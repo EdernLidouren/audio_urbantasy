@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Templeton — démo</title>
+  <style>
+    /* Masque visuellement tout en restant lu par le lecteur d'écran.
+       Motif "clip" standard. NE PAS remplacer par display:none, qui retire
+       aussi l'élément de l'arbre d'accessibilité (donc le lecteur ne le lit plus). */
+    .sr-only {
+      position: absolute;
+      width: 1px; height: 1px;
+      padding: 0; margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      clip-path: inset(50%);
+      white-space: nowrap;
+      border: 0;
+    }
+  </style>
+</head>
+<body>
+  <!-- Zone de jeu. role="application" : les flèches et touches arrivent
+       DIRECTEMENT à ton code, sans que NVDA les capte pour sa navigation.
+       Contrepartie assumée : c'est toi qui annonces tout, via les live regions
+       plus bas. tabindex="-1" la rend focusable par programme ; main.js lui
+       donnera le focus au démarrage pour que les touches y aillent. -->
+  <main id="game" role="application" aria-label="Zone de jeu Templeton" tabindex="-1">
+    <!-- Le menu et l'UI (en DOM) viendront ici. -->
+  </main>
+
+  <!-- Les deux live regions d'annonce. Vides au chargement : ton système écrit
+       dedans. "assertive" coupe la parole en cours (urgent) ; "polite" attend
+       une pause (le reste). aria-atomic="true" = relire tout le contenu à chaque
+       mise à jour, pas seulement le mot qui a changé. -->
+  <div id="announce-assertive" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
+  <div id="announce-polite" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- Howler EN PREMIER (UMD : expose les globals Howl / Howler),
+       puis ton point d'entrée en module ES. L'ordre garantit que le global
+       existe quand main.js s'exécute. -->
+  <script src="vendor/howler.min.js"></script>
+  <script type="module" src="main.js"></script>
+</body>
+</html>

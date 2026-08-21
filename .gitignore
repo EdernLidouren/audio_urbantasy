@@ -1,0 +1,23 @@
+# Outils et notes perso, a la racine, hors du jeu lui-meme
+/dev/
+
+# Python (dev-server.py et autres scripts)
+__pycache__/
+*.pyc
+
+# Cruft systeme
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Cruft editeurs
+.vscode/
+.idea/
+*.swp
+
+# Dependances npm : on n'en utilise pas (Howler est vendu dans vendor/),
+# mais on l'ignore par securite si jamais tu en ajoutes un jour.
+node_modules/
+
+# Logs et fichiers temporaires
+*.log
