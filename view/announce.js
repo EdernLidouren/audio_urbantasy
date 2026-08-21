@@ -33,9 +33,21 @@ function sanitize(text) {
 }
 
 // Réannoncer le même texte deux fois de suite ne redéclenche pas la lecture
-// tant que le contenu de la live region ne change pas. On force donc une
-// relecture en vidant la region puis en réécrivant au tick suivant.
+// tant que le contenu de la live region ne change pas. Cas normal (texte
+// différent) : écriture directe, la live region s'annonce d'elle-même au
+// changement, aucune latence ajoutée. Cas identique : on force la relecture
+// en vidant la region puis en réécrivant au tick suivant. Le vidage doit
+// passer par un macrotask (setTimeout) et non un microtask (queueMicrotask,
+// Promise.then) ni requestAnimationFrame : les microtasks se vident avant
+// la mise à jour du rendu et de l'arbre d'accessibilité, donc l'état vide
+// serait invisible du lecteur d'écran et la relecture forcée casserait en
+// silence.
 function writeWithRetrigger(region, text) {
+  if (region.textContent !== text) {
+    region.textContent = text;
+    return;
+  }
+
   region.textContent = "";
   setTimeout(() => {
     region.textContent = text;
