@@ -4,7 +4,9 @@
 // de la pile), puis charge le niveau en tâche de fond.
 
 import { pushScreen, tickActive } from "./lib/screens.js";
-import { initInput } from "./view/input.js";
+import { initInput } from "./lib/input.js";
+import { ensureAudioUnlocked } from "./lib/audio.js";
+import { preventMovementKeyScrolling } from "./view/input.js";
 import { createMainMenu } from "./view/menus/main-menu.js";
 import { makeMenuScreen } from "./view/menu.js";
 import { makeCityScreen } from "./view/city-screen.js";
@@ -23,7 +25,10 @@ console.log("Vérifs dispo : tape runMovementChecks()");
 
 const gameZone = document.getElementById("game");
 
-initInput(gameZone);
+// lib/input.js ne connaît pas l'audio : c'est ici, au point de composition,
+// qu'on branche le déverrouillage sur le tout premier appui touche.
+initInput(gameZone, { onFirstInput: ensureAudioUnlocked });
+preventMovementKeyScrolling(gameZone);
 gameZone.focus();
 
 // Niveau chargé en tâche de fond ; enterCity() le lit au moment de
