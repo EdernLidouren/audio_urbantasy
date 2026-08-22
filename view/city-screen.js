@@ -4,9 +4,9 @@
 // accesseurs fournis par main.js.
 
 import { getMoveIntent } from "./input.js";
-import { announce } from "./announce.js";
+import { announce } from "../lib/announce.js";
 import { t } from "../i18n/index.js";
-import { ensureAudioUnlocked } from "./audio.js";
+import { ensureAudioUnlocked } from "../lib/audio.js";
 import { createCityAudioScene } from "./audio/city-scene.js";
 import { tick } from "../core/actions.js";
 import { reduce } from "../core/reduce.js";

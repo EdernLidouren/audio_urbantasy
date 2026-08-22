@@ -9,9 +9,9 @@
 // title et entry.label sont des CLÉS de traduction, jamais des chaînes déjà
 // résolues : la traduction se fait ici, au moment de l'annonce.
 
-import { announce } from "./announce.js";
+import { announce } from "../lib/announce.js";
 import { t } from "../i18n/index.js";
-import { popScreen } from "./screens.js";
+import { popScreen } from "../lib/screens.js";
 
 function formatPosition(index, total) {
   return t("menu.position", { index: index + 1, total });

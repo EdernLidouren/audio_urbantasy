@@ -12,8 +12,8 @@
 //
 // Aucune règle de jeu ici, seulement de la capture d'entrée.
 
-import { handleKeyDown } from "./screens.js";
-import { ensureAudioUnlocked } from "./audio.js";
+import { handleKeyDown } from "../lib/screens.js";
+import { ensureAudioUnlocked } from "../lib/audio.js";
 
 // Déplacement : flèche gauche / q / a -> gauche ; flèche droite / d -> droite.
 const LEFT_KEYS = new Set(["ArrowLeft", "q", "a"]);

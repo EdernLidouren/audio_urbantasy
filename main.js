@@ -3,13 +3,13 @@
 // démarre la boucle à pas fixe (qui tick uniquement l'écran actif au sommet
 // de la pile), puis charge le niveau en tâche de fond.
 
-import { pushScreen, tickActive } from "./view/screens.js";
+import { pushScreen, tickActive } from "./lib/screens.js";
 import { initInput } from "./view/input.js";
 import { createMainMenu } from "./view/menus/main-menu.js";
 import { makeMenuScreen } from "./view/menu.js";
 import { makeCityScreen } from "./view/city-screen.js";
 import { runMovementChecks } from "./core/movement.check.js";
-import { startLoop } from "./view/loop.js";
+import { startLoop } from "./lib/loop.js";
 import { loadLevel } from "./level/load.js";
 import registry from "./entities/types.js";
 import { createInitialState } from "./core/state.js";

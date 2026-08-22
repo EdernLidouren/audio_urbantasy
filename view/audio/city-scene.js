@@ -7,7 +7,7 @@
 // HRTF (voir CLAUDE.md). Un passe-bas dépendant de la distance se superpose
 // au volume/pan (lointain = étouffé), sans les remplacer.
 
-import { playOneShot, createPositionedSound } from "../audio.js";
+import { playOneShot, createPositionedSound } from "../../lib/audio.js";
 import registry from "../../entities/types.js";
 import { TUNING_DEFAULTS, resolveTuning } from "../../config/tuning.js";
 

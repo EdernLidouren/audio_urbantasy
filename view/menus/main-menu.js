@@ -5,8 +5,8 @@
 // title et les labels d'entrées sont des CLÉS de traduction (jamais des
 // chaînes déjà traduites) : menu.js les résout via t() au moment de l'annonce.
 
-import { announce } from "../announce.js";
-import { pushScreen } from "../screens.js";
+import { announce } from "../../lib/announce.js";
+import { pushScreen } from "../../lib/screens.js";
 import { makeMenuScreen } from "../menu.js";
 import { t } from "../../i18n/index.js";
 import { createOptionsMenu } from "./options-menu.js";
