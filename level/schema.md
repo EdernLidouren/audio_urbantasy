@@ -21,7 +21,7 @@ parsé, sans aucune chaîne affichable en dur — uniquement des clés i18n.
 | `id`      | string | non vide, unique dans le niveau                                  |
 | `type`    | string | doit exister dans le registre `entities/types.js`                |
 | `x`       | number | dans `[0, length]`                                                |
-| `target`  | string | **requis** si `type === "door"` : id du niveau de destination     |
+| `target`  | string | **requis** si `type === "door"` : identifiant du niveau cible, prévu pour un futur chargement de niveau — non câblé aujourd'hui (aucun mécanisme ne charge encore un niveau par id) |
 | `nameKey` | string | optionnel (npc/object) : clé i18n spécifique à l'instance          |
 
 `parseLevel` normalise chaque entité en ajoutant `labelKey` :
@@ -34,12 +34,18 @@ est exposé.
 
 Donnée neutre, sans import. Un objet `{ [type]: TypeDef }` :
 
-| Champ            | Type    | Lu par | Rôle                                         |
-|------------------|---------|--------|-----------------------------------------------|
-| `label`          | string  | vue    | clé i18n du libellé par défaut du type        |
-| `sound`          | string  | vue    | chemin placeholder vers l'asset audio         |
-| `blocksMovement` | boolean | core   | l'entité empêche-t-elle le déplacement au travers ? |
-| `enterable`      | boolean | core   | l'entité déclenche-t-elle une action à l'entrée (ex. porte) ? |
+| Champ            | Type    | Lu par        | Rôle                                         |
+|------------------|---------|---------------|-----------------------------------------------|
+| `label`          | string  | vue           | clé i18n du libellé par défaut du type        |
+| `sound`          | string  | vue           | chemin placeholder vers l'asset audio         |
+| `blocksMovement` | boolean | core (prévu)  | prévu pour empêcher le déplacement au travers de l'entité |
+| `enterable`      | boolean | core (prévu)  | prévu pour déclencher une action à l'entrée (ex. porte)   |
+
+`blocksMovement` et `enterable` existent dans la donnée et sont documentés ici,
+mais **ne sont pas encore lus** : `core/reduce.js` ignore aujourd'hui les
+entités du niveau — ni collision, ni entrée en porte. Le déplacement se limite
+aux bornes `[0, length]` du niveau. Ces deux champs sont le point d'ancrage
+prévu pour cette logique, le jour où elle sera implémentée.
 
 Types de départ : `door`, `npc`, `object`.
 

@@ -1,8 +1,9 @@
 // Registre des types d'entités. Donnée neutre : aucun import, ni du core ni
-// de la vue. Le core lit blocksMovement/enterable pour la logique de
-// collision/interaction ; la vue lit sound/label pour le rendu audio et les
-// annonces. Ni l'un ni l'autre ne dépend de l'autre, seulement de ce
-// registre.
+// de la vue. blocksMovement/enterable sont PRÉVUS pour être lus par le core
+// (collision, entrée en porte) mais ne sont pas encore câblés : le
+// déplacement (core/reduce.js) ignore aujourd'hui les entités du niveau. La
+// vue lit sound/label pour le rendu audio et les annonces. Ni l'un ni
+// l'autre ne dépend de l'autre, seulement de ce registre.
 //
 // label est une CLÉ i18n (jamais une chaîne affichable directement).
 // sound est le chemin réel de l'asset audio, sous /sounds.
