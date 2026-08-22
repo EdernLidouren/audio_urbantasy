@@ -2,7 +2,8 @@
 // Fermable (Échap ou "Retour" ramènent au menu principal).
 //
 // title et les labels d'entrées sont des CLÉS de traduction (jamais des
-// chaînes déjà traduites) : menu.js les résout via t() au moment de l'annonce.
+// chaînes déjà traduites) : lib/menu.js les résout via le t reçu en
+// paramètre, au moment de l'annonce.
 
 import { announce } from "../../lib/announce.js";
 import { popScreen } from "../../lib/screens.js";

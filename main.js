@@ -8,8 +8,9 @@ import { initInput } from "./lib/input.js";
 import { ensureAudioUnlocked } from "./lib/audio.js";
 import { preventMovementKeyScrolling } from "./view/input.js";
 import { createMainMenu } from "./view/menus/main-menu.js";
-import { makeMenuScreen } from "./view/menu.js";
+import { makeMenuScreen } from "./lib/menu.js";
 import { makeCityScreen } from "./view/city-screen.js";
+import { t } from "./i18n/index.js";
 import { runMovementChecks } from "./core/movement.check.js";
 import { startLoop } from "./lib/loop.js";
 import { loadLevel } from "./level/load.js";
@@ -63,7 +64,7 @@ window.debugPlayerX = () => {
   console.log(session.player.x);
 };
 
-pushScreen(makeMenuScreen(createMainMenu(enterCity)));
+pushScreen(makeMenuScreen(createMainMenu(enterCity), t));
 startLoop(tickActive);
 
 loadLevel("./level/demo.json", registry)
