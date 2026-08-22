@@ -18,7 +18,7 @@ export const TUNING_DEFAULTS = {
   // Distance parcourue entre deux bruits de pas. Plus haut = pas plus
   // espacés (marche qui sonne plus "lente"/plus grande foulée) ; plus bas =
   // pas plus rapprochés.
-  stepDistance: 0.8,
+  stepDistance: 0.6,
 
   // Distance au-delà de laquelle une entité devient inaudible (volume 0).
   // Plus haut = on l'entend de plus loin ; plus bas = elle disparaît vite.
@@ -30,10 +30,21 @@ export const TUNING_DEFAULTS = {
   // d'un côté.
   panSaturation: 10,
 
-  // Distance en-deçà de laquelle une entité est à portée d'interaction (et
-  // de plein volume). Pas encore consommé ailleurs dans le code — posé pour
-  // une fonctionnalité à venir.
-  interactRange: 1.5,
+  // Distance en-deçà de laquelle une entité est à portée d'interaction, et
+  // donc à plein volume (voir FULL_VOLUME). Plus haut = la zone
+  // d'interaction est plus large ; plus bas = il faut être plus proche.
+  interactRange: 1.0,
+
+  // Volume à l'intérieur de interactRange : plateau plein et stable, le
+  // signal "cette entité est interactible". Ne descend jamais en dessous.
+  fullVolume: 1.0,
+
+  // Volume juste après avoir quitté interactRange (palier volontaire, pas
+  // une valeur de continuité) : marque clairement la sortie de la zone
+  // d'interaction avant de décroître doucement vers 0 à audibleRange. Plus
+  // haut = le palier est moins marqué (se rapproche de fullVolume) ; plus
+  // bas = la coupure en sortant de interactRange s'entend davantage.
+  farVolumeMax: 0.5,
 
   // Intervalle minimum (ms) entre deux bruits de pas, quelle que soit leur
   // origine (premier pas immédiat ou cadence). Anti-mitraillette sur appuis
@@ -42,6 +53,17 @@ export const TUNING_DEFAULTS = {
   // valeurs actuelles) pour rester invisible en marche normale ; plus haut
   // = pas plus espacés/étouffés sur des à-coups ; plus bas = plus permissif.
   minStepIntervalMs: 150,
+
+  // Fréquence de coupure (Hz) du passe-bas d'une entité au plus loin
+  // (dist proche de audibleRange) : plus bas = plus étouffé/sourd de loin ;
+  // plus haut = perd son effet d'éloignement (se rapproche de cutoffMax).
+  cutoffMin: 500,
+
+  // Fréquence de coupure (Hz) d'une entité proche (dist <= interactRange) :
+  // le son est clair, non filtré. 20000 Hz est au-delà de l'audible humain,
+  // donc sans effet perceptible. Plus bas = même de près, le son reste
+  // légèrement voilé.
+  cutoffMax: 20000,
 };
 
 // Résolution en cascade, du plus spécifique au plus général :
