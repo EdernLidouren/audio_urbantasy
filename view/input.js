@@ -1,17 +1,19 @@
-// Entrée clavier de la vue. Deux usages partagent la même capture : routage
-// ponctuel vers le menu (une touche = une action), et suivi des touches de
-// déplacement tenues (pour le jeu, lu à chaque tick via getMoveIntent()).
+// Entrée clavier de la vue, avec deux rôles nets :
+//  (a) CONTINU — suivi des touches de déplacement tenues. Lu à chaque tick
+//      via getMoveIntent(), par l'écran actif qui en a besoin (la ville).
+//      Ce module ne sait pas qui lit l'intention ni quand : un menu au
+//      sommet de la pile ne tick jamais, donc n'appelle jamais
+//      getMoveIntent() — le déplacement s'arrête par construction, sans
+//      condition à vérifier ici.
+//  (b) DISCRET — toute touche qui n'est pas une touche de déplacement est
+//      transmise telle quelle (l'objet KeyboardEvent complet, pour l'avenir)
+//      à screens.handleKeyDown, qui la route vers l'écran actif au sommet
+//      de la pile. Ce module ignore le contenu des écrans.
+//
 // Aucune règle de jeu ici, seulement de la capture d'entrée.
 
-import { isMenuOpen, moveCursor, activateCurrent, closeTopMenu } from "./menu.js";
-
-const MENU_KEY_HANDLERS = {
-  ArrowUp: () => moveCursor(-1),
-  ArrowDown: () => moveCursor(1),
-  Enter: () => activateCurrent(),
-  " ": () => activateCurrent(),
-  Escape: () => closeTopMenu(),
-};
+import { handleKeyDown } from "./screens.js";
+import { ensureAudioUnlocked } from "./audio.js";
 
 // Déplacement : flèche gauche / q / a -> gauche ; flèche droite / d -> droite.
 const LEFT_KEYS = new Set(["ArrowLeft", "q", "a"]);
@@ -25,26 +27,39 @@ function normalizeKey(key) {
 
 const heldMoveKeys = new Set();
 
+// Contexte audio suspendu tant qu'aucun geste utilisateur n'a eu lieu
+// (règle autoplay) : on tente le déverrouillage une seule fois, au tout
+// premier keydown, sans bloquer le traitement normal de la touche.
+let audioUnlockAttempted = false;
+
 export function initInput(target) {
   target.addEventListener("keydown", (event) => {
+    if (!audioUnlockAttempted) {
+      audioUnlockAttempted = true;
+      ensureAudioUnlocked();
+    }
+
     const key = normalizeKey(event.key);
 
     if (LEFT_KEYS.has(key) || RIGHT_KEYS.has(key)) {
+      // add() est idempotent (Set) : le déplacement est piloté par cet état,
+      // interrogé au tick, jamais par les keydown eux-mêmes — un repeat OS
+      // ne fait donc que re-confirmer un état déjà présent, sans effet. On
+      // NE sort PAS tôt ici : preventDefault doit s'appliquer à CHAQUE
+      // keydown (y compris les répétitions), sinon le défilement de page
+      // reprend une fois l'auto-repeat de l'OS enclenché.
       heldMoveKeys.add(key);
-      // Empêche le défilement de page par les flèches.
       event.preventDefault();
       return;
     }
 
-    if (!isMenuOpen()) return;
+    // Auto-repeat de l'OS sur une touche discrète (menu, etc.) : sans ce
+    // garde-fou, tenir Entrée/une flèche de menu déclencherait son action en
+    // rafale une fois le délai initial de répétition dépassé. Une pression
+    // doit rester une action ponctuelle.
+    if (event.repeat) return;
 
-    const handler = MENU_KEY_HANDLERS[event.key];
-    if (!handler) return;
-
-    // Empêche le comportement par défaut du navigateur (ex. espace qui
-    // scrolle la page) puisque role="application" nous laisse tout gérer.
-    event.preventDefault();
-    handler();
+    handleKeyDown(event);
   });
 
   target.addEventListener("keyup", (event) => {
@@ -60,11 +75,8 @@ export function initInput(target) {
 }
 
 // -1 (gauche), 0 (immobile), +1 (droite). Gauche+droite tenues ensemble
-// s'annulent. Un menu ouvert capte le clavier : l'intention est alors
-// toujours 0, le déplacement ne s'applique qu'en dehors des menus.
+// s'annulent.
 export function getMoveIntent() {
-  if (isMenuOpen()) return 0;
-
   let left = false;
   let right = false;
   for (const key of heldMoveKeys) {

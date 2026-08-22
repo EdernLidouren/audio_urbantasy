@@ -6,12 +6,17 @@
 // chaînes déjà traduites) : menu.js les résout via t() au moment de l'annonce.
 
 import { announce } from "../announce.js";
-import { openMenu } from "../menu.js";
+import { pushScreen } from "../screens.js";
+import { makeMenuScreen } from "../menu.js";
 import { t } from "../../i18n/index.js";
 import { createOptionsMenu } from "./options-menu.js";
 
+// enterCity : callback fourni par main.js (crée la session de jeu et pousse
+// l'écran ville). Ce menu ne connaît ni le niveau ni la session — il se
+// contente d'appeler ce qu'on lui donne.
+//
 // Menu racine : jamais fermable (rien en dessous vers quoi revenir).
-export function createMainMenu() {
+export function createMainMenu(enterCity) {
   return {
     title: "menu.main.title",
     closable: false,
@@ -21,8 +26,12 @@ export function createMainMenu() {
         onActivate: () => announce(t("menu.main.new_game_stub")),
       },
       {
+        label: "menu.main.city_test",
+        onActivate: () => enterCity(),
+      },
+      {
         label: "menu.main.options",
-        onActivate: () => openMenu(createOptionsMenu()),
+        onActivate: () => pushScreen(makeMenuScreen(createOptionsMenu())),
       },
     ],
   };

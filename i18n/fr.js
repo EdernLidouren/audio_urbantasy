@@ -8,6 +8,7 @@ export default {
   "menu.main.title": "Templeton",
   "menu.main.new_game": "Nouvelle partie",
   "menu.main.new_game_stub": "Nouvelle partie : pas encore implémenté.",
+  "menu.main.city_test": "Ville test",
   "menu.main.options": "Options",
 
   "menu.options.title": "Options",

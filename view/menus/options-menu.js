@@ -5,7 +5,7 @@
 // chaînes déjà traduites) : menu.js les résout via t() au moment de l'annonce.
 
 import { announce } from "../announce.js";
-import { closeTopMenu } from "../menu.js";
+import { popScreen } from "../screens.js";
 import { t } from "../../i18n/index.js";
 
 export function createOptionsMenu() {
@@ -19,7 +19,7 @@ export function createOptionsMenu() {
       },
       {
         label: "menu.options.back",
-        onActivate: () => closeTopMenu(),
+        onActivate: () => popScreen(),
       },
     ],
   };

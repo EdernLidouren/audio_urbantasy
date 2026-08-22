@@ -4,7 +4,7 @@
 // parseLevel — aucune dépendance hors des modules du core.
 
 import { parseLevel } from "./level.js";
-import { createInitialState } from "./state.js";
+import { createInitialState, MOVE_STEP } from "./state.js";
 import { tick } from "./actions.js";
 import { reduce } from "./reduce.js";
 
@@ -41,7 +41,7 @@ export function runMovementChecks() {
   state = reduce(state, tick(1));
   state = reduce(state, tick(1));
   state = reduce(state, tick(1));
-  run("3 ticks à droite depuis x=5", 6.5, state.player.x);
+  run("3 ticks à droite depuis x=5", 5 + 3 * MOVE_STEP, state.player.x);
 
   // Clamp à gauche : depuis le bord 0, un tick à gauche reste à 0.
   const leftLevel = parseLevel({ ...RAW_LEVEL, playerStart: 0 }, EMPTY_REGISTRY);
