@@ -63,4 +63,33 @@ export const TUNING_DEFAULTS = {
   // donc sans effet perceptible. Plus bas = même de près, le son reste
   // légèrement voilé.
   cutoffMax: 20000,
+
+  // Durée (s) de la réponse impulsionnelle générée du bus de réverb : la
+  // "taille" perçue du lieu. Plus haut = pièce plus grande/queue plus
+  // longue ; plus bas = espace plus petit/sec.
+  reverbDurationSec: 1.2,
+
+  // Taux de déclin (1/s) de l'enveloppe de la réponse impulsionnelle : la
+  // "matière" du lieu. Plus haut = la queue s'éteint plus vite (surfaces
+  // absorbantes) ; plus bas = elle traîne plus longtemps (pièce réverbérante).
+  reverbDecay: 2.5,
+
+  // Niveau de retour (0-1) du bus de réverb vers la sortie. VOLONTAIREMENT
+  // BAS par défaut : la réverb ne doit jamais noyer le chemin sec — pan,
+  // filtre et volume portent toute la lisibilité spatiale (localisation,
+  // distance). Plus haut = sensation d'espace plus marquée, au risque de
+  // brouiller la scène sonore ; plus bas = quasi inaudible.
+  reverbWet: 0.18,
+
+  // Part (0-1) du signal de CHAQUE voix envoyée au bus de réverb. Uniforme
+  // pour toutes les entités dans ce premier passage (pas encore de variation
+  // par distance). Plus haut = la voix nourrit davantage la réverb ; plus
+  // bas = elle reste presque entièrement sèche.
+  reverbSend: 0.5,
+
+  // Part (0-1) du bruit de pas envoyée au bus de réverb — DISTINCTE de
+  // reverbSend (les entités) : le pas est proche et centré sur l'auditeur,
+  // une valeur MODÉRÉE suffit à lui donner du corps sans noyer la cadence de
+  // marche. Plus haut = pas plus "dans la pièce" ; plus bas = pas plus secs.
+  footstepReverbSend: 0.15,
 };

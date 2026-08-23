@@ -20,6 +20,7 @@ export default {
   "entity.door": "Porte",
   "entity.npc": "Personnage",
   "entity.object": "Objet",
-  "npc.merchant": "Marchand",
-  "object.bench": "Banc",
+  "object.toolbox": "Boîte à outils",
+  "npc.passerby": "Passant",
+  "door.exit": "Porte de sortie",
 };

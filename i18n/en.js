@@ -19,6 +19,7 @@ export default {
   "entity.door": "Door",
   "entity.npc": "Character",
   "entity.object": "Object",
-  "npc.merchant": "Merchant",
-  "object.bench": "Bench",
+  "object.toolbox": "Toolbox",
+  "npc.passerby": "Passerby",
+  "door.exit": "Exit door",
 };

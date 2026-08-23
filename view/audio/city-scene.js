@@ -1,30 +1,52 @@
 // Scène audio de la ville : lit session + registre pour positionner le son
 // de chaque entité et déclencher les bruits de pas. Ne fournit que des
 // distances et des réglages à audio.js — la plomberie Web Audio (dont le
-// passe-bas) y reste entièrement.
+// passe-bas et le bus de réverb) y reste entièrement.
 //
 // Spatialisation en stereo + volume dérivés de la distance au joueur, pas en
 // HRTF (voir CLAUDE.md). Un passe-bas dépendant de la distance se superpose
-// au volume/pan (lointain = étouffé), sans les remplacer.
+// au volume/pan (lointain = étouffé), sans les remplacer. Un bus de réverb
+// PARTAGÉ (un seul pour toute la scène) se superpose en plus, discrètement,
+// pour donner un sentiment d'espace — le chemin sec (pan/filtre/volume)
+// reste la seule source de localisation et de distance. Modèle d'entité et
+// vocabulaire de sons (balise/mouvement/ponctuel) : voir entities/model.md.
 
-import { playOneShot, createPositionedSound } from "../../lib/audio.js";
+import { playOneShot, createPositionedSound, createReverbBus } from "../../lib/audio.js";
+import { announce } from "../../lib/announce.js";
 import registry from "../../entities/types.js";
+import player from "../../entities/player.js";
 import { TUNING_DEFAULTS, resolveTuning } from "../../config/tuning.js";
+import { t } from "../../i18n/index.js";
 
 // STEP_DISTANCE ne concerne aucune entité (c'est le pas du joueur) : défaut
-// global lu directement. AUDIBLE_RANGE, PAN_SATURATION et INTERACT_RANGE
-// concernent chaque entité individuellement : résolus via resolveTuning
-// (cascade instance -> type -> défaut global), voir plus bas.
+// global lu directement. AUDIBLE_RANGE, PAN_SATURATION, INTERACT_RANGE et
+// REVERB_SEND (des entités) concernent chaque entité individuellement :
+// résolus via resolveTuning (cascade son -> instance -> type -> défaut
+// global), voir plus bas.
 const STEP_DISTANCE = TUNING_DEFAULTS.stepDistance;
 // Anti-mitraillette sur le SON du pas uniquement — le déplacement, lui,
 // reste pleinement réactif à chaque tick. Nettement sous l'intervalle de
 // marche soutenue (~330ms), donc invisible en marche normale.
 const MIN_STEP_INTERVAL_MS = TUNING_DEFAULTS.minStepIntervalMs;
-const FOOTSTEP_SOUND = "sounds/footstep_concrete_walk_1.mp3";
 // Niveaux du modèle de volume par zones (voir volumeForDistance) : ce sont
 // des constantes de forme de courbe, pas des réglages par entité.
 const FULL_VOLUME = TUNING_DEFAULTS.fullVolume;
 const FAR_VOLUME_MAX = TUNING_DEFAULTS.farVolumeMax;
+
+// Réverb : propriétés du bus lui-même (un seul par scène, jamais par
+// entité), défauts globaux lus directement, pas de cascade par entité.
+const REVERB_DURATION_SEC = TUNING_DEFAULTS.reverbDurationSec;
+const REVERB_DECAY = TUNING_DEFAULTS.reverbDecay;
+const REVERB_WET = TUNING_DEFAULTS.reverbWet;
+
+// Son de déplacement du joueur (auditeur, jamais dans entities). reverbSend
+// n'a pas de niveau "type"/"instance" applicable (le joueur n'en a pas) :
+// simple repli sound -> défaut global dédié (footstepReverbSend), pas la
+// cascade générale de resolveTuning (dont le défaut global porterait sur
+// "reverbSend", la valeur des ENTITÉS — délibérément différente).
+const MOVEMENT_SOUND = player.sounds.movement;
+const FOOTSTEP_REVERB_SEND =
+  MOVEMENT_SOUND.reverbSend !== undefined ? MOVEMENT_SOUND.reverbSend : TUNING_DEFAULTS.footstepReverbSend;
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
@@ -44,8 +66,8 @@ function volumeForDistance(dist, interactRange, audibleRange) {
   const range = audibleRange - interactRange;
   if (range <= 0) return 0; // config incohérente (audibleRange <= interactRange)
 
-  const t = (dist - interactRange) / range;
-  return FAR_VOLUME_MAX * (1 - t);
+  const progress = (dist - interactRange) / range;
+  return FAR_VOLUME_MAX * (1 - progress);
 }
 
 // Fréquence de coupure du passe-bas par zones, contrairement au volume SANS
@@ -65,24 +87,79 @@ function cutoffForDistance(dist, interactRange, audibleRange, cutoffMin, cutoffM
   const range = audibleRange - interactRange;
   if (range <= 0) return cutoffMin;
 
-  const t = (dist - interactRange) / range;
-  return cutoffMax * Math.pow(cutoffMin / cutoffMax, t);
+  const progress = (dist - interactRange) / range;
+  return cutoffMax * Math.pow(cutoffMin / cutoffMax, progress);
+}
+
+// Entités dont la zone d'interaction (interactRange résolu PAR ENTITÉ, via
+// la cascade) englobe le joueur à l'instant x. Raisonne en distance
+// relative à chaque entité, jamais en position figée : fonctionne aussi si
+// une entité venait à se déplacer un jour, sans code spécial.
+function occupiedEntities(entitySounds, x) {
+  return entitySounds
+    .filter(({ entity, interactRange }) => Math.abs(entity.x - x) <= interactRange)
+    .map(({ entity }) => entity);
+}
+
+// Phrase d'annonce : noms triés par x croissant (le plus à gauche d'abord),
+// séparés par ", ". Chaque labelKey est déjà résolu par parseLevel (nameKey
+// d'instance sinon label du type) ; on ne fait que le traduire ici.
+function buildOccupancyAnnouncement(entities) {
+  return entities
+    .slice()
+    .sort((a, b) => a.x - b.x)
+    .map((entity) => t(entity.labelKey))
+    .join(", ");
+}
+
+function setsEqual(a, b) {
+  if (a.size !== b.size) return false;
+  for (const item of a) {
+    if (!b.has(item)) return false;
+  }
+  return true;
 }
 
 // getSession : accesseur (pas la session elle-même), car le core remplace
 // l'objet session à chaque tick (immutabilité) — update() doit relire l'état
 // courant à chaque appel plutôt que capturer une session figée à la création.
 export function createCityAudioScene(getSession) {
-  const entitySounds = getSession().level.entities.map((entity) => ({
-    entity,
-    sound: createPositionedSound(registry[entity.type].sound),
-    // Résolus une fois ici : statiques pour la durée de vie de la scène.
-    audibleRange: resolveTuning("audibleRange", entity),
-    panSaturation: resolveTuning("panSaturation", entity),
-    interactRange: resolveTuning("interactRange", entity),
-    cutoffMin: resolveTuning("cutoffMin", entity),
-    cutoffMax: resolveTuning("cutoffMax", entity),
-  }));
+  // Les voix positionnées d'abord : createPositionedSound crée un Howl, ce
+  // qui garantit que Howler.ctx existe (Howler le crée au tout premier
+  // `new Howl()`) avant de construire le bus de réverb juste après — lui
+  // n'a pas de retente paresseuse comme le filtre par voix, il lui faut le
+  // contexte tout de suite.
+  const entitySounds = getSession().level.entities.map((entity) => {
+    // beacon : la boucle positionnée du type (voir entities/model.md pour
+    // le vocabulaire des rôles de son).
+    const beacon = registry[entity.type].sounds.beacon;
+    return {
+      entity,
+      sound: createPositionedSound(beacon.path),
+      // Résolus une fois ici : statiques pour la durée de vie de la scène.
+      audibleRange: resolveTuning("audibleRange", entity),
+      panSaturation: resolveTuning("panSaturation", entity),
+      interactRange: resolveTuning("interactRange", entity),
+      cutoffMin: resolveTuning("cutoffMin", entity),
+      cutoffMax: resolveTuning("cutoffMax", entity),
+      // Cascade son -> instance -> type -> global : ni la balise, ni
+      // l'instance, ni le type ne définissent reverbSend aujourd'hui, donc
+      // ça retombe sur le défaut global — comportement identique à avant
+      // l'introduction du modèle de son.
+      reverbSend: resolveTuning("reverbSend", entity, beacon),
+    };
+  });
+
+  // Un seul bus de réverb pour toute la scène, jamais un par entité.
+  const reverbBus = createReverbBus({
+    durationSec: REVERB_DURATION_SEC,
+    decay: REVERB_DECAY,
+    wet: REVERB_WET,
+  });
+
+  for (const { sound, reverbSend } of entitySounds) {
+    sound.sendToReverb(reverbBus.input, reverbSend);
+  }
 
   let lastFootstepX = getSession().player.x;
   let previousX = getSession().player.x;
@@ -90,6 +167,9 @@ export function createCityAudioScene(getSession) {
   let wasMoving = false;
   // Instant (performance.now()) du dernier pas RÉELLEMENT joué.
   let lastFootstepAt = -Infinity;
+  // Ids des entités occupées (zone d'interaction englobant le joueur) au
+  // tick précédent — seule source de vérité pour détecter un changement.
+  let occupiedIds = new Set();
 
   // Point de passage unique pour tout déclenchement de pas (immédiat ou de
   // cadence) : applique le cooldown sur le son, jamais sur le déplacement.
@@ -97,7 +177,10 @@ export function createCityAudioScene(getSession) {
   function playFootstep() {
     const now = performance.now();
     if (now - lastFootstepAt < MIN_STEP_INTERVAL_MS) return;
-    playOneShot(FOOTSTEP_SOUND);
+    playOneShot(MOVEMENT_SOUND.path, {
+      reverbSend: FOOTSTEP_REVERB_SEND,
+      reverbBusInput: reverbBus.input,
+    });
     lastFootstepAt = now;
   }
 
@@ -113,6 +196,19 @@ export function createCityAudioScene(getSession) {
       sound.update(pan, volume);
       // Passe-bas : se superpose au volume/pan, ne les remplace pas.
       sound.setCutoff(cutoffForDistance(dist, interactRange, audibleRange, cutoffMin, cutoffMax));
+    }
+
+    // Occupation par diff : n'agit QUE si l'ensemble a changé depuis le
+    // tick précédent. Une nouvelle photo (assertive) coupe la précédente
+    // devenue obsolète ; l'ensemble vide ne déclenche aucune annonce, juste
+    // un réarmement silencieux pour la prochaine entrée.
+    const occupied = occupiedEntities(entitySounds, x);
+    const occupiedIdsNow = new Set(occupied.map((entity) => entity.id));
+    if (!setsEqual(occupiedIdsNow, occupiedIds)) {
+      if (occupiedIdsNow.size > 0) {
+        announce(buildOccupancyAnnouncement(occupied), { assertive: true });
+      }
+      occupiedIds = occupiedIdsNow;
     }
 
     // Pas centré, sans pan : c'est le joueur lui-même.
@@ -137,8 +233,9 @@ export function createCityAudioScene(getSession) {
 
   function destroy() {
     for (const { sound } of entitySounds) {
-      sound.stop();
+      sound.stop(); // nettoie aussi son propre envoi de réverb
     }
+    reverbBus.destroy();
   }
 
   return { update, destroy };

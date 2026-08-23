@@ -37,7 +37,7 @@ Donnée neutre, sans import. Un objet `{ [type]: TypeDef }` :
 | Champ            | Type    | Lu par        | Rôle                                         |
 |------------------|---------|---------------|-----------------------------------------------|
 | `label`          | string  | vue           | clé i18n du libellé par défaut du type        |
-| `sound`          | string  | vue           | chemin placeholder vers l'asset audio         |
+| `sounds`         | object  | vue           | descripteurs de son du type, par rôle (`{ beacon, ... }`) — voir `entities/model.md` |
 | `blocksMovement` | boolean | core (prévu)  | prévu pour empêcher le déplacement au travers de l'entité |
 | `enterable`      | boolean | core (prévu)  | prévu pour déclencher une action à l'entrée (ex. porte)   |
 
@@ -47,7 +47,10 @@ entités du niveau — ni collision, ni entrée en porte. Le déplacement se lim
 aux bornes `[0, length]` du niveau. Ces deux champs sont le point d'ancrage
 prévu pour cette logique, le jour où elle sera implémentée.
 
-Types de départ : `door`, `npc`, `object`.
+Types de départ : `door`, `npc`, `object`, `decor` (ce dernier non utilisé
+dans `demo.json`). Le modèle complet (descripteurs de son, cascade de
+réglages, sous-types comme presets, la place du joueur) est documenté dans
+`entities/model.md`.
 
 ## Exemple minimal
 
