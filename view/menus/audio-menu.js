@@ -9,7 +9,7 @@
 import { announce } from "../../lib/announce.js";
 import { popScreen } from "../../lib/screens.js";
 import { reannounceActiveMenuEntry } from "../../lib/menu.js";
-import { setMusicVolume } from "../../lib/audio.js";
+import { setGlobalVolume } from "../../lib/audio.js";
 import { t } from "../../i18n/index.js";
 import { setPref, PREF_CONSTRAINTS } from "../../config/preferences.js";
 import { refreshActiveBeaconVolumes } from "../audio/city-scene.js";
@@ -17,6 +17,7 @@ import { refreshActiveBeaconVolumes } from "../audio/city-scene.js";
 const BEACON = PREF_CONSTRAINTS.beaconVolume;
 const FOOTSTEP = PREF_CONSTRAINTS.footstepVolume;
 const MUSIC = PREF_CONSTRAINTS.musicVolume;
+const AMBIENCE = PREF_CONSTRAINTS.ambienceVolume;
 
 export function createAudioMenu() {
   // Liste séparée (pas juste inline dans entries) : réutilisée telle quelle
@@ -64,10 +65,25 @@ export function createAudioMenu() {
       bigStep: 5,
       unit: "%",
       default: MUSIC.default,
-      // Canal global (lib/audio.js), singleton indépendant de toute scène :
-      // pas besoin de passer par city-scene.js, setMusicVolume s'applique
+      // Canal global (lib/audio.js), indépendant de toute scène : pas
+      // besoin de passer par city-scene.js, setGlobalVolume s'applique
       // directement à la piste en cours (déjà en train de jouer).
-      onChange: (value) => setMusicVolume(value / 100),
+      onChange: (value) => setGlobalVolume("music", value / 100),
+    },
+    {
+      kind: "slider",
+      labelKey: "audio.ambience_volume",
+      prefKey: "ambienceVolume",
+      min: AMBIENCE.min,
+      max: AMBIENCE.max,
+      step: 1,
+      bigStep: 5,
+      unit: "%",
+      default: AMBIENCE.default,
+      // Un seul curseur pour les deux couches éventuelles du canal
+      // "ambience" (voir lib/audio.js, setGlobalVolume applique le même
+      // facteur à tous les flux du canal).
+      onChange: (value) => setGlobalVolume("ambience", value / 100),
     },
   ];
 
@@ -80,7 +96,8 @@ export function createAudioMenu() {
       setPref(slider.prefKey, slider.default);
     }
     refreshActiveBeaconVolumes();
-    setMusicVolume(MUSIC.default / 100);
+    setGlobalVolume("music", MUSIC.default / 100);
+    setGlobalVolume("ambience", AMBIENCE.default / 100);
     announce(t("menu.audio.reset_done"), { assertive: true });
     // Ré-annonce la ligne courante avec sa nouvelle valeur (le curseur est
     // resté sur "Réinitialiser", mais le principe reste générique — voir

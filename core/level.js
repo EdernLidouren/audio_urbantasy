@@ -2,6 +2,11 @@
 // DOM, aucune chaîne affichable produite (labelKey reste une clé i18n).
 // Testable en Node/console sans navigateur : voir le bas du fichier pour un
 // exemple d'invocation manuelle.
+//
+// AMBIENCE_CHANNEL_LIMIT vient d'une donnée neutre (zéro import), jamais de
+// lib/audio.js : le core ne doit jamais importer la couche Web Audio/vue.
+
+import { AMBIENCE_CHANNEL_LIMIT } from "../config/audio-channels.js";
 
 function fail(message) {
   throw new Error(`parseLevel: ${message}`);
@@ -63,7 +68,7 @@ export function parseLevel(raw, registry) {
     fail("le registre de types est manquant ou invalide.");
   }
 
-  const { id, titleKey, length, playerStart, entities, music } = raw;
+  const { id, titleKey, length, playerStart, entities, music, ambiences } = raw;
 
   if (!isNonEmptyString(id)) {
     fail(`id manquant ou invalide (reçu : ${JSON.stringify(id)}).`);
@@ -86,11 +91,22 @@ export function parseLevel(raw, registry) {
   if (music !== undefined && !isNonEmptyString(music)) {
     fail(`music doit être une chaîne non vide si présent (reçu : ${JSON.stringify(music)}).`);
   }
+  // ambiences : optionnel, tableau de 0 à AMBIENCE_CHANNEL_LIMIT chemins
+  // (voir view/audio/city-scene.js, lib/audio.js playAmbiences). Même
+  // passage simple, juste la forme est vérifiée ici — la limite elle-même
+  // vient de la source unique partagée avec lib/audio.js.
+  if (ambiences !== undefined) {
+    if (!Array.isArray(ambiences) || ambiences.length > AMBIENCE_CHANNEL_LIMIT || !ambiences.every(isNonEmptyString)) {
+      fail(
+        `ambiences doit être un tableau d'au plus ${AMBIENCE_CHANNEL_LIMIT} chaînes non vides si présent (reçu : ${JSON.stringify(ambiences)}).`
+      );
+    }
+  }
 
   const seenIds = new Set();
   const parsedEntities = entities.map((rawEntity, index) =>
     parseEntity(rawEntity, index, registry, length, seenIds)
   );
 
-  return { id, titleKey, length, playerStart, entities: parsedEntities, music };
+  return { id, titleKey, length, playerStart, entities: parsedEntities, music, ambiences };
 }

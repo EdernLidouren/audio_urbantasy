@@ -14,6 +14,7 @@ parsé, sans aucune chaîne affichable en dur — uniquement des clés i18n.
 | `playerStart` | number   | dans `[0, length]` — position x de départ         |
 | `entities`    | Entity[] | voir ci-dessous                                   |
 | `music`       | string   | optionnel : chemin vers la musique du lieu (`assets/musics/...`), canal global non spatialisé — voir `view/audio/city-scene.js` |
+| `ambiences`   | string[] | optionnel : 0 à 2 chemins d'ambiance (`assets/ambiances/...`), canal global non spatialisé, jusqu'à deux couches simultanées — voir `view/audio/city-scene.js` |
 
 ## Entité
 

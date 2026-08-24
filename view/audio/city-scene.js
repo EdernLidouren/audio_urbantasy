@@ -11,7 +11,15 @@
 // reste la seule source de localisation et de distance. Modèle d'entité et
 // vocabulaire de sons (balise/mouvement/ponctuel) : voir entities/model.md.
 
-import { playOneShot, createPositionedSound, createReverbBus, playMusic, stopMusic, setMusicVolume } from "../../lib/audio.js";
+import {
+  playOneShot,
+  createPositionedSound,
+  createReverbBus,
+  playGlobal,
+  playAmbiences,
+  stopGlobal,
+  setGlobalVolume,
+} from "../../lib/audio.js";
 import { announce } from "../../lib/announce.js";
 import registry from "../../entities/types.js";
 import player from "../../entities/player.js";
@@ -35,6 +43,9 @@ function footstepVolumeFactor() {
 }
 function musicVolumeFactor() {
   return getPref("musicVolume", PREF_CONSTRAINTS.musicVolume.default) / 100;
+}
+function ambienceVolumeFactor() {
+  return getPref("ambienceVolume", PREF_CONSTRAINTS.ambienceVolume.default) / 100;
 }
 
 // STEP_DISTANCE ne concerne aucune entité (c'est le pas du joueur) : défaut
@@ -185,13 +196,21 @@ export function createCityAudioScene(getSession) {
     sound.sendToReverb(reverbBus.input, reverbSend);
   }
 
-  // Musique du lieu : canal GLOBAL non spatialisé (aucun pan/filtre/réverb,
-  // voir lib/audio.js), propriété du niveau, pas d'une entité — optionnelle,
-  // un niveau sans champ music ne joue simplement rien.
+  // Musique et ambiances du lieu : canaux GLOBAUX non spatialisés (aucun
+  // pan/filtre/réverb, voir lib/audio.js), propriété du niveau, pas d'une
+  // entité — optionnels, un niveau sans champ music/ambiences ne joue
+  // simplement rien sur le canal correspondant. Ambiances : jusqu'à deux
+  // couches simultanées, un seul curseur de volume pour les deux.
   const music = getSession().level.music;
   if (music) {
-    playMusic(music);
-    setMusicVolume(musicVolumeFactor());
+    playGlobal("music", music);
+    setGlobalVolume("music", musicVolumeFactor());
+  }
+
+  const ambiences = getSession().level.ambiences;
+  if (ambiences && ambiences.length > 0) {
+    playAmbiences(ambiences);
+    setGlobalVolume("ambience", ambienceVolumeFactor());
   }
 
   let lastFootstepX = getSession().player.x;
@@ -292,8 +311,9 @@ export function createCityAudioScene(getSession) {
     reverbBus.destroy();
     // Sortie RÉELLE de la scène uniquement (voir view/city-screen.js,
     // onExit) : un menu/pause empilé par-dessus n'appelle jamais destroy(),
-    // donc n'arrête jamais la musique — seule la vraie sortie le fait.
-    stopMusic();
+    // donc n'arrête jamais musique/ambiances — seule la vraie sortie le fait.
+    stopGlobal("music");
+    stopGlobal("ambience");
     if (activeScene === api) activeScene = null;
   }
 
@@ -312,13 +332,13 @@ export function createCityAudioScene(getSession) {
 
   // Pause/reprise SÉLECTIVE : uniquement les balises positionnées des
   // entités (pas le bus de réverb, qui ne fait que traiter un signal — sans
-  // signal entrant il est déjà silencieux — et pas la musique, canal global
-  // non spatialisé, qui n'est pas une "voix de la scène" — voir lib/audio.js
-  // playMusic/stopMusic). Utilisé par les menus qui se superposent au jeu
-  // (désambiguïsation, pause — voir view/interaction.js,
-  // view/menus/pause-menu.js) pour dégager le canal positionné pendant
-  // qu'ils sont ouverts, sans toucher au contexte audio global ni à la
-  // musique, qui continue derrière eux.
+  // signal entrant il est déjà silencieux — et pas musique/ambiances,
+  // canaux globaux non spatialisés, qui ne sont pas des "voix de la scène"
+  // — voir lib/audio.js playGlobal/stopGlobal). Utilisé par les menus qui
+  // se superposent au jeu (désambiguïsation, pause — voir
+  // view/interaction.js, view/menus/pause-menu.js) pour dégager le canal
+  // positionné pendant qu'ils sont ouverts, sans toucher au contexte audio
+  // global ni à la musique/aux ambiances, qui continuent derrière eux.
   function pauseBeacons() {
     for (const { sound } of entitySounds) {
       sound.pause();

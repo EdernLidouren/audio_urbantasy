@@ -10,7 +10,7 @@
 import { announce } from "../../lib/announce.js";
 import { pushScreen, popScreen } from "../../lib/screens.js";
 import { makeMenuScreen, reannounceActiveMenuEntry } from "../../lib/menu.js";
-import { setMusicVolume } from "../../lib/audio.js";
+import { setGlobalVolume } from "../../lib/audio.js";
 import { t } from "../../i18n/index.js";
 import { getPref, resetAllPrefs, exportPreferences, importPreferences, PREF_CONSTRAINTS } from "../../config/preferences.js";
 import { refreshActiveBeaconVolumes } from "../audio/city-scene.js";
@@ -43,15 +43,16 @@ function ensureFileInput() {
     announce(t(result.success ? "menu.options.import_success" : "menu.options.import_failure"), { assertive: true });
 
     // Effet temps réel si une scène ville est active (comportement
-    // fonctionnel inchangé par ce déplacement). setMusicVolume : la musique
-    // est un canal global déjà en train de jouer, indépendant d'une scène —
-    // relit la valeur importée (ou son défaut si absente du fichier).
+    // fonctionnel inchangé par ce déplacement). Musique/ambiance sont des
+    // canaux globaux déjà en train de jouer, indépendants d'une scène —
+    // relit les valeurs importées (ou leurs défauts si absentes du fichier).
     // Ré-annonce GÉNÉRIQUE de la ligne courante, quel que soit le menu actif
     // — plus d'hypothèse "on est dans Audio" : les sliders relisent getPref
     // à la volée, il n'y a donc rien de spécifique à rafraîchir s'ils sont
     // affichés plus tard.
     refreshActiveBeaconVolumes();
-    setMusicVolume(getPref("musicVolume", PREF_CONSTRAINTS.musicVolume.default) / 100);
+    setGlobalVolume("music", getPref("musicVolume", PREF_CONSTRAINTS.musicVolume.default) / 100);
+    setGlobalVolume("ambience", getPref("ambienceVolume", PREF_CONSTRAINTS.ambienceVolume.default) / 100);
     reannounceActiveMenuEntry();
   });
 
@@ -79,7 +80,8 @@ function openResetAllConfirmation() {
           popScreen();
           resetAllPrefs();
           refreshActiveBeaconVolumes();
-          setMusicVolume(PREF_CONSTRAINTS.musicVolume.default / 100);
+          setGlobalVolume("music", PREF_CONSTRAINTS.musicVolume.default / 100);
+          setGlobalVolume("ambience", PREF_CONSTRAINTS.ambienceVolume.default / 100);
           announce(t("menu.options.reset_all_done"), { assertive: true });
           reannounceActiveMenuEntry();
         },

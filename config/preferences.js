@@ -22,6 +22,9 @@ export const PREF_CONSTRAINTS = {
   beaconVolume: { type: "number", min: 0, max: 100, default: 50 },
   footstepVolume: { type: "number", min: 0, max: 100, default: 50 },
   musicVolume: { type: "number", min: 0, max: 100, default: 50 },
+  // Plus bas que la musique par défaut : une ambiance est un fond, pas un
+  // second plan musical.
+  ambienceVolume: { type: "number", min: 0, max: 100, default: 35 },
   // Comportement générique des menus (lib/menu.js), pas un réglage audio :
   // cyclage haut/bas, étoile de repli pour braille/sans-son, suffixe de
   // position ("x sur y"). Défauts choisis pour ne rien changer au
