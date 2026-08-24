@@ -11,6 +11,6 @@
 
 export default {
   sounds: {
-    movement: { path: "sounds/footstep_concrete_walk_1.mp3", loop: false },
+    movement: { path: "assets/sounds/footstep_concrete_walk_1.mp3", loop: false },
   },
 };

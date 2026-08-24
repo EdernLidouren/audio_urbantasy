@@ -35,7 +35,7 @@ export default {
     label: "entity.door",
     descriptionKey: "entity.door.description",
     sounds: {
-      beacon: { path: "sounds/door_1.mp3", loop: true },
+      beacon: { path: "assets/sounds/door_1.mp3", loop: true },
     },
     blocksMovement: false,
     enterable: true,
@@ -44,7 +44,7 @@ export default {
     label: "entity.npc",
     descriptionKey: "entity.npc.description",
     sounds: {
-      beacon: { path: "sounds/tictoc_1.mp3", loop: true },
+      beacon: { path: "assets/sounds/tictoc_1.mp3", loop: true },
     },
     blocksMovement: true,
     enterable: false,
@@ -53,7 +53,7 @@ export default {
     label: "entity.object",
     descriptionKey: "entity.object.description",
     sounds: {
-      beacon: { path: "sounds/box_of_nails_1.mp3", loop: true },
+      beacon: { path: "assets/sounds/box_of_nails_1.mp3", loop: true },
     },
     blocksMovement: true,
     enterable: false,
@@ -64,7 +64,7 @@ export default {
   decor: {
     label: "entity.decor",
     sounds: {
-      beacon: { path: "sounds/box_of_nails_1.mp3", loop: true },
+      beacon: { path: "assets/sounds/box_of_nails_1.mp3", loop: true },
     },
     blocksMovement: true,
     enterable: false,
