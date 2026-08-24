@@ -58,6 +58,65 @@ export function runMovementChecks() {
   const after = reduce(before, { type: "UNKNOWN" });
   run("action inconnue renvoie la même référence", before, after);
 
+  // --- Errance (behavior wander) : PRNG seedé, déterminisme ---
+
+  const WANDER_REGISTRY = { dog: { label: "entity.dog" } };
+
+  function makeWanderLevel(overrides = {}) {
+    return {
+      id: "movement-check-wander",
+      titleKey: "level.demo.title",
+      length: 10,
+      playerStart: 5,
+      entities: [
+        { id: "wander-1", type: "dog", x: 5, behavior: { kind: "wander", speed: 0.5, turnChance: 0.3 } },
+      ],
+      ...overrides,
+    };
+  }
+
+  function runTicks(startState, count) {
+    const positions = [];
+    let current = startState;
+    for (let i = 0; i < count; i++) {
+      current = reduce(current, tick(0));
+      positions.push(current.level.entities[0].x);
+    }
+    return { state: current, positions };
+  }
+
+  const wanderLevel = parseLevel(makeWanderLevel(), WANDER_REGISTRY);
+
+  // Même seed, même suite de ticks -> trajectoire identique à chaque tick,
+  // pas seulement au final.
+  const run1 = runTicks(createInitialState(wanderLevel, 42), 50);
+  const run2 = runTicks(createInitialState(wanderLevel, 42), 50);
+  run(
+    "errance : trajectoire reproductible (même seed)",
+    JSON.stringify(run1.positions),
+    JSON.stringify(run2.positions)
+  );
+
+  // Toujours dans les bornes du niveau, à chaque tick de la trajectoire.
+  const allInBounds = run1.positions.every((x) => x >= 0 && x <= wanderLevel.length);
+  run("errance : position toujours dans [0, length]", true, allInBounds);
+
+  // Demi-tour à la borne : niveau très court, turnChance à 0 pour une
+  // trajectoire prévisible (seul le rebond de bord entre en jeu).
+  const tightLevel = parseLevel(
+    makeWanderLevel({
+      length: 1,
+      playerStart: 0,
+      entities: [{ id: "wander-1", type: "dog", x: 0.9, behavior: { kind: "wander", speed: 0.5, turnChance: 0 } }],
+    }),
+    WANDER_REGISTRY
+  );
+  let boundaryState = createInitialState(tightLevel, 7);
+  boundaryState = reduce(boundaryState, tick(0)); // 0.9 + 0.5 = 1.4 -> bornée à length, direction inversée
+  run("errance : position bornée à length après dépassement", tightLevel.length, boundaryState.level.entities[0].x);
+  boundaryState = reduce(boundaryState, tick(0)); // direction -1 désormais : 1 - 0.5 = 0.5, repart vers l'intérieur
+  run("errance : demi-tour effectif (repart vers l'intérieur)", 0.5, boundaryState.level.entities[0].x);
+
   console.log(`Récapitulatif : ${passed} réussis / ${total} total`);
   return { passed, total };
 }

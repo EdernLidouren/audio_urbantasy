@@ -1,7 +1,8 @@
 // Registre des types d'entités. Donnée neutre : aucun import, ni du core ni
 // de la vue. blocksMovement/enterable sont PRÉVUS pour être lus par le core
 // (collision, entrée en porte) mais ne sont pas encore câblés : le
-// déplacement (core/reduce.js) ignore aujourd'hui les entités du niveau. La
+// déplacement au tick (core/reduce.js) sait avancer une entité dotée d'un
+// `behavior` (voir level/*.json), mais aucune collision n'existe encore. La
 // vue lit sounds/label pour le rendu audio et les annonces. Ni l'un ni
 // l'autre ne dépend de l'autre, seulement de ce registre.
 //
@@ -56,6 +57,19 @@ export default {
       beacon: { path: "assets/sounds/box_of_nails_1.mp3", loop: true },
     },
     blocksMovement: true,
+    enterable: false,
+  },
+  // Premier type doté d'un `behavior` en jeu (voir level/demo.json) : une
+  // entité "dog" avec behavior:{kind:"wander"} se déplace au fil des ticks
+  // (core/reduce.js). Son provisoire, sans rapport avec le comportement —
+  // le son propre au chien n'est pas le sujet de cette étape.
+  dog: {
+    label: "entity.dog",
+    descriptionKey: "entity.dog.description",
+    sounds: {
+      beacon: { path: "assets/sounds/box_of_nails_1.mp3", loop: true },
+    },
+    blocksMovement: false,
     enterable: false,
   },
   // Preset d'exemple, non utilisé dans demo.json : positionné et purement

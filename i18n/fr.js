@@ -54,6 +54,8 @@ export default {
   "entity.npc.description": "Un personnage.",
   "entity.object": "Objet",
   "entity.object.description": "Un objet.",
+  "entity.dog": "Chien",
+  "entity.dog.description": "Un chien qui erre dans les environs.",
   "object.toolbox": "Boîte à outils",
   "object.toolbox.description": "Une boîte à outils métallique. Elle semble fouillable.",
   "npc.passerby": "Passant",

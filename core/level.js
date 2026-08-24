@@ -25,7 +25,7 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
     fail(`entities[${index}] n'est pas un objet.`);
   }
 
-  const { id, type, x, target, nameKey, descriptionKey } = rawEntity;
+  const { id, type, x, target, nameKey, descriptionKey, behavior } = rawEntity;
 
   if (!isNonEmptyString(id)) {
     fail(`entities[${index}].id manquant ou invalide.`);
@@ -57,7 +57,38 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
     entity.target = target;
   }
 
+  // behavior : optionnel, donnée (pas une classe) décrivant un comportement
+  // de mouvement au tick (voir core/reduce.js). Sans behavior, une entité
+  // reste immobile — comportement inchangé pour tout le contenu existant.
+  if (behavior !== undefined) {
+    entity.behavior = parseBehavior(behavior, index, id);
+  }
+
   return entity;
+}
+
+function parseBehavior(behavior, index, id) {
+  if (typeof behavior !== "object" || behavior === null) {
+    fail(`entities[${index}] ("${id}") : behavior doit être un objet si présent.`);
+  }
+
+  const { kind, speed, turnChance } = behavior;
+  if (kind !== "wander") {
+    fail(`entities[${index}] ("${id}") : behavior.kind "${kind}" inconnu (seul "wander" existe pour l'instant).`);
+  }
+  if (speed !== undefined && (!isFiniteNumber(speed) || speed <= 0)) {
+    fail(`entities[${index}] ("${id}") : behavior.speed doit être un nombre > 0 si présent.`);
+  }
+  if (turnChance !== undefined && (!isFiniteNumber(turnChance) || turnChance < 0 || turnChance > 1)) {
+    fail(`entities[${index}] ("${id}") : behavior.turnChance doit être dans [0, 1] si présent.`);
+  }
+
+  // Défauts "raisonnables" appliqués à la CONSOMMATION (core/reduce.js), pas
+  // ici : parseLevel ne fait que valider et passer ce qui est fourni.
+  const parsed = { kind };
+  if (speed !== undefined) parsed.speed = speed;
+  if (turnChance !== undefined) parsed.turnChance = turnChance;
+  return parsed;
 }
 
 export function parseLevel(raw, registry) {

@@ -21,6 +21,7 @@ import {
   setGlobalVolume,
 } from "../../lib/audio.js";
 import { announce } from "../../lib/announce.js";
+import { resolveAsset } from "../../lib/assets.js";
 import registry from "../../entities/types.js";
 import player from "../../entities/player.js";
 import { TUNING_DEFAULTS, resolveTuning } from "../../config/tuning.js";
@@ -126,16 +127,18 @@ function cutoffForDistance(dist, interactRange, audibleRange, cutoffMin, cutoffM
 
 // Entités dont la zone d'interaction (interactRange résolu PAR ENTITÉ, via
 // la cascade) englobe le joueur à l'instant x, triées par x croissant (le
-// plus à gauche d'abord). Raisonne en distance relative à chaque entité,
-// jamais en position figée : fonctionne aussi si une entité venait à se
-// déplacer un jour, sans code spécial. Le tri est fait ici une seule fois :
-// consommé aussi bien par l'annonce d'occupation que par la résolution de
-// cible d'interaction (chooseInteractionTarget, view/interaction.js), qui
-// doivent voir exactement le même ensemble dans le même ordre.
-function occupiedEntities(entitySounds, x) {
+// plus à gauche d'abord). entitySounds porte la config STATIQUE par entité
+// (interactRange...), résolue une fois à la création de la scène ; liveById
+// porte la position COURANTE (x change au tick pour une entité "wander",
+// voir core/reduce.js) — jointes ici par id, jamais une entité figée à sa
+// position de spawn. Le tri est fait ici une seule fois : consommé aussi
+// bien par l'annonce d'occupation que par la résolution de cible
+// d'interaction (chooseInteractionTarget, view/interaction.js), qui doivent
+// voir exactement le même ensemble dans le même ordre.
+function occupiedEntities(entitySounds, liveById, x) {
   return entitySounds
-    .filter(({ entity, interactRange }) => Math.abs(entity.x - x) <= interactRange)
-    .map(({ entity }) => entity)
+    .filter(({ entity, interactRange }) => Math.abs(liveById.get(entity.id).x - x) <= interactRange)
+    .map(({ entity }) => liveById.get(entity.id))
     .sort((a, b) => a.x - b.x);
 }
 
@@ -173,7 +176,10 @@ export function createCityAudioScene(getSession) {
     const beacon = registry[entity.type].sounds.beacon;
     return {
       entity,
-      sound: createPositionedSound(beacon.path),
+      // Résolu une fois ici (balise = boucle persistante, pas de nouveau
+      // tirage à chaque tick) : beacon.path peut être un pool, un membre
+      // précis, ou un chemin direct — resolveAsset gère les trois.
+      sound: createPositionedSound(resolveAsset(beacon.path)),
       // Résolus une fois ici : statiques pour la durée de vie de la scène.
       audibleRange: resolveTuning("audibleRange", entity),
       panSaturation: resolveTuning("panSaturation", entity),
@@ -208,15 +214,18 @@ export function createCityAudioScene(getSession) {
   // entité — optionnels, un niveau sans champ music/ambiences ne joue
   // simplement rien sur le canal correspondant. Ambiances : jusqu'à deux
   // couches simultanées, un seul curseur de volume pour les deux.
+  // level.music/.ambiences peuvent être un pool, un membre précis, ou un
+  // chemin direct — resolveAsset() gère les trois, résolu une fois ici (pas
+  // un nouveau tirage par tick, la musique/ambiance ne se retire pas).
   const music = level.music;
   if (music) {
-    playGlobal("music", music);
+    playGlobal("music", resolveAsset(music));
     setGlobalVolume("music", musicVolumeFactor());
   }
 
   const ambiences = level.ambiences;
   if (ambiences && ambiences.length > 0) {
-    playAmbiences(ambiences);
+    playAmbiences(ambiences.map(resolveAsset));
     setGlobalVolume("ambience", ambienceVolumeFactor());
   }
 
@@ -241,7 +250,11 @@ export function createCityAudioScene(getSession) {
   function playFootstep() {
     const now = performance.now();
     if (now - lastFootstepAt < MIN_STEP_INTERVAL_MS) return;
-    playOneShot(MOVEMENT_SOUND.path, {
+    // Résolu à CHAQUE pas (pas une fois pour la scène) : si
+    // MOVEMENT_SOUND.path est un pool, chaque pas peut tirer un fichier
+    // différent (variété), contrairement à une balise (boucle persistante,
+    // résolue une seule fois à la création).
+    playOneShot(resolveAsset(MOVEMENT_SOUND.path), {
       reverbSend: FOOTSTEP_REVERB_SEND,
       reverbBusInput: reverbBus.input,
       volume: footstepVolumeFactor(),
@@ -255,10 +268,20 @@ export function createCityAudioScene(getSession) {
   // immédiatement sur les balises DÉJÀ en train de jouer, même quand le tick
   // de la ville est arrêté (un menu au sommet de la pile, ex. Options >
   // Audio — voir CLAUDE.md sur le routage par pile d'écrans).
+  // entitySounds fige entity à la création de la scène (config statique) ;
+  // une entité "wander" (core/reduce.js) déplace sa position à CHAQUE tick,
+  // donc la position réelle doit être relue ici depuis la session courante,
+  // jamais depuis la référence figée — sinon la balise sonne juste, mais
+  // reste plantée à son point de spawn.
+  function liveEntitiesById() {
+    return new Map(getSession().level.entities.map((entity) => [entity.id, entity]));
+  }
+
   function applyEntityAudio(x) {
     const beaconFactor = beaconVolumeFactor();
+    const liveById = liveEntitiesById();
     for (const { entity, sound, audibleRange, panSaturation, interactRange, cutoffMin, cutoffMax } of entitySounds) {
-      const relX = entity.x - x;
+      const relX = liveById.get(entity.id).x - x;
       const dist = Math.abs(relX);
       // Pan inchangé : toujours dérivé de panSaturation, indépendant du volume.
       const pan = clamp(relX / panSaturation, -1, 1);
@@ -281,7 +304,7 @@ export function createCityAudioScene(getSession) {
     // imposé ici : on laisse le canal par défaut du module (liveRegion,
     // ariaNotify expérimental via setAnnounceChannel) décider, pour comparer
     // les deux sur exactement le même déclenchement.
-    const occupied = occupiedEntities(entitySounds, x);
+    const occupied = occupiedEntities(entitySounds, liveEntitiesById(), x);
     currentOccupied = occupied;
     const occupiedIdsNow = new Set(occupied.map((entity) => entity.id));
     if (!setsEqual(occupiedIdsNow, occupiedIds)) {

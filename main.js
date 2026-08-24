@@ -17,6 +17,7 @@ import { loadLevel } from "./level/load.js";
 import registry from "./entities/types.js";
 import { createInitialState } from "./core/state.js";
 import { getPref, setPref } from "./config/preferences.js";
+import { configureAssetManifest } from "./lib/assets.js";
 
 // Préférences de menu (sliders/toggles + cyclage/étoile/suffixe, voir
 // lib/menu.js) injectées UNE FOIS ici, point de composition unique — tout
@@ -80,4 +81,23 @@ loadLevel("./level/demo.json", registry)
   })
   .catch((error) => {
     console.error(error.message);
+  });
+
+// Manifeste des pools d'assets audio (voir tools/build_audio_manifest.py),
+// chargé UNE FOIS ici et injecté dans lib/assets.js — resolveAsset() ne
+// relit jamais le disque. Échec (réseau, JSON invalide, fichier absent) :
+// signalé clairement, jamais silencieux — mais ne bloque pas le reste du
+// jeu, exactement comme le chargement du niveau ci-dessus.
+fetch("assets/manifest.json")
+  .then((response) => {
+    if (!response.ok) {
+      throw new Error(`réponse HTTP ${response.status}`);
+    }
+    return response.json();
+  })
+  .then((manifest) => {
+    configureAssetManifest(manifest);
+  })
+  .catch((error) => {
+    console.error(`Impossible de charger assets/manifest.json : ${error.message}`);
   });

@@ -1,0 +1,26 @@
+{
+  "assets/ambiances/traffic_street_afternoon": [
+    "assets/ambiances/traffic_street_afternoon_1.mp3"
+  ],
+  "assets/ambiances/wind_medium": [
+    "assets/ambiances/wind_medium_1.mp3"
+  ],
+  "assets/musics/a_warm_night_in_harlem": [
+    "assets/musics/a_warm_night_in_harlem.mp3"
+  ],
+  "assets/musics/indigo_glow": [
+    "assets/musics/indigo_glow.mp3"
+  ],
+  "assets/sounds/box_of_nails": [
+    "assets/sounds/box_of_nails_1.mp3"
+  ],
+  "assets/sounds/door": [
+    "assets/sounds/door_1.mp3"
+  ],
+  "assets/sounds/footstep_concrete_walk": [
+    "assets/sounds/footstep_concrete_walk_1.mp3"
+  ],
+  "assets/sounds/tictoc": [
+    "assets/sounds/tictoc_1.mp3"
+  ]
+}
