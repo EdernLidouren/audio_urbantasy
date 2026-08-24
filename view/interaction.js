@@ -6,22 +6,8 @@
 
 import { announce } from "../lib/announce.js";
 import { t } from "../i18n/index.js";
-import { pushScreen, popScreen } from "../lib/screens.js";
+import { pushScreen, popScreen, composeHook } from "../lib/screens.js";
 import { makeMenuScreen } from "../lib/menu.js";
-
-// Principe général : un écran qui en enveloppe un autre (ex. ajoute un
-// effet de bord à l'ouverture/fermeture d'un menu) ne doit JAMAIS écraser
-// silencieusement un hook de cycle de vie existant (onEnter, onExit, ...) —
-// il compose : l'ancien comportement d'abord, puis le sien. Écraser ferait
-// perdre en silence ce que l'écran de base fait déjà (ici, l'annonce
-// d'ouverture du menu), et casserait sans avertissement si l'écran de base
-// évoluait plus tard pour ajouter un hook aujourd'hui absent (ex. onExit).
-function composeHook(baseHook, extra) {
-  return () => {
-    if (typeof baseHook === "function") baseHook();
-    extra();
-  };
-}
 
 // kind ∈ { "describe", "activate" }.
 export function interact(entity, kind) {

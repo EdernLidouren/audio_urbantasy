@@ -13,6 +13,11 @@ export default {
 
   "menu.interaction.title": "Interagir",
 
+  "menu.pause.title": "Pause",
+  "menu.pause.options": "Options",
+  "menu.pause.main_menu": "Retour au menu principal",
+  "menu.pause.resume": "Retour au jeu",
+
   "menu.options.title": "Options",
   "menu.options.audio": "Audio",
   "menu.options.export": "Exporter les préférences",
