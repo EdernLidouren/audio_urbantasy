@@ -4,6 +4,8 @@
 
 export default {
   "menu.position": "{index} sur {total}",
+  "menu.toggle.yes": "Oui",
+  "menu.toggle.no": "Non",
 
   "menu.main.title": "Templeton",
   "menu.main.new_game": "Nouvelle partie",
@@ -20,6 +22,7 @@ export default {
 
   "menu.options.title": "Options",
   "menu.options.audio": "Audio",
+  "menu.options.navigation": "Navigation",
   "menu.options.export": "Exporter les préférences",
   "menu.options.import": "Importer les préférences",
   "menu.options.import_success": "Préférences importées.",
@@ -37,6 +40,11 @@ export default {
   "audio.music_volume": "Volume de la musique",
   "menu.audio.reset": "Réinitialiser aux valeurs par défaut",
   "menu.audio.reset_done": "Réglages audio réinitialisés.",
+
+  "menu.navigation.title": "Navigation",
+  "menu.navigation.cycling": "Cyclage des menus",
+  "menu.navigation.star_prefix": "Préfixage des annonces par une étoile",
+  "menu.navigation.index_suffix": "Annoncer la position (« 1 sur 2 »)",
 
   "level.demo.title": "Niveau de démo",
   "entity.door": "Porte",

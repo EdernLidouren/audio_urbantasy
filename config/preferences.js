@@ -13,14 +13,24 @@ const STORAGE_KEY = "templeton-preferences";
 const PREFS_VERSION = 1;
 
 // Contraintes par prefKey — SOURCE UNIQUE partagée entre la validation de
-// persistance (ci-dessous) et les sliders qui les consomment (voir
-// view/menus/audio-menu.js, qui lit min/max/default d'ici plutôt que de les
+// persistance (ci-dessous) et les sliders/toggles qui les consomment (voir
+// view/menus/*.js, qui lisent min/max/default d'ici plutôt que de les
 // redéfinir) : jamais deux définitions divergentes des bornes d'une même
-// préférence.
+// préférence. type ∈ "number" (borné [min,max]) | "boolean" (bornes non
+// pertinentes, ignorées par isValidPrefValue).
 export const PREF_CONSTRAINTS = {
   beaconVolume: { type: "number", min: 0, max: 100, default: 50 },
   footstepVolume: { type: "number", min: 0, max: 100, default: 50 },
   musicVolume: { type: "number", min: 0, max: 100, default: 50 },
+  // Comportement générique des menus (lib/menu.js), pas un réglage audio :
+  // cyclage haut/bas, étoile de repli pour braille/sans-son, suffixe de
+  // position ("x sur y"). Défauts choisis pour ne rien changer au
+  // comportement déjà en place (cyclage désactivé, étoile et suffixe déjà
+  // de facto présents) sauf le cyclage, nouvelle mécanique désactivée tant
+  // que l'utilisateur ne l'active pas explicitement.
+  menuCycling: { type: "boolean", default: false },
+  menuStarPrefix: { type: "boolean", default: true },
+  menuIndexSuffix: { type: "boolean", default: true },
 };
 
 const store = new Map();

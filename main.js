@@ -8,7 +8,7 @@ import { initInput } from "./lib/input.js";
 import { ensureAudioUnlocked } from "./lib/audio.js";
 import { preventMovementKeyScrolling } from "./view/input.js";
 import { createMainMenu } from "./view/menus/main-menu.js";
-import { makeMenuScreen } from "./lib/menu.js";
+import { makeMenuScreen, configureMenuPreferences } from "./lib/menu.js";
 import { makeCityScreen } from "./view/city-screen.js";
 import { t } from "./i18n/index.js";
 import { runMovementChecks } from "./core/movement.check.js";
@@ -16,6 +16,13 @@ import { startLoop } from "./lib/loop.js";
 import { loadLevel } from "./level/load.js";
 import registry from "./entities/types.js";
 import { createInitialState } from "./core/state.js";
+import { getPref, setPref } from "./config/preferences.js";
+
+// Préférences de menu (sliders/toggles + cyclage/étoile/suffixe, voir
+// lib/menu.js) injectées UNE FOIS ici, point de composition unique — tout
+// écran-menu construit ensuite (makeMenuScreen(menu, t)) en hérite sans
+// avoir à les repasser.
+configureMenuPreferences({ getPref, setPref });
 
 // Un import n'expose rien au scope global : on l'attache explicitement à
 // window pour pouvoir appeler runMovementChecks() depuis la console. Un

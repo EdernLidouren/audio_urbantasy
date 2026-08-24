@@ -12,9 +12,10 @@ import { pushScreen, popScreen } from "../../lib/screens.js";
 import { makeMenuScreen, reannounceActiveMenuEntry } from "../../lib/menu.js";
 import { setMusicVolume } from "../../lib/audio.js";
 import { t } from "../../i18n/index.js";
-import { getPref, setPref, resetAllPrefs, exportPreferences, importPreferences, PREF_CONSTRAINTS } from "../../config/preferences.js";
+import { getPref, resetAllPrefs, exportPreferences, importPreferences, PREF_CONSTRAINTS } from "../../config/preferences.js";
 import { refreshActiveBeaconVolumes } from "../audio/city-scene.js";
 import { createAudioMenu } from "./audio-menu.js";
+import { createNavigationMenu } from "./navigation-menu.js";
 
 // Input file caché, créé UNE SEULE FOIS (pas à chaque ouverture du menu :
 // createOptionsMenu() est appelée à chaque fois) — pont vers le sélecteur
@@ -95,10 +96,14 @@ export function createOptionsMenu() {
     entries: [
       {
         label: "menu.options.audio",
-        // getPref/setPref injectés ici (pas importés par lib/menu.js lui-
-        // même) : le sous-menu Audio a des sliders, celui-ci non, donc lui
-        // n'en a pas besoin.
-        onActivate: () => pushScreen(makeMenuScreen(createAudioMenu(), t, { getPref, setPref })),
+        // getPref/setPref des sliders/toggles viennent des préférences de
+        // menu configurées une fois dans main.js (configureMenuPreferences,
+        // voir lib/menu.js) — plus besoin de les repasser ici.
+        onActivate: () => pushScreen(makeMenuScreen(createAudioMenu(), t)),
+      },
+      {
+        label: "menu.options.navigation",
+        onActivate: () => pushScreen(makeMenuScreen(createNavigationMenu(), t)),
       },
       {
         label: "menu.options.export",

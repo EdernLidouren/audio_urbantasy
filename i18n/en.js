@@ -3,6 +3,8 @@
 
 export default {
   "menu.position": "{index} of {total}",
+  "menu.toggle.yes": "Yes",
+  "menu.toggle.no": "No",
 
   "menu.main.title": "Templeton",
   "menu.main.new_game": "New game",
@@ -19,6 +21,7 @@ export default {
 
   "menu.options.title": "Options",
   "menu.options.audio": "Audio",
+  "menu.options.navigation": "Navigation",
   "menu.options.export": "Export preferences",
   "menu.options.import": "Import preferences",
   "menu.options.import_success": "Preferences imported.",
@@ -36,6 +39,11 @@ export default {
   "audio.music_volume": "Music volume",
   "menu.audio.reset": "Reset to defaults",
   "menu.audio.reset_done": "Audio settings reset.",
+
+  "menu.navigation.title": "Navigation",
+  "menu.navigation.cycling": "Menu cycling",
+  "menu.navigation.star_prefix": "Prefix announcements with a star",
+  "menu.navigation.index_suffix": "Announce position (\"1 of 2\")",
 
   "level.demo.title": "Demo level",
   "entity.door": "Door",

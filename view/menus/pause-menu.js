@@ -12,7 +12,6 @@
 import { t } from "../../i18n/index.js";
 import { pushScreen, popScreen, composeHook } from "../../lib/screens.js";
 import { makeMenuScreen } from "../../lib/menu.js";
-import { getPref, setPref } from "../../config/preferences.js";
 import { createOptionsMenu } from "./options-menu.js";
 
 // scene : fournit pauseBeacons()/resumeBeacons() (voir
@@ -25,9 +24,7 @@ export function openPauseMenu(scene) {
     entries: [
       {
         label: "menu.pause.options",
-        // getPref/setPref injectés ici (pas importés par lib/menu.js) :
-        // même câblage que depuis le menu principal (voir main-menu.js).
-        onActivate: () => pushScreen(makeMenuScreen(createOptionsMenu(), t, { getPref, setPref })),
+        onActivate: () => pushScreen(makeMenuScreen(createOptionsMenu(), t)),
       },
       {
         label: "menu.pause.main_menu",
