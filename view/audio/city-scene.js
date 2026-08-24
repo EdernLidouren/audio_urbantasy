@@ -16,7 +16,20 @@ import { announce } from "../../lib/announce.js";
 import registry from "../../entities/types.js";
 import player from "../../entities/player.js";
 import { TUNING_DEFAULTS, resolveTuning } from "../../config/tuning.js";
+import { getPref } from "../../config/preferences.js";
 import { t } from "../../i18n/index.js";
+
+// Facteurs de préférence (Options > Audio, voir view/menus/audio-menu.js) :
+// stockés en pourcentage [0,100] (même domaine que les sliders), convertis
+// ici en facteur [0,1] appliqué MULTIPLICATIVEMENT par-dessus le volume déjà
+// calculé (distance, cascade de tuning...) — jamais à sa place. Défaut 100 :
+// comportement strictement inchangé tant qu'aucune préférence n'est posée.
+function beaconVolumeFactor() {
+  return getPref("beaconVolume", 100) / 100;
+}
+function footstepVolumeFactor() {
+  return getPref("footstepVolume", 100) / 100;
+}
 
 // STEP_DISTANCE ne concerne aucune entité (c'est le pas du joueur) : défaut
 // global lu directement. AUDIBLE_RANGE, PAN_SATURATION, INTERACT_RANGE et
@@ -121,6 +134,10 @@ function setsEqual(a, b) {
   return true;
 }
 
+// Scène ville actuellement vivante, s'il y en a une (voir
+// refreshActiveBeaconVolumes plus bas).
+let activeScene = null;
+
 // getSession : accesseur (pas la session elle-même), car le core remplace
 // l'objet session à chaque tick (immutabilité) — update() doit relire l'état
 // courant à chaque appel plutôt que capturer une session figée à la création.
@@ -186,23 +203,35 @@ export function createCityAudioScene(getSession) {
     playOneShot(MOVEMENT_SOUND.path, {
       reverbSend: FOOTSTEP_REVERB_SEND,
       reverbBusInput: reverbBus.input,
+      volume: footstepVolumeFactor(),
     });
     lastFootstepAt = now;
   }
 
-  function update() {
-    const x = getSession().player.x;
-
+  // Recalcule et applique pan/volume/passe-bas de chaque balise pour la
+  // position x donnée. Factorisé hors de update() : réutilisé tel quel par
+  // refreshBeaconVolumes() pour qu'un changement de préférence prenne effet
+  // immédiatement sur les balises DÉJÀ en train de jouer, même quand le tick
+  // de la ville est arrêté (un menu au sommet de la pile, ex. Options >
+  // Audio — voir CLAUDE.md sur le routage par pile d'écrans).
+  function applyEntityAudio(x) {
+    const beaconFactor = beaconVolumeFactor();
     for (const { entity, sound, audibleRange, panSaturation, interactRange, cutoffMin, cutoffMax } of entitySounds) {
       const relX = entity.x - x;
       const dist = Math.abs(relX);
       // Pan inchangé : toujours dérivé de panSaturation, indépendant du volume.
       const pan = clamp(relX / panSaturation, -1, 1);
-      const volume = volumeForDistance(dist, interactRange, audibleRange);
+      const volume = volumeForDistance(dist, interactRange, audibleRange) * beaconFactor;
       sound.update(pan, volume);
       // Passe-bas : se superpose au volume/pan, ne les remplace pas.
       sound.setCutoff(cutoffForDistance(dist, interactRange, audibleRange, cutoffMin, cutoffMax));
     }
+  }
+
+  function update() {
+    const x = getSession().player.x;
+
+    applyEntityAudio(x);
 
     // Occupation par diff : n'agit QUE si l'ensemble a changé depuis le
     // tick précédent. Une nouvelle photo (assertive) coupe la précédente
@@ -246,12 +275,20 @@ export function createCityAudioScene(getSession) {
       sound.stop(); // nettoie aussi son propre envoi de réverb
     }
     reverbBus.destroy();
+    if (activeScene === api) activeScene = null;
   }
 
   // Candidats d'interaction courants (Espace/Entrée) : même ensemble, même
   // tri que la dernière annonce d'occupation calculée en update().
   function getInteractionCandidates() {
     return currentOccupied;
+  }
+
+  // Rafraîchit les balises à la position courante du joueur, sans repasser
+  // par le reste de update() (pas de re-déclenchement de pas ni de
+  // ré-évaluation de l'occupation) — voir applyEntityAudio ci-dessus.
+  function refreshBeaconVolumes() {
+    applyEntityAudio(getSession().player.x);
   }
 
   // Pause/reprise SÉLECTIVE : uniquement les balises positionnées des
@@ -271,5 +308,19 @@ export function createCityAudioScene(getSession) {
     }
   }
 
-  return { update, destroy, getInteractionCandidates, pauseBeacons, resumeBeacons };
+  const api = { update, destroy, getInteractionCandidates, pauseBeacons, resumeBeacons, refreshBeaconVolumes };
+  // Au plus une scène ville vivante à la fois dans cette appli (jamais
+  // imbriquée) : permet à un menu ouvert par-dessus (Options > Audio) de
+  // rafraîchir la scène courante sans passer une référence explicite à
+  // travers main.js — voir refreshActiveBeaconVolumes ci-dessous.
+  activeScene = api;
+  return api;
+}
+
+// Rafraîchit en temps réel le volume des balises de la scène ville
+// actuellement active, s'il y en a une (ex. Options ouvert depuis le menu
+// principal, avant toute entrée en ville : no-op). Voir
+// view/menus/audio-menu.js, appelé en onChange d'un slider de volume.
+export function refreshActiveBeaconVolumes() {
+  if (activeScene) activeScene.refreshBeaconVolumes();
 }

@@ -14,9 +14,20 @@ export default {
   "menu.interaction.title": "Interagir",
 
   "menu.options.title": "Options",
-  "menu.options.volume": "Volume",
-  "menu.options.volume_stub": "Volume : pas encore implémenté.",
+  "menu.options.audio": "Audio",
+  "menu.options.reset_all": "Réinitialiser tous les réglages",
+  "menu.options.reset_all_done": "Tous les réglages ont été réinitialisés.",
   "menu.options.back": "Retour",
+
+  "menu.audio.title": "Audio",
+  "audio.beacon_volume": "Volume des balises",
+  "audio.footstep_volume": "Volume des pas",
+  "menu.audio.reset": "Réinitialiser aux valeurs par défaut",
+  "menu.audio.reset_done": "Réglages audio réinitialisés.",
+  "menu.audio.export": "Exporter les préférences",
+  "menu.audio.import": "Importer les préférences",
+  "menu.audio.import_success": "Préférences importées.",
+  "menu.audio.import_failure": "Échec de l'import des préférences.",
 
   "level.demo.title": "Niveau de démo",
   "entity.door": "Porte",
