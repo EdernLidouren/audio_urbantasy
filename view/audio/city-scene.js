@@ -201,7 +201,10 @@ export function createCityAudioScene(getSession) {
     // Occupation par diff : n'agit QUE si l'ensemble a changé depuis le
     // tick précédent. Une nouvelle photo (assertive) coupe la précédente
     // devenue obsolète ; l'ensemble vide ne déclenche aucune annonce, juste
-    // un réarmement silencieux pour la prochaine entrée.
+    // un réarmement silencieux pour la prochaine entrée. Pas de `channel`
+    // imposé ici : on laisse le canal par défaut du module (liveRegion,
+    // ariaNotify expérimental via setAnnounceChannel) décider, pour comparer
+    // les deux sur exactement le même déclenchement.
     const occupied = occupiedEntities(entitySounds, x);
     const occupiedIdsNow = new Set(occupied.map((entity) => entity.id));
     if (!setsEqual(occupiedIdsNow, occupiedIds)) {
