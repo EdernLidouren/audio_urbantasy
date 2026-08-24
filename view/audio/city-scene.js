@@ -92,24 +92,25 @@ function cutoffForDistance(dist, interactRange, audibleRange, cutoffMin, cutoffM
 }
 
 // Entités dont la zone d'interaction (interactRange résolu PAR ENTITÉ, via
-// la cascade) englobe le joueur à l'instant x. Raisonne en distance
-// relative à chaque entité, jamais en position figée : fonctionne aussi si
-// une entité venait à se déplacer un jour, sans code spécial.
+// la cascade) englobe le joueur à l'instant x, triées par x croissant (le
+// plus à gauche d'abord). Raisonne en distance relative à chaque entité,
+// jamais en position figée : fonctionne aussi si une entité venait à se
+// déplacer un jour, sans code spécial. Le tri est fait ici une seule fois :
+// consommé aussi bien par l'annonce d'occupation que par la résolution de
+// cible d'interaction (chooseInteractionTarget, view/interaction.js), qui
+// doivent voir exactement le même ensemble dans le même ordre.
 function occupiedEntities(entitySounds, x) {
   return entitySounds
     .filter(({ entity, interactRange }) => Math.abs(entity.x - x) <= interactRange)
-    .map(({ entity }) => entity);
+    .map(({ entity }) => entity)
+    .sort((a, b) => a.x - b.x);
 }
 
-// Phrase d'annonce : noms triés par x croissant (le plus à gauche d'abord),
-// séparés par ", ". Chaque labelKey est déjà résolu par parseLevel (nameKey
+// Phrase d'annonce : noms séparés par ", ", dans l'ordre déjà trié par
+// occupiedEntities. Chaque labelKey est déjà résolu par parseLevel (nameKey
 // d'instance sinon label du type) ; on ne fait que le traduire ici.
 function buildOccupancyAnnouncement(entities) {
-  return entities
-    .slice()
-    .sort((a, b) => a.x - b.x)
-    .map((entity) => t(entity.labelKey))
-    .join(", ");
+  return entities.map((entity) => t(entity.labelKey)).join(", ");
 }
 
 function setsEqual(a, b) {
@@ -170,6 +171,11 @@ export function createCityAudioScene(getSession) {
   // Ids des entités occupées (zone d'interaction englobant le joueur) au
   // tick précédent — seule source de vérité pour détecter un changement.
   let occupiedIds = new Set();
+  // Entités occupées au tick courant, déjà triées par x (voir
+  // occupiedEntities) — exposé via getInteractionCandidates() pour que
+  // l'écran ville résolve une cible d'interaction (Espace/Entrée) sans
+  // recalculer l'occupation en double.
+  let currentOccupied = [];
 
   // Point de passage unique pour tout déclenchement de pas (immédiat ou de
   // cadence) : applique le cooldown sur le son, jamais sur le déplacement.
@@ -206,6 +212,7 @@ export function createCityAudioScene(getSession) {
     // ariaNotify expérimental via setAnnounceChannel) décider, pour comparer
     // les deux sur exactement le même déclenchement.
     const occupied = occupiedEntities(entitySounds, x);
+    currentOccupied = occupied;
     const occupiedIdsNow = new Set(occupied.map((entity) => entity.id));
     if (!setsEqual(occupiedIdsNow, occupiedIds)) {
       if (occupiedIdsNow.size > 0) {
@@ -241,5 +248,28 @@ export function createCityAudioScene(getSession) {
     reverbBus.destroy();
   }
 
-  return { update, destroy };
+  // Candidats d'interaction courants (Espace/Entrée) : même ensemble, même
+  // tri que la dernière annonce d'occupation calculée en update().
+  function getInteractionCandidates() {
+    return currentOccupied;
+  }
+
+  // Pause/reprise SÉLECTIVE : uniquement les balises positionnées des
+  // entités (pas le bus de réverb, qui ne fait que traiter un signal — sans
+  // signal entrant il est déjà silencieux — et pas une future
+  // musique/ambiance globale, qui n'est pas une "voix de la scène"). Utilisé
+  // par le menu de désambiguïsation (view/interaction.js) pour dégager le
+  // canal pendant qu'il est ouvert, sans toucher au contexte audio global.
+  function pauseBeacons() {
+    for (const { sound } of entitySounds) {
+      sound.pause();
+    }
+  }
+  function resumeBeacons() {
+    for (const { sound } of entitySounds) {
+      sound.resume();
+    }
+  }
+
+  return { update, destroy, getInteractionCandidates, pauseBeacons, resumeBeacons };
 }

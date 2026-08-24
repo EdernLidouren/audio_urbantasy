@@ -23,12 +23,15 @@ parsé, sans aucune chaîne affichable en dur — uniquement des clés i18n.
 | `x`       | number | dans `[0, length]`                                                |
 | `target`  | string | **requis** si `type === "door"` : identifiant du niveau cible, prévu pour un futur chargement de niveau — non câblé aujourd'hui (aucun mécanisme ne charge encore un niveau par id) |
 | `nameKey` | string | optionnel (npc/object) : clé i18n spécifique à l'instance          |
+| `descriptionKey` | string | optionnel : clé i18n de description spécifique à l'instance, utilisée par l'interaction "describe" (touche Espace) |
 
-`parseLevel` normalise chaque entité en ajoutant `labelKey` :
-`entity.nameKey` si présent, sinon `registry[type].label`. Les champs
-supplémentaires du JSON source non listés ci-dessus (par ex. `nameKey` une
-fois résolu) ne sont pas reportés dans l'entité normalisée — seul `labelKey`
-est exposé.
+`parseLevel` normalise chaque entité en ajoutant `labelKey` et
+`descriptionKey` : `entity.nameKey` si présent sinon `registry[type].label`
+pour le premier ; `entity.descriptionKey` (du JSON) si présent sinon
+`registry[type].descriptionKey` pour le second (peut rester `undefined`, ex.
+`decor`). Les champs bruts du JSON source une fois résolus (`nameKey`,
+`descriptionKey`) ne sont pas reportés tels quels dans l'entité normalisée —
+seuls `labelKey` et `descriptionKey` (résolus) sont exposés.
 
 ## Registre de types (`entities/types.js`)
 
@@ -37,6 +40,7 @@ Donnée neutre, sans import. Un objet `{ [type]: TypeDef }` :
 | Champ            | Type    | Lu par        | Rôle                                         |
 |------------------|---------|---------------|-----------------------------------------------|
 | `label`          | string  | vue           | clé i18n du libellé par défaut du type        |
+| `descriptionKey` | string  | vue           | optionnel : clé i18n de la description par défaut du type, utilisée par l'interaction "describe" si l'instance n'en fournit pas |
 | `sounds`         | object  | vue           | descripteurs de son du type, par rôle (`{ beacon, ... }`) — voir `entities/model.md` |
 | `blocksMovement` | boolean | core (prévu)  | prévu pour empêcher le déplacement au travers de l'entité |
 | `enterable`      | boolean | core (prévu)  | prévu pour déclencher une action à l'entrée (ex. porte)   |

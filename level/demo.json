@@ -4,8 +4,8 @@
   "length": 40,
   "playerStart": 2,
   "entities": [
-    { "id": "object-toolbox", "type": "object", "x": 8, "nameKey": "object.toolbox" },
-    { "id": "door-exit", "type": "door", "x": 9, "nameKey": "door.exit", "target": "demo-next" },
-    { "id": "npc-passerby", "type": "npc", "x": 20, "nameKey": "npc.passerby" }
+    { "id": "object-toolbox", "type": "object", "x": 8, "nameKey": "object.toolbox", "descriptionKey": "object.toolbox.description" },
+    { "id": "door-exit", "type": "door", "x": 9, "nameKey": "door.exit", "target": "demo-next", "descriptionKey": "door.exit.description" },
+    { "id": "npc-passerby", "type": "npc", "x": 20, "nameKey": "npc.passerby", "descriptionKey": "npc.passerby.description" }
   ]
 }

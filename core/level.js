@@ -20,7 +20,7 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
     fail(`entities[${index}] n'est pas un objet.`);
   }
 
-  const { id, type, x, target, nameKey } = rawEntity;
+  const { id, type, x, target, nameKey, descriptionKey } = rawEntity;
 
   if (!isNonEmptyString(id)) {
     fail(`entities[${index}].id manquant ou invalide.`);
@@ -39,7 +39,11 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
   }
 
   const labelKey = isNonEmptyString(nameKey) ? nameKey : registry[type].label;
-  const entity = { id, type, x, labelKey };
+  // Même cascade instance -> type que labelKey, pour la description utilisée
+  // par l'interaction "describe" (voir view/interaction.js). Peut rester
+  // undefined si ni l'instance ni le type n'en fournissent une (ex. decor).
+  const resolvedDescriptionKey = isNonEmptyString(descriptionKey) ? descriptionKey : registry[type].descriptionKey;
+  const entity = { id, type, x, labelKey, descriptionKey: resolvedDescriptionKey };
 
   if (type === "door") {
     if (!isNonEmptyString(target)) {

@@ -7,6 +7,12 @@
 //
 // label est une CLÉ i18n (jamais une chaîne affichable directement).
 //
+// descriptionKey (optionnel) : CLÉ i18n de la description utilisée par
+// l'interaction "describe" (touche Espace, voir view/interaction.js).
+// Défaut par type ici, surchargeable par instance via le champ
+// `descriptionKey` du niveau (level/*.json) — cascade instance -> type
+// identique à celle de nameKey/label (résolue dans core/level.js).
+//
 // sounds regroupe les descripteurs de son du type PAR RÔLE (voir
 // entities/model.md pour le vocabulaire complet). `beacon` est la boucle
 // positionnée qui signale l'entité dans l'espace (loop:true) — le seul rôle
@@ -27,6 +33,7 @@
 export default {
   door: {
     label: "entity.door",
+    descriptionKey: "entity.door.description",
     sounds: {
       beacon: { path: "sounds/door_1.mp3", loop: true },
     },
@@ -35,6 +42,7 @@ export default {
   },
   npc: {
     label: "entity.npc",
+    descriptionKey: "entity.npc.description",
     sounds: {
       beacon: { path: "sounds/tictoc_1.mp3", loop: true },
     },
@@ -43,6 +51,7 @@ export default {
   },
   object: {
     label: "entity.object",
+    descriptionKey: "entity.object.description",
     sounds: {
       beacon: { path: "sounds/box_of_nails_1.mp3", loop: true },
     },
@@ -50,8 +59,8 @@ export default {
     enterable: false,
   },
   // Preset d'exemple, non utilisé dans demo.json : positionné et purement
-  // décoratif. Aucune interaction (enterable:false) — le registre ne porte
-  // aujourd'hui aucun mécanisme d'activation, quel que soit le type.
+  // décoratif. Aucune interaction (enterable:false, pas de descriptionKey) —
+  // seuls les types ci-dessus sont concernés par l'interaction "describe".
   decor: {
     label: "entity.decor",
     sounds: {
