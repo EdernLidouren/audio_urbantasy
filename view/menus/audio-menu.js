@@ -1,54 +1,20 @@
 // Définition du sous-menu Audio (Options > Audio). Deux sliders de volume,
 // tous deux persistés via config/preferences.js (voir lib/menu.js pour le
-// mécanisme générique de slider), plus l'export/import fichier des
-// préférences (global, pas spécifique à l'audio — voir plus bas pourquoi
-// il vit ici). title et les labelKey/label d'entrées sont des CLÉS de
-// traduction, résolues par lib/menu.js via le t reçu en paramètre.
+// mécanisme générique de slider). Export/Import et réinitialisation globale
+// vivent dans options-menu.js (ce sont des opérations GLOBALES sur toutes
+// les préférences, pas spécifiques à l'audio). title et les labelKey/label
+// d'entrées sont des CLÉS de traduction, résolues par lib/menu.js via le t
+// reçu en paramètre.
 
 import { announce } from "../../lib/announce.js";
 import { popScreen } from "../../lib/screens.js";
 import { reannounceActiveMenuEntry } from "../../lib/menu.js";
 import { t } from "../../i18n/index.js";
-import { setPref, PREF_CONSTRAINTS, exportPreferences, importPreferences } from "../../config/preferences.js";
+import { setPref, PREF_CONSTRAINTS } from "../../config/preferences.js";
 import { refreshActiveBeaconVolumes } from "../audio/city-scene.js";
 
 const BEACON = PREF_CONSTRAINTS.beaconVolume;
 const FOOTSTEP = PREF_CONSTRAINTS.footstepVolume;
-
-// Input file caché, créé UNE SEULE FOIS (pas à chaque ouverture du menu :
-// createAudioMenu() est appelée à chaque fois) — pont vers le sélecteur de
-// fichier natif de l'OS, déclenché depuis l'entrée "Importer".
-let fileInput = null;
-
-function ensureFileInput() {
-  if (fileInput) return fileInput;
-
-  fileInput = document.createElement("input");
-  fileInput.type = "file";
-  fileInput.accept = ".json,application/json";
-  // Hors écran plutôt que display:none : .click() programmatique est
-  // fiable sur un élément non affiché mais toujours dans le flux du DOM.
-  fileInput.style.position = "fixed";
-  fileInput.style.left = "-9999px";
-  document.body.appendChild(fileInput);
-
-  fileInput.addEventListener("change", async () => {
-    const file = fileInput.files[0];
-    fileInput.value = ""; // permet de réimporter le même fichier ensuite
-    if (!file) return; // sélection annulée
-
-    const result = await importPreferences(file);
-    announce(t(result.success ? "menu.audio.import_success" : "menu.audio.import_failure"), { assertive: true });
-
-    // Effet temps réel si une scène ville est active, et ré-annonce de la
-    // ligne courante (qui relit getPref à la volée : aucun état à
-    // rafraîchir côté slider, juste redire ce qui a changé).
-    refreshActiveBeaconVolumes();
-    reannounceActiveMenuEntry();
-  });
-
-  return fileInput;
-}
 
 export function createAudioMenu() {
   // Liste séparée (pas juste inline dans entries) : réutilisée telle quelle
@@ -88,12 +54,20 @@ export function createAudioMenu() {
     },
   ];
 
+  // Réinitialise UNIQUEMENT les clés de ce sous-menu (pas resetAllPrefs,
+  // qui est global) — chaque écriture passe par setPref, jamais d'accès
+  // direct au store. Moins destructif qu'un reset global : pas de
+  // confirmation nécessaire.
   function resetToDefaults() {
     for (const slider of sliders) {
       setPref(slider.prefKey, slider.default);
     }
     refreshActiveBeaconVolumes();
     announce(t("menu.audio.reset_done"), { assertive: true });
+    // Ré-annonce la ligne courante avec sa nouvelle valeur (le curseur est
+    // resté sur "Réinitialiser", mais le principe reste générique — voir
+    // reannounceActiveMenuEntry).
+    reannounceActiveMenuEntry();
   }
 
   return {
@@ -101,17 +75,6 @@ export function createAudioMenu() {
     closable: true,
     entries: [
       ...sliders,
-      {
-        label: "menu.audio.export",
-        onActivate: () => exportPreferences(),
-      },
-      {
-        // Ouvre le sélecteur de fichier natif de l'OS ; le résultat arrive
-        // plus tard, de façon asynchrone, via le listener "change" posé
-        // une fois pour toutes dans ensureFileInput() ci-dessus.
-        label: "menu.audio.import",
-        onActivate: () => ensureFileInput().click(),
-      },
       {
         label: "menu.audio.reset",
         onActivate: resetToDefaults,

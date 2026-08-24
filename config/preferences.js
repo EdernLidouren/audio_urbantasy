@@ -112,15 +112,16 @@ export function setPref(key, value) {
   persist();
 }
 
-// Vide TOUTES les préférences (mémoire + localStorage) : chaque getPref()
-// retombe alors sur le fallback fourni par SON appelant (le store n'a pas
-// besoin de connaître les clés ni leurs défauts). Utilisé par
+// Réinitialise TOUTES les préférences connues à leur valeur par défaut
+// (PREF_CONSTRAINTS), via setPref — jamais d'accès direct au store : même
+// chemin, mêmes garanties que toute autre écriture. Utilisé par
 // "Réinitialiser tous les réglages" (menu Options) — robuste par
-// construction à l'ajout futur d'autres catégories de préférences, sans
-// modification de ce bouton.
+// construction à l'ajout futur d'une préférence : il suffit de la déclarer
+// dans PREF_CONSTRAINTS, ce reset la couvre automatiquement.
 export function resetAllPrefs() {
-  store.clear();
-  persist();
+  for (const [key, constraint] of Object.entries(PREF_CONSTRAINTS)) {
+    setPref(key, constraint.default);
+  }
 }
 
 // Déclenche le téléchargement d'un fichier JSON contenant les préférences

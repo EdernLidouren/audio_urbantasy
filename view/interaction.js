@@ -9,6 +9,20 @@ import { t } from "../i18n/index.js";
 import { pushScreen, popScreen } from "../lib/screens.js";
 import { makeMenuScreen } from "../lib/menu.js";
 
+// Principe général : un écran qui en enveloppe un autre (ex. ajoute un
+// effet de bord à l'ouverture/fermeture d'un menu) ne doit JAMAIS écraser
+// silencieusement un hook de cycle de vie existant (onEnter, onExit, ...) —
+// il compose : l'ancien comportement d'abord, puis le sien. Écraser ferait
+// perdre en silence ce que l'écran de base fait déjà (ici, l'annonce
+// d'ouverture du menu), et casserait sans avertissement si l'écran de base
+// évoluait plus tard pour ajouter un hook aujourd'hui absent (ex. onExit).
+function composeHook(baseHook, extra) {
+  return () => {
+    if (typeof baseHook === "function") baseHook();
+    extra();
+  };
+}
+
 // kind ∈ { "describe", "activate" }.
 export function interact(entity, kind) {
   if (kind === "describe") {
@@ -56,14 +70,11 @@ function openDisambiguationMenu(candidates, kind, scene) {
 
   // makeMenuScreen ne connaît rien de l'audio : on enveloppe onEnter/onExit
   // ici plutôt que d'y toucher, pour garder ce module générique inchangé.
-  const baseOnEnter = screen.onEnter;
-  screen.onEnter = () => {
-    scene.pauseBeacons();
-    baseOnEnter();
-  };
-  screen.onExit = () => {
-    scene.resumeBeacons();
-  };
+  // Composition (voir composeHook) : onEnter de base (annonce d'ouverture)
+  // PUIS pause des balises ; onExit de base (actuellement aucun, mais
+  // composé quand même par principe) PUIS reprise des balises.
+  screen.onEnter = composeHook(screen.onEnter, () => scene.pauseBeacons());
+  screen.onExit = composeHook(screen.onExit, () => scene.resumeBeacons());
 
   pushScreen(screen);
 }

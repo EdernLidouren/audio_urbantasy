@@ -15,7 +15,14 @@ export default {
 
   "menu.options.title": "Options",
   "menu.options.audio": "Audio",
+  "menu.options.export": "Exporter les préférences",
+  "menu.options.import": "Importer les préférences",
+  "menu.options.import_success": "Préférences importées.",
+  "menu.options.import_failure": "Échec de l'import des préférences.",
   "menu.options.reset_all": "Réinitialiser tous les réglages",
+  "menu.options.reset_all_confirm_title": "Tout réinitialiser ?",
+  "menu.options.reset_all_confirm": "Confirmer",
+  "menu.options.reset_all_cancel": "Annuler",
   "menu.options.reset_all_done": "Tous les réglages ont été réinitialisés.",
   "menu.options.back": "Retour",
 
@@ -24,10 +31,6 @@ export default {
   "audio.footstep_volume": "Volume des pas",
   "menu.audio.reset": "Réinitialiser aux valeurs par défaut",
   "menu.audio.reset_done": "Réglages audio réinitialisés.",
-  "menu.audio.export": "Exporter les préférences",
-  "menu.audio.import": "Importer les préférences",
-  "menu.audio.import_success": "Préférences importées.",
-  "menu.audio.import_failure": "Échec de l'import des préférences.",
 
   "level.demo.title": "Niveau de démo",
   "entity.door": "Porte",
