@@ -11,10 +11,12 @@ parsé, sans aucune chaîne affichable en dur — uniquement des clés i18n.
 | `id`          | string   | non vide                                          |
 | `titleKey`    | string   | non vide, clé i18n du titre du niveau             |
 | `length`      | number   | `> 0` — longueur en unités le long de l'axe x     |
-| `playerStart` | number   | dans `[0, length]` — position x de départ         |
+| `playerStart` | number   | point d'arrivée PAR DÉFAUT du lieu. **FILET, jamais rejeté** : absent ou hors `[0, length]` -> repli sur `0` (avec un `console.warn`), jamais d'exception. Des points d'arrivée NOMMÉS (ex. par porte) pourront s'ajouter plus tard, sans toucher à ce filet. |
 | `entities`    | Entity[] | voir ci-dessous                                   |
 | `music`       | string   | optionnel : chemin vers la musique du lieu (`assets/musics/...`), canal global non spatialisé — voir `view/audio/city-scene.js` |
-| `ambiences`   | string[] | optionnel : 0 à 2 chemins d'ambiance (`assets/ambiances/...`), canal global non spatialisé, jusqu'à deux couches simultanées — voir `view/audio/city-scene.js` |
+| `ambiences`   | string[] | optionnel : 0 à `AMBIENCE_CHANNEL_LIMIT` chemins d'ambiance (`assets/ambiances/...`, voir `config/audio-channels.js`), canal global non spatialisé, jusqu'à autant de couches simultanées — voir `view/audio/city-scene.js` |
+| `reverbDurationSec` | number | optionnel, `> 0` : surcharge PAR LIEU la durée de la réponse impulsionnelle du bus de réverb (défaut global : `config/tuning-values.js`) |
+| `reverbDecay` | number | optionnel, `> 0` : surcharge PAR LIEU le taux de déclin de la réverb (défaut global : `config/tuning-values.js`) |
 
 ## Entité
 
@@ -23,7 +25,7 @@ parsé, sans aucune chaîne affichable en dur — uniquement des clés i18n.
 | `id`      | string | non vide, unique dans le niveau                                  |
 | `type`    | string | doit exister dans le registre `entities/types.js`                |
 | `x`       | number | dans `[0, length]`                                                |
-| `target`  | string | **requis** si `type === "door"` : identifiant du niveau cible, prévu pour un futur chargement de niveau — non câblé aujourd'hui (aucun mécanisme ne charge encore un niveau par id) |
+| `target`  | string | **requis** si `type === "door"` : id d'un niveau du registre (`level/index.js`) — l'action "activate" sur la porte y transitionne (voir `view/interaction.js`, `view/city-screen.js`) |
 | `nameKey` | string | optionnel (npc/object) : clé i18n spécifique à l'instance          |
 | `descriptionKey` | string | optionnel : clé i18n de description spécifique à l'instance, utilisée par l'interaction "describe" (touche Espace) |
 
@@ -80,4 +82,7 @@ réglages, sous-types comme presets, la place du joueur) est documenté dans
   DOM. Toute violation lève une `Error` nommant le champ ou l'entité fautive.
 - `level/load.js` — `loadLevel(url, registry)` : chargeur au bord (`fetch` +
   `parseLevel`). Erreurs réseau et JSON invalide remontées avec un message
-  clair.
+  clair. `loadLevelById(id, registry)` : résout `id` en chemin via
+  `level/index.js` puis délègue à `loadLevel` — utilisé pour la transition
+  par porte (`target` = id, pas un chemin).
+- `level/index.js` — registre `{ id: chemin }` des niveaux existants.

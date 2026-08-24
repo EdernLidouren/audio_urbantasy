@@ -59,4 +59,12 @@ export default {
   "npc.passerby.description": "A passerby muttering to themselves, paying you no attention.",
   "door.exit": "Exit door",
   "door.exit.description": "A wooden door left ajar, cool air drifting in from outside.",
+
+  "level.demo2.title": "Back room",
+  "door.back": "Way back",
+  "door.back.description": "The same door, seen from inside: it leads outside.",
+  "npc.guard": "Guard",
+  "npc.guard.description": "A guard watching the room without a word.",
+  "npc.merchant": "Merchant",
+  "npc.merchant.description": "A merchant quietly stacking crates.",
 };

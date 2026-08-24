@@ -8,13 +8,43 @@ import { announce } from "../lib/announce.js";
 import { t } from "../i18n/index.js";
 import { ensureAudioUnlocked } from "../lib/audio.js";
 import { createCityAudioScene } from "./audio/city-scene.js";
-import { interact, chooseInteractionTarget } from "./interaction.js";
+import { interact, chooseInteractionTarget, setDoorTransitionHandler } from "./interaction.js";
 import { openPauseMenu } from "./menus/pause-menu.js";
 import { tick } from "../core/actions.js";
 import { reduce } from "../core/reduce.js";
+import { loadLevelById } from "../level/load.js";
+import { createInitialState } from "../core/state.js";
+import registry from "../entities/types.js";
 
 export function makeCityScreen(getSession, setSession) {
   let scene = null;
+
+  // Transition FRANCHE par porte (pas de fondu, pas d'animation) :
+  // scene.destroy() arrête et décharge TOUT ce que possédait le lieu
+  // courant — balises, réverb, ET canaux globaux musique/ambiance (voir
+  // view/audio/city-scene.js) — donc rien de plus à nettoyer ici. Puis
+  // chargement du niveau cible par id, nouvelle session à son playerStart
+  // (filet 0 si absent/invalide, voir core/level.js), nouvelle scène audio,
+  // annonce du titre. Aucune session/scène persistée entre lieux : chaque
+  // transition en fabrique une toute neuve (rien à préserver pour l'instant).
+  //
+  // scene reste null le temps de l'attente réseau (loadLevelById) : onTick
+  // et onKeyDown s'en gardent (voir plus bas) plutôt que d'accéder une
+  // scène absente — aucune touche n'a d'effet pendant cette brève fenêtre.
+  async function transitionThroughDoor(levelId) {
+    scene.destroy();
+    scene = null;
+
+    const level = await loadLevelById(levelId, registry);
+    setSession(createInitialState(level));
+    scene = createCityAudioScene(getSession);
+    announce(t(getSession().level.titleKey), { assertive: true });
+  }
+
+  // Enregistré une fois, pour la durée de vie de cet écran ville (voir
+  // view/interaction.js) : interact() délègue ici sur "activate" d'une
+  // porte, sans avoir besoin de connaître scene/session lui-même.
+  setDoorTransitionHandler(transitionThroughDoor);
 
   return {
     onEnter() {
@@ -33,6 +63,9 @@ export function makeCityScreen(getSession, setSession) {
       announce(t(getSession().level.titleKey), { assertive: true });
     },
     onTick() {
+      // scene momentanément null pendant une transition par porte (voir
+      // transitionThroughDoor) : rien à mettre à jour, on saute ce tick.
+      if (!scene) return;
       setSession(reduce(getSession(), tick(getMoveIntent())));
       scene.update();
     },
@@ -41,6 +74,10 @@ export function makeCityScreen(getSession, setSession) {
     // la ville est au sommet de la pile : le stack routing s'en charge par
     // construction (voir CLAUDE.md), aucune vérification à faire ici.
     onKeyDown(event) {
+      // Même garde qu'onTick : aucune interaction possible pendant la brève
+      // fenêtre où scene est null (transition par porte en cours).
+      if (!scene) return;
+
       if (event.key === "Escape") {
         event.preventDefault();
         openPauseMenu(scene);
@@ -64,6 +101,7 @@ export function makeCityScreen(getSession, setSession) {
     onExit() {
       scene.destroy();
       scene = null;
+      setDoorTransitionHandler(null);
       // Invariant documenté (CLAUDE.md) : session est null hors partie.
       // Seul chemin de sortie de la ville aujourd'hui (menu pause -> retour
       // au menu principal, voir view/menus/pause-menu.js).

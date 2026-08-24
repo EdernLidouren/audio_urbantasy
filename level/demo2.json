@@ -1,0 +1,14 @@
+{
+  "id": "demo2",
+  "titleKey": "level.demo2.title",
+  "length": 15,
+  "playerStart": 2,
+  "music": "assets/musics/indigo_glow.mp3",
+  "reverbDurationSec": 0.25,
+  "reverbDecay": 12,
+  "entities": [
+    { "id": "door-back", "type": "door", "x": 2, "nameKey": "door.back", "target": "demo", "descriptionKey": "door.back.description" },
+    { "id": "npc-guard", "type": "npc", "x": 6, "nameKey": "npc.guard", "descriptionKey": "npc.guard.description" },
+    { "id": "npc-merchant", "type": "npc", "x": 10, "nameKey": "npc.merchant", "descriptionKey": "npc.merchant.description" }
+  ]
+}

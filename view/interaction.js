@@ -9,6 +9,18 @@ import { t } from "../i18n/index.js";
 import { pushScreen, popScreen, composeHook } from "../lib/screens.js";
 import { makeMenuScreen } from "../lib/menu.js";
 
+// Gestionnaire de transition par porte, enregistré UNE FOIS par
+// view/city-screen.js (setDoorTransitionHandler, au moment de sa
+// construction) — au plus un écran ville vivant à la fois dans cette appli
+// (même principe que activeScene, voir view/audio/city-scene.js). Permet à
+// interact() de déclencher la transition SANS connaître scene/session : il
+// délègue à qui les possède.
+let doorTransitionHandler = null;
+
+export function setDoorTransitionHandler(handler) {
+  doorTransitionHandler = handler;
+}
+
 // kind ∈ { "describe", "activate" }.
 export function interact(entity, kind) {
   if (kind === "describe") {
@@ -20,10 +32,18 @@ export function interact(entity, kind) {
   }
 
   if (kind === "activate") {
-    // STUB volontaire : emplacement réservé pour une future action de
-    // gameplay (ex. ouvrir la porte, fouiller la boîte). Cette action-là
-    // passera par le core (reduce), pas par la vue — no-op pour l'instant,
-    // le câblage clavier existe déjà (voir city-screen.js).
+    // Porte : déclenche la transition vers entity.target (id de niveau,
+    // voir level/schema.md), via le gestionnaire enregistré. Marche aussi
+    // bien depuis city-screen.js (candidat unique) que depuis le menu de
+    // désambiguïsation ci-dessous — les deux appellent interact() ici,
+    // jamais de logique de transition dupliquée.
+    if (entity.type === "door" && doorTransitionHandler) {
+      doorTransitionHandler(entity.target);
+      return;
+    }
+    // STUB pour tout le reste (object, npc...) : emplacement réservé pour
+    // une future action de gameplay (ex. fouiller la boîte). Cette action-là
+    // passera par le core (reduce), pas par la vue — no-op pour l'instant.
     return;
   }
 }

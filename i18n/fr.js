@@ -60,4 +60,12 @@ export default {
   "npc.passerby.description": "Un passant qui marmonne en attendant, sans vous prêter attention.",
   "door.exit": "Porte de sortie",
   "door.exit.description": "Une porte en bois entrouverte, l'air frais du dehors s'y engouffre.",
+
+  "level.demo2.title": "Arrière-boutique",
+  "door.back": "Porte de retour",
+  "door.back.description": "La même porte, vue de l'intérieur : elle mène dehors.",
+  "npc.guard": "Garde",
+  "npc.guard.description": "Un garde qui surveille la pièce sans un mot.",
+  "npc.merchant": "Marchand",
+  "npc.merchant.description": "Un marchand qui range des caisses en silence.",
 };

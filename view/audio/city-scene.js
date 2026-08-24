@@ -64,9 +64,12 @@ const FULL_VOLUME = TUNING_DEFAULTS.fullVolume;
 const FAR_VOLUME_MAX = TUNING_DEFAULTS.farVolumeMax;
 
 // Réverb : propriétés du bus lui-même (un seul par scène, jamais par
-// entité), défauts globaux lus directement, pas de cascade par entité.
-const REVERB_DURATION_SEC = TUNING_DEFAULTS.reverbDurationSec;
-const REVERB_DECAY = TUNING_DEFAULTS.reverbDecay;
+// entité). Durée/decay sont surchargeables PAR LIEU (level.reverbDurationSec/
+// reverbDecay, voir level/schema.md) — repli sur ces défauts globaux si le
+// lieu n'en fournit pas ; wet reste global (jamais surchargé par lieu,
+// non demandé). Pas de cascade par entité dans tous les cas.
+const REVERB_DURATION_SEC_DEFAULT = TUNING_DEFAULTS.reverbDurationSec;
+const REVERB_DECAY_DEFAULT = TUNING_DEFAULTS.reverbDecay;
 const REVERB_WET = TUNING_DEFAULTS.reverbWet;
 
 // Son de déplacement du joueur (auditeur, jamais dans entities). reverbSend
@@ -185,10 +188,14 @@ export function createCityAudioScene(getSession) {
     };
   });
 
-  // Un seul bus de réverb pour toute la scène, jamais un par entité.
+  // Un seul bus de réverb pour toute la scène, jamais un par entité. Lieu ->
+  // défaut global (voir REVERB_DURATION_SEC_DEFAULT/REVERB_DECAY_DEFAULT
+  // ci-dessus) : deux niveaux de repli, pas la cascade générale de
+  // resolveTuning (celle-ci reste entité-only).
+  const level = getSession().level;
   const reverbBus = createReverbBus({
-    durationSec: REVERB_DURATION_SEC,
-    decay: REVERB_DECAY,
+    durationSec: level.reverbDurationSec ?? REVERB_DURATION_SEC_DEFAULT,
+    decay: level.reverbDecay ?? REVERB_DECAY_DEFAULT,
     wet: REVERB_WET,
   });
 
@@ -201,13 +208,13 @@ export function createCityAudioScene(getSession) {
   // entité — optionnels, un niveau sans champ music/ambiences ne joue
   // simplement rien sur le canal correspondant. Ambiances : jusqu'à deux
   // couches simultanées, un seul curseur de volume pour les deux.
-  const music = getSession().level.music;
+  const music = level.music;
   if (music) {
     playGlobal("music", music);
     setGlobalVolume("music", musicVolumeFactor());
   }
 
-  const ambiences = getSession().level.ambiences;
+  const ambiences = level.ambiences;
   if (ambiences && ambiences.length > 0) {
     playAmbiences(ambiences);
     setGlobalVolume("ambience", ambienceVolumeFactor());

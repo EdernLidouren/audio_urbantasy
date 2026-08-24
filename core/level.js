@@ -68,7 +68,7 @@ export function parseLevel(raw, registry) {
     fail("le registre de types est manquant ou invalide.");
   }
 
-  const { id, titleKey, length, playerStart, entities, music, ambiences } = raw;
+  const { id, titleKey, length, playerStart, entities, music, ambiences, reverbDurationSec, reverbDecay } = raw;
 
   if (!isNonEmptyString(id)) {
     fail(`id manquant ou invalide (reçu : ${JSON.stringify(id)}).`);
@@ -79,8 +79,17 @@ export function parseLevel(raw, registry) {
   if (!isFiniteNumber(length) || length <= 0) {
     fail(`length doit être un nombre > 0 (reçu : ${JSON.stringify(length)}).`);
   }
-  if (!isFiniteNumber(playerStart) || playerStart < 0 || playerStart > length) {
-    fail(`playerStart (${JSON.stringify(playerStart)}) hors des bornes [0, ${length}].`);
+  // playerStart : point d'arrivée PAR DÉFAUT du lieu. FILET, pas de rejet :
+  // absent ou hors [0, length] -> repli sur 0, jamais d'exception (un lieu
+  // mal configuré ne doit pas empêcher d'y entrer). Des points d'arrivée
+  // NOMMÉS (ex. arriver à l'entrée précise associée à la porte empruntée)
+  // pourront s'ajouter plus tard, sans toucher à ce filet — pas codés ici.
+  const resolvedPlayerStart =
+    isFiniteNumber(playerStart) && playerStart >= 0 && playerStart <= length ? playerStart : 0;
+  if (resolvedPlayerStart !== playerStart) {
+    console.warn(
+      `parseLevel: playerStart (${JSON.stringify(playerStart)}) absent ou hors bornes, repli sur 0.`
+    );
   }
   if (!Array.isArray(entities)) {
     fail(`entities doit être un tableau (reçu : ${JSON.stringify(entities)}).`);
@@ -102,11 +111,31 @@ export function parseLevel(raw, registry) {
       );
     }
   }
+  // reverbDurationSec/reverbDecay : optionnels, surchargent par LIEU les
+  // défauts globaux du bus de réverb (config/tuning-values.js) — voir
+  // view/audio/city-scene.js. Simple passage validé, comme music/ambiences ;
+  // aucune logique de résolution ici (ça reste dans la vue).
+  if (reverbDurationSec !== undefined && (!isFiniteNumber(reverbDurationSec) || reverbDurationSec <= 0)) {
+    fail(`reverbDurationSec doit être un nombre > 0 si présent (reçu : ${JSON.stringify(reverbDurationSec)}).`);
+  }
+  if (reverbDecay !== undefined && (!isFiniteNumber(reverbDecay) || reverbDecay <= 0)) {
+    fail(`reverbDecay doit être un nombre > 0 si présent (reçu : ${JSON.stringify(reverbDecay)}).`);
+  }
 
   const seenIds = new Set();
   const parsedEntities = entities.map((rawEntity, index) =>
     parseEntity(rawEntity, index, registry, length, seenIds)
   );
 
-  return { id, titleKey, length, playerStart, entities: parsedEntities, music, ambiences };
+  return {
+    id,
+    titleKey,
+    length,
+    playerStart: resolvedPlayerStart,
+    entities: parsedEntities,
+    music,
+    ambiences,
+    reverbDurationSec,
+    reverbDecay,
+  };
 }
