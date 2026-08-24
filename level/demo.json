@@ -3,6 +3,7 @@
   "titleKey": "level.demo.title",
   "length": 40,
   "playerStart": 2,
+  "music": "assets/musics/a_warm_night_in_harlem.mp3",
   "entities": [
     { "id": "object-toolbox", "type": "object", "x": 8, "nameKey": "object.toolbox", "descriptionKey": "object.toolbox.description" },
     { "id": "door-exit", "type": "door", "x": 9, "nameKey": "door.exit", "target": "demo-next", "descriptionKey": "door.exit.description" },

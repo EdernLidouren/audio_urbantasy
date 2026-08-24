@@ -20,6 +20,7 @@ const PREFS_VERSION = 1;
 export const PREF_CONSTRAINTS = {
   beaconVolume: { type: "number", min: 0, max: 100, default: 50 },
   footstepVolume: { type: "number", min: 0, max: 100, default: 50 },
+  musicVolume: { type: "number", min: 0, max: 100, default: 50 },
 };
 
 const store = new Map();

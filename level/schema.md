@@ -13,6 +13,7 @@ parsé, sans aucune chaîne affichable en dur — uniquement des clés i18n.
 | `length`      | number   | `> 0` — longueur en unités le long de l'axe x     |
 | `playerStart` | number   | dans `[0, length]` — position x de départ         |
 | `entities`    | Entity[] | voir ci-dessous                                   |
+| `music`       | string   | optionnel : chemin vers la musique du lieu (`assets/musics/...`), canal global non spatialisé — voir `view/audio/city-scene.js` |
 
 ## Entité
 

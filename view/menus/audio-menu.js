@@ -9,12 +9,14 @@
 import { announce } from "../../lib/announce.js";
 import { popScreen } from "../../lib/screens.js";
 import { reannounceActiveMenuEntry } from "../../lib/menu.js";
+import { setMusicVolume } from "../../lib/audio.js";
 import { t } from "../../i18n/index.js";
 import { setPref, PREF_CONSTRAINTS } from "../../config/preferences.js";
 import { refreshActiveBeaconVolumes } from "../audio/city-scene.js";
 
 const BEACON = PREF_CONSTRAINTS.beaconVolume;
 const FOOTSTEP = PREF_CONSTRAINTS.footstepVolume;
+const MUSIC = PREF_CONSTRAINTS.musicVolume;
 
 export function createAudioMenu() {
   // Liste séparée (pas juste inline dans entries) : réutilisée telle quelle
@@ -52,6 +54,21 @@ export function createAudioMenu() {
       // chaque pas (lib/audio.js, playOneShot), pas besoin de rafraîchir
       // quoi que ce soit ici.
     },
+    {
+      kind: "slider",
+      labelKey: "audio.music_volume",
+      prefKey: "musicVolume",
+      min: MUSIC.min,
+      max: MUSIC.max,
+      step: 1,
+      bigStep: 5,
+      unit: "%",
+      default: MUSIC.default,
+      // Canal global (lib/audio.js), singleton indépendant de toute scène :
+      // pas besoin de passer par city-scene.js, setMusicVolume s'applique
+      // directement à la piste en cours (déjà en train de jouer).
+      onChange: (value) => setMusicVolume(value / 100),
+    },
   ];
 
   // Réinitialise UNIQUEMENT les clés de ce sous-menu (pas resetAllPrefs,
@@ -63,6 +80,7 @@ export function createAudioMenu() {
       setPref(slider.prefKey, slider.default);
     }
     refreshActiveBeaconVolumes();
+    setMusicVolume(MUSIC.default / 100);
     announce(t("menu.audio.reset_done"), { assertive: true });
     // Ré-annonce la ligne courante avec sa nouvelle valeur (le curseur est
     // resté sur "Réinitialiser", mais le principe reste générique — voir

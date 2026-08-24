@@ -63,7 +63,7 @@ export function parseLevel(raw, registry) {
     fail("le registre de types est manquant ou invalide.");
   }
 
-  const { id, titleKey, length, playerStart, entities } = raw;
+  const { id, titleKey, length, playerStart, entities, music } = raw;
 
   if (!isNonEmptyString(id)) {
     fail(`id manquant ou invalide (reçu : ${JSON.stringify(id)}).`);
@@ -80,11 +80,17 @@ export function parseLevel(raw, registry) {
   if (!Array.isArray(entities)) {
     fail(`entities doit être un tableau (reçu : ${JSON.stringify(entities)}).`);
   }
+  // music : optionnel, chemin vers la musique du lieu (voir
+  // view/audio/city-scene.js). Simple passage : parseLevel ne connaît ni
+  // Howler ni la lecture audio, juste la présence d'une chaîne.
+  if (music !== undefined && !isNonEmptyString(music)) {
+    fail(`music doit être une chaîne non vide si présent (reçu : ${JSON.stringify(music)}).`);
+  }
 
   const seenIds = new Set();
   const parsedEntities = entities.map((rawEntity, index) =>
     parseEntity(rawEntity, index, registry, length, seenIds)
   );
 
-  return { id, titleKey, length, playerStart, entities: parsedEntities };
+  return { id, titleKey, length, playerStart, entities: parsedEntities, music };
 }

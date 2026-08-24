@@ -34,6 +34,7 @@ export default {
   "menu.audio.title": "Audio",
   "audio.beacon_volume": "Volume des balises",
   "audio.footstep_volume": "Volume des pas",
+  "audio.music_volume": "Volume de la musique",
   "menu.audio.reset": "Réinitialiser aux valeurs par défaut",
   "menu.audio.reset_done": "Réglages audio réinitialisés.",
 

@@ -11,24 +11,30 @@
 // reste la seule source de localisation et de distance. Modèle d'entité et
 // vocabulaire de sons (balise/mouvement/ponctuel) : voir entities/model.md.
 
-import { playOneShot, createPositionedSound, createReverbBus } from "../../lib/audio.js";
+import { playOneShot, createPositionedSound, createReverbBus, playMusic, stopMusic, setMusicVolume } from "../../lib/audio.js";
 import { announce } from "../../lib/announce.js";
 import registry from "../../entities/types.js";
 import player from "../../entities/player.js";
 import { TUNING_DEFAULTS, resolveTuning } from "../../config/tuning.js";
-import { getPref } from "../../config/preferences.js";
+import { getPref, PREF_CONSTRAINTS } from "../../config/preferences.js";
 import { t } from "../../i18n/index.js";
 
 // Facteurs de préférence (Options > Audio, voir view/menus/audio-menu.js) :
 // stockés en pourcentage [0,100] (même domaine que les sliders), convertis
 // ici en facteur [0,1] appliqué MULTIPLICATIVEMENT par-dessus le volume déjà
-// calculé (distance, cascade de tuning...) — jamais à sa place. Défaut 100 :
-// comportement strictement inchangé tant qu'aucune préférence n'est posée.
+// calculé (distance, cascade de tuning...) — jamais à sa place. Fallback =
+// PREF_CONSTRAINTS.default (même source que les sliders, voir
+// config/preferences.js) : comportement inchangé tant qu'aucune préférence
+// n'est posée, cohérent avec ce que le slider affiche dès sa première
+// ouverture.
 function beaconVolumeFactor() {
-  return getPref("beaconVolume", 100) / 100;
+  return getPref("beaconVolume", PREF_CONSTRAINTS.beaconVolume.default) / 100;
 }
 function footstepVolumeFactor() {
-  return getPref("footstepVolume", 100) / 100;
+  return getPref("footstepVolume", PREF_CONSTRAINTS.footstepVolume.default) / 100;
+}
+function musicVolumeFactor() {
+  return getPref("musicVolume", PREF_CONSTRAINTS.musicVolume.default) / 100;
 }
 
 // STEP_DISTANCE ne concerne aucune entité (c'est le pas du joueur) : défaut
@@ -179,6 +185,15 @@ export function createCityAudioScene(getSession) {
     sound.sendToReverb(reverbBus.input, reverbSend);
   }
 
+  // Musique du lieu : canal GLOBAL non spatialisé (aucun pan/filtre/réverb,
+  // voir lib/audio.js), propriété du niveau, pas d'une entité — optionnelle,
+  // un niveau sans champ music ne joue simplement rien.
+  const music = getSession().level.music;
+  if (music) {
+    playMusic(music);
+    setMusicVolume(musicVolumeFactor());
+  }
+
   let lastFootstepX = getSession().player.x;
   let previousX = getSession().player.x;
   // Seule source de vérité pour "était en mouvement au tick précédent".
@@ -275,6 +290,10 @@ export function createCityAudioScene(getSession) {
       sound.stop(); // nettoie aussi son propre envoi de réverb
     }
     reverbBus.destroy();
+    // Sortie RÉELLE de la scène uniquement (voir view/city-screen.js,
+    // onExit) : un menu/pause empilé par-dessus n'appelle jamais destroy(),
+    // donc n'arrête jamais la musique — seule la vraie sortie le fait.
+    stopMusic();
     if (activeScene === api) activeScene = null;
   }
 
@@ -293,10 +312,13 @@ export function createCityAudioScene(getSession) {
 
   // Pause/reprise SÉLECTIVE : uniquement les balises positionnées des
   // entités (pas le bus de réverb, qui ne fait que traiter un signal — sans
-  // signal entrant il est déjà silencieux — et pas une future
-  // musique/ambiance globale, qui n'est pas une "voix de la scène"). Utilisé
-  // par le menu de désambiguïsation (view/interaction.js) pour dégager le
-  // canal pendant qu'il est ouvert, sans toucher au contexte audio global.
+  // signal entrant il est déjà silencieux — et pas la musique, canal global
+  // non spatialisé, qui n'est pas une "voix de la scène" — voir lib/audio.js
+  // playMusic/stopMusic). Utilisé par les menus qui se superposent au jeu
+  // (désambiguïsation, pause — voir view/interaction.js,
+  // view/menus/pause-menu.js) pour dégager le canal positionné pendant
+  // qu'ils sont ouverts, sans toucher au contexte audio global ni à la
+  // musique, qui continue derrière eux.
   function pauseBeacons() {
     for (const { sound } of entitySounds) {
       sound.pause();

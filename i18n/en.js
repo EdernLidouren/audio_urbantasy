@@ -33,6 +33,7 @@ export default {
   "menu.audio.title": "Audio",
   "audio.beacon_volume": "Beacon volume",
   "audio.footstep_volume": "Footstep volume",
+  "audio.music_volume": "Music volume",
   "menu.audio.reset": "Reset to defaults",
   "menu.audio.reset_done": "Audio settings reset.",
 
