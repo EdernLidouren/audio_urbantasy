@@ -24,6 +24,7 @@ import { playOneShot } from "../lib/audio.js";
 import { resolveAsset } from "../lib/assets.js";
 import { announce } from "../lib/announce.js";
 import { t } from "../i18n/index.js";
+import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
 
 const STORAGE_KEY = "templeton-save";
 
@@ -50,7 +51,7 @@ function decodeFromStorage(raw) {
 // juste le nom du pool seul, resolveAsset ne le trouverait pas.
 // resolveAsset reste défensif si le fichier ou le manifeste manquait
 // (intercepté ci-dessous, jamais de crash, juste pas de son).
-const SAVE_SOUND_KEY = "assets/sounds/ui_save";
+const SAVE_SOUND_KEY = "assets/sounds/ui/save";
 
 // Exporté : réutilisé tel quel pour le retour sensoriel d'un import de
 // partie réussi (voir view/menus/save-menu.js) — même son que la
@@ -58,7 +59,11 @@ const SAVE_SOUND_KEY = "assets/sounds/ui_save";
 // succès", pas seulement "sauvegarde".
 export function playSaveSound() {
   try {
-    playOneShot(resolveAsset(SAVE_SOUND_KEY), { volume: 1 });
+    // Catégorie "interface" (Options > Audio) : même son que les menus, même
+    // curseur de volume — voir config/preferences.js/interfaceVolume et
+    // view/menu-sounds.js.
+    const factor = getPref("interfaceVolume", PREF_CONSTRAINTS.interfaceVolume.default) / 100;
+    playOneShot(resolveAsset(SAVE_SOUND_KEY), { volume: factor });
   } catch (error) {
     console.warn(`saveGame: son de sauvegarde indisponible ("${SAVE_SOUND_KEY}") : ${error.message}`);
   }

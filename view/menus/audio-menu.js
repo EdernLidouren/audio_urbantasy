@@ -17,6 +17,7 @@ const BEACON = PREF_CONSTRAINTS.beaconVolume;
 const FOOTSTEP = PREF_CONSTRAINTS.footstepVolume;
 const MUSIC = PREF_CONSTRAINTS.musicVolume;
 const AMBIENCE = PREF_CONSTRAINTS.ambienceVolume;
+const INTERFACE = PREF_CONSTRAINTS.interfaceVolume;
 
 export function createAudioMenu() {
   // Liste séparée (pas juste inline dans entries) : réutilisée telle quelle
@@ -83,6 +84,22 @@ export function createAudioMenu() {
       // "ambience" (voir lib/audio.js, setGlobalVolume applique le même
       // facteur à tous les flux du canal).
       onChange: (value) => setGlobalVolume("ambience", value / 100),
+    },
+    {
+      kind: "slider",
+      labelKey: "audio.interface_volume",
+      prefKey: "interfaceVolume",
+      min: INTERFACE.min,
+      max: INTERFACE.max,
+      step: 1,
+      bigStep: 5,
+      unit: "%",
+      default: INTERFACE.default,
+      // Sons PONCTUELS (menus + sauvegarde), jamais déjà en cours : la
+      // préférence est relue à chaque déclenchement (voir
+      // view/menu-sounds.js et view/save-storage.js), même raisonnement que
+      // footstepVolume ci-dessus — pas besoin de rafraîchir quoi que ce soit
+      // ici.
     },
   ];
 

@@ -25,6 +25,11 @@ export const PREF_CONSTRAINTS = {
   // Plus bas que la musique par défaut : une ambiance est un fond, pas un
   // second plan musical.
   ambienceVolume: { type: "number", min: 0, max: 100, default: 35 },
+  // Sons d'INTERFACE : menus (wrap/block/select/cancel/toggle, voir
+  // view/menu-sounds.js) + retour de sauvegarde (voir view/save-storage.js)
+  // — jamais spatialisés, jamais dans la scène ville. Catégorie à part des
+  // quatre ci-dessus (qui sont toutes des sons DU MONDE ou de son ambiance).
+  interfaceVolume: { type: "number", min: 0, max: 100, default: 50 },
   // Comportement générique des menus (lib/menu.js), pas un réglage audio :
   // cyclage haut/bas, étoile de repli pour braille/sans-son, suffixe de
   // position ("x sur y"). Défauts choisis pour ne rien changer au

@@ -8,7 +8,8 @@ import { initInput } from "./lib/input.js";
 import { ensureAudioUnlocked } from "./lib/audio.js";
 import { preventMovementKeyScrolling } from "./view/input.js";
 import { createMainMenu } from "./view/menus/main-menu.js";
-import { makeMenuScreen, configureMenuPreferences } from "./lib/menu.js";
+import { makeMenuScreen, configureMenuPreferences, configureMenuSounds } from "./lib/menu.js";
+import { playMenuSound } from "./view/menu-sounds.js";
 import { makeCityScreen } from "./view/city-screen.js";
 import { t } from "./i18n/index.js";
 import { runMovementChecks } from "./core/movement.check.js";
@@ -25,6 +26,10 @@ import { checkAutoSaveTimer } from "./view/autosave-timer.js";
 // écran-menu construit ensuite (makeMenuScreen(menu, t)) en hérite sans
 // avoir à les repasser.
 configureMenuPreferences({ getPref, setPref });
+// Sons d'interaction des menus (wrap/block/select/cancel/toggle), même
+// patron d'injection que les préférences ci-dessus — voir lib/menu.js et
+// view/menu-sounds.js.
+configureMenuSounds(playMenuSound);
 
 // Un import n'expose rien au scope global : on l'attache explicitement à
 // window pour pouvoir appeler runMovementChecks() depuis la console. Un

@@ -37,6 +37,7 @@ export default {
   "audio.footstep_volume": "Volume des pas",
   "audio.music_volume": "Volume de la musique",
   "audio.ambience_volume": "Volume de l'ambiance",
+  "audio.interface_volume": "Volume de l'interface",
   "menu.audio.reset": "Réinitialiser aux valeurs par défaut",
   "menu.audio.reset_done": "Réglages audio réinitialisés",
 

@@ -36,6 +36,7 @@ export default {
   "audio.footstep_volume": "Footstep volume",
   "audio.music_volume": "Music volume",
   "audio.ambience_volume": "Ambience volume",
+  "audio.interface_volume": "Interface volume",
   "menu.audio.reset": "Reset to defaults",
   "menu.audio.reset_done": "Audio settings reset",
 

@@ -37,7 +37,7 @@ export default {
     label: "entity.door",
     descriptionKey: "entity.door.description",
     sounds: {
-      beacon: { path: "assets/sounds/door_beacon_1.mp3", loop: true },
+      beacon: { path: "assets/sounds/entities/door_beacon_1.mp3", loop: true },
     },
     blocksMovement: false,
     enterable: true,
@@ -46,7 +46,7 @@ export default {
     label: "entity.npc",
     descriptionKey: "entity.npc.description",
     sounds: {
-      beacon: { path: "assets/sounds/npc_beacon_1.mp3", loop: true },
+      beacon: { path: "assets/sounds/entities/npc_beacon_1.mp3", loop: true },
     },
     blocksMovement: false,
     enterable: false,
@@ -55,7 +55,7 @@ export default {
     label: "entity.object",
     descriptionKey: "entity.object.description",
     sounds: {
-      beacon: { path: "assets/sounds/box_of_nails_beacon_1.mp3", loop: true },
+      beacon: { path: "assets/sounds/entities/box_of_nails_beacon_1.mp3", loop: true },
     },
     blocksMovement: false,
     enterable: false,
@@ -71,9 +71,9 @@ export default {
     label: "entity.rock",
     descriptionKey: "entity.rock.description",
     sounds: {
-      beacon: { path: "assets/sounds/big_rock_beacon_1.mp3", loop: true },
+      beacon: { path: "assets/sounds/entities/big_rock_beacon_1.mp3", loop: true },
     },
-    collisionSound: "assets/sounds/big_rock_collision_1.mp3",
+    collisionSound: "assets/sounds/entities/big_rock_collision_1.mp3",
     blocksMovement: true,
     enterable: false,
   },
@@ -85,7 +85,7 @@ export default {
     label: "entity.dog",
     descriptionKey: "entity.dog.description",
     sounds: {
-      beacon: { path: "assets/sounds/box_of_nails_beacon_1.mp3", loop: true },
+      beacon: { path: "assets/sounds/entities/box_of_nails_beacon_1.mp3", loop: true },
     },
     blocksMovement: false,
     enterable: false,
@@ -96,7 +96,7 @@ export default {
   decor: {
     label: "entity.decor",
     sounds: {
-      beacon: { path: "assets/sounds/box_of_nails_beacon_1.mp3", loop: true },
+      beacon: { path: "assets/sounds/entities/box_of_nails_beacon_1.mp3", loop: true },
     },
     blocksMovement: true,
     enterable: false,

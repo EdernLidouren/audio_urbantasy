@@ -11,25 +11,57 @@
   "assets/musics/indigo_glow": [
     "assets/musics/indigo_glow.mp3"
   ],
-  "assets/sounds/big_rock_beacon": [
-    "assets/sounds/big_rock_beacon_1.mp3"
+  "assets/sounds/entities/big_rock_beacon": [
+    "assets/sounds/entities/big_rock_beacon_1.mp3"
   ],
-  "assets/sounds/big_rock_collision": [
-    "assets/sounds/big_rock_collision_1.mp3"
+  "assets/sounds/entities/big_rock_collision": [
+    "assets/sounds/entities/big_rock_collision_1.mp3"
   ],
-  "assets/sounds/box_of_nails_beacon": [
-    "assets/sounds/box_of_nails_beacon_1.mp3"
+  "assets/sounds/entities/box_of_nails_beacon": [
+    "assets/sounds/entities/box_of_nails_beacon_1.mp3"
   ],
-  "assets/sounds/door_beacon": [
-    "assets/sounds/door_beacon_1.mp3"
+  "assets/sounds/entities/dog_medium_vocal": [
+    "assets/sounds/entities/dog_medium_vocal_1.mp3",
+    "assets/sounds/entities/dog_medium_vocal_2.mp3",
+    "assets/sounds/entities/dog_medium_vocal_3.mp3",
+    "assets/sounds/entities/dog_medium_vocal_4.mp3",
+    "assets/sounds/entities/dog_medium_vocal_5.mp3"
   ],
-  "assets/sounds/footstep_concrete_walk": [
-    "assets/sounds/footstep_concrete_walk_1.mp3"
+  "assets/sounds/entities/door_beacon": [
+    "assets/sounds/entities/door_beacon_1.mp3"
   ],
-  "assets/sounds/npc_beacon": [
-    "assets/sounds/npc_beacon_1.mp3"
+  "assets/sounds/entities/npc_beacon": [
+    "assets/sounds/entities/npc_beacon_1.mp3"
   ],
-  "assets/sounds/ui_save": [
-    "assets/sounds/ui_save_1.mp3"
+  "assets/sounds/footsteps/concrete_walk": [
+    "assets/sounds/footsteps/concrete_walk_1.mp3"
+  ],
+  "assets/sounds/footsteps/dog_medium_walk": [
+    "assets/sounds/footsteps/dog_medium_walk_1.mp3",
+    "assets/sounds/footsteps/dog_medium_walk_2.mp3",
+    "assets/sounds/footsteps/dog_medium_walk_3.mp3",
+    "assets/sounds/footsteps/dog_medium_walk_4.mp3",
+    "assets/sounds/footsteps/dog_medium_walk_5.mp3"
+  ],
+  "assets/sounds/ui/block": [
+    "assets/sounds/ui/block_1.mp3"
+  ],
+  "assets/sounds/ui/cancel": [
+    "assets/sounds/ui/cancel_1.mp3"
+  ],
+  "assets/sounds/ui/reset": [
+    "assets/sounds/ui/reset_1.mp3"
+  ],
+  "assets/sounds/ui/save": [
+    "assets/sounds/ui/save_1.mp3"
+  ],
+  "assets/sounds/ui/select": [
+    "assets/sounds/ui/select_1.mp3"
+  ],
+  "assets/sounds/ui/toggle": [
+    "assets/sounds/ui/toggle_1.mp3"
+  ],
+  "assets/sounds/ui/wrap": [
+    "assets/sounds/ui/wrap_1.mp3"
   ]
 }
