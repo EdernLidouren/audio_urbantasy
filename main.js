@@ -18,6 +18,7 @@ import registry from "./entities/types.js";
 import { createInitialState } from "./core/state.js";
 import { getPref, setPref } from "./config/preferences.js";
 import { configureAssetManifest } from "./lib/assets.js";
+import { checkAutoSaveTimer } from "./view/autosave-timer.js";
 
 // Préférences de menu (sliders/toggles + cyclage/étoile/suffixe, voir
 // lib/menu.js) injectées UNE FOIS ici, point de composition unique — tout
@@ -73,7 +74,14 @@ window.debugPlayerX = () => {
 };
 
 pushScreen(makeMenuScreen(createMainMenu(enterCity, getSession), t));
-startLoop(tickActive);
+// checkAutoSaveTimer composé À CÔTÉ de tickActive, pas dedans : il doit
+// tourner en continu (temps réel), même quand un menu est au sommet de la
+// pile et que tickActive() ne fait donc plus rien (voir
+// view/autosave-timer.js).
+startLoop(() => {
+  tickActive();
+  checkAutoSaveTimer(getSession);
+});
 
 loadLevel("./level/demo.json", registry)
   .then((loadedLevel) => {

@@ -40,6 +40,10 @@ export const PREF_CONSTRAINTS = {
   // partie EST la sauvegarde (voir CLAUDE.md), autant qu'elle le soit
   // réellement sans action de l'utilisateur.
   autoSaveOnTransition: { type: "boolean", default: true },
+  // Auto-save TEMPORELLE (temps réel, voir view/autosave-timer.js) — 0 =
+  // désactivée ("Jamais", formatage spécial côté menu). INDÉPENDANTE
+  // d'autoSaveOnTransition : les deux coexistent, jamais couplées.
+  autoSaveIntervalMinutes: { type: "number", min: 0, max: 30, default: 5 },
 };
 
 const store = new Map();

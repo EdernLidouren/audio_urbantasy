@@ -19,8 +19,10 @@ import { saveGame } from "../save-storage.js";
 // view/audio/city-scene.js), pour dégager le canal audio positionné pendant
 // que ce menu est ouvert, sans toucher au contexte audio global. getSession
 // : partie courante, TOUJOURS non nulle ici (ce menu n'existe qu'ouvert
-// depuis une scène d'exploration active) — passée à Options -> Sauvegarde
-// pour l'accès "Sauvegarder" complet (voir save-menu.js).
+// depuis une scène d'exploration active) — utilisée directement pour
+// "Sauvegarder" ci-dessous (seul point d'accès à la sauvegarde manuelle,
+// voir save-menu.js pour les réglages/import-export) et transmise à
+// Options pour ce qui en a besoin (Sauvegarde > import/export de partie).
 export function openPauseMenu(scene, getSession) {
   const menu = {
     title: "menu.pause.title",

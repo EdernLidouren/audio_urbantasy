@@ -6,9 +6,8 @@
 // chaînes déjà traduites) : lib/menu.js les résout via le t reçu en
 // paramètre, au moment de l'annonce.
 
-import { announce } from "../../lib/announce.js";
 import { pushScreen, popScreen } from "../../lib/screens.js";
-import { makeMenuScreen, reannounceActiveMenuEntry } from "../../lib/menu.js";
+import { makeMenuScreen, makeMessageScreen } from "../../lib/menu.js";
 import { setGlobalVolume } from "../../lib/audio.js";
 import { t } from "../../i18n/index.js";
 import { resetAllPrefs, PREF_CONSTRAINTS } from "../../config/preferences.js";
@@ -41,8 +40,11 @@ function openResetAllConfirmation() {
           refreshActiveBeaconVolumes();
           setGlobalVolume("music", PREF_CONSTRAINTS.musicVolume.default / 100);
           setGlobalVolume("ambience", PREF_CONSTRAINTS.ambienceVolume.default / 100);
-          announce(t("menu.options.reset_all_done"), { assertive: true });
-          reannounceActiveMenuEntry();
+          // Écran-message plutôt qu'une simple annonce : le résultat doit
+          // être entendu en entier, jamais écrasé par une ré-annonce
+          // immédiate de la ligne de menu courante (voir
+          // lib/menu.js/makeMessageScreen).
+          pushScreen(makeMessageScreen("menu.options.reset_all_done", t));
         },
       },
     ],

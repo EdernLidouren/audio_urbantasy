@@ -6,9 +6,8 @@
 // d'entrées sont des CLÉS de traduction, résolues par lib/menu.js via le t
 // reçu en paramètre.
 
-import { announce } from "../../lib/announce.js";
-import { popScreen } from "../../lib/screens.js";
-import { reannounceActiveMenuEntry } from "../../lib/menu.js";
+import { pushScreen, popScreen } from "../../lib/screens.js";
+import { makeMessageScreen } from "../../lib/menu.js";
 import { setGlobalVolume } from "../../lib/audio.js";
 import { t } from "../../i18n/index.js";
 import { setPref, PREF_CONSTRAINTS } from "../../config/preferences.js";
@@ -98,11 +97,10 @@ export function createAudioMenu() {
     refreshActiveBeaconVolumes();
     setGlobalVolume("music", MUSIC.default / 100);
     setGlobalVolume("ambience", AMBIENCE.default / 100);
-    announce(t("menu.audio.reset_done"), { assertive: true });
-    // Ré-annonce la ligne courante avec sa nouvelle valeur (le curseur est
-    // resté sur "Réinitialiser", mais le principe reste générique — voir
-    // reannounceActiveMenuEntry).
-    reannounceActiveMenuEntry();
+    // Écran-message plutôt qu'une simple annonce : le résultat doit être
+    // entendu en entier, jamais écrasé par une ré-annonce immédiate de la
+    // ligne de menu courante (voir lib/menu.js/makeMessageScreen).
+    pushScreen(makeMessageScreen("menu.audio.reset_done", t));
   }
 
   return {

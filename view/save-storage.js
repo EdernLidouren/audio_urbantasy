@@ -1,9 +1,12 @@
-// Accès disque pour la SAUVEGARDE DE PARTIE (localStorage) — distinct de
+// Accès disque pour la SAUVEGARDE DE PARTIE (localStorage ET fichier —
+// export/import, voir exportGame/importGame plus bas) — distinct de
 // config/preferences.js (clé différente, format différent : une PARTIE, pas
 // des réglages). La forme/validation reste dans core/save.js (pur) ; ce
 // module ne fait QUE lire/écrire le disque, brancher l'obscurcissement (voir
 // lib/obfuscate.js) et le retour sensoriel (son + annonce) d'une sauvegarde
-// réussie — jamais de logique de partie ici.
+// réussie — jamais de logique de partie ici. importGame en particulier ne
+// REMPLACE rien elle-même : elle renvoie une session candidate, à charge de
+// l'appelant de décider de l'appliquer (voir view/menus/save-menu.js).
 //
 // Obscurcissement, PAS chiffrement (voir lib/obfuscate.js pour l'avertissement
 // complet) : décourage l'édition triviale d'un fichier de save, ne sécurise
@@ -42,13 +45,18 @@ function decodeFromStorage(raw) {
   return raw;
 }
 
-// Clé PLACEHOLDER : le fichier n'existe pas encore, à ajouter plus tard.
-// resolveAsset échoue proprement (clé introuvable, ou manifeste pas encore
-// chargé) tant qu'il manque — intercepté ci-dessous, jamais de crash, juste
-// pas de son.
-const SAVE_SOUND_KEY = "ui_save";
+// Clé de POOL, chemin complet (assets/<dossier>/<pool>) — comme partout
+// ailleurs dans le manifeste (voir tools/build_audio_manifest.py) : jamais
+// juste le nom du pool seul, resolveAsset ne le trouverait pas.
+// resolveAsset reste défensif si le fichier ou le manifeste manquait
+// (intercepté ci-dessous, jamais de crash, juste pas de son).
+const SAVE_SOUND_KEY = "assets/sounds/ui_save";
 
-function playSaveSound() {
+// Exporté : réutilisé tel quel pour le retour sensoriel d'un import de
+// partie réussi (voir view/menus/save-menu.js) — même son que la
+// sauvegarde, traité comme le repère général "donnée écrite/restaurée avec
+// succès", pas seulement "sauvegarde".
+export function playSaveSound() {
   try {
     playOneShot(resolveAsset(SAVE_SOUND_KEY), { volume: 1 });
   } catch (error) {
@@ -56,13 +64,17 @@ function playSaveSound() {
   }
 }
 
-// Sérialise + écrit la partie sur disque. Retour sensoriel (son + annonce)
-// UNIQUEMENT si l'écriture a réellement réussi — jamais si localStorage a
-// échoué (quota, mode privé, désactivé), pour ne jamais laisser croire à
-// une sauvegarde qui n'a pas eu lieu. Ne lève jamais : { success } pour que
-// l'appelant puisse réagir en plus (ex. fermer un menu) sans dupliquer la
-// détection d'échec.
-export function saveGame(session) {
+// Sérialise + écrit la partie sur disque. Retour sensoriel UNIQUEMENT si
+// l'écriture a réellement réussi — jamais si localStorage a échoué (quota,
+// mode privé, désactivé), pour ne jamais laisser croire à une sauvegarde
+// qui n'a pas eu lieu. L'annonce accompagne TOUJOURS un succès ; le SON,
+// lui, est optionnel (playSound, défaut true) — la sauvegarde auto sur
+// TRANSITION (voir city-screen.js) le désactive explicitement, pour ne
+// jamais se superposer au reste de l'ambiance sonore d'une simple
+// traversée de porte. Ne lève jamais : { success } pour que l'appelant
+// puisse réagir en plus (ex. fermer un menu) sans dupliquer la détection
+// d'échec.
+export function saveGame(session, { playSound = true } = {}) {
   try {
     const json = JSON.stringify(serializeGame(session));
     localStorage.setItem(STORAGE_KEY, encodeForStorage(json));
@@ -71,7 +83,7 @@ export function saveGame(session) {
     return { success: false };
   }
 
-  playSaveSound();
+  if (playSound) playSaveSound();
   announce(t("save.done"), { assertive: true });
   return { success: true };
 }
@@ -120,4 +132,79 @@ export function hasSave() {
   } catch {
     return false;
   }
+}
+
+// Déclenche le téléchargement d'un fichier texte — même mécanique que
+// config/preferences.js/exportPreferences (Blob + <a download> détaché,
+// jamais ajouté au DOM), généralisée ici pour être réutilisée par
+// exportGame ci-dessous sans dupliquer la logique.
+function downloadTextFile(filename, text) {
+  const blob = new Blob([text], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// Lit un File en texte — même mécanique que config/preferences.js/
+// importPreferences (FileReader), généralisée ici pour être réutilisée par
+// importGame ci-dessous.
+function readTextFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("lecture du fichier impossible"));
+    reader.onload = () => resolve(reader.result);
+    reader.readAsText(file);
+  });
+}
+
+// Exporte la partie COURANTE dans un fichier, OBSCURCIE — même couche et
+// même format que le stockage local (préfixe + blob), pour rester
+// cohérente et non éditable trivialement. Non destructif : aucune
+// confirmation nécessaire (voir importGame pour l'inverse).
+export function exportGame(session) {
+  const json = JSON.stringify(serializeGame(session));
+  downloadTextFile("templeton-partie.json", encodeForStorage(json));
+}
+
+// Lit un fichier de partie exportée -> { success, session } ou { success:
+// false, reason }. Gère l'obscurci ET le clair en repli (même détection de
+// préfixe que loadGame ci-dessus). Ne REMPLACE rien elle-même : renvoie
+// juste une session CANDIDATE, la décision de l'appliquer (destructif)
+// revient à l'appelant (voir view/menus/save-menu.js, qui demande
+// confirmation avant). Ne lève jamais.
+// reason ∈ "read" (FileReader), "obfuscation" (désobscurcissement), "parse"
+// (JSON invalide), ou une raison de deserializeGame ("format"/"version"/
+// "invalid").
+export async function importGame(file) {
+  let raw;
+  try {
+    raw = await readTextFile(file);
+  } catch {
+    return { success: false, reason: "read" };
+  }
+
+  let json;
+  try {
+    json = decodeFromStorage(raw);
+  } catch {
+    return { success: false, reason: "obfuscation" };
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    return { success: false, reason: "parse" };
+  }
+
+  const result = deserializeGame(parsed);
+  if (!result.success) {
+    return { success: false, reason: result.reason };
+  }
+  return { success: true, session: result.session };
 }

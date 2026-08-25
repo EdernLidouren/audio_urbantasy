@@ -10,6 +10,7 @@ import { ensureAudioUnlocked } from "../lib/audio.js";
 import { createCityAudioScene } from "./audio/city-scene.js";
 import { interact, chooseInteractionTarget, setDoorTransitionHandler } from "./interaction.js";
 import { openPauseMenu } from "./menus/pause-menu.js";
+import { setGameReplaceHandler } from "./menus/save-menu.js";
 import { tick } from "../core/actions.js";
 import { reduce } from "../core/reduce.js";
 import { loadLevelById } from "../level/load.js";
@@ -50,17 +51,36 @@ export function makeCityScreen(getSession, setSession) {
     // Auto-save SUR TRANSITION (préférence autoSaveOnTransition, défaut
     // true) : la transition vient d'atteindre un point de cohérence
     // naturel (nouveau monde actif, ancien rangé) — après l'annonce du
-    // titre, saveGame() ajoute sa propre confirmation (son + annonce, voir
-    // view/save-storage.js), qui prime alors sur la ligne assertive.
+    // titre, saveGame() ajoute sa propre annonce de confirmation, qui prime
+    // alors sur la ligne assertive. SANS le son (playSound:false) : une
+    // simple traversée de porte ne doit jamais se superposer au reste de
+    // l'ambiance sonore — seules la sauvegarde manuelle et l'auto-save
+    // temporelle (voir view/autosave-timer.js) le jouent.
     if (getPref("autoSaveOnTransition", PREF_CONSTRAINTS.autoSaveOnTransition.default)) {
-      saveGame(getSession());
+      saveGame(getSession(), { playSound: false });
     }
   }
 
-  // Enregistré une fois, pour la durée de vie de cet écran ville (voir
-  // view/interaction.js) : interact() délègue ici sur "activate" d'une
-  // porte, sans avoir besoin de connaître scene/session lui-même.
+  // Remplace la partie EN COURS par une session importée (voir
+  // view/menus/save-menu.js) : même mécanique que transitionThroughDoor
+  // (détruit la scène, remplace la session, reconstruit la scène sur le
+  // nouveau monde actif) — pour ne jamais laisser un Howl résiduel de
+  // l'ancien monde ni une scène désynchronisée de la session. Le son +
+  // l'annonce "Partie importée" restent à la charge de l'appelant (voir
+  // save-menu.js), symétrique à saveGame qui gère les siens lui-même.
+  function replaceCurrentGame(newSession) {
+    scene.destroy();
+    scene = null;
+    setSession(newSession);
+    scene = createCityAudioScene(getSession);
+  }
+
+  // Enregistrés une fois, pour la durée de vie de cet écran ville : mêmes
+  // principe et portée que setDoorTransitionHandler (voir
+  // view/interaction.js) — un module qui déclenche un effet possédé par
+  // city-screen.js (scene/session) sans avoir besoin de les connaître.
   setDoorTransitionHandler(transitionThroughDoor);
+  setGameReplaceHandler(replaceCurrentGame);
 
   return {
     onEnter() {
@@ -118,6 +138,7 @@ export function makeCityScreen(getSession, setSession) {
       scene.destroy();
       scene = null;
       setDoorTransitionHandler(null);
+      setGameReplaceHandler(null);
       // Invariant documenté (CLAUDE.md) : session est null hors partie.
       // Seul chemin de sortie de la ville aujourd'hui (menu pause -> retour
       // au menu principal, voir view/menus/pause-menu.js).
