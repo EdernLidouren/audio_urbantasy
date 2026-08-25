@@ -24,6 +24,7 @@ import { exportGame, importGame, playSaveSound } from "../save-storage.js";
 
 const AUTOSAVE_TRANSITION = PREF_CONSTRAINTS.autoSaveOnTransition;
 const AUTOSAVE_INTERVAL = PREF_CONSTRAINTS.autoSaveIntervalMinutes;
+const SAVE_SOUND_ENABLED = PREF_CONSTRAINTS.saveSoundEnabled;
 
 // Gestionnaire de remplacement de partie, enregistré UNE FOIS par
 // view/city-screen.js (setGameReplaceHandler, au moment de sa
@@ -182,6 +183,16 @@ export function createSaveMenu(getSession) {
         // 0 = désactivée : formatage spécial plutôt que "0 min", pour que
         // l'état "jamais" soit sans ambiguïté à l'oreille.
         format: (value) => (value === 0 ? t("save.autosave_interval_never") : `${value} min`),
+      },
+      {
+        // Gouverne le son de confirmation (voir
+        // view/save-storage.js/playSaveSound, vérifié là-bas au point
+        // d'émission unique — couvre sauvegarde ET import) — n'affecte
+        // jamais l'écriture elle-même, purement le retour sensoriel.
+        kind: "toggle",
+        labelKey: "save.sound_enabled",
+        prefKey: "saveSoundEnabled",
+        default: SAVE_SOUND_ENABLED.default,
       },
       {
         label: "save.export_game",

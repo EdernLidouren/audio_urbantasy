@@ -30,9 +30,9 @@ export function openPauseMenu(scene, getSession) {
     entries: [
       {
         // Accès rapide à la sauvegarde manuelle, sans détour par Options.
-        // saveGame() joue déjà le son + l'annonce de confirmation (voir
-        // view/save-storage.js) : on ferme le menu APRÈS, jamais de
-        // ré-annonce entre les deux qui écraserait la confirmation.
+        // saveGame() joue déjà son propre son de confirmation (voir
+        // view/save-storage.js, aucune annonce parlée) : fermer le menu
+        // juste après ne risque donc d'écraser aucune confirmation.
         label: "save.now",
         onActivate: () => {
           saveGame(getSession());

@@ -32,7 +32,9 @@ export function checkAutoSaveTimer(getSession) {
   const session = getSession();
   if (!session) return;
 
-  // Sauvegarde manuelle ou temporelle : le son joue (voir
-  // view/save-storage.js) — seule l'auto-save sur TRANSITION le désactive.
+  // Sauvegarde manuelle ou temporelle : le son est autorisé à jouer (voir
+  // view/save-storage.js, playSound) — seule l'auto-save sur TRANSITION le
+  // désactive structurellement. playSaveSound() vérifie en plus la
+  // préférence saveSoundEnabled : l'utilisateur garde le dernier mot.
   saveGame(session, { playSound: true });
 }

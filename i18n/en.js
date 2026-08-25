@@ -8,9 +8,9 @@ export default {
   "menu.message.ok": "OK",
 
   "menu.main.title": "Templeton",
+  "menu.main.continue": "Continue",
   "menu.main.new_game": "New game",
-  "menu.main.new_game_stub": "New game: not implemented yet.",
-  "menu.main.city_test": "Test town",
+  "menu.main.new_game_confirm_title": "A save exists. Starting a new game will overwrite it. Confirm?",
   "menu.main.options": "Options",
 
   "menu.interaction.title": "Interact",
@@ -54,7 +54,7 @@ export default {
   "save.autosave": "Auto-save on transitions",
   "save.autosave_interval": "Auto-save (minutes)",
   "save.autosave_interval_never": "Never",
-  "save.done": "Game saved.",
+  "save.sound_enabled": "Save sound",
   "save.no_active_game": "No active game.",
   "save.export_game": "Export game",
   "save.import_game": "Import game",

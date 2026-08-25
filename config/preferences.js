@@ -49,6 +49,13 @@ export const PREF_CONSTRAINTS = {
   // désactivée ("Jamais", formatage spécial côté menu). INDÉPENDANTE
   // d'autoSaveOnTransition : les deux coexistent, jamais couplées.
   autoSaveIntervalMinutes: { type: "number", min: 0, max: 30, default: 5 },
+  // Son de confirmation d'une sauvegarde réussie (voir
+  // view/save-storage.js/playSaveSound), lue à chaque appel — QUAND jouer un
+  // son reste décidé par l'appelant (playSound, jamais sur l'auto-save
+  // transition) ; ce réglage décide juste SI l'utilisateur veut l'entendre
+  // du tout. Activé par défaut : comportement inchangé tant que non
+  // désactivé explicitement.
+  saveSoundEnabled: { type: "boolean", default: true },
 };
 
 const store = new Map();

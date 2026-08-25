@@ -20,6 +20,7 @@ import { createInitialState } from "./core/state.js";
 import { getPref, setPref } from "./config/preferences.js";
 import { configureAssetManifest } from "./lib/assets.js";
 import { checkAutoSaveTimer } from "./view/autosave-timer.js";
+import { loadGame } from "./view/save-storage.js";
 
 // Préférences de menu (sliders/toggles + cyclage/étoile/suffixe, voir
 // lib/menu.js) injectées UNE FOIS ici, point de composition unique — tout
@@ -46,8 +47,10 @@ initInput(gameZone, { onFirstInput: ensureAudioUnlocked });
 preventMovementKeyScrolling(gameZone);
 gameZone.focus();
 
-// Niveau chargé en tâche de fond ; enterCity() le lit au moment de
+// Niveau chargé en tâche de fond ; startNewGame() le lit au moment de
 // l'activation (cas limite improbable : niveau pas encore chargé -> no-op).
+// "Continuer" n'en a pas besoin : une partie sauvegardée embarque déjà l'état
+// complet de ses mondes (voir loadGame/core/save.js), aucun fetch requis.
 let level = null;
 
 // Session de la partie en cours (sortie de createInitialState). null hors
@@ -62,11 +65,53 @@ function setSession(next) {
   session = next;
 }
 
-function enterCity() {
-  if (!level) return;
+// Session candidate d'une sauvegarde CHARGEABLE (pas juste présente : lue,
+// désobscurcie, parsée ET validée avec succès — voir loadGame), recalculée à
+// chaque (ré)affichage du menu principal (mainMenuScreen.onEnter ci-dessous).
+// Sert à la fois à décider si "Continuer" apparaît ET à fournir la session
+// à continueGame() sans recharger une seconde fois.
+let loadableSave = null;
+
+// "Nouvelle partie" (confirmée au préalable si un save existe, voir
+// main-menu.js/activateNewGame) : construit une partie NEUVE sur le niveau
+// de départ. ÉCRASEMENT PARESSEUX voulu : n'efface PAS le save disque ici —
+// la nouvelle partie ne remplacera l'ancien save qu'à sa PROCHAINE écriture
+// (manuelle ou auto), jamais à cet instant. Quitter avant toute sauvegarde
+// laisse donc l'ancien save intact.
+function startNewGame() {
+  if (!level) return; // niveau pas encore chargé : cas limite improbable
   session = createInitialState(level);
   pushScreen(makeCityScreen(getSession, setSession));
 }
+
+// "Continuer" : réutilise la session déjà chargée par mainMenuScreen.onEnter
+// (jamais un second appel à loadGame() ici) — cette entrée n'apparaît de
+// toute façon que quand loadableSave n'est pas null (voir createMainMenu).
+function continueGame() {
+  if (!loadableSave) return; // garde-fou, ne devrait pas arriver
+  session = loadableSave;
+  pushScreen(makeCityScreen(getSession, setSession));
+}
+
+// Écran-menu du menu principal : construit UNE FOIS puis réutilisé pour
+// toute la durée de vie de l'appli (revient au sommet de la pile par
+// "reveal" quand on quitte une partie, voir pause-menu.js/main_menu) — mais
+// ses ENTRÉES sont reconstruites à CHAQUE affichage (splice en place dans le
+// même tableau, jamais un nouvel objet menu : lib/menu.js capture la
+// référence `menu` une seule fois, entries/cursor restent mutables dessus).
+// Pas composeHook (lib/screens.js) ici : l'ordre compte — le
+// rafraîchissement doit avoir lieu AVANT l'annonce d'ouverture, alors que
+// composeHook exécute toujours le hook de base (l'annonce) en premier.
+const mainMenuDef = createMainMenu({ canContinue: false, continueGame, startNewGame, getSession });
+const mainMenuScreen = makeMenuScreen(mainMenuDef, t);
+const baseMainMenuOnEnter = mainMenuScreen.onEnter;
+mainMenuScreen.onEnter = () => {
+  loadableSave = loadGame();
+  const fresh = createMainMenu({ canContinue: loadableSave !== null, continueGame, startNewGame, getSession });
+  mainMenuDef.entries.splice(0, mainMenuDef.entries.length, ...fresh.entries);
+  mainMenuDef.cursor = 0;
+  baseMainMenuOnEnter();
+};
 
 // Vérif console : logge player.x pendant qu'on tient une touche de
 // déplacement. Rendu audio/annonce non requis à ce stade.
@@ -78,7 +123,13 @@ window.debugPlayerX = () => {
   console.log(session.player.x);
 };
 
-pushScreen(makeMenuScreen(createMainMenu(enterCity, getSession), t));
+// Le jeu démarre TOUJOURS sur le menu principal, jamais en partie : la
+// session naît d'un choix ("Continuer"/"Nouvelle partie" ci-dessus), jamais
+// d'office. Tant qu'aucun choix n'est fait, session reste null — onTick de
+// la ville n'existe pas encore, aucun risque d'accéder à une session
+// inexistante (voir aussi checkAutoSaveTimer/view/autosave-timer.js, déjà
+// tolérant à session null).
+pushScreen(mainMenuScreen);
 // checkAutoSaveTimer composé À CÔTÉ de tickActive, pas dedans : il doit
 // tourner en continu (temps réel), même quand un menu est au sommet de la
 // pile et que tickActive() ne fait donc plus rien (voir

@@ -3,8 +3,8 @@
 // config/preferences.js (clé différente, format différent : une PARTIE, pas
 // des réglages). La forme/validation reste dans core/save.js (pur) ; ce
 // module ne fait QUE lire/écrire le disque, brancher l'obscurcissement (voir
-// lib/obfuscate.js) et le retour sensoriel (son + annonce) d'une sauvegarde
-// réussie — jamais de logique de partie ici. importGame en particulier ne
+// lib/obfuscate.js) et le retour sensoriel (son seul, voir playSaveSound)
+// d'une sauvegarde réussie — jamais de logique de partie ici. importGame en particulier ne
 // REMPLACE rien elle-même : elle renvoie une session candidate, à charge de
 // l'appelant de décider de l'appliquer (voir view/menus/save-menu.js).
 //
@@ -22,8 +22,6 @@ import { serializeGame, deserializeGame } from "../core/save.js";
 import { obfuscate, deobfuscate } from "../lib/obfuscate.js";
 import { playOneShot } from "../lib/audio.js";
 import { resolveAsset } from "../lib/assets.js";
-import { announce } from "../lib/announce.js";
-import { t } from "../i18n/index.js";
 import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
 
 const STORAGE_KEY = "templeton-save";
@@ -56,8 +54,12 @@ const SAVE_SOUND_KEY = "assets/sounds/ui/save";
 // Exporté : réutilisé tel quel pour le retour sensoriel d'un import de
 // partie réussi (voir view/menus/save-menu.js) — même son que la
 // sauvegarde, traité comme le repère général "donnée écrite/restaurée avec
-// succès", pas seulement "sauvegarde".
+// succès", pas seulement "sauvegarde". Préférence saveSoundEnabled (Options
+// > Sauvegarde) vérifiée ICI, au point d'émission unique : couvre les deux
+// appelants (sauvegarde ET import) sans dupliquer le garde-fou.
 export function playSaveSound() {
+  if (!getPref("saveSoundEnabled", PREF_CONSTRAINTS.saveSoundEnabled.default)) return;
+
   try {
     // Catégorie "interface" (Options > Audio) : même son que les menus, même
     // curseur de volume — voir config/preferences.js/interfaceVolume et
@@ -72,13 +74,16 @@ export function playSaveSound() {
 // Sérialise + écrit la partie sur disque. Retour sensoriel UNIQUEMENT si
 // l'écriture a réellement réussi — jamais si localStorage a échoué (quota,
 // mode privé, désactivé), pour ne jamais laisser croire à une sauvegarde
-// qui n'a pas eu lieu. L'annonce accompagne TOUJOURS un succès ; le SON,
-// lui, est optionnel (playSound, défaut true) — la sauvegarde auto sur
-// TRANSITION (voir city-screen.js) le désactive explicitement, pour ne
-// jamais se superposer au reste de l'ambiance sonore d'une simple
-// traversée de porte. Ne lève jamais : { success } pour que l'appelant
-// puisse réagir en plus (ex. fermer un menu) sans dupliquer la détection
-// d'échec.
+// qui n'a pas eu lieu. Volontairement SANS annonce parlée (juste le son,
+// voir playSaveSound) : une sauvegarde manuelle ou temporelle est un
+// évènement fréquent, une confirmation lue à chaque fois serait plus
+// bruyante qu'utile — le son suffit, et reste lui-même désactivable (voir
+// la préférence saveSoundEnabled). SON optionnel côté appelant (playSound,
+// défaut true) — la sauvegarde auto sur TRANSITION (voir city-screen.js) le
+// désactive explicitement, pour ne jamais se superposer au reste de
+// l'ambiance sonore d'une simple traversée de porte. Ne lève jamais :
+// { success } pour que l'appelant puisse réagir en plus (ex. fermer un
+// menu) sans dupliquer la détection d'échec.
 export function saveGame(session, { playSound = true } = {}) {
   try {
     const json = JSON.stringify(serializeGame(session));
@@ -89,7 +94,6 @@ export function saveGame(session, { playSound = true } = {}) {
   }
 
   if (playSound) playSaveSound();
-  announce(t("save.done"), { assertive: true });
   return { success: true };
 }
 

@@ -50,12 +50,12 @@ export function makeCityScreen(getSession, setSession) {
 
     // Auto-save SUR TRANSITION (préférence autoSaveOnTransition, défaut
     // true) : la transition vient d'atteindre un point de cohérence
-    // naturel (nouveau monde actif, ancien rangé) — après l'annonce du
-    // titre, saveGame() ajoute sa propre annonce de confirmation, qui prime
-    // alors sur la ligne assertive. SANS le son (playSound:false) : une
-    // simple traversée de porte ne doit jamais se superposer au reste de
-    // l'ambiance sonore — seules la sauvegarde manuelle et l'auto-save
-    // temporelle (voir view/autosave-timer.js) le jouent.
+    // naturel (nouveau monde actif, ancien rangé). SANS le son
+    // (playSound:false) : une simple traversée de porte ne doit jamais se
+    // superposer au reste de l'ambiance sonore — seules la sauvegarde
+    // manuelle et l'auto-save temporelle (voir view/autosave-timer.js) le
+    // jouent (et seulement si l'utilisateur l'a activé, voir
+    // saveSoundEnabled).
     if (getPref("autoSaveOnTransition", PREF_CONSTRAINTS.autoSaveOnTransition.default)) {
       saveGame(getSession(), { playSound: false });
     }

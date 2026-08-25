@@ -9,9 +9,9 @@ export default {
   "menu.message.ok": "OK",
 
   "menu.main.title": "Templeton",
+  "menu.main.continue": "Continuer",
   "menu.main.new_game": "Nouvelle partie",
-  "menu.main.new_game_stub": "Nouvelle partie : pas encore implémenté.",
-  "menu.main.city_test": "Ville test",
+  "menu.main.new_game_confirm_title": "Une sauvegarde existe. Démarrer une nouvelle partie l'écrasera. Confirmer ?",
   "menu.main.options": "Options",
 
   "menu.interaction.title": "Interagir",
@@ -55,7 +55,7 @@ export default {
   "save.autosave": "Sauvegarde auto aux transitions",
   "save.autosave_interval": "Sauvegarde auto (minutes)",
   "save.autosave_interval_never": "Jamais",
-  "save.done": "Partie sauvegardée.",
+  "save.sound_enabled": "Son de sauvegarde",
   "save.no_active_game": "Aucune partie en cours.",
   "save.export_game": "Exporter la partie",
   "save.import_game": "Importer la partie",
