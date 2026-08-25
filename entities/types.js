@@ -36,7 +36,7 @@ export default {
     label: "entity.door",
     descriptionKey: "entity.door.description",
     sounds: {
-      beacon: { path: "assets/sounds/door_1.mp3", loop: true },
+      beacon: { path: "assets/sounds/door_beacon_1.mp3", loop: true },
     },
     blocksMovement: false,
     enterable: true,
@@ -45,7 +45,7 @@ export default {
     label: "entity.npc",
     descriptionKey: "entity.npc.description",
     sounds: {
-      beacon: { path: "assets/sounds/tictoc_1.mp3", loop: true },
+      beacon: { path: "assets/sounds/npc_beacon_1.mp3", loop: true },
     },
     blocksMovement: true,
     enterable: false,
@@ -54,7 +54,22 @@ export default {
     label: "entity.object",
     descriptionKey: "entity.object.description",
     sounds: {
-      beacon: { path: "assets/sounds/box_of_nails_1.mp3", loop: true },
+      beacon: { path: "assets/sounds/box_of_nails_beacon_1.mp3", loop: true },
+    },
+    blocksMovement: true,
+    enterable: false,
+  },
+  // Preset d'exemple, non utilisé dans demo.json (comme decor plus bas) :
+  // placement laissé au level design. big_rock_collision_1.mp3 existe pour
+  // ce même rocher mais n'est pas câblé : aucune mécanique de collision
+  // dans le core pour l'instant (blocksMovement n'est pas encore exploité,
+  // voir le commentaire en tête de fichier) — un son sans déclencheur serait
+  // du code mort.
+  rock: {
+    label: "entity.rock",
+    descriptionKey: "entity.rock.description",
+    sounds: {
+      beacon: { path: "assets/sounds/big_rock_beacon_1.mp3", loop: true },
     },
     blocksMovement: true,
     enterable: false,
@@ -67,7 +82,7 @@ export default {
     label: "entity.dog",
     descriptionKey: "entity.dog.description",
     sounds: {
-      beacon: { path: "assets/sounds/box_of_nails_1.mp3", loop: true },
+      beacon: { path: "assets/sounds/box_of_nails_beacon_1.mp3", loop: true },
     },
     blocksMovement: false,
     enterable: false,
@@ -78,7 +93,7 @@ export default {
   decor: {
     label: "entity.decor",
     sounds: {
-      beacon: { path: "assets/sounds/box_of_nails_1.mp3", loop: true },
+      beacon: { path: "assets/sounds/box_of_nails_beacon_1.mp3", loop: true },
     },
     blocksMovement: true,
     enterable: false,

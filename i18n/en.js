@@ -55,6 +55,8 @@ export default {
   "entity.object.description": "An object.",
   "entity.dog": "Dog",
   "entity.dog.description": "A dog wandering nearby.",
+  "entity.rock": "Boulder",
+  "entity.rock.description": "A large boulder.",
   "object.toolbox": "Toolbox",
   "object.toolbox.description": "A metal toolbox. It looks like it can be searched.",
   "npc.passerby": "Passerby",

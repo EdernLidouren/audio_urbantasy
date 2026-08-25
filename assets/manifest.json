@@ -11,16 +11,22 @@
   "assets/musics/indigo_glow": [
     "assets/musics/indigo_glow.mp3"
   ],
-  "assets/sounds/box_of_nails": [
-    "assets/sounds/box_of_nails_1.mp3"
+  "assets/sounds/big_rock_beacon": [
+    "assets/sounds/big_rock_beacon_1.mp3"
   ],
-  "assets/sounds/door": [
-    "assets/sounds/door_1.mp3"
+  "assets/sounds/big_rock_collision": [
+    "assets/sounds/big_rock_collision_1.mp3"
+  ],
+  "assets/sounds/box_of_nails_beacon": [
+    "assets/sounds/box_of_nails_beacon_1.mp3"
+  ],
+  "assets/sounds/door_beacon": [
+    "assets/sounds/door_beacon_1.mp3"
   ],
   "assets/sounds/footstep_concrete_walk": [
     "assets/sounds/footstep_concrete_walk_1.mp3"
   ],
-  "assets/sounds/tictoc": [
-    "assets/sounds/tictoc_1.mp3"
+  "assets/sounds/npc_beacon": [
+    "assets/sounds/npc_beacon_1.mp3"
   ]
 }

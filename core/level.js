@@ -7,6 +7,7 @@
 // lib/audio.js : le core ne doit jamais importer la couche Web Audio/vue.
 
 import { AMBIENCE_CHANNEL_LIMIT } from "../config/audio-channels.js";
+import BEHAVIORS from "./behaviors/index.js";
 
 function fail(message) {
   throw new Error(`parseLevel: ${message}`);
@@ -67,28 +68,25 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
   return entity;
 }
 
+// Générique : ne connaît aucun kind par son nom. Cherche kind dans le
+// registre (comme registry[type] pour les types d'entité juste au-dessus),
+// puis délègue la validation propre au comportement à son module (voir
+// core/behaviors/wander.js) — parseParams ne renvoie que les champs fournis,
+// les défauts se résolvent ailleurs (voir le contrat documenté dans le
+// module), jamais ici.
 function parseBehavior(behavior, index, id) {
   if (typeof behavior !== "object" || behavior === null) {
     fail(`entities[${index}] ("${id}") : behavior doit être un objet si présent.`);
   }
 
-  const { kind, speed, turnChance } = behavior;
-  if (kind !== "wander") {
-    fail(`entities[${index}] ("${id}") : behavior.kind "${kind}" inconnu (seul "wander" existe pour l'instant).`);
-  }
-  if (speed !== undefined && (!isFiniteNumber(speed) || speed <= 0)) {
-    fail(`entities[${index}] ("${id}") : behavior.speed doit être un nombre > 0 si présent.`);
-  }
-  if (turnChance !== undefined && (!isFiniteNumber(turnChance) || turnChance < 0 || turnChance > 1)) {
-    fail(`entities[${index}] ("${id}") : behavior.turnChance doit être dans [0, 1] si présent.`);
+  const { kind } = behavior;
+  const module = BEHAVIORS[kind];
+  if (!module) {
+    fail(`entities[${index}] ("${id}") : behavior.kind "${kind}" inconnu.`);
   }
 
-  // Défauts "raisonnables" appliqués à la CONSOMMATION (core/reduce.js), pas
-  // ici : parseLevel ne fait que valider et passer ce qui est fourni.
-  const parsed = { kind };
-  if (speed !== undefined) parsed.speed = speed;
-  if (turnChance !== undefined) parsed.turnChance = turnChance;
-  return parsed;
+  const params = module.parseParams(behavior, (message) => fail(`entities[${index}] ("${id}") : ${message}`));
+  return { kind, ...params };
 }
 
 export function parseLevel(raw, registry) {

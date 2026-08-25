@@ -117,6 +117,19 @@ export function runMovementChecks() {
   boundaryState = reduce(boundaryState, tick(0)); // direction -1 désormais : 1 - 0.5 = 0.5, repart vers l'intérieur
   run("errance : demi-tour effectif (repart vers l'intérieur)", 0.5, boundaryState.level.entities[0].x);
 
+  // behavior.kind absent du registre (core/behaviors/index.js) -> parseLevel
+  // échoue clairement, plutôt que d'ignorer silencieusement le comportement.
+  let unknownKindRejected = false;
+  try {
+    parseLevel(
+      makeWanderLevel({ entities: [{ id: "wander-1", type: "dog", x: 5, behavior: { kind: "fly" } }] }),
+      WANDER_REGISTRY
+    );
+  } catch {
+    unknownKindRejected = true;
+  }
+  run("errance : behavior.kind inconnu rejeté par le registre", true, unknownKindRejected);
+
   console.log(`Récapitulatif : ${passed} réussis / ${total} total`);
   return { passed, total };
 }
