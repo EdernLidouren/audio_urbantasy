@@ -1,10 +1,11 @@
 // Registre des types d'entités. Donnée neutre : aucun import, ni du core ni
-// de la vue. blocksMovement/enterable sont PRÉVUS pour être lus par le core
-// (collision, entrée en porte) mais ne sont pas encore câblés : le
-// déplacement au tick (core/reduce.js) sait avancer une entité dotée d'un
-// `behavior` (voir level/*.json), mais aucune collision n'existe encore. La
-// vue lit sounds/label pour le rendu audio et les annonces. Ni l'un ni
-// l'autre ne dépend de l'autre, seulement de ce registre.
+// de la vue. blocksMovement est lu par core/level.js (baké dans l'entité
+// parsée) puis exploité par core/reduce.js pour arrêter le joueur au bord
+// du corps d'une entité bloquante (voir BODY_RADIUS, uniforme pour
+// l'instant). enterable reste PRÉVU (entrée en porte) mais pas encore
+// câblé. La vue lit sounds/label/collisionSound pour le rendu audio et les
+// annonces. Ni l'un ni l'autre ne dépend de l'autre, seulement de ce
+// registre.
 //
 // label est une CLÉ i18n (jamais une chaîne affichable directement).
 //
@@ -47,7 +48,7 @@ export default {
     sounds: {
       beacon: { path: "assets/sounds/npc_beacon_1.mp3", loop: true },
     },
-    blocksMovement: true,
+    blocksMovement: false,
     enterable: false,
   },
   object: {
@@ -56,21 +57,23 @@ export default {
     sounds: {
       beacon: { path: "assets/sounds/box_of_nails_beacon_1.mp3", loop: true },
     },
-    blocksMovement: true,
+    blocksMovement: false,
     enterable: false,
   },
-  // Preset d'exemple, non utilisé dans demo.json (comme decor plus bas) :
-  // placement laissé au level design. big_rock_collision_1.mp3 existe pour
-  // ce même rocher mais n'est pas câblé : aucune mécanique de collision
-  // dans le core pour l'instant (blocksMovement n'est pas encore exploité,
-  // voir le commentaire en tête de fichier) — un son sans déclencheur serait
-  // du code mort.
+  // blocksMovement est maintenant exploité par core/reduce.js (résolution
+  // de collision joueur/entité) : voir core/level.js pour le bakage dans
+  // l'entité parsée, et view/audio/city-scene.js pour le son de butée.
+  // collisionSound (optionnel, ailleurs que dans sounds : ce n'est pas un
+  // rôle du modèle d'entité, juste une clé d'asset jouée par la vue quand le
+  // CORE signale player.blockedBy === cette entité) — dormant si l'entité
+  // n'est pas blocksMovement.
   rock: {
     label: "entity.rock",
     descriptionKey: "entity.rock.description",
     sounds: {
       beacon: { path: "assets/sounds/big_rock_beacon_1.mp3", loop: true },
     },
+    collisionSound: "assets/sounds/big_rock_collision_1.mp3",
     blocksMovement: true,
     enterable: false,
   },

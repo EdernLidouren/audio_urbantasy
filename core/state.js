@@ -29,7 +29,10 @@ export function createInitialState(level, seed = DEFAULT_SEED) {
         entity.behavior?.kind === "wander" ? { ...entity, dir: 1 } : entity
       ),
     },
-    player: { x: level.playerStart },
+    // blockedBy : id de l'entité bloquante contre laquelle le joueur bute CE
+    // tick, ou null (voir core/reduce.js) — transitoire, recalculé à chaque
+    // tick, jamais accumulé.
+    player: { x: level.playerStart, blockedBy: null },
     rngState: createSeed(seed),
   };
 }

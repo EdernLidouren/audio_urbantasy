@@ -9,6 +9,7 @@
     { "id": "object-toolbox", "type": "object", "x": 8, "nameKey": "object.toolbox", "descriptionKey": "object.toolbox.description" },
     { "id": "door-exit", "type": "door", "x": 9, "nameKey": "door.exit", "target": "demo2", "descriptionKey": "door.exit.description" },
     { "id": "npc-passerby", "type": "npc", "x": 20, "nameKey": "npc.passerby", "descriptionKey": "npc.passerby.description" },
-    { "id": "dog-stray", "type": "dog", "x": 25, "behavior": { "kind": "wander" } }
+    { "id": "dog-stray", "type": "dog", "x": 25, "behavior": { "kind": "wander" } },
+    { "id": "rock-blocker", "type": "rock", "x": 14 }
   ]
 }

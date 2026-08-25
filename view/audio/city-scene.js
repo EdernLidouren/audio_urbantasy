@@ -27,6 +27,7 @@ import player from "../../entities/player.js";
 import { TUNING_DEFAULTS, resolveTuning } from "../../config/tuning.js";
 import { getPref, PREF_CONSTRAINTS } from "../../config/preferences.js";
 import { t } from "../../i18n/index.js";
+import { MOVE_STEP } from "../../core/state.js";
 
 // Facteurs de préférence (Options > Audio, voir view/menus/audio-menu.js) :
 // stockés en pourcentage [0,100] (même domaine que les sliders), convertis
@@ -209,6 +210,15 @@ export function createCityAudioScene(getSession) {
     sound.sendToReverb(reverbBus.input, reverbSend);
   }
 
+  // Son de collision par entité (optionnel, dormant si absent OU si
+  // l'entité n'est pas blocksMovement — voir entities/types.js). Résolu par
+  // id, pas par référence figée : blockedBy (core/reduce.js) ne nomme
+  // jamais une entité non bloquante, donc ce lookup suffit, pas besoin de
+  // revérifier blocksMovement ici.
+  const collisionSoundByEntityId = new Map(
+    entitySounds.map(({ entity }) => [entity.id, registry[entity.type].collisionSound])
+  );
+
   // Musique et ambiances du lieu : canaux GLOBAUX non spatialisés (aucun
   // pan/filtre/réverb, voir lib/audio.js), propriété du niveau, pas d'une
   // entité — optionnels, un niveau sans champ music/ambiences ne joue
@@ -233,8 +243,14 @@ export function createCityAudioScene(getSession) {
   let previousX = getSession().player.x;
   // Seule source de vérité pour "était en mouvement au tick précédent".
   let wasMoving = false;
-  // Instant (performance.now()) du dernier pas RÉELLEMENT joué.
-  let lastFootstepAt = -Infinity;
+  // Instant (performance.now()) du dernier son RÉELLEMENT joué, un
+  // cooldown PAR CANAL (pas/collision) — jamais partagé : sur le tick où le
+  // joueur vient buter, x avance encore jusqu'au bord (pas normal) PUIS
+  // blockedBy s'active (son de collision) dans le MÊME tick ; un cooldown
+  // commun ferait que le pas consomme le cooldown et fasse taire le son de
+  // collision immédiat qui suit aussitôt.
+  const footstepCooldown = { lastAt: -Infinity };
+  const collisionCooldown = { lastAt: -Infinity };
   // Ids des entités occupées (zone d'interaction englobant le joueur) au
   // tick précédent — seule source de vérité pour détecter un changement.
   let occupiedIds = new Set();
@@ -243,23 +259,45 @@ export function createCityAudioScene(getSession) {
   // l'écran ville résolve une cible d'interaction (Espace/Entrée) sans
   // recalculer l'occupation en double.
   let currentOccupied = [];
+  // Distance que le joueur AURAIT parcourue depuis le début du blocage
+  // courant (voir le bloc collision dans update()) — jamais la distance
+  // réellement parcourue, puisque x ne bouge pas pendant une butée.
+  let collisionAccumX = 0;
+  // Seule source de vérité pour "était bloqué au tick précédent" — même
+  // rôle que wasMoving pour les pas, pour détecter la transition et jouer
+  // un premier son immédiat (voir update()).
+  let wasBlocked = false;
 
-  // Point de passage unique pour tout déclenchement de pas (immédiat ou de
-  // cadence) : applique le cooldown sur le son, jamais sur le déplacement.
-  // Trop tôt -> le pas est simplement sauté, pas de file d'attente.
-  function playFootstep() {
+  // Point de passage commun à tout son cadencé comme les pas (pas normal OU
+  // butée contre une entité bloquante — centré sur le joueur, sans pan
+  // particulier) : applique le cooldown de SON canal, jamais sur le
+  // déplacement. Trop tôt -> le son est simplement sauté, pas de file
+  // d'attente. cooldown est un objet {lastAt} propre à l'appelant (voir
+  // footstepCooldown/collisionCooldown) : jamais partagé entre canaux.
+  function playPacedSound(path, reverbSend, cooldown) {
     const now = performance.now();
-    if (now - lastFootstepAt < MIN_STEP_INTERVAL_MS) return;
-    // Résolu à CHAQUE pas (pas une fois pour la scène) : si
-    // MOVEMENT_SOUND.path est un pool, chaque pas peut tirer un fichier
-    // différent (variété), contrairement à une balise (boucle persistante,
-    // résolue une seule fois à la création).
-    playOneShot(resolveAsset(MOVEMENT_SOUND.path), {
-      reverbSend: FOOTSTEP_REVERB_SEND,
+    if (now - cooldown.lastAt < MIN_STEP_INTERVAL_MS) return;
+    // Résolu à CHAQUE appel (pas une fois pour la scène) : si path est un
+    // pool, chaque déclenchement peut tirer un fichier différent (variété),
+    // contrairement à une balise (boucle persistante, résolue une seule
+    // fois à la création).
+    playOneShot(resolveAsset(path), {
+      reverbSend,
       reverbBusInput: reverbBus.input,
       volume: footstepVolumeFactor(),
     });
-    lastFootstepAt = now;
+    cooldown.lastAt = now;
+  }
+
+  function playFootstep() {
+    playPacedSound(MOVEMENT_SOUND.path, FOOTSTEP_REVERB_SEND, footstepCooldown);
+  }
+
+  // Dormant si l'entité ne porte pas de collisionSound (voir
+  // entities/types.js) — jamais joué dans ce cas.
+  function playCollisionSound(entityId) {
+    const path = collisionSoundByEntityId.get(entityId);
+    if (path) playPacedSound(path, FOOTSTEP_REVERB_SEND, collisionCooldown);
   }
 
   // Recalcule et applique pan/volume/passe-bas de chaque balise pour la
@@ -293,7 +331,9 @@ export function createCityAudioScene(getSession) {
   }
 
   function update() {
-    const x = getSession().player.x;
+    const session = getSession();
+    const x = session.player.x;
+    const blockedBy = session.player.blockedBy;
 
     applyEntityAudio(x);
 
@@ -331,6 +371,31 @@ export function createCityAudioScene(getSession) {
     while (Math.abs(x - lastFootstepX) >= STEP_DISTANCE) {
       playFootstep();
       lastFootstepX += Math.sign(x - lastFootstepX) * STEP_DISTANCE;
+    }
+
+    // Butée contre une entité bloquante (core/reduce.js signale blockedBy) :
+    // x ne bouge pas, donc aucun pas normal ci-dessus — le son de collision
+    // le REMPLACE, il ne s'y ajoute pas. Même structure que le pas
+    // ci-dessus : transition immobile -> bloqué = son immédiat (sans
+    // attendre l'accumulateur, sinon un simple appui bref ne s'entend pas —
+    // même souci qu'avait le premier pas), puis cadence de croisière tant
+    // que le joueur tente d'avancer contre le corps, à la vitesse de marche
+    // (STEP_DISTANCE), jamais mitraillette. Remis à zéro dès que le blocage
+    // cesse.
+    const isBlocked = blockedBy !== null;
+    if (isBlocked && !wasBlocked) {
+      playCollisionSound(blockedBy);
+    }
+    wasBlocked = isBlocked;
+
+    if (isBlocked) {
+      collisionAccumX += MOVE_STEP;
+      while (collisionAccumX >= STEP_DISTANCE) {
+        collisionAccumX -= STEP_DISTANCE;
+        playCollisionSound(blockedBy);
+      }
+    } else {
+      collisionAccumX = 0;
     }
   }
 

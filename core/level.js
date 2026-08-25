@@ -26,7 +26,7 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
     fail(`entities[${index}] n'est pas un objet.`);
   }
 
-  const { id, type, x, target, nameKey, descriptionKey, behavior } = rawEntity;
+  const { id, type, x, target, nameKey, descriptionKey, behavior, blocksMovement } = rawEntity;
 
   if (!isNonEmptyString(id)) {
     fail(`entities[${index}].id manquant ou invalide.`);
@@ -49,7 +49,22 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
   // par l'interaction "describe" (voir view/interaction.js). Peut rester
   // undefined si ni l'instance ni le type n'en fournissent une (ex. decor).
   const resolvedDescriptionKey = isNonEmptyString(descriptionKey) ? descriptionKey : registry[type].descriptionKey;
-  const entity = { id, type, x, labelKey, descriptionKey: resolvedDescriptionKey };
+  // blocksMovement : même cascade instance -> type que labelKey/
+  // descriptionKey ci-dessus. Bakée ici, pas lue directement par
+  // core/reduce.js dans le registre : le core ne connaît le registre qu'à
+  // travers ce que parseLevel en extrait, jamais en l'important lui-même.
+  if (blocksMovement !== undefined && typeof blocksMovement !== "boolean") {
+    fail(`entities[${index}] ("${id}") : blocksMovement doit être un booléen si présent.`);
+  }
+  const resolvedBlocksMovement = blocksMovement !== undefined ? blocksMovement : Boolean(registry[type].blocksMovement);
+  const entity = {
+    id,
+    type,
+    x,
+    labelKey,
+    descriptionKey: resolvedDescriptionKey,
+    blocksMovement: resolvedBlocksMovement,
+  };
 
   if (type === "door") {
     if (!isNonEmptyString(target)) {

@@ -6,7 +6,7 @@
 import { parseLevel } from "./level.js";
 import { createInitialState, MOVE_STEP } from "./state.js";
 import { tick } from "./actions.js";
-import { reduce } from "./reduce.js";
+import { reduce, BODY_RADIUS } from "./reduce.js";
 
 const RAW_LEVEL = {
   id: "movement-check",
@@ -129,6 +129,82 @@ export function runMovementChecks() {
     unknownKindRejected = true;
   }
   run("errance : behavior.kind inconnu rejeté par le registre", true, unknownKindRejected);
+
+  // --- Collision joueur/entité bloquante : signal de blocage (blockedBy) ---
+
+  const BLOCKING_REGISTRY = { wall: { label: "entity.wall", blocksMovement: true } };
+  const blockingLevel = parseLevel(
+    { id: "movement-check-blocking", titleKey: "level.demo.title", length: 10, playerStart: 4, entities: [{ id: "wall-1", type: "wall", x: 5 }] },
+    BLOCKING_REGISTRY
+  );
+  const wallEntity = blockingLevel.entities[0];
+  const expectedEdge = wallEntity.x - BODY_RADIUS; // bord du corps côté approche (dir=1)
+
+  let blockState = createInitialState(blockingLevel);
+  for (let i = 0; i < 20; i++) {
+    blockState = reduce(blockState, tick(1));
+  }
+  run("collision : joueur arrêté au bord du corps bloquant", expectedEdge, blockState.player.x);
+  run("collision : blockedBy nomme l'entité bloquante", wallEntity.id, blockState.player.blockedBy);
+
+  // Relâche (dir=0) : le signal retombe à null, position inchangée.
+  blockState = reduce(blockState, tick(0));
+  run("collision : blockedBy retombe à null au relâchement", null, blockState.player.blockedBy);
+  run("collision : position inchangée au relâchement", expectedEdge, blockState.player.x);
+
+  // Entité non bloquante (blocksMovement absent -> false) : ne freine jamais
+  // le joueur, ne signale jamais de blocage. Comparé à une simulation SANS
+  // entité (mêmes ticks, même arithmétique) plutôt qu'à une valeur
+  // attendue en dur : seule façon d'obtenir une égalité exacte en flottant
+  // sans dépendre du nombre de ticks nécessaires pour atteindre un bord.
+  const NONBLOCKING_REGISTRY = { deco: { label: "entity.deco" } };
+  const passThroughLevel = parseLevel(
+    { id: "movement-check-passthrough", titleKey: "level.demo.title", length: 10, playerStart: 4, entities: [{ id: "deco-1", type: "deco", x: 5 }] },
+    NONBLOCKING_REGISTRY
+  );
+  const emptyLevel = parseLevel(
+    { id: "movement-check-passthrough-empty", titleKey: "level.demo.title", length: 10, playerStart: 4, entities: [] },
+    NONBLOCKING_REGISTRY
+  );
+  let passState = createInitialState(passThroughLevel);
+  let unobstructedState = createInitialState(emptyLevel);
+  for (let i = 0; i < 20; i++) {
+    passState = reduce(passState, tick(1));
+    unobstructedState = reduce(unobstructedState, tick(1));
+  }
+  run("collision : entité non bloquante ne freine jamais le joueur", unobstructedState.player.x, passState.player.x);
+  run("collision : entité non bloquante ne signale jamais de blocage", null, passState.player.blockedBy);
+
+  // Surcharge d'instance blocksMovement (level JSON), lue AVANT le défaut du
+  // type — cascade identique à labelKey/descriptionKey.
+  const overrideBlockLevel = parseLevel(
+    { id: "movement-check-override-block", titleKey: "level.demo.title", length: 10, playerStart: 4, entities: [{ id: "wall-2", type: "deco", x: 5, blocksMovement: true }] },
+    NONBLOCKING_REGISTRY // type "deco" a blocksMovement absent (-> false par défaut)
+  );
+  run("collision : surcharge d'instance blocksMovement:true respectée", true, overrideBlockLevel.entities[0].blocksMovement);
+  let overrideBlockState = createInitialState(overrideBlockLevel);
+  for (let i = 0; i < 20; i++) {
+    overrideBlockState = reduce(overrideBlockState, tick(1));
+  }
+  run("collision : entité surchargée bloquante freine bien le joueur", "wall-2", overrideBlockState.player.blockedBy);
+
+  const overrideUnblockLevel = parseLevel(
+    { id: "movement-check-override-unblock", titleKey: "level.demo.title", length: 10, playerStart: 4, entities: [{ id: "wall-3", type: "wall", x: 5, blocksMovement: false }] },
+    BLOCKING_REGISTRY // type "wall" a blocksMovement:true par défaut
+  );
+  run("collision : surcharge d'instance blocksMovement:false respectée", false, overrideUnblockLevel.entities[0].blocksMovement);
+
+  // blocksMovement présent mais invalide (pas un booléen) -> rejeté.
+  let invalidBlockRejected = false;
+  try {
+    parseLevel(
+      { id: "movement-check-invalid-block", titleKey: "level.demo.title", length: 10, playerStart: 4, entities: [{ id: "wall-4", type: "wall", x: 5, blocksMovement: "oui" }] },
+      BLOCKING_REGISTRY
+    );
+  } catch {
+    invalidBlockRejected = true;
+  }
+  run("collision : blocksMovement non booléen rejeté", true, invalidBlockRejected);
 
   console.log(`Récapitulatif : ${passed} réussis / ${total} total`);
   return { passed, total };
