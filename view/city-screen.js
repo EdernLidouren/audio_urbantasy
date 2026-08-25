@@ -13,7 +13,7 @@ import { openPauseMenu } from "./menus/pause-menu.js";
 import { tick } from "../core/actions.js";
 import { reduce } from "../core/reduce.js";
 import { loadLevelById } from "../level/load.js";
-import { createInitialState } from "../core/state.js";
+import { getActiveWorld, travelToWorld } from "../core/state.js";
 import registry from "../entities/types.js";
 
 export function makeCityScreen(getSession, setSession) {
@@ -22,23 +22,28 @@ export function makeCityScreen(getSession, setSession) {
   // Transition FRANCHE par porte (pas de fondu, pas d'animation) :
   // scene.destroy() arrête et décharge TOUT ce que possédait le lieu
   // courant — balises, réverb, ET canaux globaux musique/ambiance (voir
-  // view/audio/city-scene.js) — donc rien de plus à nettoyer ici. Puis
-  // chargement du niveau cible par id, nouvelle session à son playerStart
-  // (filet 0 si absent/invalide, voir core/level.js), nouvelle scène audio,
-  // annonce du titre. Aucune session/scène persistée entre lieux : chaque
-  // transition en fabrique une toute neuve (rien à préserver pour l'instant).
+  // view/audio/city-scene.js) — donc aucun Howl résiduel, rien de plus à
+  // nettoyer ici. Le monde quitté est RANGÉ (gelé) dans session.worlds, pas
+  // détruit : une re-visite le ressort tel quel (voir core/state.js,
+  // travelToWorld). Le fetch reste ici, au bord — SEULEMENT si la cible
+  // n'est pas déjà connue de la partie ; sinon aucun réseau, la cible
+  // ressort directement de worlds. Nouvelle scène audio sur le monde actif,
+  // annonce du titre.
   //
-  // scene reste null le temps de l'attente réseau (loadLevelById) : onTick
-  // et onKeyDown s'en gardent (voir plus bas) plutôt que d'accéder une
-  // scène absente — aucune touche n'a d'effet pendant cette brève fenêtre.
-  async function transitionThroughDoor(levelId) {
+  // scene reste null le temps de l'attente réseau (éventuelle) : onTick et
+  // onKeyDown s'en gardent (voir plus bas) plutôt que d'accéder une scène
+  // absente — aucune touche n'a d'effet pendant cette brève fenêtre.
+  async function transitionThroughDoor(targetId) {
     scene.destroy();
     scene = null;
 
-    const level = await loadLevelById(levelId, registry);
-    setSession(createInitialState(level));
+    const session = getSession();
+    const alreadyVisited = Boolean(session.worlds[targetId]);
+    const freshLevel = alreadyVisited ? null : await loadLevelById(targetId, registry);
+
+    setSession(travelToWorld(session, targetId, freshLevel));
     scene = createCityAudioScene(getSession);
-    announce(t(getSession().level.titleKey), { assertive: true });
+    announce(t(getActiveWorld(getSession()).titleKey), { assertive: true });
   }
 
   // Enregistré une fois, pour la durée de vie de cet écran ville (voir
@@ -60,7 +65,7 @@ export function makeCityScreen(getSession, setSession) {
       ensureAudioUnlocked();
       scene = createCityAudioScene(getSession);
       document.getElementById("game").focus();
-      announce(t(getSession().level.titleKey), { assertive: true });
+      announce(t(getActiveWorld(getSession()).titleKey), { assertive: true });
     },
     onTick() {
       // scene momentanément null pendant une transition par porte (voir

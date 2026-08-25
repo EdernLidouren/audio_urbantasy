@@ -27,7 +27,7 @@ import player from "../../entities/player.js";
 import { TUNING_DEFAULTS, resolveTuning } from "../../config/tuning.js";
 import { getPref, PREF_CONSTRAINTS } from "../../config/preferences.js";
 import { t } from "../../i18n/index.js";
-import { MOVE_STEP } from "../../core/state.js";
+import { MOVE_STEP, getActiveWorld } from "../../core/state.js";
 
 // Facteurs de préférence (Options > Audio, voir view/menus/audio-menu.js) :
 // stockés en pourcentage [0,100] (même domaine que les sliders), convertis
@@ -171,7 +171,7 @@ export function createCityAudioScene(getSession) {
   // `new Howl()`) avant de construire le bus de réverb juste après — lui
   // n'a pas de retente paresseuse comme le filtre par voix, il lui faut le
   // contexte tout de suite.
-  const entitySounds = getSession().level.entities.map((entity) => {
+  const entitySounds = getActiveWorld(getSession()).entities.map((entity) => {
     // beacon : la boucle positionnée du type (voir entities/model.md pour
     // le vocabulaire des rôles de son).
     const beacon = registry[entity.type].sounds.beacon;
@@ -199,10 +199,10 @@ export function createCityAudioScene(getSession) {
   // défaut global (voir REVERB_DURATION_SEC_DEFAULT/REVERB_DECAY_DEFAULT
   // ci-dessus) : deux niveaux de repli, pas la cascade générale de
   // resolveTuning (celle-ci reste entité-only).
-  const level = getSession().level;
+  const world = getActiveWorld(getSession());
   const reverbBus = createReverbBus({
-    durationSec: level.reverbDurationSec ?? REVERB_DURATION_SEC_DEFAULT,
-    decay: level.reverbDecay ?? REVERB_DECAY_DEFAULT,
+    durationSec: world.reverbDurationSec ?? REVERB_DURATION_SEC_DEFAULT,
+    decay: world.reverbDecay ?? REVERB_DECAY_DEFAULT,
     wet: REVERB_WET,
   });
 
@@ -227,13 +227,13 @@ export function createCityAudioScene(getSession) {
   // level.music/.ambiences peuvent être un pool, un membre précis, ou un
   // chemin direct — resolveAsset() gère les trois, résolu une fois ici (pas
   // un nouveau tirage par tick, la musique/ambiance ne se retire pas).
-  const music = level.music;
+  const music = world.music;
   if (music) {
     playGlobal("music", resolveAsset(music));
     setGlobalVolume("music", musicVolumeFactor());
   }
 
-  const ambiences = level.ambiences;
+  const ambiences = world.ambiences;
   if (ambiences && ambiences.length > 0) {
     playAmbiences(ambiences.map(resolveAsset));
     setGlobalVolume("ambience", ambienceVolumeFactor());
@@ -312,7 +312,7 @@ export function createCityAudioScene(getSession) {
   // jamais depuis la référence figée — sinon la balise sonne juste, mais
   // reste plantée à son point de spawn.
   function liveEntitiesById() {
-    return new Map(getSession().level.entities.map((entity) => [entity.id, entity]));
+    return new Map(getActiveWorld(getSession()).entities.map((entity) => [entity.id, entity]));
   }
 
   function applyEntityAudio(x) {
