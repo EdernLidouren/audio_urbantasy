@@ -13,18 +13,33 @@ import { t } from "../../i18n/index.js";
 import { pushScreen, popScreen, composeHook } from "../../lib/screens.js";
 import { makeMenuScreen } from "../../lib/menu.js";
 import { createOptionsMenu } from "./options-menu.js";
+import { saveGame } from "../save-storage.js";
 
 // scene : fournit pauseBeacons()/resumeBeacons() (voir
 // view/audio/city-scene.js), pour dégager le canal audio positionné pendant
-// que ce menu est ouvert, sans toucher au contexte audio global.
-export function openPauseMenu(scene) {
+// que ce menu est ouvert, sans toucher au contexte audio global. getSession
+// : partie courante, TOUJOURS non nulle ici (ce menu n'existe qu'ouvert
+// depuis une scène d'exploration active) — passée à Options -> Sauvegarde
+// pour l'accès "Sauvegarder" complet (voir save-menu.js).
+export function openPauseMenu(scene, getSession) {
   const menu = {
     title: "menu.pause.title",
     closable: true, // Échap referme le menu : identique à "Retour au jeu"
     entries: [
       {
+        // Accès rapide à la sauvegarde manuelle, sans détour par Options.
+        // saveGame() joue déjà le son + l'annonce de confirmation (voir
+        // view/save-storage.js) : on ferme le menu APRÈS, jamais de
+        // ré-annonce entre les deux qui écraserait la confirmation.
+        label: "save.now",
+        onActivate: () => {
+          saveGame(getSession());
+          popScreen();
+        },
+      },
+      {
         label: "menu.pause.options",
-        onActivate: () => pushScreen(makeMenuScreen(createOptionsMenu(), t)),
+        onActivate: () => pushScreen(makeMenuScreen(createOptionsMenu(getSession), t)),
       },
       {
         label: "menu.pause.main_menu",

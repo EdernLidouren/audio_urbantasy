@@ -13,11 +13,12 @@ import { t } from "../../i18n/index.js";
 import { createOptionsMenu } from "./options-menu.js";
 
 // enterCity : callback fourni par main.js (crée la session de jeu et pousse
-// l'écran ville). Ce menu ne connaît ni le niveau ni la session — il se
-// contente d'appeler ce qu'on lui donne.
+// l'écran ville). getSession : transmis tel quel jusqu'à Options ->
+// Sauvegarde (voir save-menu.js) — renvoie null ici (hors partie), géré
+// explicitement là-bas plutôt que de supposer une partie en cours.
 //
 // Menu racine : jamais fermable (rien en dessous vers quoi revenir).
-export function createMainMenu(enterCity) {
+export function createMainMenu(enterCity, getSession) {
   return {
     title: "menu.main.title",
     closable: false,
@@ -32,7 +33,7 @@ export function createMainMenu(enterCity) {
       },
       {
         label: "menu.main.options",
-        onActivate: () => pushScreen(makeMenuScreen(createOptionsMenu(), t)),
+        onActivate: () => pushScreen(makeMenuScreen(createOptionsMenu(getSession), t)),
       },
     ],
   };

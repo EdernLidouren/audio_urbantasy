@@ -28,5 +28,8 @@
   ],
   "assets/sounds/npc_beacon": [
     "assets/sounds/npc_beacon_1.mp3"
+  ],
+  "assets/sounds/ui_save": [
+    "assets/sounds/ui_save_1.mp3"
   ]
 }

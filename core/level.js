@@ -63,9 +63,15 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
     type,
     x,
     labelKey,
-    descriptionKey: resolvedDescriptionKey,
     blocksMovement: resolvedBlocksMovement,
   };
+  // Clé ajoutée SEULEMENT si résolue (jamais explicitement undefined) :
+  // l'état doit rester de la donnée pure, un aller-retour JSON ne doit rien
+  // changer à sa forme (voir movement.check.js, audit de sérialisabilité).
+  // Même principe que target/behavior plus bas.
+  if (resolvedDescriptionKey !== undefined) {
+    entity.descriptionKey = resolvedDescriptionKey;
+  }
 
   if (type === "door") {
     if (!isNonEmptyString(target)) {
@@ -200,15 +206,20 @@ export function parseLevel(raw, registry) {
 
   warnOnOverlaps(parsedEntities, resolvedPlayerStart);
 
-  return {
+  const level = {
     id,
     titleKey,
     length,
     playerStart: resolvedPlayerStart,
     entities: parsedEntities,
-    music,
-    ambiences,
-    reverbDurationSec,
-    reverbDecay,
   };
+  // Clés ajoutées SEULEMENT si présentes (jamais explicitement undefined) :
+  // l'état doit rester de la donnée pure, un aller-retour JSON ne doit rien
+  // changer à sa forme (voir movement.check.js, audit de sérialisabilité).
+  if (music !== undefined) level.music = music;
+  if (ambiences !== undefined) level.ambiences = ambiences;
+  if (reverbDurationSec !== undefined) level.reverbDurationSec = reverbDurationSec;
+  if (reverbDecay !== undefined) level.reverbDecay = reverbDecay;
+
+  return level;
 }

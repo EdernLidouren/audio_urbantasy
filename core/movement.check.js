@@ -8,6 +8,7 @@ import { createInitialState, getActiveWorld, travelToWorld, MOVE_STEP, BODY_RADI
 import { tick } from "./actions.js";
 import { reduce } from "./reduce.js";
 import { moveAndBounce } from "./physics/movement.js";
+import { SAVE_VERSION, serializeGame, deserializeGame } from "./save.js";
 
 const RAW_LEVEL = {
   id: "movement-check",
@@ -413,6 +414,218 @@ export function runMovementChecks() {
     travelToUnknownRejected = true;
   }
   run("partie : transition vers un monde inconnu sans niveau fourni est rejetée", true, travelToUnknownRejected);
+
+  // --- Audit de sérialisabilité (avant tout système de sauvegarde) ---
+  // Objectif : confirmer que l'état de partie survit à un aller-retour JSON
+  // en restant structurellement identique ET fonctionnel — pas un système
+  // de sauvegarde, juste la garantie que rien de non-sérialisable ne s'est
+  // glissé dans l'état. C'est l'invariant "l'état est le save", tenu depuis
+  // le début du projet (voir CLAUDE.md), qui doit rester vrai avant qu'un
+  // vrai système de save s'appuie dessus.
+
+  // Décrit une valeur pour un message de diagnostic : JSON.stringify
+  // renvoie undefined (la valeur, pas une chaîne) pour une fonction, peu
+  // lisible tel quel dans un message.
+  function describeValue(value) {
+    return typeof value === "function" ? `[Function ${value.name || "anonyme"}]` : JSON.stringify(value);
+  }
+
+  // Type "logique" d'une valeur pour la comparaison de structure : NaN/
+  // Infinity/-Infinity partagent un type distinct des nombres finis — JSON
+  // les convertit TOUS en null, contrairement à un nombre fini qui survit
+  // tel quel.
+  function logicalType(value) {
+    if (value === null) return "null";
+    if (Array.isArray(value)) return "array";
+    if (typeof value === "number" && !Number.isFinite(value)) return "non-finite-number";
+    return typeof value;
+  }
+
+  // Parcourt `value` et signale toute donnée qui ne survivrait pas à
+  // JSON.stringify : fonction, nombre non fini, référence circulaire, objet
+  // non "plain" (Map/Set/Date/instance de classe — JSON les sérialise de
+  // façon inattendue, parfois vide). Fonctionne même si JSON.stringify
+  // planterait (cycle) : ne dépend d'aucune tentative de sérialisation
+  // réelle. `seen` ne piste que la branche COURANTE de la récursion (ajout
+  // à l'entrée, retrait à la sortie) : partager la même référence depuis
+  // deux branches distinctes n'est pas un cycle, seul un ancêtre qui se
+  // retrouve dans son propre sous-arbre en est un.
+  function auditNonSerializable(value, path, seen, findings) {
+    if (value === null || value === undefined) return;
+    const type = typeof value;
+
+    if (type === "function") {
+      findings.push(`${path} : fonction (${value.name || "anonyme"}) — disparaîtrait silencieusement`);
+      return;
+    }
+    if (type === "number" && !Number.isFinite(value)) {
+      findings.push(`${path} : nombre non fini (${value}) — deviendrait null`);
+      return;
+    }
+    if (type !== "object") return;
+
+    if (seen.has(value)) {
+      findings.push(`${path} : référence circulaire`);
+      return;
+    }
+    seen.add(value);
+
+    if (Array.isArray(value)) {
+      value.forEach((item, i) => auditNonSerializable(item, `${path}[${i}]`, seen, findings));
+    } else {
+      const proto = Object.getPrototypeOf(value);
+      if (proto !== Object.prototype && proto !== null) {
+        findings.push(`${path} : objet non "plain" (${proto?.constructor?.name ?? "?"})`);
+      }
+      for (const key of Object.keys(value)) {
+        auditNonSerializable(value[key], `${path}.${key}`, seen, findings);
+      }
+    }
+
+    seen.delete(value);
+  }
+
+  // Diffère deux structures déjà décodées (avant/après aller-retour JSON) et
+  // liste précisément chaque divergence (clé apparue/disparue, changement
+  // de type, changement de valeur) plutôt qu'un simple pass/fail.
+  function diffStructure(a, b, path, diffs) {
+    if (Object.is(a, b)) return;
+
+    const typeA = logicalType(a);
+    const typeB = logicalType(b);
+    if (typeA !== typeB) {
+      diffs.push(`${path} : ${typeA} -> ${typeB} (${describeValue(a)} -> ${describeValue(b)})`);
+      return;
+    }
+    if (typeA === "array") {
+      const len = Math.max(a.length, b.length);
+      for (let i = 0; i < len; i++) diffStructure(a[i], b[i], `${path}[${i}]`, diffs);
+      return;
+    }
+    if (typeA === "object") {
+      const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+      for (const key of keys) {
+        const inA = Object.prototype.hasOwnProperty.call(a, key);
+        const inB = Object.prototype.hasOwnProperty.call(b, key);
+        if (inA && !inB) diffs.push(`${path}.${key} : présent avant, absent après (${describeValue(a[key])})`);
+        else if (!inA && inB) diffs.push(`${path}.${key} : absent avant, apparu après (${describeValue(b[key])})`);
+        else diffStructure(a[key], b[key], `${path}.${key}`, diffs);
+      }
+      return;
+    }
+    diffs.push(`${path} : ${describeValue(a)} -> ${describeValue(b)}`);
+  }
+
+  // Auto-test du détecteur lui-même, sur une fuite SYNTHÉTIQUE (fonction,
+  // NaN, Infinity, cycle) : doit être repérée, sinon un "aucune fuite"
+  // trouvé plus bas sur la vraie partie ne prouverait rien.
+  const syntheticLeaky = { a: 1, b: () => {}, c: NaN, d: Infinity };
+  syntheticLeaky.self = syntheticLeaky; // référence circulaire
+  const syntheticFindings = [];
+  auditNonSerializable(syntheticLeaky, "synthetic", new Set(), syntheticFindings);
+  run("sérialisation : le détecteur repère une fonction synthétique", true, syntheticFindings.some((f) => f.includes("fonction")));
+  run("sérialisation : le détecteur repère un nombre non fini synthétique", true, syntheticFindings.some((f) => f.includes("non fini")));
+  run("sérialisation : le détecteur repère une référence circulaire synthétique", true, syntheticFindings.some((f) => f.includes("circulaire")));
+
+  // Partie avec activité réelle (joueur qui avance, chien qui erre) ET une
+  // transition (pour peupler worlds avec 2 mondes, un actif et un rangé) —
+  // le cas le plus représentatif d'un vrai save.
+  const AUDIT_REGISTRY = { dog: { label: "entity.dog" }, door: { label: "entity.door" } };
+  const auditWorldA = parseLevel(
+    {
+      id: "movement-check-audit-a",
+      titleKey: "level.demo.title",
+      length: 20,
+      playerStart: 2,
+      music: "assets/musics/a_warm_night_in_harlem.mp3",
+      entities: [
+        { id: "audit-dog", type: "dog", x: 10, behavior: { kind: "wander", speed: 0.5, turnChance: 0.3 } },
+        { id: "audit-door", type: "door", x: 15, target: "movement-check-audit-b" },
+      ],
+    },
+    AUDIT_REGISTRY
+  );
+  const auditWorldB = parseLevel(
+    { id: "movement-check-audit-b", titleKey: "level.demo.title", length: 15, playerStart: 3, entities: [] },
+    AUDIT_REGISTRY
+  );
+
+  let auditSession = createInitialState(auditWorldA, 77);
+  for (let i = 0; i < 25; i++) auditSession = reduce(auditSession, tick(1));
+  auditSession = travelToWorld(auditSession, auditWorldB.id, auditWorldB);
+  for (let i = 0; i < 10; i++) auditSession = reduce(auditSession, tick(-1));
+  const auditDogXParked = auditSession.worlds[auditWorldA.id].entities[0].x;
+
+  // 1) Détection de fuite AVANT toute tentative de sérialisation réelle.
+  const leakFindings = [];
+  auditNonSerializable(auditSession, "session", new Set(), leakFindings);
+  if (leakFindings.length > 0) {
+    console.warn("Audit sérialisabilité : fuites détectées —", leakFindings);
+  }
+  run("sérialisation : aucune fuite de non-sérialisable dans la partie", 0, leakFindings.length);
+
+  // 2) Aller-retour JSON réel, capturé pour détecter un throw (ex. cycle)
+  // au lieu de laisser l'exception interrompre toute la suite de checks.
+  let auditRoundTripped = null;
+  let auditRoundTripThrew = false;
+  try {
+    auditRoundTripped = JSON.parse(JSON.stringify(auditSession));
+  } catch {
+    auditRoundTripThrew = true;
+  }
+  run("sérialisation : JSON.stringify/parse ne lève pas", false, auditRoundTripThrew);
+
+  // 3) Divergence structurelle précise entre avant/après.
+  const structureDiffs = [];
+  if (auditRoundTripped) {
+    diffStructure(auditSession, auditRoundTripped, "session", structureDiffs);
+  }
+  if (structureDiffs.length > 0) {
+    console.warn("Audit sérialisabilité : divergences structurelles —", structureDiffs);
+  }
+  run("sérialisation : structure identique après aller-retour JSON", 0, structureDiffs.length);
+
+  // 4) Fonctionnel : la partie reparse doit rester simulable sans erreur —
+  // quelques ticks dans le monde actif (B), retour vers A (déjà connu, pas
+  // de fetch). Le PNJ de A doit avoir survécu au voyage EXACTEMENT, vérifié
+  // IMMÉDIATEMENT au retour, AVANT tout nouveau tick sur A (A était rangé
+  // pendant tout l'aller-retour, sa position ne devait pas bouger d'un
+  // iota) — puis, séparément, on retick A pour confirmer qu'il redevient
+  // normalement simulable (sa position DOIT alors recommencer à évoluer,
+  // ce n'est plus la même assertion).
+  if (auditRoundTripped) {
+    let revived = auditRoundTripped;
+    let revivalThrew = false;
+    let dogXOnReturn = null;
+    try {
+      for (let i = 0; i < 10; i++) revived = reduce(revived, tick(1));
+      revived = travelToWorld(revived, auditWorldA.id);
+      dogXOnReturn = getActiveWorld(revived).entities[0].x;
+      for (let i = 0; i < 10; i++) revived = reduce(revived, tick(-1));
+    } catch {
+      revivalThrew = true;
+    }
+    run("sérialisation : la partie reparse reste jouable (aucune erreur)", false, revivalThrew);
+    if (!revivalThrew) {
+      run("sérialisation : le PNJ du monde reparse a survécu au voyage", auditDogXParked, dogXOnReturn);
+      run("sérialisation : le monde reparse redevient normalement simulable", true, getActiveWorld(revived).entities[0].x !== dogXOnReturn);
+    }
+  }
+
+  // --- core/save.js : enveloppe de sauvegarde (forme, pas le disque) ---
+
+  const saveEnvelope = serializeGame(auditSession);
+  run("save : serializeGame enveloppe avec la version courante", SAVE_VERSION, saveEnvelope.version);
+
+  const saveResult = deserializeGame(saveEnvelope);
+  run("save : deserializeGame réussit sur une enveloppe valide", true, saveResult.success);
+  if (saveResult.success) {
+    run("save : la partie désérialisée est identique à l'originale", JSON.stringify(auditSession), JSON.stringify(saveResult.session));
+  }
+
+  run("save : format non exploitable rejeté", false, deserializeGame({ notASave: true }).success);
+  run("save : version inconnue rejetée", false, deserializeGame({ version: SAVE_VERSION + 1, data: auditSession }).success);
+  run("save : structure implausible rejetée", false, deserializeGame({ version: SAVE_VERSION, data: { player: {} } }).success);
 
   console.log(`Récapitulatif : ${passed} réussis / ${total} total`);
   return { passed, total };

@@ -34,6 +34,12 @@ export const PREF_CONSTRAINTS = {
   menuCycling: { type: "boolean", default: false },
   menuStarPrefix: { type: "boolean", default: true },
   menuIndexSuffix: { type: "boolean", default: true },
+  // Sauvegarde automatique à chaque transition de lieu réussie (voir
+  // view/city-screen.js) — pas un réglage audio ni de menu, mais suit le
+  // même patron de persistance que le reste. Activée par défaut : la
+  // partie EST la sauvegarde (voir CLAUDE.md), autant qu'elle le soit
+  // réellement sans action de l'utilisateur.
+  autoSaveOnTransition: { type: "boolean", default: true },
 };
 
 const store = new Map();

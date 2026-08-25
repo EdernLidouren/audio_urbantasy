@@ -15,6 +15,8 @@ import { reduce } from "../core/reduce.js";
 import { loadLevelById } from "../level/load.js";
 import { getActiveWorld, travelToWorld } from "../core/state.js";
 import registry from "../entities/types.js";
+import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
+import { saveGame } from "./save-storage.js";
 
 export function makeCityScreen(getSession, setSession) {
   let scene = null;
@@ -44,6 +46,15 @@ export function makeCityScreen(getSession, setSession) {
     setSession(travelToWorld(session, targetId, freshLevel));
     scene = createCityAudioScene(getSession);
     announce(t(getActiveWorld(getSession()).titleKey), { assertive: true });
+
+    // Auto-save SUR TRANSITION (préférence autoSaveOnTransition, défaut
+    // true) : la transition vient d'atteindre un point de cohérence
+    // naturel (nouveau monde actif, ancien rangé) — après l'annonce du
+    // titre, saveGame() ajoute sa propre confirmation (son + annonce, voir
+    // view/save-storage.js), qui prime alors sur la ligne assertive.
+    if (getPref("autoSaveOnTransition", PREF_CONSTRAINTS.autoSaveOnTransition.default)) {
+      saveGame(getSession());
+    }
   }
 
   // Enregistré une fois, pour la durée de vie de cet écran ville (voir
@@ -85,7 +96,7 @@ export function makeCityScreen(getSession, setSession) {
 
       if (event.key === "Escape") {
         event.preventDefault();
-        openPauseMenu(scene);
+        openPauseMenu(scene, getSession);
         return;
       }
 

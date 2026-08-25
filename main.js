@@ -72,7 +72,7 @@ window.debugPlayerX = () => {
   console.log(session.player.x);
 };
 
-pushScreen(makeMenuScreen(createMainMenu(enterCity), t));
+pushScreen(makeMenuScreen(createMainMenu(enterCity, getSession), t));
 startLoop(tickActive);
 
 loadLevel("./level/demo.json", registry)
