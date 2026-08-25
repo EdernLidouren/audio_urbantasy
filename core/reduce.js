@@ -1,53 +1,27 @@
 // Le réducteur : seule source de vérité pour l'évolution de l'état. Pure,
 // ne mute jamais state, renvoie toujours un nouvel objet (sauf action
 // inconnue, qui renvoie la référence inchangée).
+//
+// Pipeline du TICK, en deux phases explicites (voir core/physics/ pour le
+// détail de la frontière) :
+//   1. INTENTIONS — qui veut bouger, et dans quel sens : action.dir pour le
+//      joueur (déjà une intention, câblée depuis view/input.js -> tick(),
+//      voir actions.js) ; core/behaviors/ pour chaque entité dotée d'un
+//      comportement (wander décide de sa propre direction).
+//   2. PHYSIQUE — applique et contraint ces intentions, sans rien savoir de
+//      qui les a formées : core/physics/collision.js résout le déplacement
+//      du joueur (pas fixe, bornes, collision contre les corps impassables)
+//      ; core/physics/overlap.js referme, en une passe finale universelle,
+//      tout chevauchement de corps résiduel.
 
-import { MOVE_STEP } from "./state.js";
 import BEHAVIORS from "./behaviors/index.js";
-
-function clamp(value, min, max) {
-  return Math.min(Math.max(value, min), max);
-}
-
-// Rayon de corps uniforme pour toute entité blocksMovement — pas encore par
-// entité/type (hors périmètre de cette tâche, qui ne touche que core/) ;
-// orthogonal à blocksMovement, qui décide SEUL si ce corps arrête le joueur.
-export const BODY_RADIUS = 0.25;
-
-// Résout le déplacement VOULU du joueur pour ce tick : bornes du niveau,
-// PUIS le corps de la première entité blocksMovement rencontrée dans le
-// sens du déplacement (si son bord serait franchi). blockedBy est l'id de
-// cette entité, ou null si rien n'arrête le mouvement. dir === 0 : jamais
-// bloqué (rien n'est tenté). Pure, ne mute rien.
-function resolvePlayerMove(playerX, dir, entities, levelLength) {
-  const intendedX = clamp(playerX + dir * MOVE_STEP, 0, levelLength);
-  if (dir === 0) return { x: intendedX, blockedBy: null };
-
-  let stoppedX = intendedX;
-  let blockedBy = null;
-  for (const entity of entities) {
-    if (!entity.blocksMovement) continue;
-    const edge = entity.x - dir * BODY_RADIUS; // bord du corps côté approche
-    const crosses = dir === 1 ? playerX <= edge && intendedX > edge : playerX >= edge && intendedX < edge;
-    if (!crosses) continue;
-    // Le corps le plus proche du joueur dans le sens du déplacement gagne.
-    if (blockedBy === null || (dir === 1 ? edge < stoppedX : edge > stoppedX)) {
-      stoppedX = edge;
-      blockedBy = entity.id;
-    }
-  }
-  return { x: stoppedX, blockedBy };
-}
+import { resolvePlayerMove } from "./physics/collision.js";
+import { resolveOverlaps } from "./physics/overlap.js";
 
 export function reduce(state, action) {
   switch (action.type) {
     case "TICK": {
-      const { x: nextX, blockedBy } = resolvePlayerMove(
-        state.player.x,
-        action.dir,
-        state.level.entities,
-        state.level.length
-      );
+      // --- Phase 1 : intentions ---
 
       // Chaque entité dotée d'un comportement tire son(ses) coup(s) dans la
       // MÊME suite de PRNG, à la queue leu leu (rngState avance à chaque
@@ -64,10 +38,25 @@ export function reduce(state, action) {
         return stepped.entity;
       });
 
+      // --- Phase 2 : physique ---
+
+      const { x: nextX, blockedBy } = resolvePlayerMove(
+        state.player.x,
+        action.dir,
+        state.level.entities,
+        state.level.length
+      );
+
+      // Passe curative finale : sépare tout chevauchement de corps résiduel
+      // (impossible en théorie vu ce qui précède, mais le level design peut
+      // en produire un au chargement, ou une entité mobile peut finir
+      // exactement sur le joueur/une autre entité) — voir resolveOverlaps.
+      const overlapFix = resolveOverlaps(nextX, nextEntities, state.level.length);
+
       return {
         ...state,
-        player: { ...state.player, x: nextX, blockedBy },
-        level: { ...state.level, entities: nextEntities },
+        player: { ...state.player, x: overlapFix.playerX, blockedBy, pushedBy: overlapFix.pushedBy },
+        level: { ...state.level, entities: overlapFix.entities },
         rngState,
       };
     }

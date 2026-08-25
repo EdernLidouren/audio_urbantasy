@@ -10,6 +10,13 @@ import { createSeed } from "./rng.js";
 
 export const MOVE_STEP = TUNING_DEFAULTS.moveStep;
 
+// Rayon de corps uniforme pour toute entité blocksMovement — pas encore par
+// entité/type. Orthogonal à blocksMovement, qui décide SEUL si ce corps
+// arrête/exclut quelque chose (voir core/reduce.js). Vit ici (pas dans
+// reduce.js) pour être partagé sans détour par core/level.js (validation au
+// chargement) ET core/reduce.js (résolution au tick) — une seule source.
+export const BODY_RADIUS = 0.25;
+
 // Graine par défaut du PRNG : fixe, jamais Date.now() — le déterminisme
 // (voir CLAUDE.md) s'applique aussi en jeu réel, pas seulement en test.
 const DEFAULT_SEED = 1;
@@ -30,9 +37,12 @@ export function createInitialState(level, seed = DEFAULT_SEED) {
       ),
     },
     // blockedBy : id de l'entité bloquante contre laquelle le joueur bute CE
-    // tick, ou null (voir core/reduce.js) — transitoire, recalculé à chaque
-    // tick, jamais accumulé.
-    player: { x: level.playerStart, blockedBy: null },
+    // tick, ou null. pushedBy : id de l'entité dont la résolution de
+    // chevauchement a forcé le joueur à se déplacer CE tick (cas curatif,
+    // voir core/reduce.js), ou null — distinct de blockedBy (bute en
+    // avançant vs déjà chevauché malgré lui). Les deux transitoires,
+    // recalculés à chaque tick, jamais accumulés.
+    player: { x: level.playerStart, blockedBy: null, pushedBy: null },
     rngState: createSeed(seed),
   };
 }

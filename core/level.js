@@ -7,6 +7,7 @@
 // lib/audio.js : le core ne doit jamais importer la couche Web Audio/vue.
 
 import { AMBIENCE_CHANNEL_LIMIT } from "../config/audio-channels.js";
+import { BODY_RADIUS } from "./state.js";
 import BEHAVIORS from "./behaviors/index.js";
 
 function fail(message) {
@@ -104,6 +105,32 @@ function parseBehavior(behavior, index, id) {
   return { kind, ...params };
 }
 
+// Détection de chevauchement au chargement (préventif, NON bloquant) : le
+// level design évite ce cas, mais un niveau mal formé doit se dénoncer au
+// chargement plutôt qu'en cours de jeu — même principe de filet que
+// playerStart plus bas, un console.warn clair, jamais un fail(). Une
+// entité passable n'a pas de zone d'exclusion propre (voir
+// core/reduce.js/resolveOverlaps) : seules les paires impliquant au moins
+// une entité impassable sont vérifiées.
+function warnOnOverlaps(entities, playerStart) {
+  for (let i = 0; i < entities.length; i++) {
+    const a = entities[i];
+    if (a.blocksMovement && Math.abs(playerStart - a.x) < BODY_RADIUS) {
+      console.warn(
+        `parseLevel: playerStart (${playerStart}) démarre dans le corps de l'entité impassable "${a.id}" (x=${a.x}).`
+      );
+    }
+    for (let j = i + 1; j < entities.length; j++) {
+      const b = entities[j];
+      if (a.blocksMovement && b.blocksMovement && Math.abs(a.x - b.x) < 2 * BODY_RADIUS) {
+        console.warn(
+          `parseLevel: entités impassables "${a.id}" (x=${a.x}) et "${b.id}" (x=${b.x}) se chevauchent au chargement.`
+        );
+      }
+    }
+  }
+}
+
 export function parseLevel(raw, registry) {
   if (typeof raw !== "object" || raw === null) {
     fail("le niveau n'est pas un objet.");
@@ -170,6 +197,8 @@ export function parseLevel(raw, registry) {
   const parsedEntities = entities.map((rawEntity, index) =>
     parseEntity(rawEntity, index, registry, length, seenIds)
   );
+
+  warnOnOverlaps(parsedEntities, resolvedPlayerStart);
 
   return {
     id,

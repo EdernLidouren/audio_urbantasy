@@ -10,6 +10,7 @@
 
 import { MOVE_STEP } from "../state.js";
 import { nextRandom } from "../rng.js";
+import { moveAndBounce } from "../physics/movement.js";
 
 export const DEFAULTS = {
   speed: MOVE_STEP / 2,
@@ -18,10 +19,6 @@ export const DEFAULTS = {
 
 function isFiniteNumber(value) {
   return typeof value === "number" && Number.isFinite(value);
-}
-
-function clamp(value, min, max) {
-  return Math.min(Math.max(value, min), max);
 }
 
 // Valide et ne renvoie QUE les champs présents dans raw (speed, turnChance) —
@@ -44,21 +41,21 @@ export function parseParams(raw, fail) {
 }
 
 // Avance l'entité d'un tick. Petite probabilité (turnChance, tirée du PRNG)
-// d'inverser la direction, puis déplacement de dir * speed ; demi-tour
-// (position bornée + direction inversée) si ça dépasse [0, length]. Pure :
-// ne mute rien, renvoie {entity, rngState}.
+// d'inverser la direction : c'est l'INTENTION de wander, la seule chose
+// qu'il décide. Le déplacement lui-même et la réaction aux bornes du
+// niveau (borner la position, inverser la direction si le bord serait
+// franchi) sont de la PHYSIQUE — wander ne teste ni ne clampe rien
+// lui-même, il délègue à moveAndBounce (core/physics/movement.js), qui
+// renvoie la direction déjà à jour pour le tick suivant. Pure : ne mute
+// rien, renvoie {entity, rngState}.
 export function step(entity, length, rngState) {
   const speed = entity.behavior.speed ?? DEFAULTS.speed;
   const turnChance = entity.behavior.turnChance ?? DEFAULTS.turnChance;
 
   const { value: turnRoll, state: nextRngState } = nextRandom(rngState);
-  const dir = turnRoll < turnChance ? -entity.dir : entity.dir;
+  const intendedDir = turnRoll < turnChance ? -entity.dir : entity.dir;
 
-  const rawX = entity.x + dir * speed;
-  const hitLower = rawX <= 0;
-  const hitUpper = rawX >= length;
-  const nextX = clamp(rawX, 0, length);
-  const nextDir = hitLower ? 1 : hitUpper ? -1 : dir;
+  const { x: nextX, dir: nextDir } = moveAndBounce(entity.x, intendedDir, speed, length);
 
   return { entity: { ...entity, x: nextX, dir: nextDir }, rngState: nextRngState };
 }
