@@ -33,15 +33,38 @@
   "assets/sounds/entities/npc_beacon": [
     "assets/sounds/entities/npc_beacon_1.mp3"
   ],
-  "assets/sounds/footsteps/concrete_walk": [
-    "assets/sounds/footsteps/concrete_walk_1.mp3"
-  ],
   "assets/sounds/footsteps/dog_medium_walk": [
     "assets/sounds/footsteps/dog_medium_walk_1.mp3",
     "assets/sounds/footsteps/dog_medium_walk_2.mp3",
     "assets/sounds/footsteps/dog_medium_walk_3.mp3",
     "assets/sounds/footsteps/dog_medium_walk_4.mp3",
     "assets/sounds/footsteps/dog_medium_walk_5.mp3"
+  ],
+  "assets/sounds/footsteps/sand_walk": [
+    "assets/sounds/footsteps/sand_walk_1.mp3"
+  ],
+  "assets/sounds/footsteps/shoes_walk": [
+    "assets/sounds/footsteps/shoes_walk_1.mp3",
+    "assets/sounds/footsteps/shoes_walk_2.mp3",
+    "assets/sounds/footsteps/shoes_walk_4.mp3",
+    "assets/sounds/footsteps/shoes_walk_5.mp3",
+    "assets/sounds/footsteps/shoes_walk_6.mp3",
+    "assets/sounds/footsteps/shoes_walk_7.mp3",
+    "assets/sounds/footsteps/shoes_walk_8.mp3",
+    "assets/sounds/footsteps/shoes_walk_9.mp3",
+    "assets/sounds/footsteps/shoes_walk_10.mp3",
+    "assets/sounds/footsteps/shoes_walk_11.mp3",
+    "assets/sounds/footsteps/shoes_walk_12.mp3",
+    "assets/sounds/footsteps/shoes_walk_13.mp3",
+    "assets/sounds/footsteps/shoes_walk_14.mp3",
+    "assets/sounds/footsteps/shoes_walk_15.mp3",
+    "assets/sounds/footsteps/shoes_walk_16.mp3",
+    "assets/sounds/footsteps/shoes_walk_17.mp3",
+    "assets/sounds/footsteps/shoes_walk_18.mp3",
+    "assets/sounds/footsteps/shoes_walk_19.mp3",
+    "assets/sounds/footsteps/shoes_walk_20.mp3",
+    "assets/sounds/footsteps/shoes_walk_21.mp3",
+    "assets/sounds/footsteps/shoes_walk_22.mp3"
   ],
   "assets/sounds/ui/block": [
     "assets/sounds/ui/block_1.mp3"

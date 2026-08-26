@@ -220,6 +220,58 @@ rouvrir ce fichier. `resolveTuning` lit ensuite `entity.tuning[key]` (palier
 et la résolution retombe sur le palier ARCHÉTYPE, comportement inchangé pour
 toute entité qui ne déclare pas `tuning`.
 
+## Surfaces de sol et son de pas
+
+Le sol de la scène (`defaultSurface`/`segments`, voir `level/schema.md`) et
+son registre (`core/surfaces.js`, `neutral: true/false` par surface) sont du
+CORE pur — ce document-ci ne couvre que ce que la VUE en tire pour choisir
+le fichier du son de pas (`view/audio/city-scene.js`,
+`resolveFootstepPath`). Deux propriétés d'ENTITÉ, résolues par la MÊME
+cascade que les paramètres sonores ci-dessus (`resolveTuning(key, entity)`,
+sans `sound` — comme `audibleRange`/`panSaturation` : une propriété de
+l'entité, pas d'un rôle de son) :
+
+- **`gait`** — la CHAUSSURE/allure de l'entité (ex. `"heavy_boots"`),
+  optionnelle : la plupart des entités n'en ont pas.
+- **`naturalWalk`** — le pas NATUREL de l'entité (ex. `"barefoot"`), pour
+  une entité qui n'a pas de gait particulier mais un pas qui lui est propre
+  malgré tout. Une entité qui porte déjà son PROPRE son de déplacement
+  (`sounds.movement.path`, ex. `dog.js`) n'a besoin d'AUCUN des deux : ce
+  son propre sert directement de repli, voir la résolution ci-dessous.
+
+### La règle : le sol domine, ou l'entité domine — jamais les deux
+
+`resolveFootstepPath` choisit un fichier `"<nom>_walk"` sous
+`assets/sounds/footsteps/`, en DEUX branches strictement disjointes selon
+`neutral` (jamais de croisement surface×chaussure, jamais de produit
+cartésien N surfaces × M gaits — chaque cran teste UN nom, une seule
+dimension à la fois) :
+
+- **Sol SPÉCIAL** (`neutral: false`, ex. `sand`, `snow`) — `"<surface>_walk"`
+  si ce pool existe : LE SOL DOMINE, le `gait`/`naturalWalk` de l'entité est
+  ignoré. Absent -> bascule sur la branche NEUTRE ci-dessous (un sol spécial
+  sans son dédié sonne comme un sol neutre, jamais comme un silence).
+- **Sol NEUTRE** (`neutral: true`, ex. `concrete`, `asphalt`) — L'ENTITÉ
+  DOMINE, en cascade : `"<gait>_walk"` si un gait est résolu ET que le
+  fichier existe ; sinon le pas NATUREL — `"<naturalWalk>_walk"` si résolu
+  ET existant, SINON le son propre de l'entité (`sounds.movement.path`,
+  s'il y en a un) ; sinon le PLANCHER GARANTI (le son de pas historique du
+  jeu, `concrete_walk` — jamais vérifié, DOIT toujours exister). Trois crans
+  au plus, jamais davantage.
+
+`hasAsset` (`lib/assets.js`) teste l'existence d'un pool SANS lever ni
+tirer, contrairement à `resolveAsset` — c'est ce qui permet à
+`resolveFootstepPath` d'essayer un cran, constater son absence, et basculer
+au suivant sans jamais planter : "ne peut jamais échouer" est une garantie
+structurelle, pas une convention.
+
+Exemple : `entities/types/buddy.js` déclare `gait: "heavy_boots"` ET
+`naturalWalk: "barefoot"` — NI L'UN NI L'AUTRE fichier n'existe aujourd'hui,
+la résolution dégrade donc jusqu'au son propre du compagnon
+(`dog_medium_walk`), sans qu'aucun nouveau fichier soit requis et sans
+changer son comportement audible. Déposer `heavy_boots_walk_*.mp3` demain
+suffirait à faire marcher le compagnon différemment, sans toucher à la vue.
+
 ## Ce qui n'est PAS un paramètre sonore
 
 Deux catégories voisines, à ne pas confondre avec les paramètres sonores

@@ -18,6 +18,53 @@ parsé, sans aucune chaîne affichable en dur — uniquement des clés i18n.
 | `ambiences`   | string[] | optionnel : 0 à `AMBIENCE_CHANNEL_LIMIT` chemins d'ambiance (`assets/ambiances/...`, voir `config/audio-channels.js`), canal global non spatialisé, jusqu'à autant de couches simultanées — voir `view/audio/city-scene.js` |
 | `reverbDurationSec` | number | optionnel, `> 0` : surcharge PAR LIEU la durée de la réponse impulsionnelle du bus de réverb (défaut global : `config/tuning-values.js`) |
 | `reverbDecay` | number | optionnel, `> 0` : surcharge PAR LIEU le taux de déclin de la réverb (défaut global : `config/tuning-values.js`) |
+| `defaultSurface` | string | optionnel : nom de surface (voir "Surfaces de sol" plus bas) couvrant tout le `x` non-segmenté. **FILET SILENCIEUX si absent** (repli sur `DEFAULT_SURFACE`, `core/surfaces.js` — comportement audible inchangé pour toute scène qui n'en déclare pas). **Échec clair si fourni mais absent du registre** (comme un type d'entité inconnu) — une référence de contenu erronée n'est jamais dégradée en silence. |
+| `segments`    | Segment[] | optionnel : zones qui PATCHENT `defaultSurface` sur des portions du lieu (voir "Surfaces de sol" plus bas). Absent -> `[]`, `defaultSurface` partout. |
+
+## Segment (surface)
+
+| Champ     | Type   | Contrainte                                                    |
+|-----------|--------|------------------------------------------------------------------|
+| `from`    | number | `>= 0`, `< to`                                                    |
+| `to`      | number | `<= length`, `> from`                                             |
+| `surface` | string | doit exister dans le registre de surfaces (`core/surfaces.js`) — **TOUJOURS explicite, aucun filet** : en déclarer un est un choix délibéré, une surface inconnue est une vraie erreur de contenu -> `parseLevel` échoue clairement. |
+
+## Surfaces de sol
+
+Toute la scène est couverte par une surface, SANS TROU — c'est un invariant
+garanti par construction, pas une validation à part : `defaultSurface`
+couvre tout le lieu comme une couche de base, les `segments` ne font que la
+PATCHER par endroits (bornes `from`/`to` incluses). `core/surfaces.js`
+(CORE pur) porte :
+
+- `SURFACE_REGISTRY` — un registre `nom -> propriétés`, structuré comme le
+  registre de types d'entités (`entities/types/index.js`) mais placé DANS
+  `core/`, importé directement (comme `config/tuning-values.js`) : à la
+  différence du registre d'entités (contenu, jamais lu par le core), une
+  surface est prête à porter une future propriété de PHYSIQUE (ex. un
+  ralentissement) que `core/reduce.js`/`core/physics/` liront un jour
+  directement. Chaque entrée est un objet plat (`{ neutral: boolean }`
+  aujourd'hui) conçu pour en recevoir d'autres PLUS TARD (ex.
+  `speedFactor`) sans changer la forme ni la logique de résolution — ajouter
+  une surface, c'est ajouter une entrée ; ajouter une propriété de
+  gameplay, c'est ajouter une clé à chaque entrée concernée, jamais une
+  nouvelle fonction.
+- `neutral` — `true` = sol NEUTRE (le son de pas vient de l'ENTITÉ qui
+  marche) ; `false` = sol SPÉCIAL (le son vient DU SOL, qui domine). Ce
+  registre ne connaît AUCUN chemin de fichier : la dérivation du son est
+  entièrement à la charge de la VUE (voir `entities/model.md`, "Surfaces de
+  sol et son de pas").
+- `surfaceAt(world, x)` — nom de la surface au point `x`, TOUJOURS défini
+  (segment couvrant, sinon `defaultSurface`), jamais `null`/`undefined`.
+  Pure, testable au terminal.
+- `surfaceProps(name)` / `surfacePropsAt(world, x)` — propriétés du
+  registre pour une surface (dont `neutral`) : le point d'extension
+  gameplay futur, un appelant qui voudra lire `speedFactor` demain appelle
+  exactement ces fonctions, rien à ajouter au mécanisme.
+
+Aucune mécanique n'exploite encore ce champ au-delà du son de pas (voir
+`entities/model.md`) : pas de position Y, pas de ralentissement réel — le
+registre est prêt à en accueillir, rien de plus aujourd'hui.
 
 ## Entité
 

@@ -46,13 +46,14 @@ import {
   setGlobalVolume,
 } from "../../lib/audio.js";
 import { announce } from "../../lib/announce.js";
-import { resolveAsset } from "../../lib/assets.js";
+import { resolveAsset, hasAsset } from "../../lib/assets.js";
 import registry from "../../entities/types/index.js";
 import player from "../../entities/player.js";
 import { TUNING_DEFAULTS, resolveTuning } from "../../config/tuning.js";
 import { getPref, PREF_CONSTRAINTS } from "../../config/preferences.js";
 import { t } from "../../i18n/index.js";
 import { MOVE_STEP, getActiveWorld } from "../../core/state.js";
+import { surfaceAt, surfaceProps } from "../../core/surfaces.js";
 
 // Facteurs de préférence (Options > Audio, voir view/menus/audio-menu.js) :
 // stockés en pourcentage [0,100] (même domaine que les sliders), convertis
@@ -107,6 +108,59 @@ const REVERB_WET = TUNING_DEFAULTS.reverbWet;
 const MOVEMENT_SOUND = player.sounds.movement;
 const FOOTSTEP_REVERB_SEND =
   MOVEMENT_SOUND.reverbSend !== undefined ? MOVEMENT_SOUND.reverbSend : TUNING_DEFAULTS.footstepReverbSend;
+
+// Clé d'asset "<name>_walk" sous assets/sounds/footsteps/ — convention
+// PARTAGÉE par une surface, un gait ou un naturalWalk (voir
+// resolveFootstepPath ci-dessous) : un simple nom + suffixe, jamais composé
+// (voir entities/model.md, "pas de produit cartésien surface×chaussure").
+function footstepKey(name) {
+  return `assets/sounds/footsteps/${name}_walk`;
+}
+
+// Plancher garanti du son de pas : le SEUL chemin dont l'existence n'est
+// JAMAIS vérifiée (contrairement aux crans ci-dessous, tous testés via
+// hasAsset) — DOIT rester présent en permanence. "shoes" : le pool neutre
+// général du jeu (voir entities/player.js) — remplace "concrete", retiré de
+// assets/ lors de l'ajout des pools shoes_walk/sand_walk.
+const FOOTSTEP_FLOOR_PATH = footstepKey("shoes");
+
+// Résout le CHEMIN du son de pas d'un mobile (joueur ou entité) au point x
+// d'un monde donné — VUE : dérive un nom de fichier depuis le flag
+// `neutral` de core/surfaces.js, le core lui-même ne connaît AUCUN son. DEUX
+// branches disjointes selon `neutral`, JAMAIS de croisement surface×gait
+// (voir entities/model.md) — au plus 3 crans, chacun une clé à UNE seule
+// dimension, chacun vérifié via hasAsset (jamais resolveAsset : on doit
+// pouvoir tester l'existence AVANT de trancher, sans jamais lever) :
+//   - sol SPÉCIAL (neutral:false) : "<surface>_walk" si son pool existe ->
+//     sinon bascule en branche NEUTRE (un sol spécial sans son dédié sonne
+//     comme un sol neutre, jamais comme un silence).
+//   - sol NEUTRE (neutral:true) : "<gait>_walk" si l'entité a un gait ET
+//     que son pool existe -> sinon le pas NATUREL de l'entité :
+//     "<naturalWalk>_walk" si résolu ET existant, SINON son propre (ownPath,
+//     si l'entité en a un — voir entities/model.md, "chien important") ->
+//     sinon le plancher garanti (FOOTSTEP_FLOOR_PATH, jamais vérifié).
+// Ne peut jamais échouer : au pire, retombe sur FOOTSTEP_FLOOR_PATH.
+function resolveFootstepPath(world, x, { gait, naturalWalk, ownPath } = {}) {
+  const surface = surfaceAt(world, x);
+  const props = surfaceProps(surface);
+
+  if (props && !props.neutral) {
+    const specialKey = footstepKey(surface);
+    if (hasAsset(specialKey)) return specialKey;
+  }
+
+  if (gait) {
+    const gaitKey = footstepKey(gait);
+    if (hasAsset(gaitKey)) return gaitKey;
+  }
+
+  if (naturalWalk) {
+    const naturalKey = footstepKey(naturalWalk);
+    if (hasAsset(naturalKey)) return naturalKey;
+  }
+
+  return ownPath || FOOTSTEP_FLOOR_PATH;
+}
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
@@ -285,6 +339,15 @@ export function createCityAudioScene(getSession) {
           // qu'après avoir parcouru movementStepDistance depuis là, comme le
           // joueur au tout premier tick d'une partie.
           lastMovementX: entity.x,
+          // gait/naturalWalk (voir entities/model.md, "Surfaces de sol et
+          // son de pas") : propriétés de l'ENTITÉ, pas d'un rôle de son —
+          // même cascade que audibleRange/panSaturation ci-dessus (pas de
+          // `sound` en 3e paramètre, jamais surchargées par descripteur de
+          // son). Résolues seulement ICI (une entité sans movement n'a de
+          // toute façon aucun pas à faire sonner) : point de départ du choix
+          // DYNAMIQUE du fichier à chaque pas, voir resolveFootstepPath.
+          gait: resolveTuning("gait", entity),
+          naturalWalk: resolveTuning("naturalWalk", entity),
         }
       : {};
 
@@ -436,8 +499,14 @@ export function createCityAudioScene(getSession) {
     cooldown.lastAt = now;
   }
 
-  function playFootstep() {
-    playPacedSound(MOVEMENT_SOUND.path, FOOTSTEP_REVERB_SEND, footstepCooldown);
+  // Chemin résolu à CHAQUE pas (voir resolveFootstepPath) — jamais figé au
+  // MOVEMENT_SOUND.path d'origine, qui ne sert que de repli "son propre" du
+  // joueur si gait/naturalWalk (champs directs sur player, pas de cascade
+  // instance/archétype pour lui — voir entities/player.js) ne résolvent
+  // rien.
+  function playFootstep(x, world) {
+    const path = resolveFootstepPath(world, x, { gait: player.gait, naturalWalk: player.naturalWalk, ownPath: MOVEMENT_SOUND.path });
+    playPacedSound(path, FOOTSTEP_REVERB_SEND, footstepCooldown);
   }
 
   // Dormant si l'entité ne porte pas de collisionSound (voir
@@ -519,15 +588,24 @@ export function createCityAudioScene(getSession) {
   // le "premier pas immédiat" du joueur (voir update()) : une entité
   // "wander" n'a pas de transition immobile -> mouvement pilotée par une
   // touche, elle erre en continu tant qu'elle a un behavior — rien à
-  // détecter en plus de l'accumulateur de distance lui-même.
-  function updateEntityMovementSounds(x, liveById) {
+  // détecter en plus de l'accumulateur de distance lui-même. Fichier résolu
+  // à CHAQUE pas via resolveFootstepPath (surface AU POINT DE L'ENTITÉ, pas
+  // celle du joueur) — movementPath sert de repli "son propre" (voir
+  // entities/model.md), plus le chemin fixe d'avant l'introduction des
+  // surfaces.
+  function updateEntityMovementSounds(x, world, liveById) {
     const volumeFactor = footstepVolumeFactor();
     for (const entry of entitySounds) {
       if (!entry.movementPath) continue;
 
       const liveX = liveById.get(entry.entity.id).x;
       while (Math.abs(liveX - entry.lastMovementX) >= entry.movementStepDistance) {
-        playPositionedOneShot(entry.movementPath, {
+        const path = resolveFootstepPath(world, liveX, {
+          gait: entry.gait,
+          naturalWalk: entry.naturalWalk,
+          ownPath: entry.movementPath,
+        });
+        playPositionedOneShot(path, {
           relX: liveX - x,
           interactRange: entry.interactRange,
           audibleRange: entry.audibleRange,
@@ -579,6 +657,10 @@ export function createCityAudioScene(getSession) {
     const session = getSession();
     const x = session.player.x;
     const blockedBy = session.player.blockedBy;
+    // Monde actif de CE tick — lu une fois, transmis à tout ce qui doit
+    // connaître la carte des surfaces (voir resolveFootstepPath) plutôt que
+    // de rappeler getActiveWorld(getSession()) à chaque son de pas.
+    const world = getActiveWorld(session);
 
     applyEntityAudio(x);
 
@@ -587,7 +669,7 @@ export function createCityAudioScene(getSession) {
     // ces appels, inutile de la reconstruire trois fois.
     const liveById = liveEntitiesById();
     updateIntermittentSources(x, liveById);
-    updateEntityMovementSounds(x, liveById);
+    updateEntityMovementSounds(x, world, liveById);
 
     // Occupation par diff : n'agit QUE si l'ensemble a changé depuis le
     // tick précédent. Une nouvelle photo (assertive) coupe la précédente
@@ -614,14 +696,14 @@ export function createCityAudioScene(getSession) {
     // le tick suivant.
     const isMoving = x !== previousX;
     if (isMoving && !wasMoving) {
-      playFootstep();
+      playFootstep(x, world);
       lastFootstepX = x;
     }
     wasMoving = isMoving;
     previousX = x;
 
     while (Math.abs(x - lastFootstepX) >= STEP_DISTANCE) {
-      playFootstep();
+      playFootstep(x, world);
       lastFootstepX += Math.sign(x - lastFootstepX) * STEP_DISTANCE;
     }
 

@@ -9,6 +9,7 @@
 import { AMBIENCE_CHANNEL_LIMIT } from "../config/audio-channels.js";
 import { BODY_RADIUS } from "./state.js";
 import BEHAVIORS from "./behaviors/index.js";
+import { SURFACE_REGISTRY, DEFAULT_SURFACE } from "./surfaces.js";
 
 function fail(message) {
   throw new Error(`parseLevel: ${message}`);
@@ -155,6 +156,30 @@ function warnOnOverlaps(entities, playerStart) {
   }
 }
 
+// Un segment PATCHE defaultSurface sur [from, to] (bornes incluses, voir
+// surfaceAt/core/surfaces.js) : from < to, les deux dans [0, length].
+// TOUJOURS explicite si présent (pas de filet ici, contrairement à
+// defaultSurface) : déclarer un segment est un choix délibéré, une surface
+// inconnue est une vraie erreur de contenu -> échec clair, comme un type
+// d'entité inconnu (voir parseEntity).
+function parseSegment(rawSegment, index, length) {
+  if (typeof rawSegment !== "object" || rawSegment === null) {
+    fail(`segments[${index}] n'est pas un objet.`);
+  }
+
+  const { from, to, surface } = rawSegment;
+  if (!isFiniteNumber(from) || !isFiniteNumber(to) || from < 0 || to > length || from >= to) {
+    fail(
+      `segments[${index}] : bornes [from, to] invalides (reçu from=${JSON.stringify(from)}, to=${JSON.stringify(to)}, longueur ${length}).`
+    );
+  }
+  if (!isNonEmptyString(surface) || !SURFACE_REGISTRY[surface]) {
+    fail(`segments[${index}] : surface "${surface}" absente du registre de surfaces.`);
+  }
+
+  return { from, to, surface };
+}
+
 export function parseLevel(raw, registry) {
   if (typeof raw !== "object" || raw === null) {
     fail("le niveau n'est pas un objet.");
@@ -163,7 +188,20 @@ export function parseLevel(raw, registry) {
     fail("le registre de types est manquant ou invalide.");
   }
 
-  const { id, titleKey, length, playerStart, entities, music, ambiences, reverbDurationSec, reverbDecay, floors } = raw;
+  const {
+    id,
+    titleKey,
+    length,
+    playerStart,
+    entities,
+    music,
+    ambiences,
+    reverbDurationSec,
+    reverbDecay,
+    floors,
+    defaultSurface,
+    segments,
+  } = raw;
 
   if (!isNonEmptyString(id)) {
     fail(`id manquant ou invalide (reçu : ${JSON.stringify(id)}).`);
@@ -202,6 +240,27 @@ export function parseLevel(raw, registry) {
   if (floors !== undefined && resolvedFloors !== floors) {
     console.warn(`parseLevel: floors (${JSON.stringify(floors)}) invalide (entier >= 1 attendu), repli sur 1.`);
   }
+  // defaultSurface : couvre tout le X non-segmenté (voir surfaceAt,
+  // core/surfaces.js) — toute la scène est TOUJOURS couverte, sans trou.
+  // FILET SILENCIEUX si absent (repli sur DEFAULT_SURFACE, comportement
+  // audible inchangé pour toute scène existante qui n'en déclare pas encore
+  // — même politique d'omission que floors), mais une valeur FOURNIE doit
+  // exister dans le registre -> échec clair sinon (comme un type d'entité
+  // inconnu, voir parseEntity) : une référence de surface erronée est un
+  // vrai bug de contenu, jamais dégradée en silence.
+  if (defaultSurface !== undefined && (!isNonEmptyString(defaultSurface) || !SURFACE_REGISTRY[defaultSurface])) {
+    fail(`defaultSurface "${JSON.stringify(defaultSurface)}" absente du registre de surfaces.`);
+  }
+  const resolvedDefaultSurface = defaultSurface !== undefined ? defaultSurface : DEFAULT_SURFACE;
+  // segments : optionnel, PATCHE defaultSurface sur des zones précises (voir
+  // parseSegment) — absent -> tableau vide, toujours resolvedDefaultSurface
+  // partout (comportement inchangé). Chaque segment est TOUJOURS explicite
+  // (pas de filet par segment, voir parseSegment) : en déclarer un est un
+  // choix délibéré.
+  if (segments !== undefined && !Array.isArray(segments)) {
+    fail(`segments doit être un tableau si présent (reçu : ${JSON.stringify(segments)}).`);
+  }
+  const parsedSegments = (segments ?? []).map((rawSegment, index) => parseSegment(rawSegment, index, length));
   // music : optionnel, chemin vers la musique du lieu (voir
   // view/audio/city-scene.js). Simple passage : parseLevel ne connaît ni
   // Howler ni la lecture audio, juste la présence d'une chaîne.
@@ -243,6 +302,8 @@ export function parseLevel(raw, registry) {
     length,
     playerStart: resolvedPlayerStart,
     floors: resolvedFloors,
+    defaultSurface: resolvedDefaultSurface,
+    segments: parsedSegments,
     entities: parsedEntities,
   };
   // Clés ajoutées SEULEMENT si présentes (jamais explicitement undefined) :
