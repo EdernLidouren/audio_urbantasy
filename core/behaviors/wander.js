@@ -7,6 +7,12 @@
 // parseParams ne stocke QUE les champs fournis dans le JSON du niveau ; le
 // repli sur DEFAULTS a lieu UNIQUEMENT dans step(), au moment de lire chaque
 // paramètre (params.x ?? DEFAULTS.x). Jamais appliqué ailleurs.
+//
+// step(entity, context) : signature UNIFORME avec les autres comportements
+// (voir core/behaviors/follow.js) — context porte length/rngState (ce
+// module ignore le reste, ex. getTargetPosition, réservé à follow). Permet
+// à core/reduce.js d'appeler tout module de la même façon, sans jamais
+// savoir lequel il invoque (voir son en-tête).
 
 import { MOVE_STEP } from "../state.js";
 import { nextRandom } from "../rng.js";
@@ -47,15 +53,17 @@ export function parseParams(raw, fail) {
 // franchi) sont de la PHYSIQUE — wander ne teste ni ne clampe rien
 // lui-même, il délègue à moveAndBounce (core/physics/movement.js), qui
 // renvoie la direction déjà à jour pour le tick suivant. Pure : ne mute
-// rien, renvoie {entity, rngState}.
-export function step(entity, length, rngState) {
+// rien, renvoie {entity, rngState} — jamais de champ `intent` (voir
+// follow.js) : wander résout sa position LUI-MÊME, il n'y a rien de plus à
+// faire pour la physique en phase 2.
+export function step(entity, context) {
   const speed = entity.behavior.speed ?? DEFAULTS.speed;
   const turnChance = entity.behavior.turnChance ?? DEFAULTS.turnChance;
 
-  const { value: turnRoll, state: nextRngState } = nextRandom(rngState);
+  const { value: turnRoll, state: nextRngState } = nextRandom(context.rngState);
   const intendedDir = turnRoll < turnChance ? -entity.dir : entity.dir;
 
-  const { x: nextX, dir: nextDir } = moveAndBounce(entity.x, intendedDir, speed, length);
+  const { x: nextX, dir: nextDir } = moveAndBounce(entity.x, intendedDir, speed, context.length);
 
   return { entity: { ...entity, x: nextX, dir: nextDir }, rngState: nextRngState };
 }

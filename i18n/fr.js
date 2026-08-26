@@ -80,6 +80,7 @@ export default {
   "entity.fountain.description": "Une fontaine qui coule sans interruption.",
   "entity.hound": "Chien errant",
   "entity.hound.description": "Un chien errant qu'on entend aboyer au loin, de temps en temps.",
+  "entity.buddy.description": "Votre fidèle compagnon à quatre pattes.",
   "object.toolbox": "Boîte à outils",
   "object.toolbox.description": "Une boîte à outils métallique. Elle semble fouillable.",
   "npc.passerby": "Passant",

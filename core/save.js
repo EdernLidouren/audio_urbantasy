@@ -18,27 +18,36 @@ export function serializeGame(session) {
 }
 
 // Migre une sauvegarde déjà déballée { version, data } vers la partie
-// courante. v1 -> v1 : identité, pour l'instant — point d'ancrage documenté
+// courante. v1 -> v1 : identité pour l'essentiel, SAUF le rebouchage de
+// `companions`/`companionsRngState` (voir core/state.js) — absents d'une
+// sauvegarde antérieure à leur introduction, sans que ça justifie une
+// montée de version (la forme reste v1, juste complétée par des défauts
+// sûrs : aucun compagnon, un flux de PRNG frais). Point d'ancrage documenté
 // pour de futures montées (v1 -> v2 -> ... -> courante, jamais en sautant
 // une étape, même principe que migratePrefs). Version inconnue -> null
 // (aucun chemin de montée), traité comme un échec par deserializeGame.
 function migrateSave(raw) {
-  if (raw.version === SAVE_VERSION) return raw.data;
-  return null;
+  if (raw.version !== SAVE_VERSION) return null;
+
+  const data = raw.data;
+  if (!data || typeof data !== "object" || Array.isArray(data.companions)) return data;
+  return { ...data, companions: [], companionsRngState: 0 };
 }
 
 // Valide la forme MINIMALE d'une partie déjà migrée : player/worlds/
 // activeWorldId présents, du bon type, et le monde actif réellement
-// présent dans worlds. Ne revalide pas chaque champ d'entité un par un (ce
-// serait dupliquer parseLevel) — l'objectif est de détecter une donnée
-// manifestement corrompue ou étrangère, pas de rejouer la validation de
-// niveau.
+// présent dans worlds. companions (déjà rebouché par migrateSave si
+// absent, voir plus haut) doit être un tableau. Ne revalide pas chaque
+// champ d'entité un par un (ce serait dupliquer parseLevel) — l'objectif
+// est de détecter une donnée manifestement corrompue ou étrangère, pas de
+// rejouer la validation de niveau.
 function isPlausibleSession(data) {
   if (!data || typeof data !== "object") return false;
   if (!data.player || typeof data.player !== "object" || typeof data.player.x !== "number") return false;
   if (!data.worlds || typeof data.worlds !== "object") return false;
   if (typeof data.activeWorldId !== "string") return false;
   if (!data.worlds[data.activeWorldId]) return false;
+  if (!Array.isArray(data.companions)) return false;
   return true;
 }
 

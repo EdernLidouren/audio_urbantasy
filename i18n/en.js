@@ -79,6 +79,7 @@ export default {
   "entity.fountain.description": "A fountain running without interruption.",
   "entity.hound": "Stray dog",
   "entity.hound.description": "A stray dog you can hear barking in the distance, every so often.",
+  "entity.buddy.description": "Your loyal four-legged companion.",
   "object.toolbox": "Toolbox",
   "object.toolbox.description": "A metal toolbox. It looks like it can be searched.",
   "npc.passerby": "Passerby",

@@ -9,6 +9,16 @@ import { tick } from "./actions.js";
 import { reduce } from "./reduce.js";
 import { moveAndBounce } from "./physics/movement.js";
 import { SAVE_VERSION, serializeGame, deserializeGame } from "./save.js";
+import { MAX_COMPANIONS } from "../config/companions.js";
+
+// { companions: [] } : passé explicitement à CHAQUE createInitialState()
+// ci-dessous qui ne concerne pas les compagnons — sans lui, le défaut (UN
+// compagnon de test, voir core/state.js) s'ajouterait à des scénarios
+// conçus et vérifiés AVANT son existence, avec des positions attendues
+// calculées à la main. Les vérifications dédiées aux compagnons (voir plus
+// bas, section "Compagnons") l'omettent volontairement pour exercer le
+// défaut réel.
+const NO_COMPANIONS = { companions: [] };
 
 const RAW_LEVEL = {
   id: "movement-check",
@@ -39,7 +49,7 @@ export function runMovementChecks() {
   const level = parseLevel(RAW_LEVEL, EMPTY_REGISTRY);
 
   // Quelques ticks à droite depuis le centre : x avance de MOVE_STEP par tick.
-  let state = createInitialState(level);
+  let state = createInitialState(level, undefined, NO_COMPANIONS);
   state = reduce(state, tick(1));
   state = reduce(state, tick(1));
   state = reduce(state, tick(1));
@@ -47,16 +57,16 @@ export function runMovementChecks() {
 
   // Clamp à gauche : depuis le bord 0, un tick à gauche reste à 0.
   const leftLevel = parseLevel({ ...RAW_LEVEL, playerStart: 0 }, EMPTY_REGISTRY);
-  const leftState = reduce(createInitialState(leftLevel), tick(-1));
+  const leftState = reduce(createInitialState(leftLevel, undefined, NO_COMPANIONS), tick(-1));
   run("clamp à gauche depuis x=0", 0, leftState.player.x);
 
   // Clamp à droite : depuis le bord length, un tick à droite reste à length.
   const rightLevel = parseLevel({ ...RAW_LEVEL, playerStart: RAW_LEVEL.length }, EMPTY_REGISTRY);
-  const rightState = reduce(createInitialState(rightLevel), tick(1));
+  const rightState = reduce(createInitialState(rightLevel, undefined, NO_COMPANIONS), tick(1));
   run("clamp à droite depuis x=length", RAW_LEVEL.length, rightState.player.x);
 
   // Action inconnue -> état inchangé, MÊME référence (pas de nouvel objet).
-  const before = createInitialState(level);
+  const before = createInitialState(level, undefined, NO_COMPANIONS);
   const after = reduce(before, { type: "UNKNOWN" });
   run("action inconnue renvoie la même référence", before, after);
 
@@ -91,8 +101,8 @@ export function runMovementChecks() {
 
   // Même seed, même suite de ticks -> trajectoire identique à chaque tick,
   // pas seulement au final.
-  const run1 = runTicks(createInitialState(wanderLevel, 42), 50);
-  const run2 = runTicks(createInitialState(wanderLevel, 42), 50);
+  const run1 = runTicks(createInitialState(wanderLevel, 42, NO_COMPANIONS), 50);
+  const run2 = runTicks(createInitialState(wanderLevel, 42, NO_COMPANIONS), 50);
   run(
     "errance : trajectoire reproductible (même seed)",
     JSON.stringify(run1.positions),
@@ -113,7 +123,7 @@ export function runMovementChecks() {
     }),
     WANDER_REGISTRY
   );
-  let boundaryState = createInitialState(tightLevel, 7);
+  let boundaryState = createInitialState(tightLevel, 7, NO_COMPANIONS);
   boundaryState = reduce(boundaryState, tick(0)); // 0.9 + 0.5 = 1.4 -> bornée à length, direction inversée
   run("errance : position bornée à length après dépassement", tightLevel.length, getActiveWorld(boundaryState).entities[0].x);
   boundaryState = reduce(boundaryState, tick(0)); // direction -1 désormais : 1 - 0.5 = 0.5, repart vers l'intérieur
@@ -142,7 +152,7 @@ export function runMovementChecks() {
   const wallEntity = blockingLevel.entities[0];
   const expectedEdge = wallEntity.x - BODY_RADIUS; // bord du corps côté approche (dir=1)
 
-  let blockState = createInitialState(blockingLevel);
+  let blockState = createInitialState(blockingLevel, undefined, NO_COMPANIONS);
   for (let i = 0; i < 20; i++) {
     blockState = reduce(blockState, tick(1));
   }
@@ -168,8 +178,8 @@ export function runMovementChecks() {
     { id: "movement-check-passthrough-empty", titleKey: "level.demo.title", length: 10, playerStart: 4, entities: [] },
     NONBLOCKING_REGISTRY
   );
-  let passState = createInitialState(passThroughLevel);
-  let unobstructedState = createInitialState(emptyLevel);
+  let passState = createInitialState(passThroughLevel, undefined, NO_COMPANIONS);
+  let unobstructedState = createInitialState(emptyLevel, undefined, NO_COMPANIONS);
   for (let i = 0; i < 20; i++) {
     passState = reduce(passState, tick(1));
     unobstructedState = reduce(unobstructedState, tick(1));
@@ -184,7 +194,7 @@ export function runMovementChecks() {
     NONBLOCKING_REGISTRY // type "deco" a blocksMovement absent (-> false par défaut)
   );
   run("collision : surcharge d'instance blocksMovement:true respectée", true, overrideBlockLevel.entities[0].blocksMovement);
-  let overrideBlockState = createInitialState(overrideBlockLevel);
+  let overrideBlockState = createInitialState(overrideBlockLevel, undefined, NO_COMPANIONS);
   for (let i = 0; i < 20; i++) {
     overrideBlockState = reduce(overrideBlockState, tick(1));
   }
@@ -228,7 +238,7 @@ export function runMovementChecks() {
     },
     OVERLAP_REGISTRY
   );
-  let overlapState = createInitialState(overlapLevel);
+  let overlapState = createInitialState(overlapLevel, undefined, NO_COMPANIONS);
   overlapState = reduce(overlapState, tick(0));
   const [entA, entB] = getActiveWorld(overlapState).entities;
   run("chevauchement : deux entités impassables séparées en une passe", true, Math.abs(entB.x - entA.x) >= 2 * BODY_RADIUS);
@@ -249,7 +259,7 @@ export function runMovementChecks() {
     { id: "movement-check-overlap-player", titleKey: "level.demo.title", length: 10, playerStart: 5, entities: [{ id: "wall-p", type: "wall", x: 5.1 }] },
     OVERLAP_REGISTRY
   );
-  let playerInsideState = createInitialState(playerInsideLevel);
+  let playerInsideState = createInitialState(playerInsideLevel, undefined, NO_COMPANIONS);
   playerInsideState = reduce(playerInsideState, tick(0));
   run("chevauchement : joueur inchangé quand l'entité a la marge pour s'écarter", 5, playerInsideState.player.x);
   run("chevauchement : entité écartée, plus de recouvrement avec le joueur", true, Math.abs(getActiveWorld(playerInsideState).entities[0].x - 5) >= BODY_RADIUS);
@@ -263,7 +273,7 @@ export function runMovementChecks() {
     { id: "movement-check-overlap-forced", titleKey: "level.demo.title", length: 10, playerStart: 0.05, entities: [{ id: "wall-forced", type: "wall", x: 0.02 }] },
     OVERLAP_REGISTRY
   );
-  let forcedState = createInitialState(forcedRoomLevel);
+  let forcedState = createInitialState(forcedRoomLevel, undefined, NO_COMPANIONS);
   forcedState = reduce(forcedState, tick(0));
   run("chevauchement : entité pinée au bord quand il n'y a plus de marge", 0, getActiveWorld(forcedState).entities[0].x);
   run("chevauchement : joueur forcé de bouger signale l'entité responsable", "wall-forced", forcedState.player.pushedBy);
@@ -279,7 +289,7 @@ export function runMovementChecks() {
     { id: "movement-check-no-overlap", titleKey: "level.demo.title", length: 10, playerStart: 2, entities: [{ id: "wall-far", type: "wall", x: 8 }] },
     OVERLAP_REGISTRY
   );
-  let noOverlapState = createInitialState(noOverlapLevel);
+  let noOverlapState = createInitialState(noOverlapLevel, undefined, NO_COMPANIONS);
   noOverlapState = reduce(noOverlapState, tick(0));
   run("chevauchement : cas normal, aucun déplacement parasite (joueur)", 2, noOverlapState.player.x);
   run("chevauchement : cas normal, aucun déplacement parasite (entité)", 8, getActiveWorld(noOverlapState).entities[0].x);
@@ -334,7 +344,7 @@ export function runMovementChecks() {
     PIPELINE_REGISTRY
   );
   function runPipeline() {
-    let s = createInitialState(pipelineLevel, 123);
+    let s = createInitialState(pipelineLevel, 123, NO_COMPANIONS);
     for (let i = 0; i < 60; i++) s = reduce(s, tick(1));
     return { playerX: s.player.x, blockedBy: s.player.blockedBy, dogX: getActiveWorld(s).entities[0].x };
   }
@@ -372,7 +382,7 @@ export function runMovementChecks() {
   );
 
   // Un seul monde reçoit les ticks : à la création, c'est le premier.
-  let partie = createInitialState(worldA, 55);
+  let partie = createInitialState(worldA, 55, NO_COMPANIONS);
   run("partie : un seul monde actif à la création", worldA.id, partie.activeWorldId);
 
   // Fait errer le PNJ de A loin de son spawn avant de partir.
@@ -414,6 +424,295 @@ export function runMovementChecks() {
     travelToUnknownRejected = true;
   }
   run("partie : transition vers un monde inconnu sans niveau fourni est rejetée", true, travelToUnknownRejected);
+
+  // --- Compagnons (brique 1/3 : infrastructure — persistance/injection/
+  // traversée, PAS de suivi du joueur à ce stade, voir CLAUDE.md) ---
+
+  const COMPANION_REGISTRY = { dog: { label: "entity.dog" }, npc: { label: "entity.npc" } };
+  const companionLevel = parseLevel(
+    {
+      id: "movement-check-companion-a",
+      titleKey: "level.demo.title",
+      length: 20,
+      playerStart: 5,
+      entities: [{ id: "npc-a", type: "npc", x: 15 }],
+    },
+    COMPANION_REGISTRY
+  );
+
+  // Défaut (aucune surcharge de companions, contrairement à NO_COMPANIONS
+  // utilisé partout ailleurs dans ce fichier) : UN compagnon de test
+  // prédéfini, comme au vrai lancement d'une partie (voir core/state.js).
+  let companionState = createInitialState(companionLevel, 1);
+  run("compagnons : un compagnon prédéfini par défaut", 1, companionState.companions.length);
+  run("compagnons : type du compagnon de test", "buddy", companionState.companions[0].type);
+  run("compagnons : positionné près du joueur à la création", companionLevel.playerStart, companionState.companions[0].x);
+
+  // Injection à la LECTURE (voir core/state.js/getActiveWorld) : présent
+  // dans le flux d'entités du lieu actif (compagnon + npc-a, l'entité
+  // native) — mais ABSENT du monde BRUT stocké (session.worlds[...]
+  // .entities), qui ne contient QUE npc-a. C'est tout le mécanisme :
+  // stocké dans le cercle partie, injecté pour être rendu/tické.
+  run("compagnons : injecté dans le flux d'entités du lieu actif (native + compagnon)", 2, getActiveWorld(companionState).entities.length);
+  run("compagnons : ABSENT du monde brut stocké (pas persisté avec le lieu)", 1, companionState.worlds[companionLevel.id].entities.length);
+
+  // Comportement "follow" (brique 2/3, voir core/behaviors/follow.js) :
+  // co-localisé avec le joueur à la création (distance 0 < minDistance) ->
+  // reste immobile tant que le joueur ne s'éloigne pas — contrairement à
+  // wander (brique 1), rien de spontané.
+  for (let i = 0; i < 10; i++) companionState = reduce(companionState, tick(0));
+  run(
+    "compagnons : ne bouge pas tant que le joueur reste proche (zone morte)",
+    companionLevel.playerStart,
+    companionState.companions[0].x
+  );
+
+  // Le joueur s'éloigne (tick(1)) : une fois hors de maxDistance, le
+  // compagnon suit.
+  for (let i = 0; i < 200; i++) companionState = reduce(companionState, tick(1));
+  run(
+    "compagnons : suit le joueur une fois hors de la zone morte (comportement follow)",
+    true,
+    companionState.companions[0].x !== companionLevel.playerStart
+  );
+
+  // PRNG séparé (companionsRngState) : la présence d'un compagnon ne change
+  // RIEN à la trajectoire d'une entité DU LIEU (comparaison directe,
+  // réutilise wanderLevel/runTicks déjà définis plus haut) — sinon, deux
+  // suites de tirages partageant le même flux se marcheraient dessus, et le
+  // comportement d'une entité existante dépendrait silencieusement de la
+  // présence ou non d'un compagnon.
+  run(
+    "compagnons : n'affecte pas la trajectoire d'une entité du lieu (PRNG séparés)",
+    JSON.stringify(runTicks(createInitialState(wanderLevel, 42, NO_COMPANIONS), 50).positions),
+    JSON.stringify(runTicks(createInitialState(wanderLevel, 42), 50).positions)
+  );
+
+  // MAX_COMPANIONS : la liste ne dépasse jamais cette limite, même fournie
+  // en surnombre explicitement (ex. futur système de recrutement).
+  const tooManyCompanions = Array.from({ length: MAX_COMPANIONS + 3 }, (_, i) => ({
+    id: `extra-companion-${i}`,
+    type: "dog",
+    labelKey: "entity.dog",
+    blocksMovement: false,
+    x: 0,
+    dir: 1,
+  }));
+  const cappedState = createInitialState(companionLevel, 1, { companions: tooManyCompanions });
+  run("compagnons : la liste ne dépasse jamais MAX_COMPANIONS", MAX_COMPANIONS, cappedState.companions.length);
+
+  // --- Compagnons : traversée d'un lieu à l'autre avec la partie ---
+
+  const companionWorldB = parseLevel(
+    { id: "movement-check-companion-b", titleKey: "level.demo.title", length: 12, playerStart: 3, entities: [] },
+    COMPANION_REGISTRY
+  );
+
+  let companionPartie = createInitialState(companionLevel, 1);
+  // Le joueur avance, le compagnon (follow) le suit : garantit qu'il ne se
+  // retrouve pas "par coïncidence" déjà à la position attendue après la
+  // transition (contrairement à wander en brique 1, il ne bouge jamais
+  // spontanément — il faut faire bouger sa cible pour l'entraîner).
+  for (let i = 0; i < 200; i++) companionPartie = reduce(companionPartie, tick(1));
+  const companionXBeforeLeaving = companionPartie.companions[0].x;
+
+  companionPartie = travelToWorld(companionPartie, companionWorldB.id, companionWorldB);
+
+  run(
+    "compagnons : réapparaît dans le nouveau lieu, repositionné près du joueur",
+    companionWorldB.playerStart,
+    companionPartie.companions[0].x
+  );
+  run(
+    "compagnons : a RÉELLEMENT traversé (position différente d'avant le départ)",
+    true,
+    companionPartie.companions[0].x !== companionXBeforeLeaving
+  );
+  run(
+    "compagnons : flux d'entités du nouveau lieu = natives (0) + compagnons (1), rien de plus",
+    1,
+    getActiveWorld(companionPartie).entities.length
+  );
+  run(
+    "compagnons : jamais en double (un seul compagnon dans le nouveau lieu)",
+    1,
+    getActiveWorld(companionPartie).entities.filter((e) => e.id === "companion-test-dog").length
+  );
+  run(
+    "compagnons : PAS de résidu dans l'ancien lieu (monde brut A, toujours sa seule entité native)",
+    1,
+    companionPartie.worlds[companionLevel.id].entities.length
+  );
+
+  // Retour au lieu de départ : de nouveau repositionné près du joueur — pas
+  // laissé où il avait fini de suivre avant le premier départ (il n'a pas
+  // d'état "de lieu" à restaurer, contrairement à un PNJ rangé dans un monde).
+  companionPartie = travelToWorld(companionPartie, companionLevel.id);
+  run(
+    "compagnons : re-visite -> repositionné près du joueur, pas resté où il suivait",
+    companionLevel.playerStart,
+    companionPartie.companions[0].x
+  );
+  run("compagnons : toujours pas de résidu dans le lieu B quitté", 0, companionPartie.worlds[companionWorldB.id].entities.length);
+
+  // --- Comportement "follow" (brique 2/3, voir core/behaviors/follow.js) ---
+  // Testé sur des entités du LIEU dédiées (pas les compagnons ci-dessus) :
+  // follow est un comportement générique, réutilisable par toute entité —
+  // ce découpage isole la logique du comportement de celle du cercle
+  // partie, déjà couverte plus haut.
+
+  const FOLLOW_REGISTRY = { dog: { label: "entity.dog" }, wall: { label: "entity.wall", blocksMovement: true } };
+
+  // Cible statique (sans behavior) : cadre de test simple, aucun mouvement
+  // parasite à modéliser.
+  function makeFollowLevel(overrides = {}) {
+    return {
+      id: "movement-check-follow",
+      titleKey: "level.demo.title",
+      length: 20,
+      playerStart: 0,
+      entities: [
+        { id: "anchor-1", type: "dog", x: 15 },
+        { id: "follower-1", type: "dog", x: 0, behavior: { kind: "follow", targetId: "anchor-1", minDistance: 1, maxDistance: 3 } },
+      ],
+      ...overrides,
+    };
+  }
+
+  function followerX(followState, id = "follower-1") {
+    return getActiveWorld(followState).entities.find((e) => e.id === id).x;
+  }
+
+  const followLevel = parseLevel(makeFollowLevel(), FOLLOW_REGISTRY);
+
+  // Cible hors de portée (distance 15 > maxDistance 3) : le suiveur se
+  // rapproche, jusqu'à entrer dans la zone morte — puis s'arrête, sans
+  // jamais coller à la cible (distance >= minDistance en permanence).
+  let followState = createInitialState(followLevel, 1, NO_COMPANIONS);
+  for (let i = 0; i < 500; i++) followState = reduce(followState, tick(0));
+  const followerSettled = followerX(followState);
+  run("follow : se rapproche d'une cible hors de portée", true, followerSettled > 0);
+  run("follow : s'arrête dans la zone morte (distance <= maxDistance)", true, 15 - followerSettled <= 3);
+  run("follow : ne colle jamais à la cible (distance >= minDistance)", true, 15 - followerSettled >= 1);
+
+  // Une fois dans la zone morte, il y reste : aucun autre tick ne le fait
+  // plus bouger (pas d'oscillation, pas de dérive).
+  for (let i = 0; i < 50; i++) followState = reduce(followState, tick(0));
+  run("follow : reste immobile une fois dans la zone morte", followerSettled, followerX(followState));
+
+  // Cible qui s'approche trop (< minDistance) : le suiveur NE RECULE PAS —
+  // il reste exactement où il est, ni en avant ni en arrière.
+  const closeLevel = parseLevel(
+    makeFollowLevel({
+      entities: [
+        { id: "anchor-1", type: "dog", x: 10 },
+        { id: "follower-1", type: "dog", x: 9.7, behavior: { kind: "follow", targetId: "anchor-1", minDistance: 1, maxDistance: 3 } },
+      ],
+    }),
+    FOLLOW_REGISTRY
+  );
+  let closeState = createInitialState(closeLevel, 1, NO_COMPANIONS);
+  for (let i = 0; i < 100; i++) closeState = reduce(closeState, tick(0));
+  run("follow : ne recule jamais quand la cible est trop proche", 9.7, followerX(closeState));
+
+  // Déterminisme : même point de départ, même suite de ticks -> même
+  // trajectoire, à chaque tick (pas seulement au résultat final) — aucun
+  // PRNG consommé (voir follow.js).
+  function runFollowTicks(startState, count) {
+    const positions = [];
+    let current = startState;
+    for (let i = 0; i < count; i++) {
+      current = reduce(current, tick(0));
+      positions.push(followerX(current));
+    }
+    return positions;
+  }
+  const followRun1 = runFollowTicks(createInitialState(followLevel, 1, NO_COMPANIONS), 100);
+  const followRun2 = runFollowTicks(createInitialState(followLevel, 1, NO_COMPANIONS), 100);
+  run("follow : trajectoire reproductible (déterministe, sans PRNG)", JSON.stringify(followRun1), JSON.stringify(followRun2));
+
+  // minDistance >= maxDistance : incohérent (zone morte nulle ou inversée),
+  // rejeté au chargement.
+  let followMinMaxRejected = false;
+  try {
+    parseLevel(
+      makeFollowLevel({
+        entities: [
+          { id: "anchor-1", type: "dog", x: 15 },
+          { id: "follower-1", type: "dog", x: 0, behavior: { kind: "follow", minDistance: 3, maxDistance: 2 } },
+        ],
+      }),
+      FOLLOW_REGISTRY
+    );
+  } catch {
+    followMinMaxRejected = true;
+  }
+  run("follow : minDistance >= maxDistance rejeté (incohérent)", true, followMinMaxRejected);
+
+  // Le joueur dépasse le suiveur (passe de l'autre côté) : le suivi
+  // s'inverse SANS code spécial — direction recalculée à chaque tick depuis
+  // la position courante, jamais mémorisée (voir follow.js). Cible par
+  // défaut (targetId omis) : le joueur.
+  const passLevel = parseLevel(
+    {
+      id: "movement-check-follow-pass",
+      titleKey: "level.demo.title",
+      length: 30,
+      playerStart: 20,
+      entities: [{ id: "follower-2", type: "dog", x: 15, behavior: { kind: "follow", minDistance: 1, maxDistance: 3 } }],
+    },
+    FOLLOW_REGISTRY
+  );
+  let followPassState = createInitialState(passLevel, 1, NO_COMPANIONS);
+  // Le joueur reste immobile : le suiveur (distance 5 > 3) se rapproche et
+  // se stabilise derrière lui, à gauche.
+  for (let i = 0; i < 300; i++) followPassState = reduce(followPassState, tick(0));
+  const followerBeforePass = followerX(followPassState, "follower-2");
+  run("follow : avant d'être dépassé, suit depuis la gauche", true, followerBeforePass < followPassState.player.x);
+
+  // Le joueur traverse tout le niveau vers la gauche, passe le suiveur, et
+  // continue jusqu'à l'autre bord.
+  for (let i = 0; i < 800; i++) followPassState = reduce(followPassState, tick(-1));
+  const followerAfterPass = followerX(followPassState, "follower-2");
+  run("follow : après avoir été dépassé, suit depuis la droite (suivi inversé)", true, followerAfterPass > followPassState.player.x);
+  run(
+    "follow : reste dans la zone morte après l'inversion",
+    true,
+    Math.abs(followerAfterPass - followPassState.player.x) <= 3 && Math.abs(followerAfterPass - followPassState.player.x) >= 1
+  );
+
+  // Obstacle bloquant entre la cible et le suiveur : celui-ci intentionne
+  // d'avancer, la PHYSIQUE (resolveBodyMove, voir core/physics/collision.js)
+  // l'arrête pile au contact — jamais de traversée, et le bloqueur lui-même
+  // ne bouge jamais (voir les deux assertions ci-dessous).
+  const blockedFollowLevel = parseLevel(
+    {
+      id: "movement-check-follow-blocked",
+      titleKey: "level.demo.title",
+      length: 20,
+      playerStart: 0,
+      entities: [
+        { id: "anchor-1", type: "dog", x: 15 },
+        { id: "wall-follow", type: "wall", x: 8 },
+        { id: "follower-3", type: "dog", x: 0, behavior: { kind: "follow", targetId: "anchor-1", minDistance: 1, maxDistance: 3 } },
+      ],
+    },
+    FOLLOW_REGISTRY
+  );
+  let blockedFollowState = createInitialState(blockedFollowLevel, 1, NO_COMPANIONS);
+  for (let i = 0; i < 500; i++) blockedFollowState = reduce(blockedFollowState, tick(0));
+  run(
+    "follow : un obstacle bloquant l'arrête au contact (pas de traversée)",
+    8 - 2 * BODY_RADIUS,
+    followerX(blockedFollowState, "follower-3")
+  );
+  // Stabilité : le mur ne doit JAMAIS avoir bougé (voir reduce.js/
+  // resolveIntents pour pourquoi un décalage y est nécessaire).
+  run(
+    "follow : l'obstacle bloquant lui-même ne bouge jamais",
+    8,
+    getActiveWorld(blockedFollowState).entities.find((e) => e.id === "wall-follow").x
+  );
 
   // --- Audit de sérialisabilité (avant tout système de sauvegarde) ---
   // Objectif : confirmer que l'état de partie survit à un aller-retour JSON
@@ -550,7 +849,7 @@ export function runMovementChecks() {
     AUDIT_REGISTRY
   );
 
-  let auditSession = createInitialState(auditWorldA, 77);
+  let auditSession = createInitialState(auditWorldA, 77, NO_COMPANIONS);
   for (let i = 0; i < 25; i++) auditSession = reduce(auditSession, tick(1));
   auditSession = travelToWorld(auditSession, auditWorldB.id, auditWorldB);
   for (let i = 0; i < 10; i++) auditSession = reduce(auditSession, tick(-1));

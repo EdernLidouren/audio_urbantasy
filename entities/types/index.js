@@ -1,7 +1,7 @@
 // Registre des types d'entités. Connecteur pur, zéro logique : rassemble
 // chaque archétype (un fichier par type, voir door.js/npc.js/object.js/
-// rock.js/dog.js/decor.js/bird.js/fountain.js/hound.js) en un seul objet —
-// même patron que core/behaviors/index.js. Donnée neutre au global : aucun
+// rock.js/dog.js/decor.js/bird.js/fountain.js/hound.js/buddy.js) en un seul
+// objet — même patron que core/behaviors/index.js. Donnée neutre au global : aucun
 // import, ni du core ni de la vue. blocksMovement est lu par core/level.js
 // (baké dans l'entité parsée) puis exploité par core/reduce.js pour arrêter
 // le joueur au bord du corps d'une entité bloquante (voir BODY_RADIUS,
@@ -38,8 +38,8 @@
 // participent à la MÊME cascade (voir entities/model.md), aucune logique de
 // résolution ici, seulement la donnée.
 //
-// Les archétypes (door/npc/object/rock/dog/decor/bird/fountain/hound) sont
-// des PRESETS de propriétés — des objets plats indépendants, jamais une
+// Les archétypes (door/npc/object/rock/dog/decor/bird/fountain/hound/buddy)
+// sont des PRESETS de propriétés — des objets plats indépendants, jamais une
 // hiérarchie ni de l'héritage : voir entities/model.md. Aucun n'a de
 // `behavior` par défaut (voir dog.js) : le comportement se déclare toujours
 // à l'instance.
@@ -53,5 +53,6 @@ import decor from "./decor.js";
 import bird from "./bird.js";
 import fountain from "./fountain.js";
 import hound from "./hound.js";
+import buddy from "./buddy.js";
 
-export default { door, npc, object, rock, dog, decor, bird, fountain, hound };
+export default { door, npc, object, rock, dog, decor, bird, fountain, hound, buddy };
