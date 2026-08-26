@@ -150,11 +150,14 @@ code. Consulter directement ce fichier pour la valeur courante d'un défaut.
   n'est jamais réglée ici.
 - **`movementGain`** — facteur multiplicatif propre au son de déplacement
   (1 = neutre), même principe que `beaconGain` mais pour le rôle `movement`.
-  Sert notamment à COMPENSER un fichier source enregistré à un niveau très
-  différent des autres sons du jeu — cas réel : `dog.js` compense ainsi une
-  amplitude crête mesurée ~10x plus faible que le pas du joueur, sans quoi
-  le son se déclenche mais reste quasi inaudible. Un réglage de CONTENU
-  (propre à l'archétype ou à l'instance), pas un curseur de mixage utilisateur.
+  Peut compenser un fichier source enregistré à un niveau différent des
+  autres sons du jeu, mais À MANIER AVEC PRÉCAUTION : un gain logiciel élevé
+  sur un signal déjà faible amplifie aussi son bruit de fond et peut
+  introduire des artefacts audibles (crépitement, quasi-mitraillette
+  perçue) — préférer corriger le niveau À LA SOURCE (réenregistrer/amplifier
+  le fichier) plutôt qu'empiler un gros `movementGain`, réservé aux écarts
+  mineurs. Un réglage de CONTENU (propre à l'archétype ou à l'instance), pas
+  un curseur de mixage utilisateur.
 
 ### Déterminisme et rendu audio
 
@@ -194,8 +197,8 @@ générique, rien à étendre pour en ajouter un nouveau. Exemples déjà en pla
 au niveau ARCHÉTYPE : `entities/types/bird.js` surcharge `beaconMode` (dans
 son `sounds.beacon`) ; `entities/types/dog.js` surcharge `vocalInterval`/
 `vocalIntervalVariation` (dans son `sounds.vocal`, pour aboyer plus souvent
-que le défaut global) ET `movementGain` (voir "Paramètres sonores"). En
-dehors de ces cas, `demo.json` ne surcharge aucun de ces paramètres au
+que le défaut global). En dehors de ce cas, `demo.json` ne surcharge aucun
+de ces paramètres au
 niveau INSTANCE : la résolution retombe alors sur le défaut du type puis sur
 le défaut global, exactement comme pour tout paramètre non déclaré.
 

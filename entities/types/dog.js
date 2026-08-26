@@ -12,11 +12,10 @@
 // sounds.movement (rôle "movement", voir entities/model.md) : cadencé par la
 // distance parcourue, exactement comme le joueur — dormant tant que
 // l'instance n'a pas de behavior (un chien immobile ne pose jamais de pas).
-// movementGain:10 compense un fichier source (dog_medium_walk) enregistré à
-// une amplitude crête ~10x plus faible que concrete_walk (pas du joueur) ou
-// dog_medium_vocal (l'aboiement) — mesuré, pas estimé (voir historique de
-// session) : sans ce gain, le pas du chien se déclenche bien mais reste
-// quasi inaudible sous l'ambiance.
+// Volume porté par les fichiers source (dog_medium_walk) eux-mêmes, aucun
+// movementGain de compensation ici — un gain logiciel élevé sur un signal
+// déjà faible peut introduire des artefacts audibles (crépitement) plutôt
+// que corriger proprement le niveau.
 //
 // "Chien important" : porte les TROIS rôles de son positionné (voir
 // entities/model.md) — beacon (LOCALISATION, continu, placeholder générique
@@ -44,12 +43,6 @@ export default {
       path: "assets/sounds/footsteps/dog_medium_walk",
       loop: false,
       pitchVariation: 0.08,
-      // movementGain:10 compense un fichier source (dog_medium_walk)
-      // enregistré à une amplitude crête ~10x plus faible que concrete_walk
-      // (pas du joueur) ou dog_medium_vocal (l'aboiement) — mesuré, pas
-      // estimé (voir historique de session) : sans ce gain, le pas se
-      // déclenche bien mais reste quasi inaudible sous l'ambiance.
-      movementGain: 10,
     },
   },
   blocksMovement: false,

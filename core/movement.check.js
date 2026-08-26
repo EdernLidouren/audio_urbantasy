@@ -1112,6 +1112,34 @@ export function runMovementChecks() {
   run("save : version inconnue rejetée", false, deserializeGame({ version: SAVE_VERSION + 1, data: auditSession }).success);
   run("save : structure implausible rejetée", false, deserializeGame({ version: SAVE_VERSION, data: { player: {} } }).success);
 
+  // Sauvegarde ANTÉRIEURE à floors/defaultSurface/segments (voir
+  // core/level.js/parseLevel) : ses mondes n'ont jamais eu ces clés, et une
+  // relecture de sauvegarde ne repasse jamais par parseLevel — sans
+  // rebouchage (core/save.js/backfillWorld), surfaceAt(world, x) plante sur
+  // world.segments.find(...) dès qu'un tel monde redevient actif (bug réel,
+  // trouvé en jeu).
+  const oldWorlds = {};
+  for (const [id, world] of Object.entries(auditSession.worlds)) {
+    const { floors, defaultSurface, segments, ...oldWorld } = world;
+    oldWorlds[id] = oldWorld;
+  }
+  const oldSave = { version: SAVE_VERSION, data: { ...auditSession, worlds: oldWorlds } };
+  const oldSaveResult = deserializeGame(oldSave);
+  run("save : sauvegarde antérieure aux surfaces acceptée (reboutchée)", true, oldSaveResult.success);
+  if (oldSaveResult.success) {
+    const revivedWorld = oldSaveResult.session.worlds[oldSaveResult.session.activeWorldId];
+    run("save : monde rebouché — floors par défaut", 1, revivedWorld.floors);
+    run("save : monde rebouché — defaultSurface par défaut", DEFAULT_SURFACE, revivedWorld.defaultSurface);
+    run("save : monde rebouché — segments par défaut (tableau vide)", 0, revivedWorld.segments.length);
+    let surfaceAtThrew = false;
+    try {
+      surfaceAt(revivedWorld, 0);
+    } catch {
+      surfaceAtThrew = true;
+    }
+    run("save : surfaceAt ne plante jamais sur un monde rebouché", false, surfaceAtThrew);
+  }
+
   console.log(`Récapitulatif : ${passed} réussis / ${total} total`);
   return { passed, total };
 }

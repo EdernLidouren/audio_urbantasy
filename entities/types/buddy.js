@@ -34,9 +34,8 @@ export default {
       path: "assets/sounds/footsteps/dog_medium_walk",
       loop: false,
       pitchVariation: 0.08,
-      // movementGain:10 : voir dog.js, même fichier source, même écart
-      // d'amplitude mesuré.
-      movementGain: 10,
+      // Aucun movementGain : voir dog.js — volume porté par les fichiers
+      // source, plus de compensation logicielle.
     },
   },
   blocksMovement: false,

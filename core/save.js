@@ -11,27 +11,70 @@
 // EN CLAIR pour l'instant (aucun encodage/compression) : volontaire, voir
 // view/save-storage.js. L'obscurcissement viendra dans un prompt séparé.
 
+import { DEFAULT_SURFACE } from "./surfaces.js";
+
 export const SAVE_VERSION = 1;
 
 export function serializeGame(session) {
   return { version: SAVE_VERSION, data: session };
 }
 
+// Rebouche UN monde antérieur à floors/defaultSurface/segments (voir
+// core/level.js/parseLevel, qui garantit ces trois clés TOUJOURS présentes
+// pour un monde fraîchement chargé) — une sauvegarde plus ancienne ne les a
+// jamais eues, et une relecture de sauvegarde ne repasse JAMAIS par
+// parseLevel (qui ne s'applique qu'au chargement réseau d'un niveau). Sans
+// ce rebouchage, surfaceAt(world, x) plante sur world.segments.find(...)
+// dès qu'un monde ANCIEN redevient actif (voir view/audio/city-scene.js).
+// Mêmes défauts que parseLevel : 1 étage, DEFAULT_SURFACE partout, aucun
+// segment — comportement inchangé pour ces mondes anciens. `world` suspect
+// (donnée de disque) : jamais de confiance aveugle, renvoyé tel quel si ce
+// n'est manifestement pas un objet plutôt que de planter ici.
+function backfillWorld(world) {
+  if (!world || typeof world !== "object") return world;
+  if (world.floors !== undefined && world.defaultSurface !== undefined && world.segments !== undefined) {
+    return world;
+  }
+  return {
+    ...world,
+    floors: world.floors !== undefined ? world.floors : 1,
+    defaultSurface: world.defaultSurface !== undefined ? world.defaultSurface : DEFAULT_SURFACE,
+    segments: world.segments !== undefined ? world.segments : [],
+  };
+}
+
 // Migre une sauvegarde déjà déballée { version, data } vers la partie
 // courante. v1 -> v1 : identité pour l'essentiel, SAUF le rebouchage de
-// `companions`/`companionsRngState` (voir core/state.js) — absents d'une
+// `companions`/`companionsRngState` (voir core/state.js) et, par monde, de
+// floors/defaultSurface/segments (voir backfillWorld) — absents d'une
 // sauvegarde antérieure à leur introduction, sans que ça justifie une
 // montée de version (la forme reste v1, juste complétée par des défauts
-// sûrs : aucun compagnon, un flux de PRNG frais). Point d'ancrage documenté
-// pour de futures montées (v1 -> v2 -> ... -> courante, jamais en sautant
-// une étape, même principe que migratePrefs). Version inconnue -> null
-// (aucun chemin de montée), traité comme un échec par deserializeGame.
+// sûrs). Point d'ancrage documenté pour de futures montées (v1 -> v2 -> ...
+// -> courante, jamais en sautant une étape, même principe que
+// migratePrefs). Version inconnue -> null (aucun chemin de montée), traité
+// comme un échec par deserializeGame.
 function migrateSave(raw) {
   if (raw.version !== SAVE_VERSION) return null;
 
-  const data = raw.data;
-  if (!data || typeof data !== "object" || Array.isArray(data.companions)) return data;
-  return { ...data, companions: [], companionsRngState: 0 };
+  let data = raw.data;
+  if (!data || typeof data !== "object") return data;
+
+  if (!Array.isArray(data.companions)) {
+    data = { ...data, companions: [], companionsRngState: 0 };
+  }
+
+  if (data.worlds && typeof data.worlds === "object") {
+    const patchedWorlds = {};
+    let anyChanged = false;
+    for (const [id, world] of Object.entries(data.worlds)) {
+      const patched = backfillWorld(world);
+      patchedWorlds[id] = patched;
+      if (patched !== world) anyChanged = true;
+    }
+    if (anyChanged) data = { ...data, worlds: patchedWorlds };
+  }
+
+  return data;
 }
 
 // Valide la forme MINIMALE d'une partie déjà migrée : player/worlds/
