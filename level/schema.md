@@ -23,7 +23,7 @@ parsé, sans aucune chaîne affichable en dur — uniquement des clés i18n.
 | Champ     | Type   | Contrainte                                                    |
 |-----------|--------|------------------------------------------------------------------|
 | `id`      | string | non vide, unique dans le niveau                                  |
-| `type`    | string | doit exister dans le registre `entities/types.js`                |
+| `type`    | string | doit exister dans le registre `entities/types/index.js`          |
 | `x`       | number | dans `[0, length]`                                                |
 | `target`  | string | **requis** si `type === "door"` : id d'un niveau du registre (`level/index.js`) — l'action "activate" sur la porte y transitionne (voir `view/interaction.js`, `view/city-screen.js`) |
 | `nameKey` | string | optionnel (npc/object) : clé i18n spécifique à l'instance          |
@@ -37,9 +37,10 @@ pour le premier ; `entity.descriptionKey` (du JSON) si présent sinon
 `descriptionKey`) ne sont pas reportés tels quels dans l'entité normalisée —
 seuls `labelKey` et `descriptionKey` (résolus) sont exposés.
 
-## Registre de types (`entities/types.js`)
+## Registre de types (`entities/types/index.js`)
 
-Donnée neutre, sans import. Un objet `{ [type]: TypeDef }` :
+Donnée neutre, sans import — un fichier par archétype sous `entities/types/`,
+rassemblés par `index.js` en un objet `{ [type]: TypeDef }` :
 
 | Champ            | Type    | Lu par        | Rôle                                         |
 |------------------|---------|---------------|-----------------------------------------------|

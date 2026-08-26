@@ -15,7 +15,7 @@ import { t } from "./i18n/index.js";
 import { runMovementChecks } from "./core/movement.check.js";
 import { startLoop } from "./lib/loop.js";
 import { loadLevel } from "./level/load.js";
-import registry from "./entities/types.js";
+import registry from "./entities/types/index.js";
 import { createInitialState } from "./core/state.js";
 import { getPref, setPref } from "./config/preferences.js";
 import { configureAssetManifest } from "./lib/assets.js";

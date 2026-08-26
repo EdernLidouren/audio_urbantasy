@@ -8,8 +8,8 @@ format JSON qui l'instancie.
 
 ## Le descripteur d'entité partagé
 
-Une entité (registre `entities/types.js`, instance dans un fichier de
-niveau) porte :
+Une entité (registre `entities/types/index.js`, un fichier par archétype dans
+`entities/types/` ; instance dans un fichier de niveau) porte :
 
 | Catégorie              | Champs                                                          | Rôle |
 |-------------------------|-------------------------------------------------------------------|------|
@@ -76,12 +76,13 @@ l'introduction de ce modèle.
 
 ## Les sous-types sont des PRESETS, pas une hiérarchie
 
-`door`, `npc`, `object`, `decor` dans `entities/types.js` sont des objets
-plats **indépendants** — chacun définit l'intégralité de ses propriétés.
-Il n'y a ni héritage, ni classe de base, ni "entité générique" dont les
-autres dériveraient : ajouter un type, c'est ajouter une entrée autonome au
-registre, jamais étendre une chaîne de prototypes. Cohérent avec l'anti-ECS
-et l'anti-hiérarchie-de-classes de `CLAUDE.md`.
+`door`, `npc`, `object`, `rock`, `dog`, `decor` (un fichier par archétype
+sous `entities/types/`, rassemblés par `entities/types/index.js`) sont des
+objets plats **indépendants** — chacun définit l'intégralité de ses
+propriétés. Il n'y a ni héritage, ni classe de base, ni "entité générique"
+dont les autres dériveraient : ajouter un type, c'est ajouter un fichier
+autonome au dossier, jamais étendre une chaîne de prototypes. Cohérent avec
+l'anti-ECS et l'anti-hiérarchie-de-classes de `CLAUDE.md`.
 
 ## Le joueur : même modèle, mais AUDITEUR
 

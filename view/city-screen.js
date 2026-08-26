@@ -15,7 +15,7 @@ import { tick } from "../core/actions.js";
 import { reduce } from "../core/reduce.js";
 import { loadLevelById } from "../level/load.js";
 import { getActiveWorld, travelToWorld } from "../core/state.js";
-import registry from "../entities/types.js";
+import registry from "../entities/types/index.js";
 import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
 import { saveGame } from "./save-storage.js";
 

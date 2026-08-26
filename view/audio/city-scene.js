@@ -22,7 +22,7 @@ import {
 } from "../../lib/audio.js";
 import { announce } from "../../lib/announce.js";
 import { resolveAsset } from "../../lib/assets.js";
-import registry from "../../entities/types.js";
+import registry from "../../entities/types/index.js";
 import player from "../../entities/player.js";
 import { TUNING_DEFAULTS, resolveTuning } from "../../config/tuning.js";
 import { getPref, PREF_CONSTRAINTS } from "../../config/preferences.js";
@@ -211,7 +211,7 @@ export function createCityAudioScene(getSession) {
   }
 
   // Son de collision par entité (optionnel, dormant si absent OU si
-  // l'entité n'est pas blocksMovement — voir entities/types.js). Résolu par
+  // l'entité n'est pas blocksMovement — voir entities/types/index.js). Résolu par
   // id, pas par référence figée : blockedBy (core/reduce.js) ne nomme
   // jamais une entité non bloquante, donc ce lookup suffit, pas besoin de
   // revérifier blocksMovement ici.
@@ -294,7 +294,7 @@ export function createCityAudioScene(getSession) {
   }
 
   // Dormant si l'entité ne porte pas de collisionSound (voir
-  // entities/types.js) — jamais joué dans ce cas.
+  // entities/types/index.js) — jamais joué dans ce cas.
   function playCollisionSound(entityId) {
     const path = collisionSoundByEntityId.get(entityId);
     if (path) playPacedSound(path, FOOTSTEP_REVERB_SEND, collisionCooldown);
