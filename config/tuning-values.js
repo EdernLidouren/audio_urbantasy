@@ -92,4 +92,71 @@ export const TUNING_DEFAULTS = {
   // une valeur MODÉRÉE suffit à lui donner du corps sans noyer la cadence de
   // marche. Plus haut = pas plus "dans la pièce" ; plus bas = pas plus secs.
   footstepReverbSend: 0.15,
+
+  // --- Paramètres sonores d'entité (cascade son -> instance -> archétype ->
+  // défaut global, voir entities/model.md et config/tuning.js/resolveTuning)
+  // : les clés ci-dessous rejoignent reverbSend plus haut dans ce même
+  // référentiel, résolues exactement de la même façon. Défauts choisis pour
+  // ne RIEN changer au comportement des entités existantes tant qu'elles ne
+  // déclarent aucune de ces clés.
+
+  // Mode de lecture de la balise (voir view/audio/city-scene.js) :
+  // "continu" (défaut, comportement actuel) — boucle positionnée permanente,
+  // pan/volume/passe-bas mis à jour à chaque tick ;
+  // "intermittent" — rejouée en ONE-SHOT positionné toutes les
+  // beaconInterval ± beaconIntervalVariation (voir les deux réglages
+  // suivants), sans boucle Howler permanente ni passe-bas (un one-shot est
+  // trop court pour qu'un filtre continu ait un sens).
+  beaconMode: "continu",
+  // Intervalle moyen (ms) entre deux déclenchements en mode "intermittent".
+  // Sans effet en mode "continu". Plus haut = balise plus rare ; plus bas =
+  // plus fréquente.
+  beaconInterval: 4000,
+  // Aléa (ms) appliqué de part et d'autre de beaconInterval, tiré à chaque
+  // déclenchement (voir la note sur le déterminisme dans
+  // view/audio/city-scene.js) : évite une cadence mécanique/prévisible.
+  // Sans effet en mode "continu".
+  beaconIntervalVariation: 1000,
+  // Facteur propre de la balise (multiplicatif, 1 = neutre). INDÉPENDANT de
+  // la préférence utilisateur "beaconVolume" (Options > Audio, voir
+  // config/preferences.js) qui règle TOUTES les balises à la fois : celui-ci
+  // règle CETTE balise. Les deux se multiplient entre eux.
+  beaconGain: 1,
+  // Variation de hauteur (fraction du taux de lecture, 0-1) appliquée
+  // aléatoirement à chaque lecture d'un son PONCTUEL (balise intermittente
+  // ou son de déplacement) : le taux de lecture est tiré uniformément dans
+  // [1-pitchVariation, 1+pitchVariation]. 0 = aucune variation (défaut,
+  // comportement actuel inchangé). Pour une balise CONTINUE, la variation
+  // est tirée UNE SEULE FOIS à la création de la voix (une boucle n'a pas
+  // d'évènement "déclenchement" répété).
+  pitchVariation: 0,
+  // Multiplicateur de cadence du son de déplacement d'une entité (rôle
+  // "movement", voir entities/model.md) : la distance parcourue entre deux
+  // pas reste stepDistance (ci-dessus) DIVISÉE par ce facteur — jamais une
+  // fréquence réglée indépendamment de la vitesse. 1 = même cadence que le
+  // joueur à distance parcourue égale (défaut).
+  movementStepMultiplier: 1,
+  // Facteur propre du son de déplacement (multiplicatif, 1 = neutre) —
+  // même principe que beaconGain, mais pour le rôle "movement". Utile en
+  // COMPENSATION d'un asset enregistré à un niveau très différent des
+  // autres sons du jeu (ex. dog.js, dont le fichier source de pas est
+  // nettement plus discret que celui du joueur) : un réglage de CONTENU,
+  // pas de mixage temps réel.
+  movementGain: 1,
+
+  // Intervalle moyen (ms) entre deux déclenchements du VOCAL (rôle
+  // d'expression — aboiement, sifflement... — voir entities/model.md) :
+  // TOUJOURS intermittent, jamais de mode continu pour ce rôle. Nettement
+  // plus long ET plus variable que beaconInterval par défaut : un vocal est
+  // sporadique par nature, pas un signal de repérage régulier comme la
+  // balise.
+  vocalInterval: 20000,
+  // Aléa (ms) appliqué de part et d'autre de vocalInterval, tiré à chaque
+  // déclenchement — même mécanisme que beaconIntervalVariation (voir la
+  // note sur le déterminisme dans view/audio/city-scene.js), VOLONTAIREMENT
+  // large pour renforcer le caractère imprévisible du vocal.
+  vocalIntervalVariation: 15000,
+  // Facteur propre du vocal (multiplicatif, 1 = neutre) — même principe que
+  // beaconGain/movementGain, pour le rôle "vocal".
+  vocalGain: 1,
 };

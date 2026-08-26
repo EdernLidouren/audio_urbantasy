@@ -16,42 +16,160 @@ Une entité (registre `entities/types/index.js`, un fichier par archétype dans
 | Position                | `x` (instance uniquement, voir `level/schema.md`)                  | où l'entité se trouve dans le niveau |
 | Type                    | `type` (instance), `label` (registre, clé i18n)                    | quoi et comment l'annoncer |
 | Sons par rôle            | `sounds: { <rôle>: descripteur }`                                  | voir "Vocabulaire de sons" ci-dessous |
-| Propriétés spatiales      | `audibleRange`, `panSaturation`, `interactRange`, `cutoffMin`, `cutoffMax`, `reverbSend` | résolues en cascade, voir plus bas |
+| Portée spatiale           | `audibleRange`, `panSaturation`, `interactRange`, `cutoffMin`, `cutoffMax` | où/comment une entité est perçue dans l'espace — voir "Ce qui n'est PAS un paramètre sonore" |
+| Paramètres sonores        | `reverbSend`, `beaconMode`, `beaconInterval`, `beaconIntervalVariation`, `beaconGain`, `vocalInterval`, `vocalIntervalVariation`, `vocalGain`, `pitchVariation`, `movementStepMultiplier`, `movementGain` | voir "Paramètres sonores" ci-dessous, surchargeables à l'instance via `tuning` (voir "Le palier INSTANCE") |
 | Drapeaux                 | `blocksMovement`, `enterable`                                      | prévus pour le core (collision, entrée), non câblés à ce jour |
 
-Aucun de ces champs n'est obligatoire au-delà de `sounds.beacon` : tout le
-reste retombe sur le défaut global (`config/tuning-values.js`) si absent.
+Aucun de ces champs n'est obligatoire, pas même `sounds.beacon` (voir
+"Beacon vs vocal" ci-dessous — une entité peut n'avoir aucun son positionné,
+un seul rôle, ou les deux) : tout ce qui manque retombe sur le défaut global
+(`config/tuning-values.js`).
 
 ## Vocabulaire de sons
 
 Un descripteur de son est un objet plat :
 
 ```js
-{ path, loop, reverbSend?, pitchVariation? }
+{ path, loop, reverbSend?, beaconMode?, beaconInterval?, beaconIntervalVariation?, beaconGain?, vocalInterval?, vocalIntervalVariation?, vocalGain?, pitchVariation? }
 ```
 
-- `path` — chemin du fichier, sous `/sounds`.
-- `loop` — le SEUL champ qui distingue les deux modes de lecture Web Audio :
-  - `loop: true` → **balise** (*beacon*) : une boucle positionnée, créée une
-    fois via `createPositionedSound` et maintenue pour la durée de vie de la
-    scène (pan/volume/filtre mis à jour à chaque tick). C'est ainsi qu'une
-    entité "sonne" en continu dans l'espace.
-  - `loop: false` → **ponctuel** : joué à la demande via `playOneShot`, pas
-    de position maintenue dans le temps. Le mouvement du joueur (rôle
-    `movement`) en est un exemple : ce n'est pas une boucle Web Audio native,
-    même si la marche elle-même est continue — c'est `view/audio/city-scene.js`
-    qui le rejoue à la cadence de marche (`STEP_DISTANCE`).
-- `reverbSend` (optionnel) — part du signal envoyée au bus de réverb partagé.
-  Absent → cascade (voir plus bas).
-- `pitchVariation` (optionnel) — réservé, pas encore consommé par aucun code.
-  Structurellement résoluble dès aujourd'hui via la cascade, pour qu'un futur
-  usage n'ait pas à toucher au mécanisme.
+- `path` — chemin du fichier, sous `/sounds`. Peut être un pool (voir
+  `lib/assets.js`/`resolveAsset`) : un son PONCTUEL (voir `loop` ci-dessous)
+  en tire un membre à CHAQUE lecture (variété d'une occurrence à l'autre,
+  sans répétition immédiate) ; une balise CONTINUE le résout UNE FOIS, à la
+  création de la voix.
+- `loop` — indique l'INTENTION du rôle de son (continu vs ponctuel) ; garde
+  une valeur documentaire pour `movement`/`vocal` (toujours ponctuels en
+  pratique), mais pour `beacon` c'est désormais `beaconMode` (voir
+  "Paramètres sonores" ci-dessous) qui gouverne RÉELLEMENT le mode de
+  lecture — les deux devraient rester cohérents pour un rôle donné, mais
+  rien ne l'impose structurellement.
+- Les autres champs (`reverbSend`, `beaconMode`/`beaconInterval`/
+  `beaconIntervalVariation`/`beaconGain`, `vocalInterval`/
+  `vocalIntervalVariation`/`vocalGain`, `pitchVariation`) sont tous
+  optionnels et tous résolus en cascade — voir "Paramètres sonores" et
+  "Résolution en cascade" ci-dessous. Absents, ils retombent sur le défaut
+  du type puis sur le défaut global.
 
 `sounds` regroupe ces descripteurs **par rôle** (une clé arbitraire du type :
-`beacon`, `movement`, et d'autres à venir sans casser l'existant — ex. un son
-d'interaction ponctuel un jour). Un rôle donné a un mode (`loop`) cohérent
-avec son usage, mais rien ne l'impose structurellement — c'est une convention
-respectée par ce projet, pas une contrainte du modèle.
+`beacon`, `vocal`, `movement`, et d'autres à venir sans casser l'existant —
+ex. un son d'interaction ponctuel un jour). Un rôle donné a un mode
+(`loop`/`beaconMode`) cohérent avec son usage, mais rien ne l'impose
+structurellement — c'est une convention respectée par ce projet, pas une
+contrainte du modèle.
+
+## Beacon vs vocal : deux rôles positionnés, deux intentions
+
+`beacon` et `vocal` sont TECHNIQUEMENT identiques — tous deux des sons
+POSITIONNÉS (même calcul pan/distance, voir `view/audio/city-scene.js`),
+tous deux capables d'être intermittents via le MÊME mécanisme de
+déclenchement/replanification (`resolveIntermittentSource`/
+`updateIntermittentSources`). Ce qui les distingue, c'est leur INTENTION —
+et donc leurs valeurs par défaut, contrastées volontairement :
+
+- **`beacon` — LOCALISATION.** Sert à situer une entité dans l'espace :
+  continu (le défaut) ou intermittent à cadence RÉGULIÈRE et RAPPROCHÉE
+  (`beaconInterval`/`beaconIntervalVariation`, voir "Paramètres sonores").
+  On s'attend à pouvoir suivre une balise pour retrouver l'entité.
+- **`vocal` — EXPRESSION.** Sert à faire "vivre" une entité (aboiement,
+  sifflement...) : TOUJOURS intermittent (aucun mode continu pour ce rôle —
+  un vocal en boucle n'aurait aucun sens), à cadence LONGUE et TRÈS VARIABLE
+  par défaut (`vocalInterval`/`vocalIntervalVariation`, nettement plus
+  grands et plus variables que leurs équivalents beacon — voir
+  `config/tuning-values.js`). On n'attend PAS de pouvoir localiser une
+  entité par son seul vocal — c'est un effet d'ambiance, pas un repère.
+
+Les deux rôles sont **optionnels et indépendants** — une entité peut avoir
+un beacon seul, un vocal seul, les deux, ou ni l'un ni l'autre :
+- `dog.js` (le "chien important") a les DEUX : un beacon continu pour le
+  retrouver, un vocal pour l'entendre aboiement sporadiquement.
+- `hound.js` (le "chien décor") a le VOCAL SEUL : on n'a pas besoin de le
+  localiser, seulement de l'entendre en fond — donc pas de beacon, pas de
+  bruit de repérage inutile.
+- `npc.js` (le "passant") a les DEUX : un beacon "tic tic" pour le suivre,
+  un vocal (sifflement) pour l'ambiance.
+
+## Paramètres sonores
+
+Chacun des paramètres ci-dessous est résolu par `resolveTuning` (voir
+"Résolution en cascade" plus bas) : valeurs par défaut, bornes et unités
+précises vivent TOUTES dans `config/tuning-values.js` (`TUNING_DEFAULTS`),
+jamais reprises ici en dur — cette section explique le SENS de chaque
+paramètre, pas ses chiffres, pour que la doc ne puisse jamais diverger du
+code. Consulter directement ce fichier pour la valeur courante d'un défaut.
+
+- **`reverbSend`** — part du signal de ce son envoyée au bus de réverb
+  partagé de la scène. Résolue INDÉPENDAMMENT pour chaque rôle (le `beacon`,
+  le `vocal` et le `movement` d'une même entité peuvent avoir des
+  `reverbSend` différents — aucun ne reprend celui d'un autre rôle).
+- **`beaconMode`** — mode de lecture DU BEACON UNIQUEMENT (le vocal n'en a
+  pas, voir "Beacon vs vocal" plus haut : toujours intermittent), une valeur
+  parmi deux littéraux : `"continu"` (une boucle positionnée permanente,
+  maintenue et mise à jour à chaque tick — pan, volume, passe-bas) ou
+  `"intermittent"` (rejouée en son PONCTUEL positionné, à intervalles — voir
+  `beaconInterval`/`beaconIntervalVariation`). Un son intermittent n'a PAS
+  de passe-bas dépendant de la distance (voir "Ce qui n'est PAS un
+  paramètre sonore") : trop court pour qu'un filtre continu ait un sens.
+- **`beaconInterval`** / **`beaconIntervalVariation`** — cadence d'un beacon
+  `"intermittent"` : durée moyenne entre deux déclenchements, et aléa
+  appliqué de part et d'autre à CHAQUE déclenchement (évite une cadence
+  mécanique). Les deux en millisecondes. Sans effet en mode `"continu"`.
+  Aléa NON déterministe (`Math.random`, jamais le PRNG seedé du core) : voir
+  "Déterminisme et rendu audio" plus bas. Par défaut, nettement plus COURTS
+  et moins VARIABLES que leurs équivalents vocal ci-dessous (voir "Beacon vs
+  vocal").
+- **`beaconGain`** — facteur multiplicatif propre à CE beacon (1 = neutre).
+  Indépendant de la préférence utilisateur "Volume des balises" (Options >
+  Audio, voir `config/preferences.js`) qui agit sur TOUS les beacons ET
+  vocaux à la fois (même catégorie utilisateur "présence d'entité", voir
+  `view/audio/city-scene.js`) : les deux facteurs se multiplient entre eux,
+  l'un global au joueur, l'autre propre au contenu.
+- **`vocalInterval`** / **`vocalIntervalVariation`** — mêmes rôles que
+  `beaconInterval`/`beaconIntervalVariation`, mais pour le VOCAL (toujours
+  intermittent — ces deux réglages s'appliquent donc TOUJOURS, contrairement
+  à leurs équivalents beacon). Par défaut, nettement plus LONGS et plus
+  VARIABLES : un vocal est sporadique par nature (voir "Beacon vs vocal"),
+  pas un signal de repérage régulier. Même politique de déterminisme que
+  `beaconIntervalVariation`.
+- **`vocalGain`** — même principe que `beaconGain`, mais pour LE VOCAL (1 =
+  neutre) — un rôle de son, un gain qui lui est propre.
+- **`pitchVariation`** — variation de hauteur (fraction du taux de lecture)
+  appliquée aléatoirement à un son PONCTUEL (beacon intermittent, vocal, ou
+  son de déplacement) à CHAQUE lecture ; pour un beacon CONTINU, tirée UNE
+  SEULE FOIS à la création de la voix (une boucle n'a pas de "déclenchement"
+  répété auquel raccrocher une variation). 0 = aucune variation. Résolue
+  indépendamment pour chaque rôle de son (le `beacon`, le `vocal` et le
+  `movement` d'une même entité peuvent avoir des `pitchVariation`
+  différentes).
+- **`movementStepMultiplier`** — module la CADENCE du son de déplacement
+  d'une entité (rôle `movement`) sans jamais régler une fréquence dans
+  l'absolu : la distance parcourue entre deux pas reste la MÊME que celle du
+  joueur (`stepDistance`, `config/tuning-values.js`), divisée par ce
+  facteur. 1 = même cadence que le joueur à distance parcourue égale — voir
+  "Ce qui n'est PAS un paramètre sonore" pour pourquoi la vitesse elle-même
+  n'est jamais réglée ici.
+- **`movementGain`** — facteur multiplicatif propre au son de déplacement
+  (1 = neutre), même principe que `beaconGain` mais pour le rôle `movement`.
+  Sert notamment à COMPENSER un fichier source enregistré à un niveau très
+  différent des autres sons du jeu — cas réel : `dog.js` compense ainsi une
+  amplitude crête mesurée ~10x plus faible que le pas du joueur, sans quoi
+  le son se déclenche mais reste quasi inaudible. Un réglage de CONTENU
+  (propre à l'archétype ou à l'instance), pas un curseur de mixage utilisateur.
+
+### Déterminisme et rendu audio
+
+`beaconIntervalVariation`, `vocalIntervalVariation` et `pitchVariation`
+utilisent `Math.random()`, jamais le PRNG seedé du core (`core/rng.js`) —
+même politique pour les deux intervalles, aucune raison de les traiter
+différemment. C'est un aléa de RENDU pur,
+sans aucun effet sur l'état de partie (position, comportement, save...).
+Coupler ce genre de détail cosmétique au PRNG du core reviendrait à faire
+porter à la simulation déterministe un souci qui ne la concerne pas — même
+principe déjà en place pour le tirage d'un fichier dans un pool
+(`lib/assets.js`/`resolveAsset`, `Math.random()` également). Deux
+sauvegardes identiques rejouées à l'identique peuvent donc "sonner"
+légèrement différemment sans que ce soit un bug : l'état, lui, reste
+parfaitement reproductible.
 
 ## Résolution en cascade
 
@@ -60,7 +178,8 @@ respectée par ce projet, pas une contrainte du modèle.
 général :
 
 1. `sound[key]` — le descripteur de son lui-même, s'il en porte un ;
-2. `entity[key]` — l'instance de niveau, si elle surcharge ;
+2. `entity.tuning[key]` — l'instance de niveau, si elle surcharge (voir
+   "Le palier INSTANCE" ci-dessous) ;
 3. `registry[entity.type][key]` — le défaut du type ;
 4. `defaults[key]` — le défaut global (`config/tuning-values.js`), dernier
    recours.
@@ -69,20 +188,84 @@ général :
 ne fournir que `sound` (ex. un réglage propre à un descripteur de son sans
 lien avec une instance de niveau — c'est le cas du joueur, voir plus bas).
 
-Aujourd'hui, aucune balise du registre ni aucune instance de `demo.json` ne
-surcharge `reverbSend` : la résolution retombe systématiquement sur le
-défaut global, donc le son des entités existantes est identique à avant
-l'introduction de ce modèle.
+Chaque paramètre sonore listé ci-dessus passe par ce même mécanisme, y
+compris ceux peu ou jamais surchargés aujourd'hui — le mécanisme est
+générique, rien à étendre pour en ajouter un nouveau. Exemples déjà en place
+au niveau ARCHÉTYPE : `entities/types/bird.js` surcharge `beaconMode` (dans
+son `sounds.beacon`) ; `entities/types/dog.js` surcharge `vocalInterval`/
+`vocalIntervalVariation` (dans son `sounds.vocal`, pour aboyer plus souvent
+que le défaut global) ET `movementGain` (voir "Paramètres sonores"). En
+dehors de ces cas, `demo.json` ne surcharge aucun de ces paramètres au
+niveau INSTANCE : la résolution retombe alors sur le défaut du type puis sur
+le défaut global, exactement comme pour tout paramètre non déclaré.
+
+### Le palier INSTANCE
+
+Une instance de niveau (`level/*.json`) surcharge un paramètre en cascade via
+un champ RÉSERVÉ, `tuning`, un objet plat de clés -> valeurs :
+
+```json
+{ "id": "bird-loud", "type": "bird", "x": 12, "tuning": { "beaconInterval": 1500, "beaconGain": 1.4 } }
+```
+
+`core/level.js`/`parseEntity` recopie ce champ TEL QUEL (`entity.tuning`) —
+validé en FORME (un objet, sinon `fail()`), jamais en CONTENU : le core
+ignore tout du sens de ces clés (sonore ou non), il se contente de les
+porter jusqu'à l'entité parsée, exactement comme `music`/`ambiences`/
+`reverbDurationSec`/`reverbDecay` au niveau du LIEU (voir `level/schema.md`).
+Aucune clé nommée en dur dans `parseEntity` : un futur paramètre ajouté à
+`config/tuning-values.js` devient surchargeable à l'instance sans jamais
+rouvrir ce fichier. `resolveTuning` lit ensuite `entity.tuning[key]` (palier
+2) — voir `lib/tuning.js`. Absent, `entity.tuning` est simplement `undefined`
+et la résolution retombe sur le palier ARCHÉTYPE, comportement inchangé pour
+toute entité qui ne déclare pas `tuning`.
+
+## Ce qui n'est PAS un paramètre sonore
+
+Deux catégories voisines, à ne pas confondre avec les paramètres sonores
+ci-dessus, même si l'audio en dépend :
+
+- **Le comportement (vitesse de déplacement)** — `behavior.speed` (voir
+  `core/behaviors/wander.js`) est une donnée du CORE : elle détermine à
+  quelle vitesse une entité avance, donc indirectement À QUELLE FRÉQUENCE
+  RÉELLE son son de déplacement se déclenche (plus vite = plus de distance
+  parcourue par tick = pas plus rapprochés dans le temps) — mais aucun
+  paramètre sonore ne règle cette fréquence dans l'ABSOLU
+  (`movementStepMultiplier` ne fait que multiplier la CADENCE PAR DISTANCE,
+  jamais indexée sur le temps). Régler l'allure d'une entité, c'est déclarer
+  ou ajuster son `behavior` à l'instance (voir `level/schema.md`), jamais un
+  paramètre sonore.
+- **Les rayons** (`audibleRange`, `interactRange`, et `bodyRadius` — ce
+  dernier UNIFORME pour toutes les entités aujourd'hui, voir
+  `core/state.js`/`BODY_RADIUS`, pas encore par-entité) — décrivent la
+  PRÉSENCE d'une entité dans l'espace (jusqu'où on l'entend, jusqu'où on
+  peut interagir, quel encombrement physique) : la scène audio LES LIT pour
+  façonner le volume/passe-bas d'une balise (voir `volumeForDistance`/
+  `cutoffForDistance`, `view/audio/city-scene.js`), mais ce sont des
+  propriétés de l'ENTITÉ elle-même, pas d'un RÔLE de son particulier —
+  contrairement à `reverbSend`/`beaconGain`/`vocalGain`/`pitchVariation`,
+  qui vivent à l'intérieur d'un descripteur de son précis et peuvent
+  différer d'un rôle à l'autre pour la MÊME entité.
 
 ## Les sous-types sont des PRESETS, pas une hiérarchie
 
-`door`, `npc`, `object`, `rock`, `dog`, `decor` (un fichier par archétype
-sous `entities/types/`, rassemblés par `entities/types/index.js`) sont des
-objets plats **indépendants** — chacun définit l'intégralité de ses
-propriétés. Il n'y a ni héritage, ni classe de base, ni "entité générique"
-dont les autres dériveraient : ajouter un type, c'est ajouter un fichier
-autonome au dossier, jamais étendre une chaîne de prototypes. Cohérent avec
-l'anti-ECS et l'anti-hiérarchie-de-classes de `CLAUDE.md`.
+`door`, `npc`, `object`, `rock`, `dog`, `decor`, `bird`, `fountain`, `hound`
+(un fichier par archétype sous `entities/types/`, rassemblés par
+`entities/types/index.js`) sont des objets plats **indépendants** — chacun
+définit l'intégralité de ses propriétés. Il n'y a ni héritage, ni classe de
+base, ni "entité générique" dont les autres dériveraient : ajouter un type,
+c'est ajouter un fichier autonome au dossier, jamais étendre une chaîne de
+prototypes. Cohérent avec l'anti-ECS et l'anti-hiérarchie-de-classes de
+`CLAUDE.md`.
+
+`bird` (beacon `"intermittent"`) et `fountain` (beacon `"continu"`, le
+défaut) illustrent ce même principe appliqué à `beaconMode` : deux PRESETS
+indépendants, chacun choisissant son propre mode, sans partager de code de
+résolution particulier — la même cascade générique s'applique aux deux.
+`dog` (beacon + vocal + movement), `hound` (vocal seul) et `npc` (beacon +
+vocal) illustrent la même chose pour la COMPOSITION LIBRE des rôles de son
+positionné (voir "Beacon vs vocal" plus haut) : chaque archétype déclare
+juste ce dont il a besoin, rien de plus.
 
 ## Le joueur : même modèle, mais AUDITEUR
 

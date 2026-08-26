@@ -1,15 +1,40 @@
 // Scène audio de la ville : lit session + registre pour positionner le son
-// de chaque entité et déclencher les bruits de pas. Ne fournit que des
-// distances et des réglages à audio.js — la plomberie Web Audio (dont le
-// passe-bas et le bus de réverb) y reste entièrement.
+// de chaque entité et déclencher les bruits de pas (du joueur ET des
+// entités mobiles, voir jouer les sons de déplacement plus bas). Ne fournit
+// que des distances et des réglages à audio.js — la plomberie Web Audio
+// (dont le passe-bas et le bus de réverb) y reste entièrement.
 //
 // Spatialisation en stereo + volume dérivés de la distance au joueur, pas en
 // HRTF (voir CLAUDE.md). Un passe-bas dépendant de la distance se superpose
-// au volume/pan (lointain = étouffé), sans les remplacer. Un bus de réverb
-// PARTAGÉ (un seul pour toute la scène) se superpose en plus, discrètement,
-// pour donner un sentiment d'espace — le chemin sec (pan/filtre/volume)
-// reste la seule source de localisation et de distance. Modèle d'entité et
-// vocabulaire de sons (balise/mouvement/ponctuel) : voir entities/model.md.
+// au volume/pan (lointain = étouffé), sans les remplacer — SEULEMENT pour
+// une balise CONTINUE (voix maintenue) : un one-shot (balise intermittente,
+// vocal, son de déplacement) est trop court pour qu'un filtre continu ait un
+// sens, voir playPositionedOneShot plus bas. Un bus de réverb PARTAGÉ (un
+// seul pour toute la scène) se superpose en plus, discrètement, pour donner
+// un sentiment d'espace — le chemin sec (pan/filtre/volume) reste la seule
+// source de localisation et de distance.
+//
+// Deux rôles de son POSITIONNÉ, techniquement identiques (même calcul pan/
+// distance/filtre) mais distincts par leur INTENTION, voir entities/model.md :
+// - beacon (LOCALISATION) — continu ou intermittent régulier, sert à situer
+//   l'entité dans l'espace ;
+// - vocal (EXPRESSION) — TOUJOURS intermittent, à intervalle long et très
+//   variable, ne sert pas à localiser, juste à peupler l'ambiance.
+// Chacun optionnel indépendamment (aucune entité n'est tenue d'avoir l'un ou
+// l'autre) ; leur mécanisme de déclenchement intermittent est UNIQUE et
+// PARTAGÉ (voir resolveIntermittentSource/updateIntermittentSources), seules
+// les clés de cascade et les valeurs par défaut diffèrent par rôle. Modèle
+// d'entité complet et vocabulaire de sons (balise/vocal/mouvement/ponctuel) :
+// voir entities/model.md — les valeurs par défaut listées ci-dessous
+// viennent toutes de config/tuning-values.js, jamais dupliquées ici.
+//
+// Aléa de rendu NON déterministe (Math.random, jamais le PRNG seedé du
+// core) : l'intervalle d'une source intermittente (beacon ou vocal) et la
+// variation de hauteur (pitchVariation) sont de la présentation pure, sans
+// effet sur l'état de partie — les faire dépendre du PRNG seedé coderait
+// dans le core un souci qui ne le concerne pas (voir resolveAsset,
+// lib/assets.js, qui tire déjà ses pools au hasard de la même façon,
+// précédent déjà en place).
 
 import {
   playOneShot,
@@ -85,6 +110,51 @@ const FOOTSTEP_REVERB_SEND =
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
+}
+
+// Taux de lecture tiré uniformément dans [1-pitchVariation, 1+pitchVariation]
+// (voir TUNING_DEFAULTS.pitchVariation) — 1 (aucune variation) si
+// pitchVariation est 0 ou absent, jamais d'appel à Math.random() inutile
+// dans ce cas.
+function randomRate(pitchVariation) {
+  if (!pitchVariation) return 1;
+  return 1 + (Math.random() * 2 - 1) * pitchVariation;
+}
+
+// Prochain délai (ms) avant un déclenchement intermittent (beacon ou
+// vocal) : voir TUNING_DEFAULTS.beaconInterval/vocalInterval et leurs
+// variations respectives. Borné à 0 au cas où la variation dépasserait
+// l'intervalle lui-même (config extrême) — jamais un délai négatif.
+function jitteredIntervalMs(interval, variation) {
+  return Math.max(0, interval + (Math.random() * 2 - 1) * variation);
+}
+
+// Clés de cascade propres à chaque RÔLE de source positionnée intermittente
+// (voir resolveIntermittentSource ci-dessous) — c'est la SEULE différence
+// entre un beacon intermittent et un vocal : le mécanisme de déclenchement/
+// replanification lui-même est unique et partagé (voir
+// updateIntermittentSources, plus bas dans createCityAudioScene).
+const BEACON_TUNING_KEYS = { interval: "beaconInterval", intervalVariation: "beaconIntervalVariation", gain: "beaconGain" };
+const VOCAL_TUNING_KEYS = { interval: "vocalInterval", intervalVariation: "vocalIntervalVariation", gain: "vocalGain" };
+
+// Résout une source positionnée INTERMITTENTE (beacon en mode
+// "intermittent", ou vocal — toujours intermittent) : chemin, cadence
+// (interval/intervalVariation), gain propre et variation de hauteur, tous
+// résolus contre CE descripteur de son (cascade son -> instance ->
+// archétype -> défaut global, voir entities/model.md) via les clés du rôle
+// (keys). nextAt (mutable, relu/réécrit à chaque tick — voir
+// updateIntermittentSources) réamorcé à 0 : premier déclenchement dès le
+// premier tick.
+function resolveIntermittentSource(entity, descriptor, keys) {
+  return {
+    path: descriptor.path,
+    interval: resolveTuning(keys.interval, entity, descriptor),
+    intervalVariation: resolveTuning(keys.intervalVariation, entity, descriptor),
+    gain: resolveTuning(keys.gain, entity, descriptor),
+    pitchVariation: resolveTuning("pitchVariation", entity, descriptor),
+    reverbSend: resolveTuning("reverbSend", entity, descriptor),
+    nextAt: 0,
+  };
 }
 
 // Volume par zones (palier volontaire à interactRange, pas une rampe
@@ -166,32 +236,104 @@ let activeScene = null;
 // l'objet session à chaque tick (immutabilité) — update() doit relire l'état
 // courant à chaque appel plutôt que capturer une session figée à la création.
 export function createCityAudioScene(getSession) {
-  // Les voix positionnées d'abord : createPositionedSound crée un Howl, ce
-  // qui garantit que Howler.ctx existe (Howler le crée au tout premier
-  // `new Howl()`) avant de construire le bus de réverb juste après — lui
-  // n'a pas de retente paresseuse comme le filtre par voix, il lui faut le
-  // contexte tout de suite.
+  // Les voix positionnées d'abord (si au moins une entité est en balise
+  // CONTINUE) : createPositionedSound crée un Howl, ce qui garantit que
+  // Howler.ctx existe (Howler le crée au tout premier `new Howl()`) avant de
+  // construire le bus de réverb juste après — lui n'a pas de retente
+  // paresseuse comme le filtre par voix, il lui faut le contexte tout de
+  // suite. Limite connue : un niveau dont AUCUNE entité n'aurait de balise
+  // continue (tout en intermittent/vocal/absent) ne créerait aucun Howl ici,
+  // et createReverbBus se dégraderait silencieusement (pas de contexte ->
+  // pas de bus, voir lib/audio.js) — non atteignable avec le contenu actuel
+  // (toujours au moins une balise continue), pas corrigé pour ce cas
+  // hypothétique.
   const entitySounds = getActiveWorld(getSession()).entities.map((entity) => {
-    // beacon : la boucle positionnée du type (voir entities/model.md pour
-    // le vocabulaire des rôles de son).
-    const beacon = registry[entity.type].sounds.beacon;
+    // beacon (localisation) et vocal (expression) : descripteurs de son du
+    // type, tous deux OPTIONNELS et indépendants (voir entities/model.md) —
+    // ni l'un ni l'autre n'est "le" son obligatoire d'une entité.
+    const sounds = registry[entity.type].sounds;
+    const beacon = sounds.beacon;
+    const vocal = sounds.vocal;
+
+    // Résolus une fois ici : statiques pour la durée de vie de la scène,
+    // propriétés de l'ENTITÉ (pas d'un rôle de son particulier) — partagées
+    // par le beacon, le vocal ET le son de déplacement ci-dessous.
+    const audibleRange = resolveTuning("audibleRange", entity);
+    const panSaturation = resolveTuning("panSaturation", entity);
+    const interactRange = resolveTuning("interactRange", entity);
+    const cutoffMin = resolveTuning("cutoffMin", entity);
+    const cutoffMax = resolveTuning("cutoffMax", entity);
+
+    // Son de déplacement (rôle "movement", voir entities/model.md) :
+    // DORMANT si l'archétype n'en porte pas — la plupart des types n'ont pas
+    // vocation à marcher. Cadencé par la DISTANCE parcourue, jamais par un
+    // intervalle de temps : traité à part des sources intermittentes
+    // ci-dessous (beacon/vocal), qui partagent, elles, le même mécanisme.
+    const movement = sounds.movement;
+    const movementFields = movement
+      ? {
+          movementPath: movement.path,
+          movementReverbSend: resolveTuning("reverbSend", entity, movement),
+          movementPitchVariation: resolveTuning("pitchVariation", entity, movement),
+          movementGain: resolveTuning("movementGain", entity, movement),
+          // stepDistance reste le même réglage GLOBAL que le joueur
+          // (STEP_DISTANCE), jamais surchargé indépendamment — seul
+          // movementStepMultiplier module la cadence (voir
+          // config/tuning-values.js).
+          movementStepDistance: STEP_DISTANCE / resolveTuning("movementStepMultiplier", entity, movement),
+          // Position de départ = spawn de l'entité : le premier pas ne sonne
+          // qu'après avoir parcouru movementStepDistance depuis là, comme le
+          // joueur au tout premier tick d'une partie.
+          lastMovementX: entity.x,
+        }
+      : {};
+
+    // sound (voix positionnée CONTINUE, un Howl persistant) UNIQUEMENT si
+    // le beacon existe ET qu'il est en mode "continu" (défaut) — sinon
+    // (intermittent, ou pas de beacon du tout), rien de permanent à
+    // maintenir ici : intermittentSources ci-dessous s'en charge en
+    // one-shot, à sa propre cadence (voir updateIntermittentSources).
+    // beaconGain/beaconReverbSend ne sont résolus que dans ce cas : seuls
+    // applyEntityAudio (volume/tick) et le branchement au bus de réverb
+    // juste après ce bloc en ont besoin.
+    let sound = null;
+    let beaconGain;
+    let beaconReverbSend;
+    const intermittentSources = [];
+
+    if (beacon) {
+      const beaconMode = resolveTuning("beaconMode", entity, beacon);
+      if (beaconMode === "continu") {
+        beaconGain = resolveTuning("beaconGain", entity, beacon);
+        beaconReverbSend = resolveTuning("reverbSend", entity, beacon);
+        const beaconPitchVariation = resolveTuning("pitchVariation", entity, beacon);
+        // pitchVariation, s'il y en a une, tirée UNE FOIS ici (voir la note
+        // du header sur les balises continues).
+        sound = createPositionedSound(resolveAsset(beacon.path), { rate: randomRate(beaconPitchVariation) });
+      } else {
+        intermittentSources.push(resolveIntermittentSource(entity, beacon, BEACON_TUNING_KEYS));
+      }
+    }
+
+    // vocal : TOUJOURS intermittent (aucun mode continu pour ce rôle, voir
+    // entities/model.md) — même mécanisme que le beacon intermittent
+    // ci-dessus, juste une deuxième source dans le même tableau.
+    if (vocal) {
+      intermittentSources.push(resolveIntermittentSource(entity, vocal, VOCAL_TUNING_KEYS));
+    }
+
     return {
       entity,
-      // Résolu une fois ici (balise = boucle persistante, pas de nouveau
-      // tirage à chaque tick) : beacon.path peut être un pool, un membre
-      // précis, ou un chemin direct — resolveAsset gère les trois.
-      sound: createPositionedSound(resolveAsset(beacon.path)),
-      // Résolus une fois ici : statiques pour la durée de vie de la scène.
-      audibleRange: resolveTuning("audibleRange", entity),
-      panSaturation: resolveTuning("panSaturation", entity),
-      interactRange: resolveTuning("interactRange", entity),
-      cutoffMin: resolveTuning("cutoffMin", entity),
-      cutoffMax: resolveTuning("cutoffMax", entity),
-      // Cascade son -> instance -> type -> global : ni la balise, ni
-      // l'instance, ni le type ne définissent reverbSend aujourd'hui, donc
-      // ça retombe sur le défaut global — comportement identique à avant
-      // l'introduction du modèle de son.
-      reverbSend: resolveTuning("reverbSend", entity, beacon),
+      audibleRange,
+      panSaturation,
+      interactRange,
+      cutoffMin,
+      cutoffMax,
+      sound,
+      beaconGain,
+      beaconReverbSend,
+      intermittentSources,
+      ...movementFields,
     };
   });
 
@@ -206,8 +348,13 @@ export function createCityAudioScene(getSession) {
     wet: REVERB_WET,
   });
 
-  for (const { sound, reverbSend } of entitySounds) {
-    sound.sendToReverb(reverbBus.input, reverbSend);
+  // sound absent (pas de beacon continu : intermittent, vocal seul, ou
+  // aucun des deux) : pas de voix persistante à brancher au bus —
+  // playPositionedOneShot passe reverbBusInput/reverbSend directement à
+  // chaque déclenchement (voir plus bas), comme playOneShot le fait déjà
+  // pour les pas.
+  for (const { sound, beaconReverbSend } of entitySounds) {
+    if (sound) sound.sendToReverb(reverbBus.input, beaconReverbSend);
   }
 
   // Son de collision par entité (optionnel, dormant si absent OU si
@@ -300,6 +447,101 @@ export function createCityAudioScene(getSession) {
     if (path) playPacedSound(path, FOOTSTEP_REVERB_SEND, collisionCooldown);
   }
 
+  // Son PONCTUEL mais POSITIONNÉ (contrairement à playPacedSound, centré sur
+  // le joueur) : source intermittente (beacon ou vocal, voir
+  // updateIntermittentSources) ou pas d'une entité mobile (voir
+  // updateEntityMovementSounds). Pan/volume calculés une seule fois, au
+  // moment du déclenchement — jamais maintenus après coup, contrairement à
+  // une balise continue (applyEntityAudio) : c'est pourquoi ce chemin ne
+  // touche jamais au passe-bas (voir le header du fichier). gain (défaut 1) :
+  // facteur propre optionnel (ex. beaconGain/vocalGain/movementGain) ;
+  // pitchVariation (défaut 0) : voir randomRate.
+  function playPositionedOneShot(
+    path,
+    { relX, interactRange, audibleRange, panSaturation, reverbSend, volumeFactor, gain = 1, pitchVariation = 0 }
+  ) {
+    const dist = Math.abs(relX);
+    const pan = clamp(relX / panSaturation, -1, 1);
+    const volume = volumeForDistance(dist, interactRange, audibleRange) * volumeFactor * gain;
+    playOneShot(resolveAsset(path), {
+      reverbSend,
+      reverbBusInput: reverbBus.input,
+      volume,
+      stereo: pan,
+      rate: randomRate(pitchVariation),
+    });
+  }
+
+  // Sources positionnées INTERMITTENTES (voir entitySounds/
+  // intermittentSources) : un beacon en mode "intermittent" ET/OU un vocal
+  // (toujours intermittent) partagent ICI le même mécanisme de
+  // déclenchement/replanification — factorisé pour ne jamais dupliquer
+  // cette logique entre les deux rôles, seuls path/interval/gain/... (déjà
+  // résolus par rôle, voir resolveIntermittentSource) diffèrent. Pour
+  // chaque source dont nextAt est atteint : un one-shot positionné, puis
+  // replanification — jamais de `while` de rattrapage ici (contrairement
+  // aux pas, cadencés par une DISTANCE qui n'avance pas pendant une pause) :
+  // nextAt est une horloge MURALE (performance.now()) qui continue
+  // d'avancer même écran de jeu à l'arrêt (menu au sommet de la pile, voir
+  // CLAUDE.md) — un `while` y déclencherait une rafale de rattrapage au
+  // retour. Ici, au plus UN déclenchement par source et par reprise, quelle
+  // que soit la durée de la pause. volumeFactor unique (préférence
+  // utilisateur "Volume des balises") pour les deux rôles : beacon et vocal
+  // relèvent tous deux de la même catégorie "présence d'entité" côté
+  // utilisateur, distincte du pas (footstepVolume) — seul le gain PROPRE à
+  // chaque source (beaconGain/vocalGain) les différencie individuellement.
+  function updateIntermittentSources(x, liveById) {
+    const now = performance.now();
+    const volumeFactor = beaconVolumeFactor();
+    for (const entry of entitySounds) {
+      for (const src of entry.intermittentSources) {
+        if (now < src.nextAt) continue;
+
+        playPositionedOneShot(src.path, {
+          relX: liveById.get(entry.entity.id).x - x,
+          interactRange: entry.interactRange,
+          audibleRange: entry.audibleRange,
+          panSaturation: entry.panSaturation,
+          reverbSend: src.reverbSend,
+          volumeFactor,
+          gain: src.gain,
+          pitchVariation: src.pitchVariation,
+        });
+        src.nextAt = now + jitteredIntervalMs(src.interval, src.intervalVariation);
+      }
+    }
+  }
+
+  // Son de déplacement des entités mobiles (rôle "movement", voir
+  // entities/model.md) — dormant pour toute entité sans ce rôle
+  // (movementPath absent, voir entitySounds). Même principe de cadence par
+  // DISTANCE que le joueur (lastMovementX/movementStepDistance), mais SANS
+  // le "premier pas immédiat" du joueur (voir update()) : une entité
+  // "wander" n'a pas de transition immobile -> mouvement pilotée par une
+  // touche, elle erre en continu tant qu'elle a un behavior — rien à
+  // détecter en plus de l'accumulateur de distance lui-même.
+  function updateEntityMovementSounds(x, liveById) {
+    const volumeFactor = footstepVolumeFactor();
+    for (const entry of entitySounds) {
+      if (!entry.movementPath) continue;
+
+      const liveX = liveById.get(entry.entity.id).x;
+      while (Math.abs(liveX - entry.lastMovementX) >= entry.movementStepDistance) {
+        playPositionedOneShot(entry.movementPath, {
+          relX: liveX - x,
+          interactRange: entry.interactRange,
+          audibleRange: entry.audibleRange,
+          panSaturation: entry.panSaturation,
+          reverbSend: entry.movementReverbSend,
+          volumeFactor,
+          gain: entry.movementGain,
+          pitchVariation: entry.movementPitchVariation,
+        });
+        entry.lastMovementX += Math.sign(liveX - entry.lastMovementX) * entry.movementStepDistance;
+      }
+    }
+  }
+
   // Recalcule et applique pan/volume/passe-bas de chaque balise pour la
   // position x donnée. Factorisé hors de update() : réutilisé tel quel par
   // refreshBeaconVolumes() pour qu'un changement de préférence prenne effet
@@ -315,15 +557,18 @@ export function createCityAudioScene(getSession) {
     return new Map(getActiveWorld(getSession()).entities.map((entity) => [entity.id, entity]));
   }
 
+  // sound absent (pas de beacon continu) : rien à maintenir en continu,
+  // ignoré ici — updateIntermittentSources() s'en charge à sa propre cadence.
   function applyEntityAudio(x) {
     const beaconFactor = beaconVolumeFactor();
     const liveById = liveEntitiesById();
-    for (const { entity, sound, audibleRange, panSaturation, interactRange, cutoffMin, cutoffMax } of entitySounds) {
+    for (const { entity, sound, audibleRange, panSaturation, interactRange, cutoffMin, cutoffMax, beaconGain } of entitySounds) {
+      if (!sound) continue;
       const relX = liveById.get(entity.id).x - x;
       const dist = Math.abs(relX);
       // Pan inchangé : toujours dérivé de panSaturation, indépendant du volume.
       const pan = clamp(relX / panSaturation, -1, 1);
-      const volume = volumeForDistance(dist, interactRange, audibleRange) * beaconFactor;
+      const volume = volumeForDistance(dist, interactRange, audibleRange) * beaconFactor * beaconGain;
       sound.update(pan, volume);
       // Passe-bas : se superpose au volume/pan, ne les remplace pas.
       sound.setCutoff(cutoffForDistance(dist, interactRange, audibleRange, cutoffMin, cutoffMax));
@@ -337,6 +582,13 @@ export function createCityAudioScene(getSession) {
 
     applyEntityAudio(x);
 
+    // Une seule photo des entités vivantes pour le reste du tick (occupation
+    // + les deux sons ponctuels ci-dessous) : la session ne change pas entre
+    // ces appels, inutile de la reconstruire trois fois.
+    const liveById = liveEntitiesById();
+    updateIntermittentSources(x, liveById);
+    updateEntityMovementSounds(x, liveById);
+
     // Occupation par diff : n'agit QUE si l'ensemble a changé depuis le
     // tick précédent. Une nouvelle photo (assertive) coupe la précédente
     // devenue obsolète ; l'ensemble vide ne déclenche aucune annonce, juste
@@ -344,7 +596,7 @@ export function createCityAudioScene(getSession) {
     // imposé ici : on laisse le canal par défaut du module (liveRegion,
     // ariaNotify expérimental via setAnnounceChannel) décider, pour comparer
     // les deux sur exactement le même déclenchement.
-    const occupied = occupiedEntities(entitySounds, liveEntitiesById(), x);
+    const occupied = occupiedEntities(entitySounds, liveById, x);
     currentOccupied = occupied;
     const occupiedIdsNow = new Set(occupied.map((entity) => entity.id));
     if (!setsEqual(occupiedIdsNow, occupiedIds)) {
@@ -400,8 +652,10 @@ export function createCityAudioScene(getSession) {
   }
 
   function destroy() {
+    // sound absent (pas de beacon continu) : rien à arrêter, ses one-shots
+    // se terminent d'eux-mêmes (mêmes Howl partagés que playOneShot ailleurs).
     for (const { sound } of entitySounds) {
-      sound.stop(); // nettoie aussi son propre envoi de réverb
+      if (sound) sound.stop(); // nettoie aussi son propre envoi de réverb
     }
     reverbBus.destroy();
     // Sortie RÉELLE de la scène uniquement (voir view/city-screen.js,
@@ -434,14 +688,18 @@ export function createCityAudioScene(getSession) {
   // view/interaction.js, view/menus/pause-menu.js) pour dégager le canal
   // positionné pendant qu'ils sont ouverts, sans toucher au contexte audio
   // global ni à la musique/aux ambiances, qui continuent derrière eux.
+  // sound absent (pas de beacon continu) : rien à mettre en pause — au pire
+  // un one-shot déjà lancé continue derrière le menu (aussi court qu'un pas,
+  // négligeable), et updateIntermittentSources() ne tourne de toute façon
+  // plus tant qu'un menu est au sommet de la pile (voir update()).
   function pauseBeacons() {
     for (const { sound } of entitySounds) {
-      sound.pause();
+      if (sound) sound.pause();
     }
   }
   function resumeBeacons() {
     for (const { sound } of entitySounds) {
-      sound.resume();
+      if (sound) sound.resume();
     }
   }
 

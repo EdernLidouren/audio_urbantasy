@@ -27,7 +27,7 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
     fail(`entities[${index}] n'est pas un objet.`);
   }
 
-  const { id, type, x, target, nameKey, descriptionKey, behavior, blocksMovement } = rawEntity;
+  const { id, type, x, target, nameKey, descriptionKey, behavior, blocksMovement, tuning } = rawEntity;
 
   if (!isNonEmptyString(id)) {
     fail(`entities[${index}].id manquant ou invalide.`);
@@ -85,6 +85,24 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
   // reste immobile — comportement inchangé pour tout le contenu existant.
   if (behavior !== undefined) {
     entity.behavior = parseBehavior(behavior, index, id);
+  }
+
+  // tuning : surcharges d'INSTANCE pour la cascade de réglages
+  // (lib/tuning.js/resolveTuning, config/tuning.js) — TRANSPORT générique,
+  // jamais interprété ici. Le core ignore tout du SENS de ces clés (sonore
+  // ou non) : il se contente de les porter jusqu'à l'entité parsée, palier
+  // le plus spécifique après le descripteur de son lui-même (voir
+  // entities/model.md). Aucune clé nommée en dur — ajouter demain un
+  // nouveau paramètre résolu en cascade (config/tuning-values.js) le rend
+  // automatiquement surchargeable ici, sans jamais rouvrir ce fichier.
+  // Même statut que music/ambiences/reverbDurationSec/reverbDecay plus bas
+  // dans parseLevel (niveau LIEU, pas entité) : simple passage validé en
+  // FORME (un objet), jamais en contenu.
+  if (tuning !== undefined) {
+    if (typeof tuning !== "object" || tuning === null || Array.isArray(tuning)) {
+      fail(`entities[${index}] ("${id}") : tuning doit être un objet si présent.`);
+    }
+    entity.tuning = tuning;
   }
 
   return entity;
