@@ -163,7 +163,7 @@ export function parseLevel(raw, registry) {
     fail("le registre de types est manquant ou invalide.");
   }
 
-  const { id, titleKey, length, playerStart, entities, music, ambiences, reverbDurationSec, reverbDecay } = raw;
+  const { id, titleKey, length, playerStart, entities, music, ambiences, reverbDurationSec, reverbDecay, floors } = raw;
 
   if (!isNonEmptyString(id)) {
     fail(`id manquant ou invalide (reçu : ${JSON.stringify(id)}).`);
@@ -188,6 +188,19 @@ export function parseLevel(raw, registry) {
   }
   if (!Array.isArray(entities)) {
     fail(`entities doit être un tableau (reçu : ${JSON.stringify(entities)}).`);
+  }
+  // floors : nombre d'ÉTAGES du lieu — fondation RÉSERVÉE de la verticalité
+  // future (voir level/schema.md), totalement INERTE ici : aucune mécanique
+  // n'en dépend (pas de position Y, pas de palier actif, pas d'audio
+  // d'étage). FILET comme playerStart : entier >= 1 attendu, absent ou
+  // invalide -> repli sur 1, JAMAIS d'exception. Absent reste SILENCIEUX
+  // (c'est le cas normal — aucune scène actuelle n'en déclare, toutes
+  // valent donc 1 implicitement, comportement inchangé) ; une valeur
+  // FOURNIE mais invalide avertit clairement, même politique que
+  // playerStart hors bornes.
+  const resolvedFloors = Number.isInteger(floors) && floors >= 1 ? floors : 1;
+  if (floors !== undefined && resolvedFloors !== floors) {
+    console.warn(`parseLevel: floors (${JSON.stringify(floors)}) invalide (entier >= 1 attendu), repli sur 1.`);
   }
   // music : optionnel, chemin vers la musique du lieu (voir
   // view/audio/city-scene.js). Simple passage : parseLevel ne connaît ni
@@ -229,6 +242,7 @@ export function parseLevel(raw, registry) {
     titleKey,
     length,
     playerStart: resolvedPlayerStart,
+    floors: resolvedFloors,
     entities: parsedEntities,
   };
   // Clés ajoutées SEULEMENT si présentes (jamais explicitement undefined) :

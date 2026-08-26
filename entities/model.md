@@ -267,6 +267,18 @@ vocal) illustrent la même chose pour la COMPOSITION LIBRE des rôles de son
 positionné (voir "Beacon vs vocal" plus haut) : chaque archétype déclare
 juste ce dont il a besoin, rien de plus.
 
+## Verticalité (réservé)
+
+`level/schema.md` documente `floors` (nombre d'étages d'un lieu) — un champ
+RÉSERVÉ, totalement INERTE aujourd'hui : aucune entité de ce modèle n'a de
+position d'étage, aucun son n'est rendu différemment selon l'étage. Le jour
+où la verticalité sera implémentée (paliers discrets, jamais un axe Y
+continu — voir `level/schema.md`), l'audio "des autres étages" (ex. un son
+étouffé venant d'un étage voisin) s'appuiera sur le vocabulaire de sons
+ci-dessus, pas sur un mécanisme séparé — mais rien de tout cela n'existe
+encore, ce paragraphe ne fait qu'ancrer où cette future mécanique viendra se
+greffer.
+
 ## Le joueur : même modèle, mais AUDITEUR
 
 `entities/player.js` porte un descripteur de contenu qui suit le même
