@@ -8,7 +8,7 @@
 
 import { pushScreen, popScreen } from "../../lib/screens.js";
 import { makeMenuScreen, makeMessageScreen } from "../../lib/menu.js";
-import { setGlobalVolume } from "../../lib/audio.js";
+import { setGlobalVolume, setMasterVolume } from "../../lib/audio.js";
 import { t } from "../../i18n/index.js";
 import { resetAllPrefs, PREF_CONSTRAINTS } from "../../config/preferences.js";
 import { refreshActiveBeaconVolumes } from "../audio/city-scene.js";
@@ -38,6 +38,7 @@ function openResetAllConfirmation() {
           popScreen();
           resetAllPrefs();
           refreshActiveBeaconVolumes();
+          setMasterVolume(PREF_CONSTRAINTS.masterVolume.default / 100);
           setGlobalVolume("music", PREF_CONSTRAINTS.musicVolume.default / 100);
           setGlobalVolume("ambience", PREF_CONSTRAINTS.ambienceVolume.default / 100);
           // Écran-message plutôt qu'une simple annonce : le résultat doit

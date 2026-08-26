@@ -95,6 +95,24 @@ function repositionCompanions(companions, playerX, length) {
   }));
 }
 
+// SEUL point d'ajout d'un compagnon à la partie (brique 3/3) — le
+// recrutement en jeu n'existe pas encore, mais quand il arrivera, c'est ICI
+// qu'il appellera, jamais en poussant directement dans session.companions.
+// Politique volontairement simple : à la limite (MAX_COMPANIONS), REFUSE
+// (liste renvoyée INCHANGÉE) et SIGNALE l'échec — jamais d'éviction
+// silencieuse d'un compagnon existant pour faire de la place. `added` dans
+// le retour permet à l'appelant (vue ou test) de distinguer un ajout réussi
+// d'un refus sans avoir à recomparer les longueurs lui-même. Pure hormis
+// l'avertissement diagnostique (même convention que core/level.js, qui
+// avertit déjà sur des cas similaires au chargement).
+export function addCompanion(companions, companion) {
+  if (companions.length >= MAX_COMPANIONS) {
+    console.warn(`addCompanion: limite de ${MAX_COMPANIONS} compagnon(s) déjà atteinte, ajout refusé.`);
+    return { companions, added: false };
+  }
+  return { companions: [...companions, companion], added: true };
+}
+
 // Construit l'état d'un monde à partir d'un niveau déjà validé (sortie de
 // parseLevel) : entités à leur position de départ (dir initiale pour les
 // entités "wander", seule pièce d'état mobile qui n'existe pas encore sur

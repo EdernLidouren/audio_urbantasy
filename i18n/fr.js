@@ -33,6 +33,7 @@ export default {
   "menu.options.back": "Retour",
 
   "menu.audio.title": "Audio",
+  "audio.master_volume": "Volume principal",
   "audio.beacon_volume": "Volume des balises",
   "audio.footstep_volume": "Volume des pas",
   "audio.music_volume": "Volume de la musique",

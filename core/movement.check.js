@@ -4,7 +4,7 @@
 // parseLevel — aucune dépendance hors des modules du core.
 
 import { parseLevel } from "./level.js";
-import { createInitialState, getActiveWorld, travelToWorld, MOVE_STEP, BODY_RADIUS } from "./state.js";
+import { createInitialState, getActiveWorld, travelToWorld, addCompanion, MOVE_STEP, BODY_RADIUS } from "./state.js";
 import { tick } from "./actions.js";
 import { reduce } from "./reduce.js";
 import { moveAndBounce } from "./physics/movement.js";
@@ -714,6 +714,46 @@ export function runMovementChecks() {
     getActiveWorld(blockedFollowState).entities.find((e) => e.id === "wall-follow").x
   );
 
+  // Cible introuvable (cas limite, brique 3/3 : un targetId qui ne
+  // correspond à AUCUNE entité connue — futur, dès qu'une cible autre que
+  // le joueur sera possible) : follow.js dégrade proprement (intent: 0),
+  // jamais de crash. Le joueur, cible par défaut, existe toujours : ce cas
+  // ne peut survenir qu'avec un targetId explicite et erroné.
+  const missingTargetLevel = parseLevel(
+    makeFollowLevel({
+      entities: [{ id: "follower-1", type: "dog", x: 5, behavior: { kind: "follow", targetId: "does-not-exist" } }],
+    }),
+    FOLLOW_REGISTRY
+  );
+  let missingTargetState = createInitialState(missingTargetLevel, 1, NO_COMPANIONS);
+  let missingTargetThrew = false;
+  try {
+    for (let i = 0; i < 100; i++) missingTargetState = reduce(missingTargetState, tick(0));
+  } catch {
+    missingTargetThrew = true;
+  }
+  run("follow : cible introuvable ne fait jamais planter le tick", false, missingTargetThrew);
+  run("follow : cible introuvable -> reste immobile (dégradation propre)", 5, followerX(missingTargetState));
+
+  // --- Compagnons : robustesse (brique 3/3) ---
+  // addCompanion (core/state.js) : SEUL point d'ajout. Refuse + signale à la
+  // limite, jamais d'éviction silencieuse — voir son commentaire pour la
+  // politique complète.
+  const fullCompanions = [
+    { id: "c1", type: "dog", x: 0 },
+    { id: "c2", type: "dog", x: 1 },
+  ];
+  run("compagnons : addCompanion accepte sous la limite", true, addCompanion([], { id: "c1", type: "dog", x: 0 }).added);
+  const acceptedResult = addCompanion([fullCompanions[0]], fullCompanions[1]);
+  run("compagnons : addCompanion accepté -> liste allongée de un", 2, acceptedResult.companions.length);
+  const refusedResult = addCompanion(fullCompanions, { id: "c3", type: "dog", x: 2 });
+  run("compagnons : addCompanion refuse au-delà de MAX_COMPANIONS", false, refusedResult.added);
+  run(
+    "compagnons : addCompanion refusé -> liste renvoyée INCHANGÉE (pas d'éviction)",
+    fullCompanions,
+    refusedResult.companions
+  );
+
   // --- Audit de sérialisabilité (avant tout système de sauvegarde) ---
   // Objectif : confirmer que l'état de partie survit à un aller-retour JSON
   // en restant structurellement identique ET fonctionnel — pas un système
@@ -849,7 +889,17 @@ export function runMovementChecks() {
     AUDIT_REGISTRY
   );
 
-  let auditSession = createInitialState(auditWorldA, 77, NO_COMPANIONS);
+  // Compagnon EXPLICITE (pas le défaut de createTestCompanion) : targetId
+  // écrit en dur plutôt que laissé au défaut interne de follow.js, pour que
+  // l'aller-retour JSON exerce réellement cette clé (brique 3/3 — l'audit
+  // datait d'avant les compagnons, jamais vérifié avec l'un d'eux avant).
+  const auditCompanion = {
+    id: "audit-companion",
+    type: "dog",
+    x: 2,
+    behavior: { kind: "follow", targetId: "player", minDistance: 1, maxDistance: 3 },
+  };
+  let auditSession = createInitialState(auditWorldA, 77, { companions: [auditCompanion] });
   for (let i = 0; i < 25; i++) auditSession = reduce(auditSession, tick(1));
   auditSession = travelToWorld(auditSession, auditWorldB.id, auditWorldB);
   for (let i = 0; i < 10; i++) auditSession = reduce(auditSession, tick(-1));
@@ -908,6 +958,40 @@ export function runMovementChecks() {
     if (!revivalThrew) {
       run("sérialisation : le PNJ du monde reparse a survécu au voyage", auditDogXParked, dogXOnReturn);
       run("sérialisation : le monde reparse redevient normalement simulable", true, getActiveWorld(revived).entities[0].x !== dogXOnReturn);
+
+      // Compagnon (brique 3/3) : même garanties que le PNJ ci-dessus, PLUS
+      // la garantie propre aux compagnons (jamais rangés avec un monde
+      // quitté, voir core/state.js/getActiveWorld) — vérifiées ICI, sur la
+      // partie RECONSTRUITE depuis JSON, pas sur l'originale (qui n'a
+      // jamais transité par une désérialisation).
+      run(
+        "sérialisation : le compagnon garde son comportement et sa cible après rechargement",
+        JSON.stringify(auditCompanion.behavior),
+        JSON.stringify(revived.companions.find((c) => c.id === "audit-companion").behavior)
+      );
+      run(
+        "sérialisation : aucun résidu du compagnon dans le monde quitté (B) après rechargement",
+        false,
+        revived.worlds[auditWorldB.id].entities.some((e) => e.id === "audit-companion")
+      );
+      run(
+        "sérialisation : le compagnon reparu est injecté une seule fois dans le lieu actif",
+        1,
+        getActiveWorld(revived).entities.filter((e) => e.id === "audit-companion").length
+      );
+
+      // Suivi toujours actif : le joueur s'éloigne largement (vers la
+      // droite, où le lieu A laisse de la marge, playerStart=2/length=20) —
+      // le compagnon reconstruit depuis JSON doit encore réagir (targetId
+      // "player" toujours résolu, comportement follow intact).
+      const companionXAfterReturn = revived.companions.find((c) => c.id === "audit-companion").x;
+      for (let i = 0; i < 300; i++) revived = reduce(revived, tick(1));
+      const companionXAfterChase = revived.companions.find((c) => c.id === "audit-companion").x;
+      run(
+        "sérialisation : le compagnon suit toujours après un aller-retour JSON",
+        true,
+        companionXAfterChase !== companionXAfterReturn
+      );
     }
   }
 

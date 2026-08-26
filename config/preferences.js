@@ -19,6 +19,15 @@ const PREFS_VERSION = 1;
 // préférence. type ∈ "number" (borné [min,max]) | "boolean" (bornes non
 // pertinentes, ignorées par isValidPrefValue).
 export const PREF_CONSTRAINTS = {
+  // Gain de sortie GLOBAL, en bout de chaîne (voir lib/audio.js/
+  // setMasterVolume) — AU-DESSUS de tous les volumes par canal ci-dessous,
+  // jamais un remplaçant. Défaut délibérément BAS (20%, pas 50% comme les
+  // autres) : sécurité d'accessibilité. Un jeu qui démarre fort peut couvrir
+  // le lecteur d'écran du joueur — qui ne l'entend alors plus assez pour
+  // naviguer jusqu'aux options et baisser le son, piégé par le volume même
+  // qui l'en empêche. On démarre bas, le joueur monte s'il le souhaite —
+  // jamais l'inverse.
+  masterVolume: { type: "number", min: 0, max: 100, default: 20 },
   beaconVolume: { type: "number", min: 0, max: 100, default: 50 },
   footstepVolume: { type: "number", min: 0, max: 100, default: 50 },
   musicVolume: { type: "number", min: 0, max: 100, default: 50 },

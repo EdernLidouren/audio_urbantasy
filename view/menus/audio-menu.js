@@ -8,11 +8,12 @@
 
 import { pushScreen, popScreen } from "../../lib/screens.js";
 import { makeMessageScreen } from "../../lib/menu.js";
-import { setGlobalVolume } from "../../lib/audio.js";
+import { setGlobalVolume, setMasterVolume } from "../../lib/audio.js";
 import { t } from "../../i18n/index.js";
 import { setPref, PREF_CONSTRAINTS } from "../../config/preferences.js";
 import { refreshActiveBeaconVolumes } from "../audio/city-scene.js";
 
+const MASTER = PREF_CONSTRAINTS.masterVolume;
 const BEACON = PREF_CONSTRAINTS.beaconVolume;
 const FOOTSTEP = PREF_CONSTRAINTS.footstepVolume;
 const MUSIC = PREF_CONSTRAINTS.musicVolume;
@@ -26,6 +27,22 @@ export function createAudioMenu() {
   // default viennent de PREF_CONSTRAINTS (config/preferences.js), pas
   // redéfinis ici : même source que la validation de persistance.
   const sliders = [
+    {
+      kind: "slider",
+      labelKey: "audio.master_volume",
+      prefKey: "masterVolume",
+      min: MASTER.min,
+      max: MASTER.max,
+      step: 1,
+      bigStep: 5,
+      unit: "%",
+      default: MASTER.default,
+      // Gain de sortie GLOBAL (lib/audio.js/setMasterVolume, Howler.volume)
+      // : re-multiplie INSTANTANÉMENT tout ce qui joue déjà, sans passer par
+      // un canal particulier — c'est pourquoi ce slider est EN PREMIER,
+      // au-dessus de tous les réglages par canal ci-dessous.
+      onChange: (value) => setMasterVolume(value / 100),
+    },
     {
       kind: "slider",
       labelKey: "audio.beacon_volume",
@@ -112,6 +129,7 @@ export function createAudioMenu() {
       setPref(slider.prefKey, slider.default);
     }
     refreshActiveBeaconVolumes();
+    setMasterVolume(MASTER.default / 100);
     setGlobalVolume("music", MUSIC.default / 100);
     setGlobalVolume("ambience", AMBIENCE.default / 100);
     // Écran-message plutôt qu'une simple annonce : le résultat doit être
