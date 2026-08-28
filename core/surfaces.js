@@ -24,8 +24,10 @@
 // jamais une catégorie ou un cas en dur ailleurs (même principe que les
 // PRESETS d'entités, voir entities/model.md).
 export const SURFACE_REGISTRY = {
-  concrete: { neutral: true },
   asphalt: { neutral: true },
+  concrete: { neutral: true },
+  dirt: { neutral: false },
+  grass: { neutral: false },
   sand: { neutral: false },
   snow: { neutral: false },
 };

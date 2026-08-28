@@ -5,8 +5,8 @@
   "playerStart": 2,
   "music": "assets/musics/a_warm_night_in_harlem.mp3",
   "ambiences": ["assets/ambiances/traffic_street_afternoon_1.mp3", "assets/ambiances/wind_medium_1.mp3"],
-  "defaultSurface": "concrete",
-  "segments": [{ "from": 25, "to": 35, "surface": "sand" }],
+  "defaultSurface": "dirt",
+  "segments": [{ "from": 15, "to": 35, "surface": "grass" }],
   "entities": [
     { "id": "object-toolbox", "type": "object", "x": 8, "nameKey": "object.toolbox", "descriptionKey": "object.toolbox.description" },
     { "id": "door-exit", "type": "door", "x": 9, "nameKey": "door.exit", "target": "demo2", "descriptionKey": "door.exit.description" },

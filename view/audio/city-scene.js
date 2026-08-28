@@ -38,6 +38,8 @@
 
 import {
   playOneShot,
+  preloadOneShot,
+  keepAudioContextAwake,
   createPositionedSound,
   createReverbBus,
   playGlobal,
@@ -46,7 +48,7 @@ import {
   setGlobalVolume,
 } from "../../lib/audio.js";
 import { announce } from "../../lib/announce.js";
-import { resolveAsset, hasAsset } from "../../lib/assets.js";
+import { resolveAsset, hasAsset, assetKeyMembers } from "../../lib/assets.js";
 import registry from "../../entities/types/index.js";
 import player from "../../entities/player.js";
 import { TUNING_DEFAULTS, resolveTuning } from "../../config/tuning.js";
@@ -160,6 +162,19 @@ function resolveFootstepPath(world, x, { gait, naturalWalk, ownPath } = {}) {
   }
 
   return ownPath || FOOTSTEP_FLOOR_PATH;
+}
+
+// TOUTES les clés que resolveFootstepPath pourrait un jour choisir pour ce
+// mobile (gait/naturalWalk/ownPath), quel que soit le sol — pour le
+// PRÉCHARGEMENT de scène (voir preloadSceneSounds), qui doit amorcer le
+// décodage de chaque candidat AVANT que la marche ne commence, jamais pour
+// la résolution elle-même (qui reste au tick, selon le sol courant).
+function footstepCandidateKeys({ gait, naturalWalk, ownPath } = {}) {
+  const keys = [];
+  if (gait) keys.push(footstepKey(gait));
+  if (naturalWalk) keys.push(footstepKey(naturalWalk));
+  if (ownPath) keys.push(ownPath);
+  return keys;
 }
 
 function clamp(value, min, max) {
@@ -290,6 +305,11 @@ let activeScene = null;
 // l'objet session à chaque tick (immutabilité) — update() doit relire l'état
 // courant à chaque appel plutôt que capturer une session figée à la création.
 export function createCityAudioScene(getSession) {
+  // Contexte maintenu éveillé pour toute la scène (voir
+  // lib/audio.js/keepAudioContextAwake) — au tout début du montage, avant
+  // même la première voix créée plus bas.
+  keepAudioContextAwake();
+
   // Les voix positionnées d'abord (si au moins une entité est en balise
   // CONTINUE) : createPositionedSound crée un Howl, ce qui garantit que
   // Howler.ctx existe (Howler le crée au tout premier `new Howl()`) avant de
@@ -388,8 +408,14 @@ export function createCityAudioScene(getSession) {
         beaconReverbSend = resolveTuning("reverbSend", entity, beacon);
         const beaconPitchVariation = resolveTuning("pitchVariation", entity, beacon);
         // pitchVariation, s'il y en a une, tirée UNE FOIS ici (voir la note
-        // du header sur les balises continues).
-        sound = createPositionedSound(resolveAsset(beacon.path), { rate: randomRate(beaconPitchVariation) });
+        // du header sur les balises continues). cacheKey: entity.id — stable
+        // d'une visite à l'autre (voir lib/audio.js/createPositionedSound) :
+        // une balise déjà entendue une fois ne se redécode pas à chaque
+        // aller-retour, cohérent avec les mondes gardés en mémoire.
+        sound = createPositionedSound(resolveAsset(beacon.path), {
+          rate: randomRate(beaconPitchVariation),
+          cacheKey: entity.id,
+        });
       } else {
         intermittentSources.push(resolveIntermittentSource(entity, beacon, BEACON_TUNING_KEYS));
       }
@@ -445,6 +471,66 @@ export function createCityAudioScene(getSession) {
   const collisionSoundByEntityId = new Map(
     entitySounds.map(({ entity }) => [entity.id, registry[entity.type].collisionSound])
   );
+
+  // Préchargement de scène (voir lib/audio.js/preloadOneShot,
+  // lib/assets.js/assetKeyMembers) : amorce le décodage de TOUT ce que
+  // cette scène pourrait jouer, AVANT que le gameplay ne commence. Un Howl
+  // fraîchement créé décode déjà en tâche de fond (Howler, preload:true par
+  // défaut) — mais une lecture demandée AVANT la fin du décodage est mise
+  // en ATTENTE par Howler jusqu'à la fin du chargement : audible comme un
+  // pas "en retard"/qui saute, jamais un son perdu (diagnostiqué en
+  // direct : Howl.state() vaut "loading" au moment du tout premier pas,
+  // joueur ET compagnon). Avec un pool de plusieurs dizaines de membres
+  // (ex. shoes_walk), CHAQUE membre encore jamais tiré est individuellement
+  // "à froid" à son premier tirage — précharger TOUT le pool, pas
+  // seulement celui que resolveFootstepPath choisirait maintenant, sinon le
+  // symptôme peut se reproduire à tout moment de la marche (confirmé en
+  // direct : un membre jamais joué restait "loading" même après de longues
+  // secondes de jeu). Asynchrone et non bloquant par construction — juste
+  // la création des Howl ici, jamais d'attente — le premier rendu de la
+  // scène n'est donc jamais retardé, même avec beaucoup de fichiers.
+  const preloadKeys = new Set();
+  for (const { intermittentSources, movementPath, gait, naturalWalk, entity } of entitySounds) {
+    for (const src of intermittentSources) preloadKeys.add(src.path);
+    for (const key of footstepCandidateKeys({ gait, naturalWalk, ownPath: movementPath })) preloadKeys.add(key);
+    const collisionSound = collisionSoundByEntityId.get(entity.id);
+    if (collisionSound) preloadKeys.add(collisionSound);
+  }
+  for (const key of footstepCandidateKeys({ gait: player.gait, naturalWalk: player.naturalWalk, ownPath: MOVEMENT_SOUND.path })) {
+    preloadKeys.add(key);
+  }
+  preloadKeys.add(FOOTSTEP_FLOOR_PATH);
+  for (const segment of initialWorld.segments) preloadKeys.add(footstepKey(segment.surface));
+
+  for (const key of preloadKeys) {
+    for (const member of assetKeyMembers(key)) preloadOneShot(member);
+  }
+
+  // "Réchauffe" les pas critiques : un vrai playOneShot à volume 0, pendant
+  // que le joueur est encore immobile — force l'allocation complète de la
+  // voix (pas seulement le décodage), pour que le tout premier pas RÉEL
+  // soit instantané, sans artefact audible (volume 0, jamais entendu). Un
+  // seul candidat par mobile (celui que resolveFootstepPath choisirait
+  // MAINTENANT, à sa position de spawn) : suffisant pour amorcer le
+  // pipeline audio lui-même (contexte, noeuds Web Audio...), commun à tout
+  // fichier du même format — chaque membre de pool est déjà préchargé
+  // (décodage) ci-dessus, inutile de tous les rejouer un par un.
+  function warmUpFootstep(atX, candidates) {
+    // resolveAsset ici, comme playPacedSound (jamais la clé de pool brute
+    // telle que resolveFootstepPath la renvoie — voir hasAsset/assetKeyMembers
+    // ci-dessus, qui manipulent la clé, pas playOneShot, qui attend un
+    // fichier réel).
+    playOneShot(resolveAsset(resolveFootstepPath(initialWorld, atX, candidates)), { volume: 0 });
+  }
+  warmUpFootstep(getSession().player.x, {
+    gait: player.gait,
+    naturalWalk: player.naturalWalk,
+    ownPath: MOVEMENT_SOUND.path,
+  });
+  for (const { entity, movementPath, gait, naturalWalk } of entitySounds) {
+    if (!movementPath) continue;
+    warmUpFootstep(entity.x, { gait, naturalWalk, ownPath: movementPath });
+  }
 
   // Musique et ambiances du lieu : canaux GLOBAUX non spatialisés (aucun
   // pan/filtre/réverb, voir lib/audio.js), propriété du niveau, pas d'une
