@@ -195,7 +195,11 @@ export function parseLevel(raw, registry) {
     playerStart,
     entities,
     music,
+    musicDay,
+    musicNight,
     ambiences,
+    ambiencesDay,
+    ambiencesNight,
     reverbDurationSec,
     reverbDecay,
     floors,
@@ -267,6 +271,17 @@ export function parseLevel(raw, registry) {
   if (music !== undefined && !isNonEmptyString(music)) {
     fail(`music doit être une chaîne non vide si présent (reçu : ${JSON.stringify(music)}).`);
   }
+  // musicDay/musicNight : optionnels, musique PAR PHASE (voir
+  // core/time.js/phaseAt, view/audio/city-scene.js) — un lieu qui n'en
+  // déclare qu'une (musicDay SEULE, ou aucune des deux) retombe sur `music`
+  // pour la phase manquante, jamais de régression pour le contenu existant.
+  // Même validation de forme que music, rien de plus ici.
+  if (musicDay !== undefined && !isNonEmptyString(musicDay)) {
+    fail(`musicDay doit être une chaîne non vide si présent (reçu : ${JSON.stringify(musicDay)}).`);
+  }
+  if (musicNight !== undefined && !isNonEmptyString(musicNight)) {
+    fail(`musicNight doit être une chaîne non vide si présent (reçu : ${JSON.stringify(musicNight)}).`);
+  }
   // ambiences : optionnel, tableau de 0 à AMBIENCE_CHANNEL_LIMIT chemins
   // (voir view/audio/city-scene.js, lib/audio.js playAmbiences). Même
   // passage simple, juste la forme est vérifiée ici — la limite elle-même
@@ -275,6 +290,35 @@ export function parseLevel(raw, registry) {
     if (!Array.isArray(ambiences) || ambiences.length > AMBIENCE_CHANNEL_LIMIT || !ambiences.every(isNonEmptyString)) {
       fail(
         `ambiences doit être un tableau d'au plus ${AMBIENCE_CHANNEL_LIMIT} chaînes non vides si présent (reçu : ${JSON.stringify(ambiences)}).`
+      );
+    }
+  }
+  // ambiencesDay/ambiencesNight : STRUCTURE RÉSERVÉE, même principe que
+  // musicDay/musicNight ci-dessus, mais AUCUN consommateur ne les lit encore
+  // (voir view/audio/city-scene.js — seule la musique réagit à la phase
+  // pour l'instant, voir core/time.md). Validées en FORME dès maintenant
+  // pour qu'un niveau qui les déclare échoue clairement en cas d'erreur,
+  // plutôt que de découvrir une faute de frappe le jour où l'ambiance de
+  // phase sera câblée.
+  if (ambiencesDay !== undefined) {
+    if (
+      !Array.isArray(ambiencesDay) ||
+      ambiencesDay.length > AMBIENCE_CHANNEL_LIMIT ||
+      !ambiencesDay.every(isNonEmptyString)
+    ) {
+      fail(
+        `ambiencesDay doit être un tableau d'au plus ${AMBIENCE_CHANNEL_LIMIT} chaînes non vides si présent (reçu : ${JSON.stringify(ambiencesDay)}).`
+      );
+    }
+  }
+  if (ambiencesNight !== undefined) {
+    if (
+      !Array.isArray(ambiencesNight) ||
+      ambiencesNight.length > AMBIENCE_CHANNEL_LIMIT ||
+      !ambiencesNight.every(isNonEmptyString)
+    ) {
+      fail(
+        `ambiencesNight doit être un tableau d'au plus ${AMBIENCE_CHANNEL_LIMIT} chaînes non vides si présent (reçu : ${JSON.stringify(ambiencesNight)}).`
       );
     }
   }
@@ -310,7 +354,11 @@ export function parseLevel(raw, registry) {
   // l'état doit rester de la donnée pure, un aller-retour JSON ne doit rien
   // changer à sa forme (voir movement.check.js, audit de sérialisabilité).
   if (music !== undefined) level.music = music;
+  if (musicDay !== undefined) level.musicDay = musicDay;
+  if (musicNight !== undefined) level.musicNight = musicNight;
   if (ambiences !== undefined) level.ambiences = ambiences;
+  if (ambiencesDay !== undefined) level.ambiencesDay = ambiencesDay;
+  if (ambiencesNight !== undefined) level.ambiencesNight = ambiencesNight;
   if (reverbDurationSec !== undefined) level.reverbDurationSec = reverbDurationSec;
   if (reverbDecay !== undefined) level.reverbDecay = reverbDecay;
 

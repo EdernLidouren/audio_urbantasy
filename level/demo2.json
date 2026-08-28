@@ -3,7 +3,7 @@
   "titleKey": "level.demo2.title",
   "length": 15,
   "playerStart": 2,
-  "music": "assets/musics/indigo_glow.mp3",
+  "music": "assets/musics/streets_day",
   "reverbDurationSec": 0.25,
   "reverbDecay": 12,
   "entities": [

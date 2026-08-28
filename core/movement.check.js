@@ -21,6 +21,7 @@ import {
   monthOfYear,
   seasonOfYear,
   yearNumber,
+  phaseAt,
 } from "./time.js";
 import { TIME_CONFIG } from "../config/time-values.js";
 
@@ -560,6 +561,21 @@ export function runMovementChecks() {
   // bas, vérifié ici explicitement et lisiblement pour ce champ précis).
   const timeRoundTrip = JSON.parse(JSON.stringify(afterAdvance));
   run("horloge : session.time survit à un aller-retour JSON", afterAdvance.time, timeRoundTrip.time);
+
+  // Phase jour/nuit (voir core/time.js/phaseAt) : dérivée de l'heure, un
+  // seul palier de chaque côté — vérifié aux bornes précises (dayStartHour/
+  // nightStartHour, config/time-values.js), pas seulement à l'origine.
+  const { dayStartHour, nightStartHour } = TIME_CONFIG;
+  run("horloge : phase à l'origine (INITIAL_TIME, 8h) = jour", "day", phaseAt(INITIAL_TIME));
+  run("horloge : phase juste avant dayStartHour = nuit", "night", phaseAt(dayStartHour * TIME_CONFIG.minutesPerHour - 1));
+  run("horloge : phase à dayStartHour pile = jour", "day", phaseAt(dayStartHour * TIME_CONFIG.minutesPerHour));
+  run(
+    "horloge : phase juste avant nightStartHour = jour",
+    "day",
+    phaseAt(nightStartHour * TIME_CONFIG.minutesPerHour - 1)
+  );
+  run("horloge : phase à nightStartHour pile = nuit", "night", phaseAt(nightStartHour * TIME_CONFIG.minutesPerHour));
+  run("horloge : phase à minuit = nuit", "night", phaseAt(0));
 
   // Lien réservé (pas exploité) avec lastVisited : voir travelToWorld
   // ci-dessus ("lastVisited écrit au rangement de A") et core/time.md.

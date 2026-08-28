@@ -15,7 +15,9 @@ parsé, sans aucune chaîne affichable en dur — uniquement des clés i18n.
 | `floors`      | number   | optionnel, entier `>= 1` : nombre d'étages du lieu. **FILET, jamais rejeté** : absent ou invalide (non entier, `< 1`) -> repli sur `1` (`console.warn` uniquement si une valeur a été fournie et est invalide — absent reste silencieux, c'est le cas normal). Réservé pour la verticalité future : voir "Verticalité (réservé)" plus bas. Totalement INERTE aujourd'hui — aucune mécanique n'en dépend. |
 | `entities`    | Entity[] | voir ci-dessous                                   |
 | `music`       | string   | optionnel : chemin vers la musique du lieu (`assets/musics/...`), canal global non spatialisé — voir `view/audio/city-scene.js` |
+| `musicDay` / `musicNight` | string | optionnels : musique PAR PHASE jour/nuit (voir `core/time.js`/`phaseAt`, "Phase jour/nuit" plus bas). Un lieu qui n'en déclare aucune des deux retombe sur `music` pour les deux phases (rétrocompatible, aucune régression). Bascule en cours de jeu par FONDU CROISÉ (`view/audio/city-scene.js`) ; à l'entrée dans une scène, la phase courante joue directement, sans fondu. |
 | `ambiences`   | string[] | optionnel : 0 à `AMBIENCE_CHANNEL_LIMIT` chemins d'ambiance (`assets/ambiances/...`, voir `config/audio-channels.js`), canal global non spatialisé, jusqu'à autant de couches simultanées — voir `view/audio/city-scene.js` |
+| `ambiencesDay` / `ambiencesNight` | string[] | optionnels, même forme que `ambiences`. **RÉSERVÉS** : structure validée par `parseLevel` mais AUCUN consommateur ne les lit encore — seule la musique réagit à la phase pour l'instant (voir `core/time.md`). |
 | `reverbDurationSec` | number | optionnel, `> 0` : surcharge PAR LIEU la durée de la réponse impulsionnelle du bus de réverb (défaut global : `config/tuning-values.js`) |
 | `reverbDecay` | number | optionnel, `> 0` : surcharge PAR LIEU le taux de déclin de la réverb (défaut global : `config/tuning-values.js`) |
 | `defaultSurface` | string | optionnel : nom de surface (voir "Surfaces de sol" plus bas) couvrant tout le `x` non-segmenté. **FILET SILENCIEUX si absent** (repli sur `DEFAULT_SURFACE`, `core/surfaces.js` — comportement audible inchangé pour toute scène qui n'en déclare pas). **Échec clair si fourni mais absent du registre** (comme un type d'entité inconnu) — une référence de contenu erronée n'est jamais dégradée en silence. |
@@ -65,6 +67,16 @@ PATCHER par endroits (bornes `from`/`to` incluses). `core/surfaces.js`
 Aucune mécanique n'exploite encore ce champ au-delà du son de pas (voir
 `entities/model.md`) : pas de position Y, pas de ralentissement réel — le
 registre est prêt à en accueillir, rien de plus aujourd'hui.
+
+## Phase jour/nuit
+
+`phaseAt(time)` (`core/time.js`, pur, dérivée de l'horloge de partie — voir
+`core/time.md`) renvoie `"day"` ou `"night"` selon l'heure courante
+(`dayStartHour`/`nightStartHour`, `config/time-values.js`). Premier
+consommateur de l'horloge : `musicDay`/`musicNight` (voir tableau "Niveau"
+ci-dessus) en tirent la musique du lieu, avec un fondu croisé à chaque
+bascule en cours de jeu (`view/audio/city-scene.js`). Détail complet :
+`core/time.md`.
 
 ## Entité
 

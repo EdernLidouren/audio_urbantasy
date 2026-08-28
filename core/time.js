@@ -75,6 +75,20 @@ export function yearNumber(time) {
   return Math.floor(wholeMinutes(time) / MINUTES_PER_YEAR) + 1;
 }
 
+// Phase jour/nuit courante, dérivée de l'heure — comme les autres
+// dérivations ci-dessus, jamais stockée séparément. Un seul palier de
+// chaque côté (voir config/time-values.js/dayStartHour, nightStartHour) :
+// PAS de troisième état (aube/crépuscule) pour l'instant — la valeur de
+// retour est un TYPE FERMÉ à deux cas ("day" | "night"), volontairement,
+// pour que tout consommateur (ex. view/audio/city-scene.js) exhaustif sur
+// ces deux cas n'ait rien à changer le jour où une phase intermédiaire
+// s'ajoutera ; ce jour-là, étendre cette fonction ET ses appelants,
+// jamais glisser un troisième cas en silence dans l'un des deux existants.
+export function phaseAt(time) {
+  const hour = hourOfDay(time);
+  return hour >= TIME_CONFIG.dayStartHour && hour < TIME_CONFIG.nightStartHour ? "day" : "night";
+}
+
 // SEUL point d'avancement du compteur — pur, ne lit jamais l'horloge
 // réelle : `minutes` (déjà en MINUTES DE JEU, converties au bord depuis un
 // delta réel, voir view/city-screen.js) s'ajoute tel quel à session.time.

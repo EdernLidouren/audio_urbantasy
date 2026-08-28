@@ -43,6 +43,7 @@ import {
   createPositionedSound,
   createReverbBus,
   playGlobal,
+  crossfadeGlobal,
   playAmbiences,
   stopGlobal,
   setGlobalVolume,
@@ -56,6 +57,7 @@ import { getPref, PREF_CONSTRAINTS } from "../../config/preferences.js";
 import { t } from "../../i18n/index.js";
 import { MOVE_STEP, getActiveWorld } from "../../core/state.js";
 import { surfaceAt, surfaceProps } from "../../core/surfaces.js";
+import { phaseAt } from "../../core/time.js";
 
 // Facteurs de préférence (Options > Audio, voir view/menus/audio-menu.js) :
 // stockés en pourcentage [0,100] (même domaine que les sliders), convertis
@@ -78,6 +80,17 @@ function ambienceVolumeFactor() {
   return getPref("ambienceVolume", PREF_CONSTRAINTS.ambienceVolume.default) / 100;
 }
 
+// Musique du lieu POUR UNE PHASE (voir core/time.js/phaseAt) : musicDay/
+// musicNight si le lieu les déclare, sinon repli sur `music` (champ
+// unique, rétrocompatible — voir core/level.js) pour la phase manquante.
+// Un lieu sans AUCUN des trois champs n'a simplement pas de musique, aux
+// deux phases (renvoie undefined, comme `world.music` absent aujourd'hui).
+function resolveMusicForPhase(world, phase) {
+  if (phase === "day" && world.musicDay) return world.musicDay;
+  if (phase === "night" && world.musicNight) return world.musicNight;
+  return world.music;
+}
+
 // STEP_DISTANCE ne concerne aucune entité (c'est le pas du joueur) : défaut
 // global lu directement. AUDIBLE_RANGE, PAN_SATURATION, INTERACT_RANGE et
 // REVERB_SEND (des entités) concernent chaque entité individuellement :
@@ -93,6 +106,10 @@ const MIN_STEP_INTERVAL_MS = TUNING_DEFAULTS.minStepIntervalMs;
 // entièrement, sans réintroduire le retard qu'avait le cooldown PARTAGÉ
 // d'origine (voir surfaceChangeCooldown).
 const FOOTSTEP_OVERLAP_GUARD_MS = TUNING_DEFAULTS.footstepOverlapGuardMs;
+// Durée du fondu croisé à une bascule de phase jour/nuit (voir
+// resolveMusicForPhase, update()) — jamais utilisée à l'entrée dans une
+// scène (musique de la phase courante jouée directement, sans fondu).
+const MUSIC_CROSSFADE_MS = TUNING_DEFAULTS.musicCrossfadeMs;
 // Niveaux du modèle de volume par zones (voir volumeForDistance) : ce sont
 // des constantes de forme de courbe, pas des réglages par entité.
 const FULL_VOLUME = TUNING_DEFAULTS.fullVolume;
@@ -563,7 +580,14 @@ export function createCityAudioScene(getSession) {
   // level.music/.ambiences peuvent être un pool, un membre précis, ou un
   // chemin direct — resolveAsset() gère les trois, résolu une fois ici (pas
   // un nouveau tirage par tick, la musique/ambiance ne se retire pas).
-  const music = world.music;
+  //
+  // Musique PAR PHASE (voir core/time.js/phaseAt, resolveMusicForPhase) :
+  // à l'ENTRÉE dans une scène, on joue directement la musique de la phase
+  // COURANTE — jamais de fondu depuis le silence, voir CLAUDE.md/le prompt
+  // d'origine. currentPhase mémorise cette phase pour update() ci-dessous,
+  // seul endroit qui la refait varier (sur bascule, avec fondu).
+  let currentPhase = phaseAt(getSession().time);
+  const music = resolveMusicForPhase(world, currentPhase);
   if (music) {
     playGlobal("music", resolveAsset(music));
     setGlobalVolume("music", musicVolumeFactor());
@@ -847,6 +871,22 @@ export function createCityAudioScene(getSession) {
     // connaître la carte des surfaces (voir resolveFootstepPath) plutôt que
     // de rappeler getActiveWorld(getSession()) à chaque son de pas.
     const world = getActiveWorld(session);
+
+    // Bascule de phase jour/nuit (voir core/time.js/phaseAt) : on compare à
+    // la phase MÉMORISÉE, on n'agit QUE sur la différence — jamais en
+    // continu (phaseAt est réévalué chaque tick, mais currentPhase ne
+    // change que sur un vrai changement, voir CLAUDE.md/le prompt d'origine
+    // "on agit sur la TRANSITION, pas en continu"). Fondu croisé (voir
+    // crossfadeGlobal) — jamais l'entrée en scène ci-dessus, qui joue déjà
+    // la bonne phase directement.
+    const phase = phaseAt(session.time);
+    if (phase !== currentPhase) {
+      currentPhase = phase;
+      const nextMusic = resolveMusicForPhase(world, currentPhase);
+      if (nextMusic) {
+        crossfadeGlobal("music", resolveAsset(nextMusic), musicVolumeFactor(), MUSIC_CROSSFADE_MS);
+      }
+    }
 
     applyEntityAudio(x);
 

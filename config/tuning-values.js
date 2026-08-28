@@ -105,6 +105,15 @@ export const TUNING_DEFAULTS = {
   // marche. Plus haut = pas plus "dans la pièce" ; plus bas = pas plus secs.
   footstepReverbSend: 0.15,
 
+  // Durée (ms) du fondu croisé musique à une bascule de phase jour/nuit
+  // (voir core/time.js/phaseAt, view/audio/city-scene.js) : la piste
+  // sortante descend à 0 puis s'arrête, l'entrante monte de 0 à son volume,
+  // sur cette même durée. Réglable à l'oreille — plus haut = transition plus
+  // douce/lente ; plus bas = bascule plus nette. Ne s'applique QU'aux
+  // bascules en cours de jeu, jamais à l'entrée dans une scène (voir
+  // resolveMusicForPhase, jouée directement, sans fondu).
+  musicCrossfadeMs: 2000,
+
   // --- Paramètres sonores d'entité (cascade son -> instance -> archétype ->
   // défaut global, voir entities/model.md et config/tuning.js/resolveTuning)
   // : les clés ci-dessous rejoignent reverbSend plus haut dans ce même

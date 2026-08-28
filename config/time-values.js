@@ -23,4 +23,12 @@ export const TIME_CONFIG = {
   // une journée de jeu (24 h) dure 24 minutes réelles. Modifiable ici sans
   // toucher à la logique qui la consomme (voir view/city-screen.js).
   timeScale: 60,
+
+  // Plages jour/nuit (voir core/time.js/phaseAt) : jour = [dayStartHour,
+  // nightStartHour), nuit le reste (traverse minuit sans cas particulier —
+  // toute heure hors [dayStartHour, nightStartHour) est nuit). Un seul
+  // palier de chaque côté pour l'instant (pas d'aube/crépuscule) — extensible
+  // plus tard à d'autres phases sans changer cette table, juste sa lecture.
+  dayStartHour: 6,
+  nightStartHour: 9,
 };

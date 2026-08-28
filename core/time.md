@@ -1,10 +1,11 @@
 # Horloge de partie
 
 Référence pour le système de temps : le compteur, ses dérivations, le calendrier
-simplifié, l'avancement accéléré, la pause, la persistance. Ce document décrit
-UNIQUEMENT le cœur temporel (`core/time.js` + `session.time`). Rien dans le jeu ne
-consomme encore ce temps (pas de jour/nuit, pas d'événements) — voir "Chantiers
-réservés, pas câblés" en fin de document.
+simplifié, l'avancement accéléré, la pause, la persistance, et son premier
+consommateur (la phase jour/nuit). Ce document décrit le cœur temporel
+(`core/time.js` + `session.time`) ET ce premier consommateur — le reste (événements
+datés, simulation d'absence...) n'est pas câblé, voir "Chantiers réservés, pas
+câblés" en fin de document.
 
 ## Source de vérité unique
 
@@ -96,6 +97,42 @@ simulation d'absence (modèle "Animal Crossing" : un lieu quitté pourrait évol
 simplement rattraper le temps écoulé, à la prochaine visite) — non câblée par ce
 chantier.
 
+## Phase jour/nuit — premier consommateur de l'horloge
+
+`phaseAt(time)` (`core/time.js`, pure) dérive `"day"` | `"night"` de `hourOfDay` :
+jour = `[dayStartHour, nightStartHour)`, nuit le reste (`config/time-values.js`,
+défauts 6h/20h). Un seul palier de chaque côté pour l'instant — **pas** de
+troisième état (aube/crépuscule). Le type de retour reste volontairement fermé à
+deux cas : un consommateur exhaustif dessus n'a rien à changer le jour où une
+phase intermédiaire s'ajoutera, il faudra alors étendre `phaseAt` ET ses
+appelants, jamais glisser un troisième cas en silence dans l'un des deux
+existants.
+
+**Musique par phase, propriété du lieu** (`level/schema.md`) : `musicDay` /
+`musicNight`, optionnels — un lieu qui n'en déclare aucun retombe sur `music`
+(champ existant) pour les deux phases, aucune régression pour le contenu déjà
+écrit. Même structure prévue pour l'ambiance (`ambiencesDay` / `ambiencesNight`,
+validés par `parseLevel`) mais **non exploitée** — seule la musique réagit à la
+phase pour l'instant.
+
+**Réaction en VUE, sur la TRANSITION uniquement** (`view/audio/city-scene.js`) :
+- `phaseAt` reste pur ; c'est la vue qui compare, à chaque tick, la phase courante
+  à une phase MÉMORISÉE (`currentPhase`) — n'agit que sur la différence, jamais en
+  continu.
+- À l'ENTRÉE dans une scène : joue directement la musique de la phase courante
+  (`resolveMusicForPhase`), sans fondu — il n'y a rien dont partir.
+- À une bascule EN COURS DE JEU : fondu croisé (`lib/audio.js`/`crossfadeGlobal`,
+  distinct de `playGlobal` qui reste réservé aux transitions de lieu, franches).
+  La piste entrante démarre à 0 et monte vers son volume de croisière (facteur de
+  préférence musique déjà appliqué, voir `musicVolumeFactor`) ; la sortante
+  descend à 0 puis s'arrête/décharge — jamais de Howl fantôme après le fondu.
+  Durée réglable à l'oreille : `TUNING_DEFAULTS.musicCrossfadeMs`
+  (`config/tuning-values.js`, défaut 2000 ms).
+- Limite connue, acceptée : si la préférence de volume musique change PENDANT un
+  fondu (fenêtre de quelques secondes), l'appel direct à `setGlobalVolume`
+  interrompt l'animation Howler en cours sur la ou les pistes concernées — pas de
+  correctif dédié, cas rare et sans conséquence audible durable.
+
 ## Vérification manuelle (touche "t")
 
 Sur l'écran de jeu, "t" (discrète, sans effet sur le déplacement) annonce heure puis
@@ -107,11 +144,13 @@ qui repart à `printemps`).
 
 ## Chantiers réservés, pas câblés
 
-Ce prompt pose uniquement le cœur temporel. Rien ne consomme encore `session.time`
-en dehors de l'annonce de test ci-dessus :
+Au-delà de la phase jour/nuit (musique) et de l'annonce de test ci-dessus, rien
+d'autre ne consomme encore `session.time` :
 
-- pas de cycle jour/nuit (rendu, audio d'ambiance selon l'heure...) ;
+- `ambiencesDay` / `ambiencesNight` : structure validée (voir plus haut), aucun
+  fondu ni réaction câblés — même principe que la musique, pas encore fait.
 - pas d'événements datés (PNJ absent la nuit, ambiance saisonnière...) ;
+- pas de troisième phase (aube/crépuscule) — voir "Phase jour/nuit" plus haut ;
 - pas de simulation d'absence via `lastVisited` (voir plus haut).
 
 Tout ça reste pour de futurs chantiers, qui LIRONT le temps sans jamais le faire
