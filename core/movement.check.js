@@ -11,6 +11,18 @@ import { moveAndBounce } from "./physics/movement.js";
 import { SAVE_VERSION, serializeGame, deserializeGame } from "./save.js";
 import { MAX_COMPANIONS } from "../config/companions.js";
 import { SURFACE_REGISTRY, DEFAULT_SURFACE, surfaceAt, surfaceProps, surfacePropsAt } from "./surfaces.js";
+import {
+  INITIAL_TIME,
+  SEASON_KEYS,
+  advanceTime,
+  minuteOfHour,
+  hourOfDay,
+  dayOfMonth,
+  monthOfYear,
+  seasonOfYear,
+  yearNumber,
+} from "./time.js";
+import { TIME_CONFIG } from "../config/time-values.js";
 
 // { companions: [] } : passé explicitement à CHAQUE createInitialState()
 // ci-dessous qui ne concerne pas les compagnons — sans lui, le défaut (UN
@@ -403,7 +415,10 @@ export function runMovementChecks() {
   run("partie : état du joueur conservé à travers la transition", "conserve-moi", partie.player.testMarker);
   run("partie : blockedBy réinitialisé à l'arrivée", null, partie.player.blockedBy);
   run("partie : le monde quitté (A) reste dans worlds, rangé", true, Boolean(partie.worlds[worldA.id]));
-  run("partie : lastVisited écrit au rangement de A", 1, partie.worlds[worldA.id].lastVisited);
+  // lastVisited horodaté à la minute de jeu COURANTE (session.time, voir
+  // core/time.js) — aucun advanceTime() appelé avant cette transition dans
+  // ce scénario, donc encore à INITIAL_TIME.
+  run("partie : lastVisited écrit au rangement de A (minute de jeu courante)", INITIAL_TIME, partie.worlds[worldA.id].lastVisited);
 
   // Le monde A est gelé : plusieurs ticks dans B ne le font pas bouger.
   const npcXParked = partie.worlds[worldA.id].entities[0].x;
@@ -425,6 +440,129 @@ export function runMovementChecks() {
     travelToUnknownRejected = true;
   }
   run("partie : transition vers un monde inconnu sans niveau fourni est rejetée", true, travelToUnknownRejected);
+
+  // --- Horloge de partie (core/time.js) ---
+  // Compteur unique + dérivations pures. RIEN d'autre ne consomme le temps
+  // ici (pas de jour/nuit, pas d'événements) — ce sont de futurs chantiers,
+  // voir core/time.md. advanceTime ne lit jamais l'horloge réelle : chaque
+  // scénario ci-dessous injecte un delta EXPLICITE, jamais mesuré.
+
+  const timeLevel = parseLevel(
+    { id: "movement-check-time", titleKey: "level.demo.title", length: 10, playerStart: 0, entities: [] },
+    EMPTY_REGISTRY
+  );
+
+  // Origine : jour 1, mois 1 (saison 0), année 1, à l'heure de départ
+  // configurée (config/time-values.js/startHour) — jamais minuit.
+  let timeState = createInitialState(timeLevel, undefined, NO_COMPANIONS);
+  run("horloge : session.time démarre à INITIAL_TIME", INITIAL_TIME, timeState.time);
+  run("horloge : heure de départ = startHour configuré", TIME_CONFIG.startHour, hourOfDay(timeState.time));
+  run("horloge : minute de départ = 0", 0, minuteOfHour(timeState.time));
+  run("horloge : jour de départ = 1", 1, dayOfMonth(timeState.time));
+  run("horloge : mois de départ = 1", 1, monthOfYear(timeState.time));
+  run("horloge : saison de départ = 0 (printemps)", 0, seasonOfYear(timeState.time));
+  run("horloge : année de départ = 1", 1, yearNumber(timeState.time));
+  run("horloge : SEASON_KEYS couvre les 4 saisons", 4, SEASON_KEYS.length);
+
+  // Pureté : n'affecte QUE .time, jamais mutée sur place (référence
+  // d'entrée intacte), et déterministe (même delta -> même résultat).
+  const beforeAdvance = timeState;
+  const afterAdvance = advanceTime(timeState, 30);
+  run("horloge : advanceTime ne mute jamais l'état d'entrée", INITIAL_TIME, beforeAdvance.time);
+  run("horloge : advanceTime avance le compteur du delta exact", INITIAL_TIME + 30, afterAdvance.time);
+  run(
+    "horloge : advanceTime déterministe (même delta -> même résultat)",
+    advanceTime(timeState, 30).time,
+    advanceTime(timeState, 30).time
+  );
+  run(
+    "horloge : advanceTime ne touche à rien d'autre que .time",
+    JSON.stringify({ ...beforeAdvance, time: null }),
+    JSON.stringify({ ...afterAdvance, time: null })
+  );
+
+  // Aucune horloge implicite dans le core : de nombreux TICK ne font JAMAIS
+  // avancer .time — seul advanceTime() le fait (voir CLAUDE.md, "le core
+  // n'a ni horloge ni clavier").
+  let noClockState = createInitialState(timeLevel, undefined, NO_COMPANIONS);
+  for (let i = 0; i < 500; i++) noClockState = reduce(noClockState, tick(1));
+  run("horloge : reduce()/TICK ne fait jamais avancer le temps", INITIAL_TIME, noClockState.time);
+
+  // Roulement minute -> heure (23 -> 0 avant 60).
+  const oneHour = TIME_CONFIG.minutesPerHour;
+  const beforeMinuteRoll = advanceTime(timeState, oneHour - minuteOfHour(timeState.time) - 1); // xx:59
+  const afterMinuteRoll = advanceTime(beforeMinuteRoll, 1); // xx+1:00
+  run("horloge : juste avant le roulement, minute = 59", 59, minuteOfHour(beforeMinuteRoll.time));
+  run("horloge : après le roulement, minute retombe à 0", 0, minuteOfHour(afterMinuteRoll.time));
+  run(
+    "horloge : après le roulement, l'heure a avancé de 1",
+    (hourOfDay(beforeMinuteRoll.time) + 1) % TIME_CONFIG.hoursPerDay,
+    hourOfDay(afterMinuteRoll.time)
+  );
+
+  // Roulement jour -> mois -> minuit : depuis l'origine, avancer jusqu'à
+  // 23:59 du dernier jour du mois puis +1 minute doit faire rouler jour ET
+  // mois ensemble (jour 1 du mois suivant, minuit).
+  const minutesToMonthEnd =
+    TIME_CONFIG.daysPerMonth * TIME_CONFIG.hoursPerDay * TIME_CONFIG.minutesPerHour - INITIAL_TIME - 1;
+  const monthEndState = advanceTime(timeState, minutesToMonthEnd); // dernier jour du mois, 23:59
+  run("horloge : dernier jour du mois avant minuit", TIME_CONFIG.daysPerMonth, dayOfMonth(monthEndState.time));
+  run("horloge : heure juste avant minuit", TIME_CONFIG.hoursPerDay - 1, hourOfDay(monthEndState.time));
+  const nextMonthState = advanceTime(monthEndState, 1); // minuit, mois suivant
+  run("horloge : après minuit, jour retombe à 1", 1, dayOfMonth(nextMonthState.time));
+  run("horloge : après minuit du dernier jour, mois avance", 2, monthOfYear(nextMonthState.time));
+  run("horloge : après minuit, heure retombe à 0", 0, hourOfDay(nextMonthState.time));
+
+  // Roulement mois -> année -> saison : mois 12 -> mois 1, année +1, saison
+  // retombe à 0 (printemps).
+  const minutesToYearEnd =
+    TIME_CONFIG.monthsPerYear * TIME_CONFIG.daysPerMonth * TIME_CONFIG.hoursPerDay * TIME_CONFIG.minutesPerHour -
+    INITIAL_TIME -
+    1;
+  const yearEndState = advanceTime(timeState, minutesToYearEnd); // dernier jour du dernier mois, 23:59
+  run("horloge : dernier mois de l'année avant le roulement", TIME_CONFIG.monthsPerYear, monthOfYear(yearEndState.time));
+  run("horloge : année avant le roulement = 1", 1, yearNumber(yearEndState.time));
+  const nextYearState = advanceTime(yearEndState, 1);
+  run("horloge : après le roulement, mois retombe à 1", 1, monthOfYear(nextYearState.time));
+  run("horloge : après le roulement, année avance", 2, yearNumber(nextYearState.time));
+  run("horloge : après le roulement, saison retombe à 0 (printemps)", 0, seasonOfYear(nextYearState.time));
+
+  // Saisons : chaque bloc de monthsPerSeason mois partage la même saison,
+  // la suivante commence au mois suivant — vérifié sur les 12 mois de
+  // l'année, pas seulement aux bornes déjà couvertes ci-dessus.
+  const seasonsByMonth = [];
+  for (let m = 1; m <= TIME_CONFIG.monthsPerYear; m++) {
+    const minutesToMonth = (m - 1) * TIME_CONFIG.daysPerMonth * TIME_CONFIG.hoursPerDay * TIME_CONFIG.minutesPerHour - INITIAL_TIME;
+    seasonsByMonth.push(seasonOfYear(advanceTime(timeState, minutesToMonth).time));
+  }
+  run(
+    "horloge : les 12 mois se répartissent en 4 saisons de 3 mois consécutifs",
+    JSON.stringify([0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3]),
+    JSON.stringify(seasonsByMonth)
+  );
+
+  // Granularité minute : un delta fractionnaire (< 1 minute) s'accumule
+  // dans .time (jamais arrondi par advanceTime lui-même, voir son
+  // commentaire) mais reste invisible tant qu'il ne franchit pas la minute
+  // entière — les dérivations ne montrent jamais de fraction.
+  const fractionalState = advanceTime(timeState, 0.4);
+  run("horloge : un delta fractionnaire est conservé dans .time", INITIAL_TIME + 0.4, fractionalState.time);
+  run(
+    "horloge : mais reste invisible dans les dérivations (granularité = la minute)",
+    minuteOfHour(timeState.time),
+    minuteOfHour(fractionalState.time)
+  );
+  const fractionalCrossing = advanceTime(fractionalState, 0.7); // 0.4 + 0.7 = 1.1 -> franchit la minute
+  run("horloge : la somme de fractions franchit bien la minute au bon moment", minuteOfHour(timeState.time) + 1, minuteOfHour(fractionalCrossing.time));
+
+  // Persistance : session.time survit à un aller-retour JSON avec sa valeur
+  // EXACTE (déjà couvert génériquement par l'audit de sérialisabilité plus
+  // bas, vérifié ici explicitement et lisiblement pour ce champ précis).
+  const timeRoundTrip = JSON.parse(JSON.stringify(afterAdvance));
+  run("horloge : session.time survit à un aller-retour JSON", afterAdvance.time, timeRoundTrip.time);
+
+  // Lien réservé (pas exploité) avec lastVisited : voir travelToWorld
+  // ci-dessus ("lastVisited écrit au rangement de A") et core/time.md.
 
   // --- Compagnons (brique 1/3 : infrastructure — persistance/injection/
   // traversée, PAS de suivi du joueur à ce stade, voir CLAUDE.md) ---
@@ -1138,6 +1276,17 @@ export function runMovementChecks() {
       surfaceAtThrew = true;
     }
     run("save : surfaceAt ne plante jamais sur un monde rebouché", false, surfaceAtThrew);
+  }
+
+  // Sauvegarde ANTÉRIEURE à l'horloge de partie (voir core/time.js) : jamais
+  // eu de clé .time — sans rebouchage (core/save.js/migrateSave), toute
+  // dérivation (minuteOfHour, etc.) recevrait undefined au lieu d'un nombre.
+  const { time: _droppedTime, ...auditSessionWithoutTime } = auditSession;
+  const oldTimeSave = { version: SAVE_VERSION, data: auditSessionWithoutTime };
+  const oldTimeSaveResult = deserializeGame(oldTimeSave);
+  run("save : sauvegarde antérieure à l'horloge acceptée (rebouchée)", true, oldTimeSaveResult.success);
+  if (oldTimeSaveResult.success) {
+    run("save : partie rebouchée — time par défaut (INITIAL_TIME)", INITIAL_TIME, oldTimeSaveResult.session.time);
   }
 
   console.log(`Récapitulatif : ${passed} réussis / ${total} total`);

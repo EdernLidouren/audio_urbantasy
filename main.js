@@ -3,7 +3,7 @@
 // démarre la boucle à pas fixe (qui tick uniquement l'écran actif au sommet
 // de la pile), puis charge le niveau en tâche de fond.
 
-import { pushScreen, tickActive } from "./lib/screens.js";
+import { pushScreen, tickActive, tickFrame } from "./lib/screens.js";
 import { initInput } from "./lib/input.js";
 import { ensureAudioUnlocked, setMasterVolume } from "./lib/audio.js";
 import { preventMovementKeyScrolling } from "./view/input.js";
@@ -145,10 +145,18 @@ pushScreen(mainMenuScreen);
 // tourner en continu (temps réel), même quand un menu est au sommet de la
 // pile et que tickActive() ne fait donc plus rien (voir
 // view/autosave-timer.js).
-startLoop(() => {
-  tickActive();
-  checkAutoSaveTimer(getSession);
-});
+// Second paramètre : le delta RÉEL de frame, routé au même écran actif que
+// tickActive() (voir lib/screens.js/tickFrame) — porte l'horloge de partie
+// (view/city-screen.js/onFrame), gelée pour la même raison que le
+// déplacement quand un menu est au sommet (rien à faire ici pour ça, c'est
+// le routage par pile qui s'en charge).
+startLoop(
+  () => {
+    tickActive();
+    checkAutoSaveTimer(getSession);
+  },
+  (deltaMs) => tickFrame(deltaMs)
+);
 
 loadLevel("./level/demo.json", registry)
   .then((loadedLevel) => {

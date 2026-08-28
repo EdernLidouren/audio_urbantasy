@@ -64,6 +64,12 @@ export default {
   "save.import_confirm_title": "Importer cette partie remplacera la partie en cours. Confirmer ?",
   "save.imported": "Partie importée.",
 
+  "time.announce": "{hour} h {minute}. Jour {day} du mois {month}, {season}, année {year}.",
+  "time.season.spring": "printemps",
+  "time.season.summer": "été",
+  "time.season.autumn": "automne",
+  "time.season.winter": "hiver",
+
   "level.demo.title": "Niveau de démo",
   "entity.door": "Porte",
   "entity.door.description": "Une porte.",

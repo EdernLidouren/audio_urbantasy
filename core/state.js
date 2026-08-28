@@ -5,18 +5,23 @@
 // traverse des MONDES (un par lieu visité) qui persistent, gelés, pendant
 // son absence — une re-visite les ressort tels qu'ils ont été laissés
 // (PNJ compris), pas réinitialisés. Forme :
-//   { player, worlds: { [id]: <état d'un monde> }, activeWorldId, parkCounter,
+//   { player, worlds: { [id]: <état d'un monde> }, activeWorldId, time,
 //     companions, companionsRngState }
 // player : l'état du joueur (position, extensible plus tard — inventaire...).
 // Vit ICI, JAMAIS dans les entités d'un monde : il traverse les lieux, ne
 // leur appartient pas. worlds[id] : ~ l'ancien "level" (entités avec
 // position/intention/état, longueur, métadonnées), PLUS son propre rngState
 // (chaque monde avance sa propre suite de tirages, gelée avec lui) et
-// lastVisited (horodaté au rangement, voir travelToWorld). Un seul monde
-// actif à la fois (activeWorldId) : seul lui reçoit les ticks (voir
-// core/reduce.js) — les autres sont inertes tant qu'ils ne sont pas
-// réactivés (simulation de l'absence : pas codée, viendra avec une horloge,
-// lastVisited est le crochet réservé pour ça).
+// lastVisited (horodaté au rangement, voir travelToWorld, avec la minute de
+// jeu COURANTE — voir core/time.js). Un seul monde actif à la fois
+// (activeWorldId) : seul lui reçoit les ticks (voir core/reduce.js) — les
+// autres sont inertes tant qu'ils ne sont pas réactivés (simulation de
+// l'absence : pas codée, lastVisited est le crochet réservé pour ça, voir
+// core/time.md).
+// time : minutes de jeu écoulées depuis l'origine de la partie — SEULE
+// source de vérité temporelle (voir core/time.js pour les dérivations
+// minute/heure/jour/mois/saison/année). Avance UNIQUEMENT via
+// core/time.js/advanceTime, jamais ici ni dans core/reduce.js.
 //
 // COMPAGNONS — cercle PARTIE, comme le joueur (voir CLAUDE.md, brique 1/3
 // du système de compagnons) : `companions` est une liste d'entités (MÊME
@@ -37,6 +42,7 @@ import { TUNING_DEFAULTS } from "../config/tuning-values.js";
 import { MAX_COMPANIONS } from "../config/companions.js";
 import { createSeed } from "./rng.js";
 import { clamp } from "./physics/movement.js";
+import { INITIAL_TIME } from "./time.js";
 
 export const MOVE_STEP = TUNING_DEFAULTS.moveStep;
 
@@ -154,9 +160,9 @@ export function createInitialState(level, seed = DEFAULT_SEED, { companions } = 
     player: { x: level.playerStart, blockedBy: null, pushedBy: null },
     worlds: { [level.id]: world },
     activeWorldId: level.id,
-    // Compteur monotone de rangements de monde, source de lastVisited (voir
-    // travelToWorld) — jamais un monde rangé avant la première transition.
-    parkCounter: 0,
+    // Horloge de partie : voir core/time.js. INITIAL_TIME = jour 1, mois 1,
+    // à l'heure de départ configurée (config/time-values.js/startHour).
+    time: INITIAL_TIME,
     companions: repositionCompanions(requestedCompanions.slice(0, MAX_COMPANIONS), level.playerStart, level.length),
     // Flux PRNG dédié aux compagnons (voir header) : dérivé du même seed,
     // mais hashé sous une clé distincte — jamais la même suite que le
@@ -186,7 +192,8 @@ export function getActiveWorld(session) {
 }
 
 // Transition vers un autre monde (porte). RANGE le monde courant tel quel
-// (gelé, lastVisited horodaté par parkCounter) ; ressort la cible telle
+// (gelé, lastVisited horodaté à la minute de jeu COURANTE — session.time,
+// voir core/time.js — jamais l'horloge réelle) ; ressort la cible telle
 // quelle si déjà visitée (état sauvegardé : entités où elles étaient),
 // sinon la construit depuis freshLevel et l'ajoute à worlds ; ACTIVE la
 // cible et replace le JOUEUR à son point d'arrivée (playerStart) — sans
@@ -205,11 +212,10 @@ export function getActiveWorld(session) {
 // worlds (ignoré sinon, le monde déjà rangé prime). Cible ni visitée ni
 // fournie -> erreur claire plutôt qu'un état à moitié construit.
 export function travelToWorld(session, targetId, freshLevel = null) {
-  const nextParkCounter = session.parkCounter + 1;
   const currentWorld = session.worlds[session.activeWorldId];
   const worldsAfterParking = {
     ...session.worlds,
-    [session.activeWorldId]: { ...currentWorld, lastVisited: nextParkCounter },
+    [session.activeWorldId]: { ...currentWorld, lastVisited: session.time },
   };
 
   const existingTarget = worldsAfterParking[targetId];
@@ -223,7 +229,6 @@ export function travelToWorld(session, targetId, freshLevel = null) {
     player: { ...session.player, x: targetWorld.playerStart, blockedBy: null, pushedBy: null },
     worlds: { ...worldsAfterParking, [targetId]: targetWorld },
     activeWorldId: targetId,
-    parkCounter: nextParkCounter,
     companions: repositionCompanions(session.companions, targetWorld.playerStart, targetWorld.length),
   };
 }

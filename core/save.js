@@ -12,6 +12,7 @@
 // view/save-storage.js. L'obscurcissement viendra dans un prompt séparé.
 
 import { DEFAULT_SURFACE } from "./surfaces.js";
+import { INITIAL_TIME } from "./time.js";
 
 export const SAVE_VERSION = 1;
 
@@ -45,14 +46,15 @@ function backfillWorld(world) {
 
 // Migre une sauvegarde déjà déballée { version, data } vers la partie
 // courante. v1 -> v1 : identité pour l'essentiel, SAUF le rebouchage de
-// `companions`/`companionsRngState` (voir core/state.js) et, par monde, de
-// floors/defaultSurface/segments (voir backfillWorld) — absents d'une
-// sauvegarde antérieure à leur introduction, sans que ça justifie une
-// montée de version (la forme reste v1, juste complétée par des défauts
-// sûrs). Point d'ancrage documenté pour de futures montées (v1 -> v2 -> ...
-// -> courante, jamais en sautant une étape, même principe que
-// migratePrefs). Version inconnue -> null (aucun chemin de montée), traité
-// comme un échec par deserializeGame.
+// `companions`/`companionsRngState` (voir core/state.js), de `time` (voir
+// core/time.js — absent d'une sauvegarde antérieure à l'horloge de partie)
+// et, par monde, de floors/defaultSurface/segments (voir backfillWorld) —
+// absents d'une sauvegarde antérieure à leur introduction, sans que ça
+// justifie une montée de version (la forme reste v1, juste complétée par
+// des défauts sûrs). Point d'ancrage documenté pour de futures montées
+// (v1 -> v2 -> ... -> courante, jamais en sautant une étape, même principe
+// que migratePrefs). Version inconnue -> null (aucun chemin de montée),
+// traité comme un échec par deserializeGame.
 function migrateSave(raw) {
   if (raw.version !== SAVE_VERSION) return null;
 
@@ -61,6 +63,10 @@ function migrateSave(raw) {
 
   if (!Array.isArray(data.companions)) {
     data = { ...data, companions: [], companionsRngState: 0 };
+  }
+
+  if (typeof data.time !== "number") {
+    data = { ...data, time: INITIAL_TIME };
   }
 
   if (data.worlds && typeof data.worlds === "object") {

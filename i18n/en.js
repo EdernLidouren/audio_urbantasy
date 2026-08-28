@@ -63,6 +63,12 @@ export default {
   "save.import_confirm_title": "Importing this game will replace the current game. Confirm?",
   "save.imported": "Game imported.",
 
+  "time.announce": "{hour}:{minute}. Day {day} of month {month}, {season}, year {year}.",
+  "time.season.spring": "spring",
+  "time.season.summer": "summer",
+  "time.season.autumn": "autumn",
+  "time.season.winter": "winter",
+
   "level.demo.title": "Demo level",
   "entity.door": "Door",
   "entity.door.description": "A door.",

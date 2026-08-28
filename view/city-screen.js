@@ -15,9 +15,34 @@ import { tick } from "../core/actions.js";
 import { reduce } from "../core/reduce.js";
 import { loadLevelById } from "../level/load.js";
 import { getActiveWorld, travelToWorld } from "../core/state.js";
+import { advanceTime, minuteOfHour, hourOfDay, dayOfMonth, monthOfYear, seasonOfYear, yearNumber, SEASON_KEYS } from "../core/time.js";
 import registry from "../entities/types/index.js";
 import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
 import { saveGame } from "./save-storage.js";
+import { TIME_CONFIG } from "../config/time-values.js";
+
+// Outil de VÉRIFICATION du système de temps (voir core/time.md) : formate
+// et annonce heure + date courantes, sur demande (touche "t", voir
+// onKeyDown plus bas) — rien d'autre ne consomme encore session.time. Deux
+// chiffres systématiques (padStart) pour une lecture d'horloge stable,
+// jamais "9 h 5".
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
+function announceGameTime(session) {
+  const { time } = session;
+  announce(
+    t("time.announce", {
+      hour: pad2(hourOfDay(time)),
+      minute: pad2(minuteOfHour(time)),
+      day: dayOfMonth(time),
+      month: monthOfYear(time),
+      season: t(SEASON_KEYS[seasonOfYear(time)]),
+      year: yearNumber(time),
+    })
+  );
+}
 
 export function makeCityScreen(getSession, setSession) {
   let scene = null;
@@ -105,6 +130,19 @@ export function makeCityScreen(getSession, setSession) {
       setSession(reduce(getSession(), tick(getMoveIntent())));
       scene.update();
     },
+    // Horloge de partie (voir core/time.js) : delta RÉEL de frame, PAS le
+    // nombre de ticks (voir lib/loop.js) — converti ici en minutes de jeu
+    // via TIME_SCALE (config/time-values.js), puis injecté tel quel dans le
+    // core, qui ne lit jamais l'horloge lui-même. Même garde que onTick
+    // (scene null pendant une transition) : PAUSE GRATUITE par construction
+    // — un menu au sommet de la pile empêche cet appel d'avoir lieu du tout
+    // (voir lib/screens.js/tickFrame), une transition de porte le no-op ici
+    // — dans les deux cas, aucun delta injecté, le temps se fige.
+    onFrame(deltaMs) {
+      if (!scene) return;
+      const minutes = (deltaMs / 1000) * (TIME_CONFIG.timeScale / TIME_CONFIG.minutesPerHour);
+      setSession(advanceTime(getSession(), minutes));
+    },
     // Espace/Entrée : touches discrètes (screens.js ne route que la touche
     // non répétée), pas de souci d'auto-interruption ici. N'agit que quand
     // la ville est au sommet de la pile : le stack routing s'en charge par
@@ -117,6 +155,14 @@ export function makeCityScreen(getSession, setSession) {
       if (event.key === "Escape") {
         event.preventDefault();
         openPauseMenu(scene, getSession);
+        return;
+      }
+
+      // "t" discrète : outil de vérification de l'horloge (voir
+      // announceGameTime plus haut, core/time.md) — aucune règle de jeu ne
+      // consomme encore le temps, seule cette annonce le lit.
+      if (event.key === "t" || event.key === "T") {
+        announceGameTime(getSession());
         return;
       }
 
