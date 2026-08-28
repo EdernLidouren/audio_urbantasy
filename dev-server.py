@@ -42,7 +42,14 @@ class DevRequestHandler(http.server.SimpleHTTPRequestHandler):
 def serve(port):
     address = ("127.0.0.1", port)
     try:
-        httpd = http.server.HTTPServer(address, DevRequestHandler)
+        # ThreadingHTTPServer plutôt que HTTPServer : mono-thread, ce dernier ne
+        # sert qu'UNE connexion à la fois et se bloque dès qu'un client garde une
+        # connexion HTTP/1.1 keep-alive ouverte (ex. le navigateur en train de
+        # streamer une musique html5) — toute requête concurrente (rafale de
+        # préchargement audio, plusieurs dizaines de fichiers à la fois) reste
+        # en attente derrière, jusqu'à saturer la file d'écoute (ERR_CONNECTION_REFUSED
+        # observé en direct). Un thread par connexion lève cette limite.
+        httpd = http.server.ThreadingHTTPServer(address, DevRequestHandler)
     except OSError as error:
         print(f"Impossible d'écouter sur le port {port} : {error}")
         sys.exit(1)

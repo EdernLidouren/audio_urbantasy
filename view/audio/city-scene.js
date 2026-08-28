@@ -500,6 +500,13 @@ export function createCityAudioScene(getSession) {
     preloadKeys.add(key);
   }
   preloadKeys.add(FOOTSTEP_FLOOR_PATH);
+  // defaultSurface est la couche de BASE (voir core/surfaces.js/surfaceAt) :
+  // aussi jouable que n'importe quel segment, souvent PLUS (c'est la surface
+  // par défaut de toute la scène) — oubliée ici, son pool entier restait
+  // jamais préchargé (diagnostiqué en direct : dirt_walk en defaultSurface,
+  // chaque pas piochait un membre à froid, plusieurs requêtes concurrentes
+  // non préchargées ont fini par saturer dev-server.py, mono-thread).
+  preloadKeys.add(footstepKey(initialWorld.defaultSurface));
   for (const segment of initialWorld.segments) preloadKeys.add(footstepKey(segment.surface));
 
   for (const key of preloadKeys) {
