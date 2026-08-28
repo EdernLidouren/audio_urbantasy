@@ -24,6 +24,15 @@
   "assets/musics/streets_day": [
     "assets/musics/streets_day_1.mp3"
   ],
+  "assets/sounds/effects/electrical_flickering": [
+    "assets/sounds/effects/electrical_flickering_1.mp3",
+    "assets/sounds/effects/electrical_flickering_2.mp3",
+    "assets/sounds/effects/electrical_flickering_3.mp3",
+    "assets/sounds/effects/electrical_flickering_4.mp3",
+    "assets/sounds/effects/electrical_flickering_5.mp3",
+    "assets/sounds/effects/electrical_flickering_6.mp3",
+    "assets/sounds/effects/electrical_flickering_7.mp3"
+  ],
   "assets/sounds/entities/big_rock_beacon": [
     "assets/sounds/entities/big_rock_beacon_1.mp3"
   ],
@@ -42,6 +51,9 @@
   ],
   "assets/sounds/entities/door_beacon": [
     "assets/sounds/entities/door_beacon_1.mp3"
+  ],
+  "assets/sounds/entities/neon_beacon": [
+    "assets/sounds/entities/neon_beacon_1.mp3"
   ],
   "assets/sounds/entities/npc_beacon": [
     "assets/sounds/entities/npc_beacon_1.mp3"

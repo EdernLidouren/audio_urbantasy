@@ -11,6 +11,29 @@
   "entities": [
     { "id": "object-toolbox", "type": "object", "x": 8, "nameKey": "object.toolbox", "descriptionKey": "object.toolbox.description" },
     { "id": "door-exit", "type": "door", "x": 9, "nameKey": "door.exit", "target": "demo2", "descriptionKey": "door.exit.description" },
-    { "id": "npc-passerby", "type": "npc", "x": 20, "nameKey": "npc.passerby", "descriptionKey": "npc.passerby.description" }
+    {
+      "id": "npc-resident",
+      "type": "npc",
+      "x": 20,
+      "nameKey": "npc.resident",
+      "descriptionKey": "npc.resident.description",
+      "behavior": { "kind": "wander", "speed": 0.5, "turnChance": 0.3 },
+      "presence": [
+        { "when": { "type": "arrived" }, "effects": [{ "type": "presence", "present": false }] },
+        { "when": { "type": "timeRange", "from": 0, "to": 8 }, "effects": [{ "type": "presence", "present": false }] },
+        {
+          "when": { "type": "timeRange", "from": 8, "to": 24 },
+          "effects": [
+            { "type": "presence", "present": true },
+            { "type": "behavior", "behavior": { "kind": "wander", "speed": 0.5, "turnChance": 0.3 } }
+          ]
+        },
+        {
+          "when": { "type": "timeRange", "from": 9, "to": 24 },
+          "effects": [{ "type": "behavior", "behavior": { "kind": "goto", "targetId": "door-exit" } }]
+        }
+      ]
+    },
+    { "id": "object-neon", "type": "neon", "x": 30 }
   ]
 }

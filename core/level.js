@@ -10,6 +10,7 @@ import { AMBIENCE_CHANNEL_LIMIT } from "../config/audio-channels.js";
 import { BODY_RADIUS } from "./state.js";
 import BEHAVIORS from "./behaviors/index.js";
 import { SURFACE_REGISTRY, DEFAULT_SURFACE } from "./surfaces.js";
+import { CONDITION_TYPES } from "./presence.js";
 
 function fail(message) {
   throw new Error(`parseLevel: ${message}`);
@@ -23,12 +24,74 @@ function isFiniteNumber(value) {
   return typeof value === "number" && Number.isFinite(value);
 }
 
+// Un effet porté par une règle de presence[] : { type: "presence", present:
+// boolean } ou { type: "behavior", behavior: <objet behavior, même forme
+// que entities[].behavior — voir parseBehavior plus bas, réutilisé TEL
+// QUEL, aucune duplication>. Aiguillage EXPLICITE par type, PAS un registre
+// comme CONDITION_TYPES (voir core/presence.js, header) : un effet a une
+// validation propre à son type — une simple chaîne booléenne pour
+// "presence", une sous-validation complète de comportement pour
+// "behavior" — qu'un registre de noms ne suffirait pas à couvrir. Ajouter
+// un effet demain = ajouter un cas ici, même esprit que les conditions,
+// juste pas la même mécanique.
+function parseEffect(rawEffect, effectIndex, ruleIndex, index, id) {
+  if (typeof rawEffect !== "object" || rawEffect === null) {
+    fail(`entities[${index}] ("${id}") : presence[${ruleIndex}].effects[${effectIndex}] n'est pas un objet.`);
+  }
+  const { type } = rawEffect;
+  if (type === "presence") {
+    if (typeof rawEffect.present !== "boolean") {
+      fail(`entities[${index}] ("${id}") : presence[${ruleIndex}].effects[${effectIndex}].present doit être un booléen.`);
+    }
+    return { type: "presence", present: rawEffect.present };
+  }
+  if (type === "behavior") {
+    return { type: "behavior", behavior: parseBehavior(rawEffect.behavior, index, id) };
+  }
+  fail(`entities[${index}] ("${id}") : presence[${ruleIndex}].effects[${effectIndex}].type "${type}" inconnu.`);
+}
+
+// Une règle de presence[] : { when: { type, ... }, effects: [<effet>...] }.
+// `when` est reporté TEL QUEL (transport générique, comme `tuning` plus
+// bas) — son évaluateur (core/presence.js) gère seul ses propres champs, y
+// compris leur absence/malformation (repli défensif -> false). RACCOURCI
+// rétrocompatible avec la présence seule (avant ce système généralisé) :
+// `{ when, present: boolean }` sans `effects`, normalisé ICI en forme
+// canonique `{ when, effects: [{ type: "presence", present }] }` — tout
+// consommateur d'une entité PARSÉE (vue, sauvegarde...) ne voit plus qu'une
+// seule forme, jamais les deux. Une règle sans AUCUN effet ne sert à rien
+// (échec clair plutôt qu'une règle muette qu'on croirait active) : l'un des
+// deux (`effects` ou `present`) est requis.
+function parsePresenceRule(rawRule, ruleIndex, index, id) {
+  if (typeof rawRule !== "object" || rawRule === null) {
+    fail(`entities[${index}] ("${id}") : presence[${ruleIndex}] n'est pas un objet.`);
+  }
+  const { when, present, effects } = rawRule;
+  if (typeof when !== "object" || when === null || !isNonEmptyString(when.type)) {
+    fail(`entities[${index}] ("${id}") : presence[${ruleIndex}].when doit être un objet avec un type.`);
+  }
+  if (!CONDITION_TYPES.includes(when.type)) {
+    fail(`entities[${index}] ("${id}") : presence[${ruleIndex}].when.type "${when.type}" absent du registre de conditions.`);
+  }
+
+  if (effects !== undefined) {
+    if (!Array.isArray(effects) || effects.length === 0) {
+      fail(`entities[${index}] ("${id}") : presence[${ruleIndex}].effects doit être un tableau non vide si présent.`);
+    }
+    return { when, effects: effects.map((effect, i) => parseEffect(effect, i, ruleIndex, index, id)) };
+  }
+  if (typeof present !== "boolean") {
+    fail(`entities[${index}] ("${id}") : presence[${ruleIndex}] doit fournir "effects" ou "present" (booléen).`);
+  }
+  return { when, effects: [{ type: "presence", present }] };
+}
+
 function parseEntity(rawEntity, index, registry, length, seenIds) {
   if (typeof rawEntity !== "object" || rawEntity === null) {
     fail(`entities[${index}] n'est pas un objet.`);
   }
 
-  const { id, type, x, target, nameKey, descriptionKey, behavior, blocksMovement, tuning } = rawEntity;
+  const { id, type, x, target, nameKey, descriptionKey, behavior, blocksMovement, tuning, presence } = rawEntity;
 
   if (!isNonEmptyString(id)) {
     fail(`entities[${index}].id manquant ou invalide.`);
@@ -104,6 +167,21 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
       fail(`entities[${index}] ("${id}") : tuning doit être un objet si présent.`);
     }
     entity.tuning = tuning;
+  }
+
+  // presence : optionnel, RÈGLES DÉCLARATIVES de présence conditionnelle
+  // (voir core/presence.js) — cascade INSTANCE -> TYPE, même principe que
+  // blocksMovement (ex. "neon" est TOUJOURS nocturne par archétype, voir
+  // entities/types/neon.js ; une instance pourrait surcharger son propre
+  // calendrier si besoin un jour). Ni l'un ni l'autre -> toujours présente,
+  // comportement STRICTEMENT inchangé pour tout contenu existant (voir
+  // core/presence.js/isPresent).
+  const resolvedPresence = presence !== undefined ? presence : registry[type].presence;
+  if (resolvedPresence !== undefined) {
+    if (!Array.isArray(resolvedPresence)) {
+      fail(`entities[${index}] ("${id}") : presence doit être un tableau si présent.`);
+    }
+    entity.presence = resolvedPresence.map((rule, i) => parsePresenceRule(rule, i, index, id));
   }
 
   return entity;

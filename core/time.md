@@ -133,6 +133,17 @@ phase pour l'instant.
   interrompt l'animation Howler en cours sur la ou les pistes concernées — pas de
   correctif dédié, cas rare et sans conséquence audible durable.
 
+## Présence conditionnelle d'entité — deuxième consommateur
+
+`core/presence.js`/`isPresent` dérive la présence d'une entité de `session.time`
+via ses règles déclaratives (`presence: [{ when, present }]`) — condition
+`"timeRange"` aujourd'hui, même dérivation d'heure que `phaseAt` mais totalement
+DÉCOUPLÉE de la phase jour/nuit (une entité déclare son propre horaire, ex.
+`entities/types/neon.js`, "présent 20h..6h", indépendant de `dayStartHour`/
+`nightStartHour`). Détail complet (l'aiguillage extensible, les trois plans
+coupés par l'état dormant, la réaction vue par diff) : `entities/model.md`,
+`level/schema.md`.
+
 ## Vérification manuelle (touche "t")
 
 Sur l'écran de jeu, "t" (discrète, sans effet sur le déplacement) annonce heure puis
@@ -144,13 +155,19 @@ qui repart à `printemps`).
 
 ## Chantiers réservés, pas câblés
 
-Au-delà de la phase jour/nuit (musique) et de l'annonce de test ci-dessus, rien
-d'autre ne consomme encore `session.time` :
+Au-delà de la phase jour/nuit (musique), de la présence conditionnelle
+d'entité et de l'annonce de test ci-dessus, rien d'autre ne consomme encore
+`session.time` :
 
 - `ambiencesDay` / `ambiencesNight` : structure validée (voir plus haut), aucun
   fondu ni réaction câblés — même principe que la musique, pas encore fait.
-- pas d'événements datés (PNJ absent la nuit, ambiance saisonnière...) ;
-- pas de troisième phase (aube/crépuscule) — voir "Phase jour/nuit" plus haut ;
+- présence conditionnelle : un seul type de condition (`"timeRange"`) — pas de
+  `"season"`/`"weather"`/`"questFlag"` (l'aiguillage est prêt à les accueillir,
+  voir "Présence conditionnelle d'entité" plus haut) ;
+- description conditionnelle d'entité (texte différent selon la phase, même
+  principe que `presence` — voir `entities/model.md`) ;
+- pas de troisième phase jour/nuit (aube/crépuscule) — voir "Phase jour/nuit"
+  plus haut ;
 - pas de simulation d'absence via `lastVisited` (voir plus haut).
 
 Tout ça reste pour de futurs chantiers, qui LIRONT le temps sans jamais le faire

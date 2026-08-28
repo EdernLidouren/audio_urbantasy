@@ -1,9 +1,11 @@
 // Archétype "buddy" — le compagnon de test prédéfini (voir
-// core/state.js/createTestCompanion). Distinct de "dog" (dog.js) :
-// label partagé ("Chien"), mais son PROPRE beacon — npc_beacon plutôt que
-// le placeholder générique — pour le suivre facilement à l'oreille pendant
-// qu'il apprend à suivre le joueur (voir core/behaviors/follow.js). vocal
-// et movement repris tels quels de dog.js (même famille de son).
+// core/state.js/createTestCompanion). Distinct de "dog" (dog.js) : label
+// partagé ("Chien"), mais SANS beacon (retiré à la demande — le
+// compagnon suit le joueur de trop près, le "tic tic" continu gênait
+// l'écoute du reste de la scène) : on le repère à son pas et à sa voix
+// (vocal/movement), suffisants vu sa proximité constante avec le joueur en
+// "follow" (voir core/behaviors/follow.js). vocal et movement repris tels
+// quels de dog.js (même famille de son).
 //
 // gait:"heavy_boots" + naturalWalk:"barefoot" — démontrent la CHAÎNE
 // COMPLÈTE de résolution du pas sur sol NEUTRE (voir entities/model.md,
@@ -22,7 +24,6 @@ export default {
   gait: "heavy_boots",
   naturalWalk: "barefoot",
   sounds: {
-    beacon: { path: "assets/sounds/entities/npc_beacon_1.mp3", loop: true },
     vocal: {
       path: "assets/sounds/entities/dog_medium_vocal",
       loop: false,

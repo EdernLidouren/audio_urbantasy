@@ -58,6 +58,7 @@ import { t } from "../../i18n/index.js";
 import { MOVE_STEP, getActiveWorld } from "../../core/state.js";
 import { surfaceAt, surfaceProps } from "../../core/surfaces.js";
 import { phaseAt } from "../../core/time.js";
+import { isPresent } from "../../core/presence.js";
 
 // Facteurs de préférence (Options > Audio, voir view/menus/audio-menu.js) :
 // stockés en pourcentage [0,100] (même domaine que les sliders), convertis
@@ -248,6 +249,26 @@ function resolveIntermittentSource(entity, descriptor, keys) {
   };
 }
 
+// enterSound/exitSound (voir core/presence.js, entities/model.md) : rôles
+// sonores PONCTUELS et POSITIONNÉS, déclenchés par une bascule de présence
+// OBSERVÉE (core/reduce.js/stepEntities), jamais par une cadence/intervalle
+// — contrairement à resolveIntermittentSource ci-dessus, pas de nextAt à
+// replanifier. Chemin/gain/pitchVariation/reverbSend résolus UNE FOIS ici
+// (cascade son -> instance -> archétype -> défaut global), comme les
+// autres rôles. descriptor absent -> null (rôle optionnel, indépendant de
+// l'autre — une entité peut n'avoir que l'un des deux, voir neon.js).
+const ENTER_SOUND_TUNING_KEYS = { gain: "enterSoundGain" };
+const EXIT_SOUND_TUNING_KEYS = { gain: "exitSoundGain" };
+function resolveTransitionSound(entity, descriptor, keys) {
+  if (!descriptor) return null;
+  return {
+    path: descriptor.path,
+    gain: resolveTuning(keys.gain, entity, descriptor),
+    pitchVariation: resolveTuning("pitchVariation", entity, descriptor),
+    reverbSend: resolveTuning("reverbSend", entity, descriptor),
+  };
+}
+
 // Volume par zones (palier volontaire à interactRange, pas une rampe
 // continue) :
 //   - dist <= interactRange       : FULL_VOLUME, plateau plein et stable.
@@ -299,7 +320,14 @@ function cutoffForDistance(dist, interactRange, audibleRange, cutoffMin, cutoffM
 // voir exactement le même ensemble dans le même ordre.
 function occupiedEntities(entitySounds, liveById, x) {
   return entitySounds
-    .filter(({ entity, interactRange }) => Math.abs(liveById.get(entity.id).x - x) <= interactRange)
+    .filter(({ entity, interactRange }) => {
+      const live = liveById.get(entity.id);
+      // Dormante (voir core/presence.js) : jamais occupée, jamais
+      // interactive — "comme si absente" (troisième plan coupé par le
+      // drapeau, voir le header du fichier).
+      if (live.present === false) return false;
+      return Math.abs(live.x - x) <= interactRange;
+    })
     .map(({ entity }) => liveById.get(entity.id))
     .sort((a, b) => a.x - b.x);
 }
@@ -356,6 +384,11 @@ export function createCityAudioScene(getSession) {
     const sounds = registry[entity.type].sounds;
     const beacon = sounds.beacon;
     const vocal = sounds.vocal;
+    // enterSound/exitSound (voir core/presence.js) : rôles PONCTUELS
+    // distincts du beacon, optionnels et indépendants l'un de l'autre —
+    // résolus une fois ci-dessous (resolveTransitionSound), null si absent.
+    const enterSound = resolveTransitionSound(entity, sounds.enterSound, ENTER_SOUND_TUNING_KEYS);
+    const exitSound = resolveTransitionSound(entity, sounds.exitSound, EXIT_SOUND_TUNING_KEYS);
 
     // Résolus une fois ici : statiques pour la durée de vie de la scène,
     // propriétés de l'ENTITÉ (pas d'un rôle de son particulier) — partagées
@@ -450,6 +483,20 @@ export function createCityAudioScene(getSession) {
       intermittentSources.push(resolveIntermittentSource(entity, vocal, VOCAL_TUNING_KEYS));
     }
 
+    // Présence conditionnelle (voir core/presence.js) : résolue ICI, au
+    // montage — recalculée directement via isPresent (pas relue sur
+    // entity.present, pas garanti à jour à cet instant précis, voir
+    // core/reduce.js/stepEntities) à partir du MÊME state.time. Une balise
+    // CONTINUE créée dormante est immédiatement stoppée : le Howl existe
+    // déjà (décodage amorcé, prêt pour une bascule future) mais ne joue
+    // jamais tant que l'entité reste dormante. AUCUN son de transition ici
+    // (enterSound/exitSound) : cet état de départ n'est PAS une bascule
+    // (voir core/reduce.js/stepEntities, presenceChanged reste null au
+    // premier calcul) — seules les bascules OBSERVÉES en cours de jeu
+    // déclenchent, voir applyEntityAudio, qui lit presenceChanged sur
+    // l'entité VIVANTE à chaque tick (jamais un diff maison ici).
+    if (sound && !isPresent(entity, { time: getSession().time })) sound.stop();
+
     return {
       entity,
       audibleRange,
@@ -461,6 +508,8 @@ export function createCityAudioScene(getSession) {
       beaconGain,
       beaconReverbSend,
       intermittentSources,
+      enterSound,
+      exitSound,
       ...movementFields,
     };
   });
@@ -549,11 +598,18 @@ export function createCityAudioScene(getSession) {
   // la création des Howl ici, jamais d'attente — le premier rendu de la
   // scène n'est donc jamais retardé, même avec beaucoup de fichiers.
   const preloadKeys = new Set();
-  for (const { intermittentSources, movementPath, gait, naturalWalk, entity } of entitySounds) {
+  for (const { intermittentSources, movementPath, gait, naturalWalk, entity, enterSound, exitSound } of entitySounds) {
     for (const src of intermittentSources) preloadKeys.add(src.path);
     for (const key of footstepCandidateKeys({ gait, naturalWalk, ownPath: movementPath })) preloadKeys.add(key);
     const collisionSound = collisionSoundByEntityId.get(entity.id);
     if (collisionSound) preloadKeys.add(collisionSound);
+    // enterSound/exitSound (voir core/presence.js) : préchargés comme tout
+    // le reste — une bascule peut survenir dès le premier tick joué (une
+    // entité déjà présente au montage peut redevenir dormante quelques
+    // secondes plus tard), aucune raison d'attendre un premier déclenchement
+    // à froid.
+    if (enterSound) preloadKeys.add(enterSound.path);
+    if (exitSound) preloadKeys.add(exitSound.path);
   }
   for (const key of footstepCandidateKeys({ gait: player.gait, naturalWalk: player.naturalWalk, ownPath: MOVEMENT_SOUND.path })) {
     preloadKeys.add(key);
@@ -717,6 +773,27 @@ export function createCityAudioScene(getSession) {
     });
   }
 
+  // Son de TRANSITION (enterSound/exitSound, voir core/presence.js,
+  // resolveTransitionSound) : ponctuel et positionné, comme
+  // playPositionedOneShot ci-dessus dont il n'est qu'un appel nommé — même
+  // catégorie de volume que la balise (préférence "Volume des balises",
+  // ces sons accompagnent la présence d'une entité comme le beacon
+  // lui-même). Jamais soumis à la pause sélective des balises (sound.pause/
+  // resume ne concerne QUE la voix continue, voir lib/audio.js) : un
+  // one-shot Howler joue jusqu'au bout quoi qu'il arrive ensuite au beacon.
+  function playTransitionSound(entry, relX, transitionSound) {
+    playPositionedOneShot(transitionSound.path, {
+      relX,
+      interactRange: entry.interactRange,
+      audibleRange: entry.audibleRange,
+      panSaturation: entry.panSaturation,
+      reverbSend: transitionSound.reverbSend,
+      volumeFactor: beaconVolumeFactor(),
+      gain: transitionSound.gain,
+      pitchVariation: transitionSound.pitchVariation,
+    });
+  }
+
   // Sources positionnées INTERMITTENTES (voir entitySounds/
   // intermittentSources) : un beacon en mode "intermittent" ET/OU un vocal
   // (toujours intermittent) partagent ICI le même mécanisme de
@@ -739,6 +816,10 @@ export function createCityAudioScene(getSession) {
     const now = performance.now();
     const volumeFactor = beaconVolumeFactor();
     for (const entry of entitySounds) {
+      // Dormante (voir core/presence.js) : aucun déclenchement, ET aucune
+      // replanification — src.nextAt reste tel quel, gelé jusqu'au retour
+      // en présence (voir le header du fichier, "comme si absente").
+      if (liveById.get(entry.entity.id).present === false) continue;
       for (const src of entry.intermittentSources) {
         if (now < src.nextAt) continue;
 
@@ -811,8 +892,14 @@ export function createCityAudioScene(getSession) {
 
     for (const entry of entitySounds) {
       if (!entry.movementPath) continue;
+      const live = liveById.get(entry.entity.id);
+      // Dormante (voir core/presence.js) : aucun pas — cohérent avec le
+      // core, qui ne tique déjà plus son comportement/mouvement (voir
+      // core/reduce.js/stepEntities) : liveX resterait de toute façon
+      // figé, mais on l'évite explicitement plutôt que d'en dépendre.
+      if (live.present === false) continue;
 
-      const liveX = liveById.get(entry.entity.id).x;
+      const liveX = live.x;
 
       const currentSurface = surfaceAt(world, liveX);
       if (currentSurface !== entry.lastMovementSurface) {
@@ -846,13 +933,39 @@ export function createCityAudioScene(getSession) {
   }
 
   // sound absent (pas de beacon continu) : rien à maintenir en continu,
-  // ignoré ici — updateIntermittentSources() s'en charge à sa propre cadence.
+  // ignoré pour le pan/volume/passe-bas — updateIntermittentSources() s'en
+  // charge à sa propre cadence. Une entité SANS beacon peut malgré tout
+  // porter enterSound/exitSound (rôles indépendants) : la bascule est donc
+  // vérifiée pour TOUTE entité, jamais seulement celles à voix continue.
+  //
+  // Présence conditionnelle (voir core/presence.js) : la bascule est
+  // détectée par le CORE (live.presenceChanged, "entered"/"exited"/null —
+  // voir core/reduce.js/stepEntities), JAMAIS un diff maison ici. "exited" :
+  // exitSound (si défini) joué D'ABORD, PUIS le beacon s'arrête — deux Howl
+  // entièrement séparés (voir lib/audio.js/playOneShot vs
+  // createPositionedSound), le stop() du second ne coupe jamais le premier.
+  // "entered" : enterSound (si défini), PUIS le beacon reprend
+  // (sound.resume(), redémarre proprement après un stop() antérieur). Sans
+  // bascule ce tick (null) : rien de spécial, juste la mise à jour normale
+  // ci-dessous si présente.
   function applyEntityAudio(x) {
     const beaconFactor = beaconVolumeFactor();
     const liveById = liveEntitiesById();
-    for (const { entity, sound, audibleRange, panSaturation, interactRange, cutoffMin, cutoffMax, beaconGain } of entitySounds) {
-      if (!sound) continue;
-      const relX = liveById.get(entity.id).x - x;
+    for (const entry of entitySounds) {
+      const { entity, sound, audibleRange, panSaturation, interactRange, cutoffMin, cutoffMax, beaconGain } = entry;
+      const live = liveById.get(entity.id);
+      const relX = live.x - x;
+
+      if (live.presenceChanged === "exited") {
+        if (entry.exitSound) playTransitionSound(entry, relX, entry.exitSound);
+        if (sound) sound.stop();
+      } else if (live.presenceChanged === "entered") {
+        if (entry.enterSound) playTransitionSound(entry, relX, entry.enterSound);
+        if (sound) sound.resume();
+      }
+
+      if (!sound || live.present === false) continue;
+
       const dist = Math.abs(relX);
       // Pan inchangé : toujours dérivé de panSaturation, indépendant du volume.
       const pan = clamp(relX / panSaturation, -1, 1);

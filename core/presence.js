@@ -1,0 +1,228 @@
+// Système de RÈGLES déclaratives génériques : condition -> EFFET(S). Pur,
+// headless — aucune connaissance de Howler/DOM (voir CLAUDE.md). Généralise
+// la présence conditionnelle (brique 1) à tout ce qu'une condition peut
+// déclencher (brique 2/2, "triggers de comportement") — MÊME registre de
+// conditions, MÊME évaluateur, PAS un second système séparé.
+//
+// Une entité porte OPTIONNELLEMENT `presence` : une liste de règles
+// `{ when: <condition>, effects: [<effet>...] }`, évaluées DANS L'ORDRE.
+// Entité SANS champ `presence` du tout -> TOUJOURS présente, comportement
+// STRICTEMENT inchangé pour tout contenu existant. RACCOURCI rétrocompatible
+// avec la présence seule (avant ce système généralisé) : `{ when, present:
+// boolean }` SANS `effects`, sucre pour `{ when, effects: [{ type:
+// "presence", present }] }` — voir ruleEffect. core/level.js normalise déjà
+// ce raccourci en forme canonique au chargement ; ruleEffect le comprend
+// aussi directement, pour tout appelant qui construit une règle à la main
+// (ex. movement.check.js) sans passer par parseLevel.
+//
+// DEUX aiguillages EXTENSIBLES, de nature différente :
+//   - CONDITION_EVALUATORS (registre) : chaque entrée est juste "condition +
+//     context -> booléen", uniforme -> un registre suffit, core/level.js
+//     valide `when.type` contre ses clés (CONDITION_TYPES). "timeRange"
+//     (dérivée de l'horloge) et "arrived" (dérivée d'un FAIT de simulation,
+//     `entity.gotoArrived` — événementielle, pas temporelle) cohabitent
+//     sans qu'isPresent/resolveEntityRules n'aient à savoir laquelle c'est.
+//   - Types d'EFFET ("presence", "behavior") : PAS un registre pareil,
+//     aiguillage explicite (voir core/level.js/parseEffect) — un effet a une
+//     validation et une APPLICATION propres à son type (une chaîne booléenne
+//     idempotente pour "presence" ; une bascule anti-boucle + une
+//     sous-validation complète de comportement pour "behavior", voir
+//     resolveEntityRules et core/level.js/parseBehavior réutilisé tel quel).
+//     Ajouter un effet demain = ajouter un cas à ces DEUX endroits, jamais
+//     toucher au reste — même esprit d'extensibilité, mécanique adaptée à
+//     l'hétérogénéité des effets plutôt qu'un registre forcé pour deux cas.
+//
+// PRIORITÉ entre règles (plusieurs peuvent matcher le même tick) : l'ordre
+// du tableau `presence` fait foi pour la présence (la PREMIÈRE règle dont
+// `when` est vrai ET qui porte un effet "presence" décide — voir
+// resolveEntityRules, IGNORE les règles qui matchent mais n'ont pas cet
+// effet, continue d'en chercher une qui en a). Les effets "behavior", eux,
+// ne se disputent PAS un rang : ils s'appliquent chacun indépendamment,
+// SEULEMENT sur la bascule de LEUR PROPRE condition (voir plus bas) — un
+// contenu bien conçu n'a qu'une seule condition de comportement vraie à la
+// fois (ex. l'habitant, entities/model.md), mais rien n'empêche techniquement
+// d'en déclarer deux qui se chevauchent : la dernière de la liste gagnerait
+// alors simplement (dernière affectation), sans crash.
+//
+// `context` : les morceaux d'état qu'un évaluateur peut avoir besoin de
+// lire — `{ time }` (minutes de jeu, voir core/time.js) partagé par toutes
+// les entités d'un même tick, PLUS `entity` (l'entité évaluée elle-même,
+// ajouté ICI par resolveEntityRules/isPresent avant tout appel à
+// evaluateCondition) pour les conditions qui portent sur un FAIT propre à
+// l'entité (ex. "arrived"). Étendre demain (weather, flags...) ne change
+// jamais la signature de evaluateCondition, seulement ce que context
+// transporte.
+
+import { hourOfDay } from "./time.js";
+
+// "timeRange" : présente si l'heure courante (dérivée de context.time) tombe
+// dans [from, to[, EN GÉRANT le passage par minuit (from > to, ex. 20..6) —
+// même convention demi-ouverte que core/time.js/phaseAt. from === to, ou
+// l'un des deux non fini -> jamais vraie (intervalle vide/malformé), plutôt
+// qu'une ambiguïté "toujours" ou "jamais" non documentée ou un throw pour
+// une donnée de contenu déjà validée en forme par core/level.js.
+function evaluateTimeRange(cond, context) {
+  const { from, to } = cond;
+  if (!Number.isFinite(from) || !Number.isFinite(to) || from === to) return false;
+  const hour = hourOfDay(context.time);
+  return from < to ? hour >= from && hour < to : hour >= from || hour < to;
+}
+
+// "arrived" : vraie si le comportement ACTIF de l'entité est ENCORE "goto"
+// ET que ce goto a atteint sa cible (entity.gotoArrived, voir
+// core/behaviors/goto.js). Liée au comportement ACTIF plutôt qu'au seul
+// drapeau `gotoArrived` (jamais remis à false par goto.js une fois posé,
+// voir son header) : sans cette garde, une entité qui a déjà atteint une
+// cible par le passé, puis dont le comportement a depuis été remplacé (ex.
+// par un effet "behavior" qui la fait repartir en "wander"), redeviendrait
+// FAUSSEMENT "arrivée" pour toujours — c'est PRÉCISÉMENT ce que ce garde-fou
+// évite, sans jamais avoir à réinitialiser `gotoArrived` ailleurs (aucun
+// module n'a besoin de connaître ce détail de goto.js).
+function evaluateArrived(cond, context) {
+  const entity = context.entity;
+  return Boolean(entity && entity.behavior && entity.behavior.kind === "goto" && entity.gotoArrived === true);
+}
+
+// LIMITE CONNUE (transition manquée sur un grand saut de temps sans tick
+// intermédiaire) : la garde ci-dessus se corrige seule au tick SUIVANT une
+// vraie observation de la bascule (voir resolveEntityRules), mais si
+// AUCUN tick n'a lieu pendant tout le créneau où une règle de comportement
+// serait repassée à faux (ex. onglet mis en arrière-plan assez longtemps
+// pour que l'horloge de partie — non plafonnée, voir lib/loop.js/onFrame —
+// franchisse la fenêtre "8h..24h" ENTIÈREMENT avant le tick suivant ; ou,
+// dans un monde à monde actif unique — voir core/reduce.js —, un monde
+// resté INACTIF pendant qu'une telle fenêtre se referme puis se rouvre
+// ailleurs), la bascule manquée reste "collée" jusqu'à la PROCHAINE
+// bascule réelle de cette même règle — potentiellement bien plus tard.
+// Non corrigé ici : corriger nécessiterait soit de plafonner l'horloge de
+// partie (hors de portée de ce module), soit un mécanisme de rattrapage
+// hors du principe "un seul monde actif avance" (voir header de
+// core/reduce.js) — délibérément pas construit sans une demande explicite.
+
+// Registre des évaluateurs par type — SEUL endroit qui connaît les types de
+// condition. core/level.js valide `when.type` au chargement contre les clés
+// de CE MÊME registre (CONDITION_TYPES ci-dessous) : ajouter un type ici le
+// rend automatiquement acceptable en contenu, sans dupliquer la liste.
+const CONDITION_EVALUATORS = {
+  timeRange: evaluateTimeRange,
+  arrived: evaluateArrived,
+};
+
+export const CONDITION_TYPES = Object.keys(CONDITION_EVALUATORS);
+
+// Type inconnu -> false, jamais un throw : l'aiguillage runtime dégrade la
+// présence concernée plutôt que de faire planter toute la simulation
+// (core/level.js a de toute façon déjà rejeté un type inconnu au
+// chargement — ce repli ne couvre qu'un appel direct hors du chemin validé,
+// ex. depuis movement.check.js).
+export function evaluateCondition(cond, context) {
+  const evaluator = CONDITION_EVALUATORS[cond.type];
+  return evaluator ? evaluator(cond, context) : false;
+}
+
+// Un effet d'un TYPE donné porté par une règle — accepte la forme CANONIQUE
+// (`effects: [...]`) et, en repli, le raccourci `{ when, present }` sans
+// `effects` (voir header). `undefined` si la règle ne porte aucun effet de
+// ce type (l'appelant continue de chercher ailleurs, voir
+// resolveEntityRules).
+function ruleEffect(rule, type) {
+  if (Array.isArray(rule.effects)) {
+    return rule.effects.find((effect) => effect.type === type);
+  }
+  if (type === "presence" && typeof rule.present === "boolean") {
+    return { type: "presence", present: rule.present };
+  }
+  return undefined;
+}
+
+// Résout, EN UNE PASSE, tout ce qu'une entité tire de ses règles pour ce
+// tick :
+//   - present : la présence résolue (voir header, priorité de règle) ;
+//   - presenceChanged : la bascule de présence OBSERVÉE (identique à avant
+//     ce système généralisé, voir core/reduce.js) ;
+//   - ruleActive : tableau parallèle à `entity.presence`, l'état ACTIF
+//     (condition vraie ou non) de CHAQUE règle ce tick — à reporter par
+//     l'appelant sur l'entité (`entity.ruleActive`) pour la comparaison du
+//     tick suivant, seule mémoire nécessaire à la garde anti-boucle des
+//     effets "behavior" (index de tableau utilisé comme identifiant stable
+//     de règle : `entity.presence` est figé au chargement, jamais réordonné
+//     en cours de partie) ;
+//   - behaviorEffect : le comportement à POSER ce tick si un effet
+//     "behavior" vient de basculer (voir plus bas), sinon undefined.
+// Sans `entity.presence` : present toujours vrai, rien d'autre à calculer —
+// comportement STRICTEMENT inchangé pour toute entité sans règle.
+export function resolveEntityRules(entity, context) {
+  if (!entity.presence) {
+    return { present: true, presenceChanged: null, ruleActive: undefined, behaviorEffect: undefined };
+  }
+
+  const ruleContext = { ...context, entity };
+  const previousActive = entity.ruleActive;
+  const ruleActive = [];
+  let present = false;
+  let presentDecided = false;
+  let behaviorEffect;
+
+  entity.presence.forEach((rule, index) => {
+    const active = evaluateCondition(rule.when, ruleContext);
+    ruleActive.push(active);
+
+    // Présence : la PREMIÈRE règle (dans l'ordre) dont la condition est
+    // vraie ET qui porte un effet "presence" décide — réévaluée à CHAQUE
+    // tick sans mémoire (un booléen est trivialement idempotent à
+    // recalculer, contrairement à "behavior" ci-dessous).
+    if (active && !presentDecided) {
+      const effect = ruleEffect(rule, "presence");
+      if (effect) {
+        present = effect.present;
+        presentDecided = true;
+      }
+    }
+
+    // Comportement : effet appliqué SEULEMENT sur la bascule de SA PROPRE
+    // condition (faux -> vrai), jamais réappliqué en continu tant qu'elle
+    // reste vraie (sinon un goto déjà arrivé, ou un wander déjà en cours,
+    // serait sans cesse réarmé — voir header). Le TOUT PREMIER calcul pour
+    // cette entité (previousActive encore absent) compte comme une
+    // transition depuis "faux" : CONTRAIREMENT à presenceChanged plus bas
+    // (qui protège un signal AUDIBLE d'un faux déclenchement au montage),
+    // rien ici ne doit être protégé d'un son fantôme — et NE PAS le faire
+    // laisserait une entité chargée en cours de fenêtre (ex. la scène
+    // ouverte à 22h, en pleine période "goto") bloquée sur son comportement
+    // DÉCLARÉ jusqu'à la bascule suivante, potentiellement un jour entier
+    // plus tard.
+    const wasActive = previousActive ? previousActive[index] === true : false;
+    if (active && !wasActive) {
+      const effect = ruleEffect(rule, "behavior");
+      if (effect) behaviorEffect = effect.behavior;
+    }
+  });
+
+  const previousPresent = entity.present;
+  const presenceChanged =
+    typeof previousPresent === "boolean" && previousPresent !== present ? (present ? "entered" : "exited") : null;
+
+  return { present, presenceChanged, ruleActive, behaviorEffect };
+}
+
+// Présence résolue d'UNE entité pour ce tick — voir resolveEntityRules,
+// dont c'est un simple accesseur (gardé pour tout appelant qui n'a besoin
+// QUE de la présence, ex. isBlocking ci-dessous, ou du contenu existant).
+export function isPresent(entity, context) {
+  return resolveEntityRules(entity, context).present;
+}
+
+// Une entité DORMANTE ne bloque JAMAIS le mouvement (voir
+// core/physics/collision.js, core/physics/overlap.js) — "comme si absente",
+// un des trois plans coupés par la présence (voir core/reduce.js et
+// core/time.md pour les deux autres, côté vue : rendu audio et occupation/
+// interaction). blocksMovement reste la configuration DÉCLARÉE de
+// l'entité, jamais modifiée : seule la RÉSOLUTION physique du tick en tient
+// compte, recalculée ici plutôt que relue sur un éventuel `entity.present`
+// déjà posé (qui peut être absent ou porter la valeur du tick PRÉCÉDENT sur
+// les entités pré-tick lues en phase 2, voir core/reduce.js) — dérivée des
+// mêmes règles + du même context.time (constant pour tout le tick), donc
+// identique par construction à ce que la phase 1 calcule pour ce même tick.
+export function isBlocking(entity, context) {
+  return Boolean(entity.blocksMovement) && isPresent(entity, context);
+}

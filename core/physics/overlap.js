@@ -5,6 +5,7 @@
 
 import { BODY_RADIUS } from "../state.js";
 import { clamp } from "./movement.js";
+import { isBlocking } from "../presence.js";
 
 // Sépare deux positions sur l'axe pour atteindre un écart minGap, borné à
 // [0, length]. weightA/weightB pondèrent qui bouge en priorité (0 = ne bouge
@@ -42,24 +43,25 @@ export function separate(xA, weightA, xB, weightB, minGap, length) {
 
 // Résolution de chevauchement des corps (curatif) : le game design évite ce
 // cas, mais le code ne doit pas en dépendre. Appelée APRÈS le mouvement de
-// tous les mobiles au tick. Une entité passable (blocksMovement:false) n'a
-// pas de zone d'exclusion propre : seule une paire impliquant AU MOINS UNE
-// entité impassable est résolue. Une seule passe déterministe (ordre =
-// celui de level.entities), pas une résolution multi-corps itérative
-// jusqu'à convergence — hors périmètre pour un cas que le level design
-// évite par construction. Idempotente sur un état déjà sans chevauchement
-// (aucune paire n'entre dans les `if`) : rejouée à un tick suivant où rien
-// d'autre ne bouge, elle ne change rien -> pas de jitter.
-export function resolveOverlaps(playerX, entities, length) {
+// tous les mobiles au tick. Une entité NON BLOQUANTE (isBlocking : passable,
+// OU impassable mais DORMANTE — voir core/presence.js) n'a pas de zone
+// d'exclusion propre : seule une paire impliquant AU MOINS UNE entité
+// bloquante est résolue. Une seule passe déterministe (ordre = celui de
+// level.entities), pas une résolution multi-corps itérative jusqu'à
+// convergence — hors périmètre pour un cas que le level design évite par
+// construction. Idempotente sur un état déjà sans chevauchement (aucune
+// paire n'entre dans les `if`) : rejouée à un tick suivant où rien d'autre
+// ne bouge, elle ne change rien -> pas de jitter.
+export function resolveOverlaps(playerX, entities, length, presenceContext) {
   let resolvedPlayerX = playerX;
   let pushedBy = null;
 
-  // 1) Joueur vs chaque entité impassable : PRIORITÉ au joueur (weight 0),
+  // 1) Joueur vs chaque entité bloquante : PRIORITÉ au joueur (weight 0),
   // c'est l'entité qui s'écarte (weight 1) — sauf si elle n'a plus de marge
   // (bord de niveau), auquel cas le report de séparation (voir `separate`)
   // fait bouger le joueur en dernier recours, du minimum nécessaire.
   const afterPlayer = entities.map((entity) => {
-    if (!entity.blocksMovement) return entity;
+    if (!isBlocking(entity, presenceContext)) return entity;
     if (Math.abs(resolvedPlayerX - entity.x) >= BODY_RADIUS) return entity;
 
     const { xA, xB } = separate(resolvedPlayerX, 0, entity.x, 1, BODY_RADIUS, length);
@@ -70,7 +72,7 @@ export function resolveOverlaps(playerX, entities, length) {
     return xB === entity.x ? entity : { ...entity, x: xB };
   });
 
-  // 2) Paires d'entités (hors joueur) impliquant au moins une impassable :
+  // 2) Paires d'entités (hors joueur) impliquant au moins une bloquante :
   // séparation symétrique (weight 0.5/0.5). O(n²) mais le nombre d'entités
   // par niveau reste petit — pas un souci de performance ici.
   const resolvedEntities = afterPlayer.slice();
@@ -78,7 +80,7 @@ export function resolveOverlaps(playerX, entities, length) {
     for (let j = i + 1; j < resolvedEntities.length; j++) {
       const a = resolvedEntities[i];
       const b = resolvedEntities[j];
-      if (!a.blocksMovement && !b.blocksMovement) continue;
+      if (!isBlocking(a, presenceContext) && !isBlocking(b, presenceContext)) continue;
 
       const { xA, xB } = separate(a.x, 0.5, b.x, 0.5, 2 * BODY_RADIUS, length);
       if (xA !== a.x) resolvedEntities[i] = { ...a, x: xA };

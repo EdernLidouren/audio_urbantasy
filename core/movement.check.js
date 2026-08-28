@@ -24,6 +24,7 @@ import {
   phaseAt,
 } from "./time.js";
 import { TIME_CONFIG } from "../config/time-values.js";
+import { evaluateCondition, isPresent, isBlocking, resolveEntityRules } from "./presence.js";
 
 // { companions: [] } : passé explicitement à CHAQUE createInitialState()
 // ci-dessous qui ne concerne pas les compagnons — sans lui, le défaut (UN
@@ -580,6 +581,296 @@ export function runMovementChecks() {
   // Lien réservé (pas exploité) avec lastVisited : voir travelToWorld
   // ci-dessus ("lastVisited écrit au rangement de A") et core/time.md.
 
+  // --- Présence conditionnelle (core/presence.js) ---
+  // Évaluateur générique (un seul type aujourd'hui : "timeRange"), résolution
+  // de présence, et intégration dans reduce() — voir entities/types/neon.js
+  // pour le cas d'usage réel (présent la nuit).
+
+  // evaluateCondition/timeRange : dans la plage, hors plage, bornes,
+  // passage par minuit, intervalle dégénéré, type inconnu.
+  run(
+    "presence : timeRange dans la plage normale",
+    true,
+    evaluateCondition({ type: "timeRange", from: 6, to: 20 }, { time: 10 * 60 })
+  );
+  run(
+    "presence : timeRange hors plage normale",
+    false,
+    evaluateCondition({ type: "timeRange", from: 6, to: 20 }, { time: 22 * 60 })
+  );
+  run(
+    "presence : timeRange borne from incluse",
+    true,
+    evaluateCondition({ type: "timeRange", from: 6, to: 20 }, { time: 6 * 60 })
+  );
+  run(
+    "presence : timeRange borne to exclue",
+    false,
+    evaluateCondition({ type: "timeRange", from: 6, to: 20 }, { time: 20 * 60 })
+  );
+  run(
+    "presence : timeRange passage minuit — 23h dans [20,6[",
+    true,
+    evaluateCondition({ type: "timeRange", from: 20, to: 6 }, { time: 23 * 60 })
+  );
+  run(
+    "presence : timeRange passage minuit — 2h dans [20,6[",
+    true,
+    evaluateCondition({ type: "timeRange", from: 20, to: 6 }, { time: 2 * 60 })
+  );
+  run(
+    "presence : timeRange passage minuit — 10h hors [20,6[",
+    false,
+    evaluateCondition({ type: "timeRange", from: 20, to: 6 }, { time: 10 * 60 })
+  );
+  run(
+    "presence : timeRange from === to -> jamais vraie (intervalle vide)",
+    false,
+    evaluateCondition({ type: "timeRange", from: 8, to: 8 }, { time: 8 * 60 })
+  );
+  run("presence : type de condition inconnu -> false (jamais un throw)", false, evaluateCondition({ type: "weather" }, { time: 0 }));
+
+  // isPresent : sans champ presence -> toujours présente (comportement
+  // d'avant ce système, inchangé). Avec règles : la première dont `when`
+  // est vraie décide ; aucune ne correspond -> DORMANTE par défaut.
+  run("presence : isPresent sans presence -> toujours vrai", true, isPresent({ id: "x" }, { time: 0 }));
+  const neonLikeEntity = {
+    id: "neon-test",
+    presence: [{ when: { type: "timeRange", from: 20, to: 6 }, present: true }],
+  };
+  run("presence : une règle 'présent la nuit' — la nuit -> présente", true, isPresent(neonLikeEntity, { time: 23 * 60 }));
+  run(
+    "presence : une règle 'présent la nuit' — le jour -> dormante (aucune règle ne matche)",
+    false,
+    isPresent(neonLikeEntity, { time: 10 * 60 })
+  );
+  // Asymétrie documentée : UNE règle present:false ne suffit pas à exprimer
+  // "présente en dehors" — sans couverture par une règle qui matche,
+  // isPresent retombe TOUJOURS sur false (dormante), qu'un rule ait
+  // matché avec present:false OU qu'aucun rule n'ait matché du tout.
+  const absentByDay = { id: "absent-day-test", presence: [{ when: { type: "timeRange", from: 6, to: 20 }, present: false }] };
+  run("presence : règle present:false matchée -> dormante", false, isPresent(absentByDay, { time: 10 * 60 }));
+  run(
+    "presence : règle present:false NON matchée -> dormante aussi (aucune couverture, pas 'présente par défaut')",
+    false,
+    isPresent(absentByDay, { time: 23 * 60 })
+  );
+  // Deux règles complémentaires : couvre les deux cas explicitement.
+  const complementaryRules = {
+    id: "complementary-test",
+    presence: [
+      { when: { type: "timeRange", from: 6, to: 20 }, present: false },
+      { when: { type: "timeRange", from: 20, to: 6 }, present: true },
+    ],
+  };
+  run("presence : deux règles complémentaires — jour -> dormante", false, isPresent(complementaryRules, { time: 10 * 60 }));
+  run("presence : deux règles complémentaires — nuit -> présente", true, isPresent(complementaryRules, { time: 23 * 60 }));
+
+  // isBlocking : blocksMovement ET présente -> bloque ; l'un des deux
+  // manquant -> jamais.
+  run("presence : isBlocking — blocksMovement + présente -> bloque", true, isBlocking({ blocksMovement: true }, { time: 0 }));
+  run("presence : isBlocking — blocksMovement absent -> jamais", false, isBlocking({ blocksMovement: false }, { time: 0 }));
+  run(
+    "presence : isBlocking — blocksMovement + dormante -> ne bloque pas",
+    false,
+    isBlocking({ blocksMovement: true, ...neonLikeEntity }, { time: 10 * 60 })
+  );
+  run(
+    "presence : isBlocking — blocksMovement + présente (règle matchée) -> bloque",
+    true,
+    isBlocking({ blocksMovement: true, ...neonLikeEntity }, { time: 23 * 60 })
+  );
+
+  // --- Intégration dans reduce() : présence + blocage + comportement ---
+
+  const PRESENCE_REGISTRY = { wall: { label: "entity.wall", blocksMovement: true }, dog: { label: "entity.dog" } };
+  const NIGHT_ONLY = [{ when: { type: "timeRange", from: 20, to: 6 }, present: true }];
+
+  // Entité BLOQUANTE mais dormante le jour (règle "présente la nuit") : le
+  // jour, elle ne doit RIEN bloquer ("comme si absente").
+  const presenceBlockLevel = parseLevel(
+    {
+      id: "movement-check-presence-block",
+      titleKey: "level.demo.title",
+      length: 10,
+      playerStart: 0,
+      entities: [{ id: "ghost-wall", type: "wall", x: 5, presence: NIGHT_ONLY }],
+    },
+    PRESENCE_REGISTRY
+  );
+  let dayBlockState = createInitialState(presenceBlockLevel, undefined, NO_COMPANIONS);
+  for (let i = 0; i < 300; i++) dayBlockState = reduce(dayBlockState, tick(1));
+  run("presence : entité bloquante mais dormante (jour) laisse le joueur passer", true, dayBlockState.player.x > 5 + BODY_RADIUS);
+  run("presence : entité bloquante dormante ne signale jamais de blocage", null, dayBlockState.player.blockedBy);
+
+  // La MÊME entité, la nuit (advanceTime jusqu'à 22h) : redevient bloquante.
+  let nightBlockState = createInitialState(presenceBlockLevel, undefined, NO_COMPANIONS);
+  nightBlockState = advanceTime(nightBlockState, 14 * 60); // 8h (INITIAL_TIME) -> 22h
+  for (let i = 0; i < 300; i++) nightBlockState = reduce(nightBlockState, tick(1));
+  run("presence : entité bloquante présente (nuit) bloque bien le joueur", "ghost-wall", nightBlockState.player.blockedBy);
+  run("presence : joueur arrêté au bord du corps bloquant (nuit)", 5 - BODY_RADIUS, nightBlockState.player.x);
+
+  // Entité DORMANTE (jour) avec comportement wander : pas tickée du tout —
+  // ni mouvement, ni tirage PRNG.
+  const dormantWanderLevel = parseLevel(
+    {
+      id: "movement-check-presence-wander",
+      titleKey: "level.demo.title",
+      length: 20,
+      playerStart: 0,
+      entities: [
+        { id: "ghost-dog", type: "dog", x: 10, behavior: { kind: "wander", speed: 0.5, turnChance: 0.3 }, presence: NIGHT_ONLY },
+      ],
+    },
+    PRESENCE_REGISTRY
+  );
+  let dormantWanderState = createInitialState(dormantWanderLevel, 42, NO_COMPANIONS);
+  const dormantStartX = getActiveWorld(dormantWanderState).entities[0].x;
+  for (let i = 0; i < 100; i++) dormantWanderState = reduce(dormantWanderState, tick(0));
+  run(
+    "presence : entité dormante (jour) ne bouge jamais (comportement jamais tické)",
+    dormantStartX,
+    getActiveWorld(dormantWanderState).entities[0].x
+  );
+  run(
+    "presence : entité dormante porte le drapeau present:false dans l'état",
+    false,
+    getActiveWorld(dormantWanderState).entities[0].present
+  );
+
+  // PRNG non consommé pour une entité dormante : rngState après N ticks
+  // avec UNE SEULE entité dormante doit être IDENTIQUE à celui d'un monde
+  // SANS AUCUNE entité — comparaison exacte, sans dépendre de la mécanique
+  // interne du PRNG.
+  const emptyPresenceLevel = parseLevel(
+    { id: "movement-check-presence-empty", titleKey: "level.demo.title", length: 20, playerStart: 0, entities: [] },
+    PRESENCE_REGISTRY
+  );
+  let emptyPresenceState = createInitialState(emptyPresenceLevel, 42, NO_COMPANIONS);
+  for (let i = 0; i < 100; i++) emptyPresenceState = reduce(emptyPresenceState, tick(0));
+  run(
+    "presence : entité dormante ne consomme aucun tirage PRNG (rngState = monde vide)",
+    emptyPresenceState.worlds[emptyPresenceLevel.id].rngState,
+    dormantWanderState.worlds[dormantWanderLevel.id].rngState
+  );
+
+  // La MÊME entité, la nuit : présente ET réellement tickée (comportement
+  // actif, position qui évolue).
+  let awakeWanderState = createInitialState(dormantWanderLevel, 42, NO_COMPANIONS);
+  awakeWanderState = advanceTime(awakeWanderState, 14 * 60); // -> nuit
+  for (let i = 0; i < 100; i++) awakeWanderState = reduce(awakeWanderState, tick(0));
+  run("presence : entité présente (nuit) porte present:true", true, getActiveWorld(awakeWanderState).entities[0].present);
+  run(
+    "presence : entité présente (nuit) bouge réellement (comportement tické)",
+    true,
+    getActiveWorld(awakeWanderState).entities[0].x !== dormantStartX
+  );
+
+  // Entité SANS règle de présence : jamais de champ .present ajouté à son
+  // état — comportement d'avant ce système STRICTEMENT inchangé (réutilise
+  // wanderLevel, déjà défini plus haut, sans presence).
+  const noPresenceState = reduce(createInitialState(wanderLevel, 42, NO_COMPANIONS), tick(0));
+  run(
+    "presence : entité SANS règle ne porte jamais de champ .present",
+    undefined,
+    getActiveWorld(noPresenceState).entities[0].present
+  );
+
+  // --- Bascule de présence OBSERVÉE (presenceChanged) ---
+  // Formulation générique (liée à la CONDITION, pas au rouage de dormance —
+  // voir core/reduce.js/stepEntities) : "entered"/"exited"/null, jamais de
+  // bascule fantôme au tout premier calcul pour une entité.
+
+  const transitionLevel = parseLevel(
+    {
+      id: "movement-check-presence-transition",
+      titleKey: "level.demo.title",
+      length: 10,
+      playerStart: 0,
+      entities: [{ id: "flicker", type: "dog", x: 5, presence: NIGHT_ONLY }],
+    },
+    PRESENCE_REGISTRY
+  );
+
+  // Jour (état de départ) : premier calcul JAMAIS fait pour cette entité ->
+  // AUCUNE bascule, quelle que soit la valeur de présence de départ —
+  // même dormante dès ce premier calcul, ce n'est pas "une sortie".
+  let transitionState = createInitialState(transitionLevel, undefined, NO_COMPANIONS);
+  transitionState = reduce(transitionState, tick(0));
+  run(
+    "presence : aucune bascule au tout premier calcul (montage), même dormante",
+    null,
+    getActiveWorld(transitionState).entities[0].presenceChanged
+  );
+  run("presence : présence de départ (jour) correctement dormante", false, getActiveWorld(transitionState).entities[0].present);
+
+  // Un tick de plus, TOUJOURS jour : rien ne change -> pas de bascule.
+  transitionState = reduce(transitionState, tick(0));
+  run(
+    "presence : aucune bascule tant que la présence ne change pas (jour -> jour)",
+    null,
+    getActiveWorld(transitionState).entities[0].presenceChanged
+  );
+
+  // Bascule vers la nuit : le tick qui suit le changement d'heure observe
+  // dormante -> présente -> "entered".
+  transitionState = advanceTime(transitionState, 14 * 60); // 8h -> 22h (nuit)
+  transitionState = reduce(transitionState, tick(0));
+  run(
+    'presence : bascule dormante -> présente détectée ("entered")',
+    "entered",
+    getActiveWorld(transitionState).entities[0].presenceChanged
+  );
+  run("presence : présente après la bascule", true, getActiveWorld(transitionState).entities[0].present);
+
+  // Tick de plus, toujours nuit : plus de bascule (déjà présente).
+  transitionState = reduce(transitionState, tick(0));
+  run(
+    "presence : aucune bascule tant que la présence ne change pas (nuit -> nuit)",
+    null,
+    getActiveWorld(transitionState).entities[0].presenceChanged
+  );
+
+  // Retour au jour : présente -> dormante -> "exited".
+  transitionState = advanceTime(transitionState, 12 * 60); // 22h -> 10h le lendemain (jour)
+  transitionState = reduce(transitionState, tick(0));
+  run(
+    'presence : bascule présente -> dormante détectée ("exited")',
+    "exited",
+    getActiveWorld(transitionState).entities[0].presenceChanged
+  );
+  run("presence : dormante après la bascule", false, getActiveWorld(transitionState).entities[0].present);
+
+  // Une valeur de bascule NON NULLE (pas seulement null) survit elle aussi
+  // à un aller-retour JSON — transitionState porte "exited" à cet instant.
+  const transitionRoundTrip = JSON.parse(JSON.stringify(transitionState));
+  run(
+    "presence : presenceChanged non nul survit à un aller-retour JSON",
+    JSON.stringify(transitionState),
+    JSON.stringify(transitionRoundTrip)
+  );
+
+  // Entité SANS règle de présence : jamais de champ .presenceChanged non plus.
+  run(
+    "presence : entité SANS règle ne porte jamais de champ .presenceChanged",
+    undefined,
+    getActiveWorld(noPresenceState).entities[0].presenceChanged
+  );
+
+  // Sérialisation : une session avec des règles de présence actives
+  // survit à un aller-retour JSON, sans fuite de non-sérialisable
+  // (auditNonSerializable défini plus bas dans ce fichier — hoisting de
+  // function declaration, valide depuis ici).
+  const presenceRoundTrip = JSON.parse(JSON.stringify(dormantWanderState));
+  run(
+    "presence : session avec règles de présence survit à un aller-retour JSON",
+    JSON.stringify(dormantWanderState),
+    JSON.stringify(presenceRoundTrip)
+  );
+  const presenceLeaks = [];
+  auditNonSerializable(dormantWanderState, "presenceSession", new Set(), presenceLeaks);
+  run("presence : aucune fuite de non-sérialisable avec des règles de présence actives", 0, presenceLeaks.length);
+
   // --- Compagnons (brique 1/3 : infrastructure — persistance/injection/
   // traversée, PAS de suivi du joueur à ce stade, voir CLAUDE.md) ---
 
@@ -889,6 +1180,490 @@ export function runMovementChecks() {
   }
   run("follow : cible introuvable ne fait jamais planter le tick", false, missingTargetThrew);
   run("follow : cible introuvable -> reste immobile (dégradation propre)", 5, followerX(missingTargetState));
+
+  // --- Comportement "goto" (brique 1/2, voir core/behaviors/goto.js) ---
+  // Variante de follow SANS zone morte élastique, avec arrêt + signal
+  // d'arrivée (gotoArrived) — pas de temporel/trigger ici, cible fixe
+  // donnée en dur (brique 2/2, pas encore construite).
+
+  const GOTO_REGISTRY = { dog: { label: "entity.dog" }, wall: { label: "entity.wall", blocksMovement: true } };
+
+  function makeGotoLevel(overrides = {}) {
+    return {
+      id: "movement-check-goto",
+      titleKey: "level.demo.title",
+      length: 20,
+      playerStart: 0,
+      entities: [
+        { id: "anchor-1", type: "dog", x: 15 },
+        { id: "goer-1", type: "dog", x: 0, behavior: { kind: "goto", targetId: "anchor-1" } },
+      ],
+      ...overrides,
+    };
+  }
+
+  function goerX(gotoState, id = "goer-1") {
+    return getActiveWorld(gotoState).entities.find((e) => e.id === id).x;
+  }
+
+  const gotoLevel = parseLevel(makeGotoLevel(), GOTO_REGISTRY);
+
+  // Convergence + arrêt : avance vers la cible jusqu'à atteindre
+  // arriveDistance (2×BODY_RADIUS par défaut, voir goto.js), puis
+  // s'arrête, sans jamais dépasser la cible.
+  let gotoState = createInitialState(gotoLevel, 1, NO_COMPANIONS);
+  for (let i = 0; i < 500; i++) gotoState = reduce(gotoState, tick(0));
+  const settledDistance = 15 - goerX(gotoState);
+  run("goto : converge vers la cible et s'arrête à arriveDistance", true, settledDistance <= 2 * BODY_RADIUS + 1e-9);
+  run("goto : ne dépasse jamais la cible", true, goerX(gotoState) <= 15);
+  run(
+    "goto : signale son arrivée (gotoArrived)",
+    true,
+    getActiveWorld(gotoState).entities.find((e) => e.id === "goer-1").gotoArrived
+  );
+
+  // Une fois arrivé, reste immobile — rejoué à un tick suivant, aucun
+  // changement (pas d'oscillation, pas de dérive).
+  const settledX = goerX(gotoState);
+  gotoState = reduce(gotoState, tick(0));
+  run("goto : reste immobile une fois arrivé", settledX, goerX(gotoState));
+
+  // Déterminisme : même point de départ, même trajectoire à CHAQUE tick
+  // (pas seulement au résultat final) — aucun PRNG consommé (voir goto.js).
+  function runGotoTicks(startState, count) {
+    const positions = [];
+    let current = startState;
+    for (let i = 0; i < count; i++) {
+      current = reduce(current, tick(0));
+      positions.push(goerX(current));
+    }
+    return positions;
+  }
+  const gotoRun1 = runGotoTicks(createInitialState(gotoLevel, 1, NO_COMPANIONS), 200);
+  const gotoRun2 = runGotoTicks(createInitialState(gotoLevel, 1, NO_COMPANIONS), 200);
+  run("goto : trajectoire reproductible (déterministe, sans PRNG)", JSON.stringify(gotoRun1), JSON.stringify(gotoRun2));
+
+  // Cible introuvable : dégrade proprement (intent: 0, jamais de crash) —
+  // gotoArrived jamais posé, une impossibilité de progresser n'est pas une
+  // arrivée (la dégradation en présence pour ce cas reste à la charge d'un
+  // futur appelant, brique 2/2).
+  const missingGotoTargetLevel = parseLevel(
+    makeGotoLevel({
+      entities: [{ id: "goer-1", type: "dog", x: 5, behavior: { kind: "goto", targetId: "does-not-exist" } }],
+    }),
+    GOTO_REGISTRY
+  );
+  let missingGotoTargetState = createInitialState(missingGotoTargetLevel, 1, NO_COMPANIONS);
+  let missingGotoTargetThrew = false;
+  try {
+    for (let i = 0; i < 100; i++) missingGotoTargetState = reduce(missingGotoTargetState, tick(0));
+  } catch {
+    missingGotoTargetThrew = true;
+  }
+  run("goto : cible introuvable ne fait jamais planter le tick", false, missingGotoTargetThrew);
+  run("goto : cible introuvable -> reste immobile (dégradation propre)", 5, goerX(missingGotoTargetState));
+  run(
+    "goto : cible introuvable -> jamais de gotoArrived",
+    undefined,
+    getActiveWorld(missingGotoTargetState).entities.find((e) => e.id === "goer-1").gotoArrived
+  );
+
+  // Obstacle bloquant entre le mobile et sa cible : la PHYSIQUE
+  // (resolveBodyMove) l'arrête pile au contact — jamais de traversée,
+  // jamais d'arrivée (le mobile n'atteint jamais arriveDistance de la
+  // cible, coincé contre l'obstacle) — même principe que follow.js.
+  const blockedGotoLevel = parseLevel(
+    makeGotoLevel({
+      entities: [
+        { id: "anchor-1", type: "dog", x: 15 },
+        { id: "wall-goto", type: "wall", x: 8 },
+        { id: "goer-1", type: "dog", x: 0, behavior: { kind: "goto", targetId: "anchor-1" } },
+      ],
+    }),
+    GOTO_REGISTRY
+  );
+  let blockedGotoState = createInitialState(blockedGotoLevel, 1, NO_COMPANIONS);
+  for (let i = 0; i < 500; i++) blockedGotoState = reduce(blockedGotoState, tick(0));
+  run("goto : un obstacle bloquant l'arrête au contact (pas de traversée)", 8 - 2 * BODY_RADIUS, goerX(blockedGotoState));
+  run(
+    "goto : bloqué par un obstacle -> jamais arrivé (gotoArrived non posé)",
+    undefined,
+    getActiveWorld(blockedGotoState).entities.find((e) => e.id === "goer-1").gotoArrived
+  );
+  run(
+    "goto : l'obstacle bloquant lui-même ne bouge jamais",
+    8,
+    getActiveWorld(blockedGotoState).entities.find((e) => e.id === "wall-goto").x
+  );
+
+  // Validation au chargement : targetId REQUIS (contrairement à follow, qui
+  // retombe sur "player") — absent -> échec clair, jamais un repli
+  // silencieux (une cible manquante par erreur d'auteur doit se voir tout
+  // de suite, pas se dégrader en immobilité muette).
+  let missingTargetIdRejected = false;
+  try {
+    parseLevel(makeGotoLevel({ entities: [{ id: "goer-1", type: "dog", x: 0, behavior: { kind: "goto" } }] }), GOTO_REGISTRY);
+  } catch {
+    missingTargetIdRejected = true;
+  }
+  run("goto : targetId manquant rejeté au chargement (requis, pas de repli)", true, missingTargetIdRejected);
+
+  let invalidArriveDistanceRejected = false;
+  try {
+    parseLevel(
+      makeGotoLevel({
+        entities: [{ id: "goer-1", type: "dog", x: 0, behavior: { kind: "goto", targetId: "anchor-1", arriveDistance: -1 } }],
+      }),
+      GOTO_REGISTRY
+    );
+  } catch {
+    invalidArriveDistanceRejected = true;
+  }
+  run("goto : arriveDistance invalide (<=0) rejeté au chargement", true, invalidArriveDistanceRejected);
+
+  // --- Triggers de comportement (brique 2/2, voir core/presence.js) ---
+  // L'évaluateur de conditions ÉLARGI : une règle porte { when, effects }.
+  // "arrived" (nouvelle condition, événementielle) et l'effet "behavior"
+  // (nouveau, pose un comportement sur la BASCULE de sa condition, jamais
+  // en continu) — voir resolveEntityRules pour le détail.
+
+  // Rétrocompat : le raccourci { when, present } (sans effects) reste
+  // compris DIRECTEMENT par resolveEntityRules/isPresent, sans passer par
+  // parseLevel — même résultat que sa forme canonique équivalente.
+  const shorthandEntity = { id: "shorthand-test", presence: [{ when: { type: "timeRange", from: 20, to: 6 }, present: true }] };
+  const canonicalEntity = {
+    id: "canonical-test",
+    presence: [{ when: { type: "timeRange", from: 20, to: 6 }, effects: [{ type: "presence", present: true }] }],
+  };
+  run("triggers : raccourci {when,present} — nuit -> présente", true, isPresent(shorthandEntity, { time: 23 * 60 }));
+  run(
+    "triggers : forme canonique {when,effects} équivalente au raccourci",
+    isPresent(shorthandEntity, { time: 23 * 60 }),
+    isPresent(canonicalEntity, { time: 23 * 60 })
+  );
+
+  // Une règle peut porter PLUSIEURS effets à la fois (ex. présent + un
+  // comportement) — les deux s'appliquent ensemble sur la même bascule.
+  const multiEffectEntity = {
+    id: "multi-effect-test",
+    presence: [
+      {
+        when: { type: "timeRange", from: 8, to: 20 },
+        effects: [
+          { type: "presence", present: true },
+          { type: "behavior", behavior: { kind: "wander", speed: 0.5, turnChance: 0.3 } },
+        ],
+      },
+    ],
+  };
+  const multiEffectResolved = resolveEntityRules(multiEffectEntity, { time: 10 * 60 });
+  run("triggers : plusieurs effets sur une même règle — présence appliquée", true, multiEffectResolved.present);
+  run(
+    "triggers : plusieurs effets sur une même règle — comportement AUSSI posé (1er calcul)",
+    "wander",
+    multiEffectResolved.behaviorEffect && multiEffectResolved.behaviorEffect.kind
+  );
+
+  // Condition "arrived" : vraie seulement si le comportement ACTIF est
+  // ENCORE "goto" ET qu'il a atteint sa cible — jamais vraie sans
+  // comportement, avec un autre comportement, ou avec gotoArrived non posé.
+  run("triggers : arrived — sans comportement -> jamais vraie", false, evaluateCondition({ type: "arrived" }, { entity: {} }));
+  run(
+    "triggers : arrived — comportement 'wander' (pas goto) -> jamais vraie même si gotoArrived traîne",
+    false,
+    evaluateCondition({ type: "arrived" }, { entity: { behavior: { kind: "wander" }, gotoArrived: true } })
+  );
+  run(
+    "triggers : arrived — goto actif mais gotoArrived non posé -> pas encore arrivée",
+    false,
+    evaluateCondition({ type: "arrived" }, { entity: { behavior: { kind: "goto" } } })
+  );
+  run(
+    "triggers : arrived — goto actif ET gotoArrived posé -> arrivée",
+    true,
+    evaluateCondition({ type: "arrived" }, { entity: { behavior: { kind: "goto" }, gotoArrived: true } })
+  );
+  // Non-régression du filet anti-péremption (voir header de evaluateArrived
+  // dans core/presence.js) : gotoArrived reste posé pour toujours par
+  // goto.js, mais une fois le comportement REMPLACÉ par autre chose que
+  // "goto", "arrived" redevient FAUSSE — sans ce garde-fou, une entité
+  // resterait bloquée dormante pour toujours après sa toute première
+  // arrivée, même après un nouveau cycle "goto" reposé plus tard.
+  run(
+    "triggers : arrived — gotoArrived périmé (comportement déjà changé) -> plus vraie",
+    false,
+    evaluateCondition({ type: "arrived" }, { entity: { behavior: { kind: "wander" }, gotoArrived: true } })
+  );
+
+  // Effet "behavior" appliqué SEULEMENT sur la bascule (faux -> vrai) —
+  // JAMAIS réappliqué tant que la condition reste vraie. Vérifié via une
+  // entité SANS historique (ruleActive absent) au premier calcul, PUIS avec
+  // un historique déjà "actif" au second.
+  const alwaysTrueRule = {
+    when: { type: "timeRange", from: 0, to: 24 },
+    effects: [{ type: "behavior", behavior: { kind: "wander", speed: 0.5, turnChance: 0.3 } }],
+  };
+  const freshTrigger = resolveEntityRules({ id: "fresh", presence: [alwaysTrueRule] }, { time: 10 * 60 });
+  run(
+    "triggers : comportement posé dès le 1er calcul si la condition est DÉJÀ vraie (pas de bascule fantôme requise ici)",
+    "wander",
+    freshTrigger.behaviorEffect && freshTrigger.behaviorEffect.kind
+  );
+  const alreadyActiveEntity = { id: "already-active", presence: [alwaysTrueRule], ruleActive: [true] };
+  const repeatedTrigger = resolveEntityRules(alreadyActiveEntity, { time: 11 * 60 });
+  run(
+    "triggers : comportement PAS réappliqué tant que la condition reste vraie (pas réarmé en boucle)",
+    undefined,
+    repeatedTrigger.behaviorEffect
+  );
+  const justFlippedEntity = { id: "just-flipped", presence: [alwaysTrueRule], ruleActive: [false] };
+  const reflippedTrigger = resolveEntityRules(justFlippedEntity, { time: 11 * 60 });
+  run(
+    "triggers : comportement réappliqué à la bascule SUIVANTE (faux -> vrai à nouveau)",
+    "wander",
+    reflippedTrigger.behaviorEffect && reflippedTrigger.behaviorEffect.kind
+  );
+
+  // Validation au chargement : un effet "behavior" réutilise EXACTEMENT la
+  // même validation que le champ `behavior` d'une entité (voir
+  // core/level.js/parseBehavior) — un kind inconnu est rejeté clairement,
+  // jamais un crash silencieux plus tard.
+  const TRIGGER_REGISTRY = { dog: { label: "entity.dog" } };
+  let unknownEffectBehaviorRejected = false;
+  try {
+    parseLevel(
+      {
+        id: "movement-check-trigger-invalid",
+        titleKey: "level.demo.title",
+        length: 10,
+        playerStart: 0,
+        entities: [
+          {
+            id: "bad-trigger",
+            type: "dog",
+            x: 5,
+            presence: [{ when: { type: "timeRange", from: 0, to: 24 }, effects: [{ type: "behavior", behavior: { kind: "does-not-exist" } }] }],
+          },
+        ],
+      },
+      TRIGGER_REGISTRY
+    );
+  } catch {
+    unknownEffectBehaviorRejected = true;
+  }
+  run("triggers : kind de comportement inconnu dans un effet -> rejeté au chargement", true, unknownEffectBehaviorRejected);
+
+  // --- Routine complète (habitant, brique 2/2) : jour -> départ -> arrivée
+  // -> dormant -> filet de minuit -> réveil ---
+
+  const ROUTINE_REGISTRY = { dog: { label: "entity.dog" }, wall: { label: "entity.wall", blocksMovement: true } };
+
+  function residentRules(doorId) {
+    return [
+      { when: { type: "arrived" }, effects: [{ type: "presence", present: false }] },
+      { when: { type: "timeRange", from: 0, to: 8 }, effects: [{ type: "presence", present: false }] },
+      {
+        when: { type: "timeRange", from: 8, to: 24 },
+        effects: [
+          { type: "presence", present: true },
+          { type: "behavior", behavior: { kind: "wander", speed: 0.5, turnChance: 0.3 } },
+        ],
+      },
+      {
+        when: { type: "timeRange", from: 20, to: 24 },
+        effects: [{ type: "behavior", behavior: { kind: "goto", targetId: doorId } }],
+      },
+    ];
+  }
+
+  function makeRoutineLevel(overrides = {}) {
+    return {
+      id: "movement-check-routine",
+      titleKey: "level.demo.title",
+      length: 20,
+      playerStart: 0,
+      entities: [
+        { id: "door-1", type: "dog", x: 2 },
+        {
+          id: "resident-1",
+          type: "dog",
+          x: 15,
+          behavior: { kind: "wander", speed: 0.5, turnChance: 0.3 },
+          presence: residentRules("door-1"),
+        },
+      ],
+      ...overrides,
+    };
+  }
+
+  function resident(routineState, id = "resident-1") {
+    return getActiveWorld(routineState).entities.find((e) => e.id === id);
+  }
+
+  const routineLevel = parseLevel(makeRoutineLevel(), ROUTINE_REGISTRY);
+
+  // Jour (INITIAL_TIME = 8h) : présente, comportement "wander" — jamais
+  // "goto" avant 20h.
+  let dayRoutineState = createInitialState(routineLevel, 7, NO_COMPANIONS);
+  for (let i = 0; i < 50; i++) dayRoutineState = reduce(dayRoutineState, tick(0));
+  run("routine : le jour — présente", true, resident(dayRoutineState).present);
+  run("routine : le jour — comportement 'wander'", "wander", resident(dayRoutineState).behavior.kind);
+
+  // Comportement STABLE tant que rien ne bascule : la référence de
+  // `.behavior` ne change PAS d'un tick à l'autre une fois la journée
+  // installée (preuve directe de "pas réarmé en boucle" — si l'effet
+  // réappliquait `.behavior` à chaque tick, wander.js renverrait la
+  // référence PASSÉE en argument, mais l'appel { ...entity, behavior:
+  // resolved.behaviorEffect } produirait un OBJET NEUF à chaque fois).
+  const behaviorRefBefore = resident(dayRoutineState).behavior;
+  const dayRoutineStateNext = reduce(dayRoutineState, tick(0));
+  run(
+    "routine : le jour — comportement JAMAIS réécrit en boucle (référence stable)",
+    true,
+    resident(dayRoutineStateNext).behavior === behaviorRefBefore
+  );
+
+  // 20h : bascule vers "goto" — se dirige vers la porte, reste présente
+  // (elle n'a pas encore atteint la porte).
+  let eveningRoutineState = createInitialState(routineLevel, 7, NO_COMPANIONS);
+  eveningRoutineState = advanceTime(eveningRoutineState, 12 * 60); // 8h -> 20h
+  eveningRoutineState = reduce(eveningRoutineState, tick(0));
+  run("routine : à 20h — comportement bascule vers 'goto'", "goto", resident(eveningRoutineState).behavior.kind);
+  run("routine : à 20h — cible bien 'door-1'", "door-1", resident(eveningRoutineState).behavior.targetId);
+  run("routine : à 20h — encore présente (pas encore arrivée)", true, resident(eveningRoutineState).present);
+
+  // Convergence jusqu'à l'arrivée -> dormante.
+  for (let i = 0; i < 1000; i++) eveningRoutineState = reduce(eveningRoutineState, tick(0));
+  run("routine : arrivée à la porte -> gotoArrived posé", true, resident(eveningRoutineState).gotoArrived);
+  run("routine : arrivée à la porte -> dormante (present:false)", false, resident(eveningRoutineState).present);
+
+  // Filet de minuit : un obstacle empêche TOUTE arrivée — reste présente
+  // (en route) toute la soirée, jusqu'à ce que minuit force la dormance
+  // MALGRÉ l'absence d'arrivée (jamais visiblement "coincée" après minuit).
+  const blockedRoutineLevel = parseLevel(
+    makeRoutineLevel({
+      entities: [
+        { id: "door-1", type: "dog", x: 2 },
+        { id: "wall-routine", type: "wall", x: 10 },
+        {
+          id: "resident-1",
+          type: "dog",
+          x: 15,
+          behavior: { kind: "wander", speed: 0.5, turnChance: 0.3 },
+          presence: residentRules("door-1"),
+        },
+      ],
+    }),
+    ROUTINE_REGISTRY
+  );
+  let blockedRoutineState = createInitialState(blockedRoutineLevel, 7, NO_COMPANIONS);
+  blockedRoutineState = advanceTime(blockedRoutineState, 12 * 60); // -> 20h
+  for (let i = 0; i < 500; i++) blockedRoutineState = reduce(blockedRoutineState, tick(0));
+  run("routine : bloquée par un obstacle — jamais arrivée", undefined, resident(blockedRoutineState).gotoArrived);
+  run("routine : bloquée par un obstacle — reste présente avant minuit", true, resident(blockedRoutineState).present);
+  blockedRoutineState = advanceTime(blockedRoutineState, 4 * 60 - 1); // -> juste avant minuit
+  blockedRoutineState = reduce(blockedRoutineState, tick(0));
+  run("routine : juste avant minuit — encore présente (filet pas encore déclenché)", true, resident(blockedRoutineState).present);
+  blockedRoutineState = advanceTime(blockedRoutineState, 2); // -> minuit passé
+  blockedRoutineState = reduce(blockedRoutineState, tick(0));
+  run("routine : minuit — filet force la dormance MALGRÉ le blocage", false, resident(blockedRoutineState).present);
+  run("routine : minuit — toujours jamais 'arrivée' (juste dormante de force)", undefined, resident(blockedRoutineState).gotoArrived);
+
+  // Cible manquante (porte absente) : même filet, l'INTENTION ("elle rentre
+  // chez elle") reste honorée même sans marche réelle possible — vérifié en
+  // passant RÉELLEMENT par 20h (bascule vers "goto" avec une cible
+  // introuvable, dégradation immobile propre — voir goto.js) puis minuit.
+  const missingDoorRoutineLevel = parseLevel(
+    makeRoutineLevel({
+      entities: [
+        { id: "resident-1", type: "dog", x: 15, behavior: { kind: "wander", speed: 0.5, turnChance: 0.3 }, presence: residentRules("no-such-door") },
+      ],
+    }),
+    ROUTINE_REGISTRY
+  );
+  let missingDoorRoutineState = createInitialState(missingDoorRoutineLevel, 7, NO_COMPANIONS);
+  missingDoorRoutineState = advanceTime(missingDoorRoutineState, 12 * 60); // -> 20h
+  let missingDoorThrew = false;
+  try {
+    for (let i = 0; i < 100; i++) missingDoorRoutineState = reduce(missingDoorRoutineState, tick(0));
+  } catch {
+    missingDoorThrew = true;
+  }
+  run("routine : cible de porte manquante — ne plante jamais", false, missingDoorThrew);
+  run("routine : cible de porte manquante — bascule quand même vers 'goto'", "goto", resident(missingDoorRoutineState).behavior.kind);
+  run("routine : cible de porte manquante — reste immobile (dégradation propre)", 15, resident(missingDoorRoutineState).x);
+  missingDoorRoutineState = advanceTime(missingDoorRoutineState, 4 * 60 + 1); // -> minuit passé
+  missingDoorRoutineState = reduce(missingDoorRoutineState, tick(0));
+  run(
+    "routine : cible de porte manquante — le filet de minuit force quand même la dormance",
+    false,
+    resident(missingDoorRoutineState).present
+  );
+
+  // Réveil (8h le lendemain) : présente à nouveau, comportement 'wander' —
+  // repart pour un nouveau cycle. Note de décalage d'UN TICK (~16 ms,
+  // imperceptible) : "arrived" reste vraie tant que `.behavior.kind` n'a
+  // pas ENCORE été corrigé vers "wander" — au tick où la fenêtre "8h..24h"
+  // bascule, l'effet "behavior" s'applique QUAND MÊME (indépendamment de la
+  // présence, voir resolveEntityRules) et corrige `.behavior`, mais la
+  // PRÉSENCE de CE MÊME tick a déjà été calculée contre l'ancien
+  // `.behavior` (encore "goto") -> encore dormante PENDANT UN TICK, puis
+  // spontanément corrigée au suivant (voir core/presence.js/
+  // evaluateArrived). Documenté ici plutôt que masqué par une boucle large.
+  // Détour par la nuit profonde (1h) AVEC un tick réel avant de sauter à
+  // 8h : nécessaire pour que `ruleActive` enregistre RÉELLEMENT la fenêtre
+  // "8h..24h" comme retombée à faux entre-temps (un saut direct 20h->8h,
+  // sans jamais tic ker entre les deux, ne verrait jamais cette bascule —
+  // artefact du SAUT de advanceTime, pas du jeu réel, qui tique en continu).
+  let morningRoutineState = eveningRoutineState; // déjà arrivée + dormante (soir précédent)
+  morningRoutineState = advanceTime(morningRoutineState, 5 * 60); // 20h -> 1h
+  morningRoutineState = reduce(morningRoutineState, tick(0));
+  morningRoutineState = advanceTime(morningRoutineState, 7 * 60); // 1h -> 8h
+  const morningTick1 = reduce(morningRoutineState, tick(0));
+  run(
+    "routine : réveil (8h), 1er tick — comportement déjà corrigé vers 'wander' (l'effet s'applique même dormante)",
+    "wander",
+    resident(morningTick1).behavior.kind
+  );
+  const morningTick2 = reduce(morningTick1, tick(0));
+  run("routine : réveil (8h), tick suivant — présente à nouveau", true, resident(morningTick2).present);
+  run("routine : réveil (8h), tick suivant — comportement 'wander'", "wander", resident(morningTick2).behavior.kind);
+
+  // --- Miroir demo1/demo2 (même personnage, deux déclarations séparées,
+  // AUCUN état partagé) : jamais présent aux deux, jamais absent aux deux.
+  // Instantanés RÉALISTES (voir entities/model.md) : demo.json place la
+  // porte à ~11 unités de l'habitant (quelques minutes de jeu de marche,
+  // largement sous l'heure de battement avant l'ouverture de la fenêtre
+  // "maison" à 21h) — les instantanés à 21h/23h supposent donc une arrivée
+  // déjà faite, comme en jeu réel.
+
+  const homeRule = { when: { type: "timeRange", from: 21, to: 8 }, effects: [{ type: "presence", present: true }] };
+  const homeInstance = { id: "npc-resident-home", presence: [homeRule] };
+
+  const checkpoints = [
+    { hour: 12, awayBehavior: { kind: "wander" }, awayArrived: undefined, label: "12h (jour)" },
+    { hour: 20, awayBehavior: { kind: "goto" }, awayArrived: undefined, label: "20h (départ tout juste amorcé)" },
+    { hour: 21, awayBehavior: { kind: "goto" }, awayArrived: true, label: "21h (arrivée supposée faite)" },
+    { hour: 23, awayBehavior: { kind: "goto" }, awayArrived: true, label: "23h (nuit avancée)" },
+    { hour: 8, awayBehavior: { kind: "wander" }, awayArrived: true, label: "8h (réveil, comportement déjà repassé à wander)" },
+  ];
+  checkpoints.forEach(({ hour, awayBehavior, awayArrived, label }) => {
+    const awayInstance = { id: "npc-resident", behavior: awayBehavior, gotoArrived: awayArrived, presence: residentRules("door-1") };
+    const context = { time: hour * 60 };
+    const awayPresent = isPresent(awayInstance, context);
+    const homePresent = isPresent(homeInstance, context);
+    run(`miroir demo1/demo2 : ${label} — jamais présent aux deux à la fois`, false, awayPresent && homePresent);
+    run(`miroir demo1/demo2 : ${label} — jamais absent aux deux à la fois`, true, awayPresent || homePresent);
+  });
+
+  // Sérialisabilité : ruleActive (mémoire de bascule des effets "behavior")
+  // survit à un aller-retour JSON, comme tout autre champ d'entité.
+  const serializedResident = JSON.parse(JSON.stringify(resident(eveningRoutineState)));
+  run(
+    "routine : ruleActive survit à un aller-retour JSON",
+    JSON.stringify(resident(eveningRoutineState).ruleActive),
+    JSON.stringify(serializedResident.ruleActive)
+  );
 
   // --- Compagnons : robustesse (brique 3/3) ---
   // addCompanion (core/state.js) : SEUL point d'ajout. Refuse + signale à la

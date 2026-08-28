@@ -23,22 +23,25 @@
 
 import { MOVE_STEP, BODY_RADIUS } from "../state.js";
 import { moveWithinBounds } from "./movement.js";
+import { isBlocking } from "../presence.js";
 
 // Cœur commun : pas fixe + bornes du niveau (moveWithinBounds), PUIS le
-// corps de la première entité blocksMovement rencontrée dans le sens du
-// déplacement, à `clearance` du centre de son corps (si son bord serait
+// corps de la première entité BLOQUANTE rencontrée dans le sens du
+// déplacement (isBlocking : blocksMovement ET présente, voir
+// core/presence.js — une entité DORMANTE ne bloque jamais, "comme si
+// absente"), à `clearance` du centre de son corps (si son bord serait
 // franchi). blockedBy est l'id de cette entité, ou null si rien n'arrête le
 // mouvement. dir === 0 : jamais bloqué (rien n'est tenté). Pure, ne mute
 // rien. Interne, non exportée — voir resolvePlayerMove/resolveBodyMove
 // ci-dessous pour les deux dégagements concrets.
-function resolveBlockedMove(moverX, dir, entities, levelLength, clearance) {
+function resolveBlockedMove(moverX, dir, entities, levelLength, clearance, presenceContext) {
   const intendedX = moveWithinBounds(moverX, dir * MOVE_STEP, levelLength);
   if (dir === 0) return { x: intendedX, blockedBy: null };
 
   let stoppedX = intendedX;
   let blockedBy = null;
   for (const entity of entities) {
-    if (!entity.blocksMovement) continue;
+    if (!isBlocking(entity, presenceContext)) continue;
     const edge = entity.x - dir * clearance; // bord du corps côté approche
     const crosses = dir === 1 ? moverX <= edge && intendedX > edge : moverX >= edge && intendedX < edge;
     if (!crosses) continue;
@@ -53,9 +56,11 @@ function resolveBlockedMove(moverX, dir, entities, levelLength, clearance) {
 
 // Résout le déplacement VOULU du joueur pour ce tick : le joueur est un
 // POINT (dégagement d'un seul BODY_RADIUS face à un corps bloquant), voir
-// header et overlap.js §1 pour la convention miroir.
-export function resolvePlayerMove(playerX, dir, entities, levelLength) {
-  return resolveBlockedMove(playerX, dir, entities, levelLength, BODY_RADIUS);
+// header et overlap.js §1 pour la convention miroir. presenceContext : voir
+// core/presence.js/isBlocking — requis dès qu'une entité de `entities` peut
+// porter une règle de présence (toujours fourni par core/reduce.js).
+export function resolvePlayerMove(playerX, dir, entities, levelLength, presenceContext) {
+  return resolveBlockedMove(playerX, dir, entities, levelLength, BODY_RADIUS, presenceContext);
 }
 
 // Résout le déplacement VOULU d'une entité à CORPS mue par intention (ex.
@@ -64,6 +69,6 @@ export function resolvePlayerMove(playerX, dir, entities, levelLength) {
 // pleins qui ne doivent pas se chevaucher). Le mobile s'arrête pile où
 // resolveOverlaps le laisserait de toute façon au tick suivant : aucune
 // poussée résiduelle du bloqueur, voir header.
-export function resolveBodyMove(entityX, dir, entities, levelLength) {
-  return resolveBlockedMove(entityX, dir, entities, levelLength, 2 * BODY_RADIUS);
+export function resolveBodyMove(entityX, dir, entities, levelLength, presenceContext) {
+  return resolveBlockedMove(entityX, dir, entities, levelLength, 2 * BODY_RADIUS, presenceContext);
 }

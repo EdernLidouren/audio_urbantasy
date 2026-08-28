@@ -180,4 +180,11 @@ export const TUNING_DEFAULTS = {
   // Facteur propre du vocal (multiplicatif, 1 = neutre) — même principe que
   // beaconGain/movementGain, pour le rôle "vocal".
   vocalGain: 1,
+
+  // Facteurs propres des sons de TRANSITION (voir core/presence.js,
+  // entities/model.md) — même principe que beaconGain/vocalGain/
+  // movementGain, un par rôle : enterSound (bascule dormant->présent),
+  // exitSound (présent->dormant).
+  enterSoundGain: 1,
+  exitSoundGain: 1,
 };

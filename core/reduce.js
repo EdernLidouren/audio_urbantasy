@@ -41,6 +41,7 @@
 import BEHAVIORS from "./behaviors/index.js";
 import { resolvePlayerMove, resolveBodyMove } from "./physics/collision.js";
 import { resolveOverlaps } from "./physics/overlap.js";
+import { resolveEntityRules } from "./presence.js";
 
 // Résout la position d'une CIBLE par id — "player" (convention reconnue
 // ici, voir follow.js/DEFAULTS.targetId) pour le joueur, sinon une entité
@@ -64,21 +65,58 @@ function resolveTargetPosition(state, world, targetId) {
 }
 
 // Fait avancer une liste d'entités d'un tick (phase 1, comportement) contre
-// UN contexte donné (length/rngState/getTargetPosition — voir
-// resolveTargetPosition) : les entités du lieu et les compagnons de la
-// partie suivent exactement la même logique, seuls le flux de PRNG et la
-// liste diffèrent (voir l'appel des deux dans le TICK ci-dessous). Renvoie
-// les résultats PAIRÉS {entity, intent} (intent : undefined si le module
-// n'en produit pas, voir wander.js/follow.js) ET l'état du flux après tous
-// les tirages, pour que l'appelant le reporte au tick suivant.
+// UN contexte donné (length/rngState/getTargetPosition/presenceContext) :
+// les entités du lieu et les compagnons de la partie suivent exactement la
+// même logique, seuls le flux de PRNG et la liste diffèrent (voir l'appel
+// des deux dans le TICK ci-dessous). Renvoie les résultats PAIRÉS
+// {entity, intent} (intent : undefined si le module n'en produit pas, voir
+// wander.js/follow.js) ET l'état du flux après tous les tirages, pour que
+// l'appelant le reporte au tick suivant.
+//
+// Règles déclaratives (voir core/presence.js/resolveEntityRules) résolues
+// ICI, avant tout comportement — présence : premier des trois plans coupés
+// par le drapeau DORMANT (voir entities/model.md/core/time.md pour les
+// deux autres, côté vue : rendu audio, occupation/interaction ; le
+// troisième plan CORE, le blocage, est traité séparément par isBlocking,
+// voir plus bas dans TICK). DORMANTE -> aucun appel au module de
+// comportement (ni mouvement, ni tirage PRNG consommé) : rngState traverse
+// intact pour cette entité, déterminisme préservé pour les entités
+// RESTÉES actives, quel que soit l'état de présence des autres. Les
+// champs `present`/`presenceChanged`/`ruleActive` ne sont ajoutés à
+// l'entité QUE si elle porte une règle `presence` (jamais sur une entité
+// qui n'en a pas — comportement d'avant ce système strictement inchangé,
+// voir core/movement.check.js/audit de sérialisabilité).
+//
+// presenceChanged ("entered" | "exited" | null) : la BASCULE de présence
+// OBSERVÉE, exposée pour la vue (sons de transition, voir
+// view/audio/city-scene.js) — voir resolveEntityRules pour le détail
+// (jamais de bascule fantôme au montage).
+//
+// Effet "behavior" (voir resolveEntityRules) : s'il vient de basculer ce
+// tick, remplace le comportement ACTIF de l'entité AVANT que son propre
+// step() ne s'exécute — la bascule prend effet IMMÉDIATEMENT, pas au tick
+// suivant (un goto qui vient d'être posé commence à se diriger vers sa
+// cible dès ce même tick). L'effet ne fait QUE poser le comportement ;
+// c'est ensuite le pipeline normal ci-dessous (module.step) qui l'exécute
+// — jamais l'effet lui-même qui déplace l'entité.
 function stepEntities(entities, context) {
   let rngState = context.rngState;
   const results = entities.map((entity) => {
-    const module = entity.behavior && BEHAVIORS[entity.behavior.kind];
-    if (!module) return { entity, intent: undefined };
-    const stepped = module.step(entity, { ...context, rngState });
+    const resolved = resolveEntityRules(entity, context.presenceContext);
+    const { present, presenceChanged, ruleActive, behaviorEffect } = resolved;
+    const effectiveEntity = behaviorEffect ? { ...entity, behavior: behaviorEffect } : entity;
+    const withPresence = (e) =>
+      entity.presence ? { ...e, present, presenceChanged, ruleActive } : e;
+
+    if (!present) {
+      return { entity: withPresence(effectiveEntity), intent: undefined };
+    }
+
+    const module = effectiveEntity.behavior && BEHAVIORS[effectiveEntity.behavior.kind];
+    if (!module) return { entity: withPresence(effectiveEntity), intent: undefined };
+    const stepped = module.step(effectiveEntity, { ...context, rngState });
     rngState = stepped.rngState;
-    return { entity: stepped.entity, intent: stepped.intent };
+    return { entity: withPresence(stepped.entity), intent: stepped.intent };
   });
   return { results, rngState };
 }
@@ -92,11 +130,11 @@ function stepEntities(entities, context) {
 // toutes listes confondues) exclut l'entité elle-même à chaque résolution,
 // jamais de collision contre son propre corps. Une entité SANS intention
 // (wander, déjà résolue) traverse inchangée.
-function resolveIntents(results, blockerPool, length) {
+function resolveIntents(results, blockerPool, length, presenceContext) {
   return results.map(({ entity, intent }) => {
     if (intent === undefined) return entity;
     const blockers = blockerPool.filter((other) => other.id !== entity.id);
-    const { x: resolvedX } = resolveBodyMove(entity.x, intent, blockers, length);
+    const { x: resolvedX } = resolveBodyMove(entity.x, intent, blockers, length, presenceContext);
     return { ...entity, x: resolvedX };
   });
 }
@@ -117,11 +155,23 @@ export function reduce(state, action) {
       // il ne dépend que de l'état PRÉ-tick (voir resolveTargetPosition),
       // jamais de la liste en cours de traitement.
       const getTargetPosition = (targetId) => resolveTargetPosition(state, world, targetId);
-      const worldStep = stepEntities(world.entities, { length: world.length, rngState: world.rngState, getTargetPosition });
+      // Présence : dérivée UNIQUEMENT de state.time (constant pour tout ce
+      // tick, voir core/presence.js) — un seul objet construit ici, partagé
+      // par la phase 1 (stepEntities) ET la phase 2 (isBlocking, via
+      // resolvePlayerMove/resolveBodyMove/resolveOverlaps ci-dessous),
+      // jamais recréé par appel.
+      const presenceContext = { time: state.time };
+      const worldStep = stepEntities(world.entities, {
+        length: world.length,
+        rngState: world.rngState,
+        getTargetPosition,
+        presenceContext,
+      });
       const companionsStep = stepEntities(state.companions, {
         length: world.length,
         rngState: state.companionsRngState,
         getTargetPosition,
+        presenceContext,
       });
 
       // --- Phase 2 : physique ---
@@ -131,23 +181,34 @@ export function reduce(state, action) {
       // compris) — jamais persistées fusionnées, voir le découpage juste
       // après. "Avant" (entities du lieu ET compagnons, PRE-comportement)
       // pour le joueur, exactement comme avant l'introduction des
-      // compagnons (comportement inchangé).
+      // compagnons (comportement inchangé). Une entité DORMANTE ne bloque
+      // jamais (voir core/presence.js/isBlocking, lu par
+      // resolvePlayerMove/resolveBodyMove/resolveOverlaps à la place d'un
+      // simple entity.blocksMovement) — présence recalculée fraîche depuis
+      // ces entités PRÉ-tick plutôt que relue sur un éventuel `.present`
+      // déjà posé, voir le commentaire d'isBlocking.
       const combinedBefore = [...world.entities, ...state.companions];
-      const { x: nextX, blockedBy } = resolvePlayerMove(state.player.x, action.dir, combinedBefore, world.length);
+      const { x: nextX, blockedBy } = resolvePlayerMove(
+        state.player.x,
+        action.dir,
+        combinedBefore,
+        world.length,
+        presenceContext
+      );
 
       // Intentions (ex. follow) résolues contre les corps POST-phase 1,
       // toutes listes confondues (voir resolveIntents) — avant la passe de
       // chevauchement, qui referme ensuite tout résidu comme toujours.
       const stepped = [...worldStep.results.map((r) => r.entity), ...companionsStep.results.map((r) => r.entity)];
-      const resolvedWorldEntities = resolveIntents(worldStep.results, stepped, world.length);
-      const resolvedCompanions = resolveIntents(companionsStep.results, stepped, world.length);
+      const resolvedWorldEntities = resolveIntents(worldStep.results, stepped, world.length, presenceContext);
+      const resolvedCompanions = resolveIntents(companionsStep.results, stepped, world.length, presenceContext);
 
       // Passe curative finale : sépare tout chevauchement de corps résiduel
       // (impossible en théorie vu ce qui précède, mais le level design peut
       // en produire un au chargement, ou un mobile peut finir exactement
       // sur le joueur/une autre entité) — voir resolveOverlaps.
       const combinedAfter = [...resolvedWorldEntities, ...resolvedCompanions];
-      const overlapFix = resolveOverlaps(nextX, combinedAfter, world.length);
+      const overlapFix = resolveOverlaps(nextX, combinedAfter, world.length, presenceContext);
 
       // Découpage : resolveOverlaps préserve l'ordre et la longueur de son
       // entrée (map/slice, jamais un ajout/retrait) — le premier bloc de

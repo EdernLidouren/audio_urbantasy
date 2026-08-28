@@ -88,6 +88,7 @@ bascule en cours de jeu (`view/audio/city-scene.js`). Détail complet :
 | `target`  | string | **requis** si `type === "door"` : id d'un niveau du registre (`level/index.js`) — l'action "activate" sur la porte y transitionne (voir `view/interaction.js`, `view/city-screen.js`) |
 | `nameKey` | string | optionnel (npc/object) : clé i18n spécifique à l'instance          |
 | `descriptionKey` | string | optionnel : clé i18n de description spécifique à l'instance, utilisée par l'interaction "describe" (touche Espace) |
+| `presence` | `PresenceRule[]` | optionnel : règles DÉCLARATIVES de présence conditionnelle, cascade instance -> type (voir "Présence conditionnelle" plus bas et `entities/model.md`). Sans règle (ni à l'instance ni au type) : toujours présente. |
 
 `parseLevel` normalise chaque entité en ajoutant `labelKey` et
 `descriptionKey` : `entity.nameKey` si présent sinon `registry[type].label`
@@ -96,6 +97,34 @@ pour le premier ; `entity.descriptionKey` (du JSON) si présent sinon
 `decor`). Les champs bruts du JSON source une fois résolus (`nameKey`,
 `descriptionKey`) ne sont pas reportés tels quels dans l'entité normalisée —
 seuls `labelKey` et `descriptionKey` (résolus) sont exposés.
+
+## Présence conditionnelle et triggers de comportement
+
+Une `PresenceRule` : `{ when: <condition>, effects: [<effet>...] }`, ou en
+RACCOURCI rétrocompatible `{ when: <condition>, present: boolean }` (sans
+`effects`), normalisé par `parseLevel` en `{ when, effects: [{ type:
+"presence", present }] }` — tout consommateur d'une entité PARSÉE ne voit
+plus que la forme canonique. `when.type` doit exister dans le registre de
+conditions (`core/presence.js`, `CONDITION_EVALUATORS`) — **échec clair si
+inconnu**, comme un type d'entité. Les champs PROPRES à un type de condition
+(ex. `from`/`to` de `"timeRange"`) ne sont PAS validés par `parseLevel` :
+ajouter un nouveau type de condition ne doit jamais obliger à revenir ici.
+Voir `entities/model.md`/"Présence conditionnelle et triggers de
+comportement" pour la sémantique complète (priorité entre règles, les trois
+plans coupés par l'état dormant, la garde anti-boucle des effets
+`"behavior"`).
+
+| `when.type` | Champs        | Vrai si...                                                  |
+|-------------|---------------|--------------------------------------------------------------|
+| `timeRange` | `from`, `to` (heures 0-23) | l'heure courante (dérivée de `session.time`, voir `core/time.js`) tombe dans `[from, to[`, en gérant le passage par minuit (`from > to`, ex. `20..6`) |
+| `arrived`   | (aucun)       | le comportement actif de l'entité est encore `"goto"` ET a atteint sa cible (`entity.gotoArrived`) |
+
+Un `Effect` : `{ type: "presence", present: boolean }` ou `{ type:
+"behavior", behavior: <objet behavior, même forme que le champ `behavior`
+d'une entité, voir plus bas> }` — un `kind` de comportement inconnu dans un
+effet `"behavior"` est rejeté au chargement, exactement comme un `behavior`
+d'entité invalide. Un effet `"behavior"` ne s'applique qu'à la BASCULE de sa
+règle (faux -> vrai), jamais en continu — voir `entities/model.md`.
 
 ## Registre de types (`entities/types/index.js`)
 

@@ -17,13 +17,210 @@ Une entité (registre `entities/types/index.js`, un fichier par archétype dans
 | Type                    | `type` (instance), `label` (registre, clé i18n)                    | quoi et comment l'annoncer |
 | Sons par rôle            | `sounds: { <rôle>: descripteur }`                                  | voir "Vocabulaire de sons" ci-dessous |
 | Portée spatiale           | `audibleRange`, `panSaturation`, `interactRange`, `cutoffMin`, `cutoffMax` | où/comment une entité est perçue dans l'espace — voir "Ce qui n'est PAS un paramètre sonore" |
-| Paramètres sonores        | `reverbSend`, `beaconMode`, `beaconInterval`, `beaconIntervalVariation`, `beaconGain`, `vocalInterval`, `vocalIntervalVariation`, `vocalGain`, `pitchVariation`, `movementStepMultiplier`, `movementGain` | voir "Paramètres sonores" ci-dessous, surchargeables à l'instance via `tuning` (voir "Le palier INSTANCE") |
+| Paramètres sonores        | `reverbSend`, `beaconMode`, `beaconInterval`, `beaconIntervalVariation`, `beaconGain`, `vocalInterval`, `vocalIntervalVariation`, `vocalGain`, `pitchVariation`, `movementStepMultiplier`, `movementGain`, `enterSoundGain`, `exitSoundGain` | voir "Paramètres sonores" ci-dessous, surchargeables à l'instance via `tuning` (voir "Le palier INSTANCE") |
 | Drapeaux                 | `blocksMovement`, `enterable`                                      | prévus pour le core (collision, entrée), non câblés à ce jour |
+| Présence conditionnelle  | `presence` (cascade instance -> type, comme `blocksMovement`)      | voir "Présence conditionnelle" plus bas |
 
 Aucun de ces champs n'est obligatoire, pas même `sounds.beacon` (voir
 "Beacon vs vocal" ci-dessous — une entité peut n'avoir aucun son positionné,
 un seul rôle, ou les deux) : tout ce qui manque retombe sur le défaut global
 (`config/tuning-values.js`).
+
+## Présence conditionnelle et triggers de comportement
+
+`presence` (optionnel, `core/presence.js`) : une liste de RÈGLES
+`{ when: <condition>, effects: [<effet>...] }`, évaluées DANS L'ORDRE
+chaque tick. Sans ce champ, une entité reste TOUJOURS présente (comportement
+d'avant ce système, inchangé). RACCOURCI rétrocompatible : `{ when, present:
+boolean }` sans `effects`, sucre pour `{ when, effects: [{ type: "presence",
+present }] }` — voir `entities/types/neon.js` (une seule règle `{ when: {
+type: "timeRange", from, to }, present: true }` suffit : le reste de la
+journée n'étant simplement couvert par aucune règle).
+
+### Présence : la valeur résolue
+
+Parmi les règles dont `when` est vrai, la PREMIÈRE qui porte un effet
+`"presence"` fixe la présence de l'entité pour ce tick (les règles qui
+matchent mais n'en portent pas — ex. une règle purement comportementale —
+sont ignorées pour CETTE décision, la recherche continue). Aucune règle
+couvrante -> DORMANTE par défaut (une entité n'est "montrée" que par une
+règle qui la couvre explicitement).
+
+Dormante = un seul drapeau qui coupe TROIS plans d'un coup, "comme si
+absente" mais réversible :
+- **Comportement** — aucun tick de mouvement, aucun tirage PRNG consommé
+  (`core/reduce.js`) ;
+- **Rendu audio** — aucune voix maintenue/déclenchée (`view/audio/
+  city-scene.js`) ; une balise CONTINUE en cours voit sa voix arrêtée
+  proprement à la TRANSITION (jamais en continu), redémarrée si l'entité
+  redevient présente — voir aussi "Sons de transition" plus bas ;
+- **Interaction** — exclue de l'occupation et de la résolution de cible
+  (`view/interaction.js` via `city-scene.js`/`occupiedEntities`), et ne
+  bloque jamais le déplacement (`core/presence.js`/`isBlocking`, lu par
+  `core/physics/collision.js` et `core/physics/overlap.js` à la place d'un
+  simple `blocksMovement`).
+
+La bascule ELLE-MÊME (présence/dormance) est SÈCHE (immédiate, pas de
+trajet ni de fondu — raffinement futur possible, même esprit que le fondu
+croisé musique jour/nuit) ; le SON qui l'accompagne, lui, existe déjà — voir
+"Sons de transition" plus bas.
+
+### Extensibilité : conditions (registre) vs effets (aiguillage explicite)
+
+`when.type` est un AIGUILLAGE tenu par `core/presence.js`/
+`CONDITION_EVALUATORS` : `"timeRange"` (dérivé de l'horloge, voir
+`core/time.js`) et `"arrived"` (dérivé d'un FAIT de simulation — voir
+"Triggers de comportement" plus bas) cohabitent, tous deux réduits à
+"condition + contexte -> booléen". Ajouter `"season"`/`"weather"`/
+`"questFlag"` demain se fait en ajoutant une entrée à ce registre, jamais en
+touchant `isPresent`, `resolveEntityRules`, `core/reduce.js`, ni la vue.
+`core/level.js` valide `when.type` au chargement contre ce même registre
+(échec clair sur un type inconnu), mais jamais les champs PROPRES à un type
+(ex. `from`/`to` de `"timeRange"`) — ça reste à la charge de l'évaluateur
+correspondant.
+
+Les types d'EFFET (`"presence"`, `"behavior"`) suivent un AIGUILLAGE
+explicite plutôt qu'un registre uniforme comme les conditions : chaque type
+d'effet a une validation et une application propres à sa nature (une chaîne
+booléenne idempotente pour `"presence"` ; une sous-validation complète de
+comportement, réutilisant `parseBehavior`, plus une garde anti-boucle pour
+`"behavior"`, voir plus bas) — un simple registre de noms ne suffirait pas à
+couvrir cette hétérogénéité. Ajouter un effet demain (ex. `"sound"`) = un cas
+de plus dans `core/level.js`/`parseEffect` ET dans `core/presence.js`/
+`resolveEntityRules`, même esprit d'extensibilité que les conditions, juste
+pas la même mécanique.
+
+Réservé, non requis par ce système (même principe, pas câblé) : une
+DESCRIPTION conditionnelle (ex. `descriptionKey` différente selon la phase)
+pourrait s'ajouter plus tard via un effet dédié, symétrique à `"presence"`.
+
+### Triggers de comportement
+
+L'effet `"behavior"` (`{ type: "behavior", behavior: <objet behavior, même
+forme que le champ `behavior` d'une entité> }`) REMPLACE le comportement
+ACTIF de l'entité dès que la condition de SA règle vient de basculer de faux
+à vrai. L'effet POSE seulement le comportement — c'est ensuite le pipeline
+normal (`core/reduce.js`/`stepEntities`, `module.step()`) qui l'EXÉCUTE au
+même tick ; l'effet lui-même ne déplace jamais l'entité.
+
+**Application SEULEMENT sur la bascule, jamais en continu** : contrairement
+à `"presence"` (un booléen trivialement idempotent, réévalué frais à chaque
+tick sans mémoire), poser un comportement à CHAQUE tick tant que sa
+condition reste vraie serait au mieux inutile, au pire cassant pour un futur
+comportement à état propre — voir `core/presence.js`/`resolveEntityRules`
+pour le mécanisme de mémoire (`entity.ruleActive`, un booléen par règle,
+indexé par position — les règles d'une entité sont figées au chargement,
+jamais réordonnées en cours de partie). **Nuance sur le TOUT PREMIER
+calcul** (à ne pas confondre avec `presenceChanged` ci-dessous) : un effet
+`"behavior"` s'applique DÈS le premier calcul si sa condition y est déjà
+vraie (une scène ouverte à 22h en pleine fenêtre "rentre chez soi" bascule
+donc IMMÉDIATEMENT vers ce comportement, jamais coincée sur le comportement
+DÉCLARÉ jusqu'à la bascule suivante) — rien ici à protéger d'un signal
+audible fantôme, contrairement à `presenceChanged`.
+
+**Priorité entre règles** : la présence suit l'ordre du tableau (la
+première règle avec un effet `"presence"` dont `when` est vrai décide, voir
+plus haut). Les effets `"behavior"`, eux, ne se disputent pas un rang : ils
+s'appliquent chacun indépendamment sur LEUR PROPRE bascule ; un contenu bien
+conçu n'a qu'une seule condition de comportement vraie à un instant donné
+(voir l'habitant ci-dessous), mais si plusieurs se chevauchaient, la
+DERNIÈRE de la liste l'emporterait simplement (dernière affectation, jamais
+un crash).
+
+**Condition `"arrived"`** (`{ type: "arrived" }`, sans champ propre) : vraie
+seulement si le comportement ACTIF de l'entité est ENCORE `"goto"` ET que ce
+goto a atteint sa cible (`entity.gotoArrived`, posé par `core/behaviors/
+goto.js`, jamais remis à faux). Liée au comportement ACTIF plutôt qu'au seul
+drapeau : `gotoArrived` reste posé pour toujours une fois atteint, donc sans
+cette garde une entité redeviendrait faussement "arrivée" pour toujours
+après son tout premier trajet, même une fois son comportement remplacé par
+autre chose. Événementielle par nature (contrairement à `"timeRange"`,
+purement temporelle) — les deux cohabitent dans le même registre sans
+qu'aucun code appelant n'ait à distinguer leur nature.
+
+**Limite connue** (voir le commentaire dédié dans `core/presence.js`) : la
+garde ci-dessus se corrige d'elle-même dès le tick SUIVANT une vraie
+observation de la bascule, mais si aucun tick n'a lieu pendant tout un
+créneau où une règle de comportement serait repassée à faux (onglet mis en
+arrière-plan assez longtemps — l'horloge de partie n'est PAS plafonnée, voir
+`lib/loop.js`/`onFrame`, contrairement aux ticks de mouvement — ou un monde
+resté inactif le temps qu'une fenêtre se referme puis se rouvre ailleurs),
+la bascule manquée reste "collée" jusqu'à la PROCHAINE bascule réelle de
+cette même règle. Accepté tel quel pour l'instant (hors de portée d'un
+plafonnement de l'horloge ou d'un rattrapage multi-monde, ni l'un ni
+l'autre demandé).
+
+**Exemple de référence — l'habitant** (`npc-resident` dans `level/demo.json`,
+`npc-resident-home` dans `level/demo2.json`) : présent et erre le jour ;
+à 20h, part vers la porte (`"behavior"` -> `goto`) tout en restant présent
+(en chemin) ; à l'arrivée (`"arrived"`), devient dormant ; FILET DE SECOURS
+à minuit (`"timeRange"` de 0h à 8h) — dormant QUAND MÊME, qu'il soit arrivé
+ou non (cible manquante, obstacle, trop lent : l'INTENTION "il rentre chez
+lui" reste honorée même sans marche réelle possible, jamais visiblement
+coincé après minuit) ; au matin (8h), présent + `"behavior"` -> `wander` de
+nouveau (nouveau cycle). Voir `core/movement.check.js`, section "Routine
+complète", pour la vérification tick par tick, y compris le cas obstrué et
+le cas de cible manquante.
+
+**Le même personnage, deux scènes — DEUX déclarations séparées, sans état
+partagé** : `npc-resident` (demo1, présent le jour) et `npc-resident-home`
+(demo2, présent la nuit, présence simple sans `"behavior"` — un `goto`
+depuis la porte d'entrée n'a pas été jugé nécessaire ici, cf. `core/
+behaviors/goto.js`) sont deux entités INDÉPENDANTES : un NPC appartient à
+UNE scène (contrairement à un compagnon, voir `core/state.js`), la porte
+qu'il rejoint n'est que de la couleur narrative ("il rentre chez lui, de
+l'autre côté") — jamais une vraie transition d'entité entre scènes, jamais
+besoin de synchroniser les deux mondes. Complémentarité (jamais présent aux
+deux, jamais absent aux deux) obtenue en PRATIQUE par le CHOIX des horaires
+(demo2 démarre à 21h, pas 20h — une heure de battement, largement au-dessus
+de la poignée de minutes que prend la marche dans `level/demo.json`), PAS
+par une garantie structurelle : sans état partagé, rien n'empêche
+STRUCTURELLEMENT une entité lente/obstruée de rester visible au-delà de
+21h en même temps que son double nocturne apparaît déjà — un état de
+personnage PARTAGÉ (variables d'instance lues au chargement des deux scènes,
+ex. "est-il déjà rentré ?") permettrait une synchronisation stricte plus
+tard, SANS refonte : ce système de règles n'a pas à changer, seul le
+CONTEXTE qu'on lui passe grossirait (comme `{ time }` -> `{ time, weather }`
+plus haut). Délibérément DIFFÉRÉ, pas un oubli — aucun consommateur n'en a
+besoin aujourd'hui.
+
+### Bascule observée : `presenceChanged`
+
+`core/reduce.js`/`stepEntities` compare, à chaque tick, la présence
+FRAÎCHEMENT calculée à `entity.present` (la valeur du tick PRÉCÉDENT, portée
+par l'entité elle-même) et expose le résultat sur l'entité :
+`presenceChanged: "entered" | "exited" | null`. Formulation volontairement
+GÉNÉRIQUE ("la condition vient de basculer"), pas liée au rouage de dormance
+lui-même — pensée pour une future généralisation en événements, au-delà du
+seul couple présent/dormant.
+
+**Jamais de bascule fantôme au montage** : `entity.present` vaut `undefined`
+tant qu'aucun tick n'a encore calculé la présence de cette entité (monde tout
+juste créé, ou qui redevient actif après avoir été rangé sans jamais avoir
+tické) — ce cas ne compte JAMAIS comme une bascule, quelle que soit la
+valeur de départ (présente ou dormante). Entrer dans une scène de nuit avec
+un néon déjà présent n'y déclenche donc aucun son : il est "allumé depuis
+longtemps", pas en train de s'allumer.
+
+### Sons de transition
+
+`sounds.enterSound` / `sounds.exitSound` (optionnels, indépendants l'un de
+l'autre ET du beacon) : rôles PONCTUELS et POSITIONNÉS (position de
+l'entité), joués UNE FOIS sur une bascule `presenceChanged` OBSERVÉE —
+`enterSound` sur `"entered"`, `exitSound` sur `"exited"`. Distincts du
+beacon (son D'ÉTAT, maintenu tant que présente) : ce sont des sons
+D'ÉVÉNEMENT, qui ne bouclent jamais. Même cascade de gain que les autres
+rôles (`enterSoundGain`/`exitSoundGain`, `reverbSend`, `pitchVariation` —
+voir "Paramètres sonores" plus bas) et même catégorie de préférence volume
+que le beacon ("Volume des balises" — ces sons accompagnent la présence
+d'une entité comme le beacon lui-même).
+
+Ordre à la bascule (`view/audio/city-scene.js`/`applyEntityAudio`) :
+`exitSound` joué AVANT l'arrêt du beacon (Howl entièrement séparé — l'arrêt
+du beacon ne coupe jamais le one-shot en cours) ; `enterSound` joué AVANT la
+reprise du beacon. Ni l'un ni l'autre n'est soumis à la pause sélective des
+balises (`sound.pause`/`resume`, réservée à la voix CONTINUE) : un one-shot
+Howler joue jusqu'au bout une fois lancé.
 
 ## Vocabulaire de sons
 
@@ -158,6 +355,10 @@ code. Consulter directement ce fichier pour la valeur courante d'un défaut.
   le fichier) plutôt qu'empiler un gros `movementGain`, réservé aux écarts
   mineurs. Un réglage de CONTENU (propre à l'archétype ou à l'instance), pas
   un curseur de mixage utilisateur.
+- **`enterSoundGain`** / **`exitSoundGain`** — même principe que
+  `beaconGain`/`vocalGain`, mais pour les rôles PONCTUELS `enterSound`/
+  `exitSound` (voir "Sons de transition" plus haut) — un rôle de son, un
+  gain qui lui est propre, indépendant de celui du beacon.
 
 ### Déterminisme et rendu audio
 

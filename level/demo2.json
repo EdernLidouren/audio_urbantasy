@@ -8,7 +8,13 @@
   "reverbDecay": 12,
   "entities": [
     { "id": "door-back", "type": "door", "x": 2, "nameKey": "door.back", "target": "demo", "descriptionKey": "door.back.description" },
-    { "id": "npc-guard", "type": "npc", "x": 6, "nameKey": "npc.guard", "descriptionKey": "npc.guard.description" },
-    { "id": "npc-merchant", "type": "npc", "x": 10, "nameKey": "npc.merchant", "descriptionKey": "npc.merchant.description" }
+    {
+      "id": "npc-resident-home",
+      "type": "npc",
+      "x": 4,
+      "nameKey": "npc.resident",
+      "descriptionKey": "npc.resident.description",
+      "presence": [{ "when": { "type": "timeRange", "from": 9, "to": 10 }, "effects": [{ "type": "presence", "present": true }] }]
+    }
   ]
 }
