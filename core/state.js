@@ -120,16 +120,13 @@ export function addCompanion(companions, companion) {
 }
 
 // Construit l'état d'un monde à partir d'un niveau déjà validé (sortie de
-// parseLevel) : entités à leur position de départ (dir initiale pour les
-// entités "wander", seule pièce d'état mobile qui n'existe pas encore sur
-// l'entité telle que produite par parseLevel), PRNG propre au monde, et
-// lastVisited à 0 (jamais encore rangé).
+// parseLevel) : entités telles quelles (plus de seed dédiée pour "wander"
+// depuis son passage en machine à deux états — il initialise seul son
+// propre état au premier tick, voir core/behaviors/wander.js), PRNG propre
+// au monde, et lastVisited à 0 (jamais encore rangé).
 function createWorldState(level, seed) {
   return {
     ...level,
-    entities: level.entities.map((entity) =>
-      entity.behavior?.kind === "wander" ? { ...entity, dir: 1 } : entity
-    ),
     rngState: createSeed(seed),
     lastVisited: 0,
   };

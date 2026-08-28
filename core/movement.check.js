@@ -25,6 +25,7 @@ import {
 } from "./time.js";
 import { TIME_CONFIG } from "../config/time-values.js";
 import { evaluateCondition, isPresent, isBlocking, resolveEntityRules } from "./presence.js";
+import { DEFAULTS as WANDER_DEFAULTS } from "./behaviors/wander.js";
 
 // { companions: [] } : passé explicitement à CHAQUE createInitialState()
 // ci-dessous qui ne concerne pas les compagnons — sans lui, le défaut (UN
@@ -85,9 +86,17 @@ export function runMovementChecks() {
   const after = reduce(before, { type: "UNKNOWN" });
   run("action inconnue renvoie la même référence", before, after);
 
-  // --- Errance (behavior wander) : PRNG seedé, déterminisme ---
+  // --- Errance (behavior wander) : machine à deux états (marche/pause),
+  // PRNG seedé, déterminisme ---
+  // Depuis ce refacto, wander ne se borne plus lui-même (voir behaviors/
+  // wander.js) : il produit une intention (-1/0/+1, 0 en pause), résolue
+  // comme tout autre mobile à intention par resolveBodyMove
+  // (core/physics/collision.js) — bornes ET obstacles gérés par la MÊME
+  // physique inchangée, plus aucun test de borne propre à wander ici (voir
+  // toujours la section "Rebond aux bornes" plus bas pour moveAndBounce,
+  // désormais un utilitaire générique sans appelant en production).
 
-  const WANDER_REGISTRY = { dog: { label: "entity.dog" } };
+  const WANDER_REGISTRY = { dog: { label: "entity.dog" }, wall: { label: "entity.wall", blocksMovement: true } };
 
   function makeWanderLevel(overrides = {}) {
     return {
@@ -95,54 +104,197 @@ export function runMovementChecks() {
       titleKey: "level.demo.title",
       length: 10,
       playerStart: 5,
-      entities: [
-        { id: "wander-1", type: "dog", x: 5, behavior: { kind: "wander", speed: 0.5, turnChance: 0.3 } },
-      ],
+      entities: [{ id: "wander-1", type: "dog", x: 5, behavior: { kind: "wander" } }],
       ...overrides,
     };
   }
 
   function runTicks(startState, count) {
     const positions = [];
+    const phases = [];
     let current = startState;
     for (let i = 0; i < count; i++) {
       current = reduce(current, tick(0));
-      positions.push(getActiveWorld(current).entities[0].x);
+      const entity = getActiveWorld(current).entities[0];
+      positions.push(entity.x);
+      phases.push(entity.wander.phase);
     }
-    return { state: current, positions };
+    return { state: current, positions, phases };
   }
 
   const wanderLevel = parseLevel(makeWanderLevel(), WANDER_REGISTRY);
 
-  // Même seed, même suite de ticks -> trajectoire identique à chaque tick,
-  // pas seulement au final.
-  const run1 = runTicks(createInitialState(wanderLevel, 42, NO_COMPANIONS), 50);
-  const run2 = runTicks(createInitialState(wanderLevel, 42, NO_COMPANIONS), 50);
-  run(
-    "errance : trajectoire reproductible (même seed)",
-    JSON.stringify(run1.positions),
-    JSON.stringify(run2.positions)
-  );
+  // Même seed, même suite de ticks -> trajectoire ET séquence de phases
+  // identiques, pas seulement la position finale (le tirage de durée/
+  // direction doit, lui aussi, rester déterministe).
+  const run1 = runTicks(createInitialState(wanderLevel, 42, NO_COMPANIONS), 400);
+  const run2 = runTicks(createInitialState(wanderLevel, 42, NO_COMPANIONS), 400);
+  run("errance : trajectoire reproductible (même seed)", JSON.stringify(run1.positions), JSON.stringify(run2.positions));
+  run("errance : séquence de phases reproductible (même seed)", JSON.stringify(run1.phases), JSON.stringify(run2.phases));
 
   // Toujours dans les bornes du niveau, à chaque tick de la trajectoire.
-  const allInBounds = run1.positions.every((x) => x >= 0 && x <= wanderLevel.length);
-  run("errance : position toujours dans [0, length]", true, allInBounds);
+  run("errance : position toujours dans [0, length]", true, run1.positions.every((x) => x >= 0 && x <= wanderLevel.length));
 
-  // Demi-tour à la borne : niveau très court, turnChance à 0 pour une
-  // trajectoire prévisible (seul le rebond de bord entre en jeu).
-  const tightLevel = parseLevel(
+  // Les deux états sont bien atteints avec les défauts (400 ticks >
+  // walkMax : au moins une pause est nécessairement amorcée), et la phase
+  // est lisible sur l'entité — crochet exploitable plus tard pour un son
+  // par état (item 4 du prompt), pas câblé ici.
+  run("errance : la phase MARCHE est atteinte", true, run1.phases.includes("walk"));
+  run("errance : la phase PAUSE est atteinte", true, run1.phases.includes("pause"));
+  run(
+    "errance : phase exposée sur l'entité (walk/pause), jamais une autre valeur",
+    true,
+    run1.phases.every((p) => p === "walk" || p === "pause")
+  );
+
+  // Défauts CALMES (item 1) : marches courtes, pauses nettement plus
+  // longues — vérifié directement sur les constantes du module (jamais un
+  // nombre dupliqué en dur ici, qui dériverait silencieusement si les
+  // défauts changent).
+  run("errance : défauts — marches plus courtes que les pauses", true, WANDER_DEFAULTS.walkMax <= WANDER_DEFAULTS.pauseMin);
+
+  // Découpe une séquence de phases en plages contiguës {phase, length} —
+  // sert à vérifier que chaque plage COMPLÈTE (bornée des deux côtés par le
+  // test, contrairement à la toute première ou toute dernière qui peuvent
+  // être tronquées par les limites du run) reste dans sa fourchette
+  // déclarée.
+  function phaseRuns(phases) {
+    const runs = [];
+    for (const phase of phases) {
+      const last = runs[runs.length - 1];
+      if (last && last.phase === phase) last.length += 1;
+      else runs.push({ phase, length: 1 });
+    }
+    return runs;
+  }
+
+  // Fourchettes SERRÉES dédiées : sur un budget de ticks raisonnable, fait
+  // apparaître PLUSIEURS plages complètes des deux états (contrairement aux
+  // défauts calmes ci-dessus, où une seule pause tient à peine dans 400
+  // ticks) — isole la mécanique de bascule/tirage de la question du rythme.
+  const machineLevel = parseLevel(
     makeWanderLevel({
-      length: 1,
-      playerStart: 0,
-      entities: [{ id: "wander-1", type: "dog", x: 0.9, behavior: { kind: "wander", speed: 0.5, turnChance: 0 } }],
+      entities: [{ id: "wander-1", type: "dog", x: 5, behavior: { kind: "wander", walkMin: 3, walkMax: 6, pauseMin: 4, pauseMax: 8 } }],
     }),
     WANDER_REGISTRY
   );
-  let boundaryState = createInitialState(tightLevel, 7, NO_COMPANIONS);
-  boundaryState = reduce(boundaryState, tick(0)); // 0.9 + 0.5 = 1.4 -> bornée à length, direction inversée
-  run("errance : position bornée à length après dépassement", tightLevel.length, getActiveWorld(boundaryState).entities[0].x);
-  boundaryState = reduce(boundaryState, tick(0)); // direction -1 désormais : 1 - 0.5 = 0.5, repart vers l'intérieur
-  run("errance : demi-tour effectif (repart vers l'intérieur)", 0.5, getActiveWorld(boundaryState).entities[0].x);
+  const machineRun = runTicks(createInitialState(machineLevel, 99, NO_COMPANIONS), 300);
+  const machineRuns = phaseRuns(machineRun.phases);
+  const completeMachineRuns = machineRuns.slice(1, -1); // écarte la 1ère (déjà en cours) et la dernière (pas finie)
+  run("errance : plusieurs plages complètes observées (fourchettes serrées)", true, completeMachineRuns.length >= 10);
+  run(
+    "errance : chaque plage de marche reste dans [walkMin, walkMax]",
+    true,
+    completeMachineRuns.filter((r) => r.phase === "walk").every((r) => r.length >= 3 && r.length <= 6)
+  );
+  run(
+    "errance : chaque plage de pause reste dans [pauseMin, pauseMax]",
+    true,
+    completeMachineRuns.filter((r) => r.phase === "pause").every((r) => r.length >= 4 && r.length <= 8)
+  );
+
+  // Préférence de continuité (item 2) : sur les mêmes fourchettes serrées,
+  // la direction n'est PAS un pur pile-ou-face à chaque nouvelle marche —
+  // au moins une reprise (même direction que la marche précédente) ET au
+  // moins un vrai demi-tour doivent apparaître (sans quoi le biais serait
+  // absolu dans un sens ou dans l'autre, jamais l'intention).
+  const machineDirs = [];
+  {
+    let s = createInitialState(machineLevel, 99, NO_COMPANIONS);
+    let previousPhase = null;
+    for (let i = 0; i < 300; i++) {
+      s = reduce(s, tick(0));
+      const w = getActiveWorld(s).entities[0].wander;
+      if (w.phase === "walk" && previousPhase !== "walk") machineDirs.push(w.dir);
+      previousPhase = w.phase;
+    }
+  }
+  const continuations = machineDirs.slice(1).filter((d, i) => d === machineDirs[i]).length;
+  const reversals = machineDirs.length - 1 - continuations;
+  run("errance : au moins une reprise de direction observée (pas de ping-pong systématique)", true, continuations >= 1);
+  run("errance : au moins un vrai demi-tour observé (pas figée dans un seul sens)", true, reversals >= 1);
+
+  // Rebond au bord du niveau (item 3) : phase de marche FORCÉE assez longue
+  // pour ne jamais expirer seule (walkMin=walkMax élevé) — isole le rebond
+  // de toute bascule naturelle. Niveau étroit : quelle que soit la
+  // direction tirée au départ, un bord est atteint vite.
+  const boundaryLevel = parseLevel(
+    makeWanderLevel({
+      length: 1,
+      entities: [{ id: "wander-1", type: "dog", x: 0.5, behavior: { kind: "wander", walkMin: 1000, walkMax: 1000 } }],
+    }),
+    WANDER_REGISTRY
+  );
+  let boundaryState = createInitialState(boundaryLevel, 7, NO_COMPANIONS);
+  const boundaryXs = [];
+  const boundaryDirs = new Set();
+  for (let i = 0; i < 40; i++) {
+    boundaryState = reduce(boundaryState, tick(0));
+    const w = getActiveWorld(boundaryState).entities[0].wander;
+    boundaryXs.push(getActiveWorld(boundaryState).entities[0].x);
+    boundaryDirs.add(w.dir);
+  }
+  run("errance : jamais hors bornes malgré une marche forcée continue", true, boundaryXs.every((x) => x >= 0 && x <= 1));
+  run("errance : rebondit au bord (les deux directions observées)", true, boundaryDirs.has(1) && boundaryDirs.has(-1));
+
+  // Rebond sur un obstacle impassable (item 3) : même principe que le bord,
+  // mais contre une entité bloquante — corridor étroit entre deux murs,
+  // entité centrée : quelle que soit la direction tirée, elle atteint vite
+  // un mur, jamais ne le traverse, jamais ne reste collée à pousser dedans.
+  const obstacleLevel = parseLevel(
+    makeWanderLevel({
+      length: 20,
+      entities: [
+        { id: "wall-left", type: "wall", x: 5 },
+        { id: "wander-1", type: "dog", x: 6, behavior: { kind: "wander", walkMin: 1000, walkMax: 1000 } },
+        { id: "wall-right", type: "wall", x: 7 },
+      ],
+    }),
+    WANDER_REGISTRY
+  );
+  let obstacleState = createInitialState(obstacleLevel, 7, NO_COMPANIONS);
+  const obstacleXs = [];
+  const obstacleDirs = new Set();
+  for (let i = 0; i < 60; i++) {
+    obstacleState = reduce(obstacleState, tick(0));
+    const entity = getActiveWorld(obstacleState).entities.find((e) => e.id === "wander-1");
+    obstacleXs.push(entity.x);
+    obstacleDirs.add(entity.wander.dir);
+  }
+  // Corridor : [5 + 2*BODY_RADIUS, 7 - 2*BODY_RADIUS] = [5.5, 6.5].
+  run(
+    "errance : jamais de traversée d'un obstacle bloquant (corridor respecté)",
+    true,
+    obstacleXs.every((x) => x >= 5.5 - 1e-9 && x <= 6.5 + 1e-9)
+  );
+  run("errance : rebondit sur un obstacle (les deux directions observées)", true, obstacleDirs.has(1) && obstacleDirs.has(-1));
+
+  // Validation au chargement : fourchettes cohérentes (min <= max) et
+  // entières (>= 1 tick) — même politique que minDistance/maxDistance
+  // (follow.js) ou targetId (goto.js) : une donnée de contenu incohérente
+  // échoue clairement, jamais une dégradation silencieuse.
+  function expectWanderRejected(behaviorOverride) {
+    let rejected = false;
+    try {
+      parseLevel(makeWanderLevel({ entities: [{ id: "wander-1", type: "dog", x: 5, behavior: { kind: "wander", ...behaviorOverride } }] }), WANDER_REGISTRY);
+    } catch {
+      rejected = true;
+    }
+    return rejected;
+  }
+  run("errance : walkMin > walkMax rejeté au chargement", true, expectWanderRejected({ walkMin: 10, walkMax: 5 }));
+  run("errance : pauseMin > pauseMax rejeté au chargement", true, expectWanderRejected({ pauseMin: 10, pauseMax: 5 }));
+  run("errance : walkMin non entier rejeté au chargement", true, expectWanderRejected({ walkMin: 1.5 }));
+  run("errance : walkMin < 1 rejeté au chargement", true, expectWanderRejected({ walkMin: 0 }));
+
+  // Sérialisabilité : l'état wander (phase/ticksLeft/dir/prevX) survit à un
+  // aller-retour JSON, comme tout autre champ d'entité.
+  const serializedWanderEntity = JSON.parse(JSON.stringify(getActiveWorld(run1.state).entities[0]));
+  run(
+    "errance : état wander survit à un aller-retour JSON",
+    JSON.stringify(getActiveWorld(run1.state).entities[0].wander),
+    JSON.stringify(serializedWanderEntity.wander)
+  );
 
   // behavior.kind absent du registre (core/behaviors/index.js) -> parseLevel
   // échoue clairement, plutôt que d'ignorer silencieusement le comportement.
@@ -352,7 +504,7 @@ export function runMovementChecks() {
       length: 20,
       playerStart: 0,
       entities: [
-        { id: "pipeline-dog", type: "dog", x: 10, behavior: { kind: "wander", speed: 0.5, turnChance: 0.2 } },
+        { id: "pipeline-dog", type: "dog", x: 10, behavior: { kind: "wander" } },
         { id: "pipeline-wall", type: "wall", x: 2 },
       ],
     },
@@ -365,10 +517,11 @@ export function runMovementChecks() {
   }
   run("pipeline : intentions + physique combinées, résultat déterministe", JSON.stringify(runPipeline()), JSON.stringify(runPipeline()));
 
-  // --- Rebond aux bornes porté par la physique (plus par wander) ---
-  // Verrouille le contrat directement sur moveAndBounce (core/physics/
-  // movement.js), hors de tout comportement : wander ne contient plus
-  // aucun test de borne (voir behaviors/wander.js).
+  // --- moveAndBounce (core/physics/movement.js) : utilitaire générique,
+  // SANS appelant en production depuis que wander (voir behaviors/
+  // wander.js) est passé en intention pure — gardé et testé tel quel
+  // (fonction pure, potentiel appelant futur), verrouille son propre
+  // contrat indépendamment de tout comportement.
   const bounceLow = moveAndBounce(0.01, -1, 0.5, 10); // dépasse le bord bas
   run("physique : moveAndBounce borne la position au bord bas", 0, bounceLow.x);
   run("physique : moveAndBounce inverse la direction au bord bas", 1, bounceLow.dir);
@@ -387,7 +540,7 @@ export function runMovementChecks() {
       titleKey: "level.demo.title",
       length: 20,
       playerStart: 2,
-      entities: [{ id: "npc-a", type: "dog", x: 10, behavior: { kind: "wander", speed: 0.5, turnChance: 0.3 } }],
+      entities: [{ id: "npc-a", type: "dog", x: 10, behavior: { kind: "wander"} }],
     },
     WORLD_A_REGISTRY
   );
@@ -719,7 +872,7 @@ export function runMovementChecks() {
       length: 20,
       playerStart: 0,
       entities: [
-        { id: "ghost-dog", type: "dog", x: 10, behavior: { kind: "wander", speed: 0.5, turnChance: 0.3 }, presence: NIGHT_ONLY },
+        { id: "ghost-dog", type: "dog", x: 10, behavior: { kind: "wander"}, presence: NIGHT_ONLY },
       ],
     },
     PRESENCE_REGISTRY
@@ -1351,7 +1504,7 @@ export function runMovementChecks() {
         when: { type: "timeRange", from: 8, to: 20 },
         effects: [
           { type: "presence", present: true },
-          { type: "behavior", behavior: { kind: "wander", speed: 0.5, turnChance: 0.3 } },
+          { type: "behavior", behavior: { kind: "wander"} },
         ],
       },
     ],
@@ -1401,7 +1554,7 @@ export function runMovementChecks() {
   // un historique déjà "actif" au second.
   const alwaysTrueRule = {
     when: { type: "timeRange", from: 0, to: 24 },
-    effects: [{ type: "behavior", behavior: { kind: "wander", speed: 0.5, turnChance: 0.3 } }],
+    effects: [{ type: "behavior", behavior: { kind: "wander"} }],
   };
   const freshTrigger = resolveEntityRules({ id: "fresh", presence: [alwaysTrueRule] }, { time: 10 * 60 });
   run(
@@ -1466,7 +1619,7 @@ export function runMovementChecks() {
         when: { type: "timeRange", from: 8, to: 24 },
         effects: [
           { type: "presence", present: true },
-          { type: "behavior", behavior: { kind: "wander", speed: 0.5, turnChance: 0.3 } },
+          { type: "behavior", behavior: { kind: "wander"} },
         ],
       },
       {
@@ -1488,7 +1641,7 @@ export function runMovementChecks() {
           id: "resident-1",
           type: "dog",
           x: 15,
-          behavior: { kind: "wander", speed: 0.5, turnChance: 0.3 },
+          behavior: { kind: "wander"},
           presence: residentRules("door-1"),
         },
       ],
@@ -1549,7 +1702,7 @@ export function runMovementChecks() {
           id: "resident-1",
           type: "dog",
           x: 15,
-          behavior: { kind: "wander", speed: 0.5, turnChance: 0.3 },
+          behavior: { kind: "wander"},
           presence: residentRules("door-1"),
         },
       ],
@@ -1576,7 +1729,7 @@ export function runMovementChecks() {
   const missingDoorRoutineLevel = parseLevel(
     makeRoutineLevel({
       entities: [
-        { id: "resident-1", type: "dog", x: 15, behavior: { kind: "wander", speed: 0.5, turnChance: 0.3 }, presence: residentRules("no-such-door") },
+        { id: "resident-1", type: "dog", x: 15, behavior: { kind: "wander"}, presence: residentRules("no-such-door") },
       ],
     }),
     ROUTINE_REGISTRY
@@ -1909,7 +2062,7 @@ export function runMovementChecks() {
       playerStart: 2,
       music: "assets/musics/a_warm_night_in_harlem.mp3",
       entities: [
-        { id: "audit-dog", type: "dog", x: 10, behavior: { kind: "wander", speed: 0.5, turnChance: 0.3 } },
+        { id: "audit-dog", type: "dog", x: 10, behavior: { kind: "wander"} },
         { id: "audit-door", type: "door", x: 15, target: "movement-check-audit-b" },
       ],
     },
