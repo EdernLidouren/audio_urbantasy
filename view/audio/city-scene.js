@@ -472,6 +472,43 @@ export function createCityAudioScene(getSession) {
     entitySounds.map(({ entity }) => [entity.id, registry[entity.type].collisionSound])
   );
 
+  // "Réchauffe" les pas critiques EN PREMIER, avant le grand préchargement
+  // de pool ci-dessous : un vrai playOneShot à volume 0, pendant que le
+  // joueur est encore immobile — force l'allocation complète de la voix
+  // (pas seulement le décodage), pour que le tout premier pas RÉEL soit
+  // instantané, sans artefact audible (volume 0, jamais entendu). Un seul
+  // candidat par mobile (celui que resolveFootstepPath choisirait
+  // MAINTENANT, à sa position de spawn) : suffisant pour amorcer le
+  // pipeline audio lui-même (contexte, noeuds Web Audio...), commun à tout
+  // fichier du même format.
+  //
+  // ORDRE délibéré (diagnostiqué en direct, chronométré) : le navigateur
+  // plafonne à ~6 requêtes concurrentes par origine (HTTP/1.1) — avec
+  // plusieurs dizaines de fichiers à précharger d'un coup (voir
+  // preloadKeys ci-dessous), tout ce qui n'est pas parmi les tout premiers
+  // émis attend son tour par vagues. Émettre CE fichier précis ICI, avant
+  // le balayage complet des pools, lui garantit une des toutes premières
+  // requêtes plutôt que de le laisser en position aléatoire dans une file
+  // de ~50 — ensureOneShot (lib/audio.js) déduplique par chemin, donc le
+  // balayage complet plus bas retrouvera un Howl déjà chargé pour ce
+  // membre précis, jamais une deuxième requête.
+  function warmUpFootstep(atX, candidates) {
+    // resolveAsset ici, comme playPacedSound (jamais la clé de pool brute
+    // telle que resolveFootstepPath la renvoie — voir hasAsset/assetKeyMembers
+    // ci-dessus, qui manipulent la clé, pas playOneShot, qui attend un
+    // fichier réel).
+    playOneShot(resolveAsset(resolveFootstepPath(initialWorld, atX, candidates)), { volume: 0 });
+  }
+  warmUpFootstep(getSession().player.x, {
+    gait: player.gait,
+    naturalWalk: player.naturalWalk,
+    ownPath: MOVEMENT_SOUND.path,
+  });
+  for (const { entity, movementPath, gait, naturalWalk } of entitySounds) {
+    if (!movementPath) continue;
+    warmUpFootstep(entity.x, { gait, naturalWalk, ownPath: movementPath });
+  }
+
   // Préchargement de scène (voir lib/audio.js/preloadOneShot,
   // lib/assets.js/assetKeyMembers) : amorce le décodage de TOUT ce que
   // cette scène pourrait jouer, AVANT que le gameplay ne commence. Un Howl
@@ -511,32 +548,6 @@ export function createCityAudioScene(getSession) {
 
   for (const key of preloadKeys) {
     for (const member of assetKeyMembers(key)) preloadOneShot(member);
-  }
-
-  // "Réchauffe" les pas critiques : un vrai playOneShot à volume 0, pendant
-  // que le joueur est encore immobile — force l'allocation complète de la
-  // voix (pas seulement le décodage), pour que le tout premier pas RÉEL
-  // soit instantané, sans artefact audible (volume 0, jamais entendu). Un
-  // seul candidat par mobile (celui que resolveFootstepPath choisirait
-  // MAINTENANT, à sa position de spawn) : suffisant pour amorcer le
-  // pipeline audio lui-même (contexte, noeuds Web Audio...), commun à tout
-  // fichier du même format — chaque membre de pool est déjà préchargé
-  // (décodage) ci-dessus, inutile de tous les rejouer un par un.
-  function warmUpFootstep(atX, candidates) {
-    // resolveAsset ici, comme playPacedSound (jamais la clé de pool brute
-    // telle que resolveFootstepPath la renvoie — voir hasAsset/assetKeyMembers
-    // ci-dessus, qui manipulent la clé, pas playOneShot, qui attend un
-    // fichier réel).
-    playOneShot(resolveAsset(resolveFootstepPath(initialWorld, atX, candidates)), { volume: 0 });
-  }
-  warmUpFootstep(getSession().player.x, {
-    gait: player.gait,
-    naturalWalk: player.naturalWalk,
-    ownPath: MOVEMENT_SOUND.path,
-  });
-  for (const { entity, movementPath, gait, naturalWalk } of entitySounds) {
-    if (!movementPath) continue;
-    warmUpFootstep(entity.x, { gait, naturalWalk, ownPath: movementPath });
   }
 
   // Musique et ambiances du lieu : canaux GLOBAUX non spatialisés (aucun
