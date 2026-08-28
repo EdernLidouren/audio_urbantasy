@@ -88,6 +88,11 @@ const STEP_DISTANCE = TUNING_DEFAULTS.stepDistance;
 // reste pleinement réactif à chaque tick. Nettement sous l'intervalle de
 // marche soutenue (~330ms), donc invisible en marche normale.
 const MIN_STEP_INTERVAL_MS = TUNING_DEFAULTS.minStepIntervalMs;
+// Écart minimal entre un pas de reprise et un pas de changement de sol tout
+// proche (voir update()) — évite que leurs clips ne se chevauchent presque
+// entièrement, sans réintroduire le retard qu'avait le cooldown PARTAGÉ
+// d'origine (voir surfaceChangeCooldown).
+const FOOTSTEP_OVERLAP_GUARD_MS = TUNING_DEFAULTS.footstepOverlapGuardMs;
 // Niveaux du modèle de volume par zones (voir volumeForDistance) : ce sont
 // des constantes de forme de courbe, pas des réglages par entité.
 const FULL_VOLUME = TUNING_DEFAULTS.fullVolume;
@@ -577,6 +582,13 @@ export function createCityAudioScene(getSession) {
   let previousX = getSession().player.x;
   // Seule source de vérité pour "était en mouvement au tick précédent".
   let wasMoving = false;
+  // Instant (performance.now()) du dernier pas de REPRISE (!wasMoving) —
+  // UNIQUEMENT lui, jamais un pas de cadence normale (voir la garde
+  // anti-chevauchement dans update()) : sert à espacer un pas de reprise
+  // d'un pas de frontière tout proche, sans jamais retarder une frontière
+  // franchie en cours de marche continue (la cadence normale, elle, n'a pas
+  // besoin de cette garde).
+  let lastResumeAt = -Infinity;
   // Instant (performance.now()) du dernier son RÉELLEMENT joué, un
   // cooldown PAR CANAL (pas/collision) — jamais partagé : sur le tick où le
   // joueur vient buter, x avance encore jusqu'au bord (pas normal) PUIS
@@ -585,6 +597,15 @@ export function createCityAudioScene(getSession) {
   // collision immédiat qui suit aussitôt.
   const footstepCooldown = { lastAt: -Infinity };
   const collisionCooldown = { lastAt: -Infinity };
+  // Cooldown DÉDIÉ au pas immédiat de frontière (surfaceChanged, voir
+  // update()), séparé de footstepCooldown (pas de reprise après arrêt +
+  // cadence normale) — même raison que le découpage ci-dessus : au demi-tour,
+  // un pas de reprise joué juste avant de recroiser la frontière consommait
+  // footstepCooldown et retardait d'autant la détection de la VRAIE
+  // traversée, alors que les deux sont des signaux indépendants (l'un
+  // "mouvement repris", l'autre "sol changé") qui peuvent légitimement se
+  // suivre de très près.
+  const surfaceChangeCooldown = { lastAt: -Infinity };
   // Ids des entités occupées (zone d'interaction englobant le joueur) au
   // tick précédent — seule source de vérité pour détecter un changement.
   let occupiedIds = new Set();
@@ -635,9 +656,9 @@ export function createCityAudioScene(getSession) {
   // joueur si gait/naturalWalk (champs directs sur player, pas de cascade
   // instance/archétype pour lui — voir entities/player.js) ne résolvent
   // rien. Renvoie si le son a réellement joué (voir playPacedSound).
-  function playFootstep(x, world) {
+  function playFootstep(x, world, cooldown = footstepCooldown) {
     const path = resolveFootstepPath(world, x, { gait: player.gait, naturalWalk: player.naturalWalk, ownPath: MOVEMENT_SOUND.path });
-    return playPacedSound(path, FOOTSTEP_REVERB_SEND, footstepCooldown);
+    return playPacedSound(path, FOOTSTEP_REVERB_SEND, cooldown);
   }
 
   // Dormant si l'entité ne porte pas de collisionSound (voir
@@ -870,13 +891,42 @@ export function createCityAudioScene(getSession) {
     // que le cooldown se libère. Sans cette garde, un déclenchement
     // supprimé se marquait quand même "traité", et la traversée pouvait
     // rester silencieuse jusqu'à STEP_DISTANCE de plus.
+    //
+    // Cooldown DÉDIÉ (surfaceChangeCooldown) quand c'est la frontière qui
+    // déclenche, jamais footstepCooldown : au demi-tour, le pas de reprise
+    // (!wasMoving, juste en dessous) joue souvent à quelques ticks à peine
+    // de la frontière qu'on vient de franchir — partager le même cooldown
+    // ferait que ce pas de reprise, légitime, retarde la détection de la
+    // VRAIE traversée. Les deux signaux sont indépendants ("mouvement
+    // repris" vs "sol changé"), ils gardent chacun leur propre garde-fou
+    // anti-mitraillette (diagnostiqué et confirmé en direct : c'était la
+    // source de l'asymétrie aller/retour).
     const currentSurface = surfaceAt(world, x);
     const surfaceChanged = currentSurface !== lastFootstepSurface;
     const isMoving = x !== previousX;
     if (isMoving && (!wasMoving || surfaceChanged)) {
-      if (playFootstep(x, world)) {
+      // Écart anti-chevauchement (voir FOOTSTEP_OVERLAP_GUARD_MS) : en plus
+      // du cooldown DÉDIÉ ci-dessus (qui protège chaque cause de sa propre
+      // mitraillette), on vérifie que l'AUTRE cause n'a pas ELLE-MÊME joué
+      // un son il y a un instant — sinon les deux clips se chevauchent
+      // presque entièrement (ex. reprise + frontière à quelques ticks
+      // d'écart). Non joué -> état inchangé, comme un cooldown normal : le
+      // prochain tick retentera (voir le commentaire plus haut).
+      //
+      // La garde ne joue QUE reprise <-> frontière — jamais cadence <->
+      // frontière (lastResumeAt, pas footstepCooldown, qui mélangerait les
+      // deux) : la cadence normale joue à un rythme bien plus lâche
+      // (~250ms) et n'a besoin d'aucune protection ici — lui en imposer une
+      // retarderait une traversée en cours de marche continue, exactement
+      // le bug déjà corrigé plus haut.
+      const now = performance.now();
+      const overlapsOtherCause = surfaceChanged
+        ? now - lastResumeAt < FOOTSTEP_OVERLAP_GUARD_MS
+        : now - surfaceChangeCooldown.lastAt < FOOTSTEP_OVERLAP_GUARD_MS;
+      if (!overlapsOtherCause && playFootstep(x, world, surfaceChanged ? surfaceChangeCooldown : footstepCooldown)) {
         lastFootstepX = x;
         lastFootstepSurface = currentSurface;
+        if (!surfaceChanged) lastResumeAt = now;
       }
     }
     wasMoving = isMoving;

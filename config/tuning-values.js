@@ -45,13 +45,25 @@ export const TUNING_DEFAULTS = {
   // bas = la coupure en sortant de interactRange s'entend davantage.
   farVolumeMax: 0.5,
 
-  // Intervalle minimum (ms) entre deux bruits de pas, quelle que soit leur
-  // origine (premier pas immédiat ou cadence). Anti-mitraillette sur appuis
-  // répétés rapides — n'affecte que le SON, jamais le déplacement. Doit
-  // rester nettement sous l'intervalle de marche soutenue (~330ms avec les
-  // valeurs actuelles) pour rester invisible en marche normale ; plus haut
-  // = pas plus espacés/étouffés sur des à-coups ; plus bas = plus permissif.
+  // Intervalle minimum (ms) entre deux bruits de pas d'une MÊME cause
+  // (reprise après arrêt + cadence normale d'un côté, changement de sol de
+  // l'autre — voir view/audio/city-scene.js, deux cooldowns séparés).
+  // Anti-mitraillette sur appuis répétés rapides — n'affecte que le SON,
+  // jamais le déplacement. Doit rester nettement sous l'intervalle de
+  // marche soutenue (~330ms avec les valeurs actuelles) pour rester
+  // invisible en marche normale ; plus haut = pas plus espacés/étouffés sur
+  // des à-coups ; plus bas = plus permissif.
   minStepIntervalMs: 150,
+
+  // Écart minimum (ms) entre deux bruits de pas de causes DIFFÉRENTES
+  // (reprise après arrêt ET changement de sol, ex. un demi-tour juste après
+  // avoir franchi une frontière) — les deux ont leur propre cooldown
+  // ci-dessus (l'un ne doit jamais bloquer l'autre, voir city-scene.js),
+  // mais sans cet écart minimal les deux clips (souvent 300-650 ms) peuvent
+  // se chevaucher presque entièrement et brouiller la transition. Nettement
+  // plus court que minStepIntervalMs : juste de quoi séparer les deux
+  // attaques à l'oreille, pas de quoi retarder sensiblement la transition.
+  footstepOverlapGuardMs: 80,
 
   // Fréquence de coupure (Hz) du passe-bas d'une entité au plus loin
   // (dist proche de audibleRange) : plus bas = plus étouffé/sourd de loin ;
