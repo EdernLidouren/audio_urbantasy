@@ -174,8 +174,9 @@ export function makeCityScreen(getSession, setSession) {
       const kind = event.key === " " ? "describe" : "activate";
       // scene passé pour la pause/reprise sélective des balises pendant un
       // éventuel menu de désambiguïsation (2+ candidats) — voir
-      // chooseInteractionTarget.
-      const target = chooseInteractionTarget(scene.getInteractionCandidates(), kind, scene);
+      // chooseInteractionTarget. getInteractionCandidates(kind) filtre déjà
+      // par capacité (observable/interactable) — voir son commentaire.
+      const target = chooseInteractionTarget(scene.getInteractionCandidates(kind), kind, scene);
       if (!target) return;
 
       interact(target, kind);

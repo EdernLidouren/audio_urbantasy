@@ -10,5 +10,9 @@ export default {
     beacon: { path: "assets/sounds/entities/door_beacon_1.mp3", loop: true },
   },
   blocksMovement: false,
-  enterable: true,
+  // observable : a une description. interactable : entrée déclenche la
+  // transition (voir view/interaction.js) — ANCIEN enterable:true, renommé
+  // (système d'interaction niveau 0, voir entities/model.md).
+  observable: true,
+  interactable: true,
 };

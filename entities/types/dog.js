@@ -46,5 +46,6 @@ export default {
     },
   },
   blocksMovement: false,
-  enterable: false,
+  observable: true,
+  interactable: false,
 };

@@ -91,7 +91,8 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
     fail(`entities[${index}] n'est pas un objet.`);
   }
 
-  const { id, type, x, target, nameKey, descriptionKey, behavior, blocksMovement, tuning, presence } = rawEntity;
+  const { id, type, x, target, nameKey, descriptionKey, behavior, blocksMovement, observable, interactable, tuning, presence } =
+    rawEntity;
 
   if (!isNonEmptyString(id)) {
     fail(`entities[${index}].id manquant ou invalide.`);
@@ -122,12 +123,31 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
     fail(`entities[${index}] ("${id}") : blocksMovement doit être un booléen si présent.`);
   }
   const resolvedBlocksMovement = blocksMovement !== undefined ? blocksMovement : Boolean(registry[type].blocksMovement);
+  // observable/interactable : DEUX capacités indépendantes (système
+  // d'interaction niveau 0, voir view/interaction.js) — même cascade que
+  // blocksMovement, même défaut global (false, silence par défaut plutôt
+  // qu'une capacité surprise). Volontairement des booléens PLATS ici (pas
+  // de sous-objet "capabilities") : la richesse future (ex. un TYPE d'action
+  // porté par une entité interactable, voir entities/model.md) viendra
+  // s'ajouter EN PLUS via d'autres champs, jamais en remplaçant celui-ci —
+  // le filtrage par verbe (view/audio/city-scene.js/getInteractionCandidates)
+  // ne lira jamais plus que ces deux booléens.
+  if (observable !== undefined && typeof observable !== "boolean") {
+    fail(`entities[${index}] ("${id}") : observable doit être un booléen si présent.`);
+  }
+  const resolvedObservable = observable !== undefined ? observable : Boolean(registry[type].observable);
+  if (interactable !== undefined && typeof interactable !== "boolean") {
+    fail(`entities[${index}] ("${id}") : interactable doit être un booléen si présent.`);
+  }
+  const resolvedInteractable = interactable !== undefined ? interactable : Boolean(registry[type].interactable);
   const entity = {
     id,
     type,
     x,
     labelKey,
     blocksMovement: resolvedBlocksMovement,
+    observable: resolvedObservable,
+    interactable: resolvedInteractable,
   };
   // Clé ajoutée SEULEMENT si résolue (jamais explicitement undefined) :
   // l'état doit rester de la donnée pure, un aller-retour JSON ne doit rien

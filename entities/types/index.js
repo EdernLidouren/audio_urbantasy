@@ -5,9 +5,12 @@
 // import, ni du core ni de la vue. blocksMovement est lu par core/level.js
 // (baké dans l'entité parsée) puis exploité par core/reduce.js pour arrêter
 // le joueur au bord du corps d'une entité bloquante (voir BODY_RADIUS,
-// uniforme pour l'instant). enterable reste PRÉVU (entrée en porte) mais pas
-// encore câblé. La vue lit sounds/label/collisionSound pour le rendu audio
-// et les annonces. Ni l'un ni l'autre ne dépend de l'autre, seulement de ce
+// uniforme pour l'instant). observable/interactable (système d'interaction
+// niveau 0, voir view/interaction.js et entities/model.md) sont bakés de la
+// même façon, cascade instance -> type -> défaut (false), et filtrent les
+// candidats PAR VERBE (view/audio/city-scene.js/getInteractionCandidates).
+// La vue lit sounds/label/collisionSound pour le rendu audio et les
+// annonces. Ni l'un ni l'autre ne dépend de l'autre, seulement de ce
 // registre.
 //
 // label est une CLÉ i18n (jamais une chaîne affichable directement).

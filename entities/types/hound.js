@@ -19,5 +19,6 @@ export default {
     vocal: { path: "assets/sounds/entities/dog_medium_vocal", loop: false, pitchVariation: 0.15 },
   },
   blocksMovement: false,
-  enterable: false,
+  observable: true,
+  interactable: false,
 };

@@ -21,13 +21,29 @@ export function setDoorTransitionHandler(handler) {
   doorTransitionHandler = handler;
 }
 
-// kind ∈ { "describe", "activate" }.
+// Description RICHE d'une entité (interaction "describe"), distincte du nom
+// annoncé à l'approche (occupation, voir view/audio/city-scene.js). INDIRECTION
+// délibérée plutôt qu'un accès direct à descriptionKey : aujourd'hui une
+// simple clé i18n, mais un type d'entité pourra un jour fournir une
+// description DYNAMIQUE (méthode plutôt que clé statique) en changeant
+// SEULEMENT cette fonction, jamais ses appelants. undefined si l'entité n'a
+// rien à décrire (ex. descriptionKey absent malgré observable:true) — le
+// filtrage par capacité (getInteractionCandidates) évite déjà ce cas en
+// pratique, ce repli reste défensif.
+function resolveDescription(entity) {
+  if (!entity.descriptionKey) return undefined;
+  return t(entity.descriptionKey);
+}
+
+// kind ∈ { "describe", "activate" }. entity est déjà un candidat FILTRÉ par
+// capacité (voir view/audio/city-scene.js/getInteractionCandidates) — cette
+// fonction fait confiance à son appelant, elle ne revérifie pas
+// observable/interactable elle-même.
 export function interact(entity, kind) {
   if (kind === "describe") {
-    // descriptionKey peut être absent (type sans description, ex. decor) :
-    // rien à annoncer plutôt qu'une clé i18n non résolue.
-    if (!entity.descriptionKey) return;
-    announce(t(entity.descriptionKey), { assertive: true });
+    const description = resolveDescription(entity);
+    if (!description) return;
+    announce(description, { assertive: true });
     return;
   }
 
@@ -61,7 +77,11 @@ export function interact(entity, kind) {
 // une future musique/ambiance continuerait derrière ce menu.
 function openDisambiguationMenu(candidates, kind, scene) {
   const menu = {
-    title: "menu.interaction.title",
+    // Titre propre au verbe (Espace/observer vs Entrée/interagir) : les deux
+    // menus partagent le même mécanisme (makeMenuScreen), jamais le même
+    // intitulé — l'utilisateur doit savoir CE QU'IL choisit, pas seulement
+    // PARMI QUOI.
+    title: kind === "describe" ? "menu.interaction.observe.title" : "menu.interaction.title",
     closable: true, // Échap ferme sans rien faire
     entries: candidates.map((entity) => ({
       label: entity.labelKey,

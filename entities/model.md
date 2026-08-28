@@ -18,13 +18,63 @@ Une entité (registre `entities/types/index.js`, un fichier par archétype dans
 | Sons par rôle            | `sounds: { <rôle>: descripteur }`                                  | voir "Vocabulaire de sons" ci-dessous |
 | Portée spatiale           | `audibleRange`, `panSaturation`, `interactRange`, `cutoffMin`, `cutoffMax` | où/comment une entité est perçue dans l'espace — voir "Ce qui n'est PAS un paramètre sonore" |
 | Paramètres sonores        | `reverbSend`, `beaconMode`, `beaconInterval`, `beaconIntervalVariation`, `beaconGain`, `vocalInterval`, `vocalIntervalVariation`, `vocalGain`, `pitchVariation`, `movementStepMultiplier`, `movementGain`, `enterSoundGain`, `exitSoundGain` | voir "Paramètres sonores" ci-dessous, surchargeables à l'instance via `tuning` (voir "Le palier INSTANCE") |
-| Drapeaux                 | `blocksMovement`, `enterable`                                      | prévus pour le core (collision, entrée), non câblés à ce jour |
+| Drapeaux                 | `blocksMovement`                                                   | collision (core) |
+| Capacités d'interaction  | `observable`, `interactable` (cascade instance -> type, comme `blocksMovement`) | voir "Interaction (niveau 0)" plus bas |
 | Présence conditionnelle  | `presence` (cascade instance -> type, comme `blocksMovement`)      | voir "Présence conditionnelle" plus bas |
 
 Aucun de ces champs n'est obligatoire, pas même `sounds.beacon` (voir
 "Beacon vs vocal" ci-dessous — une entité peut n'avoir aucun son positionné,
 un seul rôle, ou les deux) : tout ce qui manque retombe sur le défaut global
 (`config/tuning-values.js`).
+
+## Interaction (niveau 0)
+
+Deux capacités INDÉPENDANTES (`observable`, `interactable`, booléens,
+cascade instance -> type -> défaut `false` — voir `core/level.js`) : les
+QUATRE combinaisons sont valides, aucun cas spécial. Chaque verbe (Espace /
+Entrée, voir `view/interaction.js`) ne considère QUE les entités portant SA
+capacité — un décor `observable:false` n'apparaît JAMAIS candidat à Espace,
+une balise `interactable:false` jamais candidate à Entrée, même à portée.
+
+- **`observable`** — candidate à Espace (description riche, voir plus bas).
+  Exemples : `rock`/`bird`/`fountain`/`hound`/`dog`/`buddy`/`neon`
+  (observables, non interactables), `decor` (aucune des deux — preset de
+  référence pour ce cas, voir `entities/types/decor.js`).
+- **`interactable`** — candidate à Entrée. Aujourd'hui, une action
+  GÉNÉRIQUE (stub, voir `view/interaction.js`/`interact`) — sauf `door`, qui
+  déclenche déjà sa transition. `npc`/`object` sont interactables dès ce
+  niveau 0 EN ANTICIPATION d'un futur type d'action différencié
+  (parler/ramasser — pas codé ici, voir le commentaire "IMPORTANT" dans
+  `core/level.js`/`parseEntity`) : le booléen d'aujourd'hui n'est qu'une
+  valeur POSSIBLE du champ, une entité future pourra y porter un descripteur
+  plus riche (ex. `{ type: "talk" }`) sans que le FILTRAGE par verbe n'ait à
+  changer — il ne teste jamais que la véracité du champ (`Boolean(...)`),
+  jamais son type exact.
+
+Deux niveaux de PERCEPTION, à ne pas confondre :
+
+- **Occupation** (couche légère, inchangée) : le NOM de l'entité, annoncé à
+  l'approche (`view/audio/city-scene.js`/`occupiedEntities`) — ne connaît
+  aucune capacité, toute entité à portée y figure.
+- **Observation** (Espace, couche riche) : la DESCRIPTION d'une entité
+  `observable` ciblée. Résolue via une INDIRECTION
+  (`view/interaction.js`/`resolveDescription`) plutôt qu'un accès direct à
+  `descriptionKey` : aujourd'hui une simple clé i18n, demain une entité
+  pourra fournir une description DYNAMIQUE (méthode plutôt que clé statique)
+  en changeant SEULEMENT cette fonction, jamais ses appelants.
+
+Résolution de candidats PAR VERBE
+(`view/audio/city-scene.js`/`getInteractionCandidates(kind)`) : filtre
+l'ensemble d'occupation courant par la capacité du verbe pressé
+(`observable` pour Espace, `interactable` pour Entrée) — MÊME portée
+(`interactRange`) que l'occupation, pas de zone séparée. La désambiguïsation
+(`view/interaction.js`/`chooseInteractionTarget`) n'est JAMAIS dupliquée ni
+rendue consciente du verbe elle-même : elle reçoit un ensemble DÉJÀ filtré,
+donc un menu ne s'ouvre que s'il y a PLUSIEURS candidats POUR CE VERBE
+précis (une entité interactable au milieu de trois observables : Entrée agit
+direct, Espace ouvre un menu à trois). Aucun candidat -> `null` ->
+SILENCE TOTAL, jamais un son ou une annonce vide (accessibilité assumée : un
+bip parasite pollue plus qu'il n'informe).
 
 ## Présence conditionnelle et triggers de comportement
 

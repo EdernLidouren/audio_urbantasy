@@ -1132,10 +1132,19 @@ export function createCityAudioScene(getSession) {
     if (activeScene === api) activeScene = null;
   }
 
-  // Candidats d'interaction courants (Espace/Entrée) : même ensemble, même
-  // tri que la dernière annonce d'occupation calculée en update().
-  function getInteractionCandidates() {
-    return currentOccupied;
+  // Candidats d'interaction courants POUR UN VERBE (kind : "describe" ->
+  // Espace, "activate" -> Entrée) : sous-ensemble FILTRÉ de la dernière
+  // occupation calculée en update() — même portée (interactRange), même tri,
+  // mais restreint aux entités qui portent la capacité de CE verbe
+  // (observable/interactable, voir core/level.js et entities/model.md). Une
+  // entité à portée sans la capacité voulue n'est simplement jamais dans le
+  // résultat — c'est ce filtre, PAS la désambiguïsation, qui décide si un
+  // verbe a quelque chose à faire ici (voir view/interaction.js/
+  // chooseInteractionTarget, qui reste inchangée : elle reçoit déjà un
+  // ensemble filtré, jamais consciente elle-même du verbe pour ce choix).
+  function getInteractionCandidates(kind) {
+    const capability = kind === "describe" ? "observable" : "interactable";
+    return currentOccupied.filter((entity) => entity[capability]);
   }
 
   // Rafraîchit les balises à la position courante du joueur, sans repasser

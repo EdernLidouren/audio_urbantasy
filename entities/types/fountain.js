@@ -13,5 +13,6 @@ export default {
     beacon: { path: "assets/sounds/entities/box_of_nails_beacon_1.mp3", loop: true },
   },
   blocksMovement: true,
-  enterable: false,
+  observable: true,
+  interactable: false,
 };

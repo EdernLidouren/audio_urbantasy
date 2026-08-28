@@ -17,5 +17,6 @@ export default {
   },
   collisionSound: "assets/sounds/entities/big_rock_collision_1.mp3",
   blocksMovement: true,
-  enterable: false,
+  observable: true,
+  interactable: false,
 };

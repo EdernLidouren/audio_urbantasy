@@ -3,9 +3,10 @@
 // aucun import.
 //
 // Preset d'exemple, non utilisé dans demo.json : positionné et purement
-// décoratif. Aucune interaction (enterable:false, pas de descriptionKey) —
-// seuls les archétypes avec descriptionKey sont concernés par l'interaction
-// "describe".
+// décoratif. Aucune interaction (ni observable, ni interactable, pas de
+// descriptionKey) — exemple de référence des QUATRE combinaisons valides du
+// système d'interaction niveau 0 (voir view/interaction.js,
+// entities/model.md) : celle où AUCUNE capacité n'est portée.
 
 export default {
   label: "entity.decor",
@@ -13,5 +14,6 @@ export default {
     beacon: { path: "assets/sounds/entities/box_of_nails_beacon_1.mp3", loop: true },
   },
   blocksMovement: true,
-  enterable: false,
+  observable: false,
+  interactable: false,
 };

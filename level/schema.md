@@ -88,6 +88,9 @@ bascule en cours de jeu (`view/audio/city-scene.js`). Détail complet :
 | `target`  | string | **requis** si `type === "door"` : id d'un niveau du registre (`level/index.js`) — l'action "activate" sur la porte y transitionne (voir `view/interaction.js`, `view/city-screen.js`) |
 | `nameKey` | string | optionnel (npc/object) : clé i18n spécifique à l'instance          |
 | `descriptionKey` | string | optionnel : clé i18n de description spécifique à l'instance, utilisée par l'interaction "describe" (touche Espace) |
+| `blocksMovement` | boolean | optionnel : surcharge d'instance, cascade -> défaut du type (`entities/types/index.js`) -> `false` |
+| `observable` | boolean | optionnel : idem, candidate à l'interaction "describe" (voir "Interaction (niveau 0)", `entities/model.md`) |
+| `interactable` | boolean | optionnel : idem, candidate à l'interaction "activate" |
 | `presence` | `PresenceRule[]` | optionnel : règles DÉCLARATIVES de présence conditionnelle, cascade instance -> type (voir "Présence conditionnelle" plus bas et `entities/model.md`). Sans règle (ni à l'instance ni au type) : toujours présente. |
 
 `parseLevel` normalise chaque entité en ajoutant `labelKey` et
@@ -136,14 +139,14 @@ rassemblés par `index.js` en un objet `{ [type]: TypeDef }` :
 | `label`          | string  | vue           | clé i18n du libellé par défaut du type        |
 | `descriptionKey` | string  | vue           | optionnel : clé i18n de la description par défaut du type, utilisée par l'interaction "describe" si l'instance n'en fournit pas |
 | `sounds`         | object  | vue           | descripteurs de son du type, par rôle (`{ beacon, ... }`) — voir `entities/model.md` |
-| `blocksMovement` | boolean | core (prévu)  | prévu pour empêcher le déplacement au travers de l'entité |
-| `enterable`      | boolean | core (prévu)  | prévu pour déclencher une action à l'entrée (ex. porte)   |
+| `blocksMovement` | boolean | core           | empêche le déplacement au travers de l'entité (`core/physics/collision.js`) |
+| `observable`     | boolean | vue            | candidate à l'interaction "describe" (touche Espace) — voir "Interaction (niveau 0)", `entities/model.md` |
+| `interactable`   | boolean | vue            | candidate à l'interaction "activate" (touche Entrée) — idem |
 
-`blocksMovement` et `enterable` existent dans la donnée et sont documentés ici,
-mais **ne sont pas encore lus** : `core/reduce.js` ignore aujourd'hui les
-entités du niveau — ni collision, ni entrée en porte. Le déplacement se limite
-aux bornes `[0, length]` du niveau. Ces deux champs sont le point d'ancrage
-prévu pour cette logique, le jour où elle sera implémentée.
+`blocksMovement`/`observable`/`interactable` sont tous les trois cascadés
+instance -> type -> défaut `false` (voir `core/level.js`/`parseEntity`), donc
+également déclarables au niveau ENTITÉ (voir le tableau "Entité" plus haut),
+pas seulement au niveau du type.
 
 Types de départ : `door`, `npc`, `object`, `decor` (ce dernier non utilisé
 dans `demo.json`). Le modèle complet (descripteurs de son, cascade de

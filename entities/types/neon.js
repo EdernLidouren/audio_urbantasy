@@ -26,7 +26,8 @@ export default {
     exitSound: { path: "assets/sounds/effects/electrical_flickering" },
   },
   blocksMovement: false,
-  enterable: false,
+  observable: true,
+  interactable: false,
   // 20h..6h : passage par minuit géré par core/presence.js/evaluateCondition
   // (timeRange). Une seule règle suffit — le jour n'est simplement couvert
   // par aucune, donc dormant par défaut (voir core/presence.js/isPresent).

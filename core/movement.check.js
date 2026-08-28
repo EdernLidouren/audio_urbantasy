@@ -385,6 +385,71 @@ export function runMovementChecks() {
   }
   run("collision : blocksMovement non booléen rejeté", true, invalidBlockRejected);
 
+  // --- Interaction niveau 0 : capacités observable/interactable ---
+  // Cascade IDENTIQUE à blocksMovement (instance -> type -> défaut false),
+  // voir core/level.js. Le filtrage par verbe et la désambiguïsation restent
+  // côté vue (view/audio/city-scene.js, view/interaction.js), hors de portée
+  // d'un check terminal — seule la RÉSOLUTION de ces deux champs est
+  // vérifiable ici.
+
+  const INTERACTION_REGISTRY = {
+    describable: { label: "entity.dog", observable: true, interactable: false },
+    actionable: { label: "entity.dog", observable: false, interactable: true },
+    plain: { label: "entity.dog" }, // ni l'un ni l'autre déclaré -> défaut false/false
+  };
+
+  const interactionLevel = parseLevel(
+    {
+      id: "movement-check-interaction",
+      titleKey: "level.demo.title",
+      length: 20,
+      playerStart: 0,
+      entities: [
+        { id: "e-describable", type: "describable", x: 5 },
+        { id: "e-actionable", type: "actionable", x: 6 },
+        { id: "e-plain", type: "plain", x: 7 },
+        { id: "e-both", type: "describable", x: 8, interactable: true }, // surcharge d'instance
+        { id: "e-neither", type: "actionable", x: 9, interactable: false }, // idem, désactive le défaut du type
+      ],
+    },
+    INTERACTION_REGISTRY
+  );
+  function interactionEntity(id) {
+    return interactionLevel.entities.find((e) => e.id === id);
+  }
+
+  run("interaction : défaut du type — observable hérité", true, interactionEntity("e-describable").observable);
+  run("interaction : défaut du type — interactable hérité (false)", false, interactionEntity("e-describable").interactable);
+  run("interaction : défaut du type — interactable hérité (true)", true, interactionEntity("e-actionable").interactable);
+  run("interaction : aucun des deux déclaré -> observable false par défaut", false, interactionEntity("e-plain").observable);
+  run("interaction : aucun des deux déclaré -> interactable false par défaut", false, interactionEntity("e-plain").interactable);
+
+  // Les QUATRE combinaisons sont valides — surcharge d'instance testée dans
+  // les deux sens (active un défaut à false, désactive un défaut à true).
+  run("interaction : les deux capacités (surcharge d'instance)", true, interactionEntity("e-both").observable && interactionEntity("e-both").interactable);
+  run(
+    "interaction : ni l'une ni l'autre (surcharge d'instance désactive le défaut du type)",
+    true,
+    !interactionEntity("e-neither").observable && !interactionEntity("e-neither").interactable
+  );
+
+  // Validation au chargement : type invalide -> échec clair, même politique
+  // que blocksMovement.
+  function expectInteractionRejected(field, value) {
+    let rejected = false;
+    try {
+      parseLevel(
+        { id: "movement-check-interaction-invalid", titleKey: "level.demo.title", length: 10, playerStart: 0, entities: [{ id: "bad", type: "plain", x: 5, [field]: value }] },
+        INTERACTION_REGISTRY
+      );
+    } catch {
+      rejected = true;
+    }
+    return rejected;
+  }
+  run("interaction : observable non booléen rejeté", true, expectInteractionRejected("observable", "oui"));
+  run("interaction : interactable non booléen rejeté", true, expectInteractionRejected("interactable", "oui"));
+
   // --- Robustesse : chevauchement de corps (curatif, au tick) ---
 
   const OVERLAP_REGISTRY = { wall: { label: "entity.wall", blocksMovement: true } };

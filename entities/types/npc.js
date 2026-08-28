@@ -29,5 +29,8 @@ export default {
     movement: { path: "assets/sounds/footsteps/shoes_walk", loop: false },
   },
   blocksMovement: false,
-  enterable: false,
+  observable: true,
+  // interactable:true (anticipe "parler", voir entities/model.md) : candidat
+  // à entrée dès aujourd'hui, action encore générique (stub) pour l'instant.
+  interactable: true,
 };

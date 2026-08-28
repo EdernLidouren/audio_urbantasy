@@ -15,6 +15,7 @@ export default {
   "menu.main.options": "Options",
 
   "menu.interaction.title": "Interagir",
+  "menu.interaction.observe.title": "Observer",
 
   "menu.pause.title": "Pause",
   "menu.pause.options": "Options",
