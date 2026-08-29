@@ -28,7 +28,19 @@ import { pickupEntity, lootEntity, lootEntitySpawn } from "../core/money.js";
 import { pickupItemEntity, dropItem } from "../core/bag.js";
 import { ITEM_REGISTRY } from "../core/items.js";
 import { isDebugEnabled } from "../config/debug.js";
-import { advanceTime, minuteOfHour, hourOfDay, dayOfMonth, monthOfYear, seasonOfYear, yearNumber, SEASON_KEYS } from "../core/time.js";
+import {
+  advanceTime,
+  minuteOfHour,
+  hourOfDay,
+  dayOfMonth,
+  monthOfYear,
+  seasonOfYear,
+  yearNumber,
+  weekdayOf,
+  SEASON_KEYS,
+  MONTH_KEYS,
+  WEEKDAY_KEYS,
+} from "../core/time.js";
 import registry from "../entities/types/index.js";
 import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
 import { saveGame } from "./save-storage.js";
@@ -43,14 +55,21 @@ function pad2(n) {
   return String(n).padStart(2, "0");
 }
 
+// Composants NOMMÉS fournis au gabarit "time.announce" — le code ne décide
+// d'AUCUN ordre ni ponctuation, seule la chaîne i18n (une par langue) le
+// fait (voir i18n/fr.js/en.js) : weekday/month/season sont déjà résolus en
+// texte ICI (t(...) sur leur clé) avant d'être interpolés, comme season
+// l'était déjà — interpolate() ne fait que remplacer des chaînes dans un
+// gabarit, jamais une traduction imbriquée.
 function announceGameTime(session) {
   const { time } = session;
   announce(
     t("time.announce", {
       hour: pad2(hourOfDay(time)),
       minute: pad2(minuteOfHour(time)),
+      weekday: t(WEEKDAY_KEYS[weekdayOf(time)]),
       day: dayOfMonth(time),
-      month: monthOfYear(time),
+      month: t(MONTH_KEYS[monthOfYear(time) - 1]),
       season: t(SEASON_KEYS[seasonOfYear(time)]),
       year: yearNumber(time),
     })

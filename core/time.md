@@ -21,6 +21,7 @@ dans `core/time.js` :
 | `hourOfDay`      | heure dans le jour courant, 0-23      |
 | `dayOfMonth`     | jour dans le mois courant, 1-30       |
 | `monthOfYear`    | mois dans l'année courante, 1-12      |
+| `weekdayOf`      | jour de semaine, index 0-6 (voir `WEEKDAY_KEYS`, "Jour de semaine" plus bas) |
 | `seasonOfYear`   | index de saison, 0-3 (voir `SEASON_KEYS`) |
 | `yearNumber`     | année de partie, 1-indexée            |
 
@@ -41,6 +42,25 @@ Toutes les longueurs (`minutesPerHour`, `hoursPerDay`, `daysPerMonth`,
 `monthsPerYear`, `monthsPerSeason`) sont des constantes déclaratives dans
 `config/time-values.js` (`TIME_CONFIG`), zéro import, lues directement par
 `core/time.js` — jamais codées en dur dans la logique de dérivation.
+
+Les MOIS gardent leurs noms grégoriens (janvier..décembre, `MONTH_KEYS`,
+`i18n/*.js`) même si le calendrier de jeu les fait tous durer 30 jours — un
+choix de NOMS, pas une reconstitution du calendrier lui-même.
+
+## Jour de semaine
+
+`weekdayOf(time)` : dérivation PURE, comme les autres — jours écoulés depuis
+l'origine (`Math.floor(time / MINUTES_PER_DAY)`, le jour 1 valant 0 jour
+écoulé) MODULO 7, décalés par `weekdayOrigin` (`config/time-values.js` :
+jour de semaine du jour 1, 0 = lundi dans `WEEKDAY_KEYS`). PAS un découpage
+en semaines calées sur le mois/l'année : un cycle de 7 qui tourne en continu
+sur le compteur unique, indépendant des frontières de mois/année.
+
+Conséquence ASSUMÉE, pas un bug : l'année de jeu fait 360 jours, non
+multiple de 7 — le jour de semaine du jour 1 d'une année dérive donc d'une
+année sur l'autre (l'année 2 ne commence pas nécessairement le même jour de
+semaine que l'année 1). Sans conséquence tant qu'aucun gameplay ne se cale
+sur un jour de semaine précis.
 
 ## Avancement accéléré
 
@@ -149,12 +169,22 @@ coupés par l'état dormant, la réaction vue par diff) : `entities/model.md`,
 
 ## Vérification manuelle (touche "t")
 
-Sur l'écran de jeu, "t" (discrète, sans effet sur le déplacement) annonce heure puis
-date (canal `liveRegion`, `i18n` : clé `time.announce` + `time.season.*`). C'est
-l'outil de test à l'oreille : jouer quelques minutes et appuyer sur "t" régulièrement
-doit montrer l'heure avancer au rythme de `TIME_SCALE`, et la date rouler
-correctement (minuit → jour suivant, fin de mois → mois suivant, fin d'année → saison
-qui repart à `printemps`).
+Sur l'écran de jeu, "t" (discrète, sans effet sur le déplacement) annonce heure et
+date (canal `liveRegion`, `i18n` : clé `time.announce` + `time.season.*`/
+`month.*`/`weekday.*`). C'est l'outil de test à l'oreille : jouer quelques minutes
+et appuyer sur "t" régulièrement doit montrer l'heure avancer au rythme de
+`TIME_SCALE`, et la date rouler correctement (minuit → jour suivant + jour de
+semaine qui avance, fin de mois → mois suivant, fin d'année → saison qui repart à
+`printemps`).
+
+`view/city-screen.js`/`announceGameTime` fournit à `t("time.announce", {...})` des
+composants NOMMÉS déjà résolus (`weekday`, `day`, `month`, `season`, `year`, `hour`,
+`minute` — `weekday`/`month`/`season` déjà traduits via leur propre clé, comme des
+sous-traductions résolues AVANT interpolation, `interpolate()` ne faisant jamais de
+traduction imbriquée) : le code ignore tout de l'ORDRE d'affichage, qui vit
+ENTIÈREMENT dans le gabarit `time.announce` de chaque locale (`i18n/fr.js` place le
+jour avant le mois ; `i18n/en.js` le mois avant le jour) — changer de langue change
+l'ordre sans toucher au code.
 
 ## Chantiers réservés, pas câblés
 

@@ -79,7 +79,10 @@ export default {
   "save.import_confirm_title": "Importer cette partie remplacera la partie en cours. Confirmer ?",
   "save.imported": "Partie importée.",
 
-  "time.announce": "{hour} h {minute}. Jour {day} du mois {month}, {season}, année {year}.",
+  // Ordre des composants PROPRE À CETTE LANGUE (jour avant mois, à la
+  // française) — le code ne fournit que des composants nommés déjà résolus
+  // (voir view/city-screen.js/announceGameTime), jamais un ordre.
+  "time.announce": "{weekday} {day} {month}, {season}, année {year}. {hour} h {minute}.",
   // Nom de monnaie BATEAU et PROVISOIRE — voir core/money.js, changeable
   // sans toucher au mécanisme (juste ces deux chaînes).
   "money.announce": "{amount} pièces.",
@@ -88,6 +91,30 @@ export default {
   "time.season.summer": "été",
   "time.season.autumn": "automne",
   "time.season.winter": "hiver",
+  // Noms grégoriens des mois (voir core/time.js/MONTH_KEYS) — minuscules,
+  // comme les saisons ci-dessus (usage français courant en milieu de
+  // phrase).
+  "month.1": "janvier",
+  "month.2": "février",
+  "month.3": "mars",
+  "month.4": "avril",
+  "month.5": "mai",
+  "month.6": "juin",
+  "month.7": "juillet",
+  "month.8": "août",
+  "month.9": "septembre",
+  "month.10": "octobre",
+  "month.11": "novembre",
+  "month.12": "décembre",
+  // Jours de semaine (voir core/time.js/WEEKDAY_KEYS,
+  // config/time-values.js/weekdayOrigin) — même convention minuscule.
+  "weekday.0": "lundi",
+  "weekday.1": "mardi",
+  "weekday.2": "mercredi",
+  "weekday.3": "jeudi",
+  "weekday.4": "vendredi",
+  "weekday.5": "samedi",
+  "weekday.6": "dimanche",
 
   "level.demo.title": "Niveau de démo",
   "entity.door": "Porte",

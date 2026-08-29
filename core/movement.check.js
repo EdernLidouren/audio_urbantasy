@@ -32,6 +32,8 @@ import { SURFACE_REGISTRY, DEFAULT_SURFACE, surfaceAt, surfaceProps, surfaceProp
 import {
   INITIAL_TIME,
   SEASON_KEYS,
+  MONTH_KEYS,
+  WEEKDAY_KEYS,
   advanceTime,
   minuteOfHour,
   hourOfDay,
@@ -39,6 +41,7 @@ import {
   monthOfYear,
   seasonOfYear,
   yearNumber,
+  weekdayOf,
   phaseAt,
 } from "./time.js";
 import { TIME_CONFIG } from "../config/time-values.js";
@@ -822,6 +825,38 @@ export function runMovementChecks() {
     "horloge : les 12 mois se répartissent en 4 saisons de 3 mois consécutifs",
     JSON.stringify([0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3]),
     JSON.stringify(seasonsByMonth)
+  );
+
+  // Jour de semaine (weekdayOf) : dérivation PURE, jours écoulés modulo 7,
+  // décalée par weekdayOrigin (config/time-values.js). MONTH_KEYS/
+  // WEEKDAY_KEYS : couverture de taille, comme SEASON_KEYS ci-dessus.
+  run("horloge : MONTH_KEYS couvre les 12 mois", 12, MONTH_KEYS.length);
+  run("horloge : WEEKDAY_KEYS couvre les 7 jours", 7, WEEKDAY_KEYS.length);
+  run("horloge : jour de semaine de départ = weekdayOrigin (jour 1)", TIME_CONFIG.weekdayOrigin, weekdayOf(timeState.time));
+
+  const oneDayMinutes = TIME_CONFIG.hoursPerDay * TIME_CONFIG.minutesPerHour;
+  // Rester dans le MÊME jour (avant minuit) ne fait jamais avancer le jour
+  // de semaine — seul le FRANCHISSEMENT de minuit le fait (voir plus bas).
+  const sameDayLater = advanceTime(timeState, oneDayMinutes - INITIAL_TIME - 1); // 23:59 du jour 1
+  run("horloge : jour de semaine inchangé tant qu'on reste dans le même jour", weekdayOf(timeState.time), weekdayOf(sameDayLater.time));
+  const nextDayState = advanceTime(sameDayLater, 1); // minuit, jour 2
+  run(
+    "horloge : le jour de semaine avance de 1 (modulo 7) au passage de minuit",
+    (weekdayOf(timeState.time) + 1) % 7,
+    weekdayOf(nextDayState.time)
+  );
+
+  // Cycle complet de 7 jours : lundi -> ... -> dimanche -> lundi, jamais un
+  // découpage en semaines calées sur le mois/l'année (voir le commentaire de
+  // weekdayOf) — vérifié en avançant 7 jours pleins depuis l'origine.
+  const sevenDaysLater = advanceTime(timeState, 7 * oneDayMinutes);
+  run("horloge : après 7 jours pleins, le jour de semaine boucle exactement", weekdayOf(timeState.time), weekdayOf(sevenDaysLater.time));
+  const weekdaysOverTenDays = [];
+  for (let d = 0; d < 10; d++) weekdaysOverTenDays.push(weekdayOf(advanceTime(timeState, d * oneDayMinutes).time));
+  run(
+    "horloge : séquence de jours de semaine sur 10 jours, cycle de 7 respecté",
+    JSON.stringify([0, 1, 2, 3, 4, 5, 6, 0, 1, 2].map((offset) => (offset + TIME_CONFIG.weekdayOrigin) % 7)),
+    JSON.stringify(weekdaysOverTenDays)
   );
 
   // Granularité minute : un delta fractionnaire (< 1 minute) s'accumule

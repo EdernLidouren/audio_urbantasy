@@ -31,4 +31,12 @@ export const TIME_CONFIG = {
   // plus tard à d'autres phases sans changer cette table, juste sa lecture.
   dayStartHour: 6,
   nightStartHour: 9,
+
+  // Jour de semaine du jour 1 d'une partie neuve — index dans
+  // weekday.0..weekday.6 (i18n/*.js, voir core/time.js/weekdayOf). 0 = le
+  // premier de WEEKDAY_KEYS (lundi en fr). Choix ARBITRAIRE (aucun
+  // calendrier réel à faire correspondre) : fixé ici pour que weekdayOf
+  // reste une dérivation PURE du compteur, jamais une valeur stockée à
+  // part.
+  weekdayOrigin: 0,
 };

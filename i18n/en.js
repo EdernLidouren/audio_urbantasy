@@ -78,13 +78,39 @@ export default {
   "save.import_confirm_title": "Importing this game will replace the current game. Confirm?",
   "save.imported": "Game imported.",
 
-  "time.announce": "{hour}:{minute}. Day {day} of month {month}, {season}, year {year}.",
+  // Component ORDER is specific to this language (month before day, US
+  // convention) — the code only supplies named, already-resolved
+  // components (see view/city-screen.js/announceGameTime), never an order.
+  "time.announce": "{weekday}, {month} {day}, {season}, year {year}. {hour}:{minute}.",
   "money.announce": "{amount} coins.",
   "position.announce": "Position: {x}.",
   "time.season.spring": "spring",
   "time.season.summer": "summer",
   "time.season.autumn": "autumn",
   "time.season.winter": "winter",
+  // Gregorian month names (see core/time.js/MONTH_KEYS) — capitalized, as
+  // English convention requires for month names (unlike season names above).
+  "month.1": "January",
+  "month.2": "February",
+  "month.3": "March",
+  "month.4": "April",
+  "month.5": "May",
+  "month.6": "June",
+  "month.7": "July",
+  "month.8": "August",
+  "month.9": "September",
+  "month.10": "October",
+  "month.11": "November",
+  "month.12": "December",
+  // Weekday names (see core/time.js/WEEKDAY_KEYS,
+  // config/time-values.js/weekdayOrigin) — capitalized, same convention.
+  "weekday.0": "Monday",
+  "weekday.1": "Tuesday",
+  "weekday.2": "Wednesday",
+  "weekday.3": "Thursday",
+  "weekday.4": "Friday",
+  "weekday.5": "Saturday",
+  "weekday.6": "Sunday",
 
   "level.demo.title": "Demo level",
   "entity.door": "Door",
