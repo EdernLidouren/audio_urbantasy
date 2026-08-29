@@ -115,6 +115,11 @@ const MUSIC_CROSSFADE_MS = TUNING_DEFAULTS.musicCrossfadeMs;
 // des constantes de forme de courbe, pas des réglages par entité.
 const FULL_VOLUME = TUNING_DEFAULTS.fullVolume;
 const FAR_VOLUME_MAX = TUNING_DEFAULTS.farVolumeMax;
+// Fourchette du délai de démarrage aléatoire des balises (désempilement
+// d'attaques, voir buildEntitySoundEntry plus bas) — partagée, jamais
+// résolue par entité.
+const BEACON_STAGGER_MIN_MS = TUNING_DEFAULTS.beaconStaggerMinMs;
+const BEACON_STAGGER_MAX_MS = TUNING_DEFAULTS.beaconStaggerMaxMs;
 
 // Réverb : propriétés du bus lui-même (un seul par scène, jamais par
 // entité). Durée/decay sont surchargeables PAR LIEU (level.reverbDurationSec/
@@ -219,6 +224,18 @@ function randomRate(pitchVariation) {
 // l'intervalle lui-même (config extrême) — jamais un délai négatif.
 function jitteredIntervalMs(interval, variation) {
   return Math.max(0, interval + (Math.random() * 2 - 1) * variation);
+}
+
+// Délai de démarrage ALÉATOIRE (voir BEACON_STAGGER_MIN_MS/MAX_MS,
+// lib/audio.js/createPositionedSound startDelayMs) — désempile l'attaque
+// d'une balise CONTINUE nouvellement créée par rapport aux autres démarrées
+// dans la même fenêtre (montage de scène ou apparition tardive groupée,
+// voir buildEntitySoundEntry, seul appelant). Aléa de RENDU, Math.random()
+// comme randomRate/jitteredIntervalMs ci-dessus — jamais le PRNG seedé du
+// core, aucun effet sur l'état de partie (voir "Déterminisme et rendu
+// audio", entities/model.md).
+function drawBeaconStaggerDelayMs() {
+  return BEACON_STAGGER_MIN_MS + Math.random() * (BEACON_STAGGER_MAX_MS - BEACON_STAGGER_MIN_MS);
 }
 
 // Clés de cascade propres à chaque RÔLE de source positionnée intermittente
@@ -459,6 +476,14 @@ function buildEntitySoundEntry(entity, world, time) {
       beaconGain = resolveTuning("beaconGain", entity, beacon);
       beaconReverbSend = resolveTuning("reverbSend", entity, beacon);
       const beaconPitchVariation = resolveTuning("pitchVariation", entity, beacon);
+      // staggerBeacon (défaut true, voir config/tuning-values.js) :
+      // OPT-OUT du désempilement d'attaques — appliqué INDISTINCTEMENT à
+      // TOUTE balise continue nouvellement créée ici (montage de scène OU
+      // apparition tardive groupée, voir syncNewEntitySounds), jamais
+      // seulement si "plusieurs à la fois" sont détectées (voir
+      // entities/model.md) : un délai isolé de quelques dizaines de ms est
+      // imperceptible.
+      const staggerBeacon = resolveTuning("staggerBeacon", entity, beacon);
       // pitchVariation, s'il y en a une, tirée UNE FOIS ici (voir la note
       // du header sur les balises continues). cacheKey: entity.id — stable
       // d'une visite à l'autre (voir lib/audio.js/createPositionedSound) :
@@ -467,6 +492,7 @@ function buildEntitySoundEntry(entity, world, time) {
       sound = createPositionedSound(resolveAsset(beacon.path), {
         rate: randomRate(beaconPitchVariation),
         cacheKey: entity.id,
+        startDelayMs: staggerBeacon ? drawBeaconStaggerDelayMs() : 0,
       });
     } else {
       intermittentSources.push(resolveIntermittentSource(entity, beacon, BEACON_TUNING_KEYS));

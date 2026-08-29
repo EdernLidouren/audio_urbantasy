@@ -632,6 +632,10 @@ code. Consulter directement ce fichier pour la valeur courante d'un défaut.
   vocaux à la fois (même catégorie utilisateur "présence d'entité", voir
   `view/audio/city-scene.js`) : les deux facteurs se multiplient entre eux,
   l'un global au joueur, l'autre propre au contenu.
+- **`staggerBeacon`** — booléen, défaut `true`. OPT-OUT du désempilement
+  d'attaques (voir "Désempilement d'attaques" plus bas) : `false` fait
+  démarrer CETTE balise précisément, sans le léger délai aléatoire appliqué
+  par défaut à tout démarrage groupé.
 - **`vocalInterval`** / **`vocalIntervalVariation`** — mêmes rôles que
   `beaconInterval`/`beaconIntervalVariation`, mais pour le VOCAL (toujours
   intermittent — ces deux réglages s'appliquent donc TOUJOURS, contrairement
@@ -671,12 +675,60 @@ code. Consulter directement ce fichier pour la valeur courante d'un défaut.
   `exitSound` (voir "Sons de transition" plus haut) — un rôle de son, un
   gain qui lui est propre, indépendant de celui du beacon.
 
+### Désempilement d'attaques
+
+Toute balise CONTINUE nouvellement créée (voir `view/audio/city-scene.js`/
+`buildEntitySoundEntry`) dont `staggerBeacon` reste `true` voit son
+DÉMARRAGE (pas son volume, voir plus bas) retardé d'un court délai aléatoire
+— `[beaconStaggerMinMs, beaconStaggerMaxMs]`, `config/tuning-values.js`
+(20-180 ms par défaut) — pour désempiler l'attaque de plusieurs balises qui
+démarreraient sinon toutes dans la même fenêtre :
+
+- **Deux démarrages GROUPÉS aujourd'hui** : le montage d'une scène (toutes
+  les balises initiales créées dans la même boucle) et un spawn GROUPÉ
+  d'éphémères (voir "Spawn déclenché par une action" plus bas — plusieurs
+  entités découvertes par `syncNewEntitySounds` au même tick). Les DEUX
+  passent par `buildEntitySoundEntry`, la MÊME fonction — un seul mécanisme,
+  jamais dupliqué entre les deux situations.
+- **Appliqué INDISTINCTEMENT**, jamais seulement si "plusieurs à la fois"
+  sont détectées : pas de logique de regroupement à maintenir, et un délai
+  isolé de quelques dizaines de ms sur une balise seule reste imperceptible
+  — la simplicité l'emporte sur une détection inutilement fine.
+- **Retarde le DÉMARRAGE réel, pas le volume** (`lib/audio.js`/
+  `createPositionedSound`, option `startDelayMs`) : le volume d'une balise
+  reste à 0 tant qu'`applyEntityAudio` ne l'a pas calculé de toute façon
+  (voir plus bas dans `view/audio/city-scene.js`) — retarder SEULEMENT le
+  volume révélerait la voix en cours de boucle, après que son attaque (t=0)
+  soit déjà passée silencieusement, ratant l'effet recherché. Retarder
+  `howl.play()` lui-même fait tomber l'attaque RÉELLEMENT au moment décalé.
+  COURT délibérément : un désempilement d'attaques, jamais un fondu
+  d'apparition — une scène doit se sentir présente d'emblée, pas "s'allumer
+  une par une".
+- **Annulation propre** : si l'entité disparaît ou devient dormante AVANT la
+  fin de son délai, `stop()` (déjà appelé dans ces deux cas, voir
+  `cleanupRemovedEntities`/`muteConsumedBeacons`/`applyEntityAudio`)
+  ANNULE le démarrage différé (timer explicitement annulé, jamais un simple
+  drapeau ignoré) — jamais de son fantôme qui partirait quand même après
+  coup. Aucun changement requis dans `view/audio/city-scene.js` pour ça :
+  TOUT appel existant à `sound.stop()` en bénéficie automatiquement, la
+  garantie vit dans `lib/audio.js`.
+- **Jamais un beacon déjà en cours** : ce délai ne s'applique qu'à la toute
+  PREMIÈRE mise en son (création de la voix) — une reprise après pause/
+  bascule de présence (`sound.resume()`) n'est jamais concernée. Revenir
+  dans une scène RECONSTRUIT `entitySounds` de zéro (voir
+  `createCityAudioScene`) : un nouveau démarrage groupé, donc un nouveau
+  décalage à chaque visite — c'est le comportement voulu, pas une fuite.
+- **Purement cosmétique, hors core** : n'affecte ni le ramassage, ni aucune
+  règle de jeu, ni le déterminisme de la simulation (voir plus bas) — un
+  décalage de quelques dizaines de ms sur QUAND un son devient audible,
+  rien de plus.
+
 ### Déterminisme et rendu audio
 
-`beaconIntervalVariation`, `vocalIntervalVariation` et `pitchVariation`
-utilisent `Math.random()`, jamais le PRNG seedé du core (`core/rng.js`) —
-même politique pour les deux intervalles, aucune raison de les traiter
-différemment. C'est un aléa de RENDU pur,
+`beaconIntervalVariation`, `vocalIntervalVariation`, `pitchVariation` et le
+délai de désempilement d'attaques ci-dessus utilisent `Math.random()`,
+jamais le PRNG seedé du core (`core/rng.js`) — même politique pour les
+quatre, aucune raison de les traiter différemment. C'est un aléa de RENDU pur,
 sans aucun effet sur l'état de partie (position, comportement, save...).
 Coupler ce genre de détail cosmétique au PRNG du core reviendrait à faire
 porter à la simulation déterministe un souci qui ne la concerne pas — même

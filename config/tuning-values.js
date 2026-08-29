@@ -114,6 +114,19 @@ export const TUNING_DEFAULTS = {
   // resolveMusicForPhase, jouée directement, sans fondu).
   musicCrossfadeMs: 2000,
 
+  // Fourchette (ms) du délai de démarrage ALÉATOIRE appliqué à toute balise
+  // CONTINUE nouvellement créée dont staggerBeacon reste true (voir plus
+  // bas ; view/audio/city-scene.js/buildEntitySoundEntry) — désempile les
+  // attaques d'un démarrage GROUPÉ (montage de scène, spawn groupé
+  // d'éphémères), sans jamais détecter s'il y en a réellement plusieurs :
+  // appliqué indistinctement, un délai isolé de quelques dizaines de ms
+  // reste imperceptible. COURTE délibérément (désempilement d'attaques, pas
+  // un fondu d'apparition — une scène doit se sentir présente d'emblée).
+  // Lues DIRECTEMENT (comme moveStep/stepDistance plus haut), jamais via la
+  // cascade resolveTuning : un réglage PARTAGÉ, pas par entité/son.
+  beaconStaggerMinMs: 20,
+  beaconStaggerMaxMs: 180,
+
   // --- Paramètres sonores d'entité (cascade son -> instance -> archétype ->
   // défaut global, voir entities/model.md et config/tuning.js/resolveTuning)
   // : les clés ci-dessous rejoignent reverbSend plus haut dans ce même
@@ -143,6 +156,15 @@ export const TUNING_DEFAULTS = {
   // config/preferences.js) qui règle TOUTES les balises à la fois : celui-ci
   // règle CETTE balise. Les deux se multiplient entre eux.
   beaconGain: 1,
+  // OPT-OUT du désempilement d'attaques (voir beaconStaggerMinMs/
+  // beaconStaggerMaxMs plus bas, view/audio/city-scene.js) : true (défaut)
+  // -> cette balise participe au léger délai aléatoire appliqué à tout
+  // démarrage GROUPÉ (montage de scène, spawn groupé d'éphémères). false ->
+  // démarre PRÉCISÉMENT, sans délai — pour un son dont le retard serait
+  // perçu comme de la latence (événement synchronisé, ex. un futur signal
+  // temporel exact). Résolu comme tout autre paramètre sonore (cascade
+  // son -> instance -> archétype -> ce défaut).
+  staggerBeacon: true,
   // Variation de hauteur (fraction du taux de lecture, 0-1) appliquée
   // aléatoirement à chaque lecture d'un son PONCTUEL (balise intermittente
   // ou son de déplacement) : le taux de lecture est tiré uniformément dans
