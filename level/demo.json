@@ -9,6 +9,7 @@
   "defaultSurface": "dirt",
   "segments": [{ "from": 15, "to": 35, "surface": "grass" }],
   "entities": [
+    { "id": "money-1", "type": "money", "x": 5 },
     { "id": "object-toolbox", "type": "object", "x": 8, "nameKey": "object.toolbox", "descriptionKey": "object.toolbox.description" },
     { "id": "door-exit", "type": "door", "x": 9, "nameKey": "door.exit", "target": "demo2", "descriptionKey": "door.exit.description" },
     {
@@ -29,7 +30,7 @@
           ]
         },
         {
-          "when": { "type": "timeRange", "from": 9, "to": 24 },
+          "when": { "type": "timeRange", "from": 20, "to": 24 },
           "effects": [{ "type": "behavior", "behavior": { "kind": "goto", "targetId": "door-exit" } }]
         }
       ]

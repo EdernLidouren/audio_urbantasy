@@ -10,9 +10,12 @@ export default {
     beacon: { path: "assets/sounds/entities/door_beacon_1.mp3", loop: true },
   },
   blocksMovement: false,
-  // observable : a une description. interactable : entrée déclenche la
-  // transition (voir view/interaction.js) — ANCIEN enterable:true, renommé
-  // (système d'interaction niveau 0, voir entities/model.md).
   observable: true,
   interactable: true,
+  // action:{kind:"transit"} — la porte rejoint l'aiguillage d'actions par
+  // kind (voir view/interaction.js/ACTION_HANDLERS) : entrée déclenche la
+  // transition vers `target` (voir plus bas dans le niveau qui l'instancie)
+  // via le même mécanisme que tout autre kind, plus de court-circuit
+  // `entity.type === "door"` dans la vue.
+  action: { kind: "transit" },
 };

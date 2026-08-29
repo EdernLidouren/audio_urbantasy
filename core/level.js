@@ -91,8 +91,22 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
     fail(`entities[${index}] n'est pas un objet.`);
   }
 
-  const { id, type, x, target, nameKey, descriptionKey, behavior, blocksMovement, observable, interactable, tuning, presence } =
-    rawEntity;
+  const {
+    id,
+    type,
+    x,
+    target,
+    nameKey,
+    descriptionKey,
+    consumedDescriptionKey,
+    behavior,
+    blocksMovement,
+    observable,
+    interactable,
+    action,
+    tuning,
+    presence,
+  } = rawEntity;
 
   if (!isNonEmptyString(id)) {
     fail(`entities[${index}].id manquant ou invalide.`);
@@ -115,6 +129,16 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
   // par l'interaction "describe" (voir view/interaction.js). Peut rester
   // undefined si ni l'instance ni le type n'en fournissent une (ex. decor).
   const resolvedDescriptionKey = isNonEmptyString(descriptionKey) ? descriptionKey : registry[type].descriptionKey;
+  // consumedDescriptionKey : même cascade instance -> type que
+  // descriptionKey ci-dessus — description ALTERNATIVE une fois l'entité
+  // "consumed" (voir core/state.js/markConsumed, entities/model.md/
+  // "Collectible persistant"). TRANSPORT pur, comme descriptionKey : le
+  // core ignore tout du sens de "consumed" en dehors de sa propre condition
+  // de présence (core/presence.js) — c'est view/interaction.js qui choisit
+  // laquelle des deux clés annoncer, jamais ici.
+  const resolvedConsumedDescriptionKey = isNonEmptyString(consumedDescriptionKey)
+    ? consumedDescriptionKey
+    : registry[type].consumedDescriptionKey;
   // blocksMovement : même cascade instance -> type que labelKey/
   // descriptionKey ci-dessus. Bakée ici, pas lue directement par
   // core/reduce.js dans le registre : le core ne connaît le registre qu'à
@@ -127,11 +151,11 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
   // d'interaction niveau 0, voir view/interaction.js) — même cascade que
   // blocksMovement, même défaut global (false, silence par défaut plutôt
   // qu'une capacité surprise). Volontairement des booléens PLATS ici (pas
-  // de sous-objet "capabilities") : la richesse future (ex. un TYPE d'action
-  // porté par une entité interactable, voir entities/model.md) viendra
-  // s'ajouter EN PLUS via d'autres champs, jamais en remplaçant celui-ci —
-  // le filtrage par verbe (view/audio/city-scene.js/getInteractionCandidates)
-  // ne lira jamais plus que ces deux booléens.
+  // de sous-objet "capabilities") : la richesse du TYPE d'action (voir
+  // `action` plus bas) s'ajoute EN PLUS via un champ séparé, jamais en
+  // remplaçant celui-ci — le filtrage par verbe
+  // (view/audio/city-scene.js/getInteractionCandidates) ne lit jamais plus
+  // que ces deux booléens.
   if (observable !== undefined && typeof observable !== "boolean") {
     fail(`entities[${index}] ("${id}") : observable doit être un booléen si présent.`);
   }
@@ -156,6 +180,9 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
   if (resolvedDescriptionKey !== undefined) {
     entity.descriptionKey = resolvedDescriptionKey;
   }
+  if (resolvedConsumedDescriptionKey !== undefined) {
+    entity.consumedDescriptionKey = resolvedConsumedDescriptionKey;
+  }
 
   if (type === "door") {
     if (!isNonEmptyString(target)) {
@@ -169,6 +196,27 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
   // reste immobile — comportement inchangé pour tout le contenu existant.
   if (behavior !== undefined) {
     entity.behavior = parseBehavior(behavior, index, id);
+  }
+
+  // action : optionnel, TYPE D'ACTION porté par une entité interactable
+  // (voir view/interaction.js) — { kind: <string>, ...paramètres }. Cascade
+  // instance -> type, comme behavior. TRANSPORT générique comme tuning
+  // plus bas : validé en FORME seulement (objet avec un kind non vide),
+  // JAMAIS le kind lui-même contre un registre de types connus — cet
+  // aiguillage reste entièrement côté vue (ACTION_HANDLERS,
+  // view/interaction.js), le core ignore tout du SENS d'un kind, comme il
+  // ignore déjà le sens d'une clé de tuning. Un kind inconnu à
+  // l'INTERACTION (pas au chargement) se dégrade proprement, voir
+  // view/interaction.js.
+  const resolvedAction = action !== undefined ? action : registry[type].action;
+  if (resolvedAction !== undefined) {
+    if (typeof resolvedAction !== "object" || resolvedAction === null || Array.isArray(resolvedAction)) {
+      fail(`entities[${index}] ("${id}") : action doit être un objet si présent.`);
+    }
+    if (!isNonEmptyString(resolvedAction.kind)) {
+      fail(`entities[${index}] ("${id}") : action.kind doit être une chaîne non vide.`);
+    }
+    entity.action = resolvedAction;
   }
 
   // tuning : surcharges d'INSTANCE pour la cascade de réglages

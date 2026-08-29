@@ -40,16 +40,12 @@ une balise `interactable:false` jamais candidate à Entrée, même à portée.
   Exemples : `rock`/`bird`/`fountain`/`hound`/`dog`/`buddy`/`neon`
   (observables, non interactables), `decor` (aucune des deux — preset de
   référence pour ce cas, voir `entities/types/decor.js`).
-- **`interactable`** — candidate à Entrée. Aujourd'hui, une action
-  GÉNÉRIQUE (stub, voir `view/interaction.js`/`interact`) — sauf `door`, qui
-  déclenche déjà sa transition. `npc`/`object` sont interactables dès ce
-  niveau 0 EN ANTICIPATION d'un futur type d'action différencié
-  (parler/ramasser — pas codé ici, voir le commentaire "IMPORTANT" dans
-  `core/level.js`/`parseEntity`) : le booléen d'aujourd'hui n'est qu'une
-  valeur POSSIBLE du champ, une entité future pourra y porter un descripteur
-  plus riche (ex. `{ type: "talk" }`) sans que le FILTRAGE par verbe n'ait à
-  changer — il ne teste jamais que la véracité du champ (`Boolean(...)`),
-  jamais son type exact.
+- **`interactable`** — candidate à Entrée. `npc`/`object` sont interactables
+  dès ce niveau 0 EN ANTICIPATION d'un futur type d'action (parler/
+  ramasser) au-delà de `"pickup"` (voir plus bas) : le filtrage par verbe ne
+  teste jamais que la véracité du champ (`Boolean(...)`), jamais un type
+  exact — une entité interactable SANS `action` déclarée reste un stub
+  silencieux (voir "Types d'action" plus bas).
 
 Deux niveaux de PERCEPTION, à ne pas confondre :
 
@@ -75,6 +71,206 @@ précis (une entité interactable au milieu de trois observables : Entrée agit
 direct, Espace ouvre un menu à trois). Aucun candidat -> `null` ->
 SILENCE TOTAL, jamais un son ou une annonce vide (accessibilité assumée : un
 bip parasite pollue plus qu'il n'informe).
+
+### Types d'action (aiguillage par kind)
+
+Une entité `interactable` porte OPTIONNELLEMENT `action: { kind: <string>,
+...paramètres }` (cascade instance -> type, comme `presence`/`behavior` —
+voir `core/level.js`). Le CORE ne valide que la FORME (objet, `kind` non
+vide) — jamais le `kind` contre une liste connue, ce registre-là vit
+ENTIÈREMENT côté vue (`view/interaction.js`/`ACTION_HANDLERS`, même principe
+que `core/presence.js`/`CONDITION_EVALUATORS`) : ajouter `"talk"`/un futur
+kind = une entrée de plus dans ce registre, jamais une refonte d'`interact`.
+Entité interactable SANS `action` (ex. `npc`/`object` aujourd'hui, avant un
+futur kind "talk"/"pickup" dédié) -> stub silencieux. `action.kind` déclaré
+mais absent du registre -> `console.warn` (bug de contenu signalé au
+développeur), jamais audible ni fatal pour le joueur.
+
+Trois kinds existent aujourd'hui :
+
+- **`"transit"`** (`door`) — délègue à la transition de porte déjà en place
+  (`entity.target`, gestionnaire enregistré par `view/city-screen.js`) :
+  MIGRÉ dans cet aiguillage depuis un ancien court-circuit `entity.type ===
+  "door"`, même effet exactement.
+- **`"pickup"`** (`money`, voir `entities/types/money.js`) — `{ kind:
+  "pickup", amount: <n> }`. Effet d'ÉTAT en CORE PUR
+  (`core/money.js`/`pickupEntity` : ajoute `amount` à `session.money` ET
+  retire l'entité du lieu actif, ATOMIQUEMENT — jamais l'un sans l'autre,
+  jamais un second gain sur une entité déjà ramassée), délégué depuis la vue
+  via le même mécanisme de gestionnaire enregistré que la porte
+  (`setPickupHandler`). Le retour sensoriel (son défensif, annonce "Ramassé
+  : N pièces") reste entièrement côté vue. Une entité ramassée ne réapparaît
+  JAMAIS : elle est retirée de `worlds[x].entities`, qui PERSISTE avec le
+  lieu (même garantie que tout le reste d'un monde rangé, voir "Partie
+  multi-lieux" dans `core/state.js`).
+- **`"loot"`** (`crate`, voir `entities/types/crate.js`) — `{ kind: "loot",
+  amount: <n> }`. COLLECTIBLE PERSISTANT : contrairement à `"pickup"`
+  ci-dessus, l'entité N'EST JAMAIS retirée — voir "Collectible persistant"
+  plus bas pour le détail complet (idempotence, effets post-activation
+  composables, exemples).
+
+`session.money` : entier, cercle PARTIE (comme `session.time`) — SEUL point
+d'écriture `core/money.js`/`addMoney`. Nom de monnaie ("pièces") délibérément
+bateau et provisoire (i18n uniquement, `money.announce`/`interaction.pickup`)
+— changer le nom ne touche à rien du mécanisme. Consultable à tout moment via
+la touche "g" (`view/city-screen.js`), lecture pure, canal liveRegion.
+
+## Collectible persistant
+
+Contrairement à l'action `"pickup"` (`money`, ci-dessus — l'entité DISPARAÎT
+du monde), un COLLECTIBLE PERSISTANT (`crate`, voir `entities/types/crate.js`)
+reste dans `worlds[x].entities` après activation : il change simplement
+d'ÉTAT. Le mécanisme, en trois couches strictement séparées :
+
+- **`entity.consumed`** (booléen, RUNTIME — comme `present`/`gotoArrived`,
+  JAMAIS un champ d'entrée du JSON de niveau) : `false`/absent tant que
+  l'entité n'a jamais été activée, posé UNE SEULE FOIS à `true` par
+  `core/state.js`/`markConsumed`. PERMANENT : rien dans ce système ne le
+  remet jamais à `false`.
+- **L'action `"loot"`** (`{ kind: "loot", amount: <n> }`, voir "Types
+  d'action" plus haut) — `core/money.js`/`lootEntity`, CORE PUR : ajoute
+  `amount` à `session.money` ET pose `consumed:true`, ATOMIQUEMENT (même
+  garantie que `pickupEntity` : jamais l'un sans l'autre). **IDEMPOTENCE** :
+  une entité déjà `consumed` -> RÉFÉRENCE INCHANGÉE, AUCUN gain — vérifié
+  EXPLICITEMENT avant toute écriture, le piège à éviter étant une caisse qui
+  refile son contenu à chaque activation. Le retour SENSORIEL (son, annonce
+  "Trouvé : N pièces") reste vue pure (`view/interaction.js`, même patron que
+  `"pickup"`) — mais cette fois la garde d'idempotence y est DUPLIQUÉE
+  volontairement (`entity.consumed` revérifié AVANT de jouer le son/annoncer) :
+  sans elle, réactiver une caisse déjà vide rejouerait le retour sensoriel
+  d'un gain qui n'a, lui, jamais eu lieu une seconde fois — `lootEntity` se
+  dégrade déjà silencieusement côté état, mais la VUE doit se taire aussi.
+- **Deux effets POST-ACTIVATION, COMPOSABLES** (déclarés par l'entité, au
+  choix du concepteur — l'un, l'autre, les deux, ou aucun — jamais un
+  comportement codé en dur pour "crate" spécifiquement) :
+  - **Changer d'état perceptible** — `consumedDescriptionKey` (cascade
+    instance -> type, comme `descriptionKey`, voir `core/level.js`) :
+    description alternative lue par `view/interaction.js`/
+    `resolveDescription` dès que `entity.consumed`. `muteOnConsumed`
+    (booléen, REGISTRE SEULEMENT — jamais cascadé par instance, contrairement
+    à `consumedDescriptionKey`) : arrête PERMANEMMENT le beacon continu de
+    l'entité dès que `consumed` passe à `true` (voir `view/audio/
+    city-scene.js`/`muteConsumedBeacons`, appelée une fois par tick comme
+    `cleanupRemovedEntities`). **Limite volontaire** : seule l'ABSENCE du
+    beacon est supportée, jamais un son DIFFÉRENT (un second fichier) —
+    remplacer la voix elle-même exigerait de recréer un Howl en cours de
+    scène, non construit ici (non exercé par le contenu actuel). L'entité
+    RESTE observable/interactable après cet effet seul — c'est ce qui le
+    distingue du suivant.
+  - **Devenir dormant** — PAS un champ propre à ce système : se déclare avec
+    le mécanisme de présence EXISTANT (`core/presence.js`), à l'INSTANCE (pas
+    à l'archétype, voir `entities/types/crate.js` qui n'en déclare aucune par
+    défaut) — voir `level/demo2.json`, `crate-warehouse`. Une entité
+    `consumed` alimente le registre de conditions (`core/presence.js`/
+    `CONDITION_EVALUATORS.consumed`) exactement comme `"timeRange"`/
+    `"arrived"` : AUCUNE retouche à `isPresent`/`resolveEntityRules`/
+    `core/reduce.js` n'a été nécessaire pour l'ajouter. PERMANENT par
+    construction (`consumed` ne repasse jamais à `false`). **DEUX règles
+    requises**, pas une seule (même "asymétrie documentée" que pour toute
+    présence conditionnelle, voir plus bas) : `{ when: { type: "consumed" },
+    present: false }` D'ABORD (priorité au premier rule actif), PUIS un
+    catch-all "présente par défaut" — `{ when: { type: "timeRange", from: 0,
+    to: 24 }, present: true }` (couvre TOUTE heure : pas une vraie contrainte
+    temporelle, juste l'idiome déjà en place pour "présente sinon", voir
+    l'habitant plus bas) — SANS cette seconde règle, l'entité serait dormante
+    EN PERMANENCE (avant *et* après consommation), aucune règle ne la
+    couvrant explicitement tant qu'elle n'est pas consumed. Coupe les TROIS
+    plans habituels de la dormance (comportement, audio, interaction, voir
+    "Présence conditionnelle" ci-dessous) une fois consumed, donc silencieuse
+    ET non examinable, contrairement à l'effet précédent seul.
+
+Exemple de référence — deux caisses, `level/demo2.json` :
+`crate-port` (perceptible seul : desc devient "vide", beacon coupé,
+reste interactable — réactiver ne redonne rien, silencieusement) et
+`crate-warehouse` (devient dormant : donne son contenu puis disparaît de
+toute perception, définitivement). Même archétype `crate` pour les deux —
+seule la présence D'INSTANCE distingue les deux comportements, illustrant que
+ce sont des PRESETS de propriétés composables, jamais une hiérarchie de
+sous-types (voir "Les sous-types sont des PRESETS" plus bas).
+
+## Entités éphémères
+
+À l'opposé du collectible persistant ci-dessus (l'entité SURVIT, change
+d'état) : une entité ÉPHÉMÈRE est créée EN COURS DE JEU, n'existe que pour
+la visite courante, et disparaît TOUJOURS sans laisser de trace — ramassée
+OU non. Marque distinctive : `entity.ephemeral === true`, un champ RUNTIME
+(comme `consumed`/`present`/`gotoArrived`) — jamais un champ d'entrée du
+JSON de niveau, une entité ÉPHÉMÈRE n'est par définition jamais DÉCLARÉE.
+
+- **Création** — `core/state.js`/`spawnEphemeral(session, spec, x)` : point
+  d'entrée UNIQUE et RÉUTILISABLE pour toute création d'entité en jeu (un
+  seul appelant aujourd'hui, la touche debug "e" — voir "Mode debug"
+  plus bas — mais rien dans le mécanisme n'est spécifique à ce cas :
+  une canette cassée, un objet lâché par un compagnon, un effet, pourront
+  s'y greffer plus tard). `spec` est un descripteur d'entité DÉJÀ RÉSOLU
+  (`type`, `labelKey`, `blocksMovement`, `observable`, `interactable`,
+  `action`...) — EXACTEMENT la forme qu'une entité obtient en sortie de
+  `core/level.js`/`parseEntity`, construit par L'APPELANT (voir
+  `createTestCompanion` dans `core/state.js`, même principe pour le
+  compagnon de test) : le core ne connaît AUCUN registre de types,
+  `spec.type` reste une étiquette opaque. `spawnEphemeral` pose lui-même
+  `id` (dérivé d'un compteur DÉDIÉ par monde, `world.nextEphemeralId` —
+  JAMAIS `Date.now()`/`Math.random()`, le core reste déterministe), `x` et
+  `ephemeral: true`.
+- **Rendu** — une entité éphémère est une entité COMME UNE AUTRE côté vue :
+  `view/audio/city-scene.js` la découvre au tick suivant sa création
+  (`syncNewEntitySounds`, appelée avant tout calcul positionné) et lui
+  construit une entrée `entitySounds` EXACTEMENT comme au montage de scène
+  (`buildEntitySoundEntry`, factorisée pour les deux cas) — son, occupation,
+  interaction fonctionnent sans aucun cas spécial. Seule différence
+  acceptée : pas de préchargement dédié (voir le commentaire de
+  `addLateEntitySoundEntry`) — un contenu créé en jeu peut accuser un tout
+  premier son légèrement en retard le temps d'un décodage à froid, jamais
+  un plantage.
+- **Ramassage** — réutilise l'action `"pickup"` telle quelle (voir
+  `core/money.js`/`pickupEntity`) : une entité éphémère ramassable porte
+  `action: { kind: "pickup", amount: <n> }` comme n'importe quelle autre —
+  aucune distinction de traitement, la robustesse au retrait déjà en place
+  (`view/audio/city-scene.js`/`cleanupRemovedEntities`, `present: false`
+  synthétisé pour toute entrée disparue de `world.entities`) couvre déjà ce
+  cas sans rien y ajouter.
+- **Exclusion de la sérialisation** — `core/save.js`/`serializeGame` retire
+  TOUTE entité `ephemeral` de TOUS les mondes avant d'écrire la sauvegarde
+  (jamais seulement du monde actif — la garantie ne doit dépendre d'aucun
+  autre mécanisme, voir son commentaire). Une partie rechargée ne fait
+  donc JAMAIS réapparaître un éphémère, quel que soit le moment de la
+  sauvegarde.
+- **Purge au départ** — `core/state.js`/`travelToWorld` retire les entités
+  éphémères du lieu qu'on quitte AU MOMENT de le ranger (geler un monde
+  parqué qui en contiendrait encore serait la seule façon dont un éphémère
+  pourrait survivre à une sortie de scène, en mémoire, pour une visite
+  ultérieure DANS LA MÊME partie — la sérialisation seule ne suffit pas à
+  l'empêcher). Revenir dans un lieu quitté : aucun éphémère d'avant, qu'il
+  ait été ramassé ou non.
+- **Limite anti-prolifération** — `MAX_EPHEMERALS` (`config/ephemerals.js`,
+  50 par défaut) : SEULES les entités éphémères comptent (jamais les
+  entités déclarées, dont le nombre est maîtrisé à l'écriture). Au
+  dépassement, `spawnEphemeral` ÉVINCE LE PLUS ANCIEN éphémère VIVANT (le
+  premier trouvé dans `world.entities`, dans l'ordre — les éphémères sont
+  toujours AJOUTÉS en fin de liste, jamais réordonnés, donc cet ordre EST
+  l'ordre de création) : transitoire par nature, cohérent qu'il cède la
+  place plutôt que de refuser la création demandée. Alternative "refuser le
+  nouveau" possible, non retenue ici.
+
+### Mode debug
+
+`config/debug.js` : un drapeau global minimal, désactivé par défaut,
+activable depuis la console (`window.toggleDebug()`, voir `main.js`, même
+patron que `window.runMovementChecks`) OU par la combinaison **Alt+D** en
+jeu (même fonction, deux chemins d'accès — voir l'écouteur câblé sur
+`gameZone` dans `main.js`, indépendant de la pile d'écrans, disponible quel
+que soit l'écran actif) — jamais un menu, jamais persisté (un mode debug ne doit jamais survivre à un rechargement de
+page ni à une sauvegarde, contrairement à `config/preferences.js`). Seul
+consommateur aujourd'hui : la touche "e" en ville (`view/city-screen.js`),
+qui fait apparaître une pièce éphémère (`spec` = archétype `money` existant,
+`entities/types/money.js`, réutilisé tel quel) à la position du joueur —
+active SEULEMENT si le drapeau est levé, sinon "e" ne fait RIEN (comportement
+inchangé pour tout joueur qui n'a jamais activé le mode). PAS "d" (touche
+suggérée à l'origine) : déjà liée au déplacement à droite (`view/input.js`,
+`RIGHT_KEYS`, convention ZQSD) — la réutiliser aurait fait apparaître une
+pièce à chaque premier appui d'un pas vers la droite en mode debug, jamais
+l'intention voulue. Infra volontairement minimale : d'autres outils de debug
+s'y grefferont plus tard derrière le MÊME drapeau, jamais un par outil.
 
 ## Présence conditionnelle et triggers de comportement
 

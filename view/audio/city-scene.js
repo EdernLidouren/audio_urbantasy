@@ -354,6 +354,164 @@ let activeScene = null;
 // getSession : accesseur (pas la session elle-même), car le core remplace
 // l'objet session à chaque tick (immutabilité) — update() doit relire l'état
 // courant à chaque appel plutôt que capturer une session figée à la création.
+// Construit l'entrée entitySounds d'UNE entité (config statique résolue une
+// fois : sons, portées, cascade de réglages, voix continue le cas échéant)
+// — EXTRAIT du montage de scène pour être réutilisé tel quel par
+// syncNewEntitySounds ci-dessous (voir createCityAudioScene), qui l'appelle
+// pour toute entité apparue APRÈS le montage (ex. entité ÉPHÉMÈRE, voir
+// core/state.js/spawnEphemeral, entities/model.md/"Entités éphémères") —
+// UNE SEULE construction, deux appelants (montage initial, apparition
+// tardive), jamais deux implémentations à maintenir en parallèle. `world`
+// sert UNIQUEMENT à résoudre le sol au spawn (surfaceAt) — pour une entité
+// tardive, c'est le monde du TICK courant, jamais un monde figé au
+// montage : son sol de départ doit refléter sa position RÉELLE au moment
+// où elle apparaît, pas celle d'une autre entité ni un instant passé.
+function buildEntitySoundEntry(entity, world, time) {
+  // beacon (localisation) et vocal (expression) : descripteurs de son du
+  // type, tous deux OPTIONNELS et indépendants (voir entities/model.md) —
+  // ni l'un ni l'autre n'est "le" son obligatoire d'une entité.
+  const sounds = registry[entity.type].sounds;
+  const beacon = sounds.beacon;
+  const vocal = sounds.vocal;
+  // enterSound/exitSound (voir core/presence.js) : rôles PONCTUELS
+  // distincts du beacon, optionnels et indépendants l'un de l'autre —
+  // résolus une fois ci-dessous (resolveTransitionSound), null si absent.
+  const enterSound = resolveTransitionSound(entity, sounds.enterSound, ENTER_SOUND_TUNING_KEYS);
+  const exitSound = resolveTransitionSound(entity, sounds.exitSound, EXIT_SOUND_TUNING_KEYS);
+
+  // Résolus une fois ici : statiques pour la durée de vie de la scène,
+  // propriétés de l'ENTITÉ (pas d'un rôle de son particulier) — partagées
+  // par le beacon, le vocal ET le son de déplacement ci-dessous.
+  const audibleRange = resolveTuning("audibleRange", entity);
+  const panSaturation = resolveTuning("panSaturation", entity);
+  const interactRange = resolveTuning("interactRange", entity);
+  const cutoffMin = resolveTuning("cutoffMin", entity);
+  const cutoffMax = resolveTuning("cutoffMax", entity);
+
+  // Son de déplacement (rôle "movement", voir entities/model.md) :
+  // DORMANT si l'archétype n'en porte pas — la plupart des types n'ont pas
+  // vocation à marcher. Cadencé par la DISTANCE parcourue, jamais par un
+  // intervalle de temps : traité à part des sources intermittentes
+  // ci-dessous (beacon/vocal), qui partagent, elles, le même mécanisme.
+  const movement = sounds.movement;
+  const movementFields = movement
+    ? {
+        movementPath: movement.path,
+        movementReverbSend: resolveTuning("reverbSend", entity, movement),
+        movementPitchVariation: resolveTuning("pitchVariation", entity, movement),
+        movementGain: resolveTuning("movementGain", entity, movement),
+        // stepDistance reste le même réglage GLOBAL que le joueur
+        // (STEP_DISTANCE), jamais surchargé indépendamment — seul
+        // movementStepMultiplier module la cadence (voir
+        // config/tuning-values.js).
+        movementStepDistance: STEP_DISTANCE / resolveTuning("movementStepMultiplier", entity, movement),
+        // Position de départ = spawn de l'entité : le premier pas ne sonne
+        // qu'après avoir parcouru movementStepDistance depuis là, comme le
+        // joueur au tout premier tick d'une partie.
+        lastMovementX: entity.x,
+        // Sol au spawn — voir updateEntityMovementSounds : un changement
+        // de sol déclenche un pas IMMÉDIAT, sans attendre movementStepDistance.
+        lastMovementSurface: surfaceAt(world, entity.x),
+        // Cooldown anti-mitraillette PROPRE à cette entité (même principe
+        // que footstepCooldown pour le joueur, voir playPacedSound) —
+        // sans lui, le déclenchement immédiat sur changement de sol
+        // pouvait se redéclencher chaque tick (ex. léger flottement de
+        // position près d'une frontière) : rien ne le limitait avant,
+        // l'accumulateur par distance suffisait tant qu'aucun second
+        // déclencheur n'existait.
+        movementCooldown: { lastAt: -Infinity },
+        // gait/naturalWalk (voir entities/model.md, "Surfaces de sol et
+        // son de pas") : propriétés de l'ENTITÉ, pas d'un rôle de son —
+        // même cascade que audibleRange/panSaturation ci-dessus (pas de
+        // `sound` en 3e paramètre, jamais surchargées par descripteur de
+        // son). Résolues seulement ICI (une entité sans movement n'a de
+        // toute façon aucun pas à faire sonner) : point de départ du choix
+        // DYNAMIQUE du fichier à chaque pas, voir resolveFootstepPath.
+        gait: resolveTuning("gait", entity),
+        naturalWalk: resolveTuning("naturalWalk", entity),
+      }
+    : {};
+
+  // muteOnConsumed (voir entities/model.md/"Collectible persistant",
+  // entities/types/crate.js) : registre SEULEMENT, jamais cascadé par
+  // instance (comme `sounds`, contrairement à consumedDescriptionKey qui,
+  // lui, est baké par core/level.js) — effet POST-ACTIVATION "beacon
+  // absent" d'un collectible looté (core/money.js/lootEntity), résolu ici
+  // pour être lu par muteConsumedBeacons ci-dessous, à chaque tick.
+  const muteOnConsumed = Boolean(registry[entity.type].muteOnConsumed);
+
+  // sound (voix positionnée CONTINUE, un Howl persistant) UNIQUEMENT si
+  // le beacon existe ET qu'il est en mode "continu" (défaut) — sinon
+  // (intermittent, ou pas de beacon du tout), rien de permanent à
+  // maintenir ici : intermittentSources ci-dessous s'en charge en
+  // one-shot, à sa propre cadence (voir updateIntermittentSources).
+  // beaconGain/beaconReverbSend ne sont résolus que dans ce cas : seuls
+  // applyEntityAudio (volume/tick) et le branchement au bus de réverb
+  // (au montage, ou dans addLateEntitySoundEntry) en ont besoin.
+  let sound = null;
+  let beaconGain;
+  let beaconReverbSend;
+  const intermittentSources = [];
+
+  if (beacon) {
+    const beaconMode = resolveTuning("beaconMode", entity, beacon);
+    if (beaconMode === "continu") {
+      beaconGain = resolveTuning("beaconGain", entity, beacon);
+      beaconReverbSend = resolveTuning("reverbSend", entity, beacon);
+      const beaconPitchVariation = resolveTuning("pitchVariation", entity, beacon);
+      // pitchVariation, s'il y en a une, tirée UNE FOIS ici (voir la note
+      // du header sur les balises continues). cacheKey: entity.id — stable
+      // d'une visite à l'autre (voir lib/audio.js/createPositionedSound) :
+      // une balise déjà entendue une fois ne se redécode pas à chaque
+      // aller-retour, cohérent avec les mondes gardés en mémoire.
+      sound = createPositionedSound(resolveAsset(beacon.path), {
+        rate: randomRate(beaconPitchVariation),
+        cacheKey: entity.id,
+      });
+    } else {
+      intermittentSources.push(resolveIntermittentSource(entity, beacon, BEACON_TUNING_KEYS));
+    }
+  }
+
+  // vocal : TOUJOURS intermittent (aucun mode continu pour ce rôle, voir
+  // entities/model.md) — même mécanisme que le beacon intermittent
+  // ci-dessus, juste une deuxième source dans le même tableau.
+  if (vocal) {
+    intermittentSources.push(resolveIntermittentSource(entity, vocal, VOCAL_TUNING_KEYS));
+  }
+
+  // Présence conditionnelle (voir core/presence.js) : résolue ICI, au
+  // montage (ou à l'apparition tardive) — recalculée directement via
+  // isPresent (pas relue sur entity.present, pas garanti à jour à cet
+  // instant précis, voir core/reduce.js/stepEntities) à partir du MÊME
+  // `time`. Une balise CONTINUE créée dormante est immédiatement stoppée :
+  // le Howl existe déjà (décodage amorcé, prêt pour une bascule future)
+  // mais ne joue jamais tant que l'entité reste dormante. AUCUN son de
+  // transition ici (enterSound/exitSound) : cet état de départ n'est PAS
+  // une bascule (voir core/reduce.js/stepEntities, presenceChanged reste
+  // null au premier calcul) — seules les bascules OBSERVÉES en cours de
+  // jeu déclenchent, voir applyEntityAudio, qui lit presenceChanged sur
+  // l'entité VIVANTE à chaque tick (jamais un diff maison ici).
+  if (sound && !isPresent(entity, { time })) sound.stop();
+
+  return {
+    entity,
+    audibleRange,
+    panSaturation,
+    interactRange,
+    cutoffMin,
+    cutoffMax,
+    sound,
+    beaconGain,
+    beaconReverbSend,
+    intermittentSources,
+    enterSound,
+    exitSound,
+    muteOnConsumed,
+    ...movementFields,
+  };
+}
+
 export function createCityAudioScene(getSession) {
   // Contexte maintenu éveillé pour toute la scène (voir
   // lib/audio.js/keepAudioContextAwake) — au tout début du montage, avant
@@ -377,142 +535,9 @@ export function createCityAudioScene(getSession) {
   // chaque update() (voir plus bas), jamais celui-ci qui ne vaut que pour
   // l'amorçage.
   const initialWorld = getActiveWorld(getSession());
-  const entitySounds = initialWorld.entities.map((entity) => {
-    // beacon (localisation) et vocal (expression) : descripteurs de son du
-    // type, tous deux OPTIONNELS et indépendants (voir entities/model.md) —
-    // ni l'un ni l'autre n'est "le" son obligatoire d'une entité.
-    const sounds = registry[entity.type].sounds;
-    const beacon = sounds.beacon;
-    const vocal = sounds.vocal;
-    // enterSound/exitSound (voir core/presence.js) : rôles PONCTUELS
-    // distincts du beacon, optionnels et indépendants l'un de l'autre —
-    // résolus une fois ci-dessous (resolveTransitionSound), null si absent.
-    const enterSound = resolveTransitionSound(entity, sounds.enterSound, ENTER_SOUND_TUNING_KEYS);
-    const exitSound = resolveTransitionSound(entity, sounds.exitSound, EXIT_SOUND_TUNING_KEYS);
-
-    // Résolus une fois ici : statiques pour la durée de vie de la scène,
-    // propriétés de l'ENTITÉ (pas d'un rôle de son particulier) — partagées
-    // par le beacon, le vocal ET le son de déplacement ci-dessous.
-    const audibleRange = resolveTuning("audibleRange", entity);
-    const panSaturation = resolveTuning("panSaturation", entity);
-    const interactRange = resolveTuning("interactRange", entity);
-    const cutoffMin = resolveTuning("cutoffMin", entity);
-    const cutoffMax = resolveTuning("cutoffMax", entity);
-
-    // Son de déplacement (rôle "movement", voir entities/model.md) :
-    // DORMANT si l'archétype n'en porte pas — la plupart des types n'ont pas
-    // vocation à marcher. Cadencé par la DISTANCE parcourue, jamais par un
-    // intervalle de temps : traité à part des sources intermittentes
-    // ci-dessous (beacon/vocal), qui partagent, elles, le même mécanisme.
-    const movement = sounds.movement;
-    const movementFields = movement
-      ? {
-          movementPath: movement.path,
-          movementReverbSend: resolveTuning("reverbSend", entity, movement),
-          movementPitchVariation: resolveTuning("pitchVariation", entity, movement),
-          movementGain: resolveTuning("movementGain", entity, movement),
-          // stepDistance reste le même réglage GLOBAL que le joueur
-          // (STEP_DISTANCE), jamais surchargé indépendamment — seul
-          // movementStepMultiplier module la cadence (voir
-          // config/tuning-values.js).
-          movementStepDistance: STEP_DISTANCE / resolveTuning("movementStepMultiplier", entity, movement),
-          // Position de départ = spawn de l'entité : le premier pas ne sonne
-          // qu'après avoir parcouru movementStepDistance depuis là, comme le
-          // joueur au tout premier tick d'une partie.
-          lastMovementX: entity.x,
-          // Sol au spawn — voir updateEntityMovementSounds : un changement
-          // de sol déclenche un pas IMMÉDIAT, sans attendre movementStepDistance.
-          lastMovementSurface: surfaceAt(initialWorld, entity.x),
-          // Cooldown anti-mitraillette PROPRE à cette entité (même principe
-          // que footstepCooldown pour le joueur, voir playPacedSound) —
-          // sans lui, le déclenchement immédiat sur changement de sol
-          // pouvait se redéclencher chaque tick (ex. léger flottement de
-          // position près d'une frontière) : rien ne le limitait avant,
-          // l'accumulateur par distance suffisait tant qu'aucun second
-          // déclencheur n'existait.
-          movementCooldown: { lastAt: -Infinity },
-          // gait/naturalWalk (voir entities/model.md, "Surfaces de sol et
-          // son de pas") : propriétés de l'ENTITÉ, pas d'un rôle de son —
-          // même cascade que audibleRange/panSaturation ci-dessus (pas de
-          // `sound` en 3e paramètre, jamais surchargées par descripteur de
-          // son). Résolues seulement ICI (une entité sans movement n'a de
-          // toute façon aucun pas à faire sonner) : point de départ du choix
-          // DYNAMIQUE du fichier à chaque pas, voir resolveFootstepPath.
-          gait: resolveTuning("gait", entity),
-          naturalWalk: resolveTuning("naturalWalk", entity),
-        }
-      : {};
-
-    // sound (voix positionnée CONTINUE, un Howl persistant) UNIQUEMENT si
-    // le beacon existe ET qu'il est en mode "continu" (défaut) — sinon
-    // (intermittent, ou pas de beacon du tout), rien de permanent à
-    // maintenir ici : intermittentSources ci-dessous s'en charge en
-    // one-shot, à sa propre cadence (voir updateIntermittentSources).
-    // beaconGain/beaconReverbSend ne sont résolus que dans ce cas : seuls
-    // applyEntityAudio (volume/tick) et le branchement au bus de réverb
-    // juste après ce bloc en ont besoin.
-    let sound = null;
-    let beaconGain;
-    let beaconReverbSend;
-    const intermittentSources = [];
-
-    if (beacon) {
-      const beaconMode = resolveTuning("beaconMode", entity, beacon);
-      if (beaconMode === "continu") {
-        beaconGain = resolveTuning("beaconGain", entity, beacon);
-        beaconReverbSend = resolveTuning("reverbSend", entity, beacon);
-        const beaconPitchVariation = resolveTuning("pitchVariation", entity, beacon);
-        // pitchVariation, s'il y en a une, tirée UNE FOIS ici (voir la note
-        // du header sur les balises continues). cacheKey: entity.id — stable
-        // d'une visite à l'autre (voir lib/audio.js/createPositionedSound) :
-        // une balise déjà entendue une fois ne se redécode pas à chaque
-        // aller-retour, cohérent avec les mondes gardés en mémoire.
-        sound = createPositionedSound(resolveAsset(beacon.path), {
-          rate: randomRate(beaconPitchVariation),
-          cacheKey: entity.id,
-        });
-      } else {
-        intermittentSources.push(resolveIntermittentSource(entity, beacon, BEACON_TUNING_KEYS));
-      }
-    }
-
-    // vocal : TOUJOURS intermittent (aucun mode continu pour ce rôle, voir
-    // entities/model.md) — même mécanisme que le beacon intermittent
-    // ci-dessus, juste une deuxième source dans le même tableau.
-    if (vocal) {
-      intermittentSources.push(resolveIntermittentSource(entity, vocal, VOCAL_TUNING_KEYS));
-    }
-
-    // Présence conditionnelle (voir core/presence.js) : résolue ICI, au
-    // montage — recalculée directement via isPresent (pas relue sur
-    // entity.present, pas garanti à jour à cet instant précis, voir
-    // core/reduce.js/stepEntities) à partir du MÊME state.time. Une balise
-    // CONTINUE créée dormante est immédiatement stoppée : le Howl existe
-    // déjà (décodage amorcé, prêt pour une bascule future) mais ne joue
-    // jamais tant que l'entité reste dormante. AUCUN son de transition ici
-    // (enterSound/exitSound) : cet état de départ n'est PAS une bascule
-    // (voir core/reduce.js/stepEntities, presenceChanged reste null au
-    // premier calcul) — seules les bascules OBSERVÉES en cours de jeu
-    // déclenchent, voir applyEntityAudio, qui lit presenceChanged sur
-    // l'entité VIVANTE à chaque tick (jamais un diff maison ici).
-    if (sound && !isPresent(entity, { time: getSession().time })) sound.stop();
-
-    return {
-      entity,
-      audibleRange,
-      panSaturation,
-      interactRange,
-      cutoffMin,
-      cutoffMax,
-      sound,
-      beaconGain,
-      beaconReverbSend,
-      intermittentSources,
-      enterSound,
-      exitSound,
-      ...movementFields,
-    };
-  });
+  const entitySounds = initialWorld.entities.map((entity) =>
+    buildEntitySoundEntry(entity, initialWorld, getSession().time)
+  );
 
   // Un seul bus de réverb pour toute la scène, jamais un par entité. Lieu ->
   // défaut global (voir REVERB_DURATION_SEC_DEFAULT/REVERB_DECAY_DEFAULT
@@ -542,6 +567,46 @@ export function createCityAudioScene(getSession) {
   const collisionSoundByEntityId = new Map(
     entitySounds.map(({ entity }) => [entity.id, registry[entity.type].collisionSound])
   );
+
+  // Ajoute une entrée entitySounds pour une entité apparue EN COURS DE
+  // SCÈNE, après le montage — même construction que le montage initial
+  // (buildEntitySoundEntry), juste appelée plus tard. Branchement au bus de
+  // réverb ET entrée dans collisionSoundByEntityId inclus (mêmes gestes que
+  // les blocs ci-dessus, pour qu'une entité tardive soit traitée EXACTEMENT
+  // comme une entité déclarée). PAS de préchargement pour elle (voir
+  // warmUpFootstep/preloadKeys plus bas, qui ne balaient QUE les entités
+  // connues au montage) : acceptable pour du contenu créé en jeu (ex.
+  // entité ÉPHÉMÈRE, voir core/state.js/spawnEphemeral) — au pire un tout
+  // premier son légèrement en retard le temps du décodage à froid, jamais
+  // un son perdu ni un plantage. Voir syncNewEntitySounds ci-dessous, seule
+  // appelante.
+  function addLateEntitySoundEntry(entity, world) {
+    const entry = buildEntitySoundEntry(entity, world, getSession().time);
+    entitySounds.push(entry);
+    if (entry.sound) entry.sound.sendToReverb(reverbBus.input, entry.beaconReverbSend);
+    collisionSoundByEntityId.set(entity.id, registry[entity.type].collisionSound);
+    return entry;
+  }
+
+  // Synchronise entitySounds avec world.entities : toute entité apparue EN
+  // COURS DE SCÈNE (ex. entité ÉPHÉMÈRE) et pas encore connue d'entitySounds
+  // reçoit sa propre entrée ICI — appelée une fois par tick, tôt dans
+  // update(), avant tout calcul positionné (même emplacement que
+  // cleanupRemovedEntities/muteConsumedBeacons). Sans elle, une entité créée
+  // après le montage resterait invisible au rendu ET à l'interaction :
+  // occupiedEntities/getInteractionCandidates ne lisent QUE entitySounds,
+  // jamais world.entities directement. N'AJOUTE jamais rien de plus qu'une
+  // entrée manquante (jamais de retrait — cleanupRemovedEntities s'en
+  // charge séparément) : entitySounds ne fait donc que CROÎTRE pour la
+  // durée de vie d'une scène, jamais rétrécir, ce qui garantit qu'un id
+  // déjà connu le reste pour toujours (removedEntityIds/mutedOnConsumedIds
+  // ci-dessus en dépendent).
+  function syncNewEntitySounds(world) {
+    const knownIds = new Set(entitySounds.map(({ entity }) => entity.id));
+    for (const entity of world.entities) {
+      if (!knownIds.has(entity.id)) addLateEntitySoundEntry(entity, world);
+    }
+  }
 
   // "Réchauffe" les pas critiques EN PREMIER, avant le grand préchargement
   // de pool ci-dessous : un vrai playOneShot à volume 0, pendant que le
@@ -694,6 +759,20 @@ export function createCityAudioScene(getSession) {
   // l'écran ville résolve une cible d'interaction (Espace/Entrée) sans
   // recalculer l'occupation en double.
   let currentOccupied = [];
+  // Ids d'entités DÉJÀ nettoyées (son arrêté, voir cleanupRemovedEntities
+  // plus bas) après leur disparition de world.entities (ex. ramassées,
+  // voir core/money.js/pickupEntity) — jamais réinitialisé pendant la vie
+  // de cette scène (recréée franche à chaque transition). Garantit un seul
+  // sound.stop() par entité, jamais répété à chaque tick.
+  const removedEntityIds = new Set();
+  // Ids d'entités dont le beacon a déjà été explicitement arrêté suite à
+  // leur passage à consumed (voir entities/model.md/"Collectible
+  // persistant", muteConsumedBeacons plus bas) — même principe que
+  // removedEntityIds : un seul sound.stop() par entité, jamais répété.
+  // DISTINCT de removedEntityIds : une entité consumed reste dans
+  // world.entities (jamais retirée, voir core/state.js/markConsumed) — seule
+  // sa VOIX change d'état, pas sa présence dans le monde.
+  const mutedOnConsumedIds = new Set();
   // Distance que le joueur AURAIT parcourue depuis le début du blocage
   // courant (voir le bloc collision dans update()) — jamais la distance
   // réellement parcourue, puisque x ne bouge pas pendant une butée.
@@ -928,8 +1007,76 @@ export function createCityAudioScene(getSession) {
   // donc la position réelle doit être relue ici depuis la session courante,
   // jamais depuis la référence figée — sinon la balise sonne juste, mais
   // reste plantée à son point de spawn.
+  //
+  // Entité RETIRÉE de world.entities en cours de scène (ex. ramassage, voir
+  // core/money.js/pickupEntity) : n'a plus d'entrée ici — synthétise un live
+  // "éteint" (present:false) plutôt que de laisser un `undefined` remonter
+  // jusqu'aux appelants (applyEntityAudio, occupiedEntities,
+  // updateIntermittentSources, updateEntityMovementSounds, pauseBeacons/
+  // resumeBeacons) : ils savent TOUS déjà traiter present:false comme
+  // "comme si absente" (voir core/presence.js), aucun garde-fou à dupliquer
+  // par appelant. Position figée au dernier snapshot connu (entitySounds,
+  // capturé à la création de la scène) : jamais lue pour du calcul
+  // positionné réel, puisque present:false fait sortir avant partout.
+  // AUCUNE bascule "exited" synthétisée ici volontairement (contrairement à
+  // une vraie sortie de présence, voir core/presence.js) : cette fonction
+  // est appelée depuis PLUSIEURS endroits non synchronisés entre eux avec
+  // le tick (pauseBeacons/resumeBeacons, déclenchés par l'ouverture d'un
+  // menu) — un signal "une seule fois" posé ici serait consommé par le
+  // PREMIER appelant venu, pas forcément applyEntityAudio, et le beacon ne
+  // s'arrêterait alors jamais proprement. Voir cleanupRemovedEntities
+  // ci-dessous, seule responsable de l'arrêt réel du son, appelée UNE FOIS
+  // par tick, inconditionnellement, tôt dans update().
   function liveEntitiesById() {
-    return new Map(getActiveWorld(getSession()).entities.map((entity) => [entity.id, entity]));
+    const byId = new Map(getActiveWorld(getSession()).entities.map((entity) => [entity.id, entity]));
+    for (const { entity } of entitySounds) {
+      if (!byId.has(entity.id)) byId.set(entity.id, { ...entity, present: false });
+    }
+    return byId;
+  }
+
+  // Arrête pour de bon le son d'une entité qui vient de disparaître de
+  // world.entities (ex. ramassage, voir core/money.js/pickupEntity) —
+  // JAMAIS de résidu sonore (exigence explicite du ramassage). Découplé de
+  // liveEntitiesById (voir son commentaire) : appelé UNE FOIS par tick,
+  // inconditionnellement, tôt dans update() — removedEntityIds garantit un
+  // seul stop() par entité, jamais répété. Pas d'exitSound ici : une
+  // disparition définitive n'est pas une bascule de présence (réversible),
+  // rien à annoncer en plus du son de ramassage déjà joué par la vue
+  // (view/interaction.js).
+  function cleanupRemovedEntities(world) {
+    const liveIds = new Set(world.entities.map((entity) => entity.id));
+    for (const entry of entitySounds) {
+      if (liveIds.has(entry.entity.id) || removedEntityIds.has(entry.entity.id)) continue;
+      removedEntityIds.add(entry.entity.id);
+      if (entry.sound) entry.sound.stop();
+    }
+  }
+
+  // Beacon mis en SOURDINE, PERMANEMMENT, dès qu'une entité passe consumed
+  // (voir entities/model.md/"Collectible persistant") — SEULEMENT si son
+  // type déclare muteOnConsumed:true (registre, voir entities/types/
+  // crate.js). DISTINCT de cleanupRemovedEntities ci-dessus : l'entité
+  // RESTE dans world.entities (jamais retirée) — elle reste observable/
+  // interactable, juste sa balise continue s'éteint pour de bon (effet
+  // POST-ACTIVATION "beacon absent", composable avec la description
+  // alternative — voir resolveDescription, view/interaction.js). Appelée
+  // UNE FOIS par tick comme cleanupRemovedEntities : couvre aussi bien une
+  // consommation EN COURS de scène qu'une entité déjà consumed retrouvée
+  // dès le premier tick d'une scène tout juste (re)montée (aucun état de
+  // départ spécial à poser à la construction — mutedOnConsumedIds démarre
+  // simplement vide, ce tick s'en charge). howl.stop() est déjà idempotent
+  // (voir lib/audio.js) — mutedOnConsumedIds évite seulement l'appel
+  // répété, pas un bug s'il l'était.
+  function muteConsumedBeacons(world) {
+    for (const entry of entitySounds) {
+      if (!entry.muteOnConsumed || !entry.sound || mutedOnConsumedIds.has(entry.entity.id)) continue;
+      const live = world.entities.find((entity) => entity.id === entry.entity.id);
+      if (live && live.consumed) {
+        entry.sound.stop();
+        mutedOnConsumedIds.add(entry.entity.id);
+      }
+    }
   }
 
   // sound absent (pas de beacon continu) : rien à maintenir en continu,
@@ -984,6 +1131,18 @@ export function createCityAudioScene(getSession) {
     // connaître la carte des surfaces (voir resolveFootstepPath) plutôt que
     // de rappeler getActiveWorld(getSession()) à chaque son de pas.
     const world = getActiveWorld(session);
+
+    // TÔT, avant tout calcul positionné : intègre d'abord toute entité
+    // apparue en jeu depuis le dernier tick (ex. entité ÉPHÉMÈRE, voir
+    // core/state.js/spawnEphemeral) — voir syncNewEntitySounds. Puis arrête
+    // pour de bon le son d'une entité qui vient de disparaître (ex.
+    // ramassage, voir core/money.js/pickupEntity) — voir
+    // cleanupRemovedEntities. Puis, même logique pour une entité CONSUMED
+    // (voir core/money.js/lootEntity) qui, elle, reste dans le monde — voir
+    // muteConsumedBeacons.
+    syncNewEntitySounds(world);
+    cleanupRemovedEntities(world);
+    muteConsumedBeacons(world);
 
     // Bascule de phase jour/nuit (voir core/time.js/phaseAt) : on compare à
     // la phase MÉMORISÉE, on n'agit QUE sur la différence — jamais en
@@ -1167,14 +1326,26 @@ export function createCityAudioScene(getSession) {
   // un one-shot déjà lancé continue derrière le menu (aussi court qu'un pas,
   // négligeable), et updateIntermittentSources() ne tourne de toute façon
   // plus tant qu'un menu est au sommet de la pile (voir update()).
+  //
+  // present === false EXCLU explicitement (entité dormante OU RETIRÉE, voir
+  // liveEntitiesById) : son beacon a déjà été arrêté (howl.stop(), voir
+  // applyEntityAudio pour une dormante/bascule "exited", ou
+  // cleanupRemovedEntities pour une RETIRÉE) — resume() y rappellerait
+  // howl.play(), qui REDÉMARRERAIT la voix depuis le début (contrairement à
+  // pause()/resume() sur une voix simplement en pause) : un beacon fantôme
+  // réapparaîtrait pour une entité dormante ou, pire, définitivement
+  // disparue (ex. argent ramassé). undefined (entité SANS règle de
+  // présence, l'immense majorité) reste inclus : ce n'est PAS "false".
   function pauseBeacons() {
-    for (const { sound } of entitySounds) {
-      if (sound) sound.pause();
+    const liveById = liveEntitiesById();
+    for (const { entity, sound } of entitySounds) {
+      if (sound && liveById.get(entity.id).present !== false) sound.pause();
     }
   }
   function resumeBeacons() {
-    for (const { sound } of entitySounds) {
-      if (sound) sound.resume();
+    const liveById = liveEntitiesById();
+    for (const { entity, sound } of entitySounds) {
+      if (sound && liveById.get(entity.id).present !== false) sound.resume();
     }
   }
 

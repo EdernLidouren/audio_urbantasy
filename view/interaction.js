@@ -8,17 +8,54 @@ import { announce } from "../lib/announce.js";
 import { t } from "../i18n/index.js";
 import { pushScreen, popScreen, composeHook } from "../lib/screens.js";
 import { makeMenuScreen } from "../lib/menu.js";
+import { playOneShot } from "../lib/audio.js";
+import { resolveAsset } from "../lib/assets.js";
+import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
 
-// Gestionnaire de transition par porte, enregistré UNE FOIS par
-// view/city-screen.js (setDoorTransitionHandler, au moment de sa
-// construction) — au plus un écran ville vivant à la fois dans cette appli
-// (même principe que activeScene, voir view/audio/city-scene.js). Permet à
-// interact() de déclencher la transition SANS connaître scene/session : il
-// délègue à qui les possède.
+// Gestionnaires enregistrés UNE FOIS par view/city-screen.js, au moment de
+// sa construction — au plus un écran ville vivant à la fois dans cette
+// appli (même principe que activeScene, voir view/audio/city-scene.js).
+// Permettent à interact() de déclencher un effet qui touche session/scene
+// SANS les connaître : il délègue à qui les possède (ce fichier n'importe
+// jamais le core, voir le header).
 let doorTransitionHandler = null;
+let pickupHandler = null;
+let lootHandler = null;
 
 export function setDoorTransitionHandler(handler) {
   doorTransitionHandler = handler;
+}
+
+// (entity) => void — applique l'effet d'ÉTAT du ramassage (argent + retrait
+// de l'entité, voir core/money.js/pickupEntity), fourni par city-screen.js
+// qui seul détient getSession/setSession. Ce fichier ne fait qu'appeler ce
+// qu'on lui a donné, puis gère le retour sensoriel (son, annonce) — jamais
+// l'inverse.
+export function setPickupHandler(handler) {
+  pickupHandler = handler;
+}
+
+// (entity) => void — applique l'effet d'ÉTAT du "loot" (argent + entity.consumed,
+// voir core/money.js/lootEntity ; entités/model.md/"Collectible persistant"),
+// même patron que setPickupHandler ci-dessus. Distinct de pickupHandler :
+// l'entité looté N'EST JAMAIS retirée, seul son état change.
+export function setLootHandler(handler) {
+  lootHandler = handler;
+}
+
+const PICKUP_SOUND_KEY = "assets/sounds/ui/pickup";
+
+// Défensif comme tout son d'UI du projet (voir view/save-storage.js/
+// playSaveSound, view/menu-sounds.js) : un fichier absent avertit, ne
+// plante jamais. Catégorie "interface" : un retour de ramassage n'est pas
+// positionné dans l'espace, comme un son de menu.
+function playPickupSound() {
+  try {
+    const factor = getPref("interfaceVolume", PREF_CONSTRAINTS.interfaceVolume.default) / 100;
+    playOneShot(resolveAsset(PICKUP_SOUND_KEY), { volume: factor });
+  } catch (error) {
+    console.warn(`interact: son de ramassage indisponible ("${PICKUP_SOUND_KEY}") : ${error.message}`);
+  }
 }
 
 // Description RICHE d'une entité (interaction "describe"), distincte du nom
@@ -30,10 +67,81 @@ export function setDoorTransitionHandler(handler) {
 // rien à décrire (ex. descriptionKey absent malgré observable:true) — le
 // filtrage par capacité (getInteractionCandidates) évite déjà ce cas en
 // pratique, ce repli reste défensif.
+//
+// consumedDescriptionKey (voir core/level.js, entities/model.md/
+// "Collectible persistant") : description ALTERNATIVE une fois
+// entity.consumed — effet POST-ACTIVATION "changer d'état perceptible"
+// d'un collectible persistant (core/money.js/lootEntity), déclaré par
+// l'entité elle-même, jamais un cas spécial câblé ici. Absente -> repli sur
+// descriptionKey normal (une entité consommée sans description alternative
+// déclarée garde simplement la même description qu'avant).
 function resolveDescription(entity) {
-  if (!entity.descriptionKey) return undefined;
-  return t(entity.descriptionKey);
+  const key = entity.consumed && entity.consumedDescriptionKey ? entity.consumedDescriptionKey : entity.descriptionKey;
+  if (!key) return undefined;
+  return t(key);
 }
+
+// Aiguillage par TYPE D'ACTION (entity.action.kind, voir core/level.js) —
+// même principe que core/presence.js/CONDITION_EVALUATORS : SEUL endroit
+// qui connaît les kinds. Ajouter "talk"/"activate" demain = une entrée de
+// plus ici, jamais une refonte d'interact() ni de ses appelants (le core,
+// lui, ne valide QUE la forme de `action` — voir son commentaire — jamais
+// le kind contre ce registre, qui reste entièrement côté vue).
+
+// "transit" (porte) : MIGRÉ dans cet aiguillage depuis l'ancien
+// court-circuit `entity.type === "door"` — même effet exactement (délègue
+// au gestionnaire enregistré), juste posé comme n'importe quel autre kind
+// désormais (voir entities/types/door.js, action:{kind:"transit"}).
+function handleTransit(entity) {
+  if (doorTransitionHandler) doorTransitionHandler(entity.target);
+}
+
+// "pickup" : effet d'ÉTAT délégué au gestionnaire enregistré (voir
+// setPickupHandler) — PUIS retour sensoriel, vue pure ici (son défensif,
+// annonce brève). amount manquant/invalide sur l'entité -> avertit et
+// s'arrête, jamais de crash ni d'argent ajouté sans valeur sensée.
+function handlePickup(entity) {
+  const amount = entity.action.amount;
+  if (!Number.isFinite(amount)) {
+    console.warn(`interact: action "pickup" sur "${entity.id}" sans amount numérique valide.`);
+    return;
+  }
+  if (!pickupHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
+  pickupHandler(entity);
+  playPickupSound();
+  announce(t("interaction.pickup", { amount }), { assertive: true });
+}
+
+// "loot" : COLLECTIBLE PERSISTANT (voir core/money.js/lootEntity,
+// entities/model.md/"Collectible persistant") — même structure que
+// handlePickup ci-dessus (amount validé, son défensif, annonce), mais
+// l'entité N'EST JAMAIS retirée : elle change d'état (consumed:true), avec
+// ses effets post-activation DÉCLARATIFS (description alternative —
+// resolveDescription ci-dessus ; devenir dormant — une règle de présence
+// sur la condition "consumed", voir core/presence.js) résolus ailleurs,
+// jamais ici. IDEMPOTENCE côté retour SENSORIEL, pas seulement en core :
+// sans cette garde, réactiver une entité déjà consumed rejouerait le son +
+// l'annonce "trouvé N pièces" alors qu'aucun argent n'est réellement ajouté
+// (lootEntity, lui, se dégrade déjà silencieusement — voir son commentaire)
+// — le piège exact que ce système doit éviter.
+function handleLoot(entity) {
+  if (entity.consumed) return;
+  const amount = entity.action.amount;
+  if (!Number.isFinite(amount)) {
+    console.warn(`interact: action "loot" sur "${entity.id}" sans amount numérique valide.`);
+    return;
+  }
+  if (!lootHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
+  lootHandler(entity);
+  playPickupSound();
+  announce(t("interaction.loot", { amount }), { assertive: true });
+}
+
+const ACTION_HANDLERS = {
+  transit: handleTransit,
+  pickup: handlePickup,
+  loot: handleLoot,
+};
 
 // kind ∈ { "describe", "activate" }. entity est déjà un candidat FILTRÉ par
 // capacité (voir view/audio/city-scene.js/getInteractionCandidates) — cette
@@ -48,18 +156,20 @@ export function interact(entity, kind) {
   }
 
   if (kind === "activate") {
-    // Porte : déclenche la transition vers entity.target (id de niveau,
-    // voir level/schema.md), via le gestionnaire enregistré. Marche aussi
-    // bien depuis city-screen.js (candidat unique) que depuis le menu de
-    // désambiguïsation ci-dessous — les deux appellent interact() ici,
-    // jamais de logique de transition dupliquée.
-    if (entity.type === "door" && doorTransitionHandler) {
-      doorTransitionHandler(entity.target);
+    // Pas d'action différenciée déclarée (ex. npc/object aujourd'hui,
+    // interactables mais sans kind encore câblé) -> silence, comportement
+    // STUB générique inchangé pour ce contenu-là.
+    if (!entity.action) return;
+    const handler = ACTION_HANDLERS[entity.action.kind];
+    if (!handler) {
+      // Kind DÉCLARÉ mais inconnu de ce registre : un vrai bug de contenu,
+      // signalé au développeur (console), mais jamais audible/annoncé au
+      // joueur ni fatal — même politique de dégradation que le reste de
+      // l'aiguillage par kind du projet (voir core/presence.js).
+      console.warn(`interact: type d'action "${entity.action.kind}" inconnu sur l'entité "${entity.id}".`);
       return;
     }
-    // STUB pour tout le reste (object, npc...) : emplacement réservé pour
-    // une future action de gameplay (ex. fouiller la boîte). Cette action-là
-    // passera par le core (reduce), pas par la vue — no-op pour l'instant.
+    handler(entity);
     return;
   }
 }

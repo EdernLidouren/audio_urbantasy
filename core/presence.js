@@ -99,6 +99,20 @@ function evaluateArrived(cond, context) {
 // hors du principe "un seul monde actif avance" (voir header de
 // core/reduce.js) — délibérément pas construit sans une demande explicite.
 
+// "consumed" : vraie si l'entité porte entity.consumed === true (voir
+// core/state.js/markConsumed) — permet à un COLLECTIBLE PERSISTANT (voir
+// entities/model.md/"Collectible persistant") de composer l'effet POST-
+// ACTIVATION "devient dormant" avec ce même système de présence
+// conditionnelle, jamais un mécanisme séparé (ajouter "consumed" ici suffit,
+// exactement comme "timeRange"/"arrived" — aucune retouche à isPresent/
+// resolveEntityRules/core/reduce.js). PERMANENTE par construction : consumed
+// ne repasse jamais à false (voir markConsumed), donc une règle { when:
+// { type: "consumed" }, present: false } bascule une fois pour toutes,
+// sans aucune condition de réveil à écrire.
+function evaluateConsumed(cond, context) {
+  return Boolean(context.entity && context.entity.consumed);
+}
+
 // Registre des évaluateurs par type — SEUL endroit qui connaît les types de
 // condition. core/level.js valide `when.type` au chargement contre les clés
 // de CE MÊME registre (CONDITION_TYPES ci-dessous) : ajouter un type ici le
@@ -106,6 +120,7 @@ function evaluateArrived(cond, context) {
 const CONDITION_EVALUATORS = {
   timeRange: evaluateTimeRange,
   arrived: evaluateArrived,
+  consumed: evaluateConsumed,
 };
 
 export const CONDITION_TYPES = Object.keys(CONDITION_EVALUATORS);

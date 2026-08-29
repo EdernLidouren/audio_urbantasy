@@ -33,5 +33,5 @@ export default {
   // par aucune, donc dormant par défaut (voir core/presence.js/isPresent).
   // Cascade jusqu'à l'instance (core/level.js) : un niveau pourrait donner
   // d'autres horaires à un néon précis si besoin un jour.
-  presence: [{ when: { type: "timeRange", from: 9, to: 10 }, present: true }],
+  presence: [{ when: { type: "timeRange", from: 20, to: 6 }, present: true }],
 };

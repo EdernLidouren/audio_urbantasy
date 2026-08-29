@@ -6,8 +6,10 @@
 // son absence — une re-visite les ressort tels qu'ils ont été laissés
 // (PNJ compris), pas réinitialisés. Forme :
 //   { player, worlds: { [id]: <état d'un monde> }, activeWorldId, time,
-//     companions, companionsRngState }
+//     money, companions, companionsRngState }
 // player : l'état du joueur (position, extensible plus tard — inventaire...).
+// money : entier, cercle PARTIE (comme time) — voir core/money.js/addMoney,
+// SEUL point d'écriture.
 // Vit ICI, JAMAIS dans les entités d'un monde : il traverse les lieux, ne
 // leur appartient pas. worlds[id] : ~ l'ancien "level" (entités avec
 // position/intention/état, longueur, métadonnées), PLUS son propre rngState
@@ -40,6 +42,7 @@
 
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";
 import { MAX_COMPANIONS } from "../config/companions.js";
+import { MAX_EPHEMERALS } from "../config/ephemerals.js";
 import { createSeed } from "./rng.js";
 import { clamp } from "./physics/movement.js";
 import { INITIAL_TIME } from "./time.js";
@@ -129,6 +132,13 @@ function createWorldState(level, seed) {
     ...level,
     rngState: createSeed(seed),
     lastVisited: 0,
+    // Compteur d'ids ÉPHÉMÈRES, dédié à ce monde — voir spawnEphemeral plus
+    // bas. Monotone, JAMAIS décrémenté (contrairement au nombre d'éphémères
+    // VIVANTS, qui peut baisser au gré des ramassages/purges) : garantit un
+    // id jamais réutilisé au sein de ce monde, pour toute sa durée de vie
+    // (même à travers plusieurs visites — ce compteur n'est jamais remis à
+    // zéro après sa création initiale).
+    nextEphemeralId: 0,
   };
 }
 
@@ -160,12 +170,96 @@ export function createInitialState(level, seed = DEFAULT_SEED, { companions } = 
     // Horloge de partie : voir core/time.js. INITIAL_TIME = jour 1, mois 1,
     // à l'heure de départ configurée (config/time-values.js/startHour).
     time: INITIAL_TIME,
+    // Argent : voir core/money.js. Une partie neuve démarre à 0, jamais rien
+    // de plus arbitraire.
+    money: 0,
     companions: repositionCompanions(requestedCompanions.slice(0, MAX_COMPANIONS), level.playerStart, level.length),
     // Flux PRNG dédié aux compagnons (voir header) : dérivé du même seed,
     // mais hashé sous une clé distincte — jamais la même suite que le
     // premier monde (createSeed accepte une chaîne, voir core/rng.js).
     companionsRngState: createSeed(`companions:${seed}`),
   };
+}
+
+// Retire UNE entité (par id) du lieu ACTIF — mécanisme générique derrière
+// "une entité ramassée disparaît" (voir core/money.js/pickupEntity), mais
+// pas spécifique à l'argent : n'importe quel futur effet qui fait
+// disparaître une entité du monde peut le réutiliser tel quel. Jamais les
+// compagnons (cercle partie, pas dans worlds[x].entities — voir header) :
+// ce n'est même pas la même liste. id absent du lieu actif -> RÉFÉRENCE
+// INCHANGÉE (rien à retirer), jamais une exception — une entité déjà
+// retirée (double appel, id périmé) doit se dégrader silencieusement, pas
+// planter la partie en cours.
+export function removeEntity(session, entityId) {
+  const world = session.worlds[session.activeWorldId];
+  const entities = world.entities.filter((entity) => entity.id !== entityId);
+  if (entities.length === world.entities.length) return session;
+  return { ...session, worlds: { ...session.worlds, [session.activeWorldId]: { ...world, entities } } };
+}
+
+// Marque UNE entité (par id) du lieu ACTIF comme "consumed" — mécanisme
+// générique derrière un COLLECTIBLE PERSISTANT (voir core/money.js/
+// lootEntity, entities/model.md/"Collectible persistant") : contrairement à
+// removeEntity ci-dessus, l'entité N'EST JAMAIS retirée, elle change
+// simplement d'état. `consumed` est un champ RUNTIME comme `present`/
+// `gotoArrived` (jamais posé par core/level.js) : absent (falsy) tant que
+// l'entité n'a jamais été activée, écrit ICI une seule fois. id absent du
+// lieu actif -> RÉFÉRENCE INCHANGÉE, même politique défensive que
+// removeEntity (une entité déjà consommée ou un id périmé ne doit jamais
+// planter la partie).
+export function markConsumed(session, entityId) {
+  const world = session.worlds[session.activeWorldId];
+  if (!world.entities.some((entity) => entity.id === entityId)) return session;
+  const entities = world.entities.map((entity) => (entity.id === entityId ? { ...entity, consumed: true } : entity));
+  return { ...session, worlds: { ...session.worlds, [session.activeWorldId]: { ...world, entities } } };
+}
+
+// Crée UNE entité ÉPHÉMÈRE dans le lieu ACTIF, à la position x — point
+// d'entrée UNIQUE et RÉUTILISABLE pour toute création d'entité EN COURS DE
+// JEU (voir entities/model.md/"Entités éphémères"). Aujourd'hui, un seul
+// appelant : la touche debug "e" (voir view/city-screen.js) ; demain :
+// une canette cassée, un objet lâché par un compagnon, un effet... — tous
+// passeraient par cette même fonction, jamais une variante par appelant.
+//
+// `spec` est un descripteur d'entité DÉJÀ RÉSOLU (type, labelKey,
+// blocksMovement, observable, interactable, action...) — EXACTEMENT la
+// forme qu'une entité obtient en sortie de core/level.js/parseEntity,
+// construit par L'APPELANT (voir createTestCompanion plus haut, même
+// principe) : ce module ne connaît AUCUN registre de types, `spec.type`
+// reste une étiquette opaque, jamais résolue ici — c'est la VUE qui sait
+// traduire un type en sons/rendu (voir view/audio/city-scene.js).
+//
+// Deux règles STRICTES posées ICI, jamais par l'appelant :
+//   - `ephemeral: true` — exclut l'entité de la sérialisation
+//     (core/save.js/serializeGame) ET la cible pour la purge au départ
+//     (travelToWorld ci-dessous).
+//   - id dérivé de `world.nextEphemeralId` (compteur dédié, voir
+//     createWorldState) — JAMAIS Date.now()/Math.random() : le core reste
+//     déterministe, un id ne doit dépendre que d'un état déjà threadé
+//     explicitement, comme tout le reste de ce fichier.
+//
+// Limite anti-prolifération (MAX_EPHEMERALS, config/ephemerals.js) : SEULES
+// les entités éphémères comptent (jamais les entités déclarées, dont le
+// nombre est maîtrisé à l'écriture). Au dépassement — APRÈS ajout de la
+// nouvelle — ÉVICTION DU PLUS ANCIEN éphémère VIVANT : le premier trouvé
+// dans l'ordre du tableau, qui EST l'ordre de création (les éphémères sont
+// toujours AJOUTÉS en fin de liste, jamais réordonnés) — jamais la nouvelle
+// entité elle-même (toujours la dernière, donc jamais la première
+// éphémère trouvée). Transitoire par nature : cohérent qu'il cède la place
+// plutôt que de refuser la création demandée (alternative "refuser le
+// nouveau" possible, non retenue ici).
+export function spawnEphemeral(session, spec, x) {
+  const world = session.worlds[session.activeWorldId];
+  const entity = { ...spec, id: `ephemeral-${world.nextEphemeralId}`, x, ephemeral: true };
+  let entities = [...world.entities, entity];
+
+  if (entities.filter((e) => e.ephemeral).length > MAX_EPHEMERALS) {
+    const oldestIndex = entities.findIndex((e) => e.ephemeral);
+    entities = [...entities.slice(0, oldestIndex), ...entities.slice(oldestIndex + 1)];
+  }
+
+  const nextWorld = { ...world, entities, nextEphemeralId: world.nextEphemeralId + 1 };
+  return { ...session, worlds: { ...session.worlds, [session.activeWorldId]: nextWorld } };
 }
 
 // Le monde actuellement actif, AUGMENTÉ des compagnons de la partie (voir
@@ -210,9 +304,17 @@ export function getActiveWorld(session) {
 // fournie -> erreur claire plutôt qu'un état à moitié construit.
 export function travelToWorld(session, targetId, freshLevel = null) {
   const currentWorld = session.worlds[session.activeWorldId];
+  // Purge des entités ÉPHÉMÈRES du lieu qu'on quitte (voir
+  // entities/model.md/"Entités éphémères") : PILE le moment où ce lieu est
+  // rangé (gelé) — aucun éphémère ne doit survivre à une sortie de scène,
+  // qu'il ait été ramassé ou non. Ici et nulle part ailleurs : le seul
+  // autre chemin de sortie d'une scène (retour au menu principal) abandonne
+  // la session ENTIÈRE (voir view/city-screen.js/onExit, setSession(null)),
+  // rien à purger explicitement dans ce cas.
+  const purgedEntities = currentWorld.entities.filter((entity) => !entity.ephemeral);
   const worldsAfterParking = {
     ...session.worlds,
-    [session.activeWorldId]: { ...currentWorld, lastVisited: session.time },
+    [session.activeWorldId]: { ...currentWorld, entities: purgedEntities, lastVisited: session.time },
   };
 
   const existingTarget = worldsAfterParking[targetId];

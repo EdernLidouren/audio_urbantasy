@@ -1,0 +1,23 @@
+// Archétype "money" — une somme ramassable au sol (voir view/interaction.js,
+// ACTION_HANDLERS.pickup ; core/money.js/pickupEntity). Test de bout en bout
+// du premier kind d'action différenciée (voir entities/model.md,
+// "Interaction (niveau 0)"). observable : petite description de flaveur,
+// pas requise par le système lui-même (une entité interactable sans
+// description resterait mécaniquement identique).
+//
+// amount:5 — défaut de l'archétype, comme tout autre champ `action` :
+// surchargeable par instance en redéclarant `action` EN ENTIER (cascade
+// remplace, jamais de fusion profonde — même principe que `behavior`,
+// `presence`), voir core/level.js.
+
+export default {
+  label: "entity.money",
+  descriptionKey: "entity.money.description",
+  sounds: {
+    beacon: { path: "assets/sounds/entities/box_of_nails_beacon_1.mp3", loop: true },
+  },
+  blocksMovement: false,
+  observable: true,
+  interactable: true,
+  action: { kind: "pickup", amount: 5 },
+};

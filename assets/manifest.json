@@ -5,6 +5,12 @@
   "assets/ambiances/wind_medium": [
     "assets/ambiances/wind_medium_1.mp3"
   ],
+  "assets/musics/beach_night": [
+    "assets/musics/beach_night_1.mp3"
+  ],
+  "assets/musics/factory": [
+    "assets/musics/factory_1.mp3"
+  ],
   "assets/musics/jazz_day": [
     "assets/musics/jazz_day_1.mp3",
     "assets/musics/jazz_day_2.mp3",
@@ -15,19 +21,34 @@
   "assets/musics/jazz_night": [
     "assets/musics/jazz_night_1.mp3",
     "assets/musics/jazz_night_2.mp3",
-    "assets/musics/jazz_night_3.mp3"
+    "assets/musics/jazz_night_3.mp3",
+    "assets/musics/jazz_night_4.mp3",
+    "assets/musics/jazz_night_5.mp3"
+  ],
+  "assets/musics/mystery": [
+    "assets/musics/mystery_1.mp3"
+  ],
+  "assets/musics/night_zone": [
+    "assets/musics/night_zone_3.mp3"
   ],
   "assets/musics/night_zone_day": [
-    "assets/musics/night_zone_day_1.mp3"
+    "assets/musics/night_zone_day_1.mp3",
+    "assets/musics/night_zone_day_2.mp3"
   ],
   "assets/musics/night_zone_night": [
-    "assets/musics/night_zone_night_1.mp3"
+    "assets/musics/night_zone_night_1.mp3",
+    "assets/musics/night_zone_night_2.mp3"
+  ],
+  "assets/musics/science_day": [
+    "assets/musics/science_day_1.mp3"
   ],
   "assets/musics/streets_day": [
-    "assets/musics/streets_day_1.mp3"
+    "assets/musics/streets_day_1.mp3",
+    "assets/musics/streets_day_2.mp3"
   ],
   "assets/musics/streets_night": [
-    "assets/musics/streets_night_1.mp3"
+    "assets/musics/streets_night_1.mp3",
+    "assets/musics/streets_night_2.mp3"
   ],
   "assets/sounds/effects/electrical_flickering": [
     "assets/sounds/effects/electrical_flickering_1.mp3",

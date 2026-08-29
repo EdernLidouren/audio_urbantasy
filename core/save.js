@@ -16,8 +16,30 @@ import { INITIAL_TIME } from "./time.js";
 
 export const SAVE_VERSION = 1;
 
+// Exclut les entités ÉPHÉMÈRES (voir core/state.js/spawnEphemeral,
+// entities/model.md/"Entités éphémères") de TOUS les mondes avant
+// sérialisation — jamais SEULEMENT le monde actif : une sauvegarde reste
+// correcte même si un futur appelant venait à laisser un éphémère dans un
+// monde rangé (aujourd'hui exclu par la purge de travelToWorld, mais cette
+// fonction ne doit pas EN DÉPENDRE pour tenir sa propre garantie). Monde
+// sans aucun éphémère -> référence INCHANGÉE (pas de nouvel objet pour
+// rien), même politique que le reste du fichier (backfillWorld).
+function stripEphemeralEntities(session) {
+  const worlds = {};
+  let anyChanged = false;
+  for (const [id, world] of Object.entries(session.worlds)) {
+    if (!world.entities.some((entity) => entity.ephemeral)) {
+      worlds[id] = world;
+      continue;
+    }
+    worlds[id] = { ...world, entities: world.entities.filter((entity) => !entity.ephemeral) };
+    anyChanged = true;
+  }
+  return anyChanged ? { ...session, worlds } : session;
+}
+
 export function serializeGame(session) {
-  return { version: SAVE_VERSION, data: session };
+  return { version: SAVE_VERSION, data: stripEphemeralEntities(session) };
 }
 
 // Rebouche UN monde antérieur à floors/defaultSurface/segments (voir
@@ -28,12 +50,19 @@ export function serializeGame(session) {
 // ce rebouchage, surfaceAt(world, x) plante sur world.segments.find(...)
 // dès qu'un monde ANCIEN redevient actif (voir view/audio/city-scene.js).
 // Mêmes défauts que parseLevel : 1 étage, DEFAULT_SURFACE partout, aucun
-// segment — comportement inchangé pour ces mondes anciens. `world` suspect
-// (donnée de disque) : jamais de confiance aveugle, renvoyé tel quel si ce
-// n'est manifestement pas un objet plutôt que de planter ici.
+// segment — comportement inchangé pour ces mondes anciens. Même précédent
+// pour `nextEphemeralId` (voir core/state.js/spawnEphemeral), antérieur aux
+// entités éphémères. `world` suspect (donnée de disque) : jamais de
+// confiance aveugle, renvoyé tel quel si ce n'est manifestement pas un
+// objet plutôt que de planter ici.
 function backfillWorld(world) {
   if (!world || typeof world !== "object") return world;
-  if (world.floors !== undefined && world.defaultSurface !== undefined && world.segments !== undefined) {
+  if (
+    world.floors !== undefined &&
+    world.defaultSurface !== undefined &&
+    world.segments !== undefined &&
+    world.nextEphemeralId !== undefined
+  ) {
     return world;
   }
   return {
@@ -41,14 +70,21 @@ function backfillWorld(world) {
     floors: world.floors !== undefined ? world.floors : 1,
     defaultSurface: world.defaultSurface !== undefined ? world.defaultSurface : DEFAULT_SURFACE,
     segments: world.segments !== undefined ? world.segments : [],
+    // nextEphemeralId : voir core/state.js/spawnEphemeral. Absent d'une
+    // sauvegarde antérieure aux entités éphémères -> 0, comme à la création
+    // d'un monde neuf (sans ce rebouchage, spawnEphemeral calculerait
+    // `undefined + 1` = NaN, et TOUT éphémère suivant recevrait le même id
+    // "ephemeral-NaN" — collision garantie dès le second spawn).
+    nextEphemeralId: world.nextEphemeralId !== undefined ? world.nextEphemeralId : 0,
   };
 }
 
 // Migre une sauvegarde déjà déballée { version, data } vers la partie
 // courante. v1 -> v1 : identité pour l'essentiel, SAUF le rebouchage de
 // `companions`/`companionsRngState` (voir core/state.js), de `time` (voir
-// core/time.js — absent d'une sauvegarde antérieure à l'horloge de partie)
-// et, par monde, de floors/defaultSurface/segments (voir backfillWorld) —
+// core/time.js — absent d'une sauvegarde antérieure à l'horloge de partie),
+// de `money` (voir core/money.js — même précédent) et, par monde, de
+// floors/defaultSurface/segments (voir backfillWorld) —
 // absents d'une sauvegarde antérieure à leur introduction, sans que ça
 // justifie une montée de version (la forme reste v1, juste complétée par
 // des défauts sûrs). Point d'ancrage documenté pour de futures montées
@@ -67,6 +103,10 @@ function migrateSave(raw) {
 
   if (typeof data.time !== "number") {
     data = { ...data, time: INITIAL_TIME };
+  }
+
+  if (typeof data.money !== "number") {
+    data = { ...data, money: 0 };
   }
 
   if (data.worlds && typeof data.worlds === "object") {

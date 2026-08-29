@@ -15,6 +15,8 @@ export default {
 
   "menu.interaction.title": "Interact",
   "menu.interaction.observe.title": "Observe",
+  "interaction.pickup": "Picked up: {amount} coins.",
+  "interaction.loot": "Found: {amount} coins.",
 
   "menu.pause.title": "Pause",
   "menu.pause.options": "Options",
@@ -65,6 +67,7 @@ export default {
   "save.imported": "Game imported.",
 
   "time.announce": "{hour}:{minute}. Day {day} of month {month}, {season}, year {year}.",
+  "money.announce": "{amount} coins.",
   "time.season.spring": "spring",
   "time.season.summer": "summer",
   "time.season.autumn": "autumn",
@@ -90,6 +93,11 @@ export default {
   "entity.buddy.description": "Your loyal four-legged companion.",
   "entity.neon": "Neon sign",
   "entity.neon.description": "A neon sign, buzzing softly.",
+  "entity.money": "Money",
+  "entity.money.description": "A bit of money, sitting on the ground.",
+  "entity.crate": "Crate",
+  "entity.crate.description": "A wooden crate, still closed.",
+  "entity.crate.consumed_description": "A wooden crate, emptied of its contents.",
   "object.toolbox": "Toolbox",
   "object.toolbox.description": "A metal toolbox. It looks like it can be searched.",
   "npc.passerby": "Passerby",

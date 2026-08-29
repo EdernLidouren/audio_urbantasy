@@ -14,7 +14,17 @@
       "x": 4,
       "nameKey": "npc.resident",
       "descriptionKey": "npc.resident.description",
-      "presence": [{ "when": { "type": "timeRange", "from": 9, "to": 10 }, "effects": [{ "type": "presence", "present": true }] }]
+      "presence": [{ "when": { "type": "timeRange", "from": 21, "to": 8 }, "effects": [{ "type": "presence", "present": true }] }]
+    },
+    { "id": "crate-port", "type": "crate", "x": 8 },
+    {
+      "id": "crate-warehouse",
+      "type": "crate",
+      "x": 12,
+      "presence": [
+        { "when": { "type": "consumed" }, "present": false },
+        { "when": { "type": "timeRange", "from": 0, "to": 24 }, "present": true }
+      ]
     }
   ]
 }

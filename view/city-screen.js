@@ -8,13 +8,15 @@ import { announce } from "../lib/announce.js";
 import { t } from "../i18n/index.js";
 import { ensureAudioUnlocked } from "../lib/audio.js";
 import { createCityAudioScene } from "./audio/city-scene.js";
-import { interact, chooseInteractionTarget, setDoorTransitionHandler } from "./interaction.js";
+import { interact, chooseInteractionTarget, setDoorTransitionHandler, setPickupHandler, setLootHandler } from "./interaction.js";
 import { openPauseMenu } from "./menus/pause-menu.js";
 import { setGameReplaceHandler } from "./menus/save-menu.js";
 import { tick } from "../core/actions.js";
 import { reduce } from "../core/reduce.js";
 import { loadLevelById } from "../level/load.js";
-import { getActiveWorld, travelToWorld } from "../core/state.js";
+import { getActiveWorld, travelToWorld, spawnEphemeral } from "../core/state.js";
+import { pickupEntity, lootEntity } from "../core/money.js";
+import { isDebugEnabled } from "../config/debug.js";
 import { advanceTime, minuteOfHour, hourOfDay, dayOfMonth, monthOfYear, seasonOfYear, yearNumber, SEASON_KEYS } from "../core/time.js";
 import registry from "../entities/types/index.js";
 import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
@@ -43,6 +45,32 @@ function announceGameTime(session) {
     })
   );
 }
+
+// Consultation pure de session.money (touche "g", voir onKeyDown plus bas) —
+// même patron que announceGameTime : aucune action, juste une lecture d'état
+// annoncée. Canal liveRegion par défaut (announce() sans option), comme le
+// temps.
+function announceMoney(session) {
+  announce(t("money.announce", { amount: session.money }));
+}
+
+// Descripteur ÉPHÉMÈRE de test (touche "e" en mode debug, voir onKeyDown
+// plus bas ; core/state.js/spawnEphemeral) — une PIÈCE ramassable,
+// réutilise TEL QUEL l'archétype "money" existant (entities/types/money.js) :
+// EXACTEMENT la forme qu'une instance { type: "money" } sans surcharge
+// obtiendrait en sortie de core/level.js/parseEntity, résolue ICI à la main
+// — la vue connaît déjà le registre, contrairement au core (spawnEphemeral
+// ne fait que porter ce descripteur, jamais l'interpréter). x/id/ephemeral
+// sont posés par spawnEphemeral lui-même, jamais ici.
+const EPHEMERAL_COIN_SPEC = {
+  type: "money",
+  labelKey: registry.money.label,
+  descriptionKey: registry.money.descriptionKey,
+  blocksMovement: Boolean(registry.money.blocksMovement),
+  observable: Boolean(registry.money.observable),
+  interactable: Boolean(registry.money.interactable),
+  action: registry.money.action,
+};
 
 export function makeCityScreen(getSession, setSession) {
   let scene = null;
@@ -100,11 +128,29 @@ export function makeCityScreen(getSession, setSession) {
     scene = createCityAudioScene(getSession);
   }
 
+  // Effet d'ÉTAT du ramassage (voir view/interaction.js/ACTION_HANDLERS.
+  // pickup) : argent + retrait de l'entité, core pur (core/money.js) —
+  // c'est TOUT ce que fait ce gestionnaire, le son/l'annonce restent côté
+  // interaction.js, qui l'appelle.
+  function pickupEntityEffect(entity) {
+    setSession(pickupEntity(getSession(), entity.id, entity.action.amount));
+  }
+
+  // Effet d'ÉTAT du "loot" (voir view/interaction.js/ACTION_HANDLERS.loot ;
+  // entities/model.md/"Collectible persistant") : argent + entity.consumed,
+  // core pur (core/money.js/lootEntity) — même patron que
+  // pickupEntityEffect ci-dessus, mais l'entité N'EST JAMAIS retirée.
+  function lootEntityEffect(entity) {
+    setSession(lootEntity(getSession(), entity.id, entity.action.amount));
+  }
+
   // Enregistrés une fois, pour la durée de vie de cet écran ville : mêmes
   // principe et portée que setDoorTransitionHandler (voir
   // view/interaction.js) — un module qui déclenche un effet possédé par
   // city-screen.js (scene/session) sans avoir besoin de les connaître.
   setDoorTransitionHandler(transitionThroughDoor);
+  setPickupHandler(pickupEntityEffect);
+  setLootHandler(lootEntityEffect);
   setGameReplaceHandler(replaceCurrentGame);
 
   return {
@@ -166,6 +212,28 @@ export function makeCityScreen(getSession, setSession) {
         return;
       }
 
+      // "g" (gold) discrète : consultation pure de l'argent courant — même
+      // statut que "t", aucune action, juste une lecture d'état annoncée.
+      if (event.key === "g" || event.key === "G") {
+        announceMoney(getSession());
+        return;
+      }
+
+      // "e" (éphémère), MODE DEBUG UNIQUEMENT (voir config/debug.js) : fait
+      // apparaître une pièce éphémère de test à la position du joueur —
+      // éprouve le cycle de vie complet (ramassable, jamais sauvegardée,
+      // purgée si non ramassée au départ de la scène). PAS "d" (touche
+      // suggérée à l'origine) : déjà liée au déplacement à droite (voir
+      // view/input.js, RIGHT_KEYS ZQSD) — la réutiliser aurait fait
+      // apparaître une pièce à CHAQUE premier appui d'un pas vers la
+      // droite en mode debug, jamais l'intention. En mode normal (debug
+      // désactivé), "e" ne fait RIEN — comportement inchangé pour tout
+      // joueur qui ne l'a jamais activé.
+      if ((event.key === "e" || event.key === "E") && isDebugEnabled()) {
+        setSession(spawnEphemeral(getSession(), EPHEMERAL_COIN_SPEC, getSession().player.x));
+        return;
+      }
+
       if (event.key !== " " && event.key !== "Enter") return;
 
       // Surtout pour Espace : sans ça, la page défilerait.
@@ -185,6 +253,8 @@ export function makeCityScreen(getSession, setSession) {
       scene.destroy();
       scene = null;
       setDoorTransitionHandler(null);
+      setPickupHandler(null);
+      setLootHandler(null);
       setGameReplaceHandler(null);
       // Invariant documenté (CLAUDE.md) : session est null hors partie.
       // Seul chemin de sortie de la ville aujourd'hui (menu pause -> retour

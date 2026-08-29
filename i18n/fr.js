@@ -16,6 +16,8 @@ export default {
 
   "menu.interaction.title": "Interagir",
   "menu.interaction.observe.title": "Observer",
+  "interaction.pickup": "Ramassé : {amount} pièces.",
+  "interaction.loot": "Trouvé : {amount} pièces.",
 
   "menu.pause.title": "Pause",
   "menu.pause.options": "Options",
@@ -66,6 +68,9 @@ export default {
   "save.imported": "Partie importée.",
 
   "time.announce": "{hour} h {minute}. Jour {day} du mois {month}, {season}, année {year}.",
+  // Nom de monnaie BATEAU et PROVISOIRE — voir core/money.js, changeable
+  // sans toucher au mécanisme (juste ces deux chaînes).
+  "money.announce": "{amount} pièces.",
   "time.season.spring": "printemps",
   "time.season.summer": "été",
   "time.season.autumn": "automne",
@@ -91,6 +96,11 @@ export default {
   "entity.buddy.description": "Votre fidèle compagnon à quatre pattes.",
   "entity.neon": "Enseigne au néon",
   "entity.neon.description": "Une enseigne au néon qui bourdonne doucement.",
+  "entity.money": "Argent",
+  "entity.money.description": "Un peu d'argent, posé au sol.",
+  "entity.crate": "Caisse",
+  "entity.crate.description": "Une caisse en bois, encore fermée.",
+  "entity.crate.consumed_description": "Une caisse en bois, vidée de son contenu.",
   "object.toolbox": "Boîte à outils",
   "object.toolbox.description": "Une boîte à outils métallique. Elle semble fouillable.",
   "npc.passerby": "Passant",

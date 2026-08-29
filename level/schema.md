@@ -88,9 +88,11 @@ bascule en cours de jeu (`view/audio/city-scene.js`). Détail complet :
 | `target`  | string | **requis** si `type === "door"` : id d'un niveau du registre (`level/index.js`) — l'action "activate" sur la porte y transitionne (voir `view/interaction.js`, `view/city-screen.js`) |
 | `nameKey` | string | optionnel (npc/object) : clé i18n spécifique à l'instance          |
 | `descriptionKey` | string | optionnel : clé i18n de description spécifique à l'instance, utilisée par l'interaction "describe" (touche Espace) |
+| `consumedDescriptionKey` | string | optionnel : clé i18n de description ALTERNATIVE une fois l'entité `consumed` (voir "Collectible persistant" plus bas et `entities/model.md`). Cascade instance -> type -> absente, comme `descriptionKey` |
 | `blocksMovement` | boolean | optionnel : surcharge d'instance, cascade -> défaut du type (`entities/types/index.js`) -> `false` |
 | `observable` | boolean | optionnel : idem, candidate à l'interaction "describe" (voir "Interaction (niveau 0)", `entities/model.md`) |
 | `interactable` | boolean | optionnel : idem, candidate à l'interaction "activate" |
+| `action` | `{ kind: string, ... }` | optionnel : TYPE D'ACTION pour l'interaction "activate", cascade instance -> type comme `behavior`. Forme validée ici (`kind` non vide) ; le `kind` lui-même n'est PAS validé contre un registre au chargement — l'aiguillage reste côté vue (voir "Interaction (niveau 0)", `entities/model.md`). |
 | `presence` | `PresenceRule[]` | optionnel : règles DÉCLARATIVES de présence conditionnelle, cascade instance -> type (voir "Présence conditionnelle" plus bas et `entities/model.md`). Sans règle (ni à l'instance ni au type) : toujours présente. |
 
 `parseLevel` normalise chaque entité en ajoutant `labelKey` et
@@ -121,6 +123,7 @@ plans coupés par l'état dormant, la garde anti-boucle des effets
 |-------------|---------------|--------------------------------------------------------------|
 | `timeRange` | `from`, `to` (heures 0-23) | l'heure courante (dérivée de `session.time`, voir `core/time.js`) tombe dans `[from, to[`, en gérant le passage par minuit (`from > to`, ex. `20..6`) |
 | `arrived`   | (aucun)       | le comportement actif de l'entité est encore `"goto"` ET a atteint sa cible (`entity.gotoArrived`) |
+| `consumed`  | (aucun)       | l'entité porte `consumed: true` (voir `core/state.js`/`markConsumed`, "Collectible persistant" plus bas) — PERMANENT, `consumed` ne repasse jamais à `false` |
 
 Un `Effect` : `{ type: "presence", present: boolean }` ou `{ type:
 "behavior", behavior: <objet behavior, même forme que le champ `behavior`
@@ -128,6 +131,29 @@ d'une entité, voir plus bas> }` — un `kind` de comportement inconnu dans un
 effet `"behavior"` est rejeté au chargement, exactement comme un `behavior`
 d'entité invalide. Un effet `"behavior"` ne s'applique qu'à la BASCULE de sa
 règle (faux -> vrai), jamais en continu — voir `entities/model.md`.
+
+## Collectible persistant
+
+`consumed` (booléen, RUNTIME — jamais un champ d'entrée du JSON de niveau,
+comme `present`/`gotoArrived`) : marque une entité activée une seule fois via
+l'action `"loot"` (voir "Registre de types" plus bas et `entities/model.md`),
+posé par `core/state.js`/`markConsumed`, JAMAIS retiré du monde (contrairement
+à l'action `"pickup"`, voir `core/money.js`). Deux effets POST-ACTIVATION
+composables, DÉCLARÉS par l'entité : `consumedDescriptionKey` (voir tableau
+"Entité" plus haut) et/ou une règle de présence sur la condition `"consumed"`
+(voir tableau "Présence conditionnelle" ci-dessus) pour devenir dormant.
+Détail complet (idempotence, exemples, muteOnConsumed) : `entities/model.md`.
+
+## Entités éphémères
+
+`ephemeral` (booléen, RUNTIME — jamais un champ d'entrée du JSON de niveau,
+comme `consumed`) : marque une entité créée EN COURS DE JEU via
+`core/state.js`/`spawnEphemeral`, jamais déclarée dans un fichier de niveau.
+Exclue de la sérialisation (`core/save.js`/`serializeGame`) et purgée du
+lieu au départ (`core/state.js`/`travelToWorld`) — aucune entité éphémère
+n'apparaît donc jamais dans un fichier de niveau ni dans une sauvegarde.
+Limite anti-prolifération : `MAX_EPHEMERALS` (`config/ephemerals.js`).
+Détail complet : `entities/model.md`/"Entités éphémères".
 
 ## Registre de types (`entities/types/index.js`)
 
@@ -142,6 +168,9 @@ rassemblés par `index.js` en un objet `{ [type]: TypeDef }` :
 | `blocksMovement` | boolean | core           | empêche le déplacement au travers de l'entité (`core/physics/collision.js`) |
 | `observable`     | boolean | vue            | candidate à l'interaction "describe" (touche Espace) — voir "Interaction (niveau 0)", `entities/model.md` |
 | `interactable`   | boolean | vue            | candidate à l'interaction "activate" (touche Entrée) — idem |
+| `action`         | object  | vue            | `{ kind, ... }` par défaut du type — voir "Interaction (niveau 0)", `entities/model.md` |
+| `consumedDescriptionKey` | string | vue    | optionnel : défaut de type, cascadé comme `descriptionKey` — voir "Collectible persistant" plus haut |
+| `muteOnConsumed` | boolean | vue           | optionnel, REGISTRE SEULEMENT (jamais cascadé par instance) : arrête le beacon continu une fois l'entité `consumed` — voir "Collectible persistant" plus haut, `entities/model.md` |
 
 `blocksMovement`/`observable`/`interactable` sont tous les trois cascadés
 instance -> type -> défaut `false` (voir `core/level.js`/`parseEntity`), donc

@@ -13,6 +13,7 @@ import { playMenuSound } from "./view/menu-sounds.js";
 import { makeCityScreen } from "./view/city-screen.js";
 import { t } from "./i18n/index.js";
 import { runMovementChecks } from "./core/movement.check.js";
+import { isDebugEnabled, setDebugEnabled } from "./config/debug.js";
 import { startLoop } from "./lib/loop.js";
 import { loadLevel } from "./level/load.js";
 import registry from "./entities/types/index.js";
@@ -39,6 +40,19 @@ configureMenuSounds(playMenuSound);
 window.runMovementChecks = runMovementChecks;
 console.log("Vérifs dispo : tape runMovementChecks()");
 
+// Mode DEBUG (voir config/debug.js) : PAS de menu — bascule DEPUIS LA
+// CONSOLE (window.toggleDebug, comme runMovementChecks ci-dessus) OU par la
+// combinaison Alt+D EN JEU (voir l'écouteur câblé sur gameZone plus bas,
+// après sa déclaration) — deux chemins, UNE seule fonction, jamais deux
+// logiques à maintenir. Expose la touche de debug "e" en ville (voir
+// view/city-screen.js) une fois activé.
+function toggleDebug() {
+  setDebugEnabled(!isDebugEnabled());
+  console.log(`Mode debug : ${isDebugEnabled() ? "activé" : "désactivé"}`);
+}
+window.toggleDebug = toggleDebug;
+console.log("Mode debug : tape toggleDebug() ou Alt+D en jeu");
+
 const gameZone = document.getElementById("game");
 
 // Volume principal (préférence persistée, défaut BAS — voir
@@ -56,6 +70,20 @@ setMasterVolume(getPref("masterVolume", PREF_CONSTRAINTS.masterVolume.default) /
 // qu'on branche le déverrouillage sur le tout premier appui touche.
 initInput(gameZone, { onFirstInput: ensureAudioUnlocked });
 preventMovementKeyScrolling(gameZone);
+
+// Alt+D : bascule le mode debug SANS passer par la console (voir
+// toggleDebug ci-dessus) — écouteur INDÉPENDANT de la pile d'écrans (même
+// principe que preventMovementKeyScrolling), pour rester disponible quel
+// que soit l'écran actif (menu, pause, ville...), jamais routé par
+// lib/screens.js. preventDefault : Alt+D est intercepté par certains
+// navigateurs (ex. focus de la barre d'adresse sur Firefox) sans lui.
+gameZone.addEventListener("keydown", (event) => {
+  if (event.altKey && (event.key === "d" || event.key === "D")) {
+    event.preventDefault();
+    toggleDebug();
+  }
+});
+
 gameZone.focus();
 
 // Niveau chargé en tâche de fond ; startNewGame() le lit au moment de

@@ -4,12 +4,24 @@
 // parseLevel — aucune dépendance hors des modules du core.
 
 import { parseLevel } from "./level.js";
-import { createInitialState, getActiveWorld, travelToWorld, addCompanion, MOVE_STEP, BODY_RADIUS } from "./state.js";
+import {
+  createInitialState,
+  getActiveWorld,
+  travelToWorld,
+  addCompanion,
+  removeEntity,
+  markConsumed,
+  spawnEphemeral,
+  MOVE_STEP,
+  BODY_RADIUS,
+} from "./state.js";
 import { tick } from "./actions.js";
 import { reduce } from "./reduce.js";
 import { moveAndBounce } from "./physics/movement.js";
 import { SAVE_VERSION, serializeGame, deserializeGame } from "./save.js";
+import { addMoney, pickupEntity, lootEntity } from "./money.js";
 import { MAX_COMPANIONS } from "../config/companions.js";
+import { MAX_EPHEMERALS } from "../config/ephemerals.js";
 import { SURFACE_REGISTRY, DEFAULT_SURFACE, surfaceAt, surfaceProps, surfacePropsAt } from "./surfaces.js";
 import {
   INITIAL_TIME,
@@ -450,6 +462,51 @@ export function runMovementChecks() {
   run("interaction : observable non booléen rejeté", true, expectInteractionRejected("observable", "oui"));
   run("interaction : interactable non booléen rejeté", true, expectInteractionRejected("interactable", "oui"));
 
+  // action : TRANSPORT générique, cascade instance -> type (comme
+  // behavior/presence) — le core valide la FORME (objet, kind non vide),
+  // jamais le kind lui-même contre un registre (ça reste entièrement côté
+  // vue, voir view/interaction.js/ACTION_HANDLERS) : un kind qu'AUCUN
+  // gestionnaire ne reconnaît encore charge sans erreur, se dégradera
+  // proprement à l'INTERACTION, pas au chargement.
+  const ACTION_REGISTRY = {
+    withDefault: { label: "entity.dog", interactable: true, action: { kind: "pickup", amount: 5 } },
+    plain: { label: "entity.dog" },
+  };
+  const actionLevel = parseLevel(
+    {
+      id: "movement-check-action",
+      titleKey: "level.demo.title",
+      length: 20,
+      playerStart: 0,
+      entities: [
+        { id: "e-default", type: "withDefault", x: 5 },
+        { id: "e-override", type: "withDefault", x: 6, action: { kind: "pickup", amount: 99 } },
+        { id: "e-no-action", type: "plain", x: 7 },
+        { id: "e-unknown-kind", type: "plain", x: 8, action: { kind: "fly-away" } },
+      ],
+    },
+    ACTION_REGISTRY
+  );
+  function actionEntity(id) {
+    return actionLevel.entities.find((e) => e.id === id);
+  }
+  run("action : défaut du type hérité", JSON.stringify({ kind: "pickup", amount: 5 }), JSON.stringify(actionEntity("e-default").action));
+  run(
+    "action : surcharge d'instance REMPLACE (pas de fusion), amount du type ignoré",
+    JSON.stringify({ kind: "pickup", amount: 99 }),
+    JSON.stringify(actionEntity("e-override").action)
+  );
+  run("action : absente si ni l'instance ni le type n'en fournissent", undefined, actionEntity("e-no-action").action);
+  run(
+    "action : un kind INCONNU du registre de vue charge sans erreur (transport pur, voir header)",
+    "fly-away",
+    actionEntity("e-unknown-kind").action.kind
+  );
+
+  run("action : non-objet rejeté au chargement", true, expectInteractionRejected("action", "pickup"));
+  run("action : kind manquant rejeté au chargement", true, expectInteractionRejected("action", {}));
+  run("action : kind vide rejeté au chargement", true, expectInteractionRejected("action", { kind: "" }));
+
   // --- Robustesse : chevauchement de corps (curatif, au tick) ---
 
   const OVERLAP_REGISTRY = { wall: { label: "entity.wall", blocksMovement: true } };
@@ -848,6 +905,27 @@ export function runMovementChecks() {
   );
   run("presence : type de condition inconnu -> false (jamais un throw)", false, evaluateCondition({ type: "weather" }, { time: 0 }));
 
+  // evaluateCondition/consumed (voir core/state.js/markConsumed, "Collectible
+  // persistant" dans entities/model.md) : vrai SEULEMENT si l'entité porte
+  // consumed:true — contrairement à timeRange/arrived, ne dépend pas de
+  // context.time, seulement de context.entity (posé par resolveEntityRules,
+  // voir plus bas).
+  run(
+    "presence : consumed — entité consumed:true -> vrai",
+    true,
+    evaluateCondition({ type: "consumed" }, { entity: { consumed: true } })
+  );
+  run(
+    "presence : consumed — entité consumed:false -> faux",
+    false,
+    evaluateCondition({ type: "consumed" }, { entity: { consumed: false } })
+  );
+  run(
+    "presence : consumed — entité sans champ consumed -> faux",
+    false,
+    evaluateCondition({ type: "consumed" }, { entity: {} })
+  );
+
   // isPresent : sans champ presence -> toujours présente (comportement
   // d'avant ce système, inchangé). Avec règles : la première dont `when`
   // est vraie décide ; aucune ne correspond -> DORMANTE par défaut.
@@ -883,6 +961,32 @@ export function runMovementChecks() {
   };
   run("presence : deux règles complémentaires — jour -> dormante", false, isPresent(complementaryRules, { time: 10 * 60 }));
   run("presence : deux règles complémentaires — nuit -> présente", true, isPresent(complementaryRules, { time: 23 * 60 }));
+
+  // "Collectible persistant" (voir entities/model.md) : effet post-activation
+  // "devient dormant" — une règle { when: { type: "consumed" }, present:
+  // false } sur l'INSTANCE (voir level/demo2.json, "crate-warehouse").
+  // ATTENTION (même "asymétrie documentée" que ci-dessus) : CETTE SEULE
+  // règle ne suffit PAS à rester présente avant consommation — sans règle
+  // couvrant explicitement ce cas, isPresent retombe sur dormante par
+  // défaut. Il faut donc une SECONDE règle, "présente par défaut" (ici un
+  // timeRange 0..24 — couvre TOUTE heure, jamais une vraie contrainte
+  // temporelle, juste le catch-all "présente sinon" — même idiome que la
+  // règle 8..24 de l'habitant, voir entities/model.md/"Exemple de
+  // référence — l'habitant"), placée APRÈS pour ne jamais l'emporter sur
+  // la règle "consumed" (priorité au premier rule actif, voir
+  // resolveEntityRules). isPresent lit context.entity (ajouté par
+  // resolveEntityRules lui-même) — jamais besoin de le passer ici.
+  const dormantOnConsumed = {
+    id: "crate-test",
+    consumed: false,
+    presence: [
+      { when: { type: "consumed" }, present: false },
+      { when: { type: "timeRange", from: 0, to: 24 }, present: true },
+    ],
+  };
+  run("presence : caisse NON consumed — présente (catch-all)", true, isPresent(dormantOnConsumed, { time: 0 }));
+  const consumedCrate = { ...dormantOnConsumed, consumed: true };
+  run("presence : caisse consumed:true — dormante (priorité à la 1ère règle)", false, isPresent(consumedCrate, { time: 0 }));
 
   // isBlocking : blocksMovement ET présente -> bloque ; l'un des deux
   // manquant -> jamais.
@@ -2149,6 +2253,7 @@ export function runMovementChecks() {
     behavior: { kind: "follow", targetId: "player", minDistance: 1, maxDistance: 3 },
   };
   let auditSession = createInitialState(auditWorldA, 77, { companions: [auditCompanion] });
+  auditSession = addMoney(auditSession, 12); // argent NON nul dans l'audit — voir plus bas, doit survivre au même titre que le reste
   for (let i = 0; i < 25; i++) auditSession = reduce(auditSession, tick(1));
   auditSession = travelToWorld(auditSession, auditWorldB.id, auditWorldB);
   for (let i = 0; i < 10; i++) auditSession = reduce(auditSession, tick(-1));
@@ -2161,6 +2266,10 @@ export function runMovementChecks() {
     console.warn("Audit sérialisabilité : fuites détectées —", leakFindings);
   }
   run("sérialisation : aucune fuite de non-sérialisable dans la partie", 0, leakFindings.length);
+  // Argent : présent et NOMBRE (jamais undefined) dans la partie AVANT tout
+  // aller-retour — confirme session.money comme n'importe quel autre champ
+  // du cercle partie (voir core/state.js).
+  run("sérialisation : session.money est un nombre (jamais undefined)", true, typeof auditSession.money === "number");
 
   // 2) Aller-retour JSON réel, capturé pour détecter un throw (ex. cycle)
   // au lieu de laisser l'exception interrompre toute la suite de checks.
@@ -2172,6 +2281,9 @@ export function runMovementChecks() {
     auditRoundTripThrew = true;
   }
   run("sérialisation : JSON.stringify/parse ne lève pas", false, auditRoundTripThrew);
+  if (!auditRoundTripThrew) {
+    run("sérialisation : money survit à l'aller-retour JSON", auditSession.money, auditRoundTripped.money);
+  }
 
   // 3) Divergence structurelle précise entre avant/après.
   const structureDiffs = [];
@@ -2244,6 +2356,315 @@ export function runMovementChecks() {
     }
   }
 
+  // --- Argent (core/money.js) : scalaire de partie + effet pickup ---
+
+  const MONEY_REGISTRY = { dog: { label: "entity.dog" } };
+  const moneyLevel = parseLevel(
+    {
+      id: "movement-check-money",
+      titleKey: "level.demo.title",
+      length: 10,
+      playerStart: 0,
+      entities: [
+        { id: "coin-1", type: "dog", x: 5, interactable: true, action: { kind: "pickup", amount: 7 } },
+        { id: "other-1", type: "dog", x: 6 },
+      ],
+    },
+    MONEY_REGISTRY
+  );
+  const moneyState = createInitialState(moneyLevel, undefined, NO_COMPANIONS);
+
+  run("argent : une partie neuve démarre à 0", 0, moneyState.money);
+
+  const afterAdd = addMoney(moneyState, 7);
+  run("argent : addMoney incrémente du montant donné", 7, afterAdd.money);
+  run("argent : addMoney cumule (pas un remplacement)", 10, addMoney(afterAdd, 3).money);
+  run("argent : addMoney ne mute jamais l'original", 0, moneyState.money);
+
+  run("argent : removeEntity retire l'entité ciblée", false, getActiveWorld(removeEntity(moneyState, "coin-1")).entities.some((e) => e.id === "coin-1"));
+  run(
+    "argent : removeEntity laisse les autres entités intactes",
+    true,
+    getActiveWorld(removeEntity(moneyState, "coin-1")).entities.some((e) => e.id === "other-1")
+  );
+  run("argent : removeEntity — id absent -> référence INCHANGÉE (no-op sûr)", moneyState, removeEntity(moneyState, "does-not-exist"));
+
+  const afterPickup = pickupEntity(moneyState, "coin-1", 7);
+  run("argent : pickupEntity ajoute le montant", 7, afterPickup.money);
+  run("argent : pickupEntity retire l'entité ramassée", false, getActiveWorld(afterPickup).entities.some((e) => e.id === "coin-1"));
+  run("argent : pickupEntity laisse les autres entités intactes", true, getActiveWorld(afterPickup).entities.some((e) => e.id === "other-1"));
+
+  // Double appel (id déjà retiré, ex. tentative périmée) : effet ATOMIQUE,
+  // jamais un second gain sans entité à retirer — voir le commentaire du
+  // module.
+  run("argent : pickupEntity sur une entité déjà retirée -> aucun second gain", 7, pickupEntity(afterPickup, "coin-1", 7).money);
+  run("argent : pickupEntity sur une entité déjà retirée -> référence INCHANGÉE", afterPickup, pickupEntity(afterPickup, "coin-1", 7));
+
+  // --- Collectible persistant (core/state.js/markConsumed, core/money.js/lootEntity) ---
+  // Contrairement à removeEntity/pickupEntity ci-dessus, l'entité looté
+  // N'EST JAMAIS retirée — voir entities/model.md/"Collectible persistant".
+
+  const CRATE_REGISTRY = { dog: { label: "entity.dog" } };
+  const crateLevel = parseLevel(
+    {
+      id: "movement-check-crate",
+      titleKey: "level.demo.title",
+      length: 10,
+      playerStart: 0,
+      entities: [
+        { id: "crate-1", type: "dog", x: 5, interactable: true, action: { kind: "loot", amount: 100 } },
+        { id: "other-1", type: "dog", x: 6 },
+      ],
+    },
+    CRATE_REGISTRY
+  );
+  const crateState = createInitialState(crateLevel, undefined, NO_COMPANIONS);
+
+  run("caisse : markConsumed pose consumed:true sur l'entité ciblée", true, getActiveWorld(markConsumed(crateState, "crate-1")).entities.find((e) => e.id === "crate-1").consumed);
+  run(
+    "caisse : markConsumed laisse les autres entités intactes (pas de consumed)",
+    undefined,
+    getActiveWorld(markConsumed(crateState, "crate-1")).entities.find((e) => e.id === "other-1").consumed
+  );
+  run(
+    "caisse : markConsumed NE RETIRE JAMAIS l'entité (contrairement à removeEntity)",
+    true,
+    getActiveWorld(markConsumed(crateState, "crate-1")).entities.some((e) => e.id === "crate-1")
+  );
+  run("caisse : markConsumed — id absent -> référence INCHANGÉE (no-op sûr)", crateState, markConsumed(crateState, "does-not-exist"));
+
+  const afterLoot = lootEntity(crateState, "crate-1", 100);
+  run("caisse : lootEntity ajoute le montant", 100, afterLoot.money);
+  run("caisse : lootEntity pose consumed:true", true, getActiveWorld(afterLoot).entities.find((e) => e.id === "crate-1").consumed);
+  run("caisse : lootEntity NE RETIRE JAMAIS l'entité", true, getActiveWorld(afterLoot).entities.some((e) => e.id === "crate-1"));
+
+  // IDEMPOTENCE : réactiver une caisse déjà consumed ne redonne RIEN — le
+  // piège explicitement visé par ce système (voir entities/model.md).
+  run("caisse : lootEntity sur une entité déjà consumed -> aucun second gain", 100, lootEntity(afterLoot, "crate-1", 100).money);
+  run("caisse : lootEntity sur une entité déjà consumed -> référence INCHANGÉE", afterLoot, lootEntity(afterLoot, "crate-1", 100));
+
+  // consumedDescriptionKey (core/level.js/parseEntity) : même cascade
+  // instance -> type que descriptionKey.
+  const CONSUMED_DESC_REGISTRY = {
+    dog: { label: "entity.dog", descriptionKey: "entity.dog.description", consumedDescriptionKey: "entity.dog.consumed_description" },
+  };
+  const consumedDescLevel = parseLevel(
+    {
+      id: "movement-check-consumed-desc",
+      titleKey: "level.demo.title",
+      length: 10,
+      playerStart: 0,
+      entities: [
+        { id: "type-default", type: "dog", x: 1 },
+        { id: "instance-override", type: "dog", x: 2, consumedDescriptionKey: "custom.consumed_description" },
+      ],
+    },
+    CONSUMED_DESC_REGISTRY
+  );
+  run(
+    "caisse : consumedDescriptionKey — retombe sur le défaut du type",
+    "entity.dog.consumed_description",
+    consumedDescLevel.entities.find((e) => e.id === "type-default").consumedDescriptionKey
+  );
+  run(
+    "caisse : consumedDescriptionKey — surcharge d'instance prioritaire",
+    "custom.consumed_description",
+    consumedDescLevel.entities.find((e) => e.id === "instance-override").consumedDescriptionKey
+  );
+
+  // Sérialisabilité : consumed (true, pas juste sa valeur par défaut absente)
+  // survit à un aller-retour JSON, comme n'importe quel autre champ d'entité
+  // (money, ruleActive...) — voir l'audit générique plus bas pour le
+  // mécanisme complet.
+  const roundTrippedLoot = JSON.parse(JSON.stringify(afterLoot));
+  run(
+    "caisse : consumed survit à un aller-retour JSON",
+    true,
+    getActiveWorld(roundTrippedLoot).entities.find((e) => e.id === "crate-1").consumed
+  );
+
+  // --- Entités éphémères (core/state.js/spawnEphemeral + purge, core/save.js) ---
+  // Voir entities/model.md/"Entités éphémères". Contrairement au collectible
+  // persistant ci-dessus, une entité éphémère ne survit JAMAIS — ni à une
+  // sauvegarde, ni à une sortie de scène.
+
+  const EPHEMERAL_REGISTRY = { dog: { label: "entity.dog" }, door: { label: "entity.door" } };
+  const ephemeralWorldA = parseLevel(
+    {
+      id: "movement-check-ephemeral-a",
+      titleKey: "level.demo.title",
+      length: 10,
+      playerStart: 0,
+      entities: [
+        { id: "declared-1", type: "dog", x: 3 },
+        { id: "door-to-b", type: "door", x: 9, target: "movement-check-ephemeral-b" },
+      ],
+    },
+    EPHEMERAL_REGISTRY
+  );
+  const ephemeralWorldB = parseLevel(
+    { id: "movement-check-ephemeral-b", titleKey: "level.demo.title", length: 10, playerStart: 0, entities: [] },
+    EPHEMERAL_REGISTRY
+  );
+  // spec : descripteur DÉJÀ RÉSOLU, comme le construirait la vue (voir
+  // view/city-screen.js/EPHEMERAL_COIN_SPEC) — spawnEphemeral ne l'interprète
+  // jamais, il ne fait qu'y ajouter id/x/ephemeral.
+  const EPHEMERAL_SPEC = { type: "dog", labelKey: "entity.dog", interactable: true, action: { kind: "pickup", amount: 5 } };
+
+  const ephemeralState = createInitialState(ephemeralWorldA, undefined, NO_COMPANIONS);
+  run("éphémère : monde neuf démarre à nextEphemeralId 0", 0, getActiveWorld(ephemeralState).nextEphemeralId);
+
+  const afterSpawn1 = spawnEphemeral(ephemeralState, EPHEMERAL_SPEC, 4);
+  const spawned1 = getActiveWorld(afterSpawn1).entities.find((e) => e.id === "ephemeral-0");
+  run("éphémère : spawnEphemeral ajoute une entité marquée ephemeral:true", true, Boolean(spawned1 && spawned1.ephemeral));
+  run("éphémère : spawnEphemeral pose x tel que demandé", 4, spawned1 && spawned1.x);
+  run("éphémère : spawnEphemeral reporte les champs de spec tels quels", "entity.dog", spawned1 && spawned1.labelKey);
+  run("éphémère : spawnEphemeral NE MUTE JAMAIS l'original", false, getActiveWorld(ephemeralState).entities.some((e) => e.ephemeral));
+  run(
+    "éphémère : une entité déclarée n'est jamais affectée par un spawn",
+    true,
+    getActiveWorld(afterSpawn1).entities.some((e) => e.id === "declared-1")
+  );
+
+  const afterSpawn2 = spawnEphemeral(afterSpawn1, EPHEMERAL_SPEC, 5);
+  run(
+    "éphémère : deux spawns successifs -> ids distincts (compteur incrémental)",
+    true,
+    getActiveWorld(afterSpawn2).entities.some((e) => e.id === "ephemeral-0") &&
+      getActiveWorld(afterSpawn2).entities.some((e) => e.id === "ephemeral-1")
+  );
+
+  // Ramassage : réutilise pickupEntity TEL QUEL (voir la section "Argent"
+  // plus haut) — aucun traitement spécial à une entité éphémère.
+  const afterEphemeralPickup = pickupEntity(afterSpawn2, "ephemeral-0", 5);
+  run("éphémère : ramassée via pickupEntity — argent ajouté", 5, afterEphemeralPickup.money);
+  run(
+    "éphémère : ramassée via pickupEntity — retirée du monde, sans résidu",
+    false,
+    getActiveWorld(afterEphemeralPickup).entities.some((e) => e.id === "ephemeral-0")
+  );
+
+  // Purge au départ (travelToWorld) : un éphémère NON ramassé ne doit JAMAIS
+  // survivre à une sortie de scène — voir entities/model.md.
+  const beforeDeparture = spawnEphemeral(ephemeralState, EPHEMERAL_SPEC, 6);
+  run(
+    "éphémère : présente avant la transition (contrôle)",
+    true,
+    getActiveWorld(beforeDeparture).entities.some((e) => e.ephemeral)
+  );
+  const afterDeparture = travelToWorld(beforeDeparture, "movement-check-ephemeral-b", ephemeralWorldB);
+  run(
+    "éphémère : purgée du monde QUITTÉ par travelToWorld (non ramassée)",
+    false,
+    afterDeparture.worlds["movement-check-ephemeral-a"].entities.some((e) => e.ephemeral)
+  );
+  run(
+    "éphémère : travelToWorld laisse les entités déclarées du monde quitté intactes",
+    true,
+    afterDeparture.worlds["movement-check-ephemeral-a"].entities.some((e) => e.id === "declared-1")
+  );
+  // Revenir dans le monde quitté : toujours aucun éphémère (la purge a eu
+  // lieu à la sortie, pas à l'entrée — rien à refaire ici, juste vérifier
+  // qu'il n'y a rien à trouver).
+  const backInA = travelToWorld(afterDeparture, "movement-check-ephemeral-a");
+  run(
+    "éphémère : revenir dans le monde quitté — toujours aucun éphémère",
+    false,
+    getActiveWorld(backInA).entities.some((e) => e.ephemeral)
+  );
+
+  // Exclusion de la sérialisation (core/save.js) : garantie INDÉPENDANTE de
+  // la purge ci-dessus — testée ici en construisant directement une session
+  // avec un éphémère encore présent (comme si sauvegardée SANS quitter la
+  // scène), pour vérifier que serializeGame ne compte sur AUCUN autre
+  // mécanisme pour tenir sa propre garantie.
+  const sessionWithEphemeral = spawnEphemeral(ephemeralState, EPHEMERAL_SPEC, 7);
+  run(
+    "éphémère : présente avant sérialisation (contrôle)",
+    true,
+    getActiveWorld(sessionWithEphemeral).entities.some((e) => e.ephemeral)
+  );
+  const ephemeralSaveEnvelope = serializeGame(sessionWithEphemeral);
+  run(
+    "éphémère : serializeGame l'exclut du monde actif",
+    false,
+    ephemeralSaveEnvelope.data.worlds["movement-check-ephemeral-a"].entities.some((e) => e.ephemeral)
+  );
+  run(
+    "éphémère : serializeGame laisse les entités déclarées intactes",
+    true,
+    ephemeralSaveEnvelope.data.worlds["movement-check-ephemeral-a"].entities.some((e) => e.id === "declared-1")
+  );
+  run(
+    "éphémère : serializeGame ne mute jamais la session d'origine",
+    true,
+    getActiveWorld(sessionWithEphemeral).entities.some((e) => e.ephemeral)
+  );
+  const ephemeralReload = deserializeGame(ephemeralSaveEnvelope);
+  run("éphémère : la sauvegarde reste chargeable", true, ephemeralReload.success);
+  if (ephemeralReload.success) {
+    run(
+      "éphémère : recharger ne la fait PAS réapparaître",
+      false,
+      ephemeralReload.session.worlds["movement-check-ephemeral-a"].entities.some((e) => e.ephemeral)
+    );
+  }
+
+  // Rebouchage nextEphemeralId (core/save.js/backfillWorld) : une sauvegarde
+  // antérieure aux entités éphémères n'a jamais eu cette clé — sans
+  // rebouchage, spawnEphemeral calculerait undefined + 1 = NaN, et TOUT
+  // éphémère suivant recevrait le même id ("ephemeral-NaN"), collision
+  // garantie dès le second spawn.
+  // ephemeralWorldA sort de parseLevel : porte déjà floors/defaultSurface/
+  // segments (voir core/level.js) mais PAS rngState/lastVisited/
+  // nextEphemeralId (ajoutés seulement par createWorldState, core/state.js)
+  // — on simule ICI un monde ANTÉRIEUR au compteur en ajoutant les deux
+  // premiers à la main SANS le troisième, exactement le manque à combler.
+  const worldWithoutCounter = { ...ephemeralWorldA, rngState: 1, lastVisited: 0 };
+  const oldEphemeralSave = {
+    version: SAVE_VERSION,
+    data: {
+      ...ephemeralState,
+      worlds: { [ephemeralWorldA.id]: worldWithoutCounter },
+    },
+  };
+  const oldEphemeralResult = deserializeGame(oldEphemeralSave);
+  run("éphémère : sauvegarde antérieure au compteur acceptée (rebouchée)", true, oldEphemeralResult.success);
+  if (oldEphemeralResult.success) {
+    run("éphémère : monde rebouché — nextEphemeralId par défaut (0)", 0, getActiveWorld(oldEphemeralResult.session).nextEphemeralId);
+    const spawnedAfterBackfill = spawnEphemeral(oldEphemeralResult.session, EPHEMERAL_SPEC, 1);
+    run(
+      "éphémère : spawn après rebouchage — id sain (pas 'ephemeral-NaN')",
+      true,
+      getActiveWorld(spawnedAfterBackfill).entities.some((e) => e.id === "ephemeral-0")
+    );
+  }
+
+  // Limite anti-prolifération (MAX_EPHEMERALS, config/ephemerals.js) :
+  // dépasser la limite ÉVINCE LE PLUS ANCIEN éphémère vivant, jamais les
+  // entités déclarées (dont le nombre n'est pas concerné par cette limite).
+  let evictionState = ephemeralState;
+  for (let i = 0; i < MAX_EPHEMERALS + 1; i++) {
+    evictionState = spawnEphemeral(evictionState, EPHEMERAL_SPEC, 1);
+  }
+  const ephemeralsAfterEviction = getActiveWorld(evictionState).entities.filter((e) => e.ephemeral);
+  run("éphémère : MAX_EPHEMERALS dépassé — le compte reste plafonné", MAX_EPHEMERALS, ephemeralsAfterEviction.length);
+  run(
+    "éphémère : le PLUS ANCIEN (ephemeral-0) a été évincé",
+    false,
+    ephemeralsAfterEviction.some((e) => e.id === "ephemeral-0")
+  );
+  run(
+    "éphémère : le PLUS RÉCENT est bien présent",
+    true,
+    ephemeralsAfterEviction.some((e) => e.id === `ephemeral-${MAX_EPHEMERALS}`)
+  );
+  run(
+    "éphémère : l'entité déclarée n'est jamais comptée dans la limite",
+    true,
+    getActiveWorld(evictionState).entities.some((e) => e.id === "declared-1")
+  );
+
   // --- core/save.js : enveloppe de sauvegarde (forme, pas le disque) ---
 
   const saveEnvelope = serializeGame(auditSession);
@@ -2296,6 +2717,16 @@ export function runMovementChecks() {
   run("save : sauvegarde antérieure à l'horloge acceptée (rebouchée)", true, oldTimeSaveResult.success);
   if (oldTimeSaveResult.success) {
     run("save : partie rebouchée — time par défaut (INITIAL_TIME)", INITIAL_TIME, oldTimeSaveResult.session.time);
+  }
+
+  // Sauvegarde ANTÉRIEURE à l'argent (voir core/money.js) : même précédent
+  // exact que time/floors/surfaces ci-dessus — jamais eu de clé .money.
+  const { money: _droppedMoney, ...auditSessionWithoutMoney } = auditSession;
+  const oldMoneySave = { version: SAVE_VERSION, data: auditSessionWithoutMoney };
+  const oldMoneySaveResult = deserializeGame(oldMoneySave);
+  run("save : sauvegarde antérieure à l'argent acceptée (rebouchée)", true, oldMoneySaveResult.success);
+  if (oldMoneySaveResult.success) {
+    run("save : partie rebouchée — money par défaut (0)", 0, oldMoneySaveResult.session.money);
   }
 
   console.log(`Récapitulatif : ${passed} réussis / ${total} total`);
