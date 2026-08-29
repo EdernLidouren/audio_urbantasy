@@ -12,29 +12,6 @@
     { "id": "money-1", "type": "money", "x": 5 },
     { "id": "object-toolbox", "type": "object", "x": 8, "nameKey": "object.toolbox", "descriptionKey": "object.toolbox.description" },
     { "id": "door-exit", "type": "door", "x": 9, "nameKey": "door.exit", "target": "demo2", "descriptionKey": "door.exit.description" },
-    {
-      "id": "npc-resident",
-      "type": "npc",
-      "x": 20,
-      "nameKey": "npc.resident",
-      "descriptionKey": "npc.resident.description",
-      "behavior": { "kind": "wander" },
-      "presence": [
-        { "when": { "type": "arrived" }, "effects": [{ "type": "presence", "present": false }] },
-        { "when": { "type": "timeRange", "from": 0, "to": 8 }, "effects": [{ "type": "presence", "present": false }] },
-        {
-          "when": { "type": "timeRange", "from": 8, "to": 24 },
-          "effects": [
-            { "type": "presence", "present": true },
-            { "type": "behavior", "behavior": { "kind": "wander" } }
-          ]
-        },
-        {
-          "when": { "type": "timeRange", "from": 20, "to": 24 },
-          "effects": [{ "type": "behavior", "behavior": { "kind": "goto", "targetId": "door-exit" } }]
-        }
-      ]
-    },
     { "id": "object-neon", "type": "neon", "x": 30 }
   ]
 }

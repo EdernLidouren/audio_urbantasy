@@ -61,6 +61,20 @@ function announceMoney(session) {
   announce(t("money.announce", { amount: session.money }));
 }
 
+// Consultation pure de session.player.x (touche "x", MODE DEBUG UNIQUEMENT
+// — voir onKeyDown plus bas, config/debug.js) — même patron que
+// announceGameTime/announceMoney (aucune action, juste une lecture d'état
+// annoncée), mais réservée au debug : c'est un outil de diagnostic de
+// position, pas une info utile au joueur normal. Deux décimales (toFixed) :
+// session.x
+// dérive d'additions répétées de MOVE_STEP (core/state.js), donc porte
+// souvent une dizaine de décimales de bruit flottant sans intérêt à
+// l'oreille (ex. 14.679999999999863) — deux décimales restent largement
+// assez précises pour situer le joueur (MOVE_STEP vaut 0.04).
+function announcePlayerX(session) {
+  announce(t("position.announce", { x: session.player.x.toFixed(2) }));
+}
+
 // Résout un descripteur ÉPHÉMÈRE MINIMAL (type + surcharges, ex. { type:
 // "money", amount: 20 } — même forme qu'une instance de niveau) en spec
 // COMPLET pour spawnEphemeral/spawnScatteredEphemerals (core/state.js) :
@@ -250,6 +264,17 @@ export function makeCityScreen(getSession, setSession) {
       // statut que "t", aucune action, juste une lecture d'état annoncée.
       if (event.key === "g" || event.key === "G") {
         announceMoney(getSession());
+        return;
+      }
+
+      // "x" discrète, MODE DEBUG UNIQUEMENT (voir config/debug.js, même
+      // garde que "e") : consultation pure de la position du joueur — un
+      // outil de diagnostic, pas une info destinée au joueur normal,
+      // contrairement à "t"/"g". En mode normal, "x" ne fait RIEN —
+      // comportement inchangé pour tout joueur qui n'a jamais activé le
+      // mode debug.
+      if ((event.key === "x" || event.key === "X") && isDebugEnabled()) {
+        announcePlayerX(getSession());
         return;
       }
 

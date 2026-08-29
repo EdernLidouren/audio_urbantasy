@@ -98,15 +98,11 @@ function resolveMusicForPhase(world, phase) {
 // résolus via resolveTuning (cascade son -> instance -> type -> défaut
 // global), voir plus bas.
 const STEP_DISTANCE = TUNING_DEFAULTS.stepDistance;
-// Anti-mitraillette sur le SON du pas uniquement — le déplacement, lui,
-// reste pleinement réactif à chaque tick. Nettement sous l'intervalle de
-// marche soutenue (~330ms), donc invisible en marche normale.
+// Anti-mitraillette pour le son de COLLISION UNIQUEMENT (voir
+// playCollisionSound plus bas) — le pas, lui, n'utilise plus aucun
+// cooldown : son débit est borné par STEP_DISTANCE (voir stepWalker), un
+// mécanisme purement géométrique, jamais temporel.
 const MIN_STEP_INTERVAL_MS = TUNING_DEFAULTS.minStepIntervalMs;
-// Écart minimal entre un pas de reprise et un pas de changement de sol tout
-// proche (voir update()) — évite que leurs clips ne se chevauchent presque
-// entièrement, sans réintroduire le retard qu'avait le cooldown PARTAGÉ
-// d'origine (voir surfaceChangeCooldown).
-const FOOTSTEP_OVERLAP_GUARD_MS = TUNING_DEFAULTS.footstepOverlapGuardMs;
 // Durée du fondu croisé à une bascule de phase jour/nuit (voir
 // resolveMusicForPhase, update()) — jamais utilisée à l'entrée dans une
 // scène (musique de la phase courante jouée directement, sans fondu).
@@ -207,6 +203,71 @@ function footstepCandidateKeys({ gait, naturalWalk, ownPath } = {}) {
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
+}
+
+// État minimal d'UN "marcheur" (le joueur ou une entité mobile) pour
+// stepWalker ci-dessous — voir sa doc pour le rôle de chaque champ. Un
+// walker par mobile : voir playerWalker (joueur) et entry.walker (par
+// entité, dans buildEntitySoundEntry).
+function createWalkerState(x) {
+  return { lastStepX: x, wasMoving: false, previousX: x };
+}
+
+// Déclenchement UNIFIÉ du son de pas — MÉCANISME UNIQUE, partagé par le
+// joueur et toute entité mobile (voir update()/updateEntityMovementSounds,
+// les deux seuls appelants). Remplace l'ancien système à deux voies (pas
+// immédiat de reprise + pas immédiat de frontière de surface + cadence,
+// trois cooldowns différents) par un seul principe : le débit de pas est
+// borné PAR LA DISTANCE, jamais par un minuteur — plus aucun cooldown ici.
+//
+// `walker` (voir createWalkerState) est MUTÉ EN PLACE :
+//   - lastStepX : position du DERNIER PAS JOUÉ (jalon de distance).
+//   - wasMoving : le marcheur bougeait-il au TICK PRÉCÉDENT.
+//   - previousX : position du marcheur au TICK PRÉCÉDENT — SEULE façon
+//     fiable de distinguer "immobile" de "en cours de marche entre deux
+//     jalons" : lastStepX n'avance QUE par pas de stepDistance, donc
+//     `x !== lastStepX` reste vrai la plupart du temps même à l'arrêt (dès
+//     que la position de repos ne tombe pas PILE sur un multiple de
+//     stepDistance depuis le dernier pas) — sans previousX, un marcheur
+//     resterait perçu "en mouvement" pour toujours après son tout premier
+//     pas, et taper-relâcher-retaper la touche perdrait le pas de départ
+//     après la toute première fois. Simple comparaison de position, aucune
+//     notion de temps ni de direction : symétrique par construction.
+//
+// `playStepAt(atX)` : callback fourni par l'appelant, invoqué UNE FOIS PAR
+// PAS à jouer, à la position EXACTE de ce pas (le jalon franchi, jamais la
+// position finale du tick — voir la boucle plus bas : un grand déplacement
+// qui franchit plusieurs jalons en un seul tick joue donc CHAQUE pas à SA
+// propre position, chacun résolvant sa propre surface). Ce module ne
+// connaît que LE MOMENT où jouer, jamais COMMENT (centré pour le joueur,
+// positionné avec pan/gain pour une entité — à la charge de l'appelant).
+//
+// DÉMARRAGE (immobile -> en mouvement) : un SEUL pas immédiat à x, pour ne
+// jamais "voler" le premier pas d'un tapotement bref — le SEUL cas
+// spécial. Un changement de SURFACE, lui, NE déclenche RIEN en soi : c'est
+// le PROCHAIN jalon normal qui la fera entendre, à sa position
+// (resolveFootstepPath relit déjà la surface à CETTE position à chaque
+// appel, inchangé) — plus de détection dédiée, plus de cooldown de
+// frontière : le système est donc SYMÉTRIQUE par construction, avancer
+// puis reculer sur la même frontière rejoue le même jalon dans les deux
+// sens.
+function stepWalker(walker, x, stepDistance, playStepAt) {
+  const isMoving = x !== walker.previousX;
+
+  if (isMoving) {
+    if (!walker.wasMoving) {
+      playStepAt(x);
+      walker.lastStepX = x;
+    } else {
+      while (Math.abs(x - walker.lastStepX) >= stepDistance) {
+        walker.lastStepX += Math.sign(x - walker.lastStepX) * stepDistance;
+        playStepAt(walker.lastStepX);
+      }
+    }
+  }
+
+  walker.wasMoving = isMoving;
+  walker.previousX = x;
 }
 
 // Taux de lecture tiré uniformément dans [1-pitchVariation, 1+pitchVariation]
@@ -422,21 +483,11 @@ function buildEntitySoundEntry(entity, world, time) {
         // movementStepMultiplier module la cadence (voir
         // config/tuning-values.js).
         movementStepDistance: STEP_DISTANCE / resolveTuning("movementStepMultiplier", entity, movement),
-        // Position de départ = spawn de l'entité : le premier pas ne sonne
-        // qu'après avoir parcouru movementStepDistance depuis là, comme le
-        // joueur au tout premier tick d'une partie.
-        lastMovementX: entity.x,
-        // Sol au spawn — voir updateEntityMovementSounds : un changement
-        // de sol déclenche un pas IMMÉDIAT, sans attendre movementStepDistance.
-        lastMovementSurface: surfaceAt(world, entity.x),
-        // Cooldown anti-mitraillette PROPRE à cette entité (même principe
-        // que footstepCooldown pour le joueur, voir playPacedSound) —
-        // sans lui, le déclenchement immédiat sur changement de sol
-        // pouvait se redéclencher chaque tick (ex. léger flottement de
-        // position près d'une frontière) : rien ne le limitait avant,
-        // l'accumulateur par distance suffisait tant qu'aucun second
-        // déclencheur n'existait.
-        movementCooldown: { lastAt: -Infinity },
+        // État de déclenchement DÉDIÉ à cette entité (voir stepWalker,
+        // updateEntityMovementSounds) — même mécanisme, même forme, que
+        // playerWalker pour le joueur : un walker par mobile, jamais
+        // partagé.
+        walker: createWalkerState(entity.x),
         // gait/naturalWalk (voir entities/model.md, "Surfaces de sol et
         // son de pas") : propriétés de l'ENTITÉ, pas d'un rôle de son —
         // même cascade que audibleRange/panSaturation ci-dessus (pas de
@@ -556,9 +607,9 @@ export function createCityAudioScene(getSession) {
   // (toujours au moins une balise continue), pas corrigé pour ce cas
   // hypothétique.
   // Capturé une fois ici (monde ACTIF à la création de la scène) : réutilisé
-  // pour construire entitySounds ET amorcer lastMovementSurface de chaque
-  // entité (voir plus bas) — le monde du TICK courant, lui, reste relu à
-  // chaque update() (voir plus bas), jamais celui-ci qui ne vaut que pour
+  // pour construire entitySounds (voir plus bas) — le monde du TICK
+  // courant, lui, reste relu à chaque update() (voir plus bas), jamais
+  // celui-ci qui ne vaut que pour
   // l'amorçage.
   const initialWorld = getActiveWorld(getSession());
   const entitySounds = initialWorld.entities.map((entity) =>
@@ -746,37 +797,16 @@ export function createCityAudioScene(getSession) {
     setGlobalVolume("ambience", ambienceVolumeFactor());
   }
 
-  let lastFootstepX = getSession().player.x;
-  // Sol du dernier pas joué — voir update() : un changement de sol
-  // déclenche un pas IMMÉDIAT, sans attendre STEP_DISTANCE.
-  let lastFootstepSurface = surfaceAt(initialWorld, getSession().player.x);
-  let previousX = getSession().player.x;
-  // Seule source de vérité pour "était en mouvement au tick précédent".
-  let wasMoving = false;
-  // Instant (performance.now()) du dernier pas de REPRISE (!wasMoving) —
-  // UNIQUEMENT lui, jamais un pas de cadence normale (voir la garde
-  // anti-chevauchement dans update()) : sert à espacer un pas de reprise
-  // d'un pas de frontière tout proche, sans jamais retarder une frontière
-  // franchie en cours de marche continue (la cadence normale, elle, n'a pas
-  // besoin de cette garde).
-  let lastResumeAt = -Infinity;
-  // Instant (performance.now()) du dernier son RÉELLEMENT joué, un
-  // cooldown PAR CANAL (pas/collision) — jamais partagé : sur le tick où le
-  // joueur vient buter, x avance encore jusqu'au bord (pas normal) PUIS
-  // blockedBy s'active (son de collision) dans le MÊME tick ; un cooldown
-  // commun ferait que le pas consomme le cooldown et fasse taire le son de
-  // collision immédiat qui suit aussitôt.
-  const footstepCooldown = { lastAt: -Infinity };
+  // État de déclenchement du pas du joueur — voir stepWalker. Même forme,
+  // même mécanisme, que entry.walker pour chaque entité mobile.
+  const playerWalker = createWalkerState(getSession().player.x);
+  // Instant (performance.now()) du dernier son de COLLISION joué — voir
+  // playCollisionSound plus bas. Canal séparé du pas (qui n'a plus aucun
+  // cooldown) : sur le tick où le joueur vient buter, x avance encore
+  // jusqu'au bord (pas normal) PUIS blockedBy s'active (son de collision)
+  // dans le MÊME tick — un cooldown commun ferait que le pas consomme le
+  // cooldown et fasse taire le son de collision immédiat qui suit aussitôt.
   const collisionCooldown = { lastAt: -Infinity };
-  // Cooldown DÉDIÉ au pas immédiat de frontière (surfaceChanged, voir
-  // update()), séparé de footstepCooldown (pas de reprise après arrêt +
-  // cadence normale) — même raison que le découpage ci-dessus : au demi-tour,
-  // un pas de reprise joué juste avant de recroiser la frontière consommait
-  // footstepCooldown et retardait d'autant la détection de la VRAIE
-  // traversée, alors que les deux sont des signaux indépendants (l'un
-  // "mouvement repris", l'autre "sol changé") qui peuvent légitimement se
-  // suivre de très près.
-  const surfaceChangeCooldown = { lastAt: -Infinity };
   // Ids des entités occupées (zone d'interaction englobant le joueur) au
   // tick précédent — seule source de vérité pour détecter un changement.
   let occupiedIds = new Set();
@@ -804,22 +834,15 @@ export function createCityAudioScene(getSession) {
   // réellement parcourue, puisque x ne bouge pas pendant une butée.
   let collisionAccumX = 0;
   // Seule source de vérité pour "était bloqué au tick précédent" — même
-  // rôle que wasMoving pour les pas, pour détecter la transition et jouer
-  // un premier son immédiat (voir update()).
+  // rôle que playerWalker.wasMoving pour les pas, pour détecter la
+  // transition et jouer un premier son immédiat (voir update()).
   let wasBlocked = false;
 
-  // Point de passage commun à tout son cadencé comme les pas (pas normal OU
-  // butée contre une entité bloquante — centré sur le joueur, sans pan
-  // particulier) : applique le cooldown de SON canal, jamais sur le
-  // déplacement. Trop tôt -> le son est simplement sauté, pas de file
-  // d'attente. cooldown est un objet {lastAt} propre à l'appelant (voir
-  // footstepCooldown/collisionCooldown) : jamais partagé entre canaux.
-  // Renvoie si le son a RÉELLEMENT joué (false si le cooldown l'a supprimé)
-  // — l'appelant en a besoin pour savoir s'il peut considérer un pas
-  // "consommé" (voir update()/updateEntityMovementSounds : un déclenchement
-  // immédiat sur changement de sol ne doit JAMAIS se marquer comme fait
-  // tant que le son n'est pas réellement sorti, sinon la traversée suivante
-  // se retrouve muette au lieu de simplement réessayer au tick suivant).
+  // Point de passage pour le son de COLLISION (butée contre une entité
+  // bloquante, centré sur le joueur, sans pan particulier) — SEUL appelant
+  // restant, voir playCollisionSound : le pas n'utilise plus aucun
+  // cooldown (voir stepWalker/playFootstep). Trop tôt -> le son est
+  // simplement sauté, pas de file d'attente.
   function playPacedSound(path, reverbSend, cooldown) {
     const now = performance.now();
     if (now - cooldown.lastAt < MIN_STEP_INTERVAL_MS) return false;
@@ -836,14 +859,17 @@ export function createCityAudioScene(getSession) {
     return true;
   }
 
-  // Chemin résolu à CHAQUE pas (voir resolveFootstepPath) — jamais figé au
-  // MOVEMENT_SOUND.path d'origine, qui ne sert que de repli "son propre" du
-  // joueur si gait/naturalWalk (champs directs sur player, pas de cascade
-  // instance/archétype pour lui — voir entities/player.js) ne résolvent
-  // rien. Renvoie si le son a réellement joué (voir playPacedSound).
-  function playFootstep(x, world, cooldown = footstepCooldown) {
-    const path = resolveFootstepPath(world, x, { gait: player.gait, naturalWalk: player.naturalWalk, ownPath: MOVEMENT_SOUND.path });
-    return playPacedSound(path, FOOTSTEP_REVERB_SEND, cooldown);
+  // Joue le son de pas du joueur à LA POSITION donnée (le pas de démarrage,
+  // ou un jalon franchi — voir stepWalker) — chemin résolu à CHAQUE appel
+  // (voir resolveFootstepPath), jamais figé au MOVEMENT_SOUND.path
+  // d'origine, qui ne sert que de repli "son propre" si gait/naturalWalk
+  // (champs directs sur player, pas de cascade instance/archétype pour lui
+  // — voir entities/player.js) ne résolvent rien. AUCUN cooldown : le débit
+  // est déjà borné par stepDistance côté stepWalker, jamais par un
+  // deuxième garde-fou temporel ici.
+  function playFootstep(atX, world) {
+    const path = resolveFootstepPath(world, atX, { gait: player.gait, naturalWalk: player.naturalWalk, ownPath: MOVEMENT_SOUND.path });
+    playOneShot(resolveAsset(path), { reverbSend: FOOTSTEP_REVERB_SEND, reverbBusInput: reverbBus.input, volume: footstepVolumeFactor() });
   }
 
   // Dormant si l'entité ne porte pas de collisionSound (voir
@@ -945,55 +971,17 @@ export function createCityAudioScene(getSession) {
 
   // Son de déplacement des entités mobiles (rôle "movement", voir
   // entities/model.md) — dormant pour toute entité sans ce rôle
-  // (movementPath absent, voir entitySounds). Même principe de cadence par
-  // DISTANCE que le joueur (lastMovementX/movementStepDistance), mais SANS
-  // le "premier pas immédiat" du joueur (voir update()) : une entité
-  // "wander" n'a pas de transition immobile -> mouvement pilotée par une
-  // touche, elle erre en continu tant qu'elle a un behavior — rien à
-  // détecter en plus de l'accumulateur de distance lui-même. Fichier résolu
-  // à CHAQUE pas via resolveFootstepPath (surface AU POINT DE L'ENTITÉ, pas
-  // celle du joueur) — movementPath sert de repli "son propre" (voir
-  // entities/model.md), plus le chemin fixe d'avant l'introduction des
-  // surfaces.
-  //
-  // Changement de sol -> pas IMMÉDIAT (lastMovementSurface, voir
-  // entitySounds), en plus de la cadence par distance : sans lui, la
-  // transition sonore pouvait accuser jusqu'à movementStepDistance de retard
-  // sur la frontière RÉELLE, dans les deux sens de marche (l'accumulateur ne
-  // regarde qu'une distance absolue depuis le dernier pas, jamais si le sol
-  // a changé entre-temps) — symétrique au correctif du joueur, voir update().
-  // Protégé par movementCooldown (voir entitySounds) : sans lui, un léger
-  // flottement de position près d'une frontière pouvait redéclencher CHAQUE
-  // tick, sans aucune limite (contrairement au joueur, déjà protégé par
-  // footstepCooldown/playPacedSound).
+  // (movementPath absent, voir entitySounds). MÊME mécanisme UNIFIÉ que le
+  // pas du joueur (voir stepWalker) : chaque entité porte son propre
+  // entry.walker, déclenché exactement pareil — un pas de démarrage à la
+  // reprise du mouvement, puis un pas par jalon de movementStepDistance
+  // franchi, chacun résolvant sa propre surface via resolveFootstepPath (au
+  // point DE L'ENTITÉ, jamais celui du joueur). Aucun cas spécial ici :
+  // c'est stepWalker qui porte toute la logique, ce module ne fait que lui
+  // fournir la position vivante de l'entité et SON callback de lecture
+  // (positionné, avec pan/gain propres — jamais centré comme le joueur).
   function updateEntityMovementSounds(x, world, liveById) {
     const volumeFactor = footstepVolumeFactor();
-
-    // Renvoie si le son a réellement joué (voir playPacedSound, même
-    // principe) — l'appelant en a besoin pour savoir si le déclenchement
-    // immédiat peut se marquer "traité" (sinon on force une nouvelle
-    // tentative au tick suivant, jamais une transition perdue en silence).
-    function playEntityFootstep(entry, atX) {
-      const now = performance.now();
-      if (now - entry.movementCooldown.lastAt < MIN_STEP_INTERVAL_MS) return false;
-      const path = resolveFootstepPath(world, atX, {
-        gait: entry.gait,
-        naturalWalk: entry.naturalWalk,
-        ownPath: entry.movementPath,
-      });
-      playPositionedOneShot(path, {
-        relX: atX - x,
-        interactRange: entry.interactRange,
-        audibleRange: entry.audibleRange,
-        panSaturation: entry.panSaturation,
-        reverbSend: entry.movementReverbSend,
-        volumeFactor,
-        gain: entry.movementGain,
-        pitchVariation: entry.movementPitchVariation,
-      });
-      entry.movementCooldown.lastAt = now;
-      return true;
-    }
 
     for (const entry of entitySounds) {
       if (!entry.movementPath) continue;
@@ -1004,21 +992,23 @@ export function createCityAudioScene(getSession) {
       // figé, mais on l'évite explicitement plutôt que d'en dépendre.
       if (live.present === false) continue;
 
-      const liveX = live.x;
-
-      const currentSurface = surfaceAt(world, liveX);
-      if (currentSurface !== entry.lastMovementSurface) {
-        if (playEntityFootstep(entry, liveX)) {
-          entry.lastMovementX = liveX;
-          entry.lastMovementSurface = currentSurface;
-        }
-      }
-
-      while (Math.abs(liveX - entry.lastMovementX) >= entry.movementStepDistance) {
-        playEntityFootstep(entry, liveX);
-        entry.lastMovementX += Math.sign(liveX - entry.lastMovementX) * entry.movementStepDistance;
-        entry.lastMovementSurface = currentSurface;
-      }
+      stepWalker(entry.walker, live.x, entry.movementStepDistance, (atX) => {
+        const path = resolveFootstepPath(world, atX, {
+          gait: entry.gait,
+          naturalWalk: entry.naturalWalk,
+          ownPath: entry.movementPath,
+        });
+        playPositionedOneShot(path, {
+          relX: atX - x,
+          interactRange: entry.interactRange,
+          audibleRange: entry.audibleRange,
+          panSaturation: entry.panSaturation,
+          reverbSend: entry.movementReverbSend,
+          volumeFactor,
+          gain: entry.movementGain,
+          pitchVariation: entry.movementPitchVariation,
+        });
+      });
     }
   }
 
@@ -1212,69 +1202,12 @@ export function createCityAudioScene(getSession) {
       occupiedIds = occupiedIdsNow;
     }
 
-    // Pas centré, sans pan : c'est le joueur lui-même.
-
-    // Transition immobile -> en mouvement, OU changement de sol en cours de
-    // marche : pas IMMÉDIAT, sans attendre d'avoir parcouru STEP_DISTANCE au
-    // complet. Sans le second cas, la transition sonore pouvait accuser
-    // jusqu'à STEP_DISTANCE de retard sur la frontière RÉELLE entre deux
-    // surfaces, dans les DEUX sens de marche (l'accumulateur ne mesure
-    // qu'une distance absolue depuis le dernier pas, jamais si le sol a
-    // changé entre-temps — voir surfaceAt/core/surfaces.js).
-    //
-    // L'accumulateur ET le sol mémorisé ne repartent de x courant QUE SI le
-    // son a réellement joué (voir playFootstep/playPacedSound) — sinon
-    // (cooldown trop récent, ex. juste après un pas de cadence normal) on
-    // laisse surfaceChanged VRAI : le prochain tick retentera, jusqu'à ce
-    // que le cooldown se libère. Sans cette garde, un déclenchement
-    // supprimé se marquait quand même "traité", et la traversée pouvait
-    // rester silencieuse jusqu'à STEP_DISTANCE de plus.
-    //
-    // Cooldown DÉDIÉ (surfaceChangeCooldown) quand c'est la frontière qui
-    // déclenche, jamais footstepCooldown : au demi-tour, le pas de reprise
-    // (!wasMoving, juste en dessous) joue souvent à quelques ticks à peine
-    // de la frontière qu'on vient de franchir — partager le même cooldown
-    // ferait que ce pas de reprise, légitime, retarde la détection de la
-    // VRAIE traversée. Les deux signaux sont indépendants ("mouvement
-    // repris" vs "sol changé"), ils gardent chacun leur propre garde-fou
-    // anti-mitraillette (diagnostiqué et confirmé en direct : c'était la
-    // source de l'asymétrie aller/retour).
-    const currentSurface = surfaceAt(world, x);
-    const surfaceChanged = currentSurface !== lastFootstepSurface;
-    const isMoving = x !== previousX;
-    if (isMoving && (!wasMoving || surfaceChanged)) {
-      // Écart anti-chevauchement (voir FOOTSTEP_OVERLAP_GUARD_MS) : en plus
-      // du cooldown DÉDIÉ ci-dessus (qui protège chaque cause de sa propre
-      // mitraillette), on vérifie que l'AUTRE cause n'a pas ELLE-MÊME joué
-      // un son il y a un instant — sinon les deux clips se chevauchent
-      // presque entièrement (ex. reprise + frontière à quelques ticks
-      // d'écart). Non joué -> état inchangé, comme un cooldown normal : le
-      // prochain tick retentera (voir le commentaire plus haut).
-      //
-      // La garde ne joue QUE reprise <-> frontière — jamais cadence <->
-      // frontière (lastResumeAt, pas footstepCooldown, qui mélangerait les
-      // deux) : la cadence normale joue à un rythme bien plus lâche
-      // (~250ms) et n'a besoin d'aucune protection ici — lui en imposer une
-      // retarderait une traversée en cours de marche continue, exactement
-      // le bug déjà corrigé plus haut.
-      const now = performance.now();
-      const overlapsOtherCause = surfaceChanged
-        ? now - lastResumeAt < FOOTSTEP_OVERLAP_GUARD_MS
-        : now - surfaceChangeCooldown.lastAt < FOOTSTEP_OVERLAP_GUARD_MS;
-      if (!overlapsOtherCause && playFootstep(x, world, surfaceChanged ? surfaceChangeCooldown : footstepCooldown)) {
-        lastFootstepX = x;
-        lastFootstepSurface = currentSurface;
-        if (!surfaceChanged) lastResumeAt = now;
-      }
-    }
-    wasMoving = isMoving;
-    previousX = x;
-
-    while (Math.abs(x - lastFootstepX) >= STEP_DISTANCE) {
-      playFootstep(x, world);
-      lastFootstepX += Math.sign(x - lastFootstepX) * STEP_DISTANCE;
-      lastFootstepSurface = currentSurface;
-    }
+    // Pas du joueur — voir stepWalker : mécanisme UNIFIÉ avec les entités
+    // mobiles (updateEntityMovementSounds), un seul pas de démarrage à la
+    // reprise du mouvement puis un pas par jalon de STEP_DISTANCE franchi,
+    // chacun à sa propre position (donc sa propre surface). Centré, sans
+    // pan : c'est le joueur lui-même.
+    stepWalker(playerWalker, x, STEP_DISTANCE, (atX) => playFootstep(atX, world));
 
     // Butée contre une entité bloquante (core/reduce.js signale blockedBy) :
     // x ne bouge pas, donc aucun pas normal ci-dessus — le son de collision

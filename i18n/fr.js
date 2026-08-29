@@ -72,6 +72,7 @@ export default {
   // Nom de monnaie BATEAU et PROVISOIRE — voir core/money.js, changeable
   // sans toucher au mécanisme (juste ces deux chaînes).
   "money.announce": "{amount} pièces.",
+  "position.announce": "Position : {x}.",
   "time.season.spring": "printemps",
   "time.season.summer": "été",
   "time.season.autumn": "automne",

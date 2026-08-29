@@ -69,6 +69,7 @@ export default {
 
   "time.announce": "{hour}:{minute}. Day {day} of month {month}, {season}, year {year}.",
   "money.announce": "{amount} coins.",
+  "position.announce": "Position: {x}.",
   "time.season.spring": "spring",
   "time.season.summer": "summer",
   "time.season.autumn": "autumn",
