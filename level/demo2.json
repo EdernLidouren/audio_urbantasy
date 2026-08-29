@@ -1,7 +1,7 @@
 {
   "id": "demo2",
   "titleKey": "level.demo2.title",
-  "length": 15,
+  "length": 20,
   "playerStart": 2,
   "music": "assets/musics/streets_day",
   "reverbDurationSec": 0.25,
@@ -25,6 +25,15 @@
         { "when": { "type": "consumed" }, "present": false },
         { "when": { "type": "timeRange", "from": 0, "to": 24 }, "present": true }
       ]
+    },
+    {
+      "id": "crate-stash",
+      "type": "crate",
+      "x": 17,
+      "action": {
+        "kind": "loot",
+        "spawn": { "spec": { "type": "money", "amount": 20 }, "count": 3, "spread": 1.5 }
+      }
     }
   ]
 }

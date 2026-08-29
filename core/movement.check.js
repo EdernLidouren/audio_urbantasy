@@ -12,6 +12,8 @@ import {
   removeEntity,
   markConsumed,
   spawnEphemeral,
+  spawnScatteredEphemerals,
+  drawScatteredPosition,
   MOVE_STEP,
   BODY_RADIUS,
 } from "./state.js";
@@ -19,9 +21,11 @@ import { tick } from "./actions.js";
 import { reduce } from "./reduce.js";
 import { moveAndBounce } from "./physics/movement.js";
 import { SAVE_VERSION, serializeGame, deserializeGame } from "./save.js";
-import { addMoney, pickupEntity, lootEntity } from "./money.js";
+import { addMoney, pickupEntity, lootEntity, lootEntitySpawn } from "./money.js";
+import { createSeed } from "./rng.js";
 import { MAX_COMPANIONS } from "../config/companions.js";
 import { MAX_EPHEMERALS } from "../config/ephemerals.js";
+import { TUNING_DEFAULTS } from "../config/tuning-values.js";
 import { SURFACE_REGISTRY, DEFAULT_SURFACE, surfaceAt, surfaceProps, surfacePropsAt } from "./surfaces.js";
 import {
   INITIAL_TIME,
@@ -2663,6 +2667,144 @@ export function runMovementChecks() {
     "éphémère : l'entité déclarée n'est jamais comptée dans la limite",
     true,
     getActiveWorld(evictionState).entities.some((e) => e.id === "declared-1")
+  );
+
+  // --- Spawn d'éphémères ÉPARPILLÉS (core/state.js/spawnScatteredEphemerals
+  // + drawScatteredPosition, core/money.js/lootEntitySpawn) ---
+  // Voir entities/model.md/"Spawn déclenché par une action".
+
+  const SCATTER_SPEC = { type: "dog", labelKey: "entity.dog", interactable: true, action: { kind: "pickup", amount: 1 } };
+
+  // drawScatteredPosition en ISOLATION (exportée pour ça, voir son
+  // commentaire) : bornes de carte ET obstacle, vérifiées directement,
+  // sans dépendre du hasard d'un tirage complet.
+  {
+    let state = createSeed(7);
+    let allWithinBounds = true;
+    for (let i = 0; i < 30; i++) {
+      const draw = drawScatteredPosition(0.5, 5, 10, [], { time: 0 }, state);
+      state = draw.rngState;
+      if (draw.x < 0 || draw.x > 10) allWithinBounds = false;
+    }
+    run("scatter : bornes de carte — jamais hors [0, length], même près d'un bord", true, allWithinBounds);
+  }
+  {
+    const obstacle = [{ id: "wall", x: 5, blocksMovement: true }];
+    let state = createSeed(11);
+    let neverInWall = true;
+    for (let i = 0; i < 30; i++) {
+      const draw = drawScatteredPosition(4, 3, 10, obstacle, { time: 0 }, state);
+      state = draw.rngState;
+      if (Math.abs(draw.x - 5) < BODY_RADIUS) neverInWall = false;
+    }
+    run("scatter : obstacle bloquant — aucune position tirée dans son corps", true, neverInWall);
+  }
+  // Une entité DORMANTE (règle de présence non couvrante à cet instant) ne
+  // compte JAMAIS comme obstacle, même blocksMovement:true — cohérent avec
+  // isBlocking partout ailleurs (core/presence.js). spread:0 isole la
+  // vérification de tout aléa : le seul candidat possible est sourceX lui-même.
+  {
+    const dormantObstacle = [
+      { id: "dormant-wall", x: 5, blocksMovement: true, presence: [{ when: { type: "timeRange", from: 0, to: 1 }, present: true }] },
+    ];
+    const draw = drawScatteredPosition(5, 0, 10, dormantObstacle, { time: 12 * 60 }, createSeed(3));
+    run("scatter : obstacle DORMANT -> jamais compté (isBlocking, comme partout ailleurs)", 5, draw.x);
+  }
+
+  const SCATTER_REGISTRY = { dog: { label: "entity.dog" } };
+  const scatterLevel = parseLevel(
+    {
+      id: "movement-check-scatter",
+      titleKey: "level.demo.title",
+      length: 20,
+      playerStart: 0,
+      entities: [
+        { id: "crate-1", type: "dog", x: 10, interactable: true, action: { kind: "loot", spawn: { spec: { type: "money" }, count: 4, spread: 3 } } },
+        { id: "other-1", type: "dog", x: 2 },
+      ],
+    },
+    SCATTER_REGISTRY
+  );
+  const scatterState = createInitialState(scatterLevel, 99, NO_COMPANIONS);
+
+  const scatterResult = spawnScatteredEphemerals(scatterState, SCATTER_SPEC, 10, 4, 3);
+  const scatteredEntities = getActiveWorld(scatterResult).entities.filter((e) => e.ephemeral);
+  run("scatter : spawnScatteredEphemerals crée exactement count entités", 4, scatteredEntities.length);
+  run("scatter : toutes marquées ephemeral", true, scatteredEntities.every((e) => e.ephemeral));
+  run("scatter : positions ÉPARPILLÉES, pas empilées au même point", true, new Set(scatteredEntities.map((e) => e.x)).size > 1);
+  run("scatter : spawnScatteredEphemerals NE MUTE JAMAIS l'original", false, getActiveWorld(scatterState).entities.some((e) => e.ephemeral));
+  run(
+    "scatter : entité déclarée jamais affectée",
+    true,
+    getActiveWorld(scatterResult).entities.some((e) => e.id === "other-1")
+  );
+
+  // Déterminisme : même seed + mêmes paramètres -> mêmes positions, toujours.
+  const scatterStateAgain = createInitialState(scatterLevel, 99, NO_COMPANIONS);
+  const scatterResultAgain = spawnScatteredEphemerals(scatterStateAgain, SCATTER_SPEC, 10, 4, 3);
+  const scatteredAgain = getActiveWorld(scatterResultAgain)
+    .entities.filter((e) => e.ephemeral)
+    .map((e) => e.x);
+  run(
+    "scatter : déterminisme — même seed + mêmes paramètres -> mêmes positions",
+    JSON.stringify(scatteredEntities.map((e) => e.x)),
+    JSON.stringify(scatteredAgain)
+  );
+
+  // spread omis -> repli sur config/tuning-values.js/ephemeralScatterSpread.
+  const scatterDefaultSpread = getActiveWorld(spawnScatteredEphemerals(scatterState, SCATTER_SPEC, 10, 1)).entities.filter(
+    (e) => e.ephemeral
+  );
+  run(
+    "scatter : spread omis -> repli sur ephemeralScatterSpread",
+    true,
+    scatterDefaultSpread.every((e) => Math.abs(e.x - 10) <= TUNING_DEFAULTS.ephemeralScatterSpread)
+  );
+
+  // Une pièce éparpillée se ramasse comme n'importe quel autre éphémère —
+  // réutilise pickupEntity TEL QUEL (robustesse au retrait déjà en place).
+  const oneScatteredId = scatteredEntities[0].id;
+  const afterScatterPickup = pickupEntity(scatterResult, oneScatteredId, 5);
+  run(
+    "scatter : une pièce éparpillée se ramasse via pickupEntity, sans résidu",
+    false,
+    getActiveWorld(afterScatterPickup).entities.some((e) => e.id === oneScatteredId)
+  );
+
+  // Dépassement de MAX_EPHEMERALS EN UN SEUL effet -> plafonné proprement,
+  // aucun crash.
+  const bigScatter = spawnScatteredEphemerals(scatterState, SCATTER_SPEC, 10, MAX_EPHEMERALS + 5, 3);
+  run(
+    "scatter : count > MAX_EPHEMERALS en un seul effet -> plafonné proprement",
+    MAX_EPHEMERALS,
+    getActiveWorld(bigScatter).entities.filter((e) => e.ephemeral).length
+  );
+
+  // lootEntitySpawn : même idempotence que lootEntity, marque consumed,
+  // spawn à la position DE LA SOURCE (entity.x), jamais ailleurs.
+  const afterLootSpawn = lootEntitySpawn(scatterState, "crate-1", SCATTER_SPEC, 4, 3);
+  run("scatter : lootEntitySpawn marque consumed", true, getActiveWorld(afterLootSpawn).entities.find((e) => e.id === "crate-1").consumed);
+  run(
+    "scatter : lootEntitySpawn crée count entités éphémères",
+    4,
+    getActiveWorld(afterLootSpawn).entities.filter((e) => e.ephemeral).length
+  );
+  run(
+    "scatter : lootEntitySpawn — positions centrées sur la source (x=10)",
+    true,
+    getActiveWorld(afterLootSpawn)
+      .entities.filter((e) => e.ephemeral)
+      .every((e) => Math.abs(e.x - 10) <= 3)
+  );
+  run(
+    "scatter : lootEntitySpawn sur une entité déjà consumed -> référence INCHANGÉE",
+    afterLootSpawn,
+    lootEntitySpawn(afterLootSpawn, "crate-1", SCATTER_SPEC, 4, 3)
+  );
+  run(
+    "scatter : lootEntitySpawn sur une entité absente -> référence INCHANGÉE",
+    scatterState,
+    lootEntitySpawn(scatterState, "does-not-exist", SCATTER_SPEC, 4, 3)
   );
 
   // --- core/save.js : enveloppe de sauvegarde (forme, pas le disque) ---

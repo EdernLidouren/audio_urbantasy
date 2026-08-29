@@ -17,6 +17,7 @@ export default {
   "menu.interaction.observe.title": "Observe",
   "interaction.pickup": "Picked up: {amount} coins.",
   "interaction.loot": "Found: {amount} coins.",
+  "interaction.lootSpawn": "{count} coins scattered around.",
 
   "menu.pause.title": "Pause",
   "menu.pause.options": "Options",

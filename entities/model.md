@@ -107,7 +107,11 @@ Trois kinds existent aujourd'hui :
   amount: <n> }`. COLLECTIBLE PERSISTANT : contrairement à `"pickup"`
   ci-dessus, l'entité N'EST JAMAIS retirée — voir "Collectible persistant"
   plus bas pour le détail complet (idempotence, effets post-activation
-  composables, exemples).
+  composables, exemples). **Variante `action.spawn`** (au lieu de
+  `amount`) : `{ kind: "loot", spawn: { spec, count, spread? } }` — fait
+  naître `count` entités ÉPHÉMÈRES éparpillées autour de la source au lieu
+  de créditer directement (ex. `crate-stash`, `level/demo2.json`) — voir
+  "Entités éphémères" plus bas, "Spawn déclenché par une action".
 
 `session.money` : entier, cercle PARTIE (comme `session.time`) — SEUL point
 d'écriture `core/money.js`/`addMoney`. Nom de monnaie ("pièces") délibérément
@@ -198,11 +202,13 @@ OU non. Marque distinctive : `entity.ephemeral === true`, un champ RUNTIME
 JSON de niveau, une entité ÉPHÉMÈRE n'est par définition jamais DÉCLARÉE.
 
 - **Création** — `core/state.js`/`spawnEphemeral(session, spec, x)` : point
-  d'entrée UNIQUE et RÉUTILISABLE pour toute création d'entité en jeu (un
-  seul appelant aujourd'hui, la touche debug "e" — voir "Mode debug"
-  plus bas — mais rien dans le mécanisme n'est spécifique à ce cas :
-  une canette cassée, un objet lâché par un compagnon, un effet, pourront
-  s'y greffer plus tard). `spec` est un descripteur d'entité DÉJÀ RÉSOLU
+  d'entrée UNIQUE et RÉUTILISABLE pour toute création d'entité en jeu — DEUX
+  appelants aujourd'hui, la touche debug "e" (voir "Mode debug" plus bas) et
+  l'effet "spawn d'éphémères éparpillés" déclenché par une action (voir
+  "Spawn déclenché par une action" plus bas), mais rien dans le mécanisme
+  n'est spécifique à l'un ou l'autre : un objet lâché par un compagnon, un
+  effet, pourront s'y greffer de la même façon plus tard. `spec` est un
+  descripteur d'entité DÉJÀ RÉSOLU
   (`type`, `labelKey`, `blocksMovement`, `observable`, `interactable`,
   `action`...) — EXACTEMENT la forme qu'une entité obtient en sortie de
   `core/level.js`/`parseEntity`, construit par L'APPELANT (voir
@@ -251,6 +257,65 @@ JSON de niveau, une entité ÉPHÉMÈRE n'est par définition jamais DÉCLARÉE.
   l'ordre de création) : transitoire par nature, cohérent qu'il cède la
   place plutôt que de refuser la création demandée. Alternative "refuser le
   nouveau" possible, non retenue ici.
+
+### Spawn déclenché par une action
+
+Un VRAI déclencheur en jeu (au-delà de la touche debug) : une entité peut
+déclarer, sur son `action` (voir "Types d'action" plus haut), un effet
+`spawn` qui fait naître PLUSIEURS éphémères ÉPARPILLÉS autour d'elle à
+l'activation — ex. `crate-stash` (`level/demo2.json`), une caisse dont le
+`"loot"` LÂCHE des pièces au lieu d'en créditer une directement :
+
+```json
+"action": {
+  "kind": "loot",
+  "spawn": { "spec": { "type": "money", "amount": 20 }, "count": 3, "spread": 1.5 }
+}
+```
+
+- **Forme** — `spawn: { spec, count, spread? }`, une SECONDE forme valide
+  pour `action.kind: "loot"` (voir "Types d'action" plus haut), jamais
+  mélangée avec `amount` sur la même entité : `spec` (minimal — `{ type,
+  ...surcharges }`, MÊME forme qu'une instance de niveau, pas un descripteur
+  déjà résolu) DÉCRIT ce qui naît, `count`/`spread` DÉCRIVENT comment —
+  séparation délibérée pour pouvoir un jour faire naître autre chose qu'une
+  pièce (`spec` change) sans toucher à la mécanique d'éparpillement elle-même
+  (`count`/`spread`, génériques).
+- **Effet CORE pur** — `core/money.js`/`lootEntitySpawn` : MÊME idempotence
+  que `lootEntity` (entité absente/déjà `consumed` -> référence inchangée,
+  aucun spawn) ; sinon, `markConsumed` PUIS `core/state.js`/
+  `spawnScatteredEphemerals(session, spec, sourceX, count, spread)` — qui
+  appelle `spawnEphemeral` `count` FOIS, à des positions ÉPARPILLÉES.
+- **Éparpillement déterministe** — chaque position est `sourceX + décalage`,
+  décalage tiré dans `[-spread, +spread]` via le PRNG SEEDÉ du monde
+  (`world.rngState` — LE MÊME flux que le comportement des entités, jamais
+  un flux séparé : consommer un tirage de plus entre deux ticks reste
+  parfaitement déterministe, voir le commentaire de la fonction). Même seed
+  + même suite d'actions (ticks ET interactions confondus) -> mêmes
+  positions, toujours.
+- **Bornes RESPECTÉES À TOUS COUPS** — chaque candidat est d'abord CLAMPÉ
+  dans `[0, world.length]` (jamais hors carte) puis, s'il tombe dans le
+  corps (`BODY_RADIUS`) d'une entité qui bloque RÉELLEMENT (`isBlocking` —
+  une entité dormante ne compte jamais, voir "Présence conditionnelle"
+  ci-dessous), RE-TIRÉ (quelques tentatives) — filet ultime : `sourceX`
+  lui-même, toujours valide (un collectible n'est jamais `blocksMovement`).
+  Aucun éphémère ne peut naître hors map ni dans un mur.
+  `spread` optionnel -> `config/tuning-values.js`/`ephemeralScatterSpread`
+  (défaut PAR ACTION, lu directement, pas via la cascade `resolveTuning` —
+  ce n'est pas un réglage par entité/son).
+- **`spec` résolu côté VUE** — `spawn.spec` reste minimal dans le JSON (`{
+  type, ...surcharges }`) : c'est `view/city-screen.js`/
+  `resolveEphemeralSpec` (même fonction que pour la touche debug — DEUX
+  appelants, une seule résolution) qui le traduit en descripteur COMPLET
+  avant d'appeler `spawnEphemeral`/`spawnScatteredEphemerals` — le core
+  ignore tout du registre, comme partout ailleurs.
+- **Ramassage individuel** — chaque pièce éparpillée porte SA PROPRE action
+  `"pickup"` (voir "Ramassage" ci-dessus) : rien de spécifique à leur origine
+  "spawn groupé", le joueur les ramasse une par une exactement comme
+  n'importe quel autre éphémère.
+- **`count` FIXE aujourd'hui** — une fourchette (`countMin`/`countMax`,
+  tirée comme `spread`) pourra s'ajouter plus tard si besoin ; non construite
+  ici, non demandée.
 
 ### Mode debug
 

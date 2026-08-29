@@ -5,6 +5,9 @@
   "assets/ambiances/wind_medium": [
     "assets/ambiances/wind_medium_1.mp3"
   ],
+  "assets/musics/beach_day": [
+    "assets/musics/beach_day_1.mp3"
+  ],
   "assets/musics/beach_night": [
     "assets/musics/beach_night_1.mp3"
   ],
@@ -33,14 +36,23 @@
   ],
   "assets/musics/night_zone_day": [
     "assets/musics/night_zone_day_1.mp3",
-    "assets/musics/night_zone_day_2.mp3"
+    "assets/musics/night_zone_day_2.mp3",
+    "assets/musics/night_zone_day_3.mp3",
+    "assets/musics/night_zone_day_4.mp3"
   ],
   "assets/musics/night_zone_night": [
     "assets/musics/night_zone_night_1.mp3",
     "assets/musics/night_zone_night_2.mp3"
   ],
+  "assets/musics/port_day": [
+    "assets/musics/port_day_1.mp3"
+  ],
+  "assets/musics/port_night": [
+    "assets/musics/port_night_1.mp3"
+  ],
   "assets/musics/science_day": [
-    "assets/musics/science_day_1.mp3"
+    "assets/musics/science_day_1.mp3",
+    "assets/musics/science_day_2.mp3"
   ],
   "assets/musics/streets_day": [
     "assets/musics/streets_day_1.mp3",
@@ -104,7 +116,35 @@
     "assets/sounds/footsteps/dog_medium_walk_5.mp3"
   ],
   "assets/sounds/footsteps/grass_walk": [
-    "assets/sounds/footsteps/grass_walk_1.mp3"
+    "assets/sounds/footsteps/grass_walk_1.mp3",
+    "assets/sounds/footsteps/grass_walk_2.mp3",
+    "assets/sounds/footsteps/grass_walk_3.mp3",
+    "assets/sounds/footsteps/grass_walk_4.mp3",
+    "assets/sounds/footsteps/grass_walk_5.mp3",
+    "assets/sounds/footsteps/grass_walk_6.mp3",
+    "assets/sounds/footsteps/grass_walk_7.mp3",
+    "assets/sounds/footsteps/grass_walk_8.mp3",
+    "assets/sounds/footsteps/grass_walk_9.mp3",
+    "assets/sounds/footsteps/grass_walk_10.mp3"
+  ],
+  "assets/sounds/footsteps/gravel_walk": [
+    "assets/sounds/footsteps/gravel_walk_1.mp3",
+    "assets/sounds/footsteps/gravel_walk_2.mp3",
+    "assets/sounds/footsteps/gravel_walk_3.mp3",
+    "assets/sounds/footsteps/gravel_walk_4.mp3",
+    "assets/sounds/footsteps/gravel_walk_5.mp3",
+    "assets/sounds/footsteps/gravel_walk_6.mp3",
+    "assets/sounds/footsteps/gravel_walk_7.mp3",
+    "assets/sounds/footsteps/gravel_walk_8.mp3",
+    "assets/sounds/footsteps/gravel_walk_9.mp3",
+    "assets/sounds/footsteps/gravel_walk_10.mp3",
+    "assets/sounds/footsteps/gravel_walk_11.mp3",
+    "assets/sounds/footsteps/gravel_walk_12.mp3",
+    "assets/sounds/footsteps/gravel_walk_14.mp3",
+    "assets/sounds/footsteps/gravel_walk_15.mp3",
+    "assets/sounds/footsteps/gravel_walk_16.mp3",
+    "assets/sounds/footsteps/gravel_walk_17.mp3",
+    "assets/sounds/footsteps/gravel_walk_18.mp3"
   ],
   "assets/sounds/footsteps/sand_walk": [
     "assets/sounds/footsteps/sand_walk_1.mp3",

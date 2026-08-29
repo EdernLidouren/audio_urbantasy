@@ -187,4 +187,15 @@ export const TUNING_DEFAULTS = {
   // exitSound (présent->dormant).
   enterSoundGain: 1,
   exitSoundGain: 1,
+
+  // Décalage aléatoire MAX (unités de scène, de part et d'autre de la
+  // source) appliqué à une entité éphémère ÉPARPILLÉE (voir
+  // core/state.js/spawnScatteredEphemerals, entities/model.md/"Entités
+  // éphémères") quand l'action qui la fait naître ne précise pas son propre
+  // `spawn.spread`. Lu DIRECTEMENT (comme moveStep/stepDistance plus haut),
+  // jamais via la cascade resolveTuning : ce n'est pas un réglage
+  // PAR ENTITÉ/PAR SON, mais un défaut PAR ACTION. Volontairement BAS : juste
+  // assez pour désempiler plusieurs pièces au même point, pas un vrai
+  // éparpillement large.
+  ephemeralScatterSpread: 1.5,
 };

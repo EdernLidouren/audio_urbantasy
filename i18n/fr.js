@@ -18,6 +18,7 @@ export default {
   "menu.interaction.observe.title": "Observer",
   "interaction.pickup": "Ramassé : {amount} pièces.",
   "interaction.loot": "Trouvé : {amount} pièces.",
+  "interaction.lootSpawn": "{count} pièces éparpillées tout autour.",
 
   "menu.pause.title": "Pause",
   "menu.pause.options": "Options",

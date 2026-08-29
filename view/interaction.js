@@ -21,6 +21,7 @@ import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
 let doorTransitionHandler = null;
 let pickupHandler = null;
 let lootHandler = null;
+let lootSpawnHandler = null;
 
 export function setDoorTransitionHandler(handler) {
   doorTransitionHandler = handler;
@@ -41,6 +42,15 @@ export function setPickupHandler(handler) {
 // l'entité looté N'EST JAMAIS retirée, seul son état change.
 export function setLootHandler(handler) {
   lootHandler = handler;
+}
+
+// (entity, spawn) => void — applique l'effet d'ÉTAT du "loot à spawn"
+// (entity.consumed + N entités éphémères éparpillées, voir
+// core/money.js/lootEntitySpawn ; entities/model.md/"Entités éphémères"),
+// même patron que setLootHandler ci-dessus — variante déclarée via
+// action.spawn plutôt qu'action.amount (voir handleLoot).
+export function setLootSpawnHandler(handler) {
+  lootSpawnHandler = handler;
 }
 
 const PICKUP_SOUND_KEY = "assets/sounds/ui/pickup";
@@ -124,8 +134,39 @@ function handlePickup(entity) {
 // l'annonce "trouvé N pièces" alors qu'aucun argent n'est réellement ajouté
 // (lootEntity, lui, se dégrade déjà silencieusement — voir son commentaire)
 // — le piège exact que ce système doit éviter.
+//
+// DEUX formes possibles pour action.kind:"loot", jamais mélangées sur une
+// même entité — voir entities/model.md/"Entités éphémères" :
+//   - action.amount : crédite directement (comportement d'origine, ex.
+//     crate-port/crate-warehouse) ;
+//   - action.spawn : { spec, count, spread } — fait naître `count` entités
+//     éphémères ÉPARPILLÉES autour de la source AU LIEU de créditer
+//     directement (ex. crate-stash, level/demo2.json) ; chacune se
+//     ramasse ensuite individuellement via sa PROPRE action "pickup" (déjà
+//     robuste, rien à ajouter). `spec` (minimal, ex. { type: "money",
+//     amount: 20 }) est résolu en descripteur COMPLET par lootSpawnHandler
+//     (voir view/city-screen.js/resolveEphemeralSpec) — ce fichier n'en
+//     connaît que la forme brute, jamais le registre.
 function handleLoot(entity) {
   if (entity.consumed) return;
+
+  const spawn = entity.action.spawn;
+  if (spawn) {
+    if (!Number.isInteger(spawn.count) || spawn.count <= 0 || !spawn.spec || !spawn.spec.type) {
+      console.warn(`interact: action "loot" (spawn) sur "${entity.id}" mal formée.`);
+      return;
+    }
+    if (!lootSpawnHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
+    lootSpawnHandler(entity, spawn);
+    playPickupSound();
+    // Pas de MONTANT ici (contrairement au cas action.amount ci-dessous) :
+    // rien n'est encore GAGNÉ, seulement RÉPANDU autour de la source — le
+    // joueur ramassera chaque pièce individuellement, chacune annonçant
+    // déjà son propre gain (voir handlePickup).
+    announce(t("interaction.lootSpawn", { count: spawn.count }), { assertive: true });
+    return;
+  }
+
   const amount = entity.action.amount;
   if (!Number.isFinite(amount)) {
     console.warn(`interact: action "loot" sur "${entity.id}" sans amount numérique valide.`);

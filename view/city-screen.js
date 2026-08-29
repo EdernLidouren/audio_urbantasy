@@ -8,14 +8,21 @@ import { announce } from "../lib/announce.js";
 import { t } from "../i18n/index.js";
 import { ensureAudioUnlocked } from "../lib/audio.js";
 import { createCityAudioScene } from "./audio/city-scene.js";
-import { interact, chooseInteractionTarget, setDoorTransitionHandler, setPickupHandler, setLootHandler } from "./interaction.js";
+import {
+  interact,
+  chooseInteractionTarget,
+  setDoorTransitionHandler,
+  setPickupHandler,
+  setLootHandler,
+  setLootSpawnHandler,
+} from "./interaction.js";
 import { openPauseMenu } from "./menus/pause-menu.js";
 import { setGameReplaceHandler } from "./menus/save-menu.js";
 import { tick } from "../core/actions.js";
 import { reduce } from "../core/reduce.js";
 import { loadLevelById } from "../level/load.js";
 import { getActiveWorld, travelToWorld, spawnEphemeral } from "../core/state.js";
-import { pickupEntity, lootEntity } from "../core/money.js";
+import { pickupEntity, lootEntity, lootEntitySpawn } from "../core/money.js";
 import { isDebugEnabled } from "../config/debug.js";
 import { advanceTime, minuteOfHour, hourOfDay, dayOfMonth, monthOfYear, seasonOfYear, yearNumber, SEASON_KEYS } from "../core/time.js";
 import registry from "../entities/types/index.js";
@@ -54,23 +61,37 @@ function announceMoney(session) {
   announce(t("money.announce", { amount: session.money }));
 }
 
+// Résout un descripteur ÉPHÉMÈRE MINIMAL (type + surcharges, ex. { type:
+// "money", amount: 20 } — même forme qu'une instance de niveau) en spec
+// COMPLET pour spawnEphemeral/spawnScatteredEphemerals (core/state.js) :
+// EXACTEMENT la forme qu'une instance { type } SANS surcharge obtiendrait
+// en sortie de core/level.js/parseEntity, résolue ICI à la main — la vue
+// connaît déjà le registre, contrairement au core (spawnEphemeral ne fait
+// que porter ce descripteur, jamais l'interpréter). `overrides.amount`,
+// s'il est fourni, REMPLACE ENTIÈREMENT `action` du type (jamais de fusion
+// profonde — même principe que core/level.js pour `action`/`behavior`
+// d'instance) : une pièce éparpillée à 20 plutôt que les 5 par défaut de
+// "money", sans toucher au reste de l'action (kind, etc.). DEUX appelants
+// aujourd'hui : la touche debug "e" (voir onKeyDown plus bas) et l'effet
+// "loot à spawn" (voir lootSpawnEffect ci-dessous) — assez pour justifier
+// cette petite factorisation, pas plus.
+function resolveEphemeralSpec(type, overrides = {}) {
+  const typeDef = registry[type];
+  return {
+    type,
+    labelKey: typeDef.label,
+    descriptionKey: typeDef.descriptionKey,
+    blocksMovement: Boolean(typeDef.blocksMovement),
+    observable: Boolean(typeDef.observable),
+    interactable: Boolean(typeDef.interactable),
+    action: overrides.amount !== undefined ? { ...typeDef.action, amount: overrides.amount } : typeDef.action,
+  };
+}
+
 // Descripteur ÉPHÉMÈRE de test (touche "e" en mode debug, voir onKeyDown
 // plus bas ; core/state.js/spawnEphemeral) — une PIÈCE ramassable,
-// réutilise TEL QUEL l'archétype "money" existant (entities/types/money.js) :
-// EXACTEMENT la forme qu'une instance { type: "money" } sans surcharge
-// obtiendrait en sortie de core/level.js/parseEntity, résolue ICI à la main
-// — la vue connaît déjà le registre, contrairement au core (spawnEphemeral
-// ne fait que porter ce descripteur, jamais l'interpréter). x/id/ephemeral
-// sont posés par spawnEphemeral lui-même, jamais ici.
-const EPHEMERAL_COIN_SPEC = {
-  type: "money",
-  labelKey: registry.money.label,
-  descriptionKey: registry.money.descriptionKey,
-  blocksMovement: Boolean(registry.money.blocksMovement),
-  observable: Boolean(registry.money.observable),
-  interactable: Boolean(registry.money.interactable),
-  action: registry.money.action,
-};
+// réutilise TEL QUEL l'archétype "money" existant (entities/types/money.js).
+const EPHEMERAL_COIN_SPEC = resolveEphemeralSpec("money");
 
 export function makeCityScreen(getSession, setSession) {
   let scene = null;
@@ -144,6 +165,18 @@ export function makeCityScreen(getSession, setSession) {
     setSession(lootEntity(getSession(), entity.id, entity.action.amount));
   }
 
+  // Effet d'ÉTAT du "loot à spawn" (voir view/interaction.js/
+  // ACTION_HANDLERS.loot, action.spawn ; entities/model.md/"Entités
+  // éphémères") : entity.consumed + N entités éphémères ÉPARPILLÉES, core
+  // pur (core/money.js/lootEntitySpawn) — même patron que lootEntityEffect
+  // ci-dessus, mais `spec` doit d'abord être RÉSOLU (spawn.spec est minimal,
+  // ex. { type: "money", amount: 20 }, voir resolveEphemeralSpec plus haut)
+  // avant d'être transmis au core, qui ignore tout du registre.
+  function lootSpawnEffect(entity, spawn) {
+    const spec = resolveEphemeralSpec(spawn.spec.type, spawn.spec);
+    setSession(lootEntitySpawn(getSession(), entity.id, spec, spawn.count, spawn.spread));
+  }
+
   // Enregistrés une fois, pour la durée de vie de cet écran ville : mêmes
   // principe et portée que setDoorTransitionHandler (voir
   // view/interaction.js) — un module qui déclenche un effet possédé par
@@ -151,6 +184,7 @@ export function makeCityScreen(getSession, setSession) {
   setDoorTransitionHandler(transitionThroughDoor);
   setPickupHandler(pickupEntityEffect);
   setLootHandler(lootEntityEffect);
+  setLootSpawnHandler(lootSpawnEffect);
   setGameReplaceHandler(replaceCurrentGame);
 
   return {
@@ -255,6 +289,7 @@ export function makeCityScreen(getSession, setSession) {
       setDoorTransitionHandler(null);
       setPickupHandler(null);
       setLootHandler(null);
+      setLootSpawnHandler(null);
       setGameReplaceHandler(null);
       // Invariant documenté (CLAUDE.md) : session est null hors partie.
       // Seul chemin de sortie de la ville aujourd'hui (menu pause -> retour

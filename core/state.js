@@ -43,8 +43,9 @@
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";
 import { MAX_COMPANIONS } from "../config/companions.js";
 import { MAX_EPHEMERALS } from "../config/ephemerals.js";
-import { createSeed } from "./rng.js";
+import { createSeed, nextRandom } from "./rng.js";
 import { clamp } from "./physics/movement.js";
+import { isBlocking } from "./presence.js";
 import { INITIAL_TIME } from "./time.js";
 
 export const MOVE_STEP = TUNING_DEFAULTS.moveStep;
@@ -216,10 +217,12 @@ export function markConsumed(session, entityId) {
 
 // Crée UNE entité ÉPHÉMÈRE dans le lieu ACTIF, à la position x — point
 // d'entrée UNIQUE et RÉUTILISABLE pour toute création d'entité EN COURS DE
-// JEU (voir entities/model.md/"Entités éphémères"). Aujourd'hui, un seul
-// appelant : la touche debug "e" (voir view/city-screen.js) ; demain :
-// une canette cassée, un objet lâché par un compagnon, un effet... — tous
-// passeraient par cette même fonction, jamais une variante par appelant.
+// JEU (voir entities/model.md/"Entités éphémères"). Deux appelants
+// aujourd'hui : la touche debug "e" (voir view/city-screen.js) et
+// spawnScatteredEphemerals plus bas (effet "spawn" d'une action, voir
+// core/money.js/lootEntitySpawn) ; demain : un objet lâché par un
+// compagnon, un autre effet... — tous passeraient par cette même fonction,
+// jamais une variante par appelant.
 //
 // `spec` est un descripteur d'entité DÉJÀ RÉSOLU (type, labelKey,
 // blocksMovement, observable, interactable, action...) — EXACTEMENT la
@@ -260,6 +263,90 @@ export function spawnEphemeral(session, spec, x) {
 
   const nextWorld = { ...world, entities, nextEphemeralId: world.nextEphemeralId + 1 };
   return { ...session, worlds: { ...session.worlds, [session.activeWorldId]: nextWorld } };
+}
+
+// Tentatives maximum avant d'abandonner un tirage éparpillé et de retomber
+// sur sourceX (voir drawScatteredPosition ci-dessous) — un plafond, jamais
+// une boucle sans fin : même un lieu très encombré finit TOUJOURS par
+// produire une position, au pire celle de la source elle-même.
+const SCATTER_MAX_ATTEMPTS = 5;
+
+// Une position est BLOQUÉE si elle tombe dans le corps (BODY_RADIUS) d'une
+// entité qui bloque RÉELLEMENT le mouvement (isBlocking : blocksMovement ET
+// présente, voir core/presence.js — une entité dormante ne compte jamais).
+// `entities` : le lieu actif ET les compagnons (voir spawnScatteredEphemerals)
+// — un compagnon pourrait bloquer demain, autant rester correct dès
+// aujourd'hui plutôt que de le découvrir en contenu.
+function isPositionBlocked(x, entities, presenceContext) {
+  return entities.some((entity) => isBlocking(entity, presenceContext) && Math.abs(entity.x - x) < BODY_RADIUS);
+}
+
+// Tire UNE position ÉPARPILLÉE autour de sourceX, dans [-spread, +spread],
+// via le PRNG SEEDÉ passé en paramètre (déterministe : même rngState +
+// mêmes paramètres -> même résultat, toujours). BORNES respectées à TOUS
+// COUPS : chaque candidat est d'abord CLAMPÉ dans [0, length] (jamais hors
+// carte, voir clamp/physics/movement.js) puis, s'il tombe dans un corps
+// bloquant, RE-TIRÉ (jusqu'à SCATTER_MAX_ATTEMPTS fois) — filet ultime :
+// sourceX lui-même, TOUJOURS valide (c'est la position d'une source qui
+// vient d'être activée ; un collectible n'est jamais blocksMovement, voir
+// entities/types/crate.js). Un tirage consommé PAR TENTATIVE, jamais plus :
+// le rngState renvoyé reflète exactement le nombre de tirages réellement
+// faits, pour que l'appelant l'enchaîne sans rien perdre ni dupliquer.
+// EXPORTÉE (bien qu'interne à spawnScatteredEphemerals en usage normal)
+// SEULEMENT pour permettre à core/movement.check.js de vérifier
+// directement, sans dépendre du hasard d'un tirage complet, que les BORNES
+// (carte + obstacles) sont RÉELLEMENT respectées — jamais appelée hors
+// core/state.js/movement.check.js.
+export function drawScatteredPosition(sourceX, spread, length, entities, presenceContext, rngState) {
+  let state = rngState;
+  for (let attempt = 0; attempt < SCATTER_MAX_ATTEMPTS; attempt++) {
+    const draw = nextRandom(state);
+    state = draw.state;
+    const offset = (draw.value * 2 - 1) * spread; // [-spread, +spread]
+    const candidate = clamp(sourceX + offset, 0, length);
+    if (!isPositionBlocked(candidate, entities, presenceContext)) {
+      return { x: candidate, rngState: state };
+    }
+  }
+  return { x: sourceX, rngState: state };
+}
+
+// Effet "spawn d'éphémères ÉPARPILLÉS" (voir view/interaction.js,
+// ACTION_HANDLERS.loot — action.spawn ; core/money.js/lootEntitySpawn, seul
+// appelant aujourd'hui) : fait naître `count` entités éphémères autour de
+// sourceX, chacune décalée aléatoirement pour éviter l'empilement sonore —
+// voir entities/model.md/"Entités éphémères". Réutilise spawnEphemeral TEL
+// QUEL, N fois : même mécanisme, mêmes garanties (id unique, exclusion de
+// sérialisation, MAX_EPHEMERALS — l'éviction, si elle se déclenche, agit
+// DÉJÀ pendant cette boucle, jamais seulement après coup). `spec` : même
+// contrat que spawnEphemeral (descripteur DÉJÀ RÉSOLU, construit par
+// l'appelant/la vue — ce module ignore tout du type qui naît). `spread`
+// optionnel -> config/tuning-values.js/ephemeralScatterSpread (lu
+// DIRECTEMENT, comme MOVE_STEP ci-dessus, pas via resolveTuning : un
+// défaut PAR ACTION, pas par entité/son).
+//
+// rngState : consommé depuis world.rngState — LE MÊME flux que le
+// comportement des entités (core/reduce.js/stepEntities), jamais un flux
+// séparé. Sûr : ce flux est un état EXPLICITE, threadé ici comme partout
+// ailleurs dans ce fichier — consommer un tirage de PLUS, à un point précis
+// entre deux ticks (une interaction du joueur), reste parfaitement
+// déterministe (même seed + même SUITE d'actions, ticks ET interactions
+// confondus, -> même état, toujours).
+export function spawnScatteredEphemerals(session, spec, sourceX, count, spread = TUNING_DEFAULTS.ephemeralScatterSpread) {
+  const presenceContext = { time: session.time };
+  let rngState = session.worlds[session.activeWorldId].rngState;
+  let nextSession = session;
+
+  for (let i = 0; i < count; i++) {
+    const currentWorld = nextSession.worlds[nextSession.activeWorldId];
+    const obstacles = [...currentWorld.entities, ...nextSession.companions];
+    const draw = drawScatteredPosition(sourceX, spread, currentWorld.length, obstacles, presenceContext, rngState);
+    rngState = draw.rngState;
+    nextSession = spawnEphemeral(nextSession, spec, draw.x);
+  }
+
+  const finalWorld = nextSession.worlds[nextSession.activeWorldId];
+  return { ...nextSession, worlds: { ...nextSession.worlds, [nextSession.activeWorldId]: { ...finalWorld, rngState } } };
 }
 
 // Le monde actuellement actif, AUGMENTÉ des compagnons de la partie (voir
