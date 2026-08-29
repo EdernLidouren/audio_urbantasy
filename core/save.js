@@ -83,7 +83,8 @@ function backfillWorld(world) {
 // courante. v1 -> v1 : identité pour l'essentiel, SAUF le rebouchage de
 // `companions`/`companionsRngState` (voir core/state.js), de `time` (voir
 // core/time.js — absent d'une sauvegarde antérieure à l'horloge de partie),
-// de `money` (voir core/money.js — même précédent) et, par monde, de
+// de `money` (voir core/money.js — même précédent), de `bag` (voir
+// core/bag.js — même précédent) et, par monde, de
 // floors/defaultSurface/segments (voir backfillWorld) —
 // absents d'une sauvegarde antérieure à leur introduction, sans que ça
 // justifie une montée de version (la forme reste v1, juste complétée par
@@ -107,6 +108,10 @@ function migrateSave(raw) {
 
   if (typeof data.money !== "number") {
     data = { ...data, money: 0 };
+  }
+
+  if (!Array.isArray(data.bag)) {
+    data = { ...data, bag: [] };
   }
 
   if (data.worlds && typeof data.worlds === "object") {
@@ -137,6 +142,7 @@ function isPlausibleSession(data) {
   if (typeof data.activeWorldId !== "string") return false;
   if (!data.worlds[data.activeWorldId]) return false;
   if (!Array.isArray(data.companions)) return false;
+  if (!Array.isArray(data.bag)) return false;
   return true;
 }
 

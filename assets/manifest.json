@@ -90,6 +90,9 @@
   "assets/sounds/entities/door_beacon": [
     "assets/sounds/entities/door_beacon_1.mp3"
   ],
+  "assets/sounds/entities/fruit_beacon": [
+    "assets/sounds/entities/fruit_beacon_1.mp3"
+  ],
   "assets/sounds/entities/neon_beacon": [
     "assets/sounds/entities/neon_beacon_1.mp3"
   ],

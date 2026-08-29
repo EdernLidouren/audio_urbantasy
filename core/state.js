@@ -6,10 +6,13 @@
 // son absence — une re-visite les ressort tels qu'ils ont été laissés
 // (PNJ compris), pas réinitialisés. Forme :
 //   { player, worlds: { [id]: <état d'un monde> }, activeWorldId, time,
-//     money, companions, companionsRngState }
-// player : l'état du joueur (position, extensible plus tard — inventaire...).
+//     money, bag, companions, companionsRngState }
+// player : l'état du joueur (position, extensible plus tard).
 // money : entier, cercle PARTIE (comme time) — voir core/money.js/addMoney,
 // SEUL point d'écriture.
+// bag : liste d'entrées d'objets, cercle PARTIE (comme money) — voir
+// core/bag.js/addItem, SEUL point d'écriture. Premier tiers de
+// l'inventaire (money) puis deuxième (bag), même statut, même patron.
 // Vit ICI, JAMAIS dans les entités d'un monde : il traverse les lieux, ne
 // leur appartient pas. worlds[id] : ~ l'ancien "level" (entités avec
 // position/intention/état, longueur, métadonnées), PLUS son propre rngState
@@ -174,6 +177,9 @@ export function createInitialState(level, seed = DEFAULT_SEED, { companions } = 
     // Argent : voir core/money.js. Une partie neuve démarre à 0, jamais rien
     // de plus arbitraire.
     money: 0,
+    // Sac d'objets : voir core/bag.js/addItem, SEUL point d'écriture. Une
+    // partie neuve démarre vide, comme l'argent — même précédent.
+    bag: [],
     companions: repositionCompanions(requestedCompanions.slice(0, MAX_COMPANIONS), level.playerStart, level.length),
     // Flux PRNG dédié aux compagnons (voir header) : dérivé du même seed,
     // mais hashé sous une clé distincte — jamais la même suite que le

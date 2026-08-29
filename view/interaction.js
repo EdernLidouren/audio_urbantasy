@@ -20,6 +20,7 @@ import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
 // jamais le core, voir le header).
 let doorTransitionHandler = null;
 let pickupHandler = null;
+let itemPickupHandler = null;
 let lootHandler = null;
 let lootSpawnHandler = null;
 
@@ -34,6 +35,16 @@ export function setDoorTransitionHandler(handler) {
 // l'inverse.
 export function setPickupHandler(handler) {
   pickupHandler = handler;
+}
+
+// (entity, item, count) => void — applique l'effet d'ÉTAT du ramassage vers
+// le SAC (objet + retrait de l'entité, voir core/bag.js/pickupItemEntity ;
+// entities/model.md/"Sac d'objets"), même patron que setPickupHandler
+// ci-dessus mais DISTINCT : pickupHandler écrit dans session.money,
+// itemPickupHandler dans session.bag — même verbe ("pickup"), effet choisi
+// selon la FORME de l'action (voir handlePickup).
+export function setItemPickupHandler(handler) {
+  itemPickupHandler = handler;
 }
 
 // (entity) => void — applique l'effet d'ÉTAT du "loot" (argent + entity.consumed,
@@ -106,11 +117,35 @@ function handleTransit(entity) {
   if (doorTransitionHandler) doorTransitionHandler(entity.target);
 }
 
-// "pickup" : effet d'ÉTAT délégué au gestionnaire enregistré (voir
-// setPickupHandler) — PUIS retour sensoriel, vue pure ici (son défensif,
-// annonce brève). amount manquant/invalide sur l'entité -> avertit et
-// s'arrête, jamais de crash ni d'argent ajouté sans valeur sensée.
+// "pickup" : effet d'ÉTAT délégué au gestionnaire enregistré — PUIS retour
+// sensoriel, vue pure ici (son défensif, annonce brève). DEUX formes
+// possibles pour action.kind:"pickup", jamais mélangées sur une même
+// entité (distinguées par la PRÉSENCE du champ, même principe que
+// handleLoot pour action.spawn/amount) :
+//   - action.item : vers le SAC (voir core/bag.js/pickupItemEntity,
+//     entities/model.md/"Sac d'objets") — le nom affiché ("Ramassé :
+//     <objet>") vient de entity.labelKey, déjà résolu par le core (voir
+//     core/level.js) : ce fichier n'importe jamais le core, donc jamais le
+//     registre d'objets (core/items.js) — c'est au contenu de niveau de
+//     donner à l'entité le MÊME nameKey que ITEM_REGISTRY[type].label pour
+//     que le nom ramassé corresponde à celui du sac (convention, jamais
+//     une contrainte structurelle).
+//   - action.amount : vers session.money (comportement d'origine).
 function handlePickup(entity) {
+  const item = entity.action.item;
+  if (item !== undefined) {
+    const count = entity.action.count ?? 1;
+    if (typeof item !== "string" || item === "" || !Number.isInteger(count) || count <= 0) {
+      console.warn(`interact: action "pickup" (item) sur "${entity.id}" mal formée.`);
+      return;
+    }
+    if (!itemPickupHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
+    itemPickupHandler(entity, item, count);
+    playPickupSound();
+    announce(t("interaction.pickupItem", { item: t(entity.labelKey) }), { assertive: true });
+    return;
+  }
+
   const amount = entity.action.amount;
   if (!Number.isFinite(amount)) {
     console.warn(`interact: action "pickup" sur "${entity.id}" sans amount numérique valide.`);

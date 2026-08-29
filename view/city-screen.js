@@ -13,16 +13,20 @@ import {
   chooseInteractionTarget,
   setDoorTransitionHandler,
   setPickupHandler,
+  setItemPickupHandler,
   setLootHandler,
   setLootSpawnHandler,
 } from "./interaction.js";
 import { openPauseMenu } from "./menus/pause-menu.js";
+import { openInventoryMenu, setDropItemHandler } from "./menus/inventory-menu.js";
 import { setGameReplaceHandler } from "./menus/save-menu.js";
 import { tick } from "../core/actions.js";
 import { reduce } from "../core/reduce.js";
 import { loadLevelById } from "../level/load.js";
 import { getActiveWorld, travelToWorld, spawnEphemeral } from "../core/state.js";
 import { pickupEntity, lootEntity, lootEntitySpawn } from "../core/money.js";
+import { pickupItemEntity, dropItem } from "../core/bag.js";
+import { ITEM_REGISTRY } from "../core/items.js";
 import { isDebugEnabled } from "../config/debug.js";
 import { advanceTime, minuteOfHour, hourOfDay, dayOfMonth, monthOfYear, seasonOfYear, yearNumber, SEASON_KEYS } from "../core/time.js";
 import registry from "../entities/types/index.js";
@@ -81,16 +85,22 @@ function announcePlayerX(session) {
 // EXACTEMENT la forme qu'une instance { type } SANS surcharge obtiendrait
 // en sortie de core/level.js/parseEntity, résolue ICI à la main — la vue
 // connaît déjà le registre, contrairement au core (spawnEphemeral ne fait
-// que porter ce descripteur, jamais l'interpréter). `overrides.amount`,
-// s'il est fourni, REMPLACE ENTIÈREMENT `action` du type (jamais de fusion
-// profonde — même principe que core/level.js pour `action`/`behavior`
-// d'instance) : une pièce éparpillée à 20 plutôt que les 5 par défaut de
-// "money", sans toucher au reste de l'action (kind, etc.). DEUX appelants
-// aujourd'hui : la touche debug "e" (voir onKeyDown plus bas) et l'effet
-// "loot à spawn" (voir lootSpawnEffect ci-dessous) — assez pour justifier
-// cette petite factorisation, pas plus.
+// que porter ce descripteur, jamais l'interpréter). `overrides.amount`/
+// `overrides.count`, s'ils sont fournis, REMPLACENT DANS `action` UNIQUEMENT
+// le champ concerné (jamais de fusion profonde — même principe que
+// core/level.js pour `action`/`behavior` d'instance) : une pièce éparpillée
+// à 20 plutôt que les 5 par défaut de "money" (`amount`), ou N exemplaires
+// d'un objet posé plutôt que le 1 par défaut de son type (`count`), sans
+// toucher au reste de l'action (kind, etc.). TROIS appelants aujourd'hui :
+// la touche debug "e" (voir onKeyDown plus bas), l'effet "loot à spawn"
+// (voir lootSpawnEffect ci-dessous, `amount`) et l'effet "Poser" (voir
+// resolveDroppedItemSpec/dropItemEffect ci-dessous, `count`) — assez pour
+// justifier cette petite factorisation, pas plus.
 function resolveEphemeralSpec(type, overrides = {}) {
   const typeDef = registry[type];
+  let action = typeDef.action;
+  if (overrides.amount !== undefined) action = { ...action, amount: overrides.amount };
+  if (overrides.count !== undefined) action = { ...action, count: overrides.count };
   return {
     type,
     labelKey: typeDef.label,
@@ -98,7 +108,7 @@ function resolveEphemeralSpec(type, overrides = {}) {
     blocksMovement: Boolean(typeDef.blocksMovement),
     observable: Boolean(typeDef.observable),
     interactable: Boolean(typeDef.interactable),
-    action: overrides.amount !== undefined ? { ...typeDef.action, amount: overrides.amount } : typeDef.action,
+    action,
   };
 }
 
@@ -106,6 +116,40 @@ function resolveEphemeralSpec(type, overrides = {}) {
 // plus bas ; core/state.js/spawnEphemeral) — une PIÈCE ramassable,
 // réutilise TEL QUEL l'archétype "money" existant (entities/types/money.js).
 const EPHEMERAL_COIN_SPEC = resolveEphemeralSpec("money");
+
+// Résout le spec ÉPHÉMÈRE d'un objet du SAC posé au sol ("Poser", voir
+// view/menus/inventory-menu.js/setDropItemHandler ; entities/model.md/"Sac
+// d'objets") — DEUX cas selon que `type` (une clé de core/items.js/
+// ITEM_REGISTRY, ex. "apple"/"key_bronze") possède ou non son PROPRE
+// archétype d'entité dans le registre (convention : même clé, voir
+// entities/types/apple.js) :
+//   - archétype dédié ("apple") -> resolveEphemeralSpec tel quel, avec
+//     `count` substitué dans action.count (comme `overrides.amount` le fait
+//     déjà pour "money") ;
+//   - aucun archétype dédié ("key_bronze") -> repli sur l'archétype
+//     GÉNÉRIQUE "item" (entities/types/item.js) pour `type`/`sounds` (le
+//     rendu audio, voir view/audio/city-scene.js/buildEntitySoundEntry, lit
+//     TOUJOURS `registry[entity.type].sounds` — `spec.type` doit donc rester
+//     une clé RÉELLE du registre d'entités, jamais le type d'OBJET brut),
+//     mais avec nameKey/descriptionKey/action PROPRES à l'objet (depuis
+//     ITEM_REGISTRY), exactement comme le ferait une instance de niveau qui
+//     utiliserait ce type générique (voir le header d'entities/types/item.js).
+function resolveDroppedItemSpec(type, count) {
+  if (registry[type]) {
+    return resolveEphemeralSpec(type, { count });
+  }
+  const props = ITEM_REGISTRY[type];
+  const generic = registry.item;
+  return {
+    type: "item",
+    labelKey: props.label,
+    descriptionKey: props.descriptionKey,
+    blocksMovement: Boolean(generic.blocksMovement),
+    observable: Boolean(generic.observable),
+    interactable: Boolean(generic.interactable),
+    action: { kind: "pickup", item: type, count },
+  };
+}
 
 export function makeCityScreen(getSession, setSession) {
   let scene = null;
@@ -171,6 +215,15 @@ export function makeCityScreen(getSession, setSession) {
     setSession(pickupEntity(getSession(), entity.id, entity.action.amount));
   }
 
+  // Effet d'ÉTAT du ramassage vers le SAC (voir view/interaction.js/
+  // ACTION_HANDLERS.pickup, action.item ; entities/model.md/"Sac
+  // d'objets") : objet + retrait de l'entité, core pur
+  // (core/bag.js/pickupItemEntity) — même patron que pickupEntityEffect
+  // ci-dessus, mais écrit dans session.bag plutôt que session.money.
+  function itemPickupEntityEffect(entity, item, count) {
+    setSession(pickupItemEntity(getSession(), entity.id, item, count));
+  }
+
   // Effet d'ÉTAT du "loot" (voir view/interaction.js/ACTION_HANDLERS.loot ;
   // entities/model.md/"Collectible persistant") : argent + entity.consumed,
   // core pur (core/money.js/lootEntity) — même patron que
@@ -191,14 +244,29 @@ export function makeCityScreen(getSession, setSession) {
     setSession(lootEntitySpawn(getSession(), entity.id, spec, spawn.count, spawn.spread));
   }
 
+  // Effet d'ÉTAT du "Poser" (voir view/menus/inventory-menu.js/
+  // setDropItemHandler ; entities/model.md/"Sac d'objets") : retire `count`
+  // exemplaire(s) du sac ET fait apparaître une entité éphémère au sol,
+  // core pur (core/bag.js/dropItem) — même patron que les effets ci-dessus.
+  // `spec` résolu ICI (resolveDroppedItemSpec plus haut) : le menu
+  // d'inventaire ignore tout du registre de types d'entités, comme le reste
+  // de la vue face au core.
+  function dropItemEffect(type, count) {
+    const session = getSession();
+    const spec = resolveDroppedItemSpec(type, count);
+    setSession(dropItem(session, type, count, spec, session.player.x));
+  }
+
   // Enregistrés une fois, pour la durée de vie de cet écran ville : mêmes
   // principe et portée que setDoorTransitionHandler (voir
   // view/interaction.js) — un module qui déclenche un effet possédé par
   // city-screen.js (scene/session) sans avoir besoin de les connaître.
   setDoorTransitionHandler(transitionThroughDoor);
   setPickupHandler(pickupEntityEffect);
+  setItemPickupHandler(itemPickupEntityEffect);
   setLootHandler(lootEntityEffect);
   setLootSpawnHandler(lootSpawnEffect);
+  setDropItemHandler(dropItemEffect);
   setGameReplaceHandler(replaceCurrentGame);
 
   return {
@@ -267,6 +335,15 @@ export function makeCityScreen(getSession, setSession) {
         return;
       }
 
+      // "i" (inventaire) discrète : ouvre le menu du sac (voir
+      // view/menus/inventory-menu.js) — met le jeu en PAUSE comme tout
+      // écran-menu (mécanisme de la pile, aucun code dédié ici, voir
+      // lib/screens.js). Même patron que Escape/openPauseMenu ci-dessus.
+      if (event.key === "i" || event.key === "I") {
+        openInventoryMenu(scene, getSession);
+        return;
+      }
+
       // "x" discrète, MODE DEBUG UNIQUEMENT (voir config/debug.js, même
       // garde que "e") : consultation pure de la position du joueur — un
       // outil de diagnostic, pas une info destinée au joueur normal,
@@ -313,8 +390,10 @@ export function makeCityScreen(getSession, setSession) {
       scene = null;
       setDoorTransitionHandler(null);
       setPickupHandler(null);
+      setItemPickupHandler(null);
       setLootHandler(null);
       setLootSpawnHandler(null);
+      setDropItemHandler(null);
       setGameReplaceHandler(null);
       // Invariant documenté (CLAUDE.md) : session est null hors partie.
       // Seul chemin de sortie de la ville aujourd'hui (menu pause -> retour

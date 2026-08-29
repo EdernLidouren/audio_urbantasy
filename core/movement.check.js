@@ -22,6 +22,8 @@ import { reduce } from "./reduce.js";
 import { moveAndBounce } from "./physics/movement.js";
 import { SAVE_VERSION, serializeGame, deserializeGame } from "./save.js";
 import { addMoney, pickupEntity, lootEntity, lootEntitySpawn } from "./money.js";
+import { addItem, pickupItemEntity, removeItem, dropItem } from "./bag.js";
+import { ITEM_REGISTRY, itemProps } from "./items.js";
 import { createSeed } from "./rng.js";
 import { MAX_COMPANIONS } from "../config/companions.js";
 import { MAX_EPHEMERALS } from "../config/ephemerals.js";
@@ -2258,6 +2260,7 @@ export function runMovementChecks() {
   };
   let auditSession = createInitialState(auditWorldA, 77, { companions: [auditCompanion] });
   auditSession = addMoney(auditSession, 12); // argent NON nul dans l'audit — voir plus bas, doit survivre au même titre que le reste
+  auditSession = addItem(auditSession, "apple", 3); // sac NON vide dans l'audit — même raison
   for (let i = 0; i < 25; i++) auditSession = reduce(auditSession, tick(1));
   auditSession = travelToWorld(auditSession, auditWorldB.id, auditWorldB);
   for (let i = 0; i < 10; i++) auditSession = reduce(auditSession, tick(-1));
@@ -2274,6 +2277,8 @@ export function runMovementChecks() {
   // aller-retour — confirme session.money comme n'importe quel autre champ
   // du cercle partie (voir core/state.js).
   run("sérialisation : session.money est un nombre (jamais undefined)", true, typeof auditSession.money === "number");
+  // Sac : présent et TABLEAU (jamais undefined), même précédent que money.
+  run("sérialisation : session.bag est un tableau (jamais undefined)", true, Array.isArray(auditSession.bag));
 
   // 2) Aller-retour JSON réel, capturé pour détecter un throw (ex. cycle)
   // au lieu de laisser l'exception interrompre toute la suite de checks.
@@ -2287,6 +2292,7 @@ export function runMovementChecks() {
   run("sérialisation : JSON.stringify/parse ne lève pas", false, auditRoundTripThrew);
   if (!auditRoundTripThrew) {
     run("sérialisation : money survit à l'aller-retour JSON", auditSession.money, auditRoundTripped.money);
+    run("sérialisation : bag survit à l'aller-retour JSON", JSON.stringify(auditSession.bag), JSON.stringify(auditRoundTripped.bag));
   }
 
   // 3) Divergence structurelle précise entre avant/après.
@@ -2403,6 +2409,128 @@ export function runMovementChecks() {
   // module.
   run("argent : pickupEntity sur une entité déjà retirée -> aucun second gain", 7, pickupEntity(afterPickup, "coin-1", 7).money);
   run("argent : pickupEntity sur une entité déjà retirée -> référence INCHANGÉE", afterPickup, pickupEntity(afterPickup, "coin-1", 7));
+
+  // --- Sac d'objets (core/bag.js/addItem + pickupItemEntity, core/items.js/ITEM_REGISTRY) ---
+  // Deuxième tiers de l'inventaire, même statut que l'argent ci-dessus.
+
+  run("sac : ITEM_REGISTRY.apple est empilable", true, itemProps("apple").stackable);
+  run("sac : ITEM_REGISTRY.key_bronze n'est PAS empilable", false, itemProps("key_bronze").stackable);
+  run("sac : itemProps sur un type inconnu -> undefined", undefined, itemProps("does-not-exist"));
+
+  const bagState = createInitialState(moneyLevel, undefined, NO_COMPANIONS);
+  run("sac : une partie neuve démarre avec un sac vide", 0, bagState.bag.length);
+
+  // Empilable : le PREMIER ajout crée l'entrée, les SUIVANTS incrémentent
+  // quantity — jamais une seconde entrée pour le même type.
+  const afterOneApple = addItem(bagState, "apple", 1);
+  run("sac : addItem (empilable) — une entrée créée", 1, afterOneApple.bag.length);
+  run("sac : addItem (empilable) — quantity posée à count", 1, afterOneApple.bag[0].quantity);
+  const afterTwoApples = addItem(afterOneApple, "apple", 1);
+  run("sac : addItem (empilable) — EMPILE, toujours une seule entrée", 1, afterTwoApples.bag.length);
+  run("sac : addItem (empilable) — quantity incrémentée (2)", 2, afterTwoApples.bag[0].quantity);
+  const afterFiveMoreApples = addItem(bagState, "apple", 5);
+  run("sac : addItem(count=5) en un seul appel — quantity posée directement à 5", 5, afterFiveMoreApples.bag[0].quantity);
+
+  // Non empilable : CHAQUE ajout crée une entrée DISTINCTE, jamais de
+  // quantity (toujours 1 par construction, voir le header du module).
+  const afterOneKey = addItem(bagState, "key_bronze", 1);
+  const afterTwoKeys = addItem(afterOneKey, "key_bronze", 1);
+  run("sac : addItem (non empilable) — DEUX entrées distinctes, jamais fusionnées", 2, afterTwoKeys.bag.length);
+  run("sac : addItem (non empilable) — aucune entrée ne porte de quantity", true, afterTwoKeys.bag.every((e) => e.quantity === undefined));
+  const afterThreeKeysAtOnce = addItem(bagState, "key_bronze", 3);
+  run("sac : addItem(count=3) sur non empilable — 3 entrées distinctes en un appel", 3, afterThreeKeysAtOnce.bag.length);
+
+  // Type INCONNU du registre : dégrade en non empilable (jamais un crash —
+  // voir le commentaire de addItem).
+  const afterUnknownType = addItem(bagState, "does-not-exist", 2);
+  run("sac : addItem sur un type inconnu — dégrade en non empilable (2 entrées), jamais un crash", 2, afterUnknownType.bag.length);
+
+  run("sac : addItem NE MUTE JAMAIS l'original", 0, bagState.bag.length);
+
+  // pickupItemEntity : effet atomique (objet + retrait), même patron que
+  // pickupEntity (argent) ci-dessus.
+  const ITEM_TEST_REGISTRY = { item: { label: "entity.item" } };
+  const itemLevel = parseLevel(
+    {
+      id: "movement-check-item",
+      titleKey: "level.demo.title",
+      length: 10,
+      playerStart: 0,
+      entities: [
+        { id: "apple-1", type: "item", x: 5, interactable: true, action: { kind: "pickup", item: "apple", count: 1 } },
+        { id: "other-1", type: "item", x: 6, interactable: true, action: { kind: "pickup", item: "key_bronze", count: 1 } },
+      ],
+    },
+    ITEM_TEST_REGISTRY
+  );
+  const itemState = createInitialState(itemLevel, undefined, NO_COMPANIONS);
+
+  const afterApplePickup = pickupItemEntity(itemState, "apple-1", "apple", 1);
+  run("sac : pickupItemEntity ajoute l'objet au sac", 1, afterApplePickup.bag.length);
+  run("sac : pickupItemEntity — quantity 1 pour une pomme", 1, afterApplePickup.bag[0].quantity);
+  run(
+    "sac : pickupItemEntity retire l'entité ramassée",
+    false,
+    getActiveWorld(afterApplePickup).entities.some((e) => e.id === "apple-1")
+  );
+  run(
+    "sac : pickupItemEntity laisse les autres entités intactes",
+    true,
+    getActiveWorld(afterApplePickup).entities.some((e) => e.id === "other-1")
+  );
+
+  // Double appel (id déjà retiré, ex. tentative périmée) : effet ATOMIQUE,
+  // jamais un second gain sans entité à retirer — même garantie que
+  // pickupEntity.
+  run(
+    "sac : pickupItemEntity sur une entité déjà retirée -> aucun second ajout",
+    1,
+    pickupItemEntity(afterApplePickup, "apple-1", "apple", 1).bag[0].quantity
+  );
+  run(
+    "sac : pickupItemEntity sur une entité déjà retirée -> référence INCHANGÉE",
+    afterApplePickup,
+    pickupItemEntity(afterApplePickup, "apple-1", "apple", 1)
+  );
+
+  // removeItem : inverse d'addItem — voir le commentaire du module pour la
+  // sémantique exacte (décrémente/retire pour un empilable, retire une
+  // entrée exacte pour un non empilable).
+  const afterRemoveOneApple = removeItem(afterTwoApples, "apple", 1);
+  run("sac : removeItem (empilable) — décrémente sans retirer l'entrée", 1, afterRemoveOneApple.bag.length);
+  run("sac : removeItem (empilable) — quantity décrémentée (2 -> 1)", 1, afterRemoveOneApple.bag[0].quantity);
+  const afterRemoveAllApples = removeItem(afterTwoApples, "apple", 2);
+  run("sac : removeItem (empilable) — count == quantity -> entrée retirée entièrement", 0, afterRemoveAllApples.bag.length);
+  // count > quantity disponible : CLAMPÉ, jamais un stock négatif.
+  const afterRemoveTooManyApples = removeItem(afterTwoApples, "apple", 99);
+  run("sac : removeItem (empilable) — count > disponible, clampé (entrée retirée, jamais négatif)", 0, afterRemoveTooManyApples.bag.length);
+
+  const afterRemoveOneKey = removeItem(afterTwoKeys, "key_bronze", 1);
+  run("sac : removeItem (non empilable) — retire UNE entrée exacte", 1, afterRemoveOneKey.bag.length);
+
+  run("sac : removeItem sur un type absent du sac -> référence INCHANGÉE", bagState, removeItem(bagState, "apple", 1));
+  run("sac : removeItem NE MUTE JAMAIS l'original", 2, afterTwoApples.bag[0].quantity);
+
+  // dropItem : effet "Poser" — removeItem + spawnEphemeral, ATOMIQUEMENT
+  // (voir view/menus/inventory-menu.js/setDropItemHandler). Un objet posé
+  // en pile (count > 1) donne UNE SEULE entité éphémère portant toute la
+  // quantité, jamais N éparpillées — voir core/bag.js/dropItem.
+  const DROP_SPEC = {
+    type: "item",
+    labelKey: "item.apple",
+    descriptionKey: "item.apple.description",
+    blocksMovement: false,
+    observable: true,
+    interactable: true,
+    action: { kind: "pickup", item: "apple", count: 1 },
+  };
+  const afterDrop = dropItem(afterApplePickup, "apple", 1, DROP_SPEC, 3);
+  run("sac : dropItem retire l'objet du sac", 0, afterDrop.bag.length);
+  const droppedEntity = getActiveWorld(afterDrop).entities.find((e) => e.ephemeral);
+  run("sac : dropItem fait apparaître UNE entité éphémère", true, Boolean(droppedEntity));
+  run("sac : dropItem pose l'entité à la position x demandée", 3, droppedEntity && droppedEntity.x);
+  run("sac : dropItem reporte l'action pickup (count) telle quelle", 1, droppedEntity && droppedEntity.action.count);
+  run("sac : dropItem NE MUTE JAMAIS l'original", 1, afterApplePickup.bag[0].quantity);
 
   // --- Collectible persistant (core/state.js/markConsumed, core/money.js/lootEntity) ---
   // Contrairement à removeEntity/pickupEntity ci-dessus, l'entité looté
@@ -2869,6 +2997,25 @@ export function runMovementChecks() {
   run("save : sauvegarde antérieure à l'argent acceptée (rebouchée)", true, oldMoneySaveResult.success);
   if (oldMoneySaveResult.success) {
     run("save : partie rebouchée — money par défaut (0)", 0, oldMoneySaveResult.session.money);
+  }
+
+  // Sauvegarde ANTÉRIEURE au sac (voir core/bag.js) : même précédent exact
+  // — jamais eu de clé .bag.
+  const { bag: _droppedBag, ...auditSessionWithoutBag } = auditSession;
+  const oldBagSave = { version: SAVE_VERSION, data: auditSessionWithoutBag };
+  const oldBagSaveResult = deserializeGame(oldBagSave);
+  run("save : sauvegarde antérieure au sac acceptée (rebouchée)", true, oldBagSaveResult.success);
+  if (oldBagSaveResult.success) {
+    run("save : partie rebouchée — bag par défaut (tableau vide)", 0, oldBagSaveResult.session.bag.length);
+  }
+  // Un bag manifestement CORROMPU (pas un tableau) suit le MÊME chemin que
+  // "absent" — migrateSave le rebouche AVANT toute validation de forme,
+  // exactement comme companions (voir migrateSave) : jamais rejeté, jamais
+  // un crash, juste ramené à un sac vide sûr.
+  const corruptedBagResult = deserializeGame({ version: SAVE_VERSION, data: { ...auditSession, bag: "not-an-array" } });
+  run("save : bag corrompu (pas un tableau) accepté (rebouché, comme companions)", true, corruptedBagResult.success);
+  if (corruptedBagResult.success) {
+    run("save : bag corrompu rebouché — tableau vide", 0, corruptedBagResult.session.bag.length);
   }
 
   console.log(`Récapitulatif : ${passed} réussis / ${total} total`);

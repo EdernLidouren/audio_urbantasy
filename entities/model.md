@@ -337,6 +337,65 @@ pièce à chaque premier appui d'un pas vers la droite en mode debug, jamais
 l'intention voulue. Infra volontairement minimale : d'autres outils de debug
 s'y grefferont plus tard derrière le MÊME drapeau, jamais un par outil.
 
+## Sac d'objets
+
+Deuxième tiers de l'inventaire après l'argent (`session.money`, voir
+`core/money.js`) : `session.bag`, liste d'entrées `{ type, quantity? }` —
+`quantity` présent pour un objet EMPILABLE (une seule entrée par type,
+incrémentée), absent pour un objet NON empilable (une entrée PAR
+EXEMPLAIRE). `core/bag.js`/`addItem` et `removeItem` sont les SEULS points
+d'écriture (voir son header pour le détail complet de la forme).
+
+- **Consultation** — touche "i", écran-liste
+  (`view/menus/inventory-menu.js`). Chaque ligne : "**<nom> × <quantité si
+  applicable> : <description>**" — le nom D'ABORD, la description EN QUEUE
+  (non-bloquante : qui ne veut que le nom l'a déjà entendu et peut passer à
+  l'entrée suivante).
+- **Action "Poser"** — Entrée sur une entrée ouvre TOUJOURS un menu
+  d'actions (Poser, Annuler), jamais une activation directe même à une
+  seule action disponible — prévisibilité : "Entrée sur un objet" ne
+  bascule jamais entre "menu" et "agit tout de suite" selon le contenu.
+  Objet UNIQUE (quantité 1, ou non empilable) : "Poser" agit DIRECTEMENT,
+  aucun sélecteur. Stack > 1 : ouvre un SÉLECTEUR DE QUANTITÉ — un écran
+  CUSTOM, délibérément PAS le mécanisme `kind:"slider"` de `lib/menu.js`,
+  pour deux raisons structurelles (voir le commentaire d'`openQuantitySelector`,
+  `view/menus/inventory-menu.js`) : la valeur y est TRANSITOIRE (propre à
+  cette seule ouverture) alors que le slider existant porte la sienne via
+  une PRÉFÉRENCE PERSISTÉE (`prefKey`/`config/preferences.js`, localStorage
+  réel) ; et ce sélecteur veut TROIS paliers d'incrément (aucun -> ±1, Shift
+  -> ±10, Ctrl -> ±100) alors que le slider n'en connaît qu'UN (Ctrl ->
+  `bigStep`). `lib/menu.js` reste donc intact — imitation fidèle de son
+  esprit (annonce de la seule valeur à l'ajustement, bornée, son "select" à
+  la validation), pas une réutilisation littérale.
+- **Effet CORE pur** — `core/bag.js`/`dropItem` : `removeItem` (retire la
+  quantité choisie du sac) PUIS `spawnEphemeral` (fait apparaître l'objet au
+  sol), composés atomiquement. **UNE SEULE entité éphémère porte TOUTE la
+  quantité posée** — jamais N entités éparpillées comme "loot"/`action.spawn`
+  (voir "Spawn déclenché par une action" plus haut) : poser une pile n'est
+  pas faire éclater un butin, c'est laisser un tas à un endroit — un tas
+  UNIQUE au sol reste plus lisible à l'oreille (pas de superposition de
+  balises identiques) et symétrique de la représentation du sac lui-même
+  (une seule entrée par type). `spec` résolu côté VUE
+  (`resolveDroppedItemSpec`, `view/city-screen.js`, aux côtés de
+  `resolveEphemeralSpec`) : l'archétype DÉDIÉ du type est réutilisé s'il en
+  existe un (ex. `apple` -> `entities/types/apple.js`, même son que
+  l'original) ; sinon repli sur l'archétype GÉNÉRIQUE `item`
+  (`entities/types/item.js`) avec `nameKey`/`descriptionKey`/`action`
+  propres à l'objet (depuis `core/items.js`/`ITEM_REGISTRY`) — exactement la
+  convention qu'une instance de niveau suivrait pour ce même type générique.
+- **Objet posé = ÉPHÉMÈRE** — ramassable de nouveau (réutilise l'action
+  `"pickup"` telle quelle, déjà robuste), mais **PERDU** si la scène est
+  quittée sans le ramasser (purgé comme tout éphémère au départ, jamais
+  sérialisé — voir "Entités éphémères" plus haut). Choix ASSUMÉ, pas un
+  oubli : "Poser" est un vrai LÂCHER, pas un coffre distant — perdre un
+  objet posé puis abandonné est une utilité en soi (se délester quelque
+  part, pas juste réorganiser le sac).
+- **Extensibilité anti-drop, RÉSERVÉE, PAS construite** : un futur flag
+  `droppable` sur `core/items.js`/`ITEM_REGISTRY` (défaut `true`) pourrait un
+  jour exclure "Poser" du menu d'actions pour un objet donné (ex. un objet
+  de quête vital) — non codé ici, aucun objet de ce genre n'existe encore ;
+  documenté pour ne pas condamner ce slot par erreur plus tard.
+
 ## Présence conditionnelle et triggers de comportement
 
 `presence` (optionnel, `core/presence.js`) : une liste de RÈGLES
