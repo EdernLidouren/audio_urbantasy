@@ -343,6 +343,7 @@ export function parseLevel(raw, registry) {
     music,
     musicDay,
     musicNight,
+    musicLoop,
     ambiences,
     ambiencesDay,
     ambiencesNight,
@@ -428,6 +429,14 @@ export function parseLevel(raw, registry) {
   if (musicNight !== undefined && !isNonEmptyString(musicNight)) {
     fail(`musicNight doit être une chaîne non vide si présent (reçu : ${JSON.stringify(musicNight)}).`);
   }
+  // musicLoop : optionnel, booléen — voir view/audio/city-scene.js. Bascule
+  // TOUT le lieu (les deux phases) en boucle continue plutôt que
+  // l'enchaînement-avec-respiration par défaut. Simple passage validé en
+  // FORME, comme music/ambiences ci-dessus : le core ignore tout du SENS de
+  // ce drapeau (boucle vs respiration), pure donnée de contenu.
+  if (musicLoop !== undefined && typeof musicLoop !== "boolean") {
+    fail(`musicLoop doit être un booléen si présent (reçu : ${JSON.stringify(musicLoop)}).`);
+  }
   // ambiences : optionnel, tableau de 0 à AMBIENCE_CHANNEL_LIMIT chemins
   // (voir view/audio/city-scene.js, lib/audio.js playAmbiences). Même
   // passage simple, juste la forme est vérifiée ici — la limite elle-même
@@ -502,6 +511,7 @@ export function parseLevel(raw, registry) {
   if (music !== undefined) level.music = music;
   if (musicDay !== undefined) level.musicDay = musicDay;
   if (musicNight !== undefined) level.musicNight = musicNight;
+  if (musicLoop !== undefined) level.musicLoop = musicLoop;
   if (ambiences !== undefined) level.ambiences = ambiences;
   if (ambiencesDay !== undefined) level.ambiencesDay = ambiencesDay;
   if (ambiencesNight !== undefined) level.ambiencesNight = ambiencesNight;

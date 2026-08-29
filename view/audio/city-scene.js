@@ -42,11 +42,13 @@ import {
   keepAudioContextAwake,
   createPositionedSound,
   createReverbBus,
-  playGlobal,
-  crossfadeGlobal,
   playAmbiences,
   stopGlobal,
   setGlobalVolume,
+  preloadMusic,
+  startMusicSequence,
+  switchMusicSequence,
+  fadeOutMusic,
 } from "../../lib/audio.js";
 import { announce } from "../../lib/announce.js";
 import { resolveAsset, hasAsset, assetKeyMembers } from "../../lib/assets.js";
@@ -92,6 +94,19 @@ function resolveMusicForPhase(world, phase) {
   return world.music;
 }
 
+// Fonction de TIRAGE transmise à startMusicSequence/switchMusicSequence
+// (lib/audio.js) : resolveAsset EST déjà le tirage "sans répétition
+// immédiate" (voir lib/assets.js/pickFromPool, mécanisme générique de tout
+// pool) — appelée FRAÎCHEMENT à chaque morceau de la séquence (jamais
+// mémorisée ici), pour qu'un enchaînement retire vraiment un membre
+// différent du précédent quand le pool en compte plusieurs. `phase` figée
+// au moment de la CRÉATION de cette fonction (paramètre, jamais la variable
+// mutable currentPhase) : une bascule ultérieure appelle pickMusicPath à
+// nouveau avec la NOUVELLE phase, jamais en relisant un état partagé.
+function pickMusicPath(world, phase) {
+  return () => resolveAsset(resolveMusicForPhase(world, phase));
+}
+
 // STEP_DISTANCE ne concerne aucune entité (c'est le pas du joueur) : défaut
 // global lu directement. AUDIBLE_RANGE, PAN_SATURATION, INTERACT_RANGE et
 // REVERB_SEND (des entités) concernent chaque entité individuellement :
@@ -103,10 +118,15 @@ const STEP_DISTANCE = TUNING_DEFAULTS.stepDistance;
 // cooldown : son débit est borné par STEP_DISTANCE (voir stepWalker), un
 // mécanisme purement géométrique, jamais temporel.
 const MIN_STEP_INTERVAL_MS = TUNING_DEFAULTS.minStepIntervalMs;
-// Durée du fondu croisé à une bascule de phase jour/nuit (voir
-// resolveMusicForPhase, update()) — jamais utilisée à l'entrée dans une
-// scène (musique de la phase courante jouée directement, sans fondu).
-const MUSIC_CROSSFADE_MS = TUNING_DEFAULTS.musicCrossfadeMs;
+// Durée du fondu de sortie UNIVERSEL de la musique (voir
+// lib/audio.js/fadeOutMusic) — bascule de phase ET transition de lieu,
+// jamais utilisée à l'entrée dans une scène (musique de la phase courante
+// jouée directement, sans fondu).
+const MUSIC_FADE_MS = TUNING_DEFAULTS.musicFadeMs;
+// Fourchette de la pause ("respiration") entre deux morceaux — enchaînement
+// naturel ET bascule de phase (même mécanisme, voir lib/audio.js). Sans
+// effet en mode musicLoop (boucle continue).
+const MUSIC_BREATHER_RANGE = { min: TUNING_DEFAULTS.musicBreatherMinMs, max: TUNING_DEFAULTS.musicBreatherMaxMs };
 // Niveaux du modèle de volume par zones (voir volumeForDistance) : ce sont
 // des constantes de forme de courbe, pas des réglages par entité.
 const FULL_VOLUME = TUNING_DEFAULTS.fullVolume;
@@ -770,25 +790,47 @@ export function createCityAudioScene(getSession) {
     for (const member of assetKeyMembers(key)) preloadOneShot(member);
   }
 
+  // Musique : précharge TOUS les membres des pools jour ET nuit (pas
+  // seulement la phase courante, voir lib/audio.js/preloadMusic) — une
+  // bascule de phase ne doit jamais tomber sur un membre jamais amorcé.
+  // resolveMusicForPhase retombe déjà sur `music` pour la phase manquante :
+  // les deux appels ci-dessous couvrent aussi le cas rétrocompatible (un
+  // seul champ `music`, sans musicDay/musicNight — pool à un élément si un
+  // membre précis, voir lib/assets.js/assetKeyMembers).
+  for (const phase of ["day", "night"]) {
+    const musicKey = resolveMusicForPhase(world, phase);
+    if (musicKey) {
+      for (const member of assetKeyMembers(musicKey)) preloadMusic(member);
+    }
+  }
+
   // Musique et ambiances du lieu : canaux GLOBAUX non spatialisés (aucun
   // pan/filtre/réverb, voir lib/audio.js), propriété du niveau, pas d'une
   // entité — optionnels, un niveau sans champ music/ambiences ne joue
   // simplement rien sur le canal correspondant. Ambiances : jusqu'à deux
   // couches simultanées, un seul curseur de volume pour les deux.
-  // level.music/.ambiences peuvent être un pool, un membre précis, ou un
-  // chemin direct — resolveAsset() gère les trois, résolu une fois ici (pas
-  // un nouveau tirage par tick, la musique/ambiance ne se retire pas).
   //
   // Musique PAR PHASE (voir core/time.js/phaseAt, resolveMusicForPhase) :
   // à l'ENTRÉE dans une scène, on joue directement la musique de la phase
-  // COURANTE — jamais de fondu depuis le silence, voir CLAUDE.md/le prompt
-  // d'origine. currentPhase mémorise cette phase pour update() ci-dessous,
-  // seul endroit qui la refait varier (sur bascule, avec fondu).
+  // COURANTE — jamais de fondu depuis le silence (comportement historique).
+  // ENCHAÎNEMENT AVEC RESPIRATION par défaut (voir lib/audio.js/
+  // startMusicSequence) : un morceau joue une fois (loop:false), se termine,
+  // une pause aléatoire (MUSIC_BREATHER_RANGE), puis un nouveau morceau du
+  // pool démarre — sans répétition immédiate si le pool en compte plusieurs
+  // (resolveAsset). `musicLoop` (voir level/schema.md) bascule EN BOUCLE
+  // CONTINUE à la place (ex. magasin/ambiance tendue) : figé pour tout le
+  // lieu, ne varie jamais avec la phase. currentPhase mémorise la phase pour
+  // update() ci-dessous, seul endroit qui la refait varier (sur bascule,
+  // avec fondu + respiration, voir switchMusicSequence).
   let currentPhase = phaseAt(getSession().time);
-  const music = resolveMusicForPhase(world, currentPhase);
-  if (music) {
-    playGlobal("music", resolveAsset(music));
+  const musicLoop = Boolean(world.musicLoop);
+  if (resolveMusicForPhase(world, currentPhase)) {
     setGlobalVolume("music", musicVolumeFactor());
+    startMusicSequence({
+      pickPath: pickMusicPath(world, currentPhase),
+      loop: musicLoop,
+      breatherRange: MUSIC_BREATHER_RANGE,
+    });
   }
 
   const ambiences = world.ambiences;
@@ -1164,15 +1206,25 @@ export function createCityAudioScene(getSession) {
     // la phase MÉMORISÉE, on n'agit QUE sur la différence — jamais en
     // continu (phaseAt est réévalué chaque tick, mais currentPhase ne
     // change que sur un vrai changement, voir CLAUDE.md/le prompt d'origine
-    // "on agit sur la TRANSITION, pas en continu"). Fondu croisé (voir
-    // crossfadeGlobal) — jamais l'entrée en scène ci-dessus, qui joue déjà
-    // la bonne phase directement.
+    // "on agit sur la TRANSITION, pas en continu"). Fondu UNIVERSEL PUIS
+    // respiration PUIS nouvelle séquence (voir lib/audio.js/
+    // switchMusicSequence) — jamais l'entrée en scène ci-dessus, qui joue
+    // déjà la bonne phase directement. Nouvelle phase SANS musique
+    // déclarée : la précédente doit quand même s'éteindre (même fondu
+    // universel), jamais continuer à jouer indéfiniment dans la phase
+    // suivante.
     const phase = phaseAt(session.time);
     if (phase !== currentPhase) {
       currentPhase = phase;
-      const nextMusic = resolveMusicForPhase(world, currentPhase);
-      if (nextMusic) {
-        crossfadeGlobal("music", resolveAsset(nextMusic), musicVolumeFactor(), MUSIC_CROSSFADE_MS);
+      if (resolveMusicForPhase(world, currentPhase)) {
+        switchMusicSequence({
+          pickPath: pickMusicPath(world, currentPhase),
+          loop: musicLoop,
+          breatherRange: MUSIC_BREATHER_RANGE,
+          fadeMs: MUSIC_FADE_MS,
+        });
+      } else {
+        fadeOutMusic(MUSIC_FADE_MS);
       }
     }
 
@@ -1243,9 +1295,17 @@ export function createCityAudioScene(getSession) {
     }
     reverbBus.destroy();
     // Sortie RÉELLE de la scène uniquement (voir view/city-screen.js,
-    // onExit) : un menu/pause empilé par-dessus n'appelle jamais destroy(),
-    // donc n'arrête jamais musique/ambiances — seule la vraie sortie le fait.
-    stopGlobal("music");
+    // onExit/transitionThroughDoor) : un menu/pause empilé par-dessus
+    // n'appelle jamais destroy(), donc n'arrête jamais musique/ambiances —
+    // seule la vraie sortie le fait. Musique : fondu UNIVERSEL (voir
+    // lib/audio.js/fadeOutMusic), jamais une coupure sèche — la transition
+    // elle-même reste IMMÉDIATE (la scène suivante démarre tout de suite,
+    // voir transitionThroughDoor), le morceau sortant fond simplement en
+    // arrière-plan par-dessus le début de la nouvelle scène. Léger
+    // chevauchement assumé (non masqué ici) : une future transition sonore
+    // d'habillage pourrait le couvrir, non requise aujourd'hui. Ambiance :
+    // inchangée, coupure franche.
+    fadeOutMusic(MUSIC_FADE_MS);
     stopGlobal("ambience");
     if (activeScene === api) activeScene = null;
   }

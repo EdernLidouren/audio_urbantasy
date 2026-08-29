@@ -121,17 +121,20 @@ phase pour l'instant.
   continu.
 - À l'ENTRÉE dans une scène : joue directement la musique de la phase courante
   (`resolveMusicForPhase`), sans fondu — il n'y a rien dont partir.
-- À une bascule EN COURS DE JEU : fondu croisé (`lib/audio.js`/`crossfadeGlobal`,
-  distinct de `playGlobal` qui reste réservé aux transitions de lieu, franches).
-  La piste entrante démarre à 0 et monte vers son volume de croisière (facteur de
-  préférence musique déjà appliqué, voir `musicVolumeFactor`) ; la sortante
-  descend à 0 puis s'arrête/décharge — jamais de Howl fantôme après le fondu.
-  Durée réglable à l'oreille : `TUNING_DEFAULTS.musicCrossfadeMs`
-  (`config/tuning-values.js`, défaut 2000 ms).
-- Limite connue, acceptée : si la préférence de volume musique change PENDANT un
-  fondu (fenêtre de quelques secondes), l'appel direct à `setGlobalVolume`
-  interrompt l'animation Howler en cours sur la ou les pistes concernées — pas de
-  correctif dédié, cas rare et sans conséquence audible durable.
+- À une bascule EN COURS DE JEU : fondu de sortie UNIVERSEL (`lib/audio.js`/
+  `fadeOutMusic`) PUIS une respiration (même pause aléatoire que
+  l'enchaînement naturel entre deux morceaux, voir `entities/model.md` et
+  `level/schema.md`/"Musique : séquence avec respiration") PUIS démarrage de
+  la nouvelle séquence (`switchMusicSequence`) — jamais un fondu croisé avec
+  chevauchement comme avant : la sortante s'éteint, un silence s'écoule,
+  l'entrante démarre directement (sans fondu d'entrée, comme à l'ouverture
+  d'une scène). Durée du fondu réglable à l'oreille :
+  `TUNING_DEFAULTS.musicFadeMs` (`config/tuning-values.js`, défaut 2000 ms) ;
+  fourchette de respiration : `musicBreatherMinMs`/`musicBreatherMaxMs`.
+- Robuste au chevauchement (ex. bascule puis transition de lieu coup sur
+  coup) : un compteur de génération dans `lib/audio.js` invalide toute
+  respiration/enchaînement en attente d'une séquence périmée — jamais de
+  Howl fantôme, jamais deux fondus qui se disputent le canal.
 
 ## Présence conditionnelle d'entité — deuxième consommateur
 

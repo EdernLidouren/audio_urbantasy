@@ -105,14 +105,23 @@ export const TUNING_DEFAULTS = {
   // marche. Plus haut = pas plus "dans la pièce" ; plus bas = pas plus secs.
   footstepReverbSend: 0.15,
 
-  // Durée (ms) du fondu croisé musique à une bascule de phase jour/nuit
-  // (voir core/time.js/phaseAt, view/audio/city-scene.js) : la piste
-  // sortante descend à 0 puis s'arrête, l'entrante monte de 0 à son volume,
-  // sur cette même durée. Réglable à l'oreille — plus haut = transition plus
-  // douce/lente ; plus bas = bascule plus nette. Ne s'applique QU'aux
-  // bascules en cours de jeu, jamais à l'entrée dans une scène (voir
-  // resolveMusicForPhase, jouée directement, sans fondu).
-  musicCrossfadeMs: 2000,
+  // Durée (ms) du fondu de sortie UNIVERSEL de la musique (voir
+  // lib/audio.js/fadeOutMusic, view/audio/city-scene.js) : la piste en cours
+  // descend à 0 puis s'arrête, JAMAIS une coupure sèche — réutilisée par
+  // TOUT arrêt (bascule de phase jour/nuit, transition de lieu). Réglable à
+  // l'oreille — plus haut = fondu plus doux/lent ; plus bas = plus net. Ne
+  // s'applique JAMAIS à l'entrée dans une scène (voir resolveMusicForPhase,
+  // jouée directement, sans fondu).
+  musicFadeMs: 2000,
+  // Fourchette (ms) de la PAUSE ("respiration") entre deux morceaux — à la
+  // fin naturelle d'un morceau (enchaînement, voir lib/audio.js/
+  // startMusicSequence) ET après le fondu d'une bascule de phase (même
+  // mécanisme réutilisé, voir switchMusicSequence) : silence complet, tirée
+  // aléatoirement à CHAQUE respiration (l'irrégularité fait vivant, même
+  // esprit que vocalInterval/vocalIntervalVariation). Sans effet en mode
+  // musicLoop:true (boucle continue, voir level/schema.md).
+  musicBreatherMinMs: 3000,
+  musicBreatherMaxMs: 8000,
 
   // Fourchette (ms) du délai de démarrage ALÉATOIRE appliqué à toute balise
   // CONTINUE nouvellement créée dont staggerBeacon reste true (voir plus
