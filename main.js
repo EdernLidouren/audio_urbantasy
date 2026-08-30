@@ -4,9 +4,9 @@
 // de la pile), puis charge le niveau en tâche de fond.
 
 import { pushScreen, tickActive, tickFrame } from "./lib/screens.js";
-import { initInput } from "./lib/input.js";
+import { initInput, onGlobalPress } from "./lib/input.js";
 import { ensureAudioUnlocked, setMasterVolume } from "./lib/audio.js";
-import { preventMovementKeyScrolling } from "./view/input.js";
+import { MOVE_KEYS, GLOBAL_BINDINGS } from "./view/input.js";
 import { createMainMenu } from "./view/menus/main-menu.js";
 import { makeMenuScreen, configureMenuPreferences, configureMenuSounds } from "./lib/menu.js";
 import { playMenuSound } from "./view/menu-sounds.js";
@@ -42,16 +42,16 @@ console.log("Vérifs dispo : tape runMovementChecks()");
 
 // Mode DEBUG (voir config/debug.js) : PAS de menu — bascule DEPUIS LA
 // CONSOLE (window.toggleDebug, comme runMovementChecks ci-dessus) OU par la
-// combinaison Alt+D EN JEU (voir l'écouteur câblé sur gameZone plus bas,
-// après sa déclaration) — deux chemins, UNE seule fonction, jamais deux
-// logiques à maintenir. Expose la touche de debug "e" en ville (voir
-// view/city-screen.js) une fois activé.
+// combinaison Ctrl+D EN JEU (voir onGlobalPress plus bas, lib/input.js) —
+// deux chemins, UNE seule fonction, jamais deux logiques à maintenir.
+// Expose la touche de debug "e" en ville (voir view/city-screen.js) une
+// fois activé.
 function toggleDebug() {
   setDebugEnabled(!isDebugEnabled());
   console.log(`Mode debug : ${isDebugEnabled() ? "activé" : "désactivé"}`);
 }
 window.toggleDebug = toggleDebug;
-console.log("Mode debug : tape toggleDebug() ou Alt+D en jeu");
+console.log("Mode debug : tape toggleDebug() ou Ctrl+D en jeu");
 
 const gameZone = document.getElementById("game");
 
@@ -68,20 +68,23 @@ setMasterVolume(getPref("masterVolume", PREF_CONSTRAINTS.masterVolume.default) /
 
 // lib/input.js ne connaît pas l'audio : c'est ici, au point de composition,
 // qu'on branche le déverrouillage sur le tout premier appui touche.
-initInput(gameZone, { onFirstInput: ensureAudioUnlocked });
-preventMovementKeyScrolling(gameZone);
+// preventDefaultKeys (MOVE_KEYS, view/input.js) : supprime le défilement de
+// page sur les touches de mouvement, à chaque appui (répétitions OS
+// incluses) — lib/input.js reste l'UNIQUE écouteur DOM, cette liste lui est
+// simplement fournie, jamais devinée.
+initInput(gameZone, { onFirstInput: ensureAudioUnlocked, preventDefaultKeys: MOVE_KEYS });
 
-// Alt+D : bascule le mode debug SANS passer par la console (voir
-// toggleDebug ci-dessus) — écouteur INDÉPENDANT de la pile d'écrans (même
-// principe que preventMovementKeyScrolling), pour rester disponible quel
+// Ctrl+D : bascule le mode debug SANS passer par la console (voir
+// toggleDebug ci-dessus) — binding GLOBAL (lib/input.js/onGlobalPress),
+// résolu INDÉPENDAMMENT de la pile d'écrans, pour rester disponible quel
 // que soit l'écran actif (menu, pause, ville...), jamais routé par
-// lib/screens.js. preventDefault : Alt+D est intercepté par certains
-// navigateurs (ex. focus de la barre d'adresse sur Firefox) sans lui.
-gameZone.addEventListener("keydown", (event) => {
-  if (event.altKey && (event.key === "d" || event.key === "D")) {
-    event.preventDefault();
-    toggleDebug();
-  }
+// lib/screens.js. preventDefault déjà géré par lib/input.js pour tout
+// binding global (Ctrl+D est intercepté par certains navigateurs — ex.
+// ajout aux favoris — sans lui). Ctrl plutôt qu'Alt (voir view/input.js/
+// GLOBAL_BINDINGS) : Alt seul déplace le focus vers la barre de menus sur
+// certains navigateurs, gênant même une fois la combinaison interceptée.
+onGlobalPress(GLOBAL_BINDINGS, (action) => {
+  if (action === "toggleDebug") toggleDebug();
 });
 
 gameZone.focus();

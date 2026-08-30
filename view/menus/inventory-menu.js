@@ -20,6 +20,35 @@ import { makeMenuScreen } from "../../lib/menu.js";
 import { announce } from "../../lib/announce.js";
 import { playMenuSound } from "../menu-sounds.js";
 import { ITEM_REGISTRY } from "../../core/items.js";
+import { resolveAction, checkBindingsForCollisions } from "../../lib/input.js";
+
+// Bindings du sélecteur de quantité (voir openQuantitySelector plus bas) —
+// aucun -> ±1, Shift -> ±10, Ctrl -> ±100 (convention établie), chacun une
+// action DISTINCTE (mods exige une correspondance EXACTE, voir
+// lib/input.js) plutôt qu'un magnitude lue sur l'évènement.
+const QUANTITY_BINDINGS = {
+  decrease: { keys: ["ArrowLeft"], mods: [] },
+  decreaseBig: { keys: ["ArrowLeft"], mods: ["shift"] },
+  decreaseBigger: { keys: ["ArrowLeft"], mods: ["ctrl"] },
+  increase: { keys: ["ArrowRight"], mods: [] },
+  increaseBig: { keys: ["ArrowRight"], mods: ["shift"] },
+  increaseBigger: { keys: ["ArrowRight"], mods: ["ctrl"] },
+  confirm: { keys: ["Enter", " "], mods: [] },
+  cancel: { keys: ["Escape"], mods: [] },
+};
+checkBindingsForCollisions(QUANTITY_BINDINGS, "view/menus/inventory-menu.js QUANTITY_BINDINGS");
+
+// Amplitude signée de chaque action d'ajustement — un seul endroit à lire
+// pour connaître le pas d'une action donnée, jamais dupliqué dans
+// openQuantitySelector.
+const QUANTITY_STEP_BY_ACTION = {
+  decrease: -1,
+  decreaseBig: -10,
+  decreaseBigger: -100,
+  increase: 1,
+  increaseBig: 10,
+  increaseBigger: 100,
+};
 
 // (type, count) => void — applique l'effet d'ÉTAT du "Poser" (retrait du
 // sac + apparition au sol, voir core/bag.js/dropItem), fourni par
@@ -179,8 +208,13 @@ function confirmDrop(scene, getSession, entry, itemLabelKey) {
 //   - le slider existant ne connaît qu'UN SEUL palier d'incrément (Ctrl ->
 //     bigStep) ; ce sélecteur en veut TROIS (aucun -> ±1, Shift -> ±10,
 //     Ctrl -> ±100).
-// lib/menu.js reste donc INTACT (hors frontière de cette tâche). L'imitation
-// reste volontairement fidèle à l'esprit d'un slider pour une expérience
+// La mécanique de SLIDER de lib/menu.js reste donc inutilisée ici (ces deux
+// raisons tiennent indépendamment de la refonte du moteur d'entrée — voir
+// lib/input.js — qui a, elle, migré ce fichier vers des bindings résolus).
+// Ctrl+Shift+flèche à la fois : mods exige une correspondance EXACTE (voir
+// lib/input.js), donc AUCUNE action ne résout pour cette combinaison —
+// jamais rencontré en pratique, accepté tel quel. L'imitation reste
+// volontairement fidèle à l'esprit d'un slider pour une expérience
 // cohérente : annonce de la SEULE valeur à chaque ajustement (comme
 // lib/menu.js/adjustSlider), bornée [1, max], son "select" à la validation
 // (lib/menu.js le joue automatiquement pour une entrée "action" via
@@ -195,15 +229,6 @@ function openQuantitySelector(scene, getSession, entry, itemLabelKey, max) {
     return Math.min(Math.max(value, 1), max);
   }
 
-  // aucun -> ±1, Shift -> ±10, Ctrl -> ±100 (convention établie, voir header
-  // du module) — Ctrl prioritaire si les deux sont enfoncés à la fois (cas
-  // limite jamais rencontré en pratique, choix arbitraire mais nécessaire).
-  function stepFor(event) {
-    if (event.ctrlKey) return 100;
-    if (event.shiftKey) return 10;
-    return 1;
-  }
-
   function adjust(delta) {
     quantity = clampQuantity(quantity + delta);
     // Valeur SEULE, jamais le label : retour immédiat à un ajustement,
@@ -213,20 +238,19 @@ function openQuantitySelector(scene, getSession, entry, itemLabelKey, max) {
 
   const screen = {
     onKeyDown(event) {
-      if (event.key === "ArrowLeft") {
+      const action = resolveAction(QUANTITY_BINDINGS, event.key, event.mods);
+
+      if (action in QUANTITY_STEP_BY_ACTION) {
         event.preventDefault();
-        adjust(-stepFor(event));
-      } else if (event.key === "ArrowRight") {
-        event.preventDefault();
-        adjust(stepFor(event));
-      } else if (event.key === "Enter" || event.key === " ") {
+        adjust(QUANTITY_STEP_BY_ACTION[action]);
+      } else if (action === "confirm") {
         event.preventDefault();
         playMenuSound("select");
         // Trois niveaux au-dessus de la liste à ce stade (sélecteur,
         // menu d'actions) plus la liste elle-même — voir popCount
         // d'executeDrop.
         executeDrop(scene, getSession, entry, itemLabelKey, quantity, 3);
-      } else if (event.key === "Escape") {
+      } else if (action === "cancel") {
         event.preventDefault();
         popScreen();
       }

@@ -321,10 +321,11 @@ l'activation — ex. `crate-stash` (`level/demo2.json`), une caisse dont le
 
 `config/debug.js` : un drapeau global minimal, désactivé par défaut,
 activable depuis la console (`window.toggleDebug()`, voir `main.js`, même
-patron que `window.runMovementChecks`) OU par la combinaison **Alt+D** en
-jeu (même fonction, deux chemins d'accès — voir l'écouteur câblé sur
-`gameZone` dans `main.js`, indépendant de la pile d'écrans, disponible quel
-que soit l'écran actif) — jamais un menu, jamais persisté (un mode debug ne doit jamais survivre à un rechargement de
+patron que `window.runMovementChecks`) OU par la combinaison **Ctrl+D** en
+jeu (même fonction, deux chemins d'accès — voir `lib/input.js`/
+`onGlobalPress`, binding GLOBAL résolu indépendamment de la pile d'écrans,
+disponible quel que soit l'écran actif — Ctrl plutôt qu'Alt, qui déplace le
+focus vers la barre de menus sur certains navigateurs) — jamais un menu, jamais persisté (un mode debug ne doit jamais survivre à un rechargement de
 page ni à une sauvegarde, contrairement à `config/preferences.js`). Seul
 consommateur aujourd'hui : la touche "e" en ville (`view/city-screen.js`),
 qui fait apparaître une pièce éphémère (`spec` = archétype `money` existant,
@@ -332,10 +333,14 @@ qui fait apparaître une pièce éphémère (`spec` = archétype `money` existan
 active SEULEMENT si le drapeau est levé, sinon "e" ne fait RIEN (comportement
 inchangé pour tout joueur qui n'a jamais activé le mode). PAS "d" (touche
 suggérée à l'origine) : déjà liée au déplacement à droite (`view/input.js`,
-`RIGHT_KEYS`, convention ZQSD) — la réutiliser aurait fait apparaître une
-pièce à chaque premier appui d'un pas vers la droite en mode debug, jamais
-l'intention voulue. Infra volontairement minimale : d'autres outils de debug
-s'y grefferont plus tard derrière le MÊME drapeau, jamais un par outil.
+`MOVE_BINDINGS.moveRight`, convention ZQSD) — la réutiliser aurait fait
+apparaître une pièce à chaque premier appui d'un pas vers la droite en mode
+debug si les deux touches menaient à la même action ; elles cohabitent
+désormais SANS ambiguïté grâce à l'arbitrage des modificateurs de
+`lib/input.js` ("d" seul = mouvement, "d"+Ctrl = bascule debug, "e" = ce
+spawn de test), mais le choix de "e" reste inchangé, plus clair à retenir.
+Infra volontairement minimale : d'autres outils de debug s'y grefferont plus
+tard derrière le MÊME drapeau, jamais un par outil.
 
 ## Sac d'objets
 

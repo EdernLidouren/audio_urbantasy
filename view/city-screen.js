@@ -3,7 +3,8 @@
 // partie en propre — vue sur la session (état du core), lue/écrite via les
 // accesseurs fournis par main.js.
 
-import { getMoveIntent } from "./input.js";
+import { getMoveIntent, CITY_BINDINGS } from "./input.js";
+import { resolveAction } from "../lib/input.js";
 import { announce } from "../lib/announce.js";
 import { t } from "../i18n/index.js";
 import { ensureAudioUnlocked } from "../lib/audio.js";
@@ -324,77 +325,84 @@ export function makeCityScreen(getSession, setSession) {
       const minutes = (deltaMs / 1000) * (TIME_CONFIG.timeScale / TIME_CONFIG.minutesPerHour);
       setSession(advanceTime(getSession(), minutes));
     },
-    // Espace/Entrée : touches discrètes (screens.js ne route que la touche
-    // non répétée), pas de souci d'auto-interruption ici. N'agit que quand
-    // la ville est au sommet de la pile : le stack routing s'en charge par
-    // construction (voir CLAUDE.md), aucune vérification à faire ici.
+    // Discrète (screens.js ne route que la touche non répétée), pas de
+    // souci d'auto-interruption ici. N'agit que quand la ville est au
+    // sommet de la pile : le stack routing s'en charge par construction
+    // (voir CLAUDE.md), aucune vérification à faire ici. Résout SA PROPRE
+    // table (CITY_BINDINGS, view/input.js) via lib/input.js/resolveAction —
+    // plus aucune comparaison directe à event.key ici (voir lib/input.js
+    // pour l'arbitrage des modificateurs).
     onKeyDown(event) {
       // Même garde qu'onTick : aucune interaction possible pendant la brève
       // fenêtre où scene est null (transition par porte en cours).
       if (!scene) return;
 
-      if (event.key === "Escape") {
+      const action = resolveAction(CITY_BINDINGS, event.key, event.mods);
+
+      if (action === "pauseMenu") {
         event.preventDefault();
         openPauseMenu(scene, getSession);
         return;
       }
 
-      // "t" discrète : outil de vérification de l'horloge (voir
+      // "announceTime" : outil de vérification de l'horloge (voir
       // announceGameTime plus haut, core/time.md) — aucune règle de jeu ne
       // consomme encore le temps, seule cette annonce le lit.
-      if (event.key === "t" || event.key === "T") {
+      if (action === "announceTime") {
         announceGameTime(getSession());
         return;
       }
 
-      // "g" (gold) discrète : consultation pure de l'argent courant — même
-      // statut que "t", aucune action, juste une lecture d'état annoncée.
-      if (event.key === "g" || event.key === "G") {
+      // "announceMoney" : consultation pure de l'argent courant — même
+      // statut que announceTime, aucune action, juste une lecture d'état
+      // annoncée.
+      if (action === "announceMoney") {
         announceMoney(getSession());
         return;
       }
 
-      // "i" (inventaire) discrète : ouvre le menu du sac (voir
+      // "openInventory" : ouvre le menu du sac (voir
       // view/menus/inventory-menu.js) — met le jeu en PAUSE comme tout
       // écran-menu (mécanisme de la pile, aucun code dédié ici, voir
-      // lib/screens.js). Même patron que Escape/openPauseMenu ci-dessus.
-      if (event.key === "i" || event.key === "I") {
+      // lib/screens.js). Même patron que pauseMenu ci-dessus.
+      if (action === "openInventory") {
         openInventoryMenu(scene, getSession);
         return;
       }
 
-      // "x" discrète, MODE DEBUG UNIQUEMENT (voir config/debug.js, même
-      // garde que "e") : consultation pure de la position du joueur — un
-      // outil de diagnostic, pas une info destinée au joueur normal,
-      // contrairement à "t"/"g". En mode normal, "x" ne fait RIEN —
-      // comportement inchangé pour tout joueur qui n'a jamais activé le
-      // mode debug.
-      if ((event.key === "x" || event.key === "X") && isDebugEnabled()) {
+      // "debugPosition", MODE DEBUG UNIQUEMENT (voir config/debug.js, même
+      // garde que debugSpawn) : consultation pure de la position du joueur —
+      // un outil de diagnostic, pas une info destinée au joueur normal,
+      // contrairement à announceTime/announceMoney. En mode normal, ne fait
+      // RIEN — comportement inchangé pour tout joueur qui n'a jamais activé
+      // le mode debug.
+      if (action === "debugPosition" && isDebugEnabled()) {
         announcePlayerX(getSession());
         return;
       }
 
-      // "e" (éphémère), MODE DEBUG UNIQUEMENT (voir config/debug.js) : fait
+      // "debugSpawn", MODE DEBUG UNIQUEMENT (voir config/debug.js) : fait
       // apparaître une pièce éphémère de test à la position du joueur —
       // éprouve le cycle de vie complet (ramassable, jamais sauvegardée,
-      // purgée si non ramassée au départ de la scène). PAS "d" (touche
-      // suggérée à l'origine) : déjà liée au déplacement à droite (voir
-      // view/input.js, RIGHT_KEYS ZQSD) — la réutiliser aurait fait
-      // apparaître une pièce à CHAQUE premier appui d'un pas vers la
-      // droite en mode debug, jamais l'intention. En mode normal (debug
-      // désactivé), "e" ne fait RIEN — comportement inchangé pour tout
-      // joueur qui ne l'a jamais activé.
-      if ((event.key === "e" || event.key === "E") && isDebugEnabled()) {
+      // purgée si non ramassée au départ de la scène). Liée à "e", PAS "d"
+      // (déjà liée au déplacement à droite, voir view/input.js/
+      // MOVE_BINDINGS) : les deux cohabitent SANS ambiguïté désormais (voir
+      // lib/input.js) — "d" seul reste le mouvement, "d"+Ctrl reste
+      // toggleDebug, "e" reste ce spawn de test. En mode normal (debug
+      // désactivé), ne fait RIEN — comportement inchangé pour tout joueur
+      // qui ne l'a jamais activé.
+      if (action === "debugSpawn" && isDebugEnabled()) {
         setSession(spawnEphemeral(getSession(), EPHEMERAL_COIN_SPEC, getSession().player.x));
         return;
       }
 
-      if (event.key !== " " && event.key !== "Enter") return;
+      if (action !== "interactDescribe" && action !== "interactActivate") return;
 
-      // Surtout pour Espace : sans ça, la page défilerait.
+      // Surtout pour interactDescribe (Espace) : sans ça, la page
+      // défilerait.
       event.preventDefault();
 
-      const kind = event.key === " " ? "describe" : "activate";
+      const kind = action === "interactDescribe" ? "describe" : "activate";
       // scene passé pour la pause/reprise sélective des balises pendant un
       // éventuel menu de désambiguïsation (2+ candidats) — voir
       // chooseInteractionTarget. getInteractionCandidates(kind) filtre déjà
