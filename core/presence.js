@@ -54,6 +54,7 @@
 // transporte.
 
 import { hourOfDay } from "./time.js";
+import { equippedTags } from "./equipment.js";
 
 // "timeRange" : présente si l'heure courante (dérivée de context.time) tombe
 // dans [from, to[, EN GÉRANT le passage par minuit (from > to, ex. 20..6) —
@@ -113,14 +114,34 @@ function evaluateConsumed(cond, context) {
   return Boolean(context.entity && context.entity.consumed);
 }
 
+// "hasEquipmentTag" : vraie si L'ENTITÉ ÉVALUÉE (context.entity) porte, dans
+// son PROPRE équipement, un objet marqué de ce tag — voir
+// core/equipment.js/equippedTags, qui fait déjà tout le travail d'union et
+// ignore le type de porteur. Entité sans champ `equipment` (tout contenu
+// actuel : seule session.equipment, côté joueur, en porte un aujourd'hui,
+// voir core/state.js) -> false, jamais une exception — même repli défensif
+// que evaluateArrived/evaluateConsumed ci-dessus. cond.tag est validé contre
+// TAG_REGISTRY au chargement (voir core/level.js), jamais ici (cet
+// évaluateur ne fait que LIRE une clé déjà garantie valide).
+function evaluateHasEquipmentTag(cond, context) {
+  const equipment = context.entity && context.entity.equipment;
+  return Boolean(equipment && equippedTags(equipment).has(cond.tag));
+}
+
 // Registre des évaluateurs par type — SEUL endroit qui connaît les types de
 // condition. core/level.js valide `when.type` au chargement contre les clés
 // de CE MÊME registre (CONDITION_TYPES ci-dessous) : ajouter un type ici le
 // rend automatiquement acceptable en contenu, sans dupliquer la liste.
+// "hasEquipmentTag" cohabite avec "timeRange"/"arrived"/"consumed" comme un
+// cas de plus, pas un système de vérification séparé — la seule différence
+// est que core/level.js valide EN PLUS son champ `tag` contre TAG_REGISTRY
+// (voir core/level.js/parsePresenceRule), une garantie que timeRange/arrived/
+// consumed n'ont pas besoin d'une clé de contenu externe à valider.
 const CONDITION_EVALUATORS = {
   timeRange: evaluateTimeRange,
   arrived: evaluateArrived,
   consumed: evaluateConsumed,
+  hasEquipmentTag: evaluateHasEquipmentTag,
 };
 
 export const CONDITION_TYPES = Object.keys(CONDITION_EVALUATORS);

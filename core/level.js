@@ -11,6 +11,7 @@ import { BODY_RADIUS } from "./state.js";
 import BEHAVIORS from "./behaviors/index.js";
 import { SURFACE_REGISTRY, DEFAULT_SURFACE } from "./surfaces.js";
 import { CONDITION_TYPES } from "./presence.js";
+import { TAG_REGISTRY } from "./tags.js";
 
 function fail(message) {
   throw new Error(`parseLevel: ${message}`);
@@ -72,6 +73,16 @@ function parsePresenceRule(rawRule, ruleIndex, index, id) {
   }
   if (!CONDITION_TYPES.includes(when.type)) {
     fail(`entities[${index}] ("${id}") : presence[${ruleIndex}].when.type "${when.type}" absent du registre de conditions.`);
+  }
+  // "hasEquipmentTag" : EN PLUS de son type (déjà validé ci-dessus), son
+  // champ `tag` référence un tag de contenu (core/tags.js/TAG_REGISTRY) —
+  // même traitement qu'une surface de segment (voir parseSegment plus bas) :
+  // une faute de frappe ici échouerait SILENCIEUSEMENT à l'évaluation
+  // (core/presence.js/evaluateHasEquipmentTag replie sur false pour un tag
+  // absent), donc elle est refusée ICI, au chargement, plutôt que de laisser
+  // une règle de contenu ne jamais se déclencher sans qu'on sache pourquoi.
+  if (when.type === "hasEquipmentTag" && (!isNonEmptyString(when.tag) || !TAG_REGISTRY[when.tag])) {
+    fail(`entities[${index}] ("${id}") : presence[${ruleIndex}].when.tag "${when.tag}" absent du registre de tags.`);
   }
 
   if (effects !== undefined) {

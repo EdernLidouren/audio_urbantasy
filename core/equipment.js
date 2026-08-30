@@ -20,7 +20,7 @@
 // `slot` de l'objet concerné.
 
 import { addItem, removeItem } from "./bag.js";
-import { ITEM_REGISTRY } from "./items.js";
+import { ITEM_REGISTRY, itemProps } from "./items.js";
 
 export const EQUIPMENT_SLOTS = ["feet"];
 
@@ -73,4 +73,22 @@ export function unequipItem(session, slot) {
 
   const withItemBack = addItem(session, current.type, 1);
   return { ...withItemBack, equipment: { ...withItemBack.equipment, [slot]: null } };
+}
+
+// Tags EFFECTIVEMENT portés — union des tags (core/items.js/ITEM_REGISTRY)
+// de CHAQUE objet équipé, DÉRIVÉE, jamais stockée (même principe que
+// gaitOf ci-dessus). UNIFIÉ joueur/compagnon/PNJ : cette fonction ignore
+// tout du TYPE de porteur, elle ne connaît que la FORME `equipment` ({
+// <slot>: <entrée>|null, ... }) — un futur compagnon/PNJ équipé
+// l'utiliserait EXACTEMENT comme le joueur (equippedTags(entity.equipment)),
+// aucun cas spécial à écrire. Slot vide ou type sans tags -> ignoré, jamais
+// une exception (même repli défensif que gaitOf).
+export function equippedTags(equipment) {
+  const tags = new Set();
+  for (const occupant of Object.values(equipment)) {
+    if (!occupant) continue;
+    const props = itemProps(occupant.type);
+    for (const tag of (props && props.tags) || []) tags.add(tag);
+  }
+  return tags;
 }

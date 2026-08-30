@@ -146,8 +146,12 @@ RACCOURCI rétrocompatible `{ when: <condition>, present: boolean }` (sans
 plus que la forme canonique. `when.type` doit exister dans le registre de
 conditions (`core/presence.js`, `CONDITION_EVALUATORS`) — **échec clair si
 inconnu**, comme un type d'entité. Les champs PROPRES à un type de condition
-(ex. `from`/`to` de `"timeRange"`) ne sont PAS validés par `parseLevel` :
-ajouter un nouveau type de condition ne doit jamais obliger à revenir ici.
+(ex. `from`/`to` de `"timeRange"`) ne sont EN GÉNÉRAL PAS validés par
+`parseLevel` : ajouter un nouveau type de condition ne doit jamais obliger à
+revenir ici. SEULE EXCEPTION : `"hasEquipmentTag"`, dont le champ `tag`
+référence du contenu externe (`core/tags.js`/`TAG_REGISTRY`) — validé au
+chargement comme une surface de segment, une faute de frappe y échoue donc
+clairement plutôt que de dégrader silencieusement vers "jamais vraie".
 Voir `entities/model.md`/"Présence conditionnelle et triggers de
 comportement" pour la sémantique complète (priorité entre règles, les trois
 plans coupés par l'état dormant, la garde anti-boucle des effets
@@ -158,6 +162,7 @@ plans coupés par l'état dormant, la garde anti-boucle des effets
 | `timeRange` | `from`, `to` (heures 0-23) | l'heure courante (dérivée de `session.time`, voir `core/time.js`) tombe dans `[from, to[`, en gérant le passage par minuit (`from > to`, ex. `20..6`) |
 | `arrived`   | (aucun)       | le comportement actif de l'entité est encore `"goto"` ET a atteint sa cible (`entity.gotoArrived`) |
 | `consumed`  | (aucun)       | l'entité porte `consumed: true` (voir `core/state.js`/`markConsumed`, "Collectible persistant" plus bas) — PERMANENT, `consumed` ne repasse jamais à `false` |
+| `hasEquipmentTag` | `tag` (clé de `core/tags.js`/`TAG_REGISTRY`, validée au chargement) | l'entité évaluée porte, dans son PROPRE équipement (`context.entity.equipment`), un objet marqué de ce tag (voir `core/equipment.js`/`equippedTags`) — entité sans `equipment` -> jamais vraie |
 
 Un `Effect` : `{ type: "presence", present: boolean }` ou `{ type:
 "behavior", behavior: <objet behavior, même forme que le champ `behavior`

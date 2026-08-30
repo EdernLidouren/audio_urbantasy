@@ -23,8 +23,9 @@ import { moveAndBounce } from "./physics/movement.js";
 import { SAVE_VERSION, serializeGame, deserializeGame } from "./save.js";
 import { addMoney, pickupEntity, lootEntity, lootEntitySpawn } from "./money.js";
 import { addItem, pickupItemEntity, removeItem, dropItem } from "./bag.js";
-import { ITEM_REGISTRY, itemProps } from "./items.js";
-import { EQUIPMENT_SLOTS, createEmptyEquipment, gaitOf, equipItem, unequipItem } from "./equipment.js";
+import { ITEM_REGISTRY, itemProps, validateItemTags } from "./items.js";
+import { EQUIPMENT_SLOTS, createEmptyEquipment, gaitOf, equipItem, unequipItem, equippedTags } from "./equipment.js";
+import { TAG_REGISTRY, tagProps } from "./tags.js";
 import { createSeed } from "./rng.js";
 import { MAX_COMPANIONS } from "../config/companions.js";
 import { MAX_EPHEMERALS } from "../config/ephemerals.js";
@@ -2652,6 +2653,139 @@ export function runMovementChecks() {
     false,
     afterEquipBoots.bag.some((entry) => entry.type === afterEquipBoots.equipment.feet.type)
   );
+
+  // --- Tags d'objets (core/tags.js, core/items.js/ITEM_REGISTRY.tags,
+  // core/equipment.js/equippedTags, condition "hasEquipmentTag") ---
+
+  run("tags : registre — military a la bonne clé i18n", "tag.military", tagProps("military").labelKey);
+  run("tags : registre — clé inconnue -> undefined", undefined, tagProps("does-not-exist"));
+  run("tags : registre — tagProps délègue à TAG_REGISTRY", TAG_REGISTRY.military, tagProps("military"));
+  run("tags : ITEM_REGISTRY — les rangers portent le tag military", true, ITEM_REGISTRY.combat_boots.tags.includes("military"));
+
+  // validateItemTags : même filet que la validation des surfaces contre
+  // SURFACE_REGISTRY — un tag inconnu échoue clairement, jamais un mismatch
+  // silencieux. ITEM_REGISTRY lui-même a déjà passé ce filet au chargement
+  // de core/items.js (sinon ce fichier n'aurait jamais fini de s'importer) ;
+  // testé ICI contre un registre de test pour prouver l'échec SANS corrompre
+  // le vrai registre.
+  let unknownItemTagThrew = false;
+  try {
+    validateItemTags({ fake_item: { stackable: false, tags: ["does-not-exist"] } });
+  } catch {
+    unknownItemTagThrew = true;
+  }
+  run("tags : validateItemTags — tag inconnu sur un objet -> échec clair", true, unknownItemTagThrew);
+  run(
+    "tags : validateItemTags — tags valides ou absents -> aucune erreur",
+    true,
+    (() => {
+      try {
+        validateItemTags({ a: { stackable: false, tags: ["military"] }, b: { stackable: false } });
+        return true;
+      } catch {
+        return false;
+      }
+    })()
+  );
+
+  // equippedTags : UNIFIÉ — même fonction pour le joueur (session.equipment)
+  // qu'un compagnon/PNJ hypothétique (n'importe quel objet de même forme),
+  // aucun cas spécial par type de porteur.
+  run("tags : equippedTags — slot vide -> aucun tag", 0, equippedTags({ feet: null }).size);
+  run("tags : equippedTags — objet sans tags (baskets) -> aucun tag", 0, equippedTags({ feet: { type: "sneakers" } }).size);
+  run("tags : equippedTags — objet tagué (rangers) -> tag présent", true, equippedTags({ feet: { type: "combat_boots" } }).has("military"));
+  const fakeNpcEquipment = { feet: { type: "combat_boots" } };
+  run(
+    "tags : equippedTags — même résultat pour un porteur quelconque (compagnon/PNJ simulé)",
+    true,
+    equippedTags(fakeNpcEquipment).has("military")
+  );
+
+  // Dérivé, jamais stocké : équiper/déséquiper fait apparaître/disparaître
+  // le tag IMMÉDIATEMENT, sans code de synchro (même vérification que
+  // gaitOf plus haut). freshEquipState.bag[0] est déjà les rangers de départ
+  // (voir le test "rangers DANS LE SAC" plus haut).
+  const afterEquipRangers = equipItem(freshEquipState, "combat_boots");
+  run("tags : equippedTags — absent avant d'équiper les rangers", false, equippedTags(freshEquipState.equipment).has("military"));
+  run("tags : equippedTags — présent dès l'équipement des rangers", true, equippedTags(afterEquipRangers.equipment).has("military"));
+  const afterUnequipRangers = unequipItem(afterEquipRangers, "feet");
+  run("tags : equippedTags — de nouveau absent après déséquipement", false, equippedTags(afterUnequipRangers.equipment).has("military"));
+
+  // Condition "hasEquipmentTag" — branchée dans l'aiguillage existant
+  // (evaluateCondition), lit context.entity.equipment via equippedTags.
+  run(
+    "tags : hasEquipmentTag — entité équipée du tag -> vraie",
+    true,
+    evaluateCondition({ type: "hasEquipmentTag", tag: "military" }, { entity: { equipment: { feet: { type: "combat_boots" } } } })
+  );
+  run(
+    "tags : hasEquipmentTag — entité équipée d'un autre objet (sans le tag) -> fausse",
+    false,
+    evaluateCondition({ type: "hasEquipmentTag", tag: "military" }, { entity: { equipment: { feet: { type: "sneakers" } } } })
+  );
+  run(
+    "tags : hasEquipmentTag — entité sans champ equipment -> fausse (jamais une exception)",
+    false,
+    evaluateCondition({ type: "hasEquipmentTag", tag: "military" }, { entity: {} })
+  );
+  run(
+    "tags : hasEquipmentTag — aucune entité dans le contexte -> fausse",
+    false,
+    evaluateCondition({ type: "hasEquipmentTag", tag: "military" }, {})
+  );
+
+  // Validation au chargement (core/level.js/parsePresenceRule) : un tag de
+  // condition inconnu échoue clairement, même principe que la surface d'un
+  // segment (voir plus bas, "surfaces").
+  const TAG_TRIGGER_REGISTRY = { dog: { label: "entity.dog" } };
+  let validTagConditionAccepted = false;
+  try {
+    parseLevel(
+      {
+        id: "movement-check-tags-valid",
+        titleKey: "level.demo.title",
+        length: 10,
+        playerStart: 0,
+        entities: [
+          {
+            id: "tag-rule-ok",
+            type: "dog",
+            x: 5,
+            presence: [{ when: { type: "hasEquipmentTag", tag: "military" }, present: true }],
+          },
+        ],
+      },
+      TAG_TRIGGER_REGISTRY
+    );
+    validTagConditionAccepted = true;
+  } catch {
+    validTagConditionAccepted = false;
+  }
+  run("tags : hasEquipmentTag avec un tag valide -> chargé sans erreur", true, validTagConditionAccepted);
+
+  let unknownTagConditionThrew = false;
+  try {
+    parseLevel(
+      {
+        id: "movement-check-tags-invalid",
+        titleKey: "level.demo.title",
+        length: 10,
+        playerStart: 0,
+        entities: [
+          {
+            id: "tag-rule-bad",
+            type: "dog",
+            x: 5,
+            presence: [{ when: { type: "hasEquipmentTag", tag: "does-not-exist" }, present: true }],
+          },
+        ],
+      },
+      TAG_TRIGGER_REGISTRY
+    );
+  } catch {
+    unknownTagConditionThrew = true;
+  }
+  run("tags : hasEquipmentTag avec un tag inconnu -> échec clair au chargement", true, unknownTagConditionThrew);
 
   // --- Collectible persistant (core/state.js/markConsumed, core/money.js/lootEntity) ---
   // Contrairement à removeEntity/pickupEntity ci-dessus, l'entité looté

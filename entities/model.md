@@ -418,6 +418,31 @@ l'écriture du slot).
   objet et gait). `combat_boots` fait partie du contenu de départ du sac
   (voir `core/state.js`/`createInitialState`), pas équipées — de quoi
   tester l'échange sans avoir à en ramasser une paire en jeu.
+- **Tags d'objets** (`core/tags.js`/`TAG_REGISTRY`, `core/items.js`/
+  `ITEM_REGISTRY[type].tags`) — classification HORIZONTALE d'un objet (ex.
+  `combat_boots` porte `["military"]`), indépendante de `equippable`/`slot`/
+  `gait` : un mot-étiquette pour de futures vérifications de contenu (PNJ,
+  événements), pas un mécanisme de gameplay en soi. Un tag est un
+  IDENTIFIANT STABLE (la clé du registre), traduit SEULEMENT à l'affichage
+  via `labelKey` — jamais le texte traduit dans une vérification, qui
+  cesserait de matcher au changement de langue. `TAG_REGISTRY` est la SOURCE
+  DE VÉRITÉ : un tag référencé par un objet absent de ce registre échoue au
+  chargement (`core/items.js`/`validateItemTags`, appelée sur
+  `ITEM_REGISTRY` lui-même), même principe que les surfaces contre
+  `SURFACE_REGISTRY`.
+- **Tags EFFECTIVEMENT portés — DÉRIVÉ, jamais stocké**
+  (`core/equipment.js`/`equippedTags`) : union des tags de chaque objet
+  ÉQUIPÉ, même principe que `gaitOf` juste en dessous. UNIFIÉ
+  joueur/compagnon/PNJ — la fonction ne connaît que la FORME `equipment`
+  (`{ <slot>: <entrée>|null }`), jamais le type de porteur ;
+  `equippedTags(session.equipment)` pour le joueur,
+  `equippedTags(entity.equipment)` pour tout futur compagnon/PNJ équipé,
+  aucun cas spécial. Condition `hasEquipmentTag` (voir "Présence
+  conditionnelle" plus bas) : un cas de plus dans l'aiguillage de
+  `core/presence.js`, vraie si `context.entity.equipment` porte le tag
+  demandé — son champ `tag` est validé contre `TAG_REGISTRY` au chargement
+  (`core/level.js`), comme `when.type` l'est déjà contre le registre de
+  conditions.
 - **Gait DU JOUEUR — DÉRIVÉ, jamais stocké** (`core/equipment.js`/`gaitOf`) :
   contrairement à une ENTITÉ (`gait` figé dans son archétype/instance, voir
   "Surfaces de sol et son de pas" plus bas), le gait du joueur n'est écrit
@@ -492,15 +517,20 @@ croisé musique jour/nuit) ; le SON qui l'accompagne, lui, existe déjà — voi
 
 `when.type` est un AIGUILLAGE tenu par `core/presence.js`/
 `CONDITION_EVALUATORS` : `"timeRange"` (dérivé de l'horloge, voir
-`core/time.js`) et `"arrived"` (dérivé d'un FAIT de simulation — voir
-"Triggers de comportement" plus bas) cohabitent, tous deux réduits à
-"condition + contexte -> booléen". Ajouter `"season"`/`"weather"`/
-`"questFlag"` demain se fait en ajoutant une entrée à ce registre, jamais en
-touchant `isPresent`, `resolveEntityRules`, `core/reduce.js`, ni la vue.
-`core/level.js` valide `when.type` au chargement contre ce même registre
-(échec clair sur un type inconnu), mais jamais les champs PROPRES à un type
-(ex. `from`/`to` de `"timeRange"`) — ça reste à la charge de l'évaluateur
-correspondant.
+`core/time.js`), `"arrived"` (dérivé d'un FAIT de simulation — voir
+"Triggers de comportement" plus bas) et `"hasEquipmentTag"` (voir "Tags
+d'objets" plus haut) cohabitent, tous réduits à "condition + contexte ->
+booléen". Ajouter `"season"`/`"weather"`/`"questFlag"` demain se fait en
+ajoutant une entrée à ce registre, jamais en touchant `isPresent`,
+`resolveEntityRules`, `core/reduce.js`, ni la vue. `core/level.js` valide
+`when.type` au chargement contre ce même registre (échec clair sur un type
+inconnu) ; les champs PROPRES à un type (ex. `from`/`to` de `"timeRange"`)
+restent en général à la charge de l'évaluateur correspondant (dégradation
+silencieuse, jamais une exception) — SEULE EXCEPTION, `"hasEquipmentTag"` :
+son champ `tag` référence du CONTENU externe (`core/tags.js`/
+`TAG_REGISTRY`), une faute de frappe y est donc validée au chargement comme
+une surface de segment, plutôt que de dégrader silencieusement vers "jamais
+vraie".
 
 Les types d'EFFET (`"presence"`, `"behavior"`) suivent un AIGUILLAGE
 explicite plutôt qu'un registre uniforme comme les conditions : chaque type

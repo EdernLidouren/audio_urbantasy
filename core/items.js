@@ -1,3 +1,5 @@
+import { TAG_REGISTRY } from "./tags.js";
+
 // Registre d'OBJETS DU SAC — données pures, CORE (comme SURFACE_REGISTRY,
 // voir core/surfaces.js) : le core en a besoin STRUCTURELLEMENT pour
 // décider comment une entrée de sac se comporte (empilable ou non, voir
@@ -29,6 +31,14 @@
 // (défaut, aucun objet équipé), `shoes_walk` (baskets), `boots_walk` (bottes
 // en cuir ET rangers — DEUX objets peuvent partager le même gait/pool, rien
 // n'impose une correspondance 1:1).
+//
+// `tags` (optionnel, tableau de clés — voir core/tags.js/TAG_REGISTRY) :
+// classification HORIZONTALE d'un objet (ex. "military"), indépendante de
+// stackable/equippable/slot — un objet équipé PORTE ses tags (voir
+// core/equipment.js/equippedTags), une future vérification de contenu (PNJ,
+// événement) les lit via la condition "hasEquipmentTag" (core/presence.js).
+// Absent ou vide -> aucun tag, comportement inchangé pour tout objet
+// existant.
 export const ITEM_REGISTRY = {
   apple: { stackable: true, label: "item.apple", descriptionKey: "item.apple.description" },
   key_bronze: { stackable: false, label: "item.key_bronze", descriptionKey: "item.key_bronze.description" },
@@ -55,6 +65,7 @@ export const ITEM_REGISTRY = {
     equippable: true,
     slot: "feet",
     gait: "boots",
+    tags: ["military"],
   },
 };
 
@@ -66,3 +77,25 @@ export const ITEM_REGISTRY = {
 export function itemProps(type) {
   return ITEM_REGISTRY[type];
 }
+
+// Valide que tout tag référencé par CHAQUE objet d'un registre existe dans
+// TAG_REGISTRY — même principe que la validation des surfaces contre
+// SURFACE_REGISTRY (core/level.js), mais ITEM_REGISTRY est du CODE, pas du
+// contenu JSON passé à un parseur : ce module se valide donc LUI-MÊME, tout
+// de suite (voir l'appel plus bas), plutôt que de dépendre d'un chemin de
+// chargement externe. Exporté (plutôt qu'un IIFE anonyme) pour rester
+// TESTABLE au terminal avec un registre de test (voir core/movement.check.js)
+// sans avoir à corrompre ITEM_REGISTRY lui-même. Faute de frappe -> échec
+// CLAIR (tag + objet concerné), jamais un mismatch silencieux découvert en
+// jeu.
+export function validateItemTags(registry) {
+  for (const [type, props] of Object.entries(registry)) {
+    for (const tag of props.tags || []) {
+      if (!TAG_REGISTRY[tag]) {
+        throw new Error(`core/items.js: tag "${tag}" (objet "${type}") absent de TAG_REGISTRY.`);
+      }
+    }
+  }
+}
+
+validateItemTags(ITEM_REGISTRY);

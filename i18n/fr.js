@@ -45,6 +45,12 @@ export default {
   "inventory.equipment.slot.emptyAnnounce": "Emplacement vide.",
   "equipment.slot.feet": "Pieds",
 
+  // Tags d'objets (core/tags.js/TAG_REGISTRY) — affichage traduit seulement,
+  // les vérifications portent sur la CLÉ ("military", jamais ce texte).
+  "tag.military": "militaire",
+  "tag.chic": "chic",
+  "tag.metal": "métal",
+
   "menu.pause.title": "Pause",
   "menu.pause.options": "Options",
   "menu.pause.main_menu": "Retour au menu principal",

@@ -44,6 +44,12 @@ export default {
   "inventory.equipment.slot.emptyAnnounce": "Empty slot.",
   "equipment.slot.feet": "Feet",
 
+  // Item tags (core/tags.js/TAG_REGISTRY) — translated display only, checks
+  // are done on the KEY ("military", never this text).
+  "tag.military": "military",
+  "tag.chic": "chic",
+  "tag.metal": "metal",
+
   "menu.pause.title": "Pause",
   "menu.pause.options": "Options",
   "menu.pause.main_menu": "Return to main menu",
