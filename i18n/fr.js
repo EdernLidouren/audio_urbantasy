@@ -23,13 +23,27 @@ export default {
 
   "inventory.title": "Sac",
   "inventory.empty": "Sac vide.",
+  // SANS point final, réservée à la ligne d'entrée de l'onglet Sac vide
+  // (voir view/menus/inventory-menu.js/buildBagEntries) — la ponctuation de
+  // fin de phrase y vient déjà du suffixe de position ("1 sur 1").
+  "inventory.empty.entry": "Sac vide",
   "inventory.entry.stack": "{item} × {quantity} : {description}",
   "inventory.entry.unique": "{item} : {description}",
   "inventory.actions.drop": "Poser",
+  "inventory.actions.equip": "Équiper",
+  "inventory.actions.unequip": "Déséquiper",
   "inventory.actions.cancel": "Annuler",
   "inventory.quantity.announce": "Quantité à poser : {quantity} sur {max}.",
   "inventory.dropped": "Posé : {item}.",
   "inventory.dropped.stack": "Posé : {item} × {quantity}.",
+  "inventory.equipped": "Équipé : {item}.",
+  "inventory.unequipped": "Déséquipé : {item}.",
+
+  "inventory.equipment.title": "Équipement",
+  "inventory.equipment.slot.occupied": "{slot} : {item}",
+  "inventory.equipment.slot.empty": "{slot} : vide",
+  "inventory.equipment.slot.emptyAnnounce": "Emplacement vide.",
+  "equipment.slot.feet": "Pieds",
 
   "menu.pause.title": "Pause",
   "menu.pause.options": "Options",
@@ -147,6 +161,12 @@ export default {
   "item.apple.description": "Une pomme, fraîche et croquante.",
   "item.key_bronze": "Clé de bronze",
   "item.key_bronze.description": "Une petite clé en bronze.",
+  "item.sneakers": "Baskets",
+  "item.sneakers.description": "Une paire de baskets, légères et simples.",
+  "item.leather_boots": "Bottes en cuir",
+  "item.leather_boots.description": "Des bottes en cuir robustes.",
+  "item.combat_boots": "Rangers",
+  "item.combat_boots.description": "Une paire de rangers, solides et increvables.",
   "object.toolbox": "Boîte à outils",
   "object.toolbox.description": "Une boîte à outils métallique. Elle semble fouillable.",
   "npc.passerby": "Passant",

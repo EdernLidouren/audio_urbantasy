@@ -99,6 +99,25 @@
   "assets/sounds/entities/npc_beacon": [
     "assets/sounds/entities/npc_beacon_1.mp3"
   ],
+  "assets/sounds/footsteps/barefoot_walk": [
+    "assets/sounds/footsteps/barefoot_walk_1.mp3",
+    "assets/sounds/footsteps/barefoot_walk_2.mp3",
+    "assets/sounds/footsteps/barefoot_walk_3.mp3",
+    "assets/sounds/footsteps/barefoot_walk_4.mp3",
+    "assets/sounds/footsteps/barefoot_walk_5.mp3",
+    "assets/sounds/footsteps/barefoot_walk_6.mp3",
+    "assets/sounds/footsteps/barefoot_walk_7.mp3",
+    "assets/sounds/footsteps/barefoot_walk_8.mp3"
+  ],
+  "assets/sounds/footsteps/boots_walk": [
+    "assets/sounds/footsteps/boots_walk_1.mp3",
+    "assets/sounds/footsteps/boots_walk_2.mp3",
+    "assets/sounds/footsteps/boots_walk_3.mp3",
+    "assets/sounds/footsteps/boots_walk_4.mp3",
+    "assets/sounds/footsteps/boots_walk_5.mp3",
+    "assets/sounds/footsteps/boots_walk_6.mp3",
+    "assets/sounds/footsteps/boots_walk_7.mp3"
+  ],
   "assets/sounds/footsteps/dirt_walk": [
     "assets/sounds/footsteps/dirt_walk_1.mp3",
     "assets/sounds/footsteps/dirt_walk_2.mp3",
@@ -149,6 +168,17 @@
     "assets/sounds/footsteps/gravel_walk_17.mp3",
     "assets/sounds/footsteps/gravel_walk_18.mp3"
   ],
+  "assets/sounds/footsteps/high_heels_walk": [
+    "assets/sounds/footsteps/high_heels_walk_1.mp3",
+    "assets/sounds/footsteps/high_heels_walk_2.mp3",
+    "assets/sounds/footsteps/high_heels_walk_3.mp3",
+    "assets/sounds/footsteps/high_heels_walk_4.mp3",
+    "assets/sounds/footsteps/high_heels_walk_5.mp3",
+    "assets/sounds/footsteps/high_heels_walk_6.mp3",
+    "assets/sounds/footsteps/high_heels_walk_7.mp3",
+    "assets/sounds/footsteps/high_heels_walk_8.mp3",
+    "assets/sounds/footsteps/high_heels_walk_9.mp3"
+  ],
   "assets/sounds/footsteps/light_snow_walk": [
     "assets/sounds/footsteps/light_snow_walk_1.mp3",
     "assets/sounds/footsteps/light_snow_walk_2.mp3",
@@ -176,6 +206,15 @@
     "assets/sounds/footsteps/mud_walk_7.mp3",
     "assets/sounds/footsteps/mud_walk_8.mp3",
     "assets/sounds/footsteps/mud_walk_9.mp3"
+  ],
+  "assets/sounds/footsteps/old/boots_walk": [
+    "assets/sounds/footsteps/old/boots_walk_1.mp3",
+    "assets/sounds/footsteps/old/boots_walk_2.mp3",
+    "assets/sounds/footsteps/old/boots_walk_3.mp3",
+    "assets/sounds/footsteps/old/boots_walk_4.mp3",
+    "assets/sounds/footsteps/old/boots_walk_5.mp3",
+    "assets/sounds/footsteps/old/boots_walk_6.mp3",
+    "assets/sounds/footsteps/old/boots_walk_7.mp3"
   ],
   "assets/sounds/footsteps/sand_walk": [
     "assets/sounds/footsteps/sand_walk_1.mp3",

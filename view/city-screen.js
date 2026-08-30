@@ -19,7 +19,13 @@ import {
   setLootSpawnHandler,
 } from "./interaction.js";
 import { openPauseMenu } from "./menus/pause-menu.js";
-import { openInventoryMenu, setDropItemHandler } from "./menus/inventory-menu.js";
+import {
+  openInventoryMenu,
+  openEquipmentMenu,
+  setDropItemHandler,
+  setEquipItemHandler,
+  setUnequipItemHandler,
+} from "./menus/inventory-menu.js";
 import { setGameReplaceHandler } from "./menus/save-menu.js";
 import { tick } from "../core/actions.js";
 import { reduce } from "../core/reduce.js";
@@ -27,6 +33,7 @@ import { loadLevelById } from "../level/load.js";
 import { getActiveWorld, travelToWorld, spawnEphemeral } from "../core/state.js";
 import { pickupEntity, lootEntity, lootEntitySpawn } from "../core/money.js";
 import { pickupItemEntity, dropItem } from "../core/bag.js";
+import { equipItem, unequipItem } from "../core/equipment.js";
 import { ITEM_REGISTRY } from "../core/items.js";
 import { isDebugEnabled } from "../config/debug.js";
 import {
@@ -277,6 +284,22 @@ export function makeCityScreen(getSession, setSession) {
     setSession(dropItem(session, type, count, spec, session.player.x));
   }
 
+  // Effet d'ÉTAT du "Équiper" (voir view/menus/inventory-menu.js/
+  // setEquipItemHandler ; core/equipment.js/equipItem, entities/model.md/
+  // "Équipement") : retire l'objet du sac, l'ÉCHANGE au slot correspondant
+  // (l'ancien occupant, s'il y en a un, revient au sac) — core pur, même
+  // patron que les effets ci-dessus.
+  function equipItemEffect(type) {
+    setSession(equipItem(getSession(), type));
+  }
+
+  // Effet d'ÉTAT du "Déséquiper" (voir view/menus/inventory-menu.js/
+  // setUnequipItemHandler ; core/equipment.js/unequipItem) : retire l'objet
+  // du slot, le remet au sac.
+  function unequipItemEffect(slot) {
+    setSession(unequipItem(getSession(), slot));
+  }
+
   // Enregistrés une fois, pour la durée de vie de cet écran ville : mêmes
   // principe et portée que setDoorTransitionHandler (voir
   // view/interaction.js) — un module qui déclenche un effet possédé par
@@ -287,6 +310,8 @@ export function makeCityScreen(getSession, setSession) {
   setLootHandler(lootEntityEffect);
   setLootSpawnHandler(lootSpawnEffect);
   setDropItemHandler(dropItemEffect);
+  setEquipItemHandler(equipItemEffect);
+  setUnequipItemHandler(unequipItemEffect);
   setGameReplaceHandler(replaceCurrentGame);
 
   return {
@@ -370,6 +395,16 @@ export function makeCityScreen(getSession, setSession) {
         return;
       }
 
+      // "openEquipment" ("q") : même écran que "openInventory" ("i"), juste
+      // ouvert sur l'onglet Équipement — voir
+      // view/menus/inventory-menu.js/openEquipmentMenu. Partage sa touche
+      // avec le mouvement (view/input.js/MOVE_BINDINGS.moveLeft) sans
+      // ambiguïté, voir le commentaire de CITY_BINDINGS.openEquipment.
+      if (action === "openEquipment") {
+        openEquipmentMenu(scene, getSession);
+        return;
+      }
+
       // "debugPosition", MODE DEBUG UNIQUEMENT (voir config/debug.js, même
       // garde que debugSpawn) : consultation pure de la position du joueur —
       // un outil de diagnostic, pas une info destinée au joueur normal,
@@ -421,6 +456,8 @@ export function makeCityScreen(getSession, setSession) {
       setLootHandler(null);
       setLootSpawnHandler(null);
       setDropItemHandler(null);
+      setEquipItemHandler(null);
+      setUnequipItemHandler(null);
       setGameReplaceHandler(null);
       // Invariant documenté (CLAUDE.md) : session est null hors partie.
       // Seul chemin de sortie de la ville aujourd'hui (menu pause -> retour

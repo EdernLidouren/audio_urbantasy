@@ -10,16 +10,52 @@
 // même donnée de contenu, pas deux registres séparés à garder synchronisés.
 //
 // EXTENSIBILITÉ (même esprit que SURFACE_REGISTRY) : `stackable`/`label`/
-// `descriptionKey` sont les SEULES propriétés aujourd'hui, mais chaque
-// entrée est un objet plat conçu pour en recevoir d'autres PLUS TARD (ex.
-// `usable`, `equippable`, un effet à l'utilisation...) SANS changer la
-// forme du registre ni la logique de core/bag.js — ajouter un OBJET, c'est
-// ajouter une entrée ; ajouter une CAPACITÉ, c'est ajouter une clé à
-// chaque entrée concernée, jamais une nouvelle fonction ni une hiérarchie
-// de types.
+// `descriptionKey` sont la base commune à tout objet ; `equippable`/`slot`/
+// `gait` s'y ajoutent pour un objet ÉQUIPABLE (voir core/equipment.js) —
+// chaque entrée reste un objet plat conçu pour en recevoir d'autres PLUS
+// TARD (ex. `usable`, un effet à l'utilisation...) SANS changer la forme du
+// registre ni la logique de core/bag.js — ajouter un OBJET, c'est ajouter
+// une entrée ; ajouter une CAPACITÉ, c'est ajouter une clé à chaque entrée
+// concernée, jamais une nouvelle fonction ni une hiérarchie de types.
+//
+// `equippable` (booléen) : peut être placé dans un slot d'équipement
+// (core/equipment.js/equipItem) plutôt que de rester simple contenu du sac.
+// `slot` : NOM du slot qu'il occupe (voir core/equipment.js/EQUIPMENT_SLOTS)
+// — aujourd'hui seulement "feet". `gait` : pool de son de pas (voir
+// entities/model.md, "Surfaces de sol et son de pas") que cet objet impose
+// une fois équipé — lu par core/equipment.js/gaitOf, JAMAIS stocké ailleurs
+// (voir entities/player.js). Les objets équipables déclarés ici (slot
+// "feet") couvrent les trois pools de pas disponibles : `barefoot_walk`
+// (défaut, aucun objet équipé), `shoes_walk` (baskets), `boots_walk` (bottes
+// en cuir ET rangers — DEUX objets peuvent partager le même gait/pool, rien
+// n'impose une correspondance 1:1).
 export const ITEM_REGISTRY = {
   apple: { stackable: true, label: "item.apple", descriptionKey: "item.apple.description" },
   key_bronze: { stackable: false, label: "item.key_bronze", descriptionKey: "item.key_bronze.description" },
+  sneakers: {
+    stackable: false,
+    label: "item.sneakers",
+    descriptionKey: "item.sneakers.description",
+    equippable: true,
+    slot: "feet",
+    gait: "shoes",
+  },
+  leather_boots: {
+    stackable: false,
+    label: "item.leather_boots",
+    descriptionKey: "item.leather_boots.description",
+    equippable: true,
+    slot: "feet",
+    gait: "boots",
+  },
+  combat_boots: {
+    stackable: false,
+    label: "item.combat_boots",
+    descriptionKey: "item.combat_boots.description",
+    equippable: true,
+    slot: "feet",
+    gait: "boots",
+  },
 };
 
 // Propriétés d'UN objet par son type — point d'extension futur (même

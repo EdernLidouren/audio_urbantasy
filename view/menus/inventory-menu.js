@@ -1,18 +1,25 @@
-// Menu du SAC (touche "i", voir view/city-screen.js) — écran-menu STANDARD
-// (pile d'écrans, met le jeu en pause comme tout menu, voir CLAUDE.md),
-// entries construites DYNAMIQUEMENT depuis session.bag — même patron que le
-// menu de désambiguïsation (view/interaction.js), pas un menu littéral fixe
-// comme pause-menu.js/options-menu.js.
+// Écran d'INVENTAIRE à DEUX ONGLETS — Sac ("i") et Équipement ("q"), voir
+// view/city-screen.js. UN SEUL écran RÉEL sur la pile (lib/screens.js) : il
+// délègue à un écran-menu INTERNE (lib/menu.js/makeMenuScreen), reconstruit
+// pour l'onglet actif à CHAQUE affichage/bascule — jamais un écran séparé
+// par onglet. Tab / Maj+Tab basculent ENTRE les deux (TAB_BINDINGS, résolues
+// via lib/input.js/resolveAction, comme le reste de ce fichier).
 //
-// Navigation à TROIS niveaux, chacun un écran de la pile (lib/screens.js) :
-// LISTE (une ligne par entrée de sac) -> MENU D'ACTIONS (Poser, Annuler —
-// TOUJOURS un menu, même à une seule action, jamais une activation directe
-// imprévisible) -> SÉLECTEUR DE QUANTITÉ (uniquement pour un stack > 1).
-// Échap/Annuler à un niveau retire SON écran et révèle celui du dessous,
-// qui se réannonce (comportement natif de lib/screens.js/popScreen) — voir
-// le commentaire d'executeDrop plus bas pour la SEULE exception (retour
-// après un dépôt réussi, qui saute directement au sommet plutôt que de
-// remonter niveau par niveau).
+// menu.title de chaque onglet EST DÉJÀ son propre nom ("Sac"/"Équipement") —
+// rappeler l'onEnter de l'écran-menu interne à la bascule annonce donc
+// NATURELLEMENT "<Nom de l'onglet>. <contenu>" (lib/menu.js/
+// buildOpenAnnouncement) : exactement l'exigence d'accessibilité demandée
+// (le nom de l'onglet AVANT son contenu), sans code d'annonce dédié.
+//
+// Navigation en PROFONDEUR, depuis CHAQUE onglet : LISTE -> MENU D'ACTIONS
+// (TOUJOURS un menu, même à une seule action, jamais une activation directe
+// imprévisible) -> SÉLECTEUR DE QUANTITÉ (uniquement "Poser" un stack > 1,
+// onglet Sac). Échap/Annuler à un niveau retire SON écran et révèle celui du
+// dessous, qui se réannonce (comportement natif de lib/screens.js/
+// popScreen) — voir le commentaire d'executeAction plus bas pour la SEULE
+// exception (retour après une action réussie : Poser/Équiper/Déséquiper,
+// qui saute directement à l'écran des onglets plutôt que de remonter
+// niveau par niveau, et sans réannoncer par-dessus le résultat déjà dit).
 
 import { t } from "../../i18n/index.js";
 import { pushScreen, popScreen, composeHook } from "../../lib/screens.js";
@@ -20,6 +27,7 @@ import { makeMenuScreen } from "../../lib/menu.js";
 import { announce } from "../../lib/announce.js";
 import { playMenuSound } from "../menu-sounds.js";
 import { ITEM_REGISTRY } from "../../core/items.js";
+import { EQUIPMENT_SLOTS } from "../../core/equipment.js";
 import { resolveAction, checkBindingsForCollisions } from "../../lib/input.js";
 
 // Bindings du sélecteur de quantité (voir openQuantitySelector plus bas) —
@@ -50,6 +58,30 @@ const QUANTITY_STEP_BY_ACTION = {
   increaseBigger: 100,
 };
 
+// Bascule d'onglet — GÉNÉRIQUE (aucune connaissance de Sac/Équipement dans
+// les noms d'action eux-mêmes, comme MENU_BINDINGS de lib/menu.js) : Tab et
+// Maj+Tab font la MÊME chose avec seulement deux onglets (voir otherTab),
+// mais restent deux actions distinctes pour rester correct le jour où un
+// troisième onglet s'ajouterait (cycle réel avant/arrière plutôt qu'un
+// simple basculement).
+const TAB_BINDINGS = {
+  nextTab: { keys: ["Tab"], mods: [] },
+  prevTab: { keys: ["Tab"], mods: ["shift"] },
+};
+checkBindingsForCollisions(TAB_BINDINGS, "view/menus/inventory-menu.js TAB_BINDINGS");
+
+function otherTab(tab) {
+  return tab === "bag" ? "equipment" : "bag";
+}
+
+// Noms d'affichage des slots d'équipement (core/equipment.js/EQUIPMENT_SLOTS)
+// — DONNÉE DE VUE (clé i18n par slot), jamais dérivée du core : un nom de
+// slot est un choix de contenu/présentation, pas une propriété structurelle.
+// Ajouter un slot (torse, tête...) demande une entrée ici EN PLUS de
+// EQUIPMENT_SLOTS côté core — non fait automatiquement, documenté pour ne
+// pas oublier.
+const EQUIPMENT_SLOT_LABELS = { feet: "equipment.slot.feet" };
+
 // (type, count) => void — applique l'effet d'ÉTAT du "Poser" (retrait du
 // sac + apparition au sol, voir core/bag.js/dropItem), fourni par
 // city-screen.js qui seul détient getSession/setSession — même principe
@@ -60,6 +92,30 @@ let dropItemHandler = null;
 export function setDropItemHandler(handler) {
   dropItemHandler = handler;
 }
+
+// (type) => void — applique l'effet d'ÉTAT "Équiper" (core/equipment.js/
+// equipItem), même principe d'injection que dropItemHandler ci-dessus.
+let equipItemHandler = null;
+
+export function setEquipItemHandler(handler) {
+  equipItemHandler = handler;
+}
+
+// (slot) => void — applique l'effet d'ÉTAT "Déséquiper" (core/equipment.js/
+// unequipItem), même principe.
+let unequipItemHandler = null;
+
+export function setUnequipItemHandler(handler) {
+  unequipItemHandler = handler;
+}
+
+// La SEULE instance d'écran d'onglets ouverte à la fois (comme activeScene,
+// voir view/audio/city-scene.js) : permet aux effets (Poser/Équiper/
+// Déséquiper, potentiellement enfouis sous un menu d'actions ET un
+// sélecteur de quantité) de revenir SILENCIEUSEMENT à l'onglet À JOUR après
+// une action réussie, sans threader une référence à travers chaque niveau
+// d'appel (bagEntryLine -> openItemActionsMenu -> confirmX -> executeX).
+let currentTabsScreen = null;
 
 // { label, labelParams } pour UNE entrée du sac — voir core/bag.js pour la
 // forme d'une entrée : { type, quantity } EMPILABLE (quantity présent) ->
@@ -95,69 +151,157 @@ function bagEntryLine(scene, getSession, entry) {
   };
 }
 
-// Construit l'écran-liste depuis le sac COURANT — factorisé car utilisé à
-// DEUX moments : l'ouverture normale ("i", openInventoryMenu) et la
-// réouverture silencieuse après un dépôt réussi (voir executeDrop) : même
-// contenu, seule l'annonce d'ouverture diffère entre les deux appelants.
-function buildInventoryListScreen(scene, getSession) {
+// Entrées de l'onglet SAC — un placeholder "Sac vide." (non activable) si
+// vide, plutôt qu'un tableau réellement vide : lib/menu.js/makeMenuScreen
+// suppose toujours AU MOINS une entrée courante (currentEntry() n'est jamais
+// undefined ailleurs dans son code) ; un tableau vide y planterait dès
+// onEnter. Même ligne que l'ancienne annonce "Sac vide.", juste portée par
+// une entrée plutôt qu'un refus d'ouvrir l'écran (voir openInventoryMenu :
+// contrairement à avant les onglets, un sac vide ne doit plus JAMAIS
+// empêcher d'atteindre l'onglet Équipement).
+function buildBagEntries(scene, getSession) {
   const bag = getSession().bag;
+  // "inventory.empty.entry" (SANS point final), pas "inventory.empty" (avec
+  // point, réservé aux annonces AUTONOMES — voir buildDropMessage) : cette
+  // ligne n'est pas la fin de la phrase, lib/menu.js/actionLine lui ajoute
+  // encore ". <position>" — même raison que stripTrailingPeriod plus haut,
+  // pour éviter un double point ("vide.. 1 sur 1").
+  if (bag.length === 0) return [{ label: "inventory.empty.entry", onActivate: () => {} }];
+  return bag.map((entry) => bagEntryLine(scene, getSession, entry));
+}
+
+function buildBagTabScreen(scene, getSession) {
+  const menu = { title: "inventory.title", closable: true, entries: buildBagEntries(scene, getSession) };
+  return makeMenuScreen(menu, t);
+}
+
+// Ligne d'UN slot d'équipement — occupé : "<Slot> : <objet>", activer ouvre
+// le menu d'actions (Déséquiper/Annuler) ; VIDE : "<Slot> : vide", activer
+// annonce juste "Emplacement vide." SANS ouvrir de menu (rien à y faire —
+// voir header du module, "entrée sur objet -> menu d'actions" ne s'applique
+// qu'à un objet RÉEL).
+function equipmentSlotEntry(scene, getSession, slot) {
+  const occupant = getSession().equipment[slot];
+  const slotLabel = t(EQUIPMENT_SLOT_LABELS[slot]);
+
+  if (!occupant) {
+    return {
+      label: "inventory.equipment.slot.empty",
+      labelParams: { slot: slotLabel },
+      onActivate: () => announce(t("inventory.equipment.slot.emptyAnnounce"), { assertive: true }),
+    };
+  }
+
+  const itemLabelKey = ITEM_REGISTRY[occupant.type].label;
+  return {
+    label: "inventory.equipment.slot.occupied",
+    labelParams: { slot: slotLabel, item: t(itemLabelKey) },
+    onActivate: () => openEquipmentSlotActionsMenu(scene, getSession, slot, itemLabelKey),
+  };
+}
+
+function buildEquipmentTabScreen(scene, getSession) {
   const menu = {
-    title: "inventory.title",
+    title: "inventory.equipment.title",
     closable: true,
-    entries: bag.map((entry) => bagEntryLine(scene, getSession, entry)),
+    entries: EQUIPMENT_SLOTS.map((slot) => equipmentSlotEntry(scene, getSession, slot)),
   };
   return makeMenuScreen(menu, t);
 }
 
-// scene : pause/reprise sélective des balises pendant que ce menu est
-// ouvert — même patron que le menu de désambiguïsation/le menu pause.
-// getSession : relu à CHAQUE reconstruction de liste (voir buildInventoryListScreen)
-// — contrairement à avant l'introduction de "Poser", le contenu du sac peut
-// désormais changer PENDANT que ce menu reste ouvert (un dépôt le modifie).
-export function openInventoryMenu(scene, getSession) {
-  if (getSession().bag.length === 0) {
-    announce(t("inventory.empty"), { assertive: true });
-    return;
+function buildTabScreen(tab, scene, getSession) {
+  return tab === "equipment" ? buildEquipmentTabScreen(scene, getSession) : buildBagTabScreen(scene, getSession);
+}
+
+// L'écran RÉEL (voir header) : reconstruit son écran-menu interne (`inner`)
+// à CHAQUE onEnter (première ouverture, bascule d'onglet, OU reveal après
+// la fermeture d'un sous-menu — les trois passent par ici) — jamais de
+// contenu mis en cache d'un affichage à l'autre, comme le reste de ce
+// fichier (voir buildBagEntries). scene.pauseBeacons()/resumeBeacons()
+// appelés à CHAQUE onEnter/onExit (y compris un reveal redondant) — sans
+// conséquence, même tolérance que le reste de la pile de menus ici (voir
+// openItemActionsMenu plus bas).
+function buildInventoryTabsScreen(scene, getSession, initialTab) {
+  let activeTab = initialTab;
+  let inner = null;
+  // Consommé UNE FOIS par le prochain onEnter (voir returnSilently) : un
+  // retour après une action réussie (Poser/Équiper/Déséquiper) a DÉJÀ
+  // annoncé son résultat — une seconde écriture assertive coup sur coup
+  // l'écraserait avant que l'utilisateur ait pu l'entendre (même
+  // raisonnement que lib/menu.js/makeMessageScreen).
+  let silent = false;
+
+  function rebuildInner() {
+    inner = buildTabScreen(activeTab, scene, getSession);
   }
 
-  const screen = buildInventoryListScreen(scene, getSession);
-  screen.onEnter = composeHook(screen.onEnter, () => scene.pauseBeacons());
-  screen.onExit = composeHook(screen.onExit, () => scene.resumeBeacons());
-  pushScreen(screen);
-}
-
-// Variante SILENCIEUSE de openInventoryMenu — utilisée UNIQUEMENT par
-// executeDrop ci-dessous pour revenir à la liste À JOUR juste après un
-// dépôt réussi : l'annonce d'ouverture normale de lib/menu.js est ici
-// remplacée par rien du tout, parce que executeDrop vient DÉJÀ d'annoncer
-// "Posé : ..." — une seconde écriture assertive coup sur coup, sans délai,
-// ÉCRASERAIT la première avant que l'utilisateur ait pu l'entendre (même
-// raisonnement que lib/menu.js/makeMessageScreen, voir son commentaire).
-// Toute réouverture ULTÉRIEURE de l'inventaire (ressortir puis rappuyer sur
-// "i") repasse par openInventoryMenu normalement, avec son annonce
-// habituelle — cette variante ne sert qu'à CE retour immédiat précis.
-function reopenInventoryListSilently(scene, getSession) {
-  const screen = buildInventoryListScreen(scene, getSession);
-  screen.onEnter = () => scene.pauseBeacons();
-  screen.onExit = composeHook(screen.onExit, () => scene.resumeBeacons());
-  pushScreen(screen);
-}
-
-// Actions disponibles pour UNE entrée de sac — aujourd'hui une seule :
-// "Poser". "Équiper"/"Utiliser" s'ajouteront ici plus tard, dans CE MÊME
-// menu (une entrée de plus dans ce tableau, jamais une refonte de
-// openItemActionsMenu). Extensibilité anti-drop RÉSERVÉE, PAS construite :
-// un futur flag `droppable` sur core/items.js/ITEM_REGISTRY (défaut true)
-// pourrait un jour retirer "Poser" de cette liste pour un objet donné (ex.
-// un objet de quête vital) — non codé ici, aucun objet de ce genre n'existe
-// encore ; documenté pour ne pas condamner ce slot par erreur plus tard.
-function buildItemActions(scene, getSession, entry, itemLabelKey) {
-  return [
-    {
-      label: "inventory.actions.drop",
-      onActivate: () => confirmDrop(scene, getSession, entry, itemLabelKey),
+  return {
+    onEnter() {
+      rebuildInner();
+      if (silent) {
+        silent = false;
+      } else {
+        inner.onEnter();
+      }
+      scene.pauseBeacons();
     },
-  ];
+    onExit() {
+      if (inner.onExit) inner.onExit();
+      scene.resumeBeacons();
+      currentTabsScreen = null;
+    },
+    onTick() {
+      if (inner.onTick) inner.onTick();
+    },
+    onKeyDown(event) {
+      const action = resolveAction(TAB_BINDINGS, event.key, event.mods);
+      if (action === "nextTab" || action === "prevTab") {
+        event.preventDefault();
+        activeTab = otherTab(activeTab);
+        rebuildInner();
+        inner.onEnter(); // annonce "<Nom de l'onglet>. <contenu>" — voir header.
+        return;
+      }
+      inner.onKeyDown(event);
+    },
+    // Voir la doc de `silent` ci-dessus — appelé par executeAction juste
+    // avant de remonter jusqu'ici.
+    returnSilently() {
+      silent = true;
+    },
+  };
+}
+
+function openInventoryTabs(scene, getSession, initialTab) {
+  currentTabsScreen = buildInventoryTabsScreen(scene, getSession, initialTab);
+  pushScreen(currentTabsScreen);
+}
+
+// "i" — voir view/city-screen.js.
+export function openInventoryMenu(scene, getSession) {
+  openInventoryTabs(scene, getSession, "bag");
+}
+
+// "q" — voir view/city-screen.js.
+export function openEquipmentMenu(scene, getSession) {
+  openInventoryTabs(scene, getSession, "equipment");
+}
+
+// Actions disponibles pour UNE entrée de sac — "Équiper" seulement si
+// equippable (core/items.js/ITEM_REGISTRY), TOUJOURS "Poser". Extensibilité
+// anti-drop RÉSERVÉE, PAS construite : un futur flag `droppable` sur
+// ITEM_REGISTRY (défaut true) pourrait un jour retirer "Poser" de cette
+// liste pour un objet donné (ex. un objet de quête vital) — non codé ici,
+// aucun objet de ce genre n'existe encore ; documenté pour ne pas condamner
+// ce slot par erreur plus tard.
+function buildItemActions(scene, getSession, entry, itemLabelKey) {
+  const props = ITEM_REGISTRY[entry.type];
+  const actions = [];
+  if (props.equippable) {
+    actions.push({ label: "inventory.actions.equip", onActivate: () => confirmEquip(entry, itemLabelKey) });
+  }
+  actions.push({ label: "inventory.actions.drop", onActivate: () => confirmDrop(scene, getSession, entry, itemLabelKey) });
+  return actions;
 }
 
 // Entrée sur un objet -> TOUJOURS un menu d'actions, même à une seule action
@@ -182,19 +326,80 @@ function openItemActionsMenu(scene, getSession, entry, itemLabelKey) {
   pushScreen(screen);
 }
 
+// Menu d'actions d'UN SLOT d'équipement occupé (onglet Équipement) —
+// Déséquiper + Annuler, même patron que openItemActionsMenu ci-dessus (un
+// menu d'actions par objet, quel que soit l'onglet où il se trouve).
+function openEquipmentSlotActionsMenu(scene, getSession, slot, itemLabelKey) {
+  const actions = [
+    { label: "inventory.actions.unequip", onActivate: () => confirmUnequip(slot, itemLabelKey) },
+    { label: "inventory.actions.cancel", onActivate: () => popScreen() },
+  ];
+
+  const menu = { title: itemLabelKey, closable: true, entries: actions };
+  const screen = makeMenuScreen(menu, t);
+  screen.onEnter = composeHook(screen.onEnter, () => scene.pauseBeacons());
+  screen.onExit = composeHook(screen.onExit, () => scene.resumeBeacons());
+  pushScreen(screen);
+}
+
+// "Équiper" choisi (onglet Sac) : effet immédiat, jamais de sélecteur (on
+// équipe TOUJOURS un seul exemplaire — voir core/equipment.js/equipItem).
+// Un seul niveau au-dessus des onglets à ce stade (le menu d'actions) — voir
+// popCount d'executeAction.
+function confirmEquip(entry, itemLabelKey) {
+  executeAction(
+    1,
+    () => {
+      if (!equipItemHandler) return false;
+      equipItemHandler(entry.type);
+    },
+    () => t("inventory.equipped", { item: t(itemLabelKey) })
+  );
+}
+
+// "Déséquiper" choisi (onglet Équipement) : même patron, un seul niveau au-
+// dessus des onglets (son propre menu d'actions).
+function confirmUnequip(slot, itemLabelKey) {
+  executeAction(
+    1,
+    () => {
+      if (!unequipItemHandler) return false;
+      unequipItemHandler(slot);
+    },
+    () => t("inventory.unequipped", { item: t(itemLabelKey) })
+  );
+}
+
 // "Poser" choisi : objet UNIQUE (quantité 1, ou non empilable) -> agit
 // DIRECTEMENT, aucun sélecteur (poser LA quantité disponible, toujours 1) ;
 // stack > 1 -> ouvre le sélecteur de quantité (voir openQuantitySelector).
 function confirmDrop(scene, getSession, entry, itemLabelKey) {
   const available = entry.quantity ?? 1;
   if (available <= 1) {
-    // Une seule action-menu au-dessus de la liste à ce stade (voir
-    // openItemActionsMenu) : deux niveaux à quitter pour revenir à la
-    // liste — voir le paramètre popCount d'executeDrop.
-    executeDrop(scene, getSession, entry, itemLabelKey, available, 2);
+    // Un seul niveau au-dessus des onglets à ce stade (le menu d'actions) —
+    // voir popCount d'executeAction.
+    executeAction(
+      1,
+      () => {
+        if (!dropItemHandler) return false;
+        dropItemHandler(entry.type, available);
+      },
+      () => buildDropMessage(getSession, entry, itemLabelKey, available)
+    );
     return;
   }
   openQuantitySelector(scene, getSession, entry, itemLabelKey, available);
+}
+
+// Message de résultat du dépôt — appelé APRÈS l'effet (voir executeAction) :
+// getSession().bag reflète déjà l'état POST-dépôt, donc bagNowEmpty est
+// fiable.
+function buildDropMessage(getSession, entry, itemLabelKey, quantity) {
+  const item = t(itemLabelKey);
+  const isStack = entry.quantity !== undefined;
+  const dropMessage = isStack ? t("inventory.dropped.stack", { item, quantity }) : t("inventory.dropped", { item });
+  const bagNowEmpty = getSession().bag.length === 0;
+  return bagNowEmpty ? `${dropMessage} ${t("inventory.empty")}` : dropMessage;
 }
 
 // Sélecteur de QUANTITÉ à poser (stack > 1 uniquement) — écran CUSTOM,
@@ -246,10 +451,16 @@ function openQuantitySelector(scene, getSession, entry, itemLabelKey, max) {
       } else if (action === "confirm") {
         event.preventDefault();
         playMenuSound("select");
-        // Trois niveaux au-dessus de la liste à ce stade (sélecteur,
-        // menu d'actions) plus la liste elle-même — voir popCount
-        // d'executeDrop.
-        executeDrop(scene, getSession, entry, itemLabelKey, quantity, 3);
+        // Deux niveaux au-dessus des onglets à ce stade (sélecteur, menu
+        // d'actions) — voir popCount d'executeAction.
+        executeAction(
+          2,
+          () => {
+            if (!dropItemHandler) return false;
+            dropItemHandler(entry.type, quantity);
+          },
+          () => buildDropMessage(getSession, entry, itemLabelKey, quantity)
+        );
       } else if (action === "cancel") {
         event.preventDefault();
         popScreen();
@@ -264,36 +475,31 @@ function openQuantitySelector(scene, getSession, entry, itemLabelKey, max) {
   pushScreen(screen);
 }
 
-// Applique l'effet d'ÉTAT (retrait du sac + apparition au sol, voir
-// dropItemHandler), PUIS remonte directement au sommet de la pile
-// d'inventaire (`popCount` appels à popScreen — 2 depuis le menu d'actions,
-// 3 depuis le sélecteur de quantité), et enfin annonce le résultat +
-// rouvre une liste FRAÎCHE (ou "Sac vide" si c'était le dernier objet).
-//
-// Les popScreen() intermédiaires révèlent chacun un écran encore VALIDE
-// (menu d'actions, PUIS liste ENCORE STALE) qui se réannonce normalement à
-// son tour — du bruit assertive parasite, mais SANS CONSÉQUENCE : ces
-// écritures sont toutes écrasées, synchrone après synchrone, avant que le
-// message FINAL (construit ci-dessous) ne soit lui-même écrit — la dernière
-// écriture assertive avant que le lecteur d'écran n'ait eu l'occasion de la
-// lire est celle qui compte (même raisonnement que lib/menu.js/
-// makeMessageScreen). Aucune temporisation nécessaire : tout ceci s'exécute
-// de façon strictement synchrone, dans le même tour de boucle JS.
-function executeDrop(scene, getSession, entry, itemLabelKey, quantity, popCount) {
-  if (!dropItemHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
+// Point COMMUN à toute action réussie du menu d'inventaire (Poser/Équiper/
+// Déséquiper) — DEUX callbacks, dans un ordre STRICT et pour deux raisons
+// distinctes :
+//   1. `applyEffect()` D'ABORD, AVANT tout popScreen() : l'écran des onglets
+//      va se reconstruire (rebuildInner, voir buildInventoryTabsScreen) dès
+//      qu'il est révélé par le DERNIER popScreen() ci-dessous — s'il lisait
+//      la session AVANT l'effet, il montrerait un contenu PÉRIMÉ (ex.
+//      l'objet fraîchement équipé pas encore retiré du sac affiché). Renvoie
+//      `false` -> aucun gestionnaire enregistré (cas limite, jamais en jeu
+//      réel) : on abandonne silencieusement, ni popScreen ni annonce.
+//   2. `buildMessage()` ENSUITE, APRÈS tous les popScreen() (`popCount` — 1
+//      depuis un menu d'actions, 2 depuis le sélecteur de quantité) : ces
+//      popScreen() révèlent des écrans encore valides qui se réannoncent
+//      normalement au passage (dont l'écran des onglets lui-même — marqué
+//      SILENCIEUX juste avant, voir returnSilently) — bruit assertive
+//      parasite mais SANS CONSÉQUENCE, écrasé par la présente annonce tant
+//      qu'elle reste la DERNIÈRE écriture, strictement après cette boucle
+//      (même raisonnement que lib/menu.js/makeMessageScreen). `buildMessage`
+//      reçoit donc la session DÉJÀ à jour (l'effet a déjà couru) si elle a
+//      besoin de l'inspecter (voir buildDropMessage, bagNowEmpty).
+function executeAction(popCount, applyEffect, buildMessage) {
+  if (applyEffect() === false) return;
 
-  dropItemHandler(entry.type, quantity);
-
+  if (currentTabsScreen) currentTabsScreen.returnSilently();
   for (let i = 0; i < popCount; i++) popScreen();
 
-  const item = t(itemLabelKey);
-  const isStack = entry.quantity !== undefined;
-  const dropMessage = isStack
-    ? t("inventory.dropped.stack", { item, quantity })
-    : t("inventory.dropped", { item });
-
-  const bagNowEmpty = getSession().bag.length === 0;
-  announce(bagNowEmpty ? `${dropMessage} ${t("inventory.empty")}` : dropMessage, { assertive: true });
-
-  if (!bagNowEmpty) reopenInventoryListSilently(scene, getSession);
+  announce(buildMessage(), { assertive: true });
 }

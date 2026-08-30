@@ -24,6 +24,7 @@ import { SAVE_VERSION, serializeGame, deserializeGame } from "./save.js";
 import { addMoney, pickupEntity, lootEntity, lootEntitySpawn } from "./money.js";
 import { addItem, pickupItemEntity, removeItem, dropItem } from "./bag.js";
 import { ITEM_REGISTRY, itemProps } from "./items.js";
+import { EQUIPMENT_SLOTS, createEmptyEquipment, gaitOf, equipItem, unequipItem } from "./equipment.js";
 import { createSeed } from "./rng.js";
 import { MAX_COMPANIONS } from "../config/companions.js";
 import { MAX_EPHEMERALS } from "../config/ephemerals.js";
@@ -2314,6 +2315,14 @@ export function runMovementChecks() {
   run("sérialisation : session.money est un nombre (jamais undefined)", true, typeof auditSession.money === "number");
   // Sac : présent et TABLEAU (jamais undefined), même précédent que money.
   run("sérialisation : session.bag est un tableau (jamais undefined)", true, Array.isArray(auditSession.bag));
+  // Équipement : présent et OBJET (jamais undefined), même précédent — déjà
+  // NON vide par défaut (baskets de départ, voir core/state.js), aucun
+  // ajout explicite nécessaire ici contrairement à money.
+  run(
+    "sérialisation : session.equipment est un objet (jamais undefined)",
+    true,
+    typeof auditSession.equipment === "object" && auditSession.equipment !== null
+  );
 
   // 2) Aller-retour JSON réel, capturé pour détecter un throw (ex. cycle)
   // au lieu de laisser l'exception interrompre toute la suite de checks.
@@ -2328,6 +2337,11 @@ export function runMovementChecks() {
   if (!auditRoundTripThrew) {
     run("sérialisation : money survit à l'aller-retour JSON", auditSession.money, auditRoundTripped.money);
     run("sérialisation : bag survit à l'aller-retour JSON", JSON.stringify(auditSession.bag), JSON.stringify(auditRoundTripped.bag));
+    run(
+      "sérialisation : equipment survit à l'aller-retour JSON",
+      JSON.stringify(auditSession.equipment),
+      JSON.stringify(auditRoundTripped.equipment)
+    );
   }
 
   // 3) Divergence structurelle précise entre avant/après.
@@ -2452,8 +2466,13 @@ export function runMovementChecks() {
   run("sac : ITEM_REGISTRY.key_bronze n'est PAS empilable", false, itemProps("key_bronze").stackable);
   run("sac : itemProps sur un type inconnu -> undefined", undefined, itemProps("does-not-exist"));
 
-  const bagState = createInitialState(moneyLevel, undefined, NO_COMPANIONS);
-  run("sac : une partie neuve démarre avec un sac vide", 0, bagState.bag.length);
+  // Sac VIDÉ explicitement pour ces tests de MÉCANISME (addItem/removeItem/
+  // pickupItemEntity/dropItem en isolation) : une partie neuve démarre
+  // en réalité avec des rangers dans le sac (voir "Équipement" plus bas,
+  // core/state.js/createInitialState) — hors-sujet ici, ces tests
+  // vérifient le MÉCANISME du sac, pas le contenu de départ d'une partie.
+  const bagState = { ...createInitialState(moneyLevel, undefined, NO_COMPANIONS), bag: [] };
+  run("sac : sac VIDÉ pour ces tests de mécanisme (contenu de départ testé plus bas)", 0, bagState.bag.length);
 
   // Empilable : le PREMIER ajout crée l'entrée, les SUIVANTS incrémentent
   // quantity — jamais une seconde entrée pour le même type.
@@ -2498,7 +2517,10 @@ export function runMovementChecks() {
     },
     ITEM_TEST_REGISTRY
   );
-  const itemState = createInitialState(itemLevel, undefined, NO_COMPANIONS);
+  // Sac VIDÉ ici aussi — même raison que bagState plus haut (une partie
+  // neuve démarre en réalité avec des rangers dedans, hors-sujet pour ce
+  // test de mécanisme).
+  const itemState = { ...createInitialState(itemLevel, undefined, NO_COMPANIONS), bag: [] };
 
   const afterApplePickup = pickupItemEntity(itemState, "apple-1", "apple", 1);
   run("sac : pickupItemEntity ajoute l'objet au sac", 1, afterApplePickup.bag.length);
@@ -2566,6 +2588,70 @@ export function runMovementChecks() {
   run("sac : dropItem pose l'entité à la position x demandée", 3, droppedEntity && droppedEntity.x);
   run("sac : dropItem reporte l'action pickup (count) telle quelle", 1, droppedEntity && droppedEntity.action.count);
   run("sac : dropItem NE MUTE JAMAIS l'original", 1, afterApplePickup.bag[0].quantity);
+
+  // --- Équipement (core/equipment.js) — troisième tiers de l'inventaire ---
+  // Slots nommés, gait DÉRIVÉ (jamais stocké), equipItem/unequipItem.
+
+  run("équipement : EQUIPMENT_SLOTS ne couvre que 'feet' aujourd'hui", JSON.stringify(["feet"]), JSON.stringify(EQUIPMENT_SLOTS));
+  run("équipement : createEmptyEquipment — slot feet à null", null, createEmptyEquipment().feet);
+
+  // gaitOf : dérivation pure, jamais stockée sur le joueur (entities/player.js).
+  run("gaitOf : slot vide -> barefoot", "barefoot", gaitOf({ feet: null }));
+  run("gaitOf : baskets équipées -> shoes", "shoes", gaitOf({ feet: { type: "sneakers" } }));
+  run("gaitOf : bottes en cuir équipées -> boots", "boots", gaitOf({ feet: { type: "leather_boots" } }));
+  run("gaitOf : rangers équipées -> boots (même pool que les bottes en cuir)", "boots", gaitOf({ feet: { type: "combat_boots" } }));
+  run("gaitOf : type retiré du registre entre-temps -> repli barefoot", "barefoot", gaitOf({ feet: { type: "does-not-exist" } }));
+
+  const equipmentLevel = parseLevel(RAW_LEVEL, EMPTY_REGISTRY);
+  const freshEquipState = createInitialState(equipmentLevel, undefined, NO_COMPANIONS);
+  run("équipement : une partie neuve démarre avec des baskets ÉQUIPÉES", "sneakers", freshEquipState.equipment.feet.type);
+  run("équipement : une partie neuve démarre avec des rangers DANS LE SAC (pas équipées)", 1, freshEquipState.bag.length);
+  run("équipement : les rangers de départ ne sont pas équipées", "combat_boots", freshEquipState.bag[0].type);
+  run("équipement : gait de départ d'une partie neuve -> shoes", "shoes", gaitOf(freshEquipState.equipment));
+
+  // equipItem : ÉCHANGE — équiper des bottes (sac) alors que des baskets
+  // sont déjà au slot -> les bottes prennent le slot, les baskets
+  // retournent au sac. Jamais dans les deux à la fois (voir plus bas).
+  const withBootsInBag = addItem(freshEquipState, "leather_boots", 1);
+  const afterEquipBoots = equipItem(withBootsInBag, "leather_boots");
+  run("equipItem : le slot feet porte maintenant les bottes", "leather_boots", afterEquipBoots.equipment.feet.type);
+  run(
+    "equipItem : les bottes ne sont PLUS dans le sac (retirées)",
+    false,
+    afterEquipBoots.bag.some((entry) => entry.type === "leather_boots")
+  );
+  run(
+    "equipItem : l'ancien occupant (baskets) est REVENU dans le sac (échange)",
+    true,
+    afterEquipBoots.bag.some((entry) => entry.type === "sneakers")
+  );
+  run("equipItem : gait suit l'équipement -> boots", "boots", gaitOf(afterEquipBoots.equipment));
+  run("equipItem : NE MUTE JAMAIS l'original", "sneakers", withBootsInBag.equipment.feet.type);
+
+  // equipItem : cas dégradés, RÉFÉRENCE INCHANGÉE, jamais une exception.
+  const withApple = addItem(withBootsInBag, "apple", 1);
+  run("equipItem : type NON equippable (apple, dans le sac) -> référence inchangée", withApple, equipItem(withApple, "apple"));
+  run("equipItem : type absent du sac -> référence inchangée", freshEquipState, equipItem(freshEquipState, "leather_boots"));
+  run("equipItem : type inconnu du registre -> référence inchangée", withBootsInBag, equipItem(withBootsInBag, "does-not-exist"));
+
+  // unequipItem : inverse d'equipItem — retire du slot, remet au sac.
+  const afterUnequip = unequipItem(afterEquipBoots, "feet");
+  run("unequipItem : le slot feet est vidé", null, afterUnequip.equipment.feet);
+  run(
+    "unequipItem : les bottes sont revenues dans le sac",
+    true,
+    afterUnequip.bag.some((entry) => entry.type === "leather_boots")
+  );
+  run("unequipItem : gait retombe à barefoot, slot vide", "barefoot", gaitOf(afterUnequip.equipment));
+  run("unequipItem : slot déjà vide -> référence inchangée", afterUnequip, unequipItem(afterUnequip, "feet"));
+  run("unequipItem : NE MUTE JAMAIS l'original", "leather_boots", afterEquipBoots.equipment.feet.type);
+
+  // Invariant : un objet donné n'est JAMAIS à la fois dans le sac ET équipé.
+  run(
+    "équipement : invariant — un objet équipé n'est jamais AUSSI dans le sac",
+    false,
+    afterEquipBoots.bag.some((entry) => entry.type === afterEquipBoots.equipment.feet.type)
+  );
 
   // --- Collectible persistant (core/state.js/markConsumed, core/money.js/lootEntity) ---
   // Contrairement à removeEntity/pickupEntity ci-dessus, l'entité looté
@@ -3051,6 +3137,19 @@ export function runMovementChecks() {
   run("save : bag corrompu (pas un tableau) accepté (rebouché, comme companions)", true, corruptedBagResult.success);
   if (corruptedBagResult.success) {
     run("save : bag corrompu rebouché — tableau vide", 0, corruptedBagResult.session.bag.length);
+  }
+
+  // Sauvegarde ANTÉRIEURE à l'équipement (voir core/equipment.js) : même
+  // précédent exact que time/money/bag ci-dessus — jamais eu de clé
+  // .equipment. REBOUCHÉ VIDE (jamais avec des baskets par défaut, voir le
+  // commentaire de migrateSave) : une vieille partie ne doit pas se
+  // retrouver rétroactivement chaussée.
+  const { equipment: _droppedEquipment, ...auditSessionWithoutEquipment } = auditSession;
+  const oldEquipmentSave = { version: SAVE_VERSION, data: auditSessionWithoutEquipment };
+  const oldEquipmentSaveResult = deserializeGame(oldEquipmentSave);
+  run("save : sauvegarde antérieure à l'équipement acceptée (rebouchée)", true, oldEquipmentSaveResult.success);
+  if (oldEquipmentSaveResult.success) {
+    run("save : partie rebouchée — équipement par défaut (slot feet vide)", null, oldEquipmentSaveResult.session.equipment.feet);
   }
 
   console.log(`Récapitulatif : ${passed} réussis / ${total} total`);

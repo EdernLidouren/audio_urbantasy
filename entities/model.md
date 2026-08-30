@@ -401,6 +401,54 @@ d'écriture (voir son header pour le détail complet de la forme).
   de quête vital) — non codé ici, aucun objet de ce genre n'existe encore ;
   documenté pour ne pas condamner ce slot par erreur plus tard.
 
+## Équipement
+
+Troisième tiers de l'inventaire : `session.equipment`, des SLOTS NOMMÉS —
+`{ feet: <entrée ou null> }` aujourd'hui, un seul slot. `core/equipment.js`/
+`equipItem` et `unequipItem` sont les SEULS points d'écriture ; un objet
+donné est SOIT dans le sac SOIT équipé, JAMAIS les deux (les deux fonctions
+composent `removeItem`/`addItem`, `core/bag.js`, ATOMIQUEMENT avec
+l'écriture du slot).
+
+- **Objets équipables** (`core/items.js`/`ITEM_REGISTRY`) — `equippable:true`,
+  `slot` (le nom du slot occupé), `gait` (voir plus bas). Trois exemples au
+  slot "feet" : `sneakers` (gait `"shoes"`, équipées de départ — voir plus
+  bas), `leather_boots` et `combat_boots` (toutes deux gait `"boots"` — MÊME
+  pool, deux objets distincts : rien n'impose une correspondance 1:1 entre
+  objet et gait). `combat_boots` fait partie du contenu de départ du sac
+  (voir `core/state.js`/`createInitialState`), pas équipées — de quoi
+  tester l'échange sans avoir à en ramasser une paire en jeu.
+- **Gait DU JOUEUR — DÉRIVÉ, jamais stocké** (`core/equipment.js`/`gaitOf`) :
+  contrairement à une ENTITÉ (`gait` figé dans son archétype/instance, voir
+  "Surfaces de sol et son de pas" plus bas), le gait du joueur n'est écrit
+  NULLE PART — `gaitOf(equipment)` le recalcule à CHAQUE pas
+  (`view/audio/city-scene.js`/`playFootstep`) : l'objet équipé au slot
+  "feet" porte-t-il un gait ? oui -> ce gait ; slot vide -> `"barefoot"`
+  (défaut). Conséquence directe de la dérivation, PAS un mécanisme séparé :
+  équiper/déséquiper change le pas SUIVANT automatiquement, sans
+  notification ni code de synchronisation — `entities/player.js` ne porte
+  plus aucun gait en dur (voir son commentaire, avant l'introduction de ce
+  système).
+- **Actions "Équiper"/"Déséquiper"** — même menu d'actions par objet que
+  "Poser" (voir "Sac d'objets" plus haut) : un objet `equippable` gagne
+  "Équiper" À CÔTÉ de "Poser" dans l'onglet Sac ; un slot OCCUPÉ (onglet
+  Équipement) porte "Déséquiper". Équiper un slot déjà occupé -> ÉCHANGE
+  (l'ancien occupant retourne au sac), jamais un écrasement silencieux ni
+  un refus. Un slot VIDE n'ouvre PAS de menu d'actions (rien à y faire) :
+  l'activer annonce juste "Emplacement vide."
+- **Interface à deux onglets** (`view/menus/inventory-menu.js`) — UN SEUL
+  écran réel sur la pile, deux portes d'entrée ("i" -> Sac, "q" ->
+  Équipement) et Tab/Maj+Tab pour basculer une fois ouvert. Le nom de
+  l'onglet est TOUJOURS annoncé avant son contenu à la bascule — obtenu
+  gratuitement en réutilisant `menu.title` (déjà le nom de l'onglet) et
+  l'annonce d'ouverture native de `lib/menu.js`, jamais un second mécanisme
+  d'annonce.
+- **Persistance** — `session.equipment` traverse la partie comme `bag`/
+  `money` (jamais dans un monde). Une sauvegarde ANTÉRIEURE à l'équipement
+  est rebouchée VIDE (`core/equipment.js`/`createEmptyEquipment`), JAMAIS
+  avec les baskets de départ : ce rebouchage vaut pour une partie DÉJÀ EN
+  COURS, pas pour une partie neuve (voir `core/save.js`).
+
 ## Présence conditionnelle et triggers de comportement
 
 `presence` (optionnel, `core/presence.js`) : une liste de RÈGLES
@@ -863,7 +911,11 @@ sans `sound` — comme `audibleRange`/`panSaturation` : une propriété de
 l'entité, pas d'un rôle de son) :
 
 - **`gait`** — la CHAUSSURE/allure de l'entité (ex. `"heavy_boots"`),
-  optionnelle : la plupart des entités n'en ont pas.
+  optionnelle : la plupart des entités n'en ont pas. FIGÉ (archétype ou
+  instance, cascade `resolveTuning`) — PAS le gait du JOUEUR, qui n'est
+  jamais une propriété résolue de cette façon : voir "Équipement" plus haut,
+  `core/equipment.js`/`gaitOf` le DÉRIVE de `session.equipment` à chaque
+  pas, jamais stocké nulle part (contrairement à cette propriété d'entité).
 - **`naturalWalk`** — le pas NATUREL de l'entité (ex. `"barefoot"`), pour
   une entité qui n'a pas de gait particulier mais un pas qui lui est propre
   malgré tout. Une entité qui porte déjà son PROPRE son de déplacement

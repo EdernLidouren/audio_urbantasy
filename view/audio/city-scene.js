@@ -61,6 +61,8 @@ import { MOVE_STEP, getActiveWorld } from "../../core/state.js";
 import { surfaceAt, surfaceProps } from "../../core/surfaces.js";
 import { phaseAt } from "../../core/time.js";
 import { isPresent } from "../../core/presence.js";
+import { gaitOf } from "../../core/equipment.js";
+import { ITEM_REGISTRY } from "../../core/items.js";
 
 // Facteurs de préférence (Options > Audio, voir view/menus/audio-menu.js) :
 // stockés en pourcentage [0,100] (même domaine que les sliders), convertis
@@ -113,6 +115,19 @@ function pickMusicPath(world, phase) {
 // résolus via resolveTuning (cascade son -> instance -> type -> défaut
 // global), voir plus bas.
 const STEP_DISTANCE = TUNING_DEFAULTS.stepDistance;
+// Tous les gaits que LE JOUEUR peut porter — "barefoot" (défaut, rien
+// équipé, voir core/equipment.js/gaitOf) PLUS chaque gait déclaré par un
+// objet equippable au slot "feet" (core/items.js/ITEM_REGISTRY). Dérivé du
+// registre, jamais une liste dupliquée à la main : un futur objet
+// equippable ajouté au registre met ce préchargement à jour tout seul.
+// Nécessaire pour le PRÉCHARGEMENT (voir plus bas) : l'équipement peut
+// changer PENDANT une visite (équiper/déséquiper, voir
+// view/menus/inventory-menu.js), donc TOUS ces gaits doivent déjà être
+// amorcés au montage, pas seulement celui actif à l'instant du montage.
+const PLAYER_GAIT_POOL = [
+  "barefoot",
+  ...new Set(Object.values(ITEM_REGISTRY).filter((props) => props.slot === "feet").map((props) => props.gait)),
+];
 // Anti-mitraillette pour le son de COLLISION UNIQUEMENT (voir
 // playCollisionSound plus bas) — le pas, lui, n'utilise plus aucun
 // cooldown : son débit est borné par STEP_DISTANCE (voir stepWalker), un
@@ -733,7 +748,7 @@ export function createCityAudioScene(getSession) {
     playOneShot(resolveAsset(resolveFootstepPath(initialWorld, atX, candidates)), { volume: 0 });
   }
   warmUpFootstep(getSession().player.x, {
-    gait: player.gait,
+    gait: gaitOf(getSession().equipment),
     naturalWalk: player.naturalWalk,
     ownPath: MOVEMENT_SOUND.path,
   });
@@ -773,8 +788,13 @@ export function createCityAudioScene(getSession) {
     if (enterSound) preloadKeys.add(enterSound.path);
     if (exitSound) preloadKeys.add(exitSound.path);
   }
-  for (const key of footstepCandidateKeys({ gait: player.gait, naturalWalk: player.naturalWalk, ownPath: MOVEMENT_SOUND.path })) {
-    preloadKeys.add(key);
+  // Tous les gaits POSSIBLES du joueur (PLAYER_GAIT_POOL), pas seulement
+  // celui actif au montage — voir son commentaire : équiper/déséquiper en
+  // cours de visite ne doit jamais tomber sur un pool encore jamais amorcé.
+  for (const gait of PLAYER_GAIT_POOL) {
+    for (const key of footstepCandidateKeys({ gait, naturalWalk: player.naturalWalk, ownPath: MOVEMENT_SOUND.path })) {
+      preloadKeys.add(key);
+    }
   }
   preloadKeys.add(FOOTSTEP_FLOOR_PATH);
   // defaultSurface est la couche de BASE (voir core/surfaces.js/surfaceAt) :
@@ -904,13 +924,16 @@ export function createCityAudioScene(getSession) {
   // Joue le son de pas du joueur à LA POSITION donnée (le pas de démarrage,
   // ou un jalon franchi — voir stepWalker) — chemin résolu à CHAQUE appel
   // (voir resolveFootstepPath), jamais figé au MOVEMENT_SOUND.path
-  // d'origine, qui ne sert que de repli "son propre" si gait/naturalWalk
-  // (champs directs sur player, pas de cascade instance/archétype pour lui
-  // — voir entities/player.js) ne résolvent rien. AUCUN cooldown : le débit
-  // est déjà borné par stepDistance côté stepWalker, jamais par un
-  // deuxième garde-fou temporel ici.
+  // d'origine, qui ne sert que de repli "son propre" si gait/naturalWalk ne
+  // résolvent rien. gait relu FRAÎCHEMENT depuis l'équipement COURANT à
+  // CHAQUE pas (gaitOf, core/equipment.js) — jamais mis en cache : c'est ce
+  // qui fait qu'équiper/déséquiper change le pas SUIVANT automatiquement,
+  // sans notification. AUCUN cooldown : le débit est déjà borné par
+  // stepDistance côté stepWalker, jamais par un deuxième garde-fou temporel
+  // ici.
   function playFootstep(atX, world) {
-    const path = resolveFootstepPath(world, atX, { gait: player.gait, naturalWalk: player.naturalWalk, ownPath: MOVEMENT_SOUND.path });
+    const gait = gaitOf(getSession().equipment);
+    const path = resolveFootstepPath(world, atX, { gait, naturalWalk: player.naturalWalk, ownPath: MOVEMENT_SOUND.path });
     playOneShot(resolveAsset(path), { reverbSend: FOOTSTEP_REVERB_SEND, reverbBusInput: reverbBus.input, volume: footstepVolumeFactor() });
   }
 

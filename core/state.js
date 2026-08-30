@@ -6,15 +6,20 @@
 // son absence — une re-visite les ressort tels qu'ils ont été laissés
 // (PNJ compris), pas réinitialisés. Forme :
 //   { player, worlds: { [id]: <état d'un monde> }, activeWorldId, time,
-//     money, bag, companions, companionsRngState }
+//     money, bag, equipment, companions, companionsRngState }
 // player : l'état du joueur (position, extensible plus tard).
 // money : entier, cercle PARTIE (comme time) — voir core/money.js/addMoney,
 // SEUL point d'écriture.
 // bag : liste d'entrées d'objets, cercle PARTIE (comme money) — voir
 // core/bag.js/addItem, SEUL point d'écriture. Premier tiers de
 // l'inventaire (money) puis deuxième (bag), même statut, même patron.
-// Vit ICI, JAMAIS dans les entités d'un monde : il traverse les lieux, ne
-// leur appartient pas. worlds[id] : ~ l'ancien "level" (entités avec
+// equipment : slots nommés { feet: <entrée ou null> }, TROISIÈME tiers —
+// voir core/equipment.js (equipItem/unequipItem, SEULS points d'écriture ;
+// gaitOf, dérivation pure du pas). Un objet donné n'est jamais À LA FOIS
+// dans bag ET dans equipment.
+// Tous trois vivent ICI, JAMAIS dans les entités d'un monde : ils
+// traversent les lieux, ne leur appartiennent pas. worlds[id] : ~ l'ancien
+// "level" (entités avec
 // position/intention/état, longueur, métadonnées), PLUS son propre rngState
 // (chaque monde avance sa propre suite de tirages, gelée avec lui) et
 // lastVisited (horodaté au rangement, voir travelToWorld, avec la minute de
@@ -178,8 +183,19 @@ export function createInitialState(level, seed = DEFAULT_SEED, { companions } = 
     // de plus arbitraire.
     money: 0,
     // Sac d'objets : voir core/bag.js/addItem, SEUL point d'écriture. Une
-    // partie neuve démarre vide, comme l'argent — même précédent.
-    bag: [],
+    // partie neuve démarre avec une paire de rangers DÉJÀ DANS LE SAC (pas
+    // équipées) — contenu de départ pour tester l'échange gait "boots" sans
+    // avoir à en ramasser une paire en jeu (voir core/items.js/
+    // ITEM_REGISTRY.combat_boots). Rien d'autre : pas d'argent, ni le reste
+    // du contenu ramassable normalement.
+    bag: [{ type: "combat_boots" }],
+    // Équipement : voir core/equipment.js. Une partie neuve démarre avec
+    // une paire de baskets déjà ÉQUIPÉE au slot "feet" — jamais posée dans
+    // le sac d'abord : ce n'est pas un ramassage, juste l'état de départ.
+    // Plus naturel que pieds nus, et donne un équipement non vide dès le
+    // premier pas pour l'entendre/le tester (gait "shoes", voir
+    // core/items.js/ITEM_REGISTRY.sneakers).
+    equipment: { feet: { type: "sneakers" } },
     companions: repositionCompanions(requestedCompanions.slice(0, MAX_COMPANIONS), level.playerStart, level.length),
     // Flux PRNG dédié aux compagnons (voir header) : dérivé du même seed,
     // mais hashé sous une clé distincte — jamais la même suite que le

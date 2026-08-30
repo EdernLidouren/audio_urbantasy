@@ -22,13 +22,27 @@ export default {
 
   "inventory.title": "Bag",
   "inventory.empty": "Bag empty.",
+  // No trailing period, reserved for the empty bag tab's list entry (see
+  // view/menus/inventory-menu.js/buildBagEntries) — sentence-ending
+  // punctuation already comes from the position suffix ("1 of 1").
+  "inventory.empty.entry": "Bag empty",
   "inventory.entry.stack": "{item} × {quantity}: {description}",
   "inventory.entry.unique": "{item}: {description}",
   "inventory.actions.drop": "Drop",
+  "inventory.actions.equip": "Equip",
+  "inventory.actions.unequip": "Unequip",
   "inventory.actions.cancel": "Cancel",
   "inventory.quantity.announce": "Quantity to drop: {quantity} of {max}.",
   "inventory.dropped": "Dropped: {item}.",
   "inventory.dropped.stack": "Dropped: {item} × {quantity}.",
+  "inventory.equipped": "Equipped: {item}.",
+  "inventory.unequipped": "Unequipped: {item}.",
+
+  "inventory.equipment.title": "Equipment",
+  "inventory.equipment.slot.occupied": "{slot}: {item}",
+  "inventory.equipment.slot.empty": "{slot}: empty",
+  "inventory.equipment.slot.emptyAnnounce": "Empty slot.",
+  "equipment.slot.feet": "Feet",
 
   "menu.pause.title": "Pause",
   "menu.pause.options": "Options",
@@ -143,6 +157,12 @@ export default {
   "item.apple.description": "An apple, fresh and crunchy.",
   "item.key_bronze": "Bronze key",
   "item.key_bronze.description": "A small bronze key.",
+  "item.sneakers": "Sneakers",
+  "item.sneakers.description": "A pair of light, simple sneakers.",
+  "item.leather_boots": "Leather boots",
+  "item.leather_boots.description": "A sturdy pair of leather boots.",
+  "item.combat_boots": "Combat boots",
+  "item.combat_boots.description": "A rugged, practically indestructible pair of combat boots.",
   "object.toolbox": "Toolbox",
   "object.toolbox.description": "A metal toolbox. It looks like it can be searched.",
   "npc.passerby": "Passerby",

@@ -24,15 +24,36 @@ checkBindingsForCollisions(MOVE_BINDINGS, "view/input.js MOVE_BINDINGS");
 // OS incluses.
 export const MOVE_KEYS = [...MOVE_BINDINGS.moveLeft.keys, ...MOVE_BINDINGS.moveRight.keys];
 
+// "Tab" doit être supprimé INCONDITIONNELLEMENT (pas seulement là où un écran
+// le consomme, comme lib/menu.js/inventory-menu.js le font déjà via
+// TAB_BINDINGS) : dans tout contexte qui ne le lie à rien (city-screen, un
+// menu lib/menu.js sans binding Tab), le navigateur reprend la main avec sa
+// navigation de focus native et sort le focus de #game — sans retour possible
+// autrement qu'en rechargeant la page (aucun moyen de re-cibler #game depuis
+// l'extérieur du jeu). Une seule entrée "Tab" couvre aussi Maj+Tab : event.key
+// vaut "Tab" indépendamment du modificateur, et preventDefaultKeys ne
+// distingue pas les modificateurs (voir lib/input.js/initInput).
+export const ALWAYS_PREVENT_DEFAULT_KEYS = [...MOVE_KEYS, "Tab"];
+
 // Raccourcis de la ville — APPUI (voir view/city-screen.js/onKeyDown, qui
 // résout cette table via lib/input.js/resolveAction). "debugPosition"/
 // "debugSpawn" restent bindés inconditionnellement ; c'est la CONSOMMATION
 // (city-screen.js) qui les ignore hors mode debug, comme avant.
+//
+// "openEquipment" partage la touche "q" avec "moveLeft" (MOVE_BINDINGS
+// ci-dessus) — PAS une ambiguïté : les deux canaux sont INDÉPENDANTS
+// (continu vs appui, voir lib/input.js), et le mouvement n'est de toute
+// façon consommé QUE par city-screen.js/onTick, qui cesse d'être appelé dès
+// que l'écran d'inventaire passe au sommet de la pile (seul le sommet
+// tique, voir CLAUDE.md) — presser "q" ouvre donc l'équipement SANS jamais
+// faire bouger le joueur, même si la touche reste techniquement "tenue"
+// pendant que l'écran est ouvert.
 export const CITY_BINDINGS = {
   pauseMenu: { keys: ["Escape"], mods: [] },
   announceTime: { keys: ["t"], mods: [] },
   announceMoney: { keys: ["g"], mods: [] },
   openInventory: { keys: ["i"], mods: [] },
+  openEquipment: { keys: ["q"], mods: [] },
   debugPosition: { keys: ["x"], mods: [] },
   debugSpawn: { keys: ["e"], mods: [] },
   interactDescribe: { keys: [" "], mods: [] },

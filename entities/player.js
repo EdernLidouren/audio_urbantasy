@@ -7,23 +7,23 @@
 // movement : le bruit de pas. loop:false ("ponctuel" au sens du modèle) car
 // c'est city-scene.js qui le rejoue à la cadence de marche (STEP_DISTANCE) —
 // ce n'est pas une boucle Web Audio native, même si la marche elle-même est
-// continue. path pointe sur le pool "shoes_walk" (variété à chaque pas,
-// voir resolveAsset) — remplace l'ancien concrete_walk_1.mp3 unique,
-// supprimé de assets/ lors de l'ajout des pools shoes_walk/sand_walk : ce
-// pool est désormais le repli "son propre" du joueur (voir
-// entities/model.md, "Surfaces de sol et son de pas") si gait/naturalWalk
-// ne résolvent rien — ce qui n'arrive plus tant que gait ci-dessous est
-// présent, mais reste le filet si on le retire.
+// continue. path pointe sur le pool "shoes_walk" — repli "son propre" du
+// joueur (voir entities/model.md, "Surfaces de sol et son de pas"),
+// STRUCTURELLEMENT nécessaire mais jamais atteint en pratique aujourd'hui :
+// le gait dérivé (voir plus bas) résout TOUJOURS un pool réel
+// (barefoot/shoes/boots existent tous), le filet ne servirait que si l'un
+// de ces trois pools venait à manquer.
 //
-// gait:"shoes" — TEMPORAIRE (test des pools shoes_walk/sand_walk fraîchement
-// ajoutés, voir level/demo.json qui sépare sa scène en concrete/sand) : sur
-// sol NEUTRE, force le pas du joueur sur shoes_walk (cran gait, le premier
-// testé) ; sur sol SPÉCIAL (sable), le sol domine et ce gait est ignoré,
-// shoes_walk ne joue PAS. Retire ce champ une fois l'écoute terminée — le
-// joueur retombera alors sur movement.path ci-dessus (identique à l'oreille
-// sur sol neutre, puisque les deux pointent déjà sur shoes_walk).
+// GAIT : jamais stocké ici, ni nulle part sur le joueur — DÉRIVÉ de
+// l'équipement à CHAQUE pas (voir core/equipment.js/gaitOf,
+// view/audio/city-scene.js/playFootstep) : le slot "feet" (session.equipment)
+// porte-t-il un objet avec un gait (core/items.js/ITEM_REGISTRY) ? oui -> ce
+// gait ; slot vide -> "barefoot" (pieds nus, défaut). Équiper/déséquiper
+// change donc le pas SUIVANT automatiquement, sans notification ni code de
+// synchro — c'est tout l'intérêt de dériver plutôt que de stocker. Sur sol
+// SPÉCIAL (ex. sable), le sol domine de toute façon et ce gait est ignoré
+// (voir entities/model.md, "Surfaces de sol et son de pas").
 export default {
-  gait: "shoes",
   sounds: {
     movement: { path: "assets/sounds/footsteps/shoes_walk", loop: false },
   },

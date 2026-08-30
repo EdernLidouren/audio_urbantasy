@@ -13,6 +13,7 @@
 
 import { DEFAULT_SURFACE } from "./surfaces.js";
 import { INITIAL_TIME } from "./time.js";
+import { createEmptyEquipment } from "./equipment.js";
 
 export const SAVE_VERSION = 1;
 
@@ -84,8 +85,9 @@ function backfillWorld(world) {
 // `companions`/`companionsRngState` (voir core/state.js), de `time` (voir
 // core/time.js — absent d'une sauvegarde antérieure à l'horloge de partie),
 // de `money` (voir core/money.js — même précédent), de `bag` (voir
-// core/bag.js — même précédent) et, par monde, de
-// floors/defaultSurface/segments (voir backfillWorld) —
+// core/bag.js — même précédent), de `equipment` (voir core/equipment.js —
+// même précédent, mais rebouché VIDE, jamais avec un objet par défaut) et,
+// par monde, de floors/defaultSurface/segments (voir backfillWorld) —
 // absents d'une sauvegarde antérieure à leur introduction, sans que ça
 // justifie une montée de version (la forme reste v1, juste complétée par
 // des défauts sûrs). Point d'ancrage documenté pour de futures montées
@@ -112,6 +114,15 @@ function migrateSave(raw) {
 
   if (!Array.isArray(data.bag)) {
     data = { ...data, bag: [] };
+  }
+
+  // equipment (core/equipment.js) : REBOUCHÉ VIDE, jamais avec un objet par
+  // défaut — une sauvegarde antérieure représente une partie déjà en cours,
+  // lui injecter rétroactivement des baskets serait une surprise, pas un
+  // rebouchage neutre (contrairement à createInitialState, qui ne s'applique
+  // qu'à une partie VRAIMENT neuve).
+  if (!data.equipment || typeof data.equipment !== "object") {
+    data = { ...data, equipment: createEmptyEquipment() };
   }
 
   if (data.worlds && typeof data.worlds === "object") {
