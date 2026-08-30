@@ -6,7 +6,7 @@
 import { pushScreen, tickActive, tickFrame } from "./lib/screens.js";
 import { initInput, onGlobalPress } from "./lib/input.js";
 import { ensureAudioUnlocked, setMasterVolume } from "./lib/audio.js";
-import { ALWAYS_PREVENT_DEFAULT_KEYS, GLOBAL_BINDINGS } from "./view/input.js";
+import { MOVE_KEYS, GLOBAL_BINDINGS } from "./view/input.js";
 import { createMainMenu } from "./view/menus/main-menu.js";
 import { makeMenuScreen, configureMenuPreferences, configureMenuSounds } from "./lib/menu.js";
 import { playMenuSound } from "./view/menu-sounds.js";
@@ -68,12 +68,13 @@ setMasterVolume(getPref("masterVolume", PREF_CONSTRAINTS.masterVolume.default) /
 
 // lib/input.js ne connaît pas l'audio : c'est ici, au point de composition,
 // qu'on branche le déverrouillage sur le tout premier appui touche.
-// preventDefaultKeys (ALWAYS_PREVENT_DEFAULT_KEYS, view/input.js) : supprime
-// le défilement de page sur les touches de mouvement ET la navigation de
-// focus native sur Tab, à chaque appui (répétitions OS incluses) — lib/input.js
-// reste l'UNIQUE écouteur DOM, cette liste lui est simplement fournie, jamais
-// devinée.
-initInput(gameZone, { onFirstInput: ensureAudioUnlocked, preventDefaultKeys: ALWAYS_PREVENT_DEFAULT_KEYS });
+// preventDefaultKeys (MOVE_KEYS, view/input.js) : supprime le défilement de
+// page sur les touches de mouvement, à chaque appui (répétitions OS
+// incluses) — lib/input.js reste l'UNIQUE écouteur DOM, cette liste lui est
+// simplement fournie, jamais devinée. Le piège de focus Tab est neutralisé
+// séparément, INCONDITIONNELLEMENT, DANS lib/input.js lui-même (voir
+// ALWAYS_NEUTRALIZED_BINDINGS) — rien à fournir ici pour ça.
+initInput(gameZone, { onFirstInput: ensureAudioUnlocked, preventDefaultKeys: MOVE_KEYS });
 
 // Ctrl+D : bascule le mode debug SANS passer par la console (voir
 // toggleDebug ci-dessus) — binding GLOBAL (lib/input.js/onGlobalPress),

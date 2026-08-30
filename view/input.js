@@ -24,16 +24,11 @@ checkBindingsForCollisions(MOVE_BINDINGS, "view/input.js MOVE_BINDINGS");
 // OS incluses.
 export const MOVE_KEYS = [...MOVE_BINDINGS.moveLeft.keys, ...MOVE_BINDINGS.moveRight.keys];
 
-// "Tab" doit être supprimé INCONDITIONNELLEMENT (pas seulement là où un écran
-// le consomme, comme lib/menu.js/inventory-menu.js le font déjà via
-// TAB_BINDINGS) : dans tout contexte qui ne le lie à rien (city-screen, un
-// menu lib/menu.js sans binding Tab), le navigateur reprend la main avec sa
-// navigation de focus native et sort le focus de #game — sans retour possible
-// autrement qu'en rechargeant la page (aucun moyen de re-cibler #game depuis
-// l'extérieur du jeu). Une seule entrée "Tab" couvre aussi Maj+Tab : event.key
-// vaut "Tab" indépendamment du modificateur, et preventDefaultKeys ne
-// distingue pas les modificateurs (voir lib/input.js/initInput).
-export const ALWAYS_PREVENT_DEFAULT_KEYS = [...MOVE_KEYS, "Tab"];
+// Le piège de focus Tab (navigation native du navigateur sortant le focus de
+// #game) N'EST PLUS géré ici : lib/input.js neutralise Tab/Maj+Tab de façon
+// INCONDITIONNELLE et générique, en tête de son propre traitement (voir
+// ALWAYS_NEUTRALIZED_BINDINGS, lib/input.js) — rien à fournir depuis ce
+// fichier pour ça.
 
 // Raccourcis de la ville — APPUI (voir view/city-screen.js/onKeyDown, qui
 // résout cette table via lib/input.js/resolveAction). "debugPosition"/
@@ -64,10 +59,14 @@ checkBindingsForCollisions(CITY_BINDINGS, "view/input.js CITY_BINDINGS");
 // Bindings GLOBAUX — indépendants de la pile d'écrans, voir
 // lib/input.js/onGlobalPress (câblé depuis main.js) : disponibles quel que
 // soit l'écran actif (menu, pause, ville...), exactement comme l'ancien
-// écouteur Alt+D dédié qu'ils remplacent. Ctrl plutôt qu'Alt (choix
-// délibéré) : Alt seul déplace le focus navigateur vers sa barre de menus
+// écouteur Alt+D dédié qu'ils remplacent. Ctrl plutôt qu'Alt : RÈGLE DE
+// CONCEPTION du projet (voir lib/input.js/header) — aucun binding de jeu,
+// dans AUCUNE table (celles-ci comme MOVE_BINDINGS/CITY_BINDINGS ci-dessus),
+// n'utilise Alt. Alt seul déplace le focus navigateur vers sa barre de menus
 // sur certains navigateurs (Firefox notamment), gênant même avec
-// preventDefault sur la combinaison — Ctrl n'a pas ce défaut.
+// preventDefault sur la combinaison ; Alt reste réservé à l'utilisateur/au
+// navigateur/au lecteur d'écran, jamais au jeu — seuls Ctrl et Shift servent
+// de modificateurs ici.
 export const GLOBAL_BINDINGS = {
   toggleDebug: { keys: ["d"], mods: ["ctrl"] },
 };

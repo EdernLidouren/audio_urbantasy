@@ -256,7 +256,8 @@ function buildInventoryTabsScreen(scene, getSession, initialTab) {
     onKeyDown(event) {
       const action = resolveAction(TAB_BINDINGS, event.key, event.mods);
       if (action === "nextTab" || action === "prevTab") {
-        event.preventDefault();
+        // Comportement navigateur de Tab déjà neutralisé en amont, voir
+        // lib/input.js/ALWAYS_NEUTRALIZED_BINDINGS — rien à prévenir ici.
         activeTab = otherTab(activeTab);
         rebuildInner();
         inner.onEnter(); // annonce "<Nom de l'onglet>. <contenu>" — voir header.
