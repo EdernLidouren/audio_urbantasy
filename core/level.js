@@ -47,6 +47,19 @@ function parseEffect(rawEffect, effectIndex, ruleIndex, index, id) {
     return { type: "presence", present: rawEffect.present };
   }
   if (type === "behavior") {
+    // behavior: null -> RETRAIT explicite du comportement actif (voir
+    // core/scripting.md, "Effets"/"behavior") : l'entité redevient immobile,
+    // comme si elle n'en avait jamais eu — SEULE valeur acceptée en dehors
+    // d'un objet behavior valide (jamais `undefined`, qui signifierait
+    // "aucun effet à ce champ", pas "retire-le" ; core/presence.js/
+    // resolveEntityRules distingue les deux). Nécessaire pour qu'un cycle de
+    // routine "goto" reste réenclenchable : sans repasser par un `kind`
+    // différent de "goto" (ou par ce retrait), `entity.gotoArrived` — jamais
+    // remis à faux ailleurs — laisserait la condition "arrived" bloquée à
+    // vrai pour toujours après la première arrivée.
+    if (rawEffect.behavior === null) {
+      return { type: "behavior", behavior: null };
+    }
     return { type: "behavior", behavior: parseBehavior(rawEffect.behavior, index, id) };
   }
   fail(`entities[${index}] ("${id}") : presence[${ruleIndex}].effects[${effectIndex}].type "${type}" inconnu.`);

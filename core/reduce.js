@@ -98,13 +98,17 @@ function resolveTargetPosition(state, world, targetId) {
 // suivant (un goto qui vient d'être posé commence à se diriger vers sa
 // cible dès ce même tick). L'effet ne fait QUE poser le comportement ;
 // c'est ensuite le pipeline normal ci-dessous (module.step) qui l'exécute
-// — jamais l'effet lui-même qui déplace l'entité.
+// — jamais l'effet lui-même qui déplace l'entité. `behaviorEffect` DISTINGUE
+// `undefined` (aucun effet ce tick — comportement inchangé) de `null`
+// (retrait EXPLICITE, voir core/level.js/parseEffect) : `!== undefined`,
+// jamais un simple test de vérité, sinon `null` serait confondu avec
+// "rien à faire" et le comportement resterait figé sur son ancien `kind`.
 function stepEntities(entities, context) {
   let rngState = context.rngState;
   const results = entities.map((entity) => {
     const resolved = resolveEntityRules(entity, context.presenceContext);
     const { present, presenceChanged, ruleActive, behaviorEffect } = resolved;
-    const effectiveEntity = behaviorEffect ? { ...entity, behavior: behaviorEffect } : entity;
+    const effectiveEntity = behaviorEffect !== undefined ? { ...entity, behavior: behaviorEffect } : entity;
     const withPresence = (e) =>
       entity.presence ? { ...e, present, presenceChanged, ruleActive } : e;
 

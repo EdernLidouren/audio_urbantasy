@@ -1995,31 +1995,188 @@ export function runMovementChecks() {
   run("routine : réveil (8h), tick suivant — comportement 'wander'", "wander", resident(morningTick2).behavior.kind);
 
   // --- Miroir demo1/demo2 (même personnage, deux déclarations séparées,
-  // AUCUN état partagé) : jamais présent aux deux, jamais absent aux deux.
-  // Instantanés RÉALISTES (voir entities/model.md) : demo.json place la
-  // porte à ~11 unités de l'habitant (quelques minutes de jeu de marche,
-  // largement sous l'heure de battement avant l'ouverture de la fenêtre
-  // "maison" à 21h) — les instantanés à 21h/23h supposent donc une arrivée
-  // déjà faite, comme en jeu réel.
+  // AUCUN état partagé) — RÉEL, voir level/demo.json/"npc-resident" et
+  // level/demo2.json/"npc-resident-home" (mêmes horaires EXACTS ici) :
+  // away (demo1) présente 8h-20h (wander) + 20h-23h (goto vers "door-exit",
+  // filet à 23h) ; home (demo2) présente 20h-8h (immobile, AUCUN
+  // comportement de repos) + 8h-11h (goto vers "door-back", filet à 11h).
+  // Avec CES horaires précis (fenêtres de transit PARTAGÉES, 20h-23h et
+  // 8h-11h), "jamais présent aux deux" NE TIENT PLUS — voir
+  // `entities/model.md`/"Chevauchement ASSUMÉ" : le test vérifie donc
+  // l'invariant qui RESTE vrai ("jamais absent aux deux") et affirme
+  // EXPLICITEMENT le chevauchement aux heures concernées, plutôt que de le
+  // laisser accidentellement passer inaperçu.
 
-  const homeRule = { when: { type: "timeRange", from: 21, to: 8 }, effects: [{ type: "presence", present: true }] };
-  const homeInstance = { id: "npc-resident-home", presence: [homeRule] };
+  function demo1RoutineRules(doorId) {
+    return [
+      { when: { type: "arrived" }, effects: [{ type: "presence", present: false }] },
+      { when: { type: "timeRange", from: 23, to: 8 }, effects: [{ type: "presence", present: false }] },
+      {
+        when: { type: "timeRange", from: 8, to: 20 },
+        effects: [
+          { type: "presence", present: true },
+          { type: "behavior", behavior: { kind: "wander" } },
+        ],
+      },
+      {
+        when: { type: "timeRange", from: 20, to: 23 },
+        effects: [
+          { type: "presence", present: true },
+          { type: "behavior", behavior: { kind: "goto", targetId: doorId } },
+        ],
+      },
+    ];
+  }
 
-  const checkpoints = [
-    { hour: 12, awayBehavior: { kind: "wander" }, awayArrived: undefined, label: "12h (jour)" },
-    { hour: 20, awayBehavior: { kind: "goto" }, awayArrived: undefined, label: "20h (départ tout juste amorcé)" },
-    { hour: 21, awayBehavior: { kind: "goto" }, awayArrived: true, label: "21h (arrivée supposée faite)" },
-    { hour: 23, awayBehavior: { kind: "goto" }, awayArrived: true, label: "23h (nuit avancée)" },
-    { hour: 8, awayBehavior: { kind: "wander" }, awayArrived: true, label: "8h (réveil, comportement déjà repassé à wander)" },
+  function homeRoutineRules(doorId) {
+    return [
+      { when: { type: "arrived" }, effects: [{ type: "presence", present: false }] },
+      { when: { type: "timeRange", from: 11, to: 20 }, effects: [{ type: "presence", present: false }] },
+      {
+        when: { type: "timeRange", from: 20, to: 8 },
+        effects: [
+          { type: "presence", present: true },
+          { type: "behavior", behavior: null },
+        ],
+      },
+      {
+        when: { type: "timeRange", from: 8, to: 11 },
+        effects: [
+          { type: "presence", present: true },
+          { type: "behavior", behavior: { kind: "goto", targetId: doorId } },
+        ],
+      },
+    ];
+  }
+
+  // Instantanés RÉALISTES : behavior/gotoArrived hors "arrived" à chaque
+  // checkpoint reflètent un état PLAUSIBLE à cette heure (comportement déjà
+  // remis à jour par le cycle précédent), comme le faisait l'ancienne
+  // version de ce test.
+  const mirrorCheckpoints = [
+    { hour: 12, awayBehavior: { kind: "wander" }, awayArrived: undefined, homeBehavior: null, homeArrived: true, awayExpected: true, homeExpected: false, label: "12h (jour : away erre, home dormante depuis 11h)" },
+    { hour: 21, awayBehavior: { kind: "goto" }, awayArrived: undefined, homeBehavior: null, homeArrived: true, awayExpected: true, homeExpected: true, label: "21h — CHEVAUCHEMENT ASSUMÉ (away en chemin, home déjà réveillée)" },
+    { hour: 23, awayBehavior: { kind: "goto" }, awayArrived: undefined, homeBehavior: null, homeArrived: true, awayExpected: false, homeExpected: true, label: "23h (filet away déclenché, MÊME sans arrivée réelle)" },
+    { hour: 9, awayBehavior: { kind: "wander" }, awayArrived: true, homeBehavior: { kind: "goto" }, homeArrived: undefined, awayExpected: true, homeExpected: true, label: "9h — CHEVAUCHEMENT ASSUMÉ (away réveillée, home en chemin)" },
+    { hour: 11, awayBehavior: { kind: "wander" }, awayArrived: true, homeBehavior: { kind: "goto" }, homeArrived: undefined, awayExpected: true, homeExpected: false, label: "11h (filet home déclenché, MÊME sans arrivée réelle)" },
   ];
-  checkpoints.forEach(({ hour, awayBehavior, awayArrived, label }) => {
-    const awayInstance = { id: "npc-resident", behavior: awayBehavior, gotoArrived: awayArrived, presence: residentRules("door-1") };
+  mirrorCheckpoints.forEach(({ hour, awayBehavior, awayArrived, homeBehavior, homeArrived, awayExpected, homeExpected, label }) => {
+    const awayInstance = { id: "npc-resident", behavior: awayBehavior, gotoArrived: awayArrived, presence: demo1RoutineRules("door-exit") };
+    const homeInstance = { id: "npc-resident-home", behavior: homeBehavior, gotoArrived: homeArrived, presence: homeRoutineRules("door-back") };
     const context = { time: hour * 60 };
     const awayPresent = isPresent(awayInstance, context);
     const homePresent = isPresent(homeInstance, context);
-    run(`miroir demo1/demo2 : ${label} — jamais présent aux deux à la fois`, false, awayPresent && homePresent);
+    run(`miroir demo1/demo2 : ${label} — away`, awayExpected, awayPresent);
+    run(`miroir demo1/demo2 : ${label} — home`, homeExpected, homePresent);
     run(`miroir demo1/demo2 : ${label} — jamais absent aux deux à la fois`, true, awayPresent || homePresent);
   });
+
+  // --- behavior: null — retrait EXPLICITE d'un comportement (voir
+  // core/level.js/parseEffect, core/scripting.md/"Effets") : nécessaire pour
+  // une entité SANS comportement de repos (ex. "npc-resident-home" ci-dessus)
+  // — sans lui, entity.gotoArrived (jamais remis à faux) et behavior.kind
+  // resté "goto" laisseraient "arrived" bloquée à vrai pour toujours après
+  // la PREMIÈRE arrivée, l'entité ne redeviendrait plus jamais présente. ---
+
+  let nullBehaviorEffectAccepted = false;
+  let parsedNullBehavior;
+  try {
+    const nullEffectLevel = parseLevel(
+      {
+        id: "movement-check-null-behavior-valid",
+        titleKey: "level.demo.title",
+        length: 10,
+        playerStart: 0,
+        entities: [
+          {
+            id: "reset-ok",
+            type: "dog",
+            x: 5,
+            presence: [{ when: { type: "timeRange", from: 0, to: 24 }, effects: [{ type: "behavior", behavior: null }] }],
+          },
+        ],
+      },
+      ROUTINE_REGISTRY
+    );
+    nullBehaviorEffectAccepted = true;
+    parsedNullBehavior = nullEffectLevel.entities[0].presence[0].effects[0].behavior;
+  } catch {
+    nullBehaviorEffectAccepted = false;
+  }
+  run("behavior:null — accepté au chargement, aucune erreur", true, nullBehaviorEffectAccepted);
+  run("behavior:null — transporté TEL QUEL dans l'entité parsée", null, parsedNullBehavior);
+
+  // Application : resolveEntityRules distingue `undefined` (aucun effet ce
+  // tick) de `null` (retrait explicite) — Object.is les sépare, contrairement
+  // à un simple test de vérité.
+  const nullResetEntity = {
+    id: "reset-runtime",
+    behavior: { kind: "goto", targetId: "x" },
+    gotoArrived: true,
+    presence: [{ when: { type: "timeRange", from: 0, to: 24 }, effects: [{ type: "presence", present: true }, { type: "behavior", behavior: null }] }],
+  };
+  const nullResetResolved = resolveEntityRules(nullResetEntity, { time: 0 });
+  run("behavior:null — resolveEntityRules renvoie behaviorEffect === null (jamais confondu avec undefined)", null, nullResetResolved.behaviorEffect);
+
+  // Cycle complet SANS comportement de repos, DEUX jours consécutifs — LE
+  // test qui aurait échoué en permanence dès le second réveil sans
+  // behavior:null (voir header ci-dessus). Mêmes horaires et gabarit que
+  // "npc-resident-home" (level/demo2.json).
+  function homeResident(state) {
+    return getActiveWorld(state).entities.find((e) => e.id === "home-1");
+  }
+  const homeRoutineLevel = parseLevel(
+    {
+      id: "movement-check-home-routine",
+      titleKey: "level.demo.title",
+      length: 20,
+      playerStart: 0,
+      entities: [
+        { id: "door-h", type: "dog", x: 2 },
+        { id: "home-1", type: "dog", x: 15, presence: homeRoutineRules("door-h") },
+      ],
+    },
+    ROUTINE_REGISTRY
+  );
+
+  // INITIAL_TIME = 8h : la fenêtre de transit (8h-11h) est donc DÉJÀ active
+  // dès la création — comportement "goto" posé au tout premier calcul (voir
+  // resolveEntityRules, "premier calcul compte comme une bascule"),
+  // convergence vers la porte dès le premier tick, AUCUN comportement de
+  // repos déclaré au départ (contrairement à resident-1 plus haut).
+  let homeState = createInitialState(homeRoutineLevel, 7, NO_COMPANIONS);
+  for (let i = 0; i < 1000; i++) homeState = reduce(homeState, tick(0));
+  run("routine sans repos (jour 1) : arrivée à la porte -> gotoArrived posé", true, homeResident(homeState).gotoArrived);
+  run("routine sans repos (jour 1) : arrivée -> dormante", false, homeResident(homeState).present);
+
+  // 20h (même jour) : SANS behavior:null, cette bascule échouerait pour
+  // toujours (behavior.kind resté "goto" + gotoArrived resté vrai depuis
+  // l'arrivée du matin ferait gagner "arrived" indéfiniment). Décalage d'UN
+  // TICK attendu (~16 ms, imperceptible), même artefact que le réveil de
+  // "resident-1" plus haut : l'effet "behavior" s'applique DÈS ce tick
+  // (indépendamment de la présence), mais la présence de CE MÊME tick est
+  // encore calculée contre l'ancien `.behavior`.
+  homeState = advanceTime(homeState, 12 * 60); // 8h -> 20h
+  const homeEveningTick1 = reduce(homeState, tick(0));
+  run(
+    "routine sans repos : 20h, 1er tick — comportement déjà vidé (l'effet s'applique même dormante)",
+    null,
+    homeResident(homeEveningTick1).behavior
+  );
+  const homeEveningTick2 = reduce(homeEveningTick1, tick(0));
+  run("routine sans repos : 20h, tick suivant — présente à nouveau, JAMAIS bloquée", true, homeResident(homeEveningTick2).present);
+
+  // Jour 2 : le cycle se répète intégralement — nouvelle arrivée, nouvelle
+  // dormance, nouveau réveil à 20h. C'est CE second cycle qui aurait échoué
+  // silencieusement sans behavior:null (le premier cycle, lui, n'a jamais
+  // besoin du retrait : gotoArrived n'est pas encore posé).
+  let homeDay2 = advanceTime(homeEveningTick2, 12 * 60); // 20h -> 8h (jour 2)
+  for (let i = 0; i < 1000; i++) homeDay2 = reduce(homeDay2, tick(0));
+  run("routine sans repos (jour 2) : nouvelle arrivée -> gotoArrived toujours posé", true, homeResident(homeDay2).gotoArrived);
+  run("routine sans repos (jour 2) : nouvelle arrivée -> dormante", false, homeResident(homeDay2).present);
+  homeDay2 = advanceTime(homeDay2, 12 * 60); // 8h -> 20h (jour 2, soir)
+  const homeDay2Tick2 = reduce(reduce(homeDay2, tick(0)), tick(0));
+  run("routine sans repos (jour 2) : 20h — présente à nouveau, DEUXIÈME cycle réussi", true, homeResident(homeDay2Tick2).present);
 
   // Sérialisabilité : ruleActive (mémoire de bascule des effets "behavior")
   // survit à un aller-retour JSON, comme tout autre champ d'entité.

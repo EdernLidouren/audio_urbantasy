@@ -631,6 +631,18 @@ conçu n'a qu'une seule condition de comportement vraie à un instant donné
 DERNIÈRE de la liste l'emporterait simplement (dernière affectation, jamais
 un crash).
 
+**`behavior: null` — RETRAIT explicite** (au lieu d'un objet behavior) : vide
+le comportement actif de l'entité, qui redevient immobile comme si elle
+n'en avait jamais eu. Nécessaire pour une entité qui n'a PAS de comportement
+de repos vers lequel revenir (voir `npc-resident-home` ci-dessous) : la
+condition `"arrived"` reste vraie tant que `behavior.kind` reste `"goto"`
+(`entity.gotoArrived` n'est jamais remis à `false` par `core/behaviors/
+goto.js`, voir plus bas) — sans un changement de `kind` (vers `"wander"`,
+comme `npc-resident`) OU ce retrait explicite, une entité resterait bloquée
+dormante pour toujours dès sa PREMIÈRE arrivée, incapable de redevenir
+présente au cycle suivant. Validé par `core/level.js`/`parseEffect` comme
+seule valeur spéciale acceptée pour ce champ.
+
 **Condition `"arrived"`** (`{ type: "arrived" }`, sans champ propre) : vraie
 seulement si le comportement ACTIF de l'entité est ENCORE `"goto"` ET que ce
 goto a atteint sa cible (`entity.gotoArrived`, posé par `core/behaviors/
@@ -654,39 +666,49 @@ cette même règle. Accepté tel quel pour l'instant (hors de portée d'un
 plafonnement de l'horloge ou d'un rattrapage multi-monde, ni l'un ni
 l'autre demandé).
 
-**Exemple de référence — l'habitant** (`npc-resident` dans `level/demo.json`,
-`npc-resident-home` dans `level/demo2.json`) : présent et erre le jour ;
-à 20h, part vers la porte (`"behavior"` -> `goto`) tout en restant présent
-(en chemin) ; à l'arrivée (`"arrived"`), devient dormant ; FILET DE SECOURS
-à minuit (`"timeRange"` de 0h à 8h) — dormant QUAND MÊME, qu'il soit arrivé
-ou non (cible manquante, obstacle, trop lent : l'INTENTION "il rentre chez
-lui" reste honorée même sans marche réelle possible, jamais visiblement
-coincé après minuit) ; au matin (8h), présent + `"behavior"` -> `wander` de
-nouveau (nouveau cycle). Voir `core/movement.check.js`, section "Routine
-complète", pour la vérification tick par tick, y compris le cas obstrué et
-le cas de cible manquante.
+**Exemple de référence — l'habitant** (`npc-resident` dans `level/demo.json`) :
+présent et erre de 8h à 20h ; à 20h, part vers `door-exit` (`"behavior"` ->
+`goto`) tout en restant présent (en chemin) ; à l'arrivée (`"arrived"`),
+devient dormant ; FILET DE SECOURS à 23h (`"timeRange"` de 23h à 8h) —
+dormant QUAND MÊME, qu'il soit arrivé ou non (cible manquante, obstacle, trop
+lent : l'INTENTION "il rentre chez lui" reste honorée même sans marche
+réelle possible, jamais visiblement coincé) ; au matin (8h), présent +
+`"behavior"` -> `wander` de nouveau (nouveau cycle — c'est cette
+RÉAFFECTATION à un `kind` différent de `"goto"` qui neutralise la condition
+`"arrived"` d'un cycle sur l'autre, voir plus haut). Voir
+`core/movement.check.js`, section "Routine complète", pour la vérification
+tick par tick d'un cycle équivalent, y compris le cas obstrué et le cas de
+cible manquante.
 
 **Le même personnage, deux scènes — DEUX déclarations séparées, sans état
-partagé** : `npc-resident` (demo1, présent le jour) et `npc-resident-home`
-(demo2, présent la nuit, présence simple sans `"behavior"` — un `goto`
-depuis la porte d'entrée n'a pas été jugé nécessaire ici, cf. `core/
-behaviors/goto.js`) sont deux entités INDÉPENDANTES : un NPC appartient à
-UNE scène (contrairement à un compagnon, voir `core/state.js`), la porte
-qu'il rejoint n'est que de la couleur narrative ("il rentre chez lui, de
-l'autre côté") — jamais une vraie transition d'entité entre scènes, jamais
-besoin de synchroniser les deux mondes. Complémentarité (jamais présent aux
-deux, jamais absent aux deux) obtenue en PRATIQUE par le CHOIX des horaires
-(demo2 démarre à 21h, pas 20h — une heure de battement, largement au-dessus
-de la poignée de minutes que prend la marche dans `level/demo.json`), PAS
-par une garantie structurelle : sans état partagé, rien n'empêche
-STRUCTURELLEMENT une entité lente/obstruée de rester visible au-delà de
-21h en même temps que son double nocturne apparaît déjà — un état de
-personnage PARTAGÉ (variables d'instance lues au chargement des deux scènes,
-ex. "est-il déjà rentré ?") permettrait une synchronisation stricte plus
-tard, SANS refonte : ce système de règles n'a pas à changer, seul le
-CONTEXTE qu'on lui passe grossirait (comme `{ time }` -> `{ time, weather }`
-plus haut). Délibérément DIFFÉRÉ, pas un oubli — aucun consommateur n'en a
-besoin aujourd'hui.
+partagé, DEUX cycles inversés** : `npc-resident` (demo1, présent le jour,
+ci-dessus) et `npc-resident-home` (`level/demo2.json`, présent la nuit — 20h
+à 8h) sont deux entités INDÉPENDANTES : un NPC appartient à UNE scène
+(contrairement à un compagnon, voir `core/state.js`), la porte qu'il rejoint
+n'est que de la couleur narrative ("il rentre chez lui, de l'autre côté") —
+jamais une vraie transition d'entité entre scènes, jamais besoin de
+synchroniser les deux mondes. `npc-resident-home` suit le MÊME schéma,
+inversé et sans comportement de repos (`"aucun"`, contrairement au `wander`
+de son double diurne) : présent la nuit (immobile), part vers `door-back` à
+8h, dormant à l'arrivée, filet de secours à 11h — via `behavior: null`
+plutôt qu'une réaffectation `wander` (voir "Triggers de comportement"
+ci-dessus, `behavior: null`).
+
+**Chevauchement ASSUMÉ, pas une garantie de complémentarité stricte** : avec
+CES horaires précis (fenêtres de transit 20h-23h ET 8h-11h partagées par les
+deux instances), le personnage peut être VISIBLE DANS LES DEUX MONDES À LA
+FOIS pendant ces créneaux (ex. `npc-resident` encore en chemin vers
+`door-exit` à 21h, `npc-resident-home` déjà présente à demo2 depuis 20h) —
+sans état partagé entre les deux déclarations, rien n'empêche
+STRUCTURELLEMENT cette simultanéité ; un contenu qui voudrait l'éviter
+choisirait des horaires DÉCALÉS (comme l'ancienne version de ce contenu, qui
+démarrait la présence nocturne à 21h plutôt que 20h) plutôt qu'exactement
+complémentaires. Un état de personnage PARTAGÉ (variables d'instance lues au
+chargement des deux scènes, ex. "est-il déjà rentré ?") permettrait une
+synchronisation stricte plus tard, SANS refonte : ce système de règles n'a
+pas à changer, seul le CONTEXTE qu'on lui passe grossirait (comme `{ time }`
+-> `{ time, weather }` plus haut). Délibérément DIFFÉRÉ, pas un oubli —
+aucun consommateur n'en a besoin aujourd'hui.
 
 ### Bascule observée : `presenceChanged`
 

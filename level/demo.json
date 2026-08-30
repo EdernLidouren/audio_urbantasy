@@ -15,6 +15,32 @@
     { "id": "apple-1", "type": "apple", "x": 17 },
     { "id": "object-neon", "type": "neon", "x": 30 },
     {
+      "id": "npc-resident",
+      "type": "npc",
+      "x": 20,
+      "nameKey": "npc.resident",
+      "descriptionKey": "npc.resident.description",
+      "behavior": { "kind": "wander" },
+      "presence": [
+        { "when": { "type": "arrived" }, "effects": [{ "type": "presence", "present": false }] },
+        { "when": { "type": "timeRange", "from": 23, "to": 8 }, "effects": [{ "type": "presence", "present": false }] },
+        {
+          "when": { "type": "timeRange", "from": 8, "to": 20 },
+          "effects": [
+            { "type": "presence", "present": true },
+            { "type": "behavior", "behavior": { "kind": "wander" } }
+          ]
+        },
+        {
+          "when": { "type": "timeRange", "from": 20, "to": 23 },
+          "effects": [
+            { "type": "presence", "present": true },
+            { "type": "behavior", "behavior": { "kind": "goto", "targetId": "door-exit" } }
+          ]
+        }
+      ]
+    },
+    {
       "id": "door-club",
       "type": "door",
       "x": 25,

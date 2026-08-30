@@ -14,7 +14,24 @@
       "x": 4,
       "nameKey": "npc.resident",
       "descriptionKey": "npc.resident.description",
-      "presence": [{ "when": { "type": "timeRange", "from": 21, "to": 8 }, "effects": [{ "type": "presence", "present": true }] }]
+      "presence": [
+        { "when": { "type": "arrived" }, "effects": [{ "type": "presence", "present": false }] },
+        { "when": { "type": "timeRange", "from": 11, "to": 20 }, "effects": [{ "type": "presence", "present": false }] },
+        {
+          "when": { "type": "timeRange", "from": 20, "to": 8 },
+          "effects": [
+            { "type": "presence", "present": true },
+            { "type": "behavior", "behavior": null }
+          ]
+        },
+        {
+          "when": { "type": "timeRange", "from": 8, "to": 11 },
+          "effects": [
+            { "type": "presence", "present": true },
+            { "type": "behavior", "behavior": { "kind": "goto", "targetId": "door-back" } }
+          ]
+        }
+      ]
     },
     { "id": "crate-port", "type": "crate", "x": 8 },
     {

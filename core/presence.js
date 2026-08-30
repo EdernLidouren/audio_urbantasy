@@ -184,7 +184,11 @@ function ruleEffect(rule, type) {
 //     de règle : `entity.presence` est figé au chargement, jamais réordonné
 //     en cours de partie) ;
 //   - behaviorEffect : le comportement à POSER ce tick si un effet
-//     "behavior" vient de basculer (voir plus bas), sinon undefined.
+//     "behavior" vient de basculer (voir plus bas), `null` si cet effet est
+//     un RETRAIT explicite (voir core/level.js/parseEffect), `undefined`
+//     si aucun effet "behavior" n'a basculé — trois valeurs distinctes,
+//     jamais confondues par l'appelant (core/reduce.js compare à
+//     `undefined`, jamais un test de vérité).
 // Sans `entity.presence` : present toujours vrai, rien d'autre à calculer —
 // comportement STRICTEMENT inchangé pour toute entité sans règle.
 export function resolveEntityRules(entity, context) {

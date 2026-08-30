@@ -177,6 +177,10 @@ d'une entité, voir plus bas> }` — un `kind` de comportement inconnu dans un
 effet `"behavior"` est rejeté au chargement, exactement comme un `behavior`
 d'entité invalide. Un effet `"behavior"` ne s'applique qu'à la BASCULE de sa
 règle (faux -> vrai), jamais en continu — voir `entities/model.md`.
+`behavior: null` (au lieu d'un objet) est la SEULE valeur spéciale acceptée :
+RETRAIT explicite du comportement actif (l'entité redevient immobile) —
+nécessaire pour qu'un cycle `"goto"` redevienne réenclenchable sans passer
+par un autre `kind` (voir `core/scripting.md`, "Effets").
 
 ## Collectible persistant
 
