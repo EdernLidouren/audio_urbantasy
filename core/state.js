@@ -183,12 +183,13 @@ export function createInitialState(level, seed = DEFAULT_SEED, { companions } = 
     // de plus arbitraire.
     money: 0,
     // Sac d'objets : voir core/bag.js/addItem, SEUL point d'écriture. Une
-    // partie neuve démarre avec une paire de rangers DÉJÀ DANS LE SAC (pas
-    // équipées) — contenu de départ pour tester l'échange gait "boots" sans
-    // avoir à en ramasser une paire en jeu (voir core/items.js/
-    // ITEM_REGISTRY.combat_boots). Rien d'autre : pas d'argent, ni le reste
-    // du contenu ramassable normalement.
-    bag: [{ type: "combat_boots" }],
+    // partie neuve démarre avec une paire de rangers ET une paire
+    // d'escarpins DÉJÀ DANS LE SAC (pas équipées) — contenu de départ pour
+    // tester l'échange gait "boots"/"high_heels" et le tag "chic" (porte à
+    // dresscode, voir level/demo.json) sans avoir à en ramasser en jeu (voir
+    // core/items.js/ITEM_REGISTRY.combat_boots/high_heels). Rien d'autre :
+    // pas d'argent, ni le reste du contenu ramassable normalement.
+    bag: [{ type: "combat_boots" }, { type: "high_heels" }],
     // Équipement : voir core/equipment.js. Une partie neuve démarre avec
     // une paire de baskets déjà ÉQUIPÉE au slot "feet" — jamais posée dans
     // le sac d'abord : ce n'est pas un ramassage, juste l'état de départ.

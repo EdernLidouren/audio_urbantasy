@@ -2606,8 +2606,9 @@ export function runMovementChecks() {
   const equipmentLevel = parseLevel(RAW_LEVEL, EMPTY_REGISTRY);
   const freshEquipState = createInitialState(equipmentLevel, undefined, NO_COMPANIONS);
   run("équipement : une partie neuve démarre avec des baskets ÉQUIPÉES", "sneakers", freshEquipState.equipment.feet.type);
-  run("équipement : une partie neuve démarre avec des rangers DANS LE SAC (pas équipées)", 1, freshEquipState.bag.length);
-  run("équipement : les rangers de départ ne sont pas équipées", "combat_boots", freshEquipState.bag[0].type);
+  run("équipement : une partie neuve démarre avec rangers ET escarpins DANS LE SAC (pas équipés)", 2, freshEquipState.bag.length);
+  run("équipement : les rangers de départ ne sont pas équipés", "combat_boots", freshEquipState.bag[0].type);
+  run("équipement : les escarpins de départ ne sont pas équipés", "high_heels", freshEquipState.bag[1].type);
   run("équipement : gait de départ d'une partie neuve -> shoes", "shoes", gaitOf(freshEquipState.equipment));
 
   // equipItem : ÉCHANGE — équiper des bottes (sac) alors que des baskets
@@ -2661,6 +2662,9 @@ export function runMovementChecks() {
   run("tags : registre — clé inconnue -> undefined", undefined, tagProps("does-not-exist"));
   run("tags : registre — tagProps délègue à TAG_REGISTRY", TAG_REGISTRY.military, tagProps("military"));
   run("tags : ITEM_REGISTRY — les rangers portent le tag military", true, ITEM_REGISTRY.combat_boots.tags.includes("military"));
+  run("tags : ITEM_REGISTRY — les escarpins portent le tag chic", true, ITEM_REGISTRY.high_heels.tags.includes("chic"));
+  run("tags : ITEM_REGISTRY — les escarpins imposent le gait high_heels", "high_heels", ITEM_REGISTRY.high_heels.gait);
+  run("gaitOf : escarpins équipés -> high_heels", "high_heels", gaitOf({ feet: { type: "high_heels" } }));
 
   // validateItemTags : même filet que la validation des surfaces contre
   // SURFACE_REGISTRY — un tag inconnu échoue clairement, jamais un mismatch
@@ -2694,6 +2698,7 @@ export function runMovementChecks() {
   run("tags : equippedTags — slot vide -> aucun tag", 0, equippedTags({ feet: null }).size);
   run("tags : equippedTags — objet sans tags (baskets) -> aucun tag", 0, equippedTags({ feet: { type: "sneakers" } }).size);
   run("tags : equippedTags — objet tagué (rangers) -> tag présent", true, equippedTags({ feet: { type: "combat_boots" } }).has("military"));
+  run("tags : equippedTags — escarpins équipés -> tag chic présent", true, equippedTags({ feet: { type: "high_heels" } }).has("chic"));
   const fakeNpcEquipment = { feet: { type: "combat_boots" } };
   run(
     "tags : equippedTags — même résultat pour un porteur quelconque (compagnon/PNJ simulé)",
@@ -2710,6 +2715,15 @@ export function runMovementChecks() {
   run("tags : equippedTags — présent dès l'équipement des rangers", true, equippedTags(afterEquipRangers.equipment).has("military"));
   const afterUnequipRangers = unequipItem(afterEquipRangers, "feet");
   run("tags : equippedTags — de nouveau absent après déséquipement", false, equippedTags(afterUnequipRangers.equipment).has("military"));
+
+  // Même vérification pour les escarpins (tag "chic") — freshEquipState.bag[1]
+  // est déjà les escarpins de départ (voir test "escarpins de départ" plus
+  // haut).
+  const afterEquipHeels = equipItem(freshEquipState, "high_heels");
+  run("tags : equippedTags — absent avant d'équiper les escarpins", false, equippedTags(freshEquipState.equipment).has("chic"));
+  run("tags : equippedTags — présent dès l'équipement des escarpins", true, equippedTags(afterEquipHeels.equipment).has("chic"));
+  const afterUnequipHeels = unequipItem(afterEquipHeels, "feet");
+  run("tags : equippedTags — de nouveau absent après déséquipement des escarpins", false, equippedTags(afterUnequipHeels.equipment).has("chic"));
 
   // Condition "hasEquipmentTag" — branchée dans l'aiguillage existant
   // (evaluateCondition), lit context.entity.equipment via equippedTags.
@@ -2732,6 +2746,11 @@ export function runMovementChecks() {
     "tags : hasEquipmentTag — aucune entité dans le contexte -> fausse",
     false,
     evaluateCondition({ type: "hasEquipmentTag", tag: "military" }, {})
+  );
+  run(
+    "tags : hasEquipmentTag — tag chic (escarpins équipés) -> vraie",
+    true,
+    evaluateCondition({ type: "hasEquipmentTag", tag: "chic" }, { entity: { equipment: { feet: { type: "high_heels" } } } })
   );
 
   // Validation au chargement (core/level.js/parsePresenceRule) : un tag de
@@ -2786,6 +2805,110 @@ export function runMovementChecks() {
     unknownTagConditionThrew = true;
   }
   run("tags : hasEquipmentTag avec un tag inconnu -> échec clair au chargement", true, unknownTagConditionThrew);
+
+  // --- Actions CONDITIONNELLES (core/level.js, action.condition/
+  // refusalKey ; voir view/interaction.js) — GÉNÉRIQUE à TOUT kind, testé
+  // ICI en FORME/VALIDATION seulement (au chargement) ; le blocage +
+  // l'annonce de refus à l'interaction sont côté vue, hors de portée d'un
+  // test terminal — voir "Vérifie (oreille)" pour ce volet.
+
+  const ACTION_CONDITION_REGISTRY = { dog: { label: "entity.dog" } };
+
+  let validActionConditionAccepted = false;
+  let parsedActionConditionEntity = null;
+  try {
+    const conditionalActionLevel = parseLevel(
+      {
+        id: "movement-check-action-condition-valid",
+        titleKey: "level.demo.title",
+        length: 10,
+        playerStart: 0,
+        entities: [
+          {
+            id: "conditional-action-ok",
+            type: "dog",
+            x: 5,
+            action: { kind: "transit", condition: { type: "hasEquipmentTag", tag: "chic" }, refusalKey: "door.dresscode_refused" },
+          },
+        ],
+      },
+      ACTION_CONDITION_REGISTRY
+    );
+    validActionConditionAccepted = true;
+    parsedActionConditionEntity = conditionalActionLevel.entities[0];
+  } catch {
+    validActionConditionAccepted = false;
+  }
+  run("actions conditionnelles : condition + refusalKey valides -> chargé sans erreur", true, validActionConditionAccepted);
+  run(
+    "actions conditionnelles : condition/refusalKey transportées telles quelles sur l'entité",
+    "door.dresscode_refused",
+    parsedActionConditionEntity && parsedActionConditionEntity.action.refusalKey
+  );
+
+  let unknownActionConditionTagThrew = false;
+  try {
+    parseLevel(
+      {
+        id: "movement-check-action-condition-bad-tag",
+        titleKey: "level.demo.title",
+        length: 10,
+        playerStart: 0,
+        entities: [
+          {
+            id: "conditional-action-bad-tag",
+            type: "dog",
+            x: 5,
+            action: { kind: "transit", condition: { type: "hasEquipmentTag", tag: "does-not-exist" }, refusalKey: "door.dresscode_refused" },
+          },
+        ],
+      },
+      ACTION_CONDITION_REGISTRY
+    );
+  } catch {
+    unknownActionConditionTagThrew = true;
+  }
+  run("actions conditionnelles : tag inconnu dans action.condition -> échec clair", true, unknownActionConditionTagThrew);
+
+  // Une condition SANS refusalKey laisserait l'action échouer en silence à
+  // l'interaction (voir header de parseEntity/action) : refusée dès le
+  // chargement, même sévérité qu'un tag inconnu.
+  let missingRefusalKeyThrew = false;
+  try {
+    parseLevel(
+      {
+        id: "movement-check-action-condition-no-refusal",
+        titleKey: "level.demo.title",
+        length: 10,
+        playerStart: 0,
+        entities: [
+          { id: "conditional-action-no-refusal", type: "dog", x: 5, action: { kind: "transit", condition: { type: "hasEquipmentTag", tag: "chic" } } },
+        ],
+      },
+      ACTION_CONDITION_REGISTRY
+    );
+  } catch {
+    missingRefusalKeyThrew = true;
+  }
+  run("actions conditionnelles : condition sans refusalKey -> échec clair", true, missingRefusalKeyThrew);
+
+  // Rétrocompat : une action SANS condition (tout contenu existant) reste
+  // inchangée, jamais bloquée implicitement par cette nouvelle validation.
+  const unconditionalActionLevel = parseLevel(
+    {
+      id: "movement-check-action-no-condition",
+      titleKey: "level.demo.title",
+      length: 10,
+      playerStart: 0,
+      entities: [{ id: "plain-action", type: "dog", x: 5, action: { kind: "transit" } }],
+    },
+    ACTION_CONDITION_REGISTRY
+  );
+  run(
+    "actions conditionnelles : action SANS condition -> inchangée (rétrocompat)",
+    undefined,
+    unconditionalActionLevel.entities[0].action.condition
+  );
 
   // --- Collectible persistant (core/state.js/markConsumed, core/money.js/lootEntity) ---
   // Contrairement à removeEntity/pickupEntity ci-dessus, l'entité looté

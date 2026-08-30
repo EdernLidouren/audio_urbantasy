@@ -17,6 +17,7 @@ import {
   setItemPickupHandler,
   setLootHandler,
   setLootSpawnHandler,
+  setPlayerEquipmentProvider,
 } from "./interaction.js";
 import { openPauseMenu } from "./menus/pause-menu.js";
 import {
@@ -313,6 +314,11 @@ export function makeCityScreen(getSession, setSession) {
   setEquipItemHandler(equipItemEffect);
   setUnequipItemHandler(unequipItemEffect);
   setGameReplaceHandler(replaceCurrentGame);
+  // Actions CONDITIONNELLES (voir view/interaction.js/actionConditionMet) :
+  // fournit l'équipement du JOUEUR, relu à CHAQUE tentative (jamais mis en
+  // cache) — équiper/déséquiper change donc le verdict IMMÉDIATEMENT, sans
+  // code de synchro, même principe que gaitOf.
+  setPlayerEquipmentProvider(() => getSession().equipment);
 
   return {
     onEnter() {
@@ -459,6 +465,7 @@ export function makeCityScreen(getSession, setSession) {
       setEquipItemHandler(null);
       setUnequipItemHandler(null);
       setGameReplaceHandler(null);
+      setPlayerEquipmentProvider(null);
       // Invariant documenté (CLAUDE.md) : session est null hors partie.
       // Seul chemin de sortie de la ville aujourd'hui (menu pause -> retour
       // au menu principal, voir view/menus/pause-menu.js).

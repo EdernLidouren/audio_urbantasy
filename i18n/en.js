@@ -169,6 +169,8 @@ export default {
   "item.leather_boots.description": "A sturdy pair of leather boots.",
   "item.combat_boots": "Combat boots",
   "item.combat_boots.description": "A rugged, practically indestructible pair of combat boots.",
+  "item.high_heels": "High heels",
+  "item.high_heels.description": "An elegant pair of high heels.",
   "object.toolbox": "Toolbox",
   "object.toolbox.description": "A metal toolbox. It looks like it can be searched.",
   "npc.passerby": "Passerby",
@@ -177,6 +179,12 @@ export default {
   "npc.resident.description": "A local resident, going about their day.",
   "door.exit": "Exit door",
   "door.exit.description": "A wooden door left ajar, cool air drifting in from outside.",
+  "door.club": "Club entrance",
+  "door.club.description": "A tidy entrance, guarded by a strict dress code.",
+  // Conditional action refusal (core/level.js, action.condition/refusalKey —
+  // see view/interaction.js) — INFORMATIVE: states the RULE and lets the
+  // player infer what to do, never a plain "you can't do that".
+  "door.dresscode_refused": "This entrance is reserved for chic attire.",
 
   "level.demo2.title": "Back room",
   "door.back": "Way back",

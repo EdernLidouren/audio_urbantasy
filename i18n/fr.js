@@ -173,6 +173,8 @@ export default {
   "item.leather_boots.description": "Des bottes en cuir robustes.",
   "item.combat_boots": "Rangers",
   "item.combat_boots.description": "Une paire de rangers, solides et increvables.",
+  "item.high_heels": "Escarpins",
+  "item.high_heels.description": "Une paire d'escarpins élégants, à talons.",
   "object.toolbox": "Boîte à outils",
   "object.toolbox.description": "Une boîte à outils métallique. Elle semble fouillable.",
   "npc.passerby": "Passant",
@@ -181,6 +183,12 @@ export default {
   "npc.resident.description": "Un habitant du quartier, occupé à sa journée.",
   "door.exit": "Porte de sortie",
   "door.exit.description": "Une porte en bois entrouverte, l'air frais du dehors s'y engouffre.",
+  "door.club": "Entrée du club",
+  "door.club.description": "Une entrée soignée, gardée par un dresscode strict.",
+  // Refus d'action conditionnelle (core/level.js, action.condition/
+  // refusalKey ; voir view/interaction.js) — INFORMATIF : dit la RÈGLE et
+  // laisse deviner l'action à mener, jamais un simple "vous ne pouvez pas".
+  "door.dresscode_refused": "L'entrée est réservée aux tenues chic.",
 
   "level.demo2.title": "Arrière-boutique",
   "door.back": "Porte de retour",

@@ -27,10 +27,10 @@ import { TAG_REGISTRY } from "./tags.js";
 // entities/model.md, "Surfaces de sol et son de pas") que cet objet impose
 // une fois équipé — lu par core/equipment.js/gaitOf, JAMAIS stocké ailleurs
 // (voir entities/player.js). Les objets équipables déclarés ici (slot
-// "feet") couvrent les trois pools de pas disponibles : `barefoot_walk`
+// "feet") couvrent QUATRE pools de pas disponibles : `barefoot_walk`
 // (défaut, aucun objet équipé), `shoes_walk` (baskets), `boots_walk` (bottes
 // en cuir ET rangers — DEUX objets peuvent partager le même gait/pool, rien
-// n'impose une correspondance 1:1).
+// n'impose une correspondance 1:1), `high_heels_walk` (escarpins).
 //
 // `tags` (optionnel, tableau de clés — voir core/tags.js/TAG_REGISTRY) :
 // classification HORIZONTALE d'un objet (ex. "military"), indépendante de
@@ -66,6 +66,15 @@ export const ITEM_REGISTRY = {
     slot: "feet",
     gait: "boots",
     tags: ["military"],
+  },
+  high_heels: {
+    stackable: false,
+    label: "item.high_heels",
+    descriptionKey: "item.high_heels.description",
+    equippable: true,
+    slot: "feet",
+    gait: "high_heels",
+    tags: ["chic"],
   },
 };
 

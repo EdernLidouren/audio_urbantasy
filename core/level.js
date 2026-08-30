@@ -52,6 +52,32 @@ function parseEffect(rawEffect, effectIndex, ruleIndex, index, id) {
   fail(`entities[${index}] ("${id}") : presence[${ruleIndex}].effects[${effectIndex}].type "${type}" inconnu.`);
 }
 
+// Valide un objet CONDITION ({ type, ... }) — RÉUTILISÉ par presence[].when
+// (voir parsePresenceRule) ET action.condition (voir parseEntity, actions
+// CONDITIONNELLES) : MÊME forme déclarative, MÊME registre (CONDITION_TYPES),
+// MÊME validation — une condition ne sait pas d'où elle est appelée, jamais
+// dupliquée entre les deux. `describe` : préfixe du message d'erreur (ex.
+// `presence[0].when` ou `action.condition`), pour situer l'échec sans
+// dupliquer cette fonction par appelant.
+function validateCondition(cond, describe) {
+  if (typeof cond !== "object" || cond === null || !isNonEmptyString(cond.type)) {
+    fail(`${describe} doit être un objet avec un type.`);
+  }
+  if (!CONDITION_TYPES.includes(cond.type)) {
+    fail(`${describe}.type "${cond.type}" absent du registre de conditions.`);
+  }
+  // "hasEquipmentTag" : EN PLUS de son type (déjà validé ci-dessus), son
+  // champ `tag` référence un tag de contenu (core/tags.js/TAG_REGISTRY) —
+  // même traitement qu'une surface de segment (voir parseSegment plus bas) :
+  // une faute de frappe ici échouerait SILENCIEUSEMENT à l'évaluation
+  // (core/presence.js/evaluateHasEquipmentTag replie sur false pour un tag
+  // absent), donc elle est refusée ICI, au chargement, plutôt que de laisser
+  // une règle de contenu ne jamais se déclencher sans qu'on sache pourquoi.
+  if (cond.type === "hasEquipmentTag" && (!isNonEmptyString(cond.tag) || !TAG_REGISTRY[cond.tag])) {
+    fail(`${describe}.tag "${cond.tag}" absent du registre de tags.`);
+  }
+}
+
 // Une règle de presence[] : { when: { type, ... }, effects: [<effet>...] }.
 // `when` est reporté TEL QUEL (transport générique, comme `tuning` plus
 // bas) — son évaluateur (core/presence.js) gère seul ses propres champs, y
@@ -68,22 +94,7 @@ function parsePresenceRule(rawRule, ruleIndex, index, id) {
     fail(`entities[${index}] ("${id}") : presence[${ruleIndex}] n'est pas un objet.`);
   }
   const { when, present, effects } = rawRule;
-  if (typeof when !== "object" || when === null || !isNonEmptyString(when.type)) {
-    fail(`entities[${index}] ("${id}") : presence[${ruleIndex}].when doit être un objet avec un type.`);
-  }
-  if (!CONDITION_TYPES.includes(when.type)) {
-    fail(`entities[${index}] ("${id}") : presence[${ruleIndex}].when.type "${when.type}" absent du registre de conditions.`);
-  }
-  // "hasEquipmentTag" : EN PLUS de son type (déjà validé ci-dessus), son
-  // champ `tag` référence un tag de contenu (core/tags.js/TAG_REGISTRY) —
-  // même traitement qu'une surface de segment (voir parseSegment plus bas) :
-  // une faute de frappe ici échouerait SILENCIEUSEMENT à l'évaluation
-  // (core/presence.js/evaluateHasEquipmentTag replie sur false pour un tag
-  // absent), donc elle est refusée ICI, au chargement, plutôt que de laisser
-  // une règle de contenu ne jamais se déclencher sans qu'on sache pourquoi.
-  if (when.type === "hasEquipmentTag" && (!isNonEmptyString(when.tag) || !TAG_REGISTRY[when.tag])) {
-    fail(`entities[${index}] ("${id}") : presence[${ruleIndex}].when.tag "${when.tag}" absent du registre de tags.`);
-  }
+  validateCondition(when, `entities[${index}] ("${id}") : presence[${ruleIndex}].when`);
 
   if (effects !== undefined) {
     if (!Array.isArray(effects) || effects.length === 0) {
@@ -219,6 +230,17 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
   // ignore déjà le sens d'une clé de tuning. Un kind inconnu à
   // l'INTERACTION (pas au chargement) se dégrade proprement, voir
   // view/interaction.js.
+  //
+  // action.condition (optionnel, ACTIONS CONDITIONNELLES) : MÊME objet
+  // déclaratif que presence[].when, MÊME registre (CONDITION_TYPES),
+  // GÉNÉRIQUE à TOUT kind (transit, pickup, loot...) — validé ICI via
+  // validateCondition, exactement comme une condition de présence. Contexte
+  // d'évaluation et EFFET (bloquer l'action, annoncer refusalKey) restent
+  // entièrement côté vue (voir view/interaction.js) : le core ne fait que
+  // transporter et valider la FORME, comme pour `kind`. refusalKey (clé
+  // i18n du message de refus) est REQUISE quand condition est présente —
+  // une condition sans refus laisserait l'action échouer en silence, ce que
+  // ce système est justement censé éviter (voir entities/model.md).
   const resolvedAction = action !== undefined ? action : registry[type].action;
   if (resolvedAction !== undefined) {
     if (typeof resolvedAction !== "object" || resolvedAction === null || Array.isArray(resolvedAction)) {
@@ -226,6 +248,12 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
     }
     if (!isNonEmptyString(resolvedAction.kind)) {
       fail(`entities[${index}] ("${id}") : action.kind doit être une chaîne non vide.`);
+    }
+    if (resolvedAction.condition !== undefined) {
+      validateCondition(resolvedAction.condition, `entities[${index}] ("${id}") : action.condition`);
+      if (!isNonEmptyString(resolvedAction.refusalKey)) {
+        fail(`entities[${index}] ("${id}") : action.refusalKey doit être une chaîne non vide quand action.condition est présente.`);
+      }
     }
     entity.action = resolvedAction;
   }

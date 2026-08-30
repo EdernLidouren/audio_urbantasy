@@ -119,6 +119,54 @@ bateau et provisoire (i18n uniquement, `money.announce`/`interaction.pickup`)
 — changer le nom ne touche à rien du mécanisme. Consultable à tout moment via
 la touche "g" (`view/city-screen.js`), lecture pure, canal liveRegion.
 
+### Actions conditionnelles
+
+Une action (n'importe lequel des kinds ci-dessus — pas un cas spécial de
+`"transit"`) peut porter `condition: <objet condition>` +
+`refusalKey: <clé i18n>` : `{ kind: "transit", condition: { type:
+"hasEquipmentTag", tag: "chic" }, refusalKey: "door.dresscode_refused" }`.
+`condition` est le MÊME objet déclaratif que `presence[].when` — même
+registre (`CONDITION_TYPES`, `core/presence.js`), même validation au
+chargement (`core/level.js`/`validateCondition`, factorisée entre les deux
+usages) : un type ou un `tag` inconnu échoue clairement, comme pour une
+règle de présence. `refusalKey` est REQUISE dès que `condition` est
+présente — une condition sans refus laisserait l'action échouer en silence,
+exactement ce que ce système évite.
+
+Évaluation et EFFET restent entièrement côté vue
+(`view/interaction.js`/`interact`, juste avant de déléguer à
+`ACTION_HANDLERS`) : condition VRAIE -> l'action s'exécute normalement,
+comportement STRICTEMENT inchangé ; condition FAUSSE -> AUCUN effet, AUCUNE
+transition, juste un REFUS informatif (le message `refusalKey` annoncé + un
+son défensif, `assets/sounds/ui/refused`, absent aujourd'hui — voir
+`playPickupSound` pour le même patron défensif). Action SANS `condition`
+(tout contenu existant) -> ce bloc est sauté entièrement, comportement
+inchangé (rétrocompat totale).
+
+`context.entity` de l'évaluation porte l'équipement du JOUEUR
+(`view/interaction.js`/`setPlayerEquipmentProvider`, câblé par
+`view/city-screen.js`), PAS celui de l'entité-cible : c'est le joueur qui
+DÉCLENCHE l'action, une porte n'a pas d'équipement. Différent de
+`core/presence.js`/`context.entity`, qui porte l'entité RÉGIE par SA PROPRE
+règle — la même condition (`hasEquipmentTag`) sert donc deux "entités
+concernées" différentes selon qu'elle porte sur une règle de présence ou une
+action, chacune documentée à son point d'évaluation.
+
+**Exemple de test** (`level/demo.json`, `door-club`) : une porte vers
+`demo2` conditionnée `hasEquipmentTag: "chic"`, refusée via
+`door.dresscode_refused` ("L'entrée est réservée aux tenues chic."). Le sac
+de départ contient déjà des escarpins (`high_heels`, tag `"chic"`, gait
+`"high_heels"` — voir "Objets équipables" plus haut) : équiper/déséquiper
+fait basculer le verdict de la porte immédiatement, sans code de synchro
+(même dérivation que `equippedTags`).
+
+**Extensibilité** : une caisse verrouillée (`"loot"` conditionnée par un
+`questFlag` futur), un PNJ qui ne parle qu'à condition (`"talk"` futur)
+réutiliseront cette MÊME vérification, jamais un second mécanisme — ajouter
+un nouveau TYPE de condition reste une entrée dans `CONDITION_EVALUATORS`
+(voir "Extensibilité : conditions" plus bas), jamais une retouche à
+`interact`.
+
 ## Collectible persistant
 
 Contrairement à l'action `"pickup"` (`money`, ci-dessus — l'entité DISPARAÎT
@@ -411,13 +459,16 @@ composent `removeItem`/`addItem`, `core/bag.js`, ATOMIQUEMENT avec
 l'écriture du slot).
 
 - **Objets équipables** (`core/items.js`/`ITEM_REGISTRY`) — `equippable:true`,
-  `slot` (le nom du slot occupé), `gait` (voir plus bas). Trois exemples au
+  `slot` (le nom du slot occupé), `gait` (voir plus bas). Quatre exemples au
   slot "feet" : `sneakers` (gait `"shoes"`, équipées de départ — voir plus
   bas), `leather_boots` et `combat_boots` (toutes deux gait `"boots"` — MÊME
   pool, deux objets distincts : rien n'impose une correspondance 1:1 entre
-  objet et gait). `combat_boots` fait partie du contenu de départ du sac
-  (voir `core/state.js`/`createInitialState`), pas équipées — de quoi
-  tester l'échange sans avoir à en ramasser une paire en jeu.
+  objet et gait), `high_heels` (gait `"high_heels"`, tag `"chic"` — voir
+  "Tags d'objets" juste en dessous). `combat_boots` ET `high_heels` font
+  partie du contenu de départ du sac (voir `core/state.js`/
+  `createInitialState`), pas équipés — de quoi tester l'échange ET le tag
+  "chic" (porte à dresscode, voir "Actions conditionnelles" plus bas) sans
+  avoir à en ramasser en jeu.
 - **Tags d'objets** (`core/tags.js`/`TAG_REGISTRY`, `core/items.js`/
   `ITEM_REGISTRY[type].tags`) — classification HORIZONTALE d'un objet (ex.
   `combat_boots` porte `["military"]`), indépendante de `equippable`/`slot`/

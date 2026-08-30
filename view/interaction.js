@@ -1,8 +1,11 @@
 // Interaction avec une entité de la scène ville. Déclenchée par des touches
 // DISCRÈTES (Espace/Entrée, voir city-screen.js) — pas de maintien, donc
 // aucun souci d'auto-interruption NVDA ici (contrairement au mouvement en
-// touche tenue, voir CLAUDE.md). Vue + contenu uniquement : aucune règle de
-// jeu, aucun import du core.
+// touche tenue, voir CLAUDE.md). Vue + contenu : aucune RÈGLE de jeu propre
+// ici (le core reste la seule source de vérité), mais réutilise l'évaluateur
+// de conditions pur du core (evaluateCondition, voir actionConditionMet plus
+// bas) pour les actions conditionnelles — même principe d'import que
+// view/audio/city-scene.js/isPresent.
 
 import { announce } from "../lib/announce.js";
 import { t } from "../i18n/index.js";
@@ -11,6 +14,7 @@ import { makeMenuScreen } from "../lib/menu.js";
 import { playOneShot } from "../lib/audio.js";
 import { resolveAsset } from "../lib/assets.js";
 import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
+import { evaluateCondition } from "../core/presence.js";
 
 // Gestionnaires enregistrés UNE FOIS par view/city-screen.js, au moment de
 // sa construction — au plus un écran ville vivant à la fois dans cette
@@ -64,6 +68,19 @@ export function setLootSpawnHandler(handler) {
   lootSpawnHandler = handler;
 }
 
+// () => equipment — fournit l'ÉQUIPEMENT DU JOUEUR pour l'évaluation d'une
+// condition d'action (voir actionConditionMet plus bas), même principe
+// d'injection que les gestionnaires ci-dessus. TOUJOURS l'équipement du
+// JOUEUR : c'est lui qui DÉCLENCHE l'action, jamais l'entité-cible
+// (une porte n'a pas d'équipement) — contrairement à
+// core/presence.js/context.entity, qui porte l'entité RÉGIE par SA PROPRE
+// règle de présence.
+let playerEquipmentProvider = null;
+
+export function setPlayerEquipmentProvider(provider) {
+  playerEquipmentProvider = provider;
+}
+
 const PICKUP_SOUND_KEY = "assets/sounds/ui/pickup";
 
 // Défensif comme tout son d'UI du projet (voir view/save-storage.js/
@@ -76,6 +93,19 @@ function playPickupSound() {
     playOneShot(resolveAsset(PICKUP_SOUND_KEY), { volume: factor });
   } catch (error) {
     console.warn(`interact: son de ramassage indisponible ("${PICKUP_SOUND_KEY}") : ${error.message}`);
+  }
+}
+
+// Placeholder — aucun fichier fourni pour l'instant (comme PICKUP_SOUND_KEY
+// à l'origine) : le try/catch ci-dessous reste le filet, jamais un plantage.
+const REFUSAL_SOUND_KEY = "assets/sounds/ui/refused";
+
+function playRefusalSound() {
+  try {
+    const factor = getPref("interfaceVolume", PREF_CONSTRAINTS.interfaceVolume.default) / 100;
+    playOneShot(resolveAsset(REFUSAL_SOUND_KEY), { volume: factor });
+  } catch (error) {
+    console.warn(`interact: son de refus indisponible ("${REFUSAL_SOUND_KEY}") : ${error.message}`);
   }
 }
 
@@ -219,6 +249,21 @@ const ACTION_HANDLERS = {
   loot: handleLoot,
 };
 
+// ACTIONS CONDITIONNELLES (voir core/level.js, action.condition/refusalKey)
+// — GÉNÉRIQUE à TOUT kind de ACTION_HANDLERS ci-dessus, pas un cas spécial
+// de "transit" : une caisse verrouillée, un PNJ qui ne parle qu'à condition
+// réutiliseront cette MÊME vérification, jamais un second mécanisme.
+// Réutilise TEL QUEL l'évaluateur de conditions du core
+// (core/presence.js/evaluateCondition) — même objet déclaratif que
+// presence[].when, déjà validé au chargement (core/level.js). context.entity
+// porte l'équipement du JOUEUR (voir setPlayerEquipmentProvider) : c'est lui
+// qui DÉCLENCHE l'action, jamais l'entité-cible (une porte n'a pas
+// d'équipement).
+function actionConditionMet(condition) {
+  const equipment = playerEquipmentProvider ? playerEquipmentProvider() : undefined;
+  return evaluateCondition(condition, { entity: { equipment } });
+}
+
 // kind ∈ { "describe", "activate" }. entity est déjà un candidat FILTRÉ par
 // capacité (voir view/audio/city-scene.js/getInteractionCandidates) — cette
 // fonction fait confiance à son appelant, elle ne revérifie pas
@@ -236,6 +281,17 @@ export function interact(entity, kind) {
     // interactables mais sans kind encore câblé) -> silence, comportement
     // STUB générique inchangé pour ce contenu-là.
     if (!entity.action) return;
+
+    // Condition fausse -> REFUS informatif (message + son), AUCUN effet,
+    // AUCUNE transition : l'action est simplement bloquée, proprement.
+    // Action sans condition (tout contenu existant) -> ce bloc est
+    // sauté entièrement, comportement STRICTEMENT inchangé.
+    if (entity.action.condition && !actionConditionMet(entity.action.condition)) {
+      playRefusalSound();
+      announce(t(entity.action.refusalKey), { assertive: true });
+      return;
+    }
+
     const handler = ACTION_HANDLERS[entity.action.kind];
     if (!handler) {
       // Kind DÉCLARÉ mais inconnu de ce registre : un vrai bug de contenu,

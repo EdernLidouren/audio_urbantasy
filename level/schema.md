@@ -126,7 +126,7 @@ exemple) : jamais de voix orpheline ni de fondus qui se disputent le canal.
 | `blocksMovement` | boolean | optionnel : surcharge d'instance, cascade -> défaut du type (`entities/types/index.js`) -> `false` |
 | `observable` | boolean | optionnel : idem, candidate à l'interaction "describe" (voir "Interaction (niveau 0)", `entities/model.md`) |
 | `interactable` | boolean | optionnel : idem, candidate à l'interaction "activate" |
-| `action` | `{ kind: string, ... }` | optionnel : TYPE D'ACTION pour l'interaction "activate", cascade instance -> type comme `behavior`. Forme validée ici (`kind` non vide) ; le `kind` lui-même n'est PAS validé contre un registre au chargement — l'aiguillage reste côté vue (voir "Interaction (niveau 0)", `entities/model.md`). |
+| `action` | `{ kind: string, condition?, refusalKey? ... }` | optionnel : TYPE D'ACTION pour l'interaction "activate", cascade instance -> type comme `behavior`. Forme validée ici (`kind` non vide) ; le `kind` lui-même n'est PAS validé contre un registre au chargement — l'aiguillage reste côté vue (voir "Interaction (niveau 0)", `entities/model.md`). `condition` (optionnel, ACTIONS CONDITIONNELLES) : MÊME objet que `presence[].when`, validé au chargement contre le même registre de conditions (voir tableau plus bas) — GÉNÉRIQUE à tout `kind`. `refusalKey` (clé i18n) : **requise** dès que `condition` est présente — échec clair sinon. |
 | `presence` | `PresenceRule[]` | optionnel : règles DÉCLARATIVES de présence conditionnelle, cascade instance -> type (voir "Présence conditionnelle" plus bas et `entities/model.md`). Sans règle (ni à l'instance ni au type) : toujours présente. |
 
 `parseLevel` normalise chaque entité en ajoutant `labelKey` et
@@ -156,6 +156,13 @@ Voir `entities/model.md`/"Présence conditionnelle et triggers de
 comportement" pour la sémantique complète (priorité entre règles, les trois
 plans coupés par l'état dormant, la garde anti-boucle des effets
 `"behavior"`).
+
+MÊME registre, MÊME validation (`validateCondition`, factorisée dans
+`core/level.js`) pour `entities[].action.condition` — voir "Actions
+conditionnelles" ci-dessus dans le tableau des champs d'entité et
+`entities/model.md`/"Actions conditionnelles" : une condition ne sait pas
+d'où elle est appelée, `presence[].when` et `action.condition` partagent
+exactement ce tableau.
 
 | `when.type` | Champs        | Vrai si...                                                  |
 |-------------|---------------|--------------------------------------------------------------|
