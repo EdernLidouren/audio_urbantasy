@@ -401,7 +401,6 @@ export function parseLevel(raw, registry) {
     ambiencesNight,
     reverbDurationSec,
     reverbDecay,
-    floors,
     defaultSurface,
     segments,
   } = raw;
@@ -430,27 +429,14 @@ export function parseLevel(raw, registry) {
   if (!Array.isArray(entities)) {
     fail(`entities doit être un tableau (reçu : ${JSON.stringify(entities)}).`);
   }
-  // floors : nombre d'ÉTAGES du lieu — fondation RÉSERVÉE de la verticalité
-  // future (voir level/schema.md), totalement INERTE ici : aucune mécanique
-  // n'en dépend (pas de position Y, pas de palier actif, pas d'audio
-  // d'étage). FILET comme playerStart : entier >= 1 attendu, absent ou
-  // invalide -> repli sur 1, JAMAIS d'exception. Absent reste SILENCIEUX
-  // (c'est le cas normal — aucune scène actuelle n'en déclare, toutes
-  // valent donc 1 implicitement, comportement inchangé) ; une valeur
-  // FOURNIE mais invalide avertit clairement, même politique que
-  // playerStart hors bornes.
-  const resolvedFloors = Number.isInteger(floors) && floors >= 1 ? floors : 1;
-  if (floors !== undefined && resolvedFloors !== floors) {
-    console.warn(`parseLevel: floors (${JSON.stringify(floors)}) invalide (entier >= 1 attendu), repli sur 1.`);
-  }
   // defaultSurface : couvre tout le X non-segmenté (voir surfaceAt,
   // core/surfaces.js) — toute la scène est TOUJOURS couverte, sans trou.
   // FILET SILENCIEUX si absent (repli sur DEFAULT_SURFACE, comportement
-  // audible inchangé pour toute scène existante qui n'en déclare pas encore
-  // — même politique d'omission que floors), mais une valeur FOURNIE doit
-  // exister dans le registre -> échec clair sinon (comme un type d'entité
-  // inconnu, voir parseEntity) : une référence de surface erronée est un
-  // vrai bug de contenu, jamais dégradée en silence.
+  // audible inchangé pour toute scène existante qui n'en déclare pas
+  // encore), mais une valeur FOURNIE doit exister dans le registre -> échec
+  // clair sinon (comme un type d'entité inconnu, voir parseEntity) : une
+  // référence de surface erronée est un vrai bug de contenu, jamais
+  // dégradée en silence.
   if (defaultSurface !== undefined && (!isNonEmptyString(defaultSurface) || !SURFACE_REGISTRY[defaultSurface])) {
     fail(`defaultSurface "${JSON.stringify(defaultSurface)}" absente du registre de surfaces.`);
   }
@@ -552,7 +538,6 @@ export function parseLevel(raw, registry) {
     titleKey,
     length,
     playerStart: resolvedPlayerStart,
-    floors: resolvedFloors,
     defaultSurface: resolvedDefaultSurface,
     segments: parsedSegments,
     entities: parsedEntities,

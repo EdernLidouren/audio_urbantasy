@@ -2234,9 +2234,8 @@ export function runMovementChecks() {
   run("surfaces : surfaceAt — juste après le segment, retombe sur defaultSurface", "concrete", surfaceAt(surfaceLevel, 10.5));
   run("surfaces : surfacePropsAt — délègue à surfaceProps(surfaceAt(...))", SURFACE_REGISTRY.sand, surfacePropsAt(surfaceLevel, 7));
 
-  // defaultSurface : FILET silencieux si absent (comme floors) — toute
-  // scène existante qui n'en déclare pas continue de charger, résolue au
-  // défaut du registre.
+  // defaultSurface : FILET silencieux si absent — toute scène existante qui
+  // n'en déclare pas continue de charger, résolue au défaut du registre.
   const noSurfaceLevel = parseLevel(
     { id: "movement-check-surfaces-default", titleKey: "level.demo.title", length: 10, playerStart: 0, entities: [] },
     EMPTY_REGISTRY
@@ -3282,8 +3281,8 @@ export function runMovementChecks() {
   // rebouchage, spawnEphemeral calculerait undefined + 1 = NaN, et TOUT
   // éphémère suivant recevrait le même id ("ephemeral-NaN"), collision
   // garantie dès le second spawn.
-  // ephemeralWorldA sort de parseLevel : porte déjà floors/defaultSurface/
-  // segments (voir core/level.js) mais PAS rngState/lastVisited/
+  // ephemeralWorldA sort de parseLevel : porte déjà defaultSurface/segments
+  // (voir core/level.js) mais PAS rngState/lastVisited/
   // nextEphemeralId (ajoutés seulement par createWorldState, core/state.js)
   // — on simule ICI un monde ANTÉRIEUR au compteur en ajoutant les deux
   // premiers à la main SANS le troisième, exactement le manque à combler.
@@ -3485,7 +3484,7 @@ export function runMovementChecks() {
   run("save : version inconnue rejetée", false, deserializeGame({ version: SAVE_VERSION + 1, data: auditSession }).success);
   run("save : structure implausible rejetée", false, deserializeGame({ version: SAVE_VERSION, data: { player: {} } }).success);
 
-  // Sauvegarde ANTÉRIEURE à floors/defaultSurface/segments (voir
+  // Sauvegarde ANTÉRIEURE à defaultSurface/segments (voir
   // core/level.js/parseLevel) : ses mondes n'ont jamais eu ces clés, et une
   // relecture de sauvegarde ne repasse jamais par parseLevel — sans
   // rebouchage (core/save.js/backfillWorld), surfaceAt(world, x) plante sur
@@ -3493,7 +3492,7 @@ export function runMovementChecks() {
   // trouvé en jeu).
   const oldWorlds = {};
   for (const [id, world] of Object.entries(auditSession.worlds)) {
-    const { floors, defaultSurface, segments, ...oldWorld } = world;
+    const { defaultSurface, segments, ...oldWorld } = world;
     oldWorlds[id] = oldWorld;
   }
   const oldSave = { version: SAVE_VERSION, data: { ...auditSession, worlds: oldWorlds } };
@@ -3501,7 +3500,6 @@ export function runMovementChecks() {
   run("save : sauvegarde antérieure aux surfaces acceptée (reboutchée)", true, oldSaveResult.success);
   if (oldSaveResult.success) {
     const revivedWorld = oldSaveResult.session.worlds[oldSaveResult.session.activeWorldId];
-    run("save : monde rebouché — floors par défaut", 1, revivedWorld.floors);
     run("save : monde rebouché — defaultSurface par défaut", DEFAULT_SURFACE, revivedWorld.defaultSurface);
     run("save : monde rebouché — segments par défaut (tableau vide)", 0, revivedWorld.segments.length);
     let surfaceAtThrew = false;
@@ -3511,6 +3509,22 @@ export function runMovementChecks() {
       surfaceAtThrew = true;
     }
     run("save : surfaceAt ne plante jamais sur un monde rebouché", false, surfaceAtThrew);
+  }
+
+  // Sauvegarde encore plus ancienne, avec un champ de niveau depuis RETIRÉ
+  // du format (ex. un ancien jalon de contenu jamais devenu actif) : ni
+  // rejeté ni traité spécialement — simplement transporté tel quel, comme
+  // n'importe quel champ que plus aucun code ne lit.
+  const worldsWithLegacyField = {};
+  for (const [id, world] of Object.entries(auditSession.worlds)) {
+    worldsWithLegacyField[id] = { ...world, legacyField: 3 };
+  }
+  const legacyFieldSave = { version: SAVE_VERSION, data: { ...auditSession, worlds: worldsWithLegacyField } };
+  const legacyFieldResult = deserializeGame(legacyFieldSave);
+  run("save : sauvegarde avec un champ de niveau retiré du format — se charge sans erreur", true, legacyFieldResult.success);
+  if (legacyFieldResult.success) {
+    const revivedLegacyWorld = legacyFieldResult.session.worlds[legacyFieldResult.session.activeWorldId];
+    run("save : champ retiré du format — transporté tel quel, jamais nettoyé", 3, revivedLegacyWorld.legacyField);
   }
 
   // Sauvegarde ANTÉRIEURE à l'horloge de partie (voir core/time.js) : jamais
@@ -3525,7 +3539,7 @@ export function runMovementChecks() {
   }
 
   // Sauvegarde ANTÉRIEURE à l'argent (voir core/money.js) : même précédent
-  // exact que time/floors/surfaces ci-dessus — jamais eu de clé .money.
+  // exact que time/surfaces ci-dessus — jamais eu de clé .money.
   const { money: _droppedMoney, ...auditSessionWithoutMoney } = auditSession;
   const oldMoneySave = { version: SAVE_VERSION, data: auditSessionWithoutMoney };
   const oldMoneySaveResult = deserializeGame(oldMoneySave);

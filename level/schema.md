@@ -12,7 +12,6 @@ parsé, sans aucune chaîne affichable en dur — uniquement des clés i18n.
 | `titleKey`    | string   | non vide, clé i18n du titre du niveau             |
 | `length`      | number   | `> 0` — longueur en unités le long de l'axe x     |
 | `playerStart` | number   | point d'arrivée PAR DÉFAUT du lieu. **FILET, jamais rejeté** : absent ou hors `[0, length]` -> repli sur `0` (avec un `console.warn`), jamais d'exception. Des points d'arrivée NOMMÉS (ex. par porte) pourront s'ajouter plus tard, sans toucher à ce filet. |
-| `floors`      | number   | optionnel, entier `>= 1` : nombre d'étages du lieu. **FILET, jamais rejeté** : absent ou invalide (non entier, `< 1`) -> repli sur `1` (`console.warn` uniquement si une valeur a été fournie et est invalide — absent reste silencieux, c'est le cas normal). Réservé pour la verticalité future : voir "Verticalité (réservé)" plus bas. Totalement INERTE aujourd'hui — aucune mécanique n'en dépend. |
 | `entities`    | Entity[] | voir ci-dessous                                   |
 | `music`       | string   | optionnel : musique du lieu — une clé de POOL (plusieurs fichiers, voir `assets/manifest.json`) ou un membre précis, résolue par `resolveAsset` comme tout autre pool. Canal global non spatialisé — voir `view/audio/city-scene.js`. Par défaut, lue en SÉQUENCE avec respiration (voir "Musique : séquence avec respiration" plus bas), jamais en boucle simple. |
 | `musicDay` / `musicNight` | string | optionnels : musique PAR PHASE jour/nuit (voir `core/time.js`/`phaseAt`, "Phase jour/nuit" plus bas), même forme que `music` (pool ou membre précis). Un lieu qui n'en déclare aucune des deux retombe sur `music` pour les deux phases (rétrocompatible, aucune régression). Bascule en cours de jeu par FONDU UNIVERSEL puis respiration puis nouvelle séquence (`view/audio/city-scene.js`) ; à l'entrée dans une scène, la phase courante joue directement, sans fondu. |
@@ -247,16 +246,16 @@ réglages, sous-types comme presets, la place du joueur) est documenté dans
 }
 ```
 
-## Verticalité (réservé)
+## Verticalité — par SOUS-SCÈNES, pas par axe Y
 
-`floors` (voir tableau "Niveau" ci-dessus) pose la place pour une future
-verticalité, sans l'implémenter : un lieu aura des étages DISCRETS (paliers
-francs, jamais un déplacement Y continu — l'axe Y étant peu lisible à
-l'oreille, on le discrétise en paliers plutôt que de le rendre continu comme
-l'axe x). La mécanique elle-même (position d'étage, palier actif, navigation
-entre étages, audio des autres étages) n'existe pas encore et s'appuiera sur
-ce champ le jour où elle sera construite — aucune entité, aucun état de
-partie, aucun rendu audio n'en dépend à ce stade.
+Aucun champ dédié : la verticalité (ex. "les toits" au-dessus de la rue) se
+fait EXACTEMENT comme un changement de lieu horizontal — un lieu séparé
+(`level/*.json` à part entière), relié par une entité interactable dont
+l'action `"transit"` y mène (un "escalier"/une "échelle", au même titre
+qu'une `door` — voir `entities/model.md`). Jamais un axe Y discrétisé dans
+UNE scène (aucune notion de palier/étage actif à maintenir) : le mécanisme
+de transition de lieu déjà en place couvre tout, sans champ ni système
+supplémentaire.
 
 ## Chargement
 

@@ -1105,17 +1105,17 @@ vocal) illustrent la même chose pour la COMPOSITION LIBRE des rôles de son
 positionné (voir "Beacon vs vocal" plus haut) : chaque archétype déclare
 juste ce dont il a besoin, rien de plus.
 
-## Verticalité (réservé)
+## Verticalité — par sous-scènes, pas par axe Y
 
-`level/schema.md` documente `floors` (nombre d'étages d'un lieu) — un champ
-RÉSERVÉ, totalement INERTE aujourd'hui : aucune entité de ce modèle n'a de
-position d'étage, aucun son n'est rendu différemment selon l'étage. Le jour
-où la verticalité sera implémentée (paliers discrets, jamais un axe Y
-continu — voir `level/schema.md`), l'audio "des autres étages" (ex. un son
-étouffé venant d'un étage voisin) s'appuiera sur le vocabulaire de sons
-ci-dessus, pas sur un mécanisme séparé — mais rien de tout cela n'existe
-encore, ce paragraphe ne fait qu'ancrer où cette future mécanique viendra se
-greffer.
+Pas de champ ni de mécanique dédiés : "monter" (ex. accéder aux toits
+au-dessus de la rue) se fait comme tout autre changement de lieu — une
+sous-scène (`level/*.json` séparé) reliée par une entité interactable dont
+l'action `"transit"` y mène, un "escalier"/une "échelle" jouant exactement
+le rôle d'une `door` (voir "Types d'action", "transit"). Le mécanisme de
+transition de lieu déjà en place couvre entièrement ce besoin — aucun axe Y
+discrétisé, aucun palier actif à maintenir, aucun système supplémentaire à
+construire. (Un ancien champ de niveau, réservé pour un axe Y jamais
+implémenté, a été retiré comme code mort — voir `level/schema.md`.)
 
 ## Le joueur : même modèle, mais AUDITEUR
 

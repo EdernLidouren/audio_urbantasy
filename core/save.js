@@ -43,32 +43,29 @@ export function serializeGame(session) {
   return { version: SAVE_VERSION, data: stripEphemeralEntities(session) };
 }
 
-// Rebouche UN monde antérieur à floors/defaultSurface/segments (voir
-// core/level.js/parseLevel, qui garantit ces trois clés TOUJOURS présentes
+// Rebouche UN monde antérieur à defaultSurface/segments (voir
+// core/level.js/parseLevel, qui garantit ces deux clés TOUJOURS présentes
 // pour un monde fraîchement chargé) — une sauvegarde plus ancienne ne les a
 // jamais eues, et une relecture de sauvegarde ne repasse JAMAIS par
 // parseLevel (qui ne s'applique qu'au chargement réseau d'un niveau). Sans
 // ce rebouchage, surfaceAt(world, x) plante sur world.segments.find(...)
 // dès qu'un monde ANCIEN redevient actif (voir view/audio/city-scene.js).
-// Mêmes défauts que parseLevel : 1 étage, DEFAULT_SURFACE partout, aucun
-// segment — comportement inchangé pour ces mondes anciens. Même précédent
-// pour `nextEphemeralId` (voir core/state.js/spawnEphemeral), antérieur aux
+// Mêmes défauts que parseLevel : DEFAULT_SURFACE partout, aucun segment —
+// comportement inchangé pour ces mondes anciens. Même précédent pour
+// `nextEphemeralId` (voir core/state.js/spawnEphemeral), antérieur aux
 // entités éphémères. `world` suspect (donnée de disque) : jamais de
 // confiance aveugle, renvoyé tel quel si ce n'est manifestement pas un
-// objet plutôt que de planter ici.
+// objet plutôt que de planter ici. Un champ HÉRITÉ d'une save ancienne mais
+// retiré depuis du format (ex. un ancien jalon de contenu jamais devenu
+// actif) traverse tel quel, sans être touché ni relu par quoi que ce soit —
+// simplement ignoré, jamais nettoyé activement.
 function backfillWorld(world) {
   if (!world || typeof world !== "object") return world;
-  if (
-    world.floors !== undefined &&
-    world.defaultSurface !== undefined &&
-    world.segments !== undefined &&
-    world.nextEphemeralId !== undefined
-  ) {
+  if (world.defaultSurface !== undefined && world.segments !== undefined && world.nextEphemeralId !== undefined) {
     return world;
   }
   return {
     ...world,
-    floors: world.floors !== undefined ? world.floors : 1,
     defaultSurface: world.defaultSurface !== undefined ? world.defaultSurface : DEFAULT_SURFACE,
     segments: world.segments !== undefined ? world.segments : [],
     // nextEphemeralId : voir core/state.js/spawnEphemeral. Absent d'une
@@ -87,8 +84,8 @@ function backfillWorld(world) {
 // de `money` (voir core/money.js — même précédent), de `bag` (voir
 // core/bag.js — même précédent), de `equipment` (voir core/equipment.js —
 // même précédent, mais rebouché VIDE, jamais avec un objet par défaut) et,
-// par monde, de floors/defaultSurface/segments (voir backfillWorld) —
-// absents d'une sauvegarde antérieure à leur introduction, sans que ça
+// par monde, de defaultSurface/segments (voir backfillWorld) — absents
+// d'une sauvegarde antérieure à leur introduction, sans que ça
 // justifie une montée de version (la forme reste v1, juste complétée par
 // des défauts sûrs). Point d'ancrage documenté pour de futures montées
 // (v1 -> v2 -> ... -> courante, jamais en sautant une étape, même principe

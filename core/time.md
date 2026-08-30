@@ -106,7 +106,7 @@ non testable en terminal) :
 sérialisabilité (`core/movement.check.js`), étendu explicitement à ce champ. Une
 sauvegarde antérieure à l'introduction de l'horloge n'a jamais eu cette clé — rebouchée
 à `INITIAL_TIME` par `core/save.js`/`migrateSave`, même principe que le rebouchage déjà
-en place pour `floors`/`defaultSurface`/`segments`.
+en place pour `defaultSurface`/`segments`.
 
 ## Lien réservé avec `lastVisited`, pas exploité
 
