@@ -17,6 +17,7 @@ import {
   setItemPickupHandler,
   setLootHandler,
   setLootSpawnHandler,
+  setSideSwitchHandler,
   setPlayerEquipmentProvider,
 } from "./interaction.js";
 import { openPauseMenu } from "./menus/pause-menu.js";
@@ -31,7 +32,7 @@ import { setGameReplaceHandler } from "./menus/save-menu.js";
 import { tick } from "../core/actions.js";
 import { reduce } from "../core/reduce.js";
 import { loadLevelById } from "../level/load.js";
-import { getActiveWorld, travelToWorld, spawnEphemeral } from "../core/state.js";
+import { getActiveWorld, travelToWorld, switchSide, spawnEphemeral, isTwoSided } from "../core/state.js";
 import { pickupEntity, lootEntity, lootEntitySpawn } from "../core/money.js";
 import { pickupItemEntity, dropItem } from "../core/bag.js";
 import { equipItem, unequipItem } from "../core/equipment.js";
@@ -103,7 +104,18 @@ function announceMoney(session) {
 // souvent une dizaine de décimales de bruit flottant sans intérêt à
 // l'oreille (ex. 14.679999999999863) — deux décimales restent largement
 // assez précises pour situer le joueur (MOVE_STEP vaut 0.04).
+//
+// Face courante (RECTO/VERSO, voir CLAUDE.md) : annoncée EN PLUS, mais
+// SEULEMENT si le monde actif a réellement deux faces (isTwoSided) —
+// aucune info de face pour une scène simple, où elle n'aurait aucun sens.
+// Info DEBUG pour l'instant (comme le reste de cette annonce) : une version
+// destinée au joueur normal, en clair, viendra plus tard.
 function announcePlayerX(session) {
+  const world = session.worlds[session.activeWorldId];
+  if (isTwoSided(world)) {
+    announce(t("position.announceWithSide", { x: session.player.x.toFixed(2), side: t(`side.${session.player.side}`) }));
+    return;
+  }
   announce(t("position.announce", { x: session.player.x.toFixed(2) }));
 }
 
@@ -235,6 +247,25 @@ export function makeCityScreen(getSession, setSession) {
     scene = createCityAudioScene(getSession);
   }
 
+  // Bascule recto<->verso (voir view/interaction.js/ACTION_HANDLERS.
+  // switchSide ; entities/types/passage.js ; CLAUDE.md/"RECTO/VERSO") —
+  // MÊME SOIN que transitionThroughDoor pour l'audio : scene.destroy()
+  // AVANT tout changement d'état, pour n'avoir AUCUN Howl résiduel de la
+  // face quittée, scène reconstruite APRÈS la bascule core sur la NOUVELLE
+  // face active (getActiveWorld, voir core/state.js, la lit déjà via
+  // session.player.side). PAS de travelToWorld : le monde actif ne change
+  // pas, juste session.player.side + la position du joueur — pas de
+  // fetch réseau, pas de nouveau titre à annoncer (même lieu). Le marqueur
+  // sonore de bascule reste à la charge de l'appelant (voir
+  // handleSwitchSide, view/interaction.js), symétrique aux autres effets
+  // d'état de ce fichier (son/annonce restent côté interaction.js).
+  function sideSwitchEffect(arrivalX) {
+    scene.destroy();
+    scene = null;
+    setSession(switchSide(getSession(), arrivalX));
+    scene = createCityAudioScene(getSession);
+  }
+
   // Effet d'ÉTAT du ramassage (voir view/interaction.js/ACTION_HANDLERS.
   // pickup) : argent + retrait de l'entité, core pur (core/money.js) —
   // c'est TOUT ce que fait ce gestionnaire, le son/l'annonce restent côté
@@ -310,6 +341,7 @@ export function makeCityScreen(getSession, setSession) {
   setItemPickupHandler(itemPickupEntityEffect);
   setLootHandler(lootEntityEffect);
   setLootSpawnHandler(lootSpawnEffect);
+  setSideSwitchHandler(sideSwitchEffect);
   setDropItemHandler(dropItemEffect);
   setEquipItemHandler(equipItemEffect);
   setUnequipItemHandler(unequipItemEffect);
@@ -461,6 +493,7 @@ export function makeCityScreen(getSession, setSession) {
       setItemPickupHandler(null);
       setLootHandler(null);
       setLootSpawnHandler(null);
+      setSideSwitchHandler(null);
       setDropItemHandler(null);
       setEquipItemHandler(null);
       setUnequipItemHandler(null);

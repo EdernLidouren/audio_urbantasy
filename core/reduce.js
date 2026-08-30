@@ -27,6 +27,13 @@
 // Partie multi-mondes (voir core/state.js) : SEUL le monde actif avance.
 // Les autres, rangés dans session.worlds, sont inertes — reduce ne les lit
 // ni ne les écrit, ils traversent le tick sans changer (même référence).
+// RECTO/VERSO, étape 2/2 — COEXISTENCE (voir core/state.js/resolveFace/
+// isTwoSided) : au sein du monde actif, LES DEUX faces d'une scène à deux
+// faces tiquent désormais à chaque tour (fin du gel de l'étape 1), mais
+// ISOLÉES l'une de l'autre — chacune sa propre passe de comportement et de
+// résolution de corps, jamais combinées. Seule la face COURANTE
+// (state.player.side) reçoit le joueur et les compagnons ; l'autre tique
+// seule, dans son propre espace (voir le bloc dédié dans TICK ci-dessous).
 //
 // COMPAGNONS (voir core/state.js pour le modèle complet) : lus/écrits ICI
 // directement sur `state.worlds[...]`/`state.companions` BRUTS, jamais via
@@ -40,25 +47,28 @@
 // tableau SÉPARÉ en fin de tick.
 import BEHAVIORS from "./behaviors/index.js";
 import { resolvePlayerMove, resolveBodyMove } from "./physics/collision.js";
-import { resolveOverlaps } from "./physics/overlap.js";
+import { resolveOverlaps, resolveEntityOverlaps } from "./physics/overlap.js";
 import { resolveEntityRules } from "./presence.js";
+import { resolveFace, withFace, isTwoSided } from "./state.js";
 
 // Résout la position d'une CIBLE par id — "player" (convention reconnue
 // ici, voir follow.js/DEFAULTS.targetId) pour le joueur, sinon une entité
-// du lieu actif ou un compagnon. Fourni aux comportements à intention (ex.
+// de la FACE ACTIVE (voir core/state.js/resolveFace — la face gelée d'une
+// scène à deux faces n'est jamais consultée ici, exactement comme un monde
+// rangé) ou un compagnon. Fourni aux comportements à intention (ex.
 // follow) via context.getTargetPosition, pour qu'AUCUN module de
 // comportement n'ait à connaître cette structure (joueur hors entities,
-// compagnons dans un cercle séparé du lieu...). Positions PRÉ-tick (world/
+// compagnons dans un cercle séparé du lieu...). Positions PRÉ-tick (face/
 // state.companions AVANT toute étape de ce tour) : cohérent avec le reste
-// de la phase 1, qui lit aussi world.rngState/companionsRngState avant
+// de la phase 1, qui lit aussi face.rngState/companionsRngState avant
 // qu'ils n'avancent — une cible réagit à l'état de DÉBUT de tick, jamais à
 // une position déjà avancée plus tôt dans le même tick selon l'ordre de la
 // liste. Introuvable (id inconnu) -> undefined, jamais d'exception : voir
 // follow.js, qui s'arrête proprement dans ce cas.
-function resolveTargetPosition(state, world, targetId) {
+function resolveTargetPosition(state, face, targetId) {
   if (targetId === "player") return state.player.x;
-  const inWorld = world.entities.find((entity) => entity.id === targetId);
-  if (inWorld) return inWorld.x;
+  const inFace = face.entities.find((entity) => entity.id === targetId);
+  if (inFace) return inFace.x;
   const inCompanions = state.companions.find((entity) => entity.id === targetId);
   if (inCompanions) return inCompanions.x;
   return undefined;
@@ -147,6 +157,15 @@ export function reduce(state, action) {
   switch (action.type) {
     case "TICK": {
       const world = state.worlds[state.activeWorldId];
+      // face : la FACE ACTIVE du monde actif (voir core/state.js/
+      // resolveFace) — pour un monde simple, c'est le monde lui-même
+      // (comportement STRICTEMENT inchangé) ; pour un monde à deux faces,
+      // c'est recto OU verso selon state.player.side, JAMAIS les deux :
+      // l'autre face n'est ni lue ni écrite par ce tick, elle reste gelée
+      // (voir header du fichier, "Partie multi-mondes"). `length` reste
+      // PARTAGÉ au niveau du monde (les deux faces vivent sur le même axe
+      // X), jamais dupliqué par face.
+      const face = resolveFace(world, state.player.side);
 
       // --- Phase 1 : intentions ---
 
@@ -158,16 +177,16 @@ export function reduce(state, action) {
       // kind par son nom. getTargetPosition PARTAGÉ entre les deux appels :
       // il ne dépend que de l'état PRÉ-tick (voir resolveTargetPosition),
       // jamais de la liste en cours de traitement.
-      const getTargetPosition = (targetId) => resolveTargetPosition(state, world, targetId);
+      const getTargetPosition = (targetId) => resolveTargetPosition(state, face, targetId);
       // Présence : dérivée UNIQUEMENT de state.time (constant pour tout ce
       // tick, voir core/presence.js) — un seul objet construit ici, partagé
       // par la phase 1 (stepEntities) ET la phase 2 (isBlocking, via
       // resolvePlayerMove/resolveBodyMove/resolveOverlaps ci-dessous),
       // jamais recréé par appel.
       const presenceContext = { time: state.time };
-      const worldStep = stepEntities(world.entities, {
+      const worldStep = stepEntities(face.entities, {
         length: world.length,
-        rngState: world.rngState,
+        rngState: face.rngState,
         getTargetPosition,
         presenceContext,
       });
@@ -191,7 +210,7 @@ export function reduce(state, action) {
       // simple entity.blocksMovement) — présence recalculée fraîche depuis
       // ces entités PRÉ-tick plutôt que relue sur un éventuel `.present`
       // déjà posé, voir le commentaire d'isBlocking.
-      const combinedBefore = [...world.entities, ...state.companions];
+      const combinedBefore = [...face.entities, ...state.companions];
       const { x: nextX, blockedBy } = resolvePlayerMove(
         state.player.x,
         action.dir,
@@ -223,7 +242,44 @@ export function reduce(state, action) {
       const finalWorldEntities = overlapFix.entities.slice(0, worldEntityCount);
       const finalCompanions = overlapFix.entities.slice(worldEntityCount);
 
-      const nextWorld = { ...world, entities: finalWorldEntities, rngState: worldStep.rngState };
+      // Réécrit la face COURANTE (voir core/state.js/withFace).
+      let nextWorld = withFace(world, state.player.side, {
+        entities: finalWorldEntities,
+        rngState: worldStep.rngState,
+      });
+
+      // --- RECTO/VERSO étape 2/2 : COEXISTENCE, l'AUTRE face tique aussi,
+      // ISOLÉE (voir CLAUDE.md/"RECTO/VERSO", core/state.js/isTwoSided) ---
+      // Fin du gel : une scène à deux faces avance désormais SES DEUX faces
+      // à chaque tick, chacune dans son propre espace — ni le joueur, ni les
+      // compagnons, ni les entités de la face COURANTE n'y participent
+      // (isolation stricte : pas de collision, pas de ciblage de
+      // comportement, pas de résolution croisée entre faces). getTargetPosition
+      // de CETTE face ne résout QUE ses propres entités — "player" (et tout
+      // id de l'autre face ou des compagnons) y reste TOUJOURS introuvable
+      // -> undefined, jamais résolu : un goto/follow de l'autre face ne peut
+      // donc jamais viser le joueur ni une entité de la face courante. Son
+      // PROPRE rngState (déjà distinct depuis l'étape 1, voir
+      // createFaceState) préserve le déterminisme sans la moindre
+      // interférence entre les deux flux.
+      if (isTwoSided(world)) {
+        const otherSide = state.player.side === "recto" ? "verso" : "recto";
+        const otherFace = world[otherSide];
+        const otherGetTargetPosition = (targetId) => {
+          const found = otherFace.entities.find((entity) => entity.id === targetId);
+          return found ? found.x : undefined;
+        };
+        const otherStep = stepEntities(otherFace.entities, {
+          length: world.length,
+          rngState: otherFace.rngState,
+          getTargetPosition: otherGetTargetPosition,
+          presenceContext,
+        });
+        const otherStepped = otherStep.results.map((r) => r.entity);
+        const otherResolved = resolveIntents(otherStep.results, otherStepped, world.length, presenceContext);
+        const otherFinal = resolveEntityOverlaps(otherResolved, world.length, presenceContext);
+        nextWorld = withFace(nextWorld, otherSide, { entities: otherFinal, rngState: otherStep.rngState });
+      }
 
       return {
         ...state,

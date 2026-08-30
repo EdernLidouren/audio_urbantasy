@@ -51,6 +51,7 @@
         "kind": "loot",
         "spawn": { "spec": { "type": "money", "amount": 20 }, "count": 3, "spread": 1.5 }
       }
-    }
+    },
+    { "id": "door-alley", "type": "door", "x": 19, "nameKey": "door.alley", "target": "demo3", "descriptionKey": "door.alley.description" }
   ]
 }

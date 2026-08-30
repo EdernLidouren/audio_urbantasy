@@ -5,4 +5,5 @@
 export default {
   demo: "level/demo.json",
   demo2: "level/demo2.json",
+  demo3: "level/demo3.json",
 };

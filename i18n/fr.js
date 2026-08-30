@@ -107,6 +107,11 @@ export default {
   // sans toucher au mécanisme (juste ces deux chaînes).
   "money.announce": "{amount} pièces.",
   "position.announce": "Position : {x}.",
+  // Variante avec la face courante (RECTO/VERSO, voir CLAUDE.md) — utilisée
+  // UNIQUEMENT si le lieu actif a deux faces (voir view/city-screen.js).
+  "position.announceWithSide": "Position : {x}. Face : {side}.",
+  "side.recto": "recto",
+  "side.verso": "verso",
   "time.season.spring": "printemps",
   "time.season.summer": "été",
   "time.season.autumn": "automne",
@@ -197,4 +202,12 @@ export default {
   "npc.guard.description": "Un garde qui surveille la pièce sans un mot.",
   "npc.merchant": "Marchand",
   "npc.merchant.description": "Un marchand qui range des caisses en silence.",
+
+  "entity.passage": "Passage",
+  "entity.passage.description": "Un passage étroit vers l'autre côté du lieu.",
+  "door.alley": "Porte de la ruelle",
+  "door.alley.description": "Une porte de service qui donne sur une ruelle.",
+  "door.alley_back": "Porte de service",
+  "door.alley_back.description": "Cette même porte de service, vue de la ruelle : elle mène à l'arrière-boutique.",
+  "level.demo3.title": "La ruelle",
 };

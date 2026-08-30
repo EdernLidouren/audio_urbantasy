@@ -14,6 +14,7 @@
 import { DEFAULT_SURFACE } from "./surfaces.js";
 import { INITIAL_TIME } from "./time.js";
 import { createEmptyEquipment } from "./equipment.js";
+import { stripEphemeralsFromWorld } from "./state.js";
 
 export const SAVE_VERSION = 1;
 
@@ -22,19 +23,19 @@ export const SAVE_VERSION = 1;
 // sérialisation — jamais SEULEMENT le monde actif : une sauvegarde reste
 // correcte même si un futur appelant venait à laisser un éphémère dans un
 // monde rangé (aujourd'hui exclu par la purge de travelToWorld, mais cette
-// fonction ne doit pas EN DÉPENDRE pour tenir sa propre garantie). Monde
-// sans aucun éphémère -> référence INCHANGÉE (pas de nouvel objet pour
+// fonction ne doit pas EN DÉPENDRE pour tenir sa propre garantie). Réutilise
+// stripEphemeralsFromWorld (core/state.js) MONDE PAR MONDE — DEUX FACES
+// comprises, jamais dupliqué ici : une scène à deux faces (voir
+// core/state.js/isTwoSided) sauvegarde SES DEUX FACES, la gelée y compris.
+// Monde sans aucun éphémère -> référence INCHANGÉE (pas de nouvel objet pour
 // rien), même politique que le reste du fichier (backfillWorld).
 function stripEphemeralEntities(session) {
   const worlds = {};
   let anyChanged = false;
   for (const [id, world] of Object.entries(session.worlds)) {
-    if (!world.entities.some((entity) => entity.ephemeral)) {
-      worlds[id] = world;
-      continue;
-    }
-    worlds[id] = { ...world, entities: world.entities.filter((entity) => !entity.ephemeral) };
-    anyChanged = true;
+    const patched = stripEphemeralsFromWorld(world);
+    worlds[id] = patched;
+    if (patched !== world) anyChanged = true;
   }
   return anyChanged ? { ...session, worlds } : session;
 }
@@ -43,38 +44,55 @@ export function serializeGame(session) {
   return { version: SAVE_VERSION, data: stripEphemeralEntities(session) };
 }
 
-// Rebouche UN monde antérieur à defaultSurface/segments (voir
-// core/level.js/parseLevel, qui garantit ces deux clés TOUJOURS présentes
+// Rebouche UNE FACE antérieure à defaultSurface/segments (voir
+// core/level.js/parseLevel, qui garantit ces trois clés TOUJOURS présentes
 // pour un monde fraîchement chargé) — une sauvegarde plus ancienne ne les a
 // jamais eues, et une relecture de sauvegarde ne repasse JAMAIS par
 // parseLevel (qui ne s'applique qu'au chargement réseau d'un niveau). Sans
-// ce rebouchage, surfaceAt(world, x) plante sur world.segments.find(...)
-// dès qu'un monde ANCIEN redevient actif (voir view/audio/city-scene.js).
+// ce rebouchage, surfaceAt(world, x) plante sur segments.find(...) dès
+// qu'une face ANCIENNE redevient active (voir view/audio/city-scene.js).
 // Mêmes défauts que parseLevel : DEFAULT_SURFACE partout, aucun segment —
-// comportement inchangé pour ces mondes anciens. Même précédent pour
+// comportement inchangé pour ces faces anciennes. Même précédent pour
 // `nextEphemeralId` (voir core/state.js/spawnEphemeral), antérieur aux
-// entités éphémères. `world` suspect (donnée de disque) : jamais de
-// confiance aveugle, renvoyé tel quel si ce n'est manifestement pas un
+// entités éphémères. `face` suspecte (donnée de disque) : jamais de
+// confiance aveugle, renvoyée telle quelle si ce n'est manifestement pas un
 // objet plutôt que de planter ici. Un champ HÉRITÉ d'une save ancienne mais
 // retiré depuis du format (ex. un ancien jalon de contenu jamais devenu
 // actif) traverse tel quel, sans être touché ni relu par quoi que ce soit —
 // simplement ignoré, jamais nettoyé activement.
-function backfillWorld(world) {
-  if (!world || typeof world !== "object") return world;
-  if (world.defaultSurface !== undefined && world.segments !== undefined && world.nextEphemeralId !== undefined) {
-    return world;
+function backfillFace(face) {
+  if (!face || typeof face !== "object") return face;
+  if (face.defaultSurface !== undefined && face.segments !== undefined && face.nextEphemeralId !== undefined) {
+    return face;
   }
   return {
-    ...world,
-    defaultSurface: world.defaultSurface !== undefined ? world.defaultSurface : DEFAULT_SURFACE,
-    segments: world.segments !== undefined ? world.segments : [],
+    ...face,
+    defaultSurface: face.defaultSurface !== undefined ? face.defaultSurface : DEFAULT_SURFACE,
+    segments: face.segments !== undefined ? face.segments : [],
     // nextEphemeralId : voir core/state.js/spawnEphemeral. Absent d'une
     // sauvegarde antérieure aux entités éphémères -> 0, comme à la création
     // d'un monde neuf (sans ce rebouchage, spawnEphemeral calculerait
     // `undefined + 1` = NaN, et TOUT éphémère suivant recevrait le même id
     // "ephemeral-NaN" — collision garantie dès le second spawn).
-    nextEphemeralId: world.nextEphemeralId !== undefined ? world.nextEphemeralId : 0,
+    nextEphemeralId: face.nextEphemeralId !== undefined ? face.nextEphemeralId : 0,
   };
+}
+
+// Rebouche UN monde entier — SIMPLE (sa seule face, lui-même) ou À DEUX
+// FACES (recto/verso, voir core/state.js/isTwoSided) : dans les deux cas,
+// chaque face traverse backfillFace, jamais dupliqué ici. Aucune save
+// antérieure au modèle à deux faces n'en déclare — ce cas ne concerne donc
+// aujourd'hui que des saves ÉCRITES avec ce modèle, mais reste correct par
+// construction plutôt que supposé toujours complet.
+function backfillWorld(world) {
+  if (!world || typeof world !== "object") return world;
+  if (world.recto !== undefined && world.verso !== undefined) {
+    const recto = backfillFace(world.recto);
+    const verso = backfillFace(world.verso);
+    if (recto === world.recto && verso === world.verso) return world;
+    return { ...world, recto, verso };
+  }
+  return backfillFace(world);
 }
 
 // Migre une sauvegarde déjà déballée { version, data } vers la partie
@@ -120,6 +138,16 @@ function migrateSave(raw) {
   // qu'à une partie VRAIMENT neuve).
   if (!data.equipment || typeof data.equipment !== "object") {
     data = { ...data, equipment: createEmptyEquipment() };
+  }
+
+  // player.side (voir core/state.js/isTwoSided, "RECTO/VERSO") : absent
+  // d'une sauvegarde antérieure à ce modèle -> "recto", défaut neutre
+  // identique à une partie neuve (une scène simple l'ignore de toute
+  // façon). Même politique que les autres rebouchages de ce bloc : jamais
+  // une exception si data.player est déjà mal formé, isPlausibleSession le
+  // détectera ensuite.
+  if (!data.player || typeof data.player !== "object" || typeof data.player.side !== "string") {
+    data = { ...data, player: { ...data.player, side: "recto" } };
   }
 
   if (data.worlds && typeof data.worlds === "object") {

@@ -1117,6 +1117,55 @@ discrétisé, aucun palier actif à maintenir, aucun système supplémentaire à
 construire. (Un ancien champ de niveau, réservé pour un axe Y jamais
 implémenté, a été retiré comme code mort — voir `level/schema.md`.)
 
+## Recto/verso — deux faces d'une scène, isolées, qui coexistent
+
+Voir CLAUDE.md/"RECTO/VERSO", `level/schema.md`/"Scène à deux faces
+(recto/verso)" pour le contrat JSON complet, `core/scripting.md`/
+`"switchSide"` pour le format d'action. Une scène PEUT avoir deux faces
+(recto/verso) au lieu d'une seule, chacune son propre ensemble d'entités sur
+la MÊME longueur d'axe x — deux espaces PHYSIQUEMENT DISJOINTS qui partagent
+seulement cet axe. `entities/types/passage.js` est l'archétype du point de
+bascule entre les deux (une ruelle, une porte dérobée, un trou dans la
+palissade...) — GÉNÉRIQUE comme `door`, sans propriété propre au-delà des
+capacités d'interaction : `action.arrivalX` (le point d'arrivée sur l'autre
+face) est TOUJOURS fourni par l'instance, jamais par l'archétype, puisqu'il
+dépend entièrement de la géométrie du lieu.
+
+Le joueur porte `player.side`, TOUJOURS remis à `"recto"` en entrant dans le
+lieu par une porte (comme `playerStart`) ; basculer via un `passage` reste
+dans le MÊME lieu (`core/state.js`/`switchSide`), jamais un `travelToWorld`.
+
+**Coexistence, ISOLÉE (étape 2/2)** : LES DEUX faces tiquent à chaque tour
+(`core/reduce.js`/TICK) — fini le gel de l'étape 1. Mais une face reste un
+espace fermé pour tout ce qui est spatial/logique :
+- **Collision** : une entité ne heurte QUE les entités/le joueur de SA
+  PROPRE face (`core/physics/overlap.js`/`resolveEntityOverlaps`, la même
+  passe entité-vs-entité que pour une face simple, jamais combinée entre
+  faces). Se tenir au même x qu'une entité de l'autre face -> aucun contact,
+  on passe "à travers" (un autre plan).
+- **Ciblage de comportement** (`follow`/`goto`) : `getTargetPosition` d'une
+  face ne résout QUE ses propres entités — "player" y reste INTROUVABLE si
+  le joueur est sur l'AUTRE face (jamais résolu par convention, voir
+  `core/reduce.js`) : un compagnon ou un PNJ ne vise donc jamais une cible
+  de l'autre face, pas même le joueur.
+- **Interaction et occupation** : scopées à la face COURANTE (celle du
+  joueur) — les entités de l'autre face n'apparaissent JAMAIS dans
+  `getInteractionCandidates`/l'annonce d'occupation (voir
+  `view/audio/city-scene.js`), même à portée sur l'axe x.
+- **PRNG** : chaque face garde son propre `rngState` (déjà distinct depuis
+  l'étape 1, voir `createFaceState`) — déterminisme préservé, aucune
+  interférence entre les deux flux.
+
+**Seul le SON traverse** — voir `view/audio/city-scene.js` : les entités de
+l'AUTRE face sont rendues en ÉTOUFFÉ (passe-bas + atténuation de gain,
+`mufflingLowpassHz`/`mufflingGain`, `config/tuning-values.js`), toujours
+DIRECTIONNELLES (même pan/distance dérivés de leur x que d'habitude) — sauf
+leur BEACON, jamais construit pour l'autre face (`includeBeacon:false`) :
+on DEVINE la présence de l'autre face, on ne la LOCALISE jamais. Au
+basculement de face, normal et étouffé s'inversent simplement (la scène
+audio est entièrement reconstruite, voir `view/city-screen.js`/
+`sideSwitchEffect`).
+
 ## `isFlying` — hauteur SUGGÉRÉE par le son, jamais un axe Y
 
 Booléen d'entité (`core/level.js`, cascade instance -> archétype -> `false`,

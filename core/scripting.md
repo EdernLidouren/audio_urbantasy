@@ -393,6 +393,25 @@ action: { kind: "loot", amount: 100 },
 (limite anti-prolifération, éviction du plus ancien, exclusion de sauvegarde) :
 `entities/model.md`/"Entités éphémères", `core/state.js`/`spawnEphemeral`.
 
+### `"switchSide"` — bascule recto/verso (scène à deux faces)
+
+```json
+// entities/types/passage.js (défaut) + instance de niveau (level/demo3.json)
+{ "id": "alley-gap-recto", "type": "passage", "x": 8, "action": { "kind": "switchSide", "arrivalX": 8 } }
+```
+
+`arrivalX` (nombre, requis) : point d'arrivée sur l'AUTRE face du MÊME monde —
+comme `target` pour `"transit"`, mais on ne change jamais de monde
+(`activeWorldId` inchangé). Délègue à `core/state.js`/`switchSide` (bascule
+`player.side` + repositionne joueur/compagnons) PUIS reconstruit la scène audio
+sur la nouvelle face (`view/city-screen.js`/`sideSwitchEffect`, même soin que
+`transitionThroughDoor` : aucun Howl résiduel), et joue un marqueur sonore de
+bascule (`view/interaction.js`, "metal_gate" — `assets/sounds/doors/metal_gate`).
+`arrivalX` n'est PAS validé en bornes au chargement (comme tout `action.*`,
+transport générique) — clampé à l'exécution par `switchSide`, jamais un
+plantage. Détail complet du modèle à deux faces (persistance, gel de l'autre
+face) : `level/schema.md`/"Scène à deux faces (recto/verso)".
+
 ### Ajouter un kind d'action
 
 1. Un cas dans `ACTION_HANDLERS` (`view/interaction.js`) — CÔTÉ VUE uniquement, le

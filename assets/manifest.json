@@ -62,6 +62,10 @@
     "assets/musics/streets_night_1.mp3",
     "assets/musics/streets_night_2.mp3"
   ],
+  "assets/sounds/doors/metal_gate": [
+    "assets/sounds/doors/metal_gate_1.mp3",
+    "assets/sounds/doors/metal_gate_2.mp3"
+  ],
   "assets/sounds/effects/electrical_flickering": [
     "assets/sounds/effects/electrical_flickering_1.mp3",
     "assets/sounds/effects/electrical_flickering_2.mp3",

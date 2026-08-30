@@ -104,6 +104,11 @@ export default {
   "time.announce": "{weekday}, {month} {day}, {season}, year {year}. {hour}:{minute}.",
   "money.announce": "{amount} coins.",
   "position.announce": "Position: {x}.",
+  // Variant with the current side (RECTO/VERSO, see CLAUDE.md) — used ONLY
+  // when the active place has two sides (see view/city-screen.js).
+  "position.announceWithSide": "Position: {x}. Side: {side}.",
+  "side.recto": "recto",
+  "side.verso": "verso",
   "time.season.spring": "spring",
   "time.season.summer": "summer",
   "time.season.autumn": "autumn",
@@ -193,4 +198,12 @@ export default {
   "npc.guard.description": "A guard watching the room without a word.",
   "npc.merchant": "Merchant",
   "npc.merchant.description": "A merchant quietly stacking crates.",
+
+  "entity.passage": "Passage",
+  "entity.passage.description": "A narrow passage to the other side of the place.",
+  "door.alley": "Alley door",
+  "door.alley.description": "A service door opening onto an alley.",
+  "door.alley_back": "Service door",
+  "door.alley_back.description": "This same service door, seen from the alley: it leads to the back room.",
+  "level.demo3.title": "The alley",
 };

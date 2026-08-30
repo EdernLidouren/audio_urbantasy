@@ -33,6 +33,20 @@
 // minute/heure/jour/mois/saison/année). Avance UNIQUEMENT via
 // core/time.js/advanceTime, jamais ici ni dans core/reduce.js.
 //
+// RECTO/VERSO — scène à DEUX FACES (modèle B, voir CLAUDE.md) : worlds[id]
+// peut être SIMPLE (comme ci-dessus) ou contenir un recto ET un verso
+// (jamais un seul), chacun sa propre face — voir isTwoSided/resolveFace/
+// withFace plus bas. `player.side` ("recto"|"verso", "recto" par défaut) dit
+// QUELLE face est ACTIVE (celle qui porte le joueur et les compagnons).
+// Étape 2/2 — COEXISTENCE (voir core/reduce.js/TICK) : LES DEUX faces
+// tiquent à chaque tour, chacune ISOLÉE dans son propre espace (aucune
+// collision, aucun ciblage de comportement, aucune interaction entre
+// faces) — seule la face active reçoit joueur/compagnons. `getInactiveFace`
+// plus bas expose l'AUTRE face en LECTURE SEULE, pour son rendu audio
+// étouffé (voir view/audio/city-scene.js). Basculer de face (voir
+// switchSide plus bas) reste DANS le même monde, contrairement à
+// travelToWorld qui en change.
+//
 // COMPAGNONS — cercle PARTIE, comme le joueur (voir CLAUDE.md, brique 1/3
 // du système de compagnons) : `companions` est une liste d'entités (MÊME
 // forme qu'une entité de lieu — id/type/x/behavior/...) qui vit à CE niveau,
@@ -131,24 +145,103 @@ export function addCompanion(companions, companion) {
   return { companions: [...companions, companion], added: true };
 }
 
+// SCÈNE À DEUX FACES (modèle B, voir CLAUDE.md/"RECTO/VERSO") : une scène
+// PEUT contenir un recto ET un verso (core/level.js/parseLevel garantit les
+// deux présents ensemble, jamais un seul) — chacun sa PROPRE face
+// (entities/rngState/nextEphemeralId/segments/defaultSurface/music*/
+// ambiences*/reverb*), length/playerStart/lastVisited restant PARTAGÉS au
+// niveau du monde. Une scène SIMPLE (pas de recto/verso déclarés) EST
+// elle-même sa seule face — isTwoSided/resolveFace/withFace routent TOUT
+// accès à travers `side` (session.player.side), pour que le reste de ce
+// fichier (et core/reduce.js) n'ait JAMAIS à distinguer les deux cas :
+// resolveFace(world, side) renvoie toujours "la face à lire", withFace
+// "comment y réécrire", qu'il y ait deux faces ou une seule.
+export function isTwoSided(world) {
+  return world.recto !== undefined;
+}
+
+// Face COURANTE d'un monde, à LIRE. `side` ignoré pour un monde simple (il
+// est sa propre unique face) — jamais besoin de vérifier isTwoSided à
+// l'appel, cette fonction le fait une fois pour toutes.
+export function resolveFace(world, side) {
+  return isTwoSided(world) ? world[side] : world;
+}
+
+// Réécrit UNE face d'un monde avec `patch` (fusion superficielle, comme un
+// spread), en laissant l'AUTRE face totalement INTACTE (même référence) —
+// PRIMITIVE D'ÉCRITURE générique, appelée une fois par face à tiquer (voir
+// core/reduce.js/TICK, étape 2/2 : les DEUX faces d'un monde à deux faces
+// tiquent désormais, chacune via son propre appel à withFace). Pour un
+// monde SIMPLE, `side` est ignoré (il n'a qu'une seule face, lui-même).
+export function withFace(world, side, patch) {
+  if (!isTwoSided(world)) return { ...world, ...patch };
+  return { ...world, [side]: { ...world[side], ...patch } };
+}
+
+// Purge les entités ÉPHÉMÈRES d'un monde ENTIER (voir travelToWorld plus
+// bas et core/save.js/stripEphemeralEntities, SEULS appelants — factorisé
+// ICI pour ne jamais dupliquer cette logique) : SIMPLE -> sa seule face ;
+// À DEUX FACES -> LES DEUX, indépendamment (on quitte le LIEU, pas une
+// seule face — l'autre face, même tickée en coexistence, voir
+// core/reduce.js, peut très bien porter des éphémères jamais ramassés,
+// eux aussi exclus d'une sortie de SCÈNE). Référence inchangée si rien à
+// purger, même politique que le reste de ce fichier.
+function stripFaceEphemerals(face) {
+  if (!face.entities.some((entity) => entity.ephemeral)) return face;
+  return { ...face, entities: face.entities.filter((entity) => !entity.ephemeral) };
+}
+
+export function stripEphemeralsFromWorld(world) {
+  if (!isTwoSided(world)) return stripFaceEphemerals(world);
+  const recto = stripFaceEphemerals(world.recto);
+  const verso = stripFaceEphemerals(world.verso);
+  if (recto === world.recto && verso === world.verso) return world;
+  return { ...world, recto, verso };
+}
+
+// Construit l'état d'UNE face (rngState propre, compteur d'éphémères à 0) —
+// factorisé pour être appelé UNE fois (monde simple) ou DEUX (monde à deux
+// faces, recto et verso), jamais dupliqué entre les deux cas.
+function createFaceState(face, seed) {
+  return {
+    ...face,
+    rngState: createSeed(seed),
+    // Compteur d'ids ÉPHÉMÈRES, dédié à CETTE face — voir spawnEphemeral plus
+    // bas. Monotone, JAMAIS décrémenté (contrairement au nombre d'éphémères
+    // VIVANTS, qui peut baisser au gré des ramassages/purges) : garantit un
+    // id jamais réutilisé au sein de cette face, pour toute sa durée de vie
+    // (même à travers plusieurs visites — ce compteur n'est jamais remis à
+    // zéro après sa création initiale). Deux faces d'un même monde ont
+    // chacune LE LEUR : jamais partagé, elles n'ont jamais besoin de se
+    // distinguer l'une de l'autre puisqu'elles ne coexistent jamais dans la
+    // même liste d'entités (voir header, "étape 1 : une seule face active").
+    nextEphemeralId: 0,
+  };
+}
+
 // Construit l'état d'un monde à partir d'un niveau déjà validé (sortie de
 // parseLevel) : entités telles quelles (plus de seed dédiée pour "wander"
 // depuis son passage en machine à deux états — il initialise seul son
-// propre état au premier tick, voir core/behaviors/wander.js), PRNG propre
-// au monde, et lastVisited à 0 (jamais encore rangé).
+// propre état au premier tick, voir core/behaviors/wander.js). SIMPLE ->
+// une face (comportement STRICTEMENT inchangé). À DEUX FACES -> recto ET
+// verso construits chacun via createFaceState, avec des GRAINES DISTINCTES
+// (seed pour recto, `${seed}:verso` pour verso — même principe que
+// companionsRngState, voir header) : deux faces d'un même monde ne doivent
+// jamais tirer la MÊME suite de nombres, elles sont deux lieux indépendants
+// qui partagent seulement leur longueur X. lastVisited : toujours au niveau
+// du MONDE (jamais par face, voir header) — jamais encore rangé à la
+// création, quel que soit le nombre de faces.
 function createWorldState(level, seed) {
-  return {
-    ...level,
-    rngState: createSeed(seed),
-    lastVisited: 0,
-    // Compteur d'ids ÉPHÉMÈRES, dédié à ce monde — voir spawnEphemeral plus
-    // bas. Monotone, JAMAIS décrémenté (contrairement au nombre d'éphémères
-    // VIVANTS, qui peut baisser au gré des ramassages/purges) : garantit un
-    // id jamais réutilisé au sein de ce monde, pour toute sa durée de vie
-    // (même à travers plusieurs visites — ce compteur n'est jamais remis à
-    // zéro après sa création initiale).
-    nextEphemeralId: 0,
-  };
+  const { recto, verso, ...shared } = level;
+  if (recto !== undefined) {
+    return {
+      ...shared,
+      lastVisited: 0,
+      recto: createFaceState(recto, seed),
+      verso: createFaceState(verso, `${seed}:verso`),
+    };
+  }
+  return { ...createFaceState(level, seed), lastVisited: 0 };
 }
 
 // Construit une PARTIE avec un premier monde actif. Le joueur démarre à
@@ -173,7 +266,11 @@ export function createInitialState(level, seed = DEFAULT_SEED, { companions } = 
     // voir core/reduce.js), ou null — distinct de blockedBy (bute en
     // avançant vs déjà chevauché malgré lui). Les deux transitoires,
     // recalculés à chaque tick, jamais accumulés.
-    player: { x: level.playerStart, blockedBy: null, pushedBy: null },
+    // side : voir isTwoSided/resolveFace plus haut — "recto" par défaut, y
+    // compris pour une scène simple (ignoré dans ce cas, mais toujours
+    // présent : jamais de branche "side existe ou pas" ailleurs dans le
+    // core).
+    player: { x: level.playerStart, side: "recto", blockedBy: null, pushedBy: null },
     worlds: { [level.id]: world },
     activeWorldId: level.id,
     // Horloge de partie : voir core/time.js. INITIAL_TIME = jour 1, mois 1,
@@ -216,9 +313,11 @@ export function createInitialState(level, seed = DEFAULT_SEED, { companions } = 
 // planter la partie en cours.
 export function removeEntity(session, entityId) {
   const world = session.worlds[session.activeWorldId];
-  const entities = world.entities.filter((entity) => entity.id !== entityId);
-  if (entities.length === world.entities.length) return session;
-  return { ...session, worlds: { ...session.worlds, [session.activeWorldId]: { ...world, entities } } };
+  const face = resolveFace(world, session.player.side);
+  const entities = face.entities.filter((entity) => entity.id !== entityId);
+  if (entities.length === face.entities.length) return session;
+  const nextWorld = withFace(world, session.player.side, { entities });
+  return { ...session, worlds: { ...session.worlds, [session.activeWorldId]: nextWorld } };
 }
 
 // Marque UNE entité (par id) du lieu ACTIF comme "consumed" — mécanisme
@@ -233,9 +332,11 @@ export function removeEntity(session, entityId) {
 // planter la partie).
 export function markConsumed(session, entityId) {
   const world = session.worlds[session.activeWorldId];
-  if (!world.entities.some((entity) => entity.id === entityId)) return session;
-  const entities = world.entities.map((entity) => (entity.id === entityId ? { ...entity, consumed: true } : entity));
-  return { ...session, worlds: { ...session.worlds, [session.activeWorldId]: { ...world, entities } } };
+  const face = resolveFace(world, session.player.side);
+  if (!face.entities.some((entity) => entity.id === entityId)) return session;
+  const entities = face.entities.map((entity) => (entity.id === entityId ? { ...entity, consumed: true } : entity));
+  const nextWorld = withFace(world, session.player.side, { entities });
+  return { ...session, worlds: { ...session.worlds, [session.activeWorldId]: nextWorld } };
 }
 
 // Crée UNE entité ÉPHÉMÈRE dans le lieu ACTIF, à la position x — point
@@ -276,15 +377,16 @@ export function markConsumed(session, entityId) {
 // nouveau" possible, non retenue ici).
 export function spawnEphemeral(session, spec, x) {
   const world = session.worlds[session.activeWorldId];
-  const entity = { ...spec, id: `ephemeral-${world.nextEphemeralId}`, x, ephemeral: true };
-  let entities = [...world.entities, entity];
+  const face = resolveFace(world, session.player.side);
+  const entity = { ...spec, id: `ephemeral-${face.nextEphemeralId}`, x, ephemeral: true };
+  let entities = [...face.entities, entity];
 
   if (entities.filter((e) => e.ephemeral).length > MAX_EPHEMERALS) {
     const oldestIndex = entities.findIndex((e) => e.ephemeral);
     entities = [...entities.slice(0, oldestIndex), ...entities.slice(oldestIndex + 1)];
   }
 
-  const nextWorld = { ...world, entities, nextEphemeralId: world.nextEphemeralId + 1 };
+  const nextWorld = withFace(world, session.player.side, { entities, nextEphemeralId: face.nextEphemeralId + 1 });
   return { ...session, worlds: { ...session.worlds, [session.activeWorldId]: nextWorld } };
 }
 
@@ -357,19 +459,22 @@ export function drawScatteredPosition(sourceX, spread, length, entities, presenc
 // confondus, -> même état, toujours).
 export function spawnScatteredEphemerals(session, spec, sourceX, count, spread = TUNING_DEFAULTS.ephemeralScatterSpread) {
   const presenceContext = { time: session.time };
-  let rngState = session.worlds[session.activeWorldId].rngState;
+  const side = session.player.side;
+  let rngState = resolveFace(session.worlds[session.activeWorldId], side).rngState;
   let nextSession = session;
 
   for (let i = 0; i < count; i++) {
     const currentWorld = nextSession.worlds[nextSession.activeWorldId];
-    const obstacles = [...currentWorld.entities, ...nextSession.companions];
+    const currentFace = resolveFace(currentWorld, side);
+    const obstacles = [...currentFace.entities, ...nextSession.companions];
     const draw = drawScatteredPosition(sourceX, spread, currentWorld.length, obstacles, presenceContext, rngState);
     rngState = draw.rngState;
     nextSession = spawnEphemeral(nextSession, spec, draw.x);
   }
 
   const finalWorld = nextSession.worlds[nextSession.activeWorldId];
-  return { ...nextSession, worlds: { ...nextSession.worlds, [nextSession.activeWorldId]: { ...finalWorld, rngState } } };
+  const nextWorld = withFace(finalWorld, side, { rngState });
+  return { ...nextSession, worlds: { ...nextSession.worlds, [nextSession.activeWorldId]: nextWorld } };
 }
 
 // Le monde actuellement actif, AUGMENTÉ des compagnons de la partie (voir
@@ -386,10 +491,41 @@ export function spawnScatteredEphemerals(session, spec, sourceX, count, spread =
 // compagnon ne reste JAMAIS résident dans un lieu quitté : voir
 // travelToWorld ci-dessous, qui range le monde BRUT (session.worlds[...]),
 // jamais le résultat de cet accesseur.
+// FACE COURANTE aplatie (voir isTwoSided/resolveFace plus haut) : un monde
+// à deux faces expose ICI un objet plat indiscernable d'un monde simple
+// (length/playerStart/id/titleKey du monde + entities/segments/music*/...
+// de la face courante SEULEMENT) — tout consommateur externe (vue,
+// core/reduce.js) ignore donc TOTALEMENT l'existence de deux faces, sans
+// jamais avoir à tester isTwoSided lui-même. recto/verso ne fuient jamais
+// dans ce résultat, même pour un monde à deux faces.
+function flattenActiveFace(world, side) {
+  if (!isTwoSided(world)) return world;
+  const { recto, verso, ...shared } = world;
+  return { ...shared, ...world[side] };
+}
+
 export function getActiveWorld(session) {
   const world = session.worlds[session.activeWorldId];
-  if (session.companions.length === 0) return world;
-  return { ...world, entities: [...world.entities, ...session.companions] };
+  const face = flattenActiveFace(world, session.player.side);
+  if (session.companions.length === 0) return face;
+  return { ...face, entities: [...face.entities, ...session.companions] };
+}
+
+// L'AUTRE face du monde actif (RECTO/VERSO étape 2/2, voir header) — celle
+// que le joueur ne regarde PAS en ce moment. `null` pour un monde simple
+// (rien à rendre en plus, voir isTwoSided) : tout appelant doit gérer ce
+// cas, jamais un objet vide qui laisserait croire à une face sans entités.
+// JAMAIS de compagnons injectés (contrairement à getActiveWorld ci-dessus) :
+// ils suivent le joueur, jamais l'autre face — isolation stricte (voir
+// core/reduce.js/TICK). Lecture SEULE, utilisée UNIQUEMENT par la vue pour
+// le rendu audio ÉTOUFFÉ de l'autre face (view/audio/city-scene.js) —
+// jamais par le core lui-même, qui tique déjà les deux faces séparément
+// sans passer par cet accesseur.
+export function getInactiveFace(session) {
+  const world = session.worlds[session.activeWorldId];
+  if (!isTwoSided(world)) return null;
+  const otherSide = session.player.side === "recto" ? "verso" : "recto";
+  return world[otherSide];
 }
 
 // Transition vers un autre monde (porte). RANGE le monde courant tel quel
@@ -416,16 +552,15 @@ export function travelToWorld(session, targetId, freshLevel = null) {
   const currentWorld = session.worlds[session.activeWorldId];
   // Purge des entités ÉPHÉMÈRES du lieu qu'on quitte (voir
   // entities/model.md/"Entités éphémères") : PILE le moment où ce lieu est
-  // rangé (gelé) — aucun éphémère ne doit survivre à une sortie de scène,
-  // qu'il ait été ramassé ou non. Ici et nulle part ailleurs : le seul
-  // autre chemin de sortie d'une scène (retour au menu principal) abandonne
-  // la session ENTIÈRE (voir view/city-screen.js/onExit, setSession(null)),
-  // rien à purger explicitement dans ce cas.
-  const purgedEntities = currentWorld.entities.filter((entity) => !entity.ephemeral);
-  const worldsAfterParking = {
-    ...session.worlds,
-    [session.activeWorldId]: { ...currentWorld, entities: purgedEntities, lastVisited: session.time },
-  };
+  // rangé (gelé) — aucun éphémère ne doit survivre à une sortie de SCÈNE,
+  // qu'il ait été ramassé ou non. À DEUX FACES : LES DEUX sont purgées
+  // (voir stripEphemeralsFromWorld), pas seulement celle qu'on regardait —
+  // on quitte le LIEU entier, pas juste une face. Ici et nulle part
+  // ailleurs : le seul autre chemin de sortie d'une scène (retour au menu
+  // principal) abandonne la session ENTIÈRE (voir view/city-screen.js/
+  // onExit, setSession(null)), rien à purger explicitement dans ce cas.
+  const parkedWorld = { ...stripEphemeralsFromWorld(currentWorld), lastVisited: session.time };
+  const worldsAfterParking = { ...session.worlds, [session.activeWorldId]: parkedWorld };
 
   const existingTarget = worldsAfterParking[targetId];
   if (!existingTarget && !freshLevel) {
@@ -435,9 +570,40 @@ export function travelToWorld(session, targetId, freshLevel = null) {
 
   return {
     ...session,
-    player: { ...session.player, x: targetWorld.playerStart, blockedBy: null, pushedBy: null },
+    // side : TOUJOURS "recto" à l'entrée par porte (voir CLAUDE.md/
+    // "RECTO/VERSO"), comme playerStart — même pour un monde qui n'a qu'une
+    // face (ignoré dans ce cas). Un point d'arrivée sur verso pourrait
+    // s'ajouter plus tard (porte déclarant sa face cible), pas codé ici.
+    player: { ...session.player, x: targetWorld.playerStart, side: "recto", blockedBy: null, pushedBy: null },
     worlds: { ...worldsAfterParking, [targetId]: targetWorld },
     activeWorldId: targetId,
     companions: repositionCompanions(session.companions, targetWorld.playerStart, targetWorld.length),
+  };
+}
+
+// Bascule de FACE dans le MÊME monde (point de passage recto<->verso, voir
+// entities/types/passage.js, core/scripting.md/action "switchSide") — PAS
+// un travelToWorld : le lieu n'est pas quitté, currentWorld n'est ni rangé
+// ni purgé de ses éphémères (la face laissée n'est pas une "sortie de
+// scène" — voir resolveFace/withFace, header). Depuis l'étape 2/2, la face
+// quittée continue de tiquer normalement (coexistence, voir
+// core/reduce.js) : switchSide ne fait QUE changer laquelle porte le joueur
+// et les compagnons, jamais un état "actif"/"inactif" séparé du reste.
+// Bascule simplement session.player.side vers l'AUTRE face et replace
+// joueur +
+// compagnons au point d'arrivée déclaré par l'entité de passage — même
+// principe de repositionnement que travelToWorld, mais SANS toucher à
+// activeWorldId ni à worlds. arrivalX est une donnée de CONTENU
+// (action.arrivalX, jamais validée en bornes par core/level.js — voir son
+// commentaire sur `action`) : clampée ICI dans [0, length], comme
+// repositionCompanions le fait déjà pour ses propres positions.
+export function switchSide(session, arrivalX) {
+  const world = session.worlds[session.activeWorldId];
+  const nextSide = session.player.side === "recto" ? "verso" : "recto";
+  const x = clamp(arrivalX, 0, world.length);
+  return {
+    ...session,
+    player: { ...session.player, x, side: nextSide, blockedBy: null, pushedBy: null },
+    companions: repositionCompanions(session.companions, x, world.length),
   };
 }

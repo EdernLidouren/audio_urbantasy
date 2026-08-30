@@ -5,6 +5,12 @@
 //
 // AMBIENCE_CHANNEL_LIMIT vient d'une donnée neutre (zéro import), jamais de
 // lib/audio.js : le core ne doit jamais importer la couche Web Audio/vue.
+//
+// RECTO/VERSO (modèle B, voir CLAUDE.md, core/state.js) : une scène est
+// SIMPLE (comme avant ce modèle) ou À DEUX FACES (recto + verso, jamais un
+// seul) — voir parseFace/parseLevel plus bas. Une face porte exactement ce
+// qu'une scène simple portait déjà (entités + habillage sonore/surface),
+// jamais dupliqué entre les deux cas.
 
 import { AMBIENCE_CHANNEL_LIMIT } from "../config/audio-channels.js";
 import { BODY_RADIUS } from "./state.js";
@@ -390,19 +396,37 @@ function parseSegment(rawSegment, index, length) {
   return { from, to, surface };
 }
 
-export function parseLevel(raw, registry) {
-  if (typeof raw !== "object" || raw === null) {
-    fail("le niveau n'est pas un objet.");
-  }
-  if (typeof registry !== "object" || registry === null) {
-    fail("le registre de types est manquant ou invalide.");
-  }
+// Champs qu'une FACE porte en propre (recto/verso d'une scène à deux
+// faces, OU la scène entière si elle est simple — voir parseLevel) :
+// entités + habillage sonore/surface du lieu. Liste PARTAGÉE entre le mode
+// simple et le mode deux-faces pour détecter un mélange des deux modèles
+// (voir parseLevel) — jamais recopiée en dur ailleurs.
+const FACE_FIELDS = [
+  "entities",
+  "music",
+  "musicDay",
+  "musicNight",
+  "musicLoop",
+  "ambiences",
+  "ambiencesDay",
+  "ambiencesNight",
+  "reverbDurationSec",
+  "reverbDecay",
+  "defaultSurface",
+  "segments",
+];
 
+// Valide et construit UNE FACE (voir header ci-dessus) : entités +
+// habillage sonore/surface, exactement ce qu'une scène SIMPLE portait déjà
+// avant l'introduction du modèle à deux faces (voir CLAUDE.md/
+// "RECTO/VERSO") — factorisé pour être appelé UNE fois (scène simple, sur
+// `raw` directement) ou DEUX (scène à deux faces, une fois par
+// recto/verso, voir parseLevel). `describe` préfixe les messages d'erreur
+// (ex. "recto" ou "verso"), comme validateCondition le fait déjà pour ses
+// propres appelants — jamais dupliqué pour rien de plus qu'un préfixe.
+function parseFace(raw, length, registry, describe) {
+  const prefix = describe ? `${describe}.` : "";
   const {
-    id,
-    titleKey,
-    length,
-    playerStart,
     entities,
     music,
     musicDay,
@@ -416,6 +440,142 @@ export function parseLevel(raw, registry) {
     defaultSurface,
     segments,
   } = raw;
+
+  if (!Array.isArray(entities)) {
+    fail(`${prefix}entities doit être un tableau (reçu : ${JSON.stringify(entities)}).`);
+  }
+  // defaultSurface : couvre tout le X non-segmenté (voir surfaceAt,
+  // core/surfaces.js) — toute la face est TOUJOURS couverte, sans trou.
+  // FILET SILENCIEUX si absent (repli sur DEFAULT_SURFACE, comportement
+  // audible inchangé pour toute scène existante qui n'en déclare pas
+  // encore), mais une valeur FOURNIE doit exister dans le registre -> échec
+  // clair sinon (comme un type d'entité inconnu, voir parseEntity) : une
+  // référence de surface erronée est un vrai bug de contenu, jamais
+  // dégradée en silence.
+  if (defaultSurface !== undefined && (!isNonEmptyString(defaultSurface) || !SURFACE_REGISTRY[defaultSurface])) {
+    fail(`${prefix}defaultSurface "${JSON.stringify(defaultSurface)}" absente du registre de surfaces.`);
+  }
+  const resolvedDefaultSurface = defaultSurface !== undefined ? defaultSurface : DEFAULT_SURFACE;
+  // segments : optionnel, PATCHE defaultSurface sur des zones précises (voir
+  // parseSegment) — absent -> tableau vide, toujours resolvedDefaultSurface
+  // partout (comportement inchangé). Chaque segment est TOUJOURS explicite
+  // (pas de filet par segment, voir parseSegment) : en déclarer un est un
+  // choix délibéré.
+  if (segments !== undefined && !Array.isArray(segments)) {
+    fail(`${prefix}segments doit être un tableau si présent (reçu : ${JSON.stringify(segments)}).`);
+  }
+  const parsedSegments = (segments ?? []).map((rawSegment, index) => parseSegment(rawSegment, index, length));
+  // music : optionnel, chemin vers la musique du lieu (voir
+  // view/audio/city-scene.js). Simple passage : parseLevel ne connaît ni
+  // Howler ni la lecture audio, juste la présence d'une chaîne.
+  if (music !== undefined && !isNonEmptyString(music)) {
+    fail(`${prefix}music doit être une chaîne non vide si présent (reçu : ${JSON.stringify(music)}).`);
+  }
+  // musicDay/musicNight : optionnels, musique PAR PHASE (voir
+  // core/time.js/phaseAt, view/audio/city-scene.js) — un lieu qui n'en
+  // déclare qu'une (musicDay SEULE, ou aucune des deux) retombe sur `music`
+  // pour la phase manquante, jamais de régression pour le contenu existant.
+  // Même validation de forme que music, rien de plus ici.
+  if (musicDay !== undefined && !isNonEmptyString(musicDay)) {
+    fail(`${prefix}musicDay doit être une chaîne non vide si présent (reçu : ${JSON.stringify(musicDay)}).`);
+  }
+  if (musicNight !== undefined && !isNonEmptyString(musicNight)) {
+    fail(`${prefix}musicNight doit être une chaîne non vide si présent (reçu : ${JSON.stringify(musicNight)}).`);
+  }
+  // musicLoop : optionnel, booléen — voir view/audio/city-scene.js. Bascule
+  // TOUTE la face (les deux phases) en boucle continue plutôt que
+  // l'enchaînement-avec-respiration par défaut. Simple passage validé en
+  // FORME, comme music/ambiences ci-dessus : le core ignore tout du SENS de
+  // ce drapeau (boucle vs respiration), pure donnée de contenu.
+  if (musicLoop !== undefined && typeof musicLoop !== "boolean") {
+    fail(`${prefix}musicLoop doit être un booléen si présent (reçu : ${JSON.stringify(musicLoop)}).`);
+  }
+  // ambiences : optionnel, tableau de 0 à AMBIENCE_CHANNEL_LIMIT chemins
+  // (voir view/audio/city-scene.js, lib/audio.js playAmbiences). Même
+  // passage simple, juste la forme est vérifiée ici — la limite elle-même
+  // vient de la source unique partagée avec lib/audio.js.
+  if (ambiences !== undefined) {
+    if (!Array.isArray(ambiences) || ambiences.length > AMBIENCE_CHANNEL_LIMIT || !ambiences.every(isNonEmptyString)) {
+      fail(
+        `${prefix}ambiences doit être un tableau d'au plus ${AMBIENCE_CHANNEL_LIMIT} chaînes non vides si présent (reçu : ${JSON.stringify(ambiences)}).`
+      );
+    }
+  }
+  // ambiencesDay/ambiencesNight : STRUCTURE RÉSERVÉE, même principe que
+  // musicDay/musicNight ci-dessus, mais AUCUN consommateur ne les lit encore
+  // (voir view/audio/city-scene.js — seule la musique réagit à la phase
+  // pour l'instant, voir core/time.md). Validées en FORME dès maintenant
+  // pour qu'une face qui les déclare échoue clairement en cas d'erreur,
+  // plutôt que de découvrir une faute de frappe le jour où l'ambiance de
+  // phase sera câblée.
+  if (ambiencesDay !== undefined) {
+    if (
+      !Array.isArray(ambiencesDay) ||
+      ambiencesDay.length > AMBIENCE_CHANNEL_LIMIT ||
+      !ambiencesDay.every(isNonEmptyString)
+    ) {
+      fail(
+        `${prefix}ambiencesDay doit être un tableau d'au plus ${AMBIENCE_CHANNEL_LIMIT} chaînes non vides si présent (reçu : ${JSON.stringify(ambiencesDay)}).`
+      );
+    }
+  }
+  if (ambiencesNight !== undefined) {
+    if (
+      !Array.isArray(ambiencesNight) ||
+      ambiencesNight.length > AMBIENCE_CHANNEL_LIMIT ||
+      !ambiencesNight.every(isNonEmptyString)
+    ) {
+      fail(
+        `${prefix}ambiencesNight doit être un tableau d'au plus ${AMBIENCE_CHANNEL_LIMIT} chaînes non vides si présent (reçu : ${JSON.stringify(ambiencesNight)}).`
+      );
+    }
+  }
+  // reverbDurationSec/reverbDecay : optionnels, surchargent par FACE les
+  // défauts globaux du bus de réverb (config/tuning-values.js) — voir
+  // view/audio/city-scene.js. Simple passage validé, comme music/ambiences ;
+  // aucune logique de résolution ici (ça reste dans la vue).
+  if (reverbDurationSec !== undefined && (!isFiniteNumber(reverbDurationSec) || reverbDurationSec <= 0)) {
+    fail(`${prefix}reverbDurationSec doit être un nombre > 0 si présent (reçu : ${JSON.stringify(reverbDurationSec)}).`);
+  }
+  if (reverbDecay !== undefined && (!isFiniteNumber(reverbDecay) || reverbDecay <= 0)) {
+    fail(`${prefix}reverbDecay doit être un nombre > 0 si présent (reçu : ${JSON.stringify(reverbDecay)}).`);
+  }
+
+  const seenIds = new Set();
+  const parsedEntities = entities.map((rawEntity, index) =>
+    parseEntity(rawEntity, index, registry, length, seenIds)
+  );
+
+  const face = {
+    defaultSurface: resolvedDefaultSurface,
+    segments: parsedSegments,
+    entities: parsedEntities,
+  };
+  // Clés ajoutées SEULEMENT si présentes (jamais explicitement undefined) :
+  // l'état doit rester de la donnée pure, un aller-retour JSON ne doit rien
+  // changer à sa forme (voir movement.check.js, audit de sérialisabilité).
+  if (music !== undefined) face.music = music;
+  if (musicDay !== undefined) face.musicDay = musicDay;
+  if (musicNight !== undefined) face.musicNight = musicNight;
+  if (musicLoop !== undefined) face.musicLoop = musicLoop;
+  if (ambiences !== undefined) face.ambiences = ambiences;
+  if (ambiencesDay !== undefined) face.ambiencesDay = ambiencesDay;
+  if (ambiencesNight !== undefined) face.ambiencesNight = ambiencesNight;
+  if (reverbDurationSec !== undefined) face.reverbDurationSec = reverbDurationSec;
+  if (reverbDecay !== undefined) face.reverbDecay = reverbDecay;
+
+  return face;
+}
+
+export function parseLevel(raw, registry) {
+  if (typeof raw !== "object" || raw === null) {
+    fail("le niveau n'est pas un objet.");
+  }
+  if (typeof registry !== "object" || registry === null) {
+    fail("le registre de types est manquant ou invalide.");
+  }
+
+  const { id, titleKey, length, playerStart, recto, verso } = raw;
 
   if (!isNonEmptyString(id)) {
     fail(`id manquant ou invalide (reçu : ${JSON.stringify(id)}).`);
@@ -438,134 +598,44 @@ export function parseLevel(raw, registry) {
       `parseLevel: playerStart (${JSON.stringify(playerStart)}) absent ou hors bornes, repli sur 0.`
     );
   }
-  if (!Array.isArray(entities)) {
-    fail(`entities doit être un tableau (reçu : ${JSON.stringify(entities)}).`);
-  }
-  // defaultSurface : couvre tout le X non-segmenté (voir surfaceAt,
-  // core/surfaces.js) — toute la scène est TOUJOURS couverte, sans trou.
-  // FILET SILENCIEUX si absent (repli sur DEFAULT_SURFACE, comportement
-  // audible inchangé pour toute scène existante qui n'en déclare pas
-  // encore), mais une valeur FOURNIE doit exister dans le registre -> échec
-  // clair sinon (comme un type d'entité inconnu, voir parseEntity) : une
-  // référence de surface erronée est un vrai bug de contenu, jamais
-  // dégradée en silence.
-  if (defaultSurface !== undefined && (!isNonEmptyString(defaultSurface) || !SURFACE_REGISTRY[defaultSurface])) {
-    fail(`defaultSurface "${JSON.stringify(defaultSurface)}" absente du registre de surfaces.`);
-  }
-  const resolvedDefaultSurface = defaultSurface !== undefined ? defaultSurface : DEFAULT_SURFACE;
-  // segments : optionnel, PATCHE defaultSurface sur des zones précises (voir
-  // parseSegment) — absent -> tableau vide, toujours resolvedDefaultSurface
-  // partout (comportement inchangé). Chaque segment est TOUJOURS explicite
-  // (pas de filet par segment, voir parseSegment) : en déclarer un est un
-  // choix délibéré.
-  if (segments !== undefined && !Array.isArray(segments)) {
-    fail(`segments doit être un tableau si présent (reçu : ${JSON.stringify(segments)}).`);
-  }
-  const parsedSegments = (segments ?? []).map((rawSegment, index) => parseSegment(rawSegment, index, length));
-  // music : optionnel, chemin vers la musique du lieu (voir
-  // view/audio/city-scene.js). Simple passage : parseLevel ne connaît ni
-  // Howler ni la lecture audio, juste la présence d'une chaîne.
-  if (music !== undefined && !isNonEmptyString(music)) {
-    fail(`music doit être une chaîne non vide si présent (reçu : ${JSON.stringify(music)}).`);
-  }
-  // musicDay/musicNight : optionnels, musique PAR PHASE (voir
-  // core/time.js/phaseAt, view/audio/city-scene.js) — un lieu qui n'en
-  // déclare qu'une (musicDay SEULE, ou aucune des deux) retombe sur `music`
-  // pour la phase manquante, jamais de régression pour le contenu existant.
-  // Même validation de forme que music, rien de plus ici.
-  if (musicDay !== undefined && !isNonEmptyString(musicDay)) {
-    fail(`musicDay doit être une chaîne non vide si présent (reçu : ${JSON.stringify(musicDay)}).`);
-  }
-  if (musicNight !== undefined && !isNonEmptyString(musicNight)) {
-    fail(`musicNight doit être une chaîne non vide si présent (reçu : ${JSON.stringify(musicNight)}).`);
-  }
-  // musicLoop : optionnel, booléen — voir view/audio/city-scene.js. Bascule
-  // TOUT le lieu (les deux phases) en boucle continue plutôt que
-  // l'enchaînement-avec-respiration par défaut. Simple passage validé en
-  // FORME, comme music/ambiences ci-dessus : le core ignore tout du SENS de
-  // ce drapeau (boucle vs respiration), pure donnée de contenu.
-  if (musicLoop !== undefined && typeof musicLoop !== "boolean") {
-    fail(`musicLoop doit être un booléen si présent (reçu : ${JSON.stringify(musicLoop)}).`);
-  }
-  // ambiences : optionnel, tableau de 0 à AMBIENCE_CHANNEL_LIMIT chemins
-  // (voir view/audio/city-scene.js, lib/audio.js playAmbiences). Même
-  // passage simple, juste la forme est vérifiée ici — la limite elle-même
-  // vient de la source unique partagée avec lib/audio.js.
-  if (ambiences !== undefined) {
-    if (!Array.isArray(ambiences) || ambiences.length > AMBIENCE_CHANNEL_LIMIT || !ambiences.every(isNonEmptyString)) {
-      fail(
-        `ambiences doit être un tableau d'au plus ${AMBIENCE_CHANNEL_LIMIT} chaînes non vides si présent (reçu : ${JSON.stringify(ambiences)}).`
-      );
+
+  // SCÈNE À DEUX FACES (modèle B, voir CLAUDE.md/"RECTO/VERSO",
+  // core/state.js) : recto ET verso requis ENSEMBLE (jamais un seul), et
+  // AUCUN des champs de face (FACE_FIELDS) au niveau racine — un niveau ne
+  // mélange jamais les deux modèles, échec clair plutôt qu'une scène à
+  // moitié construite. RÉTROCOMPAT STRICTE sinon : ni recto ni verso ->
+  // exactement le comportement d'avant ce modèle, `raw` EST la face unique.
+  const isTwoFaced = recto !== undefined || verso !== undefined;
+  if (isTwoFaced) {
+    if (recto === undefined || verso === undefined) {
+      fail("une scène à deux faces doit déclarer recto ET verso, jamais un seul.");
     }
-  }
-  // ambiencesDay/ambiencesNight : STRUCTURE RÉSERVÉE, même principe que
-  // musicDay/musicNight ci-dessus, mais AUCUN consommateur ne les lit encore
-  // (voir view/audio/city-scene.js — seule la musique réagit à la phase
-  // pour l'instant, voir core/time.md). Validées en FORME dès maintenant
-  // pour qu'un niveau qui les déclare échoue clairement en cas d'erreur,
-  // plutôt que de découvrir une faute de frappe le jour où l'ambiance de
-  // phase sera câblée.
-  if (ambiencesDay !== undefined) {
-    if (
-      !Array.isArray(ambiencesDay) ||
-      ambiencesDay.length > AMBIENCE_CHANNEL_LIMIT ||
-      !ambiencesDay.every(isNonEmptyString)
-    ) {
-      fail(
-        `ambiencesDay doit être un tableau d'au plus ${AMBIENCE_CHANNEL_LIMIT} chaînes non vides si présent (reçu : ${JSON.stringify(ambiencesDay)}).`
-      );
+    const leakedField = FACE_FIELDS.find((field) => raw[field] !== undefined);
+    if (leakedField) {
+      fail(`"${leakedField}" est un champ de FACE : une scène à deux faces le déclare dans recto/verso, jamais à la racine.`);
     }
-  }
-  if (ambiencesNight !== undefined) {
-    if (
-      !Array.isArray(ambiencesNight) ||
-      ambiencesNight.length > AMBIENCE_CHANNEL_LIMIT ||
-      !ambiencesNight.every(isNonEmptyString)
-    ) {
-      fail(
-        `ambiencesNight doit être un tableau d'au plus ${AMBIENCE_CHANNEL_LIMIT} chaînes non vides si présent (reçu : ${JSON.stringify(ambiencesNight)}).`
-      );
-    }
-  }
-  // reverbDurationSec/reverbDecay : optionnels, surchargent par LIEU les
-  // défauts globaux du bus de réverb (config/tuning-values.js) — voir
-  // view/audio/city-scene.js. Simple passage validé, comme music/ambiences ;
-  // aucune logique de résolution ici (ça reste dans la vue).
-  if (reverbDurationSec !== undefined && (!isFiniteNumber(reverbDurationSec) || reverbDurationSec <= 0)) {
-    fail(`reverbDurationSec doit être un nombre > 0 si présent (reçu : ${JSON.stringify(reverbDurationSec)}).`);
-  }
-  if (reverbDecay !== undefined && (!isFiniteNumber(reverbDecay) || reverbDecay <= 0)) {
-    fail(`reverbDecay doit être un nombre > 0 si présent (reçu : ${JSON.stringify(reverbDecay)}).`);
+    const parsedRecto = parseFace(recto, length, registry, "recto");
+    const parsedVerso = parseFace(verso, length, registry, "verso");
+    warnOnOverlaps(parsedRecto.entities, resolvedPlayerStart);
+    warnOnOverlaps(parsedVerso.entities, resolvedPlayerStart);
+    return {
+      id,
+      titleKey,
+      length,
+      playerStart: resolvedPlayerStart,
+      recto: parsedRecto,
+      verso: parsedVerso,
+    };
   }
 
-  const seenIds = new Set();
-  const parsedEntities = entities.map((rawEntity, index) =>
-    parseEntity(rawEntity, index, registry, length, seenIds)
-  );
+  const face = parseFace(raw, length, registry, null);
+  warnOnOverlaps(face.entities, resolvedPlayerStart);
 
-  warnOnOverlaps(parsedEntities, resolvedPlayerStart);
-
-  const level = {
+  return {
     id,
     titleKey,
     length,
     playerStart: resolvedPlayerStart,
-    defaultSurface: resolvedDefaultSurface,
-    segments: parsedSegments,
-    entities: parsedEntities,
+    ...face,
   };
-  // Clés ajoutées SEULEMENT si présentes (jamais explicitement undefined) :
-  // l'état doit rester de la donnée pure, un aller-retour JSON ne doit rien
-  // changer à sa forme (voir movement.check.js, audit de sérialisabilité).
-  if (music !== undefined) level.music = music;
-  if (musicDay !== undefined) level.musicDay = musicDay;
-  if (musicNight !== undefined) level.musicNight = musicNight;
-  if (musicLoop !== undefined) level.musicLoop = musicLoop;
-  if (ambiences !== undefined) level.ambiences = ambiences;
-  if (ambiencesDay !== undefined) level.ambiencesDay = ambiencesDay;
-  if (ambiencesNight !== undefined) level.ambiencesNight = ambiencesNight;
-  if (reverbDurationSec !== undefined) level.reverbDurationSec = reverbDurationSec;
-  if (reverbDecay !== undefined) level.reverbDecay = reverbDecay;
-
-  return level;
 }

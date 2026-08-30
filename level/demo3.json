@@ -1,0 +1,31 @@
+{
+  "id": "demo3",
+  "titleKey": "level.demo3.title",
+  "length": 10,
+  "playerStart": 1,
+  "recto": {
+    "music": "assets/musics/streets_day",
+    "entities": [
+      { "id": "door-alley-back", "type": "door", "x": 1, "nameKey": "door.alley_back", "target": "demo2", "descriptionKey": "door.alley_back.description" },
+      { "id": "hound-alley-recto", "type": "hound", "x": 4 },
+      {
+        "id": "alley-gap-recto",
+        "type": "passage",
+        "x": 8,
+        "action": { "kind": "switchSide", "arrivalX": 8 }
+      }
+    ]
+  },
+  "verso": {
+    "music": "assets/musics/mystery",
+    "entities": [
+      { "id": "bird-alley-verso", "type": "bird", "x": 4 },
+      {
+        "id": "alley-gap-verso",
+        "type": "passage",
+        "x": 8,
+        "action": { "kind": "switchSide", "arrivalX": 8 }
+      }
+    ]
+  }
+}

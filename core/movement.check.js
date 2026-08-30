@@ -8,6 +8,7 @@ import {
   createInitialState,
   getActiveWorld,
   travelToWorld,
+  switchSide,
   addCompanion,
   removeEntity,
   markConsumed,
@@ -772,6 +773,254 @@ export function runMovementChecks() {
     travelToUnknownRejected = true;
   }
   run("partie : transition vers un monde inconnu sans niveau fourni est rejetée", true, travelToUnknownRejected);
+
+  // --- Scène à deux faces (recto/verso), étape 1/2 (voir CLAUDE.md/
+  // "RECTO/VERSO", level/schema.md, core/state.js/isTwoSided) ---
+
+  // Validation au chargement : recto/verso requis ENSEMBLE, jamais un seul
+  // champ de face à la racine en même temps.
+  const twoFacedRawLevel = {
+    id: "movement-check-twoface",
+    titleKey: "level.demo.title",
+    length: 10,
+    playerStart: 1,
+    recto: { entities: [{ id: "recto-dog", type: "dog", x: 3, behavior: { kind: "wander" } }] },
+    verso: { entities: [{ id: "verso-dog", type: "dog", x: 7, behavior: { kind: "wander" } }] },
+  };
+
+  let missingVersoRejected = false;
+  try {
+    parseLevel({ ...twoFacedRawLevel, verso: undefined }, WORLD_A_REGISTRY);
+  } catch {
+    missingVersoRejected = true;
+  }
+  run("deux faces : recto déclaré sans verso est rejeté", true, missingVersoRejected);
+
+  let leakedFaceFieldRejected = false;
+  try {
+    parseLevel({ ...twoFacedRawLevel, entities: [] }, WORLD_A_REGISTRY);
+  } catch {
+    leakedFaceFieldRejected = true;
+  }
+  run("deux faces : un champ de face (entities) à la racine est rejeté", true, leakedFaceFieldRejected);
+
+  const twoFacedLevel = parseLevel(twoFacedRawLevel, WORLD_A_REGISTRY);
+  run("deux faces : parseLevel construit recto ET verso", true, Boolean(twoFacedLevel.recto) && Boolean(twoFacedLevel.verso));
+  run("deux faces : aucun `entities` à la racine du niveau parsé", undefined, twoFacedLevel.entities);
+  run("deux faces : recto porte ses propres entités", "recto-dog", twoFacedLevel.recto.entities[0].id);
+  run("deux faces : verso porte ses propres entités", "verso-dog", twoFacedLevel.verso.entities[0].id);
+
+  // Rétrocompat stricte : une scène simple (déjà parsée plus haut, `level`)
+  // ne porte jamais recto/verso.
+  run("scène simple : jamais de recto/verso (rétrocompat)", undefined, level.recto);
+
+  // Construction : recto/verso ont chacun leur PROPRE rngState (graines
+  // distinctes, voir core/state.js/createFaceState) — jamais la même suite
+  // de tirages pour les deux faces d'un même monde.
+  let twoFaceSession = createInitialState(twoFacedLevel, 99, NO_COMPANIONS);
+  run("deux faces : player.side par défaut 'recto'", "recto", twoFaceSession.player.side);
+  const twoFaceWorldId = twoFacedLevel.id;
+  const twoFaceWorldAtStart = twoFaceSession.worlds[twoFaceWorldId];
+  run(
+    "deux faces : le monde créé porte recto ET verso",
+    true,
+    Boolean(twoFaceWorldAtStart.recto) && Boolean(twoFaceWorldAtStart.verso)
+  );
+  run(
+    "deux faces : recto et verso ont des rngState distincts",
+    true,
+    twoFaceWorldAtStart.recto.rngState !== twoFaceWorldAtStart.verso.rngState
+  );
+  run("deux faces : lastVisited vit au niveau du monde (partagé, pas par face)", 0, twoFaceWorldAtStart.lastVisited);
+  run("deux faces : aucun `entities` au niveau du monde (seulement par face)", undefined, twoFaceWorldAtStart.entities);
+
+  // getActiveWorld : aplatit la face COURANTE, ne fuit jamais recto/verso.
+  const twoFaceActiveFlat = getActiveWorld(twoFaceSession);
+  run("deux faces : getActiveWorld renvoie la face recto par défaut", "recto-dog", twoFaceActiveFlat.entities[0].id);
+  run("deux faces : getActiveWorld ne fuit jamais recto/verso", undefined, twoFaceActiveFlat.recto);
+
+  // TICK, étape 2/2 — COEXISTENCE (voir CLAUDE.md/"RECTO/VERSO",
+  // core/reduce.js) : fin du gel de l'étape 1, LES DEUX faces avancent à
+  // chaque tick, chacune dans sa PROPRE suite de tirages (isolation de
+  // déterminisme, voir plus haut).
+  for (let i = 0; i < 30; i++) twoFaceSession = reduce(twoFaceSession, tick(0));
+  const rectoDogXAfterTicks = twoFaceSession.worlds[twoFaceWorldId].recto.entities[0].x;
+  const versoDogXAfterTicks = twoFaceSession.worlds[twoFaceWorldId].verso.entities[0].x;
+  run("deux faces : le PNJ de la face courante (recto) a bougé", true, rectoDogXAfterTicks !== 3);
+  run("deux faces : le PNJ de l'AUTRE face (verso) bouge AUSSI (coexistence)", true, versoDogXAfterTicks !== 7);
+
+  // switchSide : bascule DANS le même monde (pas un travelToWorld) — un
+  // changement de player.side/x INSTANTANÉ, zéro tick écoulé : les DEUX
+  // faces gardent donc exactement leur position d'avant la bascule.
+  twoFaceSession = switchSide(twoFaceSession, 6);
+  run("switchSide : bascule player.side vers verso", "verso", twoFaceSession.player.side);
+  run("switchSide : place le joueur à arrivalX", 6, twoFaceSession.player.x);
+  run("switchSide : ne change PAS activeWorldId (même monde)", twoFaceWorldId, twoFaceSession.activeWorldId);
+  run(
+    "switchSide : bascule instantanée — la face quittée (recto) garde EXACTEMENT sa position",
+    rectoDogXAfterTicks,
+    twoFaceSession.worlds[twoFaceWorldId].recto.entities[0].x
+  );
+
+  for (let i = 0; i < 30; i++) twoFaceSession = reduce(twoFaceSession, tick(0));
+  run(
+    "switchSide : le PNJ de la NOUVELLE face courante (verso) continue de bouger",
+    true,
+    twoFaceSession.worlds[twoFaceWorldId].verso.entities[0].x !== versoDogXAfterTicks
+  );
+  run(
+    "switchSide : le PNJ de l'AUTRE face (recto, quittée) continue AUSSI de bouger (coexistence, pas un gel)",
+    true,
+    twoFaceSession.worlds[twoFaceWorldId].recto.entities[0].x !== rectoDogXAfterTicks
+  );
+
+  twoFaceSession = switchSide(twoFaceSession, 2);
+  run("switchSide : rebascule player.side vers recto", "recto", twoFaceSession.player.side);
+
+  // --- Isolation stricte (voir entities/model.md/"Recto/verso") : collision
+  // ET ciblage de comportement restent bornés à la face de l'entité, jamais
+  // croisés entre recto et verso.
+
+  const ISOLATION_REGISTRY = { npc: { label: "entity.npc" }, blocker: { label: "entity.blocker", blocksMovement: true } };
+
+  // Collision : un bloqueur de l'AUTRE face ne doit JAMAIS arrêter le
+  // joueur — deux espaces disjoints qui partagent seulement l'axe x.
+  const isolationBlockOnRecto = parseLevel(
+    {
+      id: "movement-check-isolation-block-recto",
+      titleKey: "level.demo.title",
+      length: 12,
+      playerStart: 1,
+      recto: { entities: [{ id: "recto-blocker", type: "blocker", x: 6 }] },
+      verso: { entities: [] },
+    },
+    ISOLATION_REGISTRY
+  );
+  let isolationSessionA = switchSide(createInitialState(isolationBlockOnRecto, 1, NO_COMPANIONS), 4);
+  for (let i = 0; i < 80; i++) isolationSessionA = reduce(isolationSessionA, tick(1));
+  run("isolation : un bloqueur de l'AUTRE face ne bloque JAMAIS le joueur", null, isolationSessionA.player.blockedBy);
+  run("isolation : le joueur traverse librement le x d'un bloqueur de l'autre face", true, isolationSessionA.player.x > 6);
+
+  // CONTRÔLE : le MÊME bloqueur, sur la face du joueur cette fois — DOIT
+  // bloquer normalement (prouve que l'absence de blocage ci-dessus relève
+  // bien de l'isolation, pas d'une collision cassée en général).
+  const isolationBlockOnVerso = parseLevel(
+    {
+      id: "movement-check-isolation-block-verso",
+      titleKey: "level.demo.title",
+      length: 12,
+      playerStart: 1,
+      recto: { entities: [] },
+      verso: { entities: [{ id: "verso-blocker", type: "blocker", x: 6 }] },
+    },
+    ISOLATION_REGISTRY
+  );
+  let isolationSessionB = switchSide(createInitialState(isolationBlockOnVerso, 1, NO_COMPANIONS), 4);
+  for (let i = 0; i < 80; i++) isolationSessionB = reduce(isolationSessionB, tick(1));
+  run("isolation (contrôle) : un bloqueur de la MÊME face bloque normalement", "verso-blocker", isolationSessionB.player.blockedBy);
+  run("isolation (contrôle) : le joueur est arrêté avant le bloqueur", true, isolationSessionB.player.x < 6);
+
+  // Ciblage de comportement (goto) : ne résout JAMAIS une cible de l'AUTRE
+  // face, y compris "player" quand le joueur n'y est pas — voir
+  // core/reduce.js, getTargetPosition scopé par face.
+  const targetingLevel = parseLevel(
+    {
+      id: "movement-check-isolation-targeting",
+      titleKey: "level.demo.title",
+      length: 12,
+      playerStart: 6,
+      recto: { entities: [{ id: "recto-seeker", type: "npc", x: 2, behavior: { kind: "goto", targetId: "verso-target" } }] },
+      verso: {
+        entities: [
+          { id: "verso-target", type: "npc", x: 10 },
+          { id: "verso-seeker", type: "npc", x: 2, behavior: { kind: "goto", targetId: "player" } },
+        ],
+      },
+    },
+    ISOLATION_REGISTRY
+  );
+  let targetingSession = createInitialState(targetingLevel, 1, NO_COMPANIONS);
+  for (let i = 0; i < 40; i++) targetingSession = reduce(targetingSession, tick(0));
+  run(
+    "isolation : un goto de la face courante ne peut jamais cibler une entité de l'autre face",
+    2,
+    targetingSession.worlds[targetingLevel.id].recto.entities[0].x
+  );
+  run(
+    "isolation : un goto de l'autre face ne peut jamais cibler le joueur (absent de cette face)",
+    2,
+    targetingSession.worlds[targetingLevel.id].verso.entities.find((e) => e.id === "verso-seeker").x
+  );
+
+  // arrivalX est une donnée de CONTENU, jamais validée en bornes au
+  // chargement (voir core/level.js/parseEntity, action) — clampée à
+  // l'exécution par switchSide, jamais un joueur hors carte.
+  const clampedSwitch = switchSide(createInitialState(twoFacedLevel, 1, NO_COMPANIONS), 9999);
+  run("switchSide : arrivalX hors bornes est clampé au bord droit", twoFacedLevel.length, clampedSwitch.player.x);
+
+  // Éphémères : spawnEphemeral/removeEntity/markConsumed sont scopés à la
+  // face COURANTE (session.player.side), jamais l'autre.
+  let twoFaceEphemeralSession = createInitialState(twoFacedLevel, 3, NO_COMPANIONS);
+  const TWO_FACE_EPHEMERAL_SPEC = { type: "dog", labelKey: "entity.dog" };
+  twoFaceEphemeralSession = spawnEphemeral(twoFaceEphemeralSession, TWO_FACE_EPHEMERAL_SPEC, 4);
+  run(
+    "deux faces : spawnEphemeral crée sur la face COURANTE (recto)",
+    true,
+    twoFaceEphemeralSession.worlds[twoFaceWorldId].recto.entities.some((e) => e.ephemeral)
+  );
+  run(
+    "deux faces : spawnEphemeral ne touche jamais l'autre face (verso)",
+    false,
+    twoFaceEphemeralSession.worlds[twoFaceWorldId].verso.entities.some((e) => e.ephemeral)
+  );
+
+  // travelToWorld QUITTE le lieu (pas juste la face) : purge les éphémères
+  // des DEUX faces, remet player.side à "recto" (comme playerStart).
+  twoFaceEphemeralSession = switchSide(twoFaceEphemeralSession, 5);
+  twoFaceEphemeralSession = spawnEphemeral(twoFaceEphemeralSession, TWO_FACE_EPHEMERAL_SPEC, 5);
+  run(
+    "deux faces : contrôle — un éphémère sur CHAQUE face avant le départ",
+    true,
+    twoFaceEphemeralSession.worlds[twoFaceWorldId].recto.entities.some((e) => e.ephemeral) &&
+      twoFaceEphemeralSession.worlds[twoFaceWorldId].verso.entities.some((e) => e.ephemeral)
+  );
+  const twoFaceOtherWorld = parseLevel(
+    { id: "movement-check-twoface-elsewhere", titleKey: "level.demo.title", length: 5, playerStart: 0, entities: [] },
+    WORLD_A_REGISTRY
+  );
+  const afterLeavingTwoFace = travelToWorld(twoFaceEphemeralSession, twoFaceOtherWorld.id, twoFaceOtherWorld);
+  run("deux faces : travelToWorld remet player.side à 'recto' à l'arrivée", "recto", afterLeavingTwoFace.player.side);
+  const parkedTwoFaceWorld = afterLeavingTwoFace.worlds[twoFaceWorldId];
+  run(
+    "deux faces : travelToWorld purge les éphémères des DEUX faces (recto)",
+    false,
+    parkedTwoFaceWorld.recto.entities.some((e) => e.ephemeral)
+  );
+  run(
+    "deux faces : travelToWorld purge les éphémères des DEUX faces (verso)",
+    false,
+    parkedTwoFaceWorld.verso.entities.some((e) => e.ephemeral)
+  );
+  run(
+    "deux faces : travelToWorld laisse les entités déclarées intactes (recto)",
+    true,
+    parkedTwoFaceWorld.recto.entities.some((e) => e.id === "recto-dog")
+  );
+  run(
+    "deux faces : travelToWorld laisse les entités déclarées intactes (verso)",
+    true,
+    parkedTwoFaceWorld.verso.entities.some((e) => e.id === "verso-dog")
+  );
+
+  // Sérialisabilité : aller-retour JSON fidèle sur une session à deux
+  // faces — même exigence que le reste du core (voir "Audit de
+  // sérialisabilité" plus bas), vérifiée ICI dédiée à ce modèle.
+  const twoFaceRoundTripped = JSON.parse(JSON.stringify(afterLeavingTwoFace));
+  run(
+    "deux faces : structure identique après aller-retour JSON",
+    JSON.stringify(afterLeavingTwoFace),
+    JSON.stringify(twoFaceRoundTripped)
+  );
 
   // --- Horloge de partie (core/time.js) ---
   // Compteur unique + dérivations pures. RIEN d'autre ne consomme le temps
@@ -3622,6 +3871,60 @@ export function runMovementChecks() {
   run("save : sauvegarde antérieure à l'équipement acceptée (rebouchée)", true, oldEquipmentSaveResult.success);
   if (oldEquipmentSaveResult.success) {
     run("save : partie rebouchée — équipement par défaut (slot feet vide)", null, oldEquipmentSaveResult.session.equipment.feet);
+  }
+
+  // Sauvegarde ANTÉRIEURE au modèle recto/verso (voir CLAUDE.md/
+  // "RECTO/VERSO") : jamais eu de clé `player.side` — sans rebouchage
+  // (core/save.js/migrateSave), une scène à deux faces qu'on visiterait
+  // plus tard n'aurait aucune face "courante" définie.
+  const { side: _droppedSide, ...auditPlayerWithoutSide } = auditSession.player;
+  const oldSideSave = {
+    version: SAVE_VERSION,
+    data: { ...auditSession, player: auditPlayerWithoutSide },
+  };
+  const oldSideSaveResult = deserializeGame(oldSideSave);
+  run("save : sauvegarde antérieure à recto/verso acceptée (player.side rebouché)", true, oldSideSaveResult.success);
+  if (oldSideSaveResult.success) {
+    run("save : partie rebouchée — player.side par défaut 'recto'", "recto", oldSideSaveResult.session.player.side);
+  }
+
+  // Sauvegarde d'une scène à DEUX FACES, ANTÉRIEURE à defaultSurface/
+  // segments/nextEphemeralId — même précédent que le monde simple ci-dessus
+  // (core/save.js/backfillFace), mais chaque face doit être rebouchée
+  // INDÉPENDAMMENT (voir core/save.js/backfillWorld).
+  const freshTwoFaceSession = createInitialState(twoFacedLevel, 42, NO_COMPANIONS);
+  const freshTwoFaceWorld = freshTwoFaceSession.worlds[twoFaceWorldId];
+  const { defaultSurface: _droppedRectoSurface, segments: _droppedRectoSegments, nextEphemeralId: _droppedRectoNextId, ...oldRectoFace } = freshTwoFaceWorld.recto;
+  const { defaultSurface: _droppedVersoSurface, segments: _droppedVersoSegments, nextEphemeralId: _droppedVersoNextId, ...oldVersoFace } = freshTwoFaceWorld.verso;
+  const oldTwoFaceWorldSave = {
+    version: SAVE_VERSION,
+    data: {
+      ...freshTwoFaceSession,
+      worlds: { ...freshTwoFaceSession.worlds, [twoFaceWorldId]: { ...freshTwoFaceWorld, recto: oldRectoFace, verso: oldVersoFace } },
+    },
+  };
+  const oldTwoFaceWorldResult = deserializeGame(oldTwoFaceWorldSave);
+  run("save : scène à deux faces antérieure aux surfaces acceptée (chaque face rebouchée)", true, oldTwoFaceWorldResult.success);
+  if (oldTwoFaceWorldResult.success) {
+    const revivedTwoFaceWorld = oldTwoFaceWorldResult.session.worlds[twoFaceWorldId];
+    run("save : deux faces rebouchées — defaultSurface par défaut (recto)", DEFAULT_SURFACE, revivedTwoFaceWorld.recto.defaultSurface);
+    run("save : deux faces rebouchées — defaultSurface par défaut (verso)", DEFAULT_SURFACE, revivedTwoFaceWorld.verso.defaultSurface);
+    run("save : deux faces rebouchées — segments par défaut (recto)", 0, revivedTwoFaceWorld.recto.segments.length);
+    run("save : deux faces rebouchées — segments par défaut (verso)", 0, revivedTwoFaceWorld.verso.segments.length);
+  }
+
+  // Round-trip complet d'une session à deux faces via le vrai système de
+  // save (pas juste JSON.stringify/parse) : les deux faces ET player.side
+  // survivent, identiques.
+  const twoFaceSaveEnvelope = serializeGame(freshTwoFaceSession);
+  const twoFaceSaveResult = deserializeGame(twoFaceSaveEnvelope);
+  run("save : session à deux faces se recharge sans erreur", true, twoFaceSaveResult.success);
+  if (twoFaceSaveResult.success) {
+    run(
+      "save : session à deux faces identique après un aller-retour save/load complet",
+      JSON.stringify(freshTwoFaceSession),
+      JSON.stringify(twoFaceSaveResult.session)
+    );
   }
 
   console.log(`Récapitulatif : ${passed} réussis / ${total} total`);

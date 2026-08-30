@@ -23,6 +23,93 @@ parsé, sans aucune chaîne affichable en dur — uniquement des clés i18n.
 | `defaultSurface` | string | optionnel : nom de surface (voir "Surfaces de sol" plus bas) couvrant tout le `x` non-segmenté. **FILET SILENCIEUX si absent** (repli sur `DEFAULT_SURFACE`, `core/surfaces.js` — comportement audible inchangé pour toute scène qui n'en déclare pas). **Échec clair si fourni mais absent du registre** (comme un type d'entité inconnu) — une référence de contenu erronée n'est jamais dégradée en silence. |
 | `segments`    | Segment[] | optionnel : zones qui PATCHENT `defaultSurface` sur des portions du lieu (voir "Surfaces de sol" plus bas). Absent -> `[]`, `defaultSurface` partout. |
 
+## Scène à deux faces (recto/verso)
+
+Étape 1/2 (voir CLAUDE.md/"RECTO/VERSO") : une scène est SIMPLE (comme
+ci-dessus, `entities`/`music`/... à la racine) OU À DEUX FACES — `recto` ET
+`verso` déclarés ENSEMBLE, jamais un seul. `id`/`titleKey`/`length`/
+`playerStart` restent TOUJOURS à la racine, PARTAGÉS par les deux faces
+(même longueur d'axe x) ; tous les autres champs du tableau "Niveau"
+ci-dessus (`entities`, `music`/`musicDay`/`musicNight`/`musicLoop`,
+`ambiences`/`ambiencesDay`/`ambiencesNight`, `reverbDurationSec`/
+`reverbDecay`, `defaultSurface`, `segments`) sont des champs de FACE :
+déclarés dans `recto`/`verso` pour une scène à deux faces, à la racine pour
+une scène simple — **jamais mélangés** : `parseLevel` échoue clairement si
+un de ces champs apparaît à la racine EN MÊME TEMPS que `recto`/`verso`.
+
+```json
+{
+  "id": "alley",
+  "titleKey": "level.alley.title",
+  "length": 10,
+  "playerStart": 1,
+  "recto": { "music": "assets/musics/streets_day", "entities": [ /* ... */ ] },
+  "verso":  { "music": "assets/musics/mystery",     "entities": [ /* ... */ ] }
+}
+```
+
+Une scène SIMPLE (ni `recto` ni `verso`) se comporte EXACTEMENT comme avant
+ce modèle — RÉTROCOMPAT STRICTE, aucune régression pour tout niveau
+existant (`demo.json`, `demo2.json`).
+
+**Face courante et bascule** : le joueur porte `player.side`
+(`"recto"|"verso"`, défaut `"recto"`), sérialisé avec lui. En entrant dans
+une scène à deux faces depuis un autre lieu (porte), on arrive TOUJOURS sur
+le recto. Depuis l'étape 2/2, LES DEUX faces tiquent à chaque tour
+(`core/reduce.js`/TICK) — mais ISOLÉES : collision, ciblage de comportement
+(`follow`/`goto`), interaction et occupation restent bornés à la face de
+l'entité (voir `entities/model.md`/"Recto/verso" pour le détail complet de
+cette isolation). "Face courante" ne veut donc plus dire "seule face
+active", mais "celle qui porte le joueur/les compagnons ET se rend
+normalement" — l'autre se rend en ÉTOUFFÉ (voir "Coexistence audible" plus
+bas), jamais gelée. Basculer de face reste DANS le même monde
+(`core/state.js`/`switchSide`) — PAS un `travelToWorld` : `activeWorldId` ne
+change pas, seuls `player.side`/`player.x` et l'audio de scène (voir plus
+bas) le font.
+
+**Point de passage** (`entities/types/passage.js`) : une entité
+interactable avec `action: { kind: "switchSide", arrivalX: <number> }` —
+`arrivalX` est le point d'arrivée sur l'AUTRE face (comme `target` pour une
+`door`, mais on reste dans le même monde). Une entité par face, chacune
+déclarant l'arrivée sur l'autre (voir l'exemple ci-dessous) — jamais une
+entité "des deux côtés à la fois". `arrivalX` n'est PAS validé en bornes par `parseLevel` (comme tout
+champ `action.*`, voir le tableau "Entité" plus haut) — clampé à
+l'exécution par `core/state.js`/`switchSide`, jamais un plantage sur un
+contenu mal formé.
+
+```json
+{ "id": "gap-recto", "type": "passage", "x": 8, "action": { "kind": "switchSide", "arrivalX": 8 } }
+```
+
+**Audio de bascule (VUE)** : `scene.destroy()` puis reconstruction sur la
+nouvelle face active, même soin que `transitionThroughDoor` pour ne laisser
+AUCUN Howl résiduel (voir `view/city-screen.js`/`sideSwitchEffect`), plus un
+marqueur sonore de bascule (`view/interaction.js`, "metal_gate" —
+`assets/sounds/doors/metal_gate`, défensif si le fichier venait à manquer).
+
+**Coexistence audible (étape 2/2)** : depuis `core/reduce.js`/TICK, LES DEUX
+faces tiquent à chaque tour — plus de gel de l'autre face, mais ISOLATION
+STRICTE (voir `entities/model.md`/"Recto/verso") : collision, ciblage de
+comportement (`follow`/`goto`), interaction et occupation restent bornés à
+la face de l'entité, jamais croisés. Seul le SON traverse : les entités de
+l'autre face sont rendues en ÉTOUFFÉ (passe-bas + atténuation de gain,
+réglages `mufflingLowpassHz`/`mufflingGain` — `config/tuning-values.js`),
+directionnelles (même pan/distance que d'habitude), SAUF leur beacon,
+jamais audible de l'autre côté (aucune localisation croisée) — voir
+`view/audio/city-scene.js`/`includeBeacon`. Au basculement de face (même
+mécanisme que ci-dessus), normal et étouffé s'inversent.
+
+**Persistance** : une scène à deux faces sauvegarde SES DEUX FACES
+(entités, rngState, compteur d'éphémères) — `core/save.js` traite un monde à
+deux faces comme deux faces indépendantes (purge d'éphémères,
+rebouchage `defaultSurface`/`segments`/`nextEphemeralId`). Une sauvegarde
+antérieure à ce modèle n'a jamais de `recto`/`verso` (scènes simples
+inchangées) ni de `player.side` (rebouché à `"recto"`).
+
+**Étape 2/2 : coexistence audible** — voir "Coexistence audible" ci-dessus.
+Les deux faces tiquent désormais toujours ensemble, isolées ; le modèle
+"une seule face active" de l'étape 1 n'existe plus.
+
 ## Segment (surface)
 
 | Champ     | Type   | Contrainte                                                    |

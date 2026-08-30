@@ -41,6 +41,29 @@ export function separate(xA, weightA, xB, weightB, minGap, length) {
   return { xA: newXA, xB: newXB };
 }
 
+// Sépare toute paire d'ENTITÉS (hors joueur) impliquant au moins une
+// bloquante — deuxième moitié historique de resolveOverlaps, EXTRAITE pour
+// être réutilisée SANS joueur (voir core/reduce.js, RECTO/VERSO étape 2/2 :
+// la face NON courante d'une scène à deux faces tique désormais elle aussi,
+// mais isolée — aucun joueur sur cette face, seulement ses propres entités
+// entre elles). O(n²) mais le nombre d'entités par face reste petit — pas un
+// souci de performance ici.
+export function resolveEntityOverlaps(entities, length, presenceContext) {
+  const resolved = entities.slice();
+  for (let i = 0; i < resolved.length; i++) {
+    for (let j = i + 1; j < resolved.length; j++) {
+      const a = resolved[i];
+      const b = resolved[j];
+      if (!isBlocking(a, presenceContext) && !isBlocking(b, presenceContext)) continue;
+
+      const { xA, xB } = separate(a.x, 0.5, b.x, 0.5, 2 * BODY_RADIUS, length);
+      if (xA !== a.x) resolved[i] = { ...a, x: xA };
+      if (xB !== b.x) resolved[j] = { ...b, x: xB };
+    }
+  }
+  return resolved;
+}
+
 // Résolution de chevauchement des corps (curatif) : le game design évite ce
 // cas, mais le code ne doit pas en dépendre. Appelée APRÈS le mouvement de
 // tous les mobiles au tick. Une entité NON BLOQUANTE (isBlocking : passable,
@@ -72,21 +95,9 @@ export function resolveOverlaps(playerX, entities, length, presenceContext) {
     return xB === entity.x ? entity : { ...entity, x: xB };
   });
 
-  // 2) Paires d'entités (hors joueur) impliquant au moins une bloquante :
-  // séparation symétrique (weight 0.5/0.5). O(n²) mais le nombre d'entités
-  // par niveau reste petit — pas un souci de performance ici.
-  const resolvedEntities = afterPlayer.slice();
-  for (let i = 0; i < resolvedEntities.length; i++) {
-    for (let j = i + 1; j < resolvedEntities.length; j++) {
-      const a = resolvedEntities[i];
-      const b = resolvedEntities[j];
-      if (!isBlocking(a, presenceContext) && !isBlocking(b, presenceContext)) continue;
-
-      const { xA, xB } = separate(a.x, 0.5, b.x, 0.5, 2 * BODY_RADIUS, length);
-      if (xA !== a.x) resolvedEntities[i] = { ...a, x: xA };
-      if (xB !== b.x) resolvedEntities[j] = { ...b, x: xB };
-    }
-  }
+  // 2) Paires d'entités (hors joueur) impliquant au moins une bloquante —
+  // voir resolveEntityOverlaps ci-dessus, factorisée.
+  const resolvedEntities = resolveEntityOverlaps(afterPlayer, length, presenceContext);
 
   return { playerX: resolvedPlayerX, entities: resolvedEntities, pushedBy };
 }

@@ -246,6 +246,26 @@ export const TUNING_DEFAULTS = {
   // volante).
   flyingVolumeFactor: 0.4,
 
+  // --- Rendu ÉTOUFFÉ de l'AUTRE face (voir CLAUDE.md/"RECTO/VERSO" étape
+  // 2/2, view/audio/city-scene.js) : chaîne de filtres appliquée à TOUT son
+  // ponctuel (vocal, pas, transition) d'une entité de la face que le joueur
+  // ne regarde PAS — jamais aux beacons, coupés entièrement (aucune
+  // localisation de l'autre côté). Bac à sable de réglage, même principe que
+  // le profil isFlying juste au-dessus : ces deux valeurs sont le SEUL
+  // endroit à toucher pour ajuster l'effet à l'oreille. GLOBAL (pas encore
+  // cascadé par entité/type) : un seul "de l'autre côté", pas de nuance par
+  // contenu pour l'instant.
+
+  // Fréquence de coupure (Hz) du PASSE-BAS appliqué à un one-shot de
+  // l'autre face — bas = très sourd/lointain, haut = à peine étouffé.
+  mufflingLowpassHz: 500,
+
+  // Facteur multiplicatif (0-1) de volume, COMPOSÉ avec le volume déjà
+  // dérivé de la distance (jamais à sa place) : présent, mais nettement en
+  // retrait — l'autre face se DEVINE, elle ne s'entend pas comme si le
+  // joueur y était.
+  mufflingGain: 0.4,
+
   // Décalage aléatoire MAX (unités de scène, de part et d'autre de la
   // source) appliqué à une entité éphémère ÉPARPILLÉE (voir
   // core/state.js/spawnScatteredEphemerals, entities/model.md/"Entités
