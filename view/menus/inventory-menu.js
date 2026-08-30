@@ -135,7 +135,20 @@ function stripTrailingPeriod(text) {
   return text.endsWith(".") ? text.slice(0, -1) : text;
 }
 
-function bagEntryLine(scene, getSession, entry) {
+// Texte AUTONOME (phrase complète, point final CONSERVÉ) pour une entrée du
+// sac — réservé à la réannonce après retrait (voir bagRemovalAnnouncement
+// plus bas), jamais à la ligne de menu elle-même (bagEntryLine ci-dessous,
+// qui strip le point pour laisser la place au suffixe de position ajouté
+// par lib/menu.js).
+function describeBagEntry(entry) {
+  const item = t(ITEM_REGISTRY[entry.type].label);
+  const description = t(ITEM_REGISTRY[entry.type].descriptionKey);
+  return entry.quantity !== undefined
+    ? t("inventory.entry.stack", { item, quantity: entry.quantity, description })
+    : t("inventory.entry.unique", { item, description });
+}
+
+function bagEntryLine(scene, getSession, entry, index) {
   const itemLabelKey = ITEM_REGISTRY[entry.type].label;
   const description = stripTrailingPeriod(t(ITEM_REGISTRY[entry.type].descriptionKey));
   const item = t(itemLabelKey);
@@ -147,8 +160,28 @@ function bagEntryLine(scene, getSession, entry) {
 
   return {
     ...text,
-    onActivate: () => openItemActionsMenu(scene, getSession, entry, itemLabelKey),
+    onActivate: () => openItemActionsMenu(scene, getSession, entry, itemLabelKey, index),
   };
+}
+
+// Index où le curseur doit atterrir après le RETRAIT de l'entrée `index` du
+// sac (RÈGLE GÉNÉRALE — voir executeAction/bagRemovalAnnouncement) :
+// l'entrée qui prend sa place (même index, décalée), sinon la précédente,
+// sinon 0 — seul index valide de l'état "sac vide" (voir buildBagEntries, un
+// placeholder unique). Appelé APRÈS l'effet (bag déjà à jour).
+function bagCursorAfterRemoval(bag, index) {
+  return Math.min(index, Math.max(bag.length - 1, 0));
+}
+
+// Réannonce après RETRAIT d'une entrée du sac (RÈGLE GÉNÉRALE, pas
+// seulement l'équipement — voir header executeAction) : décrit l'entrée qui
+// prend la place de l'index retiré, sinon la précédente, sinon "Sac vide."
+// — jamais un silence sur le sac devenu vide, jamais un index invalide.
+// Appelé APRÈS l'effet (getSession() déjà à jour).
+function bagRemovalAnnouncement(getSession, index) {
+  const bag = getSession().bag;
+  if (bag.length === 0) return t("inventory.empty");
+  return describeBagEntry(bag[bagCursorAfterRemoval(bag, index)]);
 }
 
 // Entrées de l'onglet SAC — un placeholder "Sac vide." (non activable) si
@@ -167,19 +200,26 @@ function buildBagEntries(scene, getSession) {
   // encore ". <position>" — même raison que stripTrailingPeriod plus haut,
   // pour éviter un double point ("vide.. 1 sur 1").
   if (bag.length === 0) return [{ label: "inventory.empty.entry", onActivate: () => {} }];
-  return bag.map((entry) => bagEntryLine(scene, getSession, entry));
+  return bag.map((entry, index) => bagEntryLine(scene, getSession, entry, index));
 }
 
-function buildBagTabScreen(scene, getSession) {
+// `cursor` optionnel : impose la position du curseur (voir
+// bagCursorAfterRemoval/buildInventoryTabsScreen) plutôt que le défaut 0 de
+// lib/menu.js/makeMenuScreen.
+function buildBagTabScreen(scene, getSession, cursor) {
   const menu = { title: "inventory.title", closable: true, entries: buildBagEntries(scene, getSession) };
+  if (cursor !== undefined) menu.cursor = cursor;
   return makeMenuScreen(menu, t);
 }
 
-// Ligne d'UN slot d'équipement — occupé : "<Slot> : <objet>", activer ouvre
-// le menu d'actions (Déséquiper/Annuler) ; VIDE : "<Slot> : vide", activer
-// annonce juste "Emplacement vide." SANS ouvrir de menu (rien à y faire —
-// voir header du module, "entrée sur objet -> menu d'actions" ne s'applique
-// qu'à un objet RÉEL).
+// Ligne d'UN slot d'équipement — occupé : "<Slot> : <objet> : <description>"
+// (trois parties, description en fin — même logique que bagEntryLine :
+// point final stripé avant interpolation, pour la même raison, voir
+// stripTrailingPeriod), activer ouvre le menu d'actions (Déséquiper/
+// Annuler) ; VIDE : "<Slot> : vide" (deux parties, pas de description),
+// activer annonce juste "Emplacement vide." SANS ouvrir de menu (rien à y
+// faire — voir header du module, "entrée sur objet -> menu d'actions" ne
+// s'applique qu'à un objet RÉEL).
 function equipmentSlotEntry(scene, getSession, slot) {
   const occupant = getSession().equipment[slot];
   const slotLabel = t(EQUIPMENT_SLOT_LABELS[slot]);
@@ -193,9 +233,10 @@ function equipmentSlotEntry(scene, getSession, slot) {
   }
 
   const itemLabelKey = ITEM_REGISTRY[occupant.type].label;
+  const description = stripTrailingPeriod(t(ITEM_REGISTRY[occupant.type].descriptionKey));
   return {
     label: "inventory.equipment.slot.occupied",
-    labelParams: { slot: slotLabel, item: t(itemLabelKey) },
+    labelParams: { slot: slotLabel, item: t(itemLabelKey), description },
     onActivate: () => openEquipmentSlotActionsMenu(scene, getSession, slot, itemLabelKey),
   };
 }
@@ -209,8 +250,11 @@ function buildEquipmentTabScreen(scene, getSession) {
   return makeMenuScreen(menu, t);
 }
 
-function buildTabScreen(tab, scene, getSession) {
-  return tab === "equipment" ? buildEquipmentTabScreen(scene, getSession) : buildBagTabScreen(scene, getSession);
+// `cursor` : seul l'onglet Sac en a l'usage (voir buildBagTabScreen) — la
+// liste de l'onglet Équipement ne change jamais de longueur (un slot par
+// entrée, toujours), rien à repositionner de ce côté.
+function buildTabScreen(tab, scene, getSession, cursor) {
+  return tab === "equipment" ? buildEquipmentTabScreen(scene, getSession) : buildBagTabScreen(scene, getSession, cursor);
 }
 
 // L'écran RÉEL (voir header) : reconstruit son écran-menu interne (`inner`)
@@ -230,9 +274,16 @@ function buildInventoryTabsScreen(scene, getSession, initialTab) {
   // l'écraserait avant que l'utilisateur ait pu l'entendre (même
   // raisonnement que lib/menu.js/makeMessageScreen).
   let silent = false;
+  // Curseur à IMPOSER au prochain rebuild, consommé UNE FOIS (même patron
+  // que `silent` ci-dessus) — voir returnSilently/bagCursorAfterRemoval :
+  // repositionne le focus du sac après le retrait d'une entrée plutôt que
+  // de laisser rebuildInner retomber sur le défaut (index 0) de
+  // lib/menu.js/makeMenuScreen.
+  let pendingCursor;
 
   function rebuildInner() {
-    inner = buildTabScreen(activeTab, scene, getSession);
+    inner = buildTabScreen(activeTab, scene, getSession, pendingCursor);
+    pendingCursor = undefined;
   }
 
   return {
@@ -265,10 +316,13 @@ function buildInventoryTabsScreen(scene, getSession, initialTab) {
       }
       inner.onKeyDown(event);
     },
-    // Voir la doc de `silent` ci-dessus — appelé par executeAction juste
-    // avant de remonter jusqu'ici.
-    returnSilently() {
+    // Voir la doc de `silent`/`pendingCursor` ci-dessus — appelé par
+    // executeAction juste avant de remonter jusqu'ici. `cursor` optionnel :
+    // omis (ex. Déséquiper, qui ne retire rien de la liste) -> comportement
+    // inchangé, retombe sur le défaut de rebuildInner.
+    returnSilently(cursor) {
       silent = true;
+      pendingCursor = cursor;
     },
   };
 }
@@ -295,13 +349,16 @@ export function openEquipmentMenu(scene, getSession) {
 // liste pour un objet donné (ex. un objet de quête vital) — non codé ici,
 // aucun objet de ce genre n'existe encore ; documenté pour ne pas condamner
 // ce slot par erreur plus tard.
-function buildItemActions(scene, getSession, entry, itemLabelKey) {
+function buildItemActions(scene, getSession, entry, itemLabelKey, index) {
   const props = ITEM_REGISTRY[entry.type];
   const actions = [];
   if (props.equippable) {
-    actions.push({ label: "inventory.actions.equip", onActivate: () => confirmEquip(entry, itemLabelKey) });
+    actions.push({ label: "inventory.actions.equip", onActivate: () => confirmEquip(getSession, entry, itemLabelKey, index) });
   }
-  actions.push({ label: "inventory.actions.drop", onActivate: () => confirmDrop(scene, getSession, entry, itemLabelKey) });
+  actions.push({
+    label: "inventory.actions.drop",
+    onActivate: () => confirmDrop(scene, getSession, entry, itemLabelKey, index),
+  });
   return actions;
 }
 
@@ -314,8 +371,8 @@ function buildItemActions(scene, getSession, entry, itemLabelKey) {
 // voir bagEntryLine) réutilisé tel quel comme titre de menu ("Pomme. Poser.
 // 1 sur 2") — pas de nouvelle clé i18n dédiée, menu.title n'étant qu'une clé
 // passée telle quelle à t() par lib/menu.js.
-function openItemActionsMenu(scene, getSession, entry, itemLabelKey) {
-  const actions = buildItemActions(scene, getSession, entry, itemLabelKey);
+function openItemActionsMenu(scene, getSession, entry, itemLabelKey, index) {
+  const actions = buildItemActions(scene, getSession, entry, itemLabelKey, index);
   if (actions.length === 0) return;
 
   actions.push({ label: "inventory.actions.cancel", onActivate: () => popScreen() });
@@ -344,17 +401,22 @@ function openEquipmentSlotActionsMenu(scene, getSession, slot, itemLabelKey) {
 }
 
 // "Équiper" choisi (onglet Sac) : effet immédiat, jamais de sélecteur (on
-// équipe TOUJOURS un seul exemplaire — voir core/equipment.js/equipItem).
+// équipe TOUJOURS un seul exemplaire — voir core/equipment.js/equipItem, un
+// objet equippable n'est jamais empilable : équiper RETIRE donc TOUJOURS
+// l'entrée entière du sac, jamais une simple décrémentation de quantité).
 // Un seul niveau au-dessus des onglets à ce stade (le menu d'actions) — voir
-// popCount d'executeAction.
-function confirmEquip(entry, itemLabelKey) {
+// popCount d'executeAction. Réannonce + repositionnement du curseur après
+// coup (RÈGLE GÉNÉRALE, voir bagRemovalAnnouncement/executeAction) : `index`
+// = position de l'entrée équipée dans le sac AVANT l'effet.
+function confirmEquip(getSession, entry, itemLabelKey, index) {
   executeAction(
     1,
     () => {
       if (!equipItemHandler) return false;
       equipItemHandler(entry.type);
     },
-    () => t("inventory.equipped", { item: t(itemLabelKey) })
+    () => `${t("inventory.equipped", { item: t(itemLabelKey) })} ${bagRemovalAnnouncement(getSession, index)}`,
+    () => bagCursorAfterRemoval(getSession().bag, index)
   );
 }
 
@@ -372,9 +434,13 @@ function confirmUnequip(slot, itemLabelKey) {
 }
 
 // "Poser" choisi : objet UNIQUE (quantité 1, ou non empilable) -> agit
-// DIRECTEMENT, aucun sélecteur (poser LA quantité disponible, toujours 1) ;
-// stack > 1 -> ouvre le sélecteur de quantité (voir openQuantitySelector).
-function confirmDrop(scene, getSession, entry, itemLabelKey) {
+// DIRECTEMENT, aucun sélecteur (poser LA quantité disponible, toujours 1,
+// donc TOUJOURS un retrait complet de l'entrée) ; stack > 1 -> ouvre le
+// sélecteur de quantité (voir openQuantitySelector, qui peut ou non vider
+// l'entrée selon la quantité choisie). `index` : position de l'entrée dans
+// le sac AVANT l'effet, transmise pour la réannonce/repositionnement (voir
+// bagRemovalAnnouncement/executeAction).
+function confirmDrop(scene, getSession, entry, itemLabelKey, index) {
   const available = entry.quantity ?? 1;
   if (available <= 1) {
     // Un seul niveau au-dessus des onglets à ce stade (le menu d'actions) —
@@ -385,22 +451,26 @@ function confirmDrop(scene, getSession, entry, itemLabelKey) {
         if (!dropItemHandler) return false;
         dropItemHandler(entry.type, available);
       },
-      () => buildDropMessage(getSession, entry, itemLabelKey, available)
+      () => buildDropMessage(getSession, entry, itemLabelKey, available, index),
+      () => bagCursorAfterRemoval(getSession().bag, index)
     );
     return;
   }
-  openQuantitySelector(scene, getSession, entry, itemLabelKey, available);
+  openQuantitySelector(scene, getSession, entry, itemLabelKey, available, index);
 }
 
 // Message de résultat du dépôt — appelé APRÈS l'effet (voir executeAction) :
-// getSession().bag reflète déjà l'état POST-dépôt, donc bagNowEmpty est
-// fiable.
-function buildDropMessage(getSession, entry, itemLabelKey, quantity) {
+// getSession().bag reflète déjà l'état POST-dépôt. `quantity` posée
+// couvrant TOUT le disponible AVANT l'effet (entry.quantity, snapshot
+// jamais muté) -> retrait complet de l'entrée -> réannonce (RÈGLE GÉNÉRALE,
+// voir bagRemovalAnnouncement) ; sinon (dépôt partiel d'un stack, l'entrée
+// SURVIT au même index) -> message seul, rien à réannoncer.
+function buildDropMessage(getSession, entry, itemLabelKey, quantity, index) {
   const item = t(itemLabelKey);
   const isStack = entry.quantity !== undefined;
   const dropMessage = isStack ? t("inventory.dropped.stack", { item, quantity }) : t("inventory.dropped", { item });
-  const bagNowEmpty = getSession().bag.length === 0;
-  return bagNowEmpty ? `${dropMessage} ${t("inventory.empty")}` : dropMessage;
+  const fullyRemoved = quantity >= (entry.quantity ?? 1);
+  return fullyRemoved ? `${dropMessage} ${bagRemovalAnnouncement(getSession, index)}` : dropMessage;
 }
 
 // Sélecteur de QUANTITÉ à poser (stack > 1 uniquement) — écran CUSTOM,
@@ -428,7 +498,7 @@ function buildDropMessage(getSession, entry, itemLabelKey, quantity) {
 // jamais par ce mécanisme). Ne pause/reprend PAS les balises lui-même : le
 // menu d'actions juste en-dessous, encore sur la pile, l'a déjà fait à son
 // ouverture et ne s'en dépossède qu'à SA propre sortie.
-function openQuantitySelector(scene, getSession, entry, itemLabelKey, max) {
+function openQuantitySelector(scene, getSession, entry, itemLabelKey, max, index) {
   let quantity = 1;
 
   function clampQuantity(value) {
@@ -460,7 +530,8 @@ function openQuantitySelector(scene, getSession, entry, itemLabelKey, max) {
             if (!dropItemHandler) return false;
             dropItemHandler(entry.type, quantity);
           },
-          () => buildDropMessage(getSession, entry, itemLabelKey, quantity)
+          () => buildDropMessage(getSession, entry, itemLabelKey, quantity, index),
+          () => bagCursorAfterRemoval(getSession().bag, index)
         );
       } else if (action === "cancel") {
         event.preventDefault();
@@ -495,11 +566,15 @@ function openQuantitySelector(scene, getSession, entry, itemLabelKey, max) {
 //      qu'elle reste la DERNIÈRE écriture, strictement après cette boucle
 //      (même raisonnement que lib/menu.js/makeMessageScreen). `buildMessage`
 //      reçoit donc la session DÉJÀ à jour (l'effet a déjà couru) si elle a
-//      besoin de l'inspecter (voir buildDropMessage, bagNowEmpty).
-function executeAction(popCount, applyEffect, buildMessage) {
+//      besoin de l'inspecter (voir buildDropMessage, bagRemovalAnnouncement).
+//   `cursorAfter` optionnel : () => index à imposer au curseur du sac au
+//      prochain rebuild (voir bagCursorAfterRemoval) — RÈGLE GÉNÉRALE pour
+//      toute action qui retire une entrée d'une liste (équiper, poser),
+//      omis pour une action qui n'en retire aucune (ex. Déséquiper).
+function executeAction(popCount, applyEffect, buildMessage, cursorAfter) {
   if (applyEffect() === false) return;
 
-  if (currentTabsScreen) currentTabsScreen.returnSilently();
+  if (currentTabsScreen) currentTabsScreen.returnSilently(cursorAfter ? cursorAfter() : undefined);
   for (let i = 0; i < popCount; i++) popScreen();
 
   announce(buildMessage(), { assertive: true });

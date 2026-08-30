@@ -39,7 +39,7 @@ export default {
   "inventory.unequipped": "Unequipped: {item}.",
 
   "inventory.equipment.title": "Equipment",
-  "inventory.equipment.slot.occupied": "{slot}: {item}",
+  "inventory.equipment.slot.occupied": "{slot}: {item}: {description}",
   "inventory.equipment.slot.empty": "{slot}: empty",
   "inventory.equipment.slot.emptyAnnounce": "Empty slot.",
   "equipment.slot.feet": "Feet",
