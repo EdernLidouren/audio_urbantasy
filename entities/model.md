@@ -1117,6 +1117,37 @@ discrétisé, aucun palier actif à maintenir, aucun système supplémentaire à
 construire. (Un ancien champ de niveau, réservé pour un axe Y jamais
 implémenté, a été retiré comme code mort — voir `level/schema.md`.)
 
+## `isFlying` — hauteur SUGGÉRÉE par le son, jamais un axe Y
+
+Booléen d'entité (`core/level.js`, cascade instance -> archétype -> `false`,
+même patron que `observable`/`interactable`) : marqueur PUR, aucune logique
+dans le core (pas de position verticale, pas de palier — voir "Verticalité"
+ci-dessus, qui reste l'unique façon de vraiment CHANGER d'altitude). Lu
+UNIQUEMENT par la vue (`view/audio/city-scene.js`) pour faire passer les
+sons de l'entité par une CHAÎNE DE FILTRES qui évoque l'altitude à
+l'oreille, sans jamais la simuler : passe-haut (retire le grave, son plus
+fin/aérien), envoi de réverb plus généreux (ouverture, ciel) et légère
+atténuation de volume (composée avec la distance, jamais à sa place). Les
+trois valeurs vivent dans `config/tuning-values.js` (`flyingHighpassHz`,
+`flyingReverbSend`, `flyingVolumeFactor`) — résolues comme tout paramètre
+sonore (cascade son -> instance -> archétype -> ce défaut), pensées comme un
+bac à sable de réglage plutôt qu'un effet figé.
+
+Couvre les DEUX modes de beacon (voir "Paramètres sonores" plus haut) :
+intermittent (`lib/audio.js`/`playOneShot`, nouveau paramètre `highpassHz`
+optionnel, chemin STRICTEMENT inchangé sans lui) et continu
+(`lib/audio.js`/`createPositionedSound`, nouvelle méthode `setHighpass`, en
+série APRÈS le passe-bas de distance déjà existant). Aucune entité
+non-`isFlying` n'appelle jamais ces nouveaux chemins : comportement
+STRICTEMENT inchangé pour tout contenu existant.
+
+**Exemple de référence** — `bird` (`entities/types/bird.js`,
+`level/demo.json`, instance `bird-1`) : VOCAL SEUL, aucun beacon (même choix
+que `hound`, voir "Beacon vs vocal" plus haut), pool DÉDIÉ `bird_1_vocal`,
+interval/variation surchargés pour un chant largement espacé. `isFlying:true`
+y suffit à lui seul, quel que soit le rôle de son porté (beacon OU vocal) —
+aucune autre déclaration nécessaire.
+
 ## Le joueur : même modèle, mais AUDITEUR
 
 `entities/player.js` porte un descripteur de contenu qui suit le même

@@ -14,6 +14,7 @@
     { "id": "door-exit", "type": "door", "x": 9, "nameKey": "door.exit", "target": "demo2", "descriptionKey": "door.exit.description" },
     { "id": "apple-1", "type": "apple", "x": 17 },
     { "id": "object-neon", "type": "neon", "x": 30 },
+    { "id": "bird-1", "type": "bird", "x": 33 },
     {
       "id": "npc-resident",
       "type": "npc",

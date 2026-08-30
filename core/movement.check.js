@@ -473,6 +473,50 @@ export function runMovementChecks() {
   run("interaction : observable non booléen rejeté", true, expectInteractionRejected("observable", "oui"));
   run("interaction : interactable non booléen rejeté", true, expectInteractionRejected("interactable", "oui"));
 
+  // --- isFlying : marqueur PUR (voir entities/model.md), même cascade
+  // EXACTE que observable/interactable ci-dessus (instance -> type -> défaut
+  // false) — le core ne connaît rien du SENS de ce champ (chaîne de filtres
+  // audio, entièrement côté vue, hors de portée d'un check terminal), il ne
+  // fait que le résoudre et le transporter, comme les deux autres.
+
+  const FLYING_REGISTRY = {
+    winged: { label: "entity.bird", isFlying: true },
+    grounded: { label: "entity.dog" }, // non déclaré -> défaut false
+  };
+  const flyingLevel = parseLevel(
+    {
+      id: "movement-check-flying",
+      titleKey: "level.demo.title",
+      length: 20,
+      playerStart: 0,
+      entities: [
+        { id: "e-winged", type: "winged", x: 5 },
+        { id: "e-grounded", type: "grounded", x: 6 },
+        { id: "e-override-true", type: "grounded", x: 7, isFlying: true }, // surcharge d'instance
+        { id: "e-override-false", type: "winged", x: 8, isFlying: false }, // idem, désactive le défaut du type
+      ],
+    },
+    FLYING_REGISTRY
+  );
+  function flyingEntity(id) {
+    return flyingLevel.entities.find((e) => e.id === id);
+  }
+  run("isFlying : défaut du type — hérité (true)", true, flyingEntity("e-winged").isFlying);
+  run("isFlying : non déclaré -> false par défaut", false, flyingEntity("e-grounded").isFlying);
+  run("isFlying : surcharge d'instance (true sur un type qui ne le déclare pas)", true, flyingEntity("e-override-true").isFlying);
+  run("isFlying : surcharge d'instance (désactive le défaut du type)", false, flyingEntity("e-override-false").isFlying);
+
+  let invalidFlyingRejected = false;
+  try {
+    parseLevel(
+      { id: "movement-check-flying-invalid", titleKey: "level.demo.title", length: 10, playerStart: 0, entities: [{ id: "bad", type: "grounded", x: 5, isFlying: "oui" }] },
+      FLYING_REGISTRY
+    );
+  } catch {
+    invalidFlyingRejected = true;
+  }
+  run("isFlying : non booléen rejeté", true, invalidFlyingRejected);
+
   // action : TRANSPORT générique, cascade instance -> type (comme
   // behavior/presence) — le core valide la FORME (objet, kind non vide),
   // jamais le kind lui-même contre un registre (ça reste entièrement côté

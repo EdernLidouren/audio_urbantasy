@@ -77,6 +77,15 @@
   "assets/sounds/entities/big_rock_collision": [
     "assets/sounds/entities/big_rock_collision_1.mp3"
   ],
+  "assets/sounds/entities/bird_1_vocal": [
+    "assets/sounds/entities/bird_1_vocal_1.mp3",
+    "assets/sounds/entities/bird_1_vocal_2.mp3",
+    "assets/sounds/entities/bird_1_vocal_3.mp3",
+    "assets/sounds/entities/bird_1_vocal_4.mp3",
+    "assets/sounds/entities/bird_1_vocal_5.mp3",
+    "assets/sounds/entities/bird_1_vocal_6.mp3",
+    "assets/sounds/entities/bird_1_vocal_7.mp3"
+  ],
   "assets/sounds/entities/box_of_nails_beacon": [
     "assets/sounds/entities/box_of_nails_beacon_1.mp3"
   ],
@@ -206,15 +215,6 @@
     "assets/sounds/footsteps/mud_walk_7.mp3",
     "assets/sounds/footsteps/mud_walk_8.mp3",
     "assets/sounds/footsteps/mud_walk_9.mp3"
-  ],
-  "assets/sounds/footsteps/old/boots_walk": [
-    "assets/sounds/footsteps/old/boots_walk_1.mp3",
-    "assets/sounds/footsteps/old/boots_walk_2.mp3",
-    "assets/sounds/footsteps/old/boots_walk_3.mp3",
-    "assets/sounds/footsteps/old/boots_walk_4.mp3",
-    "assets/sounds/footsteps/old/boots_walk_5.mp3",
-    "assets/sounds/footsteps/old/boots_walk_6.mp3",
-    "assets/sounds/footsteps/old/boots_walk_7.mp3"
   ],
   "assets/sounds/footsteps/sand_walk": [
     "assets/sounds/footsteps/sand_walk_1.mp3",

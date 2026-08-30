@@ -350,6 +350,12 @@ const VOCAL_TUNING_KEYS = { interval: "vocalInterval", intervalVariation: "vocal
 // (keys). nextAt (mutable, relu/réécrit à chaque tick — voir
 // updateIntermittentSources) réamorcé à 0 : premier déclenchement dès le
 // premier tick.
+//
+// isFlying (voir entities/model.md) : reverbSend REMPLACÉ par
+// flyingReverbSend (jamais les deux), highpassHz/heightGain résolus EN PLUS
+// — sinon (entité non volante) highpassHz reste `undefined` (aucun filtre
+// tenté) et heightGain reste neutre (1), chemin STRICTEMENT inchangé. Chaîne
+// de filtres "hauteur suggérée", voir config/tuning-values.js.
 function resolveIntermittentSource(entity, descriptor, keys) {
   return {
     path: descriptor.path,
@@ -357,7 +363,11 @@ function resolveIntermittentSource(entity, descriptor, keys) {
     intervalVariation: resolveTuning(keys.intervalVariation, entity, descriptor),
     gain: resolveTuning(keys.gain, entity, descriptor),
     pitchVariation: resolveTuning("pitchVariation", entity, descriptor),
-    reverbSend: resolveTuning("reverbSend", entity, descriptor),
+    reverbSend: entity.isFlying
+      ? resolveTuning("flyingReverbSend", entity, descriptor)
+      : resolveTuning("reverbSend", entity, descriptor),
+    highpassHz: entity.isFlying ? resolveTuning("flyingHighpassHz", entity, descriptor) : undefined,
+    heightGain: entity.isFlying ? resolveTuning("flyingVolumeFactor", entity, descriptor) : 1,
     nextAt: 0,
   };
 }
@@ -500,6 +510,13 @@ function buildEntitySoundEntry(entity, world, time) {
   const interactRange = resolveTuning("interactRange", entity);
   const cutoffMin = resolveTuning("cutoffMin", entity);
   const cutoffMax = resolveTuning("cutoffMax", entity);
+  // Chaîne de filtres "hauteur suggérée" (voir entities/model.md, isFlying)
+  // — résolus même sans balise CONTINUE (sans effet dans ce cas, voir
+  // applyEntityAudio, qui ne les utilise que si `sound` existe) : entité non
+  // volante -> flyingHighpassHz reste undefined (aucun filtre tenté),
+  // flyingVolumeFactor reste neutre (1), chemin STRICTEMENT inchangé.
+  const flyingHighpassHz = entity.isFlying ? resolveTuning("flyingHighpassHz", entity) : undefined;
+  const flyingVolumeFactor = entity.isFlying ? resolveTuning("flyingVolumeFactor", entity) : 1;
 
   // Son de déplacement (rôle "movement", voir entities/model.md) :
   // DORMANT si l'archétype n'en porte pas — la plupart des types n'ont pas
@@ -560,7 +577,12 @@ function buildEntitySoundEntry(entity, world, time) {
     const beaconMode = resolveTuning("beaconMode", entity, beacon);
     if (beaconMode === "continu") {
       beaconGain = resolveTuning("beaconGain", entity, beacon);
-      beaconReverbSend = resolveTuning("reverbSend", entity, beacon);
+      // isFlying (voir entities/model.md) : flyingReverbSend REMPLACE
+      // reverbSend, jamais les deux — même principe que
+      // resolveIntermittentSource ci-dessus.
+      beaconReverbSend = entity.isFlying
+        ? resolveTuning("flyingReverbSend", entity, beacon)
+        : resolveTuning("reverbSend", entity, beacon);
       const beaconPitchVariation = resolveTuning("pitchVariation", entity, beacon);
       // staggerBeacon (défaut true, voir config/tuning-values.js) :
       // OPT-OUT du désempilement d'attaques — appliqué INDISTINCTEMENT à
@@ -613,6 +635,8 @@ function buildEntitySoundEntry(entity, world, time) {
     interactRange,
     cutoffMin,
     cutoffMax,
+    flyingHighpassHz,
+    flyingVolumeFactor,
     sound,
     beaconGain,
     beaconReverbSend,
@@ -950,22 +974,27 @@ export function createCityAudioScene(getSession) {
   // updateEntityMovementSounds). Pan/volume calculés une seule fois, au
   // moment du déclenchement — jamais maintenus après coup, contrairement à
   // une balise continue (applyEntityAudio) : c'est pourquoi ce chemin ne
-  // touche jamais au passe-bas (voir le header du fichier). gain (défaut 1) :
-  // facteur propre optionnel (ex. beaconGain/vocalGain/movementGain) ;
-  // pitchVariation (défaut 0) : voir randomRate.
+  // touche jamais au passe-BAS de distance (voir le header du fichier).
+  // gain (défaut 1) : facteur propre optionnel (ex. beaconGain/vocalGain/
+  // movementGain) ; pitchVariation (défaut 0) : voir randomRate.
+  // highpassHz/heightGain (défauts undefined/1, voir
+  // resolveIntermittentSource) : chaîne de filtres "hauteur suggérée"
+  // (isFlying) — undefined -> aucun filtre tenté, 1 -> aucun effet sur le
+  // volume, chemin STRICTEMENT inchangé pour toute entité non volante.
   function playPositionedOneShot(
     path,
-    { relX, interactRange, audibleRange, panSaturation, reverbSend, volumeFactor, gain = 1, pitchVariation = 0 }
+    { relX, interactRange, audibleRange, panSaturation, reverbSend, volumeFactor, gain = 1, pitchVariation = 0, highpassHz, heightGain = 1 }
   ) {
     const dist = Math.abs(relX);
     const pan = clamp(relX / panSaturation, -1, 1);
-    const volume = volumeForDistance(dist, interactRange, audibleRange) * volumeFactor * gain;
+    const volume = volumeForDistance(dist, interactRange, audibleRange) * volumeFactor * gain * heightGain;
     playOneShot(resolveAsset(path), {
       reverbSend,
       reverbBusInput: reverbBus.input,
       volume,
       stereo: pan,
       rate: randomRate(pitchVariation),
+      highpassHz,
     });
   }
 
@@ -1028,6 +1057,8 @@ export function createCityAudioScene(getSession) {
           volumeFactor,
           gain: src.gain,
           pitchVariation: src.pitchVariation,
+          highpassHz: src.highpassHz,
+          heightGain: src.heightGain,
         });
         src.nextAt = now + jitteredIntervalMs(src.interval, src.intervalVariation);
       }
@@ -1180,7 +1211,8 @@ export function createCityAudioScene(getSession) {
     const beaconFactor = beaconVolumeFactor();
     const liveById = liveEntitiesById();
     for (const entry of entitySounds) {
-      const { entity, sound, audibleRange, panSaturation, interactRange, cutoffMin, cutoffMax, beaconGain } = entry;
+      const { entity, sound, audibleRange, panSaturation, interactRange, cutoffMin, cutoffMax, beaconGain, flyingHighpassHz, flyingVolumeFactor } =
+        entry;
       const live = liveById.get(entity.id);
       const relX = live.x - x;
 
@@ -1197,10 +1229,17 @@ export function createCityAudioScene(getSession) {
       const dist = Math.abs(relX);
       // Pan inchangé : toujours dérivé de panSaturation, indépendant du volume.
       const pan = clamp(relX / panSaturation, -1, 1);
-      const volume = volumeForDistance(dist, interactRange, audibleRange) * beaconFactor * beaconGain;
+      // flyingVolumeFactor : neutre (1) pour toute entité non isFlying,
+      // voir buildEntitySoundEntry — aucun effet sur le volume dans ce cas.
+      const volume = volumeForDistance(dist, interactRange, audibleRange) * beaconFactor * beaconGain * flyingVolumeFactor;
       sound.update(pan, volume);
       // Passe-bas : se superpose au volume/pan, ne les remplace pas.
       sound.setCutoff(cutoffForDistance(dist, interactRange, audibleRange, cutoffMin, cutoffMax));
+      // Passe-haut "hauteur suggérée" (voir entities/model.md, isFlying) :
+      // EN PLUS du passe-bas ci-dessus, jamais à sa place — setHighpass
+      // n'est appelé QUE pour une entité isFlying (flyingHighpassHz reste
+      // undefined sinon), aucune autre entité n'y touche jamais.
+      if (entity.isFlying) sound.setHighpass(flyingHighpassHz);
     }
   }
 

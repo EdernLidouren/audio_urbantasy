@@ -219,6 +219,33 @@ export const TUNING_DEFAULTS = {
   enterSoundGain: 1,
   exitSoundGain: 1,
 
+  // --- Hauteur suggérée (voir entities/model.md, isFlying) : chaîne de
+  // filtres appliquée aux sons d'une entité isFlying — SUGGÈRE l'altitude,
+  // ne simule PAS un axe Y. Bac à sable de réglage : ces trois valeurs sont
+  // le SEUL endroit à toucher pour ajuster l'effet à l'oreille, résolues
+  // comme tout paramètre sonore (cascade son -> instance -> archétype ->
+  // ce défaut).
+
+  // Fréquence de coupure (Hz) du PASSE-HAUT appliqué aux sons d'une entité
+  // isFlying, EN PLUS du passe-bas existant (cutoffMin/cutoffMax) : retire
+  // le grave, le son devient plus fin/aérien. Plus haut = effet plus
+  // marqué ; plus bas = effet plus subtil (proche de 0 = quasi neutre).
+  flyingHighpassHz: 5500,
+
+  // Part (0-1) du signal envoyée au bus de réverb PARTAGÉ pour une entité
+  // isFlying, À LA PLACE de reverbSend (jamais les deux à la fois) : plus
+  // généreuse par défaut — une touche d'ouverture/de ciel, cohérente avec
+  // un son qui vient d'en haut. Plus haut = sensation d'espace plus
+  // marquée.
+  flyingReverbSend: 0.8,
+
+  // Facteur multiplicatif (0-1) de volume propre à une entité isFlying,
+  // COMPOSÉ avec le volume déjà dérivé de la distance (jamais à sa place) :
+  // légèrement plus discret, cohérent avec un son qui vient de plus loin/
+  // plus haut. 1 = neutre (aucun effet, comportement d'une entité non
+  // volante).
+  flyingVolumeFactor: 0.4,
+
   // Décalage aléatoire MAX (unités de scène, de part et d'autre de la
   // source) appliqué à une entité éphémère ÉPARPILLÉE (voir
   // core/state.js/spawnScatteredEphemerals, entities/model.md/"Entités
@@ -228,5 +255,5 @@ export const TUNING_DEFAULTS = {
   // PAR ENTITÉ/PAR SON, mais un défaut PAR ACTION. Volontairement BAS : juste
   // assez pour désempiler plusieurs pièces au même point, pas un vrai
   // éparpillement large.
-  ephemeralScatterSpread: 1.5,
+  ephemeralScatterSpread: 2.5,
 };

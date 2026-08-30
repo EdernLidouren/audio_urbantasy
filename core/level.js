@@ -138,6 +138,7 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
     blocksMovement,
     observable,
     interactable,
+    isFlying,
     action,
     tuning,
     presence,
@@ -199,6 +200,16 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
     fail(`entities[${index}] ("${id}") : interactable doit être un booléen si présent.`);
   }
   const resolvedInteractable = interactable !== undefined ? interactable : Boolean(registry[type].interactable);
+  // isFlying : même cascade/même défaut (false) que observable/interactable
+  // ci-dessus — marqueur PUR, aucune logique ici ni ailleurs dans le core
+  // (pas d'axe Y, pas de position verticale). Lu UNIQUEMENT par la vue
+  // (view/audio/city-scene.js) pour déclencher une chaîne de filtres qui
+  // SUGGÈRE la hauteur — voir config/tuning-values.js/flyingHighpassHz et
+  // consorts, entities/model.md.
+  if (isFlying !== undefined && typeof isFlying !== "boolean") {
+    fail(`entities[${index}] ("${id}") : isFlying doit être un booléen si présent.`);
+  }
+  const resolvedIsFlying = isFlying !== undefined ? isFlying : Boolean(registry[type].isFlying);
   const entity = {
     id,
     type,
@@ -207,6 +218,7 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
     blocksMovement: resolvedBlocksMovement,
     observable: resolvedObservable,
     interactable: resolvedInteractable,
+    isFlying: resolvedIsFlying,
   };
   // Clé ajoutée SEULEMENT si résolue (jamais explicitement undefined) :
   // l'état doit rester de la donnée pure, un aller-retour JSON ne doit rien

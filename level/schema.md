@@ -125,6 +125,7 @@ exemple) : jamais de voix orpheline ni de fondus qui se disputent le canal.
 | `blocksMovement` | boolean | optionnel : surcharge d'instance, cascade -> défaut du type (`entities/types/index.js`) -> `false` |
 | `observable` | boolean | optionnel : idem, candidate à l'interaction "describe" (voir "Interaction (niveau 0)", `entities/model.md`) |
 | `interactable` | boolean | optionnel : idem, candidate à l'interaction "activate" |
+| `isFlying` | boolean | optionnel : idem (cascade, défaut `false`) — marqueur PUR, aucune logique ici ni ailleurs dans le core (pas d'axe Y). Fait passer les sons de l'entité par une chaîne de filtres qui SUGGÈRE la hauteur, côté vue uniquement (voir "Verticalité" et `isFlying`, `entities/model.md`, `config/tuning-values.js`) |
 | `action` | `{ kind: string, condition?, refusalKey? ... }` | optionnel : TYPE D'ACTION pour l'interaction "activate", cascade instance -> type comme `behavior`. Forme validée ici (`kind` non vide) ; le `kind` lui-même n'est PAS validé contre un registre au chargement — l'aiguillage reste côté vue (voir "Interaction (niveau 0)", `entities/model.md`). `condition` (optionnel, ACTIONS CONDITIONNELLES) : MÊME objet que `presence[].when`, validé au chargement contre le même registre de conditions (voir tableau plus bas) — GÉNÉRIQUE à tout `kind`. `refusalKey` (clé i18n) : **requise** dès que `condition` est présente — échec clair sinon. |
 | `presence` | `PresenceRule[]` | optionnel : règles DÉCLARATIVES de présence conditionnelle, cascade instance -> type (voir "Présence conditionnelle" plus bas et `entities/model.md`). Sans règle (ni à l'instance ni au type) : toujours présente. |
 
@@ -217,14 +218,15 @@ rassemblés par `index.js` en un objet `{ [type]: TypeDef }` :
 | `blocksMovement` | boolean | core           | empêche le déplacement au travers de l'entité (`core/physics/collision.js`) |
 | `observable`     | boolean | vue            | candidate à l'interaction "describe" (touche Espace) — voir "Interaction (niveau 0)", `entities/model.md` |
 | `interactable`   | boolean | vue            | candidate à l'interaction "activate" (touche Entrée) — idem |
+| `isFlying`       | boolean | vue            | optionnel, défaut du type — chaîne de filtres "hauteur suggérée" sur les sons, voir `isFlying` dans `entities/model.md` |
 | `action`         | object  | vue            | `{ kind, ... }` par défaut du type — voir "Interaction (niveau 0)", `entities/model.md` |
 | `consumedDescriptionKey` | string | vue    | optionnel : défaut de type, cascadé comme `descriptionKey` — voir "Collectible persistant" plus haut |
 | `muteOnConsumed` | boolean | vue           | optionnel, REGISTRE SEULEMENT (jamais cascadé par instance) : arrête le beacon continu une fois l'entité `consumed` — voir "Collectible persistant" plus haut, `entities/model.md` |
 
-`blocksMovement`/`observable`/`interactable` sont tous les trois cascadés
-instance -> type -> défaut `false` (voir `core/level.js`/`parseEntity`), donc
-également déclarables au niveau ENTITÉ (voir le tableau "Entité" plus haut),
-pas seulement au niveau du type.
+`blocksMovement`/`observable`/`interactable`/`isFlying` sont tous les quatre
+cascadés instance -> type -> défaut `false` (voir
+`core/level.js`/`parseEntity`), donc également déclarables au niveau ENTITÉ
+(voir le tableau "Entité" plus haut), pas seulement au niveau du type.
 
 Types de départ : `door`, `npc`, `object`, `decor` (ce dernier non utilisé
 dans `demo.json`). Le modèle complet (descripteurs de son, cascade de
