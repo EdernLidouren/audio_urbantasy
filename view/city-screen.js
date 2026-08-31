@@ -200,7 +200,7 @@ function resolveDroppedItemSpec(type, count) {
 export function makeCityScreen(getSession, setSession) {
   let scene = null;
 
-  // Transition FRANCHE par porte (pas de fondu, pas d'animation) :
+  // Transition FRANCHE (pas de fondu, pas d'animation) vers `targetId` :
   // scene.destroy() arrête et décharge TOUT ce que possédait le lieu
   // courant — balises, réverb, ET canaux globaux musique/ambiance (voir
   // view/audio/city-scene.js) — donc aucun Howl résiduel, rien de plus à
@@ -211,10 +211,18 @@ export function makeCityScreen(getSession, setSession) {
   // ressort directement de worlds. Nouvelle scène audio sur le monde actif,
   // annonce du titre.
   //
+  // PARTAGÉE par transitionThroughDoor (porte, spawnX omis -> playerStart
+  // du niveau cible, comportement STRICTEMENT inchangé) ET travelViaCityMap
+  // (carte de la ville, voir plus bas ; view/menus/city-map-menu.js) :
+  // spawnX, fourni SEULEMENT dans ce second cas, REMPLACE le playerStart
+  // déjà posé par travelToWorld — le point de TÉLÉPORTATION d'une case de
+  // carte (level/city-map.js) n'est pas forcément le point d'arrivée par
+  // porte.
+  //
   // scene reste null le temps de l'attente réseau (éventuelle) : onTick et
   // onKeyDown s'en gardent (voir plus bas) plutôt que d'accéder une scène
   // absente — aucune touche n'a d'effet pendant cette brève fenêtre.
-  async function transitionThroughDoor(targetId) {
+  async function performTransition(targetId, spawnX) {
     scene.destroy();
     scene = null;
 
@@ -222,7 +230,11 @@ export function makeCityScreen(getSession, setSession) {
     const alreadyVisited = Boolean(session.worlds[targetId]);
     const freshLevel = alreadyVisited ? null : await loadLevelById(targetId, registry);
 
-    setSession(travelToWorld(session, targetId, freshLevel));
+    let nextSession = travelToWorld(session, targetId, freshLevel);
+    if (spawnX !== undefined) {
+      nextSession = { ...nextSession, player: { ...nextSession.player, x: spawnX } };
+    }
+    setSession(nextSession);
     scene = createCityAudioScene(getSession);
     announce(t(getActiveWorld(getSession()).titleKey), { assertive: true });
 
@@ -237,6 +249,23 @@ export function makeCityScreen(getSession, setSession) {
     if (getPref("autoSaveOnTransition", PREF_CONSTRAINTS.autoSaveOnTransition.default)) {
       saveGame(getSession(), { playSound: false });
     }
+  }
+
+  async function transitionThroughDoor(targetId) {
+    await performTransition(targetId);
+  }
+
+  // Sélection sur la carte de la ville (voir view/menus/city-map-menu.js,
+  // level/city-map.js) : MÊME transition franche qu'une porte, spawnX
+  // explicite (point de TP de la case). Fonctionne AUSSI pour
+  // re-sélectionner sa PROPRE zone (recentrage volontaire, confort assumé
+  // pour un jeu sans challenge) : travelToWorld ne fait AUCUNE distinction
+  // particulière, targetId === activeWorldId range puis re-ressort le MÊME
+  // monde (éphémères purgés au passage, comme toute sortie de scène),
+  // joueur replacé à spawnX — un reset volontaire de la zone courante, pas
+  // un cas spécial à coder.
+  async function travelViaCityMap(levelId, spawnX) {
+    await performTransition(levelId, spawnX);
   }
 
   // Remplace la partie EN COURS par une session importée (voir
@@ -410,7 +439,7 @@ export function makeCityScreen(getSession, setSession) {
 
       if (action === "pauseMenu") {
         event.preventDefault();
-        openPauseMenu(scene, getSession);
+        openPauseMenu(scene, getSession, travelViaCityMap);
         return;
       }
 

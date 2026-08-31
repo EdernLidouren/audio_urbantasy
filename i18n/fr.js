@@ -52,6 +52,7 @@ export default {
   "tag.metal": "métal",
 
   "menu.pause.title": "Pause",
+  "menu.pause.city_map": "Carte de la ville",
   "menu.pause.options": "Options",
   "menu.pause.main_menu": "Retour au menu principal",
   "menu.pause.resume": "Retour au jeu",
@@ -216,4 +217,12 @@ export default {
   "door.alley_back": "Porte de service",
   "door.alley_back.description": "Cette même porte de service, vue de la ruelle : elle mène à l'arrière-boutique.",
   "level.demo3.title": "La ruelle",
+
+  // Carte de la ville (voir level/city-map.js, view/menus/city-map-menu.js)
+  // — trois annonces de case, jamais confondues : zone réelle ("<nom> :
+  // <description>", nameKey/descriptionKey de la case), "en chantier",
+  // "vide".
+  "cityMap.underConstruction": "En chantier.",
+  "cityMap.empty": "Vide.",
+  "cityMap.demo.description": "Le quartier de départ, où tout commence.",
 };

@@ -51,6 +51,7 @@ export default {
   "tag.metal": "metal",
 
   "menu.pause.title": "Pause",
+  "menu.pause.city_map": "City map",
   "menu.pause.options": "Options",
   "menu.pause.main_menu": "Return to main menu",
   "menu.pause.resume": "Resume game",
@@ -212,4 +213,12 @@ export default {
   "door.alley_back": "Service door",
   "door.alley_back.description": "This same service door, seen from the alley: it leads to the back room.",
   "level.demo3.title": "The alley",
+
+  // City map (see level/city-map.js, view/menus/city-map-menu.js) — three
+  // distinct cell announcements, never conflated: real zone ("<name>:
+  // <description>", the cell's nameKey/descriptionKey), "under
+  // construction", "empty".
+  "cityMap.underConstruction": "Under construction.",
+  "cityMap.empty": "Empty.",
+  "cityMap.demo.description": "The starting neighborhood, where it all begins.",
 };
