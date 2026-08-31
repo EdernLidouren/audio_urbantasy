@@ -9,7 +9,7 @@ import { announce } from "../lib/announce.js";
 import { t } from "../i18n/index.js";
 import { ensureAudioUnlocked, playOneShot } from "../lib/audio.js";
 import { resolveAsset } from "../lib/assets.js";
-import { createCityAudioScene } from "./audio/city-scene.js";
+import { createCityAudioScene, stopPersistentAudioLayers } from "./audio/city-scene.js";
 import {
   interact,
   chooseInteractionTarget,
@@ -245,16 +245,20 @@ export function makeCityScreen(getSession, setSession) {
     announce(t(getSession().perceptionActive ? "perception.activated" : "perception.deactivated"), { assertive: true });
   }
 
-  // Transition FRANCHE (pas de fondu, pas d'animation) vers `targetId` :
-  // scene.destroy() arrête et décharge TOUT ce que possédait le lieu
-  // courant — balises, réverb, ET canaux globaux musique/ambiance (voir
-  // view/audio/city-scene.js) — donc aucun Howl résiduel, rien de plus à
-  // nettoyer ici. Le monde quitté est RANGÉ (gelé) dans session.worlds, pas
-  // détruit : une re-visite le ressort tel quel (voir core/state.js,
-  // travelToWorld). Le fetch reste ici, au bord — SEULEMENT si la cible
-  // n'est pas déjà connue de la partie ; sinon aucun réseau, la cible
-  // ressort directement de worlds. Nouvelle scène audio sur le monde actif,
-  // annonce du titre.
+  // Transition FRANCHE côté ÉTAT/ENTITÉS (pas de fondu, pas d'animation) :
+  // scene.destroy() arrête et décharge ce que possédait le lieu courant —
+  // balises, réverb (voir view/audio/city-scene.js) — donc aucun Howl
+  // résiduel d'ENTITÉ, rien de plus à nettoyer ici. Musique/ambiance,
+  // elles, NE SONT PLUS coupées par destroy() (voir "Couches persistantes
+  // MUSIQUE/AMBIANCE", lib/audio.js) : la scène suivante (createCityAudioScene
+  // ci-dessous) compare ce qu'elle veut à ce qui continue et ne fond que ce
+  // qui change réellement — jamais de coupure/relance pour une musique ou
+  // une ambiance identique entre les deux lieux. Le monde quitté est RANGÉ
+  // (gelé) dans session.worlds, pas détruit : une re-visite le ressort tel
+  // quel (voir core/state.js, travelToWorld). Le fetch reste ici, au
+  // bord — SEULEMENT si la cible n'est pas déjà connue de la partie ; sinon
+  // aucun réseau, la cible ressort directement de worlds. Nouvelle scène
+  // audio sur le monde actif, annonce du titre.
   //
   // PARTAGÉE par transitionThroughDoor (porte, spawnX omis -> playerStart
   // du niveau cible, comportement STRICTEMENT inchangé) ET travelViaCityMap
@@ -575,6 +579,11 @@ export function makeCityScreen(getSession, setSession) {
     },
     onExit() {
       scene.destroy();
+      // Sortie RÉELLE de partie (retour au menu principal) : AUCUNE scène
+      // suivante ne reprendra une éventuelle couche musique/ambiance encore
+      // en cours (voir view/audio/city-scene.js/destroy, qui ne les touche
+      // plus) — SEUL endroit qui les arrête explicitement pour de bon.
+      stopPersistentAudioLayers();
       scene = null;
       setDoorTransitionHandler(null);
       setPickupHandler(null);

@@ -54,14 +54,12 @@ import {
   keepAudioContextAwake,
   createPositionedSound,
   createReverbBus,
-  playAmbiences,
-  stopGlobal,
   setGlobalVolume,
   preloadMusic,
-  startMusicSequence,
-  switchMusicSequence,
-  fadeOutMusic,
-  crossfadeAmbience,
+  setMusicLayer,
+  clearMusicLayers,
+  setAmbienceLayer,
+  clearAmbienceLayers,
 } from "../../lib/audio.js";
 import { announce } from "../../lib/announce.js";
 import { resolveAsset, hasAsset, assetKeyMembers } from "../../lib/assets.js";
@@ -951,63 +949,65 @@ export function createCityAudioScene(getSession) {
   // simplement rien sur le canal correspondant. Ambiances : jusqu'à deux
   // couches simultanées, un seul curseur de volume pour les deux.
   //
-  // Musique PAR PHASE (voir core/time.js/phaseAt, resolveMusicForPhase) :
-  // à l'ENTRÉE dans une scène, on joue directement la musique de la phase
-  // COURANTE — jamais de fondu depuis le silence (comportement historique).
-  // ENCHAÎNEMENT AVEC RESPIRATION par défaut (voir lib/audio.js/
-  // startMusicSequence) : un morceau joue une fois (loop:false), se termine,
-  // une pause aléatoire (MUSIC_BREATHER_RANGE), puis un nouveau morceau du
-  // pool démarre — sans répétition immédiate si le pool en compte plusieurs
-  // (resolveAsset). `musicLoop` (voir level/schema.md) bascule EN BOUCLE
-  // CONTINUE à la place (ex. magasin/ambiance tendue) : figé pour tout le
-  // lieu, ne varie jamais avec la phase. currentPhase mémorise la phase pour
-  // update() ci-dessous, seul endroit qui la refait varier (sur bascule,
-  // avec fondu + respiration, voir switchMusicSequence).
+  // COUCHES DE LIEU/D'ÉTAT (voir lib/audio.js/setMusicLayer/
+  // setAmbienceLayer, "Couches persistantes MUSIQUE/AMBIANCE") : chaque
+  // canal ne s'interrompt QUE si son identité DÉCLARÉE change réellement —
+  // jamais pour "relancer la même chose". currentPhase mémorise la phase
+  // pour update() ci-dessous, seul endroit qui la refait varier (sur
+  // bascule, la couche de lieu se redéclare, voir plus bas).
   let currentPhase = phaseAt(getSession().time);
   const musicLoop = Boolean(world.musicLoop);
   const ambiences = world.ambiences;
   // Perception surnaturelle (voir core/presence.js/"perceptionActive") :
   // tracké ICI (comme currentPhase ci-dessus), comparé à chaque tick contre
   // session.perceptionActive (voir update() plus bas) pour détecter la
-  // BASCULE, jamais réévalué en continu. À l'entrée dans une scène DÉJÀ EN
-  // perception (ex. traversée d'une porte pendant qu'elle est active) : les
-  // pools surnaturels jouent DIRECTEMENT, comme la musique de phase le fait
-  // déjà (voir resolveMusicForPhase plus bas) — jamais de fondu depuis le
-  // silence à l'entrée en scène, même règle pour les deux.
+  // BASCULE, jamais réévalué en continu — pilote la couche D'ÉTAT du
+  // canal musique/ambiance (voir juste en dessous).
   let perceptionActive = getSession().perceptionActive;
   const pickPerceptionMusicPath = () => resolveAsset(PERCEPTION_MUSIC_POOL);
 
-  if (perceptionActive) {
-    setGlobalVolume("music", musicVolumeFactor());
-    startMusicSequence({ pickPath: pickPerceptionMusicPath, loop: false, breatherRange: MUSIC_BREATHER_RANGE });
-  } else if (resolveMusicForPhase(world, currentPhase)) {
-    setGlobalVolume("music", musicVolumeFactor());
-    startMusicSequence({
-      pickPath: pickMusicPath(world, currentPhase),
-      loop: musicLoop,
-      breatherRange: MUSIC_BREATHER_RANGE,
-    });
-  }
+  // Volume AVANT toute déclaration de couche : playGlobal/playMusicTrack
+  // (lib/audio.js) lisent channelVolume("music"/"ambience") DÈS LA
+  // CRÉATION d'un flux, quel qu'il soit (démarrage direct OU fondu de
+  // crossfade) — l'ordre entre setGlobalVolume et les déclarations de
+  // couches ci-dessous n'a donc plus d'importance FONCTIONNELLE, mais
+  // AVANT reste le plus sûr : jamais de risque d'écraser en dur (sans
+  // fondu) le volume d'un flux dont un fondu viendrait tout juste de
+  // démarrer (voir setGlobalVolume, qui applique .volume() directement à
+  // TOUT ce qui est dans le canal au moment de son appel).
+  setGlobalVolume("music", musicVolumeFactor());
+  setGlobalVolume("ambience", ambienceVolumeFactor());
 
-  // ORDRE important, contrairement à la musique juste au-dessus :
-  // playMusicTrack (lib/audio.js) applique lui-même channelVolume("music")
-  // à CHAQUE Howl qu'il crée, quel que soit l'ordre d'appel — mais
-  // playGlobal (dont playAmbiences dérive) NE LE FAIT PAS : un Howl
-  // d'ambiance naît toujours au volume Howler par défaut (1), et seul
-  // setGlobalVolume l'ajuste ensuite, en itérant sur les flux DÉJÀ dans
-  // channelStreams("ambience") au moment de son appel. setGlobalVolume
-  // AVANT playAmbiences serait un no-op sur les flux (pas encore créés) —
-  // ambiance montée au volume PLEIN, ignorant la préférence, jusqu'à la
-  // PROCHAINE bascule de perception (qui, elle, applique bien le volume via
-  // crossfadeAmbience/channelVolume). D'où l'ordre INVERSE de la musique :
-  // playAmbiences D'ABORD, setGlobalVolume ENSUITE.
-  if (perceptionActive) {
-    playAmbiences([resolveAsset(PERCEPTION_AMBIENCE_POOL)]);
-    setGlobalVolume("ambience", ambienceVolumeFactor());
-  } else if (ambiences && ambiences.length > 0) {
-    playAmbiences(ambiences.map(resolveAsset));
-    setGlobalVolume("ambience", ambienceVolumeFactor());
-  }
+  // Couche D'ÉTAT AVANT couche DE LIEU (ordre important, contrairement au
+  // reste) : si l'état est DÉJÀ actif au montage (ex. sauvegarde reprise en
+  // pleine perception, ou transition en cours de perception — voir
+  // performTransition, view/city-screen.js, qui ne coupe plus la couche
+  // d'état), la déclarer EN PREMIER lui laisse imposer directement son
+  // identité — la couche de lieu, déclarée juste après, se retrouve alors
+  // simplement ignorée (l'état prime, voir winningMusicLayer/
+  // winningAmbienceLayer) sans jamais avoir démarré puis interrompu quoi
+  // que ce soit pour rien.
+  const musicStateParams = { pickPath: pickPerceptionMusicPath, loop: false, breatherRange: MUSIC_BREATHER_RANGE };
+  setMusicLayer("state", perceptionActive ? PERCEPTION_MUSIC_POOL : null, musicStateParams, PERCEPTION_FADE_MS);
+  setMusicLayer(
+    "location",
+    resolveMusicForPhase(world, currentPhase),
+    { pickPath: pickMusicPath(world, currentPhase), loop: musicLoop, breatherRange: MUSIC_BREATHER_RANGE },
+    MUSIC_FADE_MS
+  );
+
+  setAmbienceLayer(
+    "state",
+    perceptionActive ? [PERCEPTION_AMBIENCE_POOL] : null,
+    perceptionActive ? [resolveAsset(PERCEPTION_AMBIENCE_POOL)] : null,
+    PERCEPTION_FADE_MS
+  );
+  setAmbienceLayer(
+    "location",
+    ambiences && ambiences.length > 0 ? ambiences : null,
+    ambiences && ambiences.length > 0 ? ambiences.map(resolveAsset) : null,
+    MUSIC_FADE_MS
+  );
 
   // Rampe du filtre d'étouffement des entités MONDAINES (voir
   // effectiveMuffleAmount/currentMundaneMuffleAmount plus bas) : de/vers
@@ -1528,36 +1528,31 @@ export function createCityAudioScene(getSession) {
     // la phase MÉMORISÉE, on n'agit QUE sur la différence — jamais en
     // continu (phaseAt est réévalué chaque tick, mais currentPhase ne
     // change que sur un vrai changement, voir CLAUDE.md/le prompt d'origine
-    // "on agit sur la TRANSITION, pas en continu"). Fondu UNIVERSEL PUIS
-    // respiration PUIS nouvelle séquence (voir lib/audio.js/
-    // switchMusicSequence) — jamais l'entrée en scène ci-dessus, qui joue
-    // déjà la bonne phase directement. Nouvelle phase SANS musique
-    // déclarée : la précédente doit quand même s'éteindre (même fondu
-    // universel), jamais continuer à jouer indéfiniment dans la phase
-    // suivante.
+    // "on agit sur la TRANSITION, pas en continu"). Redéclare simplement la
+    // couche DE LIEU avec la nouvelle identité (voir lib/audio.js/
+    // setMusicLayer) — NO-OP si la couche D'ÉTAT (perception) a déjà la
+    // main sur le canal, sinon fondu vers la nouvelle phase (ou silence si
+    // la phase suivante n'a pas de musique déclarée).
     const phase = phaseAt(session.time);
     if (phase !== currentPhase) {
       currentPhase = phase;
-      if (resolveMusicForPhase(world, currentPhase)) {
-        switchMusicSequence({
-          pickPath: pickMusicPath(world, currentPhase),
-          loop: musicLoop,
-          breatherRange: MUSIC_BREATHER_RANGE,
-          fadeMs: MUSIC_FADE_MS,
-        });
-      } else {
-        fadeOutMusic(MUSIC_FADE_MS);
-      }
+      setMusicLayer(
+        "location",
+        resolveMusicForPhase(world, currentPhase),
+        { pickPath: pickMusicPath(world, currentPhase), loop: musicLoop, breatherRange: MUSIC_BREATHER_RANGE },
+        MUSIC_FADE_MS
+      );
     }
 
     // Bascule de PERCEPTION SURNATURELLE (voir core/state.js/
     // togglePerception, view/city-screen.js) : même principe EXACT que la
     // bascule de phase ci-dessus (compare à la valeur MÉMORISÉE, agit
-    // SEULEMENT sur la différence) — DEUX effets, tous deux en fondu sur
-    // PERCEPTION_FADE_MS : crossfade musique/ambiance vers/depuis les pools
-    // surnaturels (réutilise switchMusicSequence/crossfadeAmbience, MÊME
-    // mécanisme que la bascule jour/nuit) ET démarrage de la rampe du
-    // filtre d'étouffement mondain (mundaneMuffleRampFrom/To/StartedAt,
+    // SEULEMENT sur la différence) — redéclare la couche D'ÉTAT
+    // (musique+ambiance), voir lib/audio.js/setMusicLayer/setAmbienceLayer :
+    // NO-OP si l'identité surnaturelle est déjà celle qui joue (continuité,
+    // ex. un toggle qui retrouve exactement ce qui tournait déjà), sinon
+    // fondu vers/depuis les pools surnaturels. PLUS démarrage de la rampe
+    // du filtre d'étouffement mondain (mundaneMuffleRampFrom/To/StartedAt,
     // lue en continu par applyEntityAudio/updateIntermittentSources/
     // updateEntityMovementSounds via effectiveMuffleAmount, JAMAIS
     // recalculée ici après ce point — c'est currentMundaneMuffleAmount qui
@@ -1570,27 +1565,13 @@ export function createCityAudioScene(getSession) {
       mundaneMuffleRampTo = perceptionActive ? 1 : 0;
       mundaneMuffleRampStartedAt = performance.now();
 
-      if (perceptionActive) {
-        switchMusicSequence({
-          pickPath: pickPerceptionMusicPath,
-          loop: false,
-          breatherRange: MUSIC_BREATHER_RANGE,
-          fadeMs: PERCEPTION_FADE_MS,
-        });
-        crossfadeAmbience([resolveAsset(PERCEPTION_AMBIENCE_POOL)], PERCEPTION_FADE_MS);
-      } else {
-        if (resolveMusicForPhase(world, currentPhase)) {
-          switchMusicSequence({
-            pickPath: pickMusicPath(world, currentPhase),
-            loop: musicLoop,
-            breatherRange: MUSIC_BREATHER_RANGE,
-            fadeMs: PERCEPTION_FADE_MS,
-          });
-        } else {
-          fadeOutMusic(PERCEPTION_FADE_MS);
-        }
-        crossfadeAmbience(ambiences && ambiences.length > 0 ? ambiences.map(resolveAsset) : [], PERCEPTION_FADE_MS);
-      }
+      setMusicLayer("state", perceptionActive ? PERCEPTION_MUSIC_POOL : null, musicStateParams, PERCEPTION_FADE_MS);
+      setAmbienceLayer(
+        "state",
+        perceptionActive ? [PERCEPTION_AMBIENCE_POOL] : null,
+        perceptionActive ? [resolveAsset(PERCEPTION_AMBIENCE_POOL)] : null,
+        PERCEPTION_FADE_MS
+      );
     }
 
     applyEntityAudio(x);
@@ -1676,19 +1657,17 @@ export function createCityAudioScene(getSession) {
       if (sound) sound.stop(); // nettoie aussi son propre envoi de réverb
     }
     reverbBus.destroy();
-    // Sortie RÉELLE de la scène uniquement (voir view/city-screen.js,
-    // onExit/transitionThroughDoor) : un menu/pause empilé par-dessus
-    // n'appelle jamais destroy(), donc n'arrête jamais musique/ambiances —
-    // seule la vraie sortie le fait. Musique : fondu UNIVERSEL (voir
-    // lib/audio.js/fadeOutMusic), jamais une coupure sèche — la transition
-    // elle-même reste IMMÉDIATE (la scène suivante démarre tout de suite,
-    // voir transitionThroughDoor), le morceau sortant fond simplement en
-    // arrière-plan par-dessus le début de la nouvelle scène. Léger
-    // chevauchement assumé (non masqué ici) : une future transition sonore
-    // d'habillage pourrait le couvrir, non requise aujourd'hui. Ambiance :
-    // inchangée, coupure franche.
-    fadeOutMusic(MUSIC_FADE_MS);
-    stopGlobal("ambience");
+    // Musique/ambiance NE SONT PLUS touchées ici (voir lib/audio.js/
+    // "Couches persistantes MUSIQUE/AMBIANCE") : elles vivent au niveau
+    // MODULE, indépendamment du cycle de vie de CETTE scène — une
+    // transition de lieu (voir view/city-screen.js/performTransition) NE
+    // DOIT PAS interrompre ce qui continue légitimement (couche d'état en
+    // cours, ou couche de lieu identique déclarée par la scène suivante).
+    // C'est le MONTAGE de la scène SUIVANTE (createCityAudioScene) qui
+    // compare et décide — jamais destroy(), qui ne sait pas ce qui vient
+    // après. Pour une sortie RÉELLE de partie (retour au menu principal,
+    // aucune scène suivante), voir stopPersistentAudioLayers ci-dessous —
+    // SEUL appelant, view/city-screen.js/onExit.
     if (activeScene === api) activeScene = null;
   }
 
@@ -1765,4 +1744,17 @@ export function createCityAudioScene(getSession) {
 // view/menus/audio-menu.js, appelé en onChange d'un slider de volume.
 export function refreshActiveBeaconVolumes() {
   if (activeScene) activeScene.refreshBeaconVolumes();
+}
+
+// Arrête POUR DE BON les couches persistantes musique/ambiance (voir
+// lib/audio.js/clearMusicLayers/clearAmbienceLayers) — pour une sortie
+// RÉELLE de partie (retour au menu principal, voir
+// view/city-screen.js/onExit), où il n'y a JAMAIS de scène suivante pour
+// reprendre ce qui continuait. Distinct de destroy() (méthode de la
+// scène) : celui-ci ne touche plus jamais music/ambiance (voir son
+// commentaire), c'est ICI, explicitement, que la partie se termine
+// vraiment pour elles aussi.
+export function stopPersistentAudioLayers() {
+  clearMusicLayers(MUSIC_FADE_MS);
+  clearAmbienceLayers(MUSIC_FADE_MS);
 }
