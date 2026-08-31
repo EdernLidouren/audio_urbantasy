@@ -31,9 +31,12 @@ export const MOVE_KEYS = [...MOVE_BINDINGS.moveLeft.keys, ...MOVE_BINDINGS.moveR
 // fichier pour ça.
 
 // Raccourcis de la ville — APPUI (voir view/city-screen.js/onKeyDown, qui
-// résout cette table via lib/input.js/resolveAction). "debugPosition"/
-// "debugSpawn" restent bindés inconditionnellement ; c'est la CONSOMMATION
-// (city-screen.js) qui les ignore hors mode debug, comme avant.
+// résout cette table via lib/input.js/resolveAction). "debugSpawn" reste
+// bindée inconditionnellement ; c'est la CONSOMMATION (city-screen.js) qui
+// l'ignore hors mode debug, comme avant. "announcePosition" (touche "x")
+// n'est PLUS réservée au debug : DISPONIBLE en jeu normal comme
+// announceTime/announceMoney — seule la PRÉCISION de ce qu'elle annonce
+// varie avec isDebugEnabled(), côté consommation (voir announcePlayerX).
 //
 // "openEquipment" partage la touche "q" avec "moveLeft" (MOVE_BINDINGS
 // ci-dessus) — PAS une ambiguïté : les deux canaux sont INDÉPENDANTS
@@ -49,7 +52,7 @@ export const CITY_BINDINGS = {
   announceMoney: { keys: ["g"], mods: [] },
   openInventory: { keys: ["i"], mods: [] },
   openEquipment: { keys: ["q"], mods: [] },
-  debugPosition: { keys: ["x"], mods: [] },
+  announcePosition: { keys: ["x"], mods: [] },
   debugSpawn: { keys: ["e"], mods: [] },
   interactDescribe: { keys: [" "], mods: [] },
   interactActivate: { keys: ["Enter"], mods: [] },

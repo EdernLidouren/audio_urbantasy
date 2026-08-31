@@ -46,10 +46,8 @@ import {
   monthOfYear,
   seasonOfYear,
   yearNumber,
-  weekdayOf,
   SEASON_KEYS,
   MONTH_KEYS,
-  WEEKDAY_KEYS,
 } from "../core/time.js";
 import registry from "../entities/types/index.js";
 import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
@@ -67,17 +65,20 @@ function pad2(n) {
 
 // Composants NOMMÉS fournis au gabarit "time.announce" — le code ne décide
 // d'AUCUN ordre ni ponctuation, seule la chaîne i18n (une par langue) le
-// fait (voir i18n/fr.js/en.js) : weekday/month/season sont déjà résolus en
-// texte ICI (t(...) sur leur clé) avant d'être interpolés, comme season
-// l'était déjà — interpolate() ne fait que remplacer des chaînes dans un
-// gabarit, jamais une traduction imbriquée.
+// fait (voir i18n/fr.js/en.js, forme "heure, jour mois, saison, année" —
+// l'ordre jour/mois lui-même reste propre à chaque langue) : month/season
+// sont déjà résolus en texte ICI (t(...) sur leur clé) avant d'être
+// interpolés — interpolate() ne fait que remplacer des chaînes dans un
+// gabarit, jamais une traduction imbriquée. weekday (voir core/time.js/
+// weekdayOf, WEEKDAY_KEYS) ne fait PAS partie de cette forme — sa
+// dérivation reste dans le core, prête pour un futur gabarit qui la
+// redemanderait, mais rien ici ne la lit plus.
 function announceGameTime(session) {
   const { time } = session;
   announce(
     t("time.announce", {
       hour: pad2(hourOfDay(time)),
       minute: pad2(minuteOfHour(time)),
-      weekday: t(WEEKDAY_KEYS[weekdayOf(time)]),
       day: dayOfMonth(time),
       month: t(MONTH_KEYS[monthOfYear(time) - 1]),
       season: t(SEASON_KEYS[seasonOfYear(time)]),
@@ -94,29 +95,34 @@ function announceMoney(session) {
   announce(t("money.announce", { amount: session.money }));
 }
 
-// Consultation pure de session.player.x (touche "x", MODE DEBUG UNIQUEMENT
-// — voir onKeyDown plus bas, config/debug.js) — même patron que
-// announceGameTime/announceMoney (aucune action, juste une lecture d'état
-// annoncée), mais réservée au debug : c'est un outil de diagnostic de
-// position, pas une info utile au joueur normal. Deux décimales (toFixed) :
-// session.x
-// dérive d'additions répétées de MOVE_STEP (core/state.js), donc porte
-// souvent une dizaine de décimales de bruit flottant sans intérêt à
-// l'oreille (ex. 14.679999999999863) — deux décimales restent largement
-// assez précises pour situer le joueur (MOVE_STEP vaut 0.04).
+// Consultation pure de session.player.x (touche "x", voir onKeyDown plus
+// bas) — même patron que announceGameTime/announceMoney (aucune action,
+// juste une lecture d'état annoncée), désormais DISPONIBLE EN JEU NORMAL
+// (plus réservée au debug) : c'est la PRÉCISION de {x} qui varie selon
+// isDebugEnabled() (config/debug.js), jamais la disponibilité de la touche
+// ni le reste du gabarit.
+//   - mode debug : flottant à deux décimales (toFixed) — session.player.x
+//     dérive d'additions répétées de MOVE_STEP (core/state.js), donc porte
+//     souvent une dizaine de décimales de bruit flottant sans intérêt à
+//     l'oreille (ex. 14.679999999999863) ; deux décimales restent largement
+//     assez précises pour un diagnostic de position.
+//   - mode normal : entier ARRONDI (Math.round, jamais tronqué/Math.floor)
+//     — lisible pour le joueur, sans le bruit flottant ni la fausse
+//     précision d'un outil de diagnostic.
+// {length} (world.length, PARTAGÉ même pour une scène à deux faces — voir
+// core/level.js) situe {x} dans l'étendue du lieu, dans les DEUX modes.
 //
 // Face courante (RECTO/VERSO, voir CLAUDE.md) : annoncée EN PLUS, mais
 // SEULEMENT si le monde actif a réellement deux faces (isTwoSided) —
 // aucune info de face pour une scène simple, où elle n'aurait aucun sens.
-// Info DEBUG pour l'instant (comme le reste de cette annonce) : une version
-// destinée au joueur normal, en clair, viendra plus tard.
 function announcePlayerX(session) {
   const world = session.worlds[session.activeWorldId];
+  const x = isDebugEnabled() ? session.player.x.toFixed(2) : Math.round(session.player.x);
   if (isTwoSided(world)) {
-    announce(t("position.announceWithSide", { x: session.player.x.toFixed(2), side: t(`side.${session.player.side}`) }));
+    announce(t("position.announceWithSide", { x, length: world.length, side: t(`side.${session.player.side}`) }));
     return;
   }
-  announce(t("position.announce", { x: session.player.x.toFixed(2) }));
+  announce(t("position.announce", { x, length: world.length }));
 }
 
 // Résout un descripteur ÉPHÉMÈRE MINIMAL (type + surcharges, ex. { type:
@@ -443,13 +449,12 @@ export function makeCityScreen(getSession, setSession) {
         return;
       }
 
-      // "debugPosition", MODE DEBUG UNIQUEMENT (voir config/debug.js, même
-      // garde que debugSpawn) : consultation pure de la position du joueur —
-      // un outil de diagnostic, pas une info destinée au joueur normal,
-      // contrairement à announceTime/announceMoney. En mode normal, ne fait
-      // RIEN — comportement inchangé pour tout joueur qui n'a jamais activé
-      // le mode debug.
-      if (action === "debugPosition" && isDebugEnabled()) {
+      // "announcePosition" : consultation pure de la position du joueur —
+      // même statut que announceTime/announceMoney désormais (DISPONIBLE EN
+      // JEU NORMAL, pas seulement en debug) : announcePlayerX ci-dessus lit
+      // isDebugEnabled() ELLE-MÊME pour choisir la PRÉCISION de {x} (entier
+      // arrondi en mode normal, flottant en debug), donc aucune garde ici.
+      if (action === "announcePosition") {
         announcePlayerX(getSession());
         return;
       }

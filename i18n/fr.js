@@ -99,17 +99,23 @@ export default {
   "save.import_confirm_title": "Importer cette partie remplacera la partie en cours. Confirmer ?",
   "save.imported": "Partie importée.",
 
-  // Ordre des composants PROPRE À CETTE LANGUE (jour avant mois, à la
-  // française) — le code ne fournit que des composants nommés déjà résolus
-  // (voir view/city-screen.js/announceGameTime), jamais un ordre.
-  "time.announce": "{weekday} {day} {month}, {season}, année {year}. {hour} h {minute}.",
+  // Forme : heure, jour mois, saison, année — jour avant mois, à la
+  // française (voir i18n/en.js pour la forme "mois jour"). Le code ne
+  // fournit que des composants nommés déjà résolus (voir
+  // view/city-screen.js/announceGameTime), jamais un ordre : réordonner ou
+  // retirer un composant ne touche QUE cette chaîne.
+  "time.announce": "{hour} h {minute}, {day} {month}, {season}, année {year}.",
   // Nom de monnaie BATEAU et PROVISOIRE — voir core/money.js, changeable
   // sans toucher au mécanisme (juste ces deux chaînes).
   "money.announce": "{amount} pièces.",
-  "position.announce": "Position : {x}.",
+  // {length} : longueur totale du lieu actif (world.length), pour situer
+  // {x} dans son étendue — voir view/city-screen.js/announcePlayerX. {x}
+  // varie en PRÉCISION selon le mode debug (flottant à 2 décimales en
+  // debug, entier arrondi sinon), jamais dans ce gabarit.
+  "position.announce": "Position x : {x} sur {length}.",
   // Variante avec la face courante (RECTO/VERSO, voir CLAUDE.md) — utilisée
   // UNIQUEMENT si le lieu actif a deux faces (voir view/city-screen.js).
-  "position.announceWithSide": "Position : {x}. Face : {side}.",
+  "position.announceWithSide": "Position x : {x} sur {length}. Face : {side}.",
   "side.recto": "recto",
   "side.verso": "verso",
   "time.season.spring": "printemps",

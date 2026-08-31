@@ -98,15 +98,21 @@ export default {
   "save.import_confirm_title": "Importing this game will replace the current game. Confirm?",
   "save.imported": "Game imported.",
 
-  // Component ORDER is specific to this language (month before day, US
-  // convention) — the code only supplies named, already-resolved
-  // components (see view/city-screen.js/announceGameTime), never an order.
-  "time.announce": "{weekday}, {month} {day}, {season}, year {year}. {hour}:{minute}.",
+  // Form: hour, month day, season, year — month before day, US convention
+  // (see i18n/fr.js for the "day month" form). The code only supplies
+  // named, already-resolved components (see
+  // view/city-screen.js/announceGameTime), never an order: reordering or
+  // dropping a component only ever touches this string.
+  "time.announce": "{hour}:{minute}, {month} {day}, {season}, year {year}.",
   "money.announce": "{amount} coins.",
-  "position.announce": "Position: {x}.",
+  // {length}: total length of the active place (world.length), to place
+  // {x} within its extent — see view/city-screen.js/announcePlayerX. {x}
+  // varies in PRECISION with debug mode (2-decimal float in debug, rounded
+  // integer otherwise), never in this template.
+  "position.announce": "Position x: {x} out of {length}.",
   // Variant with the current side (RECTO/VERSO, see CLAUDE.md) — used ONLY
   // when the active place has two sides (see view/city-screen.js).
-  "position.announceWithSide": "Position: {x}. Side: {side}.",
+  "position.announceWithSide": "Position x: {x} out of {length}. Side: {side}.",
   "side.recto": "recto",
   "side.verso": "verso",
   "time.season.spring": "spring",

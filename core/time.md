@@ -171,20 +171,23 @@ coupés par l'état dormant, la réaction vue par diff) : `entities/model.md`,
 
 Sur l'écran de jeu, "t" (discrète, sans effet sur le déplacement) annonce heure et
 date (canal `liveRegion`, `i18n` : clé `time.announce` + `time.season.*`/
-`month.*`/`weekday.*`). C'est l'outil de test à l'oreille : jouer quelques minutes
+`month.*`). C'est l'outil de test à l'oreille : jouer quelques minutes
 et appuyer sur "t" régulièrement doit montrer l'heure avancer au rythme de
-`TIME_SCALE`, et la date rouler correctement (minuit → jour suivant + jour de
-semaine qui avance, fin de mois → mois suivant, fin d'année → saison qui repart à
-`printemps`).
+`TIME_SCALE`, et la date rouler correctement (minuit → jour suivant, fin de mois →
+mois suivant, fin d'année → saison qui repart à `printemps`).
 
 `view/city-screen.js`/`announceGameTime` fournit à `t("time.announce", {...})` des
-composants NOMMÉS déjà résolus (`weekday`, `day`, `month`, `season`, `year`, `hour`,
-`minute` — `weekday`/`month`/`season` déjà traduits via leur propre clé, comme des
-sous-traductions résolues AVANT interpolation, `interpolate()` ne faisant jamais de
-traduction imbriquée) : le code ignore tout de l'ORDRE d'affichage, qui vit
-ENTIÈREMENT dans le gabarit `time.announce` de chaque locale (`i18n/fr.js` place le
-jour avant le mois ; `i18n/en.js` le mois avant le jour) — changer de langue change
-l'ordre sans toucher au code.
+composants NOMMÉS déjà résolus (`day`, `month`, `season`, `year`, `hour`, `minute` —
+`month`/`season` déjà traduits via leur propre clé, comme des sous-traductions
+résolues AVANT interpolation, `interpolate()` ne faisant jamais de traduction
+imbriquée) : le code ignore tout de l'ORDRE d'affichage, qui vit ENTIÈREMENT dans le
+gabarit `time.announce` de chaque locale — forme commune "heure, jour mois, saison,
+année" (`i18n/fr.js` place le jour avant le mois ; `i18n/en.js` le mois avant le
+jour, forme "heure, mois jour, saison, année") — changer de langue, réordonner, ou
+retirer un composant ne touche QUE ce gabarit, jamais le code. `weekday`
+(`core/time.js`/`weekdayOf`, `WEEKDAY_KEYS`) reste dérivable mais n'est PLUS fourni
+à ce gabarit — sa dérivation pure est testée indépendamment (voir
+`core/movement.check.js`), prête pour un futur gabarit qui la redemanderait.
 
 ## Chantiers réservés, pas câblés
 
