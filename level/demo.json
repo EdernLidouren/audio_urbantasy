@@ -21,7 +21,8 @@
       "x": 20,
       "nameKey": "npc.resident",
       "descriptionKey": "npc.resident.description",
-      "behavior": { "kind": "wander" },
+      "speed": 0.5,
+      "behavior": { "kind": "wander", "walkMin": 180, "walkMax": 360, "pauseMin": 60, "pauseMax": 150 },
       "presence": [
         { "when": { "type": "arrived" }, "effects": [{ "type": "presence", "present": false }] },
         { "when": { "type": "timeRange", "from": 23, "to": 8 }, "effects": [{ "type": "presence", "present": false }] },
@@ -29,7 +30,7 @@
           "when": { "type": "timeRange", "from": 8, "to": 20 },
           "effects": [
             { "type": "presence", "present": true },
-            { "type": "behavior", "behavior": { "kind": "wander" } }
+            { "type": "behavior", "behavior": { "kind": "wander", "walkMin": 180, "walkMax": 360, "pauseMin": 60, "pauseMax": 150 } }
           ]
         },
         {

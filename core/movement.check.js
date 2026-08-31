@@ -21,6 +21,7 @@ import {
 import { tick } from "./actions.js";
 import { reduce } from "./reduce.js";
 import { moveAndBounce } from "./physics/movement.js";
+import { resolvePlayerMove } from "./physics/collision.js";
 import { SAVE_VERSION, serializeGame, deserializeGame } from "./save.js";
 import { addMoney, pickupEntity, lootEntity, lootEntitySpawn } from "./money.js";
 import { addItem, pickupItemEntity, removeItem, dropItem } from "./bag.js";
@@ -332,6 +333,138 @@ export function runMovementChecks() {
     unknownKindRejected = true;
   }
   run("errance : behavior.kind inconnu rejeté par le registre", true, unknownKindRejected);
+
+  // --- Vitesse (speed) : consommée par la PHYSIQUE de résolution, jamais
+  // par le comportement (voir core/physics/collision.js/resolveBlockedMove,
+  // core/reduce.js/resolveIntents) — wander/follow/goto continuent de ne
+  // produire qu'une intention de direction, ignorant tout de la vitesse.
+  // Cascade instance -> archétype -> défaut (1), même patron que
+  // blocksMovement/isFlying (core/level.js/parseEntity).
+
+  const SPEED_REGISTRY = {
+    dog: { label: "entity.dog" },
+    slowDog: { label: "entity.dog", speed: 0.5 },
+  };
+
+  const speedDefaultLevel = parseLevel(
+    { id: "movement-check-speed-default", titleKey: "level.demo.title", length: 10, playerStart: 5, entities: [{ id: "e1", type: "dog", x: 5 }] },
+    SPEED_REGISTRY
+  );
+  run("speed : défaut (ni instance ni type) -> 1", 1, speedDefaultLevel.entities[0].speed);
+
+  const speedTypeLevel = parseLevel(
+    { id: "movement-check-speed-type", titleKey: "level.demo.title", length: 10, playerStart: 5, entities: [{ id: "e1", type: "slowDog", x: 5 }] },
+    SPEED_REGISTRY
+  );
+  run("speed : hérité de l'archétype si l'instance ne surcharge pas", 0.5, speedTypeLevel.entities[0].speed);
+
+  const speedOverrideLevel = parseLevel(
+    { id: "movement-check-speed-override", titleKey: "level.demo.title", length: 10, playerStart: 5, entities: [{ id: "e1", type: "slowDog", x: 5, speed: 2 }] },
+    SPEED_REGISTRY
+  );
+  run("speed : surcharge d'instance prioritaire sur l'archétype", 2, speedOverrideLevel.entities[0].speed);
+
+  function expectSpeedRejected(speed) {
+    let rejected = false;
+    try {
+      parseLevel(
+        { id: "movement-check-speed-invalid", titleKey: "level.demo.title", length: 10, playerStart: 5, entities: [{ id: "e1", type: "dog", x: 5, speed }] },
+        SPEED_REGISTRY
+      );
+    } catch {
+      rejected = true;
+    }
+    return rejected;
+  }
+  run("speed : 0 rejeté au chargement", true, expectSpeedRejected(0));
+  run("speed : négatif rejeté au chargement", true, expectSpeedRejected(-1));
+  run("speed : non numérique rejeté au chargement", true, expectSpeedRejected("lent"));
+
+  // Conséquence physique : un mobile deux fois plus lent parcourt EXACTEMENT
+  // la moitié de la distance sur le même nombre de ticks, à comportement
+  // IDENTIQUE (même seed, marche forcée sans pause ni rebond — walkMin=
+  // walkMax élevé, corridor large pour ne jamais toucher un bord).
+  function makeSpeedWanderLevel(speed) {
+    return parseLevel(
+      {
+        id: `movement-check-speed-wander-${speed}`,
+        titleKey: "level.demo.title",
+        length: 100,
+        playerStart: 50,
+        entities: [{ id: "e1", type: "dog", x: 50, speed, behavior: { kind: "wander", walkMin: 1000, walkMax: 1000 } }],
+      },
+      SPEED_REGISTRY
+    );
+  }
+  let fastSpeedState = createInitialState(makeSpeedWanderLevel(1), 3, NO_COMPANIONS);
+  let slowSpeedState = createInitialState(makeSpeedWanderLevel(0.5), 3, NO_COMPANIONS);
+  for (let i = 0; i < 50; i++) {
+    fastSpeedState = reduce(fastSpeedState, tick(0));
+    slowSpeedState = reduce(slowSpeedState, tick(0));
+  }
+  const fastSpeedEntity = getActiveWorld(fastSpeedState).entities[0];
+  const slowSpeedEntity = getActiveWorld(slowSpeedState).entities[0];
+  const fastSpeedDelta = fastSpeedEntity.x - 50;
+  const slowSpeedDelta = slowSpeedEntity.x - 50;
+  run(
+    "speed : un mobile deux fois plus lent (0.5) parcourt deux fois moins de distance",
+    true,
+    Math.abs(slowSpeedDelta - fastSpeedDelta / 2) < 1e-9
+  );
+  run("speed : même direction (même seed, seule la distance diffère)", Math.sign(fastSpeedDelta), Math.sign(slowSpeedDelta));
+
+  // Frontière comportement/physique préservée : speed ne change RIEN à
+  // l'état interne du comportement (phase/ticksLeft/dir), seulement à x —
+  // preuve que la vitesse est appliquée APRÈS le comportement (résolution),
+  // jamais lue par lui (wander.js n'a pas été touché par ce branchement).
+  run(
+    "speed : état interne du comportement identique quelle que soit la vitesse (wander ignore speed)",
+    JSON.stringify({ phase: fastSpeedEntity.wander.phase, ticksLeft: fastSpeedEntity.wander.ticksLeft, dir: fastSpeedEntity.wander.dir }),
+    JSON.stringify({ phase: slowSpeedEntity.wander.phase, ticksLeft: slowSpeedEntity.wander.ticksLeft, dir: slowSpeedEntity.wander.dir })
+  );
+
+  // Non-régression du JOUEUR : resolvePlayerMove SANS speed fourni avance
+  // d'EXACTEMENT MOVE_STEP — le joueur ne fournit jamais de speed (voir
+  // core/reduce.js), donc rien ne change pour lui.
+  const playerMoveNoSpeed = resolvePlayerMove(5, 1, [], 10, { time: 0 });
+  run("speed : resolvePlayerMove sans speed avance de MOVE_STEP (joueur rigoureusement inchangé)", 5 + MOVE_STEP, playerMoveNoSpeed.x);
+
+  // follow ET goto respectent aussi speed (pas seulement wander) — un
+  // compagnon pourrait avoir sa propre vitesse.
+  const speedFollowLevel = parseLevel(
+    {
+      id: "movement-check-speed-follow",
+      titleKey: "level.demo.title",
+      length: 100,
+      playerStart: 50,
+      entities: [
+        { id: "follower", type: "dog", x: 40, speed: 0.5, behavior: { kind: "follow", targetId: "player", minDistance: 1, maxDistance: 3 } },
+      ],
+    },
+    SPEED_REGISTRY
+  );
+  let speedFollowState = createInitialState(speedFollowLevel, 1, NO_COMPANIONS);
+  speedFollowState = reduce(speedFollowState, tick(0)); // joueur immobile, follower loin -> avance vers lui
+  const speedFollowDelta = getActiveWorld(speedFollowState).entities[0].x - 40;
+  run("speed : follow avance de MOVE_STEP × speed (0.5)", true, Math.abs(speedFollowDelta - MOVE_STEP * 0.5) < 1e-9);
+
+  const speedGotoLevel = parseLevel(
+    {
+      id: "movement-check-speed-goto",
+      titleKey: "level.demo.title",
+      length: 100,
+      playerStart: 50,
+      entities: [
+        { id: "walker", type: "dog", x: 10, speed: 0.5, behavior: { kind: "goto", targetId: "landmark" } },
+        { id: "landmark", type: "dog", x: 90 },
+      ],
+    },
+    SPEED_REGISTRY
+  );
+  let speedGotoState = createInitialState(speedGotoLevel, 1, NO_COMPANIONS);
+  speedGotoState = reduce(speedGotoState, tick(0));
+  const speedGotoDelta = getActiveWorld(speedGotoState).entities.find((e) => e.id === "walker").x - 10;
+  run("speed : goto avance de MOVE_STEP × speed (0.5)", true, Math.abs(speedGotoDelta - MOVE_STEP * 0.5) < 1e-9);
 
   // --- Collision joueur/entité bloquante : signal de blocage (blockedBy) ---
 

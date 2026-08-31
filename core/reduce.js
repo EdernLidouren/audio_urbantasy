@@ -144,11 +144,19 @@ function stepEntities(entities, context) {
 // toutes listes confondues) exclut l'entité elle-même à chaque résolution,
 // jamais de collision contre son propre corps. Une entité SANS intention
 // (wander, déjà résolue) traverse inchangée.
+//
+// entity.speed (voir core/level.js/parseEntity, défaut 1) : facteur de
+// vitesse consommé ICI, à la RÉSOLUTION — jamais par le comportement qui a
+// produit `intent` (wander/follow/goto ignorent tout de la vitesse, voir
+// leur frontière avec la physique). `?? 1` : filet pour une entité qui ne
+// passe pas par cette cascade (ex. un compagnon, core/state.js/
+// createTestCompanion) — vitesse normale par défaut, comme le reste du jeu
+// tant qu'aucune vitesse n'est déclarée.
 function resolveIntents(results, blockerPool, length, presenceContext) {
   return results.map(({ entity, intent }) => {
     if (intent === undefined) return entity;
     const blockers = blockerPool.filter((other) => other.id !== entity.id);
-    const { x: resolvedX } = resolveBodyMove(entity.x, intent, blockers, length, presenceContext);
+    const { x: resolvedX } = resolveBodyMove(entity.x, intent, blockers, length, presenceContext, entity.speed ?? 1);
     return { ...entity, x: resolvedX };
   });
 }

@@ -145,6 +145,7 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
     observable,
     interactable,
     isFlying,
+    speed,
     action,
     tuning,
     presence,
@@ -216,6 +217,25 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
     fail(`entities[${index}] ("${id}") : isFlying doit être un booléen si présent.`);
   }
   const resolvedIsFlying = isFlying !== undefined ? isFlying : Boolean(registry[type].isFlying);
+  // speed : même cascade instance -> type que isFlying ci-dessus, défaut `1`
+  // (jamais `false`/`0` — une vitesse nulle immobiliserait un mobile à
+  // intention sans le distinguer d'une entité VRAIMENT sans comportement).
+  // Facteur MULTIPLICATIF de MOVE_STEP, consommé par la PHYSIQUE de
+  // résolution (core/physics/collision.js/resolveBodyMove), JAMAIS par un
+  // comportement (wander/follow/goto) : ceux-ci ne produisent toujours
+  // qu'une intention de direction, ignorant tout de la vitesse — c'est
+  // core/reduce.js qui lit CE champ pour résoudre le déplacement voulu de
+  // chaque mobile à intention. Baké ici (pas relu dans le registre par
+  // core/reduce.js) pour la même raison que blocksMovement/isFlying : le
+  // core ne connaît le registre qu'à travers ce que parseLevel en extrait.
+  // Cadence de pas INCHANGÉE par ailleurs (view/audio/city-scene.js/
+  // stepWalker) : elle dérive déjà de la distance parcourue, donc un mobile
+  // deux fois plus lent voit SES PAS s'espacer deux fois plus, sans le
+  // moindre réglage de cadence séparé à toucher.
+  if (speed !== undefined && (!isFiniteNumber(speed) || speed <= 0)) {
+    fail(`entities[${index}] ("${id}") : speed doit être un nombre > 0 si présent.`);
+  }
+  const resolvedSpeed = speed !== undefined ? speed : registry[type].speed !== undefined ? registry[type].speed : 1;
   const entity = {
     id,
     type,
@@ -225,6 +245,7 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
     observable: resolvedObservable,
     interactable: resolvedInteractable,
     isFlying: resolvedIsFlying,
+    speed: resolvedSpeed,
   };
   // Clé ajoutée SEULEMENT si résolue (jamais explicitement undefined) :
   // l'état doit rester de la donnée pure, un aller-retour JSON ne doit rien

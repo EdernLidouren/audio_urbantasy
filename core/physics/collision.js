@@ -25,17 +25,25 @@ import { MOVE_STEP, BODY_RADIUS } from "../state.js";
 import { moveWithinBounds } from "./movement.js";
 import { isBlocking } from "../presence.js";
 
-// Cœur commun : pas fixe + bornes du niveau (moveWithinBounds), PUIS le
-// corps de la première entité BLOQUANTE rencontrée dans le sens du
-// déplacement (isBlocking : blocksMovement ET présente, voir
-// core/presence.js — une entité DORMANTE ne bloque jamais, "comme si
-// absente"), à `clearance` du centre de son corps (si son bord serait
-// franchi). blockedBy est l'id de cette entité, ou null si rien n'arrête le
-// mouvement. dir === 0 : jamais bloqué (rien n'est tenté). Pure, ne mute
-// rien. Interne, non exportée — voir resolvePlayerMove/resolveBodyMove
-// ci-dessous pour les deux dégagements concrets.
-function resolveBlockedMove(moverX, dir, entities, levelLength, clearance, presenceContext) {
-  const intendedX = moveWithinBounds(moverX, dir * MOVE_STEP, levelLength);
+// Cœur commun : pas fixe (MOVE_STEP × speed, voir plus bas) + bornes du
+// niveau (moveWithinBounds), PUIS le corps de la première entité BLOQUANTE
+// rencontrée dans le sens du déplacement (isBlocking : blocksMovement ET
+// présente, voir core/presence.js — une entité DORMANTE ne bloque jamais,
+// "comme si absente"), à `clearance` du centre de son corps (si son bord
+// serait franchi). blockedBy est l'id de cette entité, ou null si rien
+// n'arrête le mouvement. dir === 0 : jamais bloqué (rien n'est tenté). Pure,
+// ne mute rien. Interne, non exportée — voir resolvePlayerMove/
+// resolveBodyMove ci-dessous pour les deux dégagements concrets.
+//
+// speed (défaut 1) : facteur MULTIPLICATIF du pas fixe — c'est ICI, dans la
+// PHYSIQUE de résolution, que la vitesse d'un mobile à intention prend effet,
+// JAMAIS dans le comportement qui a produit `dir` (wander/follow/goto
+// continuent de ne connaître qu'une direction, voir core/behaviors/) :
+// frontière comportement/physique préservée. Défaut 1 -> MOVE_STEP inchangé,
+// comportement STRICTEMENT identique à avant l'introduction de `speed` pour
+// tout appelant qui ne le fournit pas (le joueur, voir resolvePlayerMove).
+function resolveBlockedMove(moverX, dir, entities, levelLength, clearance, presenceContext, speed = 1) {
+  const intendedX = moveWithinBounds(moverX, dir * MOVE_STEP * speed, levelLength);
   if (dir === 0) return { x: intendedX, blockedBy: null };
 
   let stoppedX = intendedX;
@@ -58,9 +66,11 @@ function resolveBlockedMove(moverX, dir, entities, levelLength, clearance, prese
 // POINT (dégagement d'un seul BODY_RADIUS face à un corps bloquant), voir
 // header et overlap.js §1 pour la convention miroir. presenceContext : voir
 // core/presence.js/isBlocking — requis dès qu'une entité de `entities` peut
-// porter une règle de présence (toujours fourni par core/reduce.js).
-export function resolvePlayerMove(playerX, dir, entities, levelLength, presenceContext) {
-  return resolveBlockedMove(playerX, dir, entities, levelLength, BODY_RADIUS, presenceContext);
+// porter une règle de présence (toujours fourni par core/reduce.js). `speed`
+// n'est JAMAIS fourni par le joueur (voir core/reduce.js) : reste à son
+// défaut 1, vitesse et cadence de pas RIGOUREUSEMENT inchangées.
+export function resolvePlayerMove(playerX, dir, entities, levelLength, presenceContext, speed = 1) {
+  return resolveBlockedMove(playerX, dir, entities, levelLength, BODY_RADIUS, presenceContext, speed);
 }
 
 // Résout le déplacement VOULU d'une entité à CORPS mue par intention (ex.
@@ -68,7 +78,10 @@ export function resolvePlayerMove(playerX, dir, entities, levelLength, presenceC
 // dégagement de 2×BODY_RADIUS, cohérent avec overlap.js §2 (deux corps
 // pleins qui ne doivent pas se chevaucher). Le mobile s'arrête pile où
 // resolveOverlaps le laisserait de toute façon au tick suivant : aucune
-// poussée résiduelle du bloqueur, voir header.
-export function resolveBodyMove(entityX, dir, entities, levelLength, presenceContext) {
-  return resolveBlockedMove(entityX, dir, entities, levelLength, 2 * BODY_RADIUS, presenceContext);
+// poussée résiduelle du bloqueur, voir header. `speed` : voir
+// resolveBlockedMove — core/reduce.js le lit sur l'entité résolue
+// (entity.speed, voir core/level.js/parseEntity), défaut 1 si absent
+// (compagnon sans cascade dédiée, ex. core/state.js/createTestCompanion).
+export function resolveBodyMove(entityX, dir, entities, levelLength, presenceContext, speed = 1) {
+  return resolveBlockedMove(entityX, dir, entities, levelLength, 2 * BODY_RADIUS, presenceContext, speed);
 }
