@@ -1374,6 +1374,100 @@ export function runMovementChecks() {
   );
   run("presence : type de condition inconnu -> false (jamais un throw)", false, evaluateCondition({ type: "weather" }, { time: 0 }));
 
+  // evaluateCondition/timeRange — VARIATION DE SEUIL PAR INSTANCE (cond.spread,
+  // core/temporal-spread.js) : chaque entité obtient un seuil légèrement
+  // décalé, de façon DÉTERMINISTE (même id + mêmes bornes -> même décalage,
+  // toujours) et STABLE (jamais stocké, recalculé à chaque évaluation).
+
+  // Sans context.entity (comme les tests ci-dessus) : spread ignoré, seuil
+  // pile sur from/to — même résultat qu'un appel sans spread du tout.
+  run(
+    "presence : timeRange spread ignoré sans context.entity (rétrocompat)",
+    evaluateCondition({ type: "timeRange", from: 6, to: 20 }, { time: 6 * 60 }),
+    evaluateCondition({ type: "timeRange", from: 6, to: 20, spread: 15 }, { time: 6 * 60 })
+  );
+
+  // Sans spread déclaré, MÊME avec une entité fournie : comportement
+  // rigoureusement inchangé (seuil exact, aucun décalage).
+  run(
+    "presence : timeRange sans spread déclaré -> seuil exact (rétrocompat)",
+    true,
+    evaluateCondition({ type: "timeRange", from: 6, to: 20 }, { time: 6 * 60, entity: { id: "npc-x" } })
+  );
+
+  // Deux entités DIFFÉRENTES, même règle à spread -> décalages différents
+  // (déterministe par id) : au moins l'une des deux ne bascule pas exactement
+  // à la même minute que l'autre sur une fenêtre resserrée autour du seuil.
+  function spreadOffsetMinutesFor(entityId, from, to, spread) {
+    // Sonde indirecte : cherche, minute par minute autour de `from`, le
+    // premier instant où la condition devient vraie pour CETTE entité —
+    // reflète fidèlement ce qu'observerait un joueur (déclenchement réel),
+    // plutôt que d'importer temporalThresholdOffset directement ici (ce
+    // check vérifie le COMPORTEMENT de l'évaluateur, pas l'implémentation).
+    for (let deltaMin = -spread - 1; deltaMin <= spread + 1; deltaMin++) {
+      const timeAtCandidate = (from * 60 + deltaMin + MINUTES_PER_DAY_CHECK) % MINUTES_PER_DAY_CHECK;
+      const active = evaluateCondition(
+        { type: "timeRange", from, to, spread },
+        { time: timeAtCandidate, entity: { id: entityId } }
+      );
+      if (active) return deltaMin;
+    }
+    return null;
+  }
+  const MINUTES_PER_DAY_CHECK = TIME_CONFIG.minutesPerHour * TIME_CONFIG.hoursPerDay;
+  const npcADeparture = spreadOffsetMinutesFor("npc-bar-a", 6, 20, 5);
+  const npcBDeparture = spreadOffsetMinutesFor("npc-bar-b", 6, 20, 5);
+  const npcCDeparture = spreadOffsetMinutesFor("npc-bar-c", 6, 20, 5);
+  run("presence : spread — décalage trouvé dans la fourchette déclarée (±5 min)", true, [npcADeparture, npcBDeparture, npcCDeparture].every((d) => d !== null && Math.abs(d) <= 5));
+  run(
+    "presence : spread — trois entités de la même règle NE partent PAS toutes à la même minute décalée",
+    true,
+    new Set([npcADeparture, npcBDeparture, npcCDeparture]).size >= 2
+  );
+
+  // Stabilité : rejouer la même sonde pour la même entité renvoie EXACTEMENT
+  // le même décalage — reproduit un "rechargement" (aucun état à recharger,
+  // le décalage est recalculé, pas relu).
+  run(
+    "presence : spread — décalage stable pour une même entité (rejoué deux fois)",
+    npcADeparture,
+    spreadOffsetMinutesFor("npc-bar-a", 6, 20, 5)
+  );
+
+  // Décalage indépendant par RÈGLE : la même entité, sur deux règles à bornes
+  // différentes, n'obtient pas nécessairement le même décalage relatif.
+  const npcADepartureOther = spreadOffsetMinutesFor("npc-bar-a", 12, 18, 5);
+  run("presence : spread — bornes fournies (sanity check, valeur dans la fourchette)", true, npcADepartureOther !== null && Math.abs(npcADepartureOther) <= 5);
+
+  // Wrap minuit : seuil déclaré tout près de minuit (from proche de 0),
+  // spread suffisant pour pousser le décalage de l'autre côté de 0h — la
+  // condition doit rester évaluable sans jamais planter ni se figer à faux
+  // pour toute heure, prouvé en balayant les 24h.
+  const midnightWrapActive = [];
+  for (let h = 0; h < 24; h++) {
+    midnightWrapActive.push(
+      evaluateCondition({ type: "timeRange", from: 0.05, to: 6, spread: 10 }, { time: h * 60, entity: { id: "npc-midnight" } })
+    );
+  }
+  run("presence : spread — passage minuit du décalage n'empêche jamais une plage active", true, midnightWrapActive.some(Boolean));
+  // Contiguïté CIRCULAIRE (l'heure 23 touche l'heure 0) : exactement deux
+  // transitions faux<->vrai sur le cercle des 24h -> UN SEUL bloc actif,
+  // qu'il traverse minuit ou non — un simple "chaque heure = précédente+1"
+  // se tromperait sur un bloc qui traverse minuit (ex. actif à 23h ET 0h,
+  // mais 23 !== 0-1 en arithmétique linéaire).
+  let midnightTransitions = 0;
+  for (let h = 0; h < 24; h++) {
+    if (midnightWrapActive[h] !== midnightWrapActive[(h + 1) % 24]) midnightTransitions++;
+  }
+  run("presence : spread — plage active reste UN SEUL bloc contigu malgré le passage minuit (pas de trou parasite)", 2, midnightTransitions);
+
+  // spread <= 0 ou non fini -> aucun décalage (même filet que "absent").
+  run(
+    "presence : spread <= 0 -> comportement inchangé",
+    evaluateCondition({ type: "timeRange", from: 6, to: 20 }, { time: 6 * 60, entity: { id: "npc-x" } }),
+    evaluateCondition({ type: "timeRange", from: 6, to: 20, spread: 0 }, { time: 6 * 60, entity: { id: "npc-x" } })
+  );
+
   // evaluateCondition/consumed (voir core/state.js/markConsumed, "Collectible
   // persistant" dans entities/model.md) : vrai SEULEMENT si l'entité porte
   // consumed:true — contrairement à timeRange/arrived, ne dépend pas de
@@ -2611,6 +2705,138 @@ export function runMovementChecks() {
     "routine : ruleActive survit à un aller-retour JSON",
     JSON.stringify(resident(eveningRoutineState).ruleActive),
     JSON.stringify(serializedResident.ruleActive)
+  );
+
+  // --- "Le bar" : trois PNJ, MÊME règle de départ "vers 6h" à spread,
+  // partent de façon ÉCHELONNÉE (voir core/temporal-spread.js,
+  // core/presence.js/evaluateTimeRange) — test D'INTÉGRATION (via
+  // reduce()/resolveEntityRules(), pas l'évaluateur isolé comme plus haut)
+  // qui prouve que le mécanisme fonctionne de bout en bout sur une scène
+  // réelle à plusieurs entités partageant un contenu identique.
+
+  const BAR_REGISTRY = { dog: { label: "entity.dog" } };
+
+  // Même règle LITTÉRALEMENT partagée (même objet presence[]) par les trois
+  // patrons — spread ±5 min autour de 6h, bascule wander -> goto (vers la
+  // sortie) à l'entrée de la fenêtre.
+  function barPatronPresence() {
+    return [
+      {
+        when: { type: "timeRange", from: 6, to: 6.5, spread: 5 },
+        effects: [{ type: "behavior", behavior: { kind: "goto", targetId: "door-bar-exit" } }],
+      },
+    ];
+  }
+
+  const barLevel = parseLevel(
+    {
+      id: "movement-check-bar",
+      titleKey: "level.demo.title",
+      length: 20,
+      playerStart: 0,
+      entities: [
+        { id: "door-bar-exit", type: "dog", x: 18 },
+        { id: "npc-bar-a", type: "dog", x: 5, behavior: { kind: "wander", walkMin: 1000, walkMax: 1000 }, presence: barPatronPresence() },
+        { id: "npc-bar-b", type: "dog", x: 6, behavior: { kind: "wander", walkMin: 1000, walkMax: 1000 }, presence: barPatronPresence() },
+        { id: "npc-bar-c", type: "dog", x: 7, behavior: { kind: "wander", walkMin: 1000, walkMax: 1000 }, presence: barPatronPresence() },
+      ],
+    },
+    BAR_REGISTRY
+  );
+  const BAR_PATRON_IDS = ["npc-bar-a", "npc-bar-b", "npc-bar-c"];
+
+  function barPatron(state, id) {
+    return getActiveWorld(state).entities.find((e) => e.id === id);
+  }
+
+  // Avance JUSQU'À une minute-du-jour donnée (toujours vers l'AVANT, jamais
+  // en arrière — comme partout ailleurs dans ce fichier), sans dépendre de
+  // l'heure de départ exacte d'une partie neuve (INITIAL_TIME).
+  function advanceToMinuteOfDay(state, targetMinuteOfDay) {
+    const minutesPerDay = TIME_CONFIG.hoursPerDay * TIME_CONFIG.minutesPerHour;
+    const currentMinuteOfDay = hourOfDay(state.time) * TIME_CONFIG.minutesPerHour + minuteOfHour(state.time);
+    const delta = ((targetMinuteOfDay - currentMinuteOfDay) % minutesPerDay + minutesPerDay) % minutesPerDay;
+    return advanceTime(state, delta);
+  }
+
+  // Depuis 5h50 (avant toute fenêtre possible, spread <= 5 min), tique
+  // minute par minute et note, pour chaque patron, la minute ÉCOULÉE où son
+  // comportement bascule vers "goto" — 20 minutes suffisent à couvrir toute
+  // la fourchette possible (5h55 à 6h05) avec marge.
+  function runBarDepartures(seed) {
+    let state = createInitialState(barLevel, seed, NO_COMPANIONS);
+    state = advanceToMinuteOfDay(state, 5 * 60 + 50);
+    const departureMinute = Object.fromEntries(BAR_PATRON_IDS.map((id) => [id, null]));
+    for (let elapsed = 0; elapsed < 20; elapsed++) {
+      state = advanceTime(state, 1);
+      state = reduce(state, tick(0));
+      for (const id of BAR_PATRON_IDS) {
+        if (departureMinute[id] === null && barPatron(state, id).behavior.kind === "goto") {
+          departureMinute[id] = elapsed;
+        }
+      }
+    }
+    return departureMinute;
+  }
+
+  const barRun1 = runBarDepartures(2024);
+  run("bar : les trois patrons finissent tous par partir (fenêtre observée)", true, Object.values(barRun1).every((minute) => minute !== null));
+  run(
+    "bar : départs ÉCHELONNÉS — les trois patrons ne partent PAS tous à la même minute",
+    true,
+    new Set(Object.values(barRun1)).size >= 2
+  );
+
+  // Rejeu (même seed, même suite d'actions) -> mêmes minutes de départ pour
+  // CHAQUE patron : le décalage ne dépend d'AUCUN état accumulé pendant la
+  // simulation (il n'y en a pas à rejouer), seulement de l'id + des bornes
+  // de la règle — donc STABLE, y compris à travers un rechargement/une
+  // re-visite de scène (mêmes entrées -> même décalage recalculé, jamais
+  // relu depuis un état stocké).
+  const barRun2 = runBarDepartures(2024);
+  run("bar : rejeu identique -> mêmes minutes de départ (stable, rien de nouveau sérialisé)", JSON.stringify(barRun1), JSON.stringify(barRun2));
+
+  // Sans spread déclaré : rétrocompat stricte, les trois partiraient TOUS à
+  // la même minute (comportement d'avant ce mécanisme).
+  const barLevelNoSpread = parseLevel(
+    {
+      id: "movement-check-bar-no-spread",
+      titleKey: "level.demo.title",
+      length: 20,
+      playerStart: 0,
+      entities: [
+        { id: "door-bar-exit", type: "dog", x: 18 },
+        {
+          id: "npc-bar-a",
+          type: "dog",
+          x: 5,
+          behavior: { kind: "wander", walkMin: 1000, walkMax: 1000 },
+          presence: [{ when: { type: "timeRange", from: 6, to: 6.5 }, effects: [{ type: "behavior", behavior: { kind: "goto", targetId: "door-bar-exit" } }] }],
+        },
+        {
+          id: "npc-bar-b",
+          type: "dog",
+          x: 6,
+          behavior: { kind: "wander", walkMin: 1000, walkMax: 1000 },
+          presence: [{ when: { type: "timeRange", from: 6, to: 6.5 }, effects: [{ type: "behavior", behavior: { kind: "goto", targetId: "door-bar-exit" } }] }],
+        },
+      ],
+    },
+    BAR_REGISTRY
+  );
+  let noSpreadState = createInitialState(barLevelNoSpread, 2024, NO_COMPANIONS);
+  noSpreadState = advanceToMinuteOfDay(noSpreadState, 5 * 60 + 59);
+  noSpreadState = advanceTime(noSpreadState, 1);
+  noSpreadState = reduce(noSpreadState, tick(0));
+  run(
+    "bar : sans spread déclaré — tous les patrons partent PILE à la même minute (rétrocompat)",
+    "goto",
+    barPatron(noSpreadState, "npc-bar-a").behavior.kind
+  );
+  run(
+    "bar : sans spread déclaré — les deux patrons basculent ENSEMBLE",
+    barPatron(noSpreadState, "npc-bar-a").behavior.kind,
+    barPatron(noSpreadState, "npc-bar-b").behavior.kind
   );
 
   // --- Compagnons : robustesse (brique 3/3) ---

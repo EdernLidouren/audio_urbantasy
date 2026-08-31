@@ -53,8 +53,34 @@
 // jamais la signature de evaluateCondition, seulement ce que context
 // transporte.
 
-import { hourOfDay } from "./time.js";
 import { equippedTags } from "./equipment.js";
+import { temporalThresholdOffset } from "./temporal-spread.js";
+import { TIME_CONFIG } from "../config/time-values.js";
+
+// Valeur numérique importée directement (voir CLAUDE.md/"Réglages en
+// cascade" : le core peut lire une valeur de config, jamais un registre de
+// contenu) — pas via core/time.js, dont les dérivations (hourOfDay) tronquent
+// à l'heure ENTIÈRE, insuffisant ici : un spread de quelques minutes doit
+// rester observable (voir hourOfDayFraction ci-dessous).
+const { minutesPerHour, hoursPerDay } = TIME_CONFIG;
+const MINUTES_PER_DAY = minutesPerHour * hoursPerDay;
+
+// Heure du jour EN CONTINU (fractionnaire), contrairement à
+// core/time.js/hourOfDay (entier) — nécessaire UNIQUEMENT ici : comparer un
+// seuil décalé de quelques minutes à une heure arrondie à l'entier rendrait
+// ce décalage invisible (hour >= 20.1 se comporte comme hour >= 21).
+function hourOfDayFraction(time) {
+  return (Math.floor(time) % MINUTES_PER_DAY) / minutesPerHour;
+}
+
+// Ramène une heure décalée dans [0, hoursPerDay[ — un décalage peut pousser
+// from/to de l'autre côté de minuit, en plus du passage par minuit "de
+// contenu" déjà géré par la comparaison from/to plus bas (deux passages par
+// minuit distincts, jamais confondus : celui du DÉCALAGE ici, celui de la
+// FENÊTRE elle-même dans evaluateTimeRange).
+function wrapHour(hour) {
+  return ((hour % hoursPerDay) + hoursPerDay) % hoursPerDay;
+}
 
 // "timeRange" : présente si l'heure courante (dérivée de context.time) tombe
 // dans [from, to[, EN GÉRANT le passage par minuit (from > to, ex. 20..6) —
@@ -62,11 +88,26 @@ import { equippedTags } from "./equipment.js";
 // l'un des deux non fini -> jamais vraie (intervalle vide/malformé), plutôt
 // qu'une ambiguïté "toujours" ou "jamais" non documentée ou un throw pour
 // une donnée de contenu déjà validée en forme par core/level.js.
+//
+// VARIATION DE SEUIL PAR INSTANCE (cond.spread, en MINUTES, optionnel) —
+// voir core/scripting.md/"spread" : désynchronise des entités qui partagent
+// la MÊME règle temporelle (ex. plusieurs PNJ "vers 6h", chacun décalé de
+// quelques minutes, jamais tous pile à l'heure). Décalage dérivé de façon
+// DÉTERMINISTE de l'id d'entité + les bornes de la règle (voir
+// core/temporal-spread.js) — jamais stocké, recalculé à CHAQUE évaluation,
+// donc STABLE à travers ticks, rechargements et re-visites de scène.
+// Appliqué IDENTIQUEMENT à from ET to : la fenêtre entière glisse, sa
+// largeur ne change jamais. context.entity absent (ex. action.condition
+// hors d'une entité de monde, voir view/interaction.js/actionConditionMet)
+// ou spread absent/nul -> décalage nul, comportement EXACTEMENT inchangé.
 function evaluateTimeRange(cond, context) {
-  const { from, to } = cond;
+  const { from, to, spread } = cond;
   if (!Number.isFinite(from) || !Number.isFinite(to) || from === to) return false;
-  const hour = hourOfDay(context.time);
-  return from < to ? hour >= from && hour < to : hour >= from || hour < to;
+  const offset = context.entity ? temporalThresholdOffset(context.entity.id, from, to, spread) : 0;
+  const effectiveFrom = wrapHour(from + offset);
+  const effectiveTo = wrapHour(to + offset);
+  const hour = hourOfDayFraction(context.time);
+  return effectiveFrom < effectiveTo ? hour >= effectiveFrom && hour < effectiveTo : hour >= effectiveFrom || hour < effectiveTo;
 }
 
 // "arrived" : vraie si le comportement ACTIF de l'entité est ENCORE "goto"

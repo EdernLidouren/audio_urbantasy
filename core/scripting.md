@@ -69,15 +69,63 @@ surface de segment.
 { type: "timeRange", from: 20, to: 6 }
 ```
 
-Vraie si l'heure courante (`hourOfDay(context.time)`) tombe dans `[from, to[`, en
-gérant le passage par minuit (`from > to`, comme ci-dessus). `from === to`, ou l'un
-des deux non fini, → toujours fausse (jamais une ambiguïté "toujours vraie").
+Vraie si l'heure courante (dérivée de `context.time`, en HEURE FRACTIONNAIRE —
+`core/presence.js`/`hourOfDayFraction`, pas l'entier de `core/time.js`/`hourOfDay` :
+nécessaire pour que `spread` ci-dessous ait un effet observable à la minute) tombe
+dans `[from, to[`, en gérant le passage par minuit (`from > to`, comme ci-dessus).
+`from === to`, ou l'un des deux non fini, → toujours fausse (jamais une ambiguïté
+"toujours vraie").
 
 Exemple réel complet — le néon (`entities/types/neon.js`), présent uniquement la
 nuit :
 
 ```js
 presence: [{ when: { type: "timeRange", from: 20, to: 6 }, present: true }],
+```
+
+#### Variation de seuil par instance (`spread`)
+
+```js
+{ type: "timeRange", from: 6, to: 6.5, spread: 5 }
+```
+
+`spread` (optionnel, en MINUTES) désynchronise des entités qui partagent la MÊME
+règle temporelle — le pendant TEMPOREL de l'éparpillement spatial
+(`core/state.js`/`spawnScatteredEphemerals`) : même esprit ("désynchroniser sans
+introduire d'état"), mécanisme différent. Vaut pour TOUT seuil temporel, pas
+seulement un départ de PNJ — une lumière "vers le soir", un commerce qui ouvre
+"vers 8h", etc. se désynchronisent exactement de la même façon.
+
+Chaque entité obtient un décalage effectif dans `[-spread, +spread]` (minutes),
+appliqué IDENTIQUEMENT à `from` ET `to` (la fenêtre entière glisse, sa largeur ne
+change jamais) — trois PNJ partageant `{ from: 6, to: 6.5, spread: 5 }` basculent
+chacun à SA propre minute entre 5h55 et 6h05, jamais tous à 6h00 pile.
+
+Le décalage n'est PAS un délai ni une attente : le déclenchement reste INSTANTANÉ,
+c'est le SEUIL lui-même qui diffère par entité. Dérivé de façon DÉTERMINISTE de
+l'id de l'entité + les bornes `from`/`to` de la règle (voir
+`core/temporal-spread.js`/`temporalThresholdOffset`) — jamais stocké ni
+sérialisé : recalculé à l'identique à CHAQUE évaluation, donc STABLE à travers
+ticks, rechargements et re-visites de scène (même entité + même règle → toujours
+le même décalage). Le passage par minuit du DÉCALAGE lui-même (un seuil proche de
+0h peut se retrouver de l'autre côté après décalage) est géré indépendamment du
+passage par minuit de la FENÊTRE `from`/`to` — les deux cohabitent sans conflit.
+
+Sans `spread` déclaré (ou évalué hors d'une entité de monde, ex.
+`action.condition`, voir `view/interaction.js`/`actionConditionMet`) : décalage
+nul, comportement EXACTEMENT inchangé — seuil pile sur `from`/`to`, comme avant ce
+mécanisme.
+
+Exemple — trois habitués d'un bar, même règle de départ partagée, décalés de
+quelques minutes chacun (voir `core/movement.check.js`, section "le bar") :
+
+```js
+const departureRule = {
+  when: { type: "timeRange", from: 6, to: 6.5, spread: 5 },
+  effects: [{ type: "behavior", behavior: { kind: "goto", targetId: "door-bar-exit" } }],
+};
+// Les trois patrons portent LA MÊME règle (même objet ou un clone identique) —
+// c'est leur id d'entité, seul, qui fait varier le décalage effectif.
 ```
 
 ### `arrived` — un `goto` a atteint sa cible

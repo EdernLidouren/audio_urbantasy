@@ -253,7 +253,7 @@ exactement ce tableau.
 
 | `when.type` | Champs        | Vrai si...                                                  |
 |-------------|---------------|--------------------------------------------------------------|
-| `timeRange` | `from`, `to` (heures 0-23) | l'heure courante (dérivée de `session.time`, voir `core/time.js`) tombe dans `[from, to[`, en gérant le passage par minuit (`from > to`, ex. `20..6`) |
+| `timeRange` | `from`, `to` (heures 0-23), `spread` (minutes, optionnel) | l'heure courante (dérivée de `session.time`) tombe dans `[from, to[`, en gérant le passage par minuit (`from > to`, ex. `20..6`) — `spread` décale ce seuil d'une quantité DÉTERMINISTE et STABLE par entité (voir `core/scripting.md`/"Variation de seuil par instance", `core/temporal-spread.js`), pour désynchroniser des entités qui partagent la même règle |
 | `arrived`   | (aucun)       | le comportement actif de l'entité est encore `"goto"` ET a atteint sa cible (`entity.gotoArrived`) |
 | `consumed`  | (aucun)       | l'entité porte `consumed: true` (voir `core/state.js`/`markConsumed`, "Collectible persistant" plus bas) — PERMANENT, `consumed` ne repasse jamais à `false` |
 | `hasEquipmentTag` | `tag` (clé de `core/tags.js`/`TAG_REGISTRY`, validée au chargement) | l'entité évaluée porte, dans son PROPRE équipement (`context.entity.equipment`), un objet marqué de ce tag (voir `core/equipment.js`/`equippedTags`) — entité sans `equipment` -> jamais vraie |
