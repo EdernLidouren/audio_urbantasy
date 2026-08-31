@@ -53,12 +53,23 @@ la structure pour ça le jour venu.
 Écran CUSTOM (objet plat consommé par `lib/screens.js`), PAS construit via
 `lib/menu.js` : ce dernier réserve gauche/droite à l'ajustement
 slider/toggle, incompatible avec un déplacement de curseur 2D. Ouvert
-depuis le menu pause ("Carte de la ville").
+depuis le menu pause ("Carte de la ville") — REMPLACE la pause
+(`popScreen()` puis `pushScreen` la carte, jamais un empilement) : une
+sélection ne ferme donc que CET écran pour retomber directement sur le
+jeu, jamais sur la pause restée en dessous.
 
 - **Navigation** : flèches haut/bas/gauche/droite déplacent le curseur de
-  case en case, BORNÉ à la grille — jamais de cyclage aux bords
-  (contrairement à `lib/menu.js`/`moveCursor`) : à un bord, la touche vers
-  l'extérieur ne fait rien.
+  case en case. **Comportements de bordure REPRODUITS depuis les menus
+  verticaux** (`lib/menu.js`/`moveCursor`), transposés aux deux axes
+  indépendamment (une touche fléchée ne bouge jamais qu'un seul axe) :
+  - un bord atteint joue un son (`view/menu-sounds.js`/`playMenuSound`) —
+    `"wrap"` si le cyclage boucle effectivement, `"block"` sinon ;
+  - le CYCLAGE (préférence `menuCycling`, même clé que les menus
+    classiques) boucle le curseur vers le bord opposé de l'axe concerné si
+    activé, sinon le curseur reste sur place ;
+  - dans les DEUX cas, ré-annonce de la case courante, ÉTOILÉE (`"* ..."`,
+    préférence `menuStarPrefix`, même clé/mêmes règles que les menus
+    classiques) — l'utilisateur doit savoir qu'il est à une limite.
 - **Curseur de départ** : sur la case du lieu ACTUELLEMENT actif
   (`findCityMapCoordinates(session.activeWorldId)`), lu UNE FOIS à
   l'ouverture — repli sur `(0, 0)` si ce lieu n'est pas représenté sur la
@@ -67,13 +78,45 @@ depuis le menu pause ("Carte de la ville").
   - zone réelle : `"<nom> : <description>"` (`t(nameKey)`/`t(descriptionKey)`).
   - en chantier : `t("cityMap.underConstruction")`.
   - vide : `t("cityMap.empty")`.
+- **Touche "x" — coordonnées** : annonce la position de la case courante,
+  voir "Coordonnées" plus bas — indépendante du contenu de la case,
+  jamais étoilée (simple consultation, pas un évènement de bordure).
 - **Consultation NON DESTRUCTIVE** : ouvrir, naviguer, refermer (Échap) ne
   charge ni ne décharge RIEN — aucun accès à `core/state.js` en dehors
   d'une VRAIE sélection (voir plus bas). Échap = `popScreen()`, retour
   EXACT à l'état d'avant ouverture.
-- **Pas de pause/reprise de balises propre** : cet écran n'est jamais
-  ouvert autrement que par-dessus le menu pause, qui l'a déjà fait à SA
-  propre ouverture.
+- **Pause/reprise des balises PROPRE à cet écran** (`scene.pauseBeacons()`/
+  `resumeBeacons()`, composées sur `onEnter`/`onExit`) : puisqu'il REMPLACE
+  le menu pause plutôt que de s'empiler dessus, il ne peut plus hériter de
+  sa pause/reprise — même principe que `view/menus/pause-menu.js`, dupliqué
+  ici pour la même raison (deux ÉCRANS DIFFÉRENTS, jamais simultanément
+  actifs, chacun responsable de son propre passage).
+
+## Coordonnées (`lib/coordinate-label.js`)
+
+Brique PORTABLE (aucune connaissance d'aucun jeu, d'aucune grille concrète
+ni d'aucune préférence — reçues en PARAMÈTRE par l'appelant) qui traduit
+des coordonnées de grille 0-indexées internes en langage humain, pour la
+touche "x" ci-dessus. Forme annoncée : `"<x> - <y>"` (ex. `"A - 1"` ou
+`"1 - 1"`).
+
+- **x (colonne)** : toujours 1-indexée. Alphabétisée si la préférence
+  `cityMapAlphaCoordinates` (Options > Navigation, **oui par défaut**) est
+  active — `1=A, 2=B, ..., 26=Z, 27=AA, 28=AB, ...` (numérotation
+  "tableur", voir `alphaLabel`) ; sinon un nombre tel quel.
+- **y (ligne)** : toujours 1-indexée, mais DEPUIS LE BAS de la grille par
+  défaut (préférence `cityMapInvertY`, **non par défaut**) — la case
+  BAS-gauche de la grille est donc `"1 - 1"` (ou `"A - 1"`), PAS `"1 - 1"`
+  pour la case HAUT-gauche : `formatCoordinateY(y, height, inverted)` vaut
+  `height - y` par défaut. Si `cityMapInvertY` est activée, le sens
+  s'inverse (`y + 1`) : la case HAUT-gauche devient alors `"1 - 1"`,
+  compté à l'envers du défaut.
+
+Les deux préférences vivent dans `config/preferences.js`
+(`PREF_CONSTRAINTS.cityMapAlphaCoordinates`/`cityMapInvertY`), réglables
+via Options > Navigation (`view/menus/navigation-menu.js`) — lues
+DIRECTEMENT par `view/menus/city-map-menu.js`, jamais via l'injection de
+`lib/menu.js` (ce module-là reste portable, il ignore tout de la carte).
 
 ## Sélection
 

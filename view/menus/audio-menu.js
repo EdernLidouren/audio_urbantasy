@@ -30,6 +30,7 @@ export function createAudioMenu() {
     {
       kind: "slider",
       labelKey: "audio.master_volume",
+      descriptionKey: "audio.master_volume.description",
       prefKey: "masterVolume",
       min: MASTER.min,
       max: MASTER.max,
@@ -46,6 +47,7 @@ export function createAudioMenu() {
     {
       kind: "slider",
       labelKey: "audio.beacon_volume",
+      descriptionKey: "audio.beacon_volume.description",
       prefKey: "beaconVolume",
       min: BEACON.min,
       max: BEACON.max,
@@ -61,6 +63,7 @@ export function createAudioMenu() {
     {
       kind: "slider",
       labelKey: "audio.footstep_volume",
+      descriptionKey: "audio.footstep_volume.description",
       prefKey: "footstepVolume",
       min: FOOTSTEP.min,
       max: FOOTSTEP.max,
@@ -75,6 +78,7 @@ export function createAudioMenu() {
     {
       kind: "slider",
       labelKey: "audio.music_volume",
+      descriptionKey: "audio.music_volume.description",
       prefKey: "musicVolume",
       min: MUSIC.min,
       max: MUSIC.max,
@@ -90,6 +94,7 @@ export function createAudioMenu() {
     {
       kind: "slider",
       labelKey: "audio.ambience_volume",
+      descriptionKey: "audio.ambience_volume.description",
       prefKey: "ambienceVolume",
       min: AMBIENCE.min,
       max: AMBIENCE.max,
@@ -105,6 +110,7 @@ export function createAudioMenu() {
     {
       kind: "slider",
       labelKey: "audio.interface_volume",
+      descriptionKey: "audio.interface_volume.description",
       prefKey: "interfaceVolume",
       min: INTERFACE.min,
       max: INTERFACE.max,

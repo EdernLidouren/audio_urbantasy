@@ -48,6 +48,14 @@ export const PREF_CONSTRAINTS = {
   menuCycling: { type: "boolean", default: false },
   menuStarPrefix: { type: "boolean", default: true },
   menuIndexSuffix: { type: "boolean", default: true },
+  // Carte de la ville (voir lib/coordinate-label.js, view/menus/
+  // city-map-menu.js) : SEULEMENT l'annonce des coordonnées (touche "x"),
+  // jamais le contenu d'une case. Alpha ACTIVÉE par défaut ("A - 1" plus
+  // lisible qu'un doublon numérique "1 - 1") ; inversion des ordonnées
+  // DÉSACTIVÉE par défaut (compte depuis le BAS de la grille, voir
+  // lib/coordinate-label.js/formatCoordinateY pour la convention exacte).
+  cityMapAlphaCoordinates: { type: "boolean", default: true },
+  cityMapInvertY: { type: "boolean", default: false },
   // Sauvegarde automatique à chaque transition de lieu réussie (voir
   // view/city-screen.js) — pas un réglage audio ni de menu, mais suit le
   // même patron de persistance que le reste. Activée par défaut : la

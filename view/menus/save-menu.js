@@ -169,12 +169,14 @@ export function createSaveMenu(getSession) {
       {
         kind: "toggle",
         labelKey: "save.autosave",
+        descriptionKey: "save.autosave.description",
         prefKey: "autoSaveOnTransition",
         default: AUTOSAVE_TRANSITION.default,
       },
       {
         kind: "slider",
         labelKey: "save.autosave_interval",
+        descriptionKey: "save.autosave_interval.description",
         prefKey: "autoSaveIntervalMinutes",
         min: AUTOSAVE_INTERVAL.min,
         max: AUTOSAVE_INTERVAL.max,
@@ -191,6 +193,7 @@ export function createSaveMenu(getSession) {
         // jamais l'écriture elle-même, purement le retour sensoriel.
         kind: "toggle",
         labelKey: "save.sound_enabled",
+        descriptionKey: "save.sound_enabled.description",
         prefKey: "saveSoundEnabled",
         default: SAVE_SOUND_ENABLED.default,
       },

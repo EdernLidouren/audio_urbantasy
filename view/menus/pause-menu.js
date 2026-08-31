@@ -18,14 +18,15 @@ import { saveGame } from "../save-storage.js";
 
 // scene : fournit pauseBeacons()/resumeBeacons() (voir
 // view/audio/city-scene.js), pour dégager le canal audio positionné pendant
-// que ce menu est ouvert, sans toucher au contexte audio global (couvre
-// AUSSI la carte de la ville, ouverte PAR-DESSUS ce menu — voir son
-// header : elle ne duplique pas cette pause/reprise). getSession : partie
-// courante, TOUJOURS non nulle ici (ce menu n'existe qu'ouvert depuis une
-// scène d'exploration active) — utilisée directement pour "Sauvegarder"
-// ci-dessous (seul point d'accès à la sauvegarde manuelle, voir
-// save-menu.js pour les réglages/import-export) et transmise à Options
-// pour ce qui en a besoin (Sauvegarde > import/export de partie).
+// que CE menu est ouvert, sans toucher au contexte audio global — transmis
+// AUSSI à la carte de la ville (voir plus bas), qui gère sa PROPRE
+// pause/reprise : elle REMPLACE ce menu (popScreen() avant de l'ouvrir,
+// jamais un empilement), donc rien à partager entre les deux. getSession :
+// partie courante, TOUJOURS non nulle ici (ce menu n'existe qu'ouvert
+// depuis une scène d'exploration active) — utilisée directement pour
+// "Sauvegarder" ci-dessous (seul point d'accès à la sauvegarde manuelle,
+// voir save-menu.js pour les réglages/import-export) et transmise à
+// Options pour ce qui en a besoin (Sauvegarde > import/export de partie).
 // travelViaCityMap(levelId, spawnX) : effet de sélection sur la carte de
 // la ville (voir view/city-screen.js) — transmis tel quel à
 // view/menus/city-map-menu.js, ce fichier ignore tout de son
@@ -48,7 +49,16 @@ export function openPauseMenu(scene, getSession, travelViaCityMap) {
       },
       {
         label: "menu.pause.city_map",
-        onActivate: () => openCityMapMenu(getSession, travelViaCityMap),
+        // Ferme la pause AVANT d'ouvrir la carte — jamais un empilement :
+        // la carte la REMPLACE, ne se pousse pas par-dessus (contrairement
+        // à Options ci-dessous, qui reste un vrai sous-menu). Sinon
+        // sélectionner une zone ne referme QUE la carte (voir
+        // view/menus/city-map-menu.js/selectCurrent, un seul popScreen)
+        // et laisse la pause visible en dessous, jeu toujours figé.
+        onActivate: () => {
+          popScreen();
+          openCityMapMenu(scene, getSession, travelViaCityMap);
+        },
       },
       {
         label: "menu.pause.options",
