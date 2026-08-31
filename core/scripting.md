@@ -588,8 +588,8 @@ union des tags de chaque objet ÉQUIPÉ, DÉRIVÉE, jamais stockée — même pr
 ### Ajouter un tag
 
 Une entrée dans `TAG_REGISTRY` (`core/tags.js`), avec son `labelKey` (+ la
-traduction dans `i18n/fr.js`/`i18n/en.js`). Rien d'autre à toucher — un objet peut
-alors le référencer dans son `tags: [...]`.
+traduction dans `data/i18n/fr/items.json`/`data/i18n/en/items.json`). Rien d'autre à
+toucher — un objet peut alors le référencer dans son `tags: [...]`.
 
 ## Sources de vérité — où lire la liste exhaustive, jamais ici
 

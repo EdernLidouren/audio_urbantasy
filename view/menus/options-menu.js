@@ -9,7 +9,7 @@
 import { pushScreen, popScreen } from "../../lib/screens.js";
 import { makeMenuScreen, makeMessageScreen } from "../../lib/menu.js";
 import { setGlobalVolume, setMasterVolume } from "../../lib/audio.js";
-import { t } from "../../i18n/index.js";
+import { t } from "../../data/i18n/index.js";
 import { resetAllPrefs, PREF_CONSTRAINTS } from "../../config/preferences.js";
 import { refreshActiveBeaconVolumes } from "../audio/city-scene.js";
 import { createAudioMenu } from "./audio-menu.js";

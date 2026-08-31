@@ -1,0 +1,21 @@
+{
+  "menu.save.title": "Save",
+  "menu.save.export": "Export preferences",
+  "menu.save.import": "Import preferences",
+  "menu.save.import_success": "Preferences imported",
+  "menu.save.import_failure": "Failed to import preferences",
+  "save.now": "Save",
+  "save.autosave": "Auto-save on transitions",
+  "save.autosave.description": "Automatically saves the game on every successful place change, silently — without the confirmation sound, so it never overlaps a simple door crossing.",
+  "save.autosave_interval": "Auto-save (minutes)",
+  "save.autosave_interval.description": "Automatically saves the game at regular real-time intervals, even while a menu is open. Set to zero, this periodic save is disabled.",
+  "save.autosave_interval_never": "Never",
+  "save.sound_enabled": "Save sound",
+  "save.sound_enabled.description": "Plays a confirmation sound on every successful manual or periodic save — never on the silent save triggered by a simple place change.",
+  "save.no_active_game": "No active game.",
+  "save.export_game": "Export game",
+  "save.import_game": "Import game",
+  "save.import_game_failure": "Failed to import the game",
+  "save.import_confirm_title": "Importing this game will replace the current game. Confirm?",
+  "save.imported": "Game imported."
+}

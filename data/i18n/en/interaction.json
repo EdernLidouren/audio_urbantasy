@@ -1,0 +1,8 @@
+{
+  "menu.interaction.title": "Interact",
+  "menu.interaction.observe.title": "Observe",
+  "interaction.pickup": "Picked up: {amount} coins.",
+  "interaction.pickupItem": "Picked up: {item}.",
+  "interaction.loot": "Found: {amount} coins.",
+  "interaction.lootSpawn": "{count} coins scattered around."
+}

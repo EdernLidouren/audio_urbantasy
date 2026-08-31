@@ -17,7 +17,7 @@ import { announce } from "../../lib/announce.js";
 import { pushScreen, popScreen } from "../../lib/screens.js";
 import { makeMenuScreen, makeMessageScreen } from "../../lib/menu.js";
 import { setGlobalVolume } from "../../lib/audio.js";
-import { t } from "../../i18n/index.js";
+import { t } from "../../data/i18n/index.js";
 import { getPref, PREF_CONSTRAINTS, exportPreferences, importPreferences } from "../../config/preferences.js";
 import { refreshActiveBeaconVolumes } from "../audio/city-scene.js";
 import { exportGame, importGame, playSaveSound } from "../save-storage.js";

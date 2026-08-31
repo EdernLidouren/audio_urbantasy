@@ -13,7 +13,7 @@
 
 import { pushScreen, popScreen } from "../../lib/screens.js";
 import { makeMenuScreen } from "../../lib/menu.js";
-import { t } from "../../i18n/index.js";
+import { t } from "../../data/i18n/index.js";
 import { createOptionsMenu } from "./options-menu.js";
 import { hasSave } from "../save-storage.js";
 

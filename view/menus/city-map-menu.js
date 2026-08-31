@@ -24,7 +24,7 @@
 // onEnter/onExit, comme pause-menu.js le fait pour lui-même), rien à
 // hériter du menu qu'il remplace.
 
-import { t } from "../../i18n/index.js";
+import { t } from "../../data/i18n/index.js";
 import { pushScreen, popScreen } from "../../lib/screens.js";
 import { resolveAction, checkBindingsForCollisions } from "../../lib/input.js";
 import { announce } from "../../lib/announce.js";

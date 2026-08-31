@@ -44,7 +44,7 @@ Toutes les longueurs (`minutesPerHour`, `hoursPerDay`, `daysPerMonth`,
 `core/time.js` — jamais codées en dur dans la logique de dérivation.
 
 Les MOIS gardent leurs noms grégoriens (janvier..décembre, `MONTH_KEYS`,
-`i18n/*.js`) même si le calendrier de jeu les fait tous durer 30 jours — un
+`data/i18n/*/status.json`) même si le calendrier de jeu les fait tous durer 30 jours — un
 choix de NOMS, pas une reconstitution du calendrier lui-même.
 
 ## Jour de semaine
@@ -182,8 +182,9 @@ composants NOMMÉS déjà résolus (`day`, `month`, `season`, `year`, `hour`, `m
 résolues AVANT interpolation, `interpolate()` ne faisant jamais de traduction
 imbriquée) : le code ignore tout de l'ORDRE d'affichage, qui vit ENTIÈREMENT dans le
 gabarit `time.announce` de chaque locale — forme commune "heure, jour mois, saison,
-année" (`i18n/fr.js` place le jour avant le mois ; `i18n/en.js` le mois avant le
-jour, forme "heure, mois jour, saison, année") — changer de langue, réordonner, ou
+année" (`data/i18n/fr/status.json` place le jour avant le mois ;
+`data/i18n/en/status.json` le mois avant le jour, forme "heure, mois jour, saison,
+année") — changer de langue, réordonner, ou
 retirer un composant ne touche QUE ce gabarit, jamais le code. `weekday`
 (`core/time.js`/`weekdayOf`, `WEEKDAY_KEYS`) reste dérivable mais n'est PLUS fourni
 à ce gabarit — sa dérivation pure est testée indépendamment (voir

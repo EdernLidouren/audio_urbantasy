@@ -6,7 +6,7 @@
 import { getMoveIntent, CITY_BINDINGS } from "./input.js";
 import { resolveAction } from "../lib/input.js";
 import { announce } from "../lib/announce.js";
-import { t } from "../i18n/index.js";
+import { t } from "../data/i18n/index.js";
 import { ensureAudioUnlocked, playOneShot } from "../lib/audio.js";
 import { resolveAsset } from "../lib/assets.js";
 import { createCityAudioScene, stopPersistentAudioLayers } from "./audio/city-scene.js";
@@ -67,8 +67,9 @@ function pad2(n) {
 
 // Composants NOMMÉS fournis au gabarit "time.announce" — le code ne décide
 // d'AUCUN ordre ni ponctuation, seule la chaîne i18n (une par langue) le
-// fait (voir i18n/fr.js/en.js, forme "heure, jour mois, saison, année" —
-// l'ordre jour/mois lui-même reste propre à chaque langue) : month/season
+// fait (voir data/i18n/fr/status.json et en/status.json, forme "heure, jour
+// mois, saison, année" — l'ordre jour/mois lui-même reste propre à chaque
+// langue) : month/season
 // sont déjà résolus en texte ICI (t(...) sur leur clé) avant d'être
 // interpolés — interpolate() ne fait que remplacer des chaînes dans un
 // gabarit, jamais une traduction imbriquée. weekday (voir core/time.js/

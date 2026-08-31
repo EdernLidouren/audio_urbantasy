@@ -21,7 +21,7 @@
 // qui saute directement à l'écran des onglets plutôt que de remonter
 // niveau par niveau, et sans réannoncer par-dessus le résultat déjà dit).
 
-import { t } from "../../i18n/index.js";
+import { t } from "../../data/i18n/index.js";
 import { pushScreen, popScreen, composeHook } from "../../lib/screens.js";
 import { makeMenuScreen } from "../../lib/menu.js";
 import { announce } from "../../lib/announce.js";

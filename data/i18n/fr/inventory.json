@@ -1,0 +1,21 @@
+{
+  "inventory.title": "Sac",
+  "inventory.empty": "Sac vide.",
+  "inventory.empty.entry": "Sac vide",
+  "inventory.entry.stack": "{item} × {quantity} : {description}",
+  "inventory.entry.unique": "{item} : {description}",
+  "inventory.actions.drop": "Poser",
+  "inventory.actions.equip": "Équiper",
+  "inventory.actions.unequip": "Déséquiper",
+  "inventory.actions.cancel": "Annuler",
+  "inventory.quantity.announce": "Quantité à poser : {quantity} sur {max}.",
+  "inventory.dropped": "Posé : {item}.",
+  "inventory.dropped.stack": "Posé : {item} × {quantity}.",
+  "inventory.equipped": "Équipé : {item}.",
+  "inventory.unequipped": "Déséquipé : {item}.",
+  "inventory.equipment.title": "Équipement",
+  "inventory.equipment.slot.occupied": "{slot} : {item} : {description}",
+  "inventory.equipment.slot.empty": "{slot} : vide",
+  "inventory.equipment.slot.emptyAnnounce": "Emplacement vide.",
+  "equipment.slot.feet": "Pieds"
+}

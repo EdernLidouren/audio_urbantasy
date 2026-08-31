@@ -9,7 +9,7 @@
 // cycle de vie avec la pause/reprise des balises de la scène plutôt que
 // d'écraser onEnter/onExit — voir composeHook (lib/screens.js).
 
-import { t } from "../../i18n/index.js";
+import { t } from "../../data/i18n/index.js";
 import { pushScreen, popScreen, composeHook } from "../../lib/screens.js";
 import { makeMenuScreen } from "../../lib/menu.js";
 import { createOptionsMenu } from "./options-menu.js";

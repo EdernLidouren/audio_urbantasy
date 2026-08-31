@@ -11,7 +11,7 @@ import { createMainMenu } from "./view/menus/main-menu.js";
 import { makeMenuScreen, configureMenuPreferences, configureMenuSounds } from "./lib/menu.js";
 import { playMenuSound } from "./view/menu-sounds.js";
 import { makeCityScreen } from "./view/city-screen.js";
-import { t } from "./i18n/index.js";
+import { t } from "./data/i18n/index.js";
 import { runMovementChecks } from "./core/movement.check.js";
 import { isDebugEnabled, setDebugEnabled } from "./config/debug.js";
 import { startLoop } from "./lib/loop.js";

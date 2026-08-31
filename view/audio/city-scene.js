@@ -68,7 +68,7 @@ import player from "../../entities/player.js";
 import { TUNING_DEFAULTS, resolveTuning } from "../../config/tuning.js";
 import { getPref, PREF_CONSTRAINTS } from "../../config/preferences.js";
 import { PERCEPTION_MUSIC_POOL, PERCEPTION_AMBIENCE_POOL } from "../../config/perception.js";
-import { t } from "../../i18n/index.js";
+import { t } from "../../data/i18n/index.js";
 import { MOVE_STEP, getActiveWorld, getInactiveFace } from "../../core/state.js";
 import { surfaceAt, surfaceProps } from "../../core/surfaces.js";
 import { phaseAt } from "../../core/time.js";

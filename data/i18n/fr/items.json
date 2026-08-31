@@ -1,0 +1,17 @@
+{
+  "tag.military": "militaire",
+  "tag.chic": "chic",
+  "tag.metal": "métal",
+  "item.apple": "Pomme",
+  "item.apple.description": "Une pomme, fraîche et croquante.",
+  "item.key_bronze": "Clé de bronze",
+  "item.key_bronze.description": "Une petite clé en bronze.",
+  "item.sneakers": "Baskets",
+  "item.sneakers.description": "Une paire de baskets, légères et simples.",
+  "item.leather_boots": "Bottes en cuir",
+  "item.leather_boots.description": "Des bottes en cuir robustes.",
+  "item.combat_boots": "Rangers",
+  "item.combat_boots.description": "Une paire de rangers, solides et increvables.",
+  "item.high_heels": "Escarpins",
+  "item.high_heels.description": "Une paire d'escarpins élégants, à talons."
+}
