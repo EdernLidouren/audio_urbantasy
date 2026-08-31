@@ -53,6 +53,12 @@ export const CITY_BINDINGS = {
   openInventory: { keys: ["i"], mods: [] },
   openEquipment: { keys: ["q"], mods: [] },
   announcePosition: { keys: ["x"], mods: [] },
+  // "p" (perception) : bascule la PERCEPTION SURNATURELLE (voir
+  // core/state.js/togglePerception, view/city-screen.js/togglePerceptionEffect)
+  // — COOLDOWN anti-spam entièrement côté consommation (city-screen.js),
+  // ce binding ne fait que router l'appui, comme tout le reste de cette
+  // table.
+  togglePerception: { keys: ["p"], mods: [] },
   debugSpawn: { keys: ["e"], mods: [] },
   interactDescribe: { keys: [" "], mods: [] },
   interactActivate: { keys: ["Enter"], mods: [] },

@@ -7,7 +7,8 @@ import { getMoveIntent, CITY_BINDINGS } from "./input.js";
 import { resolveAction } from "../lib/input.js";
 import { announce } from "../lib/announce.js";
 import { t } from "../i18n/index.js";
-import { ensureAudioUnlocked } from "../lib/audio.js";
+import { ensureAudioUnlocked, playOneShot } from "../lib/audio.js";
+import { resolveAsset } from "../lib/assets.js";
 import { createCityAudioScene } from "./audio/city-scene.js";
 import {
   interact,
@@ -32,7 +33,7 @@ import { setGameReplaceHandler } from "./menus/save-menu.js";
 import { tick } from "../core/actions.js";
 import { reduce } from "../core/reduce.js";
 import { loadLevelById } from "../level/load.js";
-import { getActiveWorld, travelToWorld, switchSide, spawnEphemeral, isTwoSided } from "../core/state.js";
+import { getActiveWorld, travelToWorld, switchSide, spawnEphemeral, isTwoSided, togglePerception } from "../core/state.js";
 import { pickupEntity, lootEntity, lootEntitySpawn } from "../core/money.js";
 import { pickupItemEntity, dropItem } from "../core/bag.js";
 import { equipItem, unequipItem } from "../core/equipment.js";
@@ -53,6 +54,7 @@ import registry from "../entities/types/index.js";
 import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
 import { saveGame } from "./save-storage.js";
 import { TIME_CONFIG } from "../config/time-values.js";
+import { TUNING_DEFAULTS } from "../config/tuning-values.js";
 
 // Outil de VÉRIFICATION du système de temps (voir core/time.md) : formate
 // et annonce heure + date courantes, sur demande (touche "t", voir
@@ -197,8 +199,51 @@ function resolveDroppedItemSpec(type, count) {
   };
 }
 
+// Marqueur sonore de bascule de PERCEPTION SURNATURELLE — non positionné
+// (le joueur ne change pas de position), volume UI (interfaceVolume), même
+// patron défensif (try/catch) que view/interaction.js/playSideSwitchSound.
+// Réutilise le pool générique "toggle" (view/menu-sounds.js) : un simple
+// on/off de mode, pas un son propre à inventer pour celui-ci.
+const PERCEPTION_TOGGLE_SOUND_KEY = "assets/sounds/ui/toggle";
+
+function playPerceptionToggleSound() {
+  try {
+    const factor = getPref("interfaceVolume", PREF_CONSTRAINTS.interfaceVolume.default) / 100;
+    playOneShot(resolveAsset(PERCEPTION_TOGGLE_SOUND_KEY), { volume: factor });
+  } catch (error) {
+    console.warn(`city-screen: son de bascule de perception indisponible ("${PERCEPTION_TOGGLE_SOUND_KEY}") : ${error.message}`);
+  }
+}
+
 export function makeCityScreen(getSession, setSession) {
   let scene = null;
+  // COOLDOWN anti-spam de la touche perception (voir view/input.js/
+  // CITY_BINDINGS.togglePerception, config/tuning-values.js/
+  // perceptionCooldownMs — DÉRIVÉ de la durée du fondu audio + une marge,
+  // voir son commentaire) : horloge MURALE (performance.now()), jamais
+  // l'horloge de partie (session.time, qui peut avancer différemment/pas
+  // du tout selon le contexte) — le fondu lui-même est mené en temps réel
+  // par view/audio/city-scene.js, ce cooldown doit rester synchronisé avec
+  // LUI, pas avec le jeu. Persiste pour la DURÉE DE VIE de cet écran
+  // (au-delà d'une transition de scène, voir performTransition) : un
+  // joueur ne doit pas pouvoir contourner le cooldown en traversant une
+  // porte en plein fondu.
+  let perceptionCooldownUntil = 0;
+
+  // Bascule la perception (core, pur) PUIS le retour sensoriel (son +
+  // annonce) — même patron que les autres effets d'état de ce fichier
+  // (ex. sideSwitchEffect). INERTE pendant le cooldown : la touche ne fait
+  // ALORS rigoureusement rien, ni bascule ni son ni annonce — jamais de
+  // fondu qui se chevauche/se bat (voir view/audio/city-scene.js).
+  function togglePerceptionEffect() {
+    const now = performance.now();
+    if (now < perceptionCooldownUntil) return;
+    perceptionCooldownUntil = now + TUNING_DEFAULTS.perceptionCooldownMs;
+
+    setSession(togglePerception(getSession()));
+    playPerceptionToggleSound();
+    announce(t(getSession().perceptionActive ? "perception.activated" : "perception.deactivated"), { assertive: true });
+  }
 
   // Transition FRANCHE (pas de fondu, pas d'animation) vers `targetId` :
   // scene.destroy() arrête et décharge TOUT ce que possédait le lieu
@@ -485,6 +530,15 @@ export function makeCityScreen(getSession, setSession) {
       // arrondi en mode normal, flottant en debug), donc aucune garde ici.
       if (action === "announcePosition") {
         announcePlayerX(getSession());
+        return;
+      }
+
+      // "togglePerception" ("p") : bascule la perception surnaturelle — voir
+      // togglePerceptionEffect (cooldown, son, annonce) plus haut. Aucune
+      // garde de mode ici (contrairement à "debugSpawn" ci-dessous) :
+      // disponible à tout joueur, en jeu normal.
+      if (action === "togglePerception") {
+        togglePerceptionEffect();
         return;
       }
 

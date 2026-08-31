@@ -192,6 +192,45 @@ exception. `tag` est validé contre `core/tags.js`/`TAG_REGISTRY` au chargement 
 Le champ s'appelle pareil, l'évaluateur est identique, mais QUI il désigne dépend du
 point d'appel — à documenter explicitement dans tout nouveau consommateur.
 
+### `perceptionActive` — perception surnaturelle active
+
+```js
+{ type: "perceptionActive" }
+```
+
+Sans champ propre. Vraie si `context.perceptionActive` est vrai — posé par
+`core/reduce.js`/TICK dans `presenceContext` (`{ time, perceptionActive }`, PARTAGÉ
+par tout le tick, exactement comme `time`), lui-même dérivé de
+`session.perceptionActive` (`core/state.js`/`togglePerception`, bascule via une
+touche dédiée, voir `view/city-screen.js`). Contexte SANS `perceptionActive` (ex.
+`action.condition`, voir "Conditions d'action" plus bas) → `context.perceptionActive`
+vaut `undefined` → `Boolean(undefined)` → fausse, même repli défensif que les autres
+évaluateurs.
+
+Une entité SURNATURELLE n'est RIEN DE PLUS qu'une entité normale dont la présence
+est conditionnée par cette condition — aucun champ d'entité dédié, aucun mécanisme
+séparé (voir `entities/types/ghost.js`, le pendant de `neon.js` pour `timeRange`) :
+DORMANTE (silencieuse, non examinable, jamais bloquante) tant que la perception est
+inactive, PRÉSENTE dès qu'elle s'active — état conservé à la désactivation (comme
+tout `present:false`), jamais réinitialisé.
+
+Exemple réel complet — `spirit-1` (`level/demo.json`) :
+
+```json
+"presence": [{ "when": { "type": "perceptionActive" }, "present": true }]
+```
+
+Côté VUE (`view/audio/city-scene.js`), la bascule de perception déclenche AUSSI un
+crossfade musique/ambiance vers des pools surnaturels globaux
+(`config/perception.js`) et un fondu du filtre d'étouffement des entités MONDAINES
+(réutilise la chaîne d'occlusion RECTO/VERSO, `config/tuning-values.js`/
+`mufflingLowpassHz`/`mufflingGain`) — une entité dont la présence porte cette
+condition (`isPerceptionGated`, `view/audio/city-scene.js`) en est TOUJOURS
+exemptée, elle émerge pleine et claire. Détail complet côté vue : voir les
+commentaires de `view/audio/city-scene.js` (`effectiveMuffleAmount`,
+`currentMundaneMuffleAmount`) — hors de portée de ce document, qui ne couvre que le
+format déclaratif du core.
+
 Exemple réel complet : voir "Conditions d'action" (la porte à dresscode).
 
 ### Ajouter un type de condition

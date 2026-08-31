@@ -150,6 +150,14 @@ function migrateSave(raw) {
     data = { ...data, player: { ...data.player, side: "recto" } };
   }
 
+  // perceptionActive (voir core/state.js/togglePerception, "Perception
+  // surnaturelle") : absent d'une sauvegarde antérieure à ce mécanisme ->
+  // false, défaut neutre identique à une partie neuve — même politique que
+  // player.side juste au-dessus.
+  if (typeof data.perceptionActive !== "boolean") {
+    data = { ...data, perceptionActive: false };
+  }
+
   if (data.worlds && typeof data.worlds === "object") {
     const patchedWorlds = {};
     let anyChanged = false;

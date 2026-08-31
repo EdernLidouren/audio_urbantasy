@@ -299,7 +299,24 @@ export function createInitialState(level, seed = DEFAULT_SEED, { companions } = 
     // mais hashé sous une clé distincte — jamais la même suite que le
     // premier monde (createSeed accepte une chaîne, voir core/rng.js).
     companionsRngState: createSeed(`companions:${seed}`),
+    // Perception surnaturelle (voir core/presence.js/"perceptionActive",
+    // view/audio/city-scene.js) : booléen simple, cercle PARTIE comme side/
+    // time/money — jamais par monde. false par défaut : une partie neuve
+    // démarre en perception normale.
+    perceptionActive: false,
   };
+}
+
+// Bascule la perception surnaturelle (touche dédiée, voir
+// view/city-screen.js — le COOLDOWN anti-spam reste entièrement côté vue,
+// rien à en savoir ici). Pur : un simple flip, aucun état d'attente ni
+// compte-à-rebours — la bascule est INSTANTANÉE, c'est le SEUIL de
+// perception lui-même qui change, jamais un délai. Toute entité dont la
+// présence dépend de "perceptionActive" (voir core/presence.js) réagit dès
+// le PROCHAIN tick, via le même mécanisme de présence conditionnelle que
+// le reste (ex. neon.js) — rien de plus à faire ici.
+export function togglePerception(session) {
+  return { ...session, perceptionActive: !session.perceptionActive };
 }
 
 // Retire UNE entité (par id) du lieu ACTIF — mécanisme générique derrière

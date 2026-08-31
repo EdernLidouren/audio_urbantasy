@@ -169,6 +169,21 @@ function evaluateHasEquipmentTag(cond, context) {
   return Boolean(equipment && equippedTags(equipment).has(cond.tag));
 }
 
+// "perceptionActive" : vraie si la PERCEPTION SURNATURELLE (voir
+// core/state.js/togglePerception, session.perceptionActive) est actuellement
+// active. Sans champ propre — comme "arrived"/"consumed" — elle lit
+// context.perceptionActive (posé par core/reduce.js/TICK dans
+// presenceContext, PARTAGÉ par tout le tick, comme context.time), jamais
+// context.entity : une entité SURNATURELLE n'est rien de plus qu'une entité
+// normale dont la présence est conditionnée par CETTE condition (voir
+// entities/types/ghost.js) — aucun mécanisme séparé, aucun champ d'entité
+// dédié. Absent (contexte hors tick, ex. action.condition, voir
+// view/interaction.js/actionConditionMet) -> false, même repli défensif que
+// les autres évaluateurs.
+function evaluatePerceptionActive(cond, context) {
+  return Boolean(context.perceptionActive);
+}
+
 // Registre des évaluateurs par type — SEUL endroit qui connaît les types de
 // condition. core/level.js valide `when.type` au chargement contre les clés
 // de CE MÊME registre (CONDITION_TYPES ci-dessous) : ajouter un type ici le
@@ -183,6 +198,7 @@ const CONDITION_EVALUATORS = {
   arrived: evaluateArrived,
   consumed: evaluateConsumed,
   hasEquipmentTag: evaluateHasEquipmentTag,
+  perceptionActive: evaluatePerceptionActive,
 };
 
 export const CONDITION_TYPES = Object.keys(CONDITION_EVALUATORS);

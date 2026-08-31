@@ -184,6 +184,8 @@ export default {
   "entity.buddy.description": "Votre fidèle compagnon à quatre pattes.",
   "entity.neon": "Enseigne au néon",
   "entity.neon.description": "Une enseigne au néon qui bourdonne doucement.",
+  "entity.ghost": "Présence",
+  "entity.ghost.description": "Une présence indistincte, qui ne se révèle qu'à la perception surnaturelle.",
   "entity.money": "Argent",
   "entity.money.description": "Un peu d'argent, posé au sol.",
   "entity.crate": "Caisse",
@@ -241,4 +243,11 @@ export default {
   "cityMap.underConstruction": "En chantier.",
   "cityMap.empty": "Vide.",
   "cityMap.demo.description": "Le quartier de départ, où tout commence.",
+
+  // Perception surnaturelle (touche "p", voir core/presence.js/
+  // "perceptionActive", view/city-screen.js/togglePerceptionEffect) —
+  // annoncée à CHAQUE bascule réussie (jamais pendant le cooldown, qui
+  // reste silencieux, voir son commentaire).
+  "perception.activated": "Perception surnaturelle activée.",
+  "perception.deactivated": "Perception surnaturelle désactivée.",
 };

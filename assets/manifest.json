@@ -1,4 +1,7 @@
 {
+  "assets/ambiances/supernatural_reality": [
+    "assets/ambiances/supernatural_reality_1.mp3"
+  ],
   "assets/ambiances/traffic_street_afternoon": [
     "assets/ambiances/traffic_street_afternoon_1.mp3"
   ],
@@ -53,6 +56,9 @@
   "assets/musics/science_day": [
     "assets/musics/science_day_1.mp3",
     "assets/musics/science_day_2.mp3"
+  ],
+  "assets/musics/slums_night": [
+    "assets/musics/slums_night_1.mp3"
   ],
   "assets/musics/streets_day": [
     "assets/musics/streets_day_1.mp3",

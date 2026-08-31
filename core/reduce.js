@@ -186,12 +186,12 @@ export function reduce(state, action) {
       // il ne dépend que de l'état PRÉ-tick (voir resolveTargetPosition),
       // jamais de la liste en cours de traitement.
       const getTargetPosition = (targetId) => resolveTargetPosition(state, face, targetId);
-      // Présence : dérivée UNIQUEMENT de state.time (constant pour tout ce
-      // tick, voir core/presence.js) — un seul objet construit ici, partagé
-      // par la phase 1 (stepEntities) ET la phase 2 (isBlocking, via
-      // resolvePlayerMove/resolveBodyMove/resolveOverlaps ci-dessous),
-      // jamais recréé par appel.
-      const presenceContext = { time: state.time };
+      // Présence : dérivée de state.time ET state.perceptionActive (les
+      // deux constants pour tout ce tick, voir core/presence.js) — un seul
+      // objet construit ici, partagé par la phase 1 (stepEntities) ET la
+      // phase 2 (isBlocking, via resolvePlayerMove/resolveBodyMove/
+      // resolveOverlaps ci-dessous), jamais recréé par appel.
+      const presenceContext = { time: state.time, perceptionActive: state.perceptionActive };
       const worldStep = stepEntities(face.entities, {
         length: world.length,
         rngState: face.rngState,

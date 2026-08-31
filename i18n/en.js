@@ -180,6 +180,8 @@ export default {
   "entity.buddy.description": "Your loyal four-legged companion.",
   "entity.neon": "Neon sign",
   "entity.neon.description": "A neon sign, buzzing softly.",
+  "entity.ghost": "Presence",
+  "entity.ghost.description": "An indistinct presence, only revealed by supernatural perception.",
   "entity.money": "Money",
   "entity.money.description": "A bit of money, sitting on the ground.",
   "entity.crate": "Crate",
@@ -237,4 +239,11 @@ export default {
   "cityMap.underConstruction": "Under construction.",
   "cityMap.empty": "Empty.",
   "cityMap.demo.description": "The starting neighborhood, where it all begins.",
+
+  // Supernatural perception ("p" key, see core/presence.js/
+  // "perceptionActive", view/city-screen.js/togglePerceptionEffect) —
+  // announced on every successful toggle (never during the cooldown, which
+  // stays silent, see its comment).
+  "perception.activated": "Supernatural perception activated.",
+  "perception.deactivated": "Supernatural perception deactivated.",
 };

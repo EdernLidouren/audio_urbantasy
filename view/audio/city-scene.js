@@ -61,6 +61,7 @@ import {
   startMusicSequence,
   switchMusicSequence,
   fadeOutMusic,
+  crossfadeAmbience,
 } from "../../lib/audio.js";
 import { announce } from "../../lib/announce.js";
 import { resolveAsset, hasAsset, assetKeyMembers } from "../../lib/assets.js";
@@ -68,6 +69,7 @@ import registry from "../../entities/types/index.js";
 import player from "../../entities/player.js";
 import { TUNING_DEFAULTS, resolveTuning } from "../../config/tuning.js";
 import { getPref, PREF_CONSTRAINTS } from "../../config/preferences.js";
+import { PERCEPTION_MUSIC_POOL, PERCEPTION_AMBIENCE_POOL } from "../../config/perception.js";
 import { t } from "../../i18n/index.js";
 import { MOVE_STEP, getActiveWorld, getInactiveFace } from "../../core/state.js";
 import { surfaceAt, surfaceProps } from "../../core/surfaces.js";
@@ -169,6 +171,13 @@ const BEACON_STAGGER_MAX_MS = TUNING_DEFAULTS.beaconStaggerMaxMs;
 // beacons (exclus entièrement, voir buildEntitySoundEntry/includeBeacon).
 const MUFFLING_LOWPASS_HZ = TUNING_DEFAULTS.mufflingLowpassHz;
 const MUFFLING_GAIN = TUNING_DEFAULTS.mufflingGain;
+// Durée (ms) du fondu de PERCEPTION SURNATURELLE (voir
+// core/presence.js/"perceptionActive") — crossfade musique/ambiance ET
+// rampe du filtre d'étouffement des entités mondaines, la MÊME durée pour
+// les deux (voir plus bas, currentMundaneMuffleAmount). Le cooldown de la
+// touche (view/city-screen.js) est DÉRIVÉ de cette même valeur
+// (config/tuning-values.js/perceptionCooldownMs) — jamais dupliquée ici.
+const PERCEPTION_FADE_MS = TUNING_DEFAULTS.perceptionFadeMs;
 
 // Réverb : propriétés du bus lui-même (un seul par scène, jamais par
 // entité). Durée/decay sont surchargeables PAR LIEU (level.reverbDurationSec/
@@ -256,6 +265,19 @@ function footstepCandidateKeys({ gait, naturalWalk, ownPath } = {}) {
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
+}
+
+// Une entité est "surnaturelle" si elle ne PORTE aucun champ dédié (voir
+// entities/model.md, header : "les entités portent la logique, pas la
+// structure des scènes") — juste une entité normale dont la présence est
+// conditionnée par "perceptionActive" (voir core/presence.js,
+// entities/types/ghost.js). Détecté ICI, STRUCTURELLEMENT (inspection de
+// entity.presence, jamais un flag séparé) : sert à l'EXEMPTER du filtre
+// d'étouffement des entités mondaines (voir currentMundaneMuffleAmount plus
+// bas) — une entité surnaturelle émerge pleine et claire, jamais étouffée
+// par son propre mécanisme de révélation.
+function isPerceptionGated(entity) {
+  return Boolean(entity.presence && entity.presence.some((rule) => rule.when && rule.when.type === "perceptionActive"));
 }
 
 // État minimal d'UN "marcheur" (le joueur ou une entité mobile) pour
@@ -514,7 +536,7 @@ let activeScene = null;
 // DEVINE la présence de l'autre face, on ne la LOCALISE pas. Vocal/movement/
 // enterSound/exitSound restent inchangés (rendus en ÉTOUFFÉ par l'appelant,
 // voir playPositionedOneShot/playTransitionSound, jamais coupés ici).
-function buildEntitySoundEntry(entity, world, time, { includeBeacon = true } = {}) {
+function buildEntitySoundEntry(entity, world, time, perceptionActive, { includeBeacon = true } = {}) {
   // beacon (localisation) et vocal (expression) : descripteurs de son du
   // type, tous deux OPTIONNELS et indépendants (voir entities/model.md) —
   // ni l'un ni l'autre n'est "le" son obligatoire d'une entité.
@@ -651,7 +673,7 @@ function buildEntitySoundEntry(entity, world, time, { includeBeacon = true } = {
   // null au premier calcul) — seules les bascules OBSERVÉES en cours de
   // jeu déclenchent, voir applyEntityAudio, qui lit presenceChanged sur
   // l'entité VIVANTE à chaque tick (jamais un diff maison ici).
-  if (sound && !isPresent(entity, { time })) sound.stop();
+  if (sound && !isPresent(entity, { time, perceptionActive })) sound.stop();
 
   return {
     entity,
@@ -669,6 +691,10 @@ function buildEntitySoundEntry(entity, world, time, { includeBeacon = true } = {
     enterSound,
     exitSound,
     muteOnConsumed,
+    // Surnaturelle (voir isPerceptionGated plus haut) : jamais soumise au
+    // filtre d'étouffement des entités mondaines (voir
+    // currentMundaneMuffleAmount, applyEntityAudio, effectiveMuffleAmount).
+    perceptionGated: isPerceptionGated(entity),
     ...movementFields,
   };
 }
@@ -697,7 +723,7 @@ export function createCityAudioScene(getSession) {
   // l'amorçage.
   const initialWorld = getActiveWorld(getSession());
   const entitySounds = initialWorld.entities.map((entity) =>
-    buildEntitySoundEntry(entity, initialWorld, getSession().time)
+    buildEntitySoundEntry(entity, initialWorld, getSession().time, getSession().perceptionActive)
   );
 
   // RECTO/VERSO étape 2/2 (voir CLAUDE.md) : entrées de son pour l'AUTRE
@@ -711,7 +737,9 @@ export function createCityAudioScene(getSession) {
   // suivent le joueur, jamais l'autre face.
   const initialOtherFace = getInactiveFace(getSession());
   const otherEntitySounds = initialOtherFace
-    ? initialOtherFace.entities.map((entity) => buildEntitySoundEntry(entity, initialOtherFace, getSession().time, { includeBeacon: false }))
+    ? initialOtherFace.entities.map((entity) =>
+        buildEntitySoundEntry(entity, initialOtherFace, getSession().time, getSession().perceptionActive, { includeBeacon: false })
+      )
     : null;
 
   // Un seul bus de réverb pour toute la scène, jamais un par entité. Lieu ->
@@ -756,7 +784,7 @@ export function createCityAudioScene(getSession) {
   // un son perdu ni un plantage. Voir syncNewEntitySounds ci-dessous, seule
   // appelante.
   function addLateEntitySoundEntry(entity, world) {
-    const entry = buildEntitySoundEntry(entity, world, getSession().time);
+    const entry = buildEntitySoundEntry(entity, world, getSession().time, getSession().perceptionActive);
     entitySounds.push(entry);
     if (entry.sound) entry.sound.sendToReverb(reverbBus.input, entry.beaconReverbSend);
     collisionSoundByEntityId.set(entity.id, registry[entity.type].collisionSound);
@@ -792,7 +820,7 @@ export function createCityAudioScene(getSession) {
   // isolation stricte). No-op si la scène est simple (otherEntitySounds
   // null, jamais d'entité à synchroniser).
   function addLateOtherEntitySoundEntry(entity, otherFace) {
-    const entry = buildEntitySoundEntry(entity, otherFace, getSession().time, { includeBeacon: false });
+    const entry = buildEntitySoundEntry(entity, otherFace, getSession().time, getSession().perceptionActive, { includeBeacon: false });
     otherEntitySounds.push(entry);
     return entry;
   }
@@ -937,7 +965,22 @@ export function createCityAudioScene(getSession) {
   // avec fondu + respiration, voir switchMusicSequence).
   let currentPhase = phaseAt(getSession().time);
   const musicLoop = Boolean(world.musicLoop);
-  if (resolveMusicForPhase(world, currentPhase)) {
+  const ambiences = world.ambiences;
+  // Perception surnaturelle (voir core/presence.js/"perceptionActive") :
+  // tracké ICI (comme currentPhase ci-dessus), comparé à chaque tick contre
+  // session.perceptionActive (voir update() plus bas) pour détecter la
+  // BASCULE, jamais réévalué en continu. À l'entrée dans une scène DÉJÀ EN
+  // perception (ex. traversée d'une porte pendant qu'elle est active) : les
+  // pools surnaturels jouent DIRECTEMENT, comme la musique de phase le fait
+  // déjà (voir resolveMusicForPhase plus bas) — jamais de fondu depuis le
+  // silence à l'entrée en scène, même règle pour les deux.
+  let perceptionActive = getSession().perceptionActive;
+  const pickPerceptionMusicPath = () => resolveAsset(PERCEPTION_MUSIC_POOL);
+
+  if (perceptionActive) {
+    setGlobalVolume("music", musicVolumeFactor());
+    startMusicSequence({ pickPath: pickPerceptionMusicPath, loop: false, breatherRange: MUSIC_BREATHER_RANGE });
+  } else if (resolveMusicForPhase(world, currentPhase)) {
     setGlobalVolume("music", musicVolumeFactor());
     startMusicSequence({
       pickPath: pickMusicPath(world, currentPhase),
@@ -946,10 +989,63 @@ export function createCityAudioScene(getSession) {
     });
   }
 
-  const ambiences = world.ambiences;
-  if (ambiences && ambiences.length > 0) {
+  // ORDRE important, contrairement à la musique juste au-dessus :
+  // playMusicTrack (lib/audio.js) applique lui-même channelVolume("music")
+  // à CHAQUE Howl qu'il crée, quel que soit l'ordre d'appel — mais
+  // playGlobal (dont playAmbiences dérive) NE LE FAIT PAS : un Howl
+  // d'ambiance naît toujours au volume Howler par défaut (1), et seul
+  // setGlobalVolume l'ajuste ensuite, en itérant sur les flux DÉJÀ dans
+  // channelStreams("ambience") au moment de son appel. setGlobalVolume
+  // AVANT playAmbiences serait un no-op sur les flux (pas encore créés) —
+  // ambiance montée au volume PLEIN, ignorant la préférence, jusqu'à la
+  // PROCHAINE bascule de perception (qui, elle, applique bien le volume via
+  // crossfadeAmbience/channelVolume). D'où l'ordre INVERSE de la musique :
+  // playAmbiences D'ABORD, setGlobalVolume ENSUITE.
+  if (perceptionActive) {
+    playAmbiences([resolveAsset(PERCEPTION_AMBIENCE_POOL)]);
+    setGlobalVolume("ambience", ambienceVolumeFactor());
+  } else if (ambiences && ambiences.length > 0) {
     playAmbiences(ambiences.map(resolveAsset));
     setGlobalVolume("ambience", ambienceVolumeFactor());
+  }
+
+  // Rampe du filtre d'étouffement des entités MONDAINES (voir
+  // effectiveMuffleAmount/currentMundaneMuffleAmount plus bas) : de/vers
+  // (from/to), démarrée à mundaneMuffleRampStartedAt (performance.now()) —
+  // AUCUNE animation à l'entrée en scène (from === to d'emblée, comme la
+  // musique/l'ambiance ci-dessus) : une scène qui s'ouvre déjà en perception
+  // démarre déjà pleinement étouffée, jamais en train de "finir" un fondu
+  // qui n'a jamais eu lieu ici.
+  let mundaneMuffleRampFrom = perceptionActive ? 1 : 0;
+  let mundaneMuffleRampTo = perceptionActive ? 1 : 0;
+  let mundaneMuffleRampStartedAt = performance.now();
+
+  // Amount courant (0..1) du filtre d'étouffement mondain, interpolé EN
+  // TEMPS RÉEL entre mundaneMuffleRampFrom/To sur PERCEPTION_FADE_MS — lu à
+  // CHAQUE tick par applyEntityAudio/effectiveMuffleAmount, jamais mis en
+  // cache : c'est cette ré-évaluation continue qui donne le "fondu du
+  // filtre" demandé (voir CLAUDE.md/prompt d'origine), pas un mécanisme
+  // séparé par voix.
+  function currentMundaneMuffleAmount() {
+    if (mundaneMuffleRampFrom === mundaneMuffleRampTo) return mundaneMuffleRampTo;
+    const progress = clamp((performance.now() - mundaneMuffleRampStartedAt) / PERCEPTION_FADE_MS, 0, 1);
+    return mundaneMuffleRampFrom + (mundaneMuffleRampTo - mundaneMuffleRampFrom) * progress;
+  }
+
+  // Amount effectif (0..1) d'UNE entrée donnée : forcedMuffle (RECTO/VERSO,
+  // l'AUTRE face — TOUJOURS 1, fixe, voir updateIntermittentSources/
+  // updateEntityMovementSounds ci-dessous) prime sur tout le reste ; sinon
+  // une entité SURNATURELLE (perceptionGated) n'est JAMAIS étouffée par ce
+  // mécanisme (elle émerge pleine et claire, voir isPerceptionGated) ;
+  // sinon la rampe mondaine courante s'applique. Les deux mécanismes de
+  // filtre d'étouffement (RECTO/VERSO fixe, PERCEPTION progressif)
+  // partagent la MÊME primitive de rendu (playPositionedOneShot/muffled,
+  // sound.setCutoff côté balise continue), jamais deux implémentations
+  // parallèles — seule la VALEUR appliquée diffère.
+  function effectiveMuffleAmount(entry, forcedMuffle) {
+    if (forcedMuffle > 0) return forcedMuffle;
+    if (entry.perceptionGated) return 0;
+    return currentMundaneMuffleAmount();
   }
 
   // État de déclenchement du pas du joueur — voir stepWalker. Même forme,
@@ -1050,15 +1146,25 @@ export function createCityAudioScene(getSession) {
   // resolveIntermittentSource) : chaîne de filtres "hauteur suggérée"
   // (isFlying) — undefined -> aucun filtre tenté, 1 -> aucun effet sur le
   // volume, chemin STRICTEMENT inchangé pour toute entité non volante.
-  // muffled (défaut false, RECTO/VERSO étape 2/2) : `true` pour un one-shot
-  // de l'AUTRE face — position (pan/distance) INCHANGÉE (directionnel comme
-  // tout le reste), mais passe-bas + atténuation de gain EN PLUS
-  // (MUFFLING_LOWPASS_HZ/MUFFLING_GAIN, config/tuning-values.js), composables
-  // avec highpassHz/heightGain (une entité isFlying de l'autre face cumule
-  // les deux chaînes, voir lib/audio.js). cacheKey DISTINCT quand muffled :
-  // le MÊME fichier joué normalement ailleurs (face courante) ne doit
-  // jamais partager sa chaîne de filtres avec sa version étouffée (voir
-  // lib/audio.js/ensureOneShot).
+  // muffled (défaut 0, NUMÉRIQUE — voir RECTO/VERSO étape 2/2 ET perception
+  // surnaturelle, effectiveMuffleAmount plus haut) : 0..1, jamais un simple
+  // booléen — DEUX appelants distincts partagent CETTE MÊME primitive avec
+  // des besoins différents : l'AUTRE face (RECTO/VERSO) passe toujours 1
+  // (fixe, comportement HISTORIQUE inchangé), la perception surnaturelle
+  // passe la rampe COURANTE (0..1, voir currentMundaneMuffleAmount) — un
+  // one-shot ne peut pas être modulé APRÈS son déclenchement (trop court
+  // pour une automation continue), donc c'est la PROPORTION de gain
+  // retirée à CE déclenchement précis qui porte le fondu, observable au fil
+  // d'une SÉQUENCE de one-shots pendant la rampe. Position (pan/distance)
+  // toujours INCHANGÉE (directionnel comme tout le reste) ; passe-bas
+  // (MUFFLING_LOWPASS_HZ) engagé dès que muffled > 0 (porte binaire — seul
+  // le GAIN interpole continûment, le passe-bas reste la même fréquence
+  // fixe quelle que soit l'intensité, voir header du fichier) ; composable
+  // avec highpassHz/heightGain (une entité isFlying étouffée cumule les
+  // deux chaînes, voir lib/audio.js). cacheKey DISTINCT dès que muffled > 0 :
+  // le MÊME fichier joué normalement ailleurs (face courante, hors
+  // perception) ne doit jamais partager sa chaîne de filtres avec sa
+  // version étouffée (voir lib/audio.js/ensureOneShot).
   function playPositionedOneShot(
     path,
     {
@@ -1072,13 +1178,13 @@ export function createCityAudioScene(getSession) {
       pitchVariation = 0,
       highpassHz,
       heightGain = 1,
-      muffled = false,
+      muffled = 0,
     }
   ) {
     const dist = Math.abs(relX);
     const pan = clamp(relX / panSaturation, -1, 1);
     let volume = volumeForDistance(dist, interactRange, audibleRange) * volumeFactor * gain * heightGain;
-    if (muffled) volume *= MUFFLING_GAIN;
+    if (muffled > 0) volume *= 1 - muffled * (1 - MUFFLING_GAIN);
     const resolved = resolveAsset(path);
     playOneShot(resolved, {
       reverbSend,
@@ -1087,8 +1193,8 @@ export function createCityAudioScene(getSession) {
       stereo: pan,
       rate: randomRate(pitchVariation),
       highpassHz,
-      lowpassHz: muffled ? MUFFLING_LOWPASS_HZ : undefined,
-      cacheKey: muffled ? `muffled:${resolved}` : undefined,
+      lowpassHz: muffled > 0 ? MUFFLING_LOWPASS_HZ : undefined,
+      cacheKey: muffled > 0 ? `muffled:${resolved}` : undefined,
     });
   }
 
@@ -1100,7 +1206,7 @@ export function createCityAudioScene(getSession) {
   // lui-même). Jamais soumis à la pause sélective des balises (sound.pause/
   // resume ne concerne QUE la voix continue, voir lib/audio.js) : un
   // one-shot Howler joue jusqu'au bout quoi qu'il arrive ensuite au beacon.
-  function playTransitionSound(entry, relX, transitionSound, muffled = false) {
+  function playTransitionSound(entry, relX, transitionSound, muffled = 0) {
     playPositionedOneShot(transitionSound.path, {
       relX,
       interactRange: entry.interactRange,
@@ -1132,11 +1238,14 @@ export function createCityAudioScene(getSession) {
   // relèvent tous deux de la même catégorie "présence d'entité" côté
   // utilisateur, distincte du pas (footstepVolume) — seul le gain PROPRE à
   // chaque source (beaconGain/vocalGain) les différencie individuellement.
-  // entries/muffled : paramétrés depuis update() (RECTO/VERSO étape 2/2) —
-  // même mécanisme EXACT pour la face courante (entitySounds, muffled:false,
-  // comportement STRICTEMENT inchangé) et l'AUTRE face (otherEntitySounds,
-  // muffled:true) : jamais deux implémentations à maintenir en parallèle.
-  function updateIntermittentSources(entries, x, liveById, muffled = false) {
+  // entries/forcedMuffle : paramétrés depuis update() — DEUX appelants
+  // partagent CE mécanisme, jamais deux implémentations parallèles : l'AUTRE
+  // face (RECTO/VERSO, otherEntitySounds, forcedMuffle:1 — fixe,
+  // comportement STRICTEMENT inchangé) ET la face courante (entitySounds,
+  // forcedMuffle:0 par défaut — muffle PAR ENTRÉE via effectiveMuffleAmount,
+  // qui exempte les entités surnaturelles et applique la rampe de
+  // perception aux autres, voir plus haut).
+  function updateIntermittentSources(entries, x, liveById, forcedMuffle = 0) {
     const now = performance.now();
     const volumeFactor = beaconVolumeFactor();
     for (const entry of entries) {
@@ -1144,6 +1253,7 @@ export function createCityAudioScene(getSession) {
       // replanification — src.nextAt reste tel quel, gelé jusqu'au retour
       // en présence (voir le header du fichier, "comme si absente").
       if (liveById.get(entry.entity.id).present === false) continue;
+      const muffled = effectiveMuffleAmount(entry, forcedMuffle);
       for (const src of entry.intermittentSources) {
         if (now < src.nextAt) continue;
 
@@ -1176,9 +1286,9 @@ export function createCityAudioScene(getSession) {
   // c'est stepWalker qui porte toute la logique, ce module ne fait que lui
   // fournir la position vivante de l'entité et SON callback de lecture
   // (positionné, avec pan/gain propres — jamais centré comme le joueur).
-  // entries/muffled : voir updateIntermittentSources ci-dessus, même
+  // entries/forcedMuffle : voir updateIntermittentSources ci-dessus, même
   // principe de paramétrage pour éviter deux implémentations parallèles.
-  function updateEntityMovementSounds(entries, x, world, liveById, muffled = false) {
+  function updateEntityMovementSounds(entries, x, world, liveById, forcedMuffle = 0) {
     const volumeFactor = footstepVolumeFactor();
 
     for (const entry of entries) {
@@ -1190,6 +1300,7 @@ export function createCityAudioScene(getSession) {
       // figé, mais on l'évite explicitement plutôt que d'en dépendre.
       if (live.present === false) continue;
 
+      const muffled = effectiveMuffleAmount(entry, forcedMuffle);
       stepWalker(entry.walker, live.x, entry.movementStepDistance, (atX) => {
         const path = resolveFootstepPath(world, atX, {
           gait: entry.gait,
@@ -1331,12 +1442,16 @@ export function createCityAudioScene(getSession) {
         entry;
       const live = liveById.get(entity.id);
       const relX = live.x - x;
+      // Perception surnaturelle (voir effectiveMuffleAmount plus haut) :
+      // toujours 0 (aucun effet) pour une entité surnaturelle (perceptionGated) —
+      // jamais étouffée par le mécanisme qui la révèle.
+      const muffled = effectiveMuffleAmount(entry, 0);
 
       if (live.presenceChanged === "exited") {
-        if (entry.exitSound) playTransitionSound(entry, relX, entry.exitSound);
+        if (entry.exitSound) playTransitionSound(entry, relX, entry.exitSound, muffled);
         if (sound) sound.stop();
       } else if (live.presenceChanged === "entered") {
-        if (entry.enterSound) playTransitionSound(entry, relX, entry.enterSound);
+        if (entry.enterSound) playTransitionSound(entry, relX, entry.enterSound, muffled);
         if (sound) sound.resume();
       }
 
@@ -1347,10 +1462,20 @@ export function createCityAudioScene(getSession) {
       const pan = clamp(relX / panSaturation, -1, 1);
       // flyingVolumeFactor : neutre (1) pour toute entité non isFlying,
       // voir buildEntitySoundEntry — aucun effet sur le volume dans ce cas.
-      const volume = volumeForDistance(dist, interactRange, audibleRange) * beaconFactor * beaconGain * flyingVolumeFactor;
+      let volume = volumeForDistance(dist, interactRange, audibleRange) * beaconFactor * beaconGain * flyingVolumeFactor;
+      // Filtre d'étouffement des entités MONDAINES (voir
+      // effectiveMuffleAmount/currentMundaneMuffleAmount plus haut) :
+      // volume interpolé CONTINÛMENT (0..1, le fondu demandé), passe-bas
+      // interpolé linéairement vers MUFFLING_LOWPASS_HZ — se COMPOSE avec
+      // le passe-bas de distance ci-dessous (cutoffForDistance), jamais à
+      // sa place : une entité mondaine proche ET en pleine perception
+      // s'étouffe quand même progressivement.
+      if (muffled > 0) volume *= 1 - muffled * (1 - MUFFLING_GAIN);
       sound.update(pan, volume);
       // Passe-bas : se superpose au volume/pan, ne les remplace pas.
-      sound.setCutoff(cutoffForDistance(dist, interactRange, audibleRange, cutoffMin, cutoffMax));
+      let cutoff = cutoffForDistance(dist, interactRange, audibleRange, cutoffMin, cutoffMax);
+      if (muffled > 0) cutoff = cutoff * (1 - muffled) + MUFFLING_LOWPASS_HZ * muffled;
+      sound.setCutoff(cutoff);
       // Passe-haut "hauteur suggérée" (voir entities/model.md, isFlying) :
       // EN PLUS du passe-bas ci-dessus, jamais à sa place — setHighpass
       // n'est appelé QUE pour une entité isFlying (flyingHighpassHz reste
@@ -1371,9 +1496,9 @@ export function createCityAudioScene(getSession) {
       const live = otherLiveById.get(entry.entity.id);
       const relX = live.x - x;
       if (live.presenceChanged === "exited" && entry.exitSound) {
-        playTransitionSound(entry, relX, entry.exitSound, true);
+        playTransitionSound(entry, relX, entry.exitSound, 1);
       } else if (live.presenceChanged === "entered" && entry.enterSound) {
-        playTransitionSound(entry, relX, entry.enterSound, true);
+        playTransitionSound(entry, relX, entry.enterSound, 1);
       }
     }
   }
@@ -1422,6 +1547,49 @@ export function createCityAudioScene(getSession) {
         });
       } else {
         fadeOutMusic(MUSIC_FADE_MS);
+      }
+    }
+
+    // Bascule de PERCEPTION SURNATURELLE (voir core/state.js/
+    // togglePerception, view/city-screen.js) : même principe EXACT que la
+    // bascule de phase ci-dessus (compare à la valeur MÉMORISÉE, agit
+    // SEULEMENT sur la différence) — DEUX effets, tous deux en fondu sur
+    // PERCEPTION_FADE_MS : crossfade musique/ambiance vers/depuis les pools
+    // surnaturels (réutilise switchMusicSequence/crossfadeAmbience, MÊME
+    // mécanisme que la bascule jour/nuit) ET démarrage de la rampe du
+    // filtre d'étouffement mondain (mundaneMuffleRampFrom/To/StartedAt,
+    // lue en continu par applyEntityAudio/updateIntermittentSources/
+    // updateEntityMovementSounds via effectiveMuffleAmount, JAMAIS
+    // recalculée ici après ce point — c'est currentMundaneMuffleAmount qui
+    // l'anime tick après tick). from = la valeur COURANTE de la rampe
+    // (jamais figée à 0/1) : un re-toggle en cours de fondu repart
+    // proprement d'où il en est, sans saut.
+    if (session.perceptionActive !== perceptionActive) {
+      perceptionActive = session.perceptionActive;
+      mundaneMuffleRampFrom = currentMundaneMuffleAmount();
+      mundaneMuffleRampTo = perceptionActive ? 1 : 0;
+      mundaneMuffleRampStartedAt = performance.now();
+
+      if (perceptionActive) {
+        switchMusicSequence({
+          pickPath: pickPerceptionMusicPath,
+          loop: false,
+          breatherRange: MUSIC_BREATHER_RANGE,
+          fadeMs: PERCEPTION_FADE_MS,
+        });
+        crossfadeAmbience([resolveAsset(PERCEPTION_AMBIENCE_POOL)], PERCEPTION_FADE_MS);
+      } else {
+        if (resolveMusicForPhase(world, currentPhase)) {
+          switchMusicSequence({
+            pickPath: pickMusicPath(world, currentPhase),
+            loop: musicLoop,
+            breatherRange: MUSIC_BREATHER_RANGE,
+            fadeMs: PERCEPTION_FADE_MS,
+          });
+        } else {
+          fadeOutMusic(PERCEPTION_FADE_MS);
+        }
+        crossfadeAmbience(ambiences && ambiences.length > 0 ? ambiences.map(resolveAsset) : [], PERCEPTION_FADE_MS);
       }
     }
 
@@ -1496,8 +1664,8 @@ export function createCityAudioScene(getSession) {
       syncNewOtherEntitySounds(otherWorld);
       const otherLiveById = liveOtherEntitiesById(otherWorld);
       applyMuffledPresenceTransitions(x, otherLiveById);
-      updateIntermittentSources(otherEntitySounds, x, otherLiveById, true);
-      updateEntityMovementSounds(otherEntitySounds, x, otherWorld, otherLiveById, true);
+      updateIntermittentSources(otherEntitySounds, x, otherLiveById, 1);
+      updateEntityMovementSounds(otherEntitySounds, x, otherWorld, otherLiveById, 1);
     }
   }
 

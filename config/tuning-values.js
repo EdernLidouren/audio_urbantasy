@@ -9,6 +9,20 @@
 // Dernier recours de la cascade (voir lib/tuning.js / resolveTuning) : le
 // registre d'entités et les instances peuvent tout ignorer, tout retombe ici.
 
+// Durée (ms) du fondu de la PERCEPTION SURNATURELLE (voir
+// core/presence.js/"perceptionActive", view/audio/city-scene.js) —
+// crossfade musique/ambiance vers les pools surnaturels ET rampe du filtre
+// d'étouffement des entités mondaines, LA MÊME durée pour les deux (une
+// seule transition ressentie, pas deux désynchronisées). Const à part
+// (jamais un littéral direct dans TUNING_DEFAULTS) : perceptionCooldownMs
+// juste en dessous DOIT rester >= cette valeur + une marge, un lien
+// STRUCTUREL, pas seulement documenté en commentaire.
+const PERCEPTION_FADE_MS = 2500;
+// Marge (ms) AU-DESSUS du fondu ci-dessus avant que la touche de perception
+// ne redevienne active — jamais en dessous, sous peine de fondus qui se
+// chevauchent/se battent (voir view/city-screen.js).
+const PERCEPTION_COOLDOWN_MARGIN_MS = 700;
+
 export const TUNING_DEFAULTS = {
   // Unités parcourues par tick de déplacement (à 60 ticks/s). Plus haut =
   // marche plus rapide ; plus bas = plus lente.
@@ -276,4 +290,17 @@ export const TUNING_DEFAULTS = {
   // assez pour désempiler plusieurs pièces au même point, pas un vrai
   // éparpillement large.
   ephemeralScatterSpread: 2.5,
+
+  // Durée (ms) du fondu de la perception surnaturelle — voir
+  // PERCEPTION_FADE_MS ci-dessus, seule définition, jamais dupliquée ici.
+  // Plus haut = transition plus lente/immersive ; plus bas = plus nette.
+  perceptionFadeMs: PERCEPTION_FADE_MS,
+
+  // Durée (ms) pendant laquelle la touche de perception reste INERTE après
+  // une bascule — DÉRIVÉE de perceptionFadeMs + une marge (voir
+  // PERCEPTION_COOLDOWN_MARGIN_MS ci-dessus) : garantie STRUCTURELLE que le
+  // cooldown ne peut jamais tomber sous la durée du fondu qu'il protège
+  // (jamais deux fondus qui se chevauchent/se battent, voir
+  // view/city-screen.js). Ne jamais remplacer par un littéral indépendant.
+  perceptionCooldownMs: PERCEPTION_FADE_MS + PERCEPTION_COOLDOWN_MARGIN_MS,
 };
