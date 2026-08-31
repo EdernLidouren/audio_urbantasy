@@ -199,19 +199,23 @@ function resolveDroppedItemSpec(type, count) {
   };
 }
 
-// Marqueur sonore de bascule de PERCEPTION SURNATURELLE — non positionné
-// (le joueur ne change pas de position), volume UI (interfaceVolume), même
-// patron défensif (try/catch) que view/interaction.js/playSideSwitchSound.
-// Réutilise le pool générique "toggle" (view/menu-sounds.js) : un simple
-// on/off de mode, pas un son propre à inventer pour celui-ci.
-const PERCEPTION_TOGGLE_SOUND_KEY = "assets/sounds/ui/toggle";
+// Marqueurs sonores DÉDIÉS de bascule de PERCEPTION SURNATURELLE — non
+// positionnés (le joueur ne change pas de position), volume UI
+// (interfaceVolume), même patron défensif (try/catch) que
+// view/interaction.js/playSideSwitchSound. Deux pools DISTINCTS
+// (contrairement au pool générique "toggle" utilisé pendant le
+// développement) : l'activation et la désactivation doivent se
+// reconnaître à l'oreille sans attendre l'annonce.
+const PERCEPTION_ACTIVATION_SOUND_KEY = "assets/sounds/ui/supernatural_perception_activation";
+const PERCEPTION_DEACTIVATION_SOUND_KEY = "assets/sounds/ui/supernatural_perception_disactivation";
 
-function playPerceptionToggleSound() {
+function playPerceptionToggleSound(active) {
+  const key = active ? PERCEPTION_ACTIVATION_SOUND_KEY : PERCEPTION_DEACTIVATION_SOUND_KEY;
   try {
     const factor = getPref("interfaceVolume", PREF_CONSTRAINTS.interfaceVolume.default) / 100;
-    playOneShot(resolveAsset(PERCEPTION_TOGGLE_SOUND_KEY), { volume: factor });
+    playOneShot(resolveAsset(key), { volume: factor });
   } catch (error) {
-    console.warn(`city-screen: son de bascule de perception indisponible ("${PERCEPTION_TOGGLE_SOUND_KEY}") : ${error.message}`);
+    console.warn(`city-screen: son de bascule de perception indisponible ("${key}") : ${error.message}`);
   }
 }
 
@@ -241,8 +245,9 @@ export function makeCityScreen(getSession, setSession) {
     perceptionCooldownUntil = now + TUNING_DEFAULTS.perceptionCooldownMs;
 
     setSession(togglePerception(getSession()));
-    playPerceptionToggleSound();
-    announce(t(getSession().perceptionActive ? "perception.activated" : "perception.deactivated"), { assertive: true });
+    const active = getSession().perceptionActive;
+    playPerceptionToggleSound(active);
+    announce(t(active ? "perception.activated" : "perception.deactivated"), { assertive: true });
   }
 
   // Transition FRANCHE côté ÉTAT/ENTITÉS (pas de fondu, pas d'animation) :

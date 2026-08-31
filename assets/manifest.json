@@ -1,6 +1,8 @@
 {
   "assets/ambiances/supernatural_reality": [
-    "assets/ambiances/supernatural_reality_1.mp3"
+    "assets/ambiances/supernatural_reality_1.mp3",
+    "assets/ambiances/supernatural_reality_2.mp3",
+    "assets/ambiances/supernatural_reality_3.mp3"
   ],
   "assets/ambiances/traffic_street_afternoon": [
     "assets/ambiances/traffic_street_afternoon_1.mp3"
@@ -16,6 +18,12 @@
   ],
   "assets/musics/factory": [
     "assets/musics/factory_1.mp3"
+  ],
+  "assets/musics/graveyard_day": [
+    "assets/musics/graveyard_day_1.mp3",
+    "assets/musics/graveyard_day_2.mp3",
+    "assets/musics/graveyard_day_3.mp3",
+    "assets/musics/graveyard_day_4.mp3"
   ],
   "assets/musics/jazz_day": [
     "assets/musics/jazz_day_1.mp3",
@@ -48,10 +56,19 @@
     "assets/musics/night_zone_night_2.mp3"
   ],
   "assets/musics/port_day": [
-    "assets/musics/port_day_1.mp3"
+    "assets/musics/port_day_1.mp3",
+    "assets/musics/port_day_2.mp3"
   ],
   "assets/musics/port_night": [
     "assets/musics/port_night_1.mp3"
+  ],
+  "assets/musics/ruins_day": [
+    "assets/musics/ruins_day_1.mp3",
+    "assets/musics/ruins_day_2.mp3",
+    "assets/musics/ruins_day_3.mp3"
+  ],
+  "assets/musics/ruins_night": [
+    "assets/musics/ruins_night_1.mp3"
   ],
   "assets/musics/science_day": [
     "assets/musics/science_day_1.mp3",
@@ -344,6 +361,12 @@
   ],
   "assets/sounds/ui/select": [
     "assets/sounds/ui/select_1.mp3"
+  ],
+  "assets/sounds/ui/supernatural_perception_activation": [
+    "assets/sounds/ui/supernatural_perception_activation_1.mp3"
+  ],
+  "assets/sounds/ui/supernatural_perception_disactivation": [
+    "assets/sounds/ui/supernatural_perception_disactivation_1.mp3"
   ],
   "assets/sounds/ui/toggle": [
     "assets/sounds/ui/toggle_1.mp3"
