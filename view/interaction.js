@@ -33,11 +33,14 @@ export function setDoorTransitionHandler(handler) {
   doorTransitionHandler = handler;
 }
 
-// (arrivalX) => void — bascule la face courante ET reconstruit la scène
-// audio (voir view/city-screen.js/sideSwitchEffect ; core/state.js/
+// (arrivalX) => Promise<void> — bascule la face courante via un SAS animé
+// (croisement des filtres d'occlusion PUIS reconstruction de la scène
+// audio, voir view/city-screen.js/sideSwitchEffect ; core/state.js/
 // switchSide ; entities/types/passage.js), même patron que
 // setDoorTransitionHandler ci-dessus — PAS un travelToWorld, on reste dans
-// le même monde.
+// le même monde. Asynchrone comme doorTransitionHandler, mais handleSwitchSide
+// ne l'attend pas (comme handleTransit) : le gestionnaire gère seul son
+// propre sas.
 export function setSideSwitchHandler(handler) {
   sideSwitchHandler = handler;
 }
@@ -119,26 +122,6 @@ function playRefusalSound() {
   }
 }
 
-// Marqueur sonore de bascule recto<->verso (voir CLAUDE.md/"RECTO/VERSO") —
-// "metal_gate" (une grille métallique qu'on referme/ouvre) : signale
-// clairement le changement de face à l'oreille, en plus du décor sonore
-// différent qui suit (nouvelle scène audio, voir sideSwitchHandler). Non
-// positionné (comme PICKUP_SOUND_KEY) : le joueur vient de changer de face,
-// un pan/volume basé sur sa position n'aurait aucun sens ici. Défensif
-// (try/catch ci-dessous) comme tout son d'UI du projet, malgré la présence
-// du fichier aujourd'hui : un contenu futur pourrait renommer/retirer le
-// pool sans que ce marqueur ne devienne un plantage.
-const SIDE_SWITCH_SOUND_KEY = "assets/sounds/doors/metal_gate";
-
-function playSideSwitchSound() {
-  try {
-    const factor = getPref("interfaceVolume", PREF_CONSTRAINTS.interfaceVolume.default) / 100;
-    playOneShot(resolveAsset(SIDE_SWITCH_SOUND_KEY), { volume: factor });
-  } catch (error) {
-    console.warn(`interact: son de bascule indisponible ("${SIDE_SWITCH_SOUND_KEY}") : ${error.message}`);
-  }
-}
-
 // Description RICHE d'une entité (interaction "describe"), distincte du nom
 // annoncé à l'approche (occupation, voir view/audio/city-scene.js). INDIRECTION
 // délibérée plutôt qu'un accès direct à descriptionKey : aujourd'hui une
@@ -178,14 +161,16 @@ function handleTransit(entity) {
 }
 
 // "switchSide" (point de passage recto<->verso, voir entities/types/
-// passage.js) : MÊME PATRON que handleTransit — délègue tout l'effet
-// d'ÉTAT + AUDIO au gestionnaire enregistré (voir view/city-screen.js/
-// sideSwitchEffect), PUIS joue le marqueur sonore de bascule ICI (comme
-// handlePickup/handleLoot jouent LEUR retour sensoriel après avoir délégué
-// l'effet d'état). arrivalX : donnée de CONTENU (action.arrivalX, jamais
-// validée en FORME par core/level.js — voir son commentaire sur `action`,
-// même politique que amount/spawn ci-dessous) — un contenu mal formé se
-// dégrade en avertissement, jamais un plantage.
+// passage.js) : MÊME PATRON EXACT que handleTransit — délègue TOUT l'effet
+// (état + son de passage + croisement d'occlusion, voir
+// view/city-screen.js/sideSwitchEffect, qui orchestre son propre sas) au
+// gestionnaire enregistré, jamais de son joué ICI (contrairement à
+// handlePickup/handleLoot) : le son de bascule appartient à la SÉQUENCE du
+// sas, dont le timing (juste après le gel, AVANT le croisement de filtres)
+// ce fichier n'a aucune raison de connaître. arrivalX : donnée de CONTENU
+// (action.arrivalX, jamais validée en FORME par core/level.js — voir son
+// commentaire sur `action`, même politique que amount/spawn ci-dessous) —
+// un contenu mal formé se dégrade en avertissement, jamais un plantage.
 function handleSwitchSide(entity) {
   const arrivalX = entity.action.arrivalX;
   if (!Number.isFinite(arrivalX)) {
@@ -194,7 +179,6 @@ function handleSwitchSide(entity) {
   }
   if (!sideSwitchHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
   sideSwitchHandler(arrivalX);
-  playSideSwitchSound();
 }
 
 // "pickup" : effet d'ÉTAT délégué au gestionnaire enregistré — PUIS retour

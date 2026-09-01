@@ -3,16 +3,17 @@
 // Aucun `behavior` par défaut ici, volontairement (voir dog.js) : se
 // déclare à l'INSTANCE (level/*.json). Donnée pure : aucun import.
 //
-// Présence conditionnée par la MÉTÉO (core/presence.js/"weather",
-// core/scripting.md) : présent SEULEMENT sous la brume — sert de cas de
-// test pour cette condition (voir view/menus/debug-weather-menu.js,
-// Shift+W, pour la forcer). Idéalement composée AUSSI avec
-// "perceptionActive" (loup surnaturel visible uniquement perception
-// active ET brume) — l'évaluateur actuel ne supporte qu'UNE condition par
-// règle (pas de ET entre deux types), donc repli sur la condition météo
-// SEULE pour l'instant, comme prévu par la demande d'origine. Un futur
-// condition composite (`allOf`) pourrait réintroduire le ET sans retoucher
-// cette entité.
+// Présence conditionnée par l'ET de DEUX conditions (core/presence.js/
+// "allOf") : perception surnaturelle ACTIVE ET météo BRUMEUSE — un loup
+// surnaturel, visible SEULEMENT si les deux tiennent à la fois (perception
+// seule ou brume seule ne suffisent pas). Entité SURNATURELLE comme
+// ghost.js (même statut "flag surnaturel" — dormante/non examinable/jamais
+// bloquante hors perception, JAMAIS soumise au filtre d'étouffement des
+// entités mondaines, voir view/audio/city-scene.js/isPerceptionGated, qui
+// détecte la condition "perceptionActive" MÊME imbriquée dans un "allOf",
+// voir son commentaire), avec une exigence météo EN PLUS. Testable via le
+// menu debug météo (Shift+W) pour forcer la brume, combiné à la touche de
+// perception ("p").
 export default {
   label: "entity.cumulo_lupus",
   descriptionKey: "entity.cumulo_lupus.description",
@@ -22,5 +23,10 @@ export default {
   blocksMovement: false,
   observable: true,
   interactable: false,
-  presence: [{ when: { type: "weather", state: "fog" }, present: true }],
+  presence: [
+    {
+      when: { type: "allOf", conditions: [{ type: "perceptionActive" }, { type: "weather", state: "fog" }] },
+      present: true,
+    },
+  ],
 };

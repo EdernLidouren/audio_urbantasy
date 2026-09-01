@@ -1051,12 +1051,20 @@ tirer, contrairement à `resolveAsset` — c'est ce qui permet à
 au suivant sans jamais planter : "ne peut jamais échouer" est une garantie
 structurelle, pas une convention.
 
-Exemple : `entities/types/buddy.js` déclare `gait: "heavy_boots"` ET
-`naturalWalk: "barefoot"` — NI L'UN NI L'AUTRE fichier n'existe aujourd'hui,
-la résolution dégrade donc jusqu'au son propre du compagnon
-(`dog_medium_walk`), sans qu'aucun nouveau fichier soit requis et sans
-changer son comportement audible. Déposer `heavy_boots_walk_*.mp3` demain
-suffirait à faire marcher le compagnon différemment, sans toucher à la vue.
+Exemple : `entities/types/dog.js` et `entities/types/buddy.js` ne déclarent
+NI `gait` NI `naturalWalk` — la résolution retombe directement sur le son
+PROPRE de l'entité (`sounds.movement.path`, `dog_medium_walk`), sans passer
+par les deux premiers crans. **Piège vécu** : `buddy.js` a un temps déclaré
+`gait: "heavy_boots"` + `naturalWalk: "barefoot"` pour DÉMONTRER la chaîne
+complète, sur l'hypothèse qu'aucun des deux pools n'existait encore — un
+pool `barefoot_walk` ajouté PLUS TARD (pour le pas nu-pieds du joueur, sans
+lien avec le compagnon) a silencieusement court-circuité cette démo et fait
+marcher le chien pieds nus (bug réel, corrigé en retirant les deux champs).
+Une valeur `gait`/`naturalWalk` de DÉMONSTRATION (plutôt qu'un vrai choix de
+contenu) est donc FRAGILE : elle peut se mettre à matcher un pool ajouté
+pour une tout autre raison, sans qu'on y touche — à réserver aux entités qui
+ont VRAIMENT un gait/pas naturel distinct de leur son propre, jamais comme
+illustration.
 
 ## Ce qui n'est PAS un paramètre sonore
 
@@ -1160,11 +1168,20 @@ espace fermé pour tout ce qui est spatial/logique :
 l'AUTRE face sont rendues en ÉTOUFFÉ (passe-bas + atténuation de gain,
 `mufflingLowpassHz`/`mufflingGain`, `config/tuning-values.js`), toujours
 DIRECTIONNELLES (même pan/distance dérivés de leur x que d'habitude) — sauf
-leur BEACON, jamais construit pour l'autre face (`includeBeacon:false`) :
-on DEVINE la présence de l'autre face, on ne la LOCALISE jamais. Au
-basculement de face, normal et étouffé s'inversent simplement (la scène
-audio est entièrement reconstruite, voir `view/city-screen.js`/
-`sideSwitchEffect`).
+leur BEACON, jamais construit pour l'autre face EN JEU NORMAL
+(`includeBeacon:false`) : on DEVINE la présence de l'autre face, on ne la
+LOCALISE jamais. Au basculement de face, normal et étouffé s'inversent —
+ANIMÉ par un SAS (jeu gelé, voir `view/city-screen.js`/`sideSwitchEffect`) :
+un CROISEMENT DE FILTRES (`view/audio/city-scene.js`/`crossfadeFaceSwap`)
+ferme le filtre de la face quittée pendant qu'il ouvre celui de la face
+rejointe, les deux restant AUDIBLES tout du long (pas un fondu vers le
+silence). Pour porter ce croisement, `crossfadeFaceSwap` construit des
+balises TEMPORAIRES pour les beacons continus de l'autre face — SEULE
+exception à `includeBeacon:false`, bornée à la durée du sas et détruite à
+sa fin (jamais persistée) : l'invariant "on ne localise jamais l'autre
+face" reste vrai en dehors de cette fenêtre. Le croisement terminé, la
+scène audio est reconstruite (comme avant ce mécanisme), sans effet
+audible puisque le son y est déjà.
 
 ## `isFlying` — hauteur SUGGÉRÉE par le son, jamais un axe Y
 

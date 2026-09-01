@@ -4185,6 +4185,139 @@ export function runMovementChecks() {
   notFoggyAgainState = reduce(notFoggyAgainState, tick(0));
   run("weather (condition) : redevient dormante quand la météo change à nouveau", false, wolf(notFoggyAgainState).present);
 
+  // --- Condition "allOf" (core/presence.js/evaluateAllOf) : composite, ET
+  // logique entre plusieurs conditions — délègue à evaluateCondition pour
+  // chaque sous-condition, jamais un second mécanisme.
+  run(
+    "allOf : les deux sous-conditions vraies -> vraie",
+    true,
+    evaluateCondition({ type: "allOf", conditions: [{ type: "perceptionActive" }, { type: "weather", state: "fog" }] }, { perceptionActive: true, weather: "fog" })
+  );
+  run(
+    "allOf : une seule sous-condition vraie (perception) -> fausse",
+    false,
+    evaluateCondition({ type: "allOf", conditions: [{ type: "perceptionActive" }, { type: "weather", state: "fog" }] }, { perceptionActive: true, weather: "sunny" })
+  );
+  run(
+    "allOf : une seule sous-condition vraie (météo) -> fausse",
+    false,
+    evaluateCondition({ type: "allOf", conditions: [{ type: "perceptionActive" }, { type: "weather", state: "fog" }] }, { perceptionActive: false, weather: "fog" })
+  );
+  run(
+    "allOf : aucune sous-condition vraie -> fausse",
+    false,
+    evaluateCondition({ type: "allOf", conditions: [{ type: "perceptionActive" }, { type: "weather", state: "fog" }] }, { perceptionActive: false, weather: "sunny" })
+  );
+  // Cas limite : "conditions" à un SEUL élément — redondant (revient à la
+  // sous-condition seule) mais légal, voir core/level.js/validateCondition
+  // (rejette seulement un tableau VIDE, pas un tableau à un élément).
+  run(
+    "allOf : une seule sous-condition, vraie -> vraie",
+    true,
+    evaluateCondition({ type: "allOf", conditions: [{ type: "perceptionActive" }] }, { perceptionActive: true })
+  );
+  run(
+    "allOf : une seule sous-condition, fausse -> fausse",
+    false,
+    evaluateCondition({ type: "allOf", conditions: [{ type: "perceptionActive" }] }, { perceptionActive: false })
+  );
+  run(
+    "allOf : imbriqué (allOf dans allOf) — toutes vraies -> vraie",
+    true,
+    evaluateCondition(
+      { type: "allOf", conditions: [{ type: "allOf", conditions: [{ type: "perceptionActive" }, { type: "weather", state: "fog" }] }, { type: "consumed" }] },
+      { perceptionActive: true, weather: "fog", entity: { consumed: true } }
+    )
+  );
+
+  // Validation au chargement (core/level.js/validateCondition) :
+  // "conditions" doit être un tableau NON VIDE, chaque élément revalidé
+  // RÉCURSIVEMENT — une sous-condition mal formée échoue exactement comme
+  // au premier niveau.
+  run(
+    "allOf : conditions vide -> erreur claire au chargement",
+    true,
+    expectLevelParseThrows(
+      { id: "movement-check-allof-empty", titleKey: "level.demo.title", length: 20, playerStart: 0, entities: [{ id: "wolf-1", type: "wolf", x: 10, presence: [{ when: { type: "allOf", conditions: [] }, present: true }] }] },
+      { wolf: { label: "entity.cumulo_lupus" } }
+    )
+  );
+  run(
+    "allOf : conditions absent (pas un tableau) -> erreur claire au chargement",
+    true,
+    expectLevelParseThrows(
+      { id: "movement-check-allof-missing", titleKey: "level.demo.title", length: 20, playerStart: 0, entities: [{ id: "wolf-1", type: "wolf", x: 10, presence: [{ when: { type: "allOf" }, present: true }] }] },
+      { wolf: { label: "entity.cumulo_lupus" } }
+    )
+  );
+  run(
+    "allOf : conditions à un seul élément -> légal au chargement (pas d'erreur)",
+    false,
+    expectLevelParseThrows(
+      { id: "movement-check-allof-single", titleKey: "level.demo.title", length: 20, playerStart: 0, entities: [{ id: "wolf-1", type: "wolf", x: 10, presence: [{ when: { type: "allOf", conditions: [{ type: "perceptionActive" }] }, present: true }] }] },
+      { wolf: { label: "entity.cumulo_lupus" } }
+    )
+  );
+  run(
+    "allOf : sous-condition mal formée (état météo inconnu) -> erreur claire au chargement, RÉCURSIVE",
+    true,
+    expectLevelParseThrows(
+      {
+        id: "movement-check-allof-bad-sub",
+        titleKey: "level.demo.title",
+        length: 20,
+        playerStart: 0,
+        entities: [
+          {
+            id: "wolf-1",
+            type: "wolf",
+            x: 10,
+            presence: [{ when: { type: "allOf", conditions: [{ type: "perceptionActive" }, { type: "weather", state: "doesNotExist" }] }, present: true }],
+          },
+        ],
+      },
+      { wolf: { label: "entity.cumulo_lupus" } }
+    )
+  );
+
+  // Intégration : même patron que cumulo-lupus (entities/types/
+  // cumulo-lupus.js) — présent SEULEMENT perception ACTIVE ET météo
+  // BRUMEUSE, les QUATRE combinaisons vérifiées via reduce(), aucun
+  // mécanisme séparé du reste de la présence conditionnelle.
+  const ALLOF_REGISTRY = {
+    wolf: {
+      label: "entity.cumulo_lupus",
+      presence: [{ when: { type: "allOf", conditions: [{ type: "perceptionActive" }, { type: "weather", state: "fog" }] }, present: true }],
+    },
+  };
+  const allOfLevel = parseLevel(
+    { id: "movement-check-allof-integration", titleKey: "level.demo.title", length: 20, playerStart: 0, entities: [{ id: "wolf-1", type: "wolf", x: 10, behavior: { kind: "wander", walkMin: 1000, walkMax: 1000 } }] },
+    ALLOF_REGISTRY
+  );
+  function allOfWolf(state) {
+    return getActiveWorld(state).entities.find((e) => e.id === "wolf-1");
+  }
+  let neitherState = createInitialState(allOfLevel, "allof-cond-check", NO_COMPANIONS);
+  neitherState = setWeather(neitherState, "sunny");
+  neitherState = reduce(neitherState, tick(0));
+  run("allOf (intégration) : ni perception ni brume -> dormante", false, allOfWolf(neitherState).present);
+
+  let perceptionOnlyState = togglePerception(neitherState);
+  perceptionOnlyState = reduce(perceptionOnlyState, tick(0));
+  run("allOf (intégration) : perception SEULE (pas de brume) -> dormante", false, allOfWolf(perceptionOnlyState).present);
+
+  let fogOnlyState = setWeather(neitherState, "fog");
+  fogOnlyState = reduce(fogOnlyState, tick(0));
+  run("allOf (intégration) : brume SEULE (perception inactive) -> dormante", false, allOfWolf(fogOnlyState).present);
+
+  let bothState = togglePerception(fogOnlyState);
+  bothState = reduce(bothState, tick(0));
+  run("allOf (intégration) : perception ACTIVE ET brume -> présente", true, allOfWolf(bothState).present);
+
+  let bothThenOffState = togglePerception(bothState);
+  bothThenOffState = reduce(bothThenOffState, tick(0));
+  run("allOf (intégration) : perception redevient inactive -> redevient dormante", false, allOfWolf(bothThenOffState).present);
+
   // --- Collectible persistant (core/state.js/markConsumed, core/money.js/lootEntity) ---
   // Contrairement à removeEntity/pickupEntity ci-dessus, l'entité looté
   // N'EST JAMAIS retirée — voir entities/model.md/"Collectible persistant".

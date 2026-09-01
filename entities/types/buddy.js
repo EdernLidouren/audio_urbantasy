@@ -7,22 +7,20 @@
 // "follow" (voir core/behaviors/follow.js). vocal et movement repris tels
 // quels de dog.js (même famille de son).
 //
-// gait:"heavy_boots" + naturalWalk:"barefoot" — démontrent la CHAÎNE
-// COMPLÈTE de résolution du pas sur sol NEUTRE (voir entities/model.md,
-// "Surfaces de sol et son de pas") : NI "heavy_boots_walk" NI
-// "barefoot_walk" n'existent aujourd'hui, donc la résolution dégrade
-// proprement, cran par cran, jusqu'au pas naturel "son propre" de l'entité
-// (sounds.movement.path, dog_medium_walk) — sans qu'aucun nouveau fichier
-// soit requis, comportement audible du compagnon INCHANGÉ. Retire ces
-// champs le jour où l'un des deux fichiers existe réellement : le
-// compagnon se mettra alors à l'utiliser automatiquement, sans toucher à
-// la vue.
+// Ni gait ni naturalWalk déclarés (voir entities/model.md, "Surfaces de sol
+// et son de pas") : la résolution du pas retombe directement sur le son
+// PROPRE de l'entité (sounds.movement.path, dog_medium_walk), comme
+// dog.js. Ce fichier a autrefois déclaré gait:"heavy_boots" +
+// naturalWalk:"barefoot" pour DÉMONTRER la chaîne de résolution complète
+// sur sol neutre, sur l'hypothèse qu'aucun des deux pools n'existait —
+// devenu FAUX depuis l'ajout de "barefoot_walk" (voir ses assets), qui
+// court-circuitait la résolution avant "son propre" et faisait marcher le
+// compagnon pieds nus au lieu de chien (bug corrigé en retirant ces deux
+// champs, jamais en les ajustant : la démonstration n'a plus sa place ici).
 
 export default {
   label: "entity.dog",
   descriptionKey: "entity.buddy.description",
-  gait: "heavy_boots",
-  naturalWalk: "barefoot",
   sounds: {
     vocal: {
       path: "assets/sounds/entities/dog_medium_vocal",

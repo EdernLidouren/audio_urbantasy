@@ -105,6 +105,17 @@ function validateCondition(cond, describe) {
   if (cond.type === "weather" && (!isNonEmptyString(cond.state) || !WEATHER_STATES[cond.state])) {
     fail(`${describe}.state "${cond.state}" absent de la table météo.`);
   }
+  // "allOf" : composite — son champ `conditions` doit être un tableau NON
+  // VIDE, chaque élément revalidé RÉCURSIVEMENT par cette même fonction
+  // (une sous-condition peut être de n'importe quel type du registre, y
+  // compris un autre "allOf" imbriqué) — jamais un second chemin de
+  // validation, voir core/scripting.md.
+  if (cond.type === "allOf") {
+    if (!Array.isArray(cond.conditions) || cond.conditions.length === 0) {
+      fail(`${describe}.conditions doit être un tableau non vide pour "allOf".`);
+    }
+    cond.conditions.forEach((subCond, i) => validateCondition(subCond, `${describe}.conditions[${i}]`));
+  }
 }
 
 // Une règle de presence[] : { when: { type, ... }, effects: [<effet>...] }.

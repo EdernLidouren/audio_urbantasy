@@ -7,8 +7,9 @@ import { getMoveIntent, CITY_BINDINGS } from "./input.js";
 import { resolveAction } from "../lib/input.js";
 import { announce } from "../lib/announce.js";
 import { t } from "../data/i18n/index.js";
-import { ensureAudioUnlocked, playOneShot } from "../lib/audio.js";
+import { ensureAudioUnlocked, playOneShot, rampEntityLayerGain } from "../lib/audio.js";
 import { resolveAsset } from "../lib/assets.js";
+import { pushScreen, popScreen } from "../lib/screens.js";
 import { createCityAudioScene, stopPersistentAudioLayers } from "./audio/city-scene.js";
 import {
   interact,
@@ -231,6 +232,47 @@ function playPerceptionToggleSound(active) {
   }
 }
 
+// Son de PASSAGE (porte), voir runDoorTransitionSas plus bas — non
+// positionné, volume UI (interfaceVolume), même patron défensif (try/catch)
+// que playPerceptionToggleSound/playSideSwitchSound ci-dessous. Joué HORS
+// du gain de couche entités (lib/audio.js) : appartient à la TRANSITION
+// elle-même, jamais à la scène qui vient de s'effacer — reste audible même
+// au plus fort du fondu.
+const DOOR_TRANSITION_SOUND_KEY = "assets/sounds/doors/door_transition";
+// Durées du fondu de couche entités pendant le sas (voir
+// config/tuning-values.js, seule définition, jamais dupliquée ici).
+const DOOR_TRANSITION_FADE_OUT_MS = TUNING_DEFAULTS.doorTransitionFadeOutMs;
+const DOOR_TRANSITION_FADE_IN_MS = TUNING_DEFAULTS.doorTransitionFadeInMs;
+
+function playDoorTransitionSound() {
+  try {
+    const factor = getPref("interfaceVolume", PREF_CONSTRAINTS.interfaceVolume.default) / 100;
+    playOneShot(resolveAsset(DOOR_TRANSITION_SOUND_KEY), { volume: factor });
+  } catch (error) {
+    console.warn(`city-screen: son de passage indisponible ("${DOOR_TRANSITION_SOUND_KEY}") : ${error.message}`);
+  }
+}
+
+// Marqueur sonore de bascule recto<->verso — "metal_gate" (une grille
+// métallique qu'on referme/ouvre), voir sideSwitchEffect plus bas. MÊME
+// patron défensif que playDoorTransitionSound ci-dessus (non positionné,
+// volume UI, try/catch) — déplacé ici depuis view/interaction.js : le
+// timing du son fait maintenant partie de la SÉQUENCE du sas (joué juste
+// après le gel, avant le croisement de filtres), que ce fichier orchestre.
+const SIDE_SWITCH_SOUND_KEY = "assets/sounds/doors/metal_gate";
+// Durée du croisement de filtres d'occlusion (voir
+// config/tuning-values.js, seule définition, jamais dupliquée ici).
+const FACE_SWITCH_FADE_MS = TUNING_DEFAULTS.faceSwitchFadeMs;
+
+function playSideSwitchSound() {
+  try {
+    const factor = getPref("interfaceVolume", PREF_CONSTRAINTS.interfaceVolume.default) / 100;
+    playOneShot(resolveAsset(SIDE_SWITCH_SOUND_KEY), { volume: factor });
+  } catch (error) {
+    console.warn(`city-screen: son de bascule indisponible ("${SIDE_SWITCH_SOUND_KEY}") : ${error.message}`);
+  }
+}
+
 export function makeCityScreen(getSession, setSession) {
   let scene = null;
   // COOLDOWN anti-spam de la touche perception (voir view/input.js/
@@ -333,8 +375,51 @@ export function makeCityScreen(getSession, setSession) {
     }
   }
 
+  // Attend `ms` millisecondes réelles — utilisé UNIQUEMENT pour cadencer le
+  // SAS de transition ci-dessous (voir runDoorTransitionSas), jamais lié au
+  // temps de jeu.
+  function wait(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  // SAS de transition de porte : "fondu au noir SONORE" (à la Animal
+  // Crossing) qui souligne le changement de lieu et masque le chargement
+  // derrière un silence bref plutôt qu'une coupure sèche des balises ou un
+  // blanc audible. Musique/ambiance INCHANGÉES : elles suivent leur PROPRE
+  // logique de continuité/crossfade (lib/audio.js), entièrement indifférente
+  // au gain de couche entités fondu ici (voir son commentaire, lib/audio.js)
+  // — cette séquence ne les touche JAMAIS.
+  //
+  // Jeu GELÉ pendant tout le sas : réutilise le MÊME mécanisme qu'un menu
+  // (seul le sommet de la pile tique/reçoit le clavier, voir
+  // lib/screens.js) — un écran-sas SANS onTick/onFrame/onKeyDown suffit,
+  // aucun code de gel dédié. Popé à la toute fin, quel que soit le résultat
+  // (voir finally) : un échec de chargement ne doit jamais laisser le jeu
+  // gelé pour de bon.
+  //
+  // Séquence STRICTE : sas -> fondu SORTANT (scène quittée) -> destruction +
+  // chargement de la cible (caché derrière le silence — RÉSERVÉ pour un
+  // futur préchauffage Howler avant ce point, pas construit maintenant) ->
+  // son de PASSAGE (hors du gain, voir playDoorTransitionSound) -> fondu
+  // ENTRANT (scène cible, déjà prête) -> fin du sas.
+  async function runDoorTransitionSas(targetId) {
+    pushScreen({});
+    try {
+      rampEntityLayerGain(0, DOOR_TRANSITION_FADE_OUT_MS);
+      await wait(DOOR_TRANSITION_FADE_OUT_MS);
+
+      await performTransition(targetId);
+
+      playDoorTransitionSound();
+      rampEntityLayerGain(1, DOOR_TRANSITION_FADE_IN_MS);
+      await wait(DOOR_TRANSITION_FADE_IN_MS);
+    } finally {
+      popScreen();
+    }
+  }
+
   async function transitionThroughDoor(targetId) {
-    await performTransition(targetId);
+    await runDoorTransitionSas(targetId);
   }
 
   // Sélection sur la carte de la ville (voir view/menus/city-map-menu.js,
@@ -364,23 +449,39 @@ export function makeCityScreen(getSession, setSession) {
     scene = createCityAudioScene(getSession);
   }
 
-  // Bascule recto<->verso (voir view/interaction.js/ACTION_HANDLERS.
+  // SAS de bascule recto<->verso (voir view/interaction.js/ACTION_HANDLERS.
   // switchSide ; entities/types/passage.js ; CLAUDE.md/"RECTO/VERSO") —
-  // MÊME SOIN que transitionThroughDoor pour l'audio : scene.destroy()
-  // AVANT tout changement d'état, pour n'avoir AUCUN Howl résiduel de la
-  // face quittée, scène reconstruite APRÈS la bascule core sur la NOUVELLE
-  // face active (getActiveWorld, voir core/state.js, la lit déjà via
-  // session.player.side). PAS de travelToWorld : le monde actif ne change
-  // pas, juste session.player.side + la position du joueur — pas de
-  // fetch réseau, pas de nouveau titre à annoncer (même lieu). Le marqueur
-  // sonore de bascule reste à la charge de l'appelant (voir
-  // handleSwitchSide, view/interaction.js), symétrique aux autres effets
-  // d'état de ce fichier (son/annonce restent côté interaction.js).
-  function sideSwitchEffect(arrivalX) {
-    scene.destroy();
-    scene = null;
-    setSession(switchSide(getSession(), arrivalX));
-    scene = createCityAudioScene(getSession);
+  // réutilise le MÊME mécanisme de gel que runDoorTransitionSas (pushScreen
+  // vide), mais un geste AUDIO différent : PAS un fondu vers le silence
+  // (rien ne disparaît, rien ne se charge — les deux faces COEXISTENT déjà),
+  // un CROISEMENT DE FILTRES D'OCCLUSION (voir scene.crossfadeFaceSwap,
+  // view/audio/city-scene.js) — la face courante s'étouffe pendant que
+  // l'autre s'éclaircit, en parallèle, toutes deux restant audibles.
+  //
+  // Séquence STRICTE : sas -> son de PASSAGE (metal_gate, hors du gain de
+  // couche entités comme le son de porte) -> croisement des DEUX filtres ->
+  // bascule core (switchSide, position + face) -> scène reconstruite sur la
+  // NOUVELLE face active (getActiveWorld la lit déjà via
+  // session.player.side) -> fin du sas. La reconstruction reste un
+  // destroy()+recreate franc (comme avant ce sas) : SANS effet audible,
+  // puisque le croisement qui la précède a déjà amené le son exactement là
+  // où la scène fraîche le poserait (face active nette, face quittée
+  // étouffée/one-shot seul) — PAS de travelToWorld, le monde actif ne
+  // change pas, pas de fetch réseau, pas de nouveau titre à annoncer (même
+  // lieu).
+  async function sideSwitchEffect(arrivalX) {
+    pushScreen({});
+    try {
+      playSideSwitchSound();
+      await scene.crossfadeFaceSwap(FACE_SWITCH_FADE_MS);
+
+      scene.destroy();
+      scene = null;
+      setSession(switchSide(getSession(), arrivalX));
+      scene = createCityAudioScene(getSession);
+    } finally {
+      popScreen();
+    }
   }
 
   // Effet d'ÉTAT du ramassage (voir view/interaction.js/ACTION_HANDLERS.

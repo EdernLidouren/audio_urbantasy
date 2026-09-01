@@ -253,17 +253,64 @@ Testable EN JEU sans attendre le hasard via le menu debug météo (Shift+W, mode
 voir `view/menus/debug-weather-menu.js`), qui force directement `session.weather.state`
 (`core/weather.js`/`setWeather`).
 
-Exemple réel complet — `cumuloLupus` (`entities/types/cumulo-lupus.js`), présent
-seulement sous la brume :
+Exemple réel — combinée à `perceptionActive` via `"allOf"` (voir plus bas), un loup
+surnaturel visible seulement perception active ET brume : `cumuloLupus`
+(`entities/types/cumulo-lupus.js`).
+
+### `allOf` — composite, ET logique entre plusieurs conditions
 
 ```js
-presence: [{ when: { type: "weather", state: "fog" }, present: true }],
+{ type: "allOf", conditions: [{ type: "perceptionActive" }, { type: "weather", state: "fog" }] }
 ```
 
-Note de composition : cette condition ne se combine PAS (pas de `ET` entre deux types de
-condition dans une même règle aujourd'hui) — un loup à la fois surnaturel ET brumeux
-demanderait une future condition composite (`allOf`), pas construite tant qu'un seul cas
-d'usage ne la justifie pas (voir CLAUDE.md/anti-abstraction prématurée).
+Vraie si TOUTES les sous-conditions de `conditions` le sont — délègue à
+`evaluateCondition` pour CHACUNE (n'importe quel type du registre, y compris un autre
+`"allOf"` imbriqué) : MÊME registre, MÊME évaluateur, jamais un second mécanisme de
+composition. `conditions` validé au chargement (`core/level.js`/`validateCondition`,
+factorisée : tableau NON VIDE, chaque élément revalidé RÉCURSIVEMENT par la même
+fonction) — une sous-condition mal formée échoue donc exactement comme si elle était au
+premier niveau. Un tableau à un SEUL élément est légal (seul un tableau VIDE est
+rejeté) — redondant avec la sous-condition seule, mais pas une erreur.
+
+Imbrication réelle — un `"allOf"` DANS un `"allOf"` (ici combiné à une troisième
+condition sœur, `"consumed"`) :
+
+```js
+{
+  type: "allOf",
+  conditions: [
+    { type: "allOf", conditions: [{ type: "perceptionActive" }, { type: "weather", state: "fog" }] },
+    { type: "consumed" },
+  ],
+}
+```
+
+`evaluateCondition` s'appelle elle-même sans traitement spécial pour ce cas : le
+`"allOf"` externe évalue son second élément (`"consumed"`) exactement comme le premier
+(`"allOf"` imbriqué), qui lui-même redélègue à `evaluateCondition` pour ses deux
+sous-conditions — aucune limite de profondeur codée en dur, testé jusqu'à deux niveaux
+dans `core/movement.check.js`.
+
+**Piège à connaître** : un consommateur qui inspecte `entity.presence[].when.type`
+DIRECTEMENT (ex. `view/audio/city-scene.js`/`isPerceptionGated`, qui détecte une entité
+SURNATURELLE pour l'exempter du filtre d'étouffement mondain) doit chercher la condition
+recherchée RÉCURSIVEMENT à l'intérieur d'un `"allOf"` — pas seulement au premier niveau —
+sous peine de rater une entité dont la condition est désormais COMPOSÉE (voir
+`conditionRequiresPerception`, `view/audio/city-scene.js`, qui fait cette recherche pour
+`isPerceptionGated`).
+
+Exemple réel complet — `cumuloLupus` (`entities/types/cumulo-lupus.js`), présent
+seulement perception ACTIVE ET météo BRUMEUSE (perception seule ou brume seule ne
+suffisent pas) :
+
+```js
+presence: [
+  {
+    when: { type: "allOf", conditions: [{ type: "perceptionActive" }, { type: "weather", state: "fog" }] },
+    present: true,
+  },
+],
+```
 
 Côté VUE (`view/audio/city-scene.js`), un changement de `session.weather.state` déclenche
 AUSSI une AMBIANCE SONORE dédiée : une couche GLOBALE (`lib/audio.js`/

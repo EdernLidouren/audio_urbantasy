@@ -311,4 +311,25 @@ export const TUNING_DEFAULTS = {
   // bascule météo est un changement atmosphérique graduel, jamais aussi
   // net qu'un toggle de perception.
   weatherAmbienceFadeMs: 3000,
+
+  // Durées (ms) du fondu de la couche ENTITÉS pendant le SAS d'une
+  // transition de porte (voir lib/audio.js/rampEntityLayerGain,
+  // view/city-screen.js/transitionThroughDoor) — le "fondu au noir sonore"
+  // qui souligne le changement de lieu et masque le chargement. COURTES
+  // par nature (souligner sans ralentir le passage de porte) : sortant
+  // avant de détruire la scène quittée, entrant une fois la scène cible
+  // prête. Musique/ambiance NE PASSENT PAS par ce gain (voir lib/audio.js,
+  // "Gain de couche ENTITÉS") : ces durées n'affectent qu'elles-mêmes.
+  doorTransitionFadeOutMs: 250,
+  doorTransitionFadeInMs: 300,
+
+  // Durée (ms) du CROISEMENT DE FILTRES d'occlusion pendant une bascule
+  // recto/verso (voir view/audio/city-scene.js/crossfadeFaceSwap,
+  // view/city-screen.js/sideSwitchEffect) — la face courante se referme
+  // pendant que l'autre s'ouvre, EN PARALLÈLE, sur cette même durée. Courte
+  // par nature (souligner le passage sans ralentir), DISTINCTE des durées
+  // de transition de porte ci-dessus : pas le même geste (un échange de
+  // clarté entre deux faces qui coexistent, jamais un fondu vers le
+  // silence).
+  faceSwitchFadeMs: 300,
 };

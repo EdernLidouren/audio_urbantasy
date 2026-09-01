@@ -82,11 +82,19 @@ contenu mal formé.
 { "id": "gap-recto", "type": "passage", "x": 8, "action": { "kind": "switchSide", "arrivalX": 8 } }
 ```
 
-**Audio de bascule (VUE)** : `scene.destroy()` puis reconstruction sur la
-nouvelle face active, même soin que `transitionThroughDoor` pour ne laisser
-AUCUN Howl résiduel (voir `view/city-screen.js`/`sideSwitchEffect`), plus un
-marqueur sonore de bascule (`view/interaction.js`, "metal_gate" —
+**Audio de bascule (VUE)** : un SAS animé (jeu gelé, même mécanisme que la
+transition de porte — voir `view/city-screen.js`/`runDoorTransitionSas`),
+mais un geste différent : PAS un fondu vers le silence (rien ne disparaît,
+les deux faces coexistent déjà), un CROISEMENT DES DEUX FILTRES D'OCCLUSION
+(`view/audio/city-scene.js`/`crossfadeFaceSwap`) — la face courante ferme
+son filtre (nette → étouffée) pendant que l'autre ouvre le sien (étouffée →
+nette), en parallèle, toutes deux restant audibles. Un marqueur sonore de
+passage joue juste après le gel ("metal_gate" —
 `assets/sounds/doors/metal_gate`, défensif si le fichier venait à manquer).
+Le croisement terminé, `scene.destroy()` puis reconstruction sur la
+nouvelle face active (voir `view/city-screen.js`/`sideSwitchEffect`) —
+SANS effet audible : le croisement a déjà amené le son là où la scène
+fraîche le poserait.
 
 **Coexistence audible (étape 2/2)** : depuis `core/reduce.js`/TICK, LES DEUX
 faces tiquent à chaque tour — plus de gel de l'autre face, mais ISOLATION
@@ -96,9 +104,15 @@ la face de l'entité, jamais croisés. Seul le SON traverse : les entités de
 l'autre face sont rendues en ÉTOUFFÉ (passe-bas + atténuation de gain,
 réglages `mufflingLowpassHz`/`mufflingGain` — `config/tuning-values.js`),
 directionnelles (même pan/distance que d'habitude), SAUF leur beacon,
-jamais audible de l'autre côté (aucune localisation croisée) — voir
-`view/audio/city-scene.js`/`includeBeacon`. Au basculement de face (même
-mécanisme que ci-dessus), normal et étouffé s'inversent.
+jamais audible de l'autre côté en temps normal (aucune localisation
+croisée) — voir `view/audio/city-scene.js`/`includeBeacon`. EXCEPTION
+BORNÉE AU SAS : `crossfadeFaceSwap` construit des balises TEMPORAIRES pour
+les beacons continus de l'autre face, SEULEMENT le temps du croisement, afin
+d'avoir un filtre à ouvrir — détruites à la fin du sas, jamais persistées ;
+l'invariant "jamais de beacon localisable de l'autre face" reste intact en
+dehors de cette fenêtre. Au basculement de face, normal et étouffé
+s'inversent — c'est ce croisement qui l'anime désormais, plutôt qu'un
+échange instantané.
 
 **Persistance** : une scène à deux faces sauvegarde SES DEUX FACES
 (entités, rngState, compteur d'éphémères) — `core/save.js` traite un monde à
@@ -241,7 +255,10 @@ revenir ici. EXCEPTIONS : `"hasEquipmentTag"` (champ `tag`) et `"weather"`
 (`core/tags.js`/`TAG_REGISTRY`, `config/weather-values.js`/`WEATHER_STATES`)
 — validés au chargement comme une surface de segment, une faute de frappe y
 échoue donc clairement plutôt que de dégrader silencieusement vers "jamais
-vraie".
+vraie". `"allOf"` (champ `conditions`) est une AUTRE exception, structurelle
+cette fois : son tableau de sous-conditions est validé RÉCURSIVEMENT (même
+fonction, voir tableau ci-dessous) — une sous-condition mal formée échoue
+donc au chargement, exactement comme si elle était au premier niveau.
 Voir `entities/model.md`/"Présence conditionnelle et triggers de
 comportement" pour la sémantique complète (priorité entre règles, les trois
 plans coupés par l'état dormant, la garde anti-boucle des effets
@@ -262,6 +279,7 @@ exactement ce tableau.
 | `hasEquipmentTag` | `tag` (clé de `core/tags.js`/`TAG_REGISTRY`, validée au chargement) | l'entité évaluée porte, dans son PROPRE équipement (`context.entity.equipment`), un objet marqué de ce tag (voir `core/equipment.js`/`equippedTags`) — entité sans `equipment` -> jamais vraie |
 | `perceptionActive` | (aucun) | la perception surnaturelle (`session.perceptionActive`, voir `core/state.js`/`togglePerception`) est active |
 | `weather` | `state` (clé de `config/weather-values.js`/`WEATHER_STATES`, validée au chargement) | l'état météo courant (`session.weather.state`, voir `core/weather.js`) est exactement cet état |
+| `allOf` | `conditions` (tableau NON VIDE de conditions, chaque élément validé RÉCURSIVEMENT) | TOUTES les sous-conditions de `conditions` sont vraies (ET logique) — une sous-condition peut être n'importe quel type de ce tableau, y compris un autre `allOf` imbriqué |
 
 Un `Effect` : `{ type: "presence", present: boolean }` ou `{ type:
 "behavior", behavior: <objet behavior, même forme que le champ `behavior`

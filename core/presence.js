@@ -195,6 +195,20 @@ function evaluateWeather(cond, context) {
   return context.weather !== undefined && context.weather === cond.state;
 }
 
+// "allOf" : condition COMPOSITE — vraie si TOUTES les sous-conditions de
+// cond.conditions le sont (ET logique). Délègue à evaluateCondition pour
+// CHAQUE sous-condition (aucune connaissance de leur type précis ici, une
+// sous-condition peut être n'importe quel type du registre, y compris un
+// autre "allOf" imbriqué) — MÊME registre, MÊME évaluateur, jamais un
+// mécanisme de composition séparé (voir core/scripting.md). cond.conditions
+// validé au chargement (core/level.js/validateCondition, tableau non vide,
+// chaque élément validé récursivement) : jamais lu ici sans garantie de
+// forme. Court-circuite via Array.prototype.every (s'arrête à la première
+// fausse), sans effet observable puisque tous les évaluateurs sont purs.
+function evaluateAllOf(cond, context) {
+  return cond.conditions.every((sub) => evaluateCondition(sub, context));
+}
+
 // Registre des évaluateurs par type — SEUL endroit qui connaît les types de
 // condition. core/level.js valide `when.type` au chargement contre les clés
 // de CE MÊME registre (CONDITION_TYPES ci-dessous) : ajouter un type ici le
@@ -211,6 +225,7 @@ const CONDITION_EVALUATORS = {
   hasEquipmentTag: evaluateHasEquipmentTag,
   perceptionActive: evaluatePerceptionActive,
   weather: evaluateWeather,
+  allOf: evaluateAllOf,
 };
 
 export const CONDITION_TYPES = Object.keys(CONDITION_EVALUATORS);
