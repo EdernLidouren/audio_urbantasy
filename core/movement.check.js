@@ -52,6 +52,8 @@ import {
 import { TIME_CONFIG } from "../config/time-values.js";
 import { evaluateCondition, isPresent, isBlocking, resolveEntityRules } from "./presence.js";
 import { DEFAULTS as WANDER_DEFAULTS } from "./behaviors/wander.js";
+import { validateWeatherStates, createInitialWeather, advanceWeather, pickTransition, setWeather, triggerNextWeatherTransition } from "./weather.js";
+import { WEATHER_STATES, DEFAULT_WEATHER_STATE } from "../config/weather-values.js";
 
 // { companions: [] } : passé explicitement à CHAQUE createInitialState()
 // ci-dessous qui ne concerne pas les compagnons — sans lui, le défaut (UN
@@ -1373,7 +1375,11 @@ export function runMovementChecks() {
     false,
     evaluateCondition({ type: "timeRange", from: 8, to: 8 }, { time: 8 * 60 })
   );
-  run("presence : type de condition inconnu -> false (jamais un throw)", false, evaluateCondition({ type: "weather" }, { time: 0 }));
+  run(
+    "presence : type de condition inconnu -> false (jamais un throw)",
+    false,
+    evaluateCondition({ type: "doesNotExist" }, { time: 0 })
+  );
 
   // evaluateCondition/timeRange — VARIATION DE SEUIL PAR INSTANCE (cond.spread,
   // core/temporal-spread.js) : chaque entité obtient un seuil légèrement
@@ -2896,6 +2902,48 @@ export function runMovementChecks() {
   run("surfaces : defaultSurface absent -> repli sur DEFAULT_SURFACE", DEFAULT_SURFACE, noSurfaceLevel.defaultSurface);
   run("surfaces : segments absent -> tableau vide (jamais undefined)", 0, noSurfaceLevel.segments.length);
 
+  // indoor (core/level.js/parseFace, "nature de lieu") : même filet que
+  // defaultSurface — absent -> false (extérieur), TOUJOURS résolu en
+  // booléen sur une face parsée, jamais undefined.
+  run("indoor : absent -> false (extérieur) par défaut", false, noSurfaceLevel.indoor);
+  const indoorLevel = parseLevel(
+    { id: "movement-check-indoor-true", titleKey: "level.demo.title", length: 10, playerStart: 0, indoor: true, entities: [] },
+    EMPTY_REGISTRY
+  );
+  run("indoor : true déclaré -> transporté tel quel", true, indoorLevel.indoor);
+  const outdoorLevel = parseLevel(
+    { id: "movement-check-indoor-false", titleKey: "level.demo.title", length: 10, playerStart: 0, indoor: false, entities: [] },
+    EMPTY_REGISTRY
+  );
+  run("indoor : false déclaré explicitement -> transporté tel quel", false, outdoorLevel.indoor);
+  let invalidIndoorThrew = false;
+  try {
+    parseLevel(
+      { id: "movement-check-indoor-bad", titleKey: "level.demo.title", length: 10, playerStart: 0, indoor: "yes", entities: [] },
+      EMPTY_REGISTRY
+    );
+  } catch {
+    invalidIndoorThrew = true;
+  }
+  run("indoor : type invalide (non booléen) -> échec clair au chargement", true, invalidIndoorThrew);
+
+  // indoor est un champ de FACE (voir core/level.js/FACE_FIELDS) : une scène
+  // à deux faces le déclare INDÉPENDAMMENT par face — ex. une ruelle
+  // extérieure (recto) menant à une arrière-boutique intérieure (verso).
+  const indoorTwoFacedLevel = parseLevel(
+    {
+      id: "movement-check-indoor-two-faced",
+      titleKey: "level.demo.title",
+      length: 10,
+      playerStart: 0,
+      recto: { entities: [] },
+      verso: { entities: [], indoor: true },
+    },
+    EMPTY_REGISTRY
+  );
+  run("indoor : scène à deux faces — recto sans déclaration -> false", false, indoorTwoFacedLevel.recto.indoor);
+  run("indoor : scène à deux faces — verso déclaré true -> transporté sur SA face uniquement", true, indoorTwoFacedLevel.verso.indoor);
+
   // defaultSurface/segment FOURNI mais invalide -> échec clair (jamais un
   // filet, contrairement à l'omission ci-dessus) : une référence de contenu
   // erronée ne doit jamais se dégrader en silence.
@@ -3811,6 +3859,332 @@ export function runMovementChecks() {
     run("perception : partie rebouchée — perceptionActive par défaut false", false, oldPerceptionSaveResult.session.perceptionActive);
   }
 
+  // --- Moteur météo (core/weather.js, config/weather-values.js) : machine
+  // à états GLOBALE pilotée par le temps de jeu, PRNG seedé ->
+  // déterministe. AUCUN effet à ce stade (voir CLAUDE.md/prompt d'origine
+  // "MOTEUR MÉTÉO") : seul le moteur (état + transitions) est vérifié ici.
+
+  function expectWeatherValidationThrows(states) {
+    let threw = false;
+    try {
+      validateWeatherStates(states);
+    } catch {
+      threw = true;
+    }
+    return threw;
+  }
+  run("weather : table vide rejetée", true, expectWeatherValidationThrows({}));
+  run(
+    "weather : état sans transition de poids positif rejeté (état sans issue)",
+    true,
+    expectWeatherValidationThrows({ sunny: { duration: { min: 10, max: 20 }, transitions: { sunny: 0 } } })
+  );
+  run(
+    "weather : transition vers une cible inconnue rejetée",
+    true,
+    expectWeatherValidationThrows({ sunny: { duration: { min: 10, max: 20 }, transitions: { doesNotExist: 1 } } })
+  );
+  run(
+    "weather : poids négatif rejeté",
+    true,
+    expectWeatherValidationThrows({ sunny: { duration: { min: 10, max: 20 }, transitions: { sunny: -1 } } })
+  );
+  run(
+    "weather : duration incohérente (min > max) rejetée",
+    true,
+    expectWeatherValidationThrows({ sunny: { duration: { min: 20, max: 10 }, transitions: { sunny: 1 } } })
+  );
+  run(
+    "weather : durée non entière rejetée",
+    true,
+    expectWeatherValidationThrows({ sunny: { duration: { min: 1.5, max: 10 }, transitions: { sunny: 1 } } })
+  );
+  run(
+    "weather : état inatteignable depuis DEFAULT_WEATHER_STATE rejeté",
+    true,
+    expectWeatherValidationThrows({
+      [DEFAULT_WEATHER_STATE]: { duration: { min: 10, max: 20 }, transitions: { [DEFAULT_WEATHER_STATE]: 1 } },
+      orphanState: { duration: { min: 10, max: 20 }, transitions: { orphanState: 1 } },
+    })
+  );
+  run(
+    "weather : table valide (deux états, tous atteignables) acceptée",
+    false,
+    expectWeatherValidationThrows({
+      [DEFAULT_WEATHER_STATE]: { duration: { min: 10, max: 20 }, transitions: { [DEFAULT_WEATHER_STATE]: 1, other: 1 } },
+      other: { duration: { min: 5, max: 15 }, transitions: { [DEFAULT_WEATHER_STATE]: 1 } },
+    })
+  );
+  run("weather : la VRAIE table (config/weather-values.js) est valide", false, expectWeatherValidationThrows(WEATHER_STATES));
+
+  // Tirage pondéré (pickTransition) — ÉQUITÉ : sur un grand nombre de
+  // tirages avec des poids CONNUS (40/40/10/10, indépendants de la vraie
+  // table), les fréquences observées doivent rester dans une tolérance
+  // large mais significative des proportions attendues (40%/40%/10%/10%
+  // sur 4000 tirages, marge ±7 points — assez pour absorber le bruit
+  // statistique sans jamais valider un tirage biaisé).
+  const FAIRNESS_TRANSITIONS = { a: 40, b: 40, c: 10, d: 10 };
+  const fairnessTally = { a: 0, b: 0, c: 0, d: 0 };
+  let fairnessRngState = createSeed("weather-fairness-check");
+  const FAIRNESS_SAMPLES = 4000;
+  for (let i = 0; i < FAIRNESS_SAMPLES; i++) {
+    const picked = pickTransition(FAIRNESS_TRANSITIONS, fairnessRngState);
+    fairnessTally[picked.target] += 1;
+    fairnessRngState = picked.rngState;
+  }
+  function withinTolerance(observedCount, expectedWeight) {
+    const observedPct = (observedCount / FAIRNESS_SAMPLES) * 100;
+    return Math.abs(observedPct - expectedWeight) <= 7;
+  }
+  run(
+    "weather : tirage pondéré — fréquences observées proches des poids déclarés (40/40/10/10 ± 7 points)",
+    true,
+    withinTolerance(fairnessTally.a, 40) &&
+      withinTolerance(fairnessTally.b, 40) &&
+      withinTolerance(fairnessTally.c, 10) &&
+      withinTolerance(fairnessTally.d, 10)
+  );
+  run(
+    "weather : tirage pondéré — poids nul JAMAIS tiré (filet, indépendamment de la tolérance ci-dessus)",
+    0,
+    (() => {
+      let s = createSeed("weather-zero-weight-check");
+      let zeroPicked = 0;
+      for (let i = 0; i < 500; i++) {
+        const picked = pickTransition({ never: 0, always: 1 }, s);
+        s = picked.rngState;
+        if (picked.target === "never") zeroPicked += 1;
+      }
+      return zeroPicked;
+    })()
+  );
+
+  // État initial d'une partie (createInitialState -> createInitialWeather).
+  const weatherLevel = parseLevel(RAW_LEVEL, EMPTY_REGISTRY);
+  const freshWeatherState = createInitialState(weatherLevel, 1, NO_COMPANIONS);
+  run("weather : état initial = DEFAULT_WEATHER_STATE", DEFAULT_WEATHER_STATE, freshWeatherState.weather.state);
+  run(
+    "weather : première transition programmée DANS la fourchette de durée de l'état par défaut",
+    true,
+    freshWeatherState.weather.nextTransitionAt - INITIAL_TIME >= WEATHER_STATES[DEFAULT_WEATHER_STATE].duration.min &&
+      freshWeatherState.weather.nextTransitionAt - INITIAL_TIME <= WEATHER_STATES[DEFAULT_WEATHER_STATE].duration.max
+  );
+
+  // Gel : sans avancée de temps, advanceWeather ne fait RIEN — même
+  // référence renvoyée (comme le reste du core, voir "action inconnue
+  // renvoie la même référence" plus haut). C'est CE mécanisme, appelé
+  // uniquement depuis view/city-screen.js/onFrame (jamais si un menu est
+  // au sommet de la pile), qui donne le gel en pause — rien de spécial à
+  // tester côté pause elle-même, purement une conséquence de ce test.
+  const frozen = advanceWeather(freshWeatherState);
+  run("weather : sans avancée de temps -> référence INCHANGÉE (gel)", freshWeatherState, frozen);
+
+  // Transition simple : franchir le rendez-vous programmé déclenche UNE
+  // transition, le nouveau rendez-vous est dans le futur.
+  const justPastThreshold = {
+    ...freshWeatherState,
+    time: freshWeatherState.weather.nextTransitionAt + 1,
+  };
+  const afterOneTransition = advanceWeather(justPastThreshold);
+  run("weather : franchir le rendez-vous déclenche une transition (nouvel objet)", true, afterOneTransition.weather !== freshWeatherState.weather);
+  run(
+    "weather : après transition, le nouveau rendez-vous est dans le futur",
+    true,
+    afterOneTransition.weather.nextTransitionAt > afterOneTransition.time
+  );
+
+  // Grand saut vs accumulation pas à pas : DOIVENT produire EXACTEMENT le
+  // même résultat (même seed, même temps total écoulé) — preuve à la fois
+  // du déterminisme ET que le grand saut franchit correctement PLUSIEURS
+  // transitions d'affilée (si la boucle n'en traitait qu'UNE à la fois, le
+  // grand saut resterait bloqué sur un rendez-vous largement dépassé, très
+  // différent du résultat pas à pas).
+  const BIG_JUMP_MINUTES = 3000; // largement de quoi franchir plusieurs transitions
+  let bigJumpState = createInitialState(weatherLevel, 42, NO_COMPANIONS);
+  bigJumpState = advanceWeather({ ...bigJumpState, time: bigJumpState.time + BIG_JUMP_MINUTES });
+
+  let smallStepsState = createInitialState(weatherLevel, 42, NO_COMPANIONS);
+  for (let i = 0; i < BIG_JUMP_MINUTES; i++) {
+    smallStepsState = advanceWeather({ ...smallStepsState, time: smallStepsState.time + 1 });
+  }
+  run(
+    "weather : un grand saut de temps == une accumulation pas à pas (multi-transitions franchies, déterminisme)",
+    JSON.stringify(smallStepsState.weather),
+    JSON.stringify(bigJumpState.weather)
+  );
+
+  // Déterminisme direct : même seed + même déroulé -> même succession
+  // météo, rejouée deux fois indépendamment.
+  function weatherSequence(seed, totalMinutes) {
+    let s = createInitialState(weatherLevel, seed, NO_COMPANIONS);
+    const sequence = [];
+    for (let i = 0; i < totalMinutes; i++) {
+      const before = s.weather.state;
+      s = advanceWeather({ ...s, time: s.time + 1 });
+      if (s.weather.state !== before) sequence.push(s.weather.state);
+    }
+    return sequence;
+  }
+  const weatherSeq1 = weatherSequence(7, 2000);
+  const weatherSeq2 = weatherSequence(7, 2000);
+  run("weather : même seed + même déroulé -> même succession météo (déterminisme)", JSON.stringify(weatherSeq1), JSON.stringify(weatherSeq2));
+  run("weather : la météo change réellement au fil du temps (au moins une transition observée)", true, weatherSeq1.length > 0);
+
+  // Save/load : session.weather (état + rendez-vous + rngState) survit à
+  // un aller-retour complet.
+  const weatherSaveEnvelope = serializeGame(afterOneTransition);
+  const weatherSaveResult = deserializeGame(weatherSaveEnvelope);
+  run("weather : sauvegarde — round-trip réussi", true, weatherSaveResult.success);
+  if (weatherSaveResult.success) {
+    run(
+      "weather : sauvegarde — weather identique après round-trip",
+      JSON.stringify(afterOneTransition.weather),
+      JSON.stringify(weatherSaveResult.session.weather)
+    );
+  }
+
+  // Sauvegarde ANTÉRIEURE à ce mécanisme : jamais eu de clé `weather` —
+  // sans rebouchage (core/save.js/migrateSave), une partie ainsi rechargée
+  // porterait `undefined`. Reboutchée depuis la minute de jeu COURANTE de
+  // CETTE sauvegarde (auditSession.time), jamais depuis zéro.
+  const { weather: _droppedWeather, ...auditSessionWithoutWeather } = auditSession;
+  const oldWeatherSave = { version: SAVE_VERSION, data: auditSessionWithoutWeather };
+  const oldWeatherSaveResult = deserializeGame(oldWeatherSave);
+  run("weather : sauvegarde antérieure acceptée (weather rebouché)", true, oldWeatherSaveResult.success);
+  if (oldWeatherSaveResult.success) {
+    run("weather : partie rebouchée — état par défaut", DEFAULT_WEATHER_STATE, oldWeatherSaveResult.session.weather.state);
+    run(
+      "weather : partie rebouchée — rendez-vous programmé depuis la minute de jeu COURANTE (jamais depuis zéro)",
+      true,
+      oldWeatherSaveResult.session.weather.nextTransitionAt > auditSession.time
+    );
+  }
+
+  // Forçage debug (core/weather.js/setWeather, triggerNextWeatherTransition
+  // — voir view/menus/debug-weather-menu.js, Shift+W) : entrée PROPRE dans
+  // un état choisi à la main, sans passer par un tirage de CIBLE, mais avec
+  // une durée TIRÉE (PRNG toujours sain après coup, voir header du module).
+  const forcedBase = createInitialState(weatherLevel, "force-check", NO_COMPANIONS);
+  const forcedRain = setWeather(forcedBase, "rain");
+  run("setWeather : entre bien dans l'état demandé", "rain", forcedRain.weather.state);
+  run(
+    "setWeather : nouvelle durée dans la fourchette DÉCLARÉE de l'état forcé",
+    true,
+    forcedRain.weather.nextTransitionAt - forcedBase.time >= WEATHER_STATES.rain.duration.min &&
+      forcedRain.weather.nextTransitionAt - forcedBase.time <= WEATHER_STATES.rain.duration.max
+  );
+  run(
+    "setWeather : rngState avance (PRNG non figé après un forçage)",
+    true,
+    JSON.stringify(forcedRain.weather.rngState) !== JSON.stringify(forcedBase.weather.rngState)
+  );
+  // Entrée propre : le rendez-vous forcé n'est jamais déjà expiré au
+  // moment même du forçage -> advanceWeather juste après reste un no-op
+  // (même référence, comme le gel testé plus haut).
+  run("setWeather : entrée propre, rendez-vous jamais déjà expiré (advanceWeather juste après = no-op)", forcedRain, advanceWeather(forcedRain));
+  // Le moteur reprend son cours normal APRÈS un forçage : dépasser le
+  // nouveau rendez-vous transite selon les règles NORMALES de l'état forcé
+  // (rain), vers une cible qui lui appartient réellement.
+  const afterForcedRun = advanceWeather({ ...forcedRain, time: forcedRain.weather.nextTransitionAt + 1 });
+  run(
+    "setWeather : après forçage, la transition suivante reste une cible VALIDE de l'état forcé (moteur sain)",
+    true,
+    WEATHER_STATES.rain.transitions[afterForcedRun.weather.state] > 0
+  );
+
+  // triggerNextWeatherTransition : force le moteur à transiter MAINTENANT
+  // selon les poids NORMAUX de l'état courant (pas un état choisi à la
+  // main, contrairement à setWeather) — chaque cible tirée doit toujours
+  // appartenir aux transitions de poids positif de l'état QUITTÉ, sur une
+  // longue chaîne d'appels enchaînés (chacun repart de l'état/rngState
+  // produit par le précédent), et produire une variété de résultats
+  // (preuve qu'il ne renvoie jamais bêtement la même cible).
+  let triggerState = createInitialState(weatherLevel, "trigger-check", NO_COMPANIONS);
+  const triggerTargetsSeen = new Set();
+  let allTriggerTargetsValid = true;
+  const TRIGGER_SAMPLES = 300;
+  for (let i = 0; i < TRIGGER_SAMPLES; i++) {
+    const before = triggerState.weather.state;
+    triggerState = triggerNextWeatherTransition(triggerState);
+    triggerTargetsSeen.add(triggerState.weather.state);
+    if (!(WEATHER_STATES[before].transitions[triggerState.weather.state] > 0)) allTriggerTargetsValid = false;
+  }
+  run(`triggerNextWeatherTransition : chaque cible (${TRIGGER_SAMPLES} tirages enchaînés) appartient aux transitions de l'état quitté`, true, allTriggerTargetsValid);
+  run("triggerNextWeatherTransition : produit une variété de cibles (pas toujours la même)", true, triggerTargetsSeen.size > 1);
+
+  // --- Condition "weather" (core/presence.js/evaluateWeather, effet des
+  // EFFETS météo — prompt 2/2) : réutilise l'évaluateur de conditions
+  // existant, un cas de plus à côté de timeRange/perceptionActive.
+  run("weather (condition) : evaluateCondition — état courant == état demandé -> vraie", true, evaluateCondition({ type: "weather", state: "fog" }, { weather: "fog" }));
+  run("weather (condition) : evaluateCondition — état courant != état demandé -> fausse", false, evaluateCondition({ type: "weather", state: "fog" }, { weather: "sunny" }));
+  run("weather (condition) : evaluateCondition — champ absent du contexte -> fausse", false, evaluateCondition({ type: "weather", state: "fog" }, {}));
+  run(
+    "weather (condition) : evaluateCondition — ni state déclaré ni weather au contexte -> fausse (jamais undefined==undefined)",
+    false,
+    evaluateCondition({ type: "weather" }, {})
+  );
+
+  // Validation au chargement (core/level.js/validateCondition) : un état
+  // référencé par la condition doit exister dans la VRAIE table météo —
+  // même politique que hasEquipmentTag.tag contre TAG_REGISTRY.
+  function expectLevelParseThrows(rawLevel, registry) {
+    let threw = false;
+    try {
+      parseLevel(rawLevel, registry);
+    } catch {
+      threw = true;
+    }
+    return threw;
+  }
+  const WEATHER_COND_REGISTRY = {
+    wolf: { label: "entity.cumulo_lupus", presence: [{ when: { type: "weather", state: "fog" }, present: true }] },
+  };
+  const weatherCondLevelRaw = () => ({
+    id: "movement-check-weather-condition",
+    titleKey: "level.demo.title",
+    length: 20,
+    playerStart: 0,
+    entities: [{ id: "wolf-1", type: "wolf", x: 10, behavior: { kind: "wander", walkMin: 1000, walkMax: 1000 } }],
+  });
+  run(
+    "weather (condition) : état inexistant dans la table météo -> erreur claire au chargement",
+    true,
+    expectLevelParseThrows(
+      {
+        id: "movement-check-weather-condition-bad",
+        titleKey: "level.demo.title",
+        length: 20,
+        playerStart: 0,
+        entities: [{ id: "wolf-1", type: "wolf", x: 10, presence: [{ when: { type: "weather", state: "doesNotExist" }, present: true }] }],
+      },
+      { wolf: { label: "entity.cumulo_lupus" } }
+    )
+  );
+  run("weather (condition) : état valide -> chargement accepté", false, expectLevelParseThrows(weatherCondLevelRaw(), WEATHER_COND_REGISTRY));
+
+  // Intégration : une entité (même patron que entities/types/cumulo-lupus.js)
+  // dont la présence est conditionnée par weather=="fog" est DORMANTE tant
+  // que la météo n'est pas la brume, PRÉSENTE dès que session.weather.state
+  // devient "fog" — via LE MÊME presenceContext que time/perceptionActive
+  // (core/reduce.js/TICK), forcée par core/weather.js/setWeather (comme le
+  // menu debug le ferait), aucun mécanisme séparé.
+  const weatherCondLevel = parseLevel(weatherCondLevelRaw(), WEATHER_COND_REGISTRY);
+  function wolf(state) {
+    return getActiveWorld(state).entities.find((e) => e.id === "wolf-1");
+  }
+  let notFoggyState = createInitialState(weatherCondLevel, "weather-cond-check", NO_COMPANIONS);
+  notFoggyState = setWeather(notFoggyState, "sunny");
+  notFoggyState = reduce(notFoggyState, tick(0));
+  run("weather (condition) : entité conditionnée — dormante hors de l'état déclaré", false, wolf(notFoggyState).present);
+
+  let foggyState = setWeather(notFoggyState, "fog");
+  foggyState = reduce(foggyState, tick(0));
+  run("weather (condition) : entité conditionnée — présente dès que l'état météo correspond", true, wolf(foggyState).present);
+
+  let notFoggyAgainState = setWeather(foggyState, "cloudy");
+  notFoggyAgainState = reduce(notFoggyAgainState, tick(0));
+  run("weather (condition) : redevient dormante quand la météo change à nouveau", false, wolf(notFoggyAgainState).present);
+
   // --- Collectible persistant (core/state.js/markConsumed, core/money.js/lootEntity) ---
   // Contrairement à removeEntity/pickupEntity ci-dessus, l'entité looté
   // N'EST JAMAIS retirée — voir entities/model.md/"Collectible persistant".
@@ -4256,6 +4630,23 @@ export function runMovementChecks() {
     run("save : surfaceAt ne plante jamais sur un monde rebouché", false, surfaceAtThrew);
   }
 
+  // Sauvegarde ANTÉRIEURE à `indoor` (voir core/level.js/parseFace, "nature
+  // de lieu") : ses mondes n'ont jamais eu cette clé — sans rebouchage
+  // (core/save.js/backfillFace), le rendu d'ambiance météo lirait
+  // `undefined` (ni indoor ni outdoor) au lieu d'un booléen.
+  const oldIndoorWorlds = {};
+  for (const [id, world] of Object.entries(auditSession.worlds)) {
+    const { indoor, ...oldWorld } = world;
+    oldIndoorWorlds[id] = oldWorld;
+  }
+  const oldIndoorSave = { version: SAVE_VERSION, data: { ...auditSession, worlds: oldIndoorWorlds } };
+  const oldIndoorSaveResult = deserializeGame(oldIndoorSave);
+  run("save : sauvegarde antérieure à indoor acceptée (rebouchée)", true, oldIndoorSaveResult.success);
+  if (oldIndoorSaveResult.success) {
+    const revivedIndoorWorld = oldIndoorSaveResult.session.worlds[oldIndoorSaveResult.session.activeWorldId];
+    run("save : monde rebouché — indoor par défaut (false, extérieur)", false, revivedIndoorWorld.indoor);
+  }
+
   // Sauvegarde encore plus ancienne, avec un champ de niveau depuis RETIRÉ
   // du format (ex. un ancien jalon de contenu jamais devenu actif) : ni
   // rejeté ni traité spécialement — simplement transporté tel quel, comme
@@ -4341,13 +4732,25 @@ export function runMovementChecks() {
   }
 
   // Sauvegarde d'une scène à DEUX FACES, ANTÉRIEURE à defaultSurface/
-  // segments/nextEphemeralId — même précédent que le monde simple ci-dessus
-  // (core/save.js/backfillFace), mais chaque face doit être rebouchée
-  // INDÉPENDAMMENT (voir core/save.js/backfillWorld).
+  // segments/nextEphemeralId/indoor — même précédent que le monde simple
+  // ci-dessus (core/save.js/backfillFace), mais chaque face doit être
+  // rebouchée INDÉPENDAMMENT (voir core/save.js/backfillWorld).
   const freshTwoFaceSession = createInitialState(twoFacedLevel, 42, NO_COMPANIONS);
   const freshTwoFaceWorld = freshTwoFaceSession.worlds[twoFaceWorldId];
-  const { defaultSurface: _droppedRectoSurface, segments: _droppedRectoSegments, nextEphemeralId: _droppedRectoNextId, ...oldRectoFace } = freshTwoFaceWorld.recto;
-  const { defaultSurface: _droppedVersoSurface, segments: _droppedVersoSegments, nextEphemeralId: _droppedVersoNextId, ...oldVersoFace } = freshTwoFaceWorld.verso;
+  const {
+    defaultSurface: _droppedRectoSurface,
+    segments: _droppedRectoSegments,
+    nextEphemeralId: _droppedRectoNextId,
+    indoor: _droppedRectoIndoor,
+    ...oldRectoFace
+  } = freshTwoFaceWorld.recto;
+  const {
+    defaultSurface: _droppedVersoSurface,
+    segments: _droppedVersoSegments,
+    nextEphemeralId: _droppedVersoNextId,
+    indoor: _droppedVersoIndoor,
+    ...oldVersoFace
+  } = freshTwoFaceWorld.verso;
   const oldTwoFaceWorldSave = {
     version: SAVE_VERSION,
     data: {
@@ -4363,6 +4766,8 @@ export function runMovementChecks() {
     run("save : deux faces rebouchées — defaultSurface par défaut (verso)", DEFAULT_SURFACE, revivedTwoFaceWorld.verso.defaultSurface);
     run("save : deux faces rebouchées — segments par défaut (recto)", 0, revivedTwoFaceWorld.recto.segments.length);
     run("save : deux faces rebouchées — segments par défaut (verso)", 0, revivedTwoFaceWorld.verso.segments.length);
+    run("save : deux faces rebouchées — indoor par défaut (recto)", false, revivedTwoFaceWorld.recto.indoor);
+    run("save : deux faces rebouchées — indoor par défaut (verso)", false, revivedTwoFaceWorld.verso.indoor);
   }
 
   // Round-trip complet d'une session à deux faces via le vrai système de

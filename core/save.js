@@ -15,6 +15,7 @@ import { DEFAULT_SURFACE } from "./surfaces.js";
 import { INITIAL_TIME } from "./time.js";
 import { createEmptyEquipment } from "./equipment.js";
 import { stripEphemeralsFromWorld } from "./state.js";
+import { createInitialWeather } from "./weather.js";
 
 export const SAVE_VERSION = 1;
 
@@ -62,7 +63,12 @@ export function serializeGame(session) {
 // simplement ignoré, jamais nettoyé activement.
 function backfillFace(face) {
   if (!face || typeof face !== "object") return face;
-  if (face.defaultSurface !== undefined && face.segments !== undefined && face.nextEphemeralId !== undefined) {
+  if (
+    face.defaultSurface !== undefined &&
+    face.segments !== undefined &&
+    face.nextEphemeralId !== undefined &&
+    face.indoor !== undefined
+  ) {
     return face;
   }
   return {
@@ -75,6 +81,11 @@ function backfillFace(face) {
     // `undefined + 1` = NaN, et TOUT éphémère suivant recevrait le même id
     // "ephemeral-NaN" — collision garantie dès le second spawn).
     nextEphemeralId: face.nextEphemeralId !== undefined ? face.nextEphemeralId : 0,
+    // indoor : voir core/level.js/parseFace ("nature de lieu", TOUJOURS
+    // résolue pour un monde fraîchement chargé) — absente d'une sauvegarde
+    // antérieure à cette propriété -> false (extérieur), même politique que
+    // defaultSurface juste au-dessus.
+    indoor: face.indoor !== undefined ? face.indoor : false,
   };
 }
 
@@ -156,6 +167,18 @@ function migrateSave(raw) {
   // player.side juste au-dessus.
   if (typeof data.perceptionActive !== "boolean") {
     data = { ...data, perceptionActive: false };
+  }
+
+  // weather (voir core/weather.js/createInitialWeather, "Moteur météo") :
+  // absent d'une sauvegarde antérieure à ce mécanisme -> état par défaut,
+  // prochaine transition programmée depuis la minute de jeu COURANTE de
+  // CETTE sauvegarde (data.time, déjà rebouché plus haut si besoin) —
+  // jamais depuis zéro, pour ne pas donner l'impression que la partie
+  // recommence. Seed de rebouchage FIXE ("migrated"), même politique que
+  // companionsRngState ci-dessus (0) : une sauvegarde ancienne n'a aucun
+  // seed de partie accessible à réutiliser.
+  if (!data.weather || typeof data.weather !== "object" || typeof data.weather.state !== "string") {
+    data = { ...data, weather: createInitialWeather("migrated", data.time) };
   }
 
   if (data.worlds && typeof data.worlds === "object") {

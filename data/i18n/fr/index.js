@@ -19,6 +19,7 @@ const DOMAINS = [
   "entities",
   "map",
   "perception",
+  "weather",
 ];
 
 export default await loadLocale("data/i18n/fr", DOMAINS);

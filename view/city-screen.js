@@ -22,6 +22,7 @@ import {
   setPlayerEquipmentProvider,
 } from "./interaction.js";
 import { openPauseMenu } from "./menus/pause-menu.js";
+import { openWeatherDebugMenu } from "./menus/debug-weather-menu.js";
 import {
   openInventoryMenu,
   openEquipmentMenu,
@@ -34,6 +35,7 @@ import { tick } from "../core/actions.js";
 import { reduce } from "../core/reduce.js";
 import { loadLevelById } from "../level/load.js";
 import { getActiveWorld, travelToWorld, switchSide, spawnEphemeral, isTwoSided, togglePerception } from "../core/state.js";
+import { advanceWeather, setWeather, triggerNextWeatherTransition } from "../core/weather.js";
 import { pickupEntity, lootEntity, lootEntitySpawn } from "../core/money.js";
 import { pickupItemEntity, dropItem } from "../core/bag.js";
 import { equipItem, unequipItem } from "../core/equipment.js";
@@ -96,6 +98,15 @@ function announceGameTime(session) {
 // temps.
 function announceMoney(session) {
   announce(t("money.announce", { amount: session.money }));
+}
+
+// Consultation pure de session.weather (touche "w", voir onKeyDown plus
+// bas ; core/weather.js) — même patron que announceGameTime/announceMoney.
+// Clé i18n DÉRIVÉE de l'état (`weather.state.${state}`), jamais une table
+// de correspondance à part à tenir à jour — même technique que
+// announcePlayerX/`side.${session.player.side}` plus bas.
+function announceWeather(session) {
+  announce(t("weather.announce", { state: t(`weather.state.${session.weather.state}`) }));
 }
 
 // Consultation pure de session.player.x (touche "x", voir onKeyDown plus
@@ -249,6 +260,22 @@ export function makeCityScreen(getSession, setSession) {
     const active = getSession().perceptionActive;
     playPerceptionToggleSound(active);
     announce(t(active ? "perception.activated" : "perception.deactivated"), { assertive: true });
+  }
+
+  // Effets DEBUG du menu de forçage météo (Shift+W, voir
+  // view/menus/debug-weather-menu.js ; core/weather.js/setWeather,
+  // triggerNextWeatherTransition) : core pur PUIS annonce, même patron que
+  // togglePerceptionEffect ci-dessus — réutilise announceWeather (mêmes
+  // mots que la touche "w"), le menu se referme séparément (voir son
+  // onActivate).
+  function forceWeatherEffect(targetState) {
+    setSession(setWeather(getSession(), targetState));
+    announceWeather(getSession());
+  }
+
+  function triggerWeatherTransitionEffect() {
+    setSession(triggerNextWeatherTransition(getSession()));
+    announceWeather(getSession());
   }
 
   // Transition FRANCHE côté ÉTAT/ENTITÉS (pas de fondu, pas d'animation) :
@@ -476,7 +503,12 @@ export function makeCityScreen(getSession, setSession) {
     onFrame(deltaMs) {
       if (!scene) return;
       const minutes = (deltaMs / 1000) * (TIME_CONFIG.timeScale / TIME_CONFIG.minutesPerHour);
-      setSession(advanceTime(getSession(), minutes));
+      // Météo (voir core/weather.js) : composée JUSTE APRÈS advanceTime,
+      // jamais ailleurs — c'est CE branchement qui la fait avancer AVEC le
+      // temps de jeu et geler QUAND il gèle (cette méthode entière n'est
+      // pas appelée si un menu est au sommet de la pile, voir le
+      // commentaire au-dessus), sans code de pause dédié.
+      setSession(advanceWeather(advanceTime(getSession(), minutes)));
     },
     // Discrète (screens.js ne route que la touche non répétée), pas de
     // souci d'auto-interruption ici. N'agit que quand la ville est au
@@ -511,6 +543,13 @@ export function makeCityScreen(getSession, setSession) {
       // annoncée.
       if (action === "announceMoney") {
         announceMoney(getSession());
+        return;
+      }
+
+      // "announceWeather" : consultation pure de la météo courante — même
+      // statut que announceTime/announceMoney (voir core/weather.js).
+      if (action === "announceWeather") {
+        announceWeather(getSession());
         return;
       }
 
@@ -564,6 +603,15 @@ export function makeCityScreen(getSession, setSession) {
       // qui ne l'a jamais activé.
       if (action === "debugSpawn" && isDebugEnabled()) {
         setSession(spawnEphemeral(getSession(), EPHEMERAL_COIN_SPEC, getSession().player.x));
+        return;
+      }
+
+      // "openWeatherDebugMenu" (Shift+W), MODE DEBUG UNIQUEMENT (voir
+      // config/debug.js) : ouvre le menu de forçage météo — voir
+      // forceWeatherEffect/triggerWeatherTransitionEffect plus haut. Hors
+      // mode debug, ne fait RIEN, même garde que "debugSpawn" ci-dessus.
+      if (action === "openWeatherDebugMenu" && isDebugEnabled()) {
+        openWeatherDebugMenu(forceWeatherEffect, triggerWeatherTransitionEffect);
         return;
       }
 

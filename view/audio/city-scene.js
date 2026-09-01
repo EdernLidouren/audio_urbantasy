@@ -60,6 +60,7 @@ import {
   clearMusicLayers,
   setAmbienceLayer,
   clearAmbienceLayers,
+  setWeatherAmbienceLayer,
 } from "../../lib/audio.js";
 import { announce } from "../../lib/announce.js";
 import { resolveAsset, hasAsset, assetKeyMembers } from "../../lib/assets.js";
@@ -68,6 +69,7 @@ import player from "../../entities/player.js";
 import { TUNING_DEFAULTS, resolveTuning } from "../../config/tuning.js";
 import { getPref, PREF_CONSTRAINTS } from "../../config/preferences.js";
 import { PERCEPTION_MUSIC_POOL, PERCEPTION_AMBIENCE_POOL } from "../../config/perception.js";
+import { WEATHER_STATES } from "../../config/weather-values.js";
 import { t } from "../../data/i18n/index.js";
 import { MOVE_STEP, getActiveWorld, getInactiveFace } from "../../core/state.js";
 import { surfaceAt, surfaceProps } from "../../core/surfaces.js";
@@ -154,6 +156,10 @@ const MUSIC_FADE_MS = TUNING_DEFAULTS.musicFadeMs;
 // naturel ET bascule de phase (même mécanisme, voir lib/audio.js). Sans
 // effet en mode musicLoop (boucle continue).
 const MUSIC_BREATHER_RANGE = { min: TUNING_DEFAULTS.musicBreatherMinMs, max: TUNING_DEFAULTS.musicBreatherMaxMs };
+// Fondu de l'ambiance MÉTÉO (voir core/weather.js, lib/audio.js/
+// setWeatherAmbienceLayer) — une seule durée pour toute transition météo,
+// jamais dupliquée en dur ici.
+const WEATHER_AMBIENCE_FADE_MS = TUNING_DEFAULTS.weatherAmbienceFadeMs;
 // Niveaux du modèle de volume par zones (voir volumeForDistance) : ce sont
 // des constantes de forme de courbe, pas des réglages par entité.
 const FULL_VOLUME = TUNING_DEFAULTS.fullVolume;
@@ -534,7 +540,7 @@ let activeScene = null;
 // DEVINE la présence de l'autre face, on ne la LOCALISE pas. Vocal/movement/
 // enterSound/exitSound restent inchangés (rendus en ÉTOUFFÉ par l'appelant,
 // voir playPositionedOneShot/playTransitionSound, jamais coupés ici).
-function buildEntitySoundEntry(entity, world, time, perceptionActive, { includeBeacon = true } = {}) {
+function buildEntitySoundEntry(entity, world, time, perceptionActive, weather, { includeBeacon = true } = {}) {
   // beacon (localisation) et vocal (expression) : descripteurs de son du
   // type, tous deux OPTIONNELS et indépendants (voir entities/model.md) —
   // ni l'un ni l'autre n'est "le" son obligatoire d'une entité.
@@ -671,7 +677,7 @@ function buildEntitySoundEntry(entity, world, time, perceptionActive, { includeB
   // null au premier calcul) — seules les bascules OBSERVÉES en cours de
   // jeu déclenchent, voir applyEntityAudio, qui lit presenceChanged sur
   // l'entité VIVANTE à chaque tick (jamais un diff maison ici).
-  if (sound && !isPresent(entity, { time, perceptionActive })) sound.stop();
+  if (sound && !isPresent(entity, { time, perceptionActive, weather })) sound.stop();
 
   return {
     entity,
@@ -721,7 +727,7 @@ export function createCityAudioScene(getSession) {
   // l'amorçage.
   const initialWorld = getActiveWorld(getSession());
   const entitySounds = initialWorld.entities.map((entity) =>
-    buildEntitySoundEntry(entity, initialWorld, getSession().time, getSession().perceptionActive)
+    buildEntitySoundEntry(entity, initialWorld, getSession().time, getSession().perceptionActive, getSession().weather.state)
   );
 
   // RECTO/VERSO étape 2/2 (voir CLAUDE.md) : entrées de son pour l'AUTRE
@@ -736,7 +742,9 @@ export function createCityAudioScene(getSession) {
   const initialOtherFace = getInactiveFace(getSession());
   const otherEntitySounds = initialOtherFace
     ? initialOtherFace.entities.map((entity) =>
-        buildEntitySoundEntry(entity, initialOtherFace, getSession().time, getSession().perceptionActive, { includeBeacon: false })
+        buildEntitySoundEntry(entity, initialOtherFace, getSession().time, getSession().perceptionActive, getSession().weather.state, {
+          includeBeacon: false,
+        })
       )
     : null;
 
@@ -782,7 +790,7 @@ export function createCityAudioScene(getSession) {
   // un son perdu ni un plantage. Voir syncNewEntitySounds ci-dessous, seule
   // appelante.
   function addLateEntitySoundEntry(entity, world) {
-    const entry = buildEntitySoundEntry(entity, world, getSession().time, getSession().perceptionActive);
+    const entry = buildEntitySoundEntry(entity, world, getSession().time, getSession().perceptionActive, getSession().weather.state);
     entitySounds.push(entry);
     if (entry.sound) entry.sound.sendToReverb(reverbBus.input, entry.beaconReverbSend);
     collisionSoundByEntityId.set(entity.id, registry[entity.type].collisionSound);
@@ -818,7 +826,9 @@ export function createCityAudioScene(getSession) {
   // isolation stricte). No-op si la scène est simple (otherEntitySounds
   // null, jamais d'entité à synchroniser).
   function addLateOtherEntitySoundEntry(entity, otherFace) {
-    const entry = buildEntitySoundEntry(entity, otherFace, getSession().time, getSession().perceptionActive, { includeBeacon: false });
+    const entry = buildEntitySoundEntry(entity, otherFace, getSession().time, getSession().perceptionActive, getSession().weather.state, {
+      includeBeacon: false,
+    });
     otherEntitySounds.push(entry);
     return entry;
   }
@@ -1008,6 +1018,36 @@ export function createCityAudioScene(getSession) {
     ambiences && ambiences.length > 0 ? ambiences.map(resolveAsset) : null,
     MUSIC_FADE_MS
   );
+
+  // Ambiance MÉTÉO (voir core/weather.js, lib/audio.js/
+  // setWeatherAmbienceLayer, "Couche météo") : SUPERPOSÉE à la couche
+  // gagnante ci-dessus, jamais à sa place — un état météo SANS ambience
+  // déclarée (ex. "sunny", voir config/weather-values.js) ne joue
+  // simplement rien de plus. Déclarée EN DERNIER (après état ET lieu) :
+  // seule couche des trois qui ne dépend pas de perceptionActive, donc
+  // sans ordre imposé vis-à-vis d'elles, contrairement à état/lieu entre
+  // eux. weatherState tracké ICI (comme currentPhase/perceptionActive
+  // ci-dessus) pour détecter la TRANSITION dans update() plus bas.
+  //
+  // INDOOR/OUTDOOR (modèle A, voir core/level.js/parseFace, "nature de
+  // lieu") : `indoor` est la propriété de la scène ACTIVE, capturée UNE
+  // FOIS ici — une scène ne change jamais de nature en cours de vie, seule
+  // une TRANSITION (destroy + recreate, donc un nouveau montage de ce
+  // fichier) peut faire passer de outdoor à indoor ou l'inverse. C'est CE
+  // qui donne le fondu "déclenché par le changement de CONTEXTE" demandé :
+  // au montage de la scène SUIVANTE, cette même fonction redéclare le pool
+  // pour le NOUVEAU contexte, avec le MÊME weatherState si la météo n'a pas
+  // changé — l'identité déclarée diffère (pool outdoor vs indoor, jamais
+  // composée par concaténation de nom, LUE telle quelle dans la table), donc
+  // lib/audio.js/syncAmbienceChannel détecte la différence et FOND vers le
+  // nouveau pool, sans code de transition dédié ici.
+  let weatherState = getSession().weather.state;
+  const indoor = Boolean(world.indoor);
+  function declareWeatherAmbience(state, fadeMs) {
+    const pool = WEATHER_STATES[state]?.ambience?.[indoor ? "indoor" : "outdoor"];
+    setWeatherAmbienceLayer(pool ? [pool] : null, pool ? [resolveAsset(pool)] : null, fadeMs);
+  }
+  declareWeatherAmbience(weatherState, WEATHER_AMBIENCE_FADE_MS);
 
   // Rampe du filtre d'étouffement des entités MONDAINES (voir
   // effectiveMuffleAmount/currentMundaneMuffleAmount plus bas) : de/vers
@@ -1572,6 +1612,20 @@ export function createCityAudioScene(getSession) {
         perceptionActive ? [resolveAsset(PERCEPTION_AMBIENCE_POOL)] : null,
         PERCEPTION_FADE_MS
       );
+    }
+
+    // Transition MÉTÉO (voir core/weather.js/advanceWeather, ou un forçage
+    // debug — view/menus/debug-weather-menu.js) : même principe EXACT que
+    // la bascule de phase/perception ci-dessus, compare à la valeur
+    // MÉMORISÉE, agit SEULEMENT sur la différence — redéclare la couche
+    // météo (voir declareWeatherAmbience plus haut), NO-OP si le nouvel
+    // état météo n'apporte aucune ambience (silence -> silence) ou la
+    // MÊME ambience qu'un autre mécanisme joue déjà (continuité par
+    // identité, voir lib/audio.js/targetAmbience), sinon fondu vers/depuis
+    // le pool météo, SUPERPOSÉ à la couche gagnante (jamais à sa place).
+    if (session.weather.state !== weatherState) {
+      weatherState = session.weather.state;
+      declareWeatherAmbience(weatherState, WEATHER_AMBIENCE_FADE_MS);
     }
 
     applyEntityAudio(x);

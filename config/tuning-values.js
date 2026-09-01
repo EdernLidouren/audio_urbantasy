@@ -303,4 +303,12 @@ export const TUNING_DEFAULTS = {
   // (jamais deux fondus qui se chevauchent/se battent, voir
   // view/city-screen.js). Ne jamais remplacer par un littéral indépendant.
   perceptionCooldownMs: PERCEPTION_FADE_MS + PERCEPTION_COOLDOWN_MARGIN_MS,
+
+  // Durée (ms) du fondu de l'AMBIANCE MÉTÉO (voir core/weather.js,
+  // view/audio/city-scene.js) — couche d'ÉTAT superposée à l'ambiance de
+  // lieu (lib/audio.js/setWeatherAmbienceLayer), fondue à chaque
+  // transition météo. Plus lent que perceptionFadeMs par défaut : une
+  // bascule météo est un changement atmosphérique graduel, jamais aussi
+  // net qu'un toggle de perception.
+  weatherAmbienceFadeMs: 3000,
 };

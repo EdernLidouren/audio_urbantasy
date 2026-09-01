@@ -1,0 +1,10 @@
+{
+  "weather.announce": "Weather: {state}.",
+  "weather.state.sunny": "sunny",
+  "weather.state.cloudy": "cloudy",
+  "weather.state.rain": "rainy",
+  "weather.state.fog": "foggy",
+  "weather.debug.title": "Weather (debug)",
+  "weather.debug.triggerTransition": "Trigger next transition",
+  "weather.debug.force": "Force: {state}"
+}

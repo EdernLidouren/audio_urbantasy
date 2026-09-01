@@ -1,14 +1,29 @@
 {
+  "assets/ambiances/rain_indoor": [
+    "assets/ambiances/rain_indoor_1.mp3"
+  ],
+  "assets/ambiances/rain_outdoor": [
+    "assets/ambiances/rain_outdoor_1.mp3"
+  ],
   "assets/ambiances/supernatural_reality": [
     "assets/ambiances/supernatural_reality_1.mp3",
     "assets/ambiances/supernatural_reality_2.mp3",
     "assets/ambiances/supernatural_reality_3.mp3"
   ],
+  "assets/ambiances/thunderstorm_indoor": [
+    "assets/ambiances/thunderstorm_indoor_1.mp3"
+  ],
+  "assets/ambiances/thunderstorm_outdoor": [
+    "assets/ambiances/thunderstorm_outdoor_1.mp3"
+  ],
   "assets/ambiances/traffic_street_afternoon": [
     "assets/ambiances/traffic_street_afternoon_1.mp3"
   ],
-  "assets/ambiances/wind_medium": [
-    "assets/ambiances/wind_medium_1.mp3"
+  "assets/ambiances/wind_indoor": [
+    "assets/ambiances/wind_indoor_1.mp3"
+  ],
+  "assets/ambiances/wind_outdoor": [
+    "assets/ambiances/wind_outdoor_1.mp3"
   ],
   "assets/musics/beach_day": [
     "assets/musics/beach_day_1.mp3"
@@ -153,6 +168,16 @@
   ],
   "assets/sounds/entities/npc_beacon": [
     "assets/sounds/entities/npc_beacon_1.mp3"
+  ],
+  "assets/sounds/entities/old/spectral_wolf_vocal": [
+    "assets/sounds/entities/old/spectral_wolf_vocal_1.mp3",
+    "assets/sounds/entities/old/spectral_wolf_vocal_2.mp3",
+    "assets/sounds/entities/old/spectral_wolf_vocal_3.mp3",
+    "assets/sounds/entities/old/spectral_wolf_vocal_4.mp3",
+    "assets/sounds/entities/old/spectral_wolf_vocal_5.mp3",
+    "assets/sounds/entities/old/spectral_wolf_vocal_6.mp3",
+    "assets/sounds/entities/old/spectral_wolf_vocal_7.mp3",
+    "assets/sounds/entities/old/spectral_wolf_vocal_8.mp3"
   ],
   "assets/sounds/entities/spectral_wolf_growl": [
     "assets/sounds/entities/spectral_wolf_growl_1.mp3"
@@ -329,12 +354,6 @@
     "assets/sounds/footsteps/shoes_walk_21.mp3",
     "assets/sounds/footsteps/shoes_walk_22.mp3"
   ],
-  "assets/sounds/footsteps/smoke_walk": [
-    "assets/sounds/footsteps/smoke_walk_1.mp3",
-    "assets/sounds/footsteps/smoke_walk_2.mp3",
-    "assets/sounds/footsteps/smoke_walk_3.mp3",
-    "assets/sounds/footsteps/smoke_walk_4.mp3"
-  ],
   "assets/sounds/footsteps/snow_walk": [
     "assets/sounds/footsteps/snow_walk_1.mp3",
     "assets/sounds/footsteps/snow_walk_2.mp3",
@@ -356,6 +375,12 @@
     "assets/sounds/footsteps/snow_walk_18.mp3",
     "assets/sounds/footsteps/snow_walk_19.mp3",
     "assets/sounds/footsteps/snow_walk_20.mp3"
+  ],
+  "assets/sounds/footsteps/temp/smoke_walk": [
+    "assets/sounds/footsteps/temp/smoke_walk_1.mp3",
+    "assets/sounds/footsteps/temp/smoke_walk_2.mp3",
+    "assets/sounds/footsteps/temp/smoke_walk_3.mp3",
+    "assets/sounds/footsteps/temp/smoke_walk_4.mp3"
   ],
   "assets/sounds/footsteps/wood_walk": [
     "assets/sounds/footsteps/wood_walk_1.mp3",

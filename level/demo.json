@@ -5,7 +5,7 @@
   "playerStart": 2,
   "musicDay": "assets/musics/jazz_day",
   "musicNight": "assets/musics/jazz_night",
-  "ambiences": ["assets/ambiances/traffic_street_afternoon_1.mp3", "assets/ambiances/wind_medium_1.mp3"],
+  "ambiences": ["assets/ambiances/traffic_street_afternoon_1.mp3"],
   "defaultSurface": "dirt",
   "segments": [{ "from": 15, "to": 35, "surface": "grass" }],
   "entities": [

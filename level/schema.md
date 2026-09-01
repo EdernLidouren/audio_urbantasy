@@ -22,6 +22,7 @@ parsé, sans aucune chaîne affichable en dur — uniquement des clés i18n.
 | `reverbDecay` | number | optionnel, `> 0` : surcharge PAR LIEU le taux de déclin de la réverb (défaut global : `config/tuning-values.js`) |
 | `defaultSurface` | string | optionnel : nom de surface (voir "Surfaces de sol" plus bas) couvrant tout le `x` non-segmenté. **FILET SILENCIEUX si absent** (repli sur `DEFAULT_SURFACE`, `core/surfaces.js` — comportement audible inchangé pour toute scène qui n'en déclare pas). **Échec clair si fourni mais absent du registre** (comme un type d'entité inconnu) — une référence de contenu erronée n'est jamais dégradée en silence. |
 | `segments`    | Segment[] | optionnel : zones qui PATCHENT `defaultSurface` sur des portions du lieu (voir "Surfaces de sol" plus bas). Absent -> `[]`, `defaultSurface` partout. |
+| `indoor`      | boolean  | optionnel, défaut `false` (extérieur) : propriété de NATURE DE LIEU — TOUJOURS résolue en booléen sur une face parsée (comme `defaultSurface`, jamais `undefined`). Aujourd'hui consultée par le rendu d'ambiance météo pour choisir le pool outdoor/indoor de l'état courant (voir `core/scripting.md`/"weather", `config/weather-values.js`) — délibérément générique, un futur consommateur (réverb, sons ambiants...) pourra la lire aussi sans rien changer ici. |
 
 ## Scène à deux faces (recto/verso)
 
@@ -32,7 +33,7 @@ ci-dessus, `entities`/`music`/... à la racine) OU À DEUX FACES — `recto` ET
 (même longueur d'axe x) ; tous les autres champs du tableau "Niveau"
 ci-dessus (`entities`, `music`/`musicDay`/`musicNight`/`musicLoop`,
 `ambiences`/`ambiencesDay`/`ambiencesNight`, `reverbDurationSec`/
-`reverbDecay`, `defaultSurface`, `segments`) sont des champs de FACE :
+`reverbDecay`, `defaultSurface`, `segments`, `indoor`) sont des champs de FACE :
 déclarés dans `recto`/`verso` pour une scène à deux faces, à la racine pour
 une scène simple — **jamais mélangés** : `parseLevel` échoue clairement si
 un de ces champs apparaît à la racine EN MÊME TEMPS que `recto`/`verso`.
@@ -235,10 +236,12 @@ conditions (`core/presence.js`, `CONDITION_EVALUATORS`) — **échec clair si
 inconnu**, comme un type d'entité. Les champs PROPRES à un type de condition
 (ex. `from`/`to` de `"timeRange"`) ne sont EN GÉNÉRAL PAS validés par
 `parseLevel` : ajouter un nouveau type de condition ne doit jamais obliger à
-revenir ici. SEULE EXCEPTION : `"hasEquipmentTag"`, dont le champ `tag`
-référence du contenu externe (`core/tags.js`/`TAG_REGISTRY`) — validé au
-chargement comme une surface de segment, une faute de frappe y échoue donc
-clairement plutôt que de dégrader silencieusement vers "jamais vraie".
+revenir ici. EXCEPTIONS : `"hasEquipmentTag"` (champ `tag`) et `"weather"`
+(champ `state`), dont le champ référence du contenu externe
+(`core/tags.js`/`TAG_REGISTRY`, `config/weather-values.js`/`WEATHER_STATES`)
+— validés au chargement comme une surface de segment, une faute de frappe y
+échoue donc clairement plutôt que de dégrader silencieusement vers "jamais
+vraie".
 Voir `entities/model.md`/"Présence conditionnelle et triggers de
 comportement" pour la sémantique complète (priorité entre règles, les trois
 plans coupés par l'état dormant, la garde anti-boucle des effets
@@ -257,6 +260,8 @@ exactement ce tableau.
 | `arrived`   | (aucun)       | le comportement actif de l'entité est encore `"goto"` ET a atteint sa cible (`entity.gotoArrived`) |
 | `consumed`  | (aucun)       | l'entité porte `consumed: true` (voir `core/state.js`/`markConsumed`, "Collectible persistant" plus bas) — PERMANENT, `consumed` ne repasse jamais à `false` |
 | `hasEquipmentTag` | `tag` (clé de `core/tags.js`/`TAG_REGISTRY`, validée au chargement) | l'entité évaluée porte, dans son PROPRE équipement (`context.entity.equipment`), un objet marqué de ce tag (voir `core/equipment.js`/`equippedTags`) — entité sans `equipment` -> jamais vraie |
+| `perceptionActive` | (aucun) | la perception surnaturelle (`session.perceptionActive`, voir `core/state.js`/`togglePerception`) est active |
+| `weather` | `state` (clé de `config/weather-values.js`/`WEATHER_STATES`, validée au chargement) | l'état météo courant (`session.weather.state`, voir `core/weather.js`) est exactement cet état |
 
 Un `Effect` : `{ type: "presence", present: boolean }` ou `{ type:
 "behavior", behavior: <objet behavior, même forme que le champ `behavior`

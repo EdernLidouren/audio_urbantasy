@@ -6,6 +6,7 @@
   "music": "assets/musics/streets_day",
   "reverbDurationSec": 0.25,
   "reverbDecay": 12,
+  "indoor": true,
   "entities": [
     { "id": "door-back", "type": "door", "x": 2, "nameKey": "door.back", "target": "demo", "descriptionKey": "door.back.description" },
     {

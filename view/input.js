@@ -53,6 +53,16 @@ export const CITY_BINDINGS = {
   openInventory: { keys: ["i"], mods: [] },
   openEquipment: { keys: ["q"], mods: [] },
   announcePosition: { keys: ["x"], mods: [] },
+  // "w" (weather) : consultation pure de la météo courante (voir
+  // core/weather.js) — outil de VÉRIFICATION, comme announceTime ("t") :
+  // aucune action, juste une lecture d'état annoncée.
+  announceWeather: { keys: ["w"], mods: [] },
+  // Shift+W, MODE DEBUG UNIQUEMENT (voir config/debug.js,
+  // view/city-screen.js/onKeyDown) : ouvre le menu de forçage météo (voir
+  // view/menus/debug-weather-menu.js). Modificateur EXACT (mods:["shift"])
+  // -> canal INDÉPENDANT de "announceWeather" ci-dessus (mods:[]), aucune
+  // collision malgré la même touche "w" (voir lib/input.js).
+  openWeatherDebugMenu: { keys: ["w"], mods: ["shift"] },
   // "p" (perception) : bascule la PERCEPTION SURNATURELLE (voir
   // core/state.js/togglePerception, view/city-screen.js/togglePerceptionEffect)
   // — COOLDOWN anti-spam entièrement côté consommation (city-screen.js),

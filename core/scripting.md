@@ -233,6 +233,55 @@ format déclaratif du core.
 
 Exemple réel complet : voir "Conditions d'action" (la porte à dresscode).
 
+### `weather` — météo courante
+
+```js
+{ type: "weather", state: "fog" }
+```
+
+Vraie si l'état météo courant (`context.weather`, posé par `core/reduce.js`/TICK dans
+`presenceContext`, `{ time, perceptionActive, weather }`, PARTAGÉ par tout le tick —
+même patron que `perceptionActive` ci-dessus, dérivé de `session.weather.state`, voir
+`core/weather.js`) est EXACTEMENT `state`. `state` est validé au chargement contre
+`config/weather-values.js`/`WEATHER_STATES` (comme `hasEquipmentTag.tag` contre
+`TAG_REGISTRY`) — un état inconnu échoue clairement plutôt que de dégrader vers "jamais
+vraie". Contexte SANS `weather` (ex. `action.condition`) → `context.weather` vaut
+`undefined` → jamais égal à un `state` déclaré → fausse, même repli défensif que les
+autres évaluateurs.
+
+Testable EN JEU sans attendre le hasard via le menu debug météo (Shift+W, mode debug —
+voir `view/menus/debug-weather-menu.js`), qui force directement `session.weather.state`
+(`core/weather.js`/`setWeather`).
+
+Exemple réel complet — `cumuloLupus` (`entities/types/cumulo-lupus.js`), présent
+seulement sous la brume :
+
+```js
+presence: [{ when: { type: "weather", state: "fog" }, present: true }],
+```
+
+Note de composition : cette condition ne se combine PAS (pas de `ET` entre deux types de
+condition dans une même règle aujourd'hui) — un loup à la fois surnaturel ET brumeux
+demanderait une future condition composite (`allOf`), pas construite tant qu'un seul cas
+d'usage ne la justifie pas (voir CLAUDE.md/anti-abstraction prématurée).
+
+Côté VUE (`view/audio/city-scene.js`), un changement de `session.weather.state` déclenche
+AUSSI une AMBIANCE SONORE dédiée : une couche GLOBALE (`lib/audio.js`/
+`setWeatherAmbienceLayer`), SUPERPOSÉE à l'ambiance du lieu (jamais à sa place,
+contrairement à la couche `"state"` de perception qui REMPLACE le lieu) et persistante
+au niveau module — elle continue SANS COUPURE à travers une transition de scène tant que
+NI la météo NI le contexte indoor/outdoor de la scène active ne changent, et ne fond
+(crossfade existant, `lib/audio.js`/`crossfadeAmbience`) qu'à une vraie transition météo
+OU de contexte. `WEATHER_STATES[state].ambience` (optionnel, `config/weather-values.js`)
+déclare DEUX pools DISTINCTS par contexte (`{ outdoor?, indoor? }`, modèle A — deux
+matériaux sonores réels, jamais un filtre) : le rendu LIT le pool du contexte de la scène
+active (`indoor`, propriété de FACE — voir `core/level.js`/`parseFace` et
+`level/schema.md`), il ne le COMPOSE jamais. Un contexte absent pour un état donné
+reste silencieux dans CE contexte (ex. la brume, inaudible à l'intérieur). Hors de
+portée de ce document (format déclaratif du core) : détail complet côté vue dans les
+commentaires de `view/audio/city-scene.js` (`declareWeatherAmbience`) et `lib/audio.js`
+(`targetAmbience`).
+
 ### Ajouter un type de condition
 
 1. Un cas dans `CONDITION_EVALUATORS` (`core/presence.js`) : `(cond, context) ->

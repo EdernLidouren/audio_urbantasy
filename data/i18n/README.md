@@ -57,6 +57,7 @@ de ta clé, ajoute-la dans **les deux langues**, même fichier.
 | Monde | `entities.json` | Titres de lieu (`level.*.title`), types d'entité (`entity.*`), instances spécifiques (`object.*`, `npc.*`, `door.*`) |
 | Carte | `map.json` | Carte de la ville (`cityMap.*`) |
 | Perception | `perception.json` | Perception surnaturelle (`perception.*`) |
+| Météo | `weather.json` | Moteur météo (`weather.*`) — noms d'état + gabarit d'annonce (voir core/weather.js) |
 
 Aucune clé ne doit apparaître dans deux fichiers-domaines de la même langue (chaque
 domaine est un espace de noms disjoint) — `fr/index.js`/`en/index.js` les assemblent

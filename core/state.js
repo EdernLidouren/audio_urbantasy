@@ -69,6 +69,7 @@ import { createSeed, nextRandom } from "./rng.js";
 import { clamp } from "./physics/movement.js";
 import { isBlocking } from "./presence.js";
 import { INITIAL_TIME } from "./time.js";
+import { createInitialWeather } from "./weather.js";
 
 export const MOVE_STEP = TUNING_DEFAULTS.moveStep;
 
@@ -299,6 +300,11 @@ export function createInitialState(level, seed = DEFAULT_SEED, { companions } = 
     // mais hashé sous une clé distincte — jamais la même suite que le
     // premier monde (createSeed accepte une chaîne, voir core/rng.js).
     companionsRngState: createSeed(`companions:${seed}`),
+    // Météo (voir core/weather.js) : machine à états GLOBALE, cercle
+    // PARTIE comme time/money — jamais par monde. État initial +
+    // rendez-vous de transition dérivés du seed de partie, comme
+    // companionsRngState juste au-dessus.
+    weather: createInitialWeather(seed),
     // Perception surnaturelle (voir core/presence.js/"perceptionActive",
     // view/audio/city-scene.js) : booléen simple, cercle PARTIE comme side/
     // time/money — jamais par monde. false par défaut : une partie neuve

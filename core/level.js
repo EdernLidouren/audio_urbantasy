@@ -18,6 +18,7 @@ import BEHAVIORS from "./behaviors/index.js";
 import { SURFACE_REGISTRY, DEFAULT_SURFACE } from "./surfaces.js";
 import { CONDITION_TYPES } from "./presence.js";
 import { TAG_REGISTRY } from "./tags.js";
+import { WEATHER_STATES } from "../config/weather-values.js";
 
 function fail(message) {
   throw new Error(`parseLevel: ${message}`);
@@ -94,6 +95,15 @@ function validateCondition(cond, describe) {
   // une règle de contenu ne jamais se déclencher sans qu'on sache pourquoi.
   if (cond.type === "hasEquipmentTag" && (!isNonEmptyString(cond.tag) || !TAG_REGISTRY[cond.tag])) {
     fail(`${describe}.tag "${cond.tag}" absent du registre de tags.`);
+  }
+  // "weather" : EN PLUS de son type, son champ `state` référence un état de
+  // la table météo (config/weather-values.js/WEATHER_STATES) — même
+  // traitement que hasEquipmentTag.tag ci-dessus : une faute de frappe
+  // échouerait SILENCIEUSEMENT à l'évaluation (core/presence.js/
+  // evaluateWeather replie sur false pour un état qui ne matche jamais),
+  // donc refusée ICI, au chargement.
+  if (cond.type === "weather" && (!isNonEmptyString(cond.state) || !WEATHER_STATES[cond.state])) {
+    fail(`${describe}.state "${cond.state}" absent de la table météo.`);
   }
 }
 
@@ -435,6 +445,7 @@ const FACE_FIELDS = [
   "reverbDecay",
   "defaultSurface",
   "segments",
+  "indoor",
 ];
 
 // Valide et construit UNE FACE (voir header ci-dessus) : entités +
@@ -460,6 +471,7 @@ function parseFace(raw, length, registry, describe) {
     reverbDecay,
     defaultSurface,
     segments,
+    indoor,
   } = raw;
 
   if (!Array.isArray(entities)) {
@@ -477,6 +489,19 @@ function parseFace(raw, length, registry, describe) {
     fail(`${prefix}defaultSurface "${JSON.stringify(defaultSurface)}" absente du registre de surfaces.`);
   }
   const resolvedDefaultSurface = defaultSurface !== undefined ? defaultSurface : DEFAULT_SURFACE;
+  // indoor : PROPRIÉTÉ DE NATURE DE LIEU (comme defaultSurface juste
+  // au-dessus), pas un "flag ambiance météo" — aujourd'hui seul le RENDU de
+  // l'ambiance météo la consulte (voir view/audio/city-scene.js, choix du
+  // pool outdoor/indoor par état, config/weather-values.js), mais rien
+  // n'empêche un futur consommateur (réverb, sons ambiants...) de la lire
+  // aussi. TOUJOURS résolue en booléen (comme defaultSurface, jamais
+  // `undefined` sur une face parsée) : défaut `false` (extérieur, le cas
+  // courant en ville) — comportement inchangé pour tout lieu existant qui
+  // ne la déclare pas encore.
+  if (indoor !== undefined && typeof indoor !== "boolean") {
+    fail(`${prefix}indoor doit être un booléen si présent (reçu : ${JSON.stringify(indoor)}).`);
+  }
+  const resolvedIndoor = indoor !== undefined ? indoor : false;
   // segments : optionnel, PATCHE defaultSurface sur des zones précises (voir
   // parseSegment) — absent -> tableau vide, toujours resolvedDefaultSurface
   // partout (comportement inchangé). Chaque segment est TOUJOURS explicite
@@ -571,6 +596,7 @@ function parseFace(raw, length, registry, describe) {
     defaultSurface: resolvedDefaultSurface,
     segments: parsedSegments,
     entities: parsedEntities,
+    indoor: resolvedIndoor,
   };
   // Clés ajoutées SEULEMENT si présentes (jamais explicitement undefined) :
   // l'état doit rester de la donnée pure, un aller-retour JSON ne doit rien

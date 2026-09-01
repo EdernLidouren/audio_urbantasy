@@ -1,0 +1,10 @@
+{
+  "weather.announce": "Météo : {state}.",
+  "weather.state.sunny": "ensoleillé",
+  "weather.state.cloudy": "nuageux",
+  "weather.state.rain": "pluvieux",
+  "weather.state.fog": "brumeux",
+  "weather.debug.title": "Météo (debug)",
+  "weather.debug.triggerTransition": "Déclencher la transition suivante",
+  "weather.debug.force": "Forcer : {state}"
+}

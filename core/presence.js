@@ -184,6 +184,17 @@ function evaluatePerceptionActive(cond, context) {
   return Boolean(context.perceptionActive);
 }
 
+// "weather" : vraie si l'état météo courant (context.weather, voir
+// core/reduce.js/TICK, dérivé de session.weather.state — core/weather.js)
+// est EXACTEMENT cond.state. Sans état dans le contexte (ex.
+// action.condition, hors tick) -> false, même repli défensif que
+// perceptionActive. cond.state validé au chargement contre
+// config/weather-values.js/WEATHER_STATES (core/level.js/validateCondition),
+// comme hasEquipmentTag.tag contre TAG_REGISTRY.
+function evaluateWeather(cond, context) {
+  return context.weather !== undefined && context.weather === cond.state;
+}
+
 // Registre des évaluateurs par type — SEUL endroit qui connaît les types de
 // condition. core/level.js valide `when.type` au chargement contre les clés
 // de CE MÊME registre (CONDITION_TYPES ci-dessous) : ajouter un type ici le
@@ -199,6 +210,7 @@ const CONDITION_EVALUATORS = {
   consumed: evaluateConsumed,
   hasEquipmentTag: evaluateHasEquipmentTag,
   perceptionActive: evaluatePerceptionActive,
+  weather: evaluateWeather,
 };
 
 export const CONDITION_TYPES = Object.keys(CONDITION_EVALUATORS);
