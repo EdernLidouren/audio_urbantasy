@@ -154,6 +154,32 @@
   "assets/sounds/entities/npc_beacon": [
     "assets/sounds/entities/npc_beacon_1.mp3"
   ],
+  "assets/sounds/entities/spectral_wolf_growl": [
+    "assets/sounds/entities/spectral_wolf_growl_1.mp3"
+  ],
+  "assets/sounds/entities/spectral_wolf_vocal": [
+    "assets/sounds/entities/spectral_wolf_vocal_1.mp3",
+    "assets/sounds/entities/spectral_wolf_vocal_2.mp3",
+    "assets/sounds/entities/spectral_wolf_vocal_3.mp3",
+    "assets/sounds/entities/spectral_wolf_vocal_4.mp3",
+    "assets/sounds/entities/spectral_wolf_vocal_5.mp3",
+    "assets/sounds/entities/spectral_wolf_vocal_6.mp3",
+    "assets/sounds/entities/spectral_wolf_vocal_7.mp3",
+    "assets/sounds/entities/spectral_wolf_vocal_8.mp3"
+  ],
+  "assets/sounds/entities/wolf_growl": [
+    "assets/sounds/entities/wolf_growl_1.mp3"
+  ],
+  "assets/sounds/entities/wolf_vocal": [
+    "assets/sounds/entities/wolf_vocal_1.mp3",
+    "assets/sounds/entities/wolf_vocal_2.mp3",
+    "assets/sounds/entities/wolf_vocal_3.mp3",
+    "assets/sounds/entities/wolf_vocal_4.mp3",
+    "assets/sounds/entities/wolf_vocal_5.mp3",
+    "assets/sounds/entities/wolf_vocal_6.mp3",
+    "assets/sounds/entities/wolf_vocal_7.mp3",
+    "assets/sounds/entities/wolf_vocal_8.mp3"
+  ],
   "assets/sounds/footsteps/barefoot_walk": [
     "assets/sounds/footsteps/barefoot_walk_1.mp3",
     "assets/sounds/footsteps/barefoot_walk_2.mp3",
@@ -302,6 +328,12 @@
     "assets/sounds/footsteps/shoes_walk_20.mp3",
     "assets/sounds/footsteps/shoes_walk_21.mp3",
     "assets/sounds/footsteps/shoes_walk_22.mp3"
+  ],
+  "assets/sounds/footsteps/smoke_walk": [
+    "assets/sounds/footsteps/smoke_walk_1.mp3",
+    "assets/sounds/footsteps/smoke_walk_2.mp3",
+    "assets/sounds/footsteps/smoke_walk_3.mp3",
+    "assets/sounds/footsteps/smoke_walk_4.mp3"
   ],
   "assets/sounds/footsteps/snow_walk": [
     "assets/sounds/footsteps/snow_walk_1.mp3",

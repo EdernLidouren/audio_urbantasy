@@ -21,6 +21,8 @@
   "entity.neon.description": "Une enseigne au néon qui bourdonne doucement.",
   "entity.ghost": "Présence",
   "entity.ghost.description": "Une présence indistincte, qui ne se révèle qu'à la perception surnaturelle.",
+  "entity.cumulo_lupus": "Cumulo Lupus",
+  "entity.cumulo_lupus.description": "Un loup fait de brume et de fumée, qui ne se laisse voir — ou entendre — qu'à la perception surnaturelle.",
   "entity.money": "Argent",
   "entity.money.description": "Un peu d'argent, posé au sol.",
   "entity.crate": "Caisse",

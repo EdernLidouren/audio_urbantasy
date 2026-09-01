@@ -21,6 +21,8 @@
   "entity.neon.description": "A neon sign, buzzing softly.",
   "entity.ghost": "Presence",
   "entity.ghost.description": "An indistinct presence, only revealed by supernatural perception.",
+  "entity.cumulo_lupus": "Cumulo Lupus",
+  "entity.cumulo_lupus.description": "A wolf made of mist and smoke, only seen — or heard — through supernatural perception.",
   "entity.money": "Money",
   "entity.money.description": "A bit of money, sitting on the ground.",
   "entity.crate": "Crate",
