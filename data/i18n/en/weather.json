@@ -4,6 +4,8 @@
   "weather.state.cloudy": "cloudy",
   "weather.state.rain": "rainy",
   "weather.state.fog": "foggy",
+  "weather.state.windy": "windy",
+  "weather.state.stormy": "stormy",
   "weather.debug.title": "Weather (debug)",
   "weather.debug.triggerTransition": "Trigger next transition",
   "weather.debug.force": "Force: {state}"

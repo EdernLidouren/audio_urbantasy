@@ -44,19 +44,34 @@ export const DEFAULT_WEATHER_STATE = "sunny";
 export const WEATHER_STATES = {
   sunny: {
     duration: { min: 120, max: 360 },
-    transitions: { sunny: 40, cloudy: 40, rain: 10, fog: 10 },
+    transitions: { sunny: 35, cloudy: 35, windy: 15, rain: 5, fog: 10 },
   },
   cloudy: {
     duration: { min: 60, max: 240 },
-    transitions: { cloudy: 50, rain: 30, sunny: 15, fog: 5 },
+    transitions: { cloudy: 40, rain: 20, windy: 20, sunny: 15, fog: 5 },
+  },
+  windy: {
+    duration: { min: 45, max: 180 },
+    transitions: { windy: 35, cloudy: 30, sunny: 20, rain: 10, stormy: 5 },
+    // DEUX matériaux RÉELS distincts par contexte (modèle A, voir header
+    // ci-dessus) : le vent porte franchement à l'extérieur, nettement
+    // assourdi derrière des murs.
+    ambience: { outdoor: "assets/ambiances/wind_outdoor", indoor: "assets/ambiances/wind_indoor" },
   },
   rain: {
     duration: { min: 30, max: 150 },
-    transitions: { rain: 30, cloudy: 50, sunny: 10, fog: 10 },
+    transitions: { rain: 25, cloudy: 40, stormy: 15, sunny: 10, fog: 10 },
     // DEUX matériaux RÉELS distincts par contexte (modèle A, voir header
     // ci-dessus) : rain_outdoor_1.mp3 (l'averse elle-même) et
     // rain_indoor_1.mp3 (assourdie/différente, entendue depuis l'abri).
     ambience: { outdoor: "assets/ambiances/rain_outdoor", indoor: "assets/ambiances/rain_indoor" },
+  },
+  stormy: {
+    duration: { min: 15, max: 60 },
+    transitions: { stormy: 20, rain: 50, cloudy: 25, windy: 5 },
+    // Orage : plus intense qu'une simple pluie, matériaux DÉDIÉS (tonnerre
+    // + averse forte) plutôt qu'une variation de volume sur rain_*.
+    ambience: { outdoor: "assets/ambiances/thunderstorm_outdoor", indoor: "assets/ambiances/thunderstorm_indoor" },
   },
   fog: {
     duration: { min: 30, max: 120 },

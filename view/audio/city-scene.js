@@ -61,6 +61,7 @@ import {
   setAmbienceLayer,
   clearAmbienceLayers,
   setWeatherAmbienceLayer,
+  declareAmbienceLayers,
 } from "../../lib/audio.js";
 import { announce } from "../../lib/announce.js";
 import { resolveAsset, hasAsset, assetKeyMembers } from "../../lib/assets.js";
@@ -976,9 +977,9 @@ export function createCityAudioScene(getSession) {
   let perceptionActive = getSession().perceptionActive;
   const pickPerceptionMusicPath = () => resolveAsset(PERCEPTION_MUSIC_POOL);
 
-  // Volume AVANT toute déclaration de couche : playGlobal/playMusicTrack
-  // (lib/audio.js) lisent channelVolume("music"/"ambience") DÈS LA
-  // CRÉATION d'un flux, quel qu'il soit (démarrage direct OU fondu de
+  // Volume AVANT toute déclaration de couche : playMusicTrack/crossfadeSlot/
+  // startSlotDirect (lib/audio.js) lisent channelVolume("music"/"ambience")
+  // DÈS LA CRÉATION d'un flux, quel qu'il soit (démarrage direct OU fondu de
   // crossfade) — l'ordre entre setGlobalVolume et les déclarations de
   // couches ci-dessous n'a donc plus d'importance FONCTIONNELLE, mais
   // AVANT reste le plus sûr : jamais de risque d'écraser en dur (sans
@@ -994,9 +995,9 @@ export function createCityAudioScene(getSession) {
   // performTransition, view/city-screen.js, qui ne coupe plus la couche
   // d'état), la déclarer EN PREMIER lui laisse imposer directement son
   // identité — la couche de lieu, déclarée juste après, se retrouve alors
-  // simplement ignorée (l'état prime, voir winningMusicLayer/
-  // winningAmbienceLayer) sans jamais avoir démarré puis interrompu quoi
-  // que ce soit pour rien.
+  // simplement ignorée (l'état prime, voir lib/audio.js/winningMusicLayer
+  // pour la musique, desiredAmbienceSlots pour l'ambiance) sans jamais
+  // avoir démarré puis interrompu quoi que ce soit pour rien.
   const musicStateParams = { pickPath: pickPerceptionMusicPath, loop: false, breatherRange: MUSIC_BREATHER_RANGE };
   setMusicLayer("state", perceptionActive ? PERCEPTION_MUSIC_POOL : null, musicStateParams, PERCEPTION_FADE_MS);
   setMusicLayer(
@@ -1006,28 +1007,14 @@ export function createCityAudioScene(getSession) {
     MUSIC_FADE_MS
   );
 
-  setAmbienceLayer(
-    "state",
-    perceptionActive ? [PERCEPTION_AMBIENCE_POOL] : null,
-    perceptionActive ? [resolveAsset(PERCEPTION_AMBIENCE_POOL)] : null,
-    PERCEPTION_FADE_MS
-  );
-  setAmbienceLayer(
-    "location",
-    ambiences && ambiences.length > 0 ? ambiences : null,
-    ambiences && ambiences.length > 0 ? ambiences.map(resolveAsset) : null,
-    MUSIC_FADE_MS
-  );
-
-  // Ambiance MÉTÉO (voir core/weather.js, lib/audio.js/
-  // setWeatherAmbienceLayer, "Couche météo") : SUPERPOSÉE à la couche
-  // gagnante ci-dessus, jamais à sa place — un état météo SANS ambience
-  // déclarée (ex. "sunny", voir config/weather-values.js) ne joue
-  // simplement rien de plus. Déclarée EN DERNIER (après état ET lieu) :
-  // seule couche des trois qui ne dépend pas de perceptionActive, donc
-  // sans ordre imposé vis-à-vis d'elles, contrairement à état/lieu entre
-  // eux. weatherState tracké ICI (comme currentPhase/perceptionActive
-  // ci-dessus) pour détecter la TRANSITION dans update() plus bas.
+  // Ambiance : état, lieu ET météo déclarés EN UNE SEULE FOIS au montage
+  // (voir lib/audio.js/declareAmbienceLayers) — une intention complète,
+  // plutôt que trois déclarations séparées. La synchronisation sous-jacente
+  // (lib/audio.js/syncAmbienceLayers) fait un DIFFING PAR COUCHE : seule une
+  // couche dont la source déclarée change réellement est fondue, les autres
+  // gardent EXACTEMENT leurs flux en cours (ni fondu, ni retirage) — c'est
+  // CE mécanisme qui garantit qu'un changement de météo seul ne touche
+  // jamais l'ambiance de lieu, et inversement.
   //
   // INDOOR/OUTDOOR (modèle A, voir core/level.js/parseFace, "nature de
   // lieu") : `indoor` est la propriété de la scène ACTIVE, capturée UNE
@@ -1035,19 +1022,46 @@ export function createCityAudioScene(getSession) {
   // une TRANSITION (destroy + recreate, donc un nouveau montage de ce
   // fichier) peut faire passer de outdoor à indoor ou l'inverse. C'est CE
   // qui donne le fondu "déclenché par le changement de CONTEXTE" demandé :
-  // au montage de la scène SUIVANTE, cette même fonction redéclare le pool
+  // au montage de la scène SUIVANTE, ce même mécanisme redéclare le pool
   // pour le NOUVEAU contexte, avec le MÊME weatherState si la météo n'a pas
   // changé — l'identité déclarée diffère (pool outdoor vs indoor, jamais
   // composée par concaténation de nom, LUE telle quelle dans la table), donc
-  // lib/audio.js/syncAmbienceChannel détecte la différence et FOND vers le
-  // nouveau pool, sans code de transition dédié ici.
+  // la couche météo (et ELLE SEULE) fond vers le nouveau pool ; le lieu
+  // suit sa PROPRE logique, inchangé si sa source déclarée l'est aussi.
+  // weatherState tracké ICI (comme currentPhase/perceptionActive ci-dessus)
+  // pour détecter la TRANSITION dans update() plus bas.
   let weatherState = getSession().weather.state;
   const indoor = Boolean(world.indoor);
+  function weatherAmbiencePool(state) {
+    return WEATHER_STATES[state]?.ambience?.[indoor ? "indoor" : "outdoor"];
+  }
+  const mountWeatherPool = weatherAmbiencePool(weatherState);
+  declareAmbienceLayers(
+    {
+      state: {
+        identity: perceptionActive ? [PERCEPTION_AMBIENCE_POOL] : null,
+        resolvedPaths: perceptionActive ? [resolveAsset(PERCEPTION_AMBIENCE_POOL)] : null,
+      },
+      location: {
+        identity: ambiences && ambiences.length > 0 ? ambiences : null,
+        resolvedPaths: ambiences && ambiences.length > 0 ? ambiences.map(resolveAsset) : null,
+      },
+      weather: {
+        identity: mountWeatherPool ? [mountWeatherPool] : null,
+        resolvedPaths: mountWeatherPool ? [resolveAsset(mountWeatherPool)] : null,
+      },
+    },
+    MUSIC_FADE_MS
+  );
+
+  // Redéclare la couche météo SEULE — voir update() plus bas, transition
+  // météo EN COURS DE SCÈNE (rien d'autre ne change à cet instant, un seul
+  // appel suffit : pas de cible intermédiaire à éviter, contrairement au
+  // montage ci-dessus).
   function declareWeatherAmbience(state, fadeMs) {
-    const pool = WEATHER_STATES[state]?.ambience?.[indoor ? "indoor" : "outdoor"];
+    const pool = weatherAmbiencePool(state);
     setWeatherAmbienceLayer(pool ? [pool] : null, pool ? [resolveAsset(pool)] : null, fadeMs);
   }
-  declareWeatherAmbience(weatherState, WEATHER_AMBIENCE_FADE_MS);
 
   // Rampe du filtre d'étouffement des entités MONDAINES (voir
   // effectiveMuffleAmount/currentMundaneMuffleAmount plus bas) : de/vers
@@ -1619,10 +1633,11 @@ export function createCityAudioScene(getSession) {
     // la bascule de phase/perception ci-dessus, compare à la valeur
     // MÉMORISÉE, agit SEULEMENT sur la différence — redéclare la couche
     // météo (voir declareWeatherAmbience plus haut), NO-OP si le nouvel
-    // état météo n'apporte aucune ambience (silence -> silence) ou la
-    // MÊME ambience qu'un autre mécanisme joue déjà (continuité par
-    // identité, voir lib/audio.js/targetAmbience), sinon fondu vers/depuis
-    // le pool météo, SUPERPOSÉ à la couche gagnante (jamais à sa place).
+    // état météo n'apporte aucune ambience (silence -> silence) ou la MÊME
+    // ambience qu'avant (continuité par identité, voir lib/audio.js/
+    // syncAmbienceLayers, diffing PAR COUCHE — SEULE la couche météo est
+    // évaluée ici, le lieu n'est jamais touché), sinon fondu vers/depuis le
+    // pool météo, SUPERPOSÉ à la couche gagnante (jamais à sa place).
     if (session.weather.state !== weatherState) {
       weatherState = session.weather.state;
       declareWeatherAmbience(weatherState, WEATHER_AMBIENCE_FADE_MS);
@@ -1751,7 +1766,7 @@ export function createCityAudioScene(getSession) {
   // entités (pas le bus de réverb, qui ne fait que traiter un signal — sans
   // signal entrant il est déjà silencieux — et pas musique/ambiances,
   // canaux globaux non spatialisés, qui ne sont pas des "voix de la scène"
-  // — voir lib/audio.js playGlobal/stopGlobal). Utilisé par les menus qui
+  // — voir lib/audio.js/GLOBAL_CHANNELS). Utilisé par les menus qui
   // se superposent au jeu (désambiguïsation, pause — voir
   // view/interaction.js, view/menus/pause-menu.js) pour dégager le canal
   // positionné pendant qu'ils sont ouverts, sans toucher au contexte audio

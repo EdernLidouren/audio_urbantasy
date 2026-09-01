@@ -537,7 +537,7 @@ function parseFace(raw, length, registry, describe) {
     fail(`${prefix}musicLoop doit être un booléen si présent (reçu : ${JSON.stringify(musicLoop)}).`);
   }
   // ambiences : optionnel, tableau de 0 à AMBIENCE_CHANNEL_LIMIT chemins
-  // (voir view/audio/city-scene.js, lib/audio.js playAmbiences). Même
+  // (voir view/audio/city-scene.js, lib/audio.js/setAmbienceLayer). Même
   // passage simple, juste la forme est vérifiée ici — la limite elle-même
   // vient de la source unique partagée avec lib/audio.js.
   if (ambiences !== undefined) {
