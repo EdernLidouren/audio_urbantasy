@@ -1,5 +1,6 @@
 {
   "level.demo.title": "Demo level",
+  "level.default.title": "Unnamed place",
   "entity.door": "Door",
   "entity.door.description": "A door.",
   "entity.npc": "Character",
@@ -54,5 +55,8 @@
   "door.alley.description": "A service door opening onto an alley.",
   "door.alley_back": "Service door",
   "door.alley_back.description": "This same service door, seen from the alley: it leads to the back room.",
-  "level.demo3.title": "The alley"
+  "level.demo3.title": "The alley",
+  "level.town_square.title": "Town square",
+  "entity.river": "River",
+  "entity.river.description": "The river's waters are murky, but calm."
 }

@@ -24,6 +24,18 @@ function fail(message) {
   throw new Error(`parseLevel: ${message}`);
 }
 
+// Parsing TOTAL (voir header) : l'ABSENCE d'un champ de scène retombe
+// toujours sur un défaut sensé, jamais une erreur — seule sa PRÉSENCE
+// malformée échoue. Ces trois défauts couvrent les champs qui n'avaient
+// jusqu'ici AUCUN filet (id/titleKey/length étaient requis) ; les autres
+// champs de scène (entities, defaultSurface, segments, indoor,
+// playerStart) ont déjà le leur plus bas. `{}` doit rester un niveau
+// valide et jouable : id/titre génériques, longueur minimale mais non
+// nulle (traversable).
+const DEFAULT_LEVEL_ID = "level";
+const DEFAULT_LEVEL_TITLE_KEY = "level.default.title";
+const DEFAULT_LEVEL_LENGTH = 10;
+
 function isNonEmptyString(value) {
   return typeof value === "string" && value.trim().length > 0;
 }
@@ -485,9 +497,12 @@ function parseFace(raw, length, registry, describe) {
     indoor,
   } = raw;
 
-  if (!Array.isArray(entities)) {
-    fail(`${prefix}entities doit être un tableau (reçu : ${JSON.stringify(entities)}).`);
+  // entities : ABSENT -> [] (face vide, toujours jouable) ; PRÉSENT mais pas
+  // un tableau -> erreur claire, inchangé.
+  if (entities !== undefined && !Array.isArray(entities)) {
+    fail(`${prefix}entities doit être un tableau si présent (reçu : ${JSON.stringify(entities)}).`);
   }
+  const resolvedEntities = entities !== undefined ? entities : [];
   // defaultSurface : couvre tout le X non-segmenté (voir surfaceAt,
   // core/surfaces.js) — toute la face est TOUJOURS couverte, sans trou.
   // FILET SILENCIEUX si absent (repli sur DEFAULT_SURFACE, comportement
@@ -599,7 +614,7 @@ function parseFace(raw, length, registry, describe) {
   }
 
   const seenIds = new Set();
-  const parsedEntities = entities.map((rawEntity, index) =>
+  const parsedEntities = resolvedEntities.map((rawEntity, index) =>
     parseEntity(rawEntity, index, registry, length, seenIds)
   );
 
@@ -635,22 +650,29 @@ export function parseLevel(raw, registry) {
 
   const { id, titleKey, length, playerStart, recto, verso } = raw;
 
-  if (!isNonEmptyString(id)) {
-    fail(`id manquant ou invalide (reçu : ${JSON.stringify(id)}).`);
+  // id/titleKey/length : ABSENTS -> défauts génériques (DEFAULT_LEVEL_*,
+  // voir header) ; PRÉSENTS mais malformés -> erreur claire, inchangé — la
+  // distinction absence/malformation vaut ici comme pour tout autre champ
+  // de scène.
+  if (id !== undefined && !isNonEmptyString(id)) {
+    fail(`id invalide si présent (reçu : ${JSON.stringify(id)}).`);
   }
-  if (!isNonEmptyString(titleKey)) {
-    fail(`titleKey manquant ou invalide (reçu : ${JSON.stringify(titleKey)}).`);
+  const resolvedId = id !== undefined ? id : DEFAULT_LEVEL_ID;
+  if (titleKey !== undefined && !isNonEmptyString(titleKey)) {
+    fail(`titleKey invalide si présent (reçu : ${JSON.stringify(titleKey)}).`);
   }
-  if (!isFiniteNumber(length) || length <= 0) {
-    fail(`length doit être un nombre > 0 (reçu : ${JSON.stringify(length)}).`);
+  const resolvedTitleKey = titleKey !== undefined ? titleKey : DEFAULT_LEVEL_TITLE_KEY;
+  if (length !== undefined && (!isFiniteNumber(length) || length <= 0)) {
+    fail(`length doit être un nombre > 0 si présent (reçu : ${JSON.stringify(length)}).`);
   }
+  const resolvedLength = length !== undefined ? length : DEFAULT_LEVEL_LENGTH;
   // playerStart : point d'arrivée PAR DÉFAUT du lieu. FILET, pas de rejet :
   // absent ou hors [0, length] -> repli sur 0, jamais d'exception (un lieu
   // mal configuré ne doit pas empêcher d'y entrer). Des points d'arrivée
   // NOMMÉS (ex. arriver à l'entrée précise associée à la porte empruntée)
   // pourront s'ajouter plus tard, sans toucher à ce filet — pas codés ici.
   const resolvedPlayerStart =
-    isFiniteNumber(playerStart) && playerStart >= 0 && playerStart <= length ? playerStart : 0;
+    isFiniteNumber(playerStart) && playerStart >= 0 && playerStart <= resolvedLength ? playerStart : 0;
   if (resolvedPlayerStart !== playerStart) {
     console.warn(
       `parseLevel: playerStart (${JSON.stringify(playerStart)}) absent ou hors bornes, repli sur 0.`
@@ -672,27 +694,27 @@ export function parseLevel(raw, registry) {
     if (leakedField) {
       fail(`"${leakedField}" est un champ de FACE : une scène à deux faces le déclare dans recto/verso, jamais à la racine.`);
     }
-    const parsedRecto = parseFace(recto, length, registry, "recto");
-    const parsedVerso = parseFace(verso, length, registry, "verso");
+    const parsedRecto = parseFace(recto, resolvedLength, registry, "recto");
+    const parsedVerso = parseFace(verso, resolvedLength, registry, "verso");
     warnOnOverlaps(parsedRecto.entities, resolvedPlayerStart);
     warnOnOverlaps(parsedVerso.entities, resolvedPlayerStart);
     return {
-      id,
-      titleKey,
-      length,
+      id: resolvedId,
+      titleKey: resolvedTitleKey,
+      length: resolvedLength,
       playerStart: resolvedPlayerStart,
       recto: parsedRecto,
       verso: parsedVerso,
     };
   }
 
-  const face = parseFace(raw, length, registry, null);
+  const face = parseFace(raw, resolvedLength, registry, null);
   warnOnOverlaps(face.entities, resolvedPlayerStart);
 
   return {
-    id,
-    titleKey,
-    length,
+    id: resolvedId,
+    titleKey: resolvedTitleKey,
+    length: resolvedLength,
     playerStart: resolvedPlayerStart,
     ...face,
   };

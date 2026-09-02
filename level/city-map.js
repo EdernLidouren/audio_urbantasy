@@ -30,9 +30,9 @@ export const CITY_MAP_HEIGHT = 5;
 // (voir isCityMapUnderConstruction) — pas un nouvel objet par case.
 const UNDER_CONSTRUCTION = { underConstruction: true };
 
-// Seule case réelle du test : reliée au niveau de départ ("demo"), au point
-// d'entrée déjà existant (playerStart de level/demo.json) — cohérent avec
-// le fait que le joueur y démarre déjà une partie neuve.
+// Seule case réelle du test : reliée à "demo" (l'ancienne scène de départ,
+// avant town_square — voir main.js/startTestCityGame), au point d'entrée
+// déjà existant (playerStart de level/demo.json).
 const DEMO_ZONE = { levelId: "demo", nameKey: "level.demo.title", descriptionKey: "cityMap.demo.description", spawnX: 2 };
 
 // Grille littérale, lisible d'un coup d'œil (une ligne de source = une

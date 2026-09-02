@@ -50,20 +50,34 @@ function openNewGameConfirmation(startNewGame) {
 // détection (hasSave, présence brute) est volontairement DIFFÉRENTE de celle
 // qui gouverne "Continuer" (une sauvegarde CHARGEABLE, voir main.js) — une
 // sauvegarde corrompue n'offre jamais de reprise, mais reste bien un risque
-// d'écrasement à confirmer.
-function activateNewGame(startNewGame) {
+// d'écrasement à confirmer. GÉNÉRIQUE sur le callback de démarrage : sert
+// aussi bien "Nouvelle partie" que "Ville test" ci-dessous (MÊME risque
+// d'écrasement, une session neuve dans les deux cas), jamais une seconde
+// fonction dupliquée pour la même confirmation.
+function activateNewGame(startGame) {
   if (hasSave()) {
-    openNewGameConfirmation(startNewGame);
+    openNewGameConfirmation(startGame);
   } else {
-    startNewGame();
+    startGame();
   }
 }
 
-// canContinue/continueGame/startNewGame/getSession : état + callbacks
-// fournis par main.js (seul propriétaire de session/level). Menu racine :
-// jamais fermable (rien en dessous vers quoi revenir).
-export function createMainMenu({ canContinue, continueGame, startNewGame, getSession }) {
+// canContinue/continueGame/startNewGame/startTestCityGame/getSession : état
+// + callbacks fournis par main.js (seul propriétaire de session/level).
+// Menu racine : jamais fermable (rien en dessous vers quoi revenir).
+export function createMainMenu({ canContinue, continueGame, startNewGame, startTestCityGame, getSession }) {
   const entries = [];
+
+  // "Ville test" : EN TÊTE de menu (avant même "Continuer"), raccourci de
+  // développement/démo vers l'ancienne scène de départ ("demo", voir
+  // main.js/startTestCityGame) — réutilise TEL QUEL le même garde-fou de
+  // confirmation qu'une "Nouvelle partie" normale (activateNewGame
+  // ci-dessus), puisque c'est exactement la même opération : une session
+  // neuve qui écrasera la sauvegarde à sa prochaine écriture.
+  entries.push({
+    label: "menu.main.test_city",
+    onActivate: () => activateNewGame(startTestCityGame),
+  });
 
   if (canContinue) {
     entries.push({

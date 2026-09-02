@@ -29,8 +29,8 @@ export const TIME_CONFIG = {
   // toute heure hors [dayStartHour, nightStartHour) est nuit). Un seul
   // palier de chaque côté pour l'instant (pas d'aube/crépuscule) — extensible
   // plus tard à d'autres phases sans changer cette table, juste sa lecture.
-  dayStartHour: 6,
-  nightStartHour: 9,
+  dayStartHour: 8,
+  nightStartHour: 20,
 
   // Jour de semaine du jour 1 d'une partie neuve — index dans
   // weekday.0..weekday.6 (i18n/*.js, voir core/time.js/weekdayOf). 0 = le

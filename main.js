@@ -15,7 +15,7 @@ import { t } from "./data/i18n/index.js";
 import { runMovementChecks } from "./core/movement.check.js";
 import { isDebugEnabled, setDebugEnabled } from "./config/debug.js";
 import { startLoop } from "./lib/loop.js";
-import { loadLevel } from "./level/load.js";
+import { loadLevel, loadLevelById } from "./level/load.js";
 import registry from "./entities/types/index.js";
 import { createInitialState } from "./core/state.js";
 import { getPref, setPref, PREF_CONSTRAINTS } from "./config/preferences.js";
@@ -128,6 +128,26 @@ function startNewGame() {
   pushScreen(makeCityScreen(getSession, setSession));
 }
 
+// "Ville test" (entrée de tête du menu principal, voir main-menu.js) :
+// démarre une partie NEUVE directement sur le niveau "demo" (l'ancienne
+// scène de départ, avant l'introduction de town_square ci-dessus) — MÊME
+// risque d'écrasement qu'une "Nouvelle partie" normale, voir
+// activateNewGame/main-menu.js, réutilisé TEL QUEL pour cette entrée.
+// Contrairement à `level` (préchargé en tâche de fond dès le boot, voir plus
+// bas), "demo" n'est chargé qu'à la demande via loadLevelById (même chemin
+// que la traversée d'une porte, voir view/city-screen.js/performTransition)
+// — un raccourci de test n'a pas besoin d'être préchargé au démarrage.
+function startTestCityGame() {
+  loadLevelById("demo", registry)
+    .then((testLevel) => {
+      session = createInitialState(testLevel);
+      pushScreen(makeCityScreen(getSession, setSession));
+    })
+    .catch((error) => {
+      console.error(error.message);
+    });
+}
+
 // "Continuer" : réutilise la session déjà chargée par mainMenuScreen.onEnter
 // (jamais un second appel à loadGame() ici) — cette entrée n'apparaît de
 // toute façon que quand loadableSave n'est pas null (voir createMainMenu).
@@ -146,12 +166,12 @@ function continueGame() {
 // Pas composeHook (lib/screens.js) ici : l'ordre compte — le
 // rafraîchissement doit avoir lieu AVANT l'annonce d'ouverture, alors que
 // composeHook exécute toujours le hook de base (l'annonce) en premier.
-const mainMenuDef = createMainMenu({ canContinue: false, continueGame, startNewGame, getSession });
+const mainMenuDef = createMainMenu({ canContinue: false, continueGame, startNewGame, startTestCityGame, getSession });
 const mainMenuScreen = makeMenuScreen(mainMenuDef, t);
 const baseMainMenuOnEnter = mainMenuScreen.onEnter;
 mainMenuScreen.onEnter = () => {
   loadableSave = loadGame();
-  const fresh = createMainMenu({ canContinue: loadableSave !== null, continueGame, startNewGame, getSession });
+  const fresh = createMainMenu({ canContinue: loadableSave !== null, continueGame, startNewGame, startTestCityGame, getSession });
   mainMenuDef.entries.splice(0, mainMenuDef.entries.length, ...fresh.entries);
   mainMenuDef.cursor = 0;
   baseMainMenuOnEnter();
@@ -191,7 +211,7 @@ startLoop(
   (deltaMs) => tickFrame(deltaMs)
 );
 
-loadLevel("./level/demo.json", registry)
+loadLevel("./level/town_square.json", registry)
   .then((loadedLevel) => {
     level = loadedLevel;
   })

@@ -1,0 +1,17 @@
+{
+  "id": "town_square",
+  "titleKey": "level.town_square.title",
+  "length": 50,
+  "playerStart": 1,
+  "recto": {
+    "music": "assets/musics/streets_day",
+    "entities": [
+      { "id": "river", "type": "river", "x": 10 }
+    ]
+  },
+  "verso": {
+    "entities": [
+
+    ]
+  }
+}

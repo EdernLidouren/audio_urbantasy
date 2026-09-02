@@ -4,6 +4,7 @@
   "menu.toggle.no": "No",
   "menu.message.ok": "OK",
   "menu.main.title": "Templeton",
+  "menu.main.test_city": "Test city",
   "menu.main.continue": "Continue",
   "menu.main.new_game": "New game",
   "menu.main.new_game_confirm_title": "A save exists. Starting a new game will overwrite it. Confirm?",

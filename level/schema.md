@@ -6,13 +6,22 @@ parsé, sans aucune chaîne affichable en dur — uniquement des clés i18n.
 
 ## Niveau
 
+**Parsing TOTAL** : `parseLevel` accepte `{}` — TOUS les champs de scène sont
+optionnels et retombent sur un défaut sensé s'ils sont absents ; seule leur
+PRÉSENCE malformée (mauvais type, valeur hors contrainte) échoue clairement.
+`parseLevel({})` produit donc un lieu VALIDE et JOUABLE : sans entité, plat,
+surface uniforme, longueur minimale traversable, titre générique, silence
+(pas de musique/ambiance) — le joueur y apparaît et s'y déplace sans que rien
+ne plante (rendu, tick, audio, interaction, sauvegarde). Vaut aussi pour une
+FACE recto/verso vide (`parseFace`, même mécanisme).
+
 | Champ         | Type     | Contrainte                                      |
 |---------------|----------|--------------------------------------------------|
-| `id`          | string   | non vide                                          |
-| `titleKey`    | string   | non vide, clé i18n du titre du niveau             |
-| `length`      | number   | `> 0` — longueur en unités le long de l'axe x     |
+| `id`          | string   | optionnel, non vide si présent — **FILET si absent** : repli sur `"level"` (`DEFAULT_LEVEL_ID`) |
+| `titleKey`    | string   | optionnel, non vide si présent, clé i18n du titre du niveau — **FILET si absent** : repli sur `"level.default.title"` (`DEFAULT_LEVEL_TITLE_KEY`, "Lieu sans nom"/"Unnamed place") |
+| `length`      | number   | optionnel, `> 0` si présent — longueur en unités le long de l'axe x — **FILET si absent** : repli sur `10` (`DEFAULT_LEVEL_LENGTH`, petite étendue traversable, jamais `0`) |
 | `playerStart` | number   | point d'arrivée PAR DÉFAUT du lieu. **FILET, jamais rejeté** : absent ou hors `[0, length]` -> repli sur `0` (avec un `console.warn`), jamais d'exception. Des points d'arrivée NOMMÉS (ex. par porte) pourront s'ajouter plus tard, sans toucher à ce filet. |
-| `entities`    | Entity[] | voir ci-dessous                                   |
+| `entities`    | Entity[] | optionnel — **FILET si absent** : repli sur `[]` (lieu sans entité, toujours jouable). Voir ci-dessous pour la forme d'une entité. |
 | `music`       | string   | optionnel : musique du lieu — une clé de POOL (plusieurs fichiers, voir `assets/manifest.json`) ou un membre précis, résolue par `resolveAsset` comme tout autre pool. Canal global non spatialisé — voir `view/audio/city-scene.js`. Par défaut, lue en SÉQUENCE avec respiration (voir "Musique : séquence avec respiration" plus bas), jamais en boucle simple. |
 | `musicDay` / `musicNight` | string | optionnels : musique PAR PHASE jour/nuit (voir `core/time.js`/`phaseAt`, "Phase jour/nuit" plus bas), même forme que `music` (pool ou membre précis). Un lieu qui n'en déclare aucune des deux retombe sur `music` pour les deux phases (rétrocompatible, aucune régression). Bascule en cours de jeu par FONDU UNIVERSEL puis respiration puis nouvelle séquence (`view/audio/city-scene.js`) ; à l'entrée dans une scène, la phase courante joue directement, sans fondu. |
 | `musicLoop`   | boolean  | optionnel, défaut `false` : `true` fait jouer la musique du lieu en BOUCLE CONTINUE (comportement historique), sans enchaînement ni respiration — pour les deux phases, un seul drapeau par lieu. Voir "Musique : séquence avec respiration" plus bas. |
@@ -357,6 +366,10 @@ réglages, sous-types comme presets, la place du joueur) est documenté dans
   ]
 }
 ```
+
+Encore plus minimal : `{}` est un niveau valide (voir "Parsing TOTAL" plus
+haut) — un lieu vide, plat, traversable, sans rien à configurer. Utile pour
+un test/lab rapide sans avoir à écrire un fichier de niveau complet.
 
 ## Verticalité — par SOUS-SCÈNES, pas par axe Y
 

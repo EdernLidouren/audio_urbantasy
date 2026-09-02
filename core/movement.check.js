@@ -4917,6 +4917,114 @@ export function runMovementChecks() {
     );
   }
 
+  // --- Parsing TOTAL de niveau (core/level.js/parseLevel) : l'ABSENCE de
+  // tout champ de scène retombe sur un défaut sensé, {} est un niveau
+  // valide et jouable — voir level/schema.md/"Parsing TOTAL". Seule la
+  // PRÉSENCE malformée d'un champ échoue encore (inchangé).
+  {
+    const emptyLevel = parseLevel({}, EMPTY_REGISTRY);
+    run("parseLevel({}) : id -> défaut générique", "level", emptyLevel.id);
+    run("parseLevel({}) : titleKey -> défaut générique", "level.default.title", emptyLevel.titleKey);
+    run("parseLevel({}) : length -> défaut minimal traversable (10)", 10, emptyLevel.length);
+    run("parseLevel({}) : playerStart -> 0 (filet existant)", 0, emptyLevel.playerStart);
+    run("parseLevel({}) : entities -> [] (tableau vide)", 0, emptyLevel.entities.length);
+    run("parseLevel({}) : defaultSurface -> DEFAULT_SURFACE", DEFAULT_SURFACE, emptyLevel.defaultSurface);
+    run("parseLevel({}) : segments -> [] (tableau vide)", 0, emptyLevel.segments.length);
+    run("parseLevel({}) : indoor -> false (extérieur)", false, emptyLevel.indoor);
+    run("parseLevel({}) : aucune musique déclarée (silence valide)", undefined, emptyLevel.music);
+
+    // Jouable de bout en bout : spawn, déplacement, surface — jamais de
+    // lecture sur du undefined, jamais d'exception.
+    let emptyState = createInitialState(emptyLevel, undefined, NO_COMPANIONS);
+    run("parseLevel({}) : le joueur apparaît à playerStart (0)", 0, emptyState.player.x);
+    emptyState = reduce(emptyState, tick(1));
+    emptyState = reduce(emptyState, tick(1));
+    run("parseLevel({}) : le joueur s'y déplace (2 ticks à droite)", 2 * MOVE_STEP, emptyState.player.x);
+    const emptyWorld = getActiveWorld(emptyState);
+    run(
+      "parseLevel({}) : surfaceAt ne plante jamais sur la scène vide",
+      DEFAULT_SURFACE,
+      surfaceAt(emptyWorld, emptyState.player.x)
+    );
+
+    // Clamp à droite : la longueur minimale reste bornée normalement.
+    // Largement assez de ticks (MOVE_STEP par tick) pour dépasser length=10.
+    let clampState = createInitialState(emptyLevel, undefined, NO_COMPANIONS);
+    for (let i = 0; i < 500; i++) clampState = reduce(clampState, tick(1));
+    run("parseLevel({}) : clamp à droite sur la longueur minimale (10)", 10, clampState.player.x);
+
+    // Save/load : aucune exception, aller-retour fidèle.
+    const emptySaveEnvelope = serializeGame(emptyState);
+    const emptySaveResult = deserializeGame(emptySaveEnvelope);
+    run("parseLevel({}) : save/load réussit sans exception", true, emptySaveResult.success);
+    if (emptySaveResult.success) {
+      run(
+        "parseLevel({}) : session rechargée identique après aller-retour",
+        JSON.stringify(emptyState),
+        JSON.stringify(emptySaveResult.session)
+      );
+    }
+  }
+
+  // Face recto/verso vide : même filet, partagé via parseFace.
+  {
+    const emptyTwoFacedLevel = parseLevel({ recto: {}, verso: {} }, EMPTY_REGISTRY);
+    run("parseLevel : face recto vide -> entities []", 0, emptyTwoFacedLevel.recto.entities.length);
+    run("parseLevel : face verso vide -> entities []", 0, emptyTwoFacedLevel.verso.entities.length);
+    run("parseLevel : scène à deux faces vides -> length par défaut (10)", 10, emptyTwoFacedLevel.length);
+  }
+
+  // Chaque champ omis INDIVIDUELLEMENT -> son propre défaut (les autres
+  // champs restant fournis, pour isoler l'effet du filet testé).
+  run(
+    "parseLevel : sans defaultSurface -> DEFAULT_SURFACE (filet préexistant)",
+    DEFAULT_SURFACE,
+    parseLevel({ id: "x", titleKey: "level.demo.title", length: 5, entities: [] }, EMPTY_REGISTRY).defaultSurface
+  );
+  run(
+    "parseLevel : sans length -> 10 (filet nouveau)",
+    10,
+    parseLevel({ id: "x", titleKey: "level.demo.title", entities: [] }, EMPTY_REGISTRY).length
+  );
+  run(
+    "parseLevel : sans titleKey -> level.default.title (filet nouveau)",
+    "level.default.title",
+    parseLevel({ id: "x", length: 5, entities: [] }, EMPTY_REGISTRY).titleKey
+  );
+  run(
+    "parseLevel : sans id -> level (filet nouveau)",
+    "level",
+    parseLevel({ titleKey: "level.demo.title", length: 5, entities: [] }, EMPTY_REGISTRY).id
+  );
+
+  // PRÉSENT mais MALFORMÉ -> erreur claire, INCHANGÉ (le défaut ne couvre
+  // que l'omission, jamais une valeur fournie invalide).
+  run(
+    "parseLevel : id présent mais vide -> erreur",
+    true,
+    expectLevelParseThrows({ id: "", titleKey: "level.demo.title", length: 5, entities: [] }, EMPTY_REGISTRY)
+  );
+  run(
+    "parseLevel : titleKey présent mais vide -> erreur",
+    true,
+    expectLevelParseThrows({ id: "x", titleKey: "", length: 5, entities: [] }, EMPTY_REGISTRY)
+  );
+  run(
+    "parseLevel : length présent mais <= 0 -> erreur",
+    true,
+    expectLevelParseThrows({ id: "x", titleKey: "level.demo.title", length: 0, entities: [] }, EMPTY_REGISTRY)
+  );
+  run(
+    "parseLevel : length présent mais mauvais type -> erreur",
+    true,
+    expectLevelParseThrows({ id: "x", titleKey: "level.demo.title", length: "10", entities: [] }, EMPTY_REGISTRY)
+  );
+  run(
+    "parseLevel : entities présent mais pas un tableau -> erreur",
+    true,
+    expectLevelParseThrows({ id: "x", titleKey: "level.demo.title", length: 5, entities: "oops" }, EMPTY_REGISTRY)
+  );
+
   console.log(`Récapitulatif : ${passed} réussis / ${total} total`);
   return { passed, total };
 }

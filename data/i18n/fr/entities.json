@@ -1,5 +1,6 @@
 {
   "level.demo.title": "Niveau de démo",
+  "level.default.title": "Lieu sans nom",
   "entity.door": "Porte",
   "entity.door.description": "Une porte.",
   "entity.npc": "Personnage",
@@ -54,5 +55,8 @@
   "door.alley.description": "Une porte de service qui donne sur une ruelle.",
   "door.alley_back": "Porte de service",
   "door.alley_back.description": "Cette même porte de service, vue de la ruelle : elle mène à l'arrière-boutique.",
-  "level.demo3.title": "La ruelle"
+  "level.demo3.title": "La ruelle",
+  "level.town_square.title": "Grand place",
+  "entity.river": "Rivière",
+  "entity.river.description": "Les eaux de la rivière sont troubles, mais calmes."
 }
