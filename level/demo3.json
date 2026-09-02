@@ -1,14 +1,14 @@
 {
   "id": "demo3",
-  "titleKey": "level.demo3.title",
+  "titleKey": "level.demo3.name",
   "length": 10,
   "playerStart": 1,
   "recto": {
     "music": "assets/musics/streets_day",
     "entities": [
-      { "id": "door-alley-back", "type": "door", "x": 1, "nameKey": "door.alley_back", "target": "demo2", "descriptionKey": "door.alley_back.description" },
+      { "id": "door_alley_back", "type": "door", "x": 1, "nameKey": "door.alley_back.name", "target": "demo2", "descriptionKey": "door.alley_back.description" },
       {
-        "id": "alley-gap-recto",
+        "id": "alley_gap_recto",
         "type": "passage",
         "x": 8,
         "action": { "kind": "switchSide", "arrivalX": 8 }
@@ -18,10 +18,10 @@
   "verso": {
     "music": "assets/musics/mystery",
     "entities": [
-      { "id": "bird-alley-verso", "type": "bird", "x": 4 },
-      { "id": "cumulo-lupus-verso", "type": "cumuloLupus", "x": 4, "behavior": { "kind": "wander" } },
+      { "id": "bird_alley_verso", "type": "bird", "x": 4 },
+      { "id": "cumulo_lupus_verso", "type": "cumuloLupus", "x": 4, "behavior": { "kind": "wander" } },
       {
-        "id": "alley-gap-verso",
+        "id": "alley_gap_verso",
         "type": "passage",
         "x": 8,
         "action": { "kind": "switchSide", "arrivalX": 8 }

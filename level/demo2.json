@@ -1,6 +1,6 @@
 {
   "id": "demo2",
-  "titleKey": "level.demo2.title",
+  "titleKey": "level.demo2.name",
   "length": 20,
   "playerStart": 2,
   "music": "assets/musics/streets_day",
@@ -8,12 +8,12 @@
   "reverbDecay": 12,
   "indoor": true,
   "entities": [
-    { "id": "door-back", "type": "door", "x": 2, "nameKey": "door.back", "target": "demo", "descriptionKey": "door.back.description" },
+    { "id": "door_back", "type": "door", "x": 2, "nameKey": "door.back.name", "target": "demo", "descriptionKey": "door.back.description" },
     {
-      "id": "npc-resident-home",
+      "id": "npc_resident_home",
       "type": "npc",
       "x": 4,
-      "nameKey": "npc.resident",
+      "nameKey": "npc.resident.name",
       "descriptionKey": "npc.resident.description",
       "presence": [
         { "when": { "type": "arrived" }, "effects": [{ "type": "presence", "present": false }] },
@@ -29,14 +29,14 @@
           "when": { "type": "timeRange", "from": 8, "to": 11 },
           "effects": [
             { "type": "presence", "present": true },
-            { "type": "behavior", "behavior": { "kind": "goto", "targetId": "door-back" } }
+            { "type": "behavior", "behavior": { "kind": "goto", "targetId": "door_back" } }
           ]
         }
       ]
     },
-    { "id": "crate-port", "type": "crate", "x": 8 },
+    { "id": "crate_port", "type": "crate", "x": 8 },
     {
-      "id": "crate-warehouse",
+      "id": "crate_warehouse",
       "type": "crate",
       "x": 12,
       "presence": [
@@ -45,7 +45,7 @@
       ]
     },
     {
-      "id": "crate-stash",
+      "id": "crate_stash",
       "type": "crate",
       "x": 17,
       "action": {
@@ -53,6 +53,6 @@
         "spawn": { "spec": { "type": "money", "amount": 20 }, "count": 3, "spread": 1.5 }
       }
     },
-    { "id": "door-alley", "type": "door", "x": 19, "nameKey": "door.alley", "target": "demo3", "descriptionKey": "door.alley.description" }
+    { "id": "door_alley", "type": "door", "x": 19, "nameKey": "door.alley.name", "target": "demo3", "descriptionKey": "door.alley.description" }
   ]
 }

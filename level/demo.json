@@ -5,22 +5,22 @@
   "playerStart": 2,
   "musicDay": "assets/musics/jazz_day",
   "musicNight": "assets/musics/jazz_night",
-  "ambiences": ["assets/ambiances/traffic_street_afternoon_1.mp3"],
+  "ambiences": ["assets/ambiances/traffic_1.mp3"],
   "defaultSurface": "dirt",
   "segments": [{ "from": 15, "to": 35, "surface": "grass" }],
   "entities": [
-    { "id": "money-1", "type": "money", "x": 5 },
-    { "id": "object-toolbox", "type": "object", "x": 8, "nameKey": "object.toolbox", "descriptionKey": "object.toolbox.description" },
-    { "id": "door-exit", "type": "door", "x": 9, "nameKey": "door.exit", "target": "demo2", "descriptionKey": "door.exit.description" },
-    { "id": "apple-1", "type": "apple", "x": 17 },
-    { "id": "object-neon", "type": "neon", "x": 30 },
-    { "id": "bird-1", "type": "bird", "x": 33 },
-    { "id": "spirit-1", "type": "ghost", "x": 36 },
+    { "id": "money_1", "type": "money", "x": 5 },
+    { "id": "object_toolbox", "type": "object", "x": 8, "nameKey": "object.toolbox.name", "descriptionKey": "object.toolbox.description" },
+    { "id": "door_exit", "type": "door", "x": 9, "nameKey": "door.exit.name", "target": "demo2", "descriptionKey": "door.exit.description" },
+    { "id": "apple_1", "type": "apple", "x": 17 },
+    { "id": "object_neon", "type": "neon", "x": 30 },
+    { "id": "bird_1", "type": "bird", "x": 33 },
+    { "id": "spirit_1", "type": "ghost", "x": 36 },
     {
-      "id": "npc-resident",
+      "id": "npc_resident",
       "type": "npc",
       "x": 20,
-      "nameKey": "npc.resident",
+      "nameKey": "npc.resident.name",
       "descriptionKey": "npc.resident.description",
       "speed": 0.5,
       "behavior": { "kind": "wander", "walkMin": 180, "walkMax": 360, "pauseMin": 60, "pauseMax": 150 },
@@ -38,22 +38,22 @@
           "when": { "type": "timeRange", "from": 20, "to": 23 },
           "effects": [
             { "type": "presence", "present": true },
-            { "type": "behavior", "behavior": { "kind": "goto", "targetId": "door-exit" } }
+            { "type": "behavior", "behavior": { "kind": "goto", "targetId": "door_exit" } }
           ]
         }
       ]
     },
     {
-      "id": "door-club",
+      "id": "door_club",
       "type": "door",
       "x": 25,
-      "nameKey": "door.club",
+      "nameKey": "door.club.name",
       "descriptionKey": "door.club.description",
       "target": "demo2",
       "action": {
         "kind": "transit",
         "condition": { "type": "hasEquipmentTag", "tag": "chic" },
-        "refusalKey": "door.dresscode_refused"
+        "refusalKey": "door.club.dresscode_refused"
       }
     }
   ]
