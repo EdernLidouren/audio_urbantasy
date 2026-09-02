@@ -1,8 +1,14 @@
 {
-  "level.demo.title": "Niveau de démo",
   "level.default.title": "Lieu sans nom",
+  "level.demo.title": "Niveau de démo",
+  "level.demo2.title": "Arrière-boutique",
+  "level.demo3.title": "La ruelle",
+  "level.town_square.title": "Grand place",
+  "level.townhall.title": "Hôtel de ville, salle principale",
   "entity.door": "Porte",
   "entity.door.description": "Une porte.",
+  "entity.townhall_door": "Porte de l'hôtel de ville",
+  "entity.townhall_door.description": "La porte de l'hôtel de ville. Elle est grande, faite d'un bois clair et ajourée de vitres en losange.",
   "entity.npc": "Personnage",
   "entity.npc.description": "Un personnage.",
   "entity.object": "Objet",
@@ -42,7 +48,6 @@
   "door.club": "Entrée du club",
   "door.club.description": "Une entrée soignée, gardée par un dresscode strict.",
   "door.dresscode_refused": "L'entrée est réservée aux tenues chic.",
-  "level.demo2.title": "Arrière-boutique",
   "door.back": "Porte de retour",
   "door.back.description": "La même porte, vue de l'intérieur : elle mène dehors.",
   "npc.guard": "Garde",
@@ -55,13 +60,8 @@
   "door.alley.description": "Une porte de service qui donne sur une ruelle.",
   "door.alley_back": "Porte de service",
   "door.alley_back.description": "Cette même porte de service, vue de la ruelle : elle mène à l'arrière-boutique.",
-  "level.demo3.title": "La ruelle",
-  "level.town_square.title": "Grand place",
   "entity.river": "Rivière",
   "entity.river.description": "Les eaux de la rivière sont troubles, mais calmes.",
   "entity.window": "Fenêtre",
-  "entity.window.description": "Une fenêtre à battants, fermée.",
-  "entity.window.refusal": "Rien ne se passe.",
-  "entity.window.opened": "La fenêtre s'ouvre en grinçant.",
-  "entity.window.closed": "La fenêtre se referme."
+  "entity.window.description": "Une fenêtre équipée de store."
 }
