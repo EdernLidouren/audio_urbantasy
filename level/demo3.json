@@ -6,7 +6,14 @@
   "recto": {
     "music": "assets/musics/streets_day",
     "entities": [
-      { "id": "door_alley_back", "type": "door", "x": 1, "nameKey": "door.alley_back.name", "target": "demo2", "descriptionKey": "door.alley_back.description" },
+      {
+        "id": "door_alley_back",
+        "type": "door",
+        "x": 1,
+        "nameKey": "door.alley_back.name",
+        "descriptionKey": "door.alley_back.description",
+        "action": { "kind": "applyEffects", "effects": [{ "type": "teleport", "target": "demo2" }] }
+      },
       {
         "id": "alley_gap_recto",
         "type": "passage",

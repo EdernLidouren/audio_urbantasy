@@ -73,6 +73,7 @@ import {
   clearAmbienceLayers,
   setWeatherAmbienceLayer,
   declareAmbienceLayers,
+  randomRate,
 } from "../../lib/audio.js";
 import { announce } from "../../lib/announce.js";
 import { resolveAsset, hasAsset, assetKeyMembers } from "../../lib/assets.js";
@@ -378,14 +379,11 @@ function stepWalker(walker, x, stepDistance, playStepAt) {
   walker.previousX = x;
 }
 
-// Taux de lecture tiré uniformément dans [1-pitchVariation, 1+pitchVariation]
-// (voir TUNING_DEFAULTS.pitchVariation) — 1 (aucune variation) si
-// pitchVariation est 0 ou absent, jamais d'appel à Math.random() inutile
-// dans ce cas.
-function randomRate(pitchVariation) {
-  if (!pitchVariation) return 1;
-  return 1 + (Math.random() * 2 - 1) * pitchVariation;
-}
+// randomRate (voir TUNING_DEFAULTS.pitchVariation) : déplacé dans
+// lib/audio.js — utilitaire GÉNÉRIQUE (aucune connaissance du jeu), importé
+// ci-dessus, SEUL point de calcul, partagé avec playDescribedOneShot (un
+// effet "playSound", voir view/interaction.js) — plus de définition locale
+// ici.
 
 // Prochain délai (ms) avant un déclenchement intermittent (beacon ou
 // vocal) : voir TUNING_DEFAULTS.beaconInterval/vocalInterval et leurs
@@ -415,30 +413,54 @@ function drawBeaconStaggerDelayMs() {
 const BEACON_TUNING_KEYS = { interval: "beaconInterval", intervalVariation: "beaconIntervalVariation", gain: "beaconGain" };
 const VOCAL_TUNING_KEYS = { interval: "vocalInterval", intervalVariation: "vocalIntervalVariation", gain: "vocalGain" };
 
+// DESCRIPTEUR DE SON PARTAGÉ — cœur commun (gain/pitchVariation/reverbSend)
+// résolu en CASCADE (son -> instance -> archétype -> défaut global, voir
+// config/tuning.js/resolveTuning) contre `descriptor` — SEUL point de
+// résolution de ce triplet, réutilisé par TOUS les rôles positionnés
+// ci-dessous (beacon continu/intermittent, vocal, enterSound/exitSound) :
+// ajouter un réglage commun demain (voir CLAUDE.md/"Format déclaratif") ne
+// touche qu'ici. `gainKey` : SEULE clé de cascade qui varie par rôle
+// (beaconGain/vocalGain/enterSoundGain/exitSoundGain — voir
+// entities/model.md) ; pitchVariation/reverbSend partagent toujours la MÊME
+// clé partout. `useFlyingReverbSend` (défaut false) : SEULS les rôles
+// CONTINU/INTERMITTENT swappent reverbSend -> flyingReverbSend pour une
+// entité isFlying (voir "Chaîne de filtres hauteur", entities/model.md) —
+// enterSound/exitSound n'ont jamais fait ce swap, comportement PRÉEXISTANT
+// préservé tel quel, jamais unifié par ce regroupement.
+function resolveSoundSettings(entity, descriptor, gainKey, { useFlyingReverbSend = false } = {}) {
+  return {
+    gain: resolveTuning(gainKey, entity, descriptor),
+    pitchVariation: resolveTuning("pitchVariation", entity, descriptor),
+    reverbSend:
+      useFlyingReverbSend && entity.isFlying
+        ? resolveTuning("flyingReverbSend", entity, descriptor)
+        : resolveTuning("reverbSend", entity, descriptor),
+  };
+}
+
 // Résout une source positionnée INTERMITTENTE (beacon en mode
 // "intermittent", ou vocal — toujours intermittent) : chemin, cadence
-// (interval/intervalVariation), gain propre et variation de hauteur, tous
-// résolus contre CE descripteur de son (cascade son -> instance ->
-// archétype -> défaut global, voir entities/model.md) via les clés du rôle
-// (keys). nextAt (mutable, relu/réécrit à chaque tick — voir
-// updateIntermittentSources) réamorcé à 0 : premier déclenchement dès le
-// premier tick.
+// (interval/intervalVariation), + le cœur commun (resolveSoundSettings
+// ci-dessus) via les clés du rôle (keys). nextAt (mutable, relu/réécrit à
+// chaque tick — voir updateIntermittentSources) réamorcé à 0 : premier
+// déclenchement dès le premier tick.
 //
-// isFlying (voir entities/model.md) : reverbSend REMPLACÉ par
-// flyingReverbSend (jamais les deux), highpassHz/heightGain résolus EN PLUS
-// — sinon (entité non volante) highpassHz reste `undefined` (aucun filtre
-// tenté) et heightGain reste neutre (1), chemin STRICTEMENT inchangé. Chaîne
-// de filtres "hauteur suggérée", voir config/tuning-values.js.
+// isFlying (voir entities/model.md) : highpassHz/heightGain résolus EN PLUS
+// du swap reverbSend (resolveSoundSettings) — sinon (entité non volante)
+// highpassHz reste `undefined` (aucun filtre tenté) et heightGain reste
+// neutre (1), chemin STRICTEMENT inchangé. Chaîne de filtres "hauteur
+// suggérée", voir config/tuning-values.js.
 function resolveIntermittentSource(entity, descriptor, keys) {
+  const { gain, pitchVariation, reverbSend } = resolveSoundSettings(entity, descriptor, keys.gain, {
+    useFlyingReverbSend: true,
+  });
   return {
     path: descriptor.path,
     interval: resolveTuning(keys.interval, entity, descriptor),
     intervalVariation: resolveTuning(keys.intervalVariation, entity, descriptor),
-    gain: resolveTuning(keys.gain, entity, descriptor),
-    pitchVariation: resolveTuning("pitchVariation", entity, descriptor),
-    reverbSend: entity.isFlying
-      ? resolveTuning("flyingReverbSend", entity, descriptor)
-      : resolveTuning("reverbSend", entity, descriptor),
+    gain,
+    pitchVariation,
+    reverbSend,
     highpassHz: entity.isFlying ? resolveTuning("flyingHighpassHz", entity, descriptor) : undefined,
     heightGain: entity.isFlying ? resolveTuning("flyingVolumeFactor", entity, descriptor) : 1,
     nextAt: 0,
@@ -449,20 +471,15 @@ function resolveIntermittentSource(entity, descriptor, keys) {
 // sonores PONCTUELS et POSITIONNÉS, déclenchés par une bascule de présence
 // OBSERVÉE (core/reduce.js/stepEntities), jamais par une cadence/intervalle
 // — contrairement à resolveIntermittentSource ci-dessus, pas de nextAt à
-// replanifier. Chemin/gain/pitchVariation/reverbSend résolus UNE FOIS ici
-// (cascade son -> instance -> archétype -> défaut global), comme les
-// autres rôles. descriptor absent -> null (rôle optionnel, indépendant de
-// l'autre — une entité peut n'avoir que l'un des deux, voir neon.js).
+// replanifier. Chemin + cœur commun (resolveSoundSettings) résolus UNE FOIS
+// ici, comme les autres rôles. descriptor absent -> null (rôle optionnel,
+// indépendant de l'autre — une entité peut n'avoir que l'un des deux, voir
+// neon.js).
 const ENTER_SOUND_TUNING_KEYS = { gain: "enterSoundGain" };
 const EXIT_SOUND_TUNING_KEYS = { gain: "exitSoundGain" };
 function resolveTransitionSound(entity, descriptor, keys) {
   if (!descriptor) return null;
-  return {
-    path: descriptor.path,
-    gain: resolveTuning(keys.gain, entity, descriptor),
-    pitchVariation: resolveTuning("pitchVariation", entity, descriptor),
-    reverbSend: resolveTuning("reverbSend", entity, descriptor),
-  };
+  return { path: descriptor.path, ...resolveSoundSettings(entity, descriptor, keys.gain) };
 }
 
 // Volume par zones (palier volontaire à interactRange, pas une rampe
@@ -656,14 +673,14 @@ function buildEntitySoundEntry(entity, world, time, perceptionActive, weather, {
   if (beacon) {
     const beaconMode = resolveTuning("beaconMode", entity, beacon);
     if (beaconMode === "continu") {
-      beaconGain = resolveTuning("beaconGain", entity, beacon);
-      // isFlying (voir entities/model.md) : flyingReverbSend REMPLACE
-      // reverbSend, jamais les deux — même principe que
-      // resolveIntermittentSource ci-dessus.
-      beaconReverbSend = entity.isFlying
-        ? resolveTuning("flyingReverbSend", entity, beacon)
-        : resolveTuning("reverbSend", entity, beacon);
-      const beaconPitchVariation = resolveTuning("pitchVariation", entity, beacon);
+      // Cœur commun (resolveSoundSettings ci-dessus) — beaconGain/
+      // beaconReverbSend PORTÉS par l'entrée son (voir applyEntityAudio),
+      // beaconPitchVariation consommée UNE FOIS ici (balise continue, voir
+      // le commentaire de header sur cette particularité).
+      const beaconSettings = resolveSoundSettings(entity, beacon, "beaconGain", { useFlyingReverbSend: true });
+      beaconGain = beaconSettings.gain;
+      beaconReverbSend = beaconSettings.reverbSend;
+      const beaconPitchVariation = beaconSettings.pitchVariation;
       // staggerBeacon (défaut true, voir config/tuning-values.js) :
       // OPT-OUT du désempilement d'attaques — appliqué INDISTINCTEMENT à
       // TOUTE balise continue nouvellement créée ici (montage de scène OU
@@ -1314,6 +1331,46 @@ export function createCityAudioScene(getSession) {
     });
   }
 
+  // Son PONCTUEL positionné sur une entité ARBITRAIRE, ID fourni par
+  // l'appelant — voir view/interaction.js/runEffects, effet "playSound"
+  // DIÉGÉTIQUE (core/scripting.md/"Effets d'action"). RÉUTILISE playTransitionSound
+  // TEL QUEL (même descripteur {path,gain,pitchVariation,reverbSend}, voir
+  // core/effects.js) : AUCUNE nouvelle logique de filtrage/positionnement,
+  // seulement une RECHERCHE de l'entrée déjà construite pour cette entité
+  // (entitySounds pour la face courante, PUIS otherEntitySounds pour
+  // l'AUTRE face si absente de la première — forcedMuffle 0 ou 1
+  // respectivement, MÊME convention que updateIntermittentSources/update()
+  // plus bas) + sa position LIVE relue fraîche (comme tout le reste de ce
+  // module, jamais mise en cache). Entité introuvable (id jamais construit
+  // par buildEntitySoundEntry) ou actuellement dormante (present:false,
+  // core/presence.js) -> silencieuse, `console.warn`, jamais un plantage —
+  // même politique défensive que tout son de ce projet.
+  function playEntityOneShot(targetId, descriptor) {
+    const session = getSession();
+    const activeEntry = entitySounds.find((e) => e.entity.id === targetId);
+    if (activeEntry) {
+      const liveEntity = getActiveWorld(session).entities.find((e) => e.id === targetId);
+      if (!liveEntity || liveEntity.present === false) {
+        console.warn(`city-scene: playEntityOneShot("${targetId}") : entité dormante ou introuvable.`);
+        return;
+      }
+      playTransitionSound(activeEntry, liveEntity.x - session.player.x, descriptor, effectiveMuffleAmount(activeEntry, 0));
+      return;
+    }
+    const otherEntry = otherEntitySounds && otherEntitySounds.find((e) => e.entity.id === targetId);
+    if (otherEntry) {
+      const otherFace = getInactiveFace(session);
+      const liveEntity = otherFace && otherFace.entities.find((e) => e.id === targetId);
+      if (!liveEntity || liveEntity.present === false) {
+        console.warn(`city-scene: playEntityOneShot("${targetId}") : entité dormante ou introuvable (autre face).`);
+        return;
+      }
+      playTransitionSound(otherEntry, liveEntity.x - session.player.x, descriptor, effectiveMuffleAmount(otherEntry, 1));
+      return;
+    }
+    console.warn(`city-scene: playEntityOneShot("${targetId}") : id absent de la scène.`);
+  }
+
   // Sources positionnées INTERMITTENTES (voir entitySounds/
   // intermittentSources) : un beacon en mode "intermittent" ET/OU un vocal
   // (toujours intermittent) partagent ICI le même mécanisme de
@@ -1927,7 +1984,16 @@ export function createCityAudioScene(getSession) {
     });
   }
 
-  const api = { update, destroy, getInteractionCandidates, pauseBeacons, resumeBeacons, refreshBeaconVolumes, crossfadeFaceSwap };
+  const api = {
+    update,
+    destroy,
+    getInteractionCandidates,
+    pauseBeacons,
+    resumeBeacons,
+    refreshBeaconVolumes,
+    crossfadeFaceSwap,
+    playEntityOneShot,
+  };
   // Au plus une scène ville vivante à la fois dans cette appli (jamais
   // imbriquée) : permet à un menu ouvert par-dessus (Options > Audio) de
   // rafraîchir la scène courante sans passer une référence explicite à

@@ -312,11 +312,11 @@ export const TUNING_DEFAULTS = {
   // net qu'un toggle de perception.
   weatherAmbienceFadeMs: 3000,
 
-  // Durées (ms) du fondu de la couche ENTITÉS pendant le SAS d'une
-  // transition de porte (voir lib/audio.js/rampEntityLayerGain,
-  // view/city-screen.js/transitionThroughDoor) — le "fondu au noir sonore"
-  // qui souligne le changement de lieu et masque le chargement. COURTES
-  // par nature (souligner sans ralentir le passage de porte) : sortant
+  // Durées (ms) du fondu de la couche ENTITÉS pendant le SAS d'un teleport
+  // en mode "fade" (voir lib/audio.js/rampEntityLayerGain,
+  // view/city-screen.js/runTeleportSas) — le "fondu au noir sonore" qui
+  // souligne le changement de lieu/position et masque un éventuel
+  // chargement. COURTES par nature (souligner sans ralentir le passage) : sortant
   // avant de détruire la scène quittée, entrant une fois la scène cible
   // prête. Musique/ambiance NE PASSENT PAS par ce gain (voir lib/audio.js,
   // "Gain de couche ENTITÉS") : ces durées n'affectent qu'elles-mêmes.

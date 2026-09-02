@@ -8,7 +8,14 @@
   "reverbDecay": 12,
   "indoor": true,
   "entities": [
-    { "id": "door_back", "type": "door", "x": 2, "nameKey": "door.back.name", "target": "demo", "descriptionKey": "door.back.description" },
+    {
+      "id": "door_back",
+      "type": "door",
+      "x": 2,
+      "nameKey": "door.back.name",
+      "descriptionKey": "door.back.description",
+      "action": { "kind": "applyEffects", "effects": [{ "type": "teleport", "target": "demo" }] }
+    },
     {
       "id": "npc_resident_home",
       "type": "npc",
@@ -53,6 +60,13 @@
         "spawn": { "spec": { "type": "money", "amount": 20 }, "count": 3, "spread": 1.5 }
       }
     },
-    { "id": "door_alley", "type": "door", "x": 19, "nameKey": "door.alley.name", "target": "demo3", "descriptionKey": "door.alley.description" }
+    {
+      "id": "door_alley",
+      "type": "door",
+      "x": 19,
+      "nameKey": "door.alley.name",
+      "descriptionKey": "door.alley.description",
+      "action": { "kind": "applyEffects", "effects": [{ "type": "teleport", "target": "demo3" }] }
+    }
   ]
 }

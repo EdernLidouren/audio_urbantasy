@@ -18,8 +18,10 @@ import BEHAVIORS from "./behaviors/index.js";
 import { SURFACE_REGISTRY, DEFAULT_SURFACE } from "./surfaces.js";
 import { CONDITION_TYPES } from "./presence.js";
 import { TAG_REGISTRY } from "./tags.js";
+import { IMPROVEMENT_REGISTRY } from "./improvements.js";
 import { WEATHER_STATES } from "../config/weather-values.js";
 import { parseVariables, VARIABLE_SCOPES, isValidValueForType } from "./variables.js";
+import { ACTION_EFFECT_TYPES } from "./effects.js";
 
 function fail(message) {
   throw new Error(`parseLevel: ${message}`);
@@ -134,17 +136,63 @@ function validateVariableReference(scope, name, entityVariables, sceneVariables,
   }
 }
 
-// Un effet D'ÉCRITURE déclenché à l'ACTIVATION d'une action (voir
-// core/variables.js/applyActionEffects, view/interaction.js, core/scripting.md/
-// "Effets d'action") — AIGUILLAGE DISTINCT de parseEffect ci-dessus
-// (presence/behavior, appliqués au TICK) : ces effets n'ont de sens qu'au
-// moment d'une interaction ponctuelle, jamais réévalués en continu, jamais
-// mélangés dans le même registre. Même esprit d'extensibilité (un cas de
-// plus par type) et même validation de RÉFÉRENCE que la condition
-// "variable" (voir validateVariableReference/resolveKnownVariableType) :
-// scope/name existants, opération cohérente avec le TYPE réel de la
-// variable quand il est connu (toggle sur un "flag", add sur un "int" —
-// jamais l'inverse).
+// Natures reconnues pour l'effet "playSound" (voir plus bas) — DIÉGÉTIQUE
+// (positionné, filtré comme un beacon/vocal) ou MÉTA (centré joueur, sans
+// filtre) ; défaut dérivé de la PROVENANCE côté vue quand absente, jamais
+// codé ici (voir view/interaction.js/resolvePlaySoundNature).
+const PLAY_SOUND_NATURES = ["diegetic", "meta"];
+
+// Faces et modes de transition reconnus pour l'effet "teleport" (voir plus
+// bas) — "side" : face d'arrivée si la cible est une scène à deux faces
+// (ignorée sinon, comme partout ailleurs) ; "transition" : "fade" (sas +
+// fondu, comportement historique d'une porte) ou "instant" (aucun sas,
+// déplacement immédiat).
+const TELEPORT_SIDES = ["recto", "verso"];
+const TELEPORT_TRANSITIONS = ["fade", "instant"];
+
+// Un effet déclenché à l'ACTIVATION d'une action (voir core/effects.js pour
+// la partition CORE/VUE, core/variables.js/applyActionEffects,
+// view/interaction.js, core/scripting.md/"Effets d'action") — AIGUILLAGE
+// DISTINCT de parseEffect ci-dessus (presence/behavior, appliqués au TICK) :
+// ces effets n'ont de sens qu'au moment d'une interaction ponctuelle, jamais
+// réévalués en continu, jamais mélangés dans le même registre. RÉUTILISÉ TEL
+// QUEL pour `action.effects` (condition RÉUSSIT) ET `action.refusalEffects`
+// (condition ÉCHOUE, voir parseSingleAction) — MÊME vocabulaire, MÊME
+// validation, un effet ne sait pas duquel des deux il fait partie.
+//
+// TROIS types d'ÉTAT (setVariable/toggleVariable/addVariable, appliqués par
+// le CORE) : même esprit d'extensibilité (un cas de plus par type) et même
+// validation de RÉFÉRENCE que la condition "variable" (voir
+// validateVariableReference/resolveKnownVariableType) — scope/name
+// existants, opération cohérente avec le TYPE réel de la variable quand il
+// est connu (toggle sur un "flag", add sur un "int" — jamais l'inverse).
+//
+// DEUX types de RENDU (playSound/announce, exécutés par la VUE, jamais ici) :
+// validés en FORME SEULEMENT, comme `action.sound`/`action.announceKey`
+// l'étaient avant l'introduction de ce vocabulaire unifié — le core ignore
+// tout du SENS (quel fichier, quelle traduction), il ne fait que garantir
+// qu'un contenu malformé échoue au CHARGEMENT plutôt qu'à l'interaction.
+//
+// UN type MIXTE (`"teleport"`, JOUEUR uniquement — voir "Sources de vérité",
+// core/effects.js) : validé en FORME comme les effets de RENDU (le core ne
+// l'applique jamais lui-même), mais la VUE délègue son EXÉCUTION à des
+// fonctions du core DÉJÀ EXISTANTES (core/state.js/travelToWorld,
+// placePlayer) plutôt que de la réinventer. La PORTE n'est plus un cas
+// spécial (voir parseEntity, ci-dessous — plus de champ `target` dédié) :
+// une porte est une action ORDINAIRE dont `effects` contient un `"teleport"`,
+// comme n'importe quel autre contenu.
+// `playSound` porte le DESCRIPTEUR DE SON PARTAGÉ (voir lib/audio.js/
+// playDescribedOneShot, view/audio/city-scene.js) réduit à ses sous-champs
+// COMMUNS : `path` (requis, résolu via resolveAsset côté vue) ;
+// `gain`/`pitchVariation`/`reverbSend` (optionnels, nombres finis — mêmes
+// noms que les rôles positionnés beacon/vocal, jamais un vocabulaire
+// parallèle) ; `at` (optionnel, id d'entité — PROVENANCE, une surcharge
+// explicite) et `nature` (optionnel, `"diegetic"`/`"meta"` — une surcharge
+// explicite) : le core ne fait que transporter/valider leur FORME, TOUTE
+// résolution de DÉFAUT (provenance dérivée de l'entité porteuse de
+// l'action, nature dérivée de la provenance) vit côté vue (voir
+// view/interaction.js/runPlaySoundEffect) — le core ne connaît même pas
+// l'existence de cette cascade.
 function parseActionEffect(rawEffect, describe, entityVariables, sceneVariables) {
   if (typeof rawEffect !== "object" || rawEffect === null) {
     fail(`${describe} n'est pas un objet.`);
@@ -177,7 +225,84 @@ function parseActionEffect(rawEffect, describe, entityVariables, sceneVariables)
     }
     return { type: "addVariable", scope, name, amount: rawEffect.amount };
   }
-  fail(`${describe}.type "${type}" inconnu (attendu : "setVariable" | "toggleVariable" | "addVariable").`);
+  // "giveImprovement"/"removeImprovement" { id } — ÉTAT, comme les trois
+  // effets de variable ci-dessus (voir core/improvements.js/
+  // giveImprovement/removeImprovement, core/variables.js/
+  // applyActionEffects, qui les applique dans le MÊME passage). `id`
+  // validé contre IMPROVEMENT_REGISTRY, même sévérité que hasEquipmentTag/
+  // hasImprovement (voir validateCondition plus haut) : une faute de frappe
+  // échoue au CHARGEMENT plutôt que de ne jamais débloquer silencieusement.
+  if (type === "giveImprovement" || type === "removeImprovement") {
+    if (!isNonEmptyString(rawEffect.id) || !IMPROVEMENT_REGISTRY[rawEffect.id]) {
+      fail(`${describe}.id "${rawEffect.id}" absent du registre d'improvements.`);
+    }
+    return { type, id: rawEffect.id };
+  }
+  if (type === "playSound") {
+    if (!isNonEmptyString(rawEffect.path)) {
+      fail(`${describe}.path doit être une chaîne non vide.`);
+    }
+    for (const field of ["gain", "pitchVariation", "reverbSend"]) {
+      if (rawEffect[field] !== undefined && !isFiniteNumber(rawEffect[field])) {
+        fail(`${describe}.${field} doit être un nombre si présent.`);
+      }
+    }
+    // at (id d'entité, PROVENANCE) / nature ("diegetic"|"meta") : TRANSPORT
+    // pur comme le reste de cet effet — le core ignore tout du SENS (quelle
+    // entité, quel filtrage), seule la vue (view/interaction.js/
+    // resolvePlaySoundTarget/resolvePlaySoundNature) résout des DÉFAUTS
+    // dérivés du contexte quand l'un ou l'autre est absent. Validés ici pour
+    // qu'une déclaration malformée échoue au CHARGEMENT, comme le reste de
+    // ce vocabulaire.
+    if (rawEffect.at !== undefined && !isNonEmptyString(rawEffect.at)) {
+      fail(`${describe}.at doit être une chaîne non vide si présent.`);
+    }
+    if (rawEffect.nature !== undefined && !PLAY_SOUND_NATURES.includes(rawEffect.nature)) {
+      fail(`${describe}.nature "${rawEffect.nature}" inconnue (attendu : ${PLAY_SOUND_NATURES.map((n) => `"${n}"`).join(" | ")}).`);
+    }
+    const effect = { type: "playSound", path: rawEffect.path };
+    if (rawEffect.gain !== undefined) effect.gain = rawEffect.gain;
+    if (rawEffect.pitchVariation !== undefined) effect.pitchVariation = rawEffect.pitchVariation;
+    if (rawEffect.reverbSend !== undefined) effect.reverbSend = rawEffect.reverbSend;
+    if (rawEffect.at !== undefined) effect.at = rawEffect.at;
+    if (rawEffect.nature !== undefined) effect.nature = rawEffect.nature;
+    return effect;
+  }
+  if (type === "announce") {
+    if (!isNonEmptyString(rawEffect.key)) {
+      fail(`${describe}.key doit être une chaîne non vide.`);
+    }
+    if (rawEffect.assertive !== undefined && typeof rawEffect.assertive !== "boolean") {
+      fail(`${describe}.assertive doit être un booléen si présent.`);
+    }
+    const effect = { type: "announce", key: rawEffect.key };
+    if (rawEffect.assertive !== undefined) effect.assertive = rawEffect.assertive;
+    return effect;
+  }
+  if (type === "teleport") {
+    if (!isNonEmptyString(rawEffect.target)) {
+      fail(`${describe}.target doit être une chaîne non vide.`);
+    }
+    if (rawEffect.x !== undefined && !isFiniteNumber(rawEffect.x)) {
+      fail(`${describe}.x doit être un nombre si présent.`);
+    }
+    if (rawEffect.side !== undefined && !TELEPORT_SIDES.includes(rawEffect.side)) {
+      fail(`${describe}.side "${rawEffect.side}" inconnue (attendu : ${TELEPORT_SIDES.map((s) => `"${s}"`).join(" | ")}).`);
+    }
+    if (rawEffect.reloadIfSame !== undefined && typeof rawEffect.reloadIfSame !== "boolean") {
+      fail(`${describe}.reloadIfSame doit être un booléen si présent.`);
+    }
+    if (rawEffect.transition !== undefined && !TELEPORT_TRANSITIONS.includes(rawEffect.transition)) {
+      fail(`${describe}.transition "${rawEffect.transition}" inconnue (attendu : ${TELEPORT_TRANSITIONS.map((t) => `"${t}"`).join(" | ")}).`);
+    }
+    const effect = { type: "teleport", target: rawEffect.target };
+    if (rawEffect.x !== undefined) effect.x = rawEffect.x;
+    if (rawEffect.side !== undefined) effect.side = rawEffect.side;
+    if (rawEffect.reloadIfSame !== undefined) effect.reloadIfSame = rawEffect.reloadIfSame;
+    if (rawEffect.transition !== undefined) effect.transition = rawEffect.transition;
+    return effect;
+  }
+  fail(`${describe}.type "${type}" inconnu (attendu : ${ACTION_EFFECT_TYPES.map((t) => `"${t}"`).join(" | ")}).`);
 }
 
 // Comparateurs reconnus par la condition "variable" (voir plus bas) — un
@@ -212,6 +337,15 @@ function validateCondition(cond, describe, entityVariables, sceneVariables) {
   // une règle de contenu ne jamais se déclencher sans qu'on sache pourquoi.
   if (cond.type === "hasEquipmentTag" && (!isNonEmptyString(cond.tag) || !TAG_REGISTRY[cond.tag])) {
     fail(`${describe}.tag "${cond.tag}" absent du registre de tags.`);
+  }
+  // "hasImprovement" : EN PLUS de son type, son champ `id` référence une
+  // amélioration du registre (core/improvements.js/IMPROVEMENT_REGISTRY) —
+  // même traitement que hasEquipmentTag.tag ci-dessus : une faute de frappe
+  // échouerait SILENCIEUSEMENT à l'évaluation (core/presence.js/
+  // evaluateHasImprovement replie sur false pour un id absent, HORS mode
+  // debug — voir son commentaire), donc refusée ICI, au chargement.
+  if (cond.type === "hasImprovement" && (!isNonEmptyString(cond.id) || !IMPROVEMENT_REGISTRY[cond.id])) {
+    fail(`${describe}.id "${cond.id}" absent du registre d'improvements.`);
   }
   // "weather" : EN PLUS de son type, son champ `state` référence un état de
   // la table météo (config/weather-values.js/WEATHER_STATES) — même
@@ -301,12 +435,24 @@ function parsePresenceRule(rawRule, ruleIndex, index, id, entityVariables, scene
 // Valide UNE candidate d'action — RÉUTILISÉE À L'IDENTIQUE que `action` soit
 // un objet UNIQUE ou un élément d'un TABLEAU de candidates (voir
 // parseEntity) : la forme d'une candidate ne dépend jamais du nombre de
-// candidates. `sound` (optionnel) : TRANSPORT pur, comme `item`/`amount`
-// existants — la vue (view/interaction.js) résout le chemin et le joue,
-// core en ignore tout le sens. `effects` (optionnel) : EFFETS D'ÉCRITURE de
-// variable (voir parseActionEffect), appliqués À L'ACTIVATION — aiguillage
-// DISTINCT de presence[].effects (voir parseEffect, "Un effet porté par une
-// règle de presence[]"), jamais mélangé.
+// candidates.
+//
+// `effects` (optionnel) : la LISTE D'EFFETS exécutée si la condition RÉUSSIT
+// (ou s'il n'y a pas de condition — comportement d'une action ordinaire),
+// MÊME vocabulaire que `refusalEffects` ci-dessous (voir parseActionEffect,
+// core/effects.js) — état (setVariable/toggleVariable/addVariable) ET rendu
+// (playSound/announce) librement mélangés, le ROUTAGE core/vue se fait à
+// l'EXÉCUTION (view/interaction.js), jamais ici.
+//
+// `refusalEffects` : SYMÉTRIQUE d'`effects`, exécutée si la condition
+// ÉCHOUE — REQUISE (tableau non vide) dès que `condition` est présente,
+// même exigence que l'ancien `refusalKey` qu'elle remplace : une condition
+// sans effet de refus laisserait l'action échouer en silence, inacceptable
+// pour ce projet audio-first (voir CLAUDE.md, "L'accessibilité est une
+// exigence de premier ordre"). Aucun son de refus GÉNÉRIQUE imposé ici : une
+// action qui ne veut QU'annoncer son refus déclare `[{ type: "announce",
+// ... }]`, sans playSound — c'est un choix de CONTENU, jamais une valeur par
+// défaut du système.
 function parseSingleAction(rawAction, describe, entityVariables, sceneVariables) {
   if (typeof rawAction !== "object" || rawAction === null || Array.isArray(rawAction)) {
     fail(`${describe} doit être un objet.`);
@@ -316,31 +462,25 @@ function parseSingleAction(rawAction, describe, entityVariables, sceneVariables)
   }
   if (rawAction.condition !== undefined) {
     validateCondition(rawAction.condition, `${describe}.condition`, entityVariables, sceneVariables);
-    if (!isNonEmptyString(rawAction.refusalKey)) {
-      fail(`${describe}.refusalKey doit être une chaîne non vide quand condition est présente.`);
+    if (!Array.isArray(rawAction.refusalEffects) || rawAction.refusalEffects.length === 0) {
+      fail(`${describe}.refusalEffects doit être un tableau non vide quand condition est présente.`);
     }
   }
-  if (rawAction.sound !== undefined && !isNonEmptyString(rawAction.sound)) {
-    fail(`${describe}.sound doit être une chaîne non vide si présent.`);
+  const result = { ...rawAction };
+  if (rawAction.effects !== undefined) {
+    if (!Array.isArray(rawAction.effects) || rawAction.effects.length === 0) {
+      fail(`${describe}.effects doit être un tableau non vide si présent.`);
+    }
+    result.effects = rawAction.effects.map((effect, i) =>
+      parseActionEffect(effect, `${describe}.effects[${i}]`, entityVariables, sceneVariables)
+    );
   }
-  // announceKey : optionnel, clé i18n de la confirmation PARLÉE annoncée
-  // après application des effets (voir view/interaction.js/
-  // handleApplyEffects) — MÊME statut que `sound` (transport pur, validé en
-  // forme seulement) : sans elle, une bascule d'état ne serait confirmée
-  // QUE par le son, jamais par la parole — inacceptable pour ce projet
-  // audio-first (voir CLAUDE.md, "L'accessibilité est une exigence de
-  // premier ordre").
-  if (rawAction.announceKey !== undefined && !isNonEmptyString(rawAction.announceKey)) {
-    fail(`${describe}.announceKey doit être une chaîne non vide si présent.`);
+  if (rawAction.refusalEffects !== undefined) {
+    result.refusalEffects = rawAction.refusalEffects.map((effect, i) =>
+      parseActionEffect(effect, `${describe}.refusalEffects[${i}]`, entityVariables, sceneVariables)
+    );
   }
-  if (rawAction.effects === undefined) return rawAction;
-  if (!Array.isArray(rawAction.effects) || rawAction.effects.length === 0) {
-    fail(`${describe}.effects doit être un tableau non vide si présent.`);
-  }
-  const effects = rawAction.effects.map((effect, i) =>
-    parseActionEffect(effect, `${describe}.effects[${i}]`, entityVariables, sceneVariables)
-  );
-  return { ...rawAction, effects };
+  return result;
 }
 
 function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables) {
@@ -352,7 +492,6 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
     id,
     type,
     x,
-    target,
     nameKey,
     descriptionKey,
     consumedDescriptionKey,
@@ -467,7 +606,7 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
   // Clé ajoutée SEULEMENT si résolue (jamais explicitement undefined) :
   // l'état doit rester de la donnée pure, un aller-retour JSON ne doit rien
   // changer à sa forme (voir movement.check.js, audit de sérialisabilité).
-  // Même principe que target/behavior plus bas.
+  // Même principe que behavior/action plus bas.
   if (resolvedDescriptionKey !== undefined) {
     entity.descriptionKey = resolvedDescriptionKey;
   }
@@ -489,13 +628,6 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
   // validateVariableReference (core/level.js).
   if (variables !== undefined) {
     entity.variables = parseVariables(variables, `entities[${index}] ("${id}") : variables`, fail);
-  }
-
-  if (type === "door") {
-    if (!isNonEmptyString(target)) {
-      fail(`entities[${index}] ("${id}") : entité "door" sans target.`);
-    }
-    entity.target = target;
   }
 
   // behavior : optionnel, donnée (pas une classe) décrivant un comportement
@@ -520,12 +652,13 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
   // déclaratif que presence[].when, MÊME registre (CONDITION_TYPES),
   // GÉNÉRIQUE à TOUT kind (transit, pickup, loot...) — validé ICI via
   // validateCondition, exactement comme une condition de présence. Contexte
-  // d'évaluation et EFFET (bloquer l'action, annoncer refusalKey) restent
-  // entièrement côté vue (voir view/interaction.js) : le core ne fait que
-  // transporter et valider la FORME, comme pour `kind`. refusalKey (clé
-  // i18n du message de refus) est REQUISE quand condition est présente —
-  // une condition sans refus laisserait l'action échouer en silence, ce que
-  // ce système est justement censé éviter (voir entities/model.md).
+  // d'évaluation et EXÉCUTION (bloquer l'action, exécuter refusalEffects)
+  // restent entièrement côté vue (voir view/interaction.js) : le core ne
+  // fait que transporter et valider la FORME, comme pour `kind`.
+  // refusalEffects (voir parseSingleAction) est REQUISE quand condition est
+  // présente — une condition sans effet de refus laisserait l'action
+  // échouer en silence, ce que ce système est justement censé éviter (voir
+  // doc/entity-model.md).
   //
   // ACTIONS MULTIPLES CANDIDATES (voir core/scripting.md/"Actions multiples
   // filtrées par condition", core/presence.js/selectMatchingAction) :

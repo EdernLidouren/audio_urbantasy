@@ -84,8 +84,9 @@ bas) le font.
 
 **Point de passage** (`entities/types/passage.js`) : une entité
 interactable avec `action: { kind: "switchSide", arrivalX: <number> }` —
-`arrivalX` est le point d'arrivée sur l'AUTRE face (comme `target` pour une
-`door`, mais on reste dans le même monde). Une entité par face, chacune
+`arrivalX` est le point d'arrivée sur l'AUTRE face (comme `x` pour l'effet
+`"teleport"` d'une porte, voir `doc/scripting.md`/"Effets d'action", mais on
+reste dans le même monde). Une entité par face, chacune
 déclarant l'arrivée sur l'autre (voir l'exemple ci-dessous) — jamais une
 entité "des deux côtés à la fois". `arrivalX` n'est PAS validé en bornes par `parseLevel` (comme tout
 champ `action.*`, voir le tableau "Entité" plus haut) — clampé à
@@ -96,8 +97,8 @@ contenu mal formé.
 { "id": "gap-recto", "type": "passage", "x": 8, "action": { "kind": "switchSide", "arrivalX": 8 } }
 ```
 
-**Audio de bascule (VUE)** : un SAS animé (jeu gelé, même mécanisme que la
-transition de porte — voir `view/city-screen.js`/`runDoorTransitionSas`),
+**Audio de bascule (VUE)** : un SAS animé (jeu gelé, même mécanisme qu'un
+teleport en mode "fade" — voir `view/city-screen.js`/`runTeleportSas`),
 mais un geste différent : PAS un fondu vers le silence (rien ne disparaît,
 les deux faces coexistent déjà), un CROISEMENT DES DEUX FILTRES D'OCCLUSION
 (`view/audio/city-scene.js`/`crossfadeFaceSwap`) — la face courante ferme
@@ -234,7 +235,6 @@ exemple) : jamais de voix orpheline ni de fondus qui se disputent le canal.
 | `id`      | string | non vide, unique dans le niveau                                  |
 | `type`    | string | doit exister dans le registre `entities/types/index.js`          |
 | `x`       | number | dans `[0, length]`                                                |
-| `target`  | string | **requis** si `type === "door"` : id d'un niveau du registre (`level/index.js`) — l'action "activate" sur la porte y transitionne (voir `view/interaction.js`, `view/city-screen.js`) |
 | `nameKey` | string | optionnel (npc/object) : clé i18n spécifique à l'instance          |
 | `descriptionKey` | string | optionnel : clé i18n de description spécifique à l'instance, utilisée par l'interaction "describe" (touche Espace) |
 | `consumedDescriptionKey` | string | optionnel : clé i18n de description ALTERNATIVE une fois l'entité `consumed` (voir "Collectible persistant" plus bas et `doc/entity-model.md`). Cascade instance -> type -> absente, comme `descriptionKey` |
@@ -242,7 +242,7 @@ exemple) : jamais de voix orpheline ni de fondus qui se disputent le canal.
 | `observable` | boolean | optionnel : idem, candidate à l'interaction "describe" (voir "Interaction (niveau 0)", `doc/entity-model.md`) |
 | `interactable` | boolean | optionnel : idem, candidate à l'interaction "activate" |
 | `isFlying` | boolean | optionnel : idem (cascade, défaut `false`) — marqueur PUR, aucune logique ici ni ailleurs dans le core (pas d'axe Y). Fait passer les sons de l'entité par une chaîne de filtres qui SUGGÈRE la hauteur, côté vue uniquement (voir "Verticalité" et `isFlying`, `doc/entity-model.md`, `config/tuning-values.js`) |
-| `action` | `{ kind, condition?, refusalKey?, ... }` OU un TABLEAU de plusieurs objets de cette forme | optionnel : TYPE D'ACTION pour l'interaction "activate", cascade instance -> type comme `behavior`. Forme validée ici (`kind` non vide par candidate) ; le `kind` lui-même n'est PAS validé contre un registre au chargement — l'aiguillage reste côté vue. Objet UNIQUE : comportement historique inchangé. TABLEAU (non vide) : PLUSIEURS candidates, chacune filtrée par sa propre `condition`, sélection SILENCIEUSE de la première qui matche à l'activation — voir `doc/scripting.md`/"Actions"/"Actions multiples filtrées par condition" pour la grammaire complète (kinds, `condition`/`refusalKey`, `sound`/`effects`/`announceKey`). |
+| `action` | `{ kind, condition?, refusalEffects?, effects?, ... }` OU un TABLEAU de plusieurs objets de cette forme | optionnel : TYPE D'ACTION pour l'interaction "activate", cascade instance -> type comme `behavior`. Forme validée ici (`kind` non vide par candidate) ; le `kind` lui-même n'est PAS validé contre un registre au chargement — l'aiguillage reste côté vue. Objet UNIQUE : comportement historique inchangé. TABLEAU (non vide) : PLUSIEURS candidates, chacune filtrée par sa propre `condition`, sélection SILENCIEUSE de la première qui matche à l'activation — voir `doc/scripting.md`/"Actions"/"Effets d'action"/"Actions multiples filtrées par condition" pour la grammaire complète (kinds, `condition`/`refusalEffects`, le vocabulaire `effects` — état ET rendu). |
 | `presence` | `PresenceRule[]` | optionnel : règles DÉCLARATIVES de présence conditionnelle, cascade instance -> type (voir `doc/scripting.md`/"Règles" pour la grammaire, `doc/entity-model.md` pour la sémantique de dormance). Sans règle (ni à l'instance ni au type) : toujours présente. |
 | `variables` | Variable[] | optionnel : déclarations de portée **"entity"** (voir `doc/scripting.md`/"Variables"). PAS de cascade instance -> type (contrairement à `behavior`/`action`/`presence`) : une variable est un compteur/flag D'INSTANCE, jamais un défaut d'archétype. SPARSE : absente si non déclarée (`entity.variables` reste `undefined`), jamais un sac vide imposé. |
 
@@ -343,8 +343,13 @@ documenté dans `doc/entity-model.md`.
   "length": 40,
   "playerStart": 2,
   "entities": [
-    { "id": "npc-merchant", "type": "npc", "x": 15, "nameKey": "npc.merchant" },
-    { "id": "door-exit", "type": "door", "x": 38, "target": "demo-next" }
+    { "id": "npc_merchant", "type": "npc", "x": 15, "nameKey": "npc.merchant" },
+    {
+      "id": "door_exit",
+      "type": "door",
+      "x": 38,
+      "action": { "kind": "applyEffects", "effects": [{ "type": "teleport", "target": "demo-next" }] }
+    }
   ]
 }
 ```
@@ -358,8 +363,9 @@ un test/lab rapide sans avoir à écrire un fichier de niveau complet.
 Aucun champ dédié : la verticalité (ex. "les toits" au-dessus de la rue) se
 fait EXACTEMENT comme un changement de lieu horizontal — un lieu séparé
 (`level/*.json` à part entière), relié par une entité interactable dont
-l'action `"transit"` y mène (un "escalier"/une "échelle", au même titre
-qu'une `door` — voir `doc/entity-model.md`). Jamais un axe Y discrétisé dans
+l'effet `"teleport"` y mène (voir `doc/scripting.md`/"Effets d'action" —
+un "escalier"/une "échelle", au même titre qu'une `door`, voir
+`doc/entity-model.md`). Jamais un axe Y discrétisé dans
 UNE scène (aucune notion de palier/étage actif à maintenir) : le mécanisme
 de transition de lieu déjà en place couvre tout, sans champ ni système
 supplémentaire.
@@ -372,6 +378,7 @@ supplémentaire.
 - `level/load.js` — `loadLevel(url, registry)` : chargeur au bord (`fetch` +
   `parseLevel`). Erreurs réseau et JSON invalide remontées avec un message
   clair. `loadLevelById(id, registry)` : résout `id` en chemin via
-  `level/index.js` puis délègue à `loadLevel` — utilisé pour la transition
-  par porte (`target` = id, pas un chemin).
+  `level/index.js` puis délègue à `loadLevel` — utilisé pour l'effet
+  "teleport" (`target` = id, pas un chemin, voir `doc/scripting.md`/"Effets
+  d'action").
 - `level/index.js` — registre `{ id: chemin }` des niveaux existants.

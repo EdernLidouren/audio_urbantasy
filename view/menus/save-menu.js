@@ -28,7 +28,7 @@ const SAVE_SOUND_ENABLED = PREF_CONSTRAINTS.saveSoundEnabled;
 
 // Gestionnaire de remplacement de partie, enregistré UNE FOIS par
 // view/city-screen.js (setGameReplaceHandler, au moment de sa
-// construction) — même principe que setDoorTransitionHandler (voir
+// construction) — même principe que setTeleportHandler (voir
 // view/interaction.js) : ce module déclenche l'effet (remplacer la
 // session, reconstruire la scène) sans avoir besoin de les connaître.
 // null hors partie (aucun écran ville vivant pour l'accueillir) : voir le

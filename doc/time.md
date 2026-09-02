@@ -96,7 +96,7 @@ non testable en terminal) :
   `onFrame` de la ville n'est simplement plus appelé, sans condition à écrire nulle
   part pour ça.
 - **Transition de scène** : `scene` reste `null` le temps d'un éventuel chargement
-  réseau (voir `view/city-screen.js`/`transitionThroughDoor`). `onFrame` s'en garde
+  réseau (voir `view/city-screen.js`/`performTransition`). `onFrame` s'en garde
   exactement comme `onTick` (`if (!scene) return;`) — aucun delta injecté pendant le
   chargement, le temps ne "mange" rien.
 

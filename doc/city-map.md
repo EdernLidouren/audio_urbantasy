@@ -134,9 +134,10 @@ Entrée sur une case :
   (confort assumé, jeu sans challenge) : pas de "vous y êtes déjà".
 
 `view/city-screen.js`/`travelViaCityMap(levelId, spawnX)` réutilise
-`performTransition` — LA MÊME transition franche qu'une porte
-(`transitionThroughDoor`) : `scene.destroy()` (aucun Howl résiduel),
-`travelToWorld` (core, inchangé), `spawnX` REMPLACE le `playerStart` déjà
-posé si fourni, nouvelle scène audio, annonce du titre, auto-save sur
-transition (comme toute transition). Le core reste pur : cette fonction vit
-entièrement côté vue, `travelToWorld` n'est ni modifié ni contourné.
+`performTransition` — LA MÊME transition franche qu'une porte (voir
+`doc/scripting.md`/"Effets d'action"/`"teleport"`, mode rechargement) :
+`scene.destroy()` (aucun Howl résiduel), `travelToWorld` (core, x/side
+explicites), `spawnX` REMPLACE le `playerStart` déjà posé si fourni, nouvelle
+scène audio, annonce du titre, auto-save sur transition (comme toute
+transition). Le core reste pur : cette fonction vit entièrement côté vue,
+`travelToWorld` n'est ni modifié ni contourné.

@@ -14,13 +14,16 @@ import { createCityAudioScene, stopPersistentAudioLayers } from "./audio/city-sc
 import {
   interact,
   chooseInteractionTarget,
-  setDoorTransitionHandler,
+  setTeleportHandler,
   setPickupHandler,
   setItemPickupHandler,
   setLootHandler,
   setLootSpawnHandler,
   setSideSwitchHandler,
   setPlayerEquipmentProvider,
+  setTimeProvider,
+  setSessionProvider,
+  setPositionedSoundPlayer,
   setVariableEffectsHandler,
 } from "./interaction.js";
 import { openPauseMenu } from "./menus/pause-menu.js";
@@ -40,12 +43,14 @@ import {
   getActiveWorld,
   travelToWorld,
   switchSide,
+  placePlayer,
   spawnEphemeral,
   isTwoSided,
   togglePerception,
   applyEntityActionEffects,
 } from "../core/state.js";
 import { advanceWeather, setWeather, triggerNextWeatherTransition } from "../core/weather.js";
+import { evaluateCondition } from "../core/presence.js";
 import { pickupEntity, lootEntity, lootEntitySpawn } from "../core/money.js";
 import { pickupItemEntity, dropItem } from "../core/bag.js";
 import { equipItem, unequipItem } from "../core/equipment.js";
@@ -241,7 +246,7 @@ function playPerceptionToggleSound(active) {
   }
 }
 
-// Son de PASSAGE (porte), voir runDoorTransitionSas plus bas — non
+// Son de PASSAGE (teleport en mode "fade"), voir runTeleportSas plus bas — non
 // positionné, volume UI (interfaceVolume), même patron défensif (try/catch)
 // que playPerceptionToggleSound/playSideSwitchSound ci-dessous. Joué HORS
 // du gain de couche entités (lib/audio.js) : appartient à la TRANSITION
@@ -297,12 +302,25 @@ export function makeCityScreen(getSession, setSession) {
   // porte en plein fondu.
   let perceptionCooldownUntil = 0;
 
+  // GATE : la perception surnaturelle est débloquée par l'improvement
+  // "supernatural_perception" (voir core/improvements.js, core/scripting.md/
+  // "Conditions"/`hasImprovement`) — réutilise TEL QUEL l'évaluateur du core
+  // (core/presence.js/evaluateCondition), MÊME condition qu'une action/une
+  // règle de présence en déclarerait, jamais une vérification maison. Sans
+  // l'improvement -> touche p SILENCIEUSE (comme une touche non attribuée,
+  // aucun son ni annonce) ; le COURT-CIRCUIT DEBUG (voir
+  // evaluateHasImprovement) fait passer cette gate INCONDITIONNELLEMENT tant
+  // que le mode debug est actif, sans jamais toucher session.improvements.
+  const SUPERNATURAL_PERCEPTION_IMPROVEMENT = { type: "hasImprovement", id: "supernatural_perception" };
+
   // Bascule la perception (core, pur) PUIS le retour sensoriel (son +
   // annonce) — même patron que les autres effets d'état de ce fichier
   // (ex. sideSwitchEffect). INERTE pendant le cooldown : la touche ne fait
   // ALORS rigoureusement rien, ni bascule ni son ni annonce — jamais de
   // fondu qui se chevauche/se bat (voir view/audio/city-scene.js).
   function togglePerceptionEffect() {
+    if (!evaluateCondition(SUPERNATURAL_PERCEPTION_IMPROVEMENT, { session: getSession() })) return;
+
     const now = performance.now();
     if (now < perceptionCooldownUntil) return;
     perceptionCooldownUntil = now + TUNING_DEFAULTS.perceptionCooldownMs;
@@ -344,18 +362,20 @@ export function makeCityScreen(getSession, setSession) {
   // aucun réseau, la cible ressort directement de worlds. Nouvelle scène
   // audio sur le monde actif, annonce du titre.
   //
-  // PARTAGÉE par transitionThroughDoor (porte, spawnX omis -> playerStart
-  // du niveau cible, comportement STRICTEMENT inchangé) ET travelViaCityMap
-  // (carte de la ville, voir plus bas ; view/menus/city-map-menu.js) :
-  // spawnX, fourni SEULEMENT dans ce second cas, REMPLACE le playerStart
-  // déjà posé par travelToWorld — le point de TÉLÉPORTATION d'une case de
-  // carte (level/city-map.js) n'est pas forcément le point d'arrivée par
-  // porte.
+  // Implémente le RECHARGEMENT de l'effet "teleport" (voir core/effects.js,
+  // core/scripting.md/"Effets d'action") — PARTAGÉE par executeTeleport
+  // (porte ou tout autre effet, cible DIFFÉRENTE du monde actif OU
+  // reloadIfSame:true) ET travelViaCityMap (carte de la ville, voir plus
+  // bas ; view/menus/city-map-menu.js). x/side, absents -> comportement
+  // HISTORIQUE inchangé (travelToWorld : playerStart de la cible, "recto") —
+  // fournis, ils REMPLACENT ces défauts (le point de TÉLÉPORTATION d'une
+  // case de carte, ou celui d'un effet "teleport", n'est pas forcément
+  // playerStart).
   //
   // scene reste null le temps de l'attente réseau (éventuelle) : onTick et
   // onKeyDown s'en gardent (voir plus bas) plutôt que d'accéder une scène
   // absente — aucune touche n'a d'effet pendant cette brève fenêtre.
-  async function performTransition(targetId, spawnX) {
+  async function performTransition(targetId, x, side) {
     scene.destroy();
     scene = null;
 
@@ -363,11 +383,7 @@ export function makeCityScreen(getSession, setSession) {
     const alreadyVisited = Boolean(session.worlds[targetId]);
     const freshLevel = alreadyVisited ? null : await loadLevelById(targetId, registry);
 
-    let nextSession = travelToWorld(session, targetId, freshLevel);
-    if (spawnX !== undefined) {
-      nextSession = { ...nextSession, player: { ...nextSession.player, x: spawnX } };
-    }
-    setSession(nextSession);
+    setSession(travelToWorld(session, targetId, freshLevel, { x, side }));
     scene = createCityAudioScene(getSession);
     announce(t(getActiveWorld(getSession()).titleKey), { assertive: true });
 
@@ -385,19 +401,23 @@ export function makeCityScreen(getSession, setSession) {
   }
 
   // Attend `ms` millisecondes réelles — utilisé UNIQUEMENT pour cadencer le
-  // SAS de transition ci-dessous (voir runDoorTransitionSas), jamais lié au
+  // SAS de téléportation ci-dessous (voir runTeleportSas), jamais lié au
   // temps de jeu.
   function wait(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  // SAS de transition de porte : "fondu au noir SONORE" (à la Animal
-  // Crossing) qui souligne le changement de lieu et masque le chargement
-  // derrière un silence bref plutôt qu'une coupure sèche des balises ou un
-  // blanc audible. Musique/ambiance INCHANGÉES : elles suivent leur PROPRE
-  // logique de continuité/crossfade (lib/audio.js), entièrement indifférente
-  // au gain de couche entités fondu ici (voir son commentaire, lib/audio.js)
-  // — cette séquence ne les touche JAMAIS.
+  // SAS de téléportation (mode "fade" de l'effet "teleport", voir
+  // core/effects.js) : "fondu au noir SONORE" (à la Animal Crossing) qui
+  // souligne le changement de lieu/position et masque un éventuel
+  // chargement derrière un silence bref plutôt qu'une coupure sèche des
+  // balises ou un blanc audible — comportement HISTORIQUE d'une traversée
+  // de porte, désormais généralisé à TOUT teleport en mode "fade", qu'il
+  // recharge (needsReload) ou déplace seulement le joueur DANS le lieu
+  // courant (voir placePlayer, core/state.js). Musique/ambiance INCHANGÉES :
+  // elles suivent leur PROPRE logique de continuité/crossfade (lib/audio.js),
+  // entièrement indifférente au gain de couche entités fondu ici (voir son
+  // commentaire, lib/audio.js) — cette séquence ne les touche JAMAIS.
   //
   // Jeu GELÉ pendant tout le sas : réutilise le MÊME mécanisme qu'un menu
   // (seul le sommet de la pile tique/reçoit le clavier, voir
@@ -406,18 +426,26 @@ export function makeCityScreen(getSession, setSession) {
   // (voir finally) : un échec de chargement ne doit jamais laisser le jeu
   // gelé pour de bon.
   //
-  // Séquence STRICTE : sas -> fondu SORTANT (scène quittée) -> destruction +
-  // chargement de la cible (caché derrière le silence — RÉSERVÉ pour un
-  // futur préchauffage Howler avant ce point, pas construit maintenant) ->
-  // son de PASSAGE (hors du gain, voir playDoorTransitionSound) -> fondu
-  // ENTRANT (scène cible, déjà prête) -> fin du sas.
-  async function runDoorTransitionSas(targetId) {
+  // Séquence STRICTE : sas -> fondu SORTANT -> déplacement (rechargement
+  // caché derrière le silence, ou simple repositionnement si needsReload
+  // est faux) -> son de PASSAGE (hors du gain, voir playDoorTransitionSound)
+  // -> fondu ENTRANT (scène prête) -> fin du sas.
+  async function runTeleportSas(target, x, side, needsReload) {
     pushScreen({});
     try {
       rampEntityLayerGain(0, DOOR_TRANSITION_FADE_OUT_MS);
       await wait(DOOR_TRANSITION_FADE_OUT_MS);
 
-      await performTransition(targetId);
+      if (needsReload) {
+        await performTransition(target, x, side);
+      } else {
+        // Même monde, aucun rechargement : juste replacer le joueur (+
+        // compagnons, voir placeInCurrentWorld) — la scène courante n'a
+        // besoin d'AUCUNE reconstruction, elle relit déjà
+        // session.player.x/side à CHAQUE tick (voir
+        // view/audio/city-scene.js/update).
+        placeInCurrentWorld(x, side);
+      }
 
       playDoorTransitionSound();
       rampEntityLayerGain(1, DOOR_TRANSITION_FADE_IN_MS);
@@ -427,8 +455,47 @@ export function makeCityScreen(getSession, setSession) {
     }
   }
 
-  async function transitionThroughDoor(targetId) {
-    await runDoorTransitionSas(targetId);
+  // Exécute l'effet "teleport" (voir core/effects.js, core/scripting.md/
+  // "Effets d'action") — SEUL chemin de téléportation JOUEUR, qu'il soit
+  // déclenché par une porte (voir entities/types/door.js) ou par n'importe
+  // quel autre effet (trigger temporel, effet de partie...). Câblé par
+  // setTeleportHandler ci-dessous.
+  //
+  // reloadIfSame (défaut false) décide SEULEMENT si la cible est le monde
+  // ACTIF : différent -> toujours un rechargement (travelToWorld, comme une
+  // porte l'a toujours fait). transition ("fade", défaut, ou "instant")
+  // choisit SÉPARÉMENT s'il y a un sas — orthogonal au rechargement, les
+  // QUATRE combinaisons sont valides (ex. un déplacement instantané qui
+  // recharge quand même, ou un sas pour un simple repositionnement). `side`
+  // NON pré-résolue ici (contrairement à x) : son défaut dépend du CHEMIN —
+  // "recto" pour un rechargement (travelToWorld impose déjà ce défaut,
+  // comportement historique d'une porte) mais la face ACTUELLE du joueur
+  // pour un simple repositionnement (voir placeInCurrentWorld ci-dessous) —
+  // "recto" y serait FAUX (basculerait silencieusement un joueur au verso).
+  function executeTeleport({ target, x, side, reloadIfSame = false, transition = "fade" }) {
+    const sameWorld = target === getSession().activeWorldId;
+    const needsReload = !sameWorld || reloadIfSame;
+
+    if (transition === "fade") {
+      runTeleportSas(target, x, side, needsReload);
+      return;
+    }
+    // "instant" : aucun sas, aucun fondu — le déplacement d'autorité prend
+    // effet immédiatement (voir core/scripting.md/"teleport", ex. un
+    // vigile qui éjecte le joueur).
+    if (needsReload) {
+      performTransition(target, x, side);
+      return;
+    }
+    placeInCurrentWorld(x, side);
+  }
+
+  // Repositionne le joueur DANS LE MONDE ACTUEL (voir core/state.js/
+  // placePlayer) — x/side absents -> conservent la valeur COURANTE
+  // (jamais "recto" en dur, voir executeTeleport ci-dessus).
+  function placeInCurrentWorld(x, side) {
+    const session = getSession();
+    setSession(placePlayer(session, x !== undefined ? x : session.player.x, side !== undefined ? side : session.player.side));
   }
 
   // Sélection sur la carte de la ville (voir view/menus/city-map-menu.js,
@@ -445,7 +512,7 @@ export function makeCityScreen(getSession, setSession) {
   }
 
   // Remplace la partie EN COURS par une session importée (voir
-  // view/menus/save-menu.js) : même mécanique que transitionThroughDoor
+  // view/menus/save-menu.js) : même mécanique que performTransition
   // (détruit la scène, remplace la session, reconstruit la scène sur le
   // nouveau monde actif) — pour ne jamais laisser un Howl résiduel de
   // l'ancien monde ni une scène désynchronisée de la session. Le son +
@@ -460,7 +527,7 @@ export function makeCityScreen(getSession, setSession) {
 
   // SAS de bascule recto<->verso (voir view/interaction.js/ACTION_HANDLERS.
   // switchSide ; entities/types/passage.js ; CLAUDE.md/"RECTO/VERSO") —
-  // réutilise le MÊME mécanisme de gel que runDoorTransitionSas (pushScreen
+  // réutilise le MÊME mécanisme de gel que runTeleportSas (pushScreen
   // vide), mais un geste AUDIO différent : PAS un fondu vers le silence
   // (rien ne disparaît, rien ne se charge — les deux faces COEXISTENT déjà),
   // un CROISEMENT DE FILTRES D'OCCLUSION (voir scene.crossfadeFaceSwap,
@@ -577,10 +644,10 @@ export function makeCityScreen(getSession, setSession) {
   }
 
   // Enregistrés une fois, pour la durée de vie de cet écran ville : mêmes
-  // principe et portée que setDoorTransitionHandler (voir
-  // view/interaction.js) — un module qui déclenche un effet possédé par
-  // city-screen.js (scene/session) sans avoir besoin de les connaître.
-  setDoorTransitionHandler(transitionThroughDoor);
+  // principe et portée que setTeleportHandler (voir view/interaction.js) —
+  // un module qui déclenche un effet possédé par city-screen.js
+  // (scene/session) sans avoir besoin de les connaître.
+  setTeleportHandler(executeTeleport);
   setPickupHandler(pickupEntityEffect);
   setItemPickupHandler(itemPickupEntityEffect);
   setLootHandler(lootEntityEffect);
@@ -596,6 +663,27 @@ export function makeCityScreen(getSession, setSession) {
   // cache) — équiper/déséquiper change donc le verdict IMMÉDIATEMENT, sans
   // code de synchro, même principe que gaitOf.
   setPlayerEquipmentProvider(() => getSession().equipment);
+  // Même principe, pour "timeRange" côté action.condition (voir
+  // view/interaction.js/actionContext) : relu à CHAQUE tentative, jamais mis
+  // en cache, donc toujours l'heure de partie ACTUELLE.
+  setTimeProvider(() => getSession().time);
+  // Même principe encore, pour hasImprovement/weather/perceptionActive/
+  // variable scope "scene"/"party" côté action.condition (voir
+  // view/interaction.js/actionContext, audit de santé Finding 1) : la
+  // session ENTIÈRE, relue à CHAQUE tentative — une amélioration tout juste
+  // obtenue, une météo qui vient de changer, débloquent donc une action
+  // IMMÉDIATEMENT, sans code de synchro, même principe que gaitOf.
+  setSessionProvider(() => getSession());
+  // Rendu DIÉGÉTIQUE de l'effet "playSound" (voir view/interaction.js/
+  // runPlaySoundEffect, view/audio/city-scene.js/playEntityOneShot) — ferme
+  // sur `scene` (variable MUTABLE de ce closure, réassignée à chaque
+  // transition/bascule, voir performTransition/replaceCurrentGame/
+  // sideSwitchEffect) : lit donc TOUJOURS la scène ACTUELLE, jamais une
+  // référence figée au moment de l'enregistrement, sans avoir à
+  // ré-enregistrer ce provider à chaque recréation de scène. `scene` peut
+  // être `null` dans la brève fenêtre d'une transition (voir
+  // performTransition) -> no-op silencieux, jamais une exception.
+  setPositionedSoundPlayer((entityId, descriptor) => scene && scene.playEntityOneShot(entityId, descriptor));
 
   return {
     onEnter() {
@@ -614,8 +702,8 @@ export function makeCityScreen(getSession, setSession) {
       announce(t(getActiveWorld(getSession()).titleKey), { assertive: true });
     },
     onTick() {
-      // scene momentanément null pendant une transition par porte (voir
-      // transitionThroughDoor) : rien à mettre à jour, on saute ce tick.
+      // scene momentanément null pendant un rechargement de teleport (voir
+      // performTransition) : rien à mettre à jour, on saute ce tick.
       if (!scene) return;
       setSession(reduce(getSession(), tick(getMoveIntent())));
       scene.update();
@@ -767,7 +855,7 @@ export function makeCityScreen(getSession, setSession) {
       // plus) — SEUL endroit qui les arrête explicitement pour de bon.
       stopPersistentAudioLayers();
       scene = null;
-      setDoorTransitionHandler(null);
+      setTeleportHandler(null);
       setPickupHandler(null);
       setItemPickupHandler(null);
       setLootHandler(null);
@@ -779,6 +867,9 @@ export function makeCityScreen(getSession, setSession) {
       setUnequipItemHandler(null);
       setGameReplaceHandler(null);
       setPlayerEquipmentProvider(null);
+      setTimeProvider(null);
+      setSessionProvider(null);
+      setPositionedSoundPlayer(null);
       // Invariant documenté (CLAUDE.md) : session est null hors partie.
       // Seul chemin de sortie de la ville aujourd'hui (menu pause -> retour
       // au menu principal, voir view/menus/pause-menu.js).

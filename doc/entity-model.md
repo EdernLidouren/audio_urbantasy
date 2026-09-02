@@ -80,11 +80,12 @@ bip parasite pollue plus qu'il n'informe).
 
 Une entité `interactable` porte OPTIONNELLEMENT `action` (un objet, ou un
 tableau de plusieurs candidates filtrées par condition) — **la grammaire
-complète (kinds `"transit"`/`"pickup"`/`"loot"`/`"switchSide"`/
-`"applyEffects"`, `action.condition`/`refusalKey`, la sélection parmi
-plusieurs candidates) vit ENTIÈREMENT dans `doc/scripting.md`/"Actions",
-jamais dupliquée ici**. Ce que ce document ajoute, spécifique au MODÈLE
-d'entité :
+complète (kinds `"pickup"`/`"loot"`/`"switchSide"`/`"applyEffects"`,
+`action.condition`/`refusalEffects`, les effets `playSound`/`announce`/
+`teleport`/`setVariable`/`toggleVariable`/`addVariable`, la sélection parmi
+plusieurs candidates) vit ENTIÈREMENT dans `doc/scripting.md`/"Actions"/
+"Effets d'action", jamais dupliquée ici**. Ce que ce document ajoute,
+spécifique au MODÈLE d'entité :
 
 - Entité interactable SANS `action` (ex. `npc`/`object` sans kind dédié) ->
   stub silencieux, pas un cas d'erreur.
@@ -1027,8 +1028,8 @@ juste ce dont il a besoin, rien de plus.
 Pas de champ ni de mécanique dédiés : "monter" (ex. accéder aux toits
 au-dessus de la rue) se fait comme tout autre changement de lieu — une
 sous-scène (`level/*.json` séparé) reliée par une entité interactable dont
-l'action `"transit"` y mène, un "escalier"/une "échelle" jouant exactement
-le rôle d'une `door` (voir `doc/scripting.md`/"Actions"/`"transit"`). Le mécanisme de
+l'effet `"teleport"` y mène, un "escalier"/une "échelle" jouant exactement
+le rôle d'une `door` (voir `doc/scripting.md`/"Effets d'action"/`"teleport"`). Le mécanisme de
 transition de lieu déjà en place couvre entièrement ce besoin — aucun axe Y
 discrétisé, aucun palier actif à maintenir, aucun système supplémentaire à
 construire. (Un ancien champ de niveau, réservé pour un axe Y jamais

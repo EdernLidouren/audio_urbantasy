@@ -11,7 +11,14 @@
   "entities": [
     { "id": "money_1", "type": "money", "x": 5 },
     { "id": "object_toolbox", "type": "object", "x": 8, "nameKey": "object.toolbox.name", "descriptionKey": "object.toolbox.description" },
-    { "id": "door_exit", "type": "door", "x": 9, "nameKey": "door.exit.name", "target": "demo2", "descriptionKey": "door.exit.description" },
+    {
+      "id": "door_exit",
+      "type": "door",
+      "x": 9,
+      "nameKey": "door.exit.name",
+      "descriptionKey": "door.exit.description",
+      "action": { "kind": "applyEffects", "effects": [{ "type": "teleport", "target": "demo2" }] }
+    },
     { "id": "apple_1", "type": "apple", "x": 17 },
     { "id": "object_neon", "type": "neon", "x": 30 },
     { "id": "bird_1", "type": "bird", "x": 33 },
@@ -49,11 +56,11 @@
       "x": 25,
       "nameKey": "door.club.name",
       "descriptionKey": "door.club.description",
-      "target": "demo2",
       "action": {
-        "kind": "transit",
+        "kind": "applyEffects",
         "condition": { "type": "hasEquipmentTag", "tag": "chic" },
-        "refusalKey": "door.club.dresscode_refused"
+        "refusalEffects": [{ "type": "announce", "key": "door.club.dresscode_refused" }],
+        "effects": [{ "type": "teleport", "target": "demo2" }]
       }
     }
   ]

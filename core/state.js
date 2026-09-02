@@ -326,6 +326,13 @@ export function createInitialState(level, seed = DEFAULT_SEED, { companions, par
     // TOUJOURS résolu (jamais undefined), même politique EAGER que
     // money/bag/equipment ci-dessus.
     variables: parseVariables(partyVariables, "variables de partie", fail),
+    // improvements (voir core/improvements.js/IMPROVEMENT_REGISTRY) :
+    // capacités POSSÉDÉES par le joueur, cercle PARTIE comme
+    // equipment/variables — jamais par monde. Sac VIDE au départ (aucune
+    // improvement débloquée à la création d'une partie neuve), PERSISTANT
+    // (une improvement débloquée le reste, jamais réinitialisée comme une
+    // variable volatile — voir core/save.js).
+    improvements: {},
   };
 }
 
@@ -389,11 +396,12 @@ export function markConsumed(session, entityId) {
 // mélanger les trois portées — entity/scene/party — dans la MÊME
 // activation, voir core/scripting.md/"Actions multiples filtrées par
 // condition") : chaque portée non touchée traverse par RÉFÉRENCE INCHANGÉE.
-// `result.session` : SEUL `.variables` en est repris (portée "party") —
-// jamais le reste de l'objet, qui resterait le SESSION PRÉ-effets (worlds
-// pas encore patché par un éventuel effet "entity"/"scene" de la MÊME
-// liste) si on le reprenait tel quel. id absent du lieu actif -> session
-// INCHANGÉE, même politique défensive que markConsumed/removeEntity.
+// `result.session` : SEULS `.variables`/`.improvements` en sont repris
+// (portée "party") — jamais le reste de l'objet, qui resterait le SESSION
+// PRÉ-effets (worlds pas encore patché par un éventuel effet "entity"/
+// "scene" de la MÊME liste) si on le reprenait tel quel. id absent du lieu
+// actif -> session INCHANGÉE, même politique défensive que markConsumed/
+// removeEntity.
 export function applyEntityActionEffects(session, entityId, effects) {
   const world = session.worlds[session.activeWorldId];
   const face = resolveFace(world, session.player.side);
@@ -416,6 +424,7 @@ export function applyEntityActionEffects(session, entityId, effects) {
     ...session,
     worlds: worldChanged || entityChanged ? { ...session.worlds, [session.activeWorldId]: nextWorld } : session.worlds,
     variables: partyChanged ? result.session.variables : session.variables,
+    improvements: partyChanged ? result.session.improvements : session.improvements,
   };
 }
 
@@ -628,7 +637,17 @@ export function getInactiveFace(session) {
 // view/city-screen.js), fourni SEULEMENT si la cible n'est pas encore dans
 // worlds (ignoré sinon, le monde déjà rangé prime). Cible ni visitée ni
 // fournie -> erreur claire plutôt qu'un état à moitié construit.
-export function travelToWorld(session, targetId, freshLevel = null) {
+// x/side (optionnels) : point d'arrivée EXPLICITE — voir core/effects.js/
+// "teleport", qui les porte. Absents -> comportement HISTORIQUE inchangé
+// (x -> targetWorld.playerStart, side -> "recto", même pour un monde qui n'a
+// qu'une face, ignoré dans ce cas). x fourni est bordé dans [0, longueur de
+// la cible], comme placePlayer ci-dessous. Compagnons repositionnés autour
+// du point d'arrivée RÉEL (celui-ci, pas playerStart) — avant ce paramètre,
+// un appelant qui replaçait le joueur APRÈS coup (voir view/city-screen.js/
+// performTransition, historique) laissait les compagnons autour de
+// playerStart tandis que le joueur atterrissait ailleurs ; ce paramètre
+// élimine cette classe de désync en résolvant tout EN UNE FOIS.
+export function travelToWorld(session, targetId, freshLevel = null, { x, side = "recto" } = {}) {
   const currentWorld = session.worlds[session.activeWorldId];
   // Purge des entités ÉPHÉMÈRES du lieu qu'on quitte (voir
   // entities/model.md/"Entités éphémères") : PILE le moment où ce lieu est
@@ -647,17 +666,30 @@ export function travelToWorld(session, targetId, freshLevel = null) {
     throw new Error(`travelToWorld: monde "${targetId}" introuvable et aucun niveau fourni pour le créer.`);
   }
   const targetWorld = existingTarget ?? createWorldState(freshLevel, DEFAULT_SEED);
+  const arrivalX = x !== undefined ? clamp(x, 0, targetWorld.length) : targetWorld.playerStart;
 
   return {
     ...session,
-    // side : TOUJOURS "recto" à l'entrée par porte (voir CLAUDE.md/
-    // "RECTO/VERSO"), comme playerStart — même pour un monde qui n'a qu'une
-    // face (ignoré dans ce cas). Un point d'arrivée sur verso pourrait
-    // s'ajouter plus tard (porte déclarant sa face cible), pas codé ici.
-    player: { ...session.player, x: targetWorld.playerStart, side: "recto", blockedBy: null, pushedBy: null },
+    player: { ...session.player, x: arrivalX, side, blockedBy: null, pushedBy: null },
     worlds: { ...worldsAfterParking, [targetId]: targetWorld },
     activeWorldId: targetId,
-    companions: repositionCompanions(session.companions, targetWorld.playerStart, targetWorld.length),
+    companions: repositionCompanions(session.companions, arrivalX, targetWorld.length),
+  };
+}
+
+// Place le joueur + les compagnons à x sur la face `side`, DANS LE MONDE
+// ACTUEL — sans toucher activeWorldId/worlds/lastVisited (contrairement à
+// travelToWorld : le lieu n'est jamais quitté). Primitive PARTAGÉE par
+// switchSide (bascule recto<->verso) ci-dessous ET par un teleport SANS
+// rechargement (voir core/effects.js/"teleport", reloadIfSame: false —
+// appliqué par la vue quand la cible EST le monde actif).
+export function placePlayer(session, x, side) {
+  const world = session.worlds[session.activeWorldId];
+  const arrivalX = clamp(x, 0, world.length);
+  return {
+    ...session,
+    player: { ...session.player, x: arrivalX, side, blockedBy: null, pushedBy: null },
+    companions: repositionCompanions(session.companions, arrivalX, world.length),
   };
 }
 
@@ -675,15 +707,10 @@ export function travelToWorld(session, targetId, freshLevel = null) {
 // principe de repositionnement que travelToWorld, mais SANS toucher à
 // activeWorldId ni à worlds. arrivalX est une donnée de CONTENU
 // (action.arrivalX, jamais validée en bornes par core/level.js — voir son
-// commentaire sur `action`) : clampée ICI dans [0, length], comme
-// repositionCompanions le fait déjà pour ses propres positions.
+// commentaire sur `action`) — bordée par placePlayer, comme tout point
+// d'arrivée. Simple appel NOMMÉ de placePlayer ci-dessus (face TOUJOURS
+// opposée à l'actuelle) — aucune logique propre au-delà de ce choix de face.
 export function switchSide(session, arrivalX) {
-  const world = session.worlds[session.activeWorldId];
   const nextSide = session.player.side === "recto" ? "verso" : "recto";
-  const x = clamp(arrivalX, 0, world.length);
-  return {
-    ...session,
-    player: { ...session.player, x, side: nextSide, blockedBy: null, pushedBy: null },
-    companions: repositionCompanions(session.companions, x, world.length),
-  };
+  return placePlayer(session, arrivalX, nextSide);
 }

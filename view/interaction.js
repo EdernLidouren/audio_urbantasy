@@ -11,7 +11,7 @@ import { announce } from "../lib/announce.js";
 import { t } from "../data/i18n/index.js";
 import { pushScreen, popScreen, composeHook } from "../lib/screens.js";
 import { makeMenuScreen } from "../lib/menu.js";
-import { playOneShot } from "../lib/audio.js";
+import { playOneShot, playDescribedOneShot } from "../lib/audio.js";
 import { resolveAsset } from "../lib/assets.js";
 import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
 import { evaluateCondition, selectMatchingAction } from "../core/presence.js";
@@ -22,7 +22,7 @@ import { evaluateCondition, selectMatchingAction } from "../core/presence.js";
 // Permettent à interact() de déclencher un effet qui touche session/scene
 // SANS les connaître : il délègue à qui les possède (ce fichier n'importe
 // jamais le core, voir le header).
-let doorTransitionHandler = null;
+let teleportHandler = null;
 let pickupHandler = null;
 let itemPickupHandler = null;
 let lootHandler = null;
@@ -30,18 +30,26 @@ let lootSpawnHandler = null;
 let sideSwitchHandler = null;
 let variableEffectsHandler = null;
 
-export function setDoorTransitionHandler(handler) {
-  doorTransitionHandler = handler;
+// (effect) => void — exécute l'effet MIXTE "teleport" (voir core/effects.js,
+// core/scripting.md/"Effets d'action") : une PORTE n'est plus un cas
+// spécial, juste une action dont `effects` contient CET effet (voir
+// runEffects plus bas) — le gestionnaire (view/city-screen.js) est le
+// SEUL chemin de téléportation JOUEUR, qu'il soit déclenché par une porte
+// ou par n'importe quel autre effet. Asynchrone (sas + fondu, voir
+// view/city-screen.js), mais JAMAIS attendu ici (comme l'ancien
+// doorTransitionHandler qu'il remplace) : le gestionnaire gère seul son
+// propre séquençage.
+export function setTeleportHandler(handler) {
+  teleportHandler = handler;
 }
 
 // (arrivalX) => Promise<void> — bascule la face courante via un SAS animé
 // (croisement des filtres d'occlusion PUIS reconstruction de la scène
 // audio, voir view/city-screen.js/sideSwitchEffect ; core/state.js/
 // switchSide ; entities/types/passage.js), même patron que
-// setDoorTransitionHandler ci-dessus — PAS un travelToWorld, on reste dans
-// le même monde. Asynchrone comme doorTransitionHandler, mais handleSwitchSide
-// ne l'attend pas (comme handleTransit) : le gestionnaire gère seul son
-// propre sas.
+// setTeleportHandler ci-dessus — PAS un travelToWorld, on reste dans
+// le même monde. Asynchrone comme teleportHandler, mais handleSwitchSide
+// ne l'attend pas : le gestionnaire gère seul son propre sas.
 export function setSideSwitchHandler(handler) {
   sideSwitchHandler = handler;
 }
@@ -113,6 +121,58 @@ export function setPlayerEquipmentProvider(provider) {
   playerEquipmentProvider = provider;
 }
 
+// () => session.time — fournit L'HEURE DE PARTIE pour l'évaluation d'une
+// condition d'action (voir actionConditionMet plus bas), même principe
+// d'injection que playerEquipmentProvider ci-dessus. Sans ce provider,
+// context.time reste undefined et une condition "timeRange" sur
+// action.condition est STRUCTURELLEMENT toujours fausse (voir
+// core/presence.js/evaluateTimeRange, hourOfDayFraction(undefined)) — c'est
+// ce que ce provider corrige, sans changer l'évaluateur lui-même (déjà
+// partagé avec presence[].when, voir core/scripting.md/"Conditions d'action").
+let timeProvider = null;
+
+export function setTimeProvider(provider) {
+  timeProvider = provider;
+}
+
+// () => session — fournit LA SESSION COMPLÈTE pour l'évaluation d'une
+// condition d'action (voir actionContext plus bas), même principe
+// d'injection que playerEquipmentProvider/timeProvider ci-dessus. Corrige un
+// trou identifié par l'audit de santé (Finding 1) : sans ce provider,
+// perceptionActive/weather/world/session restent undefined dans le contexte
+// d'action, et hasImprovement/weather/perceptionActive/variable scope
+// "scene"/"party" y sont STRUCTURELLEMENT toujours fausses (voir
+// core/presence.js) — même si le joueur possède réellement ce qui est
+// demandé. Un OUBLI, pas un choix d'architecture : rien n'empêchait de
+// suivre le MÊME patron d'injection que playerEquipment/time dès le départ
+// (voir "AVANT ce provider" dans actionContext ci-dessous). L'évaluateur
+// reste un PUR consommateur de données (core/presence.js/evaluateCondition,
+// core/variables.js) — lui passer une référence à `session` ne lui donne
+// aucun moyen de MUTER l'état ni de toucher DOM/audio, la frontière core/vue
+// tient : ce fichier lit `session` pour construire un contexte, il ne
+// l'écrit jamais (toute écriture reste déléguée aux handlers enregistrés
+// plus haut, qui seuls détiennent setSession).
+let sessionProvider = null;
+
+export function setSessionProvider(provider) {
+  sessionProvider = provider;
+}
+
+// (entityId, descriptor) => joue un one-shot POSITIONNÉ + FILTRÉ sur
+// l'entité `entityId`, exactement comme un beacon/vocal à cet instant (voir
+// view/audio/city-scene.js/playEntityOneShot, câblé par view/city-screen.js)
+// — fournit le rendu DIÉGÉTIQUE de l'effet "playSound" (voir
+// playDescribedSound plus bas pour le rendu MÉTA, non positionné). Même
+// principe d'injection que playerEquipmentProvider/timeProvider : ce fichier
+// ne connaît toujours ni la scène ni sa chaîne de filtrage, seulement CE
+// point d'entrée. Sans provider (hors ville, scène pas encore montée) ->
+// repli défensif sur le rendu MÉTA, voir runEffects plus bas.
+let positionedSoundPlayer = null;
+
+export function setPositionedSoundPlayer(provider) {
+  positionedSoundPlayer = provider;
+}
+
 const PICKUP_SOUND_KEY = "assets/sounds/ui/pickup";
 
 // Défensif comme tout son d'UI du projet (voir view/save-storage.js/
@@ -128,16 +188,114 @@ function playPickupSound() {
   }
 }
 
-// Placeholder — aucun fichier fourni pour l'instant (comme PICKUP_SOUND_KEY
-// à l'origine) : le try/catch ci-dessous reste le filet, jamais un plantage.
-const REFUSAL_SOUND_KEY = "assets/sounds/ui/refused";
+// Effet "playSound" (voir core/effects.js, core/scripting.md/"Effets
+// d'action") — DEUX NATURES DE RENDU, jamais un troisième mécanisme :
+//
+// MÉTA (ce que ce fichier savait déjà faire) : son CENTRÉ, NON positionné,
+// IGNORE tout filtre actif — le descripteur partagé { path, gain?,
+// pitchVariation?, reverbSend? } joué via playDescribedOneShot
+// (lib/audio.js), composé avec `interfaceVolume` comme tout son d'UI/
+// interaction du projet (playPickupSound plus haut). Aucun bus de réverb
+// accessible depuis ce fichier (voir header, "vue + contenu") : reverbSend
+// reste donc sans effet en pratique ici.
+//
+// DIÉGÉTIQUE (nouveau) : son POSITIONNÉ sur une entité de la scène, soumis
+// aux MÊMES filtres actifs qu'un beacon/vocal à cet instant (occlusion
+// RECTO/VERSO, étouffement de perception, distance) — délégué ENTIÈREMENT à
+// positionedSoundPlayer (voir plus haut, view/audio/city-scene.js/
+// playEntityOneShot) : AUCUNE logique de filtrage dupliquée ici, ce fichier
+// ne fait que router vers la BONNE primitive.
+//
+// PROVENANCE (résout la cible, voir resolvePlaySoundTarget ci-dessous) et
+// NATURE (résout diégétique/méta, voir resolvePlaySoundNature ci-dessous)
+// sont calculées séparément, puis composées ICI. PLUS de son de refus
+// GÉNÉRIQUE en dur (ancien REFUSAL_SOUND_KEY) : un effet "playSound" est un
+// CHOIX DE CONTENU explicite (voir refusalEffects, actionConditionMet plus
+// bas), jamais une valeur par défaut du système. Défensif comme
+// playPickupSound : fichier absent -> avertit, ne plante jamais.
 
-function playRefusalSound() {
+// `effect.at` (optionnel, id d'entité) : PROVENANCE explicite — le son émane
+// de LA POSITION de CETTE entité, pas forcément celle qui porte l'action
+// (ex. un effet sur une porte qui fait sonner une AUTRE entité, plus loin).
+// Non précisé, DANS le contexte d'une action d'entité (`entity` fourni) ->
+// l'entité PORTEUSE elle-même (cas courant : la fenêtre grince à SA
+// position, aucune déclaration nécessaire). Non précisé, HORS contexte
+// d'entité (`entity` absent — futur effet global/trigger de partie) ->
+// `undefined`, résolu ensuite en CENTRÉ JOUEUR par resolvePlaySoundNature.
+function resolvePlaySoundTarget(entity, effect) {
+  if (effect.at !== undefined) return effect.at;
+  return entity ? entity.id : undefined;
+}
+
+// `effect.nature` (optionnel, "diegetic" | "meta") : SURCHARGE explicite,
+// pour les cas exotiques (un son positionné qu'on veut méta, ou l'inverse).
+// Non précisée -> DÉRIVÉE de la PROVENANCE (resolvePlaySoundTarget) : une
+// cible résolue -> diégétique (positionné, filtré) ; aucune cible (centré
+// joueur) -> méta (non filtré) — dans le cas courant, on ne déclare NI `at`
+// NI `nature`, les deux tombent du contexte.
+function resolvePlaySoundNature(effect, targetId) {
+  if (effect.nature !== undefined) return effect.nature;
+  return targetId !== undefined ? "diegetic" : "meta";
+}
+
+function playMetaSound(descriptor) {
   try {
     const factor = getPref("interfaceVolume", PREF_CONSTRAINTS.interfaceVolume.default) / 100;
-    playOneShot(resolveAsset(REFUSAL_SOUND_KEY), { volume: factor });
+    playDescribedOneShot(resolveAsset(descriptor.path), {
+      gain: descriptor.gain,
+      pitchVariation: descriptor.pitchVariation,
+      reverbSend: descriptor.reverbSend,
+      volumeFactor: factor,
+    });
   } catch (error) {
-    console.warn(`interact: son de refus indisponible ("${REFUSAL_SOUND_KEY}") : ${error.message}`);
+    console.warn(`interact: son d'effet indisponible ("${descriptor.path}") : ${error.message}`);
+  }
+}
+
+function runPlaySoundEffect(entity, effect) {
+  const targetId = resolvePlaySoundTarget(entity, effect);
+  const nature = resolvePlaySoundNature(effect, targetId);
+  // Diégétique sans cible résolvable (ex. nature forcée sans `at` ni
+  // contexte d'entité) ou sans provider câblé (hors ville) -> repli MÉTA,
+  // défensif, jamais un plantage ni un son perdu en silence.
+  if (nature === "diegetic" && targetId !== undefined && positionedSoundPlayer) {
+    positionedSoundPlayer(targetId, effect);
+    return;
+  }
+  playMetaSound(effect);
+}
+
+// Exécute une LISTE d'effets (voir core/effects.js pour la partition
+// core/vue, core/scripting.md/"Effets") — `action.effects` (condition
+// RÉUSSIT) ou `action.refusalEffects` (condition ÉCHOUE, voir
+// actionConditionMet plus bas), MÊME fonction pour les deux, MÊME
+// vocabulaire. ROUTAGE : les effets d'ÉTAT (setVariable/toggleVariable/
+// addVariable) sont délégués EN UN SEUL APPEL à variableEffectsHandler (le
+// gestionnaire enregistré par view/city-screen.js, seul à détenir
+// getSession/setSession — voir son commentaire plus haut) — no-op silencieux
+// sur un tableau qui n'en contient aucun (core/variables.js/
+// applyActionEffects ignore déjà tout type qu'il ne reconnaît pas). Les
+// effets de RENDU (playSound/announce) et l'effet MIXTE (teleport, voir
+// core/effects.js) sont ensuite REJOUÉS ICI, DANS L'ORDRE DÉCLARÉ — l'ordre
+// relatif entre un effet d'état (invisible/inaudible au moment où il
+// s'applique) et un effet de rendu/mixte n'a donc aucune importance
+// observable, SEUL l'ordre ENTRE effets de rendu/mixtes compte (ex. le son
+// AVANT l'annonce de confirmation, voir "Effets" plus haut) — un
+// "teleport" typiquement DERNIER de sa liste (le sas gèle le jeu, tout
+// effet déclaré APRÈS lui dans la MÊME liste s'exécuterait quand même,
+// avant que le sas ne commence, puisque teleportHandler n'est jamais
+// attendu ici).
+function runEffects(entity, effects) {
+  if (!effects) return;
+  if (variableEffectsHandler) variableEffectsHandler(entity, effects);
+  for (const effect of effects) {
+    if (effect.type === "playSound") {
+      runPlaySoundEffect(entity, effect);
+    } else if (effect.type === "announce") {
+      announce(t(effect.key), { assertive: effect.assertive !== false });
+    } else if (effect.type === "teleport") {
+      if (teleportHandler) teleportHandler(effect);
+    }
   }
 }
 
@@ -171,21 +329,8 @@ function resolveDescription(entity) {
 // lui, ne valide QUE la forme de `action` — voir son commentaire — jamais
 // le kind contre ce registre, qui reste entièrement côté vue).
 
-// "transit" (porte) : MIGRÉ dans cet aiguillage depuis l'ancien
-// court-circuit `entity.type === "door"` — même effet exactement (délègue
-// au gestionnaire enregistré), juste posé comme n'importe quel autre kind
-// désormais (voir entities/types/door.js, action:{kind:"transit"}). `entity`
-// PORTE `target` aujourd'hui (voir core/level.js/parseEntity, cascade
-// spécifique au type "door", jamais dans `action` lui-même) — DISTINCT des
-// autres handlers ci-dessous, qui lisent leurs paramètres depuis `action`
-// (l'action RÉSOLUE, voir interact() : un objet unique ou un élément choisi
-// d'un tableau de candidates, voir core/presence.js/selectMatchingAction).
-function handleTransit(entity) {
-  if (doorTransitionHandler) doorTransitionHandler(entity.target);
-}
-
 // "switchSide" (point de passage recto<->verso, voir entities/types/
-// passage.js) : MÊME PATRON EXACT que handleTransit — délègue TOUT l'effet
+// passage.js) : délègue TOUT l'effet
 // (état + son de passage + croisement d'occlusion, voir
 // view/city-screen.js/sideSwitchEffect, qui orchestre son propre sas) au
 // gestionnaire enregistré, jamais de son joué ICI (contrairement à
@@ -303,48 +448,29 @@ function handleLoot(entity, action) {
 
 // "applyEffects" : kind GÉNÉRIQUE, sans état "métier" propre (contrairement
 // à transit/pickup/loot/switchSide) — sa SEULE substance est ce que le
-// contenu déclare : `action.sound` (optionnel, TRANSPORT, voir
-// core/level.js/parseSingleAction) joué ICI, défensivement comme
-// playPickupSound/playRefusalSound ; `action.effects` (optionnel, EFFETS
-// D'ÉCRITURE de variable — setVariable/toggleVariable/addVariable, voir
-// core/level.js/parseActionEffect) délégué au gestionnaire enregistré
-// (voir setVariableEffectsHandler), qui seul détient getSession/setSession
-// pour les appliquer et les splicer dans la partie — jamais ici, ce fichier
-// ne connaît toujours pas le core ; `action.announceKey` (optionnel)
-// confirmé À LA PAROLE, APRÈS l'effet — jamais SEULEMENT le son (voir
-// CLAUDE.md, accessibilité de premier ordre), même politique que
-// handlePickup/handleLoot ci-dessus. Cas d'usage de référence : la fenêtre
-// (deux actions candidates opposées, voir core/scripting.md/"Actions
-// multiples filtrées par condition").
-function handleApplyEffects(entity, action) {
-  if (action.sound) {
-    try {
-      const factor = getPref("interfaceVolume", PREF_CONSTRAINTS.interfaceVolume.default) / 100;
-      playOneShot(resolveAsset(action.sound), { volume: factor });
-    } catch (error) {
-      console.warn(`interact: son d'action indisponible ("${action.sound}") : ${error.message}`);
-    }
-  }
-  if (action.effects && variableEffectsHandler) {
-    variableEffectsHandler(entity, action.effects);
-  }
-  if (action.announceKey) {
-    announce(t(action.announceKey), { assertive: true });
-  }
-}
+// contenu déclare via `action.effects` (voir "Effets" plus haut,
+// core/scripting.md/"Effets"), déjà exécutés GÉNÉRIQUEMENT pour TOUT kind
+// par interact() AVANT ce dispatch (voir runEffects) : ce handler n'a donc
+// RIEN de plus à faire — NO-OP délibéré, gardé dans ACTION_HANDLERS
+// seulement pour que ce kind reste un kind CONNU (sinon l'aiguillage
+// avertirait "type d'action inconnu", voir plus bas). Cas d'usage de
+// référence : la fenêtre (deux actions candidates opposées, voir
+// core/scripting.md/"Actions multiples filtrées par condition").
+function handleApplyEffects() {}
 
 const ACTION_HANDLERS = {
-  transit: handleTransit,
   pickup: handlePickup,
   loot: handleLoot,
   switchSide: handleSwitchSide,
   applyEffects: handleApplyEffects,
 };
 
-// ACTIONS CONDITIONNELLES (voir core/level.js, action.condition/refusalKey)
-// — GÉNÉRIQUE à TOUT kind de ACTION_HANDLERS ci-dessus, pas un cas spécial
-// de "transit" : une caisse verrouillée, un PNJ qui ne parle qu'à condition
-// réutiliseront cette MÊME vérification, jamais un second mécanisme.
+// ACTIONS CONDITIONNELLES (voir core/level.js, action.condition/
+// refusalEffects) — GÉNÉRIQUE à TOUT kind de ACTION_HANDLERS ci-dessus, pas
+// un cas spécial d'un kind précis : une porte (teleport conditionné, voir
+// "Effets d'action"/`"teleport"`), une caisse verrouillée, un PNJ qui ne
+// parle qu'à condition réutilisent tous cette MÊME vérification, jamais un
+// second mécanisme.
 // Réutilise TEL QUEL l'évaluateur de conditions du core
 // (core/presence.js/evaluateCondition) — même objet déclaratif que
 // presence[].when, déjà validé au chargement (core/level.js).
@@ -360,9 +486,30 @@ const ACTION_HANDLERS = {
 // peuvent PAS partager `context.entity` sans se marcher dessus dès qu'une
 // condition "variable" et une condition "hasEquipmentTag" coexistent (ex.
 // dans un allOf) sur la MÊME action.
+//
+// time : injecté via timeProvider ci-dessus, MÊME clé que
+// core/reduce.js/presenceContext — une condition "timeRange" se comporte
+// donc IDENTIQUEMENT sur presence[].when et sur action.condition.
+// perceptionActive/weather/world/session : injectés via sessionProvider
+// ci-dessus, dérivés de LA MÊME session avec EXACTEMENT la même formule que
+// core/reduce.js/presenceContext (weather : son `.state` ; world : le monde
+// ACTIF entier — recto ET verso pour une scène à deux faces, jamais
+// seulement la face courante, voir core/variables.js/carrierForScope, scope
+// "scene" — PAS core/state.js/getActiveWorld, qui aplatit la face et ferait
+// perdre l'autre). hasImprovement/weather/perceptionActive/variable scope
+// "scene"/"party" se comportent donc désormais IDENTIQUEMENT sur
+// action.condition et sur presence[].when (voir doc/scripting.md, section
+// "Conditions d'action"). Sans provider enregistré (cas limite, jamais en
+// jeu réel) -> ces clés restent undefined, repli déjà géré par chaque
+// évaluateur (core/presence.js).
 function actionContext(entity) {
   const equipment = playerEquipmentProvider ? playerEquipmentProvider() : undefined;
-  return { entity, playerEquipment: equipment };
+  const time = timeProvider ? timeProvider() : undefined;
+  const session = sessionProvider ? sessionProvider() : undefined;
+  const perceptionActive = session ? session.perceptionActive : undefined;
+  const weather = session ? session.weather.state : undefined;
+  const world = session ? session.worlds[session.activeWorldId] : undefined;
+  return { entity, playerEquipment: equipment, time, perceptionActive, weather, world, session };
 }
 
 function actionConditionMet(condition, entity) {
@@ -402,18 +549,26 @@ export function interact(entity, kind) {
       : entity.action;
     if (!resolvedAction) return;
 
-    // Condition fausse -> REFUS informatif (message + son), AUCUN effet,
-    // AUCUNE transition : l'action est simplement bloquée, proprement.
-    // Action sans condition (tout contenu existant) -> ce bloc est
-    // sauté entièrement, comportement STRICTEMENT inchangé. Pour une action
-    // choisie DANS un tableau, cette condition est déjà connue vraie (voir
-    // selectMatchingAction) — la revérifier ici reste correct (fonction
-    // pure, même contexte) et évite un second chemin de code.
+    // Condition fausse -> REFUS informatif (refusalEffects, voir "Effets"
+    // plus haut), AUCUN effet de succès, AUCUNE transition : l'action est
+    // simplement bloquée, proprement. Action sans condition (tout contenu
+    // existant) -> ce bloc est sauté entièrement, comportement STRICTEMENT
+    // inchangé. Pour une action choisie DANS un tableau, cette condition est
+    // déjà connue vraie (voir selectMatchingAction) — la revérifier ici
+    // reste correct (fonction pure, même contexte) et évite un second
+    // chemin de code.
     if (resolvedAction.condition && !actionConditionMet(resolvedAction.condition, entity)) {
-      playRefusalSound();
-      announce(t(resolvedAction.refusalKey), { assertive: true });
+      runEffects(entity, resolvedAction.refusalEffects);
       return;
     }
+
+    // Condition VRAIE (ou absente) -> effets de succès exécutés
+    // GÉNÉRIQUEMENT pour TOUT kind (voir "Effets" plus haut), AVANT le
+    // handler propre au kind — ni transit/pickup/loot/switchSide ne
+    // déclarent `effects` aujourd'hui (comportement STRICTEMENT inchangé
+    // pour eux), mais rien ne les en empêche demain : ce n'est plus
+    // réservé à "applyEffects" (voir handleApplyEffects, désormais NO-OP).
+    runEffects(entity, resolvedAction.effects);
 
     const handler = ACTION_HANDLERS[resolvedAction.kind];
     if (!handler) {

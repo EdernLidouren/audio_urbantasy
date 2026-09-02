@@ -3,6 +3,13 @@
 // complet. Donnée pure : aucun import, importable par le core comme par la
 // vue.
 
+// PAS de cascade `action` ici (contrairement à d'autres archétypes) : une
+// porte n'a plus rien de commun à l'échelle du TYPE — sa cible (`teleport.
+// target`, voir core/scripting.md/"Effets d'action") varie par INSTANCE,
+// chaque porte doit donc déclarer SA PROPRE `action` complète (voir
+// level/demo.json et consorts). La porte n'est PLUS un cas spécial du core
+// ni de la vue : juste une entité `interactable` ordinaire dont l'action
+// déclenche un effet "teleport" comme n'importe quel autre contenu.
 export default {
   label: "entity.door",
   descriptionKey: "entity.door.description",
@@ -12,10 +19,4 @@ export default {
   blocksMovement: false,
   observable: true,
   interactable: true,
-  // action:{kind:"transit"} — la porte rejoint l'aiguillage d'actions par
-  // kind (voir view/interaction.js/ACTION_HANDLERS) : entrée déclenche la
-  // transition vers `target` (voir plus bas dans le niveau qui l'instancie)
-  // via le même mécanisme que tout autre kind, plus de court-circuit
-  // `entity.type === "door"` dans la vue.
-  action: { kind: "transit" },
 };

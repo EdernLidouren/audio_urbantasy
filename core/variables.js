@@ -19,6 +19,15 @@
 // restent le SEUL point d'accès bas niveau ; applyActionEffects les enchaîne
 // pour une LISTE d'effets déjà validée, sans connaître elle-même le SENS
 // d'un effet au-delà de son `type`.
+//
+// applyActionEffects (plus bas) est en réalité le point d'entrée PARTAGÉ de
+// TOUT effet d'ÉTAT d'une action, pas seulement les variables — voir
+// core/effects.js/STATE_EFFECT_TYPES : giveImprovement/removeImprovement
+// (core/improvements.js) y sont appliqués dans le MÊME passage, faute
+// d'un second point d'entrée générique côté vue (view/interaction.js/
+// runEffects délègue TOUS les effets d'état ICI, en un seul appel).
+
+import { giveImprovement, removeImprovement } from "./improvements.js";
 
 export const VARIABLE_TYPES = ["flag", "int"];
 
@@ -171,6 +180,24 @@ export function applyActionEffects(effects, context) {
     if (effect.type === "addVariable") {
       const current = getVariable(ctx, effect.scope, effect.name);
       return { ...ctx, [key]: setVariable(ctx, effect.scope, effect.name, (current ?? 0) + effect.amount) };
+    }
+    // giveImprovement/removeImprovement (core/improvements.js) : TOUJOURS
+    // portée PARTIE — même clé de contexte ("session") qu'une variable
+    // scope "party" (SCOPE_CONTEXT_KEYS.party), jamais un champ `scope` à
+    // lire sur l'effet (une improvement n'a qu'UN porteur possible, le
+    // joueur, contrairement à une variable). `ctx.session` absent -> `ctx`
+    // INCHANGÉ (même repli défensif que carrierForScope/setVariable
+    // ci-dessus sur un contexte incomplet), jamais une exception : latent
+    // aujourd'hui (le seul appelant, core/state.js/applyEntityActionEffects,
+    // fournit toujours `session`), mais aligné sur la même discipline
+    // défensive que le reste de ce fichier plutôt que de faire exception.
+    if (effect.type === "giveImprovement") {
+      if (!ctx.session) return ctx;
+      return { ...ctx, session: { ...ctx.session, improvements: giveImprovement(ctx.session.improvements, effect.id) } };
+    }
+    if (effect.type === "removeImprovement") {
+      if (!ctx.session) return ctx;
+      return { ...ctx, session: { ...ctx.session, improvements: removeImprovement(ctx.session.improvements, effect.id) } };
     }
     return ctx;
   }, context);

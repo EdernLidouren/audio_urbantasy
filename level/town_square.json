@@ -17,14 +17,14 @@
         "x": 25,
         "nameKey": "door.townhall_main.name",
         "descriptionKey": "door.townhall_main.description",
-        "target": "town_square_townhall_main",
         "sounds": {
           "beacon": { "path": "assets/sounds/entities/door_1_beacon_1.mp3", "loop": true }
         },
         "action": {
-          "kind": "transit",
-          "condition": { "type": "timeRange", "from": 20, "to": 8 },
-          "refusalKey": "door.townhall_main.time_refused"
+          "kind": "applyEffects",
+          "condition": { "type": "timeRange", "from": 8, "to": 20 },
+          "refusalEffects": [{ "type": "announce", "key": "door.townhall_main.time_refused" }],
+          "effects": [{ "type": "teleport", "target": "town_square_townhall_main" }]
         }
       }
     ]

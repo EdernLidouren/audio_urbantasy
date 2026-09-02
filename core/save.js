@@ -301,6 +301,16 @@ function migrateSave(raw) {
     data = { ...data, variables: {} };
   }
 
+  // improvements (voir core/improvements.js/IMPROVEMENT_REGISTRY,
+  // core/state.js/createInitialState) : absent d'une sauvegarde antérieure
+  // à ce mécanisme -> sac VIDE `{}`, même politique que variables/
+  // equipment ci-dessus — une sauvegarde ancienne représente une partie
+  // déjà en cours, jamais rétroactivement créditée d'improvements qu'elle
+  // n'a jamais débloquées.
+  if (!data.improvements || typeof data.improvements !== "object") {
+    data = { ...data, improvements: {} };
+  }
+
   if (data.worlds && typeof data.worlds === "object") {
     const patchedWorlds = {};
     let anyChanged = false;

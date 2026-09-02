@@ -9,6 +9,7 @@ import {
   getActiveWorld,
   travelToWorld,
   switchSide,
+  placePlayer,
   addCompanion,
   removeEntity,
   markConsumed,
@@ -56,6 +57,8 @@ import { DEFAULTS as WANDER_DEFAULTS } from "./behaviors/wander.js";
 import { validateWeatherStates, createInitialWeather, advanceWeather, pickTransition, setWeather, triggerNextWeatherTransition } from "./weather.js";
 import { WEATHER_STATES, DEFAULT_WEATHER_STATE } from "../config/weather-values.js";
 import { parseVariables, getVariable, setVariable, applyActionEffects } from "./variables.js";
+import { IMPROVEMENT_REGISTRY, improvementProps, hasImprovement, giveImprovement, removeImprovement } from "./improvements.js";
+import { isDebugEnabled, setDebugEnabled } from "../config/debug.js";
 
 // { companions: [] } : passé explicitement à CHAQUE createInitialState()
 // ci-dessous qui ne concerne pas les compagnons — sans lui, le défaut (UN
@@ -911,6 +914,34 @@ export function runMovementChecks() {
     travelToUnknownRejected = true;
   }
   run("partie : transition vers un monde inconnu sans niveau fourni est rejetée", true, travelToUnknownRejected);
+
+  // --- travelToWorld : x/side EXPLICITES (voir core/effects.js/"teleport")
+  // — sans eux, comportement HISTORIQUE ci-dessus (playerStart, "recto").
+  // Fournis, ils REMPLACENT ces défauts, compagnons repositionnés AUTOUR DU
+  // POINT RÉEL (jamais playerStart) EN UNE SEULE PASSE — voir le commentaire
+  // de travelToWorld.
+  let partieWithArrival = travelToWorld(partie, worldB.id, undefined, { x: 7, side: "verso" });
+  run("travelToWorld : x explicite -> remplace playerStart", 7, partieWithArrival.player.x);
+  run("travelToWorld : side explicite -> remplace le défaut recto", "verso", partieWithArrival.player.side);
+  run(
+    "travelToWorld : x/side absents -> défauts historiques inchangés (playerStart/recto)",
+    true,
+    (() => {
+      const back = travelToWorld(partieWithArrival, worldA.id);
+      return back.player.x === worldA.playerStart && back.player.side === "recto";
+    })()
+  );
+
+  // --- placePlayer (voir core/state.js) — repositionnement SANS quitter le
+  // monde actif : ni activeWorldId ni worlds ne changent, contrairement à
+  // travelToWorld. Primitive PARTAGÉE avec switchSide (voir plus bas,
+  // "bascule DANS le même monde").
+  const beforePlace = createInitialState(worldA, 1, NO_COMPANIONS);
+  const afterPlace = placePlayer(beforePlace, 12, "verso");
+  run("placePlayer : déplace le joueur à x", 12, afterPlace.player.x);
+  run("placePlayer : pose la face demandée", "verso", afterPlace.player.side);
+  run("placePlayer : activeWorldId INCHANGÉ", beforePlace.activeWorldId, afterPlace.activeWorldId);
+  run("placePlayer : x bordé dans [0, longueur]", worldA.length, placePlayer(beforePlace, 9999, "recto").player.x);
 
   // --- Scène à deux faces (recto/verso), étape 1/2 (voir CLAUDE.md/
   // "RECTO/VERSO", level/schema.md, core/state.js/isTwoSided) ---
@@ -3134,7 +3165,7 @@ export function runMovementChecks() {
       music: "assets/musics/a_warm_night_in_harlem.mp3",
       entities: [
         { id: "audit-dog", type: "dog", x: 10, behavior: { kind: "wander"} },
-        { id: "audit-door", type: "door", x: 15, target: "movement-check-audit-b" },
+        { id: "audit-door", type: "door", x: 15 },
       ],
     },
     AUDIT_REGISTRY
@@ -3669,11 +3700,233 @@ export function runMovementChecks() {
   }
   run("tags : hasEquipmentTag avec un tag inconnu -> échec clair au chargement", true, unknownTagConditionThrew);
 
+  // --- Improvements (core/improvements.js) — registre, stockage,
+  // effets give/remove, condition hasImprovement + court-circuit DEBUG.
+  {
+    function expectThrows(fn) {
+      try {
+        fn();
+        return false;
+      } catch {
+        return true;
+      }
+    }
+    function expectAccepted(fn) {
+      try {
+        fn();
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    run("improvements : registre porte supernatural_perception", true, Boolean(IMPROVEMENT_REGISTRY.supernatural_perception));
+    run("improvements : improvementProps id inconnu -> undefined", undefined, improvementProps("does-not-exist"));
+
+    // Primitives PURES (core/improvements.js) — sac SPARSE, référence
+    // INCHANGÉE si rien à faire (même politique que setVariable).
+    run("improvements : hasImprovement sur sac vide -> faux", false, hasImprovement({}, "flashlight"));
+    const givenOnce = giveImprovement({}, "flashlight");
+    run("improvements : giveImprovement ajoute la clé", true, hasImprovement(givenOnce, "flashlight"));
+    run("improvements : giveImprovement idempotent -> RÉFÉRENCE inchangée si déjà possédée", givenOnce, giveImprovement(givenOnce, "flashlight"));
+    const removedAgain = removeImprovement(givenOnce, "flashlight");
+    run("improvements : removeImprovement retire la clé", false, hasImprovement(removedAgain, "flashlight"));
+    run("improvements : removeImprovement idempotent -> RÉFÉRENCE inchangée si déjà absente", removedAgain, removeImprovement(removedAgain, "flashlight"));
+
+    // Validation au CHARGEMENT (core/level.js) — condition ET effets.
+    const IMPROVEMENT_TEST_REGISTRY = { dog: { label: "entity.dog" } };
+    function levelWithHasImprovement(id) {
+      return {
+        id: "movement-check-has-improvement",
+        titleKey: "level.demo.title",
+        length: 10,
+        playerStart: 0,
+        entities: [{ id: "e1", type: "dog", x: 5, presence: [{ when: { type: "hasImprovement", id }, present: true }] }],
+      };
+    }
+    run(
+      "hasImprovement : id valide -> chargé sans erreur",
+      true,
+      expectAccepted(() => parseLevel(levelWithHasImprovement("supernatural_perception"), IMPROVEMENT_TEST_REGISTRY))
+    );
+    run(
+      "hasImprovement : id inconnu -> échec clair au chargement",
+      true,
+      expectThrows(() => parseLevel(levelWithHasImprovement("does-not-exist"), IMPROVEMENT_TEST_REGISTRY))
+    );
+    function levelWithImprovementEffect(effect) {
+      return {
+        id: "movement-check-improvement-effect",
+        titleKey: "level.demo.title",
+        length: 10,
+        playerStart: 0,
+        entities: [{ id: "e1", type: "dog", x: 5, action: { kind: "applyEffects", effects: [effect] } }],
+      };
+    }
+    run(
+      "giveImprovement : id valide -> chargé sans erreur",
+      true,
+      expectAccepted(() => parseLevel(levelWithImprovementEffect({ type: "giveImprovement", id: "mirror_pass" }), IMPROVEMENT_TEST_REGISTRY))
+    );
+    run(
+      "giveImprovement : id inconnu -> échec clair au chargement",
+      true,
+      expectThrows(() => parseLevel(levelWithImprovementEffect({ type: "giveImprovement", id: "does-not-exist" }), IMPROVEMENT_TEST_REGISTRY))
+    );
+    run(
+      "removeImprovement : id inconnu -> échec clair au chargement",
+      true,
+      expectThrows(() => parseLevel(levelWithImprovementEffect({ type: "removeImprovement", id: "does-not-exist" }), IMPROVEMENT_TEST_REGISTRY))
+    );
+
+    // Évaluation RUNTIME — condition "hasImprovement" (core/presence.js).
+    run(
+      "evaluateCondition hasImprovement : possédée -> vrai",
+      true,
+      evaluateCondition({ type: "hasImprovement", id: "flashlight" }, { session: { improvements: { flashlight: true } } })
+    );
+    run(
+      "evaluateCondition hasImprovement : non possédée -> faux",
+      false,
+      evaluateCondition({ type: "hasImprovement", id: "flashlight" }, { session: { improvements: {} } })
+    );
+    run(
+      "evaluateCondition hasImprovement : contexte sans session -> faux (repli défensif)",
+      false,
+      evaluateCondition({ type: "hasImprovement", id: "flashlight" }, {})
+    );
+
+    // COURT-CIRCUIT DEBUG — LECTURE ment TOUJOURS vrai, jamais d'écriture.
+    // Réinitialisé en finally : un test qui laisserait le debug allumé
+    // pollueraît TOUT le reste de cette suite (module-level, voir
+    // config/debug.js).
+    try {
+      run("improvements debug : désactivé par défaut au début de ce bloc", false, isDebugEnabled());
+      setDebugEnabled(true);
+      run(
+        "improvements debug : hasImprovement répond vrai SANS improvement réelle",
+        true,
+        evaluateCondition({ type: "hasImprovement", id: "flashlight" }, { session: { improvements: {} } })
+      );
+      run(
+        "improvements debug : hasImprovement répond vrai même contexte totalement absent",
+        true,
+        evaluateCondition({ type: "hasImprovement", id: "flashlight" }, {})
+      );
+      setDebugEnabled(false);
+      run(
+        "improvements debug : coupé -> reconsulte l'état réel INSTANTANÉMENT (faux ici, rien de réellement possédé)",
+        false,
+        evaluateCondition({ type: "hasImprovement", id: "flashlight" }, { session: { improvements: {} } })
+      );
+    } finally {
+      setDebugEnabled(false);
+    }
+
+    // applyActionEffects (core/variables.js) — giveImprovement/
+    // removeImprovement appliqués dans le MÊME passage que setVariable,
+    // MÊME clé de contexte "session" (portée PARTIE, comme "party").
+    const improvementEffectsCtx = { session: { improvements: {} } };
+    const afterGive = applyActionEffects([{ type: "giveImprovement", id: "mirror_pass" }], improvementEffectsCtx);
+    run("applyActionEffects : giveImprovement — improvement ajoutée", true, hasImprovement(afterGive.session.improvements, "mirror_pass"));
+    const afterRemove = applyActionEffects([{ type: "removeImprovement", id: "mirror_pass" }], afterGive);
+    run("applyActionEffects : removeImprovement — improvement retirée", false, hasImprovement(afterRemove.session.improvements, "mirror_pass"));
+    // Liste MIXTE variable + improvement — les DEUX portées "party"
+    // touchées dans la MÊME activation, sans se marcher dessus (MÊME clé
+    // de contexte "session", mais des champs DIFFÉRENTS : variables vs
+    // improvements).
+    const mixedPartyCtx = { session: { improvements: {}, variables: { friendship: { type: "int", initial: 0, persistent: true, value: 0 } } } };
+    const afterMixedParty = applyActionEffects(
+      [
+        { type: "giveImprovement", id: "flashlight" },
+        { type: "addVariable", scope: "party", name: "friendship", amount: 1 },
+      ],
+      mixedPartyCtx
+    );
+    run("applyActionEffects : liste mixte — improvement ET variable de partie touchées", true, hasImprovement(afterMixedParty.session.improvements, "flashlight") && afterMixedParty.session.variables.friendship.value === 1);
+
+    // applyEntityActionEffects (core/state.js) — bout en bout, CONFIRME la
+    // correction : improvements survit désormais au splice final (comme
+    // variables), alors que seul .variables était repris auparavant.
+    const IMPROVEMENT_ENTITY_REGISTRY = { npc: { label: "entity.npc" } };
+    const improvementWorld = parseLevel(
+      {
+        id: "movement-check-improvement-world",
+        titleKey: "level.demo.title",
+        length: 10,
+        playerStart: 0,
+        entities: [{ id: "unlocker", type: "npc", x: 5 }],
+      },
+      IMPROVEMENT_ENTITY_REGISTRY
+    );
+    let improvementSession = createInitialState(improvementWorld, 1, { companions: [] });
+    run("improvements : session neuve démarre sans AUCUNE improvement", 0, Object.keys(improvementSession.improvements).length);
+    improvementSession = applyEntityActionEffects(improvementSession, "unlocker", [{ type: "giveImprovement", id: "supernatural_perception" }]);
+    run(
+      "applyEntityActionEffects : giveImprovement — improvement réellement possédée après splice",
+      true,
+      hasImprovement(improvementSession.improvements, "supernatural_perception")
+    );
+
+    // Persistance : improvement réelle -> survit au save/reload (contraste
+    // avec le test DEBUG plus bas, jamais réellement possédée).
+    const improvementEnvelope = serializeGame(improvementSession);
+    const improvementReload = deserializeGame(improvementEnvelope);
+    run("improvements : save/load réussit", true, improvementReload.success);
+    if (improvementReload.success) {
+      run(
+        "improvements : possédée RÉELLEMENT -> survit au rechargement",
+        true,
+        hasImprovement(improvementReload.session.improvements, "supernatural_perception")
+      );
+    }
+
+    // DEBUG + sauvegarde : activer le debug fait passer TOUTES les gates,
+    // mais NE MODIFIE JAMAIS session.improvements — une partie sauvegardée
+    // en debug reste PROPRE, aucune improvement fictive n'y apparaît.
+    try {
+      let cleanSession = createInitialState(improvementWorld, 2, { companions: [] });
+      setDebugEnabled(true);
+      const debugPasses = evaluateCondition({ type: "hasImprovement", id: "supernatural_perception" }, { session: cleanSession });
+      run("improvements debug : la gate passe pendant le debug", true, debugPasses);
+      run("improvements debug : session.improvements JAMAIS modifiée par la simple LECTURE", 0, Object.keys(cleanSession.improvements).length);
+      const cleanEnvelope = serializeGame(cleanSession);
+      setDebugEnabled(false);
+      const cleanReload = deserializeGame(cleanEnvelope);
+      run("improvements debug : rechargement (debug coupé) réussit", true, cleanReload.success);
+      if (cleanReload.success) {
+        run(
+          "improvements debug : sauvegarde propre — AUCUNE improvement réellement possédée après reload",
+          0,
+          Object.keys(cleanReload.session.improvements).length
+        );
+        run(
+          "improvements debug : la gate échoue de nouveau (debug coupé, rien de réel)",
+          false,
+          evaluateCondition({ type: "hasImprovement", id: "supernatural_perception" }, { session: cleanReload.session })
+        );
+      }
+    } finally {
+      setDebugEnabled(false);
+    }
+
+    // Rebouchage d'une VIEILLE sauvegarde (voir core/save.js/migrateSave) —
+    // antérieure au mécanisme d'improvements, `improvements` absent du
+    // blob brut.
+    const oldSaveWithoutImprovements = { version: SAVE_VERSION, data: { ...improvementSession } };
+    delete oldSaveWithoutImprovements.data.improvements;
+    const oldSaveReload = deserializeGame(oldSaveWithoutImprovements);
+    run("improvements : vieille save sans le champ -> rechargement réussit", true, oldSaveReload.success);
+    if (oldSaveReload.success) {
+      run("improvements : vieille save rebouchée -> sac vide, jamais d'exception", 0, Object.keys(oldSaveReload.session.improvements).length);
+    }
+  }
+
   // --- Actions CONDITIONNELLES (core/level.js, action.condition/
-  // refusalKey ; voir view/interaction.js) — GÉNÉRIQUE à TOUT kind, testé
-  // ICI en FORME/VALIDATION seulement (au chargement) ; le blocage +
-  // l'annonce de refus à l'interaction sont côté vue, hors de portée d'un
-  // test terminal — voir "Vérifie (oreille)" pour ce volet.
+  // refusalEffects ; voir view/interaction.js) — GÉNÉRIQUE à TOUT kind,
+  // testé ICI en FORME/VALIDATION seulement (au chargement) ; le blocage +
+  // l'exécution des effets de refus à l'interaction sont côté vue, hors de
+  // portée d'un test terminal — voir "Vérifie (oreille)" pour ce volet.
 
   const ACTION_CONDITION_REGISTRY = { dog: { label: "entity.dog" } };
 
@@ -3691,7 +3944,11 @@ export function runMovementChecks() {
             id: "conditional-action-ok",
             type: "dog",
             x: 5,
-            action: { kind: "transit", condition: { type: "hasEquipmentTag", tag: "chic" }, refusalKey: "door.dresscode_refused" },
+            action: {
+              kind: "transit",
+              condition: { type: "hasEquipmentTag", tag: "chic" },
+              refusalEffects: [{ type: "announce", key: "door.dresscode_refused" }],
+            },
           },
         ],
       },
@@ -3702,11 +3959,11 @@ export function runMovementChecks() {
   } catch {
     validActionConditionAccepted = false;
   }
-  run("actions conditionnelles : condition + refusalKey valides -> chargé sans erreur", true, validActionConditionAccepted);
+  run("actions conditionnelles : condition + refusalEffects valides -> chargé sans erreur", true, validActionConditionAccepted);
   run(
-    "actions conditionnelles : condition/refusalKey transportées telles quelles sur l'entité",
+    "actions conditionnelles : condition/refusalEffects transportées telles quelles sur l'entité",
     "door.dresscode_refused",
-    parsedActionConditionEntity && parsedActionConditionEntity.action.refusalKey
+    parsedActionConditionEntity && parsedActionConditionEntity.action.refusalEffects[0].key
   );
 
   let unknownActionConditionTagThrew = false;
@@ -3722,7 +3979,11 @@ export function runMovementChecks() {
             id: "conditional-action-bad-tag",
             type: "dog",
             x: 5,
-            action: { kind: "transit", condition: { type: "hasEquipmentTag", tag: "does-not-exist" }, refusalKey: "door.dresscode_refused" },
+            action: {
+              kind: "transit",
+              condition: { type: "hasEquipmentTag", tag: "does-not-exist" },
+              refusalEffects: [{ type: "announce", key: "door.dresscode_refused" }],
+            },
           },
         ],
       },
@@ -3733,10 +3994,10 @@ export function runMovementChecks() {
   }
   run("actions conditionnelles : tag inconnu dans action.condition -> échec clair", true, unknownActionConditionTagThrew);
 
-  // Une condition SANS refusalKey laisserait l'action échouer en silence à
-  // l'interaction (voir header de parseEntity/action) : refusée dès le
-  // chargement, même sévérité qu'un tag inconnu.
-  let missingRefusalKeyThrew = false;
+  // Une condition SANS refusalEffects laisserait l'action échouer en
+  // silence à l'interaction (voir header de parseEntity/action) : refusée
+  // dès le chargement, même sévérité qu'un tag inconnu.
+  let missingRefusalEffectsThrew = false;
   try {
     parseLevel(
       {
@@ -3751,9 +4012,36 @@ export function runMovementChecks() {
       ACTION_CONDITION_REGISTRY
     );
   } catch {
-    missingRefusalKeyThrew = true;
+    missingRefusalEffectsThrew = true;
   }
-  run("actions conditionnelles : condition sans refusalKey -> échec clair", true, missingRefusalKeyThrew);
+  run("actions conditionnelles : condition sans refusalEffects -> échec clair", true, missingRefusalEffectsThrew);
+
+  // refusalEffects présent mais VIDE ([]) doit échouer comme absent : une
+  // condition sans AUCUN effet de refus resterait silencieuse à
+  // l'interaction, même sévérité.
+  let emptyRefusalEffectsThrew = false;
+  try {
+    parseLevel(
+      {
+        id: "movement-check-action-condition-empty-refusal",
+        titleKey: "level.demo.title",
+        length: 10,
+        playerStart: 0,
+        entities: [
+          {
+            id: "conditional-action-empty-refusal",
+            type: "dog",
+            x: 5,
+            action: { kind: "transit", condition: { type: "hasEquipmentTag", tag: "chic" }, refusalEffects: [] },
+          },
+        ],
+      },
+      ACTION_CONDITION_REGISTRY
+    );
+  } catch {
+    emptyRefusalEffectsThrew = true;
+  }
+  run("actions conditionnelles : refusalEffects vide -> échec clair", true, emptyRefusalEffectsThrew);
 
   // Rétrocompat : une action SANS condition (tout contenu existant) reste
   // inchangée, jamais bloquée implicitement par cette nouvelle validation.
@@ -4421,7 +4709,7 @@ export function runMovementChecks() {
       playerStart: 0,
       entities: [
         { id: "declared-1", type: "dog", x: 3 },
-        { id: "door-to-b", type: "door", x: 9, target: "movement-check-ephemeral-b" },
+        { id: "door-to-b", type: "door", x: 9 },
       ],
     },
     EPHEMERAL_REGISTRY
@@ -5458,6 +5746,30 @@ export function runMovementChecks() {
       applyActionEffects([{ type: "setVariable", scope: "entity", name: "doesNotExist", value: true }], effectsCtx).entity
     );
 
+    // ROUTAGE core/vue (voir core/effects.js) : une liste MIXTE état+rendu
+    // ne fait muter QUE l'état — playSound/announce (à charge de la vue,
+    // voir view/interaction.js/runEffects) traversent SANS EFFET, jamais une
+    // erreur, exactement comme un type totalement inconnu (voir plus haut).
+    const afterMixedNature = applyActionEffects(
+      [
+        { type: "playSound", path: "assets/sounds/effects/window_blinds_open" },
+        { type: "setVariable", scope: "entity", name: "isOpen", value: true },
+        { type: "announce", key: "entity.window.opened" },
+      ],
+      effectsCtx
+    );
+    run("applyActionEffects : liste état+rendu — état muté normalement", true, afterMixedNature.entity.variables.isOpen.value);
+
+    // ROUTAGE : "teleport" (effet MIXTE, voir core/effects.js) traverse
+    // applyActionEffects SANS EFFET — exécuté par la vue (view/city-screen.js/
+    // executeTeleport), jamais par le core, exactement comme playSound/
+    // announce.
+    run(
+      "applyActionEffects : teleport — ignoré (référence INCHANGÉE)",
+      effectsCtx.entity,
+      applyActionEffects([{ type: "teleport", target: "elsewhere" }], effectsCtx).entity
+    );
+
     // 4) Validation au CHARGEMENT (core/level.js) — PRÉSENT mais MALFORMÉ ->
     // erreur claire ; ABSENT -> défaut, jamais testé ici (déjà couvert par
     // le stockage seul, prompt précédent).
@@ -5577,6 +5889,145 @@ export function runMovementChecks() {
       expectThrows(() => parseLevel(levelWithActionEffect({ type: "bogusEffect", scope: "entity", name: "isOpen" }), VAR_ACTION_REGISTRY))
     );
 
+    // --- Effets de RENDU (playSound/announce, voir core/effects.js) —
+    // validés en FORME seulement ICI (comme sound/announceKey avant eux) :
+    // le core ignore leur SENS, la vue les exécute (hors de portée d'un
+    // test terminal, voir "Vérifie (oreille)").
+    const playSoundLevel = parseLevel(
+      levelWithActionEffect({ type: "playSound", path: "assets/sounds/effects/window_blinds_open", gain: 0.8, pitchVariation: 0.1, reverbSend: 0.2 }),
+      VAR_ACTION_REGISTRY
+    );
+    const parsedPlaySound = playSoundLevel.entities[0].action.effects[0];
+    run("playSound : forme valide -> chargé sans erreur, path transporté", "assets/sounds/effects/window_blinds_open", parsedPlaySound.path);
+    run("playSound : gain/pitchVariation/reverbSend transportés tels quels", true, parsedPlaySound.gain === 0.8 && parsedPlaySound.pitchVariation === 0.1 && parsedPlaySound.reverbSend === 0.2);
+    run(
+      "playSound : path manquant -> erreur au chargement",
+      true,
+      expectThrows(() => parseLevel(levelWithActionEffect({ type: "playSound" }), VAR_ACTION_REGISTRY))
+    );
+    run(
+      "playSound : gain non numérique -> erreur au chargement",
+      true,
+      expectThrows(() => parseLevel(levelWithActionEffect({ type: "playSound", path: "x", gain: "loud" }), VAR_ACTION_REGISTRY))
+    );
+
+    // PROVENANCE (at) / NATURE (nature) — voir view/interaction.js/
+    // resolvePlaySoundTarget/resolvePlaySoundNature pour la résolution des
+    // défauts (hors de portée d'un test core, pure vue) ; ici seulement la
+    // FORME transportée.
+    const playSoundPlacementLevel = parseLevel(
+      levelWithActionEffect({ type: "playSound", path: "x", at: "far-bell", nature: "meta" }),
+      VAR_ACTION_REGISTRY
+    );
+    const parsedPlaySoundPlacement = playSoundPlacementLevel.entities[0].action.effects[0];
+    run(
+      "playSound : at/nature valides -> transportés tels quels",
+      true,
+      parsedPlaySoundPlacement.at === "far-bell" && parsedPlaySoundPlacement.nature === "meta"
+    );
+    run(
+      "playSound : at vide -> erreur au chargement",
+      true,
+      expectThrows(() => parseLevel(levelWithActionEffect({ type: "playSound", path: "x", at: "" }), VAR_ACTION_REGISTRY))
+    );
+    run(
+      "playSound : nature inconnue -> erreur au chargement",
+      true,
+      expectThrows(() => parseLevel(levelWithActionEffect({ type: "playSound", path: "x", nature: "bogus" }), VAR_ACTION_REGISTRY))
+    );
+
+    const announceLevel = parseLevel(levelWithActionEffect({ type: "announce", key: "entity.window.opened", assertive: false }), VAR_ACTION_REGISTRY);
+    const parsedAnnounce = announceLevel.entities[0].action.effects[0];
+    run("announce : forme valide -> chargé sans erreur, key/assertive transportés", true, parsedAnnounce.key === "entity.window.opened" && parsedAnnounce.assertive === false);
+    run(
+      "announce : key manquante -> erreur au chargement",
+      true,
+      expectThrows(() => parseLevel(levelWithActionEffect({ type: "announce" }), VAR_ACTION_REGISTRY))
+    );
+    run(
+      "announce : assertive non booléen -> erreur au chargement",
+      true,
+      expectThrows(() => parseLevel(levelWithActionEffect({ type: "announce", key: "x", assertive: "oui" }), VAR_ACTION_REGISTRY))
+    );
+
+    // --- Effet MIXTE "teleport" (JOUEUR uniquement, voir core/effects.js)
+    // — validé en FORME ici comme playSound/announce ; l'EXÉCUTION (core/
+    // state.js/travelToWorld, placePlayer) est testée séparément plus bas.
+    const teleportLevel = parseLevel(
+      levelWithActionEffect({ type: "teleport", target: "elsewhere", x: 4, side: "verso", reloadIfSame: true, transition: "instant" }),
+      VAR_ACTION_REGISTRY
+    );
+    const parsedTeleport = teleportLevel.entities[0].action.effects[0];
+    run(
+      "teleport : forme complète valide -> tous les champs transportés tels quels",
+      true,
+      parsedTeleport.target === "elsewhere" &&
+        parsedTeleport.x === 4 &&
+        parsedTeleport.side === "verso" &&
+        parsedTeleport.reloadIfSame === true &&
+        parsedTeleport.transition === "instant"
+    );
+    const minimalTeleportLevel = parseLevel(levelWithActionEffect({ type: "teleport", target: "elsewhere" }), VAR_ACTION_REGISTRY);
+    run(
+      "teleport : target seul -> forme valide, aucun champ optionnel imposé",
+      "elsewhere",
+      minimalTeleportLevel.entities[0].action.effects[0].target
+    );
+    run(
+      "teleport : target manquant -> erreur au chargement",
+      true,
+      expectThrows(() => parseLevel(levelWithActionEffect({ type: "teleport" }), VAR_ACTION_REGISTRY))
+    );
+    run(
+      "teleport : x non numérique -> erreur au chargement",
+      true,
+      expectThrows(() => parseLevel(levelWithActionEffect({ type: "teleport", target: "x", x: "loin" }), VAR_ACTION_REGISTRY))
+    );
+    run(
+      "teleport : side inconnue -> erreur au chargement",
+      true,
+      expectThrows(() => parseLevel(levelWithActionEffect({ type: "teleport", target: "x", side: "milieu" }), VAR_ACTION_REGISTRY))
+    );
+    run(
+      "teleport : reloadIfSame non booléen -> erreur au chargement",
+      true,
+      expectThrows(() => parseLevel(levelWithActionEffect({ type: "teleport", target: "x", reloadIfSame: "oui" }), VAR_ACTION_REGISTRY))
+    );
+    run(
+      "teleport : transition inconnue -> erreur au chargement",
+      true,
+      expectThrows(() => parseLevel(levelWithActionEffect({ type: "teleport", target: "x", transition: "boom" }), VAR_ACTION_REGISTRY))
+    );
+
+    // Liste MIXTE (état + rendu) : le core la valide/transporte comme UN
+    // SEUL vocabulaire, jamais deux registres — voir core/effects.js.
+    const mixedRenderStateLevel = parseLevel(
+      {
+        id: "movement-check-mixed-render-state",
+        titleKey: "level.demo.title",
+        length: 10,
+        playerStart: 0,
+        entities: [
+          {
+            id: "e1",
+            type: "npc",
+            x: 5,
+            variables: [{ name: "isOpen", type: "flag", initial: false }],
+            action: {
+              kind: "applyEffects",
+              effects: [
+                { type: "playSound", path: "assets/sounds/effects/window_blinds_open" },
+                { type: "setVariable", scope: "entity", name: "isOpen", value: true },
+                { type: "announce", key: "entity.window.opened" },
+              ],
+            },
+          },
+        ],
+      },
+      VAR_ACTION_REGISTRY
+    );
+    run("effets mixtes : liste de 3 types différents chargée sans erreur", 3, mixedRenderStateLevel.entities[0].action.effects.length);
+
     run(
       "action : tableau vide -> erreur au chargement",
       true,
@@ -5588,7 +6039,7 @@ export function runMovementChecks() {
       )
     );
     run(
-      "action : candidate sans refusalKey malgré une condition -> erreur au chargement (RÉUTILISE la règle existante, par candidate)",
+      "action : candidate sans refusalEffects malgré une condition -> erreur au chargement (RÉUTILISE la règle existante, par candidate)",
       true,
       expectThrows(() =>
         parseLevel(
@@ -5646,18 +6097,22 @@ export function runMovementChecks() {
             {
               kind: "applyEffects",
               condition: { type: "variable", scope: "entity", name: "isOpen", equals: false },
-              refusalKey: "entity.window.refusal",
-              sound: "assets/sounds/effects/window_blinds_open",
-              announceKey: "entity.window.opened",
-              effects: [{ type: "setVariable", scope: "entity", name: "isOpen", value: true }],
+              refusalEffects: [{ type: "announce", key: "entity.window.refusal" }],
+              effects: [
+                { type: "playSound", path: "assets/sounds/effects/window_blinds_open" },
+                { type: "setVariable", scope: "entity", name: "isOpen", value: true },
+                { type: "announce", key: "entity.window.opened" },
+              ],
             },
             {
               kind: "applyEffects",
               condition: { type: "variable", scope: "entity", name: "isOpen", equals: true },
-              refusalKey: "entity.window.refusal",
-              sound: "assets/sounds/effects/window_blinds_close",
-              announceKey: "entity.window.closed",
-              effects: [{ type: "setVariable", scope: "entity", name: "isOpen", value: false }],
+              refusalEffects: [{ type: "announce", key: "entity.window.refusal" }],
+              effects: [
+                { type: "playSound", path: "assets/sounds/effects/window_blinds_close" },
+                { type: "setVariable", scope: "entity", name: "isOpen", value: false },
+                { type: "announce", key: "entity.window.closed" },
+              ],
             },
           ],
         },
@@ -5669,9 +6124,21 @@ export function runMovementChecks() {
 
     let windowSession = createInitialState(windowLevel, undefined, { companions: [] });
 
+    // announceKey a disparu comme champ spécial (voir core/effects.js,
+    // core/scripting.md/"Effets") : la confirmation parlée d'une candidate
+    // est maintenant l'effet "announce" de SA PROPRE liste `effects`.
+    function announceKeyOf(chosen) {
+      const effect = chosen.effects.find((e) => e.type === "announce");
+      return effect && effect.key;
+    }
+
     // Simule "activer l'entité" : sélectionne la candidate qui matche PUIS
     // applique ses effets — exactement le pipeline de
-    // view/interaction.js/interact() ("activate"), sans la vue.
+    // view/interaction.js/interact() ("activate"), sans la vue (le
+    // ROUTAGE se vérifie ICI : seul l'effet d'ÉTAT — setVariable — est
+    // passé à applyEntityActionEffects/applyActionEffects, playSound/
+    // announce y traversent déjà sans effet, voir plus haut — la VUE, elle,
+    // ne verrait que ces deux-là).
     function activateWindow(session) {
       const world = session.worlds[session.activeWorldId];
       const entity = world.entities.find((e) => e.id === "window-1");
@@ -5681,7 +6148,7 @@ export function runMovementChecks() {
     }
 
     const activation1 = activateWindow(windowSession);
-    run("fenêtre : 1ère activation — choisit la candidate OUVRIR", "entity.window.opened", activation1.chosen.announceKey);
+    run("fenêtre : 1ère activation — choisit la candidate OUVRIR", "entity.window.opened", announceKeyOf(activation1.chosen));
     run(
       "fenêtre : 1ère activation — isOpen devient true",
       true,
@@ -5690,7 +6157,7 @@ export function runMovementChecks() {
     windowSession = activation1.session;
 
     const activation2 = activateWindow(windowSession);
-    run("fenêtre : 2ème activation — choisit la candidate FERMER", "entity.window.closed", activation2.chosen.announceKey);
+    run("fenêtre : 2ème activation — choisit la candidate FERMER", "entity.window.closed", announceKeyOf(activation2.chosen));
     run(
       "fenêtre : 2ème activation — isOpen redevient false",
       false,
@@ -5699,7 +6166,7 @@ export function runMovementChecks() {
     windowSession = activation2.session;
 
     const activation3 = activateWindow(windowSession);
-    run("fenêtre : 3ème activation — alterne de nouveau vers OUVRIR", "entity.window.opened", activation3.chosen.announceKey);
+    run("fenêtre : 3ème activation — alterne de nouveau vers OUVRIR", "entity.window.opened", announceKeyOf(activation3.chosen));
     windowSession = activation3.session;
 
     // Persistance : isOpen VOLATILE ne survit pas au save/reload — repart
@@ -5751,6 +6218,338 @@ export function runMovementChecks() {
     const windowLeakFindings = [];
     auditNonSerializable(windowSession, "windowSession", new Set(), windowLeakFindings);
     run("fenêtre : sérialisation — aucune fuite de non-sérialisable", 0, windowLeakFindings.length);
+  }
+
+  // 9) TELEPORT — la porte n'est plus un cas spécial (voir core/level.js,
+  // entities/types/door.js) : deux confirmations structurelles demandées
+  // par la tâche, l'EXÉCUTION (view/city-screen.js/executeTeleport) restant
+  // hors de portée d'un test core (voir "Vérifie (oreille)").
+  {
+    // a) Actions multiples filtrées par condition, teleport vers des
+    // cibles DIFFÉRENTES — tombe GRATUITEMENT du mécanisme existant
+    // (core/presence.js/selectMatchingAction), aucun code dédié. Condition
+    // "variable" scope "entity" (même patron que la fenêtre plus haut) :
+    // une porte VIP dont la destination dépend d'un flag PROPRE à cette
+    // porte (ex. posé par un effet ailleurs dans la partie).
+    const CONDITIONAL_TELEPORT_REGISTRY = { door: { label: "entity.door" } };
+    const conditionalTeleportLevel = parseLevel(
+      {
+        id: "movement-check-conditional-teleport",
+        titleKey: "level.demo.title",
+        length: 10,
+        playerStart: 0,
+        entities: [
+          {
+            id: "fancy-door",
+            type: "door",
+            x: 5,
+            variables: [{ name: "vipUnlocked", type: "flag", initial: false }],
+            action: [
+              {
+                kind: "applyEffects",
+                condition: { type: "variable", scope: "entity", name: "vipUnlocked", equals: true },
+                refusalEffects: [{ type: "announce", key: "entity.door.description" }],
+                effects: [{ type: "teleport", target: "vip-lounge" }],
+              },
+              { kind: "applyEffects", effects: [{ type: "teleport", target: "main-hall" }] },
+            ],
+          },
+        ],
+      },
+      CONDITIONAL_TELEPORT_REGISTRY
+    );
+    const fancyDoor = conditionalTeleportLevel.entities[0];
+    const lockedChoice = selectMatchingAction(fancyDoor.action, { entity: fancyDoor });
+    run("teleport conditionnel : flag à false -> candidate catch-all, cible 'main-hall'", "main-hall", lockedChoice.effects[0].target);
+    const unlockedDoor = { ...fancyDoor, variables: { vipUnlocked: { ...fancyDoor.variables.vipUnlocked, value: true } } };
+    const unlockedChoice = selectMatchingAction(unlockedDoor.action, { entity: unlockedDoor });
+    run("teleport conditionnel : flag à true -> PREMIÈRE candidate, cible 'vip-lounge'", "vip-lounge", unlockedChoice.effects[0].target);
+
+    // b) teleport déclenché par une entité qui N'EST PAS une porte (trigger
+    // temporel, vigile...) — même vocabulaire, aucune restriction de type.
+    const NON_DOOR_TELEPORT_REGISTRY = { npc: { label: "entity.npc" } };
+    const nonDoorTeleportLevel = parseLevel(
+      {
+        id: "movement-check-non-door-teleport",
+        titleKey: "level.demo.title",
+        length: 10,
+        playerStart: 0,
+        entities: [
+          {
+            id: "closing-time-guard",
+            type: "npc",
+            x: 5,
+            action: { kind: "applyEffects", effects: [{ type: "teleport", target: "demo", x: 2, transition: "instant" }] },
+          },
+        ],
+      },
+      NON_DOOR_TELEPORT_REGISTRY
+    );
+    run(
+      "teleport hors porte : un NPC porte un teleport valide -> chargé sans erreur",
+      "teleport",
+      nonDoorTeleportLevel.entities[0].action.effects[0].type
+    );
+  }
+
+  // 10) ANGLE MORT comblé — CONTEXTE D'ACTION complet (voir audit de santé,
+  // Finding 1 : view/interaction.js/actionContext ne portait PAS `session`,
+  // laissant hasImprovement/weather/perceptionActive/variable scope
+  // "scene"/"party" STRUCTURELLEMENT toujours fausses sur `action.condition`
+  // hors mode debug — jamais couvert avant cet audit, qui n'avait testé ces
+  // conditions QUE via presence[].when). Ce fichier reste headless (voir
+  // header) : il ne peut PAS importer view/interaction.js (Howler/DOM en
+  // cascade) pour appeler le VRAI actionContext — il reconstruit ici, à la
+  // main, EXACTEMENT la forme que actionContext produit désormais (même
+  // dérivation, reprise au mot près : perceptionActive/weather/world lus
+  // depuis la session, comme core/reduce.js/presenceContext), et vérifie que
+  // evaluateCondition (le SEUL évaluateur, partagé avec presence[].when) s'y
+  // comporte enfin comme sur presence[].when — DANS LES DEUX SENS (fausse
+  // PUIS vraie), pour ne pas juste remplacer un "toujours faux" par un
+  // "toujours vrai" sans le prouver. Le câblage RÉEL de la vue (le provider,
+  // city-screen.js) reste hors de portée d'un test core, à vérifier à
+  // l'oreille (voir CLAUDE.md, "Vérifie (oreille)").
+  {
+    const ANGLE_MORT_REGISTRY = { door: { label: "entity.door" } };
+    const angleMortLevel = parseLevel(
+      {
+        id: "movement-check-action-context",
+        titleKey: "level.demo.title",
+        length: 10,
+        playerStart: 0,
+        variables: [{ name: "doorUnlocked", type: "flag", initial: false }],
+        entities: [{ id: "gated-door", type: "door", x: 5 }],
+      },
+      ANGLE_MORT_REGISTRY
+    );
+    const angleMortSession = createInitialState(angleMortLevel, "action-context-check", {
+      companions: [],
+      partyVariables: [{ name: "questDone", type: "flag", initial: false }],
+    });
+    const doorEntity = angleMortSession.worlds[angleMortLevel.id].entities[0];
+
+    // Forme EXACTE produite par view/interaction.js/actionContext(entity)
+    // depuis ce correctif — voir header de ce bloc.
+    function buildActionContextLike(session, entity) {
+      return {
+        entity,
+        playerEquipment: session.equipment,
+        time: session.time,
+        perceptionActive: session.perceptionActive,
+        weather: session.weather.state,
+        world: session.worlds[session.activeWorldId],
+        session,
+      };
+    }
+
+    const withFlashlight = applyActionEffects([{ type: "giveImprovement", id: "flashlight" }], { session: angleMortSession }).session;
+    run(
+      "action.condition (contexte réel) : hasImprovement fausse sans l'amélioration",
+      false,
+      evaluateCondition({ type: "hasImprovement", id: "flashlight" }, buildActionContextLike(angleMortSession, doorEntity))
+    );
+    run(
+      "action.condition (contexte réel) : hasImprovement vraie une fois possédée — angle mort comblé",
+      true,
+      evaluateCondition({ type: "hasImprovement", id: "flashlight" }, buildActionContextLike(withFlashlight, doorEntity))
+    );
+
+    const rainySession = setWeather(angleMortSession, "rain");
+    run(
+      "action.condition (contexte réel) : weather fausse hors de l'état demandé",
+      false,
+      evaluateCondition({ type: "weather", state: "rain" }, buildActionContextLike(angleMortSession, doorEntity))
+    );
+    run(
+      "action.condition (contexte réel) : weather vraie dans l'état demandé — angle mort comblé",
+      true,
+      evaluateCondition({ type: "weather", state: "rain" }, buildActionContextLike(rainySession, doorEntity))
+    );
+
+    const perceivingSession = togglePerception(angleMortSession);
+    run(
+      "action.condition (contexte réel) : perceptionActive fausse par défaut",
+      false,
+      evaluateCondition({ type: "perceptionActive" }, buildActionContextLike(angleMortSession, doorEntity))
+    );
+    run(
+      "action.condition (contexte réel) : perceptionActive vraie une fois activée — angle mort comblé",
+      true,
+      evaluateCondition({ type: "perceptionActive" }, buildActionContextLike(perceivingSession, doorEntity))
+    );
+
+    const unlockedWorld = setVariable({ world: angleMortSession.worlds[angleMortLevel.id] }, "scene", "doorUnlocked", true);
+    const unlockedSession = { ...angleMortSession, worlds: { ...angleMortSession.worlds, [angleMortLevel.id]: unlockedWorld } };
+    run(
+      "action.condition (contexte réel) : variable scope scene fausse avant setVariable",
+      false,
+      evaluateCondition({ type: "variable", scope: "scene", name: "doorUnlocked", equals: true }, buildActionContextLike(angleMortSession, doorEntity))
+    );
+    run(
+      "action.condition (contexte réel) : variable scope scene vraie après setVariable — angle mort comblé",
+      true,
+      evaluateCondition({ type: "variable", scope: "scene", name: "doorUnlocked", equals: true }, buildActionContextLike(unlockedSession, doorEntity))
+    );
+
+    const questDoneSession = applyActionEffects(
+      [{ type: "setVariable", scope: "party", name: "questDone", value: true }],
+      { session: angleMortSession }
+    ).session;
+    run(
+      "action.condition (contexte réel) : variable scope party fausse avant setVariable",
+      false,
+      evaluateCondition({ type: "variable", scope: "party", name: "questDone", equals: true }, buildActionContextLike(angleMortSession, doorEntity))
+    );
+    run(
+      "action.condition (contexte réel) : variable scope party vraie après setVariable — angle mort comblé",
+      true,
+      evaluateCondition({ type: "variable", scope: "party", name: "questDone", equals: true }, buildActionContextLike(questDoneSession, doorEntity))
+    );
+  }
+
+  // 11) Chaînage défensif de giveImprovement/removeImprovement (voir audit
+  // de santé, point de consolidation modéré ; core/variables.js/
+  // applyActionEffects) : un contexte SANS `session` (incomplet — même genre
+  // de trou que le point 10 ci-dessus, mais côté ÉCRITURE plutôt que
+  // lecture) doit dégrader en NO-OP PROPRE, jamais lever une exception,
+  // exactement comme setVariable/toggleVariable/addVariable le font déjà
+  // via carrierForScope.
+  {
+    const contextWithoutSession = { entity: {} };
+    let gaveThrew = false;
+    let afterGive = contextWithoutSession;
+    try {
+      afterGive = applyActionEffects([{ type: "giveImprovement", id: "flashlight" }], contextWithoutSession);
+    } catch {
+      gaveThrew = true;
+    }
+    run("applyActionEffects : giveImprovement sur contexte sans session -> ne lève pas", false, gaveThrew);
+    run("applyActionEffects : giveImprovement sur contexte sans session -> contexte inchangé", contextWithoutSession, afterGive);
+
+    let removeThrew = false;
+    let afterRemove = contextWithoutSession;
+    try {
+      afterRemove = applyActionEffects([{ type: "removeImprovement", id: "flashlight" }], contextWithoutSession);
+    } catch {
+      removeThrew = true;
+    }
+    run("applyActionEffects : removeImprovement sur contexte sans session -> ne lève pas", false, removeThrew);
+    run("applyActionEffects : removeImprovement sur contexte sans session -> contexte inchangé", contextWithoutSession, afterRemove);
+  }
+
+  // 12) PANIER PLEIN — comble le trou de couverture identifié par l'audit de
+  // santé (Finding 4) : chaque système récent a son propre round-trip
+  // serializeGame/deserializeGame DÉDIÉ et rigoureux (variables, improvements,
+  // weather, recto/verso — voir plus haut), mais aucun ne les exerce TOUS À
+  // LA FOIS. Une vraie partie peut pourtant les cumuler : amélioration
+  // possédée + météo non-défaut + joueur sur le VERSO + variables des 3
+  // portées (entité/scène/partie) + compagnon + argent/sac/équipement, en
+  // même temps. Round-trip RÉEL (serializeGame/deserializeGame, pas un
+  // JSON.stringify brut) + audit générique de fuite (auditNonSerializable)
+  // + diff structurel sur cette composition.
+  {
+    const PANIER_PLEIN_REGISTRY = { dog: { label: "entity.dog" } };
+    const panierPleinLevel = parseLevel(
+      {
+        id: "movement-check-panier-plein",
+        titleKey: "level.demo.title",
+        length: 12,
+        playerStart: 2,
+        variables: [{ name: "sceneFlag", type: "flag", initial: false }],
+        recto: { entities: [{ id: "recto-dog", type: "dog", x: 3, variables: [{ name: "metOnce", type: "flag", initial: false }] }] },
+        verso: { entities: [{ id: "verso-dog", type: "dog", x: 7 }] },
+      },
+      PANIER_PLEIN_REGISTRY
+    );
+
+    const panierCompanion = {
+      id: "panier-companion",
+      type: "dog",
+      x: 1,
+      behavior: { kind: "follow", targetId: "player", minDistance: 1, maxDistance: 3 },
+    };
+    let panierSession = createInitialState(panierPleinLevel, "panier-plein", {
+      companions: [panierCompanion],
+      partyVariables: [{ name: "partyFlag", type: "flag", initial: false }],
+    });
+
+    // Cumule TOUT à la fois — chaque étape réutilise une primitive DÉJÀ
+    // testée isolément plus haut, jamais réinventée ici.
+    panierSession = addMoney(panierSession, 25);
+    panierSession = addItem(panierSession, "apple", 2);
+    panierSession = setWeather(panierSession, "rain");
+    panierSession = togglePerception(panierSession);
+    panierSession = switchSide(panierSession, 4);
+    panierSession = applyActionEffects([{ type: "giveImprovement", id: "supernatural_perception" }], { session: panierSession }).session;
+    panierSession = applyActionEffects(
+      [{ type: "setVariable", scope: "party", name: "partyFlag", value: true }],
+      { session: panierSession }
+    ).session;
+
+    let panierWorld = setVariable({ world: panierSession.worlds[panierPleinLevel.id] }, "scene", "sceneFlag", true);
+    const rectoDog = setVariable({ entity: panierWorld.recto.entities[0] }, "entity", "metOnce", true);
+    panierWorld = { ...panierWorld, recto: { ...panierWorld.recto, entities: [rectoDog] } };
+    panierSession = { ...panierSession, worlds: { ...panierSession.worlds, [panierPleinLevel.id]: panierWorld } };
+
+    for (let i = 0; i < 5; i++) panierSession = reduce(panierSession, tick(1));
+
+    const panierLeakFindings = [];
+    auditNonSerializable(panierSession, "panierPleinSession", new Set(), panierLeakFindings);
+    if (panierLeakFindings.length > 0) {
+      console.warn("Panier plein : fuites détectées —", panierLeakFindings);
+    }
+    run("panier plein : aucune fuite de non-sérialisable (tous systèmes cumulés)", 0, panierLeakFindings.length);
+
+    const panierEnvelope = serializeGame(panierSession);
+    const panierReload = deserializeGame(panierEnvelope);
+    run("panier plein : save/load réussit", true, panierReload.success);
+    if (panierReload.success) {
+      const revived = panierReload.session;
+      run("panier plein : argent survit", 25, revived.money);
+      run("panier plein : sac survit", JSON.stringify(panierSession.bag), JSON.stringify(revived.bag));
+      run("panier plein : météo (état) survit", "rain", revived.weather.state);
+      run("panier plein : perception surnaturelle survit", true, revived.perceptionActive);
+      run("panier plein : côté du joueur (verso) survit", "verso", revived.player.side);
+      run("panier plein : amélioration possédée survit", true, hasImprovement(revived.improvements, "supernatural_perception"));
+      run("panier plein : variable de PARTIE survit", true, revived.variables.partyFlag.value);
+      run("panier plein : variable de SCÈNE survit", true, revived.worlds[panierPleinLevel.id].variables.sceneFlag.value);
+      run(
+        "panier plein : variable d'ENTITÉ (recto) survit",
+        true,
+        revived.worlds[panierPleinLevel.id].recto.entities.find((e) => e.id === "recto-dog").variables.metOnce.value
+      );
+      run("panier plein : verso toujours présent après rechargement", "verso-dog", revived.worlds[panierPleinLevel.id].verso.entities[0].id);
+      run(
+        "panier plein : compagnon reparu avec son comportement intact",
+        JSON.stringify(panierCompanion.behavior),
+        JSON.stringify(revived.companions.find((c) => c.id === "panier-companion").behavior)
+      );
+
+      // Divergence structurelle précise (voir diffStructure plus haut) sur
+      // la composition ENTIÈRE — pas seulement les champs vérifiés un par un
+      // ci-dessus. Toutes les variables posées ici sont PERSISTANTES (défaut
+      // de parseVariables) : round-trip JSON direct == round-trip par
+      // enveloppe, aucune divergence attendue.
+      const panierRoundTripped = JSON.parse(JSON.stringify(panierSession));
+      const panierDiffs = [];
+      diffStructure(panierSession, panierRoundTripped, "panierPleinSession", panierDiffs);
+      if (panierDiffs.length > 0) {
+        console.warn("Panier plein : divergences structurelles —", panierDiffs);
+      }
+      run("panier plein : structure identique après round-trip JSON direct", 0, panierDiffs.length);
+
+      // La partie reparse doit rester simulable (comme les autres blocs de
+      // sérialisation plus haut) — quelques ticks sur les deux faces + le
+      // compagnon.
+      let revivedPlayable = revived;
+      let revivalThrew = false;
+      try {
+        for (let i = 0; i < 5; i++) revivedPlayable = reduce(revivedPlayable, tick(1));
+      } catch {
+        revivalThrew = true;
+      }
+      run("panier plein : la partie reparse reste jouable (aucune erreur)", false, revivalThrew);
+    }
   }
 
   console.log(`Récapitulatif : ${passed} réussis / ${total} total`);

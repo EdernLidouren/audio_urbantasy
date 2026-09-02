@@ -57,6 +57,8 @@ import { equippedTags } from "./equipment.js";
 import { temporalThresholdOffset } from "./temporal-spread.js";
 import { TIME_CONFIG } from "../config/time-values.js";
 import { getVariable } from "./variables.js";
+import { hasImprovement } from "./improvements.js";
+import { isDebugEnabled } from "../config/debug.js";
 
 // Valeur numérique importée directement (voir CLAUDE.md/"Réglages en
 // cascade" : le core peut lire une valeur de config, jamais un registre de
@@ -182,6 +184,30 @@ function evaluateHasEquipmentTag(cond, context) {
   return Boolean(equipment && equippedTags(equipment).has(cond.tag));
 }
 
+// "hasImprovement" : vraie si le joueur possède l'AMÉLIORATION `cond.id`
+// (voir core/improvements.js/IMPROVEMENT_REGISTRY, session.improvements).
+// Lit `context.session.improvements` — MÊME clé que la portée "party" d'une
+// condition "variable" (voir SCOPE_CONTEXT_KEYS, core/variables.js) : une
+// improvement est cercle PARTIE comme une variable de partie, jamais un
+// second mécanisme de contexte. Contexte sans `session` (ex. hors tick, une
+// action sans provider câblé) -> `context.session` vaut `undefined` ->
+// `hasImprovement` replie sur `false`, même politique défensive que le
+// reste de ce fichier.
+//
+// COURT-CIRCUIT DEBUG (config/debug.js/isDebugEnabled) : en mode debug,
+// cette RÉSOLUTION répond TOUJOURS vrai, SANS même consulter
+// `context.session` — l'état RÉEL (session.improvements) n'est ni lu ni
+// modifié, le joueur ne possède réellement RIEN de plus. Couper le debug
+// fait retomber INSTANTANÉMENT sur l'état réel au prochain appel (aucune
+// trace laissée, aucune écriture jamais eu lieu) : un court-circuit sur la
+// LECTURE seule, jamais sur l'ÉCRITURE — giveImprovement/removeImprovement
+// (core/variables.js/applyActionEffects) ignorent totalement ce drapeau,
+// l'effet réel d'un giveImprovement n'est jamais court-circuité.
+function evaluateHasImprovement(cond, context) {
+  if (isDebugEnabled()) return true;
+  return hasImprovement(context.session && context.session.improvements, cond.id);
+}
+
 // "perceptionActive" : vraie si la PERCEPTION SURNATURELLE (voir
 // core/state.js/togglePerception, session.perceptionActive) est actuellement
 // active. Sans champ propre — comme "arrived"/"consumed" — elle lit
@@ -266,6 +292,7 @@ const CONDITION_EVALUATORS = {
   arrived: evaluateArrived,
   consumed: evaluateConsumed,
   hasEquipmentTag: evaluateHasEquipmentTag,
+  hasImprovement: evaluateHasImprovement,
   perceptionActive: evaluatePerceptionActive,
   weather: evaluateWeather,
   allOf: evaluateAllOf,
