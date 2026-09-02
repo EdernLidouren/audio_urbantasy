@@ -14,7 +14,7 @@
 import { DEFAULT_SURFACE } from "./surfaces.js";
 import { INITIAL_TIME } from "./time.js";
 import { createEmptyEquipment } from "./equipment.js";
-import { stripEphemeralsFromWorld } from "./state.js";
+import { stripEphemeralsFromWorld, isTwoSided } from "./state.js";
 import { createInitialWeather } from "./weather.js";
 
 export const SAVE_VERSION = 1;
@@ -41,8 +41,106 @@ function stripEphemeralEntities(session) {
   return anyChanged ? { ...session, worlds } : session;
 }
 
+// PERSISTANCE SÉLECTIVE des variables (voir core/variables.js/CLAUDE.md) :
+// une variable VOLATILE (persistent: false) ne doit jamais transporter sa
+// valeur RÉELLE au disque — sa valeur EST REPLACÉE par sa valeur INITIALE
+// déclarée avant sérialisation (jamais la clé elle-même retirée : voir
+// note ci-dessous). Une variable PERSISTANTE traverse INCHANGÉE.
+//
+// Note d'implémentation, pour qui s'attendrait à voir la clé disparaître
+// purement et simplement : `deserializeGame` ne REPASSE JAMAIS par
+// parseLevel/parseEntity (voir migrateSave plus bas, qui travaille
+// uniquement sur le blob déjà sauvé) — il n'a donc AUCUN accès à la
+// déclaration d'origine (type/valeur initiale) d'une variable une fois son
+// contenu retiré. Remplacer la valeur PAR l'initiale ICI, à l'écriture,
+// est le seul moyen pour qu'une relecture retrouve "sa valeur initiale
+// déclarée" sans réinventer un mécanisme de reconstruction séparé au
+// chargement : ce qui atterrit sur le disque pour une volatile EST déjà
+// son état "comme neuve", la CHARGER ne fait alors que la lire telle
+// quelle, exactement comme une variable qui n'aurait jamais changé.
+// Référence INCHANGÉE si rien à réinitialiser, même politique que le reste
+// de ce fichier (stripEphemeralEntities/backfillFace).
+function resetVolatileInBag(variables) {
+  if (!variables) return variables;
+  let changed = false;
+  const reset = {};
+  for (const [name, variable] of Object.entries(variables)) {
+    if (variable.persistent || Object.is(variable.value, variable.initial)) {
+      reset[name] = variable;
+    } else {
+      changed = true;
+      reset[name] = { ...variable, value: variable.initial };
+    }
+  }
+  return changed ? reset : variables;
+}
+
+// Applique resetVolatileInBag à UNE face (ses entités, portée "entity") ET
+// à elle-même si elle porte le sac PARTAGÉ de portée "scene" (voir
+// core/level.js/parseLevel — le sac de scène vit à la racine du MONDE,
+// jamais par face ; `world` est passé ici pour une scène SIMPLE, où la face
+// EST le monde). `world` : objet distinct de `face` UNIQUEMENT pour une
+// scène à deux faces (voir resetVolatileVariablesInWorld) — pour une scène
+// simple, les deux sont LE MÊME objet, le sac de scène n'est donc réinitialisé
+// qu'une fois.
+function resetVolatileInFaceEntities(face) {
+  const entities = face.entities.map((entity) => {
+    const variables = resetVolatileInBag(entity.variables);
+    return variables === entity.variables ? entity : { ...entity, variables };
+  });
+  return entities.every((entity, i) => entity === face.entities[i]) ? face : { ...face, entities };
+}
+
+// Un monde ENTIER (portée "scene" à sa racine, portée "entity" par face) —
+// SIMPLE ou À DEUX FACES, même distinction que backfillWorld plus bas.
+function resetVolatileVariablesInWorld(world) {
+  const sceneVariables = resetVolatileInBag(world.variables);
+  let patched = sceneVariables === world.variables ? world : { ...world, variables: sceneVariables };
+
+  if (isTwoSided(patched)) {
+    const recto = resetVolatileInFaceEntities(patched.recto);
+    const verso = resetVolatileInFaceEntities(patched.verso);
+    if (recto === patched.recto && verso === patched.verso) return patched;
+    return { ...patched, recto, verso };
+  }
+  return resetVolatileInFaceEntities(patched);
+}
+
+// Toute la SESSION : variables de partie (racine), de chaque monde (tous,
+// pas seulement l'actif — un lieu rangé garde ses propres variables) et de
+// chaque compagnon (même statut d'entité qu'un habitant de lieu, voir
+// core/state.js/header — aucun n'en déclare aujourd'hui, mais le mécanisme
+// reste correct par construction plutôt que supposé toujours vide).
+function resetVolatileVariablesInSession(session) {
+  const partyVariables = resetVolatileInBag(session.variables);
+
+  const worlds = {};
+  let worldsChanged = false;
+  for (const [id, world] of Object.entries(session.worlds)) {
+    const patched = resetVolatileVariablesInWorld(world);
+    worlds[id] = patched;
+    if (patched !== world) worldsChanged = true;
+  }
+
+  const companions = session.companions.map((companion) => {
+    const variables = resetVolatileInBag(companion.variables);
+    return variables === companion.variables ? companion : { ...companion, variables };
+  });
+  const companionsChanged = companions.some((c, i) => c !== session.companions[i]);
+
+  if (partyVariables === session.variables && !worldsChanged && !companionsChanged) return session;
+  return {
+    ...session,
+    variables: partyVariables,
+    worlds: worldsChanged ? worlds : session.worlds,
+    companions: companionsChanged ? companions : session.companions,
+  };
+}
+
 export function serializeGame(session) {
-  return { version: SAVE_VERSION, data: stripEphemeralEntities(session) };
+  const withoutEphemerals = stripEphemeralEntities(session);
+  const withResetVolatiles = resetVolatileVariablesInSession(withoutEphemerals);
+  return { version: SAVE_VERSION, data: withResetVolatiles };
 }
 
 // Rebouche UNE FACE antérieure à defaultSurface/segments (voir
@@ -95,7 +193,21 @@ function backfillFace(face) {
 // antérieure au modèle à deux faces n'en déclare — ce cas ne concerne donc
 // aujourd'hui que des saves ÉCRITES avec ce modèle, mais reste correct par
 // construction plutôt que supposé toujours complet.
-function backfillWorld(world) {
+// variables (portée "scene", voir core/level.js/parseLevel/core/variables.js)
+// : RACINE PARTAGÉE du monde, jamais par face (contrairement à
+// defaultSurface/segments/indoor ci-dessus) — rebouchée ICI, avant la
+// distinction simple/deux-faces, pour n'être backfillée qu'UNE fois même
+// pour un monde à deux faces. Absente d'une sauvegarde antérieure à ce
+// mécanisme -> sac vide `{}`, même politique que defaultSurface/indoor
+// (backfillFace) : une scène ancienne sans variable déclarée se comporte
+// exactement comme une scène neuve qui n'en déclare pas.
+function backfillWorldVariables(world) {
+  if (!world || typeof world !== "object" || world.variables !== undefined) return world;
+  return { ...world, variables: {} };
+}
+
+function backfillWorld(rawWorld) {
+  const world = backfillWorldVariables(rawWorld);
   if (!world || typeof world !== "object") return world;
   if (world.recto !== undefined && world.verso !== undefined) {
     const recto = backfillFace(world.recto);
@@ -112,9 +224,10 @@ function backfillWorld(world) {
 // core/time.js — absent d'une sauvegarde antérieure à l'horloge de partie),
 // de `money` (voir core/money.js — même précédent), de `bag` (voir
 // core/bag.js — même précédent), de `equipment` (voir core/equipment.js —
-// même précédent, mais rebouché VIDE, jamais avec un objet par défaut) et,
-// par monde, de defaultSurface/segments (voir backfillWorld) — absents
-// d'une sauvegarde antérieure à leur introduction, sans que ça
+// même précédent, mais rebouché VIDE, jamais avec un objet par défaut), de
+// `variables` (portée "party", voir core/variables.js) et, par monde, de
+// defaultSurface/segments/variables (portée "scene", voir backfillWorld) —
+// absents d'une sauvegarde antérieure à leur introduction, sans que ça
 // justifie une montée de version (la forme reste v1, juste complétée par
 // des défauts sûrs). Point d'ancrage documenté pour de futures montées
 // (v1 -> v2 -> ... -> courante, jamais en sautant une étape, même principe
@@ -179,6 +292,13 @@ function migrateSave(raw) {
   // seed de partie accessible à réutiliser.
   if (!data.weather || typeof data.weather !== "object" || typeof data.weather.state !== "string") {
     data = { ...data, weather: createInitialWeather("migrated", data.time) };
+  }
+
+  // variables (portée "party", voir core/state.js/createInitialState,
+  // core/variables.js) : absent d'une sauvegarde antérieure à ce mécanisme
+  // -> sac vide `{}`, même politique que perceptionActive/weather ci-dessus.
+  if (!data.variables || typeof data.variables !== "object") {
+    data = { ...data, variables: {} };
   }
 
   if (data.worlds && typeof data.worlds === "object") {

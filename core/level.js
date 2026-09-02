@@ -19,6 +19,7 @@ import { SURFACE_REGISTRY, DEFAULT_SURFACE } from "./surfaces.js";
 import { CONDITION_TYPES } from "./presence.js";
 import { TAG_REGISTRY } from "./tags.js";
 import { WEATHER_STATES } from "../config/weather-values.js";
+import { parseVariables, VARIABLE_SCOPES, isValidValueForType } from "./variables.js";
 
 function fail(message) {
   throw new Error(`parseLevel: ${message}`);
@@ -51,17 +52,22 @@ function isFiniteNumber(value) {
 // comme CONDITION_TYPES (voir core/presence.js, header) : un effet a une
 // validation propre à son type — une simple chaîne booléenne pour
 // "presence", une sous-validation complète de comportement pour
-// "behavior" — qu'un registre de noms ne suffirait pas à couvrir. Ajouter
-// un effet demain = ajouter un cas ici, même esprit que les conditions,
-// juste pas la même mécanique.
-function parseEffect(rawEffect, effectIndex, ruleIndex, index, id) {
+// "behavior" — qu'un registre de noms ne suffirait pas à couvrir. `describe`
+// : préfixe du message d'erreur fourni par l'appelant (même patron que
+// validateCondition plus bas) — ce SEUL aiguillage sert `presence[].effects`
+// (voir parsePresenceRule) ; les effets d'ÉCRITURE de variable
+// (setVariable/toggleVariable/addVariable, déclenchés à l'ACTIVATION d'une
+// action, jamais au TICK) vivent dans un aiguillage VOISIN mais DISTINCT,
+// voir parseActionEffect plus bas — deux natures d'effet différentes,
+// jamais mélangées dans le même registre.
+function parseEffect(rawEffect, describe, index, id) {
   if (typeof rawEffect !== "object" || rawEffect === null) {
-    fail(`entities[${index}] ("${id}") : presence[${ruleIndex}].effects[${effectIndex}] n'est pas un objet.`);
+    fail(`${describe} n'est pas un objet.`);
   }
   const { type } = rawEffect;
   if (type === "presence") {
     if (typeof rawEffect.present !== "boolean") {
-      fail(`entities[${index}] ("${id}") : presence[${ruleIndex}].effects[${effectIndex}].present doit être un booléen.`);
+      fail(`${describe}.present doit être un booléen.`);
     }
     return { type: "presence", present: rawEffect.present };
   }
@@ -81,8 +87,103 @@ function parseEffect(rawEffect, effectIndex, ruleIndex, index, id) {
     }
     return { type: "behavior", behavior: parseBehavior(rawEffect.behavior, index, id) };
   }
-  fail(`entities[${index}] ("${id}") : presence[${ruleIndex}].effects[${effectIndex}].type "${type}" inconnu.`);
+  fail(`${describe}.type "${type}" inconnu (attendu : "presence" | "behavior").`);
 }
+
+// Le TYPE connu d'une variable référencée par sa portée + son nom — undefined
+// si non vérifiable ICI (portée "party", voir validateVariableReference) ou
+// si le nom n'existe pas dans le sac déjà résolu de sa portée.
+function resolveKnownVariableType(scope, name, entityVariables, sceneVariables) {
+  if (scope === "entity") return entityVariables?.[name]?.type;
+  if (scope === "scene") return sceneVariables?.[name]?.type;
+  return undefined;
+}
+
+// Valide qu'une référence de variable (condition "variable", effets
+// setVariable/toggleVariable/addVariable — voir core/variables.js) porte
+// une PORTÉE connue, un NOM non vide, et — SEULEMENT quand c'est vérifiable
+// au chargement — une EXISTENCE réelle sur le sac déjà résolu de sa portée :
+//   - "entity" : contre `entityVariables`, LE SAC DE CETTE ENTITÉ (parseEntity
+//     résout `entity.variables` AVANT tout ce qui peut le référencer — voir
+//     son ordre de parsing) — une référence à une variable jamais déclarée
+//     sur CETTE entité échoue clairement, exactement comme un tag inconnu
+//     (voir hasEquipmentTag ci-dessus).
+//   - "scene" : contre `sceneVariables`, LE SAC DE LA SCÈNE (racine du
+//     niveau, résolu par parseLevel AVANT tout parseFace/parseEntity — voir
+//     son ordre d'appel) — même exigence.
+//   - "party" : AUCUNE vérification d'existence possible ICI — les
+//     déclarations de partie n'existent qu'à createInitialState
+//     (core/state.js), hors de portée d'un parseLevel qui ne connaît qu'UN
+//     niveau à la fois. LIMITE CONNUE, documentée (voir
+//     core/scripting.md/"Variables") plutôt que silencieusement ignorée :
+//     une variable de partie mal orthographiée dans une condition/un effet
+//     ne sera détectée qu'à l'ÉVALUATION (repli sur false/no-op, voir
+//     core/presence.js/core/variables.js), jamais au chargement du niveau.
+function validateVariableReference(scope, name, entityVariables, sceneVariables, describe) {
+  if (!VARIABLE_SCOPES.includes(scope)) {
+    fail(`${describe}.scope "${scope}" inconnu (attendu : ${VARIABLE_SCOPES.join(" | ")}).`);
+  }
+  if (!isNonEmptyString(name)) {
+    fail(`${describe}.name manquant ou invalide.`);
+  }
+  if (scope === "entity" && (!entityVariables || entityVariables[name] === undefined)) {
+    fail(`${describe} référence la variable "${name}" (portée "entity"), jamais déclarée sur cette entité.`);
+  }
+  if (scope === "scene" && (!sceneVariables || sceneVariables[name] === undefined)) {
+    fail(`${describe} référence la variable "${name}" (portée "scene"), jamais déclarée sur cette scène.`);
+  }
+}
+
+// Un effet D'ÉCRITURE déclenché à l'ACTIVATION d'une action (voir
+// core/variables.js/applyActionEffects, view/interaction.js, core/scripting.md/
+// "Effets d'action") — AIGUILLAGE DISTINCT de parseEffect ci-dessus
+// (presence/behavior, appliqués au TICK) : ces effets n'ont de sens qu'au
+// moment d'une interaction ponctuelle, jamais réévalués en continu, jamais
+// mélangés dans le même registre. Même esprit d'extensibilité (un cas de
+// plus par type) et même validation de RÉFÉRENCE que la condition
+// "variable" (voir validateVariableReference/resolveKnownVariableType) :
+// scope/name existants, opération cohérente avec le TYPE réel de la
+// variable quand il est connu (toggle sur un "flag", add sur un "int" —
+// jamais l'inverse).
+function parseActionEffect(rawEffect, describe, entityVariables, sceneVariables) {
+  if (typeof rawEffect !== "object" || rawEffect === null) {
+    fail(`${describe} n'est pas un objet.`);
+  }
+  const { type, scope, name } = rawEffect;
+  if (type === "setVariable") {
+    validateVariableReference(scope, name, entityVariables, sceneVariables, describe);
+    const knownType = resolveKnownVariableType(scope, name, entityVariables, sceneVariables);
+    if (knownType && !isValidValueForType(knownType, rawEffect.value)) {
+      fail(`${describe}.value incohérent avec le type "${knownType}" (reçu : ${JSON.stringify(rawEffect.value)}).`);
+    }
+    return { type: "setVariable", scope, name, value: rawEffect.value };
+  }
+  if (type === "toggleVariable") {
+    validateVariableReference(scope, name, entityVariables, sceneVariables, describe);
+    const knownType = resolveKnownVariableType(scope, name, entityVariables, sceneVariables);
+    if (knownType && knownType !== "flag") {
+      fail(`${describe} : "toggleVariable" ne s'applique qu'à une variable "flag" (portée "${scope}", type réel "${knownType}").`);
+    }
+    return { type: "toggleVariable", scope, name };
+  }
+  if (type === "addVariable") {
+    validateVariableReference(scope, name, entityVariables, sceneVariables, describe);
+    const knownType = resolveKnownVariableType(scope, name, entityVariables, sceneVariables);
+    if (knownType && knownType !== "int") {
+      fail(`${describe} : "addVariable" ne s'applique qu'à une variable "int" (portée "${scope}", type réel "${knownType}").`);
+    }
+    if (!Number.isInteger(rawEffect.amount)) {
+      fail(`${describe}.amount doit être un entier (reçu : ${JSON.stringify(rawEffect.amount)}).`);
+    }
+    return { type: "addVariable", scope, name, amount: rawEffect.amount };
+  }
+  fail(`${describe}.type "${type}" inconnu (attendu : "setVariable" | "toggleVariable" | "addVariable").`);
+}
+
+// Comparateurs reconnus par la condition "variable" (voir plus bas) — un
+// SEUL par condition, "equals" valant pour flag ET int, les quatre autres
+// réservés aux int (voir la vérification de cohérence plus bas).
+const VARIABLE_COMPARATORS = ["equals", "greaterThan", "lessThan", "greaterOrEqual", "lessOrEqual"];
 
 // Valide un objet CONDITION ({ type, ... }) — RÉUTILISÉ par presence[].when
 // (voir parsePresenceRule) ET action.condition (voir parseEntity, actions
@@ -90,8 +191,12 @@ function parseEffect(rawEffect, effectIndex, ruleIndex, index, id) {
 // MÊME validation — une condition ne sait pas d'où elle est appelée, jamais
 // dupliquée entre les deux. `describe` : préfixe du message d'erreur (ex.
 // `presence[0].when` ou `action.condition`), pour situer l'échec sans
-// dupliquer cette fonction par appelant.
-function validateCondition(cond, describe) {
+// dupliquer cette fonction par appelant. `entityVariables`/`sceneVariables` :
+// les sacs déjà résolus des portées "entity"/"scene" du PORTEUR courant
+// (voir validateVariableReference plus bas) — UNIQUEMENT nécessaires pour
+// valider une condition "variable", `undefined` sans effet sur tout autre
+// type de condition.
+function validateCondition(cond, describe, entityVariables, sceneVariables) {
   if (typeof cond !== "object" || cond === null || !isNonEmptyString(cond.type)) {
     fail(`${describe} doit être un objet avec un type.`);
   }
@@ -126,7 +231,35 @@ function validateCondition(cond, describe) {
     if (!Array.isArray(cond.conditions) || cond.conditions.length === 0) {
       fail(`${describe}.conditions doit être un tableau non vide pour "allOf".`);
     }
-    cond.conditions.forEach((subCond, i) => validateCondition(subCond, `${describe}.conditions[${i}]`));
+    cond.conditions.forEach((subCond, i) =>
+      validateCondition(subCond, `${describe}.conditions[${i}]`, entityVariables, sceneVariables)
+    );
+  }
+  // "variable" : LECTURE d'une variable (voir core/presence.js/
+  // evaluateVariable, core/variables.js) — scope/name validés contre les
+  // sacs déjà résolus du porteur (voir validateVariableReference, y
+  // compris sa limite documentée sur la portée "party"), EXACTEMENT UN
+  // comparateur requis (VARIABLE_COMPARATORS), et — SEULEMENT quand le
+  // TYPE réel de la variable est connu — cohérence comparateur/type
+  // ("greaterThan" etc. refusés sur un "flag", seul "equals" y est permis)
+  // ET valeur/type du comparateur lui-même (ex. equals:1 sur un "flag").
+  if (cond.type === "variable") {
+    validateVariableReference(cond.scope, cond.name, entityVariables, sceneVariables, describe);
+
+    const usedComparators = VARIABLE_COMPARATORS.filter((c) => cond[c] !== undefined);
+    if (usedComparators.length !== 1) {
+      fail(`${describe} doit porter EXACTEMENT un comparateur (${VARIABLE_COMPARATORS.join(" | ")}).`);
+    }
+    const comparator = usedComparators[0];
+    const knownType = resolveKnownVariableType(cond.scope, cond.name, entityVariables, sceneVariables);
+    if (knownType) {
+      if (comparator !== "equals" && knownType !== "int") {
+        fail(`${describe} : comparateur "${comparator}" invalide sur une variable "flag" (seul "equals" est permis).`);
+      }
+      if (!isValidValueForType(knownType, cond[comparator])) {
+        fail(`${describe}.${comparator} incohérent avec le type "${knownType}" (reçu : ${JSON.stringify(cond[comparator])}).`);
+      }
+    }
   }
 }
 
@@ -141,18 +274,23 @@ function validateCondition(cond, describe) {
 // seule forme, jamais les deux. Une règle sans AUCUN effet ne sert à rien
 // (échec clair plutôt qu'une règle muette qu'on croirait active) : l'un des
 // deux (`effects` ou `present`) est requis.
-function parsePresenceRule(rawRule, ruleIndex, index, id) {
+function parsePresenceRule(rawRule, ruleIndex, index, id, entityVariables, sceneVariables) {
   if (typeof rawRule !== "object" || rawRule === null) {
     fail(`entities[${index}] ("${id}") : presence[${ruleIndex}] n'est pas un objet.`);
   }
   const { when, present, effects } = rawRule;
-  validateCondition(when, `entities[${index}] ("${id}") : presence[${ruleIndex}].when`);
+  validateCondition(when, `entities[${index}] ("${id}") : presence[${ruleIndex}].when`, entityVariables, sceneVariables);
 
   if (effects !== undefined) {
     if (!Array.isArray(effects) || effects.length === 0) {
       fail(`entities[${index}] ("${id}") : presence[${ruleIndex}].effects doit être un tableau non vide si présent.`);
     }
-    return { when, effects: effects.map((effect, i) => parseEffect(effect, i, ruleIndex, index, id)) };
+    return {
+      when,
+      effects: effects.map((effect, i) =>
+        parseEffect(effect, `entities[${index}] ("${id}") : presence[${ruleIndex}].effects[${i}]`, index, id)
+      ),
+    };
   }
   if (typeof present !== "boolean") {
     fail(`entities[${index}] ("${id}") : presence[${ruleIndex}] doit fournir "effects" ou "present" (booléen).`);
@@ -160,7 +298,52 @@ function parsePresenceRule(rawRule, ruleIndex, index, id) {
   return { when, effects: [{ type: "presence", present }] };
 }
 
-function parseEntity(rawEntity, index, registry, length, seenIds) {
+// Valide UNE candidate d'action — RÉUTILISÉE À L'IDENTIQUE que `action` soit
+// un objet UNIQUE ou un élément d'un TABLEAU de candidates (voir
+// parseEntity) : la forme d'une candidate ne dépend jamais du nombre de
+// candidates. `sound` (optionnel) : TRANSPORT pur, comme `item`/`amount`
+// existants — la vue (view/interaction.js) résout le chemin et le joue,
+// core en ignore tout le sens. `effects` (optionnel) : EFFETS D'ÉCRITURE de
+// variable (voir parseActionEffect), appliqués À L'ACTIVATION — aiguillage
+// DISTINCT de presence[].effects (voir parseEffect, "Un effet porté par une
+// règle de presence[]"), jamais mélangé.
+function parseSingleAction(rawAction, describe, entityVariables, sceneVariables) {
+  if (typeof rawAction !== "object" || rawAction === null || Array.isArray(rawAction)) {
+    fail(`${describe} doit être un objet.`);
+  }
+  if (!isNonEmptyString(rawAction.kind)) {
+    fail(`${describe}.kind doit être une chaîne non vide.`);
+  }
+  if (rawAction.condition !== undefined) {
+    validateCondition(rawAction.condition, `${describe}.condition`, entityVariables, sceneVariables);
+    if (!isNonEmptyString(rawAction.refusalKey)) {
+      fail(`${describe}.refusalKey doit être une chaîne non vide quand condition est présente.`);
+    }
+  }
+  if (rawAction.sound !== undefined && !isNonEmptyString(rawAction.sound)) {
+    fail(`${describe}.sound doit être une chaîne non vide si présent.`);
+  }
+  // announceKey : optionnel, clé i18n de la confirmation PARLÉE annoncée
+  // après application des effets (voir view/interaction.js/
+  // handleApplyEffects) — MÊME statut que `sound` (transport pur, validé en
+  // forme seulement) : sans elle, une bascule d'état ne serait confirmée
+  // QUE par le son, jamais par la parole — inacceptable pour ce projet
+  // audio-first (voir CLAUDE.md, "L'accessibilité est une exigence de
+  // premier ordre").
+  if (rawAction.announceKey !== undefined && !isNonEmptyString(rawAction.announceKey)) {
+    fail(`${describe}.announceKey doit être une chaîne non vide si présent.`);
+  }
+  if (rawAction.effects === undefined) return rawAction;
+  if (!Array.isArray(rawAction.effects) || rawAction.effects.length === 0) {
+    fail(`${describe}.effects doit être un tableau non vide si présent.`);
+  }
+  const effects = rawAction.effects.map((effect, i) =>
+    parseActionEffect(effect, `${describe}.effects[${i}]`, entityVariables, sceneVariables)
+  );
+  return { ...rawAction, effects };
+}
+
+function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables) {
   if (typeof rawEntity !== "object" || rawEntity === null) {
     fail(`entities[${index}] n'est pas un objet.`);
   }
@@ -182,6 +365,7 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
     action,
     tuning,
     presence,
+    variables,
   } = rawEntity;
 
   if (!isNonEmptyString(id)) {
@@ -291,6 +475,22 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
     entity.consumedDescriptionKey = resolvedConsumedDescriptionKey;
   }
 
+  // variables : optionnel, STOCKAGE de variables PROPRES à cette entité
+  // (portée "entity", voir core/variables.js/CLAUDE.md) — PAS de cascade
+  // instance -> type (contrairement à presence/behavior/action plus bas) :
+  // une variable est un compteur/flag d'INSTANCE (ex. l'état d'UNE porte
+  // précise), jamais un défaut partagé par tout un archétype. Absente ->
+  // entity.variables reste undefined (aucun sac à porter), même politique
+  // SPARSE que presence/behavior/action ci-dessous — jamais un objet vide
+  // imposé à chaque entité qui n'en a pas besoin. Résolue ICI, AVANT
+  // action/presence : les deux peuvent RÉFÉRENCER une variable d'entité
+  // (condition "variable", effets setVariable/toggleVariable/addVariable),
+  // leur validation a donc besoin du sac déjà résolu — voir
+  // validateVariableReference (core/level.js).
+  if (variables !== undefined) {
+    entity.variables = parseVariables(variables, `entities[${index}] ("${id}") : variables`, fail);
+  }
+
   if (type === "door") {
     if (!isNonEmptyString(target)) {
       fail(`entities[${index}] ("${id}") : entité "door" sans target.`);
@@ -326,21 +526,32 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
   // i18n du message de refus) est REQUISE quand condition est présente —
   // une condition sans refus laisserait l'action échouer en silence, ce que
   // ce système est justement censé éviter (voir entities/model.md).
+  //
+  // ACTIONS MULTIPLES CANDIDATES (voir core/scripting.md/"Actions multiples
+  // filtrées par condition", core/presence.js/selectMatchingAction) :
+  // `action` peut être un OBJET UNIQUE (comme ci-dessus, INCHANGÉ) ou un
+  // TABLEAU de candidates, chacune validée EXACTEMENT comme une action
+  // unique (voir parseSingleAction) — à l'ACTIVATION, la vue choisit celle
+  // dont la condition est vraie (view/interaction.js). RÉTROCOMPAT
+  // STRICTE : une entité qui déclare `action` comme un objet suit la MÊME
+  // branche qu'avant ce mécanisme, structurellement inchangée.
   const resolvedAction = action !== undefined ? action : registry[type].action;
   if (resolvedAction !== undefined) {
-    if (typeof resolvedAction !== "object" || resolvedAction === null || Array.isArray(resolvedAction)) {
-      fail(`entities[${index}] ("${id}") : action doit être un objet si présent.`);
-    }
-    if (!isNonEmptyString(resolvedAction.kind)) {
-      fail(`entities[${index}] ("${id}") : action.kind doit être une chaîne non vide.`);
-    }
-    if (resolvedAction.condition !== undefined) {
-      validateCondition(resolvedAction.condition, `entities[${index}] ("${id}") : action.condition`);
-      if (!isNonEmptyString(resolvedAction.refusalKey)) {
-        fail(`entities[${index}] ("${id}") : action.refusalKey doit être une chaîne non vide quand action.condition est présente.`);
+    if (Array.isArray(resolvedAction)) {
+      if (resolvedAction.length === 0) {
+        fail(`entities[${index}] ("${id}") : action ne peut pas être un tableau vide.`);
       }
+      entity.action = resolvedAction.map((candidate, i) =>
+        parseSingleAction(candidate, `entities[${index}] ("${id}") : action[${i}]`, entity.variables, sceneVariables)
+      );
+    } else {
+      entity.action = parseSingleAction(
+        resolvedAction,
+        `entities[${index}] ("${id}") : action`,
+        entity.variables,
+        sceneVariables
+      );
     }
-    entity.action = resolvedAction;
   }
 
   // tuning : surcharges d'INSTANCE pour la cascade de réglages
@@ -373,7 +584,9 @@ function parseEntity(rawEntity, index, registry, length, seenIds) {
     if (!Array.isArray(resolvedPresence)) {
       fail(`entities[${index}] ("${id}") : presence doit être un tableau si présent.`);
     }
-    entity.presence = resolvedPresence.map((rule, i) => parsePresenceRule(rule, i, index, id));
+    entity.presence = resolvedPresence.map((rule, i) =>
+      parsePresenceRule(rule, i, index, id, entity.variables, sceneVariables)
+    );
   }
 
   return entity;
@@ -479,7 +692,11 @@ const FACE_FIELDS = [
 // recto/verso, voir parseLevel). `describe` préfixe les messages d'erreur
 // (ex. "recto" ou "verso"), comme validateCondition le fait déjà pour ses
 // propres appelants — jamais dupliqué pour rien de plus qu'un préfixe.
-function parseFace(raw, length, registry, describe) {
+// `sceneVariables` : le sac de variables de portée "scene" DÉJÀ RÉSOLU par
+// parseLevel (racine, PARTAGÉ entre les deux faces — voir son commentaire) —
+// simplement RELAYÉ jusqu'à chaque entité (voir parseEntity), jamais relu
+// ici : une face ne PORTE pas son propre sac de scène.
+function parseFace(raw, length, registry, describe, sceneVariables) {
   const prefix = describe ? `${describe}.` : "";
   const {
     entities,
@@ -615,7 +832,7 @@ function parseFace(raw, length, registry, describe) {
 
   const seenIds = new Set();
   const parsedEntities = resolvedEntities.map((rawEntity, index) =>
-    parseEntity(rawEntity, index, registry, length, seenIds)
+    parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables)
   );
 
   const face = {
@@ -648,7 +865,7 @@ export function parseLevel(raw, registry) {
     fail("le registre de types est manquant ou invalide.");
   }
 
-  const { id, titleKey, length, playerStart, recto, verso } = raw;
+  const { id, titleKey, length, playerStart, recto, verso, variables } = raw;
 
   // id/titleKey/length : ABSENTS -> défauts génériques (DEFAULT_LEVEL_*,
   // voir header) ; PRÉSENTS mais malformés -> erreur claire, inchangé — la
@@ -679,6 +896,17 @@ export function parseLevel(raw, registry) {
     );
   }
 
+  // variables : STOCKAGE de variables de portée "scene" (voir
+  // core/variables.js/CLAUDE.md) — RACINE PARTAGÉE, comme id/titleKey/
+  // length/playerStart ci-dessus, JAMAIS un champ de FACE (une scène à deux
+  // faces n'a qu'UN SEUL sac de variables de scène, partagé par recto ET
+  // verso — pas dans FACE_FIELDS, jamais cherché dans recto/verso). TOUJOURS
+  // résolu (sac vide `{}` si absent, jamais undefined) — même politique
+  // EAGER que defaultSurface/indoor plus bas (parseFace), contrairement au
+  // sac SPARSE d'une entité (voir parseEntity) : une scène a TOUJOURS un état
+  // de variables, même vide, au même titre que sa surface par défaut.
+  const resolvedVariables = parseVariables(variables, "variables", fail);
+
   // SCÈNE À DEUX FACES (modèle B, voir CLAUDE.md/"RECTO/VERSO",
   // core/state.js) : recto ET verso requis ENSEMBLE (jamais un seul), et
   // AUCUN des champs de face (FACE_FIELDS) au niveau racine — un niveau ne
@@ -694,8 +922,8 @@ export function parseLevel(raw, registry) {
     if (leakedField) {
       fail(`"${leakedField}" est un champ de FACE : une scène à deux faces le déclare dans recto/verso, jamais à la racine.`);
     }
-    const parsedRecto = parseFace(recto, resolvedLength, registry, "recto");
-    const parsedVerso = parseFace(verso, resolvedLength, registry, "verso");
+    const parsedRecto = parseFace(recto, resolvedLength, registry, "recto", resolvedVariables);
+    const parsedVerso = parseFace(verso, resolvedLength, registry, "verso", resolvedVariables);
     warnOnOverlaps(parsedRecto.entities, resolvedPlayerStart);
     warnOnOverlaps(parsedVerso.entities, resolvedPlayerStart);
     return {
@@ -703,12 +931,13 @@ export function parseLevel(raw, registry) {
       titleKey: resolvedTitleKey,
       length: resolvedLength,
       playerStart: resolvedPlayerStart,
+      variables: resolvedVariables,
       recto: parsedRecto,
       verso: parsedVerso,
     };
   }
 
-  const face = parseFace(raw, resolvedLength, registry, null);
+  const face = parseFace(raw, resolvedLength, registry, null, resolvedVariables);
   warnOnOverlaps(face.entities, resolvedPlayerStart);
 
   return {
@@ -716,6 +945,7 @@ export function parseLevel(raw, registry) {
     titleKey: resolvedTitleKey,
     length: resolvedLength,
     playerStart: resolvedPlayerStart,
+    variables: resolvedVariables,
     ...face,
   };
 }

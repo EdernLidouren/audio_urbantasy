@@ -28,8 +28,13 @@ export const SURFACE_REGISTRY = {
   concrete: { neutral: true },
   dirt: { neutral: false },
   grass: { neutral: false },
+  gravel: { neutral: false },
+  light_snow: { neutral: false },
+  mud: { neutral: false },
   sand: { neutral: false },
   snow: { neutral: false },
+  water: { neutral: false },
+  wood: { neutral: false },
 };
 
 // Repli SILENCIEUX de defaultSurface quand une scène ne le déclare pas (voir

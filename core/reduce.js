@@ -191,8 +191,23 @@ export function reduce(state, action) {
       // core/presence.js) — un seul objet construit ici, partagé par la
       // phase 1 (stepEntities) ET la phase 2 (isBlocking, via
       // resolvePlayerMove/resolveBodyMove/resolveOverlaps ci-dessous),
-      // jamais recréé par appel.
-      const presenceContext = { time: state.time, perceptionActive: state.perceptionActive, weather: state.weather.state };
+      // jamais recréé par appel. `world`/`session` : PORTEURS des variables
+      // de portée "scene"/"party" (voir core/variables.js) pour la condition
+      // "variable" — `world` reste le MONDE RACINE (variables de scène
+      // PARTAGÉES entre recto/verso, jamais par face, voir
+      // core/level.js/parseLevel), IDENTIQUE pour les deux faces tiquées
+      // ci-dessous (recto ET verso lisent/écrivent le MÊME sac de scène,
+      // jamais un par face) ; `session` reste `state` lui-même, jamais une
+      // copie — resolveEntityRules n'en fait rien d'autre qu'une LECTURE
+      // (aucun effet d'écriture ne passe par presence[].effects, voir
+      // core/scripting.md/"Effets d'action").
+      const presenceContext = {
+        time: state.time,
+        perceptionActive: state.perceptionActive,
+        weather: state.weather.state,
+        world,
+        session: state,
+      };
       const worldStep = stepEntities(face.entities, {
         length: world.length,
         rngState: face.rngState,

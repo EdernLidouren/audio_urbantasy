@@ -58,5 +58,10 @@
   "level.demo3.title": "La ruelle",
   "level.town_square.title": "Grand place",
   "entity.river": "Rivière",
-  "entity.river.description": "Les eaux de la rivière sont troubles, mais calmes."
+  "entity.river.description": "Les eaux de la rivière sont troubles, mais calmes.",
+  "entity.window": "Fenêtre",
+  "entity.window.description": "Une fenêtre à battants, fermée.",
+  "entity.window.refusal": "Rien ne se passe.",
+  "entity.window.opened": "La fenêtre s'ouvre en grinçant.",
+  "entity.window.closed": "La fenêtre se referme."
 }

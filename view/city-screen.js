@@ -21,6 +21,7 @@ import {
   setLootSpawnHandler,
   setSideSwitchHandler,
   setPlayerEquipmentProvider,
+  setVariableEffectsHandler,
 } from "./interaction.js";
 import { openPauseMenu } from "./menus/pause-menu.js";
 import { openWeatherDebugMenu } from "./menus/debug-weather-menu.js";
@@ -35,7 +36,15 @@ import { setGameReplaceHandler } from "./menus/save-menu.js";
 import { tick } from "../core/actions.js";
 import { reduce } from "../core/reduce.js";
 import { loadLevelById } from "../level/load.js";
-import { getActiveWorld, travelToWorld, switchSide, spawnEphemeral, isTwoSided, togglePerception } from "../core/state.js";
+import {
+  getActiveWorld,
+  travelToWorld,
+  switchSide,
+  spawnEphemeral,
+  isTwoSided,
+  togglePerception,
+  applyEntityActionEffects,
+} from "../core/state.js";
 import { advanceWeather, setWeather, triggerNextWeatherTransition } from "../core/weather.js";
 import { pickupEntity, lootEntity, lootEntitySpawn } from "../core/money.js";
 import { pickupItemEntity, dropItem } from "../core/bag.js";
@@ -487,9 +496,12 @@ export function makeCityScreen(getSession, setSession) {
   // Effet d'ÉTAT du ramassage (voir view/interaction.js/ACTION_HANDLERS.
   // pickup) : argent + retrait de l'entité, core pur (core/money.js) —
   // c'est TOUT ce que fait ce gestionnaire, le son/l'annonce restent côté
-  // interaction.js, qui l'appelle.
-  function pickupEntityEffect(entity) {
-    setSession(pickupEntity(getSession(), entity.id, entity.action.amount));
+  // interaction.js, qui l'appelle. `amount` : DÉJÀ EXTRAIT par
+  // view/interaction.js/handlePickup de l'action RÉSOLUE (jamais relu ici
+  // sur entity.action, qui peut désormais être un TABLEAU de candidates,
+  // voir core/scripting.md/"Actions multiples filtrées par condition").
+  function pickupEntityEffect(entity, amount) {
+    setSession(pickupEntity(getSession(), entity.id, amount));
   }
 
   // Effet d'ÉTAT du ramassage vers le SAC (voir view/interaction.js/
@@ -504,9 +516,10 @@ export function makeCityScreen(getSession, setSession) {
   // Effet d'ÉTAT du "loot" (voir view/interaction.js/ACTION_HANDLERS.loot ;
   // entities/model.md/"Collectible persistant") : argent + entity.consumed,
   // core pur (core/money.js/lootEntity) — même patron que
-  // pickupEntityEffect ci-dessus, mais l'entité N'EST JAMAIS retirée.
-  function lootEntityEffect(entity) {
-    setSession(lootEntity(getSession(), entity.id, entity.action.amount));
+  // pickupEntityEffect ci-dessus (`amount` déjà extrait, même raison), mais
+  // l'entité N'EST JAMAIS retirée.
+  function lootEntityEffect(entity, amount) {
+    setSession(lootEntity(getSession(), entity.id, amount));
   }
 
   // Effet d'ÉTAT du "loot à spawn" (voir view/interaction.js/
@@ -519,6 +532,19 @@ export function makeCityScreen(getSession, setSession) {
   function lootSpawnEffect(entity, spawn) {
     const spec = resolveEphemeralSpec(spawn.spec.type, spawn.spec);
     setSession(lootEntitySpawn(getSession(), entity.id, spec, spawn.count, spawn.spread));
+  }
+
+  // Effet d'ÉTAT des ACTIONS D'ÉCRITURE de variable (voir
+  // view/interaction.js/ACTION_HANDLERS.applyEffects, core/level.js/
+  // parseActionEffect, core/scripting.md/"Actions multiples filtrées par
+  // condition") : setVariable/toggleVariable/addVariable, core pur
+  // (core/state.js/applyEntityActionEffects, qui résout seul la portée —
+  // entity/scene/party — de chaque effet et splice le résultat au bon
+  // endroit) — même patron que les effets ci-dessus, aucun son/annonce ici
+  // (le son de l'action, s'il y en a un, est joué par handleApplyEffects
+  // lui-même, voir view/interaction.js).
+  function variableEffectsEffect(entity, effects) {
+    setSession(applyEntityActionEffects(getSession(), entity.id, effects));
   }
 
   // Effet d'ÉTAT du "Poser" (voir view/menus/inventory-menu.js/
@@ -560,6 +586,7 @@ export function makeCityScreen(getSession, setSession) {
   setLootHandler(lootEntityEffect);
   setLootSpawnHandler(lootSpawnEffect);
   setSideSwitchHandler(sideSwitchEffect);
+  setVariableEffectsHandler(variableEffectsEffect);
   setDropItemHandler(dropItemEffect);
   setEquipItemHandler(equipItemEffect);
   setUnequipItemHandler(unequipItemEffect);
@@ -746,6 +773,7 @@ export function makeCityScreen(getSession, setSession) {
       setLootHandler(null);
       setLootSpawnHandler(null);
       setSideSwitchHandler(null);
+      setVariableEffectsHandler(null);
       setDropItemHandler(null);
       setEquipItemHandler(null);
       setUnequipItemHandler(null);

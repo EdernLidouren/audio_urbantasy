@@ -31,6 +31,14 @@
   "assets/musics/beach_night": [
     "assets/musics/beach_night_1.mp3"
   ],
+  "assets/musics/derelict_district_day": [
+    "assets/musics/derelict_district_day_1.mp3",
+    "assets/musics/derelict_district_day_2.mp3",
+    "assets/musics/derelict_district_day_3.mp3"
+  ],
+  "assets/musics/derelict_district_night": [
+    "assets/musics/derelict_district_night_1.mp3"
+  ],
   "assets/musics/factory": [
     "assets/musics/factory_1.mp3"
   ],
@@ -57,33 +65,25 @@
   "assets/musics/mystery": [
     "assets/musics/mystery_1.mp3"
   ],
-  "assets/musics/night_zone": [
-    "assets/musics/night_zone_3.mp3"
+  "assets/musics/nightlife_district": [
+    "assets/musics/nightlife_district_3.mp3"
   ],
-  "assets/musics/night_zone_day": [
-    "assets/musics/night_zone_day_1.mp3",
-    "assets/musics/night_zone_day_2.mp3",
-    "assets/musics/night_zone_day_3.mp3",
-    "assets/musics/night_zone_day_4.mp3"
+  "assets/musics/nightlife_district_day": [
+    "assets/musics/nightlife_district_day_1.mp3",
+    "assets/musics/nightlife_district_day_2.mp3",
+    "assets/musics/nightlife_district_day_3.mp3",
+    "assets/musics/nightlife_district_day_4.mp3"
   ],
-  "assets/musics/night_zone_night": [
-    "assets/musics/night_zone_night_1.mp3",
-    "assets/musics/night_zone_night_2.mp3"
+  "assets/musics/nightlife_district_night": [
+    "assets/musics/nightlife_district_night_1.mp3",
+    "assets/musics/nightlife_district_night_2.mp3"
   ],
-  "assets/musics/port_day": [
-    "assets/musics/port_day_1.mp3",
-    "assets/musics/port_day_2.mp3"
+  "assets/musics/pier_day": [
+    "assets/musics/pier_day_1.mp3",
+    "assets/musics/pier_day_2.mp3"
   ],
-  "assets/musics/port_night": [
-    "assets/musics/port_night_1.mp3"
-  ],
-  "assets/musics/ruins_day": [
-    "assets/musics/ruins_day_1.mp3",
-    "assets/musics/ruins_day_2.mp3",
-    "assets/musics/ruins_day_3.mp3"
-  ],
-  "assets/musics/ruins_night": [
-    "assets/musics/ruins_night_1.mp3"
+  "assets/musics/pier_night": [
+    "assets/musics/pier_night_1.mp3"
   ],
   "assets/musics/science_day": [
     "assets/musics/science_day_1.mp3",
@@ -104,6 +104,9 @@
     "assets/sounds/doors/metal_gate_1.mp3",
     "assets/sounds/doors/metal_gate_2.mp3"
   ],
+  "assets/sounds/effects/clock_tower_bell": [
+    "assets/sounds/effects/clock_tower_bell_1.mp3"
+  ],
   "assets/sounds/effects/coin": [
     "assets/sounds/effects/coin_1.mp3"
   ],
@@ -115,6 +118,19 @@
     "assets/sounds/effects/electrical_flickering_5.mp3",
     "assets/sounds/effects/electrical_flickering_6.mp3",
     "assets/sounds/effects/electrical_flickering_7.mp3"
+  ],
+  "assets/sounds/effects/neon_malfunction": [
+    "assets/sounds/effects/neon_malfunction_1.mp3",
+    "assets/sounds/effects/neon_malfunction_2.mp3",
+    "assets/sounds/effects/neon_malfunction_3.mp3",
+    "assets/sounds/effects/neon_malfunction_4.mp3",
+    "assets/sounds/effects/neon_malfunction_5.mp3"
+  ],
+  "assets/sounds/effects/window_blinds_close": [
+    "assets/sounds/effects/window_blinds_close_1.mp3"
+  ],
+  "assets/sounds/effects/window_blinds_open": [
+    "assets/sounds/effects/window_blinds_open_1.mp3"
   ],
   "assets/sounds/entities/big_rock_beacon": [
     "assets/sounds/entities/big_rock_beacon_1.mp3"
@@ -147,8 +163,19 @@
   "assets/sounds/entities/box_of_nails_beacon": [
     "assets/sounds/entities/box_of_nails_beacon_1.mp3"
   ],
+  "assets/sounds/entities/chair_1_beacon": [
+    "assets/sounds/entities/chair_1_beacon_1.mp3",
+    "assets/sounds/entities/chair_1_beacon_2.mp3",
+    "assets/sounds/entities/chair_1_beacon_3.mp3"
+  ],
   "assets/sounds/entities/clocktower_tick_tock_beacon": [
     "assets/sounds/entities/clocktower_tick_tock_beacon_1.mp3"
+  ],
+  "assets/sounds/entities/closet_door_1_close": [
+    "assets/sounds/entities/closet_door_1_close_1.mp3"
+  ],
+  "assets/sounds/entities/closet_door_open": [
+    "assets/sounds/entities/closet_door_open_1.mp3"
   ],
   "assets/sounds/entities/coin_push_beacon": [
     "assets/sounds/entities/coin_push_beacon_1.mp3"
@@ -159,6 +186,12 @@
     "assets/sounds/entities/dog_medium_vocal_3.mp3",
     "assets/sounds/entities/dog_medium_vocal_4.mp3",
     "assets/sounds/entities/dog_medium_vocal_5.mp3"
+  ],
+  "assets/sounds/entities/door_1_close": [
+    "assets/sounds/entities/door_1_close_1.mp3"
+  ],
+  "assets/sounds/entities/door_1_open": [
+    "assets/sounds/entities/door_1_open_1.mp3"
   ],
   "assets/sounds/entities/door_beacon": [
     "assets/sounds/entities/door_beacon_1.mp3"
@@ -201,6 +234,16 @@
   "assets/sounds/entities/stone_slab_beacon": [
     "assets/sounds/entities/stone_slab_beacon_1.mp3",
     "assets/sounds/entities/stone_slab_beacon_2.mp3"
+  ],
+  "assets/sounds/entities/tree_beacon": [
+    "assets/sounds/entities/tree_beacon_1.mp3",
+    "assets/sounds/entities/tree_beacon_2.mp3",
+    "assets/sounds/entities/tree_beacon_3.mp3",
+    "assets/sounds/entities/tree_beacon_4.mp3",
+    "assets/sounds/entities/tree_beacon_5.mp3"
+  ],
+  "assets/sounds/entities/window_beacon": [
+    "assets/sounds/entities/window_beacon_1.mp3"
   ],
   "assets/sounds/entities/wolf_growl": [
     "assets/sounds/entities/wolf_growl_1.mp3"

@@ -4,14 +4,35 @@
   "length": 50,
   "playerStart": 1,
   "recto": {
-    "music": "assets/musics/streets_day",
+    "musicDay": "assets/musics/jazz_day",
+    "musicNight": "assets/musics/jazz_night",
+    "ambiences": ["assets/ambiances/traffic_street_afternoon_1.mp3"],
+    "defaultSurface": "concrete",
+    "segments": [{ "from": 8, "to": 12, "surface": "wood" }],
     "entities": [
-      { "id": "river", "type": "river", "x": 10 }
+      { "id": "river", "type": "river", "x": 10 },
+      {
+        "id": "window-1",
+        "type": "window",
+        "x": 17,
+        "variables": [{ "name": "isOpen", "type": "flag", "initial": false, "persistent": false }]
+      },
+      {
+        "id": "door-club",
+        "type": "door",
+        "x": 25,
+        "nameKey": "door.club",
+        "descriptionKey": "door.club.description",
+        "target": "demo2",
+        "action": {
+          "kind": "transit",
+          "condition": { "type": "hasEquipmentTag", "tag": "chic" },
+          "refusalKey": "door.dresscode_refused"
+        }
+      }
     ]
   },
   "verso": {
-    "entities": [
-
-    ]
+    "entities": []
   }
 }

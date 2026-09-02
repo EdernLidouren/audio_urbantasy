@@ -58,5 +58,10 @@
   "level.demo3.title": "The alley",
   "level.town_square.title": "Town square",
   "entity.river": "River",
-  "entity.river.description": "The river's waters are murky, but calm."
+  "entity.river.description": "The river's waters are murky, but calm.",
+  "entity.window": "Window",
+  "entity.window.description": "A casement window, closed.",
+  "entity.window.refusal": "Nothing happens.",
+  "entity.window.opened": "The window creaks open.",
+  "entity.window.closed": "The window closes."
 }

@@ -70,6 +70,11 @@ import { clamp } from "./physics/movement.js";
 import { isBlocking } from "./presence.js";
 import { INITIAL_TIME } from "./time.js";
 import { createInitialWeather } from "./weather.js";
+import { parseVariables, applyActionEffects } from "./variables.js";
+
+function fail(message) {
+  throw new Error(`createInitialState: ${message}`);
+}
 
 export const MOVE_STEP = TUNING_DEFAULTS.moveStep;
 
@@ -257,7 +262,7 @@ function createWorldState(level, seed) {
 // la source (défaut ou fournie) — l'invariant "près du joueur, jamais plus
 // de MAX_COMPANIONS" tient dès la construction, pas seulement après une
 // transition.
-export function createInitialState(level, seed = DEFAULT_SEED, { companions } = {}) {
+export function createInitialState(level, seed = DEFAULT_SEED, { companions, partyVariables } = {}) {
   const world = createWorldState(level, seed);
   const requestedCompanions = companions ?? [createTestCompanion()];
   return {
@@ -310,6 +315,17 @@ export function createInitialState(level, seed = DEFAULT_SEED, { companions } = 
     // time/money — jamais par monde. false par défaut : une partie neuve
     // démarre en perception normale.
     perceptionActive: false,
+    // variables : STOCKAGE de variables de portée "party" (voir
+    // core/variables.js/CLAUDE.md), cercle PARTIE comme money/weather —
+    // jamais par monde ni par entité. `partyVariables` : déclarations BRUTES
+    // (même forme qu'une entité/scène, voir core/level.js/parseEntity),
+    // fournies par l'appelant — le core n'importe AUCUN registre de contenu
+    // (voir CLAUDE.md, "réglages en cascade"), jamais un fichier de
+    // déclarations global importé ICI. Absent -> sac vide `{}`, comportement
+    // inchangé pour tout appelant existant (aucun n'en fournit encore).
+    // TOUJOURS résolu (jamais undefined), même politique EAGER que
+    // money/bag/equipment ci-dessus.
+    variables: parseVariables(partyVariables, "variables de partie", fail),
   };
 }
 
@@ -360,6 +376,47 @@ export function markConsumed(session, entityId) {
   const entities = face.entities.map((entity) => (entity.id === entityId ? { ...entity, consumed: true } : entity));
   const nextWorld = withFace(world, session.player.side, { entities });
   return { ...session, worlds: { ...session.worlds, [session.activeWorldId]: nextWorld } };
+}
+
+// Applique une LISTE d'effets D'ÉCRITURE de variable (voir core/level.js/
+// parseActionEffect, core/variables.js/applyActionEffects) déclenchés par
+// l'ACTIVATION d'une action portée par UNE entité du lieu ACTIF (par id) —
+// POINT D'ENTRÉE unique pour la vue (voir view/interaction.js/
+// setVariableEffectsHandler), qui ne connaît ni resolveFace/withFace ni la
+// forme de session.worlds : construit le contexte { entity, world, session }
+// attendu par applyActionEffects depuis LA FACE ACTIVE, puis SPLICE le
+// résultat aux emplacements RÉELLEMENT touchés (une liste d'effets peut
+// mélanger les trois portées — entity/scene/party — dans la MÊME
+// activation, voir core/scripting.md/"Actions multiples filtrées par
+// condition") : chaque portée non touchée traverse par RÉFÉRENCE INCHANGÉE.
+// `result.session` : SEUL `.variables` en est repris (portée "party") —
+// jamais le reste de l'objet, qui resterait le SESSION PRÉ-effets (worlds
+// pas encore patché par un éventuel effet "entity"/"scene" de la MÊME
+// liste) si on le reprenait tel quel. id absent du lieu actif -> session
+// INCHANGÉE, même politique défensive que markConsumed/removeEntity.
+export function applyEntityActionEffects(session, entityId, effects) {
+  const world = session.worlds[session.activeWorldId];
+  const face = resolveFace(world, session.player.side);
+  const entity = face.entities.find((e) => e.id === entityId);
+  if (!entity) return session;
+
+  const result = applyActionEffects(effects, { entity, world, session });
+  const entityChanged = result.entity !== entity;
+  const worldChanged = result.world !== world;
+  const partyChanged = result.session !== session;
+  if (!entityChanged && !worldChanged && !partyChanged) return session;
+
+  let nextWorld = worldChanged ? result.world : world;
+  if (entityChanged) {
+    const entities = face.entities.map((e) => (e.id === entityId ? result.entity : e));
+    nextWorld = withFace(nextWorld, session.player.side, { entities });
+  }
+
+  return {
+    ...session,
+    worlds: worldChanged || entityChanged ? { ...session.worlds, [session.activeWorldId]: nextWorld } : session.worlds,
+    variables: partyChanged ? result.session.variables : session.variables,
+  };
 }
 
 // Crée UNE entité ÉPHÉMÈRE dans le lieu ACTIF, à la position x — point

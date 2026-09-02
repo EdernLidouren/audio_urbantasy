@@ -172,25 +172,22 @@ filet "présente sinon" — sans elle, l'entité serait dormante en permanence, 
 { type: "hasEquipmentTag", tag: "chic" }
 ```
 
-Vraie si `context.entity.equipment` porte, sur un slot occupé, un objet marqué de
+Vraie si `context.playerEquipment` porte, sur un slot occupé, un objet marqué de
 `tag` (délègue à `core/equipment.js`/`equippedTags`, qui fait l'union des tags de
-tout ce qui est équipé). Entité sans champ `equipment` → fausse, jamais une
+tout ce qui est équipé). Contexte sans `playerEquipment` → fausse, jamais une
 exception. `tag` est validé contre `core/tags.js`/`TAG_REGISTRY` au chargement (voir
 "Validation" plus haut) — voir "Tags" plus bas pour le registre.
 
-**Nuance capitale, propre à cette condition** : "l'entité concernée"
-(`context.entity`) N'EST PAS TOUJOURS la même chose selon le CONSOMMATEUR :
-
-- dans une règle de **présence/comportement** (`entity.presence`), `context.entity`
-  est l'entité RÉGIE par SA PROPRE règle (voir `core/presence.js`/
-  `resolveEntityRules`, qui construit `{ ...context, entity }`) — un futur
-  compagnon/PNJ équipé vérifierait SON PROPRE équipement.
-- dans une **condition d'action** (`action.condition`), `context.entity` porte
-  l'équipement du JOUEUR (voir "Conditions d'action" plus bas) — c'est lui qui
-  DÉCLENCHE l'action, jamais l'entité-cible (une porte n'a pas d'équipement).
-
-Le champ s'appelle pareil, l'évaluateur est identique, mais QUI il désigne dépend du
-point d'appel — à documenter explicitement dans tout nouveau consommateur.
+**Clé de contexte DÉDIÉE, PAS `context.entity`** — TOUJOURS le JOUEUR, quel que soit
+le CONSOMMATEUR : `context.entity`, lui, désigne systématiquement l'entité qui PORTE
+la condition évaluée (l'entité elle-même pour `presence[].when` — voir
+`core/presence.js`/`resolveEntityRules`, qui construit `{ ...context, entity }` —
+l'entité qui déclare l'action pour `action.condition`, voir "Conditions d'action"
+plus bas) — jamais le joueur qui déclenche une action sur une AUTRE entité (une
+porte n'a pas d'équipement). Les deux rôles ont chacun leur clé PRÉCISÉMENT parce
+qu'ils doivent pouvoir COEXISTER dans la MÊME condition composite (`allOf` d'un
+`hasEquipmentTag` et d'un `"variable"` scope `"entity"`, voir plus bas) sans se
+marcher dessus.
 
 ### `perceptionActive` — perception surnaturelle active
 
@@ -330,6 +327,46 @@ reste silencieux dans CE contexte (ex. la brume, inaudible à l'intérieur). Hor
 portée de ce document (format déclaratif du core) : détail complet côté vue dans les
 commentaires de `view/audio/city-scene.js` (`declareWeatherAmbience`) et `lib/audio.js`
 (`syncAmbienceLayers`, `desiredAmbienceSlots`).
+
+### `variable` — lecture d'une variable, avec comparaison
+
+```js
+{ type: "variable", scope: "entity", name: "isOpen", equals: false }
+{ type: "variable", scope: "party", name: "friendship_margot", greaterThan: 50 }
+```
+
+Voir "Variables" plus bas pour le MODÈLE (déclaration, portées, persistance) — cette
+section couvre seulement la LECTURE. `scope` ∈ `"entity" | "scene" | "party"` :
+
+- `"entity"` : la variable de l'entité qui PORTE la condition (`context.entity` —
+  l'entité elle-même pour `presence[].when`, l'entité qui déclare l'action pour
+  `action.condition`, voir "Conditions d'action" plus bas et le piège
+  `hasEquipmentTag` ci-dessus pour la distinction avec `context.playerEquipment`).
+- `"scene"` : la scène ACTIVE (`context.world`).
+- `"party"` : global (`context.session`).
+
+Un SEUL comparateur par condition : `"equals"` (flag ET int) ou, pour un int
+SEULEMENT, `"greaterThan"` / `"lessThan"` / `"greaterOrEqual"` / `"lessOrEqual"`.
+Délègue à `core/variables.js`/`getVariable(context, scope, name)` — variable
+introuvable (nom jamais déclaré, ou porteur absent du contexte, ex. `"scene"`/
+`"party"` dans une condition d'action aujourd'hui, `view/interaction.js` ne fournit
+encore que `context.entity`) → `undefined` → AUCUN comparateur ne peut être vrai,
+même repli défensif que le reste de ce registre.
+
+**Validation au chargement** (`core/level.js`/`validateVariableReference`) :
+`scope` connu, `name` non vide, EXACTEMENT un comparateur — et, SEULEMENT quand le
+TYPE réel de la variable est vérifiable (portées `"entity"`/`"scene"`, dont le sac
+est déjà résolu au moment où `parseLevel` atteint cette condition), cohérence
+comparateur/type (`greaterThan` etc. refusés sur un `"flag"`, seul `"equals"` y est
+permis) ET valeur/type du comparateur lui-même. **Limite connue, documentée plutôt
+que silencieuse** : la portée `"party"` n'est JAMAIS vérifiable au chargement d'un
+niveau (ses déclarations n'existent qu'à `createInitialState`, hors de portée d'un
+`parseLevel` qui ne connaît qu'UN niveau) — une variable de partie mal orthographiée
+n'est détectée qu'à l'ÉVALUATION (repli sur `false`), jamais au chargement.
+
+Composable dans un `allOf` comme toute autre condition (variable ET météo, variable
+ET `hasEquipmentTag`...). Exemple réel complet — la fenêtre (voir "Actions multiples
+filtrées par condition" plus bas).
 
 ### Ajouter un type de condition
 
@@ -597,6 +634,38 @@ transport générique) — clampé à l'exécution par `switchSide`, jamais un
 plantage. Détail complet du modèle à deux faces (persistance, gel de l'autre
 face) : `level/schema.md`/"Scène à deux faces (recto/verso)".
 
+### `"applyEffects"` — effets déclaratifs génériques (son + écriture de variable)
+
+```json
+{
+  "kind": "applyEffects",
+  "sound": "assets/sounds/doors/metal_gate",
+  "announceKey": "entity.window.opened",
+  "effects": [{ "type": "setVariable", "scope": "entity", "name": "isOpen", "value": true }]
+}
+```
+
+Le SEUL kind GÉNÉRIQUE de cet aiguillage : aucun état "métier" propre
+(contrairement à `transit`/`pickup`/`loot`/`switchSide`, chacun lié à un système du
+jeu) — sa substance est ENTIÈREMENT ce que le contenu déclare :
+
+- `sound` (optionnel, TRANSPORT — comme `action.item`/`action.amount`) : chemin/pool
+  joué défensivement (`view/interaction.js`/`handleApplyEffects`, même politique
+  d'échec silencieux que `playPickupSound`).
+- `announceKey` (optionnel, TRANSPORT) : clé i18n annoncée À LA PAROLE APRÈS
+  l'effet — JAMAIS seulement le son (voir CLAUDE.md, accessibilité de premier
+  ordre) : une bascule d'état sans confirmation parlée serait invisible à un
+  lecteur d'écran.
+- `effects` (optionnel) : liste d'EFFETS D'ÉCRITURE de variable — voir
+  "Variables"/"Effets d'action" plus bas. Appliqués et SPLICÉS dans la partie par
+  `core/state.js`/`applyEntityActionEffects`, via le gestionnaire enregistré
+  (`view/interaction.js`/`setVariableEffectsHandler`, câblé par
+  `view/city-screen.js`) — ce fichier ne connaît toujours pas le core directement.
+
+Exemple réel complet : `entities/types/window.js` (voir "Actions multiples filtrées
+par condition" plus bas pour le cas complet, deux candidates `applyEffects` aux
+conditions opposées).
+
 ### Ajouter un kind d'action
 
 1. Un cas dans `ACTION_HANDLERS` (`view/interaction.js`) — CÔTÉ VUE uniquement, le
@@ -640,15 +709,208 @@ politique que tout son d'UI du projet). Action SANS `condition` (tout contenu
 existant, ex. `door-exit`) → ce bloc est sauté entièrement, rétrocompatibilité
 totale.
 
-`context.entity` porte l'équipement du JOUEUR (`view/interaction.js`/
-`setPlayerEquipmentProvider`, câblé par `view/city-screen.js`), PAS celui de
-l'entité-cible — voir la nuance détaillée dans "Conditions"/`hasEquipmentTag`
-plus haut.
+`context.entity` porte l'entité qui DÉCLARE l'action (celle qu'on active — voir
+`view/interaction.js`/`actionContext`) ; `context.playerEquipment` (séparément,
+`view/interaction.js`/`setPlayerEquipmentProvider`, câblé par `view/city-screen.js`)
+porte l'équipement du JOUEUR — voir la nuance détaillée dans "Conditions"/
+`hasEquipmentTag` plus haut. Une condition `"variable"` scope `"entity"` (voir
+"Variables" plus bas) se résout donc contre les variables de L'ENTITÉ-CIBLE elle-même
+(ex. `isOpen` d'une fenêtre), jamais contre le joueur.
 
 **Extensibilité** : une caisse verrouillée (`"loot"` conditionnée par un futur
 `questFlag`), un PNJ qui ne parle qu'à condition (un futur kind `"talk"`)
 réutiliseraient cette MÊME vérification, sans y toucher — `action.condition` ne
 connaît rien du `kind` qu'il protège.
+
+## Actions multiples filtrées par condition
+
+`entity.action` peut être soit un OBJET UNIQUE (tout ce qui précède, INCHANGÉ —
+RÉTROCOMPAT stricte), soit un TABLEAU de candidates — chacune une action complète
+(`kind`, `condition`/`refusalKey` optionnels, `sound`/`effects` optionnels si
+`applyEffects`, voir plus haut), validée EXACTEMENT comme une action unique
+(`core/level.js`/`parseSingleAction`, réutilisée à l'identique par les deux formes).
+
+**Sélection SILENCIEUSE, pas un menu** (`core/presence.js`/`selectMatchingAction`) :
+à l'ACTIVATION, la PREMIÈRE candidate (ordre de déclaration) dont la `condition` est
+vraie est choisie et exécutée — entièrement dictée par l'état du jeu, aucun choix
+JOUEUR. Très proche de la désambiguïsation d'ENTITÉS
+(`view/interaction.js`/`chooseInteractionTarget`, qui ouvre un menu quand plusieurs
+entités se chevauchent) mais un mécanisme DIFFÉRENT : ici on choisit parmi les
+actions d'UNE SEULE entité, jamais via un menu. Une candidate SANS `condition`
+matche TOUJOURS (utile en dernier recours, en fin de liste). **PRIORITÉ documentée**
+: si plusieurs candidates matchent en même temps (contenu mal conçu — des
+conditions qui ne sont pas mutuellement exclusives), UNE SEULE s'applique, la
+PREMIÈRE déclarée, jamais les deux. Si AUCUNE ne matche → rien, exactement comme une
+action unique à condition non remplie.
+
+**Approche B — conditions opposées, zéro structure de contrôle impérative** : pour
+une bascule à deux états (une fenêtre ouverte/fermée), DEUX candidates aux
+conditions EXACTEMENT opposées (`equals: false` / `equals: true` sur la MÊME
+variable) — jamais un `if`/`else` ni une machine à états codée en dur, juste deux
+règles déclaratives dont l'union couvre tout l'espace du flag.
+
+**Exemple réel complet — la fenêtre** (`entities/types/window.js`, instance dans
+`level/town_square.json`) :
+
+```js
+// entities/types/window.js — l'ARCHÉTYPE porte l'action (cascade type -> instance,
+// comme behavior/presence), mais PAS la variable isOpen : une variable ne cascade
+// JAMAIS type -> instance (voir "Variables" plus bas) — chaque instance qui utilise
+// ce type DOIT déclarer SA PROPRE isOpen, sinon le chargement échoue.
+action: [
+  {
+    kind: "applyEffects",
+    condition: { type: "variable", scope: "entity", name: "isOpen", equals: false },
+    refusalKey: "entity.window.refusal", // requis dès qu'il y a une condition,
+    // mais STRUCTURELLEMENT inatteignable ici : les deux conditions couvrent
+    // tout l'espace du flag, une des deux matche toujours.
+    sound: "assets/sounds/doors/metal_gate",
+    announceKey: "entity.window.opened",
+    effects: [{ type: "setVariable", scope: "entity", name: "isOpen", value: true }],
+  },
+  {
+    kind: "applyEffects",
+    condition: { type: "variable", scope: "entity", name: "isOpen", equals: true },
+    refusalKey: "entity.window.refusal",
+    sound: "assets/sounds/doors/metal_gate",
+    announceKey: "entity.window.closed",
+    effects: [{ type: "setVariable", scope: "entity", name: "isOpen", value: false }],
+  },
+],
+```
+
+```json
+// level/town_square.json — l'INSTANCE déclare isOpen, VOLATILE (repart fermée à
+// chaque rechargement, jamais de mémoire d'ouverture entre deux parties)
+{
+  "id": "window-1",
+  "type": "window",
+  "x": 17,
+  "variables": [{ "name": "isOpen", "type": "flag", "initial": false, "persistent": false }]
+}
+```
+
+Activer la fenêtre alterne : fermée → ouvre (son + `isOpen: true` + confirmation
+parlée) ; ouverte → ferme (son + `isOpen: false` + confirmation parlée) — chaque
+activation choisit la BONNE candidate parce que `isOpen` a changé depuis la
+dernière, jamais un compteur ou une machine à états gérée à la main.
+
+## Variables
+
+**STOCKAGE** (`core/variables.js`) — déclaration, valeur initiale, persistance,
+sérialisation sélective, accès pur `getVariable`/`setVariable`, **BRANCHÉ** sur la
+LECTURE (type de condition `"variable"`, voir "Conditions"/`variable` plus haut —
+composable dans un `allOf` comme toute autre condition) et l'ÉCRITURE (effets
+`setVariable`/`toggleVariable`/`addVariable`, voir "Effets d'action" plus bas,
+consommés par "Actions multiples filtrées par condition" ci-dessus). Rend le
+stockage VIVANT : une condition peut désormais LIRE une variable, une action
+ACTIVÉE peut l'ÉCRIRE — voir l'exemple complet de la fenêtre plus haut.
+
+**Modèle** : deux types SEULEMENT — `"flag"` (booléen) et `"int"` (entier
+strict, jamais un flottant) — flottants/chaînes viendront si un cas concret
+les réclame, comme `"allOf"` est venu avec le loup (voir "Conditions"/`allOf`
+plus haut). Une déclaration :
+
+```js
+{ name: "friendship", type: "int", initial: 0 }
+{ name: "doorUnlocked", type: "flag", initial: false, persistent: false }
+```
+
+`name` (non vide, unique dans SA liste), `type`, `initial` (OBLIGATOIRE,
+cohérent avec `type` — un flag à `true`/`false`, un int à un entier) et
+`persistent` (optionnel, **défaut `true`**) : validés au chargement
+(`core/variables.js`/`parseVariables`, réutilisée À L'IDENTIQUE par les trois
+porteurs ci-dessous — un seul mécanisme, jamais trois). Résultat stocké,
+même forme partout : `{ [name]: { type, initial, persistent, value } }` —
+`value` démarre TOUJOURS égale à `initial`.
+
+**Trois PORTÉES, même mécanisme, où l'objet `variables` est rangé change
+seul** :
+
+| Portée (API) | "Porteur" | Déclarée dans | Stockée dans |
+|---|---|---|---|
+| `"entity"` | une entité | `entities[].variables` (niveau) | `entity.variables` — SPARSE : absente si l'entité n'en déclare aucune (comme `behavior`/`action`/`presence`), pas de cascade type -> instance |
+| `"scene"` | une scène (monde) | `variables` RACINE du fichier de niveau (voir `core/level.js`/`parseLevel`) — **PARTAGÉE**, jamais un champ de FACE : une scène à deux faces (recto/verso) n'a qu'UN SEUL sac de variables de scène | `world.variables` — TOUJOURS présent (sac vide `{}` si rien déclaré), comme `defaultSurface`/`indoor` |
+| `"party"` | la partie | fourni par l'appelant à `createInitialState(level, seed, { partyVariables })` — le core n'importe AUCUN fichier de contenu (voir CLAUDE.md, "réglages en cascade") | `session.variables` — TOUJOURS présent, cercle PARTIE comme `money`/`bag`/`weather` |
+
+`money`/`perceptionActive`/`bag`/etc. restent des champs DÉDIÉS (ils ont leur
+propre logique de résolution) — ce système est réservé aux variables
+GÉNÉRIQUES sans champ dédié : flags de quête, états d'objets, compteurs,
+affinité...
+
+**Persistance SÉLECTIVE à la sérialisation** (`core/save.js`) — le point clé :
+`serializeGame` REMPLACE la valeur d'une variable VOLATILE par son `initial`
+AVANT écriture (jamais la clé elle-même retirée). Pourquoi la valeur et pas la
+clé : `deserializeGame` ne repasse JAMAIS par `parseLevel`/`parseEntity` (voir
+"Chargement" plus bas) — il n'a donc AUCUN accès à la déclaration d'origine
+une fois celle-ci effacée. Réinitialiser la valeur ICI, à l'écriture, est le
+seul moyen pour qu'une relecture retrouve "sa valeur initiale déclarée" sans
+un second mécanisme de reconstruction au chargement : ce qui atterrit sur le
+disque pour une volatile EST déjà son état "comme neuve", la charger ne fait
+que la lire telle quelle. Une variable PERSISTANTE (le défaut) traverse
+INCHANGÉE. Sauvegarde antérieure à ce mécanisme -> sac vide `{}` (`variables`
+absente, portées "scene"/"party" seulement — voir `core/save.js`/
+`backfillWorld`/`migrateSave`, même politique que `defaultSurface`/`indoor`).
+
+**Accès** (`core/variables.js`) — point d'entrée UNIQUE que le futur type de
+condition et les futures actions d'écriture réutiliseront :
+
+```js
+getVariable(context, scope, name) // -> value, ou undefined si nom/portée inconnus
+setVariable(context, scope, name, value) // -> le PORTEUR mis à jour (pas le contexte entier)
+```
+
+`context` : `{ entity?, world?, session? }`, assemblé par l'appelant.
+`setVariable` renvoie le PORTEUR seul (entité/monde/session), jamais
+recomposé dans l'état global — pour la portée `"party"`, le porteur EST déjà la
+session (aucun splice nécessaire) ; pour `"entity"`/`"scene"`, l'appelant
+doit replacer le porteur mis à jour au bon endroit (`session.worlds[id]`,
+`face.entities[i]`) — exactement ce qu'un futur gestionnaire d'action fera,
+pas codé ici. Écriture SILENCIEUSE sur nom inconnu ou valeur incohérente avec
+le type (porteur renvoyé INCHANGÉ, même référence) : jamais une exception à
+l'ÉCRITURE, contrairement à `parseVariables`, strict au CHARGEMENT.
+
+### Effets d'action — `setVariable` / `toggleVariable` / `addVariable`
+
+```js
+{ type: "setVariable", scope: "entity", name: "isOpen", value: true }
+{ type: "toggleVariable", scope: "entity", name: "isOpen" }
+{ type: "addVariable", scope: "party", name: "friendship_test", amount: -2 }
+```
+
+Trois effets D'ÉCRITURE, déclenchés à l'ACTIVATION d'une action (`action.effects`,
+voir "Actions"/`"applyEffects"` et "Actions multiples filtrées par condition"
+plus haut) — AIGUILLAGE DISTINCT de "Effets" ci-dessus (`"presence"`/`"behavior"`,
+appliqués au TICK par `core/presence.js`/`resolveEntityRules`) : ces trois-là n'ont
+de sens qu'au moment d'une interaction PONCTUELLE, jamais réévalués en continu,
+jamais mélangés dans le même registre (`core/level.js`/`parseActionEffect`, PAS
+`parseEffect`).
+
+- `"setVariable"` `{ scope, name, value }` : assigne (flag ou entier, cohérent avec
+  le type déclaré).
+- `"toggleVariable"` `{ scope, name }` : inverse un FLAG (erreur au chargement sur
+  un int, quand le type est vérifiable).
+- `"addVariable"` `{ scope, name, amount }` : ajoute `amount` (ENTIER, négatif
+  accepté) à un INT (erreur au chargement sur un flag).
+
+**Validation** : MÊME `validateVariableReference` que la condition `"variable"`
+(scope/name/existence, même limite documentée sur `"party"`) + cohérence
+opération/type quand il est connu.
+
+**Application** (`core/variables.js`/`applyActionEffects(effects, context)`) :
+enchaîne les effets d'UNE liste SÉQUENTIELLEMENT (le contexte progresse d'un effet
+au suivant — deux effets qui touchent la MÊME variable dans la MÊME liste
+s'appliquent donc dans l'ordre déclaré, jamais l'un n'écrase l'autre par accident) ;
+`toggleVariable`/`addVariable` LISENT la valeur COURANTE (déjà mise à jour par un
+effet précédent de CETTE liste, le cas échéant) via `getVariable`, puis délèguent à
+`setVariable` — aucune logique d'écriture dupliquée. Renvoie le contexte final
+(`{ entity?, world?, session? }`), à SPLICER dans la session par l'appelant —
+`core/state.js`/`applyEntityActionEffects(session, entityId, effects)` fait
+EXACTEMENT ça pour la vue (résout le contexte depuis le lieu ACTIF, splice le
+résultat aux emplacements RÉELLEMENT touchés, une liste peut mélanger les trois
+portées dans la MÊME activation), point d'entrée de
+`view/interaction.js`/`setVariableEffectsHandler` (câblé par
+`view/city-screen.js`).
 
 ## Tags
 
@@ -694,12 +956,15 @@ toucher — un objet peut alors le référencer dans son `tags: [...]`.
 | Vocabulaire | Registre / aiguillage | Fichier |
 |---|---|---|
 | Types de condition | `CONDITION_EVALUATORS` | `core/presence.js` |
-| Types d'effet | `parseEffect` + `resolveEntityRules` | `core/level.js`, `core/presence.js` |
+| Types d'effet (presence/behavior, TICK) | `parseEffect` + `resolveEntityRules` | `core/level.js`, `core/presence.js` |
+| Types d'effet d'action (ÉCRITURE de variable, ACTIVATION) | `parseActionEffect` + `applyActionEffects` | `core/level.js`, `core/variables.js` |
 | Kinds d'action | `ACTION_HANDLERS` | `view/interaction.js` |
 | Kinds de comportement | `BEHAVIORS` | `core/behaviors/index.js` |
 | Tags | `TAG_REGISTRY` | `core/tags.js` |
 | Objets et leurs tags/gait | `ITEM_REGISTRY` | `core/items.js` |
 | Surfaces | `SURFACE_REGISTRY` | `core/surfaces.js` |
+| Types de variable | `VARIABLE_TYPES` | `core/variables.js` |
+| Portées de variable | `VARIABLE_SCOPES` | `core/variables.js` |
 
 Doc voisines à consulter selon ce qu'on touche : `entities/model.md` (modèle
 d'entité, présence en détail, entités éphémères, collectible persistant),

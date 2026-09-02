@@ -14,7 +14,7 @@ import { makeMenuScreen } from "../lib/menu.js";
 import { playOneShot } from "../lib/audio.js";
 import { resolveAsset } from "../lib/assets.js";
 import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
-import { evaluateCondition } from "../core/presence.js";
+import { evaluateCondition, selectMatchingAction } from "../core/presence.js";
 
 // Gestionnaires enregistrés UNE FOIS par view/city-screen.js, au moment de
 // sa construction — au plus un écran ville vivant à la fois dans cette
@@ -28,6 +28,7 @@ let itemPickupHandler = null;
 let lootHandler = null;
 let lootSpawnHandler = null;
 let sideSwitchHandler = null;
+let variableEffectsHandler = null;
 
 export function setDoorTransitionHandler(handler) {
   doorTransitionHandler = handler;
@@ -45,11 +46,15 @@ export function setSideSwitchHandler(handler) {
   sideSwitchHandler = handler;
 }
 
-// (entity) => void — applique l'effet d'ÉTAT du ramassage (argent + retrait
-// de l'entité, voir core/money.js/pickupEntity), fourni par city-screen.js
-// qui seul détient getSession/setSession. Ce fichier ne fait qu'appeler ce
-// qu'on lui a donné, puis gère le retour sensoriel (son, annonce) — jamais
-// l'inverse.
+// (entity, amount) => void — applique l'effet d'ÉTAT du ramassage (argent +
+// retrait de l'entité, voir core/money.js/pickupEntity), fourni par
+// city-screen.js qui seul détient getSession/setSession. Ce fichier ne fait
+// qu'appeler ce qu'on lui a donné, puis gère le retour sensoriel (son,
+// annonce) — jamais l'inverse. `amount` : DÉJÀ EXTRAIT de l'action RÉSOLUE
+// par handlePickup (voir plus bas) — jamais entity.action.amount relu ici
+// ou par l'appelant, qui ne doit rien savoir de la forme (objet unique ou
+// candidate choisie dans un tableau, voir core/scripting.md/"Actions
+// multiples filtrées par condition").
 export function setPickupHandler(handler) {
   pickupHandler = handler;
 }
@@ -64,10 +69,11 @@ export function setItemPickupHandler(handler) {
   itemPickupHandler = handler;
 }
 
-// (entity) => void — applique l'effet d'ÉTAT du "loot" (argent + entity.consumed,
-// voir core/money.js/lootEntity ; entités/model.md/"Collectible persistant"),
-// même patron que setPickupHandler ci-dessus. Distinct de pickupHandler :
-// l'entité looté N'EST JAMAIS retirée, seul son état change.
+// (entity, amount) => void — applique l'effet d'ÉTAT du "loot" (argent +
+// entity.consumed, voir core/money.js/lootEntity ; entités/model.md/
+// "Collectible persistant"), même patron que setPickupHandler ci-dessus
+// (`amount` déjà extrait, même raison). Distinct de pickupHandler : l'entité
+// looté N'EST JAMAIS retirée, seul son état change.
 export function setLootHandler(handler) {
   lootHandler = handler;
 }
@@ -79,6 +85,19 @@ export function setLootHandler(handler) {
 // action.spawn plutôt qu'action.amount (voir handleLoot).
 export function setLootSpawnHandler(handler) {
   lootSpawnHandler = handler;
+}
+
+// (entity, effects) => void — applique une LISTE d'effets D'ÉCRITURE de
+// variable (setVariable/toggleVariable/addVariable, voir core/level.js/
+// parseActionEffect, core/variables.js/applyActionEffects), fournie par
+// city-screen.js qui seul détient getSession/setSession — même patron que
+// setPickupHandler ci-dessus. Utilisé par le kind "applyEffects" (voir
+// handleApplyEffects plus bas), le premier kind GÉNÉRIQUE de cet aiguillage
+// (aucun état "métier" propre, contrairement à transit/pickup/loot/
+// switchSide) : sa SEULE substance est la liste d'effets déclarée par le
+// contenu.
+export function setVariableEffectsHandler(handler) {
+  variableEffectsHandler = handler;
 }
 
 // () => equipment — fournit l'ÉQUIPEMENT DU JOUEUR pour l'évaluation d'une
@@ -155,7 +174,12 @@ function resolveDescription(entity) {
 // "transit" (porte) : MIGRÉ dans cet aiguillage depuis l'ancien
 // court-circuit `entity.type === "door"` — même effet exactement (délègue
 // au gestionnaire enregistré), juste posé comme n'importe quel autre kind
-// désormais (voir entities/types/door.js, action:{kind:"transit"}).
+// désormais (voir entities/types/door.js, action:{kind:"transit"}). `entity`
+// PORTE `target` aujourd'hui (voir core/level.js/parseEntity, cascade
+// spécifique au type "door", jamais dans `action` lui-même) — DISTINCT des
+// autres handlers ci-dessous, qui lisent leurs paramètres depuis `action`
+// (l'action RÉSOLUE, voir interact() : un objet unique ou un élément choisi
+// d'un tableau de candidates, voir core/presence.js/selectMatchingAction).
 function handleTransit(entity) {
   if (doorTransitionHandler) doorTransitionHandler(entity.target);
 }
@@ -171,8 +195,8 @@ function handleTransit(entity) {
 // (action.arrivalX, jamais validée en FORME par core/level.js — voir son
 // commentaire sur `action`, même politique que amount/spawn ci-dessous) —
 // un contenu mal formé se dégrade en avertissement, jamais un plantage.
-function handleSwitchSide(entity) {
-  const arrivalX = entity.action.arrivalX;
+function handleSwitchSide(entity, action) {
+  const arrivalX = action.arrivalX;
   if (!Number.isFinite(arrivalX)) {
     console.warn(`interact: action "switchSide" sur "${entity.id}" sans arrivalX numérique valide.`);
     return;
@@ -195,10 +219,10 @@ function handleSwitchSide(entity) {
 //     que le nom ramassé corresponde à celui du sac (convention, jamais
 //     une contrainte structurelle).
 //   - action.amount : vers session.money (comportement d'origine).
-function handlePickup(entity) {
-  const item = entity.action.item;
+function handlePickup(entity, action) {
+  const item = action.item;
   if (item !== undefined) {
-    const count = entity.action.count ?? 1;
+    const count = action.count ?? 1;
     if (typeof item !== "string" || item === "" || !Number.isInteger(count) || count <= 0) {
       console.warn(`interact: action "pickup" (item) sur "${entity.id}" mal formée.`);
       return;
@@ -210,13 +234,13 @@ function handlePickup(entity) {
     return;
   }
 
-  const amount = entity.action.amount;
+  const amount = action.amount;
   if (!Number.isFinite(amount)) {
     console.warn(`interact: action "pickup" sur "${entity.id}" sans amount numérique valide.`);
     return;
   }
   if (!pickupHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
-  pickupHandler(entity);
+  pickupHandler(entity, amount);
   playPickupSound();
   announce(t("interaction.pickup", { amount }), { assertive: true });
 }
@@ -246,10 +270,10 @@ function handlePickup(entity) {
 //     amount: 20 }) est résolu en descripteur COMPLET par lootSpawnHandler
 //     (voir view/city-screen.js/resolveEphemeralSpec) — ce fichier n'en
 //     connaît que la forme brute, jamais le registre.
-function handleLoot(entity) {
+function handleLoot(entity, action) {
   if (entity.consumed) return;
 
-  const spawn = entity.action.spawn;
+  const spawn = action.spawn;
   if (spawn) {
     if (!Number.isInteger(spawn.count) || spawn.count <= 0 || !spawn.spec || !spawn.spec.type) {
       console.warn(`interact: action "loot" (spawn) sur "${entity.id}" mal formée.`);
@@ -266,15 +290,47 @@ function handleLoot(entity) {
     return;
   }
 
-  const amount = entity.action.amount;
+  const amount = action.amount;
   if (!Number.isFinite(amount)) {
     console.warn(`interact: action "loot" sur "${entity.id}" sans amount numérique valide.`);
     return;
   }
   if (!lootHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
-  lootHandler(entity);
+  lootHandler(entity, amount);
   playPickupSound();
   announce(t("interaction.loot", { amount }), { assertive: true });
+}
+
+// "applyEffects" : kind GÉNÉRIQUE, sans état "métier" propre (contrairement
+// à transit/pickup/loot/switchSide) — sa SEULE substance est ce que le
+// contenu déclare : `action.sound` (optionnel, TRANSPORT, voir
+// core/level.js/parseSingleAction) joué ICI, défensivement comme
+// playPickupSound/playRefusalSound ; `action.effects` (optionnel, EFFETS
+// D'ÉCRITURE de variable — setVariable/toggleVariable/addVariable, voir
+// core/level.js/parseActionEffect) délégué au gestionnaire enregistré
+// (voir setVariableEffectsHandler), qui seul détient getSession/setSession
+// pour les appliquer et les splicer dans la partie — jamais ici, ce fichier
+// ne connaît toujours pas le core ; `action.announceKey` (optionnel)
+// confirmé À LA PAROLE, APRÈS l'effet — jamais SEULEMENT le son (voir
+// CLAUDE.md, accessibilité de premier ordre), même politique que
+// handlePickup/handleLoot ci-dessus. Cas d'usage de référence : la fenêtre
+// (deux actions candidates opposées, voir core/scripting.md/"Actions
+// multiples filtrées par condition").
+function handleApplyEffects(entity, action) {
+  if (action.sound) {
+    try {
+      const factor = getPref("interfaceVolume", PREF_CONSTRAINTS.interfaceVolume.default) / 100;
+      playOneShot(resolveAsset(action.sound), { volume: factor });
+    } catch (error) {
+      console.warn(`interact: son d'action indisponible ("${action.sound}") : ${error.message}`);
+    }
+  }
+  if (action.effects && variableEffectsHandler) {
+    variableEffectsHandler(entity, action.effects);
+  }
+  if (action.announceKey) {
+    announce(t(action.announceKey), { assertive: true });
+  }
 }
 
 const ACTION_HANDLERS = {
@@ -282,6 +338,7 @@ const ACTION_HANDLERS = {
   pickup: handlePickup,
   loot: handleLoot,
   switchSide: handleSwitchSide,
+  applyEffects: handleApplyEffects,
 };
 
 // ACTIONS CONDITIONNELLES (voir core/level.js, action.condition/refusalKey)
@@ -290,13 +347,26 @@ const ACTION_HANDLERS = {
 // réutiliseront cette MÊME vérification, jamais un second mécanisme.
 // Réutilise TEL QUEL l'évaluateur de conditions du core
 // (core/presence.js/evaluateCondition) — même objet déclaratif que
-// presence[].when, déjà validé au chargement (core/level.js). context.entity
-// porte l'équipement du JOUEUR (voir setPlayerEquipmentProvider) : c'est lui
-// qui DÉCLENCHE l'action, jamais l'entité-cible (une porte n'a pas
-// d'équipement).
-function actionConditionMet(condition) {
+// presence[].when, déjà validé au chargement (core/level.js).
+//
+// context.entity PORTE ICI L'ENTITÉ-CIBLE (celle qui déclare l'action —
+// une variable de portée "entity" référencée par la condition, voir
+// core/presence.js/evaluateVariable, se résout donc contre SES PROPRES
+// variables), JAMAIS le joueur — voir context.playerEquipment ci-dessous
+// pour la distinction. AVANT ce mécanisme, context.entity portait un
+// wrapper synthétique { equipment } pour le JOUEUR : ce rôle vit maintenant
+// dans sa PROPRE clé, `playerEquipment` (voir core/presence.js/
+// evaluateHasEquipmentTag, qui la lit spécifiquement) — les deux rôles ne
+// peuvent PAS partager `context.entity` sans se marcher dessus dès qu'une
+// condition "variable" et une condition "hasEquipmentTag" coexistent (ex.
+// dans un allOf) sur la MÊME action.
+function actionContext(entity) {
   const equipment = playerEquipmentProvider ? playerEquipmentProvider() : undefined;
-  return evaluateCondition(condition, { entity: { equipment } });
+  return { entity, playerEquipment: equipment };
+}
+
+function actionConditionMet(condition, entity) {
+  return evaluateCondition(condition, actionContext(entity));
 }
 
 // kind ∈ { "describe", "activate" }. entity est déjà un candidat FILTRÉ par
@@ -317,26 +387,44 @@ export function interact(entity, kind) {
     // STUB générique inchangé pour ce contenu-là.
     if (!entity.action) return;
 
+    // ACTIONS MULTIPLES CANDIDATES (voir core/level.js/parseEntity,
+    // core/presence.js/selectMatchingAction, core/scripting.md/"Actions
+    // multiples filtrées par condition") : entity.action est soit un OBJET
+    // UNIQUE (RÉTROCOMPAT stricte — resolvedAction EST cet objet), soit un
+    // TABLEAU de candidates — la PREMIÈRE dont la condition est vraie est
+    // choisie SILENCIEUSEMENT (pas de menu, contrairement à
+    // chooseInteractionTarget plus bas, qui désambiguïse entre ENTITÉS via
+    // un choix JOUEUR — ici, la sélection est entièrement dictée par
+    // l'état du jeu). AUCUNE candidate ne matche -> rien, exactement comme
+    // une action à condition non remplie ci-dessous.
+    const resolvedAction = Array.isArray(entity.action)
+      ? selectMatchingAction(entity.action, actionContext(entity))
+      : entity.action;
+    if (!resolvedAction) return;
+
     // Condition fausse -> REFUS informatif (message + son), AUCUN effet,
     // AUCUNE transition : l'action est simplement bloquée, proprement.
     // Action sans condition (tout contenu existant) -> ce bloc est
-    // sauté entièrement, comportement STRICTEMENT inchangé.
-    if (entity.action.condition && !actionConditionMet(entity.action.condition)) {
+    // sauté entièrement, comportement STRICTEMENT inchangé. Pour une action
+    // choisie DANS un tableau, cette condition est déjà connue vraie (voir
+    // selectMatchingAction) — la revérifier ici reste correct (fonction
+    // pure, même contexte) et évite un second chemin de code.
+    if (resolvedAction.condition && !actionConditionMet(resolvedAction.condition, entity)) {
       playRefusalSound();
-      announce(t(entity.action.refusalKey), { assertive: true });
+      announce(t(resolvedAction.refusalKey), { assertive: true });
       return;
     }
 
-    const handler = ACTION_HANDLERS[entity.action.kind];
+    const handler = ACTION_HANDLERS[resolvedAction.kind];
     if (!handler) {
       // Kind DÉCLARÉ mais inconnu de ce registre : un vrai bug de contenu,
       // signalé au développeur (console), mais jamais audible/annoncé au
       // joueur ni fatal — même politique de dégradation que le reste de
       // l'aiguillage par kind du projet (voir core/presence.js).
-      console.warn(`interact: type d'action "${entity.action.kind}" inconnu sur l'entité "${entity.id}".`);
+      console.warn(`interact: type d'action "${resolvedAction.kind}" inconnu sur l'entité "${entity.id}".`);
       return;
     }
-    handler(entity);
+    handler(entity, resolvedAction);
     return;
   }
 }

@@ -56,6 +56,7 @@
 import { equippedTags } from "./equipment.js";
 import { temporalThresholdOffset } from "./temporal-spread.js";
 import { TIME_CONFIG } from "../config/time-values.js";
+import { getVariable } from "./variables.js";
 
 // Valeur numérique importée directement (voir CLAUDE.md/"Réglages en
 // cascade" : le core peut lire une valeur de config, jamais un registre de
@@ -155,17 +156,29 @@ function evaluateConsumed(cond, context) {
   return Boolean(context.entity && context.entity.consumed);
 }
 
-// "hasEquipmentTag" : vraie si L'ENTITÉ ÉVALUÉE (context.entity) porte, dans
-// son PROPRE équipement, un objet marqué de ce tag — voir
-// core/equipment.js/equippedTags, qui fait déjà tout le travail d'union et
-// ignore le type de porteur. Entité sans champ `equipment` (tout contenu
-// actuel : seule session.equipment, côté joueur, en porte un aujourd'hui,
-// voir core/state.js) -> false, jamais une exception — même repli défensif
-// que evaluateArrived/evaluateConsumed ci-dessus. cond.tag est validé contre
-// TAG_REGISTRY au chargement (voir core/level.js), jamais ici (cet
-// évaluateur ne fait que LIRE une clé déjà garantie valide).
+// "hasEquipmentTag" : vraie si le JOUEUR (context.playerEquipment — PAS
+// context.entity, voir plus bas) porte, dans son PROPRE équipement, un
+// objet marqué de ce tag — voir core/equipment.js/equippedTags, qui fait
+// déjà tout le travail d'union et ignore le type de porteur. Contexte sans
+// équipement joueur (ex. hors d'une interaction) -> false, jamais une
+// exception — même repli défensif que evaluateArrived/evaluateConsumed
+// ci-dessus. cond.tag est validé contre TAG_REGISTRY au chargement (voir
+// core/level.js), jamais ici (cet évaluateur ne fait que LIRE une clé déjà
+// garantie valide).
+//
+// CLÉ DE CONTEXTE DÉDIÉE, PAS context.entity : contrairement à TOUT autre
+// évaluateur de ce fichier, "hasEquipmentTag" porte sur le JOUEUR qui
+// DÉCLENCHE une action conditionnelle, jamais sur l'entité qui PORTE la
+// condition (une porte n'a pas d'équipement) — voir
+// view/interaction.js/actionConditionMet. context.entity, LUI, désigne
+// TOUJOURS l'entité qui porte la condition évaluée (l'entité elle-même pour
+// presence[].when ; l'entité qui déclare l'action pour action.condition,
+// voir evaluateVariable plus bas) — les deux rôles ne peuvent PAS partager
+// la même clé sans se marcher dessus dès qu'une condition "variable" (scope
+// "entity") et une condition "hasEquipmentTag" coexistent (ex. dans un
+// allOf) sur la MÊME action.
 function evaluateHasEquipmentTag(cond, context) {
-  const equipment = context.entity && context.entity.equipment;
+  const equipment = context.playerEquipment;
   return Boolean(equipment && equippedTags(equipment).has(cond.tag));
 }
 
@@ -209,6 +222,34 @@ function evaluateAllOf(cond, context) {
   return cond.conditions.every((sub) => evaluateCondition(sub, context));
 }
 
+// "variable" : LECTURE d'une variable (voir core/variables.js/getVariable)
+// avec COMPARAISON — { type:"variable", scope, name, <comparateur>:
+// valeur }. Un SEUL comparateur par condition (voir core/level.js/
+// validateCondition, qui l'exige) : "equals" (flag ET int) ou, pour un int
+// seulement, "greaterThan"/"lessThan"/"greaterOrEqual"/"lessOrEqual" — déjà
+// validés au chargement contre le TYPE réel de la variable quand il est
+// connu (portées "entity"/"scene" ; "party" échappe à cette vérification,
+// voir validateVariableReference). getVariable résout le PORTEUR selon
+// `scope` depuis context.entity/world/session — context.entity porte ICI
+// l'entité qui PORTE la condition (l'entité elle-même pour presence[].when,
+// celle qui déclare l'action pour action.condition, voir
+// evaluateHasEquipmentTag plus haut pour la distinction avec le JOUEUR).
+// Variable introuvable (nom jamais déclaré, ou porteur absent du contexte,
+// ex. "scene"/"party" hors d'un tick, voir view/interaction.js/
+// actionConditionMet qui ne fournit pas encore world/session) -> undefined
+// -> AUCUN comparateur ne peut être vrai, repli défensif comme le reste de
+// ce fichier.
+function evaluateVariable(cond, context) {
+  const value = getVariable(context, cond.scope, cond.name);
+  if (value === undefined) return false;
+  if (cond.equals !== undefined) return value === cond.equals;
+  if (cond.greaterThan !== undefined) return value > cond.greaterThan;
+  if (cond.lessThan !== undefined) return value < cond.lessThan;
+  if (cond.greaterOrEqual !== undefined) return value >= cond.greaterOrEqual;
+  if (cond.lessOrEqual !== undefined) return value <= cond.lessOrEqual;
+  return false;
+}
+
 // Registre des évaluateurs par type — SEUL endroit qui connaît les types de
 // condition. core/level.js valide `when.type` au chargement contre les clés
 // de CE MÊME registre (CONDITION_TYPES ci-dessous) : ajouter un type ici le
@@ -217,7 +258,9 @@ function evaluateAllOf(cond, context) {
 // cas de plus, pas un système de vérification séparé — la seule différence
 // est que core/level.js valide EN PLUS son champ `tag` contre TAG_REGISTRY
 // (voir core/level.js/parsePresenceRule), une garantie que timeRange/arrived/
-// consumed n'ont pas besoin d'une clé de contenu externe à valider.
+// consumed n'ont pas besoin d'une clé de contenu externe à valider. Même
+// esprit pour "variable" : core/level.js valide EN PLUS scope/name/
+// comparateur (voir validateVariableReference).
 const CONDITION_EVALUATORS = {
   timeRange: evaluateTimeRange,
   arrived: evaluateArrived,
@@ -226,6 +269,7 @@ const CONDITION_EVALUATORS = {
   perceptionActive: evaluatePerceptionActive,
   weather: evaluateWeather,
   allOf: evaluateAllOf,
+  variable: evaluateVariable,
 };
 
 export const CONDITION_TYPES = Object.keys(CONDITION_EVALUATORS);
@@ -349,4 +393,27 @@ export function isPresent(entity, context) {
 // identique par construction à ce que la phase 1 calcule pour ce même tick.
 export function isBlocking(entity, context) {
   return Boolean(entity.blocksMovement) && isPresent(entity, context);
+}
+
+// Sélectionne, parmi PLUSIEURS actions CANDIDATES (voir core/level.js/
+// parseEntity — entity.action peut être un objet UNIQUE, comme avant, ou un
+// TABLEAU de candidates), celle dont la condition est VRAIE — voir
+// core/scripting.md/"Actions multiples filtrées par condition". Très proche
+// de la désambiguïsation d'entités (view/interaction.js/
+// chooseInteractionTarget, qui choisit parmi PLUSIEURS ENTITÉS via un menu
+// JOUEUR) mais un mécanisme DIFFÉRENT : ici, PAS de choix utilisateur — la
+// sélection est SILENCIEUSE et DÉTERMINISTE, entièrement dictée par l'état
+// du jeu (les conditions), comme resolveEntityRules choisit la première
+// règle de présence vraie.
+//
+// PRIORITÉ documentée : la PREMIÈRE candidate (ordre de déclaration) dont
+// la condition est vraie l'emporte — si plusieurs matchent (contenu mal
+// conçu, ex. deux conditions non mutuellement exclusives), UNE SEULE
+// s'applique, jamais les deux. Une candidate SANS condition matche
+// TOUJOURS (comme une action simple sans condition) — utile comme
+// "défaut"/dernier recours si placée en fin de liste. Aucune candidate ne
+// matche -> undefined, exactement comme une action à condition non remplie
+// aujourd'hui (rien ne se passe, voir view/interaction.js/interact).
+export function selectMatchingAction(actions, context) {
+  return actions.find((action) => !action.condition || evaluateCondition(action.condition, context));
 }
