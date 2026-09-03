@@ -11,7 +11,7 @@
 // `presence`), voir core/level.js.
 
 export default {
-  label: "entity.money",
+  nameKey: "entity.money.name",
   descriptionKey: "entity.money.description",
   sounds: {
     beacon: { path: "assets/sounds/entities/box_of_nails_beacon_1.mp3", loop: true },

@@ -7,7 +7,7 @@
 // object/dog/decor, aucun asset "fontaine" dédié pour l'instant.
 
 export default {
-  label: "entity.fountain",
+  nameKey: "entity.fountain.name",
   descriptionKey: "entity.fountain.description",
   sounds: {
     beacon: { path: "assets/sounds/entities/box_of_nails_beacon_1.mp3", loop: true },

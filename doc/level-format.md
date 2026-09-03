@@ -235,7 +235,7 @@ exemple) : jamais de voix orpheline ni de fondus qui se disputent le canal.
 | `id`      | string | non vide, unique dans le niveau                                  |
 | `type`    | string | doit exister dans le registre `entities/types/index.js`          |
 | `x`       | number | dans `[0, length]`                                                |
-| `nameKey` | string | optionnel (npc/object) : clé i18n spécifique à l'instance          |
+| `nameKey` | string | optionnel (npc/object) : clé i18n spécifique à l'instance, forme `<namespace>.name` (ex. `door.club.name`) |
 | `descriptionKey` | string | optionnel : clé i18n de description spécifique à l'instance, utilisée par l'interaction "describe" (touche Espace) |
 | `consumedDescriptionKey` | string | optionnel : clé i18n de description ALTERNATIVE une fois l'entité `consumed` (voir "Collectible persistant" plus bas et `doc/entity-model.md`). Cascade instance -> type -> absente, comme `descriptionKey` |
 | `blocksMovement` | boolean | optionnel : surcharge d'instance, cascade -> défaut du type (`entities/types/index.js`) -> `false` |
@@ -247,8 +247,8 @@ exemple) : jamais de voix orpheline ni de fondus qui se disputent le canal.
 | `variables` | Variable[] | optionnel : déclarations de portée **"entity"** (voir `doc/scripting.md`/"Variables"). PAS de cascade instance -> type (contrairement à `behavior`/`action`/`presence`) : une variable est un compteur/flag D'INSTANCE, jamais un défaut d'archétype. SPARSE : absente si non déclarée (`entity.variables` reste `undefined`), jamais un sac vide imposé. |
 
 `parseLevel` normalise chaque entité en ajoutant `labelKey` et
-`descriptionKey` : `entity.nameKey` si présent sinon `registry[type].label`
-pour le premier ; `entity.descriptionKey` (du JSON) si présent sinon
+`descriptionKey` : `entity.nameKey` (du JSON) si présent sinon
+`registry[type].nameKey` pour le premier ; `entity.descriptionKey` (du JSON) si présent sinon
 `registry[type].descriptionKey` pour le second (peut rester `undefined`, ex.
 `decor`). Les champs bruts du JSON source une fois résolus (`nameKey`,
 `descriptionKey`) ne sont pas reportés tels quels dans l'entité normalisée —
@@ -312,7 +312,7 @@ rassemblés par `index.js` en un objet `{ [type]: TypeDef }` :
 
 | Champ            | Type    | Lu par        | Rôle                                         |
 |------------------|---------|---------------|-----------------------------------------------|
-| `label`          | string  | vue           | clé i18n du libellé par défaut du type        |
+| `nameKey`        | string  | vue           | clé i18n du nom par défaut du type, forme `<namespace>.name` — même champ qu'à l'instance (`entity.nameKey` ci-dessus), symétrique à `descriptionKey` |
 | `descriptionKey` | string  | vue           | optionnel : clé i18n de la description par défaut du type, utilisée par l'interaction "describe" si l'instance n'en fournit pas |
 | `sounds`         | object  | vue           | descripteurs de son du type, par rôle (`{ beacon, ... }`) — voir `doc/entity-model.md` |
 | `blocksMovement` | boolean | core           | empêche le déplacement au travers de l'entité (`core/physics/collision.js`) |
@@ -343,7 +343,7 @@ documenté dans `doc/entity-model.md`.
   "length": 40,
   "playerStart": 2,
   "entities": [
-    { "id": "npc_merchant", "type": "npc", "x": 15, "nameKey": "npc.merchant" },
+    { "id": "npc_merchant", "type": "npc", "x": 15, "nameKey": "npc.merchant.name" },
     {
       "id": "door_exit",
       "type": "door",

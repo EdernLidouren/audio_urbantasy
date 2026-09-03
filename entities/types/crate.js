@@ -25,7 +25,7 @@
 // défaut (desc + beacon), pas dormance — une caisse looté reste
 // observable/interactable tant qu'aucune instance ne surcharge `presence`.
 export default {
-  label: "entity.crate",
+  nameKey: "entity.crate.name",
   descriptionKey: "entity.crate.description",
   consumedDescriptionKey: "entity.crate.consumed_description",
   // Pool réutilisé (déjà utilisé par money.js/npc.js, voir leurs

@@ -28,6 +28,7 @@ import {
 } from "./interaction.js";
 import { openPauseMenu } from "./menus/pause-menu.js";
 import { openWeatherDebugMenu } from "./menus/debug-weather-menu.js";
+import { openTimeDebugMenu } from "./menus/debug-time-menu.js";
 import {
   openInventoryMenu,
   openEquipmentMenu,
@@ -70,7 +71,7 @@ import {
 import registry from "../entities/types/index.js";
 import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
 import { saveGame } from "./save-storage.js";
-import { TIME_CONFIG } from "../config/time-values.js";
+import { TIME_CONFIG, DEFAULT_TIME_SCALE, setTimeScale, resetTimeScale } from "../config/time-values.js";
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";
 
 // Outil de VÉRIFICATION du système de temps (voir core/time.md) : formate
@@ -178,7 +179,7 @@ function resolveEphemeralSpec(type, overrides = {}) {
   if (overrides.count !== undefined) action = { ...action, count: overrides.count };
   return {
     type,
-    labelKey: typeDef.label,
+    labelKey: typeDef.nameKey,
     descriptionKey: typeDef.descriptionKey,
     blocksMovement: Boolean(typeDef.blocksMovement),
     observable: Boolean(typeDef.observable),
@@ -345,6 +346,39 @@ export function makeCityScreen(getSession, setSession) {
   function triggerWeatherTransitionEffect() {
     setSession(triggerNextWeatherTransition(getSession()));
     announceWeather(getSession());
+  }
+
+  // Effet DEBUG du menu du temps (Shift+T, voir
+  // view/menus/debug-time-menu.js) : MÊME composition que onFrame plus bas
+  // (advanceTime PUIS advanceWeather, jamais l'inverse) — un saut manuel
+  // déclenche donc exactement la même réaction météo qu'un écoulement réel
+  // du même nombre de minutes. `minutes` toujours positif (voir
+  // debug-time-menu.js/minutesToNextOccurrence, le temps ne recule jamais) :
+  // aucune garde supplémentaire nécessaire ici. Les réactions qui dépendent
+  // d'un TICK (routine PNJ, crossfade jour/nuit) suivent au tick suivant,
+  // automatique dès la fermeture du menu — rien à déclencher explicitement
+  // ici, voir le header de debug-time-menu.js. Réutilise announceGameTime
+  // (mêmes mots que la touche "t") : le nouvel instant s'entend
+  // immédiatement après le saut.
+  function advanceTimeDebugEffect(minutes) {
+    setSession(advanceWeather(advanceTime(getSession(), minutes)));
+    announceGameTime(getSession());
+  }
+
+  // Vitesse d'écoulement TEMPORAIRE (voir config/time-values.js/setTimeScale/
+  // resetTimeScale, relues à CHAQUE frame par onFrame plus bas — un
+  // changement ici prend donc effet immédiatement). `scale` null -> restaure
+  // la valeur normale. Annonce DÉRIVÉE de l'état résultant (multiplicateur
+  // par rapport à DEFAULT_TIME_SCALE), jamais du choix du menu lui-même —
+  // même principe que announceWeather (CLAUDE.md, "dérive ses annonces du
+  // diff entre deux états").
+  function setTimeScaleDebugEffect(scale) {
+    if (scale === null) {
+      resetTimeScale();
+    } else {
+      setTimeScale(scale);
+    }
+    announce(t("time.debug.speedSet", { multiplier: TIME_CONFIG.timeScale / DEFAULT_TIME_SCALE }));
   }
 
   // Transition FRANCHE côté ÉTAT/ENTITÉS (pas de fondu, pas d'animation) :
@@ -828,6 +862,15 @@ export function makeCityScreen(getSession, setSession) {
       // mode debug, ne fait RIEN, même garde que "debugSpawn" ci-dessus.
       if (action === "openWeatherDebugMenu" && isDebugEnabled()) {
         openWeatherDebugMenu(forceWeatherEffect, triggerWeatherTransitionEffect);
+        return;
+      }
+
+      // "openTimeDebugMenu" (Shift+T), MODE DEBUG UNIQUEMENT (voir
+      // config/debug.js) : ouvre le menu de forçage du temps — voir
+      // advanceTimeDebugEffect/setTimeScaleDebugEffect plus haut. Hors mode
+      // debug, ne fait RIEN, même garde que "openWeatherDebugMenu" ci-dessus.
+      if (action === "openTimeDebugMenu" && isDebugEnabled()) {
+        openTimeDebugMenu(getSession, advanceTimeDebugEffect, setTimeScaleDebugEffect);
         return;
       }
 

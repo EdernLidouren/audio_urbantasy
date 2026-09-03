@@ -129,7 +129,7 @@ export function runMovementChecks() {
   // toujours la section "Rebond aux bornes" plus bas pour moveAndBounce,
   // désormais un utilitaire générique sans appelant en production).
 
-  const WANDER_REGISTRY = { dog: { label: "entity.dog" }, wall: { label: "entity.wall", blocksMovement: true } };
+  const WANDER_REGISTRY = { dog: { nameKey: "entity.dog.name" }, wall: { nameKey: "entity.wall.name", blocksMovement: true } };
 
   function makeWanderLevel(overrides = {}) {
     return {
@@ -350,8 +350,8 @@ export function runMovementChecks() {
   // blocksMovement/isFlying (core/level.js/parseEntity).
 
   const SPEED_REGISTRY = {
-    dog: { label: "entity.dog" },
-    slowDog: { label: "entity.dog", speed: 0.5 },
+    dog: { nameKey: "entity.dog.name" },
+    slowDog: { nameKey: "entity.dog.name", speed: 0.5 },
   };
 
   const speedDefaultLevel = parseLevel(
@@ -476,7 +476,7 @@ export function runMovementChecks() {
 
   // --- Collision joueur/entité bloquante : signal de blocage (blockedBy) ---
 
-  const BLOCKING_REGISTRY = { wall: { label: "entity.wall", blocksMovement: true } };
+  const BLOCKING_REGISTRY = { wall: { nameKey: "entity.wall.name", blocksMovement: true } };
   const blockingLevel = parseLevel(
     { id: "movement-check-blocking", titleKey: "level.demo.title", length: 10, playerStart: 4, entities: [{ id: "wall-1", type: "wall", x: 5 }] },
     BLOCKING_REGISTRY
@@ -501,7 +501,7 @@ export function runMovementChecks() {
   // entité (mêmes ticks, même arithmétique) plutôt qu'à une valeur
   // attendue en dur : seule façon d'obtenir une égalité exacte en flottant
   // sans dépendre du nombre de ticks nécessaires pour atteindre un bord.
-  const NONBLOCKING_REGISTRY = { deco: { label: "entity.deco" } };
+  const NONBLOCKING_REGISTRY = { deco: { nameKey: "entity.deco.name" } };
   const passThroughLevel = parseLevel(
     { id: "movement-check-passthrough", titleKey: "level.demo.title", length: 10, playerStart: 4, entities: [{ id: "deco-1", type: "deco", x: 5 }] },
     NONBLOCKING_REGISTRY
@@ -558,9 +558,9 @@ export function runMovementChecks() {
   // vérifiable ici.
 
   const INTERACTION_REGISTRY = {
-    describable: { label: "entity.dog", observable: true, interactable: false },
-    actionable: { label: "entity.dog", observable: false, interactable: true },
-    plain: { label: "entity.dog" }, // ni l'un ni l'autre déclaré -> défaut false/false
+    describable: { nameKey: "entity.dog.name", observable: true, interactable: false },
+    actionable: { nameKey: "entity.dog.name", observable: false, interactable: true },
+    plain: { nameKey: "entity.dog.name" }, // ni l'un ni l'autre déclaré -> défaut false/false
   };
 
   const interactionLevel = parseLevel(
@@ -622,8 +622,8 @@ export function runMovementChecks() {
   // fait que le résoudre et le transporter, comme les deux autres.
 
   const FLYING_REGISTRY = {
-    winged: { label: "entity.bird", isFlying: true },
-    grounded: { label: "entity.dog" }, // non déclaré -> défaut false
+    winged: { nameKey: "entity.bird.name", isFlying: true },
+    grounded: { nameKey: "entity.dog.name" }, // non déclaré -> défaut false
   };
   const flyingLevel = parseLevel(
     {
@@ -666,8 +666,8 @@ export function runMovementChecks() {
   // gestionnaire ne reconnaît encore charge sans erreur, se dégradera
   // proprement à l'INTERACTION, pas au chargement.
   const ACTION_REGISTRY = {
-    withDefault: { label: "entity.dog", interactable: true, action: { kind: "pickup", amount: 5 } },
-    plain: { label: "entity.dog" },
+    withDefault: { nameKey: "entity.dog.name", interactable: true, action: { kind: "pickup", amount: 5 } },
+    plain: { nameKey: "entity.dog.name" },
   };
   const actionLevel = parseLevel(
     {
@@ -706,7 +706,7 @@ export function runMovementChecks() {
 
   // --- Robustesse : chevauchement de corps (curatif, au tick) ---
 
-  const OVERLAP_REGISTRY = { wall: { label: "entity.wall", blocksMovement: true } };
+  const OVERLAP_REGISTRY = { wall: { nameKey: "entity.wall.name", blocksMovement: true } };
 
   // Deux entités impassables placées en chevauchement à leur spawn -> une
   // passe suffit à les séparer, et l'état est stable au tick suivant (si
@@ -815,7 +815,7 @@ export function runMovementChecks() {
   // comportement) + physique (phase 2) combinées dans le même tick, sur un
   // niveau mêlant une entité wander ET une entité bloquante — le
   // déménagement en modules ne change aucun résultat, toujours déterministe.
-  const PIPELINE_REGISTRY = { dog: { label: "entity.dog" }, wall: { label: "entity.wall", blocksMovement: true } };
+  const PIPELINE_REGISTRY = { dog: { nameKey: "entity.dog.name" }, wall: { nameKey: "entity.wall.name", blocksMovement: true } };
   const pipelineLevel = parseLevel(
     {
       id: "movement-check-pipeline",
@@ -852,7 +852,7 @@ export function runMovementChecks() {
 
   // --- Partie multi-mondes (modèle "Animal Crossing") ---
 
-  const WORLD_A_REGISTRY = { dog: { label: "entity.dog" } };
+  const WORLD_A_REGISTRY = { dog: { nameKey: "entity.dog.name" } };
   const worldA = parseLevel(
     {
       id: "movement-check-world-a",
@@ -1050,7 +1050,7 @@ export function runMovementChecks() {
   // ET ciblage de comportement restent bornés à la face de l'entité, jamais
   // croisés entre recto et verso.
 
-  const ISOLATION_REGISTRY = { npc: { label: "entity.npc" }, blocker: { label: "entity.blocker", blocksMovement: true } };
+  const ISOLATION_REGISTRY = { npc: { nameKey: "entity.npc.name" }, blocker: { nameKey: "entity.blocker.name", blocksMovement: true } };
 
   // Collision : un bloqueur de l'AUTRE face ne doit JAMAIS arrêter le
   // joueur — deux espaces disjoints qui partagent seulement l'axe x.
@@ -1608,7 +1608,7 @@ export function runMovementChecks() {
 
   // --- Intégration dans reduce() : présence + blocage + comportement ---
 
-  const PRESENCE_REGISTRY = { wall: { label: "entity.wall", blocksMovement: true }, dog: { label: "entity.dog" } };
+  const PRESENCE_REGISTRY = { wall: { nameKey: "entity.wall.name", blocksMovement: true }, dog: { nameKey: "entity.dog.name" } };
   const NIGHT_ONLY = [{ when: { type: "timeRange", from: 20, to: 6 }, present: true }];
 
   // Entité BLOQUANTE mais dormante le jour (règle "présente la nuit") : le
@@ -1799,7 +1799,7 @@ export function runMovementChecks() {
   // --- Compagnons (brique 1/3 : infrastructure — persistance/injection/
   // traversée, PAS de suivi du joueur à ce stade, voir CLAUDE.md) ---
 
-  const COMPANION_REGISTRY = { dog: { label: "entity.dog" }, npc: { label: "entity.npc" } };
+  const COMPANION_REGISTRY = { dog: { nameKey: "entity.dog.name" }, npc: { nameKey: "entity.npc.name" } };
   const companionLevel = parseLevel(
     {
       id: "movement-check-companion-a",
@@ -1932,7 +1932,7 @@ export function runMovementChecks() {
   // ce découpage isole la logique du comportement de celle du cercle
   // partie, déjà couverte plus haut.
 
-  const FOLLOW_REGISTRY = { dog: { label: "entity.dog" }, wall: { label: "entity.wall", blocksMovement: true } };
+  const FOLLOW_REGISTRY = { dog: { nameKey: "entity.dog.name" }, wall: { nameKey: "entity.wall.name", blocksMovement: true } };
 
   // Cible statique (sans behavior) : cadre de test simple, aucun mouvement
   // parasite à modéliser.
@@ -2111,7 +2111,7 @@ export function runMovementChecks() {
   // d'arrivée (gotoArrived) — pas de temporel/trigger ici, cible fixe
   // donnée en dur (brique 2/2, pas encore construite).
 
-  const GOTO_REGISTRY = { dog: { label: "entity.dog" }, wall: { label: "entity.wall", blocksMovement: true } };
+  const GOTO_REGISTRY = { dog: { nameKey: "entity.dog.name" }, wall: { nameKey: "entity.wall.name", blocksMovement: true } };
 
   function makeGotoLevel(overrides = {}) {
     return {
@@ -2353,7 +2353,7 @@ export function runMovementChecks() {
   // même validation que le champ `behavior` d'une entité (voir
   // core/level.js/parseBehavior) — un kind inconnu est rejeté clairement,
   // jamais un crash silencieux plus tard.
-  const TRIGGER_REGISTRY = { dog: { label: "entity.dog" } };
+  const TRIGGER_REGISTRY = { dog: { nameKey: "entity.dog.name" } };
   let unknownEffectBehaviorRejected = false;
   try {
     parseLevel(
@@ -2381,7 +2381,7 @@ export function runMovementChecks() {
   // --- Routine complète (habitant, brique 2/2) : jour -> départ -> arrivée
   // -> dormant -> filet de minuit -> réveil ---
 
-  const ROUTINE_REGISTRY = { dog: { label: "entity.dog" }, wall: { label: "entity.wall", blocksMovement: true } };
+  const ROUTINE_REGISTRY = { dog: { nameKey: "entity.dog.name" }, wall: { nameKey: "entity.wall.name", blocksMovement: true } };
 
   function residentRules(doorId) {
     return [
@@ -2754,7 +2754,7 @@ export function runMovementChecks() {
   // qui prouve que le mécanisme fonctionne de bout en bout sur une scène
   // réelle à plusieurs entités partageant un contenu identique.
 
-  const BAR_REGISTRY = { dog: { label: "entity.dog" } };
+  const BAR_REGISTRY = { dog: { nameKey: "entity.dog.name" } };
 
   // Même règle LITTÉRALEMENT partagée (même objet presence[]) par les trois
   // patrons — spread ±5 min autour de 6h, bascule wander -> goto (vers la
@@ -3155,7 +3155,7 @@ export function runMovementChecks() {
   // Partie avec activité réelle (joueur qui avance, chien qui erre) ET une
   // transition (pour peupler worlds avec 2 mondes, un actif et un rangé) —
   // le cas le plus représentatif d'un vrai save.
-  const AUDIT_REGISTRY = { dog: { label: "entity.dog" }, door: { label: "entity.door" } };
+  const AUDIT_REGISTRY = { dog: { nameKey: "entity.dog.name" }, door: { nameKey: "entity.door.name" } };
   const auditWorldA = parseLevel(
     {
       id: "movement-check-audit-a",
@@ -3308,7 +3308,7 @@ export function runMovementChecks() {
 
   // --- Argent (core/money.js) : scalaire de partie + effet pickup ---
 
-  const MONEY_REGISTRY = { dog: { label: "entity.dog" } };
+  const MONEY_REGISTRY = { dog: { nameKey: "entity.dog.name" } };
   const moneyLevel = parseLevel(
     {
       id: "movement-check-money",
@@ -3394,7 +3394,7 @@ export function runMovementChecks() {
 
   // pickupItemEntity : effet atomique (objet + retrait), même patron que
   // pickupEntity (argent) ci-dessus.
-  const ITEM_TEST_REGISTRY = { item: { label: "entity.item" } };
+  const ITEM_TEST_REGISTRY = { item: { nameKey: "entity.item.name" } };
   const itemLevel = parseLevel(
     {
       id: "movement-check-item",
@@ -3650,7 +3650,7 @@ export function runMovementChecks() {
   // Validation au chargement (core/level.js/parsePresenceRule) : un tag de
   // condition inconnu échoue clairement, même principe que la surface d'un
   // segment (voir plus bas, "surfaces").
-  const TAG_TRIGGER_REGISTRY = { dog: { label: "entity.dog" } };
+  const TAG_TRIGGER_REGISTRY = { dog: { nameKey: "entity.dog.name" } };
   let validTagConditionAccepted = false;
   try {
     parseLevel(
@@ -3734,7 +3734,7 @@ export function runMovementChecks() {
     run("improvements : removeImprovement idempotent -> RÉFÉRENCE inchangée si déjà absente", removedAgain, removeImprovement(removedAgain, "flashlight"));
 
     // Validation au CHARGEMENT (core/level.js) — condition ET effets.
-    const IMPROVEMENT_TEST_REGISTRY = { dog: { label: "entity.dog" } };
+    const IMPROVEMENT_TEST_REGISTRY = { dog: { nameKey: "entity.dog.name" } };
     function levelWithHasImprovement(id) {
       return {
         id: "movement-check-has-improvement",
@@ -3848,7 +3848,7 @@ export function runMovementChecks() {
     // applyEntityActionEffects (core/state.js) — bout en bout, CONFIRME la
     // correction : improvements survit désormais au splice final (comme
     // variables), alors que seul .variables était repris auparavant.
-    const IMPROVEMENT_ENTITY_REGISTRY = { npc: { label: "entity.npc" } };
+    const IMPROVEMENT_ENTITY_REGISTRY = { npc: { nameKey: "entity.npc.name" } };
     const improvementWorld = parseLevel(
       {
         id: "movement-check-improvement-world",
@@ -3928,7 +3928,7 @@ export function runMovementChecks() {
   // l'exécution des effets de refus à l'interaction sont côté vue, hors de
   // portée d'un test terminal — voir "Vérifie (oreille)" pour ce volet.
 
-  const ACTION_CONDITION_REGISTRY = { dog: { label: "entity.dog" } };
+  const ACTION_CONDITION_REGISTRY = { dog: { nameKey: "entity.dog.name" } };
 
   let validActionConditionAccepted = false;
   let parsedActionConditionEntity = null;
@@ -4088,8 +4088,8 @@ export function runMovementChecks() {
   // dès la bascule — via LE MÊME presenceContext que time (voir
   // core/reduce.js/TICK), aucun mécanisme séparé.
   const SPIRIT_REGISTRY = {
-    dog: { label: "entity.dog" },
-    spirit: { label: "entity.ghost", presence: [{ when: { type: "perceptionActive" }, present: true }] },
+    dog: { nameKey: "entity.dog.name" },
+    spirit: { nameKey: "entity.ghost.name", presence: [{ when: { type: "perceptionActive" }, present: true }] },
   };
   const spiritLevel = parseLevel(
     {
@@ -4431,7 +4431,7 @@ export function runMovementChecks() {
     return threw;
   }
   const WEATHER_COND_REGISTRY = {
-    wolf: { label: "entity.cumulo_lupus", presence: [{ when: { type: "weather", state: "fog" }, present: true }] },
+    wolf: { nameKey: "entity.cumulo_lupus.name", presence: [{ when: { type: "weather", state: "fog" }, present: true }] },
   };
   const weatherCondLevelRaw = () => ({
     id: "movement-check-weather-condition",
@@ -4451,7 +4451,7 @@ export function runMovementChecks() {
         playerStart: 0,
         entities: [{ id: "wolf-1", type: "wolf", x: 10, presence: [{ when: { type: "weather", state: "doesNotExist" }, present: true }] }],
       },
-      { wolf: { label: "entity.cumulo_lupus" } }
+      { wolf: { nameKey: "entity.cumulo_lupus.name" } }
     )
   );
   run("weather (condition) : état valide -> chargement accepté", false, expectLevelParseThrows(weatherCondLevelRaw(), WEATHER_COND_REGISTRY));
@@ -4533,7 +4533,7 @@ export function runMovementChecks() {
     true,
     expectLevelParseThrows(
       { id: "movement-check-allof-empty", titleKey: "level.demo.title", length: 20, playerStart: 0, entities: [{ id: "wolf-1", type: "wolf", x: 10, presence: [{ when: { type: "allOf", conditions: [] }, present: true }] }] },
-      { wolf: { label: "entity.cumulo_lupus" } }
+      { wolf: { nameKey: "entity.cumulo_lupus.name" } }
     )
   );
   run(
@@ -4541,7 +4541,7 @@ export function runMovementChecks() {
     true,
     expectLevelParseThrows(
       { id: "movement-check-allof-missing", titleKey: "level.demo.title", length: 20, playerStart: 0, entities: [{ id: "wolf-1", type: "wolf", x: 10, presence: [{ when: { type: "allOf" }, present: true }] }] },
-      { wolf: { label: "entity.cumulo_lupus" } }
+      { wolf: { nameKey: "entity.cumulo_lupus.name" } }
     )
   );
   run(
@@ -4549,7 +4549,7 @@ export function runMovementChecks() {
     false,
     expectLevelParseThrows(
       { id: "movement-check-allof-single", titleKey: "level.demo.title", length: 20, playerStart: 0, entities: [{ id: "wolf-1", type: "wolf", x: 10, presence: [{ when: { type: "allOf", conditions: [{ type: "perceptionActive" }] }, present: true }] }] },
-      { wolf: { label: "entity.cumulo_lupus" } }
+      { wolf: { nameKey: "entity.cumulo_lupus.name" } }
     )
   );
   run(
@@ -4570,7 +4570,7 @@ export function runMovementChecks() {
           },
         ],
       },
-      { wolf: { label: "entity.cumulo_lupus" } }
+      { wolf: { nameKey: "entity.cumulo_lupus.name" } }
     )
   );
 
@@ -4580,7 +4580,7 @@ export function runMovementChecks() {
   // mécanisme séparé du reste de la présence conditionnelle.
   const ALLOF_REGISTRY = {
     wolf: {
-      label: "entity.cumulo_lupus",
+      nameKey: "entity.cumulo_lupus.name",
       presence: [{ when: { type: "allOf", conditions: [{ type: "perceptionActive" }, { type: "weather", state: "fog" }] }, present: true }],
     },
   };
@@ -4616,7 +4616,7 @@ export function runMovementChecks() {
   // Contrairement à removeEntity/pickupEntity ci-dessus, l'entité looté
   // N'EST JAMAIS retirée — voir entities/model.md/"Collectible persistant".
 
-  const CRATE_REGISTRY = { dog: { label: "entity.dog" } };
+  const CRATE_REGISTRY = { dog: { nameKey: "entity.dog.name" } };
   const crateLevel = parseLevel(
     {
       id: "movement-check-crate",
@@ -4658,7 +4658,7 @@ export function runMovementChecks() {
   // consumedDescriptionKey (core/level.js/parseEntity) : même cascade
   // instance -> type que descriptionKey.
   const CONSUMED_DESC_REGISTRY = {
-    dog: { label: "entity.dog", descriptionKey: "entity.dog.description", consumedDescriptionKey: "entity.dog.consumed_description" },
+    dog: { nameKey: "entity.dog.name", descriptionKey: "entity.dog.description", consumedDescriptionKey: "entity.dog.consumed_description" },
   };
   const consumedDescLevel = parseLevel(
     {
@@ -4700,7 +4700,7 @@ export function runMovementChecks() {
   // persistant ci-dessus, une entité éphémère ne survit JAMAIS — ni à une
   // sauvegarde, ni à une sortie de scène.
 
-  const EPHEMERAL_REGISTRY = { dog: { label: "entity.dog" }, door: { label: "entity.door" } };
+  const EPHEMERAL_REGISTRY = { dog: { nameKey: "entity.dog.name" }, door: { nameKey: "entity.door.name" } };
   const ephemeralWorldA = parseLevel(
     {
       id: "movement-check-ephemeral-a",
@@ -4919,7 +4919,7 @@ export function runMovementChecks() {
     run("scatter : obstacle DORMANT -> jamais compté (isBlocking, comme partout ailleurs)", 5, draw.x);
   }
 
-  const SCATTER_REGISTRY = { dog: { label: "entity.dog" } };
+  const SCATTER_REGISTRY = { dog: { nameKey: "entity.dog.name" } };
   const scatterLevel = parseLevel(
     {
       id: "movement-check-scatter",
@@ -5341,7 +5341,7 @@ export function runMovementChecks() {
     // chacune une variable PERSISTANTE (défaut) et une variable VOLATILE
     // (persistent: false explicite) — le couple minimal requis par la
     // vérification "modifier les deux, sauvegarder, recharger".
-    const VARIABLES_REGISTRY = { npc: { label: "entity.npc" } };
+    const VARIABLES_REGISTRY = { npc: { nameKey: "entity.npc.name" } };
     const variablesRawLevel = {
       id: "movement-check-variables",
       titleKey: "level.demo.title",
@@ -5773,7 +5773,7 @@ export function runMovementChecks() {
     // 4) Validation au CHARGEMENT (core/level.js) — PRÉSENT mais MALFORMÉ ->
     // erreur claire ; ABSENT -> défaut, jamais testé ici (déjà couvert par
     // le stockage seul, prompt précédent).
-    const VAR_ACTION_REGISTRY = { npc: { label: "entity.npc" } };
+    const VAR_ACTION_REGISTRY = { npc: { nameKey: "entity.npc.name" } };
     function levelWithCondition(cond, entityVariables = [{ name: "isOpen", type: "flag", initial: false }]) {
       return {
         id: "movement-check-var-cond",
@@ -6081,7 +6081,7 @@ export function runMovementChecks() {
     // 6) LA FENÊTRE — cas de test bout en bout (voir entities/types/
     // window.js pour l'archétype réel, dupliqué ici en dur — ce fichier ne
     // dépend jamais de entities/, voir header).
-    const WINDOW_REGISTRY = { window: { label: "entity.window" } };
+    const WINDOW_REGISTRY = { window: { nameKey: "entity.window.name" } };
     const windowRawLevel = {
       id: "movement-check-window",
       titleKey: "level.demo.title",
@@ -6231,7 +6231,7 @@ export function runMovementChecks() {
     // "variable" scope "entity" (même patron que la fenêtre plus haut) :
     // une porte VIP dont la destination dépend d'un flag PROPRE à cette
     // porte (ex. posé par un effet ailleurs dans la partie).
-    const CONDITIONAL_TELEPORT_REGISTRY = { door: { label: "entity.door" } };
+    const CONDITIONAL_TELEPORT_REGISTRY = { door: { nameKey: "entity.door.name" } };
     const conditionalTeleportLevel = parseLevel(
       {
         id: "movement-check-conditional-teleport",
@@ -6267,7 +6267,7 @@ export function runMovementChecks() {
 
     // b) teleport déclenché par une entité qui N'EST PAS une porte (trigger
     // temporel, vigile...) — même vocabulaire, aucune restriction de type.
-    const NON_DOOR_TELEPORT_REGISTRY = { npc: { label: "entity.npc" } };
+    const NON_DOOR_TELEPORT_REGISTRY = { npc: { nameKey: "entity.npc.name" } };
     const nonDoorTeleportLevel = parseLevel(
       {
         id: "movement-check-non-door-teleport",
@@ -6310,7 +6310,7 @@ export function runMovementChecks() {
   // city-screen.js) reste hors de portée d'un test core, à vérifier à
   // l'oreille (voir CLAUDE.md, "Vérifie (oreille)").
   {
-    const ANGLE_MORT_REGISTRY = { door: { label: "entity.door" } };
+    const ANGLE_MORT_REGISTRY = { door: { nameKey: "entity.door.name" } };
     const angleMortLevel = parseLevel(
       {
         id: "movement-check-action-context",
@@ -6448,7 +6448,7 @@ export function runMovementChecks() {
   // JSON.stringify brut) + audit générique de fuite (auditNonSerializable)
   // + diff structurel sur cette composition.
   {
-    const PANIER_PLEIN_REGISTRY = { dog: { label: "entity.dog" } };
+    const PANIER_PLEIN_REGISTRY = { dog: { nameKey: "entity.dog.name" } };
     const panierPleinLevel = parseLevel(
       {
         id: "movement-check-panier-plein",

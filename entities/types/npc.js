@@ -20,7 +20,7 @@
 // NEUTRE (ex. level/demo2.json, qui ne déclare pas de defaultSurface et
 // retombe donc sur "concrete", neutre — voir core/surfaces.js).
 export default {
-  label: "entity.npc",
+  nameKey: "entity.npc.name",
   descriptionKey: "entity.npc.description",
   gait: "shoes",
   sounds: {

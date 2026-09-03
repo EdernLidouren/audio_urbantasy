@@ -13,7 +13,7 @@
 // dog_medium_walk, voir dog.js).
 
 export default {
-  label: "entity.hound",
+  nameKey: "entity.hound.name",
   descriptionKey: "entity.hound.description",
   sounds: {
     vocal: { path: "assets/sounds/entities/dog_medium_vocal", loop: false, pitchVariation: 0.15 },

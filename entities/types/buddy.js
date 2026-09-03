@@ -1,5 +1,5 @@
 // Archétype "buddy" — le compagnon de test prédéfini (voir
-// core/state.js/createTestCompanion). Distinct de "dog" (dog.js) : label
+// core/state.js/createTestCompanion). Distinct de "dog" (dog.js) : nameKey
 // partagé ("Chien"), mais SANS beacon (retiré à la demande — le
 // compagnon suit le joueur de trop près, le "tic tic" continu gênait
 // l'écoute du reste de la scène) : on le repère à son pas et à sa voix
@@ -19,7 +19,7 @@
 // champs, jamais en les ajustant : la démonstration n'a plus sa place ici).
 
 export default {
-  label: "entity.dog",
+  nameKey: "entity.dog.name",
   descriptionKey: "entity.buddy.description",
   sounds: {
     vocal: {

@@ -523,7 +523,7 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
     fail(`entities[${index}] ("${id}") : x (${x}) hors des bornes [0, ${length}].`);
   }
 
-  const labelKey = isNonEmptyString(nameKey) ? nameKey : registry[type].label;
+  const labelKey = isNonEmptyString(nameKey) ? nameKey : registry[type].nameKey;
   // Même cascade instance -> type que labelKey, pour la description utilisée
   // par l'interaction "describe" (voir view/interaction.js). Peut rester
   // undefined si ni l'instance ni le type n'en fournissent une (ex. decor).

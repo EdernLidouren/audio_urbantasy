@@ -2,7 +2,7 @@
   "tag.military": "militaire",
   "tag.chic": "chic",
   "tag.metal": "métal",
-  "item.apple": "Pomme",
+  "item.apple.name": "Pomme",
   "item.apple.description": "Une pomme, fraîche et croquante.",
   "item.key_bronze": "Clé de bronze",
   "item.key_bronze.description": "Une petite clé en bronze.",

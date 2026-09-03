@@ -10,17 +10,20 @@
 // niveau 0, voir view/interaction.js et entities/model.md) sont bakés de la
 // même façon, cascade instance -> type -> défaut (false), et filtrent les
 // candidats PAR VERBE (view/audio/city-scene.js/getInteractionCandidates).
-// La vue lit sounds/label/collisionSound pour le rendu audio et les
+// La vue lit sounds/nameKey/collisionSound pour le rendu audio et les
 // annonces. Ni l'un ni l'autre ne dépend de l'autre, seulement de ce
 // registre.
 //
-// label est une CLÉ i18n (jamais une chaîne affichable directement).
+// nameKey est une CLÉ i18n (jamais une chaîne affichable directement),
+// forme "<namespace>.name" (ex. "entity.window.name") — SYMÉTRIQUE à
+// descriptionKey ci-dessous : même nom de champ à l'archétype ET à
+// l'instance (level/*.json), jamais un champ "label" séparé.
 //
 // descriptionKey (optionnel) : CLÉ i18n de la description utilisée par
 // l'interaction "describe" (touche Espace, voir view/interaction.js).
 // Défaut par type, surchargeable par instance via le champ
 // `descriptionKey` du niveau (level/*.json) — cascade instance -> type
-// identique à celle de nameKey/label (résolue dans core/level.js).
+// identique à celle de nameKey (résolue dans core/level.js).
 //
 // sounds regroupe les descripteurs de son du type PAR RÔLE (voir
 // entities/model.md pour le vocabulaire complet et la liste des paramètres

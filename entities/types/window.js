@@ -23,7 +23,7 @@
 // d'instance, le chargement du niveau échoue clairement (variable
 // référencée jamais déclarée).
 export default {
-  label: "entity.window",
+  nameKey: "entity.window.name",
   descriptionKey: "entity.window.description",
   sounds: {
     beacon: { path: "assets/sounds/entities/window_beacon_1.mp3", loop: true },
@@ -35,21 +35,17 @@ export default {
     {
       kind: "applyEffects",
       condition: { type: "variable", scope: "entity", name: "isOpen", equals: false },
-      refusalEffects: [{ type: "announce", key: "entity.window.refusal" }],
       effects: [
         { type: "playSound", path: "assets/sounds/effects/window_blinds_open" },
-        { type: "setVariable", scope: "entity", name: "isOpen", value: true },
-        { type: "announce", key: "entity.window.opened" },
+        { type: "setVariable", scope: "entity", name: "isOpen", value: true }
       ],
     },
     {
       kind: "applyEffects",
       condition: { type: "variable", scope: "entity", name: "isOpen", equals: true },
-      refusalEffects: [{ type: "announce", key: "entity.window.refusal" }],
       effects: [
         { type: "playSound", path: "assets/sounds/effects/window_blinds_close" },
-        { type: "setVariable", scope: "entity", name: "isOpen", value: false },
-        { type: "announce", key: "entity.window.closed" },
+        { type: "setVariable", scope: "entity", name: "isOpen", value: false }
       ],
     },
   ],

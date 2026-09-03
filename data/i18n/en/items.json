@@ -2,7 +2,7 @@
   "tag.military": "military",
   "tag.chic": "chic",
   "tag.metal": "metal",
-  "item.apple": "Apple",
+  "item.apple.name": "Apple",
   "item.apple.description": "An apple, fresh and crunchy.",
   "item.key_bronze": "Bronze key",
   "item.key_bronze.description": "A small bronze key.",

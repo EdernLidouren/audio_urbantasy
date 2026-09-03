@@ -10,7 +10,7 @@
 // que d'autres archétypes sans asset propre (voir bird.js) : un point de
 // passage doit rester LOCALISABLE au clavier/à l'oreille, comme une porte.
 export default {
-  label: "entity.passage",
+  nameKey: "entity.passage.name",
   descriptionKey: "entity.passage.description",
   sounds: {
     beacon: { path: "assets/sounds/entities/door_beacon", loop: true },

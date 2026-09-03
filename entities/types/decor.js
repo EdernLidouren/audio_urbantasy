@@ -9,7 +9,7 @@
 // entities/model.md) : celle où AUCUNE capacité n'est portée.
 
 export default {
-  label: "entity.decor",
+  nameKey: "entity.decor.name",
   sounds: {
     beacon: { path: "assets/sounds/entities/box_of_nails_beacon_1.mp3", loop: true },
   },

@@ -17,7 +17,7 @@
 // ci-dessous par un passe-haut + une réverb plus généreuse + une légère
 // atténuation de volume, pour que "bird" sonne plus fin/aérien.
 export default {
-  label: "entity.bird",
+  nameKey: "entity.bird.name",
   descriptionKey: "entity.bird.description",
   isFlying: true,
   sounds: {
@@ -29,6 +29,6 @@ export default {
     },
   },
   blocksMovement: false,
-  observable: true,
+  observable: false,
   interactable: false,
 };

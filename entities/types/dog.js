@@ -28,7 +28,7 @@
 // sonores").
 
 export default {
-  label: "entity.dog",
+  nameKey: "entity.dog.name",
   descriptionKey: "entity.dog.description",
   sounds: {
     beacon: { path: "assets/sounds/entities/box_of_nails_beacon_1.mp3", loop: true },

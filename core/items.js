@@ -40,7 +40,7 @@ import { TAG_REGISTRY } from "./tags.js";
 // Absent ou vide -> aucun tag, comportement inchangé pour tout objet
 // existant.
 export const ITEM_REGISTRY = {
-  apple: { stackable: true, label: "item.apple", descriptionKey: "item.apple.description" },
+  apple: { stackable: true, label: "item.apple.name", descriptionKey: "item.apple.description" },
   key_bronze: { stackable: false, label: "item.key_bronze", descriptionKey: "item.key_bronze.description" },
   sneakers: {
     stackable: false,

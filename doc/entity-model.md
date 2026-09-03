@@ -18,7 +18,7 @@ Une entité (registre `entities/types/index.js`, un fichier par archétype dans
 | Catégorie              | Champs                                                          | Rôle |
 |-------------------------|-------------------------------------------------------------------|------|
 | Position                | `x` (instance uniquement, voir `doc/level-format.md`)                  | où l'entité se trouve dans le niveau |
-| Type                    | `type` (instance), `label` (registre, clé i18n)                    | quoi et comment l'annoncer |
+| Type                    | `type` (instance), `nameKey` (registre ET instance, clé i18n, forme `<namespace>.name`) | quoi et comment l'annoncer |
 | Sons par rôle            | `sounds: { <rôle>: descripteur }`                                  | voir "Vocabulaire de sons" ci-dessous |
 | Portée spatiale           | `audibleRange`, `panSaturation`, `interactRange`, `cutoffMin`, `cutoffMax` | où/comment une entité est perçue dans l'espace — voir "Ce qui n'est PAS un paramètre sonore" |
 | Paramètres sonores        | `reverbSend`, `beaconMode`, `beaconInterval`, `beaconIntervalVariation`, `beaconGain`, `vocalInterval`, `vocalIntervalVariation`, `vocalGain`, `pitchVariation`, `movementStepMultiplier`, `movementGain`, `enterSoundGain`, `exitSoundGain` | voir "Paramètres sonores" ci-dessous, surchargeables à l'instance via `tuning` (voir "Le palier INSTANCE") |

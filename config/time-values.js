@@ -1,7 +1,10 @@
 // Constantes du calendrier de jeu + facteur d'accélération temporelle.
 // Donnée pure, ZÉRO import — même patron que config/tuning-values.js : le
 // core (core/time.js) la lit directement, jamais une logique ni un
-// registre de contenu.
+// registre de contenu. Exception UNIQUE, en bas de fichier : timeScale
+// porte un point d'écriture contrôlé (setTimeScale/resetTimeScale), pour le
+// menu debug du temps — le core ne les appelle jamais, il ne fait que lire
+// TIME_CONFIG comme le reste.
 //
 // Calendrier SIMPLIFIÉ, pas une reconstitution du grégorien : 12 mois de
 // longueur ÉGALE (30 jours), 4 saisons de 3 mois, pas de bissextile —
@@ -40,3 +43,28 @@ export const TIME_CONFIG = {
   // part.
   weekdayOrigin: 0,
 };
+
+// Valeur de RÉFÉRENCE de timeScale, capturée une fois à l'import — permet à
+// resetTimeScale ci-dessous de restaurer EXACTEMENT la valeur normale, et à
+// tout appelant (menu debug du temps, voir view/menus/debug-time-menu.js) de
+// calculer un multiplicateur à annoncer, sans dupliquer "60" en dur ailleurs.
+export const DEFAULT_TIME_SCALE = TIME_CONFIG.timeScale;
+
+// Ajuste TEMPORAIREMENT timeScale — SEUL point d'écriture de ce champ hors
+// configuration initiale (l'unique exception à "donnée pure" du header),
+// réservé au menu debug du temps (Shift+T, MODE DEBUG UNIQUEMENT) : accélère
+// l'écoulement pour OBSERVER une transition (crossfade jour/nuit, météo) au
+// lieu de la sauter avec advanceTime. Relu à CHAQUE frame par
+// view/city-screen.js/onFrame : un changement ici prend donc effet
+// IMMÉDIATEMENT, aucun code de synchro. `value` non positif ignoré — ce
+// réglage ne doit jamais figer ou inverser l'écoulement, seulement son
+// rythme.
+export function setTimeScale(value) {
+  if (typeof value !== "number" || !(value > 0)) return;
+  TIME_CONFIG.timeScale = value;
+}
+
+// Restaure la valeur normale — voir setTimeScale ci-dessus.
+export function resetTimeScale() {
+  TIME_CONFIG.timeScale = DEFAULT_TIME_SCALE;
+}

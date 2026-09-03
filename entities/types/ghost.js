@@ -13,7 +13,7 @@
 // — voir entities/types/neon.js pour son usage d'origine — en attendant un
 // asset "spectral" dédié). Donnée pure : aucun import.
 export default {
-  label: "entity.ghost",
+  nameKey: "entity.ghost.name",
   descriptionKey: "entity.ghost.description",
   sounds: {
     beacon: { path: "assets/sounds/entities/neon_beacon", loop: true },

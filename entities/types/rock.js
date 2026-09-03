@@ -10,7 +10,7 @@
 // pas blocksMovement.
 
 export default {
-  label: "entity.rock",
+  nameKey: "entity.rock.name",
   descriptionKey: "entity.rock.description",
   sounds: {
     beacon: { path: "assets/sounds/entities/big_rock_beacon_1.mp3", loop: true },

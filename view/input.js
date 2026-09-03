@@ -63,6 +63,12 @@ export const CITY_BINDINGS = {
   // -> canal INDÉPENDANT de "announceWeather" ci-dessus (mods:[]), aucune
   // collision malgré la même touche "w" (voir lib/input.js).
   openWeatherDebugMenu: { keys: ["w"], mods: ["shift"] },
+  // Shift+T, MODE DEBUG UNIQUEMENT (voir config/debug.js,
+  // view/city-screen.js/onKeyDown) : ouvre le menu de forçage du temps (voir
+  // view/menus/debug-time-menu.js). Même raisonnement que
+  // openWeatherDebugMenu ci-dessus : mods:["shift"] est un canal INDÉPENDANT
+  // de "announceTime" (mods:[]), aucune collision malgré la même touche "t".
+  openTimeDebugMenu: { keys: ["t"], mods: ["shift"] },
   // "p" (perception) : bascule la PERCEPTION SURNATURELLE (voir
   // core/state.js/togglePerception, view/city-screen.js/togglePerceptionEffect)
   // — COOLDOWN anti-spam entièrement côté consommation (city-screen.js),

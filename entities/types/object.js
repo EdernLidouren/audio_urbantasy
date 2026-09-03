@@ -3,7 +3,7 @@
 // aucun import.
 
 export default {
-  label: "entity.object",
+  nameKey: "entity.object.name",
   descriptionKey: "entity.object.description",
   sounds: {
     beacon: { path: "assets/sounds/entities/box_of_nails_beacon_1.mp3", loop: true },

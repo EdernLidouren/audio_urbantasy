@@ -18,7 +18,7 @@
 // nuit) pourrait s'ajouter via une règle -> texte, symétrique à `presence`
 // — pas câblé, `descriptionKey` reste unique aujourd'hui.
 export default {
-  label: "entity.neon",
+  nameKey: "entity.neon.name",
   descriptionKey: "entity.neon.description",
   sounds: {
     beacon: { path: "assets/sounds/entities/neon_beacon", loop: true },

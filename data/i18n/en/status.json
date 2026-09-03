@@ -27,5 +27,22 @@
   "weekday.3": "Thursday",
   "weekday.4": "Friday",
   "weekday.5": "Saturday",
-  "weekday.6": "Sunday"
+  "weekday.6": "Sunday",
+  "time.debug.title": "Time (debug)",
+  "time.debug.advance15Min": "Advance 15 minutes",
+  "time.debug.advance1Hour": "Advance 1 hour",
+  "time.debug.advance6Hours": "Advance 6 hours",
+  "time.debug.advance1Day": "Advance 1 day",
+  "time.debug.goToMidnight": "Go to midnight",
+  "time.debug.goTo8": "Go to 8 AM",
+  "time.debug.goToNoon": "Go to noon",
+  "time.debug.goTo20": "Go to 8 PM",
+  "time.debug.speedNormal": "Normal speed",
+  "time.debug.speedFast": "Fast speed",
+  "time.debug.speedVeryFast": "Very fast speed",
+  "time.debug.speedSet": "Speed: x{multiplier}.",
+  "time.debug.nextDay": "Go to next day",
+  "time.debug.nextNight": "Go to next night",
+  "time.debug.advance1Week": "Advance 1 week",
+  "time.debug.nextSeason": "Go to next season"
 }

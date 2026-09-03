@@ -6,13 +6,13 @@
 // contrairement aux paramètres numériques résolus par resolveTuning — voir
 // entities/model.md, "Résolution en cascade").
 //
-// label/descriptionKey/action réutilisent DIRECTEMENT les mêmes clés que
-// core/items.js/ITEM_REGISTRY.apple : une instance de niveau minimale
-// ({ type: "apple", x }) suffit donc, sans jamais répéter nameKey/
-// descriptionKey/action — le nom annoncé au ramassage correspond déjà à
-// celui du sac par construction, pas seulement par convention.
+// nameKey/descriptionKey/action réutilisent DIRECTEMENT les mêmes clés que
+// core/items.js/ITEM_REGISTRY.apple.label/descriptionKey : une instance de
+// niveau minimale ({ type: "apple", x }) suffit donc, sans jamais répéter
+// nameKey/descriptionKey/action — le nom annoncé au ramassage correspond
+// déjà à celui du sac par construction, pas seulement par convention.
 export default {
-  label: "item.apple",
+  nameKey: "item.apple.name",
   descriptionKey: "item.apple.description",
   sounds: {
     beacon: { path: "assets/sounds/entities/fruit_beacon", loop: true },

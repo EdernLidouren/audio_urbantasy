@@ -15,7 +15,7 @@
 // menu debug météo (Shift+W) pour forcer la brume, combiné à la touche de
 // perception ("p").
 export default {
-  label: "entity.cumulo_lupus",
+  nameKey: "entity.cumulo_lupus.name",
   descriptionKey: "entity.cumulo_lupus.description",
   sounds: {
     vocal: { path: "assets/sounds/entities/spectral_wolf_vocal", loop: false, pitchVariation: 0.15 },
