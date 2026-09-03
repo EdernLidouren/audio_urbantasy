@@ -12,19 +12,16 @@
     "entities": [
       { "id": "river", "type": "river", "x": 10, "interactable": false },
       {
-        "id": "townhall_door",
+        "id": "town_hall_main_door",
         "type": "door",
         "x": 25,
-        "nameKey": "door.townhall_main.name",
-        "descriptionKey": "door.townhall_main.description",
-        "sounds": {
-          "beacon": { "path": "assets/sounds/entities/door_1_beacon_1.mp3", "loop": true }
-        },
+        "nameKey": "door.town_hall_main.name",
+        "descriptionKey": "door.town_hall_main.description",
         "action": {
           "kind": "applyEffects",
           "condition": { "type": "timeRange", "from": 8, "to": 20 },
-          "refusalEffects": [{ "type": "announce", "key": "door.townhall_main.time_refused" }],
-          "effects": [{ "type": "teleport", "target": "town_square_townhall_main" }]
+          "refusalEffects": [{ "type": "announce", "key": "door.town_hall_main.time_refusal" }],
+          "effects": [{ "type": "teleport", "target": "town_square_town_hall_main" }]
         }
       }
     ]

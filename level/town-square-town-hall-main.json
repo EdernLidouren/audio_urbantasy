@@ -1,0 +1,56 @@
+{
+  "id": "town_square_town_hall_main",
+  "titleKey": "level.town_square_town_hall_main.name",
+  "length": 20,
+  "playerStart": 10,
+  "recto": {
+    "musicDay": "assets/musics/jazz_day",
+    "musicNight": "assets/musics/jazz_night",
+    "ambiences": [],
+    "defaultSurface": "concrete",
+    "entities": [
+      {
+        "id": "window_1",
+        "type": "window",
+        "x": 1,
+        "variables": [{ "name": "isOpen", "type": "flag", "initial": false, "persistent": false }]
+      },
+      {
+        "id": "window_2",
+        "type": "window",
+        "x": 20,
+        "variables": [{ "name": "isOpen", "type": "flag", "initial": false, "persistent": false }]
+      },
+      {
+        "id": "town_hall_door",
+        "type": "door",
+        "nameKey": "door.town_hall_main.name",
+        "descriptionKey": "door.town_hall_main.description",
+        "x": 10,
+        "action": { "kind": "applyEffects", "effects": [{ "type": "teleport", "target": "town_square", "x": 25 }] }
+      },
+      {
+        "id": "mayor_office_door",
+        "type": "door",
+        "nameKey": "door.mayor_office.name",
+        "descriptionKey": "door.mayor_office.description",
+        "x": 3,
+        "sounds": {
+          "beacon": { "path": "assets/sounds/entities/door_1_close_1.mp3", "loop": true }
+        },
+        "action": { "kind": "applyEffects", "effects": [{ "type": "teleport", "target": "town_square", "x": 25 }] }
+      },
+      {
+        "id": "potted_plant_1",
+        "type": "potted_plant",
+        "x": 17
+      },
+      {
+        "id": "chair_1",
+        "type": "chair",
+        "x": 8
+      }
+    ]
+  },
+  "verso": {}
+}

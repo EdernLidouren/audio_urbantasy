@@ -59,9 +59,12 @@ Deux niveaux de PERCEPTION, à ne pas confondre :
 - **Observation** (Espace, couche riche) : la DESCRIPTION d'une entité
   `observable` ciblée. Résolue via une INDIRECTION
   (`view/interaction.js`/`resolveDescription`) plutôt qu'un accès direct à
-  `descriptionKey` : aujourd'hui une simple clé i18n, demain une entité
-  pourra fournir une description DYNAMIQUE (méthode plutôt que clé statique)
-  en changeant SEULEMENT cette fonction, jamais ses appelants.
+  `descriptionKey` — DYNAMIQUE : `descriptionKey` reste une clé i18n, mais
+  peut porter un GABARIT à variables (`{hour}`, `{minute}`...), rempli avec
+  le contexte COURANT à chaque lecture, jamais stocké (voir
+  `view/description-resolver.js`, `doc/scripting.md`/"Descriptions
+  dynamiques" pour le détail et l'axe d'évolution vers des fragments choisis
+  par condition).
 
 Résolution de candidats PAR VERBE
 (`view/audio/city-scene.js`/`getInteractionCandidates(kind)`) : filtre
@@ -884,11 +887,13 @@ lien avec une instance de niveau — c'est le cas du joueur, voir plus bas).
 Chaque paramètre sonore listé ci-dessus passe par ce même mécanisme, y
 compris ceux peu ou jamais surchargés aujourd'hui — le mécanisme est
 générique, rien à étendre pour en ajouter un nouveau. Exemples déjà en place
-au niveau ARCHÉTYPE : `entities/types/bird.js` surcharge `beaconMode` (dans
-son `sounds.beacon`) ; `entities/types/dog.js` surcharge `vocalInterval`/
-`vocalIntervalVariation` (dans son `sounds.vocal`, pour aboyer plus souvent
-que le défaut global). En dehors de ce cas, `demo.json` ne surcharge aucun
-de ces paramètres au
+au niveau ARCHÉTYPE : `entities/types/bird_1.js` (et `bird_2.js`/`bird_3.js`)
+surchargent `vocalInterval`/`vocalIntervalVariation` (dans leur
+`sounds.vocal`, pour chanter par à-coups plus espacés que le défaut
+global) ; `entities/types/dog.js` surcharge les MÊMES paramètres en sens
+inverse (dans son `sounds.vocal`, pour aboyer plus souvent que le défaut
+global). En dehors de ce cas, `demo.json` ne surcharge aucun de ces
+paramètres au
 niveau INSTANCE : la résolution retombe alors sur le défaut du type puis sur
 le défaut global, exactement comme pour tout paramètre non déclaré.
 
@@ -898,7 +903,7 @@ Une instance de niveau (`level/*.json`) surcharge un paramètre en cascade via
 un champ RÉSERVÉ, `tuning`, un objet plat de clés -> valeurs :
 
 ```json
-{ "id": "bird-loud", "type": "bird", "x": 12, "tuning": { "beaconInterval": 1500, "beaconGain": 1.4 } }
+{ "id": "bird-loud", "type": "bird_1", "x": 12, "tuning": { "beaconInterval": 1500, "beaconGain": 1.4 } }
 ```
 
 `core/level.js`/`parseEntity` recopie ce champ TEL QUEL (`entity.tuning`) —
@@ -1117,8 +1122,8 @@ série APRÈS le passe-bas de distance déjà existant). Aucune entité
 non-`isFlying` n'appelle jamais ces nouveaux chemins : comportement
 STRICTEMENT inchangé pour tout contenu existant.
 
-**Exemple de référence** — `bird` (`entities/types/bird.js`,
-`level/demo.json`, instance `bird-1`) : VOCAL SEUL, aucun beacon (même choix
+**Exemple de référence** — `bird_1` (`entities/types/bird_1.js`,
+`level/demo.json`, instance `bird_1`) : VOCAL SEUL, aucun beacon (même choix
 que `hound`, voir "Beacon vs vocal" plus haut), pool DÉDIÉ `bird_1_vocal`,
 interval/variation surchargés pour un chant largement espacé. `isFlying:true`
 y suffit à lui seul, quel que soit le rôle de son porté (beacon OU vocal) —

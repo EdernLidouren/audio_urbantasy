@@ -211,7 +211,7 @@ startLoop(
   (deltaMs) => tickFrame(deltaMs)
 );
 
-loadLevel("./level/town_square.json", registry)
+loadLevel("./level/town-square.json", registry)
   .then((loadedLevel) => {
     level = loadedLevel;
   })

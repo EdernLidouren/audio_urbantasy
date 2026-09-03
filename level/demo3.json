@@ -25,7 +25,7 @@
   "verso": {
     "music": "assets/musics/mystery",
     "entities": [
-      { "id": "bird_alley_verso", "type": "bird", "x": 4 },
+      { "id": "bird_alley_verso", "type": "bird_1", "x": 4 },
       { "id": "cumulo_lupus_verso", "type": "cumuloLupus", "x": 4, "behavior": { "kind": "wander" } },
       {
         "id": "alley_gap_verso",

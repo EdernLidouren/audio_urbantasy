@@ -108,6 +108,18 @@ function announceGameTime(session) {
   );
 }
 
+// Consultation pure du TITRE de la scène active (touche Retour arrière, voir
+// onKeyDown plus bas) — même patron que announceGameTime ci-dessous, mais
+// réutilisé aussi à l'ENTRÉE dans une scène et après une transition (voir
+// plus bas) : MÊME annonce dans les trois cas, jamais une seconde version.
+// Miroir du Retour arrière des écrans-menus (lib/menu.js, "titre. entrée
+// courante") : ici, pas d'entrée sélectionnée à réannoncer, seulement le nom
+// de la scène — l'équivalent le plus proche pour un écran qui n'est pas un
+// menu.
+function announceSceneName(session) {
+  announce(t(getActiveWorld(session).titleKey), { assertive: true });
+}
+
 // Consultation pure de session.money (touche "g", voir onKeyDown plus bas) —
 // même patron que announceGameTime : aucune action, juste une lecture d'état
 // annoncée. Canal liveRegion par défaut (announce() sans option), comme le
@@ -419,7 +431,7 @@ export function makeCityScreen(getSession, setSession) {
 
     setSession(travelToWorld(session, targetId, freshLevel, { x, side }));
     scene = createCityAudioScene(getSession);
-    announce(t(getActiveWorld(getSession()).titleKey), { assertive: true });
+    announceSceneName(getSession());
 
     // Auto-save SUR TRANSITION (préférence autoSaveOnTransition, défaut
     // true) : la transition vient d'atteindre un point de cohérence
@@ -733,7 +745,7 @@ export function makeCityScreen(getSession, setSession) {
       ensureAudioUnlocked();
       scene = createCityAudioScene(getSession);
       document.getElementById("game").focus();
-      announce(t(getActiveWorld(getSession()).titleKey), { assertive: true });
+      announceSceneName(getSession());
     },
     onTick() {
       // scene momentanément null pendant un rechargement de teleport (voir
@@ -777,6 +789,19 @@ export function makeCityScreen(getSession, setSession) {
       if (action === "pauseMenu") {
         event.preventDefault();
         openPauseMenu(scene, getSession, travelViaCityMap);
+        return;
+      }
+
+      // "announceSceneName" (Retour arrière) : miroir du Retour arrière des
+      // écrans-menus (lib/menu.js), qui réannonce "titre. entrée courante" —
+      // ici, aucune entrée à réannoncer, juste le nom de la scène (même
+      // annonce qu'à l'entrée/après une transition, voir announceSceneName
+      // plus haut). preventDefault comme lib/menu.js/onKeyDown (même touche) :
+      // certains navigateurs anciens font naviguer "en arrière" sur Retour
+      // arrière hors champ de saisie.
+      if (action === "announceSceneName") {
+        event.preventDefault();
+        announceSceneName(getSession());
         return;
       }
 

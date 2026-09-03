@@ -15,6 +15,7 @@ import { playOneShot, playDescribedOneShot } from "../lib/audio.js";
 import { resolveAsset } from "../lib/assets.js";
 import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
 import { evaluateCondition, selectMatchingAction } from "../core/presence.js";
+import { resolveDescriptionText } from "./description-resolver.js";
 
 // Gestionnaires enregistrés UNE FOIS par view/city-screen.js, au moment de
 // sa construction — au plus un écran ville vivant à la fois dans cette
@@ -300,14 +301,17 @@ function runEffects(entity, effects) {
 }
 
 // Description RICHE d'une entité (interaction "describe"), distincte du nom
-// annoncé à l'approche (occupation, voir view/audio/city-scene.js). INDIRECTION
-// délibérée plutôt qu'un accès direct à descriptionKey : aujourd'hui une
-// simple clé i18n, mais un type d'entité pourra un jour fournir une
-// description DYNAMIQUE (méthode plutôt que clé statique) en changeant
-// SEULEMENT cette fonction, jamais ses appelants. undefined si l'entité n'a
-// rien à décrire (ex. descriptionKey absent malgré observable:true) — le
-// filtrage par capacité (getInteractionCandidates) évite déjà ce cas en
-// pratique, ce repli reste défensif.
+// annoncé à l'approche (occupation, voir view/audio/city-scene.js).
+// INDIRECTION délibérée plutôt qu'un accès direct à descriptionKey : la clé
+// choisie est résolue par description-resolver.js/resolveDescriptionText,
+// PAS un accès direct à t(key) — DYNAMIQUE désormais (gabarit i18n rempli du
+// CONTEXTE courant, voir son en-tête), recalculée à CHAQUE appel, jamais
+// stockée. Contexte = EXACTEMENT actionContext(entity) (voir plus bas) —
+// MÊME source que l'évaluation de condition, aucune seconde forme de
+// contexte à maintenir. undefined si l'entité n'a rien à décrire (ex.
+// descriptionKey absent malgré observable:true) — le filtrage par capacité
+// (getInteractionCandidates) évite déjà ce cas en pratique, ce repli reste
+// défensif.
 //
 // consumedDescriptionKey (voir core/level.js, entities/model.md/
 // "Collectible persistant") : description ALTERNATIVE une fois
@@ -315,11 +319,12 @@ function runEffects(entity, effects) {
 // d'un collectible persistant (core/money.js/lootEntity), déclaré par
 // l'entité elle-même, jamais un cas spécial câblé ici. Absente -> repli sur
 // descriptionKey normal (une entité consommée sans description alternative
-// déclarée garde simplement la même description qu'avant).
+// déclarée garde simplement la même description qu'avant). Cette clé PEUT
+// elle aussi porter un gabarit, comme n'importe quelle descriptionKey.
 function resolveDescription(entity) {
   const key = entity.consumed && entity.consumedDescriptionKey ? entity.consumedDescriptionKey : entity.descriptionKey;
   if (!key) return undefined;
-  return t(key);
+  return resolveDescriptionText(key, actionContext(entity));
 }
 
 // Aiguillage par TYPE D'ACTION (entity.action.kind, voir core/level.js) —

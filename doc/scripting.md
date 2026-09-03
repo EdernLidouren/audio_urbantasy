@@ -942,7 +942,8 @@ se déplacerait entre des mondes que le core ne tique jamais simultanément
 
 ## Conditions d'action
 
-Une action peut porter `condition: <objet condition>` + `refusalEffects: [<effet>, ...]` :
+Une action peut porter `condition: <objet condition>`, optionnellement accompagnée
+de `refusalEffects: [<effet>, ...]` :
 
 ```json
 // level/demo.json, door_club — MÊME kind "applyEffects" que door_exit, juste
@@ -962,13 +963,23 @@ Une action peut porter `condition: <objet condition>` + `refusalEffects: [<effet
 `condition` est le MÊME objet déclaratif que `presence[].when` — même registre,
 même validation (`core/level.js`/`validateCondition`, factorisée entre les deux
 usages). `refusalEffects` (MÊME vocabulaire que `effects`, voir "Effets
-d'action" plus haut) est REQUISE (tableau non vide) dès que `condition` est
-présente (échec clair au chargement sinon) : une condition sans effet de refus
-laisserait l'action échouer en silence, exactement ce que ce système évite.
-AUCUN son de refus GÉNÉRIQUE imposé par le système (l'ancien
-`assets/sounds/ui/refused` en dur a disparu) : une action qui ne veut
-QU'annoncer son refus déclare `[{ type: "announce", ... }]`, sans
-`"playSound"` — c'est un choix de CONTENU, jamais une valeur par défaut.
+d'action" plus haut) est OPTIONNELLE : une RESPONSABILITÉ DE CONTENU, pas une
+contrainte du validateur. **RECOMMANDÉE** dès qu'un échec laisserait le joueur
+sans AUCUN retour — bloqué sans explication (ex. `door_club`, ci-dessus : sans
+`refusalEffects`, tenter d'entrer sans tenue chic ne produirait RIEN, silence
+déroutant). **SUPERFLUE/omise** quand aucun échec n'est réellement atteignable
+— condition(s) qui couvrent tout l'espace possible, action non bloquante (voir
+"Actions multiples filtrées par condition"/la fenêtre plus bas : un
+`refusalEffects` y serait du code mort, jamais exécuté). Absente et la
+condition échoue → l'action ne s'exécute simplement pas, SANS effet d'aucune
+sorte (ni son ni annonce) — échec silencieux ASSUMÉ, à la charge du contenu de
+juger si c'est acceptable. PRÉSENTE, elle reste validée comme n'importe quelle
+liste d'effets (tableau NON VIDE, même règle qu'`effects` — un champ déclaré
+mais vide échoue au chargement, comme un tableau `effects` vide). AUCUN son de
+refus GÉNÉRIQUE imposé par le système (l'ancien `assets/sounds/ui/refused` en
+dur a disparu) : une action qui ne veut QU'annoncer son refus déclare
+`[{ type: "announce", ... }]`, sans `"playSound"` — c'est un choix de CONTENU,
+jamais une valeur par défaut.
 
 Évaluation et EXÉCUTION restent entièrement côté VUE
 (`view/interaction.js`/`interact`, juste avant de déléguer à
@@ -989,7 +1000,7 @@ porte l'équipement du JOUEUR — voir la nuance détaillée dans "Conditions"/
 `view/interaction.js`/`setTimeProvider`, câblé par `view/city-screen.js`, MÊME clé
 que `core/reduce.js`/`presenceContext`) porte l'heure de partie COURANTE : une
 condition `"timeRange"` se comporte donc IDENTIQUEMENT sur `action.condition` et sur
-`presence[].when` (ex. `door.townhall_main`, `level/town_square.json`).
+`presence[].when` (ex. `door.town_hall_main`, `level/town_square.json`).
 `context.perceptionActive`/`context.weather`/`context.world`/`context.session`
 (séparément, `view/interaction.js`/`setSessionProvider`, câblé par
 `view/city-screen.js`, MÊME dérivation que `core/reduce.js`/`presenceContext` — la
@@ -1032,7 +1043,7 @@ variable) — jamais un `if`/`else` ni une machine à états codée en dur, just
 règles déclaratives dont l'union couvre tout l'espace du flag.
 
 **Exemple réel complet — la fenêtre** (`entities/types/window.js`, instances dans
-`level/town_square_townhall_main.json`) — CAS DE RÉFÉRENCE combinant les DEUX
+`level/town_square_town-hall_main.json`) — CAS DE RÉFÉRENCE combinant les DEUX
 mécanismes de cette page : actions multiples filtrées par condition ET effets
 de première classe (état + rendu mélangés) :
 
@@ -1045,31 +1056,28 @@ action: [
   {
     kind: "applyEffects",
     condition: { type: "variable", scope: "entity", name: "isOpen", equals: false },
-    // refusalEffects requis dès qu'il y a une condition, mais
-    // STRUCTURELLEMENT inatteignable ici : les deux conditions couvrent tout
-    // l'espace du flag, une des deux matche toujours.
-    refusalEffects: [{ type: "announce", key: "entity.window.refusal" }],
+    // Pas de refusalEffects : les deux conditions couvrent tout l'espace du
+    // flag, une des deux matche TOUJOURS — un refus n'est jamais réellement
+    // atteignable ici, en déclarer un serait du code mort (voir "Conditions
+    // d'action" plus haut, refusalEffects OPTIONNELLE).
     effects: [
       { type: "playSound", path: "assets/sounds/effects/window_blinds_open" },
       { type: "setVariable", scope: "entity", name: "isOpen", value: true },
-      { type: "announce", key: "entity.window.opened" },
     ],
   },
   {
     kind: "applyEffects",
     condition: { type: "variable", scope: "entity", name: "isOpen", equals: true },
-    refusalEffects: [{ type: "announce", key: "entity.window.refusal" }],
     effects: [
       { type: "playSound", path: "assets/sounds/effects/window_blinds_close" },
       { type: "setVariable", scope: "entity", name: "isOpen", value: false },
-      { type: "announce", key: "entity.window.closed" },
     ],
   },
 ],
 ```
 
 ```json
-// level/town_square_townhall_main.json — l'INSTANCE déclare isOpen, VOLATILE
+// level/town_square_town-hall_main.json — l'INSTANCE déclare isOpen, VOLATILE
 // (repart fermée à chaque rechargement, jamais de mémoire d'ouverture entre
 // deux parties)
 {
@@ -1080,11 +1088,11 @@ action: [
 }
 ```
 
-Activer la fenêtre alterne : fermée → ouvre (son + `isOpen: true` + confirmation
-parlée, DANS CET ORDRE — voir "Effets d'action" plus haut) ; ouverte → ferme
-(son + `isOpen: false` + confirmation parlée) — chaque activation choisit la
-BONNE candidate parce que `isOpen` a changé depuis la dernière, jamais un
-compteur ou une machine à états gérée à la main.
+Activer la fenêtre alterne : fermée → ouvre (son + `isOpen: true`) ; ouverte →
+ferme (son + `isOpen: false`) — le SON suffit comme retour, aucun texte imposé
+(choix de contenu, voir "Conditions d'action" plus haut). Chaque activation
+choisit la BONNE candidate parce que `isOpen` a changé depuis la dernière,
+jamais un compteur ou une machine à états gérée à la main.
 
 ## Variables
 
@@ -1267,6 +1275,51 @@ Une entrée dans `TAG_REGISTRY` (`core/tags.js`), avec son `labelKey` (+ la
 traduction dans `data/i18n/fr/items.json`/`data/i18n/en/items.json`). Rien d'autre à
 toucher — un objet peut alors le référencer dans son `tags: [...]`.
 
+## Descriptions dynamiques
+
+`descriptionKey`/`consumedDescriptionKey` (voir "Collectible persistant",
+`doc/entity-model.md`) restent des clés i18n, mais peuvent porter un GABARIT
+à variables — RÉSOLU à chaque lecture (`view/description-resolver.js`/
+`resolveDescriptionText`, appelé par `view/interaction.js`/
+`resolveDescription`, l'INDIRECTION déjà en place pour "Espace"), JAMAIS
+stocké ni mis à jour par effet. Une description SANS `{variable}` reste
+STATIQUE, comportement STRICTEMENT inchangé (le gabarit ne fait que
+réutiliser `lib/i18n.js`/`interpolate`, qui traverse un gabarit sans
+placeholder sans y toucher).
+
+```json
+"entity.clock.description": "Une horloge murale... Il est {hour} h {minute}."
+```
+
+Examiner l'horloge à 8h → "...il est 08 h 00." ; à 14h30 → "...14 h 30." —
+aucun état de description stocké, recalculée à CHAQUE "Espace" avec l'heure
+COURANTE (voir `entities/types/clock.js`).
+
+**Valeurs disponibles** : dictionnaire dérivé du CONTEXTE
+(`resolveDescriptionText`/`buildDescriptionValues`), MÊMES noms que
+`time.announce`/`weather.announce` (`hour`, `minute`, `day`, `month`,
+`season`, `year`, `weather`) — EXTENSIBLE : une valeur de plus s'ajoute dans
+ce dictionnaire, jamais dans le mécanisme de remplissage
+(`resolveDescriptionText`), qui reste agnostique de ce qu'il contient.
+Variable de gabarit inconnue ou valeur manquante → dégradation PROPRE
+(`{placeholder}` laissé tel quel + avertissement, voir `lib/i18n.js`),
+jamais un plantage.
+
+**Contexte de résolution** : EXACTEMENT `actionContext(entity)` (voir
+"Conditions d'action" plus haut) — MÊME source que l'évaluation de
+condition (`entity`, `time`, `perceptionActive`, `weather`, `world`,
+`session`), construit par l'appelant (la vue), jamais lu directement par le
+résolveur (PUR : aucun accès à l'horloge réelle ni à un état global).
+
+**Axe d'évolution — niveau RICHE (pas construit)** : le gabarit à variables
+est une version DÉGÉNÉRÉE d'une forme future qui choisirait des FRAGMENTS de
+texte selon des CONDITIONS (ex. la position d'une grenouille selon la
+météo), réutilisant `evaluateCondition` (`core/presence.js`) contre ce MÊME
+contexte — jamais une seconde forme de contexte à maintenir. Le riche est
+une EXTENSION du simple, jamais un remplacement ; rien dans ce mécanisme
+n'empêche de l'ajouter plus tard (voir `doc/entity-model.md`/"Interaction
+(niveau 0)").
+
 ## Sources de vérité — où lire la liste exhaustive, jamais ici
 
 | Vocabulaire | Registre / aiguillage | Fichier |
@@ -1283,6 +1336,7 @@ toucher — un objet peut alors le référencer dans son `tags: [...]`.
 | Surfaces | `SURFACE_REGISTRY` | `core/surfaces.js` |
 | Types de variable | `VARIABLE_TYPES` | `core/variables.js` |
 | Portées de variable | `VARIABLE_SCOPES` | `core/variables.js` |
+| Valeurs de gabarit de description | `buildDescriptionValues` | `view/description-resolver.js` |
 
 Doc voisines à consulter selon ce qu'on touche : `doc/entity-model.md` (modèle
 d'entité, présence en détail, entités éphémères, collectible persistant),

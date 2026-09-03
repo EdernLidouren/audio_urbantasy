@@ -114,7 +114,7 @@ function createTestCompanion() {
   return {
     id: "companion-test-dog",
     type: "buddy",
-    labelKey: "entity.dog",
+    labelKey: "entity.dog.name",
     descriptionKey: "entity.buddy.description",
     blocksMovement: false,
     x: 0,

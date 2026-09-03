@@ -1130,7 +1130,7 @@ export function runMovementChecks() {
   // Éphémères : spawnEphemeral/removeEntity/markConsumed sont scopés à la
   // face COURANTE (session.player.side), jamais l'autre.
   let twoFaceEphemeralSession = createInitialState(twoFacedLevel, 3, NO_COMPANIONS);
-  const TWO_FACE_EPHEMERAL_SPEC = { type: "dog", labelKey: "entity.dog" };
+  const TWO_FACE_EPHEMERAL_SPEC = { type: "dog", labelKey: "entity.dog.name" };
   twoFaceEphemeralSession = spawnEphemeral(twoFaceEphemeralSession, TWO_FACE_EPHEMERAL_SPEC, 4);
   run(
     "deux faces : spawnEphemeral crée sur la face COURANTE (recto)",
@@ -1864,7 +1864,7 @@ export function runMovementChecks() {
   const tooManyCompanions = Array.from({ length: MAX_COMPANIONS + 3 }, (_, i) => ({
     id: `extra-companion-${i}`,
     type: "dog",
-    labelKey: "entity.dog",
+    labelKey: "entity.dog.name",
     blocksMovement: false,
     x: 0,
     dir: 1,
@@ -3465,7 +3465,7 @@ export function runMovementChecks() {
   // quantité, jamais N éparpillées — voir core/bag.js/dropItem.
   const DROP_SPEC = {
     type: "item",
-    labelKey: "item.apple",
+    labelKey: "item.apple.name",
     descriptionKey: "item.apple.description",
     blocksMovement: false,
     observable: true,
@@ -3994,10 +3994,12 @@ export function runMovementChecks() {
   }
   run("actions conditionnelles : tag inconnu dans action.condition -> échec clair", true, unknownActionConditionTagThrew);
 
-  // Une condition SANS refusalEffects laisserait l'action échouer en
-  // silence à l'interaction (voir header de parseEntity/action) : refusée
-  // dès le chargement, même sévérité qu'un tag inconnu.
-  let missingRefusalEffectsThrew = false;
+  // refusalEffects est OPTIONNEL (voir "Conditions d'action"/core/level.js/
+  // parseSingleAction) : une condition SANS refusalEffects charge SANS
+  // erreur — l'échec devient silencieux, ASSUMÉ (voir entities/types/
+  // window.js, dont les deux candidates couvrent tout l'espace du flag
+  // isOpen : un refus n'y est jamais réellement atteignable).
+  let missingRefusalEffectsAccepted = false;
   try {
     parseLevel(
       {
@@ -4011,14 +4013,17 @@ export function runMovementChecks() {
       },
       ACTION_CONDITION_REGISTRY
     );
+    missingRefusalEffectsAccepted = true;
   } catch {
-    missingRefusalEffectsThrew = true;
+    missingRefusalEffectsAccepted = false;
   }
-  run("actions conditionnelles : condition sans refusalEffects -> échec clair", true, missingRefusalEffectsThrew);
+  run("actions conditionnelles : condition SANS refusalEffects -> chargé sans erreur (optionnel)", true, missingRefusalEffectsAccepted);
 
-  // refusalEffects présent mais VIDE ([]) doit échouer comme absent : une
-  // condition sans AUCUN effet de refus resterait silencieuse à
-  // l'interaction, même sévérité.
+  // refusalEffects, quand PRÉSENT, reste validé comme n'importe quelle liste
+  // d'effets (MÊME règle qu'`effects`) : présent mais VIDE ([]) échoue —
+  // DISTINCT de son absence totale (légale ci-dessus) : un champ déclaré
+  // s'engage à servir à quelque chose, jamais un tableau vide laissé en
+  // trace.
   let emptyRefusalEffectsThrew = false;
   try {
     parseLevel(
@@ -4041,7 +4046,33 @@ export function runMovementChecks() {
   } catch {
     emptyRefusalEffectsThrew = true;
   }
-  run("actions conditionnelles : refusalEffects vide -> échec clair", true, emptyRefusalEffectsThrew);
+  run("actions conditionnelles : refusalEffects PRÉSENT mais vide -> échec clair", true, emptyRefusalEffectsThrew);
+
+  // refusalEffects malformé (présent, mais pas un tableau) -> même filet
+  // que vide : la FORME reste validée dès que le champ est déclaré.
+  let malformedRefusalEffectsThrew = false;
+  try {
+    parseLevel(
+      {
+        id: "movement-check-action-condition-malformed-refusal",
+        titleKey: "level.demo.title",
+        length: 10,
+        playerStart: 0,
+        entities: [
+          {
+            id: "conditional-action-malformed-refusal",
+            type: "dog",
+            x: 5,
+            action: { kind: "transit", condition: { type: "hasEquipmentTag", tag: "chic" }, refusalEffects: "oops" },
+          },
+        ],
+      },
+      ACTION_CONDITION_REGISTRY
+    );
+  } catch {
+    malformedRefusalEffectsThrew = true;
+  }
+  run("actions conditionnelles : refusalEffects malformé (pas un tableau) -> échec clair", true, malformedRefusalEffectsThrew);
 
   // Rétrocompat : une action SANS condition (tout contenu existant) reste
   // inchangée, jamais bloquée implicitement par cette nouvelle validation.
@@ -4721,7 +4752,7 @@ export function runMovementChecks() {
   // spec : descripteur DÉJÀ RÉSOLU, comme le construirait la vue (voir
   // view/city-screen.js/EPHEMERAL_COIN_SPEC) — spawnEphemeral ne l'interprète
   // jamais, il ne fait qu'y ajouter id/x/ephemeral.
-  const EPHEMERAL_SPEC = { type: "dog", labelKey: "entity.dog", interactable: true, action: { kind: "pickup", amount: 5 } };
+  const EPHEMERAL_SPEC = { type: "dog", labelKey: "entity.dog.name", interactable: true, action: { kind: "pickup", amount: 5 } };
 
   const ephemeralState = createInitialState(ephemeralWorldA, undefined, NO_COMPANIONS);
   run("éphémère : monde neuf démarre à nextEphemeralId 0", 0, getActiveWorld(ephemeralState).nextEphemeralId);
@@ -4730,7 +4761,7 @@ export function runMovementChecks() {
   const spawned1 = getActiveWorld(afterSpawn1).entities.find((e) => e.id === "ephemeral-0");
   run("éphémère : spawnEphemeral ajoute une entité marquée ephemeral:true", true, Boolean(spawned1 && spawned1.ephemeral));
   run("éphémère : spawnEphemeral pose x tel que demandé", 4, spawned1 && spawned1.x);
-  run("éphémère : spawnEphemeral reporte les champs de spec tels quels", "entity.dog", spawned1 && spawned1.labelKey);
+  run("éphémère : spawnEphemeral reporte les champs de spec tels quels", "entity.dog.name", spawned1 && spawned1.labelKey);
   run("éphémère : spawnEphemeral NE MUTE JAMAIS l'original", false, getActiveWorld(ephemeralState).entities.some((e) => e.ephemeral));
   run(
     "éphémère : une entité déclarée n'est jamais affectée par un spawn",
@@ -4881,7 +4912,7 @@ export function runMovementChecks() {
   // + drawScatteredPosition, core/money.js/lootEntitySpawn) ---
   // Voir entities/model.md/"Spawn déclenché par une action".
 
-  const SCATTER_SPEC = { type: "dog", labelKey: "entity.dog", interactable: true, action: { kind: "pickup", amount: 1 } };
+  const SCATTER_SPEC = { type: "dog", labelKey: "entity.dog.name", interactable: true, action: { kind: "pickup", amount: 1 } };
 
   // drawScatteredPosition en ISOLATION (exportée pour ça, voir son
   // commentaire) : bornes de carte ET obstacle, vérifiées directement,
@@ -6039,8 +6070,8 @@ export function runMovementChecks() {
       )
     );
     run(
-      "action : candidate sans refusalEffects malgré une condition -> erreur au chargement (RÉUTILISE la règle existante, par candidate)",
-      true,
+      "action : candidate sans refusalEffects malgré une condition -> chargé sans erreur (optionnel, RÉUTILISE la même règle, par candidate)",
+      false,
       expectThrows(() =>
         parseLevel(
           {
@@ -6097,21 +6128,21 @@ export function runMovementChecks() {
             {
               kind: "applyEffects",
               condition: { type: "variable", scope: "entity", name: "isOpen", equals: false },
-              refusalEffects: [{ type: "announce", key: "entity.window.refusal" }],
+              // Pas de refusalEffects (optionnel, voir core/level.js/
+              // parseSingleAction) : les deux candidates couvrent tout
+              // l'espace du flag, un refus n'est jamais réellement
+              // atteignable ici.
               effects: [
                 { type: "playSound", path: "assets/sounds/effects/window_blinds_open" },
                 { type: "setVariable", scope: "entity", name: "isOpen", value: true },
-                { type: "announce", key: "entity.window.opened" },
               ],
             },
             {
               kind: "applyEffects",
               condition: { type: "variable", scope: "entity", name: "isOpen", equals: true },
-              refusalEffects: [{ type: "announce", key: "entity.window.refusal" }],
               effects: [
                 { type: "playSound", path: "assets/sounds/effects/window_blinds_close" },
                 { type: "setVariable", scope: "entity", name: "isOpen", value: false },
-                { type: "announce", key: "entity.window.closed" },
               ],
             },
           ],
@@ -6124,12 +6155,13 @@ export function runMovementChecks() {
 
     let windowSession = createInitialState(windowLevel, undefined, { companions: [] });
 
-    // announceKey a disparu comme champ spécial (voir core/effects.js,
-    // core/scripting.md/"Effets") : la confirmation parlée d'une candidate
-    // est maintenant l'effet "announce" de SA PROPRE liste `effects`.
-    function announceKeyOf(chosen) {
-      const effect = chosen.effects.find((e) => e.type === "announce");
-      return effect && effect.key;
+    // Identifie la candidate choisie par le CHEMIN de son "playSound" (open
+    // vs close) — plus d'effet "announce" ici : le son SEUL sert de retour
+    // (refusalEffects/confirmation parlée retirés, voir entities/types/
+    // window.js/header, "Conditions d'action" — refusalEffects OPTIONNELLE).
+    function playSoundPathOf(chosen) {
+      const effect = chosen.effects.find((e) => e.type === "playSound");
+      return effect && effect.path;
     }
 
     // Simule "activer l'entité" : sélectionne la candidate qui matche PUIS
@@ -6148,7 +6180,11 @@ export function runMovementChecks() {
     }
 
     const activation1 = activateWindow(windowSession);
-    run("fenêtre : 1ère activation — choisit la candidate OUVRIR", "entity.window.opened", announceKeyOf(activation1.chosen));
+    run(
+      "fenêtre : 1ère activation — choisit la candidate OUVRIR",
+      "assets/sounds/effects/window_blinds_open",
+      playSoundPathOf(activation1.chosen)
+    );
     run(
       "fenêtre : 1ère activation — isOpen devient true",
       true,
@@ -6157,7 +6193,11 @@ export function runMovementChecks() {
     windowSession = activation1.session;
 
     const activation2 = activateWindow(windowSession);
-    run("fenêtre : 2ème activation — choisit la candidate FERMER", "entity.window.closed", announceKeyOf(activation2.chosen));
+    run(
+      "fenêtre : 2ème activation — choisit la candidate FERMER",
+      "assets/sounds/effects/window_blinds_close",
+      playSoundPathOf(activation2.chosen)
+    );
     run(
       "fenêtre : 2ème activation — isOpen redevient false",
       false,
@@ -6166,7 +6206,11 @@ export function runMovementChecks() {
     windowSession = activation2.session;
 
     const activation3 = activateWindow(windowSession);
-    run("fenêtre : 3ème activation — alterne de nouveau vers OUVRIR", "entity.window.opened", announceKeyOf(activation3.chosen));
+    run(
+      "fenêtre : 3ème activation — alterne de nouveau vers OUVRIR",
+      "assets/sounds/effects/window_blinds_open",
+      playSoundPathOf(activation3.chosen)
+    );
     windowSession = activation3.session;
 
     // Persistance : isOpen VOLATILE ne survit pas au save/reload — repart

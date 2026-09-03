@@ -21,7 +21,7 @@
     },
     { "id": "apple_1", "type": "apple", "x": 17 },
     { "id": "object_neon", "type": "neon", "x": 30 },
-    { "id": "bird_1", "type": "bird", "x": 33 },
+    { "id": "bird_1", "type": "bird_1", "x": 33 },
     { "id": "spirit_1", "type": "ghost", "x": 36 },
     {
       "id": "npc_resident",

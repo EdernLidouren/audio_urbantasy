@@ -8,19 +8,19 @@
 import { loadLocale } from "../../../lib/i18n.js";
 
 const DOMAINS = [
-  "menus",
+  "audio",
+  "entities",
+  "improvements",
   "interaction",
   "inventory",
   "items",
-  "audio",
+  "map",
+  "menus",
   "navigation",
+  "perception",
   "save",
   "status",
-  "entities",
-  "map",
-  "perception",
   "weather",
-  "improvements",
 ];
 
 export default await loadLocale("data/i18n/fr", DOMAINS);

@@ -4,8 +4,8 @@
 // connaître aucun kind par son nom — ajouter un comportement se fait en
 // créant un module + une entrée ici, sans toucher au core lui-même.
 
-import wander from "./wander.js";
 import follow from "./follow.js";
 import goto from "./goto.js";
+import wander from "./wander.js";
 
-export default { wander, follow, goto };
+export default { follow, goto, wander };

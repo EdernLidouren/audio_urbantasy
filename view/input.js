@@ -48,6 +48,11 @@ export const MOVE_KEYS = [...MOVE_BINDINGS.moveLeft.keys, ...MOVE_BINDINGS.moveR
 // pendant que l'écran est ouvert.
 export const CITY_BINDINGS = {
   pauseMenu: { keys: ["Escape"], mods: [] },
+  // Retour arrière : miroir de lib/menu.js/MENU_BINDINGS.backspace (annonce
+  // "titre. entrée courante" dans un menu) — ici, annonce le nom de la
+  // scène (voir view/city-screen.js/announceSceneName), l'équivalent le
+  // plus proche pour un écran qui n'est pas un menu.
+  announceSceneName: { keys: ["Backspace"], mods: [] },
   announceTime: { keys: ["t"], mods: [] },
   announceMoney: { keys: ["g"], mods: [] },
   openInventory: { keys: ["i"], mods: [] },

@@ -9,10 +9,11 @@
 // doc/scripting.md/"Effets") : DEUX candidates, l'une valable FERMÉE
 // (l'ouvre), l'autre valable OUVERTE (la ferme) — mutuellement EXCLUSIVES
 // par construction (isOpen ne peut être QUE true ou false), jamais deux qui
-// matchent en même temps. `refusalEffects` REQUIS par candidate dès qu'elle
-// porte une condition (voir core/level.js/parseSingleAction), mais
-// STRUCTURELLEMENT INATTEIGNABLE ici : l'union des deux conditions couvre
-// tout l'espace du flag, une des deux matche TOUJOURS.
+// matchent en même temps. `refusalEffects` est OPTIONNEL par candidate
+// (voir core/level.js/parseSingleAction) — délibérément ABSENT ici : l'union
+// des deux conditions couvre tout l'espace du flag, une des deux matche
+// TOUJOURS, un refus n'est donc jamais réellement atteignable. Le SON des
+// volets suffit comme retour ; aucun texte de confirmation/refus imposé.
 //
 // isOpen : VARIABLE D'INSTANCE (portée "entity", voir core/variables.js),
 // PAS déclarée ici — le TYPE ne cascade jamais de variable (contrairement à

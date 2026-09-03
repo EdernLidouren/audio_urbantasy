@@ -6,6 +6,6 @@ export default {
   demo: "level/demo.json",
   demo2: "level/demo2.json",
   demo3: "level/demo3.json",
-  town_square: "level/town_square.json",
-  town_square_townhall_main: "level/town_square_townhall_main.json",
+  town_square: "level/town-square.json",
+  town_square_town_hall_main: "level/town-square-town-hall-main.json",
 };

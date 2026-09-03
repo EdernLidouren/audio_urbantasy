@@ -126,6 +126,9 @@
     "assets/sounds/effects/neon_malfunction_4.mp3",
     "assets/sounds/effects/neon_malfunction_5.mp3"
   ],
+  "assets/sounds/effects/plant_shake": [
+    "assets/sounds/effects/plant_shake_1.mp3"
+  ],
   "assets/sounds/effects/window_blinds_close": [
     "assets/sounds/effects/window_blinds_close_1.mp3"
   ],
@@ -168,8 +171,11 @@
     "assets/sounds/entities/chair_1_beacon_2.mp3",
     "assets/sounds/entities/chair_1_beacon_3.mp3"
   ],
-  "assets/sounds/entities/clocktower_tick_tock_beacon": [
-    "assets/sounds/entities/clocktower_tick_tock_beacon_1.mp3"
+  "assets/sounds/entities/clock_1_beacon": [
+    "assets/sounds/entities/clock_1_beacon_1.mp3"
+  ],
+  "assets/sounds/entities/clocktower_beacon": [
+    "assets/sounds/entities/clocktower_beacon_1.mp3"
   ],
   "assets/sounds/entities/closet_door_1_close": [
     "assets/sounds/entities/closet_door_1_close_1.mp3"
@@ -456,6 +462,9 @@
     "assets/sounds/footsteps/wood_walk_18.mp3",
     "assets/sounds/footsteps/wood_walk_19.mp3",
     "assets/sounds/footsteps/wood_walk_20.mp3"
+  ],
+  "assets/sounds/keyboard_typing": [
+    "assets/sounds/keyboard_typing_1.mp3"
   ],
   "assets/sounds/ui/block": [
     "assets/sounds/ui/block_1.mp3"

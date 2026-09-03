@@ -7,7 +7,7 @@
 // — il dépend entièrement de la géométrie du lieu qui l'instancie.
 //
 // beacon : réutilise door_beacon (aucun son dédié encore) — même principe
-// que d'autres archétypes sans asset propre (voir bird.js) : un point de
+// que d'autres archétypes sans asset propre (voir decor.js) : un point de
 // passage doit rester LOCALISABLE au clavier/à l'oreille, comme une porte.
 export default {
   nameKey: "entity.passage.name",

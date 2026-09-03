@@ -2,8 +2,7 @@
 // complet et entities/model.md. Donnée pure : aucun import.
 //
 // Balise CONTINUE (beaconMode par défaut, non déclaré ici — voir
-// entities/model.md) : sert de point de comparaison avec bird.js
-// (intermittent). Son provisoire : même placeholder générique que
+// entities/model.md). Son provisoire : même placeholder générique que
 // object/dog/decor, aucun asset "fontaine" dédié pour l'instant.
 
 export default {

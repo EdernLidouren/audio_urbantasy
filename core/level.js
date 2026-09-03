@@ -445,14 +445,22 @@ function parsePresenceRule(rawRule, ruleIndex, index, id, entityVariables, scene
 // l'EXÉCUTION (view/interaction.js), jamais ici.
 //
 // `refusalEffects` : SYMÉTRIQUE d'`effects`, exécutée si la condition
-// ÉCHOUE — REQUISE (tableau non vide) dès que `condition` est présente,
-// même exigence que l'ancien `refusalKey` qu'elle remplace : une condition
-// sans effet de refus laisserait l'action échouer en silence, inacceptable
-// pour ce projet audio-first (voir CLAUDE.md, "L'accessibilité est une
-// exigence de premier ordre"). Aucun son de refus GÉNÉRIQUE imposé ici : une
-// action qui ne veut QU'annoncer son refus déclare `[{ type: "announce",
-// ... }]`, sans playSound — c'est un choix de CONTENU, jamais une valeur par
-// défaut du système.
+// ÉCHOUE — OPTIONNELLE : une action conditionnelle peut s'en passer si
+// l'échec est un choix de conception ASSUMÉ, jamais atteignable en pratique
+// (ex. entities/types/window.js, dont les deux candidates couvrent tout
+// l'espace de leur variable — aucun refus n'est jamais réellement possible,
+// en déclarer un serait du code mort). RECOMMANDÉE dès que l'échec
+// laisserait le joueur sans aucun retour (ex. porte à dresscode/horaires) —
+// c'est désormais une RESPONSABILITÉ DE CONTENU, plus une contrainte du
+// validateur (voir doc/scripting.md/"Conditions d'action"). Absente ->
+// l'action ne s'exécute simplement pas si la condition échoue, SANS effet
+// (ni son ni annonce) ; PRÉSENTE, elle reste validée comme n'importe quelle
+// liste d'effets (tableau NON VIDE, MÊME vocabulaire qu'`effects`) — un
+// champ déclaré s'engage à servir à quelque chose, jamais un tableau vide
+// laissé en trace. Aucun son de refus GÉNÉRIQUE imposé ici : une action qui
+// ne veut QU'annoncer son refus déclare `[{ type: "announce", ... }]`, sans
+// playSound — c'est un choix de CONTENU, jamais une valeur par défaut du
+// système.
 function parseSingleAction(rawAction, describe, entityVariables, sceneVariables) {
   if (typeof rawAction !== "object" || rawAction === null || Array.isArray(rawAction)) {
     fail(`${describe} doit être un objet.`);
@@ -462,9 +470,6 @@ function parseSingleAction(rawAction, describe, entityVariables, sceneVariables)
   }
   if (rawAction.condition !== undefined) {
     validateCondition(rawAction.condition, `${describe}.condition`, entityVariables, sceneVariables);
-    if (!Array.isArray(rawAction.refusalEffects) || rawAction.refusalEffects.length === 0) {
-      fail(`${describe}.refusalEffects doit être un tableau non vide quand condition est présente.`);
-    }
   }
   const result = { ...rawAction };
   if (rawAction.effects !== undefined) {
@@ -476,6 +481,9 @@ function parseSingleAction(rawAction, describe, entityVariables, sceneVariables)
     );
   }
   if (rawAction.refusalEffects !== undefined) {
+    if (!Array.isArray(rawAction.refusalEffects) || rawAction.refusalEffects.length === 0) {
+      fail(`${describe}.refusalEffects doit être un tableau non vide si présent.`);
+    }
     result.refusalEffects = rawAction.refusalEffects.map((effect, i) =>
       parseActionEffect(effect, `${describe}.refusalEffects[${i}]`, entityVariables, sceneVariables)
     );
@@ -655,10 +663,10 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
   // d'évaluation et EXÉCUTION (bloquer l'action, exécuter refusalEffects)
   // restent entièrement côté vue (voir view/interaction.js) : le core ne
   // fait que transporter et valider la FORME, comme pour `kind`.
-  // refusalEffects (voir parseSingleAction) est REQUISE quand condition est
-  // présente — une condition sans effet de refus laisserait l'action
-  // échouer en silence, ce que ce système est justement censé éviter (voir
-  // doc/entity-model.md).
+  // refusalEffects (voir parseSingleAction) est OPTIONNELLE : RECOMMANDÉE
+  // quand une condition qui échoue laisserait l'action bloquée sans aucun
+  // retour, mais jamais imposée — un échec structurellement inatteignable
+  // (voir entities/types/window.js) n'a pas à en déclarer une.
   //
   // ACTIONS MULTIPLES CANDIDATES (voir core/scripting.md/"Actions multiples
   // filtrées par condition", core/presence.js/selectMatchingAction) :

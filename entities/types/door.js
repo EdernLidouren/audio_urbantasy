@@ -11,8 +11,8 @@
 // ni de la vue : juste une entité `interactable` ordinaire dont l'action
 // déclenche un effet "teleport" comme n'importe quel autre contenu.
 export default {
-  nameKey: "entity.door.name",
-  descriptionKey: "entity.door.description",
+  nameKey: "door.default.name",
+  descriptionKey: "door.default.description",
   sounds: {
     beacon: { path: "assets/sounds/entities/door_1_close_1.mp3", loop: true },
   },
