@@ -44,13 +44,19 @@ export function setTeleportHandler(handler) {
   teleportHandler = handler;
 }
 
-// (arrivalX) => Promise<void> — bascule la face courante via un SAS animé
-// (croisement des filtres d'occlusion PUIS reconstruction de la scène
-// audio, voir view/city-screen.js/sideSwitchEffect ; core/state.js/
-// switchSide ; entities/types/passage.js), même patron que
-// setTeleportHandler ci-dessus — PAS un travelToWorld, on reste dans
-// le même monde. Asynchrone comme teleportHandler, mais handleSwitchSide
-// ne l'attend pas : le gestionnaire gère seul son propre sas.
+// (arrivalX, entity) => Promise<void> — bascule la face courante via un SAS
+// animé (croisement des filtres d'occlusion, pas de TRAJET/ARRIVÉE PUIS
+// reconstruction de la scène audio, voir view/city-screen.js/
+// sideSwitchEffect ; core/state.js/switchSide ; entities/types/passage.js),
+// même patron que setTeleportHandler ci-dessus — PAS un travelToWorld, on
+// reste dans le même monde. Asynchrone comme teleportHandler, mais
+// handleSwitchSide ne l'attend pas : le gestionnaire gère seul son propre
+// sas. `entity` : LE PASSAGE lui-même — transmis tel quel (jamais relu ici,
+// ce fichier ignore tout du son) pour que le gestionnaire puisse résoudre
+// SES flags (transitionSteps/transitionSurface, cascade instance ->
+// archétype -> défaut, voir config/tuning-values.js), exactement comme un
+// effet playSound diégétique reçoit l'entité porteuse (voir
+// runPlaySoundEffect plus haut).
 export function setSideSwitchHandler(handler) {
   sideSwitchHandler = handler;
 }
@@ -336,15 +342,17 @@ function resolveDescription(entity) {
 
 // "switchSide" (point de passage recto<->verso, voir entities/types/
 // passage.js) : délègue TOUT l'effet
-// (état + son de passage + croisement d'occlusion, voir
-// view/city-screen.js/sideSwitchEffect, qui orchestre son propre sas) au
-// gestionnaire enregistré, jamais de son joué ICI (contrairement à
+// (état + son de passage + croisement d'occlusion + pas de trajet/arrivée,
+// voir view/city-screen.js/sideSwitchEffect, qui orchestre son propre sas)
+// au gestionnaire enregistré, jamais de son joué ICI (contrairement à
 // handlePickup/handleLoot) : le son de bascule appartient à la SÉQUENCE du
 // sas, dont le timing (juste après le gel, AVANT le croisement de filtres)
 // ce fichier n'a aucune raison de connaître. arrivalX : donnée de CONTENU
 // (action.arrivalX, jamais validée en FORME par core/level.js — voir son
 // commentaire sur `action`, même politique que amount/spawn ci-dessous) —
 // un contenu mal formé se dégrade en avertissement, jamais un plantage.
+// `entity` (le passage) transmis tel quel au gestionnaire, voir
+// setSideSwitchHandler ci-dessus.
 function handleSwitchSide(entity, action) {
   const arrivalX = action.arrivalX;
   if (!Number.isFinite(arrivalX)) {
@@ -352,7 +360,7 @@ function handleSwitchSide(entity, action) {
     return;
   }
   if (!sideSwitchHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
-  sideSwitchHandler(arrivalX);
+  sideSwitchHandler(arrivalX, entity);
 }
 
 // "pickup" : effet d'ÉTAT délégué au gestionnaire enregistré — PUIS retour

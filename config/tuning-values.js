@@ -76,6 +76,26 @@ export const TUNING_DEFAULTS = {
   // surligné sans le demander explicitement à l'un de ces deux paliers.
   highlight: false,
 
+  // Pas du joueur pendant une TRANSITION recto/verso (voir
+  // entities/types/passage.js, view/audio/city-scene.js/playTransitionSteps/
+  // playArrivalStep) : activés PAR DÉFAUT (true) — un passage PHYSIQUE
+  // (ruelle, porte dérobée) se traverse à pied, donc se marche à l'oreille.
+  // Résolu par la MÊME cascade instance -> archétype -> ce défaut que
+  // `highlight` juste au-dessus : un futur passage IMMATÉRIEL (passe-miroir)
+  // désactivera ce flag sur SON archétype, sans toucher au défaut global.
+  transitionSteps: true,
+
+  // `transitionSurface` (nom de surface, voir core/surfaces.js/
+  // SURFACE_REGISTRY) : surcharge OPTIONNELLE de la surface des pas de
+  // TRAJET pendant une transition (voir
+  // view/audio/city-scene.js/playTransitionSteps) — un passage peut
+  // déclarer la sienne (ex. une ruelle PAVÉE, distincte du sol de la
+  // scène). AUCUNE entrée ici, comme `gait`/`naturalWalk` (voir
+  // doc/entity-model.md) : pas de défaut global sensé pour un nom de
+  // surface — non déclaré, `resolveTuning` retombe naturellement sur
+  // `undefined`, et c'est CE `undefined` que l'appelant interprète comme
+  // "utilise la surface de la face de départ", jamais un défaut figé ici.
+
   // Intervalle minimum (ms) entre deux bruits de pas d'une MÊME cause
   // (reprise après arrêt + cadence normale d'un côté, changement de sol de
   // l'autre — voir view/audio/city-scene.js, deux cooldowns séparés).
@@ -349,4 +369,14 @@ export const TUNING_DEFAULTS = {
   // clarté entre deux faces qui coexistent, jamais un fondu vers le
   // silence).
   faceSwitchFadeMs: 300,
+
+  // Intervalle (ms) entre deux pas de TRAJET pendant une transition
+  // recto/verso (voir view/audio/city-scene.js/playTransitionSteps) —
+  // CADENCE NATURELLE de marche (proche de STEP_DISTANCE/moveStep à vitesse
+  // normale, ~250ms), mais un LITTÉRAL indépendant plutôt qu'une formule
+  // dérivée : ce réglage de FEELING se tourne très bien à l'oreille, sans
+  // faire dépendre la vue d'un import du moteur de boucle (lib/loop.js)
+  // pour ça. Lu DIRECTEMENT (comme faceSwitchFadeMs ci-dessus), jamais via
+  // la cascade resolveTuning : un réglage PARTAGÉ, pas par passage.
+  transitionStepIntervalMs: 250,
 };

@@ -581,26 +581,32 @@ export function makeCityScreen(getSession, setSession) {
   // l'autre s'éclaircit, en parallèle, toutes deux restant audibles.
   //
   // Séquence STRICTE : sas -> son de PASSAGE (metal_gate, hors du gain de
-  // couche entités comme le son de porte) -> croisement des DEUX filtres ->
-  // bascule core (switchSide, position + face) -> scène reconstruite sur la
-  // NOUVELLE face active (getActiveWorld la lit déjà via
-  // session.player.side) -> fin du sas. La reconstruction reste un
-  // destroy()+recreate franc (comme avant ce sas) : SANS effet audible,
-  // puisque le croisement qui la précède a déjà amené le son exactement là
-  // où la scène fraîche le poserait (face active nette, face quittée
-  // étouffée/one-shot seul) — PAS de travelToWorld, le monde actif ne
-  // change pas, pas de fetch réseau, pas de nouveau titre à annoncer (même
-  // lieu).
-  async function sideSwitchEffect(arrivalX) {
+  // couche entités comme le son de porte) -> pas de TRAJET (voir
+  // scene.playTransitionSteps, EN PARALLÈLE du croisement — même durée,
+  // jamais attendu séparément, voir plus bas) + croisement des DEUX
+  // filtres -> bascule core (switchSide, position + face) -> pas
+  // d'ARRIVÉE (scene.playArrivalStep, sur la scène FRAÎCHE — voir
+  // view/audio/city-scene.js pour pourquoi getActiveWorld y désigne déjà
+  // la face de destination) -> scène reconstruite sur la NOUVELLE face
+  // active (getActiveWorld la lit déjà via session.player.side) -> fin du
+  // sas. La reconstruction reste un destroy()+recreate franc (comme avant
+  // ce sas) : SANS effet audible sur les DEUX faces, puisque le croisement
+  // qui la précède a déjà amené le son exactement là où la scène fraîche
+  // le poserait (face active nette, face quittée étouffée/one-shot seul)
+  // — PAS de travelToWorld, le monde actif ne change pas, pas de fetch
+  // réseau, pas de nouveau titre à annoncer (même lieu).
+  async function sideSwitchEffect(arrivalX, entity) {
     pushScreen({});
     try {
       playSideSwitchSound();
+      scene.playTransitionSteps(entity, FACE_SWITCH_FADE_MS);
       await scene.crossfadeFaceSwap(FACE_SWITCH_FADE_MS);
 
       scene.destroy();
       scene = null;
       setSession(switchSide(getSession(), arrivalX));
       scene = createCityAudioScene(getSession);
+      scene.playArrivalStep(entity, arrivalX);
     } finally {
       popScreen();
     }

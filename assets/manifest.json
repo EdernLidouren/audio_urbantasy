@@ -51,6 +51,9 @@
   "assets/musics/heights_day": [
     "assets/musics/heights_day_1.mp3"
   ],
+  "assets/musics/heights_night": [
+    "assets/musics/heights_night_1.mp3"
+  ],
   "assets/musics/jazz_day": [
     "assets/musics/jazz_day_1.mp3",
     "assets/musics/jazz_day_2.mp3",
@@ -94,6 +97,9 @@
     "assets/musics/science_day_1.mp3",
     "assets/musics/science_day_2.mp3"
   ],
+  "assets/musics/shop_day": [
+    "assets/musics/shop_day_1.mp3"
+  ],
   "assets/musics/slums_night": [
     "assets/musics/slums_night_1.mp3"
   ],
@@ -107,8 +113,7 @@
     "assets/musics/streets_night_2.mp3"
   ],
   "assets/musics/town_hall_day": [
-    "assets/musics/town_hall_day_1.mp3",
-    "assets/musics/town_hall_day_2.mp3"
+    "assets/musics/town_hall_day_1.mp3"
   ],
   "assets/old/window_beacon": [
     "assets/old/window_beacon_1.mp3"

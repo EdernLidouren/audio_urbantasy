@@ -1135,6 +1135,31 @@ face" reste vrai en dehors de cette fenêtre. Le croisement terminé, la
 scène audio est reconstruite (comme avant ce mécanisme), sans effet
 audible puisque le son y est déjà.
 
+**Pas du joueur pendant la transition** (voir
+`view/audio/city-scene.js`/`playTransitionSteps`/`playArrivalStep`,
+`view/city-screen.js`/`sideSwitchEffect`) : un passage `interactable`
+PHYSIQUE se traverse à pied — `transitionSteps` (booléen, cascade instance
+-> archétype -> défaut `true`, comme `highlight`) joue par défaut des pas
+DU JOUEUR pendant le sas, en DEUX temps distincts, jamais un flou
+mi-trajet-mi-arrivée :
+
+- **Trajet**, cadencé sur `transitionStepIntervalMs`
+  (`config/tuning-values.js`) EN PARALLÈLE du croisement de filtres — sur la
+  surface déclarée par `transitionSurface` (nom de surface, cascade comme
+  `transitionSteps`) SINON celle de la face de DÉPART.
+- **Arrivée**, UN SEUL pas, joué APRÈS `switchSide` — sur la surface RÉELLE
+  du point d'atterrissage (`surfaceAt`, comme un pas normal), pour un
+  contraste net si elle diffère de celle du trajet (ex. pavé -> herbe).
+
+Les DEUX sont des sons **MÉTA** (voir `doc/scripting.md`/"playSound", même
+vocabulaire diégétique/méta) : ils représentent le joueur, pas une des deux
+faces — jamais de bus de réverb, jamais de rampe d'occlusion, jamais de
+`entityLayer` (`lib/audio.js`), audibles NETS quel que soit l'état
+d'étouffement des faces pendant le croisement. `transitionSteps: false` (un
+futur passe-miroir, par exemple) désactive les deux d'un coup — silence
+total côté pas, seuls le son de passage et le croisement de filtres
+demeurent.
+
 ## `isFlying` — hauteur SUGGÉRÉE par le son, jamais un axe Y
 
 Booléen d'entité (`core/level.js`, cascade instance -> archétype -> `false`,

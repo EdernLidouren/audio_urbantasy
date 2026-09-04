@@ -195,6 +195,10 @@ const MUFFLING_GAIN = TUNING_DEFAULTS.mufflingGain;
 // touche (view/city-screen.js) est DÉRIVÉ de cette même valeur
 // (config/tuning-values.js/perceptionCooldownMs) — jamais dupliquée ici.
 const PERCEPTION_FADE_MS = TUNING_DEFAULTS.perceptionFadeMs;
+// Cadence des pas de TRAJET pendant une transition recto/verso (voir
+// playTransitionSteps plus bas) — réglage PARTAGÉ, jamais résolu par
+// passage (voir config/tuning-values.js/transitionStepIntervalMs).
+const TRANSITION_STEP_INTERVAL_MS = TUNING_DEFAULTS.transitionStepIntervalMs;
 
 // Réverb : propriétés du bus lui-même (un seul par scène, jamais par
 // entité). Durée/decay sont surchargeables PAR LIEU (level.reverbDurationSec/
@@ -1269,6 +1273,61 @@ export function createCityAudioScene(getSession) {
     });
   }
 
+  // Pas du joueur pendant une TRANSITION recto/verso (voir
+  // entities/types/passage.js, view/city-screen.js/sideSwitchEffect) — MÊME
+  // résolution de chemin que playFootstep (resolveFootstepPath), mais joués
+  // MÉTA : AUCUN reverbSend/reverbBusInput, AUCUN entityLayer (voir
+  // doc/scripting.md/"playSound", même vocabulaire "diégétique vs méta") —
+  // ils représentent le joueur qui marche, pas un son de l'une ou l'autre
+  // face, donc jamais routés par le bus de réverb de la scène ni par ses
+  // rampes d'occlusion (mundaneMuffleRamp, crossfadeFaceSwap) : audibles
+  // nets, quel que soit l'état d'étouffement des faces pendant le
+  // croisement.
+  function playMetaFootstepAt(world, atX, gait) {
+    const path = resolveFootstepPath(world, atX, { gait, naturalWalk: player.naturalWalk, ownPath: MOVEMENT_SOUND.path });
+    playOneShot(resolveAsset(path), { volume: footstepVolumeFactor() });
+  }
+
+  // Pas de TRAJET — cadencés sur TRANSITION_STEP_INTERVAL_MS pendant `durationMs`
+  // (voir view/city-screen.js/sideSwitchEffect, appelé EN PARALLÈLE du
+  // croisement de filtres, jeu déjà gelé) : ni stepWalker (basé sur une
+  // DISTANCE parcourue — le joueur ne bouge pas physiquement pendant le
+  // sas, `x` ne change qu'après switchSide) ni le tick de jeu (gelé, voir
+  // crossfadeFaceSwap) ne conviennent ici — un simple `setTimeout` par pas,
+  // comme le reste de la séquence du sas (rampEntityLayerGain,
+  // Howler.fade()) tourne sur l'horloge murale, pas le tick. Surface : celle
+  // déclarée par le passage (transitionSurface) SINON celle de la face de
+  // DÉPART (`??`, pas `||` : un nom de surface ne peut jamais être "faux" au
+  // sens JS, mais reste correct par prudence) — jamais "au point x", cette
+  // surface est fixe pour toute la traversée. `transitionSteps` (cascade
+  // instance -> archétype -> défaut true, comme `highlight`) désactivé ->
+  // silence total, aucun pas de trajet.
+  function playTransitionSteps(entity, durationMs) {
+    if (!resolveTuning("transitionSteps", entity)) return;
+    const departureFace = getActiveWorld(getSession());
+    const surfaceName = resolveTuning("transitionSurface", entity) ?? departureFace.defaultSurface;
+    const transitWorld = { defaultSurface: surfaceName, segments: [] };
+    const gait = gaitOf(getSession().equipment);
+    const stepCount = Math.max(1, Math.round(durationMs / TRANSITION_STEP_INTERVAL_MS));
+    for (let i = 0; i < stepCount; i++) {
+      setTimeout(() => playMetaFootstepAt(transitWorld, 0, gait), (i * durationMs) / stepCount);
+    }
+  }
+
+  // Pas d'ARRIVÉE — UN SEUL, joué APRÈS switchSide (voir l'appelant : la
+  // session porte déjà la NOUVELLE face active, donc getActiveWorld ici
+  // EST la face de destination) sur la surface RÉELLE du point
+  // d'atterrissage (surfaceAt, via resolveFootstepPath) — contraste net si
+  // elle diffère de celle du trajet (ex. pavé -> herbe), le signal "je pose
+  // le pied de l'autre côté". Même flag `transitionSteps` que le trajet
+  // (désactivé -> aucun pas d'arrivée non plus, jamais l'un sans l'autre).
+  function playArrivalStep(entity, arrivalX) {
+    if (!resolveTuning("transitionSteps", entity)) return;
+    const destinationFace = getActiveWorld(getSession());
+    const gait = gaitOf(getSession().equipment);
+    playMetaFootstepAt(destinationFace, arrivalX, gait);
+  }
+
   // Dormant si l'entité ne porte pas de collisionSound (voir
   // entities/types/index.js) — jamais joué dans ce cas.
   function playCollisionSound(entityId) {
@@ -2046,6 +2105,8 @@ export function createCityAudioScene(getSession) {
     refreshBeaconVolumes,
     crossfadeFaceSwap,
     playEntityOneShot,
+    playTransitionSteps,
+    playArrivalStep,
   };
   // Au plus une scène ville vivante à la fois dans cette appli (jamais
   // imbriquée) : permet à un menu ouvert par-dessus (Options > Audio) de
