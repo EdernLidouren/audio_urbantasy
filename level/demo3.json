@@ -18,6 +18,7 @@
         "id": "alley_gap_recto",
         "type": "passage",
         "x": 8,
+        "tuning": { "transitionSound": "assets/sounds/doors/metal_gate" },
         "action": { "kind": "switchSide", "arrivalX": 8 }
       }
     ]
@@ -31,6 +32,7 @@
         "id": "alley_gap_verso",
         "type": "passage",
         "x": 8,
+        "tuning": { "transitionSound": "assets/sounds/doors/metal_gate" },
         "action": { "kind": "switchSide", "arrivalX": 8 }
       }
     ]

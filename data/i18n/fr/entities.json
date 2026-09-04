@@ -68,11 +68,18 @@
   "entity.clock.name": "horloge",
   "entity.clock.description": "Une horloge murale au cadre circulaire en bois et aux aiguilles dorées. Il est {hour} h {minute}.",
   "entity.clocktower.name": "clocher",
-  "entity.clocktower.description": "Une tour circulaire de vieille pierre brunie par les siècles. Haute d'une vingtaine de mètres, elle flanque l'hôtel de ville en dominant la grand-place.",
+  "entity.clocktower.description": "Une tour octogonale de vieille pierre brunie par les siècles. Haute d'une vingtaine de mètres, elle flanque l'hôtel de ville en dominant la grand-place.",
   "entity.chair.name": "chaise",
   "entity.chair.description": "Une chaise en bois et assise de paille.",
   "entity.potted_plant.name": "plante en pot",
   "entity.potted_plant.description": "Un pot en terre cuite contenant une espèce végétale très commune.",
   "door.mayor_office.name": "porte du bureau de la maire",
-  "door.mayor_office.description": "Une plaque en laiton sur la porte expose le nom complet de la maire en lettres sobres : \"Amaryllis Grenat\""
+  "door.mayor_office.description": "Une plaque en laiton sur la porte expose le nom complet de la maire en lettres sobres : \"Amaryllis Grenat\"",
+  "entity.default_statue.name": "Statue",
+  "entity.default_statue.description": "Une statue.",
+  "entity.shellter_statue.name": "Statue de Matasîle",
+  "entity.shellter_statue.description": "Une statue aux dimensions impressionnantes figurant une tortue de mer géante portant plusieurs maisons sur sa carapace. Sa pierre est ancienne, mais propre et entretenue.",
+  "door.default_passage.name": "passage",
+  "door.town_hall_passage.description": "Un passage ombragé qui longe le bâtiment de l'hôtel de ville.",
+  "door.clocktower_passage.description": "Un passage discret courant à la base du clocher."
 }

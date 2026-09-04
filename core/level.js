@@ -47,6 +47,37 @@ function isFiniteNumber(value) {
   return typeof value === "number" && Number.isFinite(value);
 }
 
+// Fusion PROFONDE d'une surcharge sur une base — utilisée par `sounds`
+// (voir parseEntity plus bas), SEUL champ cascadé PAR FUSION plutôt que par
+// simple remplacement (labelKey, blocksMovement...) ou transport brut
+// (tuning). Appliquée récursivement, TROIS cas :
+//   - override === undefined (clé absente) -> hérite `base` telle quelle.
+//   - override === null -> RETIRE ce palier (résultat undefined ici — le
+//     parent, en itérant ses clés, en fait alors l'absence).
+//   - override objet ET base objet -> fusionne clé par clé (récursif) ;
+//     sinon (override terminal : chaîne, nombre, pool, tableau...) ->
+//     REMPLACE base entièrement, jamais fusionné (un path ne "fusionne"
+//     pas avec un autre).
+function deepMergeOverride(base, override) {
+  if (override === null) return undefined;
+  if (override === undefined) return base;
+
+  const overrideIsObject = typeof override === "object" && !Array.isArray(override);
+  const baseIsObject = typeof base === "object" && base !== null && !Array.isArray(base);
+  if (!overrideIsObject || !baseIsObject) return override;
+
+  const merged = { ...base };
+  for (const key of Object.keys(override)) {
+    const mergedValue = deepMergeOverride(base[key], override[key]);
+    if (mergedValue === undefined) {
+      delete merged[key];
+    } else {
+      merged[key] = mergedValue;
+    }
+  }
+  return merged;
+}
+
 // Un effet porté par une règle de presence[] : { type: "presence", present:
 // boolean } ou { type: "behavior", behavior: <objet behavior, même forme
 // que entities[].behavior — voir parseBehavior plus bas, réutilisé TEL
@@ -513,6 +544,7 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
     tuning,
     presence,
     variables,
+    sounds,
   } = rawEntity;
 
   if (!isNonEmptyString(id)) {
@@ -530,6 +562,22 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
   if (!isFiniteNumber(x) || x < 0 || x > length) {
     fail(`entities[${index}] ("${id}") : x (${x}) hors des bornes [0, ${length}].`);
   }
+
+  // sounds : cascade instance -> archétype PAR FUSION PROFONDE (voir
+  // deepMergeOverride ci-dessus) — SEUL champ fusionné plutôt que
+  // remplacé/transporté : une instance ne déclare QUE ce qu'elle CHANGE,
+  // fusionné récursivement avec le sounds de l'archétype (ex. { beacon: {
+  // gain: 0.8 } } surcharge juste ce champ, hérite le reste du rôle ET les
+  // autres rôles). TROIS états, voir doc/entity-model.md/"Cascade de
+  // sounds" : champ/rôle ABSENT -> hérite ; déclaré en OBJET -> fusionne ;
+  // déclaré à `null` -> RETIRE ce palier (ex. beacon: null retire le
+  // beacon sans toucher vocal/movement — le cas "passage sans beacon").
+  // Toujours un objet en sortie (`?? {}`), jamais undefined : la vue lit
+  // `entity.sounds` comme structurellement présent.
+  if (sounds !== undefined && sounds !== null && (typeof sounds !== "object" || Array.isArray(sounds))) {
+    fail(`entities[${index}] ("${id}") : sounds doit être un objet (ou null) si présent.`);
+  }
+  const resolvedSounds = deepMergeOverride(registry[type].sounds, sounds) ?? {};
 
   const labelKey = isNonEmptyString(nameKey) ? nameKey : registry[type].nameKey;
   // Même cascade instance -> type que labelKey, pour la description utilisée
@@ -605,6 +653,7 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
     type,
     x,
     labelKey,
+    sounds: resolvedSounds,
     blocksMovement: resolvedBlocksMovement,
     observable: resolvedObservable,
     interactable: resolvedInteractable,

@@ -136,6 +136,33 @@ function pickMusicPath(world, phase) {
   return () => resolveAsset(resolveMusicForPhase(world, phase));
 }
 
+// Message météo COMPOSÉ à un changement d'état (voir advanceWeather,
+// core/weather.js, et son appelant plus bas) : {fin de L'ANCIEN état} +
+// {début du NOUVEL état}, assemblés PAR GABARIT i18n
+// ("weather.transition.both"/"weather.transition.startOnly", une clé par
+// langue — voir data/i18n/*/weather.json) — jamais de concaténation en
+// dur ici, l'ordre/le connecteur/la ponctuation vivent ENTIÈREMENT dans
+// ces deux gabarits. Chaîne vide = signal "omets cette partie" (ex.
+// weather.transition.clear.end vide — "dégagé" n'a rien à dire en
+// PARTANT) : RÈGLE GÉNÉRALE sur la valeur résolue, jamais un cas spécial
+// codé en dur sur un état précis — n'importe quel état pourrait un jour
+// déclarer un fragment vide et serait traité pareil. fin ET début non
+// vides -> gabarit "both" ; fin vide -> gabarit "startOnly" (le début
+// seul) ; le cas symétrique (début vide, fin non vide) n'existe dans
+// aucun contenu actuel, mais reste couvert : même gabarit "startOnly",
+// nourri du fragment survivant (nommage du paramètre sans conséquence
+// puisque le gabarit ne fait qu'interpoler une chaîne dans une phrase).
+// Les deux vides (état hypothétique) -> chaîne vide, announce() s'en
+// dépêtre déjà (no-op silencieux sur "", voir lib/announce.js).
+function composeWeatherTransitionMessage(fromState, toState) {
+  const end = t(`weather.transition.${fromState}.end`);
+  const start = t(`weather.transition.${toState}.start`);
+  if (end && start) return t("weather.transition.both", { end, start });
+  if (start) return t("weather.transition.startOnly", { start });
+  if (end) return t("weather.transition.startOnly", { start: end });
+  return "";
+}
+
 // STEP_DISTANCE ne concerne aucune entité (c'est le pas du joueur) : défaut
 // global lu directement. AUDIBLE_RANGE, PAN_SATURATION, INTERACT_RANGE et
 // REVERB_SEND (des entités) concernent chaque entité individuellement :
@@ -619,8 +646,13 @@ let activeScene = null;
 function buildEntitySoundEntry(entity, world, time, perceptionActive, weather, { includeBeacon = true, disableStagger = false } = {}) {
   // beacon (localisation) et vocal (expression) : descripteurs de son du
   // type, tous deux OPTIONNELS et indépendants (voir entities/model.md) —
-  // ni l'un ni l'autre n'est "le" son obligatoire d'une entité.
-  const sounds = registry[entity.type].sounds;
+  // ni l'un ni l'autre n'est "le" son obligatoire d'une entité. `entity.sounds`
+  // (jamais `registry[entity.type].sounds` directement) : déjà le résultat
+  // RÉSOLU de la cascade instance -> archétype par fusion profonde (voir
+  // core/level.js/parseEntity) — un rôle retiré à l'instance (ex.
+  // beacon: null) n'existe donc déjà plus ICI, rien à revérifier contre
+  // l'archétype.
+  const sounds = entity.sounds;
   const beacon = includeBeacon ? sounds.beacon : undefined;
   const vocal = sounds.vocal;
   // enterSound/exitSound (voir core/presence.js) : rôles PONCTUELS
@@ -1799,6 +1831,9 @@ export function createCityAudioScene(getSession) {
         { pickPath: pickMusicPath(world, currentPhase), loop: musicLoop, breatherRange: MUSIC_BREATHER_RANGE },
         MUSIC_FADE_MS
       );
+      // Annonce d'ambiance (non-assertive, comme la météo plus bas) : ne
+      // coupe pas la parole en cours, s'insère entre deux pauses.
+      announce(t(currentPhase === "night" ? "time.phase.nightBegins" : "time.phase.dayBegins"));
     }
 
     // Bascule de PERCEPTION SURNATURELLE (voir core/state.js/
@@ -1842,8 +1877,13 @@ export function createCityAudioScene(getSession) {
     // évaluée ici, le lieu n'est jamais touché), sinon fondu vers/depuis le
     // pool météo, SUPERPOSÉ à la couche gagnante (jamais à sa place).
     if (session.weather.state !== weatherState) {
+      const previousWeatherState = weatherState;
       weatherState = session.weather.state;
       declareWeatherAmbience(weatherState, WEATHER_AMBIENCE_FADE_MS);
+      // Annonce d'ambiance (non-assertive) : message COMPOSÉ fin/début, voir
+      // composeWeatherTransitionMessage plus haut — jamais coupée par cette
+      // transition, s'insère entre deux pauses de parole.
+      announce(composeWeatherTransitionMessage(previousWeatherState, weatherState));
     }
 
     applyEntityAudio(x);

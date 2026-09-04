@@ -110,12 +110,36 @@ const COMPANION_SPAWN_SPACING = 2 * BODY_RADIUS;
 // repositionCompanions juste après, jamais lu tel quel. Pas de `dir` :
 // contrairement à wander, follow ne mémorise aucune direction d'un tick à
 // l'autre (recalculée à chaque fois depuis la distance à la cible).
+// sounds : dupliqué à la main depuis entities/types/buddy.js (comme
+// labelKey/descriptionKey ci-dessus) — le rendu audio lit désormais
+// `entity.sounds` (résultat de la cascade de core/level.js/parseEntity,
+// jamais le registre directement, voir view/audio/city-scene.js), donc CE
+// champ doit être porté explicitement ici aussi. Risque de dérive ASSUMÉ
+// (même risque que labelKey/descriptionKey déjà) : si buddy.js change ses
+// sons, cette copie ne suit pas automatiquement — le core ne peut PAS
+// importer le registre de contenu pour se resynchroniser lui-même.
+const TEST_COMPANION_SOUNDS = {
+  vocal: {
+    path: "assets/sounds/entities/dog_medium_vocal",
+    loop: false,
+    vocalInterval: 6000,
+    vocalIntervalVariation: 2000,
+    pitchVariation: 0.15,
+  },
+  movement: {
+    path: "assets/sounds/footsteps/entities/dog_medium_walk",
+    loop: false,
+    pitchVariation: 0.08,
+  },
+};
+
 function createTestCompanion() {
   return {
     id: "companion-test-dog",
     type: "buddy",
     labelKey: "entity.dog.name",
     descriptionKey: "entity.buddy.description",
+    sounds: TEST_COMPANION_SOUNDS,
     blocksMovement: false,
     x: 0,
     behavior: { kind: "follow" },

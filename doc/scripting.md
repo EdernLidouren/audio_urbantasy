@@ -352,6 +352,16 @@ portée de ce document (format déclaratif du core) : détail complet côté vue
 commentaires de `view/audio/city-scene.js` (`declareWeatherAmbience`) et `lib/audio.js`
 (`syncAmbienceLayers`, `desiredAmbienceSlots`).
 
+Le MÊME changement déclenche AUSSI une ANNONCE (non-assertive, canal ambiance) —
+`view/audio/city-scene.js`/`composeWeatherTransitionMessage` : {fin de l'état QUITTÉ} +
+{début de l'état REJOINT}, composés PAR GABARIT i18n (`weather.transition.both`/
+`weather.transition.startOnly`, `data/i18n/*/weather.json`), jamais une concaténation en
+dur — un fragment i18n vide (ex. `weather.transition.clear.end`, "dégagé" n'a rien à dire
+en partant) omet proprement sa partie de la phrase (gabarit "un seul", pas de virgule
+orpheline). MÊME principe pour la bascule de PHASE jour/nuit (`phaseAt`,
+`time.phase.dayBegins`/`time.phase.nightBegins`) — deux clés fixes, aucune composition
+nécessaire (une seule phase à la fois, jamais de fragment à assembler).
+
 ### `variable` — lecture d'une variable, avec comparaison
 
 ```js
@@ -641,9 +651,11 @@ mais on ne change jamais de monde (`activeWorldId` inchangé). Délègue à
 compagnons — RÉUTILISE `placePlayer`, la MÊME primitive qu'un teleport
 `reloadIfSame:false`) PUIS reconstruit la scène audio sur la nouvelle face
 (`view/city-screen.js`/`sideSwitchEffect`, même soin que `performTransition` :
-aucun Howl résiduel), et joue un marqueur sonore de
-bascule (`view/interaction.js`, "metal_gate" — `assets/sounds/doors/metal_gate`).
-`arrivalX` n'est PAS validé en bornes au chargement (comme tout `action.*`,
+aucun Howl résiduel), et joue le marqueur sonore de bascule DÉCLARÉ par le
+passage (`transitionSound`, cascade instance -> archétype -> défaut ABSENT
+— voir `doc/entity-model.md`/"Recto/verso", `config/tuning-values.js`) :
+silence côté son de passage si rien n'est déclaré, jamais un son générique
+imposé. `arrivalX` n'est PAS validé en bornes au chargement (comme tout `action.*`,
 transport générique) — clampé à l'exécution par `switchSide`, jamais un
 plantage. Détail complet du modèle à deux faces (persistance, gel de l'autre
 face) : `doc/level-format.md`/"Scène à deux faces (recto/verso)".

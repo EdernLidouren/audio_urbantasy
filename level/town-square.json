@@ -10,7 +10,7 @@
     "defaultSurface": "concrete",
     "segments": [{ "from": 8, "to": 12, "surface": "wood" }],
     "entities": [
-      { "id": "river", "type": "river", "x": 10, "interactable": false },
+      { "id": "river_recto", "type": "river", "x": 10, "interactable": false },
       {
         "id": "town_hall_main_door",
         "type": "door",
@@ -23,8 +23,65 @@
           "refusalEffects": [{ "type": "announce", "key": "door.town_hall_main.time_refusal" }],
           "effects": [{ "type": "teleport", "target": "town_square_town_hall_main" }]
         }
+      },
+      {
+        "id": "clocktower_1",
+        "type": "clock_tower",
+        "x": 35,
+        "isFlying": true
+      },
+      {
+        "id": "shellter_statue_1",
+        "type": "statue",
+        "x": 28,
+        "nameKey": "entity.shellter_statue.name",
+        "descriptionKey": "entity.shellter_statue.description"
+      },
+      {
+        "id": "town_hall_passage_recto",
+        "type": "passage",
+        "x": 19,
+        "nameKey": "door.default_passage.name",
+        "descriptionKey": "door.town_hall_passage.description",
+        "sounds": { "beacon": null },
+        "action": { "kind": "switchSide", "arrivalX": 19 }
+      },
+      {
+        "id": "clocktower_passage_recto",
+        "type": "passage",
+        "x": 41,
+        "nameKey": "door.default_passage.name",
+        "descriptionKey": "door.clocktower_passage.description",
+        "sounds": { "beacon": null },
+        "action": { "kind": "switchSide", "arrivalX": 41 }
       }
     ]
   },
-  "verso": {}
+  "verso": {
+    "musicDay": "assets/musics/jazz_day",
+    "musicNight": "assets/musics/jazz_night",
+    "ambiences": ["assets/ambiances/traffic_1.mp3"],
+    "defaultSurface": "dirt",
+    "entities": [
+      { "id": "river_verso", "type": "river", "x": 10, "interactable": false, "blocksMovement": true },
+      {
+        "id": "town_hall_passage_verso",
+        "type": "passage",
+        "x": 19,
+        "nameKey": "door.default_passage.name",
+        "descriptionKey": "door.town_hall_passage.description",
+        "sounds": { "beacon": null },
+        "action": { "kind": "switchSide", "arrivalX": 19 }
+      },
+      {
+        "id": "clocktower_passage_verso",
+        "type": "passage",
+        "x": 41,
+        "nameKey": "door.default_passage.name",
+        "descriptionKey": "door.clocktower_passage.description",
+        "sounds": { "beacon": null },
+        "action": { "kind": "switchSide", "arrivalX": 41 }
+      }
+    ]
+  }
 }

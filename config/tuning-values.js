@@ -96,6 +96,17 @@ export const TUNING_DEFAULTS = {
   // `undefined`, et c'est CE `undefined` que l'appelant interprète comme
   // "utilise la surface de la face de départ", jamais un défaut figé ici.
 
+  // `transitionSound` (chemin/pool résolu via resolveAsset, voir
+  // view/city-screen.js/playSideSwitchSound) : le son DÉCLARÉ d'un
+  // franchissement recto/verso (grincement, tintement...) — AUCUNE entrée
+  // ici, même raisonnement que `transitionSurface` juste au-dessus : pas
+  // de son générique imposé, un passage qui n'en déclare aucun (à
+  // l'instance via `tuning`, ou à l'archétype) transite en SILENCE côté
+  // son de passage — les rampes d'occlusion et les pas de trajet/arrivée
+  // jouent quand même, DEUX choses sonores indépendantes qui se composent
+  // (voir playTransitionSteps/playArrivalStep, view/audio/city-scene.js),
+  // jamais mélangées à ce son-ci.
+
   // Intervalle minimum (ms) entre deux bruits de pas d'une MÊME cause
   // (reprise après arrêt + cadence normale d'un côté, changement de sol de
   // l'autre — voir view/audio/city-scene.js, deux cooldowns séparés).
@@ -363,12 +374,17 @@ export const TUNING_DEFAULTS = {
   // Durée (ms) du CROISEMENT DE FILTRES d'occlusion pendant une bascule
   // recto/verso (voir view/audio/city-scene.js/crossfadeFaceSwap,
   // view/city-screen.js/sideSwitchEffect) — la face courante se referme
-  // pendant que l'autre s'ouvre, EN PARALLÈLE, sur cette même durée. Courte
-  // par nature (souligner le passage sans ralentir), DISTINCTE des durées
-  // de transition de porte ci-dessus : pas le même geste (un échange de
-  // clarté entre deux faces qui coexistent, jamais un fondu vers le
-  // silence).
-  faceSwitchFadeMs: 300,
+  // pendant que l'autre s'ouvre, EN PARALLÈLE, sur cette même durée.
+  // DISTINCTE des durées de transition de porte ci-dessus : pas le même
+  // geste (un échange de clarté entre deux faces qui coexistent, jamais un
+  // fondu vers le silence). PARAMÈTRE MAÎTRE de toute la traversée : le
+  // nombre de pas de TRAJET en DÉRIVE (voir
+  // view/audio/city-scene.js/playTransitionSteps,
+  // transitionStepIntervalMs ci-dessous) — ajuster CETTE seule valeur
+  // recadence les pas EN MÊME TEMPS que les rampes, jamais un second
+  // réglage à tenir synchronisé. Doublée (300 -> 600, essai en cours) pour
+  // une traversée plus vécue : à réajuster à l'oreille.
+  faceSwitchFadeMs: 600,
 
   // Intervalle (ms) entre deux pas de TRAJET pendant une transition
   // recto/verso (voir view/audio/city-scene.js/playTransitionSteps) —

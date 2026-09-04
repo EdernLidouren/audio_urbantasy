@@ -1,6 +1,6 @@
 {
   "weather.announce": "Weather: {state}.",
-  "weather.state.sunny": "sunny",
+  "weather.state.clear": "clear",
   "weather.state.cloudy": "cloudy",
   "weather.state.rain": "rainy",
   "weather.state.fog": "foggy",
@@ -8,5 +8,19 @@
   "weather.state.stormy": "stormy",
   "weather.debug.title": "Weather (debug)",
   "weather.debug.triggerTransition": "Trigger next transition",
-  "weather.debug.force": "Force: {state}"
+  "weather.debug.force": "Force: {state}",
+  "weather.transition.clear.start": "the sky clears up",
+  "weather.transition.clear.end": "",
+  "weather.transition.cloudy.start": "the sky clouds over",
+  "weather.transition.cloudy.end": "the clouds disperse",
+  "weather.transition.rain.start": "it starts to rain",
+  "weather.transition.rain.end": "the rain stops",
+  "weather.transition.windy.start": "the wind picks up",
+  "weather.transition.windy.end": "the wind dies down",
+  "weather.transition.stormy.start": "the storm begins to rumble",
+  "weather.transition.stormy.end": "the storm subsides",
+  "weather.transition.fog.start": "fog rises from the ground",
+  "weather.transition.fog.end": "the fog clears",
+  "weather.transition.both": "{end}, and {start}.",
+  "weather.transition.startOnly": "{start}."
 }

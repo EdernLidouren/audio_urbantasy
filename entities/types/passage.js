@@ -9,6 +9,17 @@
 // beacon : réutilise door_beacon (aucun son dédié encore) — même principe
 // que d'autres archétypes sans asset propre (voir decor.js) : un point de
 // passage doit rester LOCALISABLE au clavier/à l'oreille, comme une porte.
+// Un passage MUET (ex. town_square.json, town_hall_passage_recto) retire ce
+// beacon À L'INSTANCE via `"sounds": { "beacon": null }` (cascade PAR
+// FUSION, voir core/level.js/parseEntity, doc/entity-model.md/"Cascade de
+// sounds") — jamais un second archétype dupliqué pour ce cas.
+//
+// Son de FRANCHISSEMENT (recto<->verso, voir view/city-screen.js/
+// playSideSwitchSound) : AUCUN défaut ici — `transitionSound` (cascade
+// instance -> archétype -> défaut ABSENT, voir config/tuning-values.js) est
+// un choix de CONTENU par instance (via `tuning.transitionSound` au
+// niveau), jamais un défaut d'archétype imposé. Voir demo3.json (alley_gap_
+// recto/verso) pour un exemple de déclaration.
 export default {
   nameKey: "entity.passage.name",
   descriptionKey: "entity.passage.description",

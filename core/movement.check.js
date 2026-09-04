@@ -659,6 +659,65 @@ export function runMovementChecks() {
   }
   run("isFlying : non booléen rejeté", true, invalidFlyingRejected);
 
+  // --- sounds : cascade instance -> archétype PAR FUSION PROFONDE (voir
+  // entities/model.md/"Cascade de sounds") — SEUL champ cascadé ainsi,
+  // TROIS états : absent -> hérite, objet -> fusionne (récursif), null ->
+  // retire ce palier. entity.sounds toujours un objet en sortie.
+  const SOUNDS_REGISTRY = {
+    withSounds: {
+      nameKey: "entity.dog.name",
+      sounds: {
+        beacon: { path: "assets/sounds/a", gain: 0.5, reverbSend: 0.5 },
+        vocal: { path: "assets/sounds/b", pitchVariation: 0.1 },
+      },
+    },
+    noSounds: { nameKey: "entity.dog.name" }, // archétype sans sounds du tout
+  };
+  const soundsLevel = parseLevel(
+    {
+      id: "movement-check-sounds",
+      titleKey: "level.demo.title",
+      length: 20,
+      playerStart: 0,
+      entities: [
+        { id: "e-inherit", type: "withSounds", x: 1 }, // absent -> hérite tout
+        { id: "e-merge-field", type: "withSounds", x: 2, sounds: { beacon: { gain: 0.8 } } }, // objet -> fusionne
+        { id: "e-remove-role", type: "withSounds", x: 3, sounds: { beacon: null } }, // null -> retire
+        { id: "e-replace-path", type: "withSounds", x: 4, sounds: { beacon: { path: "assets/sounds/c" } } },
+        { id: "e-add-role", type: "noSounds", x: 5, sounds: { vocal: { path: "assets/sounds/d" } } }, // archétype vide -> objet neuf
+        { id: "e-remove-all", type: "withSounds", x: 6, sounds: null }, // null au sommet -> retire tout
+        { id: "e-no-archetype-no-instance", type: "noSounds", x: 7 }, // ni l'un ni l'autre -> {}
+      ],
+    },
+    SOUNDS_REGISTRY
+  );
+  function soundsEntity(id) {
+    return soundsLevel.entities.find((e) => e.id === id);
+  }
+  run("sounds : instance sans déclaration -> hérite tout de l'archétype", true, JSON.stringify(soundsEntity("e-inherit").sounds) === JSON.stringify(SOUNDS_REGISTRY.withSounds.sounds));
+  run("sounds : fusion — champ surchargé", 0.8, soundsEntity("e-merge-field").sounds.beacon.gain);
+  run("sounds : fusion — reste du rôle hérité (path)", "assets/sounds/a", soundsEntity("e-merge-field").sounds.beacon.path);
+  run("sounds : fusion — reste du rôle hérité (reverbSend)", 0.5, soundsEntity("e-merge-field").sounds.beacon.reverbSend);
+  run("sounds : fusion — autre rôle (vocal) inchangé", "assets/sounds/b", soundsEntity("e-merge-field").sounds.vocal.path);
+  run("sounds : null retire le rôle ciblé", undefined, soundsEntity("e-remove-role").sounds.beacon);
+  run("sounds : null sur un rôle n'affecte pas les autres rôles", "assets/sounds/b", soundsEntity("e-remove-role").sounds.vocal.path);
+  run("sounds : valeur terminale (path) remplacée, jamais fusionnée", "assets/sounds/c", soundsEntity("e-replace-path").sounds.beacon.path);
+  run("sounds : archétype sans ce rôle -> objet d'instance pris tel quel", "assets/sounds/d", soundsEntity("e-add-role").sounds.vocal.path);
+  run("sounds : null au sommet retire tout (objet vide)", 0, Object.keys(soundsEntity("e-remove-all").sounds).length);
+  run("sounds : ni archétype ni instance -> objet vide, jamais undefined", true, typeof soundsEntity("e-no-archetype-no-instance").sounds === "object" && soundsEntity("e-no-archetype-no-instance").sounds !== null);
+  run("sounds : résolu toujours sérialisable (round-trip JSON identique)", JSON.stringify(soundsEntity("e-merge-field").sounds), JSON.stringify(JSON.parse(JSON.stringify(soundsEntity("e-merge-field").sounds))));
+
+  let invalidSoundsRejected = false;
+  try {
+    parseLevel(
+      { id: "movement-check-sounds-invalid", titleKey: "level.demo.title", length: 10, playerStart: 0, entities: [{ id: "bad", type: "withSounds", x: 5, sounds: "oui" }] },
+      SOUNDS_REGISTRY
+    );
+  } catch {
+    invalidSoundsRejected = true;
+  }
+  run("sounds : type invalide (ni objet ni null) rejeté", true, invalidSoundsRejected);
+
   // action : TRANSPORT générique, cascade instance -> type (comme
   // behavior/presence) — le core valide la FORME (objet, kind non vide),
   // jamais le kind lui-même contre un registre (ça reste entièrement côté
@@ -4202,27 +4261,27 @@ export function runMovementChecks() {
   run(
     "weather : état sans transition de poids positif rejeté (état sans issue)",
     true,
-    expectWeatherValidationThrows({ sunny: { duration: { min: 10, max: 20 }, transitions: { sunny: 0 } } })
+    expectWeatherValidationThrows({ clear: { duration: { min: 10, max: 20 }, transitions: { clear: 0 } } })
   );
   run(
     "weather : transition vers une cible inconnue rejetée",
     true,
-    expectWeatherValidationThrows({ sunny: { duration: { min: 10, max: 20 }, transitions: { doesNotExist: 1 } } })
+    expectWeatherValidationThrows({ clear: { duration: { min: 10, max: 20 }, transitions: { doesNotExist: 1 } } })
   );
   run(
     "weather : poids négatif rejeté",
     true,
-    expectWeatherValidationThrows({ sunny: { duration: { min: 10, max: 20 }, transitions: { sunny: -1 } } })
+    expectWeatherValidationThrows({ clear: { duration: { min: 10, max: 20 }, transitions: { clear: -1 } } })
   );
   run(
     "weather : duration incohérente (min > max) rejetée",
     true,
-    expectWeatherValidationThrows({ sunny: { duration: { min: 20, max: 10 }, transitions: { sunny: 1 } } })
+    expectWeatherValidationThrows({ clear: { duration: { min: 20, max: 10 }, transitions: { clear: 1 } } })
   );
   run(
     "weather : durée non entière rejetée",
     true,
-    expectWeatherValidationThrows({ sunny: { duration: { min: 1.5, max: 10 }, transitions: { sunny: 1 } } })
+    expectWeatherValidationThrows({ clear: { duration: { min: 1.5, max: 10 }, transitions: { clear: 1 } } })
   );
   run(
     "weather : état inatteignable depuis DEFAULT_WEATHER_STATE rejeté",
@@ -4441,7 +4500,7 @@ export function runMovementChecks() {
   // EFFETS météo — prompt 2/2) : réutilise l'évaluateur de conditions
   // existant, un cas de plus à côté de timeRange/perceptionActive.
   run("weather (condition) : evaluateCondition — état courant == état demandé -> vraie", true, evaluateCondition({ type: "weather", state: "fog" }, { weather: "fog" }));
-  run("weather (condition) : evaluateCondition — état courant != état demandé -> fausse", false, evaluateCondition({ type: "weather", state: "fog" }, { weather: "sunny" }));
+  run("weather (condition) : evaluateCondition — état courant != état demandé -> fausse", false, evaluateCondition({ type: "weather", state: "fog" }, { weather: "clear" }));
   run("weather (condition) : evaluateCondition — champ absent du contexte -> fausse", false, evaluateCondition({ type: "weather", state: "fog" }, {}));
   run(
     "weather (condition) : evaluateCondition — ni state déclaré ni weather au contexte -> fausse (jamais undefined==undefined)",
@@ -4498,7 +4557,7 @@ export function runMovementChecks() {
     return getActiveWorld(state).entities.find((e) => e.id === "wolf-1");
   }
   let notFoggyState = createInitialState(weatherCondLevel, "weather-cond-check", NO_COMPANIONS);
-  notFoggyState = setWeather(notFoggyState, "sunny");
+  notFoggyState = setWeather(notFoggyState, "clear");
   notFoggyState = reduce(notFoggyState, tick(0));
   run("weather (condition) : entité conditionnée — dormante hors de l'état déclaré", false, wolf(notFoggyState).present);
 
@@ -4521,7 +4580,7 @@ export function runMovementChecks() {
   run(
     "allOf : une seule sous-condition vraie (perception) -> fausse",
     false,
-    evaluateCondition({ type: "allOf", conditions: [{ type: "perceptionActive" }, { type: "weather", state: "fog" }] }, { perceptionActive: true, weather: "sunny" })
+    evaluateCondition({ type: "allOf", conditions: [{ type: "perceptionActive" }, { type: "weather", state: "fog" }] }, { perceptionActive: true, weather: "clear" })
   );
   run(
     "allOf : une seule sous-condition vraie (météo) -> fausse",
@@ -4531,7 +4590,7 @@ export function runMovementChecks() {
   run(
     "allOf : aucune sous-condition vraie -> fausse",
     false,
-    evaluateCondition({ type: "allOf", conditions: [{ type: "perceptionActive" }, { type: "weather", state: "fog" }] }, { perceptionActive: false, weather: "sunny" })
+    evaluateCondition({ type: "allOf", conditions: [{ type: "perceptionActive" }, { type: "weather", state: "fog" }] }, { perceptionActive: false, weather: "clear" })
   );
   // Cas limite : "conditions" à un SEUL élément — redondant (revient à la
   // sous-condition seule) mais légal, voir core/level.js/validateCondition
@@ -4623,7 +4682,7 @@ export function runMovementChecks() {
     return getActiveWorld(state).entities.find((e) => e.id === "wolf-1");
   }
   let neitherState = createInitialState(allOfLevel, "allof-cond-check", NO_COMPANIONS);
-  neitherState = setWeather(neitherState, "sunny");
+  neitherState = setWeather(neitherState, "clear");
   neitherState = reduce(neitherState, tick(0));
   run("allOf (intégration) : ni perception ni brume -> dormante", false, allOfWolf(neitherState).present);
 
@@ -5691,7 +5750,7 @@ export function runMovementChecks() {
             { type: "weather", state: "fog" },
           ],
         },
-        { ...varCtx, weather: "sunny" }
+        { ...varCtx, weather: "clear" }
       )
     );
 

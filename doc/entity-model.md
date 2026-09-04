@@ -19,7 +19,7 @@ Une entité (registre `entities/types/index.js`, un fichier par archétype dans
 |-------------------------|-------------------------------------------------------------------|------|
 | Position                | `x` (instance uniquement, voir `doc/level-format.md`)                  | où l'entité se trouve dans le niveau |
 | Type                    | `type` (instance), `nameKey` (registre ET instance, clé i18n, forme `<namespace>.name`) | quoi et comment l'annoncer |
-| Sons par rôle            | `sounds: { <rôle>: descripteur }`                                  | voir "Vocabulaire de sons" ci-dessous |
+| Sons par rôle            | `sounds: { <rôle>: descripteur }` (registre ET instance, cascade PAR FUSION PROFONDE, voir "Cascade de sounds") | voir "Vocabulaire de sons" ci-dessous |
 | Portée spatiale           | `audibleRange`, `panSaturation`, `interactRange`, `cutoffMin`, `cutoffMax` | où/comment une entité est perçue dans l'espace — voir "Ce qui n'est PAS un paramètre sonore" |
 | Surlignage audio          | `highlight` (cascade instance -> type -> défaut `false`)           | gain de proximité, voir "Surlignage audio de proximité" plus bas — INDÉPENDANT de `observable`/`interactable` |
 | Paramètres sonores        | `reverbSend`, `beaconMode`, `beaconInterval`, `beaconIntervalVariation`, `beaconGain`, `vocalInterval`, `vocalIntervalVariation`, `vocalGain`, `pitchVariation`, `movementStepMultiplier`, `movementGain`, `enterSoundGain`, `exitSoundGain` | voir "Paramètres sonores" ci-dessous, surchargeables à l'instance via `tuning` (voir "Le palier INSTANCE") |
@@ -196,11 +196,14 @@ JSON de niveau, une entité ÉPHÉMÈRE n'est par définition jamais DÉCLARÉE.
   n'est spécifique à l'un ou l'autre : un objet lâché par un compagnon, un
   effet, pourront s'y greffer de la même façon plus tard. `spec` est un
   descripteur d'entité DÉJÀ RÉSOLU
-  (`type`, `labelKey`, `blocksMovement`, `observable`, `interactable`,
-  `action`...) — EXACTEMENT la forme qu'une entité obtient en sortie de
-  `core/level.js`/`parseEntity`, construit par L'APPELANT (voir
+  (`type`, `labelKey`, `sounds`, `blocksMovement`, `observable`,
+  `interactable`, `action`...) — EXACTEMENT la forme qu'une entité obtient
+  en sortie de `core/level.js`/`parseEntity`, construit par L'APPELANT (voir
   `createTestCompanion` dans `core/state.js`, même principe pour le
-  compagnon de test) : le core ne connaît AUCUN registre de types,
+  compagnon de test) : `sounds` DOIT être porté explicitement ici (voir
+  "Cascade de sounds" plus bas) — la vue lit `entity.sounds`, jamais le
+  registre directement, donc un spec fabriqué à la main qui l'omettrait
+  perdrait tout son. Le core ne connaît AUCUN registre de types,
   `spec.type` reste une étiquette opaque. `spawnEphemeral` pose lui-même
   `id` (dérivé d'un compteur DÉDIÉ par monde, `world.nextEphemeralId` —
   JAMAIS `Date.now()`/`Math.random()`, le core reste déterministe), `x` et
@@ -696,6 +699,48 @@ ex. un son d'interaction ponctuel un jour). Un rôle donné a un mode
 structurellement — c'est une convention respectée par ce projet, pas une
 contrainte du modèle.
 
+## Cascade de sounds — fusion profonde, instance -> archétype
+
+`sounds` cascade instance -> archétype (`core/level.js`/`parseEntity`,
+`entity.sounds` déjà RÉSOLU sur l'entité parsée — la vue, voir
+`view/audio/city-scene.js`/`buildEntitySoundEntry`, lit `entity.sounds`,
+jamais `registry[type].sounds` directement) — mais PAR FUSION PROFONDE
+(`deepMergeOverride`, `core/level.js`), SEUL champ cascadé de cette façon :
+contrairement à `nameKey`/`blocksMovement` (remplacement simple, tout ou
+rien) ou `tuning` (transport brut, jamais interprété par le core), une
+instance ne déclare QUE ce qu'elle CHANGE — le reste du rôle, et les autres
+rôles, restent HÉRITÉS de l'archétype.
+
+```json
+// entities/types/X.js : sounds: { beacon: { path: "a", gain: 0.5, reverbSend: 0.5 } }
+{ "id": "x1", "type": "X", "sounds": { "beacon": { "gain": 0.8 } } }
+// -> entity.sounds.beacon = { path: "a", gain: 0.8, reverbSend: 0.5 }
+```
+
+**TROIS états, à ne jamais confondre** (récursifs — s'appliquent à n'importe
+quel niveau : un rôle entier, ou un champ À L'INTÉRIEUR d'un rôle) :
+
+- **ABSENT** (la clé n'apparaît pas dans `sounds` à l'instance, ou le champ
+  n'apparaît pas dans le rôle déclaré) -> HÉRITE tel quel de l'archétype.
+  Une instance qui ne déclare `sounds` nulle part hérite donc TOUT,
+  inchangé — comportement STRICT rétrocompatible pour tout contenu
+  existant.
+- **Déclaré en OBJET** -> FUSIONNE récursivement avec l'équivalent de
+  l'archétype : chaque champ présent dans l'objet SURCHARGE, chaque champ
+  absent reste HÉRITÉ. S'applique aux RÔLES (`beacon`/`vocal`/`movement`)
+  ET, à l'intérieur d'un rôle, à SES champs (`path`/`gain`/`pitchVariation`/
+  `reverbSend`...).
+- **Déclaré à `null`** -> RETIRE ce palier pour cette instance — n'hérite
+  PAS, disparaît purement et simplement. `"sounds": { "beacon": null }`
+  retire le beacon d'UNE instance (les autres rôles, `vocal`/`movement`,
+  restent hérités intacts si l'archétype en porte) — c'est le cas d'un
+  passage MUET (voir `entities/types/passage.js`, `level/town-square.json`)
+  : plus besoin d'un second archétype dupliqué pour cette seule différence.
+
+Une valeur TERMINALE (chaîne — même un chemin de pool —, nombre, tableau)
+REMPLACE toujours entièrement celle de l'archétype, jamais de fusion à ce
+niveau : un `path` n'a pas de sens "fusionné" avec un autre.
+
 ## Beacon vs vocal : deux rôles positionnés, deux intentions
 
 `beacon` et `vocal` sont TECHNIQUEMENT identiques — tous deux des sons
@@ -1157,8 +1202,19 @@ faces — jamais de bus de réverb, jamais de rampe d'occlusion, jamais de
 `entityLayer` (`lib/audio.js`), audibles NETS quel que soit l'état
 d'étouffement des faces pendant le croisement. `transitionSteps: false` (un
 futur passe-miroir, par exemple) désactive les deux d'un coup — silence
-total côté pas, seuls le son de passage et le croisement de filtres
-demeurent.
+total côté pas, seuls le son de passage (s'il y en a un, voir plus bas) et
+le croisement de filtres demeurent.
+
+**Son de franchissement** (voir `view/city-screen.js`/`playSideSwitchSound`)
+— DÉCLARABLE, ABSENT par défaut : `transitionSound` (chemin/pool résolu via
+`resolveAsset`, cascade instance -> archétype -> défaut ABSENT, comme
+`transitionSurface`) est un choix de CONTENU par passage, jamais un son
+générique imposé à chaque franchissement. Un passage qui n'en déclare
+aucun (à l'instance via `tuning.transitionSound`, ou à l'archétype) transite
+en SILENCE côté son de passage — les pas de trajet/arrivée ci-dessus jouent
+quand même, DEUX choses sonores INDÉPENDANTES qui se composent, jamais
+mélangées (voir `demo3.json`, `alley_gap_recto`/`alley_gap_verso`, pour un
+exemple de déclaration).
 
 ## `isFlying` — hauteur SUGGÉRÉE par le son, jamais un axe Y
 

@@ -66,10 +66,13 @@
     "assets/musics/jazz_night_2.mp3",
     "assets/musics/jazz_night_3.mp3",
     "assets/musics/jazz_night_4.mp3",
-    "assets/musics/jazz_night_5.mp3"
+    "assets/musics/jazz_night_5.mp3",
+    "assets/musics/jazz_night_6.mp3",
+    "assets/musics/jazz_night_7.mp3"
   ],
   "assets/musics/mystery": [
-    "assets/musics/mystery_1.mp3"
+    "assets/musics/mystery_1.mp3",
+    "assets/musics/mystery_2.mp3"
   ],
   "assets/musics/nightlife_district_day": [
     "assets/musics/nightlife_district_day_1.mp3",
@@ -91,7 +94,11 @@
     "assets/musics/pier_night_1.mp3"
   ],
   "assets/musics/riverwalk_day": [
-    "assets/musics/riverwalk_day_1.mp3"
+    "assets/musics/riverwalk_day_1.mp3",
+    "assets/musics/riverwalk_day_2.mp3"
+  ],
+  "assets/musics/riverwalk_night": [
+    "assets/musics/riverwalk_night_1.mp3"
   ],
   "assets/musics/science_day": [
     "assets/musics/science_day_1.mp3",
@@ -110,7 +117,8 @@
   ],
   "assets/musics/streets_night": [
     "assets/musics/streets_night_1.mp3",
-    "assets/musics/streets_night_2.mp3"
+    "assets/musics/streets_night_2.mp3",
+    "assets/musics/streets_night_3.mp3"
   ],
   "assets/musics/town_hall_day": [
     "assets/musics/town_hall_day_1.mp3"

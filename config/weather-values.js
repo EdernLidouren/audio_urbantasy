@@ -11,7 +11,7 @@
 //     pourcentages : le moteur les normalise par leur SOMME au moment du
 //     tirage (voir core/weather.js/pickTransition). Ajuster UN poids ne
 //     demande donc JAMAIS de recalculer les autres. Une transition d'un
-//     état vers LUI-MÊME (ex. sunny -> sunny) est un choix ORDINAIRE : ça
+//     état vers LUI-MÊME (ex. clear -> clear) est un choix ORDINAIRE : ça
 //     veut dire "reste dans cet état encore un moment, avec une nouvelle
 //     durée tirée" — pas un cas spécial.
 //   - ambience (optionnel) : { outdoor?, indoor? } — DEUX pools DISTINCTS
@@ -39,20 +39,20 @@
 // mal formée échoue clairement au démarrage, jamais une météo bloquée en
 // silence.
 
-export const DEFAULT_WEATHER_STATE = "sunny";
+export const DEFAULT_WEATHER_STATE = "clear";
 
 export const WEATHER_STATES = {
-  sunny: {
+  clear: {
     duration: { min: 120, max: 360 },
-    transitions: { sunny: 35, cloudy: 35, windy: 15, rain: 5, fog: 10 },
+    transitions: { clear: 35, cloudy: 35, windy: 15, rain: 5, fog: 10 },
   },
   cloudy: {
     duration: { min: 60, max: 240 },
-    transitions: { cloudy: 40, rain: 20, windy: 20, sunny: 15, fog: 5 },
+    transitions: { cloudy: 40, rain: 20, windy: 20, clear: 15, fog: 5 },
   },
   windy: {
     duration: { min: 45, max: 180 },
-    transitions: { windy: 35, cloudy: 30, sunny: 20, rain: 10, stormy: 5 },
+    transitions: { windy: 35, cloudy: 30, clear: 20, rain: 10, stormy: 5 },
     // DEUX matériaux RÉELS distincts par contexte (modèle A, voir header
     // ci-dessus) : le vent porte franchement à l'extérieur, nettement
     // assourdi derrière des murs.
@@ -60,7 +60,7 @@ export const WEATHER_STATES = {
   },
   rain: {
     duration: { min: 30, max: 150 },
-    transitions: { rain: 25, cloudy: 40, stormy: 15, sunny: 10, fog: 10 },
+    transitions: { rain: 25, cloudy: 40, stormy: 15, clear: 10, fog: 10 },
     // DEUX matériaux RÉELS distincts par contexte (modèle A, voir header
     // ci-dessus) : rain_outdoor_1.mp3 (l'averse elle-même) et
     // rain_indoor_1.mp3 (assourdie/différente, entendue depuis l'abri).
@@ -75,6 +75,6 @@ export const WEATHER_STATES = {
   },
   fog: {
     duration: { min: 30, max: 120 },
-    transitions: { fog: 30, cloudy: 50, sunny: 15, rain: 5 },
+    transitions: { fog: 30, cloudy: 50, clear: 15, rain: 5 },
   },
 };

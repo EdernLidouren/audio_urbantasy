@@ -3,7 +3,7 @@
 // bird_3.js/buddy.js/chair.js/clock.js/clock_tower.js/crate.js/
 // cumulo-lupus.js/decor.js/dog.js/door.js/fountain.js/ghost.js/hound.js/
 // item.js/money.js/neon.js/npc.js/object.js/passage.js/potted_plant.js/
-// river.js/rock.js/window.js) en un seul objet — même patron que
+// river.js/rock.js/statue.js/window.js) en un seul objet — même patron que
 // core/behaviors/index.js. Donnée neutre au global : aucun import, ni du
 // core ni de la vue. blocksMovement est lu par core/level.js (baké dans
 // l'entité parsée) puis exploité par core/reduce.js pour arrêter le joueur
@@ -49,7 +49,7 @@
 //
 // Les archétypes (apple/bird_1/bird_2/bird_3/buddy/chair/clock/clock_tower/
 // crate/cumuloLupus/decor/dog/door/fountain/ghost/hound/item/money/neon/npc/
-// object/passage/potted_plant/river/rock/window) sont des PRESETS de
+// object/passage/potted_plant/river/rock/statue/window) sont des PRESETS de
 // propriétés — des objets plats indépendants, jamais une hiérarchie ni de
 // l'héritage : voir entities/model.md. Aucun n'a de `behavior` par défaut
 // (voir dog.js) : le comportement se déclare toujours à l'instance.
@@ -79,6 +79,7 @@ import passage from "./passage.js";
 import pottedPlant from "./potted_plant.js";
 import river from "./river.js";
 import rock from "./rock.js";
+import statue from "./statue.js";
 import window_ from "./window.js";
 
 export default {
@@ -107,6 +108,7 @@ export default {
   potted_plant: pottedPlant,
   river,
   rock,
+  statue,
   // Alias d'IMPORT ("window_") pour éviter d'ombrer le global navigateur
   // `window` dans ce module — la CLÉ DE REGISTRE, elle, reste "window" :
   // c'est CE nom que le contenu référence via entities[].type.

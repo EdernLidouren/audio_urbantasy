@@ -73,6 +73,7 @@ import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
 import { saveGame } from "./save-storage.js";
 import { TIME_CONFIG, DEFAULT_TIME_SCALE, setTimeScale, resetTimeScale } from "../config/time-values.js";
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";
+import { resolveTuning } from "../config/tuning.js";
 
 // Outil de VÉRIFICATION du système de temps (voir core/time.md) : formate
 // et annonce heure + date courantes, sur demande (touche "t", voir
@@ -193,6 +194,12 @@ function resolveEphemeralSpec(type, overrides = {}) {
     type,
     labelKey: typeDef.nameKey,
     descriptionKey: typeDef.descriptionKey,
+    // sounds : AUCUNE surcharge d'instance possible pour un éphémère (pas
+    // de fusion ici, contrairement à core/level.js/parseEntity) — le
+    // rendu audio (view/audio/city-scene.js/buildEntitySoundEntry) lit
+    // `entity.sounds`, jamais le registre directement, donc CE champ doit
+    // être porté explicitement, même sans surcharge.
+    sounds: typeDef.sounds,
     blocksMovement: Boolean(typeDef.blocksMovement),
     observable: Boolean(typeDef.observable),
     interactable: Boolean(typeDef.interactable),
@@ -217,8 +224,8 @@ const EPHEMERAL_COIN_SPEC = resolveEphemeralSpec("money");
 //   - aucun archétype dédié ("key_bronze") -> repli sur l'archétype
 //     GÉNÉRIQUE "item" (entities/types/item.js) pour `type`/`sounds` (le
 //     rendu audio, voir view/audio/city-scene.js/buildEntitySoundEntry, lit
-//     TOUJOURS `registry[entity.type].sounds` — `spec.type` doit donc rester
-//     une clé RÉELLE du registre d'entités, jamais le type d'OBJET brut),
+//     `entity.sounds` — `spec.type` doit donc rester une clé RÉELLE du
+//     registre d'entités, jamais le type d'OBJET brut),
 //     mais avec nameKey/descriptionKey/action PROPRES à l'objet (depuis
 //     ITEM_REGISTRY), exactement comme le ferait une instance de niveau qui
 //     utiliserait ce type générique (voir le header d'entities/types/item.js).
@@ -232,6 +239,7 @@ function resolveDroppedItemSpec(type, count) {
     type: "item",
     labelKey: props.label,
     descriptionKey: props.descriptionKey,
+    sounds: generic.sounds,
     blocksMovement: Boolean(generic.blocksMovement),
     observable: Boolean(generic.observable),
     interactable: Boolean(generic.interactable),
@@ -280,25 +288,37 @@ function playDoorTransitionSound() {
   }
 }
 
-// Marqueur sonore de bascule recto<->verso — "metal_gate" (une grille
-// métallique qu'on referme/ouvre), voir sideSwitchEffect plus bas. MÊME
-// patron défensif que playDoorTransitionSound ci-dessus (non positionné,
-// volume UI, try/catch) — déplacé ici depuis view/interaction.js : le
-// timing du son fait maintenant partie de la SÉQUENCE du sas (joué juste
-// après le gel, avant le croisement de filtres), que ce fichier orchestre.
-const SIDE_SWITCH_SOUND_KEY = "assets/sounds/doors/metal_gate";
-// Durée du croisement de filtres d'occlusion (voir
-// config/tuning-values.js, seule définition, jamais dupliquée ici).
-const FACE_SWITCH_FADE_MS = TUNING_DEFAULTS.faceSwitchFadeMs;
-
-function playSideSwitchSound() {
+// Marqueur sonore de bascule recto<->verso — voir sideSwitchEffect plus
+// bas. DÉCLARABLE, ABSENT par défaut (`resolveTuning("transitionSound",
+// entity)`, cascade instance -> archétype -> défaut ABSENT, comme
+// `transitionSteps`/`transitionSurface` — voir entities/types/passage.js,
+// config/tuning-values.js) : PLUS de son générique imposé à chaque
+// passage — un passage qui n'en déclare aucun (via `tuning.transitionSound`
+// à l'instance, ou un défaut à l'archétype) transite en SILENCE côté son
+// de passage, rampes + pas de trajet/arrivée mis à part (voir
+// scene.playTransitionSteps/playArrivalStep, DEUX choses sonores
+// indépendantes qui se composent, jamais mélangées). MÊME patron
+// défensif que playDoorTransitionSound ci-dessus (non positionné, volume
+// UI, try/catch) pour le cas où le son EST déclaré mais introuvable.
+function playSideSwitchSound(entity) {
+  const path = resolveTuning("transitionSound", entity);
+  if (!path) return; // rien de déclaré : silence, pas une erreur
   try {
     const factor = getPref("interfaceVolume", PREF_CONSTRAINTS.interfaceVolume.default) / 100;
-    playOneShot(resolveAsset(SIDE_SWITCH_SOUND_KEY), { volume: factor });
+    playOneShot(resolveAsset(path), { volume: factor });
   } catch (error) {
-    console.warn(`city-screen: son de bascule indisponible ("${SIDE_SWITCH_SOUND_KEY}") : ${error.message}`);
+    console.warn(`city-screen: son de bascule indisponible ("${path}") : ${error.message}`);
   }
 }
+
+// Durée du croisement de filtres d'occlusion (voir
+// config/tuning-values.js, seule définition, jamais dupliquée ici) — le
+// nombre de pas de TRAJET en DÉRIVE automatiquement (voir
+// scene.playTransitionSteps, view/audio/city-scene.js/
+// TRANSITION_STEP_INTERVAL_MS) : ajuster CETTE seule valeur retarde/allonge
+// les rampes ET recadence les pas ensemble, jamais un réglage séparé à
+// tenir synchronisé.
+const FACE_SWITCH_FADE_MS = TUNING_DEFAULTS.faceSwitchFadeMs;
 
 export function makeCityScreen(getSession, setSession) {
   let scene = null;
@@ -580,11 +600,12 @@ export function makeCityScreen(getSession, setSession) {
   // view/audio/city-scene.js) — la face courante s'étouffe pendant que
   // l'autre s'éclaircit, en parallèle, toutes deux restant audibles.
   //
-  // Séquence STRICTE : sas -> son de PASSAGE (metal_gate, hors du gain de
-  // couche entités comme le son de porte) -> pas de TRAJET (voir
-  // scene.playTransitionSteps, EN PARALLÈLE du croisement — même durée,
-  // jamais attendu séparément, voir plus bas) + croisement des DEUX
-  // filtres -> bascule core (switchSide, position + face) -> pas
+  // Séquence STRICTE : sas -> son de PASSAGE (DÉCLARÉ, voir
+  // playSideSwitchSound ci-dessus — silencieux si le passage n'en déclare
+  // aucun ; hors du gain de couche entités comme le son de porte) -> pas de
+  // TRAJET (voir scene.playTransitionSteps, EN PARALLÈLE du croisement —
+  // même durée, jamais attendu séparément, voir plus bas) + croisement des
+  // DEUX filtres -> bascule core (switchSide, position + face) -> pas
   // d'ARRIVÉE (scene.playArrivalStep, sur la scène FRAÎCHE — voir
   // view/audio/city-scene.js pour pourquoi getActiveWorld y désigne déjà
   // la face de destination) -> scène reconstruite sur la NOUVELLE face
@@ -598,7 +619,7 @@ export function makeCityScreen(getSession, setSession) {
   async function sideSwitchEffect(arrivalX, entity) {
     pushScreen({});
     try {
-      playSideSwitchSound();
+      playSideSwitchSound(entity);
       scene.playTransitionSteps(entity, FACE_SWITCH_FADE_MS);
       await scene.crossfadeFaceSwap(FACE_SWITCH_FADE_MS);
 

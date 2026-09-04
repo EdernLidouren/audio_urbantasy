@@ -5,6 +5,8 @@
   "position.announceWithSide": "Position x: {x} out of {length}. Side: {side}.",
   "side.recto": "recto",
   "side.verso": "verso",
+  "time.phase.dayBegins": "Day breaks.",
+  "time.phase.nightBegins": "Night falls.",
   "time.season.spring": "spring",
   "time.season.summer": "summer",
   "time.season.autumn": "autumn",

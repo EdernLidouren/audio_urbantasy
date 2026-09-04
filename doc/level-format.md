@@ -104,9 +104,12 @@ les deux faces coexistent déjà), un CROISEMENT DES DEUX FILTRES D'OCCLUSION
 (`view/audio/city-scene.js`/`crossfadeFaceSwap`) — la face courante ferme
 son filtre (nette → étouffée) pendant que l'autre ouvre le sien (étouffée →
 nette), en parallèle, toutes deux restant audibles. Un marqueur sonore de
-passage joue juste après le gel ("metal_gate" —
-`assets/sounds/doors/metal_gate`, défensif si le fichier venait à manquer).
-Le croisement terminé, `scene.destroy()` puis reconstruction sur la
+passage DÉCLARÉ (`transitionSound`, cascade instance -> archétype -> défaut
+ABSENT — voir `doc/entity-model.md`/"Recto/verso") joue juste après le gel
+s'il y en a un ; sinon, silence côté son de passage (défensif si le fichier
+venait à manquer, même si déclaré). Des pas de trajet/arrivée jouent en
+plus, indépendamment (voir `doc/entity-model.md`, même section). Le
+croisement terminé, `scene.destroy()` puis reconstruction sur la
 nouvelle face active (voir `view/city-screen.js`/`sideSwitchEffect`) —
 SANS effet audible : le croisement a déjà amené le son là où la scène
 fraîche le poserait.
