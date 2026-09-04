@@ -27,7 +27,7 @@ export default {
   nameKey: "entity.window.name",
   descriptionKey: "entity.window.description",
   sounds: {
-    beacon: { path: "assets/sounds/furniture/window_1_beacon_1.mp3", loop: true },
+    beacon: { path: "assets/sounds/furniture/window_1_beacon", loop: true },
   },
   blocksMovement: false,
   observable: true,

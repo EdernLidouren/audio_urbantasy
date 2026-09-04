@@ -779,12 +779,33 @@ laisse `session.improvements` à une RÉFÉRENCE INCHANGÉE).
 tout chemin de son du projet. `gain`/`pitchVariation`/`reverbSend` (optionnels,
 nombres) : le **DESCRIPTEUR DE SON PARTAGÉ** — les sous-champs COMMUNS aux
 rôles de son POSITIONNÉS (`sounds.beacon`/`sounds.vocal`, voir
-`doc/entity-model.md`/"Paramètres sonores"), réutilisés IDENTIQUEMENT quelle
-que soit la nature (voir plus bas) : MÊME primitive de calcul rate/volume
-(`lib/audio.js`/`playDescribedOneShot`, `randomRate`) et, pour un rendu
-diégétique, MÊME chaîne positionnée que beacon/vocal
-(`view/audio/city-scene.js`/`playPositionedOneShot` via `playTransitionSound`)
-— un seul point de calcul partout, jamais dupliqué.
+`doc/entity-model.md`/"Paramètres sonores").
+
+Pour un rendu **diégétique**, ce triplet n'est PAS lu tel quel sur l'effet :
+il passe par la MÊME résolution en cascade que `enterSound`/`exitSound`
+(`view/audio/city-scene.js`/`resolveTransitionSound`, cascade
+`resolveTuning` : effet -> `tuning` d'instance -> archétype -> défaut
+global, voir "Résolution en cascade" de `doc/entity-model.md`) —
+`PLAY_SOUND_TUNING_KEYS` pour `gain` (clé littérale `"gain"`, un playSound
+n'a pas de rôle fixe comme `beaconGain`/`vocalGain`), `pitchVariation`/
+`reverbSend` PARTAGENT la MÊME clé que tout autre rôle positionné. Un champ
+NON déclaré retombe donc sur le défaut de l'entité/de l'archétype/global
+(`reverbSend` -> 0.5 par défaut, `config/tuning-values.js`) — **jamais sur
+`undefined` silencieux** : c'est ce qui garantit qu'un playSound diégétique
+sans `reverbSend` déclaré profite quand même de la réverb du lieu, EXACTEMENT
+comme un beacon qui n'en déclare pas non plus. Un champ déclaré explicitement
+reste prioritaire (`resolveTuning` teste d'abord le descripteur lui-même) :
+la cascade ne fait qu'ajouter un FILET, jamais une contrainte.
+Pour un rendu **méta**, ce triplet reste lu TEL QUEL sur l'effet
+(`view/interaction.js`/`playMetaSound` -> `lib/audio.js`/
+`playDescribedOneShot`) — aucune cascade, aucun bus de réverb accessible
+(voir NATURE ci-dessous) : `reverbSend` y reste sans effet en pratique,
+`gain`/`pitchVariation` n'ont pas de défaut au-delà de 1/0.
+
+MÊME primitive de calcul rate/volume (`lib/audio.js`/`playDescribedOneShot`,
+`randomRate`) et, pour un rendu diégétique, MÊME chaîne positionnée que
+beacon/vocal (`view/audio/city-scene.js`/`playPositionedOneShot` via
+`playTransitionSound`) — un seul point de calcul partout, jamais dupliqué.
 
 **PROVENANCE — `at` (optionnel, id d'entité)** : d'où émane le son dans
 l'espace (`view/interaction.js`/`resolvePlaySoundTarget`) :
@@ -813,9 +834,12 @@ PROVENANCE, jamais déclaré dans le cas courant :
   (`interactRange`/`audibleRange`/`panSaturation`), occlusion RECTO/VERSO
   (`forcedMuffle` selon la face qui porte l'entité) et étouffement de
   perception (`effectiveMuffleAmount`, qui exempte déjà les entités
-  surnaturelles) — AUCUN filtre réinventé. Volume composé avec `beaconVolume`
-  (préférence "Volume des balises", même catégorie qu'un enterSound/
-  exitSound), pas `interfaceVolume`.
+  surnaturelles) — AUCUN filtre réinventé. `gain`/`pitchVariation`/
+  `reverbSend` résolus par la MÊME cascade que `enterSound`/`exitSound` (voir
+  plus haut) — un `reverbSend` non déclaré rejoint donc le bus de réverb du
+  lieu au défaut global, comme un beacon au même endroit. Volume composé avec
+  `beaconVolume` (préférence "Volume des balises", même catégorie qu'un
+  enterSound/exitSound), pas `interfaceVolume`.
 - aucune cible résolue (centré joueur) → **`"meta"`** par défaut : rendu
   IDENTIQUE au comportement d'avant cette cascade (chemin `playDescribedOneShot`
   non positionné, `interfaceVolume`) — IGNORE tout filtre actif, "parle"

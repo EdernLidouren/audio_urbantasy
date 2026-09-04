@@ -487,6 +487,25 @@ function resolveTransitionSound(entity, descriptor, keys) {
   return { path: descriptor.path, ...resolveSoundSettings(entity, descriptor, keys.gain) };
 }
 
+// Effet "playSound" DIÉGÉTIQUE (voir view/interaction.js/runPlaySoundEffect,
+// playEntityOneShot plus bas) : un son PONCTUEL positionné sur une entité,
+// EXACTEMENT comme enterSound/exitSound ci-dessus — même mécanisme de
+// résolution (resolveTransitionSound), pas une seconde logique parallèle.
+// "gain" (littéral, pas de rôle dédié du genre beaconGain/vocalGain) : un
+// playSound n'a pas de rôle fixe sur l'entité, seulement son propre champ
+// `gain` optionnel (core/level.js/parseEffect) — TUNING_DEFAULTS n'en porte
+// aucun défaut global sous cette clé, playPositionedOneShot retombe alors
+// sur son propre défaut neutre (1), comportement de gain STRICTEMENT
+// inchangé. Ce qui CHANGE : pitchVariation/reverbSend, jusque-là lus TELS
+// QUELS sur l'effet brut (jamais undefined -> defaut, voir l'ancien bug —
+// un playSound sans reverbSend déclaré ne rejoignait JAMAIS le bus de
+// réverb du lieu), passent désormais par la MÊME cascade que tout son
+// positionné d'entité (sound -> instance -> archétype -> défaut global,
+// reverbSend: 0.5) — un playSound qui déclare `reverbSend` explicitement
+// continue de le surcharger (resolveTuning teste `descriptor[key]` en
+// premier), seul le CAS NON DÉCLARÉ change de comportement.
+const PLAY_SOUND_TUNING_KEYS = { gain: "gain" };
+
 // Volume dérivé de la distance, en DEUX couches jamais mélangées :
 //   - un PLANCHER continu, décroissance linéaire de FAR_VOLUME_MAX (à
 //     dist=0) vers 0 (à audibleRange) — le même pour TOUTE entité,
@@ -1347,18 +1366,26 @@ export function createCityAudioScene(getSession) {
 
   // Son PONCTUEL positionné sur une entité ARBITRAIRE, ID fourni par
   // l'appelant — voir view/interaction.js/runEffects, effet "playSound"
-  // DIÉGÉTIQUE (core/scripting.md/"Effets d'action"). RÉUTILISE playTransitionSound
-  // TEL QUEL (même descripteur {path,gain,pitchVariation,reverbSend}, voir
-  // core/effects.js) : AUCUNE nouvelle logique de filtrage/positionnement,
-  // seulement une RECHERCHE de l'entrée déjà construite pour cette entité
-  // (entitySounds pour la face courante, PUIS otherEntitySounds pour
-  // l'AUTRE face si absente de la première — forcedMuffle 0 ou 1
-  // respectivement, MÊME convention que updateIntermittentSources/update()
-  // plus bas) + sa position LIVE relue fraîche (comme tout le reste de ce
-  // module, jamais mise en cache). Entité introuvable (id jamais construit
-  // par buildEntitySoundEntry) ou actuellement dormante (present:false,
-  // core/presence.js) -> silencieuse, `console.warn`, jamais un plantage —
-  // même politique défensive que tout son de ce projet.
+  // DIÉGÉTIQUE (core/scripting.md/"Effets d'action"). RÉUTILISE
+  // playTransitionSound TEL QUEL : AUCUNE nouvelle logique de
+  // filtrage/positionnement, seulement une RECHERCHE de l'entrée déjà
+  // construite pour cette entité (entitySounds pour la face courante, PUIS
+  // otherEntitySounds pour l'AUTRE face si absente de la première —
+  // forcedMuffle 0 ou 1 respectivement, MÊME convention que
+  // updateIntermittentSources/update() plus bas) + sa position LIVE relue
+  // fraîche (comme tout le reste de ce module, jamais mise en cache).
+  // `descriptor` (l'effet brut {path,gain?,pitchVariation?,reverbSend?},
+  // voir core/effects.js) est d'abord RÉSOLU via resolveTransitionSound
+  // (PLAY_SOUND_TUNING_KEYS, voir plus haut) — un playSound diégétique
+  // reçoit ainsi EXACTEMENT la même cascade de tuning qu'un enterSound/
+  // exitSound (donc qu'un son positionné d'entité en général), jamais un
+  // second mécanisme de résolution parallèle : un champ non déclaré (ex.
+  // reverbSend) retombe sur le défaut de l'entité/de l'archétype/global,
+  // jamais sur `undefined` silencieux. Entité introuvable (id jamais
+  // construit par buildEntitySoundEntry) ou actuellement dormante
+  // (present:false, core/presence.js) -> silencieuse, `console.warn`,
+  // jamais un plantage — même politique défensive que tout son de ce
+  // projet.
   function playEntityOneShot(targetId, descriptor) {
     const session = getSession();
     const activeEntry = entitySounds.find((e) => e.entity.id === targetId);
@@ -1368,7 +1395,8 @@ export function createCityAudioScene(getSession) {
         console.warn(`city-scene: playEntityOneShot("${targetId}") : entité dormante ou introuvable.`);
         return;
       }
-      playTransitionSound(activeEntry, liveEntity.x - session.player.x, descriptor, effectiveMuffleAmount(activeEntry, 0));
+      const resolved = resolveTransitionSound(activeEntry.entity, descriptor, PLAY_SOUND_TUNING_KEYS);
+      playTransitionSound(activeEntry, liveEntity.x - session.player.x, resolved, effectiveMuffleAmount(activeEntry, 0));
       return;
     }
     const otherEntry = otherEntitySounds && otherEntitySounds.find((e) => e.entity.id === targetId);
@@ -1379,7 +1407,8 @@ export function createCityAudioScene(getSession) {
         console.warn(`city-scene: playEntityOneShot("${targetId}") : entité dormante ou introuvable (autre face).`);
         return;
       }
-      playTransitionSound(otherEntry, liveEntity.x - session.player.x, descriptor, effectiveMuffleAmount(otherEntry, 1));
+      const resolved = resolveTransitionSound(otherEntry.entity, descriptor, PLAY_SOUND_TUNING_KEYS);
+      playTransitionSound(otherEntry, liveEntity.x - session.player.x, resolved, effectiveMuffleAmount(otherEntry, 1));
       return;
     }
     console.warn(`city-scene: playEntityOneShot("${targetId}") : id absent de la scène.`);
