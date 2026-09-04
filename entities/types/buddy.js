@@ -30,7 +30,7 @@ export default {
       pitchVariation: 0.15,
     },
     movement: {
-      path: "assets/sounds/footsteps/dog_medium_walk",
+      path: "assets/sounds/footsteps/entities/dog_medium_walk",
       loop: false,
       pitchVariation: 0.08,
       // Aucun movementGain : voir dog.js — volume porté par les fichiers

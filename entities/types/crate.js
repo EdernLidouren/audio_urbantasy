@@ -31,11 +31,15 @@ export default {
   // Pool réutilisé (déjà utilisé par money.js/npc.js, voir leurs
   // commentaires) : aucun son "caisse" dédié pour l'instant.
   sounds: {
-    beacon: { path: "assets/sounds/entities/box_of_nails_beacon_1.mp3", loop: true },
+    beacon: { path: "assets/sounds/items/box_of_nails_beacon_1.mp3", loop: true },
   },
   muteOnConsumed: true,
   blocksMovement: false,
   observable: true,
   interactable: true,
+  // Surlignage audio de proximité (voir entities/model.md) : une caisse se
+  // repère nettement une fois à portée, consumed ou non (muteOnConsumed
+  // coupe le beacon lui-même, pas ce flag).
+  highlight: true,
   action: { kind: "loot", amount: 100 },
 };

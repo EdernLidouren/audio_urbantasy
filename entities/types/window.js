@@ -27,11 +27,14 @@ export default {
   nameKey: "entity.window.name",
   descriptionKey: "entity.window.description",
   sounds: {
-    beacon: { path: "assets/sounds/entities/window_beacon_1.mp3", loop: true },
+    beacon: { path: "assets/sounds/furniture/window_1_beacon_1.mp3", loop: true },
   },
   blocksMovement: false,
   observable: true,
   interactable: true,
+  // Surlignage audio de proximité (voir entities/model.md) : une fenêtre se
+  // repère nettement une fois à portée.
+  highlight: true,
   action: [
     {
       kind: "applyEffects",

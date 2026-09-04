@@ -13,9 +13,12 @@ export default {
   nameKey: "entity.passage.name",
   descriptionKey: "entity.passage.description",
   sounds: {
-    beacon: { path: "assets/sounds/entities/door_beacon", loop: true },
+    beacon: { path: "assets/sounds/doors/door_beacon", loop: true },
   },
   blocksMovement: false,
   observable: true,
   interactable: true,
+  // Surlignage audio de proximité (voir entities/model.md) : un passage se
+  // repère nettement une fois à portée, comme une porte.
+  highlight: true,
 };

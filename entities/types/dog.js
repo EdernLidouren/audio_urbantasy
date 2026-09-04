@@ -31,7 +31,7 @@ export default {
   nameKey: "entity.dog.name",
   descriptionKey: "entity.dog.description",
   sounds: {
-    beacon: { path: "assets/sounds/entities/box_of_nails_beacon_1.mp3", loop: true },
+    beacon: { path: "assets/sounds/items/box_of_nails_beacon_1.mp3", loop: true },
     vocal: {
       path: "assets/sounds/entities/dog_medium_vocal",
       loop: false,
@@ -40,7 +40,7 @@ export default {
       pitchVariation: 0.15,
     },
     movement: {
-      path: "assets/sounds/footsteps/dog_medium_walk",
+      path: "assets/sounds/footsteps/entities/dog_medium_walk",
       loop: false,
       pitchVariation: 0.08,
     },

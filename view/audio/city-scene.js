@@ -214,20 +214,25 @@ const MOVEMENT_SOUND = player.sounds.movement;
 const FOOTSTEP_REVERB_SEND =
   MOVEMENT_SOUND.reverbSend !== undefined ? MOVEMENT_SOUND.reverbSend : TUNING_DEFAULTS.footstepReverbSend;
 
-// Clé d'asset "<name>_walk" sous assets/sounds/footsteps/ — convention
-// PARTAGÉE par une surface, un gait ou un naturalWalk (voir
+// Clé d'asset "<name>_walk" sous assets/sounds/footsteps/<catégorie>/ —
+// convention PARTAGÉE par une surface, un gait ou un naturalWalk (voir
 // resolveFootstepPath ci-dessous) : un simple nom + suffixe, jamais composé
 // (voir entities/model.md, "pas de produit cartésien surface×chaussure").
-function footstepKey(name) {
-  return `assets/sounds/footsteps/${name}_walk`;
+// `category` : "surfaces" (sol) ou "gaits" (chaussure/allure ET pas naturel
+// — naturalWalk PARTAGE le même sous-dossier que gait, jamais un troisième :
+// voir entities/model.md, "naturalWalk" peut réutiliser un nom de gait
+// existant, ex. "barefoot", par conception).
+function footstepKey(category, name) {
+  return `assets/sounds/footsteps/${category}/${name}_walk`;
 }
 
 // Plancher garanti du son de pas : le SEUL chemin dont l'existence n'est
 // JAMAIS vérifiée (contrairement aux crans ci-dessous, tous testés via
-// hasAsset) — DOIT rester présent en permanence. "shoes" : le pool neutre
-// général du jeu (voir entities/player.js) — remplace "concrete", retiré de
-// assets/ lors de l'ajout des pools shoes_walk/sand_walk.
-const FOOTSTEP_FLOOR_PATH = footstepKey("shoes");
+// hasAsset) — DOIT rester présent en permanence. "shoes" (catégorie
+// "gaits") : le pool neutre général du jeu (voir entities/player.js) —
+// remplace "concrete", retiré de assets/ lors de l'ajout des pools
+// shoes_walk/sand_walk.
+const FOOTSTEP_FLOOR_PATH = footstepKey("gaits", "shoes");
 
 // Résout le CHEMIN du son de pas d'un mobile (joueur ou entité) au point x
 // d'un monde donné — VUE : dérive un nom de fichier depuis le flag
@@ -250,17 +255,17 @@ function resolveFootstepPath(world, x, { gait, naturalWalk, ownPath } = {}) {
   const props = surfaceProps(surface);
 
   if (props && !props.neutral) {
-    const specialKey = footstepKey(surface);
+    const specialKey = footstepKey("surfaces", surface);
     if (hasAsset(specialKey)) return specialKey;
   }
 
   if (gait) {
-    const gaitKey = footstepKey(gait);
+    const gaitKey = footstepKey("gaits", gait);
     if (hasAsset(gaitKey)) return gaitKey;
   }
 
   if (naturalWalk) {
-    const naturalKey = footstepKey(naturalWalk);
+    const naturalKey = footstepKey("gaits", naturalWalk);
     if (hasAsset(naturalKey)) return naturalKey;
   }
 
@@ -274,8 +279,8 @@ function resolveFootstepPath(world, x, { gait, naturalWalk, ownPath } = {}) {
 // la résolution elle-même (qui reste au tick, selon le sol courant).
 function footstepCandidateKeys({ gait, naturalWalk, ownPath } = {}) {
   const keys = [];
-  if (gait) keys.push(footstepKey(gait));
-  if (naturalWalk) keys.push(footstepKey(naturalWalk));
+  if (gait) keys.push(footstepKey("gaits", gait));
+  if (naturalWalk) keys.push(footstepKey("gaits", naturalWalk));
   if (ownPath) keys.push(ownPath);
   return keys;
 }
@@ -482,22 +487,24 @@ function resolveTransitionSound(entity, descriptor, keys) {
   return { path: descriptor.path, ...resolveSoundSettings(entity, descriptor, keys.gain) };
 }
 
-// Volume par zones (palier volontaire à interactRange, pas une rampe
-// continue) :
-//   - dist <= interactRange       : FULL_VOLUME, plateau plein et stable.
-//   - interactRange < dist < audibleRange : décroissance linéaire de
-//     FAR_VOLUME_MAX vers 0. Le saut FULL_VOLUME -> FAR_VOLUME_MAX à la
-//     frontière est le signal audio "tu quittes la zone d'interaction".
-//   - dist >= audibleRange        : 0, silence.
-function volumeForDistance(dist, interactRange, audibleRange) {
-  if (dist <= interactRange) return FULL_VOLUME;
+// Volume dérivé de la distance, en DEUX couches jamais mélangées :
+//   - un PLANCHER continu, décroissance linéaire de FAR_VOLUME_MAX (à
+//     dist=0) vers 0 (à audibleRange) — le même pour TOUTE entité,
+//     surlignée ou non, sans plateau ni saut.
+//   - un PALIER à FULL_VOLUME quand `highlighted` est vrai (voir
+//     entities/model.md, "Surlignage audio de proximité") : SAUT NET, pas
+//     de rampe — un essai de fondu progressif (quelques dizaines à
+//     quelques centaines de ms) s'est révélé quasi inaudible à l'oreille
+//     en marchant/courant normalement (la fenêtre de présence dans
+//     interactRange est trop courte pour laisser le fondu se terminer) ;
+//     l'ancien comportement (saut instantané) est reconduit TEL QUEL, mais
+//     désormais GOUVERNÉ par le flag highlight (voir buildEntitySoundEntry)
+//     au lieu de s'appliquer à toute entité sans distinction.
+function volumeForDistance(dist, audibleRange, highlighted) {
   if (dist >= audibleRange) return 0;
+  if (highlighted) return FULL_VOLUME;
 
-  const range = audibleRange - interactRange;
-  if (range <= 0) return 0; // config incohérente (audibleRange <= interactRange)
-
-  const progress = (dist - interactRange) / range;
-  return FAR_VOLUME_MAX * (1 - progress);
+  return FAR_VOLUME_MAX * (1 - dist / audibleRange);
 }
 
 // Fréquence de coupure du passe-bas par zones, contrairement au volume SANS
@@ -607,6 +614,12 @@ function buildEntitySoundEntry(entity, world, time, perceptionActive, weather, {
   const interactRange = resolveTuning("interactRange", entity);
   const cutoffMin = resolveTuning("cutoffMin", entity);
   const cutoffMax = resolveTuning("cutoffMax", entity);
+  // Surlignage (voir volumeForDistance, entities/model.md) : flag EXPLICITE
+  // de l'entité, pas d'un rôle de son — même cascade que gait/naturalWalk
+  // plus bas (pas de `sound` en 3e paramètre). Boolean() : un `tuning`/
+  // registre qui déclare une valeur truthy non booléenne resterait un flag
+  // franc, jamais une valeur exotique propagée plus loin.
+  const highlight = Boolean(resolveTuning("highlight", entity));
   // Chaîne de filtres "hauteur suggérée" (voir entities/model.md, isFlying)
   // — résolus même sans balise CONTINUE (sans effet dans ce cas, voir
   // applyEntityAudio, qui ne les utilise que si `sound` existe) : entité non
@@ -735,6 +748,7 @@ function buildEntitySoundEntry(entity, world, time, perceptionActive, weather, {
     audibleRange,
     panSaturation,
     interactRange,
+    highlight,
     cutoffMin,
     cutoffMax,
     flyingHighpassHz,
@@ -983,8 +997,8 @@ export function createCityAudioScene(getSession) {
   // jamais préchargé (diagnostiqué en direct : dirt_walk en defaultSurface,
   // chaque pas piochait un membre à froid, plusieurs requêtes concurrentes
   // non préchargées ont fini par saturer dev-server.py, mono-thread).
-  preloadKeys.add(footstepKey(initialWorld.defaultSurface));
-  for (const segment of initialWorld.segments) preloadKeys.add(footstepKey(segment.surface));
+  preloadKeys.add(footstepKey("surfaces", initialWorld.defaultSurface));
+  for (const segment of initialWorld.segments) preloadKeys.add(footstepKey("surfaces", segment.surface));
 
   for (const key of preloadKeys) {
     for (const member of assetKeyMembers(key)) preloadOneShot(member);
@@ -1279,7 +1293,6 @@ export function createCityAudioScene(getSession) {
     path,
     {
       relX,
-      interactRange,
       audibleRange,
       panSaturation,
       reverbSend,
@@ -1289,11 +1302,12 @@ export function createCityAudioScene(getSession) {
       highpassHz,
       heightGain = 1,
       muffled = 0,
+      highlighted = false,
     }
   ) {
     const dist = Math.abs(relX);
     const pan = clamp(relX / panSaturation, -1, 1);
-    let volume = volumeForDistance(dist, interactRange, audibleRange) * volumeFactor * gain * heightGain;
+    let volume = volumeForDistance(dist, audibleRange, highlighted) * volumeFactor * gain * heightGain;
     if (muffled > 0) volume *= 1 - muffled * (1 - MUFFLING_GAIN);
     const resolved = resolveAsset(path);
     playOneShot(resolved, {
@@ -1320,7 +1334,6 @@ export function createCityAudioScene(getSession) {
   function playTransitionSound(entry, relX, transitionSound, muffled = 0) {
     playPositionedOneShot(transitionSound.path, {
       relX,
-      interactRange: entry.interactRange,
       audibleRange: entry.audibleRange,
       panSaturation: entry.panSaturation,
       reverbSend: transitionSound.reverbSend,
@@ -1328,6 +1341,7 @@ export function createCityAudioScene(getSession) {
       gain: transitionSound.gain,
       pitchVariation: transitionSound.pitchVariation,
       muffled,
+      highlighted: entry.highlight && Math.abs(relX) <= entry.interactRange,
     });
   }
 
@@ -1410,7 +1424,6 @@ export function createCityAudioScene(getSession) {
 
         playPositionedOneShot(src.path, {
           relX: liveById.get(entry.entity.id).x - x,
-          interactRange: entry.interactRange,
           audibleRange: entry.audibleRange,
           panSaturation: entry.panSaturation,
           reverbSend: src.reverbSend,
@@ -1420,6 +1433,7 @@ export function createCityAudioScene(getSession) {
           highpassHz: src.highpassHz,
           heightGain: src.heightGain,
           muffled,
+          highlighted: entry.highlight && Math.abs(liveById.get(entry.entity.id).x - x) <= entry.interactRange,
         });
         src.nextAt = now + jitteredIntervalMs(src.interval, src.intervalVariation);
       }
@@ -1460,7 +1474,6 @@ export function createCityAudioScene(getSession) {
         });
         playPositionedOneShot(path, {
           relX: atX - x,
-          interactRange: entry.interactRange,
           audibleRange: entry.audibleRange,
           panSaturation: entry.panSaturation,
           reverbSend: entry.movementReverbSend,
@@ -1468,6 +1481,7 @@ export function createCityAudioScene(getSession) {
           gain: entry.movementGain,
           pitchVariation: entry.movementPitchVariation,
           muffled,
+          highlighted: entry.highlight && Math.abs(atX - x) <= entry.interactRange,
         });
       });
     }
@@ -1589,10 +1603,11 @@ export function createCityAudioScene(getSession) {
     const beaconFactor = beaconVolumeFactor();
     const liveById = liveEntitiesById();
     for (const entry of entitySounds) {
-      const { entity, sound, audibleRange, panSaturation, interactRange, cutoffMin, cutoffMax, beaconGain, flyingHighpassHz, flyingVolumeFactor } =
+      const { entity, sound, audibleRange, panSaturation, interactRange, highlight, cutoffMin, cutoffMax, beaconGain, flyingHighpassHz, flyingVolumeFactor } =
         entry;
       const live = liveById.get(entity.id);
       const relX = live.x - x;
+      const dist = Math.abs(relX);
       // Perception surnaturelle (voir effectiveMuffleAmount plus haut) :
       // toujours 0 (aucun effet) pour une entité surnaturelle (perceptionGated) —
       // jamais étouffée par le mécanisme qui la révèle.
@@ -1608,12 +1623,15 @@ export function createCityAudioScene(getSession) {
 
       if (!sound || live.present === false) continue;
 
-      const dist = Math.abs(relX);
       // Pan inchangé : toujours dérivé de panSaturation, indépendant du volume.
       const pan = clamp(relX / panSaturation, -1, 1);
       // flyingVolumeFactor : neutre (1) pour toute entité non isFlying,
       // voir buildEntitySoundEntry — aucun effet sur le volume dans ce cas.
-      let volume = volumeForDistance(dist, interactRange, audibleRange) * beaconFactor * beaconGain * flyingVolumeFactor;
+      let volume =
+        volumeForDistance(dist, audibleRange, highlight && dist <= interactRange) *
+        beaconFactor *
+        beaconGain *
+        flyingVolumeFactor;
       // Filtre d'étouffement des entités MONDAINES (voir
       // effectiveMuffleAmount/currentMundaneMuffleAmount plus haut) :
       // volume interpolé CONTINÛMENT (0..1, le fondu demandé), passe-bas
@@ -1944,7 +1962,10 @@ export function createCityAudioScene(getSession) {
       const pan = clamp(relX / entry.panSaturation, -1, 1);
       const dist = Math.abs(relX);
       const openVolume =
-        volumeForDistance(dist, entry.interactRange, entry.audibleRange) * beaconFactor * entry.beaconGain * entry.flyingVolumeFactor;
+        volumeForDistance(dist, entry.audibleRange, entry.highlight && dist <= entry.interactRange) *
+        beaconFactor *
+        entry.beaconGain *
+        entry.flyingVolumeFactor;
       const openCutoff = cutoffForDistance(dist, entry.interactRange, entry.audibleRange, entry.cutoffMin, entry.cutoffMax);
       entry.sound.update(pan, openVolume);
       entry.sound.setCutoff(openCutoff);
@@ -1970,7 +1991,10 @@ export function createCityAudioScene(getSession) {
       const pan = clamp(relX / entry.panSaturation, -1, 1);
       const dist = Math.abs(relX);
       const openVolume =
-        volumeForDistance(dist, entry.interactRange, entry.audibleRange) * beaconFactor * rebuilt.beaconGain * entry.flyingVolumeFactor;
+        volumeForDistance(dist, entry.audibleRange, entry.highlight && dist <= entry.interactRange) *
+        beaconFactor *
+        rebuilt.beaconGain *
+        entry.flyingVolumeFactor;
       const openCutoff = cutoffForDistance(dist, entry.interactRange, entry.audibleRange, entry.cutoffMin, entry.cutoffMax);
       rebuilt.sound.update(pan, openVolume * MUFFLING_GAIN);
       rebuilt.sound.setCutoff(MUFFLING_LOWPASS_HZ);

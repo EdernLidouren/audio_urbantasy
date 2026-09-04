@@ -15,10 +15,13 @@ export default {
   nameKey: "item.apple.name",
   descriptionKey: "item.apple.description",
   sounds: {
-    beacon: { path: "assets/sounds/entities/fruit_beacon", loop: true },
+    beacon: { path: "assets/sounds/items/fruit_beacon", loop: true },
   },
   blocksMovement: false,
   observable: true,
   interactable: true,
+  // Surlignage audio de proximité (voir entities/model.md) : une pomme se
+  // repère nettement une fois à portée.
+  highlight: true,
   action: { kind: "pickup", item: "apple", count: 1 },
 };

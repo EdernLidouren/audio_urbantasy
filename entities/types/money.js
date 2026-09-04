@@ -14,10 +14,13 @@ export default {
   nameKey: "entity.money.name",
   descriptionKey: "entity.money.description",
   sounds: {
-    beacon: { path: "assets/sounds/entities/box_of_nails_beacon_1.mp3", loop: true },
+    beacon: { path: "assets/sounds/items/box_of_nails_beacon_1.mp3", loop: true },
   },
   blocksMovement: false,
   observable: true,
   interactable: true,
+  // Surlignage audio de proximité (voir entities/model.md) : une somme au
+  // sol se repère nettement une fois à portée.
+  highlight: true,
   action: { kind: "pickup", amount: 5 },
 };

@@ -21,6 +21,7 @@ Une entité (registre `entities/types/index.js`, un fichier par archétype dans
 | Type                    | `type` (instance), `nameKey` (registre ET instance, clé i18n, forme `<namespace>.name`) | quoi et comment l'annoncer |
 | Sons par rôle            | `sounds: { <rôle>: descripteur }`                                  | voir "Vocabulaire de sons" ci-dessous |
 | Portée spatiale           | `audibleRange`, `panSaturation`, `interactRange`, `cutoffMin`, `cutoffMax` | où/comment une entité est perçue dans l'espace — voir "Ce qui n'est PAS un paramètre sonore" |
+| Surlignage audio          | `highlight` (cascade instance -> type -> défaut `false`)           | gain de proximité, voir "Surlignage audio de proximité" plus bas — INDÉPENDANT de `observable`/`interactable` |
 | Paramètres sonores        | `reverbSend`, `beaconMode`, `beaconInterval`, `beaconIntervalVariation`, `beaconGain`, `vocalInterval`, `vocalIntervalVariation`, `vocalGain`, `pitchVariation`, `movementStepMultiplier`, `movementGain`, `enterSoundGain`, `exitSoundGain` | voir "Paramètres sonores" ci-dessous, surchargeables à l'instance via `tuning` (voir "Le palier INSTANCE") |
 | Drapeaux                 | `blocksMovement`                                                   | collision (core) |
 | Capacités d'interaction  | `observable`, `interactable` (cascade instance -> type, comme `blocksMovement`) | voir "Interaction (niveau 0)" plus bas |
@@ -937,28 +938,37 @@ l'entité, pas d'un rôle de son) :
   pas, jamais stocké nulle part (contrairement à cette propriété d'entité).
 - **`naturalWalk`** — le pas NATUREL de l'entité (ex. `"barefoot"`), pour
   une entité qui n'a pas de gait particulier mais un pas qui lui est propre
-  malgré tout. Une entité qui porte déjà son PROPRE son de déplacement
-  (`sounds.movement.path`, ex. `dog.js`) n'a besoin d'AUCUN des deux : ce
-  son propre sert directement de repli, voir la résolution ci-dessous.
+  malgré tout. PARTAGE le MÊME espace de noms que `gait` (voir plus bas,
+  "footsteps/gaits/") — `naturalWalk` peut donc réutiliser tel quel un nom
+  de gait déjà existant, PAR CONCEPTION (ex. `"barefoot"`, voir le piège vécu
+  ci-dessous), jamais un troisième vocabulaire séparé. Une entité qui porte
+  déjà son PROPRE son de déplacement (`sounds.movement.path`, ex. `dog.js`)
+  n'a besoin d'AUCUN des deux : ce son propre sert directement de repli,
+  voir la résolution ci-dessous.
 
 ### La règle : le sol domine, ou l'entité domine — jamais les deux
 
 `resolveFootstepPath` choisit un fichier `"<nom>_walk"` sous
-`assets/sounds/footsteps/`, en DEUX branches strictement disjointes selon
-`neutral` (jamais de croisement surface×chaussure, jamais de produit
-cartésien N surfaces × M gaits — chaque cran teste UN nom, une seule
-dimension à la fois) :
+`assets/sounds/footsteps/<catégorie>/` — TROIS sous-dossiers de contenu
+(`surfaces/`, `gaits/`, `entities/`, voir `view/audio/city-scene.js`/
+`footstepKey(category, name)`), mais DEUX branches de RÉSOLUTION strictement
+disjointes selon `neutral` (jamais de croisement surface×chaussure, jamais
+de produit cartésien N surfaces × M gaits — chaque cran teste UN nom sous
+UNE catégorie, une seule dimension à la fois) :
 
-- **Sol SPÉCIAL** (`neutral: false`, ex. `sand`, `snow`) — `"<surface>_walk"`
-  si ce pool existe : LE SOL DOMINE, le `gait`/`naturalWalk` de l'entité est
-  ignoré. Absent -> bascule sur la branche NEUTRE ci-dessous (un sol spécial
-  sans son dédié sonne comme un sol neutre, jamais comme un silence).
+- **Sol SPÉCIAL** (`neutral: false`, ex. `sand`, `snow`) —
+  `"surfaces/<surface>_walk"` si ce pool existe : LE SOL DOMINE, le
+  `gait`/`naturalWalk` de l'entité est ignoré. Absent -> bascule sur la
+  branche NEUTRE ci-dessous (un sol spécial sans son dédié sonne comme un
+  sol neutre, jamais comme un silence).
 - **Sol NEUTRE** (`neutral: true`, ex. `concrete`, `asphalt`) — L'ENTITÉ
-  DOMINE, en cascade : `"<gait>_walk"` si un gait est résolu ET que le
-  fichier existe ; sinon le pas NATUREL — `"<naturalWalk>_walk"` si résolu
-  ET existant, SINON le son propre de l'entité (`sounds.movement.path`,
-  s'il y en a un) ; sinon le PLANCHER GARANTI (le son de pas historique du
-  jeu, `concrete_walk` — jamais vérifié, DOIT toujours exister). Trois crans
+  DOMINE, en cascade : `"gaits/<gait>_walk"` si un gait est résolu ET que le
+  fichier existe ; sinon le pas NATUREL — `"gaits/<naturalWalk>_walk"`
+  (MÊME sous-dossier que `gait`, jamais `entities/`) si résolu ET existant,
+  SINON le son propre de l'entité (`sounds.movement.path`, typiquement sous
+  `entities/` pour une créature — ex. `dog_medium_walk` — s'il y en a un) ;
+  sinon le PLANCHER GARANTI (le son de pas historique du jeu,
+  `gaits/shoes_walk` — jamais vérifié, DOIT toujours exister). Trois crans
   au plus, jamais davantage.
 
 `hasAsset` (`lib/assets.js`) teste l'existence d'un pool SANS lever ni
@@ -1008,6 +1018,33 @@ ci-dessus, même si l'audio en dépend :
   contrairement à `reverbSend`/`beaconGain`/`vocalGain`/`pitchVariation`,
   qui vivent à l'intérieur d'un descripteur de son précis et peuvent
   différer d'un rôle à l'autre pour la MÊME entité.
+
+## Surlignage audio de proximité
+
+`highlight` (booléen, cascade instance -> type -> défaut `false`, résolu par
+`resolveTuning("highlight", entity)` comme `gait`/`naturalWalk` — voir
+"Résolution en cascade") gouverne le SAUT de volume vers `fullVolume` quand
+une entité est à portée d'interaction (`dist <= interactRange`) — voir
+`volumeForDistance`, `view/audio/city-scene.js`. EXPLICITE et INDÉPENDANT de
+`observable`/`interactable` : une entité n'est surlignée QUE si elle (ou son
+archétype, ou son instance via `tuning.highlight`) déclare `highlight: true`,
+jamais un effet de bord d'une autre capacité. Décor et ambiance (`decor`,
+`fountain`, `rock`, `river`, `neon`, créatures...) ne le déclarent pas — hors
+zone comme dans, leur volume suit le même plancher continu que tout le monde
+(`farVolumeMax` à `dist=0`, décroissance linéaire vers 0 à `audibleRange`,
+JAMAIS de plateau/saut). Aujourd'hui déclaré sur les portes, PNJ, passages et
+objets/collectibles (`door`/`npc`/`object`/`item`/`money`/`apple`/`crate`/
+`passage`/`window`) : ce que le joueur a besoin de repérer précisément.
+
+SAUT INSTANTANÉ, PAS de rampe : `dist <= interactRange` fait passer le
+volume DIRECTEMENT à `fullVolume`, sans transition — même mécanique que
+l'ancien comportement (avant l'introduction du flag `highlight`), désormais
+GOUVERNÉE par ce flag plutôt qu'appliquée à toute entité sans distinction.
+Une version rampée (montée/descente progressives) a été essayée puis
+abandonnée : à l'oreille, en marchant/courant normalement, la fenêtre de
+présence dans `interactRange` est trop courte pour laisser une rampe même
+courte (quelques dizaines de ms) se terminer — le pic ne s'entendait alors
+quasiment jamais, une régression nette par rapport au saut net d'origine.
 
 ## Les sous-types sont des PRESETS, pas une hiérarchie
 

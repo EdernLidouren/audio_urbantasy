@@ -9,7 +9,7 @@ export default {
   nameKey: "entity.fountain.name",
   descriptionKey: "entity.fountain.description",
   sounds: {
-    beacon: { path: "assets/sounds/entities/box_of_nails_beacon_1.mp3", loop: true },
+    beacon: { path: "assets/sounds/items/box_of_nails_beacon_1.mp3", loop: true },
   },
   blocksMovement: true,
   observable: true,

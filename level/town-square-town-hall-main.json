@@ -36,7 +36,7 @@
         "descriptionKey": "door.mayor_office.description",
         "x": 3,
         "sounds": {
-          "beacon": { "path": "assets/sounds/entities/door_1_close_1.mp3", "loop": true }
+          "beacon": { "path": "assets/sounds/doors/door_1_close_1.mp3", "loop": true }
         },
         "action": { "kind": "applyEffects", "effects": [{ "type": "teleport", "target": "town_square", "x": 25 }] }
       },

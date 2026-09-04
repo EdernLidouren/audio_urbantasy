@@ -13,9 +13,9 @@ export default {
   nameKey: "entity.rock.name",
   descriptionKey: "entity.rock.description",
   sounds: {
-    beacon: { path: "assets/sounds/entities/big_rock_beacon_1.mp3", loop: true },
+    beacon: { path: "assets/sounds/decor/big_rock_beacon_1.mp3", loop: true },
   },
-  collisionSound: "assets/sounds/entities/big_rock_collision_1.mp3",
+  collisionSound: "assets/sounds/effects/big_rock_collision_1.mp3",
   blocksMovement: true,
   observable: true,
   interactable: false,

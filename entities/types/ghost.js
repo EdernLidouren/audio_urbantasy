@@ -16,7 +16,7 @@ export default {
   nameKey: "entity.ghost.name",
   descriptionKey: "entity.ghost.description",
   sounds: {
-    beacon: { path: "assets/sounds/entities/neon_beacon", loop: true },
+    beacon: { path: "assets/sounds/furniture/neon_beacon", loop: true },
   },
   blocksMovement: false,
   observable: true,

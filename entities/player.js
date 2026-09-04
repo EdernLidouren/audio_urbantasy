@@ -25,6 +25,6 @@
 // (voir entities/model.md, "Surfaces de sol et son de pas").
 export default {
   sounds: {
-    movement: { path: "assets/sounds/footsteps/shoes_walk", loop: false },
+    movement: { path: "assets/sounds/footsteps/gaits/shoes_walk", loop: false },
   },
 };

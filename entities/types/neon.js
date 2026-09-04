@@ -21,7 +21,7 @@ export default {
   nameKey: "entity.neon.name",
   descriptionKey: "entity.neon.description",
   sounds: {
-    beacon: { path: "assets/sounds/entities/neon_beacon", loop: true },
+    beacon: { path: "assets/sounds/furniture/neon_beacon", loop: true },
     enterSound: { path: "assets/sounds/effects/electrical_flickering" },
     exitSound: { path: "assets/sounds/effects/electrical_flickering" },
   },

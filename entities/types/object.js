@@ -6,7 +6,7 @@ export default {
   nameKey: "entity.object.name",
   descriptionKey: "entity.object.description",
   sounds: {
-    beacon: { path: "assets/sounds/entities/box_of_nails_beacon_1.mp3", loop: true },
+    beacon: { path: "assets/sounds/items/box_of_nails_beacon_1.mp3", loop: true },
   },
   blocksMovement: false,
   observable: true,
@@ -15,4 +15,7 @@ export default {
   // aujourd'hui, même si l'action reste le stub générique tant que les
   // types d'action ne sont pas différenciés (voir view/interaction.js).
   interactable: true,
+  // Surlignage audio de proximité (voir entities/model.md) : un objet à
+  // fouiller se repère nettement une fois à portée.
+  highlight: true,
 };

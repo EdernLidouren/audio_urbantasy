@@ -14,9 +14,12 @@ export default {
   nameKey: "door.default.name",
   descriptionKey: "door.default.description",
   sounds: {
-    beacon: { path: "assets/sounds/entities/door_1_close_1.mp3", loop: true },
+    beacon: { path: "assets/sounds/doors/door_beacon", loop: true },
   },
   blocksMovement: false,
   observable: true,
   interactable: true,
+  // Surlignage audio de proximité (voir entities/model.md, "Surlignage
+  // audio de proximité") : une porte se repère nettement une fois à portée.
+  highlight: true,
 };

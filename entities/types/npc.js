@@ -25,12 +25,15 @@ export default {
   gait: "shoes",
   sounds: {
     beacon: { path: "assets/sounds/entities/npc_beacon_1.mp3", loop: true },
-    vocal: { path: "assets/sounds/entities/box_of_nails_beacon_1.mp3", loop: false },
-    movement: { path: "assets/sounds/footsteps/shoes_walk", loop: false },
+    vocal: { path: "assets/sounds/items/box_of_nails_beacon_1.mp3", loop: false },
+    movement: { path: "assets/sounds/footsteps/gaits/shoes_walk", loop: false },
   },
   blocksMovement: false,
   observable: true,
   // interactable:true (anticipe "parler", voir entities/model.md) : candidat
   // à entrée dès aujourd'hui, action encore générique (stub) pour l'instant.
   interactable: true,
+  // Surlignage audio de proximité (voir entities/model.md) : un PNJ se
+  // repère nettement une fois à portée.
+  highlight: true,
 };

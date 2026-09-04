@@ -52,12 +52,29 @@ export const TUNING_DEFAULTS = {
   // signal "cette entité est interactible". Ne descend jamais en dessous.
   fullVolume: 1.0,
 
-  // Volume juste après avoir quitté interactRange (palier volontaire, pas
-  // une valeur de continuité) : marque clairement la sortie de la zone
-  // d'interaction avant de décroître doucement vers 0 à audibleRange. Plus
-  // haut = le palier est moins marqué (se rapproche de fullVolume) ; plus
-  // bas = la coupure en sortant de interactRange s'entend davantage.
+  // Volume-plancher (hors surlignage) juste après avoir quitté
+  // interactRange, avant de décroître doucement vers 0 à audibleRange. Plus
+  // haut = ce plancher est plus haut ; plus bas = la décroissance vers 0
+  // s'entend davantage. Voir "highlight" ci-dessous : ce plancher s'applique
+  // à TOUTE entité, surlignée ou non — fullVolume n'est atteint que par une
+  // entité highlight:true, une fois sa zone d'interaction rejointe.
   farVolumeMax: 0.5,
+
+  // Surlignage audio de proximité (voir view/audio/city-scene.js,
+  // entities/model.md) : à portée d'interaction (dist <= interactRange),
+  // une entité highlight:true saute à fullVolume — SAUT NET, INSTANTANÉ,
+  // pas une rampe. Une version rampée (montée/descente progressives sur
+  // quelques dizaines à centaines de ms) a été essayée et abandonnée :
+  // quasi inaudible à l'oreille en marchant/courant normalement, la
+  // fenêtre de présence dans interactRange étant trop courte pour laisser
+  // le fondu se terminer (voir l'historique de view/audio/city-scene.js/
+  // volumeForDistance). EXPLICITE et INDÉPENDANT de observable/
+  // interactable — une entité n'est surlignée QUE si elle (ou son
+  // archétype, ou son instance) déclare highlight: true. Ce défaut GLOBAL
+  // (false) est le dernier recours de la cascade instance -> archétype ->
+  // ce défaut (même mécanisme que gait/naturalWalk) : le décor n'est jamais
+  // surligné sans le demander explicitement à l'un de ces deux paliers.
+  highlight: false,
 
   // Intervalle minimum (ms) entre deux bruits de pas d'une MÊME cause
   // (reprise après arrêt + cadence normale d'un côté, changement de sol de
