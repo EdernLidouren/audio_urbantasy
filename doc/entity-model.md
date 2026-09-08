@@ -793,6 +793,32 @@ code. Consulter directement ce fichier pour la valeur courante d'un défaut.
   `beaconInterval`/`beaconIntervalVariation`). Un son intermittent n'a PAS
   de passe-bas dépendant de la distance (voir "Ce qui n'est PAS un
   paramètre sonore") : trop court pour qu'un filtre continu ait un sens.
+  **Durée minimale du fichier, mode `"continu"` — CONTRAINTE DE CONTENU
+  CONFIRMÉE :** un fichier de balise continue trop court (constaté sous
+  ~1,5 s) peut, selon le navigateur, cesser de boucler après UNE seule
+  lecture — silence permanent, sans erreur console. Cause précise non
+  isolée avec certitude (probablement liée à la fréquence de réarmement
+  d'un mécanisme interne à Howler, plus un fichier est court, plus il se
+  réarme souvent — voir le filet de sécurité ci-dessous), mais le
+  CORRECTIF EMPIRIQUE, confirmé en conditions réelles (`glass_window`,
+  `level/town-square-town-hall-main.json`), est net : rallonger le fichier
+  au-delà de ce seuil (silence ajouté en fin de fichier si le son lui-même
+  est bref) fait disparaître le symptôme. **Règle de contenu à respecter
+  pour toute NOUVELLE balise `"continu"` : viser au moins ~1,5 s, quitte à
+  padder de silence.**
+  **Filet de sécurité anti-blocage** (mode `"continu"` uniquement, voir
+  `lib/audio.js`/`createPositionedSound`/`isStuck()`) : Howler (vendor
+  v2.2.3) boucle nativement une balise continue, mais tient en parallèle une
+  chaîne de `setTimeout` interne qui se réarme à chaque tour pour sa propre
+  comptabilité — un seul maillon manqué (dépendant du navigateur) casse
+  cette chaîne pour de bon, sans exception, et la balise peut alors rester
+  silencieuse indéfiniment. N'A PAS suffi à corriger le cas ci-dessus
+  (`howl.playing()` restait vrai malgré le silence réel — la panne se situe
+  plus profondément que ce que Howler expose en JS), mais reste en place
+  comme filet pour tout AUTRE cas où `playing()` refléterait correctement
+  l'arrêt. `applyEntityAudio` (`view/audio/city-scene.js`) détecte ce cas à chaque
+  tick (`sound.isStuck()`) et relance la voix — un filet, pas un correctif
+  du mécanisme Howler en cause.
 - **`beaconInterval`** / **`beaconIntervalVariation`** — cadence d'un beacon
   `"intermittent"` : durée moyenne entre deux déclenchements, et aléa
   appliqué de part et d'autre à CHAQUE déclenchement (évite une cadence

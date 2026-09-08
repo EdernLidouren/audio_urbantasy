@@ -467,11 +467,11 @@
   "assets/sounds/furniture/desk_chair_1_beacon": [
     "assets/sounds/furniture/desk_chair_1_beacon_1.mp3"
   ],
+  "assets/sounds/furniture/glass_window_1_beacon": [
+    "assets/sounds/furniture/glass_window_1_beacon_1.mp3"
+  ],
   "assets/sounds/furniture/neon_beacon": [
     "assets/sounds/furniture/neon_beacon_1.mp3"
-  ],
-  "assets/sounds/furniture/window_1_beacon": [
-    "assets/sounds/furniture/window_1_beacon_1.mp3"
   ],
   "assets/sounds/items/box_of_nails_beacon": [
     "assets/sounds/items/box_of_nails_beacon_1.mp3"

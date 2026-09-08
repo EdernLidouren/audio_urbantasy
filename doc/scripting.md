@@ -692,9 +692,9 @@ ORDINAIRE dont l'action est `"applyEffects"` avec un effet `"teleport"` dans
 (la cible varie par INSTANCE, jamais un défaut d'archétype) : chaque porte
 déclare la sienne en entier.
 
-Exemple réel complet (fenêtre) : `entities/types/window.js` (voir "Actions
-multiples filtrées par condition" plus bas pour le cas complet, deux
-candidates `applyEffects` aux conditions opposées).
+Exemple réel complet (fenêtre) : `entities/types/glass-window.js` (voir
+"Actions multiples filtrées par condition" plus bas pour le cas complet,
+deux candidates `applyEffects` aux conditions opposées).
 
 ### Ajouter un kind d'action
 
@@ -867,7 +867,7 @@ dormant (`view/audio/city-scene.js`/`playEntityOneShot`) → `console.warn`,
 jamais un plantage, le reste de la liste d'effets (état, annonce) continue
 normalement.
 
-**Exemple réel — la fenêtre** (`entities/types/window.js`) : ne déclare NI
+**Exemple réel — la fenêtre** (`entities/types/glass-window.js`) : ne déclare NI
 `at` NI `nature` → son diégétique, positionné À LA FENÊTRE elle-même, étouffé
 si le joueur est de l'autre face ou en perception active — exactement le
 rendu d'un beacon au même endroit.
@@ -1078,16 +1078,17 @@ conditions EXACTEMENT opposées (`equals: false` / `equals: true` sur la MÊME
 variable) — jamais un `if`/`else` ni une machine à états codée en dur, juste deux
 règles déclaratives dont l'union couvre tout l'espace du flag.
 
-**Exemple réel complet — la fenêtre** (`entities/types/window.js`, instances dans
-`level/town_square_town-hall_main.json`) — CAS DE RÉFÉRENCE combinant les DEUX
+**Exemple réel complet — la fenêtre** (`entities/types/glass-window.js`) — CAS
+DE RÉFÉRENCE combinant les DEUX
 mécanismes de cette page : actions multiples filtrées par condition ET effets
 de première classe (état + rendu mélangés) :
 
 ```js
-// entities/types/window.js — l'ARCHÉTYPE porte l'action (cascade type -> instance,
-// comme behavior/presence), mais PAS la variable isOpen : une variable ne cascade
-// JAMAIS type -> instance (voir "Variables" plus bas) — chaque instance qui utilise
-// ce type DOIT déclarer SA PROPRE isOpen, sinon le chargement échoue.
+// entities/types/glass-window.js — l'ARCHÉTYPE porte l'action (cascade type ->
+// instance, comme behavior/presence), mais PAS la variable isOpen : une variable
+// ne cascade JAMAIS type -> instance (voir "Variables" plus bas) — chaque
+// instance qui utilise ce type DOIT déclarer SA PROPRE isOpen, sinon le
+// chargement échoue.
 action: [
   {
     kind: "applyEffects",
@@ -1113,13 +1114,13 @@ action: [
 ```
 
 ```json
-// level/town_square_town-hall_main.json — l'INSTANCE déclare isOpen, VOLATILE
+// level/town-square-town-hall-main.json — l'INSTANCE déclare isOpen, VOLATILE
 // (repart fermée à chaque rechargement, jamais de mémoire d'ouverture entre
 // deux parties)
 {
-  "id": "window_1",
-  "type": "window",
-  "x": 5,
+  "id": "glass_window_1",
+  "type": "glass_window",
+  "x": 1,
   "variables": [{ "name": "isOpen", "type": "flag", "initial": false, "persistent": false }]
 }
 ```

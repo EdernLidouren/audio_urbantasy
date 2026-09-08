@@ -267,26 +267,10 @@ function playPerceptionToggleSound(active) {
   }
 }
 
-// Son de PASSAGE (teleport en mode "fade"), voir runTeleportSas plus bas — non
-// positionné, volume UI (interfaceVolume), même patron défensif (try/catch)
-// que playPerceptionToggleSound/playSideSwitchSound ci-dessous. Joué HORS
-// du gain de couche entités (lib/audio.js) : appartient à la TRANSITION
-// elle-même, jamais à la scène qui vient de s'effacer — reste audible même
-// au plus fort du fondu.
-const DOOR_TRANSITION_SOUND_KEY = "assets/sounds/doors/door_transition";
 // Durées du fondu de couche entités pendant le sas (voir
 // config/tuning-values.js, seule définition, jamais dupliquée ici).
 const DOOR_TRANSITION_FADE_OUT_MS = TUNING_DEFAULTS.doorTransitionFadeOutMs;
 const DOOR_TRANSITION_FADE_IN_MS = TUNING_DEFAULTS.doorTransitionFadeInMs;
-
-function playDoorTransitionSound() {
-  try {
-    const factor = getPref("interfaceVolume", PREF_CONSTRAINTS.interfaceVolume.default) / 100;
-    playOneShot(resolveAsset(DOOR_TRANSITION_SOUND_KEY), { volume: factor });
-  } catch (error) {
-    console.warn(`city-screen: son de passage indisponible ("${DOOR_TRANSITION_SOUND_KEY}") : ${error.message}`);
-  }
-}
 
 // Marqueur sonore de bascule recto<->verso — voir sideSwitchEffect plus
 // bas. DÉCLARABLE, ABSENT par défaut (`resolveTuning("transitionSound",
@@ -297,9 +281,8 @@ function playDoorTransitionSound() {
 // à l'instance, ou un défaut à l'archétype) transite en SILENCE côté son
 // de passage, rampes + pas de trajet/arrivée mis à part (voir
 // scene.playTransitionSteps/playArrivalStep, DEUX choses sonores
-// indépendantes qui se composent, jamais mélangées). MÊME patron
-// défensif que playDoorTransitionSound ci-dessus (non positionné, volume
-// UI, try/catch) pour le cas où le son EST déclaré mais introuvable.
+// indépendantes qui se composent, jamais mélangées). Non positionné,
+// volume UI, try/catch pour le cas où le son EST déclaré mais introuvable.
 function playSideSwitchSound(entity) {
   const path = resolveTuning("transitionSound", entity);
   if (!path) return; // rien de déclaré : silence, pas une erreur
@@ -494,8 +477,7 @@ export function makeCityScreen(getSession, setSession) {
   //
   // Séquence STRICTE : sas -> fondu SORTANT -> déplacement (rechargement
   // caché derrière le silence, ou simple repositionnement si needsReload
-  // est faux) -> son de PASSAGE (hors du gain, voir playDoorTransitionSound)
-  // -> fondu ENTRANT (scène prête) -> fin du sas.
+  // est faux) -> fondu ENTRANT (scène prête) -> fin du sas.
   async function runTeleportSas(target, x, side, needsReload) {
     pushScreen({});
     try {
@@ -513,7 +495,6 @@ export function makeCityScreen(getSession, setSession) {
         placeInCurrentWorld(x, side);
       }
 
-      playDoorTransitionSound();
       rampEntityLayerGain(1, DOOR_TRANSITION_FADE_IN_MS);
       await wait(DOOR_TRANSITION_FADE_IN_MS);
     } finally {

@@ -11,14 +11,14 @@
   "reverbDecay": 3.0,
   "entities": [
     {
-      "id": "window_1",
-      "type": "window",
+      "id": "glass_window_1",
+      "type": "glass_window",
       "x": 1,
       "variables": [{ "name": "isOpen", "type": "flag", "initial": false, "persistent": false }]
     },
     {
-      "id": "window_2",
-      "type": "window",
+      "id": "glass_window_2",
+      "type": "glass_window",
       "x": 20,
       "variables": [{ "name": "isOpen", "type": "flag", "initial": false, "persistent": false }]
     },

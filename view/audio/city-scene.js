@@ -1743,6 +1743,15 @@ export function createCityAudioScene(getSession) {
 
       if (!sound || live.present === false) continue;
 
+      // Filet de sécurité anti-blocage (voir lib/audio.js/createPositionedSound
+      // isStuck()) : une balise censée boucler en continu peut, rarement et
+      // dans certains navigateurs, s'arrêter pour de bon sans que rien de
+      // notre côté ne l'ait demandé (cause exacte non isolée avec certitude,
+      // voir isStuck()) — jamais un correctif du mécanisme en cause, juste
+      // un filet qui rend le symptôme invisible au joueur. isStuck() ignore
+      // déjà tout arrêt VOULU (dormance, consommation, pause de menu).
+      if (sound.isStuck()) sound.resume();
+
       // Pan inchangé : toujours dérivé de panSaturation, indépendant du volume.
       const pan = clamp(relX / panSaturation, -1, 1);
       // flyingVolumeFactor : neutre (1) pour toute entité non isFlying,
