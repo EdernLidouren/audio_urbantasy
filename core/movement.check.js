@@ -59,6 +59,9 @@ import { WEATHER_STATES, DEFAULT_WEATHER_STATE } from "../config/weather-values.
 import { parseVariables, getVariable, setVariable, applyActionEffects } from "./variables.js";
 import { IMPROVEMENT_REGISTRY, improvementProps, hasImprovement, giveImprovement, removeImprovement } from "./improvements.js";
 import { isDebugEnabled, setDebugEnabled } from "../config/debug.js";
+import { validateSpawnTables, validateDistribution, resolveDistribution, drawItem } from "./distribution.js";
+import { spawnCycleAt, refillDueSpawns, searchContainer } from "./spawn.js";
+import { SPAWN_TABLES, SPAWN_RANGE_DEFAULT_COUNT } from "../config/spawn-values.js";
 
 // { companions: [] } : passé explicitement à CHAQUE createInitialState()
 // ci-dessous qui ne concerne pas les compagnons — sans lui, le défaut (UN
@@ -6653,6 +6656,231 @@ export function runMovementChecks() {
       }
       run("panier plein : la partie reparse reste jouable (aucune erreur)", false, revivalThrew);
     }
+  }
+
+  // --- Collecte (core/distribution.js + core/spawn.js) ---
+  // Distribution, sources (conteneur/plage), cycle quotidien + file,
+  // matérialisation (fouille/pickup), persistance, déterminisme.
+
+  const SPAWN_DAY = TIME_CONFIG.minutesPerHour * TIME_CONFIG.hoursPerDay;
+  const spawnFail = (message) => {
+    throw new Error(message);
+  };
+  const spawnThrows = (fn) => {
+    try {
+      fn();
+      return false;
+    } catch {
+      return true;
+    }
+  };
+
+  // Tables et distributions : validation.
+  run("collecte : la table standard SPAWN_TABLES est valide", false, spawnThrows(() => validateSpawnTables(SPAWN_TABLES)));
+  run("collecte : table sans aucun poids positif -> rejetée", true, spawnThrows(() => validateSpawnTables({ t: { apple: 0 } })));
+  run("collecte : table référençant un objet inconnu -> rejetée", true, spawnThrows(() => validateSpawnTables({ t: { nope: 1 } })));
+  run("collecte : distribution { table } connue -> acceptée", false, spawnThrows(() => validateDistribution({ table: "default" }, "d", spawnFail)));
+  run("collecte : distribution { table } inconnue -> rejetée", true, spawnThrows(() => validateDistribution({ table: "nope" }, "d", spawnFail)));
+  run("collecte : distribution { items } inline -> acceptée", false, spawnThrows(() => validateDistribution({ items: { apple: 1 } }, "d", spawnFail)));
+  run("collecte : distribution table ET items -> rejetée", true, spawnThrows(() => validateDistribution({ table: "default", items: { apple: 1 } }, "d", spawnFail)));
+  run("collecte : resolveDistribution { table } -> la table standard", SPAWN_TABLES.default, resolveDistribution({ table: "default" }));
+
+  // Tirage pondéré : réutilise pickTransition (météo) — équité vérifiée sur
+  // une table inline à deux objets 3:1.
+  {
+    const counts = { apple: 0, key_bronze: 0 };
+    let rng = createSeed("spawn-draw");
+    for (let i = 0; i < 4000; i++) {
+      const d = drawItem({ items: { apple: 3, key_bronze: 1 } }, rng);
+      counts[d.item] += 1;
+      rng = d.rngState;
+    }
+    run("collecte : drawItem ne tire que des objets de la table", 4000, counts.apple + counts.key_bronze);
+    run("collecte : drawItem respecte les poids (3:1, ±10 %)", true, Math.abs(counts.apple / 4000 - 0.75) < 0.1);
+  }
+
+  // Cycle quotidien : index de jour depuis l'origine (SPAWN_CYCLE_HOUR = minuit).
+  run("collecte : cycle 0 au départ d'une partie", 0, spawnCycleAt(INITIAL_TIME));
+  run("collecte : cycle inchangé juste avant minuit", 0, spawnCycleAt(SPAWN_DAY - 1));
+  run("collecte : cycle 1 à minuit", 1, spawnCycleAt(SPAWN_DAY));
+  run("collecte : cycle 3 après trois jours", 3, spawnCycleAt(INITIAL_TIME + 3 * SPAWN_DAY));
+
+  // Registre de test : un conteneur (bush) + les archétypes que le moteur
+  // instancie au sol (apple dédié, item générique) + un bloqueur.
+  const SPAWN_REGISTRY = {
+    bush: {
+      nameKey: "entity.bush.name",
+      sounds: { beacon: { path: "assets/sounds/decor/tree_beacon", loop: true } },
+      container: { distribution: { table: "default" } },
+      observable: true,
+      interactable: true,
+      action: { kind: "search" },
+    },
+    apple: {
+      nameKey: "item.apple.name",
+      sounds: { beacon: { path: "assets/sounds/items/fruit_beacon", loop: true } },
+      interactable: true,
+      action: { kind: "pickup", item: "apple", count: 1 },
+    },
+    item: { nameKey: "entity.item.name", sounds: { beacon: { path: "assets/sounds/items/box_of_nails_beacon", loop: true } }, interactable: true },
+    rock: { nameKey: "entity.rock.name", blocksMovement: true },
+    dog: { nameKey: "entity.dog.name" },
+  };
+  const spawnRaw = {
+    id: "movement-check-spawn",
+    titleKey: "level.demo.title",
+    length: 40,
+    playerStart: 2,
+    spawnRanges: [{ from: 20, to: 30, count: 4, distribution: { table: "default" } }],
+    entities: [
+      { id: "bush-1", type: "bush", x: 5 },
+      { id: "bush-2", type: "bush", x: 8, container: { distribution: { items: { key_bronze: 1 } } } },
+      { id: "rock-1", type: "rock", x: 25 },
+    ],
+  };
+  const spawnLevel = parseLevel(spawnRaw, SPAWN_REGISTRY);
+  const spawnLevelB = parseLevel({ id: "movement-check-spawn-b", titleKey: "level.demo.title", length: 10, playerStart: 1, entities: [] }, SPAWN_REGISTRY);
+
+  run("collecte : parseLevel porte spawnRanges (count explicite conservé)", 4, spawnLevel.spawnRanges[0].count);
+  run("collecte : parseLevel — container cascadé depuis l'archétype", "default", spawnLevel.entities[0].container.distribution.table);
+  run("collecte : parseLevel — container surchargé à l'instance (inline)", 1, spawnLevel.entities[1].container.distribution.items.key_bronze);
+  run("collecte : parseLevel — une face sans plage ne porte pas spawnRanges", undefined, spawnLevelB.spawnRanges);
+  run(
+    "collecte : parseLevel rejette une plage hors bornes",
+    true,
+    spawnThrows(() => parseLevel({ ...spawnRaw, spawnRanges: [{ from: 35, to: 45, distribution: { table: "default" } }] }, SPAWN_REGISTRY))
+  );
+  run(
+    "collecte : parseLevel rejette une plage à distribution inconnue",
+    true,
+    spawnThrows(() => parseLevel({ ...spawnRaw, spawnRanges: [{ from: 1, to: 2, distribution: { table: "nope" } }] }, SPAWN_REGISTRY))
+  );
+  run(
+    "collecte : parseLevel rejette un container sans distribution valide",
+    true,
+    spawnThrows(() => parseLevel({ ...spawnRaw, entities: [{ id: "b", type: "bush", x: 1, container: {} }] }, SPAWN_REGISTRY))
+  );
+
+  // Premier chargement : garnissage (conteneurs stockés, plage posée).
+  const spawnFresh = { ...createInitialState(spawnLevel, undefined, NO_COMPANIONS), bag: [] };
+  const spawnFilled = refillDueSpawns(spawnFresh, SPAWN_REGISTRY);
+  const spawnWorld = (s) => s.worlds[spawnLevel.id];
+  const spawnedOf = (s) => spawnWorld(s).entities.filter((e) => e.spawned);
+  run("collecte : refillDueSpawns marque le cycle matérialisé", 0, spawnWorld(spawnFilled).spawnCycle);
+  run("collecte : refillDueSpawns stocke chaque conteneur", true, spawnWorld(spawnFilled).entities.slice(0, 2).every((e) => typeof e.stock === "string"));
+  run("collecte : conteneur à distribution inline -> tire dans SA table", "key_bronze", spawnWorld(spawnFilled).entities[1].stock);
+  run("collecte : plage -> count collectibles posés", 4, spawnedOf(spawnFilled).length);
+  run("collecte : collectibles posés DANS la plage", true, spawnedOf(spawnFilled).every((e) => e.x >= 20 && e.x <= 30));
+  run("collecte : collectibles posés hors du corps du bloqueur", true, spawnedOf(spawnFilled).every((e) => Math.abs(e.x - 25) >= BODY_RADIUS));
+  run(
+    "collecte : collectibles espacés (positions variées, jamais superposées)",
+    true,
+    spawnedOf(spawnFilled).every((a, i) => spawnedOf(spawnFilled).every((b, j) => i === j || Math.abs(a.x - b.x) >= TUNING_DEFAULTS.spawnMinSpacing))
+  );
+  run("collecte : collectibles posés portent une action pickup vers le sac", true, spawnedOf(spawnFilled).every((e) => e.action.kind === "pickup" && typeof e.action.item === "string"));
+  run("collecte : un objet à archétype dédié (apple) naît sous SON type", true, spawnedOf(spawnFilled).filter((e) => e.action.item === "apple").every((e) => e.type === "apple"));
+  run("collecte : un objet sans archétype dédié naît sous le type générique item", true, spawnedOf(spawnFilled).filter((e) => e.action.item === "key_bronze").every((e) => e.type === "item"));
+  run("collecte : refillDueSpawns idempotent dans le même cycle (référence INCHANGÉE)", spawnFilled, refillDueSpawns(spawnFilled, SPAWN_REGISTRY));
+  run("collecte : refillDueSpawns sur un monde sans source -> référence INCHANGÉE", true, (() => {
+    const s = createInitialState(spawnLevelB, undefined, NO_COMPANIONS);
+    return refillDueSpawns(s, SPAWN_REGISTRY) === s;
+  })());
+
+  // Ramassage au sol : pickupItemEntity existant, l'entité disparaît.
+  const spawnFirstGround = spawnedOf(spawnFilled)[0];
+  const spawnPicked = pickupItemEntity(spawnFilled, spawnFirstGround.id, spawnFirstGround.action.item, 1);
+  run("collecte : ramasser un collectible posé -> objet au sac", spawnFirstGround.action.item, spawnPicked.bag[0].type);
+  run("collecte : ramasser un collectible posé -> entité retirée", 3, spawnedOf(spawnPicked).length);
+
+  // Fouille : garni -> objet au sac ; refouille le même jour -> vide.
+  const spawnSearch1 = searchContainer(spawnFilled, "bush-1");
+  run("collecte : fouiller un conteneur garni -> objet obtenu", spawnWorld(spawnFilled).entities[0].stock, spawnSearch1.item);
+  run("collecte : fouiller -> objet ajouté au sac", spawnSearch1.item, spawnSearch1.session.bag[0].type);
+  run("collecte : fouiller -> conteneur noté vidé", null, spawnWorld(spawnSearch1.session).entities[0].stock);
+  const spawnSearch2 = searchContainer(spawnSearch1.session, "bush-1");
+  run("collecte : refouiller le même jour -> vide", null, spawnSearch2.item);
+  run("collecte : refouiller le même jour -> sac inchangé", 1, spawnSearch2.session.bag.length);
+  run("collecte : fouiller une entité qui n'est pas un conteneur -> null, session inchangée", true, (() => {
+    const r = searchContainer(spawnSearch2.session, "rock-1");
+    return r.item === null && r.session === spawnSearch2.session;
+  })());
+
+  // Jour suivant SUR PLACE : le conteneur se re-garnit paresseusement à la
+  // fouille ; la plage, elle, n'a PAS changé (rien ne se matérialise sous
+  // le joueur).
+  const spawnNextDayInPlace = advanceTime(spawnSearch2.session, SPAWN_DAY);
+  run(
+    "collecte : joueur présent au passage du cycle -> plage INCHANGÉE (aucun tick ne matérialise)",
+    JSON.stringify(spawnedOf(spawnSearch2.session).map((e) => e.id)),
+    JSON.stringify(spawnedOf(spawnNextDayInPlace).map((e) => e.id))
+  );
+  run("collecte : joueur présent au passage du cycle -> marqueur INCHANGÉ (dû, pas exécuté)", 0, spawnWorld(spawnNextDayInPlace).spawnCycle);
+  const spawnSearch3 = searchContainer(spawnNextDayInPlace, "bush-1");
+  run("collecte : un jour plus tard sur place -> conteneur refouillable (re-garni)", true, typeof spawnSearch3.item === "string");
+  run("collecte : conteneur re-garni note le nouveau cycle", 1, spawnWorld(spawnSearch3.session).entities[0].stockCycle);
+
+  // Quitter puis revenir : la scène est re-garnie (marqueur exécuté au
+  // chargement) — anciens collectibles retirés, nouveaux posés, stocks neufs.
+  const spawnAway = refillDueSpawns(travelToWorld(spawnNextDayInPlace, spawnLevelB.id, spawnLevelB), SPAWN_REGISTRY);
+  const spawnBack = refillDueSpawns(travelToWorld(spawnAway, spawnLevel.id), SPAWN_REGISTRY);
+  run("collecte : retour dans la scène -> marqueur exécuté (cycle 1)", 1, spawnWorld(spawnBack).spawnCycle);
+  run("collecte : retour -> anciens collectibles posés retirés (ids du cycle 0 absents)", false, spawnedOf(spawnBack).some((e) => e.id.startsWith("spawn-0-")));
+  run("collecte : retour -> nouveaux collectibles posés (cycle 1)", 4, spawnedOf(spawnBack).filter((e) => e.id.startsWith("spawn-1-")).length);
+  run("collecte : retour -> conteneur vidé la veille est re-stocké", true, typeof spawnWorld(spawnBack).entities[0].stock === "string");
+  run("collecte : retour -> entités déclarées conservées", true, spawnWorld(spawnBack).entities.some((e) => e.id === "rock-1"));
+
+  // Absence longue : plusieurs cycles sans revenir -> UN seul garnissage
+  // (écrasement du marqueur, jamais d'accumulation).
+  const spawnLongAway = advanceTime(spawnAway, 5 * SPAWN_DAY);
+  const spawnLongBack = refillDueSpawns(travelToWorld(spawnLongAway, spawnLevel.id), SPAWN_REGISTRY);
+  run("collecte : absence de 5 cycles -> marqueur au cycle COURANT (6)", 6, spawnWorld(spawnLongBack).spawnCycle);
+  run("collecte : absence de 5 cycles -> UN seul lot de collectibles (pas d'accumulation)", 4, spawnedOf(spawnLongBack).length);
+  run("collecte : absence de 5 cycles -> tous du cycle courant", true, spawnedOf(spawnLongBack).every((e) => e.id.startsWith("spawn-6-")));
+
+  // Déterminisme : même seed + même cycle -> même contenu (stocks, objets,
+  // positions).
+  const spawnDet1 = refillDueSpawns(createInitialState(spawnLevel, 5, NO_COMPANIONS), SPAWN_REGISTRY);
+  const spawnDet2 = refillDueSpawns(createInitialState(spawnLevel, 5, NO_COMPANIONS), SPAWN_REGISTRY);
+  const spawnSignature = (s) => JSON.stringify(spawnWorld(s).entities.map((e) => [e.id, e.x, e.stock, e.action && e.action.item]));
+  run("collecte : déterminisme — même seed + même cycle -> même garnissage", spawnSignature(spawnDet1), spawnSignature(spawnDet2));
+  run("collecte : déterminisme — le PRNG de la face a bien avancé (tirages consommés)", true, spawnWorld(spawnFilled).rngState !== spawnWorld(spawnFresh).rngState);
+
+  // Scène à deux faces : LES DEUX faces garnies, marqueur au niveau du monde.
+  const spawnTwoSided = parseLevel(
+    {
+      id: "movement-check-spawn-2f",
+      titleKey: "level.demo.title",
+      length: 20,
+      playerStart: 1,
+      recto: { entities: [{ id: "bush-r", type: "bush", x: 5 }] },
+      verso: { spawnRanges: [{ from: 10, to: 18, distribution: { items: { apple: 1 } } }], entities: [] },
+    },
+    SPAWN_REGISTRY
+  );
+  const spawnTwoFilled = refillDueSpawns(createInitialState(spawnTwoSided, undefined, NO_COMPANIONS), SPAWN_REGISTRY);
+  run("collecte : deux faces — recto (conteneur) garni", true, typeof spawnTwoFilled.worlds[spawnTwoSided.id].recto.entities[0].stock === "string");
+  run("collecte : deux faces — verso (plage) garni avec le count par défaut", SPAWN_RANGE_DEFAULT_COUNT, spawnTwoFilled.worlds[spawnTwoSided.id].verso.entities.filter((e) => e.spawned).length);
+  run("collecte : deux faces — marqueur au niveau du monde", 0, spawnTwoFilled.worlds[spawnTwoSided.id].spawnCycle);
+
+  // Persistance : save après fouille + reload -> conteneur toujours vidé,
+  // collectibles posés toujours là, marqueur conservé ; audit de
+  // sérialisabilité sur l'état de collecte.
+  const spawnLeaks = [];
+  auditNonSerializable(spawnSearch1.session, "spawnSession", new Set(), spawnLeaks);
+  run("collecte : aucune fuite de non-sérialisable (stock/spawned/spawnCycle)", 0, spawnLeaks.length);
+  const spawnDiffs = [];
+  diffStructure(spawnSearch1.session, JSON.parse(JSON.stringify(spawnSearch1.session)), "spawnSession", spawnDiffs);
+  run("collecte : structure identique après round-trip JSON", 0, spawnDiffs.length);
+  const spawnReload = deserializeGame(serializeGame(spawnSearch1.session));
+  run("collecte : save/load réussit", true, spawnReload.success);
+  if (spawnReload.success) {
+    const revived = spawnReload.session;
+    run("collecte : save/load — conteneur fouillé reste vidé", null, spawnWorld(revived).entities[0].stock);
+    run("collecte : save/load — refouiller après reload le même jour -> vide", null, searchContainer(revived, "bush-1").item);
+    run("collecte : save/load — collectibles posés survivent (pas des éphémères)", 4, spawnedOf(revived).length);
+    run("collecte : save/load — marqueur de cycle survit", 0, spawnWorld(revived).spawnCycle);
+    run("collecte : save/load — aucun re-garnissage au rechargement dans le même cycle", revived, refillDueSpawns(revived, SPAWN_REGISTRY));
+    run("collecte : save/load — l'objet fouillé est toujours au sac", spawnSearch1.item, revived.bag[0].type);
   }
 
   console.log(`Récapitulatif : ${passed} réussis / ${total} total`);

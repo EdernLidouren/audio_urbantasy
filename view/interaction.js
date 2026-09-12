@@ -30,6 +30,7 @@ let lootHandler = null;
 let lootSpawnHandler = null;
 let sideSwitchHandler = null;
 let variableEffectsHandler = null;
+let searchHandler = null;
 
 // (effect) => void — exécute l'effet MIXTE "teleport" (voir core/effects.js,
 // core/scripting.md/"Effets d'action") : une PORTE n'est plus un cas
@@ -113,6 +114,16 @@ export function setLootSpawnHandler(handler) {
 // contenu.
 export function setVariableEffectsHandler(handler) {
   variableEffectsHandler = handler;
+}
+
+// (entity) => labelKey | null — applique l'effet d'ÉTAT de la FOUILLE d'un
+// conteneur de collecte (voir core/spawn.js/searchContainer,
+// doc/entity-model.md/"Collecte"), même patron que setLootHandler. Renvoie
+// la clé i18n de l'objet obtenu (ajouté au sac), ou null si le conteneur
+// était vide — le retour sensoriel (son, annonce) reste ici, voir
+// handleSearch.
+export function setSearchHandler(handler) {
+  searchHandler = handler;
 }
 
 // () => equipment — fournit l'ÉQUIPEMENT DU JOUEUR pour l'évaluation d'une
@@ -471,11 +482,29 @@ function handleLoot(entity, action) {
 // core/scripting.md/"Actions multiples filtrées par condition").
 function handleApplyEffects() {}
 
+// "search" : FOUILLE d'un conteneur de collecte (voir core/spawn.js/
+// searchContainer, doc/entity-model.md/"Collecte") — l'effet d'état
+// (tirage paresseux, objet au sac, conteneur noté vidé) est délégué au
+// gestionnaire, qui renvoie la clé i18n de l'objet obtenu ou null ; le
+// retour sensoriel se lit sur CE résultat : trouvé -> son de ramassage +
+// annonce, vide -> annonce seule (aucun son de refus générique imposé).
+function handleSearch(entity) {
+  if (!searchHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
+  const foundLabelKey = searchHandler(entity);
+  if (!foundLabelKey) {
+    announce(t("interaction.searchEmpty"), { assertive: true });
+    return;
+  }
+  playPickupSound();
+  announce(t("interaction.search", { item: t(foundLabelKey) }), { assertive: true });
+}
+
 const ACTION_HANDLERS = {
   pickup: handlePickup,
   loot: handleLoot,
   switchSide: handleSwitchSide,
   applyEffects: handleApplyEffects,
+  search: handleSearch,
 };
 
 // ACTIONS CONDITIONNELLES (voir core/level.js, action.condition/

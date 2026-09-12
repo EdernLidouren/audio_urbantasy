@@ -339,6 +339,13 @@ export const TUNING_DEFAULTS = {
   // éparpillement large.
   ephemeralScatterSpread: 2.5,
 
+  // Écart minimal (unités x) entre deux collectibles posés dans une même
+  // PLAGE de spawn (voir core/spawn.js, doc/entity-model.md/"Collecte") :
+  // évite l'empilement sonore de deux balises au même point. Lu
+  // DIRECTEMENT comme ephemeralScatterSpread (défaut PAR MÉCANIQUE, pas
+  // par entité/son).
+  spawnMinSpacing: 1,
+
   // Durée (ms) du fondu de la perception surnaturelle — voir
   // PERCEPTION_FADE_MS ci-dessus, seule définition, jamais dupliquée ici.
   // Plus haut = transition plus lente/immersive ; plus bas = plus nette.

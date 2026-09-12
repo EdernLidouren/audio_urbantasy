@@ -1,9 +1,10 @@
 // Registre des types d'entités. Connecteur pur, zéro logique : rassemble
 // chaque archétype (un fichier par type, voir apple.js/bird_1.js/bird_2.js/
-// bird_3.js/buddy.js/chair.js/clock.js/clock_tower.js/crate.js/
+// bird_3.js/buddy.js/bush.js/chair.js/clock.js/clock_tower.js/crate.js/
 // cumulo-lupus.js/decor.js/dog.js/door.js/fountain.js/ghost.js/
 // glass-window.js/hound.js/item.js/money.js/neon.js/npc.js/object.js/
-// passage.js/potted_plant.js/river.js/rock.js/statue.js) en un seul objet — même patron que
+// office_computer.js/passage.js/potted_plant.js/river.js/rock.js/statue.js)
+// en un seul objet — même patron que
 // core/behaviors/index.js. Donnée neutre au global : aucun import, ni du
 // core ni de la vue. blocksMovement est lu par core/level.js (baké dans
 // l'entité parsée) puis exploité par core/reduce.js pour arrêter le joueur
@@ -47,9 +48,10 @@
 // cascade (voir entities/model.md), aucune logique de résolution ici,
 // seulement la donnée.
 //
-// Les archétypes (apple/bird_1/bird_2/bird_3/buddy/chair/clock/clock_tower/
+// Les archétypes (apple/bird_1/bird_2/bird_3/buddy/bush/chair/clock/clock_tower/
 // crate/cumuloLupus/decor/dog/door/fountain/ghost/glass_window/hound/item/
-// money/neon/npc/object/passage/potted_plant/river/rock/statue) sont des PRESETS de
+// money/neon/npc/object/office_computer/passage/potted_plant/river/rock/
+// statue) sont des PRESETS de
 // propriétés — des objets plats indépendants, jamais une hiérarchie ni de
 // l'héritage : voir entities/model.md. Aucun n'a de `behavior` par défaut
 // (voir dog.js) : le comportement se déclare toujours à l'instance.
@@ -59,6 +61,7 @@ import bird_1 from "./bird_1.js";
 import bird_2 from "./bird_2.js";
 import bird_3 from "./bird_3.js";
 import buddy from "./buddy.js";
+import bush from "./bush.js";
 import chair from "./chair.js";
 import clock from "./clock.js";
 import clockTower from "./clock_tower.js";
@@ -76,6 +79,7 @@ import money from "./money.js";
 import neon from "./neon.js";
 import npc from "./npc.js";
 import object from "./object.js";
+import officeComputer from "./office_computer.js";
 import passage from "./passage.js";
 import pottedPlant from "./potted_plant.js";
 import river from "./river.js";
@@ -88,6 +92,7 @@ export default {
   bird_2,
   bird_3,
   buddy,
+  bush,
   chair,
   clock,
   clock_tower: clockTower,
@@ -105,6 +110,7 @@ export default {
   neon,
   npc,
   object,
+  office_computer: officeComputer,
   passage,
   potted_plant: pottedPlant,
   river,

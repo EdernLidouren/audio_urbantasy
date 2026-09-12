@@ -25,6 +25,7 @@ import {
   setSessionProvider,
   setPositionedSoundPlayer,
   setVariableEffectsHandler,
+  setSearchHandler,
 } from "./interaction.js";
 import { openPauseMenu } from "./menus/pause-menu.js";
 import { openWeatherDebugMenu } from "./menus/debug-weather-menu.js";
@@ -54,6 +55,7 @@ import { advanceWeather, setWeather, triggerNextWeatherTransition } from "../cor
 import { evaluateCondition } from "../core/presence.js";
 import { pickupEntity, lootEntity, lootEntitySpawn } from "../core/money.js";
 import { pickupItemEntity, dropItem } from "../core/bag.js";
+import { refillDueSpawns, searchContainer } from "../core/spawn.js";
 import { equipItem, unequipItem } from "../core/equipment.js";
 import { ITEM_REGISTRY } from "../core/items.js";
 import { isDebugEnabled } from "../config/debug.js";
@@ -433,6 +435,7 @@ export function makeCityScreen(getSession, setSession) {
     const freshLevel = alreadyVisited ? null : await loadLevelById(targetId, registry);
 
     setSession(travelToWorld(session, targetId, freshLevel, { x, side }));
+    refreshSpawns();
     scene = createCityAudioScene(getSession);
     announceSceneName(getSession());
 
@@ -569,7 +572,29 @@ export function makeCityScreen(getSession, setSession) {
     scene.destroy();
     scene = null;
     setSession(newSession);
+    refreshSpawns();
     scene = createCityAudioScene(getSession);
+  }
+
+  // Garnissage de collecte dû sur le monde ACTIF (voir core/spawn.js/
+  // refillDueSpawns, doc/entity-model.md/"Collecte") — appelé à CHAQUE
+  // chargement d'un monde (première entrée, transition, partie remplacée),
+  // TOUJOURS avant createCityAudioScene : les collectibles posés au sol sont
+  // des entités ordinaires, la scène audio les découvre au montage comme le
+  // reste. Le registre est injecté ici, le core ne l'importe jamais.
+  function refreshSpawns() {
+    setSession(refillDueSpawns(getSession(), registry));
+  }
+
+  // Effet d'ÉTAT de la FOUILLE (voir view/interaction.js/ACTION_HANDLERS.
+  // search ; core/spawn.js/searchContainer) : tirage paresseux + objet au
+  // sac + conteneur noté vidé, core pur. Renvoie la clé i18n de l'objet
+  // obtenu (core/items.js/ITEM_REGISTRY, même clé que le sac) ou null —
+  // interaction.js ne connaît jamais le registre d'objets.
+  function searchEffect(entity) {
+    const result = searchContainer(getSession(), entity.id);
+    setSession(result.session);
+    return result.item ? ITEM_REGISTRY[result.item].label : null;
   }
 
   // SAS de bascule recto<->verso (voir view/interaction.js/ACTION_HANDLERS.
@@ -708,6 +733,7 @@ export function makeCityScreen(getSession, setSession) {
   setLootSpawnHandler(lootSpawnEffect);
   setSideSwitchHandler(sideSwitchEffect);
   setVariableEffectsHandler(variableEffectsEffect);
+  setSearchHandler(searchEffect);
   setDropItemHandler(dropItemEffect);
   setEquipItemHandler(equipItemEffect);
   setUnequipItemHandler(unequipItemEffect);
@@ -751,6 +777,7 @@ export function makeCityScreen(getSession, setSession) {
       if (scene) return;
 
       ensureAudioUnlocked();
+      refreshSpawns();
       scene = createCityAudioScene(getSession);
       document.getElementById("game").focus();
       announceSceneName(getSession());
@@ -938,6 +965,7 @@ export function makeCityScreen(getSession, setSession) {
       setLootSpawnHandler(null);
       setSideSwitchHandler(null);
       setVariableEffectsHandler(null);
+      setSearchHandler(null);
       setDropItemHandler(null);
       setEquipItemHandler(null);
       setUnequipItemHandler(null);

@@ -167,6 +167,16 @@ DÉCOUPLÉE de la phase jour/nuit (une entité déclare son propre horaire, ex.
 coupés par l'état dormant, la réaction vue par diff) : `doc/entity-model.md`,
 `doc/scripting.md`, `doc/level-format.md`.
 
+## Cycle de collecte quotidien — troisième consommateur
+
+`core/spawn.js`/`spawnCycleAt(time)` dérive un INDEX DE CYCLE (jours écoulés
+depuis l'origine, frontière à `config/spawn-values.js`/`SPAWN_CYCLE_HOUR`,
+minuit) — dérivation PURE comme les autres, jamais stockée à part. Le moteur
+de collecte le compare au dernier cycle matérialisé d'un monde
+(`world.spawnCycle`) AU CHARGEMENT du lieu : aucun code ne s'exécute au
+tick ni dans `onFrame` — le temps avance, la collecte le LIT. Détail complet
+(sources, file, persistance) : `doc/entity-model.md`/"Collecte".
+
 ## Vérification manuelle (touche "t")
 
 Sur l'écran de jeu, "t" (discrète, sans effet sur le déplacement) annonce heure et
@@ -193,8 +203,8 @@ retirer un composant ne touche QUE ce gabarit, jamais le code. `weekday`
 ## Chantiers réservés, pas câblés
 
 Au-delà de la phase jour/nuit (musique), de la présence conditionnelle
-d'entité et de l'annonce de test ci-dessus, rien d'autre ne consomme encore
-`session.time` :
+d'entité, du cycle de collecte quotidien et de l'annonce de test ci-dessus,
+rien d'autre ne consomme encore `session.time` :
 
 - `ambiencesDay` / `ambiencesNight` : structure validée (voir plus haut), aucun
   fondu ni réaction câblés — même principe que la musique, pas encore fait.

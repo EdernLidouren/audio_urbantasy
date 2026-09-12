@@ -35,6 +35,7 @@ FACE recto/verso vide (`parseFace`, même mécanisme).
 | `reverbDecay` | number | optionnel, `> 0` : surcharge PAR LIEU le taux de déclin de la réverb (défaut global : `config/tuning-values.js`) |
 | `defaultSurface` | string | optionnel : nom de surface (voir "Surfaces de sol" plus bas) couvrant tout le `x` non-segmenté. **FILET SILENCIEUX si absent** (repli sur `DEFAULT_SURFACE`, `core/surfaces.js` — comportement audible inchangé pour toute scène qui n'en déclare pas). **Échec clair si fourni mais absent du registre** (comme un type d'entité inconnu) — une référence de contenu erronée n'est jamais dégradée en silence. |
 | `segments`    | Segment[] | optionnel : zones qui PATCHENT `defaultSurface` sur des portions du lieu (voir "Surfaces de sol" plus bas). Absent -> `[]`, `defaultSurface` partout. |
+| `spawnRanges` | SpawnRange[] | optionnel : PLAGES de collecte au sol (voir `doc/entity-model.md`/"Collecte", `core/spawn.js`) — `{ from, to, count?, distribution }` : bornes comme un segment (`from < to`, dans `[0, length]`), `count` entier `>= 1` (défaut `config/spawn-values.js`/`SPAWN_RANGE_DEFAULT_COUNT`), `distribution` = `{ table: "<nom de SPAWN_TABLES>" }` ou `{ items: { <objet ITEM_REGISTRY>: <poids> } }` (validée au chargement, échec clair). SPARSE : absent -> aucune clé. Champ de FACE (chaque face d'une scène à deux faces déclare les siennes). À chaque cycle quotidien (au CHARGEMENT du lieu), `count` collectibles y sont posés à des positions tirées au PRNG seedé — entités RUNTIME marquées `spawned: true`, ramassables via `"pickup"`, remplacées au cycle suivant. |
 | `indoor`      | boolean  | optionnel, défaut `false` (extérieur) : propriété de NATURE DE LIEU — TOUJOURS résolue en booléen sur une face parsée (comme `defaultSurface`, jamais `undefined`). Aujourd'hui consultée par le rendu d'ambiance météo pour choisir le pool outdoor/indoor de l'état courant (voir `doc/scripting.md`/"weather", `config/weather-values.js`) — délibérément générique, un futur consommateur (réverb, sons ambiants...) pourra la lire aussi sans rien changer ici. |
 | `variables`   | Variable[] | optionnel : déclarations de portée **"scene"** (voir `doc/scripting.md`/"Variables" pour le modèle complet — nom/type/valeur initiale/persistance). RACINE PARTAGÉE, jamais un champ de FACE (une scène à deux faces n'a qu'UN SEUL sac, commun à recto ET verso). **TOUJOURS résolu** (sac vide `{}` si absent, jamais `undefined`), comme `defaultSurface`/`indoor` — contrairement au sac SPARSE d'une entité (voir tableau "Entité" plus bas). |
 
@@ -47,7 +48,7 @@ ci-dessus, `entities`/`music`/... à la racine) OU À DEUX FACES — `recto` ET
 (même longueur d'axe x) ; tous les autres champs du tableau "Niveau"
 ci-dessus (`entities`, `music`/`musicDay`/`musicNight`/`musicLoop`,
 `ambiences`/`ambiencesDay`/`ambiencesNight`, `reverbDurationSec`/
-`reverbDecay`, `defaultSurface`, `segments`, `indoor`) sont des champs de FACE :
+`reverbDecay`, `defaultSurface`, `segments`, `indoor`, `spawnRanges`) sont des champs de FACE :
 déclarés dans `recto`/`verso` pour une scène à deux faces, à la racine pour
 une scène simple — **jamais mélangés** : `parseLevel` échoue clairement si
 un de ces champs apparaît à la racine EN MÊME TEMPS que `recto`/`verso`.
@@ -248,6 +249,7 @@ exemple) : jamais de voix orpheline ni de fondus qui se disputent le canal.
 | `action` | `{ kind, condition?, refusalEffects?, effects?, ... }` OU un TABLEAU de plusieurs objets de cette forme | optionnel : TYPE D'ACTION pour l'interaction "activate", cascade instance -> type comme `behavior`. Forme validée ici (`kind` non vide par candidate) ; le `kind` lui-même n'est PAS validé contre un registre au chargement — l'aiguillage reste côté vue. Objet UNIQUE : comportement historique inchangé. TABLEAU (non vide) : PLUSIEURS candidates, chacune filtrée par sa propre `condition`, sélection SILENCIEUSE de la première qui matche à l'activation — voir `doc/scripting.md`/"Actions"/"Effets d'action"/"Actions multiples filtrées par condition" pour la grammaire complète (kinds, `condition`/`refusalEffects`, le vocabulaire `effects` — état ET rendu). |
 | `presence` | `PresenceRule[]` | optionnel : règles DÉCLARATIVES de présence conditionnelle, cascade instance -> type (voir `doc/scripting.md`/"Règles" pour la grammaire, `doc/entity-model.md` pour la sémantique de dormance). Sans règle (ni à l'instance ni au type) : toujours présente. |
 | `variables` | Variable[] | optionnel : déclarations de portée **"entity"** (voir `doc/scripting.md`/"Variables"). PAS de cascade instance -> type (contrairement à `behavior`/`action`/`presence`) : une variable est un compteur/flag D'INSTANCE, jamais un défaut d'archétype. SPARSE : absente si non déclarée (`entity.variables` reste `undefined`), jamais un sac vide imposé. |
+| `container` | `{ distribution }` | optionnel : CONTENEUR de collecte régénérant (voir `doc/entity-model.md`/"Collecte", `core/spawn.js`), cascade instance -> type comme `action`. `distribution` : même forme que pour `spawnRanges` ci-dessus (`{ table }` ou `{ items }`), validée au chargement. L'action `"search"` (voir `doc/scripting.md`) l'exploite. Champs RUNTIME associés, jamais en entrée : `stock` (objet tiré, ou `null` une fois fouillé), `stockCycle` (cycle du dernier stock). |
 
 `parseLevel` normalise chaque entité en ajoutant `labelKey` et
 `descriptionKey` : `entity.nameKey` (du JSON) si présent sinon
@@ -297,6 +299,17 @@ composables, DÉCLARÉS par l'entité : `consumedDescriptionKey` (voir tableau
 (voir tableau "Présence conditionnelle" ci-dessus) pour devenir dormant.
 Détail complet (idempotence, exemples, muteOnConsumed) : `doc/entity-model.md`.
 
+## Collectibles posés par la collecte
+
+`spawned` (booléen, RUNTIME — jamais un champ d'entrée du JSON de niveau,
+comme `consumed`/`ephemeral`) : marque une entité posée au sol par le moteur
+de collecte (`core/spawn.js`, depuis une plage `spawnRanges`, voir tableau
+"Niveau"). Contrairement à un éphémère, elle est PERSISTANTE (sérialisée,
+jamais purgée au départ) : elle reste jusqu'à être ramassée ou remplacée au
+cycle suivant. Au niveau du MONDE (racine, partagé par les deux faces),
+`spawnCycle` (RUNTIME) mémorise le dernier cycle matérialisé. Détail complet :
+`doc/entity-model.md`/"Collecte".
+
 ## Entités éphémères
 
 `ephemeral` (booléen, RUNTIME — jamais un champ d'entrée du JSON de niveau,
@@ -325,6 +338,7 @@ rassemblés par `index.js` en un objet `{ [type]: TypeDef }` :
 | `action`         | object OU tableau | vue   | `{ kind, ... }` (ou plusieurs candidates) par défaut du type — voir tableau "Entité" plus haut, `doc/scripting.md`/"Actions" |
 | `consumedDescriptionKey` | string | vue    | optionnel : défaut de type, cascadé comme `descriptionKey` — voir "Collectible persistant" plus haut |
 | `muteOnConsumed` | boolean | vue           | optionnel, REGISTRE SEULEMENT (jamais cascadé par instance) : arrête le beacon continu une fois l'entité `consumed` — voir "Collectible persistant" plus haut, `doc/entity-model.md` |
+| `container` | `{ distribution }` | core | optionnel : défaut de type d'un conteneur de collecte, cascadé comme `action` — voir tableau "Entité" plus haut, `doc/entity-model.md`/"Collecte" |
 
 `blocksMovement`/`observable`/`interactable`/`isFlying` sont tous les quatre
 cascadés instance -> type -> défaut `false` (voir

@@ -108,8 +108,10 @@ validateWeatherStates(WEATHER_STATES);
 // core/state.js/drawScatteredPosition) SEULEMENT pour permettre à
 // core/movement.check.js de vérifier directement l'ÉQUITÉ du tirage
 // pondéré (fréquences observées vs poids déclarés) sans dépendre des
-// valeurs de la VRAIE table ni rejouer toute la mécanique temps/session —
-// jamais appelée hors core/weather.js/core/movement.check.js.
+// valeurs de la VRAIE table ni rejouer toute la mécanique temps/session.
+// Réutilisée TELLE QUELLE par core/distribution.js (tirage d'un
+// collectible dans une table { objet: poids }, même forme qu'une table de
+// transitions) — une seule logique de tirage pondéré dans le core.
 export function pickTransition(transitions, rngState) {
   const entries = Object.entries(transitions).filter(([, weight]) => weight > 0);
   const total = entries.reduce((sum, [, weight]) => sum + weight, 0);

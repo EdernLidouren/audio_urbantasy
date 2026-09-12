@@ -81,5 +81,12 @@
   "entity.shellter_statue.description": "Une statue aux dimensions impressionnantes figurant une tortue de mer géante portant plusieurs maisons sur sa carapace. Sa pierre est ancienne, mais propre et entretenue.",
   "door.default_passage.name": "passage",
   "door.town_hall_passage.description": "Un passage ombragé qui longe le bâtiment de l'hôtel de ville.",
-  "door.clocktower_passage.description": "Un passage discret courant à la base du clocher."
+  "door.clocktower_passage.description": "Un passage discret courant à la base du clocher.",
+  "level.town_square_town_hall_mayor_office.name": "Hôtel de ville, bureau de la maire",
+  "door.main_room_door.name": "porte de la salle principale",
+  "door.main_room_door.description": "Une porte donnant sur la salle principale.",
+  "entity.office_computer.name": "ordinateur de bureau",
+  "entity.office_computer.description": "Un ensemble sobre et moderne composé d'une tour, d'un écran plat, d'un clavier, d'une souris et d'une paire de haut-parleurs.",
+  "entity.bush.name": "buisson",
+  "entity.bush.description": "Un buisson touffu. On y trouve parfois quelque chose."
 }

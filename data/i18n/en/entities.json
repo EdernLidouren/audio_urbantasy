@@ -81,5 +81,12 @@
   "entity.shellter_statue.description": "An impressively large statue depicting a giant sea turtle carrying several houses on its shell. Its stone is old, but clean and well kept.",
   "door.default_passage.name": "passage",
   "door.town_hall_passage.description": "A shaded passage running along the town hall building.",
-  "door.clocktower_passage.description": "A discreet passage running along the base of the clock tower."
+  "door.clocktower_passage.description": "A discreet passage running along the base of the clock tower.",
+  "level.town_square_town_hall_mayor_office.name": "Town hall, mayor's office",
+  "door.main_room_door.name": "main room door",
+  "door.main_room_door.description": "A door leading to the main hall.",
+  "entity.office_computer.name": "desktop computer",
+  "entity.office_computer.description": "A sleek, modern setup made up of a tower, a flat screen, a keyboard, a mouse, and a pair of speakers.",
+  "entity.bush.name": "bush",
+  "entity.bush.description": "A thick bush. Sometimes there's something in it."
 }

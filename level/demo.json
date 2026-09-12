@@ -8,8 +8,10 @@
   "ambiences": ["assets/ambiances/traffic_1.mp3"],
   "defaultSurface": "dirt",
   "segments": [{ "from": 15, "to": 35, "surface": "grass" }],
+  "spawnRanges": [{ "from": 27, "to": 34, "count": 3, "distribution": { "table": "default" } }],
   "entities": [
     { "id": "money_1", "type": "money", "x": 5 },
+    { "id": "bush_1", "type": "bush", "x": 12 },
     { "id": "object_toolbox", "type": "object", "x": 8, "nameKey": "object.toolbox.name", "descriptionKey": "object.toolbox.description" },
     {
       "id": "door_exit",

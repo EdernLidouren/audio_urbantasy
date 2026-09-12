@@ -637,6 +637,28 @@ action: { kind: "loot", amount: 100 },
 (limite anti-prolifération, éviction du plus ancien, exclusion de sauvegarde) :
 `doc/entity-model.md`/"Entités éphémères", `core/state.js`/`spawnEphemeral`.
 
+### `"search"` — FOUILLE d'un conteneur de collecte régénérant
+
+```js
+// entities/types/bush.js
+container: { distribution: { table: "default" } },
+action: { kind: "search" },
+```
+
+Aucun paramètre sur l'action elle-même : ce qu'on trouve vient de
+`entity.container.distribution` (voir `doc/level-format.md`/"Entité" et
+`doc/entity-model.md`/"Collecte" pour le modèle complet — conteneur garni à
+chaque cycle quotidien, objet TIRÉ dans une distribution pondérée,
+`{ table: "<nom>" }` référençant `config/spawn-values.js`/`SPAWN_TABLES` ou
+`{ items: { <objet>: <poids> } }` inline). Effet d'état : `core/spawn.js`/
+`searchContainer` — objet ajouté au sac (`core/bag.js`/`addItem`), conteneur
+noté vidé (`stock: null`) pour le cycle courant ; refouillé le même jour ->
+vide, jusqu'au prochain cycle. Retour sensoriel (`view/interaction.js`/
+`handleSearch`) dérivé du RÉSULTAT : trouvé -> son de ramassage + annonce
+`interaction.search` ; vide -> annonce `interaction.searchEmpty` seule.
+Contrairement à `"loot"`, l'entité n'est jamais `consumed` : elle se
+régénère.
+
 ### `"switchSide"` — bascule recto/verso (scène à deux faces)
 
 ```json
@@ -1370,6 +1392,7 @@ n'empêche de l'ajouter plus tard (voir `doc/entity-model.md`/"Interaction
 | Tags | `TAG_REGISTRY` | `core/tags.js` |
 | Améliorations (improvements) | `IMPROVEMENT_REGISTRY` | `core/improvements.js` |
 | Objets et leurs tags/gait | `ITEM_REGISTRY` | `core/items.js` |
+| Tables de distribution de collecte (standard, référençables) | `SPAWN_TABLES` | `config/spawn-values.js` |
 | Surfaces | `SURFACE_REGISTRY` | `core/surfaces.js` |
 | Types de variable | `VARIABLE_TYPES` | `core/variables.js` |
 | Portées de variable | `VARIABLE_SCOPES` | `core/variables.js` |

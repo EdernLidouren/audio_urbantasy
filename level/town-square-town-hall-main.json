@@ -39,7 +39,7 @@
       "sounds": {
         "beacon": { "path": "assets/sounds/doors/door_1_close_1.mp3", "loop": true }
       },
-      "action": { "kind": "applyEffects", "effects": [{ "type": "teleport", "target": "town_square", "x": 25 }] }
+      "action": { "kind": "applyEffects", "effects": [{ "type": "teleport", "target": "town_square_town_hall_mayor_office", "x": 8 }] }
     },
     {
       "id": "potted_plant_1",

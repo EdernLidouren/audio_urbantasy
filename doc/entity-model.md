@@ -332,6 +332,81 @@ spawn de test), mais le choix de "e" reste inchangé, plus clair à retenir.
 Infra volontairement minimale : d'autres outils de debug s'y grefferont plus
 tard derrière le MÊME drapeau, jamais un par outil.
 
+## Collecte — conteneurs régénérants et plages au sol
+
+Mécanique de SPAWN de collectibles (`core/distribution.js`, `core/spawn.js`) :
+UNE logique de garnissage, DEUX matérialisations. Ni un collectible
+persistant (`consumed` une fois pour toutes) ni un éphémère (purgé au
+départ) : une source se RE-GARNIT chaque jour de jeu, et ce qu'elle produit
+persiste avec le monde.
+
+- **Distribution (quoi)** — `{ table: "<nom>" }` référence une table
+  standard de `config/spawn-values.js`/`SPAWN_TABLES` ; `{ items: { <objet>:
+  <poids> } }` en déclare une inline (`<objet>` = clé de `ITEM_REGISTRY`).
+  Poids RELATIFS, tirage via `core/weather.js`/`pickTransition` réutilisé tel
+  quel — une seule logique de tirage pondéré. Résolue à CHAQUE tirage, jamais
+  figée dans l'état : un monde sauvegardé tire toujours dans la table
+  COURANTE. Validée au chargement (`core/level.js`) ; les tables standard
+  s'auto-valident à l'import (`validateSpawnTables`), comme la météo.
+- **Sources (où)** — CONTENEUR : entité portant `container: { distribution }`
+  (cascade instance -> type, ex. `entities/types/bush.js`) + action
+  `"search"` ; point fixe, contenu CACHÉ. PLAGE : `face.spawnRanges`
+  (`{ from, to, count?, distribution }`, voir `doc/level-format.md`) ;
+  collectibles posés AU SOL à des positions VARIÉES — `drawScatteredPosition`
+  (bornes carte, corps bloquants) autour du centre de la plage, re-tirée si
+  trop proche d'un collectible déjà posé (`config/tuning-values.js`/
+  `spawnMinSpacing`). Chaque collectible posé passe par le MÊME parseur qu'une
+  instance de niveau (`core/level.js`/`parseSpawnedEntity`, registre INJECTÉ
+  comme pour `parseLevel`) : archétype du même nom que l'objet s'il existe
+  (`apple`), sinon l'archétype générique `item` avec nameKey/action pickup
+  dérivés d'`ITEM_REGISTRY` (même convention que "Poser", voir
+  `view/city-screen.js`/`resolveDroppedItemSpec`). Marqué `spawned: true`
+  (RUNTIME) ; id `spawn-<cycle>-<plage>-<i>`, déterministe.
+- **Cycle (quand)** — quotidien : `spawnCycleAt(time)` = index de jour
+  depuis l'origine, frontière à `SPAWN_CYCLE_HOUR` (minuit). SIMPLE pour
+  commencer : chaque source garnie à chaque cycle, ni plafond ni
+  probabilité (à doser plus tard). Rien ne se matérialise JAMAIS pendant que
+  le joueur est dans la scène — aucun code au tick : `refillDueSpawns`
+  s'exécute au CHARGEMENT du monde actif (`view/city-screen.js`/
+  `refreshSpawns` : première entrée, transition, partie remplacée), et
+  `world.spawnCycle` (dernier cycle matérialisé) tient lieu de FILE — un seul
+  marqueur, ÉCRASÉ par nature : après N cycles d'absence, UN garnissage, avec
+  la distribution du moment, jamais une accumulation. Au garnissage : anciens
+  collectibles posés retirés (ramassés ou non), nouveaux posés ; chaque
+  conteneur reçoit un `stock`/`stockCycle` neufs. Scène à deux faces : LES
+  DEUX faces garnies (on charge le lieu entier), chacune sur son PRNG.
+  Exception assumée pour le CONTENEUR : à la fouille, si son `stockCycle`
+  diffère du cycle courant, il se re-garnit PARESSEUSEMENT d'abord — un jour
+  passé sur place suffit. RAISON de l'asymétrie : le contenu d'un conteneur
+  est CACHÉ (rien n'est perceptible tant qu'on ne fouille pas — aucune
+  balise, aucune annonce), alors qu'un collectible de plage est VISIBLE dès
+  qu'il existe (balise, occupation) — le matérialiser pendant que le joueur
+  est là ferait « popper » un son/une entité sous ses pieds, sans cause
+  audible. Les plages attendent donc le prochain chargement ; le conteneur
+  peut se garnir sur place sans rien trahir.
+- **Matérialisation (comment)** — CONTENEUR : action `"search"` (voir
+  `doc/scripting.md`) -> `core/spawn.js`/`searchContainer` : garni -> objet
+  au sac (`addItem`) + `stock: null` ; vide -> rien ; retour sensoriel dérivé
+  du résultat (`view/interaction.js`/`handleSearch`). PLAGE : ramassage
+  ordinaire via l'action `"pickup"` que porte chaque collectible posé
+  (`core/bag.js`/`pickupItemEntity`, aucun cas spécial).
+- **Déterminisme** — tous les tirages (objet, position) consomment
+  `face.rngState` (comme `spawnScatteredEphemerals`) : même seed + même cycle
+  -> même garnissage, positions comprises.
+- **Persistance** — `stock`/`stockCycle` (entité), `spawned` (entité posée),
+  `spawnCycle` (monde) : champs plats, sérialisés avec la partie ; save après
+  fouille + reload -> conteneur toujours vidé jusqu'au cycle suivant,
+  collectibles posés toujours là, marqueur conservé (aucun re-garnissage au
+  rechargement dans le même cycle). Une sauvegarde antérieure n'a pas de
+  `spawnCycle` : absence = cycle dû, garnissage au premier chargement — aucun
+  rebouchage nécessaire. Vérifié par l'audit de sérialisabilité
+  (`core/movement.check.js`, section "Collecte").
+
+Contenu de test : `level/demo.json` ("Ville test") — `bush_1` (x=12, table
+`default`) et une plage `[27, 34]` de 3 collectibles. Menu debug du temps
+(Shift+T, mode debug) : "Avancer d'une journée" puis refouiller/quitter et
+revenir pour observer le cycle.
+
 ## Sac d'objets
 
 Deuxième tiers de l'inventaire après l'argent (`session.money`, voir

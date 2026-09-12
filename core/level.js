@@ -22,6 +22,7 @@ import { IMPROVEMENT_REGISTRY } from "./improvements.js";
 import { WEATHER_STATES } from "../config/weather-values.js";
 import { parseVariables, VARIABLE_SCOPES, isValidValueForType } from "./variables.js";
 import { ACTION_EFFECT_TYPES } from "./effects.js";
+import { validateDistribution } from "./distribution.js";
 
 function fail(message) {
   throw new Error(`parseLevel: ${message}`);
@@ -545,6 +546,7 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
     presence,
     variables,
     sounds,
+    container,
   } = rawEntity;
 
   if (!isNonEmptyString(id)) {
@@ -762,6 +764,21 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
     entity.tuning = tuning;
   }
 
+  // container : optionnel, SOURCE DE COLLECTE régénérante (voir core/spawn.js,
+  // doc/entity-model.md/"Collecte") — { distribution } (référence à une
+  // table standard ou table inline, voir core/distribution.js). Cascade
+  // instance -> type comme action/behavior. Seule la distribution est
+  // validée ici ; le garnissage (stock/stockCycle, champs RUNTIME) reste au
+  // moteur, et l'action "search" qui l'exploite reste côté vue.
+  const resolvedContainer = container !== undefined ? container : registry[type].container;
+  if (resolvedContainer !== undefined) {
+    if (typeof resolvedContainer !== "object" || resolvedContainer === null || Array.isArray(resolvedContainer)) {
+      fail(`entities[${index}] ("${id}") : container doit être un objet si présent.`);
+    }
+    validateDistribution(resolvedContainer.distribution, `entities[${index}] ("${id}") : container.distribution`, fail);
+    entity.container = { distribution: resolvedContainer.distribution };
+  }
+
   // presence : optionnel, RÈGLES DÉCLARATIVES de présence conditionnelle
   // (voir core/presence.js) — cascade INSTANCE -> TYPE, même principe que
   // blocksMovement (ex. "neon" est TOUJOURS nocturne par archétype, voir
@@ -780,6 +797,15 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
   }
 
   return entity;
+}
+
+// Entité créée EN JEU par le moteur de collecte (core/spawn.js) : MÊME
+// parseur qu'une instance de niveau (cascade sounds/capacités/action de
+// l'archétype, validation complète), sans contexte de liste — `raw` porte
+// déjà un id unique (dérivé du cycle, voir core/spawn.js), aucune
+// déduplication à faire ici.
+export function parseSpawnedEntity(raw, registry, length, sceneVariables) {
+  return parseEntity(raw, 0, registry, length, new Set(), sceneVariables);
 }
 
 // Générique : ne connaît aucun kind par son nom. Cherche kind dans le
@@ -872,7 +898,33 @@ const FACE_FIELDS = [
   "defaultSurface",
   "segments",
   "indoor",
+  "spawnRanges",
 ];
+
+// Une PLAGE de collecte (voir core/spawn.js, doc/entity-model.md/"Collecte")
+// : { from, to, count?, distribution } — bornes comme un segment (from < to,
+// dans [0, length]), count entier >= 1 optionnel (défaut :
+// config/spawn-values.js/SPAWN_RANGE_DEFAULT_COUNT, résolu par le moteur),
+// distribution validée comme celle d'un conteneur.
+function parseSpawnRange(rawRange, index, length, prefix) {
+  const describe = `${prefix}spawnRanges[${index}]`;
+  if (typeof rawRange !== "object" || rawRange === null) {
+    fail(`${describe} n'est pas un objet.`);
+  }
+  const { from, to, count, distribution } = rawRange;
+  if (!isFiniteNumber(from) || !isFiniteNumber(to) || from < 0 || to > length || from >= to) {
+    fail(
+      `${describe} : bornes [from, to] invalides (reçu from=${JSON.stringify(from)}, to=${JSON.stringify(to)}, longueur ${length}).`
+    );
+  }
+  if (count !== undefined && (!Number.isInteger(count) || count < 1)) {
+    fail(`${describe} : count doit être un entier >= 1 si présent (reçu : ${JSON.stringify(count)}).`);
+  }
+  validateDistribution(distribution, `${describe}.distribution`, fail);
+  const range = { from, to, distribution };
+  if (count !== undefined) range.count = count;
+  return range;
+}
 
 // Valide et construit UNE FACE (voir header ci-dessus) : entités +
 // habillage sonore/surface, exactement ce qu'une scène SIMPLE portait déjà
@@ -902,6 +954,7 @@ function parseFace(raw, length, registry, describe, sceneVariables) {
     defaultSurface,
     segments,
     indoor,
+    spawnRanges,
   } = raw;
 
   // entities : ABSENT -> [] (face vide, toujours jouable) ; PRÉSENT mais pas
@@ -944,6 +997,14 @@ function parseFace(raw, length, registry, describe, sceneVariables) {
     fail(`${prefix}segments doit être un tableau si présent (reçu : ${JSON.stringify(segments)}).`);
   }
   const parsedSegments = (segments ?? []).map((rawSegment, index) => parseSegment(rawSegment, index, length));
+  // spawnRanges : optionnel, PLAGES de collecte au sol (voir parseSpawnRange,
+  // core/spawn.js) — SPARSE : absent -> aucune clé (une face sans plage
+  // n'en porte pas un tableau vide), même politique que music/ambiences.
+  if (spawnRanges !== undefined && !Array.isArray(spawnRanges)) {
+    fail(`${prefix}spawnRanges doit être un tableau si présent (reçu : ${JSON.stringify(spawnRanges)}).`);
+  }
+  const parsedSpawnRanges =
+    spawnRanges !== undefined ? spawnRanges.map((rawRange, index) => parseSpawnRange(rawRange, index, length, prefix)) : undefined;
   // music : optionnel, chemin vers la musique du lieu (voir
   // view/audio/city-scene.js). Simple passage : parseLevel ne connaît ni
   // Howler ni la lecture audio, juste la présence d'une chaîne.
@@ -1043,6 +1104,7 @@ function parseFace(raw, length, registry, describe, sceneVariables) {
   if (ambiencesNight !== undefined) face.ambiencesNight = ambiencesNight;
   if (reverbDurationSec !== undefined) face.reverbDurationSec = reverbDurationSec;
   if (reverbDecay !== undefined) face.reverbDecay = reverbDecay;
+  if (parsedSpawnRanges !== undefined) face.spawnRanges = parsedSpawnRanges;
 
   return face;
 }
