@@ -19,6 +19,7 @@ const DOMAINS = [
   "navigation",
   "perception",
   "save",
+  "shop",
   "status",
   "weather",
 ];

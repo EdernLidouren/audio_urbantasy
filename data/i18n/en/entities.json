@@ -88,5 +88,7 @@
   "entity.office_computer.name": "desktop computer",
   "entity.office_computer.description": "A sleek, modern setup made up of a tower, a flat screen, a keyboard, a mouse, and a pair of speakers.",
   "entity.bush.name": "bush",
-  "entity.bush.description": "A thick bush. Sometimes there's something in it."
+  "entity.bush.description": "A thick bush. Sometimes there's something in it.",
+  "entity.shop_counter.name": "counter",
+  "entity.shop_counter.description": "A sales counter with its cash drawer. You can sell what you carry here."
 }

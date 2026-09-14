@@ -26,7 +26,10 @@ import {
   setPositionedSoundPlayer,
   setVariableEffectsHandler,
   setSearchHandler,
+  setShopHandler,
 } from "./interaction.js";
+import { openShopMenu, setSellHandler } from "./menus/shop-menu.js";
+import { sellItems } from "../core/trade.js";
 import { openPauseMenu } from "./menus/pause-menu.js";
 import { openWeatherDebugMenu } from "./menus/debug-weather-menu.js";
 import { openTimeDebugMenu } from "./menus/debug-time-menu.js";
@@ -733,6 +736,12 @@ export function makeCityScreen(getSession, setSession) {
   setSideSwitchHandler(sideSwitchEffect);
   setVariableEffectsHandler(variableEffectsEffect);
   setSearchHandler(searchEffect);
+  // Point de vente (voir view/menus/shop-menu.js) : le menu a besoin de la
+  // scène (pause des balises) et de la session ; la TRANSACTION reste un
+  // effet d'état pur (core/trade.js/sellItems), même patron que les effets
+  // ci-dessus.
+  setShopHandler((entity) => openShopMenu(scene, getSession, entity));
+  setSellHandler((sales) => setSession(sellItems(getSession(), sales)));
   setDropItemHandler(dropItemEffect);
   setEquipItemHandler(equipItemEffect);
   setUnequipItemHandler(unequipItemEffect);
@@ -965,6 +974,8 @@ export function makeCityScreen(getSession, setSession) {
       setSideSwitchHandler(null);
       setVariableEffectsHandler(null);
       setSearchHandler(null);
+      setShopHandler(null);
+      setSellHandler(null);
       setDropItemHandler(null);
       setEquipItemHandler(null);
       setUnequipItemHandler(null);

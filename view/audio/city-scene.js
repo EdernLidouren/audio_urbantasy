@@ -1906,18 +1906,21 @@ export function createCityAudioScene(getSession) {
     updateEntityMovementSounds(entitySounds, x, world, liveById);
 
     // Occupation par diff : n'agit QUE si l'ensemble a changé depuis le
-    // tick précédent. Une nouvelle photo (assertive) coupe la précédente
-    // devenue obsolète ; l'ensemble vide ne déclenche aucune annonce, juste
-    // un réarmement silencieux pour la prochaine entrée. Pas de `channel`
-    // imposé ici : on laisse le canal par défaut du module (liveRegion,
-    // ariaNotify expérimental via setAnnounceChannel) décider, pour comparer
-    // les deux sur exactement le même déclenchement.
+    // tick précédent. POLITE (jamais assertive) : croiser une entité en
+    // marchant est une information de contexte, pas une urgence — elle
+    // s'insère entre deux lectures sans couper ce que le lecteur d'écran
+    // est en train de dire (une annonce d'interaction, de temps...).
+    // L'ensemble vide ne déclenche aucune annonce, juste un réarmement
+    // silencieux pour la prochaine entrée. Pas de `channel` imposé ici : on
+    // laisse le canal par défaut du module (liveRegion, ariaNotify
+    // expérimental via setAnnounceChannel) décider, pour comparer les deux
+    // sur exactement le même déclenchement.
     const occupied = occupiedEntities(entitySounds, liveById, x);
     currentOccupied = occupied;
     const occupiedIdsNow = new Set(occupied.map((entity) => entity.id));
     if (!setsEqual(occupiedIdsNow, occupiedIds)) {
       if (occupiedIdsNow.size > 0) {
-        announce(buildOccupancyAnnouncement(occupied), { assertive: true });
+        announce(buildOccupancyAnnouncement(occupied));
       }
       occupiedIds = occupiedIdsNow;
     }

@@ -88,5 +88,7 @@
   "entity.office_computer.name": "ordinateur de bureau",
   "entity.office_computer.description": "Un ensemble sobre et moderne composé d'une tour, d'un écran plat, d'un clavier, d'une souris et d'une paire de haut-parleurs.",
   "entity.bush.name": "buisson",
-  "entity.bush.description": "Un buisson touffu. On y trouve parfois quelque chose."
+  "entity.bush.description": "Un buisson touffu. On y trouve parfois quelque chose.",
+  "entity.shop_counter.name": "comptoir",
+  "entity.shop_counter.description": "Un comptoir de vente, avec son tiroir-caisse. On peut y vendre ce qu'on porte."
 }

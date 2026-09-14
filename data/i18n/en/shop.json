@@ -1,0 +1,17 @@
+{
+  "shop.actions.sell": "Sell",
+  "shop.actions.cancel": "Cancel",
+  "shop.sell.empty": "Nothing to sell.",
+  "shop.sell.entry": "{item} {selected} of {owned}, {price} coins: {description}",
+  "shop.sell.adjust": "{selected}, {subtotal}",
+  "shop.sell.total": "Sell {count} items for {total} coins",
+  "shop.sell.validate": "Confirm sale",
+  "shop.sell.cancel": "Cancel",
+  "shop.sell.nothingSelected": "No item selected.",
+  "shop.sell.detail": "{item} × {quantity}",
+  "shop.sell.confirm.title": "Sell {count} items for {total} coins? {details}",
+  "shop.sell.confirm.cancel": "Cancel",
+  "shop.sell.confirm.confirm": "Confirm",
+  "shop.sell.done": "Sold: {details}. {total} coins received.",
+  "shop.sell.discard.title": "Discard the current selection?"
+}

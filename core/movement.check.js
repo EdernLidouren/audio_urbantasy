@@ -62,6 +62,7 @@ import { isDebugEnabled, setDebugEnabled } from "../config/debug.js";
 import { validateSpawnTables, validateDistribution, resolveDistribution, drawItem } from "./distribution.js";
 import { spawnCycleAt, refillDueSpawns, searchContainer, isSearchable } from "./spawn.js";
 import { SPAWN_TABLES, SPAWN_RANGE_DEFAULT_COUNT, SPAWN_CONTAINER_DEFAULT_COUNT } from "../config/spawn-values.js";
+import { sellValueOf, isSellable, ownedQuantity, sellTotal, sellItems } from "./trade.js";
 
 // { companions: [] } : passé explicitement à CHAQUE createInitialState()
 // ci-dessous qui ne concerne pas les compagnons — sans lui, le défaut (UN
@@ -6656,6 +6657,60 @@ export function runMovementChecks() {
       }
       run("panier plein : la partie reparse reste jouable (aucune erreur)", false, revivalThrew);
     }
+  }
+
+  // --- Vente (core/trade.js) : prix, vendabilité, transaction ---
+
+  run("vente : sellValueOf lit `value` du registre (pomme)", ITEM_REGISTRY.apple.value, sellValueOf("apple"));
+  run("vente : un objet sans `value` (clé) vaut 0", 0, sellValueOf("key_bronze"));
+  run("vente : un type inconnu vaut 0", 0, sellValueOf("does-not-exist"));
+  run("vente : isSellable vrai si value > 0", true, isSellable("apple"));
+  run("vente : isSellable faux sans value", false, isSellable("key_bronze"));
+  run("vente : sellTotal = Σ prix × quantité (non vendable compte 0)", 3 * sellValueOf("apple") + 2 * sellValueOf("coin"), sellTotal([
+    { type: "apple", quantity: 3 },
+    { type: "coin", quantity: 2 },
+    { type: "key_bronze", quantity: 5 },
+  ]));
+
+  // Sac de test : 5 pommes (empilable), 2 clés (non empilable, deux
+  // entrées), 1 paire de baskets (non empilable, vendable).
+  let tradeState = { ...createInitialState(moneyLevel, undefined, NO_COMPANIONS), bag: [] };
+  tradeState = addItem(tradeState, "apple", 5);
+  tradeState = addItem(tradeState, "key_bronze", 2);
+  tradeState = addItem(tradeState, "sneakers", 1);
+  run("vente : ownedQuantity agrège un empilable", 5, ownedQuantity(tradeState.bag, "apple"));
+  run("vente : ownedQuantity compte les entrées d'un non-empilable", 2, ownedQuantity(tradeState.bag, "key_bronze"));
+  run("vente : ownedQuantity d'un type absent -> 0", 0, ownedQuantity(tradeState.bag, "coin"));
+
+  const soldPartial = sellItems(tradeState, [{ type: "apple", quantity: 3 }]);
+  run("vente : vendre 3 pommes sur 5 -> 2 restent", 2, ownedQuantity(soldPartial.bag, "apple"));
+  run("vente : vendre 3 pommes -> argent crédité du total exact", 3 * sellValueOf("apple"), soldPartial.money);
+  run("vente : l'original n'est jamais muté", 5, ownedQuantity(tradeState.bag, "apple"));
+
+  const soldMixed = sellItems(tradeState, [
+    { type: "apple", quantity: 5 },
+    { type: "sneakers", quantity: 1 },
+  ]);
+  run("vente : vendre tout un stack -> entrée retirée", false, soldMixed.bag.some((e) => e.type === "apple"));
+  run("vente : vendre un non-empilable -> son entrée retirée", false, soldMixed.bag.some((e) => e.type === "sneakers"));
+  run("vente : total mixte juste", 5 * sellValueOf("apple") + sellValueOf("sneakers"), soldMixed.money);
+  run("vente : les objets non vendus restent (clés)", 2, ownedQuantity(soldMixed.bag, "key_bronze"));
+
+  const soldClamped = sellItems(tradeState, [{ type: "apple", quantity: 99 }]);
+  run("vente : quantité CLAMPÉE au possédé (jamais de sac négatif)", 0, ownedQuantity(soldClamped.bag, "apple"));
+  run("vente : crédit calculé sur la quantité RÉELLEMENT vendue", 5 * sellValueOf("apple"), soldClamped.money);
+
+  run("vente : objet non vendable ignoré -> référence INCHANGÉE", tradeState, sellItems(tradeState, [{ type: "key_bronze", quantity: 2 }]));
+  run("vente : type absent du sac -> référence INCHANGÉE", tradeState, sellItems(tradeState, [{ type: "coin", quantity: 1 }]));
+  run("vente : liste vide -> référence INCHANGÉE", tradeState, sellItems(tradeState, []));
+  run("vente : quantité 0/négative ignorée -> référence INCHANGÉE", tradeState, sellItems(tradeState, [{ type: "apple", quantity: 0 }, { type: "apple", quantity: -2 }]));
+
+  // Save/load : l'état après vente est cohérent.
+  const tradeReload = deserializeGame(serializeGame(soldMixed));
+  run("vente : save/load réussit après une vente", true, tradeReload.success);
+  if (tradeReload.success) {
+    run("vente : save/load — argent conservé", soldMixed.money, tradeReload.session.money);
+    run("vente : save/load — sac conservé", JSON.stringify(soldMixed.bag), JSON.stringify(tradeReload.session.bag));
   }
 
   // --- Collecte (core/distribution.js + core/spawn.js) ---

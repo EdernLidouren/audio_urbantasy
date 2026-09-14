@@ -39,16 +39,22 @@ import { TAG_REGISTRY } from "./tags.js";
 // événement) les lit via la condition "hasEquipmentTag" (core/presence.js).
 // Absent ou vide -> aucun tag, comportement inchangé pour tout objet
 // existant.
+//
+// `value` (optionnel, entier > 0) : VALEUR de l'objet en pièces — prix de
+// vente unitaire (voir core/trade.js/sellValueOf ; pleine valeur pour
+// l'instant, la marge marchand viendra avec l'achat). Absente ou 0 -> objet
+// NON VENDABLE (ex. une clé de quête), jamais listé au comptoir.
 export const ITEM_REGISTRY = {
-  apple: { stackable: true, label: "item.apple.name", descriptionKey: "item.apple.description" },
+  apple: { stackable: true, label: "item.apple.name", descriptionKey: "item.apple.description", value: 5 },
   // Pièce : objet EMPILABLE du sac, distinct de session.money (voir
   // entities/types/coin.js vs money.js).
-  coin: { stackable: true, label: "item.coin.name", descriptionKey: "item.coin.description" },
+  coin: { stackable: true, label: "item.coin.name", descriptionKey: "item.coin.description", value: 1 },
   key_bronze: { stackable: false, label: "item.key_bronze", descriptionKey: "item.key_bronze.description" },
   sneakers: {
     stackable: false,
     label: "item.sneakers",
     descriptionKey: "item.sneakers.description",
+    value: 20,
     equippable: true,
     slot: "feet",
     gait: "shoes",
@@ -57,6 +63,7 @@ export const ITEM_REGISTRY = {
     stackable: false,
     label: "item.leather_boots",
     descriptionKey: "item.leather_boots.description",
+    value: 40,
     equippable: true,
     slot: "feet",
     gait: "boots",
@@ -65,6 +72,7 @@ export const ITEM_REGISTRY = {
     stackable: false,
     label: "item.combat_boots",
     descriptionKey: "item.combat_boots.description",
+    value: 60,
     equippable: true,
     slot: "feet",
     gait: "boots",
@@ -74,6 +82,7 @@ export const ITEM_REGISTRY = {
     stackable: false,
     label: "item.high_heels",
     descriptionKey: "item.high_heels.description",
+    value: 50,
     equippable: true,
     slot: "feet",
     gait: "high_heels",

@@ -55,8 +55,10 @@ une balise `interactable:false` jamais candidate à Entrée, même à portée.
 Deux niveaux de PERCEPTION, à ne pas confondre :
 
 - **Occupation** (couche légère, inchangée) : le NOM de l'entité, annoncé à
-  l'approche (`view/audio/city-scene.js`/`occupiedEntities`) — ne connaît
-  aucune capacité, toute entité à portée y figure.
+  l'approche (`view/audio/city-scene.js`/`occupiedEntities`) sur le canal
+  POLITE (information de contexte, jamais une urgence : ne coupe pas une
+  lecture en cours) — ne connaît aucune capacité, toute entité à portée y
+  figure.
 - **Observation** (Espace, couche riche) : la DESCRIPTION d'une entité
   `observable` ciblée. Résolue via une INDIRECTION
   (`view/interaction.js`/`resolveDescription`) plutôt qu'un accès direct à
@@ -424,6 +426,52 @@ Contenu de test : `level/demo.json` ("Ville test") — `bush_1` (x=12, table
 `default`) et une plage `[27, 34]` de 3 collectibles. Menu debug du temps
 (Shift+T, mode debug) : "Avancer d'une journée" puis refouiller/quitter et
 revenir pour observer le cycle.
+
+## Vente — point de vente et menu à sliders inline
+
+Une entité POINT DE VENTE (`entities/types/shop_counter.js`, action
+`{ kind: "shop" }` — voir `doc/scripting.md`) s'active pour VENDRE les objets
+du sac contre de l'argent. Frontière : tout le menu est VUE
+(`view/menus/shop-menu.js`, pile d'écrans, jeu en pause, balises en pause) ;
+la TRANSACTION est un effet d'état CORE (`core/trade.js`/`sellItems`,
+injecté depuis `view/city-screen.js`/`setSellHandler`, même patron que
+"Poser"). Prix : `value` sur l'objet (`core/items.js`/`ITEM_REGISTRY`),
+pleine valeur pour l'instant (la marge marchand viendra avec l'ACHAT) ;
+sans `value` (ou 0) -> NON vendable, jamais listé (filtrage par catégories/
+tags de boutique : prévu, pas construit).
+
+- **Menu d'actions** — TOUJOURS un menu, même à une action ("Vendre" ;
+  "Acheter" viendra), titre = nom du comptoir ; "Vendre" sans rien de
+  vendable au sac -> annonce seule, aucune liste vide.
+- **Menu de vente** — écran CUSTOM (pas un slider `lib/menu.js`, valeur
+  TRANSITOIRE, voir `inventory-menu.js`/`openQuantitySelector` pour les
+  mêmes raisons) : une LIGNE par TYPE vendable du sac (agrégée : un
+  non-empilable possédé en N exemplaires = une ligne, possédé N), chaque
+  ligne étant un slider inline de 0 (plancher) au possédé (plafond, un cran
+  au-delà sonne "block") ; puis "Valider la vente" et "Annuler". Touches :
+  droite/Entrée/Espace +1, gauche -1, Maj+flèche ±5 (maintien pris en
+  charge, comme un slider `lib/menu.js`), Suppr -> 0, Retour arrière ->
+  grand total, Maj+A -> valider, Échap -> annuler, Home/End, cyclage/étoile/
+  suffixe de position selon les préférences de menu.
+- **Annonces** — à la NAVIGATION : entrée complète `"{nom} {choisi} sur
+  {possédé}, {prix} pièces : {description}"` ; à l'AJUSTEMENT : SEULEMENT
+  `"{choisi}, {sous-total de la ligne}"` (fluide en ajustement répété,
+  jamais le grand total à chaque cran) ; le GRAND TOTAL ("Vendre N objets
+  pour M pièces") est le TITRE, dit à l'ouverture et à la demande (Retour
+  arrière).
+- **Validation** — rien de sélectionné -> "Aucun objet sélectionné.",
+  jamais une confirmation vide ; sinon confirmation DÉTAILLÉE (titre
+  dynamique via `lib/menu.js`/`titleParams` : total + "Pomme × 3, Pièce ×
+  2"), "Annuler" en première entrée. Confirmer -> `sellItems` (quantités
+  clampées au possédé, non vendable ignoré, retrait + crédit dans le MÊME
+  état) puis retour DIRECT au jeu (trois écrans retirés) et annonce du
+  résultat ; Annuler -> retour au menu de vente, SÉLECTION PRÉSERVÉE (elle
+  vit dans le closure de l'écran).
+- **Annulation** — sélection vide -> fermeture DIRECTE, sans confirmation ;
+  sélection en cours -> "Abandonner la sélection en cours ?" (Confirmer ->
+  retour au menu d'actions ; Annuler -> sélection préservée).
+
+Contenu de test : `level/demo.json`, `counter_1` (x=38).
 
 ## Sac d'objets
 

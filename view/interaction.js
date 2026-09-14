@@ -31,6 +31,7 @@ let lootSpawnHandler = null;
 let sideSwitchHandler = null;
 let variableEffectsHandler = null;
 let searchHandler = null;
+let shopHandler = null;
 
 // (effect) => void — exécute l'effet MIXTE "teleport" (voir core/effects.js,
 // core/scripting.md/"Effets d'action") : une PORTE n'est plus un cas
@@ -123,6 +124,15 @@ export function setVariableEffectsHandler(handler) {
 // sensoriel (annonce) reste ici, voir handleSearch.
 export function setSearchHandler(handler) {
   searchHandler = handler;
+}
+
+// (entity) => void — ouvre le menu du POINT DE VENTE (voir view/menus/
+// shop-menu.js/openShopMenu), fourni par city-screen.js qui seul détient
+// scene/getSession — même patron que les gestionnaires ci-dessus. Aucun
+// effet d'état ici : la transaction, elle, passe par le gestionnaire de
+// vente injecté dans shop-menu.js.
+export function setShopHandler(handler) {
+  shopHandler = handler;
 }
 
 // () => equipment — fournit l'ÉQUIPEMENT DU JOUEUR pour l'évaluation d'une
@@ -497,12 +507,22 @@ function handleSearch(entity) {
   announce(t("interaction.searchSpawn", { count }), { assertive: true });
 }
 
+// "shop" : POINT DE VENTE (voir entities/types/shop_counter.js, doc/
+// entity-model.md/"Vente") — ouvre le menu d'actions du comptoir ; tout le
+// reste (liste de vente, confirmations, transaction) vit dans
+// view/menus/shop-menu.js.
+function handleShop(entity) {
+  if (!shopHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
+  shopHandler(entity);
+}
+
 const ACTION_HANDLERS = {
   pickup: handlePickup,
   loot: handleLoot,
   switchSide: handleSwitchSide,
   applyEffects: handleApplyEffects,
   search: handleSearch,
+  shop: handleShop,
 };
 
 // ACTIONS CONDITIONNELLES (voir core/level.js, action.condition/

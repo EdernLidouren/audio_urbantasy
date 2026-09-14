@@ -672,6 +672,22 @@ avec les objets tombés autour ; il reste occupé, observable (Espace) et
 audible. Fouillable de nouveau dès qu'un cycle est passé. Contrairement à
 `"loot"`, l'entité n'est jamais `consumed` : elle se régénère.
 
+### `"shop"` — POINT DE VENTE, ouvre le menu du comptoir
+
+```js
+// entities/types/shop_counter.js
+action: { kind: "shop" },
+```
+
+Aucun paramètre : activer l'entité ouvre le MENU D'ACTIONS du point de vente
+(`view/menus/shop-menu.js`/`openShopMenu` — "Vendre" aujourd'hui, "Acheter"
+plus tard), puis le menu de vente à sliders inline. Tout est VUE (pile
+d'écrans, jeu en pause) ; seule la TRANSACTION est un effet d'état du core
+(`core/trade.js`/`sellItems` : retrait du sac + crédit de `session.money`,
+atomique). Prix unitaire = `value` de l'objet (`core/items.js`/
+`ITEM_REGISTRY`) ; sans `value` -> non vendable, jamais listé. Détail
+(ergonomie, annonces, confirmations) : `doc/entity-model.md`/"Vente".
+
 ### `"switchSide"` — bascule recto/verso (scène à deux faces)
 
 ```json
