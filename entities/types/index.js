@@ -1,6 +1,6 @@
 // Registre des types d'entités. Connecteur pur, zéro logique : rassemble
 // chaque archétype (un fichier par type, voir apple.js/bird_1.js/bird_2.js/
-// bird_3.js/buddy.js/bush.js/chair.js/clock.js/clock_tower.js/crate.js/
+// bird_3.js/buddy.js/bush.js/chair.js/clock.js/clock_tower.js/coin.js/crate.js/
 // cumulo-lupus.js/decor.js/dog.js/door.js/fountain.js/ghost.js/
 // glass-window.js/hound.js/item.js/money.js/neon.js/npc.js/object.js/
 // office_computer.js/passage.js/potted_plant.js/river.js/rock.js/statue.js)
@@ -49,7 +49,7 @@
 // seulement la donnée.
 //
 // Les archétypes (apple/bird_1/bird_2/bird_3/buddy/bush/chair/clock/clock_tower/
-// crate/cumuloLupus/decor/dog/door/fountain/ghost/glass_window/hound/item/
+// coin/crate/cumuloLupus/decor/dog/door/fountain/ghost/glass_window/hound/item/
 // money/neon/npc/object/office_computer/passage/potted_plant/river/rock/
 // statue) sont des PRESETS de
 // propriétés — des objets plats indépendants, jamais une hiérarchie ni de
@@ -65,6 +65,7 @@ import bush from "./bush.js";
 import chair from "./chair.js";
 import clock from "./clock.js";
 import clockTower from "./clock_tower.js";
+import coin from "./coin.js";
 import crate from "./crate.js";
 import cumuloLupus from "./cumulo-lupus.js";
 import decor from "./decor.js";
@@ -96,6 +97,7 @@ export default {
   chair,
   clock,
   clock_tower: clockTower,
+  coin,
   crate,
   cumuloLupus,
   decor,

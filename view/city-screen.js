@@ -587,14 +587,13 @@ export function makeCityScreen(getSession, setSession) {
   }
 
   // Effet d'ÉTAT de la FOUILLE (voir view/interaction.js/ACTION_HANDLERS.
-  // search ; core/spawn.js/searchContainer) : tirage paresseux + objet au
-  // sac + conteneur noté vidé, core pur. Renvoie la clé i18n de l'objet
-  // obtenu (core/items.js/ITEM_REGISTRY, même clé que le sac) ou null —
-  // interaction.js ne connaît jamais le registre d'objets.
+  // search ; core/spawn.js/searchContainer) : tirage paresseux + stock lâché
+  // au sol en éphémères éparpillés + conteneur noté vidé, core pur (registre
+  // injecté, comme refreshSpawns). Renvoie le nombre d'objets tombés.
   function searchEffect(entity) {
-    const result = searchContainer(getSession(), entity.id);
+    const result = searchContainer(getSession(), entity.id, registry);
     setSession(result.session);
-    return result.item ? ITEM_REGISTRY[result.item].label : null;
+    return result.items.length;
   }
 
   // SAS de bascule recto<->verso (voir view/interaction.js/ACTION_HANDLERS.

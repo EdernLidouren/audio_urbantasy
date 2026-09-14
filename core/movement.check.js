@@ -60,8 +60,8 @@ import { parseVariables, getVariable, setVariable, applyActionEffects } from "./
 import { IMPROVEMENT_REGISTRY, improvementProps, hasImprovement, giveImprovement, removeImprovement } from "./improvements.js";
 import { isDebugEnabled, setDebugEnabled } from "../config/debug.js";
 import { validateSpawnTables, validateDistribution, resolveDistribution, drawItem } from "./distribution.js";
-import { spawnCycleAt, refillDueSpawns, searchContainer } from "./spawn.js";
-import { SPAWN_TABLES, SPAWN_RANGE_DEFAULT_COUNT } from "../config/spawn-values.js";
+import { spawnCycleAt, refillDueSpawns, searchContainer, isSearchable } from "./spawn.js";
+import { SPAWN_TABLES, SPAWN_RANGE_DEFAULT_COUNT, SPAWN_CONTAINER_DEFAULT_COUNT } from "../config/spawn-values.js";
 
 // { companions: [] } : passé explicitement à CHAQUE createInitialState()
 // ci-dessous qui ne concerne pas les compagnons — sans lui, le défaut (UN
@@ -6731,7 +6731,10 @@ export function runMovementChecks() {
     titleKey: "level.demo.title",
     length: 40,
     playerStart: 2,
-    spawnRanges: [{ from: 20, to: 30, count: 4, distribution: { table: "default" } }],
+    // Distribution INLINE (pas la table standard, dont le contenu peut
+    // changer) : exerce à coup sûr les DEUX voies de matérialisation —
+    // archétype dédié (apple) et générique item (key_bronze, sans archétype).
+    spawnRanges: [{ from: 20, to: 30, count: 4, distribution: { items: { apple: 1, key_bronze: 1 } } }],
     entities: [
       { id: "bush-1", type: "bush", x: 5 },
       { id: "bush-2", type: "bush", x: 8, container: { distribution: { items: { key_bronze: 1 } } } },
@@ -6760,6 +6763,16 @@ export function runMovementChecks() {
     true,
     spawnThrows(() => parseLevel({ ...spawnRaw, entities: [{ id: "b", type: "bush", x: 1, container: {} }] }, SPAWN_REGISTRY))
   );
+  run(
+    "collecte : parseLevel rejette un container.count non entier >= 1",
+    true,
+    spawnThrows(() => parseLevel({ ...spawnRaw, entities: [{ id: "b", type: "bush", x: 1, container: { distribution: { table: "default" }, count: 0 } }] }, SPAWN_REGISTRY))
+  );
+  run(
+    "collecte : parseLevel conserve container.count explicite",
+    3,
+    parseLevel({ ...spawnRaw, entities: [{ id: "b", type: "bush", x: 1, container: { distribution: { table: "default" }, count: 3 } }] }, SPAWN_REGISTRY).entities[0].container.count
+  );
 
   // Premier chargement : garnissage (conteneurs stockés, plage posée).
   const spawnFresh = { ...createInitialState(spawnLevel, undefined, NO_COMPANIONS), bag: [] };
@@ -6767,8 +6780,15 @@ export function runMovementChecks() {
   const spawnWorld = (s) => s.worlds[spawnLevel.id];
   const spawnedOf = (s) => spawnWorld(s).entities.filter((e) => e.spawned);
   run("collecte : refillDueSpawns marque le cycle matérialisé", 0, spawnWorld(spawnFilled).spawnCycle);
-  run("collecte : refillDueSpawns stocke chaque conteneur", true, spawnWorld(spawnFilled).entities.slice(0, 2).every((e) => typeof e.stock === "string"));
-  run("collecte : conteneur à distribution inline -> tire dans SA table", "key_bronze", spawnWorld(spawnFilled).entities[1].stock);
+  run(
+    "collecte : refillDueSpawns stocke chaque conteneur (count par défaut)",
+    true,
+    spawnWorld(spawnFilled).entities.slice(0, 2).every((e) => Array.isArray(e.stock) && e.stock.length === SPAWN_CONTAINER_DEFAULT_COUNT)
+  );
+  run("collecte : conteneur à distribution inline -> tire dans SA table", true, spawnWorld(spawnFilled).entities[1].stock.every((i) => i === "key_bronze"));
+  run("collecte : conteneur garni -> fouillable (isSearchable)", true, isSearchable(spawnWorld(spawnFilled).entities[0], spawnFilled.time));
+  run("collecte : entité sans container -> jamais fouillable", false, isSearchable(spawnWorld(spawnFilled).entities[2], spawnFilled.time));
+  run("collecte : conteneur jamais garni (monde neuf) -> fouillable (garnissage paresseux dû)", true, isSearchable(spawnWorld(spawnFresh).entities[0], spawnFresh.time));
   run("collecte : plage -> count collectibles posés", 4, spawnedOf(spawnFilled).length);
   run("collecte : collectibles posés DANS la plage", true, spawnedOf(spawnFilled).every((e) => e.x >= 20 && e.x <= 30));
   run("collecte : collectibles posés hors du corps du bloqueur", true, spawnedOf(spawnFilled).every((e) => Math.abs(e.x - 25) >= BODY_RADIUS));
@@ -6792,17 +6812,34 @@ export function runMovementChecks() {
   run("collecte : ramasser un collectible posé -> objet au sac", spawnFirstGround.action.item, spawnPicked.bag[0].type);
   run("collecte : ramasser un collectible posé -> entité retirée", 3, spawnedOf(spawnPicked).length);
 
-  // Fouille : garni -> objet au sac ; refouille le même jour -> vide.
-  const spawnSearch1 = searchContainer(spawnFilled, "bush-1");
-  run("collecte : fouiller un conteneur garni -> objet obtenu", spawnWorld(spawnFilled).entities[0].stock, spawnSearch1.item);
-  run("collecte : fouiller -> objet ajouté au sac", spawnSearch1.item, spawnSearch1.session.bag[0].type);
+  // Fouille : garni -> le stock TOMBE au sol (éphémères éparpillés autour
+  // du conteneur), rien au sac ; le conteneur est noté vidé et n'est PLUS
+  // fouillable le même jour (aucun effet, session inchangée).
+  const spawnSearch1 = searchContainer(spawnFilled, "bush-1", SPAWN_REGISTRY);
+  const spawnDropped = (s) => spawnWorld(s).entities.filter((e) => e.ephemeral);
+  run("collecte : fouiller un conteneur garni -> les objets du stock tombent", JSON.stringify(spawnWorld(spawnFilled).entities[0].stock), JSON.stringify(spawnSearch1.items));
+  run("collecte : fouiller -> une entité ÉPHÉMÈRE par objet tombé", spawnSearch1.items.length, spawnDropped(spawnSearch1.session).length);
+  run("collecte : fouiller -> objets tombés éparpillés AUTOUR du conteneur", true, spawnDropped(spawnSearch1.session).every((e) => Math.abs(e.x - 5) <= TUNING_DEFAULTS.ephemeralScatterSpread));
+  run("collecte : fouiller -> objets tombés ramassables (action pickup vers le sac)", true, spawnDropped(spawnSearch1.session).every((e) => e.action.kind === "pickup" && spawnSearch1.items.includes(e.action.item)));
+  run("collecte : fouiller -> objets tombés jamais marqués spawned (pas un lot de plage)", true, spawnDropped(spawnSearch1.session).every((e) => !e.spawned));
+  run("collecte : fouiller -> RIEN au sac directement", 0, spawnSearch1.session.bag.length);
   run("collecte : fouiller -> conteneur noté vidé", null, spawnWorld(spawnSearch1.session).entities[0].stock);
-  const spawnSearch2 = searchContainer(spawnSearch1.session, "bush-1");
-  run("collecte : refouiller le même jour -> vide", null, spawnSearch2.item);
-  run("collecte : refouiller le même jour -> sac inchangé", 1, spawnSearch2.session.bag.length);
-  run("collecte : fouiller une entité qui n'est pas un conteneur -> null, session inchangée", true, (() => {
-    const r = searchContainer(spawnSearch2.session, "rock-1");
-    return r.item === null && r.session === spawnSearch2.session;
+  run("collecte : conteneur vidé -> plus fouillable (isSearchable)", false, isSearchable(spawnWorld(spawnSearch1.session).entities[0], spawnSearch1.session.time));
+  run("collecte : conteneur vidé -> toujours observable/interactable (seule la fouille s'éteint)", true, (() => {
+    const e = spawnWorld(spawnSearch1.session).entities[0];
+    return e.observable === true && e.interactable === true && e.sounds.beacon !== undefined;
+  })());
+  const spawnSearch2 = searchContainer(spawnSearch1.session, "bush-1", SPAWN_REGISTRY);
+  run("collecte : refouiller le même jour -> rien ne tombe", 0, spawnSearch2.items.length);
+  run("collecte : refouiller le même jour -> session INCHANGÉE", spawnSearch1.session, spawnSearch2.session);
+  run("collecte : ramasser un objet tombé -> au sac, entité retirée", true, (() => {
+    const dropped = spawnDropped(spawnSearch1.session)[0];
+    const picked = pickupItemEntity(spawnSearch1.session, dropped.id, dropped.action.item, 1);
+    return picked.bag[0].type === dropped.action.item && spawnDropped(picked).length === spawnSearch1.items.length - 1;
+  })());
+  run("collecte : fouiller une entité qui n'est pas un conteneur -> rien, session inchangée", true, (() => {
+    const r = searchContainer(spawnSearch2.session, "rock-1", SPAWN_REGISTRY);
+    return r.items.length === 0 && r.session === spawnSearch2.session;
   })());
 
   // Jour suivant SUR PLACE : le conteneur se re-garnit paresseusement à la
@@ -6815,8 +6852,9 @@ export function runMovementChecks() {
     JSON.stringify(spawnedOf(spawnNextDayInPlace).map((e) => e.id))
   );
   run("collecte : joueur présent au passage du cycle -> marqueur INCHANGÉ (dû, pas exécuté)", 0, spawnWorld(spawnNextDayInPlace).spawnCycle);
-  const spawnSearch3 = searchContainer(spawnNextDayInPlace, "bush-1");
-  run("collecte : un jour plus tard sur place -> conteneur refouillable (re-garni)", true, typeof spawnSearch3.item === "string");
+  run("collecte : un jour plus tard sur place -> conteneur vidé redevient fouillable", true, isSearchable(spawnWorld(spawnNextDayInPlace).entities[0], spawnNextDayInPlace.time));
+  const spawnSearch3 = searchContainer(spawnNextDayInPlace, "bush-1", SPAWN_REGISTRY);
+  run("collecte : un jour plus tard sur place -> la fouille fait tomber un stock neuf", SPAWN_CONTAINER_DEFAULT_COUNT, spawnSearch3.items.length);
   run("collecte : conteneur re-garni note le nouveau cycle", 1, spawnWorld(spawnSearch3.session).entities[0].stockCycle);
 
   // Quitter puis revenir : la scène est re-garnie (marqueur exécuté au
@@ -6826,7 +6864,8 @@ export function runMovementChecks() {
   run("collecte : retour dans la scène -> marqueur exécuté (cycle 1)", 1, spawnWorld(spawnBack).spawnCycle);
   run("collecte : retour -> anciens collectibles posés retirés (ids du cycle 0 absents)", false, spawnedOf(spawnBack).some((e) => e.id.startsWith("spawn-0-")));
   run("collecte : retour -> nouveaux collectibles posés (cycle 1)", 4, spawnedOf(spawnBack).filter((e) => e.id.startsWith("spawn-1-")).length);
-  run("collecte : retour -> conteneur vidé la veille est re-stocké", true, typeof spawnWorld(spawnBack).entities[0].stock === "string");
+  run("collecte : retour -> conteneur vidé la veille est re-stocké", true, Array.isArray(spawnWorld(spawnBack).entities[0].stock) && spawnWorld(spawnBack).entities[0].stock.length > 0);
+  run("collecte : retour -> les objets tombés (éphémères) n'ont pas survécu au départ", 0, spawnDropped(spawnBack).length);
   run("collecte : retour -> entités déclarées conservées", true, spawnWorld(spawnBack).entities.some((e) => e.id === "rock-1"));
 
   // Absence longue : plusieurs cycles sans revenir -> UN seul garnissage
@@ -6858,7 +6897,7 @@ export function runMovementChecks() {
     SPAWN_REGISTRY
   );
   const spawnTwoFilled = refillDueSpawns(createInitialState(spawnTwoSided, undefined, NO_COMPANIONS), SPAWN_REGISTRY);
-  run("collecte : deux faces — recto (conteneur) garni", true, typeof spawnTwoFilled.worlds[spawnTwoSided.id].recto.entities[0].stock === "string");
+  run("collecte : deux faces — recto (conteneur) garni", true, Array.isArray(spawnTwoFilled.worlds[spawnTwoSided.id].recto.entities[0].stock));
   run("collecte : deux faces — verso (plage) garni avec le count par défaut", SPAWN_RANGE_DEFAULT_COUNT, spawnTwoFilled.worlds[spawnTwoSided.id].verso.entities.filter((e) => e.spawned).length);
   run("collecte : deux faces — marqueur au niveau du monde", 0, spawnTwoFilled.worlds[spawnTwoSided.id].spawnCycle);
 
@@ -6876,11 +6915,12 @@ export function runMovementChecks() {
   if (spawnReload.success) {
     const revived = spawnReload.session;
     run("collecte : save/load — conteneur fouillé reste vidé", null, spawnWorld(revived).entities[0].stock);
-    run("collecte : save/load — refouiller après reload le même jour -> vide", null, searchContainer(revived, "bush-1").item);
-    run("collecte : save/load — collectibles posés survivent (pas des éphémères)", 4, spawnedOf(revived).length);
+    run("collecte : save/load — conteneur fouillé reste non fouillable le même jour", false, isSearchable(spawnWorld(revived).entities[0], revived.time));
+    run("collecte : save/load — refouiller après reload le même jour -> rien", 0, searchContainer(revived, "bush-1", SPAWN_REGISTRY).items.length);
+    run("collecte : save/load — collectibles posés par la plage survivent (pas des éphémères)", 4, spawnedOf(revived).length);
+    run("collecte : save/load — objets tombés d'une fouille exclus (éphémères)", 0, spawnDropped(revived).length);
     run("collecte : save/load — marqueur de cycle survit", 0, spawnWorld(revived).spawnCycle);
     run("collecte : save/load — aucun re-garnissage au rechargement dans le même cycle", revived, refillDueSpawns(revived, SPAWN_REGISTRY));
-    run("collecte : save/load — l'objet fouillé est toujours au sac", spawnSearch1.item, revived.bag[0].type);
   }
 
   console.log(`Récapitulatif : ${passed} réussis / ${total} total`);

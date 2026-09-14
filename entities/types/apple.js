@@ -16,6 +16,11 @@ export default {
   descriptionKey: "item.apple.description",
   sounds: {
     beacon: { path: "assets/sounds/items/fruit_beacon", loop: true },
+    // Son de RAMASSAGE (rôle `pickup`, voir doc/entity-model.md/"Son de
+    // ramassage") : DÉCLARÉ par archétype, jamais imposé — un objet sans ce
+    // rôle se ramasse en silence. Même pool que la balise : la pomme sonne
+    // pareil qu'on la repère ou qu'on la prenne.
+    pickup: { path: "assets/sounds/items/fruit_beacon" },
   },
   blocksMovement: false,
   observable: true,

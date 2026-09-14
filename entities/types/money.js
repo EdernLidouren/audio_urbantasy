@@ -15,6 +15,9 @@ export default {
   descriptionKey: "entity.money.description",
   sounds: {
     beacon: { path: "assets/sounds/items/box_of_nails_beacon_1.mp3", loop: true },
+    // Son de RAMASSAGE (rôle `pickup`, voir doc/entity-model.md/"Vocabulaire
+    // de sons") : déclaré par archétype, jamais imposé.
+    pickup: { path: "assets/sounds/effects/coin" },
   },
   blocksMovement: false,
   observable: true,

@@ -611,6 +611,12 @@ action: { kind: "pickup", item: "apple", count: 1 },
 Distinguées par la PRÉSENCE de `item` (jamais mélangées sur une même entité).
 `item` doit être une clé de `core/items.js`/`ITEM_REGISTRY`.
 
+**Son de ramassage** : rôle `sounds.pickup` de l'ARCHÉTYPE de l'objet
+(cascade instance -> archétype, voir `doc/entity-model.md`/"Son de
+ramassage"), SANS défaut — non déclaré, l'objet se ramasse en silence (juste
+l'annonce). Aucun son générique imposé par le système ; vaut aussi pour
+`"loot"`.
+
 ### `"loot"` — collectible PERSISTANT, DEUX formes
 
 Crédit direct (l'entité N'EST JAMAIS retirée, contrairement à `"pickup"` — elle
@@ -645,19 +651,26 @@ container: { distribution: { table: "default" } },
 action: { kind: "search" },
 ```
 
-Aucun paramètre sur l'action elle-même : ce qu'on trouve vient de
-`entity.container.distribution` (voir `doc/level-format.md`/"Entité" et
-`doc/entity-model.md`/"Collecte" pour le modèle complet — conteneur garni à
-chaque cycle quotidien, objet TIRÉ dans une distribution pondérée,
-`{ table: "<nom>" }` référençant `config/spawn-values.js`/`SPAWN_TABLES` ou
-`{ items: { <objet>: <poids> } }` inline). Effet d'état : `core/spawn.js`/
-`searchContainer` — objet ajouté au sac (`core/bag.js`/`addItem`), conteneur
-noté vidé (`stock: null`) pour le cycle courant ; refouillé le même jour ->
-vide, jusqu'au prochain cycle. Retour sensoriel (`view/interaction.js`/
-`handleSearch`) dérivé du RÉSULTAT : trouvé -> son de ramassage + annonce
-`interaction.search` ; vide -> annonce `interaction.searchEmpty` seule.
-Contrairement à `"loot"`, l'entité n'est jamais `consumed` : elle se
-régénère.
+Aucun paramètre sur l'action elle-même : ce qui tombe vient de
+`entity.container` (`{ distribution, count? }`, voir `doc/level-format.md`/
+"Entité" et `doc/entity-model.md`/"Collecte" pour le modèle complet —
+conteneur garni à chaque cycle quotidien de `count` objets TIRÉS dans une
+distribution pondérée, `{ table: "<nom>" }` référençant
+`config/spawn-values.js`/`SPAWN_TABLES` ou `{ items: { <objet>: <poids> } }`
+inline). Effet d'état : `core/spawn.js`/`searchContainer` — le stock TOMBE
+AU SOL, une entité ÉPHÉMÈRE par objet, éparpillée autour du conteneur
+(`spawnScatteredEphemerals`, MÊME geste que le `"loot"` à spawn ci-dessus),
+à ramasser ensuite via `"pickup"` ou à laisser ; le conteneur est noté vidé
+(`stock: null`) pour le cycle courant. Retour : annonce
+`interaction.searchSpawn` seule (les balises des objets tombés font le
+reste) — aucun son de fouille imposé.
+
+**Candidature liée à l'état** : un conteneur VIDÉ n'est plus candidat à
+Entrée (`core/spawn.js`/`isSearchable`, filtré par `view/audio/city-scene.js`/
+`getInteractionCandidates`) — aucun retour, aucun menu de désambiguïsation
+avec les objets tombés autour ; il reste occupé, observable (Espace) et
+audible. Fouillable de nouveau dès qu'un cycle est passé. Contrairement à
+`"loot"`, l'entité n'est jamais `consumed` : elle se régénère.
 
 ### `"switchSide"` — bascule recto/verso (scène à deux faces)
 

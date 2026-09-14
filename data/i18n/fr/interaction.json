@@ -5,6 +5,5 @@
   "interaction.pickupItem": "Ramassé : {item}.",
   "interaction.loot": "Trouvé : {amount} pièces.",
   "interaction.lootSpawn": "{count} pièces éparpillées tout autour.",
-  "interaction.search": "Trouvé : {item}.",
-  "interaction.searchEmpty": "Rien à trouver ici."
+  "interaction.searchSpawn": "{count} objets tombent tout autour."
 }

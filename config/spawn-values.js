@@ -16,7 +16,7 @@
 export const DEFAULT_SPAWN_TABLE = "default";
 
 export const SPAWN_TABLES = {
-  default: { apple: 80, key_bronze: 20 },
+  default: { apple: 80, coin: 20 },
 };
 
 // Heure de jeu (0-23) du re-garnissage quotidien : un cycle commence à
@@ -26,3 +26,7 @@ export const SPAWN_CYCLE_HOUR = 0;
 // Nombre de collectibles posés par PLAGE et par cycle, si la plage ne
 // déclare pas son propre `count`.
 export const SPAWN_RANGE_DEFAULT_COUNT = 3;
+
+// Nombre d'objets stockés par CONTENEUR et par cycle (tous lâchés au sol à
+// la fouille), si le conteneur ne déclare pas son propre `count`.
+export const SPAWN_CONTAINER_DEFAULT_COUNT = 2;

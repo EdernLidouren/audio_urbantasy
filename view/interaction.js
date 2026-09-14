@@ -11,7 +11,7 @@ import { announce } from "../lib/announce.js";
 import { t } from "../data/i18n/index.js";
 import { pushScreen, popScreen, composeHook } from "../lib/screens.js";
 import { makeMenuScreen } from "../lib/menu.js";
-import { playOneShot, playDescribedOneShot } from "../lib/audio.js";
+import { playDescribedOneShot } from "../lib/audio.js";
 import { resolveAsset } from "../lib/assets.js";
 import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
 import { evaluateCondition, selectMatchingAction } from "../core/presence.js";
@@ -116,12 +116,11 @@ export function setVariableEffectsHandler(handler) {
   variableEffectsHandler = handler;
 }
 
-// (entity) => labelKey | null — applique l'effet d'ÉTAT de la FOUILLE d'un
-// conteneur de collecte (voir core/spawn.js/searchContainer,
-// doc/entity-model.md/"Collecte"), même patron que setLootHandler. Renvoie
-// la clé i18n de l'objet obtenu (ajouté au sac), ou null si le conteneur
-// était vide — le retour sensoriel (son, annonce) reste ici, voir
-// handleSearch.
+// (entity) => number — applique l'effet d'ÉTAT de la FOUILLE d'un conteneur
+// de collecte (voir core/spawn.js/searchContainer, doc/entity-model.md/
+// "Collecte"), même patron que setLootSpawnHandler : le stock TOMBE au sol
+// en éphémères éparpillés. Renvoie le nombre d'objets tombés — le retour
+// sensoriel (annonce) reste ici, voir handleSearch.
 export function setSearchHandler(handler) {
   searchHandler = handler;
 }
@@ -191,19 +190,19 @@ export function setPositionedSoundPlayer(provider) {
   positionedSoundPlayer = provider;
 }
 
-const PICKUP_SOUND_KEY = "assets/sounds/ui/pickup";
-
-// Défensif comme tout son d'UI du projet (voir view/save-storage.js/
-// playSaveSound, view/menu-sounds.js) : un fichier absent avertit, ne
-// plante jamais. Catégorie "interface" : un retour de ramassage n'est pas
-// positionné dans l'espace, comme un son de menu.
-function playPickupSound() {
-  try {
-    const factor = getPref("interfaceVolume", PREF_CONSTRAINTS.interfaceVolume.default) / 100;
-    playOneShot(resolveAsset(PICKUP_SOUND_KEY), { volume: factor });
-  } catch (error) {
-    console.warn(`interact: son de ramassage indisponible ("${PICKUP_SOUND_KEY}") : ${error.message}`);
-  }
+// Son de RAMASSAGE : rôle `sounds.pickup` DÉCLARÉ par l'archétype de l'objet
+// (cascade instance -> archétype par fusion, comme tout rôle de `sounds` —
+// voir doc/entity-model.md/"Vocabulaire de sons"), SANS défaut : un objet
+// sans ce rôle est ramassé en silence (l'annonce suffit). Plus aucun son
+// générique imposé ("tout son est déclaré, jamais imposé"). Rendu DIÉGÉTIQUE
+// via le même chemin qu'un effet "playSound" (runPlaySoundEffect plus bas :
+// positionné sur l'entité, soumis aux filtres de scène) — à appeler AVANT
+// l'effet d'état qui retire l'entité, tant qu'elle a encore une voix dans
+// la scène.
+function playEntityPickupSound(entity) {
+  const descriptor = entity.sounds && entity.sounds.pickup;
+  if (!descriptor) return;
+  runPlaySoundEffect(entity, descriptor);
 }
 
 // Effet "playSound" (voir core/effects.js, core/scripting.md/"Effets
@@ -213,7 +212,7 @@ function playPickupSound() {
 // IGNORE tout filtre actif — le descripteur partagé { path, gain?,
 // pitchVariation?, reverbSend? } joué via playDescribedOneShot
 // (lib/audio.js), composé avec `interfaceVolume` comme tout son d'UI/
-// interaction du projet (playPickupSound plus haut). Aucun bus de réverb
+// interaction du projet (view/menu-sounds.js). Aucun bus de réverb
 // accessible depuis ce fichier (voir header, "vue + contenu") : reverbSend
 // reste donc sans effet en pratique ici.
 //
@@ -229,8 +228,8 @@ function playPickupSound() {
 // sont calculées séparément, puis composées ICI. PLUS de son de refus
 // GÉNÉRIQUE en dur (ancien REFUSAL_SOUND_KEY) : un effet "playSound" est un
 // CHOIX DE CONTENU explicite (voir refusalEffects, actionConditionMet plus
-// bas), jamais une valeur par défaut du système. Défensif comme
-// playPickupSound : fichier absent -> avertit, ne plante jamais.
+// bas), jamais une valeur par défaut du système. Défensif comme tout son du
+// projet : fichier absent -> avertit, ne plante jamais.
 
 // `effect.at` (optionnel, id d'entité) : PROVENANCE explicite — le son émane
 // de LA POSITION de CETTE entité, pas forcément celle qui porte l'action
@@ -397,8 +396,8 @@ function handlePickup(entity, action) {
       return;
     }
     if (!itemPickupHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
+    playEntityPickupSound(entity); // avant le retrait : l'entité a encore sa voix
     itemPickupHandler(entity, item, count);
-    playPickupSound();
     announce(t("interaction.pickupItem", { item: t(entity.labelKey) }), { assertive: true });
     return;
   }
@@ -409,8 +408,8 @@ function handlePickup(entity, action) {
     return;
   }
   if (!pickupHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
+  playEntityPickupSound(entity);
   pickupHandler(entity, amount);
-  playPickupSound();
   announce(t("interaction.pickup", { amount }), { assertive: true });
 }
 
@@ -449,8 +448,8 @@ function handleLoot(entity, action) {
       return;
     }
     if (!lootSpawnHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
+    playEntityPickupSound(entity);
     lootSpawnHandler(entity, spawn);
-    playPickupSound();
     // Pas de MONTANT ici (contrairement au cas action.amount ci-dessous) :
     // rien n'est encore GAGNÉ, seulement RÉPANDU autour de la source — le
     // joueur ramassera chaque pièce individuellement, chacune annonçant
@@ -465,8 +464,8 @@ function handleLoot(entity, action) {
     return;
   }
   if (!lootHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
+  playEntityPickupSound(entity);
   lootHandler(entity, amount);
-  playPickupSound();
   announce(t("interaction.loot", { amount }), { assertive: true });
 }
 
@@ -483,20 +482,19 @@ function handleLoot(entity, action) {
 function handleApplyEffects() {}
 
 // "search" : FOUILLE d'un conteneur de collecte (voir core/spawn.js/
-// searchContainer, doc/entity-model.md/"Collecte") — l'effet d'état
-// (tirage paresseux, objet au sac, conteneur noté vidé) est délégué au
-// gestionnaire, qui renvoie la clé i18n de l'objet obtenu ou null ; le
-// retour sensoriel se lit sur CE résultat : trouvé -> son de ramassage +
-// annonce, vide -> annonce seule (aucun son de refus générique imposé).
+// searchContainer, doc/entity-model.md/"Collecte") — même geste que le
+// "loot" à spawn ci-dessus : le stock TOMBE au sol, éparpillé, à ramasser
+// ensuite objet par objet (chacun annonçant et sonnant son propre ramassage,
+// voir handlePickup). Aucun son ici : les balises des objets tombés sont le
+// retour audible. Un conteneur vidé n'arrive JAMAIS jusqu'ici : il n'est
+// plus candidat à "activate" (voir core/spawn.js/isSearchable,
+// view/audio/city-scene.js/getInteractionCandidates) — aucun "vide" à
+// annoncer, aucun menu parasite.
 function handleSearch(entity) {
   if (!searchHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
-  const foundLabelKey = searchHandler(entity);
-  if (!foundLabelKey) {
-    announce(t("interaction.searchEmpty"), { assertive: true });
-    return;
-  }
-  playPickupSound();
-  announce(t("interaction.search", { item: t(foundLabelKey) }), { assertive: true });
+  const count = searchHandler(entity);
+  if (count === 0) return;
+  announce(t("interaction.searchSpawn", { count }), { assertive: true });
 }
 
 const ACTION_HANDLERS = {

@@ -41,6 +41,9 @@ import { TAG_REGISTRY } from "./tags.js";
 // existant.
 export const ITEM_REGISTRY = {
   apple: { stackable: true, label: "item.apple.name", descriptionKey: "item.apple.description" },
+  // Pièce : objet EMPILABLE du sac, distinct de session.money (voir
+  // entities/types/coin.js vs money.js).
+  coin: { stackable: true, label: "item.coin.name", descriptionKey: "item.coin.description" },
   key_bronze: { stackable: false, label: "item.key_bronze", descriptionKey: "item.key_bronze.description" },
   sneakers: {
     stackable: false,

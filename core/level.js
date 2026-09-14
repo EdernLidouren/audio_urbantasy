@@ -765,18 +765,24 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
   }
 
   // container : optionnel, SOURCE DE COLLECTE régénérante (voir core/spawn.js,
-  // doc/entity-model.md/"Collecte") — { distribution } (référence à une
-  // table standard ou table inline, voir core/distribution.js). Cascade
-  // instance -> type comme action/behavior. Seule la distribution est
-  // validée ici ; le garnissage (stock/stockCycle, champs RUNTIME) reste au
-  // moteur, et l'action "search" qui l'exploite reste côté vue.
+  // doc/entity-model.md/"Collecte") — { distribution, count? } (référence à
+  // une table standard ou table inline, voir core/distribution.js ; count
+  // entier >= 1, défaut config/spawn-values.js/SPAWN_CONTAINER_DEFAULT_COUNT
+  // résolu par le moteur). Cascade instance -> type comme action/behavior.
+  // Seule la forme est validée ici ; le garnissage (stock/stockCycle, champs
+  // RUNTIME) reste au moteur, et l'action "search" qui l'exploite reste côté
+  // vue.
   const resolvedContainer = container !== undefined ? container : registry[type].container;
   if (resolvedContainer !== undefined) {
     if (typeof resolvedContainer !== "object" || resolvedContainer === null || Array.isArray(resolvedContainer)) {
       fail(`entities[${index}] ("${id}") : container doit être un objet si présent.`);
     }
     validateDistribution(resolvedContainer.distribution, `entities[${index}] ("${id}") : container.distribution`, fail);
+    if (resolvedContainer.count !== undefined && (!Number.isInteger(resolvedContainer.count) || resolvedContainer.count < 1)) {
+      fail(`entities[${index}] ("${id}") : container.count doit être un entier >= 1 si présent.`);
+    }
     entity.container = { distribution: resolvedContainer.distribution };
+    if (resolvedContainer.count !== undefined) entity.container.count = resolvedContainer.count;
   }
 
   // presence : optionnel, RÈGLES DÉCLARATIVES de présence conditionnelle

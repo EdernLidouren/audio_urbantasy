@@ -348,9 +348,10 @@ persiste avec le monde.
   figée dans l'état : un monde sauvegardé tire toujours dans la table
   COURANTE. Validée au chargement (`core/level.js`) ; les tables standard
   s'auto-valident à l'import (`validateSpawnTables`), comme la météo.
-- **Sources (où)** — CONTENEUR : entité portant `container: { distribution }`
-  (cascade instance -> type, ex. `entities/types/bush.js`) + action
-  `"search"` ; point fixe, contenu CACHÉ. PLAGE : `face.spawnRanges`
+- **Sources (où)** — CONTENEUR : entité portant `container: { distribution,
+  count? }` (cascade instance -> type, ex. `entities/types/bush.js` ;
+  `count` : objets par cycle, défaut `SPAWN_CONTAINER_DEFAULT_COUNT`) +
+  action `"search"` ; point fixe, contenu CACHÉ. PLAGE : `face.spawnRanges`
   (`{ from, to, count?, distribution }`, voir `doc/level-format.md`) ;
   collectibles posés AU SOL à des positions VARIÉES — `drawScatteredPosition`
   (bornes carte, corps bloquants) autour du centre de la plage, re-tirée si
@@ -385,19 +386,36 @@ persiste avec le monde.
   audible. Les plages attendent donc le prochain chargement ; le conteneur
   peut se garnir sur place sans rien trahir.
 - **Matérialisation (comment)** — CONTENEUR : action `"search"` (voir
-  `doc/scripting.md`) -> `core/spawn.js`/`searchContainer` : garni -> objet
-  au sac (`addItem`) + `stock: null` ; vide -> rien ; retour sensoriel dérivé
-  du résultat (`view/interaction.js`/`handleSearch`). PLAGE : ramassage
-  ordinaire via l'action `"pickup"` que porte chaque collectible posé
+  `doc/scripting.md`) -> `core/spawn.js`/`searchContainer` : le stock TOMBE
+  AU SOL — une entité ÉPHÉMÈRE par objet, éparpillée autour du conteneur
+  (`spawnScatteredEphemerals`, MÊME geste que la caisse qui lâche des pièces
+  : bornes, obstacles, décalage d'attaques des balises), à ramasser ensuite
+  objet par objet ou à laisser (purgée au départ comme tout éphémère) ; puis
+  `stock: null`. Rien ne va JAMAIS directement au sac. Retour : annonce
+  `interaction.searchSpawn` seule. PLAGE ET objets tombés : ramassage
+  ordinaire via l'action `"pickup"` que porte chaque collectible
   (`core/bag.js`/`pickupItemEntity`, aucun cas spécial).
+- **Fouillabilité liée au garnissage** — un conteneur n'est candidat à
+  Entrée QUE garni (`core/spawn.js`/`isSearchable` : stock non vide, OU un
+  cycle passé depuis `stockCycle` — garnissage paresseux dû) ; filtré par
+  `view/audio/city-scene.js`/`getInteractionCandidates` pour `"activate"`
+  seulement. Vidé -> Entrée ne le concerne plus : AUCUN retour (ni "vide",
+  ni menu), et il n'entre pas dans la désambiguïsation — ramasser les objets
+  tombés autour d'un conteneur vidé ne propose jamais le conteneur. CRUCIAL :
+  SEULE la fouille s'éteint. `interactable`/`observable`, présence, beacon,
+  occupation restent INCHANGÉS — l'arbre reste un arbre, Espace le décrit
+  toujours, il bruisse toujours. Jamais rendu dormant/inerte par ce
+  mécanisme.
 - **Déterminisme** — tous les tirages (objet, position) consomment
   `face.rngState` (comme `spawnScatteredEphemerals`) : même seed + même cycle
   -> même garnissage, positions comprises.
-- **Persistance** — `stock`/`stockCycle` (entité), `spawned` (entité posée),
-  `spawnCycle` (monde) : champs plats, sérialisés avec la partie ; save après
-  fouille + reload -> conteneur toujours vidé jusqu'au cycle suivant,
-  collectibles posés toujours là, marqueur conservé (aucun re-garnissage au
-  rechargement dans le même cycle). Une sauvegarde antérieure n'a pas de
+- **Persistance** — `stock` (tableau d'objets, ou `null` vidé)/`stockCycle`
+  (entité), `spawned` (entité posée par une plage), `spawnCycle` (monde) :
+  champs plats, sérialisés avec la partie ; save après fouille + reload ->
+  conteneur toujours vidé (et non fouillable) jusqu'au cycle suivant,
+  collectibles de plage toujours là, marqueur conservé (aucun re-garnissage
+  au rechargement dans le même cycle). Les objets TOMBÉS d'une fouille,
+  éphémères, sont exclus de la sauvegarde comme tout éphémère. Une sauvegarde antérieure n'a pas de
   `spawnCycle` : absence = cycle dû, garnissage au premier chargement — aucun
   rebouchage nécessaire. Vérifié par l'audit de sérialisabilité
   (`core/movement.check.js`, section "Collecte").
@@ -740,6 +758,22 @@ du beacon ne coupe jamais le one-shot en cours) ; `enterSound` joué AVANT la
 reprise du beacon. Ni l'un ni l'autre n'est soumis à la pause sélective des
 balises (`sound.pause`/`resume`, réservée à la voix CONTINUE) : un one-shot
 Howler joue jusqu'au bout une fois lancé.
+
+### Son de ramassage
+
+`sounds.pickup` (optionnel) : rôle PONCTUEL joué quand l'entité est
+RAMASSÉE ou LOOTÉE (`"pickup"`/`"loot"`, voir `doc/scripting.md`/"Actions"),
+DÉCLARÉ par l'archétype de l'objet (`entities/types/apple.js`, `coin.js`,
+`money.js`) et
+cascadé instance -> archétype comme tout rôle de `sounds` — SANS défaut : un
+objet qui ne le déclare pas se ramasse en silence, l'annonce suffit
+(`entities/types/item.js`, `crate.js` aujourd'hui). Plus aucun son de
+ramassage générique imposé par le système ("tout son est déclaré, jamais
+imposé"). Rendu DIÉGÉTIQUE par le même chemin qu'un effet `"playSound"`
+(`view/interaction.js`/`playEntityPickupSound` -> `runPlaySoundEffect`,
+positionné sur l'entité, filtres de scène), joué AVANT le retrait de
+l'entité — tant qu'elle a encore une voix dans la scène. Même descripteur
+qu'un `"playSound"` (`{ path, gain?, pitchVariation?, reverbSend? }`).
 
 ## Vocabulaire de sons
 

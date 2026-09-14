@@ -5,6 +5,5 @@
   "interaction.pickupItem": "Picked up: {item}.",
   "interaction.loot": "Found: {amount} coins.",
   "interaction.lootSpawn": "{count} coins scattered around.",
-  "interaction.search": "Found: {item}.",
-  "interaction.searchEmpty": "Nothing to find here."
+  "interaction.searchSpawn": "{count} items fall all around."
 }

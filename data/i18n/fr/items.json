@@ -4,6 +4,8 @@
   "tag.metal": "métal",
   "item.apple.name": "Pomme",
   "item.apple.description": "Une pomme, fraîche et croquante.",
+  "item.coin.name": "Pièce",
+  "item.coin.description": "Une pièce de monnaie, un peu terne.",
   "item.key_bronze": "Clé de bronze",
   "item.key_bronze.description": "Une petite clé en bronze.",
   "item.sneakers": "Baskets",
