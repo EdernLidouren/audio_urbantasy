@@ -44,6 +44,7 @@ import { TIME_CONFIG } from "../config/time-values.js";
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";
 import { ITEM_REGISTRY } from "./items.js";
 import { drawItem } from "./distribution.js";
+import { restockShopEntity } from "./catalog.js";
 import { isTwoSided, resolveFace, withFace, drawScatteredPosition, spawnScatteredEphemerals } from "./state.js";
 import { parseSpawnedEntity } from "./level.js";
 
@@ -79,8 +80,10 @@ export function isSearchable(entity, time) {
   return Array.isArray(entity.stock) && entity.stock.length > 0;
 }
 
+// Sources garnies au cycle : plages, conteneurs ET points de vente (leur
+// rayon se recharge au même point temporel, voir core/catalog.js).
 function faceHasSources(face) {
-  return (face.spawnRanges !== undefined && face.spawnRanges.length > 0) || face.entities.some((e) => e.container);
+  return (face.spawnRanges !== undefined && face.spawnRanges.length > 0) || face.entities.some((e) => e.container || e.shop);
 }
 
 // Tire `count` objets dans une distribution, en enchaînant le PRNG.
@@ -142,6 +145,10 @@ function refillFace(face, world, cycle, registry, companions, presenceContext) {
   const entities = [];
   for (const entity of face.entities) {
     if (entity.spawned) continue;
+    if (entity.shop) {
+      entities.push(restockShopEntity(entity, cycle));
+      continue;
+    }
     if (!entity.container) {
       entities.push(entity);
       continue;

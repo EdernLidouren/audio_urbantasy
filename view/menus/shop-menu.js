@@ -1,12 +1,12 @@
-// POINT DE VENTE (voir doc/entity-model.md/"Vente", entities/types/
-// shop_counter.js) — deux écrans sur la pile (lib/screens.js) :
-//   1. MENU D'ACTIONS (lib/menu.js) : "Vendre" (+ "Acheter" plus tard,
-//      structure prête), "Annuler". TOUJOURS un menu, même à une action —
-//      même prévisibilité que view/menus/inventory-menu.js.
-//   2. MENU DE VENTE (écran CUSTOM, ci-dessous) : liste des objets VENDABLES
-//      du sac, chaque entrée étant un SLIDER INLINE (quantité à vendre, de 0
-//      au possédé), puis "Valider la vente" et "Annuler". Écran custom plutôt
-//      qu'un slider lib/menu.js pour les mêmes raisons structurelles que le
+// POINT DE VENTE (voir doc/entity-model.md/"Vente et achat", entities/types/
+// shop_counter.js) — écrans sur la pile (lib/screens.js) :
+//   1. MENU D'ACTIONS (lib/menu.js) : "Vendre", "Acheter", "Annuler". TOUJOURS
+//      un menu — même prévisibilité que view/menus/inventory-menu.js.
+//   2. MENU À SLIDERS INLINE (écran CUSTOM, openQuantityList ci-dessous), UN
+//      SEUL écran paramétré pour la VENTE (lignes = objets vendables du sac,
+//      plafond = possédé) et l'ACHAT (lignes = articles du catalogue, plafond
+//      = STOCK, condition d'incrément = ARGENT). Écran custom plutôt qu'un
+//      slider lib/menu.js pour les mêmes raisons structurelles que le
 //      sélecteur de quantité de l'inventaire (valeur TRANSITOIRE, pas une
 //      préférence persistée ; Entrée = +1 ; Suppr = 0 ; Maj = grand pas) —
 //      voir view/menus/inventory-menu.js/openQuantitySelector.
@@ -14,9 +14,9 @@
 // NAVIGATION ; un ajustement n'annonce que "<quantité>, <sous-total de la
 // ligne>" (fluide en ajustement répété, maintien de touche compris) ; le
 // GRAND TOTAL est à la demande (Retour arrière) — jamais imposé à chaque cran.
-// La TRANSACTION est un effet d'état du core (core/trade.js/sellItems),
-// appliqué par le gestionnaire injecté depuis view/city-screen.js — ce
-// module ne connaît ni session.money ni le sac autrement qu'en LECTURE.
+// Les TRANSACTIONS sont des effets d'état du core (core/trade.js/sellItems,
+// buyItems), appliqués par les gestionnaires injectés depuis
+// view/city-screen.js — ce module ne lit la session qu'en LECTURE.
 
 import { t } from "../../data/i18n/index.js";
 import { pushScreen, popScreen, composeHook } from "../../lib/screens.js";
@@ -26,9 +26,10 @@ import { playMenuSound } from "../menu-sounds.js";
 import { resolveAction, checkBindingsForCollisions, isHeld, isModActive } from "../../lib/input.js";
 import { getPref } from "../../config/preferences.js";
 import { ITEM_REGISTRY } from "../../core/items.js";
-import { isSellable, sellValueOf, ownedQuantity } from "../../core/trade.js";
+import { getActiveWorld } from "../../core/state.js";
+import { isSellable, sellValueOf, ownedQuantity, shopArticles } from "../../core/trade.js";
 
-// (sales: [{ type, quantity }]) => void — applique l'effet d'ÉTAT de la vente
+// (sales: [{ type, quantity }]) => void — effet d'ÉTAT de la vente
 // (core/trade.js/sellItems), fourni par city-screen.js qui seul détient
 // getSession/setSession — même injection que inventory-menu.js/
 // setDropItemHandler.
@@ -38,12 +39,20 @@ export function setSellHandler(handler) {
   sellHandler = handler;
 }
 
-// Bindings du menu de vente. Entrée/Espace : +1 sur une ligne, ACTIVE une
+// (entityId, purchases: [{ type, quantity }]) => void — effet d'ÉTAT de
+// l'achat (core/trade.js/buyItems), même injection.
+let buyHandler = null;
+
+export function setBuyHandler(handler) {
+  buyHandler = handler;
+}
+
+// Bindings du menu à sliders. Entrée/Espace : +1 sur une ligne, ACTIVE une
 // entrée d'action ("Valider"/"Annuler"). Maj+flèche : grand pas (±5).
 // Suppr : remise à 0. Retour arrière : grand total. Maj+A : valider depuis
 // n'importe où. Chaque combinaison est une action DISTINCTE (mods exige une
 // correspondance EXACTE, voir lib/input.js).
-const SELL_BINDINGS = {
+const LIST_BINDINGS = {
   up: { keys: ["ArrowUp"], mods: [] },
   down: { keys: ["ArrowDown"], mods: [] },
   home: { keys: ["Home"], mods: [] },
@@ -58,7 +67,7 @@ const SELL_BINDINGS = {
   validate: { keys: ["a"], mods: ["shift"] },
   cancel: { keys: ["Escape"], mods: [] },
 };
-checkBindingsForCollisions(SELL_BINDINGS, "view/menus/shop-menu.js SELL_BINDINGS");
+checkBindingsForCollisions(LIST_BINDINGS, "view/menus/shop-menu.js LIST_BINDINGS");
 
 const STEP = 1;
 const BIG_STEP = 5;
@@ -69,8 +78,14 @@ function stripTrailingPeriod(text) {
   return text.endsWith(".") ? text.slice(0, -1) : text;
 }
 
+// Entité VIVANTE du point de vente (état de stock à jour), relue dans la
+// session — jamais le snapshot reçu à l'activation.
+function liveShop(getSession, entityId) {
+  return getActiveWorld(getSession()).entities.find((e) => e.id === entityId);
+}
+
 // Une LIGNE de vente par TYPE vendable du sac (agrégée : un non-empilable
-// possédé en plusieurs exemplaires fait une seule ligne, quantité = nombre
+// possédé en plusieurs exemplaires fait une seule ligne, `max` = nombre
 // d'entrées). `selected` : quantité choisie, TRANSITOIRE, propre à cette
 // ouverture du menu.
 function buildSaleLines(bag) {
@@ -79,14 +94,23 @@ function buildSaleLines(bag) {
     type,
     labelKey: ITEM_REGISTRY[type].label,
     descriptionKey: ITEM_REGISTRY[type].descriptionKey,
-    owned: ownedQuantity(bag, type),
+    max: ownedQuantity(bag, type),
     price: sellValueOf(type),
     selected: 0,
   }));
 }
 
-function currentSales(lines) {
-  return lines.filter((line) => line.selected > 0).map((line) => ({ type: line.type, quantity: line.selected }));
+// Une LIGNE d'achat par ARTICLE du catalogue, épuisés compris (`max` = 0 :
+// le joueur sait qu'il existe et reviendra au prochain cycle).
+function buildPurchaseLines(shopEntity) {
+  return shopArticles(shopEntity).map((article) => ({
+    type: article.type,
+    labelKey: ITEM_REGISTRY[article.type].label,
+    descriptionKey: ITEM_REGISTRY[article.type].descriptionKey,
+    max: article.stock,
+    price: article.price,
+    selected: 0,
+  }));
 }
 
 function selectedCount(lines) {
@@ -97,23 +121,34 @@ function selectedTotal(lines) {
   return lines.reduce((total, line) => total + line.selected * line.price, 0);
 }
 
-// "Pomme × 3, Pièce × 2" — récapitulatif de ce qui part (confirmation,
-// résultat).
-function saleDetails(lines) {
+function selectedQuantities(lines) {
+  return lines.filter((line) => line.selected > 0).map((line) => ({ type: line.type, quantity: line.selected }));
+}
+
+// "Pomme × 3, Pièce × 2" — récapitulatif (confirmation, résultat).
+function details(lines) {
   return lines
     .filter((line) => line.selected > 0)
-    .map((line) => t("shop.sell.detail", { item: t(line.labelKey), quantity: line.selected }))
+    .map((line) => t("shop.detail", { item: t(line.labelKey), quantity: line.selected }))
     .join(", ");
 }
 
-// Menu de VENTE — écran custom (voir header). `scene` non utilisé pour les
-// balises : le menu d'actions juste dessous les a déjà mises en pause.
-function openSellMenu(getSession) {
-  const lines = buildSaleLines(getSession().bag);
-  // Entrées d'ACTION après les lignes : "Valider la vente", "Annuler".
+// Menu à SLIDERS INLINE, générique vente/achat (voir header). `spec` :
+//   lines            — lignes { type, labelKey, descriptionKey, max, price, selected }
+//   entryKey         — gabarit de l'entrée complète ({item, selected, max, price, description})
+//   soldOutKey?      — gabarit d'une ligne à max 0 (achat : "épuisé")
+//   totalKey         — gabarit du titre/grand total ({count, total})
+//   validateKey, nothingSelectedKey
+//   allowedIncrease(line, delta) -> { delta, refusalKey? } — ce que la
+//                      CONDITION d'incrément (argent, pour l'achat) autorise
+//                      de `delta` (déjà borné au plafond `max`)
+//   onValidate(lines)
+// Balises : le menu d'actions juste dessous les a déjà mises en pause.
+function openQuantityList(spec) {
+  const { lines } = spec;
   const actions = [
-    { label: "shop.sell.validate", onActivate: () => validate() },
-    { label: "shop.sell.cancel", onActivate: () => cancel() },
+    { label: spec.validateKey, onActivate: () => validate() },
+    { label: "shop.list.cancel", onActivate: () => cancel() },
   ];
   const total = () => lines.length + actions.length;
   let cursor = 0;
@@ -126,17 +161,17 @@ function openSellMenu(getSession) {
     return t("menu.position", { index: index + 1, total: total() });
   }
 
-  // Ligne COMPLÈTE d'une entrée (navigation, ouverture, Retour arrière) :
-  // "{nom} {choisi} sur {possédé}, {prix} pièces : {description}[. position]".
+  // Ligne COMPLÈTE d'une entrée (navigation, ouverture, Retour arrière).
   function entryLine(index) {
     const suffix = position(index);
     let text;
     if (isLine(index)) {
       const line = lines[index];
-      text = t("shop.sell.entry", {
+      const key = line.max === 0 && spec.soldOutKey ? spec.soldOutKey : spec.entryKey;
+      text = t(key, {
         item: t(line.labelKey),
         selected: line.selected,
-        owned: line.owned,
+        max: line.max,
         price: line.price,
         description: stripTrailingPeriod(t(line.descriptionKey)),
       });
@@ -146,9 +181,9 @@ function openSellMenu(getSession) {
     return suffix ? `${text}. ${suffix}` : text;
   }
 
-  // Titre = grand total courant ("Vendre N objets pour M pièces").
+  // Titre = grand total courant.
   function title() {
-    return t("shop.sell.total", { count: selectedCount(lines), total: selectedTotal(lines) });
+    return t(spec.totalKey, { count: selectedCount(lines), total: selectedTotal(lines) });
   }
 
   function announceStarred(text, starred) {
@@ -176,24 +211,36 @@ function openSellMenu(getSession) {
     announceStarred(entryLine(cursor), previous === cursor);
   }
 
-  // Ajustement d'une ligne : PLANCHER 0, PLAFOND possédé — une tentative
-  // au-delà sonne "block" (comme un slider lib/menu.js à sa borne), sinon
-  // "toggle". Annonce : quantité + SOUS-TOTAL de la ligne, rien d'autre.
-  function setLine(line, value) {
-    const next = Math.min(Math.max(value, 0), line.owned);
-    playMenuSound(next === value ? "toggle" : "block");
-    line.selected = next;
+  function announceLine(line) {
     lastAdjustAt = performance.now();
-    announce(t("shop.sell.adjust", { selected: next, subtotal: next * line.price }), { assertive: true });
+    announce(t("shop.adjust", { selected: line.selected, subtotal: line.selected * line.price }), { assertive: true });
   }
 
+  // Ajustement : PLANCHER 0, PLAFOND `max` (borne STRUCTURELLE, sonne
+  // "block" sans message) ; puis, pour un incrément, la CONDITION de
+  // `allowedIncrease` (argent) — SEULE source de refus avec message.
+  // Annonce : quantité + SOUS-TOTAL de la ligne, rien d'autre.
   function adjust(direction, big) {
     if (!isLine(cursor)) {
       playMenuSound("block");
       return;
     }
     const line = lines[cursor];
-    setLine(line, line.selected + direction * (big ? BIG_STEP : STEP));
+    const wanted = line.selected + direction * (big ? BIG_STEP : STEP);
+    const bounded = Math.min(Math.max(wanted, 0), line.max);
+    let delta = bounded - line.selected;
+    if (delta > 0 && spec.allowedIncrease) {
+      const allowed = spec.allowedIncrease(line, delta);
+      if (allowed.delta <= 0) {
+        playMenuSound("block");
+        announce(t(allowed.refusalKey), { assertive: true });
+        return;
+      }
+      delta = allowed.delta;
+    }
+    playMenuSound(bounded === wanted && delta !== 0 ? "toggle" : "block");
+    line.selected += delta;
+    announceLine(line);
   }
 
   function reset() {
@@ -201,7 +248,10 @@ function openSellMenu(getSession) {
       playMenuSound("block");
       return;
     }
-    setLine(lines[cursor], 0);
+    const line = lines[cursor];
+    playMenuSound(line.selected === 0 ? "block" : "toggle");
+    line.selected = 0;
+    announceLine(line);
   }
 
   // Entrée/Espace : +1 sur une ligne, activation sur une action.
@@ -215,15 +265,14 @@ function openSellMenu(getSession) {
   }
 
   // Validation : rien de sélectionné -> annonce seule, jamais une
-  // confirmation vide ; sinon confirmation DÉTAILLÉE (vente destructive).
+  // confirmation vide ; sinon confirmation DÉTAILLÉE (voir onValidate).
   function validate() {
-    const sales = currentSales(lines);
-    if (sales.length === 0) {
+    if (selectedCount(lines) === 0) {
       playMenuSound("block");
-      announce(t("shop.sell.nothingSelected"), { assertive: true });
+      announce(t(spec.nothingSelectedKey), { assertive: true });
       return;
     }
-    openSaleConfirmation(lines, sales);
+    spec.onValidate(lines);
   }
 
   // Annulation : sélection vide -> fermeture DIRECTE (ouvrir/fermer "pour
@@ -254,7 +303,7 @@ function openSellMenu(getSession) {
     cancel: () => cancel(),
   };
 
-  const screen = {
+  pushScreen({
     onEnter() {
       // Ouverture ET retour depuis une confirmation (sélection préservée :
       // `lines` vit dans ce closure) — titre + entrée courante, comme un
@@ -272,44 +321,38 @@ function openSellMenu(getSession) {
       adjust(left ? -1 : 1, isModActive("shift"));
     },
     onKeyDown(event) {
-      const action = resolveAction(SELL_BINDINGS, event.key, event.mods);
+      const action = resolveAction(LIST_BINDINGS, event.key, event.mods);
       const handler = keyHandlers[action];
       if (!handler) return;
       event.preventDefault();
       handler();
     },
-  };
-
-  pushScreen(screen);
+  });
 }
 
-// Confirmation de VENTE (destructive) : "Annuler" en première entrée (curseur
-// par défaut, une pression rapide d'Entrée reste sans effet), "Confirmer"
-// ensuite — même patron que main-menu.js/openNewGameConfirmation. Titre
-// DYNAMIQUE (lib/menu.js/titleParams) : total + récapitulatif de ce qui part.
-// Confirmer -> effet d'état (sellHandler), puis retour DIRECT au jeu (trois
-// écrans retirés : confirmation, vente, actions — le jeu ne réannonce rien à
-// son reveal, voir view/city-screen.js/onEnter) et annonce du résultat, DERNIÈRE
-// écriture donc jamais écrasée.
-function openSaleConfirmation(lines, sales) {
-  const count = selectedCount(lines);
-  const total = selectedTotal(lines);
-  const details = saleDetails(lines);
+// Confirmation de TRANSACTION (destructive) : "Annuler" en première entrée
+// (curseur par défaut, une pression rapide d'Entrée reste sans effet),
+// "Confirmer" ensuite — même patron que main-menu.js/openNewGameConfirmation.
+// Titre DYNAMIQUE (lib/menu.js/titleParams) : total + récapitulatif.
+// Confirmer -> `apply()` (effet d'état) puis retour DIRECT au jeu (trois
+// écrans retirés : confirmation, liste, actions — le jeu ne réannonce rien à
+// son reveal, voir view/city-screen.js/onEnter) et annonce du résultat,
+// DERNIÈRE écriture donc jamais écrasée.
+function openTransactionConfirmation(titleKey, titleParams, apply, doneMessage) {
   const menu = {
-    title: "shop.sell.confirm.title",
-    titleParams: { count, total, details },
+    title: titleKey,
+    titleParams,
     closable: true,
     entries: [
-      { label: "shop.sell.confirm.cancel", onActivate: () => popScreen() },
+      { label: "shop.confirm.cancel", onActivate: () => popScreen() },
       {
-        label: "shop.sell.confirm.confirm",
+        label: "shop.confirm.confirm",
         onActivate: () => {
-          if (!sellHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
-          sellHandler(sales);
+          if (apply() === false) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
           popScreen();
           popScreen();
           popScreen();
-          announce(t("shop.sell.done", { details, total }), { assertive: true });
+          announce(doneMessage(), { assertive: true });
         },
       },
     ],
@@ -318,17 +361,17 @@ function openSaleConfirmation(lines, sales) {
 }
 
 // Confirmation d'ABANDON d'une sélection en cours (Échap/"Annuler" avec au
-// moins une ligne > 0) : Confirmer retire la confirmation ET le menu de
-// vente (retour au menu d'actions) ; Annuler revient au menu de vente,
-// sélection préservée.
+// moins une ligne > 0) : Confirmer retire la confirmation ET la liste
+// (retour au menu d'actions) ; Annuler revient à la liste, sélection
+// préservée.
 function openDiscardConfirmation() {
   const menu = {
-    title: "shop.sell.discard.title",
+    title: "shop.discard.title",
     closable: true,
     entries: [
-      { label: "shop.sell.confirm.cancel", onActivate: () => popScreen() },
+      { label: "shop.confirm.cancel", onActivate: () => popScreen() },
       {
-        label: "shop.sell.confirm.confirm",
+        label: "shop.confirm.confirm",
         onActivate: () => {
           popScreen();
           popScreen();
@@ -339,11 +382,77 @@ function openDiscardConfirmation() {
   pushScreen(makeMenuScreen(menu, t));
 }
 
+// VENTE : lignes = objets vendables du sac, plafond = possédé, aucune
+// condition d'incrément.
+function openSellMenu(getSession) {
+  openQuantityList({
+    lines: buildSaleLines(getSession().bag),
+    entryKey: "shop.sell.entry",
+    totalKey: "shop.sell.total",
+    validateKey: "shop.sell.validate",
+    nothingSelectedKey: "shop.sell.nothingSelected",
+    onValidate: (lines) => {
+      const count = selectedCount(lines);
+      const total = selectedTotal(lines);
+      const summary = details(lines);
+      const sales = selectedQuantities(lines);
+      openTransactionConfirmation(
+        "shop.sell.confirm.title",
+        { count, total, details: summary },
+        () => {
+          if (!sellHandler) return false;
+          sellHandler(sales);
+        },
+        () => t("shop.sell.done", { details: summary, total })
+      );
+    },
+  });
+}
+
+// ACHAT : lignes = articles du catalogue (épuisés compris), plafond = STOCK
+// (borne du slider), condition d'incrément = ARGENT — un CUMUL (total du
+// panier) est comparé à session.money avant chaque incrément ; un grand pas
+// est réduit à ce que les fonds permettent, zéro -> refus "fonds
+// insuffisants", SEULE source de refus avec message (le stock est déjà la
+// borne, jamais confondu avec l'argent).
+function openBuyMenu(getSession, entityId) {
+  const lines = buildPurchaseLines(liveShop(getSession, entityId));
+  openQuantityList({
+    lines,
+    entryKey: "shop.buy.entry",
+    soldOutKey: "shop.buy.entry.soldOut",
+    totalKey: "shop.buy.total",
+    validateKey: "shop.buy.validate",
+    nothingSelectedKey: "shop.buy.nothingSelected",
+    allowedIncrease: (line, delta) => {
+      const budget = getSession().money - selectedTotal(lines);
+      const affordable = Math.min(delta, Math.floor(budget / line.price));
+      return affordable > 0 ? { delta: affordable } : { delta: 0, refusalKey: "shop.buy.insufficientFunds" };
+    },
+    onValidate: (validated) => {
+      const count = selectedCount(validated);
+      const total = selectedTotal(validated);
+      const summary = details(validated);
+      const purchases = selectedQuantities(validated);
+      openTransactionConfirmation(
+        "shop.buy.confirm.title",
+        { count, total, details: summary },
+        () => {
+          if (!buyHandler) return false;
+          buyHandler(entityId, purchases);
+        },
+        () => t("shop.buy.done", { details: summary, total })
+      );
+    },
+  });
+}
+
 // Activation du point de vente (action "shop", voir view/interaction.js) :
 // MENU D'ACTIONS, titre = le nom du point de vente lui-même (entity.labelKey,
 // déjà une clé i18n — même idiome que inventory-menu.js/openItemActionsMenu).
-// "Vendre" sans rien de vendable au sac -> annonce seule, aucune liste vide.
-// Balises en pause tant que ce menu (ou un écran au-dessus) est ouvert.
+// "Vendre" sans rien de vendable au sac, "Acheter" sans catalogue -> annonce
+// seule, aucune liste vide. Balises en pause tant que ce menu (ou un écran
+// au-dessus) est ouvert.
 export function openShopMenu(scene, getSession, entity) {
   const menu = {
     title: entity.labelKey,
@@ -358,6 +467,18 @@ export function openShopMenu(scene, getSession, entity) {
             return;
           }
           openSellMenu(getSession);
+        },
+      },
+      {
+        label: "shop.actions.buy",
+        onActivate: () => {
+          const shop = liveShop(getSession, entity.id);
+          if (!shop || !shop.shop) {
+            playMenuSound("block");
+            announce(t("shop.buy.empty"), { assertive: true });
+            return;
+          }
+          openBuyMenu(getSession, entity.id);
         },
       },
       { label: "shop.actions.cancel", onActivate: () => popScreen() },

@@ -23,6 +23,7 @@ import { WEATHER_STATES } from "../config/weather-values.js";
 import { parseVariables, VARIABLE_SCOPES, isValidValueForType } from "./variables.js";
 import { ACTION_EFFECT_TYPES } from "./effects.js";
 import { validateDistribution } from "./distribution.js";
+import { validateCatalog } from "./catalog.js";
 
 function fail(message) {
   throw new Error(`parseLevel: ${message}`);
@@ -547,6 +548,7 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
     variables,
     sounds,
     container,
+    shop,
   } = rawEntity;
 
   if (!isNonEmptyString(id)) {
@@ -783,6 +785,20 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
     }
     entity.container = { distribution: resolvedContainer.distribution };
     if (resolvedContainer.count !== undefined) entity.container.count = resolvedContainer.count;
+  }
+
+  // shop : optionnel, POINT DE VENTE (voir core/catalog.js, core/trade.js,
+  // doc/entity-model.md/"Vente et achat") — { catalog } (référence à un
+  // catalogue standard ou catalogue inline), cascade instance -> type comme
+  // container. Le stock courant (shopStock/shopCycle, champs RUNTIME) reste
+  // au moteur ; l'action "shop" qui l'exploite reste côté vue.
+  const resolvedShop = shop !== undefined ? shop : registry[type].shop;
+  if (resolvedShop !== undefined) {
+    if (typeof resolvedShop !== "object" || resolvedShop === null || Array.isArray(resolvedShop)) {
+      fail(`entities[${index}] ("${id}") : shop doit être un objet si présent.`);
+    }
+    validateCatalog(resolvedShop.catalog, `entities[${index}] ("${id}") : shop.catalog`, fail);
+    entity.shop = { catalog: resolvedShop.catalog };
   }
 
   // presence : optionnel, RÈGLES DÉCLARATIVES de présence conditionnelle

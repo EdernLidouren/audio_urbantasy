@@ -376,8 +376,10 @@ persiste avec le monde.
   marqueur, ÉCRASÉ par nature : après N cycles d'absence, UN garnissage, avec
   la distribution du moment, jamais une accumulation. Au garnissage : anciens
   collectibles posés retirés (ramassés ou non), nouveaux posés ; chaque
-  conteneur reçoit un `stock`/`stockCycle` neufs. Scène à deux faces : LES
-  DEUX faces garnies (on charge le lieu entier), chacune sur son PRNG.
+  conteneur reçoit un `stock`/`stockCycle` neufs ; chaque POINT DE VENTE
+  recharge son rayon (`shopStock`, voir "Vente et achat"). Scène à deux
+  faces : LES DEUX faces garnies (on charge le lieu entier), chacune sur son
+  PRNG.
   Exception assumée pour le CONTENEUR : à la fouille, si son `stockCycle`
   diffère du cycle courant, il se re-garnit PARESSEUSEMENT d'abord — un jour
   passé sur place suffit. RAISON de l'asymétrie : le contenu d'un conteneur
@@ -427,51 +429,77 @@ Contenu de test : `level/demo.json` ("Ville test") — `bush_1` (x=12, table
 (Shift+T, mode debug) : "Avancer d'une journée" puis refouiller/quitter et
 revenir pour observer le cycle.
 
-## Vente — point de vente et menu à sliders inline
+## Vente et achat — point de vente et menu à sliders inline
 
 Une entité POINT DE VENTE (`entities/types/shop_counter.js`, action
 `{ kind: "shop" }` — voir `doc/scripting.md`) s'active pour VENDRE les objets
-du sac contre de l'argent. Frontière : tout le menu est VUE
-(`view/menus/shop-menu.js`, pile d'écrans, jeu en pause, balises en pause) ;
-la TRANSACTION est un effet d'état CORE (`core/trade.js`/`sellItems`,
-injecté depuis `view/city-screen.js`/`setSellHandler`, même patron que
-"Poser"). Prix : `value` sur l'objet (`core/items.js`/`ITEM_REGISTRY`),
-pleine valeur pour l'instant (la marge marchand viendra avec l'ACHAT) ;
-sans `value` (ou 0) -> NON vendable, jamais listé (filtrage par catégories/
-tags de boutique : prévu, pas construit).
+du sac contre de l'argent, ou ACHETER dans son CATALOGUE. Frontière : tout
+le menu est VUE (`view/menus/shop-menu.js`, pile d'écrans, jeu en pause,
+balises en pause) ; les TRANSACTIONS sont des effets d'état CORE
+(`core/trade.js`/`sellItems`, `buyItems`, injectés depuis
+`view/city-screen.js`, même patron que "Poser"). Prix de vente : `value` sur
+l'objet (`core/items.js`/`ITEM_REGISTRY`), pleine valeur ; sans `value` (ou
+0) -> NON vendable, jamais listé (filtrage par catégories/tags de boutique :
+prévu, pas construit). Prix d'achat : `price` de l'article, sinon `value`
+(pleine valeur, marge marchand plus tard).
 
-- **Menu d'actions** — TOUJOURS un menu, même à une action ("Vendre" ;
-  "Acheter" viendra), titre = nom du comptoir ; "Vendre" sans rien de
-  vendable au sac -> annonce seule, aucune liste vide.
-- **Menu de vente** — écran CUSTOM (pas un slider `lib/menu.js`, valeur
+- **Catalogue et stock FINI cyclique** — `entity.shop = { catalog }`
+  (cascade instance -> type, comme `container.distribution`) : `{ table:
+  "<nom>" }` référence `config/shop-values.js`/`SHOP_CATALOGS`, `{ items: {
+  <objet>: { stock, price? } } }` déclare inline (`core/catalog.js`, validé au
+  chargement, catalogues standard auto-validés à l'import). L'ÉTAT courant
+  du rayon vit sur l'entité, RUNTIME et persistant : `shopStock` (`{ <objet>:
+  n }`) / `shopCycle`. Il se RECHARGE à la valeur de table au cycle de
+  collecte (`core/spawn.js`/`refillFace` traite un point de vente comme une
+  source garnie : `restockShopEntity`, jamais un cumul avec l'invendu), et
+  PARESSEUSEMENT à l'activation du comptoir si un cycle est passé sur place
+  (`core/trade.js`/`restockShopIfDue` — contenu caché, même asymétrie qu'un
+  conteneur). Catalogue dynamique/aléatoire par jour : plus tard.
+- **Menu d'actions** — TOUJOURS un menu, titre = nom du comptoir : "Vendre",
+  "Acheter", "Annuler". "Vendre" sans rien de vendable au sac, "Acheter"
+  sans catalogue -> annonce seule, aucune liste vide.
+- **Menu à sliders inline** — UN SEUL écran CUSTOM paramétré pour les deux
+  sens (`openQuantityList` ; pas un slider `lib/menu.js`, valeur
   TRANSITOIRE, voir `inventory-menu.js`/`openQuantitySelector` pour les
-  mêmes raisons) : une LIGNE par TYPE vendable du sac (agrégée : un
-  non-empilable possédé en N exemplaires = une ligne, possédé N), chaque
-  ligne étant un slider inline de 0 (plancher) au possédé (plafond, un cran
-  au-delà sonne "block") ; puis "Valider la vente" et "Annuler". Touches :
-  droite/Entrée/Espace +1, gauche -1, Maj+flèche ±5 (maintien pris en
-  charge, comme un slider `lib/menu.js`), Suppr -> 0, Retour arrière ->
+  mêmes raisons). VENTE : une LIGNE par TYPE vendable du sac (agrégée : un
+  non-empilable possédé en N exemplaires = une ligne, plafond N). ACHAT :
+  une ligne par ARTICLE du catalogue, ÉPUISÉS COMPRIS (lus "épuisé", le
+  joueur sait qu'ils reviendront au cycle suivant), plafond = STOCK
+  disponible. Puis "Valider la vente"/"Valider l'achat" et "Annuler".
+  Touches : droite/Entrée/Espace +1, gauche -1, Maj+flèche ±5 (maintien pris
+  en charge, comme un slider `lib/menu.js`), Suppr -> 0, Retour arrière ->
   grand total, Maj+A -> valider, Échap -> annuler, Home/End, cyclage/étoile/
   suffixe de position selon les préférences de menu.
+- **Double plafond à l'achat, UNE seule source de refus** — le STOCK est la
+  BORNE du slider (structurelle : un cran au-delà sonne "block", sans
+  message, comme le possédé en vente). L'ARGENT est la CONDITION
+  d'incrément : un CUMUL (total du panier) est comparé à `session.money`
+  avant chaque incrément — un grand pas est réduit à ce que les fonds
+  permettent, zéro -> refus "Fonds insuffisants." (seul refus avec message,
+  jamais confondu avec le stock).
 - **Annonces** — à la NAVIGATION : entrée complète `"{nom} {choisi} sur
-  {possédé}, {prix} pièces : {description}"` ; à l'AJUSTEMENT : SEULEMENT
+  {plafond}, {prix} pièces : {description}"` ; à l'AJUSTEMENT : SEULEMENT
   `"{choisi}, {sous-total de la ligne}"` (fluide en ajustement répété,
-  jamais le grand total à chaque cran) ; le GRAND TOTAL ("Vendre N objets
-  pour M pièces") est le TITRE, dit à l'ouverture et à la demande (Retour
+  jamais le grand total à chaque cran) ; le GRAND TOTAL ("Vendre/Acheter N
+  … pour M pièces") est le TITRE, dit à l'ouverture et à la demande (Retour
   arrière).
-- **Validation** — rien de sélectionné -> "Aucun objet sélectionné.",
-  jamais une confirmation vide ; sinon confirmation DÉTAILLÉE (titre
-  dynamique via `lib/menu.js`/`titleParams` : total + "Pomme × 3, Pièce ×
-  2"), "Annuler" en première entrée. Confirmer -> `sellItems` (quantités
-  clampées au possédé, non vendable ignoré, retrait + crédit dans le MÊME
-  état) puis retour DIRECT au jeu (trois écrans retirés) et annonce du
-  résultat ; Annuler -> retour au menu de vente, SÉLECTION PRÉSERVÉE (elle
-  vit dans le closure de l'écran).
+- **Validation** — rien de sélectionné -> "Aucun objet/article
+  sélectionné.", jamais une confirmation vide ; sinon confirmation DÉTAILLÉE
+  (titre dynamique via `lib/menu.js`/`titleParams` : total + "Pomme × 3,
+  Pièce × 2"), "Annuler" en première entrée. Confirmer -> `sellItems`
+  (quantités clampées au possédé, non vendable ignoré, retrait + crédit dans
+  le MÊME état) ou `buyItems` (quantités clampées au stock, FONDS REVÉRIFIÉS
+  — jamais de débit partiel —, débit + ajout au sac + décrément du stock dans
+  le MÊME état ; aucune capacité de sac à respecter, voir `core/bag.js`) puis
+  retour DIRECT au jeu (trois écrans retirés) et annonce du résultat ;
+  Annuler -> retour à la liste, SÉLECTION PRÉSERVÉE (elle vit dans le closure
+  de l'écran).
 - **Annulation** — sélection vide -> fermeture DIRECTE, sans confirmation ;
   sélection en cours -> "Abandonner la sélection en cours ?" (Confirmer ->
   retour au menu d'actions ; Annuler -> sélection préservée).
 
-Contenu de test : `level/demo.json`, `counter_1` (x=38).
+Contenu de test : `level/demo.json`, `counter_1` (x=38, catalogue
+`general`).
 
 ## Sac d'objets
 

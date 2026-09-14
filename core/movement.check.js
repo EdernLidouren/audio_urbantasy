@@ -62,7 +62,9 @@ import { isDebugEnabled, setDebugEnabled } from "../config/debug.js";
 import { validateSpawnTables, validateDistribution, resolveDistribution, drawItem } from "./distribution.js";
 import { spawnCycleAt, refillDueSpawns, searchContainer, isSearchable } from "./spawn.js";
 import { SPAWN_TABLES, SPAWN_RANGE_DEFAULT_COUNT, SPAWN_CONTAINER_DEFAULT_COUNT } from "../config/spawn-values.js";
-import { sellValueOf, isSellable, ownedQuantity, sellTotal, sellItems } from "./trade.js";
+import { sellValueOf, isSellable, ownedQuantity, sellTotal, sellItems, shopArticles, restockShopIfDue, purchaseTotal, buyItems } from "./trade.js";
+import { validateShopCatalogs, validateCatalog, fullStockOf, articlePrice } from "./catalog.js";
+import { SHOP_CATALOGS } from "../config/shop-values.js";
 
 // { companions: [] } : passé explicitement à CHAQUE createInitialState()
 // ci-dessous qui ne concerne pas les compagnons — sans lui, le défaut (UN
@@ -6712,6 +6714,121 @@ export function runMovementChecks() {
     run("vente : save/load — argent conservé", soldMixed.money, tradeReload.session.money);
     run("vente : save/load — sac conservé", JSON.stringify(soldMixed.bag), JSON.stringify(tradeReload.session.bag));
   }
+
+  // --- Achat (core/catalog.js + core/trade.js) : catalogue, stock cyclique, transaction ---
+
+  const shopFail = (message) => {
+    throw new Error(message);
+  };
+  const shopThrows = (fn) => {
+    try {
+      fn();
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  run("achat : les catalogues standard SHOP_CATALOGS sont valides", false, shopThrows(() => validateShopCatalogs(SHOP_CATALOGS)));
+  run("achat : catalogue référençant un objet inconnu -> rejeté", true, shopThrows(() => validateShopCatalogs({ c: { nope: { stock: 1 } } })));
+  run("achat : article à stock négatif -> rejeté", true, shopThrows(() => validateShopCatalogs({ c: { apple: { stock: -1 } } })));
+  run("achat : article sans prix résolvable (clé sans value) -> rejeté", true, shopThrows(() => validateShopCatalogs({ c: { key_bronze: { stock: 1 } } })));
+  run("achat : article avec price explicite mais objet sans value -> accepté", false, shopThrows(() => validateShopCatalogs({ c: { key_bronze: { stock: 1, price: 3 } } })));
+  run("achat : validateCatalog { table } inconnue -> rejetée", true, shopThrows(() => validateCatalog({ table: "nope" }, "c", shopFail)));
+  run("achat : validateCatalog table ET items -> rejetée", true, shopThrows(() => validateCatalog({ table: "general", items: {} }, "c", shopFail)));
+  run("achat : articlePrice = price déclaré sinon value de l'objet", true, articlePrice("apple", { stock: 1, price: 9 }) === 9 && articlePrice("apple", { stock: 1 }) === ITEM_REGISTRY.apple.value);
+  run("achat : fullStockOf reproduit les stocks de la table", JSON.stringify({ apple: 2, coin: 3 }), JSON.stringify(fullStockOf({ items: { apple: { stock: 2 }, coin: { stock: 3 } } })));
+
+  const SHOP_REGISTRY = {
+    counter: { nameKey: "entity.shop_counter.name", interactable: true, shop: { catalog: { table: "general" } }, action: { kind: "shop" } },
+    dog: { nameKey: "entity.dog.name" },
+  };
+  const shopLevel = parseLevel(
+    {
+      id: "movement-check-shop",
+      titleKey: "level.demo.title",
+      length: 10,
+      playerStart: 1,
+      entities: [
+        { id: "counter-1", type: "counter", x: 3 },
+        { id: "counter-2", type: "counter", x: 6, shop: { catalog: { items: { apple: { stock: 2, price: 7 } } } } },
+        { id: "dog-1", type: "dog", x: 8 },
+      ],
+    },
+    SHOP_REGISTRY
+  );
+  run("achat : parseLevel — shop cascadé depuis l'archétype", "general", shopLevel.entities[0].shop.catalog.table);
+  run("achat : parseLevel — shop surchargé à l'instance (inline)", 7, shopLevel.entities[1].shop.catalog.items.apple.price);
+  run(
+    "achat : parseLevel rejette un shop sans catalogue valide",
+    true,
+    shopThrows(() => parseLevel({ id: "s", titleKey: "level.demo.title", length: 10, playerStart: 1, entities: [{ id: "c", type: "counter", x: 1, shop: {} }] }, SHOP_REGISTRY))
+  );
+
+  const shopWorld = (s) => s.worlds[shopLevel.id];
+  const shopEntity = (s, id) => shopWorld(s).entities.find((e) => e.id === id);
+  const shopFresh = { ...createInitialState(shopLevel, undefined, NO_COMPANIONS), bag: [] };
+  run("achat : avant tout rechargement, les articles sont à stock 0", true, shopArticles(shopEntity(shopFresh, "counter-1")).every((a) => a.stock === 0));
+
+  // Rechargement au CHARGEMENT (cycle de collecte, core/spawn.js) : un point
+  // de vente est une source garnie comme un conteneur.
+  const shopLoaded = refillDueSpawns(shopFresh, SHOP_REGISTRY);
+  run("achat : refillDueSpawns recharge le rayon à la valeur de table", JSON.stringify(fullStockOf({ table: "general" })), JSON.stringify(shopEntity(shopLoaded, "counter-1").shopStock));
+  run("achat : refillDueSpawns note le cycle sur le point de vente", 0, shopEntity(shopLoaded, "counter-1").shopCycle);
+  run("achat : catalogue inline -> son propre stock/prix", true, (() => {
+    const a = shopArticles(shopEntity(shopLoaded, "counter-2"));
+    return a.length === 1 && a[0].type === "apple" && a[0].stock === 2 && a[0].price === 7;
+  })());
+  run("achat : restockShopIfDue dans le même cycle -> référence INCHANGÉE", shopLoaded, restockShopIfDue(shopLoaded, "counter-1"));
+  run("achat : restockShopIfDue sur une entité non marchande -> référence INCHANGÉE", shopLoaded, restockShopIfDue(shopLoaded, "dog-1"));
+  run("achat : rechargement PARESSEUX d'un point de vente jamais rechargé", true, (() => {
+    const lazy = restockShopIfDue(shopFresh, "counter-1");
+    return shopEntity(lazy, "counter-1").shopCycle === 0 && shopArticles(shopEntity(lazy, "counter-1")).some((a) => a.stock > 0);
+  })());
+
+  // Transaction : fonds, stock, sac, débit.
+  const applePrice = articlePrice("apple", SHOP_CATALOGS.general.apple);
+  const appleStock = SHOP_CATALOGS.general.apple.stock;
+  const shopRich = addMoney(shopLoaded, 100);
+  run("achat : purchaseTotal = Σ prix × quantité", 3 * applePrice, purchaseTotal(shopEntity(shopRich, "counter-1"), [{ type: "apple", quantity: 3 }]));
+
+  const bought = buyItems(shopRich, "counter-1", [{ type: "apple", quantity: 3 }]);
+  run("achat : acheter 3 pommes -> argent débité du coût exact", 100 - 3 * applePrice, bought.money);
+  run("achat : acheter 3 pommes -> pommes au sac", 3, ownedQuantity(bought.bag, "apple"));
+  run("achat : acheter 3 pommes -> stock du magasin décrémenté", appleStock - 3, shopEntity(bought, "counter-1").shopStock.apple);
+  run("achat : l'original n'est jamais muté", 100, shopRich.money);
+
+  const boughtAll = buyItems(bought, "counter-1", [{ type: "apple", quantity: 99 }]);
+  run("achat : quantité CLAMPÉE au stock", appleStock, ownedQuantity(boughtAll.bag, "apple"));
+  run("achat : tout le stock acheté -> article épuisé (0)", 0, shopEntity(boughtAll, "counter-1").shopStock.apple);
+  run("achat : article épuisé -> aucun achat possible, référence INCHANGÉE", boughtAll, buyItems(boughtAll, "counter-1", [{ type: "apple", quantity: 1 }]));
+
+  const shopPoor = addMoney(shopLoaded, applePrice - 1);
+  run("achat : fonds insuffisants -> référence INCHANGÉE (jamais de débit partiel)", shopPoor, buyItems(shopPoor, "counter-1", [{ type: "apple", quantity: 1 }]));
+  run("achat : fonds exacts -> achat accepté, argent à 0", 0, buyItems(addMoney(shopLoaded, applePrice), "counter-1", [{ type: "apple", quantity: 1 }]).money);
+  run("achat : article hors catalogue ignoré -> référence INCHANGÉE", shopRich, buyItems(shopRich, "counter-1", [{ type: "combat_boots", quantity: 1 }]));
+  run("achat : id non marchand -> référence INCHANGÉE", shopRich, buyItems(shopRich, "dog-1", [{ type: "apple", quantity: 1 }]));
+  run("achat : panier vide -> référence INCHANGÉE", shopRich, buyItems(shopRich, "counter-1", []));
+
+  // Cycle suivant sur place : rayon rechargé paresseusement à l'activation.
+  const SHOP_DAY = TIME_CONFIG.minutesPerHour * TIME_CONFIG.hoursPerDay;
+  const shopNextDay = advanceTime(boughtAll, SHOP_DAY);
+  run("achat : jour suivant, avant activation -> stock encore épuisé (rien au tick)", 0, shopEntity(shopNextDay, "counter-1").shopStock.apple);
+  const shopRestocked = restockShopIfDue(shopNextDay, "counter-1");
+  run("achat : jour suivant, à l'activation -> stock rechargé", appleStock, shopEntity(shopRestocked, "counter-1").shopStock.apple);
+  run("achat : rechargement -> cycle 1 noté", 1, shopEntity(shopRestocked, "counter-1").shopCycle);
+  run("achat : rechargement -> rachetable", appleStock + 1, ownedQuantity(buyItems(shopRestocked, "counter-1", [{ type: "apple", quantity: 1 }]).bag, "apple"));
+
+  // Save/load : stock du magasin et argent conservés.
+  const shopReload = deserializeGame(serializeGame(bought));
+  run("achat : save/load réussit", true, shopReload.success);
+  if (shopReload.success) {
+    run("achat : save/load — argent conservé", bought.money, shopReload.session.money);
+    run("achat : save/load — stock du magasin conservé", JSON.stringify(shopEntity(bought, "counter-1").shopStock), JSON.stringify(shopEntity(shopReload.session, "counter-1").shopStock));
+    run("achat : save/load — cycle du magasin conservé (pas de rechargement intempestif)", shopReload.session, restockShopIfDue(shopReload.session, "counter-1"));
+  }
+  const shopLeaks = [];
+  auditNonSerializable(bought, "shopSession", new Set(), shopLeaks);
+  run("achat : aucune fuite de non-sérialisable (shopStock/shopCycle)", 0, shopLeaks.length);
 
   // --- Collecte (core/distribution.js + core/spawn.js) ---
   // Distribution, sources (conteneur/plage), cycle quotidien + file,

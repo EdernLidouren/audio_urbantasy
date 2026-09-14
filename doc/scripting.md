@@ -679,14 +679,18 @@ audible. Fouillable de nouveau dès qu'un cycle est passé. Contrairement à
 action: { kind: "shop" },
 ```
 
-Aucun paramètre : activer l'entité ouvre le MENU D'ACTIONS du point de vente
-(`view/menus/shop-menu.js`/`openShopMenu` — "Vendre" aujourd'hui, "Acheter"
-plus tard), puis le menu de vente à sliders inline. Tout est VUE (pile
-d'écrans, jeu en pause) ; seule la TRANSACTION est un effet d'état du core
-(`core/trade.js`/`sellItems` : retrait du sac + crédit de `session.money`,
-atomique). Prix unitaire = `value` de l'objet (`core/items.js`/
-`ITEM_REGISTRY`) ; sans `value` -> non vendable, jamais listé. Détail
-(ergonomie, annonces, confirmations) : `doc/entity-model.md`/"Vente".
+Aucun paramètre sur l'action : activer l'entité ouvre le MENU D'ACTIONS du
+point de vente (`view/menus/shop-menu.js`/`openShopMenu` — "Vendre",
+"Acheter"), puis un menu à sliders inline. Tout est VUE (pile d'écrans, jeu
+en pause) ; seules les TRANSACTIONS sont des effets d'état du core
+(`core/trade.js`/`sellItems` : retrait du sac + crédit de `session.money` ;
+`buyItems` : débit + ajout au sac + décrément du stock — atomiques). Vente :
+prix = `value` de l'objet (`core/items.js`/`ITEM_REGISTRY`), sans `value` ->
+non vendable. Achat : catalogue déclaré par l'entité (`shop: { catalog }`,
+voir `doc/level-format.md`/"Entité" — `{ table: "<nom de SHOP_CATALOGS>" }`
+ou `{ items: { <objet>: { stock, price? } } }`, `config/shop-values.js`),
+stock FINI rechargé au cycle de collecte. Détail (ergonomie, annonces,
+confirmations, double plafond) : `doc/entity-model.md`/"Vente et achat".
 
 ### `"switchSide"` — bascule recto/verso (scène à deux faces)
 
@@ -1422,6 +1426,7 @@ n'empêche de l'ajouter plus tard (voir `doc/entity-model.md`/"Interaction
 | Améliorations (improvements) | `IMPROVEMENT_REGISTRY` | `core/improvements.js` |
 | Objets et leurs tags/gait | `ITEM_REGISTRY` | `core/items.js` |
 | Tables de distribution de collecte (standard, référençables) | `SPAWN_TABLES` | `config/spawn-values.js` |
+| Catalogues de point de vente (standard, référençables) | `SHOP_CATALOGS` | `config/shop-values.js` |
 | Surfaces | `SURFACE_REGISTRY` | `core/surfaces.js` |
 | Types de variable | `VARIABLE_TYPES` | `core/variables.js` |
 | Portées de variable | `VARIABLE_SCOPES` | `core/variables.js` |
