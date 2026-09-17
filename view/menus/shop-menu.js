@@ -50,8 +50,10 @@ export function setBuyHandler(handler) {
 // Bindings du menu à sliders. Entrée/Espace : +1 sur une ligne, ACTIVE une
 // entrée d'action ("Valider"/"Annuler"). Maj+flèche : grand pas (±5).
 // Suppr : remise à 0. Retour arrière : grand total. Maj+A : valider depuis
-// n'importe où. Chaque combinaison est une action DISTINCTE (mods exige une
-// correspondance EXACTE, voir lib/input.js).
+// n'importe où. Maj+G : argent actuel (même annonce que "g" en ville) — Maj
+// parce que les lettres NUES restent réservées à un futur saut par initiale
+// dans les listes d'objets. Chaque combinaison est une action DISTINCTE
+// (mods exige une correspondance EXACTE, voir lib/input.js).
 const LIST_BINDINGS = {
   up: { keys: ["ArrowUp"], mods: [] },
   down: { keys: ["ArrowDown"], mods: [] },
@@ -65,13 +67,17 @@ const LIST_BINDINGS = {
   confirm: { keys: ["Enter", " "], mods: [] },
   total: { keys: ["Backspace"], mods: [] },
   validate: { keys: ["a"], mods: ["shift"] },
+  money: { keys: ["g"], mods: ["shift"] },
   cancel: { keys: ["Escape"], mods: [] },
 };
 checkBindingsForCollisions(LIST_BINDINGS, "view/menus/shop-menu.js LIST_BINDINGS");
 
 const STEP = 1;
 const BIG_STEP = 5;
-// Cadence du maintien gauche/droite — même rythme que lib/menu.js.
+// Maintien gauche/droite — mêmes rythmes que lib/menu.js : un DÉLAI INITIAL
+// après le premier cran (une pression brève n'en produit jamais qu'un), puis
+// une cadence de répétition.
+const SLIDER_REPEAT_DELAY_MS = 400;
 const SLIDER_REPEAT_INTERVAL_MS = 150;
 
 function stripTrailingPeriod(text) {
@@ -134,6 +140,7 @@ function details(lines) {
 }
 
 // Menu à SLIDERS INLINE, générique vente/achat (voir header). `spec` :
+//   getSession       — lecture de la session (argent, Maj+G)
 //   lines            — lignes { type, labelKey, descriptionKey, max, price, selected }
 //   entryKey         — gabarit de l'entrée complète ({item, selected, max, price, description})
 //   soldOutKey?      — gabarit d'une ligne à max 0 (achat : "épuisé")
@@ -152,7 +159,9 @@ function openQuantityList(spec) {
   ];
   const total = () => lines.length + actions.length;
   let cursor = 0;
-  let lastAdjustAt = -Infinity;
+  // Instant à partir duquel le maintien peut produire son prochain cran
+  // (voir lib/menu.js, même mécanisme).
+  let nextRepeatAt = -Infinity;
 
   const isLine = (index) => index < lines.length;
 
@@ -212,15 +221,18 @@ function openQuantityList(spec) {
   }
 
   function announceLine(line) {
-    lastAdjustAt = performance.now();
     announce(t("shop.adjust", { selected: line.selected, subtotal: line.selected * line.price }), { assertive: true });
   }
 
   // Ajustement : PLANCHER 0, PLAFOND `max` (borne STRUCTURELLE, sonne
   // "block" sans message) ; puis, pour un incrément, la CONDITION de
   // `allowedIncrease` (argent) — SEULE source de refus avec message.
-  // Annonce : quantité + SOUS-TOTAL de la ligne, rien d'autre.
-  function adjust(direction, big) {
+  // Annonce : quantité + SOUS-TOTAL de la ligne, rien d'autre. `nextDelayMs`
+  // : délai avant le prochain cran de maintien (long après un appui, court
+  // entre deux crans de maintien) — posé même sur un refus, pour qu'un
+  // maintien à la borne ne mitraille pas le son "block".
+  function adjust(direction, big, nextDelayMs = SLIDER_REPEAT_DELAY_MS) {
+    nextRepeatAt = performance.now() + nextDelayMs;
     if (!isLine(cursor)) {
       playMenuSound("block");
       return;
@@ -300,6 +312,9 @@ function openQuantityList(spec) {
     confirm: () => confirm(),
     total: () => announce(`${title()}. ${entryLine(cursor)}`, { assertive: true }),
     validate: () => validate(),
+    // Même clé/gabarit que la touche "g" en ville (view/city-screen.js/
+    // announceMoney) — relu dans la session, jamais un cumul du menu.
+    money: () => announce(t("money.announce", { amount: spec.getSession().money }), { assertive: true }),
     cancel: () => cancel(),
   };
 
@@ -317,8 +332,8 @@ function openQuantityList(spec) {
       const left = isHeld("ArrowLeft");
       const right = isHeld("ArrowRight");
       if (left === right) return;
-      if (performance.now() - lastAdjustAt < SLIDER_REPEAT_INTERVAL_MS) return;
-      adjust(left ? -1 : 1, isModActive("shift"));
+      if (performance.now() < nextRepeatAt) return;
+      adjust(left ? -1 : 1, isModActive("shift"), SLIDER_REPEAT_INTERVAL_MS);
     },
     onKeyDown(event) {
       const action = resolveAction(LIST_BINDINGS, event.key, event.mods);
@@ -386,6 +401,7 @@ function openDiscardConfirmation() {
 // condition d'incrément.
 function openSellMenu(getSession) {
   openQuantityList({
+    getSession,
     lines: buildSaleLines(getSession().bag),
     entryKey: "shop.sell.entry",
     totalKey: "shop.sell.total",
@@ -418,6 +434,7 @@ function openSellMenu(getSession) {
 function openBuyMenu(getSession, entityId) {
   const lines = buildPurchaseLines(liveShop(getSession, entityId));
   openQuantityList({
+    getSession,
     lines,
     entryKey: "shop.buy.entry",
     soldOutKey: "shop.buy.entry.soldOut",
@@ -448,27 +465,16 @@ function openBuyMenu(getSession, entityId) {
 }
 
 // Activation du point de vente (action "shop", voir view/interaction.js) :
-// MENU D'ACTIONS, titre = le nom du point de vente lui-même (entity.labelKey,
-// déjà une clé i18n — même idiome que inventory-menu.js/openItemActionsMenu).
-// "Vendre" sans rien de vendable au sac, "Acheter" sans catalogue -> annonce
-// seule, aucune liste vide. Balises en pause tant que ce menu (ou un écran
-// au-dessus) est ouvert.
+// MENU D'ACTIONS ("Acheter" d'abord, "Vendre", "Annuler"), titre = le nom du
+// point de vente lui-même (entity.labelKey, déjà une clé i18n — même idiome
+// que inventory-menu.js/openItemActionsMenu). "Acheter" sans catalogue,
+// "Vendre" sans rien de vendable au sac -> annonce seule, aucune liste vide.
+// Balises en pause tant que ce menu (ou un écran au-dessus) est ouvert.
 export function openShopMenu(scene, getSession, entity) {
   const menu = {
     title: entity.labelKey,
     closable: true,
     entries: [
-      {
-        label: "shop.actions.sell",
-        onActivate: () => {
-          if (buildSaleLines(getSession().bag).length === 0) {
-            playMenuSound("block");
-            announce(t("shop.sell.empty"), { assertive: true });
-            return;
-          }
-          openSellMenu(getSession);
-        },
-      },
       {
         label: "shop.actions.buy",
         onActivate: () => {
@@ -479,6 +485,17 @@ export function openShopMenu(scene, getSession, entity) {
             return;
           }
           openBuyMenu(getSession, entity.id);
+        },
+      },
+      {
+        label: "shop.actions.sell",
+        onActivate: () => {
+          if (buildSaleLines(getSession().bag).length === 0) {
+            playMenuSound("block");
+            announce(t("shop.sell.empty"), { assertive: true });
+            return;
+          }
+          openSellMenu(getSession);
         },
       },
       { label: "shop.actions.cancel", onActivate: () => popScreen() },

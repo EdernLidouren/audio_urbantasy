@@ -455,9 +455,9 @@ prévu, pas construit). Prix d'achat : `price` de l'article, sinon `value`
   PARESSEUSEMENT à l'activation du comptoir si un cycle est passé sur place
   (`core/trade.js`/`restockShopIfDue` — contenu caché, même asymétrie qu'un
   conteneur). Catalogue dynamique/aléatoire par jour : plus tard.
-- **Menu d'actions** — TOUJOURS un menu, titre = nom du comptoir : "Vendre",
-  "Acheter", "Annuler". "Vendre" sans rien de vendable au sac, "Acheter"
-  sans catalogue -> annonce seule, aucune liste vide.
+- **Menu d'actions** — TOUJOURS un menu, titre = nom du comptoir : "Acheter",
+  "Vendre", "Annuler". "Acheter" sans catalogue, "Vendre" sans rien de
+  vendable au sac -> annonce seule, aucune liste vide.
 - **Menu à sliders inline** — UN SEUL écran CUSTOM paramétré pour les deux
   sens (`openQuantityList` ; pas un slider `lib/menu.js`, valeur
   TRANSITOIRE, voir `inventory-menu.js`/`openQuantitySelector` pour les
@@ -467,9 +467,13 @@ prévu, pas construit). Prix d'achat : `price` de l'article, sinon `value`
   joueur sait qu'ils reviendront au cycle suivant), plafond = STOCK
   disponible. Puis "Valider la vente"/"Valider l'achat" et "Annuler".
   Touches : droite/Entrée/Espace +1, gauche -1, Maj+flèche ±5 (maintien pris
-  en charge, comme un slider `lib/menu.js`), Suppr -> 0, Retour arrière ->
-  grand total, Maj+A -> valider, Échap -> annuler, Home/End, cyclage/étoile/
-  suffixe de position selon les préférences de menu.
+  en charge comme un slider `lib/menu.js` : un DÉLAI INITIAL après le
+  premier cran — une pression brève n'en produit jamais qu'un — puis une
+  cadence de répétition), Suppr -> 0, Retour arrière -> grand total, Maj+A
+  -> valider, Maj+G -> argent actuel (même annonce que "g" en ville ; Maj
+  parce que les lettres nues sont réservées à un futur saut par initiale
+  dans les listes), Échap -> annuler, Home/End, cyclage/étoile/suffixe de
+  position selon les préférences de menu.
 - **Double plafond à l'achat, UNE seule source de refus** — le STOCK est la
   BORNE du slider (structurelle : un cran au-delà sonne "block", sans
   message, comme le possédé en vente). L'ARGENT est la CONDITION
