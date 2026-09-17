@@ -12,6 +12,7 @@ import { setGlobalVolume, setMasterVolume } from "../../lib/audio.js";
 import { t } from "../../data/i18n/index.js";
 import { setPref, PREF_CONSTRAINTS } from "../../config/preferences.js";
 import { refreshActiveBeaconVolumes } from "../audio/city-scene.js";
+import { playMenuSound } from "../menu-sounds.js";
 
 const MASTER = PREF_CONSTRAINTS.masterVolume;
 const BEACON = PREF_CONSTRAINTS.beaconVolume;
@@ -134,6 +135,7 @@ export function createAudioMenu() {
     for (const slider of sliders) {
       setPref(slider.prefKey, slider.default);
     }
+    playMenuSound("reset");
     refreshActiveBeaconVolumes();
     setMasterVolume(MASTER.default / 100);
     setGlobalVolume("music", MUSIC.default / 100);

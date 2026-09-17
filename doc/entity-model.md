@@ -481,6 +481,10 @@ prévu, pas construit). Prix d'achat : `price` de l'article, sinon `value`
   avant chaque incrément — un grand pas est réduit à ce que les fonds
   permettent, zéro -> refus "Fonds insuffisants." (seul refus avec message,
   jamais confondu avec le stock).
+- **Sons** — tout refus AVEC message (rien à vendre, pas de catalogue, rien
+  de sélectionné à la validation, fonds insuffisants) joue "refusal" ;
+  "block" reste réservé aux tentatives sans effet et sans message (bornes,
+  Entrée hors ligne). Rôles et fichiers : `view/menu-sounds.js`.
 - **Annonces** — à la NAVIGATION : entrée complète `"{nom} {choisi} sur
   {plafond}, {prix} pièces : {description}"` ; à l'AJUSTEMENT : SEULEMENT
   `"{choisi}, {sous-total de la ligne}"` (fluide en ajustement répété,

@@ -5,6 +5,14 @@
 // configureMenuPreferences) : lib/menu.js reste ainsi portable, il ne
 // connaît jamais ces chemins.
 //
+// Deux rôles supplémentaires, joués par les menus SPÉCIFIQUES à Templeton
+// (jamais par lib/menu.js) : "reset" quand des préférences sont remises à
+// leurs valeurs par défaut (options globales, sous-menus), "refusal" quand
+// une VALIDATION explicite est refusée avec un message (rien à vendre, pas
+// de catalogue, rien de sélectionné, fonds insuffisants) — distinct de
+// "block", réservé aux tentatives sans effet et sans message (borne d'un
+// slider, cyclage refusé, Entrée sur un slider).
+//
 // Centrés, non spatialisés — des sons d'UI, comme le son de sauvegarde
 // (voir view/save-storage.js). Défensif : un son manquant avertit, ne
 // plante jamais.
@@ -19,6 +27,8 @@ const MENU_SOUND_KEYS = {
   select: "assets/sounds/ui/select",
   cancel: "assets/sounds/ui/cancel",
   toggle: "assets/sounds/ui/toggle",
+  reset: "assets/sounds/ui/reset",
+  refusal: "assets/sounds/ui/refusal",
 };
 
 // Catégorie "interface" (Options > Audio, voir view/menus/audio-menu.js) :

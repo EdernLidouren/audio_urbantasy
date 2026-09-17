@@ -1,6 +1,6 @@
 // POINT DE VENTE (voir doc/entity-model.md/"Vente et achat", entities/types/
 // shop_counter.js) — écrans sur la pile (lib/screens.js) :
-//   1. MENU D'ACTIONS (lib/menu.js) : "Vendre", "Acheter", "Annuler". TOUJOURS
+//   1. MENU D'ACTIONS (lib/menu.js) : "Acheter", "Vendre", "Annuler". TOUJOURS
 //      un menu — même prévisibilité que view/menus/inventory-menu.js.
 //   2. MENU À SLIDERS INLINE (écran CUSTOM, openQuantityList ci-dessous), UN
 //      SEUL écran paramétré pour la VENTE (lignes = objets vendables du sac,
@@ -226,7 +226,8 @@ function openQuantityList(spec) {
 
   // Ajustement : PLANCHER 0, PLAFOND `max` (borne STRUCTURELLE, sonne
   // "block" sans message) ; puis, pour un incrément, la CONDITION de
-  // `allowedIncrease` (argent) — SEULE source de refus avec message.
+  // `allowedIncrease` (argent) — SEULE source de refus avec message, et
+  // c'est le son "refusal" (voir view/menu-sounds.js) qui l'accompagne.
   // Annonce : quantité + SOUS-TOTAL de la ligne, rien d'autre. `nextDelayMs`
   // : délai avant le prochain cran de maintien (long après un appui, court
   // entre deux crans de maintien) — posé même sur un refus, pour qu'un
@@ -244,7 +245,7 @@ function openQuantityList(spec) {
     if (delta > 0 && spec.allowedIncrease) {
       const allowed = spec.allowedIncrease(line, delta);
       if (allowed.delta <= 0) {
-        playMenuSound("block");
+        playMenuSound("refusal");
         announce(t(allowed.refusalKey), { assertive: true });
         return;
       }
@@ -276,11 +277,12 @@ function openQuantityList(spec) {
     actions[cursor - lines.length].onActivate();
   }
 
-  // Validation : rien de sélectionné -> annonce seule, jamais une
-  // confirmation vide ; sinon confirmation DÉTAILLÉE (voir onValidate).
+  // Validation : rien de sélectionné -> son "refusal" + annonce seule,
+  // jamais une confirmation vide ; sinon confirmation DÉTAILLÉE (voir
+  // onValidate).
   function validate() {
     if (selectedCount(lines) === 0) {
-      playMenuSound("block");
+      playMenuSound("refusal");
       announce(t(spec.nothingSelectedKey), { assertive: true });
       return;
     }
@@ -468,7 +470,8 @@ function openBuyMenu(getSession, entityId) {
 // MENU D'ACTIONS ("Acheter" d'abord, "Vendre", "Annuler"), titre = le nom du
 // point de vente lui-même (entity.labelKey, déjà une clé i18n — même idiome
 // que inventory-menu.js/openItemActionsMenu). "Acheter" sans catalogue,
-// "Vendre" sans rien de vendable au sac -> annonce seule, aucune liste vide.
+// "Vendre" sans rien de vendable au sac -> son "refusal" + annonce seule,
+// aucune liste vide.
 // Balises en pause tant que ce menu (ou un écran au-dessus) est ouvert.
 export function openShopMenu(scene, getSession, entity) {
   const menu = {
@@ -480,7 +483,7 @@ export function openShopMenu(scene, getSession, entity) {
         onActivate: () => {
           const shop = liveShop(getSession, entity.id);
           if (!shop || !shop.shop) {
-            playMenuSound("block");
+            playMenuSound("refusal");
             announce(t("shop.buy.empty"), { assertive: true });
             return;
           }
@@ -491,7 +494,7 @@ export function openShopMenu(scene, getSession, entity) {
         label: "shop.actions.sell",
         onActivate: () => {
           if (buildSaleLines(getSession().bag).length === 0) {
-            playMenuSound("block");
+            playMenuSound("refusal");
             announce(t("shop.sell.empty"), { assertive: true });
             return;
           }

@@ -11,6 +11,7 @@ import { makeMenuScreen, makeMessageScreen } from "../../lib/menu.js";
 import { setGlobalVolume, setMasterVolume } from "../../lib/audio.js";
 import { t } from "../../data/i18n/index.js";
 import { resetAllPrefs, PREF_CONSTRAINTS } from "../../config/preferences.js";
+import { playMenuSound } from "../menu-sounds.js";
 import { refreshActiveBeaconVolumes } from "../audio/city-scene.js";
 import { createAudioMenu } from "./audio-menu.js";
 import { createNavigationMenu } from "./navigation-menu.js";
@@ -37,6 +38,7 @@ function openResetAllConfirmation() {
         onActivate: () => {
           popScreen();
           resetAllPrefs();
+          playMenuSound("reset");
           refreshActiveBeaconVolumes();
           setMasterVolume(PREF_CONSTRAINTS.masterVolume.default / 100);
           setGlobalVolume("music", PREF_CONSTRAINTS.musicVolume.default / 100);

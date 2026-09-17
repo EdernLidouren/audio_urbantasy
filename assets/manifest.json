@@ -491,6 +491,9 @@
   "assets/sounds/ui/cancel": [
     "assets/sounds/ui/cancel_1.mp3"
   ],
+  "assets/sounds/ui/refusal": [
+    "assets/sounds/ui/refusal_1.mp3"
+  ],
   "assets/sounds/ui/reset": [
     "assets/sounds/ui/reset_1.mp3"
   ],
