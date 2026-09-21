@@ -926,9 +926,9 @@ quel niveau : un rôle entier, ou un champ À L'INTÉRIEUR d'un rôle) :
 - **Déclaré à `null`** -> RETIRE ce palier pour cette instance — n'hérite
   PAS, disparaît purement et simplement. `"sounds": { "beacon": null }`
   retire le beacon d'UNE instance (les autres rôles, `vocal`/`movement`,
-  restent hérités intacts si l'archétype en porte) — c'est le cas d'un
-  passage MUET (voir `entities/types/passage.js`, `level/town-square.json`)
-  : plus besoin d'un second archétype dupliqué pour cette seule différence.
+  restent hérités intacts si l'archétype en porte) — c'est ainsi qu'on
+  rend un passage MUET (voir `entities/types/passage.js`) : plus besoin
+  d'un second archétype dupliqué pour cette seule différence.
 
 Une valeur TERMINALE (chaîne — même un chemin de pool —, nombre, tableau)
 REMPLACE toujours entièrement celle de l'archétype, jamais de fusion à ce

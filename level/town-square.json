@@ -28,7 +28,7 @@
         "id": "clocktower_1",
         "type": "clock_tower",
         "x": 35,
-        "isFlying": true
+        "isFlying": false
       },
       {
         "id": "shellter_statue_1",
@@ -43,7 +43,6 @@
         "x": 19,
         "nameKey": "door.default_passage.name",
         "descriptionKey": "door.town_hall_passage.description",
-        "sounds": { "beacon": null },
         "action": { "kind": "switchSide", "arrivalX": 19 }
       },
       {
@@ -52,7 +51,6 @@
         "x": 41,
         "nameKey": "door.default_passage.name",
         "descriptionKey": "door.clocktower_passage.description",
-        "sounds": { "beacon": null },
         "action": { "kind": "switchSide", "arrivalX": 41 }
       }
     ]
@@ -61,16 +59,28 @@
     "musicDay": "assets/musics/jazz_day",
     "musicNight": "assets/musics/jazz_night",
     "ambiences": ["assets/ambiances/traffic_1.mp3"],
-    "defaultSurface": "dirt",
+    "defaultSurface": "gravel",
+    "segments": [
+      { "from": 0, "to": 4, "surface": "grass" },
+      { "from": 5, "to": 6, "surface": "mud" },
+      { "from": 7, "to": 13, "surface": "shallow_water" },
+      { "from": 14, "to": 15, "surface": "mud" },
+      { "from": 16, "to": 20, "surface": "grass" }
+    ],
     "entities": [
       { "id": "river_verso", "type": "river", "x": 10, "interactable": false, "blocksMovement": true },
+      {
+        "id": "clocktower_1_v",
+        "type": "clock_tower",
+        "x": 35,
+        "isFlying": true
+      },
       {
         "id": "town_hall_passage_verso",
         "type": "passage",
         "x": 19,
         "nameKey": "door.default_passage.name",
         "descriptionKey": "door.town_hall_passage.description",
-        "sounds": { "beacon": null },
         "action": { "kind": "switchSide", "arrivalX": 19 }
       },
       {
@@ -79,7 +89,6 @@
         "x": 41,
         "nameKey": "door.default_passage.name",
         "descriptionKey": "door.clocktower_passage.description",
-        "sounds": { "beacon": null },
         "action": { "kind": "switchSide", "arrivalX": 41 }
       }
     ]

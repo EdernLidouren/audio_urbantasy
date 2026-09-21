@@ -165,6 +165,9 @@
     "assets/sounds/doors/metal_gate_1.mp3",
     "assets/sounds/doors/metal_gate_2.mp3"
   ],
+  "assets/sounds/doors/passage_wind_beacon": [
+    "assets/sounds/doors/passage_wind_beacon_1.mp3"
+  ],
   "assets/sounds/effects/big_rock_collision": [
     "assets/sounds/effects/big_rock_collision_1.mp3"
   ],

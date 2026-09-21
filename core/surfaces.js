@@ -32,8 +32,8 @@ export const SURFACE_REGISTRY = {
   light_snow: { neutral: false },
   mud: { neutral: false },
   sand: { neutral: false },
+  shallow_water: { neutral: false },
   snow: { neutral: false },
-  water: { neutral: false },
   wood: { neutral: false },
 };
 

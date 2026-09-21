@@ -18,7 +18,16 @@ export default {
   nameKey: "entity.cumulo_lupus.name",
   descriptionKey: "entity.cumulo_lupus.description",
   sounds: {
-    vocal: { path: "assets/sounds/entities/spectral_wolf_vocal", loop: false, pitchVariation: 0.15 },
+    vocal: {
+      path: "assets/sounds/entities/spectral_wolf_vocal",
+      loop: false,
+      pitchVariation: 0.15,
+      vocalInterval: 5000,
+      vocalIntervalVariation: 1500,
+      // Léger renfort : les fichiers sortent un peu bas par rapport au reste
+      // de la scène (voir config/tuning-values.js/vocalGain, défaut 1).
+      vocalGain: 1.5,
+    }
   },
   blocksMovement: false,
   observable: true,

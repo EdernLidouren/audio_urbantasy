@@ -326,7 +326,7 @@ export const TUNING_DEFAULTS = {
   // dérivé de la distance (jamais à sa place) : présent, mais nettement en
   // retrait — l'autre face se DEVINE, elle ne s'entend pas comme si le
   // joueur y était.
-  mufflingGain: 0.4,
+  mufflingGain: 0.5,
 
   // Décalage aléatoire MAX (unités de scène, de part et d'autre de la
   // source) appliqué à une entité éphémère ÉPARPILLÉE (voir

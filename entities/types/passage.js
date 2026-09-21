@@ -6,13 +6,15 @@
 // face) est TOUJOURS fourni par l'instance de niveau, jamais par ce défaut
 // — il dépend entièrement de la géométrie du lieu qui l'instancie.
 //
-// beacon : réutilise door_beacon (aucun son dédié encore) — même principe
-// que d'autres archétypes sans asset propre (voir decor.js) : un point de
-// passage doit rester LOCALISABLE au clavier/à l'oreille, comme une porte.
-// Un passage MUET (ex. town_square.json, town_hall_passage_recto) retire ce
-// beacon À L'INSTANCE via `"sounds": { "beacon": null }` (cascade PAR
-// FUSION, voir core/level.js/parseEntity, doc/entity-model.md/"Cascade de
-// sounds") — jamais un second archétype dupliqué pour ce cas.
+// beacon : passage_wind_beacon, un souffle de vent en boucle CONTINUE
+// (fichier ~12 s, bien au-delà du seuil de 1,5 s exigé par Howler pour une
+// boucle fiable, voir doc/entity-model.md) — essai en cours pour signaler
+// à l'oreille un passage SANS porte, distinct du beacon ponctuel des portes.
+// Un point de passage doit rester LOCALISABLE au clavier/à l'oreille, comme
+// une porte. Pour rendre un passage MUET, retirer ce beacon À L'INSTANCE
+// via `"sounds": { "beacon": null }` (cascade PAR FUSION, voir
+// core/level.js/parseEntity, doc/entity-model.md/"Cascade de sounds") —
+// jamais un second archétype dupliqué pour ce cas.
 //
 // Son de FRANCHISSEMENT (recto<->verso, voir view/city-screen.js/
 // playSideSwitchSound) : AUCUN défaut ici — `transitionSound` (cascade
@@ -24,7 +26,7 @@ export default {
   nameKey: "entity.passage.name",
   descriptionKey: "entity.passage.description",
   sounds: {
-    beacon: { path: "assets/sounds/doors/door_beacon", loop: true },
+    beacon: { path: "assets/sounds/doors/passage_wind_beacon", loop: true },
   },
   blocksMovement: false,
   observable: true,
