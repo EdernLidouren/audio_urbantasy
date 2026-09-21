@@ -316,12 +316,26 @@ function runEffects(entity, effects) {
   if (!effects) return;
   if (variableEffectsHandler) variableEffectsHandler(entity, effects);
   for (const effect of effects) {
+    if (effect.type === "teleport") {
+      if (teleportHandler) teleportHandler(effect);
+    } else {
+      runRenderEffects(entity, [effect]);
+    }
+  }
+}
+
+// Effets de RENDU seuls (playSound/announce, voir core/effects.js/
+// RENDER_EFFECT_TYPES), dans l'ordre déclaré — les autres types traversent
+// sans effet. Exporté pour les triggers horaires (view/city-screen.js/
+// advanceClock) : le core a DÉJÀ appliqué leurs effets d'état
+// (core/triggers.js/applyDueTriggers), seul le rendu reste à jouer ici,
+// avec la même provenance (l'entité porteuse) qu'un effet d'action.
+export function runRenderEffects(entity, effects) {
+  for (const effect of effects) {
     if (effect.type === "playSound") {
       runPlaySoundEffect(entity, effect);
     } else if (effect.type === "announce") {
       announce(t(effect.key), { assertive: effect.assertive !== false });
-    } else if (effect.type === "teleport") {
-      if (teleportHandler) teleportHandler(effect);
     }
   }
 }

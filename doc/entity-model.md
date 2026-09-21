@@ -805,6 +805,19 @@ pas à changer, seul le CONTEXTE qu'on lui passe grossirait (comme `{ time }`
 -> `{ time, weather }` plus haut). Délibérément DIFFÉRÉ, pas un oubli —
 aucun consommateur n'en a besoin aujourd'hui.
 
+### Triggers horaires — voir `doc/scripting.md`/"Triggers"
+
+Distincts des triggers de COMPORTEMENT ci-dessus (portés par une règle de
+présence, réévalués au tick) : `entity.triggers` déclare des EFFETS D'ACTION
+(`playSound`, `setVariable`...) exécutés au FRANCHISSEMENT d'une heure — à
+chaque heure, ou à une heure précise — par `core/triggers.js`, sur les DEUX
+faces du monde actif. Une entité DORMANTE ne tire pas (même règle que le
+comportement). Un `playSound` déclenché ainsi est DIÉGÉTIQUE, positionné sur
+l'entité : depuis l'autre face il s'entend étouffé, par la chaîne
+d'occlusion ordinaire (voir "Recto/verso"). Premier client : la cloche du
+clocher (`level/town-square.json`, recto seulement). Grammaire, sauts de
+temps, portée : `doc/scripting.md`/"Triggers".
+
 ### Bascule observée : `presenceChanged`
 
 `core/reduce.js`/`stepEntities` compare, à chaque tick, la présence

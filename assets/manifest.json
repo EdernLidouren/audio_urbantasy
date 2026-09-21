@@ -132,6 +132,12 @@
   "assets/sounds/decor/clocktower_beacon": [
     "assets/sounds/decor/clocktower_beacon_1.mp3"
   ],
+  "assets/sounds/decor/gear_1_beacon": [
+    "assets/sounds/decor/gear_1_beacon_1.mp3"
+  ],
+  "assets/sounds/decor/gear_2_beacon": [
+    "assets/sounds/decor/gear_2_beacon_1.mp3"
+  ],
   "assets/sounds/decor/river_beacon": [
     "assets/sounds/decor/river_beacon_1.mp3"
   ],
@@ -160,6 +166,15 @@
   ],
   "assets/sounds/doors/door_beacon": [
     "assets/sounds/doors/door_beacon_1.mp3"
+  ],
+  "assets/sounds/doors/heavy_door_1_open": [
+    "assets/sounds/doors/heavy_door_1_open_1.mp3"
+  ],
+  "assets/sounds/doors/metal_door_1_close": [
+    "assets/sounds/doors/metal_door_1_close_1.mp3"
+  ],
+  "assets/sounds/doors/metal_door_1_open": [
+    "assets/sounds/doors/metal_door_1_open_1.mp3"
   ],
   "assets/sounds/doors/metal_gate": [
     "assets/sounds/doors/metal_gate_1.mp3",
@@ -195,6 +210,9 @@
     "assets/sounds/effects/neon_malfunction_3.mp3",
     "assets/sounds/effects/neon_malfunction_4.mp3",
     "assets/sounds/effects/neon_malfunction_5.mp3"
+  ],
+  "assets/sounds/effects/old/clock_tower_bell": [
+    "assets/sounds/effects/old/clock_tower_bell_1.mp3"
   ],
   "assets/sounds/effects/plant_shake": [
     "assets/sounds/effects/plant_shake_1.mp3"
@@ -463,6 +481,9 @@
   ],
   "assets/sounds/furniture/clock_1_beacon": [
     "assets/sounds/furniture/clock_1_beacon_1.mp3"
+  ],
+  "assets/sounds/furniture/clock_2_beacon": [
+    "assets/sounds/furniture/clock_2_beacon_1.mp3"
   ],
   "assets/sounds/furniture/computer_1_beacon": [
     "assets/sounds/furniture/computer_1_beacon_1.mp3"

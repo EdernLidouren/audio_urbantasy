@@ -581,6 +581,75 @@ indépendamment de l'ordre) — et pourquoi le personnage vit en DEUX instances
 totalement indépendantes, sans état partagé entre les deux mondes (voir
 `doc/entity-model.md` pour la discussion complète de ce choix).
 
+## Triggers — effets déclenchés par une TRANSITION d'horloge
+
+`entity.triggers` (optionnel, cascade instance -> type comme `action`) : un
+TABLEAU non vide de `{ on: "hour", hour?: 0..23, effects: [<effet d'action>,
+...] }`. Point d'accroche GÉNÉRAL (`core/triggers.js`) : le clocher n'est que
+son premier client. Un seul mécanisme, paramétré :
+
+- `hour` ABSENT -> les effets s'exécutent à CHAQUE nouvelle heure (le
+  clocher) ;
+- `hour` PRÉCISÉ -> SEULEMENT quand l'horloge arrive à cette heure (futurs :
+  coq à l'aube, commerce à 8h, lampadaires à 20h...).
+
+`effects` : le MÊME vocabulaire que les effets d'action (voir "Effets
+d'action" plus bas — état `setVariable`/`giveImprovement`..., rendu
+`playSound`/`announce`), MÊME validation (`core/level.js`/`parseTrigger` ->
+`parseActionEffect`), MÊME routage (`core/effects.js`) : le core applique
+les effets d'ÉTAT (`core/state.js`/`applyEntityActionEffects`, sur la face
+qui porte l'entité), la vue rejoue les effets de RENDU dus
+(`view/interaction.js`/`runRenderEffects`, câblé par `view/city-screen.js`/
+`advanceClock`). Un `playSound` sans `at` émane de l'entité porteuse, donc
+DIÉGÉTIQUE (voir `"playSound"` plus bas) : entendu ÉTOUFFÉ depuis l'autre
+face par la chaîne d'occlusion existante, rien de spécial à déclarer. Les
+effets MIXTES (`teleport`, déplacement du JOUEUR) sont REFUSÉS au
+chargement : ils n'ont pas de sens sur un trigger.
+
+**Déclenchement sur TRANSITION, jamais une condition continue** : à chaque
+avancement de l'horloge, le core compare l'index d'heure ABSOLU d'avant et
+d'après (`hourChanged`) — même patron que le jour/nuit ou la météo. Un tick
+"dans l'heure" ne fait rien ; on ne rejoue jamais un trigger tant que
+l'heure ne change pas.
+
+**Sauts de temps (menu debug, retour après absence) : résolution
+PARESSEUSE.** On reflète l'heure d'ARRIVÉE, jamais les heures franchies
+entre-temps — pas de rafale de cloches, pas de passé simulé : "à chaque
+heure" tire UNE fois à l'arrivée ; "à Xh" tire SEULEMENT si Xh est l'heure
+d'arrivée (Xh simplement FRANCHIE pendant le saut ne tire pas). Un saut de
+24 h exactes compte comme un changement d'heure (index absolu, pas heure du
+jour). La PAUSE gèle l'horloge (aucun delta injecté, voir `doc/time.md`),
+donc ne déclenche rien — aucun code dédié.
+
+**Portée** : le MONDE ACTIF, ses DEUX faces (recto ET verso, même si le
+joueur n'en occupe qu'une). Les autres mondes sont gelés, comme le reste de
+leur simulation. Une entité DORMANTE (`present: false`, voir "Règles") ne
+tire pas ; une entité dont la présence n'a pas encore été résolue par un
+tick compte comme présente.
+
+**Exemple réel — le clocher** (`level/town-square.json`, `clocktower_1`, au
+RECTO seulement — pas sur son miroir du verso, pour ne pas doubler la
+cloche : c'est justement l'écho étouffé qui traverse depuis le recto qu'on
+entend de l'autre face) :
+
+```json
+"triggers": [{ "on": "hour", "effects": [{ "type": "playSound", "path": "assets/sounds/effects/clock_tower_bell" }] }]
+```
+
+Un trigger CIBLÉ, forme complète (pas encore de contenu réel) :
+
+```json
+"triggers": [
+  { "on": "hour", "hour": 20, "effects": [{ "type": "setVariable", "scope": "entity", "name": "lit", "value": true }] },
+  { "on": "hour", "hour": 6, "effects": [{ "type": "setVariable", "scope": "entity", "name": "lit", "value": false }] }
+]
+```
+
+Un kind de trigger de plus demain (météo, phase...) = une entrée dans
+`TRIGGER_KINDS` (`core/triggers.js`) + sa détection dans
+`dueTriggerEffects`, jamais un second mécanisme. Vérification terminal :
+`core/movement.check.js`, section "Triggers horaires".
+
 ## Actions
 
 `entity.action` (optionnel, cascade instance → type) : `{ kind: <string>,
@@ -926,6 +995,46 @@ normalement.
 `at` NI `nature` → son diégétique, positionné À LA FENÊTRE elle-même, étouffé
 si le joueur est de l'autre face ou en perception active — exactement le
 rendu d'un beacon au même endroit.
+
+**SUIVI ou ANCRÉ — `tracked` (optionnel, booléen, défaut `true`)** : un son
+positionné qui DURE est-il re-spatialisé pendant qu'il joue ? Ne concerne
+que le rendu DIÉGÉTIQUE : un son méta n'a pas de position, rien à suivre ni
+à ancrer, le flag y est sans effet.
+
+- `tracked: true` (défaut) — **SUIVI** : la source est enregistrée comme
+  active pendant toute sa lecture et réévaluée à CHAQUE tick selon la
+  position COURANTE du joueur, avec le rendu spatial COMPLET d'une balise
+  (pan, volume et passe-bas de distance, occlusion recto/verso et
+  perception — `view/audio/city-scene.js`/`updateTrackedOneShots`, MÊME
+  formule que les balises continues, `spatialRendering`). Retirée à la fin
+  du son, jamais une source fantôme. C'est le cas courant : une source
+  VIVANTE à une position, autour de laquelle le joueur se déplace — la
+  cloche du clocher (`level/town-square.json`) passe de gauche à droite
+  quand on la dépasse pendant qu'elle résonne, le volet de la fenêtre
+  s'atténue quand on s'en éloigne, un son entendu pendant une bascule de
+  face suit le MÊME fondu que les balises (`crossfadeFaceSwap`), survit à la
+  reconstruction de scène du sas et reprend son suivi au tick sans second
+  saut. Avant ce flag, tout playSound positionné était
+  calculé une fois au démarrage puis figé : la cloche restait à gauche après
+  qu'on avait dépassé le clocher.
+- `tracked: false` — **ANCRÉ** : spatialisé UNE fois au départ, puis figé à
+  son point d'émission tel qu'entendu à cet instant. Pour un ÉVÉNEMENT
+  PONCTUEL qui "s'est produit là" et n'a pas à suivre la tête du joueur : un
+  impact, une chute, une détonation lointaine. Convient aussi aux sons très
+  courts, où le suivi n'apporterait rien (économie d'un suivi au tick).
+  Ce n'est PAS un oubli ni un mode dégradé : c'est un choix de contenu, le
+  son représente un instant, pas une source.
+
+```js
+// Suivi (défaut, rien à déclarer) : la cloche VIT sur le clocher.
+{ type: "playSound", path: "assets/sounds/effects/clock_tower_bell" }
+
+// Ancré : l'éboulement s'est produit là-bas, à cet instant — figé.
+{ type: "playSound", path: "assets/sounds/effects/big_rock_collision", tracked: false }
+```
+
+Déclaré sur l'EFFET, jamais sur le fichier : le même son peut être suivi
+dans un contexte et ancré dans un autre, le suivi dépend de l'usage.
 
 ### `"announce"` — message parlé, VUE
 
@@ -1420,6 +1529,7 @@ n'empêche de l'ajouter plus tard (voir `doc/entity-model.md`/"Interaction
 | Types d'effet (presence/behavior, TICK) | `parseEffect` + `resolveEntityRules` | `core/level.js`, `core/presence.js` |
 | Types d'effet d'action (ACTIVATION, état + rendu + mixte) | `parseActionEffect` (forme) + `STATE_EFFECT_TYPES`/`RENDER_EFFECT_TYPES`/`MIXED_EFFECT_TYPES` (nature/routage) + `applyActionEffects` (état) + `runEffects` (rendu + mixte) | `core/level.js`, `core/effects.js`, `core/variables.js`, `view/interaction.js` |
 | Exécution de l'effet "teleport" (rechargement/repositionnement) | `performTransition`/`placePlayer`/`travelToWorld` | `view/city-screen.js`, `core/state.js` |
+| Kinds de trigger (transition d'horloge) | `TRIGGER_KINDS` + `parseTrigger` (forme) + `applyDueTriggers` (détection, état) + `runRenderEffects` (rendu) | `core/triggers.js`, `core/level.js`, `view/interaction.js` |
 | Kinds d'action | `ACTION_HANDLERS` | `view/interaction.js` |
 | Kinds de comportement | `BEHAVIORS` | `core/behaviors/index.js` |
 | Tags | `TAG_REGISTRY` | `core/tags.js` |

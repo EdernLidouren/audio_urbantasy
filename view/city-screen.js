@@ -27,7 +27,9 @@ import {
   setVariableEffectsHandler,
   setSearchHandler,
   setShopHandler,
+  runRenderEffects,
 } from "./interaction.js";
+import { applyDueTriggers } from "../core/triggers.js";
 import { openShopMenu, setSellHandler, setBuyHandler } from "./menus/shop-menu.js";
 import { sellItems, buyItems, restockShopIfDue } from "../core/trade.js";
 import { openPauseMenu } from "./menus/pause-menu.js";
@@ -381,8 +383,20 @@ export function makeCityScreen(getSession, setSession) {
   // (mêmes mots que la touche "t") : le nouvel instant s'entend
   // immédiatement après le saut.
   function advanceTimeDebugEffect(minutes) {
-    setSession(advanceWeather(advanceTime(getSession(), minutes)));
+    advanceClock(minutes);
     announceGameTime(getSession());
+  }
+
+  // SEUL point d'avancement de l'horloge en ville (onFrame ET le saut
+  // debug ci-dessus) : temps, puis météo, puis triggers horaires
+  // (core/triggers.js) — le core applique leurs effets d'état et renvoie
+  // les effets de rendu dus, rejoués ici avec la même provenance qu'un effet
+  // d'action (positionnés sur l'entité, donc soumis à l'occlusion de face).
+  function advanceClock(minutes) {
+    const before = getSession();
+    const { session, fired } = applyDueTriggers(advanceWeather(advanceTime(before, minutes)), before.time);
+    setSession(session);
+    for (const { entity, effects } of fired) runRenderEffects(entity, effects);
   }
 
   // Vitesse d'écoulement TEMPORAIRE (voir config/time-values.js/setTimeScale/
@@ -818,8 +832,9 @@ export function makeCityScreen(getSession, setSession) {
       // jamais ailleurs — c'est CE branchement qui la fait avancer AVEC le
       // temps de jeu et geler QUAND il gèle (cette méthode entière n'est
       // pas appelée si un menu est au sommet de la pile, voir le
-      // commentaire au-dessus), sans code de pause dédié.
-      setSession(advanceWeather(advanceTime(getSession(), minutes)));
+      // commentaire au-dessus), sans code de pause dédié. Triggers
+      // horaires compris, voir advanceClock.
+      advanceClock(minutes);
     },
     // Discrète (screens.js ne route que la touche non répétée), pas de
     // souci d'auto-interruption ici. N'agit que quand la ville est au

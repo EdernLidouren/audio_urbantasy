@@ -425,10 +425,12 @@ export function markConsumed(session, entityId) {
 // PRÉ-effets (worlds pas encore patché par un éventuel effet "entity"/
 // "scene" de la MÊME liste) si on le reprenait tel quel. id absent du lieu
 // actif -> session INCHANGÉE, même politique défensive que markConsumed/
-// removeEntity.
-export function applyEntityActionEffects(session, entityId, effects) {
+// removeEntity. `side` : face qui porte l'entité — celle du joueur par
+// défaut (une action s'active toujours sur sa face), explicite pour un
+// trigger horaire de l'AUTRE face (voir core/triggers.js).
+export function applyEntityActionEffects(session, entityId, effects, side = session.player.side) {
   const world = session.worlds[session.activeWorldId];
-  const face = resolveFace(world, session.player.side);
+  const face = resolveFace(world, side);
   const entity = face.entities.find((e) => e.id === entityId);
   if (!entity) return session;
 
@@ -441,7 +443,7 @@ export function applyEntityActionEffects(session, entityId, effects) {
   let nextWorld = worldChanged ? result.world : world;
   if (entityChanged) {
     const entities = face.entities.map((e) => (e.id === entityId ? result.entity : e));
-    nextWorld = withFace(nextWorld, session.player.side, { entities });
+    nextWorld = withFace(nextWorld, side, { entities });
   }
 
   return {

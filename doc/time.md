@@ -177,6 +177,18 @@ de collecte le compare au dernier cycle matérialisé d'un monde
 tick ni dans `onFrame` — le temps avance, la collecte le LIT. Détail complet
 (sources, file, persistance) : `doc/entity-model.md`/"Collecte".
 
+## Triggers horaires — quatrième consommateur
+
+`core/triggers.js`/`applyDueTriggers` compare l'index d'heure ABSOLU d'avant
+et d'après chaque avancement (`hourChanged`) et exécute les triggers
+`{ on: "hour", hour?, effects }` déclarés par les entités du monde actif —
+sur TRANSITION seulement, à l'heure d'ARRIVÉE seulement (un saut de
+plusieurs heures ne rejoue pas les heures franchies). Câblé au SEUL point
+d'avancement de l'horloge en ville (`view/city-screen.js`/`advanceClock` :
+temps, puis météo, puis triggers — `onFrame` ET le saut du menu debug) :
+la pause gèle donc les triggers avec l'horloge, sans code dédié. Grammaire
+et sémantique complètes : `doc/scripting.md`/"Triggers".
+
 ## Vérification manuelle (touche "t")
 
 Sur l'écran de jeu, "t" (discrète, sans effet sur le déplacement) annonce heure et
@@ -203,8 +215,8 @@ retirer un composant ne touche QUE ce gabarit, jamais le code. `weekday`
 ## Chantiers réservés, pas câblés
 
 Au-delà de la phase jour/nuit (musique), de la présence conditionnelle
-d'entité, du cycle de collecte quotidien et de l'annonce de test ci-dessus,
-rien d'autre ne consomme encore `session.time` :
+d'entité, du cycle de collecte quotidien, des triggers horaires et de
+l'annonce de test ci-dessus, rien d'autre ne consomme encore `session.time` :
 
 - `ambiencesDay` / `ambiencesNight` : structure validée (voir plus haut), aucun
   fondu ni réaction câblés — même principe que la musique, pas encore fait.

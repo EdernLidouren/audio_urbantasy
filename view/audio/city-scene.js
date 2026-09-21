@@ -61,6 +61,7 @@
 
 import {
   playOneShot,
+  playTrackedOneShot,
   preloadOneShot,
   keepAudioContextAwake,
   createPositionedSound,
@@ -577,6 +578,36 @@ function cutoffForDistance(dist, interactRange, audibleRange, cutoffMin, cutoffM
 
   const progress = (dist - interactRange) / range;
   return cutoffMax * Math.pow(cutoffMin / cutoffMax, progress);
+}
+
+// One-shots positionnés SUIVIS en cours de lecture : { entityId, gain,
+// handle } (voir lib/audio.js/playTrackedOneShot, startTrackedOneShot/
+// updateTrackedOneShots plus bas). Au niveau MODULE, pas de la scène : une
+// bascule recto/verso reconstruit la scène (view/city-screen.js/
+// sideSwitchEffect) alors que le son continue — la nouvelle scène le
+// reprend et le ré-étouffe. Retirés à la FIN du son (événement Howler),
+// jamais une source fantôme. cacheKey dédiée ("tracked:<fichier>") : le
+// passe-bas de cette entrée est PILOTÉ au tick (distance + étouffement), il
+// ne doit jamais contaminer les lectures ancrées/intermittentes du même
+// fichier, qui gardent leur propre entrée.
+const trackedOneShots = [];
+
+// Rendu spatial CONTINU d'une source positionnée qui SUIT le joueur — balise
+// continue (applyEntityAudio, crossfadeFaceSwap) ET one-shot suivi
+// (updateTrackedOneShots) : UNE formule, jamais deux. Pan depuis
+// panSaturation ; volume de distance (surlignage compris, voir
+// volumeForDistance) ; passe-bas de distance (cutoffForDistance) ;
+// étouffement (`muffled`, perception ou autre face) appliqué aux deux. Le
+// volume renvoyé est ADIMENSIONNÉ : l'appelant le multiplie par ses propres
+// facteurs (préférence, gain de rôle, hauteur).
+function spatialRendering(entry, relX, muffled) {
+  const dist = Math.abs(relX);
+  const pan = clamp(relX / entry.panSaturation, -1, 1);
+  let volume = volumeForDistance(dist, entry.audibleRange, entry.highlight && dist <= entry.interactRange);
+  if (muffled > 0) volume *= 1 - muffled * (1 - MUFFLING_GAIN);
+  let cutoff = cutoffForDistance(dist, entry.interactRange, entry.audibleRange, entry.cutoffMin, entry.cutoffMax);
+  if (muffled > 0) cutoff = cutoff * (1 - muffled) + MUFFLING_LOWPASS_HZ * muffled;
+  return { pan, volume, cutoff };
 }
 
 // Entités dont la zone d'interaction (interactRange résolu PAR ENTITÉ, via
@@ -1478,32 +1509,101 @@ export function createCityAudioScene(getSession) {
   // (present:false, core/presence.js) -> silencieuse, `console.warn`,
   // jamais un plantage — même politique défensive que tout son de ce
   // projet.
+  //
+  // SUIVI (descriptor.tracked, défaut true — voir doc/scripting.md/
+  // "playSound") : la source est enregistrée dans trackedOneShots et
+  // re-spatialisée à CHAQUE tick jusqu'à la fin du son (voir
+  // startTrackedOneShot/updateTrackedOneShots) — une cloche reste sur son
+  // clocher quand le joueur passe devant. tracked:false -> ANCRÉ : rendu
+  // calculé UNE fois au départ (playTransitionSound, chemin historique),
+  // figé ensuite — un événement ponctuel qui "s'est produit là".
   function playEntityOneShot(targetId, descriptor) {
+    const found = findEntitySource(targetId);
+    if (!found) {
+      console.warn(`city-scene: playEntityOneShot("${targetId}") : id absent de la scène.`);
+      return;
+    }
+    if (!found.live || found.live.present === false) {
+      console.warn(`city-scene: playEntityOneShot("${targetId}") : entité dormante ou introuvable.`);
+      return;
+    }
+    const resolved = resolveTransitionSound(found.entry.entity, descriptor, PLAY_SOUND_TUNING_KEYS);
+    if (descriptor.tracked === false) {
+      playTransitionSound(found.entry, found.live.x - getSession().player.x, resolved, effectiveMuffleAmount(found.entry, found.forcedMuffle));
+      return;
+    }
+    startTrackedOneShot(targetId, found, resolved);
+  }
+
+  // Entrée sonore + entité VIVANTE d'un id, sur la face courante d'abord
+  // (forcedMuffle 0), puis l'AUTRE face (forcedMuffle 1) — même convention
+  // qu'updateIntermittentSources/update(). Relu à chaque appel, jamais mis
+  // en cache : après une bascule recto/verso, le même id change de face, et
+  // donc d'étouffement. `live` null si l'entité a quitté le monde.
+  function findEntitySource(targetId) {
     const session = getSession();
     const activeEntry = entitySounds.find((e) => e.entity.id === targetId);
     if (activeEntry) {
-      const liveEntity = getActiveWorld(session).entities.find((e) => e.id === targetId);
-      if (!liveEntity || liveEntity.present === false) {
-        console.warn(`city-scene: playEntityOneShot("${targetId}") : entité dormante ou introuvable.`);
-        return;
-      }
-      const resolved = resolveTransitionSound(activeEntry.entity, descriptor, PLAY_SOUND_TUNING_KEYS);
-      playTransitionSound(activeEntry, liveEntity.x - session.player.x, resolved, effectiveMuffleAmount(activeEntry, 0));
-      return;
+      const live = getActiveWorld(session).entities.find((e) => e.id === targetId) || null;
+      return { entry: activeEntry, live, forcedMuffle: 0 };
     }
     const otherEntry = otherEntitySounds && otherEntitySounds.find((e) => e.entity.id === targetId);
     if (otherEntry) {
       const otherFace = getInactiveFace(session);
-      const liveEntity = otherFace && otherFace.entities.find((e) => e.id === targetId);
-      if (!liveEntity || liveEntity.present === false) {
-        console.warn(`city-scene: playEntityOneShot("${targetId}") : entité dormante ou introuvable (autre face).`);
-        return;
-      }
-      const resolved = resolveTransitionSound(otherEntry.entity, descriptor, PLAY_SOUND_TUNING_KEYS);
-      playTransitionSound(otherEntry, liveEntity.x - session.player.x, resolved, effectiveMuffleAmount(otherEntry, 1));
+      const live = (otherFace && otherFace.entities.find((e) => e.id === targetId)) || null;
+      return { entry: otherEntry, live, forcedMuffle: 1 };
+    }
+    return null;
+  }
+
+  function startTrackedOneShot(entityId, found, resolved) {
+    let file;
+    try {
+      file = resolveAsset(resolved.path);
+    } catch (error) {
+      console.warn(`city-scene: son suivi indisponible ("${resolved.path}") : ${error.message}`);
       return;
     }
-    console.warn(`city-scene: playEntityOneShot("${targetId}") : id absent de la scène.`);
+    const rendering = spatialRendering(found.entry, found.live.x - getSession().player.x, effectiveMuffleAmount(found.entry, found.forcedMuffle));
+    const gain = resolved.gain ?? 1;
+    const handle = playTrackedOneShot(file, {
+      cacheKey: `tracked:${file}`,
+      reverbSend: resolved.reverbSend,
+      reverbBusInput: reverbBus.input,
+      volume: rendering.volume * beaconVolumeFactor() * gain,
+      stereo: rendering.pan,
+      rate: randomRate(resolved.pitchVariation),
+      lowpassHz: rendering.cutoff,
+      entityLayer: true,
+    });
+    if (!handle) return;
+    const source = { entityId, gain, handle };
+    trackedOneShots.push(source);
+    handle.onEnd(() => {
+      const index = trackedOneShots.indexOf(source);
+      if (index >= 0) trackedOneShots.splice(index, 1);
+    });
+  }
+
+  // Re-spatialise chaque one-shot suivi à la position COURANTE du joueur et
+  // de son entité (face, étouffement et distance relus, voir
+  // findEntitySource/spatialRendering) — même traitement qu'une balise
+  // continue, seul le cycle de vie diffère. Entité disparue du monde
+  // (ramassée...) : on cesse de suivre, le son finit sur son dernier rendu.
+  // Après un sas de bascule (crossfadeFaceSwap), le premier tick retombe
+  // sur les cibles du fondu : transition continue fondu -> tick.
+  function updateTrackedOneShots(x) {
+    if (trackedOneShots.length === 0) return;
+    const volumeFactor = beaconVolumeFactor();
+    for (const source of [...trackedOneShots]) {
+      const found = findEntitySource(source.entityId);
+      if (!found || !found.live) {
+        trackedOneShots.splice(trackedOneShots.indexOf(source), 1);
+        continue;
+      }
+      const rendering = spatialRendering(found.entry, found.live.x - x, effectiveMuffleAmount(found.entry, found.forcedMuffle));
+      source.handle.update(rendering.pan, rendering.volume * volumeFactor * source.gain, rendering.cutoff);
+    }
   }
 
   // Sources positionnées INTERMITTENTES (voir entitySounds/
@@ -1724,11 +1824,9 @@ export function createCityAudioScene(getSession) {
     const beaconFactor = beaconVolumeFactor();
     const liveById = liveEntitiesById();
     for (const entry of entitySounds) {
-      const { entity, sound, audibleRange, panSaturation, interactRange, highlight, cutoffMin, cutoffMax, beaconGain, flyingHighpassHz, flyingVolumeFactor } =
-        entry;
+      const { entity, sound, beaconGain, flyingHighpassHz, flyingVolumeFactor } = entry;
       const live = liveById.get(entity.id);
       const relX = live.x - x;
-      const dist = Math.abs(relX);
       // Perception surnaturelle (voir effectiveMuffleAmount plus haut) :
       // toujours 0 (aucun effet) pour une entité surnaturelle (perceptionGated) —
       // jamais étouffée par le mécanisme qui la révèle.
@@ -1753,27 +1851,14 @@ export function createCityAudioScene(getSession) {
       // déjà tout arrêt VOULU (dormance, consommation, pause de menu).
       if (sound.isStuck()) sound.resume();
 
-      // Pan inchangé : toujours dérivé de panSaturation, indépendant du volume.
-      const pan = clamp(relX / panSaturation, -1, 1);
+      // Rendu spatial partagé (voir spatialRendering) : pan, volume de
+      // distance et passe-bas, étouffement compris (voir
+      // effectiveMuffleAmount — volume interpolé continûment, passe-bas
+      // composé avec celui de distance, jamais à sa place).
       // flyingVolumeFactor : neutre (1) pour toute entité non isFlying,
       // voir buildEntitySoundEntry — aucun effet sur le volume dans ce cas.
-      let volume =
-        volumeForDistance(dist, audibleRange, highlight && dist <= interactRange) *
-        beaconFactor *
-        beaconGain *
-        flyingVolumeFactor;
-      // Filtre d'étouffement des entités MONDAINES (voir
-      // effectiveMuffleAmount/currentMundaneMuffleAmount plus haut) :
-      // volume interpolé CONTINÛMENT (0..1, le fondu demandé), passe-bas
-      // interpolé linéairement vers MUFFLING_LOWPASS_HZ — se COMPOSE avec
-      // le passe-bas de distance ci-dessous (cutoffForDistance), jamais à
-      // sa place : une entité mondaine proche ET en pleine perception
-      // s'étouffe quand même progressivement.
-      if (muffled > 0) volume *= 1 - muffled * (1 - MUFFLING_GAIN);
-      sound.update(pan, volume);
-      // Passe-bas : se superpose au volume/pan, ne les remplace pas.
-      let cutoff = cutoffForDistance(dist, interactRange, audibleRange, cutoffMin, cutoffMax);
-      if (muffled > 0) cutoff = cutoff * (1 - muffled) + MUFFLING_LOWPASS_HZ * muffled;
+      const { pan, volume, cutoff } = spatialRendering(entry, relX, muffled);
+      sound.update(pan, volume * beaconFactor * beaconGain * flyingVolumeFactor);
       sound.setCutoff(cutoff);
       // Passe-haut "hauteur suggérée" (voir entities/model.md, isFlying) :
       // EN PLUS du passe-bas ci-dessus, jamais à sa place — setHighpass
@@ -1897,6 +1982,7 @@ export function createCityAudioScene(getSession) {
     }
 
     applyEntityAudio(x);
+    updateTrackedOneShots(x);
 
     // Une seule photo des entités vivantes pour le reste du tick (occupation
     // + les deux sons ponctuels ci-dessous) : la session ne change pas entre
@@ -1981,6 +2067,10 @@ export function createCityAudioScene(getSession) {
     for (const { sound } of entitySounds) {
       if (sound) sound.stop(); // nettoie aussi son propre envoi de réverb
     }
+    // One-shots suivis : PAS purgés ici (liste au niveau MODULE, voir
+    // trackedOneShots) — la scène suivante les reprend si elle connaît
+    // encore leur entité (bascule recto/verso : la cloche s'étouffe en
+    // cours), sinon les lâche à son premier tick.
     reverbBus.destroy();
     // Musique/ambiance NE SONT PLUS touchées ici (voir lib/audio.js/
     // "Couches persistantes MUSIQUE/AMBIANCE") : elles vivent au niveau
@@ -2105,15 +2195,10 @@ export function createCityAudioScene(getSession) {
       if (!entry.sound) continue;
       const live = liveById.get(entry.entity.id);
       if (!live || live.present === false) continue;
-      const relX = live.x - x;
-      const pan = clamp(relX / entry.panSaturation, -1, 1);
-      const dist = Math.abs(relX);
-      const openVolume =
-        volumeForDistance(dist, entry.audibleRange, entry.highlight && dist <= entry.interactRange) *
-        beaconFactor *
-        entry.beaconGain *
-        entry.flyingVolumeFactor;
-      const openCutoff = cutoffForDistance(dist, entry.interactRange, entry.audibleRange, entry.cutoffMin, entry.cutoffMax);
+      const open = spatialRendering(entry, live.x - x, 0);
+      const pan = open.pan;
+      const openVolume = open.volume * beaconFactor * entry.beaconGain * entry.flyingVolumeFactor;
+      const openCutoff = open.cutoff;
       entry.sound.update(pan, openVolume);
       entry.sound.setCutoff(openCutoff);
       entry.sound.fadeVolume(openVolume * MUFFLING_GAIN, durationMs);
@@ -2134,20 +2219,37 @@ export function createCityAudioScene(getSession) {
       });
       if (!rebuilt.sound) continue; // pas de balise continue pour ce type/mode (intermittente ou absente)
 
-      const relX = live.x - x;
-      const pan = clamp(relX / entry.panSaturation, -1, 1);
-      const dist = Math.abs(relX);
-      const openVolume =
-        volumeForDistance(dist, entry.audibleRange, entry.highlight && dist <= entry.interactRange) *
-        beaconFactor *
-        rebuilt.beaconGain *
-        entry.flyingVolumeFactor;
-      const openCutoff = cutoffForDistance(dist, entry.interactRange, entry.audibleRange, entry.cutoffMin, entry.cutoffMax);
+      const open = spatialRendering(entry, live.x - x, 0);
+      const pan = open.pan;
+      const openVolume = open.volume * beaconFactor * rebuilt.beaconGain * entry.flyingVolumeFactor;
+      const openCutoff = open.cutoff;
       rebuilt.sound.update(pan, openVolume * MUFFLING_GAIN);
       rebuilt.sound.setCutoff(MUFFLING_LOWPASS_HZ);
       rebuilt.sound.fadeVolume(openVolume, durationMs);
       rebuilt.sound.rampCutoff(openCutoff, durationMs);
       temporarySounds.push(rebuilt.sound);
+    }
+
+    // Sources SUIVIES (one-shots positionnés en cours, voir trackedOneShots)
+    // : MÊME fondu que les balises — de leur rendu actuel vers le rendu que
+    // la face d'arrivée leur donnera (étouffé si elles restent sur la face
+    // qu'on quitte, net si elles étaient sur l'autre). Les cibles sont
+    // EXACTEMENT celles que le premier tick de la scène suivante recalculera
+    // (spatialRendering, même étouffement) : aucun second saut à la
+    // reprise. Copie de la liste : un son qui se termine pendant le fondu
+    // s'en retire lui-même (événement de fin), sa poignée ignore alors tout
+    // fondu (voir lib/audio.js/playTrackedOneShot). Aucun arrêt ici : le
+    // son survit à la reconstruction de scène (liste au niveau module).
+    for (const source of [...trackedOneShots]) {
+      const found = findEntitySource(source.entityId);
+      if (!found || !found.live) continue;
+      const relX = found.live.x - x;
+      const current = spatialRendering(found.entry, relX, effectiveMuffleAmount(found.entry, found.forcedMuffle));
+      const arrivalMuffle = found.forcedMuffle > 0 ? effectiveMuffleAmount(found.entry, 0) : 1;
+      const target = spatialRendering(found.entry, relX, arrivalMuffle);
+      source.handle.update(current.pan, current.volume * beaconFactor * source.gain, current.cutoff);
+      source.handle.fadeVolume(target.volume * beaconFactor * source.gain, durationMs);
+      source.handle.rampCutoff(target.cutoff, durationMs);
     }
 
     return new Promise((resolve) => setTimeout(resolve, durationMs)).then(() => {

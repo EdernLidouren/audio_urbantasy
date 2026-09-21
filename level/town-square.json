@@ -28,7 +28,8 @@
         "id": "clocktower_1",
         "type": "clock_tower",
         "x": 35,
-        "isFlying": false
+        "isFlying": false,
+        "triggers": [{ "on": "hour", "effects": [{ "type": "playSound", "path": "assets/sounds/effects/clock_tower_bell" }], "gain": 2.5 }]
       },
       {
         "id": "shellter_statue_1",

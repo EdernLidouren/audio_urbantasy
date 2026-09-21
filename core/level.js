@@ -21,7 +21,9 @@ import { TAG_REGISTRY } from "./tags.js";
 import { IMPROVEMENT_REGISTRY } from "./improvements.js";
 import { WEATHER_STATES } from "../config/weather-values.js";
 import { parseVariables, VARIABLE_SCOPES, isValidValueForType } from "./variables.js";
-import { ACTION_EFFECT_TYPES } from "./effects.js";
+import { ACTION_EFFECT_TYPES, MIXED_EFFECT_TYPES } from "./effects.js";
+import { TRIGGER_KINDS } from "./triggers.js";
+import { TIME_CONFIG } from "../config/time-values.js";
 import { validateDistribution } from "./distribution.js";
 import { validateCatalog } from "./catalog.js";
 
@@ -293,12 +295,18 @@ function parseActionEffect(rawEffect, describe, entityVariables, sceneVariables)
     if (rawEffect.nature !== undefined && !PLAY_SOUND_NATURES.includes(rawEffect.nature)) {
       fail(`${describe}.nature "${rawEffect.nature}" inconnue (attendu : ${PLAY_SOUND_NATURES.map((n) => `"${n}"`).join(" | ")}).`);
     }
+    // tracked (booléen, SUIVI vs ANCRÉ d'un son positionné — défaut true,
+    // résolu côté vue) : transport pur, comme at/nature.
+    if (rawEffect.tracked !== undefined && typeof rawEffect.tracked !== "boolean") {
+      fail(`${describe}.tracked doit être un booléen si présent.`);
+    }
     const effect = { type: "playSound", path: rawEffect.path };
     if (rawEffect.gain !== undefined) effect.gain = rawEffect.gain;
     if (rawEffect.pitchVariation !== undefined) effect.pitchVariation = rawEffect.pitchVariation;
     if (rawEffect.reverbSend !== undefined) effect.reverbSend = rawEffect.reverbSend;
     if (rawEffect.at !== undefined) effect.at = rawEffect.at;
     if (rawEffect.nature !== undefined) effect.nature = rawEffect.nature;
+    if (rawEffect.tracked !== undefined) effect.tracked = rawEffect.tracked;
     return effect;
   }
   if (type === "announce") {
@@ -336,6 +344,41 @@ function parseActionEffect(rawEffect, describe, entityVariables, sceneVariables)
     return effect;
   }
   fail(`${describe}.type "${type}" inconnu (attendu : ${ACTION_EFFECT_TYPES.map((t) => `"${t}"`).join(" | ")}).`);
+}
+
+// Un TRIGGER de transition d'horloge (voir core/triggers.js,
+// doc/scripting.md/"Triggers") : { on: "hour", hour?: 0..23, effects }.
+// `effects` : MÊME vocabulaire et MÊME validation qu'une action
+// (parseActionEffect ci-dessus), SAUF les effets MIXTES (teleport) — un
+// déplacement du JOUEUR déclenché par l'horloge n'a pas de sens, refusé au
+// chargement plutôt que silencieusement ignoré. Un trigger sans effet
+// échoue, comme une règle muette (voir parsePresenceRule).
+function parseTrigger(rawTrigger, describe, entityVariables, sceneVariables) {
+  if (typeof rawTrigger !== "object" || rawTrigger === null || Array.isArray(rawTrigger)) {
+    fail(`${describe} n'est pas un objet.`);
+  }
+  if (!TRIGGER_KINDS.includes(rawTrigger.on)) {
+    fail(`${describe}.on "${rawTrigger.on}" inconnu (attendu : ${TRIGGER_KINDS.map((k) => `"${k}"`).join(" | ")}).`);
+  }
+  if (
+    rawTrigger.hour !== undefined &&
+    (!Number.isInteger(rawTrigger.hour) || rawTrigger.hour < 0 || rawTrigger.hour >= TIME_CONFIG.hoursPerDay)
+  ) {
+    fail(`${describe}.hour doit être un entier entre 0 et ${TIME_CONFIG.hoursPerDay - 1} si présent.`);
+  }
+  if (!Array.isArray(rawTrigger.effects) || rawTrigger.effects.length === 0) {
+    fail(`${describe}.effects doit être un tableau non vide.`);
+  }
+  const effects = rawTrigger.effects.map((effect, i) =>
+    parseActionEffect(effect, `${describe}.effects[${i}]`, entityVariables, sceneVariables)
+  );
+  const mixed = effects.find((effect) => MIXED_EFFECT_TYPES.includes(effect.type));
+  if (mixed) {
+    fail(`${describe}.effects : "${mixed.type}" (effet mixte, joueur) n'est pas admis sur un trigger.`);
+  }
+  const trigger = { on: rawTrigger.on, effects };
+  if (rawTrigger.hour !== undefined) trigger.hour = rawTrigger.hour;
+  return trigger;
 }
 
 // Comparateurs reconnus par la condition "variable" (voir plus bas) — un
@@ -549,6 +592,7 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
     sounds,
     container,
     shop,
+    triggers,
   } = rawEntity;
 
   if (!isNonEmptyString(id)) {
@@ -799,6 +843,19 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
     }
     validateCatalog(resolvedShop.catalog, `entities[${index}] ("${id}") : shop.catalog`, fail);
     entity.shop = { catalog: resolvedShop.catalog };
+  }
+
+  // triggers : optionnel, TRIGGERS de transition d'horloge (voir
+  // core/triggers.js, parseTrigger plus haut) — cascade instance -> type
+  // comme action/container. SPARSE : absent si non déclaré.
+  const resolvedTriggers = triggers !== undefined ? triggers : registry[type].triggers;
+  if (resolvedTriggers !== undefined) {
+    if (!Array.isArray(resolvedTriggers) || resolvedTriggers.length === 0) {
+      fail(`entities[${index}] ("${id}") : triggers doit être un tableau non vide si présent.`);
+    }
+    entity.triggers = resolvedTriggers.map((trigger, i) =>
+      parseTrigger(trigger, `entities[${index}] ("${id}") : triggers[${i}]`, entity.variables, sceneVariables)
+    );
   }
 
   // presence : optionnel, RÈGLES DÉCLARATIVES de présence conditionnelle
