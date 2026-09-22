@@ -9,4 +9,5 @@ export default {
   town_square: "level/town-square.json",
   town_square_town_hall_main: "level/town-square-town-hall-main.json",
   town_square_town_hall_mayor_office: "level/town-square-town-hall-mayor-office.json",
+  clock_tower_main: "level/clock-tower-main.json",
 };

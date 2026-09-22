@@ -2,9 +2,11 @@
 // chaque archétype (un fichier par type, voir apple.js/bird_1.js/bird_2.js/
 // bird_3.js/buddy.js/bush.js/chair.js/clock.js/clock_tower.js/coin.js/crate.js/
 // cumulo-lupus.js/decor.js/dog.js/door.js/fountain.js/ghost.js/
-// glass-window.js/hound.js/item.js/money.js/neon.js/npc.js/object.js/
-// office_computer.js/passage.js/potted_plant.js/river.js/rock.js/
-// shop_counter.js/statue.js) en un seul objet — même patron que
+// glass-window.js/hound.js/item.js/large_machinery.js/money.js/neon.js/
+// npc.js/object.js/office_computer.js/passage.js/potted_plant.js/river.js/
+// rock.js/shop_counter.js/sound_emitter.js/statue.js/turret_clockwork.js) en
+// un seul objet —
+// même patron que
 // core/behaviors/index.js. Donnée neutre au global : aucun import, ni du
 // core ni de la vue. blocksMovement est lu par core/level.js (baké dans
 // l'entité parsée) puis exploité par core/reduce.js pour arrêter le joueur
@@ -50,8 +52,9 @@
 //
 // Les archétypes (apple/bird_1/bird_2/bird_3/buddy/bush/chair/clock/clock_tower/
 // coin/crate/cumuloLupus/decor/dog/door/fountain/ghost/glass_window/hound/item/
-// money/neon/npc/object/office_computer/passage/potted_plant/river/rock/
-// shop_counter/statue) sont des PRESETS de
+// large_machinery/money/neon/npc/object/office_computer/passage/potted_plant/
+// river/rock/shop_counter/sound_emitter/statue/turret_clockwork) sont des
+// PRESETS de
 // propriétés — des objets plats indépendants, jamais une hiérarchie ni de
 // l'héritage : voir entities/model.md. Aucun n'a de `behavior` par défaut
 // (voir dog.js) : le comportement se déclare toujours à l'instance.
@@ -76,6 +79,7 @@ import ghost from "./ghost.js";
 import glassWindow from "./glass-window.js";
 import hound from "./hound.js";
 import item from "./item.js";
+import largeMachinery from "./large_machinery.js";
 import money from "./money.js";
 import neon from "./neon.js";
 import npc from "./npc.js";
@@ -86,7 +90,9 @@ import pottedPlant from "./potted_plant.js";
 import river from "./river.js";
 import rock from "./rock.js";
 import shopCounter from "./shop_counter.js";
+import soundEmitter from "./sound_emitter.js";
 import statue from "./statue.js";
+import turretClockwork from "./turret_clockwork.js";
 
 export default {
   apple,
@@ -109,6 +115,7 @@ export default {
   glass_window: glassWindow,
   hound,
   item,
+  large_machinery: largeMachinery,
   money,
   neon,
   npc,
@@ -119,5 +126,7 @@ export default {
   river,
   rock,
   shop_counter: shopCounter,
+  sound_emitter: soundEmitter,
   statue,
+  turret_clockwork: turretClockwork,
 };

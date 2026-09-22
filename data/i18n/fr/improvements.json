@@ -4,5 +4,9 @@
   "improvement.flashlight": "Lampe torche",
   "improvement.flashlight.description": "Une lampe torche, pour éclairer ce que l'obscurité cache.",
   "improvement.mirror_pass": "Passe-miroir",
-  "improvement.mirror_pass.description": "Le droit de franchir certains miroirs comme on franchit une porte."
+  "improvement.mirror_pass.description": "Le droit de franchir certains miroirs comme on franchit une porte.",
+  "improvement.master_key": "Passe-partout",
+  "improvement.master_key.description": "Une clé qui ouvre les portes ordinaires de la ville, celles qu'on ferme par habitude plus que par méfiance.",
+  "improvement.skeleton_key": "Sésame",
+  "improvement.skeleton_key.description": "Une clé qui ouvre ce que le passe-partout laisse clos : les serrures qu'on a voulu vraiment inviolables."
 }

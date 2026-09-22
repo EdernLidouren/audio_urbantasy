@@ -100,6 +100,9 @@
   "assets/musics/riverwalk_night": [
     "assets/musics/riverwalk_night_1.mp3"
   ],
+  "assets/musics/sanctuary": [
+    "assets/musics/sanctuary_1.mp3"
+  ],
   "assets/musics/science_day": [
     "assets/musics/science_day_1.mp3",
     "assets/musics/science_day_2.mp3"
@@ -138,8 +141,17 @@
   "assets/sounds/decor/gear_2_beacon": [
     "assets/sounds/decor/gear_2_beacon_1.mp3"
   ],
+  "assets/sounds/decor/machine_1_beacon": [
+    "assets/sounds/decor/machine_1_beacon_1.mp3"
+  ],
   "assets/sounds/decor/river_beacon": [
     "assets/sounds/decor/river_beacon_1.mp3"
+  ],
+  "assets/sounds/decor/slow_gear_1_beacon": [
+    "assets/sounds/decor/slow_gear_1_beacon_1.mp3"
+  ],
+  "assets/sounds/decor/slow_gear_2_beacon": [
+    "assets/sounds/decor/slow_gear_2_beacon_1.mp3"
   ],
   "assets/sounds/decor/stone_slab_beacon": [
     "assets/sounds/decor/stone_slab_beacon_1.mp3",
@@ -180,6 +192,9 @@
     "assets/sounds/doors/metal_gate_1.mp3",
     "assets/sounds/doors/metal_gate_2.mp3"
   ],
+  "assets/sounds/doors/metal_ladder_1_beacon": [
+    "assets/sounds/doors/metal_ladder_1_beacon_1.mp3"
+  ],
   "assets/sounds/doors/passage_wind_beacon": [
     "assets/sounds/doors/passage_wind_beacon_1.mp3"
   ],
@@ -210,9 +225,6 @@
     "assets/sounds/effects/neon_malfunction_3.mp3",
     "assets/sounds/effects/neon_malfunction_4.mp3",
     "assets/sounds/effects/neon_malfunction_5.mp3"
-  ],
-  "assets/sounds/effects/old/clock_tower_bell": [
-    "assets/sounds/effects/old/clock_tower_bell_1.mp3"
   ],
   "assets/sounds/effects/plant_shake": [
     "assets/sounds/effects/plant_shake_1.mp3"
@@ -402,6 +414,24 @@
     "assets/sounds/footsteps/surfaces/light_snow_walk_14.mp3",
     "assets/sounds/footsteps/surfaces/light_snow_walk_15.mp3"
   ],
+  "assets/sounds/footsteps/surfaces/metal_walk": [
+    "assets/sounds/footsteps/surfaces/metal_walk_1.mp3",
+    "assets/sounds/footsteps/surfaces/metal_walk_2.mp3",
+    "assets/sounds/footsteps/surfaces/metal_walk_3.mp3",
+    "assets/sounds/footsteps/surfaces/metal_walk_4.mp3",
+    "assets/sounds/footsteps/surfaces/metal_walk_5.mp3",
+    "assets/sounds/footsteps/surfaces/metal_walk_6.mp3",
+    "assets/sounds/footsteps/surfaces/metal_walk_7.mp3",
+    "assets/sounds/footsteps/surfaces/metal_walk_8.mp3",
+    "assets/sounds/footsteps/surfaces/metal_walk_9.mp3",
+    "assets/sounds/footsteps/surfaces/metal_walk_10.mp3",
+    "assets/sounds/footsteps/surfaces/metal_walk_11.mp3",
+    "assets/sounds/footsteps/surfaces/metal_walk_12.mp3",
+    "assets/sounds/footsteps/surfaces/metal_walk_13.mp3",
+    "assets/sounds/footsteps/surfaces/metal_walk_14.mp3",
+    "assets/sounds/footsteps/surfaces/metal_walk_15.mp3",
+    "assets/sounds/footsteps/surfaces/metal_walk_16.mp3"
+  ],
   "assets/sounds/footsteps/surfaces/mud_walk": [
     "assets/sounds/footsteps/surfaces/mud_walk_1.mp3",
     "assets/sounds/footsteps/surfaces/mud_walk_2.mp3",
@@ -484,6 +514,9 @@
   ],
   "assets/sounds/furniture/clock_2_beacon": [
     "assets/sounds/furniture/clock_2_beacon_1.mp3"
+  ],
+  "assets/sounds/furniture/clock_3_beacon": [
+    "assets/sounds/furniture/clock_3_beacon_1.mp3"
   ],
   "assets/sounds/furniture/computer_1_beacon": [
     "assets/sounds/furniture/computer_1_beacon_1.mp3"

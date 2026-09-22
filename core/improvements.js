@@ -17,6 +17,8 @@ export const IMPROVEMENT_REGISTRY = {
   },
   flashlight: { labelKey: "improvement.flashlight", descriptionKey: "improvement.flashlight.description" },
   mirror_pass: { labelKey: "improvement.mirror_pass", descriptionKey: "improvement.mirror_pass.description" },
+  master_key: { labelKey: "improvement.master_key", descriptionKey: "improvement.master_key.description" },
+  skeleton_key: { labelKey: "improvement.skeleton_key", descriptionKey: "improvement.skeleton_key.description" },
 };
 
 export function improvementProps(id) {

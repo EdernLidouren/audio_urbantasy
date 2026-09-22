@@ -1,0 +1,72 @@
+{
+  "id": "clock_tower_main",
+  "titleKey": "level.clock_tower_main.name",
+  "length": 50,
+  "playerStart": 25,
+  "indoor": true,
+  "music": "assets/musics/sanctuary",
+  "ambiences": [],
+  "defaultSurface": "concrete",
+  "reverbDurationSec": 5.0,
+  "reverbDecay": 2.5,
+  "entities": [
+    {
+      "id": "large_machinery_1_r",
+      "type": "large_machinery",
+      "x": 4
+    },
+    {
+      "id": "clock_tower_backdoor_r",
+      "type": "door",
+      "x": 12,
+      "nameKey": "door.clock_tower_backdoor.name",
+      "descriptionKey": "door.clock_tower_backdoor.description",
+      "sounds": {
+        "beacon": {
+          "path": "assets/sounds/doors/metal_door_1_close"
+        }
+      },
+      "action": {
+        "kind": "applyEffects",
+        "effects": [
+          {
+            "type": "teleport",
+            "target": "town_square",
+            "side": "verso",
+            "x": 37
+          }
+        ]
+      }
+    },
+    {
+      "id": "clockwork_r",
+      "type": "turret_clockwork",
+      "x": 25
+    },
+    {
+      "id": "large_machinery_2_r",
+      "type": "large_machinery",
+      "x": 35,
+      "sounds": {
+        "beacon": {
+          "path": "assets/sounds/decor/slow_gear_2_beacon"
+        }
+      }
+    },
+    {
+      "id": "clock_tower_ladder_r",
+      "type": "door",
+      "x": 45,
+      "nameKey": "door.clock_tower_ladder.name",
+      "descriptionKey": "door.clock_tower_ladder.description",
+      "sounds": {
+        "beacon": {
+          "path": "assets/sounds/doors/metal_ladder_1_beacon"
+        }
+      },
+      "action": {
+        "kind": "applyEffects"
+      }
+    }
+  ]
+}

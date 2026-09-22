@@ -643,6 +643,11 @@ function occupiedEntities(entitySounds, liveById, x) {
       // interactive — "comme si absente" (troisième plan coupé par le
       // drapeau, voir le header du fichier).
       if (live.present === false) return false;
+      // Ni observable ni interactable (ex. entities/types/sound_emitter.js,
+      // decor.js) : rien à offrir à Espace ni à Entrée, donc jamais
+      // annoncée à l'approche — l'occupation ne nomme que ce qu'on peut
+      // interroger.
+      if (!entity.observable && !entity.interactable) return false;
       return Math.abs(live.x - x) <= interactRange;
     })
     .map(({ entity }) => liveById.get(entity.id))

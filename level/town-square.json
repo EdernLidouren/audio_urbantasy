@@ -2,7 +2,7 @@
   "id": "town_square",
   "titleKey": "level.town_square.name",
   "length": 50,
-  "playerStart": 1,
+  "playerStart": 26,
   "recto": {
     "musicDay": "assets/musics/jazz_day",
     "musicNight": "assets/musics/jazz_night",
@@ -75,6 +75,20 @@
         "type": "clock_tower",
         "x": 35,
         "isFlying": true
+      },
+      {
+        "id": "clock_tower_backdoor_1_v",
+        "type": "door",
+        "x": 37,
+        "nameKey": "door.clock_tower_backdoor.name",
+        "descriptionKey": "door.clock_tower_backdoor.description",
+        "sounds": { "beacon": { "path": "assets/sounds/doors/metal_door_1_close" } },
+        "action": {
+          "kind": "applyEffects",
+          "condition": { "type": "hasImprovement", "id": "master_key" },
+          "refusalEffects": [{ "type": "announce", "key": "door.default.master_key_refusal" }],
+          "effects": [{ "type": "teleport", "target": "clock_tower_main", "x": 12 }]
+        }
       },
       {
         "id": "town_hall_passage_verso",

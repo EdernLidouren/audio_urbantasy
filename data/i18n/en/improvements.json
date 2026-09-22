@@ -4,5 +4,9 @@
   "improvement.flashlight": "Flashlight",
   "improvement.flashlight.description": "A flashlight, to light up what the dark hides.",
   "improvement.mirror_pass": "Mirror pass",
-  "improvement.mirror_pass.description": "The right to step through certain mirrors as one steps through a door."
+  "improvement.mirror_pass.description": "The right to step through certain mirrors as one steps through a door.",
+  "improvement.master_key": "Master key",
+  "improvement.master_key.description": "A key that opens the ordinary doors of the town, the ones locked out of habit rather than distrust.",
+  "improvement.skeleton_key": "Skeleton key",
+  "improvement.skeleton_key.description": "A key that opens what the master key leaves shut: the locks meant to be truly inviolable."
 }

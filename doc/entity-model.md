@@ -44,7 +44,10 @@ une balise `interactable:false` jamais candidate à Entrée, même à portée.
 - **`observable`** — candidate à Espace (description riche, voir plus bas).
   Exemples : `rock`/`bird`/`fountain`/`hound`/`dog`/`buddy`/`neon`
   (observables, non interactables), `decor` (aucune des deux — preset de
-  référence pour ce cas, voir `entities/types/decor.js`).
+  référence pour ce cas, voir `entities/types/decor.js`), `sound_emitter`
+  (aucune des deux, et aucun son propre : un ÉMETTEUR INVISIBLE, une
+  position + des `triggers` déclarés par instance — voir
+  `entities/types/sound_emitter.js`, `doc/scripting.md`/"Triggers").
 - **`interactable`** — candidate à Entrée. `npc`/`object` sont interactables
   dès ce niveau 0 EN ANTICIPATION d'un futur type d'action (parler/
   ramasser) au-delà de `"pickup"` (voir plus bas) : le filtrage par verbe ne
@@ -57,8 +60,10 @@ Deux niveaux de PERCEPTION, à ne pas confondre :
 - **Occupation** (couche légère, inchangée) : le NOM de l'entité, annoncé à
   l'approche (`view/audio/city-scene.js`/`occupiedEntities`) sur le canal
   POLITE (information de contexte, jamais une urgence : ne coupe pas une
-  lecture en cours) — ne connaît aucune capacité, toute entité à portée y
-  figure.
+  lecture en cours). Toute entité à portée y figure, SAUF celles qui n'ont
+  AUCUNE des deux capacités (`observable:false` ET `interactable:false`,
+  ex. `decor`, `sound_emitter`) : rien à offrir à Espace ni à Entrée,
+  l'occupation ne nomme que ce qu'on peut interroger.
 - **Observation** (Espace, couche riche) : la DESCRIPTION d'une entité
   `observable` ciblée. Résolue via une INDIRECTION
   (`view/interaction.js`/`resolveDescription`) plutôt qu'un accès direct à
