@@ -1395,7 +1395,8 @@ espace fermé pour tout ce qui est spatial/logique :
 
 **Seul le SON traverse** — voir `view/audio/city-scene.js` : les entités de
 l'AUTRE face sont rendues en ÉTOUFFÉ (passe-bas + atténuation de gain,
-`mufflingLowpassHz`/`mufflingGain`, `config/tuning-values.js`), toujours
+profil `faceMufflingLowpassHz`/`faceMufflingGain`, `config/tuning-values.js`
+— distinct du profil de perception surnaturelle), toujours
 DIRECTIONNELLES (même pan/distance dérivés de leur x que d'habitude) — sauf
 leur BEACON, jamais construit pour l'autre face EN JEU NORMAL
 (`includeBeacon:false`) : on DEVINE la présence de l'autre face, on ne la

@@ -353,9 +353,18 @@ function parseActionEffect(rawEffect, describe, entityVariables, sceneVariables)
 // déplacement du JOUEUR déclenché par l'horloge n'a pas de sens, refusé au
 // chargement plutôt que silencieusement ignoré. Un trigger sans effet
 // échoue, comme une règle muette (voir parsePresenceRule).
+const TRIGGER_FIELDS = ["on", "hour", "effects"];
+
 function parseTrigger(rawTrigger, describe, entityVariables, sceneVariables) {
   if (typeof rawTrigger !== "object" || rawTrigger === null || Array.isArray(rawTrigger)) {
     fail(`${describe} n'est pas un objet.`);
+  }
+  // Clé inconnue -> échec : un réglage posé au mauvais niveau (ex. `gain`
+  // sur le trigger au lieu de son effet playSound) serait sinon ignoré en
+  // silence.
+  const unknown = Object.keys(rawTrigger).find((key) => !TRIGGER_FIELDS.includes(key));
+  if (unknown !== undefined) {
+    fail(`${describe}.${unknown} inconnu (attendu : ${TRIGGER_FIELDS.map((k) => `"${k}"`).join(" | ")}).`);
   }
   if (!TRIGGER_KINDS.includes(rawTrigger.on)) {
     fail(`${describe}.on "${rawTrigger.on}" inconnu (attendu : ${TRIGGER_KINDS.map((k) => `"${k}"`).join(" | ")}).`);

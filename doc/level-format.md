@@ -121,7 +121,7 @@ STRICTE (voir `doc/entity-model.md`/"Recto/verso") : collision, ciblage de
 comportement (`follow`/`goto`), interaction et occupation restent bornés à
 la face de l'entité, jamais croisés. Seul le SON traverse : les entités de
 l'autre face sont rendues en ÉTOUFFÉ (passe-bas + atténuation de gain,
-réglages `mufflingLowpassHz`/`mufflingGain` — `config/tuning-values.js`),
+réglages `faceMufflingLowpassHz`/`faceMufflingGain` — `config/tuning-values.js`),
 directionnelles (même pan/distance que d'habitude), SAUF leur beacon,
 jamais audible de l'autre côté en temps normal (aucune localisation
 croisée) — voir `view/audio/city-scene.js`/`includeBeacon`. EXCEPTION

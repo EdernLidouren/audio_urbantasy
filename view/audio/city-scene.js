@@ -211,12 +211,28 @@ const FAR_VOLUME_MAX = TUNING_DEFAULTS.farVolumeMax;
 // résolue par entité.
 const BEACON_STAGGER_MIN_MS = TUNING_DEFAULTS.beaconStaggerMinMs;
 const BEACON_STAGGER_MAX_MS = TUNING_DEFAULTS.beaconStaggerMaxMs;
-// Rendu ÉTOUFFÉ de l'AUTRE face (RECTO/VERSO étape 2/2, voir
-// config/tuning-values.js pour le détail des deux réglages) — appliqués à
-// TOUT one-shot positionné d'une entité de la face non courante, jamais aux
-// beacons (exclus entièrement, voir buildEntitySoundEntry/includeBeacon).
-const MUFFLING_LOWPASS_HZ = TUNING_DEFAULTS.mufflingLowpassHz;
-const MUFFLING_GAIN = TUNING_DEFAULTS.mufflingGain;
+// Deux PROFILS d'étouffement (voir config/tuning-values.js), UNE chaîne de
+// rendu (applyMuffle*, spatialRendering, playPositionedOneShot) : l'AUTRE
+// face (RECTO/VERSO étape 2/2 — tout son positionné d'une entité de la face
+// non courante, jamais ses beacons, voir buildEntitySoundEntry/
+// includeBeacon) et la PERCEPTION surnaturelle (entités mondaines de la
+// face courante, en fondu). Un étouffement = { amount, gain, lowpassHz } :
+// amount (0..1) dose, gain/lowpassHz viennent du profil — voir
+// effectiveMuffle.
+const FACE_MUFFLE = { gain: TUNING_DEFAULTS.faceMufflingGain, lowpassHz: TUNING_DEFAULTS.faceMufflingLowpassHz };
+const PERCEPTION_MUFFLE = { gain: TUNING_DEFAULTS.perceptionMufflingGain, lowpassHz: TUNING_DEFAULTS.perceptionMufflingLowpassHz };
+const NO_MUFFLE = Object.freeze({ amount: 0, gain: 1, lowpassHz: undefined });
+const FULL_FACE_MUFFLE = Object.freeze({ amount: 1, ...FACE_MUFFLE });
+
+function applyMuffleToVolume(volume, muffle) {
+  if (muffle.amount <= 0) return volume;
+  return volume * (1 - muffle.amount * (1 - muffle.gain));
+}
+
+function applyMuffleToCutoff(cutoff, muffle) {
+  if (muffle.amount <= 0) return cutoff;
+  return cutoff * (1 - muffle.amount) + muffle.lowpassHz * muffle.amount;
+}
 // Durée (ms) du fondu de PERCEPTION SURNATURELLE (voir
 // core/presence.js/"perceptionActive") — crossfade musique/ambiance ET
 // rampe du filtre d'étouffement des entités mondaines, la MÊME durée pour
@@ -597,16 +613,15 @@ const trackedOneShots = [];
 // (updateTrackedOneShots) : UNE formule, jamais deux. Pan depuis
 // panSaturation ; volume de distance (surlignage compris, voir
 // volumeForDistance) ; passe-bas de distance (cutoffForDistance) ;
-// étouffement (`muffled`, perception ou autre face) appliqué aux deux. Le
-// volume renvoyé est ADIMENSIONNÉ : l'appelant le multiplie par ses propres
-// facteurs (préférence, gain de rôle, hauteur).
-function spatialRendering(entry, relX, muffled) {
+// étouffement (`muffle`, profil perception ou autre face, voir
+// effectiveMuffle) appliqué aux deux. Le volume renvoyé est ADIMENSIONNÉ :
+// l'appelant le multiplie par ses propres facteurs (préférence, gain de
+// rôle, hauteur).
+function spatialRendering(entry, relX, muffle) {
   const dist = Math.abs(relX);
   const pan = clamp(relX / entry.panSaturation, -1, 1);
-  let volume = volumeForDistance(dist, entry.audibleRange, entry.highlight && dist <= entry.interactRange);
-  if (muffled > 0) volume *= 1 - muffled * (1 - MUFFLING_GAIN);
-  let cutoff = cutoffForDistance(dist, entry.interactRange, entry.audibleRange, entry.cutoffMin, entry.cutoffMax);
-  if (muffled > 0) cutoff = cutoff * (1 - muffled) + MUFFLING_LOWPASS_HZ * muffled;
+  const volume = applyMuffleToVolume(volumeForDistance(dist, entry.audibleRange, entry.highlight && dist <= entry.interactRange), muffle);
+  const cutoff = applyMuffleToCutoff(cutoffForDistance(dist, entry.interactRange, entry.audibleRange, entry.cutoffMin, entry.cutoffMax), muffle);
   return { pan, volume, cutoff };
 }
 
@@ -1237,20 +1252,20 @@ export function createCityAudioScene(getSession) {
     return mundaneMuffleRampFrom + (mundaneMuffleRampTo - mundaneMuffleRampFrom) * progress;
   }
 
-  // Amount effectif (0..1) d'UNE entrée donnée : forcedMuffle (RECTO/VERSO,
-  // l'AUTRE face — TOUJOURS 1, fixe, voir updateIntermittentSources/
-  // updateEntityMovementSounds ci-dessous) prime sur tout le reste ; sinon
-  // une entité SURNATURELLE (perceptionGated) n'est JAMAIS étouffée par ce
-  // mécanisme (elle émerge pleine et claire, voir isPerceptionGated) ;
-  // sinon la rampe mondaine courante s'applique. Les deux mécanismes de
-  // filtre d'étouffement (RECTO/VERSO fixe, PERCEPTION progressif)
-  // partagent la MÊME primitive de rendu (playPositionedOneShot/muffled,
+  // Étouffement effectif { amount, gain, lowpassHz } d'UNE entrée donnée :
+  // forcedMuffle (RECTO/VERSO, l'AUTRE face — TOUJOURS 1, fixe, voir
+  // updateIntermittentSources/updateEntityMovementSounds ci-dessous) prime
+  // sur tout le reste, avec le profil de FACE ; sinon une entité
+  // SURNATURELLE (perceptionGated) n'est JAMAIS étouffée (elle émerge pleine
+  // et claire, voir isPerceptionGated) ; sinon la rampe mondaine courante
+  // s'applique, avec le profil de PERCEPTION. Les deux mécanismes partagent
+  // la MÊME chaîne de rendu (applyMuffle*, playPositionedOneShot,
   // sound.setCutoff côté balise continue), jamais deux implémentations
-  // parallèles — seule la VALEUR appliquée diffère.
-  function effectiveMuffleAmount(entry, forcedMuffle) {
-    if (forcedMuffle > 0) return forcedMuffle;
-    if (entry.perceptionGated) return 0;
-    return currentMundaneMuffleAmount();
+  // parallèles — seuls amount et profil diffèrent.
+  function effectiveMuffle(entry, forcedMuffle) {
+    if (forcedMuffle > 0) return { amount: forcedMuffle, ...FACE_MUFFLE };
+    if (entry.perceptionGated) return NO_MUFFLE;
+    return { amount: currentMundaneMuffleAmount(), ...PERCEPTION_MUFFLE };
   }
 
   // État de déclenchement du pas du joueur — voir stepWalker. Même forme,
@@ -1443,14 +1458,13 @@ export function createCityAudioScene(getSession) {
       pitchVariation = 0,
       highpassHz,
       heightGain = 1,
-      muffled = 0,
+      muffle = NO_MUFFLE,
       highlighted = false,
     }
   ) {
     const dist = Math.abs(relX);
     const pan = clamp(relX / panSaturation, -1, 1);
-    let volume = volumeForDistance(dist, audibleRange, highlighted) * volumeFactor * gain * heightGain;
-    if (muffled > 0) volume *= 1 - muffled * (1 - MUFFLING_GAIN);
+    const volume = applyMuffleToVolume(volumeForDistance(dist, audibleRange, highlighted) * volumeFactor * gain * heightGain, muffle);
     const resolved = resolveAsset(path);
     playOneShot(resolved, {
       reverbSend,
@@ -1459,8 +1473,8 @@ export function createCityAudioScene(getSession) {
       stereo: pan,
       rate: randomRate(pitchVariation),
       highpassHz,
-      lowpassHz: muffled > 0 ? MUFFLING_LOWPASS_HZ : undefined,
-      cacheKey: muffled > 0 ? `muffled:${resolved}` : undefined,
+      lowpassHz: muffle.amount > 0 ? muffle.lowpassHz : undefined,
+      cacheKey: muffle.amount > 0 ? `muffled:${resolved}` : undefined,
       entityLayer: true,
     });
   }
@@ -1473,7 +1487,7 @@ export function createCityAudioScene(getSession) {
   // lui-même). Jamais soumis à la pause sélective des balises (sound.pause/
   // resume ne concerne QUE la voix continue, voir lib/audio.js) : un
   // one-shot Howler joue jusqu'au bout quoi qu'il arrive ensuite au beacon.
-  function playTransitionSound(entry, relX, transitionSound, muffled = 0) {
+  function playTransitionSound(entry, relX, transitionSound, muffle = NO_MUFFLE) {
     playPositionedOneShot(transitionSound.path, {
       relX,
       audibleRange: entry.audibleRange,
@@ -1482,7 +1496,7 @@ export function createCityAudioScene(getSession) {
       volumeFactor: beaconVolumeFactor(),
       gain: transitionSound.gain,
       pitchVariation: transitionSound.pitchVariation,
-      muffled,
+      muffle,
       highlighted: entry.highlight && Math.abs(relX) <= entry.interactRange,
     });
   }
@@ -1529,7 +1543,7 @@ export function createCityAudioScene(getSession) {
     }
     const resolved = resolveTransitionSound(found.entry.entity, descriptor, PLAY_SOUND_TUNING_KEYS);
     if (descriptor.tracked === false) {
-      playTransitionSound(found.entry, found.live.x - getSession().player.x, resolved, effectiveMuffleAmount(found.entry, found.forcedMuffle));
+      playTransitionSound(found.entry, found.live.x - getSession().player.x, resolved, effectiveMuffle(found.entry, found.forcedMuffle));
       return;
     }
     startTrackedOneShot(targetId, found, resolved);
@@ -1564,7 +1578,7 @@ export function createCityAudioScene(getSession) {
       console.warn(`city-scene: son suivi indisponible ("${resolved.path}") : ${error.message}`);
       return;
     }
-    const rendering = spatialRendering(found.entry, found.live.x - getSession().player.x, effectiveMuffleAmount(found.entry, found.forcedMuffle));
+    const rendering = spatialRendering(found.entry, found.live.x - getSession().player.x, effectiveMuffle(found.entry, found.forcedMuffle));
     const gain = resolved.gain ?? 1;
     const handle = playTrackedOneShot(file, {
       cacheKey: `tracked:${file}`,
@@ -1601,7 +1615,7 @@ export function createCityAudioScene(getSession) {
         trackedOneShots.splice(trackedOneShots.indexOf(source), 1);
         continue;
       }
-      const rendering = spatialRendering(found.entry, found.live.x - x, effectiveMuffleAmount(found.entry, found.forcedMuffle));
+      const rendering = spatialRendering(found.entry, found.live.x - x, effectiveMuffle(found.entry, found.forcedMuffle));
       source.handle.update(rendering.pan, rendering.volume * volumeFactor * source.gain, rendering.cutoff);
     }
   }
@@ -1639,7 +1653,7 @@ export function createCityAudioScene(getSession) {
       // replanification — src.nextAt reste tel quel, gelé jusqu'au retour
       // en présence (voir le header du fichier, "comme si absente").
       if (liveById.get(entry.entity.id).present === false) continue;
-      const muffled = effectiveMuffleAmount(entry, forcedMuffle);
+      const muffle = effectiveMuffle(entry, forcedMuffle);
       for (const src of entry.intermittentSources) {
         if (now < src.nextAt) continue;
 
@@ -1653,7 +1667,7 @@ export function createCityAudioScene(getSession) {
           pitchVariation: src.pitchVariation,
           highpassHz: src.highpassHz,
           heightGain: src.heightGain,
-          muffled,
+          muffle,
           highlighted: entry.highlight && Math.abs(liveById.get(entry.entity.id).x - x) <= entry.interactRange,
         });
         src.nextAt = now + jitteredIntervalMs(src.interval, src.intervalVariation);
@@ -1686,7 +1700,7 @@ export function createCityAudioScene(getSession) {
       // figé, mais on l'évite explicitement plutôt que d'en dépendre.
       if (live.present === false) continue;
 
-      const muffled = effectiveMuffleAmount(entry, forcedMuffle);
+      const muffle = effectiveMuffle(entry, forcedMuffle);
       stepWalker(entry.walker, live.x, entry.movementStepDistance, (atX) => {
         const path = resolveFootstepPath(world, atX, {
           gait: entry.gait,
@@ -1701,7 +1715,7 @@ export function createCityAudioScene(getSession) {
           volumeFactor,
           gain: entry.movementGain,
           pitchVariation: entry.movementPitchVariation,
-          muffled,
+          muffle,
           highlighted: entry.highlight && Math.abs(atX - x) <= entry.interactRange,
         });
       });
@@ -1830,13 +1844,13 @@ export function createCityAudioScene(getSession) {
       // Perception surnaturelle (voir effectiveMuffleAmount plus haut) :
       // toujours 0 (aucun effet) pour une entité surnaturelle (perceptionGated) —
       // jamais étouffée par le mécanisme qui la révèle.
-      const muffled = effectiveMuffleAmount(entry, 0);
+      const muffle = effectiveMuffle(entry, 0);
 
       if (live.presenceChanged === "exited") {
-        if (entry.exitSound) playTransitionSound(entry, relX, entry.exitSound, muffled);
+        if (entry.exitSound) playTransitionSound(entry, relX, entry.exitSound, muffle);
         if (sound) sound.stop();
       } else if (live.presenceChanged === "entered") {
-        if (entry.enterSound) playTransitionSound(entry, relX, entry.enterSound, muffled);
+        if (entry.enterSound) playTransitionSound(entry, relX, entry.enterSound, muffle);
         if (sound) sound.resume();
       }
 
@@ -1857,7 +1871,7 @@ export function createCityAudioScene(getSession) {
       // composé avec celui de distance, jamais à sa place).
       // flyingVolumeFactor : neutre (1) pour toute entité non isFlying,
       // voir buildEntitySoundEntry — aucun effet sur le volume dans ce cas.
-      const { pan, volume, cutoff } = spatialRendering(entry, relX, muffled);
+      const { pan, volume, cutoff } = spatialRendering(entry, relX, muffle);
       sound.update(pan, volume * beaconFactor * beaconGain * flyingVolumeFactor);
       sound.setCutoff(cutoff);
       // Passe-haut "hauteur suggérée" (voir entities/model.md, isFlying) :
@@ -1880,9 +1894,9 @@ export function createCityAudioScene(getSession) {
       const live = otherLiveById.get(entry.entity.id);
       const relX = live.x - x;
       if (live.presenceChanged === "exited" && entry.exitSound) {
-        playTransitionSound(entry, relX, entry.exitSound, 1);
+        playTransitionSound(entry, relX, entry.exitSound, FULL_FACE_MUFFLE);
       } else if (live.presenceChanged === "entered" && entry.enterSound) {
-        playTransitionSound(entry, relX, entry.enterSound, 1);
+        playTransitionSound(entry, relX, entry.enterSound, FULL_FACE_MUFFLE);
       }
     }
   }
@@ -2195,14 +2209,14 @@ export function createCityAudioScene(getSession) {
       if (!entry.sound) continue;
       const live = liveById.get(entry.entity.id);
       if (!live || live.present === false) continue;
-      const open = spatialRendering(entry, live.x - x, 0);
+      const open = spatialRendering(entry, live.x - x, NO_MUFFLE);
       const pan = open.pan;
       const openVolume = open.volume * beaconFactor * entry.beaconGain * entry.flyingVolumeFactor;
       const openCutoff = open.cutoff;
       entry.sound.update(pan, openVolume);
       entry.sound.setCutoff(openCutoff);
-      entry.sound.fadeVolume(openVolume * MUFFLING_GAIN, durationMs);
-      entry.sound.rampCutoff(MUFFLING_LOWPASS_HZ, durationMs);
+      entry.sound.fadeVolume(openVolume * FACE_MUFFLE.gain, durationMs);
+      entry.sound.rampCutoff(FACE_MUFFLE.lowpassHz, durationMs);
     }
 
     // Face AUTRE : balises TEMPORAIRES (voir header), démarrées DÉJÀ
@@ -2219,12 +2233,12 @@ export function createCityAudioScene(getSession) {
       });
       if (!rebuilt.sound) continue; // pas de balise continue pour ce type/mode (intermittente ou absente)
 
-      const open = spatialRendering(entry, live.x - x, 0);
+      const open = spatialRendering(entry, live.x - x, NO_MUFFLE);
       const pan = open.pan;
       const openVolume = open.volume * beaconFactor * rebuilt.beaconGain * entry.flyingVolumeFactor;
       const openCutoff = open.cutoff;
-      rebuilt.sound.update(pan, openVolume * MUFFLING_GAIN);
-      rebuilt.sound.setCutoff(MUFFLING_LOWPASS_HZ);
+      rebuilt.sound.update(pan, openVolume * FACE_MUFFLE.gain);
+      rebuilt.sound.setCutoff(FACE_MUFFLE.lowpassHz);
       rebuilt.sound.fadeVolume(openVolume, durationMs);
       rebuilt.sound.rampCutoff(openCutoff, durationMs);
       temporarySounds.push(rebuilt.sound);
@@ -2244,8 +2258,8 @@ export function createCityAudioScene(getSession) {
       const found = findEntitySource(source.entityId);
       if (!found || !found.live) continue;
       const relX = found.live.x - x;
-      const current = spatialRendering(found.entry, relX, effectiveMuffleAmount(found.entry, found.forcedMuffle));
-      const arrivalMuffle = found.forcedMuffle > 0 ? effectiveMuffleAmount(found.entry, 0) : 1;
+      const current = spatialRendering(found.entry, relX, effectiveMuffle(found.entry, found.forcedMuffle));
+      const arrivalMuffle = found.forcedMuffle > 0 ? effectiveMuffle(found.entry, 0) : FULL_FACE_MUFFLE;
       const target = spatialRendering(found.entry, relX, arrivalMuffle);
       source.handle.update(current.pan, current.volume * beaconFactor * source.gain, current.cutoff);
       source.handle.fadeVolume(target.volume * beaconFactor * source.gain, durationMs);

@@ -7189,6 +7189,7 @@ export function runMovementChecks() {
   run("triggers : effet inconnu rejeté", true, triggerRejected({ triggers: [{ on: "hour", effects: [{ type: "explode" }] }] }));
   run("triggers : tableau vide rejeté", true, triggerRejected({ triggers: [] }));
   run("triggers : non-tableau rejeté", true, triggerRejected({ triggers: BELL_TRIGGER }));
+  run("triggers : clé inconnue sur le trigger (gain au mauvais niveau) rejetée", true, triggerRejected({ triggers: [{ ...BELL_TRIGGER, gain: 10 }] }));
   run("triggers : variable inconnue dans un effet rejetée", true, triggerRejected({ triggers: [{ on: "hour", effects: [{ type: "setVariable", scope: "entity", name: "nope", value: 1 }] }] }));
 
   // Détection : sur TRANSITION d'heure ABSOLUE (un saut de 24 h exactes

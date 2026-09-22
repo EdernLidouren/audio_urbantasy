@@ -244,8 +244,10 @@ Exemple réel complet — `spirit_1` (`level/demo.json`) :
 Côté VUE (`view/audio/city-scene.js`), la bascule de perception déclenche AUSSI un
 crossfade musique/ambiance vers des pools surnaturels globaux
 (`config/perception.js`) et un fondu du filtre d'étouffement des entités MONDAINES
-(réutilise la chaîne d'occlusion RECTO/VERSO, `config/tuning-values.js`/
-`mufflingLowpassHz`/`mufflingGain`) — une entité dont la présence porte cette
+(MÊME chaîne de rendu que l'occlusion RECTO/VERSO, mais son PROPRE profil
+de réglage : `config/tuning-values.js`/`perceptionMufflingLowpassHz`/
+`perceptionMufflingGain`, indépendant de `faceMuffling*`) — une entité dont
+la présence porte cette
 condition (`isPerceptionGated`, `view/audio/city-scene.js`) en est TOUJOURS
 exemptée, elle émerge pleine et claire. Détail complet côté vue : voir les
 commentaires de `view/audio/city-scene.js` (`effectiveMuffleAmount`,
@@ -644,6 +646,11 @@ Un trigger CIBLÉ, forme complète (pas encore de contenu réel) :
   { "on": "hour", "hour": 6, "effects": [{ "type": "setVariable", "scope": "entity", "name": "lit", "value": false }] }
 ]
 ```
+
+Un trigger n'accepte QUE `on`, `hour` et `effects` : toute autre clé échoue
+au chargement — un réglage de son (`gain`, `pitchVariation`...) se déclare
+sur l'EFFET `playSound`, jamais sur le trigger, et une faute de niveau ne
+doit pas passer en silence.
 
 Un kind de trigger de plus demain (météo, phase...) = une entrée dans
 `TRIGGER_KINDS` (`core/triggers.js`) + sa détection dans

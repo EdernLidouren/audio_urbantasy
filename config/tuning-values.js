@@ -308,25 +308,28 @@ export const TUNING_DEFAULTS = {
   // volante).
   flyingVolumeFactor: 0.4,
 
-  // --- Rendu ÉTOUFFÉ de l'AUTRE face (voir CLAUDE.md/"RECTO/VERSO" étape
-  // 2/2, view/audio/city-scene.js) : chaîne de filtres appliquée à TOUT son
-  // ponctuel (vocal, pas, transition) d'une entité de la face que le joueur
-  // ne regarde PAS — jamais aux beacons, coupés entièrement (aucune
-  // localisation de l'autre côté). Bac à sable de réglage, même principe que
-  // le profil isFlying juste au-dessus : ces deux valeurs sont le SEUL
-  // endroit à toucher pour ajuster l'effet à l'oreille. GLOBAL (pas encore
-  // cascadé par entité/type) : un seul "de l'autre côté", pas de nuance par
-  // contenu pour l'instant.
+  // --- ÉTOUFFEMENT : deux PROFILS, une seule chaîne de rendu (voir
+  // view/audio/city-scene.js/effectiveMuffle). Chaque profil = un passe-bas
+  // (Hz) + un facteur de volume (0-1) COMPOSÉ avec le volume déjà dérivé de
+  // la distance, jamais à sa place. Bac à sable de réglage, même principe
+  // que le profil isFlying juste au-dessus. GLOBAL (pas cascadé par
+  // entité/type).
 
-  // Fréquence de coupure (Hz) du PASSE-BAS appliqué à un one-shot de
-  // l'autre face — bas = très sourd/lointain, haut = à peine étouffé.
-  mufflingLowpassHz: 500,
+  // Profil de l'AUTRE FACE (voir CLAUDE.md/"RECTO/VERSO" étape 2/2) :
+  // appliqué à tout son positionné d'une entité de la face que le joueur ne
+  // regarde PAS — jamais aux beacons, coupés entièrement. Fixe (amount
+  // toujours 1). Bas = très sourd/lointain, haut = à peine étouffé ;
+  // l'autre face se DEVINE, elle ne s'entend pas comme si le joueur y était.
+  faceMufflingLowpassHz: 1000,
+  faceMufflingGain: 0.5,
 
-  // Facteur multiplicatif (0-1) de volume, COMPOSÉ avec le volume déjà
-  // dérivé de la distance (jamais à sa place) : présent, mais nettement en
-  // retrait — l'autre face se DEVINE, elle ne s'entend pas comme si le
-  // joueur y était.
-  mufflingGain: 0.5,
+  // Profil de la PERCEPTION SURNATURELLE (voir doc/scripting.md/
+  // "perceptionActive") : appliqué aux entités MONDAINES de la face
+  // courante quand la perception est active, en fondu (perceptionFadeMs)
+  // — les entités surnaturelles en sont exemptées. Indépendant du profil
+  // de face ci-dessus : régler l'un ne touche jamais l'autre.
+  perceptionMufflingLowpassHz: 1000,
+  perceptionMufflingGain: 0.5,
 
   // Décalage aléatoire MAX (unités de scène, de part et d'autre de la
   // source) appliqué à une entité éphémère ÉPARPILLÉE (voir
