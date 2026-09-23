@@ -7,7 +7,7 @@ export default {
   nameKey: "entity.large_machinery.name",
   descriptionKey: "entity.large_machinery.description",
   sounds: {
-    beacon: { path: "assets/sounds/decor/slow_gear_1_beacon", loop: true, beaconGain: 1.5 },
+    beacon: { path: "assets/sounds/decor/large_gear_1_beacon", loop: true, beaconGain: 1.5 },
   },
   blocksMovement: false,
   observable: true,

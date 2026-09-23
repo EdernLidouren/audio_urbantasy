@@ -329,7 +329,7 @@ export const TUNING_DEFAULTS = {
   // — les entités surnaturelles en sont exemptées. Indépendant du profil
   // de face ci-dessus : régler l'un ne touche jamais l'autre.
   perceptionMufflingLowpassHz: 1000,
-  perceptionMufflingGain: 0.5,
+  perceptionMufflingGain: 0.7,
 
   // Décalage aléatoire MAX (unités de scène, de part et d'autre de la
   // source) appliqué à une entité éphémère ÉPARPILLÉE (voir

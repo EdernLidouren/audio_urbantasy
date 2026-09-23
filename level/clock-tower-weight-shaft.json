@@ -1,0 +1,90 @@
+{
+  "id": "clock_tower_weight_shaft",
+  "titleKey": "level.clock_tower_weight_shaft.name",
+  "length": 50,
+  "playerStart": 25,
+  "recto": {
+    "indoor": true,
+    "music": "assets/musics/sanctuary",
+    "ambiences": [
+      "assets/ambiances/shaft_1.mp3"
+    ],
+    "defaultSurface": "concrete",
+    "segments": [
+      {
+        "from": 1,
+        "to": 10,
+        "surface": "metal"
+      },
+      {
+        "from": 41,
+        "to": 50,
+        "surface": "metal"
+      }
+    ],
+    "reverbDurationSec": 5.0,
+    "reverbDecay": 2.5,
+    "entities": [
+      {
+        "id": "weight_shaft_r",
+        "type": "weight_shaft",
+        "x": 25
+      },
+      {
+        "id": "winding_mechanism_r",
+        "type": "large_winding_mechanism",
+        "x": 35
+      },
+      {
+        "id": "clock_tower_escapement_r",
+        "type": "clock_tower_escapement",
+        "x": 40
+      },
+      {
+        "id": "clock_tower_ladder_r",
+        "type": "door",
+        "x": 45,
+        "nameKey": "door.clock_tower_ladder.name",
+        "descriptionKey": "door.clock_tower_ladder.description",
+        "sounds": {
+          "beacon": {
+            "path": "assets/sounds/doors/metal_ladder_1_beacon"
+          }
+        },
+        "action": {
+          "kind": "applyEffects",
+          "effects": [
+            {
+              "type": "teleport",
+              "target": "clock_tower_main",
+              "x": 45
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "verso": {
+    "indoor": true,
+    "music": "assets/musics/sanctuary",
+    "ambiences": [
+      "assets/ambiances/shaft_1.mp3"
+    ],
+    "defaultSurface": "concrete",
+    "segments": [
+      {
+        "from": 1,
+        "to": 10,
+        "surface": "metal"
+      },
+      {
+        "from": 41,
+        "to": 50,
+        "surface": "metal"
+      }
+    ],
+    "reverbDurationSec": 5.0,
+    "reverbDecay": 2.5,
+    "entities": []
+  }
+}

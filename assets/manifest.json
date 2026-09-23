@@ -5,6 +5,9 @@
   "assets/ambiances/rain_outdoor": [
     "assets/ambiances/rain_outdoor_1.mp3"
   ],
+  "assets/ambiances/shaft": [
+    "assets/ambiances/shaft_1.mp3"
+  ],
   "assets/ambiances/supernatural_reality": [
     "assets/ambiances/supernatural_reality_1.mp3",
     "assets/ambiances/supernatural_reality_2.mp3",
@@ -135,23 +138,54 @@
   "assets/sounds/decor/clocktower_beacon": [
     "assets/sounds/decor/clocktower_beacon_1.mp3"
   ],
+  "assets/sounds/decor/creaky_bell": [
+    "assets/sounds/decor/creaky_bell_1.mp3"
+  ],
   "assets/sounds/decor/gear_1_beacon": [
     "assets/sounds/decor/gear_1_beacon_1.mp3"
   ],
   "assets/sounds/decor/gear_2_beacon": [
     "assets/sounds/decor/gear_2_beacon_1.mp3"
   ],
-  "assets/sounds/decor/machine_1_beacon": [
-    "assets/sounds/decor/machine_1_beacon_1.mp3"
+  "assets/sounds/decor/gear_3_beacon": [
+    "assets/sounds/decor/gear_3_beacon_1.mp3"
+  ],
+  "assets/sounds/decor/large_gear_1_beacon": [
+    "assets/sounds/decor/large_gear_1_beacon_1.mp3"
+  ],
+  "assets/sounds/decor/large_gear_2_beacon": [
+    "assets/sounds/decor/large_gear_2_beacon_1.mp3"
+  ],
+  "assets/sounds/decor/large_weight_machine_1_beacon": [
+    "assets/sounds/decor/large_weight_machine_1_beacon_1.mp3"
+  ],
+  "assets/sounds/decor/machine_1_vocal": [
+    "assets/sounds/decor/machine_1_vocal_1.mp3",
+    "assets/sounds/decor/machine_1_vocal_2.mp3",
+    "assets/sounds/decor/machine_1_vocal_3.mp3",
+    "assets/sounds/decor/machine_1_vocal_4.mp3",
+    "assets/sounds/decor/machine_1_vocal_5.mp3"
+  ],
+  "assets/sounds/decor/pulley_1_beacon": [
+    "assets/sounds/decor/pulley_1_beacon_1.mp3"
+  ],
+  "assets/sounds/decor/pulley_1_vocal": [
+    "assets/sounds/decor/pulley_1_vocal_1.mp3",
+    "assets/sounds/decor/pulley_1_vocal_2.mp3"
+  ],
+  "assets/sounds/decor/rattling": [
+    "assets/sounds/decor/rattling_1.mp3"
   ],
   "assets/sounds/decor/river_beacon": [
     "assets/sounds/decor/river_beacon_1.mp3"
   ],
-  "assets/sounds/decor/slow_gear_1_beacon": [
-    "assets/sounds/decor/slow_gear_1_beacon_1.mp3"
+  "assets/sounds/decor/rope_1_vocal": [
+    "assets/sounds/decor/rope_1_vocal_4.mp3"
   ],
-  "assets/sounds/decor/slow_gear_2_beacon": [
-    "assets/sounds/decor/slow_gear_2_beacon_1.mp3"
+  "assets/sounds/decor/rope_creaking": [
+    "assets/sounds/decor/rope_creaking_1.mp3",
+    "assets/sounds/decor/rope_creaking_2.mp3",
+    "assets/sounds/decor/rope_creaking_3.mp3"
   ],
   "assets/sounds/decor/stone_slab_beacon": [
     "assets/sounds/decor/stone_slab_beacon_1.mp3",
@@ -163,6 +197,9 @@
     "assets/sounds/decor/tree_beacon_3.mp3",
     "assets/sounds/decor/tree_beacon_4.mp3",
     "assets/sounds/decor/tree_beacon_5.mp3"
+  ],
+  "assets/sounds/decor/weight_machine_1_beacon": [
+    "assets/sounds/decor/weight_machine_1_beacon_1.mp3"
   ],
   "assets/sounds/doors/closet_door_1_close": [
     "assets/sounds/doors/closet_door_1_close_1.mp3"
@@ -178,6 +215,9 @@
   ],
   "assets/sounds/doors/door_beacon": [
     "assets/sounds/doors/door_beacon_1.mp3"
+  ],
+  "assets/sounds/doors/heavy_door_1_close": [
+    "assets/sounds/doors/heavy_door_1_close_1.mp3"
   ],
   "assets/sounds/doors/heavy_door_1_open": [
     "assets/sounds/doors/heavy_door_1_open_1.mp3"
@@ -517,6 +557,9 @@
   ],
   "assets/sounds/furniture/clock_3_beacon": [
     "assets/sounds/furniture/clock_3_beacon_1.mp3"
+  ],
+  "assets/sounds/furniture/clock_4_beacon": [
+    "assets/sounds/furniture/clock_4_beacon_1.mp3"
   ],
   "assets/sounds/furniture/computer_1_beacon": [
     "assets/sounds/furniture/computer_1_beacon_1.mp3"
