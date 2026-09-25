@@ -26,6 +26,46 @@
     "reverbDecay": 2.5,
     "entities": [
       {
+        "id": "mirror_r",
+        "type": "clock_tower_mirror",
+        "x": 0
+      },
+      {
+        "id": "magic_mirror_r",
+        "type": "clock_tower_magic_mirror",
+        "x": 0,
+        "action": [
+          {
+            "kind": "applyEffects",
+            "condition": {
+              "type": "hasImprovement",
+              "id": "mirror_pass"
+            },
+            "effects": [
+              {
+                "type": "playSound",
+                "path": "assets/sounds/ui/supernatural_mirror_pass_in",
+                "nature": "meta"
+              },
+              {
+                "type": "teleport",
+                "target": "clock_tower_weight_shaft_mirror_space",
+                "x": 1
+              }
+            ]
+          },
+          {
+            "kind": "applyEffects",
+            "effects": [
+              {
+                "type": "announce",
+                "key": "door.clock_tower_magic_mirror.pass_refusal"
+              }
+            ]
+          }
+        ]
+      },
+      {
         "id": "weight_shaft_r",
         "type": "weight_shaft",
         "x": 25

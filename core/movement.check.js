@@ -4709,6 +4709,46 @@ export function runMovementChecks() {
   bothThenOffState = reduce(bothThenOffState, tick(0));
   run("allOf (intégration) : perception redevient inactive -> redevient dormante", false, allOfWolf(bothThenOffState).present);
 
+  // --- Condition "not" (core/presence.js/evaluateNot) : négation, composable ---
+  const NOT_PERCEPTION = { type: "not", condition: { type: "perceptionActive" } };
+  run("not : perception inactive -> vraie", true, evaluateCondition(NOT_PERCEPTION, { perceptionActive: false }));
+  run("not : perception active -> fausse", false, evaluateCondition(NOT_PERCEPTION, { perceptionActive: true }));
+  run("not : contexte sans perception -> vraie (sous-condition fausse par repli)", true, evaluateCondition(NOT_PERCEPTION, {}));
+  run("not : double négation = la condition d'origine", true, evaluateCondition({ type: "not", condition: NOT_PERCEPTION }, { perceptionActive: true }));
+  const NOT_FOGGY_PERCEPTION = { type: "not", condition: { type: "allOf", conditions: [{ type: "perceptionActive" }, { type: "weather", state: "fog" }] } };
+  run("not(allOf) : perception ET brume -> fausse", false, evaluateCondition(NOT_FOGGY_PERCEPTION, { perceptionActive: true, weather: "fog" }));
+  run("not(allOf) : perception seule -> vraie", true, evaluateCondition(NOT_FOGGY_PERCEPTION, { perceptionActive: true, weather: "clear" }));
+  const FOG_WITHOUT_PERCEPTION = { type: "allOf", conditions: [NOT_PERCEPTION, { type: "weather", state: "fog" }] };
+  run("allOf(not) : brume hors perception -> vraie", true, evaluateCondition(FOG_WITHOUT_PERCEPTION, { perceptionActive: false, weather: "fog" }));
+  run("allOf(not) : brume EN perception -> fausse", false, evaluateCondition(FOG_WITHOUT_PERCEPTION, { perceptionActive: true, weather: "fog" }));
+
+  const NOT_REGISTRY = { wolf: { nameKey: "entity.cumulo_lupus.name" } };
+  const notLevel = (when) => ({ id: "movement-check-not", titleKey: "level.demo.title", length: 20, playerStart: 0, entities: [{ id: "wolf-1", type: "wolf", x: 10, presence: [{ when, present: true }] }] });
+  run("not : forme valide -> chargée", false, expectLevelParseThrows(notLevel(NOT_PERCEPTION), NOT_REGISTRY));
+  run("not : sous-condition absente -> erreur claire au chargement", true, expectLevelParseThrows(notLevel({ type: "not" }), NOT_REGISTRY));
+  run("not : sous-condition en tableau -> erreur claire au chargement", true, expectLevelParseThrows(notLevel({ type: "not", condition: [{ type: "perceptionActive" }] }), NOT_REGISTRY));
+  run("not : sous-condition mal formée -> erreur RÉCURSIVE", true, expectLevelParseThrows(notLevel({ type: "not", condition: { type: "weather", state: "doesNotExist" } }), NOT_REGISTRY));
+  run("not dans allOf, sous-condition mal formée -> erreur RÉCURSIVE", true, expectLevelParseThrows(notLevel({ type: "allOf", conditions: [{ type: "not", condition: { type: "nope" } }] }), NOT_REGISTRY));
+  run("allOf dans not -> chargé", false, expectLevelParseThrows(notLevel(NOT_FOGGY_PERCEPTION), NOT_REGISTRY));
+
+  // Intégration : deux entités superposées, l'une présente HORS perception,
+  // l'autre EN perception — jamais les deux, jamais aucune.
+  const SWAP_REGISTRY = {
+    plainMirror: { nameKey: "entity.clock_tower_mirror.name", presence: [{ when: NOT_PERCEPTION, present: true }] },
+    magicMirror: { nameKey: "door.clock_tower_magic_mirror.name", presence: [{ when: { type: "perceptionActive" }, present: true }] },
+  };
+  const swapLevel = parseLevel(
+    { id: "movement-check-not-swap", titleKey: "level.demo.title", length: 20, playerStart: 5, entities: [{ id: "plain", type: "plainMirror", x: 0 }, { id: "magic", type: "magicMirror", x: 0 }] },
+    SWAP_REGISTRY
+  );
+  const swapPresence = (state) => getActiveWorld(state).entities.map((e) => `${e.id}:${e.present}`).join(",");
+  let swapState = reduce(createInitialState(swapLevel, "not-swap", NO_COMPANIONS), tick(0));
+  run("not (intégration) : perception inactive -> ordinaire seul", "plain:true,magic:false", swapPresence(swapState));
+  swapState = reduce(togglePerception(swapState), tick(0));
+  run("not (intégration) : perception active -> magique seul", "plain:false,magic:true", swapPresence(swapState));
+  swapState = reduce(togglePerception(swapState), tick(0));
+  run("not (intégration) : perception redevient inactive -> ordinaire seul", "plain:true,magic:false", swapPresence(swapState));
+
   // --- Collectible persistant (core/state.js/markConsumed, core/money.js/lootEntity) ---
   // Contrairement à removeEntity/pickupEntity ci-dessus, l'entité looté
   // N'EST JAMAIS retirée — voir entities/model.md/"Collectible persistant".

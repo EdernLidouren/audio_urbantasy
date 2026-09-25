@@ -1,10 +1,11 @@
 // Registre des types d'entités. Connecteur pur, zéro logique : rassemble
 // chaque archétype (un fichier par type, voir apple.js/bird_1.js/bird_2.js/
 // bird_3.js/buddy.js/bush.js/chair.js/clock.js/clock_tower.js/
-// clock_tower_escapement.js/coin.js/crate.js/
+// clock_tower_escapement.js/clock_tower_magic_mirror.js/clock_tower_mirror.js/
+// coin.js/crate.js/
 // cumulo-lupus.js/decor.js/dog.js/door.js/fountain.js/ghost.js/
 // glass-window.js/hound.js/item.js/large_machinery.js/
-// large_winding_mechanism.js/machine_1.js/money.js/neon.js/
+// large_winding_mechanism.js/machine_1.js/miravi.js/money.js/neon.js/
 // npc.js/object.js/office_computer.js/passage.js/potted_plant.js/river.js/
 // rock.js/shop_counter.js/sound_emitter.js/statue.js/turret_clockwork.js/
 // weight_shaft.js) en
@@ -54,9 +55,9 @@
 // seulement la donnée.
 //
 // Les archétypes (apple/bird_1/bird_2/bird_3/buddy/bush/chair/clock/clock_tower/
-// clock_tower_escapement/
+// clock_tower_escapement/clock_tower_magic_mirror/clock_tower_mirror/
 // coin/crate/cumuloLupus/decor/dog/door/fountain/ghost/glass_window/hound/item/
-// large_machinery/large_winding_mechanism/machine_1/money/neon/npc/object/
+// large_machinery/large_winding_mechanism/machine_1/miravi/money/neon/npc/object/
 // office_computer/passage/potted_plant/
 // river/rock/shop_counter/sound_emitter/statue/turret_clockwork/weight_shaft) sont des
 // PRESETS de
@@ -74,6 +75,8 @@ import chair from "./chair.js";
 import clock from "./clock.js";
 import clockTower from "./clock_tower.js";
 import clockTowerEscapement from "./clock_tower_escapement.js";
+import clockTowerMagicMirror from "./clock_tower_magic_mirror.js";
+import clockTowerMirror from "./clock_tower_mirror.js";
 import coin from "./coin.js";
 import crate from "./crate.js";
 import cumuloLupus from "./cumulo-lupus.js";
@@ -88,6 +91,7 @@ import item from "./item.js";
 import largeMachinery from "./large_machinery.js";
 import largeWindingMechanism from "./large_winding_mechanism.js";
 import machine1 from "./machine_1.js";
+import miravi from "./miravi.js";
 import money from "./money.js";
 import neon from "./neon.js";
 import npc from "./npc.js";
@@ -114,6 +118,8 @@ export default {
   clock,
   clock_tower: clockTower,
   clock_tower_escapement: clockTowerEscapement,
+  clock_tower_magic_mirror: clockTowerMagicMirror,
+  clock_tower_mirror: clockTowerMirror,
   coin,
   crate,
   cumuloLupus,
@@ -128,6 +134,7 @@ export default {
   large_machinery: largeMachinery,
   large_winding_mechanism: largeWindingMechanism,
   machine_1: machine1,
+  miravi,
   money,
   neon,
   npc,

@@ -13,6 +13,7 @@
     { "id": "money_1", "type": "money", "x": 5 },
     { "id": "bush_1", "type": "bush", "x": 12 },
     { "id": "counter_1", "type": "shop_counter", "x": 38 },
+    { "id": "miravi_test", "type": "miravi", "x": 5, "isFlying": true, "behavior": { "kind": "wander" } },
     { "id": "object_toolbox", "type": "object", "x": 8, "nameKey": "object.toolbox.name", "descriptionKey": "object.toolbox.description" },
     {
       "id": "door_exit",

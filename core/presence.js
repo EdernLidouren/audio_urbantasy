@@ -248,6 +248,15 @@ function evaluateAllOf(cond, context) {
   return cond.conditions.every((sub) => evaluateCondition(sub, context));
 }
 
+// "not" : condition COMPOSITE — vraie si SA sous-condition (cond.condition)
+// est fausse (négation logique). Même patron qu'allOf : délègue à
+// evaluateCondition, n'importe quel type du registre (y compris allOf ou un
+// autre not). cond.condition validée au chargement (core/level.js/
+// validateCondition, obligatoire, revalidée récursivement).
+function evaluateNot(cond, context) {
+  return !evaluateCondition(cond.condition, context);
+}
+
 // "variable" : LECTURE d'une variable (voir core/variables.js/getVariable)
 // avec COMPARAISON — { type:"variable", scope, name, <comparateur>:
 // valeur }. Un SEUL comparateur par condition (voir core/level.js/
@@ -296,6 +305,7 @@ const CONDITION_EVALUATORS = {
   perceptionActive: evaluatePerceptionActive,
   weather: evaluateWeather,
   allOf: evaluateAllOf,
+  not: evaluateNot,
   variable: evaluateVariable,
 };
 

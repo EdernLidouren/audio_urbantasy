@@ -1,0 +1,72 @@
+{
+  "id": "clock_tower_weight_shaft_mirror_space",
+  "titleKey": "level.clock_tower_weight_shaft_mirror_space.name",
+  "length": 50,
+  "playerStart": 25,
+  "indoor": true,
+  "music": "assets/musics/sanctuary",
+  "ambiences": [
+    "assets/ambiances/shaft_1.mp3"
+  ],
+  "defaultSurface": "concrete",
+  "segments": [
+    {
+      "from": 1,
+      "to": 10,
+      "surface": "metal"
+    },
+    {
+      "from": 41,
+      "to": 50,
+      "surface": "metal"
+    }
+  ],
+  "reverbDurationSec": 5.0,
+  "reverbDecay": 2.5,
+  "entities": [
+    {
+      "id": "magic_mirror_r",
+      "type": "clock_tower_magic_mirror",
+      "x": 0,
+      "action": [
+        {
+          "kind": "applyEffects",
+          "condition": {
+            "type": "hasImprovement",
+            "id": "mirror_pass"
+          },
+          "effects": [
+            {
+              "type": "playSound",
+              "path": "assets/sounds/ui/supernatural_mirror_pass_out",
+              "nature": "meta"
+            },
+            {
+              "type": "teleport",
+              "target": "clock_tower_weight_shaft",
+              "x": 1
+            }
+          ]
+        },
+        {
+          "kind": "applyEffects",
+          "effects": [
+            {
+              "type": "announce",
+              "key": "door.clock_tower_magic_mirror.pass_refusal"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "miravi_1_r",
+      "type": "miravi",
+      "x": 25,
+      "isFlying": true,
+      "behavior": {
+        "kind": "wander"
+      }
+    }
+  ]
+}

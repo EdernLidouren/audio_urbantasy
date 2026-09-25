@@ -11,4 +11,5 @@ export default {
   town_square_town_hall_mayor_office: "level/town-square-town-hall-mayor-office.json",
   clock_tower_main: "level/clock-tower-main.json",
   clock_tower_weight_shaft: "level/clock-tower-weight-shaft.json",
+  clock_tower_weight_shaft_mirror_space: "level/clock-tower-weight-shaft-mirror-space.json",
 };

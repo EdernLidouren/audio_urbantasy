@@ -364,6 +364,45 @@ orpheline). MÊME principe pour la bascule de PHASE jour/nuit (`phaseAt`,
 `time.phase.dayBegins`/`time.phase.nightBegins`) — deux clés fixes, aucune composition
 nécessaire (une seule phase à la fois, jamais de fragment à assembler).
 
+### `not` — composite, négation logique
+
+```js
+{ type: "not", condition: { type: "perceptionActive" } }
+```
+
+Vraie si SA sous-condition `condition` est fausse — délègue à `evaluateCondition`,
+n'importe quel type du registre, y compris `"allOf"` ou un autre `"not"` : même
+registre, même évaluateur que `"allOf"`, jamais un second mécanisme. `condition` est
+OBLIGATOIRE (un objet, jamais un tableau), revalidée RÉCURSIVEMENT au chargement
+(`core/level.js`/`validateCondition`). Composable dans les deux sens : `"not"` dans un
+`"allOf"` (« brume ET hors perception ») comme `"allOf"` dans un `"not"` (« pas à la
+fois perception et brume »).
+
+Utile surtout pour la PRÉSENCE : une entité qu'aucune règle ne couvre est dormante par
+défaut, `"not"` est donc le moyen d'écrire « présente SAUF quand… ». Pas de `anyOf`
+pour l'instant : aucun cas concret (un « ou » d'action s'écrit en candidates
+multiples, voir "Actions multiples filtrées par condition").
+
+**Piège à connaître — inverse de celui d'`"allOf"`** : un inspecteur de structure qui
+cherche une condition dans `presence[].when` (ex. `view/audio/city-scene.js`/
+`conditionRequiresPerception`, qui repère les entités SURNATURELLES) ne doit PAS
+descendre dans un `"not"` comme dans un `"allOf"`. `{ not: perceptionActive }` décrit
+une entité MONDAINE, présente hors perception : la prendre pour surnaturelle
+l'exempterait à tort de l'étouffement mondain. `conditionRequiresPerception` ne
+parcourt donc jamais `"not"` (une double négation y est traitée comme mondaine,
+prudemment).
+
+Exemple réel complet — les deux miroirs superposés de
+`level/clock-tower-weight-shaft.json` (archétypes `entities/types/clock_tower_mirror.js`
+et `clock_tower_magic_mirror.js`), jamais présents ensemble, jamais absents ensemble :
+
+```js
+// Miroir ordinaire — présent HORS perception.
+presence: [{ when: { type: "not", condition: { type: "perceptionActive" } }, present: true }]
+// Miroir magique — présent EN perception.
+presence: [{ when: { type: "perceptionActive" }, present: true }]
+```
+
 ### `variable` — lecture d'une variable, avec comparaison
 
 ```js

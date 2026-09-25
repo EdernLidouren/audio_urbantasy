@@ -299,11 +299,14 @@ const FOOTSTEP_FLOOR_PATH = footstepKey("gaits", "shoes");
 //     si l'entité en a un — voir entities/model.md, "chien important") ->
 //     sinon le plancher garanti (FOOTSTEP_FLOOR_PATH, jamais vérifié).
 // Ne peut jamais échouer : au pire, retombe sur FOOTSTEP_FLOOR_PATH.
-function resolveFootstepPath(world, x, { gait, naturalWalk, ownPath } = {}) {
+// `airborne` (entité isFlying) : le sol n'a pas de prise sur elle — la
+// branche SPÉCIALE est sautée, son son propre (battement d'ailes...) joue
+// partout, jamais un pas de métal ou d'herbe.
+function resolveFootstepPath(world, x, { gait, naturalWalk, ownPath, airborne = false } = {}) {
   const surface = surfaceAt(world, x);
   const props = surfaceProps(surface);
 
-  if (props && !props.neutral) {
+  if (!airborne && props && !props.neutral) {
     const specialKey = footstepKey("surfaces", surface);
     if (hasAsset(specialKey)) return specialKey;
   }
@@ -345,6 +348,12 @@ function clamp(value, min, max) {
 // entities/types/cumulo-lupus.js, perception ET météo) reste "surnaturelle"
 // au même titre qu'une condition perceptionActive seule, voir
 // isPerceptionGated ci-dessous.
+//
+// "not" n'est JAMAIS parcouru : { not: perceptionActive } décrit une entité
+// MONDAINE (présente hors perception), qui doit rester soumise à
+// l'étouffement mondain. Descendre dans not comme dans allOf la ferait
+// passer pour surnaturelle. Une double négation (not(not(perceptionActive)))
+// est donc traitée comme mondaine — prudent, et sans contenu réel.
 function conditionRequiresPerception(cond) {
   if (!cond) return false;
   if (cond.type === "perceptionActive") return true;
@@ -1711,6 +1720,7 @@ export function createCityAudioScene(getSession) {
           gait: entry.gait,
           naturalWalk: entry.naturalWalk,
           ownPath: entry.movementPath,
+          airborne: Boolean(entry.entity.isFlying),
         });
         playPositionedOneShot(path, {
           relX: atX - x,

@@ -454,6 +454,15 @@ function validateCondition(cond, describe, entityVariables, sceneVariables) {
       validateCondition(subCond, `${describe}.conditions[${i}]`, entityVariables, sceneVariables)
     );
   }
+  // "not" : composite — son champ `condition` est OBLIGATOIRE (un objet,
+  // jamais un tableau), revalidé RÉCURSIVEMENT par cette même fonction,
+  // comme les éléments d'un allOf.
+  if (cond.type === "not") {
+    if (typeof cond.condition !== "object" || cond.condition === null || Array.isArray(cond.condition)) {
+      fail(`${describe}.condition doit être un objet condition pour "not".`);
+    }
+    validateCondition(cond.condition, `${describe}.condition`, entityVariables, sceneVariables);
+  }
   // "variable" : LECTURE d'une variable (voir core/presence.js/
   // evaluateVariable, core/variables.js) — scope/name validés contre les
   // sacs déjà résolus du porteur (voir validateVariableReference, y

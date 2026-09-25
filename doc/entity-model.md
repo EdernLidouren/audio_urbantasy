@@ -1238,6 +1238,10 @@ disjointes selon `neutral` (jamais de croisement surface×chaussure, jamais
 de produit cartésien N surfaces × M gaits — chaque cran teste UN nom sous
 UNE catégorie, une seule dimension à la fois) :
 
+- **Entité VOLANTE** (`isFlying: true`, ex. `miravi`) — le sol n'a aucune
+  prise : la branche SPÉCIALE est sautée, l'entité suit toujours la branche
+  NEUTRE ci-dessous (en pratique son son propre, un battement d'ailes),
+  quel que soit le sol survolé.
 - **Sol SPÉCIAL** (`neutral: false`, ex. `sand`, `snow`) —
   `"surfaces/<surface>_walk"` si ce pool existe : LE SOL DOMINE, le
   `gait`/`naturalWalk` de l'entité est ignoré. Absent -> bascule sur la

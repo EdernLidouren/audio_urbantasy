@@ -304,6 +304,15 @@
     "assets/sounds/entities/dog_medium_vocal_4.mp3",
     "assets/sounds/entities/dog_medium_vocal_5.mp3"
   ],
+  "assets/sounds/entities/miravi_vocal": [
+    "assets/sounds/entities/miravi_vocal_1.mp3",
+    "assets/sounds/entities/miravi_vocal_2.mp3",
+    "assets/sounds/entities/miravi_vocal_3.mp3",
+    "assets/sounds/entities/miravi_vocal_4.mp3",
+    "assets/sounds/entities/miravi_vocal_5.mp3",
+    "assets/sounds/entities/miravi_vocal_6.mp3",
+    "assets/sounds/entities/miravi_vocal_7.mp3"
+  ],
   "assets/sounds/entities/npc_beacon": [
     "assets/sounds/entities/npc_beacon_1.mp3"
   ],
@@ -332,6 +341,10 @@
     "assets/sounds/entities/wolf_vocal_6.mp3",
     "assets/sounds/entities/wolf_vocal_7.mp3",
     "assets/sounds/entities/wolf_vocal_8.mp3"
+  ],
+  "assets/sounds/footsteps/entities/bird_large_fly": [
+    "assets/sounds/footsteps/entities/bird_large_fly_1.mp3",
+    "assets/sounds/footsteps/entities/bird_large_fly_2.mp3"
   ],
   "assets/sounds/footsteps/entities/dog_medium_walk": [
     "assets/sounds/footsteps/entities/dog_medium_walk_1.mp3",
@@ -570,6 +583,12 @@
   "assets/sounds/furniture/glass_window_1_beacon": [
     "assets/sounds/furniture/glass_window_1_beacon_1.mp3"
   ],
+  "assets/sounds/furniture/magic_mirror_1_beacon": [
+    "assets/sounds/furniture/magic_mirror_1_beacon_1.mp3"
+  ],
+  "assets/sounds/furniture/mirror_1_beacon": [
+    "assets/sounds/furniture/mirror_1_beacon_1.mp3"
+  ],
   "assets/sounds/furniture/neon_beacon": [
     "assets/sounds/furniture/neon_beacon_1.mp3"
   ],
@@ -602,6 +621,12 @@
   ],
   "assets/sounds/ui/select": [
     "assets/sounds/ui/select_1.mp3"
+  ],
+  "assets/sounds/ui/supernatural_mirror_pass_in": [
+    "assets/sounds/ui/supernatural_mirror_pass_in.mp3"
+  ],
+  "assets/sounds/ui/supernatural_mirror_pass_out": [
+    "assets/sounds/ui/supernatural_mirror_pass_out.mp3"
   ],
   "assets/sounds/ui/supernatural_perception_activation": [
     "assets/sounds/ui/supernatural_perception_activation_1.mp3"
