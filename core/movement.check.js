@@ -57,7 +57,7 @@ import { DEFAULTS as WANDER_DEFAULTS } from "./behaviors/wander.js";
 import { validateWeatherStates, createInitialWeather, advanceWeather, pickTransition, setWeather, triggerNextWeatherTransition } from "./weather.js";
 import { WEATHER_STATES, DEFAULT_WEATHER_STATE } from "../config/weather-values.js";
 import { parseVariables, getVariable, setVariable, applyActionEffects } from "./variables.js";
-import { IMPROVEMENT_REGISTRY, improvementProps, hasImprovement, giveImprovement, removeImprovement } from "./improvements.js";
+import { IMPROVEMENT_REGISTRY, improvementProps, hasImprovement, giveImprovement, removeImprovement, validateImprovementRegistry, orderedImprovementIds } from "./improvements.js";
 import { isDebugEnabled, setDebugEnabled } from "../config/debug.js";
 import { validateSpawnTables, validateDistribution, resolveDistribution, drawItem } from "./distribution.js";
 import { spawnCycleAt, refillDueSpawns, searchContainer, isSearchable } from "./spawn.js";
@@ -3848,6 +3848,22 @@ export function runMovementChecks() {
 
     run("improvements : registre porte supernatural_perception", true, Boolean(IMPROVEMENT_REGISTRY.supernatural_perception));
     run("improvements : improvementProps id inconnu -> undefined", undefined, improvementProps("does-not-exist"));
+    // `order` : déclaré, unique, et seul critère de tri de l'onglet.
+    run("improvements : chaque entrée porte un order entier >= 1", true, Object.values(IMPROVEMENT_REGISTRY).every((p) => Number.isInteger(p.order) && p.order >= 1));
+    run("improvements : ordre d'affichage suit order", "supernatural_perception,flashlight,mirror_pass,master_key,skeleton_key", orderedImprovementIds().join(","));
+    run("improvements : tri indépendant de l'ordre d'insertion", "b,a", orderedImprovementIds({ a: { order: 2 }, b: { order: 1 } }).join(","));
+    const improvementRegistryRejected = (registry) => {
+      try {
+        validateImprovementRegistry(registry);
+        return false;
+      } catch {
+        return true;
+      }
+    };
+    run("improvements : order dupliqué rejeté", true, improvementRegistryRejected({ a: { order: 1 }, b: { order: 1 } }));
+    run("improvements : order absent rejeté", true, improvementRegistryRejected({ a: {} }));
+    run("improvements : order non entier rejeté", true, improvementRegistryRejected({ a: { order: 1.5 } }));
+    run("improvements : registre réel valide", false, improvementRegistryRejected(IMPROVEMENT_REGISTRY));
 
     // Primitives PURES (core/improvements.js) — sac SPARSE, référence
     // INCHANGÉE si rien à faire (même politique que setVariable).

@@ -1110,6 +1110,13 @@ que le rendu DIÉGÉTIQUE : un son méta n'a pas de position, rien à suivre ni
 Déclaré sur l'EFFET, jamais sur le fichier : le même son peut être suivi
 dans un contexte et ancré dans un autre, le suivi dépend de l'usage.
 
+Le MÊME flag, avec le même défaut, existe sur les rôles de son INTERMITTENTS
+d'une entité — `sounds.vocal` et `sounds.beacon` en mode `"intermittent"`
+(voir `doc/entity-model.md`/"Paramètres sonores") : un cri lancé par une entité
+rapide la suit au lieu de rester derrière elle. La balise CONTINUE est suivie
+par nature (boucle réévaluée à chaque tick) ; les pas (`sounds.movement`) restent
+ANCRÉS, chacun émis là où l'entité pose le pied.
+
 ### `"announce"` — message parlé, VUE
 
 ```js
@@ -1466,12 +1473,17 @@ portées dans la MÊME activation), point d'entrée de
 **Registre** (`core/improvements.js`/`IMPROVEMENT_REGISTRY`) — données pures,
 structuré comme `core/tags.js`/`TAG_REGISTRY` : SOURCE DE VÉRITÉ des
 améliorations existantes (valide `hasImprovement`/`giveImprovement`/
-`removeImprovement`), alimentera un futur onglet de menu (interface
-ultérieure, PAS construite ici). Ajouter une amélioration = une entrée ici :
+`removeImprovement`), affichées dans l'onglet Améliorations du menu global
+(voir plus bas). Ajouter une amélioration = une entrée ici :
 
 ```js
-{ labelKey: "improvement.supernatural_perception", descriptionKey: "improvement.supernatural_perception.description" }
+{ order: 1, labelKey: "improvement.supernatural_perception.name", descriptionKey: "improvement.supernatural_perception.description" }
 ```
+
+`order` (entier >= 1, UNIQUE, validé à l'import par
+`validateImprovementRegistry`) : position dans l'onglet et numéro annoncé.
+Toujours DÉCLARÉ, jamais dérivé de l'ordre d'insertion du registre —
+réarranger le registre ne doit jamais renuméroter les pouvoirs.
 
 **⚠️ À jour avec `core/improvements.js`/`IMPROVEMENT_REGISTRY`.**
 
@@ -1485,6 +1497,17 @@ amélioration NON possédée n'a PAS de clé), cercle PARTIE comme `equipment`/
 réinitialisée comme une variable volatile). Vide à la création d'une partie
 neuve ; rebouché vide pour une sauvegarde antérieure à ce mécanisme (voir
 `core/save.js`/`migrateSave`).
+
+**Onglet Améliorations** (`view/menus/inventory-menu.js`, touche "m", troisième
+onglet du menu global après Sac et Équipement) : toutes les améliorations du
+registre, triées par `order`. Débloquée : `"{order} - {nom} : {description}"` ;
+non débloquée : `"{order} - Inconnue"` — le numéro trahit qu'un pouvoir existe,
+jamais lequel. Titre : `"Améliorations : {débloquées} sur {total}"`. Aucune
+action (les pouvoirs s'activent ailleurs). L'onglet lit `session.improvements`
+DIRECTEMENT, jamais la condition `hasImprovement` : en debug, celle-ci répond
+toujours vrai (court-circuit plus bas), alors que l'onglet doit montrer ce que
+le joueur possède RÉELLEMENT — c'est le seul endroit où vérifier cet état
+pendant qu'on joue en debug.
 
 **Lecture** (voir "Conditions"/`hasImprovement` plus haut) : condition
 `{ type: "hasImprovement", id }`. **Écriture** (voir "Effets d'action"/

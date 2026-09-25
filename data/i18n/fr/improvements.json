@@ -1,12 +1,15 @@
 {
-  "improvement.supernatural_perception": "Perception surnaturelle",
-  "improvement.supernatural_perception.description": "Perçoit ce qui échappe au regard ordinaire — présences, échos, phénomènes invisibles au commun des mortels.",
-  "improvement.flashlight": "Lampe torche",
-  "improvement.flashlight.description": "Une lampe torche, pour éclairer ce que l'obscurité cache.",
-  "improvement.mirror_pass": "Passe-miroir",
-  "improvement.mirror_pass.description": "Le droit de franchir certains miroirs comme on franchit une porte.",
-  "improvement.master_key": "Passe-partout",
-  "improvement.master_key.description": "Une clé qui ouvre les portes ordinaires de la ville, celles qu'on ferme par habitude plus que par méfiance.",
-  "improvement.skeleton_key": "Sésame",
-  "improvement.skeleton_key.description": "Une clé qui ouvre ce que le passe-partout laisse clos : les serrures qu'on a voulu vraiment inviolables."
+  "improvement.supernatural_perception.name": "perception surnaturelle",
+  "improvement.supernatural_perception.description": "Ouvre vos sens au monde de l'invisible jusqu'à ce que vous révoquiez ce pouvoir. Tandis que vous devinez la magie et les entités qui y sont affiliées, vous perdez une partie de vos perceptions ordinaires.",
+  "improvement.flashlight.name": "lampe-torche",
+  "improvement.flashlight.description": "Une puissante lampe électrique dont la lumière vous permet d'explorer sans crainte les lieux les plus sombres.",
+  "improvement.mirror_pass.name": "passe-miroir",
+  "improvement.mirror_pass.description": "Beaucoup de miroirs ont un jour été enchantés afin de créer un sanctuaire hors de l'espace et du temps. Ce pouvoir vous octroie la possibilité d'emprunter ces portails à volonté.",
+  "improvement.master_key.name": "passe-partout",
+  "improvement.master_key.description": "Un trousseau de clés si absurdement chargé qu'il promet d'ouvrir toutes les serrures de la région à qui aura la patience de l'employer.",
+  "improvement.skeleton_key.name": "sésame",
+  "improvement.skeleton_key.description": "Une vieille clé de bronze dépourvue de dents, mais pourtant capable de déverrouiller ce qui ne devrait pouvoir l'être. Son enchantement passe outre la plupart des protections surnaturelles.",
+  "improvements.title": "Améliorations : {unlocked} sur {total}",
+  "improvements.entry.known": "{order} - {name} : {description}",
+  "improvements.entry.unknown": "{order} - Inconnue"
 }

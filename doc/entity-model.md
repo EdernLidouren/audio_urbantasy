@@ -639,9 +639,10 @@ l'écriture du slot).
   (l'ancien occupant retourne au sac), jamais un écrasement silencieux ni
   un refus. Un slot VIDE n'ouvre PAS de menu d'actions (rien à y faire) :
   l'activer annonce juste "Emplacement vide."
-- **Interface à deux onglets** (`view/menus/inventory-menu.js`) — UN SEUL
-  écran réel sur la pile, deux portes d'entrée ("i" -> Sac, "q" ->
-  Équipement) et Tab/Maj+Tab pour basculer une fois ouvert. Le nom de
+- **Interface à trois onglets** (`view/menus/inventory-menu.js`) — UN SEUL
+  écran réel sur la pile, trois portes d'entrée ("i" -> Sac, "q" ->
+  Équipement, "m" -> Améliorations, voir `doc/scripting.md`/"Améliorations")
+  et Tab/Maj+Tab pour parcourir les onglets en cycle une fois ouvert. Le nom de
   l'onglet est TOUJOURS annoncé avant son contenu à la bascule — obtenu
   gratuitement en réutilisant `menu.title` (déjà le nom de l'onglet) et
   l'annonce d'ouverture native de `lib/menu.js`, jamais un second mécanisme
@@ -887,7 +888,7 @@ qu'un `"playSound"` (`{ path, gain?, pitchVariation?, reverbSend? }`).
 Un descripteur de son est un objet plat :
 
 ```js
-{ path, loop, reverbSend?, beaconMode?, beaconInterval?, beaconIntervalVariation?, beaconGain?, vocalInterval?, vocalIntervalVariation?, vocalGain?, pitchVariation? }
+{ path, loop, reverbSend?, beaconMode?, beaconInterval?, beaconIntervalVariation?, beaconGain?, vocalInterval?, vocalIntervalVariation?, vocalGain?, pitchVariation?, tracked? }
 ```
 
 - `path` — chemin du fichier, sous `/sounds`. Peut être un pool (voir
@@ -1001,6 +1002,15 @@ code. Consulter directement ce fichier pour la valeur courante d'un défaut.
   partagé de la scène. Résolue INDÉPENDAMMENT pour chaque rôle (le `beacon`,
   le `vocal` et le `movement` d'une même entité peuvent avoir des
   `reverbSend` différents — aucun ne reprend celui d'un autre rôle).
+- **`tracked`** — rôles INTERMITTENTS seulement (`vocal`, `beacon` en mode
+  `"intermittent"`), booléen, défaut `true` : chaque son joué reste SUIVI
+  pendant sa lecture (pan, volume et passe-bas de distance, occlusion de face
+  et perception réévalués à chaque tick, facteur et passe-haut de hauteur
+  `isFlying` conservés). `false` : spatialisé une fois au départ puis figé
+  (événement ponctuel « qui s'est produit là »). Lu sur le descripteur du rôle
+  seulement, jamais cascadé. Même sémantique que le `tracked` de l'effet
+  `playSound` (voir `doc/scripting.md`/"playSound"). Sans objet pour la balise
+  continue (suivie par nature) et pour les pas (toujours ancrés).
 - **`beaconMode`** — mode de lecture DU BEACON UNIQUEMENT (le vocal n'en a
   pas, voir "Beacon vs vocal" plus haut : toujours intermittent), une valeur
   parmi deux littéraux : `"continu"` (une boucle positionnée permanente,

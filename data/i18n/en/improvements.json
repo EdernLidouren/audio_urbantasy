@@ -1,12 +1,15 @@
 {
-  "improvement.supernatural_perception": "Supernatural perception",
-  "improvement.supernatural_perception.description": "Perceives what escapes the ordinary gaze — presences, echoes, phenomena invisible to most.",
-  "improvement.flashlight": "Flashlight",
-  "improvement.flashlight.description": "A flashlight, to light up what the dark hides.",
-  "improvement.mirror_pass": "Mirror pass",
-  "improvement.mirror_pass.description": "The right to step through certain mirrors as one steps through a door.",
-  "improvement.master_key": "Master key",
-  "improvement.master_key.description": "A key that opens the ordinary doors of the town, the ones locked out of habit rather than distrust.",
-  "improvement.skeleton_key": "Skeleton key",
-  "improvement.skeleton_key.description": "A key that opens what the master key leaves shut: the locks meant to be truly inviolable."
+  "improvement.supernatural_perception.name": "supernatural perception",
+  "improvement.supernatural_perception.description": "Opens your senses to the invisible world until you revoke this power. While you sense magic and the entities bound to it, you lose part of your ordinary perceptions.",
+  "improvement.flashlight.name": "flashlight",
+  "improvement.flashlight.description": "A powerful electric lamp whose light lets you explore the darkest places without fear.",
+  "improvement.mirror_pass.name": "mirror pass",
+  "improvement.mirror_pass.description": "Many mirrors were once enchanted to create a sanctuary outside space and time. This power lets you pass through these portals at will.",
+  "improvement.master_key.name": "master key",
+  "improvement.master_key.description": "A key ring so absurdly loaded that it promises to open every lock in the region to whoever has the patience to use it.",
+  "improvement.skeleton_key.name": "skeleton key",
+  "improvement.skeleton_key.description": "An old bronze key without teeth, yet able to unlock what should never open. Its enchantment overrides most supernatural protections.",
+  "improvements.title": "Improvements: {unlocked} of {total}",
+  "improvements.entry.known": "{order} - {name}: {description}",
+  "improvements.entry.unknown": "{order} - Unknown"
 }

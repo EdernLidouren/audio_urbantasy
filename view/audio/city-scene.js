@@ -526,6 +526,10 @@ function resolveIntermittentSource(entity, descriptor, keys) {
     reverbSend,
     highpassHz: entity.isFlying ? resolveTuning("flyingHighpassHz", entity, descriptor) : undefined,
     heightGain: entity.isFlying ? resolveTuning("flyingVolumeFactor", entity, descriptor) : 1,
+    // SUIVI (défaut) ou ANCRAGE, même sémantique que l'effet playSound
+    // (voir doc/scripting.md/"playSound"/`tracked`) : lu sur le
+    // descripteur seul, un choix propre à ce rôle de son.
+    tracked: descriptor.tracked !== false,
     nextAt: 0,
   };
 }
@@ -1593,15 +1597,20 @@ export function createCityAudioScene(getSession) {
       return;
     }
     const rendering = spatialRendering(found.entry, found.live.x - getSession().player.x, effectiveMuffle(found.entry, found.forcedMuffle));
-    const gain = resolved.gain ?? 1;
+    // gain de rôle × facteur de hauteur (isFlying, 1 sinon) : constants
+    // pendant toute la lecture, seul le rendu spatial varie.
+    const gain = (resolved.gain ?? 1) * (resolved.heightGain ?? 1);
     const handle = playTrackedOneShot(file, {
-      cacheKey: `tracked:${file}`,
+      // Clé PAR ENTITÉ : deux entités qui jouent le même fichier en même
+      // temps gardent chacune leur passe-bas (piloté au tick).
+      cacheKey: `tracked:${entityId}:${file}`,
       reverbSend: resolved.reverbSend,
       reverbBusInput: reverbBus.input,
       volume: rendering.volume * beaconVolumeFactor() * gain,
       stereo: rendering.pan,
       rate: randomRate(resolved.pitchVariation),
       lowpassHz: rendering.cutoff,
+      highpassHz: resolved.highpassHz,
       entityLayer: true,
     });
     if (!handle) return;
@@ -1635,7 +1644,10 @@ export function createCityAudioScene(getSession) {
   }
 
   // Sources positionnées INTERMITTENTES (voir entitySounds/
-  // intermittentSources) : un beacon en mode "intermittent" ET/OU un vocal
+  // intermittentSources) — SUIVIES par défaut pendant leur lecture (voir
+  // startTrackedOneShot), comme un effet playSound : un vocal lancé par une
+  // entité rapide ne reste plus ancré derrière elle. Un beacon en mode
+  // "intermittent" ET/OU un vocal
   // (toujours intermittent) partagent ICI le même mécanisme de
   // déclenchement/replanification — factorisé pour ne jamais dupliquer
   // cette logique entre les deux rôles, seuls path/interval/gain/... (déjà
@@ -1671,6 +1683,15 @@ export function createCityAudioScene(getSession) {
       for (const src of entry.intermittentSources) {
         if (now < src.nextAt) continue;
 
+        // SUIVI (défaut) : le son reste sur l'entité pendant toute sa
+        // lecture, même si elle se déplace (voir startTrackedOneShot). Le
+        // rendu initial vient de la même formule que ci-dessous.
+        if (src.tracked) {
+          startTrackedOneShot(entry.entity.id, { entry, live: liveById.get(entry.entity.id), forcedMuffle }, src);
+          src.nextAt = now + jitteredIntervalMs(src.interval, src.intervalVariation);
+          continue;
+        }
+        // ANCRÉ (tracked:false) : spatialisé une fois, figé.
         playPositionedOneShot(src.path, {
           relX: liveById.get(entry.entity.id).x - x,
           audibleRange: entry.audibleRange,

@@ -57,6 +57,10 @@ export const CITY_BINDINGS = {
   announceMoney: { keys: ["g"], mods: [] },
   openInventory: { keys: ["i"], mods: [] },
   openEquipment: { keys: ["q"], mods: [] },
+  // "m" : même écran à onglets, ouvert sur l'onglet Améliorations (voir
+  // view/menus/inventory-menu.js/openImprovementsMenu). Canal distinct de
+  // Shift+M (openTeleportDebugMenu, mods exacts).
+  openImprovements: { keys: ["m"], mods: [] },
   announcePosition: { keys: ["x"], mods: [] },
   // "w" (weather) : consultation pure de la météo courante (voir
   // core/weather.js) — outil de VÉRIFICATION, comme announceTime ("t") :

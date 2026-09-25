@@ -39,6 +39,7 @@ import { openTeleportDebugMenu } from "./menus/debug-teleport-menu.js";
 import {
   openInventoryMenu,
   openEquipmentMenu,
+  openImprovementsMenu,
   setDropItemHandler,
   setEquipItemHandler,
   setUnequipItemHandler,
@@ -909,6 +910,12 @@ export function makeCityScreen(getSession, setSession) {
       // ambiguïté, voir le commentaire de CITY_BINDINGS.openEquipment.
       if (action === "openEquipment") {
         openEquipmentMenu(scene, getSession);
+        return;
+      }
+
+      // "openImprovements" ("m") : même écran, onglet Améliorations.
+      if (action === "openImprovements") {
+        openImprovementsMenu(scene, getSession);
         return;
       }
 

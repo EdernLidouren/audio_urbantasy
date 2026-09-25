@@ -1,9 +1,10 @@
-// Écran d'INVENTAIRE à DEUX ONGLETS — Sac ("i") et Équipement ("q"), voir
-// view/city-screen.js. UN SEUL écran RÉEL sur la pile (lib/screens.js) : il
-// délègue à un écran-menu INTERNE (lib/menu.js/makeMenuScreen), reconstruit
-// pour l'onglet actif à CHAQUE affichage/bascule — jamais un écran séparé
-// par onglet. Tab / Maj+Tab basculent ENTRE les deux (TAB_BINDINGS, résolues
-// via lib/input.js/resolveAction, comme le reste de ce fichier).
+// Écran d'INVENTAIRE à TROIS ONGLETS — Sac ("i"), Équipement ("q") et
+// Améliorations ("m"), voir view/city-screen.js. UN SEUL écran RÉEL sur la
+// pile (lib/screens.js) : il délègue à un écran-menu INTERNE
+// (lib/menu.js/makeMenuScreen), reconstruit pour l'onglet actif à CHAQUE
+// affichage/bascule — jamais un écran séparé par onglet. Tab / Maj+Tab
+// parcourent les onglets en cycle, dans les deux sens (TAB_BINDINGS,
+// résolues via lib/input.js/resolveAction, comme le reste de ce fichier).
 //
 // menu.title de chaque onglet EST DÉJÀ son propre nom ("Sac"/"Équipement") —
 // rappeler l'onEnter de l'écran-menu interne à la bascule annonce donc
@@ -28,6 +29,7 @@ import { announce } from "../../lib/announce.js";
 import { playMenuSound } from "../menu-sounds.js";
 import { ITEM_REGISTRY } from "../../core/items.js";
 import { EQUIPMENT_SLOTS } from "../../core/equipment.js";
+import { IMPROVEMENT_REGISTRY, orderedImprovementIds } from "../../core/improvements.js";
 import { resolveAction, checkBindingsForCollisions } from "../../lib/input.js";
 
 // Bindings du sélecteur de quantité (voir openQuantitySelector plus bas) —
@@ -58,20 +60,21 @@ const QUANTITY_STEP_BY_ACTION = {
   increaseBigger: 100,
 };
 
-// Bascule d'onglet — GÉNÉRIQUE (aucune connaissance de Sac/Équipement dans
-// les noms d'action eux-mêmes, comme MENU_BINDINGS de lib/menu.js) : Tab et
-// Maj+Tab font la MÊME chose avec seulement deux onglets (voir otherTab),
-// mais restent deux actions distinctes pour rester correct le jour où un
-// troisième onglet s'ajouterait (cycle réel avant/arrière plutôt qu'un
-// simple basculement).
+// Bascule d'onglet — GÉNÉRIQUE (aucune connaissance des onglets dans les
+// noms d'action eux-mêmes, comme MENU_BINDINGS de lib/menu.js) : Tab avance,
+// Maj+Tab recule, en cycle sur TABS (voir cycleTab).
 const TAB_BINDINGS = {
   nextTab: { keys: ["Tab"], mods: [] },
   prevTab: { keys: ["Tab"], mods: ["shift"] },
 };
 checkBindingsForCollisions(TAB_BINDINGS, "view/menus/inventory-menu.js TAB_BINDINGS");
 
-function otherTab(tab) {
-  return tab === "bag" ? "equipment" : "bag";
+// Ordre des onglets, celui du cycle Tab / Maj+Tab.
+const TABS = ["bag", "equipment", "improvements"];
+
+function cycleTab(tab, direction) {
+  const index = TABS.indexOf(tab);
+  return TABS[(index + direction + TABS.length) % TABS.length];
 }
 
 // Noms d'affichage des slots d'équipement (core/equipment.js/EQUIPMENT_SLOTS)
@@ -250,11 +253,53 @@ function buildEquipmentTabScreen(scene, getSession) {
   return makeMenuScreen(menu, t);
 }
 
-// `cursor` : seul l'onglet Sac en a l'usage (voir buildBagTabScreen) — la
-// liste de l'onglet Équipement ne change jamais de longueur (un slot par
-// entrée, toujours), rien à repositionner de ce côté.
+// Ligne d'UNE amélioration de l'onglet Améliorations. Débloquée :
+// "{order} - {nom} : {description}", Espace/Entrée la réannonce. Non
+// débloquée : "{order} - Inconnue" — le numéro révèle qu'un pouvoir existe
+// sans dire lequel ; l'activer ne fait rien de plus. Aucune action
+// "utiliser" : les pouvoirs s'activent ailleurs (ex. "p" pour la perception).
+function improvementEntry(id, owned) {
+  const props = IMPROVEMENT_REGISTRY[id];
+  if (!owned) {
+    return { label: "improvements.entry.unknown", labelParams: { order: props.order }, onActivate: () => {} };
+  }
+  const labelParams = {
+    order: props.order,
+    name: t(props.labelKey),
+    description: stripTrailingPeriod(t(props.descriptionKey)),
+  };
+  return {
+    label: "improvements.entry.known",
+    labelParams,
+    onActivate: () => announce(t("improvements.entry.known", labelParams), { assertive: true }),
+  };
+}
+
+// Onglet Améliorations : toutes les améliorations du registre, dans leur
+// `order` déclaré. "Débloquée" se lit dans l'ÉTAT RÉEL
+// (session.improvements), JAMAIS via la condition hasImprovement : en mode
+// debug, celle-ci répond toujours vrai (court-circuit, voir
+// core/presence.js), alors que cet onglet doit montrer ce que le joueur
+// possède vraiment — sinon impossible de vérifier son état en debug.
+function buildImprovementsTabScreen(getSession) {
+  const owned = getSession().improvements || {};
+  const ids = orderedImprovementIds();
+  const menu = {
+    title: "improvements.title",
+    titleParams: { unlocked: ids.filter((id) => owned[id]).length, total: ids.length },
+    closable: true,
+    entries: ids.map((id) => improvementEntry(id, Boolean(owned[id]))),
+  };
+  return makeMenuScreen(menu, t);
+}
+
+// `cursor` : seul l'onglet Sac en a l'usage (voir buildBagTabScreen) — les
+// listes des autres onglets ne changent pas de longueur pendant qu'on les
+// parcourt, rien à repositionner de ce côté.
 function buildTabScreen(tab, scene, getSession, cursor) {
-  return tab === "equipment" ? buildEquipmentTabScreen(scene, getSession) : buildBagTabScreen(scene, getSession, cursor);
+  if (tab === "equipment") return buildEquipmentTabScreen(scene, getSession);
+  if (tab === "improvements") return buildImprovementsTabScreen(getSession);
+  return buildBagTabScreen(scene, getSession, cursor);
 }
 
 // L'écran RÉEL (voir header) : reconstruit son écran-menu interne (`inner`)
@@ -309,7 +354,7 @@ function buildInventoryTabsScreen(scene, getSession, initialTab) {
       if (action === "nextTab" || action === "prevTab") {
         // Comportement navigateur de Tab déjà neutralisé en amont, voir
         // lib/input.js/ALWAYS_NEUTRALIZED_BINDINGS — rien à prévenir ici.
-        activeTab = otherTab(activeTab);
+        activeTab = cycleTab(activeTab, action === "nextTab" ? 1 : -1);
         rebuildInner();
         inner.onEnter(); // annonce "<Nom de l'onglet>. <contenu>" — voir header.
         return;
@@ -340,6 +385,11 @@ export function openInventoryMenu(scene, getSession) {
 // "q" — voir view/city-screen.js.
 export function openEquipmentMenu(scene, getSession) {
   openInventoryTabs(scene, getSession, "equipment");
+}
+
+// "m" — voir view/city-screen.js.
+export function openImprovementsMenu(scene, getSession) {
+  openInventoryTabs(scene, getSession, "improvements");
 }
 
 // Actions disponibles pour UNE entrée de sac — "Équiper" seulement si
