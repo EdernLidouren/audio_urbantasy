@@ -74,6 +74,9 @@ export const CITY_BINDINGS = {
   // openWeatherDebugMenu ci-dessus : mods:["shift"] est un canal INDÉPENDANT
   // de "announceTime" (mods:[]), aucune collision malgré la même touche "t".
   openTimeDebugMenu: { keys: ["t"], mods: ["shift"] },
+  // Shift+M, MODE DEBUG UNIQUEMENT : menu de téléportation vers n'importe
+  // quelle scène du registre (voir view/menus/debug-teleport-menu.js).
+  openTeleportDebugMenu: { keys: ["m"], mods: ["shift"] },
   // "p" (perception) : bascule la PERCEPTION SURNATURELLE (voir
   // core/state.js/togglePerception, view/city-screen.js/togglePerceptionEffect)
   // — COOLDOWN anti-spam entièrement côté consommation (city-screen.js),

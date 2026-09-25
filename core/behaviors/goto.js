@@ -55,8 +55,9 @@ export function parseParams(raw, fail) {
 
   const params = { targetId };
   if (arriveDistance !== undefined) params.arriveDistance = arriveDistance;
-  // speed : validé mais pas encore CONSOMMÉ par step() — même statut que
-  // follow.js/speed (voir son commentaire) : reduce.js résout tout mobile
+  // speed : jamais lu par step() — consommé à la RÉSOLUTION par
+  // core/reduce.js/resolveIntents (prime sur entity.speed), comme
+  // follow.js/speed. Ancien commentaire : reduce.js résout tout mobile
   // à intention à la cadence MOVE_STEP uniforme, réservé pour une future
   // variation de cadence.
   if (speed !== undefined) params.speed = speed;

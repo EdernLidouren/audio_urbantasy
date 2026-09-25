@@ -432,6 +432,66 @@ export function runMovementChecks() {
   // l'état interne du comportement (phase/ticksLeft/dir), seulement à x —
   // preuve que la vitesse est appliquée APRÈS le comportement (résolution),
   // jamais lue par lui (wander.js n'a pas été touché par ce branchement).
+  // behavior.speed : PRIME sur entity.speed, même résolution physique.
+  function makeBehaviorSpeedLevel(entitySpeed, behaviorSpeed) {
+    const behavior = { kind: "wander", walkMin: 1000, walkMax: 1000 };
+    if (behaviorSpeed !== undefined) behavior.speed = behaviorSpeed;
+    const entity = { id: "e1", type: "dog", x: 50, speed: entitySpeed, behavior };
+    return parseLevel({ id: "movement-check-behavior-speed", titleKey: "level.demo.title", length: 100, playerStart: 50, entities: [entity] }, SPEED_REGISTRY);
+  }
+  function distanceAfter50Ticks(level) {
+    let state = createInitialState(level, 3, NO_COMPANIONS);
+    for (let i = 0; i < 50; i++) state = reduce(state, tick(0));
+    return Math.abs(getActiveWorld(state).entities[0].x - 50);
+  }
+  const entitySpeedOnly = distanceAfter50Ticks(makeBehaviorSpeedLevel(1, undefined));
+  const behaviorSpeedWins = distanceAfter50Ticks(makeBehaviorSpeedLevel(1, 0.5));
+  const behaviorOverEntity = distanceAfter50Ticks(makeBehaviorSpeedLevel(0.5, 2));
+  run("behavior.speed : 0.5 sur une entité à 1 -> moitié de la distance", true, Math.abs(behaviorSpeedWins - entitySpeedOnly / 2) < 1e-9);
+  run("behavior.speed : 2 sur une entité à 0.5 -> double de la distance à 1", true, Math.abs(behaviorOverEntity - entitySpeedOnly * 2) < 1e-9);
+  run("behavior.speed : absent -> entity.speed s'applique", true, entitySpeedOnly > 0);
+
+  // continueBias : 0 -> demi-tour à CHAQUE nouvelle marche ; 1 -> jamais.
+  function walkDirections(continueBias) {
+    const level = parseLevel(
+      {
+        id: `movement-check-continue-bias-${continueBias}`,
+        titleKey: "level.demo.title",
+        length: 1000,
+        playerStart: 500,
+        entities: [{ id: "e1", type: "dog", x: 500, behavior: { kind: "wander", walkMin: 5, walkMax: 5, pauseMin: 3, pauseMax: 3, continueBias } }],
+      },
+      SPEED_REGISTRY
+    );
+    let state = createInitialState(level, 7, NO_COMPANIONS);
+    const dirs = [];
+    let previousPhase = null;
+    for (let i = 0; i < 200; i++) {
+      state = reduce(state, tick(0));
+      const w = getActiveWorld(state).entities[0].wander;
+      // Direction retenue à CHAQUE entrée en marche (transition pause -> marche).
+      if (w.phase === "walk" && previousPhase === "pause") dirs.push(w.dir);
+      previousPhase = w.phase;
+    }
+    return dirs;
+  }
+  const alwaysTurn = walkDirections(0);
+  const neverTurn = walkDirections(1);
+  run("continueBias : 0 -> plusieurs marches observées", true, alwaysTurn.length >= 10);
+  run("continueBias : 0 -> demi-tour à chaque marche", true, alwaysTurn.every((dir, i) => i === 0 || dir === -alwaysTurn[i - 1]));
+  run("continueBias : 1 -> toujours la même direction", true, neverTurn.length >= 10 && neverTurn.every((dir) => dir === neverTurn[0]));
+  function expectBehaviorRejected(behavior) {
+    try {
+      parseLevel({ id: "movement-check-bad-bias", titleKey: "level.demo.title", length: 10, playerStart: 5, entities: [{ id: "e1", type: "dog", x: 5, behavior }] }, SPEED_REGISTRY);
+      return false;
+    } catch {
+      return true;
+    }
+  }
+  run("continueBias : > 1 rejeté au chargement", true, expectBehaviorRejected({ kind: "wander", continueBias: 1.5 }));
+  run("continueBias : négatif rejeté au chargement", true, expectBehaviorRejected({ kind: "wander", continueBias: -0.1 }));
+  run("continueBias : non numérique rejeté au chargement", true, expectBehaviorRejected({ kind: "wander", continueBias: "souvent" }));
+
   run(
     "speed : état interne du comportement identique quelle que soit la vitesse (wander ignore speed)",
     JSON.stringify({ phase: fastSpeedEntity.wander.phase, ticksLeft: fastSpeedEntity.wander.ticksLeft, dir: fastSpeedEntity.wander.dir }),

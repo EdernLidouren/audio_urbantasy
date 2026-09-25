@@ -35,6 +35,7 @@ import { sellItems, buyItems, restockShopIfDue } from "../core/trade.js";
 import { openPauseMenu } from "./menus/pause-menu.js";
 import { openWeatherDebugMenu } from "./menus/debug-weather-menu.js";
 import { openTimeDebugMenu } from "./menus/debug-time-menu.js";
+import { openTeleportDebugMenu } from "./menus/debug-teleport-menu.js";
 import {
   openInventoryMenu,
   openEquipmentMenu,
@@ -960,6 +961,14 @@ export function makeCityScreen(getSession, setSession) {
       // debug, ne fait RIEN, même garde que "openWeatherDebugMenu" ci-dessus.
       if (action === "openTimeDebugMenu" && isDebugEnabled()) {
         openTimeDebugMenu(getSession, advanceTimeDebugEffect, setTimeScaleDebugEffect);
+        return;
+      }
+
+      // "openTeleportDebugMenu" (Shift+M), MODE DEBUG UNIQUEMENT : liste des
+      // scènes du registre, Entrée téléporte via executeTeleport (le même
+      // chemin qu'une porte). Hors debug, ne fait RIEN.
+      if (action === "openTeleportDebugMenu" && isDebugEnabled()) {
+        openTeleportDebugMenu(getSession, executeTeleport);
         return;
       }
 

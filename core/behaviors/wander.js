@@ -16,11 +16,9 @@
 // obstacles pour s'y arrêter proprement, seulement pour RÉAGIR à l'arrêt
 // (rebond, voir plus bas).
 //
-// Conséquence : `speed` (repris ci-dessous, validé mais toujours pas
-// consommé) rejoint le même statut que follow.js/goto.js — tout mobile à
-// intention avance à la cadence MOVE_STEP uniforme (voir
-// resolvePlayerMove/resolveBodyMove), réservé pour une future variation de
-// cadence commune aux trois comportements. `turnChance` (ancien réglage,
+// Conséquence : `speed` (validé ci-dessous) n'est jamais lu par step() —
+// consommé à la RÉSOLUTION par core/reduce.js/resolveIntents, où il prime
+// sur entity.speed, comme pour follow.js/goto.js. `turnChance` (ancien réglage,
 // flip à chaque tick) disparaît : REMPLACÉ par la machine à deux états
 // ci-dessous, qui ne choisit plus une direction qu'aux TRANSITIONS de
 // phase, jamais par tick.
@@ -44,21 +42,20 @@ import { nextRandom } from "../rng.js";
 // longues et notables (2 à 5s) — à ajuster à l'oreille via une surcharge de
 // behavior si besoin (cascade instance -> archétype -> ces défauts, comme
 // tout autre comportement).
+//
+// continueBias (0..1) : probabilité, à l'entrée d'une NOUVELLE marche, de
+// repartir dans la direction de la marche précédente plutôt que de faire
+// demi-tour. 0.65 par défaut : évite le ping-pong systématique sans figer
+// l'entité dans un aller simple. 0 = demi-tour à chaque pause (garde qui
+// fait les cent pas), vers 1 = ne revient presque jamais sur ses pas
+// (explorateur ; seuls les bords la retournent).
 export const DEFAULTS = {
   walkMin: 45,
   walkMax: 90,
   pauseMin: 120,
   pauseMax: 300,
+  continueBias: 0.65,
 };
-
-// Préférence de continuité (item 2 du prompt) : à l'entrée d'une NOUVELLE
-// marche, la direction TIRÉE privilégie MODÉRÉMENT celle de la marche
-// précédente plutôt qu'un pile-ou-face pur — évite le ping-pong systématique
-// (faire demi-tour à chaque pause) sans figer non plus l'entité dans un
-// aller simple. 65% : choix simple, validé à l'oreille, pas exposé en
-// DEFAULTS (détail d'implémentation du TIRAGE, pas un rythme à régler par
-// contenu comme les fourchettes ci-dessus).
-const CONTINUE_BIAS = 0.65;
 
 function isFiniteNumber(value) {
   return typeof value === "number" && Number.isFinite(value);
@@ -84,10 +81,13 @@ function checkTickRange(raw, minKey, maxKey, fail) {
 // les autres comportements : les défauts se résolvent dans step(), jamais
 // bakés ici.
 export function parseParams(raw, fail) {
-  const { walkMin, walkMax, pauseMin, pauseMax, speed } = raw;
+  const { walkMin, walkMax, pauseMin, pauseMax, speed, continueBias } = raw;
 
   checkTickRange(raw, "walkMin", "walkMax", fail);
   checkTickRange(raw, "pauseMin", "pauseMax", fail);
+  if (continueBias !== undefined && (!isFiniteNumber(continueBias) || continueBias < 0 || continueBias > 1)) {
+    fail(`behavior.continueBias doit être un nombre entre 0 et 1 si présent.`);
+  }
   if (speed !== undefined && (!isFiniteNumber(speed) || speed <= 0)) {
     fail(`behavior.speed doit être un nombre > 0 si présent.`);
   }
@@ -97,8 +97,9 @@ export function parseParams(raw, fail) {
   if (walkMax !== undefined) params.walkMax = walkMax;
   if (pauseMin !== undefined) params.pauseMin = pauseMin;
   if (pauseMax !== undefined) params.pauseMax = pauseMax;
-  // speed : voir header — réservé, non consommé.
+  // speed : voir header — consommé par core/reduce.js, jamais par step().
   if (speed !== undefined) params.speed = speed;
+  if (continueBias !== undefined) params.continueBias = continueBias;
   return params;
 }
 
@@ -113,10 +114,10 @@ function drawDirection(rngState) {
   return { value: value < 0.5 ? -1 : 1, rngState: state };
 }
 
-// Voir CONTINUE_BIAS ci-dessus.
-function drawWalkDirection(previousDir, rngState) {
+// Voir continueBias (DEFAULTS) ci-dessus.
+function drawWalkDirection(previousDir, continueBias, rngState) {
   const { value, state } = nextRandom(rngState);
-  return { value: value < CONTINUE_BIAS ? previousDir : -previousDir, rngState: state };
+  return { value: value < continueBias ? previousDir : -previousDir, rngState: state };
 }
 
 // step(entity, context) : context porte length/rngState (ce module ignore
@@ -156,7 +157,7 @@ export function step(entity, context) {
   if (ticksLeft <= 0) {
     phase = phase === "walk" ? "pause" : "walk";
     if (phase === "walk") {
-      const dirDraw = drawWalkDirection(dir, rngState);
+      const dirDraw = drawWalkDirection(dir, cfg.continueBias, rngState);
       rngState = dirDraw.rngState;
       dir = dirDraw.value;
     }

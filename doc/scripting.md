@@ -513,6 +513,34 @@ il fait basculer `behavior.kind` à `undefined` (via `entity.behavior = null`),
 suffisant pour que `arrived` redevienne fausse au cycle suivant, SANS lui donner de
 comportement de repos pour autant.
 
+#### Allure : `speed` (commun) et paramètres de `wander`
+
+`speed` (nombre `> 0`, optionnel) est accepté par les TROIS kinds (`wander`,
+`follow`, `goto`) : facteur de vitesse, 1 = allure du joueur (2,4 cases par
+seconde). Il PRIME sur le `speed` de l'entité (champ d'entité, défaut 1). Une règle
+qui change de comportement change donc aussi d'allure — « calme le jour, frénétique
+la nuit » s'écrit avec deux objets `behavior` qui portent chacun leur `speed`. Jamais
+lu par le comportement lui-même : appliqué à la résolution physique
+(`core/reduce.js`/`resolveIntents`).
+
+`wander` (`core/behaviors/wander.js`, défauts dans `DEFAULTS`) — machine à deux
+phases, durées en TICKS (60 ticks = 1 seconde) :
+
+- `walkMin` / `walkMax` : durée d'une marche, tirée dans la fourchette.
+- `pauseMin` / `pauseMax` : durée d'une pause.
+- `continueBias` (0 à 1, défaut 0,65) : probabilité de repartir dans la MÊME
+  direction après une pause. 0 = demi-tour à chaque pause (garde qui fait les cent
+  pas), proche de 1 = ne revient presque jamais sur ses pas (seuls les bords et les
+  obstacles la retournent).
+
+Exemple réel — le miravi de l'espace miroir (`level/clock-tower-weight-shaft-mirror-space.json`),
+un ARPENTEUR : des marches plus longues que la traversée de la salle, courtes pauses,
+il parcourt la salle d'un bout à l'autre et fait demi-tour au bord :
+
+```json
+"behavior": { "kind": "wander", "walkMin": 1300, "walkMax": 1600, "pauseMin": 30, "pauseMax": 90, "speed": 2 }
+```
+
 ### Ajouter un type d'effet
 
 1. Un cas dans `core/level.js`/`parseEffect` : valide la FORME propre à ce type,

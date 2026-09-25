@@ -67,12 +67,8 @@ export function parseParams(raw, fail) {
   if (minDistance !== undefined) params.minDistance = minDistance;
   if (maxDistance !== undefined) params.maxDistance = maxDistance;
   if (targetId !== undefined) params.targetId = targetId;
-  // speed : validé mais pas encore CONSOMMÉ par step() — reduce.js résout
-  // tout mobile à intention à la cadence MOVE_STEP (même pas que le
-  // joueur), voir resolvePlayerMove. Réservé pour une future variation de
-  // cadence par compagnon, même esprit que pitchVariation avant d'être
-  // câblé (voir entities/model.md) : le champ existe et se valide déjà,
-  // pour qu'un futur usage n'ait pas à revenir toucher au parsing.
+  // speed : jamais lu par step() — consommé à la RÉSOLUTION par
+  // core/reduce.js/resolveIntents, où il prime sur entity.speed.
   if (speed !== undefined) params.speed = speed;
   return params;
 }

@@ -65,7 +65,12 @@
       "x": 25,
       "isFlying": true,
       "behavior": {
-        "kind": "wander"
+        "kind": "wander",
+        "walkMin": 1300,
+        "walkMax": 1600,
+        "pauseMin": 30,
+        "pauseMax": 90,
+        "speed": 2
       }
     }
   ]

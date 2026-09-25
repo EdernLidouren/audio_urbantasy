@@ -337,7 +337,12 @@ désormais SANS ambiguïté grâce à l'arbitrage des modificateurs de
 `lib/input.js` ("d" seul = mouvement, "d"+Ctrl = bascule debug, "e" = ce
 spawn de test), mais le choix de "e" reste inchangé, plus clair à retenir.
 Infra volontairement minimale : d'autres outils de debug s'y grefferont plus
-tard derrière le MÊME drapeau, jamais un par outil.
+tard derrière le MÊME drapeau, jamais un par outil. Menus de debug derrière ce
+drapeau, en ville : Shift+W (météo, `view/menus/debug-weather-menu.js`),
+Shift+T (temps, `view/menus/debug-time-menu.js`), Shift+M (téléportation vers
+n'importe quelle scène du registre `level/index.js`, liste générée,
+`view/menus/debug-teleport-menu.js` — passe par l'effet `teleport` en mode
+`instant`, jamais par un chemin de chargement parallèle).
 
 ## Collecte — conteneurs régénérants et plages au sol
 
@@ -1283,8 +1288,9 @@ illustration.
 Deux catégories voisines, à ne pas confondre avec les paramètres sonores
 ci-dessus, même si l'audio en dépend :
 
-- **Le comportement (vitesse de déplacement)** — `behavior.speed` (voir
-  `core/behaviors/wander.js`) est une donnée du CORE : elle détermine à
+- **Le comportement (vitesse de déplacement)** — `behavior.speed`, qui prime
+  sur le `speed` de l'entité (voir `doc/scripting.md`/"Allure"), est une
+  donnée du CORE : elle détermine à
   quelle vitesse une entité avance, donc indirectement À QUELLE FRÉQUENCE
   RÉELLE son son de déplacement se déclenche (plus vite = plus de distance
   parcourue par tick = pas plus rapprochés dans le temps) — mais aucun
