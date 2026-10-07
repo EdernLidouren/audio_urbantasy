@@ -12,13 +12,14 @@
         "x": 1,
         "nameKey": "door.alley_back.name",
         "descriptionKey": "door.alley_back.description",
-        "action": { "kind": "applyEffects", "effects": [{ "type": "teleport", "target": "demo2" }] }
+        "action": { "kind": "applyEffects", "effects": [{ "type": "playSound", "path": "assets/sounds/doors/door_1_open" }, { "type": "teleport", "target": "demo2" }] }
       },
       {
         "id": "alley_gap_recto",
         "type": "passage",
         "x": 8,
-        "tuning": { "transitionSound": "assets/sounds/doors/metal_gate" },
+        "sounds": { "beacon": { "path": "assets/sounds/doors/metal_gate_1_close" } },
+        "tuning": { "transitionSound": "assets/sounds/doors/metal_gate_1_open" },
         "action": { "kind": "switchSide", "arrivalX": 8 }
       }
     ]
@@ -32,7 +33,8 @@
         "id": "alley_gap_verso",
         "type": "passage",
         "x": 8,
-        "tuning": { "transitionSound": "assets/sounds/doors/metal_gate" },
+        "sounds": { "beacon": { "path": "assets/sounds/doors/metal_gate_1_close" } },
+        "tuning": { "transitionSound": "assets/sounds/doors/metal_gate_1_open" },
         "action": { "kind": "switchSide", "arrivalX": 8 }
       }
     ]

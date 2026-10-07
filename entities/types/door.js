@@ -10,11 +10,19 @@
 // level/demo.json et consorts). La porte n'est PLUS un cas spécial du core
 // ni de la vue : juste une entité `interactable` ordinaire dont l'action
 // déclenche un effet "teleport" comme n'importe quel autre contenu.
+//
+// CONVENTION SONORE des portes : beacon `<famille>_close`, et l'action joue
+// `<famille>_open` par un effet playSound placé AVANT son teleport (son de
+// départ, voir doc/scripting.md/"playSound") — s'il existe. Famille par
+// défaut : door_1 (ci-dessous) ; une instance en change en surchargeant
+// `sounds.beacon.path` ET le playSound de son action (door_2 pour l'hôtel
+// de ville, metal_door_1 pour le clocher). Les échelles, de type door, ont
+// leur propre beacon et pas de son d'ouverture.
 export default {
   nameKey: "door.default.name",
   descriptionKey: "door.default.description",
   sounds: {
-    beacon: { path: "assets/sounds/doors/door_beacon", loop: true },
+    beacon: { path: "assets/sounds/doors/door_1_close", loop: true },
   },
   blocksMovement: false,
   observable: true,

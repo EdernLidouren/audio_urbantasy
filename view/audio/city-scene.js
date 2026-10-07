@@ -1478,12 +1478,17 @@ export function createCityAudioScene(getSession) {
       heightGain = 1,
       muffle = NO_MUFFLE,
       highlighted = false,
+      // false : HORS couche entités, jamais éteint par le fondu du sas (son
+      // de départ, voir playEntityOneShot). Cache dédié ("departure:"), pour
+      // que ses filtres ne se branchent jamais dans la couche.
+      entityLayer = true,
     }
   ) {
     const dist = Math.abs(relX);
     const pan = clamp(relX / panSaturation, -1, 1);
     const volume = applyMuffleToVolume(volumeForDistance(dist, audibleRange, highlighted) * volumeFactor * gain * heightGain, muffle);
     const resolved = resolveAsset(path);
+    const cachePrefix = `${entityLayer ? "" : "departure:"}${muffle.amount > 0 ? "muffled:" : ""}`;
     playOneShot(resolved, {
       reverbSend,
       reverbBusInput: reverbBus.input,
@@ -1492,8 +1497,8 @@ export function createCityAudioScene(getSession) {
       rate: randomRate(pitchVariation),
       highpassHz,
       lowpassHz: muffle.amount > 0 ? muffle.lowpassHz : undefined,
-      cacheKey: muffle.amount > 0 ? `muffled:${resolved}` : undefined,
-      entityLayer: true,
+      cacheKey: cachePrefix ? `${cachePrefix}${resolved}` : undefined,
+      entityLayer,
     });
   }
 
@@ -1505,8 +1510,9 @@ export function createCityAudioScene(getSession) {
   // lui-même). Jamais soumis à la pause sélective des balises (sound.pause/
   // resume ne concerne QUE la voix continue, voir lib/audio.js) : un
   // one-shot Howler joue jusqu'au bout quoi qu'il arrive ensuite au beacon.
-  function playTransitionSound(entry, relX, transitionSound, muffle = NO_MUFFLE) {
+  function playTransitionSound(entry, relX, transitionSound, muffle = NO_MUFFLE, { entityLayer = true } = {}) {
     playPositionedOneShot(transitionSound.path, {
+      entityLayer,
       relX,
       audibleRange: entry.audibleRange,
       panSaturation: entry.panSaturation,
@@ -1549,7 +1555,15 @@ export function createCityAudioScene(getSession) {
   // clocher quand le joueur passe devant. tracked:false -> ANCRÉ : rendu
   // calculé UNE fois au départ (playTransitionSound, chemin historique),
   // figé ensuite — un événement ponctuel qui "s'est produit là".
-  function playEntityOneShot(targetId, descriptor) {
+  //
+  // DÉPART (`departing`, voir view/interaction.js/runEffects) : le son
+  // appartient à l'acte de PARTIR (même liste d'effets qu'un teleport).
+  // Spatialisé à sa position d'émission, ANCRÉ (la scène qui le
+  // positionnait va disparaître) et HORS couche entités : il survit au
+  // fondu du sas et finit de résonner, comme les pas de transition d'une
+  // bascule de face. Sa réverb, elle, appartient au lieu quitté et s'éteint
+  // avec lui.
+  function playEntityOneShot(targetId, descriptor, { departing = false } = {}) {
     const found = findEntitySource(targetId);
     if (!found) {
       console.warn(`city-scene: playEntityOneShot("${targetId}") : id absent de la scène.`);
@@ -1560,6 +1574,12 @@ export function createCityAudioScene(getSession) {
       return;
     }
     const resolved = resolveTransitionSound(found.entry.entity, descriptor, PLAY_SOUND_TUNING_KEYS);
+    if (departing) {
+      playTransitionSound(found.entry, found.live.x - getSession().player.x, resolved, effectiveMuffle(found.entry, found.forcedMuffle), {
+        entityLayer: false,
+      });
+      return;
+    }
     if (descriptor.tracked === false) {
       playTransitionSound(found.entry, found.live.x - getSession().player.x, resolved, effectiveMuffle(found.entry, found.forcedMuffle));
       return;

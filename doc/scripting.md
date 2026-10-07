@@ -1110,6 +1110,29 @@ que le rendu DIÉGÉTIQUE : un son méta n'a pas de position, rien à suivre ni
 Déclaré sur l'EFFET, jamais sur le fichier : le même son peut être suivi
 dans un contexte et ancré dans un autre, le suivi dépend de l'usage.
 
+**SON DE DÉPART — un `playSound` dans la même liste qu'un `"teleport"`.** Une
+porte joue son grincement par un effet `playSound` placé AVANT son `teleport`
+(la grammaire d'effets, jamais le sas : une porte fait un fondu, pas une
+chorégraphie). Ce son appartient à l'acte de partir : il reste diégétique et
+positionné sur la porte, mais il est joué ANCRÉ et HORS de la couche des
+entités que le sas éteint (`view/interaction.js`/`runEffects`,
+`view/audio/city-scene.js`/`playEntityOneShot`). Il finit donc de résonner
+pendant le fondu au lieu d'être coupé, comme les pas de transition d'une
+bascule de face. Sa réverb appartient au lieu quitté et s'éteint avec lui.
+Rien à déclarer : c'est la présence du `teleport` dans la liste qui le
+décide. `"nature": "meta"` reste réservé aux sons qui ne viennent d'aucun
+objet du monde (ex. le passage d'un miroir).
+
+```json
+"action": {
+  "kind": "applyEffects",
+  "effects": [
+    { "type": "playSound", "path": "assets/sounds/doors/metal_door_1_open" },
+    { "type": "teleport", "target": "clock_tower_main", "x": 12 }
+  ]
+}
+```
+
 Le MÊME flag, avec le même défaut, existe sur les rôles de son INTERMITTENTS
 d'une entité — `sounds.vocal` et `sounds.beacon` en mode `"intermittent"`
 (voir `doc/entity-model.md`/"Paramètres sonores") : un cri lancé par une entité

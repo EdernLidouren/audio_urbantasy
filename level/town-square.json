@@ -17,11 +17,12 @@
         "x": 25,
         "nameKey": "door.town_hall_main.name",
         "descriptionKey": "door.town_hall_main.description",
+        "sounds": { "beacon": { "path": "assets/sounds/doors/door_2_close" } },
         "action": {
           "kind": "applyEffects",
           "condition": { "type": "timeRange", "from": 8, "to": 20 },
           "refusalEffects": [{ "type": "announce", "key": "door.town_hall_main.time_refusal" }],
-          "effects": [{ "type": "teleport", "target": "town_square_town_hall_main" }]
+          "effects": [{ "type": "playSound", "path": "assets/sounds/doors/door_2_open" }, { "type": "teleport", "target": "town_square_town_hall_main" }]
         }
       },
       {
@@ -87,7 +88,10 @@
           "kind": "applyEffects",
           "condition": { "type": "hasImprovement", "id": "master_key" },
           "refusalEffects": [{ "type": "announce", "key": "door.default.master_key_refusal" }],
-          "effects": [{ "type": "teleport", "target": "clock_tower_main", "x": 12 }]
+          "effects": [
+            { "type": "playSound", "path": "assets/sounds/doors/metal_door_1_open" },
+            { "type": "teleport", "target": "clock_tower_main", "x": 12 }
+          ]
         }
       },
       {

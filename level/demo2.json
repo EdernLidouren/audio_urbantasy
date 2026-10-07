@@ -14,7 +14,7 @@
       "x": 2,
       "nameKey": "door.back.name",
       "descriptionKey": "door.back.description",
-      "action": { "kind": "applyEffects", "effects": [{ "type": "teleport", "target": "demo" }] }
+      "action": { "kind": "applyEffects", "effects": [{ "type": "playSound", "path": "assets/sounds/doors/door_1_open" }, { "type": "teleport", "target": "demo" }] }
     },
     {
       "id": "npc_resident_home",
@@ -66,7 +66,7 @@
       "x": 19,
       "nameKey": "door.alley.name",
       "descriptionKey": "door.alley.description",
-      "action": { "kind": "applyEffects", "effects": [{ "type": "teleport", "target": "demo3" }] }
+      "action": { "kind": "applyEffects", "effects": [{ "type": "playSound", "path": "assets/sounds/doors/door_1_open" }, { "type": "teleport", "target": "demo3" }] }
     }
   ]
 }

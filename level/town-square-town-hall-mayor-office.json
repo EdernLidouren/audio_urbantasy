@@ -16,7 +16,8 @@
       "nameKey": "door.main_room_door.name",
       "descriptionKey": "door.main_room_door.description",
       "x": 8,
-      "action": { "kind": "applyEffects", "effects": [{ "type": "teleport", "target": "town_square_town_hall_main", "x": 2 }] }
+      "sounds": { "beacon": { "path": "assets/sounds/doors/door_2_close" } },
+      "action": { "kind": "applyEffects", "effects": [{ "type": "playSound", "path": "assets/sounds/doors/door_2_open" }, { "type": "teleport", "target": "town_square_town_hall_main", "x": 2 }] }
     },
     {
       "id": "office_computer_1",

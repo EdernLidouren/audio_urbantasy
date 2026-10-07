@@ -279,14 +279,16 @@ function playMetaSound(descriptor) {
   }
 }
 
-function runPlaySoundEffect(entity, effect) {
+// `options.departing` : voir runEffects — transmis tel quel au lecteur
+// positionné (view/audio/city-scene.js/playEntityOneShot).
+function runPlaySoundEffect(entity, effect, options = {}) {
   const targetId = resolvePlaySoundTarget(entity, effect);
   const nature = resolvePlaySoundNature(effect, targetId);
   // Diégétique sans cible résolvable (ex. nature forcée sans `at` ni
   // contexte d'entité) ou sans provider câblé (hors ville) -> repli MÉTA,
   // défensif, jamais un plantage ni un son perdu en silence.
   if (nature === "diegetic" && targetId !== undefined && positionedSoundPlayer) {
-    positionedSoundPlayer(targetId, effect);
+    positionedSoundPlayer(targetId, effect, options);
     return;
   }
   playMetaSound(effect);
@@ -312,14 +314,21 @@ function runPlaySoundEffect(entity, effect) {
 // effet déclaré APRÈS lui dans la MÊME liste s'exécuterait quand même,
 // avant que le sas ne commence, puisque teleportHandler n'est jamais
 // attendu ici).
+//
+// SON DE DÉPART : une liste qui contient un "teleport" décrit l'acte de
+// PARTIR — ses playSound (ex. le grincement de la porte) sont joués
+// `departing` : positionnés, mais hors du fondu du sas (voir
+// view/audio/city-scene.js/playEntityOneShot), pour finir de résonner
+// pendant la transition au lieu d'être coupés.
 function runEffects(entity, effects) {
   if (!effects) return;
   if (variableEffectsHandler) variableEffectsHandler(entity, effects);
+  const departing = effects.some((effect) => effect.type === "teleport");
   for (const effect of effects) {
     if (effect.type === "teleport") {
       if (teleportHandler) teleportHandler(effect);
     } else {
-      runRenderEffects(entity, [effect]);
+      runRenderEffects(entity, [effect], { departing });
     }
   }
 }
@@ -330,10 +339,10 @@ function runEffects(entity, effects) {
 // advanceClock) : le core a DÉJÀ appliqué leurs effets d'état
 // (core/triggers.js/applyDueTriggers), seul le rendu reste à jouer ici,
 // avec la même provenance (l'entité porteuse) qu'un effet d'action.
-export function runRenderEffects(entity, effects) {
+export function runRenderEffects(entity, effects, options = {}) {
   for (const effect of effects) {
     if (effect.type === "playSound") {
-      runPlaySoundEffect(entity, effect);
+      runPlaySoundEffect(entity, effect, options);
     } else if (effect.type === "announce") {
       announce(t(effect.key), { assertive: effect.assertive !== false });
     }

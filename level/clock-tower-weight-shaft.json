@@ -12,13 +12,8 @@
     "defaultSurface": "concrete",
     "segments": [
       {
-        "from": 1,
-        "to": 10,
-        "surface": "metal"
-      },
-      {
-        "from": 41,
-        "to": 50,
+        "from": 15,
+        "to": 35,
         "surface": "metal"
       }
     ],
@@ -73,7 +68,7 @@
       {
         "id": "winding_mechanism_r",
         "type": "large_winding_mechanism",
-        "x": 35
+        "x": 30
       },
       {
         "id": "clock_tower_escapement_r",
@@ -113,13 +108,8 @@
     "defaultSurface": "concrete",
     "segments": [
       {
-        "from": 1,
-        "to": 10,
-        "surface": "metal"
-      },
-      {
-        "from": 41,
-        "to": 50,
+        "from": 15,
+        "to": 35,
         "surface": "metal"
       }
     ],

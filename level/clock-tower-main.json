@@ -31,6 +31,10 @@
           "kind": "applyEffects",
           "effects": [
             {
+              "type": "playSound",
+              "path": "assets/sounds/doors/metal_door_1_open"
+            },
+            {
               "type": "teleport",
               "target": "town_square",
               "side": "verso",
@@ -87,7 +91,13 @@
         },
         "action": {
           "kind": "applyEffects",
-          "effects": [{ "type": "teleport", "target": "clock_tower_weight_shaft", "x": 45 }]
+          "effects": [
+            {
+              "type": "teleport",
+              "target": "clock_tower_weight_shaft",
+              "x": 45
+            }
+          ]
         }
       }
     ]

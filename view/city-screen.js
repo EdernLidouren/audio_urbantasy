@@ -793,7 +793,7 @@ export function makeCityScreen(getSession, setSession) {
   // ré-enregistrer ce provider à chaque recréation de scène. `scene` peut
   // être `null` dans la brève fenêtre d'une transition (voir
   // performTransition) -> no-op silencieux, jamais une exception.
-  setPositionedSoundPlayer((entityId, descriptor) => scene && scene.playEntityOneShot(entityId, descriptor));
+  setPositionedSoundPlayer((entityId, descriptor, options) => scene && scene.playEntityOneShot(entityId, descriptor, options));
 
   return {
     onEnter() {

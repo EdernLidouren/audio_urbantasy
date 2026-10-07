@@ -28,7 +28,8 @@
       "nameKey": "door.town_hall_main.name",
       "descriptionKey": "door.town_hall_main.description",
       "x": 10,
-      "action": { "kind": "applyEffects", "effects": [{ "type": "teleport", "target": "town_square", "x": 25 }] }
+      "sounds": { "beacon": { "path": "assets/sounds/doors/door_2_close" } },
+      "action": { "kind": "applyEffects", "effects": [{ "type": "playSound", "path": "assets/sounds/doors/door_2_open" }, { "type": "teleport", "target": "town_square", "x": 25 }] }
     },
     {
       "id": "mayor_office_door",
@@ -37,9 +38,9 @@
       "descriptionKey": "door.mayor_office.description",
       "x": 3,
       "sounds": {
-        "beacon": { "path": "assets/sounds/doors/door_1_close_1.mp3", "loop": true }
+        "beacon": { "path": "assets/sounds/doors/door_2_close", "loop": true }
       },
-      "action": { "kind": "applyEffects", "effects": [{ "type": "teleport", "target": "town_square_town_hall_mayor_office", "x": 8 }] }
+      "action": { "kind": "applyEffects", "effects": [{ "type": "playSound", "path": "assets/sounds/doors/door_2_open" }, { "type": "teleport", "target": "town_square_town_hall_mayor_office", "x": 8 }] }
     },
     {
       "id": "potted_plant_1",

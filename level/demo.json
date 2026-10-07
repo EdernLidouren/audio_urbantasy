@@ -21,7 +21,7 @@
       "x": 9,
       "nameKey": "door.exit.name",
       "descriptionKey": "door.exit.description",
-      "action": { "kind": "applyEffects", "effects": [{ "type": "teleport", "target": "demo2" }] }
+      "action": { "kind": "applyEffects", "effects": [{ "type": "playSound", "path": "assets/sounds/doors/door_1_open" }, { "type": "teleport", "target": "demo2" }] }
     },
     { "id": "apple_1", "type": "apple", "x": 17 },
     { "id": "object_neon", "type": "neon", "x": 30 },
@@ -64,7 +64,7 @@
         "kind": "applyEffects",
         "condition": { "type": "hasEquipmentTag", "tag": "chic" },
         "refusalEffects": [{ "type": "announce", "key": "door.club.dresscode_refused" }],
-        "effects": [{ "type": "teleport", "target": "demo2" }]
+        "effects": [{ "type": "playSound", "path": "assets/sounds/doors/door_1_open" }, { "type": "teleport", "target": "demo2" }]
       }
     }
   ]

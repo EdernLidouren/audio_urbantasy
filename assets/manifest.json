@@ -180,12 +180,10 @@
     "assets/sounds/decor/river_beacon_1.mp3"
   ],
   "assets/sounds/decor/rope_1_vocal": [
+    "assets/sounds/decor/rope_1_vocal_1.mp3",
+    "assets/sounds/decor/rope_1_vocal_2.mp3",
+    "assets/sounds/decor/rope_1_vocal_3.mp3",
     "assets/sounds/decor/rope_1_vocal_4.mp3"
-  ],
-  "assets/sounds/decor/rope_creaking": [
-    "assets/sounds/decor/rope_creaking_1.mp3",
-    "assets/sounds/decor/rope_creaking_2.mp3",
-    "assets/sounds/decor/rope_creaking_3.mp3"
   ],
   "assets/sounds/decor/stone_slab_beacon": [
     "assets/sounds/decor/stone_slab_beacon_1.mp3",
@@ -213,8 +211,11 @@
   "assets/sounds/doors/door_1_open": [
     "assets/sounds/doors/door_1_open_1.mp3"
   ],
-  "assets/sounds/doors/door_beacon": [
-    "assets/sounds/doors/door_beacon_1.mp3"
+  "assets/sounds/doors/door_2_close": [
+    "assets/sounds/doors/door_2_close_1.mp3"
+  ],
+  "assets/sounds/doors/door_2_open": [
+    "assets/sounds/doors/door_2_open_1.mp3"
   ],
   "assets/sounds/doors/heavy_door_1_close": [
     "assets/sounds/doors/heavy_door_1_close_1.mp3"
@@ -222,15 +223,24 @@
   "assets/sounds/doors/heavy_door_1_open": [
     "assets/sounds/doors/heavy_door_1_open_1.mp3"
   ],
+  "assets/sounds/doors/heavy_metal_gate_1_close": [
+    "assets/sounds/doors/heavy_metal_gate_1_close_1.mp3"
+  ],
+  "assets/sounds/doors/heavy_metal_gate_1_open": [
+    "assets/sounds/doors/heavy_metal_gate_1_open_1.mp3"
+  ],
   "assets/sounds/doors/metal_door_1_close": [
     "assets/sounds/doors/metal_door_1_close_1.mp3"
   ],
   "assets/sounds/doors/metal_door_1_open": [
     "assets/sounds/doors/metal_door_1_open_1.mp3"
   ],
-  "assets/sounds/doors/metal_gate": [
-    "assets/sounds/doors/metal_gate_1.mp3",
-    "assets/sounds/doors/metal_gate_2.mp3"
+  "assets/sounds/doors/metal_gate_1_close": [
+    "assets/sounds/doors/metal_gate_1_close_1.mp3"
+  ],
+  "assets/sounds/doors/metal_gate_1_open": [
+    "assets/sounds/doors/metal_gate_1_open_1.mp3",
+    "assets/sounds/doors/metal_gate_1_open_2.mp3"
   ],
   "assets/sounds/doors/metal_ladder_1_beacon": [
     "assets/sounds/doors/metal_ladder_1_beacon_1.mp3"
@@ -557,6 +567,9 @@
     "assets/sounds/footsteps/surfaces/wood_walk_19.mp3",
     "assets/sounds/footsteps/surfaces/wood_walk_20.mp3"
   ],
+  "assets/sounds/furniture/box_1_beacon": [
+    "assets/sounds/furniture/box_1_beacon_1.mp3"
+  ],
   "assets/sounds/furniture/chair_1_beacon": [
     "assets/sounds/furniture/chair_1_beacon_1.mp3",
     "assets/sounds/furniture/chair_1_beacon_2.mp3",
@@ -580,11 +593,20 @@
   "assets/sounds/furniture/desk_chair_1_beacon": [
     "assets/sounds/furniture/desk_chair_1_beacon_1.mp3"
   ],
+  "assets/sounds/furniture/furniture_heavy_1_beacon": [
+    "assets/sounds/furniture/furniture_heavy_1_beacon_1.mp3"
+  ],
   "assets/sounds/furniture/glass_window_1_beacon": [
     "assets/sounds/furniture/glass_window_1_beacon_1.mp3"
   ],
   "assets/sounds/furniture/magic_mirror_1_beacon": [
     "assets/sounds/furniture/magic_mirror_1_beacon_1.mp3"
+  ],
+  "assets/sounds/furniture/metal_container_1_close": [
+    "assets/sounds/furniture/metal_container_1_close_1.mp3"
+  ],
+  "assets/sounds/furniture/metal_container_1_open": [
+    "assets/sounds/furniture/metal_container_1_open_1.mp3"
   ],
   "assets/sounds/furniture/mirror_1_beacon": [
     "assets/sounds/furniture/mirror_1_beacon_1.mp3"
