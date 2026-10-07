@@ -21,3 +21,14 @@ node_modules/
 
 # Logs et fichiers temporaires
 *.log
+
+# Fichiers propres à l'assistant de code (Claude Code) : instructions et
+# config locale, jamais publiés.
+CLAUDE.md
+.claude/
+
+# Rapports générés par les outils (tools/), régénérés à chaque lancement.
+tools/i18n_parity_report.txt
+
+# Anciens sons conservés pour mémoire, hors du jeu.
+assets/old/
