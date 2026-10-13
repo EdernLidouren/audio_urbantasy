@@ -48,6 +48,14 @@ export const TUNING_DEFAULTS = {
   // d'interaction est plus large ; plus bas = il faut être plus proche.
   interactRange: 1.0,
 
+  // Délai (ms) pendant lequel un nouvel appui sur Entrée sur la MÊME entité
+  // est ignoré en silence (voir view/interaction.js/interact) : empêche la
+  // rafale d'une action qui ne se protège pas d'elle-même (volets, porte
+  // verrouillée qui refuse, fouille). Horloge réelle, pas le temps de jeu.
+  // Plus haut = action moins répétable ; une entité au son long peut le
+  // monter sur son archétype ou son instance.
+  interactCooldownMs: 700,
+
   // Volume à l'intérieur de interactRange : plateau plein et stable, le
   // signal "cette entité est interactible". Ne descend jamais en dessous.
   fullVolume: 1.0,
@@ -380,6 +388,13 @@ export const TUNING_DEFAULTS = {
   // "Gain de couche ENTITÉS") : ces durées n'affectent qu'elles-mêmes.
   doorTransitionFadeOutMs: 250,
   doorTransitionFadeInMs: 300,
+
+  // Durée (ms) du fondu qui arrête un son SUIVI (cloche, cri...) quand le
+  // joueur QUITTE le lieu où il a été émis (voir
+  // view/audio/city-scene.js/stopForeignTrackedOneShots). Court : il évite
+  // seulement le clic d'un arrêt net. Pendant une porte, le sas a déjà
+  // éteint la couche entités, ce fondu y est inaudible.
+  sceneExitSoundFadeMs: 150,
 
   // Durée (ms) du CROISEMENT DE FILTRES d'occlusion pendant une bascule
   // recto/verso (voir view/audio/city-scene.js/crossfadeFaceSwap,

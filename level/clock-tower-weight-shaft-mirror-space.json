@@ -11,13 +11,8 @@
   "defaultSurface": "concrete",
   "segments": [
     {
-      "from": 1,
-      "to": 10,
-      "surface": "metal"
-    },
-    {
-      "from": 41,
-      "to": 50,
+      "from": 15,
+      "to": 35,
       "surface": "metal"
     }
   ],
@@ -54,6 +49,24 @@
             {
               "type": "announce",
               "key": "door.clock_tower_magic_mirror.pass_refusal"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bell_emitter_r",
+      "type": "sound_emitter",
+      "x": 25,
+      "triggers": [
+        {
+          "on": "hour",
+          "effects": [
+            {
+              "type": "playSound",
+              "path": "assets/sounds/effects/reversed_clock_tower_bell",
+              "gain": 3,
+              "reverbSend": 0.9
             }
           ]
         }

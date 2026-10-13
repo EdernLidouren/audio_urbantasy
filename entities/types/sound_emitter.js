@@ -5,9 +5,11 @@
 // doc/scripting.md/"Triggers"), déclarés PAR INSTANCE, jamais ici — comme
 // un comportement. Un playSound déclenché ainsi est diégétique, positionné
 // sur l'émetteur, soumis à la même chaîne que n'importe quelle balise
-// (distance, pan, occlusion de face, réverb du lieu). Aucun client pour
-// l'instant (essayé pour la cloche du clocher, remise sur sa minuterie).
-// nameKey requis par le format, jamais lu à l'oreille.
+// (distance, pan, occlusion de face, réverb du lieu). Clients : les cloches
+// du puits des contrepoids et de son espace miroir (bell_emitter_r dans
+// level/clock-tower-weight-shaft.json et
+// level/clock-tower-weight-shaft-mirror-space.json). nameKey requis par le
+// format, jamais lu à l'oreille.
 export default {
   nameKey: "entity.sound_emitter.name",
   blocksMovement: false,

@@ -16,6 +16,7 @@ import { resolveAsset } from "../lib/assets.js";
 import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
 import { evaluateCondition, selectMatchingAction } from "../core/presence.js";
 import { resolveDescriptionText } from "./description-resolver.js";
+import { resolveTuning } from "../config/tuning.js";
 
 // Gestionnaires enregistrés UNE FOIS par view/city-screen.js, au moment de
 // sa construction — au plus un écran ville vivant à la fois dans cette
@@ -603,6 +604,36 @@ function actionConditionMet(condition, entity) {
 // capacité (voir view/audio/city-scene.js/getInteractionCandidates) — cette
 // fonction fait confiance à son appelant, elle ne revérifie pas
 // observable/interactable elle-même.
+// COOLDOWN D'INTERACTION (Entrée seulement, PAR ENTITÉ) — limite de cadence
+// d'entrée, pas une règle de jeu : jamais dans le core, jamais sauvegardé.
+// Dernier appui par id d'entité, horloge réelle monotone (performance.now) :
+// indépendant de la vitesse du temps de jeu et de la pause. Pendant
+// `interactCooldownMs` (cascade instance -> archétype -> défaut, voir
+// config/tuning-values.js), un nouvel appui sur la même entité est ignoré EN
+// SILENCE — l'action entière, succès comme refus, quelle que soit la
+// candidate qui aurait été choisie : état et rendu restent synchronisés.
+// Purgé à chaque changement de lieu ou de face (clearInteractionCooldowns,
+// appelée par view/city-screen.js/performTransition et sideSwitchEffect) :
+// un ancien horodatage ne bloque jamais une entité après un aller-retour.
+const lastActivationAt = new Map();
+
+export function clearInteractionCooldowns() {
+  lastActivationAt.clear();
+}
+
+function isInCooldown(entity) {
+  const last = lastActivationAt.get(entity.id);
+  if (last === undefined) return false;
+  return performance.now() - last < resolveTuning("interactCooldownMs", entity);
+}
+
+// Une action qui TÉLÉPORTE se protège d'elle-même (le sas met le jeu en
+// pause) : aucun horodatage, pour qu'un retour dans le même lieu ne garde
+// pas la porte bloquée après coup.
+function departsWithTeleport(effects) {
+  return Boolean(effects && effects.some((effect) => effect.type === "teleport"));
+}
+
 export function interact(entity, kind) {
   if (kind === "describe") {
     const description = resolveDescription(entity);
@@ -616,6 +647,9 @@ export function interact(entity, kind) {
     // interactables mais sans kind encore câblé) -> silence, comportement
     // STUB générique inchangé pour ce contenu-là.
     if (!entity.action) return;
+
+    // Cooldown (voir lastActivationAt plus haut) : ignoré en silence.
+    if (isInCooldown(entity)) return;
 
     // ACTIONS MULTIPLES CANDIDATES (voir core/level.js/parseEntity,
     // core/presence.js/selectMatchingAction, core/scripting.md/"Actions
@@ -641,9 +675,12 @@ export function interact(entity, kind) {
     // reste correct (fonction pure, même contexte) et évite un second
     // chemin de code.
     if (resolvedAction.condition && !actionConditionMet(resolvedAction.condition, entity)) {
+      lastActivationAt.set(entity.id, performance.now());
       runEffects(entity, resolvedAction.refusalEffects);
       return;
     }
+
+    if (!departsWithTeleport(resolvedAction.effects)) lastActivationAt.set(entity.id, performance.now());
 
     // Condition VRAIE (ou absente) -> effets de succès exécutés
     // GÉNÉRIQUEMENT pour TOUT kind (voir "Effets" plus haut), AVANT le

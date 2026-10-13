@@ -279,6 +279,9 @@
   "assets/sounds/effects/plant_shake": [
     "assets/sounds/effects/plant_shake_1.mp3"
   ],
+  "assets/sounds/effects/reversed_clock_tower_bell": [
+    "assets/sounds/effects/reversed_clock_tower_bell_1.mp3"
+  ],
   "assets/sounds/effects/window_blinds_close": [
     "assets/sounds/effects/window_blinds_close_1.mp3"
   ],
@@ -598,6 +601,11 @@
   ],
   "assets/sounds/furniture/glass_window_1_beacon": [
     "assets/sounds/furniture/glass_window_1_beacon_1.mp3"
+  ],
+  "assets/sounds/furniture/keyboard_typing": [
+    "assets/sounds/furniture/keyboard_typing_1.mp3",
+    "assets/sounds/furniture/keyboard_typing_2.mp3",
+    "assets/sounds/furniture/keyboard_typing_3.mp3"
   ],
   "assets/sounds/furniture/magic_mirror_1_beacon": [
     "assets/sounds/furniture/magic_mirror_1_beacon_1.mp3"

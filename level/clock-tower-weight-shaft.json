@@ -66,6 +66,24 @@
         "x": 25
       },
       {
+        "id": "bell_emitter_r",
+        "type": "sound_emitter",
+        "x": 25,
+        "triggers": [
+          {
+            "on": "hour",
+            "effects": [
+              {
+                "type": "playSound",
+                "path": "assets/sounds/effects/clock_tower_bell",
+                "gain": 3,
+                "reverbSend": 0.9
+              }
+            ]
+          }
+        ]
+      },
+      {
         "id": "winding_mechanism_r",
         "type": "large_winding_mechanism",
         "x": 30

@@ -48,6 +48,16 @@ une balise `interactable:false` jamais candidate à Entrée, même à portée.
   (aucune des deux, et aucun son propre : un ÉMETTEUR INVISIBLE, une
   position + des `triggers` déclarés par instance — voir
   `entities/types/sound_emitter.js`, `doc/scripting.md`/"Triggers").
+- **Cooldown d'interaction** (`interactCooldownMs`, cascade instance ->
+  archétype -> défaut `config/tuning-values.js`, comme `interactRange`) :
+  pendant ce délai, un nouvel appui sur Entrée sur la MÊME entité est ignoré
+  en silence — l'action entière (succès ou refus, quelle que soit la
+  candidate), pour que l'état et le son restent synchronisés. Par entité :
+  les autres restent disponibles. Espace n'en a pas. Côté vue
+  (`view/interaction.js`), horloge réelle, jamais sauvegardé, purgé à
+  chaque changement de lieu ou de face (`view/city-screen.js` l'appelle dans
+  ses deux transitions). Une action qui téléporte n'arme pas le
+  délai : son sas la protège déjà.
 - **`interactable`** — candidate à Entrée. `npc`/`object` sont interactables
   dès ce niveau 0 EN ANTICIPATION d'un futur type d'action (parler/
   ramasser) au-delà de `"pickup"` (voir plus bas) : le filtrage par verbe ne

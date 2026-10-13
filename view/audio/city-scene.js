@@ -609,17 +609,36 @@ function cutoffForDistance(dist, interactRange, audibleRange, cutoffMin, cutoffM
   return cutoffMax * Math.pow(cutoffMin / cutoffMax, progress);
 }
 
-// One-shots positionnés SUIVIS en cours de lecture : { entityId, gain,
-// handle } (voir lib/audio.js/playTrackedOneShot, startTrackedOneShot/
+// One-shots positionnés SUIVIS en cours de lecture : { entityId, worldId,
+// gain, handle } (voir lib/audio.js/playTrackedOneShot, startTrackedOneShot/
 // updateTrackedOneShots plus bas). Au niveau MODULE, pas de la scène : une
 // bascule recto/verso reconstruit la scène (view/city-screen.js/
 // sideSwitchEffect) alors que le son continue — la nouvelle scène le
-// reprend et le ré-étouffe. Retirés à la FIN du son (événement Howler),
-// jamais une source fantôme. cacheKey dédiée ("tracked:<fichier>") : le
+// reprend et le ré-étouffe. `worldId` : le LIEU d'émission. Quitter ce lieu
+// arrête le son (fondu bref, voir stopForeignTrackedOneShots) : un son
+// appartient à son lieu, et deux lieux peuvent avoir une entité au même id
+// (ex. bell_emitter_r dans le puits et dans son espace miroir) — sans ce
+// rattachement, la nouvelle scène reprendrait la cloche de l'ancienne.
+// Retirés à la FIN du son (événement Howler), jamais une source fantôme. cacheKey dédiée ("tracked:<fichier>") : le
 // passe-bas de cette entrée est PILOTÉ au tick (distance + étouffement), il
 // ne doit jamais contaminer les lectures ancrées/intermittentes du même
 // fichier, qui gardent leur propre entrée.
 const trackedOneShots = [];
+
+const SCENE_EXIT_SOUND_FADE_MS = TUNING_DEFAULTS.sceneExitSoundFadeMs;
+
+// Arrête (fondu bref) tout son suivi émis dans un AUTRE lieu que
+// `activeWorldId`, et le retire aussitôt de la liste. Appelée au montage de
+// chaque scène (un changement de lieu reconstruit toujours la scène) et,
+// par sécurité, à chaque mise à jour. Une bascule de face reste dans le
+// même lieu : ses sons continuent.
+function stopForeignTrackedOneShots(activeWorldId) {
+  for (const source of [...trackedOneShots]) {
+    if (source.worldId === activeWorldId) continue;
+    trackedOneShots.splice(trackedOneShots.indexOf(source), 1);
+    source.handle.stop(SCENE_EXIT_SOUND_FADE_MS);
+  }
+}
 
 // Rendu spatial CONTINU d'une source positionnée qui SUIT le joueur — balise
 // continue (applyEntityAudio, crossfadeFaceSwap) ET one-shot suivi
@@ -893,6 +912,10 @@ export function createCityAudioScene(getSession) {
   // lib/audio.js/keepAudioContextAwake) — au tout début du montage, avant
   // même la première voix créée plus bas.
   keepAudioContextAwake();
+
+  // Les sons suivis du lieu QUITTÉ s'arrêtent ici : le monde actif est déjà
+  // le nouveau (voir view/city-screen.js/performTransition).
+  stopForeignTrackedOneShots(getSession().activeWorldId);
 
   // Les voix positionnées d'abord (si au moins une entité est en balise
   // CONTINUE) : createPositionedSound crée un Howl, ce qui garantit que
@@ -1634,7 +1657,7 @@ export function createCityAudioScene(getSession) {
       entityLayer: true,
     });
     if (!handle) return;
-    const source = { entityId, gain, handle };
+    const source = { entityId, worldId: getSession().activeWorldId, gain, handle };
     trackedOneShots.push(source);
     handle.onEnd(() => {
       const index = trackedOneShots.indexOf(source);
@@ -1651,6 +1674,7 @@ export function createCityAudioScene(getSession) {
   // sur les cibles du fondu : transition continue fondu -> tick.
   function updateTrackedOneShots(x) {
     if (trackedOneShots.length === 0) return;
+    stopForeignTrackedOneShots(getSession().activeWorldId);
     const volumeFactor = beaconVolumeFactor();
     for (const source of [...trackedOneShots]) {
       const found = findEntitySource(source.entityId);
@@ -2138,9 +2162,10 @@ export function createCityAudioScene(getSession) {
       if (sound) sound.stop(); // nettoie aussi son propre envoi de réverb
     }
     // One-shots suivis : PAS purgés ici (liste au niveau MODULE, voir
-    // trackedOneShots) — la scène suivante les reprend si elle connaît
-    // encore leur entité (bascule recto/verso : la cloche s'étouffe en
-    // cours), sinon les lâche à son premier tick.
+    // trackedOneShots) — la scène suivante les reprend s'ils viennent du
+    // même lieu (bascule recto/verso : la cloche s'étouffe en cours), et
+    // arrête ceux d'un autre lieu dès son montage
+    // (stopForeignTrackedOneShots).
     reverbBus.destroy();
     // Musique/ambiance NE SONT PLUS touchées ici (voir lib/audio.js/
     // "Couches persistantes MUSIQUE/AMBIANCE") : elles vivent au niveau

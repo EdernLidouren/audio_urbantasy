@@ -1088,7 +1088,10 @@ que le rendu DIÉGÉTIQUE : un son méta n'a pas de position, rien à suivre ni
   s'atténue quand on s'en éloigne, un son entendu pendant une bascule de
   face suit le MÊME fondu que les balises (`crossfadeFaceSwap`), survit à la
   reconstruction de scène du sas et reprend son suivi au tick sans second
-  saut. Avant ce flag, tout playSound positionné était
+  saut. Un son suivi appartient à son LIEU : quitter ce lieu (porte,
+  téléportation) l'arrête par un fondu bref (`sceneExitSoundFadeMs`,
+  `config/tuning-values.js`), même si le lieu d'arrivée a une entité au même
+  id. Avant ce flag, tout playSound positionné était
   calculé une fois au démarrage puis figé : la cloche restait à gauche après
   qu'on avait dépassé le clocher.
 - `tracked: false` — **ANCRÉ** : spatialisé UNE fois au départ, puis figé à

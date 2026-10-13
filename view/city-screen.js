@@ -28,6 +28,7 @@ import {
   setSearchHandler,
   setShopHandler,
   runRenderEffects,
+  clearInteractionCooldowns,
 } from "./interaction.js";
 import { applyDueTriggers } from "../core/triggers.js";
 import { openShopMenu, setSellHandler, setBuyHandler } from "./menus/shop-menu.js";
@@ -454,6 +455,7 @@ export function makeCityScreen(getSession, setSession) {
     const freshLevel = alreadyVisited ? null : await loadLevelById(targetId, registry);
 
     setSession(travelToWorld(session, targetId, freshLevel, { x, side }));
+    clearInteractionCooldowns();
     refreshSpawns();
     scene = createCityAudioScene(getSession);
     announceSceneName(getSession());
@@ -650,6 +652,7 @@ export function makeCityScreen(getSession, setSession) {
       scene.destroy();
       scene = null;
       setSession(switchSide(getSession(), arrivalX));
+      clearInteractionCooldowns();
       scene = createCityAudioScene(getSession);
       scene.playArrivalStep(entity, arrivalX);
     } finally {
