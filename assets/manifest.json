@@ -138,8 +138,8 @@
   "assets/sounds/decor/clocktower_beacon": [
     "assets/sounds/decor/clocktower_beacon_1.mp3"
   ],
-  "assets/sounds/decor/creaky_bell": [
-    "assets/sounds/decor/creaky_bell_1.mp3"
+  "assets/sounds/decor/creepy_bell": [
+    "assets/sounds/decor/creepy_bell_1.mp3"
   ],
   "assets/sounds/decor/gear_1_beacon": [
     "assets/sounds/decor/gear_1_beacon_1.mp3"
@@ -166,6 +166,13 @@
     "assets/sounds/decor/machine_1_vocal_4.mp3",
     "assets/sounds/decor/machine_1_vocal_5.mp3"
   ],
+  "assets/sounds/decor/organic_rope_1_vocal": [
+    "assets/sounds/decor/organic_rope_1_vocal_1.mp3",
+    "assets/sounds/decor/organic_rope_1_vocal_2.mp3",
+    "assets/sounds/decor/organic_rope_1_vocal_3.mp3",
+    "assets/sounds/decor/organic_rope_1_vocal_4.mp3",
+    "assets/sounds/decor/organic_rope_1_vocal_5.mp3"
+  ],
   "assets/sounds/decor/pulley_1_beacon": [
     "assets/sounds/decor/pulley_1_beacon_1.mp3"
   ],
@@ -175,6 +182,12 @@
   ],
   "assets/sounds/decor/rattling": [
     "assets/sounds/decor/rattling_1.mp3"
+  ],
+  "assets/sounds/decor/reversed_large_weight_machine_1_beacon": [
+    "assets/sounds/decor/reversed_large_weight_machine_1_beacon_1.mp3"
+  ],
+  "assets/sounds/decor/reversed_pulley_1_beacon": [
+    "assets/sounds/decor/reversed_pulley_1_beacon_1.mp3"
   ],
   "assets/sounds/decor/river_beacon": [
     "assets/sounds/decor/river_beacon_1.mp3"
@@ -265,9 +278,6 @@
     "assets/sounds/effects/electrical_flickering_5.mp3",
     "assets/sounds/effects/electrical_flickering_6.mp3",
     "assets/sounds/effects/electrical_flickering_7.mp3"
-  ],
-  "assets/sounds/effects/keyboard_typing": [
-    "assets/sounds/effects/keyboard_typing_1.mp3"
   ],
   "assets/sounds/effects/neon_malfunction": [
     "assets/sounds/effects/neon_malfunction_1.mp3",
@@ -621,6 +631,12 @@
   ],
   "assets/sounds/furniture/neon_beacon": [
     "assets/sounds/furniture/neon_beacon_1.mp3"
+  ],
+  "assets/sounds/furniture/office_chair_1_beacon": [
+    "assets/sounds/furniture/office_chair_1_beacon_1.mp3"
+  ],
+  "assets/sounds/furniture/reversed_clock_4_beacon": [
+    "assets/sounds/furniture/reversed_clock_4_beacon_1.mp3"
   ],
   "assets/sounds/items/box_of_nails_beacon": [
     "assets/sounds/items/box_of_nails_beacon_1.mp3"

@@ -5,8 +5,11 @@
 // coin.js/crate.js/
 // cumulo-lupus.js/decor.js/dog.js/door.js/fountain.js/ghost.js/
 // glass-window.js/hound.js/item.js/large_machinery.js/
-// large_winding_mechanism.js/machine_1.js/miravi.js/money.js/neon.js/
-// npc.js/object.js/office_computer.js/passage.js/potted_plant.js/river.js/
+// large_winding_mechanism.js/machine_1.js/miravi.js/
+// mirror_clock_tower_escapement.js/mirror_large_winding_mechanism.js/
+// mirror_weight_shaft.js/money.js/neon.js/
+// npc.js/object.js/office_chair.js/office_computer.js/passage.js/
+// potted_plant.js/river.js/
 // rock.js/shop_counter.js/sound_emitter.js/statue.js/turret_clockwork.js/
 // weight_shaft.js) en
 // un seul objet —
@@ -57,8 +60,10 @@
 // Les archétypes (apple/bird_1/bird_2/bird_3/buddy/bush/chair/clock/clock_tower/
 // clock_tower_escapement/clock_tower_magic_mirror/clock_tower_mirror/
 // coin/crate/cumuloLupus/decor/dog/door/fountain/ghost/glass_window/hound/item/
-// large_machinery/large_winding_mechanism/machine_1/miravi/money/neon/npc/object/
-// office_computer/passage/potted_plant/
+// large_machinery/large_winding_mechanism/machine_1/miravi/
+// mirror_clock_tower_escapement/mirror_large_winding_mechanism/mirror_weight_shaft/
+// money/neon/npc/object/
+// office_chair/office_computer/passage/potted_plant/
 // river/rock/shop_counter/sound_emitter/statue/turret_clockwork/weight_shaft) sont des
 // PRESETS de
 // propriétés — des objets plats indépendants, jamais une hiérarchie ni de
@@ -92,10 +97,14 @@ import largeMachinery from "./large_machinery.js";
 import largeWindingMechanism from "./large_winding_mechanism.js";
 import machine1 from "./machine_1.js";
 import miravi from "./miravi.js";
+import mirrorClockTowerEscapement from "./mirror_clock_tower_escapement.js";
+import mirrorLargeWindingMechanism from "./mirror_large_winding_mechanism.js";
+import mirrorWeightShaft from "./mirror_weight_shaft.js";
 import money from "./money.js";
 import neon from "./neon.js";
 import npc from "./npc.js";
 import object from "./object.js";
+import officeChair from "./office_chair.js";
 import officeComputer from "./office_computer.js";
 import passage from "./passage.js";
 import pottedPlant from "./potted_plant.js";
@@ -135,10 +144,14 @@ export default {
   large_winding_mechanism: largeWindingMechanism,
   machine_1: machine1,
   miravi,
+  mirror_clock_tower_escapement: mirrorClockTowerEscapement,
+  mirror_large_winding_mechanism: mirrorLargeWindingMechanism,
+  mirror_weight_shaft: mirrorWeightShaft,
   money,
   neon,
   npc,
   object,
+  office_chair: officeChair,
   office_computer: officeComputer,
   passage,
   potted_plant: pottedPlant,

@@ -85,6 +85,21 @@
         "pauseMax": 90,
         "speed": 2
       }
+    },
+    {
+      "id": "mirror_weight_shaft_r",
+      "type": "mirror_weight_shaft",
+      "x": 25
+    },
+    {
+      "id": "mirror_winding_mechanism_r",
+      "type": "mirror_large_winding_mechanism",
+      "x": 30
+    },
+    {
+      "id": "mirror_clock_tower_escapement_r",
+      "type": "mirror_clock_tower_escapement",
+      "x": 40
     }
   ]
 }

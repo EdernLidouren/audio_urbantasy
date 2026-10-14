@@ -7,9 +7,15 @@
   "musicDay": "assets/musics/town_hall_day",
   "ambiences": [],
   "defaultSurface": "concrete",
-  "reverbDurationSec": 1.5,
-  "reverbDecay": 4.0,
+  "reverbDurationSec": 0.6,
+  "reverbDecay": 5.0,
   "entities": [
+    {
+      "id": "glass_window_1",
+      "type": "glass_window",
+      "x": 0,
+      "variables": [{ "name": "isOpen", "type": "flag", "initial": false, "persistent": false }]
+    },
     {
       "id": "main_room_door_1",
       "type": "door",
@@ -25,9 +31,9 @@
       "x": 4
     },
     {
-      "id": "chair_1",
-      "type": "chair",
-      "x": 2
+      "id": "office_chair_1",
+      "type": "office_chair",
+      "x": 3
     }
   ]
 }
