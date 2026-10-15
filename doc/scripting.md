@@ -220,7 +220,8 @@ bas pour le principe complet (lecture ment, écriture jamais touchée).
 ```
 
 Sans champ propre. Vraie si `context.perceptionActive` est vrai — posé par
-`core/reduce.js`/TICK dans `presenceContext` (`{ time, perceptionActive }`, PARTAGÉ
+`core/reduce.js`/TICK dans `presenceContext` (construit par
+`core/presence.js`/`presenceContextOf`, voir `variable` plus bas), PARTAGÉ
 par tout le tick, exactement comme `time`), lui-même dérivé de
 `session.perceptionActive` (`core/state.js`/`togglePerception`, bascule via une
 touche dédiée — GATÉE par l'improvement `supernatural_perception`, voir
@@ -266,7 +267,7 @@ Exemple réel complet : voir "Conditions d'action" (la porte à dresscode).
 ```
 
 Vraie si l'état météo courant (`context.weather`, posé par `core/reduce.js`/TICK dans
-`presenceContext`, `{ time, perceptionActive, weather }`, PARTAGÉ par tout le tick —
+`presenceContext`, construit par `presenceContextOf`, PARTAGÉ par tout le tick —
 même patron que `perceptionActive` ci-dessus, dérivé de `session.weather.state`, voir
 `core/weather.js`) est EXACTEMENT `state`. `state` est validé au chargement contre
 `config/weather-values.js`/`WEATHER_STATES` (comme `hasEquipmentTag.tag` contre
@@ -423,13 +424,41 @@ section couvre seulement la LECTURE. `scope` ∈ `"entity" | "scene" | "party"` 
 - `"scene"` : la scène ACTIVE (`context.world`).
 - `"party"` : global (`context.session`).
 
+**Contexte d'évaluation.** Pour les règles de présence, il vient TOUJOURS de
+`core/presence.js`/`presenceContextOf(session)` : `{ time, perceptionActive,
+weather, world, session }`, `world` étant le monde RACINE (variables de scène
+partagées entre recto et verso). C'est la SOURCE UNIQUE, utilisée par le TICK
+et par la vue quand elle doit connaître une présence hors tick (montage de la
+scène audio, qui coupe d'emblée le beacon d'une entité dormante). Ne jamais
+reconstruire ce contexte à la main : sans `world` ni `session`, une condition
+de portée `"scene"`/`"party"` vaut toujours faux. Les conditions d'action
+(`view/interaction.js`/`actionContext`) et les beacons conditionnels
+(`view/audio/city-scene.js`/`beaconConditionAllows`) reçoivent les mêmes
+porteurs, plus l'équipement du joueur.
+
+**Exemple d'usage — deux entités en alternance sur un état de la salle.** Un
+vidéoprojecteur écrit une variable de SCÈNE `projectorOn` ; la projection est
+présente quand elle vaut `true`, une porte cachée quand elle vaut `false`
+(même principe que les deux miroirs et `perceptionActive`). Une entité ne lit
+jamais les variables d'une AUTRE entité : un état partagé par plusieurs
+entités appartient à la scène.
+
+```json
+"variables": [{ "name": "projectorOn", "type": "flag", "initial": true }],
+"entities": [
+  { "id": "video_projection_1", "type": "video_projection", "x": 5,
+    "presence": [{ "when": { "type": "variable", "scope": "scene", "name": "projectorOn", "equals": true }, "present": true }] },
+  { "id": "hidden_door_1", "type": "door", "x": 5,
+    "presence": [{ "when": { "type": "variable", "scope": "scene", "name": "projectorOn", "equals": false }, "present": true }] }
+]
+```
+
 Un SEUL comparateur par condition : `"equals"` (flag ET int) ou, pour un int
 SEULEMENT, `"greaterThan"` / `"lessThan"` / `"greaterOrEqual"` / `"lessOrEqual"`.
 Délègue à `core/variables.js`/`getVariable(context, scope, name)` — variable
-introuvable (nom jamais déclaré, ou porteur absent du contexte, ex. `"scene"`/
-`"party"` dans une condition d'action aujourd'hui, `view/interaction.js` ne fournit
-encore que `context.entity`) → `undefined` → AUCUN comparateur ne peut être vrai,
-même repli défensif que le reste de ce registre.
+introuvable (nom jamais déclaré, ou porteur absent du contexte) → `undefined` →
+AUCUN comparateur ne peut être vrai, même repli défensif que le reste de ce
+registre.
 
 **Validation au chargement** (`core/level.js`/`validateVariableReference`) :
 `scope` connu, `name` non vide, EXACTEMENT un comparateur — et, SEULEMENT quand le

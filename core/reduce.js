@@ -48,7 +48,7 @@
 import BEHAVIORS from "./behaviors/index.js";
 import { resolvePlayerMove, resolveBodyMove } from "./physics/collision.js";
 import { resolveOverlaps, resolveEntityOverlaps } from "./physics/overlap.js";
-import { resolveEntityRules } from "./presence.js";
+import { resolveEntityRules, presenceContextOf } from "./presence.js";
 import { resolveFace, withFace, isTwoSided } from "./state.js";
 
 // Résout la position d'une CIBLE par id — "player" (convention reconnue
@@ -202,14 +202,9 @@ export function reduce(state, action) {
       // jamais un par face) ; `session` reste `state` lui-même, jamais une
       // copie — resolveEntityRules n'en fait rien d'autre qu'une LECTURE
       // (aucun effet d'écriture ne passe par presence[].effects, voir
-      // core/scripting.md/"Effets d'action").
-      const presenceContext = {
-        time: state.time,
-        perceptionActive: state.perceptionActive,
-        weather: state.weather.state,
-        world,
-        session: state,
-      };
+      // core/scripting.md/"Effets d'action"). Construit par
+      // presenceContextOf, la même fonction que la vue utilise au montage.
+      const presenceContext = presenceContextOf(state);
       const worldStep = stepEntities(face.entities, {
         length: world.length,
         rngState: face.rngState,

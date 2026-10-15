@@ -3,16 +3,16 @@
 // bird_3.js/buddy.js/bush.js/chair.js/clock.js/clock_tower.js/
 // clock_tower_escapement.js/clock_tower_magic_mirror.js/clock_tower_mirror.js/
 // coin.js/crate.js/
-// cumulo-lupus.js/decor.js/dog.js/door.js/film_projector.js/fountain.js/ghost.js/
+// cumulo-lupus.js/decor.js/dog.js/door.js/fountain.js/ghost.js/
 // glass-window.js/hound.js/item.js/large_machinery.js/
 // large_winding_mechanism.js/machine_1.js/miravi.js/
 // mirror_clock_tower_escapement.js/mirror_large_winding_mechanism.js/
 // mirror_weight_shaft.js/money.js/neon.js/
 // npc.js/object.js/office_chair.js/office_computer.js/
-// office_water_fountain.js/passage.js/
+// office_water_cooler.js/passage.js/
 // potted_plant.js/river.js/
 // rock.js/shop_counter.js/sound_emitter.js/statue.js/turret_clockwork.js/
-// video_projection.js/weight_shaft.js) en
+// video_projection.js/video_projector.js/weight_shaft.js) en
 // un seul objet —
 // même patron que
 // core/behaviors/index.js. Donnée neutre au global : aucun import, ni du
@@ -60,13 +60,13 @@
 //
 // Les archétypes (apple/bird_1/bird_2/bird_3/buddy/bush/chair/clock/clock_tower/
 // clock_tower_escapement/clock_tower_magic_mirror/clock_tower_mirror/
-// coin/crate/cumuloLupus/decor/dog/door/film_projector/fountain/ghost/glass_window/hound/item/
+// coin/crate/cumuloLupus/decor/dog/door/fountain/ghost/glass_window/hound/item/
 // large_machinery/large_winding_mechanism/machine_1/miravi/
 // mirror_clock_tower_escapement/mirror_large_winding_mechanism/mirror_weight_shaft/
 // money/neon/npc/object/
-// office_chair/office_computer/office_water_fountain/passage/potted_plant/
+// office_chair/office_computer/office_water_cooler/passage/potted_plant/
 // river/rock/shop_counter/sound_emitter/statue/turret_clockwork/video_projection/
-// weight_shaft) sont des
+// video_projector/weight_shaft) sont des
 // PRESETS de
 // propriétés — des objets plats indépendants, jamais une hiérarchie ni de
 // l'héritage : voir entities/model.md. Aucun n'a de `behavior` par défaut
@@ -90,7 +90,6 @@ import cumuloLupus from "./cumulo-lupus.js";
 import decor from "./decor.js";
 import dog from "./dog.js";
 import door from "./door.js";
-import filmProjector from "./film_projector.js";
 import fountain from "./fountain.js";
 import ghost from "./ghost.js";
 import glassWindow from "./glass-window.js";
@@ -109,7 +108,7 @@ import npc from "./npc.js";
 import object from "./object.js";
 import officeChair from "./office_chair.js";
 import officeComputer from "./office_computer.js";
-import officeWaterFountain from "./office_water_fountain.js";
+import officeWaterCooler from "./office_water_cooler.js";
 import passage from "./passage.js";
 import pottedPlant from "./potted_plant.js";
 import river from "./river.js";
@@ -119,6 +118,7 @@ import soundEmitter from "./sound_emitter.js";
 import statue from "./statue.js";
 import turretClockwork from "./turret_clockwork.js";
 import videoProjection from "./video_projection.js";
+import videoProjector from "./video_projector.js";
 import weightShaft from "./weight_shaft.js";
 
 export default {
@@ -140,7 +140,6 @@ export default {
   decor,
   dog,
   door,
-  film_projector: filmProjector,
   fountain,
   ghost,
   glass_window: glassWindow,
@@ -159,7 +158,7 @@ export default {
   object,
   office_chair: officeChair,
   office_computer: officeComputer,
-  office_water_fountain: officeWaterFountain,
+  office_water_cooler: officeWaterCooler,
   passage,
   potted_plant: pottedPlant,
   river,
@@ -169,5 +168,6 @@ export default {
   statue,
   turret_clockwork: turretClockwork,
   video_projection: videoProjection,
+  video_projector: videoProjector,
   weight_shaft: weightShaft,
 };

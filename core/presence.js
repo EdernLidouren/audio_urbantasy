@@ -410,6 +410,24 @@ export function resolveEntityRules(entity, context) {
   return { present, presenceChanged, ruleActive, behaviorEffect };
 }
 
+// Contexte d'évaluation des règles de présence pour le monde ACTIF — SOURCE
+// UNIQUE, partagée par le TICK (core/reduce.js) et par la vue quand elle
+// doit connaître une présence hors tick (view/audio/city-scene.js, montage
+// d'une scène). `world` est le MONDE RACINE (variables de scène partagées
+// entre recto et verso, jamais une face) et `session` la partie elle-même :
+// les porteurs des portées "scene"/"party" de la condition "variable".
+// Construire ce contexte à la main ailleurs risquerait d'en oublier un
+// champ, et une condition évaluée sans son porteur vaut toujours faux.
+export function presenceContextOf(session) {
+  return {
+    time: session.time,
+    perceptionActive: session.perceptionActive,
+    weather: session.weather.state,
+    world: session.worlds[session.activeWorldId],
+    session,
+  };
+}
+
 // Présence résolue d'UNE entité pour ce tick — voir resolveEntityRules,
 // dont c'est un simple accesseur (gardé pour tout appelant qui n'a besoin
 // QUE de la présence, ex. isBlocking ci-dessous, ou du contenu existant).

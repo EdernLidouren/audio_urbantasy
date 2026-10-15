@@ -52,7 +52,7 @@ import {
   phaseAt,
 } from "./time.js";
 import { TIME_CONFIG } from "../config/time-values.js";
-import { evaluateCondition, isPresent, isBlocking, resolveEntityRules, selectMatchingAction } from "./presence.js";
+import { evaluateCondition, isPresent, isBlocking, resolveEntityRules, selectMatchingAction, presenceContextOf } from "./presence.js";
 import { DEFAULTS as WANDER_DEFAULTS } from "./behaviors/wander.js";
 import { validateWeatherStates, createInitialWeather, advanceWeather, pickTransition, setWeather, triggerNextWeatherTransition } from "./weather.js";
 import { WEATHER_STATES, DEFAULT_WEATHER_STATE } from "../config/weather-values.js";
@@ -4831,7 +4831,7 @@ export function runMovementChecks() {
   // les variables COURANTES de l'entité (évaluation côté vue). ---
   const IS_ON = { type: "variable", scope: "entity", name: "isOn", equals: true };
   const BEACON_COND_REGISTRY = {
-    projector: { nameKey: "entity.film_projector.name", sounds: { beacon: { path: "assets/sounds/furniture/film_projector_1_beacon", loop: true, condition: IS_ON } } },
+    projector: { nameKey: "entity.video_projector.name", sounds: { beacon: { path: "assets/sounds/furniture/video_projector_1_beacon", loop: true, condition: IS_ON } } },
   };
   const IS_ON_VARIABLE = [{ name: "isOn", type: "flag", initial: true, persistent: true }];
   const beaconCondLevel = (entity) => ({ id: "movement-check-beacon-condition", titleKey: "level.demo.title", length: 20, playerStart: 0, entities: [{ id: "projector-1", type: "projector", x: 5, ...entity }] });
@@ -4850,6 +4850,53 @@ export function runMovementChecks() {
   run("beacon conditionnel : allumé au départ -> condition vraie", true, evaluateCondition(projectorOf(beaconCondState).sounds.beacon.condition, { entity: projectorOf(beaconCondState) }));
   beaconCondState = applyEntityActionEffects(beaconCondState, "projector-1", [{ type: "setVariable", scope: "entity", name: "isOn", value: false }]);
   run("beacon conditionnel : éteint par effet -> condition fausse", false, evaluateCondition(projectorOf(beaconCondState).sounds.beacon.condition, { entity: projectorOf(beaconCondState) }));
+
+  // --- Présence pilotée par une variable de SCÈNE (presenceContextOf) :
+  // le cas "projection / porte cachée" — deux entités en alternance sur une
+  // variable que le projecteur écrit. presenceContextOf est le contexte
+  // partagé par le TICK et la vue (montage de la scène audio) : sans le
+  // monde, la condition vaudrait toujours faux et la vue couperait à tort
+  // le beacon d'une entité présente. ---
+  const PROJECTOR_ON = (equals) => ({ type: "variable", scope: "scene", name: "projectorOn", equals });
+  const SCENE_PRESENCE_REGISTRY = {
+    projection: { nameKey: "entity.video_projection.name" },
+    door: { nameKey: "door.default.name", interactable: true },
+    switcher: { nameKey: "entity.video_projector.name" },
+  };
+  const scenePresenceLevel = parseLevel(
+    {
+      id: "movement-check-scene-presence",
+      titleKey: "level.demo.title",
+      length: 20,
+      playerStart: 0,
+      variables: [{ name: "projectorOn", type: "flag", initial: true }],
+      entities: [
+        { id: "projection", type: "projection", x: 5, presence: [{ when: PROJECTOR_ON(true), present: true }] },
+        { id: "hidden-door", type: "door", x: 5, presence: [{ when: PROJECTOR_ON(false), present: true }] },
+        { id: "switcher", type: "switcher", x: 9 },
+      ],
+    },
+    SCENE_PRESENCE_REGISTRY
+  );
+  let scenePresenceState = createInitialState(scenePresenceLevel, "scene-presence", NO_COMPANIONS);
+  const presentAtMount = (state) =>
+    getActiveWorld(state).entities.filter((e) => e.presence).map((e) => `${e.id}:${isPresent(e, presenceContextOf(state))}`).join(",");
+  run("variable de scène : présence au montage (contexte partagé)", "projection:true,hidden-door:false", presentAtMount(scenePresenceState));
+  run(
+    "variable de scène : sans le monde, la condition vaudrait faux (le bug évité)",
+    false,
+    isPresent(getActiveWorld(scenePresenceState).entities[0], { time: scenePresenceState.time, perceptionActive: false, weather: "clear" })
+  );
+  scenePresenceState = reduce(scenePresenceState, tick(0));
+  run("variable de scène : après un tick -> projection seule", "projection:true,hidden-door:false", swapPresence(scenePresenceState).replace(",switcher:undefined", ""));
+  scenePresenceState = applyEntityActionEffects(scenePresenceState, "switcher", [{ type: "setVariable", scope: "scene", name: "projectorOn", value: false }]);
+  scenePresenceState = reduce(scenePresenceState, tick(0));
+  run("variable de scène : projecteur éteint -> porte seule", "projection:false,hidden-door:true", swapPresence(scenePresenceState).replace(",switcher:undefined", ""));
+  run(
+    "variable de scène : bascule observée des deux côtés",
+    "exited,entered",
+    getActiveWorld(scenePresenceState).entities.filter((e) => e.presence).map((e) => e.presenceChanged).join(",")
+  );
 
   // --- Collectible persistant (core/state.js/markConsumed, core/money.js/lootEntity) ---
   // Contrairement à removeEntity/pickupEntity ci-dessus, l'entité looté

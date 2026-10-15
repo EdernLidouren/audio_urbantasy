@@ -1,4 +1,4 @@
-// Archétype "film_projector" — vidéoprojecteur qu'on allume et éteint.
+// Archétype "video_projector" — vidéoprojecteur qu'on allume et éteint.
 // Beacon CONDITIONNEL (voir doc/entity-model.md/"Beacon conditionnel") :
 // il ne tourne que tant que la variable d'entité `isOn` vaut true. L'action
 // ne touche jamais au son directement : elle bascule `isOn` (approche B,
@@ -14,10 +14,10 @@ const IS_ON = { type: "variable", scope: "entity", name: "isOn", equals: true };
 const IS_OFF = { type: "variable", scope: "entity", name: "isOn", equals: false };
 
 export default {
-  nameKey: "entity.film_projector.name",
-  descriptionKey: "entity.film_projector.description",
+  nameKey: "entity.video_projector.name",
+  descriptionKey: "entity.video_projector.description",
   sounds: {
-    beacon: { path: "assets/sounds/furniture/film_projector_1_beacon", loop: true, condition: IS_ON },
+    beacon: { path: "assets/sounds/furniture/video_projector_1_beacon", loop: true, condition: IS_ON },
   },
   action: [
     {

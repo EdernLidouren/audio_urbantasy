@@ -1012,7 +1012,7 @@ On ne « change » jamais un beacon par effet : une action modifie l'ÉTAT
 (une variable, en général), et le beacon suit cet état. L'état étant
 sérialisé, une partie rechargée retrouve le bon son sans rien rejouer.
 
-**Exemple réel — le vidéoprojecteur** (`entities/types/film_projector.js`) :
+**Exemple réel — le vidéoprojecteur** (`entities/types/video_projector.js`) :
 beacon soumis à la variable d'entité `isOn`, deux actions candidates aux
 conditions opposées qui jouent `switch_off`/`switch_on` et basculent `isOn`.
 Chaque instance déclare sa propre `isOn` (une variable ne cascade jamais
@@ -1020,13 +1020,13 @@ type -> instance), avec la valeur de départ voulue :
 
 ```js
 sounds: {
-  beacon: { path: "assets/sounds/furniture/film_projector_1_beacon", loop: true,
+  beacon: { path: "assets/sounds/furniture/video_projector_1_beacon", loop: true,
             condition: { type: "variable", scope: "entity", name: "isOn", equals: true } },
 },
 ```
 
 ```json
-{ "id": "film_projector_1", "type": "film_projector", "x": 3,
+{ "id": "video_projector_1", "type": "video_projector", "x": 3,
   "variables": [{ "name": "isOn", "type": "flag", "initial": true }] }
 ```
 

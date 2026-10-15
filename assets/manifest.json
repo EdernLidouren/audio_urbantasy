@@ -618,9 +618,6 @@
   "assets/sounds/furniture/desk_chair_1_beacon": [
     "assets/sounds/furniture/desk_chair_1_beacon_1.mp3"
   ],
-  "assets/sounds/furniture/film_projector_1_beacon": [
-    "assets/sounds/furniture/film_projector_1_beacon_1.mp3"
-  ],
   "assets/sounds/furniture/furniture_heavy_1_beacon": [
     "assets/sounds/furniture/furniture_heavy_1_beacon_1.mp3"
   ],
@@ -650,14 +647,17 @@
   "assets/sounds/furniture/office_chair_1_beacon": [
     "assets/sounds/furniture/office_chair_1_beacon_1.mp3"
   ],
-  "assets/sounds/furniture/office_water_fountain_1_beacon": [
-    "assets/sounds/furniture/office_water_fountain_1_beacon_1.mp3"
+  "assets/sounds/furniture/office_water_cooler_1_beacon": [
+    "assets/sounds/furniture/office_water_cooler_1_beacon_1.mp3"
   ],
   "assets/sounds/furniture/reversed_clock_4_beacon": [
     "assets/sounds/furniture/reversed_clock_4_beacon_1.mp3"
   ],
   "assets/sounds/furniture/video_projection_1_beacon": [
     "assets/sounds/furniture/video_projection_1_beacon_1.mp3"
+  ],
+  "assets/sounds/furniture/video_projector_1_beacon": [
+    "assets/sounds/furniture/video_projector_1_beacon_1.mp3"
   ],
   "assets/sounds/items/box_of_nails_beacon": [
     "assets/sounds/items/box_of_nails_beacon_1.mp3"

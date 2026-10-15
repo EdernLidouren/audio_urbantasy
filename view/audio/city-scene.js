@@ -89,7 +89,7 @@ import { t } from "../../data/i18n/index.js";
 import { MOVE_STEP, getActiveWorld, getInactiveFace } from "../../core/state.js";
 import { surfaceAt, surfaceProps } from "../../core/surfaces.js";
 import { phaseAt } from "../../core/time.js";
-import { isPresent, evaluateCondition } from "../../core/presence.js";
+import { isPresent, evaluateCondition, presenceContextOf } from "../../core/presence.js";
 import { gaitOf } from "../../core/equipment.js";
 import { ITEM_REGISTRY } from "../../core/items.js";
 
@@ -715,11 +715,9 @@ let activeScene = null;
 // pour toute entité apparue APRÈS le montage (ex. entité ÉPHÉMÈRE, voir
 // core/state.js/spawnEphemeral, entities/model.md/"Entités éphémères") —
 // UNE SEULE construction, deux appelants (montage initial, apparition
-// tardive), jamais deux implémentations à maintenir en parallèle. `world`
-// sert UNIQUEMENT à résoudre le sol au spawn (surfaceAt) — pour une entité
-// tardive, c'est le monde du TICK courant, jamais un monde figé au
-// montage : son sol de départ doit refléter sa position RÉELLE au moment
-// où elle apparaît, pas celle d'une autre entité ni un instant passé.
+// tardive), jamais deux implémentations à maintenir en parallèle.
+// `session` : la partie COURANTE, lue seulement pour résoudre la présence
+// de départ (voir plus bas) avec le même contexte que le TICK.
 // includeBeacon (défaut true) : `false` pour une entité de l'AUTRE face
 // d'une scène à deux faces (RECTO/VERSO étape 2/2, voir CLAUDE.md) — AUCUN
 // beacon, ni continu ni intermittent, jamais construit dans ce cas (`beacon`
@@ -727,7 +725,7 @@ let activeScene = null;
 // DEVINE la présence de l'autre face, on ne la LOCALISE pas. Vocal/movement/
 // enterSound/exitSound restent inchangés (rendus en ÉTOUFFÉ par l'appelant,
 // voir playPositionedOneShot/playTransitionSound, jamais coupés ici).
-function buildEntitySoundEntry(entity, world, time, perceptionActive, weather, { includeBeacon = true, disableStagger = false } = {}) {
+function buildEntitySoundEntry(entity, session, { includeBeacon = true, disableStagger = false } = {}) {
   // beacon (localisation) et vocal (expression) : descripteurs de son du
   // type, tous deux OPTIONNELS et indépendants (voir entities/model.md) —
   // ni l'un ni l'autre n'est "le" son obligatoire d'une entité. `entity.sounds`
@@ -875,7 +873,9 @@ function buildEntitySoundEntry(entity, world, time, perceptionActive, weather, {
   // montage (ou à l'apparition tardive) — recalculée directement via
   // isPresent (pas relue sur entity.present, pas garanti à jour à cet
   // instant précis, voir core/reduce.js/stepEntities) à partir du MÊME
-  // `time`. Une balise CONTINUE créée dormante est immédiatement stoppée :
+  // contexte que le TICK (presenceContextOf) : sans le monde ni la partie,
+  // une condition sur une variable de scène ou de partie vaudrait toujours
+  // faux et couperait à tort le beacon d'une entité présente. Une balise CONTINUE créée dormante est immédiatement stoppée :
   // le Howl existe déjà (décodage amorcé, prêt pour une bascule future)
   // mais ne joue jamais tant que l'entité reste dormante. AUCUN son de
   // transition ici (enterSound/exitSound) : cet état de départ n'est PAS
@@ -883,7 +883,7 @@ function buildEntitySoundEntry(entity, world, time, perceptionActive, weather, {
   // null au premier calcul) — seules les bascules OBSERVÉES en cours de
   // jeu déclenchent, voir applyEntityAudio, qui lit presenceChanged sur
   // l'entité VIVANTE à chaque tick (jamais un diff maison ici).
-  if (sound && !isPresent(entity, { time, perceptionActive, weather })) sound.stop();
+  if (sound && !isPresent(entity, presenceContextOf(session))) sound.stop();
 
   return {
     entity,
@@ -947,7 +947,7 @@ export function createCityAudioScene(getSession) {
   // l'amorçage.
   const initialWorld = getActiveWorld(getSession());
   const entitySounds = initialWorld.entities.map((entity) =>
-    buildEntitySoundEntry(entity, initialWorld, getSession().time, getSession().perceptionActive, getSession().weather.state)
+    buildEntitySoundEntry(entity, getSession())
   );
 
   // RECTO/VERSO étape 2/2 (voir CLAUDE.md) : entrées de son pour l'AUTRE
@@ -962,7 +962,7 @@ export function createCityAudioScene(getSession) {
   const initialOtherFace = getInactiveFace(getSession());
   const otherEntitySounds = initialOtherFace
     ? initialOtherFace.entities.map((entity) =>
-        buildEntitySoundEntry(entity, initialOtherFace, getSession().time, getSession().perceptionActive, getSession().weather.state, {
+        buildEntitySoundEntry(entity, getSession(), {
           includeBeacon: false,
         })
       )
@@ -1009,8 +1009,8 @@ export function createCityAudioScene(getSession) {
   // premier son légèrement en retard le temps du décodage à froid, jamais
   // un son perdu ni un plantage. Voir syncNewEntitySounds ci-dessous, seule
   // appelante.
-  function addLateEntitySoundEntry(entity, world) {
-    const entry = buildEntitySoundEntry(entity, world, getSession().time, getSession().perceptionActive, getSession().weather.state);
+  function addLateEntitySoundEntry(entity) {
+    const entry = buildEntitySoundEntry(entity, getSession());
     entitySounds.push(entry);
     if (entry.sound) entry.sound.sendToReverb(reverbBus.input, entry.beaconReverbSend);
     collisionSoundByEntityId.set(entity.id, registry[entity.type].collisionSound);
@@ -1033,7 +1033,7 @@ export function createCityAudioScene(getSession) {
   function syncNewEntitySounds(world) {
     const knownIds = new Set(entitySounds.map(({ entity }) => entity.id));
     for (const entity of world.entities) {
-      if (!knownIds.has(entity.id)) addLateEntitySoundEntry(entity, world);
+      if (!knownIds.has(entity.id)) addLateEntitySoundEntry(entity);
     }
   }
 
@@ -1045,8 +1045,8 @@ export function createCityAudioScene(getSession) {
   // collisionne jamais avec l'autre face, voir core/reduce.js/TICK —
   // isolation stricte). No-op si la scène est simple (otherEntitySounds
   // null, jamais d'entité à synchroniser).
-  function addLateOtherEntitySoundEntry(entity, otherFace) {
-    const entry = buildEntitySoundEntry(entity, otherFace, getSession().time, getSession().perceptionActive, getSession().weather.state, {
+  function addLateOtherEntitySoundEntry(entity) {
+    const entry = buildEntitySoundEntry(entity, getSession(), {
       includeBeacon: false,
     });
     otherEntitySounds.push(entry);
@@ -1056,7 +1056,7 @@ export function createCityAudioScene(getSession) {
     if (!otherEntitySounds) return;
     const knownIds = new Set(otherEntitySounds.map(({ entity }) => entity.id));
     for (const entity of otherFace.entities) {
-      if (!knownIds.has(entity.id)) addLateOtherEntitySoundEntry(entity, otherFace);
+      if (!knownIds.has(entity.id)) addLateOtherEntitySoundEntry(entity);
     }
   }
 
@@ -2366,7 +2366,7 @@ export function createCityAudioScene(getSession) {
       // Beacon conditionnel éteint : aucune balise temporaire à ouvrir.
       if (!beaconConditionAllows(entry.entity.sounds.beacon?.condition, live)) continue;
 
-      const rebuilt = buildEntitySoundEntry(entry.entity, otherWorld, session.time, session.perceptionActive, session.weather.state, {
+      const rebuilt = buildEntitySoundEntry(entry.entity, session, {
         includeBeacon: true,
         disableStagger: true,
       });
