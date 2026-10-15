@@ -89,7 +89,7 @@ import { t } from "../../data/i18n/index.js";
 import { MOVE_STEP, getActiveWorld, getInactiveFace } from "../../core/state.js";
 import { surfaceAt, surfaceProps } from "../../core/surfaces.js";
 import { phaseAt } from "../../core/time.js";
-import { isPresent } from "../../core/presence.js";
+import { isPresent, evaluateCondition } from "../../core/presence.js";
 import { gaitOf } from "../../core/equipment.js";
 import { ITEM_REGISTRY } from "../../core/items.js";
 
@@ -857,7 +857,10 @@ function buildEntitySoundEntry(entity, world, time, perceptionActive, weather, {
         startDelayMs: staggerBeacon ? drawBeaconStaggerDelayMs() : 0,
       });
     } else {
-      intermittentSources.push(resolveIntermittentSource(entity, beacon, BEACON_TUNING_KEYS));
+      // Condition de beacon (voir doc/entity-model.md/"Beacon conditionnel")
+      // : portée par la SOURCE, propre au rôle beacon — un vocal du même
+      // tableau n'en a jamais.
+      intermittentSources.push({ ...resolveIntermittentSource(entity, beacon, BEACON_TUNING_KEYS), condition: beacon.condition });
     }
   }
 
@@ -899,6 +902,15 @@ function buildEntitySoundEntry(entity, world, time, perceptionActive, weather, {
     enterSound,
     exitSound,
     muteOnConsumed,
+    // Beacon conditionnel (voir doc/entity-model.md/"Beacon conditionnel")
+    // : condition du beacon CONTINU, réévaluée à chaque tick par
+    // applyEntityAudio contre l'entité VIVANTE (ses variables courantes).
+    // beaconSilenced : la balise a été arrêtée parce que la condition est
+    // fausse — jamais posé à la construction : le premier tick s'en charge,
+    // avant toute mise en volume (la voix démarre à volume 0, voir
+    // lib/audio.js/createPositionedSound), donc sans blip audible.
+    beaconCondition: beacon ? beacon.condition : undefined,
+    beaconSilenced: false,
     // Surnaturelle (voir isPerceptionGated plus haut) : jamais soumise au
     // filtre d'étouffement des entités mondaines (voir
     // currentMundaneMuffleAmount, applyEntityAudio, effectiveMuffleAmount).
@@ -1726,6 +1738,9 @@ export function createCityAudioScene(getSession) {
       const muffle = effectiveMuffle(entry, forcedMuffle);
       for (const src of entry.intermittentSources) {
         if (now < src.nextAt) continue;
+        // Beacon conditionnel éteint : rien ne part, nextAt reste tel quel
+        // (même gel qu'une entité dormante, voir plus haut).
+        if (src.condition && !beaconConditionAllows(src.condition, liveById.get(entry.entity.id))) continue;
 
         // SUIVI (défaut) : le son reste sur l'entité pendant toute sa
         // lecture, même si elle se déplace (voir startTrackedOneShot). Le
@@ -1833,6 +1848,25 @@ export function createCityAudioScene(getSession) {
   // s'arrêterait alors jamais proprement. Voir cleanupRemovedEntities
   // ci-dessous, seule responsable de l'arrêt réel du son, appelée UNE FOIS
   // par tick, inconditionnellement, tôt dans update().
+  // Beacon conditionnel (voir doc/entity-model.md/"Beacon conditionnel") :
+  // MÊME contexte que les conditions d'action (view/interaction.js/
+  // actionContext), relu à chaque appel — `live` est l'entité VIVANTE du
+  // tick, porteuse de ses variables courantes. Pas de condition -> toujours
+  // autorisé (cas de l'immense majorité des beacons).
+  function beaconConditionAllows(condition, live) {
+    if (!condition) return true;
+    const session = getSession();
+    return evaluateCondition(condition, {
+      entity: live,
+      playerEquipment: session.equipment,
+      time: session.time,
+      perceptionActive: session.perceptionActive,
+      weather: session.weather.state,
+      world: session.worlds[session.activeWorldId],
+      session,
+    });
+  }
+
   function liveEntitiesById() {
     const byId = new Map(getActiveWorld(getSession()).entities.map((entity) => [entity.id, entity]));
     for (const { entity } of entitySounds) {
@@ -1931,10 +1965,30 @@ export function createCityAudioScene(getSession) {
         if (sound) sound.stop();
       } else if (live.presenceChanged === "entered") {
         if (entry.enterSound) playTransitionSound(entry, relX, entry.enterSound, muffle);
-        if (sound) sound.resume();
+        if (sound && beaconConditionAllows(entry.beaconCondition, live)) {
+          sound.resume();
+          entry.beaconSilenced = false;
+        }
       }
 
       if (!sound || live.present === false) continue;
+
+      // Beacon conditionnel (voir doc/entity-model.md/"Beacon conditionnel")
+      // : condition fausse -> balise arrêtée, une seule fois ; redevenue
+      // vraie -> reprise. stop()/resume(), même geste qu'une bascule de
+      // présence. Une balise coupée pour consommation (muteOnConsumed) ne
+      // revient jamais par ce chemin.
+      if (!beaconConditionAllows(entry.beaconCondition, live)) {
+        if (!entry.beaconSilenced) {
+          sound.stop();
+          entry.beaconSilenced = true;
+        }
+        continue;
+      }
+      if (entry.beaconSilenced) {
+        entry.beaconSilenced = false;
+        if (!mutedOnConsumedIds.has(entity.id)) sound.resume();
+      }
 
       // Filet de sécurité anti-blocage (voir lib/audio.js/createPositionedSound
       // isStuck()) : une balise censée boucler en continu peut, rarement et
@@ -2238,10 +2292,12 @@ export function createCityAudioScene(getSession) {
       if (sound && liveById.get(entity.id).present !== false) sound.pause();
     }
   }
+  // beaconSilenced EXCLU de la reprise (voir applyEntityAudio) : une balise
+  // éteinte par sa condition resterait sinon rallumée par la sortie du menu.
   function resumeBeacons() {
     const liveById = liveEntitiesById();
-    for (const { entity, sound } of entitySounds) {
-      if (sound && liveById.get(entity.id).present !== false) sound.resume();
+    for (const { entity, sound, beaconSilenced } of entitySounds) {
+      if (sound && !beaconSilenced && liveById.get(entity.id).present !== false) sound.resume();
     }
   }
 
@@ -2287,7 +2343,7 @@ export function createCityAudioScene(getSession) {
     // dernier tick l'avait laissée) vers l'état étouffé — MÊME formule que
     // applyEntityAudio, juste évaluée une fois plutôt qu'à chaque tick.
     for (const entry of entitySounds) {
-      if (!entry.sound) continue;
+      if (!entry.sound || entry.beaconSilenced) continue;
       const live = liveById.get(entry.entity.id);
       if (!live || live.present === false) continue;
       const open = spatialRendering(entry, live.x - x, NO_MUFFLE);
@@ -2307,6 +2363,8 @@ export function createCityAudioScene(getSession) {
     for (const entry of otherEntitySounds) {
       const live = otherLiveById.get(entry.entity.id);
       if (!live || live.present === false) continue; // dormante : rien à faire entendre
+      // Beacon conditionnel éteint : aucune balise temporaire à ouvrir.
+      if (!beaconConditionAllows(entry.entity.sounds.beacon?.condition, live)) continue;
 
       const rebuilt = buildEntitySoundEntry(entry.entity, otherWorld, session.time, session.perceptionActive, session.weather.state, {
         includeBeacon: true,

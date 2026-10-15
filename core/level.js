@@ -810,6 +810,27 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
     }
   }
 
+  // sounds.beacon.condition (optionnel, BEACON CONDITIONNEL — voir
+  // doc/entity-model.md/"Beacon conditionnel") : MÊME objet déclaratif
+  // qu'action.condition, validé ICI (après entity.variables, qu'une
+  // condition "variable" peut référencer). Évaluation entièrement côté vue
+  // (view/audio/city-scene.js) : le core ne fait que valider la FORME.
+  // Une condition est un tout : celle de l'instance REMPLACE celle de
+  // l'archétype, jamais fusionnée clé par clé comme le reste de `sounds`
+  // (deepMergeOverride mélangerait deux conditions en une troisième).
+  const instanceBeaconCondition = sounds && sounds.beacon ? sounds.beacon.condition : undefined;
+  if (resolvedSounds.beacon && instanceBeaconCondition) {
+    resolvedSounds.beacon = { ...resolvedSounds.beacon, condition: instanceBeaconCondition };
+  }
+  if (resolvedSounds.beacon && resolvedSounds.beacon.condition !== undefined) {
+    validateCondition(
+      resolvedSounds.beacon.condition,
+      `entities[${index}] ("${id}") : sounds.beacon.condition`,
+      entity.variables,
+      sceneVariables
+    );
+  }
+
   // tuning : surcharges d'INSTANCE pour la cascade de réglages
   // (lib/tuning.js/resolveTuning, config/tuning.js) — TRANSPORT générique,
   // jamais interprété ici. Le core ignore tout du SENS de ces clés (sonore

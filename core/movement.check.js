@@ -4825,6 +4825,32 @@ export function runMovementChecks() {
   swapState = reduce(togglePerception(swapState), tick(0));
   run("not (intégration) : perception redevient inactive -> ordinaire seul", "plain:true,magic:false", swapPresence(swapState));
 
+  // --- Beacon conditionnel (sounds.beacon.condition, core/level.js) :
+  // validé au chargement comme une condition d'action, une condition
+  // d'instance REMPLACE celle de l'archétype, et la condition se lit contre
+  // les variables COURANTES de l'entité (évaluation côté vue). ---
+  const IS_ON = { type: "variable", scope: "entity", name: "isOn", equals: true };
+  const BEACON_COND_REGISTRY = {
+    projector: { nameKey: "entity.film_projector.name", sounds: { beacon: { path: "assets/sounds/furniture/film_projector_1_beacon", loop: true, condition: IS_ON } } },
+  };
+  const IS_ON_VARIABLE = [{ name: "isOn", type: "flag", initial: true, persistent: true }];
+  const beaconCondLevel = (entity) => ({ id: "movement-check-beacon-condition", titleKey: "level.demo.title", length: 20, playerStart: 0, entities: [{ id: "projector-1", type: "projector", x: 5, ...entity }] });
+  run("beacon conditionnel : variable déclarée -> chargé", false, expectLevelParseThrows(beaconCondLevel({ variables: IS_ON_VARIABLE }), BEACON_COND_REGISTRY));
+  run("beacon conditionnel : variable absente de l'instance -> erreur au chargement", true, expectLevelParseThrows(beaconCondLevel({}), BEACON_COND_REGISTRY));
+  run("beacon conditionnel : condition mal formée -> erreur au chargement", true, expectLevelParseThrows(beaconCondLevel({ variables: IS_ON_VARIABLE, sounds: { beacon: { condition: { type: "nope" } } } }), BEACON_COND_REGISTRY));
+  const nightBeaconLevel = parseLevel(beaconCondLevel({ sounds: { beacon: { condition: { type: "timeRange", from: 20, to: 6 } } } }), BEACON_COND_REGISTRY);
+  run(
+    "beacon conditionnel : condition d'instance REMPLACE celle de l'archétype (jamais fusionnée)",
+    JSON.stringify({ type: "timeRange", from: 20, to: 6 }),
+    JSON.stringify(getActiveWorld(createInitialState(nightBeaconLevel, "beacon-cond", NO_COMPANIONS)).entities[0].sounds.beacon.condition)
+  );
+  run("beacon conditionnel : registre intact après remplacement", IS_ON, BEACON_COND_REGISTRY.projector.sounds.beacon.condition);
+  let beaconCondState = createInitialState(parseLevel(beaconCondLevel({ variables: IS_ON_VARIABLE }), BEACON_COND_REGISTRY), "beacon-cond", NO_COMPANIONS);
+  const projectorOf = (state) => getActiveWorld(state).entities.find((e) => e.id === "projector-1");
+  run("beacon conditionnel : allumé au départ -> condition vraie", true, evaluateCondition(projectorOf(beaconCondState).sounds.beacon.condition, { entity: projectorOf(beaconCondState) }));
+  beaconCondState = applyEntityActionEffects(beaconCondState, "projector-1", [{ type: "setVariable", scope: "entity", name: "isOn", value: false }]);
+  run("beacon conditionnel : éteint par effet -> condition fausse", false, evaluateCondition(projectorOf(beaconCondState).sounds.beacon.condition, { entity: projectorOf(beaconCondState) }));
+
   // --- Collectible persistant (core/state.js/markConsumed, core/money.js/lootEntity) ---
   // Contrairement à removeEntity/pickupEntity ci-dessus, l'entité looté
   // N'EST JAMAIS retirée — voir entities/model.md/"Collectible persistant".

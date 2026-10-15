@@ -999,6 +999,56 @@ un beacon seul, un vocal seul, les deux, ou ni l'un ni l'autre :
 - `npc.js` (le "passant") a les DEUX : un beacon "tic tic" pour le suivre,
   un vocal (sifflement) pour l'ambiance.
 
+### Beacon conditionnel
+
+`sounds.beacon.condition` (optionnel) : une condition du script (même forme
+et même évaluateur que `action.condition`, voir `doc/scripting.md`/
+"Conditions") qui décide si le beacon SONNE. Fausse : la balise se tait ;
+redevenue vraie : elle reprend. L'entité reste présente, observable et
+interactive : seul son beacon est concerné (contrairement à la présence
+conditionnelle, qui rend l'entité dormante).
+
+On ne « change » jamais un beacon par effet : une action modifie l'ÉTAT
+(une variable, en général), et le beacon suit cet état. L'état étant
+sérialisé, une partie rechargée retrouve le bon son sans rien rejouer.
+
+**Exemple réel — le vidéoprojecteur** (`entities/types/film_projector.js`) :
+beacon soumis à la variable d'entité `isOn`, deux actions candidates aux
+conditions opposées qui jouent `switch_off`/`switch_on` et basculent `isOn`.
+Chaque instance déclare sa propre `isOn` (une variable ne cascade jamais
+type -> instance), avec la valeur de départ voulue :
+
+```js
+sounds: {
+  beacon: { path: "assets/sounds/furniture/film_projector_1_beacon", loop: true,
+            condition: { type: "variable", scope: "entity", name: "isOn", equals: true } },
+},
+```
+
+```json
+{ "id": "film_projector_1", "type": "film_projector", "x": 3,
+  "variables": [{ "name": "isOn", "type": "flag", "initial": true }] }
+```
+
+Règles :
+- **Validation au chargement** (`core/level.js`/`parseEntity`), comme une
+  condition d'action : type inconnu ou variable non déclarée -> erreur.
+- **Une condition est un tout** : celle d'une instance REMPLACE celle de
+  l'archétype, jamais fusionnée clé par clé comme le reste de `sounds`
+  (voir "Cascade de sounds"). `condition: null` à l'instance la retire.
+- **Évaluée à chaque tick** par la vue (`view/audio/city-scene.js`/
+  `beaconConditionAllows`) contre l'entité VIVANTE : le changement s'entend
+  dès le tick qui suit l'action. Coupure et reprise sont franches
+  (`stop()`/`resume()`, même geste qu'une bascule de présence) : le son de
+  l'interrupteur joué par l'action couvre la transition.
+- **Continu ou intermittent** : un beacon intermittent dont la condition est
+  fausse ne déclenche plus rien, sa cadence est gelée comme celle d'une
+  entité dormante.
+- **Partout où un beacon peut sonner** : reprise après un menu, balises
+  temporaires du croisement recto/verso — une balise éteinte reste éteinte.
+- **Beacon seulement** : le `vocal` n'a pas de condition aujourd'hui (aucun
+  cas concret), ce serait la même mécanique le jour où il en faut une.
+
 ## Paramètres sonores
 
 Chacun des paramètres ci-dessous est résolu par `resolveTuning` (voir

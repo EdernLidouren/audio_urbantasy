@@ -18,11 +18,11 @@ si tu ajoutes un type/kind/tag, mets à jour le CODE d'abord, puis complète la
 section correspondante ICI (nouvel exemple si le concept le justifie) — cette
 maintenance fait partie du travail, voir `CLAUDE.md`.
 
-## Vue d'ensemble : une seule couche de conditions, trois consommateurs
+## Vue d'ensemble : une seule couche de conditions, quatre consommateurs
 
 Le même objet condition (`{ type, ...champs }`) et le même évaluateur
-(`core/presence.js`/`evaluateCondition`) servent aujourd'hui à TROIS usages, sans
-jamais trois mécanismes séparés :
+(`core/presence.js`/`evaluateCondition`) servent aujourd'hui à QUATRE usages, sans
+jamais quatre mécanismes séparés :
 
 1. **Présence conditionnelle** — `entity.presence` décide si une entité est
    affichée/simulée (voir "Règles" plus bas).
@@ -31,10 +31,13 @@ jamais trois mécanismes séparés :
    `"behavior"`).
 3. **Conditions d'action** — `entity.action.condition` décide si une action
    (applyEffects, pickup, loot...) s'exécute ou déclenche un refus.
+4. **Beacon conditionnel** — `sounds.beacon.condition` décide si le beacon d'une
+   entité sonne (ex. un vidéoprojecteur allumé/éteint par une variable) ; voir
+   `doc/entity-model.md`/"Beacon conditionnel".
 
 Un futur PNJ qui ne parle qu'à condition, ou un dialogue conditionnel, RÉUTILISERAIT
-cette même couche (nouveau CONSOMMATEUR du même évaluateur), jamais un quatrième
-système de conditions.
+cette même couche (nouveau CONSOMMATEUR du même évaluateur), jamais un système de
+conditions parallèle.
 
 ## Conditions
 
