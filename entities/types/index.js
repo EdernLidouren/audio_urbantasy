@@ -81,6 +81,7 @@ import npc from "./npc.js";
 import object from "./object.js";
 import officeChair from "./office_chair.js";
 import officeComputer from "./office_computer.js";
+import officeTable from "./office_table.js";
 import officeWaterCooler from "./office_water_cooler.js";
 import passage from "./passage.js";
 import pottedPlant from "./potted_plant.js";
@@ -131,6 +132,7 @@ export default {
   object,
   office_chair: officeChair,
   office_computer: officeComputer,
+  office_table: officeTable,
   office_water_cooler: officeWaterCooler,
   passage,
   potted_plant: pottedPlant,

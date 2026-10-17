@@ -21,6 +21,8 @@
   "door.main_room_door.name": "main room door",
   "door.mayor_office.description": "A brass plate on the door displays the mayor's full name in plain lettering: \"Amaryllis Grenat\"",
   "door.mayor_office.name": "mayor's office door",
+  "door.meeting_room.description": "A door leading to the meeting room.",
+  "door.meeting_room.name": "meeting room door",
   "door.town_hall_main.description": "The town hall's front door. It is tall, made of pale wood, with diamond-paned glass.",
   "door.town_hall_main.name": "Town hall door",
   "door.town_hall_main.time_refusal": "The town hall only opens its doors between 8am and 8pm.",
@@ -76,6 +78,8 @@
   "entity.office_chair.name": "office chair",
   "entity.office_computer.description": "A sleek, modern setup made up of a tower, a flat screen, a keyboard, a mouse, and a pair of speakers.",
   "entity.office_computer.name": "desktop computer",
+  "entity.office_table.description": "A plain, long table made of a light wooden top on bare metal legs. A hole closed by a plastic cover lets wires and cables through.",
+  "entity.office_table.name": "meeting table",
   "entity.office_water_cooler.description": "A tall dispenser topped with a huge bottle of water.",
   "entity.office_water_cooler.name": "water cooler",
   "entity.potted_plant.description": "A terracotta pot holding a very common plant species.",
@@ -121,5 +125,6 @@
   "passage.clock_tower.description": "A discreet passage running along the base of the clock tower.",
   "passage.default.description": "A narrow passage to the other side of the place.",
   "passage.default.name": "passage",
-  "passage.town_hall.description": "A shaded passage running along the town hall building."
+  "passage.town_hall.description": "A shaded passage running along the town hall building.",
+  "passage.town_hall_meeting_room.description": "A gap left between the wall and the chairs that lets you cross the meeting room."
 }

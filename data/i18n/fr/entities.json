@@ -21,6 +21,8 @@
   "door.main_room_door.name": "porte de la salle principale",
   "door.mayor_office.description": "Une plaque en laiton sur la porte expose le nom complet de la maire en lettres sobres : \"Amaryllis Grenat\"",
   "door.mayor_office.name": "porte du bureau de la maire",
+  "door.meeting_room.description": "Une porte donnant sur la salle de réunion.",
+  "door.meeting_room.name": "porte de la salle de réunion",
   "door.town_hall_main.description": "La porte de l'hôtel de ville. Elle est grande, faite d'un bois clair et ajourée de vitres en losange.",
   "door.town_hall_main.name": "Porte de l'hôtel de ville",
   "door.town_hall_main.time_refusal": "L'hôtel de ville n'ouvre ses portes qu'entre 8h et 20h.",
@@ -76,6 +78,8 @@
   "entity.office_chair.name": "chaise de bureau",
   "entity.office_computer.description": "Un ensemble sobre et moderne composé d'une tour, d'un écran plat, d'un clavier, d'une souris et d'une paire de haut-parleurs.",
   "entity.office_computer.name": "ordinateur de bureau",
+  "entity.office_table.description": "Une table sobre, tout en longueur, constituée d'un plateau de bois clair et de pieds en métal nu. Fermé par un cache en plastique, un trou permet le passage de fils et de câbles.",
+  "entity.office_table.name": "table de réunion",
   "entity.office_water_cooler.description": "Un haut distributeur surmonté d'une énorme bouteille d'eau.",
   "entity.office_water_cooler.name": "fontaine à eau",
   "entity.potted_plant.description": "Un pot en terre cuite contenant une espèce végétale très commune.",
@@ -121,5 +125,6 @@
   "passage.clock_tower.description": "Un passage discret courant à la base du clocher.",
   "passage.default.description": "Un passage étroit vers l'autre côté du lieu.",
   "passage.default.name": "passage",
-  "passage.town_hall.description": "Un passage ombragé qui longe le bâtiment de l'hôtel de ville."
+  "passage.town_hall.description": "Un passage ombragé qui longe le bâtiment de l'hôtel de ville.",
+  "passage.town_hall_meeting_room.description": "Un passage ménagé entre le mur et les chaises qui permet de traverser la salle de réunion."
 }

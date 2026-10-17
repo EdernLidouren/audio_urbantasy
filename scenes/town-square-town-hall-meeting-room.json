@@ -1,0 +1,195 @@
+{
+  "id": "town_square_town_hall_meeting_room",
+  "titleKey": "scene.town_square_town_hall_meeting_room.name",
+  "length": 30,
+  "playerStart": 0,
+  "recto": {
+    "indoor": true,
+    "musicDay": "assets/musics/town_hall_day",
+    "ambiences": [],
+    "defaultSurface": "concrete",
+    "reverbDurationSec": 3.5,
+    "reverbDecay": 3.0,
+    "entities": [
+      {
+        "id": "main_room_door_1_r",
+        "type": "door",
+        "nameKey": "door.main_room_door.name",
+        "descriptionKey": "door.main_room_door.description",
+        "x": 0,
+        "sounds": {
+          "beacon": {
+            "path": "assets/sounds/doors/door_2_close"
+          }
+        },
+        "action": {
+          "kind": "applyEffects",
+          "effects": [
+            {
+              "type": "playSound",
+              "path": "assets/sounds/doors/door_2_open"
+            },
+            {
+              "type": "teleport",
+              "target": "town_square_town_hall_main",
+              "x": 17
+            }
+          ]
+        }
+      },
+      {
+        "id": "passage_1_r",
+        "type": "passage",
+        "x": 2,
+        "descriptionKey": "passage.town_hall_meeting_room.description",
+        "action": {
+          "kind": "switchSide",
+          "arrivalX": 2
+        }
+      },
+      {
+        "id": "office_chair_1_r",
+        "type": "office_chair",
+        "x": 8
+      },
+      {
+        "id": "office_table_1_r",
+        "type": "office_table",
+        "x": 10
+      },
+      {
+        "id": "office_chair_2_r",
+        "type": "office_chair",
+        "x": 12
+      },
+      {
+        "id": "office_chair_3_r",
+        "type": "office_chair",
+        "x": 13
+      },
+      {
+        "id": "office_table_2_r",
+        "type": "office_table",
+        "x": 15
+      },
+      {
+        "id": "office_chair_4_r",
+        "type": "office_chair",
+        "x": 17
+      },
+      {
+        "id": "office_chair_5_r",
+        "type": "office_chair",
+        "x": 18
+      },
+      {
+        "id": "office_table_3_r",
+        "type": "office_table",
+        "x": 20
+      },
+      {
+        "id": "office_chair_6_r",
+        "type": "office_chair",
+        "x": 22
+      },
+      {
+        "id": "passage_2_r",
+        "type": "passage",
+        "x": 28,
+        "descriptionKey": "passage.town_hall_meeting_room.description",
+        "action": {
+          "kind": "switchSide",
+          "arrivalX": 28
+        }
+      },
+      {
+        "id": "video_projector_1_r",
+        "type": "video_projector",
+        "x": 30,
+        "variables": [
+          {
+            "name": "isOn",
+            "type": "flag",
+            "initial": true,
+            "persistent": true
+          }
+        ]
+      }
+    ]
+  },
+  "verso": {
+    "indoor": true,
+    "musicDay": "assets/musics/town_hall_day",
+    "ambiences": [],
+    "defaultSurface": "concrete",
+    "reverbDurationSec": 3.5,
+    "reverbDecay": 3.0,
+    "entities": [
+      {
+        "id": "office_water_cooler_1_v",
+        "type": "office_water_cooler",
+        "x": 0
+      },
+      {
+        "id": "passage_1_v",
+        "type": "passage",
+        "x": 2,
+        "descriptionKey": "passage.town_hall_meeting_room.description",
+        "action": {
+          "kind": "switchSide",
+          "arrivalX": 2
+        }
+      },
+      {
+        "id": "office_chair_1_v",
+        "type": "office_chair",
+        "x": 8
+      },
+      {
+        "id": "office_table_1_v",
+        "type": "office_table",
+        "x": 10
+      },
+      {
+        "id": "office_chair_2_v",
+        "type": "office_chair",
+        "x": 12
+      },
+      {
+        "id": "video_projection_1_v",
+        "type": "video_projection",
+        "x": 15
+      },
+      {
+        "id": "office_chair_3_v",
+        "type": "office_chair",
+        "x": 18
+      },
+      {
+        "id": "office_table_2_v",
+        "type": "office_table",
+        "x": 20
+      },
+      {
+        "id": "office_chair_4_v",
+        "type": "office_chair",
+        "x": 22
+      },
+      {
+        "id": "passage_2_v",
+        "type": "passage",
+        "x": 28,
+        "descriptionKey": "passage.town_hall_meeting_room.description",
+        "action": {
+          "kind": "switchSide",
+          "arrivalX": 28
+        }
+      },
+      {
+        "id": "potted_plant_1_v",
+        "type": "potted_plant",
+        "x": 30
+      }
+    ]
+  }
+}

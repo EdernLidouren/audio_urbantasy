@@ -43,9 +43,18 @@
       "action": { "kind": "applyEffects", "effects": [{ "type": "playSound", "path": "assets/sounds/doors/door_2_open" }, { "type": "teleport", "target": "town_square_town_hall_mayor_office", "x": 8 }] }
     },
     {
+      "id": "meeting_room_door",
+      "type": "door",
+      "nameKey": "door.meeting_room.name",
+      "descriptionKey": "door.meeting_room.description",
+      "x": 17,
+      "sounds": { "beacon": { "path": "assets/sounds/doors/door_2_close" } },
+      "action": { "kind": "applyEffects", "effects": [{ "type": "playSound", "path": "assets/sounds/doors/door_2_open" }, { "type": "teleport", "target": "town_square_town_hall_meeting_room", "x": 0 }] }
+    },
+    {
       "id": "potted_plant_1",
       "type": "potted_plant",
-      "x": 17
+      "x": 19
     },
     {
       "id": "clock_1",

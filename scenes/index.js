@@ -9,6 +9,7 @@ export default {
   town_square: "scenes/town-square.json",
   town_square_town_hall_main: "scenes/town-square-town-hall-main.json",
   town_square_town_hall_mayor_office: "scenes/town-square-town-hall-mayor-office.json",
+  town_square_town_hall_meeting_room: "scenes/town-square-town-hall-meeting-room.json",
   clock_tower_main: "scenes/clock-tower-main.json",
   clock_tower_weight_shaft: "scenes/clock-tower-weight-shaft.json",
   clock_tower_weight_shaft_mirror_space: "scenes/clock-tower-weight-shaft-mirror-space.json",
