@@ -1,5 +1,5 @@
 {
-  "cityMap.underConstruction": "Under construction.",
+  "cityMap.demo.description": "The starting neighborhood, where it all begins.",
   "cityMap.empty": "Empty.",
-  "cityMap.demo.description": "The starting neighborhood, where it all begins."
+  "cityMap.underConstruction": "Under construction."
 }

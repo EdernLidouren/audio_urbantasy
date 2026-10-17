@@ -1,9 +1,9 @@
 {
-  "menu.interaction.title": "Interagir",
-  "menu.interaction.observe.title": "Observer",
-  "interaction.pickup": "Ramassé : {amount} pièces.",
-  "interaction.pickupItem": "Ramassé : {item}.",
   "interaction.loot": "Trouvé : {amount} pièces.",
   "interaction.lootSpawn": "{count} pièces éparpillées tout autour.",
-  "interaction.searchSpawn": "{count} objets tombent tout autour."
+  "interaction.pickup": "Ramassé : {amount} pièces.",
+  "interaction.pickupItem": "Ramassé : {item}.",
+  "interaction.searchSpawn": "{count} objets tombent tout autour.",
+  "menu.interaction.observe.title": "Observer",
+  "menu.interaction.title": "Interagir"
 }

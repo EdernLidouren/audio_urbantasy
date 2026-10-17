@@ -1,21 +1,6 @@
 // Registre des types d'entités. Connecteur pur, zéro logique : rassemble
-// chaque archétype (un fichier par type, voir apple.js/bird_1.js/bird_2.js/
-// bird_3.js/buddy.js/bush.js/chair.js/clock.js/clock_tower.js/
-// clock_tower_escapement.js/clock_tower_magic_mirror.js/clock_tower_mirror.js/
-// coin.js/crate.js/
-// cumulo-lupus.js/decor.js/dog.js/door.js/fountain.js/ghost.js/
-// glass-window.js/hound.js/item.js/large_machinery.js/
-// large_winding_mechanism.js/machine_1.js/miravi.js/
-// mirror_clock_tower_escapement.js/mirror_large_winding_mechanism.js/
-// mirror_weight_shaft.js/money.js/neon.js/
-// npc.js/object.js/office_chair.js/office_computer.js/
-// office_water_cooler.js/passage.js/
-// potted_plant.js/river.js/
-// rock.js/shop_counter.js/sound_emitter.js/statue.js/turret_clockwork.js/
-// video_projection.js/video_projector.js/weight_shaft.js) en
-// un seul objet —
-// même patron que
-// core/behaviors/index.js. Donnée neutre au global : aucun import, ni du
+// chaque archétype (un fichier par type, voir les imports ci-dessous) en
+// un seul objet — même patron que core/behaviors/index.js. Donnée neutre au global : aucun import, ni du
 // core ni de la vue. blocksMovement est lu par core/scene.js (baké dans
 // l'entité parsée) puis exploité par core/reduce.js pour arrêter le joueur
 // au bord du corps d'une entité bloquante (voir BODY_RADIUS, uniforme pour
@@ -58,32 +43,21 @@
 // cascade (voir entities/model.md), aucune logique de résolution ici,
 // seulement la donnée.
 //
-// Les archétypes (apple/bird_1/bird_2/bird_3/buddy/bush/chair/clock/clock_tower/
-// clock_tower_escapement/clock_tower_magic_mirror/clock_tower_mirror/
-// coin/crate/cumuloLupus/decor/dog/door/fountain/ghost/glass_window/hound/item/
-// large_machinery/large_winding_mechanism/machine_1/miravi/
-// mirror_clock_tower_escapement/mirror_large_winding_mechanism/mirror_weight_shaft/
-// money/neon/npc/object/
-// office_chair/office_computer/office_water_cooler/passage/potted_plant/
-// river/rock/shop_counter/sound_emitter/statue/turret_clockwork/video_projection/
-// video_projector/weight_shaft) sont des
-// PRESETS de
+// Les archétypes sont des PRESETS de
 // propriétés — des objets plats indépendants, jamais une hiérarchie ni de
 // l'héritage : voir entities/model.md. Aucun n'a de `behavior` par défaut
 // (voir dog.js) : le comportement se déclare toujours à l'instance.
 
 import apple from "./apple.js";
-import bird_1 from "./bird_1.js";
-import bird_2 from "./bird_2.js";
-import bird_3 from "./bird_3.js";
+import bird1 from "./bird_1.js";
+import bird2 from "./bird_2.js";
+import bird3 from "./bird_3.js";
 import buddy from "./buddy.js";
 import bush from "./bush.js";
 import chair from "./chair.js";
 import clock from "./clock.js";
 import clockTower from "./clock_tower.js";
 import clockTowerEscapement from "./clock_tower_escapement.js";
-import clockTowerMagicMirror from "./clock_tower_magic_mirror.js";
-import clockTowerMirror from "./clock_tower_mirror.js";
 import coin from "./coin.js";
 import crate from "./crate.js";
 import cumuloLupus from "./cumulo-lupus.js";
@@ -98,10 +72,9 @@ import item from "./item.js";
 import largeMachinery from "./large_machinery.js";
 import largeWindingMechanism from "./large_winding_mechanism.js";
 import machine1 from "./machine_1.js";
+import magicMirror from "./magic_mirror.js";
 import miravi from "./miravi.js";
-import mirrorClockTowerEscapement from "./mirror_clock_tower_escapement.js";
-import mirrorLargeWindingMechanism from "./mirror_large_winding_mechanism.js";
-import mirrorWeightShaft from "./mirror_weight_shaft.js";
+import mirror from "./mirror.js";
 import money from "./money.js";
 import neon from "./neon.js";
 import npc from "./npc.js";
@@ -111,6 +84,9 @@ import officeComputer from "./office_computer.js";
 import officeWaterCooler from "./office_water_cooler.js";
 import passage from "./passage.js";
 import pottedPlant from "./potted_plant.js";
+import reversedClockTowerEscapement from "./reversed_clock_tower_escapement.js";
+import reversedLargeWindingMechanism from "./reversed_large_winding_mechanism.js";
+import reversedWeightShaft from "./reversed_weight_shaft.js";
 import river from "./river.js";
 import rock from "./rock.js";
 import shopCounter from "./shop_counter.js";
@@ -123,17 +99,15 @@ import weightShaft from "./weight_shaft.js";
 
 export default {
   apple,
-  bird_1,
-  bird_2,
-  bird_3,
+  bird_1: bird1,
+  bird_2: bird2,
+  bird_3: bird3,
   buddy,
   bush,
   chair,
   clock,
   clock_tower: clockTower,
   clock_tower_escapement: clockTowerEscapement,
-  clock_tower_magic_mirror: clockTowerMagicMirror,
-  clock_tower_mirror: clockTowerMirror,
   coin,
   crate,
   cumuloLupus,
@@ -148,10 +122,9 @@ export default {
   large_machinery: largeMachinery,
   large_winding_mechanism: largeWindingMechanism,
   machine_1: machine1,
+  magic_mirror: magicMirror,
   miravi,
-  mirror_clock_tower_escapement: mirrorClockTowerEscapement,
-  mirror_large_winding_mechanism: mirrorLargeWindingMechanism,
-  mirror_weight_shaft: mirrorWeightShaft,
+  mirror,
   money,
   neon,
   npc,
@@ -161,6 +134,9 @@ export default {
   office_water_cooler: officeWaterCooler,
   passage,
   potted_plant: pottedPlant,
+  reversed_clock_tower_escapement: reversedClockTowerEscapement,
+  reversed_large_winding_mechanism: reversedLargeWindingMechanism,
+  reversed_weight_shaft: reversedWeightShaft,
   river,
   rock,
   shop_counter: shopCounter,

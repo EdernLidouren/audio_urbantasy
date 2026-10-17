@@ -6,7 +6,7 @@ Outil de DÉVELOPPEMENT, autonome : ne dépend d'aucun module du jeu (le
 moteur i18n vit dans lib/i18n.js, jamais importé ici), lecture seule des
 fichiers i18n, écriture du seul fichier de rapport. Lancé à la demande :
 
-    python tools/check_i18n_parity.py [--verbose] [--output CHEMIN]
+    python tools/check_i18n_parity.py [--verbose] [--sort] [--output CHEMIN]
 
 Données PURES en JSON (voir data/i18n/README.md) : json.load() suffit,
 aucun parsing complexe. Code de sortie : 0 si toutes les langues sont
@@ -14,6 +14,13 @@ synchrones avec REFERENCE_LANG (aucun domaine manquant, aucune clé
 divergente, aucune valeur vide), non nul sinon — utilisable en vérification
 automatique. --verbose ajoute une section indicative (valeurs identiques à
 la référence) qui n'influence JAMAIS le code de sortie.
+
+ORDRE DES CLÉS : chaque fichier doit garder ses clés triées par ordre
+alphabétique (tri Python, par point de code), pour que chaque famille de
+clés (door.*, entity.*, passage.*...) reste d'un seul bloc. Un fichier non
+trié est une divergence. --sort réécrit les fichiers non triés dans l'ordre
+attendu (même format : indentation de 2, UTF-8, saut de ligne final), avant
+l'analyse : ajouter une clé n'importe où puis lancer --sort suffit.
 """
 
 import argparse
@@ -55,6 +62,29 @@ def load_domain_files(lang_dir):
             continue
         files[path.stem] = {"path": path, "data": data, "error": None}
     return files
+
+
+def dump_sorted(path, data):
+    """Écrit un fichier de domaine trié, au format commun de data/i18n/."""
+    text = json.dumps(dict(sorted(data.items())), ensure_ascii=False, indent=2) + "\n"
+    with path.open("w", encoding="utf-8", newline="\n") as f:
+        f.write(text)
+
+
+def sort_files(per_lang_files):
+    """--sort : réécrit les fichiers lisibles dont les clés ne sont pas
+    triées, met à jour les données chargées. Renvoie les étiquettes des
+    fichiers réécrits."""
+    rewritten = []
+    for lang, files in per_lang_files.items():
+        for domain, info in files.items():
+            data = info["data"]
+            if data is None or list(data) == sorted(data):
+                continue
+            dump_sorted(info["path"], data)
+            info["data"] = dict(sorted(data.items()))
+            rewritten.append(rel_label(lang, domain))
+    return rewritten
 
 
 def rel_label(lang, domain):
@@ -117,6 +147,7 @@ def analyze(languages, per_lang_files):
                 continue  # JSON invalide, déjà signalé plus haut
 
             empty = sorted(k for k, v in info["data"].items() if v == "")
+            unsorted = list(info["data"]) != sorted(info["data"])
 
             missing, extra, identical = [], [], []
             if lang != REFERENCE_LANG:
@@ -131,17 +162,20 @@ def analyze(languages, per_lang_files):
                         if ref_data[k] == lang_data[k] and ref_data[k] != ""
                     )
 
-            if missing or extra or empty or identical:
+            if missing or extra or empty or identical or unsorted:
                 per_file.append({
                     "lang": lang, "domain": domain,
                     "missing": missing, "extra": extra,
                     "empty": empty, "identical": identical,
+                    "unsorted": unsorted,
                 })
 
             label = rel_label(lang, domain)
             problems.extend(f'{label} : traduction manquante pour "{k}" (présente dans {REFERENCE_LANG})' for k in missing)
             problems.extend(f'{label} : clé orpheline "{k}" (absente de {REFERENCE_LANG})' for k in extra)
             problems.extend(f'{label} : valeur vide pour "{k}"' for k in empty)
+            if unsorted:
+                problems.append(f"{label} : clés non triées (lancer avec --sort)")
 
     return counts, parse_errors, file_parity, per_file, problems
 
@@ -180,12 +214,12 @@ def render_report(languages, counts, parse_errors, file_parity, per_file, proble
         lines.append(f"  Tous les domaines de {REFERENCE_LANG}/ sont présents dans chaque langue.")
     lines.append("")
 
-    lines.append("--- Divergences par fichier (clés manquantes/orphelines, valeurs vides) ---")
+    lines.append("--- Divergences par fichier (clés manquantes/orphelines, valeurs vides, ordre) ---")
     # per_file peut contenir des sections qui n'ont QUE des valeurs
     # identiques (voir "identical" ci-dessous, ex. "Templeton" légitimement
     # pareil dans les deux langues) — jamais une divergence en soi, donc
     # jamais suffisant pour éviter le repli "Aucune." ici.
-    divergent_sections = [s for s in per_file if s["missing"] or s["extra"] or s["empty"]]
+    divergent_sections = [s for s in per_file if s["missing"] or s["extra"] or s["empty"] or s["unsorted"]]
     if divergent_sections:
         for section in divergent_sections:
             lines.append(f'  {rel_label(section["lang"], section["domain"])}')
@@ -195,6 +229,8 @@ def render_report(languages, counts, parse_errors, file_parity, per_file, proble
                 lines.append(f'    orpheline : "{k}"')
             for k in section["empty"]:
                 lines.append(f'    valeur vide : "{k}"')
+            if section["unsorted"]:
+                lines.append("    clés non triées par ordre alphabétique (lancer avec --sort)")
     else:
         lines.append("  Aucune.")
     lines.append("")
@@ -228,6 +264,7 @@ def main():
 
     parser = argparse.ArgumentParser(description="Vérifie la parité des traductions i18n contre REFERENCE_LANG.")
     parser.add_argument("--verbose", action="store_true", help="ajoute la liste des valeurs identiques à la référence (indicatif, n'affecte pas le code de sortie)")
+    parser.add_argument("--sort", action="store_true", help="réécrit les fichiers dont les clés ne sont pas triées, avant l'analyse")
     parser.add_argument("--output", default=str(DEFAULT_REPORT_PATH), help=f"chemin du rapport à écrire (défaut : {DEFAULT_REPORT_PATH})")
     args = parser.parse_args()
 
@@ -241,6 +278,9 @@ def main():
         return 2
 
     per_lang_files = {lang: load_domain_files(I18N_ROOT / lang) for lang in languages}
+    if args.sort:
+        for label in sort_files(per_lang_files):
+            print(f"Trié : {label}")
 
     counts, parse_errors, file_parity, per_file, problems = analyze(languages, per_lang_files)
     lines = render_report(languages, counts, parse_errors, file_parity, per_file, problems, args.verbose)

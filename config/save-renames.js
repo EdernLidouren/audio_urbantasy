@@ -13,6 +13,12 @@
 
 // Valeur du champ `type` des entités (registre entities/types/index.js).
 export const RENAMED_ENTITY_TYPES = {
+  // Familles i18n : miroirs génériques, entités inversées.
+  clock_tower_mirror: "mirror",
+  clock_tower_magic_mirror: "magic_mirror",
+  mirror_weight_shaft: "reversed_weight_shaft",
+  mirror_large_winding_mechanism: "reversed_large_winding_mechanism",
+  mirror_clock_tower_escapement: "reversed_clock_tower_escapement",
   film_projector: "video_projector",
   office_water_fountain: "office_water_cooler",
 };
@@ -35,6 +41,23 @@ export const RENAMED_I18N_KEYS = {
   "level.town_square.name": "scene.town_square.name",
   "level.town_square_town_hall_main.name": "scene.town_square_town_hall_main.name",
   "level.town_square_town_hall_mayor_office.name": "scene.town_square_town_hall_mayor_office.name",
+  // Familles i18n : passage.*, mirror.*, magic_mirror.*, entités inversées.
+  "entity.clock_tower_mirror.name": "mirror.default.name",
+  "entity.clock_tower_mirror.description": "mirror.default.description",
+  "door.clock_tower_magic_mirror.name": "magic_mirror.default.name",
+  "door.clock_tower_magic_mirror.description": "magic_mirror.default.description",
+  "door.clock_tower_magic_mirror.pass_refusal": "magic_mirror.default.pass_refusal",
+  "entity.mirror_weight_shaft.name": "entity.reversed_weight_shaft.name",
+  "entity.mirror_weight_shaft.description": "entity.reversed_weight_shaft.description",
+  "entity.mirror_large_winding_mechanism.name": "entity.reversed_large_winding_mechanism.name",
+  "entity.mirror_large_winding_mechanism.description": "entity.reversed_large_winding_mechanism.description",
+  "entity.mirror_clock_tower_escapement.name": "entity.reversed_clock_tower_escapement.name",
+  "entity.mirror_clock_tower_escapement.description": "entity.reversed_clock_tower_escapement.description",
+  "entity.passage.name": "passage.default.name",
+  "entity.passage.description": "passage.default.description",
+  "door.default_passage.name": "passage.default.name",
+  "door.town_hall_passage.description": "passage.town_hall.description",
+  "door.clocktower_passage.description": "passage.clock_tower.description",
 };
 
 // Chemins de sons (pools, sans suffixe de variante — voir assets/manifest.json),

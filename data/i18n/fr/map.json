@@ -1,5 +1,5 @@
 {
-  "cityMap.underConstruction": "En chantier.",
+  "cityMap.demo.description": "Le quartier de départ, où tout commence.",
   "cityMap.empty": "Vide.",
-  "cityMap.demo.description": "Le quartier de départ, où tout commence."
+  "cityMap.underConstruction": "En chantier."
 }

@@ -1,0 +1,12 @@
+{
+  "scene.clock_tower_main.name": "Clocher, salle des machines",
+  "scene.clock_tower_weight_shaft.name": "Clocher, puits des contrepoids",
+  "scene.clock_tower_weight_shaft_mirror_space.name": "Clocher, puits des contrepoids, côté miroir",
+  "scene.default.name": "Scène sans nom",
+  "scene.demo.name": "Scène de démo",
+  "scene.demo2.name": "Arrière-boutique",
+  "scene.demo3.name": "La ruelle",
+  "scene.town_square.name": "Grand place",
+  "scene.town_square_town_hall_main.name": "Hôtel de ville, salle principale",
+  "scene.town_square_town_hall_mayor_office.name": "Hôtel de ville, bureau de la maire"
+}

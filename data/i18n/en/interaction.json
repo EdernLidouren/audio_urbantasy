@@ -1,9 +1,9 @@
 {
-  "menu.interaction.title": "Interact",
-  "menu.interaction.observe.title": "Observe",
-  "interaction.pickup": "Picked up: {amount} coins.",
-  "interaction.pickupItem": "Picked up: {item}.",
   "interaction.loot": "Found: {amount} coins.",
   "interaction.lootSpawn": "{count} coins scattered around.",
-  "interaction.searchSpawn": "{count} items fall all around."
+  "interaction.pickup": "Picked up: {amount} coins.",
+  "interaction.pickupItem": "Picked up: {item}.",
+  "interaction.searchSpawn": "{count} items fall all around.",
+  "menu.interaction.observe.title": "Observe",
+  "menu.interaction.title": "Interact"
 }

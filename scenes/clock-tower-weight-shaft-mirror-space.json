@@ -21,7 +21,7 @@
   "entities": [
     {
       "id": "magic_mirror_r",
-      "type": "clock_tower_magic_mirror",
+      "type": "magic_mirror",
       "x": 0,
       "action": [
         {
@@ -48,7 +48,7 @@
           "effects": [
             {
               "type": "announce",
-              "key": "door.clock_tower_magic_mirror.pass_refusal"
+              "key": "magic_mirror.default.pass_refusal"
             }
           ]
         }
@@ -87,18 +87,18 @@
       }
     },
     {
-      "id": "mirror_weight_shaft_r",
-      "type": "mirror_weight_shaft",
+      "id": "reversed_weight_shaft_r",
+      "type": "reversed_weight_shaft",
       "x": 25
     },
     {
-      "id": "mirror_winding_mechanism_r",
-      "type": "mirror_large_winding_mechanism",
+      "id": "reversed_winding_mechanism_r",
+      "type": "reversed_large_winding_mechanism",
       "x": 30
     },
     {
-      "id": "mirror_clock_tower_escapement_r",
-      "type": "mirror_clock_tower_escapement",
+      "id": "reversed_clock_tower_escapement_r",
+      "type": "reversed_clock_tower_escapement",
       "x": 40
     }
   ]

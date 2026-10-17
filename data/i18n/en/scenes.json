@@ -1,0 +1,12 @@
+{
+  "scene.clock_tower_main.name": "Clock tower, machine room",
+  "scene.clock_tower_weight_shaft.name": "Clock tower, counterweight shaft",
+  "scene.clock_tower_weight_shaft_mirror_space.name": "Clock tower, counterweight shaft, mirror side",
+  "scene.default.name": "Unnamed scene",
+  "scene.demo.name": "Demo scene",
+  "scene.demo2.name": "Back room",
+  "scene.demo3.name": "The alley",
+  "scene.town_square.name": "Town square",
+  "scene.town_square_town_hall_main.name": "Town hall, main hall",
+  "scene.town_square_town_hall_mayor_office.name": "Town hall, mayor's office"
+}

@@ -18,6 +18,7 @@ const DOMAINS = [
   "navigation",
   "perception",
   "save",
+  "scenes",
   "shop",
   "status",
   "weather",

@@ -23,8 +23,8 @@
 // la scène), jamais un défaut d'archétype imposé. Voir demo3.json (alley_gap_
 // recto/verso) pour un exemple de déclaration.
 export default {
-  nameKey: "entity.passage.name",
-  descriptionKey: "entity.passage.description",
+  nameKey: "passage.default.name",
+  descriptionKey: "passage.default.description",
   sounds: {
     beacon: { path: "assets/sounds/doors/passage_wind_beacon", loop: true },
   },

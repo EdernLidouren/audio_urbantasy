@@ -43,16 +43,14 @@
         "id": "town_hall_passage_recto",
         "type": "passage",
         "x": 19,
-        "nameKey": "door.default_passage.name",
-        "descriptionKey": "door.town_hall_passage.description",
+        "descriptionKey": "passage.town_hall.description",
         "action": { "kind": "switchSide", "arrivalX": 19 }
       },
       {
         "id": "clocktower_passage_recto",
         "type": "passage",
         "x": 41,
-        "nameKey": "door.default_passage.name",
-        "descriptionKey": "door.clocktower_passage.description",
+        "descriptionKey": "passage.clock_tower.description",
         "action": { "kind": "switchSide", "arrivalX": 41 }
       }
     ]
@@ -98,16 +96,14 @@
         "id": "town_hall_passage_verso",
         "type": "passage",
         "x": 19,
-        "nameKey": "door.default_passage.name",
-        "descriptionKey": "door.town_hall_passage.description",
+        "descriptionKey": "passage.town_hall.description",
         "action": { "kind": "switchSide", "arrivalX": 19 }
       },
       {
         "id": "clocktower_passage_verso",
         "type": "passage",
         "x": 41,
-        "nameKey": "door.default_passage.name",
-        "descriptionKey": "door.clocktower_passage.description",
+        "descriptionKey": "passage.clock_tower.description",
         "action": { "kind": "switchSide", "arrivalX": 41 }
       }
     ]

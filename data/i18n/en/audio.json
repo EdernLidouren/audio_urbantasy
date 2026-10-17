@@ -1,17 +1,17 @@
 {
-  "menu.audio.title": "Audio",
-  "audio.master_volume": "Main volume",
-  "audio.master_volume.description": "The overall output volume, applied on top of every other volume setting. Deliberately low by default, so it never drowns out the screen reader.",
+  "audio.ambience_volume": "Ambience volume",
+  "audio.ambience_volume.description": "The volume of the place's background sounds, like traffic or wind.",
   "audio.beacon_volume": "Beacon volume",
   "audio.beacon_volume.description": "The volume of sounds that signal an entity's presence: locator beacons and vocalizations.",
   "audio.footstep_volume": "Footstep volume",
   "audio.footstep_volume.description": "The volume of footstep sounds, yours as well as any moving entity's.",
-  "audio.music_volume": "Music volume",
-  "audio.music_volume.description": "The volume of the current place's music.",
-  "audio.ambience_volume": "Ambience volume",
-  "audio.ambience_volume.description": "The volume of the place's background sounds, like traffic or wind.",
   "audio.interface_volume": "Interface volume",
   "audio.interface_volume.description": "The volume of interface sounds: menu navigation, picking up items, save confirmation.",
+  "audio.master_volume": "Main volume",
+  "audio.master_volume.description": "The overall output volume, applied on top of every other volume setting. Deliberately low by default, so it never drowns out the screen reader.",
+  "audio.music_volume": "Music volume",
+  "audio.music_volume.description": "The volume of the current place's music.",
   "menu.audio.reset": "Reset to defaults",
-  "menu.audio.reset_done": "Audio settings reset"
+  "menu.audio.reset_done": "Audio settings reset",
+  "menu.audio.title": "Audio"
 }

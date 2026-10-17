@@ -1,13 +1,13 @@
 {
-  "menu.navigation.title": "Navigation",
-  "menu.navigation.cycling": "Menu cycling",
-  "menu.navigation.cycling.description": "Makes the cursor wrap from one end of a list or grid to the other, instead of stopping at the edge.",
-  "menu.navigation.star_prefix": "Prefix announcements with a star",
-  "menu.navigation.star_prefix.description": "Adds a star at the start of the announcement when a limit is reached, so it can be noticed even without the matching sound.",
-  "menu.navigation.index_suffix": "Announce position (\"1 of 2\")",
-  "menu.navigation.index_suffix.description": "Adds the selected entry's position to the end of its announcement, e.g. \"1 of 5\".",
   "menu.navigation.city_map_alpha": "City map: alphanumeric coordinates",
   "menu.navigation.city_map_alpha.description": "On the city map, displays the column as a letter instead of a number.",
   "menu.navigation.city_map_invert_y": "City map: invert Y coordinates",
-  "menu.navigation.city_map_invert_y.description": "On the city map, reverses how rows are counted: from the top instead of from the bottom."
+  "menu.navigation.city_map_invert_y.description": "On the city map, reverses how rows are counted: from the top instead of from the bottom.",
+  "menu.navigation.cycling": "Menu cycling",
+  "menu.navigation.cycling.description": "Makes the cursor wrap from one end of a list or grid to the other, instead of stopping at the edge.",
+  "menu.navigation.index_suffix": "Announce position (\"1 of 2\")",
+  "menu.navigation.index_suffix.description": "Adds the selected entry's position to the end of its announcement, e.g. \"1 of 5\".",
+  "menu.navigation.star_prefix": "Prefix announcements with a star",
+  "menu.navigation.star_prefix.description": "Adds a star at the start of the announcement when a limit is reached, so it can be noticed even without the matching sound.",
+  "menu.navigation.title": "Navigation"
 }

@@ -4810,8 +4810,8 @@ export function runMovementChecks() {
   // Intégration : deux entités superposées, l'une présente HORS perception,
   // l'autre EN perception — jamais les deux, jamais aucune.
   const SWAP_REGISTRY = {
-    plainMirror: { nameKey: "entity.clock_tower_mirror.name", presence: [{ when: NOT_PERCEPTION, present: true }] },
-    magicMirror: { nameKey: "door.clock_tower_magic_mirror.name", presence: [{ when: { type: "perceptionActive" }, present: true }] },
+    plainMirror: { nameKey: "mirror.default.name", presence: [{ when: NOT_PERCEPTION, present: true }] },
+    magicMirror: { nameKey: "magic_mirror.default.name", presence: [{ when: { type: "perceptionActive" }, present: true }] },
   };
   const swapScene = parseScene(
     { id: "movement-check-not-swap", titleKey: "scene.demo.name", length: 20, playerStart: 5, entities: [{ id: "plain", type: "plainMirror", x: 0 }, { id: "magic", type: "magicMirror", x: 0 }] },

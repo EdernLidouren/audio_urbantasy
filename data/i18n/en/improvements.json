@@ -1,15 +1,15 @@
 {
-  "improvement.supernatural_perception.name": "supernatural perception",
-  "improvement.supernatural_perception.description": "Opens your senses to the invisible world until you revoke this power. While you sense magic and the entities bound to it, you lose part of your ordinary perceptions.",
-  "improvement.flashlight.name": "flashlight",
   "improvement.flashlight.description": "A powerful electric lamp whose light lets you explore the darkest places without fear.",
-  "improvement.mirror_pass.name": "mirror pass",
-  "improvement.mirror_pass.description": "Many mirrors were once enchanted to create a sanctuary outside space and time. This power lets you pass through these portals at will.",
-  "improvement.master_key.name": "master key",
+  "improvement.flashlight.name": "flashlight",
   "improvement.master_key.description": "A key ring so absurdly loaded that it promises to open every lock in the region to whoever has the patience to use it.",
-  "improvement.skeleton_key.name": "skeleton key",
+  "improvement.master_key.name": "master key",
+  "improvement.mirror_pass.description": "Many mirrors were once enchanted to create a sanctuary outside space and time. This power lets you pass through these portals at will.",
+  "improvement.mirror_pass.name": "mirror pass",
   "improvement.skeleton_key.description": "An old bronze key without teeth, yet able to unlock what should never open. Its enchantment overrides most supernatural protections.",
-  "improvements.title": "Improvements: {unlocked} of {total}",
+  "improvement.skeleton_key.name": "skeleton key",
+  "improvement.supernatural_perception.description": "Opens your senses to the invisible world until you revoke this power. While you sense magic and the entities bound to it, you lose part of your ordinary perceptions.",
+  "improvement.supernatural_perception.name": "supernatural perception",
   "improvements.entry.known": "{order} - {name}: {description}",
-  "improvements.entry.unknown": "{order} - Unknown"
+  "improvements.entry.unknown": "{order} - Unknown",
+  "improvements.title": "Improvements: {unlocked} of {total}"
 }

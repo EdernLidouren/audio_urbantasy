@@ -22,12 +22,12 @@
     "entities": [
       {
         "id": "mirror_r",
-        "type": "clock_tower_mirror",
+        "type": "mirror",
         "x": 0
       },
       {
         "id": "magic_mirror_r",
-        "type": "clock_tower_magic_mirror",
+        "type": "magic_mirror",
         "x": 0,
         "action": [
           {
@@ -54,7 +54,7 @@
             "effects": [
               {
                 "type": "announce",
-                "key": "door.clock_tower_magic_mirror.pass_refusal"
+                "key": "magic_mirror.default.pass_refusal"
               }
             ]
           }

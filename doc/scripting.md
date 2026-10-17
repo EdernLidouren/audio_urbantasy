@@ -397,8 +397,8 @@ parcourt donc jamais `"not"` (une double négation y est traitée comme mondaine
 prudemment).
 
 Exemple réel complet — les deux miroirs superposés de
-`scenes/clock-tower-weight-shaft.json` (archétypes `entities/types/clock_tower_mirror.js`
-et `clock_tower_magic_mirror.js`), jamais présents ensemble, jamais absents ensemble :
+`scenes/clock-tower-weight-shaft.json` (archétypes `entities/types/mirror.js`
+et `magic_mirror.js`), jamais présents ensemble, jamais absents ensemble :
 
 ```js
 // Miroir ordinaire — présent HORS perception.
