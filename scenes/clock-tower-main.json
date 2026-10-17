@@ -1,6 +1,6 @@
 {
   "id": "clock_tower_main",
-  "titleKey": "level.clock_tower_main.name",
+  "titleKey": "scene.clock_tower_main.name",
   "length": 50,
   "playerStart": 25,
   "recto": {

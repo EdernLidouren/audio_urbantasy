@@ -1,9 +1,9 @@
 // Vérifications du déplacement du core, exécutables depuis la console du
 // navigateur (Node n'est pas disponible sur cette machine). Pur : aucun DOM,
-// aucun fetch. Le niveau est construit en dur via un objet littéral, passé à
-// parseLevel — aucune dépendance hors des modules du core.
+// aucun fetch. La scène est construite en dur via un objet littéral, passé à
+// parseScene — aucune dépendance hors des modules du core.
 
-import { parseLevel } from "./level.js";
+import { parseScene } from "./scene.js";
 import {
   createInitialState,
   getActiveWorld,
@@ -76,15 +76,15 @@ import { SHOP_CATALOGS } from "../config/shop-values.js";
 // défaut réel.
 const NO_COMPANIONS = { companions: [] };
 
-const RAW_LEVEL = {
+const RAW_SCENE = {
   id: "movement-check",
-  titleKey: "level.demo.title",
+  titleKey: "scene.demo.name",
   length: 10,
   playerStart: 5,
   entities: [],
 };
 
-// Pas d'entité dans le niveau de test : le registre peut rester vide.
+// Pas d'entité dans la scène de test : le registre peut rester vide.
 const EMPTY_REGISTRY = {};
 
 function check(label, expected, actual) {
@@ -102,27 +102,27 @@ export function runMovementChecks() {
     if (check(label, expected, actual)) passed += 1;
   }
 
-  const level = parseLevel(RAW_LEVEL, EMPTY_REGISTRY);
+  const scene = parseScene(RAW_SCENE, EMPTY_REGISTRY);
 
   // Quelques ticks à droite depuis le centre : x avance de MOVE_STEP par tick.
-  let state = createInitialState(level, undefined, NO_COMPANIONS);
+  let state = createInitialState(scene, undefined, NO_COMPANIONS);
   state = reduce(state, tick(1));
   state = reduce(state, tick(1));
   state = reduce(state, tick(1));
   run("3 ticks à droite depuis x=5", 5 + 3 * MOVE_STEP, state.player.x);
 
   // Clamp à gauche : depuis le bord 0, un tick à gauche reste à 0.
-  const leftLevel = parseLevel({ ...RAW_LEVEL, playerStart: 0 }, EMPTY_REGISTRY);
-  const leftState = reduce(createInitialState(leftLevel, undefined, NO_COMPANIONS), tick(-1));
+  const leftScene = parseScene({ ...RAW_SCENE, playerStart: 0 }, EMPTY_REGISTRY);
+  const leftState = reduce(createInitialState(leftScene, undefined, NO_COMPANIONS), tick(-1));
   run("clamp à gauche depuis x=0", 0, leftState.player.x);
 
   // Clamp à droite : depuis le bord length, un tick à droite reste à length.
-  const rightLevel = parseLevel({ ...RAW_LEVEL, playerStart: RAW_LEVEL.length }, EMPTY_REGISTRY);
-  const rightState = reduce(createInitialState(rightLevel, undefined, NO_COMPANIONS), tick(1));
-  run("clamp à droite depuis x=length", RAW_LEVEL.length, rightState.player.x);
+  const rightScene = parseScene({ ...RAW_SCENE, playerStart: RAW_SCENE.length }, EMPTY_REGISTRY);
+  const rightState = reduce(createInitialState(rightScene, undefined, NO_COMPANIONS), tick(1));
+  run("clamp à droite depuis x=length", RAW_SCENE.length, rightState.player.x);
 
   // Action inconnue -> état inchangé, MÊME référence (pas de nouvel objet).
-  const before = createInitialState(level, undefined, NO_COMPANIONS);
+  const before = createInitialState(scene, undefined, NO_COMPANIONS);
   const after = reduce(before, { type: "UNKNOWN" });
   run("action inconnue renvoie la même référence", before, after);
 
@@ -138,10 +138,10 @@ export function runMovementChecks() {
 
   const WANDER_REGISTRY = { dog: { nameKey: "entity.dog.name" }, wall: { nameKey: "entity.wall.name", blocksMovement: true } };
 
-  function makeWanderLevel(overrides = {}) {
+  function makeWanderScene(overrides = {}) {
     return {
       id: "movement-check-wander",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 10,
       playerStart: 5,
       entities: [{ id: "wander-1", type: "dog", x: 5, behavior: { kind: "wander" } }],
@@ -162,18 +162,18 @@ export function runMovementChecks() {
     return { state: current, positions, phases };
   }
 
-  const wanderLevel = parseLevel(makeWanderLevel(), WANDER_REGISTRY);
+  const wanderScene = parseScene(makeWanderScene(), WANDER_REGISTRY);
 
   // Même seed, même suite de ticks -> trajectoire ET séquence de phases
   // identiques, pas seulement la position finale (le tirage de durée/
   // direction doit, lui aussi, rester déterministe).
-  const run1 = runTicks(createInitialState(wanderLevel, 42, NO_COMPANIONS), 400);
-  const run2 = runTicks(createInitialState(wanderLevel, 42, NO_COMPANIONS), 400);
+  const run1 = runTicks(createInitialState(wanderScene, 42, NO_COMPANIONS), 400);
+  const run2 = runTicks(createInitialState(wanderScene, 42, NO_COMPANIONS), 400);
   run("errance : trajectoire reproductible (même seed)", JSON.stringify(run1.positions), JSON.stringify(run2.positions));
   run("errance : séquence de phases reproductible (même seed)", JSON.stringify(run1.phases), JSON.stringify(run2.phases));
 
-  // Toujours dans les bornes du niveau, à chaque tick de la trajectoire.
-  run("errance : position toujours dans [0, length]", true, run1.positions.every((x) => x >= 0 && x <= wanderLevel.length));
+  // Toujours dans les bornes de la scène, à chaque tick de la trajectoire.
+  run("errance : position toujours dans [0, length]", true, run1.positions.every((x) => x >= 0 && x <= wanderScene.length));
 
   // Les deux états sont bien atteints avec les défauts (400 ticks >
   // walkMax : au moins une pause est nécessairement amorcée), et la phase
@@ -212,13 +212,13 @@ export function runMovementChecks() {
   // apparaître PLUSIEURS plages complètes des deux états (contrairement aux
   // défauts calmes ci-dessus, où une seule pause tient à peine dans 400
   // ticks) — isole la mécanique de bascule/tirage de la question du rythme.
-  const machineLevel = parseLevel(
-    makeWanderLevel({
+  const machineScene = parseScene(
+    makeWanderScene({
       entities: [{ id: "wander-1", type: "dog", x: 5, behavior: { kind: "wander", walkMin: 3, walkMax: 6, pauseMin: 4, pauseMax: 8 } }],
     }),
     WANDER_REGISTRY
   );
-  const machineRun = runTicks(createInitialState(machineLevel, 99, NO_COMPANIONS), 300);
+  const machineRun = runTicks(createInitialState(machineScene, 99, NO_COMPANIONS), 300);
   const machineRuns = phaseRuns(machineRun.phases);
   const completeMachineRuns = machineRuns.slice(1, -1); // écarte la 1ère (déjà en cours) et la dernière (pas finie)
   run("errance : plusieurs plages complètes observées (fourchettes serrées)", true, completeMachineRuns.length >= 10);
@@ -240,7 +240,7 @@ export function runMovementChecks() {
   // absolu dans un sens ou dans l'autre, jamais l'intention).
   const machineDirs = [];
   {
-    let s = createInitialState(machineLevel, 99, NO_COMPANIONS);
+    let s = createInitialState(machineScene, 99, NO_COMPANIONS);
     let previousPhase = null;
     for (let i = 0; i < 300; i++) {
       s = reduce(s, tick(0));
@@ -254,18 +254,18 @@ export function runMovementChecks() {
   run("errance : au moins une reprise de direction observée (pas de ping-pong systématique)", true, continuations >= 1);
   run("errance : au moins un vrai demi-tour observé (pas figée dans un seul sens)", true, reversals >= 1);
 
-  // Rebond au bord du niveau (item 3) : phase de marche FORCÉE assez longue
+  // Rebond au bord de la scène (item 3) : phase de marche FORCÉE assez longue
   // pour ne jamais expirer seule (walkMin=walkMax élevé) — isole le rebond
-  // de toute bascule naturelle. Niveau étroit : quelle que soit la
+  // de toute bascule naturelle. Scène étroite : quelle que soit la
   // direction tirée au départ, un bord est atteint vite.
-  const boundaryLevel = parseLevel(
-    makeWanderLevel({
+  const boundaryScene = parseScene(
+    makeWanderScene({
       length: 1,
       entities: [{ id: "wander-1", type: "dog", x: 0.5, behavior: { kind: "wander", walkMin: 1000, walkMax: 1000 } }],
     }),
     WANDER_REGISTRY
   );
-  let boundaryState = createInitialState(boundaryLevel, 7, NO_COMPANIONS);
+  let boundaryState = createInitialState(boundaryScene, 7, NO_COMPANIONS);
   const boundaryXs = [];
   const boundaryDirs = new Set();
   for (let i = 0; i < 40; i++) {
@@ -281,8 +281,8 @@ export function runMovementChecks() {
   // mais contre une entité bloquante — corridor étroit entre deux murs,
   // entité centrée : quelle que soit la direction tirée, elle atteint vite
   // un mur, jamais ne le traverse, jamais ne reste collée à pousser dedans.
-  const obstacleLevel = parseLevel(
-    makeWanderLevel({
+  const obstacleScene = parseScene(
+    makeWanderScene({
       length: 20,
       entities: [
         { id: "wall-left", type: "wall", x: 5 },
@@ -292,7 +292,7 @@ export function runMovementChecks() {
     }),
     WANDER_REGISTRY
   );
-  let obstacleState = createInitialState(obstacleLevel, 7, NO_COMPANIONS);
+  let obstacleState = createInitialState(obstacleScene, 7, NO_COMPANIONS);
   const obstacleXs = [];
   const obstacleDirs = new Set();
   for (let i = 0; i < 60; i++) {
@@ -316,7 +316,7 @@ export function runMovementChecks() {
   function expectWanderRejected(behaviorOverride) {
     let rejected = false;
     try {
-      parseLevel(makeWanderLevel({ entities: [{ id: "wander-1", type: "dog", x: 5, behavior: { kind: "wander", ...behaviorOverride } }] }), WANDER_REGISTRY);
+      parseScene(makeWanderScene({ entities: [{ id: "wander-1", type: "dog", x: 5, behavior: { kind: "wander", ...behaviorOverride } }] }), WANDER_REGISTRY);
     } catch {
       rejected = true;
     }
@@ -336,12 +336,12 @@ export function runMovementChecks() {
     JSON.stringify(serializedWanderEntity.wander)
   );
 
-  // behavior.kind absent du registre (core/behaviors/index.js) -> parseLevel
+  // behavior.kind absent du registre (core/behaviors/index.js) -> parseScene
   // échoue clairement, plutôt que d'ignorer silencieusement le comportement.
   let unknownKindRejected = false;
   try {
-    parseLevel(
-      makeWanderLevel({ entities: [{ id: "wander-1", type: "dog", x: 5, behavior: { kind: "fly" } }] }),
+    parseScene(
+      makeWanderScene({ entities: [{ id: "wander-1", type: "dog", x: 5, behavior: { kind: "fly" } }] }),
       WANDER_REGISTRY
     );
   } catch {
@@ -354,36 +354,36 @@ export function runMovementChecks() {
   // core/reduce.js/resolveIntents) — wander/follow/goto continuent de ne
   // produire qu'une intention de direction, ignorant tout de la vitesse.
   // Cascade instance -> archétype -> défaut (1), même patron que
-  // blocksMovement/isFlying (core/level.js/parseEntity).
+  // blocksMovement/isFlying (core/scene.js/parseEntity).
 
   const SPEED_REGISTRY = {
     dog: { nameKey: "entity.dog.name" },
     slowDog: { nameKey: "entity.dog.name", speed: 0.5 },
   };
 
-  const speedDefaultLevel = parseLevel(
-    { id: "movement-check-speed-default", titleKey: "level.demo.title", length: 10, playerStart: 5, entities: [{ id: "e1", type: "dog", x: 5 }] },
+  const speedDefaultScene = parseScene(
+    { id: "movement-check-speed-default", titleKey: "scene.demo.name", length: 10, playerStart: 5, entities: [{ id: "e1", type: "dog", x: 5 }] },
     SPEED_REGISTRY
   );
-  run("speed : défaut (ni instance ni type) -> 1", 1, speedDefaultLevel.entities[0].speed);
+  run("speed : défaut (ni instance ni type) -> 1", 1, speedDefaultScene.entities[0].speed);
 
-  const speedTypeLevel = parseLevel(
-    { id: "movement-check-speed-type", titleKey: "level.demo.title", length: 10, playerStart: 5, entities: [{ id: "e1", type: "slowDog", x: 5 }] },
+  const speedTypeScene = parseScene(
+    { id: "movement-check-speed-type", titleKey: "scene.demo.name", length: 10, playerStart: 5, entities: [{ id: "e1", type: "slowDog", x: 5 }] },
     SPEED_REGISTRY
   );
-  run("speed : hérité de l'archétype si l'instance ne surcharge pas", 0.5, speedTypeLevel.entities[0].speed);
+  run("speed : hérité de l'archétype si l'instance ne surcharge pas", 0.5, speedTypeScene.entities[0].speed);
 
-  const speedOverrideLevel = parseLevel(
-    { id: "movement-check-speed-override", titleKey: "level.demo.title", length: 10, playerStart: 5, entities: [{ id: "e1", type: "slowDog", x: 5, speed: 2 }] },
+  const speedOverrideScene = parseScene(
+    { id: "movement-check-speed-override", titleKey: "scene.demo.name", length: 10, playerStart: 5, entities: [{ id: "e1", type: "slowDog", x: 5, speed: 2 }] },
     SPEED_REGISTRY
   );
-  run("speed : surcharge d'instance prioritaire sur l'archétype", 2, speedOverrideLevel.entities[0].speed);
+  run("speed : surcharge d'instance prioritaire sur l'archétype", 2, speedOverrideScene.entities[0].speed);
 
   function expectSpeedRejected(speed) {
     let rejected = false;
     try {
-      parseLevel(
-        { id: "movement-check-speed-invalid", titleKey: "level.demo.title", length: 10, playerStart: 5, entities: [{ id: "e1", type: "dog", x: 5, speed }] },
+      parseScene(
+        { id: "movement-check-speed-invalid", titleKey: "scene.demo.name", length: 10, playerStart: 5, entities: [{ id: "e1", type: "dog", x: 5, speed }] },
         SPEED_REGISTRY
       );
     } catch {
@@ -399,11 +399,11 @@ export function runMovementChecks() {
   // la moitié de la distance sur le même nombre de ticks, à comportement
   // IDENTIQUE (même seed, marche forcée sans pause ni rebond — walkMin=
   // walkMax élevé, corridor large pour ne jamais toucher un bord).
-  function makeSpeedWanderLevel(speed) {
-    return parseLevel(
+  function makeSpeedWanderScene(speed) {
+    return parseScene(
       {
         id: `movement-check-speed-wander-${speed}`,
-        titleKey: "level.demo.title",
+        titleKey: "scene.demo.name",
         length: 100,
         playerStart: 50,
         entities: [{ id: "e1", type: "dog", x: 50, speed, behavior: { kind: "wander", walkMin: 1000, walkMax: 1000 } }],
@@ -411,8 +411,8 @@ export function runMovementChecks() {
       SPEED_REGISTRY
     );
   }
-  let fastSpeedState = createInitialState(makeSpeedWanderLevel(1), 3, NO_COMPANIONS);
-  let slowSpeedState = createInitialState(makeSpeedWanderLevel(0.5), 3, NO_COMPANIONS);
+  let fastSpeedState = createInitialState(makeSpeedWanderScene(1), 3, NO_COMPANIONS);
+  let slowSpeedState = createInitialState(makeSpeedWanderScene(0.5), 3, NO_COMPANIONS);
   for (let i = 0; i < 50; i++) {
     fastSpeedState = reduce(fastSpeedState, tick(0));
     slowSpeedState = reduce(slowSpeedState, tick(0));
@@ -433,37 +433,37 @@ export function runMovementChecks() {
   // preuve que la vitesse est appliquée APRÈS le comportement (résolution),
   // jamais lue par lui (wander.js n'a pas été touché par ce branchement).
   // behavior.speed : PRIME sur entity.speed, même résolution physique.
-  function makeBehaviorSpeedLevel(entitySpeed, behaviorSpeed) {
+  function makeBehaviorSpeedScene(entitySpeed, behaviorSpeed) {
     const behavior = { kind: "wander", walkMin: 1000, walkMax: 1000 };
     if (behaviorSpeed !== undefined) behavior.speed = behaviorSpeed;
     const entity = { id: "e1", type: "dog", x: 50, speed: entitySpeed, behavior };
-    return parseLevel({ id: "movement-check-behavior-speed", titleKey: "level.demo.title", length: 100, playerStart: 50, entities: [entity] }, SPEED_REGISTRY);
+    return parseScene({ id: "movement-check-behavior-speed", titleKey: "scene.demo.name", length: 100, playerStart: 50, entities: [entity] }, SPEED_REGISTRY);
   }
-  function distanceAfter50Ticks(level) {
-    let state = createInitialState(level, 3, NO_COMPANIONS);
+  function distanceAfter50Ticks(scene) {
+    let state = createInitialState(scene, 3, NO_COMPANIONS);
     for (let i = 0; i < 50; i++) state = reduce(state, tick(0));
     return Math.abs(getActiveWorld(state).entities[0].x - 50);
   }
-  const entitySpeedOnly = distanceAfter50Ticks(makeBehaviorSpeedLevel(1, undefined));
-  const behaviorSpeedWins = distanceAfter50Ticks(makeBehaviorSpeedLevel(1, 0.5));
-  const behaviorOverEntity = distanceAfter50Ticks(makeBehaviorSpeedLevel(0.5, 2));
+  const entitySpeedOnly = distanceAfter50Ticks(makeBehaviorSpeedScene(1, undefined));
+  const behaviorSpeedWins = distanceAfter50Ticks(makeBehaviorSpeedScene(1, 0.5));
+  const behaviorOverEntity = distanceAfter50Ticks(makeBehaviorSpeedScene(0.5, 2));
   run("behavior.speed : 0.5 sur une entité à 1 -> moitié de la distance", true, Math.abs(behaviorSpeedWins - entitySpeedOnly / 2) < 1e-9);
   run("behavior.speed : 2 sur une entité à 0.5 -> double de la distance à 1", true, Math.abs(behaviorOverEntity - entitySpeedOnly * 2) < 1e-9);
   run("behavior.speed : absent -> entity.speed s'applique", true, entitySpeedOnly > 0);
 
   // continueBias : 0 -> demi-tour à CHAQUE nouvelle marche ; 1 -> jamais.
   function walkDirections(continueBias) {
-    const level = parseLevel(
+    const scene = parseScene(
       {
         id: `movement-check-continue-bias-${continueBias}`,
-        titleKey: "level.demo.title",
+        titleKey: "scene.demo.name",
         length: 1000,
         playerStart: 500,
         entities: [{ id: "e1", type: "dog", x: 500, behavior: { kind: "wander", walkMin: 5, walkMax: 5, pauseMin: 3, pauseMax: 3, continueBias } }],
       },
       SPEED_REGISTRY
     );
-    let state = createInitialState(level, 7, NO_COMPANIONS);
+    let state = createInitialState(scene, 7, NO_COMPANIONS);
     const dirs = [];
     let previousPhase = null;
     for (let i = 0; i < 200; i++) {
@@ -482,7 +482,7 @@ export function runMovementChecks() {
   run("continueBias : 1 -> toujours la même direction", true, neverTurn.length >= 10 && neverTurn.every((dir) => dir === neverTurn[0]));
   function expectBehaviorRejected(behavior) {
     try {
-      parseLevel({ id: "movement-check-bad-bias", titleKey: "level.demo.title", length: 10, playerStart: 5, entities: [{ id: "e1", type: "dog", x: 5, behavior }] }, SPEED_REGISTRY);
+      parseScene({ id: "movement-check-bad-bias", titleKey: "scene.demo.name", length: 10, playerStart: 5, entities: [{ id: "e1", type: "dog", x: 5, behavior }] }, SPEED_REGISTRY);
       return false;
     } catch {
       return true;
@@ -506,10 +506,10 @@ export function runMovementChecks() {
 
   // follow ET goto respectent aussi speed (pas seulement wander) — un
   // compagnon pourrait avoir sa propre vitesse.
-  const speedFollowLevel = parseLevel(
+  const speedFollowScene = parseScene(
     {
       id: "movement-check-speed-follow",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 100,
       playerStart: 50,
       entities: [
@@ -518,15 +518,15 @@ export function runMovementChecks() {
     },
     SPEED_REGISTRY
   );
-  let speedFollowState = createInitialState(speedFollowLevel, 1, NO_COMPANIONS);
+  let speedFollowState = createInitialState(speedFollowScene, 1, NO_COMPANIONS);
   speedFollowState = reduce(speedFollowState, tick(0)); // joueur immobile, follower loin -> avance vers lui
   const speedFollowDelta = getActiveWorld(speedFollowState).entities[0].x - 40;
   run("speed : follow avance de MOVE_STEP × speed (0.5)", true, Math.abs(speedFollowDelta - MOVE_STEP * 0.5) < 1e-9);
 
-  const speedGotoLevel = parseLevel(
+  const speedGotoScene = parseScene(
     {
       id: "movement-check-speed-goto",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 100,
       playerStart: 50,
       entities: [
@@ -536,7 +536,7 @@ export function runMovementChecks() {
     },
     SPEED_REGISTRY
   );
-  let speedGotoState = createInitialState(speedGotoLevel, 1, NO_COMPANIONS);
+  let speedGotoState = createInitialState(speedGotoScene, 1, NO_COMPANIONS);
   speedGotoState = reduce(speedGotoState, tick(0));
   const speedGotoDelta = getActiveWorld(speedGotoState).entities.find((e) => e.id === "walker").x - 10;
   run("speed : goto avance de MOVE_STEP × speed (0.5)", true, Math.abs(speedGotoDelta - MOVE_STEP * 0.5) < 1e-9);
@@ -544,14 +544,14 @@ export function runMovementChecks() {
   // --- Collision joueur/entité bloquante : signal de blocage (blockedBy) ---
 
   const BLOCKING_REGISTRY = { wall: { nameKey: "entity.wall.name", blocksMovement: true } };
-  const blockingLevel = parseLevel(
-    { id: "movement-check-blocking", titleKey: "level.demo.title", length: 10, playerStart: 4, entities: [{ id: "wall-1", type: "wall", x: 5 }] },
+  const blockingScene = parseScene(
+    { id: "movement-check-blocking", titleKey: "scene.demo.name", length: 10, playerStart: 4, entities: [{ id: "wall-1", type: "wall", x: 5 }] },
     BLOCKING_REGISTRY
   );
-  const wallEntity = blockingLevel.entities[0];
+  const wallEntity = blockingScene.entities[0];
   const expectedEdge = wallEntity.x - BODY_RADIUS; // bord du corps côté approche (dir=1)
 
-  let blockState = createInitialState(blockingLevel, undefined, NO_COMPANIONS);
+  let blockState = createInitialState(blockingScene, undefined, NO_COMPANIONS);
   for (let i = 0; i < 20; i++) {
     blockState = reduce(blockState, tick(1));
   }
@@ -569,16 +569,16 @@ export function runMovementChecks() {
   // attendue en dur : seule façon d'obtenir une égalité exacte en flottant
   // sans dépendre du nombre de ticks nécessaires pour atteindre un bord.
   const NONBLOCKING_REGISTRY = { deco: { nameKey: "entity.deco.name" } };
-  const passThroughLevel = parseLevel(
-    { id: "movement-check-passthrough", titleKey: "level.demo.title", length: 10, playerStart: 4, entities: [{ id: "deco-1", type: "deco", x: 5 }] },
+  const passThroughScene = parseScene(
+    { id: "movement-check-passthrough", titleKey: "scene.demo.name", length: 10, playerStart: 4, entities: [{ id: "deco-1", type: "deco", x: 5 }] },
     NONBLOCKING_REGISTRY
   );
-  const emptyLevel = parseLevel(
-    { id: "movement-check-passthrough-empty", titleKey: "level.demo.title", length: 10, playerStart: 4, entities: [] },
+  const emptyScene = parseScene(
+    { id: "movement-check-passthrough-empty", titleKey: "scene.demo.name", length: 10, playerStart: 4, entities: [] },
     NONBLOCKING_REGISTRY
   );
-  let passState = createInitialState(passThroughLevel, undefined, NO_COMPANIONS);
-  let unobstructedState = createInitialState(emptyLevel, undefined, NO_COMPANIONS);
+  let passState = createInitialState(passThroughScene, undefined, NO_COMPANIONS);
+  let unobstructedState = createInitialState(emptyScene, undefined, NO_COMPANIONS);
   for (let i = 0; i < 20; i++) {
     passState = reduce(passState, tick(1));
     unobstructedState = reduce(unobstructedState, tick(1));
@@ -586,30 +586,30 @@ export function runMovementChecks() {
   run("collision : entité non bloquante ne freine jamais le joueur", unobstructedState.player.x, passState.player.x);
   run("collision : entité non bloquante ne signale jamais de blocage", null, passState.player.blockedBy);
 
-  // Surcharge d'instance blocksMovement (level JSON), lue AVANT le défaut du
+  // Surcharge d'instance blocksMovement (JSON de scène), lue AVANT le défaut du
   // type — cascade identique à labelKey/descriptionKey.
-  const overrideBlockLevel = parseLevel(
-    { id: "movement-check-override-block", titleKey: "level.demo.title", length: 10, playerStart: 4, entities: [{ id: "wall-2", type: "deco", x: 5, blocksMovement: true }] },
+  const overrideBlockScene = parseScene(
+    { id: "movement-check-override-block", titleKey: "scene.demo.name", length: 10, playerStart: 4, entities: [{ id: "wall-2", type: "deco", x: 5, blocksMovement: true }] },
     NONBLOCKING_REGISTRY // type "deco" a blocksMovement absent (-> false par défaut)
   );
-  run("collision : surcharge d'instance blocksMovement:true respectée", true, overrideBlockLevel.entities[0].blocksMovement);
-  let overrideBlockState = createInitialState(overrideBlockLevel, undefined, NO_COMPANIONS);
+  run("collision : surcharge d'instance blocksMovement:true respectée", true, overrideBlockScene.entities[0].blocksMovement);
+  let overrideBlockState = createInitialState(overrideBlockScene, undefined, NO_COMPANIONS);
   for (let i = 0; i < 20; i++) {
     overrideBlockState = reduce(overrideBlockState, tick(1));
   }
   run("collision : entité surchargée bloquante freine bien le joueur", "wall-2", overrideBlockState.player.blockedBy);
 
-  const overrideUnblockLevel = parseLevel(
-    { id: "movement-check-override-unblock", titleKey: "level.demo.title", length: 10, playerStart: 4, entities: [{ id: "wall-3", type: "wall", x: 5, blocksMovement: false }] },
+  const overrideUnblockScene = parseScene(
+    { id: "movement-check-override-unblock", titleKey: "scene.demo.name", length: 10, playerStart: 4, entities: [{ id: "wall-3", type: "wall", x: 5, blocksMovement: false }] },
     BLOCKING_REGISTRY // type "wall" a blocksMovement:true par défaut
   );
-  run("collision : surcharge d'instance blocksMovement:false respectée", false, overrideUnblockLevel.entities[0].blocksMovement);
+  run("collision : surcharge d'instance blocksMovement:false respectée", false, overrideUnblockScene.entities[0].blocksMovement);
 
   // blocksMovement présent mais invalide (pas un booléen) -> rejeté.
   let invalidBlockRejected = false;
   try {
-    parseLevel(
-      { id: "movement-check-invalid-block", titleKey: "level.demo.title", length: 10, playerStart: 4, entities: [{ id: "wall-4", type: "wall", x: 5, blocksMovement: "oui" }] },
+    parseScene(
+      { id: "movement-check-invalid-block", titleKey: "scene.demo.name", length: 10, playerStart: 4, entities: [{ id: "wall-4", type: "wall", x: 5, blocksMovement: "oui" }] },
       BLOCKING_REGISTRY
     );
   } catch {
@@ -619,7 +619,7 @@ export function runMovementChecks() {
 
   // --- Interaction niveau 0 : capacités observable/interactable ---
   // Cascade IDENTIQUE à blocksMovement (instance -> type -> défaut false),
-  // voir core/level.js. Le filtrage par verbe et la désambiguïsation restent
+  // voir core/scene.js. Le filtrage par verbe et la désambiguïsation restent
   // côté vue (view/audio/city-scene.js, view/interaction.js), hors de portée
   // d'un check terminal — seule la RÉSOLUTION de ces deux champs est
   // vérifiable ici.
@@ -630,10 +630,10 @@ export function runMovementChecks() {
     plain: { nameKey: "entity.dog.name" }, // ni l'un ni l'autre déclaré -> défaut false/false
   };
 
-  const interactionLevel = parseLevel(
+  const interactionScene = parseScene(
     {
       id: "movement-check-interaction",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 20,
       playerStart: 0,
       entities: [
@@ -647,7 +647,7 @@ export function runMovementChecks() {
     INTERACTION_REGISTRY
   );
   function interactionEntity(id) {
-    return interactionLevel.entities.find((e) => e.id === id);
+    return interactionScene.entities.find((e) => e.id === id);
   }
 
   run("interaction : défaut du type — observable hérité", true, interactionEntity("e-describable").observable);
@@ -670,8 +670,8 @@ export function runMovementChecks() {
   function expectInteractionRejected(field, value) {
     let rejected = false;
     try {
-      parseLevel(
-        { id: "movement-check-interaction-invalid", titleKey: "level.demo.title", length: 10, playerStart: 0, entities: [{ id: "bad", type: "plain", x: 5, [field]: value }] },
+      parseScene(
+        { id: "movement-check-interaction-invalid", titleKey: "scene.demo.name", length: 10, playerStart: 0, entities: [{ id: "bad", type: "plain", x: 5, [field]: value }] },
         INTERACTION_REGISTRY
       );
     } catch {
@@ -692,10 +692,10 @@ export function runMovementChecks() {
     winged: { nameKey: "entity.bird.name", isFlying: true },
     grounded: { nameKey: "entity.dog.name" }, // non déclaré -> défaut false
   };
-  const flyingLevel = parseLevel(
+  const flyingScene = parseScene(
     {
       id: "movement-check-flying",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 20,
       playerStart: 0,
       entities: [
@@ -708,7 +708,7 @@ export function runMovementChecks() {
     FLYING_REGISTRY
   );
   function flyingEntity(id) {
-    return flyingLevel.entities.find((e) => e.id === id);
+    return flyingScene.entities.find((e) => e.id === id);
   }
   run("isFlying : défaut du type — hérité (true)", true, flyingEntity("e-winged").isFlying);
   run("isFlying : non déclaré -> false par défaut", false, flyingEntity("e-grounded").isFlying);
@@ -717,8 +717,8 @@ export function runMovementChecks() {
 
   let invalidFlyingRejected = false;
   try {
-    parseLevel(
-      { id: "movement-check-flying-invalid", titleKey: "level.demo.title", length: 10, playerStart: 0, entities: [{ id: "bad", type: "grounded", x: 5, isFlying: "oui" }] },
+    parseScene(
+      { id: "movement-check-flying-invalid", titleKey: "scene.demo.name", length: 10, playerStart: 0, entities: [{ id: "bad", type: "grounded", x: 5, isFlying: "oui" }] },
       FLYING_REGISTRY
     );
   } catch {
@@ -740,10 +740,10 @@ export function runMovementChecks() {
     },
     noSounds: { nameKey: "entity.dog.name" }, // archétype sans sounds du tout
   };
-  const soundsLevel = parseLevel(
+  const soundsScene = parseScene(
     {
       id: "movement-check-sounds",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 20,
       playerStart: 0,
       entities: [
@@ -759,7 +759,7 @@ export function runMovementChecks() {
     SOUNDS_REGISTRY
   );
   function soundsEntity(id) {
-    return soundsLevel.entities.find((e) => e.id === id);
+    return soundsScene.entities.find((e) => e.id === id);
   }
   run("sounds : instance sans déclaration -> hérite tout de l'archétype", true, JSON.stringify(soundsEntity("e-inherit").sounds) === JSON.stringify(SOUNDS_REGISTRY.withSounds.sounds));
   run("sounds : fusion — champ surchargé", 0.8, soundsEntity("e-merge-field").sounds.beacon.gain);
@@ -776,8 +776,8 @@ export function runMovementChecks() {
 
   let invalidSoundsRejected = false;
   try {
-    parseLevel(
-      { id: "movement-check-sounds-invalid", titleKey: "level.demo.title", length: 10, playerStart: 0, entities: [{ id: "bad", type: "withSounds", x: 5, sounds: "oui" }] },
+    parseScene(
+      { id: "movement-check-sounds-invalid", titleKey: "scene.demo.name", length: 10, playerStart: 0, entities: [{ id: "bad", type: "withSounds", x: 5, sounds: "oui" }] },
       SOUNDS_REGISTRY
     );
   } catch {
@@ -795,10 +795,10 @@ export function runMovementChecks() {
     withDefault: { nameKey: "entity.dog.name", interactable: true, action: { kind: "pickup", amount: 5 } },
     plain: { nameKey: "entity.dog.name" },
   };
-  const actionLevel = parseLevel(
+  const actionScene = parseScene(
     {
       id: "movement-check-action",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 20,
       playerStart: 0,
       entities: [
@@ -811,7 +811,7 @@ export function runMovementChecks() {
     ACTION_REGISTRY
   );
   function actionEntity(id) {
-    return actionLevel.entities.find((e) => e.id === id);
+    return actionScene.entities.find((e) => e.id === id);
   }
   run("action : défaut du type hérité", JSON.stringify({ kind: "pickup", amount: 5 }), JSON.stringify(actionEntity("e-default").action));
   run(
@@ -837,10 +837,10 @@ export function runMovementChecks() {
   // Deux entités impassables placées en chevauchement à leur spawn -> une
   // passe suffit à les séparer, et l'état est stable au tick suivant (si
   // rien d'autre ne bouge, rejouer la résolution ne change plus rien).
-  const overlapLevel = parseLevel(
+  const overlapScene = parseScene(
     {
       id: "movement-check-overlap",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 10,
       playerStart: 0,
       entities: [
@@ -850,7 +850,7 @@ export function runMovementChecks() {
     },
     OVERLAP_REGISTRY
   );
-  let overlapState = createInitialState(overlapLevel, undefined, NO_COMPANIONS);
+  let overlapState = createInitialState(overlapScene, undefined, NO_COMPANIONS);
   overlapState = reduce(overlapState, tick(0));
   const [entA, entB] = getActiveWorld(overlapState).entities;
   run("chevauchement : deux entités impassables séparées en une passe", true, Math.abs(entB.x - entA.x) >= 2 * BODY_RADIUS);
@@ -867,11 +867,11 @@ export function runMovementChecks() {
   // pas (position EXACTEMENT inchangée : le poids du joueur dans la
   // séparation est 0, donc son déplacement calculé est exactement 0, sans
   // aucun risque d'arrondi flottant).
-  const playerInsideLevel = parseLevel(
-    { id: "movement-check-overlap-player", titleKey: "level.demo.title", length: 10, playerStart: 5, entities: [{ id: "wall-p", type: "wall", x: 5.1 }] },
+  const playerInsideScene = parseScene(
+    { id: "movement-check-overlap-player", titleKey: "scene.demo.name", length: 10, playerStart: 5, entities: [{ id: "wall-p", type: "wall", x: 5.1 }] },
     OVERLAP_REGISTRY
   );
-  let playerInsideState = createInitialState(playerInsideLevel, undefined, NO_COMPANIONS);
+  let playerInsideState = createInitialState(playerInsideScene, undefined, NO_COMPANIONS);
   playerInsideState = reduce(playerInsideState, tick(0));
   run("chevauchement : joueur inchangé quand l'entité a la marge pour s'écarter", 5, playerInsideState.player.x);
   run("chevauchement : entité écartée, plus de recouvrement avec le joueur", true, Math.abs(getActiveWorld(playerInsideState).entities[0].x - 5) >= BODY_RADIUS);
@@ -881,11 +881,11 @@ export function runMovementChecks() {
   // pour s'écarter (clampée à 0, valeur EXACTE, aucun risque d'arrondi) ;
   // en dernier recours, c'est le joueur qui cède, du minimum, avec un
   // signal (jamais une téléportation silencieuse).
-  const forcedRoomLevel = parseLevel(
-    { id: "movement-check-overlap-forced", titleKey: "level.demo.title", length: 10, playerStart: 0.05, entities: [{ id: "wall-forced", type: "wall", x: 0.02 }] },
+  const forcedRoomScene = parseScene(
+    { id: "movement-check-overlap-forced", titleKey: "scene.demo.name", length: 10, playerStart: 0.05, entities: [{ id: "wall-forced", type: "wall", x: 0.02 }] },
     OVERLAP_REGISTRY
   );
-  let forcedState = createInitialState(forcedRoomLevel, undefined, NO_COMPANIONS);
+  let forcedState = createInitialState(forcedRoomScene, undefined, NO_COMPANIONS);
   forcedState = reduce(forcedState, tick(0));
   run("chevauchement : entité pinée au bord quand il n'y a plus de marge", 0, getActiveWorld(forcedState).entities[0].x);
   run("chevauchement : joueur forcé de bouger signale l'entité responsable", "wall-forced", forcedState.player.pushedBy);
@@ -897,17 +897,17 @@ export function runMovementChecks() {
   );
 
   // Cas normal (pas de chevauchement) : la résolution ne bouge rien.
-  const noOverlapLevel = parseLevel(
-    { id: "movement-check-no-overlap", titleKey: "level.demo.title", length: 10, playerStart: 2, entities: [{ id: "wall-far", type: "wall", x: 8 }] },
+  const noOverlapScene = parseScene(
+    { id: "movement-check-no-overlap", titleKey: "scene.demo.name", length: 10, playerStart: 2, entities: [{ id: "wall-far", type: "wall", x: 8 }] },
     OVERLAP_REGISTRY
   );
-  let noOverlapState = createInitialState(noOverlapLevel, undefined, NO_COMPANIONS);
+  let noOverlapState = createInitialState(noOverlapScene, undefined, NO_COMPANIONS);
   noOverlapState = reduce(noOverlapState, tick(0));
   run("chevauchement : cas normal, aucun déplacement parasite (joueur)", 2, noOverlapState.player.x);
   run("chevauchement : cas normal, aucun déplacement parasite (entité)", 8, getActiveWorld(noOverlapState).entities[0].x);
   run("chevauchement : cas normal, pas de signal pushedBy", null, noOverlapState.player.pushedBy);
 
-  // Validation au chargement : NON bloquant (parseLevel ne lève jamais pour
+  // Validation au chargement : NON bloquant (parseScene ne lève jamais pour
   // un chevauchement), mais averti clairement (console.warn).
   let overlapWarned = false;
   const originalWarn = console.warn;
@@ -917,10 +917,10 @@ export function runMovementChecks() {
   };
   let overlapLoadThrew = false;
   try {
-    parseLevel(
+    parseScene(
       {
         id: "movement-check-overlap-load",
-        titleKey: "level.demo.title",
+        titleKey: "scene.demo.name",
         length: 10,
         playerStart: 5,
         entities: [
@@ -934,18 +934,18 @@ export function runMovementChecks() {
     overlapLoadThrew = true;
   }
   console.warn = originalWarn;
-  run("chevauchement : parseLevel reste non bloquant au chargement", false, overlapLoadThrew);
-  run("chevauchement : parseLevel avertit clairement au chargement", true, overlapWarned);
+  run("chevauchement : parseScene reste non bloquant au chargement", false, overlapLoadThrew);
+  run("chevauchement : parseScene avertit clairement au chargement", true, overlapWarned);
 
   // --- Pipeline core/physics/ (refacto structurel) : intentions (phase 1,
-  // comportement) + physique (phase 2) combinées dans le même tick, sur un
-  // niveau mêlant une entité wander ET une entité bloquante — le
+  // comportement) + physique (phase 2) combinées dans le même tick, sur une
+  // scène mêlant une entité wander ET une entité bloquante — le
   // déménagement en modules ne change aucun résultat, toujours déterministe.
   const PIPELINE_REGISTRY = { dog: { nameKey: "entity.dog.name" }, wall: { nameKey: "entity.wall.name", blocksMovement: true } };
-  const pipelineLevel = parseLevel(
+  const pipelineScene = parseScene(
     {
       id: "movement-check-pipeline",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 20,
       playerStart: 0,
       entities: [
@@ -956,7 +956,7 @@ export function runMovementChecks() {
     PIPELINE_REGISTRY
   );
   function runPipeline() {
-    let s = createInitialState(pipelineLevel, 123, NO_COMPANIONS);
+    let s = createInitialState(pipelineScene, 123, NO_COMPANIONS);
     for (let i = 0; i < 60; i++) s = reduce(s, tick(1));
     return { playerX: s.player.x, blockedBy: s.player.blockedBy, dogX: getActiveWorld(s).entities[0].x };
   }
@@ -979,18 +979,18 @@ export function runMovementChecks() {
   // --- Partie multi-mondes (modèle "Animal Crossing") ---
 
   const WORLD_A_REGISTRY = { dog: { nameKey: "entity.dog.name" } };
-  const worldA = parseLevel(
+  const worldA = parseScene(
     {
       id: "movement-check-world-a",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 20,
       playerStart: 2,
       entities: [{ id: "npc-a", type: "dog", x: 10, behavior: { kind: "wander"} }],
     },
     WORLD_A_REGISTRY
   );
-  const worldB = parseLevel(
-    { id: "movement-check-world-b", titleKey: "level.demo.title", length: 15, playerStart: 3, entities: [] },
+  const worldB = parseScene(
+    { id: "movement-check-world-b", titleKey: "scene.demo.name", length: 15, playerStart: 3, entities: [] },
     WORLD_A_REGISTRY
   );
 
@@ -1008,10 +1008,10 @@ export function runMovementChecks() {
   // mais le CONTRAT de persistance doit déjà tenir).
   partie = { ...partie, player: { ...partie.player, testMarker: "conserve-moi" } };
 
-  // Transition A -> B : B jamais visité, fourni via freshLevel.
+  // Transition A -> B : B jamais visité, fourni via freshScene.
   partie = travelToWorld(partie, worldB.id, worldB);
   run("partie : transition active bien la cible", worldB.id, partie.activeWorldId);
-  run("partie : joueur replacé à playerStart du lieu cible", worldB.playerStart, partie.player.x);
+  run("partie : joueur replacé à playerStart du monde cible", worldB.playerStart, partie.player.x);
   run("partie : état du joueur conservé à travers la transition", "conserve-moi", partie.player.testMarker);
   run("partie : blockedBy réinitialisé à l'arrivée", null, partie.player.blockedBy);
   run("partie : le monde quitté (A) reste dans worlds, rangé", true, Boolean(partie.worlds[worldA.id]));
@@ -1025,11 +1025,11 @@ export function runMovementChecks() {
   for (let i = 0; i < 30; i++) partie = reduce(partie, tick(1));
   run("partie : un monde rangé ne bouge pas pendant qu'il est inactif", npcXParked, partie.worlds[worldA.id].entities[0].x);
 
-  // Retour A -> re-visite : B est déjà connu (pas de freshLevel nécessaire),
+  // Retour A -> re-visite : B est déjà connu (pas de freshScene nécessaire),
   // A ressort tel quel (PNJ où il avait été laissé, PAS réinitialisé à x=10).
   partie = travelToWorld(partie, worldA.id);
   run("partie : re-visite ressort l'état sauvegardé (PNJ non réinitialisé)", npcXParked, getActiveWorld(partie).entities[0].x);
-  run("partie : joueur replacé à playerStart du lieu re-visité", worldA.playerStart, partie.player.x);
+  run("partie : joueur replacé à playerStart du monde re-visité", worldA.playerStart, partie.player.x);
   run("partie : état du joueur toujours conservé après un aller-retour", "conserve-moi", partie.player.testMarker);
 
   // Cible ni visitée ni fournie -> échec clair, pas d'état à moitié construit.
@@ -1039,7 +1039,7 @@ export function runMovementChecks() {
   } catch {
     travelToUnknownRejected = true;
   }
-  run("partie : transition vers un monde inconnu sans niveau fourni est rejetée", true, travelToUnknownRejected);
+  run("partie : transition vers un monde inconnu sans scène fournie est rejetée", true, travelToUnknownRejected);
 
   // --- travelToWorld : x/side EXPLICITES (voir core/effects.js/"teleport")
   // — sans eux, comportement HISTORIQUE ci-dessus (playerStart, "recto").
@@ -1070,13 +1070,13 @@ export function runMovementChecks() {
   run("placePlayer : x bordé dans [0, longueur]", worldA.length, placePlayer(beforePlace, 9999, "recto").player.x);
 
   // --- Scène à deux faces (recto/verso), étape 1/2 (voir CLAUDE.md/
-  // "RECTO/VERSO", level/schema.md, core/state.js/isTwoSided) ---
+  // "RECTO/VERSO", doc/scene-format.md, core/state.js/isTwoSided) ---
 
   // Validation au chargement : recto/verso requis ENSEMBLE, jamais un seul
   // champ de face à la racine en même temps.
-  const twoFacedRawLevel = {
+  const twoFacedRawScene = {
     id: "movement-check-twoface",
-    titleKey: "level.demo.title",
+    titleKey: "scene.demo.name",
     length: 10,
     playerStart: 1,
     recto: { entities: [{ id: "recto-dog", type: "dog", x: 3, behavior: { kind: "wander" } }] },
@@ -1085,7 +1085,7 @@ export function runMovementChecks() {
 
   let missingVersoRejected = false;
   try {
-    parseLevel({ ...twoFacedRawLevel, verso: undefined }, WORLD_A_REGISTRY);
+    parseScene({ ...twoFacedRawScene, verso: undefined }, WORLD_A_REGISTRY);
   } catch {
     missingVersoRejected = true;
   }
@@ -1093,28 +1093,28 @@ export function runMovementChecks() {
 
   let leakedFaceFieldRejected = false;
   try {
-    parseLevel({ ...twoFacedRawLevel, entities: [] }, WORLD_A_REGISTRY);
+    parseScene({ ...twoFacedRawScene, entities: [] }, WORLD_A_REGISTRY);
   } catch {
     leakedFaceFieldRejected = true;
   }
   run("deux faces : un champ de face (entities) à la racine est rejeté", true, leakedFaceFieldRejected);
 
-  const twoFacedLevel = parseLevel(twoFacedRawLevel, WORLD_A_REGISTRY);
-  run("deux faces : parseLevel construit recto ET verso", true, Boolean(twoFacedLevel.recto) && Boolean(twoFacedLevel.verso));
-  run("deux faces : aucun `entities` à la racine du niveau parsé", undefined, twoFacedLevel.entities);
-  run("deux faces : recto porte ses propres entités", "recto-dog", twoFacedLevel.recto.entities[0].id);
-  run("deux faces : verso porte ses propres entités", "verso-dog", twoFacedLevel.verso.entities[0].id);
+  const twoFacedScene = parseScene(twoFacedRawScene, WORLD_A_REGISTRY);
+  run("deux faces : parseScene construit recto ET verso", true, Boolean(twoFacedScene.recto) && Boolean(twoFacedScene.verso));
+  run("deux faces : aucun `entities` à la racine de la scène parsée", undefined, twoFacedScene.entities);
+  run("deux faces : recto porte ses propres entités", "recto-dog", twoFacedScene.recto.entities[0].id);
+  run("deux faces : verso porte ses propres entités", "verso-dog", twoFacedScene.verso.entities[0].id);
 
-  // Rétrocompat stricte : une scène simple (déjà parsée plus haut, `level`)
+  // Rétrocompat stricte : une scène simple (déjà parsée plus haut, `scene`)
   // ne porte jamais recto/verso.
-  run("scène simple : jamais de recto/verso (rétrocompat)", undefined, level.recto);
+  run("scène simple : jamais de recto/verso (rétrocompat)", undefined, scene.recto);
 
   // Construction : recto/verso ont chacun leur PROPRE rngState (graines
   // distinctes, voir core/state.js/createFaceState) — jamais la même suite
   // de tirages pour les deux faces d'un même monde.
-  let twoFaceSession = createInitialState(twoFacedLevel, 99, NO_COMPANIONS);
+  let twoFaceSession = createInitialState(twoFacedScene, 99, NO_COMPANIONS);
   run("deux faces : player.side par défaut 'recto'", "recto", twoFaceSession.player.side);
-  const twoFaceWorldId = twoFacedLevel.id;
+  const twoFaceWorldId = twoFacedScene.id;
   const twoFaceWorldAtStart = twoFaceSession.worlds[twoFaceWorldId];
   run(
     "deux faces : le monde créé porte recto ET verso",
@@ -1180,10 +1180,10 @@ export function runMovementChecks() {
 
   // Collision : un bloqueur de l'AUTRE face ne doit JAMAIS arrêter le
   // joueur — deux espaces disjoints qui partagent seulement l'axe x.
-  const isolationBlockOnRecto = parseLevel(
+  const isolationBlockOnRecto = parseScene(
     {
       id: "movement-check-isolation-block-recto",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 12,
       playerStart: 1,
       recto: { entities: [{ id: "recto-blocker", type: "blocker", x: 6 }] },
@@ -1199,10 +1199,10 @@ export function runMovementChecks() {
   // CONTRÔLE : le MÊME bloqueur, sur la face du joueur cette fois — DOIT
   // bloquer normalement (prouve que l'absence de blocage ci-dessus relève
   // bien de l'isolation, pas d'une collision cassée en général).
-  const isolationBlockOnVerso = parseLevel(
+  const isolationBlockOnVerso = parseScene(
     {
       id: "movement-check-isolation-block-verso",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 12,
       playerStart: 1,
       recto: { entities: [] },
@@ -1218,10 +1218,10 @@ export function runMovementChecks() {
   // Ciblage de comportement (goto) : ne résout JAMAIS une cible de l'AUTRE
   // face, y compris "player" quand le joueur n'y est pas — voir
   // core/reduce.js, getTargetPosition scopé par face.
-  const targetingLevel = parseLevel(
+  const targetingScene = parseScene(
     {
       id: "movement-check-isolation-targeting",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 12,
       playerStart: 6,
       recto: { entities: [{ id: "recto-seeker", type: "npc", x: 2, behavior: { kind: "goto", targetId: "verso-target" } }] },
@@ -1234,28 +1234,28 @@ export function runMovementChecks() {
     },
     ISOLATION_REGISTRY
   );
-  let targetingSession = createInitialState(targetingLevel, 1, NO_COMPANIONS);
+  let targetingSession = createInitialState(targetingScene, 1, NO_COMPANIONS);
   for (let i = 0; i < 40; i++) targetingSession = reduce(targetingSession, tick(0));
   run(
     "isolation : un goto de la face courante ne peut jamais cibler une entité de l'autre face",
     2,
-    targetingSession.worlds[targetingLevel.id].recto.entities[0].x
+    targetingSession.worlds[targetingScene.id].recto.entities[0].x
   );
   run(
     "isolation : un goto de l'autre face ne peut jamais cibler le joueur (absent de cette face)",
     2,
-    targetingSession.worlds[targetingLevel.id].verso.entities.find((e) => e.id === "verso-seeker").x
+    targetingSession.worlds[targetingScene.id].verso.entities.find((e) => e.id === "verso-seeker").x
   );
 
   // arrivalX est une donnée de CONTENU, jamais validée en bornes au
-  // chargement (voir core/level.js/parseEntity, action) — clampée à
+  // chargement (voir core/scene.js/parseEntity, action) — clampée à
   // l'exécution par switchSide, jamais un joueur hors carte.
-  const clampedSwitch = switchSide(createInitialState(twoFacedLevel, 1, NO_COMPANIONS), 9999);
-  run("switchSide : arrivalX hors bornes est clampé au bord droit", twoFacedLevel.length, clampedSwitch.player.x);
+  const clampedSwitch = switchSide(createInitialState(twoFacedScene, 1, NO_COMPANIONS), 9999);
+  run("switchSide : arrivalX hors bornes est clampé au bord droit", twoFacedScene.length, clampedSwitch.player.x);
 
   // Éphémères : spawnEphemeral/removeEntity/markConsumed sont scopés à la
   // face COURANTE (session.player.side), jamais l'autre.
-  let twoFaceEphemeralSession = createInitialState(twoFacedLevel, 3, NO_COMPANIONS);
+  let twoFaceEphemeralSession = createInitialState(twoFacedScene, 3, NO_COMPANIONS);
   const TWO_FACE_EPHEMERAL_SPEC = { type: "dog", labelKey: "entity.dog.name" };
   twoFaceEphemeralSession = spawnEphemeral(twoFaceEphemeralSession, TWO_FACE_EPHEMERAL_SPEC, 4);
   run(
@@ -1269,7 +1269,7 @@ export function runMovementChecks() {
     twoFaceEphemeralSession.worlds[twoFaceWorldId].verso.entities.some((e) => e.ephemeral)
   );
 
-  // travelToWorld QUITTE le lieu (pas juste la face) : purge les éphémères
+  // travelToWorld QUITTE le monde (pas juste la face) : purge les éphémères
   // des DEUX faces, remet player.side à "recto" (comme playerStart).
   twoFaceEphemeralSession = switchSide(twoFaceEphemeralSession, 5);
   twoFaceEphemeralSession = spawnEphemeral(twoFaceEphemeralSession, TWO_FACE_EPHEMERAL_SPEC, 5);
@@ -1279,8 +1279,8 @@ export function runMovementChecks() {
     twoFaceEphemeralSession.worlds[twoFaceWorldId].recto.entities.some((e) => e.ephemeral) &&
       twoFaceEphemeralSession.worlds[twoFaceWorldId].verso.entities.some((e) => e.ephemeral)
   );
-  const twoFaceOtherWorld = parseLevel(
-    { id: "movement-check-twoface-elsewhere", titleKey: "level.demo.title", length: 5, playerStart: 0, entities: [] },
+  const twoFaceOtherWorld = parseScene(
+    { id: "movement-check-twoface-elsewhere", titleKey: "scene.demo.name", length: 5, playerStart: 0, entities: [] },
     WORLD_A_REGISTRY
   );
   const afterLeavingTwoFace = travelToWorld(twoFaceEphemeralSession, twoFaceOtherWorld.id, twoFaceOtherWorld);
@@ -1323,14 +1323,14 @@ export function runMovementChecks() {
   // voir core/time.md. advanceTime ne lit jamais l'horloge réelle : chaque
   // scénario ci-dessous injecte un delta EXPLICITE, jamais mesuré.
 
-  const timeLevel = parseLevel(
-    { id: "movement-check-time", titleKey: "level.demo.title", length: 10, playerStart: 0, entities: [] },
+  const timeScene = parseScene(
+    { id: "movement-check-time", titleKey: "scene.demo.name", length: 10, playerStart: 0, entities: [] },
     EMPTY_REGISTRY
   );
 
   // Origine : jour 1, mois 1 (saison 0), année 1, à l'heure de départ
   // configurée (config/time-values.js/startHour) — jamais minuit.
-  let timeState = createInitialState(timeLevel, undefined, NO_COMPANIONS);
+  let timeState = createInitialState(timeScene, undefined, NO_COMPANIONS);
   run("horloge : session.time démarre à INITIAL_TIME", INITIAL_TIME, timeState.time);
   run("horloge : heure de départ = startHour configuré", TIME_CONFIG.startHour, hourOfDay(timeState.time));
   run("horloge : minute de départ = 0", 0, minuteOfHour(timeState.time));
@@ -1360,7 +1360,7 @@ export function runMovementChecks() {
   // Aucune horloge implicite dans le core : de nombreux TICK ne font JAMAIS
   // avancer .time — seul advanceTime() le fait (voir CLAUDE.md, "le core
   // n'a ni horloge ni clavier").
-  let noClockState = createInitialState(timeLevel, undefined, NO_COMPANIONS);
+  let noClockState = createInitialState(timeScene, undefined, NO_COMPANIONS);
   for (let i = 0; i < 500; i++) noClockState = reduce(noClockState, tick(1));
   run("horloge : reduce()/TICK ne fait jamais avancer le temps", INITIAL_TIME, noClockState.time);
 
@@ -1693,7 +1693,7 @@ export function runMovementChecks() {
 
   // "Collectible persistant" (voir entities/model.md) : effet post-activation
   // "devient dormant" — une règle { when: { type: "consumed" }, present:
-  // false } sur l'INSTANCE (voir level/demo2.json, "crate-warehouse").
+  // false } sur l'INSTANCE (voir scenes/demo2.json, "crate-warehouse").
   // ATTENTION (même "asymétrie documentée" que ci-dessus) : CETTE SEULE
   // règle ne suffit PAS à rester présente avant consommation — sans règle
   // couvrant explicitement ce cas, isPresent retombe sur dormante par
@@ -1739,23 +1739,23 @@ export function runMovementChecks() {
 
   // Entité BLOQUANTE mais dormante le jour (règle "présente la nuit") : le
   // jour, elle ne doit RIEN bloquer ("comme si absente").
-  const presenceBlockLevel = parseLevel(
+  const presenceBlockScene = parseScene(
     {
       id: "movement-check-presence-block",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 10,
       playerStart: 0,
       entities: [{ id: "ghost-wall", type: "wall", x: 5, presence: NIGHT_ONLY }],
     },
     PRESENCE_REGISTRY
   );
-  let dayBlockState = createInitialState(presenceBlockLevel, undefined, NO_COMPANIONS);
+  let dayBlockState = createInitialState(presenceBlockScene, undefined, NO_COMPANIONS);
   for (let i = 0; i < 300; i++) dayBlockState = reduce(dayBlockState, tick(1));
   run("presence : entité bloquante mais dormante (jour) laisse le joueur passer", true, dayBlockState.player.x > 5 + BODY_RADIUS);
   run("presence : entité bloquante dormante ne signale jamais de blocage", null, dayBlockState.player.blockedBy);
 
   // La MÊME entité, la nuit (advanceTime jusqu'à 22h) : redevient bloquante.
-  let nightBlockState = createInitialState(presenceBlockLevel, undefined, NO_COMPANIONS);
+  let nightBlockState = createInitialState(presenceBlockScene, undefined, NO_COMPANIONS);
   nightBlockState = advanceTime(nightBlockState, 14 * 60); // 8h (INITIAL_TIME) -> 22h
   for (let i = 0; i < 300; i++) nightBlockState = reduce(nightBlockState, tick(1));
   run("presence : entité bloquante présente (nuit) bloque bien le joueur", "ghost-wall", nightBlockState.player.blockedBy);
@@ -1763,10 +1763,10 @@ export function runMovementChecks() {
 
   // Entité DORMANTE (jour) avec comportement wander : pas tickée du tout —
   // ni mouvement, ni tirage PRNG.
-  const dormantWanderLevel = parseLevel(
+  const dormantWanderScene = parseScene(
     {
       id: "movement-check-presence-wander",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 20,
       playerStart: 0,
       entities: [
@@ -1775,7 +1775,7 @@ export function runMovementChecks() {
     },
     PRESENCE_REGISTRY
   );
-  let dormantWanderState = createInitialState(dormantWanderLevel, 42, NO_COMPANIONS);
+  let dormantWanderState = createInitialState(dormantWanderScene, 42, NO_COMPANIONS);
   const dormantStartX = getActiveWorld(dormantWanderState).entities[0].x;
   for (let i = 0; i < 100; i++) dormantWanderState = reduce(dormantWanderState, tick(0));
   run(
@@ -1793,21 +1793,21 @@ export function runMovementChecks() {
   // avec UNE SEULE entité dormante doit être IDENTIQUE à celui d'un monde
   // SANS AUCUNE entité — comparaison exacte, sans dépendre de la mécanique
   // interne du PRNG.
-  const emptyPresenceLevel = parseLevel(
-    { id: "movement-check-presence-empty", titleKey: "level.demo.title", length: 20, playerStart: 0, entities: [] },
+  const emptyPresenceScene = parseScene(
+    { id: "movement-check-presence-empty", titleKey: "scene.demo.name", length: 20, playerStart: 0, entities: [] },
     PRESENCE_REGISTRY
   );
-  let emptyPresenceState = createInitialState(emptyPresenceLevel, 42, NO_COMPANIONS);
+  let emptyPresenceState = createInitialState(emptyPresenceScene, 42, NO_COMPANIONS);
   for (let i = 0; i < 100; i++) emptyPresenceState = reduce(emptyPresenceState, tick(0));
   run(
     "presence : entité dormante ne consomme aucun tirage PRNG (rngState = monde vide)",
-    emptyPresenceState.worlds[emptyPresenceLevel.id].rngState,
-    dormantWanderState.worlds[dormantWanderLevel.id].rngState
+    emptyPresenceState.worlds[emptyPresenceScene.id].rngState,
+    dormantWanderState.worlds[dormantWanderScene.id].rngState
   );
 
   // La MÊME entité, la nuit : présente ET réellement tickée (comportement
   // actif, position qui évolue).
-  let awakeWanderState = createInitialState(dormantWanderLevel, 42, NO_COMPANIONS);
+  let awakeWanderState = createInitialState(dormantWanderScene, 42, NO_COMPANIONS);
   awakeWanderState = advanceTime(awakeWanderState, 14 * 60); // -> nuit
   for (let i = 0; i < 100; i++) awakeWanderState = reduce(awakeWanderState, tick(0));
   run("presence : entité présente (nuit) porte present:true", true, getActiveWorld(awakeWanderState).entities[0].present);
@@ -1819,8 +1819,8 @@ export function runMovementChecks() {
 
   // Entité SANS règle de présence : jamais de champ .present ajouté à son
   // état — comportement d'avant ce système STRICTEMENT inchangé (réutilise
-  // wanderLevel, déjà défini plus haut, sans presence).
-  const noPresenceState = reduce(createInitialState(wanderLevel, 42, NO_COMPANIONS), tick(0));
+  // wanderScene, déjà défini plus haut, sans presence).
+  const noPresenceState = reduce(createInitialState(wanderScene, 42, NO_COMPANIONS), tick(0));
   run(
     "presence : entité SANS règle ne porte jamais de champ .present",
     undefined,
@@ -1832,10 +1832,10 @@ export function runMovementChecks() {
   // voir core/reduce.js/stepEntities) : "entered"/"exited"/null, jamais de
   // bascule fantôme au tout premier calcul pour une entité.
 
-  const transitionLevel = parseLevel(
+  const transitionScene = parseScene(
     {
       id: "movement-check-presence-transition",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 10,
       playerStart: 0,
       entities: [{ id: "flicker", type: "dog", x: 5, presence: NIGHT_ONLY }],
@@ -1846,7 +1846,7 @@ export function runMovementChecks() {
   // Jour (état de départ) : premier calcul JAMAIS fait pour cette entité ->
   // AUCUNE bascule, quelle que soit la valeur de présence de départ —
   // même dormante dès ce premier calcul, ce n'est pas "une sortie".
-  let transitionState = createInitialState(transitionLevel, undefined, NO_COMPANIONS);
+  let transitionState = createInitialState(transitionScene, undefined, NO_COMPANIONS);
   transitionState = reduce(transitionState, tick(0));
   run(
     "presence : aucune bascule au tout premier calcul (montage), même dormante",
@@ -1926,10 +1926,10 @@ export function runMovementChecks() {
   // traversée, PAS de suivi du joueur à ce stade, voir CLAUDE.md) ---
 
   const COMPANION_REGISTRY = { dog: { nameKey: "entity.dog.name" }, npc: { nameKey: "entity.npc.name" } };
-  const companionLevel = parseLevel(
+  const companionScene = parseScene(
     {
       id: "movement-check-companion-a",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 20,
       playerStart: 5,
       entities: [{ id: "npc-a", type: "npc", x: 15 }],
@@ -1940,18 +1940,18 @@ export function runMovementChecks() {
   // Défaut (aucune surcharge de companions, contrairement à NO_COMPANIONS
   // utilisé partout ailleurs dans ce fichier) : UN compagnon de test
   // prédéfini, comme au vrai lancement d'une partie (voir core/state.js).
-  let companionState = createInitialState(companionLevel, 1);
+  let companionState = createInitialState(companionScene, 1);
   run("compagnons : un compagnon prédéfini par défaut", 1, companionState.companions.length);
   run("compagnons : type du compagnon de test", "buddy", companionState.companions[0].type);
-  run("compagnons : positionné près du joueur à la création", companionLevel.playerStart, companionState.companions[0].x);
+  run("compagnons : positionné près du joueur à la création", companionScene.playerStart, companionState.companions[0].x);
 
   // Injection à la LECTURE (voir core/state.js/getActiveWorld) : présent
-  // dans le flux d'entités du lieu actif (compagnon + npc-a, l'entité
+  // dans le flux d'entités du monde actif (compagnon + npc-a, l'entité
   // native) — mais ABSENT du monde BRUT stocké (session.worlds[...]
   // .entities), qui ne contient QUE npc-a. C'est tout le mécanisme :
   // stocké dans le cercle partie, injecté pour être rendu/tické.
-  run("compagnons : injecté dans le flux d'entités du lieu actif (native + compagnon)", 2, getActiveWorld(companionState).entities.length);
-  run("compagnons : ABSENT du monde brut stocké (pas persisté avec le lieu)", 1, companionState.worlds[companionLevel.id].entities.length);
+  run("compagnons : injecté dans le flux d'entités du monde actif (native + compagnon)", 2, getActiveWorld(companionState).entities.length);
+  run("compagnons : ABSENT du monde brut stocké (pas persisté avec le monde)", 1, companionState.worlds[companionScene.id].entities.length);
 
   // Comportement "follow" (brique 2/3, voir core/behaviors/follow.js) :
   // co-localisé avec le joueur à la création (distance 0 < minDistance) ->
@@ -1960,7 +1960,7 @@ export function runMovementChecks() {
   for (let i = 0; i < 10; i++) companionState = reduce(companionState, tick(0));
   run(
     "compagnons : ne bouge pas tant que le joueur reste proche (zone morte)",
-    companionLevel.playerStart,
+    companionScene.playerStart,
     companionState.companions[0].x
   );
 
@@ -1970,19 +1970,19 @@ export function runMovementChecks() {
   run(
     "compagnons : suit le joueur une fois hors de la zone morte (comportement follow)",
     true,
-    companionState.companions[0].x !== companionLevel.playerStart
+    companionState.companions[0].x !== companionScene.playerStart
   );
 
   // PRNG séparé (companionsRngState) : la présence d'un compagnon ne change
-  // RIEN à la trajectoire d'une entité DU LIEU (comparaison directe,
-  // réutilise wanderLevel/runTicks déjà définis plus haut) — sinon, deux
+  // RIEN à la trajectoire d'une entité DU MONDE (comparaison directe,
+  // réutilise wanderScene/runTicks déjà définis plus haut) — sinon, deux
   // suites de tirages partageant le même flux se marcheraient dessus, et le
   // comportement d'une entité existante dépendrait silencieusement de la
   // présence ou non d'un compagnon.
   run(
-    "compagnons : n'affecte pas la trajectoire d'une entité du lieu (PRNG séparés)",
-    JSON.stringify(runTicks(createInitialState(wanderLevel, 42, NO_COMPANIONS), 50).positions),
-    JSON.stringify(runTicks(createInitialState(wanderLevel, 42), 50).positions)
+    "compagnons : n'affecte pas la trajectoire d'une entité du monde (PRNG séparés)",
+    JSON.stringify(runTicks(createInitialState(wanderScene, 42, NO_COMPANIONS), 50).positions),
+    JSON.stringify(runTicks(createInitialState(wanderScene, 42), 50).positions)
   );
 
   // MAX_COMPANIONS : la liste ne dépasse jamais cette limite, même fournie
@@ -1995,17 +1995,17 @@ export function runMovementChecks() {
     x: 0,
     dir: 1,
   }));
-  const cappedState = createInitialState(companionLevel, 1, { companions: tooManyCompanions });
+  const cappedState = createInitialState(companionScene, 1, { companions: tooManyCompanions });
   run("compagnons : la liste ne dépasse jamais MAX_COMPANIONS", MAX_COMPANIONS, cappedState.companions.length);
 
-  // --- Compagnons : traversée d'un lieu à l'autre avec la partie ---
+  // --- Compagnons : traversée d'un monde à l'autre avec la partie ---
 
-  const companionWorldB = parseLevel(
-    { id: "movement-check-companion-b", titleKey: "level.demo.title", length: 12, playerStart: 3, entities: [] },
+  const companionWorldB = parseScene(
+    { id: "movement-check-companion-b", titleKey: "scene.demo.name", length: 12, playerStart: 3, entities: [] },
     COMPANION_REGISTRY
   );
 
-  let companionPartie = createInitialState(companionLevel, 1);
+  let companionPartie = createInitialState(companionScene, 1);
   // Le joueur avance, le compagnon (follow) le suit : garantit qu'il ne se
   // retrouve pas "par coïncidence" déjà à la position attendue après la
   // transition (contrairement à wander en brique 1, il ne bouge jamais
@@ -2016,7 +2016,7 @@ export function runMovementChecks() {
   companionPartie = travelToWorld(companionPartie, companionWorldB.id, companionWorldB);
 
   run(
-    "compagnons : réapparaît dans le nouveau lieu, repositionné près du joueur",
+    "compagnons : réapparaît dans le nouveau monde, repositionné près du joueur",
     companionWorldB.playerStart,
     companionPartie.companions[0].x
   );
@@ -2026,34 +2026,34 @@ export function runMovementChecks() {
     companionPartie.companions[0].x !== companionXBeforeLeaving
   );
   run(
-    "compagnons : flux d'entités du nouveau lieu = natives (0) + compagnons (1), rien de plus",
+    "compagnons : flux d'entités du nouveau monde = natives (0) + compagnons (1), rien de plus",
     1,
     getActiveWorld(companionPartie).entities.length
   );
   run(
-    "compagnons : jamais en double (un seul compagnon dans le nouveau lieu)",
+    "compagnons : jamais en double (un seul compagnon dans le nouveau monde)",
     1,
     getActiveWorld(companionPartie).entities.filter((e) => e.id === "companion-test-dog").length
   );
   run(
-    "compagnons : PAS de résidu dans l'ancien lieu (monde brut A, toujours sa seule entité native)",
+    "compagnons : PAS de résidu dans l'ancien monde (monde brut A, toujours sa seule entité native)",
     1,
-    companionPartie.worlds[companionLevel.id].entities.length
+    companionPartie.worlds[companionScene.id].entities.length
   );
 
-  // Retour au lieu de départ : de nouveau repositionné près du joueur — pas
+  // Retour au monde de départ : de nouveau repositionné près du joueur — pas
   // laissé où il avait fini de suivre avant le premier départ (il n'a pas
-  // d'état "de lieu" à restaurer, contrairement à un PNJ rangé dans un monde).
-  companionPartie = travelToWorld(companionPartie, companionLevel.id);
+  // d'état "de monde" à restaurer, contrairement à un PNJ rangé dans un monde).
+  companionPartie = travelToWorld(companionPartie, companionScene.id);
   run(
     "compagnons : re-visite -> repositionné près du joueur, pas resté où il suivait",
-    companionLevel.playerStart,
+    companionScene.playerStart,
     companionPartie.companions[0].x
   );
-  run("compagnons : toujours pas de résidu dans le lieu B quitté", 0, companionPartie.worlds[companionWorldB.id].entities.length);
+  run("compagnons : toujours pas de résidu dans le monde B quitté", 0, companionPartie.worlds[companionWorldB.id].entities.length);
 
   // --- Comportement "follow" (brique 2/3, voir core/behaviors/follow.js) ---
-  // Testé sur des entités du LIEU dédiées (pas les compagnons ci-dessus) :
+  // Testé sur des entités du MONDE dédiées (pas les compagnons ci-dessus) :
   // follow est un comportement générique, réutilisable par toute entité —
   // ce découpage isole la logique du comportement de celle du cercle
   // partie, déjà couverte plus haut.
@@ -2062,10 +2062,10 @@ export function runMovementChecks() {
 
   // Cible statique (sans behavior) : cadre de test simple, aucun mouvement
   // parasite à modéliser.
-  function makeFollowLevel(overrides = {}) {
+  function makeFollowScene(overrides = {}) {
     return {
       id: "movement-check-follow",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 20,
       playerStart: 0,
       entities: [
@@ -2080,12 +2080,12 @@ export function runMovementChecks() {
     return getActiveWorld(followState).entities.find((e) => e.id === id).x;
   }
 
-  const followLevel = parseLevel(makeFollowLevel(), FOLLOW_REGISTRY);
+  const followScene = parseScene(makeFollowScene(), FOLLOW_REGISTRY);
 
   // Cible hors de portée (distance 15 > maxDistance 3) : le suiveur se
   // rapproche, jusqu'à entrer dans la zone morte — puis s'arrête, sans
   // jamais coller à la cible (distance >= minDistance en permanence).
-  let followState = createInitialState(followLevel, 1, NO_COMPANIONS);
+  let followState = createInitialState(followScene, 1, NO_COMPANIONS);
   for (let i = 0; i < 500; i++) followState = reduce(followState, tick(0));
   const followerSettled = followerX(followState);
   run("follow : se rapproche d'une cible hors de portée", true, followerSettled > 0);
@@ -2099,8 +2099,8 @@ export function runMovementChecks() {
 
   // Cible qui s'approche trop (< minDistance) : le suiveur NE RECULE PAS —
   // il reste exactement où il est, ni en avant ni en arrière.
-  const closeLevel = parseLevel(
-    makeFollowLevel({
+  const closeScene = parseScene(
+    makeFollowScene({
       entities: [
         { id: "anchor-1", type: "dog", x: 10 },
         { id: "follower-1", type: "dog", x: 9.7, behavior: { kind: "follow", targetId: "anchor-1", minDistance: 1, maxDistance: 3 } },
@@ -2108,7 +2108,7 @@ export function runMovementChecks() {
     }),
     FOLLOW_REGISTRY
   );
-  let closeState = createInitialState(closeLevel, 1, NO_COMPANIONS);
+  let closeState = createInitialState(closeScene, 1, NO_COMPANIONS);
   for (let i = 0; i < 100; i++) closeState = reduce(closeState, tick(0));
   run("follow : ne recule jamais quand la cible est trop proche", 9.7, followerX(closeState));
 
@@ -2124,16 +2124,16 @@ export function runMovementChecks() {
     }
     return positions;
   }
-  const followRun1 = runFollowTicks(createInitialState(followLevel, 1, NO_COMPANIONS), 100);
-  const followRun2 = runFollowTicks(createInitialState(followLevel, 1, NO_COMPANIONS), 100);
+  const followRun1 = runFollowTicks(createInitialState(followScene, 1, NO_COMPANIONS), 100);
+  const followRun2 = runFollowTicks(createInitialState(followScene, 1, NO_COMPANIONS), 100);
   run("follow : trajectoire reproductible (déterministe, sans PRNG)", JSON.stringify(followRun1), JSON.stringify(followRun2));
 
   // minDistance >= maxDistance : incohérent (zone morte nulle ou inversée),
   // rejeté au chargement.
   let followMinMaxRejected = false;
   try {
-    parseLevel(
-      makeFollowLevel({
+    parseScene(
+      makeFollowScene({
         entities: [
           { id: "anchor-1", type: "dog", x: 15 },
           { id: "follower-1", type: "dog", x: 0, behavior: { kind: "follow", minDistance: 3, maxDistance: 2 } },
@@ -2150,24 +2150,24 @@ export function runMovementChecks() {
   // s'inverse SANS code spécial — direction recalculée à chaque tick depuis
   // la position courante, jamais mémorisée (voir follow.js). Cible par
   // défaut (targetId omis) : le joueur.
-  const passLevel = parseLevel(
+  const passScene = parseScene(
     {
       id: "movement-check-follow-pass",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 30,
       playerStart: 20,
       entities: [{ id: "follower-2", type: "dog", x: 15, behavior: { kind: "follow", minDistance: 1, maxDistance: 3 } }],
     },
     FOLLOW_REGISTRY
   );
-  let followPassState = createInitialState(passLevel, 1, NO_COMPANIONS);
+  let followPassState = createInitialState(passScene, 1, NO_COMPANIONS);
   // Le joueur reste immobile : le suiveur (distance 5 > 3) se rapproche et
   // se stabilise derrière lui, à gauche.
   for (let i = 0; i < 300; i++) followPassState = reduce(followPassState, tick(0));
   const followerBeforePass = followerX(followPassState, "follower-2");
   run("follow : avant d'être dépassé, suit depuis la gauche", true, followerBeforePass < followPassState.player.x);
 
-  // Le joueur traverse tout le niveau vers la gauche, passe le suiveur, et
+  // Le joueur traverse toute la scène vers la gauche, passe le suiveur, et
   // continue jusqu'à l'autre bord.
   for (let i = 0; i < 800; i++) followPassState = reduce(followPassState, tick(-1));
   const followerAfterPass = followerX(followPassState, "follower-2");
@@ -2182,10 +2182,10 @@ export function runMovementChecks() {
   // d'avancer, la PHYSIQUE (resolveBodyMove, voir core/physics/collision.js)
   // l'arrête pile au contact — jamais de traversée, et le bloqueur lui-même
   // ne bouge jamais (voir les deux assertions ci-dessous).
-  const blockedFollowLevel = parseLevel(
+  const blockedFollowScene = parseScene(
     {
       id: "movement-check-follow-blocked",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 20,
       playerStart: 0,
       entities: [
@@ -2196,7 +2196,7 @@ export function runMovementChecks() {
     },
     FOLLOW_REGISTRY
   );
-  let blockedFollowState = createInitialState(blockedFollowLevel, 1, NO_COMPANIONS);
+  let blockedFollowState = createInitialState(blockedFollowScene, 1, NO_COMPANIONS);
   for (let i = 0; i < 500; i++) blockedFollowState = reduce(blockedFollowState, tick(0));
   run(
     "follow : un obstacle bloquant l'arrête au contact (pas de traversée)",
@@ -2216,13 +2216,13 @@ export function runMovementChecks() {
   // le joueur sera possible) : follow.js dégrade proprement (intent: 0),
   // jamais de crash. Le joueur, cible par défaut, existe toujours : ce cas
   // ne peut survenir qu'avec un targetId explicite et erroné.
-  const missingTargetLevel = parseLevel(
-    makeFollowLevel({
+  const missingTargetScene = parseScene(
+    makeFollowScene({
       entities: [{ id: "follower-1", type: "dog", x: 5, behavior: { kind: "follow", targetId: "does-not-exist" } }],
     }),
     FOLLOW_REGISTRY
   );
-  let missingTargetState = createInitialState(missingTargetLevel, 1, NO_COMPANIONS);
+  let missingTargetState = createInitialState(missingTargetScene, 1, NO_COMPANIONS);
   let missingTargetThrew = false;
   try {
     for (let i = 0; i < 100; i++) missingTargetState = reduce(missingTargetState, tick(0));
@@ -2239,10 +2239,10 @@ export function runMovementChecks() {
 
   const GOTO_REGISTRY = { dog: { nameKey: "entity.dog.name" }, wall: { nameKey: "entity.wall.name", blocksMovement: true } };
 
-  function makeGotoLevel(overrides = {}) {
+  function makeGotoScene(overrides = {}) {
     return {
       id: "movement-check-goto",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 20,
       playerStart: 0,
       entities: [
@@ -2257,12 +2257,12 @@ export function runMovementChecks() {
     return getActiveWorld(gotoState).entities.find((e) => e.id === id).x;
   }
 
-  const gotoLevel = parseLevel(makeGotoLevel(), GOTO_REGISTRY);
+  const gotoScene = parseScene(makeGotoScene(), GOTO_REGISTRY);
 
   // Convergence + arrêt : avance vers la cible jusqu'à atteindre
   // arriveDistance (2×BODY_RADIUS par défaut, voir goto.js), puis
   // s'arrête, sans jamais dépasser la cible.
-  let gotoState = createInitialState(gotoLevel, 1, NO_COMPANIONS);
+  let gotoState = createInitialState(gotoScene, 1, NO_COMPANIONS);
   for (let i = 0; i < 500; i++) gotoState = reduce(gotoState, tick(0));
   const settledDistance = 15 - goerX(gotoState);
   run("goto : converge vers la cible et s'arrête à arriveDistance", true, settledDistance <= 2 * BODY_RADIUS + 1e-9);
@@ -2290,21 +2290,21 @@ export function runMovementChecks() {
     }
     return positions;
   }
-  const gotoRun1 = runGotoTicks(createInitialState(gotoLevel, 1, NO_COMPANIONS), 200);
-  const gotoRun2 = runGotoTicks(createInitialState(gotoLevel, 1, NO_COMPANIONS), 200);
+  const gotoRun1 = runGotoTicks(createInitialState(gotoScene, 1, NO_COMPANIONS), 200);
+  const gotoRun2 = runGotoTicks(createInitialState(gotoScene, 1, NO_COMPANIONS), 200);
   run("goto : trajectoire reproductible (déterministe, sans PRNG)", JSON.stringify(gotoRun1), JSON.stringify(gotoRun2));
 
   // Cible introuvable : dégrade proprement (intent: 0, jamais de crash) —
   // gotoArrived jamais posé, une impossibilité de progresser n'est pas une
   // arrivée (la dégradation en présence pour ce cas reste à la charge d'un
   // futur appelant, brique 2/2).
-  const missingGotoTargetLevel = parseLevel(
-    makeGotoLevel({
+  const missingGotoTargetScene = parseScene(
+    makeGotoScene({
       entities: [{ id: "goer-1", type: "dog", x: 5, behavior: { kind: "goto", targetId: "does-not-exist" } }],
     }),
     GOTO_REGISTRY
   );
-  let missingGotoTargetState = createInitialState(missingGotoTargetLevel, 1, NO_COMPANIONS);
+  let missingGotoTargetState = createInitialState(missingGotoTargetScene, 1, NO_COMPANIONS);
   let missingGotoTargetThrew = false;
   try {
     for (let i = 0; i < 100; i++) missingGotoTargetState = reduce(missingGotoTargetState, tick(0));
@@ -2323,8 +2323,8 @@ export function runMovementChecks() {
   // (resolveBodyMove) l'arrête pile au contact — jamais de traversée,
   // jamais d'arrivée (le mobile n'atteint jamais arriveDistance de la
   // cible, coincé contre l'obstacle) — même principe que follow.js.
-  const blockedGotoLevel = parseLevel(
-    makeGotoLevel({
+  const blockedGotoScene = parseScene(
+    makeGotoScene({
       entities: [
         { id: "anchor-1", type: "dog", x: 15 },
         { id: "wall-goto", type: "wall", x: 8 },
@@ -2333,7 +2333,7 @@ export function runMovementChecks() {
     }),
     GOTO_REGISTRY
   );
-  let blockedGotoState = createInitialState(blockedGotoLevel, 1, NO_COMPANIONS);
+  let blockedGotoState = createInitialState(blockedGotoScene, 1, NO_COMPANIONS);
   for (let i = 0; i < 500; i++) blockedGotoState = reduce(blockedGotoState, tick(0));
   run("goto : un obstacle bloquant l'arrête au contact (pas de traversée)", 8 - 2 * BODY_RADIUS, goerX(blockedGotoState));
   run(
@@ -2353,7 +2353,7 @@ export function runMovementChecks() {
   // de suite, pas se dégrader en immobilité muette).
   let missingTargetIdRejected = false;
   try {
-    parseLevel(makeGotoLevel({ entities: [{ id: "goer-1", type: "dog", x: 0, behavior: { kind: "goto" } }] }), GOTO_REGISTRY);
+    parseScene(makeGotoScene({ entities: [{ id: "goer-1", type: "dog", x: 0, behavior: { kind: "goto" } }] }), GOTO_REGISTRY);
   } catch {
     missingTargetIdRejected = true;
   }
@@ -2361,8 +2361,8 @@ export function runMovementChecks() {
 
   let invalidArriveDistanceRejected = false;
   try {
-    parseLevel(
-      makeGotoLevel({
+    parseScene(
+      makeGotoScene({
         entities: [{ id: "goer-1", type: "dog", x: 0, behavior: { kind: "goto", targetId: "anchor-1", arriveDistance: -1 } }],
       }),
       GOTO_REGISTRY
@@ -2380,7 +2380,7 @@ export function runMovementChecks() {
 
   // Rétrocompat : le raccourci { when, present } (sans effects) reste
   // compris DIRECTEMENT par resolveEntityRules/isPresent, sans passer par
-  // parseLevel — même résultat que sa forme canonique équivalente.
+  // parseScene — même résultat que sa forme canonique équivalente.
   const shorthandEntity = { id: "shorthand-test", presence: [{ when: { type: "timeRange", from: 20, to: 6 }, present: true }] };
   const canonicalEntity = {
     id: "canonical-test",
@@ -2477,15 +2477,15 @@ export function runMovementChecks() {
 
   // Validation au chargement : un effet "behavior" réutilise EXACTEMENT la
   // même validation que le champ `behavior` d'une entité (voir
-  // core/level.js/parseBehavior) — un kind inconnu est rejeté clairement,
+  // core/scene.js/parseBehavior) — un kind inconnu est rejeté clairement,
   // jamais un crash silencieux plus tard.
   const TRIGGER_REGISTRY = { dog: { nameKey: "entity.dog.name" } };
   let unknownEffectBehaviorRejected = false;
   try {
-    parseLevel(
+    parseScene(
       {
         id: "movement-check-trigger-invalid",
-        titleKey: "level.demo.title",
+        titleKey: "scene.demo.name",
         length: 10,
         playerStart: 0,
         entities: [
@@ -2527,10 +2527,10 @@ export function runMovementChecks() {
     ];
   }
 
-  function makeRoutineLevel(overrides = {}) {
+  function makeRoutineScene(overrides = {}) {
     return {
       id: "movement-check-routine",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 20,
       playerStart: 0,
       entities: [
@@ -2551,11 +2551,11 @@ export function runMovementChecks() {
     return getActiveWorld(routineState).entities.find((e) => e.id === id);
   }
 
-  const routineLevel = parseLevel(makeRoutineLevel(), ROUTINE_REGISTRY);
+  const routineScene = parseScene(makeRoutineScene(), ROUTINE_REGISTRY);
 
   // Jour (INITIAL_TIME = 8h) : présente, comportement "wander" — jamais
   // "goto" avant 20h.
-  let dayRoutineState = createInitialState(routineLevel, 7, NO_COMPANIONS);
+  let dayRoutineState = createInitialState(routineScene, 7, NO_COMPANIONS);
   for (let i = 0; i < 50; i++) dayRoutineState = reduce(dayRoutineState, tick(0));
   run("routine : le jour — présente", true, resident(dayRoutineState).present);
   run("routine : le jour — comportement 'wander'", "wander", resident(dayRoutineState).behavior.kind);
@@ -2576,7 +2576,7 @@ export function runMovementChecks() {
 
   // 20h : bascule vers "goto" — se dirige vers la porte, reste présente
   // (elle n'a pas encore atteint la porte).
-  let eveningRoutineState = createInitialState(routineLevel, 7, NO_COMPANIONS);
+  let eveningRoutineState = createInitialState(routineScene, 7, NO_COMPANIONS);
   eveningRoutineState = advanceTime(eveningRoutineState, 12 * 60); // 8h -> 20h
   eveningRoutineState = reduce(eveningRoutineState, tick(0));
   run("routine : à 20h — comportement bascule vers 'goto'", "goto", resident(eveningRoutineState).behavior.kind);
@@ -2591,8 +2591,8 @@ export function runMovementChecks() {
   // Filet de minuit : un obstacle empêche TOUTE arrivée — reste présente
   // (en route) toute la soirée, jusqu'à ce que minuit force la dormance
   // MALGRÉ l'absence d'arrivée (jamais visiblement "coincée" après minuit).
-  const blockedRoutineLevel = parseLevel(
-    makeRoutineLevel({
+  const blockedRoutineScene = parseScene(
+    makeRoutineScene({
       entities: [
         { id: "door-1", type: "dog", x: 2 },
         { id: "wall-routine", type: "wall", x: 10 },
@@ -2607,7 +2607,7 @@ export function runMovementChecks() {
     }),
     ROUTINE_REGISTRY
   );
-  let blockedRoutineState = createInitialState(blockedRoutineLevel, 7, NO_COMPANIONS);
+  let blockedRoutineState = createInitialState(blockedRoutineScene, 7, NO_COMPANIONS);
   blockedRoutineState = advanceTime(blockedRoutineState, 12 * 60); // -> 20h
   for (let i = 0; i < 500; i++) blockedRoutineState = reduce(blockedRoutineState, tick(0));
   run("routine : bloquée par un obstacle — jamais arrivée", undefined, resident(blockedRoutineState).gotoArrived);
@@ -2624,15 +2624,15 @@ export function runMovementChecks() {
   // chez elle") reste honorée même sans marche réelle possible — vérifié en
   // passant RÉELLEMENT par 20h (bascule vers "goto" avec une cible
   // introuvable, dégradation immobile propre — voir goto.js) puis minuit.
-  const missingDoorRoutineLevel = parseLevel(
-    makeRoutineLevel({
+  const missingDoorRoutineScene = parseScene(
+    makeRoutineScene({
       entities: [
         { id: "resident-1", type: "dog", x: 15, behavior: { kind: "wander"}, presence: residentRules("no-such-door") },
       ],
     }),
     ROUTINE_REGISTRY
   );
-  let missingDoorRoutineState = createInitialState(missingDoorRoutineLevel, 7, NO_COMPANIONS);
+  let missingDoorRoutineState = createInitialState(missingDoorRoutineScene, 7, NO_COMPANIONS);
   missingDoorRoutineState = advanceTime(missingDoorRoutineState, 12 * 60); // -> 20h
   let missingDoorThrew = false;
   try {
@@ -2681,8 +2681,8 @@ export function runMovementChecks() {
   run("routine : réveil (8h), tick suivant — comportement 'wander'", "wander", resident(morningTick2).behavior.kind);
 
   // --- Miroir demo1/demo2 (même personnage, deux déclarations séparées,
-  // AUCUN état partagé) — RÉEL, voir level/demo.json/"npc-resident" et
-  // level/demo2.json/"npc-resident-home" (mêmes horaires EXACTS ici) :
+  // AUCUN état partagé) — RÉEL, voir scenes/demo.json/"npc-resident" et
+  // scenes/demo2.json/"npc-resident-home" (mêmes horaires EXACTS ici) :
   // away (demo1) présente 8h-20h (wander) + 20h-23h (goto vers "door-exit",
   // filet à 23h) ; home (demo2) présente 20h-8h (immobile, AUCUN
   // comportement de repos) + 8h-11h (goto vers "door-back", filet à 11h).
@@ -2758,7 +2758,7 @@ export function runMovementChecks() {
   });
 
   // --- behavior: null — retrait EXPLICITE d'un comportement (voir
-  // core/level.js/parseEffect, core/scripting.md/"Effets") : nécessaire pour
+  // core/scene.js/parseEffect, core/scripting.md/"Effets") : nécessaire pour
   // une entité SANS comportement de repos (ex. "npc-resident-home" ci-dessus)
   // — sans lui, entity.gotoArrived (jamais remis à faux) et behavior.kind
   // resté "goto" laisseraient "arrived" bloquée à vrai pour toujours après
@@ -2767,10 +2767,10 @@ export function runMovementChecks() {
   let nullBehaviorEffectAccepted = false;
   let parsedNullBehavior;
   try {
-    const nullEffectLevel = parseLevel(
+    const nullEffectScene = parseScene(
       {
         id: "movement-check-null-behavior-valid",
-        titleKey: "level.demo.title",
+        titleKey: "scene.demo.name",
         length: 10,
         playerStart: 0,
         entities: [
@@ -2785,7 +2785,7 @@ export function runMovementChecks() {
       ROUTINE_REGISTRY
     );
     nullBehaviorEffectAccepted = true;
-    parsedNullBehavior = nullEffectLevel.entities[0].presence[0].effects[0].behavior;
+    parsedNullBehavior = nullEffectScene.entities[0].presence[0].effects[0].behavior;
   } catch {
     nullBehaviorEffectAccepted = false;
   }
@@ -2807,14 +2807,14 @@ export function runMovementChecks() {
   // Cycle complet SANS comportement de repos, DEUX jours consécutifs — LE
   // test qui aurait échoué en permanence dès le second réveil sans
   // behavior:null (voir header ci-dessus). Mêmes horaires et gabarit que
-  // "npc-resident-home" (level/demo2.json).
+  // "npc-resident-home" (scenes/demo2.json).
   function homeResident(state) {
     return getActiveWorld(state).entities.find((e) => e.id === "home-1");
   }
-  const homeRoutineLevel = parseLevel(
+  const homeRoutineScene = parseScene(
     {
       id: "movement-check-home-routine",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 20,
       playerStart: 0,
       entities: [
@@ -2830,7 +2830,7 @@ export function runMovementChecks() {
   // resolveEntityRules, "premier calcul compte comme une bascule"),
   // convergence vers la porte dès le premier tick, AUCUN comportement de
   // repos déclaré au départ (contrairement à resident-1 plus haut).
-  let homeState = createInitialState(homeRoutineLevel, 7, NO_COMPANIONS);
+  let homeState = createInitialState(homeRoutineScene, 7, NO_COMPANIONS);
   for (let i = 0; i < 1000; i++) homeState = reduce(homeState, tick(0));
   run("routine sans repos (jour 1) : arrivée à la porte -> gotoArrived posé", true, homeResident(homeState).gotoArrived);
   run("routine sans repos (jour 1) : arrivée -> dormante", false, homeResident(homeState).present);
@@ -2894,10 +2894,10 @@ export function runMovementChecks() {
     ];
   }
 
-  const barLevel = parseLevel(
+  const barScene = parseScene(
     {
       id: "movement-check-bar",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 20,
       playerStart: 0,
       entities: [
@@ -2930,7 +2930,7 @@ export function runMovementChecks() {
   // comportement bascule vers "goto" — 20 minutes suffisent à couvrir toute
   // la fourchette possible (5h55 à 6h05) avec marge.
   function runBarDepartures(seed) {
-    let state = createInitialState(barLevel, seed, NO_COMPANIONS);
+    let state = createInitialState(barScene, seed, NO_COMPANIONS);
     state = advanceToMinuteOfDay(state, 5 * 60 + 50);
     const departureMinute = Object.fromEntries(BAR_PATRON_IDS.map((id) => [id, null]));
     for (let elapsed = 0; elapsed < 20; elapsed++) {
@@ -2964,10 +2964,10 @@ export function runMovementChecks() {
 
   // Sans spread déclaré : rétrocompat stricte, les trois partiraient TOUS à
   // la même minute (comportement d'avant ce mécanisme).
-  const barLevelNoSpread = parseLevel(
+  const barSceneNoSpread = parseScene(
     {
       id: "movement-check-bar-no-spread",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 20,
       playerStart: 0,
       entities: [
@@ -2990,7 +2990,7 @@ export function runMovementChecks() {
     },
     BAR_REGISTRY
   );
-  let noSpreadState = createInitialState(barLevelNoSpread, 2024, NO_COMPANIONS);
+  let noSpreadState = createInitialState(barSceneNoSpread, 2024, NO_COMPANIONS);
   noSpreadState = advanceToMinuteOfDay(noSpreadState, 5 * 60 + 59);
   noSpreadState = advanceTime(noSpreadState, 1);
   noSpreadState = reduce(noSpreadState, tick(0));
@@ -3024,7 +3024,7 @@ export function runMovementChecks() {
     refusedResult.companions
   );
 
-  // --- Surfaces de sol (core/surfaces.js + level.js) ---
+  // --- Surfaces de sol (core/surfaces.js + scene.js) ---
   // registre + carte + surfaceAt/surfaceProps = CORE pur, testable ici sans
   // navigateur (la dérivation du SON reste à la vue, voir
   // view/audio/city-scene.js — hors de portée d'un test terminal).
@@ -3033,10 +3033,10 @@ export function runMovementChecks() {
   run("surfaces : registre — sand est spécial", false, surfaceProps("sand").neutral);
   run("surfaces : registre — nom inconnu -> undefined", undefined, surfaceProps("does-not-exist"));
 
-  const surfaceLevel = parseLevel(
+  const surfaceScene = parseScene(
     {
       id: "movement-check-surfaces",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 20,
       playerStart: 0,
       defaultSurface: "concrete",
@@ -3045,40 +3045,40 @@ export function runMovementChecks() {
     },
     EMPTY_REGISTRY
   );
-  run("surfaces : surfaceAt — defaultSurface hors segment", "concrete", surfaceAt(surfaceLevel, 2));
-  run("surfaces : surfaceAt — segment couvrant (borne from incluse)", "sand", surfaceAt(surfaceLevel, 5));
-  run("surfaces : surfaceAt — segment couvrant (milieu)", "sand", surfaceAt(surfaceLevel, 7));
-  run("surfaces : surfaceAt — segment couvrant (borne to incluse)", "sand", surfaceAt(surfaceLevel, 10));
-  run("surfaces : surfaceAt — juste après le segment, retombe sur defaultSurface", "concrete", surfaceAt(surfaceLevel, 10.5));
-  run("surfaces : surfacePropsAt — délègue à surfaceProps(surfaceAt(...))", SURFACE_REGISTRY.sand, surfacePropsAt(surfaceLevel, 7));
+  run("surfaces : surfaceAt — defaultSurface hors segment", "concrete", surfaceAt(surfaceScene, 2));
+  run("surfaces : surfaceAt — segment couvrant (borne from incluse)", "sand", surfaceAt(surfaceScene, 5));
+  run("surfaces : surfaceAt — segment couvrant (milieu)", "sand", surfaceAt(surfaceScene, 7));
+  run("surfaces : surfaceAt — segment couvrant (borne to incluse)", "sand", surfaceAt(surfaceScene, 10));
+  run("surfaces : surfaceAt — juste après le segment, retombe sur defaultSurface", "concrete", surfaceAt(surfaceScene, 10.5));
+  run("surfaces : surfacePropsAt — délègue à surfaceProps(surfaceAt(...))", SURFACE_REGISTRY.sand, surfacePropsAt(surfaceScene, 7));
 
   // defaultSurface : FILET silencieux si absent — toute scène existante qui
   // n'en déclare pas continue de charger, résolue au défaut du registre.
-  const noSurfaceLevel = parseLevel(
-    { id: "movement-check-surfaces-default", titleKey: "level.demo.title", length: 10, playerStart: 0, entities: [] },
+  const noSurfaceScene = parseScene(
+    { id: "movement-check-surfaces-default", titleKey: "scene.demo.name", length: 10, playerStart: 0, entities: [] },
     EMPTY_REGISTRY
   );
-  run("surfaces : defaultSurface absent -> repli sur DEFAULT_SURFACE", DEFAULT_SURFACE, noSurfaceLevel.defaultSurface);
-  run("surfaces : segments absent -> tableau vide (jamais undefined)", 0, noSurfaceLevel.segments.length);
+  run("surfaces : defaultSurface absent -> repli sur DEFAULT_SURFACE", DEFAULT_SURFACE, noSurfaceScene.defaultSurface);
+  run("surfaces : segments absent -> tableau vide (jamais undefined)", 0, noSurfaceScene.segments.length);
 
-  // indoor (core/level.js/parseFace, "nature de lieu") : même filet que
+  // indoor (core/scene.js/parseFace, "nature de scène") : même filet que
   // defaultSurface — absent -> false (extérieur), TOUJOURS résolu en
   // booléen sur une face parsée, jamais undefined.
-  run("indoor : absent -> false (extérieur) par défaut", false, noSurfaceLevel.indoor);
-  const indoorLevel = parseLevel(
-    { id: "movement-check-indoor-true", titleKey: "level.demo.title", length: 10, playerStart: 0, indoor: true, entities: [] },
+  run("indoor : absent -> false (extérieur) par défaut", false, noSurfaceScene.indoor);
+  const indoorScene = parseScene(
+    { id: "movement-check-indoor-true", titleKey: "scene.demo.name", length: 10, playerStart: 0, indoor: true, entities: [] },
     EMPTY_REGISTRY
   );
-  run("indoor : true déclaré -> transporté tel quel", true, indoorLevel.indoor);
-  const outdoorLevel = parseLevel(
-    { id: "movement-check-indoor-false", titleKey: "level.demo.title", length: 10, playerStart: 0, indoor: false, entities: [] },
+  run("indoor : true déclaré -> transporté tel quel", true, indoorScene.indoor);
+  const outdoorScene = parseScene(
+    { id: "movement-check-indoor-false", titleKey: "scene.demo.name", length: 10, playerStart: 0, indoor: false, entities: [] },
     EMPTY_REGISTRY
   );
-  run("indoor : false déclaré explicitement -> transporté tel quel", false, outdoorLevel.indoor);
+  run("indoor : false déclaré explicitement -> transporté tel quel", false, outdoorScene.indoor);
   let invalidIndoorThrew = false;
   try {
-    parseLevel(
-      { id: "movement-check-indoor-bad", titleKey: "level.demo.title", length: 10, playerStart: 0, indoor: "yes", entities: [] },
+    parseScene(
+      { id: "movement-check-indoor-bad", titleKey: "scene.demo.name", length: 10, playerStart: 0, indoor: "yes", entities: [] },
       EMPTY_REGISTRY
     );
   } catch {
@@ -3086,13 +3086,13 @@ export function runMovementChecks() {
   }
   run("indoor : type invalide (non booléen) -> échec clair au chargement", true, invalidIndoorThrew);
 
-  // indoor est un champ de FACE (voir core/level.js/FACE_FIELDS) : une scène
+  // indoor est un champ de FACE (voir core/scene.js/FACE_FIELDS) : une scène
   // à deux faces le déclare INDÉPENDAMMENT par face — ex. une ruelle
   // extérieure (recto) menant à une arrière-boutique intérieure (verso).
-  const indoorTwoFacedLevel = parseLevel(
+  const indoorTwoFacedScene = parseScene(
     {
       id: "movement-check-indoor-two-faced",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 10,
       playerStart: 0,
       recto: { entities: [] },
@@ -3100,16 +3100,16 @@ export function runMovementChecks() {
     },
     EMPTY_REGISTRY
   );
-  run("indoor : scène à deux faces — recto sans déclaration -> false", false, indoorTwoFacedLevel.recto.indoor);
-  run("indoor : scène à deux faces — verso déclaré true -> transporté sur SA face uniquement", true, indoorTwoFacedLevel.verso.indoor);
+  run("indoor : scène à deux faces — recto sans déclaration -> false", false, indoorTwoFacedScene.recto.indoor);
+  run("indoor : scène à deux faces — verso déclaré true -> transporté sur SA face uniquement", true, indoorTwoFacedScene.verso.indoor);
 
   // defaultSurface/segment FOURNI mais invalide -> échec clair (jamais un
   // filet, contrairement à l'omission ci-dessus) : une référence de contenu
   // erronée ne doit jamais se dégrader en silence.
   let unknownDefaultSurfaceThrew = false;
   try {
-    parseLevel(
-      { id: "x", titleKey: "level.demo.title", length: 10, playerStart: 0, defaultSurface: "lava", entities: [] },
+    parseScene(
+      { id: "x", titleKey: "scene.demo.name", length: 10, playerStart: 0, defaultSurface: "lava", entities: [] },
       EMPTY_REGISTRY
     );
   } catch {
@@ -3119,10 +3119,10 @@ export function runMovementChecks() {
 
   let unknownSegmentSurfaceThrew = false;
   try {
-    parseLevel(
+    parseScene(
       {
         id: "x",
-        titleKey: "level.demo.title",
+        titleKey: "scene.demo.name",
         length: 10,
         playerStart: 0,
         segments: [{ from: 0, to: 5, surface: "lava" }],
@@ -3137,10 +3137,10 @@ export function runMovementChecks() {
 
   let malformedSegmentThrew = false;
   try {
-    parseLevel(
+    parseScene(
       {
         id: "x",
-        titleKey: "level.demo.title",
+        titleKey: "scene.demo.name",
         length: 10,
         playerStart: 0,
         segments: [{ from: 6, to: 3, surface: "sand" }], // from >= to
@@ -3154,10 +3154,10 @@ export function runMovementChecks() {
   run("surfaces : segment mal formé (from >= to) -> échec clair", true, malformedSegmentThrew);
 
   // Sérialisabilité : aller-retour JSON fidèle, aucune clé undefined injectée.
-  const surfaceRoundTrip = JSON.parse(JSON.stringify(surfaceLevel));
+  const surfaceRoundTrip = JSON.parse(JSON.stringify(surfaceScene));
   run(
     "surfaces : structure identique après aller-retour JSON",
-    JSON.stringify(surfaceLevel),
+    JSON.stringify(surfaceScene),
     JSON.stringify(surfaceRoundTrip)
   );
   run(
@@ -3282,10 +3282,10 @@ export function runMovementChecks() {
   // transition (pour peupler worlds avec 2 mondes, un actif et un rangé) —
   // le cas le plus représentatif d'un vrai save.
   const AUDIT_REGISTRY = { dog: { nameKey: "entity.dog.name" }, door: { nameKey: "entity.door.name" } };
-  const auditWorldA = parseLevel(
+  const auditWorldA = parseScene(
     {
       id: "movement-check-audit-a",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 20,
       playerStart: 2,
       music: "assets/musics/a_warm_night_in_harlem.mp3",
@@ -3296,8 +3296,8 @@ export function runMovementChecks() {
     },
     AUDIT_REGISTRY
   );
-  const auditWorldB = parseLevel(
-    { id: "movement-check-audit-b", titleKey: "level.demo.title", length: 15, playerStart: 3, entities: [] },
+  const auditWorldB = parseScene(
+    { id: "movement-check-audit-b", titleKey: "scene.demo.name", length: 15, playerStart: 3, entities: [] },
     AUDIT_REGISTRY
   );
 
@@ -3412,13 +3412,13 @@ export function runMovementChecks() {
         revived.worlds[auditWorldB.id].entities.some((e) => e.id === "audit-companion")
       );
       run(
-        "sérialisation : le compagnon reparu est injecté une seule fois dans le lieu actif",
+        "sérialisation : le compagnon reparu est injecté une seule fois dans le monde actif",
         1,
         getActiveWorld(revived).entities.filter((e) => e.id === "audit-companion").length
       );
 
       // Suivi toujours actif : le joueur s'éloigne largement (vers la
-      // droite, où le lieu A laisse de la marge, playerStart=2/length=20) —
+      // droite, où le monde A laisse de la marge, playerStart=2/length=20) —
       // le compagnon reconstruit depuis JSON doit encore réagir (targetId
       // "player" toujours résolu, comportement follow intact).
       const companionXAfterReturn = revived.companions.find((c) => c.id === "audit-companion").x;
@@ -3435,10 +3435,10 @@ export function runMovementChecks() {
   // --- Argent (core/money.js) : scalaire de partie + effet pickup ---
 
   const MONEY_REGISTRY = { dog: { nameKey: "entity.dog.name" } };
-  const moneyLevel = parseLevel(
+  const moneyScene = parseScene(
     {
       id: "movement-check-money",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 10,
       playerStart: 0,
       entities: [
@@ -3448,7 +3448,7 @@ export function runMovementChecks() {
     },
     MONEY_REGISTRY
   );
-  const moneyState = createInitialState(moneyLevel, undefined, NO_COMPANIONS);
+  const moneyState = createInitialState(moneyScene, undefined, NO_COMPANIONS);
 
   run("argent : une partie neuve démarre à 0", 0, moneyState.money);
 
@@ -3488,7 +3488,7 @@ export function runMovementChecks() {
   // en réalité avec des rangers dans le sac (voir "Équipement" plus bas,
   // core/state.js/createInitialState) — hors-sujet ici, ces tests
   // vérifient le MÉCANISME du sac, pas le contenu de départ d'une partie.
-  const bagState = { ...createInitialState(moneyLevel, undefined, NO_COMPANIONS), bag: [] };
+  const bagState = { ...createInitialState(moneyScene, undefined, NO_COMPANIONS), bag: [] };
   run("sac : sac VIDÉ pour ces tests de mécanisme (contenu de départ testé plus bas)", 0, bagState.bag.length);
 
   // Empilable : le PREMIER ajout crée l'entrée, les SUIVANTS incrémentent
@@ -3521,10 +3521,10 @@ export function runMovementChecks() {
   // pickupItemEntity : effet atomique (objet + retrait), même patron que
   // pickupEntity (argent) ci-dessus.
   const ITEM_TEST_REGISTRY = { item: { nameKey: "entity.item.name" } };
-  const itemLevel = parseLevel(
+  const itemScene = parseScene(
     {
       id: "movement-check-item",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 10,
       playerStart: 0,
       entities: [
@@ -3537,7 +3537,7 @@ export function runMovementChecks() {
   // Sac VIDÉ ici aussi — même raison que bagState plus haut (une partie
   // neuve démarre en réalité avec des rangers dedans, hors-sujet pour ce
   // test de mécanisme).
-  const itemState = { ...createInitialState(itemLevel, undefined, NO_COMPANIONS), bag: [] };
+  const itemState = { ...createInitialState(itemScene, undefined, NO_COMPANIONS), bag: [] };
 
   const afterApplePickup = pickupItemEntity(itemState, "apple-1", "apple", 1);
   run("sac : pickupItemEntity ajoute l'objet au sac", 1, afterApplePickup.bag.length);
@@ -3619,8 +3619,8 @@ export function runMovementChecks() {
   run("gaitOf : rangers équipées -> boots (même pool que les bottes en cuir)", "boots", gaitOf({ feet: { type: "combat_boots" } }));
   run("gaitOf : type retiré du registre entre-temps -> repli barefoot", "barefoot", gaitOf({ feet: { type: "does-not-exist" } }));
 
-  const equipmentLevel = parseLevel(RAW_LEVEL, EMPTY_REGISTRY);
-  const freshEquipState = createInitialState(equipmentLevel, undefined, NO_COMPANIONS);
+  const equipmentScene = parseScene(RAW_SCENE, EMPTY_REGISTRY);
+  const freshEquipState = createInitialState(equipmentScene, undefined, NO_COMPANIONS);
   run("équipement : une partie neuve démarre avec des baskets ÉQUIPÉES", "sneakers", freshEquipState.equipment.feet.type);
   run("équipement : une partie neuve démarre avec rangers ET escarpins DANS LE SAC (pas équipés)", 2, freshEquipState.bag.length);
   run("équipement : les rangers de départ ne sont pas équipés", "combat_boots", freshEquipState.bag[0].type);
@@ -3773,16 +3773,16 @@ export function runMovementChecks() {
     evaluateCondition({ type: "hasEquipmentTag", tag: "chic" }, { playerEquipment: { feet: { type: "high_heels" } } })
   );
 
-  // Validation au chargement (core/level.js/parsePresenceRule) : un tag de
+  // Validation au chargement (core/scene.js/parsePresenceRule) : un tag de
   // condition inconnu échoue clairement, même principe que la surface d'un
   // segment (voir plus bas, "surfaces").
   const TAG_TRIGGER_REGISTRY = { dog: { nameKey: "entity.dog.name" } };
   let validTagConditionAccepted = false;
   try {
-    parseLevel(
+    parseScene(
       {
         id: "movement-check-tags-valid",
-        titleKey: "level.demo.title",
+        titleKey: "scene.demo.name",
         length: 10,
         playerStart: 0,
         entities: [
@@ -3804,10 +3804,10 @@ export function runMovementChecks() {
 
   let unknownTagConditionThrew = false;
   try {
-    parseLevel(
+    parseScene(
       {
         id: "movement-check-tags-invalid",
-        titleKey: "level.demo.title",
+        titleKey: "scene.demo.name",
         length: 10,
         playerStart: 0,
         entities: [
@@ -3875,12 +3875,12 @@ export function runMovementChecks() {
     run("improvements : removeImprovement retire la clé", false, hasImprovement(removedAgain, "flashlight"));
     run("improvements : removeImprovement idempotent -> RÉFÉRENCE inchangée si déjà absente", removedAgain, removeImprovement(removedAgain, "flashlight"));
 
-    // Validation au CHARGEMENT (core/level.js) — condition ET effets.
+    // Validation au CHARGEMENT (core/scene.js) — condition ET effets.
     const IMPROVEMENT_TEST_REGISTRY = { dog: { nameKey: "entity.dog.name" } };
-    function levelWithHasImprovement(id) {
+    function sceneWithHasImprovement(id) {
       return {
         id: "movement-check-has-improvement",
-        titleKey: "level.demo.title",
+        titleKey: "scene.demo.name",
         length: 10,
         playerStart: 0,
         entities: [{ id: "e1", type: "dog", x: 5, presence: [{ when: { type: "hasImprovement", id }, present: true }] }],
@@ -3889,17 +3889,17 @@ export function runMovementChecks() {
     run(
       "hasImprovement : id valide -> chargé sans erreur",
       true,
-      expectAccepted(() => parseLevel(levelWithHasImprovement("supernatural_perception"), IMPROVEMENT_TEST_REGISTRY))
+      expectAccepted(() => parseScene(sceneWithHasImprovement("supernatural_perception"), IMPROVEMENT_TEST_REGISTRY))
     );
     run(
       "hasImprovement : id inconnu -> échec clair au chargement",
       true,
-      expectThrows(() => parseLevel(levelWithHasImprovement("does-not-exist"), IMPROVEMENT_TEST_REGISTRY))
+      expectThrows(() => parseScene(sceneWithHasImprovement("does-not-exist"), IMPROVEMENT_TEST_REGISTRY))
     );
-    function levelWithImprovementEffect(effect) {
+    function sceneWithImprovementEffect(effect) {
       return {
         id: "movement-check-improvement-effect",
-        titleKey: "level.demo.title",
+        titleKey: "scene.demo.name",
         length: 10,
         playerStart: 0,
         entities: [{ id: "e1", type: "dog", x: 5, action: { kind: "applyEffects", effects: [effect] } }],
@@ -3908,17 +3908,17 @@ export function runMovementChecks() {
     run(
       "giveImprovement : id valide -> chargé sans erreur",
       true,
-      expectAccepted(() => parseLevel(levelWithImprovementEffect({ type: "giveImprovement", id: "mirror_pass" }), IMPROVEMENT_TEST_REGISTRY))
+      expectAccepted(() => parseScene(sceneWithImprovementEffect({ type: "giveImprovement", id: "mirror_pass" }), IMPROVEMENT_TEST_REGISTRY))
     );
     run(
       "giveImprovement : id inconnu -> échec clair au chargement",
       true,
-      expectThrows(() => parseLevel(levelWithImprovementEffect({ type: "giveImprovement", id: "does-not-exist" }), IMPROVEMENT_TEST_REGISTRY))
+      expectThrows(() => parseScene(sceneWithImprovementEffect({ type: "giveImprovement", id: "does-not-exist" }), IMPROVEMENT_TEST_REGISTRY))
     );
     run(
       "removeImprovement : id inconnu -> échec clair au chargement",
       true,
-      expectThrows(() => parseLevel(levelWithImprovementEffect({ type: "removeImprovement", id: "does-not-exist" }), IMPROVEMENT_TEST_REGISTRY))
+      expectThrows(() => parseScene(sceneWithImprovementEffect({ type: "removeImprovement", id: "does-not-exist" }), IMPROVEMENT_TEST_REGISTRY))
     );
 
     // Évaluation RUNTIME — condition "hasImprovement" (core/presence.js).
@@ -3991,10 +3991,10 @@ export function runMovementChecks() {
     // correction : improvements survit désormais au splice final (comme
     // variables), alors que seul .variables était repris auparavant.
     const IMPROVEMENT_ENTITY_REGISTRY = { npc: { nameKey: "entity.npc.name" } };
-    const improvementWorld = parseLevel(
+    const improvementWorld = parseScene(
       {
         id: "movement-check-improvement-world",
-        titleKey: "level.demo.title",
+        titleKey: "scene.demo.name",
         length: 10,
         playerStart: 0,
         entities: [{ id: "unlocker", type: "npc", x: 5 }],
@@ -4064,7 +4064,7 @@ export function runMovementChecks() {
     }
   }
 
-  // --- Actions CONDITIONNELLES (core/level.js, action.condition/
+  // --- Actions CONDITIONNELLES (core/scene.js, action.condition/
   // refusalEffects ; voir view/interaction.js) — GÉNÉRIQUE à TOUT kind,
   // testé ICI en FORME/VALIDATION seulement (au chargement) ; le blocage +
   // l'exécution des effets de refus à l'interaction sont côté vue, hors de
@@ -4075,10 +4075,10 @@ export function runMovementChecks() {
   let validActionConditionAccepted = false;
   let parsedActionConditionEntity = null;
   try {
-    const conditionalActionLevel = parseLevel(
+    const conditionalActionScene = parseScene(
       {
         id: "movement-check-action-condition-valid",
-        titleKey: "level.demo.title",
+        titleKey: "scene.demo.name",
         length: 10,
         playerStart: 0,
         entities: [
@@ -4097,7 +4097,7 @@ export function runMovementChecks() {
       ACTION_CONDITION_REGISTRY
     );
     validActionConditionAccepted = true;
-    parsedActionConditionEntity = conditionalActionLevel.entities[0];
+    parsedActionConditionEntity = conditionalActionScene.entities[0];
   } catch {
     validActionConditionAccepted = false;
   }
@@ -4110,10 +4110,10 @@ export function runMovementChecks() {
 
   let unknownActionConditionTagThrew = false;
   try {
-    parseLevel(
+    parseScene(
       {
         id: "movement-check-action-condition-bad-tag",
-        titleKey: "level.demo.title",
+        titleKey: "scene.demo.name",
         length: 10,
         playerStart: 0,
         entities: [
@@ -4136,17 +4136,17 @@ export function runMovementChecks() {
   }
   run("actions conditionnelles : tag inconnu dans action.condition -> échec clair", true, unknownActionConditionTagThrew);
 
-  // refusalEffects est OPTIONNEL (voir "Conditions d'action"/core/level.js/
+  // refusalEffects est OPTIONNEL (voir "Conditions d'action"/core/scene.js/
   // parseSingleAction) : une condition SANS refusalEffects charge SANS
   // erreur — l'échec devient silencieux, ASSUMÉ (voir entities/types/
   // window.js, dont les deux candidates couvrent tout l'espace du flag
   // isOpen : un refus n'y est jamais réellement atteignable).
   let missingRefusalEffectsAccepted = false;
   try {
-    parseLevel(
+    parseScene(
       {
         id: "movement-check-action-condition-no-refusal",
-        titleKey: "level.demo.title",
+        titleKey: "scene.demo.name",
         length: 10,
         playerStart: 0,
         entities: [
@@ -4168,10 +4168,10 @@ export function runMovementChecks() {
   // trace.
   let emptyRefusalEffectsThrew = false;
   try {
-    parseLevel(
+    parseScene(
       {
         id: "movement-check-action-condition-empty-refusal",
-        titleKey: "level.demo.title",
+        titleKey: "scene.demo.name",
         length: 10,
         playerStart: 0,
         entities: [
@@ -4194,10 +4194,10 @@ export function runMovementChecks() {
   // que vide : la FORME reste validée dès que le champ est déclaré.
   let malformedRefusalEffectsThrew = false;
   try {
-    parseLevel(
+    parseScene(
       {
         id: "movement-check-action-condition-malformed-refusal",
-        titleKey: "level.demo.title",
+        titleKey: "scene.demo.name",
         length: 10,
         playerStart: 0,
         entities: [
@@ -4218,10 +4218,10 @@ export function runMovementChecks() {
 
   // Rétrocompat : une action SANS condition (tout contenu existant) reste
   // inchangée, jamais bloquée implicitement par cette nouvelle validation.
-  const unconditionalActionLevel = parseLevel(
+  const unconditionalActionScene = parseScene(
     {
       id: "movement-check-action-no-condition",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 10,
       playerStart: 0,
       entities: [{ id: "plain-action", type: "dog", x: 5, action: { kind: "transit" } }],
@@ -4231,7 +4231,7 @@ export function runMovementChecks() {
   run(
     "actions conditionnelles : action SANS condition -> inchangée (rétrocompat)",
     undefined,
-    unconditionalActionLevel.entities[0].action.condition
+    unconditionalActionScene.entities[0].action.condition
   );
 
   // --- Perception surnaturelle (core/state.js/togglePerception,
@@ -4240,9 +4240,9 @@ export function runMovementChecks() {
   // entités mondaines) reste ENTIÈREMENT côté vue (view/audio/city-scene.js,
   // view/city-screen.js) — hors de portée d'un check terminal.
 
-  run("perception : createInitialState — perceptionActive false par défaut", false, createInitialState(level, undefined, NO_COMPANIONS).perceptionActive);
+  run("perception : createInitialState — perceptionActive false par défaut", false, createInitialState(scene, undefined, NO_COMPANIONS).perceptionActive);
 
-  const perceptionSession = createInitialState(level, undefined, NO_COMPANIONS);
+  const perceptionSession = createInitialState(scene, undefined, NO_COMPANIONS);
   const perceptionToggled = togglePerception(perceptionSession);
   run("perception : togglePerception active (false -> true)", true, perceptionToggled.perceptionActive);
   run("perception : togglePerception NE MUTE JAMAIS l'original", false, perceptionSession.perceptionActive);
@@ -4264,10 +4264,10 @@ export function runMovementChecks() {
     dog: { nameKey: "entity.dog.name" },
     spirit: { nameKey: "entity.ghost.name", presence: [{ when: { type: "perceptionActive" }, present: true }] },
   };
-  const spiritLevel = parseLevel(
+  const spiritScene = parseScene(
     {
       id: "movement-check-perception",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 20,
       playerStart: 0,
       entities: [{ id: "spirit-1", type: "spirit", x: 10, behavior: { kind: "wander", walkMin: 1000, walkMax: 1000 } }],
@@ -4278,7 +4278,7 @@ export function runMovementChecks() {
     return getActiveWorld(state).entities.find((e) => e.id === "spirit-1");
   }
 
-  let perceptionOffState = createInitialState(spiritLevel, 5, NO_COMPANIONS);
+  let perceptionOffState = createInitialState(spiritScene, 5, NO_COMPANIONS);
   for (let i = 0; i < 30; i++) perceptionOffState = reduce(perceptionOffState, tick(0));
   run("perception : entité surnaturelle — dormante tant que la perception est inactive", false, spirit(perceptionOffState).present);
   run(
@@ -4427,8 +4427,8 @@ export function runMovementChecks() {
   );
 
   // État initial d'une partie (createInitialState -> createInitialWeather).
-  const weatherLevel = parseLevel(RAW_LEVEL, EMPTY_REGISTRY);
-  const freshWeatherState = createInitialState(weatherLevel, 1, NO_COMPANIONS);
+  const weatherScene = parseScene(RAW_SCENE, EMPTY_REGISTRY);
+  const freshWeatherState = createInitialState(weatherScene, 1, NO_COMPANIONS);
   run("weather : état initial = DEFAULT_WEATHER_STATE", DEFAULT_WEATHER_STATE, freshWeatherState.weather.state);
   run(
     "weather : première transition programmée DANS la fourchette de durée de l'état par défaut",
@@ -4467,10 +4467,10 @@ export function runMovementChecks() {
   // grand saut resterait bloqué sur un rendez-vous largement dépassé, très
   // différent du résultat pas à pas).
   const BIG_JUMP_MINUTES = 3000; // largement de quoi franchir plusieurs transitions
-  let bigJumpState = createInitialState(weatherLevel, 42, NO_COMPANIONS);
+  let bigJumpState = createInitialState(weatherScene, 42, NO_COMPANIONS);
   bigJumpState = advanceWeather({ ...bigJumpState, time: bigJumpState.time + BIG_JUMP_MINUTES });
 
-  let smallStepsState = createInitialState(weatherLevel, 42, NO_COMPANIONS);
+  let smallStepsState = createInitialState(weatherScene, 42, NO_COMPANIONS);
   for (let i = 0; i < BIG_JUMP_MINUTES; i++) {
     smallStepsState = advanceWeather({ ...smallStepsState, time: smallStepsState.time + 1 });
   }
@@ -4483,7 +4483,7 @@ export function runMovementChecks() {
   // Déterminisme direct : même seed + même déroulé -> même succession
   // météo, rejouée deux fois indépendamment.
   function weatherSequence(seed, totalMinutes) {
-    let s = createInitialState(weatherLevel, seed, NO_COMPANIONS);
+    let s = createInitialState(weatherScene, seed, NO_COMPANIONS);
     const sequence = [];
     for (let i = 0; i < totalMinutes; i++) {
       const before = s.weather.state;
@@ -4531,7 +4531,7 @@ export function runMovementChecks() {
   // — voir view/menus/debug-weather-menu.js, Shift+W) : entrée PROPRE dans
   // un état choisi à la main, sans passer par un tirage de CIBLE, mais avec
   // une durée TIRÉE (PRNG toujours sain après coup, voir header du module).
-  const forcedBase = createInitialState(weatherLevel, "force-check", NO_COMPANIONS);
+  const forcedBase = createInitialState(weatherScene, "force-check", NO_COMPANIONS);
   const forcedRain = setWeather(forcedBase, "rain");
   run("setWeather : entre bien dans l'état demandé", "rain", forcedRain.weather.state);
   run(
@@ -4566,7 +4566,7 @@ export function runMovementChecks() {
   // longue chaîne d'appels enchaînés (chacun repart de l'état/rngState
   // produit par le précédent), et produire une variété de résultats
   // (preuve qu'il ne renvoie jamais bêtement la même cible).
-  let triggerState = createInitialState(weatherLevel, "trigger-check", NO_COMPANIONS);
+  let triggerState = createInitialState(weatherScene, "trigger-check", NO_COMPANIONS);
   const triggerTargetsSeen = new Set();
   let allTriggerTargetsValid = true;
   const TRIGGER_SAMPLES = 300;
@@ -4591,13 +4591,13 @@ export function runMovementChecks() {
     evaluateCondition({ type: "weather" }, {})
   );
 
-  // Validation au chargement (core/level.js/validateCondition) : un état
+  // Validation au chargement (core/scene.js/validateCondition) : un état
   // référencé par la condition doit exister dans la VRAIE table météo —
   // même politique que hasEquipmentTag.tag contre TAG_REGISTRY.
-  function expectLevelParseThrows(rawLevel, registry) {
+  function expectSceneParseThrows(rawScene, registry) {
     let threw = false;
     try {
-      parseLevel(rawLevel, registry);
+      parseScene(rawScene, registry);
     } catch {
       threw = true;
     }
@@ -4606,9 +4606,9 @@ export function runMovementChecks() {
   const WEATHER_COND_REGISTRY = {
     wolf: { nameKey: "entity.cumulo_lupus.name", presence: [{ when: { type: "weather", state: "fog" }, present: true }] },
   };
-  const weatherCondLevelRaw = () => ({
+  const weatherCondSceneRaw = () => ({
     id: "movement-check-weather-condition",
-    titleKey: "level.demo.title",
+    titleKey: "scene.demo.name",
     length: 20,
     playerStart: 0,
     entities: [{ id: "wolf-1", type: "wolf", x: 10, behavior: { kind: "wander", walkMin: 1000, walkMax: 1000 } }],
@@ -4616,10 +4616,10 @@ export function runMovementChecks() {
   run(
     "weather (condition) : état inexistant dans la table météo -> erreur claire au chargement",
     true,
-    expectLevelParseThrows(
+    expectSceneParseThrows(
       {
         id: "movement-check-weather-condition-bad",
-        titleKey: "level.demo.title",
+        titleKey: "scene.demo.name",
         length: 20,
         playerStart: 0,
         entities: [{ id: "wolf-1", type: "wolf", x: 10, presence: [{ when: { type: "weather", state: "doesNotExist" }, present: true }] }],
@@ -4627,7 +4627,7 @@ export function runMovementChecks() {
       { wolf: { nameKey: "entity.cumulo_lupus.name" } }
     )
   );
-  run("weather (condition) : état valide -> chargement accepté", false, expectLevelParseThrows(weatherCondLevelRaw(), WEATHER_COND_REGISTRY));
+  run("weather (condition) : état valide -> chargement accepté", false, expectSceneParseThrows(weatherCondSceneRaw(), WEATHER_COND_REGISTRY));
 
   // Intégration : une entité (même patron que entities/types/cumulo-lupus.js)
   // dont la présence est conditionnée par weather=="fog" est DORMANTE tant
@@ -4635,11 +4635,11 @@ export function runMovementChecks() {
   // devient "fog" — via LE MÊME presenceContext que time/perceptionActive
   // (core/reduce.js/TICK), forcée par core/weather.js/setWeather (comme le
   // menu debug le ferait), aucun mécanisme séparé.
-  const weatherCondLevel = parseLevel(weatherCondLevelRaw(), WEATHER_COND_REGISTRY);
+  const weatherCondScene = parseScene(weatherCondSceneRaw(), WEATHER_COND_REGISTRY);
   function wolf(state) {
     return getActiveWorld(state).entities.find((e) => e.id === "wolf-1");
   }
-  let notFoggyState = createInitialState(weatherCondLevel, "weather-cond-check", NO_COMPANIONS);
+  let notFoggyState = createInitialState(weatherCondScene, "weather-cond-check", NO_COMPANIONS);
   notFoggyState = setWeather(notFoggyState, "clear");
   notFoggyState = reduce(notFoggyState, tick(0));
   run("weather (condition) : entité conditionnée — dormante hors de l'état déclaré", false, wolf(notFoggyState).present);
@@ -4676,7 +4676,7 @@ export function runMovementChecks() {
     evaluateCondition({ type: "allOf", conditions: [{ type: "perceptionActive" }, { type: "weather", state: "fog" }] }, { perceptionActive: false, weather: "clear" })
   );
   // Cas limite : "conditions" à un SEUL élément — redondant (revient à la
-  // sous-condition seule) mais légal, voir core/level.js/validateCondition
+  // sous-condition seule) mais légal, voir core/scene.js/validateCondition
   // (rejette seulement un tableau VIDE, pas un tableau à un élément).
   run(
     "allOf : une seule sous-condition, vraie -> vraie",
@@ -4697,41 +4697,41 @@ export function runMovementChecks() {
     )
   );
 
-  // Validation au chargement (core/level.js/validateCondition) :
+  // Validation au chargement (core/scene.js/validateCondition) :
   // "conditions" doit être un tableau NON VIDE, chaque élément revalidé
   // RÉCURSIVEMENT — une sous-condition mal formée échoue exactement comme
   // au premier niveau.
   run(
     "allOf : conditions vide -> erreur claire au chargement",
     true,
-    expectLevelParseThrows(
-      { id: "movement-check-allof-empty", titleKey: "level.demo.title", length: 20, playerStart: 0, entities: [{ id: "wolf-1", type: "wolf", x: 10, presence: [{ when: { type: "allOf", conditions: [] }, present: true }] }] },
+    expectSceneParseThrows(
+      { id: "movement-check-allof-empty", titleKey: "scene.demo.name", length: 20, playerStart: 0, entities: [{ id: "wolf-1", type: "wolf", x: 10, presence: [{ when: { type: "allOf", conditions: [] }, present: true }] }] },
       { wolf: { nameKey: "entity.cumulo_lupus.name" } }
     )
   );
   run(
     "allOf : conditions absent (pas un tableau) -> erreur claire au chargement",
     true,
-    expectLevelParseThrows(
-      { id: "movement-check-allof-missing", titleKey: "level.demo.title", length: 20, playerStart: 0, entities: [{ id: "wolf-1", type: "wolf", x: 10, presence: [{ when: { type: "allOf" }, present: true }] }] },
+    expectSceneParseThrows(
+      { id: "movement-check-allof-missing", titleKey: "scene.demo.name", length: 20, playerStart: 0, entities: [{ id: "wolf-1", type: "wolf", x: 10, presence: [{ when: { type: "allOf" }, present: true }] }] },
       { wolf: { nameKey: "entity.cumulo_lupus.name" } }
     )
   );
   run(
     "allOf : conditions à un seul élément -> légal au chargement (pas d'erreur)",
     false,
-    expectLevelParseThrows(
-      { id: "movement-check-allof-single", titleKey: "level.demo.title", length: 20, playerStart: 0, entities: [{ id: "wolf-1", type: "wolf", x: 10, presence: [{ when: { type: "allOf", conditions: [{ type: "perceptionActive" }] }, present: true }] }] },
+    expectSceneParseThrows(
+      { id: "movement-check-allof-single", titleKey: "scene.demo.name", length: 20, playerStart: 0, entities: [{ id: "wolf-1", type: "wolf", x: 10, presence: [{ when: { type: "allOf", conditions: [{ type: "perceptionActive" }] }, present: true }] }] },
       { wolf: { nameKey: "entity.cumulo_lupus.name" } }
     )
   );
   run(
     "allOf : sous-condition mal formée (état météo inconnu) -> erreur claire au chargement, RÉCURSIVE",
     true,
-    expectLevelParseThrows(
+    expectSceneParseThrows(
       {
         id: "movement-check-allof-bad-sub",
-        titleKey: "level.demo.title",
+        titleKey: "scene.demo.name",
         length: 20,
         playerStart: 0,
         entities: [
@@ -4757,14 +4757,14 @@ export function runMovementChecks() {
       presence: [{ when: { type: "allOf", conditions: [{ type: "perceptionActive" }, { type: "weather", state: "fog" }] }, present: true }],
     },
   };
-  const allOfLevel = parseLevel(
-    { id: "movement-check-allof-integration", titleKey: "level.demo.title", length: 20, playerStart: 0, entities: [{ id: "wolf-1", type: "wolf", x: 10, behavior: { kind: "wander", walkMin: 1000, walkMax: 1000 } }] },
+  const allOfScene = parseScene(
+    { id: "movement-check-allof-integration", titleKey: "scene.demo.name", length: 20, playerStart: 0, entities: [{ id: "wolf-1", type: "wolf", x: 10, behavior: { kind: "wander", walkMin: 1000, walkMax: 1000 } }] },
     ALLOF_REGISTRY
   );
   function allOfWolf(state) {
     return getActiveWorld(state).entities.find((e) => e.id === "wolf-1");
   }
-  let neitherState = createInitialState(allOfLevel, "allof-cond-check", NO_COMPANIONS);
+  let neitherState = createInitialState(allOfScene, "allof-cond-check", NO_COMPANIONS);
   neitherState = setWeather(neitherState, "clear");
   neitherState = reduce(neitherState, tick(0));
   run("allOf (intégration) : ni perception ni brume -> dormante", false, allOfWolf(neitherState).present);
@@ -4799,13 +4799,13 @@ export function runMovementChecks() {
   run("allOf(not) : brume EN perception -> fausse", false, evaluateCondition(FOG_WITHOUT_PERCEPTION, { perceptionActive: true, weather: "fog" }));
 
   const NOT_REGISTRY = { wolf: { nameKey: "entity.cumulo_lupus.name" } };
-  const notLevel = (when) => ({ id: "movement-check-not", titleKey: "level.demo.title", length: 20, playerStart: 0, entities: [{ id: "wolf-1", type: "wolf", x: 10, presence: [{ when, present: true }] }] });
-  run("not : forme valide -> chargée", false, expectLevelParseThrows(notLevel(NOT_PERCEPTION), NOT_REGISTRY));
-  run("not : sous-condition absente -> erreur claire au chargement", true, expectLevelParseThrows(notLevel({ type: "not" }), NOT_REGISTRY));
-  run("not : sous-condition en tableau -> erreur claire au chargement", true, expectLevelParseThrows(notLevel({ type: "not", condition: [{ type: "perceptionActive" }] }), NOT_REGISTRY));
-  run("not : sous-condition mal formée -> erreur RÉCURSIVE", true, expectLevelParseThrows(notLevel({ type: "not", condition: { type: "weather", state: "doesNotExist" } }), NOT_REGISTRY));
-  run("not dans allOf, sous-condition mal formée -> erreur RÉCURSIVE", true, expectLevelParseThrows(notLevel({ type: "allOf", conditions: [{ type: "not", condition: { type: "nope" } }] }), NOT_REGISTRY));
-  run("allOf dans not -> chargé", false, expectLevelParseThrows(notLevel(NOT_FOGGY_PERCEPTION), NOT_REGISTRY));
+  const notScene = (when) => ({ id: "movement-check-not", titleKey: "scene.demo.name", length: 20, playerStart: 0, entities: [{ id: "wolf-1", type: "wolf", x: 10, presence: [{ when, present: true }] }] });
+  run("not : forme valide -> chargée", false, expectSceneParseThrows(notScene(NOT_PERCEPTION), NOT_REGISTRY));
+  run("not : sous-condition absente -> erreur claire au chargement", true, expectSceneParseThrows(notScene({ type: "not" }), NOT_REGISTRY));
+  run("not : sous-condition en tableau -> erreur claire au chargement", true, expectSceneParseThrows(notScene({ type: "not", condition: [{ type: "perceptionActive" }] }), NOT_REGISTRY));
+  run("not : sous-condition mal formée -> erreur RÉCURSIVE", true, expectSceneParseThrows(notScene({ type: "not", condition: { type: "weather", state: "doesNotExist" } }), NOT_REGISTRY));
+  run("not dans allOf, sous-condition mal formée -> erreur RÉCURSIVE", true, expectSceneParseThrows(notScene({ type: "allOf", conditions: [{ type: "not", condition: { type: "nope" } }] }), NOT_REGISTRY));
+  run("allOf dans not -> chargé", false, expectSceneParseThrows(notScene(NOT_FOGGY_PERCEPTION), NOT_REGISTRY));
 
   // Intégration : deux entités superposées, l'une présente HORS perception,
   // l'autre EN perception — jamais les deux, jamais aucune.
@@ -4813,19 +4813,19 @@ export function runMovementChecks() {
     plainMirror: { nameKey: "entity.clock_tower_mirror.name", presence: [{ when: NOT_PERCEPTION, present: true }] },
     magicMirror: { nameKey: "door.clock_tower_magic_mirror.name", presence: [{ when: { type: "perceptionActive" }, present: true }] },
   };
-  const swapLevel = parseLevel(
-    { id: "movement-check-not-swap", titleKey: "level.demo.title", length: 20, playerStart: 5, entities: [{ id: "plain", type: "plainMirror", x: 0 }, { id: "magic", type: "magicMirror", x: 0 }] },
+  const swapScene = parseScene(
+    { id: "movement-check-not-swap", titleKey: "scene.demo.name", length: 20, playerStart: 5, entities: [{ id: "plain", type: "plainMirror", x: 0 }, { id: "magic", type: "magicMirror", x: 0 }] },
     SWAP_REGISTRY
   );
   const swapPresence = (state) => getActiveWorld(state).entities.map((e) => `${e.id}:${e.present}`).join(",");
-  let swapState = reduce(createInitialState(swapLevel, "not-swap", NO_COMPANIONS), tick(0));
+  let swapState = reduce(createInitialState(swapScene, "not-swap", NO_COMPANIONS), tick(0));
   run("not (intégration) : perception inactive -> ordinaire seul", "plain:true,magic:false", swapPresence(swapState));
   swapState = reduce(togglePerception(swapState), tick(0));
   run("not (intégration) : perception active -> magique seul", "plain:false,magic:true", swapPresence(swapState));
   swapState = reduce(togglePerception(swapState), tick(0));
   run("not (intégration) : perception redevient inactive -> ordinaire seul", "plain:true,magic:false", swapPresence(swapState));
 
-  // --- Beacon conditionnel (sounds.beacon.condition, core/level.js) :
+  // --- Beacon conditionnel (sounds.beacon.condition, core/scene.js) :
   // validé au chargement comme une condition d'action, une condition
   // d'instance REMPLACE celle de l'archétype, et la condition se lit contre
   // les variables COURANTES de l'entité (évaluation côté vue). ---
@@ -4834,18 +4834,18 @@ export function runMovementChecks() {
     projector: { nameKey: "entity.video_projector.name", sounds: { beacon: { path: "assets/sounds/furniture/video_projector_1_beacon", loop: true, condition: IS_ON } } },
   };
   const IS_ON_VARIABLE = [{ name: "isOn", type: "flag", initial: true, persistent: true }];
-  const beaconCondLevel = (entity) => ({ id: "movement-check-beacon-condition", titleKey: "level.demo.title", length: 20, playerStart: 0, entities: [{ id: "projector-1", type: "projector", x: 5, ...entity }] });
-  run("beacon conditionnel : variable déclarée -> chargé", false, expectLevelParseThrows(beaconCondLevel({ variables: IS_ON_VARIABLE }), BEACON_COND_REGISTRY));
-  run("beacon conditionnel : variable absente de l'instance -> erreur au chargement", true, expectLevelParseThrows(beaconCondLevel({}), BEACON_COND_REGISTRY));
-  run("beacon conditionnel : condition mal formée -> erreur au chargement", true, expectLevelParseThrows(beaconCondLevel({ variables: IS_ON_VARIABLE, sounds: { beacon: { condition: { type: "nope" } } } }), BEACON_COND_REGISTRY));
-  const nightBeaconLevel = parseLevel(beaconCondLevel({ sounds: { beacon: { condition: { type: "timeRange", from: 20, to: 6 } } } }), BEACON_COND_REGISTRY);
+  const beaconCondScene = (entity) => ({ id: "movement-check-beacon-condition", titleKey: "scene.demo.name", length: 20, playerStart: 0, entities: [{ id: "projector-1", type: "projector", x: 5, ...entity }] });
+  run("beacon conditionnel : variable déclarée -> chargé", false, expectSceneParseThrows(beaconCondScene({ variables: IS_ON_VARIABLE }), BEACON_COND_REGISTRY));
+  run("beacon conditionnel : variable absente de l'instance -> erreur au chargement", true, expectSceneParseThrows(beaconCondScene({}), BEACON_COND_REGISTRY));
+  run("beacon conditionnel : condition mal formée -> erreur au chargement", true, expectSceneParseThrows(beaconCondScene({ variables: IS_ON_VARIABLE, sounds: { beacon: { condition: { type: "nope" } } } }), BEACON_COND_REGISTRY));
+  const nightBeaconScene = parseScene(beaconCondScene({ sounds: { beacon: { condition: { type: "timeRange", from: 20, to: 6 } } } }), BEACON_COND_REGISTRY);
   run(
     "beacon conditionnel : condition d'instance REMPLACE celle de l'archétype (jamais fusionnée)",
     JSON.stringify({ type: "timeRange", from: 20, to: 6 }),
-    JSON.stringify(getActiveWorld(createInitialState(nightBeaconLevel, "beacon-cond", NO_COMPANIONS)).entities[0].sounds.beacon.condition)
+    JSON.stringify(getActiveWorld(createInitialState(nightBeaconScene, "beacon-cond", NO_COMPANIONS)).entities[0].sounds.beacon.condition)
   );
   run("beacon conditionnel : registre intact après remplacement", IS_ON, BEACON_COND_REGISTRY.projector.sounds.beacon.condition);
-  let beaconCondState = createInitialState(parseLevel(beaconCondLevel({ variables: IS_ON_VARIABLE }), BEACON_COND_REGISTRY), "beacon-cond", NO_COMPANIONS);
+  let beaconCondState = createInitialState(parseScene(beaconCondScene({ variables: IS_ON_VARIABLE }), BEACON_COND_REGISTRY), "beacon-cond", NO_COMPANIONS);
   const projectorOf = (state) => getActiveWorld(state).entities.find((e) => e.id === "projector-1");
   run("beacon conditionnel : allumé au départ -> condition vraie", true, evaluateCondition(projectorOf(beaconCondState).sounds.beacon.condition, { entity: projectorOf(beaconCondState) }));
   beaconCondState = applyEntityActionEffects(beaconCondState, "projector-1", [{ type: "setVariable", scope: "entity", name: "isOn", value: false }]);
@@ -4863,10 +4863,10 @@ export function runMovementChecks() {
     door: { nameKey: "door.default.name", interactable: true },
     switcher: { nameKey: "entity.video_projector.name" },
   };
-  const scenePresenceLevel = parseLevel(
+  const scenePresenceScene = parseScene(
     {
       id: "movement-check-scene-presence",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 20,
       playerStart: 0,
       variables: [{ name: "projectorOn", type: "flag", initial: true }],
@@ -4878,7 +4878,7 @@ export function runMovementChecks() {
     },
     SCENE_PRESENCE_REGISTRY
   );
-  let scenePresenceState = createInitialState(scenePresenceLevel, "scene-presence", NO_COMPANIONS);
+  let scenePresenceState = createInitialState(scenePresenceScene, "scene-presence", NO_COMPANIONS);
   const presentAtMount = (state) =>
     getActiveWorld(state).entities.filter((e) => e.presence).map((e) => `${e.id}:${isPresent(e, presenceContextOf(state))}`).join(",");
   run("variable de scène : présence au montage (contexte partagé)", "projection:true,hidden-door:false", presentAtMount(scenePresenceState));
@@ -4903,10 +4903,10 @@ export function runMovementChecks() {
   // N'EST JAMAIS retirée — voir entities/model.md/"Collectible persistant".
 
   const CRATE_REGISTRY = { dog: { nameKey: "entity.dog.name" } };
-  const crateLevel = parseLevel(
+  const crateScene = parseScene(
     {
       id: "movement-check-crate",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 10,
       playerStart: 0,
       entities: [
@@ -4916,7 +4916,7 @@ export function runMovementChecks() {
     },
     CRATE_REGISTRY
   );
-  const crateState = createInitialState(crateLevel, undefined, NO_COMPANIONS);
+  const crateState = createInitialState(crateScene, undefined, NO_COMPANIONS);
 
   run("caisse : markConsumed pose consumed:true sur l'entité ciblée", true, getActiveWorld(markConsumed(crateState, "crate-1")).entities.find((e) => e.id === "crate-1").consumed);
   run(
@@ -4941,15 +4941,15 @@ export function runMovementChecks() {
   run("caisse : lootEntity sur une entité déjà consumed -> aucun second gain", 100, lootEntity(afterLoot, "crate-1", 100).money);
   run("caisse : lootEntity sur une entité déjà consumed -> référence INCHANGÉE", afterLoot, lootEntity(afterLoot, "crate-1", 100));
 
-  // consumedDescriptionKey (core/level.js/parseEntity) : même cascade
+  // consumedDescriptionKey (core/scene.js/parseEntity) : même cascade
   // instance -> type que descriptionKey.
   const CONSUMED_DESC_REGISTRY = {
     dog: { nameKey: "entity.dog.name", descriptionKey: "entity.dog.description", consumedDescriptionKey: "entity.dog.consumed_description" },
   };
-  const consumedDescLevel = parseLevel(
+  const consumedDescScene = parseScene(
     {
       id: "movement-check-consumed-desc",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 10,
       playerStart: 0,
       entities: [
@@ -4962,12 +4962,12 @@ export function runMovementChecks() {
   run(
     "caisse : consumedDescriptionKey — retombe sur le défaut du type",
     "entity.dog.consumed_description",
-    consumedDescLevel.entities.find((e) => e.id === "type-default").consumedDescriptionKey
+    consumedDescScene.entities.find((e) => e.id === "type-default").consumedDescriptionKey
   );
   run(
     "caisse : consumedDescriptionKey — surcharge d'instance prioritaire",
     "custom.consumed_description",
-    consumedDescLevel.entities.find((e) => e.id === "instance-override").consumedDescriptionKey
+    consumedDescScene.entities.find((e) => e.id === "instance-override").consumedDescriptionKey
   );
 
   // Sérialisabilité : consumed (true, pas juste sa valeur par défaut absente)
@@ -4987,10 +4987,10 @@ export function runMovementChecks() {
   // sauvegarde, ni à une sortie de scène.
 
   const EPHEMERAL_REGISTRY = { dog: { nameKey: "entity.dog.name" }, door: { nameKey: "entity.door.name" } };
-  const ephemeralWorldA = parseLevel(
+  const ephemeralWorldA = parseScene(
     {
       id: "movement-check-ephemeral-a",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 10,
       playerStart: 0,
       entities: [
@@ -5000,8 +5000,8 @@ export function runMovementChecks() {
     },
     EPHEMERAL_REGISTRY
   );
-  const ephemeralWorldB = parseLevel(
-    { id: "movement-check-ephemeral-b", titleKey: "level.demo.title", length: 10, playerStart: 0, entities: [] },
+  const ephemeralWorldB = parseScene(
+    { id: "movement-check-ephemeral-b", titleKey: "scene.demo.name", length: 10, playerStart: 0, entities: [] },
     EPHEMERAL_REGISTRY
   );
   // spec : descripteur DÉJÀ RÉSOLU, comme le construirait la vue (voir
@@ -5113,8 +5113,8 @@ export function runMovementChecks() {
   // rebouchage, spawnEphemeral calculerait undefined + 1 = NaN, et TOUT
   // éphémère suivant recevrait le même id ("ephemeral-NaN"), collision
   // garantie dès le second spawn.
-  // ephemeralWorldA sort de parseLevel : porte déjà defaultSurface/segments
-  // (voir core/level.js) mais PAS rngState/lastVisited/
+  // ephemeralWorldA sort de parseScene : porte déjà defaultSurface/segments
+  // (voir core/scene.js) mais PAS rngState/lastVisited/
   // nextEphemeralId (ajoutés seulement par createWorldState, core/state.js)
   // — on simule ICI un monde ANTÉRIEUR au compteur en ajoutant les deux
   // premiers à la main SANS le troisième, exactement le manque à combler.
@@ -5206,10 +5206,10 @@ export function runMovementChecks() {
   }
 
   const SCATTER_REGISTRY = { dog: { nameKey: "entity.dog.name" } };
-  const scatterLevel = parseLevel(
+  const scatterScene = parseScene(
     {
       id: "movement-check-scatter",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 20,
       playerStart: 0,
       entities: [
@@ -5219,7 +5219,7 @@ export function runMovementChecks() {
     },
     SCATTER_REGISTRY
   );
-  const scatterState = createInitialState(scatterLevel, 99, NO_COMPANIONS);
+  const scatterState = createInitialState(scatterScene, 99, NO_COMPANIONS);
 
   const scatterResult = spawnScatteredEphemerals(scatterState, SCATTER_SPEC, 10, 4, 3);
   const scatteredEntities = getActiveWorld(scatterResult).entities.filter((e) => e.ephemeral);
@@ -5234,7 +5234,7 @@ export function runMovementChecks() {
   );
 
   // Déterminisme : même seed + mêmes paramètres -> mêmes positions, toujours.
-  const scatterStateAgain = createInitialState(scatterLevel, 99, NO_COMPANIONS);
+  const scatterStateAgain = createInitialState(scatterScene, 99, NO_COMPANIONS);
   const scatterResultAgain = spawnScatteredEphemerals(scatterStateAgain, SCATTER_SPEC, 10, 4, 3);
   const scatteredAgain = getActiveWorld(scatterResultAgain)
     .entities.filter((e) => e.ephemeral)
@@ -5316,9 +5316,63 @@ export function runMovementChecks() {
   run("save : version inconnue rejetée", false, deserializeGame({ version: SAVE_VERSION + 1, data: auditSession }).success);
   run("save : structure implausible rejetée", false, deserializeGame({ version: SAVE_VERSION, data: { player: {} } }).success);
 
+  // --- Renommages de contenu (config/save-renames.js) et types inconnus ---
+  // Une partie ancienne porte des noms figés à la première visite : le
+  // type, les clés i18n et les chemins de sons d'un vidéoprojecteur d'avant
+  // le renommage doivent ressortir sous leurs nouveaux noms.
+  const renameWorldId = auditSession.activeWorldId;
+  const renameWorld = auditSession.worlds[renameWorldId];
+  const legacyProjector = {
+    id: "legacy-projector",
+    type: "film_projector",
+    x: 1,
+    nameKey: "entity.film_projector.name",
+    descriptionKey: "entity.film_projector.description",
+    sounds: { beacon: { path: "assets/sounds/furniture/film_projector_1_beacon", loop: true } },
+  };
+  const ghostEntity = { id: "vanished", type: "type_that_no_longer_exists", x: 2, sounds: {} };
+  const ghostCompanion = { id: "vanished-companion", type: "type_that_no_longer_exists", x: 0, sounds: {} };
+  const renameSave = {
+    version: SAVE_VERSION,
+    data: {
+      ...auditSession,
+      worlds: { ...auditSession.worlds, [renameWorldId]: { ...renameWorld, entities: [...renameWorld.entities, legacyProjector, ghostEntity] } },
+      companions: [...auditSession.companions, ghostCompanion],
+    },
+  };
+  const renameResult = deserializeGame(renameSave);
+  const migratedProjector = renameResult.success
+    ? renameResult.session.worlds[renameWorldId].entities.find((e) => e.id === "legacy-projector")
+    : undefined;
+  run("save renommages : type renommé", "video_projector", migratedProjector && migratedProjector.type);
+  run("save renommages : clé i18n renommée", "entity.video_projector.name", migratedProjector && migratedProjector.nameKey);
+  run("save renommages : chemin de son renommé", "assets/sounds/furniture/video_projector_1_beacon", migratedProjector && migratedProjector.sounds.beacon.path);
+  run(
+    "save renommages : idempotent (une partie déjà migrée ne change plus)",
+    JSON.stringify(renameResult.session),
+    JSON.stringify(deserializeGame({ version: SAVE_VERSION, data: renameResult.session }).session)
+  );
+  run("save renommages : partie à jour -> identique à l'originale", JSON.stringify(auditSession), JSON.stringify(deserializeGame(saveEnvelope).session));
+  run("save types inconnus : sans registre, rien n'est retiré", true, renameResult.session.worlds[renameWorldId].entities.some((e) => e.id === "vanished"));
+  const knownTypes = { video_projector: {} };
+  for (const world of Object.values(auditSession.worlds)) {
+    for (const face of world.recto ? [world.recto, world.verso] : [world]) for (const e of face.entities) knownTypes[e.type] = {};
+  }
+  for (const companion of auditSession.companions) knownTypes[companion.type] = {};
+  const filteredResult = deserializeGame(renameSave, { registry: knownTypes });
+  run("save types inconnus : entité retirée du monde", false, filteredResult.session.worlds[renameWorldId].entities.some((e) => e.id === "vanished"));
+  run("save types inconnus : compagnon retiré", false, filteredResult.session.companions.some((e) => e.id === "vanished-companion"));
+  run("save types inconnus : entité renommée conservée", true, filteredResult.session.worlds[renameWorldId].entities.some((e) => e.id === "legacy-projector"));
+  run(
+    "save types inconnus : retraits listés pour l'avertissement",
+    `${renameWorldId}/vanished:type_that_no_longer_exists,companions/vanished-companion:type_that_no_longer_exists`,
+    filteredResult.droppedEntities.join(",")
+  );
+  run("save types inconnus : partie saine -> rien de retiré", 0, deserializeGame(saveEnvelope, { registry: knownTypes }).droppedEntities.length);
+
   // Sauvegarde ANTÉRIEURE à defaultSurface/segments (voir
-  // core/level.js/parseLevel) : ses mondes n'ont jamais eu ces clés, et une
-  // relecture de sauvegarde ne repasse jamais par parseLevel — sans
+  // core/scene.js/parseScene) : ses mondes n'ont jamais eu ces clés, et une
+  // relecture de sauvegarde ne repasse jamais par parseScene — sans
   // rebouchage (core/save.js/backfillWorld), surfaceAt(world, x) plante sur
   // world.segments.find(...) dès qu'un tel monde redevient actif (bug réel,
   // trouvé en jeu).
@@ -5343,8 +5397,8 @@ export function runMovementChecks() {
     run("save : surfaceAt ne plante jamais sur un monde rebouché", false, surfaceAtThrew);
   }
 
-  // Sauvegarde ANTÉRIEURE à `indoor` (voir core/level.js/parseFace, "nature
-  // de lieu") : ses mondes n'ont jamais eu cette clé — sans rebouchage
+  // Sauvegarde ANTÉRIEURE à `indoor` (voir core/scene.js/parseFace, "nature
+  // de scène") : ses mondes n'ont jamais eu cette clé — sans rebouchage
   // (core/save.js/backfillFace), le rendu d'ambiance météo lirait
   // `undefined` (ni indoor ni outdoor) au lieu d'un booléen.
   const oldIndoorWorlds = {};
@@ -5360,7 +5414,7 @@ export function runMovementChecks() {
     run("save : monde rebouché — indoor par défaut (false, extérieur)", false, revivedIndoorWorld.indoor);
   }
 
-  // Sauvegarde encore plus ancienne, avec un champ de niveau depuis RETIRÉ
+  // Sauvegarde encore plus ancienne, avec un champ de scène depuis RETIRÉ
   // du format (ex. un ancien jalon de contenu jamais devenu actif) : ni
   // rejeté ni traité spécialement — simplement transporté tel quel, comme
   // n'importe quel champ que plus aucun code ne lit.
@@ -5370,7 +5424,7 @@ export function runMovementChecks() {
   }
   const legacyFieldSave = { version: SAVE_VERSION, data: { ...auditSession, worlds: worldsWithLegacyField } };
   const legacyFieldResult = deserializeGame(legacyFieldSave);
-  run("save : sauvegarde avec un champ de niveau retiré du format — se charge sans erreur", true, legacyFieldResult.success);
+  run("save : sauvegarde avec un champ de scène retiré du format — se charge sans erreur", true, legacyFieldResult.success);
   if (legacyFieldResult.success) {
     const revivedLegacyWorld = legacyFieldResult.session.worlds[legacyFieldResult.session.activeWorldId];
     run("save : champ retiré du format — transporté tel quel, jamais nettoyé", 3, revivedLegacyWorld.legacyField);
@@ -5448,7 +5502,7 @@ export function runMovementChecks() {
   // segments/nextEphemeralId/indoor — même précédent que le monde simple
   // ci-dessus (core/save.js/backfillFace), mais chaque face doit être
   // rebouchée INDÉPENDAMMENT (voir core/save.js/backfillWorld).
-  const freshTwoFaceSession = createInitialState(twoFacedLevel, 42, NO_COMPANIONS);
+  const freshTwoFaceSession = createInitialState(twoFacedScene, 42, NO_COMPANIONS);
   const freshTwoFaceWorld = freshTwoFaceSession.worlds[twoFaceWorldId];
   const {
     defaultSurface: _droppedRectoSurface,
@@ -5497,49 +5551,49 @@ export function runMovementChecks() {
     );
   }
 
-  // --- Parsing TOTAL de niveau (core/level.js/parseLevel) : l'ABSENCE de
-  // tout champ de scène retombe sur un défaut sensé, {} est un niveau
-  // valide et jouable — voir level/schema.md/"Parsing TOTAL". Seule la
+  // --- Parsing TOTAL de scène (core/scene.js/parseScene) : l'ABSENCE de
+  // tout champ de scène retombe sur un défaut sensé, {} est une scène
+  // valide et jouable — voir doc/scene-format.md/"Parsing TOTAL". Seule la
   // PRÉSENCE malformée d'un champ échoue encore (inchangé).
   {
-    const emptyLevel = parseLevel({}, EMPTY_REGISTRY);
-    run("parseLevel({}) : id -> défaut générique", "level", emptyLevel.id);
-    run("parseLevel({}) : titleKey -> défaut générique", "level.default.title", emptyLevel.titleKey);
-    run("parseLevel({}) : length -> défaut minimal traversable (10)", 10, emptyLevel.length);
-    run("parseLevel({}) : playerStart -> 0 (filet existant)", 0, emptyLevel.playerStart);
-    run("parseLevel({}) : entities -> [] (tableau vide)", 0, emptyLevel.entities.length);
-    run("parseLevel({}) : defaultSurface -> DEFAULT_SURFACE", DEFAULT_SURFACE, emptyLevel.defaultSurface);
-    run("parseLevel({}) : segments -> [] (tableau vide)", 0, emptyLevel.segments.length);
-    run("parseLevel({}) : indoor -> false (extérieur)", false, emptyLevel.indoor);
-    run("parseLevel({}) : aucune musique déclarée (silence valide)", undefined, emptyLevel.music);
+    const emptyScene = parseScene({}, EMPTY_REGISTRY);
+    run("parseScene({}) : id -> défaut générique", "scene", emptyScene.id);
+    run("parseScene({}) : titleKey -> défaut générique", "scene.default.name", emptyScene.titleKey);
+    run("parseScene({}) : length -> défaut minimal traversable (10)", 10, emptyScene.length);
+    run("parseScene({}) : playerStart -> 0 (filet existant)", 0, emptyScene.playerStart);
+    run("parseScene({}) : entities -> [] (tableau vide)", 0, emptyScene.entities.length);
+    run("parseScene({}) : defaultSurface -> DEFAULT_SURFACE", DEFAULT_SURFACE, emptyScene.defaultSurface);
+    run("parseScene({}) : segments -> [] (tableau vide)", 0, emptyScene.segments.length);
+    run("parseScene({}) : indoor -> false (extérieur)", false, emptyScene.indoor);
+    run("parseScene({}) : aucune musique déclarée (silence valide)", undefined, emptyScene.music);
 
     // Jouable de bout en bout : spawn, déplacement, surface — jamais de
     // lecture sur du undefined, jamais d'exception.
-    let emptyState = createInitialState(emptyLevel, undefined, NO_COMPANIONS);
-    run("parseLevel({}) : le joueur apparaît à playerStart (0)", 0, emptyState.player.x);
+    let emptyState = createInitialState(emptyScene, undefined, NO_COMPANIONS);
+    run("parseScene({}) : le joueur apparaît à playerStart (0)", 0, emptyState.player.x);
     emptyState = reduce(emptyState, tick(1));
     emptyState = reduce(emptyState, tick(1));
-    run("parseLevel({}) : le joueur s'y déplace (2 ticks à droite)", 2 * MOVE_STEP, emptyState.player.x);
+    run("parseScene({}) : le joueur s'y déplace (2 ticks à droite)", 2 * MOVE_STEP, emptyState.player.x);
     const emptyWorld = getActiveWorld(emptyState);
     run(
-      "parseLevel({}) : surfaceAt ne plante jamais sur la scène vide",
+      "parseScene({}) : surfaceAt ne plante jamais sur la scène vide",
       DEFAULT_SURFACE,
       surfaceAt(emptyWorld, emptyState.player.x)
     );
 
     // Clamp à droite : la longueur minimale reste bornée normalement.
     // Largement assez de ticks (MOVE_STEP par tick) pour dépasser length=10.
-    let clampState = createInitialState(emptyLevel, undefined, NO_COMPANIONS);
+    let clampState = createInitialState(emptyScene, undefined, NO_COMPANIONS);
     for (let i = 0; i < 500; i++) clampState = reduce(clampState, tick(1));
-    run("parseLevel({}) : clamp à droite sur la longueur minimale (10)", 10, clampState.player.x);
+    run("parseScene({}) : clamp à droite sur la longueur minimale (10)", 10, clampState.player.x);
 
     // Save/load : aucune exception, aller-retour fidèle.
     const emptySaveEnvelope = serializeGame(emptyState);
     const emptySaveResult = deserializeGame(emptySaveEnvelope);
-    run("parseLevel({}) : save/load réussit sans exception", true, emptySaveResult.success);
+    run("parseScene({}) : save/load réussit sans exception", true, emptySaveResult.success);
     if (emptySaveResult.success) {
       run(
-        "parseLevel({}) : session rechargée identique après aller-retour",
+        "parseScene({}) : session rechargée identique après aller-retour",
         JSON.stringify(emptyState),
         JSON.stringify(emptySaveResult.session)
       );
@@ -5548,61 +5602,61 @@ export function runMovementChecks() {
 
   // Face recto/verso vide : même filet, partagé via parseFace.
   {
-    const emptyTwoFacedLevel = parseLevel({ recto: {}, verso: {} }, EMPTY_REGISTRY);
-    run("parseLevel : face recto vide -> entities []", 0, emptyTwoFacedLevel.recto.entities.length);
-    run("parseLevel : face verso vide -> entities []", 0, emptyTwoFacedLevel.verso.entities.length);
-    run("parseLevel : scène à deux faces vides -> length par défaut (10)", 10, emptyTwoFacedLevel.length);
+    const emptyTwoFacedScene = parseScene({ recto: {}, verso: {} }, EMPTY_REGISTRY);
+    run("parseScene : face recto vide -> entities []", 0, emptyTwoFacedScene.recto.entities.length);
+    run("parseScene : face verso vide -> entities []", 0, emptyTwoFacedScene.verso.entities.length);
+    run("parseScene : scène à deux faces vides -> length par défaut (10)", 10, emptyTwoFacedScene.length);
   }
 
   // Chaque champ omis INDIVIDUELLEMENT -> son propre défaut (les autres
   // champs restant fournis, pour isoler l'effet du filet testé).
   run(
-    "parseLevel : sans defaultSurface -> DEFAULT_SURFACE (filet préexistant)",
+    "parseScene : sans defaultSurface -> DEFAULT_SURFACE (filet préexistant)",
     DEFAULT_SURFACE,
-    parseLevel({ id: "x", titleKey: "level.demo.title", length: 5, entities: [] }, EMPTY_REGISTRY).defaultSurface
+    parseScene({ id: "x", titleKey: "scene.demo.name", length: 5, entities: [] }, EMPTY_REGISTRY).defaultSurface
   );
   run(
-    "parseLevel : sans length -> 10 (filet nouveau)",
+    "parseScene : sans length -> 10 (filet nouveau)",
     10,
-    parseLevel({ id: "x", titleKey: "level.demo.title", entities: [] }, EMPTY_REGISTRY).length
+    parseScene({ id: "x", titleKey: "scene.demo.name", entities: [] }, EMPTY_REGISTRY).length
   );
   run(
-    "parseLevel : sans titleKey -> level.default.title (filet nouveau)",
-    "level.default.title",
-    parseLevel({ id: "x", length: 5, entities: [] }, EMPTY_REGISTRY).titleKey
+    "parseScene : sans titleKey -> scene.default.name (filet nouveau)",
+    "scene.default.name",
+    parseScene({ id: "x", length: 5, entities: [] }, EMPTY_REGISTRY).titleKey
   );
   run(
-    "parseLevel : sans id -> level (filet nouveau)",
-    "level",
-    parseLevel({ titleKey: "level.demo.title", length: 5, entities: [] }, EMPTY_REGISTRY).id
+    "parseScene : sans id -> scene (filet nouveau)",
+    "scene",
+    parseScene({ titleKey: "scene.demo.name", length: 5, entities: [] }, EMPTY_REGISTRY).id
   );
 
   // PRÉSENT mais MALFORMÉ -> erreur claire, INCHANGÉ (le défaut ne couvre
   // que l'omission, jamais une valeur fournie invalide).
   run(
-    "parseLevel : id présent mais vide -> erreur",
+    "parseScene : id présent mais vide -> erreur",
     true,
-    expectLevelParseThrows({ id: "", titleKey: "level.demo.title", length: 5, entities: [] }, EMPTY_REGISTRY)
+    expectSceneParseThrows({ id: "", titleKey: "scene.demo.name", length: 5, entities: [] }, EMPTY_REGISTRY)
   );
   run(
-    "parseLevel : titleKey présent mais vide -> erreur",
+    "parseScene : titleKey présent mais vide -> erreur",
     true,
-    expectLevelParseThrows({ id: "x", titleKey: "", length: 5, entities: [] }, EMPTY_REGISTRY)
+    expectSceneParseThrows({ id: "x", titleKey: "", length: 5, entities: [] }, EMPTY_REGISTRY)
   );
   run(
-    "parseLevel : length présent mais <= 0 -> erreur",
+    "parseScene : length présent mais <= 0 -> erreur",
     true,
-    expectLevelParseThrows({ id: "x", titleKey: "level.demo.title", length: 0, entities: [] }, EMPTY_REGISTRY)
+    expectSceneParseThrows({ id: "x", titleKey: "scene.demo.name", length: 0, entities: [] }, EMPTY_REGISTRY)
   );
   run(
-    "parseLevel : length présent mais mauvais type -> erreur",
+    "parseScene : length présent mais mauvais type -> erreur",
     true,
-    expectLevelParseThrows({ id: "x", titleKey: "level.demo.title", length: "10", entities: [] }, EMPTY_REGISTRY)
+    expectSceneParseThrows({ id: "x", titleKey: "scene.demo.name", length: "10", entities: [] }, EMPTY_REGISTRY)
   );
   run(
-    "parseLevel : entities présent mais pas un tableau -> erreur",
+    "parseScene : entities présent mais pas un tableau -> erreur",
     true,
-    expectLevelParseThrows({ id: "x", titleKey: "level.demo.title", length: 5, entities: "oops" }, EMPTY_REGISTRY)
+    expectSceneParseThrows({ id: "x", titleKey: "scene.demo.name", length: 5, entities: "oops" }, EMPTY_REGISTRY)
   );
 
   // --- STOCKAGE de variables (core/variables.js) : trois portées (entity/
@@ -5628,9 +5682,9 @@ export function runMovementChecks() {
     // (persistent: false explicite) — le couple minimal requis par la
     // vérification "modifier les deux, sauvegarder, recharger".
     const VARIABLES_REGISTRY = { npc: { nameKey: "entity.npc.name" } };
-    const variablesRawLevel = {
+    const variablesRawScene = {
       id: "movement-check-variables",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 10,
       playerStart: 0,
       variables: [
@@ -5649,21 +5703,21 @@ export function runMovementChecks() {
         },
       ],
     };
-    const variablesLevel = parseLevel(variablesRawLevel, VARIABLES_REGISTRY);
-    const npc1Decl = variablesLevel.entities.find((e) => e.id === "npc-1");
+    const variablesScene = parseScene(variablesRawScene, VARIABLES_REGISTRY);
+    const npc1Decl = variablesScene.entities.find((e) => e.id === "npc-1");
 
     // 1) Déclarées aux trois portées -> stockées, valeurs initiales
     // correctes, persistance résolue (défaut TRUE, explicite FALSE).
-    run("variables : scène — visits (int) initial 0", 0, variablesLevel.variables.visits.value);
-    run("variables : scène — visits persistent PAR DÉFAUT true", true, variablesLevel.variables.visits.persistent);
-    run("variables : scène — doorUnlocked (flag) initial false", false, variablesLevel.variables.doorUnlocked.value);
-    run("variables : scène — doorUnlocked persistent EXPLICITE false", false, variablesLevel.variables.doorUnlocked.persistent);
+    run("variables : scène — visits (int) initial 0", 0, variablesScene.variables.visits.value);
+    run("variables : scène — visits persistent PAR DÉFAUT true", true, variablesScene.variables.visits.persistent);
+    run("variables : scène — doorUnlocked (flag) initial false", false, variablesScene.variables.doorUnlocked.value);
+    run("variables : scène — doorUnlocked persistent EXPLICITE false", false, variablesScene.variables.doorUnlocked.persistent);
     run("variables : entité — metOnce (flag) initial false", false, npc1Decl.variables.metOnce.value);
     run("variables : entité — metOnce persistent PAR DÉFAUT true", true, npc1Decl.variables.metOnce.persistent);
     run("variables : entité — affinity (int) initial 0", 0, npc1Decl.variables.affinity.value);
     run("variables : entité — affinity persistent EXPLICITE false", false, npc1Decl.variables.affinity.persistent);
 
-    let variablesSession = createInitialState(variablesLevel, undefined, {
+    let variablesSession = createInitialState(variablesScene, undefined, {
       companions: [],
       partyVariables: [{ name: "score", type: "int", initial: 0 }],
     });
@@ -5675,7 +5729,7 @@ export function runMovementChecks() {
     run(
       "variables : aucune valeur undefined (scène)",
       true,
-      Object.values(variablesLevel.variables).every((v) => v.value !== undefined)
+      Object.values(variablesScene.variables).every((v) => v.value !== undefined)
     );
     run(
       "variables : aucune valeur undefined (entité)",
@@ -5738,7 +5792,7 @@ export function runMovementChecks() {
     rtSession = setVariable({ session: rtSession }, "party", "score", 42);
 
     const rtEnvelope = serializeGame(rtSession);
-    const savedWorld = rtEnvelope.data.worlds[variablesLevel.id];
+    const savedWorld = rtEnvelope.data.worlds[variablesScene.id];
     const savedEntity = savedWorld.entities.find((e) => e.id === "npc-1");
     run("save : scène — visits (persistante) survit dans l'enveloppe", 7, savedWorld.variables.visits.value);
     run(
@@ -5757,7 +5811,7 @@ export function runMovementChecks() {
     const rtReload = deserializeGame(rtEnvelope);
     run("save/load : variables — recharge sans erreur", true, rtReload.success);
     if (rtReload.success) {
-      const reloadedWorld = rtReload.session.worlds[variablesLevel.id];
+      const reloadedWorld = rtReload.session.worlds[variablesScene.id];
       const reloadedEntity = reloadedWorld.entities.find((e) => e.id === "npc-1");
       run("save/load : scène — visits (persistante) reprend sa valeur modifiée (7)", 7, reloadedWorld.variables.visits.value);
       run("save/load : scène — doorUnlocked (volatile) repart de son initial (false)", false, reloadedWorld.variables.doorUnlocked.value);
@@ -5816,23 +5870,23 @@ export function runMovementChecks() {
     run("variables : élément qui n'est pas un objet -> erreur", true, expectThrows(() => parseVariables(["oops"], "test", noopFail)));
     run("variables : absent -> sac vide, PAS une erreur", false, expectThrows(() => parseVariables(undefined, "test", noopFail)));
 
-    // ... puis via les VRAIS points d'entrée (core/level.js/core/state.js),
+    // ... puis via les VRAIS points d'entrée (core/scene.js/core/state.js),
     // pour confirmer que le branchement, pas seulement la fonction pure,
     // rejette bien un contenu malformé.
     run(
-      "variables : scène malformée -> erreur au chargement (parseLevel)",
+      "variables : scène malformée -> erreur au chargement (parseScene)",
       true,
       expectThrows(() =>
-        parseLevel({ ...variablesRawLevel, variables: [{ name: "bad", type: "unknown", initial: 0 }] }, VARIABLES_REGISTRY)
+        parseScene({ ...variablesRawScene, variables: [{ name: "bad", type: "unknown", initial: 0 }] }, VARIABLES_REGISTRY)
       )
     );
     run(
-      "variables : entité malformée -> erreur au chargement (parseLevel)",
+      "variables : entité malformée -> erreur au chargement (parseScene)",
       true,
       expectThrows(() =>
-        parseLevel(
+        parseScene(
           {
-            ...variablesRawLevel,
+            ...variablesRawScene,
             entities: [{ id: "npc-bad", type: "npc", x: 1, variables: [{ name: "bad", type: "int", initial: "nope" }] }],
           },
           VARIABLES_REGISTRY
@@ -5843,7 +5897,7 @@ export function runMovementChecks() {
       "variables : partie malformée -> erreur au chargement (createInitialState)",
       true,
       expectThrows(() =>
-        createInitialState(variablesLevel, undefined, {
+        createInitialState(variablesScene, undefined, {
           companions: [],
           partyVariables: [{ name: "bad", type: "flag", initial: "nope" }],
         })
@@ -5854,7 +5908,7 @@ export function runMovementChecks() {
   // --- VARIABLES BRANCHÉES (étape 2/2, voir core/scripting.md/"Variables"
   // et "Actions multiples filtrées par condition") : condition "variable"
   // (LECTURE, core/presence.js/evaluateVariable), effets setVariable/
-  // toggleVariable/addVariable (ÉCRITURE, core/level.js/parseActionEffect,
+  // toggleVariable/addVariable (ÉCRITURE, core/scene.js/parseActionEffect,
   // core/variables.js/applyActionEffects), sélection d'action multiple par
   // condition (core/presence.js/selectMatchingAction). Cas de référence :
   // la FENÊTRE (deux candidates aux conditions opposées).
@@ -6056,24 +6110,24 @@ export function runMovementChecks() {
       applyActionEffects([{ type: "teleport", target: "elsewhere" }], effectsCtx).entity
     );
 
-    // 4) Validation au CHARGEMENT (core/level.js) — PRÉSENT mais MALFORMÉ ->
+    // 4) Validation au CHARGEMENT (core/scene.js) — PRÉSENT mais MALFORMÉ ->
     // erreur claire ; ABSENT -> défaut, jamais testé ici (déjà couvert par
     // le stockage seul, prompt précédent).
     const VAR_ACTION_REGISTRY = { npc: { nameKey: "entity.npc.name" } };
-    function levelWithCondition(cond, entityVariables = [{ name: "isOpen", type: "flag", initial: false }]) {
+    function sceneWithCondition(cond, entityVariables = [{ name: "isOpen", type: "flag", initial: false }]) {
       return {
         id: "movement-check-var-cond",
-        titleKey: "level.demo.title",
+        titleKey: "scene.demo.name",
         length: 10,
         playerStart: 0,
         variables: [{ name: "sceneCounter", type: "int", initial: 0 }],
         entities: [{ id: "e1", type: "npc", x: 5, variables: entityVariables, presence: [{ when: cond, present: true }] }],
       };
     }
-    function levelWithActionEffect(effect, entityVariables = [{ name: "isOpen", type: "flag", initial: false }]) {
+    function sceneWithActionEffect(effect, entityVariables = [{ name: "isOpen", type: "flag", initial: false }]) {
       return {
         id: "movement-check-var-effect",
-        titleKey: "level.demo.title",
+        titleKey: "scene.demo.name",
         length: 10,
         playerStart: 0,
         variables: [{ name: "sceneCounter", type: "int", initial: 0 }],
@@ -6084,51 +6138,51 @@ export function runMovementChecks() {
     run(
       "variable : scope inconnu -> erreur au chargement",
       true,
-      expectThrows(() => parseLevel(levelWithCondition({ type: "variable", scope: "bogus", name: "isOpen", equals: true }), VAR_ACTION_REGISTRY))
+      expectThrows(() => parseScene(sceneWithCondition({ type: "variable", scope: "bogus", name: "isOpen", equals: true }), VAR_ACTION_REGISTRY))
     );
     run(
       "variable : nom jamais déclaré sur l'entité (scope entity) -> erreur au chargement",
       true,
-      expectThrows(() => parseLevel(levelWithCondition({ type: "variable", scope: "entity", name: "doesNotExist", equals: true }), VAR_ACTION_REGISTRY))
+      expectThrows(() => parseScene(sceneWithCondition({ type: "variable", scope: "entity", name: "doesNotExist", equals: true }), VAR_ACTION_REGISTRY))
     );
     run(
       "variable : nom jamais déclaré sur la scène (scope scene) -> erreur au chargement",
       true,
-      expectThrows(() => parseLevel(levelWithCondition({ type: "variable", scope: "scene", name: "doesNotExist", equals: true }), VAR_ACTION_REGISTRY))
+      expectThrows(() => parseScene(sceneWithCondition({ type: "variable", scope: "scene", name: "doesNotExist", equals: true }), VAR_ACTION_REGISTRY))
     );
     run(
-      "variable : nom de PARTIE jamais déclaré NULLE PART -> PAS d'erreur (non vérifiable au chargement d'un niveau, voir core/level.js/validateVariableReference)",
+      "variable : nom de PARTIE jamais déclaré NULLE PART -> PAS d'erreur (non vérifiable au chargement d'une scène, voir core/scene.js/validateVariableReference)",
       false,
-      expectThrows(() => parseLevel(levelWithCondition({ type: "variable", scope: "party", name: "totallyMadeUp", equals: true }), VAR_ACTION_REGISTRY))
+      expectThrows(() => parseScene(sceneWithCondition({ type: "variable", scope: "party", name: "totallyMadeUp", equals: true }), VAR_ACTION_REGISTRY))
     );
     run(
       "variable : aucun comparateur -> erreur au chargement",
       true,
-      expectThrows(() => parseLevel(levelWithCondition({ type: "variable", scope: "entity", name: "isOpen" }), VAR_ACTION_REGISTRY))
+      expectThrows(() => parseScene(sceneWithCondition({ type: "variable", scope: "entity", name: "isOpen" }), VAR_ACTION_REGISTRY))
     );
     run(
       "variable : DEUX comparateurs -> erreur au chargement",
       true,
       expectThrows(() =>
-        parseLevel(levelWithCondition({ type: "variable", scope: "entity", name: "isOpen", equals: true, greaterThan: 0 }), VAR_ACTION_REGISTRY)
+        parseScene(sceneWithCondition({ type: "variable", scope: "entity", name: "isOpen", equals: true, greaterThan: 0 }), VAR_ACTION_REGISTRY)
       )
     );
     run(
       "variable : greaterThan sur un flag -> erreur au chargement",
       true,
-      expectThrows(() => parseLevel(levelWithCondition({ type: "variable", scope: "entity", name: "isOpen", greaterThan: 0 }), VAR_ACTION_REGISTRY))
+      expectThrows(() => parseScene(sceneWithCondition({ type: "variable", scope: "entity", name: "isOpen", greaterThan: 0 }), VAR_ACTION_REGISTRY))
     );
     run(
       "variable : equals incohérent avec le type (nombre sur un flag) -> erreur au chargement",
       true,
-      expectThrows(() => parseLevel(levelWithCondition({ type: "variable", scope: "entity", name: "isOpen", equals: 1 }), VAR_ACTION_REGISTRY))
+      expectThrows(() => parseScene(sceneWithCondition({ type: "variable", scope: "entity", name: "isOpen", equals: 1 }), VAR_ACTION_REGISTRY))
     );
     run(
       "variable : equals sur un int avec greaterThan valide ailleurs -> chargé sans erreur (cas sain, non-régression)",
       false,
       expectThrows(() =>
-        parseLevel(
-          levelWithCondition({ type: "variable", scope: "scene", name: "sceneCounter", greaterThan: 0 }, [{ name: "isOpen", type: "flag", initial: false }]),
+        parseScene(
+          sceneWithCondition({ type: "variable", scope: "scene", name: "sceneCounter", greaterThan: 0 }, [{ name: "isOpen", type: "flag", initial: false }]),
           VAR_ACTION_REGISTRY
         )
       )
@@ -6137,14 +6191,14 @@ export function runMovementChecks() {
     run(
       "setVariable (effet) : valeur incohérente avec le type -> erreur au chargement",
       true,
-      expectThrows(() => parseLevel(levelWithActionEffect({ type: "setVariable", scope: "entity", name: "isOpen", value: "nope" }), VAR_ACTION_REGISTRY))
+      expectThrows(() => parseScene(sceneWithActionEffect({ type: "setVariable", scope: "entity", name: "isOpen", value: "nope" }), VAR_ACTION_REGISTRY))
     );
     run(
       "toggleVariable (effet) : sur un int -> erreur au chargement",
       true,
       expectThrows(() =>
-        parseLevel(
-          levelWithActionEffect({ type: "toggleVariable", scope: "entity", name: "counter" }, [{ name: "counter", type: "int", initial: 0 }]),
+        parseScene(
+          sceneWithActionEffect({ type: "toggleVariable", scope: "entity", name: "counter" }, [{ name: "counter", type: "int", initial: 0 }]),
           VAR_ACTION_REGISTRY
         )
       )
@@ -6152,14 +6206,14 @@ export function runMovementChecks() {
     run(
       "addVariable (effet) : sur un flag -> erreur au chargement",
       true,
-      expectThrows(() => parseLevel(levelWithActionEffect({ type: "addVariable", scope: "entity", name: "isOpen", amount: 1 }), VAR_ACTION_REGISTRY))
+      expectThrows(() => parseScene(sceneWithActionEffect({ type: "addVariable", scope: "entity", name: "isOpen", amount: 1 }), VAR_ACTION_REGISTRY))
     );
     run(
       "addVariable (effet) : amount non entier -> erreur au chargement",
       true,
       expectThrows(() =>
-        parseLevel(
-          levelWithActionEffect({ type: "addVariable", scope: "entity", name: "counter", amount: 1.5 }, [{ name: "counter", type: "int", initial: 0 }]),
+        parseScene(
+          sceneWithActionEffect({ type: "addVariable", scope: "entity", name: "counter", amount: 1.5 }, [{ name: "counter", type: "int", initial: 0 }]),
           VAR_ACTION_REGISTRY
         )
       )
@@ -6167,55 +6221,55 @@ export function runMovementChecks() {
     run(
       "setVariable (effet) : nom jamais déclaré -> erreur au chargement",
       true,
-      expectThrows(() => parseLevel(levelWithActionEffect({ type: "setVariable", scope: "entity", name: "doesNotExist", value: true }), VAR_ACTION_REGISTRY))
+      expectThrows(() => parseScene(sceneWithActionEffect({ type: "setVariable", scope: "entity", name: "doesNotExist", value: true }), VAR_ACTION_REGISTRY))
     );
     run(
       "effet : type inconnu -> erreur au chargement",
       true,
-      expectThrows(() => parseLevel(levelWithActionEffect({ type: "bogusEffect", scope: "entity", name: "isOpen" }), VAR_ACTION_REGISTRY))
+      expectThrows(() => parseScene(sceneWithActionEffect({ type: "bogusEffect", scope: "entity", name: "isOpen" }), VAR_ACTION_REGISTRY))
     );
 
     // --- Effets de RENDU (playSound/announce, voir core/effects.js) —
     // validés en FORME seulement ICI (comme sound/announceKey avant eux) :
     // le core ignore leur SENS, la vue les exécute (hors de portée d'un
     // test terminal, voir "Vérifie (oreille)").
-    const playSoundLevel = parseLevel(
-      levelWithActionEffect({ type: "playSound", path: "assets/sounds/effects/window_blinds_open", gain: 0.8, pitchVariation: 0.1, reverbSend: 0.2 }),
+    const playSoundScene = parseScene(
+      sceneWithActionEffect({ type: "playSound", path: "assets/sounds/effects/window_blinds_open", gain: 0.8, pitchVariation: 0.1, reverbSend: 0.2 }),
       VAR_ACTION_REGISTRY
     );
-    const parsedPlaySound = playSoundLevel.entities[0].action.effects[0];
+    const parsedPlaySound = playSoundScene.entities[0].action.effects[0];
     run("playSound : forme valide -> chargé sans erreur, path transporté", "assets/sounds/effects/window_blinds_open", parsedPlaySound.path);
     run("playSound : gain/pitchVariation/reverbSend transportés tels quels", true, parsedPlaySound.gain === 0.8 && parsedPlaySound.pitchVariation === 0.1 && parsedPlaySound.reverbSend === 0.2);
     run(
       "playSound : path manquant -> erreur au chargement",
       true,
-      expectThrows(() => parseLevel(levelWithActionEffect({ type: "playSound" }), VAR_ACTION_REGISTRY))
+      expectThrows(() => parseScene(sceneWithActionEffect({ type: "playSound" }), VAR_ACTION_REGISTRY))
     );
     run(
       "playSound : gain non numérique -> erreur au chargement",
       true,
-      expectThrows(() => parseLevel(levelWithActionEffect({ type: "playSound", path: "x", gain: "loud" }), VAR_ACTION_REGISTRY))
+      expectThrows(() => parseScene(sceneWithActionEffect({ type: "playSound", path: "x", gain: "loud" }), VAR_ACTION_REGISTRY))
     );
     // tracked (suivi vs ancré, voir doc/scripting.md/"playSound") :
     // transporté tel quel, absent si non déclaré (le défaut vit côté vue).
     run("playSound : tracked absent -> champ absent (défaut résolu par la vue)", false, "tracked" in parsedPlaySound);
-    const anchoredLevel = parseLevel(levelWithActionEffect({ type: "playSound", path: "x", tracked: false }), VAR_ACTION_REGISTRY);
-    run("playSound : tracked:false transporté tel quel", false, anchoredLevel.entities[0].action.effects[0].tracked);
+    const anchoredScene = parseScene(sceneWithActionEffect({ type: "playSound", path: "x", tracked: false }), VAR_ACTION_REGISTRY);
+    run("playSound : tracked:false transporté tel quel", false, anchoredScene.entities[0].action.effects[0].tracked);
     run(
       "playSound : tracked non booléen -> erreur au chargement",
       true,
-      expectThrows(() => parseLevel(levelWithActionEffect({ type: "playSound", path: "x", tracked: "yes" }), VAR_ACTION_REGISTRY))
+      expectThrows(() => parseScene(sceneWithActionEffect({ type: "playSound", path: "x", tracked: "yes" }), VAR_ACTION_REGISTRY))
     );
 
     // PROVENANCE (at) / NATURE (nature) — voir view/interaction.js/
     // resolvePlaySoundTarget/resolvePlaySoundNature pour la résolution des
     // défauts (hors de portée d'un test core, pure vue) ; ici seulement la
     // FORME transportée.
-    const playSoundPlacementLevel = parseLevel(
-      levelWithActionEffect({ type: "playSound", path: "x", at: "far-bell", nature: "meta" }),
+    const playSoundPlacementScene = parseScene(
+      sceneWithActionEffect({ type: "playSound", path: "x", at: "far-bell", nature: "meta" }),
       VAR_ACTION_REGISTRY
     );
-    const parsedPlaySoundPlacement = playSoundPlacementLevel.entities[0].action.effects[0];
+    const parsedPlaySoundPlacement = playSoundPlacementScene.entities[0].action.effects[0];
     run(
       "playSound : at/nature valides -> transportés tels quels",
       true,
@@ -6224,36 +6278,36 @@ export function runMovementChecks() {
     run(
       "playSound : at vide -> erreur au chargement",
       true,
-      expectThrows(() => parseLevel(levelWithActionEffect({ type: "playSound", path: "x", at: "" }), VAR_ACTION_REGISTRY))
+      expectThrows(() => parseScene(sceneWithActionEffect({ type: "playSound", path: "x", at: "" }), VAR_ACTION_REGISTRY))
     );
     run(
       "playSound : nature inconnue -> erreur au chargement",
       true,
-      expectThrows(() => parseLevel(levelWithActionEffect({ type: "playSound", path: "x", nature: "bogus" }), VAR_ACTION_REGISTRY))
+      expectThrows(() => parseScene(sceneWithActionEffect({ type: "playSound", path: "x", nature: "bogus" }), VAR_ACTION_REGISTRY))
     );
 
-    const announceLevel = parseLevel(levelWithActionEffect({ type: "announce", key: "entity.window.opened", assertive: false }), VAR_ACTION_REGISTRY);
-    const parsedAnnounce = announceLevel.entities[0].action.effects[0];
+    const announceScene = parseScene(sceneWithActionEffect({ type: "announce", key: "entity.window.opened", assertive: false }), VAR_ACTION_REGISTRY);
+    const parsedAnnounce = announceScene.entities[0].action.effects[0];
     run("announce : forme valide -> chargé sans erreur, key/assertive transportés", true, parsedAnnounce.key === "entity.window.opened" && parsedAnnounce.assertive === false);
     run(
       "announce : key manquante -> erreur au chargement",
       true,
-      expectThrows(() => parseLevel(levelWithActionEffect({ type: "announce" }), VAR_ACTION_REGISTRY))
+      expectThrows(() => parseScene(sceneWithActionEffect({ type: "announce" }), VAR_ACTION_REGISTRY))
     );
     run(
       "announce : assertive non booléen -> erreur au chargement",
       true,
-      expectThrows(() => parseLevel(levelWithActionEffect({ type: "announce", key: "x", assertive: "oui" }), VAR_ACTION_REGISTRY))
+      expectThrows(() => parseScene(sceneWithActionEffect({ type: "announce", key: "x", assertive: "oui" }), VAR_ACTION_REGISTRY))
     );
 
     // --- Effet MIXTE "teleport" (JOUEUR uniquement, voir core/effects.js)
     // — validé en FORME ici comme playSound/announce ; l'EXÉCUTION (core/
     // state.js/travelToWorld, placePlayer) est testée séparément plus bas.
-    const teleportLevel = parseLevel(
-      levelWithActionEffect({ type: "teleport", target: "elsewhere", x: 4, side: "verso", reloadIfSame: true, transition: "instant" }),
+    const teleportScene = parseScene(
+      sceneWithActionEffect({ type: "teleport", target: "elsewhere", x: 4, side: "verso", reloadIfSame: true, transition: "instant" }),
       VAR_ACTION_REGISTRY
     );
-    const parsedTeleport = teleportLevel.entities[0].action.effects[0];
+    const parsedTeleport = teleportScene.entities[0].action.effects[0];
     run(
       "teleport : forme complète valide -> tous les champs transportés tels quels",
       true,
@@ -6263,44 +6317,44 @@ export function runMovementChecks() {
         parsedTeleport.reloadIfSame === true &&
         parsedTeleport.transition === "instant"
     );
-    const minimalTeleportLevel = parseLevel(levelWithActionEffect({ type: "teleport", target: "elsewhere" }), VAR_ACTION_REGISTRY);
+    const minimalTeleportScene = parseScene(sceneWithActionEffect({ type: "teleport", target: "elsewhere" }), VAR_ACTION_REGISTRY);
     run(
       "teleport : target seul -> forme valide, aucun champ optionnel imposé",
       "elsewhere",
-      minimalTeleportLevel.entities[0].action.effects[0].target
+      minimalTeleportScene.entities[0].action.effects[0].target
     );
     run(
       "teleport : target manquant -> erreur au chargement",
       true,
-      expectThrows(() => parseLevel(levelWithActionEffect({ type: "teleport" }), VAR_ACTION_REGISTRY))
+      expectThrows(() => parseScene(sceneWithActionEffect({ type: "teleport" }), VAR_ACTION_REGISTRY))
     );
     run(
       "teleport : x non numérique -> erreur au chargement",
       true,
-      expectThrows(() => parseLevel(levelWithActionEffect({ type: "teleport", target: "x", x: "loin" }), VAR_ACTION_REGISTRY))
+      expectThrows(() => parseScene(sceneWithActionEffect({ type: "teleport", target: "x", x: "loin" }), VAR_ACTION_REGISTRY))
     );
     run(
       "teleport : side inconnue -> erreur au chargement",
       true,
-      expectThrows(() => parseLevel(levelWithActionEffect({ type: "teleport", target: "x", side: "milieu" }), VAR_ACTION_REGISTRY))
+      expectThrows(() => parseScene(sceneWithActionEffect({ type: "teleport", target: "x", side: "milieu" }), VAR_ACTION_REGISTRY))
     );
     run(
       "teleport : reloadIfSame non booléen -> erreur au chargement",
       true,
-      expectThrows(() => parseLevel(levelWithActionEffect({ type: "teleport", target: "x", reloadIfSame: "oui" }), VAR_ACTION_REGISTRY))
+      expectThrows(() => parseScene(sceneWithActionEffect({ type: "teleport", target: "x", reloadIfSame: "oui" }), VAR_ACTION_REGISTRY))
     );
     run(
       "teleport : transition inconnue -> erreur au chargement",
       true,
-      expectThrows(() => parseLevel(levelWithActionEffect({ type: "teleport", target: "x", transition: "boom" }), VAR_ACTION_REGISTRY))
+      expectThrows(() => parseScene(sceneWithActionEffect({ type: "teleport", target: "x", transition: "boom" }), VAR_ACTION_REGISTRY))
     );
 
     // Liste MIXTE (état + rendu) : le core la valide/transporte comme UN
     // SEUL vocabulaire, jamais deux registres — voir core/effects.js.
-    const mixedRenderStateLevel = parseLevel(
+    const mixedRenderStateScene = parseScene(
       {
         id: "movement-check-mixed-render-state",
-        titleKey: "level.demo.title",
+        titleKey: "scene.demo.name",
         length: 10,
         playerStart: 0,
         entities: [
@@ -6322,14 +6376,14 @@ export function runMovementChecks() {
       },
       VAR_ACTION_REGISTRY
     );
-    run("effets mixtes : liste de 3 types différents chargée sans erreur", 3, mixedRenderStateLevel.entities[0].action.effects.length);
+    run("effets mixtes : liste de 3 types différents chargée sans erreur", 3, mixedRenderStateScene.entities[0].action.effects.length);
 
     run(
       "action : tableau vide -> erreur au chargement",
       true,
       expectThrows(() =>
-        parseLevel(
-          { id: "movement-check-empty-action", titleKey: "level.demo.title", length: 10, playerStart: 0, entities: [{ id: "e1", type: "npc", x: 5, action: [] }] },
+        parseScene(
+          { id: "movement-check-empty-action", titleKey: "scene.demo.name", length: 10, playerStart: 0, entities: [{ id: "e1", type: "npc", x: 5, action: [] }] },
           VAR_ACTION_REGISTRY
         )
       )
@@ -6338,10 +6392,10 @@ export function runMovementChecks() {
       "action : candidate sans refusalEffects malgré une condition -> chargé sans erreur (optionnel, RÉUTILISE la même règle, par candidate)",
       false,
       expectThrows(() =>
-        parseLevel(
+        parseScene(
           {
             id: "movement-check-candidate-no-refusal",
-            titleKey: "level.demo.title",
+            titleKey: "scene.demo.name",
             length: 10,
             playerStart: 0,
             entities: [
@@ -6361,26 +6415,26 @@ export function runMovementChecks() {
 
     // 5) RÉTROCOMPAT — une entité à action UNIQUE (objet, pas tableau) reste
     // structurellement INCHANGÉE.
-    const retrocompatLevel = parseLevel(
+    const retrocompatScene = parseScene(
       {
         id: "movement-check-single-action",
-        titleKey: "level.demo.title",
+        titleKey: "scene.demo.name",
         length: 10,
         playerStart: 0,
         entities: [{ id: "e1", type: "npc", x: 5, action: { kind: "transit", target: "elsewhere" } }],
       },
       VAR_ACTION_REGISTRY
     );
-    run("action unique : PAS un tableau (rétrocompat)", false, Array.isArray(retrocompatLevel.entities[0].action));
-    run("action unique : kind transporté tel quel", "transit", retrocompatLevel.entities[0].action.kind);
+    run("action unique : PAS un tableau (rétrocompat)", false, Array.isArray(retrocompatScene.entities[0].action));
+    run("action unique : kind transporté tel quel", "transit", retrocompatScene.entities[0].action.kind);
 
     // 6) LA FENÊTRE — cas de test bout en bout (voir entities/types/
     // window.js pour l'archétype réel, dupliqué ici en dur — ce fichier ne
     // dépend jamais de entities/, voir header).
     const WINDOW_REGISTRY = { window: { nameKey: "entity.window.name" } };
-    const windowRawLevel = {
+    const windowRawScene = {
       id: "movement-check-window",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 10,
       playerStart: 0,
       entities: [
@@ -6393,7 +6447,7 @@ export function runMovementChecks() {
             {
               kind: "applyEffects",
               condition: { type: "variable", scope: "entity", name: "isOpen", equals: false },
-              // Pas de refusalEffects (optionnel, voir core/level.js/
+              // Pas de refusalEffects (optionnel, voir core/scene.js/
               // parseSingleAction) : les deux candidates couvrent tout
               // l'espace du flag, un refus n'est jamais réellement
               // atteignable ici.
@@ -6414,11 +6468,11 @@ export function runMovementChecks() {
         },
       ],
     };
-    const windowLevel = parseLevel(windowRawLevel, WINDOW_REGISTRY);
-    run("fenêtre : action est un TABLEAU de deux candidates", true, Array.isArray(windowLevel.entities[0].action));
-    run("fenêtre : isOpen initial false", false, windowLevel.entities[0].variables.isOpen.value);
+    const windowScene = parseScene(windowRawScene, WINDOW_REGISTRY);
+    run("fenêtre : action est un TABLEAU de deux candidates", true, Array.isArray(windowScene.entities[0].action));
+    run("fenêtre : isOpen initial false", false, windowScene.entities[0].variables.isOpen.value);
 
-    let windowSession = createInitialState(windowLevel, undefined, { companions: [] });
+    let windowSession = createInitialState(windowScene, undefined, { companions: [] });
 
     // Identifie la candidate choisie par le CHEMIN de son "playSound" (open
     // vs close) — plus d'effet "announce" ici : le son SEUL sert de retour
@@ -6453,7 +6507,7 @@ export function runMovementChecks() {
     run(
       "fenêtre : 1ère activation — isOpen devient true",
       true,
-      activation1.session.worlds[windowLevel.id].entities[0].variables.isOpen.value
+      activation1.session.worlds[windowScene.id].entities[0].variables.isOpen.value
     );
     windowSession = activation1.session;
 
@@ -6466,7 +6520,7 @@ export function runMovementChecks() {
     run(
       "fenêtre : 2ème activation — isOpen redevient false",
       false,
-      activation2.session.worlds[windowLevel.id].entities[0].variables.isOpen.value
+      activation2.session.worlds[windowScene.id].entities[0].variables.isOpen.value
     );
     windowSession = activation2.session;
 
@@ -6481,7 +6535,7 @@ export function runMovementChecks() {
     // Persistance : isOpen VOLATILE ne survit pas au save/reload — repart
     // FERMÉE même si la fenêtre était ouverte au moment de la sauvegarde
     // (voir core/save.js/resetVolatileInBag).
-    run("fenêtre : isOpen ouverte juste avant la sauvegarde (préalable du test)", true, windowSession.worlds[windowLevel.id].entities[0].variables.isOpen.value);
+    run("fenêtre : isOpen ouverte juste avant la sauvegarde (préalable du test)", true, windowSession.worlds[windowScene.id].entities[0].variables.isOpen.value);
     const windowEnvelope = serializeGame(windowSession);
     const windowReload = deserializeGame(windowEnvelope);
     run("fenêtre : save/load réussit", true, windowReload.success);
@@ -6489,13 +6543,13 @@ export function runMovementChecks() {
       run(
         "fenêtre : isOpen (volatile) repart FERMÉE après rechargement",
         false,
-        windowReload.session.worlds[windowLevel.id].entities[0].variables.isOpen.value
+        windowReload.session.worlds[windowScene.id].entities[0].variables.isOpen.value
       );
     }
 
     // 7) BONUS — compteur de PARTIE incrémenté par addVariable, lu par une
     // condition greaterThan (chemin entier, portée "party").
-    let bonusSession = createInitialState(windowLevel, undefined, {
+    let bonusSession = createInitialState(windowScene, undefined, {
       companions: [],
       partyVariables: [{ name: "friendship_test", type: "int", initial: 0 }],
     });
@@ -6529,7 +6583,7 @@ export function runMovementChecks() {
     run("fenêtre : sérialisation — aucune fuite de non-sérialisable", 0, windowLeakFindings.length);
   }
 
-  // 9) TELEPORT — la porte n'est plus un cas spécial (voir core/level.js,
+  // 9) TELEPORT — la porte n'est plus un cas spécial (voir core/scene.js,
   // entities/types/door.js) : deux confirmations structurelles demandées
   // par la tâche, l'EXÉCUTION (view/city-screen.js/executeTeleport) restant
   // hors de portée d'un test core (voir "Vérifie (oreille)").
@@ -6541,10 +6595,10 @@ export function runMovementChecks() {
     // une porte VIP dont la destination dépend d'un flag PROPRE à cette
     // porte (ex. posé par un effet ailleurs dans la partie).
     const CONDITIONAL_TELEPORT_REGISTRY = { door: { nameKey: "entity.door.name" } };
-    const conditionalTeleportLevel = parseLevel(
+    const conditionalTeleportScene = parseScene(
       {
         id: "movement-check-conditional-teleport",
-        titleKey: "level.demo.title",
+        titleKey: "scene.demo.name",
         length: 10,
         playerStart: 0,
         entities: [
@@ -6567,7 +6621,7 @@ export function runMovementChecks() {
       },
       CONDITIONAL_TELEPORT_REGISTRY
     );
-    const fancyDoor = conditionalTeleportLevel.entities[0];
+    const fancyDoor = conditionalTeleportScene.entities[0];
     const lockedChoice = selectMatchingAction(fancyDoor.action, { entity: fancyDoor });
     run("teleport conditionnel : flag à false -> candidate catch-all, cible 'main-hall'", "main-hall", lockedChoice.effects[0].target);
     const unlockedDoor = { ...fancyDoor, variables: { vipUnlocked: { ...fancyDoor.variables.vipUnlocked, value: true } } };
@@ -6577,10 +6631,10 @@ export function runMovementChecks() {
     // b) teleport déclenché par une entité qui N'EST PAS une porte (trigger
     // temporel, vigile...) — même vocabulaire, aucune restriction de type.
     const NON_DOOR_TELEPORT_REGISTRY = { npc: { nameKey: "entity.npc.name" } };
-    const nonDoorTeleportLevel = parseLevel(
+    const nonDoorTeleportScene = parseScene(
       {
         id: "movement-check-non-door-teleport",
-        titleKey: "level.demo.title",
+        titleKey: "scene.demo.name",
         length: 10,
         playerStart: 0,
         entities: [
@@ -6597,7 +6651,7 @@ export function runMovementChecks() {
     run(
       "teleport hors porte : un NPC porte un teleport valide -> chargé sans erreur",
       "teleport",
-      nonDoorTeleportLevel.entities[0].action.effects[0].type
+      nonDoorTeleportScene.entities[0].action.effects[0].type
     );
   }
 
@@ -6620,10 +6674,10 @@ export function runMovementChecks() {
   // l'oreille (voir CLAUDE.md, "Vérifie (oreille)").
   {
     const ANGLE_MORT_REGISTRY = { door: { nameKey: "entity.door.name" } };
-    const angleMortLevel = parseLevel(
+    const angleMortScene = parseScene(
       {
         id: "movement-check-action-context",
-        titleKey: "level.demo.title",
+        titleKey: "scene.demo.name",
         length: 10,
         playerStart: 0,
         variables: [{ name: "doorUnlocked", type: "flag", initial: false }],
@@ -6631,11 +6685,11 @@ export function runMovementChecks() {
       },
       ANGLE_MORT_REGISTRY
     );
-    const angleMortSession = createInitialState(angleMortLevel, "action-context-check", {
+    const angleMortSession = createInitialState(angleMortScene, "action-context-check", {
       companions: [],
       partyVariables: [{ name: "questDone", type: "flag", initial: false }],
     });
-    const doorEntity = angleMortSession.worlds[angleMortLevel.id].entities[0];
+    const doorEntity = angleMortSession.worlds[angleMortScene.id].entities[0];
 
     // Forme EXACTE produite par view/interaction.js/actionContext(entity)
     // depuis ce correctif — voir header de ce bloc.
@@ -6687,8 +6741,8 @@ export function runMovementChecks() {
       evaluateCondition({ type: "perceptionActive" }, buildActionContextLike(perceivingSession, doorEntity))
     );
 
-    const unlockedWorld = setVariable({ world: angleMortSession.worlds[angleMortLevel.id] }, "scene", "doorUnlocked", true);
-    const unlockedSession = { ...angleMortSession, worlds: { ...angleMortSession.worlds, [angleMortLevel.id]: unlockedWorld } };
+    const unlockedWorld = setVariable({ world: angleMortSession.worlds[angleMortScene.id] }, "scene", "doorUnlocked", true);
+    const unlockedSession = { ...angleMortSession, worlds: { ...angleMortSession.worlds, [angleMortScene.id]: unlockedWorld } };
     run(
       "action.condition (contexte réel) : variable scope scene fausse avant setVariable",
       false,
@@ -6758,10 +6812,10 @@ export function runMovementChecks() {
   // + diff structurel sur cette composition.
   {
     const PANIER_PLEIN_REGISTRY = { dog: { nameKey: "entity.dog.name" } };
-    const panierPleinLevel = parseLevel(
+    const panierPleinScene = parseScene(
       {
         id: "movement-check-panier-plein",
-        titleKey: "level.demo.title",
+        titleKey: "scene.demo.name",
         length: 12,
         playerStart: 2,
         variables: [{ name: "sceneFlag", type: "flag", initial: false }],
@@ -6777,7 +6831,7 @@ export function runMovementChecks() {
       x: 1,
       behavior: { kind: "follow", targetId: "player", minDistance: 1, maxDistance: 3 },
     };
-    let panierSession = createInitialState(panierPleinLevel, "panier-plein", {
+    let panierSession = createInitialState(panierPleinScene, "panier-plein", {
       companions: [panierCompanion],
       partyVariables: [{ name: "partyFlag", type: "flag", initial: false }],
     });
@@ -6795,10 +6849,10 @@ export function runMovementChecks() {
       { session: panierSession }
     ).session;
 
-    let panierWorld = setVariable({ world: panierSession.worlds[panierPleinLevel.id] }, "scene", "sceneFlag", true);
+    let panierWorld = setVariable({ world: panierSession.worlds[panierPleinScene.id] }, "scene", "sceneFlag", true);
     const rectoDog = setVariable({ entity: panierWorld.recto.entities[0] }, "entity", "metOnce", true);
     panierWorld = { ...panierWorld, recto: { ...panierWorld.recto, entities: [rectoDog] } };
-    panierSession = { ...panierSession, worlds: { ...panierSession.worlds, [panierPleinLevel.id]: panierWorld } };
+    panierSession = { ...panierSession, worlds: { ...panierSession.worlds, [panierPleinScene.id]: panierWorld } };
 
     for (let i = 0; i < 5; i++) panierSession = reduce(panierSession, tick(1));
 
@@ -6821,13 +6875,13 @@ export function runMovementChecks() {
       run("panier plein : côté du joueur (verso) survit", "verso", revived.player.side);
       run("panier plein : amélioration possédée survit", true, hasImprovement(revived.improvements, "supernatural_perception"));
       run("panier plein : variable de PARTIE survit", true, revived.variables.partyFlag.value);
-      run("panier plein : variable de SCÈNE survit", true, revived.worlds[panierPleinLevel.id].variables.sceneFlag.value);
+      run("panier plein : variable de SCÈNE survit", true, revived.worlds[panierPleinScene.id].variables.sceneFlag.value);
       run(
         "panier plein : variable d'ENTITÉ (recto) survit",
         true,
-        revived.worlds[panierPleinLevel.id].recto.entities.find((e) => e.id === "recto-dog").variables.metOnce.value
+        revived.worlds[panierPleinScene.id].recto.entities.find((e) => e.id === "recto-dog").variables.metOnce.value
       );
-      run("panier plein : verso toujours présent après rechargement", "verso-dog", revived.worlds[panierPleinLevel.id].verso.entities[0].id);
+      run("panier plein : verso toujours présent après rechargement", "verso-dog", revived.worlds[panierPleinScene.id].verso.entities[0].id);
       run(
         "panier plein : compagnon reparu avec son comportement intact",
         JSON.stringify(panierCompanion.behavior),
@@ -6876,7 +6930,7 @@ export function runMovementChecks() {
 
   // Sac de test : 5 pommes (empilable), 2 clés (non empilable, deux
   // entrées), 1 paire de baskets (non empilable, vendable).
-  let tradeState = { ...createInitialState(moneyLevel, undefined, NO_COMPANIONS), bag: [] };
+  let tradeState = { ...createInitialState(moneyScene, undefined, NO_COMPANIONS), bag: [] };
   tradeState = addItem(tradeState, "apple", 5);
   tradeState = addItem(tradeState, "key_bronze", 2);
   tradeState = addItem(tradeState, "sneakers", 1);
@@ -6942,10 +6996,10 @@ export function runMovementChecks() {
     counter: { nameKey: "entity.shop_counter.name", interactable: true, shop: { catalog: { table: "general" } }, action: { kind: "shop" } },
     dog: { nameKey: "entity.dog.name" },
   };
-  const shopLevel = parseLevel(
+  const shopScene = parseScene(
     {
       id: "movement-check-shop",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 10,
       playerStart: 1,
       entities: [
@@ -6956,17 +7010,17 @@ export function runMovementChecks() {
     },
     SHOP_REGISTRY
   );
-  run("achat : parseLevel — shop cascadé depuis l'archétype", "general", shopLevel.entities[0].shop.catalog.table);
-  run("achat : parseLevel — shop surchargé à l'instance (inline)", 7, shopLevel.entities[1].shop.catalog.items.apple.price);
+  run("achat : parseScene — shop cascadé depuis l'archétype", "general", shopScene.entities[0].shop.catalog.table);
+  run("achat : parseScene — shop surchargé à l'instance (inline)", 7, shopScene.entities[1].shop.catalog.items.apple.price);
   run(
-    "achat : parseLevel rejette un shop sans catalogue valide",
+    "achat : parseScene rejette un shop sans catalogue valide",
     true,
-    shopThrows(() => parseLevel({ id: "s", titleKey: "level.demo.title", length: 10, playerStart: 1, entities: [{ id: "c", type: "counter", x: 1, shop: {} }] }, SHOP_REGISTRY))
+    shopThrows(() => parseScene({ id: "s", titleKey: "scene.demo.name", length: 10, playerStart: 1, entities: [{ id: "c", type: "counter", x: 1, shop: {} }] }, SHOP_REGISTRY))
   );
 
-  const shopWorld = (s) => s.worlds[shopLevel.id];
+  const shopWorld = (s) => s.worlds[shopScene.id];
   const shopEntity = (s, id) => shopWorld(s).entities.find((e) => e.id === id);
-  const shopFresh = { ...createInitialState(shopLevel, undefined, NO_COMPANIONS), bag: [] };
+  const shopFresh = { ...createInitialState(shopScene, undefined, NO_COMPANIONS), bag: [] };
   run("achat : avant tout rechargement, les articles sont à stock 0", true, shopArticles(shopEntity(shopFresh, "counter-1")).every((a) => a.stock === 0));
 
   // Rechargement au CHARGEMENT (cycle de collecte, core/spawn.js) : un point
@@ -7100,7 +7154,7 @@ export function runMovementChecks() {
   };
   const spawnRaw = {
     id: "movement-check-spawn",
-    titleKey: "level.demo.title",
+    titleKey: "scene.demo.name",
     length: 40,
     playerStart: 2,
     // Distribution INLINE (pas la table standard, dont le contenu peut
@@ -7113,43 +7167,43 @@ export function runMovementChecks() {
       { id: "rock-1", type: "rock", x: 25 },
     ],
   };
-  const spawnLevel = parseLevel(spawnRaw, SPAWN_REGISTRY);
-  const spawnLevelB = parseLevel({ id: "movement-check-spawn-b", titleKey: "level.demo.title", length: 10, playerStart: 1, entities: [] }, SPAWN_REGISTRY);
+  const spawnScene = parseScene(spawnRaw, SPAWN_REGISTRY);
+  const spawnSceneB = parseScene({ id: "movement-check-spawn-b", titleKey: "scene.demo.name", length: 10, playerStart: 1, entities: [] }, SPAWN_REGISTRY);
 
-  run("collecte : parseLevel porte spawnRanges (count explicite conservé)", 4, spawnLevel.spawnRanges[0].count);
-  run("collecte : parseLevel — container cascadé depuis l'archétype", "default", spawnLevel.entities[0].container.distribution.table);
-  run("collecte : parseLevel — container surchargé à l'instance (inline)", 1, spawnLevel.entities[1].container.distribution.items.key_bronze);
-  run("collecte : parseLevel — une face sans plage ne porte pas spawnRanges", undefined, spawnLevelB.spawnRanges);
+  run("collecte : parseScene porte spawnRanges (count explicite conservé)", 4, spawnScene.spawnRanges[0].count);
+  run("collecte : parseScene — container cascadé depuis l'archétype", "default", spawnScene.entities[0].container.distribution.table);
+  run("collecte : parseScene — container surchargé à l'instance (inline)", 1, spawnScene.entities[1].container.distribution.items.key_bronze);
+  run("collecte : parseScene — une face sans plage ne porte pas spawnRanges", undefined, spawnSceneB.spawnRanges);
   run(
-    "collecte : parseLevel rejette une plage hors bornes",
+    "collecte : parseScene rejette une plage hors bornes",
     true,
-    spawnThrows(() => parseLevel({ ...spawnRaw, spawnRanges: [{ from: 35, to: 45, distribution: { table: "default" } }] }, SPAWN_REGISTRY))
+    spawnThrows(() => parseScene({ ...spawnRaw, spawnRanges: [{ from: 35, to: 45, distribution: { table: "default" } }] }, SPAWN_REGISTRY))
   );
   run(
-    "collecte : parseLevel rejette une plage à distribution inconnue",
+    "collecte : parseScene rejette une plage à distribution inconnue",
     true,
-    spawnThrows(() => parseLevel({ ...spawnRaw, spawnRanges: [{ from: 1, to: 2, distribution: { table: "nope" } }] }, SPAWN_REGISTRY))
+    spawnThrows(() => parseScene({ ...spawnRaw, spawnRanges: [{ from: 1, to: 2, distribution: { table: "nope" } }] }, SPAWN_REGISTRY))
   );
   run(
-    "collecte : parseLevel rejette un container sans distribution valide",
+    "collecte : parseScene rejette un container sans distribution valide",
     true,
-    spawnThrows(() => parseLevel({ ...spawnRaw, entities: [{ id: "b", type: "bush", x: 1, container: {} }] }, SPAWN_REGISTRY))
+    spawnThrows(() => parseScene({ ...spawnRaw, entities: [{ id: "b", type: "bush", x: 1, container: {} }] }, SPAWN_REGISTRY))
   );
   run(
-    "collecte : parseLevel rejette un container.count non entier >= 1",
+    "collecte : parseScene rejette un container.count non entier >= 1",
     true,
-    spawnThrows(() => parseLevel({ ...spawnRaw, entities: [{ id: "b", type: "bush", x: 1, container: { distribution: { table: "default" }, count: 0 } }] }, SPAWN_REGISTRY))
+    spawnThrows(() => parseScene({ ...spawnRaw, entities: [{ id: "b", type: "bush", x: 1, container: { distribution: { table: "default" }, count: 0 } }] }, SPAWN_REGISTRY))
   );
   run(
-    "collecte : parseLevel conserve container.count explicite",
+    "collecte : parseScene conserve container.count explicite",
     3,
-    parseLevel({ ...spawnRaw, entities: [{ id: "b", type: "bush", x: 1, container: { distribution: { table: "default" }, count: 3 } }] }, SPAWN_REGISTRY).entities[0].container.count
+    parseScene({ ...spawnRaw, entities: [{ id: "b", type: "bush", x: 1, container: { distribution: { table: "default" }, count: 3 } }] }, SPAWN_REGISTRY).entities[0].container.count
   );
 
   // Premier chargement : garnissage (conteneurs stockés, plage posée).
-  const spawnFresh = { ...createInitialState(spawnLevel, undefined, NO_COMPANIONS), bag: [] };
+  const spawnFresh = { ...createInitialState(spawnScene, undefined, NO_COMPANIONS), bag: [] };
   const spawnFilled = refillDueSpawns(spawnFresh, SPAWN_REGISTRY);
-  const spawnWorld = (s) => s.worlds[spawnLevel.id];
+  const spawnWorld = (s) => s.worlds[spawnScene.id];
   const spawnedOf = (s) => spawnWorld(s).entities.filter((e) => e.spawned);
   run("collecte : refillDueSpawns marque le cycle matérialisé", 0, spawnWorld(spawnFilled).spawnCycle);
   run(
@@ -7174,7 +7228,7 @@ export function runMovementChecks() {
   run("collecte : un objet sans archétype dédié naît sous le type générique item", true, spawnedOf(spawnFilled).filter((e) => e.action.item === "key_bronze").every((e) => e.type === "item"));
   run("collecte : refillDueSpawns idempotent dans le même cycle (référence INCHANGÉE)", spawnFilled, refillDueSpawns(spawnFilled, SPAWN_REGISTRY));
   run("collecte : refillDueSpawns sur un monde sans source -> référence INCHANGÉE", true, (() => {
-    const s = createInitialState(spawnLevelB, undefined, NO_COMPANIONS);
+    const s = createInitialState(spawnSceneB, undefined, NO_COMPANIONS);
     return refillDueSpawns(s, SPAWN_REGISTRY) === s;
   })());
 
@@ -7231,8 +7285,8 @@ export function runMovementChecks() {
 
   // Quitter puis revenir : la scène est re-garnie (marqueur exécuté au
   // chargement) — anciens collectibles retirés, nouveaux posés, stocks neufs.
-  const spawnAway = refillDueSpawns(travelToWorld(spawnNextDayInPlace, spawnLevelB.id, spawnLevelB), SPAWN_REGISTRY);
-  const spawnBack = refillDueSpawns(travelToWorld(spawnAway, spawnLevel.id), SPAWN_REGISTRY);
+  const spawnAway = refillDueSpawns(travelToWorld(spawnNextDayInPlace, spawnSceneB.id, spawnSceneB), SPAWN_REGISTRY);
+  const spawnBack = refillDueSpawns(travelToWorld(spawnAway, spawnScene.id), SPAWN_REGISTRY);
   run("collecte : retour dans la scène -> marqueur exécuté (cycle 1)", 1, spawnWorld(spawnBack).spawnCycle);
   run("collecte : retour -> anciens collectibles posés retirés (ids du cycle 0 absents)", false, spawnedOf(spawnBack).some((e) => e.id.startsWith("spawn-0-")));
   run("collecte : retour -> nouveaux collectibles posés (cycle 1)", 4, spawnedOf(spawnBack).filter((e) => e.id.startsWith("spawn-1-")).length);
@@ -7243,24 +7297,24 @@ export function runMovementChecks() {
   // Absence longue : plusieurs cycles sans revenir -> UN seul garnissage
   // (écrasement du marqueur, jamais d'accumulation).
   const spawnLongAway = advanceTime(spawnAway, 5 * SPAWN_DAY);
-  const spawnLongBack = refillDueSpawns(travelToWorld(spawnLongAway, spawnLevel.id), SPAWN_REGISTRY);
+  const spawnLongBack = refillDueSpawns(travelToWorld(spawnLongAway, spawnScene.id), SPAWN_REGISTRY);
   run("collecte : absence de 5 cycles -> marqueur au cycle COURANT (6)", 6, spawnWorld(spawnLongBack).spawnCycle);
   run("collecte : absence de 5 cycles -> UN seul lot de collectibles (pas d'accumulation)", 4, spawnedOf(spawnLongBack).length);
   run("collecte : absence de 5 cycles -> tous du cycle courant", true, spawnedOf(spawnLongBack).every((e) => e.id.startsWith("spawn-6-")));
 
   // Déterminisme : même seed + même cycle -> même contenu (stocks, objets,
   // positions).
-  const spawnDet1 = refillDueSpawns(createInitialState(spawnLevel, 5, NO_COMPANIONS), SPAWN_REGISTRY);
-  const spawnDet2 = refillDueSpawns(createInitialState(spawnLevel, 5, NO_COMPANIONS), SPAWN_REGISTRY);
+  const spawnDet1 = refillDueSpawns(createInitialState(spawnScene, 5, NO_COMPANIONS), SPAWN_REGISTRY);
+  const spawnDet2 = refillDueSpawns(createInitialState(spawnScene, 5, NO_COMPANIONS), SPAWN_REGISTRY);
   const spawnSignature = (s) => JSON.stringify(spawnWorld(s).entities.map((e) => [e.id, e.x, e.stock, e.action && e.action.item]));
   run("collecte : déterminisme — même seed + même cycle -> même garnissage", spawnSignature(spawnDet1), spawnSignature(spawnDet2));
   run("collecte : déterminisme — le PRNG de la face a bien avancé (tirages consommés)", true, spawnWorld(spawnFilled).rngState !== spawnWorld(spawnFresh).rngState);
 
   // Scène à deux faces : LES DEUX faces garnies, marqueur au niveau du monde.
-  const spawnTwoSided = parseLevel(
+  const spawnTwoSided = parseScene(
     {
       id: "movement-check-spawn-2f",
-      titleKey: "level.demo.title",
+      titleKey: "scene.demo.name",
       length: 20,
       playerStart: 1,
       recto: { entities: [{ id: "bush-r", type: "bush", x: 5 }] },
@@ -7305,9 +7359,9 @@ export function runMovementChecks() {
     // Trigger porté par l'ARCHÉTYPE : cascade instance -> type, comme action.
     chime: { nameKey: "entity.chime.name", triggers: [BELL_TRIGGER] },
   };
-  const triggerRawLevel = {
+  const triggerRawScene = {
     id: "movement-check-triggers",
-    titleKey: "level.demo.title",
+    titleKey: "scene.demo.name",
     length: 20,
     playerStart: 1,
     recto: {
@@ -7345,26 +7399,26 @@ export function runMovementChecks() {
       ],
     },
   };
-  const triggerLevel = parseLevel(triggerRawLevel, HOUR_TRIGGER_REGISTRY);
-  const triggerBell = triggerLevel.recto.entities.find((e) => e.id === "bell");
-  const triggerChime = triggerLevel.recto.entities.find((e) => e.id === "chime");
-  const triggerLamp = triggerLevel.verso.entities.find((e) => e.id === "lamp");
+  const triggerScene = parseScene(triggerRawScene, HOUR_TRIGGER_REGISTRY);
+  const triggerBell = triggerScene.recto.entities.find((e) => e.id === "bell");
+  const triggerChime = triggerScene.recto.entities.find((e) => e.id === "chime");
+  const triggerLamp = triggerScene.verso.entities.find((e) => e.id === "lamp");
 
   run("triggers : parsé sur l'instance (un trigger, à chaque heure)", 1, triggerBell.triggers.length);
   run("triggers : trigger sans `hour` -> champ absent (sparse)", false, "hour" in triggerBell.triggers[0]);
   run("triggers : effets validés par la grammaire d'action", "playSound", triggerBell.triggers[0].effects[0].type);
   run("triggers : cascade instance -> type (archétype porteur)", 1, triggerChime.triggers.length);
   run("triggers : trigger ciblé conserve son heure", 20, triggerLamp.triggers[0].hour);
-  run("triggers : entité sans trigger -> champ absent", false, "triggers" in triggerLevel.verso.entities.find((e) => e.id === "sleeper") === false);
+  run("triggers : entité sans trigger -> champ absent", false, "triggers" in triggerScene.verso.entities.find((e) => e.id === "sleeper") === false);
 
   function triggerRejected(patchEntity) {
     const raw = {
-      ...triggerRawLevel,
+      ...triggerRawScene,
       recto: { entities: [{ id: "bell", type: "bell", x: 10, ...patchEntity }] },
       verso: { entities: [] },
     };
     try {
-      parseLevel(raw, HOUR_TRIGGER_REGISTRY);
+      parseScene(raw, HOUR_TRIGGER_REGISTRY);
       return false;
     } catch {
       return true;
@@ -7397,12 +7451,12 @@ export function runMovementChecks() {
   // Application sur une session : monde actif, DEUX faces, joueur au
   // recto. Le temps est posé directement (session.time), comme le ferait
   // advanceTime.
-  const triggerBase = createInitialState(triggerLevel, 3, NO_COMPANIONS);
+  const triggerBase = createInitialState(triggerScene, 3, NO_COMPANIONS);
   const atTime = (session, time) => ({ ...session, time });
   // Un tick à 9h10 résout la présence (sleeper dormante) — une entité dont
   // la présence n'a pas encore été résolue compte comme présente.
   const triggerT0 = reduce(atTime(triggerBase, 9 * HOUR + 10), tick(0));
-  const lampOf = (session) => session.worlds[triggerLevel.id].verso.entities.find((e) => e.id === "lamp");
+  const lampOf = (session) => session.worlds[triggerScene.id].verso.entities.find((e) => e.id === "lamp");
 
   const triggerSame = applyDueTriggers(atTime(triggerT0, 9 * HOUR + 40), triggerT0.time);
   run("triggers : dans l'heure -> MÊME référence de session", true, Object.is(triggerSame.session, atTime(triggerT0, 9 * HOUR + 40).session) || triggerSame.fired.length === 0);
@@ -7417,7 +7471,7 @@ export function runMovementChecks() {
   run("triggers : 20h -> recto d'abord, puis la lampe du verso", "bell,chime,lamp", triggerTwenty.fired.map((f) => f.entity.id).join(","));
   run("triggers : effet d'ÉTAT appliqué sur l'AUTRE face (lampe allumée au verso, joueur au recto)", true, lampOf(triggerTwenty.session).variables.lit.value);
   run("triggers : la lampe ne remonte que son effet de rendu (announce)", "announce", triggerTwenty.fired[2].effects.map((e) => e.type).join(","));
-  run("triggers : le recto n'est pas touché par un effet du verso", true, Object.is(triggerTwenty.session.worlds[triggerLevel.id].recto, triggerT0.worlds[triggerLevel.id].recto));
+  run("triggers : le recto n'est pas touché par un effet du verso", true, Object.is(triggerTwenty.session.worlds[triggerScene.id].recto, triggerT0.worlds[triggerScene.id].recto));
 
   const triggerJump = applyDueTriggers(atTime(triggerT0, 14 * HOUR), triggerT0.time);
   run("triggers : saut 9h->14h -> une seule cloche par entité (pas de rafale)", 2, triggerJump.fired.length);
@@ -7430,17 +7484,17 @@ export function runMovementChecks() {
   // Dormance : `sleeper` n'est présente qu'entre 0h et 1h — dormante depuis
   // le tick de triggerT0, elle ne tire pas ; AVANT toute résolution de
   // présence (session jamais tiquée), elle compte comme présente et tire.
-  run("triggers : entité dormante (présence résolue par le tick)", false, triggerT0.worlds[triggerLevel.id].verso.entities.find((e) => e.id === "sleeper").present);
+  run("triggers : entité dormante (présence résolue par le tick)", false, triggerT0.worlds[triggerScene.id].verso.entities.find((e) => e.id === "sleeper").present);
   run("triggers : entité dormante ne tire pas", false, triggerTen.fired.some((f) => f.entity.id === "sleeper"));
   const triggerUnresolved = applyDueTriggers(atTime(triggerBase, 10 * HOUR), 9 * HOUR);
   run("triggers : présence jamais résolue -> compte comme présente, tire", true, triggerUnresolved.fired.some((f) => f.entity.id === "sleeper"));
 
   // Monde SIMPLE (une seule face) : même mécanisme.
-  const triggerSimpleLevel = parseLevel(
-    { ...RAW_LEVEL, id: "movement-check-triggers-simple", entities: [{ id: "bell", type: "bell", x: 5, triggers: [BELL_TRIGGER] }] },
+  const triggerSimpleScene = parseScene(
+    { ...RAW_SCENE, id: "movement-check-triggers-simple", entities: [{ id: "bell", type: "bell", x: 5, triggers: [BELL_TRIGGER] }] },
     HOUR_TRIGGER_REGISTRY
   );
-  const triggerSimple = atTime(createInitialState(triggerSimpleLevel, 3, NO_COMPANIONS), 9 * HOUR);
+  const triggerSimple = atTime(createInitialState(triggerSimpleScene, 3, NO_COMPANIONS), 9 * HOUR);
   run("triggers : monde simple -> la cloche tire", 1, applyDueTriggers(atTime(triggerSimple, 10 * HOUR), triggerSimple.time).fired.length);
 
   // Sérialisabilité : `triggers` est de la donnée pure sur l'entité.

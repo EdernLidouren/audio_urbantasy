@@ -1,5 +1,5 @@
 // Archétype "clock_tower_mirror" — miroir mural ORDINAIRE du puits des
-// contrepoids (voir level/clock-tower-weight-shaft.json). Présent HORS
+// contrepoids (voir scenes/clock-tower-weight-shaft.json). Présent HORS
 // perception seulement (condition "not", voir doc/scripting.md/"not") :
 // superposé au miroir magique (clock_tower_magic_mirror.js), qui prend sa
 // place quand la perception s'active. Mondain : reste soumis à

@@ -1,10 +1,10 @@
 # Carte de la ville
 
-Contrat de référence pour `level/city-map.js` (topologie) et
+Contrat de référence pour `map/city-map.js` (topologie) et
 `view/menus/city-map-menu.js` (menu-carte). Voir CLAUDE.md/"Carte de la
 ville" pour le résumé.
 
-## Topologie (`level/city-map.js`)
+## Topologie (`map/city-map.js`)
 
 Donnée pure (aucun import), déclarée À LA MAIN — pas de spaghetti
 d'adjacences auto-calculées, la grille EST le fichier, lisible d'un coup
@@ -20,15 +20,15 @@ Une case a l'une de TROIS natures, jamais confondues :
 
 | Nature | Forme | Sélectionnable |
 |---|---|---|
-| Zone réelle | `{ levelId, nameKey, descriptionKey, spawnX }` | Oui |
+| Zone réelle | `{ sceneId, nameKey, descriptionKey, spawnX }` | Oui |
 | En chantier | le marqueur partagé `UNDER_CONSTRUCTION` (interne au module) | Non |
 | Vide | `null` | Non |
 
-- `levelId` : référence `level/index.js` (chargeable via `level/load.js`).
+- `sceneId` : référence `scenes/index.js` (chargeable via `scenes/load.js`).
 - `nameKey` / `descriptionKey` : clés i18n, jamais des chaînes déjà
   résolues (même convention que `entities/types/*.js`).
 - `spawnX` : point de TÉLÉPORTATION PAR DÉFAUT de cette case — PAS
-  forcément le `playerStart` du niveau (voir "Sélection" plus bas). Réservé
+  forcément le `playerStart` de la scène (voir "Sélection" plus bas). Réservé
   pour une future case avec plusieurs entrées (playerStart reste réservé à
   l'arrivée PAR PORTE).
 
@@ -39,8 +39,8 @@ Accesseurs exportés (seule interface recommandée, jamais indexer
   d'exception).
 - `isRealCityMapZone(cell)` / `isCityMapUnderConstruction(cell)` —
   prédicats de nature.
-- `findCityMapCoordinates(levelId)` — coordonnées `{ x, y }` de la case
-  dont `levelId` correspond, ou `null` si ce lieu n'est pas (encore)
+- `findCityMapCoordinates(sceneId)` — coordonnées `{ x, y }` de la case
+  dont `sceneId` correspond, ou `null` si cette scène n'est pas (encore)
   représenté sur la carte.
 
 **Réservé, pas codé** : une téléportation de bord de map (sortir d'une
@@ -70,9 +70,9 @@ jeu, jamais sur la pause restée en dessous.
   - dans les DEUX cas, ré-annonce de la case courante, ÉTOILÉE (`"* ..."`,
     préférence `menuStarPrefix`, même clé/mêmes règles que les menus
     classiques) — l'utilisateur doit savoir qu'il est à une limite.
-- **Curseur de départ** : sur la case du lieu ACTUELLEMENT actif
+- **Curseur de départ** : sur la case du monde ACTUELLEMENT actif
   (`findCityMapCoordinates(session.activeWorldId)`), lu UNE FOIS à
-  l'ouverture — repli sur `(0, 0)` si ce lieu n'est pas représenté sur la
+  l'ouverture — repli sur `(0, 0)` si ce monde n'est pas représenté sur la
   carte.
 - **Annonce à chaque déplacement**, trois natures distinctes :
   - zone réelle : `"<nom> : <description>"` (`t(nameKey)`/`t(descriptionKey)`).
@@ -123,7 +123,7 @@ DIRECTEMENT par `view/menus/city-map-menu.js`, jamais via l'injection de
 Entrée sur une case :
 
 - **Zone réelle** : ferme la carte (`popScreen()`) PUIS délègue à
-  `onSelectZone(levelId, spawnX)`, fourni par l'appelant
+  `onSelectZone(sceneId, spawnX)`, fourni par l'appelant
   (`view/city-screen.js`/`travelViaCityMap`) — ce module ignore tout de ce
   qui se passe ensuite (destroy/`travelToWorld`/recreate, voir plus bas).
 - **En chantier / vide** : PAS sélectionnable — petit retour (ré-annonce
@@ -133,7 +133,7 @@ Entrée sur une case :
   sortie de scène), joueur replacé à `spawnX`. Recentrage volontaire
   (confort assumé, jeu sans challenge) : pas de "vous y êtes déjà".
 
-`view/city-screen.js`/`travelViaCityMap(levelId, spawnX)` réutilise
+`view/city-screen.js`/`travelViaCityMap(sceneId, spawnX)` réutilise
 `performTransition` — LA MÊME transition franche qu'une porte (voir
 `doc/scripting.md`/"Effets d'action"/`"teleport"`, mode rechargement) :
 `scene.destroy()` (aucun Howl résiduel), `travelToWorld` (core, x/side

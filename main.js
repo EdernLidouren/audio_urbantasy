@@ -1,7 +1,7 @@
 // Point d'entrée : câblage core <-> vue. Au chargement : focus la zone de
 // jeu, branche le clavier, pousse le menu principal comme premier écran,
 // démarre la boucle à pas fixe (qui tick uniquement l'écran actif au sommet
-// de la pile), puis charge le niveau en tâche de fond.
+// de la pile), puis charge la scène en tâche de fond.
 
 import { pushScreen, tickActive, tickFrame } from "./lib/screens.js";
 import { initInput, onGlobalPress } from "./lib/input.js";
@@ -15,7 +15,7 @@ import { t } from "./data/i18n/index.js";
 import { runMovementChecks } from "./core/movement.check.js";
 import { isDebugEnabled, setDebugEnabled } from "./config/debug.js";
 import { startLoop } from "./lib/loop.js";
-import { loadLevel, loadLevelById } from "./level/load.js";
+import { loadScene, loadSceneById } from "./scenes/load.js";
 import registry from "./entities/types/index.js";
 import { createInitialState } from "./core/state.js";
 import { getPref, setPref, PREF_CONSTRAINTS } from "./config/preferences.js";
@@ -91,11 +91,11 @@ onGlobalPress(GLOBAL_BINDINGS, (action) => {
 
 gameZone.focus();
 
-// Niveau chargé en tâche de fond ; startNewGame() le lit au moment de
-// l'activation (cas limite improbable : niveau pas encore chargé -> no-op).
+// Scène chargée en tâche de fond ; startNewGame() la lit au moment de
+// l'activation (cas limite improbable : scène pas encore chargée -> no-op).
 // "Continuer" n'en a pas besoin : une partie sauvegardée embarque déjà l'état
 // complet de ses mondes (voir loadGame/core/save.js), aucun fetch requis.
-let level = null;
+let scene = null;
 
 // Session de la partie en cours (sortie de createInitialState). null hors
 // ville : la ville (view/city-screen.js) est une simple vue dessus, elle
@@ -117,30 +117,30 @@ function setSession(next) {
 let loadableSave = null;
 
 // "Nouvelle partie" (confirmée au préalable si un save existe, voir
-// main-menu.js/activateNewGame) : construit une partie NEUVE sur le niveau
+// main-menu.js/activateNewGame) : construit une partie NEUVE sur la scène
 // de départ. ÉCRASEMENT PARESSEUX voulu : n'efface PAS le save disque ici —
 // la nouvelle partie ne remplacera l'ancien save qu'à sa PROCHAINE écriture
 // (manuelle ou auto), jamais à cet instant. Quitter avant toute sauvegarde
 // laisse donc l'ancien save intact.
 function startNewGame() {
-  if (!level) return; // niveau pas encore chargé : cas limite improbable
-  session = createInitialState(level);
+  if (!scene) return; // scène pas encore chargée : cas limite improbable
+  session = createInitialState(scene);
   pushScreen(makeCityScreen(getSession, setSession));
 }
 
 // "Ville test" (entrée de tête du menu principal, voir main-menu.js) :
-// démarre une partie NEUVE directement sur le niveau "demo" (l'ancienne
+// démarre une partie NEUVE directement sur la scène "demo" (l'ancienne
 // scène de départ, avant l'introduction de town_square ci-dessus) — MÊME
 // risque d'écrasement qu'une "Nouvelle partie" normale, voir
 // activateNewGame/main-menu.js, réutilisé TEL QUEL pour cette entrée.
-// Contrairement à `level` (préchargé en tâche de fond dès le boot, voir plus
-// bas), "demo" n'est chargé qu'à la demande via loadLevelById (même chemin
+// Contrairement à `scene` (préchargée en tâche de fond dès le boot, voir plus
+// bas), "demo" n'est chargé qu'à la demande via loadSceneById (même chemin
 // que la traversée d'une porte, voir view/city-screen.js/performTransition)
 // — un raccourci de test n'a pas besoin d'être préchargé au démarrage.
 function startTestCityGame() {
-  loadLevelById("demo", registry)
-    .then((testLevel) => {
-      session = createInitialState(testLevel);
+  loadSceneById("demo", registry)
+    .then((testScene) => {
+      session = createInitialState(testScene);
       pushScreen(makeCityScreen(getSession, setSession));
     })
     .catch((error) => {
@@ -211,9 +211,9 @@ startLoop(
   (deltaMs) => tickFrame(deltaMs)
 );
 
-loadLevel("./level/town-square.json", registry)
-  .then((loadedLevel) => {
-    level = loadedLevel;
+loadScene("./scenes/town-square.json", registry)
+  .then((loadedScene) => {
+    scene = loadedScene;
   })
   .catch((error) => {
     console.error(error.message);
@@ -223,7 +223,7 @@ loadLevel("./level/town-square.json", registry)
 // chargé UNE FOIS ici et injecté dans lib/assets.js — resolveAsset() ne
 // relit jamais le disque. Échec (réseau, JSON invalide, fichier absent) :
 // signalé clairement, jamais silencieux — mais ne bloque pas le reste du
-// jeu, exactement comme le chargement du niveau ci-dessus.
+// jeu, exactement comme le chargement de la scène ci-dessus.
 fetch("assets/manifest.json")
   .then((response) => {
     if (!response.ok) {

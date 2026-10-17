@@ -45,3 +45,5 @@ Marbles by Piggimon -- https://freesound.org/s/366385/ -- License: Attribution N
 Woman Walking on tile surface.wav by 221097 -- https://freesound.org/s/654271/ -- License: Attribution NonCommercial 4.0
 Slipper_Walking_1_para.mp3 by Paradoxxxical -- https://freesound.org/s/679291/ -- License: Attribution 4.0
 metal gate 11.aif by ThenCameNow -- https://freesound.org/s/31240/ -- License: Attribution 4.0
+dragging chair on concrete floor, wide room 05 by funkysandwich -- https://freesound.org/s/871017/ -- License: Creative Commons 0
+Bird-Like-Chair-Squeak-1.flac by dland -- https://freesound.org/s/168439/ -- License: Creative Commons 0

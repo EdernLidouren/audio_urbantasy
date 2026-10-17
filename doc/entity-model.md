@@ -2,8 +2,8 @@
 
 Contrat de référence pour le contenu du jeu : la forme d'une entité, le
 vocabulaire de sons qu'elle porte, l'ordre de résolution des réglages, et la
-place du joueur dans ce modèle. Complète `doc/level-format.md` (le format des
-fichiers de niveau, la FORME JSON) et `doc/scripting.md` (la GRAMMAIRE des
+place du joueur dans ce modèle. Complète `doc/scene-format.md` (le format des
+fichiers de scène, la FORME JSON) et `doc/scripting.md` (la GRAMMAIRE des
 conditions/effets/actions/variables) : ce document-ci décrit le MODÈLE
 spécifique-Templeton — capacités d'interaction, dormance, collectible
 persistant, entités éphémères, modèle de son, sous-types comme presets —
@@ -13,11 +13,11 @@ jamais la grammaire déclarative elle-même, qui vit exclusivement dans
 ## Le descripteur d'entité partagé
 
 Une entité (registre `entities/types/index.js`, un fichier par archétype dans
-`entities/types/` ; instance dans un fichier de niveau) porte :
+`entities/types/` ; instance dans un fichier de scène) porte :
 
 | Catégorie              | Champs                                                          | Rôle |
 |-------------------------|-------------------------------------------------------------------|------|
-| Position                | `x` (instance uniquement, voir `doc/level-format.md`)                  | où l'entité se trouve dans le niveau |
+| Position                | `x` (instance uniquement, voir `doc/scene-format.md`)                  | où l'entité se trouve dans la scène |
 | Type                    | `type` (instance), `nameKey` (registre ET instance, clé i18n, forme `<namespace>.name`) | quoi et comment l'annoncer |
 | Sons par rôle            | `sounds: { <rôle>: descripteur }` (registre ET instance, cascade PAR FUSION PROFONDE, voir "Cascade de sounds") | voir "Vocabulaire de sons" ci-dessous |
 | Portée spatiale           | `audibleRange`, `panSaturation`, `interactRange`, `cutoffMin`, `cutoffMax` | où/comment une entité est perçue dans l'espace — voir "Ce qui n'est PAS un paramètre sonore" |
@@ -35,7 +35,7 @@ un seul rôle, ou les deux) : tout ce qui manque retombe sur le défaut global
 ## Interaction (niveau 0)
 
 Deux capacités INDÉPENDANTES (`observable`, `interactable`, booléens,
-cascade instance -> type -> défaut `false` — voir `core/level.js`) : les
+cascade instance -> type -> défaut `false` — voir `core/scene.js`) : les
 QUATRE combinaisons sont valides, aucun cas spécial. Chaque verbe (Espace /
 Entrée, voir `view/interaction.js`) ne considère QUE les entités portant SA
 capacité — un décor `observable:false` n'apparaît JAMAIS candidat à Espace,
@@ -55,7 +55,7 @@ une balise `interactable:false` jamais candidate à Entrée, même à portée.
   candidate), pour que l'état et le son restent synchronisés. Par entité :
   les autres restent disponibles. Espace n'en a pas. Côté vue
   (`view/interaction.js`), horloge réelle, jamais sauvegardé, purgé à
-  chaque changement de lieu ou de face (`view/city-screen.js` l'appelle dans
+  chaque changement de monde ou de face (`view/city-screen.js` l'appelle dans
   ses deux transitions). Une action qui téléporte n'arme pas le
   délai : son sas la protège déjà.
 - **`interactable`** — candidate à Entrée. `npc`/`object` sont interactables
@@ -116,7 +116,7 @@ spécifique au MODÈLE d'entité :
   `money.announce`/`interaction.pickup`) — changer le nom ne touche à rien
   du mécanisme. Consultable à tout moment via la touche "g"
   (`view/city-screen.js`), lecture pure, canal liveRegion.
-- **Exemple de test — dresscode** (`level/demo.json`, `door-club`) : une
+- **Exemple de test — dresscode** (`scenes/demo.json`, `door-club`) : une
   porte conditionnée `hasEquipmentTag: "chic"`. Le sac de départ contient
   déjà des escarpins (`high_heels`, tag `"chic"`, gait `"high_heels"` — voir
   "Objets équipables" plus haut) : équiper/déséquiper fait basculer le
@@ -131,7 +131,7 @@ reste dans `worlds[x].entities` après activation : il change simplement
 d'ÉTAT. Le mécanisme, en trois couches strictement séparées :
 
 - **`entity.consumed`** (booléen, RUNTIME — comme `present`/`gotoArrived`,
-  JAMAIS un champ d'entrée du JSON de niveau) : `false`/absent tant que
+  JAMAIS un champ d'entrée du JSON de scène) : `false`/absent tant que
   l'entité n'a jamais été activée, posé UNE SEULE FOIS à `true` par
   `core/state.js`/`markConsumed`. PERMANENT : rien dans ce système ne le
   remet jamais à `false`.
@@ -152,7 +152,7 @@ d'ÉTAT. Le mécanisme, en trois couches strictement séparées :
   choix du concepteur — l'un, l'autre, les deux, ou aucun — jamais un
   comportement codé en dur pour "crate" spécifiquement) :
   - **Changer d'état perceptible** — `consumedDescriptionKey` (cascade
-    instance -> type, comme `descriptionKey`, voir `core/level.js`) :
+    instance -> type, comme `descriptionKey`, voir `core/scene.js`) :
     description alternative lue par `view/interaction.js`/
     `resolveDescription` dès que `entity.consumed`. `muteOnConsumed`
     (booléen, REGISTRE SEULEMENT — jamais cascadé par instance, contrairement
@@ -168,7 +168,7 @@ d'ÉTAT. Le mécanisme, en trois couches strictement séparées :
   - **Devenir dormant** — PAS un champ propre à ce système : se déclare avec
     le mécanisme de présence EXISTANT (`core/presence.js`), à l'INSTANCE (pas
     à l'archétype, voir `entities/types/crate.js` qui n'en déclare aucune par
-    défaut) — voir `level/demo2.json`, `crate-warehouse`. Une entité
+    défaut) — voir `scenes/demo2.json`, `crate-warehouse`. Une entité
     `consumed` alimente le registre de conditions (`core/presence.js`/
     `CONDITION_EVALUATORS.consumed`) exactement comme `"timeRange"`/
     `"arrived"` : AUCUNE retouche à `isPresent`/`resolveEntityRules`/
@@ -187,7 +187,7 @@ d'ÉTAT. Le mécanisme, en trois couches strictement séparées :
     "Présence conditionnelle" ci-dessous) une fois consumed, donc silencieuse
     ET non examinable, contrairement à l'effet précédent seul.
 
-Exemple de référence — deux caisses, `level/demo2.json` :
+Exemple de référence — deux caisses, `scenes/demo2.json` :
 `crate-port` (perceptible seul : desc devient "vide", beacon coupé,
 reste interactable — réactiver ne redonne rien, silencieusement) et
 `crate-warehouse` (devient dormant : donne son contenu puis disparaît de
@@ -203,7 +203,7 @@ d'état) : une entité ÉPHÉMÈRE est créée EN COURS DE JEU, n'existe que pou
 la visite courante, et disparaît TOUJOURS sans laisser de trace — ramassée
 OU non. Marque distinctive : `entity.ephemeral === true`, un champ RUNTIME
 (comme `consumed`/`present`/`gotoArrived`) — jamais un champ d'entrée du
-JSON de niveau, une entité ÉPHÉMÈRE n'est par définition jamais DÉCLARÉE.
+JSON de scène, une entité ÉPHÉMÈRE n'est par définition jamais DÉCLARÉE.
 
 - **Création** — `core/state.js`/`spawnEphemeral(session, spec, x)` : point
   d'entrée UNIQUE et RÉUTILISABLE pour toute création d'entité en jeu — DEUX
@@ -215,7 +215,7 @@ JSON de niveau, une entité ÉPHÉMÈRE n'est par définition jamais DÉCLARÉE.
   descripteur d'entité DÉJÀ RÉSOLU
   (`type`, `labelKey`, `sounds`, `blocksMovement`, `observable`,
   `interactable`, `action`...) — EXACTEMENT la forme qu'une entité obtient
-  en sortie de `core/level.js`/`parseEntity`, construit par L'APPELANT (voir
+  en sortie de `core/scene.js`/`parseEntity`, construit par L'APPELANT (voir
   `createTestCompanion` dans `core/state.js`, même principe pour le
   compagnon de test) : `sounds` DOIT être porté explicitement ici (voir
   "Cascade de sounds" plus bas) — la vue lit `entity.sounds`, jamais le
@@ -249,11 +249,11 @@ JSON de niveau, une entité ÉPHÉMÈRE n'est par définition jamais DÉCLARÉE.
   donc JAMAIS réapparaître un éphémère, quel que soit le moment de la
   sauvegarde.
 - **Purge au départ** — `core/state.js`/`travelToWorld` retire les entités
-  éphémères du lieu qu'on quitte AU MOMENT de le ranger (geler un monde
+  éphémères du monde qu'on quitte AU MOMENT de le ranger (geler un monde
   parqué qui en contiendrait encore serait la seule façon dont un éphémère
   pourrait survivre à une sortie de scène, en mémoire, pour une visite
   ultérieure DANS LA MÊME partie — la sérialisation seule ne suffit pas à
-  l'empêcher). Revenir dans un lieu quitté : aucun éphémère d'avant, qu'il
+  l'empêcher). Revenir dans un monde quitté : aucun éphémère d'avant, qu'il
   ait été ramassé ou non.
 - **Limite anti-prolifération** — `MAX_EPHEMERALS` (`config/ephemerals.js`,
   50 par défaut) : SEULES les entités éphémères comptent (jamais les
@@ -270,7 +270,7 @@ JSON de niveau, une entité ÉPHÉMÈRE n'est par définition jamais DÉCLARÉE.
 Un VRAI déclencheur en jeu (au-delà de la touche debug) : une entité peut
 déclarer, sur son `action` (voir "Types d'action" plus haut), un effet
 `spawn` qui fait naître PLUSIEURS éphémères ÉPARPILLÉS autour d'elle à
-l'activation — ex. `crate-stash` (`level/demo2.json`), une caisse dont le
+l'activation — ex. `crate-stash` (`scenes/demo2.json`), une caisse dont le
 `"loot"` LÂCHE des pièces au lieu d'en créditer une directement :
 
 ```json
@@ -283,7 +283,7 @@ l'activation — ex. `crate-stash` (`level/demo2.json`), une caisse dont le
 - **Forme** — `spawn: { spec, count, spread? }`, une SECONDE forme valide
   pour `action.kind: "loot"` (voir "Types d'action" plus haut), jamais
   mélangée avec `amount` sur la même entité : `spec` (minimal — `{ type,
-  ...surcharges }`, MÊME forme qu'une instance de niveau, pas un descripteur
+  ...surcharges }`, MÊME forme qu'une instance de scène, pas un descripteur
   déjà résolu) DÉCRIT ce qui naît, `count`/`spread` DÉCRIVENT comment —
   séparation délibérée pour pouvoir un jour faire naître autre chose qu'une
   pièce (`spec` change) sans toucher à la mécanique d'éparpillement elle-même
@@ -350,7 +350,7 @@ Infra volontairement minimale : d'autres outils de debug s'y grefferont plus
 tard derrière le MÊME drapeau, jamais un par outil. Menus de debug derrière ce
 drapeau, en ville : Shift+W (météo, `view/menus/debug-weather-menu.js`),
 Shift+T (temps, `view/menus/debug-time-menu.js`), Shift+M (téléportation vers
-n'importe quelle scène du registre `level/index.js`, liste générée,
+n'importe quelle scène du registre `scenes/index.js`, liste générée,
 `view/menus/debug-teleport-menu.js` — passe par l'effet `teleport` en mode
 `instant`, jamais par un chemin de chargement parallèle).
 
@@ -368,19 +368,19 @@ persiste avec le monde.
   Poids RELATIFS, tirage via `core/weather.js`/`pickTransition` réutilisé tel
   quel — une seule logique de tirage pondéré. Résolue à CHAQUE tirage, jamais
   figée dans l'état : un monde sauvegardé tire toujours dans la table
-  COURANTE. Validée au chargement (`core/level.js`) ; les tables standard
+  COURANTE. Validée au chargement (`core/scene.js`) ; les tables standard
   s'auto-valident à l'import (`validateSpawnTables`), comme la météo.
 - **Sources (où)** — CONTENEUR : entité portant `container: { distribution,
   count? }` (cascade instance -> type, ex. `entities/types/bush.js` ;
   `count` : objets par cycle, défaut `SPAWN_CONTAINER_DEFAULT_COUNT`) +
   action `"search"` ; point fixe, contenu CACHÉ. PLAGE : `face.spawnRanges`
-  (`{ from, to, count?, distribution }`, voir `doc/level-format.md`) ;
+  (`{ from, to, count?, distribution }`, voir `doc/scene-format.md`) ;
   collectibles posés AU SOL à des positions VARIÉES — `drawScatteredPosition`
   (bornes carte, corps bloquants) autour du centre de la plage, re-tirée si
   trop proche d'un collectible déjà posé (`config/tuning-values.js`/
   `spawnMinSpacing`). Chaque collectible posé passe par le MÊME parseur qu'une
-  instance de niveau (`core/level.js`/`parseSpawnedEntity`, registre INJECTÉ
-  comme pour `parseLevel`) : archétype du même nom que l'objet s'il existe
+  instance de scène (`core/scene.js`/`parseSpawnedEntity`, registre INJECTÉ
+  comme pour `parseScene`) : archétype du même nom que l'objet s'il existe
   (`apple`), sinon l'archétype générique `item` avec nameKey/action pickup
   dérivés d'`ITEM_REGISTRY` (même convention que "Poser", voir
   `view/city-screen.js`/`resolveDroppedItemSpec`). Marqué `spawned: true`
@@ -398,7 +398,7 @@ persiste avec le monde.
   collectibles posés retirés (ramassés ou non), nouveaux posés ; chaque
   conteneur reçoit un `stock`/`stockCycle` neufs ; chaque POINT DE VENTE
   recharge son rayon (`shopStock`, voir "Vente et achat"). Scène à deux
-  faces : LES DEUX faces garnies (on charge le lieu entier), chacune sur son
+  faces : LES DEUX faces garnies (on charge le monde entier), chacune sur son
   PRNG.
   Exception assumée pour le CONTENEUR : à la fouille, si son `stockCycle`
   diffère du cycle courant, il se re-garnit PARESSEUSEMENT d'abord — un jour
@@ -444,7 +444,7 @@ persiste avec le monde.
   rebouchage nécessaire. Vérifié par l'audit de sérialisabilité
   (`core/movement.check.js`, section "Collecte").
 
-Contenu de test : `level/demo.json` ("Ville test") — `bush_1` (x=12, table
+Contenu de test : `scenes/demo.json` ("Ville test") — `bush_1` (x=12, table
 `default`) et une plage `[27, 34]` de 3 collectibles. Menu debug du temps
 (Shift+T, mode debug) : "Avancer d'une journée" puis refouiller/quitter et
 revenir pour observer le cycle.
@@ -526,7 +526,7 @@ prévu, pas construit). Prix d'achat : `price` de l'article, sinon `value`
   sélection en cours -> "Abandonner la sélection en cours ?" (Confirmer ->
   retour au menu d'actions ; Annuler -> sélection préservée).
 
-Contenu de test : `level/demo.json`, `counter_1` (x=38, catalogue
+Contenu de test : `scenes/demo.json`, `counter_1` (x=38, catalogue
 `general`).
 
 ## Sac d'objets
@@ -574,7 +574,7 @@ d'écriture (voir son header pour le détail complet de la forme).
   l'original) ; sinon repli sur l'archétype GÉNÉRIQUE `item`
   (`entities/types/item.js`) avec `nameKey`/`descriptionKey`/`action`
   propres à l'objet (depuis `core/items.js`/`ITEM_REGISTRY`) — exactement la
-  convention qu'une instance de niveau suivrait pour ce même type générique.
+  convention qu'une instance de scène suivrait pour ce même type générique.
 - **Objet posé = ÉPHÉMÈRE** — ramassable de nouveau (réutilise l'action
   `"pickup"` telle quelle, déjà robuste), mais **PERDU** si la scène est
   quittée sans le ramasser (purgé comme tout éphémère au départ, jamais
@@ -756,7 +756,7 @@ condition `"arrived"` reste vraie tant que `behavior.kind` reste `"goto"`
 goto.js`, voir plus bas) — sans un changement de `kind` (vers `"wander"`,
 comme `npc-resident`) OU ce retrait explicite, une entité resterait bloquée
 dormante pour toujours dès sa PREMIÈRE arrivée, incapable de redevenir
-présente au cycle suivant. Validé par `core/level.js`/`parseEffect` comme
+présente au cycle suivant. Validé par `core/scene.js`/`parseEffect` comme
 seule valeur spéciale acceptée pour ce champ.
 
 **Condition `"arrived"`** (`{ type: "arrived" }`, sans champ propre) : vraie
@@ -782,7 +782,7 @@ cette même règle. Accepté tel quel pour l'instant (hors de portée d'un
 plafonnement de l'horloge ou d'un rattrapage multi-monde, ni l'un ni
 l'autre demandé).
 
-**Exemple de référence — l'habitant** (`npc-resident` dans `level/demo.json`) :
+**Exemple de référence — l'habitant** (`npc-resident` dans `scenes/demo.json`) :
 présent et erre de 8h à 20h ; à 20h, part vers `door-exit` (`"behavior"` ->
 `goto`) tout en restant présent (en chemin) ; à l'arrivée (`"arrived"`),
 devient dormant ; FILET DE SECOURS à 23h (`"timeRange"` de 23h à 8h) —
@@ -798,7 +798,7 @@ cible manquante.
 
 **Le même personnage, deux scènes — DEUX déclarations séparées, sans état
 partagé, DEUX cycles inversés** : `npc-resident` (demo1, présent le jour,
-ci-dessus) et `npc-resident-home` (`level/demo2.json`, présent la nuit — 20h
+ci-dessus) et `npc-resident-home` (`scenes/demo2.json`, présent la nuit — 20h
 à 8h) sont deux entités INDÉPENDANTES : un NPC appartient à UNE scène
 (contrairement à un compagnon, voir `core/state.js`), la porte qu'il rejoint
 n'est que de la couleur narrative ("il rentre chez lui, de l'autre côté") —
@@ -836,7 +836,7 @@ faces du monde actif. Une entité DORMANTE ne tire pas (même règle que le
 comportement). Un `playSound` déclenché ainsi est DIÉGÉTIQUE, positionné sur
 l'entité : depuis l'autre face il s'entend étouffé, par la chaîne
 d'occlusion ordinaire (voir "Recto/verso"). Premier client : la cloche du
-clocher (`level/town-square.json`, recto seulement). Grammaire, sauts de
+clocher (`scenes/town-square.json`, recto seulement). Grammaire, sauts de
 temps, portée : `doc/scripting.md`/"Triggers".
 
 ### Bascule observée : `presenceChanged`
@@ -928,11 +928,11 @@ contrainte du modèle.
 
 ## Cascade de sounds — fusion profonde, instance -> archétype
 
-`sounds` cascade instance -> archétype (`core/level.js`/`parseEntity`,
+`sounds` cascade instance -> archétype (`core/scene.js`/`parseEntity`,
 `entity.sounds` déjà RÉSOLU sur l'entité parsée — la vue, voir
 `view/audio/city-scene.js`/`buildEntitySoundEntry`, lit `entity.sounds`,
 jamais `registry[type].sounds` directement) — mais PAR FUSION PROFONDE
-(`deepMergeOverride`, `core/level.js`), SEUL champ cascadé de cette façon :
+(`deepMergeOverride`, `core/scene.js`), SEUL champ cascadé de cette façon :
 contrairement à `nameKey`/`blocksMovement` (remplacement simple, tout ou
 rien) ou `tuning` (transport brut, jamais interprété par le core), une
 instance ne déclare QUE ce qu'elle CHANGE — le reste du rôle, et les autres
@@ -1031,7 +1031,7 @@ sounds: {
 ```
 
 Règles :
-- **Validation au chargement** (`core/level.js`/`parseEntity`), comme une
+- **Validation au chargement** (`core/scene.js`/`parseEntity`), comme une
   condition d'action : type inconnu ou variable non déclarée -> erreur.
 - **Une condition est un tout** : celle d'une instance REMPLACE celle de
   l'archétype, jamais fusionnée clé par clé comme le reste de `sounds`
@@ -1087,7 +1087,7 @@ code. Consulter directement ce fichier pour la valeur courante d'un défaut.
   d'un mécanisme interne à Howler, plus un fichier est court, plus il se
   réarme souvent — voir le filet de sécurité ci-dessous), mais le
   CORRECTIF EMPIRIQUE, confirmé en conditions réelles (`glass_window`,
-  `level/town-square-town-hall-main.json`), est net : rallonger le fichier
+  `scenes/town-square-town-hall-main.json`), est net : rallonger le fichier
   au-delà de ce seuil (silence ajouté en fin de fichier si le son lui-même
   est bref) fait disparaître le symptôme. **Règle de contenu à respecter
   pour toute NOUVELLE balise `"continu"` : viser au moins ~1,5 s, quitte à
@@ -1232,7 +1232,7 @@ parfaitement reproductible.
 général :
 
 1. `sound[key]` — le descripteur de son lui-même, s'il en porte un ;
-2. `entity.tuning[key]` — l'instance de niveau, si elle surcharge (voir
+2. `entity.tuning[key]` — l'instance de scène, si elle surcharge (voir
    "Le palier INSTANCE" ci-dessous) ;
 3. `registry[entity.type][key]` — le défaut du type ;
 4. `defaults[key]` — le défaut global (`config/tuning-values.js`), dernier
@@ -1240,7 +1240,7 @@ général :
 
 `entity` et `sound` sont tous deux optionnels et indépendants : un appel peut
 ne fournir que `sound` (ex. un réglage propre à un descripteur de son sans
-lien avec une instance de niveau — c'est le cas du joueur, voir plus bas).
+lien avec une instance de scène — c'est le cas du joueur, voir plus bas).
 
 Chaque paramètre sonore listé ci-dessus passe par ce même mécanisme, y
 compris ceux peu ou jamais surchargés aujourd'hui — le mécanisme est
@@ -1257,18 +1257,18 @@ le défaut global, exactement comme pour tout paramètre non déclaré.
 
 ### Le palier INSTANCE
 
-Une instance de niveau (`level/*.json`) surcharge un paramètre en cascade via
+Une instance de scène (`scenes/*.json`) surcharge un paramètre en cascade via
 un champ RÉSERVÉ, `tuning`, un objet plat de clés -> valeurs :
 
 ```json
 { "id": "bird-loud", "type": "bird_1", "x": 12, "tuning": { "beaconInterval": 1500, "beaconGain": 1.4 } }
 ```
 
-`core/level.js`/`parseEntity` recopie ce champ TEL QUEL (`entity.tuning`) —
+`core/scene.js`/`parseEntity` recopie ce champ TEL QUEL (`entity.tuning`) —
 validé en FORME (un objet, sinon `fail()`), jamais en CONTENU : le core
 ignore tout du sens de ces clés (sonore ou non), il se contente de les
 porter jusqu'à l'entité parsée, exactement comme `music`/`ambiences`/
-`reverbDurationSec`/`reverbDecay` au niveau du LIEU (voir `doc/level-format.md`).
+`reverbDurationSec`/`reverbDecay` au niveau de la SCÈNE (voir `doc/scene-format.md`).
 Aucune clé nommée en dur dans `parseEntity` : un futur paramètre ajouté à
 `config/tuning-values.js` devient surchargeable à l'instance sans jamais
 rouvrir ce fichier. `resolveTuning` lit ensuite `entity.tuning[key]` (palier
@@ -1278,7 +1278,7 @@ toute entité qui ne déclare pas `tuning`.
 
 ## Surfaces de sol et son de pas
 
-Le sol de la scène (`defaultSurface`/`segments`, voir `doc/level-format.md`) et
+Le sol de la scène (`defaultSurface`/`segments`, voir `doc/scene-format.md`) et
 son registre (`core/surfaces.js`, `neutral: true/false` par surface) sont du
 CORE pur — ce document-ci ne couvre que ce que la VUE en tire pour choisir
 le fichier du son de pas (`view/audio/city-scene.js`,
@@ -1367,7 +1367,7 @@ ci-dessus, même si l'audio en dépend :
   paramètre sonore ne règle cette fréquence dans l'ABSOLU
   (`movementStepMultiplier` ne fait que multiplier la CADENCE PAR DISTANCE,
   jamais indexée sur le temps). Régler l'allure d'une entité, c'est déclarer
-  ou ajuster son `behavior` à l'instance (voir `doc/level-format.md`), jamais un
+  ou ajuster son `behavior` à l'instance (voir `doc/scene-format.md`), jamais un
   paramètre sonore.
 - **Les rayons** (`audibleRange`, `interactRange`, et `bodyRadius` — ce
   dernier UNIFORME pour toutes les entités aujourd'hui, voir
@@ -1430,18 +1430,18 @@ juste ce dont il a besoin, rien de plus.
 ## Verticalité — par sous-scènes, pas par axe Y
 
 Pas de champ ni de mécanique dédiés : "monter" (ex. accéder aux toits
-au-dessus de la rue) se fait comme tout autre changement de lieu — une
-sous-scène (`level/*.json` séparé) reliée par une entité interactable dont
+au-dessus de la rue) se fait comme tout autre changement de scène — une
+sous-scène (`scenes/*.json` séparé) reliée par une entité interactable dont
 l'effet `"teleport"` y mène, un "escalier"/une "échelle" jouant exactement
 le rôle d'une `door` (voir `doc/scripting.md`/"Effets d'action"/`"teleport"`). Le mécanisme de
-transition de lieu déjà en place couvre entièrement ce besoin — aucun axe Y
+transition de scène déjà en place couvre entièrement ce besoin — aucun axe Y
 discrétisé, aucun palier actif à maintenir, aucun système supplémentaire à
-construire. (Un ancien champ de niveau, réservé pour un axe Y jamais
-implémenté, a été retiré comme code mort — voir `doc/level-format.md`.)
+construire. (Un ancien champ de scène, réservé pour un axe Y jamais
+implémenté, a été retiré comme code mort — voir `doc/scene-format.md`.)
 
 ## Recto/verso — deux faces d'une scène, isolées, qui coexistent
 
-Voir CLAUDE.md/"RECTO/VERSO", `doc/level-format.md`/"Scène à deux faces
+Voir CLAUDE.md/"RECTO/VERSO", `doc/scene-format.md`/"Scène à deux faces
 (recto/verso)" pour le contrat JSON complet, `doc/scripting.md`/
 `"switchSide"` pour le format d'action. Une scène PEUT avoir deux faces
 (recto/verso) au lieu d'une seule, chacune son propre ensemble d'entités sur
@@ -1451,11 +1451,11 @@ bascule entre les deux (une ruelle, une porte dérobée, un trou dans la
 palissade...) — GÉNÉRIQUE comme `door`, sans propriété propre au-delà des
 capacités d'interaction : `action.arrivalX` (le point d'arrivée sur l'autre
 face) est TOUJOURS fourni par l'instance, jamais par l'archétype, puisqu'il
-dépend entièrement de la géométrie du lieu.
+dépend entièrement de la géométrie de la scène.
 
 Le joueur porte `player.side`, TOUJOURS remis à `"recto"` en entrant dans le
-lieu par une porte (comme `playerStart`) ; basculer via un `passage` reste
-dans le MÊME lieu (`core/state.js`/`switchSide`), jamais un `travelToWorld`.
+monde par une porte (comme `playerStart`) ; basculer via un `passage` reste
+dans le MÊME monde (`core/state.js`/`switchSide`), jamais un `travelToWorld`.
 
 **Coexistence, ISOLÉE (étape 2/2)** : LES DEUX faces tiquent à chaque tour
 (`core/reduce.js`/TICK) — fini le gel de l'étape 1. Mais une face reste un
@@ -1536,7 +1536,7 @@ exemple de déclaration).
 
 ## `isFlying` — hauteur SUGGÉRÉE par le son, jamais un axe Y
 
-Booléen d'entité (`core/level.js`, cascade instance -> archétype -> `false`,
+Booléen d'entité (`core/scene.js`, cascade instance -> archétype -> `false`,
 même patron que `observable`/`interactable`) : marqueur PUR, aucune logique
 dans le core (pas de position verticale, pas de palier — voir "Verticalité"
 ci-dessus, qui reste l'unique façon de vraiment CHANGER d'altitude). Lu
@@ -1559,7 +1559,7 @@ non-`isFlying` n'appelle jamais ces nouveaux chemins : comportement
 STRICTEMENT inchangé pour tout contenu existant.
 
 **Exemple de référence** — `bird_1` (`entities/types/bird_1.js`,
-`level/demo.json`, instance `bird_1`) : VOCAL SEUL, aucun beacon (même choix
+`scenes/demo.json`, instance `bird_1`) : VOCAL SEUL, aucun beacon (même choix
 que `hound`, voir "Beacon vs vocal" plus haut), pool DÉDIÉ `bird_1_vocal`,
 interval/variation surchargés pour un chant largement espacé. `isFlying:true`
 y suffit à lui seul, quel que soit le rôle de son porté (beacon OU vocal) —
@@ -1569,11 +1569,11 @@ aucune autre déclaration nécessaire.
 
 `entities/player.js` porte un descripteur de contenu qui suit le même
 vocabulaire (`sounds.movement`), mais le joueur **n'est pas une entité** au
-sens du niveau :
+sens de la scène :
 
-- Il n'apparaît **jamais** dans `level.entities`.
+- Il n'apparaît **jamais** dans `scene.entities`.
 - Il n'a ni `id`, ni `type`, ni `x` dans son descripteur — sa position vient
-  de `session.player.x` (l'état du core), pas d'une instance de niveau.
+  de `session.player.x` (l'état du core), pas d'une instance de scène.
 - La scène audio (`view/audio/city-scene.js`) ne crée **aucune voix
   positionnée** pour lui : sa position sert uniquement d'ORIGINE, celle par
   rapport à laquelle chaque entité calcule sa distance/son pan. Le joueur

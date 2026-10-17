@@ -1,5 +1,5 @@
 // Archétype "mirror_weight_shaft" — puits inversé, côté miroir (voir
-// level/clock-tower-weight-shaft-mirror-space.json). Pendant inversé de
+// scenes/clock-tower-weight-shaft-mirror-space.json). Pendant inversé de
 // l'entité de même position dans le puits des contrepoids. Beacon continu
 // + vocal intermittent de câbles organiques, observable, jamais interactif.
 export default {

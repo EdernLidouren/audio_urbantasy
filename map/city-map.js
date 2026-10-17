@@ -9,12 +9,12 @@
 // d'accès, jamais l'inverse (voir cityMapCellAt ci-dessous, seul point
 // d'accès recommandé). Chaque case a l'une de TROIS natures, jamais
 // confondues (voir isRealCityMapZone/isCityMapUnderConstruction) :
-//   - ZONE RÉELLE : { levelId, nameKey, descriptionKey, spawnX } — levelId
-//     référence level/index.js (chargeable via level/load.js) ; nameKey/
+//   - ZONE RÉELLE : { sceneId, nameKey, descriptionKey, spawnX } — sceneId
+//     référence scenes/index.js (chargeable via scenes/load.js) ; nameKey/
 //     descriptionKey sont des CLÉS i18n, jamais des chaînes déjà résolues
 //     (même convention que entities/types/*.js) ; spawnX est le point de
 //     TÉLÉPORTATION PAR DÉFAUT de cette case — pas forcément le
-//     playerStart du niveau (une même zone pourrait un jour avoir plusieurs
+//     playerStart de la scène (une même zone pourrait un jour avoir plusieurs
 //     entrées ; playerStart reste réservé à l'arrivée PAR PORTE).
 //   - EN CHANTIER : le marqueur UNDER_CONSTRUCTION ci-dessous — case connue
 //     de la topologie, pas encore reliée à un contenu réel, JAMAIS
@@ -32,8 +32,8 @@ const UNDER_CONSTRUCTION = { underConstruction: true };
 
 // Seule case réelle du test : reliée à "demo" (l'ancienne scène de départ,
 // avant town_square — voir main.js/startTestCityGame), au point d'entrée
-// déjà existant (playerStart de level/demo.json).
-const DEMO_ZONE = { levelId: "demo", nameKey: "level.demo.title", descriptionKey: "cityMap.demo.description", spawnX: 2 };
+// déjà existant (playerStart de scenes/demo.json).
+const DEMO_ZONE = { sceneId: "demo", nameKey: "scene.demo.name", descriptionKey: "cityMap.demo.description", spawnX: 2 };
 
 // Grille littérale, lisible d'un coup d'œil (une ligne de source = une
 // ligne de la carte, jamais générée par boucle) — TEST : une seule zone
@@ -57,22 +57,22 @@ export function cityMapCellAt(x, y) {
 }
 
 export function isRealCityMapZone(cell) {
-  return Boolean(cell) && cell.levelId !== undefined;
+  return Boolean(cell) && cell.sceneId !== undefined;
 }
 
 export function isCityMapUnderConstruction(cell) {
   return Boolean(cell) && cell.underConstruction === true;
 }
 
-// Coordonnées de la case dont `levelId` correspond, ou `null` si ce lieu
+// Coordonnées de la case dont `sceneId` correspond, ou `null` si cette scène
 // n'est pas (encore) représenté sur la carte — filet, jamais une exception :
-// un lieu hors carte ne doit pas empêcher d'ouvrir le menu (voir
+// une scène hors carte ne doit pas empêcher d'ouvrir le menu (voir
 // view/menus/city-map-menu.js, repli sur (0,0) dans ce cas).
-export function findCityMapCoordinates(levelId) {
+export function findCityMapCoordinates(sceneId) {
   for (let y = 0; y < CITY_MAP_GRID.length; y++) {
     for (let x = 0; x < CITY_MAP_GRID[y].length; x++) {
       const cell = CITY_MAP_GRID[y][x];
-      if (isRealCityMapZone(cell) && cell.levelId === levelId) return { x, y };
+      if (isRealCityMapZone(cell) && cell.sceneId === sceneId) return { x, y };
     }
   }
   return null;

@@ -11,9 +11,9 @@
 // table d'objets a exactement la forme d'une table de transitions météo
 // ({ cible: poids }), aucune seconde logique de tirage.
 //
-// Module SÉPARÉ de core/spawn.js pour que core/level.js puisse valider une
+// Module SÉPARÉ de core/spawn.js pour que core/scene.js puisse valider une
 // distribution au chargement sans importer le moteur de spawn (qui, lui,
-// importe core/level.js — voir parseSpawnedEntity) : jamais d'import
+// importe core/scene.js — voir parseSpawnedEntity) : jamais d'import
 // circulaire.
 
 import { SPAWN_TABLES } from "../config/spawn-values.js";
@@ -64,7 +64,7 @@ export function validateSpawnTables(tables) {
 validateSpawnTables(SPAWN_TABLES);
 
 // Valide UNE distribution déclarée par une source — `fail` fourni par
-// l'appelant (core/level.js), même patron que parseVariables. EXACTEMENT une
+// l'appelant (core/scene.js), même patron que parseVariables. EXACTEMENT une
 // des deux formes : { table } (nom présent dans SPAWN_TABLES) ou { items }
 // (table inline, validée comme une table standard).
 export function validateDistribution(distribution, describe, fail) {

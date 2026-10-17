@@ -1,19 +1,19 @@
-# Format de niveau
+# Format de scène
 
-Contrat de référence pour les fichiers `level/*.json`, tel qu'implémenté par
-`core/level.js` (`parseLevel`). Un fichier de niveau est un objet JSON déjà
+Contrat de référence pour les fichiers `scenes/*.json`, tel qu'implémenté par
+`core/scene.js` (`parseScene`). Un fichier de scène est un objet JSON déjà
 parsé, sans aucune chaîne affichable en dur — uniquement des clés i18n.
 Ce document couvre la FORME JSON (quels champs, quel type, quels filets) ;
 la GRAMMAIRE des conditions/effets/actions/variables qu'un fichier peut
 déclarer (`when`, `action.condition`, `variables`...) vit dans
 `doc/scripting.md`, jamais dupliquée ici.
 
-## Niveau
+## Scène
 
-**Parsing TOTAL** : `parseLevel` accepte `{}` — TOUS les champs de scène sont
+**Parsing TOTAL** : `parseScene` accepte `{}` — TOUS les champs de scène sont
 optionnels et retombent sur un défaut sensé s'ils sont absents ; seule leur
 PRÉSENCE malformée (mauvais type, valeur hors contrainte) échoue clairement.
-`parseLevel({})` produit donc un lieu VALIDE et JOUABLE : sans entité, plat,
+`parseScene({})` produit donc une scène VALIDE et JOUABLE : sans entité, plat,
 surface uniforme, longueur minimale traversable, titre générique, silence
 (pas de musique/ambiance) — le joueur y apparaît et s'y déplace sans que rien
 ne plante (rendu, tick, audio, interaction, sauvegarde). Vaut aussi pour une
@@ -21,22 +21,22 @@ FACE recto/verso vide (`parseFace`, même mécanisme).
 
 | Champ         | Type     | Contrainte                                      |
 |---------------|----------|--------------------------------------------------|
-| `id`          | string   | optionnel, non vide si présent — **FILET si absent** : repli sur `"level"` (`DEFAULT_LEVEL_ID`) |
-| `titleKey`    | string   | optionnel, non vide si présent, clé i18n du titre du niveau — **FILET si absent** : repli sur `"level.default.title"` (`DEFAULT_LEVEL_TITLE_KEY`, "Lieu sans nom"/"Unnamed place") |
-| `length`      | number   | optionnel, `> 0` si présent — longueur en unités le long de l'axe x — **FILET si absent** : repli sur `10` (`DEFAULT_LEVEL_LENGTH`, petite étendue traversable, jamais `0`) |
-| `playerStart` | number   | point d'arrivée PAR DÉFAUT du lieu. **FILET, jamais rejeté** : absent ou hors `[0, length]` -> repli sur `0` (avec un `console.warn`), jamais d'exception. Des points d'arrivée NOMMÉS (ex. par porte) pourront s'ajouter plus tard, sans toucher à ce filet. |
-| `entities`    | Entity[] | optionnel — **FILET si absent** : repli sur `[]` (lieu sans entité, toujours jouable). Voir ci-dessous pour la forme d'une entité. |
-| `music`       | string   | optionnel : musique du lieu — une clé de POOL (plusieurs fichiers, voir `assets/manifest.json`) ou un membre précis, résolue par `resolveAsset` comme tout autre pool. Canal global non spatialisé — voir `view/audio/city-scene.js`. Par défaut, lue en SÉQUENCE avec respiration (voir "Musique : séquence avec respiration" plus bas), jamais en boucle simple. |
-| `musicDay` / `musicNight` | string | optionnels : musique PAR PHASE jour/nuit (voir `core/time.js`/`phaseAt`, "Phase jour/nuit" plus bas), même forme que `music` (pool ou membre précis). Un lieu qui n'en déclare aucune des deux retombe sur `music` pour les deux phases (rétrocompatible, aucune régression). Bascule en cours de jeu par FONDU UNIVERSEL puis respiration puis nouvelle séquence (`view/audio/city-scene.js`) ; à l'entrée dans une scène, la phase courante joue directement, sans fondu. |
-| `musicLoop`   | boolean  | optionnel, défaut `false` : `true` fait jouer la musique du lieu en BOUCLE CONTINUE (comportement historique), sans enchaînement ni respiration — pour les deux phases, un seul drapeau par lieu. Voir "Musique : séquence avec respiration" plus bas. |
+| `id`          | string   | optionnel, non vide si présent — **FILET si absent** : repli sur `"scene"` (`DEFAULT_SCENE_ID`) |
+| `titleKey`    | string   | optionnel, non vide si présent, clé i18n du titre de la scène — **FILET si absent** : repli sur `"scene.default.name"` (`DEFAULT_SCENE_TITLE_KEY`, "Scène sans nom"/"Unnamed scene") |
+| `length`      | number   | optionnel, `> 0` si présent — longueur en unités le long de l'axe x — **FILET si absent** : repli sur `10` (`DEFAULT_SCENE_LENGTH`, petite étendue traversable, jamais `0`) |
+| `playerStart` | number   | point d'arrivée PAR DÉFAUT de la scène. **FILET, jamais rejeté** : absent ou hors `[0, length]` -> repli sur `0` (avec un `console.warn`), jamais d'exception. Des points d'arrivée NOMMÉS (ex. par porte) pourront s'ajouter plus tard, sans toucher à ce filet. |
+| `entities`    | Entity[] | optionnel — **FILET si absent** : repli sur `[]` (scène sans entité, toujours jouable). Voir ci-dessous pour la forme d'une entité. |
+| `music`       | string   | optionnel : musique de la scène — une clé de POOL (plusieurs fichiers, voir `assets/manifest.json`) ou un membre précis, résolue par `resolveAsset` comme tout autre pool. Canal global non spatialisé — voir `view/audio/city-scene.js`. Par défaut, lue en SÉQUENCE avec respiration (voir "Musique : séquence avec respiration" plus bas), jamais en boucle simple. |
+| `musicDay` / `musicNight` | string | optionnels : musique PAR PHASE jour/nuit (voir `core/time.js`/`phaseAt`, "Phase jour/nuit" plus bas), même forme que `music` (pool ou membre précis). Une scène qui n'en déclare aucune des deux retombe sur `music` pour les deux phases (rétrocompatible, aucune régression). Bascule en cours de jeu par FONDU UNIVERSEL puis respiration puis nouvelle séquence (`view/audio/city-scene.js`) ; à l'entrée dans une scène, la phase courante joue directement, sans fondu. |
+| `musicLoop`   | boolean  | optionnel, défaut `false` : `true` fait jouer la musique de la scène en BOUCLE CONTINUE (comportement historique), sans enchaînement ni respiration — pour les deux phases, un seul drapeau par scène. Voir "Musique : séquence avec respiration" plus bas. |
 | `ambiences`   | string[] | optionnel : 0 à `AMBIENCE_CHANNEL_LIMIT` chemins d'ambiance (`assets/ambiances/...`, voir `config/audio-channels.js`), canal global non spatialisé, jusqu'à autant de couches simultanées — voir `view/audio/city-scene.js` |
-| `ambiencesDay` / `ambiencesNight` | string[] | optionnels, même forme que `ambiences`. **RÉSERVÉS** : structure validée par `parseLevel` mais AUCUN consommateur ne les lit encore — seule la musique réagit à la phase pour l'instant (voir `doc/time.md`). |
-| `reverbDurationSec` | number | optionnel, `> 0` : surcharge PAR LIEU la durée de la réponse impulsionnelle du bus de réverb (défaut global : `config/tuning-values.js`) |
-| `reverbDecay` | number | optionnel, `> 0` : surcharge PAR LIEU le taux de déclin de la réverb (défaut global : `config/tuning-values.js`) |
+| `ambiencesDay` / `ambiencesNight` | string[] | optionnels, même forme que `ambiences`. **RÉSERVÉS** : structure validée par `parseScene` mais AUCUN consommateur ne les lit encore — seule la musique réagit à la phase pour l'instant (voir `doc/time.md`). |
+| `reverbDurationSec` | number | optionnel, `> 0` : surcharge PAR SCÈNE la durée de la réponse impulsionnelle du bus de réverb (défaut global : `config/tuning-values.js`) |
+| `reverbDecay` | number | optionnel, `> 0` : surcharge PAR SCÈNE le taux de déclin de la réverb (défaut global : `config/tuning-values.js`) |
 | `defaultSurface` | string | optionnel : nom de surface (voir "Surfaces de sol" plus bas) couvrant tout le `x` non-segmenté. **FILET SILENCIEUX si absent** (repli sur `DEFAULT_SURFACE`, `core/surfaces.js` — comportement audible inchangé pour toute scène qui n'en déclare pas). **Échec clair si fourni mais absent du registre** (comme un type d'entité inconnu) — une référence de contenu erronée n'est jamais dégradée en silence. |
-| `segments`    | Segment[] | optionnel : zones qui PATCHENT `defaultSurface` sur des portions du lieu (voir "Surfaces de sol" plus bas). Absent -> `[]`, `defaultSurface` partout. |
-| `spawnRanges` | SpawnRange[] | optionnel : PLAGES de collecte au sol (voir `doc/entity-model.md`/"Collecte", `core/spawn.js`) — `{ from, to, count?, distribution }` : bornes comme un segment (`from < to`, dans `[0, length]`), `count` entier `>= 1` (défaut `config/spawn-values.js`/`SPAWN_RANGE_DEFAULT_COUNT`), `distribution` = `{ table: "<nom de SPAWN_TABLES>" }` ou `{ items: { <objet ITEM_REGISTRY>: <poids> } }` (validée au chargement, échec clair). SPARSE : absent -> aucune clé. Champ de FACE (chaque face d'une scène à deux faces déclare les siennes). À chaque cycle quotidien (au CHARGEMENT du lieu), `count` collectibles y sont posés à des positions tirées au PRNG seedé — entités RUNTIME marquées `spawned: true`, ramassables via `"pickup"`, remplacées au cycle suivant. |
-| `indoor`      | boolean  | optionnel, défaut `false` (extérieur) : propriété de NATURE DE LIEU — TOUJOURS résolue en booléen sur une face parsée (comme `defaultSurface`, jamais `undefined`). Aujourd'hui consultée par le rendu d'ambiance météo pour choisir le pool outdoor/indoor de l'état courant (voir `doc/scripting.md`/"weather", `config/weather-values.js`) — délibérément générique, un futur consommateur (réverb, sons ambiants...) pourra la lire aussi sans rien changer ici. |
+| `segments`    | Segment[] | optionnel : zones qui PATCHENT `defaultSurface` sur des portions de la scène (voir "Surfaces de sol" plus bas). Absent -> `[]`, `defaultSurface` partout. |
+| `spawnRanges` | SpawnRange[] | optionnel : PLAGES de collecte au sol (voir `doc/entity-model.md`/"Collecte", `core/spawn.js`) — `{ from, to, count?, distribution }` : bornes comme un segment (`from < to`, dans `[0, length]`), `count` entier `>= 1` (défaut `config/spawn-values.js`/`SPAWN_RANGE_DEFAULT_COUNT`), `distribution` = `{ table: "<nom de SPAWN_TABLES>" }` ou `{ items: { <objet ITEM_REGISTRY>: <poids> } }` (validée au chargement, échec clair). SPARSE : absent -> aucune clé. Champ de FACE (chaque face d'une scène à deux faces déclare les siennes). À chaque cycle quotidien (au CHARGEMENT du monde), `count` collectibles y sont posés à des positions tirées au PRNG seedé — entités RUNTIME marquées `spawned: true`, ramassables via `"pickup"`, remplacées au cycle suivant. |
+| `indoor`      | boolean  | optionnel, défaut `false` (extérieur) : propriété de NATURE DE SCÈNE — TOUJOURS résolue en booléen sur une face parsée (comme `defaultSurface`, jamais `undefined`). Aujourd'hui consultée par le rendu d'ambiance météo pour choisir le pool outdoor/indoor de l'état courant (voir `doc/scripting.md`/"weather", `config/weather-values.js`) — délibérément générique, un futur consommateur (réverb, sons ambiants...) pourra la lire aussi sans rien changer ici. |
 | `variables`   | Variable[] | optionnel : déclarations de portée **"scene"** (voir `doc/scripting.md`/"Variables" pour le modèle complet — nom/type/valeur initiale/persistance). RACINE PARTAGÉE, jamais un champ de FACE (une scène à deux faces n'a qu'UN SEUL sac, commun à recto ET verso). **TOUJOURS résolu** (sac vide `{}` si absent, jamais `undefined`), comme `defaultSurface`/`indoor` — contrairement au sac SPARSE d'une entité (voir tableau "Entité" plus bas). |
 
 ## Scène à deux faces (recto/verso)
@@ -45,18 +45,18 @@ FACE recto/verso vide (`parseFace`, même mécanisme).
 ci-dessus, `entities`/`music`/... à la racine) OU À DEUX FACES — `recto` ET
 `verso` déclarés ENSEMBLE, jamais un seul. `id`/`titleKey`/`length`/
 `playerStart` restent TOUJOURS à la racine, PARTAGÉS par les deux faces
-(même longueur d'axe x) ; tous les autres champs du tableau "Niveau"
+(même longueur d'axe x) ; tous les autres champs du tableau "Scène"
 ci-dessus (`entities`, `music`/`musicDay`/`musicNight`/`musicLoop`,
 `ambiences`/`ambiencesDay`/`ambiencesNight`, `reverbDurationSec`/
 `reverbDecay`, `defaultSurface`, `segments`, `indoor`, `spawnRanges`) sont des champs de FACE :
 déclarés dans `recto`/`verso` pour une scène à deux faces, à la racine pour
-une scène simple — **jamais mélangés** : `parseLevel` échoue clairement si
+une scène simple — **jamais mélangés** : `parseScene` échoue clairement si
 un de ces champs apparaît à la racine EN MÊME TEMPS que `recto`/`verso`.
 
 ```json
 {
   "id": "alley",
-  "titleKey": "level.alley.title",
+  "titleKey": "scene.alley.name",
   "length": 10,
   "playerStart": 1,
   "recto": { "music": "assets/musics/streets_day", "entities": [ /* ... */ ] },
@@ -65,12 +65,12 @@ un de ces champs apparaît à la racine EN MÊME TEMPS que `recto`/`verso`.
 ```
 
 Une scène SIMPLE (ni `recto` ni `verso`) se comporte EXACTEMENT comme avant
-ce modèle — RÉTROCOMPAT STRICTE, aucune régression pour tout niveau
-existant (`demo.json`, `demo2.json`).
+ce modèle — RÉTROCOMPAT STRICTE, aucune régression pour toute scène
+existante (`demo.json`, `demo2.json`).
 
 **Face courante et bascule** : le joueur porte `player.side`
 (`"recto"|"verso"`, défaut `"recto"`), sérialisé avec lui. En entrant dans
-une scène à deux faces depuis un autre lieu (porte), on arrive TOUJOURS sur
+une scène à deux faces depuis une autre scène (porte), on arrive TOUJOURS sur
 le recto. Depuis l'étape 2/2, LES DEUX faces tiquent à chaque tour
 (`core/reduce.js`/TICK) — mais ISOLÉES : collision, ciblage de comportement
 (`follow`/`goto`), interaction et occupation restent bornés à la face de
@@ -89,7 +89,7 @@ interactable avec `action: { kind: "switchSide", arrivalX: <number> }` —
 `"teleport"` d'une porte, voir `doc/scripting.md`/"Effets d'action", mais on
 reste dans le même monde). Une entité par face, chacune
 déclarant l'arrivée sur l'autre (voir l'exemple ci-dessous) — jamais une
-entité "des deux côtés à la fois". `arrivalX` n'est PAS validé en bornes par `parseLevel` (comme tout
+entité "des deux côtés à la fois". `arrivalX` n'est PAS validé en bornes par `parseScene` (comme tout
 champ `action.*`, voir le tableau "Entité" plus haut) — clampé à
 l'exécution par `core/state.js`/`switchSide`, jamais un plantage sur un
 contenu mal formé.
@@ -150,13 +150,13 @@ Les deux faces tiquent désormais toujours ensemble, isolées ; le modèle
 |-----------|--------|------------------------------------------------------------------|
 | `from`    | number | `>= 0`, `< to`                                                    |
 | `to`      | number | `<= length`, `> from`                                             |
-| `surface` | string | doit exister dans le registre de surfaces (`core/surfaces.js`) — **TOUJOURS explicite, aucun filet** : en déclarer un est un choix délibéré, une surface inconnue est une vraie erreur de contenu -> `parseLevel` échoue clairement. |
+| `surface` | string | doit exister dans le registre de surfaces (`core/surfaces.js`) — **TOUJOURS explicite, aucun filet** : en déclarer un est un choix délibéré, une surface inconnue est une vraie erreur de contenu -> `parseScene` échoue clairement. |
 
 ## Surfaces de sol
 
 Toute la scène est couverte par une surface, SANS TROU — c'est un invariant
 garanti par construction, pas une validation à part : `defaultSurface`
-couvre tout le lieu comme une couche de base, les `segments` ne font que la
+couvre toute la scène comme une couche de base, les `segments` ne font que la
 PATCHER par endroits (bornes `from`/`to` incluses). `core/surfaces.js`
 (CORE pur) porte :
 
@@ -194,15 +194,15 @@ registre est prêt à en accueillir, rien de plus aujourd'hui.
 `phaseAt(time)` (`core/time.js`, pur, dérivée de l'horloge de partie — voir
 `doc/time.md`) renvoie `"day"` ou `"night"` selon l'heure courante
 (`dayStartHour`/`nightStartHour`, `config/time-values.js`). Premier
-consommateur de l'horloge : `musicDay`/`musicNight` (voir tableau "Niveau"
-ci-dessus) en tirent la musique du lieu, avec un fondu universel puis une
+consommateur de l'horloge : `musicDay`/`musicNight` (voir tableau "Scène"
+ci-dessus) en tirent la musique de la scène, avec un fondu universel puis une
 respiration puis la nouvelle séquence à chaque bascule en cours de jeu
 (`view/audio/city-scene.js`, voir section suivante). Détail complet de
 l'horloge : `doc/time.md`.
 
 ## Musique : séquence avec respiration
 
-Par défaut (`musicLoop` absent ou `false`), la musique d'un lieu n'est pas
+Par défaut (`musicLoop` absent ou `false`), la musique d'une scène n'est pas
 une boucle mais une SÉQUENCE (`lib/audio.js`/`startMusicSequence`) : un
 morceau joue une fois (`loop:false`), se termine, une PAUSE aléatoire
 ("respiration" — `musicBreatherMinMs`/`musicBreatherMaxMs`,
@@ -213,8 +213,8 @@ plusieurs (`resolveAsset`/`pickFromPool`, voir `lib/assets.js` — un pool à
 un seul élément rejoue simplement ce même élément, rétrocompatible).
 Recommence indéfiniment tant que la scène reste active.
 
-`musicLoop: true` bascule le lieu ENTIER (les deux phases) en boucle
-continue à la place — comportement historique préservé pour un lieu qui
+`musicLoop: true` bascule la scène ENTIÈRE (les deux phases) en boucle
+continue à la place — comportement historique préservé pour une scène qui
 veut une ambiance ininterrompue (ex. magasin, tension) : aucun enchaînement,
 aucune respiration.
 
@@ -225,8 +225,8 @@ même pause aléatoire, PUIS démarrage de la musique de la nouvelle phase.
 
 **Fondu de sortie universel** (`musicFadeMs`, `config/tuning-values.js`,
 `lib/audio.js`/`fadeOutMusic`) : TOUT arrêt de musique (bascule de phase,
-transition de lieu) descend en volume avant de s'arrêter, jamais une
-coupure sèche. À une transition de lieu, la transition elle-même reste
+transition de scène) descend en volume avant de s'arrêter, jamais une
+coupure sèche. À une transition de scène, la transition elle-même reste
 IMMÉDIATE (la scène suivante démarre tout de suite) — seule la musique
 sortante fond en arrière-plan, par-dessus le début de la nouvelle scène.
 Robuste au chevauchement (une bascule suivie de près d'une transition, par
@@ -236,7 +236,7 @@ exemple) : jamais de voix orpheline ni de fondus qui se disputent le canal.
 
 | Champ     | Type   | Contrainte                                                    |
 |-----------|--------|------------------------------------------------------------------|
-| `id`      | string | non vide, unique dans le niveau                                  |
+| `id`      | string | non vide, unique dans la scène                                  |
 | `type`    | string | doit exister dans le registre `entities/types/index.js`          |
 | `x`       | number | dans `[0, length]`                                                |
 | `nameKey` | string | optionnel (npc/object) : clé i18n spécifique à l'instance, forme `<namespace>.name` (ex. `door.club.name`) |
@@ -253,7 +253,7 @@ exemple) : jamais de voix orpheline ni de fondus qui se disputent le canal.
 | `shop` | `{ catalog }` | optionnel : POINT DE VENTE (voir `doc/entity-model.md`/"Vente et achat", `core/catalog.js`, `core/trade.js`), cascade instance -> type comme `action`. `catalog` : `{ table: "<nom de SHOP_CATALOGS>" }` (`config/shop-values.js`) ou `{ items: { <objet ITEM_REGISTRY>: { stock, price? } } }` — `stock` entier `>= 0` (rayon PAR CYCLE), `price` entier `> 0` optionnel (défaut : `value` de l'objet ; un article sans prix résolvable est rejeté). L'action `"shop"` (voir `doc/scripting.md`) l'exploite. Champs RUNTIME associés, jamais en entrée : `shopStock` (`{ <objet>: n }`, décrémenté aux achats, rechargé au cycle), `shopCycle`. |
 | `container` | `{ distribution, count? }` | optionnel : CONTENEUR de collecte régénérant (voir `doc/entity-model.md`/"Collecte", `core/spawn.js`), cascade instance -> type comme `action`. `distribution` : même forme que pour `spawnRanges` ci-dessus (`{ table }` ou `{ items }`), validée au chargement ; `count` entier `>= 1` (défaut `config/spawn-values.js`/`SPAWN_CONTAINER_DEFAULT_COUNT`), objets par cycle. L'action `"search"` (voir `doc/scripting.md`) les fait tomber au sol. Champs RUNTIME associés, jamais en entrée : `stock` (tableau des objets tirés, ou `null` une fois fouillé — un conteneur vidé n'est plus candidat à Entrée), `stockCycle` (cycle du dernier stock). |
 
-`parseLevel` normalise chaque entité en ajoutant `labelKey` et
+`parseScene` normalise chaque entité en ajoutant `labelKey` et
 `descriptionKey` : `entity.nameKey` (du JSON) si présent sinon
 `registry[type].nameKey` pour le premier ; `entity.descriptionKey` (du JSON) si présent sinon
 `registry[type].descriptionKey` pour le second (peut rester `undefined`, ex.
@@ -265,7 +265,7 @@ seuls `labelKey` et `descriptionKey` (résolus) sont exposés.
 
 Une `PresenceRule` : `{ when: <condition>, effects: [<effet>...] }`, ou en
 RACCOURCI rétrocompatible `{ when: <condition>, present: boolean }` (sans
-`effects`), normalisé par `parseLevel` en `{ when, effects: [{ type:
+`effects`), normalisé par `parseScene` en `{ when, effects: [{ type:
 "presence", present }] }` — tout consommateur d'une entité PARSÉE ne voit
 plus que la forme canonique.
 
@@ -285,13 +285,13 @@ Sémantique de la dormance côté entité (les trois plans coupés, la garde
 anti-boucle) : `doc/entity-model.md`.
 
 MÊME registre, MÊME validation (`validateCondition`, factorisée dans
-`core/level.js`) pour `entities[].action.condition` (voir tableau "Entité"
+`core/scene.js`) pour `entities[].action.condition` (voir tableau "Entité"
 plus haut) — une condition ne sait pas d'où elle est appelée,
 `presence[].when` et `action.condition` partagent exactement ce chemin.
 
 ## Collectible persistant
 
-`consumed` (booléen, RUNTIME — jamais un champ d'entrée du JSON de niveau,
+`consumed` (booléen, RUNTIME — jamais un champ d'entrée du JSON de scène,
 comme `present`/`gotoArrived`) : marque une entité activée une seule fois via
 l'action `"loot"` (voir "Registre de types" plus bas et `doc/entity-model.md`),
 posé par `core/state.js`/`markConsumed`, JAMAIS retiré du monde (contrairement
@@ -303,10 +303,10 @@ Détail complet (idempotence, exemples, muteOnConsumed) : `doc/entity-model.md`.
 
 ## Collectibles posés par la collecte
 
-`spawned` (booléen, RUNTIME — jamais un champ d'entrée du JSON de niveau,
+`spawned` (booléen, RUNTIME — jamais un champ d'entrée du JSON de scène,
 comme `consumed`/`ephemeral`) : marque une entité posée au sol par le moteur
 de collecte (`core/spawn.js`, depuis une plage `spawnRanges`, voir tableau
-"Niveau"). Contrairement à un éphémère, elle est PERSISTANTE (sérialisée,
+"Scène"). Contrairement à un éphémère, elle est PERSISTANTE (sérialisée,
 jamais purgée au départ) : elle reste jusqu'à être ramassée ou remplacée au
 cycle suivant. Au niveau du MONDE (racine, partagé par les deux faces),
 `spawnCycle` (RUNTIME) mémorise le dernier cycle matérialisé. Détail complet :
@@ -314,12 +314,12 @@ cycle suivant. Au niveau du MONDE (racine, partagé par les deux faces),
 
 ## Entités éphémères
 
-`ephemeral` (booléen, RUNTIME — jamais un champ d'entrée du JSON de niveau,
+`ephemeral` (booléen, RUNTIME — jamais un champ d'entrée du JSON de scène,
 comme `consumed`) : marque une entité créée EN COURS DE JEU via
-`core/state.js`/`spawnEphemeral`, jamais déclarée dans un fichier de niveau.
+`core/state.js`/`spawnEphemeral`, jamais déclarée dans un fichier de scène.
 Exclue de la sérialisation (`core/save.js`/`serializeGame`) et purgée du
-lieu au départ (`core/state.js`/`travelToWorld`) — aucune entité éphémère
-n'apparaît donc jamais dans un fichier de niveau ni dans une sauvegarde.
+monde au départ (`core/state.js`/`travelToWorld`) — aucune entité éphémère
+n'apparaît donc jamais dans un fichier de scène ni dans une sauvegarde.
 Limite anti-prolifération : `MAX_EPHEMERALS` (`config/ephemerals.js`).
 Détail complet : `doc/entity-model.md`/"Entités éphémères".
 
@@ -346,7 +346,7 @@ rassemblés par `index.js` en un objet `{ [type]: TypeDef }` :
 
 `blocksMovement`/`observable`/`interactable`/`isFlying` sont tous les quatre
 cascadés instance -> type -> défaut `false` (voir
-`core/level.js`/`parseEntity`), donc également déclarables au niveau ENTITÉ
+`core/scene.js`/`parseEntity`), donc également déclarables au niveau ENTITÉ
 (voir le tableau "Entité" plus haut), pas seulement au niveau du type.
 
 Liste EXHAUSTIVE des archétypes disponibles : `entities/types/index.js` (un
@@ -360,7 +360,7 @@ documenté dans `doc/entity-model.md`.
 ```json
 {
   "id": "demo",
-  "titleKey": "level.demo.title",
+  "titleKey": "scene.demo.name",
   "length": 40,
   "playerStart": 2,
   "entities": [
@@ -375,31 +375,31 @@ documenté dans `doc/entity-model.md`.
 }
 ```
 
-Encore plus minimal : `{}` est un niveau valide (voir "Parsing TOTAL" plus
-haut) — un lieu vide, plat, traversable, sans rien à configurer. Utile pour
-un test/lab rapide sans avoir à écrire un fichier de niveau complet.
+Encore plus minimal : `{}` est une scène valide (voir "Parsing TOTAL" plus
+haut) — une scène vide, plate, traversable, sans rien à configurer. Utile pour
+un test/lab rapide sans avoir à écrire un fichier de scène complet.
 
 ## Verticalité — par SOUS-SCÈNES, pas par axe Y
 
 Aucun champ dédié : la verticalité (ex. "les toits" au-dessus de la rue) se
-fait EXACTEMENT comme un changement de lieu horizontal — un lieu séparé
-(`level/*.json` à part entière), relié par une entité interactable dont
+fait EXACTEMENT comme un changement de scène horizontal — une scène séparée
+(`scenes/*.json` à part entière), relié par une entité interactable dont
 l'effet `"teleport"` y mène (voir `doc/scripting.md`/"Effets d'action" —
 un "escalier"/une "échelle", au même titre qu'une `door`, voir
 `doc/entity-model.md`). Jamais un axe Y discrétisé dans
 UNE scène (aucune notion de palier/étage actif à maintenir) : le mécanisme
-de transition de lieu déjà en place couvre tout, sans champ ni système
+de transition de scène déjà en place couvre tout, sans champ ni système
 supplémentaire.
 
 ## Chargement
 
-- `core/level.js` — `parseLevel(raw, registry)` : fonction pure, valide et
+- `core/scene.js` — `parseScene(raw, registry)` : fonction pure, valide et
   normalise un objet déjà parsé. Utilisable en Node/console, sans réseau ni
   DOM. Toute violation lève une `Error` nommant le champ ou l'entité fautive.
-- `level/load.js` — `loadLevel(url, registry)` : chargeur au bord (`fetch` +
-  `parseLevel`). Erreurs réseau et JSON invalide remontées avec un message
-  clair. `loadLevelById(id, registry)` : résout `id` en chemin via
-  `level/index.js` puis délègue à `loadLevel` — utilisé pour l'effet
+- `scenes/load.js` — `loadScene(url, registry)` : chargeur au bord (`fetch` +
+  `parseScene`). Erreurs réseau et JSON invalide remontées avec un message
+  clair. `loadSceneById(id, registry)` : résout `id` en chemin via
+  `scenes/index.js` puis délègue à `loadScene` — utilisé pour l'effet
   "teleport" (`target` = id, pas un chemin, voir `doc/scripting.md`/"Effets
   d'action").
-- `level/index.js` — registre `{ id: chemin }` des niveaux existants.
+- `scenes/index.js` — registre `{ id: chemin }` des scènes existantes.

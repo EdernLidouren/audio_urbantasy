@@ -1,6 +1,6 @@
 // Archétype "miravi" — oiseau de proie de verre, SURNATUREL (présent en
 // perception seulement, comme ghost.js), rencontré côté miroir (voir
-// level/clock-tower-weight-shaft-mirror-space.json). Aucun beacon : on
+// scenes/clock-tower-weight-shaft-mirror-space.json). Aucun beacon : on
 // l'entend crier (vocal) et battre des ailes (movement, cadencé par la
 // distance parcourue ; isFlying à l'instance, le sol survolé est ignoré —
 // voir doc/entity-model.md/"Surfaces de sol et son de pas"). Aucun

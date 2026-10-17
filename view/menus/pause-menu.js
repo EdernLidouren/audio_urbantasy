@@ -27,7 +27,7 @@ import { saveGame } from "../save-storage.js";
 // "Sauvegarder" ci-dessous (seul point d'accès à la sauvegarde manuelle,
 // voir save-menu.js pour les réglages/import-export) et transmise à
 // Options pour ce qui en a besoin (Sauvegarde > import/export de partie).
-// travelViaCityMap(levelId, spawnX) : effet de sélection sur la carte de
+// travelViaCityMap(sceneId, spawnX) : effet de sélection sur la carte de
 // la ville (voir view/city-screen.js) — transmis tel quel à
 // view/menus/city-map-menu.js, ce fichier ignore tout de son
 // fonctionnement (destroy/travelToWorld/recreate), il ne fait que router.

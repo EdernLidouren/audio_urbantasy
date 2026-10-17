@@ -16,7 +16,7 @@
 // un seul objet —
 // même patron que
 // core/behaviors/index.js. Donnée neutre au global : aucun import, ni du
-// core ni de la vue. blocksMovement est lu par core/level.js (baké dans
+// core ni de la vue. blocksMovement est lu par core/scene.js (baké dans
 // l'entité parsée) puis exploité par core/reduce.js pour arrêter le joueur
 // au bord du corps d'une entité bloquante (voir BODY_RADIUS, uniforme pour
 // l'instant). observable/interactable (système d'interaction niveau 0, voir
@@ -30,13 +30,13 @@
 // nameKey est une CLÉ i18n (jamais une chaîne affichable directement),
 // forme "<namespace>.name" (ex. "entity.window.name") — SYMÉTRIQUE à
 // descriptionKey ci-dessous : même nom de champ à l'archétype ET à
-// l'instance (level/*.json), jamais un champ "label" séparé.
+// l'instance (scenes/*.json), jamais un champ "label" séparé.
 //
 // descriptionKey (optionnel) : CLÉ i18n de la description utilisée par
 // l'interaction "describe" (touche Espace, voir view/interaction.js).
 // Défaut par type, surchargeable par instance via le champ
-// `descriptionKey` du niveau (level/*.json) — cascade instance -> type
-// identique à celle de nameKey (résolue dans core/level.js).
+// `descriptionKey` de la scène (scenes/*.json) — cascade instance -> type
+// identique à celle de nameKey (résolue dans core/scene.js).
 //
 // sounds regroupe les descripteurs de son du type PAR RÔLE (voir
 // entities/model.md pour le vocabulaire complet et la liste des paramètres

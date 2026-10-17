@@ -1,5 +1,5 @@
 // Archétype "mirror_clock_tower_escapement" — anti-échappement, côté miroir (voir
-// level/clock-tower-weight-shaft-mirror-space.json). Pendant inversé de
+// scenes/clock-tower-weight-shaft-mirror-space.json). Pendant inversé de
 // l'entité de même position dans le puits des contrepoids. Beacon continu,
 // observable, jamais interactif.
 export default {

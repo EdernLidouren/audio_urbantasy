@@ -6,7 +6,7 @@
 // chaque lecture (jamais figé dans l'état). L'ÉTAT de stock courant, lui,
 // vit sur l'entité (entity.shopStock / shopCycle, voir restockShopEntity).
 //
-// Module SÉPARÉ de core/trade.js pour que core/level.js (validation) et
+// Module SÉPARÉ de core/trade.js pour que core/scene.js (validation) et
 // core/spawn.js (rechargement au cycle) l'importent sans tirer la
 // transaction — jamais d'import circulaire.
 
@@ -62,7 +62,7 @@ export function validateShopCatalogs(catalogs) {
 validateShopCatalogs(SHOP_CATALOGS);
 
 // Valide UN catalogue déclaré par un point de vente — `fail` fourni par
-// l'appelant (core/level.js). EXACTEMENT une des deux formes.
+// l'appelant (core/scene.js). EXACTEMENT une des deux formes.
 export function validateCatalog(catalog, describe, fail) {
   if (typeof catalog !== "object" || catalog === null || Array.isArray(catalog)) {
     fail(`${describe} doit être un objet { table } ou { items }.`);
@@ -96,7 +96,7 @@ export function fullStockOf(catalog) {
 
 // Recharge le rayon d'un point de vente pour le cycle donné : stock plein
 // (valeur de table, jamais un cumul avec l'invendu), cycle mémorisé —
-// appelé par core/spawn.js au garnissage (chargement du lieu) ET
+// appelé par core/spawn.js au garnissage (chargement du monde) ET
 // paresseusement à l'ouverture du comptoir (core/trade.js/restockShopIfDue),
 // même asymétrie assumée qu'un conteneur (contenu caché, rien ne "poppe").
 export function restockShopEntity(entity, cycle) {

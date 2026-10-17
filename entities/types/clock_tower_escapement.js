@@ -1,5 +1,5 @@
 // Archétype "clock_tower_escapement" — échappement d'un clocher, le balancier
-// qui bat la mesure (voir level/clock-tower-weight-shaft.json). Beacon
+// qui bat la mesure (voir scenes/clock-tower-weight-shaft.json). Beacon
 // continu, observable, jamais interactif.
 export default {
   nameKey: "entity.clock_tower_escapement.name",

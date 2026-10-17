@@ -113,7 +113,7 @@ en place pour `defaultSurface`/`segments`.
 Chaque monde rangé (`core/state.js`/`travelToWorld`) note désormais `session.time`
 (la minute de jeu courante) dans son `lastVisited`, plutôt qu'un simple compteur de
 rangements. **Rien ne lit encore cette valeur.** C'est le crochet pour une future
-simulation d'absence (modèle "Animal Crossing" : un lieu quitté pourrait évoluer, ou
+simulation d'absence (modèle "Animal Crossing" : un monde quitté pourrait évoluer, ou
 simplement rattraper le temps écoulé, à la prochaine visite) — non câblée par ce
 chantier.
 
@@ -128,11 +128,11 @@ phase intermédiaire s'ajoutera, il faudra alors étendre `phaseAt` ET ses
 appelants, jamais glisser un troisième cas en silence dans l'un des deux
 existants.
 
-**Musique par phase, propriété du lieu** (`doc/level-format.md`) : `musicDay` /
-`musicNight`, optionnels — un lieu qui n'en déclare aucun retombe sur `music`
+**Musique par phase, propriété de la scène** (`doc/scene-format.md`) : `musicDay` /
+`musicNight`, optionnels — une scène qui n'en déclare aucun retombe sur `music`
 (champ existant) pour les deux phases, aucune régression pour le contenu déjà
 écrit. Même structure prévue pour l'ambiance (`ambiencesDay` / `ambiencesNight`,
-validés par `parseLevel`) mais **non exploitée** — seule la musique réagit à la
+validés par `parseScene`) mais **non exploitée** — seule la musique réagit à la
 phase pour l'instant.
 
 **Réaction en VUE, sur la TRANSITION uniquement** (`view/audio/city-scene.js`) :
@@ -144,14 +144,14 @@ phase pour l'instant.
 - À une bascule EN COURS DE JEU : fondu de sortie UNIVERSEL (`lib/audio.js`/
   `fadeOutMusic`) PUIS une respiration (même pause aléatoire que
   l'enchaînement naturel entre deux morceaux, voir `doc/entity-model.md` et
-  `doc/level-format.md`/"Musique : séquence avec respiration") PUIS démarrage de
+  `doc/scene-format.md`/"Musique : séquence avec respiration") PUIS démarrage de
   la nouvelle séquence (`switchMusicSequence`) — jamais un fondu croisé avec
   chevauchement comme avant : la sortante s'éteint, un silence s'écoule,
   l'entrante démarre directement (sans fondu d'entrée, comme à l'ouverture
   d'une scène). Durée du fondu réglable à l'oreille :
   `TUNING_DEFAULTS.musicFadeMs` (`config/tuning-values.js`, défaut 2000 ms) ;
   fourchette de respiration : `musicBreatherMinMs`/`musicBreatherMaxMs`.
-- Robuste au chevauchement (ex. bascule puis transition de lieu coup sur
+- Robuste au chevauchement (ex. bascule puis transition de scène coup sur
   coup) : un compteur de génération dans `lib/audio.js` invalide toute
   respiration/enchaînement en attente d'une séquence périmée — jamais de
   Howl fantôme, jamais deux fondus qui se disputent le canal.
@@ -165,7 +165,7 @@ DÉCOUPLÉE de la phase jour/nuit (une entité déclare son propre horaire, ex.
 `entities/types/neon.js`, "présent 20h..6h", indépendant de `dayStartHour`/
 `nightStartHour`). Détail complet (l'aiguillage extensible, les trois plans
 coupés par l'état dormant, la réaction vue par diff) : `doc/entity-model.md`,
-`doc/scripting.md`, `doc/level-format.md`.
+`doc/scripting.md`, `doc/scene-format.md`.
 
 ## Cycle de collecte quotidien — troisième consommateur
 
@@ -173,7 +173,7 @@ coupés par l'état dormant, la réaction vue par diff) : `doc/entity-model.md`,
 depuis l'origine, frontière à `config/spawn-values.js`/`SPAWN_CYCLE_HOUR`,
 minuit) — dérivation PURE comme les autres, jamais stockée à part. Le moteur
 de collecte le compare au dernier cycle matérialisé d'un monde
-(`world.spawnCycle`) AU CHARGEMENT du lieu : aucun code ne s'exécute au
+(`world.spawnCycle`) AU CHARGEMENT du monde : aucun code ne s'exécute au
 tick ni dans `onFrame` — le temps avance, la collecte le LIT. Détail complet
 (sources, file, persistance) : `doc/entity-model.md`/"Collecte".
 

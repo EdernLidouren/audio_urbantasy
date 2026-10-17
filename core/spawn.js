@@ -2,9 +2,9 @@
 // doc/entity-model.md/"Collecte" pour le modèle complet. Quatre couches :
 //   - DISTRIBUTION (quoi) : core/distribution.js.
 //   - SOURCES (où) : un CONTENEUR est une entité qui porte `container:
-//     { distribution, count? }` (cascade instance -> type, voir core/level.js/
+//     { distribution, count? }` (cascade instance -> type, voir core/scene.js/
 //     parseEntity) ; une PLAGE est une entrée de `face.spawnRanges`
-//     ({ from, to, count?, distribution }, voir core/level.js/parseFace).
+//     ({ from, to, count?, distribution }, voir core/scene.js/parseFace).
 //     Même logique de garnissage dessous, seule la MATÉRIALISATION diffère :
 //     un conteneur mémorise des objets cachés (`stock`), une plage pose des
 //     entités ramassables au sol (`spawned: true`).
@@ -36,7 +36,7 @@
 // -> même contenu. Persistant : stock/stockCycle/spawned/spawnCycle sont
 // des champs plats sérialisés avec la partie (voir core/save.js).
 //
-// `registry` est INJECTÉ (comme pour core/level.js/parseLevel), jamais
+// `registry` est INJECTÉ (comme pour core/scene.js/parseScene), jamais
 // importé : le core ne connaît aucun registre de contenu.
 
 import { SPAWN_CYCLE_HOUR, SPAWN_RANGE_DEFAULT_COUNT, SPAWN_CONTAINER_DEFAULT_COUNT } from "../config/spawn-values.js";
@@ -46,7 +46,7 @@ import { ITEM_REGISTRY } from "./items.js";
 import { drawItem } from "./distribution.js";
 import { restockShopEntity } from "./catalog.js";
 import { isTwoSided, resolveFace, withFace, drawScatteredPosition, spawnScatteredEphemerals } from "./state.js";
-import { parseSpawnedEntity } from "./level.js";
+import { parseSpawnedEntity } from "./scene.js";
 
 const MINUTES_PER_DAY = TIME_CONFIG.minutesPerHour * TIME_CONFIG.hoursPerDay;
 
@@ -99,7 +99,7 @@ function drawItems(distribution, count, rngState) {
 }
 
 // Descripteur d'entité ramassable pour un objet du sac : passe par le MÊME
-// parseur qu'une instance de niveau (cascade sounds/capacités/action de
+// parseur qu'une instance de scène (cascade sounds/capacités/action de
 // l'archétype). Sert aux deux matérialisations : posé PERSISTANT par une
 // plage (marqué `spawned` par l'appelant), ou ÉPHÉMÈRE lâché par une fouille
 // (spawnEphemeral repose id/x/ephemeral lui-même).
@@ -179,7 +179,7 @@ function refillFace(face, world, cycle, registry, companions, presenceContext) {
 // différent du cycle courant) — appelé à CHAQUE chargement du monde actif
 // (voir view/city-screen.js), idempotent : rien à faire -> RÉFÉRENCE
 // INCHANGÉE (cycle déjà matérialisé, ou monde sans aucune source). Scène à
-// deux faces : LES DEUX faces sont garnies (on charge le lieu entier),
+// deux faces : LES DEUX faces sont garnies (on charge le monde entier),
 // chacune sur son propre flux PRNG ; le marqueur reste au niveau du monde.
 export function refillDueSpawns(session, registry) {
   const world = session.worlds[session.activeWorldId];

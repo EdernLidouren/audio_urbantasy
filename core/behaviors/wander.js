@@ -11,7 +11,7 @@
 // core/physics/movement.js). Nécessaire pour l'item "blocage" (voir plus
 // bas) : reduce.js résout l'intention via resolveBodyMove
 // (core/physics/collision.js), qui arrête déjà tout mobile à intention pile
-// au contact d'un corps bloquant (borne du niveau OU entité impassable) —
+// au contact d'un corps bloquant (borne de la scène OU entité impassable) —
 // PHYSIQUE INCHANGÉE, wander n'a donc plus besoin de connaître les
 // obstacles pour s'y arrêter proprement, seulement pour RÉAGIR à l'arrêt
 // (rebond, voir plus bas).
@@ -145,7 +145,7 @@ export function step(entity, context) {
     // voir header) : REBOND — inverse la direction pour la durée RESTANTE
     // de cette même phase, aucun nouveau tirage. Choisi plutôt qu'une pause
     // anticipée : c'est exactement le comportement qu'avait déjà l'ancienne
-    // version aux bornes du niveau (moveAndBounce), maintenant étendu aux
+    // version aux bornes de la scène (moveAndBounce), maintenant étendu aux
     // obstacles pour une réaction cohérente dans les deux cas — sans ce
     // rebond, l'entité resterait à intention constante contre l'obstacle,
     // collée à pousser dans le vide.

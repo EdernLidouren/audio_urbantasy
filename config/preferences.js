@@ -56,7 +56,7 @@ export const PREF_CONSTRAINTS = {
   // lib/coordinate-label.js/formatCoordinateY pour la convention exacte).
   cityMapAlphaCoordinates: { type: "boolean", default: true },
   cityMapInvertY: { type: "boolean", default: false },
-  // Sauvegarde automatique à chaque transition de lieu réussie (voir
+  // Sauvegarde automatique à chaque changement de scène réussi (voir
   // view/city-screen.js) — pas un réglage audio ni de menu, mais suit le
   // même patron de persistance que le reste. Activée par défaut : la
   // partie EST la sauvegarde (voir CLAUDE.md), autant qu'elle le soit

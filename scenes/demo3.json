@@ -1,6 +1,6 @@
 {
   "id": "demo3",
-  "titleKey": "level.demo3.name",
+  "titleKey": "scene.demo3.name",
   "length": 10,
   "playerStart": 1,
   "recto": {

@@ -7,7 +7,7 @@
 // porte n'a plus rien de commun à l'échelle du TYPE — sa cible (`teleport.
 // target`, voir core/scripting.md/"Effets d'action") varie par INSTANCE,
 // chaque porte doit donc déclarer SA PROPRE `action` complète (voir
-// level/demo.json et consorts). La porte n'est PLUS un cas spécial du core
+// scenes/demo.json et consorts). La porte n'est PLUS un cas spécial du core
 // ni de la vue : juste une entité `interactable` ordinaire dont l'action
 // déclenche un effet "teleport" comme n'importe quel autre contenu.
 //

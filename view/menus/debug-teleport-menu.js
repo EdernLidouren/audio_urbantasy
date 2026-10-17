@@ -2,7 +2,7 @@
 // même famille que Shift+W (météo) et Shift+T (temps) —
 // mode debug uniquement, la garde vit dans view/city-screen.js/onKeyDown.
 //
-// Liste GÉNÉRÉE depuis le registre des niveaux (level/index.js) : une scène
+// Liste GÉNÉRÉE depuis le registre des scènes (scenes/index.js) : une scène
 // ajoutée au registre y apparaît sans toucher à ce fichier. Nom et point de
 // départ lus dans le JSON de chaque scène (titleKey, playerStart), relus à
 // chaque ouverture ; un fichier illisible ou sans titleKey donne une entrée
@@ -17,7 +17,7 @@
 import { t } from "../../data/i18n/index.js";
 import { pushScreen, popScreen, activeScreen } from "../../lib/screens.js";
 import { makeMenuScreen } from "../../lib/menu.js";
-import levelPaths from "../../level/index.js";
+import scenePaths from "../../scenes/index.js";
 
 async function readSceneInfo(id, path) {
   try {
@@ -32,7 +32,7 @@ async function readSceneInfo(id, path) {
 export async function openTeleportDebugMenu(getSession, teleportEffect) {
   const opener = activeScreen();
   const currentId = getSession().activeWorldId;
-  const scenes = await Promise.all(Object.entries(levelPaths).map(([id, path]) => readSceneInfo(id, path)));
+  const scenes = await Promise.all(Object.entries(scenePaths).map(([id, path]) => readSceneInfo(id, path)));
   // Lecture asynchrone : si l'écran a changé entre-temps (menu ouvert,
   // sortie de la ville), on n'empile rien.
   if (activeScreen() !== opener) return;

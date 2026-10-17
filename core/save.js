@@ -16,8 +16,146 @@ import { INITIAL_TIME } from "./time.js";
 import { createEmptyEquipment } from "./equipment.js";
 import { stripEphemeralsFromWorld, isTwoSided } from "./state.js";
 import { createInitialWeather } from "./weather.js";
+import { RENAMED_ENTITY_TYPES, RENAMED_I18N_KEYS, RENAMED_ASSET_PATHS } from "../config/save-renames.js";
 
 export const SAVE_VERSION = 1;
+
+// --- Renommages de contenu (config/save-renames.js, doc/save.md) ---------
+
+// Résout les chaînes de renommage une fois pour toutes (a -> b, b -> c
+// donne a -> c, b -> c). Une boucle est une table cassée : erreur au
+// chargement du module, comme une table météo invalide (core/weather.js).
+function resolveRenameChains(table, label) {
+  const resolved = {};
+  for (const start of Object.keys(table)) {
+    const seen = new Set([start]);
+    let current = table[start];
+    while (Object.hasOwn(table, current)) {
+      if (seen.has(current)) {
+        throw new Error(`config/save-renames.js : boucle de renommage dans ${label} ("${start}").`);
+      }
+      seen.add(current);
+      current = table[current];
+    }
+    resolved[start] = current;
+  }
+  return resolved;
+}
+
+const ENTITY_TYPE_RENAMES = resolveRenameChains(RENAMED_ENTITY_TYPES, "RENAMED_ENTITY_TYPES");
+// Clés i18n et chemins de sons ne peuvent pas se confondre (forme pointée
+// contre chemin de dossier) : une seule passe sur toutes les valeurs.
+const VALUE_RENAMES = {
+  ...resolveRenameChains(RENAMED_I18N_KEYS, "RENAMED_I18N_KEYS"),
+  ...resolveRenameChains(RENAMED_ASSET_PATHS, "RENAMED_ASSET_PATHS"),
+};
+
+// Remplace, partout dans la donnée, toute VALEUR chaîne exactement égale à
+// une ancienne clé ou à un ancien chemin. Jamais les clés d'objet (noms de
+// variables, ids de mondes) : seules les valeurs portent du contenu
+// renommable. Une branche inchangée garde sa référence.
+function renameValues(value) {
+  if (typeof value === "string") return Object.hasOwn(VALUE_RENAMES, value) ? VALUE_RENAMES[value] : value;
+  if (Array.isArray(value)) {
+    let changed = false;
+    const out = value.map((item) => {
+      const renamed = renameValues(item);
+      if (renamed !== item) changed = true;
+      return renamed;
+    });
+    return changed ? out : value;
+  }
+  if (value && typeof value === "object") {
+    let changed = false;
+    const out = {};
+    for (const [key, item] of Object.entries(value)) {
+      const renamed = renameValues(item);
+      if (renamed !== item) changed = true;
+      out[key] = renamed;
+    }
+    return changed ? out : value;
+  }
+  return value;
+}
+
+// Applique `transform(entities) -> entities` à chaque liste d'entités de la
+// partie : chaque face de chaque monde, plus les compagnons. Une liste
+// inchangée garde sa référence, et le monde aussi.
+function mapEntityLists(data, transform) {
+  const mapFace = (face) => {
+    if (!face || !Array.isArray(face.entities)) return face;
+    const entities = transform(face.entities);
+    return entities === face.entities ? face : { ...face, entities };
+  };
+
+  let result = data;
+  if (data.worlds && typeof data.worlds === "object") {
+    const worlds = {};
+    let anyChanged = false;
+    for (const [id, world] of Object.entries(data.worlds)) {
+      let next = world;
+      if (world && world.recto !== undefined && world.verso !== undefined) {
+        const recto = mapFace(world.recto);
+        const verso = mapFace(world.verso);
+        if (recto !== world.recto || verso !== world.verso) next = { ...world, recto, verso };
+      } else {
+        next = mapFace(world);
+      }
+      worlds[id] = next;
+      if (next !== world) anyChanged = true;
+    }
+    if (anyChanged) result = { ...result, worlds };
+  }
+  if (Array.isArray(data.companions)) {
+    const companions = transform(data.companions);
+    if (companions !== data.companions) result = { ...result, companions };
+  }
+  return result;
+}
+
+function renameEntityTypes(entities) {
+  let changed = false;
+  const out = entities.map((entity) => {
+    if (!entity || !Object.hasOwn(ENTITY_TYPE_RENAMES, entity.type)) return entity;
+    changed = true;
+    return { ...entity, type: ENTITY_TYPE_RENAMES[entity.type] };
+  });
+  return changed ? out : entities;
+}
+
+// Renommages de contenu d'une partie déjà rebouchée : types d'entité, puis
+// clés i18n et chemins de sons. Idempotent : une sauvegarde déjà à jour
+// traverse sans changement.
+function applyContentRenames(data) {
+  return renameValues(mapEntityLists(data, renameEntityTypes));
+}
+
+// Retire les entités dont le type n'existe plus dans le registre (type
+// supprimé, ou renommé sans entrée dans config/save-renames.js). Les
+// garder ferait planter la scène au premier accès au registre ; on perd
+// l'entité, jamais la partie. Renvoie la partie et les entités retirées
+// ("<monde>/<id>:<type>") pour que l'appelant puisse avertir.
+function dropUnknownEntityTypes(data, registry) {
+  const dropped = [];
+  const filterFor = (label) => (entities) => {
+    const kept = entities.filter((entity) => {
+      if (entity && Object.hasOwn(registry, entity.type)) return true;
+      dropped.push(`${label}/${entity && entity.id}:${entity && entity.type}`);
+      return false;
+    });
+    return kept.length === entities.length ? entities : kept;
+  };
+
+  let result = data;
+  for (const [id, world] of Object.entries(data.worlds)) {
+    const single = { worlds: { [id]: world } };
+    const patched = mapEntityLists(single, filterFor(id)).worlds[id];
+    if (patched !== world) result = { ...result, worlds: { ...result.worlds, [id]: patched } };
+  }
+  const companions = filterFor("companions")(data.companions);
+  if (companions !== data.companions) result = { ...result, companions };
+  return { data: result, dropped };
+}
 
 // Exclut les entités ÉPHÉMÈRES (voir core/state.js/spawnEphemeral,
 // entities/model.md/"Entités éphémères") de TOUS les mondes avant
@@ -49,7 +187,7 @@ function stripEphemeralEntities(session) {
 //
 // Note d'implémentation, pour qui s'attendrait à voir la clé disparaître
 // purement et simplement : `deserializeGame` ne REPASSE JAMAIS par
-// parseLevel/parseEntity (voir migrateSave plus bas, qui travaille
+// parseScene/parseEntity (voir migrateSave plus bas, qui travaille
 // uniquement sur le blob déjà sauvé) — il n'a donc AUCUN accès à la
 // déclaration d'origine (type/valeur initiale) d'une variable une fois son
 // contenu retiré. Remplacer la valeur PAR l'initiale ICI, à l'écriture,
@@ -77,7 +215,7 @@ function resetVolatileInBag(variables) {
 
 // Applique resetVolatileInBag à UNE face (ses entités, portée "entity") ET
 // à elle-même si elle porte le sac PARTAGÉ de portée "scene" (voir
-// core/level.js/parseLevel — le sac de scène vit à la racine du MONDE,
+// core/scene.js/parseScene — le sac de scène vit à la racine du MONDE,
 // jamais par face ; `world` est passé ici pour une scène SIMPLE, où la face
 // EST le monde). `world` : objet distinct de `face` UNIQUEMENT pour une
 // scène à deux faces (voir resetVolatileVariablesInWorld) — pour une scène
@@ -107,8 +245,8 @@ function resetVolatileVariablesInWorld(world) {
 }
 
 // Toute la SESSION : variables de partie (racine), de chaque monde (tous,
-// pas seulement l'actif — un lieu rangé garde ses propres variables) et de
-// chaque compagnon (même statut d'entité qu'un habitant de lieu, voir
+// pas seulement l'actif — un monde rangé garde ses propres variables) et de
+// chaque compagnon (même statut d'entité qu'un habitant de monde, voir
 // core/state.js/header — aucun n'en déclare aujourd'hui, mais le mécanisme
 // reste correct par construction plutôt que supposé toujours vide).
 function resetVolatileVariablesInSession(session) {
@@ -144,13 +282,13 @@ export function serializeGame(session) {
 }
 
 // Rebouche UNE FACE antérieure à defaultSurface/segments (voir
-// core/level.js/parseLevel, qui garantit ces trois clés TOUJOURS présentes
+// core/scene.js/parseScene, qui garantit ces trois clés TOUJOURS présentes
 // pour un monde fraîchement chargé) — une sauvegarde plus ancienne ne les a
 // jamais eues, et une relecture de sauvegarde ne repasse JAMAIS par
-// parseLevel (qui ne s'applique qu'au chargement réseau d'un niveau). Sans
+// parseScene (qui ne s'applique qu'au chargement réseau d'une scène). Sans
 // ce rebouchage, surfaceAt(world, x) plante sur segments.find(...) dès
 // qu'une face ANCIENNE redevient active (voir view/audio/city-scene.js).
-// Mêmes défauts que parseLevel : DEFAULT_SURFACE partout, aucun segment —
+// Mêmes défauts que parseScene : DEFAULT_SURFACE partout, aucun segment —
 // comportement inchangé pour ces faces anciennes. Même précédent pour
 // `nextEphemeralId` (voir core/state.js/spawnEphemeral), antérieur aux
 // entités éphémères. `face` suspecte (donnée de disque) : jamais de
@@ -179,7 +317,7 @@ function backfillFace(face) {
     // `undefined + 1` = NaN, et TOUT éphémère suivant recevrait le même id
     // "ephemeral-NaN" — collision garantie dès le second spawn).
     nextEphemeralId: face.nextEphemeralId !== undefined ? face.nextEphemeralId : 0,
-    // indoor : voir core/level.js/parseFace ("nature de lieu", TOUJOURS
+    // indoor : voir core/scene.js/parseFace ("nature de scène", TOUJOURS
     // résolue pour un monde fraîchement chargé) — absente d'une sauvegarde
     // antérieure à cette propriété -> false (extérieur), même politique que
     // defaultSurface juste au-dessus.
@@ -193,7 +331,7 @@ function backfillFace(face) {
 // antérieure au modèle à deux faces n'en déclare — ce cas ne concerne donc
 // aujourd'hui que des saves ÉCRITES avec ce modèle, mais reste correct par
 // construction plutôt que supposé toujours complet.
-// variables (portée "scene", voir core/level.js/parseLevel/core/variables.js)
+// variables (portée "scene", voir core/scene.js/parseScene/core/variables.js)
 // : RACINE PARTAGÉE du monde, jamais par face (contrairement à
 // defaultSurface/segments/indoor ci-dessus) — rebouchée ICI, avant la
 // distinction simple/deux-faces, pour n'être backfillée qu'UNE fois même
@@ -322,6 +460,10 @@ function migrateSave(raw) {
     if (anyChanged) data = { ...data, worlds: patchedWorlds };
   }
 
+  // Renommages de contenu (config/save-renames.js) : APRÈS les rebouchages,
+  // sur une partie dont la forme est déjà complète.
+  data = applyContentRenames(data);
+
   return data;
 }
 
@@ -329,9 +471,9 @@ function migrateSave(raw) {
 // activeWorldId présents, du bon type, et le monde actif réellement
 // présent dans worlds. companions (déjà rebouché par migrateSave si
 // absent, voir plus haut) doit être un tableau. Ne revalide pas chaque
-// champ d'entité un par un (ce serait dupliquer parseLevel) — l'objectif
+// champ d'entité un par un (ce serait dupliquer parseScene) — l'objectif
 // est de détecter une donnée manifestement corrompue ou étrangère, pas de
-// rejouer la validation de niveau.
+// rejouer la validation de scène.
 function isPlausibleSession(data) {
   if (!data || typeof data !== "object") return false;
   if (!data.player || typeof data.player !== "object" || typeof data.player.x !== "number") return false;
@@ -349,7 +491,12 @@ function isPlausibleSession(data) {
 // un échec clair, jamais une partie à moitié chargée.
 // reason ∈ "format" (pas un objet exploitable), "version" (inconnue, aucune
 // migration), "invalid" (migrée mais structure implausible).
-export function deserializeGame(raw) {
+//
+// `registry` (optionnel, INJECTÉ comme pour parseScene — le core n'importe
+// jamais le registre de contenu) : s'il est fourni, les entités d'un type
+// absent du registre sont retirées et listées dans `droppedEntities`.
+// Sans registre, aucun filtrage (vérifications du core).
+export function deserializeGame(raw, { registry } = {}) {
   if (!raw || typeof raw !== "object" || typeof raw.version !== "number") {
     return { success: false, reason: "format" };
   }
@@ -362,5 +509,7 @@ export function deserializeGame(raw) {
     return { success: false, reason: "invalid" };
   }
 
-  return { success: true, session: data };
+  if (!registry) return { success: true, session: data, droppedEntities: [] };
+  const filtered = dropUnknownEntityTypes(data, registry);
+  return { success: true, session: filtered.data, droppedEntities: filtered.dropped };
 }

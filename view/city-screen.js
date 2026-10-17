@@ -48,7 +48,7 @@ import {
 import { setGameReplaceHandler } from "./menus/save-menu.js";
 import { tick } from "../core/actions.js";
 import { reduce } from "../core/reduce.js";
-import { loadLevelById } from "../level/load.js";
+import { loadSceneById } from "../scenes/load.js";
 import {
   getActiveWorld,
   travelToWorld,
@@ -163,7 +163,7 @@ function announceWeather(session) {
 //     — lisible pour le joueur, sans le bruit flottant ni la fausse
 //     précision d'un outil de diagnostic.
 // {length} (world.length, PARTAGÉ même pour une scène à deux faces — voir
-// core/level.js) situe {x} dans l'étendue du lieu, dans les DEUX modes.
+// core/scene.js) situe {x} dans l'étendue du monde, dans les DEUX modes.
 //
 // Face courante (RECTO/VERSO, voir CLAUDE.md) : annoncée EN PLUS, mais
 // SEULEMENT si le monde actif a réellement deux faces (isTwoSided) —
@@ -179,15 +179,15 @@ function announcePlayerX(session) {
 }
 
 // Résout un descripteur ÉPHÉMÈRE MINIMAL (type + surcharges, ex. { type:
-// "money", amount: 20 } — même forme qu'une instance de niveau) en spec
+// "money", amount: 20 } — même forme qu'une instance de scène) en spec
 // COMPLET pour spawnEphemeral/spawnScatteredEphemerals (core/state.js) :
 // EXACTEMENT la forme qu'une instance { type } SANS surcharge obtiendrait
-// en sortie de core/level.js/parseEntity, résolue ICI à la main — la vue
+// en sortie de core/scene.js/parseEntity, résolue ICI à la main — la vue
 // connaît déjà le registre, contrairement au core (spawnEphemeral ne fait
 // que porter ce descripteur, jamais l'interpréter). `overrides.amount`/
 // `overrides.count`, s'ils sont fournis, REMPLACENT DANS `action` UNIQUEMENT
 // le champ concerné (jamais de fusion profonde — même principe que
-// core/level.js pour `action`/`behavior` d'instance) : une pièce éparpillée
+// core/scene.js pour `action`/`behavior` d'instance) : une pièce éparpillée
 // à 20 plutôt que les 5 par défaut de "money" (`amount`), ou N exemplaires
 // d'un objet posé plutôt que le 1 par défaut de son type (`count`), sans
 // toucher au reste de l'action (kind, etc.). TROIS appelants aujourd'hui :
@@ -205,7 +205,7 @@ function resolveEphemeralSpec(type, overrides = {}) {
     labelKey: typeDef.nameKey,
     descriptionKey: typeDef.descriptionKey,
     // sounds : AUCUNE surcharge d'instance possible pour un éphémère (pas
-    // de fusion ici, contrairement à core/level.js/parseEntity) — le
+    // de fusion ici, contrairement à core/scene.js/parseEntity) — le
     // rendu audio (view/audio/city-scene.js/buildEntitySoundEntry) lit
     // `entity.sounds`, jamais le registre directement, donc CE champ doit
     // être porté explicitement, même sans surcharge.
@@ -237,7 +237,7 @@ const EPHEMERAL_COIN_SPEC = resolveEphemeralSpec("money");
 //     `entity.sounds` — `spec.type` doit donc rester une clé RÉELLE du
 //     registre d'entités, jamais le type d'OBJET brut),
 //     mais avec nameKey/descriptionKey/action PROPRES à l'objet (depuis
-//     ITEM_REGISTRY), exactement comme le ferait une instance de niveau qui
+//     ITEM_REGISTRY), exactement comme le ferait une instance de scène qui
 //     utiliserait ce type générique (voir le header d'entities/types/item.js).
 function resolveDroppedItemSpec(type, count) {
   if (registry[type]) {
@@ -419,14 +419,14 @@ export function makeCityScreen(getSession, setSession) {
   }
 
   // Transition FRANCHE côté ÉTAT/ENTITÉS (pas de fondu, pas d'animation) :
-  // scene.destroy() arrête et décharge ce que possédait le lieu courant —
+  // scene.destroy() arrête et décharge ce que possédait le monde courant —
   // balises, réverb (voir view/audio/city-scene.js) — donc aucun Howl
   // résiduel d'ENTITÉ, rien de plus à nettoyer ici. Musique/ambiance,
   // elles, NE SONT PLUS coupées par destroy() (voir "Couches persistantes
   // MUSIQUE/AMBIANCE", lib/audio.js) : la scène suivante (createCityAudioScene
   // ci-dessous) compare ce qu'elle veut à ce qui continue et ne fond que ce
   // qui change réellement — jamais de coupure/relance pour une musique ou
-  // une ambiance identique entre les deux lieux. Le monde quitté est RANGÉ
+  // une ambiance identique entre les deux mondes. Le monde quitté est RANGÉ
   // (gelé) dans session.worlds, pas détruit : une re-visite le ressort tel
   // quel (voir core/state.js, travelToWorld). Le fetch reste ici, au
   // bord — SEULEMENT si la cible n'est pas déjà connue de la partie ; sinon
@@ -452,9 +452,9 @@ export function makeCityScreen(getSession, setSession) {
 
     const session = getSession();
     const alreadyVisited = Boolean(session.worlds[targetId]);
-    const freshLevel = alreadyVisited ? null : await loadLevelById(targetId, registry);
+    const freshScene = alreadyVisited ? null : await loadSceneById(targetId, registry);
 
-    setSession(travelToWorld(session, targetId, freshLevel, { x, side }));
+    setSession(travelToWorld(session, targetId, freshScene, { x, side }));
     clearInteractionCooldowns();
     refreshSpawns();
     scene = createCityAudioScene(getSession);
@@ -482,11 +482,11 @@ export function makeCityScreen(getSession, setSession) {
 
   // SAS de téléportation (mode "fade" de l'effet "teleport", voir
   // core/effects.js) : "fondu au noir SONORE" (à la Animal Crossing) qui
-  // souligne le changement de lieu/position et masque un éventuel
+  // souligne le changement de scène/position et masque un éventuel
   // chargement derrière un silence bref plutôt qu'une coupure sèche des
   // balises ou un blanc audible — comportement HISTORIQUE d'une traversée
   // de porte, désormais généralisé à TOUT teleport en mode "fade", qu'il
-  // recharge (needsReload) ou déplace seulement le joueur DANS le lieu
+  // recharge (needsReload) ou déplace seulement le joueur DANS le monde
   // courant (voir placePlayer, core/state.js). Musique/ambiance INCHANGÉES :
   // elles suivent leur PROPRE logique de continuité/crossfade (lib/audio.js),
   // entièrement indifférente au gain de couche entités fondu ici (voir son
@@ -570,7 +570,7 @@ export function makeCityScreen(getSession, setSession) {
   }
 
   // Sélection sur la carte de la ville (voir view/menus/city-map-menu.js,
-  // level/city-map.js) : MÊME transition franche qu'une porte, spawnX
+  // map/city-map.js) : MÊME transition franche qu'une porte, spawnX
   // explicite (point de TP de la case). Fonctionne AUSSI pour
   // re-sélectionner sa PROPRE zone (recentrage volontaire, confort assumé
   // pour un jeu sans challenge) : travelToWorld ne fait AUCUNE distinction
@@ -578,8 +578,8 @@ export function makeCityScreen(getSession, setSession) {
   // monde (éphémères purgés au passage, comme toute sortie de scène),
   // joueur replacé à spawnX — un reset volontaire de la zone courante, pas
   // un cas spécial à coder.
-  async function travelViaCityMap(levelId, spawnX) {
-    await performTransition(levelId, spawnX);
+  async function travelViaCityMap(sceneId, spawnX) {
+    await performTransition(sceneId, spawnX);
   }
 
   // Remplace la partie EN COURS par une session importée (voir
@@ -641,7 +641,7 @@ export function makeCityScreen(getSession, setSession) {
   // qui la précède a déjà amené le son exactement là où la scène fraîche
   // le poserait (face active nette, face quittée étouffée/one-shot seul)
   // — PAS de travelToWorld, le monde actif ne change pas, pas de fetch
-  // réseau, pas de nouveau titre à annoncer (même lieu).
+  // réseau, pas de nouveau titre à annoncer (même monde).
   async function sideSwitchEffect(arrivalX, entity) {
     pushScreen({});
     try {
@@ -702,7 +702,7 @@ export function makeCityScreen(getSession, setSession) {
   }
 
   // Effet d'ÉTAT des ACTIONS D'ÉCRITURE de variable (voir
-  // view/interaction.js/ACTION_HANDLERS.applyEffects, core/level.js/
+  // view/interaction.js/ACTION_HANDLERS.applyEffects, core/scene.js/
   // parseActionEffect, core/scripting.md/"Actions multiples filtrées par
   // condition") : setVariable/toggleVariable/addVariable, core pur
   // (core/state.js/applyEntityActionEffects, qui résout seul la portée —

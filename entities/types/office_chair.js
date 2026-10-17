@@ -1,5 +1,5 @@
 // Archétype "office_chair" — chaise de bureau (voir
-// level/town-square-town-hall-mayor-office.json). Mobilier observable, jamais
+// scenes/town-square-town-hall-mayor-office.json). Mobilier observable, jamais
 // interactif, même preset que chair.js avec son propre beacon.
 export default {
   nameKey: "entity.office_chair.name",

@@ -19,6 +19,7 @@
 // partie une fois désobscurcie/parsée) ; monter l'un n'implique aucune
 // migration de l'autre.
 import { serializeGame, deserializeGame } from "../core/save.js";
+import registry from "../entities/types/index.js";
 import { obfuscate, deobfuscate } from "../lib/obfuscate.js";
 import { playOneShot } from "../lib/audio.js";
 import { resolveAsset } from "../lib/assets.js";
@@ -97,6 +98,21 @@ export function saveGame(session, { playSound = true } = {}) {
   return { success: true };
 }
 
+// Désenveloppe une sauvegarde déjà décodée, avec le registre de types
+// (core/save.js/deserializeGame) : une entité d'un type disparu est retirée
+// plutôt que de faire planter la scène. Point commun de loadGame et
+// importGame.
+function readSave(parsed) {
+  const result = deserializeGame(parsed, { registry });
+  if (result.success && result.droppedEntities.length > 0) {
+    console.warn(
+      "Sauvegarde : entités retirées, type inconnu (à ajouter dans config/save-renames.js si c'est un renommage) :",
+      result.droppedEntities
+    );
+  }
+  return result;
+}
+
 // Lit et désenveloppe la partie sauvegardée -> session valide, ou null si
 // absente/invalide. Ne lève jamais : lecture disque, JSON invalide et
 // structure implausible sont tous des échecs SILENCIEUX côté appelant
@@ -127,7 +143,7 @@ export function loadGame() {
     return null;
   }
 
-  const result = deserializeGame(parsed);
+  const result = readSave(parsed);
   if (!result.success) {
     console.warn(`loadGame: sauvegarde invalide (raison : ${result.reason}).`);
     return null;
@@ -211,7 +227,7 @@ export async function importGame(file) {
     return { success: false, reason: "parse" };
   }
 
-  const result = deserializeGame(parsed);
+  const result = readSave(parsed);
   if (!result.success) {
     return { success: false, reason: result.reason };
   }

@@ -1,5 +1,5 @@
 // Archétype "weight_shaft" — puits des contrepoids d'un clocher (voir
-// level/clock-tower-weight-shaft.json). Beacon continu de poulie + vocal
+// scenes/clock-tower-weight-shaft.json). Beacon continu de poulie + vocal
 // intermittent de câble (comme un PNJ : localisation ET expression).
 // Observable, jamais interactif.
 export default {

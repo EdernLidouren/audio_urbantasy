@@ -1,6 +1,6 @@
 {
   "id": "demo",
-  "titleKey": "level.demo.title",
+  "titleKey": "scene.demo.name",
   "length": 40,
   "playerStart": 2,
   "musicDay": "assets/musics/jazz_day",

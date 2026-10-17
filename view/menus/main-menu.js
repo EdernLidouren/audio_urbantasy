@@ -63,7 +63,7 @@ function activateNewGame(startGame) {
 }
 
 // canContinue/continueGame/startNewGame/startTestCityGame/getSession : état
-// + callbacks fournis par main.js (seul propriétaire de session/level).
+// + callbacks fournis par main.js (seul propriétaire de session/scene).
 // Menu racine : jamais fermable (rien en dessous vers quoi revenir).
 export function createMainMenu({ canContinue, continueGame, startNewGame, startTestCityGame, getSession }) {
   const entries = [];

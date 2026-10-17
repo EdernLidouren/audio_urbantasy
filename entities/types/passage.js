@@ -3,8 +3,8 @@
 // "switchSide" ; entities/model.md). Générique par nature (une ruelle, une
 // porte dérobée, un trou dans la palissade...) : label/description restent
 // des défauts génériques, `action.arrivalX` (point d'arrivée sur l'AUTRE
-// face) est TOUJOURS fourni par l'instance de niveau, jamais par ce défaut
-// — il dépend entièrement de la géométrie du lieu qui l'instancie.
+// face) est TOUJOURS fourni par l'instance de scène, jamais par ce défaut
+// — il dépend entièrement de la géométrie de la scène qui l'instancie.
 //
 // beacon : passage_wind_beacon, un souffle de vent en boucle CONTINUE
 // (fichier ~12 s, bien au-delà du seuil de 1,5 s exigé par Howler pour une
@@ -13,14 +13,14 @@
 // Un point de passage doit rester LOCALISABLE au clavier/à l'oreille, comme
 // une porte. Pour rendre un passage MUET, retirer ce beacon À L'INSTANCE
 // via `"sounds": { "beacon": null }` (cascade PAR FUSION, voir
-// core/level.js/parseEntity, doc/entity-model.md/"Cascade de sounds") —
+// core/scene.js/parseEntity, doc/entity-model.md/"Cascade de sounds") —
 // jamais un second archétype dupliqué pour ce cas.
 //
 // Son de FRANCHISSEMENT (recto<->verso, voir view/city-screen.js/
 // playSideSwitchSound) : AUCUN défaut ici — `transitionSound` (cascade
 // instance -> archétype -> défaut ABSENT, voir config/tuning-values.js) est
-// un choix de CONTENU par instance (via `tuning.transitionSound` au
-// niveau), jamais un défaut d'archétype imposé. Voir demo3.json (alley_gap_
+// un choix de CONTENU par instance (via `tuning.transitionSound` dans
+// la scène), jamais un défaut d'archétype imposé. Voir demo3.json (alley_gap_
 // recto/verso) pour un exemple de déclaration.
 export default {
   nameKey: "entity.passage.name",

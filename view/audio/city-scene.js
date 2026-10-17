@@ -114,10 +114,10 @@ function ambienceVolumeFactor() {
   return getPref("ambienceVolume", PREF_CONSTRAINTS.ambienceVolume.default) / 100;
 }
 
-// Musique du lieu POUR UNE PHASE (voir core/time.js/phaseAt) : musicDay/
-// musicNight si le lieu les déclare, sinon repli sur `music` (champ
-// unique, rétrocompatible — voir core/level.js) pour la phase manquante.
-// Un lieu sans AUCUN des trois champs n'a simplement pas de musique, aux
+// Musique de la scène POUR UNE PHASE (voir core/time.js/phaseAt) : musicDay/
+// musicNight si la scène les déclare, sinon repli sur `music` (champ
+// unique, rétrocompatible — voir core/scene.js) pour la phase manquante.
+// Une scène sans AUCUN des trois champs n'a simplement pas de musique, aux
 // deux phases (renvoie undefined, comme `world.music` absent aujourd'hui).
 function resolveMusicForPhase(world, phase) {
   if (phase === "day" && world.musicDay) return world.musicDay;
@@ -190,7 +190,7 @@ const PLAYER_GAIT_POOL = [
 // mécanisme purement géométrique, jamais temporel.
 const MIN_STEP_INTERVAL_MS = TUNING_DEFAULTS.minStepIntervalMs;
 // Durée du fondu de sortie UNIVERSEL de la musique (voir
-// lib/audio.js/fadeOutMusic) — bascule de phase ET transition de lieu,
+// lib/audio.js/fadeOutMusic) — bascule de phase ET changement de scène,
 // jamais utilisée à l'entrée dans une scène (musique de la phase courante
 // jouée directement, sans fondu).
 const MUSIC_FADE_MS = TUNING_DEFAULTS.musicFadeMs;
@@ -246,9 +246,9 @@ const PERCEPTION_FADE_MS = TUNING_DEFAULTS.perceptionFadeMs;
 const TRANSITION_STEP_INTERVAL_MS = TUNING_DEFAULTS.transitionStepIntervalMs;
 
 // Réverb : propriétés du bus lui-même (un seul par scène, jamais par
-// entité). Durée/decay sont surchargeables PAR LIEU (level.reverbDurationSec/
-// reverbDecay, voir level/schema.md) — repli sur ces défauts globaux si le
-// lieu n'en fournit pas ; wet reste global (jamais surchargé par lieu,
+// entité). Durée/decay sont surchargeables PAR SCÈNE (world.reverbDurationSec/
+// reverbDecay, voir doc/scene-format.md) — repli sur ces défauts globaux si la
+// scène n'en fournit pas ; wet reste global (jamais surchargé par scène,
 // non demandé). Pas de cascade par entité dans tous les cas.
 const REVERB_DURATION_SEC_DEFAULT = TUNING_DEFAULTS.reverbDurationSec;
 const REVERB_DECAY_DEFAULT = TUNING_DEFAULTS.reverbDecay;
@@ -555,13 +555,13 @@ function resolveTransitionSound(entity, descriptor, keys) {
 // résolution (resolveTransitionSound), pas une seconde logique parallèle.
 // "gain" (littéral, pas de rôle dédié du genre beaconGain/vocalGain) : un
 // playSound n'a pas de rôle fixe sur l'entité, seulement son propre champ
-// `gain` optionnel (core/level.js/parseEffect) — TUNING_DEFAULTS n'en porte
+// `gain` optionnel (core/scene.js/parseEffect) — TUNING_DEFAULTS n'en porte
 // aucun défaut global sous cette clé, playPositionedOneShot retombe alors
 // sur son propre défaut neutre (1), comportement de gain STRICTEMENT
 // inchangé. Ce qui CHANGE : pitchVariation/reverbSend, jusque-là lus TELS
 // QUELS sur l'effet brut (jamais undefined -> defaut, voir l'ancien bug —
 // un playSound sans reverbSend déclaré ne rejoignait JAMAIS le bus de
-// réverb du lieu), passent désormais par la MÊME cascade que tout son
+// réverb de la scène), passent désormais par la MÊME cascade que tout son
 // positionné d'entité (sound -> instance -> archétype -> défaut global,
 // reverbSend: 0.5) — un playSound qui déclare `reverbSend` explicitement
 // continue de le surcharger (resolveTuning teste `descriptor[key]` en
@@ -614,9 +614,9 @@ function cutoffForDistance(dist, interactRange, audibleRange, cutoffMin, cutoffM
 // updateTrackedOneShots plus bas). Au niveau MODULE, pas de la scène : une
 // bascule recto/verso reconstruit la scène (view/city-screen.js/
 // sideSwitchEffect) alors que le son continue — la nouvelle scène le
-// reprend et le ré-étouffe. `worldId` : le LIEU d'émission. Quitter ce lieu
+// reprend et le ré-étouffe. `worldId` : le MONDE d'émission. Quitter ce monde
 // arrête le son (fondu bref, voir stopForeignTrackedOneShots) : un son
-// appartient à son lieu, et deux lieux peuvent avoir une entité au même id
+// appartient à son monde, et deux mondes peuvent avoir une entité au même id
 // (ex. bell_emitter_r dans le puits et dans son espace miroir) — sans ce
 // rattachement, la nouvelle scène reprendrait la cloche de l'ancienne.
 // Retirés à la FIN du son (événement Howler), jamais une source fantôme. cacheKey dédiée ("tracked:<fichier>") : le
@@ -627,11 +627,11 @@ const trackedOneShots = [];
 
 const SCENE_EXIT_SOUND_FADE_MS = TUNING_DEFAULTS.sceneExitSoundFadeMs;
 
-// Arrête (fondu bref) tout son suivi émis dans un AUTRE lieu que
+// Arrête (fondu bref) tout son suivi émis dans un AUTRE monde que
 // `activeWorldId`, et le retire aussitôt de la liste. Appelée au montage de
-// chaque scène (un changement de lieu reconstruit toujours la scène) et,
+// chaque scène (un changement de monde reconstruit toujours la scène) et,
 // par sécurité, à chaque mise à jour. Une bascule de face reste dans le
-// même lieu : ses sons continuent.
+// même monde : ses sons continuent.
 function stopForeignTrackedOneShots(activeWorldId) {
   for (const source of [...trackedOneShots]) {
     if (source.worldId === activeWorldId) continue;
@@ -687,7 +687,7 @@ function occupiedEntities(entitySounds, liveById, x) {
 }
 
 // Phrase d'annonce : noms séparés par ", ", dans l'ordre déjà trié par
-// occupiedEntities. Chaque labelKey est déjà résolu par parseLevel (nameKey
+// occupiedEntities. Chaque labelKey est déjà résolu par parseScene (nameKey
 // d'instance sinon label du type) ; on ne fait que le traduire ici.
 function buildOccupancyAnnouncement(entities) {
   return entities.map((entity) => t(entity.labelKey)).join(", ");
@@ -731,7 +731,7 @@ function buildEntitySoundEntry(entity, session, { includeBeacon = true, disableS
   // ni l'un ni l'autre n'est "le" son obligatoire d'une entité. `entity.sounds`
   // (jamais `registry[entity.type].sounds` directement) : déjà le résultat
   // RÉSOLU de la cascade instance -> archétype par fusion profonde (voir
-  // core/level.js/parseEntity) — un rôle retiré à l'instance (ex.
+  // core/scene.js/parseEntity) — un rôle retiré à l'instance (ex.
   // beacon: null) n'existe donc déjà plus ICI, rien à revérifier contre
   // l'archétype.
   const sounds = entity.sounds;
@@ -802,7 +802,7 @@ function buildEntitySoundEntry(entity, session, { includeBeacon = true, disableS
   // muteOnConsumed (voir entities/model.md/"Collectible persistant",
   // entities/types/crate.js) : registre SEULEMENT, jamais cascadé par
   // instance (comme `sounds`, contrairement à consumedDescriptionKey qui,
-  // lui, est baké par core/level.js) — effet POST-ACTIVATION "beacon
+  // lui, est baké par core/scene.js) — effet POST-ACTIVATION "beacon
   // absent" d'un collectible looté (core/money.js/lootEntity), résolu ici
   // pour être lu par muteConsumedBeacons ci-dessous, à chaque tick.
   const muteOnConsumed = Boolean(registry[entity.type].muteOnConsumed);
@@ -925,7 +925,7 @@ export function createCityAudioScene(getSession) {
   // même la première voix créée plus bas.
   keepAudioContextAwake();
 
-  // Les sons suivis du lieu QUITTÉ s'arrêtent ici : le monde actif est déjà
+  // Les sons suivis du monde QUITTÉ s'arrêtent ici : le monde actif est déjà
   // le nouveau (voir view/city-screen.js/performTransition).
   stopForeignTrackedOneShots(getSession().activeWorldId);
 
@@ -934,7 +934,7 @@ export function createCityAudioScene(getSession) {
   // Howler.ctx existe (Howler le crée au tout premier `new Howl()`) avant de
   // construire le bus de réverb juste après — lui n'a pas de retente
   // paresseuse comme le filtre par voix, il lui faut le contexte tout de
-  // suite. Limite connue : un niveau dont AUCUNE entité n'aurait de balise
+  // suite. Limite connue : une scène dont AUCUNE entité n'aurait de balise
   // continue (tout en intermittent/vocal/absent) ne créerait aucun Howl ici,
   // et createReverbBus se dégraderait silencieusement (pas de contexte ->
   // pas de bus, voir lib/audio.js) — non atteignable avec le contenu actuel
@@ -968,7 +968,7 @@ export function createCityAudioScene(getSession) {
       )
     : null;
 
-  // Un seul bus de réverb pour toute la scène, jamais un par entité. Lieu ->
+  // Un seul bus de réverb pour toute la scène, jamais un par entité. Scène ->
   // défaut global (voir REVERB_DURATION_SEC_DEFAULT/REVERB_DECAY_DEFAULT
   // ci-dessus) : deux niveaux de repli, pas la cascade générale de
   // resolveTuning (celle-ci reste entité-only).
@@ -1173,18 +1173,18 @@ export function createCityAudioScene(getSession) {
     }
   }
 
-  // Musique et ambiances du lieu : canaux GLOBAUX non spatialisés (aucun
-  // pan/filtre/réverb, voir lib/audio.js), propriété du niveau, pas d'une
-  // entité — optionnels, un niveau sans champ music/ambiences ne joue
+  // Musique et ambiances de la scène : canaux GLOBAUX non spatialisés (aucun
+  // pan/filtre/réverb, voir lib/audio.js), propriété de la scène, pas d'une
+  // entité — optionnels, une scène sans champ music/ambiences ne joue
   // simplement rien sur le canal correspondant. Ambiances : jusqu'à deux
   // couches simultanées, un seul curseur de volume pour les deux.
   //
-  // COUCHES DE LIEU/D'ÉTAT (voir lib/audio.js/setMusicLayer/
+  // COUCHES DE SCÈNE/D'ÉTAT (voir lib/audio.js/setMusicLayer/
   // setAmbienceLayer, "Couches persistantes MUSIQUE/AMBIANCE") : chaque
   // canal ne s'interrompt QUE si son identité DÉCLARÉE change réellement —
   // jamais pour "relancer la même chose". currentPhase mémorise la phase
   // pour update() ci-dessous, seul endroit qui la refait varier (sur
-  // bascule, la couche de lieu se redéclare, voir plus bas).
+  // bascule, la couche de scène se redéclare, voir plus bas).
   let currentPhase = phaseAt(getSession().time);
   const musicLoop = Boolean(world.musicLoop);
   const ambiences = world.ambiences;
@@ -1208,12 +1208,12 @@ export function createCityAudioScene(getSession) {
   setGlobalVolume("music", musicVolumeFactor());
   setGlobalVolume("ambience", ambienceVolumeFactor());
 
-  // Couche D'ÉTAT AVANT couche DE LIEU (ordre important, contrairement au
+  // Couche D'ÉTAT AVANT couche DE SCÈNE (ordre important, contrairement au
   // reste) : si l'état est DÉJÀ actif au montage (ex. sauvegarde reprise en
   // pleine perception, ou transition en cours de perception — voir
   // performTransition, view/city-screen.js, qui ne coupe plus la couche
   // d'état), la déclarer EN PREMIER lui laisse imposer directement son
-  // identité — la couche de lieu, déclarée juste après, se retrouve alors
+  // identité — la couche de scène, déclarée juste après, se retrouve alors
   // simplement ignorée (l'état prime, voir lib/audio.js/winningMusicLayer
   // pour la musique, desiredAmbienceSlots pour l'ambiance) sans jamais
   // avoir démarré puis interrompu quoi que ce soit pour rien.
@@ -1226,17 +1226,17 @@ export function createCityAudioScene(getSession) {
     MUSIC_FADE_MS
   );
 
-  // Ambiance : état, lieu ET météo déclarés EN UNE SEULE FOIS au montage
+  // Ambiance : état, scène ET météo déclarés EN UNE SEULE FOIS au montage
   // (voir lib/audio.js/declareAmbienceLayers) — une intention complète,
   // plutôt que trois déclarations séparées. La synchronisation sous-jacente
   // (lib/audio.js/syncAmbienceLayers) fait un DIFFING PAR COUCHE : seule une
   // couche dont la source déclarée change réellement est fondue, les autres
   // gardent EXACTEMENT leurs flux en cours (ni fondu, ni retirage) — c'est
   // CE mécanisme qui garantit qu'un changement de météo seul ne touche
-  // jamais l'ambiance de lieu, et inversement.
+  // jamais l'ambiance de scène, et inversement.
   //
-  // INDOOR/OUTDOOR (modèle A, voir core/level.js/parseFace, "nature de
-  // lieu") : `indoor` est la propriété de la scène ACTIVE, capturée UNE
+  // INDOOR/OUTDOOR (modèle A, voir core/scene.js/parseFace, "nature de
+  // scène") : `indoor` est la propriété de la scène ACTIVE, capturée UNE
   // FOIS ici — une scène ne change jamais de nature en cours de vie, seule
   // une TRANSITION (destroy + recreate, donc un nouveau montage de ce
   // fichier) peut faire passer de outdoor à indoor ou l'inverse. C'est CE
@@ -1245,8 +1245,8 @@ export function createCityAudioScene(getSession) {
   // pour le NOUVEAU contexte, avec le MÊME weatherState si la météo n'a pas
   // changé — l'identité déclarée diffère (pool outdoor vs indoor, jamais
   // composée par concaténation de nom, LUE telle quelle dans la table), donc
-  // la couche météo (et ELLE SEULE) fond vers le nouveau pool ; le lieu
-  // suit sa PROPRE logique, inchangé si sa source déclarée l'est aussi.
+  // la couche météo (et ELLE SEULE) fond vers le nouveau pool ; la scène
+  // suit sa PROPRE logique, inchangée si sa source déclarée l'est aussi.
   // weatherState tracké ICI (comme currentPhase/perceptionActive ci-dessus)
   // pour détecter la TRANSITION dans update() plus bas.
   let weatherState = getSession().weather.state;
@@ -1596,7 +1596,7 @@ export function createCityAudioScene(getSession) {
   // Spatialisé à sa position d'émission, ANCRÉ (la scène qui le
   // positionnait va disparaître) et HORS couche entités : il survit au
   // fondu du sas et finit de résonner, comme les pas de transition d'une
-  // bascule de face. Sa réverb, elle, appartient au lieu quitté et s'éteint
+  // bascule de face. Sa réverb, elle, appartient au monde quitté et s'éteint
   // avec lui.
   function playEntityOneShot(targetId, descriptor, { departing = false } = {}) {
     const found = findEntitySource(targetId);
@@ -2061,7 +2061,7 @@ export function createCityAudioScene(getSession) {
     // continu (phaseAt est réévalué chaque tick, mais currentPhase ne
     // change que sur un vrai changement, voir CLAUDE.md/le prompt d'origine
     // "on agit sur la TRANSITION, pas en continu"). Redéclare simplement la
-    // couche DE LIEU avec la nouvelle identité (voir lib/audio.js/
+    // couche DE SCÈNE avec la nouvelle identité (voir lib/audio.js/
     // setMusicLayer) — NO-OP si la couche D'ÉTAT (perception) a déjà la
     // main sur le canal, sinon fondu vers la nouvelle phase (ou silence si
     // la phase suivante n'a pas de musique déclarée).
@@ -2117,8 +2117,9 @@ export function createCityAudioScene(getSession) {
     // état météo n'apporte aucune ambience (silence -> silence) ou la MÊME
     // ambience qu'avant (continuité par identité, voir lib/audio.js/
     // syncAmbienceLayers, diffing PAR COUCHE — SEULE la couche météo est
-    // évaluée ici, le lieu n'est jamais touché), sinon fondu vers/depuis le
-    // pool météo, SUPERPOSÉ à la couche gagnante (jamais à sa place).
+    // évaluée ici, la couche de scène n'est jamais touchée), sinon fondu
+    // vers/depuis le pool météo, SUPERPOSÉ à la couche gagnante (jamais à
+    // sa place).
     if (session.weather.state !== weatherState) {
       const previousWeatherState = weatherState;
       weatherState = session.weather.state;
@@ -2217,16 +2218,16 @@ export function createCityAudioScene(getSession) {
     }
     // One-shots suivis : PAS purgés ici (liste au niveau MODULE, voir
     // trackedOneShots) — la scène suivante les reprend s'ils viennent du
-    // même lieu (bascule recto/verso : la cloche s'étouffe en cours), et
-    // arrête ceux d'un autre lieu dès son montage
+    // même monde (bascule recto/verso : la cloche s'étouffe en cours), et
+    // arrête ceux d'un autre monde dès son montage
     // (stopForeignTrackedOneShots).
     reverbBus.destroy();
     // Musique/ambiance NE SONT PLUS touchées ici (voir lib/audio.js/
     // "Couches persistantes MUSIQUE/AMBIANCE") : elles vivent au niveau
-    // MODULE, indépendamment du cycle de vie de CETTE scène — une
-    // transition de lieu (voir view/city-screen.js/performTransition) NE
+    // MODULE, indépendamment du cycle de vie de CETTE scène — un
+    // changement de scène (voir view/city-screen.js/performTransition) NE
     // DOIT PAS interrompre ce qui continue légitimement (couche d'état en
-    // cours, ou couche de lieu identique déclarée par la scène suivante).
+    // cours, ou couche de scène identique déclarée par la scène suivante).
     // C'est le MONTAGE de la scène SUIVANTE (createCityAudioScene) qui
     // compare et décide — jamais destroy(), qui ne sait pas ce qui vient
     // après. Pour une sortie RÉELLE de partie (retour au menu principal,
@@ -2239,7 +2240,7 @@ export function createCityAudioScene(getSession) {
   // Espace, "activate" -> Entrée) : sous-ensemble FILTRÉ de la dernière
   // occupation calculée en update() — même portée (interactRange), même tri,
   // mais restreint aux entités qui portent la capacité de CE verbe
-  // (observable/interactable, voir core/level.js et entities/model.md). Une
+  // (observable/interactable, voir core/scene.js et entities/model.md). Une
   // entité à portée sans la capacité voulue n'est simplement jamais dans le
   // résultat — c'est ce filtre, PAS la désambiguïsation, qui décide si un
   // verbe a quelque chose à faire ici (voir view/interaction.js/

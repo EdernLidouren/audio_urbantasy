@@ -1,6 +1,6 @@
 {
   "id": "clock_tower_weight_shaft_mirror_space",
-  "titleKey": "level.clock_tower_weight_shaft_mirror_space.name",
+  "titleKey": "scene.clock_tower_weight_shaft_mirror_space.name",
   "length": 50,
   "playerStart": 25,
   "indoor": true,

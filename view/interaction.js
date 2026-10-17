@@ -106,7 +106,7 @@ export function setLootSpawnHandler(handler) {
 }
 
 // (entity, effects) => void — applique une LISTE d'effets D'ÉCRITURE de
-// variable (setVariable/toggleVariable/addVariable, voir core/level.js/
+// variable (setVariable/toggleVariable/addVariable, voir core/scene.js/
 // parseActionEffect, core/variables.js/applyActionEffects), fournie par
 // city-screen.js qui seul détient getSession/setSession — même patron que
 // setPickupHandler ci-dessus. Utilisé par le kind "applyEffects" (voir
@@ -363,7 +363,7 @@ export function runRenderEffects(entity, effects, options = {}) {
 // (getInteractionCandidates) évite déjà ce cas en pratique, ce repli reste
 // défensif.
 //
-// consumedDescriptionKey (voir core/level.js, entities/model.md/
+// consumedDescriptionKey (voir core/scene.js, entities/model.md/
 // "Collectible persistant") : description ALTERNATIVE une fois
 // entity.consumed — effet POST-ACTIVATION "changer d'état perceptible"
 // d'un collectible persistant (core/money.js/lootEntity), déclaré par
@@ -377,7 +377,7 @@ function resolveDescription(entity) {
   return resolveDescriptionText(key, actionContext(entity));
 }
 
-// Aiguillage par TYPE D'ACTION (entity.action.kind, voir core/level.js) —
+// Aiguillage par TYPE D'ACTION (entity.action.kind, voir core/scene.js) —
 // même principe que core/presence.js/CONDITION_EVALUATORS : SEUL endroit
 // qui connaît les kinds. Ajouter "talk"/"activate" demain = une entrée de
 // plus ici, jamais une refonte d'interact() ni de ses appelants (le core,
@@ -392,7 +392,7 @@ function resolveDescription(entity) {
 // handlePickup/handleLoot) : le son de bascule appartient à la SÉQUENCE du
 // sas, dont le timing (juste après le gel, AVANT le croisement de filtres)
 // ce fichier n'a aucune raison de connaître. arrivalX : donnée de CONTENU
-// (action.arrivalX, jamais validée en FORME par core/level.js — voir son
+// (action.arrivalX, jamais validée en FORME par core/scene.js — voir son
 // commentaire sur `action`, même politique que amount/spawn ci-dessous) —
 // un contenu mal formé se dégrade en avertissement, jamais un plantage.
 // `entity` (le passage) transmis tel quel au gestionnaire, voir
@@ -415,8 +415,8 @@ function handleSwitchSide(entity, action) {
 //   - action.item : vers le SAC (voir core/bag.js/pickupItemEntity,
 //     entities/model.md/"Sac d'objets") — le nom affiché ("Ramassé :
 //     <objet>") vient de entity.labelKey, déjà résolu par le core (voir
-//     core/level.js) : ce fichier n'importe jamais le core, donc jamais le
-//     registre d'objets (core/items.js) — c'est au contenu de niveau de
+//     core/scene.js) : ce fichier n'importe jamais le core, donc jamais le
+//     registre d'objets (core/items.js) — c'est au contenu de scène de
 //     donner à l'entité le MÊME nameKey que ITEM_REGISTRY[type].label pour
 //     que le nom ramassé corresponde à celui du sac (convention, jamais
 //     une contrainte structurelle).
@@ -466,7 +466,7 @@ function handlePickup(entity, action) {
 //     crate-port/crate-warehouse) ;
 //   - action.spawn : { spec, count, spread } — fait naître `count` entités
 //     éphémères ÉPARPILLÉES autour de la source AU LIEU de créditer
-//     directement (ex. crate-stash, level/demo2.json) ; chacune se
+//     directement (ex. crate-stash, scenes/demo2.json) ; chacune se
 //     ramasse ensuite individuellement via sa PROPRE action "pickup" (déjà
 //     robuste, rien à ajouter). `spec` (minimal, ex. { type: "money",
 //     amount: 20 }) est résolu en descripteur COMPLET par lootSpawnHandler
@@ -549,7 +549,7 @@ const ACTION_HANDLERS = {
   shop: handleShop,
 };
 
-// ACTIONS CONDITIONNELLES (voir core/level.js, action.condition/
+// ACTIONS CONDITIONNELLES (voir core/scene.js, action.condition/
 // refusalEffects) — GÉNÉRIQUE à TOUT kind de ACTION_HANDLERS ci-dessus, pas
 // un cas spécial d'un kind précis : une porte (teleport conditionné, voir
 // "Effets d'action"/`"teleport"`), une caisse verrouillée, un PNJ qui ne
@@ -557,7 +557,7 @@ const ACTION_HANDLERS = {
 // second mécanisme.
 // Réutilise TEL QUEL l'évaluateur de conditions du core
 // (core/presence.js/evaluateCondition) — même objet déclaratif que
-// presence[].when, déjà validé au chargement (core/level.js).
+// presence[].when, déjà validé au chargement (core/scene.js).
 //
 // context.entity PORTE ICI L'ENTITÉ-CIBLE (celle qui déclare l'action —
 // une variable de portée "entity" référencée par la condition, voir
@@ -612,7 +612,7 @@ function actionConditionMet(condition, entity) {
 // config/tuning-values.js), un nouvel appui sur la même entité est ignoré EN
 // SILENCE — l'action entière, succès comme refus, quelle que soit la
 // candidate qui aurait été choisie : état et rendu restent synchronisés.
-// Purgé à chaque changement de lieu ou de face (clearInteractionCooldowns,
+// Purgé à chaque changement de scène ou de face (clearInteractionCooldowns,
 // appelée par view/city-screen.js/performTransition et sideSwitchEffect) :
 // un ancien horodatage ne bloque jamais une entité après un aller-retour.
 const lastActivationAt = new Map();
@@ -628,7 +628,7 @@ function isInCooldown(entity) {
 }
 
 // Une action qui TÉLÉPORTE se protège d'elle-même (le sas met le jeu en
-// pause) : aucun horodatage, pour qu'un retour dans le même lieu ne garde
+// pause) : aucun horodatage, pour qu'un retour dans le même monde ne garde
 // pas la porte bloquée après coup.
 function departsWithTeleport(effects) {
   return Boolean(effects && effects.some((effect) => effect.type === "teleport"));
@@ -651,7 +651,7 @@ export function interact(entity, kind) {
     // Cooldown (voir lastActivationAt plus haut) : ignoré en silence.
     if (isInCooldown(entity)) return;
 
-    // ACTIONS MULTIPLES CANDIDATES (voir core/level.js/parseEntity,
+    // ACTIONS MULTIPLES CANDIDATES (voir core/scene.js/parseEntity,
     // core/presence.js/selectMatchingAction, core/scripting.md/"Actions
     // multiples filtrées par condition") : entity.action est soit un OBJET
     // UNIQUE (RÉTROCOMPAT stricte — resolvedAction EST cet objet), soit un

@@ -7,7 +7,7 @@
 //   1. INTENTIONS — qui veut bouger, et dans quel sens : action.dir pour le
 //      joueur (déjà une intention, câblée depuis view/input.js -> tick(),
 //      voir actions.js) ; core/behaviors/ pour chaque entité dotée d'un
-//      comportement — les entités du LIEU actif ET les COMPAGNONS de la
+//      comportement — les entités du MONDE actif ET les COMPAGNONS de la
 //      partie en ont chacun un jeu (voir plus bas). Deux familles de
 //      comportement, deux contrats de retour : wander (voir wander.js) se
 //      déplace ET se borne LUI-MÊME, ne renvoie aucun `intent` — rien de
@@ -39,9 +39,9 @@
 // directement sur `state.worlds[...]`/`state.companions` BRUTS, jamais via
 // getActiveWorld() (qui les mélangerait pour la LECTURE externe, voir sa
 // doc) — ce réducteur a besoin de les garder SÉPARÉS pour les persister
-// chacun à leur place (worlds[x].entities pour le lieu, state.companions
+// chacun à leur place (worlds[x].entities pour le monde, state.companions
 // pour la partie). Ils participent PLEINEMENT au pipeline (comportement ET
-// physique, combinés le temps du calcul avec les entités du lieu), mais
+// physique, combinés le temps du calcul avec les entités du monde), mais
 // avec leur PROPRE flux de PRNG (companionsRngState, jamais gelé par une
 // transition, contrairement à world.rngState) et ressortent dans un
 // tableau SÉPARÉ en fin de tick.
@@ -58,7 +58,7 @@ import { resolveFace, withFace, isTwoSided } from "./state.js";
 // rangé) ou un compagnon. Fourni aux comportements à intention (ex.
 // follow) via context.getTargetPosition, pour qu'AUCUN module de
 // comportement n'ait à connaître cette structure (joueur hors entities,
-// compagnons dans un cercle séparé du lieu...). Positions PRÉ-tick (face/
+// compagnons dans un cercle séparé du monde...). Positions PRÉ-tick (face/
 // state.companions AVANT toute étape de ce tour) : cohérent avec le reste
 // de la phase 1, qui lit aussi face.rngState/companionsRngState avant
 // qu'ils n'avancent — une cible réagit à l'état de DÉBUT de tick, jamais à
@@ -76,7 +76,7 @@ function resolveTargetPosition(state, face, targetId) {
 
 // Fait avancer une liste d'entités d'un tick (phase 1, comportement) contre
 // UN contexte donné (length/rngState/getTargetPosition/presenceContext) :
-// les entités du lieu et les compagnons de la partie suivent exactement la
+// les entités du monde et les compagnons de la partie suivent exactement la
 // même logique, seuls le flux de PRNG et la liste diffèrent (voir l'appel
 // des deux dans le TICK ci-dessous). Renvoie les résultats PAIRÉS
 // {entity, intent} (intent : undefined si le module n'en produit pas, voir
@@ -110,7 +110,7 @@ function resolveTargetPosition(state, face, targetId) {
 // c'est ensuite le pipeline normal ci-dessous (module.step) qui l'exécute
 // — jamais l'effet lui-même qui déplace l'entité. `behaviorEffect` DISTINGUE
 // `undefined` (aucun effet ce tick — comportement inchangé) de `null`
-// (retrait EXPLICITE, voir core/level.js/parseEffect) : `!== undefined`,
+// (retrait EXPLICITE, voir core/scene.js/parseEffect) : `!== undefined`,
 // jamais un simple test de vérité, sinon `null` serait confondu avec
 // "rien à faire" et le comportement resterait figé sur son ancien `kind`.
 function stepEntities(entities, context) {
@@ -149,7 +149,7 @@ function stepEntities(entities, context) {
 // comportement qui a produit `intent` (wander/follow/goto ignorent tout de
 // la vitesse, voir leur frontière avec la physique). `behavior.speed`
 // (commun aux trois kinds, validé par chacun) PRIME sur `entity.speed`
-// (voir core/level.js/parseEntity, défaut 1) : une règle qui change de
+// (voir core/scene.js/parseEntity, défaut 1) : une règle qui change de
 // comportement (effet "behavior") change donc aussi d'allure. `?? 1` :
 // filet pour une entité qui ne passe pas par la cascade (ex. un compagnon,
 // core/state.js/createTestCompanion).
@@ -197,7 +197,7 @@ export function reduce(state, action) {
       // de portée "scene"/"party" (voir core/variables.js) pour la condition
       // "variable" — `world` reste le MONDE RACINE (variables de scène
       // PARTAGÉES entre recto/verso, jamais par face, voir
-      // core/level.js/parseLevel), IDENTIQUE pour les deux faces tiquées
+      // core/scene.js/parseScene), IDENTIQUE pour les deux faces tiquées
       // ci-dessous (recto ET verso lisent/écrivent le MÊME sac de scène,
       // jamais un par face) ; `session` reste `state` lui-même, jamais une
       // copie — resolveEntityRules n'en fait rien d'autre qu'une LECTURE
@@ -221,9 +221,9 @@ export function reduce(state, action) {
       // --- Phase 2 : physique ---
 
       // Combinées ICI, à cette seule fin (collision/chevauchement doivent
-      // voir TOUS les corps présents dans le lieu actif, compagnons
+      // voir TOUS les corps présents dans le monde actif, compagnons
       // compris) — jamais persistées fusionnées, voir le découpage juste
-      // après. "Avant" (entities du lieu ET compagnons, PRE-comportement)
+      // après. "Avant" (entities du monde ET compagnons, PRE-comportement)
       // pour le joueur, exactement comme avant l'introduction des
       // compagnons (comportement inchangé). Une entité DORMANTE ne bloque
       // jamais (voir core/presence.js/isBlocking, lu par
@@ -248,16 +248,16 @@ export function reduce(state, action) {
       const resolvedCompanions = resolveIntents(companionsStep.results, stepped, world.length, presenceContext);
 
       // Passe curative finale : sépare tout chevauchement de corps résiduel
-      // (impossible en théorie vu ce qui précède, mais le level design peut
-      // en produire un au chargement, ou un mobile peut finir exactement
-      // sur le joueur/une autre entité) — voir resolveOverlaps.
+      // (impossible en théorie vu ce qui précède, mais la conception des
+      // scènes peut en produire un au chargement, ou un mobile peut finir
+      // exactement sur le joueur/une autre entité) — voir resolveOverlaps.
       const combinedAfter = [...resolvedWorldEntities, ...resolvedCompanions];
       const overlapFix = resolveOverlaps(nextX, combinedAfter, world.length, presenceContext);
 
       // Découpage : resolveOverlaps préserve l'ordre et la longueur de son
       // entrée (map/slice, jamais un ajout/retrait) — le premier bloc de
       // longueur resolvedWorldEntities.length est donc TOUJOURS les
-      // entités du lieu, le reste TOUJOURS les compagnons, quel que soit ce
+      // entités du monde, le reste TOUJOURS les compagnons, quel que soit ce
       // que la résolution a changé.
       const worldEntityCount = resolvedWorldEntities.length;
       const finalWorldEntities = overlapFix.entities.slice(0, worldEntityCount);

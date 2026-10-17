@@ -7,7 +7,7 @@
 // et overlap.js (chevauchement) pour le reste de la physique du jeu.
 //
 // Deux formes de blocage aujourd'hui, la même idée ("mobile empêché ->
-// réaction") : les bornes du niveau (moveAndBounce ci-dessous, pour un
+// réaction") : les bornes de la scène (moveAndBounce ci-dessous, pour un
 // mobile qui persiste sa propre direction — ex. wander) et le corps d'une
 // entité impassable (collision.js, pour le joueur). Elles restent deux
 // fonctions distinctes (le joueur n'a pas de direction stockée à inverser,

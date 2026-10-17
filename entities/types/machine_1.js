@@ -1,5 +1,5 @@
 // Archétype "machine_1" — installation électrique d'intérieur (voir
-// level/clock-tower-main.json). VOCAL SEUL, aucun beacon (comme hound.js) :
+// scenes/clock-tower-main.json). VOCAL SEUL, aucun beacon (comme hound.js) :
 // on ne la localise pas en continu, on l'entend rugir par intermittence.
 // Observable, jamais interactive.
 export default {

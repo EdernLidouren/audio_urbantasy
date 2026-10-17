@@ -1,8 +1,8 @@
 // Forme de l'état + construction de l'état initial. Pur, headless : aucun
 // DOM, audio, ni API navigateur.
 //
-// PARTIE (session) multi-lieux, modèle "Animal Crossing" : le joueur
-// traverse des MONDES (un par lieu visité) qui persistent, gelés, pendant
+// PARTIE (session) multi-mondes, modèle "Animal Crossing" : le joueur
+// traverse des MONDES (un par scène visitée) qui persistent, gelés, pendant
 // son absence — une re-visite les ressort tels qu'ils ont été laissés
 // (PNJ compris), pas réinitialisés. Forme :
 //   { player, worlds: { [id]: <état d'un monde> }, activeWorldId, time,
@@ -18,9 +18,9 @@
 // gaitOf, dérivation pure du pas). Un objet donné n'est jamais À LA FOIS
 // dans bag ET dans equipment.
 // Tous trois vivent ICI, JAMAIS dans les entités d'un monde : ils
-// traversent les lieux, ne leur appartiennent pas. worlds[id] : ~ l'ancien
-// "level" (entités avec
-// position/intention/état, longueur, métadonnées), PLUS son propre rngState
+// traversent les mondes, ne leur appartiennent pas. worlds[id] : une
+// scène vivante (entités avec position/intention/état, longueur,
+// métadonnées), PLUS son propre rngState
 // (chaque monde avance sa propre suite de tirages, gelée avec lui) et
 // lastVisited (horodaté au rangement, voir travelToWorld, avec la minute de
 // jeu COURANTE — voir core/time.js). Un seul monde actif à la fois
@@ -49,14 +49,14 @@
 //
 // COMPAGNONS — cercle PARTIE, comme le joueur (voir CLAUDE.md, brique 1/3
 // du système de compagnons) : `companions` est une liste d'entités (MÊME
-// forme qu'une entité de lieu — id/type/x/behavior/...) qui vit à CE niveau,
+// forme qu'une entité de monde — id/type/x/behavior/...) qui vit à CE niveau,
 // PAS dans worlds[x].entities. Elle traverse les transitions avec le
 // joueur, jamais rangée avec un monde quitté. `companionsRngState` est un
 // flux PRNG dédié, DISTINCT de world.rngState : un compagnon est tické à
 // CHAQUE tour de jeu quel que soit le monde actif, alors que world.rngState
-// est gelé pendant qu'un lieu est rangé (inactif) — les deux ne peuvent pas
+// est gelé pendant qu'un monde est rangé (inactif) — les deux ne peuvent pas
 // partager le même flux sans que l'un ou l'autre perde son déterminisme
-// "de partie" ou "de lieu". INJECTION à la lecture (voir getActiveWorld) :
+// "de partie" ou "de monde". INJECTION à la lecture (voir getActiveWorld) :
 // un compagnon n'est jamais persisté DANS un monde, seulement mélangé au
 // flux d'entités du monde actif au moment où un consommateur (vue, ou le
 // réducteur lui-même) le lit — voir le commentaire de getActiveWorld pour
@@ -81,7 +81,7 @@ export const MOVE_STEP = TUNING_DEFAULTS.moveStep;
 // Rayon de corps uniforme pour toute entité blocksMovement — pas encore par
 // entité/type. Orthogonal à blocksMovement, qui décide SEUL si ce corps
 // arrête/exclut quelque chose (voir core/reduce.js). Vit ici (pas dans
-// reduce.js) pour être partagé sans détour par core/level.js (validation au
+// reduce.js) pour être partagé sans détour par core/scene.js (validation au
 // chargement) ET core/reduce.js (résolution au tick) — une seule source.
 export const BODY_RADIUS = 0.25;
 
@@ -101,7 +101,7 @@ const COMPANION_SPAWN_SPACING = 2 * BODY_RADIUS;
 
 // Compagnon de test PRÉDÉFINI (brique 2/3 : comportement "follow", voir
 // core/behaviors/follow.js et CLAUDE.md) : donnée plate, EXACTEMENT la
-// forme qu'une entité de lieu obtient en sortie de core/level.js/
+// forme qu'une entité de scène obtient en sortie de core/scene.js/
 // parseEntity — le core ne connaît aucun registre de types (jamais importé
 // ici, "buddy" n'est qu'une étiquette opaque, interprétée seulement par la
 // vue, voir entities/types/buddy.js). behavior "follow" SANS surcharge :
@@ -112,7 +112,7 @@ const COMPANION_SPAWN_SPACING = 2 * BODY_RADIUS;
 // l'autre (recalculée à chaque fois depuis la distance à la cible).
 // sounds : dupliqué à la main depuis entities/types/buddy.js (comme
 // labelKey/descriptionKey ci-dessus) — le rendu audio lit désormais
-// `entity.sounds` (résultat de la cascade de core/level.js/parseEntity,
+// `entity.sounds` (résultat de la cascade de core/scene.js/parseEntity,
 // jamais le registre directement, voir view/audio/city-scene.js), donc CE
 // champ doit être porté explicitement ici aussi. Risque de dérive ASSUMÉ
 // (même risque que labelKey/descriptionKey déjà) : si buddy.js change ses
@@ -149,7 +149,7 @@ function createTestCompanion() {
 // Replace chaque compagnon près de `playerX` (comme le joueur lui-même,
 // voir createInitialState/travelToWorld) — un léger décalage PAR compagnon
 // (jamais un empilement exact si la partie en compte plusieurs un jour,
-// voir MAX_COMPANIONS), borné aux limites du lieu. Pure.
+// voir MAX_COMPANIONS), borné aux limites de la scène. Pure.
 function repositionCompanions(companions, playerX, length) {
   return companions.map((companion, index) => ({
     ...companion,
@@ -165,7 +165,7 @@ function repositionCompanions(companions, playerX, length) {
 // silencieuse d'un compagnon existant pour faire de la place. `added` dans
 // le retour permet à l'appelant (vue ou test) de distinguer un ajout réussi
 // d'un refus sans avoir à recomparer les longueurs lui-même. Pure hormis
-// l'avertissement diagnostique (même convention que core/level.js, qui
+// l'avertissement diagnostique (même convention que core/scene.js, qui
 // avertit déjà sur des cas similaires au chargement).
 export function addCompanion(companions, companion) {
   if (companions.length >= MAX_COMPANIONS) {
@@ -176,7 +176,7 @@ export function addCompanion(companions, companion) {
 }
 
 // SCÈNE À DEUX FACES (modèle B, voir CLAUDE.md/"RECTO/VERSO") : une scène
-// PEUT contenir un recto ET un verso (core/level.js/parseLevel garantit les
+// PEUT contenir un recto ET un verso (core/scene.js/parseScene garantit les
 // deux présents ensemble, jamais un seul) — chacun sa PROPRE face
 // (entities/rngState/nextEphemeralId/segments/defaultSurface/music*/
 // ambiences*/reverb*), length/playerStart/lastVisited restant PARTAGÉS au
@@ -211,7 +211,7 @@ export function withFace(world, side, patch) {
 // Purge les entités ÉPHÉMÈRES d'un monde ENTIER (voir travelToWorld plus
 // bas et core/save.js/stripEphemeralEntities, SEULS appelants — factorisé
 // ICI pour ne jamais dupliquer cette logique) : SIMPLE -> sa seule face ;
-// À DEUX FACES -> LES DEUX, indépendamment (on quitte le LIEU, pas une
+// À DEUX FACES -> LES DEUX, indépendamment (on quitte le MONDE, pas une
 // seule face — l'autre face, même tickée en coexistence, voir
 // core/reduce.js, peut très bien porter des éphémères jamais ramassés,
 // eux aussi exclus d'une sortie de SCÈNE). Référence inchangée si rien à
@@ -249,20 +249,20 @@ function createFaceState(face, seed) {
   };
 }
 
-// Construit l'état d'un monde à partir d'un niveau déjà validé (sortie de
-// parseLevel) : entités telles quelles (plus de seed dédiée pour "wander"
+// Construit l'état d'un monde à partir d'une scène déjà validée (sortie de
+// parseScene) : entités telles quelles (plus de seed dédiée pour "wander"
 // depuis son passage en machine à deux états — il initialise seul son
 // propre état au premier tick, voir core/behaviors/wander.js). SIMPLE ->
 // une face (comportement STRICTEMENT inchangé). À DEUX FACES -> recto ET
 // verso construits chacun via createFaceState, avec des GRAINES DISTINCTES
 // (seed pour recto, `${seed}:verso` pour verso — même principe que
 // companionsRngState, voir header) : deux faces d'un même monde ne doivent
-// jamais tirer la MÊME suite de nombres, elles sont deux lieux indépendants
+// jamais tirer la MÊME suite de nombres, elles sont deux espaces indépendants
 // qui partagent seulement leur longueur X. lastVisited : toujours au niveau
 // du MONDE (jamais par face, voir header) — jamais encore rangé à la
 // création, quel que soit le nombre de faces.
-function createWorldState(level, seed) {
-  const { recto, verso, ...shared } = level;
+function createWorldState(scene, seed) {
+  const { recto, verso, ...shared } = scene;
   if (recto !== undefined) {
     return {
       ...shared,
@@ -271,11 +271,11 @@ function createWorldState(level, seed) {
       verso: createFaceState(verso, `${seed}:verso`),
     };
   }
-  return { ...createFaceState(level, seed), lastVisited: 0 };
+  return { ...createFaceState(scene, seed), lastVisited: 0 };
 }
 
 // Construit une PARTIE avec un premier monde actif. Le joueur démarre à
-// level.playerStart (filet à 0 déjà géré par parseLevel). seed optionnel
+// scene.playerStart (filet à 0 déjà géré par parseScene). seed optionnel
 // (les appelants existants n'en fournissent pas), transmise au premier
 // monde. companions optionnel (voir header) : par défaut, UN compagnon de
 // test prédéfini (comportement réel du jeu — "Nouvelle partie" démarre
@@ -286,8 +286,8 @@ function createWorldState(level, seed) {
 // la source (défaut ou fournie) — l'invariant "près du joueur, jamais plus
 // de MAX_COMPANIONS" tient dès la construction, pas seulement après une
 // transition.
-export function createInitialState(level, seed = DEFAULT_SEED, { companions, partyVariables } = {}) {
-  const world = createWorldState(level, seed);
+export function createInitialState(scene, seed = DEFAULT_SEED, { companions, partyVariables } = {}) {
+  const world = createWorldState(scene, seed);
   const requestedCompanions = companions ?? [createTestCompanion()];
   return {
     // blockedBy : id de l'entité bloquante contre laquelle le joueur bute CE
@@ -300,9 +300,9 @@ export function createInitialState(level, seed = DEFAULT_SEED, { companions, par
     // compris pour une scène simple (ignoré dans ce cas, mais toujours
     // présent : jamais de branche "side existe ou pas" ailleurs dans le
     // core).
-    player: { x: level.playerStart, side: "recto", blockedBy: null, pushedBy: null },
-    worlds: { [level.id]: world },
-    activeWorldId: level.id,
+    player: { x: scene.playerStart, side: "recto", blockedBy: null, pushedBy: null },
+    worlds: { [scene.id]: world },
+    activeWorldId: scene.id,
     // Horloge de partie : voir core/time.js. INITIAL_TIME = jour 1, mois 1,
     // à l'heure de départ configurée (config/time-values.js/startHour).
     time: INITIAL_TIME,
@@ -313,7 +313,7 @@ export function createInitialState(level, seed = DEFAULT_SEED, { companions, par
     // partie neuve démarre avec une paire de rangers ET une paire
     // d'escarpins DÉJÀ DANS LE SAC (pas équipées) — contenu de départ pour
     // tester l'échange gait "boots"/"high_heels" et le tag "chic" (porte à
-    // dresscode, voir level/demo.json) sans avoir à en ramasser en jeu (voir
+    // dresscode, voir scenes/demo.json) sans avoir à en ramasser en jeu (voir
     // core/items.js/ITEM_REGISTRY.combat_boots/high_heels). Rien d'autre :
     // pas d'argent, ni le reste du contenu ramassable normalement.
     bag: [{ type: "combat_boots" }, { type: "high_heels" }],
@@ -324,7 +324,7 @@ export function createInitialState(level, seed = DEFAULT_SEED, { companions, par
     // premier pas pour l'entendre/le tester (gait "shoes", voir
     // core/items.js/ITEM_REGISTRY.sneakers).
     equipment: { feet: { type: "sneakers" } },
-    companions: repositionCompanions(requestedCompanions.slice(0, MAX_COMPANIONS), level.playerStart, level.length),
+    companions: repositionCompanions(requestedCompanions.slice(0, MAX_COMPANIONS), scene.playerStart, scene.length),
     // Flux PRNG dédié aux compagnons (voir header) : dérivé du même seed,
     // mais hashé sous une clé distincte — jamais la même suite que le
     // premier monde (createSeed accepte une chaîne, voir core/rng.js).
@@ -342,7 +342,7 @@ export function createInitialState(level, seed = DEFAULT_SEED, { companions, par
     // variables : STOCKAGE de variables de portée "party" (voir
     // core/variables.js/CLAUDE.md), cercle PARTIE comme money/weather —
     // jamais par monde ni par entité. `partyVariables` : déclarations BRUTES
-    // (même forme qu'une entité/scène, voir core/level.js/parseEntity),
+    // (même forme qu'une entité/scène, voir core/scene.js/parseEntity),
     // fournies par l'appelant — le core n'importe AUCUN registre de contenu
     // (voir CLAUDE.md, "réglages en cascade"), jamais un fichier de
     // déclarations global importé ICI. Absent -> sac vide `{}`, comportement
@@ -372,12 +372,12 @@ export function togglePerception(session) {
   return { ...session, perceptionActive: !session.perceptionActive };
 }
 
-// Retire UNE entité (par id) du lieu ACTIF — mécanisme générique derrière
+// Retire UNE entité (par id) du monde ACTIF — mécanisme générique derrière
 // "une entité ramassée disparaît" (voir core/money.js/pickupEntity), mais
 // pas spécifique à l'argent : n'importe quel futur effet qui fait
 // disparaître une entité du monde peut le réutiliser tel quel. Jamais les
 // compagnons (cercle partie, pas dans worlds[x].entities — voir header) :
-// ce n'est même pas la même liste. id absent du lieu actif -> RÉFÉRENCE
+// ce n'est même pas la même liste. id absent du monde actif -> RÉFÉRENCE
 // INCHANGÉE (rien à retirer), jamais une exception — une entité déjà
 // retirée (double appel, id périmé) doit se dégrader silencieusement, pas
 // planter la partie en cours.
@@ -390,14 +390,14 @@ export function removeEntity(session, entityId) {
   return { ...session, worlds: { ...session.worlds, [session.activeWorldId]: nextWorld } };
 }
 
-// Marque UNE entité (par id) du lieu ACTIF comme "consumed" — mécanisme
+// Marque UNE entité (par id) du monde ACTIF comme "consumed" — mécanisme
 // générique derrière un COLLECTIBLE PERSISTANT (voir core/money.js/
 // lootEntity, entities/model.md/"Collectible persistant") : contrairement à
 // removeEntity ci-dessus, l'entité N'EST JAMAIS retirée, elle change
 // simplement d'état. `consumed` est un champ RUNTIME comme `present`/
-// `gotoArrived` (jamais posé par core/level.js) : absent (falsy) tant que
+// `gotoArrived` (jamais posé par core/scene.js) : absent (falsy) tant que
 // l'entité n'a jamais été activée, écrit ICI une seule fois. id absent du
-// lieu actif -> RÉFÉRENCE INCHANGÉE, même politique défensive que
+// monde actif -> RÉFÉRENCE INCHANGÉE, même politique défensive que
 // removeEntity (une entité déjà consommée ou un id périmé ne doit jamais
 // planter la partie).
 export function markConsumed(session, entityId) {
@@ -409,9 +409,9 @@ export function markConsumed(session, entityId) {
   return { ...session, worlds: { ...session.worlds, [session.activeWorldId]: nextWorld } };
 }
 
-// Applique une LISTE d'effets D'ÉCRITURE de variable (voir core/level.js/
+// Applique une LISTE d'effets D'ÉCRITURE de variable (voir core/scene.js/
 // parseActionEffect, core/variables.js/applyActionEffects) déclenchés par
-// l'ACTIVATION d'une action portée par UNE entité du lieu ACTIF (par id) —
+// l'ACTIVATION d'une action portée par UNE entité du monde ACTIF (par id) —
 // POINT D'ENTRÉE unique pour la vue (voir view/interaction.js/
 // setVariableEffectsHandler), qui ne connaît ni resolveFace/withFace ni la
 // forme de session.worlds : construit le contexte { entity, world, session }
@@ -423,7 +423,7 @@ export function markConsumed(session, entityId) {
 // `result.session` : SEULS `.variables`/`.improvements` en sont repris
 // (portée "party") — jamais le reste de l'objet, qui resterait le SESSION
 // PRÉ-effets (worlds pas encore patché par un éventuel effet "entity"/
-// "scene" de la MÊME liste) si on le reprenait tel quel. id absent du lieu
+// "scene" de la MÊME liste) si on le reprenait tel quel. id absent du monde
 // actif -> session INCHANGÉE, même politique défensive que markConsumed/
 // removeEntity. `side` : face qui porte l'entité — celle du joueur par
 // défaut (une action s'active toujours sur sa face), explicite pour un
@@ -454,7 +454,7 @@ export function applyEntityActionEffects(session, entityId, effects, side = sess
   };
 }
 
-// Crée UNE entité ÉPHÉMÈRE dans le lieu ACTIF, à la position x — point
+// Crée UNE entité ÉPHÉMÈRE dans le monde ACTIF, à la position x — point
 // d'entrée UNIQUE et RÉUTILISABLE pour toute création d'entité EN COURS DE
 // JEU (voir entities/model.md/"Entités éphémères"). Deux appelants
 // aujourd'hui : la touche debug "e" (voir view/city-screen.js) et
@@ -465,7 +465,7 @@ export function applyEntityActionEffects(session, entityId, effects, side = sess
 //
 // `spec` est un descripteur d'entité DÉJÀ RÉSOLU (type, labelKey,
 // blocksMovement, observable, interactable, action...) — EXACTEMENT la
-// forme qu'une entité obtient en sortie de core/level.js/parseEntity,
+// forme qu'une entité obtient en sortie de core/scene.js/parseEntity,
 // construit par L'APPELANT (voir createTestCompanion plus haut, même
 // principe) : ce module ne connaît AUCUN registre de types, `spec.type`
 // reste une étiquette opaque, jamais résolue ici — c'est la VUE qui sait
@@ -507,14 +507,14 @@ export function spawnEphemeral(session, spec, x) {
 
 // Tentatives maximum avant d'abandonner un tirage éparpillé et de retomber
 // sur sourceX (voir drawScatteredPosition ci-dessous) — un plafond, jamais
-// une boucle sans fin : même un lieu très encombré finit TOUJOURS par
+// une boucle sans fin : même un monde très encombré finit TOUJOURS par
 // produire une position, au pire celle de la source elle-même.
 const SCATTER_MAX_ATTEMPTS = 5;
 
 // Une position est BLOQUÉE si elle tombe dans le corps (BODY_RADIUS) d'une
 // entité qui bloque RÉELLEMENT le mouvement (isBlocking : blocksMovement ET
 // présente, voir core/presence.js — une entité dormante ne compte jamais).
-// `entities` : le lieu actif ET les compagnons (voir spawnScatteredEphemerals)
+// `entities` : le monde actif ET les compagnons (voir spawnScatteredEphemerals)
 // — un compagnon pourrait bloquer demain, autant rester correct dès
 // aujourd'hui plutôt que de le découvrir en contenu.
 function isPositionBlocked(x, entities, presenceContext) {
@@ -593,17 +593,17 @@ export function spawnScatteredEphemerals(session, spec, sourceX, count, spread =
 }
 
 // Le monde actuellement actif, AUGMENTÉ des compagnons de la partie (voir
-// header) — accesseur pur, utilisé partout où "session.level" existait
-// avant le refacto multi-mondes (core/reduce.js, view/audio/city-scene.js,
+// header) — accesseur pur, utilisé partout où le monde courant est lu
+// (core/reduce.js, view/audio/city-scene.js,
 // view/city-screen.js). C'est ICI, à la LECTURE SEULE, que l'injection a
 // lieu : les compagnons sont ajoutés à la fin de `entities` (jamais avant —
-// la première entité d'un lieu reste toujours SA première entité propre),
+// la première entité d'un monde reste toujours SA première entité propre),
 // sans jamais être écrits dans `session.worlds`. Résultat : tout
 // consommateur qui lit `getActiveWorld(session).entities` (vue comprise)
 // voit le compagnon comme une entité comme une autre, sans rien savoir du
 // mécanisme — mais session.worlds[x].entities, LUI, ne contient jamais de
 // compagnon. C'est cette asymétrie lecture/stockage qui garantit qu'un
-// compagnon ne reste JAMAIS résident dans un lieu quitté : voir
+// compagnon ne reste JAMAIS résident dans un monde quitté : voir
 // travelToWorld ci-dessous, qui range le monde BRUT (session.worlds[...]),
 // jamais le résultat de cet accesseur.
 // FACE COURANTE aplatie (voir isTwoSided/resolveFace plus haut) : un monde
@@ -647,18 +647,18 @@ export function getInactiveFace(session) {
 // (gelé, lastVisited horodaté à la minute de jeu COURANTE — session.time,
 // voir core/time.js — jamais l'horloge réelle) ; ressort la cible telle
 // quelle si déjà visitée (état sauvegardé : entités où elles étaient),
-// sinon la construit depuis freshLevel et l'ajoute à worlds ; ACTIVE la
+// sinon la construit depuis freshScene et l'ajoute à worlds ; ACTIVE la
 // cible et replace le JOUEUR à son point d'arrivée (playerStart) — sans
 // toucher au reste de son état, qui traverse la transition intact (le
 // joueur n'est jamais rangé dans un monde). Les COMPAGNONS suivent le même
 // principe que le joueur (voir header) : jamais rangés avec le monde quitté
 // — `currentWorld` ci-dessous lit délibérément `session.worlds[...]`
 // directement, PAS `getActiveWorld(session)`, précisément pour ne jamais
-// ranger un compagnon dans le lieu qu'on quitte (sinon il y resterait
+// ranger un compagnon dans le monde qu'on quitte (sinon il y resterait
 // résident pour toujours, voir getActiveWorld). Leur position est
 // réinitialisée près du joueur à l'arrivée, comme le joueur lui-même.
 //
-// Contrat pur/bord : freshLevel doit déjà être passé par parseLevel — le
+// Contrat pur/bord : freshScene doit déjà être passé par parseScene — le
 // fetch réseau reste entièrement à la charge de l'appelant (voir
 // view/city-screen.js), fourni SEULEMENT si la cible n'est pas encore dans
 // worlds (ignoré sinon, le monde déjà rangé prime). Cible ni visitée ni
@@ -673,14 +673,14 @@ export function getInactiveFace(session) {
 // performTransition, historique) laissait les compagnons autour de
 // playerStart tandis que le joueur atterrissait ailleurs ; ce paramètre
 // élimine cette classe de désync en résolvant tout EN UNE FOIS.
-export function travelToWorld(session, targetId, freshLevel = null, { x, side = "recto" } = {}) {
+export function travelToWorld(session, targetId, freshScene = null, { x, side = "recto" } = {}) {
   const currentWorld = session.worlds[session.activeWorldId];
-  // Purge des entités ÉPHÉMÈRES du lieu qu'on quitte (voir
-  // entities/model.md/"Entités éphémères") : PILE le moment où ce lieu est
+  // Purge des entités ÉPHÉMÈRES du monde qu'on quitte (voir
+  // entities/model.md/"Entités éphémères") : PILE le moment où ce monde est
   // rangé (gelé) — aucun éphémère ne doit survivre à une sortie de SCÈNE,
   // qu'il ait été ramassé ou non. À DEUX FACES : LES DEUX sont purgées
   // (voir stripEphemeralsFromWorld), pas seulement celle qu'on regardait —
-  // on quitte le LIEU entier, pas juste une face. Ici et nulle part
+  // on quitte le MONDE entier, pas juste une face. Ici et nulle part
   // ailleurs : le seul autre chemin de sortie d'une scène (retour au menu
   // principal) abandonne la session ENTIÈRE (voir view/city-screen.js/
   // onExit, setSession(null)), rien à purger explicitement dans ce cas.
@@ -688,10 +688,10 @@ export function travelToWorld(session, targetId, freshLevel = null, { x, side = 
   const worldsAfterParking = { ...session.worlds, [session.activeWorldId]: parkedWorld };
 
   const existingTarget = worldsAfterParking[targetId];
-  if (!existingTarget && !freshLevel) {
-    throw new Error(`travelToWorld: monde "${targetId}" introuvable et aucun niveau fourni pour le créer.`);
+  if (!existingTarget && !freshScene) {
+    throw new Error(`travelToWorld: monde "${targetId}" introuvable et aucune scène fournie pour le créer.`);
   }
-  const targetWorld = existingTarget ?? createWorldState(freshLevel, DEFAULT_SEED);
+  const targetWorld = existingTarget ?? createWorldState(freshScene, DEFAULT_SEED);
   const arrivalX = x !== undefined ? clamp(x, 0, targetWorld.length) : targetWorld.playerStart;
 
   return {
@@ -705,7 +705,7 @@ export function travelToWorld(session, targetId, freshLevel = null, { x, side = 
 
 // Place le joueur + les compagnons à x sur la face `side`, DANS LE MONDE
 // ACTUEL — sans toucher activeWorldId/worlds/lastVisited (contrairement à
-// travelToWorld : le lieu n'est jamais quitté). Primitive PARTAGÉE par
+// travelToWorld : le monde n'est jamais quitté). Primitive PARTAGÉE par
 // switchSide (bascule recto<->verso) ci-dessous ET par un teleport SANS
 // rechargement (voir core/effects.js/"teleport", reloadIfSame: false —
 // appliqué par la vue quand la cible EST le monde actif).
@@ -721,7 +721,7 @@ export function placePlayer(session, x, side) {
 
 // Bascule de FACE dans le MÊME monde (point de passage recto<->verso, voir
 // entities/types/passage.js, core/scripting.md/action "switchSide") — PAS
-// un travelToWorld : le lieu n'est pas quitté, currentWorld n'est ni rangé
+// un travelToWorld : le monde n'est pas quitté, currentWorld n'est ni rangé
 // ni purgé de ses éphémères (la face laissée n'est pas une "sortie de
 // scène" — voir resolveFace/withFace, header). Depuis l'étape 2/2, la face
 // quittée continue de tiquer normalement (coexistence, voir
@@ -732,7 +732,7 @@ export function placePlayer(session, x, side) {
 // compagnons au point d'arrivée déclaré par l'entité de passage — même
 // principe de repositionnement que travelToWorld, mais SANS toucher à
 // activeWorldId ni à worlds. arrivalX est une donnée de CONTENU
-// (action.arrivalX, jamais validée en bornes par core/level.js — voir son
+// (action.arrivalX, jamais validée en bornes par core/scene.js — voir son
 // commentaire sur `action`) — bordée par placePlayer, comme tout point
 // d'arrivée. Simple appel NOMMÉ de placePlayer ci-dessus (face TOUJOURS
 // opposée à l'actuelle) — aucune logique propre au-delà de ce choix de face.

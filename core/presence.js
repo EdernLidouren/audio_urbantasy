@@ -10,24 +10,24 @@
 // STRICTEMENT inchangé pour tout contenu existant. RACCOURCI rétrocompatible
 // avec la présence seule (avant ce système généralisé) : `{ when, present:
 // boolean }` SANS `effects`, sucre pour `{ when, effects: [{ type:
-// "presence", present }] }` — voir ruleEffect. core/level.js normalise déjà
+// "presence", present }] }` — voir ruleEffect. core/scene.js normalise déjà
 // ce raccourci en forme canonique au chargement ; ruleEffect le comprend
 // aussi directement, pour tout appelant qui construit une règle à la main
-// (ex. movement.check.js) sans passer par parseLevel.
+// (ex. movement.check.js) sans passer par parseScene.
 //
 // DEUX aiguillages EXTENSIBLES, de nature différente :
 //   - CONDITION_EVALUATORS (registre) : chaque entrée est juste "condition +
-//     context -> booléen", uniforme -> un registre suffit, core/level.js
+//     context -> booléen", uniforme -> un registre suffit, core/scene.js
 //     valide `when.type` contre ses clés (CONDITION_TYPES). "timeRange"
 //     (dérivée de l'horloge) et "arrived" (dérivée d'un FAIT de simulation,
 //     `entity.gotoArrived` — événementielle, pas temporelle) cohabitent
 //     sans qu'isPresent/resolveEntityRules n'aient à savoir laquelle c'est.
 //   - Types d'EFFET ("presence", "behavior") : PAS un registre pareil,
-//     aiguillage explicite (voir core/level.js/parseEffect) — un effet a une
+//     aiguillage explicite (voir core/scene.js/parseEffect) — un effet a une
 //     validation et une APPLICATION propres à son type (une chaîne booléenne
 //     idempotente pour "presence" ; une bascule anti-boucle + une
 //     sous-validation complète de comportement pour "behavior", voir
-//     resolveEntityRules et core/level.js/parseBehavior réutilisé tel quel).
+//     resolveEntityRules et core/scene.js/parseBehavior réutilisé tel quel).
 //     Ajouter un effet demain = ajouter un cas à ces DEUX endroits, jamais
 //     toucher au reste — même esprit d'extensibilité, mécanique adaptée à
 //     l'hétérogénéité des effets plutôt qu'un registre forcé pour deux cas.
@@ -90,7 +90,7 @@ function wrapHour(hour) {
 // même convention demi-ouverte que core/time.js/phaseAt. from === to, ou
 // l'un des deux non fini -> jamais vraie (intervalle vide/malformé), plutôt
 // qu'une ambiguïté "toujours" ou "jamais" non documentée ou un throw pour
-// une donnée de contenu déjà validée en forme par core/level.js.
+// une donnée de contenu déjà validée en forme par core/scene.js.
 //
 // VARIATION DE SEUIL PAR INSTANCE (cond.spread, en MINUTES, optionnel) —
 // voir core/scripting.md/"spread" : désynchronise des entités qui partagent
@@ -165,7 +165,7 @@ function evaluateConsumed(cond, context) {
 // équipement joueur (ex. hors d'une interaction) -> false, jamais une
 // exception — même repli défensif que evaluateArrived/evaluateConsumed
 // ci-dessus. cond.tag est validé contre TAG_REGISTRY au chargement (voir
-// core/level.js), jamais ici (cet évaluateur ne fait que LIRE une clé déjà
+// core/scene.js), jamais ici (cet évaluateur ne fait que LIRE une clé déjà
 // garantie valide).
 //
 // CLÉ DE CONTEXTE DÉDIÉE, PAS context.entity : contrairement à TOUT autre
@@ -228,7 +228,7 @@ function evaluatePerceptionActive(cond, context) {
 // est EXACTEMENT cond.state. Sans état dans le contexte (ex.
 // action.condition, hors tick) -> false, même repli défensif que
 // perceptionActive. cond.state validé au chargement contre
-// config/weather-values.js/WEATHER_STATES (core/level.js/validateCondition),
+// config/weather-values.js/WEATHER_STATES (core/scene.js/validateCondition),
 // comme hasEquipmentTag.tag contre TAG_REGISTRY.
 function evaluateWeather(cond, context) {
   return context.weather !== undefined && context.weather === cond.state;
@@ -240,7 +240,7 @@ function evaluateWeather(cond, context) {
 // sous-condition peut être n'importe quel type du registre, y compris un
 // autre "allOf" imbriqué) — MÊME registre, MÊME évaluateur, jamais un
 // mécanisme de composition séparé (voir core/scripting.md). cond.conditions
-// validé au chargement (core/level.js/validateCondition, tableau non vide,
+// validé au chargement (core/scene.js/validateCondition, tableau non vide,
 // chaque élément validé récursivement) : jamais lu ici sans garantie de
 // forme. Court-circuite via Array.prototype.every (s'arrête à la première
 // fausse), sans effet observable puisque tous les évaluateurs sont purs.
@@ -251,7 +251,7 @@ function evaluateAllOf(cond, context) {
 // "not" : condition COMPOSITE — vraie si SA sous-condition (cond.condition)
 // est fausse (négation logique). Même patron qu'allOf : délègue à
 // evaluateCondition, n'importe quel type du registre (y compris allOf ou un
-// autre not). cond.condition validée au chargement (core/level.js/
+// autre not). cond.condition validée au chargement (core/scene.js/
 // validateCondition, obligatoire, revalidée récursivement).
 function evaluateNot(cond, context) {
   return !evaluateCondition(cond.condition, context);
@@ -259,7 +259,7 @@ function evaluateNot(cond, context) {
 
 // "variable" : LECTURE d'une variable (voir core/variables.js/getVariable)
 // avec COMPARAISON — { type:"variable", scope, name, <comparateur>:
-// valeur }. Un SEUL comparateur par condition (voir core/level.js/
+// valeur }. Un SEUL comparateur par condition (voir core/scene.js/
 // validateCondition, qui l'exige) : "equals" (flag ET int) ou, pour un int
 // seulement, "greaterThan"/"lessThan"/"greaterOrEqual"/"lessOrEqual" — déjà
 // validés au chargement contre le TYPE réel de la variable quand il est
@@ -286,15 +286,15 @@ function evaluateVariable(cond, context) {
 }
 
 // Registre des évaluateurs par type — SEUL endroit qui connaît les types de
-// condition. core/level.js valide `when.type` au chargement contre les clés
+// condition. core/scene.js valide `when.type` au chargement contre les clés
 // de CE MÊME registre (CONDITION_TYPES ci-dessous) : ajouter un type ici le
 // rend automatiquement acceptable en contenu, sans dupliquer la liste.
 // "hasEquipmentTag" cohabite avec "timeRange"/"arrived"/"consumed" comme un
 // cas de plus, pas un système de vérification séparé — la seule différence
-// est que core/level.js valide EN PLUS son champ `tag` contre TAG_REGISTRY
-// (voir core/level.js/parsePresenceRule), une garantie que timeRange/arrived/
+// est que core/scene.js valide EN PLUS son champ `tag` contre TAG_REGISTRY
+// (voir core/scene.js/parsePresenceRule), une garantie que timeRange/arrived/
 // consumed n'ont pas besoin d'une clé de contenu externe à valider. Même
-// esprit pour "variable" : core/level.js valide EN PLUS scope/name/
+// esprit pour "variable" : core/scene.js valide EN PLUS scope/name/
 // comparateur (voir validateVariableReference).
 const CONDITION_EVALUATORS = {
   timeRange: evaluateTimeRange,
@@ -313,7 +313,7 @@ export const CONDITION_TYPES = Object.keys(CONDITION_EVALUATORS);
 
 // Type inconnu -> false, jamais un throw : l'aiguillage runtime dégrade la
 // présence concernée plutôt que de faire planter toute la simulation
-// (core/level.js a de toute façon déjà rejeté un type inconnu au
+// (core/scene.js a de toute façon déjà rejeté un type inconnu au
 // chargement — ce repli ne couvre qu'un appel direct hors du chemin validé,
 // ex. depuis movement.check.js).
 export function evaluateCondition(cond, context) {
@@ -350,7 +350,7 @@ function ruleEffect(rule, type) {
 //     en cours de partie) ;
 //   - behaviorEffect : le comportement à POSER ce tick si un effet
 //     "behavior" vient de basculer (voir plus bas), `null` si cet effet est
-//     un RETRAIT explicite (voir core/level.js/parseEffect), `undefined`
+//     un RETRAIT explicite (voir core/scene.js/parseEffect), `undefined`
 //     si aucun effet "behavior" n'a basculé — trois valeurs distinctes,
 //     jamais confondues par l'appelant (core/reduce.js compare à
 //     `undefined`, jamais un test de vérité).
@@ -450,7 +450,7 @@ export function isBlocking(entity, context) {
   return Boolean(entity.blocksMovement) && isPresent(entity, context);
 }
 
-// Sélectionne, parmi PLUSIEURS actions CANDIDATES (voir core/level.js/
+// Sélectionne, parmi PLUSIEURS actions CANDIDATES (voir core/scene.js/
 // parseEntity — entity.action peut être un objet UNIQUE, comme avant, ou un
 // TABLEAU de candidates), celle dont la condition est VRAIE — voir
 // core/scripting.md/"Actions multiples filtrées par condition". Très proche

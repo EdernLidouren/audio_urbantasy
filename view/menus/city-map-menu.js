@@ -1,5 +1,5 @@
 // Écran-carte de la ville : navigation en GRILLE 2D (haut/bas/gauche/droite
-// déplacent le curseur de case en case) — voir level/city-map.js pour la
+// déplacent le curseur de case en case) — voir map/city-map.js pour la
 // topologie. Écran CUSTOM, PAS construit via lib/menu.js : ce module
 // réserve déjà gauche/droite à l'ajustement slider/toggle, incompatible
 // avec un déplacement de curseur 2D — même patron générique que
@@ -38,7 +38,7 @@ import {
   isRealCityMapZone,
   isCityMapUnderConstruction,
   findCityMapCoordinates,
-} from "../../level/city-map.js";
+} from "../../map/city-map.js";
 
 const CITY_MAP_BINDINGS = {
   up: { keys: ["ArrowUp"], mods: [] },
@@ -84,12 +84,12 @@ function announceMaybeStarred(text, starred) {
   announce(prefixed, { assertive: true });
 }
 
-// getSession : pour situer le curseur de DÉPART sur la case du lieu actif
+// getSession : pour situer le curseur de DÉPART sur la case du monde actif
 // (voir findCityMapCoordinates) — lu UNE FOIS à l'ouverture, jamais
 // resuivi ensuite (la carte ne change pas pendant qu'elle est ouverte,
-// consultation non destructive — voir header). Lieu actif absent de la
+// consultation non destructive — voir header). Monde actif absent de la
 // carte (pas encore atteignable autrement, cas limite) -> repli sur (0,0),
-// jamais une exception. onSelectZone(levelId, spawnX) : effet de sélection
+// jamais une exception. onSelectZone(sceneId, spawnX) : effet de sélection
 // fourni par l'appelant (voir view/city-screen.js/travelViaCityMap).
 // scene : voir header, pause/reprise des balises propre à cet écran.
 export function openCityMapMenu(scene, getSession, onSelectZone) {
@@ -152,7 +152,7 @@ export function openCityMapMenu(scene, getSession, onSelectZone) {
       return;
     }
     popScreen();
-    onSelectZone(cell.levelId, cell.spawnX);
+    onSelectZone(cell.sceneId, cell.spawnX);
   }
 
   const keyHandlers = {

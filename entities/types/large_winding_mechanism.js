@@ -1,5 +1,5 @@
 // Archétype "large_winding_mechanism" — mécanisme de remontage des
-// contrepoids d'un clocher (voir level/clock-tower-weight-shaft.json).
+// contrepoids d'un clocher (voir scenes/clock-tower-weight-shaft.json).
 // Beacon continu, observable, jamais interactif.
 export default {
   nameKey: "entity.large_winding_mechanism.name",

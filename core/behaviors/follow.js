@@ -75,7 +75,7 @@ export function parseParams(raw, fail) {
 
 // context.getTargetPosition(id) -> number | undefined — fourni par
 // reduce.js, qui sait résoudre un id vers une position (joueur, entité du
-// lieu actif, ou compagnon) sans que ce module connaisse cette structure.
+// monde actif, ou compagnon) sans que ce module connaisse cette structure.
 // Cible introuvable (id invalide, pas encore chargée...) -> s'arrête,
 // jamais de crash. Pure : ne mute rien. rngState TRANSMIS TEL QUEL (jamais
 // consommé, voir header) pour que le pipeline (core/reduce.js) reste

@@ -1,7 +1,7 @@
 // Archétype "cumuloLupus" — un loup de brume, errant. VOCAL SEUL, aucun
 // beacon (comme hound.js) — on ne le localise pas, on l'entend passer.
 // Aucun `behavior` par défaut ici, volontairement (voir dog.js) : se
-// déclare à l'INSTANCE (level/*.json). Donnée pure : aucun import.
+// déclare à l'INSTANCE (scenes/*.json). Donnée pure : aucun import.
 //
 // Présence conditionnée par l'ET de DEUX conditions (core/presence.js/
 // "allOf") : perception surnaturelle ACTIVE ET météo BRUMEUSE — un loup

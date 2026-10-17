@@ -3,11 +3,11 @@
 // aucun import.
 //
 // Aucun `behavior` par défaut ici, volontairement : le comportement se
-// déclare à l'INSTANCE (level/*.json), jamais comme défaut d'archétype — sinon
+// déclare à l'INSTANCE (scenes/*.json), jamais comme défaut d'archétype — sinon
 // une instance voulant rester immobile hériterait malgré elle d'un wander.
 // Deux instances "dog" peuvent donc se comporter différemment (l'une avec
 // behavior:{kind:"wander"}, l'autre sans) sans code spécial, seulement par ce
-// que chaque instance déclare (voir level/demo.json).
+// que chaque instance déclare (voir scenes/demo.json).
 //
 // sounds.movement (rôle "movement", voir entities/model.md) : cadencé par la
 // distance parcourue, exactement comme le joueur — dormant tant que

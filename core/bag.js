@@ -41,9 +41,9 @@ export function addItem(session, type, count = 1) {
 
 // Effet "pickup" vers le SAC (voir view/interaction.js, ACTION_HANDLERS.
 // pickup — action.item) : ajoute l'objet ET retire l'entité ramassée du
-// lieu actif, ATOMIQUEMENT — même garantie que core/money.js/pickupEntity
+// monde actif, ATOMIQUEMENT — même garantie que core/money.js/pickupEntity
 // (jamais l'un sans l'autre, jamais un second gain sur une entité déjà
-// ramassée). entityId DÉJÀ absent du lieu actif -> RÉFÉRENCE INCHANGÉE,
+// ramassée). entityId DÉJÀ absent du monde actif -> RÉFÉRENCE INCHANGÉE,
 // vérifié EXPLICITEMENT avant tout ajout, même politique atomique que
 // pickupEntity.
 export function pickupItemEntity(session, entityId, type, count = 1) {

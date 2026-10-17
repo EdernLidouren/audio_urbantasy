@@ -19,7 +19,7 @@
 //
 // Cible résolue via context.getTargetPosition(targetId) — EXACTEMENT le
 // même mécanisme que follow.js (core/reduce.js/resolveTargetPosition,
-// déjà générique par id : joueur, entité du lieu actif, ou compagnon).
+// déjà générique par id : joueur, entité du monde actif, ou compagnon).
 // Aucune duplication nécessaire, ce module s'en sert tel quel.
 
 import { BODY_RADIUS } from "../state.js";

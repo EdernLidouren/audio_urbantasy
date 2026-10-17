@@ -9,7 +9,7 @@
 // codés en dur pour "crate" spécifiquement (voir view/interaction.js,
 // view/audio/city-scene.js) :
 //   - consumedDescriptionKey (cascade instance -> type, comme
-//     descriptionKey — voir core/level.js) : description alternative une
+//     descriptionKey — voir core/scene.js) : description alternative une
 //     fois consumed, lue par view/interaction.js/resolveDescription. Reste
 //     OBSERVABLE/INTERACTABLE après consommation (contrairement à "devenir
 //     dormant" ci-dessous) — seul son état PERÇU change.
@@ -20,7 +20,7 @@
 // "Devenir dormant" n'est PAS un champ de cet archétype : ça se déclare
 // avec le système de présence EXISTANT (core/presence.js), en ajoutant une
 // règle { when: { type: "consumed" }, present: false } à l'INSTANCE qui
-// veut cet effet (voir level/demo2.json, "crate-warehouse") — cet
+// veut cet effet (voir scenes/demo2.json, "crate-warehouse") — cet
 // archétype n'en déclare AUCUNE par défaut : silence perceptible SEUL par
 // défaut (desc + beacon), pas dormance — une caisse looté reste
 // observable/interactable tant qu'aucune instance ne surcharge `presence`.

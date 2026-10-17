@@ -1,4 +1,4 @@
-// Parsing et validation d'un niveau. Fonction pure : aucun accès réseau ou
+// Parsing et validation d'une scène. Fonction pure : aucun accès réseau ou
 // DOM, aucune chaîne affichable produite (labelKey reste une clé i18n).
 // Testable en Node/console sans navigateur : voir le bas du fichier pour un
 // exemple d'invocation manuelle.
@@ -8,7 +8,7 @@
 //
 // RECTO/VERSO (modèle B, voir CLAUDE.md, core/state.js) : une scène est
 // SIMPLE (comme avant ce modèle) ou À DEUX FACES (recto + verso, jamais un
-// seul) — voir parseFace/parseLevel plus bas. Une face porte exactement ce
+// seul) — voir parseFace/parseScene plus bas. Une face porte exactement ce
 // qu'une scène simple portait déjà (entités + habillage sonore/surface),
 // jamais dupliqué entre les deux cas.
 
@@ -28,7 +28,7 @@ import { validateDistribution } from "./distribution.js";
 import { validateCatalog } from "./catalog.js";
 
 function fail(message) {
-  throw new Error(`parseLevel: ${message}`);
+  throw new Error(`parseScene: ${message}`);
 }
 
 // Parsing TOTAL (voir header) : l'ABSENCE d'un champ de scène retombe
@@ -36,12 +36,12 @@ function fail(message) {
 // malformée échoue. Ces trois défauts couvrent les champs qui n'avaient
 // jusqu'ici AUCUN filet (id/titleKey/length étaient requis) ; les autres
 // champs de scène (entities, defaultSurface, segments, indoor,
-// playerStart) ont déjà le leur plus bas. `{}` doit rester un niveau
+// playerStart) ont déjà le leur plus bas. `{}` doit rester une scène
 // valide et jouable : id/titre génériques, longueur minimale mais non
 // nulle (traversable).
-const DEFAULT_LEVEL_ID = "level";
-const DEFAULT_LEVEL_TITLE_KEY = "level.default.title";
-const DEFAULT_LEVEL_LENGTH = 10;
+const DEFAULT_SCENE_ID = "scene";
+const DEFAULT_SCENE_TITLE_KEY = "scene.default.name";
+const DEFAULT_SCENE_LENGTH = 10;
 
 function isNonEmptyString(value) {
   return typeof value === "string" && value.trim().length > 0;
@@ -145,17 +145,17 @@ function resolveKnownVariableType(scope, name, entityVariables, sceneVariables) 
 //     son ordre de parsing) — une référence à une variable jamais déclarée
 //     sur CETTE entité échoue clairement, exactement comme un tag inconnu
 //     (voir hasEquipmentTag ci-dessus).
-//   - "scene" : contre `sceneVariables`, LE SAC DE LA SCÈNE (racine du
-//     niveau, résolu par parseLevel AVANT tout parseFace/parseEntity — voir
+//   - "scene" : contre `sceneVariables`, LE SAC DE LA SCÈNE (racine de la
+//     scène, résolu par parseScene AVANT tout parseFace/parseEntity — voir
 //     son ordre d'appel) — même exigence.
 //   - "party" : AUCUNE vérification d'existence possible ICI — les
 //     déclarations de partie n'existent qu'à createInitialState
-//     (core/state.js), hors de portée d'un parseLevel qui ne connaît qu'UN
-//     niveau à la fois. LIMITE CONNUE, documentée (voir
+//     (core/state.js), hors de portée d'un parseScene qui ne connaît qu'UNE
+//     scène à la fois. LIMITE CONNUE, documentée (voir
 //     core/scripting.md/"Variables") plutôt que silencieusement ignorée :
 //     une variable de partie mal orthographiée dans une condition/un effet
 //     ne sera détectée qu'à l'ÉVALUATION (repli sur false/no-op, voir
-//     core/presence.js/core/variables.js), jamais au chargement du niveau.
+//     core/presence.js/core/variables.js), jamais au chargement de la scène.
 function validateVariableReference(scope, name, entityVariables, sceneVariables, describe) {
   if (!VARIABLE_SCOPES.includes(scope)) {
     fail(`${describe}.scope "${scope}" inconnu (attendu : ${VARIABLE_SCOPES.join(" | ")}).`);
@@ -663,7 +663,7 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
   // blocksMovement : même cascade instance -> type que labelKey/
   // descriptionKey ci-dessus. Bakée ici, pas lue directement par
   // core/reduce.js dans le registre : le core ne connaît le registre qu'à
-  // travers ce que parseLevel en extrait, jamais en l'important lui-même.
+  // travers ce que parseScene en extrait, jamais en l'important lui-même.
   if (blocksMovement !== undefined && typeof blocksMovement !== "boolean") {
     fail(`entities[${index}] ("${id}") : blocksMovement doit être un booléen si présent.`);
   }
@@ -705,7 +705,7 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
   // core/reduce.js qui lit CE champ pour résoudre le déplacement voulu de
   // chaque mobile à intention. Baké ici (pas relu dans le registre par
   // core/reduce.js) pour la même raison que blocksMovement/isFlying : le
-  // core ne connaît le registre qu'à travers ce que parseLevel en extrait.
+  // core ne connaît le registre qu'à travers ce que parseScene en extrait.
   // Cadence de pas INCHANGÉE par ailleurs (view/audio/city-scene.js/
   // stepWalker) : elle dérive déjà de la distance parcourue, donc un mobile
   // deux fois plus lent voit SES PAS s'espacer deux fois plus, sans le
@@ -748,7 +748,7 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
   // action/presence : les deux peuvent RÉFÉRENCER une variable d'entité
   // (condition "variable", effets setVariable/toggleVariable/addVariable),
   // leur validation a donc besoin du sac déjà résolu — voir
-  // validateVariableReference (core/level.js).
+  // validateVariableReference (core/scene.js).
   if (variables !== undefined) {
     entity.variables = parseVariables(variables, `entities[${index}] ("${id}") : variables`, fail);
   }
@@ -840,7 +840,7 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
   // nouveau paramètre résolu en cascade (config/tuning-values.js) le rend
   // automatiquement surchargeable ici, sans jamais rouvrir ce fichier.
   // Même statut que music/ambiences/reverbDurationSec/reverbDecay plus bas
-  // dans parseLevel (niveau LIEU, pas entité) : simple passage validé en
+  // dans parseScene (palier SCÈNE, pas entité) : simple passage validé en
   // FORME (un objet), jamais en contenu.
   if (tuning !== undefined) {
     if (typeof tuning !== "object" || tuning === null || Array.isArray(tuning)) {
@@ -918,7 +918,7 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
 }
 
 // Entité créée EN JEU par le moteur de collecte (core/spawn.js) : MÊME
-// parseur qu'une instance de niveau (cascade sounds/capacités/action de
+// parseur qu'une instance de scène (cascade sounds/capacités/action de
 // l'archétype, validation complète), sans contexte de liste — `raw` porte
 // déjà un id unique (dérivé du cycle, voir core/spawn.js), aucune
 // déduplication à faire ici.
@@ -947,9 +947,9 @@ function parseBehavior(behavior, index, id) {
   return { kind, ...params };
 }
 
-// Détection de chevauchement au chargement (préventif, NON bloquant) : le
-// level design évite ce cas, mais un niveau mal formé doit se dénoncer au
-// chargement plutôt qu'en cours de jeu — même principe de filet que
+// Détection de chevauchement au chargement (préventif, NON bloquant) : la
+// conception des scènes évite ce cas, mais une scène mal formée doit se
+// dénoncer au chargement plutôt qu'en cours de jeu — même principe de filet que
 // playerStart plus bas, un console.warn clair, jamais un fail(). Une
 // entité passable n'a pas de zone d'exclusion propre (voir
 // core/reduce.js/resolveOverlaps) : seules les paires impliquant au moins
@@ -959,14 +959,14 @@ function warnOnOverlaps(entities, playerStart) {
     const a = entities[i];
     if (a.blocksMovement && Math.abs(playerStart - a.x) < BODY_RADIUS) {
       console.warn(
-        `parseLevel: playerStart (${playerStart}) démarre dans le corps de l'entité impassable "${a.id}" (x=${a.x}).`
+        `parseScene: playerStart (${playerStart}) démarre dans le corps de l'entité impassable "${a.id}" (x=${a.x}).`
       );
     }
     for (let j = i + 1; j < entities.length; j++) {
       const b = entities[j];
       if (a.blocksMovement && b.blocksMovement && Math.abs(a.x - b.x) < 2 * BODY_RADIUS) {
         console.warn(
-          `parseLevel: entités impassables "${a.id}" (x=${a.x}) et "${b.id}" (x=${b.x}) se chevauchent au chargement.`
+          `parseScene: entités impassables "${a.id}" (x=${a.x}) et "${b.id}" (x=${b.x}) se chevauchent au chargement.`
         );
       }
     }
@@ -998,10 +998,10 @@ function parseSegment(rawSegment, index, length) {
 }
 
 // Champs qu'une FACE porte en propre (recto/verso d'une scène à deux
-// faces, OU la scène entière si elle est simple — voir parseLevel) :
-// entités + habillage sonore/surface du lieu. Liste PARTAGÉE entre le mode
+// faces, OU la scène entière si elle est simple — voir parseScene) :
+// entités + habillage sonore/surface de la scène. Liste PARTAGÉE entre le mode
 // simple et le mode deux-faces pour détecter un mélange des deux modèles
-// (voir parseLevel) — jamais recopiée en dur ailleurs.
+// (voir parseScene) — jamais recopiée en dur ailleurs.
 const FACE_FIELDS = [
   "entities",
   "music",
@@ -1049,11 +1049,11 @@ function parseSpawnRange(rawRange, index, length, prefix) {
 // avant l'introduction du modèle à deux faces (voir CLAUDE.md/
 // "RECTO/VERSO") — factorisé pour être appelé UNE fois (scène simple, sur
 // `raw` directement) ou DEUX (scène à deux faces, une fois par
-// recto/verso, voir parseLevel). `describe` préfixe les messages d'erreur
+// recto/verso, voir parseScene). `describe` préfixe les messages d'erreur
 // (ex. "recto" ou "verso"), comme validateCondition le fait déjà pour ses
 // propres appelants — jamais dupliqué pour rien de plus qu'un préfixe.
 // `sceneVariables` : le sac de variables de portée "scene" DÉJÀ RÉSOLU par
-// parseLevel (racine, PARTAGÉ entre les deux faces — voir son commentaire) —
+// parseScene (racine, PARTAGÉ entre les deux faces — voir son commentaire) —
 // simplement RELAYÉ jusqu'à chaque entité (voir parseEntity), jamais relu
 // ici : une face ne PORTE pas son propre sac de scène.
 function parseFace(raw, length, registry, describe, sceneVariables) {
@@ -1093,14 +1093,14 @@ function parseFace(raw, length, registry, describe, sceneVariables) {
     fail(`${prefix}defaultSurface "${JSON.stringify(defaultSurface)}" absente du registre de surfaces.`);
   }
   const resolvedDefaultSurface = defaultSurface !== undefined ? defaultSurface : DEFAULT_SURFACE;
-  // indoor : PROPRIÉTÉ DE NATURE DE LIEU (comme defaultSurface juste
+  // indoor : PROPRIÉTÉ DE NATURE DE SCÈNE (comme defaultSurface juste
   // au-dessus), pas un "flag ambiance météo" — aujourd'hui seul le RENDU de
   // l'ambiance météo la consulte (voir view/audio/city-scene.js, choix du
   // pool outdoor/indoor par état, config/weather-values.js), mais rien
   // n'empêche un futur consommateur (réverb, sons ambiants...) de la lire
   // aussi. TOUJOURS résolue en booléen (comme defaultSurface, jamais
   // `undefined` sur une face parsée) : défaut `false` (extérieur, le cas
-  // courant en ville) — comportement inchangé pour tout lieu existant qui
+  // courant en ville) — comportement inchangé pour toute scène existante qui
   // ne la déclare pas encore.
   if (indoor !== undefined && typeof indoor !== "boolean") {
     fail(`${prefix}indoor doit être un booléen si présent (reçu : ${JSON.stringify(indoor)}).`);
@@ -1123,14 +1123,14 @@ function parseFace(raw, length, registry, describe, sceneVariables) {
   }
   const parsedSpawnRanges =
     spawnRanges !== undefined ? spawnRanges.map((rawRange, index) => parseSpawnRange(rawRange, index, length, prefix)) : undefined;
-  // music : optionnel, chemin vers la musique du lieu (voir
-  // view/audio/city-scene.js). Simple passage : parseLevel ne connaît ni
+  // music : optionnel, chemin vers la musique de la scène (voir
+  // view/audio/city-scene.js). Simple passage : parseScene ne connaît ni
   // Howler ni la lecture audio, juste la présence d'une chaîne.
   if (music !== undefined && !isNonEmptyString(music)) {
     fail(`${prefix}music doit être une chaîne non vide si présent (reçu : ${JSON.stringify(music)}).`);
   }
   // musicDay/musicNight : optionnels, musique PAR PHASE (voir
-  // core/time.js/phaseAt, view/audio/city-scene.js) — un lieu qui n'en
+  // core/time.js/phaseAt, view/audio/city-scene.js) — une scène qui n'en
   // déclare qu'une (musicDay SEULE, ou aucune des deux) retombe sur `music`
   // pour la phase manquante, jamais de régression pour le contenu existant.
   // Même validation de forme que music, rien de plus ici.
@@ -1227,9 +1227,9 @@ function parseFace(raw, length, registry, describe, sceneVariables) {
   return face;
 }
 
-export function parseLevel(raw, registry) {
+export function parseScene(raw, registry) {
   if (typeof raw !== "object" || raw === null) {
-    fail("le niveau n'est pas un objet.");
+    fail("la scène n'est pas un objet.");
   }
   if (typeof registry !== "object" || registry === null) {
     fail("le registre de types est manquant ou invalide.");
@@ -1237,32 +1237,32 @@ export function parseLevel(raw, registry) {
 
   const { id, titleKey, length, playerStart, recto, verso, variables } = raw;
 
-  // id/titleKey/length : ABSENTS -> défauts génériques (DEFAULT_LEVEL_*,
+  // id/titleKey/length : ABSENTS -> défauts génériques (DEFAULT_SCENE_*,
   // voir header) ; PRÉSENTS mais malformés -> erreur claire, inchangé — la
   // distinction absence/malformation vaut ici comme pour tout autre champ
   // de scène.
   if (id !== undefined && !isNonEmptyString(id)) {
     fail(`id invalide si présent (reçu : ${JSON.stringify(id)}).`);
   }
-  const resolvedId = id !== undefined ? id : DEFAULT_LEVEL_ID;
+  const resolvedId = id !== undefined ? id : DEFAULT_SCENE_ID;
   if (titleKey !== undefined && !isNonEmptyString(titleKey)) {
     fail(`titleKey invalide si présent (reçu : ${JSON.stringify(titleKey)}).`);
   }
-  const resolvedTitleKey = titleKey !== undefined ? titleKey : DEFAULT_LEVEL_TITLE_KEY;
+  const resolvedTitleKey = titleKey !== undefined ? titleKey : DEFAULT_SCENE_TITLE_KEY;
   if (length !== undefined && (!isFiniteNumber(length) || length <= 0)) {
     fail(`length doit être un nombre > 0 si présent (reçu : ${JSON.stringify(length)}).`);
   }
-  const resolvedLength = length !== undefined ? length : DEFAULT_LEVEL_LENGTH;
-  // playerStart : point d'arrivée PAR DÉFAUT du lieu. FILET, pas de rejet :
-  // absent ou hors [0, length] -> repli sur 0, jamais d'exception (un lieu
-  // mal configuré ne doit pas empêcher d'y entrer). Des points d'arrivée
+  const resolvedLength = length !== undefined ? length : DEFAULT_SCENE_LENGTH;
+  // playerStart : point d'arrivée PAR DÉFAUT de la scène. FILET, pas de rejet :
+  // absent ou hors [0, length] -> repli sur 0, jamais d'exception (une scène
+  // mal configurée ne doit pas empêcher d'y entrer). Des points d'arrivée
   // NOMMÉS (ex. arriver à l'entrée précise associée à la porte empruntée)
   // pourront s'ajouter plus tard, sans toucher à ce filet — pas codés ici.
   const resolvedPlayerStart =
     isFiniteNumber(playerStart) && playerStart >= 0 && playerStart <= resolvedLength ? playerStart : 0;
   if (resolvedPlayerStart !== playerStart) {
     console.warn(
-      `parseLevel: playerStart (${JSON.stringify(playerStart)}) absent ou hors bornes, repli sur 0.`
+      `parseScene: playerStart (${JSON.stringify(playerStart)}) absent ou hors bornes, repli sur 0.`
     );
   }
 
@@ -1279,7 +1279,7 @@ export function parseLevel(raw, registry) {
 
   // SCÈNE À DEUX FACES (modèle B, voir CLAUDE.md/"RECTO/VERSO",
   // core/state.js) : recto ET verso requis ENSEMBLE (jamais un seul), et
-  // AUCUN des champs de face (FACE_FIELDS) au niveau racine — un niveau ne
+  // AUCUN des champs de face (FACE_FIELDS) au niveau racine — une scène ne
   // mélange jamais les deux modèles, échec clair plutôt qu'une scène à
   // moitié construite. RÉTROCOMPAT STRICTE sinon : ni recto ni verso ->
   // exactement le comportement d'avant ce modèle, `raw` EST la face unique.

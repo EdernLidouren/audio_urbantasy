@@ -101,7 +101,7 @@ export function itemProps(type) {
 
 // Valide que tout tag référencé par CHAQUE objet d'un registre existe dans
 // TAG_REGISTRY — même principe que la validation des surfaces contre
-// SURFACE_REGISTRY (core/level.js), mais ITEM_REGISTRY est du CODE, pas du
+// SURFACE_REGISTRY (core/scene.js), mais ITEM_REGISTRY est du CODE, pas du
 // contenu JSON passé à un parseur : ce module se valide donc LUI-MÊME, tout
 // de suite (voir l'appel plus bas), plutôt que de dépendre d'un chemin de
 // chargement externe. Exporté (plutôt qu'un IIFE anonyme) pour rester

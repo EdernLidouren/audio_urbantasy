@@ -11,10 +11,10 @@ export function addMoney(session, amount) {
 }
 
 // Effet "pickup" (voir view/interaction.js, ACTION_HANDLERS.pickup) :
-// ajoute l'argent ET retire l'entité ramassée du lieu actif, DANS LE MÊME
+// ajoute l'argent ET retire l'entité ramassée du monde actif, DANS LE MÊME
 // nouvel état — jamais l'un sans l'autre (une entité ramassée mais pas
 // payée, ou payée mais toujours là, serait un état incohérent observable).
-// entityId DÉJÀ absent du lieu actif (déjà ramassée, id périmé, ex. double
+// entityId DÉJÀ absent du monde actif (déjà ramassée, id périmé, ex. double
 // appel) -> RÉFÉRENCE INCHANGÉE, aucun gain supplémentaire : vérifié
 // EXPLICITEMENT avant d'ajouter l'argent (pas seulement délégué à
 // removeEntity, qui dégraderait le retrait sans empêcher un second
@@ -28,7 +28,7 @@ export function pickupEntity(session, entityId, amount) {
 
 // Effet "loot" (voir view/interaction.js, ACTION_HANDLERS.loot) : COLLECTIBLE
 // PERSISTANT — donne `amount` UNE SEULE FOIS puis marque l'entité consumed
-// (voir core/state.js/markConsumed), mais NE LA RETIRE JAMAIS du lieu (voir
+// (voir core/state.js/markConsumed), mais NE LA RETIRE JAMAIS du monde (voir
 // entities/model.md/"Collectible persistant") — distinct de pickupEntity
 // ci-dessus, qui retire l'entité. IDEMPOTENCE : une entité déjà consumed ->
 // RÉFÉRENCE INCHANGÉE, AUCUN gain supplémentaire — vérifié EXPLICITEMENT

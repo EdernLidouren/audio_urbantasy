@@ -20,7 +20,7 @@
 //     matériaux sonores réels, jamais un seul filtré à la volée. Le rendu
 //     météo (view/audio/city-scene.js/declareWeatherAmbience) LIT le pool
 //     du contexte COURANT (indoor de la scène active, voir
-//     core/level.js/parseFace) — il ne COMPOSE JAMAIS un nom de pool à
+//     core/scene.js/parseFace) — il ne COMPOSE JAMAIS un nom de pool à
 //     partir de l'état (pas de "rain" + "_indoor" deviné) : le lien
 //     état+contexte -> pool est déclaré ICI, explicitement, ou nulle part.
 //     Un contexte ABSENT pour un état donné (ex. rain SANS indoor

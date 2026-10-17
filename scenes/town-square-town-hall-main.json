@@ -1,6 +1,6 @@
 {
   "id": "town_square_town_hall_main",
-  "titleKey": "level.town_square_town_hall_main.name",
+  "titleKey": "scene.town_square_town_hall_main.name",
   "length": 20,
   "playerStart": 10,
   "indoor": true,

@@ -1,6 +1,6 @@
 {
   "id": "clock_tower_weight_shaft",
-  "titleKey": "level.clock_tower_weight_shaft.name",
+  "titleKey": "scene.clock_tower_weight_shaft.name",
   "length": 50,
   "playerStart": 25,
   "recto": {

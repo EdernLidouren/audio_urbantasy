@@ -3,8 +3,8 @@
 // perception seulement, donc exempté de l'étouffement mondain. Point de
 // passage vers l'espace miroir : l'action (condition passe-miroir,
 // destination, son de passage) est déclarée PAR INSTANCE, elle dépend de
-// la scène (voir level/clock-tower-weight-shaft.json et
-// level/clock-tower-weight-shaft-mirror-space.json).
+// la scène (voir scenes/clock-tower-weight-shaft.json et
+// scenes/clock-tower-weight-shaft-mirror-space.json).
 export default {
   nameKey: "door.clock_tower_magic_mirror.name",
   descriptionKey: "door.clock_tower_magic_mirror.description",

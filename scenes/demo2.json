@@ -1,6 +1,6 @@
 {
   "id": "demo2",
-  "titleKey": "level.demo2.name",
+  "titleKey": "scene.demo2.name",
   "length": 20,
   "playerStart": 2,
   "music": "assets/musics/streets_day",

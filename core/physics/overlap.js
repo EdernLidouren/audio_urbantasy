@@ -11,9 +11,9 @@ import { isBlocking } from "../presence.js";
 // [0, length]. weightA/weightB pondèrent qui bouge en priorité (0 = ne bouge
 // que si l'autre n'a plus de marge, 1 = bouge en premier ; 0/1 pour la
 // priorité joueur, 0.5/0.5 pour une séparation symétrique entre deux
-// entités). Si un bord de niveau coupe court au déplacement prévu d'un
+// entités). Si un bord de scène coupe court au déplacement prévu d'un
 // côté, le manque est reporté sur l'autre (déterministe) ; si aucun des
-// deux n'a de marge (niveau plus court que minGap — cas dégénéré), léger
+// deux n'a de marge (scène plus courte que minGap — cas dégénéré), léger
 // chevauchement résiduel accepté : rester dans [0, length] est la seule
 // garantie ferme. Pure.
 export function separate(xA, weightA, xB, weightB, minGap, length) {
@@ -70,8 +70,8 @@ export function resolveEntityOverlaps(entities, length, presenceContext) {
 // OU impassable mais DORMANTE — voir core/presence.js) n'a pas de zone
 // d'exclusion propre : seule une paire impliquant AU MOINS UNE entité
 // bloquante est résolue. Une seule passe déterministe (ordre = celui de
-// level.entities), pas une résolution multi-corps itérative jusqu'à
-// convergence — hors périmètre pour un cas que le level design évite par
+// `entities`), pas une résolution multi-corps itérative jusqu'à
+// convergence — hors périmètre pour un cas que la conception des scènes évite par
 // construction. Idempotente sur un état déjà sans chevauchement (aucune
 // paire n'entre dans les `if`) : rejouée à un tick suivant où rien d'autre
 // ne bouge, elle ne change rien -> pas de jitter.
@@ -81,7 +81,7 @@ export function resolveOverlaps(playerX, entities, length, presenceContext) {
 
   // 1) Joueur vs chaque entité bloquante : PRIORITÉ au joueur (weight 0),
   // c'est l'entité qui s'écarte (weight 1) — sauf si elle n'a plus de marge
-  // (bord de niveau), auquel cas le report de séparation (voir `separate`)
+  // (bord de scène), auquel cas le report de séparation (voir `separate`)
   // fait bouger le joueur en dernier recours, du minimum nécessaire.
   const afterPlayer = entities.map((entity) => {
     if (!isBlocking(entity, presenceContext)) return entity;

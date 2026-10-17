@@ -1,10 +1,10 @@
 // Archétype "turret_clockwork" — la minuterie d'un clocher (voir
-// level/clock-tower-main.json). Observable, jamais interactive ; sa
+// scenes/clock-tower-main.json). Observable, jamais interactive ; sa
 // description est DYNAMIQUE (gabarit {hour}/{minute}, voir
 // doc/scripting.md/"Descriptions dynamiques"). Porte le TRIGGER HORAIRE de
 // la cloche (voir core/triggers.js) : c'est la minuterie qui commande la
 // sonnerie, l'archétype le déclare donc lui-même — contrairement au clocher
-// de la place (level/town-square.json), dont le trigger vit sur l'instance
+// de la place (scenes/town-square.json), dont le trigger vit sur l'instance
 // pour ne pas doubler la cloche sur son miroir. Gain élevé : la cloche
 // sature à 1 près de la minuterie (bornage, voir lib/audio.js).
 export default {

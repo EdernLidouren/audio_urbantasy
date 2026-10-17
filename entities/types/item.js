@@ -5,7 +5,7 @@
 //
 // Preset GÉNÉRIQUE, PAS un objet précis — contrairement à "money" (un seul
 // type d'argent, un seul nameKey pertinent), CE type recouvre N objets
-// différents (pomme, clé...) : chaque INSTANCE de niveau doit donc fournir
+// différents (pomme, clé...) : chaque INSTANCE de scène doit donc fournir
 // SON PROPRE nameKey/descriptionKey/action (nameKey/description/action.item
 // génériques n'auraient aucun sens ici). Convention : donner à l'instance
 // le MÊME nameKey que ITEM_REGISTRY[type].label, pour que le nom annoncé au

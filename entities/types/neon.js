@@ -31,7 +31,7 @@ export default {
   // 20h..6h : passage par minuit géré par core/presence.js/evaluateCondition
   // (timeRange). Une seule règle suffit — le jour n'est simplement couvert
   // par aucune, donc dormant par défaut (voir core/presence.js/isPresent).
-  // Cascade jusqu'à l'instance (core/level.js) : un niveau pourrait donner
+  // Cascade jusqu'à l'instance (core/scene.js) : une scène pourrait donner
   // d'autres horaires à un néon précis si besoin un jour.
   presence: [{ when: { type: "timeRange", from: 20, to: 6 }, present: true }],
 };

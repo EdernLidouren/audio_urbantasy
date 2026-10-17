@@ -1,6 +1,6 @@
 {
   "id": "town_square",
-  "titleKey": "level.town_square.name",
+  "titleKey": "scene.town_square.name",
   "length": 50,
   "playerStart": 26,
   "recto": {

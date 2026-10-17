@@ -5,7 +5,7 @@
 
 // Dérive un état de graine 32 bits à partir d'un nombre ou d'une chaîne
 // (hash simple) — accepte les deux pour rester pratique à l'usage (un id de
-// niveau, un entier fixe en test...).
+// scène, un entier fixe en test...).
 export function createSeed(seed) {
   if (typeof seed === "number") return seed >>> 0;
 

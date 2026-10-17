@@ -1,6 +1,6 @@
 {
   "id": "town_square_town_hall_mayor_office",
-  "titleKey": "level.town_square_town_hall_mayor_office.name",
+  "titleKey": "scene.town_square_town_hall_mayor_office.name",
   "length": 8,
   "playerStart": 8,
   "indoor": true,

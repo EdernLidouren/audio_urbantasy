@@ -8,7 +8,7 @@
 // amount:5 — défaut de l'archétype, comme tout autre champ `action` :
 // surchargeable par instance en redéclarant `action` EN ENTIER (cascade
 // remplace, jamais de fusion profonde — même principe que `behavior`,
-// `presence`), voir core/level.js.
+// `presence`), voir core/scene.js.
 
 export default {
   nameKey: "entity.money.name",

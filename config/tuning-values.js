@@ -147,12 +147,12 @@ export const TUNING_DEFAULTS = {
   cutoffMax: 20000,
 
   // Durée (s) de la réponse impulsionnelle générée du bus de réverb : la
-  // "taille" perçue du lieu. Plus haut = pièce plus grande/queue plus
+  // "taille" perçue de la scène. Plus haut = pièce plus grande/queue plus
   // longue ; plus bas = espace plus petit/sec.
   reverbDurationSec: 1.2,
 
   // Taux de déclin (1/s) de l'enveloppe de la réponse impulsionnelle : la
-  // "matière" du lieu. Plus haut = la queue s'éteint plus vite (surfaces
+  // "matière" de la scène. Plus haut = la queue s'éteint plus vite (surfaces
   // absorbantes) ; plus bas = elle traîne plus longtemps (pièce réverbérante).
   reverbDecay: 2.5,
 
@@ -178,7 +178,7 @@ export const TUNING_DEFAULTS = {
   // Durée (ms) du fondu de sortie UNIVERSEL de la musique (voir
   // lib/audio.js/fadeOutMusic, view/audio/city-scene.js) : la piste en cours
   // descend à 0 puis s'arrête, JAMAIS une coupure sèche — réutilisée par
-  // TOUT arrêt (bascule de phase jour/nuit, transition de lieu). Réglable à
+  // TOUT arrêt (bascule de phase jour/nuit, changement de scène). Réglable à
   // l'oreille — plus haut = fondu plus doux/lent ; plus bas = plus net. Ne
   // s'applique JAMAIS à l'entrée dans une scène (voir resolveMusicForPhase,
   // jouée directement, sans fondu).
@@ -189,7 +189,7 @@ export const TUNING_DEFAULTS = {
   // mécanisme réutilisé, voir switchMusicSequence) : silence complet, tirée
   // aléatoirement à CHAQUE respiration (l'irrégularité fait vivant, même
   // esprit que vocalInterval/vocalIntervalVariation). Sans effet en mode
-  // musicLoop:true (boucle continue, voir level/schema.md).
+  // musicLoop:true (boucle continue, voir doc/scene-format.md).
   musicBreatherMinMs: 3000,
   musicBreatherMaxMs: 8000,
 
@@ -372,7 +372,7 @@ export const TUNING_DEFAULTS = {
 
   // Durée (ms) du fondu de l'AMBIANCE MÉTÉO (voir core/weather.js,
   // view/audio/city-scene.js) — couche d'ÉTAT superposée à l'ambiance de
-  // lieu (lib/audio.js/setWeatherAmbienceLayer), fondue à chaque
+  // scène (lib/audio.js/setWeatherAmbienceLayer), fondue à chaque
   // transition météo. Plus lent que perceptionFadeMs par défaut : une
   // bascule météo est un changement atmosphérique graduel, jamais aussi
   // net qu'un toggle de perception.
@@ -381,7 +381,7 @@ export const TUNING_DEFAULTS = {
   // Durées (ms) du fondu de la couche ENTITÉS pendant le SAS d'un teleport
   // en mode "fade" (voir lib/audio.js/rampEntityLayerGain,
   // view/city-screen.js/runTeleportSas) — le "fondu au noir sonore" qui
-  // souligne le changement de lieu/position et masque un éventuel
+  // souligne le changement de scène/position et masque un éventuel
   // chargement. COURTES par nature (souligner sans ralentir le passage) : sortant
   // avant de détruire la scène quittée, entrant une fois la scène cible
   // prête. Musique/ambiance NE PASSENT PAS par ce gain (voir lib/audio.js,
@@ -390,7 +390,7 @@ export const TUNING_DEFAULTS = {
   doorTransitionFadeInMs: 300,
 
   // Durée (ms) du fondu qui arrête un son SUIVI (cloche, cri...) quand le
-  // joueur QUITTE le lieu où il a été émis (voir
+  // joueur QUITTE le monde où il a été émis (voir
   // view/audio/city-scene.js/stopForeignTrackedOneShots). Court : il évite
   // seulement le clic d'un arrêt net. Pendant une porte, le sas a déjà
   // éteint la couche entités, ce fondu y est inaudible.
