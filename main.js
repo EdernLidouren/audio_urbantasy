@@ -22,6 +22,7 @@ import { getPref, setPref, PREF_CONSTRAINTS } from "./config/preferences.js";
 import { configureAssetManifest } from "./lib/assets.js";
 import { checkAutoSaveTimer } from "./view/autosave-timer.js";
 import { loadGame } from "./view/save-storage.js";
+import { reportDroppedEntities } from "./view/debug-warnings.js";
 
 // Préférences de menu (sliders/toggles + cyclage/étoile/suffixe, voir
 // lib/menu.js) injectées UNE FOIS ici, point de composition unique — tout
@@ -113,7 +114,8 @@ function setSession(next) {
 // désobscurcie, parsée ET validée avec succès — voir loadGame), recalculée à
 // chaque (ré)affichage du menu principal (mainMenuScreen.onEnter ci-dessous).
 // Sert à la fois à décider si "Continuer" apparaît ET à fournir la session
-// à continueGame() sans recharger une seconde fois.
+// à continueGame() sans recharger une seconde fois. Forme : { session,
+// droppedEntities } (voir view/save-storage.js/loadGame), ou null.
 let loadableSave = null;
 
 // "Nouvelle partie" (confirmée au préalable si un save existe, voir
@@ -153,7 +155,10 @@ function startTestCityGame() {
 // toute façon que quand loadableSave n'est pas null (voir createMainMenu).
 function continueGame() {
   if (!loadableSave) return; // garde-fou, ne devrait pas arriver
-  session = loadableSave;
+  session = loadableSave.session;
+  // La sauvegarde devient la partie : c'est ici, et pas à la lecture, que
+  // ses entités retirées sont signalées (voir view/debug-warnings.js).
+  reportDroppedEntities(loadableSave.droppedEntities);
   pushScreen(makeCityScreen(getSession, setSession));
 }
 

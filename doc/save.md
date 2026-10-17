@@ -33,9 +33,13 @@ contenu à jour ; une scène jamais visitée est, elle, chargée fraîche.
    sinon `reason: "invalid"`.
 5. **Types inconnus**, seulement si un `registry` est fourni (la vue le
    fournit toujours, le core ne l'importe jamais) : une entité dont le type
-   n'existe plus est retirée, et listée dans `droppedEntities`. La vue
-   l'écrit en avertissement console. On perd l'entité, jamais la partie : la
-   garder ferait planter la scène au premier accès au registre.
+   n'existe plus est retirée, et listée dans `droppedEntities`
+   (`{ worldId, entityId, type }`, `worldId` null pour un compagnon). On
+   perd l'entité, jamais la partie : la garder ferait planter la scène au
+   premier accès au registre. La vue la signale quand la sauvegarde devient
+   la partie en cours (« Continuer », import confirmé), jamais à la simple
+   lecture : console, et journal des avertissements, ouvert de lui-même en
+   mode debug (voir `doc/entity-model.md`/"Mode debug").
 
 ## Renommer du contenu : `config/save-renames.js`
 

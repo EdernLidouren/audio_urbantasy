@@ -37,6 +37,7 @@ import { openPauseMenu } from "./menus/pause-menu.js";
 import { openWeatherDebugMenu } from "./menus/debug-weather-menu.js";
 import { openTimeDebugMenu } from "./menus/debug-time-menu.js";
 import { openTeleportDebugMenu } from "./menus/debug-teleport-menu.js";
+import { openDebugWarningsMenu, openDebugWarningsIfUnseen } from "./menus/debug-warnings-menu.js";
 import {
   openInventoryMenu,
   openEquipmentMenu,
@@ -814,6 +815,9 @@ export function makeCityScreen(getSession, setSession) {
       scene = createCityAudioScene(getSession);
       document.getElementById("game").focus();
       announceSceneName(getSession());
+      // Entrée en partie (nouvelle, continuée) : en mode debug, le journal
+      // d'avertissements s'ouvre de lui-même s'il contient du nouveau.
+      openDebugWarningsIfUnseen();
     },
     onTick() {
       // scene momentanément null pendant un rechargement de teleport (voir
@@ -979,6 +983,13 @@ export function makeCityScreen(getSession, setSession) {
       // chemin qu'une porte). Hors debug, ne fait RIEN.
       if (action === "openTeleportDebugMenu" && isDebugEnabled()) {
         openTeleportDebugMenu(getSession, executeTeleport);
+        return;
+      }
+
+      // "openWarningsDebugMenu" (Shift+L), MODE DEBUG UNIQUEMENT : journal
+      // des avertissements, nouveaux ou non. Hors debug, ne fait RIEN.
+      if (action === "openWarningsDebugMenu" && isDebugEnabled()) {
+        openDebugWarningsMenu();
         return;
       }
 

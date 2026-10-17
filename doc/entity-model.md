@@ -352,7 +352,26 @@ drapeau, en ville : Shift+W (météo, `view/menus/debug-weather-menu.js`),
 Shift+T (temps, `view/menus/debug-time-menu.js`), Shift+M (téléportation vers
 n'importe quelle scène du registre `scenes/index.js`, liste générée,
 `view/menus/debug-teleport-menu.js` — passe par l'effet `teleport` en mode
-`instant`, jamais par un chemin de chargement parallèle).
+`instant`, jamais par un chemin de chargement parallèle), Shift+L (journal
+des avertissements, voir ci-dessous).
+
+**Journal des avertissements** (`lib/warning-log.js` pour le mécanisme,
+`view/debug-warnings.js` pour l'instance et les sources,
+`view/menus/debug-warnings-menu.js` pour le menu). Un menu où chaque entrée
+est un avertissement, parcouru aux flèches : une annonce ponctuelle se perd
+facilement, une entrée de menu non. Dernière entrée : « Vider le journal ».
+- **Ouverture** : Shift+L à tout moment (mode debug), ou automatiquement, en
+  mode debug, à l'entrée en partie (nouvelle ou continuée) et après un
+  import de partie, SEULEMENT s'il contient des avertissements pas encore
+  consultés. Ouvrir le menu les marque tous comme vus.
+- **Durée de vie** : la page. Le journal n'est jamais sauvegardé : il décrit
+  ce qui s'est passé pendant la session, pas l'état de la partie.
+- **Sources** : aujourd'hui, les entités retirées d'une sauvegarde adoptée,
+  type inconnu (voir `doc/save.md`). Une source de plus = une fonction de
+  signalement dans `view/debug-warnings.js` et ses clés `debug.warnings.*`.
+  N'y brancher que ce qui est utile à l'auteur du contenu (donnée perdue,
+  contenu incohérent), jamais du bruit technique. Chaque avertissement part
+  aussi dans la console avec son détail brut.
 
 ## Collecte — conteneurs régénérants et plages au sol
 

@@ -101,20 +101,15 @@ export function saveGame(session, { playSound = true } = {}) {
 // Désenveloppe une sauvegarde déjà décodée, avec le registre de types
 // (core/save.js/deserializeGame) : une entité d'un type disparu est retirée
 // plutôt que de faire planter la scène. Point commun de loadGame et
-// importGame.
+// importGame. AUCUN signalement ici : la liste `droppedEntities` remonte à
+// l'appelant, qui la signale quand la sauvegarde devient vraiment la partie
+// en cours (view/debug-warnings.js/reportDroppedEntities).
 function readSave(parsed) {
-  const result = deserializeGame(parsed, { registry });
-  if (result.success && result.droppedEntities.length > 0) {
-    console.warn(
-      "Sauvegarde : entités retirées, type inconnu (à ajouter dans config/save-renames.js si c'est un renommage) :",
-      result.droppedEntities
-    );
-  }
-  return result;
+  return deserializeGame(parsed, { registry });
 }
 
-// Lit et désenveloppe la partie sauvegardée -> session valide, ou null si
-// absente/invalide. Ne lève jamais : lecture disque, JSON invalide et
+// Lit et désenveloppe la partie sauvegardée -> { session, droppedEntities }
+// (voir readSave), ou null si absente/invalide. Ne lève jamais : lecture disque, JSON invalide et
 // structure implausible sont tous des échecs SILENCIEUX côté appelant
 // (juste un avertissement console), jamais une exception qui remonterait.
 export function loadGame() {
@@ -148,7 +143,7 @@ export function loadGame() {
     console.warn(`loadGame: sauvegarde invalide (raison : ${result.reason}).`);
     return null;
   }
-  return result.session;
+  return { session: result.session, droppedEntities: result.droppedEntities };
 }
 
 export function hasSave() {
@@ -231,5 +226,5 @@ export async function importGame(file) {
   if (!result.success) {
     return { success: false, reason: result.reason };
   }
-  return { success: true, session: result.session };
+  return { success: true, session: result.session, droppedEntities: result.droppedEntities };
 }

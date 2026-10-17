@@ -133,14 +133,15 @@ function applyContentRenames(data) {
 // Retire les entités dont le type n'existe plus dans le registre (type
 // supprimé, ou renommé sans entrée dans config/save-renames.js). Les
 // garder ferait planter la scène au premier accès au registre ; on perd
-// l'entité, jamais la partie. Renvoie la partie et les entités retirées
-// ("<monde>/<id>:<type>") pour que l'appelant puisse avertir.
+// l'entité, jamais la partie. Renvoie la partie et les entités retirées,
+// `{ worldId, entityId, type }` (worldId null pour un compagnon), pour que
+// l'appelant puisse avertir.
 function dropUnknownEntityTypes(data, registry) {
   const dropped = [];
-  const filterFor = (label) => (entities) => {
+  const filterFor = (worldId) => (entities) => {
     const kept = entities.filter((entity) => {
       if (entity && Object.hasOwn(registry, entity.type)) return true;
-      dropped.push(`${label}/${entity && entity.id}:${entity && entity.type}`);
+      dropped.push({ worldId, entityId: entity && entity.id, type: entity && entity.type });
       return false;
     });
     return kept.length === entities.length ? entities : kept;
@@ -152,7 +153,7 @@ function dropUnknownEntityTypes(data, registry) {
     const patched = mapEntityLists(single, filterFor(id)).worlds[id];
     if (patched !== world) result = { ...result, worlds: { ...result.worlds, [id]: patched } };
   }
-  const companions = filterFor("companions")(data.companions);
+  const companions = filterFor(null)(data.companions);
   if (companions !== data.companions) result = { ...result, companions };
   return { data: result, dropped };
 }

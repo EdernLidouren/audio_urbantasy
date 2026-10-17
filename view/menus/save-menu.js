@@ -21,6 +21,8 @@ import { t } from "../../data/i18n/index.js";
 import { getPref, PREF_CONSTRAINTS, exportPreferences, importPreferences } from "../../config/preferences.js";
 import { refreshActiveBeaconVolumes } from "../audio/city-scene.js";
 import { exportGame, importGame, playSaveSound } from "../save-storage.js";
+import { reportDroppedEntities } from "../debug-warnings.js";
+import { openDebugWarningsIfUnseen } from "./debug-warnings-menu.js";
 
 const AUTOSAVE_TRANSITION = PREF_CONSTRAINTS.autoSaveOnTransition;
 const AUTOSAVE_INTERVAL = PREF_CONSTRAINTS.autoSaveIntervalMinutes;
@@ -86,7 +88,7 @@ let gameFileInput = null;
 // accidentelle d'Entrée à l'ouverture reste sans effet. Réutilise les clés
 // génériques "Annuler"/"Confirmer" déjà en place (menu.options.reset_all_*),
 // pas de doublon de traduction pour le même mot.
-function openImportConfirmation(importedSession) {
+function openImportConfirmation(importedSession, droppedEntities) {
   const menu = {
     title: "save.import_confirm_title",
     closable: true, // Échap = annuler
@@ -103,6 +105,10 @@ function openImportConfirmation(importedSession) {
             gameReplaceHandler(importedSession);
             playSaveSound();
             announce(t("save.imported"), { assertive: true });
+            // Partie importée adoptée : signalement de ses entités
+            // retirées, et journal ouvert en mode debug s'il y a du nouveau.
+            reportDroppedEntities(droppedEntities);
+            openDebugWarningsIfUnseen();
           } else {
             // Cas limite : la partie s'est terminée entre l'ouverture de ce
             // sous-menu et la confirmation (ex. retour au menu principal
@@ -142,7 +148,7 @@ function ensureGameFileInput() {
       return;
     }
 
-    openImportConfirmation(result.session);
+    openImportConfirmation(result.session, result.droppedEntities);
   });
 
   return gameFileInput;

@@ -5365,8 +5365,8 @@ export function runMovementChecks() {
   run("save types inconnus : entité renommée conservée", true, filteredResult.session.worlds[renameWorldId].entities.some((e) => e.id === "legacy-projector"));
   run(
     "save types inconnus : retraits listés pour l'avertissement",
-    `${renameWorldId}/vanished:type_that_no_longer_exists,companions/vanished-companion:type_that_no_longer_exists`,
-    filteredResult.droppedEntities.join(",")
+    `${renameWorldId}/vanished:type_that_no_longer_exists,null/vanished-companion:type_that_no_longer_exists`,
+    filteredResult.droppedEntities.map((d) => `${d.worldId}/${d.entityId}:${d.type}`).join(",")
   );
   run("save types inconnus : partie saine -> rien de retiré", 0, deserializeGame(saveEnvelope, { registry: knownTypes }).droppedEntities.length);
 

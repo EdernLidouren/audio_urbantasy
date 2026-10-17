@@ -81,6 +81,9 @@ export const CITY_BINDINGS = {
   // Shift+M, MODE DEBUG UNIQUEMENT : menu de téléportation vers n'importe
   // quelle scène du registre (voir view/menus/debug-teleport-menu.js).
   openTeleportDebugMenu: { keys: ["m"], mods: ["shift"] },
+  // Shift+L (log), MODE DEBUG UNIQUEMENT : journal des avertissements (voir
+  // view/menus/debug-warnings-menu.js).
+  openWarningsDebugMenu: { keys: ["l"], mods: ["shift"] },
   // "p" (perception) : bascule la PERCEPTION SURNATURELLE (voir
   // core/state.js/togglePerception, view/city-screen.js/togglePerceptionEffect)
   // — COOLDOWN anti-spam entièrement côté consommation (city-screen.js),
