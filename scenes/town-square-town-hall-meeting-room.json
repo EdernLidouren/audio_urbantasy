@@ -3,6 +3,7 @@
   "titleKey": "scene.town_square_town_hall_meeting_room.name",
   "length": 30,
   "playerStart": 0,
+  "variables": [{ "name": "projectorOn", "type": "flag", "initial": true, "persistent": true }],
   "recto": {
     "indoor": true,
     "musicDay": "assets/musics/town_hall_day",
@@ -114,12 +115,23 @@
         "id": "video_projector_1_r",
         "type": "video_projector",
         "x": 30,
-        "variables": [
+        "sounds": { "beacon": { "condition": { "type": "variable", "scope": "scene", "name": "projectorOn", "equals": true } } },
+        "action": [
           {
-            "name": "isOn",
-            "type": "flag",
-            "initial": true,
-            "persistent": true
+            "kind": "applyEffects",
+            "condition": { "type": "variable", "scope": "scene", "name": "projectorOn", "equals": true },
+            "effects": [
+              { "type": "playSound", "path": "assets/sounds/effects/switch_off" },
+              { "type": "setVariable", "scope": "scene", "name": "projectorOn", "value": false }
+            ]
+          },
+          {
+            "kind": "applyEffects",
+            "condition": { "type": "variable", "scope": "scene", "name": "projectorOn", "equals": false },
+            "effects": [
+              { "type": "playSound", "path": "assets/sounds/effects/switch_on" },
+              { "type": "setVariable", "scope": "scene", "name": "projectorOn", "value": true }
+            ]
           }
         ]
       }
@@ -169,7 +181,18 @@
       {
         "id": "video_projection_1_v",
         "type": "video_projection",
-        "x": 15
+        "x": 15,
+        "presence": [{ "when": { "type": "variable", "scope": "scene", "name": "projectorOn", "equals": true }, "present": true }]
+      },
+      {
+        "id": "storeroom_door_1_v",
+        "type": "door",
+        "nameKey": "door.storeroom.name",
+        "descriptionKey": "door.storeroom.description",
+        "x": 15,
+        "presence": [{ "when": { "type": "variable", "scope": "scene", "name": "projectorOn", "equals": false }, "present": true }],
+        "sounds": { "beacon": { "path": "assets/sounds/doors/door_2_close" } },
+        "action": { "kind": "applyEffects", "effects": [{ "type": "playSound", "path": "assets/sounds/doors/door_2_open" }, { "type": "teleport", "target": "town_square_town_hall_storeroom", "x": 10 }] }
       },
       {
         "id": "office_chair_3_v",

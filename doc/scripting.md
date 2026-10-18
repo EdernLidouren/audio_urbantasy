@@ -436,8 +436,10 @@ de portée `"scene"`/`"party"` vaut toujours faux. Les conditions d'action
 (`view/audio/city-scene.js`/`beaconConditionAllows`) reçoivent les mêmes
 porteurs, plus l'équipement du joueur.
 
-**Exemple d'usage — deux entités en alternance sur un état de la salle.** Un
-vidéoprojecteur écrit une variable de SCÈNE `projectorOn` ; la projection est
+**Exemple réel — deux entités en alternance sur un état de la salle**
+(`scenes/town-square-town-hall-meeting-room.json`). Le vidéoprojecteur du recto
+écrit une variable de SCÈNE `projectorOn` (son instance remplace l'action et la
+condition de beacon de son archétype par leur version `scope: "scene"`) ; la projection est
 présente quand elle vaut `true`, une porte cachée quand elle vaut `false`
 (même principe que les deux miroirs et `perceptionActive`). Une entité ne lit
 jamais les variables d'une AUTRE entité : un état partagé par plusieurs

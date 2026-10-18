@@ -1,0 +1,23 @@
+{
+  "id": "town_square_town_hall_storeroom",
+  "titleKey": "scene.town_square_town_hall_storeroom.name",
+  "length": 10,
+  "playerStart": 5,
+  "indoor": true,
+  "musicDay": "assets/musics/town_hall_day",
+  "ambiences": [],
+  "defaultSurface": "concrete",
+  "reverbDurationSec": 0.6,
+  "reverbDecay": 5.0,
+  "entities": [
+    {
+      "id": "meeting_room_door_1",
+      "type": "door",
+      "nameKey": "door.meeting_room.name",
+      "descriptionKey": "door.meeting_room.description",
+      "x": 10,
+      "sounds": { "beacon": { "path": "assets/sounds/doors/door_2_close" } },
+      "action": { "kind": "applyEffects", "effects": [{ "type": "playSound", "path": "assets/sounds/doors/door_2_open" }, { "type": "teleport", "target": "town_square_town_hall_meeting_room", "x": 15, "side": "verso" }] }
+    }
+  ]
+}

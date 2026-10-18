@@ -23,6 +23,8 @@
   "door.mayor_office.name": "mayor's office door",
   "door.meeting_room.description": "A door leading to the meeting room.",
   "door.meeting_room.name": "meeting room door",
+  "door.storeroom.description": "A discreet door leading to the storeroom.",
+  "door.storeroom.name": "storeroom door",
   "door.town_hall_main.description": "The town hall's front door. It is tall, made of pale wood, with diamond-paned glass.",
   "door.town_hall_main.name": "Town hall door",
   "door.town_hall_main.time_refusal": "The town hall only opens its doors between 8am and 8pm.",

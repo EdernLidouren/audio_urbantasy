@@ -23,6 +23,8 @@
   "door.mayor_office.name": "porte du bureau de la maire",
   "door.meeting_room.description": "Une porte donnant sur la salle de réunion.",
   "door.meeting_room.name": "porte de la salle de réunion",
+  "door.storeroom.description": "Une porte discrète donnant sur la réserve.",
+  "door.storeroom.name": "porte de la réserve",
   "door.town_hall_main.description": "La porte de l'hôtel de ville. Elle est grande, faite d'un bois clair et ajourée de vitres en losange.",
   "door.town_hall_main.name": "Porte de l'hôtel de ville",
   "door.town_hall_main.time_refusal": "L'hôtel de ville n'ouvre ses portes qu'entre 8h et 20h.",

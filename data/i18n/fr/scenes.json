@@ -9,5 +9,6 @@
   "scene.town_square.name": "Grand place",
   "scene.town_square_town_hall_main.name": "Hôtel de ville, salle principale",
   "scene.town_square_town_hall_mayor_office.name": "Hôtel de ville, bureau de la maire",
-  "scene.town_square_town_hall_meeting_room.name": "Hôtel de ville, salle de réunion"
+  "scene.town_square_town_hall_meeting_room.name": "Hôtel de ville, salle de réunion",
+  "scene.town_square_town_hall_storeroom.name": "Hôtel de ville, réserve"
 }
