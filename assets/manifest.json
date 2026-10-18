@@ -258,8 +258,11 @@
   "assets/sounds/doors/metal_ladder_1_beacon": [
     "assets/sounds/doors/metal_ladder_1_beacon_1.mp3"
   ],
-  "assets/sounds/doors/passage_wind_beacon": [
-    "assets/sounds/doors/passage_wind_beacon_1.mp3"
+  "assets/sounds/doors/passage_indoor_1_beacon": [
+    "assets/sounds/doors/passage_indoor_1_beacon_1.mp3"
+  ],
+  "assets/sounds/doors/passage_outdoor_1_beacon": [
+    "assets/sounds/doors/passage_outdoor_1_beacon_1.mp3"
   ],
   "assets/sounds/effects/big_rock_collision": [
     "assets/sounds/effects/big_rock_collision_1.mp3"
@@ -294,6 +297,9 @@
   ],
   "assets/sounds/effects/plant_shake": [
     "assets/sounds/effects/plant_shake_1.mp3"
+  ],
+  "assets/sounds/effects/pouring_water": [
+    "assets/sounds/effects/pouring_water_1.mp3"
   ],
   "assets/sounds/effects/reversed_clock_tower_bell": [
     "assets/sounds/effects/reversed_clock_tower_bell_1.mp3"
@@ -441,6 +447,22 @@
     "assets/sounds/footsteps/gaits/shoes_walk_20.mp3",
     "assets/sounds/footsteps/gaits/shoes_walk_21.mp3",
     "assets/sounds/footsteps/gaits/shoes_walk_22.mp3"
+  ],
+  "assets/sounds/footsteps/surfaces/carpet_walk": [
+    "assets/sounds/footsteps/surfaces/carpet_walk_1.mp3",
+    "assets/sounds/footsteps/surfaces/carpet_walk_2.mp3",
+    "assets/sounds/footsteps/surfaces/carpet_walk_3.mp3",
+    "assets/sounds/footsteps/surfaces/carpet_walk_4.mp3",
+    "assets/sounds/footsteps/surfaces/carpet_walk_5.mp3",
+    "assets/sounds/footsteps/surfaces/carpet_walk_6.mp3",
+    "assets/sounds/footsteps/surfaces/carpet_walk_7.mp3",
+    "assets/sounds/footsteps/surfaces/carpet_walk_8.mp3",
+    "assets/sounds/footsteps/surfaces/carpet_walk_9.mp3",
+    "assets/sounds/footsteps/surfaces/carpet_walk_10.mp3",
+    "assets/sounds/footsteps/surfaces/carpet_walk_11.mp3",
+    "assets/sounds/footsteps/surfaces/carpet_walk_12.mp3",
+    "assets/sounds/footsteps/surfaces/carpet_walk_13.mp3",
+    "assets/sounds/footsteps/surfaces/carpet_walk_14.mp3"
   ],
   "assets/sounds/footsteps/surfaces/dirt_walk": [
     "assets/sounds/footsteps/surfaces/dirt_walk_1.mp3",
@@ -592,6 +614,9 @@
     "assets/sounds/footsteps/surfaces/wood_walk_19.mp3",
     "assets/sounds/footsteps/surfaces/wood_walk_20.mp3"
   ],
+  "assets/sounds/furniture/bench_1_beacon": [
+    "assets/sounds/furniture/bench_1_beacon_1.mp3"
+  ],
   "assets/sounds/furniture/box_1_beacon": [
     "assets/sounds/furniture/box_1_beacon_1.mp3"
   ],
@@ -652,6 +677,9 @@
   ],
   "assets/sounds/furniture/reversed_clock_4_beacon": [
     "assets/sounds/furniture/reversed_clock_4_beacon_1.mp3"
+  ],
+  "assets/sounds/furniture/table_1_beacon": [
+    "assets/sounds/furniture/table_1_beacon_1.mp3"
   ],
   "assets/sounds/furniture/video_projection_1_beacon": [
     "assets/sounds/furniture/video_projection_1_beacon_1.mp3"

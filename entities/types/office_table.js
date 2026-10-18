@@ -5,7 +5,7 @@ export default {
   nameKey: "entity.office_table.name",
   descriptionKey: "entity.office_table.description",
   sounds: {
-    beacon: { path: "assets/sounds/furniture/furniture_heavy_1_beacon", loop: true },
+    beacon: { path: "assets/sounds/furniture/table_1_beacon", loop: true },
   },
   blocksMovement: false,
   observable: true,

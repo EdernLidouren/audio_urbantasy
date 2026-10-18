@@ -25,6 +25,7 @@
 // PRESETS d'entités, voir entities/model.md).
 export const SURFACE_REGISTRY = {
   asphalt: { neutral: true },
+  carpet: { neutral: false },
   concrete: { neutral: true },
   dirt: { neutral: false },
   grass: { neutral: false },

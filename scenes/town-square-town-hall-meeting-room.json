@@ -7,7 +7,7 @@
     "indoor": true,
     "musicDay": "assets/musics/town_hall_day",
     "ambiences": [],
-    "defaultSurface": "concrete",
+    "defaultSurface": "carpet",
     "reverbDurationSec": 3.5,
     "reverbDecay": 3.0,
     "entities": [
@@ -40,6 +40,7 @@
       {
         "id": "passage_1_r",
         "type": "passage",
+        "sounds": { "beacon": { "path": "assets/sounds/doors/passage_indoor_1_beacon" } },
         "x": 2,
         "descriptionKey": "passage.town_hall_meeting_room.description",
         "action": {
@@ -50,6 +51,7 @@
       {
         "id": "office_chair_1_r",
         "type": "office_chair",
+        "sounds": { "beacon": null },
         "x": 8
       },
       {
@@ -60,11 +62,13 @@
       {
         "id": "office_chair_2_r",
         "type": "office_chair",
+        "sounds": { "beacon": null },
         "x": 12
       },
       {
         "id": "office_chair_3_r",
         "type": "office_chair",
+        "sounds": { "beacon": null },
         "x": 13
       },
       {
@@ -75,11 +79,13 @@
       {
         "id": "office_chair_4_r",
         "type": "office_chair",
+        "sounds": { "beacon": null },
         "x": 17
       },
       {
         "id": "office_chair_5_r",
         "type": "office_chair",
+        "sounds": { "beacon": null },
         "x": 18
       },
       {
@@ -90,11 +96,13 @@
       {
         "id": "office_chair_6_r",
         "type": "office_chair",
+        "sounds": { "beacon": null },
         "x": 22
       },
       {
         "id": "passage_2_r",
         "type": "passage",
+        "sounds": { "beacon": { "path": "assets/sounds/doors/passage_indoor_1_beacon" } },
         "x": 28,
         "descriptionKey": "passage.town_hall_meeting_room.description",
         "action": {
@@ -121,7 +129,7 @@
     "indoor": true,
     "musicDay": "assets/musics/town_hall_day",
     "ambiences": [],
-    "defaultSurface": "concrete",
+    "defaultSurface": "carpet",
     "reverbDurationSec": 3.5,
     "reverbDecay": 3.0,
     "entities": [
@@ -133,6 +141,7 @@
       {
         "id": "passage_1_v",
         "type": "passage",
+        "sounds": { "beacon": { "path": "assets/sounds/doors/passage_indoor_1_beacon" } },
         "x": 2,
         "descriptionKey": "passage.town_hall_meeting_room.description",
         "action": {
@@ -143,6 +152,7 @@
       {
         "id": "office_chair_1_v",
         "type": "office_chair",
+        "sounds": { "beacon": null },
         "x": 8
       },
       {
@@ -153,6 +163,7 @@
       {
         "id": "office_chair_2_v",
         "type": "office_chair",
+        "sounds": { "beacon": null },
         "x": 12
       },
       {
@@ -163,6 +174,7 @@
       {
         "id": "office_chair_3_v",
         "type": "office_chair",
+        "sounds": { "beacon": null },
         "x": 18
       },
       {
@@ -173,11 +185,13 @@
       {
         "id": "office_chair_4_v",
         "type": "office_chair",
+        "sounds": { "beacon": null },
         "x": 22
       },
       {
         "id": "passage_2_v",
         "type": "passage",
+        "sounds": { "beacon": { "path": "assets/sounds/doors/passage_indoor_1_beacon" } },
         "x": 28,
         "descriptionKey": "passage.town_hall_meeting_room.description",
         "action": {

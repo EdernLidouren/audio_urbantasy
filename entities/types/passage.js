@@ -6,7 +6,7 @@
 // face) est TOUJOURS fourni par l'instance de scène, jamais par ce défaut
 // — il dépend entièrement de la géométrie de la scène qui l'instancie.
 //
-// beacon : passage_wind_beacon, un souffle de vent en boucle CONTINUE
+// beacon : passage_outdoor_1_beacon (souffle de vent), en boucle CONTINUE
 // (fichier ~12 s, bien au-delà du seuil de 1,5 s exigé par Howler pour une
 // boucle fiable, voir doc/entity-model.md) — essai en cours pour signaler
 // à l'oreille un passage SANS porte, distinct du beacon ponctuel des portes.
@@ -26,7 +26,7 @@ export default {
   nameKey: "passage.default.name",
   descriptionKey: "passage.default.description",
   sounds: {
-    beacon: { path: "assets/sounds/doors/passage_wind_beacon", loop: true },
+    beacon: { path: "assets/sounds/doors/passage_outdoor_1_beacon", loop: true },
   },
   blocksMovement: false,
   observable: true,
