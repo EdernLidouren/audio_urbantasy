@@ -3,6 +3,8 @@
   "titleKey": "scene.clock_tower_main.name",
   "length": 50,
   "playerStart": 25,
+  "faceMufflingGain": 0.7,
+  "faceMufflingLowpassHz": 2500,
   "recto": {
     "indoor": true,
     "music": "assets/musics/sanctuary",

@@ -320,16 +320,30 @@ export const TUNING_DEFAULTS = {
   // view/audio/city-scene.js/effectiveMuffle). Chaque profil = un passe-bas
   // (Hz) + un facteur de volume (0-1) COMPOSÉ avec le volume déjà dérivé de
   // la distance, jamais à sa place. Bac à sable de réglage, même principe
-  // que le profil isFlying juste au-dessus. GLOBAL (pas cascadé par
-  // entité/type).
+  // que le profil isFlying juste au-dessus. Jamais cascadé par entité/type.
 
   // Profil de l'AUTRE FACE (voir CLAUDE.md/"RECTO/VERSO" étape 2/2) :
   // appliqué à tout son positionné d'une entité de la face que le joueur ne
-  // regarde PAS — jamais aux beacons, coupés entièrement. Fixe (amount
-  // toujours 1). Bas = très sourd/lointain, haut = à peine étouffé ;
-  // l'autre face se DEVINE, elle ne s'entend pas comme si le joueur y était.
+  // regarde PAS. Fixe (amount toujours 1). Bas = très sourd/lointain, haut
+  // = à peine étouffé ; l'autre face se DEVINE, elle ne s'entend pas comme
+  // si le joueur y était. DÉFAUTS : une scène à deux faces peut déclarer
+  // les siens à sa racine (même nom de champ, voir doc/scene-format.md) —
+  // l'étouffement décrit ce qui sépare les deux faces, une propriété du
+  // lieu, jamais d'une entité.
   faceMufflingLowpassHz: 1000,
   faceMufflingGain: 0.5,
+
+  // Gain PAR RÔLE d'un son entendu depuis l'AUTRE face (multiplicatif,
+  // composé avec l'étouffement ci-dessus et le gain du rôle). Cascade
+  // complète : descripteur de son (même nom de champ, ex.
+  // sounds.vocal.vocalCrossFaceGain), puis tuning d'instance, puis
+  // archétype, puis ce défaut. 0 = jamais entendu depuis l'autre face (et
+  // aucun son construit pour elle) ; 1 = étouffement normal ; >1 = porte
+  // plus loin. Les sons d'apparition/disparition (enterSound/exitSound)
+  // suivent vocalCrossFaceGain.
+  beaconCrossFaceGain: 0,
+  vocalCrossFaceGain: 1,
+  movementCrossFaceGain: 1,
 
   // Profil de la PERCEPTION SURNATURELLE (voir doc/scripting.md/
   // "perceptionActive") : appliqué aux entités MONDAINES de la face

@@ -22,7 +22,7 @@ Une entité (registre `entities/types/index.js`, un fichier par archétype dans
 | Sons par rôle            | `sounds: { <rôle>: descripteur }` (registre ET instance, cascade PAR FUSION PROFONDE, voir "Cascade de sounds") | voir "Vocabulaire de sons" ci-dessous |
 | Portée spatiale           | `audibleRange`, `panSaturation`, `interactRange`, `cutoffMin`, `cutoffMax` | où/comment une entité est perçue dans l'espace — voir "Ce qui n'est PAS un paramètre sonore" |
 | Surlignage audio          | `highlight` (cascade instance -> type -> défaut `false`)           | gain de proximité, voir "Surlignage audio de proximité" plus bas — INDÉPENDANT de `observable`/`interactable` |
-| Paramètres sonores        | `reverbSend`, `beaconMode`, `beaconInterval`, `beaconIntervalVariation`, `beaconGain`, `vocalInterval`, `vocalIntervalVariation`, `vocalGain`, `pitchVariation`, `movementStepMultiplier`, `movementGain`, `enterSoundGain`, `exitSoundGain` | voir "Paramètres sonores" ci-dessous, surchargeables à l'instance via `tuning` (voir "Le palier INSTANCE") |
+| Paramètres sonores        | `reverbSend`, `beaconMode`, `beaconInterval`, `beaconIntervalVariation`, `beaconGain`, `vocalInterval`, `vocalIntervalVariation`, `vocalGain`, `pitchVariation`, `movementStepMultiplier`, `movementGain`, `enterSoundGain`, `exitSoundGain`, `beaconCrossFaceGain`, `vocalCrossFaceGain`, `movementCrossFaceGain` | voir "Paramètres sonores" ci-dessous, surchargeables à l'instance via `tuning` (voir "Le palier INSTANCE") |
 | Drapeaux                 | `blocksMovement`                                                   | collision (core) |
 | Capacités d'interaction  | `observable`, `interactable` (cascade instance -> type, comme `blocksMovement`) | voir "Interaction (niveau 0)" plus bas |
 | Présence conditionnelle  | `presence` (cascade instance -> type, comme `blocksMovement`)      | voir "Présence conditionnelle" plus bas |
@@ -1521,24 +1521,53 @@ espace fermé pour tout ce qui est spatial/logique :
   interférence entre les deux flux.
 
 **Seul le SON traverse** — voir `view/audio/city-scene.js` : les entités de
-l'AUTRE face sont rendues en ÉTOUFFÉ (passe-bas + atténuation de gain,
-profil `faceMufflingLowpassHz`/`faceMufflingGain`, `config/tuning-values.js`
-— distinct du profil de perception surnaturelle), toujours
-DIRECTIONNELLES (même pan/distance dérivés de leur x que d'habitude) — sauf
-leur BEACON, jamais construit pour l'autre face EN JEU NORMAL
-(`includeBeacon:false`) : on DEVINE la présence de l'autre face, on ne la
-LOCALISE jamais. Au basculement de face, normal et étouffé s'inversent —
+l'AUTRE face sont rendues en ÉTOUFFÉ, toujours DIRECTIONNELLES (même
+pan/distance dérivés de leur x que d'habitude).
+
+- **L'étouffement est celui de la SCÈNE** : il décrit ce qui sépare les deux
+  faces (un mur épais, une cloison...), jamais une entité. Champs racine
+  optionnels `faceMufflingGain` (0-1) et `faceMufflingLowpassHz` (voir
+  `doc/scene-format.md`), sinon les défauts de `config/tuning-values.js`.
+  Distinct du profil de perception surnaturelle.
+- **Chaque rôle est dosé par son gain "autre face"**, multiplié avec
+  l'étouffement et le gain du rôle, même cascade que `beaconGain` (descripteur
+  de son, tuning d'instance, archétype, défaut) :
+
+  | Réglage | Défaut | Rôle |
+  |---|---|---|
+  | `beaconCrossFaceGain` | 0 | beacon, continu ou intermittent |
+  | `vocalCrossFaceGain` | 1 | vocal, et aussi `enterSound`/`exitSound` |
+  | `movementCrossFaceGain` | 1 | pas (rôle `movement`) |
+
+  **0 = jamais entendu depuis l'autre face**, et rien n'est construit pour
+  lui. 1 = étouffement normal, >1 = porte plus loin. Par défaut, le beacon
+  n'est donc pas entendu : on DEVINE l'autre face, on ne la LOCALISE pas,
+  sauf entité réglée pour porter à travers. Exemple, un PNJ qu'on n'entend
+  pas parler à travers le mur :
+  `"sounds": { "vocal": { "vocalCrossFaceGain": 0 } }` ; une machine qu'on
+  repère d'un côté comme de l'autre :
+  `"sounds": { "beacon": { "beaconCrossFaceGain": 1 } }`.
+- Les sons d'ACTION et de déclencheur (`playSound`, la cloche) restent
+  entendus étouffés, dosés par leur propre `gain`.
+
+Au basculement de face, normal et étouffé s'inversent —
 ANIMÉ par un SAS (jeu gelé, voir `view/city-screen.js`/`sideSwitchEffect`) :
 un CROISEMENT DE FILTRES (`view/audio/city-scene.js`/`crossfadeFaceSwap`)
 ferme le filtre de la face quittée pendant qu'il ouvre celui de la face
 rejointe, les deux restant AUDIBLES tout du long (pas un fondu vers le
-silence). Pour porter ce croisement, `crossfadeFaceSwap` construit des
-balises TEMPORAIRES pour les beacons continus de l'autre face — SEULE
-exception à `includeBeacon:false`, bornée à la durée du sas et détruite à
-sa fin (jamais persistée) : l'invariant "on ne localise jamais l'autre
-face" reste vrai en dehors de cette fenêtre. Le croisement terminé, la
-scène audio est reconstruite (comme avant ce mécanisme), sans effet
-audible puisque le son y est déjà.
+silence) : chaque balise continue fond vers le niveau que la face
+d'arrivée lui donnera — celles de la face quittée vers leur rendu "autre
+face" (silence si `beaconCrossFaceGain` vaut 0), celles de l'autre face
+vers leur rendu net. Une balise de l'autre face déjà entendue à travers est
+simplement ouverte ; les autres reçoivent une balise TEMPORAIRE, partie de
+leur niveau "autre face", bornée à la durée du sas. Le croisement terminé,
+la scène audio est reconstruite sur la nouvelle face, avec un RELAIS des
+balises en boucle (`destroy({ handover: true })`, voir
+`view/city-screen.js`/`sideSwitchEffect`) : la nouvelle scène reprend la
+balise en cours de chaque entité qui en a besoin, déjà au bon niveau grâce
+au fondu, au lieu de la recréer — ni coupure, ni retour au début du
+fichier, ni délai de désempilement. Les balises non reprises (déjà fondues
+au silence) sont arrêtées ensuite.
 
 **Pas du joueur pendant la transition** (voir
 `view/audio/city-scene.js`/`playTransitionSteps`/`playArrivalStep`,

@@ -17,7 +17,9 @@ export default {
   nameKey: "entity.video_projector.name",
   descriptionKey: "entity.video_projector.description",
   sounds: {
-    beacon: { path: "assets/sounds/furniture/video_projector_1_beacon", loop: true, condition: IS_ON },
+    // Légèrement audible depuis l'autre face d'une scène recto/verso (voir
+    // config/tuning-values.js/beaconCrossFaceGain) : un appareil bruyant.
+    beacon: { path: "assets/sounds/furniture/video_projector_1_beacon", loop: true, condition: IS_ON, beaconCrossFaceGain: 0.3 },
   },
   action: [
     {

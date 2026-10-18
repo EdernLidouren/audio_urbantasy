@@ -4900,6 +4900,37 @@ export function runMovementChecks() {
     getActiveWorld(scenePresenceState).entities.filter((e) => e.presence).map((e) => e.presenceChanged).join(",")
   );
 
+  // --- Étouffement de l'autre face déclaré par la SCÈNE (racine,
+  // core/scene.js/parseScene) : transporté sur la scène parsée puis sur le
+  // monde, validé en bornes, réservé aux scènes à deux faces. ---
+  const mufflingScene = (extra, twoFaced = true) => ({
+    id: "muffling",
+    titleKey: "scene.demo.name",
+    length: 10,
+    playerStart: 0,
+    ...(twoFaced ? { recto: { entities: [] }, verso: { entities: [] } } : { entities: [] }),
+    ...extra,
+  });
+  const parsedMuffling = parseScene(mufflingScene({ faceMufflingGain: 0.2, faceMufflingLowpassHz: 600 }), {});
+  run("étouffement de scène : transporté", "0.2/600", `${parsedMuffling.faceMufflingGain}/${parsedMuffling.faceMufflingLowpassHz}`);
+  run(
+    "étouffement de scène : présent sur la face active du monde",
+    0.2,
+    getActiveWorld(createInitialState(parsedMuffling, "muffling", NO_COMPANIONS)).faceMufflingGain
+  );
+  run("étouffement de scène : absent -> non défini (défaut résolu par la vue)", undefined, parseScene(mufflingScene({}), {}).faceMufflingGain);
+  const mufflingThrows = (raw) => {
+    try {
+      parseScene(raw, {});
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  run("étouffement de scène : gain > 1 refusé", true, mufflingThrows(mufflingScene({ faceMufflingGain: 1.5 })));
+  run("étouffement de scène : passe-bas nul refusé", true, mufflingThrows(mufflingScene({ faceMufflingLowpassHz: 0 })));
+  run("étouffement de scène : refusé sur une scène simple", true, mufflingThrows(mufflingScene({ faceMufflingGain: 0.3 }, false)));
+
   // --- Outils de debug : recharger la scène active depuis son fichier,
   // oublier les autres mondes (core/state.js/reloadActiveWorld,
   // forgetInactiveWorlds). L'état du monde rechargé repart de zéro, le

@@ -694,11 +694,16 @@ export function makeCityScreen(getSession, setSession) {
       scene.playTransitionSteps(entity, FACE_SWITCH_FADE_MS);
       await scene.crossfadeFaceSwap(FACE_SWITCH_FADE_MS);
 
-      scene.destroy();
+      // Relais des balises en boucle : la scène reconstruite reprend celles
+      // dont elle a besoin, déjà au bon niveau grâce au fondu, sans les
+      // relancer depuis le début (aucune micro-coupure). Les autres, que le
+      // fondu a déjà amenées au silence, sont arrêtées ensuite.
+      const handover = scene.destroy({ handover: true });
       scene = null;
       setSession(switchSide(getSession(), arrivalX));
       clearInteractionCooldowns();
-      scene = createCityAudioScene(getSession);
+      scene = createCityAudioScene(getSession, { handover });
+      for (const unused of handover.values()) unused.stop();
       scene.playArrivalStep(entity, arrivalX);
     } finally {
       popScreen();

@@ -37,6 +37,8 @@ FACE recto/verso vide (`parseFace`, même mécanisme).
 | `segments`    | Segment[] | optionnel : zones qui PATCHENT `defaultSurface` sur des portions de la scène (voir "Surfaces de sol" plus bas). Absent -> `[]`, `defaultSurface` partout. |
 | `spawnRanges` | SpawnRange[] | optionnel : PLAGES de collecte au sol (voir `doc/entity-model.md`/"Collecte", `core/spawn.js`) — `{ from, to, count?, distribution }` : bornes comme un segment (`from < to`, dans `[0, length]`), `count` entier `>= 1` (défaut `config/spawn-values.js`/`SPAWN_RANGE_DEFAULT_COUNT`), `distribution` = `{ table: "<nom de SPAWN_TABLES>" }` ou `{ items: { <objet ITEM_REGISTRY>: <poids> } }` (validée au chargement, échec clair). SPARSE : absent -> aucune clé. Champ de FACE (chaque face d'une scène à deux faces déclare les siennes). À chaque cycle quotidien (au CHARGEMENT du monde), `count` collectibles y sont posés à des positions tirées au PRNG seedé — entités RUNTIME marquées `spawned: true`, ramassables via `"pickup"`, remplacées au cycle suivant. |
 | `indoor`      | boolean  | optionnel, défaut `false` (extérieur) : propriété de NATURE DE SCÈNE — TOUJOURS résolue en booléen sur une face parsée (comme `defaultSurface`, jamais `undefined`). Aujourd'hui consultée par le rendu d'ambiance météo pour choisir le pool outdoor/indoor de l'état courant (voir `doc/scripting.md`/"weather", `config/weather-values.js`) — délibérément générique, un futur consommateur (réverb, sons ambiants...) pourra la lire aussi sans rien changer ici. |
+| `faceMufflingGain` | number | optionnel, **scène à deux faces seulement** (refusé sinon) : facteur de volume (0-1) appliqué à tout son entendu depuis l'AUTRE face — ce qui sépare les deux faces (mur épais, cloison...). Absent -> défaut de `config/tuning-values.js`. Validé en bornes au chargement. |
+| `faceMufflingLowpassHz` | number | optionnel, **scène à deux faces seulement** : passe-bas (Hz, > 0) du même étouffement. Absent -> défaut de `config/tuning-values.js`. |
 | `variables`   | Variable[] | optionnel : déclarations de portée **"scene"** (voir `doc/scripting.md`/"Variables" pour le modèle complet — nom/type/valeur initiale/persistance). RACINE PARTAGÉE, jamais un champ de FACE (une scène à deux faces n'a qu'UN SEUL sac, commun à recto ET verso). **TOUJOURS résolu** (sac vide `{}` si absent, jamais `undefined`), comme `defaultSurface`/`indoor` — contrairement au sac SPARSE d'une entité (voir tableau "Entité" plus bas). |
 
 ## Scène à deux faces (recto/verso)
@@ -121,15 +123,11 @@ STRICTE (voir `doc/entity-model.md`/"Recto/verso") : collision, ciblage de
 comportement (`follow`/`goto`), interaction et occupation restent bornés à
 la face de l'entité, jamais croisés. Seul le SON traverse : les entités de
 l'autre face sont rendues en ÉTOUFFÉ (passe-bas + atténuation de gain,
-réglages `faceMufflingLowpassHz`/`faceMufflingGain` — `config/tuning-values.js`),
-directionnelles (même pan/distance que d'habitude), SAUF leur beacon,
-jamais audible de l'autre côté en temps normal (aucune localisation
-croisée) — voir `view/audio/city-scene.js`/`includeBeacon`. EXCEPTION
-BORNÉE AU SAS : `crossfadeFaceSwap` construit des balises TEMPORAIRES pour
-les beacons continus de l'autre face, SEULEMENT le temps du croisement, afin
-d'avoir un filtre à ouvrir — détruites à la fin du sas, jamais persistées ;
-l'invariant "jamais de beacon localisable de l'autre face" reste intact en
-dehors de cette fenêtre. Au basculement de face, normal et étouffé
+champs racine `faceMufflingGain`/`faceMufflingLowpassHz` ci-dessous, sinon
+`config/tuning-values.js`), directionnelles (même pan/distance que
+d'habitude), chaque rôle dosé par son gain "autre face" — par défaut le
+beacon n'y est pas entendu (voir `doc/entity-model.md`/"Recto/verso" pour
+les réglages par rôle). Au basculement de face, normal et étouffé
 s'inversent — c'est ce croisement qui l'anime désormais, plutôt qu'un
 échange instantané.
 

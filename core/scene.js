@@ -1235,7 +1235,7 @@ export function parseScene(raw, registry) {
     fail("le registre de types est manquant ou invalide.");
   }
 
-  const { id, titleKey, length, playerStart, recto, verso, variables } = raw;
+  const { id, titleKey, length, playerStart, recto, verso, variables, faceMufflingGain, faceMufflingLowpassHz } = raw;
 
   // id/titleKey/length : ABSENTS -> défauts génériques (DEFAULT_SCENE_*,
   // voir header) ; PRÉSENTS mais malformés -> erreur claire, inchangé — la
@@ -1284,6 +1284,31 @@ export function parseScene(raw, registry) {
   // moitié construite. RÉTROCOMPAT STRICTE sinon : ni recto ni verso ->
   // exactement le comportement d'avant ce modèle, `raw` EST la face unique.
   const isTwoFaced = recto !== undefined || verso !== undefined;
+
+  // faceMufflingGain / faceMufflingLowpassHz (optionnels, RACINE) :
+  // étouffement de ce qui SÉPARE les deux faces (un mur épais, une simple
+  // cloison...), appliqué à tout son de l'autre face. Propriété de la scène,
+  // jamais d'une entité : le gain par rôle (beaconCrossFaceGain...) dose
+  // ensuite chaque entité. Absents -> défauts de config/tuning-values.js
+  // (résolus par la vue). Réservés aux scènes à deux faces : une scène
+  // simple n'a pas d'autre face à étouffer.
+  const muffling = {};
+  if (faceMufflingGain !== undefined) {
+    if (!isFiniteNumber(faceMufflingGain) || faceMufflingGain < 0 || faceMufflingGain > 1) {
+      fail(`faceMufflingGain doit être un nombre entre 0 et 1 (reçu : ${JSON.stringify(faceMufflingGain)}).`);
+    }
+    muffling.faceMufflingGain = faceMufflingGain;
+  }
+  if (faceMufflingLowpassHz !== undefined) {
+    if (!isFiniteNumber(faceMufflingLowpassHz) || faceMufflingLowpassHz <= 0) {
+      fail(`faceMufflingLowpassHz doit être un nombre > 0 (reçu : ${JSON.stringify(faceMufflingLowpassHz)}).`);
+    }
+    muffling.faceMufflingLowpassHz = faceMufflingLowpassHz;
+  }
+  if (!isTwoFaced && Object.keys(muffling).length > 0) {
+    fail("faceMufflingGain/faceMufflingLowpassHz sont réservés aux scènes à deux faces (recto/verso).");
+  }
+
   if (isTwoFaced) {
     if (recto === undefined || verso === undefined) {
       fail("une scène à deux faces doit déclarer recto ET verso, jamais un seul.");
@@ -1302,6 +1327,7 @@ export function parseScene(raw, registry) {
       length: resolvedLength,
       playerStart: resolvedPlayerStart,
       variables: resolvedVariables,
+      ...muffling,
       recto: parsedRecto,
       verso: parsedVerso,
     };

@@ -41,11 +41,12 @@
 // isolées). Cette vue rend la face COURANTE normalement (entitySounds,
 // inchangé) ET l'AUTRE face en ÉTOUFFÉ (otherEntitySounds) — même
 // positionnement (pan/distance) que d'habitude, PLUS un passe-bas et une
-// atténuation de gain (MUFFLING_LOWPASS_HZ/MUFFLING_GAIN,
-// config/tuning-values.js), voir playPositionedOneShot. Un seul son est
-// EXCLU du rendu NORMAL de l'autre face : le BEACON (localisation) — on
-// DEVINE sa présence, on ne la localise jamais (buildEntitySoundEntry/
-// includeBeacon). Occupation/interaction restent scopées à la face
+// atténuation de gain (faceMufflingLowpassHz/faceMufflingGain, de la
+// scène sinon de config/tuning-values.js), voir playPositionedOneShot.
+// Chaque rôle est dosé par son gain "autre face" (beaconCrossFaceGain...,
+// voir buildEntitySoundEntry/otherFace) : par défaut le BEACON n'y est pas
+// entendu — on DEVINE l'autre face, on ne la localise pas — sauf entité
+// réglée pour porter à travers. Occupation/interaction restent scopées à la face
 // courante (entitySounds seul) : le rendu étouffé n'ajoute AUCUNE cible
 // d'interaction.
 //
@@ -53,11 +54,10 @@
 // sideSwitchEffect) : au lieu d'un échange instantané (normal <-> étouffé),
 // crossfadeFaceSwap (plus bas) CROISE les deux filtres d'occlusion — la
 // face courante ferme le sien pendant que l'autre ouvre le sien, toutes
-// deux restant AUDIBLES (jamais un fondu vers le silence). SEULE exception
-// BORNÉE à `includeBeacon:false` : le temps de ce croisement, des balises
-// TEMPORAIRES portent le filtre qui s'ouvre pour les beacons continus de
-// l'autre face — détruites dès le croisement terminé, jamais ajoutées à
-// otherEntitySounds.
+// deux restant AUDIBLES. Les beacons continus de l'autre face qui n'y sont
+// pas déjà entendus (gain "autre face" à 0) reçoivent, le temps de ce
+// croisement, une balise TEMPORAIRE qui porte le filtre qui s'ouvre —
+// détruite dès le croisement terminé, jamais ajoutée à otherEntitySounds.
 
 import {
   playOneShot,
@@ -214,15 +214,14 @@ const BEACON_STAGGER_MAX_MS = TUNING_DEFAULTS.beaconStaggerMaxMs;
 // Deux PROFILS d'étouffement (voir config/tuning-values.js), UNE chaîne de
 // rendu (applyMuffle*, spatialRendering, playPositionedOneShot) : l'AUTRE
 // face (RECTO/VERSO étape 2/2 — tout son positionné d'une entité de la face
-// non courante, jamais ses beacons, voir buildEntitySoundEntry/
-// includeBeacon) et la PERCEPTION surnaturelle (entités mondaines de la
+// non courante, dosé par rôle, voir buildEntitySoundEntry/otherFace —
+// profil propre à chaque scène, voir faceMuffle dans createCityAudioScene)
+// et la PERCEPTION surnaturelle (entités mondaines de la
 // face courante, en fondu). Un étouffement = { amount, gain, lowpassHz } :
 // amount (0..1) dose, gain/lowpassHz viennent du profil — voir
 // effectiveMuffle.
-const FACE_MUFFLE = { gain: TUNING_DEFAULTS.faceMufflingGain, lowpassHz: TUNING_DEFAULTS.faceMufflingLowpassHz };
 const PERCEPTION_MUFFLE = { gain: TUNING_DEFAULTS.perceptionMufflingGain, lowpassHz: TUNING_DEFAULTS.perceptionMufflingLowpassHz };
 const NO_MUFFLE = Object.freeze({ amount: 0, gain: 1, lowpassHz: undefined });
-const FULL_FACE_MUFFLE = Object.freeze({ amount: 1, ...FACE_MUFFLE });
 
 function applyMuffleToVolume(volume, muffle) {
   if (muffle.amount <= 0) return volume;
@@ -718,14 +717,21 @@ let activeScene = null;
 // tardive), jamais deux implémentations à maintenir en parallèle.
 // `session` : la partie COURANTE, lue seulement pour résoudre la présence
 // de départ (voir plus bas) avec le même contexte que le TICK.
-// includeBeacon (défaut true) : `false` pour une entité de l'AUTRE face
-// d'une scène à deux faces (RECTO/VERSO étape 2/2, voir CLAUDE.md) — AUCUN
-// beacon, ni continu ni intermittent, jamais construit dans ce cas (`beacon`
-// reste undefined, exactement comme un type qui n'en déclare aucun) : on
-// DEVINE la présence de l'autre face, on ne la LOCALISE pas. Vocal/movement/
-// enterSound/exitSound restent inchangés (rendus en ÉTOUFFÉ par l'appelant,
-// voir playPositionedOneShot/playTransitionSound, jamais coupés ici).
-function buildEntitySoundEntry(entity, session, { includeBeacon = true, disableStagger = false } = {}) {
+// otherFace (défaut false) : `true` pour une entité de l'AUTRE face d'une
+// scène à deux faces (RECTO/VERSO étape 2/2, voir CLAUDE.md), rendue
+// ÉTOUFFÉE par l'appelant. Chaque rôle y est alors dosé par son gain
+// "autre face" (beaconCrossFaceGain, vocalCrossFaceGain — qui vaut aussi
+// pour enterSound/exitSound — et movementCrossFaceGain, voir
+// config/tuning-values.js), MULTIPLIÉ ici dans le gain du rôle : 0 = rôle
+// jamais construit pour l'autre face (exactement comme un type qui n'en
+// déclare aucun). Par défaut seul le beacon est à 0 : on DEVINE l'autre
+// face, on ne la LOCALISE pas, sauf entité réglée pour porter à travers.
+// handover (optionnel) : Map id d'entité -> balise continue DÉJÀ EN COURS,
+// transmise par la scène précédente (bascule recto/verso, voir
+// createCityAudioScene). Une entrée qui a besoin d'une balise continue y
+// reprend la sienne (retirée de la Map) au lieu d'en créer une : la boucle
+// continue sans coupure ni retour au début.
+function buildEntitySoundEntry(entity, session, { otherFace = false, disableStagger = false, handover = null } = {}) {
   // beacon (localisation) et vocal (expression) : descripteurs de son du
   // type, tous deux OPTIONNELS et indépendants (voir entities/model.md) —
   // ni l'un ni l'autre n'est "le" son obligatoire d'une entité. `entity.sounds`
@@ -735,13 +741,29 @@ function buildEntitySoundEntry(entity, session, { includeBeacon = true, disableS
   // beacon: null) n'existe donc déjà plus ICI, rien à revérifier contre
   // l'archétype.
   const sounds = entity.sounds;
-  const beacon = includeBeacon ? sounds.beacon : undefined;
-  const vocal = sounds.vocal;
+  // Gains "autre face" par rôle, résolus pour TOUTE entrée (la bascule de
+  // face, crossfadeFaceSwap, s'en sert aussi pour les beacons de la face
+  // courante). faceGain : le multiplicateur réellement appliqué, neutre sur
+  // la face courante.
+  const beaconCrossFaceGain = resolveTuning("beaconCrossFaceGain", entity, sounds.beacon);
+  const vocalCrossFaceGain = resolveTuning("vocalCrossFaceGain", entity, sounds.vocal);
+  const movementCrossFaceGain = resolveTuning("movementCrossFaceGain", entity, sounds.movement);
+  const faceGain = (crossFaceGain) => (otherFace ? crossFaceGain : 1);
+  const heardHere = (crossFaceGain) => !otherFace || crossFaceGain > 0;
+  const beacon = heardHere(beaconCrossFaceGain) ? sounds.beacon : undefined;
+  const vocal = heardHere(vocalCrossFaceGain) ? sounds.vocal : undefined;
   // enterSound/exitSound (voir core/presence.js) : rôles PONCTUELS
   // distincts du beacon, optionnels et indépendants l'un de l'autre —
   // résolus une fois ci-dessous (resolveTransitionSound), null si absent.
-  const enterSound = resolveTransitionSound(entity, sounds.enterSound, ENTER_SOUND_TUNING_KEYS);
-  const exitSound = resolveTransitionSound(entity, sounds.exitSound, EXIT_SOUND_TUNING_KEYS);
+  // Depuis l'autre face, ils suivent le gain du vocal (expression de
+  // l'entité, comme sa voix).
+  const withFaceGain = (resolved) => (resolved ? { ...resolved, gain: resolved.gain * faceGain(vocalCrossFaceGain) } : null);
+  const enterSound = heardHere(vocalCrossFaceGain)
+    ? withFaceGain(resolveTransitionSound(entity, sounds.enterSound, ENTER_SOUND_TUNING_KEYS))
+    : null;
+  const exitSound = heardHere(vocalCrossFaceGain)
+    ? withFaceGain(resolveTransitionSound(entity, sounds.exitSound, EXIT_SOUND_TUNING_KEYS))
+    : null;
 
   // Résolus une fois ici : statiques pour la durée de vie de la scène,
   // propriétés de l'ENTITÉ (pas d'un rôle de son particulier) — partagées
@@ -770,13 +792,13 @@ function buildEntitySoundEntry(entity, session, { includeBeacon = true, disableS
   // vocation à marcher. Cadencé par la DISTANCE parcourue, jamais par un
   // intervalle de temps : traité à part des sources intermittentes
   // ci-dessous (beacon/vocal), qui partagent, elles, le même mécanisme.
-  const movement = sounds.movement;
+  const movement = heardHere(movementCrossFaceGain) ? sounds.movement : undefined;
   const movementFields = movement
     ? {
         movementPath: movement.path,
         movementReverbSend: resolveTuning("reverbSend", entity, movement),
         movementPitchVariation: resolveTuning("pitchVariation", entity, movement),
-        movementGain: resolveTuning("movementGain", entity, movement),
+        movementGain: resolveTuning("movementGain", entity, movement) * faceGain(movementCrossFaceGain),
         // stepDistance reste le même réglage GLOBAL que le joueur
         // (STEP_DISTANCE), jamais surchargé indépendamment — seul
         // movementStepMultiplier module la cadence (voir
@@ -817,6 +839,7 @@ function buildEntitySoundEntry(entity, session, { includeBeacon = true, disableS
   // (au montage, ou dans addLateEntitySoundEntry) en ont besoin.
   let sound = null;
   let beaconGain;
+  let beaconRoleGain;
   let beaconReverbSend;
   const intermittentSources = [];
 
@@ -828,7 +851,12 @@ function buildEntitySoundEntry(entity, session, { includeBeacon = true, disableS
       // beaconPitchVariation consommée UNE FOIS ici (balise continue, voir
       // le commentaire de header sur cette particularité).
       const beaconSettings = resolveSoundSettings(entity, beacon, "beaconGain", { useFlyingReverbSend: true });
-      beaconGain = beaconSettings.gain;
+      // beaconRoleGain : gain du rôle seul, tel qu'entendu sur la face du
+      // joueur ; beaconGain : celui réellement appliqué ici (× gain "autre
+      // face" si l'entrée est sur l'autre face). La bascule de face fond de
+      // l'un vers l'autre (crossfadeFaceSwap).
+      beaconRoleGain = beaconSettings.gain;
+      beaconGain = beaconSettings.gain * faceGain(beaconCrossFaceGain);
       beaconReverbSend = beaconSettings.reverbSend;
       const beaconPitchVariation = beaconSettings.pitchVariation;
       // staggerBeacon (défaut true, voir config/tuning-values.js) :
@@ -849,16 +877,22 @@ function buildEntitySoundEntry(entity, session, { includeBeacon = true, disableS
       // d'une visite à l'autre (voir lib/audio.js/createPositionedSound) :
       // une balise déjà entendue une fois ne se redécode pas à chaque
       // aller-retour, cohérent avec les mondes gardés en mémoire.
-      sound = createPositionedSound(resolveAsset(beacon.path), {
-        rate: randomRate(beaconPitchVariation),
-        cacheKey: entity.id,
-        startDelayMs: staggerBeacon ? drawBeaconStaggerDelayMs() : 0,
-      });
+      if (handover && handover.has(entity.id)) {
+        sound = handover.get(entity.id);
+        handover.delete(entity.id);
+      } else {
+        sound = createPositionedSound(resolveAsset(beacon.path), {
+          rate: randomRate(beaconPitchVariation),
+          cacheKey: entity.id,
+          startDelayMs: staggerBeacon ? drawBeaconStaggerDelayMs() : 0,
+        });
+      }
     } else {
       // Condition de beacon (voir doc/entity-model.md/"Beacon conditionnel")
       // : portée par la SOURCE, propre au rôle beacon — un vocal du même
       // tableau n'en a jamais.
-      intermittentSources.push({ ...resolveIntermittentSource(entity, beacon, BEACON_TUNING_KEYS), condition: beacon.condition });
+      const source = resolveIntermittentSource(entity, beacon, BEACON_TUNING_KEYS);
+      intermittentSources.push({ ...source, gain: source.gain * faceGain(beaconCrossFaceGain), condition: beacon.condition });
     }
   }
 
@@ -866,7 +900,8 @@ function buildEntitySoundEntry(entity, session, { includeBeacon = true, disableS
   // entities/model.md) — même mécanisme que le beacon intermittent
   // ci-dessus, juste une deuxième source dans le même tableau.
   if (vocal) {
-    intermittentSources.push(resolveIntermittentSource(entity, vocal, VOCAL_TUNING_KEYS));
+    const source = resolveIntermittentSource(entity, vocal, VOCAL_TUNING_KEYS);
+    intermittentSources.push({ ...source, gain: source.gain * faceGain(vocalCrossFaceGain) });
   }
 
   // Présence conditionnelle (voir core/presence.js) : résolue ICI, au
@@ -897,6 +932,8 @@ function buildEntitySoundEntry(entity, session, { includeBeacon = true, disableS
     flyingVolumeFactor,
     sound,
     beaconGain,
+    beaconRoleGain,
+    beaconCrossFaceGain,
     beaconReverbSend,
     intermittentSources,
     enterSound,
@@ -919,7 +956,11 @@ function buildEntitySoundEntry(entity, session, { includeBeacon = true, disableS
   };
 }
 
-export function createCityAudioScene(getSession) {
+// handover (optionnel) : balises continues transmises par la scène
+// précédente (destroy({ handover: true }), bascule recto/verso) — voir
+// buildEntitySoundEntry. Celles que cette scène ne reprend pas restent dans
+// la Map : à l'appelant de les arrêter.
+export function createCityAudioScene(getSession, { handover = null } = {}) {
   // Contexte maintenu éveillé pour toute la scène (voir
   // lib/audio.js/keepAudioContextAwake) — au tout début du montage, avant
   // même la première voix créée plus bas.
@@ -947,23 +988,22 @@ export function createCityAudioScene(getSession) {
   // l'amorçage.
   const initialWorld = getActiveWorld(getSession());
   const entitySounds = initialWorld.entities.map((entity) =>
-    buildEntitySoundEntry(entity, getSession())
+    buildEntitySoundEntry(entity, getSession(), { handover })
   );
 
   // RECTO/VERSO étape 2/2 (voir CLAUDE.md) : entrées de son pour l'AUTRE
   // face, si la scène en a une — `null` sinon (scène simple, rien de plus à
-  // construire). `includeBeacon:false` (voir buildEntitySoundEntry) : AUCUN
-  // beacon pour ces entrées, jamais construit — le reste (vocal, movement,
-  // enterSound/exitSound) est bâti à l'IDENTIQUE, seul le RENDU au tick
-  // (voir update() plus bas) diffère (étouffé, jamais de continu à
-  // entretenir puisque `sound` reste toujours null ici). PAS de compagnons
+  // construire). `otherFace:true` (voir buildEntitySoundEntry) : chaque rôle
+  // dosé par son gain "autre face", absent s'il vaut 0 ; le RENDU au tick
+  // (voir update() plus bas) est étouffé. PAS de compagnons
   // mélangés (getInactiveFace, contrairement à getActiveWorld) : ils
   // suivent le joueur, jamais l'autre face.
   const initialOtherFace = getInactiveFace(getSession());
   const otherEntitySounds = initialOtherFace
     ? initialOtherFace.entities.map((entity) =>
         buildEntitySoundEntry(entity, getSession(), {
-          includeBeacon: false,
+          otherFace: true,
+          handover,
         })
       )
     : null;
@@ -984,9 +1024,19 @@ export function createCityAudioScene(getSession) {
   // playPositionedOneShot passe reverbBusInput/reverbSend directement à
   // chaque déclenchement (voir plus bas), comme playOneShot le fait déjà
   // pour les pas.
-  for (const { sound, beaconReverbSend } of entitySounds) {
+  for (const { sound, beaconReverbSend } of [...entitySounds, ...(otherEntitySounds ?? [])]) {
     if (sound) sound.sendToReverb(reverbBus.input, beaconReverbSend);
   }
+
+  // Étouffement de l'AUTRE face : celui de la scène (champs racine
+  // faceMufflingGain/faceMufflingLowpassHz, voir core/scene.js/parseScene),
+  // sinon les défauts de config/tuning-values.js. Lu UNE fois : il ne
+  // change pas pendant la vie de la scène.
+  const faceMuffle = {
+    gain: world.faceMufflingGain ?? TUNING_DEFAULTS.faceMufflingGain,
+    lowpassHz: world.faceMufflingLowpassHz ?? TUNING_DEFAULTS.faceMufflingLowpassHz,
+  };
+  const fullFaceMuffle = Object.freeze({ amount: 1, ...faceMuffle });
 
   // Son de collision par entité (optionnel, dormant si absent OU si
   // l'entité n'est pas blocksMovement — voir entities/types/index.js). Résolu par
@@ -1039,17 +1089,17 @@ export function createCityAudioScene(getSession) {
 
   // Équivalents pour l'AUTRE face (voir otherEntitySounds plus haut) — MÊME
   // principe EXACT que addLateEntitySoundEntry/syncNewEntitySounds
-  // ci-dessus, mais plus simples : `sound` reste toujours null pour une
-  // entrée étouffée (includeBeacon:false), donc rien à brancher au bus de
-  // réverb ni à suivre dans une table de sons de collision (le joueur ne
+  // ci-dessus, mais plus simples : rien à suivre dans une table de sons de
+  // collision (le joueur ne
   // collisionne jamais avec l'autre face, voir core/reduce.js/TICK —
   // isolation stricte). No-op si la scène est simple (otherEntitySounds
   // null, jamais d'entité à synchroniser).
   function addLateOtherEntitySoundEntry(entity) {
     const entry = buildEntitySoundEntry(entity, getSession(), {
-      includeBeacon: false,
+      otherFace: true,
     });
     otherEntitySounds.push(entry);
+    if (entry.sound) entry.sound.sendToReverb(reverbBus.input, entry.beaconReverbSend);
     return entry;
   }
   function syncNewOtherEntitySounds(otherFace) {
@@ -1316,7 +1366,7 @@ export function createCityAudioScene(getSession) {
   // sound.setCutoff côté balise continue), jamais deux implémentations
   // parallèles — seuls amount et profil diffèrent.
   function effectiveMuffle(entry, forcedMuffle) {
-    if (forcedMuffle > 0) return { amount: forcedMuffle, ...FACE_MUFFLE };
+    if (forcedMuffle > 0) return { amount: forcedMuffle, ...faceMuffle };
     if (entry.perceptionGated) return NO_MUFFLE;
     return { amount: currentMundaneMuffleAmount(), ...PERCEPTION_MUFFLE };
   }
@@ -1345,6 +1395,10 @@ export function createCityAudioScene(getSession) {
   // de cette scène (recréée franche à chaque transition). Garantit un seul
   // sound.stop() par entité, jamais répété à chaque tick.
   const removedEntityIds = new Set();
+  // Balises TEMPORAIRES de la bascule de face en cours (voir
+  // crossfadeFaceSwap), par id d'entité : transmises à la scène suivante par
+  // destroy({ handover: true }), arrêtées par un destroy() ordinaire.
+  const crossfadeTemporaries = new Map();
   // Ids d'entités dont le beacon a déjà été explicitement arrêté suite à
   // leur passage à consumed (voir entities/model.md/"Collectible
   // persistant", muteConsumedBeacons plus bas) — même principe que
@@ -1948,90 +2002,115 @@ export function createCityAudioScene(getSession) {
   // (sound.resume(), redémarre proprement après un stop() antérieur). Sans
   // bascule ce tick (null) : rien de spécial, juste la mise à jour normale
   // ci-dessous si présente.
+  // Balise CONTINUE d'une entrée, pour ce tick — PARTAGÉE par les deux
+  // faces (applyEntityAudio pour la face courante, applyOtherFaceBeacons
+  // pour l'autre, étouffée) : bascule de présence (le son de la balise
+  // seulement, les sons de transition restent à l'appelant), beacon
+  // conditionnel, filet anti-blocage, puis rendu spatial. `muffle` :
+  // l'étouffement à appliquer, déjà résolu par l'appelant.
+  function updateBeaconSound(entry, live, relX, muffle, beaconFactor) {
+    const { entity, sound, beaconGain, flyingHighpassHz, flyingVolumeFactor } = entry;
+    if (!sound) return;
+
+    if (live.presenceChanged === "exited") {
+      sound.stop();
+    } else if (live.presenceChanged === "entered" && beaconConditionAllows(entry.beaconCondition, live)) {
+      sound.resume();
+      entry.beaconSilenced = false;
+    }
+    if (live.present === false) return;
+
+    // Beacon conditionnel (voir doc/entity-model.md/"Beacon conditionnel")
+    // : condition fausse -> balise arrêtée, une seule fois ; redevenue
+    // vraie -> reprise. stop()/resume(), même geste qu'une bascule de
+    // présence. Une balise coupée pour consommation (muteOnConsumed) ne
+    // revient jamais par ce chemin.
+    if (!beaconConditionAllows(entry.beaconCondition, live)) {
+      if (!entry.beaconSilenced) {
+        sound.stop();
+        entry.beaconSilenced = true;
+      }
+      return;
+    }
+    if (entry.beaconSilenced) {
+      entry.beaconSilenced = false;
+      if (!mutedOnConsumedIds.has(entity.id)) sound.resume();
+    }
+
+    // Filet de sécurité anti-blocage (voir lib/audio.js/createPositionedSound
+    // isStuck()) : une balise censée boucler en continu peut, rarement et
+    // dans certains navigateurs, s'arrêter pour de bon sans que rien de
+    // notre côté ne l'ait demandé (cause exacte non isolée avec certitude,
+    // voir isStuck()) — jamais un correctif du mécanisme en cause, juste
+    // un filet qui rend le symptôme invisible au joueur. isStuck() ignore
+    // déjà tout arrêt VOULU (dormance, consommation, pause de menu).
+    if (sound.isStuck()) sound.resume();
+
+    // Rendu spatial partagé (voir spatialRendering) : pan, volume de
+    // distance et passe-bas, étouffement compris (voir effectiveMuffle —
+    // volume interpolé continûment, passe-bas composé avec celui de
+    // distance, jamais à sa place). flyingVolumeFactor : neutre (1) pour
+    // toute entité non isFlying. beaconGain inclut déjà le gain "autre
+    // face" pour une entrée de l'autre face (voir buildEntitySoundEntry).
+    const { pan, volume, cutoff } = spatialRendering(entry, relX, muffle);
+    sound.update(pan, volume * beaconFactor * beaconGain * flyingVolumeFactor);
+    sound.setCutoff(cutoff);
+    // Passe-haut "hauteur suggérée" (voir entities/model.md, isFlying) :
+    // EN PLUS du passe-bas ci-dessus, jamais à sa place — setHighpass
+    // n'est appelé QUE pour une entité isFlying (flyingHighpassHz reste
+    // undefined sinon), aucune autre entité n'y touche jamais.
+    if (entity.isFlying) sound.setHighpass(flyingHighpassHz);
+  }
+
   function applyEntityAudio(x) {
     const beaconFactor = beaconVolumeFactor();
     const liveById = liveEntitiesById();
     for (const entry of entitySounds) {
-      const { entity, sound, beaconGain, flyingHighpassHz, flyingVolumeFactor } = entry;
-      const live = liveById.get(entity.id);
+      const live = liveById.get(entry.entity.id);
       const relX = live.x - x;
-      // Perception surnaturelle (voir effectiveMuffleAmount plus haut) :
-      // toujours 0 (aucun effet) pour une entité surnaturelle (perceptionGated) —
+      // Perception surnaturelle (voir effectiveMuffle plus haut) : toujours
+      // 0 (aucun effet) pour une entité surnaturelle (perceptionGated) —
       // jamais étouffée par le mécanisme qui la révèle.
       const muffle = effectiveMuffle(entry, 0);
 
-      if (live.presenceChanged === "exited") {
-        if (entry.exitSound) playTransitionSound(entry, relX, entry.exitSound, muffle);
-        if (sound) sound.stop();
-      } else if (live.presenceChanged === "entered") {
-        if (entry.enterSound) playTransitionSound(entry, relX, entry.enterSound, muffle);
-        if (sound && beaconConditionAllows(entry.beaconCondition, live)) {
-          sound.resume();
-          entry.beaconSilenced = false;
-        }
+      // Sons de transition d'abord : exitSound joue AVANT l'arrêt de la
+      // balise (deux Howl séparés, le stop() du second ne coupe jamais le
+      // premier, voir lib/audio.js/playOneShot vs createPositionedSound).
+      if (live.presenceChanged === "exited" && entry.exitSound) {
+        playTransitionSound(entry, relX, entry.exitSound, muffle);
+      } else if (live.presenceChanged === "entered" && entry.enterSound) {
+        playTransitionSound(entry, relX, entry.enterSound, muffle);
       }
-
-      if (!sound || live.present === false) continue;
-
-      // Beacon conditionnel (voir doc/entity-model.md/"Beacon conditionnel")
-      // : condition fausse -> balise arrêtée, une seule fois ; redevenue
-      // vraie -> reprise. stop()/resume(), même geste qu'une bascule de
-      // présence. Une balise coupée pour consommation (muteOnConsumed) ne
-      // revient jamais par ce chemin.
-      if (!beaconConditionAllows(entry.beaconCondition, live)) {
-        if (!entry.beaconSilenced) {
-          sound.stop();
-          entry.beaconSilenced = true;
-        }
-        continue;
-      }
-      if (entry.beaconSilenced) {
-        entry.beaconSilenced = false;
-        if (!mutedOnConsumedIds.has(entity.id)) sound.resume();
-      }
-
-      // Filet de sécurité anti-blocage (voir lib/audio.js/createPositionedSound
-      // isStuck()) : une balise censée boucler en continu peut, rarement et
-      // dans certains navigateurs, s'arrêter pour de bon sans que rien de
-      // notre côté ne l'ait demandé (cause exacte non isolée avec certitude,
-      // voir isStuck()) — jamais un correctif du mécanisme en cause, juste
-      // un filet qui rend le symptôme invisible au joueur. isStuck() ignore
-      // déjà tout arrêt VOULU (dormance, consommation, pause de menu).
-      if (sound.isStuck()) sound.resume();
-
-      // Rendu spatial partagé (voir spatialRendering) : pan, volume de
-      // distance et passe-bas, étouffement compris (voir
-      // effectiveMuffleAmount — volume interpolé continûment, passe-bas
-      // composé avec celui de distance, jamais à sa place).
-      // flyingVolumeFactor : neutre (1) pour toute entité non isFlying,
-      // voir buildEntitySoundEntry — aucun effet sur le volume dans ce cas.
-      const { pan, volume, cutoff } = spatialRendering(entry, relX, muffle);
-      sound.update(pan, volume * beaconFactor * beaconGain * flyingVolumeFactor);
-      sound.setCutoff(cutoff);
-      // Passe-haut "hauteur suggérée" (voir entities/model.md, isFlying) :
-      // EN PLUS du passe-bas ci-dessus, jamais à sa place — setHighpass
-      // n'est appelé QUE pour une entité isFlying (flyingHighpassHz reste
-      // undefined sinon), aucune autre entité n'y touche jamais.
-      if (entity.isFlying) sound.setHighpass(flyingHighpassHz);
+      updateBeaconSound(entry, live, relX, muffle, beaconFactor);
     }
   }
 
-  // Bascules de présence de l'AUTRE face (RECTO/VERSO étape 2/2) —
-  // enterSound/exitSound UNIQUEMENT, en ÉTOUFFÉ : jamais de balise continue
-  // à entretenir ici (`sound` reste toujours null pour une entrée étouffée,
-  // voir buildEntitySoundEntry/includeBeacon), donc pas d'équivalent au
-  // reste d'applyEntityAudio ci-dessus — seule la détection de bascule
-  // (live.presenceChanged, posée par le core comme pour la face courante)
-  // est reprise à l'identique.
+  // Bascules de présence de l'AUTRE face (RECTO/VERSO étape 2/2) :
+  // enterSound/exitSound, en ÉTOUFFÉ, s'ils y sont entendus (gain du vocal,
+  // voir buildEntitySoundEntry/otherFace). Même détection que pour la face
+  // courante (live.presenceChanged, posée par le core).
   function applyMuffledPresenceTransitions(x, otherLiveById) {
     for (const entry of otherEntitySounds) {
       const live = otherLiveById.get(entry.entity.id);
       const relX = live.x - x;
       if (live.presenceChanged === "exited" && entry.exitSound) {
-        playTransitionSound(entry, relX, entry.exitSound, FULL_FACE_MUFFLE);
+        playTransitionSound(entry, relX, entry.exitSound, fullFaceMuffle);
       } else if (live.presenceChanged === "entered" && entry.enterSound) {
-        playTransitionSound(entry, relX, entry.enterSound, FULL_FACE_MUFFLE);
+        playTransitionSound(entry, relX, entry.enterSound, fullFaceMuffle);
       }
+    }
+  }
+
+  // Balises continues de l'AUTRE face, entendues à travers seulement si leur
+  // gain "autre face" est > 0 (sinon jamais construites, voir
+  // buildEntitySoundEntry/otherFace) : même mise à jour que la face
+  // courante (updateBeaconSound), étouffement complet de la scène.
+  function applyOtherFaceBeacons(x, otherLiveById) {
+    const beaconFactor = beaconVolumeFactor();
+    for (const entry of otherEntitySounds) {
+      if (!entry.sound) continue;
+      const live = otherLiveById.get(entry.entity.id);
+      updateBeaconSound(entry, live, live.x - x, fullFaceMuffle, beaconFactor);
     }
   }
 
@@ -2195,8 +2274,9 @@ export function createCityAudioScene(getSession) {
     // --- RECTO/VERSO étape 2/2 : rendu ÉTOUFFÉ de l'AUTRE face, si la
     // scène en a une (voir CLAUDE.md/"RECTO/VERSO", core/state.js/
     // getInactiveFace). Le core la tique déjà (voir core/reduce.js/TICK,
-    // isolée) — ICI, on ne fait QUE l'ENTENDRE : aucun beacon (jamais
-    // construit, voir includeBeacon), aucune occupation/interaction (jamais
+    // isolée) — ICI, on ne fait QUE l'ENTENDRE, chaque rôle dosé par son
+    // gain "autre face" (voir buildEntitySoundEntry/otherFace), aucune
+    // occupation/interaction (jamais
     // lue par occupiedEntities/getInteractionCandidates, qui ne connaissent
     // QUE entitySounds). otherWorld relu à CHAQUE tick (jamais figé au
     // montage), exactement comme `world` ci-dessus pour la face courante.
@@ -2205,16 +2285,27 @@ export function createCityAudioScene(getSession) {
       syncNewOtherEntitySounds(otherWorld);
       const otherLiveById = liveOtherEntitiesById(otherWorld);
       applyMuffledPresenceTransitions(x, otherLiveById);
+      applyOtherFaceBeacons(x, otherLiveById);
       updateIntermittentSources(otherEntitySounds, x, otherLiveById, 1);
       updateEntityMovementSounds(otherEntitySounds, x, otherWorld, otherLiveById, 1);
     }
   }
 
-  function destroy() {
+  // handover (bascule recto/verso, voir view/city-screen.js/
+  // sideSwitchEffect) : les balises continues ne sont PAS arrêtées mais
+  // RENDUES (Map id d'entité -> balise), pour que la scène reconstruite sur
+  // l'autre face les reprenne sans coupure (createCityAudioScene). Sans
+  // handover, tout s'arrête (changement de scène, sortie de partie).
+  function destroy({ handover = false } = {}) {
     // sound absent (pas de beacon continu) : rien à arrêter, ses one-shots
     // se terminent d'eux-mêmes (mêmes Howl partagés que playOneShot ailleurs).
-    for (const { sound } of entitySounds) {
-      if (sound) sound.stop(); // nettoie aussi son propre envoi de réverb
+    const beacons = new Map(crossfadeTemporaries);
+    for (const { entity, sound } of [...entitySounds, ...(otherEntitySounds ?? [])]) {
+      if (sound) beacons.set(entity.id, sound);
+    }
+    crossfadeTemporaries.clear();
+    if (!handover) {
+      for (const sound of beacons.values()) sound.stop(); // nettoie aussi son propre envoi de réverb
     }
     // One-shots suivis : PAS purgés ici (liste au niveau MODULE, voir
     // trackedOneShots) — la scène suivante les reprend s'ils viennent du
@@ -2234,6 +2325,7 @@ export function createCityAudioScene(getSession) {
     // aucune scène suivante), voir stopPersistentAudioLayers ci-dessous —
     // SEUL appelant, view/city-screen.js/onExit.
     if (activeScene === api) activeScene = null;
+    return handover ? beacons : null;
   }
 
   // Candidats d'interaction courants POUR UN VERBE (kind : "describe" ->
@@ -2261,7 +2353,9 @@ export function createCityAudioScene(getSession) {
   // par le reste de update() (pas de re-déclenchement de pas ni de
   // ré-évaluation de l'occupation) — voir applyEntityAudio ci-dessus.
   function refreshBeaconVolumes() {
-    applyEntityAudio(getSession().player.x);
+    const session = getSession();
+    applyEntityAudio(session.player.x);
+    if (otherEntitySounds) applyOtherFaceBeacons(session.player.x, liveOtherEntitiesById(getInactiveFace(session)));
   }
 
   // Pause/reprise SÉLECTIVE : uniquement les balises positionnées des
@@ -2287,19 +2381,26 @@ export function createCityAudioScene(getSession) {
   // réapparaîtrait pour une entité dormante ou, pire, définitivement
   // disparue (ex. argent ramassé). undefined (entité SANS règle de
   // présence, l'immense majorité) reste inclus : ce n'est PAS "false".
-  function pauseBeacons() {
+  // Les deux faces : une balise de l'autre face entendue à travers se tait
+  // aussi derrière un menu.
+  function eachLiveBeacon(visit) {
     const liveById = liveEntitiesById();
-    for (const { entity, sound } of entitySounds) {
-      if (sound && liveById.get(entity.id).present !== false) sound.pause();
-    }
+    for (const entry of entitySounds) visit(entry, liveById.get(entry.entity.id));
+    if (!otherEntitySounds) return;
+    const otherLiveById = liveOtherEntitiesById(getInactiveFace(getSession()));
+    for (const entry of otherEntitySounds) visit(entry, otherLiveById.get(entry.entity.id));
+  }
+  function pauseBeacons() {
+    eachLiveBeacon(({ sound }, live) => {
+      if (sound && live.present !== false) sound.pause();
+    });
   }
   // beaconSilenced EXCLU de la reprise (voir applyEntityAudio) : une balise
   // éteinte par sa condition resterait sinon rallumée par la sortie du menu.
   function resumeBeacons() {
-    const liveById = liveEntitiesById();
-    for (const { entity, sound, beaconSilenced } of entitySounds) {
-      if (sound && !beaconSilenced && liveById.get(entity.id).present !== false) sound.resume();
-    }
+    eachLiveBeacon(({ sound, beaconSilenced }, live) => {
+      if (sound && !beaconSilenced && live.present !== false) sound.resume();
+    });
   }
 
   // Croise les filtres d'occlusion des DEUX faces pendant une bascule
@@ -2315,14 +2416,17 @@ export function createCityAudioScene(getSession) {
   // partagent déjà le même axe x pour le rendu étouffé existant, même
   // convention ici.
   //
-  // Balises TEMPORAIRES pour les entités à balise CONTINUE de l'AUTRE face
-  // (normalement EXCLUES, voir buildEntitySoundEntry/includeBeacon — "on ne
-  // LOCALISE jamais l'autre face") : construites ICI, SEULEMENT le temps de
-  // ce croisement, pour avoir quelque chose à ouvrir en filtre — arrêtées
-  // À LA FIN (voir le .then() ci-dessous), avant même que l'appelant ne
-  // détruise/reconstruise la scène (qui, elle, ignore tout de ces voix
-  // temporaires, jamais ajoutées à otherEntitySounds). Scène simple
-  // (otherEntitySounds null) -> rien à croiser, résolution immédiate.
+  // Chaque balise fond vers le niveau que la face d'arrivée lui donnera :
+  // celles de la face quittée vers leur rendu "autre face" (étouffé, × leur
+  // beaconCrossFaceGain — 0 = fondu jusqu'au silence) ; celles de l'autre
+  // face vers leur rendu net. Une balise de l'autre face déjà entendue à
+  // travers (entry.sound existe) est simplement OUVERTE. Les autres
+  // reçoivent une balise TEMPORAIRE, construite ICI le temps de ce
+  // croisement, partie de leur niveau "autre face" (le silence par défaut)
+  // — arrêtée À LA FIN (voir le .then() ci-dessous), avant même que
+  // l'appelant ne détruise/reconstruise la scène, jamais ajoutée à
+  // otherEntitySounds. Scène simple (otherEntitySounds null) -> rien à
+  // croiser, résolution immédiate.
   //
   // Rampes via Howler.fade()/AudioParam natif (lib/audio.js/
   // fadeVolume/rampCutoff), PAS le mécanisme JS par relecture périodique du
@@ -2341,8 +2445,9 @@ export function createCityAudioScene(getSession) {
 
     // Face COURANTE : ferme le filtre de chaque balise continue, depuis SA
     // position réelle (recalculée ici pour repartir exactement d'où le
-    // dernier tick l'avait laissée) vers l'état étouffé — MÊME formule que
-    // applyEntityAudio, juste évaluée une fois plutôt qu'à chaque tick.
+    // dernier tick l'avait laissée) vers son rendu "autre face" — MÊME
+    // formule que applyEntityAudio/applyOtherFaceBeacons, juste évaluée une
+    // fois plutôt qu'à chaque tick.
     for (const entry of entitySounds) {
       if (!entry.sound || entry.beaconSilenced) continue;
       const live = liveById.get(entry.entity.id);
@@ -2353,35 +2458,35 @@ export function createCityAudioScene(getSession) {
       const openCutoff = open.cutoff;
       entry.sound.update(pan, openVolume);
       entry.sound.setCutoff(openCutoff);
-      entry.sound.fadeVolume(openVolume * FACE_MUFFLE.gain, durationMs);
-      entry.sound.rampCutoff(FACE_MUFFLE.lowpassHz, durationMs);
+      entry.sound.fadeVolume(openVolume * faceMuffle.gain * entry.beaconCrossFaceGain, durationMs);
+      entry.sound.rampCutoff(faceMuffle.lowpassHz, durationMs);
     }
 
-    // Face AUTRE : balises TEMPORAIRES (voir header), démarrées DÉJÀ
-    // étouffées (cohérent avec la coexistence déjà en place pour cette
-    // face), ouvertes vers l'état net.
-    const temporarySounds = [];
+    // Face AUTRE : ouvre chaque balise continue, depuis son niveau "autre
+    // face" (déjà en place si elle est entendue à travers, sinon une balise
+    // TEMPORAIRE qui part de ce niveau, voir header) vers l'état net.
     for (const entry of otherEntitySounds) {
       const live = otherLiveById.get(entry.entity.id);
       if (!live || live.present === false) continue; // dormante : rien à faire entendre
-      // Beacon conditionnel éteint : aucune balise temporaire à ouvrir.
+      // Beacon conditionnel éteint : aucune balise à ouvrir.
       if (!beaconConditionAllows(entry.entity.sounds.beacon?.condition, live)) continue;
 
-      const rebuilt = buildEntitySoundEntry(entry.entity, session, {
-        includeBeacon: true,
-        disableStagger: true,
-      });
-      if (!rebuilt.sound) continue; // pas de balise continue pour ce type/mode (intermittente ou absente)
+      let sound = entry.sound;
+      let roleGain = entry.beaconRoleGain;
+      if (!sound) {
+        const rebuilt = buildEntitySoundEntry(entry.entity, session, { disableStagger: true });
+        if (!rebuilt.sound) continue; // pas de balise continue pour ce type/mode (intermittente ou absente)
+        sound = rebuilt.sound;
+        roleGain = rebuilt.beaconRoleGain;
+        crossfadeTemporaries.set(entry.entity.id, sound);
+      }
 
       const open = spatialRendering(entry, live.x - x, NO_MUFFLE);
-      const pan = open.pan;
-      const openVolume = open.volume * beaconFactor * rebuilt.beaconGain * entry.flyingVolumeFactor;
-      const openCutoff = open.cutoff;
-      rebuilt.sound.update(pan, openVolume * FACE_MUFFLE.gain);
-      rebuilt.sound.setCutoff(FACE_MUFFLE.lowpassHz);
-      rebuilt.sound.fadeVolume(openVolume, durationMs);
-      rebuilt.sound.rampCutoff(openCutoff, durationMs);
-      temporarySounds.push(rebuilt.sound);
+      const openVolume = open.volume * beaconFactor * roleGain * entry.flyingVolumeFactor;
+      sound.update(open.pan, openVolume * faceMuffle.gain * entry.beaconCrossFaceGain);
+      sound.setCutoff(faceMuffle.lowpassHz);
+      sound.fadeVolume(openVolume, durationMs);
+      sound.rampCutoff(open.cutoff, durationMs);
     }
 
     // Sources SUIVIES (one-shots positionnés en cours, voir trackedOneShots)
@@ -2399,16 +2504,17 @@ export function createCityAudioScene(getSession) {
       if (!found || !found.live) continue;
       const relX = found.live.x - x;
       const current = spatialRendering(found.entry, relX, effectiveMuffle(found.entry, found.forcedMuffle));
-      const arrivalMuffle = found.forcedMuffle > 0 ? effectiveMuffle(found.entry, 0) : FULL_FACE_MUFFLE;
+      const arrivalMuffle = found.forcedMuffle > 0 ? effectiveMuffle(found.entry, 0) : fullFaceMuffle;
       const target = spatialRendering(found.entry, relX, arrivalMuffle);
       source.handle.update(current.pan, current.volume * beaconFactor * source.gain, current.cutoff);
       source.handle.fadeVolume(target.volume * beaconFactor * source.gain, durationMs);
       source.handle.rampCutoff(target.cutoff, durationMs);
     }
 
-    return new Promise((resolve) => setTimeout(resolve, durationMs)).then(() => {
-      for (const sound of temporarySounds) sound.stop();
-    });
+    // Les balises temporaires ne s'arrêtent PAS à la fin du fondu : la
+    // scène reconstruite les reprend (destroy({ handover: true })). Sans
+    // reprise, destroy() les arrête comme les autres.
+    return new Promise((resolve) => setTimeout(resolve, durationMs));
   }
 
   const api = {
