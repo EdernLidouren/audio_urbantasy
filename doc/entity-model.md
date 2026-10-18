@@ -355,6 +355,29 @@ n'importe quelle scène du registre `scenes/index.js`, liste générée,
 `instant`, jamais par un chemin de chargement parallèle), Shift+L (journal
 des avertissements, voir ci-dessous).
 
+**Outils de scène** (en tête du menu Shift+M, chacun derrière une
+confirmation). Une partie fige chaque monde à sa première visite (voir
+`doc/save.md`) : sans eux, une scène modifiée ne se voit qu'en nouvelle
+partie.
+- **« Recharger cette scène depuis son fichier »** (`view/city-screen.js`/
+  `reloadSceneFromFile`, `core/state.js`/`reloadActiveWorld`) : relit le JSON
+  (validé comme tout chargement, avec les archétypes actuels), remplace le
+  monde actif par un monde neuf. Perdu : l'état de CE monde (positions,
+  variables d'entité et de scène, collectibles, stock, éphémères). Conservé :
+  le reste de la partie (argent, sac, équipement, améliorations, variables
+  de partie, heure, météo, compagnons, autres mondes). Le joueur garde sa
+  position, bordée à la nouvelle longueur, et sa face si la scène en a
+  toujours deux ; les compagnons sont replacés autour de lui. Fichier
+  invalide : la scène actuelle reste intacte, l'erreur part dans le journal
+  des avertissements.
+- **« Oublier les autres scènes visitées »** (`core/state.js`/
+  `forgetInactiveWorlds`) : retire tous les mondes sauf l'actif ; chacun sera
+  relu depuis son fichier à la prochaine visite.
+
+Tout chargement de scène demande au serveur si le fichier a changé
+(`scenes/load.js`, `cache: "no-cache"`) : une scène jamais visitée se charge
+toujours dans sa version à jour, même après une modification.
+
 **Journal des avertissements** (`lib/warning-log.js` pour le mécanisme,
 `view/debug-warnings.js` pour l'instance et les sources,
 `view/menus/debug-warnings-menu.js` pour le menu). Un menu où chaque entrée

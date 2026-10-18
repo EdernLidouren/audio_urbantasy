@@ -8,7 +8,12 @@ import scenePaths from "./index.js";
 export async function loadScene(url, registry) {
   let response;
   try {
-    response = await fetch(url);
+    // "no-cache" : le navigateur redemande TOUJOURS au serveur si le fichier
+    // a changé (réponse 304 sans contenu s'il n'a pas bougé, donc presque
+    // gratuit). Sans ça, une scène modifiée peut se charger dans une
+    // version gardée en cache, en développement comme pour les joueurs
+    // après une mise à jour publiée.
+    response = await fetch(url, { cache: "no-cache" });
   } catch (error) {
     throw new Error(`loadScene: échec réseau pour "${url}" : ${error.message}`);
   }

@@ -703,6 +703,42 @@ export function travelToWorld(session, targetId, freshScene = null, { x, side = 
   };
 }
 
+// OUTIL DE DEBUG (voir view/menus/debug-teleport-menu.js, doc/entity-
+// model.md/"Mode debug") : remplace le monde ACTIF par un monde NEUF,
+// construit depuis la scène relue sur disque (`freshScene`, déjà passée par
+// parseScene). Une sauvegarde fige chaque monde à sa première visite (voir
+// doc/save.md) : sans cet outil, une scène modifiée ne se voit qu'en
+// nouvelle partie. Perdu : l'état de CE monde (positions, variables
+// d'entité et de scène, collectibles, stock, éphémères). Conservé : tout le
+// reste de la partie (argent, sac, équipement, améliorations, variables de
+// partie, heure, météo, compagnons, autres mondes). Le joueur reste à sa
+// position, bordée à la nouvelle longueur, et sur sa face si la scène en a
+// toujours deux (recto sinon) ; les compagnons sont replacés autour de lui
+// comme à toute arrivée. Pure.
+export function reloadActiveWorld(session, freshScene) {
+  const worldId = session.activeWorldId;
+  if (freshScene.id !== worldId) {
+    throw new Error(`reloadActiveWorld: la scène relue a l'id "${freshScene.id}", attendu "${worldId}".`);
+  }
+  const world = createWorldState(freshScene, DEFAULT_SEED);
+  const side = isTwoSided(world) ? session.player.side : "recto";
+  const x = clamp(session.player.x, 0, world.length);
+  return {
+    ...session,
+    player: { ...session.player, x, side, blockedBy: null, pushedBy: null },
+    worlds: { ...session.worlds, [worldId]: world },
+    companions: repositionCompanions(session.companions, x, world.length),
+  };
+}
+
+// OUTIL DE DEBUG (même famille que reloadActiveWorld ci-dessus) : retire de
+// la partie tous les mondes sauf l'actif. Chacun sera reconstruit depuis son
+// fichier à la prochaine visite (travelToWorld ne le trouve plus dans
+// worlds). Utile après avoir modifié plusieurs scènes d'un coup. Pure.
+export function forgetInactiveWorlds(session) {
+  return { ...session, worlds: { [session.activeWorldId]: session.worlds[session.activeWorldId] } };
+}
+
 // Place le joueur + les compagnons à x sur la face `side`, DANS LE MONDE
 // ACTUEL — sans toucher activeWorldId/worlds/lastVisited (contrairement à
 // travelToWorld : le monde n'est jamais quitté). Primitive PARTAGÉE par

@@ -38,6 +38,7 @@ import { openWeatherDebugMenu } from "./menus/debug-weather-menu.js";
 import { openTimeDebugMenu } from "./menus/debug-time-menu.js";
 import { openTeleportDebugMenu } from "./menus/debug-teleport-menu.js";
 import { openDebugWarningsMenu, openDebugWarningsIfUnseen } from "./menus/debug-warnings-menu.js";
+import { reportSceneReloadFailure } from "./debug-warnings.js";
 import {
   openInventoryMenu,
   openEquipmentMenu,
@@ -59,6 +60,8 @@ import {
   isTwoSided,
   togglePerception,
   applyEntityActionEffects,
+  reloadActiveWorld,
+  forgetInactiveWorlds,
 } from "../core/state.js";
 import { advanceWeather, setWeather, triggerNextWeatherTransition } from "../core/weather.js";
 import { evaluateCondition } from "../core/presence.js";
@@ -472,6 +475,47 @@ export function makeCityScreen(getSession, setSession) {
     if (getPref("autoSaveOnTransition", PREF_CONSTRAINTS.autoSaveOnTransition.default)) {
       saveGame(getSession(), { playSound: false });
     }
+  }
+
+  // OUTILS DE DEBUG (menu Shift+M, voir view/menus/debug-teleport-menu.js,
+  // core/state.js/reloadActiveWorld) : relit la scène active depuis son
+  // fichier et remplace son monde par un monde neuf. Le fichier est relu
+  // AVANT de démonter quoi que ce soit : un fichier invalide laisse la
+  // scène actuelle intacte, l'erreur part dans le journal des
+  // avertissements (Shift+L). Ensuite, mêmes gestes qu'une transition
+  // (performTransition ci-dessus) : son reconstruit, cooldowns purgés,
+  // garnissage des sources du monde neuf. Pas d'auto-save : la prochaine
+  // sauvegarde, manuelle ou automatique, enregistrera le monde rechargé.
+  async function reloadSceneFromFile() {
+    const sceneId = getSession().activeWorldId;
+    let freshScene;
+    try {
+      freshScene = await loadSceneById(sceneId, registry);
+    } catch (error) {
+      reportSceneReloadFailure(sceneId, error.message);
+      announce(t("teleport.debug.reloadFailed"), { assertive: true });
+      return;
+    }
+    // L'écran a pu changer pendant la lecture (sortie de partie) : on
+    // n'applique rien si la ville n'est plus vivante.
+    if (!scene) return;
+
+    scene.destroy();
+    scene = null;
+    setSession(reloadActiveWorld(getSession(), freshScene));
+    clearInteractionCooldowns();
+    refreshSpawns();
+    scene = createCityAudioScene(getSession);
+    announce(t("teleport.debug.reloaded"), { assertive: true });
+  }
+
+  // Oublie tous les mondes sauf l'actif (core/state.js/
+  // forgetInactiveWorlds) : chacun sera relu depuis son fichier à la
+  // prochaine visite. Rien à reconstruire, le monde actif ne change pas.
+  function forgetOtherScenes() {
+    const count = Object.keys(getSession().worlds).length - 1;
+    setSession(forgetInactiveWorlds(getSession()));
+    announce(t("teleport.debug.forgotten", { count }), { assertive: true });
   }
 
   // Attend `ms` millisecondes réelles — utilisé UNIQUEMENT pour cadencer le
@@ -982,7 +1026,7 @@ export function makeCityScreen(getSession, setSession) {
       // scènes du registre, Entrée téléporte via executeTeleport (le même
       // chemin qu'une porte). Hors debug, ne fait RIEN.
       if (action === "openTeleportDebugMenu" && isDebugEnabled()) {
-        openTeleportDebugMenu(getSession, executeTeleport);
+        openTeleportDebugMenu(getSession, executeTeleport, { reloadSceneFromFile, forgetOtherScenes });
         return;
       }
 

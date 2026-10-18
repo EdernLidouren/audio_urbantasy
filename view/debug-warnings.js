@@ -33,3 +33,16 @@ export function reportDroppedEntities(droppedEntities) {
     );
   }
 }
+
+// Rechargement d'une scène depuis son fichier impossible (outil de debug,
+// voir view/city-screen.js/reloadSceneFromFile) : le message d'erreur du
+// chargeur (réseau, JSON, validation par parseScene) dit quoi corriger.
+export function reportSceneReloadFailure(sceneId, message) {
+  reportWarning(
+    "debug.warnings.sceneReloadFailed",
+    // Point final retiré : le menu en ajoute un après chaque entrée.
+    { sceneId, message: message.replace(/\.\s*$/, "") },
+    `Rechargement de la scène "${sceneId}" impossible :`,
+    message
+  );
+}

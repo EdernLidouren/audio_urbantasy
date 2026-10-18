@@ -12,7 +12,16 @@
 // executeTeleport), mode "instant", x = playerStart, face recto — aucun
 // chemin de chargement parallèle : compagnons, rangement du monde quitté,
 // auto-save et annonce de la scène viennent de ce chemin commun. Choisir
-// la scène courante la recharge (reloadIfSame), ce qui recentre le joueur.
+// la scène courante la recharge (reloadIfSame), ce qui recentre le joueur
+// SANS relire son fichier.
+//
+// En tête de liste, deux OUTILS DE SCÈNE, chacun derrière une confirmation
+// (voir view/city-screen.js et core/state.js) : "Recharger cette scène
+// depuis son fichier" (relit le JSON, remplace le monde actif par un monde
+// neuf) et "Oublier les autres scènes visitées" (chacune sera relue depuis
+// son fichier à la prochaine visite). Une partie fige chaque monde à sa
+// première visite (doc/save.md) : sans ces outils, une scène modifiée ne
+// se voit qu'en nouvelle partie.
 
 import { t } from "../../data/i18n/index.js";
 import { pushScreen, popScreen, activeScreen } from "../../lib/screens.js";
@@ -21,7 +30,7 @@ import scenePaths from "../../scenes/index.js";
 
 async function readSceneInfo(id, path) {
   try {
-    const response = await fetch(path);
+    const response = await fetch(path, { cache: "no-cache" });
     const raw = await response.json();
     return { id, titleKey: raw.titleKey, playerStart: raw.playerStart };
   } catch {
@@ -29,7 +38,34 @@ async function readSceneInfo(id, path) {
   }
 }
 
-export async function openTeleportDebugMenu(getSession, teleportEffect) {
+// Confirmation d'un outil de scène : Annuler en premier (curseur par
+// défaut), Échap annule aussi.
+function openConfirmation(title, titleParams, onConfirm) {
+  pushScreen(
+    makeMenuScreen(
+      {
+        title,
+        titleParams,
+        closable: true,
+        entries: [
+          { label: "menu.options.reset_all_cancel", onActivate: () => popScreen() },
+          {
+            label: "menu.options.reset_all_confirm",
+            onActivate: () => {
+              popScreen();
+              onConfirm();
+            },
+          },
+        ],
+      },
+      t
+    )
+  );
+}
+
+// sceneTools : { reloadSceneFromFile, forgetOtherScenes }, fournis par
+// view/city-screen.js.
+export async function openTeleportDebugMenu(getSession, teleportEffect, sceneTools) {
   const opener = activeScreen();
   const currentId = getSession().activeWorldId;
   const scenes = await Promise.all(Object.entries(scenePaths).map(([id, path]) => readSceneInfo(id, path)));
@@ -55,9 +91,36 @@ export async function openTeleportDebugMenu(getSession, teleportEffect) {
       },
     };
   });
+  const otherCount = Object.keys(getSession().worlds).length - 1;
+  const toolEntries = [
+    {
+      label: "teleport.debug.reloadScene",
+      onActivate: () => {
+        popScreen();
+        openConfirmation("teleport.debug.reloadConfirm", undefined, sceneTools.reloadSceneFromFile);
+      },
+    },
+    {
+      label: "teleport.debug.forgetOthers",
+      labelParams: { count: otherCount },
+      onActivate: () => {
+        popScreen();
+        openConfirmation("teleport.debug.forgetConfirm", { count: otherCount }, sceneTools.forgetOtherScenes);
+      },
+    },
+  ];
+  // Curseur sur la scène courante, décalé des outils placés en tête.
   const currentIndex = scenes.findIndex((scene) => scene.id === currentId);
 
   pushScreen(
-    makeMenuScreen({ title: "teleport.debug.title", closable: true, cursor: currentIndex >= 0 ? currentIndex : 0, entries }, t)
+    makeMenuScreen(
+      {
+        title: "teleport.debug.title",
+        closable: true,
+        cursor: currentIndex >= 0 ? currentIndex + toolEntries.length : 0,
+        entries: [...toolEntries, ...entries],
+      },
+      t
+    )
   );
 }

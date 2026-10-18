@@ -18,6 +18,8 @@ import {
   drawScatteredPosition,
   togglePerception,
   applyEntityActionEffects,
+  reloadActiveWorld,
+  forgetInactiveWorlds,
   MOVE_STEP,
   BODY_RADIUS,
 } from "./state.js";
@@ -4897,6 +4899,63 @@ export function runMovementChecks() {
     "exited,entered",
     getActiveWorld(scenePresenceState).entities.filter((e) => e.presence).map((e) => e.presenceChanged).join(",")
   );
+
+  // --- Outils de debug : recharger la scène active depuis son fichier,
+  // oublier les autres mondes (core/state.js/reloadActiveWorld,
+  // forgetInactiveWorlds). L'état du monde rechargé repart de zéro, le
+  // reste de la partie (argent, compagnons, autres mondes) est intact. ---
+  const RELOAD_REGISTRY = { box: { nameKey: "entity.office_table.name" } };
+  const reloadSceneA = (patch = {}) =>
+    parseScene(
+      {
+        id: "reload-a",
+        titleKey: "scene.demo.name",
+        length: 20,
+        playerStart: 2,
+        variables: [{ name: "projectorOn", type: "flag", initial: true }],
+        recto: { entities: [{ id: "box-r", type: "box", x: 5 }] },
+        verso: { entities: [{ id: "box-v", type: "box", x: 6 }] },
+        ...patch,
+      },
+      RELOAD_REGISTRY
+    );
+  const reloadSceneB = parseScene({ id: "reload-b", titleKey: "scene.demo.name", length: 10, playerStart: 1, entities: [] }, RELOAD_REGISTRY);
+  const reloadPet = { id: "pet", type: "box", x: 2 };
+  let reloadState = createInitialState(reloadSceneA(), "reload", { companions: [reloadPet] });
+  reloadState = addMoney(reloadState, 5);
+  reloadState = travelToWorld(reloadState, "reload-b", reloadSceneB);
+  reloadState = travelToWorld(reloadState, "reload-a", null, { x: 15, side: "verso" });
+  reloadState = applyEntityActionEffects(reloadState, "box-v", [{ type: "setVariable", scope: "scene", name: "projectorOn", value: false }]);
+  const worldBBefore = reloadState.worlds["reload-b"];
+
+  // Même scène relue : état du monde remis à neuf, joueur à sa place.
+  const reloadedSame = reloadActiveWorld(reloadState, reloadSceneA());
+  run("rechargement : variable de scène revenue à sa valeur initiale", true, reloadedSame.worlds["reload-a"].variables.projectorOn.value);
+  run("rechargement : joueur à la même position", 15, reloadedSame.player.x);
+  run("rechargement : joueur sur la même face (scène toujours à deux faces)", "verso", reloadedSame.player.side);
+  run("rechargement : argent conservé", 5, reloadedSame.money);
+  run("rechargement : autre monde intact (même référence)", worldBBefore, reloadedSame.worlds["reload-b"]);
+  run("rechargement : compagnon conservé, replacé près du joueur", "pet@15", reloadedSame.companions.map((c) => `${c.id}@${c.x}`).join(","));
+
+  // Scène modifiée : plus courte et à une seule face.
+  const shorterScene = reloadSceneA({ length: 12, recto: undefined, verso: undefined, entities: [{ id: "box-new", type: "box", x: 3 }] });
+  const reloadedShorter = reloadActiveWorld(reloadState, shorterScene);
+  run("rechargement : position bordée à la nouvelle longueur", 12, reloadedShorter.player.x);
+  run("rechargement : plus de verso -> recto", "recto", reloadedShorter.player.side);
+  run("rechargement : contenu relu", "box-new", getActiveWorld(reloadedShorter).entities.filter((e) => e.id !== "pet").map((e) => e.id).join(","));
+  run("rechargement : compagnon bordé lui aussi", 12, reloadedShorter.companions[0].x);
+  let reloadIdMismatchThrew = false;
+  try {
+    reloadActiveWorld(reloadState, reloadSceneB);
+  } catch {
+    reloadIdMismatchThrew = true;
+  }
+  run("rechargement : id de scène différent -> erreur", true, reloadIdMismatchThrew);
+
+  const forgotten = forgetInactiveWorlds(reloadState);
+  run("oubli : seul le monde actif reste", "reload-a", Object.keys(forgotten.worlds).join(","));
+  run("oubli : monde actif intact (même référence)", reloadState.worlds["reload-a"], forgotten.worlds["reload-a"]);
+  run("oubli : joueur et argent intacts", "15/5", `${forgotten.player.x}/${forgotten.money}`);
 
   // --- Collectible persistant (core/state.js/markConsumed, core/money.js/lootEntity) ---
   // Contrairement à removeEntity/pickupEntity ci-dessus, l'entité looté

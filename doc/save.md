@@ -17,7 +17,10 @@ leurs actions, leurs variables.
 (`deserializeGame`) ne relit jamais le JSON de la scène. Une scène modifiée
 après avoir été visitée garde, dans une partie existante, l'état de la
 première visite. Pendant le développement, une nouvelle partie montre le
-contenu à jour ; une scène jamais visitée est, elle, chargée fraîche.
+contenu à jour ; une scène jamais visitée est, elle, chargée fraîche. En
+mode debug, le menu Shift+M permet aussi de recharger la scène courante
+depuis son fichier, ou d'oublier les autres scènes visitées, sans quitter
+la partie (voir `doc/entity-model.md`/"Mode debug").
 
 ## Relecture : rebouchage, renommages, types inconnus
 
