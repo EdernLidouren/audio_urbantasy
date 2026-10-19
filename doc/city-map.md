@@ -20,7 +20,7 @@ Une case a l'une de TROIS natures, jamais confondues :
 
 | Nature | Forme | Sélectionnable |
 |---|---|---|
-| Zone réelle | `{ sceneId, nameKey, descriptionKey, spawnX }` | Oui |
+| Zone réelle | `{ sceneId, nameKey, descriptionKey, spawnX, onMapWhen? }` | Oui, sauf hors plan (voir ci-dessous) |
 | En chantier | le marqueur partagé `UNDER_CONSTRUCTION` (interne au module) | Non |
 | Vide | `null` | Non |
 
@@ -31,6 +31,43 @@ Une case a l'une de TROIS natures, jamais confondues :
   forcément le `playerStart` de la scène (voir "Sélection" plus bas). Réservé
   pour une future case avec plusieurs entrées (playerStart reste réservé à
   l'arrivée PAR PORTE).
+- `onMapWhen` (optionnel) : une **condition du script** (même format que
+  partout, voir `doc/scripting.md`/"Conditions") qui décide si la zone
+  figure sur le plan du joueur. Absente : toujours sur le plan. Fausse : la
+  zone est **HORS PLAN** (voir "Hors plan" plus bas). Vérifiée au
+  chargement du menu-carte (type de condition connu ; pour
+  `hasImprovement`, amélioration existante) : une condition mal écrite
+  échoue tout de suite, jamais une case hors plan pour toujours en silence.
+
+**Exemple réel** — la grand place au centre, la démo hors plan à sa droite
+jusqu'à l'obtention des anciens plans (le vieux cadastre de la réserve de
+l'hôtel de ville) :
+
+```js
+const DEMO_ZONE = {
+  sceneId: "demo",
+  nameKey: "scene.demo.name",
+  descriptionKey: "cityMap.demo.description",
+  spawnX: 2,
+  onMapWhen: { type: "hasImprovement", id: "old_plans" },
+};
+```
+
+### Hors plan
+
+Une zone hors plan EXISTE (la scène est jouable) mais n'est pas connue du
+joueur, à distinguer d'une case **en chantier** (pas encore construite) :
+
+- annoncée **« Hors plan. »** à la place de son nom et de sa description ;
+- Entrée : **refusée**, son de refus des menus et « Ce lieu ne figure pas
+  sur votre plan. » ;
+- le joueur peut pourtant s'y trouver (arrivé par une porte) : la carte
+  s'ouvre sur sa case, annoncée **« Hors plan, vous êtes ici. »**, toujours
+  refusée — situer sans révéler, ce n'est pas une incohérence ;
+- la condition est évaluée sur l'état RÉEL de la partie, **jamais
+  court-circuitée par le mode debug** (contrairement à `hasImprovement`
+  ailleurs) : la carte se montre telle que le joueur la voit, comme
+  l'onglet Améliorations.
 
 Accesseurs exportés (seule interface recommandée, jamais indexer
 `CITY_MAP_GRID` directement en dehors de ce fichier) :
@@ -128,6 +165,8 @@ Entrée sur une case :
   qui se passe ensuite (destroy/`travelToWorld`/recreate, voir plus bas).
 - **En chantier / vide** : PAS sélectionnable — petit retour (ré-annonce
   de la case), aucun chargement.
+- **Hors plan** : refusée (son de refus + message, voir "Hors plan" plus
+  haut), aucun chargement.
 - **Re-sélectionner sa PROPRE zone** : AUCUN cas spécial — `travelToWorld`
   range puis re-ressort le MÊME monde (éphémères purgés, comme toute
   sortie de scène), joueur replacé à `spawnX`. Recentrage volontaire

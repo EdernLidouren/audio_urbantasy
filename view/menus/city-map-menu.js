@@ -14,7 +14,9 @@
 // CONSULTATION NON DESTRUCTIVE : ouvrir/naviguer/refermer (Échap) ne
 // charge ni ne décharge RIEN — seule une SÉLECTION (Entrée) sur une zone
 // RÉELLE déclenche `onSelectZone`, fourni par l'appelant (voir
-// view/city-screen.js/travelViaCityMap) : ce module reste entièrement
+// view/city-screen.js/travelViaCityMap) — sauf une zone HORS PLAN (voir
+// map/city-map.js/onMapWhen), annoncée "Hors plan" et refusée. Ce module
+// reste entièrement
 // ignorant du cycle de vie de la scène audio (destroy/travelToWorld/
 // recreate), il délègue, jamais n'importe core/state.js lui-même.
 //
@@ -34,11 +36,41 @@ import { playMenuSound } from "../menu-sounds.js";
 import {
   CITY_MAP_WIDTH,
   CITY_MAP_HEIGHT,
+  CITY_MAP_GRID,
   cityMapCellAt,
   isRealCityMapZone,
   isCityMapUnderConstruction,
   findCityMapCoordinates,
 } from "../../map/city-map.js";
+import { evaluateCondition, presenceContextOf, CONDITION_TYPES } from "../../core/presence.js";
+import { IMPROVEMENT_REGISTRY } from "../../core/improvements.js";
+
+// La grille est déclarée à la main (map/city-map.js) : une condition
+// onMapWhen mal écrite échoue ICI, au chargement du module, plutôt que de
+// laisser une case hors plan pour toujours en silence — même politique
+// qu'une table météo cassée (core/weather.js). Vérifie la forme et, pour
+// hasImprovement, que l'amélioration existe.
+for (const row of CITY_MAP_GRID) {
+  for (const cell of row) {
+    if (!isRealCityMapZone(cell) || cell.onMapWhen === undefined) continue;
+    const cond = cell.onMapWhen;
+    if (typeof cond !== "object" || cond === null || !CONDITION_TYPES.includes(cond.type)) {
+      throw new Error(`map/city-map.js : onMapWhen invalide pour la zone "${cell.sceneId}".`);
+    }
+    if (cond.type === "hasImprovement" && !Object.hasOwn(IMPROVEMENT_REGISTRY, cond.id)) {
+      throw new Error(`map/city-map.js : amélioration inconnue "${cond.id}" dans onMapWhen de "${cell.sceneId}".`);
+    }
+  }
+}
+
+// Une zone figure-t-elle sur le plan du joueur ? Sans onMapWhen : toujours.
+// Évaluée sur l'état RÉEL de la partie, jamais court-circuitée par le mode
+// debug (debugShortCircuit: false) : la carte se montre telle que le
+// joueur la voit, comme l'onglet Améliorations.
+function isZoneOnMap(cell, session) {
+  if (!cell.onMapWhen) return true;
+  return evaluateCondition(cell.onMapWhen, { ...presenceContextOf(session), debugShortCircuit: false });
+}
 
 const CITY_MAP_BINDINGS = {
   up: { keys: ["ArrowUp"], mods: [] },
@@ -66,10 +98,15 @@ function cityMapInvertYPref() {
   return getPref("cityMapInvertY", PREF_CONSTRAINTS.cityMapInvertY.default);
 }
 
-// "<nom> : <description>" (zone réelle) / "En chantier." / "Vide." — TROIS
-// textes distincts, jamais confondus (voir header du fichier).
-function cellAnnouncementText(x, y) {
+// "<nom> : <description>" (zone réelle) / "Hors plan." / "En chantier." /
+// "Vide." — textes distincts, jamais confondus (voir header du fichier).
+// Hors plan sur la case où se trouve le joueur : il est situé ("vous êtes
+// ici"), sans que la zone soit révélée.
+function cellAnnouncementText(x, y, session) {
   const cell = cityMapCellAt(x, y);
+  if (isRealCityMapZone(cell) && !isZoneOnMap(cell, session)) {
+    return t(cell.sceneId === session.activeWorldId ? "cityMap.offMapHere" : "cityMap.offMap");
+  }
   if (isRealCityMapZone(cell)) return `${t(cell.nameKey)} : ${t(cell.descriptionKey)}`;
   if (isCityMapUnderConstruction(cell)) return t("cityMap.underConstruction");
   return t("cityMap.empty");
@@ -121,13 +158,13 @@ export function openCityMapMenu(scene, getSession, onSelectZone) {
         cursorX = (cursorX + dx + CITY_MAP_WIDTH) % CITY_MAP_WIDTH;
         cursorY = (cursorY + dy + CITY_MAP_HEIGHT) % CITY_MAP_HEIGHT;
       }
-      announceMaybeStarred(cellAnnouncementText(cursorX, cursorY), true);
+      announceMaybeStarred(cellAnnouncementText(cursorX, cursorY, getSession()), true);
       return;
     }
 
     cursorX += dx;
     cursorY += dy;
-    announceMaybeStarred(cellAnnouncementText(cursorX, cursorY), false);
+    announceMaybeStarred(cellAnnouncementText(cursorX, cursorY, getSession()), false);
   }
 
   // Coordonnées de la case COURANTE (touche "x", voir header) — jamais
@@ -148,7 +185,13 @@ export function openCityMapMenu(scene, getSession, onSelectZone) {
   function selectCurrent() {
     const cell = cityMapCellAt(cursorX, cursorY);
     if (!isRealCityMapZone(cell)) {
-      announceMaybeStarred(cellAnnouncementText(cursorX, cursorY), false);
+      announceMaybeStarred(cellAnnouncementText(cursorX, cursorY, getSession()), false);
+      return;
+    }
+    // Hors plan : refus (son + message), même si le joueur s'y trouve.
+    if (!isZoneOnMap(cell, getSession())) {
+      playMenuSound("refusal");
+      announce(t("cityMap.offMapRefusal"), { assertive: true });
       return;
     }
     popScreen();
@@ -171,7 +214,7 @@ export function openCityMapMenu(scene, getSession, onSelectZone) {
   const screen = {
     onEnter() {
       scene.pauseBeacons();
-      announceMaybeStarred(cellAnnouncementText(cursorX, cursorY), false);
+      announceMaybeStarred(cellAnnouncementText(cursorX, cursorY, getSession()), false);
     },
     onExit() {
       scene.resumeBeacons();

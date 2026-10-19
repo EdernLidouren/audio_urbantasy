@@ -28,6 +28,7 @@ let teleportHandler = null;
 let pickupHandler = null;
 let itemPickupHandler = null;
 let lootHandler = null;
+let lootUniqueHandler = null;
 let lootSpawnHandler = null;
 let sideSwitchHandler = null;
 let variableEffectsHandler = null;
@@ -94,6 +95,15 @@ export function setItemPickupHandler(handler) {
 // looté N'EST JAMAIS retirée, seul son état change.
 export function setLootHandler(handler) {
   lootHandler = handler;
+}
+
+// (entity) => void — applique l'effet d'ÉTAT du "loot" OBJET UNIQUE (ni
+// montant ni éparpillement : entity.consumed seul, voir
+// core/money.js/lootUniqueEntity). La substance de cet objet est dans les
+// effets de l'action (ex. giveImprovement), exécutés avant, comme pour
+// tout kind.
+export function setLootUniqueHandler(handler) {
+  lootUniqueHandler = handler;
 }
 
 // (entity, spawn) => void — applique l'effet d'ÉTAT du "loot à spawn"
@@ -493,6 +503,16 @@ function handleLoot(entity, action) {
   }
 
   const amount = action.amount;
+  // OBJET UNIQUE (troisième forme) : ni montant ni éparpillement. Son de
+  // ramassage, puis l'entité passe consumed — les effets de l'action (ex.
+  // giveImprovement + annonce) ont déjà été exécutés par interact(). Aucune
+  // annonce propre ici : c'est au contenu de dire ce qu'on a pris.
+  if (amount === undefined) {
+    if (!lootUniqueHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
+    playEntityPickupSound(entity);
+    lootUniqueHandler(entity);
+    return;
+  }
   if (!Number.isFinite(amount)) {
     console.warn(`interact: action "loot" sur "${entity.id}" sans amount numérique valide.`);
     return;
@@ -665,6 +685,11 @@ export function interact(entity, kind) {
       ? selectMatchingAction(entity.action, actionContext(entity))
       : entity.action;
     if (!resolvedAction) return;
+
+    // Collectible persistant déjà consommé : plus rien à faire, ni effet ni
+    // son. Sans ce verrou, ses effets (exécutés AVANT le handler du kind,
+    // voir plus bas) se rejoueraient à chaque Entrée.
+    if (resolvedAction.kind === "loot" && entity.consumed) return;
 
     // Condition fausse -> REFUS informatif (refusalEffects, voir "Effets"
     // plus haut), AUCUN effet de succès, AUCUNE transition : l'action est

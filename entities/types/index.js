@@ -83,6 +83,7 @@ import officeChair from "./office_chair.js";
 import officeComputer from "./office_computer.js";
 import officeTable from "./office_table.js";
 import officeWaterCooler from "./office_water_cooler.js";
+import oldSurveyMap from "./old_survey_map.js";
 import passage from "./passage.js";
 import pottedPlant from "./potted_plant.js";
 import reversedClockTowerEscapement from "./reversed_clock_tower_escapement.js";
@@ -134,6 +135,7 @@ export default {
   office_computer: officeComputer,
   office_table: officeTable,
   office_water_cooler: officeWaterCooler,
+  old_survey_map: oldSurveyMap,
   passage,
   potted_plant: pottedPlant,
   reversed_clock_tower_escapement: reversedClockTowerEscapement,

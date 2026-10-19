@@ -18,6 +18,7 @@ import {
   setPickupHandler,
   setItemPickupHandler,
   setLootHandler,
+  setLootUniqueHandler,
   setLootSpawnHandler,
   setSideSwitchHandler,
   setPlayerEquipmentProvider,
@@ -65,7 +66,7 @@ import {
 } from "../core/state.js";
 import { advanceWeather, setWeather, triggerNextWeatherTransition } from "../core/weather.js";
 import { evaluateCondition } from "../core/presence.js";
-import { pickupEntity, lootEntity, lootEntitySpawn } from "../core/money.js";
+import { pickupEntity, lootEntity, lootUniqueEntity, lootEntitySpawn } from "../core/money.js";
 import { pickupItemEntity, dropItem } from "../core/bag.js";
 import { refillDueSpawns, searchContainer } from "../core/spawn.js";
 import { equipItem, unequipItem } from "../core/equipment.js";
@@ -735,6 +736,12 @@ export function makeCityScreen(getSession, setSession) {
   // core pur (core/money.js/lootEntity) — même patron que
   // pickupEntityEffect ci-dessus (`amount` déjà extrait, même raison), mais
   // l'entité N'EST JAMAIS retirée.
+  // "loot" OBJET UNIQUE (voir view/interaction.js/handleLoot) : l'entité
+  // passe consumed, rien d'autre (core/money.js/lootUniqueEntity).
+  function lootUniqueEntityEffect(entity) {
+    setSession(lootUniqueEntity(getSession(), entity.id));
+  }
+
   function lootEntityEffect(entity, amount) {
     setSession(lootEntity(getSession(), entity.id, amount));
   }
@@ -801,6 +808,7 @@ export function makeCityScreen(getSession, setSession) {
   setPickupHandler(pickupEntityEffect);
   setItemPickupHandler(itemPickupEntityEffect);
   setLootHandler(lootEntityEffect);
+  setLootUniqueHandler(lootUniqueEntityEffect);
   setLootSpawnHandler(lootSpawnEffect);
   setSideSwitchHandler(sideSwitchEffect);
   setVariableEffectsHandler(variableEffectsEffect);
@@ -1070,6 +1078,7 @@ export function makeCityScreen(getSession, setSession) {
       setPickupHandler(null);
       setItemPickupHandler(null);
       setLootHandler(null);
+      setLootUniqueHandler(null);
       setLootSpawnHandler(null);
       setSideSwitchHandler(null);
       setVariableEffectsHandler(null);

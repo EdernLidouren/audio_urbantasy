@@ -301,8 +301,14 @@
   "assets/sounds/effects/pouring_water": [
     "assets/sounds/effects/pouring_water_1.mp3"
   ],
+  "assets/sounds/effects/reveal": [
+    "assets/sounds/effects/reveal_1.mp3"
+  ],
   "assets/sounds/effects/reversed_clock_tower_bell": [
     "assets/sounds/effects/reversed_clock_tower_bell_1.mp3"
+  ],
+  "assets/sounds/effects/reward": [
+    "assets/sounds/effects/reward_1.mp3"
   ],
   "assets/sounds/effects/switch_off": [
     "assets/sounds/effects/switch_off_1.mp3"
@@ -686,6 +692,9 @@
   ],
   "assets/sounds/furniture/video_projector_1_beacon": [
     "assets/sounds/furniture/video_projector_1_beacon_1.mp3"
+  ],
+  "assets/sounds/items/book_1_beacon": [
+    "assets/sounds/items/book_1_beacon_1.mp3"
   ],
   "assets/sounds/items/box_of_nails_beacon": [
     "assets/sounds/items/box_of_nails_beacon_1.mp3"

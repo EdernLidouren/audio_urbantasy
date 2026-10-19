@@ -28,7 +28,7 @@ import { reduce } from "./reduce.js";
 import { moveAndBounce } from "./physics/movement.js";
 import { resolvePlayerMove } from "./physics/collision.js";
 import { SAVE_VERSION, serializeGame, deserializeGame } from "./save.js";
-import { addMoney, pickupEntity, lootEntity, lootEntitySpawn } from "./money.js";
+import { addMoney, pickupEntity, lootEntity, lootUniqueEntity, lootEntitySpawn } from "./money.js";
 import { addItem, pickupItemEntity, removeItem, dropItem } from "./bag.js";
 import { ITEM_REGISTRY, itemProps, validateItemTags } from "./items.js";
 import { EQUIPMENT_SLOTS, createEmptyEquipment, gaitOf, equipItem, unequipItem, equippedTags } from "./equipment.js";
@@ -3852,7 +3852,7 @@ export function runMovementChecks() {
     run("improvements : improvementProps id inconnu -> undefined", undefined, improvementProps("does-not-exist"));
     // `order` : déclaré, unique, et seul critère de tri de l'onglet.
     run("improvements : chaque entrée porte un order entier >= 1", true, Object.values(IMPROVEMENT_REGISTRY).every((p) => Number.isInteger(p.order) && p.order >= 1));
-    run("improvements : ordre d'affichage suit order", "supernatural_perception,flashlight,mirror_pass,master_key,skeleton_key", orderedImprovementIds().join(","));
+    run("improvements : ordre d'affichage suit order", "supernatural_perception,flashlight,mirror_pass,master_key,skeleton_key,old_plans", orderedImprovementIds().join(","));
     run("improvements : tri indépendant de l'ordre d'insertion", "b,a", orderedImprovementIds({ a: { order: 2 }, b: { order: 1 } }).join(","));
     const improvementRegistryRejected = (registry) => {
       try {
@@ -3956,6 +3956,17 @@ export function runMovementChecks() {
         "improvements debug : hasImprovement répond vrai même contexte totalement absent",
         true,
         evaluateCondition({ type: "hasImprovement", id: "flashlight" }, {})
+      );
+      // debugShortCircuit: false (carte de la ville) : l'état RÉEL, même en debug.
+      run(
+        "improvements debug : debugShortCircuit:false -> état réel (rien possédé)",
+        false,
+        evaluateCondition({ type: "hasImprovement", id: "flashlight" }, { session: { improvements: {} }, debugShortCircuit: false })
+      );
+      run(
+        "improvements debug : debugShortCircuit:false -> état réel (possédé)",
+        true,
+        evaluateCondition({ type: "hasImprovement", id: "flashlight" }, { session: { improvements: { flashlight: true } }, debugShortCircuit: false })
       );
       setDebugEnabled(false);
       run(
@@ -5030,6 +5041,14 @@ export function runMovementChecks() {
   // piège explicitement visé par ce système (voir entities/model.md).
   run("caisse : lootEntity sur une entité déjà consumed -> aucun second gain", 100, lootEntity(afterLoot, "crate-1", 100).money);
   run("caisse : lootEntity sur une entité déjà consumed -> référence INCHANGÉE", afterLoot, lootEntity(afterLoot, "crate-1", 100));
+
+  // OBJET UNIQUE (troisième forme de "loot", ex. le vieux cadastre) :
+  // consumed seul, sans argent ; idempotent comme lootEntity.
+  const afterUnique = lootUniqueEntity(crateState, "crate-1");
+  run("objet unique : lootUniqueEntity pose consumed:true", true, getActiveWorld(afterUnique).entities.find((e) => e.id === "crate-1").consumed);
+  run("objet unique : lootUniqueEntity ne crédite rien", crateState.money, afterUnique.money);
+  run("objet unique : déjà consumed -> référence INCHANGÉE", afterUnique, lootUniqueEntity(afterUnique, "crate-1"));
+  run("objet unique : id absent -> référence INCHANGÉE", crateState, lootUniqueEntity(crateState, "does-not-exist"));
 
   // consumedDescriptionKey (core/scene.js/parseEntity) : même cascade
   // instance -> type que descriptionKey.

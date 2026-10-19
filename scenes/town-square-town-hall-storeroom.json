@@ -11,6 +11,11 @@
   "reverbDecay": 5.0,
   "entities": [
     {
+      "id": "old_survey_map_1",
+      "type": "old_survey_map",
+      "x": 2
+    },
+    {
       "id": "meeting_room_door_1",
       "type": "door",
       "nameKey": "door.meeting_room.name",

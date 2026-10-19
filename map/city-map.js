@@ -16,6 +16,13 @@
 //     TÉLÉPORTATION PAR DÉFAUT de cette case — pas forcément le
 //     playerStart de la scène (une même zone pourrait un jour avoir plusieurs
 //     entrées ; playerStart reste réservé à l'arrivée PAR PORTE).
+//     `onMapWhen` (optionnel) : une CONDITION du script (même format que
+//     partout, voir doc/scripting.md/"Conditions") qui décide si la zone
+//     figure sur le plan du joueur. Absente -> toujours sur le plan.
+//     Fausse -> zone HORS PLAN : nom et description remplacés par "Hors
+//     plan", jamais sélectionnable (voir view/menus/city-map-menu.js). Le
+//     joueur peut pourtant s'y trouver, arrivé par une porte : la carte
+//     l'y situe, sans la révéler.
 //   - EN CHANTIER : le marqueur UNDER_CONSTRUCTION ci-dessous — case connue
 //     de la topologie, pas encore reliée à un contenu réel, JAMAIS
 //     sélectionnable.
@@ -30,19 +37,34 @@ export const CITY_MAP_HEIGHT = 5;
 // (voir isCityMapUnderConstruction) — pas un nouvel objet par case.
 const UNDER_CONSTRUCTION = { underConstruction: true };
 
-// Seule case réelle du test : reliée à "demo" (l'ancienne scène de départ,
-// avant town_square — voir main.js/startTestCityGame), au point d'entrée
-// déjà existant (playerStart de scenes/demo.json).
-const DEMO_ZONE = { sceneId: "demo", nameKey: "scene.demo.name", descriptionKey: "cityMap.demo.description", spawnX: 2 };
+// La grand place, au centre de la carte, à son point de départ habituel
+// (playerStart de scenes/town-square.json).
+const TOWN_SQUARE_ZONE = {
+  sceneId: "town_square",
+  nameKey: "scene.town_square.name",
+  descriptionKey: "cityMap.town_square.description",
+  spawnX: 26,
+};
+
+// La scène de démo (l'ancienne scène de départ, voir main.js/
+// startTestCityGame), HORS PLAN tant que le joueur n'a pas les anciens
+// plans (amélioration "old_plans", donnée par le vieux cadastre).
+const DEMO_ZONE = {
+  sceneId: "demo",
+  nameKey: "scene.demo.name",
+  descriptionKey: "cityMap.demo.description",
+  spawnX: 2,
+  onMapWhen: { type: "hasImprovement", id: "old_plans" },
+};
 
 // Grille littérale, lisible d'un coup d'œil (une ligne de source = une
-// ligne de la carte, jamais générée par boucle) — TEST : une seule zone
-// réelle en (x:1, y:2), juste à gauche du centre (2,2) ; tout le reste en
-// chantier (voir le prompt d'origine, "CARTE DE LA VILLE").
+// ligne de la carte, jamais générée par boucle) : la grand place au centre
+// (x:2, y:2), la démo juste à sa droite (x:3, y:2) ; tout le reste en
+// chantier.
 export const CITY_MAP_GRID = [
   [UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION],
   [UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION],
-  [UNDER_CONSTRUCTION, DEMO_ZONE, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION],
+  [UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, TOWN_SQUARE_ZONE, DEMO_ZONE, UNDER_CONSTRUCTION],
   [UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION],
   [UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION],
 ];

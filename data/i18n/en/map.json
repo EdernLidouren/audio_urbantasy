@@ -1,5 +1,9 @@
 {
   "cityMap.demo.description": "The starting neighborhood, where it all begins.",
   "cityMap.empty": "Empty.",
+  "cityMap.offMap": "Off the map.",
+  "cityMap.offMapHere": "Off the map, you are here.",
+  "cityMap.offMapRefusal": "This place is not on your map.",
+  "cityMap.town_square.description": "The heart of the town, overlooked by the town hall and its clock tower.",
   "cityMap.underConstruction": "Under construction."
 }

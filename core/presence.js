@@ -203,8 +203,11 @@ function evaluateHasEquipmentTag(cond, context) {
 // LECTURE seule, jamais sur l'ÉCRITURE — giveImprovement/removeImprovement
 // (core/variables.js/applyActionEffects) ignorent totalement ce drapeau,
 // l'effet réel d'un giveImprovement n'est jamais court-circuité.
+// `context.debugShortCircuit === false` : l'appelant veut l'état RÉEL même
+// en debug (la carte de la ville, qui montre le plan tel que le joueur le
+// voit — même choix que l'onglet Améliorations).
 function evaluateHasImprovement(cond, context) {
-  if (isDebugEnabled()) return true;
+  if (isDebugEnabled() && context.debugShortCircuit !== false) return true;
   return hasImprovement(context.session && context.session.improvements, cond.id);
 }
 

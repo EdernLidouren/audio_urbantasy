@@ -55,6 +55,18 @@ export function lootEntity(session, entityId, amount) {
 // lootEntity : entité absente OU déjà consumed -> RÉFÉRENCE INCHANGÉE,
 // AUCUN spawn (jamais un second lot de pièces sur une caisse déjà
 // fouillée) — vérifié AVANT tout, comme partout ailleurs dans ce fichier.
+// Collectible persistant SANS crédit ni éparpillement (troisième forme de
+// l'action "loot", l'objet unique : sa substance est dans les effets de
+// l'action, ex. giveImprovement — voir view/interaction.js/handleLoot) :
+// marque seulement l'entité consumed. Déjà consumed ou absente -> référence
+// INCHANGÉE, même garde que lootEntity.
+export function lootUniqueEntity(session, entityId) {
+  const world = session.worlds[session.activeWorldId];
+  const entity = world.entities.find((e) => e.id === entityId);
+  if (!entity || entity.consumed) return session;
+  return markConsumed(session, entityId);
+}
+
 export function lootEntitySpawn(session, entityId, spec, count, spread) {
   const world = session.worlds[session.activeWorldId];
   const entity = world.entities.find((e) => e.id === entityId);

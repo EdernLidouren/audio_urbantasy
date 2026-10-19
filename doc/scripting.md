@@ -794,7 +794,7 @@ ramassage"), SANS défaut — non déclaré, l'objet se ramasse en silence (just
 l'annonce). Aucun son générique imposé par le système ; vaut aussi pour
 `"loot"`.
 
-### `"loot"` — collectible PERSISTANT, DEUX formes
+### `"loot"` — collectible PERSISTANT, TROIS formes
 
 Crédit direct (l'entité N'EST JAMAIS retirée, contrairement à `"pickup"` — elle
 passe seulement à `consumed: true`) :
@@ -819,6 +819,29 @@ action: { kind: "loot", amount: 100 },
 éphémère" : `{ type: <clé du registre d'entités>, ...surcharges }`. Détail complet
 (limite anti-prolifération, éviction du plus ancien, exclusion de sauvegarde) :
 `doc/entity-model.md`/"Entités éphémères", `core/state.js`/`spawnEphemeral`.
+
+**Objet unique** (troisième forme) : ni `amount` ni `spawn`, la substance de
+l'objet est dans les `effects` de l'action (exécutés avant, comme pour tout
+kind). Le ramasser joue son son `pickup` (s'il en déclare un), le marque
+`consumed` (`core/money.js`/`lootUniqueEntity`), sans crédit ni annonce
+propre : c'est au contenu de dire ce qu'on a pris. Associé à une présence
+« non consommé », l'objet disparaît pour de bon une fois pris.
+
+```js
+// entities/types/old_survey_map.js — le vieux cadastre
+action: {
+  kind: "loot",
+  effects: [
+    { type: "giveImprovement", id: "old_plans" },
+    { type: "announce", key: "entity.old_survey_map.taken" },
+  ],
+},
+presence: [{ when: { type: "not", condition: { type: "consumed" } }, present: true }],
+```
+
+Pour les trois formes, un collectible déjà `consumed` ne fait plus RIEN à
+l'activation : ni effets, ni son (`view/interaction.js`, verrou avant
+l'exécution des effets).
 
 ### `"search"` — FOUILLE d'un conteneur de collecte régénérant
 
