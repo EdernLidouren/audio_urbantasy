@@ -8,6 +8,7 @@ import { loadLocale } from "../../../lib/i18n.js";
 
 const DOMAINS = [
   "audio",
+  "collections",
   "entities",
   "improvements",
   "interaction",

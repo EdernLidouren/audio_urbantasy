@@ -1,6 +1,7 @@
 {
   "debug.warnings.clear": "Clear the log",
   "debug.warnings.cleared": "Log cleared.",
+  "debug.warnings.collectionTextMissing": "Collection: missing text {key}",
   "debug.warnings.droppedCompanion": "Save: companion {entityId} removed, unknown type {type}",
   "debug.warnings.droppedEntity": "Save: entity {entityId} removed from scene {worldId}, unknown type {type}",
   "debug.warnings.empty": "No warnings",

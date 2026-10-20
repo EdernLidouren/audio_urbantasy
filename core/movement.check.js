@@ -31,6 +31,14 @@ import { SAVE_VERSION, serializeGame, deserializeGame } from "./save.js";
 import { addMoney, pickupEntity, lootEntity, lootUniqueEntity, lootEntitySpawn } from "./money.js";
 import { addItem, pickupItemEntity, removeItem, dropItem } from "./bag.js";
 import { ITEM_REGISTRY, itemProps, validateItemTags } from "./items.js";
+import {
+  validateCollection,
+  collectionEntries,
+  collectionProgress,
+  newlyDiscoveredEntries,
+  revealAllCollections,
+  resetAllCollections,
+} from "./collections.js";
 import { EQUIPMENT_SLOTS, createEmptyEquipment, gaitOf, equipItem, unequipItem, equippedTags } from "./equipment.js";
 import { TAG_REGISTRY, tagProps } from "./tags.js";
 import { createSeed } from "./rng.js";
@@ -7159,6 +7167,7 @@ export function runMovementChecks() {
   run("achat : acheter 3 pommes -> pommes au sac", 3, ownedQuantity(bought.bag, "apple"));
   run("achat : acheter 3 pommes -> stock du magasin décrémenté", appleStock - 3, shopEntity(bought, "counter-1").shopStock.apple);
   run("achat : l'original n'est jamais muté", 100, shopRich.money);
+  run("achat : l'objet acheté est noté acquis (point unique addItem)", true, Boolean(bought.acquiredItems.apple));
 
   const boughtAll = buyItems(bought, "counter-1", [{ type: "apple", quantity: 99 }]);
   run("achat : quantité CLAMPÉE au stock", appleStock, ownedQuantity(boughtAll.bag, "apple"));
@@ -7457,6 +7466,68 @@ export function runMovementChecks() {
     run("collecte : save/load — marqueur de cycle survit", 0, spawnWorld(revived).spawnCycle);
     run("collecte : save/load — aucun re-garnissage au rechargement dans le même cycle", revived, refillDueSpawns(revived, SPAWN_REGISTRY));
   }
+
+  // --- Collections (core/collections.js) : le fait neutre "objet acquis"
+  // (core/bag.js/addItem), la découverte qui s'en déduit, la sauvegarde. ---
+  const TEST_COLLECTIONS = { parts: { entries: [{ item: "apple" }, { item: "coin" }, { item: "sneakers" }] } };
+  const collCollectionScene = parseScene({ id: "collections", titleKey: "scene.demo.name", length: 10, playerStart: 0, entities: [] }, {});
+  const collFreshCollections = createInitialState(collCollectionScene, "collections", NO_COMPANIONS);
+  run(
+    "collections : partie neuve -> sac et équipement de départ notés acquis",
+    "combat_boots,high_heels,sneakers",
+    Object.keys(collFreshCollections.acquiredItems).sort().join(",")
+  );
+  const collWithApple = addItem(collFreshCollections, "apple", 2);
+  run("collections : addItem note l'objet acquis", true, Boolean(collWithApple.acquiredItems.apple));
+  run("collections : un second ajout ne recrée pas le fait (même référence)", collWithApple.acquiredItems, addItem(collWithApple, "apple", 1).acquiredItems);
+  const collAppleGone = removeItem(collWithApple, "apple", 2);
+  run("collections : retirer l'objet ne retire pas l'acquisition (définitif)", true, Boolean(collAppleGone.acquiredItems.apple));
+  run(
+    "collections : entrées dans l'ordre déclaré, avec leur état",
+    "apple:true,coin:false,sneakers:true",
+    collectionEntries("parts", TEST_COLLECTIONS.parts, collAppleGone.acquiredItems).map((e) => `${e.item}:${e.discovered}`).join(",")
+  );
+  run("collections : clés de texte déduites des ids", "collection.parts.entry.coin.name", collectionEntries("parts", TEST_COLLECTIONS.parts, {})[1].nameKey);
+  run("collections : progression", "2/3", (({ discovered, total }) => `${discovered}/${total}`)(collectionProgress(TEST_COLLECTIONS.parts, collAppleGone.acquiredItems)));
+  run(
+    "collections : diff -> seule la nouvelle entrée",
+    "parts/coin",
+    newlyDiscoveredEntries(TEST_COLLECTIONS, collAppleGone.acquiredItems, addItem(collAppleGone, "coin").acquiredItems).map((e) => `${e.collectionId}/${e.item}`).join(",")
+  );
+  run("collections : diff sans changement -> rien", 0, newlyDiscoveredEntries(TEST_COLLECTIONS, collAppleGone.acquiredItems, collAppleGone.acquiredItems).length);
+  const collCollectionThrows = (def) => {
+    try {
+      validateCollection("x", def, ITEM_REGISTRY);
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  run("collections : collection valide acceptée", false, collCollectionThrows(TEST_COLLECTIONS.parts));
+  run("collections : objet inconnu refusé", true, collCollectionThrows({ entries: [{ item: "not_an_item" }] }));
+  run("collections : doublon refusé", true, collCollectionThrows({ entries: [{ item: "apple" }, { item: "apple" }] }));
+  run("collections : liste vide refusée", true, collCollectionThrows({ entries: [] }));
+  const collRevealed = revealAllCollections(collFreshCollections, TEST_COLLECTIONS);
+  run("collections debug : tout révéler", "3/3", (({ discovered, total }) => `${discovered}/${total}`)(collectionProgress(TEST_COLLECTIONS.parts, collRevealed.acquiredItems)));
+  const collResetDone = resetAllCollections(collRevealed, TEST_COLLECTIONS);
+  run("collections debug : tout réinitialiser", 0, collectionProgress(TEST_COLLECTIONS.parts, collResetDone.acquiredItems).discovered);
+  run("collections debug : réinitialiser ne touche pas aux objets hors collection", true, Boolean(collResetDone.acquiredItems.combat_boots));
+  // Sauvegarde : fait sérialisé tel quel ; ancienne sauvegarde -> reconstitué
+  // depuis le sac et l'équipement ; id inconnu -> simplement ignoré.
+  const collCollectionReload = deserializeGame(serializeGame(collWithApple));
+  run("collections save : acquiredItems traverse la sauvegarde", true, Boolean(collCollectionReload.session.acquiredItems.apple));
+  const { acquiredItems: coll_dropped, ...collOldCollectionSave } = collWithApple;
+  const collOldCollectionReload = deserializeGame({ version: SAVE_VERSION, data: collOldCollectionSave });
+  run(
+    "collections save : ancienne sauvegarde -> reconstitué depuis sac + équipement",
+    "apple,combat_boots,high_heels,sneakers",
+    Object.keys(collOldCollectionReload.session.acquiredItems).sort().join(",")
+  );
+  run(
+    "collections save : id inconnu ignoré sans erreur",
+    "1/3",
+    (({ discovered, total }) => `${discovered}/${total}`)(collectionProgress(TEST_COLLECTIONS.parts, { apple: true, item_removed_since: true }))
+  );
 
   // --- Triggers horaires (core/triggers.js) : validation, détection sur
   // transition, sauts de temps, effets d'état sur l'AUTRE face, dormance ---

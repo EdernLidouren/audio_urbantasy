@@ -1,6 +1,8 @@
 {
   "item.apple.description": "Une pomme, fraîche et croquante.",
   "item.apple.name": "Pomme",
+  "item.capacitor.description": "Un petit cylindre gainé de plastique bleu, dressé sur deux pattes inégales.",
+  "item.capacitor.name": "Condensateur",
   "item.coin.description": "Une pièce de monnaie, un peu terne.",
   "item.coin.name": "Pièce",
   "item.combat_boots": "Rangers",
@@ -11,8 +13,12 @@
   "item.key_bronze.description": "Une petite clé en bronze.",
   "item.leather_boots": "Bottes en cuir",
   "item.leather_boots.description": "Des bottes en cuir robustes.",
+  "item.resistor.description": "Un petit cylindre beige cerclé de bandes de couleur, deux pattes métalliques de part et d'autre.",
+  "item.resistor.name": "Résistance",
   "item.sneakers": "Baskets",
   "item.sneakers.description": "Une paire de baskets, légères et simples.",
+  "item.transistor.description": "Un minuscule boîtier noir en demi-lune, hérissé de trois pattes.",
+  "item.transistor.name": "Transistor",
   "tag.chic": "chic",
   "tag.metal": "métal",
   "tag.military": "militaire"

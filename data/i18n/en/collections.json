@@ -1,0 +1,21 @@
+{
+  "collection.electronics.entry.capacitor.description": "Holds a little charge, then gives it back all at once.",
+  "collection.electronics.entry.capacitor.name": "Capacitor",
+  "collection.electronics.entry.resistor.description": "Holds back the current. Its coloured bands tell you by how much.",
+  "collection.electronics.entry.resistor.name": "Resistor",
+  "collection.electronics.entry.transistor.description": "A switch with no moving parts, at the heart of every machine that computes.",
+  "collection.electronics.entry.transistor.name": "Transistor",
+  "collection.electronics.name": "Electronic Components",
+  "collections.debug.reset": "Reset everything",
+  "collections.debug.reset.done": "All collections reset.",
+  "collections.debug.resetConfirm": "Reset every collection? Entries will become unknown again",
+  "collections.debug.reveal": "Reveal everything",
+  "collections.debug.revealConfirm": "Reveal every entry of every collection?",
+  "collections.debug.revealed": "All collections revealed.",
+  "collections.debug.title": "Collections (debug)",
+  "collections.discovered": "New discovery: {name}, {collection}.",
+  "collections.entry": "{name}, {discovered} of {total}",
+  "collections.entry.known": "{name}: {description}",
+  "collections.entry.unknown": "Unknown",
+  "collections.title": "Collections"
+}

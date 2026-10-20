@@ -1,5 +1,5 @@
-// Écran d'INVENTAIRE à TROIS ONGLETS — Sac ("i"), Équipement ("q") et
-// Améliorations ("m"), voir view/city-screen.js. UN SEUL écran RÉEL sur la
+// Écran d'INVENTAIRE à QUATRE ONGLETS — Sac ("i"), Équipement ("q"),
+// Améliorations ("m") et Collections ("c"), voir view/city-screen.js. UN SEUL écran RÉEL sur la
 // pile (lib/screens.js) : il délègue à un écran-menu INTERNE
 // (lib/menu.js/makeMenuScreen), reconstruit pour l'onglet actif à CHAQUE
 // affichage/bascule — jamais un écran séparé par onglet. Tab / Maj+Tab
@@ -30,6 +30,8 @@ import { playMenuSound } from "../menu-sounds.js";
 import { ITEM_REGISTRY } from "../../core/items.js";
 import { EQUIPMENT_SLOTS } from "../../core/equipment.js";
 import { IMPROVEMENT_REGISTRY, orderedImprovementIds } from "../../core/improvements.js";
+import { collectionEntries, collectionNameKey, collectionProgress } from "../../core/collections.js";
+import collections from "../../collections/index.js";
 import { resolveAction, checkBindingsForCollisions } from "../../lib/input.js";
 
 // Bindings du sélecteur de quantité (voir openQuantitySelector plus bas) —
@@ -70,7 +72,7 @@ const TAB_BINDINGS = {
 checkBindingsForCollisions(TAB_BINDINGS, "view/menus/inventory-menu.js TAB_BINDINGS");
 
 // Ordre des onglets, celui du cycle Tab / Maj+Tab.
-const TABS = ["bag", "equipment", "improvements"];
+const TABS = ["bag", "equipment", "improvements", "collections"];
 
 function cycleTab(tab, direction) {
   const index = TABS.indexOf(tab);
@@ -293,12 +295,54 @@ function buildImprovementsTabScreen(getSession) {
   return makeMenuScreen(menu, t);
 }
 
+// Ligne d'UNE entrée de collection. Découverte : "{nom} : {description}",
+// Espace/Entrée la réannonce. Non découverte : "Inconnu". Sans numéro,
+// contrairement aux améliorations.
+function collectionEntryLine(entry) {
+  if (!entry.discovered) return { label: "collections.entry.unknown", onActivate: () => {} };
+  const labelParams = { name: t(entry.nameKey), description: stripTrailingPeriod(t(entry.descriptionKey)) };
+  return {
+    label: "collections.entry.known",
+    labelParams,
+    onActivate: () => announce(t("collections.entry.known", labelParams), { assertive: true }),
+  };
+}
+
+// Sous-menu d'UNE collection, empilé PAR-DESSUS l'onglet (qui reste ouvert
+// dessous) : ses entrées dans l'ordre déclaré. Échap le ferme et revient à
+// la liste des collections, réannoncée par l'onglet révélé.
+function openCollectionEntriesMenu(collectionId, getSession) {
+  const entries = collectionEntries(collectionId, collections[collectionId], getSession().acquiredItems);
+  pushScreen(
+    makeMenuScreen({ title: collectionNameKey(collectionId), closable: true, entries: entries.map(collectionEntryLine) }, t)
+  );
+}
+
+// Onglet Collections : toutes les collections du registre
+// (collections/index.js), chacune avec sa progression ("{nom}, 1 sur 3").
+// Découvert se lit dans l'ÉTAT RÉEL (session.acquiredItems, voir
+// core/collections.js), comme l'onglet Améliorations.
+function buildCollectionsTabScreen(getSession) {
+  const acquired = getSession().acquiredItems;
+  const menu = {
+    title: "collections.title",
+    closable: true,
+    entries: Object.entries(collections).map(([collectionId, collection]) => ({
+      label: "collections.entry",
+      labelParams: { name: t(collectionNameKey(collectionId)), ...collectionProgress(collection, acquired) },
+      onActivate: () => openCollectionEntriesMenu(collectionId, getSession),
+    })),
+  };
+  return makeMenuScreen(menu, t);
+}
+
 // `cursor` : seul l'onglet Sac en a l'usage (voir buildBagTabScreen) — les
 // listes des autres onglets ne changent pas de longueur pendant qu'on les
 // parcourt, rien à repositionner de ce côté.
 function buildTabScreen(tab, scene, getSession, cursor) {
   if (tab === "equipment") return buildEquipmentTabScreen(scene, getSession);
   if (tab === "improvements") return buildImprovementsTabScreen(getSession);
+  if (tab === "collections") return buildCollectionsTabScreen(getSession);
   return buildBagTabScreen(scene, getSession, cursor);
 }
 
@@ -390,6 +434,11 @@ export function openEquipmentMenu(scene, getSession) {
 // "m" — voir view/city-screen.js.
 export function openImprovementsMenu(scene, getSession) {
   openInventoryTabs(scene, getSession, "improvements");
+}
+
+// "c" — voir view/city-screen.js.
+export function openCollectionsMenu(scene, getSession) {
+  openInventoryTabs(scene, getSession, "collections");
 }
 
 // Actions disponibles pour UNE entrée de sac — "Équiper" seulement si

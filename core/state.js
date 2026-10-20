@@ -324,6 +324,11 @@ export function createInitialState(scene, seed = DEFAULT_SEED, { companions, par
     // premier pas pour l'entendre/le tester (gait "shoes", voir
     // core/items.js/ITEM_REGISTRY.sneakers).
     equipment: { feet: { type: "sneakers" } },
+    // Objets déjà acquis au moins une fois (voir core/bag.js/addItem, seul
+    // point d'acquisition en jeu) : le sac et l'équipement de DÉPART ne
+    // passent pas par addItem, ils sont donc notés ici, à la main. À garder
+    // aligné sur les deux champs juste au-dessus.
+    acquiredItems: { combat_boots: true, high_heels: true, sneakers: true },
     companions: repositionCompanions(requestedCompanions.slice(0, MAX_COMPANIONS), scene.playerStart, scene.length),
     // Flux PRNG dédié aux compagnons (voir header) : dérivé du même seed,
     // mais hashé sous une clé distincte — jamais la même suite que le

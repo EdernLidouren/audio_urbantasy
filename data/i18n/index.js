@@ -16,4 +16,4 @@ import { createI18n } from "../../lib/i18n.js";
 import fr from "./fr/index.js";
 import en from "./en/index.js";
 
-export const { t, setLocale, getLocale, availableLocales } = createI18n({ fr, en });
+export const { t, hasKey, setLocale, getLocale, availableLocales } = createI18n({ fr, en });

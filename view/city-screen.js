@@ -40,10 +40,13 @@ import { openTimeDebugMenu } from "./menus/debug-time-menu.js";
 import { openTeleportDebugMenu } from "./menus/debug-teleport-menu.js";
 import { openDebugWarningsMenu, openDebugWarningsIfUnseen } from "./menus/debug-warnings-menu.js";
 import { reportSceneReloadFailure } from "./debug-warnings.js";
+import { openCollectionsDebugMenu } from "./menus/debug-collections-menu.js";
+import { muteNextDiscoveryCheck } from "./collection-discoveries.js";
 import {
   openInventoryMenu,
   openEquipmentMenu,
   openImprovementsMenu,
+  openCollectionsMenu,
   setDropItemHandler,
   setEquipItemHandler,
   setUnequipItemHandler,
@@ -638,6 +641,8 @@ export function makeCityScreen(getSession, setSession) {
   function replaceCurrentGame(newSession) {
     scene.destroy();
     scene = null;
+    // Partie remplacée en bloc : rien à annoncer comme "nouvelle découverte".
+    muteNextDiscoveryCheck();
     setSession(newSession);
     refreshSpawns();
     scene = createCityAudioScene(getSession);
@@ -983,6 +988,12 @@ export function makeCityScreen(getSession, setSession) {
         return;
       }
 
+      // "openCollections" ("c") : même écran, onglet Collections.
+      if (action === "openCollections") {
+        openCollectionsMenu(scene, getSession);
+        return;
+      }
+
       // "announcePosition" : consultation pure de la position du joueur —
       // même statut que announceTime/announceMoney désormais (DISPONIBLE EN
       // JEU NORMAL, pas seulement en debug) : announcePlayerX ci-dessus lit
@@ -1047,6 +1058,13 @@ export function makeCityScreen(getSession, setSession) {
       // des avertissements, nouveaux ou non. Hors debug, ne fait RIEN.
       if (action === "openWarningsDebugMenu" && isDebugEnabled()) {
         openDebugWarningsMenu();
+        return;
+      }
+
+      // "openCollectionsDebugMenu" (Shift+C), MODE DEBUG UNIQUEMENT : tout
+      // révéler / tout réinitialiser dans les collections.
+      if (action === "openCollectionsDebugMenu" && isDebugEnabled()) {
+        openCollectionsDebugMenu(getSession, setSession);
         return;
       }
 

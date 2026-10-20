@@ -12,7 +12,8 @@
   "entities": [
     { "id": "money_1", "type": "money", "x": 5 },
     { "id": "bush_1", "type": "bush", "x": 12 },
-    { "id": "counter_1", "type": "shop_counter", "x": 38 },
+    { "id": "counter_1", "type": "shop_counter", "x": 38,
+      "shop": { "catalog": { "items": {"apple": {"stock": 5}, "coin": {"stock": 20}, "sneakers": {"stock": 1}, "leather_boots": {"stock": 1}, "capacitor": {"stock": 3}} } } },
     { "id": "miravi_test", "type": "miravi", "x": 5, "isFlying": true, "behavior": { "kind": "wander" } },
     { "id": "object_toolbox", "type": "object", "x": 8, "nameKey": "object.toolbox.name", "descriptionKey": "object.toolbox.description" },
     {
@@ -24,6 +25,10 @@
       "action": { "kind": "applyEffects", "effects": [{ "type": "playSound", "path": "assets/sounds/doors/door_1_open" }, { "type": "teleport", "target": "demo2" }] }
     },
     { "id": "apple_1", "type": "apple", "x": 17 },
+    { "id": "resistor_1", "type": "item", "x": 3, "nameKey": "item.resistor.name", "descriptionKey": "item.resistor.description",
+      "action": { "kind": "pickup", "item": "resistor", "count": 1 } },
+    { "id": "transistor_1", "type": "item", "x": 14, "nameKey": "item.transistor.name", "descriptionKey": "item.transistor.description",
+      "action": { "kind": "pickup", "item": "transistor", "count": 1 } },
     { "id": "object_neon", "type": "neon", "x": 30 },
     { "id": "bird_1", "type": "bird_1", "x": 33 },
     { "id": "spirit_1", "type": "ghost", "x": 36 },

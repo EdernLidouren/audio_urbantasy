@@ -17,6 +17,7 @@ il les COMPLÈTE avec le détail par domaine.
 | [`time.md`](time.md) | Horloge de partie : le compteur, ses dérivations, le calendrier simplifié, l'avancement accéléré, la persistance, la phase jour/nuit. |
 | [`city-map.md`](city-map.md) | Topologie de la carte de la ville et le menu-carte. |
 | [`i18n.md`](i18n.md) | Convention `data/i18n/` : découpage par domaine, parité fr/en, où va une nouvelle clé de traduction. |
+| [`collections.md`](collections.md) | Collections : modèle (un fichier par collection), découverte par acquisition (`addItem`), textes, onglet Collections, sauvegarde, debug, extension par observation. |
 | [`save.md`](save.md) | Sauvegarde : contenu, relecture (rebouchage, renommages de contenu, types inconnus), table `config/save-renames.js`. |
 
 ## Où va une nouvelle info ? (convention)
@@ -33,6 +34,7 @@ UN SEUL endroit, jamais recopié :
 | Une dérivation ou un comportement de l'horloge de partie | `doc/time.md` |
 | La grille de la ville ou le menu-carte | `doc/city-map.md` |
 | Une nouvelle FAMILLE de clés i18n, ou une convention de traduction | `doc/i18n.md` |
+| Une collection, ses entrées, la découverte ou l'onglet Collections | `doc/collections.md` |
 | Le format de sauvegarde, sa migration, ou un RENOMMAGE de type/clé i18n/son (à reporter dans `config/save-renames.js`) | `doc/save.md` |
 | Une liste EXHAUSTIVE (types de condition, kinds d'action, types d'entité, tags...) | **NULLE PART en doc** — elle vit dans le CODE (le registre/l'aiguillage concerné), la doc y RENVOIE toujours plutôt que de la recopier, pour ne jamais diverger |
 

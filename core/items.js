@@ -88,6 +88,12 @@ export const ITEM_REGISTRY = {
     gait: "high_heels",
     tags: ["chic"],
   },
+  // Composants électroniques — objets de la collection "electronics"
+  // (collections/electronics.js). Contenu de TEST : noms et descriptions
+  // provisoires.
+  resistor: { stackable: true, label: "item.resistor.name", descriptionKey: "item.resistor.description", value: 3 },
+  capacitor: { stackable: true, label: "item.capacitor.name", descriptionKey: "item.capacitor.description", value: 4 },
+  transistor: { stackable: true, label: "item.transistor.name", descriptionKey: "item.transistor.description", value: 6 },
 };
 
 // Propriétés d'UN objet par son type — point d'extension futur (même

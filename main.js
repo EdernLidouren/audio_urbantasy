@@ -23,6 +23,7 @@ import { configureAssetManifest } from "./lib/assets.js";
 import { checkAutoSaveTimer } from "./view/autosave-timer.js";
 import { loadGame } from "./view/save-storage.js";
 import { reportDroppedEntities } from "./view/debug-warnings.js";
+import { announceNewDiscoveries } from "./view/collection-discoveries.js";
 
 // Préférences de menu (sliders/toggles + cyclage/étoile/suffixe, voir
 // lib/menu.js) injectées UNE FOIS ici, point de composition unique — tout
@@ -106,7 +107,11 @@ let session = null;
 function getSession() {
   return session;
 }
+// Toute mise à jour de la partie passe ici : c'est donc ici que la vue
+// compare l'avant et l'après pour annoncer les découvertes de collection
+// (voir view/collection-discoveries.js).
 function setSession(next) {
+  announceNewDiscoveries(session, next);
   session = next;
 }
 

@@ -1,4 +1,7 @@
 {
+  "assets/ambiances/altitude_wind": [
+    "assets/ambiances/altitude_wind_1.mp3"
+  ],
   "assets/ambiances/rain_indoor": [
     "assets/ambiances/rain_indoor_1.mp3"
   ],
@@ -662,6 +665,9 @@
   ],
   "assets/sounds/furniture/magic_mirror_1_beacon": [
     "assets/sounds/furniture/magic_mirror_1_beacon_1.mp3"
+  ],
+  "assets/sounds/furniture/metal_bucket_1_beacon": [
+    "assets/sounds/furniture/metal_bucket_1_beacon_1.mp3"
   ],
   "assets/sounds/furniture/metal_container_1_close": [
     "assets/sounds/furniture/metal_container_1_close_1.mp3"

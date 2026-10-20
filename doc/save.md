@@ -32,6 +32,9 @@ la partie (voir `doc/entity-model.md`/"Mode debug").
    améliorations...). La forme reste v1 : compléter n'est pas monter de
    version.
 3. **Renommages de contenu** (`config/save-renames.js`, voir plus bas).
+   Parmi les rebouchages : `acquiredItems` (objets acquis au moins une fois,
+   voir `doc/collections.md`), reconstitué à partir du sac et de
+   l'équipement actuels — approximatif, un objet revendu n'y figure plus.
 4. **Plausibilité** : structure minimale (joueur, mondes, monde actif...),
    sinon `reason: "invalid"`.
 5. **Types inconnus**, seulement si un `registry` est fourni (la vue le

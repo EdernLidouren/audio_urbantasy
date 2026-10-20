@@ -61,6 +61,10 @@ export const CITY_BINDINGS = {
   // view/menus/inventory-menu.js/openImprovementsMenu). Canal distinct de
   // Shift+M (openTeleportDebugMenu, mods exacts).
   openImprovements: { keys: ["m"], mods: [] },
+  // "c" : même écran à onglets, ouvert sur l'onglet Collections (voir
+  // view/menus/inventory-menu.js/openCollectionsMenu). Canal distinct de
+  // Shift+C (openCollectionsDebugMenu, mods exacts).
+  openCollections: { keys: ["c"], mods: [] },
   announcePosition: { keys: ["x"], mods: [] },
   // "w" (weather) : consultation pure de la météo courante (voir
   // core/weather.js) — outil de VÉRIFICATION, comme announceTime ("t") :
@@ -84,6 +88,9 @@ export const CITY_BINDINGS = {
   // Shift+L (log), MODE DEBUG UNIQUEMENT : journal des avertissements (voir
   // view/menus/debug-warnings-menu.js).
   openWarningsDebugMenu: { keys: ["l"], mods: ["shift"] },
+  // Shift+C, MODE DEBUG UNIQUEMENT : tout révéler / tout réinitialiser dans
+  // les collections (voir view/menus/debug-collections-menu.js).
+  openCollectionsDebugMenu: { keys: ["c"], mods: ["shift"] },
   // "p" (perception) : bascule la PERCEPTION SURNATURELLE (voir
   // core/state.js/togglePerception, view/city-screen.js/togglePerceptionEffect)
   // — COOLDOWN anti-spam entièrement côté consommation (city-screen.js),

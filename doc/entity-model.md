@@ -580,6 +580,12 @@ incrémentée), absent pour un objet NON empilable (une entrée PAR
 EXEMPLAIRE). `core/bag.js`/`addItem` et `removeItem` sont les SEULS points
 d'écriture (voir son header pour le détail complet de la forme).
 
+`addItem` est aussi le **point unique d'acquisition** : il note au passage
+que l'objet a été acquis au moins une fois (`session.acquiredItems`), un fait
+définitif que lisent les collections (voir `doc/collections.md`). Le sac et
+l'équipement de départ, posés directement par `createInitialState`, y sont
+notés à la main.
+
 - **Consultation** — touche "i", écran-liste
   (`view/menus/inventory-menu.js`). Chaque ligne : "**<nom> × <quantité si
   applicable> : <description>**" — le nom D'ABORD, la description EN QUEUE

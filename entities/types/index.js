@@ -53,6 +53,7 @@ import bird1 from "./bird_1.js";
 import bird2 from "./bird_2.js";
 import bird3 from "./bird_3.js";
 import buddy from "./buddy.js";
+import brokenComputer from "./broken_computer.js";
 import bush from "./bush.js";
 import chair from "./chair.js";
 import clock from "./clock.js";
@@ -75,12 +76,14 @@ import machine1 from "./machine_1.js";
 import magicMirror from "./magic_mirror.js";
 import miravi from "./miravi.js";
 import mirror from "./mirror.js";
+import mopAndBucket from "./mop_and_bucket.js";
 import money from "./money.js";
 import neon from "./neon.js";
 import npc from "./npc.js";
 import object from "./object.js";
 import officeChair from "./office_chair.js";
 import officeComputer from "./office_computer.js";
+import officeSupplyBox from "./office_supply_box.js";
 import officeTable from "./office_table.js";
 import officeWaterCooler from "./office_water_cooler.js";
 import oldSurveyMap from "./old_survey_map.js";
@@ -105,6 +108,7 @@ export default {
   bird_2: bird2,
   bird_3: bird3,
   buddy,
+  broken_computer: brokenComputer,
   bush,
   chair,
   clock,
@@ -128,11 +132,13 @@ export default {
   miravi,
   mirror,
   money,
+  mop_and_bucket: mopAndBucket,
   neon,
   npc,
   object,
   office_chair: officeChair,
   office_computer: officeComputer,
+  office_supply_box: officeSupplyBox,
   office_table: officeTable,
   office_water_cooler: officeWaterCooler,
   old_survey_map: oldSurveyMap,

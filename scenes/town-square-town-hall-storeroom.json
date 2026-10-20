@@ -11,9 +11,34 @@
   "reverbDecay": 5.0,
   "entities": [
     {
+      "id": "office_supply_box_1",
+      "type": "office_supply_box",
+      "x": 0
+    },
+    {
       "id": "old_survey_map_1",
       "type": "old_survey_map",
       "x": 2
+    },
+    {
+      "id": "office_supply_box_2",
+      "type": "office_supply_box",
+      "x": 4
+    },
+    {
+      "id": "broken_computer_1",
+      "type": "broken_computer",
+      "x": 6
+    },
+    {
+      "id": "office_supply_box_3",
+      "type": "office_supply_box",
+      "x": 7
+    },
+    {
+      "id": "mop_and_bucket_1",
+      "type": "mop_and_bucket",
+      "x": 8
     },
     {
       "id": "meeting_room_door_1",

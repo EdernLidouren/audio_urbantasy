@@ -6,6 +6,14 @@
 // (toujours 1 par construction : deux clés = deux entrées distinctes).
 // SEULS points d'écriture : addItem (ajout) et removeItem (retrait) ci-dessous.
 //
+// ACQUISITION : addItem est le POINT UNIQUE par lequel un objet entre dans
+// le sac (ramassage, achat, retour d'un objet déséquipé, toute source
+// future). Il note au passage que l'objet a été acquis au moins une fois
+// (session.acquiredItems, `{ [type]: true }`), un fait DÉFINITIF : retirer
+// l'objet ne l'efface jamais. Fait neutre, sans aucune connaissance des
+// collections, qui le LISENT pour savoir ce qui est découvert (voir
+// core/collections.js, doc/collections.md).
+//
 // PAS de limite de sac, PAS d'id par entrée : YAGNI délibéré — aucune
 // contrainte de place n'existe encore. Une limite de place ou un identifiant
 // d'entrée s'ajouteront SI le gameplay les réclame, sans changer cette forme
@@ -22,6 +30,10 @@ import { ITEM_REGISTRY } from "./items.js";
 // une entrée de plus, silencieusement dégradée, jamais un crash en jeu
 // réel.
 export function addItem(session, type, count = 1) {
+  return markAcquired(addToBag(session, type, count), type);
+}
+
+function addToBag(session, type, count) {
   const stackable = Boolean(ITEM_REGISTRY[type] && ITEM_REGISTRY[type].stackable);
 
   if (stackable) {
@@ -37,6 +49,14 @@ export function addItem(session, type, count = 1) {
 
   const newEntries = Array.from({ length: count }, () => ({ type }));
   return { ...session, bag: [...session.bag, ...newEntries] };
+}
+
+// Note `type` comme acquis (voir le header). Déjà noté -> référence
+// INCHANGÉE pour acquiredItems (rien de neuf à signaler à un observateur).
+export function markAcquired(session, type) {
+  const acquired = session.acquiredItems || {};
+  if (acquired[type]) return session;
+  return { ...session, acquiredItems: { ...acquired, [type]: true } };
 }
 
 // Effet "pickup" vers le SAC (voir view/interaction.js, ACTION_HANDLERS.

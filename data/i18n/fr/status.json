@@ -1,6 +1,7 @@
 {
   "debug.warnings.clear": "Vider le journal",
   "debug.warnings.cleared": "Journal vidé.",
+  "debug.warnings.collectionTextMissing": "Collection : texte manquant {key}",
   "debug.warnings.droppedCompanion": "Sauvegarde : compagnon {entityId} retiré, type inconnu {type}",
   "debug.warnings.droppedEntity": "Sauvegarde : entité {entityId} retirée de la scène {worldId}, type inconnu {type}",
   "debug.warnings.empty": "Aucun avertissement",

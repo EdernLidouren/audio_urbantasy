@@ -1,6 +1,8 @@
 {
   "item.apple.description": "An apple, fresh and crunchy.",
   "item.apple.name": "Apple",
+  "item.capacitor.description": "A small cylinder sheathed in blue plastic, standing on two uneven leads.",
+  "item.capacitor.name": "Capacitor",
   "item.coin.description": "A coin, a little tarnished.",
   "item.coin.name": "Coin",
   "item.combat_boots": "Combat boots",
@@ -11,8 +13,12 @@
   "item.key_bronze.description": "A small bronze key.",
   "item.leather_boots": "Leather boots",
   "item.leather_boots.description": "A sturdy pair of leather boots.",
+  "item.resistor.description": "A small beige cylinder ringed with coloured bands, a metal lead at each end.",
+  "item.resistor.name": "Resistor",
   "item.sneakers": "Sneakers",
   "item.sneakers.description": "A pair of light, simple sneakers.",
+  "item.transistor.description": "A tiny black half-moon package bristling with three leads.",
+  "item.transistor.name": "Transistor",
   "tag.chic": "chic",
   "tag.metal": "metal",
   "tag.military": "military"

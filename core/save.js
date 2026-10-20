@@ -450,6 +450,21 @@ function migrateSave(raw) {
     data = { ...data, improvements: {} };
   }
 
+  // acquiredItems (voir core/bag.js/addItem, core/collections.js) : absent
+  // d'une sauvegarde antérieure -> RECONSTITUÉ à partir du sac et de
+  // l'équipement actuels. Approximatif par nature : un objet déjà revendu
+  // ou perdu n'y figure plus, il ne sera pas compté comme acquis.
+  if (!data.acquiredItems || typeof data.acquiredItems !== "object") {
+    const acquiredItems = {};
+    for (const entry of Array.isArray(data.bag) ? data.bag : []) {
+      if (entry && typeof entry.type === "string") acquiredItems[entry.type] = true;
+    }
+    for (const slot of Object.values(data.equipment || {})) {
+      if (slot && typeof slot.type === "string") acquiredItems[slot.type] = true;
+    }
+    data = { ...data, acquiredItems };
+  }
+
   if (data.worlds && typeof data.worlds === "object") {
     const patchedWorlds = {};
     let anyChanged = false;
