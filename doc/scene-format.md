@@ -344,7 +344,7 @@ rassemblés par `index.js` en un objet `{ [type]: TypeDef }` :
 
 `blocksMovement`/`observable`/`interactable`/`isFlying` sont tous les quatre
 cascadés instance -> type -> défaut `false` (voir
-`core/scene.js`/`parseEntity`), donc également déclarables au niveau ENTITÉ
+`core/entity-parse.js`/`parseEntity`), donc également déclarables au niveau ENTITÉ
 (voir le tableau "Entité" plus haut), pas seulement au niveau du type.
 
 Liste EXHAUSTIVE des archétypes disponibles : `entities/types/index.js` (un

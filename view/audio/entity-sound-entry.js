@@ -130,7 +130,7 @@ function isPerceptionGated(entity) {
 //     scène précédente (bascule de face). L'entrée y reprend la sienne (et
 //     la retire de la Map) : la boucle continue sans coupure.
 export function buildEntitySoundEntry(entity, session, { otherFace = false, disableStagger = false, handover = null } = {}) {
-  // Déjà RÉSOLU par la cascade instance -> archétype (core/scene.js/
+  // Déjà RÉSOLU par la cascade instance -> archétype (core/entity-parse.js/
   // parseEntity) : un rôle retiré à l'instance n'existe plus ici.
   const sounds = entity.sounds;
   // Gains "autre face", résolus pour toute entrée (la bascule de face s'en

@@ -77,7 +77,7 @@ export default function checkActions(run) {
   });
   run("actions conditionnelles : tag inconnu dans action.condition -> échec clair", true, unknownActionConditionTagThrew);
 
-  // refusalEffects est OPTIONNEL (voir "Conditions d'action"/core/scene.js/
+  // refusalEffects est OPTIONNEL (voir "Conditions d'action"/core/script-parse.js/
   // parseSingleAction) : une condition SANS refusalEffects charge SANS
   // erreur — l'échec devient silencieux, ASSUMÉ (voir entities/types/
   // window.js, dont les deux candidates couvrent tout l'espace du flag

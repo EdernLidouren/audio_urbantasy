@@ -1,7 +1,7 @@
 // STOCKAGE de variables en jeu (flags booléens + entiers) — mécanisme
 // GÉNÉRIQUE, réutilisé À L'IDENTIQUE par les trois PORTÉES (voir
 // CLAUDE.md/core/scripting.md) :
-//   - ENTITÉ  : core/scene.js/parseEntity attache le sac résolu à l'entité.
+//   - ENTITÉ  : core/entity-parse.js/parseEntity attache le sac résolu à l'entité.
 //   - SCÈNE   : core/scene.js/parseScene attache le sac résolu au monde
 //     (racine PARTAGÉE entre recto/verso, jamais par face — voir header de
 //     parseScene).
@@ -14,7 +14,7 @@
 //
 // BRANCHÉ sur les conditions (LECTURE, condition "variable" — voir
 // core/presence.js/evaluateVariable) et les actions (ÉCRITURE, effets
-// setVariable/toggleVariable/addVariable — voir core/scene.js/
+// setVariable/toggleVariable/addVariable — voir core/script-parse.js/
 // parseActionEffect, applyActionEffects ci-dessous). getVariable/setVariable
 // restent le SEUL point d'accès bas niveau ; applyActionEffects les enchaîne
 // pour une LISTE d'effets déjà validée, sans connaître elle-même le SENS
@@ -55,7 +55,7 @@ export function isValidValueForType(type, value) {
 
 // Valide et construit le sac de variables d'UN porteur — RÉUTILISÉE À
 // L'IDENTIQUE par core/scene.js (entité, scène) et core/state.js (partie),
-// `fail` fourni par l'appelant (même patron que core/scene.js/parseBehavior)
+// `fail` fourni par l'appelant (même patron que core/parse-common.js/parseBehavior)
 // pour que le message porte le préfixe du bon appelant, jamais dupliqué ici.
 //
 // ABSENCE / MALFORMATION (voir CLAUDE.md, "rendre les états illégaux
@@ -154,7 +154,7 @@ export function setVariable(context, scope, name, value) {
 }
 
 // Applique une LISTE d'effets D'ÉCRITURE déjà validée (voir
-// core/scene.js/parseActionEffect — setVariable/toggleVariable/addVariable,
+// core/script-parse.js/parseActionEffect — setVariable/toggleVariable/addVariable,
 // core/scripting.md/"Effets d'action") à un `context` de variables — POINT
 // D'ENTRÉE que view/interaction.js (activation d'une action) réutilise pour
 // appliquer TOUS les effets d'une action choisie EN UNE FOIS. Enchaîne les

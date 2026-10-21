@@ -43,7 +43,7 @@ export default function checkMovement(run) {
   // core/reduce.js/resolveIntents) — wander/follow/goto continuent de ne
   // produire qu'une intention de direction, ignorant tout de la vitesse.
   // Cascade instance -> archétype -> défaut (1), même patron que
-  // blocksMovement/isFlying (core/scene.js/parseEntity).
+  // blocksMovement/isFlying (core/entity-parse.js/parseEntity).
 
   const SPEED_REGISTRY = {
     dog: { nameKey: "entity.dog.name" },

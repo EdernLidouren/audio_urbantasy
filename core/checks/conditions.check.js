@@ -469,7 +469,7 @@ export default function checkConditions(run) {
     evaluateCondition({ type: "weather" }, {})
   );
 
-  // Validation au chargement (core/scene.js/validateCondition) : un état
+  // Validation au chargement (core/script-parse.js/validateCondition) : un état
   // référencé par la condition doit exister dans la VRAIE table météo —
   // même politique que hasEquipmentTag.tag contre TAG_REGISTRY.
   const WEATHER_COND_REGISTRY = {
@@ -545,7 +545,7 @@ export default function checkConditions(run) {
     evaluateCondition({ type: "allOf", conditions: [{ type: "perceptionActive" }, { type: "weather", state: "fog" }] }, { perceptionActive: false, weather: "clear" })
   );
   // Cas limite : "conditions" à un SEUL élément — redondant (revient à la
-  // sous-condition seule) mais légal, voir core/scene.js/validateCondition
+  // sous-condition seule) mais légal, voir core/script-parse.js/validateCondition
   // (rejette seulement un tableau VIDE, pas un tableau à un élément).
   run(
     "allOf : une seule sous-condition, vraie -> vraie",
@@ -566,7 +566,7 @@ export default function checkConditions(run) {
     )
   );
 
-  // Validation au chargement (core/scene.js/validateCondition) :
+  // Validation au chargement (core/script-parse.js/validateCondition) :
   // "conditions" doit être un tableau NON VIDE, chaque élément revalidé
   // RÉCURSIVEMENT — une sous-condition mal formée échoue exactement comme
   // au premier niveau.

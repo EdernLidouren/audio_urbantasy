@@ -2,10 +2,10 @@
 // core/state.js/spawnEphemeral, spawnScatteredEphemerals ; doc/entity-model.md/
 // "Entités éphémères"). La vue connaît le registre des types, le core non :
 // c'est ici qu'un type devient un descripteur complet, de la forme que
-// core/scene.js/parseEntity donnerait à une instance sans surcharge.
+// core/entity-parse.js/parseEntity donnerait à une instance sans surcharge.
 //
 // À fusionner un jour avec la résolution du core pour un objet générique au
-// sol (core/scene.js/genericItemDefaults) : deux chemins décident aujourd'hui
+// sol (core/entity-parse.js/genericItemDefaults) : deux chemins décident aujourd'hui
 // du nom, de la description et des sons d'un objet posé.
 
 import registry from "../entities/types/index.js";

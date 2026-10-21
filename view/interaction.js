@@ -116,7 +116,7 @@ export function setLootSpawnHandler(handler) {
 }
 
 // (entity, effects) => void — applique une LISTE d'effets D'ÉCRITURE de
-// variable (setVariable/toggleVariable/addVariable, voir core/scene.js/
+// variable (setVariable/toggleVariable/addVariable, voir core/script-parse.js/
 // parseActionEffect, core/variables.js/applyActionEffects), fournie par
 // city-screen.js qui seul détient getSession/setSession — même patron que
 // setPickupHandler ci-dessus. Utilisé par le kind "applyEffects" (voir
@@ -685,7 +685,7 @@ export function interact(entity, kind) {
     // Cooldown (voir lastActivationAt plus haut) : ignoré en silence.
     if (isInCooldown(entity)) return;
 
-    // ACTIONS MULTIPLES CANDIDATES (voir core/scene.js/parseEntity,
+    // ACTIONS MULTIPLES CANDIDATES (voir core/entity-parse.js/parseEntity,
     // core/presence.js/selectMatchingAction, core/scripting.md/"Actions
     // multiples filtrées par condition") : entity.action est soit un OBJET
     // UNIQUE (RÉTROCOMPAT stricte — resolvedAction EST cet objet), soit un

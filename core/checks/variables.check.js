@@ -252,7 +252,7 @@ export default function checkVariables(run) {
   // --- VARIABLES BRANCHÉES (voir doc/scripting.md/"Variables"
   // et "Actions multiples filtrées par condition") : condition "variable"
   // (LECTURE, core/presence.js/evaluateVariable), effets setVariable/
-  // toggleVariable/addVariable (ÉCRITURE, core/scene.js/parseActionEffect,
+  // toggleVariable/addVariable (ÉCRITURE, core/script-parse.js/parseActionEffect,
   // core/variables.js/applyActionEffects), sélection d'action multiple par
   // condition (core/presence.js/selectMatchingAction). Cas de référence :
   // la FENÊTRE (deux candidates aux conditions opposées).
@@ -475,7 +475,7 @@ export default function checkVariables(run) {
       throws(() => parseScene(sceneWithCondition({ type: "variable", scope: "scene", name: "doesNotExist", equals: true }), VAR_ACTION_REGISTRY))
     );
     run(
-      "variable : nom de PARTIE jamais déclaré NULLE PART -> PAS d'erreur (non vérifiable au chargement d'une scène, voir core/scene.js/validateVariableReference)",
+      "variable : nom de PARTIE jamais déclaré NULLE PART -> PAS d'erreur (non vérifiable au chargement d'une scène, voir core/script-parse.js/validateVariableReference)",
       false,
       throws(() => parseScene(sceneWithCondition({ type: "variable", scope: "party", name: "totallyMadeUp", equals: true }), VAR_ACTION_REGISTRY))
     );
@@ -587,7 +587,7 @@ export default function checkVariables(run) {
             {
               kind: "applyEffects",
               condition: { type: "variable", scope: "entity", name: "isOpen", equals: false },
-              // Pas de refusalEffects (optionnel, voir core/scene.js/
+              // Pas de refusalEffects (optionnel, voir core/script-parse.js/
               // parseSingleAction) : les deux candidates couvrent tout
               // l'espace du flag, un refus n'est jamais réellement
               // atteignable ici.

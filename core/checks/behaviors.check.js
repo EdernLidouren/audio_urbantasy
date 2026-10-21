@@ -607,7 +607,7 @@ export default function checkBehaviors(run) {
 
   // Validation au chargement : un effet "behavior" réutilise EXACTEMENT la
   // même validation que le champ `behavior` d'une entité (voir
-  // core/scene.js/parseBehavior) — un kind inconnu est rejeté clairement,
+  // core/parse-common.js/parseBehavior) — un kind inconnu est rejeté clairement,
   // jamais un crash silencieux plus tard.
   const TRIGGER_REGISTRY = { dog: { nameKey: "entity.dog.name" } };
   const unknownEffectBehaviorRejected = throws(() => {

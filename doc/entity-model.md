@@ -215,7 +215,7 @@ JSON de scène, une entité ÉPHÉMÈRE n'est par définition jamais DÉCLARÉE.
   descripteur d'entité DÉJÀ RÉSOLU
   (`type`, `labelKey`, `sounds`, `blocksMovement`, `observable`,
   `interactable`, `action`...) — EXACTEMENT la forme qu'une entité obtient
-  en sortie de `core/scene.js`/`parseEntity`, construit par L'APPELANT (voir
+  en sortie de `core/entity-parse.js`/`parseEntity`, construit par L'APPELANT (voir
   `createTestCompanion` dans `core/state.js`, même principe pour le
   compagnon de test) : `sounds` DOIT être porté explicitement ici (voir
   "Cascade de sounds" plus bas) — la vue lit `entity.sounds`, jamais le
@@ -449,7 +449,7 @@ persiste avec le monde.
   (bornes carte, corps bloquants) autour du centre de la plage, re-tirée si
   trop proche d'un collectible déjà posé (`config/tuning-values.js`/
   `spawnMinSpacing`). Chaque collectible posé passe par le MÊME parseur qu'une
-  instance de scène (`core/scene.js`/`parseSpawnedEntity`, registre INJECTÉ
+  instance de scène (`core/entity-parse.js`/`parseSpawnedEntity`, registre INJECTÉ
   comme pour `parseScene`) : archétype du même nom que l'objet s'il existe
   (`apple`), sinon l'archétype générique `item` (voir "Objet au sol
   générique" plus bas). Marqué `spawned: true`
@@ -617,7 +617,7 @@ Un objet du sac sans archétype dédié devient au sol une entité du type
 générique `item` (`entities/types/item.js`). Une instance de ce type qui
 RAMASSE un objet (`action: { kind: "pickup", item }`) en reprend
 automatiquement le **nom**, la **description** et les **sons**
-(`core/scene.js`/`genericItemDefaults`) — l'instance peut toujours les
+(`core/entity-parse.js`/`genericItemDefaults`) — l'instance peut toujours les
 redéfinir :
 
 ```json
@@ -865,7 +865,7 @@ condition `"arrived"` reste vraie tant que `behavior.kind` reste `"goto"`
 goto.js`, voir plus bas) — sans un changement de `kind` (vers `"wander"`,
 comme `npc-resident`) OU ce retrait explicite, une entité resterait bloquée
 dormante pour toujours dès sa PREMIÈRE arrivée, incapable de redevenir
-présente au cycle suivant. Validé par `core/scene.js`/`parseEffect` comme
+présente au cycle suivant. Validé par `core/script-parse.js`/`parseEffect` comme
 seule valeur spéciale acceptée pour ce champ.
 
 **Condition `"arrived"`** (`{ type: "arrived" }`, sans champ propre) : vraie
@@ -1037,7 +1037,7 @@ contrainte du modèle.
 
 ## Cascade de sounds — fusion profonde, instance -> archétype
 
-`sounds` cascade instance -> archétype (`core/scene.js`/`parseEntity`,
+`sounds` cascade instance -> archétype (`core/entity-parse.js`/`parseEntity`,
 `entity.sounds` déjà RÉSOLU sur l'entité parsée — la vue, voir
 `view/audio/entity-sound-entry.js`/`buildEntitySoundEntry`, lit `entity.sounds`,
 jamais `registry[type].sounds` directement) — mais PAR FUSION PROFONDE
@@ -1140,7 +1140,7 @@ sounds: {
 ```
 
 Règles :
-- **Validation au chargement** (`core/scene.js`/`parseEntity`), comme une
+- **Validation au chargement** (`core/entity-parse.js`/`parseEntity`), comme une
   condition d'action : type inconnu ou variable non déclarée -> erreur.
 - **Une condition est un tout** : celle d'une instance REMPLACE celle de
   l'archétype, jamais fusionnée clé par clé comme le reste de `sounds`
@@ -1373,7 +1373,7 @@ un champ RÉSERVÉ, `tuning`, un objet plat de clés -> valeurs :
 { "id": "bird-loud", "type": "bird_1", "x": 12, "tuning": { "beaconInterval": 1500, "beaconGain": 1.4 } }
 ```
 
-`core/scene.js`/`parseEntity` recopie ce champ TEL QUEL (`entity.tuning`) —
+`core/entity-parse.js`/`parseEntity` recopie ce champ TEL QUEL (`entity.tuning`) —
 validé en FORME (un objet, sinon `fail()`), jamais en CONTENU : le core
 ignore tout du sens de ces clés (sonore ou non), il se contente de les
 porter jusqu'à l'entité parsée, exactement comme `music`/`ambiences`/

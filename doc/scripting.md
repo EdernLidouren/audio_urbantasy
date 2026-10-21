@@ -55,7 +55,7 @@ propriété PROPRE, ajoutée AVANT l'appel par l'appelant — voir la nuance
 porte la règle). Étendre `context` demain (`season`, `weather`...) ne change jamais
 la signature d'`evaluateCondition`, seulement ce que l'appelant y met.
 
-**Validation au chargement** (`core/scene.js`/`validateCondition`, FACTORISÉE et
+**Validation au chargement** (`core/script-parse.js`/`validateCondition`, FACTORISÉE et
 réutilisée à l'identique par `presence[].when` et `action.condition`) :
 `type` doit exister dans `CONDITION_TYPES` (dérivé de `CONDITION_EVALUATORS`,
 jamais dupliqué) — échec clair si inconnu, comme un type d'entité. Les champs
@@ -293,7 +293,7 @@ surnaturel visible seulement perception active ET brume : `cumuloLupus`
 Vraie si TOUTES les sous-conditions de `conditions` le sont — délègue à
 `evaluateCondition` pour CHACUNE (n'importe quel type du registre, y compris un autre
 `"allOf"` imbriqué) : MÊME registre, MÊME évaluateur, jamais un second mécanisme de
-composition. `conditions` validé au chargement (`core/scene.js`/`validateCondition`,
+composition. `conditions` validé au chargement (`core/script-parse.js`/`validateCondition`,
 factorisée : tableau NON VIDE, chaque élément revalidé RÉCURSIVEMENT par la même
 fonction) — une sous-condition mal formée échoue donc exactement comme si elle était au
 premier niveau. Un tableau à un SEUL élément est légal (seul un tableau VIDE est
@@ -378,7 +378,7 @@ Vraie si SA sous-condition `condition` est fausse — délègue à `evaluateCond
 n'importe quel type du registre, y compris `"allOf"` ou un autre `"not"` : même
 registre, même évaluateur que `"allOf"`, jamais un second mécanisme. `condition` est
 OBLIGATOIRE (un objet, jamais un tableau), revalidée RÉCURSIVEMENT au chargement
-(`core/scene.js`/`validateCondition`). Composable dans les deux sens : `"not"` dans un
+(`core/script-parse.js`/`validateCondition`). Composable dans les deux sens : `"not"` dans un
 `"allOf"` (« brume ET hors perception ») comme `"allOf"` dans un `"not"` (« pas à la
 fois perception et brume »).
 
@@ -462,7 +462,7 @@ introuvable (nom jamais déclaré, ou porteur absent du contexte) → `undefined
 AUCUN comparateur ne peut être vrai, même repli défensif que le reste de ce
 registre.
 
-**Validation au chargement** (`core/scene.js`/`validateVariableReference`) :
+**Validation au chargement** (`core/script-parse.js`/`validateVariableReference`) :
 `scope` connu, `name` non vide, EXACTEMENT un comparateur — et, SEULEMENT quand le
 TYPE réel de la variable est vérifiable (portées `"entity"`/`"scene"`, dont le sac
 est déjà résolu au moment où `parseScene` atteint cette condition), cohérence
@@ -486,7 +486,7 @@ filtrées par condition" plus bas).
    générique.
 3. Si le type référence un registre de CONTENU externe (comme `hasEquipmentTag` ↔
    `TAG_REGISTRY`) : ajoute une validation dédiée dans
-   `core/scene.js`/`validateCondition`, sur le modèle du bloc `hasEquipmentTag`.
+   `core/script-parse.js`/`validateCondition`, sur le modèle du bloc `hasEquipmentTag`.
    Sinon, rien à valider en plus (dégradation silencieuse acceptée).
 4. Ajoute une sous-section ICI (forme + exemple réel) — SEUL endroit, jamais dupliqué :
    `doc/scene-format.md` ne fait que RENVOYER à cette section pour la grammaire des
@@ -495,12 +495,12 @@ filtrées par condition" plus bas).
 ## Effets
 
 Un effet porté par une règle : `{ type: "<clé>", ...champs }`. Contrairement aux
-conditions, PAS un registre uniforme — aiguillage EXPLICITE (`core/scene.js`/
+conditions, PAS un registre uniforme — aiguillage EXPLICITE (`core/script-parse.js`/
 `parseEffect` pour la validation, `core/presence.js`/`resolveEntityRules` pour
 l'application) car chaque effet a une validation ET une application propres à son
 type, qu'un registre de noms ne suffirait pas à couvrir.
 
-**⚠️ À jour avec `core/scene.js`/`parseEffect` ET `core/presence.js`/
+**⚠️ À jour avec `core/script-parse.js`/`parseEffect` ET `core/presence.js`/
 `resolveEntityRules`** — types existants :
 
 ### `"presence"` — décide si l'entité est affichée/simulée
@@ -522,7 +522,7 @@ Voir `doc/entity-model.md`/"Présence : la valeur résolue" pour la sémantique 
 ```
 
 `behavior` (objet, requis, OU `null`) : un objet — MÊME forme que le champ
-`behavior` d'une entité, validé par `core/scene.js`/`parseBehavior`, qui délègue à
+`behavior` d'une entité, validé par `core/parse-common.js`/`parseBehavior`, qui délègue à
 `core/behaviors/index.js` (registre des kinds — `wander`, `follow`, `goto`
 aujourd'hui, chacun avec ses propres paramètres et sa propre validation, voir leurs
 fichiers respectifs) ; ou `null` — RETRAIT explicite du comportement actif (l'entité
@@ -577,7 +577,7 @@ il parcourt la salle d'un bout à l'autre et fait demi-tour au bord :
 
 ### Ajouter un type d'effet
 
-1. Un cas dans `core/scene.js`/`parseEffect` : valide la FORME propre à ce type,
+1. Un cas dans `core/script-parse.js`/`parseEffect` : valide la FORME propre à ce type,
    renvoie `{ type, ...champs validés }`.
 2. Un cas dans `core/presence.js`/`resolveEntityRules` : décrit ce que l'effet
    PRODUIT (une valeur résolue comme `"presence"`, ou un objet pour l'appelant comme
@@ -591,7 +591,7 @@ il parcourt la salle d'un bout à l'autre et fait demi-tour au bord :
 
 Une règle : `{ when: <condition>, effects: [<effet>, ...] }`. RACCOURCI
 rétrocompatible, encore accepté en entrée : `{ when: <condition>, present:
-<boolean> }` (sans `effects`) — normalisé par `core/scene.js`/`parsePresenceRule`
+<boolean> }` (sans `effects`) — normalisé par `core/script-parse.js`/`parsePresenceRule`
 en forme canonique `{ when, effects: [{ type: "presence", present }] }` ; tout
 consommateur d'une entité PARSÉE ne voit plus que la forme canonique. Une règle
 sans AUCUN effet (ni `effects` ni `present`) échoue au chargement — une règle
@@ -698,7 +698,7 @@ son premier client. Un seul mécanisme, paramétré :
 
 `effects` : le MÊME vocabulaire que les effets d'action (voir "Effets
 d'action" plus bas — état `setVariable`/`giveImprovement`..., rendu
-`playSound`/`announce`), MÊME validation (`core/scene.js`/`parseTrigger` ->
+`playSound`/`announce`), MÊME validation (`core/script-parse.js`/`parseTrigger` ->
 `parseActionEffect`), MÊME routage (`core/effects.js`) : le core applique
 les effets d'ÉTAT (`core/state.js`/`applyEntityActionEffects`, sur la face
 qui porte l'entité), la vue rejoue les effets de RENDU dus
@@ -989,10 +989,10 @@ d'action" plus bas) : `{ type: "<clé>", ...champs }`. AIGUILLAGE DISTINCT de
 "Effets" plus haut (`"presence"`/`"behavior"`, appliqués au TICK par
 `core/presence.js`/`resolveEntityRules`) : ceux-ci n'ont de sens qu'au moment
 d'une interaction PONCTUELLE, jamais réévalués en continu, jamais mélangés
-dans le même registre (`core/scene.js`/`parseActionEffect`, PAS `parseEffect`).
+dans le même registre (`core/script-parse.js`/`parseActionEffect`, PAS `parseEffect`).
 
 **⚠️ À jour avec `core/effects.js`** (SEULE source de vérité sur la NATURE de
-chaque type) **ET `core/scene.js`/`parseActionEffect`** — types existants :
+chaque type) **ET `core/script-parse.js`/`parseActionEffect`** — types existants :
 
 **Routage CORE/VUE, le principe central** (`core/effects.js`) : une liste
 `effects`/`refusalEffects` MÉLANGE librement des effets d'ÉTAT
@@ -1317,7 +1317,7 @@ se déplacerait entre des mondes que le core ne tique jamais simultanément
    `MIXED_EFFECT_TYPES` (MIXTE : la vue orchestre, en s'appuyant sur des
    fonctions du core DÉJÀ EXISTANTES pour l'état — voir `"teleport"` plus
    haut) — TOUTES trois dans `core/effects.js`, JAMAIS deux à la fois.
-2. Un cas dans `core/scene.js`/`parseActionEffect` : valide la FORME propre à
+2. Un cas dans `core/script-parse.js`/`parseActionEffect` : valide la FORME propre à
    ce type.
 3. Effet d'ÉTAT → un cas dans `core/variables.js`/`applyActionEffects`. Effet
    de RENDU ou MIXTE → un cas dans `view/interaction.js`/`runEffects`, JAMAIS
@@ -1346,7 +1346,7 @@ de `refusalEffects: [<effet>, ...]` :
 ```
 
 `condition` est le MÊME objet déclaratif que `presence[].when` — même registre,
-même validation (`core/scene.js`/`validateCondition`, factorisée entre les deux
+même validation (`core/script-parse.js`/`validateCondition`, factorisée entre les deux
 usages). `refusalEffects` (MÊME vocabulaire que `effects`, voir "Effets
 d'action" plus haut) est OPTIONNELLE : une RESPONSABILITÉ DE CONTENU, pas une
 contrainte du validateur. **RECOMMANDÉE** dès qu'un échec laisserait le joueur
@@ -1406,7 +1406,7 @@ connaît rien du `kind` qu'il protège.
 RÉTROCOMPAT stricte), soit un TABLEAU de candidates — chacune une action complète
 (`kind`, `condition`/`refusalEffects` optionnels, `effects` optionnel, voir
 "Effets d'action" plus haut), validée EXACTEMENT comme une action unique
-(`core/scene.js`/`parseSingleAction`, réutilisée à l'identique par les deux formes).
+(`core/script-parse.js`/`parseSingleAction`, réutilisée à l'identique par les deux formes).
 
 **Sélection SILENCIEUSE, pas un menu** (`core/presence.js`/`selectMatchingAction`) :
 à l'ACTIVATION, la PREMIÈRE candidate (ordre de déclaration) dont la `condition` est

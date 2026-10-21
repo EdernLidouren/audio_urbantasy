@@ -13,7 +13,7 @@
 // Un point de passage doit rester LOCALISABLE au clavier/à l'oreille, comme
 // une porte. Pour rendre un passage MUET, retirer ce beacon À L'INSTANCE
 // via `"sounds": { "beacon": null }` (cascade PAR FUSION, voir
-// core/scene.js/parseEntity, doc/entity-model.md/"Cascade de sounds") —
+// core/entity-parse.js/parseEntity, doc/entity-model.md/"Cascade de sounds") —
 // jamais un second archétype dupliqué pour ce cas.
 //
 // Son de FRANCHISSEMENT (recto<->verso, voir view/world-travel.js/

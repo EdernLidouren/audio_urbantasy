@@ -101,7 +101,7 @@ const COMPANION_SPAWN_SPACING = 2 * BODY_RADIUS;
 
 // Compagnon de test PRÉDÉFINI (brique 2/3 : comportement "follow", voir
 // core/behaviors/follow.js et CLAUDE.md) : donnée plate, EXACTEMENT la
-// forme qu'une entité de scène obtient en sortie de core/scene.js/
+// forme qu'une entité de scène obtient en sortie de core/entity-parse.js/
 // parseEntity — le core ne connaît aucun registre de types (jamais importé
 // ici, "buddy" n'est qu'une étiquette opaque, interprétée seulement par la
 // vue, voir entities/types/buddy.js). behavior "follow" SANS surcharge :
@@ -112,7 +112,7 @@ const COMPANION_SPAWN_SPACING = 2 * BODY_RADIUS;
 // l'autre (recalculée à chaque fois depuis la distance à la cible).
 // sounds : dupliqué à la main depuis entities/types/buddy.js (comme
 // labelKey/descriptionKey ci-dessus) — le rendu audio lit désormais
-// `entity.sounds` (résultat de la cascade de core/scene.js/parseEntity,
+// `entity.sounds` (résultat de la cascade de core/entity-parse.js/parseEntity,
 // jamais le registre directement, voir view/audio/city-scene.js), donc CE
 // champ doit être porté explicitement ici aussi. Risque de dérive ASSUMÉ
 // (même risque que labelKey/descriptionKey déjà) : si buddy.js change ses
@@ -347,7 +347,7 @@ export function createInitialState(scene, seed = DEFAULT_SEED, { companions, par
     // variables : STOCKAGE de variables de portée "party" (voir
     // core/variables.js/CLAUDE.md), cercle PARTIE comme money/weather —
     // jamais par monde ni par entité. `partyVariables` : déclarations BRUTES
-    // (même forme qu'une entité/scène, voir core/scene.js/parseEntity),
+    // (même forme qu'une entité/scène, voir core/entity-parse.js/parseEntity),
     // fournies par l'appelant — le core n'importe AUCUN registre de contenu
     // (voir CLAUDE.md, "réglages en cascade"), jamais un fichier de
     // déclarations global importé ICI. Absent -> sac vide `{}`, comportement
@@ -422,7 +422,7 @@ export function markConsumed(session, entityId) {
   return { ...session, worlds: { ...session.worlds, [session.activeWorldId]: nextWorld } };
 }
 
-// Applique une LISTE d'effets D'ÉCRITURE de variable (voir core/scene.js/
+// Applique une LISTE d'effets D'ÉCRITURE de variable (voir core/script-parse.js/
 // parseActionEffect, core/variables.js/applyActionEffects) déclenchés par
 // l'ACTIVATION d'une action portée par UNE entité du monde ACTIF (par id) —
 // POINT D'ENTRÉE unique pour la vue (voir view/interaction.js/
@@ -478,7 +478,7 @@ export function applyEntityActionEffects(session, entityId, effects, side = sess
 //
 // `spec` est un descripteur d'entité DÉJÀ RÉSOLU (type, labelKey,
 // blocksMovement, observable, interactable, action...) — EXACTEMENT la
-// forme qu'une entité obtient en sortie de core/scene.js/parseEntity,
+// forme qu'une entité obtient en sortie de core/entity-parse.js/parseEntity,
 // construit par L'APPELANT (voir createTestCompanion plus haut, même
 // principe) : ce module ne connaît AUCUN registre de types, `spec.type`
 // reste une étiquette opaque, jamais résolue ici — c'est la VUE qui sait

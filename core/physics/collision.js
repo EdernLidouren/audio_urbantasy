@@ -80,7 +80,7 @@ export function resolvePlayerMove(playerX, dir, entities, sceneLength, presenceC
 // resolveOverlaps le laisserait de toute façon au tick suivant : aucune
 // poussée résiduelle du bloqueur, voir header. `speed` : voir
 // resolveBlockedMove — core/reduce.js le lit sur l'entité résolue
-// (entity.speed, voir core/scene.js/parseEntity), défaut 1 si absent
+// (entity.speed, voir core/entity-parse.js/parseEntity), défaut 1 si absent
 // (compagnon sans cascade dédiée, ex. core/state.js/createTestCompanion).
 export function resolveBodyMove(entityX, dir, entities, sceneLength, presenceContext, speed = 1) {
   return resolveBlockedMove(entityX, dir, entities, sceneLength, 2 * BODY_RADIUS, presenceContext, speed);

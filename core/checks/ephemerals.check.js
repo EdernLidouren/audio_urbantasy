@@ -74,7 +74,7 @@ export default function checkEphemerals(run) {
   run("objet unique : déjà consumed -> référence INCHANGÉE", afterUnique, lootUniqueEntity(afterUnique, "crate-1"));
   run("objet unique : id absent -> référence INCHANGÉE", crateState, lootUniqueEntity(crateState, "does-not-exist"));
 
-  // consumedDescriptionKey (core/scene.js/parseEntity) : même cascade
+  // consumedDescriptionKey (core/entity-parse.js/parseEntity) : même cascade
   // instance -> type que descriptionKey.
   const CONSUMED_DESC_REGISTRY = {
     dog: { nameKey: "entity.dog.name", descriptionKey: "entity.dog.description", consumedDescriptionKey: "entity.dog.consumed_description" },

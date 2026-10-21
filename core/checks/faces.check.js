@@ -177,7 +177,7 @@ export default function checkFaces(run) {
   );
 
   // arrivalX est une donnée de CONTENU, jamais validée en bornes au
-  // chargement (voir core/scene.js/parseEntity, action) — clampée à
+  // chargement (voir core/entity-parse.js/parseEntity, action) — clampée à
   // l'exécution par switchSide, jamais un joueur hors carte.
   const clampedSwitch = switchSide(createInitialState(twoFacedScene, 1, NO_COMPANIONS), 9999);
   run("switchSide : arrivalX hors bornes est clampé au bord droit", twoFacedScene.length, clampedSwitch.player.x);

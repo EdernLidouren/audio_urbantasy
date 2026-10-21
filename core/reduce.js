@@ -110,7 +110,7 @@ function resolveTargetPosition(state, face, targetId) {
 // c'est ensuite le pipeline normal ci-dessous (module.step) qui l'exécute
 // — jamais l'effet lui-même qui déplace l'entité. `behaviorEffect` DISTINGUE
 // `undefined` (aucun effet ce tick — comportement inchangé) de `null`
-// (retrait EXPLICITE, voir core/scene.js/parseEffect) : `!== undefined`,
+// (retrait EXPLICITE, voir core/script-parse.js/parseEffect) : `!== undefined`,
 // jamais un simple test de vérité, sinon `null` serait confondu avec
 // "rien à faire" et le comportement resterait figé sur son ancien `kind`.
 function stepEntities(entities, context) {
@@ -149,7 +149,7 @@ function stepEntities(entities, context) {
 // comportement qui a produit `intent` (wander/follow/goto ignorent tout de
 // la vitesse, voir leur frontière avec la physique). `behavior.speed`
 // (commun aux trois kinds, validé par chacun) PRIME sur `entity.speed`
-// (voir core/scene.js/parseEntity, défaut 1) : une règle qui change de
+// (voir core/entity-parse.js/parseEntity, défaut 1) : une règle qui change de
 // comportement (effet "behavior") change donc aussi d'allure. `?? 1` :
 // filet pour une entité qui ne passe pas par la cascade (ex. un compagnon,
 // core/state.js/createTestCompanion).

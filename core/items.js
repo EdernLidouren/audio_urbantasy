@@ -158,7 +158,7 @@ export function itemProps(type) {
 // boucle, et le même son joué une fois au ramassage. Objet sans `sound` (ou
 // inconnu) -> undefined : l'appelant garde alors les sons de l'archétype
 // (générique "item", voir entities/types/item.js). Utilisé partout où un
-// objet devient une entité : instance de scène (core/scene.js/parseEntity),
+// objet devient une entité : instance de scène (core/entity-parse.js/parseEntity),
 // garnissage (core/spawn.js), objet posé depuis le sac (view/city-screen.js).
 export function itemSounds(type) {
   const props = ITEM_REGISTRY[type];

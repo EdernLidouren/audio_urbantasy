@@ -23,11 +23,11 @@
 //     `entity.gotoArrived` — événementielle, pas temporelle) cohabitent
 //     sans qu'isPresent/resolveEntityRules n'aient à savoir laquelle c'est.
 //   - Types d'EFFET ("presence", "behavior") : PAS un registre pareil,
-//     aiguillage explicite (voir core/scene.js/parseEffect) — un effet a une
+//     aiguillage explicite (voir core/script-parse.js/parseEffect) — un effet a une
 //     validation et une APPLICATION propres à son type (une chaîne booléenne
 //     idempotente pour "presence" ; une bascule anti-boucle + une
 //     sous-validation complète de comportement pour "behavior", voir
-//     resolveEntityRules et core/scene.js/parseBehavior réutilisé tel quel).
+//     resolveEntityRules et core/parse-common.js/parseBehavior réutilisé tel quel).
 //     Ajouter un effet demain = ajouter un cas à ces DEUX endroits, jamais
 //     toucher au reste — même esprit d'extensibilité, mécanique adaptée à
 //     l'hétérogénéité des effets plutôt qu'un registre forcé pour deux cas.
@@ -231,7 +231,7 @@ function evaluatePerceptionActive(cond, context) {
 // est EXACTEMENT cond.state. Sans état dans le contexte (ex.
 // action.condition, hors tick) -> false, même repli défensif que
 // perceptionActive. cond.state validé au chargement contre
-// config/weather-values.js/WEATHER_STATES (core/scene.js/validateCondition),
+// config/weather-values.js/WEATHER_STATES (core/script-parse.js/validateCondition),
 // comme hasEquipmentTag.tag contre TAG_REGISTRY.
 function evaluateWeather(cond, context) {
   return context.weather !== undefined && context.weather === cond.state;
@@ -243,7 +243,7 @@ function evaluateWeather(cond, context) {
 // sous-condition peut être n'importe quel type du registre, y compris un
 // autre "allOf" imbriqué) — MÊME registre, MÊME évaluateur, jamais un
 // mécanisme de composition séparé (voir core/scripting.md). cond.conditions
-// validé au chargement (core/scene.js/validateCondition, tableau non vide,
+// validé au chargement (core/script-parse.js/validateCondition, tableau non vide,
 // chaque élément validé récursivement) : jamais lu ici sans garantie de
 // forme. Court-circuite via Array.prototype.every (s'arrête à la première
 // fausse), sans effet observable puisque tous les évaluateurs sont purs.
@@ -254,7 +254,7 @@ function evaluateAllOf(cond, context) {
 // "not" : condition COMPOSITE — vraie si SA sous-condition (cond.condition)
 // est fausse (négation logique). Même patron qu'allOf : délègue à
 // evaluateCondition, n'importe quel type du registre (y compris allOf ou un
-// autre not). cond.condition validée au chargement (core/scene.js/
+// autre not). cond.condition validée au chargement (core/script-parse.js/
 // validateCondition, obligatoire, revalidée récursivement).
 function evaluateNot(cond, context) {
   return !evaluateCondition(cond.condition, context);
@@ -262,7 +262,7 @@ function evaluateNot(cond, context) {
 
 // "variable" : LECTURE d'une variable (voir core/variables.js/getVariable)
 // avec COMPARAISON — { type:"variable", scope, name, <comparateur>:
-// valeur }. Un SEUL comparateur par condition (voir core/scene.js/
+// valeur }. Un SEUL comparateur par condition (voir core/script-parse.js/
 // validateCondition, qui l'exige) : "equals" (flag ET int) ou, pour un int
 // seulement, "greaterThan"/"lessThan"/"greaterOrEqual"/"lessOrEqual" — déjà
 // validés au chargement contre le TYPE réel de la variable quand il est
@@ -295,7 +295,7 @@ function evaluateVariable(cond, context) {
 // "hasEquipmentTag" cohabite avec "timeRange"/"arrived"/"consumed" comme un
 // cas de plus, pas un système de vérification séparé — la seule différence
 // est que core/scene.js valide EN PLUS son champ `tag` contre TAG_REGISTRY
-// (voir core/scene.js/parsePresenceRule), une garantie que timeRange/arrived/
+// (voir core/script-parse.js/parsePresenceRule), une garantie que timeRange/arrived/
 // consumed n'ont pas besoin d'une clé de contenu externe à valider. Même
 // esprit pour "variable" : core/scene.js valide EN PLUS scope/name/
 // comparateur (voir validateVariableReference).
@@ -353,7 +353,7 @@ function ruleEffect(rule, type) {
 //     en cours de partie) ;
 //   - behaviorEffect : le comportement à POSER ce tick si un effet
 //     "behavior" vient de basculer (voir plus bas), `null` si cet effet est
-//     un RETRAIT explicite (voir core/scene.js/parseEffect), `undefined`
+//     un RETRAIT explicite (voir core/script-parse.js/parseEffect), `undefined`
 //     si aucun effet "behavior" n'a basculé — trois valeurs distinctes,
 //     jamais confondues par l'appelant (core/reduce.js compare à
 //     `undefined`, jamais un test de vérité).
@@ -453,7 +453,7 @@ export function isBlocking(entity, context) {
   return Boolean(entity.blocksMovement) && isPresent(entity, context);
 }
 
-// Sélectionne, parmi PLUSIEURS actions CANDIDATES (voir core/scene.js/
+// Sélectionne, parmi PLUSIEURS actions CANDIDATES (voir core/entity-parse.js/
 // parseEntity — entity.action peut être un objet UNIQUE, comme avant, ou un
 // TABLEAU de candidates), celle dont la condition est VRAIE — voir
 // core/scripting.md/"Actions multiples filtrées par condition". Très proche

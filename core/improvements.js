@@ -1,7 +1,7 @@
 // Registre des AMÉLIORATIONS (improvements) — capacités que le joueur
 // possède ou non, données pures, structuré comme core/tags.js/TAG_REGISTRY :
 // SOURCE DE VÉRITÉ des improvements existantes, valide give/remove/has à
-// l'instar de hasEquipmentTag/tag (voir core/scene.js/validateCondition,
+// l'instar de hasEquipmentTag/tag (voir core/script-parse.js/validateCondition,
 // parseActionEffect). Ajouter une improvement = une entrée ici, jamais une
 // chaîne en dur ailleurs — affichée dans l'onglet Améliorations du menu
 // global (view/menus/inventory-menu.js).

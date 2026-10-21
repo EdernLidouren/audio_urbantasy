@@ -2,7 +2,7 @@
 // doc/entity-model.md/"Collecte" pour le modèle complet. Quatre couches :
 //   - DISTRIBUTION (quoi) : core/distribution.js.
 //   - SOURCES (où) : un CONTENEUR est une entité qui porte `container:
-//     { distribution, count? }` (cascade instance -> type, voir core/scene.js/
+//     { distribution, count? }` (cascade instance -> type, voir core/entity-parse.js/
 //     parseEntity) ; une PLAGE est une entrée de `face.spawnRanges`
 //     ({ from, to, count?, distribution }, voir core/scene.js/parseFace).
 //     Même logique de garnissage dessous, seule la MATÉRIALISATION diffère :
@@ -53,7 +53,7 @@ import { TUNING_DEFAULTS } from "../config/tuning-values.js";
 import { drawItem } from "./distribution.js";
 import { restockShopEntity } from "./catalog.js";
 import { isTwoSided, resolveFace, withFace, drawScatteredPosition, spawnScatteredEphemerals } from "./state.js";
-import { parseSpawnedEntity } from "./scene.js";
+import { parseSpawnedEntity } from "./entity-parse.js";
 
 const MINUTES_PER_DAY = TIME_CONFIG.minutesPerHour * TIME_CONFIG.hoursPerDay;
 
@@ -137,7 +137,7 @@ function drawItems(distribution, count, rngState) {
 function buildCollectibleSpec(item, id, x, registry, length, sceneVariables) {
   // Sans archétype dédié : type générique "item", dont le nom, la
   // description et les sons sont repris de l'objet par parseEntity
-  // (core/scene.js/genericItemDefaults).
+  // (core/entity-parse.js/genericItemDefaults).
   const raw = registry[item]
     ? { id, type: item, x }
     : { id, type: GENERIC_ITEM_TYPE, x, action: { kind: "pickup", item, count: 1 } };

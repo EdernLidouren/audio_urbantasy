@@ -1,5 +1,5 @@
 // Vocabulaire des effets d'ACTION (déclenchés à l'ACTIVATION, voir
-// core/scene.js/parseActionEffect, core/scripting.md/"Effets d'action") —
+// core/script-parse.js/parseActionEffect, core/scripting.md/"Effets d'action") —
 // SEULE source de vérité sur la NATURE de chaque type d'effet. TROIS
 // natures, jamais mélangées :
 //   - ÉTAT (STATE_EFFECT_TYPES) : mute l'état, jamais de rendu.
@@ -23,7 +23,7 @@
 // ROUTE par nature.
 // Frontière STRICTE, jamais mélangée : ajouter un effet demain = choisir SA
 // nature (une seule des trois listes) + son cas dans
-// core/scene.js/parseActionEffect (validation de forme) + son exécution
+// core/script-parse.js/parseActionEffect (validation de forme) + son exécution
 // côté core (core/variables.js, ÉTAT seulement) ou vue (view/interaction.js,
 // RENDU et MIXTE).
 

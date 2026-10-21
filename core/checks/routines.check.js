@@ -266,7 +266,7 @@ export default function checkRoutines(run) {
   });
 
   // --- behavior: null — retrait EXPLICITE d'un comportement (voir
-  // core/scene.js/parseEffect, doc/scripting.md/"Effets") : nécessaire pour
+  // core/script-parse.js/parseEffect, doc/scripting.md/"Effets") : nécessaire pour
   // une entité SANS comportement de repos (ex. "npc-resident-home" ci-dessus)
   // — sans lui, entity.gotoArrived (jamais remis à faux) et behavior.kind
   // resté "goto" laisseraient "arrived" bloquée à vrai pour toujours après

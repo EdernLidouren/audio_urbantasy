@@ -23,7 +23,7 @@
 // applyEntityActionEffects, même chemin qu'une action) et RENVOIE les effets
 // de RENDU dus (`fired`), que la vue rejoue (view/interaction.js/
 // runRenderEffects) — même partition que core/effects.js. Les effets MIXTES
-// (teleport) sont refusés au chargement (core/scene.js/parseTrigger).
+// (teleport) sont refusés au chargement (core/script-parse.js/parseTrigger).
 
 import { TIME_CONFIG } from "../config/time-values.js";
 import { hourOfDay } from "./time.js";

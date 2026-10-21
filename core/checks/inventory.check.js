@@ -333,7 +333,7 @@ export default function checkInventory(run) {
     evaluateCondition({ type: "hasEquipmentTag", tag: "chic" }, { playerEquipment: { feet: { type: "high_heels" } } })
   );
 
-  // Validation au chargement (core/scene.js/parsePresenceRule) : un tag de
+  // Validation au chargement (core/script-parse.js/parsePresenceRule) : un tag de
   // condition inconnu échoue clairement, même principe que la surface d'un
   // segment (voir surfaces.check.js).
   const TAG_TRIGGER_REGISTRY = { dog: { nameKey: "entity.dog.name" } };
@@ -384,7 +384,7 @@ export default function checkInventory(run) {
   run("tags : hasEquipmentTag avec un tag inconnu -> échec clair au chargement", true, unknownTagConditionThrew);
 
   // --- Objet au sol générique (type "item") : nom, description et sons
-  // repris de l'objet ramassé (core/scene.js/genericItemDefaults,
+  // repris de l'objet ramassé (core/entity-parse.js/genericItemDefaults,
   // core/items.js/itemSounds), toujours redéfinissables par l'instance. ---
   const GENERIC_ITEM_REGISTRY = { item: { nameKey: "entity.item.name", descriptionKey: "entity.item.description", sounds: { beacon: { path: "generic", loop: true } } } };
   const genericItemScene = parseScene(
