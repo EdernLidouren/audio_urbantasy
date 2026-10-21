@@ -11,7 +11,7 @@ import { makeMessageScreen } from "../../lib/menu.js";
 import { setGlobalVolume, setMasterVolume } from "../../lib/audio.js";
 import { t } from "../../data/i18n/index.js";
 import { setPref, PREF_CONSTRAINTS } from "../../config/preferences.js";
-import { refreshActiveBeaconVolumes } from "../audio/city-scene.js";
+import { refreshActiveBeaconVolumes, applyVolumePreferences } from "../audio/city-scene.js";
 import { playMenuSound } from "../menu-sounds.js";
 
 const MASTER = PREF_CONSTRAINTS.masterVolume;
@@ -136,10 +136,7 @@ export function createAudioMenu() {
       setPref(slider.prefKey, slider.default);
     }
     playMenuSound("reset");
-    refreshActiveBeaconVolumes();
-    setMasterVolume(MASTER.default / 100);
-    setGlobalVolume("music", MUSIC.default / 100);
-    setGlobalVolume("ambience", AMBIENCE.default / 100);
+    applyVolumePreferences();
     // Écran-message plutôt qu'une simple annonce : le résultat doit être
     // entendu en entier, jamais écrasé par une ré-annonce immédiate de la
     // ligne de menu courante (voir lib/menu.js/makeMessageScreen).

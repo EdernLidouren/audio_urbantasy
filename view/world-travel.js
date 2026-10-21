@@ -3,8 +3,8 @@
 // il la monte, la détruit et la remonte à chaque changement de monde, de
 // face ou de partie. Tous les autres la lisent AU MOMENT de s'en servir, via
 // current() — jamais une copie gardée, qui désignerait l'ancien monde après
-// un voyage. current() vaut null pendant la brève attente réseau d'un
-// voyage : l'écran de ville ne fait alors rien.
+// un voyage. current() ne vaut null qu'hors partie : une scène à charger est
+// lue AVANT de démonter quoi que ce soit, et le remontage est synchrone.
 
 import { announce } from "../lib/announce.js";
 import { playOneShot, rampEntityLayerGain } from "../lib/audio.js";
@@ -21,7 +21,7 @@ import { resolveTuning } from "../config/tuning.js";
 import { createWorldView } from "./world-view.js";
 import { clearInteractionCooldowns } from "./interaction.js";
 import { announceSceneName } from "./status-announcements.js";
-import { reportSceneReloadFailure } from "./debug-warnings.js";
+import { reportSceneLoadFailure, reportSceneReloadFailure } from "./debug-warnings.js";
 import { muteNextDiscoveryCheck } from "./collection-discoveries.js";
 import { saveGame } from "./save-storage.js";
 
@@ -46,7 +46,7 @@ function playSideSwitchSound(entity) {
     const factor = getPref("interfaceVolume", PREF_CONSTRAINTS.interfaceVolume.default) / 100;
     playOneShot(resolveAsset(path), { volume: factor });
   } catch (error) {
-    console.warn(`city-screen: son de bascule indisponible ("${path}") : ${error.message}`);
+    console.warn(`world-travel: son de bascule indisponible ("${path}") : ${error.message}`);
   }
 }
 
@@ -74,22 +74,41 @@ export function createWorldTravel({ getSession, setSession }) {
     worldView = null;
   }
 
-  // Changement de MONDE, franc : la vue est détruite, le monde quitté est
-  // rangé dans la partie (une nouvelle visite le ressort tel quel), la cible
-  // est chargée depuis son fichier seulement si elle n'a jamais été visitée.
-  // Musique et ambiances ne sont pas coupées : la nouvelle vue compare ce
-  // qu'elle veut à ce qui joue et ne fond que ce qui change. x/side absents :
-  // playerStart de la cible, recto. Puis, si la préférence est active, une
-  // sauvegarde automatique SILENCIEUSE.
+  // Scène cible jamais visitée : lue depuis son fichier, jeu GELÉ pendant la
+  // lecture par un écran vide (comme le sas, voir runTeleportSas). Rend
+  // `null` pour un monde déjà visité (la partie le ressort tel quel), ou
+  // `undefined` si la lecture échoue : rien n'a été démonté, le joueur reste
+  // où il est, l'échec est annoncé et noté dans le journal.
+  async function loadTargetScene(targetId) {
+    if (getSession().worlds[targetId]) return null;
+    pushScreen({});
+    try {
+      return await loadSceneById(targetId, registry);
+    } catch (error) {
+      reportSceneLoadFailure(targetId, error.message);
+      announce(t("teleport.failed"), { assertive: true });
+      return undefined;
+    } finally {
+      popScreen();
+    }
+  }
+
+  // Changement de MONDE, franc : la cible est chargée si besoin (voir
+  // loadTargetScene), PUIS la vue est détruite, le monde quitté est rangé
+  // dans la partie (une nouvelle visite le ressort tel quel). Musique et
+  // ambiances ne sont pas coupées : la nouvelle vue compare ce qu'elle veut
+  // à ce qui joue et ne fond que ce qui change. x/side absents : playerStart
+  // de la cible, recto. Puis, si la préférence est active, une sauvegarde
+  // automatique SILENCIEUSE.
   async function performTransition(targetId, x, side) {
+    const freshScene = await loadTargetScene(targetId);
+    // Lecture échouée, ou partie quittée entre-temps (par sécurité : le jeu
+    // était gelé).
+    if (freshScene === undefined || !worldView) return;
+
     worldView.destroy();
     worldView = null;
-
-    const session = getSession();
-    const alreadyVisited = Boolean(session.worlds[targetId]);
-    const freshScene = alreadyVisited ? null : await loadSceneById(targetId, registry);
-
-    setSession(travelToWorld(session, targetId, freshScene, { x, side }));
+    setSession(travelToWorld(getSession(), targetId, freshScene, { x, side }));
     clearInteractionCooldowns();
     refreshSpawns();
     worldView = createWorldView(getSession);
@@ -195,7 +214,10 @@ export function createWorldTravel({ getSession, setSession }) {
   // Remplace la partie en cours par une partie importée (voir
   // view/menus/save-menu.js) : vue détruite puis remontée sur la nouvelle
   // partie. Rien n'est annoncé comme "nouvelle découverte". Le son et
-  // l'annonce de l'import restent à l'appelant.
+  // l'annonce de l'import restent à l'appelant. L'import se fait sous le
+  // menu de pause : la vue neuve naît balises en pause, comme celle qu'elle
+  // remplace, et le menu les reprendra en se fermant (voir
+  // view/paused-beacons.js).
   function replaceCurrentGame(newSession) {
     worldView.destroy();
     worldView = null;
@@ -203,6 +225,7 @@ export function createWorldTravel({ getSession, setSession }) {
     setSession(newSession);
     refreshSpawns();
     worldView = createWorldView(getSession);
+    worldView.pauseBeacons();
   }
 
   // DEBUG (Shift+M) : relit la scène active depuis son fichier et remplace

@@ -80,7 +80,7 @@ export function registerActionHandlers({ getSession, setSession, travel }) {
       setShopHandler,
       (entity) => {
         setSession(restockShopIfDue(getSession(), entity.id));
-        openShopMenu(travel.current(), getSession, entity);
+        openShopMenu(travel.current, getSession, entity);
       },
     ],
     [setSellHandler, (sales) => setSession(sellItems(getSession(), sales))],
@@ -105,8 +105,8 @@ export function registerActionHandlers({ getSession, setSession, travel }) {
     [setPlayerEquipmentProvider, () => getSession().equipment],
     [setTimeProvider, () => getSession().time],
     [setSessionProvider, () => getSession()],
-    // Effet "playSound" diégétique, sur la vue COURANTE (aucune pendant
-    // l'attente réseau d'un voyage : rien ne se passe).
+    // Effet "playSound" diégétique, sur la vue COURANTE (aucune hors
+    // partie : rien ne se passe).
     [
       setPositionedSoundPlayer,
       (entityId, descriptor, options) => {

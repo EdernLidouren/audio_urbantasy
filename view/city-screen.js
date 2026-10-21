@@ -45,7 +45,7 @@ export function makeCityScreen(getSession, setSession) {
   // à mettre les balises en pause pendant ce menu).
   function interactWith(kind) {
     const worldView = travel.current();
-    const target = chooseInteractionTarget(worldView.getInteractionCandidates(kind), kind, worldView);
+    const target = chooseInteractionTarget(worldView.getInteractionCandidates(kind), kind, travel.current);
     if (!target) return;
     interact(target, kind);
   }
@@ -54,16 +54,16 @@ export function makeCityScreen(getSession, setSession) {
   // `debugOnly` : sans effet hors mode debug ; `preventDefault` : la touche a
   // aussi un comportement navigateur à neutraliser.
   const KEY_ACTIONS = {
-    pauseMenu: { preventDefault: true, run: () => openPauseMenu(travel.current(), getSession, travel.travelViaCityMap) },
+    pauseMenu: { preventDefault: true, run: () => openPauseMenu(travel.current, getSession, travel.travelViaCityMap) },
     announceSceneName: { preventDefault: true, run: () => announceSceneName(getSession()) },
     announceTime: { run: () => announceGameTime(getSession()) },
     announceMoney: { run: () => announceMoney(getSession()) },
     announceWeather: { run: () => announceWeather(getSession()) },
     announcePosition: { run: () => announcePlayerX(getSession()) },
-    openInventory: { run: () => openInventoryMenu(travel.current(), getSession) },
-    openEquipment: { run: () => openEquipmentMenu(travel.current(), getSession) },
-    openImprovements: { run: () => openImprovementsMenu(travel.current(), getSession) },
-    openCollections: { run: () => openCollectionsMenu(travel.current(), getSession) },
+    openInventory: { run: () => openInventoryMenu(travel.current, getSession) },
+    openEquipment: { run: () => openEquipmentMenu(travel.current, getSession) },
+    openImprovements: { run: () => openImprovementsMenu(travel.current, getSession) },
+    openCollections: { run: () => openCollectionsMenu(travel.current, getSession) },
     togglePerception: { run: perception.toggle },
     interactDescribe: { preventDefault: true, run: () => interactWith("describe") },
     interactActivate: { preventDefault: true, run: () => interactWith("activate") },
@@ -97,16 +97,15 @@ export function makeCityScreen(getSession, setSession) {
       // contient du nouveau.
       openDebugWarningsIfUnseen();
     },
-    // Pas de simulation : pendant l'attente réseau d'un voyage, il n'y a pas
-    // de vue du monde, on saute le tick.
+    // Pas de simulation sans vue du monde (hors partie : jamais en jeu, un
+    // voyage gèle le jeu par un écran vide pendant son chargement).
     onTick() {
       const worldView = travel.current();
       if (!worldView) return;
       setSession(reduce(getSession(), tick(getMoveIntent())));
       worldView.update();
     },
-    // Horloge de partie : même garde que onTick (le temps se fige pendant un
-    // voyage, comme derrière un menu).
+    // Horloge de partie : même garde que onTick.
     onFrame(deltaMs) {
       if (!travel.current()) return;
       clock.onFrame(deltaMs);

@@ -19,7 +19,8 @@
 // view/city-screen.js — ce module ne lit la session qu'en LECTURE.
 
 import { t } from "../../data/i18n/index.js";
-import { pushScreen, popScreen, composeHook } from "../../lib/screens.js";
+import { pushScreen, popScreen } from "../../lib/screens.js";
+import { withPausedBeacons } from "../paused-beacons.js";
 import { makeMenuScreen } from "../../lib/menu.js";
 import { announce } from "../../lib/announce.js";
 import { playMenuSound } from "../menu-sounds.js";
@@ -473,7 +474,7 @@ function openBuyMenu(getSession, entityId) {
 // "Vendre" sans rien de vendable au sac -> son "refusal" + annonce seule,
 // aucune liste vide.
 // Balises en pause tant que ce menu (ou un écran au-dessus) est ouvert.
-export function openShopMenu(scene, getSession, entity) {
+export function openShopMenu(getWorldView, getSession, entity) {
   const menu = {
     title: entity.labelKey,
     closable: true,
@@ -504,8 +505,5 @@ export function openShopMenu(scene, getSession, entity) {
       { label: "shop.actions.cancel", onActivate: () => popScreen() },
     ],
   };
-  const screen = makeMenuScreen(menu, t);
-  screen.onEnter = composeHook(screen.onEnter, () => scene.pauseBeacons());
-  screen.onExit = composeHook(screen.onExit, () => scene.resumeBeacons());
-  pushScreen(screen);
+  pushScreen(withPausedBeacons(makeMenuScreen(menu, t), getWorldView));
 }

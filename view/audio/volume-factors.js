@@ -7,6 +7,11 @@
 
 import { getPref, PREF_CONSTRAINTS } from "../../config/preferences.js";
 
+// Gain de sortie global, au-dessus de toutes les catégories.
+export function masterVolumeFactor() {
+  return getPref("masterVolume", PREF_CONSTRAINTS.masterVolume.default) / 100;
+}
+
 // Balises, vocaux, sons de transition et sons ponctuels d'entité : tout ce
 // qui relève de la "présence d'une entité".
 export function beaconVolumeFactor() {

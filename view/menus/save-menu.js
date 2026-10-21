@@ -16,10 +16,9 @@
 import { announce } from "../../lib/announce.js";
 import { pushScreen, popScreen } from "../../lib/screens.js";
 import { makeMenuScreen, makeMessageScreen } from "../../lib/menu.js";
-import { setGlobalVolume } from "../../lib/audio.js";
 import { t } from "../../data/i18n/index.js";
-import { getPref, PREF_CONSTRAINTS, exportPreferences, importPreferences } from "../../config/preferences.js";
-import { refreshActiveBeaconVolumes } from "../audio/city-scene.js";
+import { PREF_CONSTRAINTS, exportPreferences, importPreferences } from "../../config/preferences.js";
+import { applyVolumePreferences } from "../audio/city-scene.js";
 import { exportGame, importGame, playSaveSound, hasSave } from "../save-storage.js";
 import { canChooseSaveLocation } from "../../lib/download.js";
 import { getActiveWorld } from "../../core/state.js";
@@ -96,11 +95,8 @@ function ensurePrefsFileInput() {
 
     const result = await importPreferences(file);
 
-    // Effet temps réel si une scène ville est active (comportement
-    // fonctionnel inchangé par le déplacement depuis options-menu.js).
-    refreshActiveBeaconVolumes();
-    setGlobalVolume("music", getPref("musicVolume", PREF_CONSTRAINTS.musicVolume.default) / 100);
-    setGlobalVolume("ambience", getPref("ambienceVolume", PREF_CONSTRAINTS.ambienceVolume.default) / 100);
+    // Les volumes importés prennent effet aussitôt.
+    applyVolumePreferences();
 
     // Écran-message plutôt qu'une simple annonce : le résultat doit être
     // entendu en entier, jamais écrasé par une ré-annonce immédiate de la

@@ -5,33 +5,31 @@
 // intercepte Échap, jamais la scène en dessous. Câblé depuis
 // view/city-screen.js.
 //
-// Comme le menu de désambiguïsation (view/interaction.js), il COMPOSE son
-// cycle de vie avec la pause/reprise des balises de la scène plutôt que
-// d'écraser onEnter/onExit — voir composeHook (lib/screens.js).
+// Balises du monde en pause tant qu'il est ouvert, comme les autres menus
+// en jeu (voir view/paused-beacons.js).
 
 import { t } from "../../data/i18n/index.js";
-import { pushScreen, popScreen, composeHook } from "../../lib/screens.js";
+import { pushScreen, popScreen } from "../../lib/screens.js";
+import { withPausedBeacons } from "../paused-beacons.js";
 import { makeMenuScreen } from "../../lib/menu.js";
 import { createOptionsMenu } from "./options-menu.js";
 import { openCityMapMenu } from "./city-map-menu.js";
 import { saveGame } from "../save-storage.js";
 
-// scene : fournit pauseBeacons()/resumeBeacons() (voir
-// view/audio/city-scene.js), pour dégager le canal audio positionné pendant
-// que CE menu est ouvert, sans toucher au contexte audio global — transmis
-// AUSSI à la carte de la ville (voir plus bas), qui gère sa PROPRE
-// pause/reprise : elle REMPLACE ce menu (popScreen() avant de l'ouvrir,
-// jamais un empilement), donc rien à partager entre les deux. getSession :
+// getWorldView : la vue du monde courante (voir view/paused-beacons.js) —
+// transmise AUSSI à la carte de la ville, qui gère sa PROPRE pause : elle
+// REMPLACE ce menu (popScreen() avant de l'ouvrir, jamais un empilement),
+// donc rien à partager entre les deux. getSession :
 // partie courante, TOUJOURS non nulle ici (ce menu n'existe qu'ouvert
 // depuis une scène d'exploration active) — utilisée directement pour
 // "Sauvegarder" ci-dessous (seul point d'accès à la sauvegarde manuelle,
 // voir save-menu.js pour les réglages/import-export) et transmise à
 // Options pour ce qui en a besoin (Sauvegarde > import/export de partie).
 // travelViaCityMap(sceneId, spawnX) : effet de sélection sur la carte de
-// la ville (voir view/city-screen.js) — transmis tel quel à
+// la ville (voir view/world-travel.js) — transmis tel quel à
 // view/menus/city-map-menu.js, ce fichier ignore tout de son
 // fonctionnement (destroy/travelToWorld/recreate), il ne fait que router.
-export function openPauseMenu(scene, getSession, travelViaCityMap) {
+export function openPauseMenu(getWorldView, getSession, travelViaCityMap) {
   const menu = {
     title: "menu.pause.title",
     closable: true, // Échap referme le menu : identique à "Retour au jeu"
@@ -57,7 +55,7 @@ export function openPauseMenu(scene, getSession, travelViaCityMap) {
         // et laisse la pause visible en dessous, jeu toujours figé.
         onActivate: () => {
           popScreen();
-          openCityMapMenu(scene, getSession, travelViaCityMap);
+          openCityMapMenu(getWorldView, getSession, travelViaCityMap);
         },
       },
       {
@@ -81,9 +79,5 @@ export function openPauseMenu(scene, getSession, travelViaCityMap) {
     ],
   };
 
-  const screen = makeMenuScreen(menu, t);
-  screen.onEnter = composeHook(screen.onEnter, () => scene.pauseBeacons());
-  screen.onExit = composeHook(screen.onExit, () => scene.resumeBeacons());
-
-  pushScreen(screen);
+  pushScreen(withPausedBeacons(makeMenuScreen(menu, t), getWorldView));
 }

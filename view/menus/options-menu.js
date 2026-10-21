@@ -8,11 +8,10 @@
 
 import { pushScreen, popScreen } from "../../lib/screens.js";
 import { makeMenuScreen, makeMessageScreen } from "../../lib/menu.js";
-import { setGlobalVolume, setMasterVolume } from "../../lib/audio.js";
 import { t } from "../../data/i18n/index.js";
-import { resetAllPrefs, PREF_CONSTRAINTS } from "../../config/preferences.js";
+import { resetAllPrefs } from "../../config/preferences.js";
 import { playMenuSound } from "../menu-sounds.js";
-import { refreshActiveBeaconVolumes } from "../audio/city-scene.js";
+import { applyVolumePreferences } from "../audio/city-scene.js";
 import { createAudioMenu } from "./audio-menu.js";
 import { createNavigationMenu } from "./navigation-menu.js";
 import { createSaveMenu } from "./save-menu.js";
@@ -39,10 +38,7 @@ function openResetAllConfirmation() {
           popScreen();
           resetAllPrefs();
           playMenuSound("reset");
-          refreshActiveBeaconVolumes();
-          setMasterVolume(PREF_CONSTRAINTS.masterVolume.default / 100);
-          setGlobalVolume("music", PREF_CONSTRAINTS.musicVolume.default / 100);
-          setGlobalVolume("ambience", PREF_CONSTRAINTS.ambienceVolume.default / 100);
+          applyVolumePreferences();
           // Écran-message plutôt qu'une simple annonce : le résultat doit
           // être entendu en entier, jamais écrasé par une ré-annonce
           // immédiate de la ligne de menu courante (voir

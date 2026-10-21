@@ -23,7 +23,8 @@
 // niveau par niveau, et sans réannoncer par-dessus le résultat déjà dit).
 
 import { t } from "../../data/i18n/index.js";
-import { pushScreen, popScreen, composeHook } from "../../lib/screens.js";
+import { pushScreen, popScreen } from "../../lib/screens.js";
+import { withPausedBeacons } from "../paused-beacons.js";
 import { makeMenuScreen } from "../../lib/menu.js";
 import { announce } from "../../lib/announce.js";
 import { playMenuSound } from "../menu-sounds.js";
@@ -153,7 +154,7 @@ function describeBagEntry(entry) {
     : t("inventory.entry.unique", { item, description });
 }
 
-function bagEntryLine(scene, getSession, entry, index) {
+function bagEntryLine(getWorldView, getSession, entry, index) {
   const itemLabelKey = ITEM_REGISTRY[entry.type].label;
   const description = stripTrailingPeriod(t(ITEM_REGISTRY[entry.type].descriptionKey));
   const item = t(itemLabelKey);
@@ -165,7 +166,7 @@ function bagEntryLine(scene, getSession, entry, index) {
 
   return {
     ...text,
-    onActivate: () => openItemActionsMenu(scene, getSession, entry, itemLabelKey, index),
+    onActivate: () => openItemActionsMenu(getWorldView, getSession, entry, itemLabelKey, index),
   };
 }
 
@@ -197,7 +198,7 @@ function bagRemovalAnnouncement(getSession, index) {
 // une entrée plutôt qu'un refus d'ouvrir l'écran (voir openInventoryMenu :
 // contrairement à avant les onglets, un sac vide ne doit plus JAMAIS
 // empêcher d'atteindre l'onglet Équipement).
-function buildBagEntries(scene, getSession) {
+function buildBagEntries(getWorldView, getSession) {
   const bag = getSession().bag;
   // "inventory.empty.entry" (SANS point final), pas "inventory.empty" (avec
   // point, réservé aux annonces AUTONOMES — voir buildDropMessage) : cette
@@ -205,14 +206,14 @@ function buildBagEntries(scene, getSession) {
   // encore ". <position>" — même raison que stripTrailingPeriod plus haut,
   // pour éviter un double point ("vide.. 1 sur 1").
   if (bag.length === 0) return [{ label: "inventory.empty.entry", onActivate: () => {} }];
-  return bag.map((entry, index) => bagEntryLine(scene, getSession, entry, index));
+  return bag.map((entry, index) => bagEntryLine(getWorldView, getSession, entry, index));
 }
 
 // `cursor` optionnel : impose la position du curseur (voir
 // bagCursorAfterRemoval/buildInventoryTabsScreen) plutôt que le défaut 0 de
 // lib/menu.js/makeMenuScreen.
-function buildBagTabScreen(scene, getSession, cursor) {
-  const menu = { title: "inventory.title", closable: true, entries: buildBagEntries(scene, getSession) };
+function buildBagTabScreen(getWorldView, getSession, cursor) {
+  const menu = { title: "inventory.title", closable: true, entries: buildBagEntries(getWorldView, getSession) };
   if (cursor !== undefined) menu.cursor = cursor;
   return makeMenuScreen(menu, t);
 }
@@ -225,7 +226,7 @@ function buildBagTabScreen(scene, getSession, cursor) {
 // activer annonce juste "Emplacement vide." SANS ouvrir de menu (rien à y
 // faire — voir header du module, "entrée sur objet -> menu d'actions" ne
 // s'applique qu'à un objet RÉEL).
-function equipmentSlotEntry(scene, getSession, slot) {
+function equipmentSlotEntry(getWorldView, getSession, slot) {
   const occupant = getSession().equipment[slot];
   const slotLabel = t(EQUIPMENT_SLOT_LABELS[slot]);
 
@@ -242,15 +243,15 @@ function equipmentSlotEntry(scene, getSession, slot) {
   return {
     label: "inventory.equipment.slot.occupied",
     labelParams: { slot: slotLabel, item: t(itemLabelKey), description },
-    onActivate: () => openEquipmentSlotActionsMenu(scene, getSession, slot, itemLabelKey),
+    onActivate: () => openEquipmentSlotActionsMenu(getWorldView, getSession, slot, itemLabelKey),
   };
 }
 
-function buildEquipmentTabScreen(scene, getSession) {
+function buildEquipmentTabScreen(getWorldView, getSession) {
   const menu = {
     title: "inventory.equipment.title",
     closable: true,
-    entries: EQUIPMENT_SLOTS.map((slot) => equipmentSlotEntry(scene, getSession, slot)),
+    entries: EQUIPMENT_SLOTS.map((slot) => equipmentSlotEntry(getWorldView, getSession, slot)),
   };
   return makeMenuScreen(menu, t);
 }
@@ -339,22 +340,20 @@ function buildCollectionsTabScreen(getSession) {
 // `cursor` : seul l'onglet Sac en a l'usage (voir buildBagTabScreen) — les
 // listes des autres onglets ne changent pas de longueur pendant qu'on les
 // parcourt, rien à repositionner de ce côté.
-function buildTabScreen(tab, scene, getSession, cursor) {
-  if (tab === "equipment") return buildEquipmentTabScreen(scene, getSession);
+function buildTabScreen(tab, getWorldView, getSession, cursor) {
+  if (tab === "equipment") return buildEquipmentTabScreen(getWorldView, getSession);
   if (tab === "improvements") return buildImprovementsTabScreen(getSession);
   if (tab === "collections") return buildCollectionsTabScreen(getSession);
-  return buildBagTabScreen(scene, getSession, cursor);
+  return buildBagTabScreen(getWorldView, getSession, cursor);
 }
 
 // L'écran RÉEL (voir header) : reconstruit son écran-menu interne (`inner`)
 // à CHAQUE onEnter (première ouverture, bascule d'onglet, OU reveal après
 // la fermeture d'un sous-menu — les trois passent par ici) — jamais de
 // contenu mis en cache d'un affichage à l'autre, comme le reste de ce
-// fichier (voir buildBagEntries). scene.pauseBeacons()/resumeBeacons()
-// appelés à CHAQUE onEnter/onExit (y compris un reveal redondant) — sans
-// conséquence, même tolérance que le reste de la pile de menus ici (voir
-// openItemActionsMenu plus bas).
-function buildInventoryTabsScreen(scene, getSession, initialTab) {
+// fichier (voir buildBagEntries). Balises en pause tant qu'il est ouvert
+// (voir view/paused-beacons.js).
+function buildInventoryTabsScreen(getWorldView, getSession, initialTab) {
   let activeTab = initialTab;
   let inner = null;
   // Consommé UNE FOIS par le prochain onEnter (voir returnSilently) : un
@@ -371,11 +370,11 @@ function buildInventoryTabsScreen(scene, getSession, initialTab) {
   let pendingCursor;
 
   function rebuildInner() {
-    inner = buildTabScreen(activeTab, scene, getSession, pendingCursor);
+    inner = buildTabScreen(activeTab, getWorldView, getSession, pendingCursor);
     pendingCursor = undefined;
   }
 
-  return {
+  return withPausedBeacons({
     onEnter() {
       rebuildInner();
       if (silent) {
@@ -383,11 +382,9 @@ function buildInventoryTabsScreen(scene, getSession, initialTab) {
       } else {
         inner.onEnter();
       }
-      scene.pauseBeacons();
     },
     onExit() {
       if (inner.onExit) inner.onExit();
-      scene.resumeBeacons();
       currentTabsScreen = null;
     },
     onTick() {
@@ -413,32 +410,32 @@ function buildInventoryTabsScreen(scene, getSession, initialTab) {
       silent = true;
       pendingCursor = cursor;
     },
-  };
+  }, getWorldView);
 }
 
-function openInventoryTabs(scene, getSession, initialTab) {
-  currentTabsScreen = buildInventoryTabsScreen(scene, getSession, initialTab);
+function openInventoryTabs(getWorldView, getSession, initialTab) {
+  currentTabsScreen = buildInventoryTabsScreen(getWorldView, getSession, initialTab);
   pushScreen(currentTabsScreen);
 }
 
 // "i" — voir view/city-screen.js.
-export function openInventoryMenu(scene, getSession) {
-  openInventoryTabs(scene, getSession, "bag");
+export function openInventoryMenu(getWorldView, getSession) {
+  openInventoryTabs(getWorldView, getSession, "bag");
 }
 
 // "q" — voir view/city-screen.js.
-export function openEquipmentMenu(scene, getSession) {
-  openInventoryTabs(scene, getSession, "equipment");
+export function openEquipmentMenu(getWorldView, getSession) {
+  openInventoryTabs(getWorldView, getSession, "equipment");
 }
 
 // "m" — voir view/city-screen.js.
-export function openImprovementsMenu(scene, getSession) {
-  openInventoryTabs(scene, getSession, "improvements");
+export function openImprovementsMenu(getWorldView, getSession) {
+  openInventoryTabs(getWorldView, getSession, "improvements");
 }
 
 // "c" — voir view/city-screen.js.
-export function openCollectionsMenu(scene, getSession) {
-  openInventoryTabs(scene, getSession, "collections");
+export function openCollectionsMenu(getWorldView, getSession) {
+  openInventoryTabs(getWorldView, getSession, "collections");
 }
 
 // Actions disponibles pour UNE entrée de sac — "Équiper" seulement si
@@ -448,7 +445,7 @@ export function openCollectionsMenu(scene, getSession) {
 // liste pour un objet donné (ex. un objet de quête vital) — non codé ici,
 // aucun objet de ce genre n'existe encore ; documenté pour ne pas condamner
 // ce slot par erreur plus tard.
-function buildItemActions(scene, getSession, entry, itemLabelKey, index) {
+function buildItemActions(getSession, entry, itemLabelKey, index) {
   const props = ITEM_REGISTRY[entry.type];
   const actions = [];
   if (props.equippable) {
@@ -456,7 +453,7 @@ function buildItemActions(scene, getSession, entry, itemLabelKey, index) {
   }
   actions.push({
     label: "inventory.actions.drop",
-    onActivate: () => confirmDrop(scene, getSession, entry, itemLabelKey, index),
+    onActivate: () => confirmDrop(getSession, entry, itemLabelKey, index),
   });
   return actions;
 }
@@ -470,33 +467,27 @@ function buildItemActions(scene, getSession, entry, itemLabelKey, index) {
 // voir bagEntryLine) réutilisé tel quel comme titre de menu ("Pomme. Poser.
 // 1 sur 2") — pas de nouvelle clé i18n dédiée, menu.title n'étant qu'une clé
 // passée telle quelle à t() par lib/menu.js.
-function openItemActionsMenu(scene, getSession, entry, itemLabelKey, index) {
-  const actions = buildItemActions(scene, getSession, entry, itemLabelKey, index);
+function openItemActionsMenu(getWorldView, getSession, entry, itemLabelKey, index) {
+  const actions = buildItemActions(getSession, entry, itemLabelKey, index);
   if (actions.length === 0) return;
 
   actions.push({ label: "inventory.actions.cancel", onActivate: () => popScreen() });
 
   const menu = { title: itemLabelKey, closable: true, entries: actions };
-  const screen = makeMenuScreen(menu, t);
-  screen.onEnter = composeHook(screen.onEnter, () => scene.pauseBeacons());
-  screen.onExit = composeHook(screen.onExit, () => scene.resumeBeacons());
-  pushScreen(screen);
+  pushScreen(withPausedBeacons(makeMenuScreen(menu, t), getWorldView));
 }
 
 // Menu d'actions d'UN SLOT d'équipement occupé (onglet Équipement) —
 // Déséquiper + Annuler, même patron que openItemActionsMenu ci-dessus (un
 // menu d'actions par objet, quel que soit l'onglet où il se trouve).
-function openEquipmentSlotActionsMenu(scene, getSession, slot, itemLabelKey) {
+function openEquipmentSlotActionsMenu(getWorldView, getSession, slot, itemLabelKey) {
   const actions = [
     { label: "inventory.actions.unequip", onActivate: () => confirmUnequip(slot, itemLabelKey) },
     { label: "inventory.actions.cancel", onActivate: () => popScreen() },
   ];
 
   const menu = { title: itemLabelKey, closable: true, entries: actions };
-  const screen = makeMenuScreen(menu, t);
-  screen.onEnter = composeHook(screen.onEnter, () => scene.pauseBeacons());
-  screen.onExit = composeHook(screen.onExit, () => scene.resumeBeacons());
-  pushScreen(screen);
+  pushScreen(withPausedBeacons(makeMenuScreen(menu, t), getWorldView));
 }
 
 // "Équiper" choisi (onglet Sac) : effet immédiat, jamais de sélecteur (on
@@ -539,7 +530,7 @@ function confirmUnequip(slot, itemLabelKey) {
 // l'entrée selon la quantité choisie). `index` : position de l'entrée dans
 // le sac AVANT l'effet, transmise pour la réannonce/repositionnement (voir
 // bagRemovalAnnouncement/executeAction).
-function confirmDrop(scene, getSession, entry, itemLabelKey, index) {
+function confirmDrop(getSession, entry, itemLabelKey, index) {
   const available = entry.quantity ?? 1;
   if (available <= 1) {
     // Un seul niveau au-dessus des onglets à ce stade (le menu d'actions) —
@@ -555,7 +546,7 @@ function confirmDrop(scene, getSession, entry, itemLabelKey, index) {
     );
     return;
   }
-  openQuantitySelector(scene, getSession, entry, itemLabelKey, available, index);
+  openQuantitySelector(getSession, entry, itemLabelKey, available, index);
 }
 
 // Message de résultat du dépôt — appelé APRÈS l'effet (voir executeAction) :
@@ -597,7 +588,7 @@ function buildDropMessage(getSession, entry, itemLabelKey, quantity, index) {
 // jamais par ce mécanisme). Ne pause/reprend PAS les balises lui-même : le
 // menu d'actions juste en-dessous, encore sur la pile, l'a déjà fait à son
 // ouverture et ne s'en dépossède qu'à SA propre sortie.
-function openQuantitySelector(scene, getSession, entry, itemLabelKey, max, index) {
+function openQuantitySelector(getSession, entry, itemLabelKey, max, index) {
   let quantity = 1;
 
   function clampQuantity(value) {

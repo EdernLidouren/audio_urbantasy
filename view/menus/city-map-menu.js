@@ -22,12 +22,12 @@
 //
 // Cet écran REMPLACE le menu pause (voir view/menus/pause-menu.js, qui le
 // popScreen() AVANT de pousser celui-ci) — jamais un empilement par-dessus
-// : il gère donc SA PROPRE pause/reprise des balises (composée sur
-// onEnter/onExit, comme pause-menu.js le fait pour lui-même), rien à
-// hériter du menu qu'il remplace.
+// : il gère donc SA PROPRE pause des balises (voir view/paused-beacons.js),
+// rien à hériter du menu qu'il remplace.
 
 import { t } from "../../data/i18n/index.js";
 import { pushScreen, popScreen } from "../../lib/screens.js";
+import { withPausedBeacons } from "../paused-beacons.js";
 import { resolveAction, checkBindingsForCollisions } from "../../lib/input.js";
 import { announce } from "../../lib/announce.js";
 import { formatCoordinate } from "../../lib/coordinate-label.js";
@@ -128,8 +128,8 @@ function announceMaybeStarred(text, starred) {
 // carte (pas encore atteignable autrement, cas limite) -> repli sur (0,0),
 // jamais une exception. onSelectZone(sceneId, spawnX) : effet de sélection
 // fourni par l'appelant (voir view/world-travel.js/travelViaCityMap).
-// scene : voir header, pause/reprise des balises propre à cet écran.
-export function openCityMapMenu(scene, getSession, onSelectZone) {
+// getWorldView : la vue du monde courante, voir header.
+export function openCityMapMenu(getWorldView, getSession, onSelectZone) {
   const start = findCityMapCoordinates(getSession().activeWorldId) ?? { x: 0, y: 0 };
   let cursorX = start.x;
   let cursorY = start.y;
@@ -213,11 +213,7 @@ export function openCityMapMenu(scene, getSession, onSelectZone) {
 
   const screen = {
     onEnter() {
-      scene.pauseBeacons();
       announceMaybeStarred(cellAnnouncementText(cursorX, cursorY, getSession()), false);
-    },
-    onExit() {
-      scene.resumeBeacons();
     },
     onKeyDown(event) {
       const action = resolveAction(CITY_MAP_BINDINGS, event.key, event.mods);
@@ -228,5 +224,5 @@ export function openCityMapMenu(scene, getSession, onSelectZone) {
     },
   };
 
-  pushScreen(screen);
+  pushScreen(withPausedBeacons(screen, getWorldView));
 }

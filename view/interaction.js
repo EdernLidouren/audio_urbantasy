@@ -9,7 +9,8 @@
 
 import { announce } from "../lib/announce.js";
 import { t } from "../data/i18n/index.js";
-import { pushScreen, popScreen, composeHook } from "../lib/screens.js";
+import { pushScreen, popScreen } from "../lib/screens.js";
+import { withPausedBeacons } from "./paused-beacons.js";
 import { makeMenuScreen } from "../lib/menu.js";
 import { playDescribedOneShot } from "../lib/audio.js";
 import { resolveAsset } from "../lib/assets.js";
@@ -750,11 +751,9 @@ export function interact(entity, kind) {
 // interact(entité, kind) reçoive le BON kind quel que soit le candidat
 // choisi.
 //
-// scene fournit pauseBeacons()/resumeBeacons() (voir
-// view/audio/city-scene.js) : seules les balises positionnées de la scène
-// sont mises en pause pendant le menu, jamais le contexte audio global —
-// une future musique/ambiance continuerait derrière ce menu.
-function openDisambiguationMenu(candidates, kind, scene) {
+// getWorldView : la vue du monde courante, dont les balises se taisent
+// pendant le menu (voir view/paused-beacons.js).
+function openDisambiguationMenu(candidates, kind, getWorldView) {
   const menu = {
     // Titre propre au verbe (Espace/observer vs Entrée/interagir) : les deux
     // menus partagent le même mécanisme (makeMenuScreen), jamais le même
@@ -771,24 +770,14 @@ function openDisambiguationMenu(candidates, kind, scene) {
     })),
   };
 
-  const screen = makeMenuScreen(menu, t);
-
-  // makeMenuScreen ne connaît rien de l'audio : on enveloppe onEnter/onExit
-  // ici plutôt que d'y toucher, pour garder ce module générique inchangé.
-  // Composition (voir composeHook) : onEnter de base (annonce d'ouverture)
-  // PUIS pause des balises ; onExit de base (actuellement aucun, mais
-  // composé quand même par principe) PUIS reprise des balises.
-  screen.onEnter = composeHook(screen.onEnter, () => scene.pauseBeacons());
-  screen.onExit = composeHook(screen.onExit, () => scene.resumeBeacons());
-
-  pushScreen(screen);
+  pushScreen(withPausedBeacons(makeMenuScreen(menu, t), getWorldView));
 }
 
 // candidates = entités dont la zone d'interaction englobe le joueur, DÉJÀ
 // triées par x croissant — même ensemble, même tri que l'annonce
-// d'occupation (voir view/occupancy.js, occupiedEntities). scene :
+// d'occupation (voir view/occupancy.js, occupiedEntities). getWorldView :
 // voir openDisambiguationMenu ci-dessus.
-export function chooseInteractionTarget(candidates, kind, scene) {
+export function chooseInteractionTarget(candidates, kind, getWorldView) {
   if (candidates.length === 0) return null;
   if (candidates.length === 1) return candidates[0];
 
@@ -796,6 +785,6 @@ export function chooseInteractionTarget(candidates, kind, scene) {
   // asynchrone (menu). null signale à l'appelant qu'il n'y a rien à faire
   // MAINTENANT — le futur choix appellera interact() lui-même (onActivate
   // ci-dessus), avec le kind mémorisé ici.
-  openDisambiguationMenu(candidates, kind, scene);
+  openDisambiguationMenu(candidates, kind, getWorldView);
   return null;
 }

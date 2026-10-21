@@ -5,7 +5,8 @@
 
 import { pushScreen, popScreen, activeScreen, tickActive, tickFrame } from "./lib/screens.js";
 import { initInput, onGlobalPress } from "./lib/input.js";
-import { ensureAudioUnlocked, setMasterVolume } from "./lib/audio.js";
+import { ensureAudioUnlocked } from "./lib/audio.js";
+import { applyVolumePreferences } from "./view/audio/city-scene.js";
 import { MOVE_KEYS, GLOBAL_BINDINGS } from "./view/input.js";
 import { createMainMenu } from "./view/menus/main-menu.js";
 import { setGameStartHandler } from "./view/menus/save-menu.js";
@@ -19,7 +20,7 @@ import { startLoop } from "./lib/loop.js";
 import { loadScene, loadSceneById } from "./scenes/load.js";
 import registry from "./entities/types/index.js";
 import { createInitialState } from "./core/state.js";
-import { getPref, setPref, PREF_CONSTRAINTS } from "./config/preferences.js";
+import { getPref, setPref } from "./config/preferences.js";
 import { configureAssetManifest } from "./lib/assets.js";
 import { checkAutoSaveTimer } from "./view/autosave-timer.js";
 import { loadGame } from "./view/save-storage.js";
@@ -59,16 +60,15 @@ console.log("Mode debug : tape toggleDebug() ou Ctrl+D en jeu");
 
 const gameZone = document.getElementById("game");
 
-// Volume principal (préférence persistée, défaut BAS — voir
-// config/preferences.js/PREF_CONSTRAINTS.masterVolume) appliqué ICI, au
-// point de composition unique, PAS à l'import de lib/audio.js (générique,
-// ignore tout de config/preferences.js) ni d'un sous-menu (qui ne s'ouvre
-// que sur demande) : contrairement aux volumes par canal (relus à chaque
-// lecture, voir view/audio/city-scene.js), Howler.volume() est un état
-// global qui reste à son défaut (100%) tant que personne ne l'a appelé —
-// sans cette ligne, la partie démarrerait au volume PLEIN, à l'exact
-// opposé de la sécurité d'accessibilité visée par le défaut bas.
-setMasterVolume(getPref("masterVolume", PREF_CONSTRAINTS.masterVolume.default) / 100);
+// Volumes des préférences appliqués ICI, au point de composition unique,
+// PAS à l'import de lib/audio.js (générique, ignore tout de
+// config/preferences.js) ni d'un sous-menu (qui ne s'ouvre que sur
+// demande) : Howler.volume() est un état global qui reste à son défaut
+// (100%) tant que personne ne l'a appelé — sans cet appel, la partie
+// démarrerait au volume PLEIN, à l'exact opposé de la sécurité
+// d'accessibilité visée par le défaut BAS du volume principal (voir
+// config/preferences.js/PREF_CONSTRAINTS.masterVolume).
+applyVolumePreferences();
 
 // lib/input.js ne connaît pas l'audio : c'est ici, au point de composition,
 // qu'on branche le déverrouillage sur le tout premier appui touche.

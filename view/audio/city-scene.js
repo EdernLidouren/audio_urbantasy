@@ -22,7 +22,7 @@
 //
 // Filet de sécurité de tout remaniement : tools/audio-trace.js.
 
-import { keepAudioContextAwake, createReverbBus } from "../../lib/audio.js";
+import { keepAudioContextAwake, createReverbBus, setMasterVolume, setGlobalVolume } from "../../lib/audio.js";
 import { TUNING_DEFAULTS } from "../../config/tuning.js";
 import { getActiveWorld, getInactiveFace } from "../../core/state.js";
 import { createEntitySounds } from "./entity-sounds.js";
@@ -33,6 +33,7 @@ import { createSceneLayers } from "./layers.js";
 import { createMuffle } from "./muffle.js";
 import { createFaceCrossfade } from "./face-crossfade.js";
 import { preloadSceneAudio } from "./preload.js";
+import { masterVolumeFactor, musicVolumeFactor, ambienceVolumeFactor } from "./volume-factors.js";
 
 export { stopPersistentAudioLayers } from "./layers.js";
 
@@ -181,4 +182,16 @@ export function createCityAudioScene(getSession, { handover = null } = {}) {
 // (appelé par les sliders de volume, voir view/menus/audio-menu.js).
 export function refreshActiveBeaconVolumes() {
   if (activeScene) activeScene.refreshBeaconVolumes();
+}
+
+// Réapplique TOUS les volumes des préférences en direct (principal,
+// musique, ambiances, balises de la scène active) : au démarrage, et après
+// toute écriture groupée de préférences (réinitialisation, import). Les
+// autres catégories (pas, sons ponctuels, interface) relisent déjà leur
+// préférence à chaque lecture.
+export function applyVolumePreferences() {
+  setMasterVolume(masterVolumeFactor());
+  setGlobalVolume("music", musicVolumeFactor());
+  setGlobalVolume("ambience", ambienceVolumeFactor());
+  refreshActiveBeaconVolumes();
 }

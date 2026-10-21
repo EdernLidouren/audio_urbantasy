@@ -1291,6 +1291,13 @@ primitives) ; auto-save sur transition (`autoSaveOnTransition`) déclenchée
 SEULEMENT par un rechargement (`performTransition`), jamais par un simple
 repositionnement.
 
+**Scène cible impossible à charger** (première visite : réseau, fichier
+invalide) : elle est lue AVANT que rien ne soit démonté
+(`view/world-travel.js`/`loadTargetScene`), jeu gelé pendant la lecture. En
+cas d'échec, le joueur reste où il est, l'échec est annoncé
+(`teleport.failed`) et son détail part dans le journal des avertissements
+(voir `doc/entity-model.md`/"Mode debug").
+
 **Actions multiples + teleport conditionnel** : une porte à DESTINATION
 CONDITIONNELLE (ex. VIP vers un salon, sinon vers le hall) tombe
 GRATUITEMENT des "actions multiples filtrées par condition" ci-dessous —

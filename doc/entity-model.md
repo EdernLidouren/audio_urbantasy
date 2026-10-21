@@ -390,9 +390,10 @@ facilement, une entrée de menu non. Dernière entrée : « Vider le journal ».
   consultés. Ouvrir le menu les marque tous comme vus.
 - **Durée de vie** : la page. Le journal n'est jamais sauvegardé : il décrit
   ce qui s'est passé pendant la session, pas l'état de la partie.
-- **Sources** : aujourd'hui, les entités retirées d'une sauvegarde adoptée,
-  type inconnu (voir `doc/save.md`). Une source de plus = une fonction de
-  signalement dans `view/debug-warnings.js` et ses clés `debug.warnings.*`.
+- **Sources** : les fonctions de signalement de `view/debug-warnings.js`
+  (ex. entités et objets retirés d'une sauvegarde adoptée, voir
+  `doc/save.md` ; scène impossible à charger ou à recharger). Une source de
+  plus = une fonction de signalement là et ses clés `debug.warnings.*`.
   N'y brancher que ce qui est utile à l'auteur du contenu (donnée perdue,
   contenu incohérent), jamais du bruit technique. Chaque avertissement part
   aussi dans la console avec son détail brut.

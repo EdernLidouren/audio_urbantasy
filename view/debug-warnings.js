@@ -34,6 +34,19 @@ export function reportDroppedEntities(droppedEntities) {
   }
 }
 
+// Scène cible d'un voyage impossible à charger (voir
+// view/world-travel.js/loadTargetScene) : le message d'erreur du chargeur
+// (réseau, JSON, validation par parseScene) dit quoi corriger.
+export function reportSceneLoadFailure(sceneId, message) {
+  reportWarning(
+    "debug.warnings.sceneLoadFailed",
+    // Point final retiré : le menu en ajoute un après chaque entrée.
+    { sceneId, message: message.replace(/\.\s*$/, "") },
+    `Chargement de la scène "${sceneId}" impossible :`,
+    message
+  );
+}
+
 // Rechargement d'une scène depuis son fichier impossible (outil de debug,
 // voir view/world-travel.js/reloadSceneFromFile) : le message d'erreur du
 // chargeur (réseau, JSON, validation par parseScene) dit quoi corriger.
