@@ -204,7 +204,7 @@ export default function checkEffects(run) {
 
   // 9) TELEPORT — la porte n'est plus un cas spécial (voir core/scene.js,
   // entities/types/door.js) : deux confirmations structurelles,
-  // l'EXÉCUTION (view/city-screen.js/executeTeleport) restant
+  // l'EXÉCUTION (view/world-travel.js/executeTeleport) restant
   // hors de portée d'un test core (voir "Vérifie (oreille)").
   {
     // a) Actions multiples filtrées par condition, teleport vers des

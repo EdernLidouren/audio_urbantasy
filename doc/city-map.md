@@ -161,7 +161,7 @@ Entrée sur une case :
 
 - **Zone réelle** : ferme la carte (`popScreen()`) PUIS délègue à
   `onSelectZone(sceneId, spawnX)`, fourni par l'appelant
-  (`view/city-screen.js`/`travelViaCityMap`) — ce module ignore tout de ce
+  (`view/world-travel.js`/`travelViaCityMap`) — ce module ignore tout de ce
   qui se passe ensuite (destroy/`travelToWorld`/recreate, voir plus bas).
 - **En chantier / vide** : PAS sélectionnable — petit retour (ré-annonce
   de la case), aucun chargement.
@@ -172,7 +172,7 @@ Entrée sur une case :
   sortie de scène), joueur replacé à `spawnX`. Recentrage volontaire
   (confort assumé, jeu sans challenge) : pas de "vous y êtes déjà".
 
-`view/city-screen.js`/`travelViaCityMap(sceneId, spawnX)` réutilise
+`view/world-travel.js`/`travelViaCityMap(sceneId, spawnX)` réutilise
 `performTransition` — LA MÊME transition franche qu'une porte (voir
 `doc/scripting.md`/"Effets d'action"/`"teleport"`, mode rechargement) :
 `scene.destroy()` (aucun Howl résiduel), `travelToWorld` (core, x/side

@@ -436,7 +436,7 @@ export default function checkVariables(run) {
     run("applyActionEffects : liste état+rendu — état muté normalement", true, afterMixedNature.entity.variables.isOpen.value);
 
     // ROUTAGE : "teleport" (effet MIXTE, voir core/effects.js) traverse
-    // applyActionEffects SANS EFFET — exécuté par la vue (view/city-screen.js/
+    // applyActionEffects SANS EFFET — exécuté par la vue (view/world-travel.js/
     // executeTeleport), jamais par le core, exactement comme playSound/
     // announce.
     run(

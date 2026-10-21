@@ -1,5 +1,5 @@
-// BASCULE DE FACE animée (recto <-> verso, voir view/city-screen.js/
-// sideSwitchEffect, dans le sas : jeu gelé). Les deux faces CROISENT leurs
+// BASCULE DE FACE animée (recto <-> verso, voir view/world-travel.js/
+// sideSwitch, dans le sas : jeu gelé). Les deux faces CROISENT leurs
 // filtres d'occlusion en parallèle — la face quittée s'étouffe pendant que
 // l'autre s'éclaircit, toutes deux restant audibles : un échange de clarté,
 // jamais un passage par le silence (contrairement au sas d'un changement de

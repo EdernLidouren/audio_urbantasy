@@ -682,7 +682,7 @@ export function getInactiveFace(session) {
 // qu'une face, ignoré dans ce cas). x fourni est bordé dans [0, longueur de
 // la cible], comme placePlayer ci-dessous. Compagnons repositionnés autour
 // du point d'arrivée RÉEL (celui-ci, pas playerStart) — avant ce paramètre,
-// un appelant qui replaçait le joueur APRÈS coup (voir view/city-screen.js/
+// un appelant qui replaçait le joueur APRÈS coup (voir view/world-travel.js/
 // performTransition, historique) laissait les compagnons autour de
 // playerStart tandis que le joueur atterrissait ailleurs ; ce paramètre
 // élimine cette classe de désync en résolvant tout EN UNE FOIS.

@@ -16,7 +16,7 @@
 // core/scene.js/parseEntity, doc/entity-model.md/"Cascade de sounds") —
 // jamais un second archétype dupliqué pour ce cas.
 //
-// Son de FRANCHISSEMENT (recto<->verso, voir view/city-screen.js/
+// Son de FRANCHISSEMENT (recto<->verso, voir view/world-travel.js/
 // playSideSwitchSound) : AUCUN défaut ici — `transitionSound` (cascade
 // instance -> archétype -> défaut ABSENT, voir config/tuning-values.js) est
 // un choix de CONTENU par instance (via `tuning.transitionSound` dans

@@ -105,7 +105,7 @@ export const TUNING_DEFAULTS = {
   // "utilise la surface de la face de départ", jamais un défaut figé ici.
 
   // `transitionSound` (chemin/pool résolu via resolveAsset, voir
-  // view/city-screen.js/playSideSwitchSound) : le son DÉCLARÉ d'un
+  // view/world-travel.js/playSideSwitchSound) : le son DÉCLARÉ d'un
   // franchissement recto/verso (grincement, tintement...) — AUCUNE entrée
   // ici, même raisonnement que `transitionSurface` juste au-dessus : pas
   // de son générique imposé, un passage qui n'en déclare aucun (à
@@ -394,7 +394,7 @@ export const TUNING_DEFAULTS = {
 
   // Durées (ms) du fondu de la couche ENTITÉS pendant le SAS d'un teleport
   // en mode "fade" (voir lib/audio.js/rampEntityLayerGain,
-  // view/city-screen.js/runTeleportSas) — le "fondu au noir sonore" qui
+  // view/world-travel.js/runTeleportSas) — le "fondu au noir sonore" qui
   // souligne le changement de scène/position et masque un éventuel
   // chargement. COURTES par nature (souligner sans ralentir le passage) : sortant
   // avant de détruire la scène quittée, entrant une fois la scène cible
@@ -412,7 +412,7 @@ export const TUNING_DEFAULTS = {
 
   // Durée (ms) du CROISEMENT DE FILTRES d'occlusion pendant une bascule
   // recto/verso (voir view/audio/face-crossfade.js/crossfadeFaceSwap,
-  // view/city-screen.js/sideSwitchEffect) — la face courante se referme
+  // view/world-travel.js/sideSwitch) — la face courante se referme
   // pendant que l'autre s'ouvre, EN PARALLÈLE, sur cette même durée.
   // DISTINCTE des durées de transition de porte ci-dessus : pas le même
   // geste (un échange de clarté entre deux faces qui coexistent, jamais un

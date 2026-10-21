@@ -97,7 +97,7 @@ export function openTimeDebugMenu(getSession, advanceTimeEffect, setTimeScaleEff
     advanceEntry("time.debug.goTo20", goToHour(20)),
     // c) Vitesse temporaire — voir config/time-values.js/setTimeScale ;
     // `null` restaure la valeur normale (resetTimeScale, voir
-    // view/city-screen.js/setTimeScaleDebugEffect). Multiplicateurs choisis
+    // view/debug-effects.js/changeTimeScale). Multiplicateurs choisis
     // pour rendre une transition (crossfade jour/nuit) audible en quelques
     // secondes réelles plutôt qu'en minutes.
     speedEntry("time.debug.speedNormal", null),

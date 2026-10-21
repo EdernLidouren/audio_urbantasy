@@ -8,7 +8,7 @@
 // flux PRNG dédié (jamais partagé avec world.rngState ni
 // companionsRngState — voir core/state.js, même principe de flux
 // indépendants). SEUL point d'écriture en cours de partie : advanceWeather
-// ci-dessous, appelé par le bord (view/city-screen.js/onFrame) EXACTEMENT
+// ci-dessous, appelé par le bord (view/game-clock.js/onFrame) EXACTEMENT
 // là où core/time.js/advanceTime avance déjà .time — jamais dans
 // core/reduce.js (TICK n'avance jamais .time, voir core/time.js/header) :
 // la météo avance donc AVEC .time, et gèle quand .time gèle (un menu au

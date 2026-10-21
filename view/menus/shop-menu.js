@@ -314,7 +314,7 @@ function openQuantityList(spec) {
     confirm: () => confirm(),
     total: () => announce(`${title()}. ${entryLine(cursor)}`, { assertive: true }),
     validate: () => validate(),
-    // Même clé/gabarit que la touche "g" en ville (view/city-screen.js/
+    // Même clé/gabarit que la touche "g" en ville (view/status-announcements.js/
     // announceMoney) — relu dans la session, jamais un cumul du menu.
     money: () => announce(t("money.announce", { amount: spec.getSession().money }), { assertive: true }),
     cancel: () => cancel(),

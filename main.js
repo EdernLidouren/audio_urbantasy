@@ -143,7 +143,7 @@ function startNewGame() {
 // activateNewGame/main-menu.js, réutilisé TEL QUEL pour cette entrée.
 // Contrairement à `scene` (préchargée en tâche de fond dès le boot, voir plus
 // bas), "demo" n'est chargé qu'à la demande via loadSceneById (même chemin
-// que la traversée d'une porte, voir view/city-screen.js/performTransition)
+// que la traversée d'une porte, voir view/world-travel.js/performTransition)
 // — un raccourci de test n'a pas besoin d'être préchargé au démarrage.
 function startTestCityGame() {
   loadSceneById("demo", registry)
@@ -212,7 +212,7 @@ pushScreen(mainMenuScreen);
 // view/autosave-timer.js).
 // Second paramètre : le delta RÉEL de frame, routé au même écran actif que
 // tickActive() (voir lib/screens.js/tickFrame) — porte l'horloge de partie
-// (view/city-screen.js/onFrame), gelée pour la même raison que le
+// (view/game-clock.js/onFrame), gelée pour la même raison que le
 // déplacement quand un menu est au sommet (rien à faire ici pour ça, c'est
 // le routage par pile qui s'en charge).
 startLoop(

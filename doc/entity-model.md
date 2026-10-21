@@ -311,7 +311,7 @@ l'activation — ex. `crate-stash` (`scenes/demo2.json`), une caisse dont le
   (défaut PAR ACTION, lu directement, pas via la cascade `resolveTuning` —
   ce n'est pas un réglage par entité/son).
 - **`spec` résolu côté VUE** — `spawn.spec` reste minimal dans le JSON (`{
-  type, ...surcharges }`) : c'est `view/city-screen.js`/
+  type, ...surcharges }`) : c'est `view/ephemeral-specs.js`/
   `resolveEphemeralSpec` (même fonction que pour la touche debug — DEUX
   appelants, une seule résolution) qui le traduit en descripteur COMPLET
   avant d'appeler `spawnEphemeral`/`spawnScatteredEphemerals` — le core
@@ -359,7 +359,7 @@ des avertissements, voir ci-dessous).
 confirmation). Une partie fige chaque monde à sa première visite (voir
 `doc/save.md`) : sans eux, une scène modifiée ne se voit qu'en nouvelle
 partie.
-- **« Recharger cette scène depuis son fichier »** (`view/city-screen.js`/
+- **« Recharger cette scène depuis son fichier »** (`view/world-travel.js`/
   `reloadSceneFromFile`, `core/state.js`/`reloadActiveWorld`) : relit le JSON
   (validé comme tout chargement, avec les archétypes actuels), remplace le
   monde actif par un monde neuf. Perdu : l'état de CE monde (positions,
@@ -459,7 +459,7 @@ persiste avec le monde.
   commencer : chaque source garnie à chaque cycle, ni plafond ni
   probabilité (à doser plus tard). Rien ne se matérialise JAMAIS pendant que
   le joueur est dans la scène — aucun code au tick : `refillDueSpawns`
-  s'exécute au CHARGEMENT du monde actif (`view/city-screen.js`/
+  s'exécute au CHARGEMENT du monde actif (`view/world-travel.js`/
   `refreshSpawns` : première entrée, transition, partie remplacée), et
   `world.spawnCycle` (dernier cycle matérialisé) tient lieu de FILE — un seul
   marqueur, ÉCRASÉ par nature : après N cycles d'absence, UN garnissage, avec
@@ -630,7 +630,7 @@ redéfinir :
   Sans `sound`, les sons de l'archétype générique restent.
 - Même règle partout où un objet devient une entité : instance de scène,
   garnissage d'une plage ou d'un conteneur (`core/spawn.js`), objet posé
-  depuis le sac (`view/city-screen.js`/`resolveDroppedItemSpec`).
+  depuis le sac (`view/ephemeral-specs.js`/`resolveDroppedItemSpec`).
 
 ## Sac d'objets
 
@@ -1618,7 +1618,7 @@ pan/distance dérivés de leur x que d'habitude).
   entendus étouffés, dosés par leur propre `gain`.
 
 Au basculement de face, normal et étouffé s'inversent —
-ANIMÉ par un SAS (jeu gelé, voir `view/city-screen.js`/`sideSwitchEffect`) :
+ANIMÉ par un SAS (jeu gelé, voir `view/world-travel.js`/`sideSwitch`) :
 un CROISEMENT DE FILTRES (`view/audio/face-crossfade.js`/`crossfadeFaceSwap`)
 ferme le filtre de la face quittée pendant qu'il ouvre celui de la face
 rejointe, les deux restant AUDIBLES tout du long (pas un fondu vers le
@@ -1630,7 +1630,7 @@ simplement ouverte ; les autres reçoivent une balise TEMPORAIRE, partie de
 leur niveau "autre face", bornée à la durée du sas. Le croisement terminé,
 la scène audio est reconstruite sur la nouvelle face, avec un RELAIS des
 balises en boucle (`destroy({ handover: true })`, voir
-`view/city-screen.js`/`sideSwitchEffect`) : la nouvelle scène reprend la
+`view/world-travel.js`/`sideSwitch`) : la nouvelle scène reprend la
 balise en cours de chaque entité qui en a besoin, déjà au bon niveau grâce
 au fondu, au lieu de la recréer — ni coupure, ni retour au début du
 fichier, ni délai de désempilement. Les balises non reprises (déjà fondues
@@ -1638,7 +1638,7 @@ au silence) sont arrêtées ensuite.
 
 **Pas du joueur pendant la transition** (voir
 `view/audio/footsteps.js`/`playTransitionSteps`/`playArrivalStep`,
-`view/city-screen.js`/`sideSwitchEffect`) : un passage `interactable`
+`view/world-travel.js`/`sideSwitch`) : un passage `interactable`
 PHYSIQUE se traverse à pied — `transitionSteps` (booléen, cascade instance
 -> archétype -> défaut `true`, comme `highlight`) joue par défaut des pas
 DU JOUEUR pendant le sas, en DEUX temps distincts, jamais un flou
@@ -1661,7 +1661,7 @@ futur passe-miroir, par exemple) désactive les deux d'un coup — silence
 total côté pas, seuls le son de passage (s'il y en a un, voir plus bas) et
 le croisement de filtres demeurent.
 
-**Son de franchissement** (voir `view/city-screen.js`/`playSideSwitchSound`)
+**Son de franchissement** (voir `view/world-travel.js`/`playSideSwitchSound`)
 — DÉCLARABLE, ABSENT par défaut : `transitionSound` (chemin/pool résolu via
 `resolveAsset`, cascade instance -> archétype -> défaut ABSENT, comme
 `transitionSurface`) est un choix de CONTENU par passage, jamais un son

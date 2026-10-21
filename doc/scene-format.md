@@ -101,7 +101,7 @@ contenu mal formé.
 ```
 
 **Audio de bascule (VUE)** : un SAS animé (jeu gelé, même mécanisme qu'un
-teleport en mode "fade" — voir `view/city-screen.js`/`runTeleportSas`),
+teleport en mode "fade" — voir `view/world-travel.js`/`runTeleportSas`),
 mais un geste différent : PAS un fondu vers le silence (rien ne disparaît,
 les deux faces coexistent déjà), un CROISEMENT DES DEUX FILTRES D'OCCLUSION
 (`view/audio/face-crossfade.js`/`crossfadeFaceSwap`) — la face courante ferme
@@ -113,7 +113,7 @@ s'il y en a un ; sinon, silence côté son de passage (défensif si le fichier
 venait à manquer, même si déclaré). Des pas de trajet/arrivée jouent en
 plus, indépendamment (voir `doc/entity-model.md`, même section). Le
 croisement terminé, `scene.destroy()` puis reconstruction sur la
-nouvelle face active (voir `view/city-screen.js`/`sideSwitchEffect`) —
+nouvelle face active (voir `view/world-travel.js`/`sideSwitch`) —
 SANS effet audible : le croisement a déjà amené le son là où la scène
 fraîche le poserait.
 

@@ -210,8 +210,8 @@ export function createPlayerFootsteps({ getSession, reverbBusInput, collisionSou
     }
   }
 
-  // Pas de TRAJET d'une bascule de face (voir view/city-screen.js/
-  // sideSwitchEffect) : le jeu est gelé et le joueur ne bouge pas, d'où une
+  // Pas de TRAJET d'une bascule de face (voir view/world-travel.js/
+  // sideSwitch) : le jeu est gelé et le joueur ne bouge pas, d'où une
   // simple minuterie par pas sur `durationMs`. Sol : celui déclaré par le
   // passage (transitionSurface), sinon le sol par défaut de la face de
   // départ. `transitionSteps` à false (cascade) : aucun pas.

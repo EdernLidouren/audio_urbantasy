@@ -50,8 +50,8 @@ export function setTeleportHandler(handler) {
 
 // (arrivalX, entity) => Promise<void> — bascule la face courante via un SAS
 // animé (croisement des filtres d'occlusion, pas de TRAJET/ARRIVÉE PUIS
-// reconstruction de la scène audio, voir view/city-screen.js/
-// sideSwitchEffect ; core/state.js/switchSide ; entities/types/passage.js),
+// reconstruction de la scène audio, voir view/world-travel.js/
+// sideSwitch ; core/state.js/switchSide ; entities/types/passage.js),
 // même patron que setTeleportHandler ci-dessus — PAS un travelToWorld, on
 // reste dans le même monde. Asynchrone comme teleportHandler, mais
 // handleSwitchSide ne l'attend pas : le gestionnaire gère seul son propre
@@ -347,8 +347,8 @@ function runEffects(entity, effects) {
 
 // Effets de RENDU seuls (playSound/announce, voir core/effects.js/
 // RENDER_EFFECT_TYPES), dans l'ordre déclaré — les autres types traversent
-// sans effet. Exporté pour les triggers horaires (view/city-screen.js/
-// advanceClock) : le core a DÉJÀ appliqué leurs effets d'état
+// sans effet. Exporté pour les triggers horaires (view/game-clock.js/
+// advance) : le core a DÉJÀ appliqué leurs effets d'état
 // (core/triggers.js/applyDueTriggers), seul le rendu reste à jouer ici,
 // avec la même provenance (l'entité porteuse) qu'un effet d'action.
 export function runRenderEffects(entity, effects, options = {}) {
@@ -398,7 +398,7 @@ function resolveDescription(entity) {
 // "switchSide" (point de passage recto<->verso, voir entities/types/
 // passage.js) : délègue TOUT l'effet
 // (état + son de passage + croisement d'occlusion + pas de trajet/arrivée,
-// voir view/city-screen.js/sideSwitchEffect, qui orchestre son propre sas)
+// voir view/world-travel.js/sideSwitch, qui orchestre son propre sas)
 // au gestionnaire enregistré, jamais de son joué ICI (contrairement à
 // handlePickup/handleLoot) : le son de bascule appartient à la SÉQUENCE du
 // sas, dont le timing (juste après le gel, AVANT le croisement de filtres)
@@ -481,7 +481,7 @@ function handlePickup(entity, action) {
 //     ramasse ensuite individuellement via sa PROPRE action "pickup" (déjà
 //     robuste, rien à ajouter). `spec` (minimal, ex. { type: "money",
 //     amount: 20 }) est résolu en descripteur COMPLET par lootSpawnHandler
-//     (voir view/city-screen.js/resolveEphemeralSpec) — ce fichier n'en
+//     (voir view/ephemeral-specs.js/resolveEphemeralSpec) — ce fichier n'en
 //     connaît que la forme brute, jamais le registre.
 function handleLoot(entity, action) {
   if (entity.consumed) return;
@@ -647,7 +647,7 @@ function actionConditionMet(condition, entity) {
 // SILENCE — l'action entière, succès comme refus, quelle que soit la
 // candidate qui aurait été choisie : état et rendu restent synchronisés.
 // Purgé à chaque changement de scène ou de face (clearInteractionCooldowns,
-// appelée par view/city-screen.js/performTransition et sideSwitchEffect) :
+// appelée par view/world-travel.js/performTransition et sideSwitch) :
 // un ancien horodatage ne bloque jamais une entité après un aller-retour.
 const lastActivationAt = new Map();
 

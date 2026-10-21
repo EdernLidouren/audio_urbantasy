@@ -225,7 +225,7 @@ Sans champ propre. Vraie si `context.perceptionActive` est vrai — posé par
 par tout le tick, exactement comme `time`), lui-même dérivé de
 `session.perceptionActive` (`core/state.js`/`togglePerception`, bascule via une
 touche dédiée — GATÉE par l'improvement `supernatural_perception`, voir
-`view/city-screen.js`/`togglePerceptionEffect` et "Améliorations
+`view/perception-toggle.js`/`toggle` et "Améliorations
 (improvements)" plus bas — jamais cette condition elle-même, qui reste un
 simple miroir de `session.perceptionActive`). Contexte SANS `perceptionActive`
 (ex. `action.condition`, voir "Conditions d'action" plus bas) →
@@ -702,8 +702,8 @@ d'action" plus bas — état `setVariable`/`giveImprovement`..., rendu
 `parseActionEffect`), MÊME routage (`core/effects.js`) : le core applique
 les effets d'ÉTAT (`core/state.js`/`applyEntityActionEffects`, sur la face
 qui porte l'entité), la vue rejoue les effets de RENDU dus
-(`view/interaction.js`/`runRenderEffects`, câblé par `view/city-screen.js`/
-`advanceClock`). Un `playSound` sans `at` émane de l'entité porteuse, donc
+(`view/interaction.js`/`runRenderEffects`, câblé par `view/game-clock.js`/
+`advance`). Un `playSound` sans `at` émane de l'entité porteuse, donc
 DIÉGÉTIQUE (voir `"playSound"` plus bas) : entendu ÉTOUFFÉ depuis l'autre
 face par la chaîne d'occlusion existante, rien de spécial à déclarer. Les
 effets MIXTES (`teleport`, déplacement du JOUEUR) sont REFUSÉS au
@@ -815,7 +815,7 @@ action: { kind: "loot", amount: 100 },
 ```
 
 `spec` (minimal, résolu en descripteur COMPLET côté vue —
-`view/city-screen.js`/`resolveEphemeralSpec`) est le vocabulaire de la "spec
+`view/ephemeral-specs.js`/`resolveEphemeralSpec`) est le vocabulaire de la "spec
 éphémère" : `{ type: <clé du registre d'entités>, ...surcharges }`. Détail complet
 (limite anti-prolifération, éviction du plus ancien, exclusion de sauvegarde) :
 `doc/entity-model.md`/"Entités éphémères", `core/state.js`/`spawnEphemeral`.
@@ -926,7 +926,7 @@ mais on ne change jamais de monde (`activeWorldId` inchangé). Délègue à
 `core/state.js`/`switchSide` (bascule `player.side` + repositionne joueur/
 compagnons — RÉUTILISE `placePlayer`, la MÊME primitive qu'un teleport
 `reloadIfSame:false`) PUIS reconstruit la scène audio sur la nouvelle face
-(`view/city-screen.js`/`sideSwitchEffect`, même soin que `performTransition` :
+(`view/world-travel.js`/`sideSwitch`, même soin que `performTransition` :
 aucun Howl résiduel), et joue le marqueur sonore de bascule DÉCLARÉ par le
 passage (`transitionSound`, cascade instance -> archétype -> défaut ABSENT
 — voir `doc/entity-model.md`/"Recto/verso", `config/tuning-values.js`) :
@@ -1114,7 +1114,7 @@ PROVENANCE, jamais déclaré dans le cas courant :
 
 - une cible résolue (positionné) → **`"diegetic"`** par défaut : rendu
   IDENTIQUE à un beacon/vocal à cet instant — `view/audio/oneshots.js`/
-  `playEntityOneShot(entityId, descriptor)` (câblé par `view/city-screen.js`/
+  `playEntityOneShot(entityId, descriptor)` (câblé par `view/action-handlers.js`/
   `setPositionedSoundPlayer`) retrouve l'entrée déjà construite pour cette
   entité (`entitySounds`, ou `otherEntitySounds` pour l'AUTRE face) + sa
   position LIVE, puis délègue à `playTransitionSound`/`playPositionedOneShot`
@@ -1269,7 +1269,7 @@ Remplace l'ancien cas spécial "porte" (kind `"transit"`, champ `entity.target`)
   SANS toucher au reste du monde (NPC où ils étaient, éphémères intacts).
 - **`transition`** (optionnel, `"fade"` | `"instant"`, **défaut `"fade"`**) :
   `"fade"` passe par le SAS + fondu
-  historique d'une traversée de porte (voir `view/city-screen.js`/
+  historique d'une traversée de porte (voir `view/world-travel.js`/
   `runTeleportSas`) ; `"instant"` saute le sas — déplacement IMMÉDIAT,
   pour un teleport D'AUTORITÉ (le joueur ne choisit pas le moment : un
   vigile qui éjecte, une boutique qui ferme à l'heure).
@@ -1280,7 +1280,7 @@ sas ; `transition:"fade"` + `reloadIfSame:false` : sas pour un simple
 repositionnement dans le monde courant).
 
 **RÉUTILISE le mécanisme de transition de porte HISTORIQUE, GÉNÉRALISÉ**
-(`view/city-screen.js`/`executeTeleport`), pas un second chemin :
+(`view/world-travel.js`/`executeTeleport`), pas un second chemin :
 `performTransition` (rechargement, `core/state.js`/
 `travelToWorld`) et `placePlayer` (repositionnement sans rechargement) restent
 les DEUX seules primitives d'état, partagées avec le menu-carte
@@ -1630,8 +1630,8 @@ JAMAIS court-circuités (le debug ne ment que sur la LECTURE, jamais sur
 l'ÉCRITURE). Couper le debug fait retomber INSTANTANÉMENT sur l'état réel au
 prochain appel — aucune trace, aucun nettoyage à faire.
 
-**Cas de test réel — la perception débloquable** (`view/city-screen.js`/
-`togglePerceptionEffect`) : la touche "p" est gatée par
+**Cas de test réel — la perception débloquable** (`view/perception-toggle.js`/
+`toggle`) : la touche "p" est gatée par
 `{ type: "hasImprovement", id: "supernatural_perception" }`, évaluée via
 `core/presence.js`/`evaluateCondition` (RÉUTILISÉ tel quel, jamais une
 vérification maison) AVANT toute bascule — sans l'amélioration, la touche

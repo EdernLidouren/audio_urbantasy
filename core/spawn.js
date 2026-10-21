@@ -63,7 +63,7 @@ const SPACING_MAX_ATTEMPTS = 8;
 
 // Archétype GÉNÉRIQUE d'objet au sol (entities/types/item.js), utilisé pour
 // tout objet du sac SANS archétype dédié — même convention que
-// view/city-screen.js/resolveDroppedItemSpec : un archétype du MÊME NOM que
+// view/ephemeral-specs.js/resolveDroppedItemSpec : un archétype du MÊME NOM que
 // l'objet (ex. "apple") est préféré s'il existe dans le registre injecté.
 const GENERIC_ITEM_TYPE = "item";
 

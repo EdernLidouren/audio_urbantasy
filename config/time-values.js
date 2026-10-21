@@ -55,7 +55,7 @@ export const DEFAULT_TIME_SCALE = TIME_CONFIG.timeScale;
 // réservé au menu debug du temps (Shift+T, MODE DEBUG UNIQUEMENT) : accélère
 // l'écoulement pour OBSERVER une transition (crossfade jour/nuit, météo) au
 // lieu de la sauter avec advanceTime. Relu à CHAQUE frame par
-// view/city-screen.js/onFrame : un changement ici prend donc effet
+// view/game-clock.js/onFrame : un changement ici prend donc effet
 // IMMÉDIATEMENT, aucun code de synchro. `value` non positif ignoré — ce
 // réglage ne doit jamais figer ou inverser l'écoulement, seulement son
 // rythme.

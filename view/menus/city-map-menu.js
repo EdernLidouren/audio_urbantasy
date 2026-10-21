@@ -14,7 +14,7 @@
 // CONSULTATION NON DESTRUCTIVE : ouvrir/naviguer/refermer (Échap) ne
 // charge ni ne décharge RIEN — seule une SÉLECTION (Entrée) sur une zone
 // RÉELLE déclenche `onSelectZone`, fourni par l'appelant (voir
-// view/city-screen.js/travelViaCityMap) — sauf une zone HORS PLAN (voir
+// view/world-travel.js/travelViaCityMap) — sauf une zone HORS PLAN (voir
 // map/city-map.js/onMapWhen), annoncée "Hors plan" et refusée. Ce module
 // reste entièrement
 // ignorant du cycle de vie de la scène audio (destroy/travelToWorld/
@@ -127,7 +127,7 @@ function announceMaybeStarred(text, starred) {
 // consultation non destructive — voir header). Monde actif absent de la
 // carte (pas encore atteignable autrement, cas limite) -> repli sur (0,0),
 // jamais une exception. onSelectZone(sceneId, spawnX) : effet de sélection
-// fourni par l'appelant (voir view/city-screen.js/travelViaCityMap).
+// fourni par l'appelant (voir view/world-travel.js/travelViaCityMap).
 // scene : voir header, pause/reprise des balises propre à cet écran.
 export function openCityMapMenu(scene, getSession, onSelectZone) {
   const start = findCityMapCoordinates(getSession().activeWorldId) ?? { x: 0, y: 0 };

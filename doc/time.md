@@ -77,7 +77,7 @@ minutes de jeu, mesuré et converti au BORD :
    rapport au temps réel). Ce delta est exposé via un second paramètre optionnel de
    `startLoop(onTick, onFrame)`, routé à l'écran actif au sommet de la pile via
    `lib/screens.js`/`tickFrame` (même mécanisme que `tickActive`/`onTick`).
-2. `view/city-screen.js`/`onFrame(deltaMs)` convertit ce delta en minutes de jeu :
+2. `view/game-clock.js`/`onFrame(deltaMs)` convertit ce delta en minutes de jeu :
    `minutes = (deltaMs / 1000) * (TIME_SCALE / minutesPerHour)`, puis appelle
    `advanceTime(getSession(), minutes)`.
 
@@ -96,7 +96,7 @@ non testable en terminal) :
   `onFrame` de la ville n'est simplement plus appelé, sans condition à écrire nulle
   part pour ça.
 - **Transition de scène** : `scene` reste `null` le temps d'un éventuel chargement
-  réseau (voir `view/city-screen.js`/`performTransition`). `onFrame` s'en garde
+  réseau (voir `view/world-travel.js`/`performTransition`). `onFrame` s'en garde
   exactement comme `onTick` (`if (!scene) return;`) — aucun delta injecté pendant le
   chargement, le temps ne "mange" rien.
 
@@ -185,7 +185,7 @@ et d'après chaque avancement (`hourChanged`) et exécute les triggers
 `{ on: "hour", hour?, effects }` déclarés par les entités du monde actif —
 sur TRANSITION seulement, à l'heure d'ARRIVÉE seulement (un saut de
 plusieurs heures ne rejoue pas les heures franchies). Câblé au SEUL point
-d'avancement de l'horloge en ville (`view/city-screen.js`/`advanceClock` :
+d'avancement de l'horloge en ville (`view/game-clock.js`/`advance` :
 temps, puis météo, puis triggers — `onFrame` ET le saut du menu debug) :
 la pause gèle donc les triggers avec l'horloge, sans code dédié. Grammaire
 et sémantique complètes : `doc/scripting.md`/"Triggers".
@@ -199,7 +199,7 @@ et appuyer sur "t" régulièrement doit montrer l'heure avancer au rythme de
 `TIME_SCALE`, et la date rouler correctement (minuit → jour suivant, fin de mois →
 mois suivant, fin d'année → saison qui repart à `printemps`).
 
-`view/city-screen.js`/`announceGameTime` fournit à `t("time.announce", {...})` des
+`view/status-announcements.js`/`announceGameTime` fournit à `t("time.announce", {...})` des
 composants NOMMÉS déjà résolus (`day`, `month`, `season`, `year`, `hour`, `minute` —
 `month`/`season` déjà traduits via leur propre clé, comme des sous-traductions
 résolues AVANT interpolation, `interpolate()` ne faisant jamais de traduction

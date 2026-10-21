@@ -1,0 +1,244 @@
+// VOYAGE et VUE DU MONDE ACTIF. Ce module est le SEUL propriétaire de la vue
+// du monde (view/world-view.js : audio, occupation, annonces d'ambiance) :
+// il la monte, la détruit et la remonte à chaque changement de monde, de
+// face ou de partie. Tous les autres la lisent AU MOMENT de s'en servir, via
+// current() — jamais une copie gardée, qui désignerait l'ancien monde après
+// un voyage. current() vaut null pendant la brève attente réseau d'un
+// voyage : l'écran de ville ne fait alors rien.
+
+import { announce } from "../lib/announce.js";
+import { playOneShot, rampEntityLayerGain } from "../lib/audio.js";
+import { resolveAsset } from "../lib/assets.js";
+import { pushScreen, popScreen } from "../lib/screens.js";
+import { t } from "../data/i18n/index.js";
+import registry from "../entities/types/index.js";
+import { loadSceneById } from "../scenes/load.js";
+import { travelToWorld, switchSide, placePlayer, reloadActiveWorld } from "../core/state.js";
+import { refillDueSpawns } from "../core/spawn.js";
+import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
+import { TUNING_DEFAULTS } from "../config/tuning-values.js";
+import { resolveTuning } from "../config/tuning.js";
+import { createWorldView } from "./world-view.js";
+import { clearInteractionCooldowns } from "./interaction.js";
+import { announceSceneName } from "./status-announcements.js";
+import { reportSceneReloadFailure } from "./debug-warnings.js";
+import { muteNextDiscoveryCheck } from "./collection-discoveries.js";
+import { saveGame } from "./save-storage.js";
+
+// Fondu de la couche entités pendant le sas d'une téléportation.
+const DOOR_TRANSITION_FADE_OUT_MS = TUNING_DEFAULTS.doorTransitionFadeOutMs;
+const DOOR_TRANSITION_FADE_IN_MS = TUNING_DEFAULTS.doorTransitionFadeInMs;
+// Durée du croisement de faces ; le nombre de pas de trajet en découle
+// (voir view/audio/footsteps.js/TRANSITION_STEP_INTERVAL_MS).
+const FACE_SWITCH_FADE_MS = TUNING_DEFAULTS.faceSwitchFadeMs;
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Son d'un passage de face, s'il en déclare un (`transitionSound`, cascade
+// instance -> archétype, absent par défaut : silence). Non positionné,
+// volume de l'interface.
+function playSideSwitchSound(entity) {
+  const path = resolveTuning("transitionSound", entity);
+  if (!path) return; // rien de déclaré : silence, pas une erreur
+  try {
+    const factor = getPref("interfaceVolume", PREF_CONSTRAINTS.interfaceVolume.default) / 100;
+    playOneShot(resolveAsset(path), { volume: factor });
+  } catch (error) {
+    console.warn(`city-screen: son de bascule indisponible ("${path}") : ${error.message}`);
+  }
+}
+
+export function createWorldTravel({ getSession, setSession }) {
+  let worldView = null;
+
+  // Garnissage de collecte dû sur le monde actif (voir core/spawn.js/
+  // refillDueSpawns) — à CHAQUE chargement d'un monde, TOUJOURS avant le
+  // montage de la vue : les collectibles posés sont des entités ordinaires,
+  // découvertes au montage comme les autres.
+  function refreshSpawns() {
+    setSession(refillDueSpawns(getSession(), registry));
+  }
+
+  // Première entrée en ville.
+  function mountInitial() {
+    refreshSpawns();
+    worldView = createWorldView(getSession);
+  }
+
+  // Sortie de la ville : détruit la vue (musique et ambiances exceptées, voir
+  // view/audio/layers.js/stopPersistentAudioLayers).
+  function unmount() {
+    worldView.destroy();
+    worldView = null;
+  }
+
+  // Changement de MONDE, franc : la vue est détruite, le monde quitté est
+  // rangé dans la partie (une nouvelle visite le ressort tel quel), la cible
+  // est chargée depuis son fichier seulement si elle n'a jamais été visitée.
+  // Musique et ambiances ne sont pas coupées : la nouvelle vue compare ce
+  // qu'elle veut à ce qui joue et ne fond que ce qui change. x/side absents :
+  // playerStart de la cible, recto. Puis, si la préférence est active, une
+  // sauvegarde automatique SILENCIEUSE.
+  async function performTransition(targetId, x, side) {
+    worldView.destroy();
+    worldView = null;
+
+    const session = getSession();
+    const alreadyVisited = Boolean(session.worlds[targetId]);
+    const freshScene = alreadyVisited ? null : await loadSceneById(targetId, registry);
+
+    setSession(travelToWorld(session, targetId, freshScene, { x, side }));
+    clearInteractionCooldowns();
+    refreshSpawns();
+    worldView = createWorldView(getSession);
+    announceSceneName(getSession());
+
+    if (getPref("autoSaveOnTransition", PREF_CONSTRAINTS.autoSaveOnTransition.default)) {
+      saveGame(getSession(), { playSound: false });
+    }
+  }
+
+  // Repositionne le joueur DANS le monde actuel. x/side absents : valeurs
+  // COURANTES (jamais "recto" en dur, qui basculerait un joueur du verso).
+  function placeInCurrentWorld(x, side) {
+    const session = getSession();
+    setSession(placePlayer(session, x !== undefined ? x : session.player.x, side !== undefined ? side : session.player.side));
+  }
+
+  // SAS de téléportation : un "fondu au noir sonore" qui masque le
+  // déplacement (et un éventuel chargement) derrière un silence bref.
+  // Musique et ambiances n'y sont pas touchées. Le jeu est GELÉ par un écran
+  // vide poussé sur la pile (seul le sommet tique et reçoit le clavier),
+  // retiré quoi qu'il arrive. Fondu sortant -> déplacement -> fondu entrant.
+  async function runTeleportSas(target, x, side, needsReload) {
+    pushScreen({});
+    try {
+      rampEntityLayerGain(0, DOOR_TRANSITION_FADE_OUT_MS);
+      await wait(DOOR_TRANSITION_FADE_OUT_MS);
+
+      if (needsReload) {
+        await performTransition(target, x, side);
+      } else {
+        // Même monde : la vue relit déjà la position à chaque tick, rien à
+        // reconstruire.
+        placeInCurrentWorld(x, side);
+      }
+
+      rampEntityLayerGain(1, DOOR_TRANSITION_FADE_IN_MS);
+      await wait(DOOR_TRANSITION_FADE_IN_MS);
+    } finally {
+      popScreen();
+    }
+  }
+
+  // Effet "teleport" (voir core/effects.js, doc/scripting.md) : SEUL chemin de
+  // téléportation du joueur (porte ou tout autre effet). Deux choix
+  // indépendants, les quatre combinaisons sont valides :
+  //   - recharger : toujours pour un autre monde, sur demande (reloadIfSame)
+  //     pour le monde actif ;
+  //   - transition "fade" (sas, défaut) ou "instant" (déplacement d'autorité).
+  // `side` n'est pas résolue ici : son défaut dépend du chemin (recto pour un
+  // rechargement, face courante pour un repositionnement).
+  function executeTeleport({ target, x, side, reloadIfSame = false, transition = "fade" }) {
+    const sameWorld = target === getSession().activeWorldId;
+    const needsReload = !sameWorld || reloadIfSame;
+
+    if (transition === "fade") {
+      runTeleportSas(target, x, side, needsReload);
+      return;
+    }
+    if (needsReload) {
+      performTransition(target, x, side);
+      return;
+    }
+    placeInCurrentWorld(x, side);
+  }
+
+  // Carte de la ville (voir view/menus/city-map-menu.js) : même transition
+  // franche qu'une porte, au point de téléportation de la case. Choisir sa
+  // propre zone la recharge (recentrage volontaire), sans cas particulier.
+  async function travelViaCityMap(sceneId, spawnX) {
+    await performTransition(sceneId, spawnX);
+  }
+
+  // Bascule recto <-> verso par un passage (voir entities/types/passage.js) :
+  // même gel qu'un sas, mais les deux faces restent audibles et CROISENT
+  // leurs filtres (voir view/audio/face-crossfade.js). Son du passage, pas
+  // de trajet en parallèle du croisement, bascule dans le core, vue
+  // reconstruite sur la nouvelle face, pas d'arrivée. Même monde : ni
+  // chargement ni annonce du lieu.
+  async function sideSwitch(arrivalX, entity) {
+    pushScreen({});
+    try {
+      playSideSwitchSound(entity);
+      worldView.playTransitionSteps(entity, FACE_SWITCH_FADE_MS);
+      await worldView.crossfadeFaceSwap(FACE_SWITCH_FADE_MS);
+
+      // Relais des balises en boucle : la vue reconstruite reprend celles dont
+      // elle a besoin, déjà au bon niveau grâce au fondu, sans les relancer
+      // (aucune micro-coupure). Les autres, que le fondu a amenées au
+      // silence, sont arrêtées ensuite.
+      const handover = worldView.destroy({ handover: true });
+      worldView = null;
+      setSession(switchSide(getSession(), arrivalX));
+      clearInteractionCooldowns();
+      worldView = createWorldView(getSession, { handover });
+      for (const unused of handover.values()) unused.stop();
+      worldView.playArrivalStep(entity, arrivalX);
+    } finally {
+      popScreen();
+    }
+  }
+
+  // Remplace la partie en cours par une partie importée (voir
+  // view/menus/save-menu.js) : vue détruite puis remontée sur la nouvelle
+  // partie. Rien n'est annoncé comme "nouvelle découverte". Le son et
+  // l'annonce de l'import restent à l'appelant.
+  function replaceCurrentGame(newSession) {
+    worldView.destroy();
+    worldView = null;
+    muteNextDiscoveryCheck();
+    setSession(newSession);
+    refreshSpawns();
+    worldView = createWorldView(getSession);
+  }
+
+  // DEBUG (Shift+M) : relit la scène active depuis son fichier et remplace
+  // son monde par un monde neuf. Le fichier est lu AVANT de rien démonter :
+  // un fichier invalide laisse la scène intacte, l'erreur part dans le
+  // journal des avertissements (Shift+L). Pas de sauvegarde automatique.
+  async function reloadSceneFromFile() {
+    const sceneId = getSession().activeWorldId;
+    let freshScene;
+    try {
+      freshScene = await loadSceneById(sceneId, registry);
+    } catch (error) {
+      reportSceneReloadFailure(sceneId, error.message);
+      announce(t("teleport.debug.reloadFailed"), { assertive: true });
+      return;
+    }
+    // La partie a pu être quittée pendant la lecture.
+    if (!worldView) return;
+
+    worldView.destroy();
+    worldView = null;
+    setSession(reloadActiveWorld(getSession(), freshScene));
+    clearInteractionCooldowns();
+    refreshSpawns();
+    worldView = createWorldView(getSession);
+    announce(t("teleport.debug.reloaded"), { assertive: true });
+  }
+
+  return {
+    current: () => worldView,
+    mountInitial,
+    unmount,
+    executeTeleport,
+    travelViaCityMap,
+    sideSwitch,
+    replaceCurrentGame,
+    reloadSceneFromFile,
+  };
+}

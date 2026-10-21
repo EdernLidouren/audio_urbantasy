@@ -131,7 +131,7 @@ export default function checkWeather(run) {
   // Gel : sans avancée de temps, advanceWeather ne fait RIEN — même
   // référence renvoyée (comme le reste du core, voir "action inconnue
   // renvoie la même référence", movement.check.js). C'est CE mécanisme, appelé
-  // uniquement depuis view/city-screen.js/onFrame (jamais si un menu est
+  // uniquement depuis view/game-clock.js/onFrame (jamais si un menu est
   // au sommet de la pile), qui donne le gel en pause — rien de spécial à
   // tester côté pause elle-même, purement une conséquence de ce test.
   const frozen = advanceWeather(freshWeatherState);

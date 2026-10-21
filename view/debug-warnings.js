@@ -35,7 +35,7 @@ export function reportDroppedEntities(droppedEntities) {
 }
 
 // Rechargement d'une scène depuis son fichier impossible (outil de debug,
-// voir view/city-screen.js/reloadSceneFromFile) : le message d'erreur du
+// voir view/world-travel.js/reloadSceneFromFile) : le message d'erreur du
 // chargeur (réseau, JSON, validation par parseScene) dit quoi corriger.
 export function reportSceneReloadFailure(sceneId, message) {
   reportWarning(

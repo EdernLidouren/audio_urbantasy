@@ -50,7 +50,7 @@ export const CITY_BINDINGS = {
   pauseMenu: { keys: ["Escape"], mods: [] },
   // Retour arrière : miroir de lib/menu.js/MENU_BINDINGS.backspace (annonce
   // "titre. entrée courante" dans un menu) — ici, annonce le nom de la
-  // scène (voir view/city-screen.js/announceSceneName), l'équivalent le
+  // scène (voir view/status-announcements.js/announceSceneName), l'équivalent le
   // plus proche pour un écran qui n'est pas un menu.
   announceSceneName: { keys: ["Backspace"], mods: [] },
   announceTime: { keys: ["t"], mods: [] },
@@ -92,7 +92,7 @@ export const CITY_BINDINGS = {
   // les collections (voir view/menus/debug-collections-menu.js).
   openCollectionsDebugMenu: { keys: ["c"], mods: ["shift"] },
   // "p" (perception) : bascule la PERCEPTION SURNATURELLE (voir
-  // core/state.js/togglePerception, view/city-screen.js/togglePerceptionEffect)
+  // core/state.js/togglePerception, view/perception-toggle.js/toggle)
   // — COOLDOWN anti-spam entièrement côté consommation (city-screen.js),
   // ce binding ne fait que router l'appui, comme tout le reste de cette
   // table.
