@@ -208,6 +208,31 @@ export default function checkSave(run) {
     deserializeGame({ version: SAVE_VERSION, data: renameResult.session }).session
   );
   run.same("save renommages : partie à jour -> identique à l'originale", auditSession, deserializeGame(saveEnvelope).session);
+
+  // Un objet posé au sol fige le libellé de l'objet : l'ancienne clé plate
+  // (`item.key_bronze`) devient la feuille `.name`, et la description, déjà
+  // une feuille, ne bouge pas (remplacement de valeur EXACTE seulement).
+  const legacyKey = {
+    id: "legacy-key",
+    type: "item",
+    x: 3,
+    labelKey: "item.key_bronze",
+    descriptionKey: "item.key_bronze.description",
+    action: { kind: "pickup", item: "key_bronze", count: 1 },
+    sounds: {},
+  };
+  const legacyKeyResult = deserializeGame({
+    version: SAVE_VERSION,
+    data: { ...auditSession, worlds: { ...auditSession.worlds, [renameWorldId]: { ...renameWorld, entities: [...renameWorld.entities, legacyKey] } } },
+  });
+  const migratedKey = legacyKeyResult.success
+    ? legacyKeyResult.session.worlds[renameWorldId].entities.find((e) => e.id === "legacy-key")
+    : undefined;
+  run(
+    "save renommages : ancienne clé d'objet -> feuille .name, description intacte",
+    "item.key_bronze.name|item.key_bronze.description",
+    migratedKey && `${migratedKey.labelKey}|${migratedKey.descriptionKey}`
+  );
   run("save types inconnus : sans registre, rien n'est retiré", true, renameResult.session.worlds[renameWorldId].entities.some((e) => e.id === "vanished"));
   const knownTypes = { video_projector: {} };
   for (const world of Object.values(auditSession.worlds)) {

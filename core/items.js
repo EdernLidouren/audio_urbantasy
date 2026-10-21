@@ -49,10 +49,10 @@ export const ITEM_REGISTRY = {
   // Pièce : objet EMPILABLE du sac, distinct de session.money (voir
   // entities/types/coin.js vs money.js).
   coin: { stackable: true, label: "item.coin.name", descriptionKey: "item.coin.description", value: 1 },
-  key_bronze: { stackable: false, label: "item.key_bronze", descriptionKey: "item.key_bronze.description" },
+  key_bronze: { stackable: false, label: "item.key_bronze.name", descriptionKey: "item.key_bronze.description" },
   sneakers: {
     stackable: false,
-    label: "item.sneakers",
+    label: "item.sneakers.name",
     descriptionKey: "item.sneakers.description",
     value: 20,
     equippable: true,
@@ -61,7 +61,7 @@ export const ITEM_REGISTRY = {
   },
   leather_boots: {
     stackable: false,
-    label: "item.leather_boots",
+    label: "item.leather_boots.name",
     descriptionKey: "item.leather_boots.description",
     value: 40,
     equippable: true,
@@ -70,7 +70,7 @@ export const ITEM_REGISTRY = {
   },
   combat_boots: {
     stackable: false,
-    label: "item.combat_boots",
+    label: "item.combat_boots.name",
     descriptionKey: "item.combat_boots.description",
     value: 60,
     equippable: true,
@@ -80,7 +80,7 @@ export const ITEM_REGISTRY = {
   },
   high_heels: {
     stackable: false,
-    label: "item.high_heels",
+    label: "item.high_heels.name",
     descriptionKey: "item.high_heels.description",
     value: 50,
     equippable: true,

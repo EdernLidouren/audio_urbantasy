@@ -58,6 +58,13 @@ export const RENAMED_I18N_KEYS = {
   "door.default_passage.name": "passage.default.name",
   "door.town_hall_passage.description": "passage.town_hall.description",
   "door.clocktower_passage.description": "passage.clock_tower.description",
+  // Objets : nom en feuille `.name` sous le namespace de l'objet, comme sa
+  // description (voir doc/i18n.md) — figé dans un objet posé au sol.
+  "item.combat_boots": "item.combat_boots.name",
+  "item.high_heels": "item.high_heels.name",
+  "item.key_bronze": "item.key_bronze.name",
+  "item.leather_boots": "item.leather_boots.name",
+  "item.sneakers": "item.sneakers.name",
 };
 
 // Chemins de sons (pools, sans suffixe de variante — voir assets/manifest.json),
