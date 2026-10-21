@@ -588,12 +588,12 @@ export default function checkVariables(run) {
         titleKey: "scene.demo.name",
         length: 10,
         playerStart: 0,
-        entities: [{ id: "e1", type: "npc", x: 5, action: { kind: "transit", target: "elsewhere" } }],
+        entities: [{ id: "e1", type: "npc", x: 5, action: { kind: "switchSide", arrivalX: 3 } }],
       },
       VAR_ACTION_REGISTRY
     );
     run("action unique : PAS un tableau (rétrocompat)", false, Array.isArray(retrocompatScene.entities[0].action));
-    run("action unique : kind transporté tel quel", "transit", retrocompatScene.entities[0].action.kind);
+    run("action unique : kind transporté tel quel", "switchSide", retrocompatScene.entities[0].action.kind);
 
     // 6) LA FENÊTRE — cas de test bout en bout (voir entities/types/
     // window.js pour l'archétype réel, dupliqué ici en dur — ce fichier ne

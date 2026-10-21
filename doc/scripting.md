@@ -769,13 +769,18 @@ Un kind de trigger de plus demain (météo, phase...) = une entrée dans
 ## Actions
 
 `entity.action` (optionnel, cascade instance → type) : `{ kind: <string>,
-...paramètres }`. Le CORE (`core/scene.js`) valide seulement la FORME (objet,
-`kind` non vide) — jamais `kind` contre une liste connue : cet aiguillage vit
-ENTIÈREMENT côté vue (`view/interaction.js`/`ACTION_HANDLERS`, même principe que
-`CONDITION_EVALUATORS` mais côté vue). `kind` déclaré mais absent de ce registre →
-`console.warn`, jamais audible ni fatal pour le joueur.
+...paramètres }`, ou un tableau de candidates (voir "Actions multiples filtrées
+par condition"). **Validée au CHARGEMENT** (`core/action-kinds.js`/`ACTION_KINDS`,
+appelé par `core/script-parse.js`/`parseSingleAction`) : `kind` connu du registre,
+champs propres du kind bien formés, AUCUN autre champ que ceux du kind et les
+champs communs (`kind`, `condition`, `effects`, `refusalEffects`) — une faute de
+frappe (`"ammount"`) échoue au chargement. Les MONTANTS d'argent sont des entiers
+STRICTEMENT positifs : une action ne retire jamais d'argent. L'EXÉCUTION d'un kind
+(appel au core, son, annonce) vit côté vue (`view/interaction.js`/
+`ACTION_HANDLERS`), dont les clés sont vérifiées contre le registre au chargement
+du module : un kind ajouté d'un seul côté échoue aussitôt.
 
-**⚠️ À jour avec `view/interaction.js`/`ACTION_HANDLERS`** — kinds existants :
+Kinds existants (liste exhaustive : `ACTION_KINDS`) :
 
 ### `"pickup"` — ramassage, DEUX formes
 
@@ -793,8 +798,8 @@ Vers le sac (`session.bag`, voir `core/bag.js`/`pickupItemEntity`) :
 action: { kind: "pickup", item: "apple", count: 1 },
 ```
 
-Distinguées par la PRÉSENCE de `item` (jamais mélangées sur une même entité).
-`item` doit être une clé de `core/items.js`/`ITEM_REGISTRY`.
+EXACTEMENT une des deux : `item` (clé de `core/items.js`/`ITEM_REGISTRY`, `count`
+entier > 0 facultatif, défaut 1) ou `amount` (entier > 0, sans `count`).
 
 **Son de ramassage** : rôle `sounds.pickup` de l'ARCHÉTYPE de l'objet
 (cascade instance -> archétype, voir `doc/entity-model.md`/"Son de
@@ -821,6 +826,10 @@ action: { kind: "loot", amount: 100 },
   "spawn": { "spec": { "type": "money", "amount": 20 }, "count": 3, "spread": 1.5 }
 }
 ```
+
+`amount` et `spawn` s'excluent. `amount` : entier > 0. `spawn` : `count` entier >
+0, `spread` (facultatif) nombre ≥ 0, `spec.type` présent dans le registre de types
+(vérifié au chargement : une faute ne plante plus à l'éparpillement).
 
 `spec` (minimal, résolu en descripteur COMPLET par le parseur d'entité —
 `core/spawn.js`/`ephemeralArchetypeSpec`) est le vocabulaire de la "spec
@@ -860,8 +869,9 @@ container: { distribution: { table: "default" } },
 action: { kind: "search" },
 ```
 
-Aucun paramètre sur l'action elle-même : ce qui tombe vient de
-`entity.container` (`{ distribution, count?, regenerates? }`, voir
+Aucun paramètre sur l'action elle-même, mais l'entité DOIT avoir un
+`container` (après la cascade instance -> archétype ; sinon, erreur au
+chargement) : ce qui tombe vient de `entity.container` (`{ distribution, count?, regenerates? }`, voir
 `doc/scene-format.md`/"Entité" et `doc/entity-model.md`/"Collecte" pour le
 modèle complet — conteneur garni à chaque cycle quotidien de `count`
 TIRAGES dans une distribution pondérée : `{ table: "<nom>" }` référençant
@@ -909,7 +919,8 @@ régénérant). Il reste occupé, observable (Espace) et audible. Contrairement
 action: { kind: "shop" },
 ```
 
-Aucun paramètre sur l'action : activer l'entité ouvre le MENU D'ACTIONS du
+Aucun paramètre sur l'action, mais l'entité DOIT avoir un `shop` (sinon,
+erreur au chargement) : activer l'entité ouvre le MENU D'ACTIONS du
 point de vente (`view/menus/shop-menu.js`/`openShopMenu` — "Vendre",
 "Acheter"), puis un menu à sliders inline. Tout est VUE (pile d'écrans, jeu
 en pause) ; seules les TRANSACTIONS sont des effets d'état du core
@@ -940,9 +951,8 @@ aucun Howl résiduel), et joue le marqueur sonore de bascule DÉCLARÉ par le
 passage (`transitionSound`, cascade instance -> archétype -> défaut ABSENT
 — voir `doc/entity-model.md`/"Recto/verso", `config/tuning-values.js`) :
 silence côté son de passage si rien n'est déclaré, jamais un son générique
-imposé. `arrivalX` n'est PAS validé en bornes au chargement (comme tout `action.*`,
-transport générique) — clampé à l'exécution par `switchSide`, jamais un
-plantage. Détail complet du modèle à deux faces (persistance, gel de l'autre
+imposé. `arrivalX` est validé au chargement : un nombre dans `[0, length]` de la
+scène. Détail complet du modèle à deux faces (persistance, gel de l'autre
 face) : `doc/scene-format.md`/"Scène à deux faces (recto/verso)".
 
 ### `"applyEffects"` — kind sans substance propre, PORTE SEULEMENT des effets
@@ -967,7 +977,8 @@ par `view/interaction.js`/`interact` pour TOUT kind dont la condition réussit
 lui-même (`view/interaction.js`/`handleApplyEffects` est un NO-OP délibéré) :
 ce kind existe seulement pour donner un `kind` valide à une entité dont
 l'action se résume à ses effets, sans ramassage ni aucun autre comportement
-propre.
+propre. `effects` y est donc OBLIGATOIRE (sans, l'action ne ferait rien :
+erreur au chargement).
 
 **La PORTE n'est PLUS un cas spécial** (ancien kind `"transit"`, ancien champ
 `entity.target` — tous deux disparus) : une porte est une entité `door`
@@ -983,9 +994,14 @@ deux candidates `applyEffects` aux conditions opposées).
 
 ### Ajouter un kind d'action
 
-1. Un cas dans `ACTION_HANDLERS` (`view/interaction.js`) — CÔTÉ VUE uniquement, le
-   core n'a rien à valider de plus que la forme générique déjà en place.
-2. Ajoute une sous-section ICI (forme + exemple réel).
+1. Une entrée dans `ACTION_KINDS` (`core/action-kinds.js`) : ses champs propres
+   (`fields`), leur validation (`validate`), et le champ que l'entité doit porter
+   s'il agit dessus (`requires`, ex. `"container"`).
+2. Un handler du MÊME nom dans `ACTION_HANDLERS` (`view/interaction.js`) : son
+   exécution (appel au core, son, annonce). Oublier l'un des deux échoue au
+   chargement de la vue.
+3. Des vérifications dans `core/checks/actions.check.js`.
+4. Ajoute une sous-section ICI (forme + exemple réel).
 3. Si le nouveau kind doit pouvoir être bloqué par condition, rien à faire de
    spécial : "Conditions d'action" ci-dessous s'applique à TOUT kind sans
    modification.
@@ -1749,7 +1765,7 @@ n'empêche de l'ajouter plus tard (voir `doc/entity-model.md`/"Interaction
 | Types d'effet d'action (ACTIVATION, état + rendu + mixte) | `parseActionEffect` (forme) + `STATE_EFFECT_TYPES`/`RENDER_EFFECT_TYPES`/`MIXED_EFFECT_TYPES` (nature/routage) + `applyActionEffects` (état) + `runEffects` (rendu + mixte) | `core/scene.js`, `core/effects.js`, `core/variables.js`, `view/interaction.js` |
 | Exécution de l'effet "teleport" (rechargement/repositionnement) | `performTransition`/`placePlayer`/`travelToWorld` | `view/city-screen.js`, `core/state.js` |
 | Kinds de trigger (transition d'horloge) | `TRIGGER_KINDS` + `parseTrigger` (forme) + `applyDueTriggers` (détection, état) + `runRenderEffects` (rendu) | `core/triggers.js`, `core/scene.js`, `view/interaction.js` |
-| Kinds d'action | `ACTION_HANDLERS` | `view/interaction.js` |
+| Kinds d'action (forme, validation) + exécution | `ACTION_KINDS` + `ACTION_HANDLERS` | `core/action-kinds.js`, `view/interaction.js` |
 | Kinds de comportement | `BEHAVIORS` | `core/behaviors/index.js` |
 | Tags | `TAG_REGISTRY` | `core/tags.js` |
 | Améliorations (improvements) | `IMPROVEMENT_REGISTRY` | `core/improvements.js` |

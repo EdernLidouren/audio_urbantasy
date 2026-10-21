@@ -169,12 +169,10 @@ export default function checkEntities(run) {
   });
   run("sounds : type invalide (ni objet ni null) rejeté", true, invalidSoundsRejected);
 
-  // action : TRANSPORT générique, cascade instance -> type (comme
-  // behavior/presence) — le core valide la FORME (objet, kind non vide),
-  // jamais le kind lui-même contre un registre (ça reste entièrement côté
-  // vue, voir view/interaction.js/ACTION_HANDLERS) : un kind qu'AUCUN
-  // gestionnaire ne reconnaît encore charge sans erreur, se dégradera
-  // proprement à l'INTERACTION, pas au chargement.
+  // action : cascade instance -> type (comme behavior/presence), kind
+  // validé contre le registre du core (core/action-kinds.js) : un kind
+  // inconnu échoue au chargement, jamais à l'interaction. Les champs propres
+  // à chaque kind : core/checks/actions.check.js.
   const ACTION_REGISTRY = {
     withDefault: { nameKey: "entity.dog.name", interactable: true, action: { kind: "pickup", amount: 5 } },
     plain: { nameKey: "entity.dog.name" },
@@ -189,7 +187,6 @@ export default function checkEntities(run) {
         { id: "e-default", type: "withDefault", x: 5 },
         { id: "e-override", type: "withDefault", x: 6, action: { kind: "pickup", amount: 99 } },
         { id: "e-no-action", type: "plain", x: 7 },
-        { id: "e-unknown-kind", type: "plain", x: 8, action: { kind: "fly-away" } },
       ],
     },
     ACTION_REGISTRY
@@ -204,11 +201,7 @@ export default function checkEntities(run) {
     actionEntity("e-override").action
   );
   run("action : absente si ni l'instance ni le type n'en fournissent", undefined, actionEntity("e-no-action").action);
-  run(
-    "action : un kind INCONNU du registre de vue charge sans erreur (transport pur, voir header)",
-    "fly-away",
-    actionEntity("e-unknown-kind").action.kind
-  );
+  run("action : kind inconnu du registre rejeté au chargement", true, expectInteractionRejected("action", { kind: "fly-away" }));
 
   run("action : non-objet rejeté au chargement", true, expectInteractionRejected("action", "pickup"));
   run("action : kind manquant rejeté au chargement", true, expectInteractionRejected("action", {}));

@@ -338,7 +338,7 @@ export default function checkEphemerals(run) {
     run("scatter : obstacle DORMANT -> jamais compté (isBlocking, comme partout ailleurs)", 5, draw.x);
   }
 
-  const SCATTER_REGISTRY = { dog: { nameKey: "entity.dog.name" } };
+  const SCATTER_REGISTRY = { dog: { nameKey: "entity.dog.name" }, money: { nameKey: "entity.money.name" } };
   const scatterScene = parseScene(
     {
       id: "movement-check-scatter",

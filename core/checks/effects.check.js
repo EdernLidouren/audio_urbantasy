@@ -192,7 +192,13 @@ export default function checkEffects(run) {
                 type: "npc",
                 x: 5,
                 variables: [{ name: "isOpen", type: "flag", initial: false }],
-                action: [{ kind: "applyEffects", condition: { type: "variable", scope: "entity", name: "isOpen", equals: false } }],
+                action: [
+                  {
+                    kind: "applyEffects",
+                    condition: { type: "variable", scope: "entity", name: "isOpen", equals: false },
+                    effects: [{ type: "setVariable", scope: "entity", name: "isOpen", value: true }],
+                  },
+                ],
               },
             ],
           },

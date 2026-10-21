@@ -10,6 +10,7 @@ import { validateDistribution } from "./distribution.js";
 import { validateCatalog } from "./catalog.js";
 import { fail, isNonEmptyString, isFiniteNumber, parseBehavior } from "./parse-common.js";
 import { validateCondition, parsePresenceRule, parseSingleAction, parseTrigger } from "./script-parse.js";
+import { ACTION_KINDS } from "./action-kinds.js";
 
 // Fusion PROFONDE d'une surcharge sur une base — utilisée par `sounds`
 // (voir parseEntity plus bas), SEUL champ cascadé PAR FUSION plutôt que par
@@ -106,15 +107,32 @@ function parseSpeed(speed, archetypeSpeed, at) {
 // Action : un objet unique, ou un TABLEAU de candidates (la vue choisit à
 // l'activation celle dont la condition est vraie, voir doc/scripting.md/
 // "Actions multiples filtrées par condition"). Chaque candidate est validée
-// en FORME (voir parseSingleAction) ; le SENS d'un kind reste à la vue.
-function parseEntityAction(resolvedAction, at, entityVariables, sceneVariables) {
+// (forme commune, kind connu et ses champs, voir parseSingleAction et
+// core/action-kinds.js) ; son EXÉCUTION reste à la vue. `kindContext` :
+// { registry, length }.
+function parseEntityAction(resolvedAction, at, entityVariables, sceneVariables, kindContext) {
   if (Array.isArray(resolvedAction)) {
     if (resolvedAction.length === 0) {
       fail(`${at} : action ne peut pas être un tableau vide.`);
     }
-    return resolvedAction.map((candidate, i) => parseSingleAction(candidate, `${at} : action[${i}]`, entityVariables, sceneVariables));
+    return resolvedAction.map((candidate, i) =>
+      parseSingleAction(candidate, `${at} : action[${i}]`, entityVariables, sceneVariables, kindContext)
+    );
   }
-  return parseSingleAction(resolvedAction, `${at} : action`, entityVariables, sceneVariables);
+  return parseSingleAction(resolvedAction, `${at} : action`, entityVariables, sceneVariables, kindContext);
+}
+
+// Un kind qui agit sur un champ de l'entité (ex. "search" sur `container`)
+// exige ce champ, après la cascade instance -> archétype (voir
+// core/action-kinds.js/ACTION_KINDS, `requires`).
+function checkActionRequirements(entity, at) {
+  const candidates = Array.isArray(entity.action) ? entity.action : [entity.action];
+  for (const action of candidates) {
+    const required = ACTION_KINDS[action.kind].requires;
+    if (required && entity[required] === undefined) {
+      fail(`${at} : action "${action.kind}" sans ${required} sur l'entité.`);
+    }
+  }
 }
 
 // Condition du beacon (voir doc/entity-model.md/"Beacon conditionnel") :
@@ -263,7 +281,7 @@ export function parseEntity(rawEntity, index, registry, length, seenIds, sceneVa
 
   const resolvedAction = action !== undefined ? action : archetype.action;
   if (resolvedAction !== undefined) {
-    entity.action = parseEntityAction(resolvedAction, at, entity.variables, sceneVariables);
+    entity.action = parseEntityAction(resolvedAction, at, entity.variables, sceneVariables, { registry, length });
   }
 
   applyBeaconCondition(resolvedSounds, sounds, at, entity.variables, sceneVariables);
@@ -287,6 +305,8 @@ export function parseEntity(rawEntity, index, registry, length, seenIds, sceneVa
   if (resolvedShop !== undefined) {
     entity.shop = parseShop(resolvedShop, at);
   }
+
+  if (entity.action !== undefined) checkActionRequirements(entity, at);
 
   // Triggers horaires (voir core/triggers.js, doc/scripting.md/"Triggers").
   const resolvedTriggers = triggers !== undefined ? triggers : archetype.triggers;

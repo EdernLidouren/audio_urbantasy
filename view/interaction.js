@@ -16,6 +16,7 @@ import { playDescribedOneShot } from "../lib/audio.js";
 import { resolveAsset } from "../lib/assets.js";
 import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
 import { evaluateCondition, selectMatchingAction } from "../core/presence.js";
+import { ACTION_KINDS } from "../core/action-kinds.js";
 import { resolveDescriptionText } from "./description-resolver.js";
 import { resolveTuning } from "../config/tuning.js";
 
@@ -389,12 +390,11 @@ function resolveDescription(entity) {
   return resolveDescriptionText(key, actionContext(entity));
 }
 
-// Aiguillage par TYPE D'ACTION (entity.action.kind, voir core/scene.js) —
-// même principe que core/presence.js/CONDITION_EVALUATORS : SEUL endroit
-// qui connaît les kinds. Ajouter "talk"/"activate" demain = une entrée de
-// plus ici, jamais une refonte d'interact() ni de ses appelants (le core,
-// lui, ne valide QUE la forme de `action` — voir son commentaire — jamais
-// le kind contre ce registre, qui reste entièrement côté vue).
+// EXÉCUTION par kind d'action. La liste des kinds et la forme de leurs
+// champs vivent dans le core (core/action-kinds.js/ACTION_KINDS), validées
+// au chargement : un handler reçoit donc toujours une action bien formée.
+// Ses clés sont vérifiées contre ce registre au chargement du module (voir
+// ACTION_HANDLERS plus bas).
 
 // "switchSide" (point de passage recto<->verso, voir entities/types/
 // passage.js) : délègue TOUT l'effet
@@ -403,65 +403,40 @@ function resolveDescription(entity) {
 // au gestionnaire enregistré, jamais de son joué ICI (contrairement à
 // handlePickup/handleLoot) : le son de bascule appartient à la SÉQUENCE du
 // sas, dont le timing (juste après le gel, AVANT le croisement de filtres)
-// ce fichier n'a aucune raison de connaître. arrivalX : donnée de CONTENU
-// (action.arrivalX, jamais validée en FORME par core/scene.js — voir son
-// commentaire sur `action`, même politique que amount/spawn ci-dessous) —
-// un contenu mal formé se dégrade en avertissement, jamais un plantage.
-// `entity` (le passage) transmis tel quel au gestionnaire, voir
-// setSideSwitchHandler ci-dessus.
+// ce fichier n'a aucune raison de connaître. `entity` (le passage)
+// transmis tel quel au gestionnaire, voir setSideSwitchHandler ci-dessus.
 function handleSwitchSide(entity, action) {
-  const arrivalX = action.arrivalX;
-  if (!Number.isFinite(arrivalX)) {
-    console.warn(`interact: action "switchSide" sur "${entity.id}" sans arrivalX numérique valide.`);
-    return;
-  }
   if (!sideSwitchHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
-  sideSwitchHandler(arrivalX, entity);
+  sideSwitchHandler(action.arrivalX, entity);
 }
 
 // "pickup" : effet d'ÉTAT délégué au gestionnaire enregistré — PUIS retour
-// sensoriel, vue pure ici (son défensif, annonce brève). DEUX formes
-// possibles pour action.kind:"pickup", jamais mélangées sur une même
-// entité (distinguées par la PRÉSENCE du champ, même principe que
-// handleLoot pour action.spawn/amount) :
+// sensoriel, vue pure ici (son, annonce brève). DEUX formes, distinguées
+// par la PRÉSENCE du champ (voir core/action-kinds.js) :
 //   - action.item : vers le SAC (voir core/bag.js/pickupItemEntity,
 //     doc/entity-model.md/"Sac d'objets") — le nom affiché ("Ramassé :
-//     <objet>") vient de entity.labelKey, déjà résolu par le core (voir
-//     core/scene.js) : ce fichier n'importe jamais le core, donc jamais le
-//     registre d'objets (core/items.js) — c'est au contenu de scène de
-//     donner à l'entité le MÊME nameKey que ITEM_REGISTRY[type].label pour
-//     que le nom ramassé corresponde à celui du sac (convention, jamais
-//     une contrainte structurelle).
-//   - action.amount : vers session.money (comportement d'origine).
+//     <objet>") est entity.labelKey, déjà résolu par le core (un objet au
+//     sol reprend le nom de l'objet, voir core/entity-parse.js/
+//     genericItemDefaults) ;
+//   - action.amount : vers session.money.
 function handlePickup(entity, action) {
-  const item = action.item;
-  if (item !== undefined) {
-    const count = action.count ?? 1;
-    if (typeof item !== "string" || item === "" || !Number.isInteger(count) || count <= 0) {
-      console.warn(`interact: action "pickup" (item) sur "${entity.id}" mal formée.`);
-      return;
-    }
+  if (action.item !== undefined) {
     if (!itemPickupHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
     playEntityPickupSound(entity); // avant le retrait : l'entité a encore sa voix
-    itemPickupHandler(entity, item, count);
+    itemPickupHandler(entity, action.item, action.count ?? 1);
     announce(t("interaction.pickupItem", { item: t(entity.labelKey) }), { assertive: true });
     return;
   }
 
-  const amount = action.amount;
-  if (!Number.isFinite(amount)) {
-    console.warn(`interact: action "pickup" sur "${entity.id}" sans amount numérique valide.`);
-    return;
-  }
   if (!pickupHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
   playEntityPickupSound(entity);
-  pickupHandler(entity, amount);
-  announce(t("interaction.pickup", { amount }), { assertive: true });
+  pickupHandler(entity, action.amount);
+  announce(t("interaction.pickup", { amount: action.amount }), { assertive: true });
 }
 
 // "loot" : COLLECTIBLE PERSISTANT (voir core/money.js/lootEntity,
 // doc/entity-model.md/"Collectible persistant") — même structure que
-// handlePickup ci-dessus (amount validé, son défensif, annonce), mais
+// handlePickup ci-dessus (son, annonce), mais
 // l'entité N'EST JAMAIS retirée : elle change d'état (consumed:true), avec
 // ses effets post-activation DÉCLARATIFS (description alternative —
 // resolveDescription ci-dessus ; devenir dormant — une règle de présence
@@ -489,10 +464,6 @@ function handleLoot(entity, action) {
 
   const spawn = action.spawn;
   if (spawn) {
-    if (!Number.isInteger(spawn.count) || spawn.count <= 0 || !spawn.spec || !spawn.spec.type) {
-      console.warn(`interact: action "loot" (spawn) sur "${entity.id}" mal formée.`);
-      return;
-    }
     if (!lootSpawnHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
     playEntityPickupSound(entity);
     lootSpawnHandler(entity, spawn);
@@ -513,10 +484,6 @@ function handleLoot(entity, action) {
     if (!lootUniqueHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
     playEntityPickupSound(entity);
     lootUniqueHandler(entity);
-    return;
-  }
-  if (!Number.isFinite(amount)) {
-    console.warn(`interact: action "loot" sur "${entity.id}" sans amount numérique valide.`);
     return;
   }
   if (!lootHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
@@ -583,6 +550,16 @@ const ACTION_HANDLERS = {
   search: handleSearch,
   shop: handleShop,
 };
+
+// Un handler par kind du registre du core, ni plus ni moins : un kind
+// ajouté d'un seul côté échoue au chargement, jamais à l'activation.
+{
+  const missing = Object.keys(ACTION_KINDS).filter((kind) => !ACTION_HANDLERS[kind]);
+  const extra = Object.keys(ACTION_HANDLERS).filter((kind) => !ACTION_KINDS[kind]);
+  if (missing.length > 0 || extra.length > 0) {
+    throw new Error(`interaction: ACTION_HANDLERS et core/action-kinds.js divergent (sans handler : ${missing.join(", ") || "-"} ; hors registre : ${extra.join(", ") || "-"}).`);
+  }
+}
 
 // ACTIONS CONDITIONNELLES (voir core/scene.js, action.condition/
 // refusalEffects) — GÉNÉRIQUE à TOUT kind de ACTION_HANDLERS ci-dessus, pas
@@ -730,16 +707,9 @@ export function interact(entity, kind) {
     // réservé à "applyEffects" (voir handleApplyEffects, désormais NO-OP).
     runEffects(entity, resolvedAction.effects);
 
-    const handler = ACTION_HANDLERS[resolvedAction.kind];
-    if (!handler) {
-      // Kind DÉCLARÉ mais inconnu de ce registre : un vrai bug de contenu,
-      // signalé au développeur (console), mais jamais audible/annoncé au
-      // joueur ni fatal — même politique de dégradation que le reste de
-      // l'aiguillage par kind du projet (voir core/presence.js).
-      console.warn(`interact: type d'action "${resolvedAction.kind}" inconnu sur l'entité "${entity.id}".`);
-      return;
-    }
-    handler(entity, resolvedAction);
+    // Kind connu par construction (validé au chargement, voir
+    // core/action-kinds.js et le contrôle sous ACTION_HANDLERS).
+    ACTION_HANDLERS[resolvedAction.kind](entity, resolvedAction);
     return;
   }
 }

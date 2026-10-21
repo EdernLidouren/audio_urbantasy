@@ -1,5 +1,5 @@
 // Vérifications du core — domaine « actions ». Actions conditionnelles
-// (action.condition, actions multiples). Lancées par
+// (action.condition, actions multiples), kinds d'action et leurs champs. Lancées par
 // core/checks/index.js/runChecks (voir ce fichier). Pur : aucun DOM, aucun
 // fetch ; chaque scène est construite en dur via un objet littéral passé à
 // parseScene.
@@ -31,7 +31,7 @@ export default function checkActions(run) {
             type: "dog",
             x: 5,
             action: {
-              kind: "transit",
+              kind: "loot",
               condition: { type: "hasEquipmentTag", tag: "chic" },
               refusalEffects: [{ type: "announce", key: "door.dresscode_refused" }],
             },
@@ -65,7 +65,7 @@ export default function checkActions(run) {
             type: "dog",
             x: 5,
             action: {
-              kind: "transit",
+              kind: "loot",
               condition: { type: "hasEquipmentTag", tag: "does-not-exist" },
               refusalEffects: [{ type: "announce", key: "door.dresscode_refused" }],
             },
@@ -91,7 +91,7 @@ export default function checkActions(run) {
         length: 10,
         playerStart: 0,
         entities: [
-          { id: "conditional-action-no-refusal", type: "dog", x: 5, action: { kind: "transit", condition: { type: "hasEquipmentTag", tag: "chic" } } },
+          { id: "conditional-action-no-refusal", type: "dog", x: 5, action: { kind: "loot", condition: { type: "hasEquipmentTag", tag: "chic" } } },
         ],
       },
       ACTION_CONDITION_REGISTRY
@@ -119,7 +119,7 @@ export default function checkActions(run) {
             id: "conditional-action-empty-refusal",
             type: "dog",
             x: 5,
-            action: { kind: "transit", condition: { type: "hasEquipmentTag", tag: "chic" }, refusalEffects: [] },
+            action: { kind: "loot", condition: { type: "hasEquipmentTag", tag: "chic" }, refusalEffects: [] },
           },
         ],
       },
@@ -142,7 +142,7 @@ export default function checkActions(run) {
             id: "conditional-action-malformed-refusal",
             type: "dog",
             x: 5,
-            action: { kind: "transit", condition: { type: "hasEquipmentTag", tag: "chic" }, refusalEffects: "oops" },
+            action: { kind: "loot", condition: { type: "hasEquipmentTag", tag: "chic" }, refusalEffects: "oops" },
           },
         ],
       },
@@ -159,7 +159,7 @@ export default function checkActions(run) {
       titleKey: "scene.demo.name",
       length: 10,
       playerStart: 0,
-      entities: [{ id: "plain-action", type: "dog", x: 5, action: { kind: "transit" } }],
+      entities: [{ id: "plain-action", type: "dog", x: 5, action: { kind: "loot" } }],
     },
     ACTION_CONDITION_REGISTRY
   );
@@ -167,5 +167,65 @@ export default function checkActions(run) {
     "actions conditionnelles : action SANS condition -> inchangée (rétrocompat)",
     undefined,
     unconditionalActionScene.entities[0].action.condition
+  );
+
+  // --- Kinds d'action et leurs champs (core/action-kinds.js), validés au
+  // chargement ---
+  const KIND_REGISTRY = {
+    dog: { nameKey: "entity.dog.name" },
+    money: { nameKey: "entity.money.name" },
+    bush: { nameKey: "entity.bush.name", container: { distribution: { items: { apple: 1 } } } },
+    counter: { nameKey: "entity.shop_counter.name", shop: { catalog: { items: { apple: { stock: 1 } } } } },
+  };
+  const kindThrows = (action, type = "dog") =>
+    throws(() =>
+      parseScene(
+        { id: "movement-check-action-kind", titleKey: "scene.demo.name", length: 10, playerStart: 0, entities: [{ id: "a", type, x: 5, action }] },
+        KIND_REGISTRY
+      )
+    );
+
+  run(
+    "kinds : formes valides -> acceptées",
+    "false,false,false,false,false,false,false,false,false",
+    [
+      [{ kind: "pickup", item: "apple" }],
+      [{ kind: "pickup", item: "apple", count: 3 }],
+      [{ kind: "pickup", amount: 5 }],
+      [{ kind: "loot", amount: 100 }],
+      [{ kind: "loot", spawn: { spec: { type: "money", amount: 20 }, count: 3, spread: 1.5 } }],
+      [{ kind: "loot", effects: [{ type: "announce", key: "entity.dog.name" }] }],
+      [{ kind: "switchSide", arrivalX: 10 }],
+      [{ kind: "search" }, "bush"],
+      [{ kind: "shop" }, "counter"],
+    ]
+      .map(([action, type]) => kindThrows(action, type))
+      .join(",")
+  );
+  run("kinds : champ inconnu (faute de frappe) -> rejeté", true, kindThrows({ kind: "pickup", ammount: 5 }));
+  run("pickup : ni item ni amount -> rejeté", true, kindThrows({ kind: "pickup" }));
+  run("pickup : item ET amount -> rejeté", true, kindThrows({ kind: "pickup", item: "apple", amount: 5 }));
+  run("pickup : objet inconnu -> rejeté", true, kindThrows({ kind: "pickup", item: "unicorn" }));
+  run("pickup : count non entier ou nul -> rejeté", "true,true", [1.5, 0].map((count) => kindThrows({ kind: "pickup", item: "apple", count })).join(","));
+  run("pickup : count sur un ramassage d'argent -> rejeté", true, kindThrows({ kind: "pickup", amount: 5, count: 2 }));
+  run(
+    "argent : montant négatif, nul, décimal ou en chaîne -> rejeté",
+    "true,true,true,true",
+    [-5, 0, 2.5, "5"].map((amount) => kindThrows({ kind: "pickup", amount })).join(",")
+  );
+  run("loot : montant négatif -> rejeté", true, kindThrows({ kind: "loot", amount: -100 }));
+  run("loot : amount ET spawn -> rejeté", true, kindThrows({ kind: "loot", amount: 5, spawn: { spec: { type: "money" }, count: 1 } }));
+  run("loot : spawn.count absent -> rejeté", true, kindThrows({ kind: "loot", spawn: { spec: { type: "money" } } }));
+  run("loot : spawn.spec.type hors registre -> rejeté", true, kindThrows({ kind: "loot", spawn: { spec: { type: "monye" }, count: 2 } }));
+  run("loot : spawn.spread négatif -> rejeté", true, kindThrows({ kind: "loot", spawn: { spec: { type: "money" }, count: 2, spread: -1 } }));
+  run("loot : spawn.spec.amount négatif -> rejeté", true, kindThrows({ kind: "loot", spawn: { spec: { type: "money", amount: -20 }, count: 2 } }));
+  run("switchSide : arrivalX absent ou hors scène -> rejeté", "true,true", [undefined, 11].map((arrivalX) => kindThrows({ kind: "switchSide", arrivalX })).join(","));
+  run("applyEffects : sans effects -> rejeté", true, kindThrows({ kind: "applyEffects" }));
+  run("search : entité sans container -> rejeté", true, kindThrows({ kind: "search" }));
+  run("shop : entité sans shop -> rejeté", true, kindThrows({ kind: "shop" }));
+  run(
+    "kinds : chaque candidate d'un tableau est validée",
+    true,
+    kindThrows([{ kind: "applyEffects", effects: [{ type: "announce", key: "entity.dog.name" }] }, { kind: "pickup" }])
   );
 }

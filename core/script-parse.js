@@ -11,6 +11,7 @@ import { WEATHER_STATES } from "../config/weather-values.js";
 import { VARIABLE_SCOPES, VARIABLE_TYPES, isValidValueForType } from "./variables.js";
 import { ACTION_EFFECT_TYPES, MIXED_EFFECT_TYPES } from "./effects.js";
 import { TRIGGER_KINDS } from "./triggers.js";
+import { validateActionKind } from "./action-kinds.js";
 import { TIME_CONFIG } from "../config/time-values.js";
 import { fail, isNonEmptyString, isFiniteNumber, parseBehavior } from "./parse-common.js";
 
@@ -517,13 +518,16 @@ export function parsePresenceRule(rawRule, ruleIndex, index, id, entityVariables
 // ne veut QU'annoncer son refus déclare `[{ type: "announce", ... }]`, sans
 // playSound — c'est un choix de CONTENU, jamais une valeur par défaut du
 // système.
-export function parseSingleAction(rawAction, describe, entityVariables, sceneVariables) {
+// `kindContext` : { registry, length } de l'entité porteuse, pour la
+// validation propre au kind (voir core/action-kinds.js).
+export function parseSingleAction(rawAction, describe, entityVariables, sceneVariables, kindContext) {
   if (typeof rawAction !== "object" || rawAction === null || Array.isArray(rawAction)) {
     fail(`${describe} doit être un objet.`);
   }
   if (!isNonEmptyString(rawAction.kind)) {
     fail(`${describe}.kind doit être une chaîne non vide.`);
   }
+  validateActionKind(rawAction, describe, kindContext, fail);
   if (rawAction.condition !== undefined) {
     validateCondition(rawAction.condition, `${describe}.condition`, entityVariables, sceneVariables);
   }
