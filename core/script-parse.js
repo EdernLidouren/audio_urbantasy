@@ -8,7 +8,7 @@ import { CONDITION_TYPES } from "./presence.js";
 import { TAG_REGISTRY } from "./tags.js";
 import { IMPROVEMENT_REGISTRY } from "./improvements.js";
 import { WEATHER_STATES } from "../config/weather-values.js";
-import { VARIABLE_SCOPES, isValidValueForType } from "./variables.js";
+import { VARIABLE_SCOPES, VARIABLE_TYPES, isValidValueForType } from "./variables.js";
 import { ACTION_EFFECT_TYPES, MIXED_EFFECT_TYPES } from "./effects.js";
 import { TRIGGER_KINDS } from "./triggers.js";
 import { TIME_CONFIG } from "../config/time-values.js";
@@ -167,8 +167,8 @@ function parseActionEffect(rawEffect, describe, entityVariables, sceneVariables)
   if (type === "setVariable") {
     validateVariableReference(scope, name, entityVariables, sceneVariables, describe);
     const knownType = resolveKnownVariableType(scope, name, entityVariables, sceneVariables);
-    if (knownType && !isValidValueForType(knownType, rawEffect.value)) {
-      fail(`${describe}.value incohérent avec le type "${knownType}" (reçu : ${JSON.stringify(rawEffect.value)}).`);
+    if (!isValidVariableValue(knownType, rawEffect.value)) {
+      fail(`${describe}.value invalide pour ${describeVariableType(knownType)} (reçu : ${JSON.stringify(rawEffect.value)}).`);
     }
     return { type: "setVariable", scope, name, value: rawEffect.value };
   }
@@ -326,6 +326,19 @@ export function parseTrigger(rawTrigger, describe, entityVariables, sceneVariabl
 // réservés aux int (voir la vérification de cohérence plus bas).
 const VARIABLE_COMPARATORS = ["equals", "greaterThan", "lessThan", "greaterOrEqual", "lessOrEqual"];
 
+// Valeur d'une variable, ou d'un comparateur, contre son type. Type inconnu
+// au chargement (portée "party", voir validateVariableReference) : on ne
+// peut pas la comparer à SON type, mais elle doit au moins être une valeur
+// possible d'une variable (jamais absente, jamais une chaîne).
+function isValidVariableValue(knownType, value) {
+  if (knownType) return isValidValueForType(knownType, value);
+  return VARIABLE_TYPES.some((type) => isValidValueForType(type, value));
+}
+
+function describeVariableType(knownType) {
+  return knownType ? `le type "${knownType}"` : `une variable (${VARIABLE_TYPES.join(" | ")})`;
+}
+
 // Valide un objet CONDITION ({ type, ... }) — RÉUTILISÉ par presence[].when
 // (voir parsePresenceRule) ET action.condition (voir parseEntity, actions
 // CONDITIONNELLES) : MÊME forme déclarative, MÊME registre (CONDITION_TYPES),
@@ -372,6 +385,25 @@ export function validateCondition(cond, describe, entityVariables, sceneVariable
   if (cond.type === "weather" && (!isNonEmptyString(cond.state) || !WEATHER_STATES[cond.state])) {
     fail(`${describe}.state "${cond.state}" absent de la table météo.`);
   }
+  // "timeRange" : bornes en heures (fractionnaires) dans [0, hoursPerDay] —
+  // la borne haute est permise (0..24 couvre toute la journée) ; from ===
+  // to serait une fenêtre vide, jamais vraie. `spread` (minutes) optionnel,
+  // >= 0. Une faute (ex. "20" en chaîne) rendrait sinon la règle toujours
+  // fausse sans que rien ne le signale (core/presence.js/evaluateTimeRange).
+  if (cond.type === "timeRange") {
+    for (const bound of ["from", "to"]) {
+      const hour = cond[bound];
+      if (!isFiniteNumber(hour) || hour < 0 || hour > TIME_CONFIG.hoursPerDay) {
+        fail(`${describe}.${bound} doit être une heure entre 0 et ${TIME_CONFIG.hoursPerDay} (reçu : ${JSON.stringify(hour)}).`);
+      }
+    }
+    if (cond.from === cond.to) {
+      fail(`${describe} : from et to égaux (${cond.from}), la plage serait vide.`);
+    }
+    if (cond.spread !== undefined && (!isFiniteNumber(cond.spread) || cond.spread < 0)) {
+      fail(`${describe}.spread doit être un nombre de minutes >= 0 si présent (reçu : ${JSON.stringify(cond.spread)}).`);
+    }
+  }
   // "allOf" : composite — son champ `conditions` doit être un tableau NON
   // VIDE, chaque élément revalidé RÉCURSIVEMENT par cette même fonction
   // (une sous-condition peut être de n'importe quel type du registre, y
@@ -411,13 +443,13 @@ export function validateCondition(cond, describe, entityVariables, sceneVariable
     }
     const comparator = usedComparators[0];
     const knownType = resolveKnownVariableType(cond.scope, cond.name, entityVariables, sceneVariables);
-    if (knownType) {
-      if (comparator !== "equals" && knownType !== "int") {
-        fail(`${describe} : comparateur "${comparator}" invalide sur une variable "flag" (seul "equals" est permis).`);
-      }
-      if (!isValidValueForType(knownType, cond[comparator])) {
-        fail(`${describe}.${comparator} incohérent avec le type "${knownType}" (reçu : ${JSON.stringify(cond[comparator])}).`);
-      }
+    if (knownType && comparator !== "equals" && knownType !== "int") {
+      fail(`${describe} : comparateur "${comparator}" invalide sur une variable "flag" (seul "equals" est permis).`);
+    }
+    // Comparateur d'ordre : toujours un entier, type connu ou non.
+    const expectedType = comparator === "equals" ? knownType : "int";
+    if (!isValidVariableValue(expectedType, cond[comparator])) {
+      fail(`${describe}.${comparator} invalide pour ${describeVariableType(expectedType)} (reçu : ${JSON.stringify(cond[comparator])}).`);
     }
   }
 }

@@ -67,7 +67,7 @@ import { MAX_COMPANIONS } from "../config/companions.js";
 import { MAX_EPHEMERALS } from "../config/ephemerals.js";
 import { createSeed, nextRandom } from "./rng.js";
 import { clamp } from "./physics/movement.js";
-import { isBlocking } from "./presence.js";
+import { isBlocking, presenceContextOf } from "./presence.js";
 import { INITIAL_TIME } from "./time.js";
 import { createInitialWeather } from "./weather.js";
 import { parseVariables, applyActionEffects } from "./variables.js";
@@ -545,11 +545,10 @@ function isPositionBlocked(x, entities, presenceContext) {
 // entities/types/crate.js). Un tirage consommé PAR TENTATIVE, jamais plus :
 // le rngState renvoyé reflète exactement le nombre de tirages réellement
 // faits, pour que l'appelant l'enchaîne sans rien perdre ni dupliquer.
-// EXPORTÉE (bien qu'interne à spawnScatteredEphemerals en usage normal)
-// SEULEMENT pour permettre à core/checks/ephemerals.check.js de vérifier
-// directement, sans dépendre du hasard d'un tirage complet, que les BORNES
-// (carte + obstacles) sont RÉELLEMENT respectées — jamais appelée hors
-// core/state.js et core/checks/ephemerals.check.js.
+// Exportée : réutilisée par core/spawn.js (placement des plages), et
+// vérifiée directement par core/checks/ephemerals.check.js, sans dépendre
+// du hasard d'un tirage complet. `presenceContext` : voir
+// core/presence.js/presenceContextOf.
 export function drawScatteredPosition(sourceX, spread, length, entities, presenceContext, rngState) {
   let state = rngState;
   for (let attempt = 0; attempt < SCATTER_MAX_ATTEMPTS; attempt++) {
@@ -586,7 +585,7 @@ export function drawScatteredPosition(sourceX, spread, length, entities, presenc
 // déterministe (même seed + même SUITE d'actions, ticks ET interactions
 // confondus, -> même état, toujours).
 export function spawnScatteredEphemerals(session, spec, sourceX, count, spread = TUNING_DEFAULTS.ephemeralScatterSpread) {
-  const presenceContext = { time: session.time };
+  const presenceContext = presenceContextOf(session);
   const side = session.player.side;
   let rngState = resolveFace(session.worlds[session.activeWorldId], side).rngState;
   let nextSession = session;

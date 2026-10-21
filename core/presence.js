@@ -90,7 +90,8 @@ function wrapHour(hour) {
 // même convention demi-ouverte que core/time.js/phaseAt. from === to, ou
 // l'un des deux non fini -> jamais vraie (intervalle vide/malformé), plutôt
 // qu'une ambiguïté "toujours" ou "jamais" non documentée ou un throw pour
-// une donnée de contenu déjà validée en forme par core/scene.js.
+// une donnée de contenu déjà validée en forme au chargement
+// (core/script-parse.js/validateCondition).
 //
 // VARIATION DE SEUIL PAR INSTANCE (cond.spread, en MINUTES, optionnel) —
 // voir core/scripting.md/"spread" : désynchronise des entités qui partagent

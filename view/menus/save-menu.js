@@ -22,7 +22,7 @@ import { applyVolumePreferences } from "../audio/city-scene.js";
 import { exportGame, importGame, playSaveSound, hasSave } from "../save-storage.js";
 import { canChooseSaveLocation } from "../../lib/download.js";
 import { getActiveWorld } from "../../core/state.js";
-import { reportDroppedEntities, reportDroppedItems } from "../debug-warnings.js";
+import { reportSaveRepairs } from "../debug-warnings.js";
 import { openDebugWarningsIfUnseen } from "./debug-warnings-menu.js";
 
 const AUTOSAVE_TRANSITION = PREF_CONSTRAINTS.autoSaveOnTransition;
@@ -51,10 +51,9 @@ export function setGameStartHandler(handler) {
 }
 
 // Adopte une partie importée : en jeu, elle REMPLACE la partie en cours ;
-// hors partie, elle DÉMARRE. Puis son, annonce, signalement des entités et
-// objets retirés à la relecture (journal ouvert en debug s'il y a du
-// nouveau).
-function applyImportedGame(importedSession, droppedEntities, droppedItems) {
+// hors partie, elle DÉMARRE. Puis son, annonce, signalement de ce que la
+// relecture a réparé (journal ouvert en debug s'il y a du nouveau).
+function applyImportedGame(importedSession, repairs) {
   if (gameReplaceHandler) {
     gameReplaceHandler(importedSession);
     announce(t("save.imported"), { assertive: true });
@@ -68,8 +67,7 @@ function applyImportedGame(importedSession, droppedEntities, droppedItems) {
     return;
   }
   playSaveSound();
-  reportDroppedEntities(droppedEntities);
-  reportDroppedItems(droppedItems);
+  reportSaveRepairs(repairs);
   openDebugWarningsIfUnseen();
 }
 
@@ -119,7 +117,7 @@ let gameFileInput = null;
 // pas de doublon de traduction pour le même mot.
 // `title` : ce qui sera remplacé — la partie en cours, ou (hors partie) la
 // sauvegarde locale.
-function openImportConfirmation(importedSession, droppedEntities, droppedItems, title) {
+function openImportConfirmation(importedSession, repairs, title) {
   const menu = {
     title,
     closable: true, // Échap = annuler
@@ -132,7 +130,7 @@ function openImportConfirmation(importedSession, droppedEntities, droppedItems, 
         label: "menu.options.reset_all_confirm",
         onActivate: () => {
           popScreen();
-          applyImportedGame(importedSession, droppedEntities, droppedItems);
+          applyImportedGame(importedSession, repairs);
         },
       },
     ],
@@ -169,11 +167,11 @@ function ensureGameFileInput() {
     // confirmation seulement si une sauvegarde locale existe (elle sera
     // remplacée à la prochaine sauvegarde) ; sinon, démarrage direct.
     if (gameReplaceHandler) {
-      openImportConfirmation(result.session, result.droppedEntities, result.droppedItems, "save.import_confirm_title");
+      openImportConfirmation(result.session, result.repairs, "save.import_confirm_title");
     } else if (hasSave()) {
-      openImportConfirmation(result.session, result.droppedEntities, result.droppedItems, "save.import_confirm_title_saved");
+      openImportConfirmation(result.session, result.repairs, "save.import_confirm_title_saved");
     } else {
-      applyImportedGame(result.session, result.droppedEntities, result.droppedItems);
+      applyImportedGame(result.session, result.repairs);
     }
   });
 

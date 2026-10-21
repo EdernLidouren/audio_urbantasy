@@ -73,14 +73,17 @@ export function validateCatalog(catalog, describe, fail) {
   }
   if (table !== undefined) {
     if (typeof table !== "string" || !SHOP_CATALOGS[table]) {
-      fail(`${describe} : catalogue "${JSON.stringify(table)}" absent de SHOP_CATALOGS.`);
+      fail(`${describe} : catalogue ${JSON.stringify(table)} absent de SHOP_CATALOGS.`);
     }
     return;
   }
   validateCatalogTable(items, `${describe}.items`, fail);
 }
 
+// Articles d'un catalogue. `null` (neutralisé à la relecture d'une
+// sauvegarde, voir core/save.js/repairContentReferences) : aucun article.
 export function resolveCatalog(catalog) {
+  if (catalog === null) return {};
   return catalog.table !== undefined ? SHOP_CATALOGS[catalog.table] : catalog.items;
 }
 

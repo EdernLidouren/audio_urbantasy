@@ -54,6 +54,7 @@ import { drawItem } from "./distribution.js";
 import { restockShopEntity } from "./catalog.js";
 import { isTwoSided, resolveFace, withFace, drawScatteredPosition, spawnScatteredEphemerals } from "./state.js";
 import { parseSpawnedEntity } from "./entity-parse.js";
+import { presenceContextOf } from "./presence.js";
 
 const MINUTES_PER_DAY = TIME_CONFIG.minutesPerHour * TIME_CONFIG.hoursPerDay;
 
@@ -117,8 +118,10 @@ function faceHasSources(face) {
 // Tire `count` objets dans une distribution, en enchaînant le PRNG. Les
 // tirages "rien" (item null) sont écartés : `items` peut compter moins de
 // `count` objets, voire aucun — `count` tirages sont consommés quoi qu'il
-// arrive.
+// arrive. Distribution `null` (neutralisée à la relecture d'une
+// sauvegarde, voir core/save.js/repairContentReferences) : rien.
 function drawItems(distribution, count, rngState) {
+  if (distribution === null) return { items: [], rngState };
   const items = [];
   let state = rngState;
   for (let i = 0; i < count; i++) {
@@ -220,6 +223,8 @@ function refillFace(face, world, cycle, registry, companions, presenceContext) {
   }
 
   (face.spawnRanges ?? []).forEach((range, rangeIndex) => {
+    // Distribution neutralisée (voir drawItems) : la plage ne pose rien.
+    if (range.distribution === null) return;
     const count = range.count ?? SPAWN_RANGE_DEFAULT_COUNT;
     const placed = [];
     for (let i = 0; i < count; i++) {
@@ -256,7 +261,7 @@ export function refillDueSpawns(session, registry) {
   const faces = isTwoSided(world) ? ["recto", "verso"] : [null];
   if (!faces.some((side) => faceHasSources(resolveFace(world, side)))) return session;
 
-  const presenceContext = { time: session.time };
+  const presenceContext = presenceContextOf(session);
   let nextWorld = world;
   for (const side of faces) {
     const face = resolveFace(world, side);

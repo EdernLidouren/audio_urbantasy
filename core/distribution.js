@@ -167,7 +167,7 @@ function validateSingleTable(source, describe, fail, extraKeys = []) {
   }
   if (table !== undefined) {
     if (typeof table !== "string" || !SPAWN_TABLES[table]) {
-      fail(`${describe} : table "${JSON.stringify(table)}" absente de SPAWN_TABLES.`);
+      fail(`${describe} : table ${JSON.stringify(table)} absente de SPAWN_TABLES.`);
     }
     return;
   }

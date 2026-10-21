@@ -24,7 +24,7 @@ import { getPref, setPref } from "./config/preferences.js";
 import { configureAssetManifest } from "./lib/assets.js";
 import { checkAutoSaveTimer } from "./view/autosave-timer.js";
 import { loadGame } from "./view/save-storage.js";
-import { reportDroppedEntities, reportDroppedItems } from "./view/debug-warnings.js";
+import { reportSaveRepairs } from "./view/debug-warnings.js";
 import { announceNewDiscoveries } from "./view/collection-discoveries.js";
 
 // Préférences de menu (sliders/toggles + cyclage/étoile/suffixe, voir
@@ -98,7 +98,8 @@ gameZone.focus();
 // Scène chargée en tâche de fond ; startNewGame() la lit au moment de
 // l'activation (cas limite improbable : scène pas encore chargée -> no-op).
 // "Continuer" n'en a pas besoin : une partie sauvegardée embarque déjà l'état
-// complet de ses mondes (voir loadGame/core/save.js), aucun fetch requis.
+// complet de ses mondes (voir view/save-storage.js/loadGame), aucun fetch
+// requis.
 let scene = null;
 
 // Session de la partie en cours (sortie de createInitialState). null hors
@@ -122,7 +123,7 @@ function setSession(next) {
 // chaque (ré)affichage du menu principal (mainMenuScreen.onEnter ci-dessous).
 // Sert à la fois à décider si "Continuer" apparaît ET à fournir la session
 // à continueGame() sans recharger une seconde fois. Forme : { session,
-// droppedEntities } (voir view/save-storage.js/loadGame), ou null.
+// repairs } (voir view/save-storage.js/loadGame), ou null.
 let loadableSave = null;
 
 // "Nouvelle partie" (confirmée au préalable si un save existe, voir
@@ -164,9 +165,8 @@ function continueGame() {
   if (!loadableSave) return; // garde-fou, ne devrait pas arriver
   session = loadableSave.session;
   // La sauvegarde devient la partie : c'est ici, et pas à la lecture, que
-  // ses entités retirées sont signalées (voir view/debug-warnings.js).
-  reportDroppedEntities(loadableSave.droppedEntities);
-  reportDroppedItems(loadableSave.droppedItems);
+  // ses réparations sont signalées (voir view/debug-warnings.js).
+  reportSaveRepairs(loadableSave.repairs);
   pushScreen(makeCityScreen(getSession, setSession));
 }
 

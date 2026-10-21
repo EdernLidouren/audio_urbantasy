@@ -479,6 +479,33 @@ export default function checkVariables(run) {
       false,
       throws(() => parseScene(sceneWithCondition({ type: "variable", scope: "party", name: "totallyMadeUp", equals: true }), VAR_ACTION_REGISTRY))
     );
+    // Portée "party" : type inconnu au chargement, mais la valeur doit au
+    // moins être une valeur possible d'une variable.
+    run(
+      "variable (party) : equals sur une chaîne -> erreur au chargement",
+      true,
+      throws(() => parseScene(sceneWithCondition({ type: "variable", scope: "party", name: "anything", equals: "yes" }), VAR_ACTION_REGISTRY))
+    );
+    run(
+      "variable (party) : comparateur d'ordre sur un booléen -> erreur au chargement",
+      true,
+      throws(() => parseScene(sceneWithCondition({ type: "variable", scope: "party", name: "anything", greaterThan: true }), VAR_ACTION_REGISTRY))
+    );
+    run(
+      "setVariable (party) : sans value -> erreur au chargement",
+      true,
+      throws(() => parseScene(sceneWithActionEffect({ type: "setVariable", scope: "party", name: "anything" }), VAR_ACTION_REGISTRY))
+    );
+    run(
+      "setVariable (party) : value chaîne -> erreur au chargement",
+      true,
+      throws(() => parseScene(sceneWithActionEffect({ type: "setVariable", scope: "party", name: "anything", value: "on" }), VAR_ACTION_REGISTRY))
+    );
+    run(
+      "setVariable (party) : value booléenne ou entière -> acceptée",
+      "false,false",
+      [true, 3].map((value) => throws(() => parseScene(sceneWithActionEffect({ type: "setVariable", scope: "party", name: "anything", value }), VAR_ACTION_REGISTRY))).join(",")
+    );
     run(
       "variable : aucun comparateur -> erreur au chargement",
       true,

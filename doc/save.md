@@ -68,6 +68,24 @@ la partie (voir `doc/entity-model.md`/"Mode debug").
    lecture : console, et journal des avertissements, ouvert de lui-même en
    mode debug (voir `doc/entity-model.md`/"Mode debug").
 
+**Références de contenu cassées** (toujours, ces tables étant du code ou de
+la donnée du core — `core/save.js`/`repairContentReferences`) : une partie
+garde aussi, telles qu'à la première visite, les distributions de collecte
+(conteneurs, plages), les stocks déjà tirés, les catalogues des points de
+vente, et l'état météo. Elles sont revalidées avec les MÊMES validateurs que
+le chargement d'une scène ; une référence cassée (table, catalogue, objet ou
+état retiré ou renommé depuis) est neutralisée plutôt que de faire planter
+la partie :
+- distribution invalide -> `distribution: null`, la source ne donne plus
+  rien (le conteneur reste fouillable, il est vide) ;
+- objet inconnu dans un stock tiré -> retiré du stock ;
+- catalogue invalide -> `catalog: null`, le rayon est vide (« Acheter » est
+  refusé comme pour un point de vente sans catalogue) ;
+- état météo inconnu -> état par défaut, même rendez-vous de transition.
+Chaque neutralisation est listée dans `brokenReferences` (`{ worldId,
+source, problem }`, `worldId` null pour la météo) et signalée au même moment
+que les entités retirées.
+
 **Objets inconnus** (toujours, le registre d'objets étant du code du core) :
 un objet du sac ou de l'équipement absent de `core/items.js`/`ITEM_REGISTRY`
 (supprimé, ou renommé : les ids d'objets n'ont pas de table de renommage)
@@ -111,9 +129,10 @@ existantes au chargement (étape 5).
 
 **Non couvert aujourd'hui** : les ids d'objets du sac et de l'équipement
 (`core/items.js` — un objet renommé est RETIRÉ des sauvegardes, voir plus
-haut) et les ids de scènes (clés de `session.worlds`, cibles de
-`teleport`). Les renommer casserait les sauvegardes existantes ; une table
+haut), les noms de tables de collecte, de catalogues et d'états météo
+(neutralisés, voir plus haut) et les ids de scènes (clés de
+`session.worlds`, cibles de `teleport`). Les renommer casserait les sauvegardes existantes ; une table
 dédiée s'ajoutera le jour où le cas se présente.
 
 Vérifications : `core/checks/save.check.js` (`runChecks("save")`), sections
-« save renommages » et « save types inconnus ».
+« save renommages », « save références » et « save types inconnus ».

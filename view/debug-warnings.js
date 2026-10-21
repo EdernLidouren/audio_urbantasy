@@ -22,7 +22,7 @@ function reportWarning(key, params, ...consoleDetail) {
 // devient la partie en cours ("Continuer", import confirmé), jamais à la
 // simple lecture : le menu principal relit la sauvegarde à chaque
 // affichage, ce qui empilerait les mêmes avertissements.
-export function reportDroppedEntities(droppedEntities) {
+function reportDroppedEntities(droppedEntities) {
   for (const { worldId, entityId, type } of droppedEntities) {
     const key = worldId === null ? "debug.warnings.droppedCompanion" : "debug.warnings.droppedEntity";
     reportWarning(
@@ -71,9 +71,34 @@ export function reportCollectionTextMissing(key) {
 // Objets retirés du sac ou de l'équipement d'une sauvegarde adoptée, type
 // absent du registre d'objets (voir core/save.js/dropUnknownItems). Même
 // moment de signalement que reportDroppedEntities.
-export function reportDroppedItems(droppedItems) {
+function reportDroppedItems(droppedItems) {
   for (const { where, type } of droppedItems) {
     const key = where === "bag" ? "debug.warnings.droppedBagItem" : "debug.warnings.droppedEquippedItem";
     reportWarning(key, { type, slot: where }, "Sauvegarde : objet retiré, type inconnu :", { where, type });
   }
+}
+
+// Références de contenu neutralisées dans une sauvegarde adoptée
+// (distribution, stock, catalogue, état météo — voir
+// core/save.js/repairContentReferences). Même moment de signalement que
+// reportDroppedEntities.
+function reportBrokenReferences(brokenReferences) {
+  for (const { worldId, source, problem } of brokenReferences) {
+    const key = worldId === null ? "debug.warnings.brokenSessionReference" : "debug.warnings.brokenWorldReference";
+    // Point final retiré : le menu en ajoute un après chaque entrée.
+    reportWarning(key, { worldId, source, problem: problem.replace(/\.\s*$/, "") }, "Sauvegarde : référence neutralisée :", {
+      worldId,
+      source,
+      problem,
+    });
+  }
+}
+
+// Tout ce que la relecture d'une sauvegarde a réparé (voir
+// view/save-storage.js/loadGame, importGame), signalé quand elle devient la
+// partie en cours.
+export function reportSaveRepairs({ droppedEntities, droppedItems, brokenReferences }) {
+  reportDroppedEntities(droppedEntities);
+  reportDroppedItems(droppedItems);
+  reportBrokenReferences(brokenReferences);
 }

@@ -1,4 +1,6 @@
 {
+  "debug.warnings.brokenSessionReference": "Sauvegarde, {source} : {problem}",
+  "debug.warnings.brokenWorldReference": "Sauvegarde, scène {worldId}, {source} : {problem}",
   "debug.warnings.clear": "Vider le journal",
   "debug.warnings.cleared": "Journal vidé.",
   "debug.warnings.collectionTextMissing": "Collection : texte manquant {key}",

@@ -8,8 +8,8 @@
 // désenvelopper et de vérifier sa structure minimale au désenveloppement —
 // jamais de confiance aveugle dans une donnée qui vient du disque.
 //
-// EN CLAIR pour l'instant (aucun encodage/compression) : volontaire, voir
-// view/save-storage.js. L'obscurcissement viendra dans un prompt séparé.
+// La forme est EN CLAIR ici ; l'obscurcissement sur disque est l'affaire
+// de view/save-storage.js (voir lib/obfuscate.js).
 
 import { DEFAULT_SURFACE } from "./surfaces.js";
 import { INITIAL_TIME } from "./time.js";
@@ -17,6 +17,9 @@ import { createEmptyEquipment } from "./equipment.js";
 import { stripEphemeralsFromWorld, isTwoSided } from "./state.js";
 import { createInitialWeather } from "./weather.js";
 import { ITEM_REGISTRY } from "./items.js";
+import { validateDistribution } from "./distribution.js";
+import { validateCatalog } from "./catalog.js";
+import { WEATHER_STATES, DEFAULT_WEATHER_STATE } from "../config/weather-values.js";
 import { RENAMED_ENTITY_TYPES, RENAMED_I18N_KEYS, RENAMED_ASSET_PATHS } from "../config/save-renames.js";
 
 export const SAVE_VERSION = 1;
@@ -163,6 +166,116 @@ function dropUnknownItems(data) {
     if (equipmentChanged) result = { ...result, equipment };
   }
   return { data: result, dropped };
+}
+
+// --- Références de contenu figées (doc/save.md) -------------------------
+//
+// Une sauvegarde garde, telles qu'à la première visite, les distributions
+// de collecte (conteneurs, plages), les stocks tirés, les catalogues des
+// points de vente, et l'état météo. Une table, un catalogue, un objet ou un
+// état météo retiré ou renommé depuis ferait planter le garnissage, la
+// boutique ou la météo. Ces références sont revalidées avec les MÊMES
+// validateurs que le chargement d'une scène ; une référence cassée est
+// NEUTRALISÉE et listée pour que l'appelant avertisse : on perd la
+// référence, jamais la partie.
+//   - distribution invalide -> `distribution: null`, la source ne donne plus
+//     rien (core/spawn.js) ;
+//   - objet inconnu dans un stock tiré -> retiré du stock ;
+//   - catalogue invalide -> `catalog: null`, rayon vide (core/catalog.js) ;
+//   - état météo inconnu -> état par défaut, même rendez-vous.
+
+// Message d'erreur d'un validateur de contenu (qui lève via `fail`), ou
+// null si la valeur est valide.
+function validationProblem(validate, value, describe) {
+  try {
+    validate(value, describe, (message) => {
+      throw new Error(message);
+    });
+    return null;
+  } catch (error) {
+    return error.message;
+  }
+}
+
+function repairEntityReferences(entity, report) {
+  if (!entity || typeof entity !== "object") return entity;
+  let next = entity;
+
+  if (entity.container && entity.container.distribution !== null) {
+    const problem = validationProblem(validateDistribution, entity.container.distribution, "container.distribution");
+    if (problem) {
+      report(entity.id, problem);
+      next = { ...next, container: { ...next.container, distribution: null } };
+    }
+  }
+  if (Array.isArray(entity.stock)) {
+    const stock = entity.stock.filter((type) => {
+      if (Object.hasOwn(ITEM_REGISTRY, type)) return true;
+      report(entity.id, `objet ${JSON.stringify(type)} retiré du stock, absent de ITEM_REGISTRY.`);
+      return false;
+    });
+    if (stock.length !== entity.stock.length) next = { ...next, stock };
+  }
+  if (entity.shop && entity.shop.catalog !== null) {
+    const problem = validationProblem(validateCatalog, entity.shop.catalog, "shop.catalog");
+    if (problem) {
+      report(entity.id, problem);
+      next = { ...next, shop: { ...next.shop, catalog: null } };
+    }
+  }
+  return next;
+}
+
+function repairFaceReferences(face, report) {
+  if (!face || typeof face !== "object") return face;
+  let next = face;
+  if (Array.isArray(face.entities)) {
+    const entities = face.entities.map((entity) => repairEntityReferences(entity, report));
+    if (entities.some((entity, i) => entity !== face.entities[i])) next = { ...next, entities };
+  }
+  if (Array.isArray(face.spawnRanges)) {
+    const spawnRanges = face.spawnRanges.map((range, index) => {
+      if (!range || range.distribution === null) return range;
+      const source = `spawnRanges[${index}]`;
+      const problem = validationProblem(validateDistribution, range.distribution, "distribution");
+      if (!problem) return range;
+      report(source, problem);
+      return { ...range, distribution: null };
+    });
+    if (spawnRanges.some((range, i) => range !== face.spawnRanges[i])) next = { ...next, spawnRanges };
+  }
+  return next;
+}
+
+// Renvoie la partie réparée et les références neutralisées,
+// `{ worldId, source, problem }` (worldId null pour la météo ; source : id
+// d'entité, "spawnRanges[i]" ou "weather").
+function repairContentReferences(data) {
+  const broken = [];
+  let result = data;
+
+  for (const [worldId, world] of Object.entries(data.worlds)) {
+    const report = (source, problem) => broken.push({ worldId, source, problem });
+    let next;
+    if (isTwoSided(world)) {
+      const recto = repairFaceReferences(world.recto, report);
+      const verso = repairFaceReferences(world.verso, report);
+      next = recto === world.recto && verso === world.verso ? world : { ...world, recto, verso };
+    } else {
+      next = repairFaceReferences(world, report);
+    }
+    if (next !== world) result = { ...result, worlds: { ...result.worlds, [worldId]: next } };
+  }
+
+  if (!Object.hasOwn(WEATHER_STATES, data.weather.state)) {
+    broken.push({
+      worldId: null,
+      source: "weather",
+      problem: `état ${JSON.stringify(data.weather.state)} absent de WEATHER_STATES, remplacé par ${JSON.stringify(DEFAULT_WEATHER_STATE)}.`,
+    });
+    result = { ...result, weather: { ...result.weather, state: DEFAULT_WEATHER_STATE } };
+  }
+  return { data: result, broken };
 }
 
 // Retire les entités dont le type n'existe plus dans le registre (type
@@ -546,7 +659,10 @@ function isPlausibleSession(data) {
 // `registry` (optionnel, INJECTÉ comme pour parseScene — le core n'importe
 // jamais le registre de contenu) : s'il est fourni, les entités d'un type
 // absent du registre sont retirées et listées dans `droppedEntities`.
-// Sans registre, aucun filtrage (vérifications du core).
+// Sans registre, aucun filtrage (vérifications du core). Toujours, quel que
+// soit le registre : objets inconnus retirés (`droppedItems`), références
+// de contenu cassées neutralisées (`brokenReferences`, voir
+// repairContentReferences).
 export function deserializeGame(raw, { registry } = {}) {
   if (!raw || typeof raw !== "object" || typeof raw.version !== "number") {
     return { success: false, reason: "format" };
@@ -560,9 +676,11 @@ export function deserializeGame(raw, { registry } = {}) {
     return { success: false, reason: "invalid" };
   }
 
-  // Objets inconnus : toujours retirés (le registre d'objets est du core).
+  // Objets et références : toujours vérifiés (registres et tables du core).
   const items = dropUnknownItems(data);
-  if (!registry) return { success: true, session: items.data, droppedEntities: [], droppedItems: items.dropped };
-  const filtered = dropUnknownEntityTypes(items.data, registry);
-  return { success: true, session: filtered.data, droppedEntities: filtered.dropped, droppedItems: items.dropped };
+  const references = repairContentReferences(items.data);
+  const repairs = { droppedItems: items.dropped, brokenReferences: references.broken };
+  if (!registry) return { success: true, session: references.data, droppedEntities: [], ...repairs };
+  const filtered = dropUnknownEntityTypes(references.data, registry);
+  return { success: true, session: filtered.data, droppedEntities: filtered.dropped, ...repairs };
 }

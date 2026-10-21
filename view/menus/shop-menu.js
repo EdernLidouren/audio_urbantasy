@@ -483,7 +483,9 @@ export function openShopMenu(getWorldView, getSession, entity) {
         label: "shop.actions.buy",
         onActivate: () => {
           const shop = liveShop(getSession, entity.id);
-          if (!shop || !shop.shop) {
+          // Sans catalogue, ou catalogue sans article (neutralisé à la
+          // relecture d'une sauvegarde, voir core/save.js) : refus.
+          if (!shop || !shop.shop || buildPurchaseLines(shop).length === 0) {
             playMenuSound("refusal");
             announce(t("shop.buy.empty"), { assertive: true });
             return;

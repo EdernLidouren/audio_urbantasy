@@ -100,17 +100,21 @@ export function saveGame(session, { playSound = true } = {}) {
 }
 
 // Désenveloppe une sauvegarde déjà décodée, avec le registre de types
-// (core/save.js/deserializeGame) : une entité d'un type disparu est retirée
-// plutôt que de faire planter la scène. Point commun de loadGame et
-// importGame. AUCUN signalement ici : la liste `droppedEntities` remonte à
-// l'appelant, qui la signale quand la sauvegarde devient vraiment la partie
-// en cours (view/debug-warnings.js/reportDroppedEntities).
+// (core/save.js/deserializeGame) : une entité d'un type disparu est retirée,
+// un objet inconnu aussi, une référence de contenu cassée est neutralisée,
+// plutôt que de faire planter la partie. Point commun de loadGame et
+// importGame. AUCUN signalement ici : `repairs` remonte à l'appelant, qui le
+// signale quand la sauvegarde devient vraiment la partie en cours
+// (view/debug-warnings.js/reportSaveRepairs).
 function readSave(parsed) {
-  return deserializeGame(parsed, { registry });
+  const result = deserializeGame(parsed, { registry });
+  if (!result.success) return result;
+  const { session, droppedEntities, droppedItems, brokenReferences } = result;
+  return { success: true, session, repairs: { droppedEntities, droppedItems, brokenReferences } };
 }
 
-// Lit et désenveloppe la partie sauvegardée -> { session, droppedEntities }
-// (voir readSave), ou null si absente/invalide. Ne lève jamais : lecture disque, JSON invalide et
+// Lit et désenveloppe la partie sauvegardée -> { session, repairs } (voir
+// readSave), ou null si absente/invalide. Ne lève jamais : lecture disque, JSON invalide et
 // structure implausible sont tous des échecs SILENCIEUX côté appelant
 // (juste un avertissement console), jamais une exception qui remonterait.
 export function loadGame() {
@@ -144,7 +148,7 @@ export function loadGame() {
     console.warn(`loadGame: sauvegarde invalide (raison : ${result.reason}).`);
     return null;
   }
-  return { session: result.session, droppedEntities: result.droppedEntities, droppedItems: result.droppedItems };
+  return { session: result.session, repairs: result.repairs };
 }
 
 export function hasSave() {
@@ -179,8 +183,8 @@ export function exportGame(session) {
   return saveTextFile("templeton-partie.json", encodeForStorage(json), { description: "Partie Templeton" });
 }
 
-// Lit un fichier de partie exportée -> { success, session } ou { success:
-// false, reason }. Gère l'obscurci ET le clair en repli (même détection de
+// Lit un fichier de partie exportée -> { success, session, repairs } ou
+// { success: false, reason }. Gère l'obscurci ET le clair en repli (même détection de
 // préfixe que loadGame ci-dessus). Ne REMPLACE rien elle-même : renvoie
 // juste une session CANDIDATE, la décision de l'appliquer (destructif)
 // revient à l'appelant (voir view/menus/save-menu.js, qui demande
@@ -210,9 +214,5 @@ export async function importGame(file) {
     return { success: false, reason: "parse" };
   }
 
-  const result = readSave(parsed);
-  if (!result.success) {
-    return { success: false, reason: result.reason };
-  }
-  return { success: true, session: result.session, droppedEntities: result.droppedEntities, droppedItems: result.droppedItems };
+  return readSave(parsed);
 }

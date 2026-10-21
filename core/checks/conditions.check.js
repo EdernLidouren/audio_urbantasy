@@ -10,6 +10,7 @@ import {
   getActiveWorld,
   togglePerception,
   applyEntityActionEffects,
+  spawnScatteredEphemerals,
   BODY_RADIUS,
 } from "../state.js";
 import { tick } from "../actions.js";
@@ -739,5 +740,63 @@ export default function checkConditions(run) {
     "variable de scène : bascule observée des deux côtés",
     "exited,entered",
     getActiveWorld(scenePresenceState).entities.filter((e) => e.presence).map((e) => e.presenceChanged).join(",")
+  );
+
+  // --- timeRange : validé au chargement (core/script-parse.js/
+  // validateCondition) ---
+  const timeRangeScene = (when) => ({
+    id: "movement-check-time-range",
+    titleKey: "scene.demo.name",
+    length: 10,
+    playerStart: 0,
+    entities: [{ id: "lamp", type: "dog", x: 5, presence: [{ when, present: true }] }],
+  });
+  const TIME_RANGE_REGISTRY = { dog: { nameKey: "entity.dog.name" } };
+  const timeRangeThrows = (when) => expectSceneParseThrows(timeRangeScene({ type: "timeRange", ...when }), TIME_RANGE_REGISTRY);
+  run("timeRange : from en chaîne -> erreur au chargement", true, timeRangeThrows({ from: "20", to: 6 }));
+  run("timeRange : to absent -> erreur au chargement", true, timeRangeThrows({ from: 20 }));
+  run("timeRange : heure hors [0, 24] -> erreur au chargement", true, timeRangeThrows({ from: 20, to: 25 }));
+  run("timeRange : from === to (plage vide) -> erreur au chargement", true, timeRangeThrows({ from: 8, to: 8 }));
+  run("timeRange : spread négatif -> erreur au chargement", true, timeRangeThrows({ from: 6, to: 7, spread: -5 }));
+  run(
+    "timeRange : formes valides (passage minuit, 0..24, heure fractionnaire, spread) -> acceptées",
+    "false,false,false,false",
+    [{ from: 20, to: 6 }, { from: 0, to: 24 }, { from: 6, to: 6.5 }, { from: 6, to: 7, spread: 5 }].map((when) => timeRangeThrows(when)).join(",")
+  );
+
+  // --- Placement au sol : la présence d'un obstacle est évaluée dans le
+  // contexte COMPLET de la partie (core/presence.js/presenceContextOf) ---
+  // Un mur présent seulement sous perception : perception active, il
+  // bloque, et l'éparpillement l'évite.
+  const perceptionWallScene = parseScene(
+    {
+      id: "movement-check-perception-wall",
+      titleKey: "scene.demo.name",
+      length: 20,
+      playerStart: 0,
+      entities: [
+        {
+          id: "spirit-wall",
+          type: "dog",
+          x: 10,
+          blocksMovement: true,
+          presence: [{ when: { type: "perceptionActive" }, present: true }, { when: { type: "not", condition: { type: "perceptionActive" } }, present: false }],
+        },
+      ],
+    },
+    TIME_RANGE_REGISTRY
+  );
+  const perceptionWallState = togglePerception(createInitialState(perceptionWallScene, 5, NO_COMPANIONS));
+  run("placement : le mur est bien bloquant sous perception", true, isBlocking(getActiveWorld(perceptionWallState).entities[0], presenceContextOf(perceptionWallState)));
+  const SCATTER_DOG = { type: "dog", labelKey: "entity.dog.name", interactable: true, action: { kind: "pickup", amount: 1 } };
+  const scattered = getActiveWorld(spawnScatteredEphemerals(perceptionWallState, SCATTER_DOG, 10, 12, 3))
+    .entities.filter((e) => e.ephemeral)
+    .map((e) => e.x);
+  run(
+    "placement : éparpillement -> aucune position dans un mur présent sous perception",
+    true,
+    // sourceX (10) est le repli ultime, toujours accepté (voir
+    // drawScatteredPosition) : seules les autres positions comptent.
+    scattered.some((x) => x !== 10) && scattered.filter((x) => x !== 10).every((x) => Math.abs(x - 10) >= BODY_RADIUS)
   );
 }

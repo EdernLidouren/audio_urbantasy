@@ -175,7 +175,7 @@ function parseFace(raw, length, registry, describe, sceneVariables) {
   // référence de surface erronée est un vrai bug de contenu, jamais
   // dégradée en silence.
   if (defaultSurface !== undefined && (!isNonEmptyString(defaultSurface) || !SURFACE_REGISTRY[defaultSurface])) {
-    fail(`${prefix}defaultSurface "${JSON.stringify(defaultSurface)}" absente du registre de surfaces.`);
+    fail(`${prefix}defaultSurface ${JSON.stringify(defaultSurface)} absente du registre de surfaces.`);
   }
   const resolvedDefaultSurface = defaultSurface !== undefined ? defaultSurface : DEFAULT_SURFACE;
   // indoor : PROPRIÉTÉ DE NATURE DE SCÈNE (comme defaultSurface juste

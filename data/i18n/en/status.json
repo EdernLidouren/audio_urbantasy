@@ -1,4 +1,6 @@
 {
+  "debug.warnings.brokenSessionReference": "Save, {source}: {problem}",
+  "debug.warnings.brokenWorldReference": "Save, scene {worldId}, {source}: {problem}",
   "debug.warnings.clear": "Clear the log",
   "debug.warnings.cleared": "Log cleared.",
   "debug.warnings.collectionTextMissing": "Collection: missing text {key}",

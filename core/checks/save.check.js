@@ -17,6 +17,9 @@ import { addMoney } from "../money.js";
 import { applyActionEffects, setVariable } from "../variables.js";
 import { hasImprovement } from "../improvements.js";
 import { DEFAULT_SURFACE, surfaceAt } from "../surfaces.js";
+import { refillDueSpawns } from "../spawn.js";
+import { shopArticles } from "../trade.js";
+import { DEFAULT_WEATHER_STATE } from "../../config/weather-values.js";
 import { throws, auditNonSerializable, diffStructure } from "../../lib/check.js";
 import { NO_COMPANIONS, WORLD_A_REGISTRY, TWO_FACED_RAW_SCENE, createAuditFixture } from "./helpers.js";
 
@@ -228,6 +231,55 @@ export default function checkSave(run) {
   const migratedKey = legacyKeyResult.success
     ? legacyKeyResult.session.worlds[renameWorldId].entities.find((e) => e.id === "legacy-key")
     : undefined;
+  // --- Références de contenu figées (core/save.js/repairContentReferences) ---
+  // Une table, un catalogue, un objet ou un état météo disparus depuis la
+  // première visite : neutralisés et listés, jamais un plantage.
+  const brokenSave = {
+    version: SAVE_VERSION,
+    data: {
+      ...auditSession,
+      weather: { ...auditSession.weather, state: "state_that_no_longer_exists" },
+      worlds: {
+        ...auditSession.worlds,
+        [renameWorldId]: {
+          ...renameWorld,
+          spawnCycle: undefined,
+          spawnRanges: [{ from: 1, to: 3, count: 2, distribution: { table: "table_that_no_longer_exists" } }],
+          entities: [
+            ...renameWorld.entities,
+            {
+              id: "old-bush",
+              type: "dog",
+              x: 2,
+              sounds: {},
+              container: { distribution: { table: "table_that_no_longer_exists" } },
+              stock: ["apple", "item_that_no_longer_exists"],
+              stockCycle: 0,
+            },
+            { id: "old-shop", type: "dog", x: 3, sounds: {}, shop: { catalog: { table: "catalog_that_no_longer_exists" } }, shopStock: {} },
+          ],
+        },
+      },
+    },
+  };
+  const brokenResult = deserializeGame(brokenSave);
+  const brokenWorld = brokenResult.success ? brokenResult.session.worlds[renameWorldId] : null;
+  const brokenEntity = (id) => brokenWorld && brokenWorld.entities.find((e) => e.id === id);
+  run("save références : partie chargée malgré des références cassées", true, brokenResult.success);
+  run("save références : distribution de conteneur inconnue -> neutralisée", null, brokenEntity("old-bush")?.container.distribution);
+  run("save références : objet inconnu retiré du stock tiré", "apple", brokenEntity("old-bush")?.stock.join(","));
+  run("save références : catalogue inconnu -> neutralisé", null, brokenEntity("old-shop")?.shop.catalog);
+  run("save références : distribution de plage inconnue -> neutralisée", null, brokenWorld?.spawnRanges[0].distribution);
+  run("save références : état météo inconnu -> état par défaut", DEFAULT_WEATHER_STATE, brokenResult.session?.weather.state);
+  run(
+    "save références : chaque neutralisation listée, dans l'ordre",
+    "old-bush,old-bush,old-shop,spawnRanges[0],weather",
+    brokenResult.brokenReferences?.map((r) => r.source).join(",")
+  );
+  run("save références : partie saine -> rien de neutralisé", 0, deserializeGame(saveEnvelope).brokenReferences.length);
+  run("save références : garnissage d'une partie réparée -> aucune erreur", false, throws(() => refillDueSpawns(brokenResult.session, {})));
+  run("save références : rayon d'un catalogue neutralisé -> vide", 0, brokenEntity("old-shop") ? shopArticles(brokenEntity("old-shop")).length : -1);
+
   run(
     "save renommages : ancienne clé d'objet -> feuille .name, description intacte",
     "item.key_bronze.name|item.key_bronze.description",

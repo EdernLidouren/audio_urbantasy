@@ -76,8 +76,13 @@ Vraie si l'heure courante (dérivée de `context.time`, en HEURE FRACTIONNAIRE �
 `core/presence.js`/`hourOfDayFraction`, pas l'entier de `core/time.js`/`hourOfDay` :
 nécessaire pour que `spread` ci-dessous ait un effet observable à la minute) tombe
 dans `[from, to[`, en gérant le passage par minuit (`from > to`, comme ci-dessus).
-`from === to`, ou l'un des deux non fini, → toujours fausse (jamais une ambiguïté
-"toujours vraie").
+
+**Validation au chargement** (`core/script-parse.js`/`validateCondition`) : `from`
+et `to` sont des heures (fractionnaires permises) dans `[0, 24]` — `24` est accepté,
+`{ from: 0, to: 24 }` couvre toute la journée ; `from === to` (plage vide) est
+refusé ; `spread`, s'il est présent, est un nombre de minutes `>= 0`. Une faute de
+contenu (ex. `"from": "20"` en chaîne) échoue donc au chargement, au lieu d'une
+règle qui ne serait jamais vraie.
 
 Exemple réel complet — le néon (`entities/types/neon.js`), présent uniquement la
 nuit :
@@ -471,7 +476,10 @@ permis) ET valeur/type du comparateur lui-même. **Limite connue, documentée pl
 que silencieuse** : la portée `"party"` n'est JAMAIS vérifiable au chargement d'une
 scène (ses déclarations n'existent qu'à `createInitialState`, hors de portée d'un
 `parseScene` qui ne connaît qu'UNE scène) — une variable de partie mal orthographiée
-n'est détectée qu'à l'ÉVALUATION (repli sur `false`), jamais au chargement.
+n'est détectée qu'à l'ÉVALUATION (repli sur `false`), jamais au chargement. Sa
+VALEUR est tout de même vérifiée : celle du comparateur doit être une valeur
+possible d'une variable (booléen ou entier), et un entier pour un comparateur
+d'ordre (`greaterThan`...).
 
 Composable dans un `allOf` comme toute autre condition (variable ET météo, variable
 ET `hasEquipmentTag`...). Exemple réel complet — la fenêtre (voir "Actions multiples
@@ -1030,7 +1038,9 @@ ROUTE par nature, frontière STRICTE :
 
 **Validation** : MÊME `validateVariableReference` que la condition `"variable"`
 (scope/name/existence, même limite documentée sur `"party"`) + cohérence
-opération/type quand il est connu. **Application** : voir "Variables"/"Accès"
+opération/type quand il est connu. Type inconnu (`"party"`) : la `value` d'un
+`"setVariable"` doit quand même être une valeur possible d'une variable (booléen
+ou entier, jamais absente). **Application** : voir "Variables"/"Accès"
 plus bas pour `applyActionEffects` en détail (enchaînement séquentiel,
 lecture-avant-écriture pour toggle/add, splice dans la session).
 
