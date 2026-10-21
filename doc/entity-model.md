@@ -144,7 +144,7 @@ d'ÉTAT. Le mécanisme, en trois couches strictement séparées :
   une entité déjà `consumed` -> RÉFÉRENCE INCHANGÉE, AUCUN gain — vérifié
   EXPLICITEMENT avant toute écriture, le piège à éviter étant une caisse qui
   refile son contenu à chaque activation. Le retour SENSORIEL (son, annonce
-  "Trouvé : N pièces") reste vue pure (`view/interaction.js`, même patron que
+  "Trouvé : N pièces") reste vue pure (`view/action-execution.js`, même patron que
   `"pickup"`) — mais cette fois la garde d'idempotence y est DUPLIQUÉE
   volontairement (`entity.consumed` revérifié AVANT de jouer le son/annoncer) :
   sans elle, réactiver une caisse déjà vide rejouerait le retour sensoriel
@@ -518,7 +518,7 @@ persiste avec le monde.
   désambiguïsation ; seul, il répond à Entrée en annonçant son état —
   `interaction.searchAlreadyToday` (« Déjà fouillé aujourd'hui. ») ou
   `interaction.searchDepleted` (« Il n'y a plus rien ici. »), jamais un
-  silence (`view/interaction.js`/`handleSearch`). CRUCIAL : SEULE la fouille
+  silence (`view/action-execution.js`/`handleSearch`). CRUCIAL : SEULE la fouille
   s'éteint. `interactable`/`observable`, présence, beacon,
   occupation restent INCHANGÉS — l'arbre reste un arbre, Espace le décrit
   toujours, il bruisse toujours. Jamais rendu dormant/inerte par ce
@@ -576,9 +576,10 @@ prévu, pas construit). Prix d'achat : `price` de l'article, sinon `value`
   "Vendre", "Annuler". "Acheter" sans catalogue, "Vendre" sans rien de
   vendable au sac -> annonce seule, aucune liste vide.
 - **Menu à sliders inline** — UN SEUL écran CUSTOM paramétré pour les deux
-  sens (`openQuantityList` ; pas un slider `lib/menu.js`, valeur
-  TRANSITOIRE, voir `inventory-menu.js`/`openQuantitySelector` pour les
-  mêmes raisons). VENTE : une LIGNE par TYPE vendable du sac (agrégée : un
+  sens (`view/menus/shop-quantity-list.js`/`openQuantityList` ; pas un
+  slider `lib/menu.js`, valeur TRANSITOIRE, voir
+  `view/menus/inventory/bag-and-equipment.js`/`openQuantitySelector` pour
+  les mêmes raisons). VENTE : une LIGNE par TYPE vendable du sac (agrégée : un
   non-empilable possédé en N exemplaires = une ligne, plafond N). ACHAT :
   une ligne par ARTICLE du catalogue, ÉPUISÉS COMPRIS (lus "épuisé", le
   joueur sait qu'ils reviendront au cycle suivant), plafond = STOCK
@@ -667,7 +668,7 @@ l'équipement de départ, posés directement par `createInitialState`, y sont
 notés à la main.
 
 - **Consultation** — touche "i", écran-liste
-  (`view/menus/inventory-menu.js`). Chaque ligne : "**<nom> × <quantité si
+  (`view/menus/inventory/bag-and-equipment.js`). Chaque ligne : "**<nom> × <quantité si
   applicable> : <description>**" — le nom D'ABORD, la description EN QUEUE
   (non-bloquante : qui ne veut que le nom l'a déjà entendu et peut passer à
   l'entrée suivante).
@@ -679,7 +680,7 @@ notés à la main.
   aucun sélecteur. Stack > 1 : ouvre un SÉLECTEUR DE QUANTITÉ — un écran
   CUSTOM, délibérément PAS le mécanisme `kind:"slider"` de `lib/menu.js`,
   pour deux raisons structurelles (voir le commentaire d'`openQuantitySelector`,
-  `view/menus/inventory-menu.js`) : la valeur y est TRANSITOIRE (propre à
+  `view/menus/inventory/bag-and-equipment.js`) : la valeur y est TRANSITOIRE (propre à
   cette seule ouverture) alors que le slider existant porte la sienne via
   une PRÉFÉRENCE PERSISTÉE (`prefKey`/`config/preferences.js`, localStorage
   réel) ; et ce sélecteur veut TROIS paliers d'incrément (aucun -> ±1, Maj
@@ -779,7 +780,8 @@ l'écriture du slot).
   (l'ancien occupant retourne au sac), jamais un écrasement silencieux ni
   un refus. Un slot VIDE n'ouvre PAS de menu d'actions (rien à y faire) :
   l'activer annonce juste "Emplacement vide."
-- **Interface à trois onglets** (`view/menus/inventory-menu.js`) — UN SEUL
+- **Interface à onglets** (`view/menus/inventory-menu.js`, la coquille ; le
+  contenu des onglets dans `view/menus/inventory/`) — UN SEUL
   écran réel sur la pile, trois portes d'entrée ("i" -> Sac, "q" ->
   Équipement, "m" -> Améliorations, voir `doc/scripting.md`/"Améliorations")
   et Tab/Maj+Tab pour parcourir les onglets en cycle une fois ouvert. Le nom de
@@ -1017,7 +1019,7 @@ cascadé instance -> archétype comme tout rôle de `sounds` — SANS défaut : 
 objet qui ne le déclare pas se ramasse en silence, l'annonce suffit
 (ex. `entities/types/item.js`, `crate.js`). Aucun son de ramassage
 générique imposé par le système ("tout son est déclaré, jamais imposé"). Rendu DIÉGÉTIQUE par le même chemin qu'un effet `"playSound"`
-(`view/interaction.js`/`playEntityPickupSound` -> `runPlaySoundEffect`,
+(`view/effect-runner.js`/`playEntityPickupSound` -> `runPlaySoundEffect`,
 positionné sur l'entité, filtres de scène), joué AVANT le retrait de
 l'entité — tant qu'elle a encore une voix dans la scène. Même descripteur
 qu'un `"playSound"` (`{ path, gain?, pitchVariation?, reverbSend? }`).

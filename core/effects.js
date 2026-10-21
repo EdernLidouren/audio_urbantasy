@@ -7,7 +7,7 @@
 //     reconnaît pas (donc RENDU ou MIXTE) traverse SANS EFFET, jamais une
 //     erreur (voir son propre commentaire).
 //   - RENDU (RENDER_EFFECT_TYPES) : joue/annonce, ne mute JAMAIS l'état, ne
-//     connaît JAMAIS le core. view/interaction.js/runEffects les exécute
+//     connaît JAMAIS le core. view/effect-runner.js/runEffects les exécute
 //     directement (aucun appel au core).
 //   - MIXTE (MIXED_EFFECT_TYPES) : mute l'état ET orchestre du rendu
 //     (aujourd'hui : "teleport" — voir "Effets d'action"/`"teleport"` de
@@ -17,14 +17,14 @@
 //     de cette logique — puis orchestre SEULE le séquençage (sas, fondu,
 //     rafraîchissement de la scène). `applyActionEffects` les ignore, EXACTE-
 //     MENT comme un effet de rendu : seul un gestionnaire dédié côté vue
-//     (voir view/interaction.js/runEffects) les reconnaît.
+//     (voir view/effect-runner.js/runEffects) les reconnaît.
 // L'humain lit une liste d'effets comme UN SEUL script ("effects":
 // [setVariable, giveImprovement, playSound, teleport, ...]) ; le système la
 // ROUTE par nature.
 // Frontière STRICTE, jamais mélangée : ajouter un effet demain = choisir SA
 // nature (une seule des trois listes) + son cas dans
 // core/script-parse.js/parseActionEffect (validation de forme) + son exécution
-// côté core (core/variables.js, ÉTAT seulement) ou vue (view/interaction.js,
+// côté core (core/variables.js, ÉTAT seulement) ou vue (view/effect-runner.js,
 // RENDU et MIXTE).
 
 export const STATE_EFFECT_TYPES = [

@@ -59,7 +59,7 @@ function markAcquired(session, type) {
   return { ...session, acquiredItems: { ...acquired, [type]: true } };
 }
 
-// Effet "pickup" vers le SAC (voir view/interaction.js, ACTION_HANDLERS.
+// Effet "pickup" vers le SAC (voir view/action-execution.js, ACTION_HANDLERS.
 // pickup — action.item) : ajoute l'objet ET retire l'entité ramassée du
 // monde actif, ATOMIQUEMENT — même garantie que core/money.js/pickupEntity
 // (jamais l'un sans l'autre, jamais un second gain sur une entité déjà
@@ -100,7 +100,7 @@ export function removeItem(session, type, count = 1) {
   return { ...session, bag: session.bag.filter((_, i) => i !== index) };
 }
 
-// Effet "Poser" (drop) — voir view/menus/inventory-menu.js/setDropItemHandler,
+// Effet "Poser" (drop) — voir view/menus/inventory/bag-and-equipment.js/setDropItemHandler,
 // doc/entity-model.md/"Sac d'objets" : retire `count` exemplaire(s) du sac ET
 // fait apparaître UNE entité éphémère au sol portant TOUTE la quantité posée
 // EN UNE FOIS (jamais N entités éparpillées — un dépôt n'est pas un

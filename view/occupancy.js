@@ -60,7 +60,7 @@ export function createOccupancy(getSession) {
   // VIDÉ ne reste candidat à Entrée que s'il n'y a rien d'autre à activer :
   // ramasser les objets tombés autour ne propose jamais de menu de
   // désambiguïsation avec lui, et seul il annonce son état (voir
-  // view/interaction.js/handleSearch).
+  // view/action-execution.js/handleSearch).
   function getInteractionCandidates(kind) {
     if (kind === "describe") return currentOccupied.filter((entity) => entity.observable);
     const time = getSession().time;

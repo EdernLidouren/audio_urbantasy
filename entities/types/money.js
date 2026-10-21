@@ -1,4 +1,4 @@
-// Archétype "money" — une somme ramassable au sol (voir view/interaction.js,
+// Archétype "money" — une somme ramassable au sol (voir view/action-execution.js,
 // ACTION_HANDLERS.pickup ; core/money.js/pickupEntity). Test de bout en bout
 // du premier kind d'action différenciée (voir doc/entity-model.md,
 // "Interaction (niveau 0)"). observable : petite description de flaveur,

@@ -1,7 +1,7 @@
 // KINDS D'ACTION (voir doc/scripting.md/"Actions") — SEULE liste des kinds
 // reconnus, et la forme de leurs champs propres, validée au CHARGEMENT
 // (core/script-parse.js/parseSingleAction). L'EXÉCUTION d'un kind (appel au
-// core, son, annonce) vit côté vue, dans view/interaction.js/
+// core, son, annonce) vit côté vue, dans view/action-execution.js/
 // ACTION_HANDLERS, dont les clés sont vérifiées au chargement contre ce
 // registre : un kind ajouté d'un côté seulement échoue aussitôt.
 //

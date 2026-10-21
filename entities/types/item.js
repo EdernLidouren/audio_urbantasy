@@ -9,7 +9,7 @@
 // SON PROPRE nameKey/descriptionKey/action (nameKey/description/action.item
 // génériques n'auraient aucun sens ici). Convention : donner à l'instance
 // le MÊME nameKey que ITEM_REGISTRY[type].label, pour que le nom annoncé au
-// ramassage ("Ramassé : <objet>", voir view/interaction.js) corresponde à
+// ramassage ("Ramassé : <objet>", voir view/action-execution.js) corresponde à
 // celui affiché dans le sac — jamais une contrainte structurelle, juste la
 // pratique attendue du contenu.
 export default {

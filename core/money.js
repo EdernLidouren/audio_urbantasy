@@ -10,7 +10,7 @@ export function addMoney(session, amount) {
   return { ...session, money: session.money + amount };
 }
 
-// Effet "pickup" (voir view/interaction.js, ACTION_HANDLERS.pickup) :
+// Effet "pickup" (voir view/action-execution.js, ACTION_HANDLERS.pickup) :
 // ajoute l'argent ET retire l'entité ramassée du monde actif, DANS LE MÊME
 // nouvel état — jamais l'un sans l'autre (une entité ramassée mais pas
 // payée, ou payée mais toujours là, serait un état incohérent observable).
@@ -25,7 +25,7 @@ export function pickupEntity(session, entityId, amount) {
   return removeEntity(addMoney(session, amount), entityId);
 }
 
-// Effet "loot" (voir view/interaction.js, ACTION_HANDLERS.loot) : COLLECTIBLE
+// Effet "loot" (voir view/action-execution.js, ACTION_HANDLERS.loot) : COLLECTIBLE
 // PERSISTANT — donne `amount` UNE SEULE FOIS puis marque l'entité consumed
 // (voir core/state.js/markConsumed), mais NE LA RETIRE JAMAIS du monde (voir
 // doc/entity-model.md/"Collectible persistant") — distinct de pickupEntity
@@ -46,7 +46,7 @@ export function lootEntity(session, entityId, amount) {
 
 // Collectible persistant SANS crédit ni éparpillement (troisième forme de
 // l'action "loot", l'objet unique : sa substance est dans les effets de
-// l'action, ex. giveImprovement — voir view/interaction.js/handleLoot) :
+// l'action, ex. giveImprovement — voir view/action-execution.js/handleLoot) :
 // marque seulement l'entité consumed. Déjà consumed ou absente -> référence
 // INCHANGÉE, même garde que lootEntity.
 export function lootUniqueEntity(session, entityId) {

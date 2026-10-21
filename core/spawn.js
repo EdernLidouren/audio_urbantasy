@@ -93,7 +93,7 @@ function isRestockDue(entity, cycle) {
 //   - "searchedToday" : vidé, se regarnira au prochain cycle ;
 //   - "depleted" : vidé, ne se regarnira jamais (regenerates: false).
 // Lu par la vue : candidats à "activate" (view/occupancy.js/
-// getInteractionCandidates) et annonce de la fouille (view/interaction.js/
+// getInteractionCandidates) et annonce de la fouille (view/action-execution.js/
 // handleSearch).
 export function containerStatus(entity, time) {
   if (!entity.container) return null;

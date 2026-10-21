@@ -24,7 +24,7 @@
 // TOUT effet d'ÉTAT d'une action, pas seulement les variables — voir
 // core/effects.js/STATE_EFFECT_TYPES : giveImprovement/removeImprovement
 // (core/improvements.js) y sont appliqués dans le MÊME passage, faute
-// d'un second point d'entrée générique côté vue (view/interaction.js/
+// d'un second point d'entrée générique côté vue (view/effect-runner.js/
 // runEffects délègue TOUS les effets d'état ICI, en un seul appel).
 
 import { giveImprovement, removeImprovement } from "./improvements.js";

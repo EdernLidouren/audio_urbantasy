@@ -21,7 +21,7 @@
 //
 // FRONTIÈRE : le core APPLIQUE les effets d'ÉTAT (core/state.js/
 // applyEntityActionEffects, même chemin qu'une action) et RENVOIE les effets
-// de RENDU dus (`fired`), que la vue rejoue (view/interaction.js/
+// de RENDU dus (`fired`), que la vue rejoue (view/effect-runner.js/
 // runRenderEffects) — même partition que core/effects.js. Les effets MIXTES
 // (teleport) sont refusés au chargement (core/script-parse.js/parseTrigger).
 

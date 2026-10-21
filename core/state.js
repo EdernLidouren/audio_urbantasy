@@ -438,7 +438,7 @@ export function markConsumed(session, entityId) {
 // Applique une LISTE d'effets D'ÉCRITURE de variable (voir core/script-parse.js/
 // parseActionEffect, core/variables.js/applyActionEffects) déclenchés par
 // l'ACTIVATION d'une action portée par UNE entité du monde ACTIF (par id) —
-// POINT D'ENTRÉE unique pour la vue (voir view/interaction.js/
+// POINT D'ENTRÉE unique pour la vue (voir view/interaction-handlers.js/
 // setVariableEffectsHandler), qui ne connaît ni resolveFace/withFace ni la
 // forme de session.worlds : construit le contexte { entity, world, session }
 // attendu par applyActionEffects depuis LA FACE ACTIVE, puis SPLICE le

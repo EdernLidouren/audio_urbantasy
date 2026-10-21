@@ -423,7 +423,7 @@ export default function checkVariables(run) {
 
     // ROUTAGE core/vue (voir core/effects.js) : une liste MIXTE état+rendu
     // ne fait muter QUE l'état — playSound/announce (à charge de la vue,
-    // voir view/interaction.js/runEffects) traversent SANS EFFET, jamais une
+    // voir view/effect-runner.js/runEffects) traversent SANS EFFET, jamais une
     // erreur, exactement comme un type totalement inconnu (voir plus haut).
     const afterMixedNature = applyActionEffects(
       [

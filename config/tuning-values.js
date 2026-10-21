@@ -424,8 +424,8 @@ export const TUNING_DEFAULTS = {
 
   // Pas des SÉLECTEURS DE QUANTITÉ (flèches gauche/droite), même convention
   // partout : Maj = pas intermédiaire, Ctrl = grand pas (sans modificateur :
-  // 1). Boutique (view/menus/shop-menu.js) : stocks et budgets petits ;
-  // quantité à poser depuis le sac (view/menus/inventory-menu.js) : des
+  // 1). Boutique (view/menus/shop-quantity-list.js) : stocks et budgets petits ;
+  // quantité à poser depuis le sac (view/menus/inventory/bag-and-equipment.js) : des
   // piles pouvant compter des centaines d'objets.
   shopQuantityMediumStep: 5,
   shopQuantityBigStep: 20,

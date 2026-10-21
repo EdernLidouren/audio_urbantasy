@@ -709,7 +709,7 @@ d'action" plus bas — état `setVariable`/`giveImprovement`..., rendu
 `parseActionEffect`), MÊME routage (`core/effects.js`) : le core applique
 les effets d'ÉTAT (`core/state.js`/`applyEntityActionEffects`, sur la face
 qui porte l'entité), la vue rejoue les effets de RENDU dus
-(`view/interaction.js`/`runRenderEffects`, câblé par `view/game-clock.js`/
+(`view/effect-runner.js`/`runRenderEffects`, câblé par `view/game-clock.js`/
 `advance`). Un `playSound` sans `at` émane de l'entité porteuse, donc
 DIÉGÉTIQUE (voir `"playSound"` plus bas) : entendu ÉTOUFFÉ depuis l'autre
 face par la chaîne d'occlusion existante, rien de spécial à déclarer. Les
@@ -775,7 +775,7 @@ champs propres du kind bien formés, AUCUN autre champ que ceux du kind et les
 champs communs (`kind`, `condition`, `effects`, `refusalEffects`) — une faute de
 frappe (`"ammount"`) échoue au chargement. Les MONTANTS d'argent sont des entiers
 STRICTEMENT positifs : une action ne retire jamais d'argent. L'EXÉCUTION d'un kind
-(appel au core, son, annonce) vit côté vue (`view/interaction.js`/
+(appel au core, son, annonce) vit côté vue (`view/action-execution.js`/
 `ACTION_HANDLERS`), dont les clés sont vérifiées contre le registre au chargement
 du module : un kind ajouté d'un seul côté échoue aussitôt.
 
@@ -973,7 +973,7 @@ Le SEUL kind GÉNÉRIQUE de cet aiguillage : aucun état "métier" propre
 ET rendu ET mixte, librement mélangés) est en réalité exécutée GÉNÉRIQUEMENT
 par `view/interaction.js`/`interact` pour TOUT kind dont la condition réussit
 (ou qui n'a pas de condition) — `"applyEffects"` n'a donc RIEN de plus à faire
-lui-même (`view/interaction.js`/`handleApplyEffects` est un NO-OP délibéré) :
+lui-même (`view/action-execution.js`/`handleApplyEffects` est un NO-OP délibéré) :
 ce kind existe seulement pour donner un `kind` valide à une entité dont
 l'action se résume à ses effets, sans ramassage ni aucun autre comportement
 propre. `effects` y est donc OBLIGATOIRE (sans, l'action ne ferait rien :
@@ -995,7 +995,7 @@ deux candidates `applyEffects` aux conditions opposées).
 1. Une entrée dans `ACTION_KINDS` (`core/action-kinds.js`) : ses champs propres
    (`fields`), leur validation (`validate`), et le champ que l'entité doit porter
    s'il agit dessus (`requires`, ex. `"container"`).
-2. Un handler du MÊME nom dans `ACTION_HANDLERS` (`view/interaction.js`) : son
+2. Un handler du MÊME nom dans `ACTION_HANDLERS` (`view/action-execution.js`) : son
    exécution (appel au core, son, annonce). Oublier l'un des deux échoue au
    chargement de la vue.
 3. Des vérifications dans `core/checks/actions.check.js`.
@@ -1027,7 +1027,7 @@ ROUTE par nature, frontière STRICTE :
   effets d'ÉTAT — un type qu'il ne reconnaît pas (donc tout effet de rendu)
   TRAVERSE SANS EFFET, jamais une erreur ; le core ne joue JAMAIS de son
   ni n'annonce JAMAIS rien lui-même.
-- la VUE (`view/interaction.js`/`runEffects`) exécute SEULEMENT les effets de
+- la VUE (`view/effect-runner.js`/`runEffects`) exécute SEULEMENT les effets de
   RENDU — appelle `applyActionEffects` (via le gestionnaire enregistré,
   `setVariableEffectsHandler`) EN UN SEUL LOT pour l'état, PUIS rejoue
   `playSound`/`announce` DANS L'ORDRE DÉCLARÉ (l'ordre relatif à un effet
@@ -1110,7 +1110,7 @@ comme un beacon qui n'en déclare pas non plus. Un champ déclaré explicitement
 reste prioritaire (`resolveTuning` teste d'abord le descripteur lui-même) :
 la cascade ne fait qu'ajouter un FILET, jamais une contrainte.
 Pour un rendu **méta**, ce triplet reste lu TEL QUEL sur l'effet
-(`view/interaction.js`/`playMetaSound` -> `lib/audio.js`/
+(`view/effect-runner.js`/`playMetaSound` -> `lib/audio.js`/
 `playDescribedOneShot`) — aucune cascade, aucun bus de réverb accessible
 (voir NATURE ci-dessous) : `reverbSend` y reste sans effet en pratique,
 `gain`/`pitchVariation` n'ont pas de défaut au-delà de 1/0.
@@ -1121,7 +1121,7 @@ beacon/vocal (`view/audio/oneshots.js`/`playPositionedOneShot` via
 `playTransitionSound`) — un seul point de calcul partout, jamais dupliqué.
 
 **PROVENANCE — `at` (optionnel, id d'entité)** : d'où émane le son dans
-l'espace (`view/interaction.js`/`resolvePlaySoundTarget`) :
+l'espace (`view/effect-runner.js`/`resolvePlaySoundTarget`) :
 
 - `at` fourni → le son émane de LA POSITION de CETTE entité (utile pour un
   son émis AILLEURS que par l'entité qui porte l'action).
@@ -1134,7 +1134,7 @@ l'espace (`view/interaction.js`/`resolvePlaySoundTarget`) :
   ci-dessous).
 
 **NATURE — `nature` (optionnel, `"diegetic"` | `"meta"`)** : filtré ou non
-(`view/interaction.js`/`resolvePlaySoundNature`) — DÉFAUT DÉRIVÉ DE LA
+(`view/effect-runner.js`/`resolvePlaySoundNature`) — DÉFAUT DÉRIVÉ DE LA
 PROVENANCE, jamais déclaré dans le cas courant :
 
 - une cible résolue (positionné) → **`"diegetic"`** par défaut : rendu
@@ -1219,7 +1219,7 @@ porte joue son grincement par un effet `playSound` placé AVANT son `teleport`
 (la grammaire d'effets, jamais le sas : une porte fait un fondu, pas une
 chorégraphie). Ce son appartient à l'acte de partir : il reste diégétique et
 positionné sur la porte, mais il est joué ANCRÉ et HORS de la couche des
-entités que le sas éteint (`view/interaction.js`/`runEffects`,
+entités que le sas éteint (`view/effect-runner.js`/`runEffects`,
 `view/audio/oneshots.js`/`playEntityOneShot`). Il finit donc de résonner
 pendant le fondu au lieu d'être coupé, comme les pas de transition d'une
 bascule de face. Sa réverb appartient au monde quitté et s'éteint avec lui.
@@ -1348,7 +1348,7 @@ se déplacerait entre des mondes que le core ne tique jamais simultanément
 2. Un cas dans `core/script-parse.js`/`parseActionEffect` : valide la FORME propre à
    ce type.
 3. Effet d'ÉTAT → un cas dans `core/variables.js`/`applyActionEffects`. Effet
-   de RENDU ou MIXTE → un cas dans `view/interaction.js`/`runEffects`, JAMAIS
+   de RENDU ou MIXTE → un cas dans `view/effect-runner.js`/`runEffects`, JAMAIS
    dans le core (un effet MIXTE y délègue son calcul d'état à une fonction du
    core EXISTANTE, jamais une nouvelle copie de cette logique).
 4. Ajoute une sous-section ICI.
@@ -1588,7 +1588,7 @@ de CETTE liste, le cas échéant) via `getVariable`, puis délèguent à
 EXACTEMENT ça pour la vue (résout le contexte depuis le monde ACTIF, splice le
 résultat aux emplacements RÉELLEMENT touchés, une liste peut mélanger les trois
 portées dans la MÊME activation), point d'entrée de
-`view/interaction.js`/`runEffects` (voir "Effets d'action" plus haut).
+`view/effect-runner.js`/`runEffects` (voir "Effets d'action" plus haut).
 
 ## Améliorations (improvements)
 
@@ -1620,7 +1620,7 @@ réinitialisée comme une variable volatile). Vide à la création d'une partie
 neuve ; rebouché vide pour une sauvegarde antérieure à ce mécanisme (voir
 `core/save.js`/`migrateSave`).
 
-**Onglet Améliorations** (`view/menus/inventory-menu.js`, touche "m", troisième
+**Onglet Améliorations** (`view/menus/inventory/progress-tabs.js`, touche "m", troisième
 onglet du menu global après Sac et Équipement) : toutes les améliorations du
 registre, triées par `order`. Débloquée : `"{order} - {nom} : {description}"` ;
 non débloquée : `"{order} - Inconnue"` — le numéro trahit qu'un pouvoir existe,
@@ -1746,10 +1746,10 @@ n'empêche de l'ajouter plus tard (voir `doc/entity-model.md`/"Interaction
 |---|---|---|
 | Types de condition | `CONDITION_EVALUATORS` | `core/presence.js` |
 | Types d'effet (presence/behavior, TICK) | `parseEffect` + `resolveEntityRules` | `core/script-parse.js`, `core/presence.js` |
-| Types d'effet d'action (ACTIVATION, état + rendu + mixte) | `parseActionEffect` (forme) + `STATE_EFFECT_TYPES`/`RENDER_EFFECT_TYPES`/`MIXED_EFFECT_TYPES` (nature/routage) + `applyActionEffects` (état) + `runEffects` (rendu + mixte) | `core/script-parse.js`, `core/effects.js`, `core/variables.js`, `view/interaction.js` |
+| Types d'effet d'action (ACTIVATION, état + rendu + mixte) | `parseActionEffect` (forme) + `STATE_EFFECT_TYPES`/`RENDER_EFFECT_TYPES`/`MIXED_EFFECT_TYPES` (nature/routage) + `applyActionEffects` (état) + `runEffects` (rendu + mixte) | `core/script-parse.js`, `core/effects.js`, `core/variables.js`, `view/effect-runner.js` |
 | Exécution de l'effet "teleport" (rechargement/repositionnement) | `executeTeleport`/`performTransition` + `placePlayer`/`travelToWorld` | `view/world-travel.js`, `core/state.js` |
-| Kinds de trigger (transition d'horloge) | `TRIGGER_KINDS` + `parseTrigger` (forme) + `applyDueTriggers` (détection, état) + `runRenderEffects` (rendu) | `core/triggers.js`, `core/script-parse.js`, `view/interaction.js` |
-| Kinds d'action (forme, validation) + exécution | `ACTION_KINDS` + `ACTION_HANDLERS` | `core/action-kinds.js`, `view/interaction.js` |
+| Kinds de trigger (transition d'horloge) | `TRIGGER_KINDS` + `parseTrigger` (forme) + `applyDueTriggers` (détection, état) + `runRenderEffects` (rendu) | `core/triggers.js`, `core/script-parse.js`, `view/effect-runner.js` |
+| Kinds d'action (forme, validation) + exécution | `ACTION_KINDS` + `ACTION_HANDLERS` | `core/action-kinds.js`, `view/action-execution.js` |
 | Kinds de comportement | `BEHAVIORS` | `core/behaviors/index.js` |
 | Tags | `TAG_REGISTRY` | `core/tags.js` |
 | Améliorations (improvements) | `IMPROVEMENT_REGISTRY` | `core/improvements.js` |

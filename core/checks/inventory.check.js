@@ -158,7 +158,7 @@ export default function checkInventory(run) {
   run("sac : removeItem NE MUTE JAMAIS l'original", 2, afterTwoApples.bag[0].quantity);
 
   // dropItem : effet "Poser" — removeItem + spawnEphemeral, ATOMIQUEMENT
-  // (voir view/menus/inventory-menu.js/setDropItemHandler). Un objet posé
+  // (voir view/menus/inventory/bag-and-equipment.js/setDropItemHandler). Un objet posé
   // en pile (count > 1) donne UNE SEULE entité éphémère portant toute la
   // quantité, jamais N éparpillées — voir core/bag.js/dropItem.
   const DROP_SPEC = {

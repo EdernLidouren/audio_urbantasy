@@ -49,7 +49,7 @@ export default function checkEffects(run) {
       throws(() => parseScene(sceneWithActionEffect({ type: "playSound", path: "x", tracked: "yes" }), VAR_ACTION_REGISTRY))
     );
 
-    // PROVENANCE (at) / NATURE (nature) — voir view/interaction.js/
+    // PROVENANCE (at) / NATURE (nature) — voir view/effect-runner.js/
     // resolvePlaySoundTarget/resolvePlaySoundNature pour la résolution des
     // défauts (hors de portée d'un test core, pure vue) ; ici seulement la
     // FORME transportée.

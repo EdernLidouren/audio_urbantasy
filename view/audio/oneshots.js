@@ -100,7 +100,7 @@ export function createOneShots({ getSession, reverbBus, findEntitySource, effect
   }
 
   // Effet "playSound" diégétique sur une entité quelconque (voir
-  // view/interaction.js/runEffects) : même résolution qu'un enterSound/
+  // view/effect-runner.js/runEffects) : même résolution qu'un enterSound/
   // exitSound (cascade de l'entité). Entité inconnue ou dormante : averti,
   // silencieux.
   //   - suivi par défaut (descriptor.tracked) ; tracked:false -> ancré ;

@@ -108,7 +108,7 @@ function validateVariableReference(scope, name, entityVariables, sceneVariables,
 // Natures reconnues pour l'effet "playSound" (voir plus bas) — DIÉGÉTIQUE
 // (positionné, filtré comme un beacon/vocal) ou MÉTA (centré joueur, sans
 // filtre) ; défaut dérivé de la PROVENANCE côté vue quand absente, jamais
-// codé ici (voir view/interaction.js/resolvePlaySoundNature).
+// codé ici (voir view/effect-runner.js/resolvePlaySoundNature).
 const PLAY_SOUND_NATURES = ["diegetic", "meta"];
 
 // Faces et modes de transition reconnus pour l'effet "teleport" (voir plus
@@ -121,7 +121,7 @@ const TELEPORT_TRANSITIONS = ["fade", "instant"];
 
 // Un effet déclenché à l'ACTIVATION d'une action (voir core/effects.js pour
 // la partition CORE/VUE, core/variables.js/applyActionEffects,
-// view/interaction.js, doc/scripting.md/"Effets d'action") — AIGUILLAGE
+// view/effect-runner.js, doc/scripting.md/"Effets d'action") — AIGUILLAGE
 // DISTINCT de parseEffect ci-dessus (presence/behavior, appliqués au TICK) :
 // ces effets n'ont de sens qu'au moment d'une interaction ponctuelle, jamais
 // réévalués en continu, jamais mélangés dans le même registre. RÉUTILISÉ TEL
@@ -157,7 +157,7 @@ const TELEPORT_TRANSITIONS = ["fade", "instant"];
 // explicite) : le core ne fait que transporter/valider leur FORME, TOUTE
 // résolution de DÉFAUT (provenance dérivée de l'entité porteuse de
 // l'action, nature dérivée de la provenance) vit côté vue (voir
-// view/interaction.js/runPlaySoundEffect) — le core ne connaît même pas
+// view/effect-runner.js/runPlaySoundEffect) — le core ne connaît même pas
 // l'existence de cette cascade.
 function parseActionEffect(rawEffect, describe, entityVariables, sceneVariables) {
   if (typeof rawEffect !== "object" || rawEffect === null) {
@@ -215,7 +215,7 @@ function parseActionEffect(rawEffect, describe, entityVariables, sceneVariables)
     }
     // at (id d'entité, PROVENANCE) / nature ("diegetic"|"meta") : TRANSPORT
     // pur comme le reste de cet effet — le core ignore tout du SENS (quelle
-    // entité, quel filtrage), seule la vue (view/interaction.js/
+    // entité, quel filtrage), seule la vue (view/effect-runner.js/
     // resolvePlaySoundTarget/resolvePlaySoundNature) résout des DÉFAUTS
     // dérivés du contexte quand l'un ou l'autre est absent. Validés ici pour
     // qu'une déclaration malformée échoue au CHARGEMENT, comme le reste de

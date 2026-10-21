@@ -21,7 +21,7 @@ import {
   setVariableEffectsHandler,
   setSearchHandler,
   setShopHandler,
-} from "./interaction.js";
+} from "./interaction-handlers.js";
 import { openShopMenu, setSellHandler, setBuyHandler } from "./menus/shop-menu.js";
 import { setDropItemHandler, setEquipItemHandler, setUnequipItemHandler } from "./menus/inventory-menu.js";
 import { setGameReplaceHandler } from "./menus/save-menu.js";

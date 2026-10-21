@@ -2,7 +2,7 @@
 // à chaque frame, et les sauts de debug). Le core ne lit jamais l'horloge :
 // on lui injecte des minutes.
 
-import { runRenderEffects } from "./interaction.js";
+import { runRenderEffects } from "./effect-runner.js";
 import { advanceTime } from "../core/time.js";
 import { advanceWeather } from "../core/weather.js";
 import { applyDueTriggers } from "../core/triggers.js";

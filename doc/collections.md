@@ -3,7 +3,7 @@
 Des listes d'objets à découvrir, consultables dans le menu global. Première
 collection : les composants électroniques. Code : `core/collections.js` (logique
 pure), `collections/` (données), `view/collection-discoveries.js` (validation,
-annonce de découverte), `view/menus/inventory-menu.js` (onglet),
+annonce de découverte), `view/menus/inventory/progress-tabs.js` (onglet),
 `view/menus/debug-collections-menu.js` (outils de debug).
 
 Les **améliorations** ne sont pas une collection : ce sont des capacités, elles
