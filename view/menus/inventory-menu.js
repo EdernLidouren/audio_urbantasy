@@ -34,10 +34,11 @@ import { IMPROVEMENT_REGISTRY, orderedImprovementIds } from "../../core/improvem
 import { collectionEntries, collectionNameKey, collectionProgress } from "../../core/collections.js";
 import collections from "../../collections/index.js";
 import { resolveAction, checkBindingsForCollisions } from "../../lib/input.js";
+import { TUNING_DEFAULTS } from "../../config/tuning-values.js";
 
 // Bindings du sélecteur de quantité (voir openQuantitySelector plus bas) —
-// aucun -> ±1, Shift -> ±10, Ctrl -> ±100 (convention établie), chacun une
-// action DISTINCTE (mods exige une correspondance EXACTE, voir
+// aucun -> ±1, Maj -> pas intermédiaire, Ctrl -> grand pas (réglages
+// bagQuantity*Step, config/tuning-values.js), chacun une action DISTINCTE (mods exige une correspondance EXACTE, voir
 // lib/input.js) plutôt qu'un magnitude lue sur l'évènement.
 const QUANTITY_BINDINGS = {
   decrease: { keys: ["ArrowLeft"], mods: [] },
@@ -56,11 +57,11 @@ checkBindingsForCollisions(QUANTITY_BINDINGS, "view/menus/inventory-menu.js QUAN
 // openQuantitySelector.
 const QUANTITY_STEP_BY_ACTION = {
   decrease: -1,
-  decreaseBig: -10,
-  decreaseBigger: -100,
+  decreaseBig: -TUNING_DEFAULTS.bagQuantityMediumStep,
+  decreaseBigger: -TUNING_DEFAULTS.bagQuantityBigStep,
   increase: 1,
-  increaseBig: 10,
-  increaseBigger: 100,
+  increaseBig: TUNING_DEFAULTS.bagQuantityMediumStep,
+  increaseBigger: TUNING_DEFAULTS.bagQuantityBigStep,
 };
 
 // Bascule d'onglet — GÉNÉRIQUE (aucune connaissance des onglets dans les
@@ -569,8 +570,8 @@ function buildDropMessage(getSession, entry, itemLabelKey, quantity, index) {
 //     écrirait sur disque une valeur qui ne doit jamais survivre à la
 //     fermeture de cet écran ;
 //   - le slider existant ne connaît qu'UN SEUL palier d'incrément (Ctrl ->
-//     bigStep) ; ce sélecteur en veut TROIS (aucun -> ±1, Shift -> ±10,
-//     Ctrl -> ±100).
+//     bigStep) ; ce sélecteur en veut TROIS (aucun, Maj, Ctrl — voir
+//     QUANTITY_STEP_BY_ACTION).
 // La mécanique de SLIDER de lib/menu.js reste donc inutilisée ici ; les
 // touches du sélecteur passent, elles, par des bindings résolus comme
 // partout (lib/input.js/resolveAction).

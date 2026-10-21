@@ -421,4 +421,14 @@ export const TUNING_DEFAULTS = {
   // pour ça. Lu DIRECTEMENT (comme faceSwitchFadeMs ci-dessus), jamais via
   // la cascade resolveTuning : un réglage PARTAGÉ, pas par passage.
   transitionStepIntervalMs: 250,
+
+  // Pas des SÉLECTEURS DE QUANTITÉ (flèches gauche/droite), même convention
+  // partout : Maj = pas intermédiaire, Ctrl = grand pas (sans modificateur :
+  // 1). Boutique (view/menus/shop-menu.js) : stocks et budgets petits ;
+  // quantité à poser depuis le sac (view/menus/inventory-menu.js) : des
+  // piles pouvant compter des centaines d'objets.
+  shopQuantityMediumStep: 5,
+  shopQuantityBigStep: 20,
+  bagQuantityMediumStep: 10,
+  bagQuantityBigStep: 100,
 };

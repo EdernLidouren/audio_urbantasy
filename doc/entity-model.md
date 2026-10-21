@@ -583,7 +583,9 @@ prévu, pas construit). Prix d'achat : `price` de l'article, sinon `value`
   une ligne par ARTICLE du catalogue, ÉPUISÉS COMPRIS (lus "épuisé", le
   joueur sait qu'ils reviendront au cycle suivant), plafond = STOCK
   disponible. Puis "Valider la vente"/"Valider l'achat" et "Annuler".
-  Touches : droite/Entrée/Espace +1, gauche -1, Maj+flèche ±5 (maintien pris
+  Touches : droite/Entrée/Espace +1, gauche -1, Maj+flèche ±5, Ctrl+flèche
+  ±20 (`shopQuantityMediumStep`/`shopQuantityBigStep`, `config/tuning-values.js` ;
+  maintien pris
   en charge comme un slider `lib/menu.js` : un DÉLAI INITIAL après le
   premier cran — une pression brève n'en produit jamais qu'un — puis une
   cadence de répétition), Suppr -> 0, Retour arrière -> grand total, Maj+A
@@ -680,9 +682,11 @@ notés à la main.
   `view/menus/inventory-menu.js`) : la valeur y est TRANSITOIRE (propre à
   cette seule ouverture) alors que le slider existant porte la sienne via
   une PRÉFÉRENCE PERSISTÉE (`prefKey`/`config/preferences.js`, localStorage
-  réel) ; et ce sélecteur veut TROIS paliers d'incrément (aucun -> ±1, Shift
-  -> ±10, Ctrl -> ±100) alors que le slider n'en connaît qu'UN (Ctrl ->
-  `bigStep`). `lib/menu.js` reste donc intact — imitation fidèle de son
+  réel) ; et ce sélecteur veut TROIS paliers d'incrément (aucun -> ±1, Maj
+  -> ±10, Ctrl -> ±100, `bagQuantityMediumStep`/`bagQuantityBigStep`,
+  `config/tuning-values.js`) alors que le slider n'en connaît qu'UN (Ctrl ->
+  `bigStep`). Même convention partout : Maj = pas intermédiaire, Ctrl =
+  grand pas. `lib/menu.js` reste donc intact — imitation fidèle de son
   esprit (annonce de la seule valeur à l'ajustement, bornée, son "select" à
   la validation), pas une réutilisation littérale.
 - **Effet CORE pur** — `core/bag.js`/`dropItem` : `removeItem` (retire la

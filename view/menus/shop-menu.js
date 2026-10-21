@@ -8,7 +8,8 @@
 //      = STOCK, condition d'incrément = ARGENT). Écran custom plutôt qu'un
 //      slider lib/menu.js pour les mêmes raisons structurelles que le
 //      sélecteur de quantité de l'inventaire (valeur TRANSITOIRE, pas une
-//      préférence persistée ; Entrée = +1 ; Suppr = 0 ; Maj = grand pas) —
+//      préférence persistée ; Entrée = +1 ; Suppr = 0 ; Maj = pas intermédiaire,
+//      Ctrl = grand pas) —
 //      voir view/menus/inventory-menu.js/openQuantitySelector.
 // ERGONOMIE lecteur d'écran : l'entrée COMPLÈTE n'est dite qu'à la
 // NAVIGATION ; un ajustement n'annonce que "<quantité>, <sous-total de la
@@ -22,7 +23,8 @@ import { t } from "../../data/i18n/index.js";
 import { pushScreen, popScreen } from "../../lib/screens.js";
 import { withPausedBeacons } from "../paused-beacons.js";
 import { openConfirmation } from "./confirmation.js";
-import { makeMenuScreen } from "../../lib/menu.js";
+import { makeMenuScreen, SLIDER_REPEAT_DELAY_MS, SLIDER_REPEAT_INTERVAL_MS } from "../../lib/menu.js";
+import { TUNING_DEFAULTS } from "../../config/tuning-values.js";
 import { announce, stripTrailingPeriod } from "../../lib/announce.js";
 import { playMenuSound } from "../menu-sounds.js";
 import { resolveAction, checkBindingsForCollisions, isHeld, isModActive } from "../../lib/input.js";
@@ -50,9 +52,9 @@ export function setBuyHandler(handler) {
 }
 
 // Bindings du menu à sliders. Entrée/Espace : +1 sur une ligne, ACTIVE une
-// entrée d'action ("Valider"/"Annuler"). Maj+flèche : grand pas (±5).
-// Suppr : remise à 0. Retour arrière : grand total. Maj+A : valider depuis
-// n'importe où. Maj+G : argent actuel (même annonce que "g" en ville) — Maj
+// entrée d'action ("Valider"/"Annuler"). Maj+flèche : pas intermédiaire,
+// Ctrl+flèche : grand pas (voir QUANTITY_STEPS). Suppr : remise à 0.
+// Retour arrière : grand total. Maj+A : valider depuis n'importe où. Maj+G : argent actuel (même annonce que "g" en ville) — Maj
 // parce que les lettres NUES restent réservées à un futur saut par initiale
 // dans les listes d'objets. Chaque combinaison est une action DISTINCTE
 // (mods exige une correspondance EXACTE, voir lib/input.js).
@@ -62,9 +64,11 @@ const LIST_BINDINGS = {
   home: { keys: ["Home"], mods: [] },
   end: { keys: ["End"], mods: [] },
   decrease: { keys: ["ArrowLeft"], mods: [] },
-  decreaseBig: { keys: ["ArrowLeft"], mods: ["shift"] },
+  decreaseMedium: { keys: ["ArrowLeft"], mods: ["shift"] },
+  decreaseBig: { keys: ["ArrowLeft"], mods: ["ctrl"] },
   increase: { keys: ["ArrowRight"], mods: [] },
-  increaseBig: { keys: ["ArrowRight"], mods: ["shift"] },
+  increaseMedium: { keys: ["ArrowRight"], mods: ["shift"] },
+  increaseBig: { keys: ["ArrowRight"], mods: ["ctrl"] },
   reset: { keys: ["Delete"], mods: [] },
   confirm: { keys: ["Enter", " "], mods: [] },
   total: { keys: ["Backspace"], mods: [] },
@@ -74,13 +78,20 @@ const LIST_BINDINGS = {
 };
 checkBindingsForCollisions(LIST_BINDINGS, "view/menus/shop-menu.js LIST_BINDINGS");
 
-const STEP = 1;
-const BIG_STEP = 5;
-// Maintien gauche/droite — mêmes rythmes que lib/menu.js : un DÉLAI INITIAL
-// après le premier cran (une pression brève n'en produit jamais qu'un), puis
-// une cadence de répétition.
-const SLIDER_REPEAT_DELAY_MS = 400;
-const SLIDER_REPEAT_INTERVAL_MS = 150;
+// Amplitude d'un cran selon le modificateur (config/tuning-values.js).
+const QUANTITY_STEPS = {
+  normal: 1,
+  medium: TUNING_DEFAULTS.shopQuantityMediumStep,
+  big: TUNING_DEFAULTS.shopQuantityBigStep,
+};
+
+// Cran du MAINTIEN : modificateur relu à chaque répétition (Ctrl prime sur
+// Maj), comme les sliders de lib/menu.js.
+function heldStep() {
+  if (isModActive("ctrl")) return QUANTITY_STEPS.big;
+  if (isModActive("shift")) return QUANTITY_STEPS.medium;
+  return QUANTITY_STEPS.normal;
+}
 
 // Entité VIVANTE du point de vente (état de stock à jour), relue dans la
 // session — jamais le snapshot reçu à l'activation.
@@ -226,18 +237,19 @@ function openQuantityList(spec) {
   // "block" sans message) ; puis, pour un incrément, la CONDITION de
   // `allowedIncrease` (argent) — SEULE source de refus avec message, et
   // c'est le son "refusal" (voir view/menu-sounds.js) qui l'accompagne.
-  // Annonce : quantité + SOUS-TOTAL de la ligne, rien d'autre. `nextDelayMs`
+  // Annonce : quantité + SOUS-TOTAL de la ligne, rien d'autre. `step` :
+  // amplitude d'un cran (QUANTITY_STEPS). `nextDelayMs`
   // : délai avant le prochain cran de maintien (long après un appui, court
   // entre deux crans de maintien) — posé même sur un refus, pour qu'un
   // maintien à la borne ne mitraille pas le son "block".
-  function adjust(direction, big, nextDelayMs = SLIDER_REPEAT_DELAY_MS) {
+  function adjust(direction, step, nextDelayMs = SLIDER_REPEAT_DELAY_MS) {
     nextRepeatAt = performance.now() + nextDelayMs;
     if (!isLine(cursor)) {
       playMenuSound("block");
       return;
     }
     const line = lines[cursor];
-    const wanted = line.selected + direction * (big ? BIG_STEP : STEP);
+    const wanted = line.selected + direction * step;
     const bounded = Math.min(Math.max(wanted, 0), line.max);
     let delta = bounded - line.selected;
     if (delta > 0 && spec.allowedIncrease) {
@@ -304,10 +316,12 @@ function openQuantityList(spec) {
     down: () => moveCursor(1),
     home: () => moveCursorTo(0),
     end: () => moveCursorTo(total() - 1),
-    decrease: () => adjust(-1, false),
-    decreaseBig: () => adjust(-1, true),
-    increase: () => adjust(1, false),
-    increaseBig: () => adjust(1, true),
+    decrease: () => adjust(-1, QUANTITY_STEPS.normal),
+    decreaseMedium: () => adjust(-1, QUANTITY_STEPS.medium),
+    decreaseBig: () => adjust(-1, QUANTITY_STEPS.big),
+    increase: () => adjust(1, QUANTITY_STEPS.normal),
+    increaseMedium: () => adjust(1, QUANTITY_STEPS.medium),
+    increaseBig: () => adjust(1, QUANTITY_STEPS.big),
     reset: () => reset(),
     confirm: () => confirm(),
     total: () => announce(`${title()}. ${entryLine(cursor)}`, { assertive: true }),
@@ -326,14 +340,14 @@ function openQuantityList(spec) {
       announce(`${title()}. ${entryLine(cursor)}`, { assertive: true });
     },
     // Maintien gauche/droite sur une ligne (même modèle que lib/menu.js :
-    // isHeld relu au tick, Maj relue à chaque déclenchement).
+    // isHeld relu au tick, modificateur relu à chaque déclenchement).
     onTick() {
       if (!isLine(cursor)) return;
       const left = isHeld("ArrowLeft");
       const right = isHeld("ArrowRight");
       if (left === right) return;
       if (performance.now() < nextRepeatAt) return;
-      adjust(left ? -1 : 1, isModActive("shift"), SLIDER_REPEAT_INTERVAL_MS);
+      adjust(left ? -1 : 1, heldStep(), SLIDER_REPEAT_INTERVAL_MS);
     },
     onKeyDown(event) {
       const action = resolveAction(LIST_BINDINGS, event.key, event.mods);
