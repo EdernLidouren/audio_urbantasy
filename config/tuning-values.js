@@ -398,7 +398,7 @@ export const TUNING_DEFAULTS = {
   // souligne le changement de scène/position et masque un éventuel
   // chargement. COURTES par nature (souligner sans ralentir le passage) : sortant
   // avant de détruire la scène quittée, entrant une fois la scène cible
-  // prête. Musique/ambiance NE PASSENT PAS par ce gain (voir lib/audio.js,
+  // prête. Musique/ambiance NE PASSENT PAS par ce gain (voir lib/audio/context.js,
   // "Gain de couche ENTITÉS") : ces durées n'affectent qu'elles-mêmes.
   doorTransitionFadeOutMs: 250,
   doorTransitionFadeInMs: 300,

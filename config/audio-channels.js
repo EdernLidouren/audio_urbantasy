@@ -2,8 +2,8 @@
 // distincte de lui : cette valeur n'est pas un réglage de feeling qu'on
 // tourne à l'oreille, c'est une CAPACITÉ structurelle (nombre max de flux
 // simultanés sur le canal ambiance). Lue à la fois par core/scene.js
-// (validation du format de scène) et lib/audio.js (lecture audio, entrée
-// "ambience" de GLOBAL_CHANNELS) — une seule source, deux lecteurs, aucun
+// (validation du format de scène) et lib/audio/channels.js (lecture audio,
+// entrée "ambience" de GLOBAL_CHANNELS) — une seule source, deux lecteurs, aucun
 // couplage core<->audio : le core importe cette donnée pure, jamais
 // lib/audio.js lui-même.
 //

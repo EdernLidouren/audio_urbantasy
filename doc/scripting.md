@@ -345,7 +345,7 @@ AUSSI une AMBIANCE SONORE dédiée : une couche GLOBALE (`lib/audio.js`/
 contrairement à la couche `"state"` de perception qui REMPLACE celle de la scène) et persistante
 au niveau module — elle continue SANS COUPURE à travers une transition de scène tant que
 NI la météo NI le contexte indoor/outdoor de la scène active ne changent (diffing PAR
-COUCHE, `lib/audio.js`/`syncAmbienceLayers` : une couche dont la source déclarée n'a pas
+COUCHE, `lib/audio/ambience.js`/`syncAmbienceLayers` : une couche dont la source déclarée n'a pas
 changé garde EXACTEMENT ses flux, jamais fondue), et ne fond (crossfade existant) qu'à
 une vraie transition météo OU de contexte, SANS jamais toucher l'ambiance de scène au
 passage. `WEATHER_STATES[state].ambience` (optionnel, `config/weather-values.js`)
