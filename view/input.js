@@ -12,7 +12,7 @@ import { isActionActive, checkBindingsForCollisions } from "../lib/input.js";
 // modificateur — c'est cette exigence qui empêche Ctrl+D de déclencher
 // "moveRight" (voir la RÈGLE D'ARBITRAGE des modificateurs, en-tête de
 // lib/input.js).
-export const MOVE_BINDINGS = {
+const MOVE_BINDINGS = {
   moveLeft: { keys: ["ArrowLeft", "q", "a"], mods: [] },
   moveRight: { keys: ["ArrowRight", "d"], mods: [] },
 };

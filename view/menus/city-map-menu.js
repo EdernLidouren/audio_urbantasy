@@ -86,10 +86,6 @@ const CITY_MAP_BINDINGS = {
 };
 checkBindingsForCollisions(CITY_MAP_BINDINGS, "view/menus/city-map-menu.js CITY_MAP_BINDINGS");
 
-function clamp(value, min, max) {
-  return Math.min(Math.max(value, min), max);
-}
-
 function cityMapAlphaPref() {
   return getPref("cityMapAlphaCoordinates", PREF_CONSTRAINTS.cityMapAlphaCoordinates.default);
 }

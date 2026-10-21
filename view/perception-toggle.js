@@ -26,7 +26,7 @@ function playPerceptionToggleSound(active) {
     const factor = getPref("interfaceVolume", PREF_CONSTRAINTS.interfaceVolume.default) / 100;
     playOneShot(resolveAsset(key), { volume: factor });
   } catch (error) {
-    console.warn(`city-screen: son de bascule de perception indisponible ("${key}") : ${error.message}`);
+    console.warn(`perception-toggle: son de bascule de perception indisponible ("${key}") : ${error.message}`);
   }
 }
 

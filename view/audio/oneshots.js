@@ -109,11 +109,11 @@ export function createOneShots({ getSession, reverbBus, findEntitySource, effect
   function playEntityOneShot(targetId, descriptor, { departing = false } = {}) {
     const found = findEntitySource(targetId);
     if (!found) {
-      console.warn(`city-scene: playEntityOneShot("${targetId}") : id absent de la scène.`);
+      console.warn(`oneshots: playEntityOneShot("${targetId}") : id absent de la scène.`);
       return;
     }
     if (!found.live || found.live.present === false) {
-      console.warn(`city-scene: playEntityOneShot("${targetId}") : entité dormante ou introuvable.`);
+      console.warn(`oneshots: playEntityOneShot("${targetId}") : entité dormante ou introuvable.`);
       return;
     }
     const resolved = resolveTransitionSound(found.entry.entity, descriptor, PLAY_SOUND_TUNING_KEYS);
@@ -137,7 +137,7 @@ export function createOneShots({ getSession, reverbBus, findEntitySource, effect
     try {
       file = resolveAsset(resolved.path);
     } catch (error) {
-      console.warn(`city-scene: son suivi indisponible ("${resolved.path}") : ${error.message}`);
+      console.warn(`oneshots: son suivi indisponible ("${resolved.path}") : ${error.message}`);
       return;
     }
     const rendering = spatialRendering(found.entry, found.live.x - getSession().player.x, effectiveMuffle(found.entry, found.forcedMuffle));

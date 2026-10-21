@@ -196,7 +196,7 @@ l'horloge : `doc/time.md`.
 ## Musique : séquence avec respiration
 
 Par défaut (`musicLoop` absent ou `false`), la musique d'une scène n'est pas
-une boucle mais une SÉQUENCE (`lib/audio.js`/`startMusicSequence`) : un
+une boucle mais une SÉQUENCE (`lib/audio/music.js`/`startMusicSequence`) : un
 morceau joue une fois (`loop:false`), se termine, une PAUSE aléatoire
 ("respiration" — `musicBreatherMinMs`/`musicBreatherMaxMs`,
 `config/tuning-values.js`, ~3 à 8s par défaut) s'écoule en silence complet,
@@ -212,11 +212,11 @@ aucune respiration.
 
 **Unification avec la bascule de phase** : une bascule jour/nuit réutilise
 EXACTEMENT le même mécanisme de respiration que l'enchaînement naturel
-(`lib/audio.js`/`switchMusicSequence`) — fondu du morceau courant, PUIS la
+(`lib/audio/music.js`/`switchMusicSequence`) — fondu du morceau courant, PUIS la
 même pause aléatoire, PUIS démarrage de la musique de la nouvelle phase.
 
 **Fondu de sortie universel** (`musicFadeMs`, `config/tuning-values.js`,
-`lib/audio.js`/`fadeOutMusic`) : TOUT arrêt de musique (bascule de phase,
+`lib/audio/music.js`/`fadeOutMusic`) : TOUT arrêt de musique (bascule de phase,
 transition de scène) descend en volume avant de s'arrêter, jamais une
 coupure sèche. À une transition de scène, la transition elle-même reste
 IMMÉDIATE (la scène suivante démarre tout de suite) — seule la musique

@@ -12,10 +12,6 @@
 // voient jamais ni l'un ni l'autre : un wander bloqué le constate seulement
 // a posteriori, par sa position inchangée (voir behaviors/wander.js).
 //
-// moveAndBounce, plus bas, est un utilitaire générique de rebond aux
-// bornes qu'aucun comportement n'emploie aujourd'hui (seul
-// core/checks/movement.check.js l'exerce).
-//
 // Futur (pas codé ici, porte laissée ouverte) : c'est ici que viendraient
 // d'éventuelles règles de monde supplémentaires — inertie, gravité — le
 // jour où elles deviendraient nécessaires. Aucune n'existe aujourd'hui,
@@ -29,23 +25,4 @@ export function clamp(value, min, max) {
 // seul pas fixe du jeu. Pure.
 export function moveWithinBounds(x, delta, length) {
   return clamp(x + delta, 0, length);
-}
-
-// Applique un déplacement de dir * delta depuis x, borné à [0, length],
-// pour un mobile qui PERSISTE sa propre direction d'un tick à l'autre, à
-// la différence du joueur (direction relue depuis l'entrée à chaque tick,
-// jamais stockée — voir collision.js/resolvePlayerMove). Contrat de
-// blocage aux bornes : rebond immédiat, jamais un tick de retard — quand
-// le déplacement voulu
-// dépasserait [0, length], la position est bornée ET la direction renvoyée
-// est DÉJÀ inversée, dans le MÊME appel — pas de signal différé que le
-// comportement encaisserait au tick suivant (ça collerait le mobile un
-// tick de trop contre la borne au lieu de repartir aussitôt). Pure.
-export function moveAndBounce(x, dir, delta, length) {
-  const rawX = x + dir * delta;
-  const hitLower = rawX <= 0;
-  const hitUpper = rawX >= length;
-  const nextX = clamp(rawX, 0, length);
-  const nextDir = hitLower ? 1 : hitUpper ? -1 : dir;
-  return { x: nextX, dir: nextDir };
 }

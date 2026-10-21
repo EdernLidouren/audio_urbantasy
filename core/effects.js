@@ -38,10 +38,6 @@ export const RENDER_EFFECT_TYPES = ["playSound", "announce"];
 export const MIXED_EFFECT_TYPES = ["teleport"];
 export const ACTION_EFFECT_TYPES = [...STATE_EFFECT_TYPES, ...RENDER_EFFECT_TYPES, ...MIXED_EFFECT_TYPES];
 
-export function isStateEffect(effect) {
-  return STATE_EFFECT_TYPES.includes(effect.type);
-}
-
 export function isRenderEffect(effect) {
   return RENDER_EFFECT_TYPES.includes(effect.type);
 }

@@ -117,7 +117,7 @@ export function parseVariables(raw, describe, fail) {
 // `context` après chaque effet), sans dupliquer cette correspondance ;
 // exportée pour qu'un futur constructeur de contexte s'y réfère plutôt que
 // de la recopier (aucun importeur aujourd'hui).
-export const SCOPE_CONTEXT_KEYS = { entity: "entity", scene: "world", party: "session" };
+const SCOPE_CONTEXT_KEYS = { entity: "entity", scene: "world", party: "session" };
 
 // Résout le PORTEUR concerné par une portée, depuis un `context` générique
 // { entity?, world?, session? } — le consommateur (condition/action)

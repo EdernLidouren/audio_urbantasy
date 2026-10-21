@@ -16,11 +16,9 @@ import {
   sellValueOf,
   isSellable,
   ownedQuantity,
-  sellTotal,
   sellItems,
   shopArticles,
   restockShopIfDue,
-  purchaseTotal,
   buyItems,
 } from "../trade.js";
 import { validateShopCatalogs, validateCatalog, fullStockOf, articlePrice } from "../catalog.js";
@@ -39,11 +37,6 @@ export default function checkTrade(run) {
   run("vente : un type inconnu vaut 0", 0, sellValueOf("does-not-exist"));
   run("vente : isSellable vrai si value > 0", true, isSellable("apple"));
   run("vente : isSellable faux sans value", false, isSellable("key_bronze"));
-  run("vente : sellTotal = Σ prix × quantité (non vendable compte 0)", 3 * sellValueOf("apple") + 2 * sellValueOf("coin"), sellTotal([
-    { type: "apple", quantity: 3 },
-    { type: "coin", quantity: 2 },
-    { type: "key_bronze", quantity: 5 },
-  ]));
 
   // Sac de test : 5 pommes (empilable), 2 clés (non empilable, deux
   // entrées), 1 paire de baskets (non empilable, vendable).
@@ -148,7 +141,6 @@ export default function checkTrade(run) {
   const applePrice = articlePrice("apple", SHOP_CATALOGS.general.apple);
   const appleStock = SHOP_CATALOGS.general.apple.stock;
   const shopRich = addMoney(shopLoaded, 100);
-  run("achat : purchaseTotal = Σ prix × quantité", 3 * applePrice, purchaseTotal(shopEntity(shopRich, "counter-1"), [{ type: "apple", quantity: 3 }]));
 
   const bought = buyItems(shopRich, "counter-1", [{ type: "apple", quantity: 3 }]);
   run("achat : acheter 3 pommes -> argent débité du coût exact", 100 - 3 * applePrice, bought.money);

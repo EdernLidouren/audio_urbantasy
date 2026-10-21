@@ -36,8 +36,6 @@ export const RARITY_LEVELS = [
   { name: "legendary", weight: 1 },
 ];
 
-export const DEFAULT_SPAWN_TABLE = "default";
-
 export const SPAWN_TABLES = {
   default: { apple: 80, coin: 20 },
   // Tous les composants électroniques (collection "electronics"), chacun

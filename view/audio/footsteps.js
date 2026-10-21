@@ -28,7 +28,7 @@ export const PLAYER_GAIT_POOL = [
 // Son de déplacement du joueur. Son envoi de réverb a son propre défaut
 // (footstepReverbSend), délibérément distinct de celui des entités.
 export const MOVEMENT_SOUND = player.sounds.movement;
-export const FOOTSTEP_REVERB_SEND =
+const FOOTSTEP_REVERB_SEND =
   MOVEMENT_SOUND.reverbSend !== undefined ? MOVEMENT_SOUND.reverbSend : TUNING_DEFAULTS.footstepReverbSend;
 
 // Anti-mitraillette du son de COLLISION seulement : le pas, lui, est borné

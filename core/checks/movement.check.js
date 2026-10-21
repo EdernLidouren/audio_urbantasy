@@ -8,7 +8,6 @@ import { parseScene } from "../scene.js";
 import { createInitialState, getActiveWorld, MOVE_STEP, BODY_RADIUS } from "../state.js";
 import { tick } from "../actions.js";
 import { reduce } from "../reduce.js";
-import { moveAndBounce } from "../physics/movement.js";
 import { resolvePlayerMove } from "../physics/collision.js";
 import { throws } from "../../lib/check.js";
 import { NO_COMPANIONS, RAW_SCENE, EMPTY_REGISTRY } from "./helpers.js";
@@ -421,18 +420,4 @@ export default function checkMovement(run) {
     return { playerX: s.player.x, blockedBy: s.player.blockedBy, dogX: getActiveWorld(s).entities[0].x };
   }
   run.same("pipeline : intentions + physique combinées, résultat déterministe", runPipeline(), runPipeline());
-
-  // --- moveAndBounce (core/physics/movement.js) : utilitaire générique,
-  // SANS appelant en production depuis que wander (voir behaviors/
-  // wander.js) est passé en intention pure — gardé et testé tel quel
-  // (fonction pure, potentiel appelant futur), verrouille son propre
-  // contrat indépendamment de tout comportement.
-  const bounceLow = moveAndBounce(0.01, -1, 0.5, 10); // dépasse le bord bas
-  run("physique : moveAndBounce borne la position au bord bas", 0, bounceLow.x);
-  run("physique : moveAndBounce inverse la direction au bord bas", 1, bounceLow.dir);
-  const bounceHigh = moveAndBounce(9.99, 1, 0.5, 10); // dépasse le bord haut
-  run("physique : moveAndBounce borne la position au bord haut", 10, bounceHigh.x);
-  run("physique : moveAndBounce inverse la direction au bord haut", -1, bounceHigh.dir);
-  const noBounce = moveAndBounce(5, 1, 0.5, 10); // pas de bord franchi
-  run("physique : moveAndBounce ne modifie pas la direction sans franchissement", 1, noBounce.dir);
 }

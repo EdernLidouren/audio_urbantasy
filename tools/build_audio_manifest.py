@@ -32,6 +32,12 @@ from pathlib import Path
 # de nouveaux formats sont un jour utilisés — seul point de configuration.
 AUDIO_EXTENSIONS = {".mp3", ".ogg", ".wav"}
 
+# Sous-dossiers de la racine HORS du jeu, jamais scannés : assets/old/ garde
+# d'anciens sons pour mémoire et n'est pas suivi par git (voir .gitignore) —
+# les mettre au manifeste ferait pointer un clone frais vers des fichiers
+# absents.
+EXCLUDED_DIRS = {"old"}
+
 # Nom de fichier "propre" attendu : lettres/chiffres/_/- uniquement, sans le
 # suffixe numérique (traité séparément ci-dessous).
 SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
@@ -96,6 +102,8 @@ def build_manifest(root):
 
     for path in sorted(root.rglob("*")):
         if not path.is_file():
+            continue
+        if path.relative_to(root).parts[0] in EXCLUDED_DIRS:
             continue
         if path.suffix.lower() not in AUDIO_EXTENSIONS:
             continue  # extension non audio : ignoré, silencieusement (normal)

@@ -53,7 +53,7 @@ function addToBag(session, type, count) {
 
 // Note `type` comme acquis (voir le header). Déjà noté -> référence
 // INCHANGÉE pour acquiredItems (rien de neuf à signaler à un observateur).
-export function markAcquired(session, type) {
+function markAcquired(session, type) {
   const acquired = session.acquiredItems || {};
   if (acquired[type]) return session;
   return { ...session, acquiredItems: { ...acquired, [type]: true } };

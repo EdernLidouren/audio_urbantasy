@@ -12,7 +12,10 @@ Données PURES en JSON (voir data/i18n/README.md) : json.load() suffit,
 aucun parsing complexe. Code de sortie : 0 si toutes les langues sont
 synchrones avec REFERENCE_LANG (aucun domaine manquant, aucune clé
 divergente, aucune valeur vide), non nul sinon — utilisable en vérification
-automatique. --verbose ajoute une section indicative (valeurs identiques à
+automatique. Une valeur vide dans TOUTES les langues est un silence VOULU
+(ex. un fragment d'annonce que le jeu omet quand il est vide), jamais une
+divergence ; vide dans une langue seulement, c'est une traduction
+manquante. --verbose ajoute une section indicative (valeurs identiques à
 la référence) qui n'influence JAMAIS le code de sortie.
 
 ORDRE DES CLÉS : chaque fichier doit garder ses clés triées par ordre
@@ -141,12 +144,25 @@ def analyze(languages, per_lang_files):
     # valeurs identiques. Un domaine absent de la référence (déjà signalé
     # en b, "en trop") n'a rien à comparer clé à clé : sauté ici.
     per_file = []  # dicts : lang, domain, missing, extra, empty, identical
+
+    # Clés vides dans TOUTES les langues qui ont ce domaine : silence voulu
+    # (voir docstring), exclu des valeurs vides signalées.
+    intentionally_empty = {}
+    for domain in ref_domains:
+        datas = [
+            per_lang_files[lang][domain]["data"]
+            for lang in languages
+            if domain in per_lang_files[lang] and per_lang_files[lang][domain]["data"] is not None
+        ]
+        keys = set.intersection(*(set(k for k, v in data.items() if v == "") for data in datas)) if datas else set()
+        intentionally_empty[domain] = keys
+
     for lang in languages:
         for domain, info in per_lang_files[lang].items():
             if info["data"] is None:
                 continue  # JSON invalide, déjà signalé plus haut
 
-            empty = sorted(k for k, v in info["data"].items() if v == "")
+            empty = sorted(k for k, v in info["data"].items() if v == "" and k not in intentionally_empty.get(domain, set()))
             unsorted = list(info["data"]) != sorted(info["data"])
 
             missing, extra, identical = [], [], []

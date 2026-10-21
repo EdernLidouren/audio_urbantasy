@@ -123,10 +123,6 @@ export const TUNING_DEFAULTS = {
   // espacées sur des à-coups ; plus bas = plus permissif.
   minStepIntervalMs: 150,
 
-  // Écart minimum (ms) entre deux bruits de pas de causes différentes,
-  // nettement plus court que minStepIntervalMs.
-  footstepOverlapGuardMs: 80,
-
   // Fréquence de coupure (Hz) du passe-bas d'une entité au plus loin
   // (dist proche de audibleRange) : plus bas = plus étouffé/sourd de loin ;
   // plus haut = perd son effet d'éloignement (se rapproche de cutoffMax).

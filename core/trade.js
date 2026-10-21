@@ -31,12 +31,6 @@ export function ownedQuantity(bag, type) {
   return bag.reduce((total, entry) => (entry.type === type ? total + (entry.quantity ?? 1) : total), 0);
 }
 
-// Montant d'une vente : Σ prix unitaire × quantité — `sales` : [{ type,
-// quantity }]. Les types non vendables comptent 0.
-export function sellTotal(sales) {
-  return sales.reduce((total, { type, quantity }) => total + sellValueOf(type) * quantity, 0);
-}
-
 // Effet d'ÉTAT de la vente : retire les quantités du sac ET crédite
 // session.money du total, dans le MÊME nouvel état (jamais l'un sans
 // l'autre). Défensif : quantité CLAMPÉE au possédé, type non vendable
@@ -101,13 +95,6 @@ export function restockShopIfDue(session, entityId) {
   const cycle = spawnCycleAt(session.time);
   if (found.entity.shopCycle === cycle) return session;
   return replaceShop(session, found, restockShopEntity(found.entity, cycle));
-}
-
-// Coût d'un panier : Σ prix × quantité — `purchases` : [{ type, quantity }],
-// prix lus dans le catalogue de l'entité.
-export function purchaseTotal(entity, purchases) {
-  const prices = Object.fromEntries(shopArticles(entity).map((a) => [a.type, a.price]));
-  return purchases.reduce((total, { type, quantity }) => total + (prices[type] ?? 0) * quantity, 0);
 }
 
 // Effet d'ÉTAT de l'achat : DÉBITE session.money, AJOUTE les articles au sac,

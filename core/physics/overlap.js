@@ -16,7 +16,7 @@ import { isBlocking } from "../presence.js";
 // deux n'a de marge (scène plus courte que minGap — cas dégénéré), léger
 // chevauchement résiduel accepté : rester dans [0, length] est la seule
 // garantie ferme. Pure.
-export function separate(xA, weightA, xB, weightB, minGap, length) {
+function separate(xA, weightA, xB, weightB, minGap, length) {
   const gap = xB - xA;
   const absGap = Math.abs(gap);
   if (absGap >= minGap) return { xA, xB };

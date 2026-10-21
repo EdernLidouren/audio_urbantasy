@@ -20,7 +20,7 @@ export default function checkBehaviors(run) {
   // une intention (-1/0/+1, 0 en pause), résolue comme tout autre mobile à
   // intention par resolveBodyMove (core/physics/collision.js) — bornes ET
   // obstacles gérés par la MÊME physique, aucun test de borne propre à
-  // wander ici (voir movement.check.js, section moveAndBounce).
+  // wander ici (voir movement.check.js).
 
   const wanderScene = parseScene(makeWanderScene(), WANDER_REGISTRY);
 

@@ -28,7 +28,7 @@ export function applyMuffleToVolume(volume, muffle) {
 }
 
 // Coupure : composée avec celle de la distance, jamais à sa place.
-export function applyMuffleToCutoff(cutoff, muffle) {
+function applyMuffleToCutoff(cutoff, muffle) {
   if (muffle.amount <= 0) return cutoff;
   return cutoff * (1 - muffle.amount) + muffle.lowpassHz * muffle.amount;
 }
@@ -54,7 +54,7 @@ export function volumeForDistance(dist, audibleRange, highlighted) {
 //     linéaire sonnerait comme un saut puis presque rien) ;
 //   - au-delà : cutoffMin.
 // Continue à dist=interactRange (pas de saut, contrairement au volume).
-export function cutoffForDistance(dist, interactRange, audibleRange, cutoffMin, cutoffMax) {
+function cutoffForDistance(dist, interactRange, audibleRange, cutoffMin, cutoffMax) {
   if (dist <= interactRange) return cutoffMax;
   if (dist >= audibleRange) return cutoffMin;
 

@@ -33,22 +33,20 @@
 
 import registry from "../entities/types/index.js";
 import { loadSceneById } from "../scenes/load.js";
-import { createInitialState, togglePerception, switchSide } from "../core/state.js";
+import { createInitialState, togglePerception, switchSide, getActiveWorld } from "../core/state.js";
 import { reduce } from "../core/reduce.js";
 import { tick } from "../core/actions.js";
 import { advanceTime } from "../core/time.js";
 import { setWeather } from "../core/weather.js";
 import { refillDueSpawns, searchContainer } from "../core/spawn.js";
 import { pickupItemEntity } from "../core/bag.js";
-import { getActiveWorld } from "../core/state.js";
+import { TICK_MS } from "../lib/loop.js";
 import { refreshActiveBeaconVolumes } from "../view/audio/city-scene.js";
 import { createWorldView, stopPersistentAudioLayers } from "../view/world-view.js";
 
 export const AUDIO_TRACE_BASELINE_KEY = "templeton:audioTraceBaseline";
 
-// Durée d'un tick de simulation (lib/loop.js/TICK_MS) et durée simulée d'un
-// son ponctuel (son "end" émis au bout de ce délai).
-const TICK_MS = 1000 / 60;
+// Durée simulée d'un son ponctuel (son "end" émis au bout de ce délai).
 const FAKE_SOUND_DURATION_MS = 900;
 
 // --- Mise en forme -------------------------------------------------------

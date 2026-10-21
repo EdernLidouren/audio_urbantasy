@@ -469,7 +469,6 @@ function buildItemActions(getSession, entry, itemLabelKey, index) {
 // passée telle quelle à t() par lib/menu.js.
 function openItemActionsMenu(getWorldView, getSession, entry, itemLabelKey, index) {
   const actions = buildItemActions(getSession, entry, itemLabelKey, index);
-  if (actions.length === 0) return;
 
   actions.push({ label: "inventory.actions.cancel", onActivate: () => popScreen() });
 
