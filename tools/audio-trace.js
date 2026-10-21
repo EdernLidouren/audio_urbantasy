@@ -223,7 +223,10 @@ function installEnvironment(seed) {
   }
 
   // Faux Howl : aucun son, mais la même surface que celle utilisée par
-  // lib/audio.js (identifiants de son, évènements, _sounds[0]._node).
+  // lib/audio.js (identifiants de son, évènements, instances). Comme Howler :
+  // une instance par lecture, chacune avec son nœud (`_node`) ; une
+  // instance terminée est réutilisée par la lecture suivante, sinon une
+  // nouvelle est créée.
   let howlSeq = 0;
   class FakeHowl {
     constructor(options) {
@@ -237,12 +240,22 @@ function installEnvironment(seed) {
       this._playing = new Set();
       this._soundSeq = 0;
       this._listeners = [];
-      const node = originalCreateGain.call(ctx);
-      node.__traceName = `${this.__traceName}.node`;
-      node.gain.__traceName = `${this.__traceName}.node.gain`;
-      this._sounds = [{ _node: node }];
+      this._sounds = [];
+      this._newSound();
       const { src, ...rest } = options;
       log(`new ${this.__traceName} ${this._src} ${describe(rest)}`);
+    }
+    _newSound() {
+      const node = originalCreateGain.call(ctx);
+      const suffix = this._sounds.length === 0 ? "" : String(this._sounds.length + 1);
+      node.__traceName = `${this.__traceName}.node${suffix}`;
+      node.gain.__traceName = `${this.__traceName}.node${suffix}.gain`;
+      const sound = { _id: null, _node: node, _ended: true, _panner: null };
+      this._sounds.push(sound);
+      return sound;
+    }
+    _soundById(id) {
+      return this._sounds.find((sound) => sound._id === id) ?? null;
     }
     _emit(event, id) {
       const listeners = this._listeners.filter((l) => l.event === event && (l.id === undefined || l.id === id));
@@ -254,6 +267,9 @@ function installEnvironment(seed) {
       if (soundId === undefined || typeof soundId !== "number") {
         this._soundSeq += 1;
         soundId = this._soundSeq;
+        const sound = this._sounds.find((s) => s._ended) ?? this._newSound();
+        sound._id = soundId;
+        sound._ended = false;
       }
       this._playing.add(soundId);
       log(`${this.__traceName}.play(${id ?? ""}) -> ${soundId}`);
@@ -261,6 +277,7 @@ function installEnvironment(seed) {
         setTimeout(() => {
           if (!this._playing.has(soundId)) return;
           this._playing.delete(soundId);
+          this._markEnded(soundId);
           this._emit("end", soundId);
         }, FAKE_SOUND_DURATION_MS);
       }
@@ -271,9 +288,14 @@ function installEnvironment(seed) {
       const ids = id === undefined ? [...this._playing] : [id];
       for (const soundId of ids) {
         this._playing.delete(soundId);
+        this._markEnded(soundId);
         this._emit("stop", soundId);
       }
       return this;
+    }
+    _markEnded(soundId) {
+      const sound = this._soundById(soundId);
+      if (sound) sound._ended = true;
     }
     pause(id) {
       log(`${this.__traceName}.pause(${id ?? ""})`);
@@ -298,6 +320,10 @@ function installEnvironment(seed) {
       return this._accessor("rate", "_rate", args);
     }
     stereo(...args) {
+      if (typeof args[1] === "number") {
+        const sound = this._soundById(args[1]);
+        if (sound) sound._panner = sound._panner ?? {};
+      }
       return this._accessor("stereo", "_stereo", args);
     }
     loop(...args) {

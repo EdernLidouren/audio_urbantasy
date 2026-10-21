@@ -5,9 +5,9 @@
 // son premier tirage). Asynchrone, jamais bloquant : seule la création des
 // Howl a lieu ici.
 //
-// L'autre face d'une scène à deux faces n'est pas préchargée : sa chaîne de
-// filtres étouffée est distincte (cacheKey "muffled:"), la précharger
-// doublerait les requêtes au montage pour un gain marginal.
+// L'autre face d'une scène à deux faces n'est pas préchargée : entendue
+// étouffée, jamais au premier plan, elle doublerait les requêtes au montage
+// pour un gain marginal.
 
 import { playOneShot, preloadOneShot, preloadMusic } from "../../lib/audio.js";
 import { resolveAsset, assetKeyMembers } from "../../lib/assets.js";

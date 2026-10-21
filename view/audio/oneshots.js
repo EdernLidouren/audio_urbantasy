@@ -42,12 +42,12 @@ export function createOneShots({ getSession, reverbBus, findEntitySource, effect
   //   - highpassHz, heightGain : chaîne "hauteur suggérée" (isFlying) ;
   //   - muffle : étouffement à CE déclenchement (un son ponctuel ne peut pas
   //     être modulé après coup : pendant une rampe de perception, c'est la
-  //     suite des déclenchements qui porte le fondu). cacheKey distincte
-  //     ("muffled:") : la version étouffée d'un fichier ne partage jamais sa
-  //     chaîne de filtres avec la version nette ;
+  //     suite des déclenchements qui porte le fondu) ;
   //   - entityLayer false : hors de la couche entités, jamais éteint par le
-  //     fondu du sas (son de départ, voir playEntityOneShot), cacheKey dédiée
-  //     ("departure:").
+  //     fondu du sas (son de départ, voir playEntityOneShot).
+  // Chaque lecture a sa propre chaîne (voir lib/audio/oneshots.js) : une
+  // version étouffée et une version nette du même fichier ne se gênent
+  // jamais.
   function playPositionedOneShot(
     path,
     {
@@ -68,9 +68,7 @@ export function createOneShots({ getSession, reverbBus, findEntitySource, effect
     const dist = Math.abs(relX);
     const pan = clamp(relX / panSaturation, -1, 1);
     const volume = applyMuffleToVolume(volumeForDistance(dist, audibleRange, highlighted) * volumeFactor * gain * heightGain, muffle);
-    const resolved = resolveAsset(path);
-    const cachePrefix = `${entityLayer ? "" : "departure:"}${muffle.amount > 0 ? "muffled:" : ""}`;
-    playOneShot(resolved, {
+    playOneShot(resolveAsset(path), {
       reverbSend,
       reverbBusInput: reverbBus.input,
       volume,
@@ -78,7 +76,6 @@ export function createOneShots({ getSession, reverbBus, findEntitySource, effect
       rate: randomRate(pitchVariation),
       highpassHz,
       lowpassHz: muffle.amount > 0 ? muffle.lowpassHz : undefined,
-      cacheKey: cachePrefix ? `${cachePrefix}${resolved}` : undefined,
       entityLayer,
     });
   }
@@ -147,9 +144,6 @@ export function createOneShots({ getSession, reverbBus, findEntitySource, effect
     // Gain de rôle × hauteur : constants pendant toute la lecture.
     const gain = (resolved.gain ?? 1) * (resolved.heightGain ?? 1);
     const handle = playTrackedOneShot(file, {
-      // Clé PAR ENTITÉ : deux entités qui jouent le même fichier gardent
-      // chacune leur passe-bas.
-      cacheKey: `tracked:${entityId}:${file}`,
       reverbSend: resolved.reverbSend,
       reverbBusInput: reverbBus.input,
       volume: rendering.volume * beaconVolumeFactor() * gain,
