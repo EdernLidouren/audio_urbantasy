@@ -814,9 +814,10 @@ action: { kind: "loot", amount: 100 },
 }
 ```
 
-`spec` (minimal, résolu en descripteur COMPLET côté vue —
-`view/ephemeral-specs.js`/`resolveEphemeralSpec`) est le vocabulaire de la "spec
-éphémère" : `{ type: <clé du registre d'entités>, ...surcharges }`. Détail complet
+`spec` (minimal, résolu en descripteur COMPLET par le parseur d'entité —
+`core/spawn.js`/`ephemeralArchetypeSpec`) est le vocabulaire de la "spec
+éphémère" : `{ type: <clé du registre d'entités>, amount?, count? }` (`amount`
+et `count` remplacent ce champ dans l'action de l'archétype). Détail complet
 (limite anti-prolifération, éviction du plus ancien, exclusion de sauvegarde) :
 `doc/entity-model.md`/"Entités éphémères", `core/state.js`/`spawnEphemeral`.
 

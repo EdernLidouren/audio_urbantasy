@@ -137,8 +137,8 @@ export default function checkEphemerals(run) {
     { id: "movement-check-ephemeral-b", titleKey: "scene.demo.name", length: 10, playerStart: 0, entities: [] },
     EPHEMERAL_REGISTRY
   );
-  // spec : descripteur DÉJÀ RÉSOLU, comme le construirait la vue (voir
-  // view/ephemeral-specs.js/EPHEMERAL_COIN_SPEC) — spawnEphemeral ne l'interprète
+  // spec : descripteur DÉJÀ RÉSOLU (voir core/spawn.js/
+  // ephemeralArchetypeSpec) — spawnEphemeral ne l'interprète
   // jamais, il ne fait qu'y ajouter id/x/ephemeral.
   const EPHEMERAL_SPEC = { type: "dog", labelKey: "entity.dog.name", interactable: true, action: { kind: "pickup", amount: 5 } };
 

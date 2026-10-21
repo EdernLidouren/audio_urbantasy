@@ -31,10 +31,9 @@ import registry from "../entities/types/index.js";
 import { applyEntityActionEffects } from "../core/state.js";
 import { pickupEntity, lootEntity, lootUniqueEntity, lootEntitySpawn } from "../core/money.js";
 import { pickupItemEntity, dropItem } from "../core/bag.js";
-import { searchContainer } from "../core/spawn.js";
+import { searchContainer, ephemeralArchetypeSpec, ephemeralItemSpec } from "../core/spawn.js";
 import { equipItem, unequipItem } from "../core/equipment.js";
 import { sellItems, buyItems, restockShopIfDue } from "../core/trade.js";
-import { resolveEphemeralSpec, resolveDroppedItemSpec } from "./ephemeral-specs.js";
 
 // Branche tous les gestionnaires et rend la fonction qui les débranche.
 // `travel` : view/world-travel.js (voyages, vue du monde COURANTE).
@@ -52,11 +51,11 @@ export function registerActionHandlers({ getSession, setSession, travel }) {
     // Loot d'un objet unique : l'entité passe consommée, rien d'autre.
     [setLootUniqueHandler, (entity) => setSession(lootUniqueEntity(getSession(), entity.id))],
     // Loot éparpillé : le descripteur minimal (ex. { type: "money", amount:
-    // 20 }) est résolu avant d'aller au core, qui ignore le registre.
+    // 20 }) est résolu par le core, avec le registre injecté.
     [
       setLootSpawnHandler,
       (entity, spawn) => {
-        const spec = resolveEphemeralSpec(spawn.spec.type, spawn.spec);
+        const spec = ephemeralArchetypeSpec(getSession(), spawn.spec.type, registry, spawn.spec);
         setSession(lootEntitySpawn(getSession(), entity.id, spec, spawn.count, spawn.spread));
       },
     ],
@@ -91,7 +90,7 @@ export function registerActionHandlers({ getSession, setSession, travel }) {
       setDropItemHandler,
       (type, count) => {
         const session = getSession();
-        const spec = resolveDroppedItemSpec(type, count);
+        const spec = ephemeralItemSpec(session, type, count, registry);
         setSession(dropItem(session, type, count, spec, session.player.x));
       },
     ],

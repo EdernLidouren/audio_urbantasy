@@ -310,12 +310,13 @@ l'activation — ex. `crate-stash` (`scenes/demo2.json`), une caisse dont le
   `spread` optionnel -> `config/tuning-values.js`/`ephemeralScatterSpread`
   (défaut PAR ACTION, lu directement, pas via la cascade `resolveTuning` —
   ce n'est pas un réglage par entité/son).
-- **`spec` résolu côté VUE** — `spawn.spec` reste minimal dans le JSON (`{
-  type, ...surcharges }`) : c'est `view/ephemeral-specs.js`/
-  `resolveEphemeralSpec` (même fonction que pour la touche debug — DEUX
-  appelants, une seule résolution) qui le traduit en descripteur COMPLET
-  avant d'appeler `spawnEphemeral`/`spawnScatteredEphemerals` — le core
-  ignore tout du registre, comme partout ailleurs.
+- **`spec` résolu par le parseur d'entité** — `spawn.spec` reste minimal
+  dans le JSON (`{ type, amount?, count? }`) : c'est `core/spawn.js`/
+  `ephemeralArchetypeSpec` (même fonction que pour la pièce de la touche
+  debug) qui le traduit en descripteur COMPLET, par le MÊME parseur qu'une
+  instance de scène (`parseSpawnedEntity`), avant
+  `spawnEphemeral`/`spawnScatteredEphemerals`. Le registre est INJECTÉ par
+  la vue, jamais importé par le core, comme partout ailleurs.
 - **Ramassage individuel** — chaque pièce éparpillée porte SA PROPRE action
   `"pickup"` (voir "Ramassage" ci-dessus) : rien de spécifique à leur origine
   "spawn groupé", le joueur les ramasse une par une exactement comme
@@ -630,7 +631,9 @@ redéfinir :
   Sans `sound`, les sons de l'archétype générique restent.
 - Même règle partout où un objet devient une entité : instance de scène,
   garnissage d'une plage ou d'un conteneur (`core/spawn.js`), objet posé
-  depuis le sac (`view/ephemeral-specs.js`/`resolveDroppedItemSpec`).
+  depuis le sac (`core/spawn.js`/`ephemeralItemSpec`) — une seule
+  fonction décide de la forme brute (`collectibleRaw`), un seul parseur la
+  résout.
 
 ## Sac d'objets
 
@@ -676,14 +679,14 @@ notés à la main.
   pas faire éclater un butin, c'est laisser un tas à un endroit — un tas
   UNIQUE au sol reste plus lisible à l'oreille (pas de superposition de
   balises identiques) et symétrique de la représentation du sac lui-même
-  (une seule entrée par type). `spec` résolu côté VUE
-  (`resolveDroppedItemSpec`, `view/city-screen.js`, aux côtés de
-  `resolveEphemeralSpec`) : l'archétype DÉDIÉ du type est réutilisé s'il en
-  existe un (ex. `apple` -> `entities/types/apple.js`, même son que
-  l'original) ; sinon repli sur l'archétype GÉNÉRIQUE `item`
-  (`entities/types/item.js`) avec `nameKey`/`descriptionKey`/`action`
-  propres à l'objet (depuis `core/items.js`/`ITEM_REGISTRY`) — exactement la
-  convention qu'une instance de scène suivrait pour ce même type générique.
+  (une seule entrée par type). `spec` résolu par le core
+  (`core/spawn.js`/`ephemeralItemSpec`, registre injecté par
+  `view/action-handlers.js`) : l'archétype DÉDIÉ du type est réutilisé s'il
+  en existe un (ex. `apple` -> `entities/types/apple.js`, même son que
+  l'original, `count` remplacé dans son action) ; sinon repli sur
+  l'archétype GÉNÉRIQUE `item` (`entities/types/item.js`), qui reprend le
+  nom, la description et les sons de l'objet (voir "Objet au sol
+  générique") — la même résolution qu'une plage ou une fouille.
 - **Objet posé = ÉPHÉMÈRE** — ramassable de nouveau (réutilise l'action
   `"pickup"` telle quelle, déjà robuste), mais **PERDU** si la scène est
   quittée sans le ramasser (purgé comme tout éphémère au départ, jamais

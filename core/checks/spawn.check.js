@@ -14,7 +14,7 @@ import { TUNING_DEFAULTS } from "../../config/tuning-values.js";
 import { INITIAL_TIME, advanceTime } from "../time.js";
 import { TIME_CONFIG } from "../../config/time-values.js";
 import { validateSpawnTables, validateDistribution, resolveDistribution, drawItem, NOTHING } from "../distribution.js";
-import { spawnCycleAt, refillDueSpawns, searchContainer, isSearchable, containerStatus } from "../spawn.js";
+import { spawnCycleAt, refillDueSpawns, searchContainer, isSearchable, containerStatus, ephemeralArchetypeSpec, ephemeralItemSpec } from "../spawn.js";
 import {
   SPAWN_TABLES,
   SPAWN_RANGE_DEFAULT_COUNT,
@@ -432,4 +432,43 @@ export default function checkSpawn(run) {
   // Persistance : un conteneur vidé pour de bon le reste après save/load.
   const pcReload = deserializeGame(serializeGame(pcSearch.session));
   run("non régénérant : save/load -> toujours depleted", "depleted", pcReload.success && containerStatus(nothingEntity(pcReload.session, "pc"), pcReload.session.time));
+
+  // --- Descripteurs d'éphémères demandés par la vue (ephemeralArchetypeSpec,
+  // ephemeralItemSpec) : même parseur et même résolution que la collecte. ---
+  const specSession = createInitialState(spawnScene, undefined, NO_COMPANIONS);
+  const SPEC_REGISTRY = { ...SPAWN_REGISTRY, money: { nameKey: "entity.money.name", interactable: true, action: { kind: "pickup", amount: 5 } } };
+
+  const coinSpec = ephemeralArchetypeSpec(specSession, "money", SPEC_REGISTRY);
+  run("spec éphémère : archétype sans surcharge -> action de l'archétype", 5, coinSpec.action.amount);
+  run("spec éphémère : passe par le parseur (capacités résolues)", "true/false", `${coinSpec.interactable}/${coinSpec.blocksMovement}`);
+  run("spec éphémère : amount remplace ce seul champ", "pickup/20", (({ kind, amount }) => `${kind}/${amount}`)(ephemeralArchetypeSpec(specSession, "money", SPEC_REGISTRY, { amount: 20 }).action));
+  run("spec éphémère : archétype sans action -> aucune action", false, "action" in ephemeralArchetypeSpec(specSession, "dog", SPEC_REGISTRY));
+
+  const droppedApple = ephemeralItemSpec(specSession, "apple", 3, SPEC_REGISTRY);
+  run("objet posé : archétype dédié -> son type, count remplacé", "apple/apple/3", `${droppedApple.type}/${droppedApple.action.item}/${droppedApple.action.count}`);
+  const droppedResistor = ephemeralItemSpec(specSession, "resistor", 4, SPEC_REGISTRY);
+  run("objet posé : sans archétype -> type générique item", "item", droppedResistor.type);
+  run("objet posé : générique -> nom et description de l'objet", `${ITEM_REGISTRY.resistor.label}|${ITEM_REGISTRY.resistor.descriptionKey}`, `${droppedResistor.labelKey}|${droppedResistor.descriptionKey}`);
+  run("objet posé : générique -> son de l'objet en balise", ITEM_REGISTRY.resistor.sound, droppedResistor.sounds.beacon.path);
+  run("objet posé : générique -> action pickup de l'objet avec la quantité", "pickup/resistor/4", (({ kind, item, count }) => `${kind}/${item}/${count}`)(droppedResistor.action));
+
+  // Un objet posé et un objet tombé d'une fouille sont le même descripteur
+  // (hors id/x/count) : une seule résolution.
+  const searchedResistor = searchContainer(
+    {
+      ...specSession,
+      worlds: {
+        ...specSession.worlds,
+        [specSession.activeWorldId]: {
+          ...specSession.worlds[specSession.activeWorldId],
+          entities: specSession.worlds[specSession.activeWorldId].entities.map((e) => (e.id === "bush-2" ? { ...e, stock: ["resistor"], stockCycle: spawnCycleAt(specSession.time) } : e)),
+        },
+      },
+    },
+    "bush-2",
+    SPEC_REGISTRY
+  );
+  const fallenResistor = searchedResistor.session.worlds[specSession.activeWorldId].entities.find((e) => e.ephemeral);
+  const withoutPlacement = ({ id, x, ephemeral, action, ...rest }) => ({ ...rest, action: { ...action, count: 0 } });
+  run.same("objet posé = objet tombé d'une fouille (hors id/x/quantité)", withoutPlacement(droppedResistor), fallenResistor && withoutPlacement(fallenResistor));
 }

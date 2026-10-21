@@ -62,9 +62,9 @@ const MINUTES_PER_DAY = TIME_CONFIG.minutesPerHour * TIME_CONFIG.hoursPerDay;
 const SPACING_MAX_ATTEMPTS = 8;
 
 // Archétype GÉNÉRIQUE d'objet au sol (entities/types/item.js), utilisé pour
-// tout objet du sac SANS archétype dédié — même convention que
-// view/ephemeral-specs.js/resolveDroppedItemSpec : un archétype du MÊME NOM que
-// l'objet (ex. "apple") est préféré s'il existe dans le registre injecté.
+// tout objet du sac SANS archétype dédié : un archétype du MÊME NOM que
+// l'objet (ex. "apple") est préféré s'il existe dans le registre injecté
+// (voir collectibleRaw).
 const GENERIC_ITEM_TYPE = "item";
 
 // Index du cycle de collecte courant : nombre de re-garnissages quotidiens
@@ -129,19 +129,52 @@ function drawItems(distribution, count, rngState) {
   return { items, rngState: state };
 }
 
+// Entité brute (avant parsing) d'un objet du sac posé au sol, sans id ni x.
+// Avec un archétype du même nom : cet archétype, `count` remplaçant celui de
+// son action s'il est donné. Sinon : le type générique "item", dont le nom,
+// la description et les sons sont repris de l'objet par parseEntity
+// (core/entity-parse.js/genericItemDefaults).
+function collectibleRaw(item, registry, count) {
+  if (registry[item]) {
+    return count === undefined ? { type: item } : { type: item, action: { ...registry[item].action, count } };
+  }
+  return { type: GENERIC_ITEM_TYPE, action: { kind: "pickup", item, count: count ?? 1 } };
+}
+
 // Descripteur d'entité ramassable pour un objet du sac : passe par le MÊME
 // parseur qu'une instance de scène (cascade sounds/capacités/action de
 // l'archétype). Sert aux deux matérialisations : posé PERSISTANT par une
 // plage (marqué `spawned` par l'appelant), ou ÉPHÉMÈRE lâché par une fouille
 // (spawnEphemeral repose id/x/ephemeral lui-même).
 function buildCollectibleSpec(item, id, x, registry, length, sceneVariables) {
-  // Sans archétype dédié : type générique "item", dont le nom, la
-  // description et les sons sont repris de l'objet par parseEntity
-  // (core/entity-parse.js/genericItemDefaults).
-  const raw = registry[item]
-    ? { id, type: item, x }
-    : { id, type: GENERIC_ITEM_TYPE, x, action: { kind: "pickup", item, count: 1 } };
-  return parseSpawnedEntity(raw, registry, length, sceneVariables);
+  return parseSpawnedEntity({ id, x, ...collectibleRaw(item, registry) }, registry, length, sceneVariables);
+}
+
+// --- Descripteurs d'entités ÉPHÉMÈRES demandées par la vue ---
+// (voir core/state.js/spawnEphemeral, doc/entity-model.md/"Entités
+// éphémères"). Même parseur que tout le reste, validé contre le monde actif.
+// L'id et le x donnés ici sont provisoires : spawnEphemeral les remplace.
+const EPHEMERAL_SPEC_ID = "ephemeral-spec";
+
+function parseEphemeralSpec(session, raw, registry) {
+  const world = session.worlds[session.activeWorldId];
+  return parseSpawnedEntity({ id: EPHEMERAL_SPEC_ID, x: 0, ...raw }, registry, world.length, world.variables);
+}
+
+// Un archétype tel quel, ex. une pièce. `amount` / `count` remplacent ce
+// seul champ de son action (jamais de fusion profonde), ex. une pièce de 20
+// au lieu des 5 par défaut (loot éparpillé, voir doc/scripting.md).
+export function ephemeralArchetypeSpec(session, type, registry, { amount, count } = {}) {
+  let action = registry[type] && registry[type].action;
+  if (amount !== undefined) action = { ...action, amount };
+  if (count !== undefined) action = { ...action, count };
+  return parseEphemeralSpec(session, action === undefined ? { type } : { type, action }, registry);
+}
+
+// Un objet du SAC posé au sol ("Poser", voir view/menus/inventory-menu.js) :
+// même résolution qu'un objet de plage ou de fouille (voir collectibleRaw).
+export function ephemeralItemSpec(session, item, count, registry) {
+  return parseEphemeralSpec(session, collectibleRaw(item, registry, count), registry);
 }
 
 // Position dans [from, to] : drawScatteredPosition (bornes carte + corps

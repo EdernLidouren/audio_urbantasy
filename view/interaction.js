@@ -481,7 +481,7 @@ function handlePickup(entity, action) {
 //     ramasse ensuite individuellement via sa PROPRE action "pickup" (déjà
 //     robuste, rien à ajouter). `spec` (minimal, ex. { type: "money",
 //     amount: 20 }) est résolu en descripteur COMPLET par lootSpawnHandler
-//     (voir view/ephemeral-specs.js/resolveEphemeralSpec) — ce fichier n'en
+//     (voir core/spawn.js/ephemeralArchetypeSpec) — ce fichier n'en
 //     connaît que la forme brute, jamais le registre.
 function handleLoot(entity, action) {
   if (entity.consumed) return;

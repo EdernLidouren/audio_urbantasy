@@ -11,13 +11,15 @@ import { spawnEphemeral, forgetInactiveWorlds } from "../core/state.js";
 import { setWeather, triggerNextWeatherTransition } from "../core/weather.js";
 import { TIME_CONFIG, DEFAULT_TIME_SCALE, setTimeScale, resetTimeScale } from "../config/time-values.js";
 import { announceGameTime, announceWeather } from "./status-announcements.js";
-import { EPHEMERAL_COIN_SPEC } from "./ephemeral-specs.js";
+import { ephemeralArchetypeSpec } from "../core/spawn.js";
+import registry from "../entities/types/index.js";
 
 // `clock` : voir view/game-clock.js.
 export function createDebugEffects({ getSession, setSession, clock }) {
   // Une pièce ramassable aux pieds du joueur (touche "e").
   function spawnCoin() {
-    setSession(spawnEphemeral(getSession(), EPHEMERAL_COIN_SPEC, getSession().player.x));
+    const session = getSession();
+    setSession(spawnEphemeral(session, ephemeralArchetypeSpec(session, "money", registry), session.player.x));
   }
 
   function forceWeather(targetState) {
