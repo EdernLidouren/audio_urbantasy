@@ -5,6 +5,8 @@
 // module n'importe localStorage ni ne connaît le format de persistance — les
 // appelants ne voient que getPref/setPref/export/import/reset.
 
+import { saveTextFile } from "../lib/download.js";
+
 const STORAGE_KEY = "templeton-preferences";
 
 // Format stocké : { version, prefs }. Les montées de version futures
@@ -179,22 +181,11 @@ export function resetAllPrefs() {
 
 // Déclenche le téléchargement d'un fichier JSON contenant les préférences
 // courantes, au même format que le stockage local — donc ré-importable tel
-// quel. Lien <a download> temporaire, jamais ajouté au DOM : cliquer sur un
-// élément détaché fonctionne, pas besoin de l'attacher/retirer.
+// quel. Rend la promesse de lib/download.js/saveTextFile ("saved" |
+// "cancelled" | "downloaded"), que l'appelant annonce.
 export function exportPreferences() {
-  const blob = new Blob([JSON.stringify({ version: PREFS_VERSION, prefs: Object.fromEntries(store) }, null, 2)], {
-    type: "application/json",
-  });
-  const url = URL.createObjectURL(blob);
-
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "templeton-preferences.json";
-  link.click();
-
-  // Révoqué après coup, pas immédiatement : laisse le temps au navigateur
-  // d'amorcer le téléchargement avant de libérer l'URL.
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const text = JSON.stringify({ version: PREFS_VERSION, prefs: Object.fromEntries(store) }, null, 2);
+  return saveTextFile("templeton-preferences.json", text, { description: "Préférences Templeton" });
 }
 
 // Lit, migre, valide et applique un fichier de préférences (typiquement

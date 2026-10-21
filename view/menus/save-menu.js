@@ -20,7 +20,9 @@ import { setGlobalVolume } from "../../lib/audio.js";
 import { t } from "../../data/i18n/index.js";
 import { getPref, PREF_CONSTRAINTS, exportPreferences, importPreferences } from "../../config/preferences.js";
 import { refreshActiveBeaconVolumes } from "../audio/city-scene.js";
-import { exportGame, importGame, playSaveSound } from "../save-storage.js";
+import { exportGame, importGame, playSaveSound, hasSave } from "../save-storage.js";
+import { canChooseSaveLocation } from "../../lib/download.js";
+import { getActiveWorld } from "../../core/state.js";
 import { reportDroppedEntities, reportDroppedItems } from "../debug-warnings.js";
 import { openDebugWarningsIfUnseen } from "./debug-warnings-menu.js";
 
@@ -39,6 +41,37 @@ let gameReplaceHandler = null;
 
 export function setGameReplaceHandler(handler) {
   gameReplaceHandler = handler;
+}
+
+// Gestionnaire de DÉMARRAGE d'une partie importée HORS partie (depuis le
+// menu principal), enregistré une fois par main.js, qui seul possède la
+// session et sait lancer l'écran de ville — comme "Continuer".
+let gameStartHandler = null;
+export function setGameStartHandler(handler) {
+  gameStartHandler = handler;
+}
+
+// Adopte une partie importée : en jeu, elle REMPLACE la partie en cours ;
+// hors partie, elle DÉMARRE. Puis son, annonce, signalement des entités et
+// objets retirés à la relecture (journal ouvert en debug s'il y a du
+// nouveau).
+function applyImportedGame(importedSession, droppedEntities, droppedItems) {
+  if (gameReplaceHandler) {
+    gameReplaceHandler(importedSession);
+    announce(t("save.imported"), { assertive: true });
+  } else if (gameStartHandler) {
+    gameStartHandler(importedSession);
+    // Au démarrage, l'écran de ville vient d'annoncer le lieu : une seule
+    // annonce reprend les deux, sinon la seconde écraserait la première.
+    announce(`${t("save.imported")} ${t(getActiveWorld(importedSession).titleKey)}`, { assertive: true });
+  } else {
+    announce(t("save.no_active_game"), { assertive: true });
+    return;
+  }
+  playSaveSound();
+  reportDroppedEntities(droppedEntities);
+  reportDroppedItems(droppedItems);
+  openDebugWarningsIfUnseen();
 }
 
 // Input file caché pour l'import de PRÉFÉRENCES (pas la partie — voir
@@ -88,9 +121,11 @@ let gameFileInput = null;
 // accidentelle d'Entrée à l'ouverture reste sans effet. Réutilise les clés
 // génériques "Annuler"/"Confirmer" déjà en place (menu.options.reset_all_*),
 // pas de doublon de traduction pour le même mot.
-function openImportConfirmation(importedSession, droppedEntities, droppedItems) {
+// `title` : ce qui sera remplacé — la partie en cours, ou (hors partie) la
+// sauvegarde locale.
+function openImportConfirmation(importedSession, droppedEntities, droppedItems, title) {
   const menu = {
-    title: "save.import_confirm_title",
+    title,
     closable: true, // Échap = annuler
     entries: [
       {
@@ -101,22 +136,7 @@ function openImportConfirmation(importedSession, droppedEntities, droppedItems) 
         label: "menu.options.reset_all_confirm",
         onActivate: () => {
           popScreen();
-          if (gameReplaceHandler) {
-            gameReplaceHandler(importedSession);
-            playSaveSound();
-            announce(t("save.imported"), { assertive: true });
-            // Partie importée adoptée : signalement de ses entités
-            // retirées, et journal ouvert en mode debug s'il y a du nouveau.
-            reportDroppedEntities(droppedEntities);
-            reportDroppedItems(droppedItems);
-            openDebugWarningsIfUnseen();
-          } else {
-            // Cas limite : la partie s'est terminée entre l'ouverture de ce
-            // sous-menu et la confirmation (ex. retour au menu principal
-            // dans un autre onglet impossible ici, mais gardé par principe
-            // plutôt que de supposer gameReplaceHandler toujours vivant).
-            announce(t("save.no_active_game"), { assertive: true });
-          }
+          applyImportedGame(importedSession, droppedEntities, droppedItems);
         },
       },
     ],
@@ -149,10 +169,34 @@ function ensureGameFileInput() {
       return;
     }
 
-    openImportConfirmation(result.session, result.droppedEntities, result.droppedItems);
+    // En jeu : confirmation (la partie en cours sera remplacée). Hors partie :
+    // confirmation seulement si une sauvegarde locale existe (elle sera
+    // remplacée à la prochaine sauvegarde) ; sinon, démarrage direct.
+    if (gameReplaceHandler) {
+      openImportConfirmation(result.session, result.droppedEntities, result.droppedItems, "save.import_confirm_title");
+    } else if (hasSave()) {
+      openImportConfirmation(result.session, result.droppedEntities, result.droppedItems, "save.import_confirm_title_saved");
+    } else {
+      applyImportedGame(result.session, result.droppedEntities, result.droppedItems);
+    }
   });
 
   return gameFileInput;
+}
+
+// Exports (partie, préférences) : la fenêtre "Enregistrer sous" native quand
+// le navigateur la propose, sinon un téléchargement (voir lib/download.js).
+// La description de l'entrée dit à l'avance laquelle des deux s'appliquera ;
+// l'annonce du résultat part APRÈS la fermeture de la fenêtre, quand le focus
+// est revenu au jeu — le navigateur, lui, ne dit rien d'un téléchargement.
+const EXPORT_LOCATION_DESCRIPTION = canChooseSaveLocation ? "save.export_location.choose" : "save.export_location.downloads";
+
+function announceExportOutcome(outcome, savedKey, downloadedKey) {
+  if (outcome === "cancelled") {
+    announce(t("save.export_cancelled"), { assertive: true });
+    return;
+  }
+  announce(t(outcome === "saved" ? savedKey : downloadedKey), { assertive: true });
 }
 
 // getSession : accesseur, peut renvoyer null hors partie (ce sous-menu
@@ -206,18 +250,27 @@ export function createSaveMenu(getSession) {
       },
       {
         label: "save.export_game",
-        onActivate: () => requireActiveGame((session) => exportGame(session)),
+        descriptionKey: EXPORT_LOCATION_DESCRIPTION,
+        onActivate: () =>
+          requireActiveGame(async (session) => {
+            announceExportOutcome(await exportGame(session), "save.exported", "save.exported_download");
+          }),
       },
       {
         // Ouvre le sélecteur de fichier natif de l'OS ; le résultat arrive
         // plus tard, de façon asynchrone, via le listener "change" posé
         // une fois pour toutes dans ensureGameFileInput() ci-dessus.
         label: "save.import_game",
-        onActivate: () => requireActiveGame(() => ensureGameFileInput().click()),
+        // Disponible aussi hors partie : depuis le menu principal, la partie
+        // importée démarre (voir applyImportedGame).
+        onActivate: () => ensureGameFileInput().click(),
       },
       {
         label: "menu.save.export",
-        onActivate: () => exportPreferences(),
+        descriptionKey: EXPORT_LOCATION_DESCRIPTION,
+        onActivate: async () => {
+          announceExportOutcome(await exportPreferences(), "menu.save.exported", "menu.save.exported_download");
+        },
       },
       {
         label: "menu.save.import",

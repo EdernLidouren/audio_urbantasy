@@ -5,6 +5,27 @@ renomme ou supprime du contenu. Code : `core/save.js` (forme, migration, pur),
 `view/save-storage.js` (disque, obscurcissement, import/export de fichier),
 `config/save-renames.js` (table des renommages).
 
+## Export et import de fichier
+
+Menu Options > Sauvegarde. L'**export** (partie ou préférences) ouvre la
+fenêtre « Enregistrer sous » native quand le navigateur la propose (Chrome,
+Edge : `showSaveFilePicker`) — l'utilisateur choisit le dossier et le nom ;
+sinon (Firefox), le fichier est téléchargé dans le dossier de téléchargements.
+Mécanisme : `lib/download.js/saveTextFile`. La description de l'entrée de menu
+dit à l'avance lequel des deux s'applique ; une annonce confirme le résultat
+APRÈS la fermeture de la fenêtre (« Partie exportée. », « Export annulé. »,
+ou le nom du fichier téléchargé). L'**import** d'une partie passe par la
+fenêtre d'ouverture native du navigateur et valide le fichier avant toute
+chose, puis :
+- **en jeu** : confirmation, puis la partie importée REMPLACE la partie en
+  cours (`view/world-travel.js/replaceCurrentGame`) ;
+- **depuis le menu principal** : la partie importée DÉMARRE, comme
+  « Continuer » (`main.js/startImportedGame`, qui referme d'abord les menus
+  ouverts pour que quitter la partie ramène au menu principal) — après
+  confirmation seulement si une sauvegarde locale existe, puisqu'elle sera
+  remplacée à la prochaine sauvegarde.
+L'import des préférences est disponible partout, avec ou sans partie.
+
 ## Ce qu'une sauvegarde contient
 
 La partie (`session`) est sérialisable de bout en bout : elle EST le format de

@@ -3,11 +3,12 @@
 // démarre la boucle à pas fixe (qui tick uniquement l'écran actif au sommet
 // de la pile), puis charge la scène en tâche de fond.
 
-import { pushScreen, tickActive, tickFrame } from "./lib/screens.js";
+import { pushScreen, popScreen, activeScreen, tickActive, tickFrame } from "./lib/screens.js";
 import { initInput, onGlobalPress } from "./lib/input.js";
 import { ensureAudioUnlocked, setMasterVolume } from "./lib/audio.js";
 import { MOVE_KEYS, GLOBAL_BINDINGS } from "./view/input.js";
 import { createMainMenu } from "./view/menus/main-menu.js";
+import { setGameStartHandler } from "./view/menus/save-menu.js";
 import { makeMenuScreen, configureMenuPreferences, configureMenuSounds } from "./lib/menu.js";
 import { playMenuSound } from "./view/menu-sounds.js";
 import { makeCityScreen } from "./view/city-screen.js";
@@ -188,6 +189,17 @@ mainMenuScreen.onEnter = () => {
   mainMenuDef.cursor = 0;
   baseMainMenuOnEnter();
 };
+
+// Partie IMPORTÉE hors partie, depuis Options > Sauvegarde du menu principal
+// (voir view/menus/save-menu.js/applyImportedGame) : referme les menus ouverts
+// par-dessus le menu principal, puis démarre la partie comme "Continuer" —
+// la quitter ramène ainsi au menu principal, jamais au menu de sauvegarde.
+function startImportedGame(importedSession) {
+  while (activeScreen() && activeScreen() !== mainMenuScreen) popScreen();
+  session = importedSession;
+  pushScreen(makeCityScreen(getSession, setSession));
+}
+setGameStartHandler(startImportedGame);
 
 // Vérif console : logge player.x pendant qu'on tient une touche de
 // déplacement. Rendu audio/annonce non requis à ce stade.

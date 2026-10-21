@@ -21,6 +21,7 @@
 import { serializeGame, deserializeGame } from "../core/save.js";
 import registry from "../entities/types/index.js";
 import { obfuscate, deobfuscate } from "../lib/obfuscate.js";
+import { saveTextFile } from "../lib/download.js";
 import { playOneShot } from "../lib/audio.js";
 import { resolveAsset } from "../lib/assets.js";
 import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
@@ -154,22 +155,6 @@ export function hasSave() {
   }
 }
 
-// Déclenche le téléchargement d'un fichier texte — même mécanique que
-// config/preferences.js/exportPreferences (Blob + <a download> détaché,
-// jamais ajouté au DOM), généralisée ici pour être réutilisée par
-// exportGame ci-dessous sans dupliquer la logique.
-function downloadTextFile(filename, text) {
-  const blob = new Blob([text], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
 // Lit un File en texte — même mécanique que config/preferences.js/
 // importPreferences (FileReader), généralisée ici pour être réutilisée par
 // importGame ci-dessous.
@@ -185,10 +170,13 @@ function readTextFile(file) {
 // Exporte la partie COURANTE dans un fichier, OBSCURCIE — même couche et
 // même format que le stockage local (préfixe + blob), pour rester
 // cohérente et non éditable trivialement. Non destructif : aucune
-// confirmation nécessaire (voir importGame pour l'inverse).
+// confirmation nécessaire (voir importGame pour l'inverse). Rend la promesse
+// de lib/download.js/saveTextFile ("saved" | "cancelled" | "downloaded"),
+// que l'appelant annonce. À appeler directement depuis le geste de
+// l'utilisateur (fenêtre d'enregistrement native).
 export function exportGame(session) {
   const json = JSON.stringify(serializeGame(session));
-  downloadTextFile("templeton-partie.json", encodeForStorage(json));
+  return saveTextFile("templeton-partie.json", encodeForStorage(json), { description: "Partie Templeton" });
 }
 
 // Lit un fichier de partie exportée -> { success, session } ou { success:
