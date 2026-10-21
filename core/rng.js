@@ -28,3 +28,22 @@ export function nextRandom(state) {
   const value = ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   return { value, state: a >>> 0 };
 }
+
+// Tire une clé de `weights` ({ clé: poids }) au prorata de son poids — poids
+// RELATIFS, normalisés ici par leur somme ; un poids nul ou négatif n'est
+// jamais tiré. Un seul pas de PRNG. Partagé par la météo (transitions) et
+// la collecte (tables d'objets) : une seule logique de tirage pondéré. Les
+// appelants garantissent au moins un poids positif (validation au
+// chargement). -> { key, rngState }
+export function pickWeighted(weights, rngState) {
+  const entries = Object.entries(weights).filter(([, weight]) => weight > 0);
+  const total = entries.reduce((sum, [, weight]) => sum + weight, 0);
+  const { value, state } = nextRandom(rngState);
+  let threshold = value * total;
+  for (const [key, weight] of entries) {
+    threshold -= weight;
+    if (threshold < 0) return { key, rngState: state };
+  }
+  // Filet de robustesse flottante (arrondi en fin de parcours).
+  return { key: entries[entries.length - 1][0], rngState: state };
+}

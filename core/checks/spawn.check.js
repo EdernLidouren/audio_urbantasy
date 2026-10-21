@@ -63,7 +63,7 @@ export default function checkSpawn(run) {
   run("rareté : objets de l'étiquette sans rareté -> table rejetée", true, throws(() => validateSpawnTables({ t: { fromTag: "chic" } })));
   run("rareté : fromTag mêlé à des entrées -> table rejetée", true, throws(() => validateSpawnTables({ t: { fromTag: "electronic", apple: 1 } })));
 
-  // Tirage pondéré : réutilise pickTransition (météo) — équité vérifiée sur
+  // Tirage pondéré : core/rng.js/pickWeighted (le même que la météo) — équité vérifiée sur
   // une table inline à deux objets 3:1.
   {
     const counts = { apple: 0, key_bronze: 0 };

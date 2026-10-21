@@ -11,14 +11,13 @@
 // l'importent sans tirer la transaction — jamais d'import circulaire.
 
 import { SHOP_CATALOGS } from "../config/shop-values.js";
-import { ITEM_REGISTRY } from "./items.js";
+import { ITEM_REGISTRY, itemValue } from "./items.js";
 
 // Prix d'achat unitaire d'un article : `price` déclaré, sinon `value` de
 // l'objet (pleine valeur). 0 si aucun des deux n'est un entier positif.
 export function articlePrice(type, article) {
   if (Number.isInteger(article.price) && article.price > 0) return article.price;
-  const value = ITEM_REGISTRY[type] && ITEM_REGISTRY[type].value;
-  return Number.isInteger(value) && value > 0 ? value : 0;
+  return itemValue(type);
 }
 
 function validateCatalogTable(items, describe, fail) {

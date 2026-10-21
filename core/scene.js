@@ -57,6 +57,14 @@ function warnOnOverlaps(entities, playerStart) {
   }
 }
 
+// Bornes [from, to] d'une portion de scène (segment, plage de collecte) :
+// from < to, les deux dans [0, length].
+function checkSceneSpan(from, to, length, describe) {
+  if (!isFiniteNumber(from) || !isFiniteNumber(to) || from < 0 || to > length || from >= to) {
+    fail(`${describe} : bornes [from, to] invalides (reçu from=${JSON.stringify(from)}, to=${JSON.stringify(to)}, longueur ${length}).`);
+  }
+}
+
 // Un segment PATCHE defaultSurface sur [from, to] (bornes incluses, voir
 // surfaceAt/core/surfaces.js) : from < to, les deux dans [0, length].
 // TOUJOURS explicite si présent (pas de filet ici, contrairement à
@@ -69,16 +77,22 @@ function parseSegment(rawSegment, index, length) {
   }
 
   const { from, to, surface } = rawSegment;
-  if (!isFiniteNumber(from) || !isFiniteNumber(to) || from < 0 || to > length || from >= to) {
-    fail(
-      `segments[${index}] : bornes [from, to] invalides (reçu from=${JSON.stringify(from)}, to=${JSON.stringify(to)}, longueur ${length}).`
-    );
-  }
+  checkSceneSpan(from, to, length, `segments[${index}]`);
   if (!isNonEmptyString(surface) || !SURFACE_REGISTRY[surface]) {
     fail(`segments[${index}] : surface "${surface}" absente du registre de surfaces.`);
   }
 
   return { from, to, surface };
+}
+
+// Liste d'ambiances (ambiences, ambiencesDay, ambiencesNight) : optionnelle,
+// tableau d'au plus AMBIENCE_CHANNEL_LIMIT chemins non vides — la limite
+// vient de la source unique partagée avec le canal d'ambiance audio.
+function checkAmbienceList(list, describe) {
+  if (list === undefined) return;
+  if (!Array.isArray(list) || list.length > AMBIENCE_CHANNEL_LIMIT || !list.every(isNonEmptyString)) {
+    fail(`${describe} doit être un tableau d'au plus ${AMBIENCE_CHANNEL_LIMIT} chaînes non vides si présent (reçu : ${JSON.stringify(list)}).`);
+  }
 }
 
 // Champs qu'une FACE porte en propre (recto/verso d'une scène à deux
@@ -114,11 +128,7 @@ function parseSpawnRange(rawRange, index, length, prefix) {
     fail(`${describe} n'est pas un objet.`);
   }
   const { from, to, count, distribution } = rawRange;
-  if (!isFiniteNumber(from) || !isFiniteNumber(to) || from < 0 || to > length || from >= to) {
-    fail(
-      `${describe} : bornes [from, to] invalides (reçu from=${JSON.stringify(from)}, to=${JSON.stringify(to)}, longueur ${length}).`
-    );
-  }
+  checkSceneSpan(from, to, length, describe);
   if (count !== undefined && (!Number.isInteger(count) || count < 1)) {
     fail(`${describe} : count doit être un entier >= 1 si présent (reçu : ${JSON.stringify(count)}).`);
   }
@@ -233,13 +243,7 @@ function parseFace(raw, length, registry, describe, sceneVariables) {
   // (voir view/audio/layers.js, lib/audio.js/setAmbienceLayer). Même
   // passage simple, juste la forme est vérifiée ici — la limite elle-même
   // vient de la source unique partagée avec lib/audio.js.
-  if (ambiences !== undefined) {
-    if (!Array.isArray(ambiences) || ambiences.length > AMBIENCE_CHANNEL_LIMIT || !ambiences.every(isNonEmptyString)) {
-      fail(
-        `${prefix}ambiences doit être un tableau d'au plus ${AMBIENCE_CHANNEL_LIMIT} chaînes non vides si présent (reçu : ${JSON.stringify(ambiences)}).`
-      );
-    }
-  }
+  checkAmbienceList(ambiences, `${prefix}ambiences`);
   // ambiencesDay/ambiencesNight : STRUCTURE RÉSERVÉE, même principe que
   // musicDay/musicNight ci-dessus, mais AUCUN consommateur ne les lit encore
   // (voir view/audio/layers.js — seule la musique réagit à la phase
@@ -247,28 +251,8 @@ function parseFace(raw, length, registry, describe, sceneVariables) {
   // pour qu'une face qui les déclare échoue clairement en cas d'erreur,
   // plutôt que de découvrir une faute de frappe le jour où l'ambiance de
   // phase sera câblée.
-  if (ambiencesDay !== undefined) {
-    if (
-      !Array.isArray(ambiencesDay) ||
-      ambiencesDay.length > AMBIENCE_CHANNEL_LIMIT ||
-      !ambiencesDay.every(isNonEmptyString)
-    ) {
-      fail(
-        `${prefix}ambiencesDay doit être un tableau d'au plus ${AMBIENCE_CHANNEL_LIMIT} chaînes non vides si présent (reçu : ${JSON.stringify(ambiencesDay)}).`
-      );
-    }
-  }
-  if (ambiencesNight !== undefined) {
-    if (
-      !Array.isArray(ambiencesNight) ||
-      ambiencesNight.length > AMBIENCE_CHANNEL_LIMIT ||
-      !ambiencesNight.every(isNonEmptyString)
-    ) {
-      fail(
-        `${prefix}ambiencesNight doit être un tableau d'au plus ${AMBIENCE_CHANNEL_LIMIT} chaînes non vides si présent (reçu : ${JSON.stringify(ambiencesNight)}).`
-      );
-    }
-  }
+  checkAmbienceList(ambiencesDay, `${prefix}ambiencesDay`);
+  checkAmbienceList(ambiencesNight, `${prefix}ambiencesNight`);
   // reverbDurationSec/reverbDecay : optionnels, surchargent par FACE les
   // défauts globaux du bus de réverb (config/tuning-values.js) — voir
   // view/audio/city-scene.js. Simple passage validé, comme music/ambiences ;

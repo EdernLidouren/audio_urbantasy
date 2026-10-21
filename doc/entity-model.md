@@ -443,8 +443,8 @@ persiste avec le monde.
   tirage sur la table équivalente (`resolveDistribution`), mêmes
   probabilités. Exemple réel : `entities/types/office_supply_box.js`
   (`electronics` poids 1 + `{ items: { nothing: 1 } }` poids 1).
-  Poids RELATIFS, tirage via `core/weather.js`/`pickTransition` réutilisé tel
-  quel — une seule logique de tirage pondéré. Résolue à CHAQUE tirage, jamais
+  Poids RELATIFS, tirage via `core/rng.js`/`pickWeighted`, le même que la
+  météo — une seule logique de tirage pondéré. Résolue à CHAQUE tirage, jamais
   figée dans l'état : un monde sauvegardé tire toujours dans la table
   COURANTE. Validée au chargement par `core/distribution.js`/
   `validateDistribution`, appelée par `core/scene.js` (plages `spawnRanges`)

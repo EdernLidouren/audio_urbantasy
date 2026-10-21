@@ -57,6 +57,7 @@
 import { equippedTags } from "./equipment.js";
 import { temporalThresholdOffset } from "./temporal-spread.js";
 import { TIME_CONFIG } from "../config/time-values.js";
+import { MINUTES_PER_DAY } from "./time.js";
 import { getVariable } from "./variables.js";
 import { hasImprovement } from "./improvements.js";
 import { isDebugEnabled } from "../config/debug.js";
@@ -66,7 +67,6 @@ import { isDebugEnabled } from "../config/debug.js";
 // à l'heure ENTIÈRE, insuffisant ici : un spread de quelques minutes doit
 // rester observable (voir hourOfDayFraction ci-dessous).
 const { minutesPerHour, hoursPerDay } = TIME_CONFIG;
-const MINUTES_PER_DAY = minutesPerHour * hoursPerDay;
 
 // Heure du jour EN CONTINU (fractionnaire), contrairement à
 // core/time.js/hourOfDay (entier) — nécessaire UNIQUEMENT ici : comparer un

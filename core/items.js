@@ -187,3 +187,11 @@ export function validateItemTags(registry) {
 }
 
 validateItemTags(ITEM_REGISTRY);
+
+// Valeur marchande d'un type d'objet (`value` du registre) — 0 si l'objet
+// est inconnu ou sans valeur entière positive. Lue par la vente (prix de
+// rachat) et par l'achat (prix par défaut d'un article de catalogue).
+export function itemValue(type) {
+  const value = ITEM_REGISTRY[type] && ITEM_REGISTRY[type].value;
+  return Number.isInteger(value) && value > 0 ? value : 0;
+}

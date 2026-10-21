@@ -6,12 +6,11 @@
 import { parseScene } from "../scene.js";
 import { createInitialState } from "../state.js";
 import { SAVE_VERSION, serializeGame, deserializeGame } from "../save.js";
-import { createSeed } from "../rng.js";
+import { createSeed, pickWeighted } from "../rng.js";
 import { INITIAL_TIME } from "../time.js";
 import {
   validateWeatherStates,
   advanceWeather,
-  pickTransition,
   setWeather,
   triggerNextWeatherTransition,
 } from "../weather.js";
@@ -75,7 +74,7 @@ export default function checkWeather(run) {
   );
   run("weather : la VRAIE table (config/weather-values.js) est valide", false, expectWeatherValidationThrows(WEATHER_STATES));
 
-  // Tirage pondéré (pickTransition) — ÉQUITÉ : sur un grand nombre de
+  // Tirage pondéré (core/rng.js/pickWeighted) — ÉQUITÉ : sur un grand nombre de
   // tirages avec des poids CONNUS (40/40/10/10, indépendants de la vraie
   // table), les fréquences observées doivent rester dans une tolérance
   // large mais significative des proportions attendues (40%/40%/10%/10%
@@ -86,8 +85,8 @@ export default function checkWeather(run) {
   let fairnessRngState = createSeed("weather-fairness-check");
   const FAIRNESS_SAMPLES = 4000;
   for (let i = 0; i < FAIRNESS_SAMPLES; i++) {
-    const picked = pickTransition(FAIRNESS_TRANSITIONS, fairnessRngState);
-    fairnessTally[picked.target] += 1;
+    const picked = pickWeighted(FAIRNESS_TRANSITIONS, fairnessRngState);
+    fairnessTally[picked.key] += 1;
     fairnessRngState = picked.rngState;
   }
   function withinTolerance(observedCount, expectedWeight) {
@@ -109,9 +108,9 @@ export default function checkWeather(run) {
       let s = createSeed("weather-zero-weight-check");
       let zeroPicked = 0;
       for (let i = 0; i < 500; i++) {
-        const picked = pickTransition({ never: 0, always: 1 }, s);
+        const picked = pickWeighted({ never: 0, always: 1 }, s);
         s = picked.rngState;
-        if (picked.target === "never") zeroPicked += 1;
+        if (picked.key === "never") zeroPicked += 1;
       }
       return zeroPicked;
     })()

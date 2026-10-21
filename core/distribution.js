@@ -16,9 +16,9 @@
 // Résolue à CHAQUE tirage (jamais figée dans l'état) : un monde sauvegardé
 // garde la référence, et tire toujours dans la table COURANTE.
 //
-// Tirage pondéré : core/weather.js/pickTransition, réutilisé TEL QUEL — une
-// table d'objets a exactement la forme d'une table de transitions météo
-// ({ cible: poids }), aucune seconde logique de tirage. Le choix "table
+// Tirage pondéré : core/rng.js/pickWeighted, le même que la météo — une
+// table d'objets a la forme { objet: poids }, aucune seconde logique de
+// tirage. Le choix "table
 // puis objet" des tables multiples est réalisé en UN SEUL tirage, sur la
 // table équivalente (voir resolveDistribution) : mêmes probabilités
 // exactement, un seul pas de PRNG par objet comme les autres formes.
@@ -31,7 +31,7 @@
 import { SPAWN_TABLES, RARITY_LEVELS } from "../config/spawn-values.js";
 import { ITEM_REGISTRY } from "./items.js";
 import { TAG_REGISTRY } from "./tags.js";
-import { pickTransition } from "./weather.js";
+import { pickWeighted } from "./rng.js";
 
 // Clé RÉSERVÉE d'une table : l'issue "rien". Jamais un objet du sac — un
 // registre qui en déclarerait un sous ce nom échoue au chargement.
@@ -69,7 +69,7 @@ function expandTagTable(tag) {
 }
 
 // Table effective, en poids NUMÉRIQUES, quelle que soit sa forme : c'est ce
-// que reçoit le tirage (pickTransition).
+// que reçoit le tirage (core/rng.js/pickWeighted).
 function toWeights(table) {
   if (table.fromTag !== undefined) return expandTagTable(table.fromTag);
   return Object.fromEntries(Object.entries(table).map(([item, value]) => [item, entryWeight(value)]));
@@ -253,6 +253,6 @@ export function resolveDistribution(distribution) {
 // quand le tirage tombe sur NOTHING : RIEN, le pas de PRNG est consommé
 // quand même (le déterminisme ne dépend pas de l'issue).
 export function drawItem(distribution, rngState) {
-  const picked = pickTransition(resolveDistribution(distribution), rngState);
-  return { item: picked.target === NOTHING ? null : picked.target, rngState: picked.rngState };
+  const picked = pickWeighted(resolveDistribution(distribution), rngState);
+  return { item: picked.key === NOTHING ? null : picked.key, rngState: picked.rngState };
 }

@@ -9,7 +9,7 @@
 //     entrée dans l'état (voir core/weather.js/drawDuration).
 //   - transitions: { <état cible>: <poids> } — poids RELATIFS, PAS des
 //     pourcentages : le moteur les normalise par leur SOMME au moment du
-//     tirage (voir core/weather.js/pickTransition). Ajuster UN poids ne
+//     tirage (voir core/rng.js/pickWeighted). Ajuster UN poids ne
 //     demande donc JAMAIS de recalculer les autres. Une transition d'un
 //     état vers LUI-MÊME (ex. clear -> clear) est un choix ORDINAIRE : ça
 //     veut dire "reste dans cet état encore un moment, avec une nouvelle

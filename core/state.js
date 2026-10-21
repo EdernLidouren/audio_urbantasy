@@ -210,6 +210,19 @@ export function withFace(world, side, patch) {
   return { ...world, [side]: { ...world[side], ...patch } };
 }
 
+// Remplace le monde ACTIF de la partie ; les autres mondes gardent leur
+// référence.
+export function withActiveWorld(session, world) {
+  return { ...session, worlds: { ...session.worlds, [session.activeWorldId]: world } };
+}
+
+// Réécrit UNE face du monde actif (voir withFace) — celle du joueur par
+// défaut. Point d'écriture commun de tout ce qui modifie les entités, le
+// PRNG ou le compteur d'éphémères de la face où l'on se trouve.
+export function updateActiveFace(session, patch, side = session.player.side) {
+  return withActiveWorld(session, withFace(session.worlds[session.activeWorldId], side, patch));
+}
+
 // Purge les entités ÉPHÉMÈRES d'un monde ENTIER (voir travelToWorld plus
 // bas et core/save.js/stripEphemeralEntities, SEULS appelants — factorisé
 // ICI pour ne jamais dupliquer cette logique) : SIMPLE -> sa seule face ;
@@ -400,8 +413,7 @@ export function removeEntity(session, entityId) {
   const face = resolveFace(world, session.player.side);
   const entities = face.entities.filter((entity) => entity.id !== entityId);
   if (entities.length === face.entities.length) return session;
-  const nextWorld = withFace(world, session.player.side, { entities });
-  return { ...session, worlds: { ...session.worlds, [session.activeWorldId]: nextWorld } };
+  return updateActiveFace(session, { entities });
 }
 
 // Marque UNE entité (par id) du monde ACTIF comme "consumed" — mécanisme
@@ -420,8 +432,7 @@ export function markConsumed(session, entityId) {
   const face = resolveFace(world, session.player.side);
   if (!face.entities.some((entity) => entity.id === entityId)) return session;
   const entities = face.entities.map((entity) => (entity.id === entityId ? { ...entity, consumed: true } : entity));
-  const nextWorld = withFace(world, session.player.side, { entities });
-  return { ...session, worlds: { ...session.worlds, [session.activeWorldId]: nextWorld } };
+  return updateActiveFace(session, { entities });
 }
 
 // Applique une LISTE d'effets D'ÉCRITURE de variable (voir core/script-parse.js/
@@ -461,9 +472,9 @@ export function applyEntityActionEffects(session, entityId, effects, side = sess
     nextWorld = withFace(nextWorld, side, { entities });
   }
 
+  const withWorld = worldChanged || entityChanged ? withActiveWorld(session, nextWorld) : session;
   return {
-    ...session,
-    worlds: worldChanged || entityChanged ? { ...session.worlds, [session.activeWorldId]: nextWorld } : session.worlds,
+    ...withWorld,
     variables: partyChanged ? result.session.variables : session.variables,
     improvements: partyChanged ? result.session.improvements : session.improvements,
   };
@@ -517,8 +528,7 @@ export function spawnEphemeral(session, spec, x) {
     entities = [...entities.slice(0, oldestIndex), ...entities.slice(oldestIndex + 1)];
   }
 
-  const nextWorld = withFace(world, session.player.side, { entities, nextEphemeralId: face.nextEphemeralId + 1 });
-  return { ...session, worlds: { ...session.worlds, [session.activeWorldId]: nextWorld } };
+  return updateActiveFace(session, { entities, nextEphemeralId: face.nextEphemeralId + 1 });
 }
 
 // Tentatives maximum avant d'abandonner un tirage éparpillé et de retomber
@@ -602,9 +612,7 @@ export function spawnScatteredEphemerals(session, spec, sourceX, count, spread =
     nextSession = spawnEphemeral(nextSession, spec, draw.x);
   }
 
-  const finalWorld = nextSession.worlds[nextSession.activeWorldId];
-  const nextWorld = withFace(finalWorld, side, { rngState });
-  return { ...nextSession, worlds: { ...nextSession.worlds, [nextSession.activeWorldId]: nextWorld } };
+  return updateActiveFace(nextSession, { rngState }, side);
 }
 
 // FACE COURANTE aplatie (voir isTwoSided/resolveFace plus haut) : un monde

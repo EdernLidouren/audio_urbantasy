@@ -36,6 +36,9 @@ export const VARIABLE_TYPES = ["flag", "int"];
 // scène/partie" utilisés en documentation/commentaires.
 export const VARIABLE_SCOPES = ["entity", "scene", "party"];
 
+// Même test que core/parse-common.js/isNonEmptyString, recopié à dessein :
+// importer parse-common ici créerait un cycle d'imports (parse-common ->
+// comportements -> state -> presence -> variables).
 function isNonEmptyString(value) {
   return typeof value === "string" && value.trim().length > 0;
 }

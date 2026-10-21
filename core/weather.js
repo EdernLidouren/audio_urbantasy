@@ -22,7 +22,7 @@
 // Pas encore de contenu qui apparaisse selon la météo.
 
 import { WEATHER_STATES, DEFAULT_WEATHER_STATE } from "../config/weather-values.js";
-import { createSeed, nextRandom } from "./rng.js";
+import { createSeed, nextRandom, pickWeighted } from "./rng.js";
 import { INITIAL_TIME } from "./time.js";
 
 // Valide la table météo — ÉTAT PAR ÉTAT (durée cohérente, au moins une
@@ -103,29 +103,6 @@ export function validateWeatherStates(states) {
 // silencieusement en cours de partie.
 validateWeatherStates(WEATHER_STATES);
 
-// Tire la CIBLE suivante parmi les transitions de poids positif de l'état
-// courant — poids relatifs (voir config/weather-values.js), normalisés ICI
-// par leur somme, jamais besoin qu'ils totalisent 100. EXPORTÉE pour deux
-// raisons : core/checks/weather.check.js vérifie directement l'ÉQUITÉ du
-// tirage pondéré (fréquences observées vs poids déclarés) sans dépendre des
-// valeurs de la VRAIE table ni rejouer toute la mécanique temps/session ;
-// et core/distribution.js la réutilise TELLE QUELLE (tirage d'un
-// collectible dans une table { objet: poids }, même forme qu'une table de
-// transitions) — une seule logique de tirage pondéré dans le core.
-export function pickTransition(transitions, rngState) {
-  const entries = Object.entries(transitions).filter(([, weight]) => weight > 0);
-  const total = entries.reduce((sum, [, weight]) => sum + weight, 0);
-  const { value, state } = nextRandom(rngState);
-  let threshold = value * total;
-  for (const [target, weight] of entries) {
-    threshold -= weight;
-    if (threshold < 0) return { target, rngState: state };
-  }
-  // Filet de robustesse flottante (arrondi en fin de parcours) : la
-  // validation au chargement garantit déjà au moins une entrée ici.
-  return { target: entries[entries.length - 1][0], rngState: state };
-}
-
 // Tire une durée (minutes de jeu, ENTIÈRES) dans [min, max] de l'état visé.
 function drawDuration({ min, max }, rngState) {
   const { value, state } = nextRandom(rngState);
@@ -169,10 +146,10 @@ export function createInitialWeather(seed, atTime = INITIAL_TIME) {
 export function advanceWeather(session) {
   let weather = session.weather;
   while (session.time >= weather.nextTransitionAt) {
-    const picked = pickTransition(WEATHER_STATES[weather.state].transitions, weather.rngState);
-    const drawn = drawDuration(WEATHER_STATES[picked.target].duration, picked.rngState);
+    const picked = pickWeighted(WEATHER_STATES[weather.state].transitions, weather.rngState);
+    const drawn = drawDuration(WEATHER_STATES[picked.key].duration, picked.rngState);
     weather = {
-      state: picked.target,
+      state: picked.key,
       nextTransitionAt: weather.nextTransitionAt + drawn.minutes,
       rngState: drawn.rngState,
     };
@@ -208,11 +185,11 @@ export function setWeather(session, targetState) {
 
 // "Déclencher la transition suivante" (menu debug météo) : force le moteur
 // à transiter MAINTENANT, selon les poids NORMAUX de l'état courant (voir
-// pickTransition) — sans attendre que le temps de jeu rattrape
+// pickWeighted) — sans attendre que le temps de jeu rattrape
 // nextTransitionAt. Compose sur setWeather : le tirage de CIBLE se fait
 // ici, l'entrée propre dans cette cible (durée + rendez-vous) est déléguée
 // à setWeather, jamais dupliquée.
 export function triggerNextWeatherTransition(session) {
-  const picked = pickTransition(WEATHER_STATES[session.weather.state].transitions, session.weather.rngState);
-  return setWeather({ ...session, weather: { ...session.weather, rngState: picked.rngState } }, picked.target);
+  const picked = pickWeighted(WEATHER_STATES[session.weather.state].transitions, session.weather.rngState);
+  return setWeather({ ...session, weather: { ...session.weather, rngState: picked.rngState } }, picked.key);
 }

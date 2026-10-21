@@ -7,18 +7,17 @@
 // addItem/removeItem (core/bag.js) et addMoney (core/money.js) : aucune
 // seconde logique de sac ni d'argent.
 
-import { ITEM_REGISTRY } from "./items.js";
+import { ITEM_REGISTRY, itemValue } from "./items.js";
 import { addItem, removeItem } from "./bag.js";
 import { addMoney } from "./money.js";
-import { resolveFace, withFace } from "./state.js";
+import { resolveFace, updateActiveFace } from "./state.js";
 import { spawnCycleAt } from "./spawn.js";
 import { resolveCatalog, articlePrice, restockShopEntity } from "./catalog.js";
 
 // Prix de vente unitaire d'un type d'objet — 0 si non vendable (absent du
 // registre, sans `value`, ou `value` non entier positif).
 export function sellValueOf(type) {
-  const value = ITEM_REGISTRY[type] && ITEM_REGISTRY[type].value;
-  return Number.isInteger(value) && value > 0 ? value : 0;
+  return itemValue(type);
 }
 
 export function isSellable(type) {
@@ -63,8 +62,7 @@ function findShop(session, entityId) {
 
 function replaceShop(session, found, entity) {
   const entities = found.face.entities.map((e, i) => (i === found.index ? entity : e));
-  const nextWorld = withFace(found.world, session.player.side, { entities });
-  return { ...session, worlds: { ...session.worlds, [session.activeWorldId]: nextWorld } };
+  return updateActiveFace(session, { entities });
 }
 
 // Articles en rayon d'un point de vente, dans l'ordre du catalogue :

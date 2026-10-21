@@ -23,7 +23,9 @@ import { TIME_CONFIG } from "../config/time-values.js";
 const { minutesPerHour, hoursPerDay, daysPerMonth, monthsPerYear, monthsPerSeason, startHour, weekdayOrigin } =
   TIME_CONFIG;
 
-const MINUTES_PER_DAY = minutesPerHour * hoursPerDay;
+// Exportée : la durée d'un jour sert aussi à la présence (heure fractionnaire)
+// et à la collecte (cycle quotidien).
+export const MINUTES_PER_DAY = minutesPerHour * hoursPerDay;
 const MINUTES_PER_MONTH = MINUTES_PER_DAY * daysPerMonth;
 const MINUTES_PER_YEAR = MINUTES_PER_MONTH * monthsPerYear;
 

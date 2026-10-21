@@ -12,7 +12,7 @@
 //     change met la table à jour tout seul.
 // Dans une table { objet: poids }, la clé RÉSERVÉE `nothing` est une issue
 // "rien" pondérée comme les autres (voir core/distribution.js/NOTHING).
-// Poids RELATIFS normalisés au tirage (voir core/weather.js/pickTransition,
+// Poids RELATIFS normalisés au tirage (voir core/rng.js/pickWeighted,
 // réutilisé tel quel), jamais des pourcentages. Une source (conteneur,
 // plage) RÉFÉRENCE une table par son nom ({ table: "default" }), déclare
 // la sienne inline ({ items: { ... } }) ou en combine plusieurs

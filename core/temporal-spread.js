@@ -19,6 +19,7 @@
 // INDÉPENDANT pour chacune, plutôt qu'un même tirage brut simplement remis
 // à l'échelle par des spreads différents.
 import { createSeed, nextRandom } from "./rng.js";
+import { TIME_CONFIG } from "../config/time-values.js";
 
 const NAMESPACE = "temporalSpread";
 
@@ -31,5 +32,5 @@ export function temporalThresholdOffset(entityId, from, to, spreadMinutes) {
   if (!Number.isFinite(spreadMinutes) || spreadMinutes <= 0) return 0;
   const { value } = nextRandom(createSeed(`${NAMESPACE}:${entityId}:${from}:${to}`));
   const offsetMinutes = (value * 2 - 1) * spreadMinutes; // [-spread, +spread]
-  return offsetMinutes / 60;
+  return offsetMinutes / TIME_CONFIG.minutesPerHour;
 }

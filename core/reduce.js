@@ -46,7 +46,7 @@ import BEHAVIORS from "./behaviors/index.js";
 import { resolvePlayerMove, resolveBodyMove } from "./physics/collision.js";
 import { resolveOverlaps, resolveEntityOverlaps } from "./physics/overlap.js";
 import { resolveEntityRules, presenceContextOf } from "./presence.js";
-import { resolveFace, withFace, isTwoSided } from "./state.js";
+import { resolveFace, withFace, withActiveWorld, isTwoSided } from "./state.js";
 
 // Résout la position d'une CIBLE par id — "player" (convention reconnue
 // ici, voir follow.js/DEFAULTS.targetId) pour le joueur, sinon une entité
@@ -300,9 +300,8 @@ export function reduce(state, action) {
       }
 
       return {
-        ...state,
+        ...withActiveWorld(state, nextWorld),
         player: { ...state.player, x: overlapFix.playerX, blockedBy, pushedBy: overlapFix.pushedBy },
-        worlds: { ...state.worlds, [state.activeWorldId]: nextWorld },
         companions: finalCompanions,
         companionsRngState: companionsStep.rngState,
       };

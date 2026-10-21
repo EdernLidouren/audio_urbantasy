@@ -43,15 +43,17 @@ function deepMergeOverride(base, override) {
   return merged;
 }
 
-// Type d'entité générique d'un objet au sol (voir parseEntity, et
-// core/spawn.js/GENERIC_ITEM_TYPE qui en est l'usage au garnissage).
-const GENERIC_ITEM_ENTITY_TYPE = "item";
+// Type d'entité générique d'un objet au sol (entities/types/item.js),
+// utilisé pour tout objet du sac SANS archétype dédié : il reprend le nom,
+// la description et les sons de l'objet qu'il porte (voir
+// genericItemDefaults). Exporté pour core/spawn.js, qui pose ces objets.
+export const GENERIC_ITEM_TYPE = "item";
 
 // Nom, description et sons repris de l'objet porté par une entité "item"
 // (voir parseEntity). Rien pour un autre type, une action qui ne ramasse
 // pas d'objet, ou un objet inconnu (validé ailleurs) : `{}`.
 function genericItemDefaults(type, action) {
-  if (type !== GENERIC_ITEM_ENTITY_TYPE || !action || Array.isArray(action)) return {};
+  if (type !== GENERIC_ITEM_TYPE || !action || Array.isArray(action)) return {};
   if (action.kind !== "pickup" || typeof action.item !== "string") return {};
   const props = ITEM_REGISTRY[action.item];
   if (!props) return {};

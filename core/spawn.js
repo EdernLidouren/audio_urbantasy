@@ -52,21 +52,23 @@ import { TIME_CONFIG } from "../config/time-values.js";
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";
 import { drawItem } from "./distribution.js";
 import { restockShopEntity } from "./catalog.js";
-import { isTwoSided, resolveFace, withFace, drawScatteredPosition, spawnScatteredEphemerals } from "./state.js";
-import { parseSpawnedEntity } from "./entity-parse.js";
+import {
+  isTwoSided,
+  resolveFace,
+  withFace,
+  withActiveWorld,
+  updateActiveFace,
+  drawScatteredPosition,
+  spawnScatteredEphemerals,
+} from "./state.js";
+import { parseSpawnedEntity, GENERIC_ITEM_TYPE } from "./entity-parse.js";
+import { MINUTES_PER_DAY } from "./time.js";
 import { presenceContextOf } from "./presence.js";
-
-const MINUTES_PER_DAY = TIME_CONFIG.minutesPerHour * TIME_CONFIG.hoursPerDay;
 
 // Tentatives pour trouver une position respectant l'espacement minimal
 // (voir drawRangePosition) — plafond, jamais une boucle sans fin.
 const SPACING_MAX_ATTEMPTS = 8;
 
-// Archétype GÉNÉRIQUE d'objet au sol (entities/types/item.js), utilisé pour
-// tout objet du sac SANS archétype dédié : un archétype du MÊME NOM que
-// l'objet (ex. "apple") est préféré s'il existe dans le registre injecté
-// (voir collectibleRaw).
-const GENERIC_ITEM_TYPE = "item";
 
 // Index du cycle de collecte courant : nombre de re-garnissages quotidiens
 // (à SPAWN_CYCLE_HOUR) écoulés depuis l'origine du temps. Peut être négatif
@@ -269,8 +271,7 @@ export function refillDueSpawns(session, registry) {
     const refilled = refillFace(face, world, cycle, registry, companions, presenceContext);
     nextWorld = withFace(nextWorld, side, { entities: refilled.entities, rngState: refilled.rngState });
   }
-  nextWorld = { ...nextWorld, spawnCycle: cycle };
-  return { ...session, worlds: { ...session.worlds, [session.activeWorldId]: nextWorld } };
+  return withActiveWorld(session, { ...nextWorld, spawnCycle: cycle });
 }
 
 // Effet "fouiller" (action "search", voir view/interaction.js) sur un
@@ -309,10 +310,7 @@ export function searchContainer(session, entityId, registry) {
 
   const searched = { ...entity, stock: null, stockCycle: cycle };
   const entities = face.entities.map((e, i) => (i === index ? searched : e));
-  let nextSession = {
-    ...session,
-    worlds: { ...session.worlds, [session.activeWorldId]: withFace(world, side, { entities, rngState }) },
-  };
+  let nextSession = updateActiveFace(session, { entities, rngState }, side);
   for (const item of stock) {
     const spec = buildCollectibleSpec(item, `${entityId}-drop`, entity.x, registry, world.length, world.variables);
     nextSession = spawnScatteredEphemerals(nextSession, spec, entity.x, 1);
