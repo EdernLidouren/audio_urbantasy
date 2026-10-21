@@ -7,9 +7,9 @@
 //
 // Deux effets POST-ACTIVATION composables, DÉCLARÉS par l'entité — jamais
 // codés en dur pour "crate" spécifiquement (voir view/interaction.js,
-// view/audio/city-scene.js) :
+// view/audio/entity-sounds.js) :
 //   - consumedDescriptionKey (cascade instance -> type, comme
-//     descriptionKey — voir core/scene.js) : description alternative une
+//     descriptionKey — voir core/entity-parse.js) : description alternative une
 //     fois consumed, lue par view/interaction.js/resolveDescription. Reste
 //     OBSERVABLE/INTERACTABLE après consommation (contrairement à "devenir
 //     dormant" ci-dessous) — seul son état PERÇU change.
@@ -28,8 +28,8 @@ export default {
   nameKey: "entity.crate.name",
   descriptionKey: "entity.crate.description",
   consumedDescriptionKey: "entity.crate.consumed_description",
-  // Pool réutilisé (déjà utilisé par money.js/npc.js, voir leurs
-  // commentaires) : aucun son "caisse" dédié pour l'instant.
+  // Pool partagé avec d'autres archétypes : aucun son "caisse" dédié pour
+  // l'instant.
   sounds: {
     beacon: { path: "assets/sounds/items/box_of_nails_beacon_1.mp3", loop: true },
   },

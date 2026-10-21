@@ -24,7 +24,7 @@ function pad2(n) {
 
 // Dictionnaire de valeurs de gabarit DÉRIVÉ du contexte — SEUL endroit qui
 // énumère les valeurs disponibles aujourd'hui (mêmes noms que
-// time.announce/weather.announce, voir view/city-screen.js, pour qu'un
+// time.announce/weather.announce, voir view/status-announcements.js, pour qu'un
 // gabarit de description se comporte comme ces annonces). Ajouter une
 // valeur PLUS TARD = une entrée de plus ICI, jamais une réécriture de
 // resolveDescriptionText ci-dessous, qui reste agnostique de ce qu'elle
@@ -49,8 +49,8 @@ function buildDescriptionValues(context) {
 }
 
 // Remplit LA clé de description avec les valeurs du contexte COURANT — un
-// gabarit sans placeholder ({...}) traverse inchangé (voir lib/i18n.js),
-// rétrocompat totale pour toute description existante.
+// gabarit sans placeholder ({...}) traverse tel quel (voir lib/i18n.js) :
+// une description statique n'a rien à déclarer de plus.
 export function resolveDescriptionText(key, context) {
   if (!key) return undefined;
   return t(key, buildDescriptionValues(context));

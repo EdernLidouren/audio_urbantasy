@@ -1,5 +1,5 @@
 // Pools audio de la PERCEPTION SURNATURELLE (voir core/presence.js/
-// "perceptionActive", view/audio/city-scene.js) — GLOBAUX, pas par scène :
+// "perceptionActive", view/audio/layers.js) — GLOBAUX, pas par scène :
 // le surnaturel est une strate unique détachée du monde visité, contrairement
 // à musicDay/musicNight/ambiences qui restent des champs DE SCÈNE (voir
 // doc/scene-format.md). Donnée NEUTRE, zéro import — même statut que

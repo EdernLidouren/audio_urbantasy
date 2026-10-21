@@ -69,7 +69,7 @@ export function createMainMenu({ canContinue, continueGame, startNewGame, startT
   const entries = [];
 
   // "Ville test" : EN TÊTE de menu (avant même "Continuer"), raccourci de
-  // développement/démo vers l'ancienne scène de départ ("demo", voir
+  // développement/démo vers la scène de test ("demo", voir
   // main.js/startTestCityGame) — réutilise TEL QUEL le même garde-fou de
   // confirmation qu'une "Nouvelle partie" normale (activateNewGame
   // ci-dessus), puisque c'est exactement la même opération : une session

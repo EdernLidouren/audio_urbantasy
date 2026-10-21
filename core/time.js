@@ -3,7 +3,7 @@
 // TIME_CONFIG.startHour:00 — voir INITIAL_TIME). Rien d'autre n'est
 // stocké : minute/heure/jour/mois/semaine/saison/année sont TOUTES dérivées ici,
 // par division entière sur ce seul compteur — jamais une seconde exposée
-// (granularité = la minute de jeu, voir CLAUDE.md).
+// (granularité = la minute de jeu, voir doc/time.md).
 //
 // Calendrier SIMPLIFIÉ (voir config/time-values.js) : 12 mois égaux de 30
 // jours, 4 saisons de 3 mois, pas de bissextile — un calendrier DE JEU,
@@ -11,11 +11,12 @@
 //
 // advanceTime NE LIT JAMAIS L'HORLOGE RÉELLE : le delta (déjà converti en
 // minutes de jeu) est mesuré au BORD et injecté tel quel (voir
-// lib/loop.js, view/city-screen.js) — même delta injecté -> même compteur
-// résultant, le déterminisme du core (CLAUDE.md) s'étend donc au temps.
-// Rien ne CONSOMME encore ce compteur ailleurs dans le jeu (pas de
-// jour/nuit, pas d'événements) : voir core/time.md pour la portée exacte
-// et les chantiers réservés.
+// lib/loop.js, view/game-clock.js) — même delta injecté -> même compteur
+// résultant, le déterminisme du core s'étend donc au temps. Consommateurs
+// du compteur : la phase jour/nuit (phaseAt ci-dessous), la condition
+// "timeRange" (core/presence.js), le cycle de collecte (core/spawn.js), la
+// météo (core/weather.js) et les triggers horaires (core/triggers.js) —
+// voir doc/time.md pour la portée exacte et les chantiers réservés.
 
 import { TIME_CONFIG } from "../config/time-values.js";
 
@@ -27,8 +28,8 @@ const MINUTES_PER_MONTH = MINUTES_PER_DAY * daysPerMonth;
 const MINUTES_PER_YEAR = MINUTES_PER_MONTH * monthsPerYear;
 
 // Compteur de départ d'une partie neuve : jour 1, mois 1 (donc saison 0,
-// voir SEASON_KEYS), à startHour:00. Seul appelant : core/state.js/
-// createInitialState.
+// voir SEASON_KEYS), à startHour:00. Lu par core/state.js/
+// createInitialState (partie neuve), core/weather.js et core/save.js.
 export const INITIAL_TIME = startHour * minutesPerHour;
 
 // Clés i18n des saisons, dans l'ORDRE où elles reviennent — l'index est
@@ -121,7 +122,7 @@ export function weekdayOf(time) {
 // chaque côté (voir config/time-values.js/dayStartHour, nightStartHour) :
 // PAS de troisième état (aube/crépuscule) pour l'instant — la valeur de
 // retour est un TYPE FERMÉ à deux cas ("day" | "night"), volontairement,
-// pour que tout consommateur (ex. view/audio/city-scene.js) exhaustif sur
+// pour que tout consommateur (ex. view/audio/layers.js) exhaustif sur
 // ces deux cas n'ait rien à changer le jour où une phase intermédiaire
 // s'ajoutera ; ce jour-là, étendre cette fonction ET ses appelants,
 // jamais glisser un troisième cas en silence dans l'un des deux existants.
@@ -132,7 +133,7 @@ export function phaseAt(time) {
 
 // SEUL point d'avancement du compteur — pur, ne lit jamais l'horloge
 // réelle : `minutes` (déjà en MINUTES DE JEU, converties au bord depuis un
-// delta réel, voir view/city-screen.js) s'ajoute tel quel à session.time.
+// delta réel, voir view/game-clock.js) s'ajoute tel quel à session.time.
 // Fractionnaire accepté et CONSERVÉ (pas arrondi ici) : un frame réel de
 // quelques dizaines de ms ne vaut souvent qu'une fraction de minute de jeu
 // — arrondir à chaque appel perdrait ce résidu et ferait dériver l'horloge

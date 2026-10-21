@@ -90,9 +90,10 @@ const EQUIPMENT_SLOT_LABELS = { feet: "equipment.slot.feet" };
 
 // (type, count) => void — applique l'effet d'ÉTAT du "Poser" (retrait du
 // sac + apparition au sol, voir core/bag.js/dropItem), fourni par
-// city-screen.js qui seul détient getSession/setSession — même principe
-// d'injection que view/interaction.js/setPickupHandler (ce module ne
-// connaît jamais le core).
+// view/action-handlers.js qui seul détient getSession/setSession — même
+// principe d'injection que view/interaction.js/setPickupHandler (ce module
+// ne LIT que des registres et des lectures pures du core, jamais il n'écrit
+// l'état).
 let dropItemHandler = null;
 
 export function setDropItemHandler(handler) {
@@ -194,10 +195,9 @@ function bagRemovalAnnouncement(getSession, index) {
 // vide, plutôt qu'un tableau réellement vide : lib/menu.js/makeMenuScreen
 // suppose toujours AU MOINS une entrée courante (currentEntry() n'est jamais
 // undefined ailleurs dans son code) ; un tableau vide y planterait dès
-// onEnter. Même ligne que l'ancienne annonce "Sac vide.", juste portée par
-// une entrée plutôt qu'un refus d'ouvrir l'écran (voir openInventoryMenu :
-// contrairement à avant les onglets, un sac vide ne doit plus JAMAIS
-// empêcher d'atteindre l'onglet Équipement).
+// onEnter. Une entrée plutôt qu'un refus d'ouvrir l'écran (voir
+// openInventoryMenu) : un sac vide ne doit JAMAIS empêcher d'atteindre les
+// autres onglets.
 function buildBagEntries(getWorldView, getSession) {
   const bag = getSession().bag;
   // "inventory.empty.entry" (SANS point final), pas "inventory.empty" (avec
@@ -404,8 +404,8 @@ function buildInventoryTabsScreen(getWorldView, getSession, initialTab) {
     },
     // Voir la doc de `silent`/`pendingCursor` ci-dessus — appelé par
     // executeAction juste avant de remonter jusqu'ici. `cursor` optionnel :
-    // omis (ex. Déséquiper, qui ne retire rien de la liste) -> comportement
-    // inchangé, retombe sur le défaut de rebuildInner.
+    // omis (ex. Déséquiper, qui ne retire rien de la liste) -> retombe sur
+    // le défaut de rebuildInner.
     returnSilently(cursor) {
       silent = true;
       pendingCursor = cursor;
@@ -574,9 +574,9 @@ function buildDropMessage(getSession, entry, itemLabelKey, quantity, index) {
 //   - le slider existant ne connaît qu'UN SEUL palier d'incrément (Ctrl ->
 //     bigStep) ; ce sélecteur en veut TROIS (aucun -> ±1, Shift -> ±10,
 //     Ctrl -> ±100).
-// La mécanique de SLIDER de lib/menu.js reste donc inutilisée ici (ces deux
-// raisons tiennent indépendamment de la refonte du moteur d'entrée — voir
-// lib/input.js — qui a, elle, migré ce fichier vers des bindings résolus).
+// La mécanique de SLIDER de lib/menu.js reste donc inutilisée ici ; les
+// touches du sélecteur passent, elles, par des bindings résolus comme
+// partout (lib/input.js/resolveAction).
 // Ctrl+Shift+flèche à la fois : mods exige une correspondance EXACTE (voir
 // lib/input.js), donc AUCUNE action ne résout pour cette combinaison —
 // jamais rencontré en pratique, accepté tel quel. L'imitation reste

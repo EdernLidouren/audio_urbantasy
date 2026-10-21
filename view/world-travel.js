@@ -187,7 +187,7 @@ export function createWorldTravel({ getSession, setSession }) {
   // leurs filtres (voir view/audio/face-crossfade.js). Son du passage, pas
   // de trajet en parallèle du croisement, bascule dans le core, vue
   // reconstruite sur la nouvelle face, pas d'arrivée. Même monde : ni
-  // chargement ni annonce du lieu.
+  // chargement ni annonce du nom de la scène.
   async function sideSwitch(arrivalX, entity) {
     pushScreen({});
     try {

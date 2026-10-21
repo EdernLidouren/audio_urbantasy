@@ -3,7 +3,7 @@
 // aucun import.
 //
 // blocksMovement est exploité par core/reduce.js (résolution de collision
-// joueur/entité) : voir core/scene.js pour le bakage dans l'entité parsée.
+// joueur/entité) : voir core/entity-parse.js pour le bakage dans l'entité parsée.
 // collisionSound (optionnel, hors de `sounds` : ce n'est pas un rôle du
 // modèle d'entité, juste une clé d'asset jouée par la vue quand le CORE
 // signale player.blockedBy === cette entité) — dormant si l'entité n'est

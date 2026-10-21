@@ -8,7 +8,7 @@
 // lib/audio.js lui-même.
 //
 // Monter cette valeur (ex. 2 -> 3) suffit à autoriser 3 ambiances de bout en
-// bout : parseScene acceptera un tableau plus long, et lib/audio.js pourra
-// effectivement en jouer 3 en simultané — aucune autre modification requise
-// dans core/scene.js ni lib/audio.js.
+// bout : parseScene accepte alors un tableau plus long, et lib/audio/ en
+// joue effectivement 3 en simultané — aucune autre modification requise
+// dans core/scene.js ni lib/audio/.
 export const AMBIENCE_CHANNEL_LIMIT = 2;

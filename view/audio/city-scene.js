@@ -2,6 +2,7 @@
 // et détruit le rendu sonore du monde actif, en composant des sous-systèmes
 // qui ne se connaissent pas entre eux :
 //   - ./entity-sounds.js   : registre des entrées sonores (les deux faces) ;
+//   - ./entity-sound-entry.js : construction d'une entrée sonore d'entité ;
 //   - ./entity-audio.js    : balises, vocaux, pas des entités ;
 //   - ./oneshots.js        : sons ponctuels ancrés ou suivis ;
 //   - ./footsteps.js       : pas et collisions du joueur ;
@@ -9,11 +10,12 @@
 //   - ./muffle.js          : étouffement (autre face, perception) ;
 //   - ./face-crossfade.js  : bascule animée recto <-> verso ;
 //   - ./preload.js         : préchargement ;
-//   - ./spatial.js         : calcul pan / volume / coupure (pur).
+//   - ./spatial.js         : calcul pan / volume / coupure (pur) ;
+//   - ./volume-factors.js  : facteurs de volume des préférences.
 // Spatialisation en stéréo + volume selon la distance au joueur, jamais en
-// HRTF (voir CLAUDE.md) ; la plomberie Web Audio reste dans lib/audio.js.
+// HRTF (voir ./spatial.js) ; la plomberie Web Audio reste dans lib/audio.js.
 //
-// SCÈNE À DEUX FACES (voir CLAUDE.md/"RECTO/VERSO") : le core tique les deux
+// SCÈNE À DEUX FACES (voir doc/entity-model.md/"Recto/verso") : le core tique les deux
 // faces ; ce module rend la face COURANTE normalement et l'AUTRE étouffée,
 // chaque rôle dosé par son gain "autre face" (par défaut, la balise n'y est
 // pas entendue : on devine l'autre face, on ne la localise pas).

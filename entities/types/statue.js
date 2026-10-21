@@ -3,8 +3,9 @@
 // aucun import.
 //
 // Générique par nature (comme door.js) : nameKey/descriptionKey restent des
-// défauts minimaux, chaque statue PARTICULIÈRE (ex. shellter_statue.js) les
-// surcharge à l'instance avec son propre nom/sa propre description — même
+// défauts minimaux, chaque statue PARTICULIÈRE (ex. l'instance
+// shellter_statue_1 de scenes/town-square.json) les surcharge à l'instance
+// avec son propre nom/sa propre description — même
 // patron que door.default.name/description pour door.js.
 export default {
   nameKey: "entity.default_statue.name",

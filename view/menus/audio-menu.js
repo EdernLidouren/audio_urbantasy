@@ -1,8 +1,9 @@
-// Définition du sous-menu Audio (Options > Audio). Deux sliders de volume,
-// tous deux persistés via config/preferences.js (voir lib/menu.js pour le
-// mécanisme générique de slider). Export/Import et réinitialisation globale
-// vivent dans options-menu.js (ce sont des opérations GLOBALES sur toutes
-// les préférences, pas spécifiques à l'audio). title et les labelKey/label
+// Définition du sous-menu Audio (Options > Audio). Six sliders de volume
+// (principal, balises, pas, musique, ambiances, interface), tous persistés
+// via config/preferences.js (voir lib/menu.js pour le mécanisme générique
+// de slider). L'export/import des préférences vit dans save-menu.js et la
+// réinitialisation globale dans options-menu.js (ce sont des opérations
+// GLOBALES sur toutes les préférences, pas spécifiques à l'audio). title et les labelKey/label
 // d'entrées sont des CLÉS de traduction, résolues par lib/menu.js via le t
 // reçu en paramètre.
 

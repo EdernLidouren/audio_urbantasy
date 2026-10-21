@@ -6,9 +6,9 @@
 // chaque lecture (jamais figé dans l'état). L'ÉTAT de stock courant, lui,
 // vit sur l'entité (entity.shopStock / shopCycle, voir restockShopEntity).
 //
-// Module SÉPARÉ de core/trade.js pour que core/scene.js (validation) et
-// core/spawn.js (rechargement au cycle) l'importent sans tirer la
-// transaction — jamais d'import circulaire.
+// Module SÉPARÉ de core/trade.js pour que core/entity-parse.js et
+// core/save.js (validation) et core/spawn.js (rechargement au cycle)
+// l'importent sans tirer la transaction — jamais d'import circulaire.
 
 import { SHOP_CATALOGS } from "../config/shop-values.js";
 import { ITEM_REGISTRY } from "./items.js";
@@ -62,7 +62,8 @@ export function validateShopCatalogs(catalogs) {
 validateShopCatalogs(SHOP_CATALOGS);
 
 // Valide UN catalogue déclaré par un point de vente — `fail` fourni par
-// l'appelant (core/scene.js). EXACTEMENT une des deux formes.
+// l'appelant (core/entity-parse.js/parseShop, ou core/save.js à la
+// relecture). EXACTEMENT une des deux formes.
 export function validateCatalog(catalog, describe, fail) {
   if (typeof catalog !== "object" || catalog === null || Array.isArray(catalog)) {
     fail(`${describe} doit être un objet { table } ou { items }.`);

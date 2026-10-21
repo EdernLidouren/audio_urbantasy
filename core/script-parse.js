@@ -43,7 +43,7 @@ function parseEffect(rawEffect, describe, index, id) {
   }
   if (type === "behavior") {
     // behavior: null -> RETRAIT explicite du comportement actif (voir
-    // core/scripting.md, "Effets"/"behavior") : l'entité redevient immobile,
+    // doc/scripting.md, "Effets"/"behavior") : l'entité redevient immobile,
     // comme si elle n'en avait jamais eu — SEULE valeur acceptée en dehors
     // d'un objet behavior valide (jamais `undefined`, qui signifierait
     // "aucun effet à ce champ", pas "retire-le" ; core/presence.js/
@@ -73,11 +73,12 @@ function resolveKnownVariableType(scope, name, entityVariables, sceneVariables) 
 // setVariable/toggleVariable/addVariable — voir core/variables.js) porte
 // une PORTÉE connue, un NOM non vide, et — SEULEMENT quand c'est vérifiable
 // au chargement — une EXISTENCE réelle sur le sac déjà résolu de sa portée :
-//   - "entity" : contre `entityVariables`, LE SAC DE CETTE ENTITÉ (parseEntity
-//     résout `entity.variables` AVANT tout ce qui peut le référencer — voir
-//     son ordre de parsing) — une référence à une variable jamais déclarée
-//     sur CETTE entité échoue clairement, exactement comme un tag inconnu
-//     (voir hasEquipmentTag ci-dessus).
+//   - "entity" : contre `entityVariables`, LE SAC DE CETTE ENTITÉ
+//     (core/entity-parse.js/parseEntity résout `entity.variables` AVANT
+//     tout ce qui peut le référencer — voir son ordre de parsing) — une
+//     référence à une variable jamais déclarée sur CETTE entité échoue
+//     clairement, exactement comme un tag inconnu (voir hasEquipmentTag
+//     dans validateCondition, plus bas).
 //   - "scene" : contre `sceneVariables`, LE SAC DE LA SCÈNE (racine de la
 //     scène, résolu par parseScene AVANT tout parseFace/parseEntity — voir
 //     son ordre d'appel) — même exigence.
@@ -85,10 +86,10 @@ function resolveKnownVariableType(scope, name, entityVariables, sceneVariables) 
 //     déclarations de partie n'existent qu'à createInitialState
 //     (core/state.js), hors de portée d'un parseScene qui ne connaît qu'UNE
 //     scène à la fois. LIMITE CONNUE, documentée (voir
-//     core/scripting.md/"Variables") plutôt que silencieusement ignorée :
+//     doc/scripting.md/"Variables") plutôt que silencieusement ignorée :
 //     une variable de partie mal orthographiée dans une condition/un effet
 //     ne sera détectée qu'à l'ÉVALUATION (repli sur false/no-op, voir
-//     core/presence.js/core/variables.js), jamais au chargement de la scène.
+//     core/presence.js et core/variables.js), jamais au chargement de la scène.
 function validateVariableReference(scope, name, entityVariables, sceneVariables, describe) {
   if (!VARIABLE_SCOPES.includes(scope)) {
     fail(`${describe}.scope "${scope}" inconnu (attendu : ${VARIABLE_SCOPES.join(" | ")}).`);
@@ -120,7 +121,7 @@ const TELEPORT_TRANSITIONS = ["fade", "instant"];
 
 // Un effet déclenché à l'ACTIVATION d'une action (voir core/effects.js pour
 // la partition CORE/VUE, core/variables.js/applyActionEffects,
-// view/interaction.js, core/scripting.md/"Effets d'action") — AIGUILLAGE
+// view/interaction.js, doc/scripting.md/"Effets d'action") — AIGUILLAGE
 // DISTINCT de parseEffect ci-dessus (presence/behavior, appliqués au TICK) :
 // ces effets n'ont de sens qu'au moment d'une interaction ponctuelle, jamais
 // réévalués en continu, jamais mélangés dans le même registre. RÉUTILISÉ TEL
@@ -136,9 +137,7 @@ const TELEPORT_TRANSITIONS = ["fade", "instant"];
 // est connu (toggle sur un "flag", add sur un "int" — jamais l'inverse).
 //
 // DEUX types de RENDU (playSound/announce, exécutés par la VUE, jamais ici) :
-// validés en FORME SEULEMENT, comme `action.sound`/`action.announceKey`
-// l'étaient avant l'introduction de ce vocabulaire unifié — le core ignore
-// tout du SENS (quel fichier, quelle traduction), il ne fait que garantir
+// validés en FORME SEULEMENT — le core ignore tout du SENS (quel fichier, quelle traduction), il ne fait que garantir
 // qu'un contenu malformé échoue au CHARGEMENT plutôt qu'à l'interaction.
 //
 // UN type MIXTE (`"teleport"`, JOUEUR uniquement — voir "Sources de vérité",
@@ -149,7 +148,7 @@ const TELEPORT_TRANSITIONS = ["fade", "instant"];
 // spécial : c'est une action ORDINAIRE dont `effects` contient un
 // `"teleport"`, comme n'importe quel autre contenu.
 // `playSound` porte le DESCRIPTEUR DE SON PARTAGÉ (voir lib/audio.js/
-// playDescribedOneShot, view/audio/city-scene.js) réduit à ses sous-champs
+// playDescribedOneShot, view/audio/oneshots.js) réduit à ses sous-champs
 // COMMUNS : `path` (requis, résolu via resolveAsset côté vue) ;
 // `gain`/`pitchVariation`/`reverbSend` (optionnels, nombres finis — mêmes
 // noms que les rôles positionnés beacon/vocal, jamais un vocabulaire
@@ -341,7 +340,7 @@ function describeVariableType(knownType) {
 }
 
 // Valide un objet CONDITION ({ type, ... }) — RÉUTILISÉ par presence[].when
-// (voir parsePresenceRule) ET action.condition (voir parseEntity, actions
+// (voir parsePresenceRule) ET action.condition (voir parseSingleAction, actions
 // CONDITIONNELLES) : MÊME forme déclarative, MÊME registre (CONDITION_TYPES),
 // MÊME validation — une condition ne sait pas d'où elle est appelée, jamais
 // dupliquée entre les deux. `describe` : préfixe du message d'erreur (ex.
@@ -409,7 +408,7 @@ export function validateCondition(cond, describe, entityVariables, sceneVariable
   // VIDE, chaque élément revalidé RÉCURSIVEMENT par cette même fonction
   // (une sous-condition peut être de n'importe quel type du registre, y
   // compris un autre "allOf" imbriqué) — jamais un second chemin de
-  // validation, voir core/scripting.md.
+  // validation, voir doc/scripting.md.
   if (cond.type === "allOf") {
     if (!Array.isArray(cond.conditions) || cond.conditions.length === 0) {
       fail(`${describe}.conditions doit être un tableau non vide pour "allOf".`);
@@ -491,7 +490,7 @@ export function parsePresenceRule(rawRule, ruleIndex, index, id, entityVariables
 
 // Valide UNE candidate d'action — RÉUTILISÉE À L'IDENTIQUE que `action` soit
 // un objet UNIQUE ou un élément d'un TABLEAU de candidates (voir
-// parseEntity) : la forme d'une candidate ne dépend jamais du nombre de
+// core/entity-parse.js/parseEntityAction) : la forme d'une candidate ne dépend jamais du nombre de
 // candidates.
 //
 // `effects` (optionnel) : la LISTE D'EFFETS exécutée si la condition RÉUSSIT
@@ -504,7 +503,7 @@ export function parsePresenceRule(rawRule, ruleIndex, index, id, entityVariables
 // `refusalEffects` : SYMÉTRIQUE d'`effects`, exécutée si la condition
 // ÉCHOUE — OPTIONNELLE : une action conditionnelle peut s'en passer si
 // l'échec est un choix de conception ASSUMÉ, jamais atteignable en pratique
-// (ex. entities/types/window.js, dont les deux candidates couvrent tout
+// (ex. entities/types/glass-window.js, dont les deux candidates couvrent tout
 // l'espace de leur variable — aucun refus n'est jamais réellement possible,
 // en déclarer un serait du code mort). RECOMMANDÉE dès que l'échec
 // laisserait le joueur sans aucun retour (ex. porte à dresscode/horaires) —

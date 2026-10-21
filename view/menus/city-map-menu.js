@@ -16,9 +16,8 @@
 // RÉELLE déclenche `onSelectZone`, fourni par l'appelant (voir
 // view/world-travel.js/travelViaCityMap) — sauf une zone HORS PLAN (voir
 // map/city-map.js/onMapWhen), annoncée "Hors plan" et refusée. Ce module
-// reste entièrement
-// ignorant du cycle de vie de la scène audio (destroy/travelToWorld/
-// recreate), il délègue, jamais n'importe core/state.js lui-même.
+// reste entièrement ignorant du cycle de vie de la vue du monde
+// (destroy/travelToWorld/recreate), il délègue, jamais n'importe core/state.js lui-même.
 //
 // Cet écran REMPLACE le menu pause (voir view/menus/pause-menu.js, qui le
 // popScreen() AVANT de pousser celui-ci) — jamais un empilement par-dessus
@@ -80,8 +79,8 @@ const CITY_MAP_BINDINGS = {
   confirm: { keys: ["Enter", " "], mods: [] },
   cancel: { keys: ["Escape"], mods: [] },
   // Coordonnées de la case courante (voir lib/coordinate-label.js) —
-  // touche PROPRE à cet écran, sans rapport avec "x"/debugPosition de
-  // view/city-screen.js (tables de bindings totalement indépendantes, voir
+  // touche PROPRE à cet écran, sans rapport avec "x"/announcePosition de
+  // view/input.js/CITY_BINDINGS (tables de bindings totalement indépendantes, voir
   // lib/screens.js : seul le sommet de la pile reçoit le clavier).
   coordinates: { keys: ["x"], mods: [] },
 };

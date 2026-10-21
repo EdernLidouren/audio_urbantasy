@@ -1,8 +1,8 @@
 // Registre des types d'entités. Connecteur pur, zéro logique : rassemble
 // chaque archétype (un fichier par type, voir les imports ci-dessous) en
 // un seul objet — même patron que core/behaviors/index.js. Donnée neutre au global : aucun import, ni du
-// core ni de la vue. blocksMovement est lu par core/scene.js (baké dans
-// l'entité parsée) puis exploité par core/reduce.js pour arrêter le joueur
+// core ni de la vue. blocksMovement est lu par core/entity-parse.js (baké
+// dans l'entité parsée) puis exploité par core/reduce.js pour arrêter le joueur
 // au bord du corps d'une entité bloquante (voir BODY_RADIUS, uniforme pour
 // l'instant). observable/interactable (système d'interaction niveau 0, voir
 // view/interaction.js et doc/entity-model.md) sont bakés de la même façon,
@@ -21,7 +21,7 @@
 // l'interaction "describe" (touche Espace, voir view/interaction.js).
 // Défaut par type, surchargeable par instance via le champ
 // `descriptionKey` de la scène (scenes/*.json) — cascade instance -> type
-// identique à celle de nameKey (résolue dans core/scene.js).
+// identique à celle de nameKey (résolue dans core/entity-parse.js).
 //
 // sounds regroupe les descripteurs de son du type PAR RÔLE (voir
 // doc/entity-model.md pour le vocabulaire complet et la liste des paramètres
@@ -29,7 +29,8 @@
 // les gains propres par source...). `beacon` (LOCALISATION, continue ou
 // intermittente), `vocal` (EXPRESSION, toujours intermittente, voir dog.js/
 // hound.js/npc.js) et `movement` (pas d'une entité mobile, voir dog.js) sont
-// les trois rôles utilisés aujourd'hui, tous OPTIONNELS et indépendants —
+// les trois rôles principaux (liste complète : doc/entity-model.md/
+// "Vocabulaire de sons"), tous OPTIONNELS et indépendants —
 // une entité peut composer librement (hound.js : vocal seul, sans beacon).
 // D'autres pourront s'ajouter au besoin sans toucher à ce qui existe.
 //

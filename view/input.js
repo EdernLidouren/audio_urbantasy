@@ -2,15 +2,16 @@
 // TABLES DE BINDINGS (voir lib/input.js pour le moteur générique qui les
 // résout). Ce fichier est la SEULE source de ces associations touche(s) ->
 // action ; un futur écran de remappage n'aurait qu'à reconstruire ces
-// objets (structure prête, aucune interface de remappage construite ici,
-// voir CLAUDE.md/YAGNI).
+// objets (structure prête, aucune interface de remappage construite ici :
+// pas d'abstraction avant le besoin).
 
 import { isActionActive, checkBindingsForCollisions } from "../lib/input.js";
 
 // Mouvement — CONTINU (voir isActionActive) : plusieurs touches physiques
 // pour une même action (flèches + ZQSD). mods:[] exige l'ABSENCE de tout
 // modificateur — c'est cette exigence qui empêche Ctrl+D de déclencher
-// "moveRight" (voir le bug historique documenté dans lib/input.js).
+// "moveRight" (voir la RÈGLE D'ARBITRAGE des modificateurs, en-tête de
+// lib/input.js).
 export const MOVE_BINDINGS = {
   moveLeft: { keys: ["ArrowLeft", "q", "a"], mods: [] },
   moveRight: { keys: ["ArrowRight", "d"], mods: [] },
@@ -25,25 +26,25 @@ checkBindingsForCollisions(MOVE_BINDINGS, "view/input.js MOVE_BINDINGS");
 export const MOVE_KEYS = [...MOVE_BINDINGS.moveLeft.keys, ...MOVE_BINDINGS.moveRight.keys];
 
 // Le piège de focus Tab (navigation native du navigateur sortant le focus de
-// #game) N'EST PLUS géré ici : lib/input.js neutralise Tab/Maj+Tab de façon
+// #game) n'a rien à faire ici : lib/input.js neutralise Tab/Maj+Tab de façon
 // INCONDITIONNELLE et générique, en tête de son propre traitement (voir
 // ALWAYS_NEUTRALIZED_BINDINGS, lib/input.js) — rien à fournir depuis ce
 // fichier pour ça.
 
 // Raccourcis de la ville — APPUI (voir view/city-screen.js/onKeyDown, qui
 // résout cette table via lib/input.js/resolveAction). "debugSpawn" reste
-// bindée inconditionnellement ; c'est la CONSOMMATION (city-screen.js) qui
-// l'ignore hors mode debug, comme avant. "announcePosition" (touche "x")
-// n'est PLUS réservée au debug : DISPONIBLE en jeu normal comme
-// announceTime/announceMoney — seule la PRÉCISION de ce qu'elle annonce
-// varie avec isDebugEnabled(), côté consommation (voir announcePlayerX).
+// bindée inconditionnellement ; c'est la CONSOMMATION (city-screen.js,
+// KEY_ACTIONS `debugOnly`) qui l'ignore hors mode debug. "announcePosition"
+// (touche "x") est DISPONIBLE en jeu normal comme announceTime/announceMoney
+// — seule la PRÉCISION de ce qu'elle annonce varie avec isDebugEnabled(),
+// côté consommation (voir view/status-announcements.js/announcePlayerX).
 //
 // "openEquipment" partage la touche "q" avec "moveLeft" (MOVE_BINDINGS
 // ci-dessus) — PAS une ambiguïté : les deux canaux sont INDÉPENDANTS
 // (continu vs appui, voir lib/input.js), et le mouvement n'est de toute
 // façon consommé QUE par city-screen.js/onTick, qui cesse d'être appelé dès
 // que l'écran d'inventaire passe au sommet de la pile (seul le sommet
-// tique, voir CLAUDE.md) — presser "q" ouvre donc l'équipement SANS jamais
+// tique, voir lib/screens.js) — presser "q" ouvre donc l'équipement SANS jamais
 // faire bouger le joueur, même si la touche reste techniquement "tenue"
 // pendant que l'écran est ouvert.
 export const CITY_BINDINGS = {
@@ -93,7 +94,7 @@ export const CITY_BINDINGS = {
   openCollectionsDebugMenu: { keys: ["c"], mods: ["shift"] },
   // "p" (perception) : bascule la PERCEPTION SURNATURELLE (voir
   // core/state.js/togglePerception, view/perception-toggle.js/toggle)
-  // — COOLDOWN anti-spam entièrement côté consommation (city-screen.js),
+  // — COOLDOWN anti-spam entièrement côté consommation (perception-toggle.js),
   // ce binding ne fait que router l'appui, comme tout le reste de cette
   // table.
   togglePerception: { keys: ["p"], mods: [] },
@@ -105,8 +106,7 @@ checkBindingsForCollisions(CITY_BINDINGS, "view/input.js CITY_BINDINGS");
 
 // Bindings GLOBAUX — indépendants de la pile d'écrans, voir
 // lib/input.js/onGlobalPress (câblé depuis main.js) : disponibles quel que
-// soit l'écran actif (menu, pause, ville...), exactement comme l'ancien
-// écouteur Alt+D dédié qu'ils remplacent. Ctrl plutôt qu'Alt : RÈGLE DE
+// soit l'écran actif (menu, pause, ville...). Ctrl plutôt qu'Alt : RÈGLE DE
 // CONCEPTION du projet (voir lib/input.js/header) — aucun binding de jeu,
 // dans AUCUNE table (celles-ci comme MOVE_BINDINGS/CITY_BINDINGS ci-dessus),
 // n'utilise Alt. Alt seul déplace le focus navigateur vers sa barre de menus

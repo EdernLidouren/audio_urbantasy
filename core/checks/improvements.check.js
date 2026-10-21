@@ -62,7 +62,8 @@ function checkImprovementsBody(run) {
     run("improvements : removeImprovement retire la clé", false, hasImprovement(removedAgain, "flashlight"));
     run("improvements : removeImprovement idempotent -> RÉFÉRENCE inchangée si déjà absente", removedAgain, removeImprovement(removedAgain, "flashlight"));
 
-    // Validation au CHARGEMENT (core/scene.js) — condition ET effets.
+    // Validation au CHARGEMENT (core/script-parse.js : validateCondition,
+    // parseActionEffect) — condition ET effets.
     const IMPROVEMENT_TEST_REGISTRY = { dog: { nameKey: "entity.dog.name" } };
     function sceneWithHasImprovement(id) {
       return {
@@ -185,9 +186,10 @@ function checkImprovementsBody(run) {
     );
     run("applyActionEffects : liste mixte — improvement ET variable de partie touchées", true, hasImprovement(afterMixedParty.session.improvements, "flashlight") && afterMixedParty.session.variables.friendship.value === 1);
 
-    // applyEntityActionEffects (core/state.js) — bout en bout, CONFIRME la
-    // correction : improvements survit désormais au splice final (comme
-    // variables), alors que seul .variables était repris auparavant.
+    // applyEntityActionEffects (core/state.js) — bout en bout : improvements
+    // survit au splice final de la portée "party", au même titre que
+    // .variables (les deux sont repris de result.session, jamais l'un sans
+    // l'autre).
     const IMPROVEMENT_ENTITY_REGISTRY = { npc: { nameKey: "entity.npc.name" } };
     const improvementWorld = parseScene(
       {

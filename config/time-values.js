@@ -24,7 +24,7 @@ export const TIME_CONFIG = {
 
   // Minutes de jeu par seconde réelle. 60 -> 1 s réelle = 1 min de jeu ->
   // une journée de jeu (24 h) dure 24 minutes réelles. Modifiable ici sans
-  // toucher à la logique qui la consomme (voir view/city-screen.js).
+  // toucher à la logique qui la consomme (voir view/game-clock.js).
   timeScale: 60,
 
   // Plages jour/nuit (voir core/time.js/phaseAt) : jour = [dayStartHour,
@@ -36,7 +36,7 @@ export const TIME_CONFIG = {
   nightStartHour: 20,
 
   // Jour de semaine du jour 1 d'une partie neuve — index dans
-  // weekday.0..weekday.6 (i18n/*.js, voir core/time.js/weekdayOf). 0 = le
+  // weekday.0..weekday.6 (data/i18n/*/status.json, voir core/time.js/weekdayOf). 0 = le
   // premier de WEEKDAY_KEYS (lundi en fr). Choix ARBITRAIRE (aucun
   // calendrier réel à faire correspondre) : fixé ici pour que weekdayOf
   // reste une dérivation PURE du compteur, jamais une valeur stockée à

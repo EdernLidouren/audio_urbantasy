@@ -92,7 +92,7 @@ export function shopArticles(entity) {
 
 // Rechargement PARESSEUX d'un point de vente de la FACE ACTIVE si un cycle
 // est passé depuis son dernier stock (ou s'il n'a jamais été rechargé) —
-// appelé à l'activation du comptoir (voir view/city-screen.js), pendant du
+// appelé à l'activation du comptoir (voir view/action-handlers.js), pendant du
 // garnissage au chargement (core/spawn.js). Rien de dû, ou id non marchand
 // -> RÉFÉRENCE INCHANGÉE.
 export function restockShopIfDue(session, entityId) {

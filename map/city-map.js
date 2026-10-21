@@ -46,7 +46,7 @@ const TOWN_SQUARE_ZONE = {
   spawnX: 26,
 };
 
-// La scène de démo (l'ancienne scène de départ, voir main.js/
+// La scène de démo (scène de test, lancée directement par main.js/
 // startTestCityGame), HORS PLAN tant que le joueur n'a pas les anciens
 // plans (amélioration "old_plans", donnée par le vieux cadastre).
 const DEMO_ZONE = {

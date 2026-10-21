@@ -15,7 +15,7 @@ import { VAR_ACTION_REGISTRY, sceneWithActionEffect } from "./helpers.js";
 
 export default function checkVariables(run) {
   // --- STOCKAGE de variables (core/variables.js) : trois portées (entity/
-  // scene/game), même mécanisme — voir CLAUDE.md/doc/scripting.md. Ce bloc
+  // scene/party), même mécanisme — voir doc/scripting.md/"Variables". Ce bloc
   // vérifie le STOCKAGE seul (déclaration, valeur initiale, persistance,
   // sérialisation sélective, accès get/set) — AUCUNE condition/action n'est
   // branchée dessus ici (voir « VARIABLES BRANCHÉES » plus bas).
@@ -214,7 +214,7 @@ export default function checkVariables(run) {
     run("variables : élément qui n'est pas un objet -> erreur", true, throws(() => parseVariables(["oops"], "test", fail)));
     run("variables : absent -> sac vide, PAS une erreur", false, throws(() => parseVariables(undefined, "test", fail)));
 
-    // ... puis via les VRAIS points d'entrée (core/scene.js/core/state.js),
+    // ... puis via les VRAIS points d'entrée (core/scene.js, core/state.js),
     // pour confirmer que le branchement, pas seulement la fonction pure,
     // rejette bien un contenu malformé.
     run(
@@ -445,7 +445,8 @@ export default function checkVariables(run) {
       applyActionEffects([{ type: "teleport", target: "elsewhere" }], effectsCtx).entity
     );
 
-    // 4) Validation au CHARGEMENT (core/scene.js) — PRÉSENT mais MALFORMÉ ->
+    // 4) Validation au CHARGEMENT (core/script-parse.js, appelé par
+    // parseScene) — PRÉSENT mais MALFORMÉ ->
     // erreur claire ; ABSENT -> défaut, jamais testé ici (déjà couvert par
     // le stockage, plus haut).
     function sceneWithCondition(cond, entityVariables = [{ name: "isOpen", type: "flag", initial: false }]) {
@@ -596,7 +597,7 @@ export default function checkVariables(run) {
     run("action unique : kind transporté tel quel", "switchSide", retrocompatScene.entities[0].action.kind);
 
     // 6) LA FENÊTRE — cas de test bout en bout (voir entities/types/
-    // window.js pour l'archétype réel, dupliqué ici en dur — ce fichier ne
+    // glass-window.js pour l'archétype réel, dupliqué ici en dur — ce fichier ne
     // dépend jamais de entities/, voir header).
     const WINDOW_REGISTRY = { window: { nameKey: "entity.window.name" } };
     const windowRawScene = {
@@ -642,9 +643,10 @@ export default function checkVariables(run) {
     let windowSession = createInitialState(windowScene, undefined, { companions: [] });
 
     // Identifie la candidate choisie par le CHEMIN de son "playSound" (open
-    // vs close) — plus d'effet "announce" ici : le son SEUL sert de retour
-    // (refusalEffects/confirmation parlée retirés, voir entities/types/
-    // window.js/header, "Conditions d'action" — refusalEffects OPTIONNELLE).
+    // vs close) — aucun effet "announce" ici : le son SEUL sert de retour
+    // (ni refusalEffects ni confirmation parlée, voir
+    // core/script-parse.js/parseSingleAction, doc/scripting.md/"Conditions
+    // d'action" — refusalEffects OPTIONNELLE).
     function playSoundPathOf(chosen) {
       const effect = chosen.effects.find((e) => e.type === "playSound");
       return effect && effect.path;

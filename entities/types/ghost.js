@@ -1,6 +1,6 @@
 // Archétype "ghost" — entité SURNATURELLE, cas de test de la PERCEPTION
 // SURNATURELLE (voir core/presence.js/"perceptionActive",
-// view/audio/city-scene.js) : même rôle que neon.js pour la présence
+// view/audio/muffle.js) : même rôle que neon.js pour la présence
 // conditionnelle "timeRange" — rien de plus qu'une entité normale dont la
 // présence est conditionnée par cette condition. Perception INACTIVE :
 // aucune règle ne correspond -> DORMANTE (silencieuse, non examinable,
@@ -10,7 +10,7 @@
 // murmure continu (beacon "neon_beacon", pool via resolveAsset, réutilisé
 // EN PLACEHOLDER : le seul bourdonnement continu du jeu qui ne soit PAS le
 // filler générique "box_of_nails_beacon" partagé par la moitié du registre
-// — voir entities/types/neon.js pour son usage d'origine — en attendant un
+// — voir entities/types/neon.js pour son usage premier — en attendant un
 // asset "spectral" dédié). Donnée pure : aucun import.
 export default {
   nameKey: "entity.ghost.name",

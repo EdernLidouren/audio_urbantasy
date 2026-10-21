@@ -1,8 +1,7 @@
 # Carte de la ville
 
 Contrat de référence pour `map/city-map.js` (topologie) et
-`view/menus/city-map-menu.js` (menu-carte). Voir CLAUDE.md/"Carte de la
-ville" pour le résumé.
+`view/menus/city-map-menu.js` (menu-carte), consulté depuis le menu pause.
 
 ## Topologie (`map/city-map.js`)
 
@@ -179,4 +178,4 @@ Entrée sur une case :
 explicites), `spawnX` REMPLACE le `playerStart` déjà posé si fourni, nouvelle
 scène audio, annonce du titre, auto-save sur transition (comme toute
 transition). Le core reste pur : cette fonction vit entièrement côté vue,
-`travelToWorld` n'est ni modifié ni contourné.
+et passe par `travelToWorld` comme toute transition, sans chemin parallèle.

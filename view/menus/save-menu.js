@@ -29,11 +29,11 @@ const AUTOSAVE_TRANSITION = PREF_CONSTRAINTS.autoSaveOnTransition;
 const AUTOSAVE_INTERVAL = PREF_CONSTRAINTS.autoSaveIntervalMinutes;
 const SAVE_SOUND_ENABLED = PREF_CONSTRAINTS.saveSoundEnabled;
 
-// Gestionnaire de remplacement de partie, enregistré UNE FOIS par
-// view/city-screen.js (setGameReplaceHandler, au moment de sa
-// construction) — même principe que setTeleportHandler (voir
-// view/interaction.js) : ce module déclenche l'effet (remplacer la
-// session, reconstruire la scène) sans avoir besoin de les connaître.
+// Gestionnaire de remplacement de partie (view/world-travel.js/
+// replaceCurrentGame), enregistré par view/action-handlers.js à la
+// construction de l'écran ville — même principe que setTeleportHandler
+// (voir view/interaction.js) : ce module déclenche l'effet (remplacer la
+// session, reconstruire la vue du monde) sans avoir besoin de les connaître.
 // null hors partie (aucun écran ville vivant pour l'accueillir) : voir le
 // garde dans applyImportedGame ci-dessous.
 let gameReplaceHandler = null;
@@ -59,7 +59,7 @@ function applyImportedGame(importedSession, repairs) {
     announce(t("save.imported"), { assertive: true });
   } else if (gameStartHandler) {
     gameStartHandler(importedSession);
-    // Au démarrage, l'écran de ville vient d'annoncer le lieu : une seule
+    // Au démarrage, l'écran de ville vient d'annoncer la scène : une seule
     // annonce reprend les deux, sinon la seconde écraserait la première.
     announce(`${t("save.imported")} ${t(getActiveWorld(importedSession).titleKey)}`, { assertive: true });
   } else {

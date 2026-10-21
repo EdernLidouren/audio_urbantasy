@@ -10,10 +10,10 @@ export default {
   },
   blocksMovement: false,
   observable: true,
-  // interactable:true (anticipe "ramasser"/"fouiller" — la description
-  // elle-même dit "semble fouillable", voir i18n) : candidat à entrée dès
-  // aujourd'hui, même si l'action reste le stub générique tant que les
-  // types d'action ne sont pas différenciés (voir view/interaction.js).
+  // interactable:true (la description elle-même dit "semble fouillable",
+  // voir i18n) : candidat à Entrée. Aucune action déclarée ici : une
+  // instance qui veut un effet concret (fouille, ramassage...) déclare la
+  // sienne (voir doc/scripting.md/"Actions").
   interactable: true,
   // Surlignage audio de proximité (voir doc/entity-model.md) : un objet à
   // fouiller se repère nettement une fois à portée.

@@ -1,7 +1,7 @@
 // Collections — logique PURE, sans aucune connaissance du contenu : les
 // collections (fichiers de données, collections/*.js) sont toujours PASSÉES
-// en paramètre, jamais importées ici (le core n'importe pas de contenu, voir
-// CLAUDE.md). Référence : doc/collections.md.
+// en paramètre, jamais importées ici (le core n'importe pas de contenu).
+// Référence : doc/collections.md.
 //
 // Une collection = { discoverySound?, entries: [{ item }, ...] } : une liste
 // ORDONNÉE d'entrées, chacune référençant un objet du sac

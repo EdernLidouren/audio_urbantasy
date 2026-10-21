@@ -9,7 +9,7 @@
 // — on reflète l'heure d'ARRIVÉE, jamais les heures franchies entre-temps
 // (aucune rafale, aucun passé simulé). Un trigger "à chaque heure" tire UNE
 // fois ; un trigger "à Xh" tire SEULEMENT si Xh est l'heure d'arrivée. La
-// pause gèle l'horloge (aucun delta injecté, voir view/city-screen.js), donc
+// pause gèle l'horloge (aucun delta injecté, voir view/game-clock.js), donc
 // ne déclenche rien — rien à coder ici.
 //
 // PORTÉE : le MONDE ACTIF, ses DEUX faces (une cloche au recto doit se
@@ -30,8 +30,8 @@ import { hourOfDay } from "./time.js";
 import { isTwoSided, applyEntityActionEffects } from "./state.js";
 import { isRenderEffect } from "./effects.js";
 
-// Kinds de trigger reconnus (`on`) — SEULE liste, lue par core/scene.js
-// pour la validation. Un kind de plus demain (météo, phase...) = une entrée
+// Kinds de trigger reconnus (`on`) — SEULE liste, lue par
+// core/script-parse.js/parseTrigger pour la validation. Un kind de plus demain (météo, phase...) = une entrée
 // ici + sa détection dans dueTriggerEffects.
 export const TRIGGER_KINDS = ["hour"];
 

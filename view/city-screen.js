@@ -86,7 +86,7 @@ export function makeCityScreen(getSession, setSession) {
     onEnter() {
       // Un menu poussé par-dessus la ville rappelle onEnter en se retirant
       // (lib/screens.js/popScreen) : seule la toute première entrée monte la
-      // vue du monde et annonce le lieu.
+      // vue du monde et annonce le nom de la scène.
       if (travel.current()) return;
 
       ensureAudioUnlocked();

@@ -1,15 +1,15 @@
 // Archétype "passage" — point de PASSAGE entre les deux FACES (recto/verso)
-// d'une même scène (voir CLAUDE.md/"RECTO/VERSO", core/scripting.md, action
-// "switchSide" ; doc/entity-model.md). Générique par nature (une ruelle, une
-// porte dérobée, un trou dans la palissade...) : label/description restent
+// d'une même scène (voir doc/entity-model.md/"Recto/verso", doc/scripting.md,
+// action "switchSide"). Générique par nature (une ruelle, une
+// porte dérobée, un trou dans la palissade...) : nom/description restent
 // des défauts génériques, `action.arrivalX` (point d'arrivée sur l'AUTRE
 // face) est TOUJOURS fourni par l'instance de scène, jamais par ce défaut
 // — il dépend entièrement de la géométrie de la scène qui l'instancie.
 //
 // beacon : passage_outdoor_1_beacon (souffle de vent), en boucle CONTINUE
 // (fichier ~12 s, bien au-delà du seuil de 1,5 s exigé par Howler pour une
-// boucle fiable, voir doc/entity-model.md) — essai en cours pour signaler
-// à l'oreille un passage SANS porte, distinct du beacon ponctuel des portes.
+// boucle fiable, voir doc/entity-model.md) — signale à l'oreille un passage
+// SANS porte, distinct du beacon ponctuel des portes.
 // Un point de passage doit rester LOCALISABLE au clavier/à l'oreille, comme
 // une porte. Pour rendre un passage MUET, retirer ce beacon À L'INSTANCE
 // via `"sounds": { "beacon": null }` (cascade PAR FUSION, voir

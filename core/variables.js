@@ -1,6 +1,6 @@
 // STOCKAGE de variables en jeu (flags booléens + entiers) — mécanisme
 // GÉNÉRIQUE, réutilisé À L'IDENTIQUE par les trois PORTÉES (voir
-// CLAUDE.md/core/scripting.md) :
+// doc/scripting.md/"Variables") :
 //   - ENTITÉ  : core/entity-parse.js/parseEntity attache le sac résolu à l'entité.
 //   - SCÈNE   : core/scene.js/parseScene attache le sac résolu au monde
 //     (racine PARTAGÉE entre recto/verso, jamais par face — voir header de
@@ -42,11 +42,12 @@ function isNonEmptyString(value) {
 
 // Une VALEUR est cohérente avec un TYPE si : "flag" -> booléen strict ;
 // "int" -> nombre ENTIER strict (jamais un flottant, jamais une chaîne
-// numérique) — les deux seuls types du système (voir header, "flottants/
-// chaînes viendront si un cas concret les réclame"). EXPORTÉE : réutilisée
-// TELLE QUELLE par core/scene.js pour valider la cohérence type/valeur des
-// effets d'écriture (setVariable.value, addVariable.amount) et le
-// comparateur d'une condition "variable" — jamais une seconde définition.
+// numérique) — les deux seuls types du système (flottants ou chaînes ne
+// viendraient que si un cas concret les réclame). EXPORTÉE : réutilisée
+// TELLE QUELLE par core/script-parse.js pour valider la cohérence
+// type/valeur des effets d'écriture (setVariable.value, addVariable.amount)
+// et le comparateur d'une condition "variable" — jamais une seconde
+// définition.
 export function isValidValueForType(type, value) {
   if (type === "flag") return typeof value === "boolean";
   if (type === "int") return typeof value === "number" && Number.isInteger(value);
@@ -54,12 +55,13 @@ export function isValidValueForType(type, value) {
 }
 
 // Valide et construit le sac de variables d'UN porteur — RÉUTILISÉE À
-// L'IDENTIQUE par core/scene.js (entité, scène) et core/state.js (partie),
+// L'IDENTIQUE par core/entity-parse.js (entité), core/scene.js (scène) et
+// core/state.js (partie),
 // `fail` fourni par l'appelant (même patron que core/parse-common.js/parseBehavior)
 // pour que le message porte le préfixe du bon appelant, jamais dupliqué ici.
 //
-// ABSENCE / MALFORMATION (voir CLAUDE.md, "rendre les états illégaux
-// non-représentables") : `raw` ABSENT -> sac vide `{}`, jamais une erreur —
+// ABSENCE / MALFORMATION (rendre les états illégaux non-représentables) :
+// `raw` ABSENT -> sac vide `{}`, jamais une erreur —
 // un porteur sans variable déclarée est un cas normal, pas un défaut de
 // contenu. `raw` PRÉSENT mais malformé (pas un tableau, élément mal formé,
 // nom dupliqué/vide, type inconnu, valeur initiale incohérente avec le
@@ -110,9 +112,11 @@ export function parseVariables(raw, describe, fail) {
 // Clé de `context` portant le PORTEUR d'une portée — SEULE table à
 // connaître que "scene" lit `world` et "party" lit `session` (vocabulaire
 // interne de core/state.js — "session" reste le nom du champ JS, "party"
-// est le mot de la PORTÉE, exactement comme "scene"/`world`). EXPORTÉE :
-// réutilisée par applyActionEffects ci-dessous pour recomposer `context`
-// après chaque effet, sans dupliquer cette correspondance.
+// est le mot de la PORTÉE, exactement comme "scene"/`world`). Lue par
+// carrierForScope ET par applyActionEffects ci-dessous (qui recompose
+// `context` après chaque effet), sans dupliquer cette correspondance ;
+// exportée pour qu'un futur constructeur de contexte s'y réfère plutôt que
+// de la recopier (aucun importeur aujourd'hui).
 export const SCOPE_CONTEXT_KEYS = { entity: "entity", scene: "world", party: "session" };
 
 // Résout le PORTEUR concerné par une portée, depuis un `context` générique
@@ -155,7 +159,7 @@ export function setVariable(context, scope, name, value) {
 
 // Applique une LISTE d'effets D'ÉCRITURE déjà validée (voir
 // core/script-parse.js/parseActionEffect — setVariable/toggleVariable/addVariable,
-// core/scripting.md/"Effets d'action") à un `context` de variables — POINT
+// doc/scripting.md/"Effets d'action") à un `context` de variables — POINT
 // D'ENTRÉE que view/interaction.js (activation d'une action) réutilise pour
 // appliquer TOUS les effets d'une action choisie EN UNE FOIS. Enchaîne les
 // effets SÉQUENTIELLEMENT (le `context` progresse d'un effet au suivant,

@@ -27,28 +27,30 @@
 // (activeWorldId) : seul lui reçoit les ticks (voir core/reduce.js) — les
 // autres sont inertes tant qu'ils ne sont pas réactivés (simulation de
 // l'absence : pas codée, lastVisited est le crochet réservé pour ça, voir
-// core/time.md).
+// doc/time.md).
 // time : minutes de jeu écoulées depuis l'origine de la partie — SEULE
 // source de vérité temporelle (voir core/time.js pour les dérivations
 // minute/heure/jour/mois/saison/année). Avance UNIQUEMENT via
 // core/time.js/advanceTime, jamais ici ni dans core/reduce.js.
 //
-// RECTO/VERSO — scène à DEUX FACES (modèle B, voir CLAUDE.md) : worlds[id]
+// RECTO/VERSO — scène à DEUX FACES (voir doc/entity-model.md/"Recto/verso",
+// doc/scene-format.md/"Scène à deux faces") : worlds[id]
 // peut être SIMPLE (comme ci-dessus) ou contenir un recto ET un verso
 // (jamais un seul), chacun sa propre face — voir isTwoSided/resolveFace/
 // withFace plus bas. `player.side` ("recto"|"verso", "recto" par défaut) dit
 // QUELLE face est ACTIVE (celle qui porte le joueur et les compagnons).
-// Étape 2/2 — COEXISTENCE (voir core/reduce.js/TICK) : LES DEUX faces
+// COEXISTENCE (voir core/reduce.js/TICK) : LES DEUX faces
 // tiquent à chaque tour, chacune ISOLÉE dans son propre espace (aucune
 // collision, aucun ciblage de comportement, aucune interaction entre
 // faces) — seule la face active reçoit joueur/compagnons. `getInactiveFace`
 // plus bas expose l'AUTRE face en LECTURE SEULE, pour son rendu audio
-// étouffé (voir view/audio/city-scene.js). Basculer de face (voir
+// étouffé (voir view/audio/entity-audio.js, view/audio/muffle.js). Basculer
+// de face (voir
 // switchSide plus bas) reste DANS le même monde, contrairement à
 // travelToWorld qui en change.
 //
-// COMPAGNONS — cercle PARTIE, comme le joueur (voir CLAUDE.md, brique 1/3
-// du système de compagnons) : `companions` est une liste d'entités (MÊME
+// COMPAGNONS — cercle PARTIE, comme le joueur : `companions` est une liste
+// d'entités (MÊME
 // forme qu'une entité de monde — id/type/x/behavior/...) qui vit à CE niveau,
 // PAS dans worlds[x].entities. Elle traverse les transitions avec le
 // joueur, jamais rangée avec un monde quitté. `companionsRngState` est un
@@ -82,14 +84,13 @@ export const MOVE_STEP = TUNING_DEFAULTS.moveStep;
 // entité/type. Orthogonal à blocksMovement, qui décide SEUL si ce corps
 // arrête/exclut quelque chose (voir core/reduce.js). Vit ici (pas dans
 // reduce.js) pour être partagé sans détour par core/scene.js (validation au
-// chargement) ET core/reduce.js (résolution au tick) — une seule source.
+// chargement) ET core/physics/ (résolution au tick) — une seule source.
 export const BODY_RADIUS = 0.25;
 
 // Graine par défaut du PRNG : fixe, jamais Date.now() — le déterminisme
-// (voir CLAUDE.md) s'applique aussi en jeu réel, pas seulement en test.
-// Utilisée pour CHAQUE monde nouvellement créé (première visite) : même
-// comportement qu'avant ce refacto, juste porté par monde plutôt que par
-// partie entière.
+// s'applique aussi en jeu réel, pas seulement en test. Utilisée pour CHAQUE
+// monde nouvellement créé (première visite) : chaque monde porte son
+// propre flux, jamais un flux de partie entière.
 const DEFAULT_SEED = 1;
 
 // Écart minimal entre deux compagnons repositionnés côte à côte (voir
@@ -99,22 +100,23 @@ const DEFAULT_SEED = 1;
 // nouveau réglage.
 const COMPANION_SPAWN_SPACING = 2 * BODY_RADIUS;
 
-// Compagnon de test PRÉDÉFINI (brique 2/3 : comportement "follow", voir
-// core/behaviors/follow.js et CLAUDE.md) : donnée plate, EXACTEMENT la
+// Compagnon de test PRÉDÉFINI (comportement "follow", voir
+// core/behaviors/follow.js) : donnée plate, EXACTEMENT la
 // forme qu'une entité de scène obtient en sortie de core/entity-parse.js/
 // parseEntity — le core ne connaît aucun registre de types (jamais importé
 // ici, "buddy" n'est qu'une étiquette opaque, interprétée seulement par la
 // vue, voir entities/types/buddy.js). behavior "follow" SANS surcharge :
 // suit le joueur (cible par défaut) à distance élastique (voir
 // follow.js/DEFAULTS). x laissé à 0 ici : toujours réassigné par
-// repositionCompanions juste après, jamais lu tel quel. Pas de `dir` :
-// contrairement à wander, follow ne mémorise aucune direction d'un tick à
-// l'autre (recalculée à chaque fois depuis la distance à la cible).
+// repositionCompanions juste après, jamais lu tel quel. Aucun état de
+// comportement : contrairement à wander, follow ne mémorise aucune
+// direction d'un tick à l'autre (recalculée à chaque fois depuis la
+// distance à la cible).
 // sounds : dupliqué à la main depuis entities/types/buddy.js (comme
-// labelKey/descriptionKey ci-dessus) — le rendu audio lit désormais
+// labelKey/descriptionKey ci-dessus) — le rendu audio lit
 // `entity.sounds` (résultat de la cascade de core/entity-parse.js/parseEntity,
-// jamais le registre directement, voir view/audio/city-scene.js), donc CE
-// champ doit être porté explicitement ici aussi. Risque de dérive ASSUMÉ
+// jamais le registre directement, voir view/audio/entity-sound-entry.js),
+// donc CE champ doit être porté explicitement ici aussi. Risque de dérive ASSUMÉ
 // (même risque que labelKey/descriptionKey déjà) : si buddy.js change ses
 // sons, cette copie ne suit pas automatiquement — le core ne peut PAS
 // importer le registre de contenu pour se resynchroniser lui-même.
@@ -157,7 +159,7 @@ function repositionCompanions(companions, playerX, length) {
   }));
 }
 
-// SEUL point d'ajout d'un compagnon à la partie (brique 3/3) — le
+// SEUL point d'ajout d'un compagnon à la partie — le
 // recrutement en jeu n'existe pas encore, mais quand il arrivera, c'est ICI
 // qu'il appellera, jamais en poussant directement dans session.companions.
 // Politique volontairement simple : à la limite (MAX_COMPANIONS), REFUSE
@@ -166,7 +168,7 @@ function repositionCompanions(companions, playerX, length) {
 // le retour permet à l'appelant (vue ou test) de distinguer un ajout réussi
 // d'un refus sans avoir à recomparer les longueurs lui-même. Pure hormis
 // l'avertissement diagnostique (même convention que core/scene.js, qui
-// avertit déjà sur des cas similaires au chargement).
+// avertit sur des cas similaires au chargement).
 export function addCompanion(companions, companion) {
   if (companions.length >= MAX_COMPANIONS) {
     console.warn(`addCompanion: limite de ${MAX_COMPANIONS} compagnon(s) déjà atteinte, ajout refusé.`);
@@ -175,7 +177,7 @@ export function addCompanion(companions, companion) {
   return { companions: [...companions, companion], added: true };
 }
 
-// SCÈNE À DEUX FACES (modèle B, voir CLAUDE.md/"RECTO/VERSO") : une scène
+// SCÈNE À DEUX FACES (voir doc/scene-format.md/"Scène à deux faces") : une scène
 // PEUT contenir un recto ET un verso (core/scene.js/parseScene garantit les
 // deux présents ensemble, jamais un seul) — chacun sa PROPRE face
 // (entities/rngState/nextEphemeralId/segments/defaultSurface/music*/
@@ -200,8 +202,8 @@ export function resolveFace(world, side) {
 // Réécrit UNE face d'un monde avec `patch` (fusion superficielle, comme un
 // spread), en laissant l'AUTRE face totalement INTACTE (même référence) —
 // PRIMITIVE D'ÉCRITURE générique, appelée une fois par face à tiquer (voir
-// core/reduce.js/TICK, étape 2/2 : les DEUX faces d'un monde à deux faces
-// tiquent désormais, chacune via son propre appel à withFace). Pour un
+// core/reduce.js/TICK : les DEUX faces d'un monde à deux faces tiquent,
+// chacune via son propre appel à withFace). Pour un
 // monde SIMPLE, `side` est ignoré (il n'a qu'une seule face, lui-même).
 export function withFace(world, side, patch) {
   if (!isTwoSided(world)) return { ...world, ...patch };
@@ -243,17 +245,17 @@ function createFaceState(face, seed) {
     // (même à travers plusieurs visites — ce compteur n'est jamais remis à
     // zéro après sa création initiale). Deux faces d'un même monde ont
     // chacune LE LEUR : jamais partagé, elles n'ont jamais besoin de se
-    // distinguer l'une de l'autre puisqu'elles ne coexistent jamais dans la
-    // même liste d'entités (voir header, "étape 1 : une seule face active").
+    // distinguer l'une de l'autre puisque leurs entités ne se mêlent jamais
+    // dans une même liste (faces isolées, voir header).
     nextEphemeralId: 0,
   };
 }
 
 // Construit l'état d'un monde à partir d'une scène déjà validée (sortie de
-// parseScene) : entités telles quelles (plus de seed dédiée pour "wander"
-// depuis son passage en machine à deux états — il initialise seul son
-// propre état au premier tick, voir core/behaviors/wander.js). SIMPLE ->
-// une face (comportement STRICTEMENT inchangé). À DEUX FACES -> recto ET
+// parseScene) : entités telles quelles (aucune seed dédiée par
+// comportement — wander initialise seul son propre état au premier tick,
+// voir core/behaviors/wander.js). SIMPLE -> le monde est sa propre et
+// unique face. À DEUX FACES -> recto ET
 // verso construits chacun via createFaceState, avec des GRAINES DISTINCTES
 // (seed pour recto, `${seed}:verso` pour verso — même principe que
 // companionsRngState, voir header) : deux faces d'un même monde ne doivent
@@ -340,18 +342,17 @@ export function createInitialState(scene, seed = DEFAULT_SEED, { companions, par
     // companionsRngState juste au-dessus.
     weather: createInitialWeather(seed),
     // Perception surnaturelle (voir core/presence.js/"perceptionActive",
-    // view/audio/city-scene.js) : booléen simple, cercle PARTIE comme side/
+    // view/perception-toggle.js) : booléen simple, cercle PARTIE comme side/
     // time/money — jamais par monde. false par défaut : une partie neuve
     // démarre en perception normale.
     perceptionActive: false,
     // variables : STOCKAGE de variables de portée "party" (voir
-    // core/variables.js/CLAUDE.md), cercle PARTIE comme money/weather —
-    // jamais par monde ni par entité. `partyVariables` : déclarations BRUTES
-    // (même forme qu'une entité/scène, voir core/entity-parse.js/parseEntity),
-    // fournies par l'appelant — le core n'importe AUCUN registre de contenu
-    // (voir CLAUDE.md, "réglages en cascade"), jamais un fichier de
-    // déclarations global importé ICI. Absent -> sac vide `{}`, comportement
-    // inchangé pour tout appelant existant (aucun n'en fournit encore).
+    // core/variables.js, doc/scripting.md/"Variables"), cercle PARTIE comme
+    // money/weather — jamais par monde ni par entité. `partyVariables` :
+    // déclarations BRUTES (même forme qu'une entité/scène, voir
+    // core/entity-parse.js/parseEntity), fournies par l'appelant — le core
+    // n'importe AUCUN registre de contenu, jamais un fichier de
+    // déclarations global importé ICI. Absent -> sac vide `{}`.
     // TOUJOURS résolu (jamais undefined), même politique EAGER que
     // money/bag/equipment ci-dessus.
     variables: parseVariables(partyVariables, "variables de partie", fail),
@@ -366,7 +367,7 @@ export function createInitialState(scene, seed = DEFAULT_SEED, { companions, par
 }
 
 // Bascule la perception surnaturelle (touche dédiée, voir
-// view/city-screen.js — le COOLDOWN anti-spam reste entièrement côté vue,
+// view/perception-toggle.js — le COOLDOWN anti-spam reste entièrement côté vue,
 // rien à en savoir ici). Pur : un simple flip, aucun état d'attente ni
 // compte-à-rebours — la bascule est INSTANTANÉE, c'est le SEUIL de
 // perception lui-même qui change, jamais un délai. Toute entité dont la
@@ -375,6 +376,14 @@ export function createInitialState(scene, seed = DEFAULT_SEED, { companions, par
 // le reste (ex. neon.js) — rien de plus à faire ici.
 export function togglePerception(session) {
   return { ...session, perceptionActive: !session.perceptionActive };
+}
+
+// Entités de la FACE ACTIVE du monde actif (sans les compagnons, qui ne
+// vivent pas dans les mondes). À utiliser pour chercher une entité de
+// scène : un monde à deux faces n'a pas de liste `entities` propre, elle
+// vit dans `recto`/`verso` (voir resolveFace).
+export function activeFaceEntities(session) {
+  return resolveFace(session.worlds[session.activeWorldId], session.player.side).entities;
 }
 
 // Retire UNE entité (par id) du monde ACTIF — mécanisme générique derrière
@@ -386,14 +395,6 @@ export function togglePerception(session) {
 // INCHANGÉE (rien à retirer), jamais une exception — une entité déjà
 // retirée (double appel, id périmé) doit se dégrader silencieusement, pas
 // planter la partie en cours.
-// Entités de la FACE ACTIVE du monde actif (sans les compagnons, qui ne
-// vivent pas dans les mondes). À utiliser pour chercher une entité de
-// scène : un monde à deux faces n'a pas de liste `entities` propre, elle
-// vit dans `recto`/`verso` (voir resolveFace).
-export function activeFaceEntities(session) {
-  return resolveFace(session.worlds[session.activeWorldId], session.player.side).entities;
-}
-
 export function removeEntity(session, entityId) {
   const world = session.worlds[session.activeWorldId];
   const face = resolveFace(world, session.player.side);
@@ -408,7 +409,8 @@ export function removeEntity(session, entityId) {
 // lootEntity, doc/entity-model.md/"Collectible persistant") : contrairement à
 // removeEntity ci-dessus, l'entité N'EST JAMAIS retirée, elle change
 // simplement d'état. `consumed` est un champ RUNTIME comme `present`/
-// `gotoArrived` (jamais posé par core/scene.js) : absent (falsy) tant que
+// `gotoArrived` (jamais posé au chargement, voir core/entity-parse.js) :
+// absent (falsy) tant que
 // l'entité n'a jamais été activée, écrit ICI une seule fois. id absent du
 // monde actif -> RÉFÉRENCE INCHANGÉE, même politique défensive que
 // removeEntity (une entité déjà consommée ou un id périmé ne doit jamais
@@ -431,7 +433,7 @@ export function markConsumed(session, entityId) {
 // attendu par applyActionEffects depuis LA FACE ACTIVE, puis SPLICE le
 // résultat aux emplacements RÉELLEMENT touchés (une liste d'effets peut
 // mélanger les trois portées — entity/scene/party — dans la MÊME
-// activation, voir core/scripting.md/"Actions multiples filtrées par
+// activation, voir doc/scripting.md/"Actions multiples filtrées par
 // condition") : chaque portée non touchée traverse par RÉFÉRENCE INCHANGÉE.
 // `result.session` : SEULS `.variables`/`.improvements` en sont repris
 // (portée "party") — jamais le reste de l'objet, qui resterait le SESSION
@@ -469,12 +471,13 @@ export function applyEntityActionEffects(session, entityId, effects, side = sess
 
 // Crée UNE entité ÉPHÉMÈRE dans le monde ACTIF, à la position x — point
 // d'entrée UNIQUE et RÉUTILISABLE pour toute création d'entité EN COURS DE
-// JEU (voir doc/entity-model.md/"Entités éphémères"). Deux appelants
-// aujourd'hui : la touche debug "e" (voir view/city-screen.js) et
-// spawnScatteredEphemerals plus bas (effet "spawn" d'une action, voir
-// core/money.js/lootEntitySpawn) ; demain : un objet lâché par un
-// compagnon, un autre effet... — tous passeraient par cette même fonction,
-// jamais une variante par appelant.
+// JEU (voir doc/entity-model.md/"Entités éphémères"). Appelants
+// aujourd'hui : spawnScatteredEphemerals plus bas (butin d'un collectible,
+// core/money.js/lootEntitySpawn ; fouille, core/spawn.js/searchContainer),
+// le dépôt d'un objet du sac (core/bag.js/dropItem) et la touche debug "e"
+// (view/debug-effects.js) ; demain : un objet lâché par un compagnon, un
+// autre effet... — tous passent par cette même fonction, jamais une
+// variante par appelant.
 //
 // `spec` est un descripteur d'entité DÉJÀ RÉSOLU (type, labelKey,
 // blocksMovement, observable, interactable, action...) — EXACTEMENT la
@@ -482,7 +485,7 @@ export function applyEntityActionEffects(session, entityId, effects, side = sess
 // construit par L'APPELANT (voir createTestCompanion plus haut, même
 // principe) : ce module ne connaît AUCUN registre de types, `spec.type`
 // reste une étiquette opaque, jamais résolue ici — c'est la VUE qui sait
-// traduire un type en sons/rendu (voir view/audio/city-scene.js).
+// traduire un type en sons/rendu (voir view/audio/entity-sound-entry.js).
 //
 // Deux règles STRICTES posées ICI, jamais par l'appelant :
 //   - `ephemeral: true` — exclut l'entité de la sérialisation
@@ -563,9 +566,9 @@ export function drawScatteredPosition(sourceX, spread, length, entities, presenc
   return { x: sourceX, rngState: state };
 }
 
-// Effet "spawn d'éphémères ÉPARPILLÉS" (voir view/interaction.js,
-// ACTION_HANDLERS.loot — action.spawn ; core/money.js/lootEntitySpawn, seul
-// appelant aujourd'hui) : fait naître `count` entités éphémères autour de
+// Effet "spawn d'éphémères ÉPARPILLÉS" (appelants : core/money.js/
+// lootEntitySpawn, pour action.spawn d'un "loot" ; core/spawn.js/
+// searchContainer, pour la fouille d'un conteneur) : fait naître `count` entités éphémères autour de
 // sourceX, chacune décalée aléatoirement pour éviter l'empilement sonore —
 // voir doc/entity-model.md/"Entités éphémères". Réutilise spawnEphemeral TEL
 // QUEL, N fois : même mécanisme, mêmes garanties (id unique, exclusion de
@@ -604,33 +607,35 @@ export function spawnScatteredEphemerals(session, spec, sourceX, count, spread =
   return { ...nextSession, worlds: { ...nextSession.worlds, [nextSession.activeWorldId]: nextWorld } };
 }
 
-// Le monde actuellement actif, AUGMENTÉ des compagnons de la partie (voir
-// header) — accesseur pur, utilisé partout où le monde courant est lu
-// (core/reduce.js, view/audio/city-scene.js,
-// view/city-screen.js). C'est ICI, à la LECTURE SEULE, que l'injection a
-// lieu : les compagnons sont ajoutés à la fin de `entities` (jamais avant —
-// la première entité d'un monde reste toujours SA première entité propre),
-// sans jamais être écrits dans `session.worlds`. Résultat : tout
-// consommateur qui lit `getActiveWorld(session).entities` (vue comprise)
-// voit le compagnon comme une entité comme une autre, sans rien savoir du
-// mécanisme — mais session.worlds[x].entities, LUI, ne contient jamais de
-// compagnon. C'est cette asymétrie lecture/stockage qui garantit qu'un
-// compagnon ne reste JAMAIS résident dans un monde quitté : voir
-// travelToWorld ci-dessous, qui range le monde BRUT (session.worlds[...]),
-// jamais le résultat de cet accesseur.
 // FACE COURANTE aplatie (voir isTwoSided/resolveFace plus haut) : un monde
 // à deux faces expose ICI un objet plat indiscernable d'un monde simple
 // (length/playerStart/id/titleKey du monde + entities/segments/music*/...
-// de la face courante SEULEMENT) — tout consommateur externe (vue,
-// core/reduce.js) ignore donc TOTALEMENT l'existence de deux faces, sans
-// jamais avoir à tester isTwoSided lui-même. recto/verso ne fuient jamais
-// dans ce résultat, même pour un monde à deux faces.
+// de la face courante SEULEMENT) — tout lecteur de getActiveWorld
+// ci-dessous ignore donc TOTALEMENT l'existence de deux faces, sans jamais
+// avoir à tester isTwoSided lui-même. recto/verso ne fuient jamais dans ce
+// résultat, même pour un monde à deux faces.
 function flattenActiveFace(world, side) {
   if (!isTwoSided(world)) return world;
   const { recto, verso, ...shared } = world;
   return { ...shared, ...world[side] };
 }
 
+// Le monde actuellement actif, AUGMENTÉ des compagnons de la partie (voir
+// header) — accesseur pur, utilisé partout où la VUE lit le monde courant
+// (view/audio/ — city-scene.js, entity-sounds.js, footsteps.js —,
+// view/occupancy.js, view/status-announcements.js, view/menus/). Le core,
+// lui, ne s'en sert pas : core/reduce.js lit les mondes BRUTS pour garder
+// entités et compagnons séparés. C'est ICI, à la LECTURE SEULE, que
+// l'injection a lieu : les compagnons sont ajoutés à la fin de `entities`
+// (jamais avant — la première entité d'un monde reste toujours SA première
+// entité propre), sans jamais être écrits dans `session.worlds`. Résultat :
+// tout consommateur qui lit `getActiveWorld(session).entities` voit le
+// compagnon comme une entité comme une autre, sans rien savoir du
+// mécanisme — mais session.worlds[x].entities, LUI, ne contient jamais de
+// compagnon. C'est cette asymétrie lecture/stockage qui garantit qu'un
+// compagnon ne reste JAMAIS résident dans un monde quitté : voir
+// travelToWorld ci-dessous, qui range le monde BRUT (session.worlds[...]),
+// jamais le résultat de cet accesseur.
 export function getActiveWorld(session) {
   const world = session.worlds[session.activeWorldId];
   const face = flattenActiveFace(world, session.player.side);
@@ -638,14 +643,14 @@ export function getActiveWorld(session) {
   return { ...face, entities: [...face.entities, ...session.companions] };
 }
 
-// L'AUTRE face du monde actif (RECTO/VERSO étape 2/2, voir header) — celle
+// L'AUTRE face du monde actif (RECTO/VERSO, voir header) — celle
 // que le joueur ne regarde PAS en ce moment. `null` pour un monde simple
 // (rien à rendre en plus, voir isTwoSided) : tout appelant doit gérer ce
 // cas, jamais un objet vide qui laisserait croire à une face sans entités.
 // JAMAIS de compagnons injectés (contrairement à getActiveWorld ci-dessus) :
 // ils suivent le joueur, jamais l'autre face — isolation stricte (voir
 // core/reduce.js/TICK). Lecture SEULE, utilisée UNIQUEMENT par la vue pour
-// le rendu audio ÉTOUFFÉ de l'autre face (view/audio/city-scene.js) —
+// le rendu audio ÉTOUFFÉ de l'autre face (view/audio/) —
 // jamais par le core lui-même, qui tique déjà les deux faces séparément
 // sans passer par cet accesseur.
 export function getInactiveFace(session) {
@@ -672,19 +677,18 @@ export function getInactiveFace(session) {
 //
 // Contrat pur/bord : freshScene doit déjà être passé par parseScene — le
 // fetch réseau reste entièrement à la charge de l'appelant (voir
-// view/city-screen.js), fourni SEULEMENT si la cible n'est pas encore dans
+// view/world-travel.js/loadTargetScene), fourni SEULEMENT si la cible n'est pas encore dans
 // worlds (ignoré sinon, le monde déjà rangé prime). Cible ni visitée ni
 // fournie -> erreur claire plutôt qu'un état à moitié construit.
 // x/side (optionnels) : point d'arrivée EXPLICITE — voir core/effects.js/
-// "teleport", qui les porte. Absents -> comportement HISTORIQUE inchangé
+// "teleport", qui les porte. Absents -> défauts d'une porte ordinaire
 // (x -> targetWorld.playerStart, side -> "recto", même pour un monde qui n'a
 // qu'une face, ignoré dans ce cas). x fourni est bordé dans [0, longueur de
 // la cible], comme placePlayer ci-dessous. Compagnons repositionnés autour
-// du point d'arrivée RÉEL (celui-ci, pas playerStart) — avant ce paramètre,
-// un appelant qui replaçait le joueur APRÈS coup (voir view/world-travel.js/
-// performTransition, historique) laissait les compagnons autour de
-// playerStart tandis que le joueur atterrissait ailleurs ; ce paramètre
-// élimine cette classe de désync en résolvant tout EN UNE FOIS.
+// du point d'arrivée RÉEL (celui-ci, pas playerStart) : tout se résout EN
+// UNE FOIS, pour qu'un appelant qui replacerait le joueur APRÈS coup ne
+// puisse pas laisser les compagnons autour de playerStart tandis que le
+// joueur atterrit ailleurs.
 export function travelToWorld(session, targetId, freshScene = null, { x, side = "recto" } = {}) {
   const currentWorld = session.worlds[session.activeWorldId];
   // Purge des entités ÉPHÉMÈRES du monde qu'on quitte (voir
@@ -768,21 +772,20 @@ export function placePlayer(session, x, side) {
 }
 
 // Bascule de FACE dans le MÊME monde (point de passage recto<->verso, voir
-// entities/types/passage.js, core/scripting.md/action "switchSide") — PAS
+// entities/types/passage.js, doc/scripting.md/action "switchSide") — PAS
 // un travelToWorld : le monde n'est pas quitté, currentWorld n'est ni rangé
 // ni purgé de ses éphémères (la face laissée n'est pas une "sortie de
-// scène" — voir resolveFace/withFace, header). Depuis l'étape 2/2, la face
-// quittée continue de tiquer normalement (coexistence, voir
-// core/reduce.js) : switchSide ne fait QUE changer laquelle porte le joueur
-// et les compagnons, jamais un état "actif"/"inactif" séparé du reste.
-// Bascule simplement session.player.side vers l'AUTRE face et replace
-// joueur +
-// compagnons au point d'arrivée déclaré par l'entité de passage — même
-// principe de repositionnement que travelToWorld, mais SANS toucher à
-// activeWorldId ni à worlds. arrivalX est une donnée de CONTENU
-// (action.arrivalX, jamais validée en bornes par core/scene.js — voir son
-// commentaire sur `action`) — bordée par placePlayer, comme tout point
-// d'arrivée. Simple appel NOMMÉ de placePlayer ci-dessus (face TOUJOURS
+// scène" — voir resolveFace/withFace, header). La face quittée continue de
+// tiquer normalement (coexistence, voir core/reduce.js) : switchSide ne
+// fait QUE changer laquelle porte le joueur et les compagnons, jamais un
+// état "actif"/"inactif" séparé du reste. Bascule simplement
+// session.player.side vers l'AUTRE face et replace joueur + compagnons au
+// point d'arrivée déclaré par l'entité de passage — même principe de
+// repositionnement que travelToWorld, mais SANS toucher à activeWorldId ni
+// à worlds. arrivalX est une donnée de CONTENU (action.arrivalX, déjà
+// validée dans les bornes de la scène au chargement, voir
+// core/action-kinds.js/validateSwitchSide) — bordée en plus par
+// placePlayer, comme tout point d'arrivée. Simple appel NOMMÉ de placePlayer ci-dessus (face TOUJOURS
 // opposée à l'actuelle) — aucune logique propre au-delà de ce choix de face.
 export function switchSide(session, arrivalX) {
   const nextSide = session.player.side === "recto" ? "verso" : "recto";

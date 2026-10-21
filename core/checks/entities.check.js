@@ -13,8 +13,9 @@ import { NO_COMPANIONS, expectSceneParseThrows } from "./helpers.js";
 export default function checkEntities(run) {
   // --- Interaction niveau 0 : capacités observable/interactable ---
   // Cascade IDENTIQUE à blocksMovement (instance -> type -> défaut false),
-  // voir core/scene.js. Le filtrage par verbe et la désambiguïsation restent
-  // côté vue (view/audio/city-scene.js, view/interaction.js), hors de portée
+  // voir core/entity-parse.js/parseEntity. Le filtrage par verbe et la
+  // désambiguïsation restent côté vue (view/occupancy.js,
+  // view/interaction.js), hors de portée
   // d'un check terminal — seule la RÉSOLUTION de ces deux champs est
   // vérifiable ici.
 
@@ -207,7 +208,7 @@ export default function checkEntities(run) {
   run("action : kind manquant rejeté au chargement", true, expectInteractionRejected("action", {}));
   run("action : kind vide rejeté au chargement", true, expectInteractionRejected("action", { kind: "" }));
 
-  // --- Beacon conditionnel (sounds.beacon.condition, core/scene.js) :
+  // --- Beacon conditionnel (sounds.beacon.condition, core/entity-parse.js) :
   // validé au chargement comme une condition d'action, une condition
   // d'instance REMPLACE celle de l'archétype, et la condition se lit contre
   // les variables COURANTES de l'entité (évaluation côté vue). ---

@@ -33,7 +33,7 @@ const MENU_SOUND_KEYS = {
 
 // Catégorie "interface" (Options > Audio, voir view/menus/audio-menu.js) :
 // relu à CHAQUE déclenchement, jamais mis en cache — même raisonnement que
-// footstepVolumeFactor (view/audio/city-scene.js), un son ponctuel n'a pas
+// footstepVolumeFactor (view/audio/volume-factors.js), un son ponctuel n'a pas
 // d'instance déjà en cours à rafraîchir.
 function interfaceVolumeFactor() {
   return getPref("interfaceVolume", PREF_CONSTRAINTS.interfaceVolume.default) / 100;

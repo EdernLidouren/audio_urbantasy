@@ -49,8 +49,8 @@ console.log("Vérifs dispo : tape runChecks()");
 // CONSOLE (window.toggleDebug, comme runChecks ci-dessus) OU par la
 // combinaison Ctrl+D EN JEU (voir onGlobalPress plus bas, lib/input.js) —
 // deux chemins, UNE seule fonction, jamais deux logiques à maintenir.
-// Expose la touche de debug "e" en ville (voir view/city-screen.js) une
-// fois activé.
+// Une fois activé, il ouvre aussi les touches de debug en ville (ex. "e",
+// voir view/city-screen.js/KEY_ACTIONS et view/debug-effects.js).
 function toggleDebug() {
   setDebugEnabled(!isDebugEnabled());
   console.log(`Mode debug : ${isDebugEnabled() ? "activé" : "désactivé"}`);
@@ -139,8 +139,8 @@ function startNewGame() {
 }
 
 // "Ville test" (entrée de tête du menu principal, voir main-menu.js) :
-// démarre une partie NEUVE directement sur la scène "demo" (l'ancienne
-// scène de départ, avant l'introduction de town_square ci-dessus) — MÊME
+// démarre une partie NEUVE directement sur la scène "demo" (scène de test,
+// distincte de la scène de départ town-square chargée plus bas) — MÊME
 // risque d'écrasement qu'une "Nouvelle partie" normale, voir
 // activateNewGame/main-menu.js, réutilisé TEL QUEL pour cette entrée.
 // Contrairement à `scene` (préchargée en tâche de fond dès le boot, voir plus

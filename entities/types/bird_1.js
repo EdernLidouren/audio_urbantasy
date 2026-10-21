@@ -6,14 +6,14 @@
 // doc/entity-model.md, "Beacon vs vocal") : pas besoin de le localiser en
 // continu, seulement de l'entendre chanter par intermittence — le vocal
 // lui-même sert de seul repère sonore. Pool DÉDIÉ bird_1_vocal (7 fichiers,
-// assets/manifest.json) — PLUS le placeholder dog_medium_vocal d'origine.
+// assets/manifest.json).
 // Interval/variation SURCHARGÉS (plus espacé, fourchette plus large que le
 // défaut global vocalInterval/vocalIntervalVariation) : un oiseau chante par
 // à-coups largement espacés, jamais un signal régulier/prévisible.
 //
 // isFlying:true — chaîne de filtres "hauteur suggérée" (voir
 // config/tuning-values.js/flyingHighpassHz et consorts, view/audio/
-// city-scene.js) : AUCUN axe Y, juste ce marqueur qui fait passer le vocal
+// entity-audio.js) : AUCUN axe Y, juste ce marqueur qui fait passer le vocal
 // ci-dessous par un passe-haut + une réverb plus généreuse + une légère
 // atténuation de volume, pour que "bird" sonne plus fin/aérien.
 export default {

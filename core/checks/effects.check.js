@@ -18,9 +18,9 @@ export default function checkEffects(run) {
   // MIXTE teleport (voir core/effects.js, doc/scripting.md/"Effets d'action") ---
   {
     // --- Effets de RENDU (playSound/announce, voir core/effects.js) —
-    // validés en FORME seulement ICI (comme sound/announceKey avant eux) :
-    // le core ignore leur SENS, la vue les exécute (hors de portée d'un
-    // test terminal, voir "Vérifie (oreille)").
+    // validés en FORME seulement ICI : le core ignore leur SENS, la vue les
+    // exécute (hors de portée d'un test terminal, à vérifier à l'oreille,
+    // en jeu).
     const playSoundScene = parseScene(
       sceneWithActionEffect({ type: "playSound", path: "assets/sounds/effects/window_blinds_open", gain: 0.8, pitchVariation: 0.1, reverbSend: 0.2 }),
       VAR_ACTION_REGISTRY
@@ -208,10 +208,11 @@ export default function checkEffects(run) {
     );
   }
 
-  // 9) TELEPORT — la porte n'est plus un cas spécial (voir core/scene.js,
-  // entities/types/door.js) : deux confirmations structurelles,
-  // l'EXÉCUTION (view/world-travel.js/executeTeleport) restant
-  // hors de portée d'un test core (voir "Vérifie (oreille)").
+  // 9) TELEPORT — la porte n'est pas un cas spécial (voir
+  // core/script-parse.js/parseActionEffect, entities/types/door.js) : deux
+  // confirmations structurelles, l'EXÉCUTION
+  // (view/world-travel.js/executeTeleport) restant hors de portée d'un test
+  // core (à vérifier à l'oreille, en jeu).
   {
     // a) Actions multiples filtrées par condition, teleport vers des
     // cibles DIFFÉRENTES — tombe GRATUITEMENT du mécanisme existant
@@ -286,15 +287,15 @@ export default function checkEffects(run) {
   // toujours fausses hors mode debug (view/interaction.js/actionContext).
   // Ce fichier reste headless : il ne peut PAS importer view/interaction.js (Howler/DOM en
   // cascade) pour appeler le VRAI actionContext — il reconstruit ici, à la
-  // main, EXACTEMENT la forme que actionContext produit désormais (même
-  // dérivation, reprise au mot près : perceptionActive/weather/world lus
-  // depuis la session, comme core/reduce.js/presenceContext), et vérifie que
+  // main, EXACTEMENT la forme que actionContext produit (même dérivation,
+  // reprise au mot près : perceptionActive/weather/world lus depuis la
+  // session, comme core/presence.js/presenceContextOf), et vérifie que
   // evaluateCondition (le SEUL évaluateur, partagé avec presence[].when) s'y
-  // comporte enfin comme sur presence[].when — DANS LES DEUX SENS (fausse
-  // PUIS vraie), pour ne pas juste remplacer un "toujours faux" par un
-  // "toujours vrai" sans le prouver. Le câblage RÉEL de la vue (le provider,
-  // city-screen.js) reste hors de portée d'un test core, à vérifier à
-  // l'oreille (voir CLAUDE.md, "Vérifie (oreille)").
+  // comporte comme sur presence[].when — DANS LES DEUX SENS (fausse PUIS
+  // vraie), pour ne pas juste remplacer un "toujours faux" par un "toujours
+  // vrai" sans le prouver. Le câblage RÉEL de la vue (le provider,
+  // view/action-handlers.js/setSessionProvider) reste hors de portée d'un
+  // test core, à vérifier à l'oreille, en jeu.
   {
     const ANGLE_MORT_REGISTRY = { door: { nameKey: "entity.door.name" } };
     const angleMortScene = parseScene(

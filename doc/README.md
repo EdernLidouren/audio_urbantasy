@@ -1,11 +1,8 @@
 # Documentation de référence
 
 Ce dossier regroupe toute la doc de RÉFÉRENCE du projet — descriptive,
-consultée AU BESOIN quand on touche un domaine précis. Les PRINCIPES
-d'architecture (core vs vue, portabilité de `lib/`, déterminisme, anti-
-patterns — ce qu'on lit pour savoir COMMENT travailler sur ce projet)
-restent dans `CLAUDE.md`, à la racine : ce dossier ne les duplique jamais,
-il les COMPLÈTE avec le détail par domaine.
+consultée AU BESOIN quand on touche un domaine précis : un document par
+domaine, le détail du code vivant dans les en-têtes de fichiers.
 
 ## Index
 
@@ -27,7 +24,6 @@ UN SEUL endroit, jamais recopié :
 
 | Tu ajoutes/modifies... | Ça va dans... |
 |---|---|
-| Un principe d'architecture, un invariant, un anti-pattern, la façon de collaborer | `CLAUDE.md` (racine) |
 | Un champ de scène/face/entité dans le JSON (nouveau champ, nouvelle contrainte) | `doc/scene-format.md` |
 | Un type de CONDITION, un type d'EFFET (tick ou action), un kind d'ACTION, un kind de TRIGGER, un tag, le modèle de VARIABLES | `doc/scripting.md` |
 | Une règle spécifique au MODÈLE d'entité (dormance, collectible, éphémère, son, presets, recto/verso, le joueur) | `doc/entity-model.md` |
@@ -42,8 +38,7 @@ Si aucune ligne ne correspond : c'est un nouveau domaine — crée un fichier
 `doc/<domaine>.md` sur le même modèle (référence descriptive, exemples réels,
 renvoi au code pour les listes exhaustives) et ajoute-le à l'index ci-dessus.
 
-**La maintenance de cette doc fait partie du travail** (voir `CLAUDE.md`,
-"Comment travailler avec moi") : toute tâche qui ajoute/modifie un
+**La maintenance de cette doc fait partie du travail** : toute tâche qui ajoute/modifie un
 condition/effet/kind/champ met à jour le document du domaine concerné DANS
 LA MÊME tâche, jamais en différé — une doc qui diverge du code est pire que
 son absence.

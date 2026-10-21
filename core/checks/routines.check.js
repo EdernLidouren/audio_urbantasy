@@ -245,8 +245,7 @@ export default function checkRoutines(run) {
 
   // Instantanés RÉALISTES : behavior/gotoArrived hors "arrived" à chaque
   // checkpoint reflètent un état PLAUSIBLE à cette heure (comportement déjà
-  // remis à jour par le cycle précédent), comme le faisait l'ancienne
-  // version de ce test.
+  // remis à jour par le cycle précédent).
   const mirrorCheckpoints = [
     { hour: 12, awayBehavior: { kind: "wander" }, awayArrived: undefined, homeBehavior: null, homeArrived: true, awayExpected: true, homeExpected: false, label: "12h (jour : away erre, home dormante depuis 11h)" },
     { hour: 21, awayBehavior: { kind: "goto" }, awayArrived: undefined, homeBehavior: null, homeArrived: true, awayExpected: true, homeExpected: true, label: "21h — CHEVAUCHEMENT ASSUMÉ (away en chemin, home déjà réveillée)" },
@@ -470,8 +469,8 @@ export default function checkRoutines(run) {
   const barRun2 = runBarDepartures(2024);
   run.same("bar : rejeu identique -> mêmes minutes de départ (stable, rien de nouveau sérialisé)", barRun1, barRun2);
 
-  // Sans spread déclaré : rétrocompat stricte, les trois partiraient TOUS à
-  // la même minute (comportement d'avant ce mécanisme).
+  // Sans spread déclaré : les trois partiraient TOUS à la même minute
+  // (seuil pile à l'heure déclarée).
   const barSceneNoSpread = parseScene(
     {
       id: "movement-check-bar-no-spread",

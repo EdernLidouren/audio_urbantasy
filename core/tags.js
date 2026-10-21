@@ -9,11 +9,13 @@
 // Un tag est un IDENTIFIANT STABLE (la clé de ce registre, ex. "military"),
 // traduit SEULEMENT à l'affichage via labelKey (i18n) — toute vérification
 // (core/items.js/ITEM_REGISTRY, condition "hasEquipmentTag" — voir
-// core/presence.js/core/scene.js) porte sur la CLÉ, jamais le texte traduit :
+// core/presence.js et core/script-parse.js/validateCondition) porte sur la
+// CLÉ, jamais le texte traduit :
 // un tag ne doit jamais cesser de matcher au changement de langue.
 //
 // VALIDATION : tout tag référencé par un objet (voir core/items.js/
-// validateItemTags) ou une condition "hasEquipmentTag" (voir core/scene.js)
+// validateItemTags) ou une condition "hasEquipmentTag" (voir
+// core/script-parse.js/validateCondition)
 // DOIT exister ici — une faute de frappe échoue clairement au chargement,
 // jamais un mismatch silencieux découvert en jeu.
 export const TAG_REGISTRY = {

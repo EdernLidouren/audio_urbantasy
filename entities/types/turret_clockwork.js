@@ -6,7 +6,7 @@
 // sonnerie, l'archétype le déclare donc lui-même — contrairement au clocher
 // de la place (scenes/town-square.json), dont le trigger vit sur l'instance
 // pour ne pas doubler la cloche sur son miroir. Gain élevé : la cloche
-// sature à 1 près de la minuterie (bornage, voir lib/audio.js).
+// sature à 1 près de la minuterie (bornage, voir lib/audio/levels.js/clampVolume).
 export default {
   nameKey: "entity.turret_clockwork.name",
   descriptionKey: "entity.turret_clockwork.description",

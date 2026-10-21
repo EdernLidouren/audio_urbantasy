@@ -1,6 +1,7 @@
 // RENDU SPATIAL, pur : de la distance entre une source et le joueur à un
 // pan, un volume et une fréquence de coupure. Spatialisation en stéréo +
-// volume, jamais en HRTF (voir CLAUDE.md). Aucun son joué ici.
+// volume, jamais en HRTF : un rendu explicite et réglable, que l'oreille
+// relie directement à la distance. Aucun son joué ici.
 //
 // ÉTOUFFEMENT : { amount, gain, lowpassHz }. `amount` (0..1) dose ; `gain`
 // et `lowpassHz` viennent d'un PROFIL — l'autre face d'une scène à deux

@@ -1,5 +1,5 @@
 // Vocabulaire des effets d'ACTION (déclenchés à l'ACTIVATION, voir
-// core/script-parse.js/parseActionEffect, core/scripting.md/"Effets d'action") —
+// core/script-parse.js/parseActionEffect, doc/scripting.md/"Effets d'action") —
 // SEULE source de vérité sur la NATURE de chaque type d'effet. TROIS
 // natures, jamais mélangées :
 //   - ÉTAT (STATE_EFFECT_TYPES) : mute l'état, jamais de rendu.
@@ -11,7 +11,7 @@
 //     directement (aucun appel au core).
 //   - MIXTE (MIXED_EFFECT_TYPES) : mute l'état ET orchestre du rendu
 //     (aujourd'hui : "teleport" — voir "Effets d'action"/`"teleport"` de
-//     core/scripting.md). Contrairement au RENDU pur, la VUE délègue le
+//     doc/scripting.md). Contrairement au RENDU pur, la VUE délègue le
 //     calcul du nouvel état à des fonctions du CORE déjà existantes
 //     (core/state.js/travelToWorld, placePlayer) — jamais une seconde copie
 //     de cette logique — puis orchestre SEULE le séquençage (sas, fondu,

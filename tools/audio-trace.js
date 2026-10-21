@@ -1,6 +1,7 @@
 // TRACE AUDIO de référence — outil de développement, jamais chargé par le
 // jeu. Rejoue un scénario FIXE contre la vraie scène audio de la ville
-// (view/audio/city-scene.js) et enregistre chaque appel audio de bas niveau
+// (view/audio/city-scene.js et les modules qu'elle compose) et enregistre
+// chaque appel audio de bas niveau
 // (Howl créé, joué, arrêté, volume, pan, vitesse, fondu ; paramètres Web
 // Audio : gain, fréquence de coupure ; branchements entre nœuds) ainsi que
 // les annonces. Deux traces identiques = le rendu audio n'a pas bougé :
@@ -9,7 +10,7 @@
 //
 // Utilisation, depuis la console du jeu (serveur de dev lancé) :
 //   1. RECHARGER la page, sans lancer de partie (l'état interne de
-//      lib/audio.js doit être vierge) ;
+//      lib/audio/ doit être vierge) ;
 //   2. const t = await import("/tools/audio-trace.js");
 //      await t.saveAudioTraceBaseline();   // AVANT le remaniement
 //   3. après le remaniement : recharger la page, puis
@@ -223,7 +224,7 @@ function installEnvironment(seed) {
   }
 
   // Faux Howl : aucun son, mais la même surface que celle utilisée par
-  // lib/audio.js (identifiants de son, évènements, instances). Comme Howler :
+  // lib/audio/ (identifiants de son, évènements, instances). Comme Howler :
   // une instance par lecture, chacune avec son nœud (`_node`) ; une
   // instance terminée est réutilisée par la lecture suivante, sinon une
   // nouvelle est créée.

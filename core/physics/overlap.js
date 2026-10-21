@@ -42,11 +42,10 @@ export function separate(xA, weightA, xB, weightB, minGap, length) {
 }
 
 // Sépare toute paire d'ENTITÉS (hors joueur) impliquant au moins une
-// bloquante — deuxième moitié historique de resolveOverlaps, EXTRAITE pour
-// être réutilisée SANS joueur (voir core/reduce.js, RECTO/VERSO étape 2/2 :
-// la face NON courante d'une scène à deux faces tique désormais elle aussi,
-// mais isolée — aucun joueur sur cette face, seulement ses propres entités
-// entre elles). O(n²) mais le nombre d'entités par face reste petit — pas un
+// bloquante — deuxième moitié de resolveOverlaps, exportée À PART pour
+// servir aussi SANS joueur (voir core/reduce.js, RECTO/VERSO : la face NON
+// courante d'une scène à deux faces tique elle aussi, mais isolée — aucun
+// joueur sur cette face, seulement ses propres entités entre elles). O(n²) mais le nombre d'entités par face reste petit — pas un
 // souci de performance ici.
 export function resolveEntityOverlaps(entities, length, presenceContext) {
   const resolved = entities.slice();
@@ -96,7 +95,7 @@ export function resolveOverlaps(playerX, entities, length, presenceContext) {
   });
 
   // 2) Paires d'entités (hors joueur) impliquant au moins une bloquante —
-  // voir resolveEntityOverlaps ci-dessus, factorisée.
+  // voir resolveEntityOverlaps ci-dessus.
   const resolvedEntities = resolveEntityOverlaps(afterPlayer, length, presenceContext);
 
   return { playerX: resolvedPlayerX, entities: resolvedEntities, pushedBy };

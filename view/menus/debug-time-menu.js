@@ -6,10 +6,10 @@
 // regarder défiler plutôt que les sauter.
 //
 // FORÇAGE PROPRE : toute entrée calcule un delta en MINUTES puis appelle
-// advanceTimeEffect (fourni par l'appelant, voir view/city-screen.js) — le
-// SEUL point d'écriture du temps (core/time.js/advanceTime) reste donc
-// inchangé, composé exactement comme onFrame (advanceTime PUIS
-// advanceWeather) : ce menu ne court-circuite AUCUNE réaction, il se contente
+// advanceTimeEffect (fourni par l'appelant, voir view/debug-effects.js/
+// advanceTime) — qui passe par le SEUL point d'avancement du temps,
+// view/game-clock.js/advance, celui-là même qu'emprunte onFrame
+// (advanceTime PUIS advanceWeather PUIS triggers horaires) : ce menu ne court-circuite AUCUNE réaction, il se contente
 // de déclencher la même avance qu'un écoulement réel du même nombre de
 // minutes aurait produite. Les réactions qui dépendent d'un TICK (présence
 // conditionnelle, routine PNJ, crossfade jour/nuit) ne se rejouent, elles,

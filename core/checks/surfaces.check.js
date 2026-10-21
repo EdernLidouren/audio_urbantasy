@@ -12,7 +12,7 @@ export default function checkSurfaces(run) {
   // --- Surfaces de sol (core/surfaces.js + scene.js) ---
   // registre + carte + surfaceAt/surfaceProps = CORE pur, testable ici sans
   // navigateur (la dérivation du SON reste à la vue, voir
-  // view/audio/city-scene.js — hors de portée d'un test terminal).
+  // view/audio/footsteps.js — hors de portée d'un test terminal).
 
   run("surfaces : registre — concrete est neutre", true, surfaceProps("concrete").neutral);
   run("surfaces : registre — sand est spécial", false, surfaceProps("sand").neutral);

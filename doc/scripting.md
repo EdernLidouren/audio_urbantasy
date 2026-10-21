@@ -16,12 +16,12 @@ liste exhaustive (types de condition, kinds d'action, tags) renvoie au fichier
 source. Chaque section porte une ligne **⚠️ À jour avec** qui nomme ce fichier :
 si tu ajoutes un type/kind/tag, mets à jour le CODE d'abord, puis complète la
 section correspondante ICI (nouvel exemple si le concept le justifie) — cette
-maintenance fait partie du travail, voir `CLAUDE.md`.
+maintenance fait partie du travail (voir `doc/README.md`).
 
 ## Vue d'ensemble : une seule couche de conditions, quatre consommateurs
 
 Le même objet condition (`{ type, ...champs }`) et le même évaluateur
-(`core/presence.js`/`evaluateCondition`) servent aujourd'hui à QUATRE usages, sans
+(`core/presence.js`/`evaluateCondition`) servent à QUATRE usages, sans
 jamais quatre mécanismes séparés :
 
 1. **Présence conditionnelle** — `entity.presence` décide si une entité est
@@ -48,12 +48,13 @@ délègue au bon évaluateur ; un `type` inconnu à l'ÉVALUATION (hors du chemi
 au chargement, ex. un appel direct depuis `core/checks/conditions.check.js`) renvoie `false`,
 jamais une exception.
 
-`context` transporte ce dont un évaluateur peut avoir besoin — aujourd'hui `time`
-(minutes de jeu, voir `doc/time.md`) et `entity` (l'entité dont on évalue une
-propriété PROPRE, ajoutée AVANT l'appel par l'appelant — voir la nuance
-`hasEquipmentTag` plus bas, où "l'entité" concernée n'est pas toujours celle qui
-porte la règle). Étendre `context` demain (`season`, `weather`...) ne change jamais
-la signature d'`evaluateCondition`, seulement ce que l'appelant y met.
+`context` transporte ce dont un évaluateur peut avoir besoin — l'état de partie
+dérivé par `core/presence.js`/`presenceContextOf` (`time` en minutes de jeu, voir
+`doc/time.md`, `weather`, `perceptionActive`, `world`, `session`) et `entity`
+(l'entité dont on évalue une propriété PROPRE, ajoutée AVANT l'appel par
+l'appelant — voir la nuance `hasEquipmentTag` plus bas, où "l'entité" concernée
+n'est pas toujours celle qui porte la règle). Étendre `context` (ex. `season`) ne
+change jamais la signature d'`evaluateCondition`, seulement ce que l'appelant y met.
 
 **Validation au chargement** (`core/script-parse.js`/`validateCondition`, FACTORISÉE et
 réutilisée à l'identique par `presence[].when` et `action.condition`) :
@@ -121,8 +122,7 @@ passage par minuit de la FENÊTRE `from`/`to` — les deux cohabitent sans confl
 
 Sans `spread` déclaré (ou évalué hors d'une entité de monde, ex.
 `action.condition`, voir `view/interaction.js`/`actionConditionMet`) : décalage
-nul, comportement EXACTEMENT inchangé — seuil pile sur `from`/`to`, comme avant ce
-mécanisme.
+nul — seuil pile sur `from`/`to`.
 
 Exemple — trois habitués d'un bar, même règle de départ partagée, décalés de
 quelques minutes chacun (voir `core/checks/routines.check.js`, section "le bar") :
@@ -250,16 +250,16 @@ Exemple réel complet — `spirit_1` (`scenes/demo.json`) :
 "presence": [{ "when": { "type": "perceptionActive" }, "present": true }]
 ```
 
-Côté VUE (`view/audio/city-scene.js`), la bascule de perception déclenche AUSSI un
-crossfade musique/ambiance vers des pools surnaturels globaux
-(`config/perception.js`) et un fondu du filtre d'étouffement des entités MONDAINES
+Côté VUE, la bascule de perception déclenche AUSSI un crossfade musique/ambiance
+vers des pools surnaturels globaux (`config/perception.js`, rendu par
+`view/audio/layers.js`) et un fondu du filtre d'étouffement des entités MONDAINES
 (MÊME chaîne de rendu que l'occlusion RECTO/VERSO, mais son PROPRE profil
 de réglage : `config/tuning-values.js`/`perceptionMufflingLowpassHz`/
 `perceptionMufflingGain`, indépendant de `faceMuffling*`) — une entité dont
 la présence porte cette
-condition (`isPerceptionGated`, `view/audio/city-scene.js`) en est TOUJOURS
+condition (`isPerceptionGated`, `view/audio/entity-sound-entry.js`) en est TOUJOURS
 exemptée, elle émerge pleine et claire. Détail complet côté vue : voir les
-commentaires de `view/audio/city-scene.js` (`effectiveMuffleAmount`,
+commentaires de `view/audio/muffle.js` (`effectiveMuffle`,
 `currentMundaneMuffleAmount`) — hors de portée de ce document, qui ne couvre que le
 format déclaratif du core.
 
@@ -327,8 +327,8 @@ dans `core/checks/conditions.check.js`.
 DIRECTEMENT (ex. `view/audio/entity-sound-entry.js`/`isPerceptionGated`, qui détecte une entité
 SURNATURELLE pour l'exempter du filtre d'étouffement mondain) doit chercher la condition
 recherchée RÉCURSIVEMENT à l'intérieur d'un `"allOf"` — pas seulement au premier niveau —
-sous peine de rater une entité dont la condition est désormais COMPOSÉE (voir
-`conditionRequiresPerception`, `view/audio/city-scene.js`, qui fait cette recherche pour
+sous peine de rater une entité dont la condition est COMPOSÉE (voir
+`conditionRequiresPerception`, `view/audio/entity-sound-entry.js`, qui fait cette recherche pour
 `isPerceptionGated`).
 
 Exemple réel complet — `cumuloLupus` (`entities/types/cumulo-lupus.js`), présent
@@ -344,7 +344,7 @@ presence: [
 ],
 ```
 
-Côté VUE (`view/audio/city-scene.js`), un changement de `session.weather.state` déclenche
+Côté VUE (`view/audio/layers.js`), un changement de `session.weather.state` déclenche
 AUSSI une AMBIANCE SONORE dédiée : une couche GLOBALE (`lib/audio.js`/
 `setWeatherAmbienceLayer`), SUPERPOSÉE à l'ambiance de la scène (jamais à sa place,
 contrairement à la couche `"state"` de perception qui REMPLACE celle de la scène) et persistante
@@ -360,7 +360,7 @@ active (`indoor`, propriété de FACE — voir `core/scene.js`/`parseFace` et
 `doc/scene-format.md`), il ne le COMPOSE jamais. Un contexte absent pour un état donné
 reste silencieux dans CE contexte (ex. la brume, inaudible à l'intérieur). Hors de
 portée de ce document (format déclaratif du core) : détail complet côté vue dans les
-commentaires de `view/audio/city-scene.js` (`declareWeatherAmbience`) et `lib/audio.js`
+commentaires de `view/audio/layers.js` (`declareWeatherAmbience`) et `lib/audio/ambience.js`
 (`syncAmbienceLayers`, `desiredAmbienceSlots`).
 
 Le MÊME changement déclenche AUSSI une ANNONCE (non-assertive, canal ambiance) —
@@ -531,9 +531,8 @@ Voir `doc/entity-model.md`/"Présence : la valeur résolue" pour la sémantique 
 
 `behavior` (objet, requis, OU `null`) : un objet — MÊME forme que le champ
 `behavior` d'une entité, validé par `core/parse-common.js`/`parseBehavior`, qui délègue à
-`core/behaviors/index.js` (registre des kinds — `wander`, `follow`, `goto`
-aujourd'hui, chacun avec ses propres paramètres et sa propre validation, voir leurs
-fichiers respectifs) ; ou `null` — RETRAIT explicite du comportement actif (l'entité
+`core/behaviors/index.js` (registre des kinds, chacun avec ses propres paramètres
+et sa propre validation, voir leurs fichiers respectifs) ; ou `null` — RETRAIT explicite du comportement actif (l'entité
 redevient immobile, comme si elle n'en avait jamais eu). Appliqué SEULEMENT sur la
 bascule (faux → vrai) de SA PROPRE condition, jamais réappliqué en continu tant
 qu'elle reste vraie (sinon un `goto` déjà en cours serait sans cesse réarmé) —
@@ -598,7 +597,7 @@ il parcourt la salle d'un bout à l'autre et fait demi-tour au bord :
 ## Règles
 
 Une règle : `{ when: <condition>, effects: [<effet>, ...] }`. RACCOURCI
-rétrocompatible, encore accepté en entrée : `{ when: <condition>, present:
+accepté en entrée : `{ when: <condition>, present:
 <boolean> }` (sans `effects`) — normalisé par `core/script-parse.js`/`parsePresenceRule`
 en forme canonique `{ when, effects: [{ type: "presence", present }] }` ; tout
 consommateur d'une entité PARSÉE ne voit plus que la forme canonique. Une règle
@@ -829,7 +828,7 @@ action: { kind: "loot", amount: 100 },
 
 `amount` et `spawn` s'excluent. `amount` : entier > 0. `spawn` : `count` entier >
 0, `spread` (facultatif) nombre ≥ 0, `spec.type` présent dans le registre de types
-(vérifié au chargement : une faute ne plante plus à l'éparpillement).
+(vérifié au chargement : une faute échoue là, jamais à l'éparpillement).
 
 `spec` (minimal, résolu en descripteur COMPLET par le parseur d'entité —
 `core/spawn.js`/`ephemeralArchetypeSpec`) est le vocabulaire de la "spec
@@ -861,7 +860,7 @@ Pour les trois formes, un collectible déjà `consumed` ne fait plus RIEN à
 l'activation : ni effets, ni son (`view/interaction.js`, verrou avant
 l'exécution des effets).
 
-### `"search"` — FOUILLE d'un conteneur de collecte régénérant
+### `"search"` — FOUILLE d'un conteneur de collecte
 
 ```js
 // entities/types/bush.js
@@ -894,7 +893,8 @@ container: {
 },
 action: { kind: "search" },
 ```
- Effet d'état : `core/spawn.js`/`searchContainer` — le stock TOMBE
+
+Effet d'état : `core/spawn.js`/`searchContainer` — le stock TOMBE
 AU SOL, une entité ÉPHÉMÈRE par objet, éparpillée autour du conteneur
 (`spawnScatteredEphemerals`, MÊME geste que le `"loot"` à spawn ci-dessus),
 à ramasser ensuite via `"pickup"` ou à laisser ; le conteneur est noté vidé
@@ -952,8 +952,8 @@ passage (`transitionSound`, cascade instance -> archétype -> défaut ABSENT
 — voir `doc/entity-model.md`/"Recto/verso", `config/tuning-values.js`) :
 silence côté son de passage si rien n'est déclaré, jamais un son générique
 imposé. `arrivalX` est validé au chargement : un nombre dans `[0, length]` de la
-scène. Détail complet du modèle à deux faces (persistance, gel de l'autre
-face) : `doc/scene-format.md`/"Scène à deux faces (recto/verso)".
+scène. Détail complet du modèle à deux faces (persistance, coexistence
+isolée des deux faces) : `doc/scene-format.md`/"Scène à deux faces (recto/verso)".
 
 ### `"applyEffects"` — kind sans substance propre, PORTE SEULEMENT des effets
 
@@ -962,8 +962,7 @@ face) : `doc/scene-format.md`/"Scène à deux faces (recto/verso)".
   "kind": "applyEffects",
   "effects": [
     { "type": "playSound", "path": "assets/sounds/effects/window_blinds_open" },
-    { "type": "setVariable", "scope": "entity", "name": "isOpen", "value": true },
-    { "type": "announce", "key": "entity.window.opened" }
+    { "type": "setVariable", "scope": "entity", "name": "isOpen", "value": true }
   ]
 }
 ```
@@ -980,13 +979,12 @@ l'action se résume à ses effets, sans ramassage ni aucun autre comportement
 propre. `effects` y est donc OBLIGATOIRE (sans, l'action ne ferait rien :
 erreur au chargement).
 
-**La PORTE n'est PLUS un cas spécial** (ancien kind `"transit"`, ancien champ
-`entity.target` — tous deux disparus) : une porte est une entité `door`
-ORDINAIRE dont l'action est `"applyEffects"` avec un effet `"teleport"` dans
-`effects` (voir "Effets d'action" plus bas, exemple réel `scenes/demo.json`/
-`door_exit`). `entities/types/door.js` ne porte plus AUCUNE cascade `action`
-(la cible varie par INSTANCE, jamais un défaut d'archétype) : chaque porte
-déclare la sienne en entier.
+**Une porte est une entité `door` ORDINAIRE**, sans kind dédié : son action
+est `"applyEffects"` avec un effet `"teleport"` dans `effects` (voir "Effets
+d'action" plus bas, exemple réel `scenes/demo.json`/`door_exit`).
+`entities/types/door.js` ne porte AUCUNE cascade `action` (la cible varie par
+INSTANCE, jamais un défaut d'archétype) : chaque porte déclare la sienne en
+entier.
 
 Exemple réel complet (fenêtre) : `entities/types/glass-window.js` (voir
 "Actions multiples filtrées par condition" plus bas pour le cas complet,
@@ -1002,7 +1000,7 @@ deux candidates `applyEffects` aux conditions opposées).
    chargement de la vue.
 3. Des vérifications dans `core/checks/actions.check.js`.
 4. Ajoute une sous-section ICI (forme + exemple réel).
-3. Si le nouveau kind doit pouvoir être bloqué par condition, rien à faire de
+5. Si le nouveau kind doit pouvoir être bloqué par condition, rien à faire de
    spécial : "Conditions d'action" ci-dessous s'applique à TOUT kind sans
    modification.
 
@@ -1148,17 +1146,17 @@ PROVENANCE, jamais déclaré dans le cas courant :
   — MÊMES filtres actifs que n'importe quelle balise : distance/pan
   (`interactRange`/`audibleRange`/`panSaturation`), occlusion RECTO/VERSO
   (`forcedMuffle` selon la face qui porte l'entité) et étouffement de
-  perception (`effectiveMuffleAmount`, qui exempte déjà les entités
-  surnaturelles) — AUCUN filtre réinventé. `gain`/`pitchVariation`/
+  perception (`view/audio/muffle.js`/`effectiveMuffle`, qui exempte les
+  entités surnaturelles) — AUCUN filtre réinventé. `gain`/`pitchVariation`/
   `reverbSend` résolus par la MÊME cascade que `enterSound`/`exitSound` (voir
   plus haut) — un `reverbSend` non déclaré rejoint donc le bus de réverb de la
   scène au défaut global, comme un beacon au même endroit. Volume composé avec
   `beaconVolume` (préférence "Volume des balises", même catégorie qu'un
   enterSound/exitSound), pas `interfaceVolume`.
 - aucune cible résolue (centré joueur) → **`"meta"`** par défaut : rendu
-  IDENTIQUE au comportement d'avant cette cascade (chemin `playDescribedOneShot`
-  non positionné, `interfaceVolume`) — IGNORE tout filtre actif, "parle"
-  directement au joueur, comme un son d'UI/confirmation.
+  non positionné (chemin `playDescribedOneShot`, `interfaceVolume`) — IGNORE
+  tout filtre actif, "parle" directement au joueur, comme un son
+  d'UI/confirmation.
 - `nature` explicite force l'un ou l'autre rendu indépendamment de la
   provenance (rare, ex. un son positionné qu'on veut quand même méta) — un
   `"diegetic"` sans cible résolvable (surcharge sans `at` ni contexte
@@ -1196,9 +1194,7 @@ que le rendu DIÉGÉTIQUE : un son méta n'a pas de position, rien à suivre ni
   saut. Un son suivi appartient à son MONDE : quitter ce monde (porte,
   téléportation) l'arrête par un fondu bref (`sceneExitSoundFadeMs`,
   `config/tuning-values.js`), même si le monde d'arrivée a une entité au même
-  id. Avant ce flag, tout playSound positionné était
-  calculé une fois au démarrage puis figé : la cloche restait à gauche après
-  qu'on avait dépassé le clocher.
+  id.
 - `tracked: false` — **ANCRÉ** : spatialisé UNE fois au départ, puis figé à
   son point d'émission tel qu'entendu à cet instant. Pour un ÉVÉNEMENT
   PONCTUEL qui "s'est produit là" et n'a pas à suivre la tête du joueur : un
@@ -1251,16 +1247,15 @@ ANCRÉS, chacun émis là où l'entité pose le pied.
 ### `"announce"` — message parlé, VUE
 
 ```js
-{ type: "announce", key: "entity.window.opened", assertive: true }
+{ type: "announce", key: "entity.old_survey_map.taken", assertive: true }
 ```
 
 `key` (requis) : clé i18n. `assertive` (optionnel, **défaut `true`**) : canal
 `lib/announce.js` — `true` (défaut) interrompt pour être entendu immédiatement
-(même politique que toute confirmation d'action du projet jusqu'ici), `false`
-route vers le canal `polite` (attend son tour). Remplace le rôle des anciens
-champs spéciaux `announceKey`/`refusalKey`, disparus de la grammaire : un
-`"announce"` est maintenant un effet comme un autre, composable dans n'importe
-quelle liste.
+(même politique que toute confirmation d'action du projet), `false` route
+vers le canal `polite` (attend son tour). Un `"announce"` est un effet comme
+un autre, composable dans n'importe quelle liste (`effects`,
+`refusalEffects`, triggers). Exemple réel : `entities/types/old_survey_map.js`.
 
 ### `"teleport"` — déplace le JOUEUR, effet MIXTE (core/vue)
 
@@ -1274,29 +1269,28 @@ quelle liste.
 
 Déplace le JOUEUR (jamais une entité — voir "Pas de teleport d'entité"
 ci-dessous) vers `target` (id de scène, PEUT être la scène courante).
-Remplace l'ancien cas spécial "porte" (kind `"transit"`, champ `entity.target`)
-: une porte est maintenant une action `"applyEffects"` ORDINAIRE dont
-`effects` contient CET effet (voir `scenes/demo.json`/`door_exit`).
+Une porte est une action `"applyEffects"` ORDINAIRE dont `effects` contient
+CET effet (voir `scenes/demo.json`/`door_exit`).
 
 - **`target`** (requis) : id de scène (`scenes/index.js`).
 - **`x`** (optionnel) : position d'arrivée. ABSENT → `playerStart` de la
-  cible (comportement HISTORIQUE d'une porte, inchangé) si un rechargement a
+  cible si un rechargement a
   lieu, ou la position ACTUELLE du joueur sinon (voir `reloadIfSame`
   ci-dessous) — jamais une valeur arbitraire.
 - **`side`** (optionnel, `"recto"`/`"verso"`) : face d'arrivée si `target` est
-  une scène à deux faces. ABSENT → `"recto"` si un rechargement a lieu
-  (comportement HISTORIQUE), ou la face ACTUELLE du joueur sinon.
+  une scène à deux faces. ABSENT → `"recto"` si un rechargement a lieu,
+  ou la face ACTUELLE du joueur sinon.
 - **`reloadIfSame`** (optionnel, **défaut `false`**) — décide SEULEMENT si
   `target` EST la scène active : DIFFÉRENTE de la scène active → toujours un
-  rechargement, cette valeur n'a alors aucun effet (comportement HISTORIQUE
-  d'une porte : aucune porte existante ne boucle sur sa propre scène).
+  rechargement, cette valeur n'a alors aucun effet (cas de toute porte vers
+  une autre scène).
   MÊME scène → `true` la RECHARGE (état frais, ephémères purgés, joueur
   recentré — un "reset" volontaire, voir "Sélection sur la carte de la
   ville" plus bas) ; `false` déplace SEULEMENT le joueur (+ compagnons),
   SANS toucher au reste du monde (NPC où ils étaient, éphémères intacts).
 - **`transition`** (optionnel, `"fade"` | `"instant"`, **défaut `"fade"`**) :
   `"fade"` passe par le SAS + fondu
-  historique d'une traversée de porte (voir `view/world-travel.js`/
+  d'une traversée de porte (voir `view/world-travel.js`/
   `runTeleportSas`) ; `"instant"` saute le sas — déplacement IMMÉDIAT,
   pour un teleport D'AUTORITÉ (le joueur ne choisit pas le moment : un
   vigile qui éjecte, une boutique qui ferme à l'heure).
@@ -1306,7 +1300,7 @@ valides (ex. `transition:"instant"` + `reloadIfSame:true` : rechargement sans
 sas ; `transition:"fade"` + `reloadIfSame:false` : sas pour un simple
 repositionnement dans le monde courant).
 
-**RÉUTILISE le mécanisme de transition de porte HISTORIQUE, GÉNÉRALISÉ**
+**UN SEUL mécanisme de transition**
 (`view/world-travel.js`/`executeTeleport`), pas un second chemin :
 `performTransition` (rechargement, `core/state.js`/
 `travelToWorld`) et `placePlayer` (repositionnement sans rechargement) restent
@@ -1342,7 +1336,7 @@ APPARTIENT à une scène" (`doc/entity-model.md`) : une entité qui semble
 "voyager" est en réalité UNE INSTANCE PAR SCÈNE, chacune conditionnée pour
 n'être active que là où elle doit apparaître — jamais une seule instance qui
 se déplacerait entre des mondes que le core ne tique jamais simultanément
-(voir CLAUDE.md, "un seul monde actif avance").
+(seul le monde actif avance, voir l'en-tête de `core/reduce.js`).
 
 ### Ajouter un type d'effet d'action
 
@@ -1395,8 +1389,7 @@ sorte (ni son ni annonce) — échec silencieux ASSUMÉ, à la charge du contenu
 juger si c'est acceptable. PRÉSENTE, elle reste validée comme n'importe quelle
 liste d'effets (tableau NON VIDE, même règle qu'`effects` — un champ déclaré
 mais vide échoue au chargement, comme un tableau `effects` vide). AUCUN son de
-refus GÉNÉRIQUE imposé par le système (l'ancien `assets/sounds/ui/refused` en
-dur a disparu) : une action qui ne veut QU'annoncer son refus déclare
+refus GÉNÉRIQUE imposé par le système : une action qui ne veut QU'annoncer son refus déclare
 `[{ type: "announce", ... }]`, sans `"playSound"` — c'est un choix de CONTENU,
 jamais une valeur par défaut.
 
@@ -1404,30 +1397,29 @@ jamais une valeur par défaut.
 (`view/interaction.js`/`interact`, juste avant de déléguer à
 `ACTION_HANDLERS`) : condition vraie (ou absente) → `effects` exécutée
 GÉNÉRIQUEMENT pour TOUT kind (voir "Effets d'action" plus haut), PUIS l'action
-s'exécute normalement (comportement STRICTEMENT inchangé) ; condition fausse →
+s'exécute normalement ; condition fausse →
 `refusalEffects` exécutée À LA PLACE, AUCUN effet de succès, AUCUNE transition.
-Action SANS `condition` (tout contenu existant, ex. `door_exit`) → le bloc
-condition est sauté entièrement, rétrocompatibilité totale.
+Action SANS `condition` (ex. `door_exit`) → le bloc condition est sauté
+entièrement.
 
 `context.entity` porte l'entité qui DÉCLARE l'action (celle qu'on active — voir
 `view/interaction.js`/`actionContext`) ; `context.playerEquipment` (séparément,
-`view/interaction.js`/`setPlayerEquipmentProvider`, câblé par `view/city-screen.js`)
+`view/interaction.js`/`setPlayerEquipmentProvider`, câblé par `view/action-handlers.js`)
 porte l'équipement du JOUEUR — voir la nuance détaillée dans "Conditions"/
 `hasEquipmentTag` plus haut. Une condition `"variable"` scope `"entity"` (voir
 "Variables" plus bas) se résout donc contre les variables de L'ENTITÉ-CIBLE elle-même
 (ex. `isOpen` d'une fenêtre), jamais contre le joueur. `context.time` (séparément,
-`view/interaction.js`/`setTimeProvider`, câblé par `view/city-screen.js`, MÊME clé
-que `core/reduce.js`/`presenceContext`) porte l'heure de partie COURANTE : une
+`view/interaction.js`/`setTimeProvider`, câblé par `view/action-handlers.js`, MÊME clé
+que `core/presence.js`/`presenceContextOf`) porte l'heure de partie COURANTE : une
 condition `"timeRange"` se comporte donc IDENTIQUEMENT sur `action.condition` et sur
 `presence[].when` (ex. `door.town_hall_main`, `scenes/town-square.json`).
 `context.perceptionActive`/`context.weather`/`context.world`/`context.session`
 (séparément, `view/interaction.js`/`setSessionProvider`, câblé par
-`view/city-screen.js`, MÊME dérivation que `core/reduce.js`/`presenceContext` — la
-session ENTIÈRE, relue à chaque tentative) complètent ce contexte depuis une tâche de
-consolidation : `weather`, `perceptionActive`, `hasImprovement` et les variables scope
+`view/action-handlers.js`, MÊME dérivation que `core/presence.js`/`presenceContextOf`
+— la session ENTIÈRE, relue à chaque tentative) complètent ce contexte :
+`weather`, `perceptionActive`, `hasImprovement` et les variables scope
 `"scene"`/`"party"` se comportent donc eux aussi IDENTIQUEMENT sur `action.condition`
-et sur `presence[].when` — plus aucune de ces conditions n'est structurellement
-condamnée à toujours refuser une action (limitation antérieure, corrigée).
+et sur `presence[].when`.
 
 **Extensibilité** : une caisse verrouillée (`"loot"` conditionnée par un futur
 `questFlag`), un PNJ qui ne parle qu'à condition (un futur kind `"talk"`)
@@ -1436,8 +1428,7 @@ connaît rien du `kind` qu'il protège.
 
 ## Actions multiples filtrées par condition
 
-`entity.action` peut être soit un OBJET UNIQUE (tout ce qui précède, INCHANGÉ —
-RÉTROCOMPAT stricte), soit un TABLEAU de candidates — chacune une action complète
+`entity.action` peut être soit un OBJET UNIQUE (tout ce qui précède), soit un TABLEAU de candidates — chacune une action complète
 (`kind`, `condition`/`refusalEffects` optionnels, `effects` optionnel, voir
 "Effets d'action" plus haut), validée EXACTEMENT comme une action unique
 (`core/script-parse.js`/`parseSingleAction`, réutilisée à l'identique par les deux formes).
@@ -1522,7 +1513,7 @@ LECTURE (type de condition `"variable"`, voir "Conditions"/`variable` plus haut 
 composable dans un `allOf` comme toute autre condition) et l'ÉCRITURE (effets
 `setVariable`/`toggleVariable`/`addVariable`, voir "Effets d'action" plus haut,
 consommés par "Actions multiples filtrées par condition" ci-dessus). Rend le
-stockage VIVANT : une condition peut désormais LIRE une variable, une action
+stockage VIVANT : une condition peut LIRE une variable, une action
 ACTIVÉE peut l'ÉCRIRE — voir l'exemple complet de la fenêtre plus haut.
 
 **Modèle** : deux types SEULEMENT — `"flag"` (booléen) et `"int"` (entier
@@ -1550,7 +1541,7 @@ seul** :
 |---|---|---|---|
 | `"entity"` | une entité | `entities[].variables` (scène) | `entity.variables` — SPARSE : absente si l'entité n'en déclare aucune (comme `behavior`/`action`/`presence`), pas de cascade type -> instance |
 | `"scene"` | une scène (monde) | `variables` RACINE du fichier de scène (voir `core/scene.js`/`parseScene`) — **PARTAGÉE**, jamais un champ de FACE : une scène à deux faces (recto/verso) n'a qu'UN SEUL sac de variables de scène | `world.variables` — TOUJOURS présent (sac vide `{}` si rien déclaré), comme `defaultSurface`/`indoor` |
-| `"party"` | la partie | fourni par l'appelant à `createInitialState(scene, seed, { partyVariables })` — le core n'importe AUCUN fichier de contenu (voir CLAUDE.md, "réglages en cascade") | `session.variables` — TOUJOURS présent, cercle PARTIE comme `money`/`bag`/`weather` |
+| `"party"` | la partie | fourni par l'appelant à `createInitialState(scene, seed, { partyVariables })` — le core n'importe AUCUN fichier de contenu, le registre lui est injecté | `session.variables` — TOUJOURS présent, cercle PARTIE comme `money`/`bag`/`weather` |
 
 `money`/`perceptionActive`/`bag`/etc. restent des champs DÉDIÉS (ils ont leur
 propre logique de résolution) — ce système est réservé aux variables
@@ -1680,8 +1671,8 @@ de `stackable`/`equippable`/`slot`. Un tag est un IDENTIFIANT STABLE (la clé du
 registre), traduit SEULEMENT à l'affichage via `labelKey` — jamais le texte traduit
 dans une vérification, qui cesserait de matcher au changement de langue.
 
-**⚠️ À jour avec `core/tags.js`/`TAG_REGISTRY`** pour la liste complète (aujourd'hui
-: `military`, `chic`, `metal` — exemples, pas une liste garantie à jour).
+**⚠️ À jour avec `core/tags.js`/`TAG_REGISTRY`** pour la liste complète (ex. `chic`,
+lu par la porte à dresscode).
 
 Un objet porte ses tags dans `core/items.js`/`ITEM_REGISTRY[type].tags`, un tableau
 optionnel :
@@ -1693,7 +1684,7 @@ high_heels: { /* ... */ tags: ["chic"] },
 ```
 
 **Validation stricte** : `ITEM_REGISTRY` est du CODE (pas du JSON parsé par
-`core/scene.js`), donc `core/items.js` se valide LUI-MÊME au chargement du module
+`core/scene.js`/`parseScene`), donc `core/items.js` se valide LUI-MÊME au chargement du module
 (`validateItemTags(ITEM_REGISTRY)`, appelée en bas du fichier) — tout tag référencé
 par un objet DOIT exister dans `TAG_REGISTRY`, sinon `throw` immédiat, nommant le
 tag fautif et l'objet concerné. `validateItemTags` est exportée pour rester
@@ -1719,7 +1710,7 @@ toucher — un objet peut alors le référencer dans son `tags: [...]`.
 `resolveDescriptionText`, appelé par `view/interaction.js`/
 `resolveDescription`, l'INDIRECTION déjà en place pour "Espace"), JAMAIS
 stocké ni mis à jour par effet. Une description SANS `{variable}` reste
-STATIQUE, comportement STRICTEMENT inchangé (le gabarit ne fait que
+STATIQUE (le gabarit ne fait que
 réutiliser `lib/i18n.js`/`interpolate`, qui traverse un gabarit sans
 placeholder sans y toucher).
 
@@ -1761,10 +1752,10 @@ n'empêche de l'ajouter plus tard (voir `doc/entity-model.md`/"Interaction
 | Vocabulaire | Registre / aiguillage | Fichier |
 |---|---|---|
 | Types de condition | `CONDITION_EVALUATORS` | `core/presence.js` |
-| Types d'effet (presence/behavior, TICK) | `parseEffect` + `resolveEntityRules` | `core/scene.js`, `core/presence.js` |
-| Types d'effet d'action (ACTIVATION, état + rendu + mixte) | `parseActionEffect` (forme) + `STATE_EFFECT_TYPES`/`RENDER_EFFECT_TYPES`/`MIXED_EFFECT_TYPES` (nature/routage) + `applyActionEffects` (état) + `runEffects` (rendu + mixte) | `core/scene.js`, `core/effects.js`, `core/variables.js`, `view/interaction.js` |
-| Exécution de l'effet "teleport" (rechargement/repositionnement) | `performTransition`/`placePlayer`/`travelToWorld` | `view/city-screen.js`, `core/state.js` |
-| Kinds de trigger (transition d'horloge) | `TRIGGER_KINDS` + `parseTrigger` (forme) + `applyDueTriggers` (détection, état) + `runRenderEffects` (rendu) | `core/triggers.js`, `core/scene.js`, `view/interaction.js` |
+| Types d'effet (presence/behavior, TICK) | `parseEffect` + `resolveEntityRules` | `core/script-parse.js`, `core/presence.js` |
+| Types d'effet d'action (ACTIVATION, état + rendu + mixte) | `parseActionEffect` (forme) + `STATE_EFFECT_TYPES`/`RENDER_EFFECT_TYPES`/`MIXED_EFFECT_TYPES` (nature/routage) + `applyActionEffects` (état) + `runEffects` (rendu + mixte) | `core/script-parse.js`, `core/effects.js`, `core/variables.js`, `view/interaction.js` |
+| Exécution de l'effet "teleport" (rechargement/repositionnement) | `executeTeleport`/`performTransition` + `placePlayer`/`travelToWorld` | `view/world-travel.js`, `core/state.js` |
+| Kinds de trigger (transition d'horloge) | `TRIGGER_KINDS` + `parseTrigger` (forme) + `applyDueTriggers` (détection, état) + `runRenderEffects` (rendu) | `core/triggers.js`, `core/script-parse.js`, `view/interaction.js` |
 | Kinds d'action (forme, validation) + exécution | `ACTION_KINDS` + `ACTION_HANDLERS` | `core/action-kinds.js`, `view/interaction.js` |
 | Kinds de comportement | `BEHAVIORS` | `core/behaviors/index.js` |
 | Tags | `TAG_REGISTRY` | `core/tags.js` |

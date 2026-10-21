@@ -8,8 +8,8 @@
 //
 // FLAG SIMPLE pour l'instant (possédée ou non) : un état interne riche (une
 // improvement qui porterait ses propres variables) viendrait s'ajouter SI un
-// cas concret le réclame — ne PAS le construire par anticipation (voir
-// CLAUDE.md, "pas d'abstraction prématurée").
+// cas concret le réclame — ne PAS le construire par anticipation (pas
+// d'abstraction prématurée).
 // `order` (entier >= 1, UNIQUE) : position d'affichage dans l'onglet
 // Améliorations (view/menus/inventory-menu.js) et numéro annoncé au joueur.
 // Déclaré, jamais dérivé de l'ordre d'insertion de cet objet : réarranger
@@ -65,7 +65,8 @@ export function improvementProps(id) {
 // (`improvements`) directement, jamais sur la session entière ; l'appelant
 // (core/variables.js/applyActionEffects) le splice lui-même dans
 // session.improvements. `id` inconnu du registre : jamais vérifié ICI (la
-// validation vit au CHARGEMENT, voir core/scene.js) — ces primitives restent
+// validation vit au CHARGEMENT, voir core/script-parse.js/
+// parseActionEffect) — ces primitives restent
 // de simples opérations d'ensemble, comme setVariable l'est pour une
 // variable.
 export function hasImprovement(improvements, id) {

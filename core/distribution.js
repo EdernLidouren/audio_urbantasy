@@ -23,10 +23,10 @@
 // table équivalente (voir resolveDistribution) : mêmes probabilités
 // exactement, un seul pas de PRNG par objet comme les autres formes.
 //
-// Module SÉPARÉ de core/spawn.js pour que core/scene.js puisse valider une
-// distribution au chargement sans importer le moteur de spawn (qui, lui,
-// importe core/scene.js — voir parseSpawnedEntity) : jamais d'import
-// circulaire.
+// Module SÉPARÉ de core/spawn.js pour que core/scene.js et
+// core/entity-parse.js puissent valider une distribution au chargement sans
+// importer le moteur de spawn (qui, lui, importe core/entity-parse.js —
+// voir parseSpawnedEntity) : jamais d'import circulaire.
 
 import { SPAWN_TABLES, RARITY_LEVELS } from "../config/spawn-values.js";
 import { ITEM_REGISTRY } from "./items.js";
@@ -175,7 +175,9 @@ function validateSingleTable(source, describe, fail, extraKeys = []) {
 }
 
 // Valide UNE distribution déclarée par une source — `fail` fourni par
-// l'appelant (core/scene.js), même patron que parseVariables. EXACTEMENT une
+// l'appelant (core/scene.js pour une plage, core/entity-parse.js pour un
+// conteneur, core/save.js à la relecture), même patron que parseVariables.
+// EXACTEMENT une
 // des trois formes (voir header) : { table }, { items } ou { tables }.
 // Chaque membre de { tables } est lui-même un { table } ou un { items },
 // plus un `weight` optionnel (nombre >= 0 ou niveau de rareté, défaut 1),

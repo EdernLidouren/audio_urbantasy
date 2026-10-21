@@ -1,24 +1,25 @@
 // Système de RÈGLES déclaratives génériques : condition -> EFFET(S). Pur,
-// headless — aucune connaissance de Howler/DOM (voir CLAUDE.md). Généralise
-// la présence conditionnelle (brique 1) à tout ce qu'une condition peut
-// déclencher (brique 2/2, "triggers de comportement") — MÊME registre de
-// conditions, MÊME évaluateur, PAS un second système séparé.
+// headless — aucune connaissance de Howler/DOM. Couvre la présence
+// conditionnelle ET tout ce qu'une condition peut déclencher d'autre
+// ("triggers de comportement") — MÊME registre de conditions, MÊME
+// évaluateur, PAS un second système séparé.
 //
 // Une entité porte OPTIONNELLEMENT `presence` : une liste de règles
 // `{ when: <condition>, effects: [<effet>...] }`, évaluées DANS L'ORDRE.
-// Entité SANS champ `presence` du tout -> TOUJOURS présente, comportement
-// STRICTEMENT inchangé pour tout contenu existant. RACCOURCI rétrocompatible
-// avec la présence seule (avant ce système généralisé) : `{ when, present:
-// boolean }` SANS `effects`, sucre pour `{ when, effects: [{ type:
-// "presence", present }] }` — voir ruleEffect. core/scene.js normalise déjà
-// ce raccourci en forme canonique au chargement ; ruleEffect le comprend
+// Entité SANS champ `presence` du tout -> TOUJOURS présente, sans aucun
+// calcul de règle. RACCOURCI pour le cas le plus courant, la présence
+// seule : `{ when, present: boolean }` SANS `effects`, sucre pour `{ when,
+// effects: [{ type: "presence", present }] }` — voir ruleEffect.
+// core/script-parse.js/parsePresenceRule normalise déjà ce raccourci en
+// forme canonique au chargement ; ruleEffect le comprend
 // aussi directement, pour tout appelant qui construit une règle à la main
 // (ex. core/checks/conditions.check.js) sans passer par parseScene.
 //
 // DEUX aiguillages EXTENSIBLES, de nature différente :
 //   - CONDITION_EVALUATORS (registre) : chaque entrée est juste "condition +
-//     context -> booléen", uniforme -> un registre suffit, core/scene.js
-//     valide `when.type` contre ses clés (CONDITION_TYPES). "timeRange"
+//     context -> booléen", uniforme -> un registre suffit,
+//     core/script-parse.js/validateCondition valide `when.type` contre ses
+//     clés (CONDITION_TYPES). "timeRange"
 //     (dérivée de l'horloge) et "arrived" (dérivée d'un FAIT de simulation,
 //     `entity.gotoArrived` — événementielle, pas temporelle) cohabitent
 //     sans qu'isPresent/resolveEntityRules n'aient à savoir laquelle c'est.
@@ -45,13 +46,13 @@
 // alors simplement (dernière affectation), sans crash.
 //
 // `context` : les morceaux d'état qu'un évaluateur peut avoir besoin de
-// lire — `{ time }` (minutes de jeu, voir core/time.js) partagé par toutes
-// les entités d'un même tick, PLUS `entity` (l'entité évaluée elle-même,
-// ajouté ICI par resolveEntityRules/isPresent avant tout appel à
+// lire — `time` (minutes de jeu, voir core/time.js), perceptionActive,
+// weather, world, session (voir presenceContextOf plus bas), partagés par
+// toutes les entités d'un même tick, PLUS `entity` (l'entité évaluée
+// elle-même, ajouté ICI par resolveEntityRules/isPresent avant tout appel à
 // evaluateCondition) pour les conditions qui portent sur un FAIT propre à
-// l'entité (ex. "arrived"). Étendre demain (weather, flags...) ne change
-// jamais la signature de evaluateCondition, seulement ce que context
-// transporte.
+// l'entité (ex. "arrived"). Étendre le contexte ne change jamais la
+// signature de evaluateCondition, seulement ce que context transporte.
 
 import { equippedTags } from "./equipment.js";
 import { temporalThresholdOffset } from "./temporal-spread.js";
@@ -60,9 +61,8 @@ import { getVariable } from "./variables.js";
 import { hasImprovement } from "./improvements.js";
 import { isDebugEnabled } from "../config/debug.js";
 
-// Valeur numérique importée directement (voir CLAUDE.md/"Réglages en
-// cascade" : le core peut lire une valeur de config, jamais un registre de
-// contenu) — pas via core/time.js, dont les dérivations (hourOfDay) tronquent
+// Valeur numérique importée directement (le core peut lire une valeur de
+// config, jamais un registre de contenu) — pas via core/time.js, dont les dérivations (hourOfDay) tronquent
 // à l'heure ENTIÈRE, insuffisant ici : un spread de quelques minutes doit
 // rester observable (voir hourOfDayFraction ci-dessous).
 const { minutesPerHour, hoursPerDay } = TIME_CONFIG;
@@ -94,16 +94,16 @@ function wrapHour(hour) {
 // (core/script-parse.js/validateCondition).
 //
 // VARIATION DE SEUIL PAR INSTANCE (cond.spread, en MINUTES, optionnel) —
-// voir core/scripting.md/"spread" : désynchronise des entités qui partagent
+// voir doc/scripting.md/"spread" : désynchronise des entités qui partagent
 // la MÊME règle temporelle (ex. plusieurs PNJ "vers 6h", chacun décalé de
 // quelques minutes, jamais tous pile à l'heure). Décalage dérivé de façon
 // DÉTERMINISTE de l'id d'entité + les bornes de la règle (voir
 // core/temporal-spread.js) — jamais stocké, recalculé à CHAQUE évaluation,
 // donc STABLE à travers ticks, rechargements et re-visites de scène.
 // Appliqué IDENTIQUEMENT à from ET to : la fenêtre entière glisse, sa
-// largeur ne change jamais. context.entity absent (ex. action.condition
-// hors d'une entité de monde, voir view/interaction.js/actionConditionMet)
-// ou spread absent/nul -> décalage nul, comportement EXACTEMENT inchangé.
+// largeur ne change jamais. context.entity absent (ex. une condition
+// évaluée sans entité, comme dans core/checks/conditions.check.js) ou
+// spread absent/nul -> décalage nul, seuil pile à l'heure déclarée.
 function evaluateTimeRange(cond, context) {
   const { from, to, spread } = cond;
   if (!Number.isFinite(from) || !Number.isFinite(to) || from === to) return false;
@@ -166,7 +166,7 @@ function evaluateConsumed(cond, context) {
 // équipement joueur (ex. hors d'une interaction) -> false, jamais une
 // exception — même repli défensif que evaluateArrived/evaluateConsumed
 // ci-dessus. cond.tag est validé contre TAG_REGISTRY au chargement (voir
-// core/scene.js), jamais ici (cet évaluateur ne fait que LIRE une clé déjà
+// core/script-parse.js/validateCondition), jamais ici (cet évaluateur ne fait que LIRE une clé déjà
 // garantie valide).
 //
 // CLÉ DE CONTEXTE DÉDIÉE, PAS context.entity : contrairement à TOUT autre
@@ -190,8 +190,9 @@ function evaluateHasEquipmentTag(cond, context) {
 // Lit `context.session.improvements` — MÊME clé que la portée "party" d'une
 // condition "variable" (voir SCOPE_CONTEXT_KEYS, core/variables.js) : une
 // improvement est cercle PARTIE comme une variable de partie, jamais un
-// second mécanisme de contexte. Contexte sans `session` (ex. hors tick, une
-// action sans provider câblé) -> `context.session` vaut `undefined` ->
+// second mécanisme de contexte. Contexte sans `session` (ex. une condition
+// d'action avant que la vue ait câblé son fournisseur de session, voir
+// view/interaction.js/actionContext) -> `context.session` vaut `undefined` ->
 // `hasImprovement` replie sur `false`, même politique défensive que le
 // reste de ce fichier.
 //
@@ -215,23 +216,23 @@ function evaluateHasImprovement(cond, context) {
 // "perceptionActive" : vraie si la PERCEPTION SURNATURELLE (voir
 // core/state.js/togglePerception, session.perceptionActive) est actuellement
 // active. Sans champ propre — comme "arrived"/"consumed" — elle lit
-// context.perceptionActive (posé par core/reduce.js/TICK dans
-// presenceContext, PARTAGÉ par tout le tick, comme context.time), jamais
+// context.perceptionActive (posé par presenceContextOf pour le tick,
+// PARTAGÉ par tout le tick comme context.time, et par
+// view/interaction.js/actionContext pour une condition d'action), jamais
 // context.entity : une entité SURNATURELLE n'est rien de plus qu'une entité
 // normale dont la présence est conditionnée par CETTE condition (voir
 // entities/types/ghost.js) — aucun mécanisme séparé, aucun champ d'entité
-// dédié. Absent (contexte hors tick, ex. action.condition, voir
-// view/interaction.js/actionConditionMet) -> false, même repli défensif que
-// les autres évaluateurs.
+// dédié. Absent (contexte construit sans session) -> false, même repli
+// défensif que les autres évaluateurs.
 function evaluatePerceptionActive(cond, context) {
   return Boolean(context.perceptionActive);
 }
 
-// "weather" : vraie si l'état météo courant (context.weather, voir
-// core/reduce.js/TICK, dérivé de session.weather.state — core/weather.js)
-// est EXACTEMENT cond.state. Sans état dans le contexte (ex.
-// action.condition, hors tick) -> false, même repli défensif que
-// perceptionActive. cond.state validé au chargement contre
+// "weather" : vraie si l'état météo courant (context.weather, dérivé de
+// session.weather.state — core/weather.js — par presenceContextOf ou
+// view/interaction.js/actionContext) est EXACTEMENT cond.state. Sans état
+// dans le contexte (contexte construit sans session) -> false, même repli
+// défensif que perceptionActive. cond.state validé au chargement contre
 // config/weather-values.js/WEATHER_STATES (core/script-parse.js/validateCondition),
 // comme hasEquipmentTag.tag contre TAG_REGISTRY.
 function evaluateWeather(cond, context) {
@@ -243,7 +244,7 @@ function evaluateWeather(cond, context) {
 // CHAQUE sous-condition (aucune connaissance de leur type précis ici, une
 // sous-condition peut être n'importe quel type du registre, y compris un
 // autre "allOf" imbriqué) — MÊME registre, MÊME évaluateur, jamais un
-// mécanisme de composition séparé (voir core/scripting.md). cond.conditions
+// mécanisme de composition séparé (voir doc/scripting.md). cond.conditions
 // validé au chargement (core/script-parse.js/validateCondition, tableau non vide,
 // chaque élément validé récursivement) : jamais lu ici sans garantie de
 // forme. Court-circuite via Array.prototype.every (s'arrête à la première
@@ -274,10 +275,9 @@ function evaluateNot(cond, context) {
 // celle qui déclare l'action pour action.condition, voir
 // evaluateHasEquipmentTag plus haut pour la distinction avec le JOUEUR).
 // Variable introuvable (nom jamais déclaré, ou porteur absent du contexte,
-// ex. "scene"/"party" hors d'un tick, voir view/interaction.js/
-// actionConditionMet qui ne fournit pas encore world/session) -> undefined
-// -> AUCUN comparateur ne peut être vrai, repli défensif comme le reste de
-// ce fichier.
+// ex. "scene"/"party" dans un contexte construit sans session) ->
+// undefined -> AUCUN comparateur ne peut être vrai, repli défensif comme le
+// reste de ce fichier.
 function evaluateVariable(cond, context) {
   const value = getVariable(context, cond.scope, cond.name);
   if (value === undefined) return false;
@@ -290,16 +290,17 @@ function evaluateVariable(cond, context) {
 }
 
 // Registre des évaluateurs par type — SEUL endroit qui connaît les types de
-// condition. core/scene.js valide `when.type` au chargement contre les clés
-// de CE MÊME registre (CONDITION_TYPES ci-dessous) : ajouter un type ici le
-// rend automatiquement acceptable en contenu, sans dupliquer la liste.
-// "hasEquipmentTag" cohabite avec "timeRange"/"arrived"/"consumed" comme un
-// cas de plus, pas un système de vérification séparé — la seule différence
-// est que core/scene.js valide EN PLUS son champ `tag` contre TAG_REGISTRY
-// (voir core/script-parse.js/parsePresenceRule), une garantie que timeRange/arrived/
-// consumed n'ont pas besoin d'une clé de contenu externe à valider. Même
-// esprit pour "variable" : core/scene.js valide EN PLUS scope/name/
-// comparateur (voir validateVariableReference).
+// condition. core/script-parse.js/validateCondition valide `when.type` au
+// chargement contre les clés de CE MÊME registre (CONDITION_TYPES
+// ci-dessous) : ajouter un type ici le rend automatiquement acceptable en
+// contenu, sans dupliquer la liste. "hasEquipmentTag" cohabite avec
+// "timeRange"/"arrived"/"consumed" comme un cas de plus, pas un système de
+// vérification séparé — la seule différence est que validateCondition
+// valide EN PLUS son champ `tag` contre TAG_REGISTRY, une garantie dont
+// timeRange/arrived/consumed n'ont pas besoin (aucune clé de contenu
+// externe à valider). Même esprit pour "variable" : validateCondition
+// valide EN PLUS scope/name/comparateur (voir
+// core/script-parse.js/validateVariableReference).
 const CONDITION_EVALUATORS = {
   timeRange: evaluateTimeRange,
   arrived: evaluateArrived,
@@ -317,8 +318,8 @@ export const CONDITION_TYPES = Object.keys(CONDITION_EVALUATORS);
 
 // Type inconnu -> false, jamais un throw : l'aiguillage runtime dégrade la
 // présence concernée plutôt que de faire planter toute la simulation
-// (core/scene.js a de toute façon déjà rejeté un type inconnu au
-// chargement — ce repli ne couvre qu'un appel direct hors du chemin validé,
+// (core/script-parse.js/validateCondition a de toute façon déjà rejeté un
+// type inconnu au chargement — ce repli ne couvre qu'un appel direct hors du chemin validé,
 // ex. depuis core/checks/conditions.check.js).
 export function evaluateCondition(cond, context) {
   const evaluator = CONDITION_EVALUATORS[cond.type];
@@ -343,8 +344,8 @@ function ruleEffect(rule, type) {
 // Résout, EN UNE PASSE, tout ce qu'une entité tire de ses règles pour ce
 // tick :
 //   - present : la présence résolue (voir header, priorité de règle) ;
-//   - presenceChanged : la bascule de présence OBSERVÉE (identique à avant
-//     ce système généralisé, voir core/reduce.js) ;
+//   - presenceChanged : la bascule de présence OBSERVÉE (voir
+//     core/reduce.js/stepEntities) ;
 //   - ruleActive : tableau parallèle à `entity.presence`, l'état ACTIF
 //     (condition vraie ou non) de CHAQUE règle ce tick — à reporter par
 //     l'appelant sur l'entité (`entity.ruleActive`) pour la comparaison du
@@ -359,7 +360,7 @@ function ruleEffect(rule, type) {
 //     jamais confondues par l'appelant (core/reduce.js compare à
 //     `undefined`, jamais un test de vérité).
 // Sans `entity.presence` : present toujours vrai, rien d'autre à calculer —
-// comportement STRICTEMENT inchangé pour toute entité sans règle.
+// une entité sans règle n'est jamais touchée par ce mécanisme.
 export function resolveEntityRules(entity, context) {
   if (!entity.presence) {
     return { present: true, presenceChanged: null, ruleActive: undefined, behaviorEffect: undefined };
@@ -416,8 +417,8 @@ export function resolveEntityRules(entity, context) {
 
 // Contexte d'évaluation des règles de présence pour le monde ACTIF — SOURCE
 // UNIQUE, partagée par le TICK (core/reduce.js) et par la vue quand elle
-// doit connaître une présence hors tick (view/audio/city-scene.js, montage
-// d'une scène). `world` est le MONDE RACINE (variables de scène partagées
+// doit connaître une présence hors tick (view/audio/entity-sound-entry.js
+// au montage d'une scène, view/menus/city-map-menu.js pour la carte). `world` est le MONDE RACINE (variables de scène partagées
 // entre recto et verso, jamais une face) et `session` la partie elle-même :
 // les porteurs des portées "scene"/"party" de la condition "variable".
 // Construire ce contexte à la main ailleurs risquerait d'en oublier un
@@ -442,7 +443,7 @@ export function isPresent(entity, context) {
 // Une entité DORMANTE ne bloque JAMAIS le mouvement (voir
 // core/physics/collision.js, core/physics/overlap.js) — "comme si absente",
 // un des trois plans coupés par la présence (voir core/reduce.js et
-// core/time.md pour les deux autres, côté vue : rendu audio et occupation/
+// doc/time.md pour les deux autres, côté vue : rendu audio et occupation/
 // interaction). blocksMovement reste la configuration DÉCLARÉE de
 // l'entité, jamais modifiée : seule la RÉSOLUTION physique du tick en tient
 // compte, recalculée ici plutôt que relue sur un éventuel `entity.present`
@@ -455,9 +456,9 @@ export function isBlocking(entity, context) {
 }
 
 // Sélectionne, parmi PLUSIEURS actions CANDIDATES (voir core/entity-parse.js/
-// parseEntity — entity.action peut être un objet UNIQUE, comme avant, ou un
+// parseEntityAction — entity.action peut être un objet UNIQUE ou un
 // TABLEAU de candidates), celle dont la condition est VRAIE — voir
-// core/scripting.md/"Actions multiples filtrées par condition". Très proche
+// doc/scripting.md/"Actions multiples filtrées par condition". Très proche
 // de la désambiguïsation d'entités (view/interaction.js/
 // chooseInteractionTarget, qui choisit parmi PLUSIEURS ENTITÉS via un menu
 // JOUEUR) mais un mécanisme DIFFÉRENT : ici, PAS de choix utilisateur — la

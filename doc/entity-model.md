@@ -35,7 +35,8 @@ un seul rôle, ou les deux) : tout ce qui manque retombe sur le défaut global
 ## Interaction (niveau 0)
 
 Deux capacités INDÉPENDANTES (`observable`, `interactable`, booléens,
-cascade instance -> type -> défaut `false` — voir `core/scene.js`) : les
+cascade instance -> type -> défaut `false` — voir
+`core/entity-parse.js`/`parseBooleanCapability`) : les
 QUATRE combinaisons sont valides, aucun cas spécial. Chaque verbe (Espace /
 Entrée, voir `view/interaction.js`) ne considère QUE les entités portant SA
 capacité — un décor `observable:false` n'apparaît JAMAIS candidat à Espace,
@@ -55,8 +56,8 @@ une balise `interactable:false` jamais candidate à Entrée, même à portée.
   candidate), pour que l'état et le son restent synchronisés. Par entité :
   les autres restent disponibles. Espace n'en a pas. Côté vue
   (`view/interaction.js`), horloge réelle, jamais sauvegardé, purgé à
-  chaque changement de monde ou de face (`view/city-screen.js` l'appelle dans
-  ses deux transitions). Une action qui téléporte n'arme pas le
+  chaque changement de monde ou de face (`view/world-travel.js` appelle
+  `clearInteractionCooldowns` à chaque transition). Une action qui téléporte n'arme pas le
   délai : son sas la protège déjà.
 - **`interactable`** — candidate à Entrée. `npc`/`object` sont interactables
   dès ce niveau 0 EN ANTICIPATION d'un futur type d'action (parler/
@@ -67,7 +68,7 @@ une balise `interactable:false` jamais candidate à Entrée, même à portée.
 
 Deux niveaux de PERCEPTION, à ne pas confondre :
 
-- **Occupation** (couche légère, inchangée) : le NOM de l'entité, annoncé à
+- **Occupation** (couche légère) : le NOM de l'entité, annoncé à
   l'approche (`view/occupancy.js`/`occupiedEntities`) sur le canal
   POLITE (information de contexte, jamais une urgence : ne coupe pas une
   lecture en cours). Toute entité à portée y figure, SAUF celles qui n'ont
@@ -115,7 +116,8 @@ spécifique au MODÈLE d'entité :
   délibérément bateau et provisoire (i18n uniquement,
   `money.announce`/`interaction.pickup`) — changer le nom ne touche à rien
   du mécanisme. Consultable à tout moment via la touche "g"
-  (`view/city-screen.js`), lecture pure, canal liveRegion.
+  (`view/status-announcements.js`/`announceMoney`, binding dans
+  `view/input.js`), lecture pure, canal liveRegion.
 - **Exemple de test — dresscode** (`scenes/demo.json`, `door-club`) : une
   porte conditionnée `hasEquipmentTag: "chic"`. Le sac de départ contient
   déjà des escarpins (`high_heels`, tag `"chic"`, gait `"high_heels"` — voir
@@ -152,13 +154,13 @@ d'ÉTAT. Le mécanisme, en trois couches strictement séparées :
   choix du concepteur — l'un, l'autre, les deux, ou aucun — jamais un
   comportement codé en dur pour "crate" spécifiquement) :
   - **Changer d'état perceptible** — `consumedDescriptionKey` (cascade
-    instance -> type, comme `descriptionKey`, voir `core/scene.js`) :
+    instance -> type, comme `descriptionKey`, voir `core/entity-parse.js`) :
     description alternative lue par `view/interaction.js`/
     `resolveDescription` dès que `entity.consumed`. `muteOnConsumed`
     (booléen, REGISTRE SEULEMENT — jamais cascadé par instance, contrairement
     à `consumedDescriptionKey`) : arrête PERMANEMMENT le beacon continu de
-    l'entité dès que `consumed` passe à `true` (voir `view/audio/
-    view/audio/entity-sounds.js`/`muteConsumedBeacons`, appelée une fois par tick comme
+    l'entité dès que `consumed` passe à `true` (voir
+    `view/audio/entity-sounds.js`/`muteConsumedBeacons`, appelée une fois par tick comme
     `cleanupRemovedEntities`). **Limite volontaire** : seule l'ABSENCE du
     beacon est supportée, jamais un son DIFFÉRENT (un second fichier) —
     remplacer la voix elle-même exigerait de recréer un Howl en cours de
@@ -171,8 +173,8 @@ d'ÉTAT. Le mécanisme, en trois couches strictement séparées :
     défaut) — voir `scenes/demo2.json`, `crate-warehouse`. Une entité
     `consumed` alimente le registre de conditions (`core/presence.js`/
     `CONDITION_EVALUATORS.consumed`) exactement comme `"timeRange"`/
-    `"arrived"` : AUCUNE retouche à `isPresent`/`resolveEntityRules`/
-    `core/reduce.js` n'a été nécessaire pour l'ajouter. PERMANENT par
+    `"arrived"`, sans aucun cas spécial dans `isPresent`/`resolveEntityRules`/
+    `core/reduce.js`. PERMANENT par
     construction (`consumed` ne repasse jamais à `false`). **DEUX règles
     requises**, pas une seule (même "asymétrie documentée" que pour toute
     présence conditionnelle, voir plus bas) : `{ when: { type: "consumed" },
@@ -206,12 +208,16 @@ OU non. Marque distinctive : `entity.ephemeral === true`, un champ RUNTIME
 JSON de scène, une entité ÉPHÉMÈRE n'est par définition jamais DÉCLARÉE.
 
 - **Création** — `core/state.js`/`spawnEphemeral(session, spec, x)` : point
-  d'entrée UNIQUE et RÉUTILISABLE pour toute création d'entité en jeu — DEUX
-  appelants aujourd'hui, la touche debug "e" (voir "Mode debug" plus bas) et
-  l'effet "spawn d'éphémères éparpillés" déclenché par une action (voir
-  "Spawn déclenché par une action" plus bas), mais rien dans le mécanisme
-  n'est spécifique à l'un ou l'autre : un objet lâché par un compagnon, un
-  effet, pourront s'y greffer de la même façon plus tard. `spec` est un
+  d'entrée UNIQUE et RÉUTILISABLE pour toute création d'entité en jeu.
+  Appelants : la touche debug "e" (`view/debug-effects.js`/`spawnCoin`,
+  voir "Mode debug" plus bas), l'objet posé depuis l'inventaire
+  (`core/bag.js`/`dropItem`), et, via `core/state.js`/
+  `spawnScatteredEphemerals` (plusieurs éphémères éparpillés autour d'une
+  source), le butin d'une action (`core/money.js`/`lootEntitySpawn`, voir
+  "Spawn déclenché par une action" plus bas) et la fouille d'un conteneur
+  (`core/spawn.js`/`searchContainer`). Rien dans le mécanisme n'est
+  spécifique à l'un d'eux : un objet lâché par un compagnon, un effet,
+  s'y greffent de la même façon. `spec` est un
   descripteur d'entité DÉJÀ RÉSOLU
   (`type`, `labelKey`, `sounds`, `blocksMovement`, `observable`,
   `interactable`, `action`...) — EXACTEMENT la forme qu'une entité obtient
@@ -226,13 +232,14 @@ JSON de scène, une entité ÉPHÉMÈRE n'est par définition jamais DÉCLARÉE.
   JAMAIS `Date.now()`/`Math.random()`, le core reste déterministe), `x` et
   `ephemeral: true`.
 - **Rendu** — une entité éphémère est une entité COMME UNE AUTRE côté vue :
-  `view/audio/city-scene.js` la découvre au tick suivant sa création
+  `view/audio/entity-sounds.js` la découvre au tick suivant sa création
   (`syncNewEntitySounds`, appelée avant tout calcul positionné) et lui
   construit une entrée `entitySounds` EXACTEMENT comme au montage de scène
-  (`buildEntitySoundEntry`, factorisée pour les deux cas) — son, occupation,
+  (`view/audio/entity-sound-entry.js`/`buildEntitySoundEntry`, partagée par
+  les deux cas) — son, occupation,
   interaction fonctionnent sans aucun cas spécial. Seule différence
   acceptée : pas de préchargement dédié (voir le commentaire de
-  `addLateEntitySoundEntry`) — un contenu créé en jeu peut accuser un tout
+  `view/audio/entity-sounds.js`/`addLateEntitySoundEntry`) — un contenu créé en jeu peut accuser un tout
   premier son légèrement en retard le temps d'un décodage à froid, jamais
   un plantage.
 - **Ramassage** — réutilise l'action `"pickup"` telle quelle (voir
@@ -334,27 +341,31 @@ jeu (même fonction, deux chemins d'accès — voir `lib/input.js`/
 `onGlobalPress`, binding GLOBAL résolu indépendamment de la pile d'écrans,
 disponible quel que soit l'écran actif — Ctrl plutôt qu'Alt, qui déplace le
 focus vers la barre de menus sur certains navigateurs) — jamais un menu, jamais persisté (un mode debug ne doit jamais survivre à un rechargement de
-page ni à une sauvegarde, contrairement à `config/preferences.js`). Seul
-consommateur aujourd'hui : la touche "e" en ville (`view/city-screen.js`),
-qui fait apparaître une pièce éphémère (`spec` = archétype `money` existant,
-`entities/types/money.js`, réutilisé tel quel) à la position du joueur —
-active SEULEMENT si le drapeau est levé, sinon "e" ne fait RIEN (comportement
-inchangé pour tout joueur qui n'a jamais activé le mode). PAS "d" (touche
-suggérée à l'origine) : déjà liée au déplacement à droite (`view/input.js`,
-`MOVE_BINDINGS.moveRight`, convention ZQSD) — la réutiliser aurait fait
-apparaître une pièce à chaque premier appui d'un pas vers la droite en mode
-debug si les deux touches menaient à la même action ; elles cohabitent
-désormais SANS ambiguïté grâce à l'arbitrage des modificateurs de
-`lib/input.js` ("d" seul = mouvement, "d"+Ctrl = bascule debug, "e" = ce
-spawn de test), mais le choix de "e" reste inchangé, plus clair à retenir.
-Infra volontairement minimale : d'autres outils de debug s'y grefferont plus
-tard derrière le MÊME drapeau, jamais un par outil. Menus de debug derrière ce
-drapeau, en ville : Shift+W (météo, `view/menus/debug-weather-menu.js`),
-Shift+T (temps, `view/menus/debug-time-menu.js`), Shift+M (téléportation vers
-n'importe quelle scène du registre `scenes/index.js`, liste générée,
-`view/menus/debug-teleport-menu.js` — passe par l'effet `teleport` en mode
-`instant`, jamais par un chemin de chargement parallèle), Shift+L (journal
-des avertissements, voir ci-dessous).
+page ni à une sauvegarde, contrairement à `config/preferences.js`).
+Consommateurs, tous derrière ce MÊME drapeau (jamais un drapeau par outil) :
+
+- la touche "e" en ville (`view/debug-effects.js`/`spawnCoin`, binding
+  `debugSpawn` dans `view/input.js`), qui fait apparaître une pièce
+  éphémère (`spec` = archétype `money` existant, `entities/types/money.js`,
+  réutilisé tel quel) à la position du joueur — active SEULEMENT si le
+  drapeau est levé, sinon "e" ne fait RIEN. Pas "d", lié au déplacement à
+  droite (`view/input.js`, `MOVE_BINDINGS.moveRight`, convention ZQSD) :
+  l'arbitrage des modificateurs de `lib/input.js` les distinguerait ("d"
+  seul = mouvement, "d"+Ctrl = bascule debug), mais "e" reste plus clair à
+  retenir ;
+- les menus de debug, en ville : Shift+W (météo,
+  `view/menus/debug-weather-menu.js`), Shift+T (temps,
+  `view/menus/debug-time-menu.js`), Shift+M (téléportation vers n'importe
+  quelle scène du registre `scenes/index.js`, liste générée,
+  `view/menus/debug-teleport-menu.js` — passe par l'effet `teleport` en mode
+  `instant`, jamais par un chemin de chargement parallèle), Shift+L (journal
+  des avertissements, voir ci-dessous), Shift+C (tout révéler / tout
+  réinitialiser dans les collections, `view/menus/debug-collections-menu.js`) ;
+- la condition `hasImprovement`, qui répond toujours vrai en mode debug
+  (`core/presence.js`/`evaluateHasImprovement`, voir
+  `doc/scripting.md`/"Améliorations") ;
+- l'annonce de position (touche "x", `view/status-announcements.js`/
+  `announcePlayerX`), plus précise en mode debug.
 
 **Outils de scène** (en tête du menu Shift+M, chacun derrière une
 confirmation). Une partie fige chaque monde à sa première visite (voir
@@ -435,7 +446,9 @@ persiste avec le monde.
   Poids RELATIFS, tirage via `core/weather.js`/`pickTransition` réutilisé tel
   quel — une seule logique de tirage pondéré. Résolue à CHAQUE tirage, jamais
   figée dans l'état : un monde sauvegardé tire toujours dans la table
-  COURANTE. Validée au chargement (`core/scene.js`) ; les tables standard
+  COURANTE. Validée au chargement par `core/distribution.js`/
+  `validateDistribution`, appelée par `core/scene.js` (plages `spawnRanges`)
+  et `core/entity-parse.js`/`parseContainer` (conteneurs) ; les tables standard
   s'auto-valident à l'import (`validateSpawnTables`), comme la météo.
 - **Sources (où)** — CONTENEUR : entité portant `container: { distribution,
   count?, regenerates? }` (cascade instance -> type, ex.
@@ -541,7 +554,7 @@ du sac contre de l'argent, ou ACHETER dans son CATALOGUE. Frontière : tout
 le menu est VUE (`view/menus/shop-menu.js`, pile d'écrans, jeu en pause,
 balises en pause) ; les TRANSACTIONS sont des effets d'état CORE
 (`core/trade.js`/`sellItems`, `buyItems`, injectés depuis
-`view/city-screen.js`, même patron que "Poser"). Prix de vente : `value` sur
+`view/action-handlers.js`, même patron que "Poser"). Prix de vente : `value` sur
 l'objet (`core/items.js`/`ITEM_REGISTRY`), pleine valeur ; sans `value` (ou
 0) -> NON vendable, jamais listé (filtrage par catégories/tags de boutique :
 prévu, pas construit). Prix d'achat : `price` de l'article, sinon `value`
@@ -780,8 +793,8 @@ l'écriture du slot).
 
 `presence` (optionnel, `core/presence.js`) : une liste de RÈGLES
 `{ when: <condition>, effects: [<effet>...] }`, évaluées DANS L'ORDRE
-chaque tick. Sans ce champ, une entité reste TOUJOURS présente (comportement
-d'avant ce système, inchangé). RACCOURCI rétrocompatible : `{ when, present:
+chaque tick. Sans ce champ, une entité reste TOUJOURS présente. RACCOURCI :
+`{ when, present:
 boolean }` sans `effects`, sucre pour `{ when, effects: [{ type: "presence",
 present }] }` — voir `entities/types/neon.js` (une seule règle `{ when: {
 type: "timeRange", from, to }, present: true }` suffit : le reste de la
@@ -800,8 +813,8 @@ Dormante = un seul drapeau qui coupe TROIS plans d'un coup, "comme si
 absente" mais réversible :
 - **Comportement** — aucun tick de mouvement, aucun tirage PRNG consommé
   (`core/reduce.js`) ;
-- **Rendu audio** — aucune voix maintenue/déclenchée (`view/audio/
-  city-scene.js`) ; une balise CONTINUE en cours voit sa voix arrêtée
+- **Rendu audio** — aucune voix maintenue/déclenchée
+  (`view/audio/entity-audio.js`) ; une balise CONTINUE en cours voit sa voix arrêtée
   proprement à la TRANSITION (jamais en continu), redémarrée si l'entité
   redevient présente — voir aussi "Sons de transition" plus bas ;
 - **Interaction** — exclue de l'occupation et de la résolution de cible
@@ -888,7 +901,8 @@ garde ci-dessus se corrige d'elle-même dès le tick SUIVANT une vraie
 observation de la bascule, mais si aucun tick n'a lieu pendant tout un
 créneau où une règle de comportement serait repassée à faux (onglet mis en
 arrière-plan assez longtemps — l'horloge de partie n'est PAS plafonnée, voir
-`lib/loop.js`/`onFrame`, contrairement aux ticks de mouvement — ou un monde
+`lib/loop.js`/`startLoop` (delta brut passé à `onFrame`) et
+`view/game-clock.js`/`onFrame`, contrairement aux ticks de mouvement — ou un monde
 resté inactif le temps qu'une fenêtre se referme puis se rouvre ailleurs),
 la bascule manquée reste "collée" jusqu'à la PROCHAINE bascule réelle de
 cette même règle. Accepté tel quel pour l'instant (hors de portée d'un
@@ -930,9 +944,8 @@ FOIS pendant ces créneaux (ex. `npc-resident` encore en chemin vers
 `door-exit` à 21h, `npc-resident-home` déjà présente à demo2 depuis 20h) —
 sans état partagé entre les deux déclarations, rien n'empêche
 STRUCTURELLEMENT cette simultanéité ; un contenu qui voudrait l'éviter
-choisirait des horaires DÉCALÉS (comme l'ancienne version de ce contenu, qui
-démarrait la présence nocturne à 21h plutôt que 20h) plutôt qu'exactement
-complémentaires. Un état de personnage PARTAGÉ (variables d'instance lues au
+choisirait des horaires DÉCALÉS (ex. démarrer la présence nocturne à 21h
+plutôt que 20h) plutôt qu'exactement complémentaires. Un état de personnage PARTAGÉ (variables d'instance lues au
 chargement des deux scènes, ex. "est-il déjà rentré ?") permettrait une
 synchronisation stricte plus tard, SANS refonte : ce système de règles n'a
 pas à changer, seul le CONTEXTE qu'on lui passe grossirait (comme `{ time }`
@@ -998,9 +1011,8 @@ DÉCLARÉ par l'archétype de l'objet (`entities/types/apple.js`, `coin.js`,
 `money.js`) et
 cascadé instance -> archétype comme tout rôle de `sounds` — SANS défaut : un
 objet qui ne le déclare pas se ramasse en silence, l'annonce suffit
-(`entities/types/item.js`, `crate.js` aujourd'hui). Plus aucun son de
-ramassage générique imposé par le système ("tout son est déclaré, jamais
-imposé"). Rendu DIÉGÉTIQUE par le même chemin qu'un effet `"playSound"`
+(ex. `entities/types/item.js`, `crate.js`). Aucun son de ramassage
+générique imposé par le système ("tout son est déclaré, jamais imposé"). Rendu DIÉGÉTIQUE par le même chemin qu'un effet `"playSound"`
 (`view/interaction.js`/`playEntityPickupSound` -> `runPlaySoundEffect`,
 positionné sur l'entité, filtres de scène), joué AVANT le retrait de
 l'entité — tant qu'elle a encore une voix dans la scène. Même descripteur
@@ -1021,7 +1033,7 @@ Un descripteur de son est un objet plat :
   création de la voix.
 - `loop` — indique l'INTENTION du rôle de son (continu vs ponctuel) ; garde
   une valeur documentaire pour `movement`/`vocal` (toujours ponctuels en
-  pratique), mais pour `beacon` c'est désormais `beaconMode` (voir
+  pratique), mais pour `beacon` c'est `beaconMode` (voir
   "Paramètres sonores" ci-dessous) qui gouverne RÉELLEMENT le mode de
   lecture — les deux devraient rester cohérents pour un rôle donné, mais
   rien ne l'impose structurellement.
@@ -1045,7 +1057,7 @@ contrainte du modèle.
 `entity.sounds` déjà RÉSOLU sur l'entité parsée — la vue, voir
 `view/audio/entity-sound-entry.js`/`buildEntitySoundEntry`, lit `entity.sounds`,
 jamais `registry[type].sounds` directement) — mais PAR FUSION PROFONDE
-(`deepMergeOverride`, `core/scene.js`), SEUL champ cascadé de cette façon :
+(`deepMergeOverride`, `core/entity-parse.js`), SEUL champ cascadé de cette façon :
 contrairement à `nameKey`/`blocksMovement` (remplacement simple, tout ou
 rien) ou `tuning` (transport brut, jamais interprété par le core), une
 instance ne déclare QUE ce qu'elle CHANGE — le reste du rôle, et les autres
@@ -1062,9 +1074,7 @@ quel niveau : un rôle entier, ou un champ À L'INTÉRIEUR d'un rôle) :
 
 - **ABSENT** (la clé n'apparaît pas dans `sounds` à l'instance, ou le champ
   n'apparaît pas dans le rôle déclaré) -> HÉRITE tel quel de l'archétype.
-  Une instance qui ne déclare `sounds` nulle part hérite donc TOUT,
-  inchangé — comportement STRICT rétrocompatible pour tout contenu
-  existant.
+  Une instance qui ne déclare `sounds` nulle part hérite donc TOUT.
 - **Déclaré en OBJET** -> FUSIONNE récursivement avec l'équivalent de
   l'archétype : chaque champ présent dans l'objet SURCHARGE, chaque champ
   absent reste HÉRITÉ. S'applique aux RÔLES (`beacon`/`vocal`/`movement`)
@@ -1084,9 +1094,10 @@ niveau : un `path` n'a pas de sens "fusionné" avec un autre.
 ## Beacon vs vocal : deux rôles positionnés, deux intentions
 
 `beacon` et `vocal` sont TECHNIQUEMENT identiques — tous deux des sons
-POSITIONNÉS (même calcul pan/distance, voir `view/audio/city-scene.js`),
+POSITIONNÉS (même calcul pan/distance, voir `view/audio/spatial.js`),
 tous deux capables d'être intermittents via le MÊME mécanisme de
-déclenchement/replanification (`resolveIntermittentSource`/
+déclenchement/replanification (`view/audio/entity-sound-entry.js`/
+`resolveIntermittentSource`, `view/audio/entity-audio.js`/
 `updateIntermittentSources`). Ce qui les distingue, c'est leur INTENTION —
 et donc leurs valeurs par défaut, contrastées volontairement :
 
@@ -1206,7 +1217,7 @@ code. Consulter directement ce fichier pour la valeur courante d'un défaut.
   pour toute NOUVELLE balise `"continu"` : viser au moins ~1,5 s, quitte à
   padder de silence.**
   **Filet de sécurité anti-blocage** (mode `"continu"` uniquement, voir
-  `lib/audio.js`/`createPositionedSound`/`isStuck()`) : Howler (vendor
+  `lib/audio/positioned.js`/`createPositionedSound`/`isStuck()`) : Howler (vendor
   v2.2.3) boucle nativement une balise continue, mais tient en parallèle une
   chaîne de `setTimeout` interne qui se réarme à chaque tour pour sa propre
   comptabilité — un seul maillon manqué (dépendant du navigateur) casse
@@ -1215,7 +1226,7 @@ code. Consulter directement ce fichier pour la valeur courante d'un défaut.
   (`howl.playing()` restait vrai malgré le silence réel — la panne se situe
   plus profondément que ce que Howler expose en JS), mais reste en place
   comme filet pour tout AUTRE cas où `playing()` refléterait correctement
-  l'arrêt. `applyEntityAudio` (`view/audio/city-scene.js`) détecte ce cas à chaque
+  l'arrêt. `applyEntityAudio` (`view/audio/entity-audio.js`) détecte ce cas à chaque
   tick (`sound.isStuck()`) et relance la voix — un filet, pas un correctif
   du mécanisme Howler en cause.
 - **`beaconInterval`** / **`beaconIntervalVariation`** — cadence d'un beacon
@@ -1230,7 +1241,7 @@ code. Consulter directement ce fichier pour la valeur courante d'un défaut.
   Indépendant de la préférence utilisateur "Volume des balises" (Options >
   Audio, voir `config/preferences.js`) qui agit sur TOUS les beacons ET
   vocaux à la fois (même catégorie utilisateur "présence d'entité", voir
-  `view/audio/city-scene.js`) : les deux facteurs se multiplient entre eux,
+  `view/audio/volume-factors.js`/`beaconVolumeFactor`) : les deux facteurs se multiplient entre eux,
   l'un global au joueur, l'autre propre au contenu.
 - **`staggerBeacon`** — booléen, défaut `true`. OPT-OUT du désempilement
   d'attaques (voir "Désempilement d'attaques" plus bas) : `false` fait
@@ -1284,20 +1295,20 @@ DÉMARRAGE (pas son volume, voir plus bas) retardé d'un court délai aléatoire
 (20-180 ms par défaut) — pour désempiler l'attaque de plusieurs balises qui
 démarreraient sinon toutes dans la même fenêtre :
 
-- **Deux démarrages GROUPÉS aujourd'hui** : le montage d'une scène (toutes
+- **Deux démarrages GROUPÉS** : le montage d'une scène (toutes
   les balises initiales créées dans la même boucle) et un spawn GROUPÉ
   d'éphémères (voir "Spawn déclenché par une action" plus bas — plusieurs
   entités découvertes par `syncNewEntitySounds` au même tick). Les DEUX
-  passent par `buildEntitySoundEntry`, la MÊME fonction — un seul mécanisme,
+  passent par `view/audio/entity-sound-entry.js`/`buildEntitySoundEntry`, la MÊME fonction — un seul mécanisme,
   jamais dupliqué entre les deux situations.
 - **Appliqué INDISTINCTEMENT**, jamais seulement si "plusieurs à la fois"
   sont détectées : pas de logique de regroupement à maintenir, et un délai
   isolé de quelques dizaines de ms sur une balise seule reste imperceptible
   — la simplicité l'emporte sur une détection inutilement fine.
-- **Retarde le DÉMARRAGE réel, pas le volume** (`lib/audio.js`/
+- **Retarde le DÉMARRAGE réel, pas le volume** (`lib/audio/positioned.js`/
   `createPositionedSound`, option `startDelayMs`) : le volume d'une balise
   reste à 0 tant qu'`applyEntityAudio` ne l'a pas calculé de toute façon
-  (voir plus bas dans `view/audio/city-scene.js`) — retarder SEULEMENT le
+  (voir `view/audio/entity-audio.js`) — retarder SEULEMENT le
   volume révélerait la voix en cours de boucle, après que son attaque (t=0)
   soit déjà passée silencieusement, ratant l'effet recherché. Retarder
   `howl.play()` lui-même fait tomber l'attaque RÉELLEMENT au moment décalé.
@@ -1309,9 +1320,8 @@ démarreraient sinon toutes dans la même fenêtre :
   `cleanupRemovedEntities`/`muteConsumedBeacons`/`applyEntityAudio`)
   ANNULE le démarrage différé (timer explicitement annulé, jamais un simple
   drapeau ignoré) — jamais de son fantôme qui partirait quand même après
-  coup. Aucun changement requis dans `view/audio/city-scene.js` pour ça :
-  TOUT appel existant à `sound.stop()` en bénéficie automatiquement, la
-  garantie vit dans `lib/audio.js`.
+  coup. Les appelants n'ont rien à faire : TOUT appel à `sound.stop()` en
+  bénéficie, la garantie vit dans `lib/audio/positioned.js`.
 - **Jamais un beacon déjà en cours** : ce délai ne s'applique qu'à la toute
   PREMIÈRE mise en son (création de la voix) — une reprise après pause/
   bascule de présence (`sound.resume()`) n'est jamais concernée. Revenir
@@ -1386,15 +1396,14 @@ Aucune clé nommée en dur dans `parseEntity` : un futur paramètre ajouté à
 `config/tuning-values.js` devient surchargeable à l'instance sans jamais
 rouvrir ce fichier. `resolveTuning` lit ensuite `entity.tuning[key]` (palier
 2) — voir `lib/tuning.js`. Absent, `entity.tuning` est simplement `undefined`
-et la résolution retombe sur le palier ARCHÉTYPE, comportement inchangé pour
-toute entité qui ne déclare pas `tuning`.
+et la résolution retombe sur le palier ARCHÉTYPE.
 
 ## Surfaces de sol et son de pas
 
 Le sol de la scène (`defaultSurface`/`segments`, voir `doc/scene-format.md`) et
 son registre (`core/surfaces.js`, `neutral: true/false` par surface) sont du
 CORE pur — ce document-ci ne couvre que ce que la VUE en tire pour choisir
-le fichier du son de pas (`view/audio/city-scene.js`,
+le fichier du son de pas (`view/audio/footsteps.js`/
 `resolveFootstepPath`). Deux propriétés d'ENTITÉ, résolues par la MÊME
 cascade que les paramètres sonores ci-dessus (`resolveTuning(key, entity)`,
 sans `sound` — comme `audibleRange`/`panSaturation` : une propriété de
@@ -1441,7 +1450,7 @@ UNE catégorie, une seule dimension à la fois) :
   (MÊME sous-dossier que `gait`, jamais `entities/`) si résolu ET existant,
   SINON le son propre de l'entité (`sounds.movement.path`, typiquement sous
   `entities/` pour une créature — ex. `dog_medium_walk` — s'il y en a un) ;
-  sinon le PLANCHER GARANTI (le son de pas historique du jeu,
+  sinon le PLANCHER GARANTI (le son de pas par défaut du jeu,
   `gaits/shoes_walk` — jamais vérifié, DOIT toujours exister). Trois crans
   au plus, jamais davantage.
 
@@ -1488,7 +1497,7 @@ ci-dessus, même si l'audio en dépend :
   PRÉSENCE d'une entité dans l'espace (jusqu'où on l'entend, jusqu'où on
   peut interagir, quel encombrement physique) : la scène audio LES LIT pour
   façonner le volume/passe-bas d'une balise (voir `volumeForDistance`/
-  `cutoffForDistance`, `view/audio/city-scene.js`), mais ce sont des
+  `cutoffForDistance`, `view/audio/spatial.js`), mais ce sont des
   propriétés de l'ENTITÉ elle-même, pas d'un RÔLE de son particulier —
   contrairement à `reverbSend`/`beaconGain`/`vocalGain`/`pitchVariation`,
   qui vivent à l'intérieur d'un descripteur de son précis et peuvent
@@ -1500,26 +1509,25 @@ ci-dessus, même si l'audio en dépend :
 `resolveTuning("highlight", entity)` comme `gait`/`naturalWalk` — voir
 "Résolution en cascade") gouverne le SAUT de volume vers `fullVolume` quand
 une entité est à portée d'interaction (`dist <= interactRange`) — voir
-`volumeForDistance`, `view/audio/city-scene.js`. EXPLICITE et INDÉPENDANT de
+`volumeForDistance`, `view/audio/spatial.js`. EXPLICITE et INDÉPENDANT de
 `observable`/`interactable` : une entité n'est surlignée QUE si elle (ou son
 archétype, ou son instance via `tuning.highlight`) déclare `highlight: true`,
 jamais un effet de bord d'une autre capacité. Décor et ambiance (`decor`,
 `fountain`, `rock`, `river`, `neon`, créatures...) ne le déclarent pas — hors
 zone comme dans, leur volume suit le même plancher continu que tout le monde
 (`farVolumeMax` à `dist=0`, décroissance linéaire vers 0 à `audibleRange`,
-JAMAIS de plateau/saut). Aujourd'hui déclaré sur les portes, PNJ, passages et
-objets/collectibles (`door`/`npc`/`object`/`item`/`money`/`apple`/`crate`/
-`passage`/`window`) : ce que le joueur a besoin de repérer précisément.
+JAMAIS de plateau/saut). Déclaré sur ce que le joueur a besoin de repérer
+précisément : portes, passages, fenêtres (`glass_window`), PNJ, comptoirs,
+objets et collectibles (liste exacte : les archétypes de `entities/types/`
+qui portent `highlight: true`).
 
 SAUT INSTANTANÉ, PAS de rampe : `dist <= interactRange` fait passer le
-volume DIRECTEMENT à `fullVolume`, sans transition — même mécanique que
-l'ancien comportement (avant l'introduction du flag `highlight`), désormais
-GOUVERNÉE par ce flag plutôt qu'appliquée à toute entité sans distinction.
-Une version rampée (montée/descente progressives) a été essayée puis
-abandonnée : à l'oreille, en marchant/courant normalement, la fenêtre de
+volume DIRECTEMENT à `fullVolume`, sans transition, pour les seules entités
+qui déclarent `highlight`. Pas de version rampée (montée/descente
+progressives) : à l'oreille, en marchant/courant normalement, la fenêtre de
 présence dans `interactRange` est trop courte pour laisser une rampe même
-courte (quelques dizaines de ms) se terminer — le pic ne s'entendait alors
-quasiment jamais, une régression nette par rapport au saut net d'origine.
+courte (quelques dizaines de ms) se terminer — le pic ne s'entendrait
+quasiment jamais, là où le saut net se repère à coup sûr.
 
 ## Les sous-types sont des PRESETS, pas une hiérarchie
 
@@ -1528,8 +1536,8 @@ Chaque archétype (un fichier sous `entities/types/`, rassemblés par
 recopiée ici) est un objet plat **indépendant** — il définit l'intégralité
 de ses propriétés. Il n'y a ni héritage, ni classe de base, ni "entité
 générique" dont les autres dériveraient : ajouter un type, c'est ajouter un
-fichier autonome au dossier, jamais étendre une chaîne de prototypes.
-Cohérent avec l'anti-ECS et l'anti-hiérarchie-de-classes de `CLAUDE.md`.
+fichier autonome au dossier, jamais étendre une chaîne de prototypes. Ni
+ECS, ni hiérarchie de classes.
 
 `bird` (beacon `"intermittent"`) et `fountain` (beacon `"continu"`, le
 défaut) illustrent ce même principe appliqué à `beaconMode` : deux PRESETS
@@ -1547,14 +1555,13 @@ au-dessus de la rue) se fait comme tout autre changement de scène — une
 sous-scène (`scenes/*.json` séparé) reliée par une entité interactable dont
 l'effet `"teleport"` y mène, un "escalier"/une "échelle" jouant exactement
 le rôle d'une `door` (voir `doc/scripting.md`/"Effets d'action"/`"teleport"`). Le mécanisme de
-transition de scène déjà en place couvre entièrement ce besoin — aucun axe Y
-discrétisé, aucun palier actif à maintenir, aucun système supplémentaire à
-construire. (Un ancien champ de scène, réservé pour un axe Y jamais
-implémenté, a été retiré comme code mort — voir `doc/scene-format.md`.)
+transition de scène couvre entièrement ce besoin — aucun axe Y
+discrétisé, aucun palier actif à maintenir, aucun système supplémentaire
+(voir aussi `doc/scene-format.md`/"Verticalité").
 
 ## Recto/verso — deux faces d'une scène, isolées, qui coexistent
 
-Voir CLAUDE.md/"RECTO/VERSO", `doc/scene-format.md`/"Scène à deux faces
+Voir `doc/scene-format.md`/"Scène à deux faces
 (recto/verso)" pour le contrat JSON complet, `doc/scripting.md`/
 `"switchSide"` pour le format d'action. Une scène PEUT avoir deux faces
 (recto/verso) au lieu d'une seule, chacune son propre ensemble d'entités sur
@@ -1570,8 +1577,8 @@ Le joueur porte `player.side`, TOUJOURS remis à `"recto"` en entrant dans le
 monde par une porte (comme `playerStart`) ; basculer via un `passage` reste
 dans le MÊME monde (`core/state.js`/`switchSide`), jamais un `travelToWorld`.
 
-**Coexistence, ISOLÉE (étape 2/2)** : LES DEUX faces tiquent à chaque tour
-(`core/reduce.js`/TICK) — fini le gel de l'étape 1. Mais une face reste un
+**Coexistence, ISOLÉE** : LES DEUX faces tiquent à chaque tour
+(`core/reduce.js`/TICK), celle où se tient le joueur comme l'autre. Mais une face reste un
 espace fermé pour tout ce qui est spatial/logique :
 - **Collision** : une entité ne heurte QUE les entités/le joueur de SA
   PROPRE face (`core/physics/overlap.js`/`resolveEntityOverlaps`, la même
@@ -1587,11 +1594,12 @@ espace fermé pour tout ce qui est spatial/logique :
   joueur) — les entités de l'autre face n'apparaissent JAMAIS dans
   `getInteractionCandidates`/l'annonce d'occupation (voir
   `view/occupancy.js`), même à portée sur l'axe x.
-- **PRNG** : chaque face garde son propre `rngState` (déjà distinct depuis
-  l'étape 1, voir `createFaceState`) — déterminisme préservé, aucune
+- **PRNG** : chaque face garde son propre `rngState` (voir
+  `createFaceState`) — déterminisme préservé, aucune
   interférence entre les deux flux.
 
-**Seul le SON traverse** — voir `view/audio/city-scene.js` : les entités de
+**Seul le SON traverse** — voir `view/audio/entity-audio.js`/
+`applyOtherFaceBeacons` et `view/audio/muffle.js` : les entités de
 l'AUTRE face sont rendues en ÉTOUFFÉ, toujours DIRECTIONNELLES (même
 pan/distance dérivés de leur x que d'habitude).
 
@@ -1659,7 +1667,7 @@ mi-trajet-mi-arrivée :
 Les DEUX sont des sons **MÉTA** (voir `doc/scripting.md`/"playSound", même
 vocabulaire diégétique/méta) : ils représentent le joueur, pas une des deux
 faces — jamais de bus de réverb, jamais de rampe d'occlusion, jamais de
-`entityLayer` (`lib/audio.js`), audibles NETS quel que soit l'état
+couche d'entités (`entityLayer`, `lib/audio/context.js`), audibles NETS quel que soit l'état
 d'étouffement des faces pendant le croisement. `transitionSteps: false` (un
 futur passe-miroir, par exemple) désactive les deux d'un coup — silence
 total côté pas, seuls le son de passage (s'il y en a un, voir plus bas) et
@@ -1678,11 +1686,13 @@ exemple de déclaration).
 
 ## `isFlying` — hauteur SUGGÉRÉE par le son, jamais un axe Y
 
-Booléen d'entité (`core/scene.js`, cascade instance -> archétype -> `false`,
+Booléen d'entité (`core/entity-parse.js`, cascade instance -> archétype -> `false`,
 même patron que `observable`/`interactable`) : marqueur PUR, aucune logique
 dans le core (pas de position verticale, pas de palier — voir "Verticalité"
 ci-dessus, qui reste l'unique façon de vraiment CHANGER d'altitude). Lu
-UNIQUEMENT par la vue (`view/audio/city-scene.js`) pour faire passer les
+UNIQUEMENT par la vue (`view/audio/entity-sound-entry.js` pour la
+résolution des réglages, `view/audio/entity-audio.js` pour leur
+application, dont `setHighpass`) pour faire passer les
 sons de l'entité par une CHAÎNE DE FILTRES qui évoque l'altitude à
 l'oreille, sans jamais la simuler : passe-haut (retire le grave, son plus
 fin/aérien), envoi de réverb plus généreux (ouverture, ciel) et légère
@@ -1693,12 +1703,11 @@ sonore (cascade son -> instance -> archétype -> ce défaut), pensées comme un
 bac à sable de réglage plutôt qu'un effet figé.
 
 Couvre les DEUX modes de beacon (voir "Paramètres sonores" plus haut) :
-intermittent (`lib/audio.js`/`playOneShot`, nouveau paramètre `highpassHz`
-optionnel, chemin STRICTEMENT inchangé sans lui) et continu
-(`lib/audio.js`/`createPositionedSound`, nouvelle méthode `setHighpass`, en
-série APRÈS le passe-bas de distance déjà existant). Aucune entité
-non-`isFlying` n'appelle jamais ces nouveaux chemins : comportement
-STRICTEMENT inchangé pour tout contenu existant.
+intermittent (`lib/audio.js`/`playOneShot`, option `highpassHz`, aucun
+filtre sans elle) et continu (`lib/audio.js`/`createPositionedSound`,
+méthode `setHighpass`, en série APRÈS le passe-bas de distance). Une entité
+non-`isFlying` n'emprunte jamais ces chemins : aucun passe-haut, aucun
+surcoût.
 
 **Exemple de référence** — `bird_1` (`entities/types/bird_1.js`,
 `scenes/demo.json`, instance `bird_1`) : VOCAL SEUL, aucun beacon (même choix

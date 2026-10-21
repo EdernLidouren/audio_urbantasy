@@ -6,11 +6,11 @@
 // AMBIENCE_CHANNEL_LIMIT vient d'une donnée neutre (zéro import), jamais de
 // lib/audio.js : le core ne doit jamais importer la couche Web Audio/vue.
 //
-// RECTO/VERSO (voir CLAUDE.md, core/state.js) : une scène est
-// SIMPLE ou À DEUX FACES (recto + verso, jamais un
-// seul) — voir parseFace/parseScene plus bas. Une face porte exactement ce
-// qu'une scène simple portait déjà (entités + habillage sonore/surface),
-// jamais dupliqué entre les deux cas.
+// RECTO/VERSO (voir doc/scene-format.md/"Scène à deux faces",
+// core/state.js) : une scène est SIMPLE ou À DEUX FACES (recto + verso,
+// jamais un seul) — voir parseFace/parseScene plus bas. Une face porte
+// exactement ce que porte une scène simple (entités + habillage
+// sonore/surface), jamais dupliqué entre les deux cas.
 
 import { AMBIENCE_CHANNEL_LIMIT } from "../config/audio-channels.js";
 import { BODY_RADIUS } from "./state.js";
@@ -22,10 +22,9 @@ import { parseEntity } from "./entity-parse.js";
 
 // Parsing TOTAL (voir header) : l'ABSENCE d'un champ de scène retombe
 // toujours sur un défaut sensé, jamais une erreur — seule sa PRÉSENCE
-// malformée échoue. Ces trois défauts couvrent les champs qui n'avaient
-// jusqu'ici AUCUN filet (id/titleKey/length étaient requis) ; les autres
-// champs de scène (entities, defaultSurface, segments, indoor,
-// playerStart) ont déjà le leur plus bas. `{}` doit rester une scène
+// malformée échoue. Ces trois défauts couvrent id/titleKey/length ; les
+// autres champs de scène (entities, defaultSurface, segments, indoor,
+// playerStart) ont le leur plus bas. `{}` doit rester une scène
 // valide et jouable : id/titre génériques, longueur minimale mais non
 // nulle (traversable).
 const DEFAULT_SCENE_ID = "scene";
@@ -37,7 +36,7 @@ const DEFAULT_SCENE_LENGTH = 10;
 // dénoncer au chargement plutôt qu'en cours de jeu — même principe de filet que
 // playerStart plus bas, un console.warn clair, jamais un fail(). Une
 // entité passable n'a pas de zone d'exclusion propre (voir
-// core/reduce.js/resolveOverlaps) : seules les paires impliquant au moins
+// core/physics/overlap.js/resolveOverlaps) : seules les paires impliquant au moins
 // une entité impassable sont vérifiées.
 function warnOnOverlaps(entities, playerStart) {
   for (let i = 0; i < entities.length; i++) {
@@ -63,7 +62,7 @@ function warnOnOverlaps(entities, playerStart) {
 // TOUJOURS explicite si présent (pas de filet ici, contrairement à
 // defaultSurface) : déclarer un segment est un choix délibéré, une surface
 // inconnue est une vraie erreur de contenu -> échec clair, comme un type
-// d'entité inconnu (voir parseEntity).
+// d'entité inconnu (voir core/entity-parse.js/parseEntity).
 function parseSegment(rawSegment, index, length) {
   if (typeof rawSegment !== "object" || rawSegment === null) {
     fail(`segments[${index}] n'est pas un objet.`);
@@ -130,12 +129,11 @@ function parseSpawnRange(rawRange, index, length, prefix) {
 }
 
 // Valide et construit UNE FACE (voir header ci-dessus) : entités +
-// habillage sonore/surface, exactement ce qu'une scène SIMPLE portait déjà
-// avant l'introduction du modèle à deux faces (voir CLAUDE.md/
-// "RECTO/VERSO") — factorisé pour être appelé UNE fois (scène simple, sur
-// `raw` directement) ou DEUX (scène à deux faces, une fois par
-// recto/verso, voir parseScene). `describe` préfixe les messages d'erreur
-// (ex. "recto" ou "verso"), comme validateCondition le fait déjà pour ses
+// habillage sonore/surface, exactement ce que porte une scène SIMPLE —
+// factorisé pour être appelé UNE fois (scène simple, sur `raw`
+// directement) ou DEUX (scène à deux faces, une fois par recto/verso, voir
+// parseScene). `describe` préfixe les messages d'erreur (ex. "recto" ou
+// "verso"), comme core/script-parse.js/validateCondition le fait pour ses
 // propres appelants — jamais dupliqué pour rien de plus qu'un préfixe.
 // `sceneVariables` : le sac de variables de portée "scene" DÉJÀ RÉSOLU par
 // parseScene (racine, PARTAGÉ entre les deux faces — voir son commentaire) —
@@ -161,16 +159,15 @@ function parseFace(raw, length, registry, describe, sceneVariables) {
   } = raw;
 
   // entities : ABSENT -> [] (face vide, toujours jouable) ; PRÉSENT mais pas
-  // un tableau -> erreur claire, inchangé.
+  // un tableau -> erreur claire.
   if (entities !== undefined && !Array.isArray(entities)) {
     fail(`${prefix}entities doit être un tableau si présent (reçu : ${JSON.stringify(entities)}).`);
   }
   const resolvedEntities = entities !== undefined ? entities : [];
   // defaultSurface : couvre tout le X non-segmenté (voir surfaceAt,
   // core/surfaces.js) — toute la face est TOUJOURS couverte, sans trou.
-  // FILET SILENCIEUX si absent (repli sur DEFAULT_SURFACE, comportement
-  // audible inchangé pour toute scène existante qui n'en déclare pas
-  // encore), mais une valeur FOURNIE doit exister dans le registre -> échec
+  // FILET SILENCIEUX si absent (repli sur DEFAULT_SURFACE, la surface
+  // neutre), mais une valeur FOURNIE doit exister dans le registre -> échec
   // clair sinon (comme un type d'entité inconnu, voir parseEntity) : une
   // référence de surface erronée est un vrai bug de contenu, jamais
   // dégradée en silence.
@@ -185,15 +182,14 @@ function parseFace(raw, length, registry, describe, sceneVariables) {
   // n'empêche un futur consommateur (réverb, sons ambiants...) de la lire
   // aussi. TOUJOURS résolue en booléen (comme defaultSurface, jamais
   // `undefined` sur une face parsée) : défaut `false` (extérieur, le cas
-  // courant en ville) — comportement inchangé pour toute scène existante qui
-  // ne la déclare pas encore.
+  // courant en ville) pour toute scène qui ne la déclare pas.
   if (indoor !== undefined && typeof indoor !== "boolean") {
     fail(`${prefix}indoor doit être un booléen si présent (reçu : ${JSON.stringify(indoor)}).`);
   }
   const resolvedIndoor = indoor !== undefined ? indoor : false;
   // segments : optionnel, PATCHE defaultSurface sur des zones précises (voir
   // parseSegment) — absent -> tableau vide, toujours resolvedDefaultSurface
-  // partout (comportement inchangé). Chaque segment est TOUJOURS explicite
+  // partout. Chaque segment est TOUJOURS explicite
   // (pas de filet par segment, voir parseSegment) : en déclarer un est un
   // choix délibéré.
   if (segments !== undefined && !Array.isArray(segments)) {
@@ -209,15 +205,15 @@ function parseFace(raw, length, registry, describe, sceneVariables) {
   const parsedSpawnRanges =
     spawnRanges !== undefined ? spawnRanges.map((rawRange, index) => parseSpawnRange(rawRange, index, length, prefix)) : undefined;
   // music : optionnel, chemin vers la musique de la scène (voir
-  // view/audio/city-scene.js). Simple passage : parseScene ne connaît ni
+  // view/audio/layers.js). Simple passage : parseScene ne connaît ni
   // Howler ni la lecture audio, juste la présence d'une chaîne.
   if (music !== undefined && !isNonEmptyString(music)) {
     fail(`${prefix}music doit être une chaîne non vide si présent (reçu : ${JSON.stringify(music)}).`);
   }
   // musicDay/musicNight : optionnels, musique PAR PHASE (voir
-  // core/time.js/phaseAt, view/audio/city-scene.js) — une scène qui n'en
+  // core/time.js/phaseAt, view/audio/layers.js) — une scène qui n'en
   // déclare qu'une (musicDay SEULE, ou aucune des deux) retombe sur `music`
-  // pour la phase manquante, jamais de régression pour le contenu existant.
+  // pour la phase manquante.
   // Même validation de forme que music, rien de plus ici.
   if (musicDay !== undefined && !isNonEmptyString(musicDay)) {
     fail(`${prefix}musicDay doit être une chaîne non vide si présent (reçu : ${JSON.stringify(musicDay)}).`);
@@ -225,7 +221,7 @@ function parseFace(raw, length, registry, describe, sceneVariables) {
   if (musicNight !== undefined && !isNonEmptyString(musicNight)) {
     fail(`${prefix}musicNight doit être une chaîne non vide si présent (reçu : ${JSON.stringify(musicNight)}).`);
   }
-  // musicLoop : optionnel, booléen — voir view/audio/city-scene.js. Bascule
+  // musicLoop : optionnel, booléen — voir view/audio/layers.js. Bascule
   // TOUTE la face (les deux phases) en boucle continue plutôt que
   // l'enchaînement-avec-respiration par défaut. Simple passage validé en
   // FORME, comme music/ambiences ci-dessus : le core ignore tout du SENS de
@@ -234,7 +230,7 @@ function parseFace(raw, length, registry, describe, sceneVariables) {
     fail(`${prefix}musicLoop doit être un booléen si présent (reçu : ${JSON.stringify(musicLoop)}).`);
   }
   // ambiences : optionnel, tableau de 0 à AMBIENCE_CHANNEL_LIMIT chemins
-  // (voir view/audio/city-scene.js, lib/audio.js/setAmbienceLayer). Même
+  // (voir view/audio/layers.js, lib/audio.js/setAmbienceLayer). Même
   // passage simple, juste la forme est vérifiée ici — la limite elle-même
   // vient de la source unique partagée avec lib/audio.js.
   if (ambiences !== undefined) {
@@ -246,8 +242,8 @@ function parseFace(raw, length, registry, describe, sceneVariables) {
   }
   // ambiencesDay/ambiencesNight : STRUCTURE RÉSERVÉE, même principe que
   // musicDay/musicNight ci-dessus, mais AUCUN consommateur ne les lit encore
-  // (voir view/audio/city-scene.js — seule la musique réagit à la phase
-  // pour l'instant, voir core/time.md). Validées en FORME dès maintenant
+  // (voir view/audio/layers.js — seule la musique réagit à la phase
+  // pour l'instant, voir doc/time.md). Validées en FORME dès maintenant
   // pour qu'une face qui les déclare échoue clairement en cas d'erreur,
   // plutôt que de découvrir une faute de frappe le jour où l'ambiance de
   // phase sera câblée.
@@ -323,7 +319,7 @@ export function parseScene(raw, registry) {
   const { id, titleKey, length, playerStart, recto, verso, variables, faceMufflingGain, faceMufflingLowpassHz } = raw;
 
   // id/titleKey/length : ABSENTS -> défauts génériques (DEFAULT_SCENE_*,
-  // voir header) ; PRÉSENTS mais malformés -> erreur claire, inchangé — la
+  // voir header) ; PRÉSENTS mais malformés -> erreur claire — la
   // distinction absence/malformation vaut ici comme pour tout autre champ
   // de scène.
   if (id !== undefined && !isNonEmptyString(id)) {
@@ -352,17 +348,18 @@ export function parseScene(raw, registry) {
   }
 
   // variables : STOCKAGE de variables de portée "scene" (voir
-  // core/variables.js/CLAUDE.md) — RACINE PARTAGÉE, comme id/titleKey/
+  // core/variables.js, doc/scripting.md/"Variables") — RACINE PARTAGÉE, comme id/titleKey/
   // length/playerStart ci-dessus, JAMAIS un champ de FACE (une scène à deux
   // faces n'a qu'UN SEUL sac de variables de scène, partagé par recto ET
   // verso — pas dans FACE_FIELDS, jamais cherché dans recto/verso). TOUJOURS
   // résolu (sac vide `{}` si absent, jamais undefined) — même politique
   // EAGER que defaultSurface/indoor plus bas (parseFace), contrairement au
-  // sac SPARSE d'une entité (voir parseEntity) : une scène a TOUJOURS un état
-  // de variables, même vide, au même titre que sa surface par défaut.
+  // sac SPARSE d'une entité (voir core/entity-parse.js/parseEntity) : une
+  // scène a TOUJOURS un état de variables, même vide, au même titre que sa
+  // surface par défaut.
   const resolvedVariables = parseVariables(variables, "variables", fail);
 
-  // SCÈNE À DEUX FACES (modèle B, voir CLAUDE.md/"RECTO/VERSO",
+  // SCÈNE À DEUX FACES (voir doc/scene-format.md/"Scène à deux faces",
   // core/state.js) : recto ET verso requis ENSEMBLE (jamais un seul), et
   // AUCUN des champs de face (FACE_FIELDS) au niveau racine — une scène ne
   // mélange jamais les deux modèles, échec clair plutôt qu'une scène à

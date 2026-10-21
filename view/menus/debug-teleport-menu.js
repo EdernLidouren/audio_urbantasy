@@ -8,15 +8,17 @@
 // chaque ouverture ; un fichier illisible ou sans titleKey donne une entrée
 // libellée par l'id brut, jamais une erreur.
 //
-// Sélection : l'effet "teleport" EXISTANT (fourni par city-screen.js, voir
-// executeTeleport), mode "instant", x = playerStart, face recto — aucun
-// chemin de chargement parallèle : compagnons, rangement du monde quitté,
-// auto-save et annonce de la scène viennent de ce chemin commun. Choisir
+// Sélection : l'effet "teleport" EXISTANT (view/world-travel.js/
+// executeTeleport, transmis par view/city-screen.js), mode "instant",
+// x = playerStart, face recto — aucun chemin de chargement parallèle :
+// compagnons, rangement du monde quitté, auto-save et annonce de la scène
+// viennent de ce chemin commun. Choisir
 // la scène courante la recharge (reloadIfSame), ce qui recentre le joueur
 // SANS relire son fichier.
 //
 // En tête de liste, deux OUTILS DE SCÈNE, chacun derrière une confirmation
-// (voir view/city-screen.js et core/state.js) : "Recharger cette scène
+// (voir view/world-travel.js/reloadSceneFromFile, view/debug-effects.js/
+// forgetOtherScenes et core/state.js) : "Recharger cette scène
 // depuis son fichier" (relit le JSON, remplace le monde actif par un monde
 // neuf) et "Oublier les autres scènes visitées" (chacune sera relue depuis
 // son fichier à la prochaine visite). Une partie fige chaque monde à sa
@@ -63,8 +65,8 @@ function openConfirmation(title, titleParams, onConfirm) {
   );
 }
 
-// sceneTools : { reloadSceneFromFile, forgetOtherScenes }, fournis par
-// view/city-screen.js.
+// sceneTools : { reloadSceneFromFile, forgetOtherScenes }, transmis par
+// view/city-screen.js depuis view/world-travel.js et view/debug-effects.js.
 export async function openTeleportDebugMenu(getSession, teleportEffect, sceneTools) {
   const opener = activeScreen();
   const currentId = getSession().activeWorldId;

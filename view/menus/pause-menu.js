@@ -66,7 +66,7 @@ export function openPauseMenu(getWorldView, getSession, travelViaCityMap) {
         label: "menu.pause.main_menu",
         onActivate: () => {
           popScreen(); // ferme ce menu pause
-          // Quitte la ville : city-screen.onExit détruit la scène et vide la
+          // Quitte la ville : city-screen.onExit détruit la vue du monde et vide la
           // session — révèle le menu principal en dessous, qui se réannonce.
           popScreen();
         },

@@ -8,11 +8,11 @@ import { parseScene } from "../scene.js";
 import { throws } from "../../lib/check.js";
 
 export default function checkActions(run) {
-  // --- Actions CONDITIONNELLES (core/scene.js, action.condition/
+  // --- Actions CONDITIONNELLES (core/script-parse.js/parseSingleAction, action.condition/
   // refusalEffects ; voir view/interaction.js) — GÉNÉRIQUE à TOUT kind,
   // testé ICI en FORME/VALIDATION seulement (au chargement) ; le blocage +
   // l'exécution des effets de refus à l'interaction sont côté vue, hors de
-  // portée d'un test terminal — voir "Vérifie (oreille)" pour ce volet.
+  // portée d'un test terminal — ce volet se vérifie à l'oreille, en jeu.
 
   const ACTION_CONDITION_REGISTRY = { dog: { nameKey: "entity.dog.name" } };
 
@@ -80,7 +80,7 @@ export default function checkActions(run) {
   // refusalEffects est OPTIONNEL (voir "Conditions d'action"/core/script-parse.js/
   // parseSingleAction) : une condition SANS refusalEffects charge SANS
   // erreur — l'échec devient silencieux, ASSUMÉ (voir entities/types/
-  // window.js, dont les deux candidates couvrent tout l'espace du flag
+  // glass-window.js, dont les deux candidates couvrent tout l'espace du flag
   // isOpen : un refus n'y est jamais réellement atteignable).
   let missingRefusalEffectsAccepted = false;
   try {

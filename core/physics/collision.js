@@ -12,13 +12,12 @@
 //     core/behaviors/follow.js) reste un CORPS PLEIN, soumis à la même
 //     règle que deux entités qui se chevauchent (voir overlap.js §2 :
 //     dégagement de 2×BODY_RADIUS, un rayon par corps) -> resolveBodyMove.
-// Sans cette distinction (un bug réel, corrigé ici), un mobile à corps
-// s'arrêtait à l'ancien dégagement "point" (un seul BODY_RADIUS) ;
-// resolveOverlaps le retrouvait alors encore trop proche d'un bloqueur et
-// écartait LES DEUX corps d'un cran — y compris le bloqueur, pourtant
-// censé être statique — CHAQUE tick tant que l'intention persistait : un
-// suiveur pouvait ainsi pousser un mur à travers la scène au lieu d'être
-// arrêté par lui. Les deux fonctions exportées partagent resolveBlockedMove
+// Pourquoi cette distinction : un mobile à corps arrêté au dégagement
+// "point" (un seul BODY_RADIUS) serait encore trop proche d'un bloqueur
+// pour resolveOverlaps, qui écarterait alors LES DEUX corps d'un cran — y
+// compris le bloqueur, pourtant censé être statique — CHAQUE tick tant que
+// l'intention persiste : un suiveur pousserait ainsi un mur à travers la
+// scène au lieu d'être arrêté par lui. Les deux fonctions exportées partagent resolveBlockedMove
 // ci-dessous ; seul le dégagement (clearance) diffère.
 
 import { MOVE_STEP, BODY_RADIUS } from "../state.js";
@@ -39,9 +38,9 @@ import { isBlocking } from "../presence.js";
 // PHYSIQUE de résolution, que la vitesse d'un mobile à intention prend effet,
 // JAMAIS dans le comportement qui a produit `dir` (wander/follow/goto
 // continuent de ne connaître qu'une direction, voir core/behaviors/) :
-// frontière comportement/physique préservée. Défaut 1 -> MOVE_STEP inchangé,
-// comportement STRICTEMENT identique à avant l'introduction de `speed` pour
-// tout appelant qui ne le fournit pas (le joueur, voir resolvePlayerMove).
+// frontière comportement/physique préservée. Défaut 1 -> le pas fixe
+// MOVE_STEP tel quel, pour tout appelant qui ne le fournit pas (le joueur,
+// voir resolvePlayerMove).
 function resolveBlockedMove(moverX, dir, entities, sceneLength, clearance, presenceContext, speed = 1) {
   const intendedX = moveWithinBounds(moverX, dir * MOVE_STEP * speed, sceneLength);
   if (dir === 0) return { x: intendedX, blockedBy: null };
@@ -68,7 +67,7 @@ function resolveBlockedMove(moverX, dir, entities, sceneLength, clearance, prese
 // core/presence.js/isBlocking — requis dès qu'une entité de `entities` peut
 // porter une règle de présence (toujours fourni par core/reduce.js). `speed`
 // n'est JAMAIS fourni par le joueur (voir core/reduce.js) : reste à son
-// défaut 1, vitesse et cadence de pas RIGOUREUSEMENT inchangées.
+// défaut 1, le joueur avance toujours au pas fixe MOVE_STEP.
 export function resolvePlayerMove(playerX, dir, entities, sceneLength, presenceContext, speed = 1) {
   return resolveBlockedMove(playerX, dir, entities, sceneLength, BODY_RADIUS, presenceContext, speed);
 }

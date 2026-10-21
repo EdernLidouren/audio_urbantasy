@@ -16,7 +16,7 @@
 // GRAND TOTAL est à la demande (Retour arrière) — jamais imposé à chaque cran.
 // Les TRANSACTIONS sont des effets d'état du core (core/trade.js/sellItems,
 // buyItems), appliqués par les gestionnaires injectés depuis
-// view/city-screen.js — ce module ne lit la session qu'en LECTURE.
+// view/action-handlers.js — ce module ne lit la session qu'en LECTURE.
 
 import { t } from "../../data/i18n/index.js";
 import { pushScreen, popScreen } from "../../lib/screens.js";
@@ -31,7 +31,7 @@ import { getActiveWorld } from "../../core/state.js";
 import { isSellable, sellValueOf, ownedQuantity, shopArticles } from "../../core/trade.js";
 
 // (sales: [{ type, quantity }]) => void — effet d'ÉTAT de la vente
-// (core/trade.js/sellItems), fourni par city-screen.js qui seul détient
+// (core/trade.js/sellItems), fourni par view/action-handlers.js qui seul détient
 // getSession/setSession — même injection que inventory-menu.js/
 // setDropItemHandler.
 let sellHandler = null;

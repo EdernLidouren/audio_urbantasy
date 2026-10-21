@@ -19,8 +19,9 @@ export default function checkPerception(run) {
   // --- Perception surnaturelle (core/state.js/togglePerception,
   // core/presence.js/"perceptionActive") : état + condition, CORE pur.
   // La bascule sonore (crossfade musique/ambiance, filtre d'étouffement des
-  // entités mondaines) reste ENTIÈREMENT côté vue (view/audio/city-scene.js,
-  // view/city-screen.js) — hors de portée d'un check terminal.
+  // entités mondaines) reste ENTIÈREMENT côté vue (view/perception-toggle.js,
+  // view/audio/layers.js, view/audio/muffle.js) — hors de portée d'un check
+  // terminal.
 
   run("perception : createInitialState — perceptionActive false par défaut", false, createInitialState(scene, undefined, NO_COMPANIONS).perceptionActive);
 

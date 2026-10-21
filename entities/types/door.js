@@ -4,10 +4,10 @@
 // vue.
 
 // PAS de cascade `action` ici (contrairement à d'autres archétypes) : une
-// porte n'a plus rien de commun à l'échelle du TYPE — sa cible (`teleport.
-// target`, voir core/scripting.md/"Effets d'action") varie par INSTANCE,
+// porte n'a rien de commun à l'échelle du TYPE — sa cible (`teleport.
+// target`, voir doc/scripting.md/"Effets d'action") varie par INSTANCE,
 // chaque porte doit donc déclarer SA PROPRE `action` complète (voir
-// scenes/demo.json et consorts). La porte n'est PLUS un cas spécial du core
+// scenes/demo.json et consorts). La porte n'est PAS un cas spécial du core
 // ni de la vue : juste une entité `interactable` ordinaire dont l'action
 // déclenche un effet "teleport" comme n'importe quel autre contenu.
 //

@@ -107,7 +107,8 @@ export function removeItem(session, type, count = 1) {
 // éclatement de butin comme "loot"/action.spawn, voir doc/entity-model.md pour
 // la justification complète), à la position `x` du joueur. `spec` :
 // descripteur DÉJÀ RÉSOLU (voir spawnEphemeral, core/state.js), construit par
-// l'appelant (view/city-screen.js) — ce module ignore tout du registre de
+// core/spawn.js/ephemeralItemSpec à la demande de la vue
+// (view/action-handlers.js) — ce module ignore tout du registre de
 // types d'entités. Symétrique de pickupItemEntity ci-dessus (removeItem +
 // spawnEphemeral au lieu d'addItem + removeEntity) : compose deux fonctions
 // déjà pures, aucune nouvelle règle de résolution.

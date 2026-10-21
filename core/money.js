@@ -44,15 +44,6 @@ export function lootEntity(session, entityId, amount) {
   return markConsumed(addMoney(session, amount), entityId);
 }
 
-// Variante de lootEntity ci-dessus (voir view/interaction.js,
-// ACTION_HANDLERS.loot — action.spawn) : AU LIEU de créditer amount
-// directement, fait naître `count` entités éphémères ÉPARPILLÉES autour de
-// la source (voir core/state.js/spawnScatteredEphemerals) — chacune
-// ramassable individuellement via son propre effet "pickup" (voir
-// doc/entity-model.md/"Collectible persistant"). MÊME idempotence que
-// lootEntity : entité absente OU déjà consumed -> RÉFÉRENCE INCHANGÉE,
-// AUCUN spawn (jamais un second lot de pièces sur une caisse déjà
-// fouillée) — vérifié AVANT tout, comme partout ailleurs dans ce fichier.
 // Collectible persistant SANS crédit ni éparpillement (troisième forme de
 // l'action "loot", l'objet unique : sa substance est dans les effets de
 // l'action, ex. giveImprovement — voir view/interaction.js/handleLoot) :
@@ -64,6 +55,15 @@ export function lootUniqueEntity(session, entityId) {
   return markConsumed(session, entityId);
 }
 
+// Variante de lootEntity ci-dessus (voir view/interaction.js,
+// ACTION_HANDLERS.loot — action.spawn) : AU LIEU de créditer amount
+// directement, fait naître `count` entités éphémères ÉPARPILLÉES autour de
+// la source (voir core/state.js/spawnScatteredEphemerals) — chacune
+// ramassable individuellement via son propre effet "pickup" (voir
+// doc/entity-model.md/"Collectible persistant"). MÊME idempotence que
+// lootEntity : entité absente OU déjà consumed -> RÉFÉRENCE INCHANGÉE,
+// AUCUN spawn (jamais un second lot de pièces sur une caisse déjà
+// fouillée) — vérifié AVANT tout, comme partout ailleurs dans ce fichier.
 export function lootEntitySpawn(session, entityId, spec, count, spread) {
   const entity = activeFaceEntities(session).find((e) => e.id === entityId);
   if (!entity || entity.consumed) return session;

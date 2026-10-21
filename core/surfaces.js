@@ -10,11 +10,11 @@
 // `neutral` : true = sol NEUTRE, le son de pas vient de l'ENTITÉ (gait/
 // naturalWalk, voir doc/entity-model.md) ; false = sol SPÉCIAL, le son vient
 // DU SOL et domine (le gait de l'entité est ignoré) — la résolution du son
-// lui-même reste entièrement à la VUE (voir view/audio/city-scene.js),
+// lui-même reste entièrement à la VUE (voir view/audio/footsteps.js),
 // jamais ici : ce registre ne connaît AUCUN chemin de fichier, seulement ce
 // flag déclaratif.
 //
-// EXTENSIBILITÉ (voir CLAUDE.md, "prêt à accueillir") : `neutral` est la
+// EXTENSIBILITÉ : `neutral` est la
 // SEULE propriété aujourd'hui, mais chaque entrée est un objet plat conçu
 // pour en recevoir d'autres PLUS TARD (ex. `speedFactor` pour un
 // ralentissement) SANS changer la forme du registre ni la logique de
@@ -41,9 +41,9 @@ export const SURFACE_REGISTRY = {
 
 // Repli SILENCIEUX de defaultSurface quand une scène ne le déclare pas (voir
 // core/scene.js/parseScene) — DOIT exister dans SURFACE_REGISTRY. "concrete"
-// : la surface la plus neutre possible, celle qui correspond déjà au son de
-// pas actuel du jeu — choisie pour que toute scène existante qui ne déclare
-// rien sonne EXACTEMENT comme avant l'introduction des surfaces.
+// : la surface la plus neutre possible (le son de pas vient alors de
+// l'entité) — une scène qui ne déclare rien sonne comme un sol de ville
+// ordinaire, sans aucune couleur de sol particulière.
 export const DEFAULT_SURFACE = "concrete";
 
 // Propriétés d'UNE surface par son nom — point d'extension gameplay futur
@@ -64,7 +64,7 @@ export function surfaceProps(name) {
 // segments ne font que la PATCHER par endroits, voir doc/scene-format.md). Pure,
 // testable au terminal. `world` est n'importe quel objet portant
 // `defaultSurface`/`segments` (une scène parsée OU un monde d'état — même
-// forme, voir core/scene.js/core/state.js).
+// forme, voir core/scene.js et core/state.js).
 export function surfaceAt(world, x) {
   const segment = world.segments.find((s) => x >= s.from && x <= s.to);
   return segment ? segment.surface : world.defaultSurface;

@@ -15,8 +15,8 @@ export default function checkFaces(run) {
   // Fixtures partagées avec d'autres domaines (voir ./helpers.js).
   const scene = parseScene(RAW_SCENE, EMPTY_REGISTRY);
 
-  // --- Scène à deux faces (recto/verso) : construction (voir CLAUDE.md/
-  // "RECTO/VERSO", doc/scene-format.md, core/state.js/isTwoSided) ---
+  // --- Scène à deux faces (recto/verso) : construction (voir
+  // doc/scene-format.md/"Scène à deux faces", core/state.js/isTwoSided) ---
 
   // Validation au chargement : recto/verso requis ENSEMBLE, jamais un seul
   // champ de face à la racine en même temps.
@@ -64,7 +64,7 @@ export default function checkFaces(run) {
   run("deux faces : getActiveWorld renvoie la face recto par défaut", "recto-dog", twoFaceActiveFlat.entities[0].id);
   run("deux faces : getActiveWorld ne fuit jamais recto/verso", undefined, twoFaceActiveFlat.recto);
 
-  // TICK — COEXISTENCE (voir CLAUDE.md/"RECTO/VERSO", core/reduce.js) :
+  // TICK — COEXISTENCE (voir doc/entity-model.md/"Recto/verso", core/reduce.js) :
   // LES DEUX faces avancent à chaque tick, chacune dans sa PROPRE suite de tirages (isolation de
   // déterminisme, voir plus haut).
   for (let i = 0; i < 30; i++) twoFaceSession = reduce(twoFaceSession, tick(0));

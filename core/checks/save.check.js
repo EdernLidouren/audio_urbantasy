@@ -32,9 +32,8 @@ export default function checkSave(run) {
   // Objectif : confirmer que l'état de partie survit à un aller-retour JSON
   // en restant structurellement identique ET fonctionnel — pas un système
   // de sauvegarde, juste la garantie que rien de non-sérialisable ne s'est
-  // glissé dans l'état. C'est l'invariant "l'état est le save", tenu depuis
-  // le début du projet (voir CLAUDE.md), qui doit rester vrai avant qu'un
-  // vrai système de save s'appuie dessus.
+  // glissé dans l'état. C'est l'invariant "l'état est le save" (voir
+  // doc/save.md), sur lequel repose tout le système de sauvegarde.
 
   // Auto-test du détecteur lui-même, sur une fuite SYNTHÉTIQUE (fonction,
   // NaN, Infinity, cycle) : doit être repérée, sinon un "aucune fuite"
@@ -410,8 +409,8 @@ export default function checkSave(run) {
     run("save : partie rebouchée — équipement par défaut (slot feet vide)", null, oldEquipmentSaveResult.session.equipment.feet);
   }
 
-  // Sauvegarde ANTÉRIEURE au modèle recto/verso (voir CLAUDE.md/
-  // "RECTO/VERSO") : jamais eu de clé `player.side` — sans rebouchage
+  // Sauvegarde ANTÉRIEURE au modèle recto/verso (voir
+  // doc/entity-model.md/"Recto/verso") : jamais eu de clé `player.side` — sans rebouchage
   // (core/save.js/migrateSave), une scène à deux faces qu'on visiterait
   // plus tard n'aurait aucune face "courante" définie.
   const { side: _droppedSide, ...auditPlayerWithoutSide } = auditSession.player;

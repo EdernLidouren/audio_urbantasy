@@ -8,12 +8,10 @@
 //      joueur (déjà une intention, câblée depuis view/input.js -> tick(),
 //      voir actions.js) ; core/behaviors/ pour chaque entité dotée d'un
 //      comportement — les entités du MONDE actif ET les COMPAGNONS de la
-//      partie en ont chacun un jeu (voir plus bas). Deux familles de
-//      comportement, deux contrats de retour : wander (voir wander.js) se
-//      déplace ET se borne LUI-MÊME, ne renvoie aucun `intent` — rien de
-//      plus à faire en phase 2. follow (voir follow.js) ne renvoie QU'une
-//      intention de direction (`intent` : -1/0/+1), sans toucher à sa
-//      position : c'est la phase 2, ci-dessous, qui la résout.
+//      partie en ont chacun un jeu (voir plus bas). Un seul contrat de
+//      retour pour tous les comportements (wander, follow, goto) : une
+//      intention de direction (`intent` : -1/0/+1), sans jamais toucher à
+//      la position — c'est la phase 2, ci-dessous, qui la résout.
 //   2. PHYSIQUE — applique et contraint ces intentions, sans rien savoir de
 //      qui les a formées : core/physics/collision.js résout le déplacement,
 //      même pas fixe et mêmes bornes pour tout mobile, mais avec DEUX
@@ -27,10 +25,9 @@
 // Partie multi-mondes (voir core/state.js) : SEUL le monde actif avance.
 // Les autres, rangés dans session.worlds, sont inertes — reduce ne les lit
 // ni ne les écrit, ils traversent le tick sans changer (même référence).
-// RECTO/VERSO, étape 2/2 — COEXISTENCE (voir core/state.js/resolveFace/
-// isTwoSided) : au sein du monde actif, LES DEUX faces d'une scène à deux
-// faces tiquent désormais à chaque tour (fin du gel de l'étape 1), mais
-// ISOLÉES l'une de l'autre — chacune sa propre passe de comportement et de
+// RECTO/VERSO — COEXISTENCE (voir core/state.js/resolveFace/isTwoSided) :
+// au sein du monde actif, LES DEUX faces d'une scène à deux faces tiquent
+// à chaque tour, mais ISOLÉES l'une de l'autre — chacune sa propre passe de comportement et de
 // résolution de corps, jamais combinées. Seule la face COURANTE
 // (state.player.side) reçoit le joueur et les compagnons ; l'autre tique
 // seule, dans son propre espace (voir le bloc dédié dans TICK ci-dessous).
@@ -53,9 +50,9 @@ import { resolveFace, withFace, isTwoSided } from "./state.js";
 
 // Résout la position d'une CIBLE par id — "player" (convention reconnue
 // ici, voir follow.js/DEFAULTS.targetId) pour le joueur, sinon une entité
-// de la FACE ACTIVE (voir core/state.js/resolveFace — la face gelée d'une
-// scène à deux faces n'est jamais consultée ici, exactement comme un monde
-// rangé) ou un compagnon. Fourni aux comportements à intention (ex.
+// de la FACE ACTIVE (voir core/state.js/resolveFace — l'autre face d'une
+// scène à deux faces n'est jamais consultée ici : elle tique avec son
+// propre résolveur, isolé, voir le bloc dédié dans TICK) ou un compagnon. Fourni aux comportements à intention (ex.
 // follow) via context.getTargetPosition, pour qu'AUCUN module de
 // comportement n'ait à connaître cette structure (joueur hors entities,
 // compagnons dans un cercle séparé du monde...). Positions PRÉ-tick (face/
@@ -79,13 +76,14 @@ function resolveTargetPosition(state, face, targetId) {
 // les entités du monde et les compagnons de la partie suivent exactement la
 // même logique, seuls le flux de PRNG et la liste diffèrent (voir l'appel
 // des deux dans le TICK ci-dessous). Renvoie les résultats PAIRÉS
-// {entity, intent} (intent : undefined si le module n'en produit pas, voir
-// wander.js/follow.js) ET l'état du flux après tous les tirages, pour que
-// l'appelant le reporte au tick suivant.
+// {entity, intent} (intent : undefined pour une entité dormante ou sans
+// comportement ; sinon celui de son module, voir wander.js, follow.js,
+// goto.js) ET l'état du flux après tous les tirages, pour que l'appelant
+// le reporte au tick suivant.
 //
 // Règles déclaratives (voir core/presence.js/resolveEntityRules) résolues
 // ICI, avant tout comportement — présence : premier des trois plans coupés
-// par le drapeau DORMANT (voir doc/entity-model.md/core/time.md pour les
+// par le drapeau DORMANT (voir doc/entity-model.md/doc/time.md pour les
 // deux autres, côté vue : rendu audio, occupation/interaction ; le
 // troisième plan CORE, le blocage, est traité séparément par isBlocking,
 // voir plus bas dans TICK). DORMANTE -> aucun appel au module de
@@ -94,12 +92,12 @@ function resolveTargetPosition(state, face, targetId) {
 // RESTÉES actives, quel que soit l'état de présence des autres. Les
 // champs `present`/`presenceChanged`/`ruleActive` ne sont ajoutés à
 // l'entité QUE si elle porte une règle `presence` (jamais sur une entité
-// qui n'en a pas — comportement d'avant ce système strictement inchangé,
-// voir core/checks/save.check.js/audit de sérialisabilité).
+// qui n'en a pas : sa forme sérialisée reste celle de sa scène, voir
+// core/checks/save.check.js, audit de sérialisabilité).
 //
 // presenceChanged ("entered" | "exited" | null) : la BASCULE de présence
 // OBSERVÉE, exposée pour la vue (sons de transition, voir
-// view/audio/city-scene.js) — voir resolveEntityRules pour le détail
+// view/audio/entity-audio.js) — voir resolveEntityRules pour le détail
 // (jamais de bascule fantôme au montage).
 //
 // Effet "behavior" (voir resolveEntityRules) : s'il vient de basculer ce
@@ -143,7 +141,7 @@ function stepEntities(entities, context) {
 // bloqueur au contact au lieu de s'y arrêter). `blockerPool` (POST-phase 1,
 // toutes listes confondues) exclut l'entité elle-même à chaque résolution,
 // jamais de collision contre son propre corps. Une entité SANS intention
-// (wander, déjà résolue) traverse inchangée.
+// (dormante ou sans comportement) traverse inchangée.
 //
 // Vitesse : facteur consommé ICI, à la RÉSOLUTION — jamais par le
 // comportement qui a produit `intent` (wander/follow/goto ignorent tout de
@@ -168,13 +166,12 @@ export function reduce(state, action) {
     case "TICK": {
       const world = state.worlds[state.activeWorldId];
       // face : la FACE ACTIVE du monde actif (voir core/state.js/
-      // resolveFace) — pour un monde simple, c'est le monde lui-même
-      // (comportement STRICTEMENT inchangé) ; pour un monde à deux faces,
-      // c'est recto OU verso selon state.player.side, JAMAIS les deux :
-      // l'autre face n'est ni lue ni écrite par ce tick, elle reste gelée
-      // (voir header du fichier, "Partie multi-mondes"). `length` reste
-      // PARTAGÉ au niveau du monde (les deux faces vivent sur le même axe
-      // X), jamais dupliqué par face.
+      // resolveFace) — pour un monde simple, c'est le monde lui-même ; pour
+      // un monde à deux faces, c'est recto OU verso selon
+      // state.player.side : celle qui reçoit le joueur et les compagnons.
+      // L'autre face tique elle aussi, mais à part et isolée (voir le bloc
+      // RECTO/VERSO plus bas). `length` reste PARTAGÉ au niveau du monde
+      // (les deux faces vivent sur le même axe X), jamais dupliqué par face.
       const face = resolveFace(world, state.player.side);
 
       // --- Phase 1 : intentions ---
@@ -202,7 +199,7 @@ export function reduce(state, action) {
       // jamais un par face) ; `session` reste `state` lui-même, jamais une
       // copie — resolveEntityRules n'en fait rien d'autre qu'une LECTURE
       // (aucun effet d'écriture ne passe par presence[].effects, voir
-      // core/scripting.md/"Effets d'action"). Construit par
+      // doc/scripting.md/"Effets d'action"). Construit par
       // presenceContextOf, la même fonction que la vue utilise au montage.
       const presenceContext = presenceContextOf(state);
       const worldStep = stepEntities(face.entities, {
@@ -223,9 +220,9 @@ export function reduce(state, action) {
       // Combinées ICI, à cette seule fin (collision/chevauchement doivent
       // voir TOUS les corps présents dans le monde actif, compagnons
       // compris) — jamais persistées fusionnées, voir le découpage juste
-      // après. "Avant" (entities du monde ET compagnons, PRE-comportement)
-      // pour le joueur, exactement comme avant l'introduction des
-      // compagnons (comportement inchangé). Une entité DORMANTE ne bloque
+      // après. Le joueur se résout contre les corps "avant" (entities du
+      // monde ET compagnons, PRE-comportement) : il réagit, comme les
+      // cibles de la phase 1, à l'état de DÉBUT de tick. Une entité DORMANTE ne bloque
       // jamais (voir core/presence.js/isBlocking, lu par
       // resolvePlayerMove/resolveBodyMove/resolveOverlaps à la place d'un
       // simple entity.blocksMovement) — présence recalculée fraîche depuis
@@ -269,10 +266,10 @@ export function reduce(state, action) {
         rngState: worldStep.rngState,
       });
 
-      // --- RECTO/VERSO étape 2/2 : COEXISTENCE, l'AUTRE face tique aussi,
-      // ISOLÉE (voir CLAUDE.md/"RECTO/VERSO", core/state.js/isTwoSided) ---
-      // Fin du gel : une scène à deux faces avance désormais SES DEUX faces
-      // à chaque tick, chacune dans son propre espace — ni le joueur, ni les
+      // --- RECTO/VERSO : COEXISTENCE, l'AUTRE face tique aussi, ISOLÉE
+      // (voir doc/entity-model.md/"Recto/verso", core/state.js/isTwoSided) ---
+      // Une scène à deux faces avance SES DEUX faces à chaque tick, chacune
+      // dans son propre espace — ni le joueur, ni les
       // compagnons, ni les entités de la face COURANTE n'y participent
       // (isolation stricte : pas de collision, pas de ciblage de
       // comportement, pas de résolution croisée entre faces). getTargetPosition
@@ -280,7 +277,7 @@ export function reduce(state, action) {
       // id de l'autre face ou des compagnons) y reste TOUJOURS introuvable
       // -> undefined, jamais résolu : un goto/follow de l'autre face ne peut
       // donc jamais viser le joueur ni une entité de la face courante. Son
-      // PROPRE rngState (déjà distinct depuis l'étape 1, voir
+      // PROPRE rngState (un flux par face, voir core/state.js/
       // createFaceState) préserve le déterminisme sans la moindre
       // interférence entre les deux flux.
       if (isTwoSided(world)) {

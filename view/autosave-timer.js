@@ -1,5 +1,5 @@
 // Auto-save TEMPORELLE (temps RÉEL, horloge murale — performance.now()),
-// INDÉPENDANTE de l'auto-save sur transition (voir city-screen.js) : les
+// INDÉPENDANTE de l'auto-save sur transition (voir world-travel.js) : les
 // deux coexistent sans se coupler, chacune sa propre préférence
 // (autoSaveIntervalMinutes / autoSaveOnTransition, config/preferences.js).
 //

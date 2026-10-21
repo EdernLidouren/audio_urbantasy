@@ -34,8 +34,8 @@ function encodeForStorage(text) {
   return OBFUSCATION_PREFIX + obfuscate(text);
 }
 
-// Absence du préfixe connu -> contenu traité comme du JSON EN CLAIR :
-// rétrocompatibilité avec les saves écrites avant cette couche, ET repli
+// Absence du préfixe connu -> contenu traité comme du JSON EN CLAIR : une
+// save écrite sans obscurcissement reste lisible, ET repli
 // si un futur préfixe inconnu apparaît un jour. Jamais de tentative de
 // désobscurcissement à l'aveugle sur une donnée qui n'est peut-être pas
 // obscurcie du tout.
@@ -81,7 +81,8 @@ export function playSaveSound() {
 // évènement fréquent, une confirmation lue à chaque fois serait plus
 // bruyante qu'utile — le son suffit, et reste lui-même désactivable (voir
 // la préférence saveSoundEnabled). SON optionnel côté appelant (playSound,
-// défaut true) — la sauvegarde auto sur TRANSITION (voir city-screen.js) le
+// défaut true) — la sauvegarde auto sur TRANSITION (voir view/world-travel.js/
+// performTransition) le
 // désactive explicitement, pour ne jamais se superposer au reste de
 // l'ambiance sonore d'une simple traversée de porte. Ne lève jamais :
 // { success } pour que l'appelant puisse réagir en plus (ex. fermer un

@@ -82,7 +82,7 @@ export default function checkWorlds(run) {
   run("partie : transition vers un monde inconnu sans scène fournie est rejetée", true, travelToUnknownRejected);
 
   // --- travelToWorld : x/side EXPLICITES (voir core/effects.js/"teleport")
-  // — sans eux, comportement HISTORIQUE ci-dessus (playerStart, "recto").
+  // — sans eux, défauts d'une porte ordinaire ci-dessus (playerStart, "recto").
   // Fournis, ils REMPLACENT ces défauts, compagnons repositionnés AUTOUR DU
   // POINT RÉEL (jamais playerStart) EN UNE SEULE PASSE — voir le commentaire
   // de travelToWorld.

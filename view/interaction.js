@@ -1,11 +1,14 @@
 // Interaction avec une entité de la scène ville. Déclenchée par des touches
 // DISCRÈTES (Espace/Entrée, voir city-screen.js) — pas de maintien, donc
 // aucun souci d'auto-interruption NVDA ici (contrairement au mouvement en
-// touche tenue, voir CLAUDE.md). Vue + contenu : aucune RÈGLE de jeu propre
-// ici (le core reste la seule source de vérité), mais réutilise l'évaluateur
-// de conditions pur du core (evaluateCondition, voir actionConditionMet plus
-// bas) pour les actions conditionnelles — même principe d'import que
-// view/audio/entity-sound-entry.js/isPresent.
+// touche tenue, voir lib/announce.js). Vue + contenu : aucune RÈGLE de jeu
+// propre ici (le core reste la seule source de vérité), mais réutilise deux
+// LECTURES pures du core : l'évaluateur de conditions (evaluateCondition/
+// selectMatchingAction, voir actionConditionMet plus bas) pour les actions
+// conditionnelles — même principe d'import que
+// view/audio/entity-sound-entry.js/isPresent — et le registre des kinds
+// d'action (core/action-kinds.js), contre lequel ACTION_HANDLERS est
+// vérifié. Toute ÉCRITURE de l'état passe par les gestionnaires injectés.
 
 import { announce } from "../lib/announce.js";
 import { t } from "../data/i18n/index.js";
@@ -20,12 +23,12 @@ import { ACTION_KINDS } from "../core/action-kinds.js";
 import { resolveDescriptionText } from "./description-resolver.js";
 import { resolveTuning } from "../config/tuning.js";
 
-// Gestionnaires enregistrés UNE FOIS par view/city-screen.js, au moment de
-// sa construction — au plus un écran ville vivant à la fois dans cette
-// appli (même principe que activeScene, voir view/audio/city-scene.js).
-// Permettent à interact() de déclencher un effet qui touche session/scene
-// SANS les connaître : il délègue à qui les possède (ce fichier n'importe
-// jamais le core, voir le header).
+// Gestionnaires enregistrés UNE FOIS par view/action-handlers.js/
+// registerActionHandlers, à la construction de l'écran ville
+// (view/city-screen.js) — au plus un écran ville vivant à la fois dans
+// cette appli. Permettent à interact() de déclencher un effet qui touche
+// la session ou la vue du monde SANS les connaître : il délègue à qui les
+// possède (ce fichier n'écrit jamais l'état, voir le header).
 let teleportHandler = null;
 let pickupHandler = null;
 let itemPickupHandler = null;
@@ -38,14 +41,13 @@ let searchHandler = null;
 let shopHandler = null;
 
 // (effect) => void — exécute l'effet MIXTE "teleport" (voir core/effects.js,
-// core/scripting.md/"Effets d'action") : une PORTE n'est plus un cas
+// doc/scripting.md/"Effets d'action") : une PORTE n'est pas un cas
 // spécial, juste une action dont `effects` contient CET effet (voir
-// runEffects plus bas) — le gestionnaire (view/city-screen.js) est le
-// SEUL chemin de téléportation JOUEUR, qu'il soit déclenché par une porte
-// ou par n'importe quel autre effet. Asynchrone (sas + fondu, voir
-// view/city-screen.js), mais JAMAIS attendu ici (comme l'ancien
-// doorTransitionHandler qu'il remplace) : le gestionnaire gère seul son
-// propre séquençage.
+// runEffects plus bas) — le gestionnaire (view/world-travel.js/
+// executeTeleport) est le SEUL chemin de téléportation JOUEUR, qu'il soit
+// déclenché par une porte ou par n'importe quel autre effet. Asynchrone
+// (sas + fondu, voir view/world-travel.js/runTeleportSas), mais JAMAIS
+// attendu ici : le gestionnaire gère seul son propre séquençage.
 export function setTeleportHandler(handler) {
   teleportHandler = handler;
 }
@@ -62,19 +64,19 @@ export function setTeleportHandler(handler) {
 // SES flags (transitionSteps/transitionSurface, cascade instance ->
 // archétype -> défaut, voir config/tuning-values.js), exactement comme un
 // effet playSound diégétique reçoit l'entité porteuse (voir
-// runPlaySoundEffect plus haut).
+// runPlaySoundEffect plus bas).
 export function setSideSwitchHandler(handler) {
   sideSwitchHandler = handler;
 }
 
 // (entity, amount) => void — applique l'effet d'ÉTAT du ramassage (argent +
 // retrait de l'entité, voir core/money.js/pickupEntity), fourni par
-// city-screen.js qui seul détient getSession/setSession. Ce fichier ne fait
+// view/action-handlers.js qui seul détient getSession/setSession. Ce fichier ne fait
 // qu'appeler ce qu'on lui a donné, puis gère le retour sensoriel (son,
 // annonce) — jamais l'inverse. `amount` : DÉJÀ EXTRAIT de l'action RÉSOLUE
 // par handlePickup (voir plus bas) — jamais entity.action.amount relu ici
 // ou par l'appelant, qui ne doit rien savoir de la forme (objet unique ou
-// candidate choisie dans un tableau, voir core/scripting.md/"Actions
+// candidate choisie dans un tableau, voir doc/scripting.md/"Actions
 // multiples filtrées par condition").
 export function setPickupHandler(handler) {
   pickupHandler = handler;
@@ -91,7 +93,7 @@ export function setItemPickupHandler(handler) {
 }
 
 // (entity, amount) => void — applique l'effet d'ÉTAT du "loot" (argent +
-// entity.consumed, voir core/money.js/lootEntity ; entités/model.md/
+// entity.consumed, voir core/money.js/lootEntity ; doc/entity-model.md/
 // "Collectible persistant"), même patron que setPickupHandler ci-dessus
 // (`amount` déjà extrait, même raison). Distinct de pickupHandler : l'entité
 // looté N'EST JAMAIS retirée, seul son état change.
@@ -120,12 +122,11 @@ export function setLootSpawnHandler(handler) {
 // (entity, effects) => void — applique une LISTE d'effets D'ÉCRITURE de
 // variable (setVariable/toggleVariable/addVariable, voir core/script-parse.js/
 // parseActionEffect, core/variables.js/applyActionEffects), fournie par
-// city-screen.js qui seul détient getSession/setSession — même patron que
-// setPickupHandler ci-dessus. Utilisé par le kind "applyEffects" (voir
-// handleApplyEffects plus bas), le premier kind GÉNÉRIQUE de cet aiguillage
-// (aucun état "métier" propre, contrairement à transit/pickup/loot/
-// switchSide) : sa SEULE substance est la liste d'effets déclarée par le
-// contenu.
+// view/action-handlers.js qui seul détient getSession/setSession — même
+// patron que setPickupHandler ci-dessus. Appelé par runEffects pour TOUT
+// kind, avant son handler ; c'est la SEULE substance du kind GÉNÉRIQUE
+// "applyEffects" (voir handleApplyEffects plus bas), qui n'a aucun état
+// "métier" propre, contrairement à pickup/loot/switchSide/search/shop.
 export function setVariableEffectsHandler(handler) {
   variableEffectsHandler = handler;
 }
@@ -141,8 +142,8 @@ export function setSearchHandler(handler) {
 }
 
 // (entity) => void — ouvre le menu du POINT DE VENTE (voir view/menus/
-// shop-menu.js/openShopMenu), fourni par city-screen.js qui seul détient
-// scene/getSession — même patron que les gestionnaires ci-dessus. Aucun
+// shop-menu.js/openShopMenu), fourni par view/action-handlers.js qui seul
+// détient la vue du monde et getSession — même patron que les gestionnaires ci-dessus. Aucun
 // effet d'état ici : la transaction, elle, passe par le gestionnaire de
 // vente injecté dans shop-menu.js.
 export function setShopHandler(handler) {
@@ -169,7 +170,7 @@ export function setPlayerEquipmentProvider(provider) {
 // action.condition est STRUCTURELLEMENT toujours fausse (voir
 // core/presence.js/evaluateTimeRange, hourOfDayFraction(undefined)) — c'est
 // ce que ce provider corrige, sans changer l'évaluateur lui-même (déjà
-// partagé avec presence[].when, voir core/scripting.md/"Conditions d'action").
+// partagé avec presence[].when, voir doc/scripting.md/"Conditions d'action").
 let timeProvider = null;
 
 export function setTimeProvider(provider) {
@@ -178,16 +179,12 @@ export function setTimeProvider(provider) {
 
 // () => session — fournit LA SESSION COMPLÈTE pour l'évaluation d'une
 // condition d'action (voir actionContext plus bas), même principe
-// d'injection que playerEquipmentProvider/timeProvider ci-dessus. Corrige un
-// trou identifié par l'audit de santé (Finding 1) : sans ce provider,
-// perceptionActive/weather/world/session restent undefined dans le contexte
-// d'action, et hasImprovement/weather/perceptionActive/variable scope
-// "scene"/"party" y sont STRUCTURELLEMENT toujours fausses (voir
+// d'injection que playerEquipmentProvider/timeProvider ci-dessus. Sans ce
+// provider, perceptionActive/weather/world/session restent undefined dans
+// le contexte d'action, et hasImprovement/weather/perceptionActive/variable
+// scope "scene"/"party" y sont STRUCTURELLEMENT toujours fausses (voir
 // core/presence.js) — même si le joueur possède réellement ce qui est
-// demandé. Un OUBLI, pas un choix d'architecture : rien n'empêchait de
-// suivre le MÊME patron d'injection que playerEquipment/time dès le départ
-// (voir "AVANT ce provider" dans actionContext ci-dessous). L'évaluateur
-// reste un PUR consommateur de données (core/presence.js/evaluateCondition,
+// demandé. L'évaluateur reste un PUR consommateur de données (core/presence.js/evaluateCondition,
 // core/variables.js) — lui passer une référence à `session` ne lui donne
 // aucun moyen de MUTER l'état ni de toucher DOM/audio, la frontière core/vue
 // tient : ce fichier lit `session` pour construire un contexte, il ne
@@ -201,7 +198,7 @@ export function setSessionProvider(provider) {
 
 // (entityId, descriptor) => joue un one-shot POSITIONNÉ + FILTRÉ sur
 // l'entité `entityId`, exactement comme un beacon/vocal à cet instant (voir
-// view/audio/oneshots.js/playEntityOneShot, câblé par view/city-screen.js)
+// view/audio/oneshots.js/playEntityOneShot, câblé par view/action-handlers.js)
 // — fournit le rendu DIÉGÉTIQUE de l'effet "playSound" (voir
 // playDescribedSound plus bas pour le rendu MÉTA, non positionné). Même
 // principe d'injection que playerEquipmentProvider/timeProvider : ce fichier
@@ -217,7 +214,7 @@ export function setPositionedSoundPlayer(provider) {
 // Son de RAMASSAGE : rôle `sounds.pickup` DÉCLARÉ par l'archétype de l'objet
 // (cascade instance -> archétype par fusion, comme tout rôle de `sounds` —
 // voir doc/entity-model.md/"Vocabulaire de sons"), SANS défaut : un objet
-// sans ce rôle est ramassé en silence (l'annonce suffit). Plus aucun son
+// sans ce rôle est ramassé en silence (l'annonce suffit) : aucun son
 // générique imposé ("tout son est déclaré, jamais imposé"). Rendu DIÉGÉTIQUE
 // via le même chemin qu'un effet "playSound" (runPlaySoundEffect plus bas :
 // positionné sur l'entité, soumis aux filtres de scène) — à appeler AVANT
@@ -229,10 +226,10 @@ function playEntityPickupSound(entity) {
   runPlaySoundEffect(entity, descriptor);
 }
 
-// Effet "playSound" (voir core/effects.js, core/scripting.md/"Effets
+// Effet "playSound" (voir core/effects.js, doc/scripting.md/"Effets
 // d'action") — DEUX NATURES DE RENDU, jamais un troisième mécanisme :
 //
-// MÉTA (ce que ce fichier savait déjà faire) : son CENTRÉ, NON positionné,
+// MÉTA : son CENTRÉ, NON positionné,
 // IGNORE tout filtre actif — le descripteur partagé { path, gain?,
 // pitchVariation?, reverbSend? } joué via playDescribedOneShot
 // (lib/audio.js), composé avec `interfaceVolume` comme tout son d'UI/
@@ -240,7 +237,7 @@ function playEntityPickupSound(entity) {
 // accessible depuis ce fichier (voir header, "vue + contenu") : reverbSend
 // reste donc sans effet en pratique ici.
 //
-// DIÉGÉTIQUE (nouveau) : son POSITIONNÉ sur une entité de la scène, soumis
+// DIÉGÉTIQUE : son POSITIONNÉ sur une entité de la scène, soumis
 // aux MÊMES filtres actifs qu'un beacon/vocal à cet instant (occlusion
 // RECTO/VERSO, étouffement de perception, distance) — délégué ENTIÈREMENT à
 // positionedSoundPlayer (voir plus haut, view/audio/oneshots.js/
@@ -249,9 +246,8 @@ function playEntityPickupSound(entity) {
 //
 // PROVENANCE (résout la cible, voir resolvePlaySoundTarget ci-dessous) et
 // NATURE (résout diégétique/méta, voir resolvePlaySoundNature ci-dessous)
-// sont calculées séparément, puis composées ICI. PLUS de son de refus
-// GÉNÉRIQUE en dur (ancien REFUSAL_SOUND_KEY) : un effet "playSound" est un
-// CHOIX DE CONTENU explicite (voir refusalEffects, actionConditionMet plus
+// sont calculées séparément, puis composées ICI. Aucun son de refus
+// GÉNÉRIQUE en dur : un effet "playSound" est un CHOIX DE CONTENU explicite (voir refusalEffects, actionConditionMet plus
 // bas), jamais une valeur par défaut du système. Défensif comme tout son du
 // projet : fichier absent -> avertit, ne plante jamais.
 
@@ -309,12 +305,12 @@ function runPlaySoundEffect(entity, effect, options = {}) {
 }
 
 // Exécute une LISTE d'effets (voir core/effects.js pour la partition
-// core/vue, core/scripting.md/"Effets") — `action.effects` (condition
+// core/vue, doc/scripting.md/"Effets") — `action.effects` (condition
 // RÉUSSIT) ou `action.refusalEffects` (condition ÉCHOUE, voir
 // actionConditionMet plus bas), MÊME fonction pour les deux, MÊME
 // vocabulaire. ROUTAGE : les effets d'ÉTAT (setVariable/toggleVariable/
 // addVariable) sont délégués EN UN SEUL APPEL à variableEffectsHandler (le
-// gestionnaire enregistré par view/city-screen.js, seul à détenir
+// gestionnaire enregistré par view/action-handlers.js, seul à détenir
 // getSession/setSession — voir son commentaire plus haut) — no-op silencieux
 // sur un tableau qui n'en contient aucun (core/variables.js/
 // applyActionEffects ignore déjà tout type qu'il ne reconnaît pas). Les
@@ -323,7 +319,7 @@ function runPlaySoundEffect(entity, effect, options = {}) {
 // relatif entre un effet d'état (invisible/inaudible au moment où il
 // s'applique) et un effet de rendu/mixte n'a donc aucune importance
 // observable, SEUL l'ordre ENTRE effets de rendu/mixtes compte (ex. le son
-// AVANT l'annonce de confirmation, voir "Effets" plus haut) — un
+// AVANT l'annonce de confirmation) — un
 // "teleport" typiquement DERNIER de sa liste (le sas gèle le jeu, tout
 // effet déclaré APRÈS lui dans la MÊME liste s'exécuterait quand même,
 // avant que le sas ne commence, puisque teleportHandler n'est jamais
@@ -367,7 +363,7 @@ export function runRenderEffects(entity, effects, options = {}) {
 // annoncé à l'approche (occupation, voir view/occupancy.js).
 // INDIRECTION délibérée plutôt qu'un accès direct à descriptionKey : la clé
 // choisie est résolue par description-resolver.js/resolveDescriptionText,
-// PAS un accès direct à t(key) — DYNAMIQUE désormais (gabarit i18n rempli du
+// PAS un accès direct à t(key) — DYNAMIQUE (gabarit i18n rempli du
 // CONTEXTE courant, voir son en-tête), recalculée à CHAQUE appel, jamais
 // stockée. Contexte = EXACTEMENT actionContext(entity) (voir plus bas) —
 // MÊME source que l'évaluation de condition, aucune seconde forme de
@@ -376,7 +372,7 @@ export function runRenderEffects(entity, effects, options = {}) {
 // (getInteractionCandidates) évite déjà ce cas en pratique, ce repli reste
 // défensif.
 //
-// consumedDescriptionKey (voir core/scene.js, doc/entity-model.md/
+// consumedDescriptionKey (voir core/entity-parse.js, doc/entity-model.md/
 // "Collectible persistant") : description ALTERNATIVE une fois
 // entity.consumed — effet POST-ACTIVATION "changer d'état perceptible"
 // d'un collectible persistant (core/money.js/lootEntity), déclaré par
@@ -449,8 +445,7 @@ function handlePickup(entity, action) {
 //
 // DEUX formes possibles pour action.kind:"loot", jamais mélangées sur une
 // même entité — voir doc/entity-model.md/"Entités éphémères" :
-//   - action.amount : crédite directement (comportement d'origine, ex.
-//     crate-port/crate-warehouse) ;
+//   - action.amount : crédite directement (ex. crate-port/crate-warehouse) ;
 //   - action.spawn : { spec, count, spread } — fait naître `count` entités
 //     éphémères ÉPARPILLÉES autour de la source AU LIEU de créditer
 //     directement (ex. crate-stash, scenes/demo2.json) ; chacune se
@@ -493,15 +488,15 @@ function handleLoot(entity, action) {
 }
 
 // "applyEffects" : kind GÉNÉRIQUE, sans état "métier" propre (contrairement
-// à transit/pickup/loot/switchSide) — sa SEULE substance est ce que le
-// contenu déclare via `action.effects` (voir "Effets" plus haut,
-// core/scripting.md/"Effets"), déjà exécutés GÉNÉRIQUEMENT pour TOUT kind
+// à pickup/loot/switchSide/search/shop) — sa SEULE substance est ce que le
+// contenu déclare via `action.effects` (voir runEffects plus haut,
+// doc/scripting.md/"Effets"), déjà exécutés GÉNÉRIQUEMENT pour TOUT kind
 // par interact() AVANT ce dispatch (voir runEffects) : ce handler n'a donc
-// RIEN de plus à faire — NO-OP délibéré, gardé dans ACTION_HANDLERS
-// seulement pour que ce kind reste un kind CONNU (sinon l'aiguillage
-// avertirait "type d'action inconnu", voir plus bas). Cas d'usage de
+// RIEN de plus à faire — NO-OP délibéré, présent dans ACTION_HANDLERS
+// parce que chaque kind du registre du core doit y avoir son handler
+// (contrôle au chargement du module, voir plus bas). Cas d'usage de
 // référence : la fenêtre (deux actions candidates opposées, voir
-// core/scripting.md/"Actions multiples filtrées par condition").
+// doc/scripting.md/"Actions multiples filtrées par condition").
 function handleApplyEffects() {}
 
 // "search" : FOUILLE d'un conteneur de collecte (voir core/spawn.js/
@@ -561,25 +556,24 @@ const ACTION_HANDLERS = {
   }
 }
 
-// ACTIONS CONDITIONNELLES (voir core/scene.js, action.condition/
-// refusalEffects) — GÉNÉRIQUE à TOUT kind de ACTION_HANDLERS ci-dessus, pas
+// ACTIONS CONDITIONNELLES (voir core/script-parse.js/parseSingleAction,
+// action.condition/refusalEffects) — GÉNÉRIQUE à TOUT kind de ACTION_HANDLERS ci-dessus, pas
 // un cas spécial d'un kind précis : une porte (teleport conditionné, voir
 // "Effets d'action"/`"teleport"`), une caisse verrouillée, un PNJ qui ne
 // parle qu'à condition réutilisent tous cette MÊME vérification, jamais un
 // second mécanisme.
 // Réutilise TEL QUEL l'évaluateur de conditions du core
 // (core/presence.js/evaluateCondition) — même objet déclaratif que
-// presence[].when, déjà validé au chargement (core/scene.js).
+// presence[].when, déjà validé au chargement (core/script-parse.js/
+// validateCondition).
 //
 // context.entity PORTE ICI L'ENTITÉ-CIBLE (celle qui déclare l'action —
 // une variable de portée "entity" référencée par la condition, voir
 // core/presence.js/evaluateVariable, se résout donc contre SES PROPRES
 // variables), JAMAIS le joueur — voir context.playerEquipment ci-dessous
-// pour la distinction. AVANT ce mécanisme, context.entity portait un
-// wrapper synthétique { equipment } pour le JOUEUR : ce rôle vit maintenant
-// dans sa PROPRE clé, `playerEquipment` (voir core/presence.js/
-// evaluateHasEquipmentTag, qui la lit spécifiquement) — les deux rôles ne
-// peuvent PAS partager `context.entity` sans se marcher dessus dès qu'une
+// pour la distinction. L'équipement du JOUEUR vit dans sa PROPRE clé,
+// `playerEquipment` (voir core/presence.js/evaluateHasEquipmentTag, qui la
+// lit spécifiquement) — les deux rôles ne peuvent PAS partager `context.entity` sans se marcher dessus dès qu'une
 // condition "variable" et une condition "hasEquipmentTag" coexistent (ex.
 // dans un allOf) sur la MÊME action.
 //
@@ -593,7 +587,7 @@ const ACTION_HANDLERS = {
 // seulement la face courante, voir core/variables.js/carrierForScope, scope
 // "scene" — PAS core/state.js/getActiveWorld, qui aplatit la face et ferait
 // perdre l'autre). hasImprovement/weather/perceptionActive/variable scope
-// "scene"/"party" se comportent donc désormais IDENTIQUEMENT sur
+// "scene"/"party" se comportent donc IDENTIQUEMENT sur
 // action.condition et sur presence[].when (voir doc/scripting.md, section
 // "Conditions d'action"). Sans provider enregistré (cas limite, jamais en
 // jeu réel) -> ces clés restent undefined, repli déjà géré par chaque
@@ -655,18 +649,18 @@ export function interact(entity, kind) {
   }
 
   if (kind === "activate") {
-    // Pas d'action différenciée déclarée (ex. npc/object aujourd'hui,
-    // interactables mais sans kind encore câblé) -> silence, comportement
-    // STUB générique inchangé pour ce contenu-là.
+    // Pas d'action différenciée déclarée (ex. npc/object, interactables
+    // mais sans kind câblé) -> silence, comportement STUB générique pour ce
+    // contenu-là.
     if (!entity.action) return;
 
     // Cooldown (voir lastActivationAt plus haut) : ignoré en silence.
     if (isInCooldown(entity)) return;
 
     // ACTIONS MULTIPLES CANDIDATES (voir core/entity-parse.js/parseEntity,
-    // core/presence.js/selectMatchingAction, core/scripting.md/"Actions
+    // core/presence.js/selectMatchingAction, doc/scripting.md/"Actions
     // multiples filtrées par condition") : entity.action est soit un OBJET
-    // UNIQUE (RÉTROCOMPAT stricte — resolvedAction EST cet objet), soit un
+    // UNIQUE (resolvedAction EST cet objet), soit un
     // TABLEAU de candidates — la PREMIÈRE dont la condition est vraie est
     // choisie SILENCIEUSEMENT (pas de menu, contrairement à
     // chooseInteractionTarget plus bas, qui désambiguïse entre ENTITÉS via
@@ -683,14 +677,13 @@ export function interact(entity, kind) {
     // voir plus bas) se rejoueraient à chaque Entrée.
     if (resolvedAction.kind === "loot" && entity.consumed) return;
 
-    // Condition fausse -> REFUS informatif (refusalEffects, voir "Effets"
+    // Condition fausse -> REFUS informatif (refusalEffects, voir runEffects
     // plus haut), AUCUN effet de succès, AUCUNE transition : l'action est
-    // simplement bloquée, proprement. Action sans condition (tout contenu
-    // existant) -> ce bloc est sauté entièrement, comportement STRICTEMENT
-    // inchangé. Pour une action choisie DANS un tableau, cette condition est
-    // déjà connue vraie (voir selectMatchingAction) — la revérifier ici
-    // reste correct (fonction pure, même contexte) et évite un second
-    // chemin de code.
+    // simplement bloquée, proprement. Action sans condition -> ce bloc est
+    // sauté entièrement. Pour une action choisie DANS un tableau, cette
+    // condition est déjà connue vraie (voir selectMatchingAction) — la
+    // revérifier ici reste correct (fonction pure, même contexte) et évite
+    // un second chemin de code.
     if (resolvedAction.condition && !actionConditionMet(resolvedAction.condition, entity)) {
       lastActivationAt.set(entity.id, performance.now());
       runEffects(entity, resolvedAction.refusalEffects);
@@ -700,11 +693,10 @@ export function interact(entity, kind) {
     if (!departsWithTeleport(resolvedAction.effects)) lastActivationAt.set(entity.id, performance.now());
 
     // Condition VRAIE (ou absente) -> effets de succès exécutés
-    // GÉNÉRIQUEMENT pour TOUT kind (voir "Effets" plus haut), AVANT le
-    // handler propre au kind — ni transit/pickup/loot/switchSide ne
-    // déclarent `effects` aujourd'hui (comportement STRICTEMENT inchangé
-    // pour eux), mais rien ne les en empêche demain : ce n'est plus
-    // réservé à "applyEffects" (voir handleApplyEffects, désormais NO-OP).
+    // GÉNÉRIQUEMENT pour TOUT kind (voir runEffects plus haut), AVANT le
+    // handler propre au kind : n'importe quel kind peut déclarer `effects`,
+    // pas seulement "applyEffects" (voir handleApplyEffects, NO-OP pour
+    // cette raison).
     runEffects(entity, resolvedAction.effects);
 
     // Kind connu par construction (validé au chargement, voir

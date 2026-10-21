@@ -11,7 +11,7 @@
 // la main.
 //
 // forceWeather(targetState) / triggerTransition() : effets fournis par
-// l'appelant (voir view/city-screen.js) — ce module ignore tout de
+// l'appelant (voir view/debug-effects.js) — ce module ignore tout de
 // setSession, même principe que openPauseMenu/openCityMapMenu. Chaque
 // activation FERME le menu (retour immédiat au jeu pour entendre le
 // résultat) — comportement uniforme pour les deux types d'entrée, par

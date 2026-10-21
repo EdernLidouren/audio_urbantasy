@@ -4,13 +4,14 @@
 // que des valeurs qu'on peut tourner à l'oreille sans rien casser — pas
 // d'invariant structurel (ceux-là restent dans le fichier qui en dépend :
 // TICK_MS/MAX_FRAME_MS dans lib/loop.js, les bornes [-1,1] du pan dans
-// view/audio/city-scene.js, etc.).
+// view/audio/spatial.js, etc.).
 //
 // Dernier recours de la cascade (voir lib/tuning.js / resolveTuning) : le
 // registre d'entités et les instances peuvent tout ignorer, tout retombe ici.
 
 // Durée (ms) du fondu de la PERCEPTION SURNATURELLE (voir
-// core/presence.js/"perceptionActive", view/audio/city-scene.js) —
+// core/presence.js/"perceptionActive", view/audio/layers.js,
+// view/audio/muffle.js) —
 // crossfade musique/ambiance vers les pools surnaturels ET rampe du filtre
 // d'étouffement des entités mondaines, LA MÊME durée pour les deux (une
 // seule transition ressentie, pas deux désynchronisées). Const à part
@@ -20,7 +21,7 @@
 const PERCEPTION_FADE_MS = 2500;
 // Marge (ms) AU-DESSUS du fondu ci-dessus avant que la touche de perception
 // ne redevienne active — jamais en dessous, sous peine de fondus qui se
-// chevauchent/se battent (voir view/city-screen.js).
+// chevauchent/se battent (voir view/perception-toggle.js).
 const PERCEPTION_COOLDOWN_MARGIN_MS = 700;
 
 export const TUNING_DEFAULTS = {
@@ -68,15 +69,13 @@ export const TUNING_DEFAULTS = {
   // entité highlight:true, une fois sa zone d'interaction rejointe.
   farVolumeMax: 0.5,
 
-  // Surlignage audio de proximité (voir view/audio/city-scene.js,
-  // doc/entity-model.md) : à portée d'interaction (dist <= interactRange),
-  // une entité highlight:true saute à fullVolume — SAUT NET, INSTANTANÉ,
-  // pas une rampe. Une version rampée (montée/descente progressives sur
-  // quelques dizaines à centaines de ms) a été essayée et abandonnée :
-  // quasi inaudible à l'oreille en marchant/courant normalement, la
-  // fenêtre de présence dans interactRange étant trop courte pour laisser
-  // le fondu se terminer (voir view/audio/spatial.js/
-  // volumeForDistance). EXPLICITE et INDÉPENDANT de observable/
+  // Surlignage audio de proximité (voir view/audio/spatial.js/
+  // volumeForDistance, view/audio/entity-audio.js, doc/entity-model.md) :
+  // à portée d'interaction (dist <= interactRange), une entité
+  // highlight:true saute à fullVolume — SAUT NET, INSTANTANÉ, pas une
+  // rampe : une montée progressive serait quasi inaudible en marchant ou
+  // en courant, la fenêtre de présence dans interactRange étant trop
+  // courte pour laisser un fondu se terminer. EXPLICITE et INDÉPENDANT de observable/
   // interactable — une entité n'est surlignée QUE si elle (ou son
   // archétype, ou son instance) déclare highlight: true. Ce défaut GLOBAL
   // (false) est le dernier recours de la cascade instance -> archétype ->
@@ -112,27 +111,20 @@ export const TUNING_DEFAULTS = {
   // l'instance via `tuning`, ou à l'archétype) transite en SILENCE côté
   // son de passage — les rampes d'occlusion et les pas de trajet/arrivée
   // jouent quand même, DEUX choses sonores indépendantes qui se composent
-  // (voir playTransitionSteps/playArrivalStep, view/audio/city-scene.js),
+  // (voir playTransitionSteps/playArrivalStep, view/audio/footsteps.js),
   // jamais mélangées à ce son-ci.
 
-  // Intervalle minimum (ms) entre deux bruits de pas d'une MÊME cause
-  // (reprise après arrêt + cadence normale d'un côté, changement de sol de
-  // l'autre — voir view/audio/city-scene.js, deux cooldowns séparés).
-  // Anti-mitraillette sur appuis répétés rapides — n'affecte que le SON,
-  // jamais le déplacement. Doit rester nettement sous l'intervalle de
-  // marche soutenue (~330ms avec les valeurs actuelles) pour rester
-  // invisible en marche normale ; plus haut = pas plus espacés/étouffés sur
-  // des à-coups ; plus bas = plus permissif.
+  // Intervalle minimum (ms) entre deux sons de COLLISION du joueur (voir
+  // view/audio/footsteps.js/playPacedSound) : un son qui arrive plus tôt
+  // est sauté, sans file d'attente. Le pas, lui, n'a aucun cooldown — il
+  // est cadencé par la distance parcourue (stepDistance). Doit rester
+  // nettement sous la cadence de marche soutenue pour qu'une butée
+  // prolongée sonne au rythme des pas ; plus haut = collisions plus
+  // espacées sur des à-coups ; plus bas = plus permissif.
   minStepIntervalMs: 150,
 
-  // Écart minimum (ms) entre deux bruits de pas de causes DIFFÉRENTES
-  // (reprise après arrêt ET changement de sol, ex. un demi-tour juste après
-  // avoir franchi une frontière) — les deux ont leur propre cooldown
-  // ci-dessus (l'un ne doit jamais bloquer l'autre, voir city-scene.js),
-  // mais sans cet écart minimal les deux clips (souvent 300-650 ms) peuvent
-  // se chevaucher presque entièrement et brouiller la transition. Nettement
-  // plus court que minStepIntervalMs : juste de quoi séparer les deux
-  // attaques à l'oreille, pas de quoi retarder sensiblement la transition.
+  // Écart minimum (ms) entre deux bruits de pas de causes différentes,
+  // nettement plus court que minStepIntervalMs.
   footstepOverlapGuardMs: 80,
 
   // Fréquence de coupure (Hz) du passe-bas d'une entité au plus loin
@@ -163,9 +155,8 @@ export const TUNING_DEFAULTS = {
   // brouiller la scène sonore ; plus bas = quasi inaudible.
   reverbWet: 0.18,
 
-  // Part (0-1) du signal de CHAQUE voix envoyée au bus de réverb. Uniforme
-  // pour toutes les entités dans ce premier passage (pas encore de variation
-  // par distance). Plus haut = la voix nourrit davantage la réverb ; plus
+  // Part (0-1) du signal de CHAQUE voix envoyée au bus de réverb. Ne varie
+  // pas avec la distance. Plus haut = la voix nourrit davantage la réverb ; plus
   // bas = elle reste presque entièrement sèche.
   reverbSend: 0.5,
 
@@ -176,7 +167,7 @@ export const TUNING_DEFAULTS = {
   footstepReverbSend: 0.15,
 
   // Durée (ms) du fondu de sortie UNIVERSEL de la musique (voir
-  // lib/audio.js/fadeOutMusic, view/audio/city-scene.js) : la piste en cours
+  // lib/audio/music.js/fadeOutMusic, view/audio/layers.js) : la piste en cours
   // descend à 0 puis s'arrête, JAMAIS une coupure sèche — réutilisée par
   // TOUT arrêt (bascule de phase jour/nuit, changement de scène). Réglable à
   // l'oreille — plus haut = fondu plus doux/lent ; plus bas = plus net. Ne
@@ -184,7 +175,7 @@ export const TUNING_DEFAULTS = {
   // jouée directement, sans fondu).
   musicFadeMs: 2000,
   // Fourchette (ms) de la PAUSE ("respiration") entre deux morceaux — à la
-  // fin naturelle d'un morceau (enchaînement, voir lib/audio.js/
+  // fin naturelle d'un morceau (enchaînement, voir lib/audio/music.js/
   // startMusicSequence) ET après le fondu d'une bascule de phase (même
   // mécanisme réutilisé, voir switchMusicSequence) : silence complet, tirée
   // aléatoirement à CHAQUE respiration (l'irrégularité fait vivant, même
@@ -194,7 +185,7 @@ export const TUNING_DEFAULTS = {
   musicBreatherMaxMs: 8000,
 
   // Fourchette (ms) du délai de démarrage ALÉATOIRE appliqué à toute balise
-  // CONTINUE nouvellement créée dont staggerBeacon reste true (voir plus
+  // CONTINUE à sa création dont staggerBeacon reste true (voir plus
   // bas ; view/audio/entity-sound-entry.js/buildEntitySoundEntry) — désempile les
   // attaques d'un démarrage GROUPÉ (montage de scène, spawn groupé
   // d'éphémères), sans jamais détecter s'il y en a réellement plusieurs :
@@ -209,12 +200,12 @@ export const TUNING_DEFAULTS = {
   // --- Paramètres sonores d'entité (cascade son -> instance -> archétype ->
   // défaut global, voir doc/entity-model.md et config/tuning.js/resolveTuning)
   // : les clés ci-dessous rejoignent reverbSend plus haut dans ce même
-  // référentiel, résolues exactement de la même façon. Défauts choisis pour
-  // ne RIEN changer au comportement des entités existantes tant qu'elles ne
-  // déclarent aucune de ces clés.
+  // référentiel, résolues exactement de la même façon. Défauts NEUTRES :
+  // une entité qui ne déclare aucune de ces clés garde le comportement de
+  // base décrit pour chacune.
 
-  // Mode de lecture de la balise (voir view/audio/city-scene.js) :
-  // "continu" (défaut, comportement actuel) — boucle positionnée permanente,
+  // Mode de lecture de la balise (voir view/audio/entity-sound-entry.js) :
+  // "continu" (défaut) — boucle positionnée permanente,
   // pan/volume/passe-bas mis à jour à chaque tick ;
   // "intermittent" — rejouée en ONE-SHOT positionné toutes les
   // beaconInterval ± beaconIntervalVariation (voir les deux réglages
@@ -226,8 +217,8 @@ export const TUNING_DEFAULTS = {
   // plus fréquente.
   beaconInterval: 4000,
   // Aléa (ms) appliqué de part et d'autre de beaconInterval, tiré à chaque
-  // déclenchement (voir la note sur le déterminisme dans
-  // view/audio/city-scene.js) : évite une cadence mécanique/prévisible.
+  // déclenchement (voir la note sur l'aléa de rendu dans
+  // view/audio/entity-sound-entry.js) : évite une cadence mécanique/prévisible.
   // Sans effet en mode "continu".
   beaconIntervalVariation: 1000,
   // Facteur propre de la balise (multiplicatif, 1 = neutre). INDÉPENDANT de
@@ -236,7 +227,7 @@ export const TUNING_DEFAULTS = {
   // règle CETTE balise. Les deux se multiplient entre eux.
   beaconGain: 1,
   // OPT-OUT du désempilement d'attaques (voir beaconStaggerMinMs/
-  // beaconStaggerMaxMs plus bas, view/audio/city-scene.js) : true (défaut)
+  // beaconStaggerMaxMs plus haut, view/audio/entity-sound-entry.js) : true (défaut)
   // -> cette balise participe au léger délai aléatoire appliqué à tout
   // démarrage GROUPÉ (montage de scène, spawn groupé d'éphémères). false ->
   // démarre PRÉCISÉMENT, sans délai — pour un son dont le retard serait
@@ -247,8 +238,8 @@ export const TUNING_DEFAULTS = {
   // Variation de hauteur (fraction du taux de lecture, 0-1) appliquée
   // aléatoirement à chaque lecture d'un son PONCTUEL (balise intermittente
   // ou son de déplacement) : le taux de lecture est tiré uniformément dans
-  // [1-pitchVariation, 1+pitchVariation]. 0 = aucune variation (défaut,
-  // comportement actuel inchangé). Pour une balise CONTINUE, la variation
+  // [1-pitchVariation, 1+pitchVariation]. 0 = aucune variation (défaut).
+  // Pour une balise CONTINUE, la variation
   // est tirée UNE SEULE FOIS à la création de la voix (une boucle n'a pas
   // d'évènement "déclenchement" répété).
   pitchVariation: 0,
@@ -275,7 +266,7 @@ export const TUNING_DEFAULTS = {
   vocalInterval: 20000,
   // Aléa (ms) appliqué de part et d'autre de vocalInterval, tiré à chaque
   // déclenchement — même mécanisme que beaconIntervalVariation (voir la
-  // note sur le déterminisme dans view/audio/city-scene.js), VOLONTAIREMENT
+  // note sur l'aléa de rendu dans view/audio/entity-sound-entry.js), VOLONTAIREMENT
   // large pour renforcer le caractère imprévisible du vocal.
   vocalIntervalVariation: 15000,
   // Facteur propre du vocal (multiplicatif, 1 = neutre) — même principe que
@@ -297,7 +288,7 @@ export const TUNING_DEFAULTS = {
   // ce défaut).
 
   // Fréquence de coupure (Hz) du PASSE-HAUT appliqué aux sons d'une entité
-  // isFlying, EN PLUS du passe-bas existant (cutoffMin/cutoffMax) : retire
+  // isFlying, EN PLUS du passe-bas de distance (cutoffMin/cutoffMax) : retire
   // le grave, le son devient plus fin/aérien. Plus haut = effet plus
   // marqué ; plus bas = effet plus subtil (proche de 0 = quasi neutre).
   flyingHighpassHz: 5500,
@@ -322,14 +313,14 @@ export const TUNING_DEFAULTS = {
   // la distance, jamais à sa place. Bac à sable de réglage, même principe
   // que le profil isFlying juste au-dessus. Jamais cascadé par entité/type.
 
-  // Profil de l'AUTRE FACE (voir CLAUDE.md/"RECTO/VERSO" étape 2/2) :
+  // Profil de l'AUTRE FACE (voir doc/entity-model.md/"Recto/verso") :
   // appliqué à tout son positionné d'une entité de la face que le joueur ne
   // regarde PAS. Fixe (amount toujours 1). Bas = très sourd/lointain, haut
   // = à peine étouffé ; l'autre face se DEVINE, elle ne s'entend pas comme
   // si le joueur y était. DÉFAUTS : une scène à deux faces peut déclarer
   // les siens à sa racine (même nom de champ, voir doc/scene-format.md) —
-  // l'étouffement décrit ce qui sépare les deux faces, une propriété du
-  // lieu, jamais d'une entité.
+  // l'étouffement décrit ce qui sépare les deux faces, une propriété de la
+  // scène, jamais d'une entité.
   faceMufflingLowpassHz: 1000,
   faceMufflingGain: 0.5,
 
@@ -381,19 +372,19 @@ export const TUNING_DEFAULTS = {
   // PERCEPTION_COOLDOWN_MARGIN_MS ci-dessus) : garantie STRUCTURELLE que le
   // cooldown ne peut jamais tomber sous la durée du fondu qu'il protège
   // (jamais deux fondus qui se chevauchent/se battent, voir
-  // view/city-screen.js). Ne jamais remplacer par un littéral indépendant.
+  // view/perception-toggle.js). Ne jamais remplacer par un littéral indépendant.
   perceptionCooldownMs: PERCEPTION_FADE_MS + PERCEPTION_COOLDOWN_MARGIN_MS,
 
   // Durée (ms) du fondu de l'AMBIANCE MÉTÉO (voir core/weather.js,
-  // view/audio/city-scene.js) — couche d'ÉTAT superposée à l'ambiance de
-  // scène (lib/audio.js/setWeatherAmbienceLayer), fondue à chaque
+  // view/audio/layers.js) — couche d'ÉTAT superposée à l'ambiance de
+  // scène (lib/audio/ambience.js/setWeatherAmbienceLayer), fondue à chaque
   // transition météo. Plus lent que perceptionFadeMs par défaut : une
   // bascule météo est un changement atmosphérique graduel, jamais aussi
   // net qu'un toggle de perception.
   weatherAmbienceFadeMs: 3000,
 
   // Durées (ms) du fondu de la couche ENTITÉS pendant le SAS d'un teleport
-  // en mode "fade" (voir lib/audio.js/rampEntityLayerGain,
+  // en mode "fade" (voir lib/audio/context.js/rampEntityLayerGain,
   // view/world-travel.js/runTeleportSas) — le "fondu au noir sonore" qui
   // souligne le changement de scène/position et masque un éventuel
   // chargement. COURTES par nature (souligner sans ralentir le passage) : sortant
@@ -421,8 +412,8 @@ export const TUNING_DEFAULTS = {
   // view/audio/footsteps.js/playTransitionSteps,
   // transitionStepIntervalMs ci-dessous) — ajuster CETTE seule valeur
   // recadence les pas EN MÊME TEMPS que les rampes, jamais un second
-  // réglage à tenir synchronisé. Doublée (300 -> 600, essai en cours) pour
-  // une traversée plus vécue : à réajuster à l'oreille.
+  // réglage à tenir synchronisé. Assez longue pour que la traversée se
+  // vive : à réajuster à l'oreille.
   faceSwitchFadeMs: 600,
 
   // Intervalle (ms) entre deux pas de TRAJET pendant une transition

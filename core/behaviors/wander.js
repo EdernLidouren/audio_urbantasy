@@ -4,34 +4,28 @@
 // core/rng.js) : les durées de chaque état ET les directions sont TIRÉES,
 // jamais Math.random().
 //
-// Respecte la frontière comportement/physique (voir core/reduce.js,
-// CLAUDE.md) : ce module produit SEULEMENT une INTENTION (`intent` :
-// -1/0/+1), JAMAIS une position résolue lui-même — CHANGEMENT par rapport à
-// l'ancienne version (qui se bornait toute seule via moveAndBounce,
-// core/physics/movement.js). Nécessaire pour l'item "blocage" (voir plus
-// bas) : reduce.js résout l'intention via resolveBodyMove
-// (core/physics/collision.js), qui arrête déjà tout mobile à intention pile
-// au contact d'un corps bloquant (borne de la scène OU entité impassable) —
-// PHYSIQUE INCHANGÉE, wander n'a donc plus besoin de connaître les
+// Respecte la frontière comportement/physique (voir core/reduce.js) : ce
+// module produit SEULEMENT une INTENTION (`intent` : -1/0/+1), JAMAIS une
+// position résolue lui-même. reduce.js résout l'intention via
+// resolveBodyMove (core/physics/collision.js), qui arrête tout mobile à
+// intention pile au contact d'un corps bloquant (borne de la scène OU
+// entité impassable) — wander n'a donc pas besoin de connaître les
 // obstacles pour s'y arrêter proprement, seulement pour RÉAGIR à l'arrêt
 // (rebond, voir plus bas).
 //
 // Conséquence : `speed` (validé ci-dessous) n'est jamais lu par step() —
 // consommé à la RÉSOLUTION par core/reduce.js/resolveIntents, où il prime
-// sur entity.speed, comme pour follow.js/goto.js. `turnChance` (ancien réglage,
-// flip à chaque tick) disparaît : REMPLACÉ par la machine à deux états
-// ci-dessous, qui ne choisit plus une direction qu'aux TRANSITIONS de
-// phase, jamais par tick.
+// sur entity.speed, comme pour follow.js et goto.js. La machine à deux états
+// ci-dessous ne choisit une direction qu'aux TRANSITIONS de phase, jamais
+// par tick.
 //
-// État interne, sous `entity.wander` (jamais `entity.dir` — l'ancien champ,
-// propre à l'ex-implémentation, n'est plus lu ici) :
+// État interne, sous `entity.wander` :
 //   { phase: "walk" | "pause", ticksLeft, dir, prevX }
 // phase/ticksLeft/dir pilotent la machine ; prevX (position au tick
 // PRÉCÉDENT) sert UNIQUEMENT à détecter un blocage (voir step()) — jamais
 // lu ailleurs. Absent tant qu'aucun tick n'a encore été joué pour cette
-// entité (lazy init dans step(), pas de seed dédiée dans core/state.js
-// contrairement à l'ancien `dir:1` : ce module gère désormais seul tout son
-// état, y compris son tirage initial).
+// entité (lazy init dans step(), pas de seed dédiée dans core/state.js :
+// ce module gère seul tout son état, y compris son tirage initial).
 
 import { nextRandom } from "../rng.js";
 
@@ -123,7 +117,7 @@ function drawWalkDirection(previousDir, continueBias, rngState) {
 // step(entity, context) : context porte length/rngState (ce module ignore
 // le reste, ex. getTargetPosition, réservé à follow/goto). Ne mute rien,
 // renvoie {entity, rngState, intent} — signature UNIFORME avec follow.js/
-// goto.js désormais (voir header).
+// goto.js (voir header).
 export function step(entity, context) {
   const cfg = { ...DEFAULTS, ...entity.behavior };
   let rngState = context.rngState;
@@ -144,11 +138,9 @@ export function step(entity, context) {
     // deux arrêtent déjà le mobile au même endroit via resolveBodyMove,
     // voir header) : REBOND — inverse la direction pour la durée RESTANTE
     // de cette même phase, aucun nouveau tirage. Choisi plutôt qu'une pause
-    // anticipée : c'est exactement le comportement qu'avait déjà l'ancienne
-    // version aux bornes de la scène (moveAndBounce), maintenant étendu aux
-    // obstacles pour une réaction cohérente dans les deux cas — sans ce
-    // rebond, l'entité resterait à intention constante contre l'obstacle,
-    // collée à pousser dans le vide.
+    // anticipée : même réaction aux bornes de la scène et aux obstacles,
+    // cohérente dans les deux cas — sans ce rebond, l'entité resterait à
+    // intention constante contre l'obstacle, collée à pousser dans le vide.
     w = { ...w, dir: -w.dir };
   }
 

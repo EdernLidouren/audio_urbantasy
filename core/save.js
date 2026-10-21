@@ -328,7 +328,8 @@ function stripEphemeralEntities(session) {
   return anyChanged ? { ...session, worlds } : session;
 }
 
-// PERSISTANCE SÉLECTIVE des variables (voir core/variables.js/CLAUDE.md) :
+// PERSISTANCE SÉLECTIVE des variables (voir core/variables.js,
+// doc/scripting.md/"Variables") :
 // une variable VOLATILE (persistent: false) ne doit jamais transporter sa
 // valeur RÉELLE au disque — sa valeur EST REPLACÉE par sa valeur INITIALE
 // déclarée avant sérialisation (jamais la clé elle-même retirée : voir
@@ -362,14 +363,12 @@ function resetVolatileInBag(variables) {
   return changed ? reset : variables;
 }
 
-// Applique resetVolatileInBag à UNE face (ses entités, portée "entity") ET
-// à elle-même si elle porte le sac PARTAGÉ de portée "scene" (voir
-// core/scene.js/parseScene — le sac de scène vit à la racine du MONDE,
-// jamais par face ; `world` est passé ici pour une scène SIMPLE, où la face
-// EST le monde). `world` : objet distinct de `face` UNIQUEMENT pour une
-// scène à deux faces (voir resetVolatileVariablesInWorld) — pour une scène
-// simple, les deux sont LE MÊME objet, le sac de scène n'est donc réinitialisé
-// qu'une fois.
+// Applique resetVolatileInBag aux ENTITÉS d'UNE face (portée "entity")
+// seulement. Le sac PARTAGÉ de portée "scene" vit à la racine du MONDE,
+// jamais par face (voir core/scene.js/parseScene) : il est traité une seule
+// fois par resetVolatileVariablesInWorld ci-dessous, qui appelle cette
+// fonction pour chaque face (le monde lui-même pour une scène SIMPLE).
+// Référence INCHANGÉE si aucune entité n'a changé.
 function resetVolatileInFaceEntities(face) {
   const entities = face.entities.map((entity) => {
     const variables = resetVolatileInBag(entity.variables);
@@ -436,7 +435,7 @@ export function serializeGame(session) {
 // jamais eues, et une relecture de sauvegarde ne repasse JAMAIS par
 // parseScene (qui ne s'applique qu'au chargement réseau d'une scène). Sans
 // ce rebouchage, surfaceAt(world, x) plante sur segments.find(...) dès
-// qu'une face ANCIENNE redevient active (voir view/audio/city-scene.js).
+// qu'une face ANCIENNE redevient active (voir view/audio/footsteps.js).
 // Mêmes défauts que parseScene : DEFAULT_SURFACE partout, aucun segment —
 // comportement inchangé pour ces faces anciennes. Même précédent pour
 // `nextEphemeralId` (voir core/state.js/spawnEphemeral), antérieur aux
@@ -480,7 +479,7 @@ function backfillFace(face) {
 // antérieure au modèle à deux faces n'en déclare — ce cas ne concerne donc
 // aujourd'hui que des saves ÉCRITES avec ce modèle, mais reste correct par
 // construction plutôt que supposé toujours complet.
-// variables (portée "scene", voir core/scene.js/parseScene/core/variables.js)
+// variables (portée "scene", voir core/scene.js/parseScene et core/variables.js)
 // : RACINE PARTAGÉE du monde, jamais par face (contrairement à
 // defaultSurface/segments/indoor ci-dessus) — rebouchée ICI, avant la
 // distinction simple/deux-faces, pour n'être backfillée qu'UNE fois même

@@ -2,11 +2,10 @@
 // joueur) — déterministe, AUCUN PRNG (contrairement à wander) : suivre ne
 // dépend que de la distance à la cible, rien à tirer au hasard.
 //
-// Respecte la frontière comportement/physique (voir core/reduce.js,
-// CLAUDE.md) : ce module produit SEULEMENT une INTENTION de direction
-// (`intent` : -1/0/+1), JAMAIS une position résolue lui-même — contrairement
-// à wander (voir wander.js), qui se déplace ET se borne tout seul. Ni
-// collision ni borne ici : reduce.js résout l'intention via resolveBodyMove
+// Respecte la frontière comportement/physique (voir core/reduce.js) : ce
+// module produit SEULEMENT une INTENTION de direction (`intent` : -1/0/+1),
+// JAMAIS une position résolue lui-même — même contrat que wander.js et
+// goto.js. Ni collision ni borne ici : reduce.js résout l'intention via resolveBodyMove
 // (core/physics/collision.js) — un mobile à intention est un corps PLEIN,
 // dégagement double par rapport au joueur (voir le header de collision.js),
 // mais le principe reste le même : arrêt au contact d'un corps bloquant,

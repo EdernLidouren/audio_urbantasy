@@ -26,10 +26,10 @@ FACE recto/verso vide (`parseFace`, même mécanisme).
 | `length`      | number   | optionnel, `> 0` si présent — longueur en unités le long de l'axe x — **FILET si absent** : repli sur `10` (`DEFAULT_SCENE_LENGTH`, petite étendue traversable, jamais `0`) |
 | `playerStart` | number   | point d'arrivée PAR DÉFAUT de la scène. **FILET, jamais rejeté** : absent ou hors `[0, length]` -> repli sur `0` (avec un `console.warn`), jamais d'exception. Des points d'arrivée NOMMÉS (ex. par porte) pourront s'ajouter plus tard, sans toucher à ce filet. |
 | `entities`    | Entity[] | optionnel — **FILET si absent** : repli sur `[]` (scène sans entité, toujours jouable). Voir ci-dessous pour la forme d'une entité. |
-| `music`       | string   | optionnel : musique de la scène — une clé de POOL (plusieurs fichiers, voir `assets/manifest.json`) ou un membre précis, résolue par `resolveAsset` comme tout autre pool. Canal global non spatialisé — voir `view/audio/city-scene.js`. Par défaut, lue en SÉQUENCE avec respiration (voir "Musique : séquence avec respiration" plus bas), jamais en boucle simple. |
-| `musicDay` / `musicNight` | string | optionnels : musique PAR PHASE jour/nuit (voir `core/time.js`/`phaseAt`, "Phase jour/nuit" plus bas), même forme que `music` (pool ou membre précis). Une scène qui n'en déclare aucune des deux retombe sur `music` pour les deux phases (rétrocompatible, aucune régression). Bascule en cours de jeu par FONDU UNIVERSEL puis respiration puis nouvelle séquence (`view/audio/city-scene.js`) ; à l'entrée dans une scène, la phase courante joue directement, sans fondu. |
-| `musicLoop`   | boolean  | optionnel, défaut `false` : `true` fait jouer la musique de la scène en BOUCLE CONTINUE (comportement historique), sans enchaînement ni respiration — pour les deux phases, un seul drapeau par scène. Voir "Musique : séquence avec respiration" plus bas. |
-| `ambiences`   | string[] | optionnel : 0 à `AMBIENCE_CHANNEL_LIMIT` chemins d'ambiance (`assets/ambiances/...`, voir `config/audio-channels.js`), canal global non spatialisé, jusqu'à autant de couches simultanées — voir `view/audio/city-scene.js` |
+| `music`       | string   | optionnel : musique de la scène — une clé de POOL (plusieurs fichiers, voir `assets/manifest.json`) ou un membre précis, résolue par `resolveAsset` comme tout autre pool. Canal global non spatialisé — voir `view/audio/layers.js`. Par défaut, lue en SÉQUENCE avec respiration (voir "Musique : séquence avec respiration" plus bas), jamais en boucle simple. |
+| `musicDay` / `musicNight` | string | optionnels : musique PAR PHASE jour/nuit (voir `core/time.js`/`phaseAt`, "Phase jour/nuit" plus bas), même forme que `music` (pool ou membre précis). Une scène qui n'en déclare aucune des deux retombe sur `music` pour les deux phases. Bascule en cours de jeu par FONDU UNIVERSEL puis respiration puis nouvelle séquence (`view/audio/layers.js`) ; à l'entrée dans une scène, la phase courante joue directement, sans fondu. |
+| `musicLoop`   | boolean  | optionnel, défaut `false` : `true` fait jouer la musique de la scène en BOUCLE CONTINUE, sans enchaînement ni respiration — pour les deux phases, un seul drapeau par scène. Voir "Musique : séquence avec respiration" plus bas. |
+| `ambiences`   | string[] | optionnel : 0 à `AMBIENCE_CHANNEL_LIMIT` chemins d'ambiance (`assets/ambiances/...`, voir `config/audio-channels.js`), canal global non spatialisé, jusqu'à autant de couches simultanées — voir `view/audio/layers.js` |
 | `ambiencesDay` / `ambiencesNight` | string[] | optionnels, même forme que `ambiences`. **RÉSERVÉS** : structure validée par `parseScene` mais AUCUN consommateur ne les lit encore — seule la musique réagit à la phase pour l'instant (voir `doc/time.md`). |
 | `reverbDurationSec` | number | optionnel, `> 0` : surcharge PAR SCÈNE la durée de la réponse impulsionnelle du bus de réverb (défaut global : `config/tuning-values.js`) |
 | `reverbDecay` | number | optionnel, `> 0` : surcharge PAR SCÈNE le taux de déclin de la réverb (défaut global : `config/tuning-values.js`) |
@@ -43,7 +43,7 @@ FACE recto/verso vide (`parseFace`, même mécanisme).
 
 ## Scène à deux faces (recto/verso)
 
-Étape 1/2 (voir CLAUDE.md/"RECTO/VERSO") : une scène est SIMPLE (comme
+Une scène est SIMPLE (comme
 ci-dessus, `entities`/`music`/... à la racine) OU À DEUX FACES — `recto` ET
 `verso` déclarés ENSEMBLE, jamais un seul. `id`/`titleKey`/`length`/
 `playerStart` restent TOUJOURS à la racine, PARTAGÉS par les deux faces
@@ -66,18 +66,17 @@ un de ces champs apparaît à la racine EN MÊME TEMPS que `recto`/`verso`.
 }
 ```
 
-Une scène SIMPLE (ni `recto` ni `verso`) se comporte EXACTEMENT comme avant
-ce modèle — RÉTROCOMPAT STRICTE, aucune régression pour toute scène
-existante (`demo.json`, `demo2.json`).
+Une scène SIMPLE (ni `recto` ni `verso`) n'a qu'une face, sans bascule
+(ex. `demo.json`, `demo2.json`).
 
 **Face courante et bascule** : le joueur porte `player.side`
 (`"recto"|"verso"`, défaut `"recto"`), sérialisé avec lui. En entrant dans
 une scène à deux faces depuis une autre scène (porte), on arrive TOUJOURS sur
-le recto. Depuis l'étape 2/2, LES DEUX faces tiquent à chaque tour
+le recto. LES DEUX faces tiquent à chaque tour
 (`core/reduce.js`/TICK) — mais ISOLÉES : collision, ciblage de comportement
 (`follow`/`goto`), interaction et occupation restent bornés à la face de
 l'entité (voir `doc/entity-model.md`/"Recto/verso" pour le détail complet de
-cette isolation). "Face courante" ne veut donc plus dire "seule face
+cette isolation). "Face courante" ne veut donc pas dire "seule face
 active", mais "celle qui porte le joueur/les compagnons ET se rend
 normalement" — l'autre se rend en ÉTOUFFÉ (voir "Coexistence audible" plus
 bas), jamais gelée. Basculer de face reste DANS le même monde
@@ -91,10 +90,10 @@ interactable avec `action: { kind: "switchSide", arrivalX: <number> }` —
 `"teleport"` d'une porte, voir `doc/scripting.md`/"Effets d'action", mais on
 reste dans le même monde). Une entité par face, chacune
 déclarant l'arrivée sur l'autre (voir l'exemple ci-dessous) — jamais une
-entité "des deux côtés à la fois". `arrivalX` n'est PAS validé en bornes par `parseScene` (comme tout
-champ `action.*`, voir le tableau "Entité" plus haut) — clampé à
-l'exécution par `core/state.js`/`switchSide`, jamais un plantage sur un
-contenu mal formé.
+entité "des deux côtés à la fois". `arrivalX` est validé au chargement
+dans `[0, length]` (`core/action-kinds.js`, comme les autres champs
+d'action, voir le tableau "Entité" plus bas) ; `core/state.js`/`switchSide`
+le borne encore à l'exécution.
 
 ```json
 { "id": "gap-recto", "type": "passage", "x": 8, "action": { "kind": "switchSide", "arrivalX": 8 } }
@@ -117,8 +116,8 @@ nouvelle face active (voir `view/world-travel.js`/`sideSwitch`) —
 SANS effet audible : le croisement a déjà amené le son là où la scène
 fraîche le poserait.
 
-**Coexistence audible (étape 2/2)** : depuis `core/reduce.js`/TICK, LES DEUX
-faces tiquent à chaque tour — plus de gel de l'autre face, mais ISOLATION
+**Coexistence audible** : dans `core/reduce.js`/TICK, LES DEUX
+faces tiquent à chaque tour — l'autre face n'est jamais gelée, mais ISOLATION
 STRICTE (voir `doc/entity-model.md`/"Recto/verso") : collision, ciblage de
 comportement (`follow`/`goto`), interaction et occupation restent bornés à
 la face de l'entité, jamais croisés. Seul le SON traverse : les entités de
@@ -128,8 +127,8 @@ champs racine `faceMufflingGain`/`faceMufflingLowpassHz` ci-dessous, sinon
 d'habitude), chaque rôle dosé par son gain "autre face" — par défaut le
 beacon n'y est pas entendu (voir `doc/entity-model.md`/"Recto/verso" pour
 les réglages par rôle). Au basculement de face, normal et étouffé
-s'inversent — c'est ce croisement qui l'anime désormais, plutôt qu'un
-échange instantané.
+s'inversent — c'est ce croisement qui l'anime, plutôt qu'un échange
+instantané.
 
 **Persistance** : une scène à deux faces sauvegarde SES DEUX FACES
 (entités, rngState, compteur d'éphémères) — `core/save.js` traite un monde à
@@ -137,10 +136,6 @@ deux faces comme deux faces indépendantes (purge d'éphémères,
 rebouchage `defaultSurface`/`segments`/`nextEphemeralId`). Une sauvegarde
 antérieure à ce modèle n'a jamais de `recto`/`verso` (scènes simples
 inchangées) ni de `player.side` (rebouché à `"recto"`).
-
-**Étape 2/2 : coexistence audible** — voir "Coexistence audible" ci-dessus.
-Les deux faces tiquent désormais toujours ensemble, isolées ; le modèle
-"une seule face active" de l'étape 1 n'existe plus.
 
 ## Segment (surface)
 
@@ -195,7 +190,7 @@ registre est prêt à en accueillir, rien de plus aujourd'hui.
 consommateur de l'horloge : `musicDay`/`musicNight` (voir tableau "Scène"
 ci-dessus) en tirent la musique de la scène, avec un fondu universel puis une
 respiration puis la nouvelle séquence à chaque bascule en cours de jeu
-(`view/audio/city-scene.js`, voir section suivante). Détail complet de
+(`view/audio/layers.js`, voir section suivante). Détail complet de
 l'horloge : `doc/time.md`.
 
 ## Musique : séquence avec respiration
@@ -208,12 +203,11 @@ morceau joue une fois (`loop:false`), se termine, une PAUSE aléatoire
 puis un nouveau morceau démarre — tiré du même pool (`music`/`musicDay`/
 `musicNight`), SANS répéter immédiatement le précédent si le pool en compte
 plusieurs (`resolveAsset`/`pickFromPool`, voir `lib/assets.js` — un pool à
-un seul élément rejoue simplement ce même élément, rétrocompatible).
+un seul élément rejoue simplement ce même élément).
 Recommence indéfiniment tant que la scène reste active.
 
 `musicLoop: true` bascule la scène ENTIÈRE (les deux phases) en boucle
-continue à la place — comportement historique préservé pour une scène qui
-veut une ambiance ininterrompue (ex. magasin, tension) : aucun enchaînement,
+continue à la place — pour une scène qui veut une ambiance ininterrompue (ex. magasin, tension) : aucun enchaînement,
 aucune respiration.
 
 **Unification avec la bascule de phase** : une bascule jour/nuit réutilise
@@ -262,7 +256,7 @@ seuls `labelKey` et `descriptionKey` (résolus) sont exposés.
 ## Présence conditionnelle et triggers de comportement
 
 Une `PresenceRule` : `{ when: <condition>, effects: [<effet>...] }`, ou en
-RACCOURCI rétrocompatible `{ when: <condition>, present: boolean }` (sans
+RACCOURCI `{ when: <condition>, present: boolean }` (sans
 `effects`), normalisé par `parseScene` en `{ when, effects: [{ type:
 "presence", present }] }` — tout consommateur d'une entité PARSÉE ne voit
 plus que la forme canonique.
@@ -271,19 +265,17 @@ plus que la forme canonique.
 sémantique, des exemples réels) vit ENTIÈREMENT dans `doc/scripting.md`**,
 jamais recopiée ici : ce document-ci ne couvre que ce qui touche le PARSING
 JSON — `when.type` doit exister dans le registre de conditions (échec clair
-si inconnu, comme un type d'entité) ; la plupart des champs propres à un
-type ne sont PAS validés en plus (dégradation silencieuse à l'évaluation),
-SAUF `"hasEquipmentTag"` (`tag`), `"weather"` (`state`) et `"variable"`
-(`scope`/`name`, voir tableau "Entité" plus haut pour où `variables` se
-déclare), dont un champ référence du contenu externe et échoue donc
-clairement au chargement — et `"allOf"`, dont le tableau `conditions` est
-validé RÉCURSIVEMENT. Détail de CHAQUE type, des effets (`"presence"`/
+si inconnu, comme un type d'entité) ; les champs propres à un type sont
+validés quand une faute ferait échouer la règle EN SILENCE à l'évaluation
+(référence de contenu inconnue, bornes, sous-conditions des composites,
+validées RÉCURSIVEMENT) — cas par cas dans `core/script-parse.js`/
+`validateCondition`, jamais recopiés ici. Détail de CHAQUE type, des effets (`"presence"`/
 `"behavior"`), et des RÈGLES (priorité, exemples réels) : `doc/scripting.md`.
 Sémantique de la dormance côté entité (les trois plans coupés, la garde
 anti-boucle) : `doc/entity-model.md`.
 
 MÊME registre, MÊME validation (`validateCondition`, factorisée dans
-`core/scene.js`) pour `entities[].action.condition` (voir tableau "Entité"
+`core/script-parse.js`) pour `entities[].action.condition` (voir tableau "Entité"
 plus haut) — une condition ne sait pas d'où elle est appelée,
 `presence[].when` et `action.condition` partagent exactement ce chemin.
 

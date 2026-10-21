@@ -64,8 +64,11 @@ sur un jour de semaine précis.
 
 ## Avancement accéléré
 
-`TIME_SCALE` (`config/time-values.js`, défaut 60) : minutes de jeu par seconde
-réelle. Avec 60, une journée de jeu (24 h) dure 24 minutes réelles.
+`TIME_CONFIG.timeScale` (`config/time-values.js`, défaut 60) : minutes de jeu par
+seconde réelle. Avec 60, une journée de jeu (24 h) dure 24 minutes réelles. Seul le
+menu debug du temps (Shift+T) le modifie, temporairement (`setTimeScale`/
+`resetTimeScale`, retour à la valeur de référence `DEFAULT_TIME_SCALE`) ; relu à
+chaque frame, un changement prend effet aussitôt.
 
 Le core ne lit **jamais** l'horloge réelle — `advanceTime(session, minutes)` est la
 SEULE fonction qui avance le compteur, et `minutes` est un delta déjà exprimé en
@@ -78,11 +81,12 @@ minutes de jeu, mesuré et converti au BORD :
    `startLoop(onTick, onFrame)`, routé à l'écran actif au sommet de la pile via
    `lib/screens.js`/`tickFrame` (même mécanisme que `tickActive`/`onTick`).
 2. `view/game-clock.js`/`onFrame(deltaMs)` convertit ce delta en minutes de jeu :
-   `minutes = (deltaMs / 1000) * (TIME_SCALE / minutesPerHour)`, puis appelle
-   `advanceTime(getSession(), minutes)`.
+   `minutes = (deltaMs / 1000) * (TIME_CONFIG.timeScale / minutesPerHour)`, puis
+   avance l'horloge (`advance`, voir "Triggers horaires" plus bas) par
+   `advanceTime(session, minutes)`.
 
-Même delta injecté → même compteur résultant : le déterminisme du core (voir
-CLAUDE.md) s'étend donc à l'horloge, malgré sa source réelle (l'horloge murale) —
+Même delta injecté → même compteur résultant : le déterminisme du core
+s'étend donc à l'horloge, malgré sa source réelle (l'horloge murale) —
 c'est la conversion au bord qui absorbe cette impureté, jamais le core lui-même.
 
 ## Pause gratuite par construction
@@ -95,27 +99,26 @@ non testable en terminal) :
   `onFrame` qu'au sommet. Un menu poussé par-dessus la ville en devient le sommet —
   `onFrame` de la ville n'est simplement plus appelé, sans condition à écrire nulle
   part pour ça.
-- **Transition de scène** : `scene` reste `null` le temps d'un éventuel chargement
-  réseau (voir `view/world-travel.js`/`performTransition`). `onFrame` s'en garde
-  exactement comme `onTick` (`if (!scene) return;`) — aucun delta injecté pendant le
-  chargement, le temps ne "mange" rien.
+- **Transition de scène** : la lecture d'une scène jamais visitée se fait sous un
+  écran vide poussé sur la pile (`view/world-travel.js`/`loadTargetScene`, comme le
+  sas d'une porte) — même gel que le menu ci-dessus. Et sans vue du monde, `onFrame`
+  de la ville s'en garde exactement comme `onTick` (`view/city-screen.js`) : aucun
+  delta injecté pendant le chargement, le temps ne "mange" rien.
 
 ## Persistance
 
 `session.time` est un nombre plat : couvert par construction par l'audit de
 sérialisabilité (`core/checks/save.check.js`), étendu explicitement à ce champ. Une
-sauvegarde antérieure à l'introduction de l'horloge n'a jamais eu cette clé — rebouchée
-à `INITIAL_TIME` par `core/save.js`/`migrateSave`, même principe que le rebouchage déjà
-en place pour `defaultSurface`/`segments`.
+sauvegarde sans cette clé est rebouchée à `INITIAL_TIME` par
+`core/save.js`/`migrateSave`, même principe que le rebouchage de
+`defaultSurface`/`segments`.
 
 ## Lien réservé avec `lastVisited`, pas exploité
 
-Chaque monde rangé (`core/state.js`/`travelToWorld`) note désormais `session.time`
-(la minute de jeu courante) dans son `lastVisited`, plutôt qu'un simple compteur de
-rangements. **Rien ne lit encore cette valeur.** C'est le crochet pour une future
-simulation d'absence (modèle "Animal Crossing" : un monde quitté pourrait évoluer, ou
-simplement rattraper le temps écoulé, à la prochaine visite) — non câblée par ce
-chantier.
+Chaque monde rangé (`core/state.js`/`travelToWorld`) note `session.time` (la minute
+de jeu courante) dans son `lastVisited`. **Rien ne lit encore cette valeur.** C'est le
+crochet pour une future simulation d'absence (modèle "Animal Crossing" : un monde quitté pourrait évoluer, ou
+simplement rattraper le temps écoulé, à la prochaine visite) — non câblée.
 
 ## Phase jour/nuit — premier consommateur de l'horloge
 
@@ -130,8 +133,7 @@ existants.
 
 **Musique par phase, propriété de la scène** (`doc/scene-format.md`) : `musicDay` /
 `musicNight`, optionnels — une scène qui n'en déclare aucun retombe sur `music`
-(champ existant) pour les deux phases, aucune régression pour le contenu déjà
-écrit. Même structure prévue pour l'ambiance (`ambiencesDay` / `ambiencesNight`,
+pour les deux phases. Même structure prévue pour l'ambiance (`ambiencesDay` / `ambiencesNight`,
 validés par `parseScene`) mais **non exploitée** — seule la musique réagit à la
 phase pour l'instant.
 
@@ -147,13 +149,13 @@ annonce « La nuit tombe. » / « Le jour se lève. » : `view/ambient-announcem
   l'enchaînement naturel entre deux morceaux, voir `doc/entity-model.md` et
   `doc/scene-format.md`/"Musique : séquence avec respiration") PUIS démarrage de
   la nouvelle séquence (`switchMusicSequence`) — jamais un fondu croisé avec
-  chevauchement comme avant : la sortante s'éteint, un silence s'écoule,
+  chevauchement : la sortante s'éteint, un silence s'écoule,
   l'entrante démarre directement (sans fondu d'entrée, comme à l'ouverture
   d'une scène). Durée du fondu réglable à l'oreille :
   `TUNING_DEFAULTS.musicFadeMs` (`config/tuning-values.js`, défaut 2000 ms) ;
   fourchette de respiration : `musicBreatherMinMs`/`musicBreatherMaxMs`.
 - Robuste au chevauchement (ex. bascule puis transition de scène coup sur
-  coup) : un compteur de génération dans `lib/audio.js` invalide toute
+  coup) : un compteur de génération dans `lib/audio/music.js` invalide toute
   respiration/enchaînement en attente d'une séquence périmée — jamais de
   Howl fantôme, jamais deux fondus qui se disputent le canal.
 
@@ -196,7 +198,7 @@ Sur l'écran de jeu, "t" (discrète, sans effet sur le déplacement) annonce heu
 date (canal `liveRegion`, `i18n` : clé `time.announce` + `time.season.*`/
 `month.*`). C'est l'outil de test à l'oreille : jouer quelques minutes
 et appuyer sur "t" régulièrement doit montrer l'heure avancer au rythme de
-`TIME_SCALE`, et la date rouler correctement (minuit → jour suivant, fin de mois →
+`TIME_CONFIG.timeScale`, et la date rouler correctement (minuit → jour suivant, fin de mois →
 mois suivant, fin d'année → saison qui repart à `printemps`).
 
 `view/status-announcements.js`/`announceGameTime` fournit à `t("time.announce", {...})` des
@@ -209,7 +211,7 @@ année" (`data/i18n/fr/status.json` place le jour avant le mois ;
 `data/i18n/en/status.json` le mois avant le jour, forme "heure, mois jour, saison,
 année") — changer de langue, réordonner, ou
 retirer un composant ne touche QUE ce gabarit, jamais le code. `weekday`
-(`core/time.js`/`weekdayOf`, `WEEKDAY_KEYS`) reste dérivable mais n'est PLUS fourni
+(`core/time.js`/`weekdayOf`, `WEEKDAY_KEYS`) reste dérivable mais n'est pas fourni
 à ce gabarit — sa dérivation pure est testée indépendamment (voir
 `core/checks/time.check.js`), prête pour un futur gabarit qui la redemanderait.
 
@@ -221,10 +223,9 @@ l'annonce de test ci-dessus, rien d'autre ne consomme encore `session.time` :
 
 - `ambiencesDay` / `ambiencesNight` : structure validée (voir plus haut), aucun
   fondu ni réaction câblés — même principe que la musique, pas encore fait.
-- présence conditionnelle : condition `"timeRange"` (l'aiguillage accueille
-  aussi `"weather"`/`"perceptionActive"`/`"variable"`/`"allOf"` aujourd'hui,
-  voir `doc/scripting.md` — mais aucune condition supplémentaire dérivée du
-  TEMPS lui-même, ex. `"season"`, n'existe encore) ;
+- présence conditionnelle : seule `"timeRange"` dérive du TEMPS (les autres
+  types de condition, voir `doc/scripting.md`, lisent autre chose) — aucune
+  condition `"season"` ni autre dérivation calendaire n'existe encore ;
 - description conditionnelle d'entité (texte différent selon la phase, même
   principe que `presence` — voir `doc/entity-model.md`) ;
 - pas de troisième phase jour/nuit (aube/crépuscule) — voir "Phase jour/nuit"

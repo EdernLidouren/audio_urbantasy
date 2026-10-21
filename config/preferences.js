@@ -1,6 +1,7 @@
-// Préférences utilisateur : store clé -> valeur, par-dessus les défauts de
-// config/tuning-values.js (jamais modifié ici — les préférences sont des
-// SURCHARGES, pas de nouveaux défauts). TOUT le stockage vit ici :
+// Préférences utilisateur : store clé -> valeur. Les défauts sont ceux de
+// PREF_CONSTRAINTS ci-dessous (champ `default`), seule source des bornes et
+// défauts de chaque préférence — sans lien avec config/tuning-values.js,
+// qui porte les réglages de feeling, pas les choix du joueur. TOUT le stockage vit ici :
 // localStorage automatique + export/import fichier manuel. Aucun autre
 // module n'importe localStorage ni ne connaît le format de persistance — les
 // appelants ne voient que getPref/setPref/export/import/reset.
@@ -21,7 +22,7 @@ const PREFS_VERSION = 1;
 // préférence. type ∈ "number" (borné [min,max]) | "boolean" (bornes non
 // pertinentes, ignorées par isValidPrefValue).
 export const PREF_CONSTRAINTS = {
-  // Gain de sortie GLOBAL, en bout de chaîne (voir lib/audio.js/
+  // Gain de sortie GLOBAL, en bout de chaîne (voir lib/audio/channels.js/
   // setMasterVolume) — AU-DESSUS de tous les volumes par canal ci-dessous,
   // jamais un remplaçant. Défaut délibérément BAS (20%, pas 50% comme les
   // autres) : sécurité d'accessibilité. Un jeu qui démarre fort peut couvrir
@@ -43,10 +44,8 @@ export const PREF_CONSTRAINTS = {
   interfaceVolume: { type: "number", min: 0, max: 100, default: 50 },
   // Comportement générique des menus (lib/menu.js), pas un réglage audio :
   // cyclage haut/bas, étoile de repli pour braille/sans-son, suffixe de
-  // position ("x sur y"). Défauts choisis pour ne rien changer au
-  // comportement déjà en place (cyclage désactivé, étoile et suffixe déjà
-  // de facto présents) sauf le cyclage, nouvelle mécanique désactivée tant
-  // que l'utilisateur ne l'active pas explicitement.
+  // position ("x sur y"). Étoile et suffixe activés par défaut ; cyclage
+  // désactivé tant que l'utilisateur ne l'active pas explicitement.
   menuCycling: { type: "boolean", default: false },
   menuStarPrefix: { type: "boolean", default: true },
   menuIndexSuffix: { type: "boolean", default: true },
@@ -59,10 +58,11 @@ export const PREF_CONSTRAINTS = {
   cityMapAlphaCoordinates: { type: "boolean", default: true },
   cityMapInvertY: { type: "boolean", default: false },
   // Sauvegarde automatique à chaque changement de scène réussi (voir
-  // view/city-screen.js) — pas un réglage audio ni de menu, mais suit le
-  // même patron de persistance que le reste. Activée par défaut : la
-  // partie EST la sauvegarde (voir CLAUDE.md), autant qu'elle le soit
-  // réellement sans action de l'utilisateur.
+  // view/world-travel.js/performTransition) — pas un réglage audio ni de
+  // menu, mais suit le même patron de persistance que le reste. Activée par
+  // défaut : l'état de partie EST le format de sauvegarde (voir
+  // doc/save.md), autant qu'elle le soit réellement sans action de
+  // l'utilisateur.
   autoSaveOnTransition: { type: "boolean", default: true },
   // Auto-save TEMPORELLE (temps réel, voir view/autosave-timer.js) — 0 =
   // désactivée ("Jamais", formatage spécial côté menu). INDÉPENDANTE
@@ -72,8 +72,7 @@ export const PREF_CONSTRAINTS = {
   // view/save-storage.js/playSaveSound), lue à chaque appel — QUAND jouer un
   // son reste décidé par l'appelant (playSound, jamais sur l'auto-save
   // transition) ; ce réglage décide juste SI l'utilisateur veut l'entendre
-  // du tout. Activé par défaut : comportement inchangé tant que non
-  // désactivé explicitement.
+  // du tout. Activé par défaut, jusqu'à désactivation explicite.
   saveSoundEnabled: { type: "boolean", default: true },
 };
 

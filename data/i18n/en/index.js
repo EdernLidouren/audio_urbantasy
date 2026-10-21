@@ -1,9 +1,11 @@
-// Assembles all English domains into a single flat table — SAME shape as
-// before (see data/i18n/README.md). Domains are PURE JSON (see each .json
-// in this folder), loaded via fetch (lib/i18n.js/loadLocale, same pattern
-// as scenes/load.js for scenes) — never a JS module import for data. The
-// file LIST is the only Templeton-specific knowledge here; the loading
-// mechanism stays generic in lib/i18n.js.
+// Assemble tous les domaines anglais en une seule table plate { clé:
+// texte } (voir data/i18n/README.md). Domaines PURS en JSON (voir chaque
+// .json de ce dossier), chargés par fetch (lib/i18n.js/loadLocale, même
+// patron que scenes/load.js pour les scènes) — jamais un import de module
+// JS pour de la donnée. La LISTE des fichiers est la seule connaissance
+// spécifique-Templeton ici ; le mécanisme de chargement reste générique
+// dans lib/i18n.js. Même liste que fr/index.js : la parité fr/en est
+// vérifiée par tools/check_i18n_parity.py.
 import { loadLocale } from "../../../lib/i18n.js";
 
 const DOMAINS = [

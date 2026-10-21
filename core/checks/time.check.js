@@ -29,7 +29,7 @@ export default function checkTime(run) {
   // --- Horloge de partie (core/time.js) ---
   // Compteur unique + dérivations pures. RIEN d'autre ne consomme le temps
   // ici (pas de jour/nuit, pas d'événements) — ce sont de futurs chantiers,
-  // voir core/time.md. advanceTime ne lit jamais l'horloge réelle : chaque
+  // voir doc/time.md. advanceTime ne lit jamais l'horloge réelle : chaque
   // scénario ci-dessous injecte un delta EXPLICITE, jamais mesuré.
 
   const timeScene = parseScene(
@@ -67,8 +67,8 @@ export default function checkTime(run) {
   );
 
   // Aucune horloge implicite dans le core : de nombreux TICK ne font JAMAIS
-  // avancer .time — seul advanceTime() le fait (voir CLAUDE.md, "le core
-  // n'a ni horloge ni clavier").
+  // avancer .time — seul advanceTime() le fait (le core n'a ni horloge ni
+  // clavier, voir doc/time.md).
   let noClockState = createInitialState(timeScene, undefined, NO_COMPANIONS);
   for (let i = 0; i < 500; i++) noClockState = reduce(noClockState, tick(1));
   run("horloge : reduce()/TICK ne fait jamais avancer le temps", INITIAL_TIME, noClockState.time);
@@ -194,5 +194,5 @@ export default function checkTime(run) {
   run("horloge : phase à minuit = nuit", "night", phaseAt(0));
 
   // Lien réservé (pas exploité) avec lastVisited : voir travelToWorld
-  // ci-dessus ("lastVisited écrit au rangement de A") et core/time.md.
+  // ci-dessus ("lastVisited écrit au rangement de A") et doc/time.md.
 }

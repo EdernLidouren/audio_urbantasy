@@ -5,8 +5,8 @@ import { TAG_REGISTRY } from "./tags.js";
 // décider comment une entrée de sac se comporte (empilable ou non, voir
 // core/bag.js/addItem), pas seulement pour l'affichage — contrairement au
 // registre de types d'entités (entities/types/index.js), contenu de RENDU
-// pur que le core n'importe JAMAIS (voir CLAUDE.md, "Réglages en
-// cascade"). label/descriptionKey sont lus par la VUE (menu d'inventaire,
+// pur que le core n'importe JAMAIS (un registre de contenu lui est
+// injecté, jamais importé). label/descriptionKey sont lus par la VUE (menu d'inventaire,
 // voir view/menus/inventory-menu.js) mais restent ici, dans ce MÊME
 // registre : un objet et ses métadonnées d'affichage sont une seule et
 // même donnée de contenu, pas deux registres séparés à garder synchronisés.
@@ -37,8 +37,7 @@ import { TAG_REGISTRY } from "./tags.js";
 // stackable/equippable/slot — un objet équipé PORTE ses tags (voir
 // core/equipment.js/equippedTags), une future vérification de contenu (PNJ,
 // événement) les lit via la condition "hasEquipmentTag" (core/presence.js).
-// Absent ou vide -> aucun tag, comportement inchangé pour tout objet
-// existant.
+// Absent ou vide -> aucun tag.
 //
 // `value` (optionnel, entier > 0) : VALEUR de l'objet en pièces — prix de
 // vente unitaire (voir core/trade.js/sellValueOf ; pleine valeur pour
@@ -157,9 +156,10 @@ export function itemProps(type) {
 // Sons d'un objet AU SOL, déduits de son champ `sound` (un pool) : beacon en
 // boucle, et le même son joué une fois au ramassage. Objet sans `sound` (ou
 // inconnu) -> undefined : l'appelant garde alors les sons de l'archétype
-// (générique "item", voir entities/types/item.js). Utilisé partout où un
-// objet devient une entité : instance de scène (core/entity-parse.js/parseEntity),
-// garnissage (core/spawn.js), objet posé depuis le sac (view/city-screen.js).
+// (générique "item", voir entities/types/item.js). Appelé par
+// core/entity-parse.js/genericItemDefaults, par où passent toutes les
+// façons dont un objet devient une entité : instance de scène, garnissage
+// (core/spawn.js), objet posé depuis le sac (core/spawn.js/ephemeralItemSpec).
 export function itemSounds(type) {
   const props = ITEM_REGISTRY[type];
   if (!props || !props.sound) return undefined;

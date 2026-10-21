@@ -5,11 +5,11 @@
 // scène — il n'a donc ni id, ni type, ni x ici, seulement ses sons.
 //
 // movement : le bruit de pas. loop:false ("ponctuel" au sens du modèle) car
-// c'est city-scene.js qui le rejoue à la cadence de marche (STEP_DISTANCE) —
+// c'est view/audio/footsteps.js qui le rejoue à la cadence de marche (STEP_DISTANCE) —
 // ce n'est pas une boucle Web Audio native, même si la marche elle-même est
 // continue. path pointe sur le pool "shoes_walk" — repli "son propre" du
 // joueur (voir doc/entity-model.md, "Surfaces de sol et son de pas"),
-// STRUCTURELLEMENT nécessaire mais jamais atteint en pratique aujourd'hui :
+// STRUCTURELLEMENT nécessaire mais jamais atteint en pratique :
 // le gait dérivé (voir plus bas) résout TOUJOURS un pool réel
 // (barefoot/shoes/boots existent tous), le filet ne servirait que si l'un
 // de ces trois pools venait à manquer.
