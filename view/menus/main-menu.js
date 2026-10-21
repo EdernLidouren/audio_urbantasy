@@ -11,9 +11,10 @@
 // menu et reconstruit les entrées en conséquence — createMainMenu() ne fait
 // que traduire un état déjà connu en entrées, jamais sa propre détection).
 
-import { pushScreen, popScreen } from "../../lib/screens.js";
+import { pushScreen } from "../../lib/screens.js";
 import { makeMenuScreen } from "../../lib/menu.js";
 import { t } from "../../data/i18n/index.js";
+import { openConfirmation } from "./confirmation.js";
 import { createOptionsMenu } from "./options-menu.js";
 import { hasSave } from "../save-storage.js";
 
@@ -25,24 +26,7 @@ import { hasSave } from "../save-storage.js";
 // (curseur par défaut), une pression rapide/accidentelle d'Entrée reste sans
 // effet.
 function openNewGameConfirmation(startNewGame) {
-  const menu = {
-    title: "menu.main.new_game_confirm_title",
-    closable: true, // Échap = annuler
-    entries: [
-      {
-        label: "menu.options.reset_all_cancel",
-        onActivate: () => popScreen(),
-      },
-      {
-        label: "menu.options.reset_all_confirm",
-        onActivate: () => {
-          popScreen();
-          startNewGame();
-        },
-      },
-    ],
-  };
-  pushScreen(makeMenuScreen(menu, t));
+  openConfirmation("menu.main.new_game_confirm_title", startNewGame);
 }
 
 // Sauvegarde PRÉSENTE (même illisible) -> confirmation d'abord (elle sera

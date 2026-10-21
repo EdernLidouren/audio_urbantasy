@@ -26,7 +26,7 @@ import { t } from "../../data/i18n/index.js";
 import { pushScreen, popScreen } from "../../lib/screens.js";
 import { withPausedBeacons } from "../paused-beacons.js";
 import { makeMenuScreen } from "../../lib/menu.js";
-import { announce } from "../../lib/announce.js";
+import { announce, stripTrailingPeriod } from "../../lib/announce.js";
 import { playMenuSound } from "../menu-sounds.js";
 import { ITEM_REGISTRY } from "../../core/items.js";
 import { EQUIPMENT_SLOTS } from "../../core/equipment.js";
@@ -137,10 +137,8 @@ let currentTabsScreen = null;
 // n'est pas la fin de la phrase (lib/menu.js/actionLine lui ajoute encore
 // ". <position>", voir "1 sur 2") — sans ce retrait, la description
 // (toujours terminée par un point dans i18n/) produirait un double point
-// ("croquante..") à chaque affichage avec le suffixe de position actif.
-function stripTrailingPeriod(text) {
-  return text.endsWith(".") ? text.slice(0, -1) : text;
-}
+// ("croquante..") à chaque affichage avec le suffixe de position actif
+// (voir lib/announce.js/stripTrailingPeriod).
 
 // Texte AUTONOME (phrase complète, point final CONSERVÉ) pour une entrée du
 // sac — réservé à la réannonce après retrait (voir bagRemovalAnnouncement

@@ -19,7 +19,7 @@
 
 import { playOneShot } from "../lib/audio.js";
 import { resolveAsset } from "../lib/assets.js";
-import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
+import { interfaceVolumeFactor } from "./audio/volume-factors.js";
 
 const MENU_SOUND_KEYS = {
   wrap: "assets/sounds/ui/wrap",
@@ -31,21 +31,21 @@ const MENU_SOUND_KEYS = {
   refusal: "assets/sounds/ui/refusal",
 };
 
-// Catégorie "interface" (Options > Audio, voir view/menus/audio-menu.js) :
-// relu à CHAQUE déclenchement, jamais mis en cache — même raisonnement que
-// footstepVolumeFactor (view/audio/volume-factors.js), un son ponctuel n'a pas
-// d'instance déjà en cours à rafraîchir.
-function interfaceVolumeFactor() {
-  return getPref("interfaceVolume", PREF_CONSTRAINTS.interfaceVolume.default) / 100;
+// Son d'INTERFACE (menus, sauvegarde, bascule de perception ou de face,
+// découverte...) : centré, au volume de la catégorie "interface" (Options >
+// Audio), relu à CHAQUE déclenchement. `path` : clé d'asset ou de pool ;
+// `what` : ce que c'est, pour l'avertissement si le son manque — jamais un
+// plantage.
+export function playInterfaceSound(path, what) {
+  try {
+    playOneShot(resolveAsset(path), { volume: interfaceVolumeFactor() });
+  } catch (error) {
+    console.warn(`son d'interface indisponible (${what}, "${path}") : ${error.message}`);
+  }
 }
 
 export function playMenuSound(eventName) {
   const key = MENU_SOUND_KEYS[eventName];
   if (!key) return; // évènement inconnu : silencieux, jamais de crash
-
-  try {
-    playOneShot(resolveAsset(key), { volume: interfaceVolumeFactor() });
-  } catch (error) {
-    console.warn(`menu: son "${eventName}" indisponible ("${key}") : ${error.message}`);
-  }
+  playInterfaceSound(key, `menu, ${eventName}`);
 }

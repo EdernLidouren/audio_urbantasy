@@ -5,28 +5,13 @@
 import { announce } from "../lib/announce.js";
 import { t } from "../data/i18n/index.js";
 import { getActiveWorld, isTwoSided } from "../core/state.js";
-import { minuteOfHour, hourOfDay, dayOfMonth, monthOfYear, seasonOfYear, yearNumber, SEASON_KEYS, MONTH_KEYS } from "../core/time.js";
+import { timeTemplateValues } from "./description-resolver.js";
 import { isDebugEnabled } from "../config/debug.js";
-
-// Deux chiffres pour une lecture d'horloge stable ("09 h 05", jamais "9 h 5").
-function pad2(n) {
-  return String(n).padStart(2, "0");
-}
 
 // Heure et date (touche "t", et après un saut de temps de debug). Mois et
 // saison sont traduits avant d'être insérés dans le gabarit.
 export function announceGameTime(session) {
-  const { time } = session;
-  announce(
-    t("time.announce", {
-      hour: pad2(hourOfDay(time)),
-      minute: pad2(minuteOfHour(time)),
-      day: dayOfMonth(time),
-      month: t(MONTH_KEYS[monthOfYear(time) - 1]),
-      season: t(SEASON_KEYS[seasonOfYear(time)]),
-      year: yearNumber(time),
-    })
-  );
+  announce(t("time.announce", timeTemplateValues(session.time)));
 }
 
 // Nom de la scène active (touche Retour arrière, et à chaque arrivée dans un

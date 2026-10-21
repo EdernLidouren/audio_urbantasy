@@ -12,6 +12,7 @@ import { t } from "../../data/i18n/index.js";
 import { resetAllPrefs } from "../../config/preferences.js";
 import { playMenuSound } from "../menu-sounds.js";
 import { applyVolumePreferences } from "../audio/city-scene.js";
+import { openConfirmation } from "./confirmation.js";
 import { createAudioMenu } from "./audio-menu.js";
 import { createNavigationMenu } from "./navigation-menu.js";
 import { createSaveMenu } from "./save-menu.js";
@@ -24,31 +25,15 @@ import { createSaveMenu } from "./save-menu.js";
 // vers "Confirmer". Global aux PRÉFÉRENCES uniquement — ne touche jamais à
 // une partie en cours ni à sa sauvegarde (voir save-menu.js).
 function openResetAllConfirmation() {
-  const menu = {
-    title: "menu.options.reset_all_confirm_title",
-    closable: true, // Échap = annuler
-    entries: [
-      {
-        label: "menu.options.reset_all_cancel",
-        onActivate: () => popScreen(),
-      },
-      {
-        label: "menu.options.reset_all_confirm",
-        onActivate: () => {
-          popScreen();
-          resetAllPrefs();
-          playMenuSound("reset");
-          applyVolumePreferences();
-          // Écran-message plutôt qu'une simple annonce : le résultat doit
-          // être entendu en entier, jamais écrasé par une ré-annonce
-          // immédiate de la ligne de menu courante (voir
-          // lib/menu.js/makeMessageScreen).
-          pushScreen(makeMessageScreen("menu.options.reset_all_done", t));
-        },
-      },
-    ],
-  };
-  pushScreen(makeMenuScreen(menu, t));
+  openConfirmation("menu.options.reset_all_confirm_title", () => {
+    resetAllPrefs();
+    playMenuSound("reset");
+    applyVolumePreferences();
+    // Écran-message plutôt qu'une simple annonce : le résultat doit être
+    // entendu en entier, jamais écrasé par une ré-annonce immédiate de la
+    // ligne de menu courante (voir lib/menu.js/makeMessageScreen).
+    pushScreen(makeMessageScreen("menu.options.reset_all_done", t));
+  });
 }
 
 // getSession : transmis tel quel à Sauvegarde (voir save-menu.js), seule

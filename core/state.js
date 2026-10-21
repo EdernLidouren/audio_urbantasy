@@ -68,7 +68,7 @@ import { TUNING_DEFAULTS } from "../config/tuning-values.js";
 import { MAX_COMPANIONS } from "../config/companions.js";
 import { MAX_EPHEMERALS } from "../config/ephemerals.js";
 import { createSeed, nextRandom } from "./rng.js";
-import { clamp } from "./physics/movement.js";
+import { clamp } from "../lib/math.js";
 import { isBlocking, presenceContextOf } from "./presence.js";
 import { INITIAL_TIME } from "./time.js";
 import { createInitialWeather } from "./weather.js";

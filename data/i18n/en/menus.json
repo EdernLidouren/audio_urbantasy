@@ -1,4 +1,6 @@
 {
+  "menu.confirm.cancel": "Cancel",
+  "menu.confirm.confirm": "Confirm",
   "menu.main.continue": "Continue",
   "menu.main.new_game": "New game",
   "menu.main.new_game_confirm_title": "A save exists. Starting a new game will overwrite it. Confirm?",
@@ -10,8 +12,6 @@
   "menu.options.back": "Back",
   "menu.options.navigation": "Navigation",
   "menu.options.reset_all": "Reset all settings",
-  "menu.options.reset_all_cancel": "Cancel",
-  "menu.options.reset_all_confirm": "Confirm",
   "menu.options.reset_all_confirm_title": "Reset everything?",
   "menu.options.reset_all_done": "All settings have been reset",
   "menu.options.save": "Save",

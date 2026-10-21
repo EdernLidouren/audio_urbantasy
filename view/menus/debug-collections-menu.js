@@ -11,32 +11,9 @@ import { announce } from "../../lib/announce.js";
 import { pushScreen, popScreen } from "../../lib/screens.js";
 import { makeMenuScreen } from "../../lib/menu.js";
 import { revealAllCollections, resetAllCollections } from "../../core/collections.js";
+import { openConfirmation } from "./confirmation.js";
 import collections from "../../collections/index.js";
 import { muteNextDiscoveryCheck } from "../collection-discoveries.js";
-
-// Confirmation : Annuler en premier (curseur par défaut), Échap annule aussi.
-function openConfirmation(title, onConfirm) {
-  pushScreen(
-    makeMenuScreen(
-      {
-        title,
-        closable: true,
-        entries: [
-          { label: "menu.options.reset_all_cancel", onActivate: () => popScreen() },
-          {
-            label: "menu.options.reset_all_confirm",
-            onActivate: () => {
-              popScreen();
-              onConfirm();
-            },
-          },
-        ],
-      },
-      t
-    )
-  );
-}
-
 export function openCollectionsDebugMenu(getSession, setSession) {
   function apply(transform, doneKey) {
     popScreen(); // ferme le menu debug lui-même

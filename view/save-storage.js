@@ -22,8 +22,7 @@ import { serializeGame, deserializeGame } from "../core/save.js";
 import registry from "../entities/types/index.js";
 import { obfuscate, deobfuscate } from "../lib/obfuscate.js";
 import { saveTextFile } from "../lib/download.js";
-import { playOneShot } from "../lib/audio.js";
-import { resolveAsset } from "../lib/assets.js";
+import { playInterfaceSound } from "./menu-sounds.js";
 import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
 
 const STORAGE_KEY = "templeton-save";
@@ -62,15 +61,7 @@ const SAVE_SOUND_KEY = "assets/sounds/ui/save";
 export function playSaveSound() {
   if (!getPref("saveSoundEnabled", PREF_CONSTRAINTS.saveSoundEnabled.default)) return;
 
-  try {
-    // Catégorie "interface" (Options > Audio) : même son que les menus, même
-    // curseur de volume — voir config/preferences.js/interfaceVolume et
-    // view/menu-sounds.js.
-    const factor = getPref("interfaceVolume", PREF_CONSTRAINTS.interfaceVolume.default) / 100;
-    playOneShot(resolveAsset(SAVE_SOUND_KEY), { volume: factor });
-  } catch (error) {
-    console.warn(`saveGame: son de sauvegarde indisponible ("${SAVE_SOUND_KEY}") : ${error.message}`);
-  }
+  playInterfaceSound(SAVE_SOUND_KEY, "sauvegarde");
 }
 
 // Sérialise + écrit la partie sur disque. Retour sensoriel UNIQUEMENT si
@@ -114,6 +105,26 @@ function readSave(parsed) {
   return { success: true, session, repairs: { droppedEntities, droppedItems, brokenReferences } };
 }
 
+// Texte brut d'une sauvegarde (stockage local ou fichier) -> même résultat
+// que readSave, ou { success: false, reason } : "obfuscation"
+// (désobscurcissement impossible) ou "parse" (JSON invalide). Point commun
+// de loadGame et importGame.
+function readSaveText(raw) {
+  let json;
+  try {
+    json = decodeFromStorage(raw);
+  } catch {
+    return { success: false, reason: "obfuscation" };
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    return { success: false, reason: "parse" };
+  }
+  return readSave(parsed);
+}
+
 // Lit et désenveloppe la partie sauvegardée -> { session, repairs } (voir
 // readSave), ou null si absente/invalide. Ne lève jamais : lecture disque, JSON invalide et
 // structure implausible sont tous des échecs SILENCIEUX côté appelant
@@ -128,25 +139,9 @@ export function loadGame() {
   }
   if (!raw) return null;
 
-  let json;
-  try {
-    json = decodeFromStorage(raw);
-  } catch (error) {
-    console.warn("loadGame: désobscurcissement impossible, sauvegarde considérée corrompue.", error);
-    return null;
-  }
-
-  let parsed;
-  try {
-    parsed = JSON.parse(json);
-  } catch (error) {
-    console.warn("loadGame: JSON invalide dans la sauvegarde.", error);
-    return null;
-  }
-
-  const result = readSave(parsed);
+  const result = readSaveText(raw);
   if (!result.success) {
-    console.warn(`loadGame: sauvegarde invalide (raison : ${result.reason}).`);
+    console.warn(`loadGame: sauvegarde illisible ou invalide (raison : ${result.reason}).`);
     return null;
   }
   return { session: result.session, repairs: result.repairs };
@@ -200,20 +195,5 @@ export async function importGame(file) {
   } catch {
     return { success: false, reason: "read" };
   }
-
-  let json;
-  try {
-    json = decodeFromStorage(raw);
-  } catch {
-    return { success: false, reason: "obfuscation" };
-  }
-
-  let parsed;
-  try {
-    parsed = JSON.parse(json);
-  } catch {
-    return { success: false, reason: "parse" };
-  }
-
-  return readSave(parsed);
+  return readSaveText(raw);
 }

@@ -16,8 +16,6 @@ import {
   setLootUniqueHandler,
   setLootSpawnHandler,
   setSideSwitchHandler,
-  setPlayerEquipmentProvider,
-  setTimeProvider,
   setSessionProvider,
   setPositionedSoundPlayer,
   setVariableEffectsHandler,
@@ -102,8 +100,6 @@ export function registerActionHandlers({ getSession, setSession, travel }) {
     // Fournisseurs relus à CHAQUE évaluation d'une condition d'action :
     // équiper, changer l'heure ou obtenir une amélioration change le verdict
     // aussitôt, sans code de synchronisation.
-    [setPlayerEquipmentProvider, () => getSession().equipment],
-    [setTimeProvider, () => getSession().time],
     [setSessionProvider, () => getSession()],
     // Effet "playSound" diégétique, sur la vue COURANTE (aucune hors
     // partie : rien ne se passe).

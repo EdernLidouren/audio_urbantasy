@@ -27,6 +27,12 @@ export function musicVolumeFactor() {
   return getPref("musicVolume", PREF_CONSTRAINTS.musicVolume.default) / 100;
 }
 
+// Sons d'interface : menus, sauvegarde, bascules, découvertes, effets
+// "playSound" non diégétiques.
+export function interfaceVolumeFactor() {
+  return getPref("interfaceVolume", PREF_CONSTRAINTS.interfaceVolume.default) / 100;
+}
+
 export function ambienceVolumeFactor() {
   return getPref("ambienceVolume", PREF_CONSTRAINTS.ambienceVolume.default) / 100;
 }

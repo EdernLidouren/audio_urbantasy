@@ -12,8 +12,6 @@
   "shop.buy.nothingSelected": "No item selected.",
   "shop.buy.total": "Buy {count} items for {total} coins",
   "shop.buy.validate": "Confirm purchase",
-  "shop.confirm.cancel": "Cancel",
-  "shop.confirm.confirm": "Confirm",
   "shop.detail": "{item} × {quantity}",
   "shop.discard.title": "Discard the current selection?",
   "shop.list.cancel": "Cancel",

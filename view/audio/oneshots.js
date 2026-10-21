@@ -8,7 +8,8 @@
 import { playOneShot, playTrackedOneShot, randomRate } from "../../lib/audio.js";
 import { resolveAsset } from "../../lib/assets.js";
 import { TUNING_DEFAULTS } from "../../config/tuning.js";
-import { NO_MUFFLE, clamp, applyMuffleToVolume, volumeForDistance, spatialRendering } from "./spatial.js";
+import { NO_MUFFLE, applyMuffleToVolume, volumeForDistance, spatialRendering } from "./spatial.js";
+import { clamp } from "../../lib/math.js";
 import { beaconVolumeFactor } from "./volume-factors.js";
 import { PLAY_SOUND_TUNING_KEYS, resolveTransitionSound } from "./entity-sound-entry.js";
 

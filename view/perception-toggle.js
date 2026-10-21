@@ -2,12 +2,10 @@
 // retour sensoriel (son, annonce).
 
 import { announce } from "../lib/announce.js";
-import { playOneShot } from "../lib/audio.js";
-import { resolveAsset } from "../lib/assets.js";
 import { t } from "../data/i18n/index.js";
 import { togglePerception } from "../core/state.js";
-import { evaluateCondition } from "../core/presence.js";
-import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
+import { evaluateCondition, presenceContextOf } from "../core/presence.js";
+import { playInterfaceSound } from "./menu-sounds.js";
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";
 
 // Débloquée par l'amélioration "supernatural_perception", vérifiée avec
@@ -21,13 +19,7 @@ const PERCEPTION_ACTIVATION_SOUND_KEY = "assets/sounds/ui/supernatural_perceptio
 const PERCEPTION_DEACTIVATION_SOUND_KEY = "assets/sounds/ui/supernatural_perception_disactivation";
 
 function playPerceptionToggleSound(active) {
-  const key = active ? PERCEPTION_ACTIVATION_SOUND_KEY : PERCEPTION_DEACTIVATION_SOUND_KEY;
-  try {
-    const factor = getPref("interfaceVolume", PREF_CONSTRAINTS.interfaceVolume.default) / 100;
-    playOneShot(resolveAsset(key), { volume: factor });
-  } catch (error) {
-    console.warn(`perception-toggle: son de bascule de perception indisponible ("${key}") : ${error.message}`);
-  }
+  playInterfaceSound(active ? PERCEPTION_ACTIVATION_SOUND_KEY : PERCEPTION_DEACTIVATION_SOUND_KEY, "bascule de perception");
 }
 
 export function createPerceptionToggle({ getSession, setSession }) {
@@ -40,7 +32,7 @@ export function createPerceptionToggle({ getSession, setSession }) {
   // Sans l'amélioration ou pendant le délai : rien du tout (ni son ni
   // annonce), comme une touche non attribuée.
   function toggle() {
-    if (!evaluateCondition(SUPERNATURAL_PERCEPTION_IMPROVEMENT, { session: getSession() })) return;
+    if (!evaluateCondition(SUPERNATURAL_PERCEPTION_IMPROVEMENT, presenceContextOf(getSession()))) return;
 
     const now = performance.now();
     if (now < cooldownUntil) return;

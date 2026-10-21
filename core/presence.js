@@ -433,6 +433,15 @@ export function presenceContextOf(session) {
   };
 }
 
+// Contexte d'une condition d'ACTION ou de BEACON (évaluée par la vue, hors
+// tick) : celui de la présence, plus l'entité qui PORTE la condition
+// (`entity`, ses variables de portée "entity") et l'équipement du JOUEUR
+// (`playerEquipment`, lu par "hasEquipmentTag" — deux clés distinctes, voir
+// evaluateHasEquipmentTag). Même source unique que presenceContextOf.
+export function actionContextOf(session, entity) {
+  return { ...presenceContextOf(session), entity, playerEquipment: session.equipment };
+}
+
 // Présence résolue d'UNE entité pour ce tick — voir resolveEntityRules,
 // dont c'est un simple accesseur (gardé pour tout appelant qui n'a besoin
 // QUE de la présence, ex. isBlocking ci-dessous, ou du contenu existant).

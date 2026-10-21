@@ -18,8 +18,24 @@
 import { t } from "../data/i18n/index.js";
 import { hourOfDay, minuteOfHour, dayOfMonth, monthOfYear, seasonOfYear, yearNumber, MONTH_KEYS, SEASON_KEYS } from "../core/time.js";
 
+// Deux chiffres pour une lecture d'horloge stable ("09 h 05", jamais "9 h 5").
 function pad2(n) {
   return String(n).padStart(2, "0");
+}
+
+// Valeurs de temps des gabarits i18n (heure, minute, jour, mois, saison,
+// année) — les mêmes pour une description et pour l'annonce de l'heure
+// (view/status-announcements.js). Mois et saison sont traduits avant
+// insertion.
+export function timeTemplateValues(time) {
+  return {
+    hour: pad2(hourOfDay(time)),
+    minute: pad2(minuteOfHour(time)),
+    day: dayOfMonth(time),
+    month: t(MONTH_KEYS[monthOfYear(time) - 1]),
+    season: t(SEASON_KEYS[seasonOfYear(time)]),
+    year: yearNumber(time),
+  };
 }
 
 // Dictionnaire de valeurs de gabarit DÉRIVÉ du contexte — SEUL endroit qui
@@ -34,14 +50,7 @@ function pad2(n) {
 // crash.
 function buildDescriptionValues(context) {
   if (!context || context.time === undefined) return {};
-  const values = {
-    hour: pad2(hourOfDay(context.time)),
-    minute: pad2(minuteOfHour(context.time)),
-    day: dayOfMonth(context.time),
-    month: t(MONTH_KEYS[monthOfYear(context.time) - 1]),
-    season: t(SEASON_KEYS[seasonOfYear(context.time)]),
-    year: yearNumber(context.time),
-  };
+  const values = timeTemplateValues(context.time);
   if (context.weather !== undefined) {
     values.weather = t(`weather.state.${context.weather}`);
   }

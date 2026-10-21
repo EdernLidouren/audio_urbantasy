@@ -1,4 +1,6 @@
 {
+  "menu.confirm.cancel": "Annuler",
+  "menu.confirm.confirm": "Confirmer",
   "menu.main.continue": "Continuer",
   "menu.main.new_game": "Nouvelle partie",
   "menu.main.new_game_confirm_title": "Une sauvegarde existe. Démarrer une nouvelle partie l'écrasera. Confirmer ?",
@@ -10,8 +12,6 @@
   "menu.options.back": "Retour",
   "menu.options.navigation": "Navigation",
   "menu.options.reset_all": "Réinitialiser tous les réglages",
-  "menu.options.reset_all_cancel": "Annuler",
-  "menu.options.reset_all_confirm": "Confirmer",
   "menu.options.reset_all_confirm_title": "Tout réinitialiser ?",
   "menu.options.reset_all_done": "Tous les réglages ont été réinitialisés",
   "menu.options.save": "Sauvegarde",

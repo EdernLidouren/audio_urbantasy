@@ -12,8 +12,6 @@
   "shop.buy.nothingSelected": "Aucun article sélectionné.",
   "shop.buy.total": "Acheter {count} articles pour {total} pièces",
   "shop.buy.validate": "Valider l'achat",
-  "shop.confirm.cancel": "Annuler",
-  "shop.confirm.confirm": "Confirmer",
   "shop.detail": "{item} × {quantity}",
   "shop.discard.title": "Abandonner la sélection en cours ?",
   "shop.list.cancel": "Annuler",

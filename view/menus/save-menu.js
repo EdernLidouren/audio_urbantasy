@@ -15,7 +15,7 @@
 
 import { announce } from "../../lib/announce.js";
 import { pushScreen, popScreen } from "../../lib/screens.js";
-import { makeMenuScreen, makeMessageScreen } from "../../lib/menu.js";
+import { makeMessageScreen } from "../../lib/menu.js";
 import { t } from "../../data/i18n/index.js";
 import { PREF_CONSTRAINTS, exportPreferences, importPreferences } from "../../config/preferences.js";
 import { applyVolumePreferences } from "../audio/city-scene.js";
@@ -24,6 +24,7 @@ import { canChooseSaveLocation } from "../../lib/download.js";
 import { getActiveWorld } from "../../core/state.js";
 import { reportSaveRepairs } from "../debug-warnings.js";
 import { openDebugWarningsIfUnseen } from "./debug-warnings-menu.js";
+import { openConfirmation } from "./confirmation.js";
 
 const AUTOSAVE_TRANSITION = PREF_CONSTRAINTS.autoSaveOnTransition;
 const AUTOSAVE_INTERVAL = PREF_CONSTRAINTS.autoSaveIntervalMinutes;
@@ -76,21 +77,29 @@ function applyImportedGame(importedSession, repairs) {
 // menu : createSaveMenu() est appelée à chaque fois).
 let prefsFileInput = null;
 
+// Champ <input type=file> caché, hors écran (jamais dans le parcours au
+// clavier) : `onFile(file)` reçoit le fichier choisi ; une sélection
+// annulée ne fait rien. Vidé après chaque choix, pour pouvoir réimporter le
+// même fichier ensuite.
+function createHiddenFileInput(onFile) {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".json,application/json";
+  input.style.position = "fixed";
+  input.style.left = "-9999px";
+  document.body.appendChild(input);
+  input.addEventListener("change", () => {
+    const file = input.files[0];
+    input.value = "";
+    if (file) onFile(file);
+  });
+  return input;
+}
+
 function ensurePrefsFileInput() {
   if (prefsFileInput) return prefsFileInput;
 
-  prefsFileInput = document.createElement("input");
-  prefsFileInput.type = "file";
-  prefsFileInput.accept = ".json,application/json";
-  prefsFileInput.style.position = "fixed";
-  prefsFileInput.style.left = "-9999px";
-  document.body.appendChild(prefsFileInput);
-
-  prefsFileInput.addEventListener("change", async () => {
-    const file = prefsFileInput.files[0];
-    prefsFileInput.value = ""; // permet de réimporter le même fichier ensuite
-    if (!file) return; // sélection annulée
-
+  prefsFileInput = createHiddenFileInput(async (file) => {
     const result = await importPreferences(file);
 
     // Les volumes importés prennent effet aussitôt.
@@ -109,50 +118,16 @@ function ensurePrefsFileInput() {
 // (déclencheurs et validations totalement différents).
 let gameFileInput = null;
 
-// Écran de confirmation, DESTRUCTIF (écrase la partie en cours) : "Annuler"
-// en première entrée (curseur par défaut), même principe que
-// options-menu.js/openResetAllConfirmation — une pression rapide/
-// accidentelle d'Entrée à l'ouverture reste sans effet. Réutilise les clés
-// génériques "Annuler"/"Confirmer" déjà en place (menu.options.reset_all_*),
-// pas de doublon de traduction pour le même mot.
-// `title` : ce qui sera remplacé — la partie en cours, ou (hors partie) la
-// sauvegarde locale.
+// Confirmation, DESTRUCTIVE (voir ./confirmation.js). `title` : ce qui sera
+// remplacé — la partie en cours, ou (hors partie) la sauvegarde locale.
 function openImportConfirmation(importedSession, repairs, title) {
-  const menu = {
-    title,
-    closable: true, // Échap = annuler
-    entries: [
-      {
-        label: "menu.options.reset_all_cancel",
-        onActivate: () => popScreen(),
-      },
-      {
-        label: "menu.options.reset_all_confirm",
-        onActivate: () => {
-          popScreen();
-          applyImportedGame(importedSession, repairs);
-        },
-      },
-    ],
-  };
-  pushScreen(makeMenuScreen(menu, t));
+  openConfirmation(title, () => applyImportedGame(importedSession, repairs));
 }
 
 function ensureGameFileInput() {
   if (gameFileInput) return gameFileInput;
 
-  gameFileInput = document.createElement("input");
-  gameFileInput.type = "file";
-  gameFileInput.accept = ".json,application/json";
-  gameFileInput.style.position = "fixed";
-  gameFileInput.style.left = "-9999px";
-  document.body.appendChild(gameFileInput);
-
-  gameFileInput.addEventListener("change", async () => {
-    const file = gameFileInput.files[0];
-    gameFileInput.value = ""; // permet de réimporter le même fichier ensuite
-    if (!file) return; // sélection annulée
-
+  gameFileInput = createHiddenFileInput(async (file) => {
     // Validé AVANT de demander confirmation : jamais confirmer une action
     // destructive pour découvrir ensuite que le fichier était invalide —
     // un échec ici ne touche jamais à la partie en cours.

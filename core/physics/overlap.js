@@ -4,7 +4,7 @@
 // intention, seulement des positions déjà résolues à recontraindre).
 
 import { BODY_RADIUS } from "../state.js";
-import { clamp } from "./movement.js";
+import { clamp } from "../../lib/math.js";
 import { isBlocking } from "../presence.js";
 
 // Sépare deux positions sur l'axe pour atteindre un écart minGap, borné à

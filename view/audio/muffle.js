@@ -8,7 +8,8 @@
 //     perceptionFadeMs), les entités surnaturelles émergent claires.
 
 import { TUNING_DEFAULTS } from "../../config/tuning.js";
-import { NO_MUFFLE, clamp } from "./spatial.js";
+import { NO_MUFFLE } from "./spatial.js";
+import { clamp } from "../../lib/math.js";
 
 const PERCEPTION_MUFFLE = { gain: TUNING_DEFAULTS.perceptionMufflingGain, lowpassHz: TUNING_DEFAULTS.perceptionMufflingLowpassHz };
 const PERCEPTION_FADE_MS = TUNING_DEFAULTS.perceptionFadeMs;

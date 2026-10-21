@@ -23,9 +23,7 @@ import {
 } from "../core/collections.js";
 import { t, hasKey } from "../data/i18n/index.js";
 import { announce } from "../lib/announce.js";
-import { playOneShot } from "../lib/audio.js";
-import { resolveAsset } from "../lib/assets.js";
-import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
+import { playInterfaceSound } from "./menu-sounds.js";
 import { reportCollectionTextMissing } from "./debug-warnings.js";
 
 for (const [collectionId, collection] of Object.entries(collections)) {
@@ -56,12 +54,7 @@ export function muteNextDiscoveryCheck() {
 }
 
 function playDiscoverySound(path) {
-  try {
-    const factor = getPref("interfaceVolume", PREF_CONSTRAINTS.interfaceVolume.default) / 100;
-    playOneShot(resolveAsset(path), { volume: factor });
-  } catch (error) {
-    console.warn(`collections : son de découverte indisponible ("${path}") : ${error.message}`);
-  }
+  playInterfaceSound(path, "découverte de collection");
 }
 
 // prev/next : deux états successifs de la partie (null hors partie -> rien).

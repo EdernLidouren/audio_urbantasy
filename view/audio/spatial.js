@@ -9,6 +9,7 @@
 // de rendu pour les deux, seuls le dosage et le profil diffèrent.
 
 import { TUNING_DEFAULTS } from "../../config/tuning.js";
+import { clamp } from "../../lib/math.js";
 
 // Niveaux de la courbe de volume (voir volumeForDistance) : constantes de
 // forme, jamais des réglages par entité.
@@ -16,10 +17,6 @@ const FULL_VOLUME = TUNING_DEFAULTS.fullVolume;
 const FAR_VOLUME_MAX = TUNING_DEFAULTS.farVolumeMax;
 
 export const NO_MUFFLE = Object.freeze({ amount: 0, gain: 1, lowpassHz: undefined });
-
-export function clamp(value, min, max) {
-  return Math.min(Math.max(value, min), max);
-}
 
 // Volume : interpolé continûment selon `amount`.
 export function applyMuffleToVolume(volume, muffle) {

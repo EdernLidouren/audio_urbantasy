@@ -21,8 +21,9 @@
 import { t } from "../../data/i18n/index.js";
 import { pushScreen, popScreen } from "../../lib/screens.js";
 import { withPausedBeacons } from "../paused-beacons.js";
+import { openConfirmation } from "./confirmation.js";
 import { makeMenuScreen } from "../../lib/menu.js";
-import { announce } from "../../lib/announce.js";
+import { announce, stripTrailingPeriod } from "../../lib/announce.js";
 import { playMenuSound } from "../menu-sounds.js";
 import { resolveAction, checkBindingsForCollisions, isHeld, isModActive } from "../../lib/input.js";
 import { getPref } from "../../config/preferences.js";
@@ -80,10 +81,6 @@ const BIG_STEP = 5;
 // une cadence de répétition.
 const SLIDER_REPEAT_DELAY_MS = 400;
 const SLIDER_REPEAT_INTERVAL_MS = 150;
-
-function stripTrailingPeriod(text) {
-  return text.endsWith(".") ? text.slice(0, -1) : text;
-}
 
 // Entité VIVANTE du point de vente (état de stock à jour), relue dans la
 // session — jamais le snapshot reçu à l'activation.
@@ -348,34 +345,22 @@ function openQuantityList(spec) {
   });
 }
 
-// Confirmation de TRANSACTION (destructive) : "Annuler" en première entrée
-// (curseur par défaut, une pression rapide d'Entrée reste sans effet),
-// "Confirmer" ensuite — même patron que main-menu.js/openNewGameConfirmation.
-// Titre DYNAMIQUE (lib/menu.js/titleParams) : total + récapitulatif.
-// Confirmer -> `apply()` (effet d'état) puis retour DIRECT au jeu (trois
-// écrans retirés : confirmation, liste, actions — le jeu ne réannonce rien à
-// son reveal, voir view/city-screen.js/onEnter) et annonce du résultat,
-// DERNIÈRE écriture donc jamais écrasée.
+// Confirmation de TRANSACTION (voir ./confirmation.js). Titre DYNAMIQUE :
+// total + récapitulatif. Confirmer -> `apply()` (effet d'état) puis retour
+// DIRECT au jeu (confirmation, liste et menu d'actions retirés — le jeu ne
+// réannonce rien à son reveal, voir view/city-screen.js/onEnter) et annonce
+// du résultat, DERNIÈRE écriture donc jamais écrasée.
 function openTransactionConfirmation(titleKey, titleParams, apply, doneMessage) {
-  const menu = {
-    title: titleKey,
-    titleParams,
-    closable: true,
-    entries: [
-      { label: "shop.confirm.cancel", onActivate: () => popScreen() },
-      {
-        label: "shop.confirm.confirm",
-        onActivate: () => {
-          if (apply() === false) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
-          popScreen();
-          popScreen();
-          popScreen();
-          announce(doneMessage(), { assertive: true });
-        },
-      },
-    ],
-  };
-  pushScreen(makeMenuScreen(menu, t));
+  openConfirmation(
+    titleKey,
+    () => {
+      if (apply() === false) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
+      popScreen(); // la liste
+      popScreen(); // le menu d'actions
+      announce(doneMessage(), { assertive: true });
+    },
+    { titleParams }
+  );
 }
 
 // Confirmation d'ABANDON d'une sélection en cours (Échap/"Annuler" avec au
@@ -383,21 +368,7 @@ function openTransactionConfirmation(titleKey, titleParams, apply, doneMessage) 
 // (retour au menu d'actions) ; Annuler revient à la liste, sélection
 // préservée.
 function openDiscardConfirmation() {
-  const menu = {
-    title: "shop.discard.title",
-    closable: true,
-    entries: [
-      { label: "shop.confirm.cancel", onActivate: () => popScreen() },
-      {
-        label: "shop.confirm.confirm",
-        onActivate: () => {
-          popScreen();
-          popScreen();
-        },
-      },
-    ],
-  };
-  pushScreen(makeMenuScreen(menu, t));
+  openConfirmation("shop.discard.title", () => popScreen());
 }
 
 // VENTE : lignes = objets vendables du sac, plafond = possédé, aucune

@@ -9,6 +9,7 @@
 // (donnée perdue, contenu incohérent), jamais du bruit technique.
 
 import { createWarningLog } from "../lib/warning-log.js";
+import { stripTrailingPeriod } from "../lib/announce.js";
 
 export const warningLog = createWarningLog();
 
@@ -41,7 +42,7 @@ export function reportSceneLoadFailure(sceneId, message) {
   reportWarning(
     "debug.warnings.sceneLoadFailed",
     // Point final retiré : le menu en ajoute un après chaque entrée.
-    { sceneId, message: message.replace(/\.\s*$/, "") },
+    { sceneId, message: stripTrailingPeriod(message) },
     `Chargement de la scène "${sceneId}" impossible :`,
     message
   );
@@ -54,7 +55,7 @@ export function reportSceneReloadFailure(sceneId, message) {
   reportWarning(
     "debug.warnings.sceneReloadFailed",
     // Point final retiré : le menu en ajoute un après chaque entrée.
-    { sceneId, message: message.replace(/\.\s*$/, "") },
+    { sceneId, message: stripTrailingPeriod(message) },
     `Rechargement de la scène "${sceneId}" impossible :`,
     message
   );
@@ -86,7 +87,7 @@ function reportBrokenReferences(brokenReferences) {
   for (const { worldId, source, problem } of brokenReferences) {
     const key = worldId === null ? "debug.warnings.brokenSessionReference" : "debug.warnings.brokenWorldReference";
     // Point final retiré : le menu en ajoute un après chaque entrée.
-    reportWarning(key, { worldId, source, problem: problem.replace(/\.\s*$/, "") }, "Sauvegarde : référence neutralisée :", {
+    reportWarning(key, { worldId, source, problem: stripTrailingPeriod(problem) }, "Sauvegarde : référence neutralisée :", {
       worldId,
       source,
       problem,

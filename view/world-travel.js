@@ -7,8 +7,8 @@
 // lue AVANT de démonter quoi que ce soit, et le remontage est synchrone.
 
 import { announce } from "../lib/announce.js";
-import { playOneShot, rampEntityLayerGain } from "../lib/audio.js";
-import { resolveAsset } from "../lib/assets.js";
+import { rampEntityLayerGain } from "../lib/audio.js";
+import { playInterfaceSound } from "./menu-sounds.js";
 import { pushScreen, popScreen } from "../lib/screens.js";
 import { t } from "../data/i18n/index.js";
 import registry from "../entities/types/index.js";
@@ -42,12 +42,7 @@ function wait(ms) {
 function playSideSwitchSound(entity) {
   const path = resolveTuning("transitionSound", entity);
   if (!path) return; // rien de déclaré : silence, pas une erreur
-  try {
-    const factor = getPref("interfaceVolume", PREF_CONSTRAINTS.interfaceVolume.default) / 100;
-    playOneShot(resolveAsset(path), { volume: factor });
-  } catch (error) {
-    console.warn(`world-travel: son de bascule indisponible ("${path}") : ${error.message}`);
-  }
+  playInterfaceSound(path, "bascule de face");
 }
 
 export function createWorldTravel({ getSession, setSession }) {

@@ -17,8 +17,8 @@ import { withPausedBeacons } from "./paused-beacons.js";
 import { makeMenuScreen } from "../lib/menu.js";
 import { playDescribedOneShot } from "../lib/audio.js";
 import { resolveAsset } from "../lib/assets.js";
-import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
-import { evaluateCondition, selectMatchingAction } from "../core/presence.js";
+import { interfaceVolumeFactor } from "./audio/volume-factors.js";
+import { evaluateCondition, selectMatchingAction, actionContextOf } from "../core/presence.js";
 import { ACTION_KINDS } from "../core/action-kinds.js";
 import { resolveDescriptionText } from "./description-resolver.js";
 import { resolveTuning } from "../config/tuning.js";
@@ -150,46 +150,12 @@ export function setShopHandler(handler) {
   shopHandler = handler;
 }
 
-// () => equipment — fournit l'ÉQUIPEMENT DU JOUEUR pour l'évaluation d'une
-// condition d'action (voir actionConditionMet plus bas), même principe
-// d'injection que les gestionnaires ci-dessus. TOUJOURS l'équipement du
-// JOUEUR : c'est lui qui DÉCLENCHE l'action, jamais l'entité-cible
-// (une porte n'a pas d'équipement) — contrairement à
-// core/presence.js/context.entity, qui porte l'entité RÉGIE par SA PROPRE
-// règle de présence.
-let playerEquipmentProvider = null;
-
-export function setPlayerEquipmentProvider(provider) {
-  playerEquipmentProvider = provider;
-}
-
-// () => session.time — fournit L'HEURE DE PARTIE pour l'évaluation d'une
-// condition d'action (voir actionConditionMet plus bas), même principe
-// d'injection que playerEquipmentProvider ci-dessus. Sans ce provider,
-// context.time reste undefined et une condition "timeRange" sur
-// action.condition est STRUCTURELLEMENT toujours fausse (voir
-// core/presence.js/evaluateTimeRange, hourOfDayFraction(undefined)) — c'est
-// ce que ce provider corrige, sans changer l'évaluateur lui-même (déjà
-// partagé avec presence[].when, voir doc/scripting.md/"Conditions d'action").
-let timeProvider = null;
-
-export function setTimeProvider(provider) {
-  timeProvider = provider;
-}
-
-// () => session — fournit LA SESSION COMPLÈTE pour l'évaluation d'une
-// condition d'action (voir actionContext plus bas), même principe
-// d'injection que playerEquipmentProvider/timeProvider ci-dessus. Sans ce
-// provider, perceptionActive/weather/world/session restent undefined dans
-// le contexte d'action, et hasImprovement/weather/perceptionActive/variable
-// scope "scene"/"party" y sont STRUCTURELLEMENT toujours fausses (voir
-// core/presence.js) — même si le joueur possède réellement ce qui est
-// demandé. L'évaluateur reste un PUR consommateur de données (core/presence.js/evaluateCondition,
-// core/variables.js) — lui passer une référence à `session` ne lui donne
-// aucun moyen de MUTER l'état ni de toucher DOM/audio, la frontière core/vue
-// tient : ce fichier lit `session` pour construire un contexte, il ne
-// l'écrit jamais (toute écriture reste déléguée aux handlers enregistrés
-// plus haut, qui seuls détiennent setSession).
+// () => session — fournit LA SESSION pour l'évaluation d'une condition
+// d'action (voir actionContext plus bas), même principe d'injection que les
+// gestionnaires ci-dessus. L'évaluateur reste un PUR consommateur de
+// données (core/presence.js/evaluateCondition) : ce fichier lit `session`
+// pour construire un contexte, il ne l'écrit jamais (toute écriture reste
+// déléguée aux gestionnaires enregistrés, qui seuls détiennent setSession).
 let sessionProvider = null;
 
 export function setSessionProvider(provider) {
@@ -201,7 +167,7 @@ export function setSessionProvider(provider) {
 // view/audio/oneshots.js/playEntityOneShot, câblé par view/action-handlers.js)
 // — fournit le rendu DIÉGÉTIQUE de l'effet "playSound" (voir
 // playDescribedSound plus bas pour le rendu MÉTA, non positionné). Même
-// principe d'injection que playerEquipmentProvider/timeProvider : ce fichier
+// principe d'injection que sessionProvider : ce fichier
 // ne connaît toujours ni la scène ni sa chaîne de filtrage, seulement CE
 // point d'entrée. Sans provider (hors ville, scène pas encore montée) ->
 // repli défensif sur le rendu MÉTA, voir runEffects plus bas.
@@ -277,12 +243,11 @@ function resolvePlaySoundNature(effect, targetId) {
 
 function playMetaSound(descriptor) {
   try {
-    const factor = getPref("interfaceVolume", PREF_CONSTRAINTS.interfaceVolume.default) / 100;
     playDescribedOneShot(resolveAsset(descriptor.path), {
       gain: descriptor.gain,
       pitchVariation: descriptor.pitchVariation,
       reverbSend: descriptor.reverbSend,
-      volumeFactor: factor,
+      volumeFactor: interfaceVolumeFactor(),
     });
   } catch (error) {
     console.warn(`interact: son d'effet indisponible ("${descriptor.path}") : ${error.message}`);
@@ -577,29 +542,14 @@ const ACTION_HANDLERS = {
 // condition "variable" et une condition "hasEquipmentTag" coexistent (ex.
 // dans un allOf) sur la MÊME action.
 //
-// time : injecté via timeProvider ci-dessus, MÊME clé que
-// core/reduce.js/presenceContext — une condition "timeRange" se comporte
-// donc IDENTIQUEMENT sur presence[].when et sur action.condition.
-// perceptionActive/weather/world/session : injectés via sessionProvider
-// ci-dessus, dérivés de LA MÊME session avec EXACTEMENT la même formule que
-// core/reduce.js/presenceContext (weather : son `.state` ; world : le monde
-// ACTIF entier — recto ET verso pour une scène à deux faces, jamais
-// seulement la face courante, voir core/variables.js/carrierForScope, scope
-// "scene" — PAS core/state.js/getActiveWorld, qui aplatit la face et ferait
-// perdre l'autre). hasImprovement/weather/perceptionActive/variable scope
-// "scene"/"party" se comportent donc IDENTIQUEMENT sur
-// action.condition et sur presence[].when (voir doc/scripting.md, section
-// "Conditions d'action"). Sans provider enregistré (cas limite, jamais en
-// jeu réel) -> ces clés restent undefined, repli déjà géré par chaque
-// évaluateur (core/presence.js).
+// Le reste du contexte (heure, météo, perception, monde, session) est
+// celui de la présence (core/presence.js/actionContextOf) : une condition
+// se comporte donc IDENTIQUEMENT sur action.condition et sur
+// presence[].when (voir doc/scripting.md/"Conditions d'action"). Sans
+// fournisseur de session (cas limite, jamais en jeu réel) : seule l'entité,
+// chaque évaluateur se replie sur faux.
 function actionContext(entity) {
-  const equipment = playerEquipmentProvider ? playerEquipmentProvider() : undefined;
-  const time = timeProvider ? timeProvider() : undefined;
-  const session = sessionProvider ? sessionProvider() : undefined;
-  const perceptionActive = session ? session.perceptionActive : undefined;
-  const weather = session ? session.weather.state : undefined;
-  const world = session ? session.worlds[session.activeWorldId] : undefined;
-  return { entity, playerEquipment: equipment, time, perceptionActive, weather, world, session };
+  return sessionProvider ? actionContextOf(sessionProvider(), entity) : { entity };
 }
 
 function actionConditionMet(condition, entity) {

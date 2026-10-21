@@ -1402,24 +1402,17 @@ s'exécute normalement ; condition fausse →
 Action SANS `condition` (ex. `door_exit`) → le bloc condition est sauté
 entièrement.
 
-`context.entity` porte l'entité qui DÉCLARE l'action (celle qu'on active — voir
-`view/interaction.js`/`actionContext`) ; `context.playerEquipment` (séparément,
-`view/interaction.js`/`setPlayerEquipmentProvider`, câblé par `view/action-handlers.js`)
-porte l'équipement du JOUEUR — voir la nuance détaillée dans "Conditions"/
-`hasEquipmentTag` plus haut. Une condition `"variable"` scope `"entity"` (voir
-"Variables" plus bas) se résout donc contre les variables de L'ENTITÉ-CIBLE elle-même
-(ex. `isOpen` d'une fenêtre), jamais contre le joueur. `context.time` (séparément,
-`view/interaction.js`/`setTimeProvider`, câblé par `view/action-handlers.js`, MÊME clé
-que `core/presence.js`/`presenceContextOf`) porte l'heure de partie COURANTE : une
-condition `"timeRange"` se comporte donc IDENTIQUEMENT sur `action.condition` et sur
-`presence[].when` (ex. `door.town_hall_main`, `scenes/town-square.json`).
-`context.perceptionActive`/`context.weather`/`context.world`/`context.session`
-(séparément, `view/interaction.js`/`setSessionProvider`, câblé par
-`view/action-handlers.js`, MÊME dérivation que `core/presence.js`/`presenceContextOf`
-— la session ENTIÈRE, relue à chaque tentative) complètent ce contexte :
-`weather`, `perceptionActive`, `hasImprovement` et les variables scope
-`"scene"`/`"party"` se comportent donc eux aussi IDENTIQUEMENT sur `action.condition`
-et sur `presence[].when`.
+`context.entity` porte l'entité qui DÉCLARE l'action (celle qu'on active) ;
+`context.playerEquipment` porte l'équipement du JOUEUR — voir la nuance détaillée
+dans "Conditions"/`hasEquipmentTag` plus haut. Une condition `"variable"` scope
+`"entity"` (voir "Variables" plus bas) se résout donc contre les variables de
+L'ENTITÉ-CIBLE elle-même (ex. `isOpen` d'une fenêtre), jamais contre le joueur. Le
+reste du contexte (heure, météo, perception, monde, session) est EXACTEMENT celui de
+la présence : `core/presence.js`/`actionContextOf` le construit à partir de
+`presenceContextOf`, pour une condition d'action (`view/interaction.js`/
+`actionContext`) comme pour un beacon conditionnel. `timeRange`, `weather`,
+`perceptionActive`, `hasImprovement` et les variables scope `"scene"`/`"party"` se
+comportent donc IDENTIQUEMENT sur `action.condition` et sur `presence[].when`.
 
 **Extensibilité** : une caisse verrouillée (`"loot"` conditionnée par un futur
 `questFlag`), un PNJ qui ne parle qu'à condition (un futur kind `"talk"`)

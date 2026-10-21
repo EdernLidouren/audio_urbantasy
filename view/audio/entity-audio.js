@@ -9,7 +9,7 @@
 // (live.presenceChanged, posé par le core) jouent enterSound/exitSound.
 
 import { getInactiveFace } from "../../core/state.js";
-import { evaluateCondition } from "../../core/presence.js";
+import { evaluateCondition, actionContextOf } from "../../core/presence.js";
 import { spatialRendering } from "./spatial.js";
 import { beaconVolumeFactor, footstepVolumeFactor } from "./volume-factors.js";
 import { resolveFootstepPath, stepWalker } from "./footsteps.js";
@@ -29,16 +29,7 @@ export function createEntityAudio({ getSession, entities, effectiveMuffle, fullF
   // l'entité VIVANTE (ses variables courantes). Sans condition : autorisé.
   function beaconConditionAllows(condition, live) {
     if (!condition) return true;
-    const session = getSession();
-    return evaluateCondition(condition, {
-      entity: live,
-      playerEquipment: session.equipment,
-      time: session.time,
-      perceptionActive: session.perceptionActive,
-      weather: session.weather.state,
-      world: session.worlds[session.activeWorldId],
-      session,
-    });
+    return evaluateCondition(condition, actionContextOf(getSession(), live));
   }
 
   // Sources INTERMITTENTES (beacon intermittent, vocal) : à l'échéance, un

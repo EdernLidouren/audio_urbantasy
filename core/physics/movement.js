@@ -17,12 +17,10 @@
 // jour où elles deviendraient nécessaires. Aucune n'existe aujourd'hui,
 // aucune n'est anticipée en code mort.
 
-export function clamp(value, min, max) {
-  return Math.min(Math.max(value, min), max);
-}
-
 // Applique un déplacement de `delta` depuis `x`, borné à [0, length] — le
 // seul pas fixe du jeu. Pure.
+import { clamp } from "../../lib/math.js";
+
 export function moveWithinBounds(x, delta, length) {
   return clamp(x + delta, 0, length);
 }

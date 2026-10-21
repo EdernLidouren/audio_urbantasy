@@ -28,6 +28,7 @@
 import { t } from "../../data/i18n/index.js";
 import { pushScreen, popScreen, activeScreen } from "../../lib/screens.js";
 import { makeMenuScreen } from "../../lib/menu.js";
+import { openConfirmation } from "./confirmation.js";
 import scenePaths from "../../scenes/index.js";
 
 async function readSceneInfo(id, path) {
@@ -39,32 +40,6 @@ async function readSceneInfo(id, path) {
     return { id };
   }
 }
-
-// Confirmation d'un outil de scène : Annuler en premier (curseur par
-// défaut), Échap annule aussi.
-function openConfirmation(title, titleParams, onConfirm) {
-  pushScreen(
-    makeMenuScreen(
-      {
-        title,
-        titleParams,
-        closable: true,
-        entries: [
-          { label: "menu.options.reset_all_cancel", onActivate: () => popScreen() },
-          {
-            label: "menu.options.reset_all_confirm",
-            onActivate: () => {
-              popScreen();
-              onConfirm();
-            },
-          },
-        ],
-      },
-      t
-    )
-  );
-}
-
 // sceneTools : { reloadSceneFromFile, forgetOtherScenes }, transmis par
 // view/city-screen.js depuis view/world-travel.js et view/debug-effects.js.
 export async function openTeleportDebugMenu(getSession, teleportEffect, sceneTools) {
@@ -99,7 +74,7 @@ export async function openTeleportDebugMenu(getSession, teleportEffect, sceneToo
       label: "teleport.debug.reloadScene",
       onActivate: () => {
         popScreen();
-        openConfirmation("teleport.debug.reloadConfirm", undefined, sceneTools.reloadSceneFromFile);
+        openConfirmation("teleport.debug.reloadConfirm", sceneTools.reloadSceneFromFile);
       },
     },
     {
@@ -107,7 +82,7 @@ export async function openTeleportDebugMenu(getSession, teleportEffect, sceneToo
       labelParams: { count: otherCount },
       onActivate: () => {
         popScreen();
-        openConfirmation("teleport.debug.forgetConfirm", { count: otherCount }, sceneTools.forgetOtherScenes);
+        openConfirmation("teleport.debug.forgetConfirm", sceneTools.forgetOtherScenes, { titleParams: { count: otherCount } });
       },
     },
   ];
