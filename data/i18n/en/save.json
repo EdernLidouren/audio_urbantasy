@@ -7,7 +7,7 @@
   "menu.save.import_success": "Preferences imported",
   "menu.save.title": "Save",
   "save.autosave": "Auto-save on transitions",
-  "save.autosave.description": "Automatically saves the game on every successful place change, silently — without the confirmation sound, so it never overlaps a simple door crossing.",
+  "save.autosave.description": "Automatically saves the game on every successful scene change, silently — without the confirmation sound, so it never overlaps a simple door crossing.",
   "save.autosave_interval": "Auto-save (minutes)",
   "save.autosave_interval.description": "Automatically saves the game at regular real-time intervals, even while a menu is open. Set to zero, this periodic save is disabled.",
   "save.autosave_interval_never": "Never",
@@ -25,5 +25,5 @@
   "save.no_active_game": "No active game.",
   "save.now": "Save",
   "save.sound_enabled": "Save sound",
-  "save.sound_enabled.description": "Plays a confirmation sound on every successful manual or periodic save — never on the silent save triggered by a simple place change."
+  "save.sound_enabled.description": "Plays a confirmation sound on every successful manual or periodic save — never on the silent save triggered by a simple scene change."
 }

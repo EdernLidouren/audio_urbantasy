@@ -1,6 +1,6 @@
 {
   "audio.ambience_volume": "Volume de l'ambiance",
-  "audio.ambience_volume.description": "Le volume des sons de fond du lieu, comme la circulation ou le vent.",
+  "audio.ambience_volume.description": "Le volume des sons de fond de la scène, comme la circulation ou le vent.",
   "audio.beacon_volume": "Volume des balises",
   "audio.beacon_volume.description": "Le volume des sons qui signalent la présence des entités : balises de repérage et vocalises.",
   "audio.footstep_volume": "Volume des pas",
@@ -10,7 +10,7 @@
   "audio.master_volume": "Volume principal",
   "audio.master_volume.description": "Le volume de sortie général, appliqué par-dessus tous les autres réglages de volume. Volontairement bas par défaut, pour ne jamais couvrir le lecteur d'écran.",
   "audio.music_volume": "Volume de la musique",
-  "audio.music_volume.description": "Le volume de la musique du lieu actuel.",
+  "audio.music_volume.description": "Le volume de la musique de la scène actuelle.",
   "menu.audio.reset": "Réinitialiser aux valeurs par défaut",
   "menu.audio.reset_done": "Réglages audio réinitialisés",
   "menu.audio.title": "Audio"

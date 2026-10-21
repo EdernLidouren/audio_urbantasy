@@ -58,7 +58,7 @@ Une zone hors plan EXISTE (la scène est jouable) mais n'est pas connue du
 joueur, à distinguer d'une case **en chantier** (pas encore construite) :
 
 - annoncée **« Hors plan. »** à la place de son nom et de sa description ;
-- Entrée : **refusée**, son de refus des menus et « Ce lieu ne figure pas
+- Entrée : **refusée**, son de refus des menus et « Cette scène ne figure pas
   sur votre plan. » ;
 - le joueur peut pourtant s'y trouver (arrivé par une porte) : la carte
   s'ouvre sur sa case, annoncée **« Hors plan, vous êtes ici. »**, toujours

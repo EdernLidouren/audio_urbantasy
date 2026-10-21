@@ -3,7 +3,7 @@
   "cityMap.empty": "Vide.",
   "cityMap.offMap": "Hors plan.",
   "cityMap.offMapHere": "Hors plan, vous êtes ici.",
-  "cityMap.offMapRefusal": "Ce lieu ne figure pas sur votre plan.",
+  "cityMap.offMapRefusal": "Cette scène ne figure pas sur votre plan.",
   "cityMap.town_square.description": "Le cœur de la ville, dominé par l'hôtel de ville et son clocher.",
   "cityMap.underConstruction": "En chantier."
 }

@@ -7,7 +7,7 @@
   "menu.save.import_success": "Préférences importées",
   "menu.save.title": "Sauvegarde",
   "save.autosave": "Sauvegarde auto aux transitions",
-  "save.autosave.description": "Sauvegarde automatiquement la partie à chaque changement de lieu réussi, silencieusement — sans le son de confirmation, pour ne jamais se superposer à une simple traversée de porte.",
+  "save.autosave.description": "Sauvegarde automatiquement la partie à chaque changement de scène réussi, silencieusement — sans le son de confirmation, pour ne jamais se superposer à une simple traversée de porte.",
   "save.autosave_interval": "Sauvegarde auto (minutes)",
   "save.autosave_interval.description": "Sauvegarde automatiquement la partie à intervalles réguliers de temps réel, même pendant qu'un menu est ouvert. Réglé sur zéro, cette sauvegarde périodique est désactivée.",
   "save.autosave_interval_never": "Jamais",
@@ -25,5 +25,5 @@
   "save.no_active_game": "Aucune partie en cours.",
   "save.now": "Sauvegarder",
   "save.sound_enabled": "Son de sauvegarde",
-  "save.sound_enabled.description": "Joue un son de confirmation à chaque sauvegarde manuelle ou automatique périodique — jamais à une sauvegarde silencieuse déclenchée par un simple changement de lieu."
+  "save.sound_enabled.description": "Joue un son de confirmation à chaque sauvegarde manuelle ou automatique périodique — jamais à une sauvegarde silencieuse déclenchée par un simple changement de scène."
 }
