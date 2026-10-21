@@ -3,7 +3,11 @@
   "interaction.lootSpawn": "{count} coins scattered around.",
   "interaction.pickup": "Picked up: {amount} coins.",
   "interaction.pickupItem": "Picked up: {item}.",
+  "interaction.searchAlreadyToday": "Already searched today.",
+  "interaction.searchDepleted": "There is nothing left here.",
+  "interaction.searchNothing": "You find nothing.",
   "interaction.searchSpawn": "{count} items fall all around.",
+  "interaction.searchSpawnOne": "An item falls nearby.",
   "menu.interaction.observe.title": "Observe",
   "menu.interaction.title": "Interact"
 }

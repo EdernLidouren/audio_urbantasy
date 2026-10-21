@@ -30,7 +30,7 @@ import { resolvePlayerMove } from "./physics/collision.js";
 import { SAVE_VERSION, serializeGame, deserializeGame } from "./save.js";
 import { addMoney, pickupEntity, lootEntity, lootUniqueEntity, lootEntitySpawn } from "./money.js";
 import { addItem, pickupItemEntity, removeItem, dropItem } from "./bag.js";
-import { ITEM_REGISTRY, itemProps, validateItemTags } from "./items.js";
+import { ITEM_REGISTRY, itemProps, validateItemTags, itemSounds } from "./items.js";
 import {
   validateCollection,
   collectionEntries,
@@ -69,9 +69,9 @@ import { WEATHER_STATES, DEFAULT_WEATHER_STATE } from "../config/weather-values.
 import { parseVariables, getVariable, setVariable, applyActionEffects } from "./variables.js";
 import { IMPROVEMENT_REGISTRY, improvementProps, hasImprovement, giveImprovement, removeImprovement, validateImprovementRegistry, orderedImprovementIds } from "./improvements.js";
 import { isDebugEnabled, setDebugEnabled } from "../config/debug.js";
-import { validateSpawnTables, validateDistribution, resolveDistribution, drawItem } from "./distribution.js";
-import { spawnCycleAt, refillDueSpawns, searchContainer, isSearchable } from "./spawn.js";
-import { SPAWN_TABLES, SPAWN_RANGE_DEFAULT_COUNT, SPAWN_CONTAINER_DEFAULT_COUNT } from "../config/spawn-values.js";
+import { validateSpawnTables, validateDistribution, resolveDistribution, drawItem, NOTHING } from "./distribution.js";
+import { spawnCycleAt, refillDueSpawns, searchContainer, isSearchable, containerStatus } from "./spawn.js";
+import { SPAWN_TABLES, SPAWN_RANGE_DEFAULT_COUNT, SPAWN_CONTAINER_DEFAULT_COUNT, RARITY_LEVELS } from "../config/spawn-values.js";
 import { sellValueOf, isSellable, ownedQuantity, sellTotal, sellItems, shopArticles, restockShopIfDue, purchaseTotal, buyItems } from "./trade.js";
 import { validateShopCatalogs, validateCatalog, fullStockOf, articlePrice } from "./catalog.js";
 import { hourChanged, dueTriggerEffects, applyDueTriggers } from "./triggers.js";
@@ -7227,7 +7227,29 @@ export function runMovementChecks() {
   run("collecte : distribution { table } inconnue -> rejetée", true, spawnThrows(() => validateDistribution({ table: "nope" }, "d", spawnFail)));
   run("collecte : distribution { items } inline -> acceptée", false, spawnThrows(() => validateDistribution({ items: { apple: 1 } }, "d", spawnFail)));
   run("collecte : distribution table ET items -> rejetée", true, spawnThrows(() => validateDistribution({ table: "default", items: { apple: 1 } }, "d", spawnFail)));
-  run("collecte : resolveDistribution { table } -> la table standard", SPAWN_TABLES.default, resolveDistribution({ table: "default" }));
+  run("collecte : resolveDistribution { table } -> la table standard", JSON.stringify(SPAWN_TABLES.default), JSON.stringify(resolveDistribution({ table: "default" })));
+
+  // Rareté : une entrée de table vaut un poids chiffré OU le nom d'un
+  // niveau ; une table { fromTag } est déduite de l'étiquette, chaque objet
+  // pesant selon sa propre rareté (ITEM_REGISTRY.rarity).
+  const rarityWeight = (name) => RARITY_LEVELS.find((level) => level.name === name).weight;
+  run(
+    "rareté : nom de niveau dans une table -> poids du niveau",
+    `${rarityWeight("rare")},7`,
+    (({ apple, coin }) => `${apple},${coin}`)(resolveDistribution({ items: { apple: "rare", coin: 7 } }))
+  );
+  run("rareté : niveau inconnu -> table rejetée", true, spawnThrows(() => validateSpawnTables({ t: { apple: "mythic" } })));
+  const electronicsWeights = resolveDistribution({ table: "electronics" });
+  run(
+    "rareté : table fromTag = tous les objets de l'étiquette",
+    Object.entries(ITEM_REGISTRY).filter(([, props]) => (props.tags || []).includes("electronic")).length,
+    Object.keys(electronicsWeights).length
+  );
+  run("rareté : table fromTag -> poids selon la rareté de l'objet (resistor, 1)", rarityWeight("common"), electronicsWeights.resistor);
+  run("rareté : table fromTag -> poids selon la rareté de l'objet (magic_eye, 5)", rarityWeight("legendary"), electronicsWeights.magic_eye);
+  run("rareté : étiquette inconnue -> table rejetée", true, spawnThrows(() => validateSpawnTables({ t: { fromTag: "nope" } })));
+  run("rareté : objets de l'étiquette sans rareté -> table rejetée", true, spawnThrows(() => validateSpawnTables({ t: { fromTag: "chic" } })));
+  run("rareté : fromTag mêlé à des entrées -> table rejetée", true, spawnThrows(() => validateSpawnTables({ t: { fromTag: "electronic", apple: 1 } })));
 
   // Tirage pondéré : réutilise pickTransition (météo) — équité vérifiée sur
   // une table inline à deux objets 3:1.
@@ -7465,6 +7487,204 @@ export function runMovementChecks() {
     run("collecte : save/load — objets tombés d'une fouille exclus (éphémères)", 0, spawnDropped(revived).length);
     run("collecte : save/load — marqueur de cycle survit", 0, spawnWorld(revived).spawnCycle);
     run("collecte : save/load — aucun re-garnissage au rechargement dans le même cycle", revived, refillDueSpawns(revived, SPAWN_REGISTRY));
+  }
+
+  // --- Collecte : issue "rien" (clé réservée `nothing`), tables multiples,
+  // conteneur non régénérant, états d'un conteneur vidé. ---
+
+  // Validation : `nothing` est une entrée pondérée comme une autre, mais
+  // une distribution doit pouvoir donner au moins un vrai objet.
+  run("rien : table standard avec nothing -> acceptée", false, spawnThrows(() => validateSpawnTables({ t: { apple: 1, nothing: 3 } })));
+  run("rien : poids de nothing en niveau de rareté -> accepté", false, spawnThrows(() => validateDistribution({ items: { apple: 1, nothing: "rare" } }, "d", spawnFail)));
+  run("rien : distribution de RIEN seul -> rejetée", true, spawnThrows(() => validateDistribution({ items: { nothing: 1 } }, "d", spawnFail)));
+  run("rien : nothing à poids nul ne compte pas comme un objet -> rejetée", true, spawnThrows(() => validateDistribution({ items: { apple: 0, nothing: 1 } }, "d", spawnFail)));
+  run("rien : clé réservée exportée", "nothing", NOTHING);
+  run("rien : ITEM_REGISTRY ne déclare jamais la clé réservée", false, Object.hasOwn(ITEM_REGISTRY, NOTHING));
+
+  // Validation des tables multiples.
+  const multiOk = { tables: [{ table: "default" }, { items: { nothing: 1 }, weight: 2 }] };
+  run("tables : référence + inline (dont une table de rien) -> acceptée", false, spawnThrows(() => validateDistribution(multiOk, "d", spawnFail)));
+  run("tables : poids de table en niveau de rareté -> accepté", false, spawnThrows(() => validateDistribution({ tables: [{ table: "default", weight: "rare" }] }, "d", spawnFail)));
+  run("tables : liste vide -> rejetée", true, spawnThrows(() => validateDistribution({ tables: [] }, "d", spawnFail)));
+  run("tables : pas un tableau -> rejetée", true, spawnThrows(() => validateDistribution({ tables: { table: "default" } }, "d", spawnFail)));
+  run("tables : mêlée à table/items -> rejetée", true, spawnThrows(() => validateDistribution({ tables: [{ table: "default" }], table: "default" }, "d", spawnFail)));
+  run("tables : membre table ET items -> rejeté", true, spawnThrows(() => validateDistribution({ tables: [{ table: "default", items: { apple: 1 } }] }, "d", spawnFail)));
+  run("tables : membre à clé inconnue -> rejeté", true, spawnThrows(() => validateDistribution({ tables: [{ table: "default", wieght: 2 }] }, "d", spawnFail)));
+  run("tables : membre à table inconnue -> rejeté", true, spawnThrows(() => validateDistribution({ tables: [{ table: "nope" }] }, "d", spawnFail)));
+  run("tables : poids de membre négatif -> rejeté", true, spawnThrows(() => validateDistribution({ tables: [{ table: "default", weight: -1 }] }, "d", spawnFail)));
+  run("tables : tous les poids de table nuls -> rejetée", true, spawnThrows(() => validateDistribution({ tables: [{ table: "default", weight: 0 }] }, "d", spawnFail)));
+  run("tables : que des tables de rien -> rejetée", true, spawnThrows(() => validateDistribution({ tables: [{ items: { nothing: 1 } }, { items: { nothing: 5 } }] }, "d", spawnFail)));
+  run("tables : table simple à clé inconnue -> rejetée", true, spawnThrows(() => validateDistribution({ table: "default", count: 2 }, "d", spawnFail)));
+
+  // Table équivalente : chaque table pèse son poids, réparti selon SES
+  // propres poids ; un objet présent dans deux tables cumule ses parts.
+  {
+    const near = (a, b) => Math.abs(a - b) < 1e-9;
+    const merged = resolveDistribution({ tables: [{ items: { apple: 3, coin: 1 } }, { items: { apple: 1, nothing: 1 } }] });
+    run("tables : doublon cumulé (pomme : 1/2 × 3/4 + 1/2 × 1/2)", true, near(merged.apple, 0.625));
+    run("tables : objet d'une seule table (pièce : 1/2 × 1/4)", true, near(merged.coin, 0.125));
+    run("tables : rien (1/2 × 1/2)", true, near(merged.nothing, 0.25));
+    const scales = resolveDistribution({ tables: [{ items: { apple: 1000 } }, { items: { coin: 1 } }] });
+    run("tables : échelles indépendantes (poids 1000 vs 1 -> moitié/moitié)", true, near(scales.apple, 0.5) && near(scales.coin, 0.5));
+    const weighted = resolveDistribution({ tables: [{ items: { apple: 1 }, weight: 3 }, { items: { coin: 1 } }] });
+    run("tables : poids de table (3 contre 1 par défaut)", true, near(weighted.apple, 0.75) && near(weighted.coin, 0.25));
+    run("tables : forme simple inchangée (poids bruts)", JSON.stringify({ apple: 80, coin: 20 }), JSON.stringify(resolveDistribution({ items: { apple: 80, coin: 20 } })));
+  }
+
+  // Tirage : `nothing` donne null, et consomme quand même son pas de PRNG.
+  {
+    let rng = createSeed("spawn-nothing");
+    let nothingCount = 0;
+    let advancedEveryTime = true;
+    for (let i = 0; i < 4000; i++) {
+      const d = drawItem({ items: { apple: 1, nothing: 3 } }, rng);
+      if (d.item === null) nothingCount += 1;
+      else if (d.item !== "apple") advancedEveryTime = false;
+      if (d.rngState === rng) advancedEveryTime = false;
+      rng = d.rngState;
+    }
+    run("rien : drawItem -> null pour nothing (3:1, ±10 %)", true, Math.abs(nothingCount / 4000 - 0.75) < 0.1);
+    run("rien : chaque tirage avance le PRNG, même sur nothing", true, advancedEveryTime);
+    rng = createSeed("spawn-multi");
+    let apples = 0;
+    for (let i = 0; i < 4000; i++) {
+      const d = drawItem({ tables: [{ items: { apple: 3, coin: 1 } }, { items: { apple: 1, nothing: 1 } }] }, rng);
+      if (d.item === "apple") apples += 1;
+      rng = d.rngState;
+    }
+    run("tables : drawItem respecte la table équivalente (pomme 62,5 %, ±5 %)", true, Math.abs(apples / 4000 - 0.625) < 0.05);
+  }
+
+  // Conteneurs : "rien" possible, non régénérant, états d'un conteneur vidé.
+  const ALMOST_ONLY_NOTHING = { items: { apple: 1, nothing: 1e9 } };
+  const nothingRaw = {
+    id: "movement-check-nothing",
+    titleKey: "scene.demo.name",
+    length: 40,
+    playerStart: 2,
+    spawnRanges: [{ from: 20, to: 30, count: 5, distribution: ALMOST_ONLY_NOTHING }],
+    entities: [
+      { id: "box", type: "bush", x: 5, container: { distribution: ALMOST_ONLY_NOTHING, count: 3 } },
+      { id: "pc", type: "bush", x: 10, container: { distribution: { items: { key_bronze: 1 } }, count: 2, regenerates: false } },
+      { id: "bush", type: "bush", x: 15 },
+    ],
+  };
+  const nothingScene = parseScene(nothingRaw, SPAWN_REGISTRY);
+  const nothingWorld = (s) => s.worlds[nothingScene.id];
+  const nothingEntity = (s, id) => nothingWorld(s).entities.find((e) => e.id === id);
+  run("non régénérant : parseScene conserve regenerates: false", false, nothingEntity({ worlds: { [nothingScene.id]: nothingScene } }, "pc").container.regenerates);
+  run("non régénérant : regenerates: true n'est pas stocké (sparse)", undefined, parseScene({ ...nothingRaw, entities: [{ id: "b", type: "bush", x: 1, container: { distribution: { table: "default" }, regenerates: true } }] }, SPAWN_REGISTRY).entities[0].container.regenerates);
+  run("non régénérant : regenerates non booléen -> rejeté", true, spawnThrows(() => parseScene({ ...nothingRaw, entities: [{ id: "b", type: "bush", x: 1, container: { distribution: { table: "default" }, regenerates: "no" } }] }, SPAWN_REGISTRY)));
+  run("conteneur : clé inconnue -> rejetée", true, spawnThrows(() => parseScene({ ...nothingRaw, entities: [{ id: "b", type: "bush", x: 1, container: { distribution: { table: "default" }, regen: false } }] }, SPAWN_REGISTRY)));
+  run("tables : parseScene accepte un container { tables }", false, spawnThrows(() => parseScene({ ...nothingRaw, entities: [{ id: "b", type: "bush", x: 1, container: { distribution: multiOk } }] }, SPAWN_REGISTRY)));
+
+  const nothingFilled = refillDueSpawns({ ...createInitialState(nothingScene, undefined, NO_COMPANIONS), bag: [] }, SPAWN_REGISTRY);
+  run("rien : plage dont tous les tirages tombent sur rien -> aucun collectible posé", 0, nothingWorld(nothingFilled).entities.filter((e) => e.spawned).length);
+  run("rien : conteneur dont tous les tirages tombent sur rien -> stock vide", 0, nothingEntity(nothingFilled, "box").stock.length);
+  run("rien : stock vide du cycle -> état searchable (il reste à fouiller)", "searchable", containerStatus(nothingEntity(nothingFilled, "box"), nothingFilled.time));
+  const nothingSearch = searchContainer(nothingFilled, "box", SPAWN_REGISTRY);
+  run("rien : fouille d'un stock vide -> fouille faite (status searchable), rien ne tombe", "searchable/0", `${nothingSearch.status}/${nothingSearch.items.length}`);
+  run("rien : après la fouille -> searchedToday", "searchedToday", containerStatus(nothingEntity(nothingSearch.session, "box"), nothingSearch.session.time));
+
+  // Conteneur régénérant vidé : status searchedToday, session inchangée.
+  const bushSearch = searchContainer(nothingSearch.session, "bush", SPAWN_REGISTRY);
+  const bushAgain = searchContainer(bushSearch.session, "bush", SPAWN_REGISTRY);
+  run("régénérant : refouiller le même jour -> status searchedToday", "searchedToday", bushAgain.status);
+  run("régénérant : refouiller le même jour -> session inchangée", bushSearch.session, bushAgain.session);
+  run("conteneur : searchContainer sur un id absent -> status null", null, searchContainer(bushSearch.session, "nope", SPAWN_REGISTRY).status);
+  run("conteneur : containerStatus d'une entité sans container -> null", null, containerStatus({ id: "x" }, 0));
+
+  // Non régénérant : garni une fois, vidé pour de bon.
+  run("non régénérant : garni au premier chargement", 2, nothingEntity(nothingFilled, "pc").stock.length);
+  const pcSearch = searchContainer(bushSearch.session, "pc", SPAWN_REGISTRY);
+  run("non régénérant : la fouille fait tomber son stock", 2, pcSearch.items.length);
+  run("non régénérant : vidé -> depleted", "depleted", containerStatus(nothingEntity(pcSearch.session, "pc"), pcSearch.session.time));
+  const pcAgain = searchContainer(pcSearch.session, "pc", SPAWN_REGISTRY);
+  run("non régénérant : refouiller -> status depleted, session inchangée", true, pcAgain.status === "depleted" && pcAgain.session === pcSearch.session);
+  const pcNextDay = advanceTime(pcSearch.session, SPAWN_DAY);
+  run("non régénérant : un jour plus tard sur place -> toujours depleted", "depleted", containerStatus(nothingEntity(pcNextDay, "pc"), pcNextDay.time));
+  run("non régénérant : un jour plus tard sur place -> la fouille ne tire rien", 0, searchContainer(pcNextDay, "pc", SPAWN_REGISTRY).items.length);
+  run("régénérant : un jour plus tard sur place -> de nouveau searchable", "searchable", containerStatus(nothingEntity(pcNextDay, "bush"), pcNextDay.time));
+  const pcAway = refillDueSpawns(travelToWorld(pcNextDay, spawnSceneB.id, spawnSceneB), SPAWN_REGISTRY);
+  const pcBack = refillDueSpawns(travelToWorld(advanceTime(pcAway, SPAWN_DAY), nothingScene.id), SPAWN_REGISTRY);
+  run("non régénérant : regarnissage de la scène -> reste vidé (stock null, cycle d'origine)", "null/0", `${nothingEntity(pcBack, "pc").stock}/${nothingEntity(pcBack, "pc").stockCycle}`);
+  run("régénérant : regarnissage de la scène -> restocké au cycle courant", 2, nothingEntity(pcBack, "bush").stockCycle);
+
+  // Non régénérant jamais fouillé : son stock d'origine est GARDÉ (jamais
+  // retiré), même plusieurs cycles plus tard.
+  const pcUntouchedAway = refillDueSpawns(travelToWorld(nothingFilled, spawnSceneB.id, spawnSceneB), SPAWN_REGISTRY);
+  const pcUntouchedBack = refillDueSpawns(travelToWorld(advanceTime(pcUntouchedAway, 3 * SPAWN_DAY), nothingScene.id), SPAWN_REGISTRY);
+  run("non régénérant : jamais fouillé -> même stock plusieurs cycles plus tard", JSON.stringify(nothingEntity(nothingFilled, "pc").stock), JSON.stringify(nothingEntity(pcUntouchedBack, "pc").stock));
+  run("non régénérant : jamais fouillé -> toujours searchable", "searchable", containerStatus(nothingEntity(pcUntouchedBack, "pc"), pcUntouchedBack.time));
+
+  // Persistance : un conteneur vidé pour de bon le reste après save/load.
+  const pcReload = deserializeGame(serializeGame(pcSearch.session));
+  run("non régénérant : save/load -> toujours depleted", "depleted", pcReload.success && containerStatus(nothingEntity(pcReload.session, "pc"), pcReload.session.time));
+
+  // --- Objet au sol générique (type "item") : nom, description et sons
+  // repris de l'objet ramassé (core/scene.js/genericItemDefaults,
+  // core/items.js/itemSounds), toujours redéfinissables par l'instance. ---
+  const GENERIC_ITEM_REGISTRY = { item: { nameKey: "entity.item.name", descriptionKey: "entity.item.description", sounds: { beacon: { path: "generic", loop: true } } } };
+  const genericItemScene = parseScene(
+    {
+      id: "generic-item", titleKey: "scene.demo.name", length: 10, playerStart: 0,
+      entities: [
+        { id: "res", type: "item", x: 2, action: { kind: "pickup", item: "resistor", count: 1 } },
+        { id: "res-named", type: "item", x: 4, nameKey: "custom.name", action: { kind: "pickup", item: "resistor", count: 1 } },
+        { id: "boots", type: "item", x: 6, action: { kind: "pickup", item: "combat_boots", count: 1 } },
+      ],
+    },
+    GENERIC_ITEM_REGISTRY
+  );
+  const genericById = Object.fromEntries(genericItemScene.entities.map((e) => [e.id, e]));
+  run("objet au sol : nom repris de l'objet", "item.resistor.name", genericById.res.labelKey);
+  run("objet au sol : description reprise de l'objet", "item.resistor.description", genericById.res.descriptionKey);
+  run("objet au sol : beacon = son de l'objet, en boucle", `${ITEM_REGISTRY.resistor.sound}/true`, `${genericById.res.sounds.beacon.path}/${genericById.res.sounds.beacon.loop}`);
+  run("objet au sol : ramassage = même son", ITEM_REGISTRY.resistor.sound, genericById.res.sounds.pickup.path);
+  run("objet au sol : nom de l'instance prioritaire", "custom.name", genericById["res-named"].labelKey);
+  run("objet au sol : objet sans son -> sons de l'archétype", "generic", genericById.boots.sounds.beacon.path);
+  run("objet au sol : itemSounds d'un objet sans son -> rien", undefined, itemSounds("apple"));
+
+  // --- Ramassage et loot dans une scène à DEUX FACES : l'entité est
+  // cherchée sur la face active (core/state.js/activeFaceEntities), un
+  // monde à deux faces n'ayant pas de liste d'entités propre. ---
+  {
+    const twoFaced = parseScene(
+      {
+        id: "two-faced-pickup", titleKey: "scene.demo.name", length: 10, playerStart: 0,
+        recto: { entities: [] },
+        verso: { entities: [
+          { id: "comp", type: "item", x: 3, action: { kind: "pickup", item: "resistor", count: 1 } },
+          { id: "cash", type: "item", x: 5, action: { kind: "pickup", item: "apple", count: 1 } },
+        ] },
+      },
+      GENERIC_ITEM_REGISTRY
+    );
+    let state = createInitialState(twoFaced, "two-faced", NO_COMPANIONS);
+    state = switchSide(state, 3);
+    const picked = pickupItemEntity(state, "comp", "resistor", 1);
+    run("deux faces : objet ramassé au sac", 1, ownedQuantity(picked.bag, "resistor"));
+    run("deux faces : entité retirée de la face", false, getActiveWorld(picked).entities.some((e) => e.id === "comp"));
+    const paid = pickupEntity(state, "cash", 5);
+    run("deux faces : argent ramassé", state.money + 5, paid.money);
+    run("deux faces : loot unique -> consumed", true, getActiveWorld(lootUniqueEntity(state, "cash")).entities.find((e) => e.id === "cash").consumed);
+  }
+
+  // --- Sauvegarde : objet absent du registre retiré du sac / de
+  // l'équipement, et listé pour l'avertissement. ---
+  {
+    const base = createInitialState(parseScene({ id: "items", titleKey: "scene.demo.name", length: 5, playerStart: 0, entities: [] }, {}), "items", NO_COMPANIONS);
+    const corrupted = {
+      ...base,
+      bag: [...base.bag, { type: "removed_item", quantity: 2 }],
+      equipment: { ...base.equipment, feet: { type: "removed_boots" } },
+    };
+    const reloaded = deserializeGame({ version: SAVE_VERSION, data: corrupted });
+    run("save objets inconnus : retirés du sac", false, reloaded.session.bag.some((e) => e.type === "removed_item"));
+    run("save objets inconnus : objets connus conservés", base.bag.length, reloaded.session.bag.length);
+    run("save objets inconnus : slot d'équipement vidé", null, reloaded.session.equipment.feet);
+    run("save objets inconnus : retraits listés", "bag:removed_item,feet:removed_boots", reloaded.droppedItems.map((d) => `${d.where}:${d.type}`).join(","));
+    run("save objets inconnus : partie saine -> rien de retiré", 0, deserializeGame(serializeGame(base)).droppedItems.length);
   }
 
   // --- Collections (core/collections.js) : le fait neutre "objet acquis"

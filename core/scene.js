@@ -22,6 +22,7 @@ import { IMPROVEMENT_REGISTRY } from "./improvements.js";
 import { WEATHER_STATES } from "../config/weather-values.js";
 import { parseVariables, VARIABLE_SCOPES, isValidValueForType } from "./variables.js";
 import { ACTION_EFFECT_TYPES, MIXED_EFFECT_TYPES } from "./effects.js";
+import { ITEM_REGISTRY, itemSounds } from "./items.js";
 import { TRIGGER_KINDS } from "./triggers.js";
 import { TIME_CONFIG } from "../config/time-values.js";
 import { validateDistribution } from "./distribution.js";
@@ -585,6 +586,21 @@ function parseSingleAction(rawAction, describe, entityVariables, sceneVariables)
   return result;
 }
 
+// Type d'entité générique d'un objet au sol (voir parseEntity, et
+// core/spawn.js/GENERIC_ITEM_TYPE qui en est l'usage au garnissage).
+const GENERIC_ITEM_ENTITY_TYPE = "item";
+
+// Nom, description et sons repris de l'objet porté par une entité "item"
+// (voir parseEntity). Rien pour un autre type, une action qui ne ramasse
+// pas d'objet, ou un objet inconnu (validé ailleurs) : `{}`.
+function genericItemDefaults(type, action) {
+  if (type !== GENERIC_ITEM_ENTITY_TYPE || !action || Array.isArray(action)) return {};
+  if (action.kind !== "pickup" || typeof action.item !== "string") return {};
+  const props = ITEM_REGISTRY[action.item];
+  if (!props) return {};
+  return { nameKey: props.label, descriptionKey: props.descriptionKey, sounds: itemSounds(action.item) };
+}
+
 function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables) {
   if (typeof rawEntity !== "object" || rawEntity === null) {
     fail(`entities[${index}] n'est pas un objet.`);
@@ -643,13 +659,23 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
   if (sounds !== undefined && sounds !== null && (typeof sounds !== "object" || Array.isArray(sounds))) {
     fail(`entities[${index}] ("${id}") : sounds doit être un objet (ou null) si présent.`);
   }
-  const resolvedSounds = deepMergeOverride(registry[type].sounds, sounds) ?? {};
+  // OBJET AU SOL générique (type "item", voir entities/types/item.js) : une
+  // instance qui RAMASSE un objet du sac (action pickup + item) en reprend
+  // le nom, la description et les sons (ITEM_REGISTRY, itemSounds), comme
+  // un palier entre l'archétype et l'instance — l'instance peut toujours
+  // les redéfinir. Placer un objet se réduit ainsi à
+  // { type: "item", x, action: { kind: "pickup", item } }.
+  const carried = genericItemDefaults(type, action !== undefined ? action : registry[type].action);
+  const resolvedSounds =
+    deepMergeOverride(deepMergeOverride(registry[type].sounds, carried.sounds), sounds) ?? {};
 
-  const labelKey = isNonEmptyString(nameKey) ? nameKey : registry[type].nameKey;
+  const labelKey = isNonEmptyString(nameKey) ? nameKey : carried.nameKey ?? registry[type].nameKey;
   // Même cascade instance -> type que labelKey, pour la description utilisée
   // par l'interaction "describe" (voir view/interaction.js). Peut rester
   // undefined si ni l'instance ni le type n'en fournissent une (ex. decor).
-  const resolvedDescriptionKey = isNonEmptyString(descriptionKey) ? descriptionKey : registry[type].descriptionKey;
+  const resolvedDescriptionKey = isNonEmptyString(descriptionKey)
+    ? descriptionKey
+    : carried.descriptionKey ?? registry[type].descriptionKey;
   // consumedDescriptionKey : même cascade instance -> type que
   // descriptionKey ci-dessus — description ALTERNATIVE une fois l'entité
   // "consumed" (voir core/state.js/markConsumed, entities/model.md/
@@ -850,7 +876,7 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
   }
 
   // container : optionnel, SOURCE DE COLLECTE régénérante (voir core/spawn.js,
-  // doc/entity-model.md/"Collecte") — { distribution, count? } (référence à
+  // doc/entity-model.md/"Collecte") — { distribution, count?, regenerates? } (référence à
   // une table standard ou table inline, voir core/distribution.js ; count
   // entier >= 1, défaut config/spawn-values.js/SPAWN_CONTAINER_DEFAULT_COUNT
   // résolu par le moteur). Cascade instance -> type comme action/behavior.
@@ -866,8 +892,20 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
     if (resolvedContainer.count !== undefined && (!Number.isInteger(resolvedContainer.count) || resolvedContainer.count < 1)) {
       fail(`entities[${index}] ("${id}") : container.count doit être un entier >= 1 si présent.`);
     }
+    // regenerates : optionnel, booléen, défaut true (regarni à chaque cycle).
+    // false : stock tiré UNE SEULE fois, jamais regarni une fois vidé (voir
+    // core/spawn.js/containerStatus). SPARSE : stocké seulement s'il vaut
+    // false.
+    if (resolvedContainer.regenerates !== undefined && typeof resolvedContainer.regenerates !== "boolean") {
+      fail(`entities[${index}] ("${id}") : container.regenerates doit être un booléen si présent.`);
+    }
+    const unknownContainerKeys = Object.keys(resolvedContainer).filter((key) => !["distribution", "count", "regenerates"].includes(key));
+    if (unknownContainerKeys.length > 0) {
+      fail(`entities[${index}] ("${id}") : container : clé(s) inconnue(s) ${unknownContainerKeys.map((key) => `"${key}"`).join(", ")}.`);
+    }
     entity.container = { distribution: resolvedContainer.distribution };
     if (resolvedContainer.count !== undefined) entity.container.count = resolvedContainer.count;
+    if (resolvedContainer.regenerates === false) entity.container.regenerates = false;
   }
 
   // shop : optionnel, POINT DE VENTE (voir core/catalog.js, core/trade.js,

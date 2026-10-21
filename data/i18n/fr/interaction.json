@@ -3,7 +3,11 @@
   "interaction.lootSpawn": "{count} pièces éparpillées tout autour.",
   "interaction.pickup": "Ramassé : {amount} pièces.",
   "interaction.pickupItem": "Ramassé : {item}.",
+  "interaction.searchAlreadyToday": "Déjà fouillé aujourd'hui.",
+  "interaction.searchDepleted": "Il n'y a plus rien ici.",
+  "interaction.searchNothing": "Vous ne trouvez rien.",
   "interaction.searchSpawn": "{count} objets tombent tout autour.",
+  "interaction.searchSpawnOne": "Un objet tombe tout près.",
   "menu.interaction.observe.title": "Observer",
   "menu.interaction.title": "Interagir"
 }

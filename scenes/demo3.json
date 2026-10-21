@@ -1,7 +1,7 @@
 {
   "id": "demo3",
   "titleKey": "scene.demo3.name",
-  "length": 10,
+  "length": 50,
   "playerStart": 1,
   "recto": {
     "music": "assets/musics/streets_day",
@@ -28,6 +28,16 @@
     "music": "assets/musics/mystery",
     "entities": [
       { "id": "bird_alley_verso", "type": "bird_1", "x": 4 },
+      { "id": "component_rattle_v", "type": "item", "x": 12, "action": { "kind": "pickup", "item": "resistor", "count": 1 } },
+      { "id": "component_plastic_v", "type": "item", "x": 16, "action": { "kind": "pickup", "item": "led", "count": 1 } },
+      { "id": "component_glass_v", "type": "item", "x": 20, "action": { "kind": "pickup", "item": "vacuum_tube", "count": 1 } },
+      { "id": "component_switch_v", "type": "item", "x": 24, "action": { "kind": "pickup", "item": "relay", "count": 1 } },
+      { "id": "component_metal_v", "type": "item", "x": 28, "action": { "kind": "pickup", "item": "ferrite_core", "count": 1 } },
+      { "id": "component_motor_v", "type": "item", "x": 32, "action": { "kind": "pickup", "item": "cooling_fan", "count": 1 } },
+      { "id": "component_beep_v", "type": "item", "x": 36, "action": { "kind": "pickup", "item": "piezo_buzzer", "count": 1 } },
+      { "id": "component_radio_v", "type": "item", "x": 40, "action": { "kind": "pickup", "item": "small_speaker", "count": 1 } },
+      { "id": "component_power_v", "type": "item", "x": 44, "action": { "kind": "pickup", "item": "small_transformer", "count": 1 } },
+      { "id": "component_static_v", "type": "item", "x": 48, "action": { "kind": "pickup", "item": "nine_volt_battery", "count": 1 } },
       { "id": "cumulo_lupus_verso", "type": "cumuloLupus", "x": 4, "behavior": { "kind": "wander" } },
       {
         "id": "alley_gap_verso",

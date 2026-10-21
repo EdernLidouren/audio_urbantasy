@@ -21,7 +21,7 @@
 // "Poser" (dropItem plus bas, view/menus/inventory-menu.js) — la PREMIÈRE
 // action du sac au-delà de la consultation.
 
-import { removeEntity, spawnEphemeral } from "./state.js";
+import { removeEntity, spawnEphemeral, activeFaceEntities } from "./state.js";
 import { ITEM_REGISTRY } from "./items.js";
 
 // type ABSENT du registre -> traité comme NON empilable (repli sûr, jamais
@@ -67,8 +67,7 @@ export function markAcquired(session, type) {
 // vérifié EXPLICITEMENT avant tout ajout, même politique atomique que
 // pickupEntity.
 export function pickupItemEntity(session, entityId, type, count = 1) {
-  const world = session.worlds[session.activeWorldId];
-  if (!world.entities.some((entity) => entity.id === entityId)) return session;
+  if (!activeFaceEntities(session).some((entity) => entity.id === entityId)) return session;
   return removeEntity(addItem(session, type, count), entityId);
 }
 

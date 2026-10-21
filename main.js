@@ -22,7 +22,7 @@ import { getPref, setPref, PREF_CONSTRAINTS } from "./config/preferences.js";
 import { configureAssetManifest } from "./lib/assets.js";
 import { checkAutoSaveTimer } from "./view/autosave-timer.js";
 import { loadGame } from "./view/save-storage.js";
-import { reportDroppedEntities } from "./view/debug-warnings.js";
+import { reportDroppedEntities, reportDroppedItems } from "./view/debug-warnings.js";
 import { announceNewDiscoveries } from "./view/collection-discoveries.js";
 
 // Préférences de menu (sliders/toggles + cyclage/étoile/suffixe, voir
@@ -164,6 +164,7 @@ function continueGame() {
   // La sauvegarde devient la partie : c'est ici, et pas à la lecture, que
   // ses entités retirées sont signalées (voir view/debug-warnings.js).
   reportDroppedEntities(loadableSave.droppedEntities);
+  reportDroppedItems(loadableSave.droppedItems);
   pushScreen(makeCityScreen(getSession, setSession));
 }
 

@@ -407,15 +407,43 @@ persiste avec le monde.
 - **Distribution (quoi)** — `{ table: "<nom>" }` référence une table
   standard de `config/spawn-values.js`/`SPAWN_TABLES` ; `{ items: { <objet>:
   <poids> } }` en déclare une inline (`<objet>` = clé de `ITEM_REGISTRY`).
+  Un poids est un NOMBRE ou le NOM d'un niveau de rareté (`"rare"`), qui vaut
+  le poids de ce niveau (`RARITY_LEVELS` : `common`, `uncommon`, `rare`,
+  `epic`, `legendary`, du plus fréquent au plus rare). Une table standard peut
+  aussi être DÉDUITE d'une étiquette, `{ fromTag: "electronic" }` : tous les
+  objets qui la portent, chacun pondéré par SA rareté (`ITEM_REGISTRY.rarity`,
+  1 à 5 = rang dans `RARITY_LEVELS`) ; un objet ajouté ou dont la rareté
+  change met la table à jour tout seul. Exemple réel : la table `electronics`
+  (les composants électroniques).
+  **Issue « rien »** : dans toute table, la clé RÉSERVÉE `nothing`
+  (`core/distribution.js`/`NOTHING`, jamais un objet de `ITEM_REGISTRY`) est
+  une issue pondérée comme les autres (nombre ou niveau de rareté) : le
+  tirage ne donne alors RIEN, mais consomme quand même son pas de PRNG. Une
+  table de rien seul est permise (comme membre de tables multiples), une
+  DISTRIBUTION qui ne pourrait jamais donner d'objet est refusée.
+  **Tables multiples** : `{ tables: [{ table | items, weight? }, ...] }` —
+  chaque tirage choisit une table selon son `weight` (nombre ou niveau de
+  rareté, défaut 1), puis un objet DANS cette table selon ses propres poids.
+  Les échelles des tables ne se mélangent jamais (une table de raretés
+  1-100 ne noie pas une table 80/20) ; un objet présent dans plusieurs
+  tables CUMULE ses chances, sans règle d'écrasement. Réalisé en un seul
+  tirage sur la table équivalente (`resolveDistribution`), mêmes
+  probabilités. Exemple réel : `entities/types/office_supply_box.js`
+  (`electronics` poids 1 + `{ items: { nothing: 1 } }` poids 1).
   Poids RELATIFS, tirage via `core/weather.js`/`pickTransition` réutilisé tel
   quel — une seule logique de tirage pondéré. Résolue à CHAQUE tirage, jamais
   figée dans l'état : un monde sauvegardé tire toujours dans la table
   COURANTE. Validée au chargement (`core/scene.js`) ; les tables standard
   s'auto-valident à l'import (`validateSpawnTables`), comme la météo.
 - **Sources (où)** — CONTENEUR : entité portant `container: { distribution,
-  count? }` (cascade instance -> type, ex. `entities/types/bush.js` ;
-  `count` : objets par cycle, défaut `SPAWN_CONTAINER_DEFAULT_COUNT`) +
-  action `"search"` ; point fixe, contenu CACHÉ. PLAGE : `face.spawnRanges`
+  count?, regenerates? }` (cascade instance -> type, ex.
+  `entities/types/bush.js` ; `count` : TIRAGES par cycle, défaut
+  `SPAWN_CONTAINER_DEFAULT_COUNT` — moins d'objets si des tirages tombent sur
+  `nothing`) + action `"search"` ; point fixe, contenu CACHÉ.
+  `regenerates: false` (défaut `true`) : conteneur NON RÉGÉNÉRANT, stock tiré
+  UNE SEULE fois (premier garnissage ou première fouille), jamais regarni ni
+  retiré ensuite — une fois vidé, vidé pour de bon (exemple réel :
+  `entities/types/broken_computer.js`, qu'on démonte une fois). PLAGE : `face.spawnRanges`
   (`{ from, to, count?, distribution }`, voir `doc/scene-format.md`) ;
   collectibles posés AU SOL à des positions VARIÉES — `drawScatteredPosition`
   (bornes carte, corps bloquants) autour du centre de la plage, re-tirée si
@@ -423,9 +451,8 @@ persiste avec le monde.
   `spawnMinSpacing`). Chaque collectible posé passe par le MÊME parseur qu'une
   instance de scène (`core/scene.js`/`parseSpawnedEntity`, registre INJECTÉ
   comme pour `parseScene`) : archétype du même nom que l'objet s'il existe
-  (`apple`), sinon l'archétype générique `item` avec nameKey/action pickup
-  dérivés d'`ITEM_REGISTRY` (même convention que "Poser", voir
-  `view/city-screen.js`/`resolveDroppedItemSpec`). Marqué `spawned: true`
+  (`apple`), sinon l'archétype générique `item` (voir "Objet au sol
+  générique" plus bas). Marqué `spawned: true`
   (RUNTIME) ; id `spawn-<cycle>-<plage>-<i>`, déterministe.
 - **Cycle (quand)** — quotidien : `spawnCycleAt(time)` = index de jour
   depuis l'origine, frontière à `SPAWN_CYCLE_HOUR` (minuit). SIMPLE pour
@@ -438,7 +465,8 @@ persiste avec le monde.
   marqueur, ÉCRASÉ par nature : après N cycles d'absence, UN garnissage, avec
   la distribution du moment, jamais une accumulation. Au garnissage : anciens
   collectibles posés retirés (ramassés ou non), nouveaux posés ; chaque
-  conteneur reçoit un `stock`/`stockCycle` neufs ; chaque POINT DE VENTE
+  conteneur régénérant reçoit un `stock`/`stockCycle` neufs (un conteneur non
+  régénérant déjà garni une fois est laissé tel quel) ; chaque POINT DE VENTE
   recharge son rayon (`shopStock`, voir "Vente et achat"). Scène à deux
   faces : LES DEUX faces garnies (on charge le monde entier), chacune sur son
   PRNG.
@@ -457,18 +485,26 @@ persiste avec le monde.
   (`spawnScatteredEphemerals`, MÊME geste que la caisse qui lâche des pièces
   : bornes, obstacles, décalage d'attaques des balises), à ramasser ensuite
   objet par objet ou à laisser (purgée au départ comme tout éphémère) ; puis
-  `stock: null`. Rien ne va JAMAIS directement au sac. Retour : annonce
-  `interaction.searchSpawn` seule. PLAGE ET objets tombés : ramassage
+  `stock: null`. Rien ne va JAMAIS directement au sac. Retour : une annonce
+  seule — `interaction.searchSpawn` (« 3 objets tombent tout autour. »),
+  `interaction.searchSpawnOne` (un seul objet), ou `interaction.searchNothing`
+  (« Vous ne trouvez rien. », tous les tirages tombés sur `nothing`). PLAGE ET objets tombés : ramassage
   ordinaire via l'action `"pickup"` que porte chaque collectible
   (`core/bag.js`/`pickupItemEntity`, aucun cas spécial).
-- **Fouillabilité liée au garnissage** — un conteneur n'est candidat à
-  Entrée QUE garni (`core/spawn.js`/`isSearchable` : stock non vide, OU un
-  cycle passé depuis `stockCycle` — garnissage paresseux dû) ; filtré par
-  `view/audio/city-scene.js`/`getInteractionCandidates` pour `"activate"`
-  seulement. Vidé -> Entrée ne le concerne plus : AUCUN retour (ni "vide",
-  ni menu), et il n'entre pas dans la désambiguïsation — ramasser les objets
-  tombés autour d'un conteneur vidé ne propose jamais le conteneur. CRUCIAL :
-  SEULE la fouille s'éteint. `interactable`/`observable`, présence, beacon,
+- **États d'un conteneur** (`core/spawn.js`/`containerStatus`) —
+  `"searchable"` (un stock pas encore fouillé, même VIDE, OU un garnissage
+  paresseux dû), `"searchedToday"` (fouillé, se regarnira au prochain cycle)
+  ou `"depleted"` (fouillé, non régénérant : plus jamais rien).
+  `isSearchable` = `"searchable"`.
+- **Candidature à Entrée** — filtrée par `view/audio/city-scene.js`/
+  `getInteractionCandidates` (`"activate"` seulement) : un conteneur VIDÉ
+  n'est candidat que s'il n'y a RIEN d'autre à activer à portée. Ramasser
+  les objets tombés autour ne propose donc jamais le conteneur ni un menu de
+  désambiguïsation ; seul, il répond à Entrée en annonçant son état —
+  `interaction.searchAlreadyToday` (« Déjà fouillé aujourd'hui. ») ou
+  `interaction.searchDepleted` (« Il n'y a plus rien ici. »), jamais un
+  silence (`view/interaction.js`/`handleSearch`). CRUCIAL : SEULE la fouille
+  s'éteint. `interactable`/`observable`, présence, beacon,
   occupation restent INCHANGÉS — l'arbre reste un arbre, Espace le décrit
   toujours, il bruisse toujours. Jamais rendu dormant/inerte par ce
   mécanisme.
@@ -487,7 +523,11 @@ persiste avec le monde.
   (`core/movement.check.js`, section "Collecte").
 
 Contenu de test : `scenes/demo.json` ("Ville test") — `bush_1` (x=12, table
-`default`) et une plage `[27, 34]` de 3 collectibles. Menu debug du temps
+`default`) et une plage `[27, 34]` de 3 collectibles.
+`scenes/town-square-town-hall-storeroom.json` (réserve de l'hôtel de ville) :
+trois `office_supply_box` régénérantes (2 tirages, une chance sur deux de
+rien) et un `broken_computer` non régénérant (3 tirages, trois chances sur
+quatre d'un composant). Menu debug du temps
 (Shift+T, mode debug) : "Avancer d'une journée" puis refouiller/quitter et
 revenir pour observer le cycle.
 
@@ -570,6 +610,27 @@ prévu, pas construit). Prix d'achat : `price` de l'article, sinon `value`
 
 Contenu de test : `scenes/demo.json`, `counter_1` (x=38, catalogue
 `general`).
+
+## Objet au sol générique (type `item`)
+
+Un objet du sac sans archétype dédié devient au sol une entité du type
+générique `item` (`entities/types/item.js`). Une instance de ce type qui
+RAMASSE un objet (`action: { kind: "pickup", item }`) en reprend
+automatiquement le **nom**, la **description** et les **sons**
+(`core/scene.js`/`genericItemDefaults`) — l'instance peut toujours les
+redéfinir :
+
+```json
+{ "id": "component_rattle_v", "type": "item", "x": 12, "action": { "kind": "pickup", "item": "resistor", "count": 1 } }
+```
+
+- Nom et description : `label`/`descriptionKey` de l'objet (`ITEM_REGISTRY`).
+- Sons : si l'objet déclare un `sound` (un pool), il devient le beacon en
+  boucle et le son de ramassage, joué une fois (`core/items.js`/`itemSounds`).
+  Sans `sound`, les sons de l'archétype générique restent.
+- Même règle partout où un objet devient une entité : instance de scène,
+  garnissage d'une plage ou d'un conteneur (`core/spawn.js`), objet posé
+  depuis le sac (`view/city-screen.js`/`resolveDroppedItemSpec`).
 
 ## Sac d'objets
 

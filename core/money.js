@@ -4,7 +4,7 @@
 // point d'écriture : addMoney — aucun autre endroit du code n'incrémente
 // session.money directement.
 
-import { removeEntity, markConsumed, spawnScatteredEphemerals } from "./state.js";
+import { removeEntity, markConsumed, spawnScatteredEphemerals, activeFaceEntities } from "./state.js";
 
 export function addMoney(session, amount) {
   return { ...session, money: session.money + amount };
@@ -21,8 +21,7 @@ export function addMoney(session, amount) {
 // paiement) — l'effet reste atomique, jamais l'un sans l'autre dans AUCUN
 // sens.
 export function pickupEntity(session, entityId, amount) {
-  const world = session.worlds[session.activeWorldId];
-  if (!world.entities.some((entity) => entity.id === entityId)) return session;
+  if (!activeFaceEntities(session).some((entity) => entity.id === entityId)) return session;
   return removeEntity(addMoney(session, amount), entityId);
 }
 
@@ -40,8 +39,7 @@ export function pickupEntity(session, entityId, amount) {
 // (view/interaction.js, core/presence.js) — ce module ne fait que poser
 // l'état dont elles dépendent, jamais leur logique de rendu.
 export function lootEntity(session, entityId, amount) {
-  const world = session.worlds[session.activeWorldId];
-  const entity = world.entities.find((e) => e.id === entityId);
+  const entity = activeFaceEntities(session).find((e) => e.id === entityId);
   if (!entity || entity.consumed) return session;
   return markConsumed(addMoney(session, amount), entityId);
 }
@@ -61,15 +59,13 @@ export function lootEntity(session, entityId, amount) {
 // marque seulement l'entité consumed. Déjà consumed ou absente -> référence
 // INCHANGÉE, même garde que lootEntity.
 export function lootUniqueEntity(session, entityId) {
-  const world = session.worlds[session.activeWorldId];
-  const entity = world.entities.find((e) => e.id === entityId);
+  const entity = activeFaceEntities(session).find((e) => e.id === entityId);
   if (!entity || entity.consumed) return session;
   return markConsumed(session, entityId);
 }
 
 export function lootEntitySpawn(session, entityId, spec, count, spread) {
-  const world = session.worlds[session.activeWorldId];
-  const entity = world.entities.find((e) => e.id === entityId);
+  const entity = activeFaceEntities(session).find((e) => e.id === entityId);
   if (!entity || entity.consumed) return session;
   return spawnScatteredEphemerals(markConsumed(session, entityId), spec, entity.x, count, spread);
 }

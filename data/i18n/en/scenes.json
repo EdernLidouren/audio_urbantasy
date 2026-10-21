@@ -1,14 +1,14 @@
 {
-  "scene.clock_tower_main.name": "Clock tower, machine room",
-  "scene.clock_tower_weight_shaft.name": "Clock tower, counterweight shaft",
-  "scene.clock_tower_weight_shaft_mirror_space.name": "Clock tower, counterweight shaft, mirror side",
-  "scene.default.name": "Unnamed scene",
-  "scene.demo.name": "Demo scene",
-  "scene.demo2.name": "Back room",
-  "scene.demo3.name": "The alley",
-  "scene.town_square.name": "Town square",
-  "scene.town_square_town_hall_main.name": "Town hall, main hall",
-  "scene.town_square_town_hall_mayor_office.name": "Town hall, mayor's office",
-  "scene.town_square_town_hall_meeting_room.name": "Town hall, meeting room",
-  "scene.town_square_town_hall_storeroom.name": "Town hall, storeroom"
+  "scene.clock_tower_main.name": "clock tower, machine room",
+  "scene.clock_tower_weight_shaft.name": "clock tower, counterweight shaft",
+  "scene.clock_tower_weight_shaft_mirror_space.name": "clock tower, counterweight shaft, mirror side",
+  "scene.default.name": "unnamed scene",
+  "scene.demo.name": "demo scene",
+  "scene.demo2.name": "back room",
+  "scene.demo3.name": "the alley",
+  "scene.town_square.name": "town square",
+  "scene.town_square_town_hall_main.name": "town hall, main hall",
+  "scene.town_square_town_hall_mayor_office.name": "town hall, mayor's office",
+  "scene.town_square_town_hall_meeting_room.name": "town hall, meeting room",
+  "scene.town_square_town_hall_storeroom.name": "town hall, storeroom"
 }

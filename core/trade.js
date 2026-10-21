@@ -79,7 +79,11 @@ function replaceShop(session, found, entity) {
 // construire le menu d'achat.
 export function shopArticles(entity) {
   const stockState = entity.shopStock ?? {};
-  return Object.entries(resolveCatalog(entity.shop.catalog)).map(([type, article]) => ({
+  // Un catalogue enregistré dans un monde sauvegardé peut citer un objet
+  // retiré du registre depuis : il est simplement ignoré, jamais proposé.
+  return Object.entries(resolveCatalog(entity.shop.catalog))
+    .filter(([type]) => Object.hasOwn(ITEM_REGISTRY, type))
+    .map(([type, article]) => ({
     type,
     price: articlePrice(type, article),
     stock: stockState[type] ?? 0,

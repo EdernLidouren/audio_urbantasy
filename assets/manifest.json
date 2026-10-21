@@ -711,6 +711,36 @@
   "assets/sounds/items/coin_push_beacon": [
     "assets/sounds/items/coin_push_beacon_1.mp3"
   ],
+  "assets/sounds/items/electronic_component_beep_1_beacon": [
+    "assets/sounds/items/electronic_component_beep_1_beacon_1.mp3"
+  ],
+  "assets/sounds/items/electronic_component_glass_1_beacon": [
+    "assets/sounds/items/electronic_component_glass_1_beacon.mp3"
+  ],
+  "assets/sounds/items/electronic_component_metal_1_beacon": [
+    "assets/sounds/items/electronic_component_metal_1_beacon_1.mp3"
+  ],
+  "assets/sounds/items/electronic_component_motor_1_beacon": [
+    "assets/sounds/items/electronic_component_motor_1_beacon_1.mp3"
+  ],
+  "assets/sounds/items/electronic_component_plastic_1_beacon": [
+    "assets/sounds/items/electronic_component_plastic_1_beacon.mp3"
+  ],
+  "assets/sounds/items/electronic_component_power_1_beacon": [
+    "assets/sounds/items/electronic_component_power_1_beacon_1.mp3"
+  ],
+  "assets/sounds/items/electronic_component_radio_1_beacon": [
+    "assets/sounds/items/electronic_component_radio_1_beacon_1.mp3"
+  ],
+  "assets/sounds/items/electronic_component_rattle_1_beacon": [
+    "assets/sounds/items/electronic_component_rattle_1_beacon.mp3"
+  ],
+  "assets/sounds/items/electronic_component_static_1_beacon": [
+    "assets/sounds/items/electronic_component_static_1_beacon_1.mp3"
+  ],
+  "assets/sounds/items/electronic_component_switch_1_beacon": [
+    "assets/sounds/items/electronic_component_switch_1_beacon_1.mp3"
+  ],
   "assets/sounds/items/fruit_beacon": [
     "assets/sounds/items/fruit_beacon_1.mp3"
   ],

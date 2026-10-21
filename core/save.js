@@ -16,6 +16,7 @@ import { INITIAL_TIME } from "./time.js";
 import { createEmptyEquipment } from "./equipment.js";
 import { stripEphemeralsFromWorld, isTwoSided } from "./state.js";
 import { createInitialWeather } from "./weather.js";
+import { ITEM_REGISTRY } from "./items.js";
 import { RENAMED_ENTITY_TYPES, RENAMED_I18N_KEYS, RENAMED_ASSET_PATHS } from "../config/save-renames.js";
 
 export const SAVE_VERSION = 1;
@@ -128,6 +129,40 @@ function renameEntityTypes(entities) {
 // traverse sans changement.
 function applyContentRenames(data) {
   return renameValues(mapEntityLists(data, renameEntityTypes));
+}
+
+// Retire du sac et de l'équipement les objets absents du registre d'objets
+// (objet supprimé, ou renommé — les ids d'objets n'ont pas de table de
+// renommage). Les garder ferait planter le menu du sac au premier accès à
+// leur fiche ; on perd l'objet, jamais la partie. ITEM_REGISTRY est du code
+// du core : aucune injection nécessaire, contrairement au registre
+// d'entités. Renvoie la partie et les objets retirés, `{ where, type }`
+// (where : "bag" ou le nom du slot), pour que l'appelant puisse avertir.
+function dropUnknownItems(data) {
+  const dropped = [];
+  const known = (type) => Object.hasOwn(ITEM_REGISTRY, type);
+  let result = data;
+
+  const bag = data.bag.filter((entry) => {
+    if (entry && known(entry.type)) return true;
+    dropped.push({ where: "bag", type: entry && entry.type });
+    return false;
+  });
+  if (bag.length !== data.bag.length) result = { ...result, bag };
+
+  if (data.equipment && typeof data.equipment === "object") {
+    let equipmentChanged = false;
+    const equipment = { ...data.equipment };
+    for (const [slot, content] of Object.entries(data.equipment)) {
+      if (content && !known(content.type)) {
+        dropped.push({ where: slot, type: content.type });
+        equipment[slot] = null;
+        equipmentChanged = true;
+      }
+    }
+    if (equipmentChanged) result = { ...result, equipment };
+  }
+  return { data: result, dropped };
 }
 
 // Retire les entités dont le type n'existe plus dans le registre (type
@@ -525,7 +560,9 @@ export function deserializeGame(raw, { registry } = {}) {
     return { success: false, reason: "invalid" };
   }
 
-  if (!registry) return { success: true, session: data, droppedEntities: [] };
-  const filtered = dropUnknownEntityTypes(data, registry);
-  return { success: true, session: filtered.data, droppedEntities: filtered.dropped };
+  // Objets inconnus : toujours retirés (le registre d'objets est du core).
+  const items = dropUnknownItems(data);
+  if (!registry) return { success: true, session: items.data, droppedEntities: [], droppedItems: items.dropped };
+  const filtered = dropUnknownEntityTypes(items.data, registry);
+  return { success: true, session: filtered.data, droppedEntities: filtered.dropped, droppedItems: items.dropped };
 }

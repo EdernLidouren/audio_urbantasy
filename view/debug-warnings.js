@@ -54,3 +54,13 @@ export function reportSceneReloadFailure(sceneId, message) {
 export function reportCollectionTextMissing(key) {
   reportWarning("debug.warnings.collectionTextMissing", { key }, "Collection : texte manquant :", key);
 }
+
+// Objets retirés du sac ou de l'équipement d'une sauvegarde adoptée, type
+// absent du registre d'objets (voir core/save.js/dropUnknownItems). Même
+// moment de signalement que reportDroppedEntities.
+export function reportDroppedItems(droppedItems) {
+  for (const { where, type } of droppedItems) {
+    const key = where === "bag" ? "debug.warnings.droppedBagItem" : "debug.warnings.droppedEquippedItem";
+    reportWarning(key, { type, slot: where }, "Sauvegarde : objet retiré, type inconnu :", { where, type });
+  }
+}

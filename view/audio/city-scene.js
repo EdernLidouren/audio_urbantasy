@@ -2339,14 +2339,18 @@ export function createCityAudioScene(getSession, { handover = null } = {}) {
   // chooseInteractionTarget, qui reste inchangée : elle reçoit déjà un
   // ensemble filtré, jamais consciente elle-même du verbe pour ce choix).
   // "activate" filtre EN PLUS par ÉTAT pour un conteneur de collecte : vidé,
-  // il n'est plus candidat (core/spawn.js/isSearchable — la seule chose qui
-  // s'éteint ; il reste occupé, observable, audible). Ramasser les objets
-  // tombés autour d'un conteneur vidé ne déclenche donc jamais de menu de
-  // désambiguïsation avec lui.
+  // il ne reste candidat QUE s'il n'y a RIEN d'autre à activer à portée
+  // (core/spawn.js/isSearchable). Ramasser les objets tombés autour d'un
+  // conteneur vidé ne déclenche donc jamais de menu de désambiguïsation avec
+  // lui ; seul, il répond à Entrée en annonçant son état ("déjà fouillé
+  // aujourd'hui", "plus rien", voir view/interaction.js/handleSearch) au
+  // lieu d'un silence.
   function getInteractionCandidates(kind) {
     if (kind === "describe") return currentOccupied.filter((entity) => entity.observable);
     const time = getSession().time;
-    return currentOccupied.filter((entity) => entity.interactable && (!entity.container || isSearchable(entity, time)));
+    const interactable = currentOccupied.filter((entity) => entity.interactable);
+    const live = interactable.filter((entity) => !entity.container || isSearchable(entity, time));
+    return live.length > 0 ? live : interactable;
   }
 
   // Rafraîchit les balises à la position courante du joueur, sans repasser

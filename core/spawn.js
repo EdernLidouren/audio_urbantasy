@@ -28,9 +28,17 @@
 //     (spawnScatteredEphemerals, MÊME geste que la caisse qui lâche des
 //     pièces) ; ramassage ensuite via l'action "pickup" EXISTANTE portée par
 //     chaque entité posée (plage ou fouille).
-// FOUILLABILITÉ (isSearchable) : un conteneur n'est candidat à "search"
-// (Entrée) QUE garni ; vidé, l'action s'éteint SEULE — présence,
-// beacon, observabilité restent intactes (l'arbre reste un arbre).
+// FOUILLABILITÉ (containerStatus / isSearchable) : un conteneur est
+// "searchable" (garni, ou un garnissage paresseux est dû), "searchedToday"
+// (vidé, se regarnira au prochain cycle) ou "depleted" (vidé pour de bon :
+// `container.regenerates: false`, stock tiré UNE SEULE fois, jamais
+// regarni). Vidé, il reste présent, audible, observable (l'arbre reste un
+// arbre) ; la vue ne le propose plus à Entrée que s'il est le SEUL candidat,
+// pour annoncer son état (voir view/audio/city-scene.js/
+// getInteractionCandidates).
+// Un tirage peut ne RIEN donner (clé `nothing` d'une table, voir
+// core/distribution.js) : un stock peut donc être vide, une plage poser
+// moins de `count` objets.
 // Déterministe : tous les tirages consomment le PRNG de la FACE
 // (face.rngState, comme spawnScatteredEphemerals) — même seed + même cycle
 // -> même contenu. Persistant : stock/stockCycle/spawned/spawnCycle sont
@@ -42,7 +50,6 @@
 import { SPAWN_CYCLE_HOUR, SPAWN_RANGE_DEFAULT_COUNT, SPAWN_CONTAINER_DEFAULT_COUNT } from "../config/spawn-values.js";
 import { TIME_CONFIG } from "../config/time-values.js";
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";
-import { ITEM_REGISTRY } from "./items.js";
 import { drawItem } from "./distribution.js";
 import { restockShopEntity } from "./catalog.js";
 import { isTwoSided, resolveFace, withFace, drawScatteredPosition, spawnScatteredEphemerals } from "./state.js";
@@ -68,16 +75,37 @@ export function spawnCycleAt(time) {
   return Math.floor((Math.floor(time) - SPAWN_CYCLE_HOUR * TIME_CONFIG.minutesPerHour) / MINUTES_PER_DAY);
 }
 
-// Un conteneur est FOUILLABLE s'il a un stock, OU si un cycle est passé
-// depuis son dernier stock (il se garnira paresseusement à la fouille, voir
-// searchContainer). Faux pour toute entité sans `container`. Lu par la vue
-// pour filtrer les candidats à "activate" (view/audio/city-scene.js/
-// getInteractionCandidates) — la seule chose qui s'éteint quand un conteneur
-// est vidé.
+// Vrai si le conteneur doit (re)tirer son stock au cycle `cycle` : jamais
+// garni (stockCycle absent), ou garni à un cycle passé ET régénérant. Un
+// conteneur `regenerates: false` ne tire qu'une fois.
+function isRestockDue(entity, cycle) {
+  if (entity.stockCycle === undefined) return true;
+  return entity.container.regenerates !== false && entity.stockCycle !== cycle;
+}
+
+// État d'un conteneur de collecte au temps donné (null pour une entité sans
+// `container`) :
+//   - "searchable" : garni, OU un garnissage paresseux est dû (voir
+//     searchContainer) ;
+//   - "searchedToday" : vidé, se regarnira au prochain cycle ;
+//   - "depleted" : vidé, ne se regarnira jamais (regenerates: false).
+// Lu par la vue : candidats à "activate" (view/audio/city-scene.js/
+// getInteractionCandidates) et annonce de la fouille (view/interaction.js/
+// handleSearch).
+export function containerStatus(entity, time) {
+  if (!entity.container) return null;
+  if (isRestockDue(entity, spawnCycleAt(time))) return "searchable";
+  // Un stock, même VIDE (tous les tirages tombés sur "nothing"), n'a pas
+  // encore été fouillé : la fouille annoncera qu'elle ne trouve rien. Seule
+  // la fouille note stock:null.
+  if (Array.isArray(entity.stock)) return "searchable";
+  return entity.container.regenerates === false ? "depleted" : "searchedToday";
+}
+
+// Raccourci : le conteneur a-t-il quelque chose à fouiller ? Faux pour
+// toute entité sans `container`.
 export function isSearchable(entity, time) {
-  if (!entity.container) return false;
-  if (entity.stockCycle !== spawnCycleAt(time)) return true;
-  return Array.isArray(entity.stock) && entity.stock.length > 0;
+  return containerStatus(entity, time) === "searchable";
 }
 
 // Sources garnies au cycle : plages, conteneurs ET points de vente (leur
@@ -86,13 +114,16 @@ function faceHasSources(face) {
   return (face.spawnRanges !== undefined && face.spawnRanges.length > 0) || face.entities.some((e) => e.container || e.shop);
 }
 
-// Tire `count` objets dans une distribution, en enchaînant le PRNG.
+// Tire `count` objets dans une distribution, en enchaînant le PRNG. Les
+// tirages "rien" (item null) sont écartés : `items` peut compter moins de
+// `count` objets, voire aucun — `count` tirages sont consommés quoi qu'il
+// arrive.
 function drawItems(distribution, count, rngState) {
   const items = [];
   let state = rngState;
   for (let i = 0; i < count; i++) {
     const draw = drawItem(distribution, state);
-    items.push(draw.item);
+    if (draw.item !== null) items.push(draw.item);
     state = draw.rngState;
   }
   return { items, rngState: state };
@@ -104,16 +135,12 @@ function drawItems(distribution, count, rngState) {
 // plage (marqué `spawned` par l'appelant), ou ÉPHÉMÈRE lâché par une fouille
 // (spawnEphemeral repose id/x/ephemeral lui-même).
 function buildCollectibleSpec(item, id, x, registry, length, sceneVariables) {
+  // Sans archétype dédié : type générique "item", dont le nom, la
+  // description et les sons sont repris de l'objet par parseEntity
+  // (core/scene.js/genericItemDefaults).
   const raw = registry[item]
     ? { id, type: item, x }
-    : {
-        id,
-        type: GENERIC_ITEM_TYPE,
-        x,
-        nameKey: ITEM_REGISTRY[item].label,
-        descriptionKey: ITEM_REGISTRY[item].descriptionKey,
-        action: { kind: "pickup", item, count: 1 },
-      };
+    : { id, type: GENERIC_ITEM_TYPE, x, action: { kind: "pickup", item, count: 1 } };
   return parseSpawnedEntity(raw, registry, length, sceneVariables);
 }
 
@@ -136,7 +163,8 @@ function drawRangePosition(range, obstacles, placed, length, presenceContext, rn
   return { x: candidate, rngState: state };
 }
 
-// Garnit UNE face pour le cycle donné : conteneurs re-stockés, anciens
+// Garnit UNE face pour le cycle donné : conteneurs re-stockés (sauf un
+// conteneur non régénérant déjà garni une fois, laissé tel quel), anciens
 // collectibles posés retirés puis remplacés. Tirages enchaînés sur
 // face.rngState, dans l'ordre des entités puis des plages — ordre stable,
 // déterminisme préservé.
@@ -149,7 +177,7 @@ function refillFace(face, world, cycle, registry, companions, presenceContext) {
       entities.push(restockShopEntity(entity, cycle));
       continue;
     }
-    if (!entity.container) {
+    if (!entity.container || !isRestockDue(entity, cycle)) {
       entities.push(entity);
       continue;
     }
@@ -163,6 +191,12 @@ function refillFace(face, world, cycle, registry, companions, presenceContext) {
     const placed = [];
     for (let i = 0; i < count; i++) {
       const draw = drawItem(range.distribution, rngState);
+      // Tirage "rien" : aucun objet posé à cette place, le tirage reste
+      // consommé (les ids suivants gardent leur index).
+      if (draw.item === null) {
+        rngState = draw.rngState;
+        continue;
+      }
       const obstacles = [...entities, ...companions];
       const position = drawRangePosition(range, obstacles, placed, world.length, presenceContext, draw.rngState);
       rngState = position.rngState;
@@ -205,24 +239,31 @@ export function refillDueSpawns(session, registry) {
 // conteneur de la FACE ACTIVE : son stock TOMBE AU SOL — une entité
 // ÉPHÉMÈRE par objet, éparpillée autour du conteneur
 // (core/state.js/spawnScatteredEphemerals, une par objet pour que chacune
-// porte SON spec), à ramasser ensuite ou à laisser. Rend `{ session, items }`
-// — `items` : les objets tombés (vide si le conteneur n'était pas garni, ou
-// si l'id n'est pas un conteneur ; dégradation silencieuse, la vue filtre
-// déjà les candidats via isSearchable). Stock tiré PARESSEUSEMENT si le
-// cycle courant diffère de stockCycle (voir header). Le conteneur note
-// stock:null pour le cycle courant : plus fouillable jusqu'au cycle suivant.
+// porte SON spec), à ramasser ensuite ou à laisser. Rend
+// `{ session, items, status }` :
+//   - `status` : l'état du conteneur AVANT la fouille (containerStatus) —
+//     "searchable" si la fouille a eu lieu ; "searchedToday" / "depleted"
+//     si le conteneur était déjà vidé (session inchangée) ; null si l'id
+//     n'est pas un conteneur de la face active (session inchangée) ;
+//   - `items` : les objets tombés — vide si rien n'a été fouillé, ou si la
+//     fouille n'a rien donné (tirages "nothing").
+// Stock tiré PARESSEUSEMENT si un garnissage est dû (voir header et
+// isRestockDue). Le conteneur note stock:null pour le cycle courant : plus
+// fouillable jusqu'au cycle suivant (ou plus jamais, s'il ne se régénère
+// pas).
 export function searchContainer(session, entityId, registry) {
   const world = session.worlds[session.activeWorldId];
   const side = session.player.side;
   const face = resolveFace(world, side);
   const index = face.entities.findIndex((e) => e.id === entityId);
   const entity = face.entities[index];
-  if (!entity || !isSearchable(entity, session.time)) return { session, items: [] };
+  const status = entity ? containerStatus(entity, session.time) : null;
+  if (status !== "searchable") return { session, items: [], status };
 
   const cycle = spawnCycleAt(session.time);
   let rngState = face.rngState;
   let stock = entity.stock;
-  if (entity.stockCycle !== cycle) {
+  if (isRestockDue(entity, cycle)) {
     const drawn = drawItems(entity.container.distribution, entity.container.count ?? SPAWN_CONTAINER_DEFAULT_COUNT, rngState);
     rngState = drawn.rngState;
     stock = drawn.items;
@@ -238,5 +279,5 @@ export function searchContainer(session, entityId, registry) {
     const spec = buildCollectibleSpec(item, `${entityId}-drop`, entity.x, registry, world.length, world.variables);
     nextSession = spawnScatteredEphemerals(nextSession, spec, entity.x, 1);
   }
-  return { session: nextSession, items: stock };
+  return { session: nextSession, items: stock, status };
 }

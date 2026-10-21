@@ -20,6 +20,9 @@ export const TAG_REGISTRY = {
   military: { labelKey: "tag.military" },
   chic: { labelKey: "tag.chic" },
   metal: { labelKey: "tag.metal" },
+  // Composants électroniques (collection "electronics") : sert aussi à la
+  // table de garnissage déduite "electronics" (config/spawn-values.js).
+  electronic: { labelKey: "tag.electronic" },
 };
 
 // Propriétés d'UN tag par sa clé — même patron que core/surfaces.js/

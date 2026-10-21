@@ -386,6 +386,14 @@ export function togglePerception(session) {
 // INCHANGÉE (rien à retirer), jamais une exception — une entité déjà
 // retirée (double appel, id périmé) doit se dégrader silencieusement, pas
 // planter la partie en cours.
+// Entités de la FACE ACTIVE du monde actif (sans les compagnons, qui ne
+// vivent pas dans les mondes). À utiliser pour chercher une entité de
+// scène : un monde à deux faces n'a pas de liste `entities` propre, elle
+// vit dans `recto`/`verso` (voir resolveFace).
+export function activeFaceEntities(session) {
+  return resolveFace(session.worlds[session.activeWorldId], session.player.side).entities;
+}
+
 export function removeEntity(session, entityId) {
   const world = session.worlds[session.activeWorldId];
   const face = resolveFace(world, session.player.side);

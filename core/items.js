@@ -88,12 +88,61 @@ export const ITEM_REGISTRY = {
     gait: "high_heels",
     tags: ["chic"],
   },
-  // Composants électroniques — objets de la collection "electronics"
-  // (collections/electronics.js). Contenu de TEST : noms et descriptions
-  // provisoires.
-  resistor: { stackable: true, label: "item.resistor.name", descriptionKey: "item.resistor.description", value: 3 },
-  capacitor: { stackable: true, label: "item.capacitor.name", descriptionKey: "item.capacitor.description", value: 4 },
-  transistor: { stackable: true, label: "item.transistor.name", descriptionKey: "item.transistor.description", value: 6 },
+  // Composants électroniques — collection "electronics"
+  // (collections/electronics.js), générés depuis la liste fournie par
+  // l'auteur. rarity : 1 (commun) à 5 (légendaire), voir
+  // config/spawn-values.js/RARITY_LEVELS ; value = rarity × 20 (provisoire).
+  // sound : beacon de l'objet au sol, rejoué une fois au ramassage (voir
+  // itemSounds plus bas).
+  resistor: { stackable: true, label: "item.resistor.name", descriptionKey: "item.resistor.description", value: 20, rarity: 1, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_rattle_1_beacon" },
+  ceramic_capacitor: { stackable: true, label: "item.ceramic_capacitor.name", descriptionKey: "item.ceramic_capacitor.description", value: 20, rarity: 1, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_rattle_1_beacon" },
+  electrolytic_capacitor: { stackable: true, label: "item.electrolytic_capacitor.name", descriptionKey: "item.electrolytic_capacitor.description", value: 20, rarity: 1, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_rattle_1_beacon" },
+  inductor: { stackable: true, label: "item.inductor.name", descriptionKey: "item.inductor.description", value: 40, rarity: 2, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_rattle_1_beacon" },
+  quartz_crystal: { stackable: true, label: "item.quartz_crystal.name", descriptionKey: "item.quartz_crystal.description", value: 40, rarity: 2, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_plastic_1_beacon" },
+  ferrite_core: { stackable: true, label: "item.ferrite_core.name", descriptionKey: "item.ferrite_core.description", value: 40, rarity: 2, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_metal_1_beacon" },
+  diode: { stackable: true, label: "item.diode.name", descriptionKey: "item.diode.description", value: 20, rarity: 1, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_rattle_1_beacon" },
+  led: { stackable: true, label: "item.led.name", descriptionKey: "item.led.description", value: 20, rarity: 1, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_plastic_1_beacon" },
+  transistor: { stackable: true, label: "item.transistor.name", descriptionKey: "item.transistor.description", value: 20, rarity: 1, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_rattle_1_beacon" },
+  power_transistor: { stackable: true, label: "item.power_transistor.name", descriptionKey: "item.power_transistor.description", value: 40, rarity: 2, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_metal_1_beacon" },
+  bridge_rectifier: { stackable: true, label: "item.bridge_rectifier.name", descriptionKey: "item.bridge_rectifier.description", value: 40, rarity: 2, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_plastic_1_beacon" },
+  laser_diode: { stackable: true, label: "item.laser_diode.name", descriptionKey: "item.laser_diode.description", value: 60, rarity: 3, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_rattle_1_beacon" },
+  timer_555: { stackable: true, label: "item.timer_555.name", descriptionKey: "item.timer_555.description", value: 40, rarity: 2, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_plastic_1_beacon" },
+  op_amp: { stackable: true, label: "item.op_amp.name", descriptionKey: "item.op_amp.description", value: 40, rarity: 2, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_plastic_1_beacon" },
+  sim_card: { stackable: true, label: "item.sim_card.name", descriptionKey: "item.sim_card.description", value: 20, rarity: 1, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_plastic_1_beacon" },
+  ram_module: { stackable: true, label: "item.ram_module.name", descriptionKey: "item.ram_module.description", value: 40, rarity: 2, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_plastic_1_beacon" },
+  microcontroller: { stackable: true, label: "item.microcontroller.name", descriptionKey: "item.microcontroller.description", value: 60, rarity: 3, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_plastic_1_beacon" },
+  cpu: { stackable: true, label: "item.cpu.name", descriptionKey: "item.cpu.description", value: 60, rarity: 3, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_metal_1_beacon" },
+  uv_eprom: { stackable: true, label: "item.uv_eprom.name", descriptionKey: "item.uv_eprom.description", value: 80, rarity: 4, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_plastic_1_beacon" },
+  relay: { stackable: true, label: "item.relay.name", descriptionKey: "item.relay.description", value: 40, rarity: 2, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_switch_1_beacon" },
+  toggle_switch: { stackable: true, label: "item.toggle_switch.name", descriptionKey: "item.toggle_switch.description", value: 20, rarity: 1, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_switch_1_beacon" },
+  potentiometer: { stackable: true, label: "item.potentiometer.name", descriptionKey: "item.potentiometer.description", value: 20, rarity: 1, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_switch_1_beacon" },
+  rotary_switch: { stackable: true, label: "item.rotary_switch.name", descriptionKey: "item.rotary_switch.description", value: 60, rarity: 3, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_switch_1_beacon" },
+  vibration_motor: { stackable: true, label: "item.vibration_motor.name", descriptionKey: "item.vibration_motor.description", value: 20, rarity: 1, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_motor_1_beacon" },
+  cooling_fan: { stackable: true, label: "item.cooling_fan.name", descriptionKey: "item.cooling_fan.description", value: 20, rarity: 1, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_motor_1_beacon" },
+  stepper_motor: { stackable: true, label: "item.stepper_motor.name", descriptionKey: "item.stepper_motor.description", value: 60, rarity: 3, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_motor_1_beacon" },
+  piezo_buzzer: { stackable: true, label: "item.piezo_buzzer.name", descriptionKey: "item.piezo_buzzer.description", value: 20, rarity: 1, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_beep_1_beacon" },
+  small_speaker: { stackable: true, label: "item.small_speaker.name", descriptionKey: "item.small_speaker.description", value: 40, rarity: 2, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_radio_1_beacon" },
+  photoresistor: { stackable: true, label: "item.photoresistor.name", descriptionKey: "item.photoresistor.description", value: 20, rarity: 1, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_rattle_1_beacon" },
+  thermistor: { stackable: true, label: "item.thermistor.name", descriptionKey: "item.thermistor.description", value: 20, rarity: 1, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_rattle_1_beacon" },
+  electret_microphone: { stackable: true, label: "item.electret_microphone.name", descriptionKey: "item.electret_microphone.description", value: 40, rarity: 2, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_plastic_1_beacon" },
+  pir_sensor: { stackable: true, label: "item.pir_sensor.name", descriptionKey: "item.pir_sensor.description", value: 40, rarity: 2, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_plastic_1_beacon" },
+  hall_sensor: { stackable: true, label: "item.hall_sensor.name", descriptionKey: "item.hall_sensor.description", value: 60, rarity: 3, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_plastic_1_beacon" },
+  tilt_switch: { stackable: true, label: "item.tilt_switch.name", descriptionKey: "item.tilt_switch.description", value: 40, rarity: 2, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_switch_1_beacon" },
+  mercury_switch: { stackable: true, label: "item.mercury_switch.name", descriptionKey: "item.mercury_switch.description", value: 80, rarity: 4, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_glass_1_beacon" },
+  coin_cell: { stackable: true, label: "item.coin_cell.name", descriptionKey: "item.coin_cell.description", value: 20, rarity: 1, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_rattle_1_beacon" },
+  nine_volt_battery: { stackable: true, label: "item.nine_volt_battery.name", descriptionKey: "item.nine_volt_battery.description", value: 20, rarity: 1, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_static_1_beacon" },
+  phone_battery: { stackable: true, label: "item.phone_battery.name", descriptionKey: "item.phone_battery.description", value: 40, rarity: 2, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_plastic_1_beacon" },
+  solar_cell: { stackable: true, label: "item.solar_cell.name", descriptionKey: "item.solar_cell.description", value: 40, rarity: 2, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_glass_1_beacon" },
+  small_transformer: { stackable: true, label: "item.small_transformer.name", descriptionKey: "item.small_transformer.description", value: 40, rarity: 2, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_power_1_beacon" },
+  supercapacitor: { stackable: true, label: "item.supercapacitor.name", descriptionKey: "item.supercapacitor.description", value: 60, rarity: 3, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_rattle_1_beacon" },
+  glass_fuse: { stackable: true, label: "item.glass_fuse.name", descriptionKey: "item.glass_fuse.description", value: 20, rarity: 1, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_glass_1_beacon" },
+  dial_lamp: { stackable: true, label: "item.dial_lamp.name", descriptionKey: "item.dial_lamp.description", value: 40, rarity: 2, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_glass_1_beacon" },
+  neon_indicator: { stackable: true, label: "item.neon_indicator.name", descriptionKey: "item.neon_indicator.description", value: 40, rarity: 2, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_glass_1_beacon" },
+  variable_capacitor: { stackable: true, label: "item.variable_capacitor.name", descriptionKey: "item.variable_capacitor.description", value: 60, rarity: 3, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_switch_1_beacon" },
+  vacuum_tube: { stackable: true, label: "item.vacuum_tube.name", descriptionKey: "item.vacuum_tube.description", value: 60, rarity: 3, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_glass_1_beacon" },
+  nixie_tube: { stackable: true, label: "item.nixie_tube.name", descriptionKey: "item.nixie_tube.description", value: 80, rarity: 4, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_glass_1_beacon" },
+  magic_eye: { stackable: true, label: "item.magic_eye.name", descriptionKey: "item.magic_eye.description", value: 100, rarity: 5, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_glass_1_beacon" },
+  core_memory: { stackable: true, label: "item.core_memory.name", descriptionKey: "item.core_memory.description", value: 100, rarity: 5, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_rattle_1_beacon" },
 };
 
 // Propriétés d'UN objet par son type — point d'extension futur (même
@@ -103,6 +152,18 @@ export const ITEM_REGISTRY = {
 // qui s'en accommode déjà en dégradant sur "non empilable").
 export function itemProps(type) {
   return ITEM_REGISTRY[type];
+}
+
+// Sons d'un objet AU SOL, déduits de son champ `sound` (un pool) : beacon en
+// boucle, et le même son joué une fois au ramassage. Objet sans `sound` (ou
+// inconnu) -> undefined : l'appelant garde alors les sons de l'archétype
+// (générique "item", voir entities/types/item.js). Utilisé partout où un
+// objet devient une entité : instance de scène (core/scene.js/parseEntity),
+// garnissage (core/spawn.js), objet posé depuis le sac (view/city-screen.js).
+export function itemSounds(type) {
+  const props = ITEM_REGISTRY[type];
+  if (!props || !props.sound) return undefined;
+  return { beacon: { path: props.sound, loop: true }, pickup: { path: props.sound } };
 }
 
 // Valide que tout tag référencé par CHAQUE objet d'un registre existe dans

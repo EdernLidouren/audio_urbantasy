@@ -47,6 +47,15 @@ la partie (voir `doc/entity-model.md`/"Mode debug").
    lecture : console, et journal des avertissements, ouvert de lui-même en
    mode debug (voir `doc/entity-model.md`/"Mode debug").
 
+**Objets inconnus** (toujours, le registre d'objets étant du code du core) :
+un objet du sac ou de l'équipement absent de `core/items.js`/`ITEM_REGISTRY`
+(supprimé, ou renommé : les ids d'objets n'ont pas de table de renommage)
+est retiré, et listé dans `droppedItems` (`{ where, type }`, `where` =
+`"bag"` ou le nom du slot). Signalé au même moment que les entités
+retirées, dans la console et le journal. Un comptoir dont le catalogue
+enregistré cite un tel objet l'ignore simplement (`core/trade.js`/
+`shopArticles`).
+
 ## Renommer du contenu : `config/save-renames.js`
 
 Quand tu renommes un **type d'entité**, une **clé i18n** ou un **fichier de
@@ -80,7 +89,8 @@ Une **suppression** de type ne demande rien : l'entité disparaît des parties
 existantes au chargement (étape 5).
 
 **Non couvert aujourd'hui** : les ids d'objets du sac et de l'équipement
-(`core/items.js`) et les ids de scènes (clés de `session.worlds`, cibles de
+(`core/items.js` — un objet renommé est RETIRÉ des sauvegardes, voir plus
+haut) et les ids de scènes (clés de `session.worlds`, cibles de
 `teleport`). Les renommer casserait les sauvegardes existantes ; une table
 dédiée s'ajoutera le jour où le cas se présente.
 

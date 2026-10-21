@@ -143,7 +143,7 @@ export function loadGame() {
     console.warn(`loadGame: sauvegarde invalide (raison : ${result.reason}).`);
     return null;
   }
-  return { session: result.session, droppedEntities: result.droppedEntities };
+  return { session: result.session, droppedEntities: result.droppedEntities, droppedItems: result.droppedItems };
 }
 
 export function hasSave() {
@@ -226,5 +226,5 @@ export async function importGame(file) {
   if (!result.success) {
     return { success: false, reason: result.reason };
   }
-  return { success: true, session: result.session, droppedEntities: result.droppedEntities };
+  return { success: true, session: result.session, droppedEntities: result.droppedEntities, droppedItems: result.droppedItems };
 }

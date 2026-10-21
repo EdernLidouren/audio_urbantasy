@@ -9,6 +9,21 @@ annonce de découverte), `view/menus/inventory-menu.js` (onglet),
 Les **améliorations** ne sont pas une collection : ce sont des capacités, elles
 gardent leur propre système (`core/improvements.js`).
 
+## Contenu actuel
+
+- **`electronics`** — 49 composants électroniques (passifs, semi-conducteurs,
+  puces, électromécaniques, capteurs, énergie, rétro), dans l'ordre de la
+  liste de l'auteur. Chacun est un objet empilable de `core/items.js`, avec
+  sa rareté (1 à 5), une valeur de vente provisoire (rareté × 20),
+  l'étiquette `electronic` et un son parmi dix
+  (`items/electronic_component_<son>_1_beacon`), qui sert de beacon au sol
+  et de son de ramassage. La table de garnissage `electronics`
+  (`config/spawn-values.js`) en est déduite, chaque composant pondéré par sa
+  rareté.
+- Contenu de test : deux composants à ramasser et un en vente dans la démo ;
+  dix composants, un par son, au verso de la démo 3 (x 12 à 48), pour juger
+  les sons à l'oreille.
+
 ## Modèle
 
 Une collection = un fichier de données pur dans `collections/`, enregistré dans
@@ -57,7 +72,7 @@ son objet y figure (`collectionEntries`, `collectionProgress`).
 deux états de la partie (`newlyDiscoveredEntries`), au `setSession` de
 `main.js`, qui voit passer toute mise à jour — jamais d'émission dans les
 sources d'acquisition. Une annonce POLIE dédiée, « Nouvelle découverte :
-résistance, Composants électroniques. », différée d'un instant pour passer
+résistance, composants électroniques. », différée d'un instant pour passer
 APRÈS l'annonce de ramassage ou d'achat, plus le `discoverySound` de la
 collection. Plusieurs découvertes simultanées : une seule annonce. Rien n'est
 annoncé quand la partie est remplacée en bloc (import) ou modifiée par un outil

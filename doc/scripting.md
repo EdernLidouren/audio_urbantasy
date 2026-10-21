@@ -852,25 +852,46 @@ action: { kind: "search" },
 ```
 
 Aucun paramètre sur l'action elle-même : ce qui tombe vient de
-`entity.container` (`{ distribution, count? }`, voir `doc/scene-format.md`/
-"Entité" et `doc/entity-model.md`/"Collecte" pour le modèle complet —
-conteneur garni à chaque cycle quotidien de `count` objets TIRÉS dans une
-distribution pondérée, `{ table: "<nom>" }` référençant
-`config/spawn-values.js`/`SPAWN_TABLES` ou `{ items: { <objet>: <poids> } }`
-inline). Effet d'état : `core/spawn.js`/`searchContainer` — le stock TOMBE
+`entity.container` (`{ distribution, count?, regenerates? }`, voir
+`doc/scene-format.md`/"Entité" et `doc/entity-model.md`/"Collecte" pour le
+modèle complet — conteneur garni à chaque cycle quotidien de `count`
+TIRAGES dans une distribution pondérée : `{ table: "<nom>" }` référençant
+`config/spawn-values.js`/`SPAWN_TABLES`, `{ items: { <objet>: <poids> } }`
+inline, ou plusieurs tables `{ tables: [{ table | items, weight? }] }` ;
+la clé réservée `nothing` y est une issue « rien » pondérée ;
+`regenerates: false` = garni une seule fois).
+
+```js
+// entities/types/broken_computer.js — démonté une fois, puis plus rien
+container: {
+  distribution: {
+    tables: [
+      { table: "electronics", weight: 3 },
+      { items: { nothing: 1 }, weight: 1 },
+    ],
+  },
+  count: 3,
+  regenerates: false,
+},
+action: { kind: "search" },
+```
+ Effet d'état : `core/spawn.js`/`searchContainer` — le stock TOMBE
 AU SOL, une entité ÉPHÉMÈRE par objet, éparpillée autour du conteneur
 (`spawnScatteredEphemerals`, MÊME geste que le `"loot"` à spawn ci-dessus),
 à ramasser ensuite via `"pickup"` ou à laisser ; le conteneur est noté vidé
-(`stock: null`) pour le cycle courant. Retour : annonce
-`interaction.searchSpawn` seule (les balises des objets tombés font le
-reste) — aucun son de fouille imposé.
+(`stock: null`) pour le cycle courant. Retour : une annonce seule (les
+balises des objets tombés font le reste) — `interaction.searchSpawn`,
+`interaction.searchSpawnOne` (un objet) ou `interaction.searchNothing`
+(tous les tirages tombés sur `nothing`) ; aucun son de fouille imposé.
 
-**Candidature liée à l'état** : un conteneur VIDÉ n'est plus candidat à
-Entrée (`core/spawn.js`/`isSearchable`, filtré par `view/audio/city-scene.js`/
-`getInteractionCandidates`) — aucun retour, aucun menu de désambiguïsation
-avec les objets tombés autour ; il reste occupé, observable (Espace) et
-audible. Fouillable de nouveau dès qu'un cycle est passé. Contrairement à
-`"loot"`, l'entité n'est jamais `consumed` : elle se régénère.
+**Candidature liée à l'état** (`core/spawn.js`/`containerStatus`) : un
+conteneur VIDÉ n'est candidat à Entrée que s'il n'y a RIEN d'autre à
+activer à portée (`view/audio/city-scene.js`/`getInteractionCandidates`) —
+jamais de menu de désambiguïsation avec les objets tombés autour. Seul, il
+annonce son état : `interaction.searchAlreadyToday` (régénérant, fouillable
+de nouveau dès qu'un cycle est passé) ou `interaction.searchDepleted` (non
+régénérant). Il reste occupé, observable (Espace) et audible. Contrairement
+à `"loot"`, l'entité n'est jamais `consumed`.
 
 ### `"shop"` — POINT DE VENTE, ouvre le menu du comptoir
 

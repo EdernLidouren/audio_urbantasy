@@ -128,11 +128,12 @@ export function setVariableEffectsHandler(handler) {
   variableEffectsHandler = handler;
 }
 
-// (entity) => number — applique l'effet d'ÉTAT de la FOUILLE d'un conteneur
+// (entity) => { status, count } — applique l'effet d'ÉTAT de la FOUILLE d'un conteneur
 // de collecte (voir core/spawn.js/searchContainer, doc/entity-model.md/
 // "Collecte"), même patron que setLootSpawnHandler : le stock TOMBE au sol
-// en éphémères éparpillés. Renvoie le nombre d'objets tombés — le retour
-// sensoriel (annonce) reste ici, voir handleSearch.
+// en éphémères éparpillés. Renvoie { status, count } (état du conteneur
+// avant la fouille, nombre d'objets tombés) — le retour sensoriel (annonce)
+// reste ici, voir handleSearch.
 export function setSearchHandler(handler) {
   searchHandler = handler;
 }
@@ -540,15 +541,28 @@ function handleApplyEffects() {}
 // "loot" à spawn ci-dessus : le stock TOMBE au sol, éparpillé, à ramasser
 // ensuite objet par objet (chacun annonçant et sonnant son propre ramassage,
 // voir handlePickup). Aucun son ici : les balises des objets tombés sont le
-// retour audible. Un conteneur vidé n'arrive JAMAIS jusqu'ici : il n'est
-// plus candidat à "activate" (voir core/spawn.js/isSearchable,
-// view/audio/city-scene.js/getInteractionCandidates) — aucun "vide" à
-// annoncer, aucun menu parasite.
+// retour audible. Un conteneur VIDÉ n'arrive ici que s'il était le seul
+// candidat à portée (voir view/audio/city-scene.js/
+// getInteractionCandidates) : son état est alors annoncé — jamais un
+// silence, jamais un menu parasite.
+const SEARCH_EMPTY_KEYS = {
+  searchedToday: "interaction.searchAlreadyToday",
+  depleted: "interaction.searchDepleted",
+};
+
 function handleSearch(entity) {
   if (!searchHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
-  const count = searchHandler(entity);
-  if (count === 0) return;
-  announce(t("interaction.searchSpawn", { count }), { assertive: true });
+  // { status, count } — voir core/spawn.js/searchContainer.
+  const { status, count } = searchHandler(entity);
+  if (SEARCH_EMPTY_KEYS[status]) {
+    announce(t(SEARCH_EMPTY_KEYS[status]), { assertive: true });
+    return;
+  }
+  if (status !== "searchable") return; // pas un conteneur de la face active (dégradation silencieuse)
+  // Fouille faite : tous les tirages ont pu tomber sur "nothing".
+  if (count === 0) announce(t("interaction.searchNothing"), { assertive: true });
+  else if (count === 1) announce(t("interaction.searchSpawnOne"), { assertive: true });
+  else announce(t("interaction.searchSpawn", { count }), { assertive: true });
 }
 
 // "shop" : POINT DE VENTE (voir entities/types/shop_counter.js, doc/

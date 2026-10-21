@@ -1,10 +1,62 @@
 // Collection "electronics" — composants électroniques. Donnée pure, aucun
 // import (voir core/collections.js pour la logique, doc/collections.md).
-// L'ordre des entrées est l'ordre d'affichage, fixe. Chaque entrée référence
-// un objet du sac (core/items.js/ITEM_REGISTRY) ; ses textes de collection
-// vivent sous collection.electronics.entry.<objet>.* (collections.json).
+// L'ordre des entrées est l'ordre d'affichage, fixe (celui de la liste de
+// l'auteur : passifs, semi-conducteurs, puces, électromécaniques, capteurs,
+// énergie, rétro). Chaque entrée référence un objet du sac
+// (core/items.js/ITEM_REGISTRY) ; ses textes de collection vivent sous
+// collection.electronics.entry.<objet>.* (collections.json).
 export default {
   // Son joué à chaque nouvelle découverte de cette collection. Provisoire.
   discoverySound: "assets/sounds/effects/reward",
-  entries: [{ item: "resistor" }, { item: "capacitor" }, { item: "transistor" }],
+  entries: [
+    { item: "resistor" },
+    { item: "ceramic_capacitor" },
+    { item: "electrolytic_capacitor" },
+    { item: "inductor" },
+    { item: "quartz_crystal" },
+    { item: "ferrite_core" },
+    { item: "diode" },
+    { item: "led" },
+    { item: "transistor" },
+    { item: "power_transistor" },
+    { item: "bridge_rectifier" },
+    { item: "laser_diode" },
+    { item: "timer_555" },
+    { item: "op_amp" },
+    { item: "sim_card" },
+    { item: "ram_module" },
+    { item: "microcontroller" },
+    { item: "cpu" },
+    { item: "uv_eprom" },
+    { item: "relay" },
+    { item: "toggle_switch" },
+    { item: "potentiometer" },
+    { item: "rotary_switch" },
+    { item: "vibration_motor" },
+    { item: "cooling_fan" },
+    { item: "stepper_motor" },
+    { item: "piezo_buzzer" },
+    { item: "small_speaker" },
+    { item: "photoresistor" },
+    { item: "thermistor" },
+    { item: "electret_microphone" },
+    { item: "pir_sensor" },
+    { item: "hall_sensor" },
+    { item: "tilt_switch" },
+    { item: "mercury_switch" },
+    { item: "coin_cell" },
+    { item: "nine_volt_battery" },
+    { item: "phone_battery" },
+    { item: "solar_cell" },
+    { item: "small_transformer" },
+    { item: "supercapacitor" },
+    { item: "glass_fuse" },
+    { item: "dial_lamp" },
+    { item: "neon_indicator" },
+    { item: "variable_capacitor" },
+    { item: "vacuum_tube" },
+    { item: "nixie_tube" },
+    { item: "magic_eye" },
+    { item: "core_memory" },
+  ],
 };

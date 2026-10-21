@@ -73,7 +73,7 @@ import { pickupEntity, lootEntity, lootUniqueEntity, lootEntitySpawn } from "../
 import { pickupItemEntity, dropItem } from "../core/bag.js";
 import { refillDueSpawns, searchContainer } from "../core/spawn.js";
 import { equipItem, unequipItem } from "../core/equipment.js";
-import { ITEM_REGISTRY } from "../core/items.js";
+import { ITEM_REGISTRY, itemSounds } from "../core/items.js";
 import { isDebugEnabled } from "../config/debug.js";
 import {
   advanceTime,
@@ -257,7 +257,9 @@ function resolveDroppedItemSpec(type, count) {
     type: "item",
     labelKey: props.label,
     descriptionKey: props.descriptionKey,
-    sounds: generic.sounds,
+    // Sons propres à l'objet s'il en déclare (core/items.js/itemSounds),
+    // même règle que pour une instance de scène ou un garnissage.
+    sounds: itemSounds(type) ?? generic.sounds,
     blocksMovement: Boolean(generic.blocksMovement),
     observable: Boolean(generic.observable),
     interactable: Boolean(generic.interactable),
@@ -661,11 +663,13 @@ export function makeCityScreen(getSession, setSession) {
   // Effet d'ÉTAT de la FOUILLE (voir view/interaction.js/ACTION_HANDLERS.
   // search ; core/spawn.js/searchContainer) : tirage paresseux + stock lâché
   // au sol en éphémères éparpillés + conteneur noté vidé, core pur (registre
-  // injecté, comme refreshSpawns). Renvoie le nombre d'objets tombés.
+  // injecté, comme refreshSpawns). Renvoie { status, count } : l'état du
+  // conteneur avant la fouille (déjà vidé ou non) et le nombre d'objets
+  // tombés, que la vue annonce (view/interaction.js/handleSearch).
   function searchEffect(entity) {
     const result = searchContainer(getSession(), entity.id, registry);
-    setSession(result.session);
-    return result.items.length;
+    if (result.session !== getSession()) setSession(result.session);
+    return { status: result.status, count: result.items.length };
   }
 
   // SAS de bascule recto<->verso (voir view/interaction.js/ACTION_HANDLERS.
