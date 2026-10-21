@@ -68,7 +68,7 @@ une balise `interactable:false` jamais candidate à Entrée, même à portée.
 Deux niveaux de PERCEPTION, à ne pas confondre :
 
 - **Occupation** (couche légère, inchangée) : le NOM de l'entité, annoncé à
-  l'approche (`view/audio/city-scene.js`/`occupiedEntities`) sur le canal
+  l'approche (`view/occupancy.js`/`occupiedEntities`) sur le canal
   POLITE (information de contexte, jamais une urgence : ne coupe pas une
   lecture en cours). Toute entité à portée y figure, SAUF celles qui n'ont
   AUCUNE des deux capacités (`observable:false` ET `interactable:false`,
@@ -85,7 +85,7 @@ Deux niveaux de PERCEPTION, à ne pas confondre :
   par condition).
 
 Résolution de candidats PAR VERBE
-(`view/audio/city-scene.js`/`getInteractionCandidates(kind)`) : filtre
+(`view/occupancy.js`/`getInteractionCandidates(kind)`) : filtre
 l'ensemble d'occupation courant par la capacité du verbe pressé
 (`observable` pour Espace, `interactable` pour Entrée) — MÊME portée
 (`interactRange`) que l'occupation, pas de zone séparée. La désambiguïsation
@@ -158,7 +158,7 @@ d'ÉTAT. Le mécanisme, en trois couches strictement séparées :
     (booléen, REGISTRE SEULEMENT — jamais cascadé par instance, contrairement
     à `consumedDescriptionKey`) : arrête PERMANEMMENT le beacon continu de
     l'entité dès que `consumed` passe à `true` (voir `view/audio/
-    city-scene.js`/`muteConsumedBeacons`, appelée une fois par tick comme
+    view/audio/entity-sounds.js`/`muteConsumedBeacons`, appelée une fois par tick comme
     `cleanupRemovedEntities`). **Limite volontaire** : seule l'ABSENCE du
     beacon est supportée, jamais un son DIFFÉRENT (un second fichier) —
     remplacer la voix elle-même exigerait de recréer un Howl en cours de
@@ -239,7 +239,7 @@ JSON de scène, une entité ÉPHÉMÈRE n'est par définition jamais DÉCLARÉE.
   `core/money.js`/`pickupEntity`) : une entité éphémère ramassable porte
   `action: { kind: "pickup", amount: <n> }` comme n'importe quelle autre —
   aucune distinction de traitement, la robustesse au retrait déjà en place
-  (`view/audio/city-scene.js`/`cleanupRemovedEntities`, `present: false`
+  (`view/audio/entity-sounds.js`/`cleanupRemovedEntities`, `present: false`
   synthétisé pour toute entrée disparue de `world.entities`) couvre déjà ce
   cas sans rien y ajouter.
 - **Exclusion de la sérialisation** — `core/save.js`/`serializeGame` retire
@@ -496,7 +496,7 @@ persiste avec le monde.
   paresseux dû), `"searchedToday"` (fouillé, se regarnira au prochain cycle)
   ou `"depleted"` (fouillé, non régénérant : plus jamais rien).
   `isSearchable` = `"searchable"`.
-- **Candidature à Entrée** — filtrée par `view/audio/city-scene.js`/
+- **Candidature à Entrée** — filtrée par `view/occupancy.js`/
   `getInteractionCandidates` (`"activate"` seulement) : un conteneur VIDÉ
   n'est candidat que s'il n'y a RIEN d'autre à activer à portée. Ramasser
   les objets tombés autour ne propose donc jamais le conteneur ni un menu de
@@ -744,7 +744,7 @@ l'écriture du slot).
   contrairement à une ENTITÉ (`gait` figé dans son archétype/instance, voir
   "Surfaces de sol et son de pas" plus bas), le gait du joueur n'est écrit
   NULLE PART — `gaitOf(equipment)` le recalcule à CHAQUE pas
-  (`view/audio/city-scene.js`/`playFootstep`) : l'objet équipé au slot
+  (`view/audio/footsteps.js`/`playFootstep`) : l'objet équipé au slot
   "feet" porte-t-il un gait ? oui -> ce gait ; slot vide -> `"barefoot"`
   (défaut). Conséquence directe de la dérivation, PAS un mécanisme séparé :
   équiper/déséquiper change le pas SUIVANT automatiquement, sans
@@ -801,7 +801,7 @@ absente" mais réversible :
   proprement à la TRANSITION (jamais en continu), redémarrée si l'entité
   redevient présente — voir aussi "Sons de transition" plus bas ;
 - **Interaction** — exclue de l'occupation et de la résolution de cible
-  (`view/interaction.js` via `city-scene.js`/`occupiedEntities`), et ne
+  (`view/interaction.js` via `view/occupancy.js`/`occupiedEntities`), et ne
   bloque jamais le déplacement (`core/presence.js`/`isBlocking`, lu par
   `core/physics/collision.js` et `core/physics/overlap.js` à la place d'un
   simple `blocksMovement`).
@@ -979,7 +979,7 @@ voir "Paramètres sonores" plus bas) et même catégorie de préférence volume
 que le beacon ("Volume des balises" — ces sons accompagnent la présence
 d'une entité comme le beacon lui-même).
 
-Ordre à la bascule (`view/audio/city-scene.js`/`applyEntityAudio`) :
+Ordre à la bascule (`view/audio/entity-audio.js`/`applyEntityAudio`) :
 `exitSound` joué AVANT l'arrêt du beacon (Howl entièrement séparé — l'arrêt
 du beacon ne coupe jamais le one-shot en cours) ; `enterSound` joué AVANT la
 reprise du beacon. Ni l'un ni l'autre n'est soumis à la pause sélective des
@@ -1039,7 +1039,7 @@ contrainte du modèle.
 
 `sounds` cascade instance -> archétype (`core/scene.js`/`parseEntity`,
 `entity.sounds` déjà RÉSOLU sur l'entité parsée — la vue, voir
-`view/audio/city-scene.js`/`buildEntitySoundEntry`, lit `entity.sounds`,
+`view/audio/entity-sound-entry.js`/`buildEntitySoundEntry`, lit `entity.sounds`,
 jamais `registry[type].sounds` directement) — mais PAR FUSION PROFONDE
 (`deepMergeOverride`, `core/scene.js`), SEUL champ cascadé de cette façon :
 contrairement à `nameKey`/`blocksMovement` (remplacement simple, tout ou
@@ -1145,7 +1145,7 @@ Règles :
 - **Une condition est un tout** : celle d'une instance REMPLACE celle de
   l'archétype, jamais fusionnée clé par clé comme le reste de `sounds`
   (voir "Cascade de sounds"). `condition: null` à l'instance la retire.
-- **Évaluée à chaque tick** par la vue (`view/audio/city-scene.js`/
+- **Évaluée à chaque tick** par la vue (`view/audio/entity-audio.js`/
   `beaconConditionAllows`) contre l'entité VIVANTE : le changement s'entend
   dès le tick qui suit l'action. Coupure et reprise sont franches
   (`stop()`/`resume()`, même geste qu'une bascule de présence) : le son de
@@ -1273,7 +1273,7 @@ code. Consulter directement ce fichier pour la valeur courante d'un défaut.
 
 ### Désempilement d'attaques
 
-Toute balise CONTINUE nouvellement créée (voir `view/audio/city-scene.js`/
+Toute balise CONTINUE nouvellement créée (voir `view/audio/entity-sound-entry.js`/
 `buildEntitySoundEntry`) dont `staggerBeacon` reste `true` voit son
 DÉMARRAGE (pas son volume, voir plus bas) retardé d'un court délai aléatoire
 — `[beaconStaggerMinMs, beaconStaggerMaxMs]`, `config/tuning-values.js`
@@ -1416,7 +1416,7 @@ l'entité, pas d'un rôle de son) :
 
 `resolveFootstepPath` choisit un fichier `"<nom>_walk"` sous
 `assets/sounds/footsteps/<catégorie>/` — TROIS sous-dossiers de contenu
-(`surfaces/`, `gaits/`, `entities/`, voir `view/audio/city-scene.js`/
+(`surfaces/`, `gaits/`, `entities/`, voir `view/audio/footsteps.js`/
 `footstepKey(category, name)`), mais DEUX branches de RÉSOLUTION strictement
 disjointes selon `neutral` (jamais de croisement surface×chaussure, jamais
 de produit cartésien N surfaces × M gaits — chaque cran teste UN nom sous
@@ -1582,7 +1582,7 @@ espace fermé pour tout ce qui est spatial/logique :
 - **Interaction et occupation** : scopées à la face COURANTE (celle du
   joueur) — les entités de l'autre face n'apparaissent JAMAIS dans
   `getInteractionCandidates`/l'annonce d'occupation (voir
-  `view/audio/city-scene.js`), même à portée sur l'axe x.
+  `view/occupancy.js`), même à portée sur l'axe x.
 - **PRNG** : chaque face garde son propre `rngState` (déjà distinct depuis
   l'étape 1, voir `createFaceState`) — déterminisme préservé, aucune
   interférence entre les deux flux.
@@ -1619,7 +1619,7 @@ pan/distance dérivés de leur x que d'habitude).
 
 Au basculement de face, normal et étouffé s'inversent —
 ANIMÉ par un SAS (jeu gelé, voir `view/city-screen.js`/`sideSwitchEffect`) :
-un CROISEMENT DE FILTRES (`view/audio/city-scene.js`/`crossfadeFaceSwap`)
+un CROISEMENT DE FILTRES (`view/audio/face-crossfade.js`/`crossfadeFaceSwap`)
 ferme le filtre de la face quittée pendant qu'il ouvre celui de la face
 rejointe, les deux restant AUDIBLES tout du long (pas un fondu vers le
 silence) : chaque balise continue fond vers le niveau que la face
@@ -1637,7 +1637,7 @@ fichier, ni délai de désempilement. Les balises non reprises (déjà fondues
 au silence) sont arrêtées ensuite.
 
 **Pas du joueur pendant la transition** (voir
-`view/audio/city-scene.js`/`playTransitionSteps`/`playArrivalStep`,
+`view/audio/footsteps.js`/`playTransitionSteps`/`playArrivalStep`,
 `view/city-screen.js`/`sideSwitchEffect`) : un passage `interactable`
 PHYSIQUE se traverse à pied — `transitionSteps` (booléen, cascade instance
 -> archétype -> défaut `true`, comme `highlight`) joue par défaut des pas

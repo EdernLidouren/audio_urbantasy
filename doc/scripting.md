@@ -319,7 +319,7 @@ sous-conditions — aucune limite de profondeur codée en dur, testé jusqu'à d
 dans `core/checks/conditions.check.js`.
 
 **Piège à connaître** : un consommateur qui inspecte `entity.presence[].when.type`
-DIRECTEMENT (ex. `view/audio/city-scene.js`/`isPerceptionGated`, qui détecte une entité
+DIRECTEMENT (ex. `view/audio/entity-sound-entry.js`/`isPerceptionGated`, qui détecte une entité
 SURNATURELLE pour l'exempter du filtre d'étouffement mondain) doit chercher la condition
 recherchée RÉCURSIVEMENT à l'intérieur d'un `"allOf"` — pas seulement au premier niveau —
 sous peine de rater une entité dont la condition est désormais COMPOSÉE (voir
@@ -359,7 +359,7 @@ commentaires de `view/audio/city-scene.js` (`declareWeatherAmbience`) et `lib/au
 (`syncAmbienceLayers`, `desiredAmbienceSlots`).
 
 Le MÊME changement déclenche AUSSI une ANNONCE (non-assertive, canal ambiance) —
-`view/audio/city-scene.js`/`composeWeatherTransitionMessage` : {fin de l'état QUITTÉ} +
+`view/ambient-announcements.js`/`composeWeatherTransitionMessage` : {fin de l'état QUITTÉ} +
 {début de l'état REJOINT}, composés PAR GABARIT i18n (`weather.transition.both`/
 `weather.transition.startOnly`, `data/i18n/*/weather.json`), jamais une concaténation en
 dur — un fragment i18n vide (ex. `weather.transition.clear.end`, "dégagé" n'a rien à dire
@@ -388,7 +388,7 @@ pour l'instant : aucun cas concret (un « ou » d'action s'écrit en candidates
 multiples, voir "Actions multiples filtrées par condition").
 
 **Piège à connaître — inverse de celui d'`"allOf"`** : un inspecteur de structure qui
-cherche une condition dans `presence[].when` (ex. `view/audio/city-scene.js`/
+cherche une condition dans `presence[].when` (ex. `view/audio/entity-sound-entry.js`/
 `conditionRequiresPerception`, qui repère les entités SURNATURELLES) ne doit PAS
 descendre dans un `"not"` comme dans un `"allOf"`. `{ not: perceptionActive }` décrit
 une entité MONDAINE, présente hors perception : la prendre pour surnaturelle
@@ -433,7 +433,7 @@ scène audio, qui coupe d'emblée le beacon d'une entité dormante). Ne jamais
 reconstruire ce contexte à la main : sans `world` ni `session`, une condition
 de portée `"scene"`/`"party"` vaut toujours faux. Les conditions d'action
 (`view/interaction.js`/`actionContext`) et les beacons conditionnels
-(`view/audio/city-scene.js`/`beaconConditionAllows`) reçoivent les mêmes
+(`view/audio/entity-audio.js`/`beaconConditionAllows`) reçoivent les mêmes
 porteurs, plus l'équipement du joueur.
 
 **Exemple réel — deux entités en alternance sur un état de la salle**
@@ -886,7 +886,7 @@ balises des objets tombés font le reste) — `interaction.searchSpawn`,
 
 **Candidature liée à l'état** (`core/spawn.js`/`containerStatus`) : un
 conteneur VIDÉ n'est candidat à Entrée que s'il n'y a RIEN d'autre à
-activer à portée (`view/audio/city-scene.js`/`getInteractionCandidates`) —
+activer à portée (`view/occupancy.js`/`getInteractionCandidates`) —
 jamais de menu de désambiguïsation avec les objets tombés autour. Seul, il
 annonce son état : `interaction.searchAlreadyToday` (régénérant, fouillable
 de nouveau dès qu'un cycle est passé) ou `interaction.searchDepleted` (non
@@ -1071,7 +1071,7 @@ rôles de son POSITIONNÉS (`sounds.beacon`/`sounds.vocal`, voir
 
 Pour un rendu **diégétique**, ce triplet n'est PAS lu tel quel sur l'effet :
 il passe par la MÊME résolution en cascade que `enterSound`/`exitSound`
-(`view/audio/city-scene.js`/`resolveTransitionSound`, cascade
+(`view/audio/entity-sound-entry.js`/`resolveTransitionSound`, cascade
 `resolveTuning` : effet -> `tuning` d'instance -> archétype -> défaut
 global, voir "Résolution en cascade" de `doc/entity-model.md`) —
 `PLAY_SOUND_TUNING_KEYS` pour `gain` (clé littérale `"gain"`, un playSound
@@ -1092,7 +1092,7 @@ Pour un rendu **méta**, ce triplet reste lu TEL QUEL sur l'effet
 
 MÊME primitive de calcul rate/volume (`lib/audio.js`/`playDescribedOneShot`,
 `randomRate`) et, pour un rendu diégétique, MÊME chaîne positionnée que
-beacon/vocal (`view/audio/city-scene.js`/`playPositionedOneShot` via
+beacon/vocal (`view/audio/oneshots.js`/`playPositionedOneShot` via
 `playTransitionSound`) — un seul point de calcul partout, jamais dupliqué.
 
 **PROVENANCE — `at` (optionnel, id d'entité)** : d'où émane le son dans
@@ -1113,7 +1113,7 @@ l'espace (`view/interaction.js`/`resolvePlaySoundTarget`) :
 PROVENANCE, jamais déclaré dans le cas courant :
 
 - une cible résolue (positionné) → **`"diegetic"`** par défaut : rendu
-  IDENTIQUE à un beacon/vocal à cet instant — `view/audio/city-scene.js`/
+  IDENTIQUE à un beacon/vocal à cet instant — `view/audio/oneshots.js`/
   `playEntityOneShot(entityId, descriptor)` (câblé par `view/city-screen.js`/
   `setPositionedSoundPlayer`) retrouve l'entrée déjà construite pour cette
   entité (`entitySounds`, ou `otherEntitySounds` pour l'AUTRE face) + sa
@@ -1139,7 +1139,7 @@ PROVENANCE, jamais déclaré dans le cas courant :
   `"meta"`, jamais un son perdu en silence.
 
 Défensif comme tout son du projet : fichier absent, ou id `at` introuvable/
-dormant (`view/audio/city-scene.js`/`playEntityOneShot`) → `console.warn`,
+dormant (`view/audio/oneshots.js`/`playEntityOneShot`) → `console.warn`,
 jamais un plantage, le reste de la liste d'effets (état, annonce) continue
 normalement.
 
@@ -1157,7 +1157,7 @@ que le rendu DIÉGÉTIQUE : un son méta n'a pas de position, rien à suivre ni
   active pendant toute sa lecture et réévaluée à CHAQUE tick selon la
   position COURANTE du joueur, avec le rendu spatial COMPLET d'une balise
   (pan, volume et passe-bas de distance, occlusion recto/verso et
-  perception — `view/audio/city-scene.js`/`updateTrackedOneShots`, MÊME
+  perception — `view/audio/oneshots.js`/`updateTrackedOneShots`, MÊME
   formule que les balises continues, `spatialRendering`). Retirée à la fin
   du son, jamais une source fantôme. C'est le cas courant : une source
   VIVANTE à une position, autour de laquelle le joueur se déplace — la
@@ -1197,7 +1197,7 @@ porte joue son grincement par un effet `playSound` placé AVANT son `teleport`
 chorégraphie). Ce son appartient à l'acte de partir : il reste diégétique et
 positionné sur la porte, mais il est joué ANCRÉ et HORS de la couche des
 entités que le sas éteint (`view/interaction.js`/`runEffects`,
-`view/audio/city-scene.js`/`playEntityOneShot`). Il finit donc de résonner
+`view/audio/oneshots.js`/`playEntityOneShot`). Il finit donc de résonner
 pendant le fondu au lieu d'être coupé, comme les pas de transition d'une
 bascule de face. Sa réverb appartient au monde quitté et s'éteint avec lui.
 Rien à déclarer : c'est la présence du `teleport` dans la liste qui le

@@ -6,7 +6,7 @@
 // aucune règle ne correspond -> DORMANTE (silencieuse, non examinable,
 // jamais bloquante — voir core/presence.js/isPresent). Perception ACTIVE :
 // PRÉSENTE, pleine et claire (JAMAIS soumise au filtre d'étouffement des
-// entités mondaines, voir view/audio/city-scene.js/isPerceptionGated) —
+// entités mondaines, voir view/audio/entity-sound-entry.js/isPerceptionGated) —
 // murmure continu (beacon "neon_beacon", pool via resolveAsset, réutilisé
 // EN PLACEHOLDER : le seul bourdonnement continu du jeu qui ne soit PAS le
 // filler générique "box_of_nails_beacon" partagé par la moitié du registre

@@ -104,7 +104,7 @@ contenu mal formé.
 teleport en mode "fade" — voir `view/city-screen.js`/`runTeleportSas`),
 mais un geste différent : PAS un fondu vers le silence (rien ne disparaît,
 les deux faces coexistent déjà), un CROISEMENT DES DEUX FILTRES D'OCCLUSION
-(`view/audio/city-scene.js`/`crossfadeFaceSwap`) — la face courante ferme
+(`view/audio/face-crossfade.js`/`crossfadeFaceSwap`) — la face courante ferme
 son filtre (nette → étouffée) pendant que l'autre ouvre le sien (étouffée →
 nette), en parallèle, toutes deux restant audibles. Un marqueur sonore de
 passage DÉCLARÉ (`transitionSound`, cascade instance -> archétype -> défaut

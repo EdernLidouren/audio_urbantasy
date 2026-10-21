@@ -34,7 +34,7 @@
 // `container.regenerates: false`, stock tiré UNE SEULE fois, jamais
 // regarni). Vidé, il reste présent, audible, observable (l'arbre reste un
 // arbre) ; la vue ne le propose plus à Entrée que s'il est le SEUL candidat,
-// pour annoncer son état (voir view/audio/city-scene.js/
+// pour annoncer son état (voir view/occupancy.js/
 // getInteractionCandidates).
 // Un tirage peut ne RIEN donner (clé `nothing` d'une table, voir
 // core/distribution.js) : un stock peut donc être vide, une plage poser
@@ -89,7 +89,7 @@ function isRestockDue(entity, cycle) {
 //     searchContainer) ;
 //   - "searchedToday" : vidé, se regarnira au prochain cycle ;
 //   - "depleted" : vidé, ne se regarnira jamais (regenerates: false).
-// Lu par la vue : candidats à "activate" (view/audio/city-scene.js/
+// Lu par la vue : candidats à "activate" (view/occupancy.js/
 // getInteractionCandidates) et annonce de la fouille (view/interaction.js/
 // handleSearch).
 export function containerStatus(entity, time) {

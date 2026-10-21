@@ -13,7 +13,7 @@
 //     fois consumed, lue par view/interaction.js/resolveDescription. Reste
 //     OBSERVABLE/INTERACTABLE après consommation (contrairement à "devenir
 //     dormant" ci-dessous) — seul son état PERÇU change.
-//   - muteOnConsumed (registre SEULEMENT, voir view/audio/city-scene.js/
+//   - muteOnConsumed (registre SEULEMENT, voir view/audio/entity-sounds.js/
 //     muteConsumedBeacons) : arrête PERMANEMMENT le beacon continu dès que
 //     consumed passe à true. Un son DIFFÉRENT (un autre fichier) n'est PAS
 //     supporté — seule son ABSENCE l'est.

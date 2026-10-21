@@ -15,7 +15,7 @@
 // PORTÉE : le MONDE ACTIF, ses DEUX faces (une cloche au recto doit se
 // faire entendre, étouffée, depuis le verso — le rendu diégétique de
 // "playSound" emprunte la chaîne d'occlusion existante, voir
-// view/audio/city-scene.js/playEntityOneShot). Les autres mondes ne tirent
+// view/audio/oneshots.js/playEntityOneShot). Les autres mondes ne tirent
 // pas : ils sont gelés, comme le reste de leur simulation. Une entité
 // DORMANTE (present:false) ne tire pas non plus, comme elle ne tique pas.
 //

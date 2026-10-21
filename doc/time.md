@@ -135,7 +135,8 @@ existants.
 validés par `parseScene`) mais **non exploitée** — seule la musique réagit à la
 phase pour l'instant.
 
-**Réaction en VUE, sur la TRANSITION uniquement** (`view/audio/city-scene.js`) :
+**Réaction en VUE, sur la TRANSITION uniquement** (musique : `view/audio/layers.js` ;
+annonce « La nuit tombe. » / « Le jour se lève. » : `view/ambient-announcements.js`) :
 - `phaseAt` reste pur ; c'est la vue qui compare, à chaque tick, la phase courante
   à une phase MÉMORISÉE (`currentPhase`) — n'agit que sur la différence, jamais en
   continu.

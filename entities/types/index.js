@@ -7,7 +7,7 @@
 // l'instant). observable/interactable (système d'interaction niveau 0, voir
 // view/interaction.js et doc/entity-model.md) sont bakés de la même façon,
 // cascade instance -> type -> défaut (false), et filtrent les candidats PAR
-// VERBE (view/audio/city-scene.js/getInteractionCandidates).
+// VERBE (view/occupancy.js/getInteractionCandidates).
 // La vue lit sounds/nameKey/collisionSound pour le rendu audio et les
 // annonces. Ni l'un ni l'autre ne dépend de l'autre, seulement de ce
 // registre.

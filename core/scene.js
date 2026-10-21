@@ -701,7 +701,7 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
   // de sous-objet "capabilities") : la richesse du TYPE d'action (voir
   // `action` plus bas) s'ajoute EN PLUS via un champ séparé, jamais en
   // remplaçant celui-ci — le filtrage par verbe
-  // (view/audio/city-scene.js/getInteractionCandidates) ne lit jamais plus
+  // (view/occupancy.js/getInteractionCandidates) ne lit jamais plus
   // que ces deux booléens.
   if (observable !== undefined && typeof observable !== "boolean") {
     fail(`entities[${index}] ("${id}") : observable doit être un booléen si présent.`);
@@ -732,7 +732,7 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
   // chaque mobile à intention. Baké ici (pas relu dans le registre par
   // core/reduce.js) pour la même raison que blocksMovement/isFlying : le
   // core ne connaît le registre qu'à travers ce que parseScene en extrait.
-  // Cadence de pas INCHANGÉE par ailleurs (view/audio/city-scene.js/
+  // Cadence de pas INCHANGÉE par ailleurs (view/audio/footsteps.js/
   // stepWalker) : elle dérive déjà de la distance parcourue, donc un mobile
   // deux fois plus lent voit SES PAS s'espacer deux fois plus, sans le
   // moindre réglage de cadence séparé à toucher.
@@ -1133,7 +1133,7 @@ function parseFace(raw, length, registry, describe, sceneVariables) {
   const resolvedDefaultSurface = defaultSurface !== undefined ? defaultSurface : DEFAULT_SURFACE;
   // indoor : PROPRIÉTÉ DE NATURE DE SCÈNE (comme defaultSurface juste
   // au-dessus), pas un "flag ambiance météo" — aujourd'hui seul le RENDU de
-  // l'ambiance météo la consulte (voir view/audio/city-scene.js, choix du
+  // l'ambiance météo la consulte (voir view/audio/layers.js, choix du
   // pool outdoor/indoor par état, config/weather-values.js), mais rien
   // n'empêche un futur consommateur (réverb, sons ambiants...) de la lire
   // aussi. TOUJOURS résolue en booléen (comme defaultSurface, jamais

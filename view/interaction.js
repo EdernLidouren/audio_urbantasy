@@ -5,7 +5,7 @@
 // ici (le core reste la seule source de vérité), mais réutilise l'évaluateur
 // de conditions pur du core (evaluateCondition, voir actionConditionMet plus
 // bas) pour les actions conditionnelles — même principe d'import que
-// view/audio/city-scene.js/isPresent.
+// view/audio/entity-sound-entry.js/isPresent.
 
 import { announce } from "../lib/announce.js";
 import { t } from "../data/i18n/index.js";
@@ -199,7 +199,7 @@ export function setSessionProvider(provider) {
 
 // (entityId, descriptor) => joue un one-shot POSITIONNÉ + FILTRÉ sur
 // l'entité `entityId`, exactement comme un beacon/vocal à cet instant (voir
-// view/audio/city-scene.js/playEntityOneShot, câblé par view/city-screen.js)
+// view/audio/oneshots.js/playEntityOneShot, câblé par view/city-screen.js)
 // — fournit le rendu DIÉGÉTIQUE de l'effet "playSound" (voir
 // playDescribedSound plus bas pour le rendu MÉTA, non positionné). Même
 // principe d'injection que playerEquipmentProvider/timeProvider : ce fichier
@@ -241,7 +241,7 @@ function playEntityPickupSound(entity) {
 // DIÉGÉTIQUE (nouveau) : son POSITIONNÉ sur une entité de la scène, soumis
 // aux MÊMES filtres actifs qu'un beacon/vocal à cet instant (occlusion
 // RECTO/VERSO, étouffement de perception, distance) — délégué ENTIÈREMENT à
-// positionedSoundPlayer (voir plus haut, view/audio/city-scene.js/
+// positionedSoundPlayer (voir plus haut, view/audio/oneshots.js/
 // playEntityOneShot) : AUCUNE logique de filtrage dupliquée ici, ce fichier
 // ne fait que router vers la BONNE primitive.
 //
@@ -292,7 +292,7 @@ function playMetaSound(descriptor) {
 }
 
 // `options.departing` : voir runEffects — transmis tel quel au lecteur
-// positionné (view/audio/city-scene.js/playEntityOneShot).
+// positionné (view/audio/oneshots.js/playEntityOneShot).
 function runPlaySoundEffect(entity, effect, options = {}) {
   const targetId = resolvePlaySoundTarget(entity, effect);
   const nature = resolvePlaySoundNature(effect, targetId);
@@ -330,7 +330,7 @@ function runPlaySoundEffect(entity, effect, options = {}) {
 // SON DE DÉPART : une liste qui contient un "teleport" décrit l'acte de
 // PARTIR — ses playSound (ex. le grincement de la porte) sont joués
 // `departing` : positionnés, mais hors du fondu du sas (voir
-// view/audio/city-scene.js/playEntityOneShot), pour finir de résonner
+// view/audio/oneshots.js/playEntityOneShot), pour finir de résonner
 // pendant la transition au lieu d'être coupés.
 function runEffects(entity, effects) {
   if (!effects) return;
@@ -362,7 +362,7 @@ export function runRenderEffects(entity, effects, options = {}) {
 }
 
 // Description RICHE d'une entité (interaction "describe"), distincte du nom
-// annoncé à l'approche (occupation, voir view/audio/city-scene.js).
+// annoncé à l'approche (occupation, voir view/occupancy.js).
 // INDIRECTION délibérée plutôt qu'un accès direct à descriptionKey : la clé
 // choisie est résolue par description-resolver.js/resolveDescriptionText,
 // PAS un accès direct à t(key) — DYNAMIQUE désormais (gabarit i18n rempli du
@@ -542,7 +542,7 @@ function handleApplyEffects() {}
 // ensuite objet par objet (chacun annonçant et sonnant son propre ramassage,
 // voir handlePickup). Aucun son ici : les balises des objets tombés sont le
 // retour audible. Un conteneur VIDÉ n'arrive ici que s'il était le seul
-// candidat à portée (voir view/audio/city-scene.js/
+// candidat à portée (voir view/occupancy.js/
 // getInteractionCandidates) : son état est alors annoncé — jamais un
 // silence, jamais un menu parasite.
 const SEARCH_EMPTY_KEYS = {
@@ -635,7 +635,7 @@ function actionConditionMet(condition, entity) {
 }
 
 // kind ∈ { "describe", "activate" }. entity est déjà un candidat FILTRÉ par
-// capacité (voir view/audio/city-scene.js/getInteractionCandidates) — cette
+// capacité (voir view/occupancy.js/getInteractionCandidates) — cette
 // fonction fait confiance à son appelant, elle ne revérifie pas
 // observable/interactable elle-même.
 // COOLDOWN D'INTERACTION (Entrée seulement, PAR ENTITÉ) — limite de cadence
@@ -786,7 +786,7 @@ function openDisambiguationMenu(candidates, kind, scene) {
 
 // candidates = entités dont la zone d'interaction englobe le joueur, DÉJÀ
 // triées par x croissant — même ensemble, même tri que l'annonce
-// d'occupation (voir view/audio/city-scene.js, occupiedEntities). scene :
+// d'occupation (voir view/occupancy.js, occupiedEntities). scene :
 // voir openDisambiguationMenu ci-dessus.
 export function chooseInteractionTarget(candidates, kind, scene) {
   if (candidates.length === 0) return null;

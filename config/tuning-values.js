@@ -75,7 +75,7 @@ export const TUNING_DEFAULTS = {
   // quelques dizaines à centaines de ms) a été essayée et abandonnée :
   // quasi inaudible à l'oreille en marchant/courant normalement, la
   // fenêtre de présence dans interactRange étant trop courte pour laisser
-  // le fondu se terminer (voir l'historique de view/audio/city-scene.js/
+  // le fondu se terminer (voir view/audio/spatial.js/
   // volumeForDistance). EXPLICITE et INDÉPENDANT de observable/
   // interactable — une entité n'est surlignée QUE si elle (ou son
   // archétype, ou son instance) déclare highlight: true. Ce défaut GLOBAL
@@ -85,7 +85,7 @@ export const TUNING_DEFAULTS = {
   highlight: false,
 
   // Pas du joueur pendant une TRANSITION recto/verso (voir
-  // entities/types/passage.js, view/audio/city-scene.js/playTransitionSteps/
+  // entities/types/passage.js, view/audio/footsteps.js/playTransitionSteps/
   // playArrivalStep) : activés PAR DÉFAUT (true) — un passage PHYSIQUE
   // (ruelle, porte dérobée) se traverse à pied, donc se marche à l'oreille.
   // Résolu par la MÊME cascade instance -> archétype -> ce défaut que
@@ -96,7 +96,7 @@ export const TUNING_DEFAULTS = {
   // `transitionSurface` (nom de surface, voir core/surfaces.js/
   // SURFACE_REGISTRY) : surcharge OPTIONNELLE de la surface des pas de
   // TRAJET pendant une transition (voir
-  // view/audio/city-scene.js/playTransitionSteps) — un passage peut
+  // view/audio/footsteps.js/playTransitionSteps) — un passage peut
   // déclarer la sienne (ex. une ruelle PAVÉE, distincte du sol de la
   // scène). AUCUNE entrée ici, comme `gait`/`naturalWalk` (voir
   // doc/entity-model.md) : pas de défaut global sensé pour un nom de
@@ -195,7 +195,7 @@ export const TUNING_DEFAULTS = {
 
   // Fourchette (ms) du délai de démarrage ALÉATOIRE appliqué à toute balise
   // CONTINUE nouvellement créée dont staggerBeacon reste true (voir plus
-  // bas ; view/audio/city-scene.js/buildEntitySoundEntry) — désempile les
+  // bas ; view/audio/entity-sound-entry.js/buildEntitySoundEntry) — désempile les
   // attaques d'un démarrage GROUPÉ (montage de scène, spawn groupé
   // d'éphémères), sans jamais détecter s'il y en a réellement plusieurs :
   // appliqué indistinctement, un délai isolé de quelques dizaines de ms
@@ -317,7 +317,7 @@ export const TUNING_DEFAULTS = {
   flyingVolumeFactor: 0.4,
 
   // --- ÉTOUFFEMENT : deux PROFILS, une seule chaîne de rendu (voir
-  // view/audio/city-scene.js/effectiveMuffle). Chaque profil = un passe-bas
+  // view/audio/muffle.js/effectiveMuffle). Chaque profil = un passe-bas
   // (Hz) + un facteur de volume (0-1) COMPOSÉ avec le volume déjà dérivé de
   // la distance, jamais à sa place. Bac à sable de réglage, même principe
   // que le profil isFlying juste au-dessus. Jamais cascadé par entité/type.
@@ -405,20 +405,20 @@ export const TUNING_DEFAULTS = {
 
   // Durée (ms) du fondu qui arrête un son SUIVI (cloche, cri...) quand le
   // joueur QUITTE le monde où il a été émis (voir
-  // view/audio/city-scene.js/stopForeignTrackedOneShots). Court : il évite
+  // view/audio/oneshots.js/stopForeignTrackedOneShots). Court : il évite
   // seulement le clic d'un arrêt net. Pendant une porte, le sas a déjà
   // éteint la couche entités, ce fondu y est inaudible.
   sceneExitSoundFadeMs: 150,
 
   // Durée (ms) du CROISEMENT DE FILTRES d'occlusion pendant une bascule
-  // recto/verso (voir view/audio/city-scene.js/crossfadeFaceSwap,
+  // recto/verso (voir view/audio/face-crossfade.js/crossfadeFaceSwap,
   // view/city-screen.js/sideSwitchEffect) — la face courante se referme
   // pendant que l'autre s'ouvre, EN PARALLÈLE, sur cette même durée.
   // DISTINCTE des durées de transition de porte ci-dessus : pas le même
   // geste (un échange de clarté entre deux faces qui coexistent, jamais un
   // fondu vers le silence). PARAMÈTRE MAÎTRE de toute la traversée : le
   // nombre de pas de TRAJET en DÉRIVE (voir
-  // view/audio/city-scene.js/playTransitionSteps,
+  // view/audio/footsteps.js/playTransitionSteps,
   // transitionStepIntervalMs ci-dessous) — ajuster CETTE seule valeur
   // recadence les pas EN MÊME TEMPS que les rampes, jamais un second
   // réglage à tenir synchronisé. Doublée (300 -> 600, essai en cours) pour
@@ -426,7 +426,7 @@ export const TUNING_DEFAULTS = {
   faceSwitchFadeMs: 600,
 
   // Intervalle (ms) entre deux pas de TRAJET pendant une transition
-  // recto/verso (voir view/audio/city-scene.js/playTransitionSteps) —
+  // recto/verso (voir view/audio/footsteps.js/playTransitionSteps) —
   // CADENCE NATURELLE de marche (proche de STEP_DISTANCE/moveStep à vitesse
   // normale, ~250ms), mais un LITTÉRAL indépendant plutôt qu'une formule
   // dérivée : ce réglage de FEELING se tourne très bien à l'oreille, sans

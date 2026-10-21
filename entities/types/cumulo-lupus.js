@@ -9,7 +9,7 @@
 // seule ou brume seule ne suffisent pas). Entité SURNATURELLE comme
 // ghost.js (même statut "flag surnaturel" — dormante/non examinable/jamais
 // bloquante hors perception, JAMAIS soumise au filtre d'étouffement des
-// entités mondaines, voir view/audio/city-scene.js/isPerceptionGated, qui
+// entités mondaines, voir view/audio/entity-sound-entry.js/isPerceptionGated, qui
 // détecte la condition "perceptionActive" MÊME imbriquée dans un "allOf",
 // voir son commentaire), avec une exigence météo EN PLUS. Testable via le
 // menu debug météo (Shift+W) pour forcer la brume, combiné à la touche de

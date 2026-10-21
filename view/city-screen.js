@@ -10,7 +10,7 @@ import { t } from "../data/i18n/index.js";
 import { ensureAudioUnlocked, playOneShot, rampEntityLayerGain } from "../lib/audio.js";
 import { resolveAsset } from "../lib/assets.js";
 import { pushScreen, popScreen } from "../lib/screens.js";
-import { createCityAudioScene, stopPersistentAudioLayers } from "./audio/city-scene.js";
+import { createWorldView, stopPersistentAudioLayers } from "./world-view.js";
 import {
   interact,
   chooseInteractionTarget,
@@ -214,7 +214,7 @@ function resolveEphemeralSpec(type, overrides = {}) {
     descriptionKey: typeDef.descriptionKey,
     // sounds : AUCUNE surcharge d'instance possible pour un éphémère (pas
     // de fusion ici, contrairement à core/scene.js/parseEntity) — le
-    // rendu audio (view/audio/city-scene.js/buildEntitySoundEntry) lit
+    // rendu audio (view/audio/entity-sound-entry.js/buildEntitySoundEntry) lit
     // `entity.sounds`, jamais le registre directement, donc CE champ doit
     // être porté explicitement, même sans surcharge.
     sounds: typeDef.sounds,
@@ -241,7 +241,7 @@ const EPHEMERAL_COIN_SPEC = resolveEphemeralSpec("money");
 //     déjà pour "money") ;
 //   - aucun archétype dédié ("key_bronze") -> repli sur l'archétype
 //     GÉNÉRIQUE "item" (entities/types/item.js) pour `type`/`sounds` (le
-//     rendu audio, voir view/audio/city-scene.js/buildEntitySoundEntry, lit
+//     rendu audio, voir view/audio/entity-sound-entry.js/buildEntitySoundEntry, lit
 //     `entity.sounds` — `spec.type` doit donc rester une clé RÉELLE du
 //     registre d'entités, jamais le type d'OBJET brut),
 //     mais avec nameKey/descriptionKey/action PROPRES à l'objet (depuis
@@ -317,7 +317,7 @@ function playSideSwitchSound(entity) {
 // Durée du croisement de filtres d'occlusion (voir
 // config/tuning-values.js, seule définition, jamais dupliquée ici) — le
 // nombre de pas de TRAJET en DÉRIVE automatiquement (voir
-// scene.playTransitionSteps, view/audio/city-scene.js/
+// scene.playTransitionSteps, view/audio/footsteps.js/
 // TRANSITION_STEP_INTERVAL_MS) : ajuster CETTE seule valeur retarde/allonge
 // les rampes ET recadence les pas ensemble, jamais un réglage séparé à
 // tenir synchronisé.
@@ -467,7 +467,7 @@ export function makeCityScreen(getSession, setSession) {
     setSession(travelToWorld(session, targetId, freshScene, { x, side }));
     clearInteractionCooldowns();
     refreshSpawns();
-    scene = createCityAudioScene(getSession);
+    scene = createWorldView(getSession);
     announceSceneName(getSession());
 
     // Auto-save SUR TRANSITION (préférence autoSaveOnTransition, défaut
@@ -511,7 +511,7 @@ export function makeCityScreen(getSession, setSession) {
     setSession(reloadActiveWorld(getSession(), freshScene));
     clearInteractionCooldowns();
     refreshSpawns();
-    scene = createCityAudioScene(getSession);
+    scene = createWorldView(getSession);
     announce(t("teleport.debug.reloaded"), { assertive: true });
   }
 
@@ -647,7 +647,7 @@ export function makeCityScreen(getSession, setSession) {
     muteNextDiscoveryCheck();
     setSession(newSession);
     refreshSpawns();
-    scene = createCityAudioScene(getSession);
+    scene = createWorldView(getSession);
   }
 
   // Garnissage de collecte dû sur le monde ACTIF (voir core/spawn.js/
@@ -712,7 +712,7 @@ export function makeCityScreen(getSession, setSession) {
       scene = null;
       setSession(switchSide(getSession(), arrivalX));
       clearInteractionCooldowns();
-      scene = createCityAudioScene(getSession, { handover });
+      scene = createWorldView(getSession, { handover });
       for (const unused of handover.values()) unused.stop();
       scene.playArrivalStep(entity, arrivalX);
     } finally {
@@ -855,7 +855,7 @@ export function makeCityScreen(getSession, setSession) {
   // IMMÉDIATEMENT, sans code de synchro, même principe que gaitOf.
   setSessionProvider(() => getSession());
   // Rendu DIÉGÉTIQUE de l'effet "playSound" (voir view/interaction.js/
-  // runPlaySoundEffect, view/audio/city-scene.js/playEntityOneShot) — ferme
+  // runPlaySoundEffect, view/audio/oneshots.js/playEntityOneShot) — ferme
   // sur `scene` (variable MUTABLE de ce closure, réassignée à chaque
   // transition/bascule, voir performTransition/replaceCurrentGame/
   // sideSwitchEffect) : lit donc TOUJOURS la scène ACTUELLE, jamais une
@@ -878,7 +878,7 @@ export function makeCityScreen(getSession, setSession) {
 
       ensureAudioUnlocked();
       refreshSpawns();
-      scene = createCityAudioScene(getSession);
+      scene = createWorldView(getSession);
       document.getElementById("game").focus();
       announceSceneName(getSession());
       // Entrée en partie (nouvelle, continuée) : en mode debug, le journal

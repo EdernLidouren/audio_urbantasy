@@ -18,7 +18,7 @@
 //     PAR CONTEXTE (résolus par lib/assets.js/resolveAsset, comme
 //     world.ambiences ou PERCEPTION_AMBIENCE_POOL), modèle A : deux
 //     matériaux sonores réels, jamais un seul filtré à la volée. Le rendu
-//     météo (view/audio/city-scene.js/declareWeatherAmbience) LIT le pool
+//     météo (view/audio/layers.js/declareWeatherAmbience) LIT le pool
 //     du contexte COURANT (indoor de la scène active, voir
 //     core/scene.js/parseFace) — il ne COMPOSE JAMAIS un nom de pool à
 //     partir de l'état (pas de "rain" + "_indoor" deviné) : le lien

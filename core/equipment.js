@@ -37,7 +37,7 @@ export function createEmptyEquipment() {
 // au slot "feet" porte-t-il un gait (ITEM_REGISTRY) ? oui -> ce gait ;
 // sinon (slot vide, ou type retiré du registre entre-temps) -> "barefoot"
 // (pieds nus, défaut). Relue à CHAQUE pas (voir
-// view/audio/city-scene.js/playFootstep) : équiper/déséquiper change donc
+// view/audio/footsteps.js/playFootstep) : équiper/déséquiper change donc
 // le pas SUIVANT automatiquement, sans notification ni code de synchro.
 export function gaitOf(equipment) {
   const feet = equipment.feet;
