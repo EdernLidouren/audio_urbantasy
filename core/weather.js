@@ -8,17 +8,18 @@
 // flux PRNG dédié (jamais partagé avec world.rngState ni
 // companionsRngState — voir core/state.js, même principe de flux
 // indépendants). SEUL point d'écriture en cours de partie : advanceWeather
-// ci-dessous, appelé par le bord (view/game-clock.js/onFrame) EXACTEMENT
+// ci-dessous, appelé par le bord (view/game-clock.js/advance) EXACTEMENT
 // là où core/time.js/advanceTime avance déjà .time — jamais dans
 // core/reduce.js (TICK n'avance jamais .time, voir core/time.js/header) :
 // la météo avance donc AVEC .time, et gèle quand .time gèle (un menu au
 // sommet de la pile arrête déjà onFrame, voir lib/screens.js) — aucun code
 // de pause dédié ici, c'est une conséquence gratuite de ce branchement.
 //
-// AUCUN EFFET à ce stade (voir CLAUDE.md/prompt d'origine "MOTEUR
-// MÉTÉO") : l'état météo évolue et se consulte (touche "w", voir
-// view/city-screen.js), rien ne le lit encore pour changer l'ambiance
-// sonore ou faire apparaître du contenu — chantiers séparés, à venir.
+// Ce moteur ne fait qu'ÉVOLUER l'état ; ceux qui le LISENT : l'ambiance
+// sonore météo (config/weather-values.js/ambience, view/audio/layers.js),
+// la condition "weather" (doc/scripting.md), les annonces (touche "w",
+// view/status-announcements.js ; transitions, view/ambient-announcements.js).
+// Pas encore de contenu qui apparaisse selon la météo.
 
 import { WEATHER_STATES, DEFAULT_WEATHER_STATE } from "../config/weather-values.js";
 import { createSeed, nextRandom } from "./rng.js";
