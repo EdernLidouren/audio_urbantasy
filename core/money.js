@@ -28,7 +28,7 @@ export function pickupEntity(session, entityId, amount) {
 // Effet "loot" (voir view/interaction.js, ACTION_HANDLERS.loot) : COLLECTIBLE
 // PERSISTANT — donne `amount` UNE SEULE FOIS puis marque l'entité consumed
 // (voir core/state.js/markConsumed), mais NE LA RETIRE JAMAIS du monde (voir
-// entities/model.md/"Collectible persistant") — distinct de pickupEntity
+// doc/entity-model.md/"Collectible persistant") — distinct de pickupEntity
 // ci-dessus, qui retire l'entité. IDEMPOTENCE : une entité déjà consumed ->
 // RÉFÉRENCE INCHANGÉE, AUCUN gain supplémentaire — vérifié EXPLICITEMENT
 // avant tout écriture (même politique atomique que pickupEntity : jamais
@@ -49,7 +49,7 @@ export function lootEntity(session, entityId, amount) {
 // directement, fait naître `count` entités éphémères ÉPARPILLÉES autour de
 // la source (voir core/state.js/spawnScatteredEphemerals) — chacune
 // ramassable individuellement via son propre effet "pickup" (voir
-// entities/model.md/"Collectible persistant"). MÊME idempotence que
+// doc/entity-model.md/"Collectible persistant"). MÊME idempotence que
 // lootEntity : entité absente OU déjà consumed -> RÉFÉRENCE INCHANGÉE,
 // AUCUN spawn (jamais un second lot de pièces sur une caisse déjà
 // fouillée) — vérifié AVANT tout, comme partout ailleurs dans ce fichier.

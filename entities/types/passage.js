@@ -1,6 +1,6 @@
 // Archétype "passage" — point de PASSAGE entre les deux FACES (recto/verso)
 // d'une même scène (voir CLAUDE.md/"RECTO/VERSO", core/scripting.md, action
-// "switchSide" ; entities/model.md). Générique par nature (une ruelle, une
+// "switchSide" ; doc/entity-model.md). Générique par nature (une ruelle, une
 // porte dérobée, un trou dans la palissade...) : label/description restent
 // des défauts génériques, `action.arrivalX` (point d'arrivée sur l'AUTRE
 // face) est TOUJOURS fourni par l'instance de scène, jamais par ce défaut
@@ -31,7 +31,7 @@ export default {
   blocksMovement: false,
   observable: true,
   interactable: true,
-  // Surlignage audio de proximité (voir entities/model.md) : un passage se
+  // Surlignage audio de proximité (voir doc/entity-model.md) : un passage se
   // repère nettement une fois à portée, comme une porte.
   highlight: true,
 };

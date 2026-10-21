@@ -88,7 +88,7 @@ c'est la conversion au bord qui absorbe cette impureté, jamais le core lui-mêm
 ## Pause gratuite par construction
 
 Le temps n'avance QUE quand `onFrame` reçoit un delta. Deux gels vérifiés
-(`core/movement.check.js` pour le premier ; le second se déduit du même mécanisme,
+(`core/checks/time.check.js` pour le premier ; le second se déduit du même mécanisme,
 non testable en terminal) :
 
 - **Menu/pause ouvert** : la pile d'écrans (`lib/screens.js`) ne route `onTick`/
@@ -103,7 +103,7 @@ non testable en terminal) :
 ## Persistance
 
 `session.time` est un nombre plat : couvert par construction par l'audit de
-sérialisabilité (`core/movement.check.js`), étendu explicitement à ce champ. Une
+sérialisabilité (`core/checks/save.check.js`), étendu explicitement à ce champ. Une
 sauvegarde antérieure à l'introduction de l'horloge n'a jamais eu cette clé — rebouchée
 à `INITIAL_TIME` par `core/save.js`/`migrateSave`, même principe que le rebouchage déjà
 en place pour `defaultSurface`/`segments`.
@@ -210,7 +210,7 @@ année") — changer de langue, réordonner, ou
 retirer un composant ne touche QUE ce gabarit, jamais le code. `weekday`
 (`core/time.js`/`weekdayOf`, `WEEKDAY_KEYS`) reste dérivable mais n'est PLUS fourni
 à ce gabarit — sa dérivation pure est testée indépendamment (voir
-`core/movement.check.js`), prête pour un futur gabarit qui la redemanderait.
+`core/checks/time.check.js`), prête pour un futur gabarit qui la redemanderait.
 
 ## Chantiers réservés, pas câblés
 

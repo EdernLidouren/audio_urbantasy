@@ -8,7 +8,7 @@ export default {
   blocksMovement: false,
   observable: true,
   interactable: true,
-  // Surlignage audio de proximité (voir entities/model.md) : une fenêtre se
+  // Surlignage audio de proximité (voir doc/entity-model.md) : une fenêtre se
   // repère nettement une fois à portée.
   highlight: true,
   action: [

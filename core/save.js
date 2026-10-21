@@ -4,7 +4,7 @@
 // accès disque ici (ça reste à la charge de la vue, voir
 // view/save-storage.js), juste la forme et sa validation. La partie
 // (session) est déjà sérialisable de bout en bout (voir l'audit dans
-// core/movement.check.js) : ce module se contente de l'envelopper/
+// core/checks/save.check.js) : ce module se contente de l'envelopper/
 // désenvelopper et de vérifier sa structure minimale au désenveloppement —
 // jamais de confiance aveugle dans une donnée qui vient du disque.
 //
@@ -194,7 +194,7 @@ function dropUnknownEntityTypes(data, registry) {
 }
 
 // Exclut les entités ÉPHÉMÈRES (voir core/state.js/spawnEphemeral,
-// entities/model.md/"Entités éphémères") de TOUS les mondes avant
+// doc/entity-model.md/"Entités éphémères") de TOUS les mondes avant
 // sérialisation — jamais SEULEMENT le monde actif : une sauvegarde reste
 // correcte même si un futur appelant venait à laisser un éphémère dans un
 // monde rangé (aujourd'hui exclu par la purge de travelToWorld, mais cette

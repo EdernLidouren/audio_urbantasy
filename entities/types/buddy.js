@@ -7,7 +7,7 @@
 // "follow" (voir core/behaviors/follow.js). vocal et movement repris tels
 // quels de dog.js (même famille de son).
 //
-// Ni gait ni naturalWalk déclarés (voir entities/model.md, "Surfaces de sol
+// Ni gait ni naturalWalk déclarés (voir doc/entity-model.md, "Surfaces de sol
 // et son de pas") : la résolution du pas retombe directement sur le son
 // PROPRE de l'entité (sounds.movement.path, dog_medium_walk), comme
 // dog.js. Ce fichier a autrefois déclaré gait:"heavy_boots" +

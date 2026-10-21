@@ -1,5 +1,5 @@
 // Archétype "dog" — voir entities/types/index.js pour le registre complet et
-// entities/model.md pour le vocabulaire du modèle d'entité. Donnée pure :
+// doc/entity-model.md pour le vocabulaire du modèle d'entité. Donnée pure :
 // aucun import.
 //
 // Aucun `behavior` par défaut ici, volontairement : le comportement se
@@ -9,7 +9,7 @@
 // behavior:{kind:"wander"}, l'autre sans) sans code spécial, seulement par ce
 // que chaque instance déclare (voir scenes/demo.json).
 //
-// sounds.movement (rôle "movement", voir entities/model.md) : cadencé par la
+// sounds.movement (rôle "movement", voir doc/entity-model.md) : cadencé par la
 // distance parcourue, exactement comme le joueur — dormant tant que
 // l'instance n'a pas de behavior (un chien immobile ne pose jamais de pas).
 // Volume porté par les fichiers source (dog_medium_walk) eux-mêmes, aucun
@@ -18,13 +18,13 @@
 // que corriger proprement le niveau.
 //
 // "Chien important" : porte les TROIS rôles de son positionné (voir
-// entities/model.md) — beacon (LOCALISATION, continu, placeholder générique
+// doc/entity-model.md) — beacon (LOCALISATION, continu, placeholder générique
 // comme object/decor/fountain), vocal (EXPRESSION, aboiements sporadiques,
 // pool dog_medium_vocal — un fichier différent à chaque occurrence, voir
 // resolveAsset) et movement (le pas). Interval/variation du vocal
 // SURCHARGÉS ici (plus fréquent que le défaut global : un chien aboie
 // davantage qu'un vocal générique) — beacon/vocal/movement se résolvent
-// tous les trois INDÉPENDAMMENT (voir entities/model.md, "Paramètres
+// tous les trois INDÉPENDAMMENT (voir doc/entity-model.md, "Paramètres
 // sonores").
 
 export default {

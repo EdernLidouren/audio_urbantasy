@@ -8,7 +8,7 @@
 // comme le registre d'entités (voir core/scene.js/parseScene).
 //
 // `neutral` : true = sol NEUTRE, le son de pas vient de l'ENTITÉ (gait/
-// naturalWalk, voir entities/model.md) ; false = sol SPÉCIAL, le son vient
+// naturalWalk, voir doc/entity-model.md) ; false = sol SPÉCIAL, le son vient
 // DU SOL et domine (le gait de l'entité est ignoré) — la résolution du son
 // lui-même reste entièrement à la VUE (voir view/audio/city-scene.js),
 // jamais ici : ce registre ne connaît AUCUN chemin de fichier, seulement ce
@@ -22,7 +22,7 @@
 // gameplay, c'est ajouter une clé à chaque entrée concernée, jamais une
 // nouvelle fonction. Ajouter une SURFACE, c'est ajouter une entrée ici,
 // jamais une catégorie ou un cas en dur ailleurs (même principe que les
-// PRESETS d'entités, voir entities/model.md).
+// PRESETS d'entités, voir doc/entity-model.md).
 export const SURFACE_REGISTRY = {
   asphalt: { neutral: true },
   carpet: { neutral: false },

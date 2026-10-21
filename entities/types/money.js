@@ -1,6 +1,6 @@
 // Archétype "money" — une somme ramassable au sol (voir view/interaction.js,
 // ACTION_HANDLERS.pickup ; core/money.js/pickupEntity). Test de bout en bout
-// du premier kind d'action différenciée (voir entities/model.md,
+// du premier kind d'action différenciée (voir doc/entity-model.md,
 // "Interaction (niveau 0)"). observable : petite description de flaveur,
 // pas requise par le système lui-même (une entité interactable sans
 // description resterait mécaniquement identique).
@@ -22,7 +22,7 @@ export default {
   blocksMovement: false,
   observable: true,
   interactable: true,
-  // Surlignage audio de proximité (voir entities/model.md) : une somme au
+  // Surlignage audio de proximité (voir doc/entity-model.md) : une somme au
   // sol se repère nettement une fois à portée.
   highlight: true,
   action: { kind: "pickup", amount: 5 },

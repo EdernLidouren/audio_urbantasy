@@ -94,5 +94,5 @@ haut) et les ids de scènes (clés de `session.worlds`, cibles de
 `teleport`). Les renommer casserait les sauvegardes existantes ; une table
 dédiée s'ajoutera le jour où le cas se présente.
 
-Vérifications : `core/movement.check.js`, sections « save renommages » et
-« save types inconnus ».
+Vérifications : `core/checks/save.check.js` (`runChecks("save")`), sections
+« save renommages » et « save types inconnus ».

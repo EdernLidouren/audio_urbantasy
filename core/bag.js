@@ -101,10 +101,10 @@ export function removeItem(session, type, count = 1) {
 }
 
 // Effet "Poser" (drop) — voir view/menus/inventory-menu.js/setDropItemHandler,
-// entities/model.md/"Sac d'objets" : retire `count` exemplaire(s) du sac ET
+// doc/entity-model.md/"Sac d'objets" : retire `count` exemplaire(s) du sac ET
 // fait apparaître UNE entité éphémère au sol portant TOUTE la quantité posée
 // EN UNE FOIS (jamais N entités éparpillées — un dépôt n'est pas un
-// éclatement de butin comme "loot"/action.spawn, voir entities/model.md pour
+// éclatement de butin comme "loot"/action.spawn, voir doc/entity-model.md pour
 // la justification complète), à la position `x` du joueur. `spec` :
 // descripteur DÉJÀ RÉSOLU (voir spawnEphemeral, core/state.js), construit par
 // l'appelant (view/city-screen.js) — ce module ignore tout du registre de

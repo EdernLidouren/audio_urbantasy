@@ -24,7 +24,7 @@ import { TAG_REGISTRY } from "./tags.js";
 // (core/equipment.js/equipItem) plutôt que de rester simple contenu du sac.
 // `slot` : NOM du slot qu'il occupe (voir core/equipment.js/EQUIPMENT_SLOTS)
 // — aujourd'hui seulement "feet". `gait` : pool de son de pas (voir
-// entities/model.md, "Surfaces de sol et son de pas") que cet objet impose
+// doc/entity-model.md, "Surfaces de sol et son de pas") que cet objet impose
 // une fois équipé — lu par core/equipment.js/gaitOf, JAMAIS stocké ailleurs
 // (voir entities/player.js). Les objets équipables déclarés ici (slot
 // "feet") couvrent QUATRE pools de pas disponibles : `barefoot_walk`
@@ -172,7 +172,7 @@ export function itemSounds(type) {
 // contenu JSON passé à un parseur : ce module se valide donc LUI-MÊME, tout
 // de suite (voir l'appel plus bas), plutôt que de dépendre d'un chemin de
 // chargement externe. Exporté (plutôt qu'un IIFE anonyme) pour rester
-// TESTABLE au terminal avec un registre de test (voir core/movement.check.js)
+// TESTABLE au terminal avec un registre de test (voir core/checks/inventory.check.js)
 // sans avoir à corrompre ITEM_REGISTRY lui-même. Faute de frappe -> échec
 // CLAIR (tag + objet concerné), jamais un mismatch silencieux découvert en
 // jeu.

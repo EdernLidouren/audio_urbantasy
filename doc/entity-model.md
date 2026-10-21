@@ -328,7 +328,7 @@ l'activation — ex. `crate-stash` (`scenes/demo2.json`), une caisse dont le
 
 `config/debug.js` : un drapeau global minimal, désactivé par défaut,
 activable depuis la console (`window.toggleDebug()`, voir `main.js`, même
-patron que `window.runMovementChecks`) OU par la combinaison **Ctrl+D** en
+patron que `window.runChecks`) OU par la combinaison **Ctrl+D** en
 jeu (même fonction, deux chemins d'accès — voir `lib/input.js`/
 `onGlobalPress`, binding GLOBAL résolu indépendamment de la pile d'écrans,
 disponible quel que soit l'écran actif — Ctrl plutôt qu'Alt, qui déplace le
@@ -520,7 +520,7 @@ persiste avec le monde.
   éphémères, sont exclus de la sauvegarde comme tout éphémère. Une sauvegarde antérieure n'a pas de
   `spawnCycle` : absence = cycle dû, garnissage au premier chargement — aucun
   rebouchage nécessaire. Vérifié par l'audit de sérialisabilité
-  (`core/movement.check.js`, section "Collecte").
+  (`core/checks/spawn.check.js`).
 
 Contenu de test : `scenes/demo.json` ("Ville test") — `bush_1` (x=12, table
 `default`) et une plage `[27, 34]` de 3 collectibles.
@@ -901,7 +901,7 @@ réelle possible, jamais visiblement coincé) ; au matin (8h), présent +
 `"behavior"` -> `wander` de nouveau (nouveau cycle — c'est cette
 RÉAFFECTATION à un `kind` différent de `"goto"` qui neutralise la condition
 `"arrived"` d'un cycle sur l'autre, voir plus haut). Voir
-`core/movement.check.js`, section "Routine complète", pour la vérification
+`core/checks/routines.check.js`, section "Routine complète", pour la vérification
 tick par tick d'un cycle équivalent, y compris le cas obstrué et le cas de
 cible manquante.
 

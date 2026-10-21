@@ -45,7 +45,7 @@ conditions parallèle.
 tenu par un REGISTRE — `CONDITION_EVALUATORS` dans `core/presence.js` — chaque
 entrée réduite à la même signature `(cond, context) -> boolean`. `evaluateCondition`
 délègue au bon évaluateur ; un `type` inconnu à l'ÉVALUATION (hors du chemin validé
-au chargement, ex. un appel direct depuis `core/movement.check.js`) renvoie `false`,
+au chargement, ex. un appel direct depuis `core/checks/conditions.check.js`) renvoie `false`,
 jamais une exception.
 
 `context` transporte ce dont un évaluateur peut avoir besoin — aujourd'hui `time`
@@ -120,7 +120,7 @@ nul, comportement EXACTEMENT inchangé — seuil pile sur `from`/`to`, comme ava
 mécanisme.
 
 Exemple — trois habitués d'un bar, même règle de départ partagée, décalés de
-quelques minutes chacun (voir `core/movement.check.js`, section "le bar") :
+quelques minutes chacun (voir `core/checks/routines.check.js`, section "le bar") :
 
 ```js
 const departureRule = {
@@ -316,7 +316,7 @@ condition sœur, `"consumed"`) :
 `"allOf"` externe évalue son second élément (`"consumed"`) exactement comme le premier
 (`"allOf"` imbriqué), qui lui-même redélègue à `evaluateCondition` pour ses deux
 sous-conditions — aucune limite de profondeur codée en dur, testé jusqu'à deux niveaux
-dans `core/movement.check.js`.
+dans `core/checks/conditions.check.js`.
 
 **Piège à connaître** : un consommateur qui inspecte `entity.presence[].when.type`
 DIRECTEMENT (ex. `view/audio/city-scene.js`/`isPerceptionGated`, qui détecte une entité
@@ -612,7 +612,7 @@ deuxième règle explicite.
 complémentaires** (`scenes/demo.json`/`npc-resident` et
 `scenes/demo2.json`/`npc-resident-home` — voir `doc/entity-model.md`/"Présence
 conditionnelle et triggers de comportement" pour la sémantique complète, et
-`core/movement.check.js`, section "Routine complète", pour la vérification tick
+`core/checks/routines.check.js`, section "Routine complète", pour la vérification tick
 par tick d'un cycle équivalent) :
 
 `npc-resident` (`scenes/demo.json`) — présent le jour (8h-20h, erre), part vers
@@ -756,7 +756,7 @@ doit pas passer en silence.
 Un kind de trigger de plus demain (météo, phase...) = une entrée dans
 `TRIGGER_KINDS` (`core/triggers.js`) + sa détection dans
 `dueTriggerEffects`, jamais un second mécanisme. Vérification terminal :
-`core/movement.check.js`, section "Triggers horaires".
+`core/checks/triggers.check.js`.
 
 ## Actions
 
@@ -1663,7 +1663,7 @@ high_heels: { /* ... */ tags: ["chic"] },
 (`validateItemTags(ITEM_REGISTRY)`, appelée en bas du fichier) — tout tag référencé
 par un objet DOIT exister dans `TAG_REGISTRY`, sinon `throw` immédiat, nommant le
 tag fautif et l'objet concerné. `validateItemTags` est exportée pour rester
-testable avec un registre de test (`core/movement.check.js`), sans avoir à
+testable avec un registre de test (`core/checks/inventory.check.js`), sans avoir à
 corrompre le vrai registre.
 
 **Tags EFFECTIVEMENT portés** (`core/equipment.js`/`equippedTags(equipment)`) :

@@ -1,5 +1,5 @@
 // Archétype "object" — voir entities/types/index.js pour le registre complet
-// et entities/model.md pour le vocabulaire du modèle d'entité. Donnée pure :
+// et doc/entity-model.md pour le vocabulaire du modèle d'entité. Donnée pure :
 // aucun import.
 
 export default {
@@ -15,7 +15,7 @@ export default {
   // aujourd'hui, même si l'action reste le stub générique tant que les
   // types d'action ne sont pas différenciés (voir view/interaction.js).
   interactable: true,
-  // Surlignage audio de proximité (voir entities/model.md) : un objet à
+  // Surlignage audio de proximité (voir doc/entity-model.md) : un objet à
   // fouiller se repère nettement une fois à portée.
   highlight: true,
 };

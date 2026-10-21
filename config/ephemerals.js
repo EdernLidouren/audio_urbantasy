@@ -3,6 +3,6 @@
 // prolifération), pas un réglage de feeling. Lue par core/state.js pour ne
 // jamais laisser le nombre d'entités ÉPHÉMÈRES du monde actif dépasser cette
 // taille — les entités DÉCLARÉES (JSON) ne sont JAMAIS concernées, leur
-// nombre est maîtrisé à l'écriture (voir entities/model.md/"Entités
+// nombre est maîtrisé à l'écriture (voir doc/entity-model.md/"Entités
 // éphémères").
 export const MAX_EPHEMERALS = 50;

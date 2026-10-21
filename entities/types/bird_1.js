@@ -1,9 +1,9 @@
 // Archétype "bird" — voir entities/types/index.js pour le registre complet
-// et entities/model.md pour le vocabulaire du modèle d'entité (dont
+// et doc/entity-model.md pour le vocabulaire du modèle d'entité (dont
 // isFlying). Donnée pure : aucun import.
 //
 // "Oiseau décor" : VOCAL SEUL, aucun beacon — même choix que hound.js (voir
-// entities/model.md, "beacon vs vocal") : pas besoin de le localiser en
+// doc/entity-model.md, "Beacon vs vocal") : pas besoin de le localiser en
 // continu, seulement de l'entendre chanter par intermittence — le vocal
 // lui-même sert de seul repère sonore. Pool DÉDIÉ bird_1_vocal (7 fichiers,
 // assets/manifest.json) — PLUS le placeholder dog_medium_vocal d'origine.

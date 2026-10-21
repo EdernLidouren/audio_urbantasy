@@ -1,9 +1,9 @@
 // Archétype "hound" — voir entities/types/index.js pour le registre complet
-// et entities/model.md pour le vocabulaire du modèle d'entité. Donnée pure :
+// et doc/entity-model.md pour le vocabulaire du modèle d'entité. Donnée pure :
 // aucun import.
 //
 // "Chien décor" : VOCAL SEUL, aucun beacon — délibérément (voir
-// entities/model.md, "beacon vs vocal") : on n'a pas besoin de le
+// doc/entity-model.md, "Beacon vs vocal") : on n'a pas besoin de le
 // localiser, seulement de l'entendre aboyer occasionnellement en fond,
 // donc pas de son de repérage inutile. Pas de movement non plus (immobile,
 // jamais de behavior). Cadence du vocal : défaut GLOBAL (aucune surcharge

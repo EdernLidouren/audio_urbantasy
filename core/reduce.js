@@ -85,7 +85,7 @@ function resolveTargetPosition(state, face, targetId) {
 //
 // Règles déclaratives (voir core/presence.js/resolveEntityRules) résolues
 // ICI, avant tout comportement — présence : premier des trois plans coupés
-// par le drapeau DORMANT (voir entities/model.md/core/time.md pour les
+// par le drapeau DORMANT (voir doc/entity-model.md/core/time.md pour les
 // deux autres, côté vue : rendu audio, occupation/interaction ; le
 // troisième plan CORE, le blocage, est traité séparément par isBlocking,
 // voir plus bas dans TICK). DORMANTE -> aucun appel au module de
@@ -95,7 +95,7 @@ function resolveTargetPosition(state, face, targetId) {
 // champs `present`/`presenceChanged`/`ruleActive` ne sont ajoutés à
 // l'entité QUE si elle porte une règle `presence` (jamais sur une entité
 // qui n'en a pas — comportement d'avant ce système strictement inchangé,
-// voir core/movement.check.js/audit de sérialisabilité).
+// voir core/checks/save.check.js/audit de sérialisabilité).
 //
 // presenceChanged ("entered" | "exited" | null) : la BASCULE de présence
 // OBSERVÉE, exposée pour la vue (sons de transition, voir

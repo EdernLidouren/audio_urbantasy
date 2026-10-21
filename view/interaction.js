@@ -80,7 +80,7 @@ export function setPickupHandler(handler) {
 
 // (entity, item, count) => void — applique l'effet d'ÉTAT du ramassage vers
 // le SAC (objet + retrait de l'entité, voir core/bag.js/pickupItemEntity ;
-// entities/model.md/"Sac d'objets"), même patron que setPickupHandler
+// doc/entity-model.md/"Sac d'objets"), même patron que setPickupHandler
 // ci-dessus mais DISTINCT : pickupHandler écrit dans session.money,
 // itemPickupHandler dans session.bag — même verbe ("pickup"), effet choisi
 // selon la FORME de l'action (voir handlePickup).
@@ -108,7 +108,7 @@ export function setLootUniqueHandler(handler) {
 
 // (entity, spawn) => void — applique l'effet d'ÉTAT du "loot à spawn"
 // (entity.consumed + N entités éphémères éparpillées, voir
-// core/money.js/lootEntitySpawn ; entities/model.md/"Entités éphémères"),
+// core/money.js/lootEntitySpawn ; doc/entity-model.md/"Entités éphémères"),
 // même patron que setLootHandler ci-dessus — variante déclarée via
 // action.spawn plutôt qu'action.amount (voir handleLoot).
 export function setLootSpawnHandler(handler) {
@@ -374,7 +374,7 @@ export function runRenderEffects(entity, effects, options = {}) {
 // (getInteractionCandidates) évite déjà ce cas en pratique, ce repli reste
 // défensif.
 //
-// consumedDescriptionKey (voir core/scene.js, entities/model.md/
+// consumedDescriptionKey (voir core/scene.js, doc/entity-model.md/
 // "Collectible persistant") : description ALTERNATIVE une fois
 // entity.consumed — effet POST-ACTIVATION "changer d'état perceptible"
 // d'un collectible persistant (core/money.js/lootEntity), déclaré par
@@ -424,7 +424,7 @@ function handleSwitchSide(entity, action) {
 // entité (distinguées par la PRÉSENCE du champ, même principe que
 // handleLoot pour action.spawn/amount) :
 //   - action.item : vers le SAC (voir core/bag.js/pickupItemEntity,
-//     entities/model.md/"Sac d'objets") — le nom affiché ("Ramassé :
+//     doc/entity-model.md/"Sac d'objets") — le nom affiché ("Ramassé :
 //     <objet>") vient de entity.labelKey, déjà résolu par le core (voir
 //     core/scene.js) : ce fichier n'importe jamais le core, donc jamais le
 //     registre d'objets (core/items.js) — c'est au contenu de scène de
@@ -459,7 +459,7 @@ function handlePickup(entity, action) {
 }
 
 // "loot" : COLLECTIBLE PERSISTANT (voir core/money.js/lootEntity,
-// entities/model.md/"Collectible persistant") — même structure que
+// doc/entity-model.md/"Collectible persistant") — même structure que
 // handlePickup ci-dessus (amount validé, son défensif, annonce), mais
 // l'entité N'EST JAMAIS retirée : elle change d'état (consumed:true), avec
 // ses effets post-activation DÉCLARATIFS (description alternative —
@@ -472,7 +472,7 @@ function handlePickup(entity, action) {
 // — le piège exact que ce système doit éviter.
 //
 // DEUX formes possibles pour action.kind:"loot", jamais mélangées sur une
-// même entité — voir entities/model.md/"Entités éphémères" :
+// même entité — voir doc/entity-model.md/"Entités éphémères" :
 //   - action.amount : crédite directement (comportement d'origine, ex.
 //     crate-port/crate-warehouse) ;
 //   - action.spawn : { spec, count, spread } — fait naître `count` entités

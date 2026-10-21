@@ -69,7 +69,7 @@ export const TUNING_DEFAULTS = {
   farVolumeMax: 0.5,
 
   // Surlignage audio de proximité (voir view/audio/city-scene.js,
-  // entities/model.md) : à portée d'interaction (dist <= interactRange),
+  // doc/entity-model.md) : à portée d'interaction (dist <= interactRange),
   // une entité highlight:true saute à fullVolume — SAUT NET, INSTANTANÉ,
   // pas une rampe. Une version rampée (montée/descente progressives sur
   // quelques dizaines à centaines de ms) a été essayée et abandonnée :
@@ -207,7 +207,7 @@ export const TUNING_DEFAULTS = {
   beaconStaggerMaxMs: 180,
 
   // --- Paramètres sonores d'entité (cascade son -> instance -> archétype ->
-  // défaut global, voir entities/model.md et config/tuning.js/resolveTuning)
+  // défaut global, voir doc/entity-model.md et config/tuning.js/resolveTuning)
   // : les clés ci-dessous rejoignent reverbSend plus haut dans ce même
   // référentiel, résolues exactement de la même façon. Défauts choisis pour
   // ne RIEN changer au comportement des entités existantes tant qu'elles ne
@@ -253,7 +253,7 @@ export const TUNING_DEFAULTS = {
   // d'évènement "déclenchement" répété).
   pitchVariation: 0,
   // Multiplicateur de cadence du son de déplacement d'une entité (rôle
-  // "movement", voir entities/model.md) : la distance parcourue entre deux
+  // "movement", voir doc/entity-model.md) : la distance parcourue entre deux
   // pas reste stepDistance (ci-dessus) DIVISÉE par ce facteur — jamais une
   // fréquence réglée indépendamment de la vitesse. 1 = même cadence que le
   // joueur à distance parcourue égale (défaut).
@@ -267,7 +267,7 @@ export const TUNING_DEFAULTS = {
   movementGain: 1,
 
   // Intervalle moyen (ms) entre deux déclenchements du VOCAL (rôle
-  // d'expression — aboiement, sifflement... — voir entities/model.md) :
+  // d'expression — aboiement, sifflement... — voir doc/entity-model.md) :
   // TOUJOURS intermittent, jamais de mode continu pour ce rôle. Nettement
   // plus long ET plus variable que beaconInterval par défaut : un vocal est
   // sporadique par nature, pas un signal de repérage régulier comme la
@@ -283,13 +283,13 @@ export const TUNING_DEFAULTS = {
   vocalGain: 1,
 
   // Facteurs propres des sons de TRANSITION (voir core/presence.js,
-  // entities/model.md) — même principe que beaconGain/vocalGain/
+  // doc/entity-model.md) — même principe que beaconGain/vocalGain/
   // movementGain, un par rôle : enterSound (bascule dormant->présent),
   // exitSound (présent->dormant).
   enterSoundGain: 1,
   exitSoundGain: 1,
 
-  // --- Hauteur suggérée (voir entities/model.md, isFlying) : chaîne de
+  // --- Hauteur suggérée (voir doc/entity-model.md, isFlying) : chaîne de
   // filtres appliquée aux sons d'une entité isFlying — SUGGÈRE l'altitude,
   // ne simule PAS un axe Y. Bac à sable de réglage : ces trois valeurs sont
   // le SEUL endroit à toucher pour ajuster l'effet à l'oreille, résolues
@@ -355,7 +355,7 @@ export const TUNING_DEFAULTS = {
 
   // Décalage aléatoire MAX (unités de scène, de part et d'autre de la
   // source) appliqué à une entité éphémère ÉPARPILLÉE (voir
-  // core/state.js/spawnScatteredEphemerals, entities/model.md/"Entités
+  // core/state.js/spawnScatteredEphemerals, doc/entity-model.md/"Entités
   // éphémères") quand l'action qui la fait naître ne précise pas son propre
   // `spawn.spread`. Lu DIRECTEMENT (comme moveStep/stepDistance plus haut),
   // jamais via la cascade resolveTuning : ce n'est pas un réglage

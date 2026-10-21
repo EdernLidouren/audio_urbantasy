@@ -1,5 +1,5 @@
 // Archétype "rock" — voir entities/types/index.js pour le registre complet
-// et entities/model.md pour le vocabulaire du modèle d'entité. Donnée pure :
+// et doc/entity-model.md pour le vocabulaire du modèle d'entité. Donnée pure :
 // aucun import.
 //
 // blocksMovement est exploité par core/reduce.js (résolution de collision

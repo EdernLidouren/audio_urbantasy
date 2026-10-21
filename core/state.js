@@ -279,7 +279,7 @@ function createWorldState(scene, seed) {
 // (les appelants existants n'en fournissent pas), transmise au premier
 // monde. companions optionnel (voir header) : par défaut, UN compagnon de
 // test prédéfini (comportement réel du jeu — "Nouvelle partie" démarre
-// toujours avec ce compagnon) ; un appelant (movement.check.js en
+// toujours avec ce compagnon) ; un appelant (core/checks/ en
 // particulier, pour les scénarios qui ne concernent pas les compagnons)
 // peut passer `{ companions: [] }` pour s'en passer explicitement. Toujours
 // plafonné à MAX_COMPANIONS et repositionné près du joueur, quelle que soit
@@ -405,7 +405,7 @@ export function removeEntity(session, entityId) {
 
 // Marque UNE entité (par id) du monde ACTIF comme "consumed" — mécanisme
 // générique derrière un COLLECTIBLE PERSISTANT (voir core/money.js/
-// lootEntity, entities/model.md/"Collectible persistant") : contrairement à
+// lootEntity, doc/entity-model.md/"Collectible persistant") : contrairement à
 // removeEntity ci-dessus, l'entité N'EST JAMAIS retirée, elle change
 // simplement d'état. `consumed` est un champ RUNTIME comme `present`/
 // `gotoArrived` (jamais posé par core/scene.js) : absent (falsy) tant que
@@ -469,7 +469,7 @@ export function applyEntityActionEffects(session, entityId, effects, side = sess
 
 // Crée UNE entité ÉPHÉMÈRE dans le monde ACTIF, à la position x — point
 // d'entrée UNIQUE et RÉUTILISABLE pour toute création d'entité EN COURS DE
-// JEU (voir entities/model.md/"Entités éphémères"). Deux appelants
+// JEU (voir doc/entity-model.md/"Entités éphémères"). Deux appelants
 // aujourd'hui : la touche debug "e" (voir view/city-screen.js) et
 // spawnScatteredEphemerals plus bas (effet "spawn" d'une action, voir
 // core/money.js/lootEntitySpawn) ; demain : un objet lâché par un
@@ -546,10 +546,10 @@ function isPositionBlocked(x, entities, presenceContext) {
 // le rngState renvoyé reflète exactement le nombre de tirages réellement
 // faits, pour que l'appelant l'enchaîne sans rien perdre ni dupliquer.
 // EXPORTÉE (bien qu'interne à spawnScatteredEphemerals en usage normal)
-// SEULEMENT pour permettre à core/movement.check.js de vérifier
+// SEULEMENT pour permettre à core/checks/ephemerals.check.js de vérifier
 // directement, sans dépendre du hasard d'un tirage complet, que les BORNES
 // (carte + obstacles) sont RÉELLEMENT respectées — jamais appelée hors
-// core/state.js/movement.check.js.
+// core/state.js et core/checks/ephemerals.check.js.
 export function drawScatteredPosition(sourceX, spread, length, entities, presenceContext, rngState) {
   let state = rngState;
   for (let attempt = 0; attempt < SCATTER_MAX_ATTEMPTS; attempt++) {
@@ -568,7 +568,7 @@ export function drawScatteredPosition(sourceX, spread, length, entities, presenc
 // ACTION_HANDLERS.loot — action.spawn ; core/money.js/lootEntitySpawn, seul
 // appelant aujourd'hui) : fait naître `count` entités éphémères autour de
 // sourceX, chacune décalée aléatoirement pour éviter l'empilement sonore —
-// voir entities/model.md/"Entités éphémères". Réutilise spawnEphemeral TEL
+// voir doc/entity-model.md/"Entités éphémères". Réutilise spawnEphemeral TEL
 // QUEL, N fois : même mécanisme, mêmes garanties (id unique, exclusion de
 // sérialisation, MAX_EPHEMERALS — l'éviction, si elle se déclenche, agit
 // DÉJÀ pendant cette boucle, jamais seulement après coup). `spec` : même
@@ -689,7 +689,7 @@ export function getInactiveFace(session) {
 export function travelToWorld(session, targetId, freshScene = null, { x, side = "recto" } = {}) {
   const currentWorld = session.worlds[session.activeWorldId];
   // Purge des entités ÉPHÉMÈRES du monde qu'on quitte (voir
-  // entities/model.md/"Entités éphémères") : PILE le moment où ce monde est
+  // doc/entity-model.md/"Entités éphémères") : PILE le moment où ce monde est
   // rangé (gelé) — aucun éphémère ne doit survivre à une sortie de SCÈNE,
   // qu'il ait été ramassé ou non. À DEUX FACES : LES DEUX sont purgées
   // (voir stripEphemeralsFromWorld), pas seulement celle qu'on regardait —

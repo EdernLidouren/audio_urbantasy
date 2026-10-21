@@ -1,5 +1,5 @@
 // Archétype "npc" — voir entities/types/index.js pour le registre complet et
-// entities/model.md pour le vocabulaire du modèle d'entité. Donnée pure :
+// doc/entity-model.md pour le vocabulaire du modèle d'entité. Donnée pure :
 // aucun import.
 //
 // "Un passant" : beacon (LOCALISATION, continu, signal "tic tic") + vocal
@@ -10,7 +10,7 @@
 //
 // gait:"shoes" + sounds.movement — EXACTEMENT le même pas que le joueur
 // (entities/player.js), pour rendre le npc audible en déplacement (il
-// n'avait aucun son de pas jusqu'ici : voir entities/model.md, "Surfaces de
+// n'avait aucun son de pas jusqu'ici : voir doc/entity-model.md, "Surfaces de
 // sol et son de pas" — un archétype SANS sounds.movement ne pose jamais de
 // pas, quel que soit le sol). ATTENTION : sur un sol SPÉCIAL (dirt/grass,
 // ex. scenes/demo.json — le cas de l'habitant qui erre le jour), c'est LE
@@ -30,10 +30,10 @@ export default {
   },
   blocksMovement: false,
   observable: true,
-  // interactable:true (anticipe "parler", voir entities/model.md) : candidat
+  // interactable:true (anticipe "parler", voir doc/entity-model.md) : candidat
   // à entrée dès aujourd'hui, action encore générique (stub) pour l'instant.
   interactable: true,
-  // Surlignage audio de proximité (voir entities/model.md) : un PNJ se
+  // Surlignage audio de proximité (voir doc/entity-model.md) : un PNJ se
   // repère nettement une fois à portée.
   highlight: true,
 };

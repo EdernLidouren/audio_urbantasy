@@ -1,4 +1,4 @@
-// Archétype "crate" — COLLECTIBLE PERSISTANT (voir entities/model.md,
+// Archétype "crate" — COLLECTIBLE PERSISTANT (voir doc/entity-model.md,
 // "Collectible persistant") : contrairement à "money" (ramassage,
 // l'entité disparaît — voir entities/types/money.js, core/money.js/
 // pickupEntity), une caisse looté reste dans le monde, changée d'état
@@ -37,7 +37,7 @@ export default {
   blocksMovement: false,
   observable: true,
   interactable: true,
-  // Surlignage audio de proximité (voir entities/model.md) : une caisse se
+  // Surlignage audio de proximité (voir doc/entity-model.md) : une caisse se
   // repère nettement une fois à portée, consumed ou non (muteOnConsumed
   // coupe le beacon lui-même, pas ce flag).
   highlight: true,

@@ -13,7 +13,7 @@
 // "presence", present }] }` — voir ruleEffect. core/scene.js normalise déjà
 // ce raccourci en forme canonique au chargement ; ruleEffect le comprend
 // aussi directement, pour tout appelant qui construit une règle à la main
-// (ex. movement.check.js) sans passer par parseScene.
+// (ex. core/checks/conditions.check.js) sans passer par parseScene.
 //
 // DEUX aiguillages EXTENSIBLES, de nature différente :
 //   - CONDITION_EVALUATORS (registre) : chaque entrée est juste "condition +
@@ -40,7 +40,7 @@
 // ne se disputent PAS un rang : ils s'appliquent chacun indépendamment,
 // SEULEMENT sur la bascule de LEUR PROPRE condition (voir plus bas) — un
 // contenu bien conçu n'a qu'une seule condition de comportement vraie à la
-// fois (ex. l'habitant, entities/model.md), mais rien n'empêche techniquement
+// fois (ex. l'habitant, doc/entity-model.md), mais rien n'empêche techniquement
 // d'en déclarer deux qui se chevauchent : la dernière de la liste gagnerait
 // alors simplement (dernière affectation), sans crash.
 //
@@ -146,7 +146,7 @@ function evaluateArrived(cond, context) {
 
 // "consumed" : vraie si l'entité porte entity.consumed === true (voir
 // core/state.js/markConsumed) — permet à un COLLECTIBLE PERSISTANT (voir
-// entities/model.md/"Collectible persistant") de composer l'effet POST-
+// doc/entity-model.md/"Collectible persistant") de composer l'effet POST-
 // ACTIVATION "devient dormant" avec ce même système de présence
 // conditionnelle, jamais un mécanisme séparé (ajouter "consumed" ici suffit,
 // exactement comme "timeRange"/"arrived" — aucune retouche à isPresent/
@@ -318,7 +318,7 @@ export const CONDITION_TYPES = Object.keys(CONDITION_EVALUATORS);
 // présence concernée plutôt que de faire planter toute la simulation
 // (core/scene.js a de toute façon déjà rejeté un type inconnu au
 // chargement — ce repli ne couvre qu'un appel direct hors du chemin validé,
-// ex. depuis movement.check.js).
+// ex. depuis core/checks/conditions.check.js).
 export function evaluateCondition(cond, context) {
   const evaluator = CONDITION_EVALUATORS[cond.type];
   return evaluator ? evaluator(cond, context) : false;

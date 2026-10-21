@@ -15,7 +15,7 @@
 // source de localisation et de distance.
 //
 // Deux rôles de son POSITIONNÉ, techniquement identiques (même calcul pan/
-// distance/filtre) mais distincts par leur INTENTION, voir entities/model.md :
+// distance/filtre) mais distincts par leur INTENTION, voir doc/entity-model.md :
 // - beacon (LOCALISATION) — continu ou intermittent régulier, sert à situer
 //   l'entité dans l'espace ;
 // - vocal (EXPRESSION) — TOUJOURS intermittent, à intervalle long et très
@@ -25,7 +25,7 @@
 // PARTAGÉ (voir resolveIntermittentSource/updateIntermittentSources), seules
 // les clés de cascade et les valeurs par défaut diffèrent par rôle. Modèle
 // d'entité complet et vocabulaire de sons (balise/vocal/mouvement/ponctuel) :
-// voir entities/model.md — les valeurs par défaut listées ci-dessous
+// voir doc/entity-model.md — les valeurs par défaut listées ci-dessous
 // viennent toutes de config/tuning-values.js, jamais dupliquées ici.
 //
 // Aléa de rendu NON déterministe (Math.random, jamais le PRNG seedé du
@@ -265,10 +265,10 @@ const FOOTSTEP_REVERB_SEND =
 // Clé d'asset "<name>_walk" sous assets/sounds/footsteps/<catégorie>/ —
 // convention PARTAGÉE par une surface, un gait ou un naturalWalk (voir
 // resolveFootstepPath ci-dessous) : un simple nom + suffixe, jamais composé
-// (voir entities/model.md, "pas de produit cartésien surface×chaussure").
+// (voir doc/entity-model.md, "pas de produit cartésien surface×chaussure").
 // `category` : "surfaces" (sol) ou "gaits" (chaussure/allure ET pas naturel
 // — naturalWalk PARTAGE le même sous-dossier que gait, jamais un troisième :
-// voir entities/model.md, "naturalWalk" peut réutiliser un nom de gait
+// voir doc/entity-model.md, "naturalWalk" peut réutiliser un nom de gait
 // existant, ex. "barefoot", par conception).
 function footstepKey(category, name) {
   return `assets/sounds/footsteps/${category}/${name}_walk`;
@@ -286,7 +286,7 @@ const FOOTSTEP_FLOOR_PATH = footstepKey("gaits", "shoes");
 // d'un monde donné — VUE : dérive un nom de fichier depuis le flag
 // `neutral` de core/surfaces.js, le core lui-même ne connaît AUCUN son. DEUX
 // branches disjointes selon `neutral`, JAMAIS de croisement surface×gait
-// (voir entities/model.md) — au plus 3 crans, chacun une clé à UNE seule
+// (voir doc/entity-model.md) — au plus 3 crans, chacun une clé à UNE seule
 // dimension, chacun vérifié via hasAsset (jamais resolveAsset : on doit
 // pouvoir tester l'existence AVANT de trancher, sans jamais lever) :
 //   - sol SPÉCIAL (neutral:false) : "<surface>_walk" si son pool existe ->
@@ -295,7 +295,7 @@ const FOOTSTEP_FLOOR_PATH = footstepKey("gaits", "shoes");
 //   - sol NEUTRE (neutral:true) : "<gait>_walk" si l'entité a un gait ET
 //     que son pool existe -> sinon le pas NATUREL de l'entité :
 //     "<naturalWalk>_walk" si résolu ET existant, SINON son propre (ownPath,
-//     si l'entité en a un — voir entities/model.md, "chien important") ->
+//     si l'entité en a un — voir doc/entity-model.md, "chien important") ->
 //     sinon le plancher garanti (FOOTSTEP_FLOOR_PATH, jamais vérifié).
 // Ne peut jamais échouer : au pire, retombe sur FOOTSTEP_FLOOR_PATH.
 // `airborne` (entité isFlying) : le sol n'a pas de prise sur elle — la
@@ -363,7 +363,7 @@ function conditionRequiresPerception(cond) {
 }
 
 // Une entité est "surnaturelle" si elle ne PORTE aucun champ dédié (voir
-// entities/model.md, header : "les entités portent la logique, pas la
+// doc/entity-model.md, header : "les entités portent la logique, pas la
 // structure des scènes") — juste une entité normale dont la présence est
 // conditionnée par "perceptionActive" (voir core/presence.js,
 // entities/types/ghost.js), SEULE ou combinée (conditionRequiresPerception
@@ -462,7 +462,7 @@ function jitteredIntervalMs(interval, variation) {
 // voir buildEntitySoundEntry, seul appelant). Aléa de RENDU, Math.random()
 // comme randomRate/jitteredIntervalMs ci-dessus — jamais le PRNG seedé du
 // core, aucun effet sur l'état de partie (voir "Déterminisme et rendu
-// audio", entities/model.md).
+// audio", doc/entity-model.md).
 function drawBeaconStaggerDelayMs() {
   return BEACON_STAGGER_MIN_MS + Math.random() * (BEACON_STAGGER_MAX_MS - BEACON_STAGGER_MIN_MS);
 }
@@ -483,10 +483,10 @@ const VOCAL_TUNING_KEYS = { interval: "vocalInterval", intervalVariation: "vocal
 // ajouter un réglage commun demain (voir CLAUDE.md/"Format déclaratif") ne
 // touche qu'ici. `gainKey` : SEULE clé de cascade qui varie par rôle
 // (beaconGain/vocalGain/enterSoundGain/exitSoundGain — voir
-// entities/model.md) ; pitchVariation/reverbSend partagent toujours la MÊME
+// doc/entity-model.md) ; pitchVariation/reverbSend partagent toujours la MÊME
 // clé partout. `useFlyingReverbSend` (défaut false) : SEULS les rôles
 // CONTINU/INTERMITTENT swappent reverbSend -> flyingReverbSend pour une
-// entité isFlying (voir "Chaîne de filtres hauteur", entities/model.md) —
+// entité isFlying (voir "Chaîne de filtres hauteur", doc/entity-model.md) —
 // enterSound/exitSound n'ont jamais fait ce swap, comportement PRÉEXISTANT
 // préservé tel quel, jamais unifié par ce regroupement.
 function resolveSoundSettings(entity, descriptor, gainKey, { useFlyingReverbSend = false } = {}) {
@@ -507,7 +507,7 @@ function resolveSoundSettings(entity, descriptor, gainKey, { useFlyingReverbSend
 // chaque tick — voir updateIntermittentSources) réamorcé à 0 : premier
 // déclenchement dès le premier tick.
 //
-// isFlying (voir entities/model.md) : highpassHz/heightGain résolus EN PLUS
+// isFlying (voir doc/entity-model.md) : highpassHz/heightGain résolus EN PLUS
 // du swap reverbSend (resolveSoundSettings) — sinon (entité non volante)
 // highpassHz reste `undefined` (aucun filtre tenté) et heightGain reste
 // neutre (1), chemin STRICTEMENT inchangé. Chaîne de filtres "hauteur
@@ -533,7 +533,7 @@ function resolveIntermittentSource(entity, descriptor, keys) {
   };
 }
 
-// enterSound/exitSound (voir core/presence.js, entities/model.md) : rôles
+// enterSound/exitSound (voir core/presence.js, doc/entity-model.md) : rôles
 // sonores PONCTUELS et POSITIONNÉS, déclenchés par une bascule de présence
 // OBSERVÉE (core/reduce.js/stepEntities), jamais par une cadence/intervalle
 // — contrairement à resolveIntermittentSource ci-dessus, pas de nextAt à
@@ -572,7 +572,7 @@ const PLAY_SOUND_TUNING_KEYS = { gain: "gain" };
 //     dist=0) vers 0 (à audibleRange) — le même pour TOUTE entité,
 //     surlignée ou non, sans plateau ni saut.
 //   - un PALIER à FULL_VOLUME quand `highlighted` est vrai (voir
-//     entities/model.md, "Surlignage audio de proximité") : SAUT NET, pas
+//     doc/entity-model.md, "Surlignage audio de proximité") : SAUT NET, pas
 //     de rampe — un essai de fondu progressif (quelques dizaines à
 //     quelques centaines de ms) s'est révélé quasi inaudible à l'oreille
 //     en marchant/courant normalement (la fenêtre de présence dans
@@ -712,7 +712,7 @@ let activeScene = null;
 // — EXTRAIT du montage de scène pour être réutilisé tel quel par
 // syncNewEntitySounds ci-dessous (voir createCityAudioScene), qui l'appelle
 // pour toute entité apparue APRÈS le montage (ex. entité ÉPHÉMÈRE, voir
-// core/state.js/spawnEphemeral, entities/model.md/"Entités éphémères") —
+// core/state.js/spawnEphemeral, doc/entity-model.md/"Entités éphémères") —
 // UNE SEULE construction, deux appelants (montage initial, apparition
 // tardive), jamais deux implémentations à maintenir en parallèle.
 // `session` : la partie COURANTE, lue seulement pour résoudre la présence
@@ -733,7 +733,7 @@ let activeScene = null;
 // continue sans coupure ni retour au début.
 function buildEntitySoundEntry(entity, session, { otherFace = false, disableStagger = false, handover = null } = {}) {
   // beacon (localisation) et vocal (expression) : descripteurs de son du
-  // type, tous deux OPTIONNELS et indépendants (voir entities/model.md) —
+  // type, tous deux OPTIONNELS et indépendants (voir doc/entity-model.md) —
   // ni l'un ni l'autre n'est "le" son obligatoire d'une entité. `entity.sounds`
   // (jamais `registry[entity.type].sounds` directement) : déjà le résultat
   // RÉSOLU de la cascade instance -> archétype par fusion profonde (voir
@@ -773,13 +773,13 @@ function buildEntitySoundEntry(entity, session, { otherFace = false, disableStag
   const interactRange = resolveTuning("interactRange", entity);
   const cutoffMin = resolveTuning("cutoffMin", entity);
   const cutoffMax = resolveTuning("cutoffMax", entity);
-  // Surlignage (voir volumeForDistance, entities/model.md) : flag EXPLICITE
+  // Surlignage (voir volumeForDistance, doc/entity-model.md) : flag EXPLICITE
   // de l'entité, pas d'un rôle de son — même cascade que gait/naturalWalk
   // plus bas (pas de `sound` en 3e paramètre). Boolean() : un `tuning`/
   // registre qui déclare une valeur truthy non booléenne resterait un flag
   // franc, jamais une valeur exotique propagée plus loin.
   const highlight = Boolean(resolveTuning("highlight", entity));
-  // Chaîne de filtres "hauteur suggérée" (voir entities/model.md, isFlying)
+  // Chaîne de filtres "hauteur suggérée" (voir doc/entity-model.md, isFlying)
   // — résolus même sans balise CONTINUE (sans effet dans ce cas, voir
   // applyEntityAudio, qui ne les utilise que si `sound` existe) : entité non
   // volante -> flyingHighpassHz reste undefined (aucun filtre tenté),
@@ -787,7 +787,7 @@ function buildEntitySoundEntry(entity, session, { otherFace = false, disableStag
   const flyingHighpassHz = entity.isFlying ? resolveTuning("flyingHighpassHz", entity) : undefined;
   const flyingVolumeFactor = entity.isFlying ? resolveTuning("flyingVolumeFactor", entity) : 1;
 
-  // Son de déplacement (rôle "movement", voir entities/model.md) :
+  // Son de déplacement (rôle "movement", voir doc/entity-model.md) :
   // DORMANT si l'archétype n'en porte pas — la plupart des types n'ont pas
   // vocation à marcher. Cadencé par la DISTANCE parcourue, jamais par un
   // intervalle de temps : traité à part des sources intermittentes
@@ -809,7 +809,7 @@ function buildEntitySoundEntry(entity, session, { otherFace = false, disableStag
         // playerWalker pour le joueur : un walker par mobile, jamais
         // partagé.
         walker: createWalkerState(entity.x),
-        // gait/naturalWalk (voir entities/model.md, "Surfaces de sol et
+        // gait/naturalWalk (voir doc/entity-model.md, "Surfaces de sol et
         // son de pas") : propriétés de l'ENTITÉ, pas d'un rôle de son —
         // même cascade que audibleRange/panSaturation ci-dessus (pas de
         // `sound` en 3e paramètre, jamais surchargées par descripteur de
@@ -821,7 +821,7 @@ function buildEntitySoundEntry(entity, session, { otherFace = false, disableStag
       }
     : {};
 
-  // muteOnConsumed (voir entities/model.md/"Collectible persistant",
+  // muteOnConsumed (voir doc/entity-model.md/"Collectible persistant",
   // entities/types/crate.js) : registre SEULEMENT, jamais cascadé par
   // instance (comme `sounds`, contrairement à consumedDescriptionKey qui,
   // lui, est baké par core/scene.js) — effet POST-ACTIVATION "beacon
@@ -864,7 +864,7 @@ function buildEntitySoundEntry(entity, session, { otherFace = false, disableStag
       // TOUTE balise continue nouvellement créée ici (montage de scène OU
       // apparition tardive groupée, voir syncNewEntitySounds), jamais
       // seulement si "plusieurs à la fois" sont détectées (voir
-      // entities/model.md) : un délai isolé de quelques dizaines de ms est
+      // doc/entity-model.md) : un délai isolé de quelques dizaines de ms est
       // imperceptible. disableStagger (voir crossfadeFaceSwap plus bas) :
       // EXCEPTION — une balise TEMPORAIRE de croisement doit jouer
       // IMMÉDIATEMENT (elle a besoin d'un volume/cutoff imposés dès sa
@@ -897,7 +897,7 @@ function buildEntitySoundEntry(entity, session, { otherFace = false, disableStag
   }
 
   // vocal : TOUJOURS intermittent (aucun mode continu pour ce rôle, voir
-  // entities/model.md) — même mécanisme que le beacon intermittent
+  // doc/entity-model.md) — même mécanisme que le beacon intermittent
   // ci-dessus, juste une deuxième source dans le même tableau.
   if (vocal) {
     const source = resolveIntermittentSource(entity, vocal, VOCAL_TUNING_KEYS);
@@ -1400,7 +1400,7 @@ export function createCityAudioScene(getSession, { handover = null } = {}) {
   // destroy({ handover: true }), arrêtées par un destroy() ordinaire.
   const crossfadeTemporaries = new Map();
   // Ids d'entités dont le beacon a déjà été explicitement arrêté suite à
-  // leur passage à consumed (voir entities/model.md/"Collectible
+  // leur passage à consumed (voir doc/entity-model.md/"Collectible
   // persistant", muteConsumedBeacons plus bas) — même principe que
   // removedEntityIds : un seul sound.stop() par entité, jamais répété.
   // DISTINCT de removedEntityIds : une entité consumed reste dans
@@ -1824,7 +1824,7 @@ export function createCityAudioScene(getSession, { handover = null } = {}) {
   }
 
   // Son de déplacement des entités mobiles (rôle "movement", voir
-  // entities/model.md) — dormant pour toute entité sans ce rôle
+  // doc/entity-model.md) — dormant pour toute entité sans ce rôle
   // (movementPath absent, voir entitySounds). MÊME mécanisme UNIFIÉ que le
   // pas du joueur (voir stepWalker) : chaque entité porte son propre
   // entry.walker, déclenché exactement pareil — un pas de démarrage à la
@@ -1961,7 +1961,7 @@ export function createCityAudioScene(getSession, { handover = null } = {}) {
   }
 
   // Beacon mis en SOURDINE, PERMANEMMENT, dès qu'une entité passe consumed
-  // (voir entities/model.md/"Collectible persistant") — SEULEMENT si son
+  // (voir doc/entity-model.md/"Collectible persistant") — SEULEMENT si son
   // type déclare muteOnConsumed:true (registre, voir entities/types/
   // crate.js). DISTINCT de cleanupRemovedEntities ci-dessus : l'entité
   // RESTE dans world.entities (jamais retirée) — elle reste observable/
@@ -2055,7 +2055,7 @@ export function createCityAudioScene(getSession, { handover = null } = {}) {
     const { pan, volume, cutoff } = spatialRendering(entry, relX, muffle);
     sound.update(pan, volume * beaconFactor * beaconGain * flyingVolumeFactor);
     sound.setCutoff(cutoff);
-    // Passe-haut "hauteur suggérée" (voir entities/model.md, isFlying) :
+    // Passe-haut "hauteur suggérée" (voir doc/entity-model.md, isFlying) :
     // EN PLUS du passe-bas ci-dessus, jamais à sa place — setHighpass
     // n'est appelé QUE pour une entité isFlying (flyingHighpassHz reste
     // undefined sinon), aucune autre entité n'y touche jamais.
@@ -2332,7 +2332,7 @@ export function createCityAudioScene(getSession, { handover = null } = {}) {
   // Espace, "activate" -> Entrée) : sous-ensemble FILTRÉ de la dernière
   // occupation calculée en update() — même portée (interactRange), même tri,
   // mais restreint aux entités qui portent la capacité de CE verbe
-  // (observable/interactable, voir core/scene.js et entities/model.md). Une
+  // (observable/interactable, voir core/scene.js et doc/entity-model.md). Une
   // entité à portée sans la capacité voulue n'est simplement jamais dans le
   // résultat — c'est ce filtre, PAS la désambiguïsation, qui décide si un
   // verbe a quelque chose à faire ici (voir view/interaction.js/

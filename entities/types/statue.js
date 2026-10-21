@@ -1,5 +1,5 @@
 // Archétype "statue" — voir entities/types/index.js pour le registre complet
-// et entities/model.md pour le vocabulaire du modèle d'entité. Donnée pure :
+// et doc/entity-model.md pour le vocabulaire du modèle d'entité. Donnée pure :
 // aucun import.
 //
 // Générique par nature (comme door.js) : nameKey/descriptionKey restent des

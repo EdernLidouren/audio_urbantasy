@@ -12,7 +12,7 @@ import { makeMenuScreen, configureMenuPreferences, configureMenuSounds } from ".
 import { playMenuSound } from "./view/menu-sounds.js";
 import { makeCityScreen } from "./view/city-screen.js";
 import { t } from "./data/i18n/index.js";
-import { runMovementChecks } from "./core/movement.check.js";
+import { runChecks } from "./core/checks/index.js";
 import { isDebugEnabled, setDebugEnabled } from "./config/debug.js";
 import { startLoop } from "./lib/loop.js";
 import { loadScene, loadSceneById } from "./scenes/load.js";
@@ -36,14 +36,15 @@ configureMenuPreferences({ getPref, setPref });
 configureMenuSounds(playMenuSound);
 
 // Un import n'expose rien au scope global : on l'attache explicitement à
-// window pour pouvoir appeler runMovementChecks() depuis la console. Un
+// window pour pouvoir appeler runChecks() depuis la console (voir
+// core/checks/index.js : runChecks("spawn") pour un seul domaine). Un
 // script type="module" s'exécute après le parsing du DOM (comme s'il avait
 // "defer"), donc le DOM est déjà prêt ici.
-window.runMovementChecks = runMovementChecks;
-console.log("Vérifs dispo : tape runMovementChecks()");
+window.runChecks = runChecks;
+console.log("Vérifs dispo : tape runChecks()");
 
 // Mode DEBUG (voir config/debug.js) : PAS de menu — bascule DEPUIS LA
-// CONSOLE (window.toggleDebug, comme runMovementChecks ci-dessus) OU par la
+// CONSOLE (window.toggleDebug, comme runChecks ci-dessus) OU par la
 // combinaison Ctrl+D EN JEU (voir onGlobalPress plus bas, lib/input.js) —
 // deux chemins, UNE seule fonction, jamais deux logiques à maintenir.
 // Expose la touche de debug "e" en ville (voir view/city-screen.js) une

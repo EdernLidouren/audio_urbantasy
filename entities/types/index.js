@@ -5,7 +5,7 @@
 // l'entité parsée) puis exploité par core/reduce.js pour arrêter le joueur
 // au bord du corps d'une entité bloquante (voir BODY_RADIUS, uniforme pour
 // l'instant). observable/interactable (système d'interaction niveau 0, voir
-// view/interaction.js et entities/model.md) sont bakés de la même façon,
+// view/interaction.js et doc/entity-model.md) sont bakés de la même façon,
 // cascade instance -> type -> défaut (false), et filtrent les candidats PAR
 // VERBE (view/audio/city-scene.js/getInteractionCandidates).
 // La vue lit sounds/nameKey/collisionSound pour le rendu audio et les
@@ -24,7 +24,7 @@
 // identique à celle de nameKey (résolue dans core/scene.js).
 //
 // sounds regroupe les descripteurs de son du type PAR RÔLE (voir
-// entities/model.md pour le vocabulaire complet et la liste des paramètres
+// doc/entity-model.md pour le vocabulaire complet et la liste des paramètres
 // sonores résolus en cascade — beaconMode, vocalInterval, pitchVariation,
 // les gains propres par source...). `beacon` (LOCALISATION, continue ou
 // intermittente), `vocal` (EXPRESSION, toujours intermittente, voir dog.js/
@@ -40,12 +40,12 @@
 // beaconGain/vocalGain/movementGain, beaconMode, pitchVariation...) vivent
 // plutôt à l'intérieur du descripteur de son concerné (ex.
 // sounds.beacon.beaconMode) — les deux emplacements participent à la MÊME
-// cascade (voir entities/model.md), aucune logique de résolution ici,
+// cascade (voir doc/entity-model.md), aucune logique de résolution ici,
 // seulement la donnée.
 //
 // Les archétypes sont des PRESETS de
 // propriétés — des objets plats indépendants, jamais une hiérarchie ni de
-// l'héritage : voir entities/model.md. Aucun n'a de `behavior` par défaut
+// l'héritage : voir doc/entity-model.md. Aucun n'a de `behavior` par défaut
 // (voir dog.js) : le comportement se déclare toujours à l'instance.
 
 import apple from "./apple.js";

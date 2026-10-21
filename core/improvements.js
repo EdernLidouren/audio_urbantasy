@@ -32,7 +32,7 @@ export const IMPROVEMENT_REGISTRY = {
 
 // Ordres présents, entiers >= 1 et uniques — sinon une erreur claire à
 // l'import, jamais un onglet mal numéroté en silence. Exportée pour les
-// checks terminal (core/movement.check.js).
+// checks terminal (core/checks/improvements.check.js).
 export function validateImprovementRegistry(registry) {
   const seen = new Map();
   for (const [id, props] of Object.entries(registry)) {

@@ -1,5 +1,5 @@
 // Descripteur de contenu du joueur. Le joueur suit le même modèle de sons
-// que les entités (voir entities/model.md), mais reste l'AUDITEUR : il
+// que les entités (voir doc/entity-model.md), mais reste l'AUDITEUR : il
 // n'entre jamais dans scene.entities, aucune voix positionnée n'est créée
 // pour lui. Sa position vient de session.player.x, pas d'une instance de
 // scène — il n'a donc ni id, ni type, ni x ici, seulement ses sons.
@@ -8,7 +8,7 @@
 // c'est city-scene.js qui le rejoue à la cadence de marche (STEP_DISTANCE) —
 // ce n'est pas une boucle Web Audio native, même si la marche elle-même est
 // continue. path pointe sur le pool "shoes_walk" — repli "son propre" du
-// joueur (voir entities/model.md, "Surfaces de sol et son de pas"),
+// joueur (voir doc/entity-model.md, "Surfaces de sol et son de pas"),
 // STRUCTURELLEMENT nécessaire mais jamais atteint en pratique aujourd'hui :
 // le gait dérivé (voir plus bas) résout TOUJOURS un pool réel
 // (barefoot/shoes/boots existent tous), le filet ne servirait que si l'un
@@ -22,7 +22,7 @@
 // change donc le pas SUIVANT automatiquement, sans notification ni code de
 // synchro — c'est tout l'intérêt de dériver plutôt que de stocker. Sur sol
 // SPÉCIAL (ex. sable), le sol domine de toute façon et ce gait est ignoré
-// (voir entities/model.md, "Surfaces de sol et son de pas").
+// (voir doc/entity-model.md, "Surfaces de sol et son de pas").
 export default {
   sounds: {
     movement: { path: "assets/sounds/footsteps/gaits/shoes_walk", loop: false },

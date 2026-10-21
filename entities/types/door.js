@@ -1,4 +1,4 @@
-// Archétype "door" — voir entities/model.md pour le vocabulaire du modèle
+// Archétype "door" — voir doc/entity-model.md pour le vocabulaire du modèle
 // d'entité (sounds, cascade) et entities/types/index.js pour le registre
 // complet. Donnée pure : aucun import, importable par le core comme par la
 // vue.
@@ -27,7 +27,7 @@ export default {
   blocksMovement: false,
   observable: true,
   interactable: true,
-  // Surlignage audio de proximité (voir entities/model.md, "Surlignage
+  // Surlignage audio de proximité (voir doc/entity-model.md, "Surlignage
   // audio de proximité") : une porte se repère nettement une fois à portée.
   highlight: true,
 };

@@ -135,4 +135,4 @@ sans annonce de découverte.
 2. Ses objets dans `core/items.js` s'ils n'existent pas.
 3. Ses textes dans `collections.json`, dans les deux langues.
 
-Vérifications : `core/movement.check.js`, section « Collections ».
+Vérifications : `core/checks/collections.check.js` (`runChecks("collections")`).

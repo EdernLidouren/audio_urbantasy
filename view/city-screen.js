@@ -231,7 +231,7 @@ function resolveEphemeralSpec(type, overrides = {}) {
 const EPHEMERAL_COIN_SPEC = resolveEphemeralSpec("money");
 
 // Résout le spec ÉPHÉMÈRE d'un objet du SAC posé au sol ("Poser", voir
-// view/menus/inventory-menu.js/setDropItemHandler ; entities/model.md/"Sac
+// view/menus/inventory-menu.js/setDropItemHandler ; doc/entity-model.md/"Sac
 // d'objets") — DEUX cas selon que `type` (une clé de core/items.js/
 // ITEM_REGISTRY, ex. "apple"/"key_bronze") possède ou non son PROPRE
 // archétype d'entité dans le registre (convention : même clé, voir
@@ -732,7 +732,7 @@ export function makeCityScreen(getSession, setSession) {
   }
 
   // Effet d'ÉTAT du ramassage vers le SAC (voir view/interaction.js/
-  // ACTION_HANDLERS.pickup, action.item ; entities/model.md/"Sac
+  // ACTION_HANDLERS.pickup, action.item ; doc/entity-model.md/"Sac
   // d'objets") : objet + retrait de l'entité, core pur
   // (core/bag.js/pickupItemEntity) — même patron que pickupEntityEffect
   // ci-dessus, mais écrit dans session.bag plutôt que session.money.
@@ -741,7 +741,7 @@ export function makeCityScreen(getSession, setSession) {
   }
 
   // Effet d'ÉTAT du "loot" (voir view/interaction.js/ACTION_HANDLERS.loot ;
-  // entities/model.md/"Collectible persistant") : argent + entity.consumed,
+  // doc/entity-model.md/"Collectible persistant") : argent + entity.consumed,
   // core pur (core/money.js/lootEntity) — même patron que
   // pickupEntityEffect ci-dessus (`amount` déjà extrait, même raison), mais
   // l'entité N'EST JAMAIS retirée.
@@ -756,7 +756,7 @@ export function makeCityScreen(getSession, setSession) {
   }
 
   // Effet d'ÉTAT du "loot à spawn" (voir view/interaction.js/
-  // ACTION_HANDLERS.loot, action.spawn ; entities/model.md/"Entités
+  // ACTION_HANDLERS.loot, action.spawn ; doc/entity-model.md/"Entités
   // éphémères") : entity.consumed + N entités éphémères ÉPARPILLÉES, core
   // pur (core/money.js/lootEntitySpawn) — même patron que lootEntityEffect
   // ci-dessus, mais `spec` doit d'abord être RÉSOLU (spawn.spec est minimal,
@@ -781,7 +781,7 @@ export function makeCityScreen(getSession, setSession) {
   }
 
   // Effet d'ÉTAT du "Poser" (voir view/menus/inventory-menu.js/
-  // setDropItemHandler ; entities/model.md/"Sac d'objets") : retire `count`
+  // setDropItemHandler ; doc/entity-model.md/"Sac d'objets") : retire `count`
   // exemplaire(s) du sac ET fait apparaître une entité éphémère au sol,
   // core pur (core/bag.js/dropItem) — même patron que les effets ci-dessus.
   // `spec` résolu ICI (resolveDroppedItemSpec plus haut) : le menu
@@ -794,7 +794,7 @@ export function makeCityScreen(getSession, setSession) {
   }
 
   // Effet d'ÉTAT du "Équiper" (voir view/menus/inventory-menu.js/
-  // setEquipItemHandler ; core/equipment.js/equipItem, entities/model.md/
+  // setEquipItemHandler ; core/equipment.js/equipItem, doc/entity-model.md/
   // "Équipement") : retire l'objet du sac, l'ÉCHANGE au slot correspondant
   // (l'ancien occupant, s'il y en a un, revient au sac) — core pur, même
   // patron que les effets ci-dessus.

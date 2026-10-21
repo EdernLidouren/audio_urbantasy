@@ -678,7 +678,7 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
     : carried.descriptionKey ?? registry[type].descriptionKey;
   // consumedDescriptionKey : même cascade instance -> type que
   // descriptionKey ci-dessus — description ALTERNATIVE une fois l'entité
-  // "consumed" (voir core/state.js/markConsumed, entities/model.md/
+  // "consumed" (voir core/state.js/markConsumed, doc/entity-model.md/
   // "Collectible persistant"). TRANSPORT pur, comme descriptionKey : le
   // core ignore tout du sens de "consumed" en dehors de sa propre condition
   // de présence (core/presence.js) — c'est view/interaction.js qui choisit
@@ -716,7 +716,7 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
   // (pas d'axe Y, pas de position verticale). Lu UNIQUEMENT par la vue
   // (view/audio/city-scene.js) pour déclencher une chaîne de filtres qui
   // SUGGÈRE la hauteur — voir config/tuning-values.js/flyingHighpassHz et
-  // consorts, entities/model.md.
+  // consorts, doc/entity-model.md.
   if (isFlying !== undefined && typeof isFlying !== "boolean") {
     fail(`entities[${index}] ("${id}") : isFlying doit être un booléen si présent.`);
   }
@@ -754,7 +754,7 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
   };
   // Clé ajoutée SEULEMENT si résolue (jamais explicitement undefined) :
   // l'état doit rester de la donnée pure, un aller-retour JSON ne doit rien
-  // changer à sa forme (voir movement.check.js, audit de sérialisabilité).
+  // changer à sa forme (voir core/checks/save.check.js, audit de sérialisabilité).
   // Même principe que behavior/action plus bas.
   if (resolvedDescriptionKey !== undefined) {
     entity.descriptionKey = resolvedDescriptionKey;
@@ -862,7 +862,7 @@ function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables
   // jamais interprété ici. Le core ignore tout du SENS de ces clés (sonore
   // ou non) : il se contente de les porter jusqu'à l'entité parsée, palier
   // le plus spécifique après le descripteur de son lui-même (voir
-  // entities/model.md). Aucune clé nommée en dur — ajouter demain un
+  // doc/entity-model.md). Aucune clé nommée en dur — ajouter demain un
   // nouveau paramètre résolu en cascade (config/tuning-values.js) le rend
   // automatiquement surchargeable ici, sans jamais rouvrir ce fichier.
   // Même statut que music/ambiences/reverbDurationSec/reverbDecay plus bas
@@ -1250,7 +1250,7 @@ function parseFace(raw, length, registry, describe, sceneVariables) {
   };
   // Clés ajoutées SEULEMENT si présentes (jamais explicitement undefined) :
   // l'état doit rester de la donnée pure, un aller-retour JSON ne doit rien
-  // changer à sa forme (voir movement.check.js, audit de sérialisabilité).
+  // changer à sa forme (voir core/checks/save.check.js, audit de sérialisabilité).
   if (music !== undefined) face.music = music;
   if (musicDay !== undefined) face.musicDay = musicDay;
   if (musicNight !== undefined) face.musicNight = musicNight;

@@ -1,0 +1,242 @@
+// Vérifications du core — domaine « entities ». Modèle d'entité : capacités
+// d'interaction, isFlying, cascade des sons, beacon conditionnel. Lancées par
+// core/checks/index.js/runChecks (voir ce fichier). Pur : aucun DOM, aucun
+// fetch ; chaque scène est construite en dur via un objet littéral passé à
+// parseScene.
+
+import { parseScene } from "../scene.js";
+import { createInitialState, getActiveWorld, applyEntityActionEffects } from "../state.js";
+import { evaluateCondition } from "../presence.js";
+import { throws } from "../../lib/check.js";
+import { NO_COMPANIONS, expectSceneParseThrows } from "./helpers.js";
+
+export default function checkEntities(run) {
+  // --- Interaction niveau 0 : capacités observable/interactable ---
+  // Cascade IDENTIQUE à blocksMovement (instance -> type -> défaut false),
+  // voir core/scene.js. Le filtrage par verbe et la désambiguïsation restent
+  // côté vue (view/audio/city-scene.js, view/interaction.js), hors de portée
+  // d'un check terminal — seule la RÉSOLUTION de ces deux champs est
+  // vérifiable ici.
+
+  const INTERACTION_REGISTRY = {
+    describable: { nameKey: "entity.dog.name", observable: true, interactable: false },
+    actionable: { nameKey: "entity.dog.name", observable: false, interactable: true },
+    plain: { nameKey: "entity.dog.name" }, // ni l'un ni l'autre déclaré -> défaut false/false
+  };
+
+  const interactionScene = parseScene(
+    {
+      id: "movement-check-interaction",
+      titleKey: "scene.demo.name",
+      length: 20,
+      playerStart: 0,
+      entities: [
+        { id: "e-describable", type: "describable", x: 5 },
+        { id: "e-actionable", type: "actionable", x: 6 },
+        { id: "e-plain", type: "plain", x: 7 },
+        { id: "e-both", type: "describable", x: 8, interactable: true }, // surcharge d'instance
+        { id: "e-neither", type: "actionable", x: 9, interactable: false }, // idem, désactive le défaut du type
+      ],
+    },
+    INTERACTION_REGISTRY
+  );
+  function interactionEntity(id) {
+    return interactionScene.entities.find((e) => e.id === id);
+  }
+
+  run("interaction : défaut du type — observable hérité", true, interactionEntity("e-describable").observable);
+  run("interaction : défaut du type — interactable hérité (false)", false, interactionEntity("e-describable").interactable);
+  run("interaction : défaut du type — interactable hérité (true)", true, interactionEntity("e-actionable").interactable);
+  run("interaction : aucun des deux déclaré -> observable false par défaut", false, interactionEntity("e-plain").observable);
+  run("interaction : aucun des deux déclaré -> interactable false par défaut", false, interactionEntity("e-plain").interactable);
+
+  // Les QUATRE combinaisons sont valides — surcharge d'instance testée dans
+  // les deux sens (active un défaut à false, désactive un défaut à true).
+  run("interaction : les deux capacités (surcharge d'instance)", true, interactionEntity("e-both").observable && interactionEntity("e-both").interactable);
+  run(
+    "interaction : ni l'une ni l'autre (surcharge d'instance désactive le défaut du type)",
+    true,
+    !interactionEntity("e-neither").observable && !interactionEntity("e-neither").interactable
+  );
+
+  // Validation au chargement : type invalide -> échec clair, même politique
+  // que blocksMovement.
+  function expectInteractionRejected(field, value) {
+    return throws(() => {
+      parseScene(
+        { id: "movement-check-interaction-invalid", titleKey: "scene.demo.name", length: 10, playerStart: 0, entities: [{ id: "bad", type: "plain", x: 5, [field]: value }] },
+        INTERACTION_REGISTRY
+      );
+    });
+  }
+  run("interaction : observable non booléen rejeté", true, expectInteractionRejected("observable", "oui"));
+  run("interaction : interactable non booléen rejeté", true, expectInteractionRejected("interactable", "oui"));
+
+  // --- isFlying : marqueur PUR (voir doc/entity-model.md), même cascade
+  // EXACTE que observable/interactable ci-dessus (instance -> type -> défaut
+  // false) — le core ne connaît rien du SENS de ce champ (chaîne de filtres
+  // audio, entièrement côté vue, hors de portée d'un check terminal), il ne
+  // fait que le résoudre et le transporter, comme les deux autres.
+
+  const FLYING_REGISTRY = {
+    winged: { nameKey: "entity.bird.name", isFlying: true },
+    grounded: { nameKey: "entity.dog.name" }, // non déclaré -> défaut false
+  };
+  const flyingScene = parseScene(
+    {
+      id: "movement-check-flying",
+      titleKey: "scene.demo.name",
+      length: 20,
+      playerStart: 0,
+      entities: [
+        { id: "e-winged", type: "winged", x: 5 },
+        { id: "e-grounded", type: "grounded", x: 6 },
+        { id: "e-override-true", type: "grounded", x: 7, isFlying: true }, // surcharge d'instance
+        { id: "e-override-false", type: "winged", x: 8, isFlying: false }, // idem, désactive le défaut du type
+      ],
+    },
+    FLYING_REGISTRY
+  );
+  function flyingEntity(id) {
+    return flyingScene.entities.find((e) => e.id === id);
+  }
+  run("isFlying : défaut du type — hérité (true)", true, flyingEntity("e-winged").isFlying);
+  run("isFlying : non déclaré -> false par défaut", false, flyingEntity("e-grounded").isFlying);
+  run("isFlying : surcharge d'instance (true sur un type qui ne le déclare pas)", true, flyingEntity("e-override-true").isFlying);
+  run("isFlying : surcharge d'instance (désactive le défaut du type)", false, flyingEntity("e-override-false").isFlying);
+
+  const invalidFlyingRejected = throws(() => {
+    parseScene(
+      { id: "movement-check-flying-invalid", titleKey: "scene.demo.name", length: 10, playerStart: 0, entities: [{ id: "bad", type: "grounded", x: 5, isFlying: "oui" }] },
+      FLYING_REGISTRY
+    );
+  });
+  run("isFlying : non booléen rejeté", true, invalidFlyingRejected);
+
+  // --- sounds : cascade instance -> archétype PAR FUSION PROFONDE (voir
+  // doc/entity-model.md/"Cascade de sounds") — SEUL champ cascadé ainsi,
+  // TROIS états : absent -> hérite, objet -> fusionne (récursif), null ->
+  // retire ce palier. entity.sounds toujours un objet en sortie.
+  const SOUNDS_REGISTRY = {
+    withSounds: {
+      nameKey: "entity.dog.name",
+      sounds: {
+        beacon: { path: "assets/sounds/a", gain: 0.5, reverbSend: 0.5 },
+        vocal: { path: "assets/sounds/b", pitchVariation: 0.1 },
+      },
+    },
+    noSounds: { nameKey: "entity.dog.name" }, // archétype sans sounds du tout
+  };
+  const soundsScene = parseScene(
+    {
+      id: "movement-check-sounds",
+      titleKey: "scene.demo.name",
+      length: 20,
+      playerStart: 0,
+      entities: [
+        { id: "e-inherit", type: "withSounds", x: 1 }, // absent -> hérite tout
+        { id: "e-merge-field", type: "withSounds", x: 2, sounds: { beacon: { gain: 0.8 } } }, // objet -> fusionne
+        { id: "e-remove-role", type: "withSounds", x: 3, sounds: { beacon: null } }, // null -> retire
+        { id: "e-replace-path", type: "withSounds", x: 4, sounds: { beacon: { path: "assets/sounds/c" } } },
+        { id: "e-add-role", type: "noSounds", x: 5, sounds: { vocal: { path: "assets/sounds/d" } } }, // archétype vide -> objet neuf
+        { id: "e-remove-all", type: "withSounds", x: 6, sounds: null }, // null au sommet -> retire tout
+        { id: "e-no-archetype-no-instance", type: "noSounds", x: 7 }, // ni l'un ni l'autre -> {}
+      ],
+    },
+    SOUNDS_REGISTRY
+  );
+  function soundsEntity(id) {
+    return soundsScene.entities.find((e) => e.id === id);
+  }
+  run("sounds : instance sans déclaration -> hérite tout de l'archétype", true, JSON.stringify(soundsEntity("e-inherit").sounds) === JSON.stringify(SOUNDS_REGISTRY.withSounds.sounds));
+  run("sounds : fusion — champ surchargé", 0.8, soundsEntity("e-merge-field").sounds.beacon.gain);
+  run("sounds : fusion — reste du rôle hérité (path)", "assets/sounds/a", soundsEntity("e-merge-field").sounds.beacon.path);
+  run("sounds : fusion — reste du rôle hérité (reverbSend)", 0.5, soundsEntity("e-merge-field").sounds.beacon.reverbSend);
+  run("sounds : fusion — autre rôle (vocal) inchangé", "assets/sounds/b", soundsEntity("e-merge-field").sounds.vocal.path);
+  run("sounds : null retire le rôle ciblé", undefined, soundsEntity("e-remove-role").sounds.beacon);
+  run("sounds : null sur un rôle n'affecte pas les autres rôles", "assets/sounds/b", soundsEntity("e-remove-role").sounds.vocal.path);
+  run("sounds : valeur terminale (path) remplacée, jamais fusionnée", "assets/sounds/c", soundsEntity("e-replace-path").sounds.beacon.path);
+  run("sounds : archétype sans ce rôle -> objet d'instance pris tel quel", "assets/sounds/d", soundsEntity("e-add-role").sounds.vocal.path);
+  run("sounds : null au sommet retire tout (objet vide)", 0, Object.keys(soundsEntity("e-remove-all").sounds).length);
+  run("sounds : ni archétype ni instance -> objet vide, jamais undefined", true, typeof soundsEntity("e-no-archetype-no-instance").sounds === "object" && soundsEntity("e-no-archetype-no-instance").sounds !== null);
+  run.same("sounds : résolu toujours sérialisable (round-trip JSON identique)", soundsEntity("e-merge-field").sounds, JSON.parse(JSON.stringify(soundsEntity("e-merge-field").sounds)));
+
+  const invalidSoundsRejected = throws(() => {
+    parseScene(
+      { id: "movement-check-sounds-invalid", titleKey: "scene.demo.name", length: 10, playerStart: 0, entities: [{ id: "bad", type: "withSounds", x: 5, sounds: "oui" }] },
+      SOUNDS_REGISTRY
+    );
+  });
+  run("sounds : type invalide (ni objet ni null) rejeté", true, invalidSoundsRejected);
+
+  // action : TRANSPORT générique, cascade instance -> type (comme
+  // behavior/presence) — le core valide la FORME (objet, kind non vide),
+  // jamais le kind lui-même contre un registre (ça reste entièrement côté
+  // vue, voir view/interaction.js/ACTION_HANDLERS) : un kind qu'AUCUN
+  // gestionnaire ne reconnaît encore charge sans erreur, se dégradera
+  // proprement à l'INTERACTION, pas au chargement.
+  const ACTION_REGISTRY = {
+    withDefault: { nameKey: "entity.dog.name", interactable: true, action: { kind: "pickup", amount: 5 } },
+    plain: { nameKey: "entity.dog.name" },
+  };
+  const actionScene = parseScene(
+    {
+      id: "movement-check-action",
+      titleKey: "scene.demo.name",
+      length: 20,
+      playerStart: 0,
+      entities: [
+        { id: "e-default", type: "withDefault", x: 5 },
+        { id: "e-override", type: "withDefault", x: 6, action: { kind: "pickup", amount: 99 } },
+        { id: "e-no-action", type: "plain", x: 7 },
+        { id: "e-unknown-kind", type: "plain", x: 8, action: { kind: "fly-away" } },
+      ],
+    },
+    ACTION_REGISTRY
+  );
+  function actionEntity(id) {
+    return actionScene.entities.find((e) => e.id === id);
+  }
+  run.same("action : défaut du type hérité", { kind: "pickup", amount: 5 }, actionEntity("e-default").action);
+  run.same(
+    "action : surcharge d'instance REMPLACE (pas de fusion), amount du type ignoré",
+    { kind: "pickup", amount: 99 },
+    actionEntity("e-override").action
+  );
+  run("action : absente si ni l'instance ni le type n'en fournissent", undefined, actionEntity("e-no-action").action);
+  run(
+    "action : un kind INCONNU du registre de vue charge sans erreur (transport pur, voir header)",
+    "fly-away",
+    actionEntity("e-unknown-kind").action.kind
+  );
+
+  run("action : non-objet rejeté au chargement", true, expectInteractionRejected("action", "pickup"));
+  run("action : kind manquant rejeté au chargement", true, expectInteractionRejected("action", {}));
+  run("action : kind vide rejeté au chargement", true, expectInteractionRejected("action", { kind: "" }));
+
+  // --- Beacon conditionnel (sounds.beacon.condition, core/scene.js) :
+  // validé au chargement comme une condition d'action, une condition
+  // d'instance REMPLACE celle de l'archétype, et la condition se lit contre
+  // les variables COURANTES de l'entité (évaluation côté vue). ---
+  const IS_ON = { type: "variable", scope: "entity", name: "isOn", equals: true };
+  const BEACON_COND_REGISTRY = {
+    projector: { nameKey: "entity.video_projector.name", sounds: { beacon: { path: "assets/sounds/furniture/video_projector_1_beacon", loop: true, condition: IS_ON } } },
+  };
+  const IS_ON_VARIABLE = [{ name: "isOn", type: "flag", initial: true, persistent: true }];
+  const beaconCondScene = (entity) => ({ id: "movement-check-beacon-condition", titleKey: "scene.demo.name", length: 20, playerStart: 0, entities: [{ id: "projector-1", type: "projector", x: 5, ...entity }] });
+  run("beacon conditionnel : variable déclarée -> chargé", false, expectSceneParseThrows(beaconCondScene({ variables: IS_ON_VARIABLE }), BEACON_COND_REGISTRY));
+  run("beacon conditionnel : variable absente de l'instance -> erreur au chargement", true, expectSceneParseThrows(beaconCondScene({}), BEACON_COND_REGISTRY));
+  run("beacon conditionnel : condition mal formée -> erreur au chargement", true, expectSceneParseThrows(beaconCondScene({ variables: IS_ON_VARIABLE, sounds: { beacon: { condition: { type: "nope" } } } }), BEACON_COND_REGISTRY));
+  const nightBeaconScene = parseScene(beaconCondScene({ sounds: { beacon: { condition: { type: "timeRange", from: 20, to: 6 } } } }), BEACON_COND_REGISTRY);
+  run.same(
+    "beacon conditionnel : condition d'instance REMPLACE celle de l'archétype (jamais fusionnée)",
+    { type: "timeRange", from: 20, to: 6 },
+    getActiveWorld(createInitialState(nightBeaconScene, "beacon-cond", NO_COMPANIONS)).entities[0].sounds.beacon.condition
+  );
+  run("beacon conditionnel : registre intact après remplacement", IS_ON, BEACON_COND_REGISTRY.projector.sounds.beacon.condition);
+  let beaconCondState = createInitialState(parseScene(beaconCondScene({ variables: IS_ON_VARIABLE }), BEACON_COND_REGISTRY), "beacon-cond", NO_COMPANIONS);
+  const projectorOf = (state) => getActiveWorld(state).entities.find((e) => e.id === "projector-1");
+  run("beacon conditionnel : allumé au départ -> condition vraie", true, evaluateCondition(projectorOf(beaconCondState).sounds.beacon.condition, { entity: projectorOf(beaconCondState) }));
+  beaconCondState = applyEntityActionEffects(beaconCondState, "projector-1", [{ type: "setVariable", scope: "entity", name: "isOn", value: false }]);
+  run("beacon conditionnel : éteint par effet -> condition fausse", false, evaluateCondition(projectorOf(beaconCondState).sounds.beacon.condition, { entity: projectorOf(beaconCondState) }));
+}

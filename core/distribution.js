@@ -134,7 +134,7 @@ function validateItemsTable(items, describe, fail) {
 
 // Auto-validation des tables STANDARD au chargement du module (voir
 // l'appel plus bas) — EXPORTÉE pour être testable contre une table
-// fabriquée (core/movement.check.js), jamais la vraie.
+// fabriquée (core/checks/spawn.check.js), jamais la vraie.
 export function validateSpawnTables(tables) {
   const fail = (message) => {
     throw new Error(`spawn-values: ${message}`);

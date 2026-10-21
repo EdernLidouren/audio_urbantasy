@@ -1,5 +1,5 @@
 // Archétype "item" — un objet du monde RAMASSABLE VERS LE SAC (voir
-// entities/model.md/"Sac d'objets"), par opposition à "money" (vers
+// doc/entity-model.md/"Sac d'objets"), par opposition à "money" (vers
 // session.money) : action { kind: "pickup", item: <type>, count: <n> },
 // <type> référence une entrée de core/items.js/ITEM_REGISTRY.
 //
@@ -23,7 +23,7 @@ export default {
   blocksMovement: false,
   observable: true,
   interactable: true,
-  // Surlignage audio de proximité (voir entities/model.md) : un objet
+  // Surlignage audio de proximité (voir doc/entity-model.md) : un objet
   // ramassable se repère nettement une fois à portée.
   highlight: true,
 };

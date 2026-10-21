@@ -29,7 +29,7 @@ import { INITIAL_TIME } from "./time.js";
 // référencée existe réellement), PUIS l'ATTEIGNABILITÉ de l'ENSEMBLE
 // (parcours depuis DEFAULT_WEATHER_STATE ; un état jamais visité est un
 // état MORT). Erreur claire et immédiate (throw), jamais une météo
-// bloquée en silence. EXPORTÉE pour que movement.check.js puisse la
+// bloquée en silence. EXPORTÉE pour que core/checks/weather.check.js puisse la
 // vérifier directement contre une table FABRIQUÉE (jamais la vraie, pour
 // tester le rejet sans casser le jeu) ; ce module s'auto-valide aussi
 // contre la vraie table plus bas, dès son chargement.
@@ -106,7 +106,7 @@ validateWeatherStates(WEATHER_STATES);
 // courant — poids relatifs (voir config/weather-values.js), normalisés ICI
 // par leur somme, jamais besoin qu'ils totalisent 100. EXPORTÉE (comme
 // core/state.js/drawScatteredPosition) SEULEMENT pour permettre à
-// core/movement.check.js de vérifier directement l'ÉQUITÉ du tirage
+// core/checks/weather.check.js de vérifier directement l'ÉQUITÉ du tirage
 // pondéré (fréquences observées vs poids déclarés) sans dépendre des
 // valeurs de la VRAIE table ni rejouer toute la mécanique temps/session.
 // Réutilisée TELLE QUELLE par core/distribution.js (tirage d'un
