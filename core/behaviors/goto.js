@@ -24,6 +24,7 @@
 // Aucune duplication nécessaire, ce module s'en sert tel quel.
 
 import { BODY_RADIUS } from "../state.js";
+import { isFiniteNumber, isNonEmptyString } from "../../lib/validate.js";
 
 export const DEFAULTS = {
   // Distance en-deçà de laquelle la cible est considérée ATTEINTE — même
@@ -37,10 +38,6 @@ export const DEFAULTS = {
 // core/parse-common.js/parseBehavior, qui rejette tout autre champ).
 export const PARAMS = ["targetId", "arriveDistance", "speed"];
 
-function isFiniteNumber(value) {
-  return typeof value === "number" && Number.isFinite(value);
-}
-
 // targetId est REQUIS (contrairement à follow.js, qui retombe sur "player"
 // par défaut) : "aller vers" sans cible n'a pas de sens pour ce
 // comportement, une entité oubliant de le préciser doit échouer clairement
@@ -48,7 +45,7 @@ function isFiniteNumber(value) {
 export function parseParams(raw, fail) {
   const { targetId, arriveDistance, speed } = raw;
 
-  if (typeof targetId !== "string" || targetId.trim().length === 0) {
+  if (!isNonEmptyString(targetId)) {
     fail(`behavior.targetId est requis (chaîne non vide) pour "goto".`);
   }
   if (arriveDistance !== undefined && (!isFiniteNumber(arriveDistance) || arriveDistance <= 0)) {

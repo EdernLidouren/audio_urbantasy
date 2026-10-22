@@ -22,6 +22,7 @@
 // s'inverse naturellement au tick suivant, sans code spécial.
 
 import { TUNING_DEFAULTS } from "../../config/tuning-values.js";
+import { isFiniteNumber, isNonEmptyString } from "../../lib/validate.js";
 
 // Distances par défaut : réglages de feeling, dans config/tuning-values.js
 // (follow*), surchargés champ par champ par l'objet `behavior` qui déclare
@@ -39,10 +40,6 @@ export const DEFAULTS = {
 // Champs acceptés dans `behavior` en plus de `kind` (voir
 // core/parse-common.js/parseBehavior, qui rejette tout autre champ).
 export const PARAMS = ["minDistance", "maxDistance", "targetId", "speed"];
-
-function isFiniteNumber(value) {
-  return typeof value === "number" && Number.isFinite(value);
-}
 
 // Valide et ne renvoie QUE les champs présents dans raw — même contrat que
 // wander.js/parseParams : les défauts se résolvent ailleurs (ici, dans
@@ -64,7 +61,7 @@ export function parseParams(raw, fail) {
       `behavior.minDistance (${resolvedMin}) doit être strictement inférieur à behavior.maxDistance (${resolvedMax}).`
     );
   }
-  if (targetId !== undefined && (typeof targetId !== "string" || targetId.trim().length === 0)) {
+  if (targetId !== undefined && !isNonEmptyString(targetId)) {
     fail(`behavior.targetId doit être une chaîne non vide si présent.`);
   }
   if (speed !== undefined && (!isFiniteNumber(speed) || speed <= 0)) {

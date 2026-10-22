@@ -6,18 +6,15 @@
 import BEHAVIORS from "./behaviors/index.js";
 import { rejectUnknownFields as rejectUnknown } from "../lib/validate.js";
 
+// Tests de type partagés par tous les parseurs du core : réexportés depuis
+// lib/validate.js, sans dépendance, que les modules pris dans un cycle avec
+// celui-ci (core/variables.js, core/behaviors/) importent directement.
+export { isNonEmptyString, isFiniteNumber } from "../lib/validate.js";
+
 // Erreur de parsing : préfixe commun à tous les messages de chargement
 // d'une scène (les messages sont testés tels quels, voir core/checks/).
 export function fail(message) {
   throw new Error(`parseScene: ${message}`);
-}
-
-export function isNonEmptyString(value) {
-  return typeof value === "string" && value.trim().length > 0;
-}
-
-export function isFiniteNumber(value) {
-  return typeof value === "number" && Number.isFinite(value);
 }
 
 // Champ inconnu -> erreur (voir lib/validate.js), avec l'erreur de scène par

@@ -30,6 +30,7 @@
 import { nextRandom } from "../rng.js";
 import { TICK_MS } from "../../lib/loop.js";
 import { TUNING_DEFAULTS } from "../../config/tuning-values.js";
+import { isFiniteNumber } from "../../lib/validate.js";
 
 // Durées déclarées en MILLISECONDES, comme tout réglage de durée du projet,
 // puis converties en TICKS (pas fixe du jeu, voir lib/loop.js/TICK_MS) au
@@ -50,10 +51,6 @@ export const DEFAULTS = {
 // Champs acceptés dans `behavior` en plus de `kind` (voir
 // core/parse-common.js/parseBehavior, qui rejette tout autre champ).
 export const PARAMS = ["walkMinMs", "walkMaxMs", "pauseMinMs", "pauseMaxMs", "continueBias", "speed"];
-
-function isFiniteNumber(value) {
-  return typeof value === "number" && Number.isFinite(value);
-}
 
 // Au moins un tick : une durée positive mais plus courte qu'un tick
 // donnerait sinon une phase vide.

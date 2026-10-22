@@ -28,7 +28,7 @@
 // runEffects délègue TOUS les effets d'état ICI, en un seul appel).
 
 import { giveImprovement, removeImprovement } from "./improvements.js";
-import { rejectUnknownFields } from "../lib/validate.js";
+import { isNonEmptyString, rejectUnknownFields } from "../lib/validate.js";
 
 export const VARIABLE_TYPES = ["flag", "int"];
 
@@ -36,13 +36,6 @@ export const VARIABLE_TYPES = ["flag", "int"];
 // stables (vocabulaire de l'API), distincts des mots français "entité/
 // scène/partie" utilisés en documentation/commentaires.
 export const VARIABLE_SCOPES = ["entity", "scene", "party"];
-
-// Même test que core/parse-common.js/isNonEmptyString, recopié à dessein :
-// importer parse-common ici créerait un cycle d'imports (parse-common ->
-// comportements -> state -> presence -> variables).
-function isNonEmptyString(value) {
-  return typeof value === "string" && value.trim().length > 0;
-}
 
 // Une VALEUR est cohérente avec un TYPE si : "flag" -> booléen strict ;
 // "int" -> nombre ENTIER strict (jamais un flottant, jamais une chaîne
