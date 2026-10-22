@@ -35,3 +35,8 @@ const DOMAINS = [
 const [fr, en] = await Promise.all([loadLocale("data/i18n/fr", DOMAINS), loadLocale("data/i18n/en", DOMAINS)]);
 
 export const { t, hasKey, setLocale, getLocale, availableLocales } = createI18n({ fr, en });
+
+// Tables brutes par langue, en LECTURE pour les outils de dev qui vérifient
+// une clé langue par langue (tools/content-audit.js) — hasKey, lui, se
+// replie sur la langue par défaut. Le jeu passe toujours par t().
+export const LOCALE_TABLES = { fr, en };

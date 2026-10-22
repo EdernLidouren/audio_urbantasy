@@ -45,6 +45,23 @@ condition/effet/kind/champ met à jour le document du domaine concerné DANS
 LA MÊME tâche, jamais en différé — une doc qui diverge du code est pire que
 son absence.
 
+## Vérifier le contenu
+
+Après une session de contenu (scènes, types d'entité, objets, textes, sons),
+lancer depuis la console du jeu :
+
+```js
+const a = await import("/tools/content-audit.js");
+await a.auditContent();
+```
+
+Charge TOUTES les scènes (une scène n'est sinon chargée qu'à sa première
+visite) et vérifie que chaque clé i18n citée existe en fr et en en, que
+chaque son cité existe dans le manifeste audio, et que chaque scène citée
+(téléportation, carte, départ) existe. Détail et limites : en-tête de
+`tools/content-audit.js`. Complète `runChecks()` (le core) et
+`python tools/check_i18n_parity.py` (la parité fr/en).
+
 ## Principe anti-divergence
 
 Chaque document explique des CONCEPTS et une STRUCTURE stables, illustrés
