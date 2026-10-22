@@ -10,6 +10,7 @@ import { tick } from "../actions.js";
 import { reduce } from "../reduce.js";
 import { resolvePlayerMove } from "../physics/collision.js";
 import { throws } from "../../lib/check.js";
+import { TICK_MS } from "../../lib/loop.js";
 import { NO_COMPANIONS, RAW_SCENE, EMPTY_REGISTRY } from "./helpers.js";
 
 export default function checkMovement(run) {
@@ -81,8 +82,8 @@ export default function checkMovement(run) {
 
   // Conséquence physique : un mobile deux fois plus lent parcourt EXACTEMENT
   // la moitié de la distance sur le même nombre de ticks, à comportement
-  // IDENTIQUE (même seed, marche forcée sans pause ni rebond — walkMin=
-  // walkMax élevé, corridor large pour ne jamais toucher un bord).
+  // IDENTIQUE (même seed, marche forcée sans pause ni rebond — walkMinMs=
+  // walkMaxMs élevé, corridor large pour ne jamais toucher un bord).
   function makeSpeedWanderScene(speed) {
     return parseScene(
       {
@@ -90,7 +91,7 @@ export default function checkMovement(run) {
         titleKey: "scene.demo.name",
         length: 100,
         playerStart: 50,
-        entities: [{ id: "e1", type: "dog", x: 50, speed, behavior: { kind: "wander", walkMin: 1000, walkMax: 1000 } }],
+        entities: [{ id: "e1", type: "dog", x: 50, speed, behavior: { kind: "wander", walkMinMs: 1000 * TICK_MS, walkMaxMs: 1000 * TICK_MS } }],
       },
       SPEED_REGISTRY
     );
@@ -118,7 +119,7 @@ export default function checkMovement(run) {
   // jamais lue par lui (wander.js n'a pas été touché par ce branchement).
   // behavior.speed : PRIME sur entity.speed, même résolution physique.
   function makeBehaviorSpeedScene(entitySpeed, behaviorSpeed) {
-    const behavior = { kind: "wander", walkMin: 1000, walkMax: 1000 };
+    const behavior = { kind: "wander", walkMinMs: 1000 * TICK_MS, walkMaxMs: 1000 * TICK_MS };
     if (behaviorSpeed !== undefined) behavior.speed = behaviorSpeed;
     const entity = { id: "e1", type: "dog", x: 50, speed: entitySpeed, behavior };
     return parseScene({ id: "movement-check-behavior-speed", titleKey: "scene.demo.name", length: 100, playerStart: 50, entities: [entity] }, SPEED_REGISTRY);
@@ -143,7 +144,7 @@ export default function checkMovement(run) {
         titleKey: "scene.demo.name",
         length: 1000,
         playerStart: 500,
-        entities: [{ id: "e1", type: "dog", x: 500, behavior: { kind: "wander", walkMin: 5, walkMax: 5, pauseMin: 3, pauseMax: 3, continueBias } }],
+        entities: [{ id: "e1", type: "dog", x: 500, behavior: { kind: "wander", walkMinMs: 5 * TICK_MS, walkMaxMs: 5 * TICK_MS, pauseMinMs: 3 * TICK_MS, pauseMaxMs: 3 * TICK_MS, continueBias } }],
       },
       SPEED_REGISTRY
     );

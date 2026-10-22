@@ -24,7 +24,9 @@ export function isFiniteNumber(value) {
 // puis délègue la validation propre au comportement à son module (voir
 // core/behaviors/wander.js) — parseParams ne renvoie que les champs fournis,
 // les défauts se résolvent ailleurs (voir le contrat documenté dans le
-// module), jamais ici.
+// module), jamais ici. Un champ hors de la liste PARAMS du module est
+// rejeté, comme pour une action (core/action-kinds.js) : un paramètre mal
+// orthographié retomberait sinon en silence sur son défaut.
 export function parseBehavior(behavior, index, id) {
   if (typeof behavior !== "object" || behavior === null) {
     fail(`entities[${index}] ("${id}") : behavior doit être un objet si présent.`);
@@ -34,6 +36,10 @@ export function parseBehavior(behavior, index, id) {
   const module = BEHAVIORS[kind];
   if (!module) {
     fail(`entities[${index}] ("${id}") : behavior.kind "${kind}" inconnu.`);
+  }
+  const unknown = Object.keys(behavior).filter((field) => field !== "kind" && !module.PARAMS.includes(field));
+  if (unknown.length > 0) {
+    fail(`entities[${index}] ("${id}") : behavior : champ(s) inconnu(s) pour "${kind}" : ${unknown.map((field) => `"${field}"`).join(", ")}.`);
   }
 
   const params = module.parseParams(behavior, (message) => fail(`entities[${index}] ("${id}") : ${message}`));

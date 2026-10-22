@@ -51,14 +51,18 @@ la partie (voir `doc/entity-model.md`/"Mode debug").
 2. **Rebouchage** (`migrateSave`) : tout champ apparu après l'écriture de la
    sauvegarde reçoit un défaut sûr (surfaces, variables, météo,
    améliorations...). La forme reste v1 : compléter n'est pas monter de
-   version.
-3. **Renommages de contenu** (`config/save-renames.js`, voir plus bas).
-   Parmi les rebouchages : `acquiredItems` (objets acquis au moins une fois,
-   voir `doc/collections.md`), reconstitué à partir du sac et de
+   version. Parmi les rebouchages : `acquiredItems` (objets acquis au moins
+   une fois, voir `doc/collections.md`), reconstitué à partir du sac et de
    l'équipement actuels — approximatif, un objet revendu n'y figure plus.
-4. **Plausibilité** : structure minimale (joueur, mondes, monde actif...),
+3. **Renommages de contenu** (`config/save-renames.js`, voir plus bas).
+4. **Champs de contenu au format changé** (voir plus bas) : les durées
+   d'errance figées en ticks (`walkMin`, `walkMax`, `pauseMin`, `pauseMax`)
+   deviennent leurs équivalents en ms (`walkMinMs`...), partout où un
+   comportement `wander` apparaît (champ `behavior`, effets "behavior" des
+   règles). Arrondies pour redonner exactement les mêmes ticks au tirage.
+5. **Plausibilité** : structure minimale (joueur, mondes, monde actif...),
    sinon `reason: "invalid"`.
-5. **Types inconnus**, seulement si un `registry` est fourni (la vue le
+6. **Types inconnus**, seulement si un `registry` est fourni (la vue le
    fournit toujours, le core ne l'importe jamais) : une entité dont le type
    n'existe plus est retirée, et listée dans `droppedEntities`
    (`{ worldId, entityId, type }`, `worldId` null pour un compagnon). On
@@ -125,7 +129,7 @@ export const RENAMED_ASSET_PATHS = {
   changement.
 
 Une **suppression** de type ne demande rien : l'entité disparaît des parties
-existantes au chargement (étape 5).
+existantes au chargement (étape 6).
 
 **Non couvert aujourd'hui** : les ids d'objets du sac et de l'équipement
 (`core/items.js` — un objet renommé est RETIRÉ des sauvegardes, voir plus
@@ -134,5 +138,12 @@ haut), les noms de tables de collecte, de catalogues et d'états météo
 `session.worlds`, cibles de `teleport`). Les renommer casserait les sauvegardes existantes ; une table
 dédiée s'ajoutera le jour où le cas se présente.
 
+**Champ de contenu renommé ou dont l'unité change** (paramètre d'un
+comportement, d'une action...) : aucune table, la conversion s'écrit dans
+`core/save.js`, appelée par `migrateSave` après les renommages, idempotente,
+avec sa vérification. Précédent : `convertWanderTicks` (durées d'errance
+passées des ticks aux ms).
+
 Vérifications : `core/checks/save.check.js` (`runChecks("save")`), sections
-« save renommages », « save références » et « save types inconnus ».
+« save renommages », « save errance », « save références » et « save types
+inconnus ».

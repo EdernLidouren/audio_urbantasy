@@ -21,6 +21,7 @@ import { refillDueSpawns } from "../spawn.js";
 import { shopArticles } from "../trade.js";
 import { DEFAULT_WEATHER_STATE } from "../../config/weather-values.js";
 import { throws, auditNonSerializable, diffStructure } from "../../lib/check.js";
+import { TICK_MS } from "../../lib/loop.js";
 import { NO_COMPANIONS, WORLD_A_REGISTRY, TWO_FACED_RAW_SCENE, createAuditFixture } from "./helpers.js";
 
 export default function checkSave(run) {
@@ -300,6 +301,48 @@ export default function checkSave(run) {
     filteredResult.droppedEntities.map((d) => `${d.worldId}/${d.entityId}:${d.type}`).join(",")
   );
   run("save types inconnus : partie saine -> rien de retiré", 0, deserializeGame(saveEnvelope, { registry: knownTypes }).droppedEntities.length);
+
+  // --- Durées d'errance en ticks (voir core/save.js/convertWanderTicks) ---
+  // Une partie ancienne a figé ses errances en ticks, dans le champ
+  // `behavior` comme dans un effet "behavior" de règle : elles ressortent
+  // en ms, aux valeurs qui redonnent exactement les mêmes ticks au tirage.
+  const legacyWanderer = {
+    id: "legacy-wanderer",
+    type: "dog",
+    x: 3,
+    sounds: {},
+    behavior: { kind: "wander", walkMin: 1300, walkMax: 1600, pauseMin: 30, pauseMax: 90, speed: 2 },
+    presence: [{ when: { type: "arrived" }, effects: [{ type: "behavior", behavior: { kind: "wander", walkMin: 45, pauseMax: 300 } }] }],
+  };
+  const wanderSave = {
+    version: SAVE_VERSION,
+    data: { ...auditSession, worlds: { ...auditSession.worlds, [renameWorldId]: { ...renameWorld, entities: [...renameWorld.entities, legacyWanderer] } } },
+  };
+  const wanderResult = deserializeGame(wanderSave);
+  const migratedWanderer = wanderResult.success
+    ? wanderResult.session.worlds[renameWorldId].entities.find((e) => e.id === "legacy-wanderer")
+    : null;
+  run.same(
+    "save errance : behavior en ticks -> ms, autres champs intacts",
+    { kind: "wander", speed: 2, walkMinMs: 21667, walkMaxMs: 26667, pauseMinMs: 500, pauseMaxMs: 1500 },
+    migratedWanderer && migratedWanderer.behavior
+  );
+  run.same(
+    "save errance : effet behavior d'une règle converti aussi",
+    { kind: "wander", walkMinMs: 750, pauseMaxMs: 5000 },
+    migratedWanderer && migratedWanderer.presence[0].effects[0].behavior
+  );
+  run(
+    "save errance : la conversion redonne exactement les ticks d'origine",
+    "1300,1600,30,90",
+    migratedWanderer &&
+      ["walkMinMs", "walkMaxMs", "pauseMinMs", "pauseMaxMs"].map((key) => Math.round(migratedWanderer.behavior[key] / TICK_MS)).join(",")
+  );
+  run.same(
+    "save errance : idempotente (une partie migrée retraverse inchangée)",
+    wanderResult.session,
+    deserializeGame({ version: SAVE_VERSION, data: wanderResult.session }).session
+  );
 
   // Sauvegarde ANTÉRIEURE à defaultSurface/segments (voir
   // core/scene.js/parseScene) : ses mondes n'ont jamais eu ces clés, et une

@@ -564,11 +564,13 @@ la nuit » s'écrit avec deux objets `behavior` qui portent chacun leur `speed`.
 lu par le comportement lui-même : appliqué à la résolution physique
 (`core/reduce.js`/`resolveIntents`).
 
-`wander` (`core/behaviors/wander.js`, défauts dans `DEFAULTS`) — machine à deux
-phases, durées en TICKS (60 ticks = 1 seconde) :
+`wander` (`core/behaviors/wander.js`) — machine à deux phases, durées en
+MILLISECONDES (nombres `> 0`, min `<=` max), défauts dans
+`config/tuning-values.js` (`wander*`) :
 
-- `walkMin` / `walkMax` : durée d'une marche, tirée dans la fourchette.
-- `pauseMin` / `pauseMax` : durée d'une pause.
+- `walkMinMs` / `walkMaxMs` (défauts 750 / 1500) : durée d'une marche, tirée
+  dans la fourchette.
+- `pauseMinMs` / `pauseMaxMs` (défauts 2000 / 5000) : durée d'une pause.
 - `continueBias` (0 à 1, défaut 0,65) : probabilité de repartir dans la MÊME
   direction après une pause. 0 = demi-tour à chaque pause (garde qui fait les cent
   pas), proche de 1 = ne revient presque jamais sur ses pas (seuls les bords et les
@@ -579,8 +581,16 @@ un ARPENTEUR : des marches plus longues que la traversée de la salle, courtes p
 il parcourt la salle d'un bout à l'autre et fait demi-tour au bord :
 
 ```json
-"behavior": { "kind": "wander", "walkMin": 1300, "walkMax": 1600, "pauseMin": 30, "pauseMax": 90, "speed": 2 }
+"behavior": { "kind": "wander", "walkMinMs": 21667, "walkMaxMs": 26667, "pauseMinMs": 500, "pauseMaxMs": 1500, "speed": 2 }
 ```
+
+Les défauts de `follow` (`minDistance` / `maxDistance`) vivent aussi dans
+`config/tuning-values.js` (`follow*`).
+
+Un champ que le kind ne connaît pas (faute de frappe, paramètre d'un autre
+kind) est REJETÉ au chargement, comme pour une action : il retomberait sinon
+en silence sur son défaut. La liste des champs acceptés est `PARAMS`, dans
+le module de chaque kind.
 
 ### Ajouter un type d'effet
 

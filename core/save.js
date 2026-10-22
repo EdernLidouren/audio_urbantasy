@@ -21,6 +21,7 @@ import { validateDistribution } from "./distribution.js";
 import { validateCatalog } from "./catalog.js";
 import { WEATHER_STATES, DEFAULT_WEATHER_STATE } from "../config/weather-values.js";
 import { RENAMED_ENTITY_TYPES, RENAMED_I18N_KEYS, RENAMED_ASSET_PATHS } from "../config/save-renames.js";
+import { TICK_MS } from "../lib/loop.js";
 
 export const SAVE_VERSION = 1;
 
@@ -54,32 +55,40 @@ const VALUE_RENAMES = {
   ...resolveRenameChains(RENAMED_ASSET_PATHS, "RENAMED_ASSET_PATHS"),
 };
 
-// Remplace, partout dans la donnée, toute VALEUR chaîne exactement égale à
-// une ancienne clé ou à un ancien chemin. Jamais les clés d'objet (noms de
-// variables, ids de mondes) : seules les valeurs portent du contenu
-// renommable. Une branche inchangée garde sa référence.
-function renameValues(value) {
-  if (typeof value === "string") return Object.hasOwn(VALUE_RENAMES, value) ? VALUE_RENAMES[value] : value;
+// Parcourt toute la donnée en profondeur : `visit(value)` reçoit chaque
+// valeur (chaîne, nombre, tableau, objet) APRÈS ses enfants, et renvoie la
+// valeur à garder. Une branche inchangée garde sa référence.
+function mapDeep(value, visit) {
   if (Array.isArray(value)) {
     let changed = false;
     const out = value.map((item) => {
-      const renamed = renameValues(item);
-      if (renamed !== item) changed = true;
-      return renamed;
+      const mapped = mapDeep(item, visit);
+      if (mapped !== item) changed = true;
+      return mapped;
     });
-    return changed ? out : value;
+    return visit(changed ? out : value);
   }
   if (value && typeof value === "object") {
     let changed = false;
     const out = {};
     for (const [key, item] of Object.entries(value)) {
-      const renamed = renameValues(item);
-      if (renamed !== item) changed = true;
-      out[key] = renamed;
+      const mapped = mapDeep(item, visit);
+      if (mapped !== item) changed = true;
+      out[key] = mapped;
     }
-    return changed ? out : value;
+    return visit(changed ? out : value);
   }
-  return value;
+  return visit(value);
+}
+
+// Remplace, partout dans la donnée, toute VALEUR chaîne exactement égale à
+// une ancienne clé ou à un ancien chemin. Jamais les clés d'objet (noms de
+// variables, ids de mondes) : seules les valeurs portent du contenu
+// renommable.
+function renameValues(data) {
+  return mapDeep(data, (value) =>
+    typeof value === "string" && Object.hasOwn(VALUE_RENAMES, value) ? VALUE_RENAMES[value] : value
+  );
 }
 
 // Applique `transform(entities) -> entities` à chaque liste d'entités de la
@@ -132,6 +141,40 @@ function renameEntityTypes(entities) {
 // traverse sans changement.
 function applyContentRenames(data) {
   return renameValues(mapEntityLists(data, renameEntityTypes));
+}
+
+// --- Durées d'errance en ticks (doc/save.md) ----------------------------
+
+// Les durées du comportement "wander" (core/behaviors/wander.js) se
+// déclaraient en ticks ; elles se déclarent en ms. Une sauvegarde fige les
+// comportements de ses mondes (`behavior` d'une entité, effets "behavior"
+// de ses règles) : sans conversion, ces champs seraient ignorés et
+// l'entité retomberait sur les défauts. ms = ticks × TICK_MS, arrondi :
+// le tirage, qui reconvertit en ticks par arrondi, retombe exactement sur
+// les durées d'origine.
+const WANDER_TICK_FIELDS = {
+  walkMin: "walkMinMs",
+  walkMax: "walkMaxMs",
+  pauseMin: "pauseMinMs",
+  pauseMax: "pauseMaxMs",
+};
+
+function convertWanderTicks(data) {
+  return mapDeep(data, (value) => {
+    if (!value || typeof value !== "object" || value.kind !== "wander") return value;
+    const oldFields = Object.keys(WANDER_TICK_FIELDS).filter((field) => Object.hasOwn(value, field));
+    if (oldFields.length === 0) return value;
+    const converted = { ...value };
+    for (const field of oldFields) {
+      // Une valeur qui n'est pas un nombre (donnée corrompue) est retirée
+      // sans remplaçant : l'entité retombe sur le défaut de ce champ.
+      if (typeof converted[field] === "number") {
+        converted[WANDER_TICK_FIELDS[field]] = Math.round(converted[field] * TICK_MS);
+      }
+      delete converted[field];
+    }
+    return converted;
+  });
 }
 
 // Retire du sac et de l'équipement les objets absents du registre d'objets
@@ -515,7 +558,9 @@ function backfillWorld(rawWorld) {
 // defaultSurface/segments/variables (portée "scene", voir backfillWorld) —
 // absents d'une sauvegarde antérieure à leur introduction, sans que ça
 // justifie une montée de version (la forme reste v1, juste complétée par
-// des défauts sûrs). Point d'ancrage documenté pour de futures montées
+// des défauts sûrs). Viennent ensuite les renommages de contenu et la
+// conversion des anciennes durées d'errance en ticks (voir plus haut),
+// mêmes raisons. Point d'ancrage documenté pour de futures montées
 // (v1 -> v2 -> ... -> courante, jamais en sautant une étape, même principe
 // que migratePrefs). Version inconnue -> null (aucun chemin de montée),
 // traité comme un échec par deserializeGame.
@@ -626,6 +671,7 @@ function migrateSave(raw) {
   // Renommages de contenu (config/save-renames.js) : APRÈS les rebouchages,
   // sur une partie dont la forme est déjà complète.
   data = applyContentRenames(data);
+  data = convertWanderTicks(data);
 
   return data;
 }

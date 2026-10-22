@@ -28,41 +28,47 @@
 // ce module gère seul tout son état, y compris son tirage initial).
 
 import { nextRandom } from "../rng.js";
+import { TICK_MS } from "../../lib/loop.js";
+import { TUNING_DEFAULTS } from "../../config/tuning-values.js";
 
-// Durées en TICKS (pas fixe du jeu, ~16.7ms — voir lib/loop.js/TICK_MS) :
-// seule unité disponible ici sans dépendre de l'horloge de partie
-// (core/time.js), hors de portée de ce module. Défauts posés pour un
-// rythme CALME : marches courtes (0.75 à 1.5s), pauses nettement plus
-// longues et notables (2 à 5s) — à ajuster à l'oreille via une surcharge de
-// behavior si besoin (cascade instance -> archétype -> ces défauts, comme
-// tout autre comportement).
-//
-// continueBias (0..1) : probabilité, à l'entrée d'une NOUVELLE marche, de
-// repartir dans la direction de la marche précédente plutôt que de faire
-// demi-tour. 0.65 par défaut : évite le ping-pong systématique sans figer
-// l'entité dans un aller simple. 0 = demi-tour à chaque pause (garde qui
-// fait les cent pas), vers 1 = ne revient presque jamais sur ses pas
-// (explorateur ; seuls les bords la retournent).
+// Durées déclarées en MILLISECONDES, comme tout réglage de durée du projet,
+// puis converties en TICKS (pas fixe du jeu, voir lib/loop.js/TICK_MS) au
+// moment du tirage : le décompte d'une phase (ticksLeft) avance avec la
+// simulation, donc se gèle avec elle (menu ouvert), et reste entier, donc
+// déterministe. Défauts dans config/tuning-values.js (wander*), surchargés
+// champ par champ par l'objet `behavior` qui déclare l'errance (champ
+// d'entité ou effet "behavior" d'une règle) — aucune autre cascade.
+// continueBias : voir config/tuning-values.js/wanderContinueBias.
 export const DEFAULTS = {
-  walkMin: 45,
-  walkMax: 90,
-  pauseMin: 120,
-  pauseMax: 300,
-  continueBias: 0.65,
+  walkMinMs: TUNING_DEFAULTS.wanderWalkMinMs,
+  walkMaxMs: TUNING_DEFAULTS.wanderWalkMaxMs,
+  pauseMinMs: TUNING_DEFAULTS.wanderPauseMinMs,
+  pauseMaxMs: TUNING_DEFAULTS.wanderPauseMaxMs,
+  continueBias: TUNING_DEFAULTS.wanderContinueBias,
 };
+
+// Champs acceptés dans `behavior` en plus de `kind` (voir
+// core/parse-common.js/parseBehavior, qui rejette tout autre champ).
+export const PARAMS = ["walkMinMs", "walkMaxMs", "pauseMinMs", "pauseMaxMs", "continueBias", "speed"];
 
 function isFiniteNumber(value) {
   return typeof value === "number" && Number.isFinite(value);
 }
 
-function checkTickRange(raw, minKey, maxKey, fail) {
+// Au moins un tick : une durée positive mais plus courte qu'un tick
+// donnerait sinon une phase vide.
+function msToTicks(ms) {
+  return Math.max(1, Math.round(ms / TICK_MS));
+}
+
+function checkDurationRange(raw, minKey, maxKey, fail) {
   const min = raw[minKey];
   const max = raw[maxKey];
-  if (min !== undefined && (!Number.isInteger(min) || min < 1)) {
-    fail(`behavior.${minKey} doit être un entier >= 1 (ticks) si présent.`);
+  if (min !== undefined && (!isFiniteNumber(min) || min <= 0)) {
+    fail(`behavior.${minKey} doit être un nombre > 0 (ms) si présent.`);
   }
-  if (max !== undefined && (!Number.isInteger(max) || max < 1)) {
-    fail(`behavior.${maxKey} doit être un entier >= 1 (ticks) si présent.`);
+  if (max !== undefined && (!isFiniteNumber(max) || max <= 0)) {
+    fail(`behavior.${maxKey} doit être un nombre > 0 (ms) si présent.`);
   }
   const resolvedMin = min !== undefined ? min : DEFAULTS[minKey];
   const resolvedMax = max !== undefined ? max : DEFAULTS[maxKey];
@@ -75,10 +81,10 @@ function checkTickRange(raw, minKey, maxKey, fail) {
 // les autres comportements : les défauts se résolvent dans step(), jamais
 // bakés ici.
 export function parseParams(raw, fail) {
-  const { walkMin, walkMax, pauseMin, pauseMax, speed, continueBias } = raw;
+  const { walkMinMs, walkMaxMs, pauseMinMs, pauseMaxMs, speed, continueBias } = raw;
 
-  checkTickRange(raw, "walkMin", "walkMax", fail);
-  checkTickRange(raw, "pauseMin", "pauseMax", fail);
+  checkDurationRange(raw, "walkMinMs", "walkMaxMs", fail);
+  checkDurationRange(raw, "pauseMinMs", "pauseMaxMs", fail);
   if (continueBias !== undefined && (!isFiniteNumber(continueBias) || continueBias < 0 || continueBias > 1)) {
     fail(`behavior.continueBias doit être un nombre entre 0 et 1 si présent.`);
   }
@@ -87,18 +93,21 @@ export function parseParams(raw, fail) {
   }
 
   const params = {};
-  if (walkMin !== undefined) params.walkMin = walkMin;
-  if (walkMax !== undefined) params.walkMax = walkMax;
-  if (pauseMin !== undefined) params.pauseMin = pauseMin;
-  if (pauseMax !== undefined) params.pauseMax = pauseMax;
+  if (walkMinMs !== undefined) params.walkMinMs = walkMinMs;
+  if (walkMaxMs !== undefined) params.walkMaxMs = walkMaxMs;
+  if (pauseMinMs !== undefined) params.pauseMinMs = pauseMinMs;
+  if (pauseMaxMs !== undefined) params.pauseMaxMs = pauseMaxMs;
   // speed : voir header — consommé par core/reduce.js, jamais par step().
   if (speed !== undefined) params.speed = speed;
   if (continueBias !== undefined) params.continueBias = continueBias;
   return params;
 }
 
-// Entier uniforme dans [min, max] (bornes incluses).
-function drawTicks(rngState, min, max) {
+// Durée d'une phase en ticks, entier uniforme entre les deux bornes
+// converties (incluses). L'arrondi préserve min <= max validé en ms.
+function drawTicks(rngState, minMs, maxMs) {
+  const min = msToTicks(minMs);
+  const max = msToTicks(maxMs);
   const { value, state } = nextRandom(rngState);
   return { value: min + Math.floor(value * (max - min + 1)), rngState: state };
 }
@@ -108,7 +117,7 @@ function drawDirection(rngState) {
   return { value: value < 0.5 ? -1 : 1, rngState: state };
 }
 
-// Voir continueBias (DEFAULTS) ci-dessus.
+// Voir config/tuning-values.js/wanderContinueBias.
 function drawWalkDirection(previousDir, continueBias, rngState) {
   const { value, state } = nextRandom(rngState);
   return { value: value < continueBias ? previousDir : -previousDir, rngState: state };
@@ -130,7 +139,7 @@ export function step(entity, context) {
     // précédente à privilégier (drawDirection, pas drawWalkDirection).
     const dirDraw = drawDirection(rngState);
     rngState = dirDraw.rngState;
-    const durationDraw = drawTicks(rngState, cfg.walkMin, cfg.walkMax);
+    const durationDraw = drawTicks(rngState, cfg.walkMinMs, cfg.walkMaxMs);
     rngState = durationDraw.rngState;
     w = { phase: "walk", ticksLeft: durationDraw.value, dir: dirDraw.value };
   } else if (w.phase === "walk" && entity.x === w.prevX) {
@@ -153,8 +162,8 @@ export function step(entity, context) {
       rngState = dirDraw.rngState;
       dir = dirDraw.value;
     }
-    const [min, max] = phase === "walk" ? [cfg.walkMin, cfg.walkMax] : [cfg.pauseMin, cfg.pauseMax];
-    const durationDraw = drawTicks(rngState, min, max);
+    const [minMs, maxMs] = phase === "walk" ? [cfg.walkMinMs, cfg.walkMaxMs] : [cfg.pauseMinMs, cfg.pauseMaxMs];
+    const durationDraw = drawTicks(rngState, minMs, maxMs);
     rngState = durationDraw.rngState;
     ticksLeft = durationDraw.value;
   }
@@ -167,4 +176,4 @@ export function step(entity, context) {
   };
 }
 
-export default { DEFAULTS, parseParams, step };
+export default { DEFAULTS, PARAMS, parseParams, step };

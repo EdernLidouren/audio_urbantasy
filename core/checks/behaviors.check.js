@@ -11,6 +11,7 @@ import { reduce } from "../reduce.js";
 import { evaluateCondition, isPresent, resolveEntityRules } from "../presence.js";
 import { DEFAULTS as WANDER_DEFAULTS } from "../behaviors/wander.js";
 import { throws } from "../../lib/check.js";
+import { TICK_MS } from "../../lib/loop.js";
 import { NO_COMPANIONS, WANDER_REGISTRY, makeWanderScene, runTicks } from "./helpers.js";
 
 export default function checkBehaviors(run) {
@@ -36,7 +37,7 @@ export default function checkBehaviors(run) {
   run("errance : position toujours dans [0, length]", true, run1.positions.every((x) => x >= 0 && x <= wanderScene.length));
 
   // Les deux états sont bien atteints avec les défauts (400 ticks >
-  // walkMax : au moins une pause est nécessairement amorcée), et la phase
+  // walkMaxMs : au moins une pause est nécessairement amorcée), et la phase
   // est lisible sur l'entité — crochet exploitable pour un son par état,
   // pas câblé ici.
   run("errance : la phase MARCHE est atteinte", true, run1.phases.includes("walk"));
@@ -51,7 +52,7 @@ export default function checkBehaviors(run) {
   // longues — vérifié directement sur les constantes du module (jamais un
   // nombre dupliqué en dur ici, qui dériverait silencieusement si les
   // défauts changent).
-  run("errance : défauts — marches plus courtes que les pauses", true, WANDER_DEFAULTS.walkMax <= WANDER_DEFAULTS.pauseMin);
+  run("errance : défauts — marches plus courtes que les pauses", true, WANDER_DEFAULTS.walkMaxMs <= WANDER_DEFAULTS.pauseMinMs);
 
   // Découpe une séquence de phases en plages contiguës {phase, length} —
   // sert à vérifier que chaque plage COMPLÈTE (bornée des deux côtés par le
@@ -74,7 +75,7 @@ export default function checkBehaviors(run) {
   // ticks) — isole la mécanique de bascule/tirage de la question du rythme.
   const machineScene = parseScene(
     makeWanderScene({
-      entities: [{ id: "wander-1", type: "dog", x: 5, behavior: { kind: "wander", walkMin: 3, walkMax: 6, pauseMin: 4, pauseMax: 8 } }],
+      entities: [{ id: "wander-1", type: "dog", x: 5, behavior: { kind: "wander", walkMinMs: 3 * TICK_MS, walkMaxMs: 6 * TICK_MS, pauseMinMs: 4 * TICK_MS, pauseMaxMs: 8 * TICK_MS } }],
     }),
     WANDER_REGISTRY
   );
@@ -115,13 +116,13 @@ export default function checkBehaviors(run) {
   run("errance : au moins un vrai demi-tour observé (pas figée dans un seul sens)", true, reversals >= 1);
 
   // Rebond au bord de la scène (item 3) : phase de marche FORCÉE assez longue
-  // pour ne jamais expirer seule (walkMin=walkMax élevé) — isole le rebond
+  // pour ne jamais expirer seule (walkMinMs=walkMaxMs élevé) — isole le rebond
   // de toute bascule naturelle. Scène étroite : quelle que soit la
   // direction tirée au départ, un bord est atteint vite.
   const boundaryScene = parseScene(
     makeWanderScene({
       length: 1,
-      entities: [{ id: "wander-1", type: "dog", x: 0.5, behavior: { kind: "wander", walkMin: 1000, walkMax: 1000 } }],
+      entities: [{ id: "wander-1", type: "dog", x: 0.5, behavior: { kind: "wander", walkMinMs: 1000 * TICK_MS, walkMaxMs: 1000 * TICK_MS } }],
     }),
     WANDER_REGISTRY
   );
@@ -146,7 +147,7 @@ export default function checkBehaviors(run) {
       length: 20,
       entities: [
         { id: "wall-left", type: "wall", x: 5 },
-        { id: "wander-1", type: "dog", x: 6, behavior: { kind: "wander", walkMin: 1000, walkMax: 1000 } },
+        { id: "wander-1", type: "dog", x: 6, behavior: { kind: "wander", walkMinMs: 1000 * TICK_MS, walkMaxMs: 1000 * TICK_MS } },
         { id: "wall-right", type: "wall", x: 7 },
       ],
     }),
@@ -170,16 +171,21 @@ export default function checkBehaviors(run) {
   run("errance : rebondit sur un obstacle (les deux directions observées)", true, obstacleDirs.has(1) && obstacleDirs.has(-1));
 
   // Validation au chargement : fourchettes cohérentes (min <= max) et
-  // entières (>= 1 tick) — même politique que minDistance/maxDistance
+  // durées strictement positives — même politique que minDistance/maxDistance
   // (follow.js) ou targetId (goto.js) : une donnée de contenu incohérente
   // échoue clairement, jamais une dégradation silencieuse.
   function expectWanderRejected(behaviorOverride) {
     return throws(() => parseScene(makeWanderScene({ entities: [{ id: "wander-1", type: "dog", x: 5, behavior: { kind: "wander", ...behaviorOverride } }] }), WANDER_REGISTRY));
   }
-  run("errance : walkMin > walkMax rejeté au chargement", true, expectWanderRejected({ walkMin: 10, walkMax: 5 }));
-  run("errance : pauseMin > pauseMax rejeté au chargement", true, expectWanderRejected({ pauseMin: 10, pauseMax: 5 }));
-  run("errance : walkMin non entier rejeté au chargement", true, expectWanderRejected({ walkMin: 1.5 }));
-  run("errance : walkMin < 1 rejeté au chargement", true, expectWanderRejected({ walkMin: 0 }));
+  run("errance : walkMinMs > walkMaxMs rejeté au chargement", true, expectWanderRejected({ walkMinMs: 1000, walkMaxMs: 500 }));
+  run("errance : pauseMinMs > pauseMaxMs rejeté au chargement", true, expectWanderRejected({ pauseMinMs: 1000, pauseMaxMs: 500 }));
+  run("errance : walkMinMs nul rejeté au chargement", true, expectWanderRejected({ walkMinMs: 0 }));
+  run("errance : pauseMaxMs non numérique rejeté au chargement", true, expectWanderRejected({ pauseMaxMs: "long" }));
+  run("errance : durée non entière acceptée (ms)", false, throws(() => parseScene(makeWanderScene({ entities: [{ id: "wander-1", type: "dog", x: 5, behavior: { kind: "wander", walkMinMs: 12.5 } }] }), WANDER_REGISTRY)));
+  // Champ inconnu : rejeté plutôt qu'ignoré, sinon une faute de frappe ou
+  // un ancien champ en ticks retomberait en silence sur le défaut.
+  run("errance : ancien champ en ticks (walkMin) rejeté au chargement", true, expectWanderRejected({ walkMin: 45 }));
+  run("errance : champ mal orthographié rejeté au chargement", true, expectWanderRejected({ pauseMaxMS: 3000 }));
 
   // Sérialisabilité : l'état wander (phase/ticksLeft/dir/prevX) survit à un
   // aller-retour JSON, comme tout autre champ d'entité.
@@ -290,6 +296,18 @@ export default function checkBehaviors(run) {
     );
   });
   run("follow : minDistance >= maxDistance rejeté (incohérent)", true, followMinMaxRejected);
+  // Champ propre à un AUTRE comportement : rejeté, chaque kind n'accepte
+  // que sa propre liste (voir core/parse-common.js/parseBehavior).
+  run(
+    "follow : champ d'un autre comportement (walkMinMs) rejeté au chargement",
+    true,
+    throws(() =>
+      parseScene(
+        makeFollowScene({ entities: [{ id: "follower-1", type: "dog", x: 0, behavior: { kind: "follow", walkMinMs: 1000 } }] }),
+        FOLLOW_REGISTRY
+      )
+    )
+  );
 
   // Le joueur dépasse le suiveur (passe de l'autre côté) : le suivi
   // s'inverse SANS code spécial — direction recalculée à chaque tick depuis

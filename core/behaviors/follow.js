@@ -21,15 +21,24 @@
 // mémorisée) : si la cible dépasse le suiveur par l'autre côté, le sens
 // s'inverse naturellement au tick suivant, sans code spécial.
 
+import { TUNING_DEFAULTS } from "../../config/tuning-values.js";
+
+// Distances par défaut : réglages de feeling, dans config/tuning-values.js
+// (follow*), surchargés champ par champ par l'objet `behavior` qui déclare
+// le suivi.
 export const DEFAULTS = {
-  minDistance: 1,
-  maxDistance: 3,
+  minDistance: TUNING_DEFAULTS.followMinDistance,
+  maxDistance: TUNING_DEFAULTS.followMaxDistance,
   // "player" : convention reconnue par reduce.js (voir
   // resolveTargetPosition) pour désigner le joueur — ce module ne code
   // jamais "le joueur" en dur, il demande juste une position par id via
   // context.getTargetPosition.
   targetId: "player",
 };
+
+// Champs acceptés dans `behavior` en plus de `kind` (voir
+// core/parse-common.js/parseBehavior, qui rejette tout autre champ).
+export const PARAMS = ["minDistance", "maxDistance", "targetId", "speed"];
 
 function isFiniteNumber(value) {
   return typeof value === "number" && Number.isFinite(value);
@@ -96,4 +105,4 @@ export function step(entity, context) {
   return { entity, rngState: context.rngState, intent };
 }
 
-export default { DEFAULTS, parseParams, step };
+export default { DEFAULTS, PARAMS, parseParams, step };

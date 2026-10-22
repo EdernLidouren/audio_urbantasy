@@ -431,4 +431,30 @@ export const TUNING_DEFAULTS = {
   shopQuantityBigStep: 20,
   bagQuantityMediumStep: 10,
   bagQuantityBigStep: 100,
+
+  // Défauts du comportement "wander" (voir core/behaviors/wander.js), pour
+  // un rythme CALME : marches courtes (0,75 à 1,5 s), pauses nettement plus
+  // longues et notables (2 à 5 s). Durées en ms, converties en ticks par le
+  // comportement. Surchargeables champ par champ dans l'objet `behavior` qui
+  // déclare l'errance (walkMinMs...), jamais via resolveTuning : le core lit
+  // ces valeurs DIRECTEMENT.
+  wanderWalkMinMs: 750,
+  wanderWalkMaxMs: 1500,
+  wanderPauseMinMs: 2000,
+  wanderPauseMaxMs: 5000,
+  // Probabilité (0 à 1), à l'entrée d'une NOUVELLE marche, de repartir dans
+  // la direction de la marche précédente plutôt que de faire demi-tour.
+  // 0,65 : évite le ping-pong systématique sans figer l'entité dans un
+  // aller simple. 0 = demi-tour à chaque pause (garde qui fait les cent
+  // pas), vers 1 = ne revient presque jamais sur ses pas.
+  wanderContinueBias: 0.65,
+
+  // Défauts du comportement "follow" (voir core/behaviors/follow.js), en
+  // unités de scène : en deçà de followMinDistance le suiveur s'arrête (il ne
+  // recule jamais), au-delà de followMaxDistance il se rapproche, entre les
+  // deux il ne bouge pas. Plus d'écart = suivi plus lâche ; maxDistance plus
+  // haut = le suiveur traîne plus loin derrière. Lus DIRECTEMENT par le core,
+  // comme les défauts de wander ci-dessus.
+  followMinDistance: 1,
+  followMaxDistance: 3,
 };

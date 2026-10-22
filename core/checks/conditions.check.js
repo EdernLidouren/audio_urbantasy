@@ -20,6 +20,7 @@ import { TIME_CONFIG } from "../../config/time-values.js";
 import { evaluateCondition, isPresent, isBlocking, presenceContextOf } from "../presence.js";
 import { setWeather } from "../weather.js";
 import { auditNonSerializable } from "../../lib/check.js";
+import { TICK_MS } from "../../lib/loop.js";
 import { NO_COMPANIONS, WANDER_REGISTRY, makeWanderScene, expectSceneParseThrows } from "./helpers.js";
 
 export default function checkConditions(run) {
@@ -481,7 +482,7 @@ export default function checkConditions(run) {
     titleKey: "scene.demo.name",
     length: 20,
     playerStart: 0,
-    entities: [{ id: "wolf-1", type: "wolf", x: 10, behavior: { kind: "wander", walkMin: 1000, walkMax: 1000 } }],
+    entities: [{ id: "wolf-1", type: "wolf", x: 10, behavior: { kind: "wander", walkMinMs: 1000 * TICK_MS, walkMaxMs: 1000 * TICK_MS } }],
   });
   run(
     "weather (condition) : état inexistant dans la table météo -> erreur claire au chargement",
@@ -628,7 +629,7 @@ export default function checkConditions(run) {
     },
   };
   const allOfScene = parseScene(
-    { id: "movement-check-allof-integration", titleKey: "scene.demo.name", length: 20, playerStart: 0, entities: [{ id: "wolf-1", type: "wolf", x: 10, behavior: { kind: "wander", walkMin: 1000, walkMax: 1000 } }] },
+    { id: "movement-check-allof-integration", titleKey: "scene.demo.name", length: 20, playerStart: 0, entities: [{ id: "wolf-1", type: "wolf", x: 10, behavior: { kind: "wander", walkMinMs: 1000 * TICK_MS, walkMaxMs: 1000 * TICK_MS } }] },
     ALLOF_REGISTRY
   );
   function allOfWolf(state) {

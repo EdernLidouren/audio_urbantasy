@@ -79,10 +79,10 @@
       "isFlying": true,
       "behavior": {
         "kind": "wander",
-        "walkMin": 1300,
-        "walkMax": 1600,
-        "pauseMin": 30,
-        "pauseMax": 90,
+        "walkMinMs": 21667,
+        "walkMaxMs": 26667,
+        "pauseMinMs": 500,
+        "pauseMaxMs": 1500,
         "speed": 2
       }
     },

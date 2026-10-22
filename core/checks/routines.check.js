@@ -12,6 +12,7 @@ import { advanceTime, minuteOfHour, hourOfDay } from "../time.js";
 import { TIME_CONFIG } from "../../config/time-values.js";
 import { isPresent, resolveEntityRules } from "../presence.js";
 import { throws } from "../../lib/check.js";
+import { TICK_MS } from "../../lib/loop.js";
 import { NO_COMPANIONS } from "./helpers.js";
 
 export default function checkRoutines(run) {
@@ -409,9 +410,9 @@ export default function checkRoutines(run) {
       playerStart: 0,
       entities: [
         { id: "door-bar-exit", type: "dog", x: 18 },
-        { id: "npc-bar-a", type: "dog", x: 5, behavior: { kind: "wander", walkMin: 1000, walkMax: 1000 }, presence: barPatronPresence() },
-        { id: "npc-bar-b", type: "dog", x: 6, behavior: { kind: "wander", walkMin: 1000, walkMax: 1000 }, presence: barPatronPresence() },
-        { id: "npc-bar-c", type: "dog", x: 7, behavior: { kind: "wander", walkMin: 1000, walkMax: 1000 }, presence: barPatronPresence() },
+        { id: "npc-bar-a", type: "dog", x: 5, behavior: { kind: "wander", walkMinMs: 1000 * TICK_MS, walkMaxMs: 1000 * TICK_MS }, presence: barPatronPresence() },
+        { id: "npc-bar-b", type: "dog", x: 6, behavior: { kind: "wander", walkMinMs: 1000 * TICK_MS, walkMaxMs: 1000 * TICK_MS }, presence: barPatronPresence() },
+        { id: "npc-bar-c", type: "dog", x: 7, behavior: { kind: "wander", walkMinMs: 1000 * TICK_MS, walkMaxMs: 1000 * TICK_MS }, presence: barPatronPresence() },
       ],
     },
     BAR_REGISTRY
@@ -483,14 +484,14 @@ export default function checkRoutines(run) {
           id: "npc-bar-a",
           type: "dog",
           x: 5,
-          behavior: { kind: "wander", walkMin: 1000, walkMax: 1000 },
+          behavior: { kind: "wander", walkMinMs: 1000 * TICK_MS, walkMaxMs: 1000 * TICK_MS },
           presence: [{ when: { type: "timeRange", from: 6, to: 6.5 }, effects: [{ type: "behavior", behavior: { kind: "goto", targetId: "door-bar-exit" } }] }],
         },
         {
           id: "npc-bar-b",
           type: "dog",
           x: 6,
-          behavior: { kind: "wander", walkMin: 1000, walkMax: 1000 },
+          behavior: { kind: "wander", walkMinMs: 1000 * TICK_MS, walkMaxMs: 1000 * TICK_MS },
           presence: [{ when: { type: "timeRange", from: 6, to: 6.5 }, effects: [{ type: "behavior", behavior: { kind: "goto", targetId: "door-bar-exit" } }] }],
         },
       ],

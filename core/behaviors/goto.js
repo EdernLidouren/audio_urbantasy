@@ -33,6 +33,10 @@ export const DEFAULTS = {
   arriveDistance: 2 * BODY_RADIUS,
 };
 
+// Champs acceptés dans `behavior` en plus de `kind` (voir
+// core/parse-common.js/parseBehavior, qui rejette tout autre champ).
+export const PARAMS = ["targetId", "arriveDistance", "speed"];
+
 function isFiniteNumber(value) {
   return typeof value === "number" && Number.isFinite(value);
 }
@@ -91,4 +95,4 @@ export function step(entity, context) {
   return { entity, rngState: context.rngState, intent };
 }
 
-export default { DEFAULTS, parseParams, step };
+export default { DEFAULTS, PARAMS, parseParams, step };

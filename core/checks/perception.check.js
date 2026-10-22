@@ -9,6 +9,7 @@ import { tick } from "../actions.js";
 import { reduce } from "../reduce.js";
 import { SAVE_VERSION, serializeGame, deserializeGame } from "../save.js";
 import { evaluateCondition } from "../presence.js";
+import { TICK_MS } from "../../lib/loop.js";
 import { NO_COMPANIONS, RAW_SCENE, EMPTY_REGISTRY, createAuditFixture } from "./helpers.js";
 
 export default function checkPerception(run) {
@@ -53,7 +54,7 @@ export default function checkPerception(run) {
       titleKey: "scene.demo.name",
       length: 20,
       playerStart: 0,
-      entities: [{ id: "spirit-1", type: "spirit", x: 10, behavior: { kind: "wander", walkMin: 1000, walkMax: 1000 } }],
+      entities: [{ id: "spirit-1", type: "spirit", x: 10, behavior: { kind: "wander", walkMinMs: 1000 * TICK_MS, walkMaxMs: 1000 * TICK_MS } }],
     },
     SPIRIT_REGISTRY
   );
