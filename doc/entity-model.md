@@ -221,9 +221,9 @@ JSON de scène, une entité ÉPHÉMÈRE n'est par définition jamais DÉCLARÉE.
   descripteur d'entité DÉJÀ RÉSOLU
   (`type`, `labelKey`, `sounds`, `blocksMovement`, `observable`,
   `interactable`, `action`...) — EXACTEMENT la forme qu'une entité obtient
-  en sortie de `core/entity-parse.js`/`parseEntity`, construit par L'APPELANT (voir
-  `createTestCompanion` dans `core/state.js`, même principe pour le
-  compagnon de test) : `sounds` DOIT être porté explicitement ici (voir
+  en sortie de `core/entity-parse.js`/`parseEntity`, construit par L'APPELANT
+  (par `parseSpawnedEntity`, comme `core/spawn.js` ; même principe pour les
+  compagnons du départ, voir `doc/new-game.md`) : `sounds` DOIT être porté explicitement ici (voir
   "Cascade de sounds" plus bas) — la vue lit `entity.sounds`, jamais le
   registre directement, donc un spec fabriqué à la main qui l'omettrait
   perdrait tout son. Le core ne connaît AUCUN registre de types,

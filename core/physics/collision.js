@@ -80,7 +80,8 @@ export function resolvePlayerMove(playerX, dir, entities, sceneLength, presenceC
 // poussée résiduelle du bloqueur, voir header. `speed` : voir
 // resolveBlockedMove — core/reduce.js le lit sur l'entité résolue
 // (entity.speed, voir core/entity-parse.js/parseEntity), défaut 1 si absent
-// (compagnon sans cascade dédiée, ex. core/state.js/createTestCompanion).
+// (entité qui n'est pas passée par la cascade, ex. un compagnon d'une
+// sauvegarde antérieure à config/new-game.js).
 export function resolveBodyMove(entityX, dir, entities, sceneLength, presenceContext, speed = 1) {
   return resolveBlockedMove(entityX, dir, entities, sceneLength, 2 * BODY_RADIUS, presenceContext, speed);
 }

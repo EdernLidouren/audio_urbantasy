@@ -15,6 +15,7 @@ domaine, le détail du code vivant dans les en-têtes de fichiers.
 | [`city-map.md`](city-map.md) | Topologie de la carte de la ville et le menu-carte. |
 | [`i18n.md`](i18n.md) | Convention `data/i18n/` : découpage par domaine, parité fr/en, où va une nouvelle clé de traduction. |
 | [`collections.md`](collections.md) | Collections : modèle (un fichier par collection), découverte par acquisition (`addItem`), textes, onglet Collections, sauvegarde, debug, extension par observation. |
+| [`new-game.md`](new-game.md) | Départ d'une partie neuve : scène, argent, sac, équipement, compagnons et variables de partie (`config/new-game.js`), validation au démarrage. |
 | [`save.md`](save.md) | Sauvegarde : contenu, relecture (rebouchage, renommages de contenu, types inconnus), table `config/save-renames.js`. |
 
 ## Où va une nouvelle info ? (convention)
@@ -31,6 +32,7 @@ UN SEUL endroit, jamais recopié :
 | La grille de la ville ou le menu-carte | `doc/city-map.md` |
 | Une nouvelle FAMILLE de clés i18n, ou une convention de traduction | `doc/i18n.md` |
 | Une collection, ses entrées, la découverte ou l'onglet Collections | `doc/collections.md` |
+| Ce avec quoi commence une partie neuve (kit de départ, compagnons, scène de départ) | `doc/new-game.md` |
 | Le format de sauvegarde, sa migration, ou un RENOMMAGE de type/clé i18n/son (à reporter dans `config/save-renames.js`) | `doc/save.md` |
 | Une liste EXHAUSTIVE (types de condition, kinds d'action, types d'entité, tags...) | **NULLE PART en doc** — elle vit dans le CODE (le registre/l'aiguillage concerné), la doc y RENVOIE toujours plutôt que de la recopier, pour ne jamais diverger |
 

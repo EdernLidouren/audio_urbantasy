@@ -14,7 +14,7 @@
 import { DEFAULT_SURFACE } from "./surfaces.js";
 import { INITIAL_TIME } from "./time.js";
 import { createEmptyEquipment } from "./equipment.js";
-import { stripEphemeralsFromWorld, isTwoSided } from "./state.js";
+import { stripEphemeralsFromWorld, isTwoSided, deriveAcquiredItems } from "./state.js";
 import { createInitialWeather } from "./weather.js";
 import { ITEM_REGISTRY } from "./items.js";
 import { validateDistribution } from "./distribution.js";
@@ -647,14 +647,7 @@ function migrateSave(raw) {
   // l'équipement actuels. Approximatif par nature : un objet déjà revendu
   // ou perdu n'y figure plus, il ne sera pas compté comme acquis.
   if (!data.acquiredItems || typeof data.acquiredItems !== "object") {
-    const acquiredItems = {};
-    for (const entry of Array.isArray(data.bag) ? data.bag : []) {
-      if (entry && typeof entry.type === "string") acquiredItems[entry.type] = true;
-    }
-    for (const slot of Object.values(data.equipment || {})) {
-      if (slot && typeof slot.type === "string") acquiredItems[slot.type] = true;
-    }
-    data = { ...data, acquiredItems };
+    data = { ...data, acquiredItems: deriveAcquiredItems(data.bag, data.equipment) };
   }
 
   if (data.worlds && typeof data.worlds === "object") {

@@ -41,6 +41,7 @@ import checkTrade from "./trade.check.js";
 import checkSpawn from "./spawn.check.js";
 import checkCollections from "./collections.check.js";
 import checkTriggers from "./triggers.check.js";
+import checkNewGame from "./new-game.check.js";
 
 const SUITES = [
   { name: "movement", check: checkMovement },
@@ -67,6 +68,7 @@ const SUITES = [
   { name: "spawn", check: checkSpawn },
   { name: "collections", check: checkCollections },
   { name: "triggers", check: checkTriggers },
+  { name: "new-game", check: checkNewGame },
 ];
 
 // Noms des domaines, dans l'ordre d'exécution.

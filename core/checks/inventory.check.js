@@ -14,7 +14,7 @@ import { TAG_REGISTRY, tagProps } from "../tags.js";
 import { evaluateCondition } from "../presence.js";
 import { ownedQuantity } from "../trade.js";
 import { throws } from "../../lib/check.js";
-import { NO_COMPANIONS, RAW_SCENE, EMPTY_REGISTRY, buildMoneyScene } from "./helpers.js";
+import { NO_COMPANIONS, ITEM_START, RAW_SCENE, EMPTY_REGISTRY, buildMoneyScene } from "./helpers.js";
 
 export default function checkInventory(run) {
   // --- Argent (core/money.js) : scalaire de partie + effet pickup ---
@@ -55,13 +55,10 @@ export default function checkInventory(run) {
   run("sac : ITEM_REGISTRY.key_bronze n'est PAS empilable", false, itemProps("key_bronze").stackable);
   run("sac : itemProps sur un type inconnu -> undefined", undefined, itemProps("does-not-exist"));
 
-  // Sac VIDÉ explicitement pour ces tests de MÉCANISME (addItem/removeItem/
-  // pickupItemEntity/dropItem en isolation) : une partie neuve démarre
-  // en réalité avec des rangers dans le sac (voir "Équipement" plus bas,
-  // core/state.js/createInitialState) — hors-sujet ici, ces tests
-  // vérifient le MÉCANISME du sac, pas le contenu de départ d'une partie.
-  const bagState = { ...createInitialState(moneyScene, undefined, NO_COMPANIONS), bag: [] };
-  run("sac : sac VIDÉ pour ces tests de mécanisme (contenu de départ testé plus bas)", 0, bagState.bag.length);
+  // Partie SANS départ : sac vide, pour tester le MÉCANISME du sac
+  // (addItem/removeItem/pickupItemEntity/dropItem) en isolation.
+  const bagState = createInitialState(moneyScene, undefined, NO_COMPANIONS);
+  run("sac : partie sans départ -> sac vide", 0, bagState.bag.length);
 
   // Empilable : le PREMIER ajout crée l'entrée, les SUIVANTS incrémentent
   // quantity — jamais une seconde entrée pour le même type.
@@ -192,12 +189,13 @@ export default function checkInventory(run) {
   run("gaitOf : type retiré du registre entre-temps -> repli barefoot", "barefoot", gaitOf({ feet: { type: "does-not-exist" } }));
 
   const equipmentScene = parseScene(RAW_SCENE, EMPTY_REGISTRY);
-  const freshEquipState = createInitialState(equipmentScene, undefined, NO_COMPANIONS);
-  run("équipement : une partie neuve démarre avec des baskets ÉQUIPÉES", "sneakers", freshEquipState.equipment.feet.type);
-  run("équipement : une partie neuve démarre avec rangers ET escarpins DANS LE SAC (pas équipés)", 2, freshEquipState.bag.length);
-  run("équipement : les rangers de départ ne sont pas équipés", "combat_boots", freshEquipState.bag[0].type);
-  run("équipement : les escarpins de départ ne sont pas équipés", "high_heels", freshEquipState.bag[1].type);
-  run("équipement : gait de départ d'une partie neuve -> shoes", "shoes", gaitOf(freshEquipState.equipment));
+  run("équipement : partie sans départ -> pieds nus", "barefoot", gaitOf(createInitialState(equipmentScene, undefined, NO_COMPANIONS).equipment));
+  // Départ d'objets de test (./helpers.js/ITEM_START) : baskets équipées,
+  // rangers et escarpins dans le sac.
+  const freshEquipState = createInitialState(equipmentScene, undefined, ITEM_START);
+  run("équipement : départ -> baskets ÉQUIPÉES", "sneakers", freshEquipState.equipment.feet.type);
+  run("équipement : départ -> rangers ET escarpins DANS LE SAC (pas équipés)", "combat_boots,high_heels", freshEquipState.bag.map((e) => e.type).join(","));
+  run("équipement : gait de départ -> shoes", "shoes", gaitOf(freshEquipState.equipment));
 
   // equipItem : ÉCHANGE — équiper des bottes (sac) alors que des baskets
   // sont déjà au slot -> les bottes prennent le slot, les baskets

@@ -17,9 +17,11 @@ import { t } from "./data/i18n/index.js";
 import { runChecks } from "./core/checks/index.js";
 import { isDebugEnabled, setDebugEnabled } from "./config/debug.js";
 import { startLoop } from "./lib/loop.js";
-import { loadScene, loadSceneById } from "./scenes/load.js";
+import { loadSceneById } from "./scenes/load.js";
 import registry from "./entities/types/index.js";
 import { createInitialState } from "./core/state.js";
+import { parseNewGame } from "./core/new-game.js";
+import { NEW_GAME } from "./config/new-game.js";
 import { getPref, setPref } from "./config/preferences.js";
 import { configureAssetManifest } from "./lib/assets.js";
 import { checkAutoSaveTimer } from "./view/autosave-timer.js";
@@ -36,6 +38,11 @@ configureMenuPreferences({ getPref, setPref });
 // patron d'injection que les préférences ci-dessus — voir lib/menu.js et
 // view/menu-sounds.js.
 configureMenuSounds(playMenuSound);
+
+// Départ d'une partie neuve (config/new-game.js), validé UNE FOIS ici, au
+// démarrage : une erreur dans ce fichier arrête le jeu tout de suite, avec
+// son message, plutôt qu'au premier "Nouvelle partie".
+const newGame = parseNewGame(NEW_GAME, registry);
 
 // Un import n'expose rien au scope global : on l'attache explicitement à
 // window pour pouvoir appeler runChecks() depuis la console (voir
@@ -134,13 +141,14 @@ let loadableSave = null;
 // laisse donc l'ancien save intact.
 function startNewGame() {
   if (!scene) return; // scène pas encore chargée : cas limite improbable
-  session = createInitialState(scene);
+  session = createInitialState(scene, undefined, newGame.start);
   pushScreen(makeCityScreen(getSession, setSession));
 }
 
 // "Ville test" (entrée de tête du menu principal, voir main-menu.js) :
 // démarre une partie NEUVE directement sur la scène "demo" (scène de test,
-// distincte de la scène de départ town-square chargée plus bas) — MÊME
+// distincte de la scène de départ chargée plus bas, avec le même départ
+// d'objets et de compagnons, voir config/new-game.js) — MÊME
 // risque d'écrasement qu'une "Nouvelle partie" normale, voir
 // activateNewGame/main-menu.js, réutilisé TEL QUEL pour cette entrée.
 // Contrairement à `scene` (préchargée en tâche de fond dès le boot, voir plus
@@ -150,7 +158,7 @@ function startNewGame() {
 function startTestCityGame() {
   loadSceneById("demo", registry)
     .then((testScene) => {
-      session = createInitialState(testScene);
+      session = createInitialState(testScene, undefined, newGame.start);
       pushScreen(makeCityScreen(getSession, setSession));
     })
     .catch((error) => {
@@ -235,7 +243,7 @@ startLoop(
   (deltaMs) => tickFrame(deltaMs)
 );
 
-loadScene("./scenes/town-square.json", registry)
+loadSceneById(newGame.startSceneId, registry)
   .then((loadedScene) => {
     scene = loadedScene;
   })

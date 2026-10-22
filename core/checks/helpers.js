@@ -10,16 +10,23 @@ import { tick } from "../actions.js";
 import { reduce } from "../reduce.js";
 import { addMoney } from "../money.js";
 import { addItem } from "../bag.js";
+import { parseNewGame } from "../new-game.js";
 import { throws } from "../../lib/check.js";
 
-// { companions: [] } : passé explicitement à CHAQUE createInitialState() des
-// vérifications qui ne concernent pas les compagnons — sans lui, le défaut
-// (UN compagnon de test, voir core/state.js) s'ajouterait à des scénarios
-// conçus et vérifiés AVANT son existence, avec des positions attendues
-// calculées à la main. Les vérifications dédiées aux compagnons
-// (./companions.check.js) l'omettent volontairement pour exercer le défaut
-// réel.
+// { companions: [] } : sans compagnon. Redondant depuis que createInitialState
+// démarre sans compagnon par défaut (voir config/new-game.js) ; encore passé
+// par de nombreuses vérifications.
 export const NO_COMPANIONS = { companions: [] };
+
+// Départ d'OBJETS des vérifications d'inventaire et de collections : le kit
+// de test de config/new-game.js (rangers et escarpins dans le sac, baskets
+// équipées), sans compagnon, résolu par le vrai parseNewGame. Écrit ici
+// plutôt que lu dans config/new-game.js : changer le kit du jeu ne doit pas
+// casser ces vérifications.
+export const ITEM_START = parseNewGame(
+  { startSceneId: "check", bag: [{ type: "combat_boots" }, { type: "high_heels" }], equipment: { feet: "sneakers" } },
+  {}
+).start;
 
 export const RAW_SCENE = {
   id: "movement-check",
@@ -103,7 +110,7 @@ export function createAuditFixture() {
     AUDIT_REGISTRY
   );
 
-  // Compagnon EXPLICITE (pas le défaut de createTestCompanion) : targetId
+  // Compagnon construit à la main (forme d'entité résolue) : targetId
   // écrit en dur plutôt que laissé au défaut interne de follow.js, pour que
   // l'aller-retour JSON exerce réellement cette clé.
   const auditCompanion = {

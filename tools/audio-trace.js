@@ -34,6 +34,8 @@
 import registry from "../entities/types/index.js";
 import { loadSceneById } from "../scenes/load.js";
 import { createInitialState, togglePerception, switchSide, getActiveWorld } from "../core/state.js";
+import { parseNewGame } from "../core/new-game.js";
+import { NEW_GAME } from "../config/new-game.js";
 import { reduce } from "../core/reduce.js";
 import { tick } from "../core/actions.js";
 import { advanceTime } from "../core/time.js";
@@ -393,6 +395,9 @@ export async function runAudioTrace({ seed = 20261021 } = {}) {
   }
   const demo = await loadSceneById("demo", registry);
   const tower = await loadSceneById("clock_tower_main", registry);
+  // Le départ d'une vraie partie (sac, équipement, compagnon) : la trace
+  // rend ce que le joueur entend.
+  const { start } = parseNewGame(NEW_GAME, registry);
   const env = installEnvironment(seed);
   const { log, advance, snapshotAnnouncements } = env;
 
@@ -418,7 +423,7 @@ export async function runAudioTrace({ seed = 20261021 } = {}) {
 
   try {
     // A) Scène simple, extérieure, peuplée (demo).
-    session = refillDueSpawns(createInitialState(demo, 7), registry);
+    session = refillDueSpawns(createInitialState(demo, 7, start), registry);
     mark("A montage demo");
     scene = createWorldView(getSession);
     snapshotAnnouncements();
@@ -467,7 +472,7 @@ export async function runAudioTrace({ seed = 20261021 } = {}) {
     advance(2000);
 
     // B) Scène à deux faces (clocher) : changement de face avec relais.
-    session = createInitialState(tower, 3);
+    session = createInitialState(tower, 3, start);
     mark("B montage clocher");
     scene = createWorldView(getSession);
     snapshotAnnouncements();

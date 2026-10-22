@@ -9,6 +9,7 @@ import { createInitialState, getActiveWorld, travelToWorld, addCompanion } from 
 import { tick } from "../actions.js";
 import { reduce } from "../reduce.js";
 import { MAX_COMPANIONS } from "../../config/companions.js";
+import { parseNewGame } from "../new-game.js";
 import { NO_COMPANIONS, WANDER_REGISTRY, makeWanderScene, runTicks } from "./helpers.js";
 
 export default function checkCompanions(run) {
@@ -30,12 +31,18 @@ export default function checkCompanions(run) {
     COMPANION_REGISTRY
   );
 
-  // Défaut (aucune surcharge de companions, contrairement à NO_COMPANIONS
-  // utilisé partout ailleurs dans ce fichier) : UN compagnon de test
-  // prédéfini, comme au vrai lancement d'une partie (voir core/state.js).
-  let companionState = createInitialState(companionScene, 1);
-  run("compagnons : un compagnon prédéfini par défaut", 1, companionState.companions.length);
-  run("compagnons : type du compagnon de test", "buddy", companionState.companions[0].type);
+  // Sans départ : aucun compagnon.
+  run("compagnons : partie sans départ -> aucun compagnon", 0, createInitialState(companionScene, 1).companions.length);
+
+  // Départ avec UN compagnon "follow", déclaré comme dans
+  // config/new-game.js et résolu par le vrai parseNewGame.
+  const COMPANION_START = parseNewGame(
+    { startSceneId: "check", companions: [{ id: "companion-test-dog", type: "dog", behavior: { kind: "follow" } }] },
+    COMPANION_REGISTRY
+  ).start;
+  let companionState = createInitialState(companionScene, 1, COMPANION_START);
+  run("compagnons : le compagnon du départ est présent", 1, companionState.companions.length);
+  run("compagnons : nom hérité de son archétype", "entity.dog.name", companionState.companions[0].labelKey);
   run("compagnons : positionné près du joueur à la création", companionScene.playerStart, companionState.companions[0].x);
 
   // Injection à la LECTURE (voir core/state.js/getActiveWorld) : présent
@@ -75,7 +82,7 @@ export default function checkCompanions(run) {
   run.same(
     "compagnons : n'affecte pas la trajectoire d'une entité du monde (PRNG séparés)",
     runTicks(createInitialState(wanderScene, 42, NO_COMPANIONS), 50).positions,
-    runTicks(createInitialState(wanderScene, 42), 50).positions
+    runTicks(createInitialState(wanderScene, 42, COMPANION_START), 50).positions
   );
 
   // MAX_COMPANIONS : la liste ne dépasse jamais cette limite, même fournie
@@ -98,7 +105,7 @@ export default function checkCompanions(run) {
     COMPANION_REGISTRY
   );
 
-  let companionPartie = createInitialState(companionScene, 1);
+  let companionPartie = createInitialState(companionScene, 1, COMPANION_START);
   // Le joueur avance, le compagnon (follow) le suit : garantit qu'il ne se
   // retrouve pas "par coïncidence" déjà à la position attendue après la
   // transition (contrairement à wander, il ne bouge jamais

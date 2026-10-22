@@ -1,5 +1,5 @@
-// Archétype "buddy" — le compagnon de test prédéfini (voir
-// core/state.js/createTestCompanion). Distinct de "dog" (dog.js) : nameKey
+// Archétype "buddy" — le compagnon de test du départ (voir
+// config/new-game.js). Distinct de "dog" (dog.js) : nameKey
 // partagé ("Chien"), mais SANS beacon (le compagnon suit le joueur de trop
 // près, un "tic tic" continu gênerait l'écoute du reste de la scène) : on
 // le repère à son pas et à sa voix
@@ -34,6 +34,9 @@ export default {
     },
   },
   blocksMovement: false,
-  observable: true,
+  // Non observable : il suit le joueur de près, il entrerait et sortirait
+  // sans cesse de sa zone d'interaction, et serait annoncé à chaque fois
+  // (voir view/occupancy.js).
+  observable: false,
   interactable: false,
 };

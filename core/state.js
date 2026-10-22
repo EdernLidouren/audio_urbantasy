@@ -73,6 +73,7 @@ import { isBlocking, presenceContextOf } from "./presence.js";
 import { INITIAL_TIME } from "./time.js";
 import { createInitialWeather } from "./weather.js";
 import { parseVariables, applyActionEffects } from "./variables.js";
+import { createEmptyEquipment } from "./equipment.js";
 
 function fail(message) {
   throw new Error(`createInitialState: ${message}`);
@@ -99,54 +100,6 @@ const DEFAULT_SEED = 1;
 // nombre arbitraire de plus : jamais un empilement exact, sans inventer un
 // nouveau réglage.
 const COMPANION_SPAWN_SPACING = 2 * BODY_RADIUS;
-
-// Compagnon de test PRÉDÉFINI (comportement "follow", voir
-// core/behaviors/follow.js) : donnée plate, EXACTEMENT la
-// forme qu'une entité de scène obtient en sortie de core/entity-parse.js/
-// parseEntity — le core ne connaît aucun registre de types (jamais importé
-// ici, "buddy" n'est qu'une étiquette opaque, interprétée seulement par la
-// vue, voir entities/types/buddy.js). behavior "follow" SANS surcharge :
-// suit le joueur (cible par défaut) à distance élastique (voir
-// follow.js/DEFAULTS). x laissé à 0 ici : toujours réassigné par
-// repositionCompanions juste après, jamais lu tel quel. Aucun état de
-// comportement : contrairement à wander, follow ne mémorise aucune
-// direction d'un tick à l'autre (recalculée à chaque fois depuis la
-// distance à la cible).
-// sounds : dupliqué à la main depuis entities/types/buddy.js (comme
-// labelKey/descriptionKey ci-dessus) — le rendu audio lit
-// `entity.sounds` (résultat de la cascade de core/entity-parse.js/parseEntity,
-// jamais le registre directement, voir view/audio/entity-sound-entry.js),
-// donc CE champ doit être porté explicitement ici aussi. Risque de dérive ASSUMÉ
-// (même risque que labelKey/descriptionKey déjà) : si buddy.js change ses
-// sons, cette copie ne suit pas automatiquement — le core ne peut PAS
-// importer le registre de contenu pour se resynchroniser lui-même.
-const TEST_COMPANION_SOUNDS = {
-  vocal: {
-    path: "assets/sounds/entities/dog_medium_vocal",
-    loop: false,
-    vocalInterval: 6000,
-    vocalIntervalVariation: 2000,
-    pitchVariation: 0.15,
-  },
-  movement: {
-    path: "assets/sounds/footsteps/entities/dog_medium_walk",
-    loop: false,
-    pitchVariation: 0.08,
-  },
-};
-
-function createTestCompanion() {
-  return {
-    id: "companion-test-dog",
-    type: "buddy",
-    labelKey: "entity.dog.name",
-    descriptionKey: "entity.buddy.description",
-    sounds: TEST_COMPANION_SOUNDS,
-    blocksMovement: false,
-    x: 0,
-    behavior: { kind: "follow" },
-  };
-}
 
 // Replace chaque compagnon près de `playerX` (comme le joueur lui-même,
 // voir createInitialState/travelToWorld) — un léger décalage PAR compagnon
@@ -289,21 +242,39 @@ function createWorldState(scene, seed) {
   return { ...createFaceState(scene, seed), lastVisited: 0 };
 }
 
+// Objets acquis au moins une fois (voir core/bag.js/addItem), DÉDUITS de ce
+// que la partie possède : sac et équipement. Sert au départ d'une partie,
+// qui ne passe pas par addItem, et au rebouchage d'une sauvegarde
+// antérieure (core/save.js). Tolère des entrées mal formées (donnée de
+// disque) en les ignorant.
+export function deriveAcquiredItems(bag, equipment) {
+  const acquiredItems = {};
+  for (const entry of Array.isArray(bag) ? bag : []) {
+    if (entry && typeof entry.type === "string") acquiredItems[entry.type] = true;
+  }
+  for (const slot of Object.values(equipment || {})) {
+    if (slot && typeof slot.type === "string") acquiredItems[slot.type] = true;
+  }
+  return acquiredItems;
+}
+
 // Construit une PARTIE avec un premier monde actif. Le joueur démarre à
-// scene.playerStart (filet à 0 déjà géré par parseScene). seed optionnel
-// (les appelants existants n'en fournissent pas), transmise au premier
-// monde. companions optionnel (voir header) : par défaut, UN compagnon de
-// test prédéfini (comportement réel du jeu — "Nouvelle partie" démarre
-// toujours avec ce compagnon) ; un appelant (core/checks/ en
-// particulier, pour les scénarios qui ne concernent pas les compagnons)
-// peut passer `{ companions: [] }` pour s'en passer explicitement. Toujours
-// plafonné à MAX_COMPANIONS et repositionné près du joueur, quelle que soit
-// la source (défaut ou fournie) — l'invariant "près du joueur, jamais plus
-// de MAX_COMPANIONS" tient dès la construction, pas seulement après une
-// transition.
-export function createInitialState(scene, seed = DEFAULT_SEED, { companions, partyVariables } = {}) {
+// scene.playerStart (filet à 0 déjà géré par parseScene). seed optionnel,
+// transmise au premier monde.
+// Le troisième paramètre est le DÉPART (argent, sac, équipement,
+// compagnons, variables de partie), déjà résolu par
+// core/new-game.js/parseNewGame pour une vraie partie (voir
+// config/new-game.js). Chaque champ absent part VIDE : sans départ, une
+// partie n'a ni argent, ni objet, ni compagnon — les vérifications du core
+// déclarent ainsi seulement ce dont elles ont besoin. Les compagnons sont
+// toujours plafonnés à MAX_COMPANIONS et repositionnés près du joueur,
+// quelle que soit leur source : l'invariant tient dès la construction.
+export function createInitialState(
+  scene,
+  seed = DEFAULT_SEED,
+  { money = 0, bag = [], equipment = createEmptyEquipment(), companions = [], partyVariables } = {}
+) {
   const world = createWorldState(scene, seed);
-  const requestedCompanions = companions ?? [createTestCompanion()];
   return {
     // blockedBy : id de l'entité bloquante contre laquelle le joueur bute CE
     // tick, ou null. pushedBy : id de l'entité dont la résolution de
@@ -321,30 +292,15 @@ export function createInitialState(scene, seed = DEFAULT_SEED, { companions, par
     // Horloge de partie : voir core/time.js. INITIAL_TIME = jour 1, mois 1,
     // à l'heure de départ configurée (config/time-values.js/startHour).
     time: INITIAL_TIME,
-    // Argent : voir core/money.js. Une partie neuve démarre à 0, jamais rien
-    // de plus arbitraire.
-    money: 0,
-    // Sac d'objets : voir core/bag.js/addItem, SEUL point d'écriture. Une
-    // partie neuve démarre avec une paire de rangers ET une paire
-    // d'escarpins DÉJÀ DANS LE SAC (pas équipées) — contenu de départ pour
-    // tester l'échange gait "boots"/"high_heels" et le tag "chic" (porte à
-    // dresscode, voir scenes/demo.json) sans avoir à en ramasser en jeu (voir
-    // core/items.js/ITEM_REGISTRY.combat_boots/high_heels). Rien d'autre :
-    // pas d'argent, ni le reste du contenu ramassable normalement.
-    bag: [{ type: "combat_boots" }, { type: "high_heels" }],
-    // Équipement : voir core/equipment.js. Une partie neuve démarre avec
-    // une paire de baskets déjà ÉQUIPÉE au slot "feet" — jamais posée dans
-    // le sac d'abord : ce n'est pas un ramassage, juste l'état de départ.
-    // Plus naturel que pieds nus, et donne un équipement non vide dès le
-    // premier pas pour l'entendre/le tester (gait "shoes", voir
-    // core/items.js/ITEM_REGISTRY.sneakers).
-    equipment: { feet: { type: "sneakers" } },
-    // Objets déjà acquis au moins une fois (voir core/bag.js/addItem, seul
-    // point d'acquisition en jeu) : le sac et l'équipement de DÉPART ne
-    // passent pas par addItem, ils sont donc notés ici, à la main. À garder
-    // aligné sur les deux champs juste au-dessus.
-    acquiredItems: { combat_boots: true, high_heels: true, sneakers: true },
-    companions: repositionCompanions(requestedCompanions.slice(0, MAX_COMPANIONS), scene.playerStart, scene.length),
+    // Argent (core/money.js), sac (core/bag.js) et équipement
+    // (core/equipment.js) : ceux du départ, vides par défaut.
+    money,
+    bag,
+    equipment,
+    // Le départ ne passe pas par addItem : ses objets sont notés acquis
+    // ici, déduits du sac et de l'équipement, jamais listés à la main.
+    acquiredItems: deriveAcquiredItems(bag, equipment),
+    companions: repositionCompanions(companions.slice(0, MAX_COMPANIONS), scene.playerStart, scene.length),
     // Flux PRNG dédié aux compagnons (voir header) : dérivé du même seed,
     // mais hashé sous une clé distincte — jamais la même suite que le
     // premier monde (createSeed accepte une chaîne, voir core/rng.js).
@@ -493,8 +449,8 @@ export function applyEntityActionEffects(session, entityId, effects, side = sess
 // `spec` est un descripteur d'entité DÉJÀ RÉSOLU (type, labelKey,
 // blocksMovement, observable, interactable, action...) — EXACTEMENT la
 // forme qu'une entité obtient en sortie de core/entity-parse.js/parseEntity,
-// construit par L'APPELANT (voir createTestCompanion plus haut, même
-// principe) : ce module ne connaît AUCUN registre de types, `spec.type`
+// construit par L'APPELANT (par parseSpawnedEntity, comme le fait
+// core/spawn.js) : ce module ne connaît AUCUN registre de types, `spec.type`
 // reste une étiquette opaque, jamais résolue ici — c'est la VUE qui sait
 // traduire un type en sons/rendu (voir view/audio/entity-sound-entry.js).
 //

@@ -40,7 +40,7 @@ export default function checkTrade(run) {
 
   // Sac de test : 5 pommes (empilable), 2 clés (non empilable, deux
   // entrées), 1 paire de baskets (non empilable, vendable).
-  let tradeState = { ...createInitialState(moneyScene, undefined, NO_COMPANIONS), bag: [] };
+  let tradeState = createInitialState(moneyScene, undefined, NO_COMPANIONS);
   tradeState = addItem(tradeState, "apple", 5);
   tradeState = addItem(tradeState, "key_bronze", 2);
   tradeState = addItem(tradeState, "sneakers", 1);

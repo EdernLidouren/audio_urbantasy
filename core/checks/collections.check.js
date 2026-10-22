@@ -17,16 +17,16 @@ import {
   resetAllCollections,
 } from "../collections.js";
 import { throws } from "../../lib/check.js";
-import { NO_COMPANIONS } from "./helpers.js";
+import { ITEM_START } from "./helpers.js";
 
 export default function checkCollections(run) {
   // --- Collections (core/collections.js) : le fait neutre "objet acquis"
   // (core/bag.js/addItem), la découverte qui s'en déduit, la sauvegarde. ---
   const TEST_COLLECTIONS = { parts: { entries: [{ item: "apple" }, { item: "coin" }, { item: "sneakers" }] } };
   const collCollectionScene = parseScene({ id: "collections", titleKey: "scene.demo.name", length: 10, playerStart: 0, entities: [] }, {});
-  const collFreshCollections = createInitialState(collCollectionScene, "collections", NO_COMPANIONS);
+  const collFreshCollections = createInitialState(collCollectionScene, "collections", ITEM_START);
   run(
-    "collections : partie neuve -> sac et équipement de départ notés acquis",
+    "collections : départ -> sac et équipement de départ notés acquis",
     "combat_boots,high_heels,sneakers",
     Object.keys(collFreshCollections.acquiredItems).sort().join(",")
   );

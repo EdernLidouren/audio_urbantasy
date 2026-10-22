@@ -149,8 +149,8 @@ function stepEntities(entities, context) {
 // (commun aux trois kinds, validé par chacun) PRIME sur `entity.speed`
 // (voir core/entity-parse.js/parseEntity, défaut 1) : une règle qui change de
 // comportement (effet "behavior") change donc aussi d'allure. `?? 1` :
-// filet pour une entité qui ne passe pas par la cascade (ex. un compagnon,
-// core/state.js/createTestCompanion).
+// filet pour une entité qui n'est pas passée par la cascade (ex. un
+// compagnon d'une sauvegarde antérieure à config/new-game.js).
 function resolveIntents(results, blockerPool, length, presenceContext) {
   return results.map(({ entity, intent }) => {
     if (intent === undefined) return entity;
