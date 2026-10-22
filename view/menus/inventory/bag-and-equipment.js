@@ -9,7 +9,7 @@
 import { t } from "../../../data/i18n/index.js";
 import { pushScreen, popScreen } from "../../../lib/screens.js";
 import { withPausedBeacons } from "../../paused-beacons.js";
-import { makeMenuScreen } from "../../../lib/menu.js";
+import { makeMenuScreen, createHoldRepeat, heldStep, shouldAnnounceAdjustment } from "../../../lib/menu.js";
 import { announce, stripTrailingPeriod } from "../../../lib/announce.js";
 import { playMenuSound } from "../../menu-sounds.js";
 import { ITEM_REGISTRY } from "../../../core/items.js";
@@ -19,30 +19,37 @@ import { TUNING_DEFAULTS } from "../../../config/tuning-values.js";
 
 // Bindings du sélecteur de quantité (voir openQuantitySelector plus bas) —
 // aucun -> ±1, Maj -> pas intermédiaire, Ctrl -> grand pas (réglages
-// bagQuantity*Step, config/tuning-values.js), chacun une action DISTINCTE (mods exige une correspondance EXACTE, voir
-// lib/input.js) plutôt qu'un magnitude lue sur l'évènement.
+// bagQuantity*Step, config/tuning-values.js), chacun une action DISTINCTE
+// (mods exige une correspondance EXACTE, voir lib/input.js) plutôt qu'une
+// amplitude lue sur l'évènement. Mêmes noms d'action que la liste de la
+// boutique (view/menus/shop-quantity-list.js).
 const QUANTITY_BINDINGS = {
   decrease: { keys: ["ArrowLeft"], mods: [] },
-  decreaseBig: { keys: ["ArrowLeft"], mods: ["shift"] },
-  decreaseBigger: { keys: ["ArrowLeft"], mods: ["ctrl"] },
+  decreaseMedium: { keys: ["ArrowLeft"], mods: ["shift"] },
+  decreaseBig: { keys: ["ArrowLeft"], mods: ["ctrl"] },
   increase: { keys: ["ArrowRight"], mods: [] },
-  increaseBig: { keys: ["ArrowRight"], mods: ["shift"] },
-  increaseBigger: { keys: ["ArrowRight"], mods: ["ctrl"] },
+  increaseMedium: { keys: ["ArrowRight"], mods: ["shift"] },
+  increaseBig: { keys: ["ArrowRight"], mods: ["ctrl"] },
   confirm: { keys: ["Enter", " "], mods: [] },
   cancel: { keys: ["Escape"], mods: [] },
 };
 checkBindingsForCollisions(QUANTITY_BINDINGS, "view/menus/inventory/bag-and-equipment.js QUANTITY_BINDINGS");
 
-// Amplitude signée de chaque action d'ajustement — un seul endroit à lire
-// pour connaître le pas d'une action donnée, jamais dupliqué dans
-// openQuantitySelector.
-const QUANTITY_STEP_BY_ACTION = {
-  decrease: -1,
-  decreaseBig: -TUNING_DEFAULTS.bagQuantityMediumStep,
-  decreaseBigger: -TUNING_DEFAULTS.bagQuantityBigStep,
-  increase: 1,
-  increaseBig: TUNING_DEFAULTS.bagQuantityMediumStep,
-  increaseBigger: TUNING_DEFAULTS.bagQuantityBigStep,
+// Amplitude d'un cran selon le modificateur (config/tuning-values.js).
+const QUANTITY_STEPS = {
+  normal: 1,
+  medium: TUNING_DEFAULTS.bagQuantityMediumStep,
+  big: TUNING_DEFAULTS.bagQuantityBigStep,
+};
+
+// Direction et palier de chaque action d'ajustement ponctuelle.
+const QUANTITY_ADJUSTMENTS = {
+  decrease: [-1, "normal"],
+  decreaseMedium: [-1, "medium"],
+  decreaseBig: [-1, "big"],
+  increase: [1, "normal"],
+  increaseMedium: [1, "medium"],
+  increaseBig: [1, "big"],
 };
 
 // Noms d'affichage des slots d'équipement (core/equipment.js/EQUIPMENT_SLOTS)
@@ -361,16 +368,19 @@ function buildDropMessage(getSession, entry, itemLabelKey, quantity, index) {
 //     fermeture de cet écran ;
 //   - le slider existant ne connaît qu'UN SEUL palier d'incrément (Ctrl ->
 //     bigStep) ; ce sélecteur en veut TROIS (aucun, Maj, Ctrl — voir
-//     QUANTITY_STEP_BY_ACTION).
-// La mécanique de SLIDER de lib/menu.js reste donc inutilisée ici ; les
-// touches du sélecteur passent, elles, par des bindings résolus comme
-// partout (lib/input.js/resolveAction).
+//     QUANTITY_STEPS).
+// L'écran slider de lib/menu.js reste donc inutilisé ici, mais ses briques
+// d'ajustement sont partagées : maintien (createHoldRepeat, heldStep) et
+// règle d'annonce à la borne (shouldAnnounceAdjustment), comme la liste de
+// la boutique. Les touches passent par des bindings résolus comme partout
+// (lib/input.js/resolveAction).
 // Ctrl+Shift+flèche à la fois : mods exige une correspondance EXACTE (voir
 // lib/input.js), donc AUCUNE action ne résout pour cette combinaison —
 // jamais rencontré en pratique, accepté tel quel. L'imitation reste
 // volontairement fidèle à l'esprit d'un slider pour une expérience
 // cohérente : annonce de la SEULE valeur à chaque ajustement (comme
-// lib/menu.js/adjustSlider), bornée [1, max], son "select" à la validation
+// lib/menu.js/adjustSlider), bornée [1, max], son "toggle" sur un cran qui
+// change la valeur et "block" contre une borne, son "select" à la validation
 // (lib/menu.js le joue automatiquement pour une entrée "action" via
 // activateOrReannounce — ici on le déclenche nous-mêmes, cet écran ne passant
 // jamais par ce mécanisme). Ne pause/reprend PAS les balises lui-même : le
@@ -378,25 +388,36 @@ function buildDropMessage(getSession, entry, itemLabelKey, quantity, index) {
 // ouverture et ne s'en dépossède qu'à SA propre sortie.
 function openQuantitySelector(getSession, entry, itemLabelKey, max, index) {
   let quantity = 1;
+  const hold = createHoldRepeat();
 
-  function clampQuantity(value) {
-    return Math.min(Math.max(value, 1), max);
-  }
-
-  function adjust(delta) {
-    quantity = clampQuantity(quantity + delta);
+  // `held` : cran de maintien plutôt qu'appui ponctuel (voir
+  // lib/menu.js/shouldAnnounceAdjustment).
+  function adjust(direction, step, held) {
+    const wanted = quantity + direction * step;
+    const next = Math.min(Math.max(wanted, 1), max);
+    playMenuSound(next === wanted ? "toggle" : "block");
+    const changed = next !== quantity;
+    quantity = next;
     // Valeur SEULE, jamais le label : retour immédiat à un ajustement,
     // le contexte complet ayant déjà été entendu à l'ouverture.
-    announce(String(quantity), { assertive: true });
+    if (shouldAnnounceAdjustment(changed, held)) announce(String(quantity), { assertive: true });
   }
 
   const screen = {
+    // Maintien gauche/droite (même modèle que lib/menu.js : modificateur
+    // relu à chaque cran).
+    onTick() {
+      const direction = hold.due();
+      if (direction !== 0) adjust(direction, heldStep(QUANTITY_STEPS), true);
+    },
     onKeyDown(event) {
       const action = resolveAction(QUANTITY_BINDINGS, event.key, event.mods);
 
-      if (action in QUANTITY_STEP_BY_ACTION) {
+      if (action in QUANTITY_ADJUSTMENTS) {
         event.preventDefault();
-        adjust(QUANTITY_STEP_BY_ACTION[action]);
+        const [direction, step] = QUANTITY_ADJUSTMENTS[action];
+        hold.press();
+        adjust(direction, QUANTITY_STEPS[step], false);
       } else if (action === "confirm") {
         event.preventDefault();
         playMenuSound("select");

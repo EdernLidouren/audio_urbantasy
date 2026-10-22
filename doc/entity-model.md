@@ -610,7 +610,13 @@ prévu, pas construit). Prix d'achat : `price` de l'article, sinon `value`
   `"{choisi}, {sous-total de la ligne}"` (fluide en ajustement répété,
   jamais le grand total à chaque cran) ; le GRAND TOTAL ("Vendre/Acheter N
   … pour M pièces") est le TITRE, dit à l'ouverture et à la demande (Retour
-  arrière).
+  arrière). RÈGLE DE BORNE, commune à TOUS les écrans d'ajustement
+  (sliders des menus, cette liste, sélecteur de quantité du sac —
+  `lib/menu.js`/`shouldAnnounceAdjustment`) : contre une borne ou sur un
+  refus, la valeur (ou le message) n'est dite qu'à un appui ponctuel ; en
+  MAINTIEN contre le mur, seul le son se répète, pour que le lecteur
+  d'écran ne réannonce pas en boucle la même chose. Relâcher puis rappuyer
+  la redit.
 - **Validation** — rien de sélectionné -> "Aucun objet/article
   sélectionné.", jamais une confirmation vide ; sinon confirmation DÉTAILLÉE
   (titre dynamique via `lib/menu.js`/`titleParams` : total + "Pomme × 3,
@@ -687,9 +693,11 @@ notés à la main.
   -> ±10, Ctrl -> ±100, `bagQuantityMediumStep`/`bagQuantityBigStep`,
   `config/tuning-values.js`) alors que le slider n'en connaît qu'UN (Ctrl ->
   `bigStep`). Même convention partout : Maj = pas intermédiaire, Ctrl =
-  grand pas. `lib/menu.js` reste donc intact — imitation fidèle de son
-  esprit (annonce de la seule valeur à l'ajustement, bornée, son "select" à
-  la validation), pas une réutilisation littérale.
+  grand pas. L'écran slider de `lib/menu.js` n'est donc pas réutilisé,
+  mais ses briques d'ajustement le sont : maintien (même délai initial et
+  même cadence), sons ("toggle" sur un cran qui change la valeur, "block"
+  contre une borne), annonce de la seule valeur et RÈGLE DE BORNE commune
+  (voir "Vente et achat"/"Annonces"). Son "select" à la validation.
 - **Effet CORE pur** — `core/bag.js`/`dropItem` : `removeItem` (retire la
   quantité choisie du sac) PUIS `spawnEphemeral` (fait apparaître l'objet au
   sol), composés atomiquement. **UNE SEULE entité éphémère porte TOUTE la

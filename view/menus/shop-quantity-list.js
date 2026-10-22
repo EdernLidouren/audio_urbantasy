@@ -6,8 +6,9 @@
 // quantité de l'inventaire (valeur TRANSITOIRE, pas une préférence
 // persistée ; Entrée = +1 ; Suppr = 0 ; Maj = pas intermédiaire, Ctrl =
 // grand pas) — voir view/menus/inventory/bag-and-equipment.js/
-// openQuantitySelector. Même rythme de maintien que les sliders de
-// lib/menu.js.
+// openQuantitySelector. Même maintien, mêmes sons et même règle d'annonce
+// à la borne que les sliders de lib/menu.js (createHoldRepeat,
+// shouldAnnounceAdjustment).
 // ERGONOMIE lecteur d'écran : l'entrée COMPLÈTE n'est dite qu'à la
 // NAVIGATION ; un ajustement n'annonce que "<quantité>, <sous-total de la
 // ligne>" (fluide en ajustement répété, maintien de touche compris) ; le
@@ -16,11 +17,11 @@
 import { t } from "../../data/i18n/index.js";
 import { pushScreen, popScreen } from "../../lib/screens.js";
 import { openConfirmation } from "./confirmation.js";
-import { SLIDER_REPEAT_DELAY_MS, SLIDER_REPEAT_INTERVAL_MS } from "../../lib/menu.js";
+import { createHoldRepeat, heldStep, shouldAnnounceAdjustment } from "../../lib/menu.js";
 import { TUNING_DEFAULTS } from "../../config/tuning-values.js";
 import { announce, stripTrailingPeriod } from "../../lib/announce.js";
 import { playMenuSound } from "../menu-sounds.js";
-import { resolveAction, checkBindingsForCollisions, isHeld, isModActive } from "../../lib/input.js";
+import { resolveAction, checkBindingsForCollisions } from "../../lib/input.js";
 import { getPref } from "../../config/preferences.js";
 
 // Bindings du menu à sliders. Entrée/Espace : +1 sur une ligne, ACTIVE une
@@ -56,14 +57,6 @@ const QUANTITY_STEPS = {
   medium: TUNING_DEFAULTS.shopQuantityMediumStep,
   big: TUNING_DEFAULTS.shopQuantityBigStep,
 };
-
-// Cran du MAINTIEN : modificateur relu à chaque répétition (Ctrl prime sur
-// Maj), comme les sliders de lib/menu.js.
-function heldStep() {
-  if (isModActive("ctrl")) return QUANTITY_STEPS.big;
-  if (isModActive("shift")) return QUANTITY_STEPS.medium;
-  return QUANTITY_STEPS.normal;
-}
 
 export function selectedCount(lines) {
   return lines.reduce((count, line) => count + line.selected, 0);
@@ -101,9 +94,8 @@ export function openQuantityList(spec) {
   ];
   const total = () => lines.length + actions.length;
   let cursor = 0;
-  // Instant à partir duquel le maintien peut produire son prochain cran
-  // (voir lib/menu.js, même mécanisme).
-  let nextRepeatAt = -Infinity;
+  // Cadence du maintien (voir lib/menu.js/createHoldRepeat).
+  const hold = createHoldRepeat();
 
   const isLine = (index) => index < lines.length;
 
@@ -170,13 +162,12 @@ export function openQuantityList(spec) {
   // "block" sans message) ; puis, pour un incrément, la CONDITION de
   // `allowedIncrease` (argent) — SEULE source de refus avec message, et
   // c'est le son "refusal" (voir view/menu-sounds.js) qui l'accompagne.
-  // Annonce : quantité + SOUS-TOTAL de la ligne, rien d'autre. `step` :
-  // amplitude d'un cran (QUANTITY_STEPS). `nextDelayMs`
-  // : délai avant le prochain cran de maintien (long après un appui, court
-  // entre deux crans de maintien) — posé même sur un refus, pour qu'un
-  // maintien à la borne ne mitraille pas le son "block".
-  function adjust(direction, step, nextDelayMs = SLIDER_REPEAT_DELAY_MS) {
-    nextRepeatAt = performance.now() + nextDelayMs;
+  // Annonce : quantité + SOUS-TOTAL de la ligne, rien d'autre, et à une
+  // borne ou sur un refus seulement à un appui ponctuel (voir
+  // lib/menu.js/shouldAnnounceAdjustment) : un maintien contre le mur ne
+  // fait entendre que son son. `step` : amplitude d'un cran
+  // (QUANTITY_STEPS). `held` : cran de maintien plutôt qu'appui.
+  function adjust(direction, step, held) {
     if (!isLine(cursor)) {
       playMenuSound("block");
       return;
@@ -189,14 +180,20 @@ export function openQuantityList(spec) {
       const allowed = spec.allowedIncrease(line, delta);
       if (allowed.delta <= 0) {
         playMenuSound("refusal");
-        announce(t(allowed.refusalKey), { assertive: true });
+        if (shouldAnnounceAdjustment(false, held)) announce(t(allowed.refusalKey), { assertive: true });
         return;
       }
       delta = allowed.delta;
     }
     playMenuSound(bounded === wanted && delta !== 0 ? "toggle" : "block");
     line.selected += delta;
-    announceLine(line);
+    if (shouldAnnounceAdjustment(delta !== 0, held)) announceLine(line);
+  }
+
+  // Appui ponctuel gauche/droite : arme le maintien, joue le cran.
+  function press(direction, step) {
+    hold.press();
+    adjust(direction, step, false);
   }
 
   function reset() {
@@ -213,7 +210,7 @@ export function openQuantityList(spec) {
   // Entrée/Espace : +1 sur une ligne, activation sur une action.
   function confirm() {
     if (isLine(cursor)) {
-      adjust(1, false);
+      adjust(1, QUANTITY_STEPS.normal, false);
       return;
     }
     playMenuSound("select");
@@ -249,12 +246,12 @@ export function openQuantityList(spec) {
     down: () => moveCursor(1),
     home: () => moveCursorTo(0),
     end: () => moveCursorTo(total() - 1),
-    decrease: () => adjust(-1, QUANTITY_STEPS.normal),
-    decreaseMedium: () => adjust(-1, QUANTITY_STEPS.medium),
-    decreaseBig: () => adjust(-1, QUANTITY_STEPS.big),
-    increase: () => adjust(1, QUANTITY_STEPS.normal),
-    increaseMedium: () => adjust(1, QUANTITY_STEPS.medium),
-    increaseBig: () => adjust(1, QUANTITY_STEPS.big),
+    decrease: () => press(-1, QUANTITY_STEPS.normal),
+    decreaseMedium: () => press(-1, QUANTITY_STEPS.medium),
+    decreaseBig: () => press(-1, QUANTITY_STEPS.big),
+    increase: () => press(1, QUANTITY_STEPS.normal),
+    increaseMedium: () => press(1, QUANTITY_STEPS.medium),
+    increaseBig: () => press(1, QUANTITY_STEPS.big),
     reset: () => reset(),
     confirm: () => confirm(),
     total: () => announce(`${title()}. ${entryLine(cursor)}`, { assertive: true }),
@@ -273,14 +270,11 @@ export function openQuantityList(spec) {
       announce(`${title()}. ${entryLine(cursor)}`, { assertive: true });
     },
     // Maintien gauche/droite sur une ligne (même modèle que lib/menu.js :
-    // isHeld relu au tick, modificateur relu à chaque déclenchement).
+    // modificateur relu à chaque cran).
     onTick() {
       if (!isLine(cursor)) return;
-      const left = isHeld("ArrowLeft");
-      const right = isHeld("ArrowRight");
-      if (left === right) return;
-      if (performance.now() < nextRepeatAt) return;
-      adjust(left ? -1 : 1, heldStep(), SLIDER_REPEAT_INTERVAL_MS);
+      const direction = hold.due();
+      if (direction !== 0) adjust(direction, heldStep(QUANTITY_STEPS), true);
     },
     onKeyDown(event) {
       const action = resolveAction(LIST_BINDINGS, event.key, event.mods);
