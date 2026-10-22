@@ -9,7 +9,7 @@ import { tick } from "../actions.js";
 import { reduce } from "../reduce.js";
 import { serializeGame, deserializeGame } from "../save.js";
 import { DEFAULT_SURFACE, surfaceAt } from "../surfaces.js";
-import { NO_COMPANIONS, EMPTY_REGISTRY, expectSceneParseThrows } from "./helpers.js";
+import { EMPTY_REGISTRY, expectSceneParseThrows } from "./helpers.js";
 
 export default function checkScene(run) {
   // --- Parsing TOTAL de scène (core/scene.js/parseScene) : l'ABSENCE de
@@ -30,7 +30,7 @@ export default function checkScene(run) {
 
     // Jouable de bout en bout : spawn, déplacement, surface — jamais de
     // lecture sur du undefined, jamais d'exception.
-    let emptyState = createInitialState(emptyScene, undefined, NO_COMPANIONS);
+    let emptyState = createInitialState(emptyScene);
     run("parseScene({}) : le joueur apparaît à playerStart (0)", 0, emptyState.player.x);
     emptyState = reduce(emptyState, tick(1));
     emptyState = reduce(emptyState, tick(1));
@@ -44,7 +44,7 @@ export default function checkScene(run) {
 
     // Clamp à droite : la longueur minimale reste bornée normalement.
     // Largement assez de ticks (MOVE_STEP par tick) pour dépasser length=10.
-    let clampState = createInitialState(emptyScene, undefined, NO_COMPANIONS);
+    let clampState = createInitialState(emptyScene);
     for (let i = 0; i < 500; i++) clampState = reduce(clampState, tick(1));
     run("parseScene({}) : clamp à droite sur la longueur minimale (10)", 10, clampState.player.x);
 

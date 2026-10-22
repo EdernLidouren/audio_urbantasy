@@ -13,7 +13,6 @@ import { TIME_CONFIG } from "../../config/time-values.js";
 import { isPresent, resolveEntityRules } from "../presence.js";
 import { throws } from "../../lib/check.js";
 import { TICK_MS } from "../../lib/loop.js";
-import { NO_COMPANIONS } from "./helpers.js";
 
 export default function checkRoutines(run) {
   // --- Routine complète (habitant) : jour -> départ -> arrivée
@@ -67,7 +66,7 @@ export default function checkRoutines(run) {
 
   // Jour (INITIAL_TIME = 8h) : présente, comportement "wander" — jamais
   // "goto" avant 20h.
-  let dayRoutineState = createInitialState(routineScene, 7, NO_COMPANIONS);
+  let dayRoutineState = createInitialState(routineScene, 7);
   for (let i = 0; i < 50; i++) dayRoutineState = reduce(dayRoutineState, tick(0));
   run("routine : le jour — présente", true, resident(dayRoutineState).present);
   run("routine : le jour — comportement 'wander'", "wander", resident(dayRoutineState).behavior.kind);
@@ -88,7 +87,7 @@ export default function checkRoutines(run) {
 
   // 20h : bascule vers "goto" — se dirige vers la porte, reste présente
   // (elle n'a pas encore atteint la porte).
-  let eveningRoutineState = createInitialState(routineScene, 7, NO_COMPANIONS);
+  let eveningRoutineState = createInitialState(routineScene, 7);
   eveningRoutineState = advanceTime(eveningRoutineState, 12 * 60); // 8h -> 20h
   eveningRoutineState = reduce(eveningRoutineState, tick(0));
   run("routine : à 20h — comportement bascule vers 'goto'", "goto", resident(eveningRoutineState).behavior.kind);
@@ -119,7 +118,7 @@ export default function checkRoutines(run) {
     }),
     ROUTINE_REGISTRY
   );
-  let blockedRoutineState = createInitialState(blockedRoutineScene, 7, NO_COMPANIONS);
+  let blockedRoutineState = createInitialState(blockedRoutineScene, 7);
   blockedRoutineState = advanceTime(blockedRoutineState, 12 * 60); // -> 20h
   for (let i = 0; i < 500; i++) blockedRoutineState = reduce(blockedRoutineState, tick(0));
   run("routine : bloquée par un obstacle — jamais arrivée", undefined, resident(blockedRoutineState).gotoArrived);
@@ -144,7 +143,7 @@ export default function checkRoutines(run) {
     }),
     ROUTINE_REGISTRY
   );
-  let missingDoorRoutineState = createInitialState(missingDoorRoutineScene, 7, NO_COMPANIONS);
+  let missingDoorRoutineState = createInitialState(missingDoorRoutineScene, 7);
   missingDoorRoutineState = advanceTime(missingDoorRoutineState, 12 * 60); // -> 20h
   const missingDoorThrew = throws(() => {
     for (let i = 0; i < 100; i++) missingDoorRoutineState = reduce(missingDoorRoutineState, tick(0));
@@ -338,7 +337,7 @@ export default function checkRoutines(run) {
   // resolveEntityRules, "premier calcul compte comme une bascule"),
   // convergence vers la porte dès le premier tick, AUCUN comportement de
   // repos déclaré au départ (contrairement à resident-1 plus haut).
-  let homeState = createInitialState(homeRoutineScene, 7, NO_COMPANIONS);
+  let homeState = createInitialState(homeRoutineScene, 7);
   for (let i = 0; i < 1000; i++) homeState = reduce(homeState, tick(0));
   run("routine sans repos (jour 1) : arrivée à la porte -> gotoArrived posé", true, homeResident(homeState).gotoArrived);
   run("routine sans repos (jour 1) : arrivée -> dormante", false, homeResident(homeState).present);
@@ -438,7 +437,7 @@ export default function checkRoutines(run) {
   // comportement bascule vers "goto" — 20 minutes suffisent à couvrir toute
   // la fourchette possible (5h55 à 6h05) avec marge.
   function runBarDepartures(seed) {
-    let state = createInitialState(barScene, seed, NO_COMPANIONS);
+    let state = createInitialState(barScene, seed);
     state = advanceToMinuteOfDay(state, 5 * 60 + 50);
     const departureMinute = Object.fromEntries(BAR_PATRON_IDS.map((id) => [id, null]));
     for (let elapsed = 0; elapsed < 20; elapsed++) {
@@ -498,7 +497,7 @@ export default function checkRoutines(run) {
     },
     BAR_REGISTRY
   );
-  let noSpreadState = createInitialState(barSceneNoSpread, 2024, NO_COMPANIONS);
+  let noSpreadState = createInitialState(barSceneNoSpread, 2024);
   noSpreadState = advanceToMinuteOfDay(noSpreadState, 5 * 60 + 59);
   noSpreadState = advanceTime(noSpreadState, 1);
   noSpreadState = reduce(noSpreadState, tick(0));

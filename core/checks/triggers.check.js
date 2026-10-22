@@ -10,7 +10,7 @@ import { reduce } from "../reduce.js";
 import { TIME_CONFIG } from "../../config/time-values.js";
 import { hourChanged, dueTriggerEffects, applyDueTriggers } from "../triggers.js";
 import { auditNonSerializable, diffStructure, throws } from "../../lib/check.js";
-import { NO_COMPANIONS, RAW_SCENE } from "./helpers.js";
+import { RAW_SCENE } from "./helpers.js";
 
 export default function checkTriggers(run) {
   // --- Triggers horaires (core/triggers.js) : validation, détection sur
@@ -110,7 +110,7 @@ export default function checkTriggers(run) {
   // Application sur une session : monde actif, DEUX faces, joueur au
   // recto. Le temps est posé directement (session.time), comme le ferait
   // advanceTime.
-  const triggerBase = createInitialState(triggerScene, 3, NO_COMPANIONS);
+  const triggerBase = createInitialState(triggerScene, 3);
   const atTime = (session, time) => ({ ...session, time });
   // Un tick à 9h10 résout la présence (sleeper dormante) — une entité dont
   // la présence n'a pas encore été résolue compte comme présente.
@@ -153,7 +153,7 @@ export default function checkTriggers(run) {
     { ...RAW_SCENE, id: "movement-check-triggers-simple", entities: [{ id: "bell", type: "bell", x: 5, triggers: [BELL_TRIGGER] }] },
     HOUR_TRIGGER_REGISTRY
   );
-  const triggerSimple = atTime(createInitialState(triggerSimpleScene, 3, NO_COMPANIONS), 9 * HOUR);
+  const triggerSimple = atTime(createInitialState(triggerSimpleScene, 3), 9 * HOUR);
   run("triggers : monde simple -> la cloche tire", 1, applyDueTriggers(atTime(triggerSimple, 10 * HOUR), triggerSimple.time).fired.length);
 
   // Sérialisabilité : `triggers` est de la donnée pure sur l'entité.

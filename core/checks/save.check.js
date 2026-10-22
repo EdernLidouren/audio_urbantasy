@@ -22,7 +22,7 @@ import { shopArticles } from "../trade.js";
 import { DEFAULT_WEATHER_STATE } from "../../config/weather-values.js";
 import { throws, auditNonSerializable, diffStructure } from "../../lib/check.js";
 import { TICK_MS } from "../../lib/loop.js";
-import { NO_COMPANIONS, WORLD_A_REGISTRY, TWO_FACED_RAW_SCENE, createAuditFixture } from "./helpers.js";
+import { WORLD_A_REGISTRY, TWO_FACED_RAW_SCENE, createAuditFixture } from "./helpers.js";
 
 export default function checkSave(run) {
   // Fixtures partagées avec d'autres domaines (voir ./helpers.js).
@@ -471,7 +471,7 @@ export default function checkSave(run) {
   // segments/nextEphemeralId/indoor — même précédent que le monde simple
   // ci-dessus (core/save.js/backfillFace), mais chaque face doit être
   // rebouchée INDÉPENDAMMENT (voir core/save.js/backfillWorld).
-  const freshTwoFaceSession = createInitialState(twoFacedScene, 42, NO_COMPANIONS);
+  const freshTwoFaceSession = createInitialState(twoFacedScene, 42);
   const freshTwoFaceWorld = freshTwoFaceSession.worlds[twoFaceWorldId];
   const {
     defaultSurface: _droppedRectoSurface,
@@ -523,7 +523,7 @@ export default function checkSave(run) {
   // --- Sauvegarde : objet absent du registre retiré du sac / de
   // l'équipement, et listé pour l'avertissement. ---
   {
-    const base = createInitialState(parseScene({ id: "items", titleKey: "scene.demo.name", length: 5, playerStart: 0, entities: [] }, {}), "items", NO_COMPANIONS);
+    const base = createInitialState(parseScene({ id: "items", titleKey: "scene.demo.name", length: 5, playerStart: 0, entities: [] }, {}), "items");
     const corrupted = {
       ...base,
       bag: [...base.bag, { type: "removed_item", quantity: 2 }],

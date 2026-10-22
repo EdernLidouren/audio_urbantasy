@@ -12,7 +12,7 @@ import { evaluateCondition, isPresent, resolveEntityRules } from "../presence.js
 import { DEFAULTS as WANDER_DEFAULTS } from "../behaviors/wander.js";
 import { throws } from "../../lib/check.js";
 import { TICK_MS } from "../../lib/loop.js";
-import { NO_COMPANIONS, WANDER_REGISTRY, makeWanderScene, runTicks } from "./helpers.js";
+import { WANDER_REGISTRY, makeWanderScene, runTicks } from "./helpers.js";
 
 export default function checkBehaviors(run) {
   // --- Errance (behavior wander) : machine à deux états (marche/pause),
@@ -28,8 +28,8 @@ export default function checkBehaviors(run) {
   // Même seed, même suite de ticks -> trajectoire ET séquence de phases
   // identiques, pas seulement la position finale (le tirage de durée/
   // direction doit, lui aussi, rester déterministe).
-  const run1 = runTicks(createInitialState(wanderScene, 42, NO_COMPANIONS), 400);
-  const run2 = runTicks(createInitialState(wanderScene, 42, NO_COMPANIONS), 400);
+  const run1 = runTicks(createInitialState(wanderScene, 42), 400);
+  const run2 = runTicks(createInitialState(wanderScene, 42), 400);
   run.same("errance : trajectoire reproductible (même seed)", run1.positions, run2.positions);
   run.same("errance : séquence de phases reproductible (même seed)", run1.phases, run2.phases);
 
@@ -79,7 +79,7 @@ export default function checkBehaviors(run) {
     }),
     WANDER_REGISTRY
   );
-  const machineRun = runTicks(createInitialState(machineScene, 99, NO_COMPANIONS), 300);
+  const machineRun = runTicks(createInitialState(machineScene, 99), 300);
   const machineRuns = phaseRuns(machineRun.phases);
   const completeMachineRuns = machineRuns.slice(1, -1); // écarte la 1ère (déjà en cours) et la dernière (pas finie)
   run("errance : plusieurs plages complètes observées (fourchettes serrées)", true, completeMachineRuns.length >= 10);
@@ -101,7 +101,7 @@ export default function checkBehaviors(run) {
   // absolu dans un sens ou dans l'autre, jamais l'intention).
   const machineDirs = [];
   {
-    let s = createInitialState(machineScene, 99, NO_COMPANIONS);
+    let s = createInitialState(machineScene, 99);
     let previousPhase = null;
     for (let i = 0; i < 300; i++) {
       s = reduce(s, tick(0));
@@ -126,7 +126,7 @@ export default function checkBehaviors(run) {
     }),
     WANDER_REGISTRY
   );
-  let boundaryState = createInitialState(boundaryScene, 7, NO_COMPANIONS);
+  let boundaryState = createInitialState(boundaryScene, 7);
   const boundaryXs = [];
   const boundaryDirs = new Set();
   for (let i = 0; i < 40; i++) {
@@ -153,7 +153,7 @@ export default function checkBehaviors(run) {
     }),
     WANDER_REGISTRY
   );
-  let obstacleState = createInitialState(obstacleScene, 7, NO_COMPANIONS);
+  let obstacleState = createInitialState(obstacleScene, 7);
   const obstacleXs = [];
   const obstacleDirs = new Set();
   for (let i = 0; i < 60; i++) {
@@ -239,7 +239,7 @@ export default function checkBehaviors(run) {
   // Cible hors de portée (distance 15 > maxDistance 3) : le suiveur se
   // rapproche, jusqu'à entrer dans la zone morte — puis s'arrête, sans
   // jamais coller à la cible (distance >= minDistance en permanence).
-  let followState = createInitialState(followScene, 1, NO_COMPANIONS);
+  let followState = createInitialState(followScene, 1);
   for (let i = 0; i < 500; i++) followState = reduce(followState, tick(0));
   const followerSettled = followerX(followState);
   run("follow : se rapproche d'une cible hors de portée", true, followerSettled > 0);
@@ -262,7 +262,7 @@ export default function checkBehaviors(run) {
     }),
     FOLLOW_REGISTRY
   );
-  let closeState = createInitialState(closeScene, 1, NO_COMPANIONS);
+  let closeState = createInitialState(closeScene, 1);
   for (let i = 0; i < 100; i++) closeState = reduce(closeState, tick(0));
   run("follow : ne recule jamais quand la cible est trop proche", 9.7, followerX(closeState));
 
@@ -278,8 +278,8 @@ export default function checkBehaviors(run) {
     }
     return positions;
   }
-  const followRun1 = runFollowTicks(createInitialState(followScene, 1, NO_COMPANIONS), 100);
-  const followRun2 = runFollowTicks(createInitialState(followScene, 1, NO_COMPANIONS), 100);
+  const followRun1 = runFollowTicks(createInitialState(followScene, 1), 100);
+  const followRun2 = runFollowTicks(createInitialState(followScene, 1), 100);
   run.same("follow : trajectoire reproductible (déterministe, sans PRNG)", followRun1, followRun2);
 
   // minDistance >= maxDistance : incohérent (zone morte nulle ou inversée),
@@ -323,7 +323,7 @@ export default function checkBehaviors(run) {
     },
     FOLLOW_REGISTRY
   );
-  let followPassState = createInitialState(passScene, 1, NO_COMPANIONS);
+  let followPassState = createInitialState(passScene, 1);
   // Le joueur reste immobile : le suiveur (distance 5 > 3) se rapproche et
   // se stabilise derrière lui, à gauche.
   for (let i = 0; i < 300; i++) followPassState = reduce(followPassState, tick(0));
@@ -359,7 +359,7 @@ export default function checkBehaviors(run) {
     },
     FOLLOW_REGISTRY
   );
-  let blockedFollowState = createInitialState(blockedFollowScene, 1, NO_COMPANIONS);
+  let blockedFollowState = createInitialState(blockedFollowScene, 1);
   for (let i = 0; i < 500; i++) blockedFollowState = reduce(blockedFollowState, tick(0));
   run(
     "follow : un obstacle bloquant l'arrête au contact (pas de traversée)",
@@ -384,7 +384,7 @@ export default function checkBehaviors(run) {
     }),
     FOLLOW_REGISTRY
   );
-  let missingTargetState = createInitialState(missingTargetScene, 1, NO_COMPANIONS);
+  let missingTargetState = createInitialState(missingTargetScene, 1);
   const missingTargetThrew = throws(() => {
     for (let i = 0; i < 100; i++) missingTargetState = reduce(missingTargetState, tick(0));
   });
@@ -421,7 +421,7 @@ export default function checkBehaviors(run) {
   // Convergence + arrêt : avance vers la cible jusqu'à atteindre
   // arriveDistance (2×BODY_RADIUS par défaut, voir goto.js), puis
   // s'arrête, sans jamais dépasser la cible.
-  let gotoState = createInitialState(gotoScene, 1, NO_COMPANIONS);
+  let gotoState = createInitialState(gotoScene, 1);
   for (let i = 0; i < 500; i++) gotoState = reduce(gotoState, tick(0));
   const settledDistance = 15 - goerX(gotoState);
   run("goto : converge vers la cible et s'arrête à arriveDistance", true, settledDistance <= 2 * BODY_RADIUS + 1e-9);
@@ -449,8 +449,8 @@ export default function checkBehaviors(run) {
     }
     return positions;
   }
-  const gotoRun1 = runGotoTicks(createInitialState(gotoScene, 1, NO_COMPANIONS), 200);
-  const gotoRun2 = runGotoTicks(createInitialState(gotoScene, 1, NO_COMPANIONS), 200);
+  const gotoRun1 = runGotoTicks(createInitialState(gotoScene, 1), 200);
+  const gotoRun2 = runGotoTicks(createInitialState(gotoScene, 1), 200);
   run.same("goto : trajectoire reproductible (déterministe, sans PRNG)", gotoRun1, gotoRun2);
 
   // Cible introuvable : dégrade proprement (intent: 0, jamais de crash) —
@@ -463,7 +463,7 @@ export default function checkBehaviors(run) {
     }),
     GOTO_REGISTRY
   );
-  let missingGotoTargetState = createInitialState(missingGotoTargetScene, 1, NO_COMPANIONS);
+  let missingGotoTargetState = createInitialState(missingGotoTargetScene, 1);
   const missingGotoTargetThrew = throws(() => {
     for (let i = 0; i < 100; i++) missingGotoTargetState = reduce(missingGotoTargetState, tick(0));
   });
@@ -489,7 +489,7 @@ export default function checkBehaviors(run) {
     }),
     GOTO_REGISTRY
   );
-  let blockedGotoState = createInitialState(blockedGotoScene, 1, NO_COMPANIONS);
+  let blockedGotoState = createInitialState(blockedGotoScene, 1);
   for (let i = 0; i < 500; i++) blockedGotoState = reduce(blockedGotoState, tick(0));
   run("goto : un obstacle bloquant l'arrête au contact (pas de traversée)", 8 - 2 * BODY_RADIUS, goerX(blockedGotoState));
   run(

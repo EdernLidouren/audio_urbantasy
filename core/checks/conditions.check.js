@@ -21,7 +21,7 @@ import { evaluateCondition, isPresent, isBlocking, presenceContextOf } from "../
 import { setWeather } from "../weather.js";
 import { auditNonSerializable } from "../../lib/check.js";
 import { TICK_MS } from "../../lib/loop.js";
-import { NO_COMPANIONS, WANDER_REGISTRY, makeWanderScene, expectSceneParseThrows } from "./helpers.js";
+import { WANDER_REGISTRY, makeWanderScene, expectSceneParseThrows } from "./helpers.js";
 
 export default function checkConditions(run) {
   // Fixtures partagées avec d'autres domaines (voir ./helpers.js).
@@ -288,13 +288,13 @@ export default function checkConditions(run) {
     },
     PRESENCE_REGISTRY
   );
-  let dayBlockState = createInitialState(presenceBlockScene, undefined, NO_COMPANIONS);
+  let dayBlockState = createInitialState(presenceBlockScene);
   for (let i = 0; i < 300; i++) dayBlockState = reduce(dayBlockState, tick(1));
   run("presence : entité bloquante mais dormante (jour) laisse le joueur passer", true, dayBlockState.player.x > 5 + BODY_RADIUS);
   run("presence : entité bloquante dormante ne signale jamais de blocage", null, dayBlockState.player.blockedBy);
 
   // La MÊME entité, la nuit (advanceTime jusqu'à 22h) : redevient bloquante.
-  let nightBlockState = createInitialState(presenceBlockScene, undefined, NO_COMPANIONS);
+  let nightBlockState = createInitialState(presenceBlockScene);
   nightBlockState = advanceTime(nightBlockState, 14 * 60); // 8h (INITIAL_TIME) -> 22h
   for (let i = 0; i < 300; i++) nightBlockState = reduce(nightBlockState, tick(1));
   run("presence : entité bloquante présente (nuit) bloque bien le joueur", "ghost-wall", nightBlockState.player.blockedBy);
@@ -314,7 +314,7 @@ export default function checkConditions(run) {
     },
     PRESENCE_REGISTRY
   );
-  let dormantWanderState = createInitialState(dormantWanderScene, 42, NO_COMPANIONS);
+  let dormantWanderState = createInitialState(dormantWanderScene, 42);
   const dormantStartX = getActiveWorld(dormantWanderState).entities[0].x;
   for (let i = 0; i < 100; i++) dormantWanderState = reduce(dormantWanderState, tick(0));
   run(
@@ -336,7 +336,7 @@ export default function checkConditions(run) {
     { id: "movement-check-presence-empty", titleKey: "scene.demo.name", length: 20, playerStart: 0, entities: [] },
     PRESENCE_REGISTRY
   );
-  let emptyPresenceState = createInitialState(emptyPresenceScene, 42, NO_COMPANIONS);
+  let emptyPresenceState = createInitialState(emptyPresenceScene, 42);
   for (let i = 0; i < 100; i++) emptyPresenceState = reduce(emptyPresenceState, tick(0));
   run(
     "presence : entité dormante ne consomme aucun tirage PRNG (rngState = monde vide)",
@@ -346,7 +346,7 @@ export default function checkConditions(run) {
 
   // La MÊME entité, la nuit : présente ET réellement tickée (comportement
   // actif, position qui évolue).
-  let awakeWanderState = createInitialState(dormantWanderScene, 42, NO_COMPANIONS);
+  let awakeWanderState = createInitialState(dormantWanderScene, 42);
   awakeWanderState = advanceTime(awakeWanderState, 14 * 60); // -> nuit
   for (let i = 0; i < 100; i++) awakeWanderState = reduce(awakeWanderState, tick(0));
   run("presence : entité présente (nuit) porte present:true", true, getActiveWorld(awakeWanderState).entities[0].present);
@@ -359,7 +359,7 @@ export default function checkConditions(run) {
   // Entité SANS règle de présence : jamais de champ .present ajouté à son
   // état (réutilise
   // wanderScene, fixture partagée de ./helpers.js, sans presence).
-  const noPresenceState = reduce(createInitialState(wanderScene, 42, NO_COMPANIONS), tick(0));
+  const noPresenceState = reduce(createInitialState(wanderScene, 42), tick(0));
   run(
     "presence : entité SANS règle ne porte jamais de champ .present",
     undefined,
@@ -385,7 +385,7 @@ export default function checkConditions(run) {
   // Jour (état de départ) : premier calcul JAMAIS fait pour cette entité ->
   // AUCUNE bascule, quelle que soit la valeur de présence de départ —
   // même dormante dès ce premier calcul, ce n'est pas "une sortie".
-  let transitionState = createInitialState(transitionScene, undefined, NO_COMPANIONS);
+  let transitionState = createInitialState(transitionScene);
   transitionState = reduce(transitionState, tick(0));
   run(
     "presence : aucune bascule au tout premier calcul (montage), même dormante",
@@ -510,7 +510,7 @@ export default function checkConditions(run) {
   function wolf(state) {
     return getActiveWorld(state).entities.find((e) => e.id === "wolf-1");
   }
-  let notFoggyState = createInitialState(weatherCondScene, "weather-cond-check", NO_COMPANIONS);
+  let notFoggyState = createInitialState(weatherCondScene, "weather-cond-check");
   notFoggyState = setWeather(notFoggyState, "clear");
   notFoggyState = reduce(notFoggyState, tick(0));
   run("weather (condition) : entité conditionnée — dormante hors de l'état déclaré", false, wolf(notFoggyState).present);
@@ -635,7 +635,7 @@ export default function checkConditions(run) {
   function allOfWolf(state) {
     return getActiveWorld(state).entities.find((e) => e.id === "wolf-1");
   }
-  let neitherState = createInitialState(allOfScene, "allof-cond-check", NO_COMPANIONS);
+  let neitherState = createInitialState(allOfScene, "allof-cond-check");
   neitherState = setWeather(neitherState, "clear");
   neitherState = reduce(neitherState, tick(0));
   run("allOf (intégration) : ni perception ni brume -> dormante", false, allOfWolf(neitherState).present);
@@ -689,7 +689,7 @@ export default function checkConditions(run) {
     SWAP_REGISTRY
   );
   const swapPresence = (state) => getActiveWorld(state).entities.map((e) => `${e.id}:${e.present}`).join(",");
-  let swapState = reduce(createInitialState(swapScene, "not-swap", NO_COMPANIONS), tick(0));
+  let swapState = reduce(createInitialState(swapScene, "not-swap"), tick(0));
   run("not (intégration) : perception inactive -> ordinaire seul", "plain:true,magic:false", swapPresence(swapState));
   swapState = reduce(togglePerception(swapState), tick(0));
   run("not (intégration) : perception active -> magique seul", "plain:false,magic:true", swapPresence(swapState));
@@ -723,7 +723,7 @@ export default function checkConditions(run) {
     },
     SCENE_PRESENCE_REGISTRY
   );
-  let scenePresenceState = createInitialState(scenePresenceScene, "scene-presence", NO_COMPANIONS);
+  let scenePresenceState = createInitialState(scenePresenceScene, "scene-presence");
   const presentAtMount = (state) =>
     getActiveWorld(state).entities.filter((e) => e.presence).map((e) => `${e.id}:${isPresent(e, presenceContextOf(state))}`).join(",");
   run("variable de scène : présence au montage (contexte partagé)", "projection:true,hidden-door:false", presentAtMount(scenePresenceState));
@@ -787,7 +787,7 @@ export default function checkConditions(run) {
     },
     TIME_RANGE_REGISTRY
   );
-  const perceptionWallState = togglePerception(createInitialState(perceptionWallScene, 5, NO_COMPANIONS));
+  const perceptionWallState = togglePerception(createInitialState(perceptionWallScene, 5));
   run("placement : le mur est bien bloquant sous perception", true, isBlocking(getActiveWorld(perceptionWallState).entities[0], presenceContextOf(perceptionWallState)));
   const SCATTER_DOG = { type: "dog", labelKey: "entity.dog.name", interactable: true, action: { kind: "pickup", amount: 1 } };
   const scattered = getActiveWorld(spawnScatteredEphemerals(perceptionWallState, SCATTER_DOG, 10, 12, 3))

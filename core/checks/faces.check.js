@@ -9,7 +9,7 @@ import { createInitialState, getActiveWorld, travelToWorld, switchSide, spawnEph
 import { tick } from "../actions.js";
 import { reduce } from "../reduce.js";
 import { throws } from "../../lib/check.js";
-import { NO_COMPANIONS, RAW_SCENE, EMPTY_REGISTRY, WORLD_A_REGISTRY, TWO_FACED_RAW_SCENE } from "./helpers.js";
+import { RAW_SCENE, EMPTY_REGISTRY, WORLD_A_REGISTRY, TWO_FACED_RAW_SCENE } from "./helpers.js";
 
 export default function checkFaces(run) {
   // Fixtures partagées avec d'autres domaines (voir ./helpers.js).
@@ -42,7 +42,7 @@ export default function checkFaces(run) {
   // Construction : recto/verso ont chacun leur PROPRE rngState (graines
   // distinctes, voir core/state.js/createFaceState) — jamais la même suite
   // de tirages pour les deux faces d'un même monde.
-  let twoFaceSession = createInitialState(twoFacedScene, 99, NO_COMPANIONS);
+  let twoFaceSession = createInitialState(twoFacedScene, 99);
   run("deux faces : player.side par défaut 'recto'", "recto", twoFaceSession.player.side);
   const twoFaceWorldId = twoFacedScene.id;
   const twoFaceWorldAtStart = twoFaceSession.worlds[twoFaceWorldId];
@@ -120,7 +120,7 @@ export default function checkFaces(run) {
     },
     ISOLATION_REGISTRY
   );
-  let isolationSessionA = switchSide(createInitialState(isolationBlockOnRecto, 1, NO_COMPANIONS), 4);
+  let isolationSessionA = switchSide(createInitialState(isolationBlockOnRecto, 1), 4);
   for (let i = 0; i < 80; i++) isolationSessionA = reduce(isolationSessionA, tick(1));
   run("isolation : un bloqueur de l'AUTRE face ne bloque JAMAIS le joueur", null, isolationSessionA.player.blockedBy);
   run("isolation : le joueur traverse librement le x d'un bloqueur de l'autre face", true, isolationSessionA.player.x > 6);
@@ -139,7 +139,7 @@ export default function checkFaces(run) {
     },
     ISOLATION_REGISTRY
   );
-  let isolationSessionB = switchSide(createInitialState(isolationBlockOnVerso, 1, NO_COMPANIONS), 4);
+  let isolationSessionB = switchSide(createInitialState(isolationBlockOnVerso, 1), 4);
   for (let i = 0; i < 80; i++) isolationSessionB = reduce(isolationSessionB, tick(1));
   run("isolation (contrôle) : un bloqueur de la MÊME face bloque normalement", "verso-blocker", isolationSessionB.player.blockedBy);
   run("isolation (contrôle) : le joueur est arrêté avant le bloqueur", true, isolationSessionB.player.x < 6);
@@ -163,7 +163,7 @@ export default function checkFaces(run) {
     },
     ISOLATION_REGISTRY
   );
-  let targetingSession = createInitialState(targetingScene, 1, NO_COMPANIONS);
+  let targetingSession = createInitialState(targetingScene, 1);
   for (let i = 0; i < 40; i++) targetingSession = reduce(targetingSession, tick(0));
   run(
     "isolation : un goto de la face courante ne peut jamais cibler une entité de l'autre face",
@@ -179,12 +179,12 @@ export default function checkFaces(run) {
   // arrivalX est une donnée de CONTENU, jamais validée en bornes au
   // chargement (voir core/entity-parse.js/parseEntity, action) — clampée à
   // l'exécution par switchSide, jamais un joueur hors carte.
-  const clampedSwitch = switchSide(createInitialState(twoFacedScene, 1, NO_COMPANIONS), 9999);
+  const clampedSwitch = switchSide(createInitialState(twoFacedScene, 1), 9999);
   run("switchSide : arrivalX hors bornes est clampé au bord droit", twoFacedScene.length, clampedSwitch.player.x);
 
   // Éphémères : spawnEphemeral/removeEntity/markConsumed sont scopés à la
   // face COURANTE (session.player.side), jamais l'autre.
-  let twoFaceEphemeralSession = createInitialState(twoFacedScene, 3, NO_COMPANIONS);
+  let twoFaceEphemeralSession = createInitialState(twoFacedScene, 3);
   const TWO_FACE_EPHEMERAL_SPEC = { type: "dog", labelKey: "entity.dog.name" };
   twoFaceEphemeralSession = spawnEphemeral(twoFaceEphemeralSession, TWO_FACE_EPHEMERAL_SPEC, 4);
   run(
@@ -262,7 +262,7 @@ export default function checkFaces(run) {
   run(
     "étouffement de scène : présent sur la face active du monde",
     0.2,
-    getActiveWorld(createInitialState(parsedMuffling, "muffling", NO_COMPANIONS)).faceMufflingGain
+    getActiveWorld(createInitialState(parsedMuffling, "muffling")).faceMufflingGain
   );
   run("étouffement de scène : absent -> non défini (défaut résolu par la vue)", undefined, parseScene(mufflingScene({}), {}).faceMufflingGain);
   const mufflingThrows = (raw) => {

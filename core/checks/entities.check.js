@@ -8,7 +8,7 @@ import { parseScene } from "../scene.js";
 import { createInitialState, getActiveWorld, applyEntityActionEffects } from "../state.js";
 import { evaluateCondition } from "../presence.js";
 import { throws } from "../../lib/check.js";
-import { NO_COMPANIONS, expectSceneParseThrows } from "./helpers.js";
+import { expectSceneParseThrows } from "./helpers.js";
 
 export default function checkEntities(run) {
   // --- Interaction niveau 0 : capacités observable/interactable ---
@@ -225,10 +225,10 @@ export default function checkEntities(run) {
   run.same(
     "beacon conditionnel : condition d'instance REMPLACE celle de l'archétype (jamais fusionnée)",
     { type: "timeRange", from: 20, to: 6 },
-    getActiveWorld(createInitialState(nightBeaconScene, "beacon-cond", NO_COMPANIONS)).entities[0].sounds.beacon.condition
+    getActiveWorld(createInitialState(nightBeaconScene, "beacon-cond")).entities[0].sounds.beacon.condition
   );
   run("beacon conditionnel : registre intact après remplacement", IS_ON, BEACON_COND_REGISTRY.projector.sounds.beacon.condition);
-  let beaconCondState = createInitialState(parseScene(beaconCondScene({ variables: IS_ON_VARIABLE }), BEACON_COND_REGISTRY), "beacon-cond", NO_COMPANIONS);
+  let beaconCondState = createInitialState(parseScene(beaconCondScene({ variables: IS_ON_VARIABLE }), BEACON_COND_REGISTRY), "beacon-cond");
   const projectorOf = (state) => getActiveWorld(state).entities.find((e) => e.id === "projector-1");
   run("beacon conditionnel : allumé au départ -> condition vraie", true, evaluateCondition(projectorOf(beaconCondState).sounds.beacon.condition, { entity: projectorOf(beaconCondState) }));
   beaconCondState = applyEntityActionEffects(beaconCondState, "projector-1", [{ type: "setVariable", scope: "entity", name: "isOn", value: false }]);

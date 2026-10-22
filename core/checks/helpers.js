@@ -13,11 +13,6 @@ import { addItem } from "../bag.js";
 import { parseNewGame } from "../new-game.js";
 import { throws } from "../../lib/check.js";
 
-// { companions: [] } : sans compagnon. Redondant depuis que createInitialState
-// démarre sans compagnon par défaut (voir config/new-game.js) ; encore passé
-// par de nombreuses vérifications.
-export const NO_COMPANIONS = { companions: [] };
-
 // Départ d'OBJETS des vérifications d'inventaire et de collections : le kit
 // de test de config/new-game.js (rangers et escarpins dans le sac, baskets
 // équipées), sans compagnon, résolu par le vrai parseNewGame. Écrit ici

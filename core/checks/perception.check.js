@@ -10,7 +10,7 @@ import { reduce } from "../reduce.js";
 import { SAVE_VERSION, serializeGame, deserializeGame } from "../save.js";
 import { evaluateCondition } from "../presence.js";
 import { TICK_MS } from "../../lib/loop.js";
-import { NO_COMPANIONS, RAW_SCENE, EMPTY_REGISTRY, createAuditFixture } from "./helpers.js";
+import { RAW_SCENE, EMPTY_REGISTRY, createAuditFixture } from "./helpers.js";
 
 export default function checkPerception(run) {
   // Fixtures partagées avec d'autres domaines (voir ./helpers.js).
@@ -24,9 +24,9 @@ export default function checkPerception(run) {
   // view/audio/layers.js, view/audio/muffle.js) — hors de portée d'un check
   // terminal.
 
-  run("perception : createInitialState — perceptionActive false par défaut", false, createInitialState(scene, undefined, NO_COMPANIONS).perceptionActive);
+  run("perception : createInitialState — perceptionActive false par défaut", false, createInitialState(scene).perceptionActive);
 
-  const perceptionSession = createInitialState(scene, undefined, NO_COMPANIONS);
+  const perceptionSession = createInitialState(scene);
   const perceptionToggled = togglePerception(perceptionSession);
   run("perception : togglePerception active (false -> true)", true, perceptionToggled.perceptionActive);
   run("perception : togglePerception NE MUTE JAMAIS l'original", false, perceptionSession.perceptionActive);
@@ -62,7 +62,7 @@ export default function checkPerception(run) {
     return getActiveWorld(state).entities.find((e) => e.id === "spirit-1");
   }
 
-  let perceptionOffState = createInitialState(spiritScene, 5, NO_COMPANIONS);
+  let perceptionOffState = createInitialState(spiritScene, 5);
   for (let i = 0; i < 30; i++) perceptionOffState = reduce(perceptionOffState, tick(0));
   run("perception : entité surnaturelle — dormante tant que la perception est inactive", false, spirit(perceptionOffState).present);
   run(

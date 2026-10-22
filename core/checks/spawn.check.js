@@ -22,7 +22,6 @@ import {
   RARITY_LEVELS,
 } from "../../config/spawn-values.js";
 import { auditNonSerializable, diffStructure, throws, fail } from "../../lib/check.js";
-import { NO_COMPANIONS } from "./helpers.js";
 
 export default function checkSpawn(run) {
   // --- Collecte (core/distribution.js + core/spawn.js) ---
@@ -153,7 +152,7 @@ export default function checkSpawn(run) {
   );
 
   // Premier chargement : garnissage (conteneurs stockés, plage posée).
-  const spawnFresh = { ...createInitialState(spawnScene, undefined, NO_COMPANIONS), bag: [] };
+  const spawnFresh = { ...createInitialState(spawnScene), bag: [] };
   const spawnFilled = refillDueSpawns(spawnFresh, SPAWN_REGISTRY);
   const spawnWorld = (s) => s.worlds[spawnScene.id];
   const spawnedOf = (s) => spawnWorld(s).entities.filter((e) => e.spawned);
@@ -180,7 +179,7 @@ export default function checkSpawn(run) {
   run("collecte : un objet sans archétype dédié naît sous le type générique item", true, spawnedOf(spawnFilled).filter((e) => e.action.item === "key_bronze").every((e) => e.type === "item"));
   run("collecte : refillDueSpawns idempotent dans le même cycle (référence INCHANGÉE)", spawnFilled, refillDueSpawns(spawnFilled, SPAWN_REGISTRY));
   run("collecte : refillDueSpawns sur un monde sans source -> référence INCHANGÉE", true, (() => {
-    const s = createInitialState(spawnSceneB, undefined, NO_COMPANIONS);
+    const s = createInitialState(spawnSceneB);
     return refillDueSpawns(s, SPAWN_REGISTRY) === s;
   })());
 
@@ -256,8 +255,8 @@ export default function checkSpawn(run) {
 
   // Déterminisme : même seed + même cycle -> même contenu (stocks, objets,
   // positions).
-  const spawnDet1 = refillDueSpawns(createInitialState(spawnScene, 5, NO_COMPANIONS), SPAWN_REGISTRY);
-  const spawnDet2 = refillDueSpawns(createInitialState(spawnScene, 5, NO_COMPANIONS), SPAWN_REGISTRY);
+  const spawnDet1 = refillDueSpawns(createInitialState(spawnScene, 5), SPAWN_REGISTRY);
+  const spawnDet2 = refillDueSpawns(createInitialState(spawnScene, 5), SPAWN_REGISTRY);
   const spawnSignature = (s) => JSON.stringify(spawnWorld(s).entities.map((e) => [e.id, e.x, e.stock, e.action && e.action.item]));
   run("collecte : déterminisme — même seed + même cycle -> même garnissage", spawnSignature(spawnDet1), spawnSignature(spawnDet2));
   run("collecte : déterminisme — le PRNG de la face a bien avancé (tirages consommés)", true, spawnWorld(spawnFilled).rngState !== spawnWorld(spawnFresh).rngState);
@@ -274,7 +273,7 @@ export default function checkSpawn(run) {
     },
     SPAWN_REGISTRY
   );
-  const spawnTwoFilled = refillDueSpawns(createInitialState(spawnTwoSided, undefined, NO_COMPANIONS), SPAWN_REGISTRY);
+  const spawnTwoFilled = refillDueSpawns(createInitialState(spawnTwoSided), SPAWN_REGISTRY);
   run("collecte : deux faces — recto (conteneur) garni", true, Array.isArray(spawnTwoFilled.worlds[spawnTwoSided.id].recto.entities[0].stock));
   run("collecte : deux faces — verso (plage) garni avec le count par défaut", SPAWN_RANGE_DEFAULT_COUNT, spawnTwoFilled.worlds[spawnTwoSided.id].verso.entities.filter((e) => e.spawned).length);
   run("collecte : deux faces — marqueur au niveau du monde", 0, spawnTwoFilled.worlds[spawnTwoSided.id].spawnCycle);
@@ -390,7 +389,7 @@ export default function checkSpawn(run) {
   run("conteneur : clé inconnue -> rejetée", true, throws(() => parseScene({ ...nothingRaw, entities: [{ id: "b", type: "bush", x: 1, container: { distribution: { table: "default" }, regen: false } }] }, SPAWN_REGISTRY)));
   run("tables : parseScene accepte un container { tables }", false, throws(() => parseScene({ ...nothingRaw, entities: [{ id: "b", type: "bush", x: 1, container: { distribution: multiOk } }] }, SPAWN_REGISTRY)));
 
-  const nothingFilled = refillDueSpawns({ ...createInitialState(nothingScene, undefined, NO_COMPANIONS), bag: [] }, SPAWN_REGISTRY);
+  const nothingFilled = refillDueSpawns({ ...createInitialState(nothingScene), bag: [] }, SPAWN_REGISTRY);
   run("rien : plage dont tous les tirages tombent sur rien -> aucun collectible posé", 0, nothingWorld(nothingFilled).entities.filter((e) => e.spawned).length);
   run("rien : conteneur dont tous les tirages tombent sur rien -> stock vide", 0, nothingEntity(nothingFilled, "box").stock.length);
   run("rien : stock vide du cycle -> état searchable (il reste à fouiller)", "searchable", containerStatus(nothingEntity(nothingFilled, "box"), nothingFilled.time));
@@ -435,7 +434,7 @@ export default function checkSpawn(run) {
 
   // --- Descripteurs d'éphémères demandés par la vue (ephemeralArchetypeSpec,
   // ephemeralItemSpec) : même parseur et même résolution que la collecte. ---
-  const specSession = createInitialState(spawnScene, undefined, NO_COMPANIONS);
+  const specSession = createInitialState(spawnScene);
   const SPEC_REGISTRY = { ...SPAWN_REGISTRY, money: { nameKey: "entity.money.name", interactable: true, action: { kind: "pickup", amount: 5 } } };
 
   const coinSpec = ephemeralArchetypeSpec(specSession, "money", SPEC_REGISTRY);

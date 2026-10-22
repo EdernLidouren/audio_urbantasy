@@ -20,7 +20,6 @@ import { pickupEntity, lootEntity, lootUniqueEntity, lootEntitySpawn } from "../
 import { createSeed } from "../rng.js";
 import { MAX_EPHEMERALS } from "../../config/ephemerals.js";
 import { TUNING_DEFAULTS } from "../../config/tuning-values.js";
-import { NO_COMPANIONS } from "./helpers.js";
 
 export default function checkEphemerals(run) {
   // --- Collectible persistant (core/state.js/markConsumed, core/money.js/lootEntity) ---
@@ -41,7 +40,7 @@ export default function checkEphemerals(run) {
     },
     CRATE_REGISTRY
   );
-  const crateState = createInitialState(crateScene, undefined, NO_COMPANIONS);
+  const crateState = createInitialState(crateScene);
 
   run("caisse : markConsumed pose consumed:true sur l'entité ciblée", true, getActiveWorld(markConsumed(crateState, "crate-1")).entities.find((e) => e.id === "crate-1").consumed);
   run(
@@ -142,7 +141,7 @@ export default function checkEphemerals(run) {
   // jamais, il ne fait qu'y ajouter id/x/ephemeral.
   const EPHEMERAL_SPEC = { type: "dog", labelKey: "entity.dog.name", interactable: true, action: { kind: "pickup", amount: 5 } };
 
-  const ephemeralState = createInitialState(ephemeralWorldA, undefined, NO_COMPANIONS);
+  const ephemeralState = createInitialState(ephemeralWorldA);
   run("éphémère : monde neuf démarre à nextEphemeralId 0", 0, getActiveWorld(ephemeralState).nextEphemeralId);
 
   const afterSpawn1 = spawnEphemeral(ephemeralState, EPHEMERAL_SPEC, 4);
@@ -352,7 +351,7 @@ export default function checkEphemerals(run) {
     },
     SCATTER_REGISTRY
   );
-  const scatterState = createInitialState(scatterScene, 99, NO_COMPANIONS);
+  const scatterState = createInitialState(scatterScene, 99);
 
   const scatterResult = spawnScatteredEphemerals(scatterState, SCATTER_SPEC, 10, 4, 3);
   const scatteredEntities = getActiveWorld(scatterResult).entities.filter((e) => e.ephemeral);
@@ -367,7 +366,7 @@ export default function checkEphemerals(run) {
   );
 
   // Déterminisme : même seed + mêmes paramètres -> mêmes positions, toujours.
-  const scatterStateAgain = createInitialState(scatterScene, 99, NO_COMPANIONS);
+  const scatterStateAgain = createInitialState(scatterScene, 99);
   const scatterResultAgain = spawnScatteredEphemerals(scatterStateAgain, SCATTER_SPEC, 10, 4, 3);
   const scatteredAgain = getActiveWorld(scatterResultAgain)
     .entities.filter((e) => e.ephemeral)

@@ -16,7 +16,7 @@ import {
 } from "../weather.js";
 import { WEATHER_STATES, DEFAULT_WEATHER_STATE } from "../../config/weather-values.js";
 import { throws } from "../../lib/check.js";
-import { NO_COMPANIONS, RAW_SCENE, EMPTY_REGISTRY, createAuditFixture } from "./helpers.js";
+import { RAW_SCENE, EMPTY_REGISTRY, createAuditFixture } from "./helpers.js";
 
 export default function checkWeather(run) {
   // Fixtures partagées avec d'autres domaines (voir ./helpers.js).
@@ -118,7 +118,7 @@ export default function checkWeather(run) {
 
   // État initial d'une partie (createInitialState -> createInitialWeather).
   const weatherScene = parseScene(RAW_SCENE, EMPTY_REGISTRY);
-  const freshWeatherState = createInitialState(weatherScene, 1, NO_COMPANIONS);
+  const freshWeatherState = createInitialState(weatherScene, 1);
   run("weather : état initial = DEFAULT_WEATHER_STATE", DEFAULT_WEATHER_STATE, freshWeatherState.weather.state);
   run(
     "weather : première transition programmée DANS la fourchette de durée de l'état par défaut",
@@ -157,10 +157,10 @@ export default function checkWeather(run) {
   // grand saut resterait bloqué sur un rendez-vous largement dépassé, très
   // différent du résultat pas à pas).
   const BIG_JUMP_MINUTES = 3000; // largement de quoi franchir plusieurs transitions
-  let bigJumpState = createInitialState(weatherScene, 42, NO_COMPANIONS);
+  let bigJumpState = createInitialState(weatherScene, 42);
   bigJumpState = advanceWeather({ ...bigJumpState, time: bigJumpState.time + BIG_JUMP_MINUTES });
 
-  let smallStepsState = createInitialState(weatherScene, 42, NO_COMPANIONS);
+  let smallStepsState = createInitialState(weatherScene, 42);
   for (let i = 0; i < BIG_JUMP_MINUTES; i++) {
     smallStepsState = advanceWeather({ ...smallStepsState, time: smallStepsState.time + 1 });
   }
@@ -173,7 +173,7 @@ export default function checkWeather(run) {
   // Déterminisme direct : même seed + même déroulé -> même succession
   // météo, rejouée deux fois indépendamment.
   function weatherSequence(seed, totalMinutes) {
-    let s = createInitialState(weatherScene, seed, NO_COMPANIONS);
+    let s = createInitialState(weatherScene, seed);
     const sequence = [];
     for (let i = 0; i < totalMinutes; i++) {
       const before = s.weather.state;
@@ -221,7 +221,7 @@ export default function checkWeather(run) {
   // — voir view/menus/debug-weather-menu.js, Shift+W) : entrée PROPRE dans
   // un état choisi à la main, sans passer par un tirage de CIBLE, mais avec
   // une durée TIRÉE (PRNG toujours sain après coup, voir header du module).
-  const forcedBase = createInitialState(weatherScene, "force-check", NO_COMPANIONS);
+  const forcedBase = createInitialState(weatherScene, "force-check");
   const forcedRain = setWeather(forcedBase, "rain");
   run("setWeather : entre bien dans l'état demandé", "rain", forcedRain.weather.state);
   run(
@@ -256,7 +256,7 @@ export default function checkWeather(run) {
   // longue chaîne d'appels enchaînés (chacun repart de l'état/rngState
   // produit par le précédent), et produire une variété de résultats
   // (preuve qu'il ne renvoie jamais bêtement la même cible).
-  let triggerState = createInitialState(weatherScene, "trigger-check", NO_COMPANIONS);
+  let triggerState = createInitialState(weatherScene, "trigger-check");
   const triggerTargetsSeen = new Set();
   let allTriggerTargetsValid = true;
   const TRIGGER_SAMPLES = 300;

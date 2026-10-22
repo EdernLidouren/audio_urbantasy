@@ -23,7 +23,7 @@ import {
   phaseAt,
 } from "../time.js";
 import { TIME_CONFIG } from "../../config/time-values.js";
-import { NO_COMPANIONS, EMPTY_REGISTRY } from "./helpers.js";
+import { EMPTY_REGISTRY } from "./helpers.js";
 
 export default function checkTime(run) {
   // --- Horloge de partie (core/time.js) ---
@@ -39,7 +39,7 @@ export default function checkTime(run) {
 
   // Origine : jour 1, mois 1 (saison 0), année 1, à l'heure de départ
   // configurée (config/time-values.js/startHour) — jamais minuit.
-  let timeState = createInitialState(timeScene, undefined, NO_COMPANIONS);
+  let timeState = createInitialState(timeScene);
   run("horloge : session.time démarre à INITIAL_TIME", INITIAL_TIME, timeState.time);
   run("horloge : heure de départ = startHour configuré", TIME_CONFIG.startHour, hourOfDay(timeState.time));
   run("horloge : minute de départ = 0", 0, minuteOfHour(timeState.time));
@@ -69,7 +69,7 @@ export default function checkTime(run) {
   // Aucune horloge implicite dans le core : de nombreux TICK ne font JAMAIS
   // avancer .time — seul advanceTime() le fait (le core n'a ni horloge ni
   // clavier, voir doc/time.md).
-  let noClockState = createInitialState(timeScene, undefined, NO_COMPANIONS);
+  let noClockState = createInitialState(timeScene);
   for (let i = 0; i < 500; i++) noClockState = reduce(noClockState, tick(1));
   run("horloge : reduce()/TICK ne fait jamais avancer le temps", INITIAL_TIME, noClockState.time);
 

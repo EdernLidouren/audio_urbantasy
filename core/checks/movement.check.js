@@ -11,13 +11,13 @@ import { reduce } from "../reduce.js";
 import { resolvePlayerMove } from "../physics/collision.js";
 import { throws } from "../../lib/check.js";
 import { TICK_MS } from "../../lib/loop.js";
-import { NO_COMPANIONS, RAW_SCENE, EMPTY_REGISTRY } from "./helpers.js";
+import { RAW_SCENE, EMPTY_REGISTRY } from "./helpers.js";
 
 export default function checkMovement(run) {
   const scene = parseScene(RAW_SCENE, EMPTY_REGISTRY);
 
   // Quelques ticks à droite depuis le centre : x avance de MOVE_STEP par tick.
-  let state = createInitialState(scene, undefined, NO_COMPANIONS);
+  let state = createInitialState(scene);
   state = reduce(state, tick(1));
   state = reduce(state, tick(1));
   state = reduce(state, tick(1));
@@ -25,16 +25,16 @@ export default function checkMovement(run) {
 
   // Clamp à gauche : depuis le bord 0, un tick à gauche reste à 0.
   const leftScene = parseScene({ ...RAW_SCENE, playerStart: 0 }, EMPTY_REGISTRY);
-  const leftState = reduce(createInitialState(leftScene, undefined, NO_COMPANIONS), tick(-1));
+  const leftState = reduce(createInitialState(leftScene), tick(-1));
   run("clamp à gauche depuis x=0", 0, leftState.player.x);
 
   // Clamp à droite : depuis le bord length, un tick à droite reste à length.
   const rightScene = parseScene({ ...RAW_SCENE, playerStart: RAW_SCENE.length }, EMPTY_REGISTRY);
-  const rightState = reduce(createInitialState(rightScene, undefined, NO_COMPANIONS), tick(1));
+  const rightState = reduce(createInitialState(rightScene), tick(1));
   run("clamp à droite depuis x=length", RAW_SCENE.length, rightState.player.x);
 
   // Action inconnue -> état inchangé, MÊME référence (pas de nouvel objet).
-  const before = createInitialState(scene, undefined, NO_COMPANIONS);
+  const before = createInitialState(scene);
   const after = reduce(before, { type: "UNKNOWN" });
   run("action inconnue renvoie la même référence", before, after);
 
@@ -96,8 +96,8 @@ export default function checkMovement(run) {
       SPEED_REGISTRY
     );
   }
-  let fastSpeedState = createInitialState(makeSpeedWanderScene(1), 3, NO_COMPANIONS);
-  let slowSpeedState = createInitialState(makeSpeedWanderScene(0.5), 3, NO_COMPANIONS);
+  let fastSpeedState = createInitialState(makeSpeedWanderScene(1), 3);
+  let slowSpeedState = createInitialState(makeSpeedWanderScene(0.5), 3);
   for (let i = 0; i < 50; i++) {
     fastSpeedState = reduce(fastSpeedState, tick(0));
     slowSpeedState = reduce(slowSpeedState, tick(0));
@@ -125,7 +125,7 @@ export default function checkMovement(run) {
     return parseScene({ id: "movement-check-behavior-speed", titleKey: "scene.demo.name", length: 100, playerStart: 50, entities: [entity] }, SPEED_REGISTRY);
   }
   function distanceAfter50Ticks(scene) {
-    let state = createInitialState(scene, 3, NO_COMPANIONS);
+    let state = createInitialState(scene, 3);
     for (let i = 0; i < 50; i++) state = reduce(state, tick(0));
     return Math.abs(getActiveWorld(state).entities[0].x - 50);
   }
@@ -148,7 +148,7 @@ export default function checkMovement(run) {
       },
       SPEED_REGISTRY
     );
-    let state = createInitialState(scene, 7, NO_COMPANIONS);
+    let state = createInitialState(scene, 7);
     const dirs = [];
     let previousPhase = null;
     for (let i = 0; i < 200; i++) {
@@ -198,7 +198,7 @@ export default function checkMovement(run) {
     },
     SPEED_REGISTRY
   );
-  let speedFollowState = createInitialState(speedFollowScene, 1, NO_COMPANIONS);
+  let speedFollowState = createInitialState(speedFollowScene, 1);
   speedFollowState = reduce(speedFollowState, tick(0)); // joueur immobile, follower loin -> avance vers lui
   const speedFollowDelta = getActiveWorld(speedFollowState).entities[0].x - 40;
   run("speed : follow avance de MOVE_STEP × speed (0.5)", true, Math.abs(speedFollowDelta - MOVE_STEP * 0.5) < 1e-9);
@@ -216,7 +216,7 @@ export default function checkMovement(run) {
     },
     SPEED_REGISTRY
   );
-  let speedGotoState = createInitialState(speedGotoScene, 1, NO_COMPANIONS);
+  let speedGotoState = createInitialState(speedGotoScene, 1);
   speedGotoState = reduce(speedGotoState, tick(0));
   const speedGotoDelta = getActiveWorld(speedGotoState).entities.find((e) => e.id === "walker").x - 10;
   run("speed : goto avance de MOVE_STEP × speed (0.5)", true, Math.abs(speedGotoDelta - MOVE_STEP * 0.5) < 1e-9);
@@ -231,7 +231,7 @@ export default function checkMovement(run) {
   const wallEntity = blockingScene.entities[0];
   const expectedEdge = wallEntity.x - BODY_RADIUS; // bord du corps côté approche (dir=1)
 
-  let blockState = createInitialState(blockingScene, undefined, NO_COMPANIONS);
+  let blockState = createInitialState(blockingScene);
   for (let i = 0; i < 20; i++) {
     blockState = reduce(blockState, tick(1));
   }
@@ -257,8 +257,8 @@ export default function checkMovement(run) {
     { id: "movement-check-passthrough-empty", titleKey: "scene.demo.name", length: 10, playerStart: 4, entities: [] },
     NONBLOCKING_REGISTRY
   );
-  let passState = createInitialState(passThroughScene, undefined, NO_COMPANIONS);
-  let unobstructedState = createInitialState(emptyScene, undefined, NO_COMPANIONS);
+  let passState = createInitialState(passThroughScene);
+  let unobstructedState = createInitialState(emptyScene);
   for (let i = 0; i < 20; i++) {
     passState = reduce(passState, tick(1));
     unobstructedState = reduce(unobstructedState, tick(1));
@@ -273,7 +273,7 @@ export default function checkMovement(run) {
     NONBLOCKING_REGISTRY // type "deco" a blocksMovement absent (-> false par défaut)
   );
   run("collision : surcharge d'instance blocksMovement:true respectée", true, overrideBlockScene.entities[0].blocksMovement);
-  let overrideBlockState = createInitialState(overrideBlockScene, undefined, NO_COMPANIONS);
+  let overrideBlockState = createInitialState(overrideBlockScene);
   for (let i = 0; i < 20; i++) {
     overrideBlockState = reduce(overrideBlockState, tick(1));
   }
@@ -314,7 +314,7 @@ export default function checkMovement(run) {
     },
     OVERLAP_REGISTRY
   );
-  let overlapState = createInitialState(overlapScene, undefined, NO_COMPANIONS);
+  let overlapState = createInitialState(overlapScene);
   overlapState = reduce(overlapState, tick(0));
   const [entA, entB] = getActiveWorld(overlapState).entities;
   run("chevauchement : deux entités impassables séparées en une passe", true, Math.abs(entB.x - entA.x) >= 2 * BODY_RADIUS);
@@ -335,7 +335,7 @@ export default function checkMovement(run) {
     { id: "movement-check-overlap-player", titleKey: "scene.demo.name", length: 10, playerStart: 5, entities: [{ id: "wall-p", type: "wall", x: 5.1 }] },
     OVERLAP_REGISTRY
   );
-  let playerInsideState = createInitialState(playerInsideScene, undefined, NO_COMPANIONS);
+  let playerInsideState = createInitialState(playerInsideScene);
   playerInsideState = reduce(playerInsideState, tick(0));
   run("chevauchement : joueur inchangé quand l'entité a la marge pour s'écarter", 5, playerInsideState.player.x);
   run("chevauchement : entité écartée, plus de recouvrement avec le joueur", true, Math.abs(getActiveWorld(playerInsideState).entities[0].x - 5) >= BODY_RADIUS);
@@ -349,7 +349,7 @@ export default function checkMovement(run) {
     { id: "movement-check-overlap-forced", titleKey: "scene.demo.name", length: 10, playerStart: 0.05, entities: [{ id: "wall-forced", type: "wall", x: 0.02 }] },
     OVERLAP_REGISTRY
   );
-  let forcedState = createInitialState(forcedRoomScene, undefined, NO_COMPANIONS);
+  let forcedState = createInitialState(forcedRoomScene);
   forcedState = reduce(forcedState, tick(0));
   run("chevauchement : entité pinée au bord quand il n'y a plus de marge", 0, getActiveWorld(forcedState).entities[0].x);
   run("chevauchement : joueur forcé de bouger signale l'entité responsable", "wall-forced", forcedState.player.pushedBy);
@@ -365,7 +365,7 @@ export default function checkMovement(run) {
     { id: "movement-check-no-overlap", titleKey: "scene.demo.name", length: 10, playerStart: 2, entities: [{ id: "wall-far", type: "wall", x: 8 }] },
     OVERLAP_REGISTRY
   );
-  let noOverlapState = createInitialState(noOverlapScene, undefined, NO_COMPANIONS);
+  let noOverlapState = createInitialState(noOverlapScene);
   noOverlapState = reduce(noOverlapState, tick(0));
   run("chevauchement : cas normal, aucun déplacement parasite (joueur)", 2, noOverlapState.player.x);
   run("chevauchement : cas normal, aucun déplacement parasite (entité)", 8, getActiveWorld(noOverlapState).entities[0].x);
@@ -416,7 +416,7 @@ export default function checkMovement(run) {
     PIPELINE_REGISTRY
   );
   function runPipeline() {
-    let s = createInitialState(pipelineScene, 123, NO_COMPANIONS);
+    let s = createInitialState(pipelineScene, 123);
     for (let i = 0; i < 60; i++) s = reduce(s, tick(1));
     return { playerX: s.player.x, blockedBy: s.player.blockedBy, dogX: getActiveWorld(s).entities[0].x };
   }

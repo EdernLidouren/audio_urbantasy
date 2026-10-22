@@ -19,7 +19,7 @@ import { reduce } from "../reduce.js";
 import { addMoney } from "../money.js";
 import { INITIAL_TIME } from "../time.js";
 import { throws } from "../../lib/check.js";
-import { NO_COMPANIONS, WORLD_A_REGISTRY } from "./helpers.js";
+import { WORLD_A_REGISTRY } from "./helpers.js";
 
 export default function checkWorlds(run) {
   // --- Partie multi-mondes (modèle "Animal Crossing") ---
@@ -40,7 +40,7 @@ export default function checkWorlds(run) {
   );
 
   // Un seul monde reçoit les ticks : à la création, c'est le premier.
-  let partie = createInitialState(worldA, 55, NO_COMPANIONS);
+  let partie = createInitialState(worldA, 55);
   run("partie : un seul monde actif à la création", worldA.id, partie.activeWorldId);
 
   // Fait errer le PNJ de A loin de son spawn avant de partir.
@@ -102,7 +102,7 @@ export default function checkWorlds(run) {
   // monde actif : ni activeWorldId ni worlds ne changent, contrairement à
   // travelToWorld. Primitive PARTAGÉE avec switchSide (voir faces.check.js,
   // "bascule DANS le même monde").
-  const beforePlace = createInitialState(worldA, 1, NO_COMPANIONS);
+  const beforePlace = createInitialState(worldA, 1);
   const afterPlace = placePlayer(beforePlace, 12, "verso");
   run("placePlayer : déplace le joueur à x", 12, afterPlace.player.x);
   run("placePlayer : pose la face demandée", "verso", afterPlace.player.side);

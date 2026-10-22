@@ -10,7 +10,7 @@ import { tick } from "../actions.js";
 import { reduce } from "../reduce.js";
 import { MAX_COMPANIONS } from "../../config/companions.js";
 import { parseNewGame } from "../new-game.js";
-import { NO_COMPANIONS, WANDER_REGISTRY, makeWanderScene, runTicks } from "./helpers.js";
+import { WANDER_REGISTRY, makeWanderScene, runTicks } from "./helpers.js";
 
 export default function checkCompanions(run) {
   // Fixtures partagées avec d'autres domaines (voir ./helpers.js).
@@ -81,7 +81,7 @@ export default function checkCompanions(run) {
   // présence ou non d'un compagnon.
   run.same(
     "compagnons : n'affecte pas la trajectoire d'une entité du monde (PRNG séparés)",
-    runTicks(createInitialState(wanderScene, 42, NO_COMPANIONS), 50).positions,
+    runTicks(createInitialState(wanderScene, 42), 50).positions,
     runTicks(createInitialState(wanderScene, 42, COMPANION_START), 50).positions
   );
 

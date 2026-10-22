@@ -14,13 +14,13 @@ import { TAG_REGISTRY, tagProps } from "../tags.js";
 import { evaluateCondition } from "../presence.js";
 import { ownedQuantity } from "../trade.js";
 import { throws } from "../../lib/check.js";
-import { NO_COMPANIONS, ITEM_START, RAW_SCENE, EMPTY_REGISTRY, buildMoneyScene } from "./helpers.js";
+import { ITEM_START, RAW_SCENE, EMPTY_REGISTRY, buildMoneyScene } from "./helpers.js";
 
 export default function checkInventory(run) {
   // --- Argent (core/money.js) : scalaire de partie + effet pickup ---
 
   const moneyScene = buildMoneyScene();
-  const moneyState = createInitialState(moneyScene, undefined, NO_COMPANIONS);
+  const moneyState = createInitialState(moneyScene);
 
   run("argent : une partie neuve démarre à 0", 0, moneyState.money);
 
@@ -57,7 +57,7 @@ export default function checkInventory(run) {
 
   // Partie SANS départ : sac vide, pour tester le MÉCANISME du sac
   // (addItem/removeItem/pickupItemEntity/dropItem) en isolation.
-  const bagState = createInitialState(moneyScene, undefined, NO_COMPANIONS);
+  const bagState = createInitialState(moneyScene);
   run("sac : partie sans départ -> sac vide", 0, bagState.bag.length);
 
   // Empilable : le PREMIER ajout crée l'entrée, les SUIVANTS incrémentent
@@ -106,7 +106,7 @@ export default function checkInventory(run) {
   // Sac VIDÉ ici aussi — même raison que bagState plus haut (une partie
   // neuve démarre en réalité avec des rangers dedans, hors-sujet pour ce
   // test de mécanisme).
-  const itemState = { ...createInitialState(itemScene, undefined, NO_COMPANIONS), bag: [] };
+  const itemState = { ...createInitialState(itemScene), bag: [] };
 
   const afterApplePickup = pickupItemEntity(itemState, "apple-1", "apple", 1);
   run("sac : pickupItemEntity ajoute l'objet au sac", 1, afterApplePickup.bag.length);
@@ -189,7 +189,7 @@ export default function checkInventory(run) {
   run("gaitOf : type retiré du registre entre-temps -> repli barefoot", "barefoot", gaitOf({ feet: { type: "does-not-exist" } }));
 
   const equipmentScene = parseScene(RAW_SCENE, EMPTY_REGISTRY);
-  run("équipement : partie sans départ -> pieds nus", "barefoot", gaitOf(createInitialState(equipmentScene, undefined, NO_COMPANIONS).equipment));
+  run("équipement : partie sans départ -> pieds nus", "barefoot", gaitOf(createInitialState(equipmentScene).equipment));
   // Départ d'objets de test (./helpers.js/ITEM_START) : baskets équipées,
   // rangers et escarpins dans le sac.
   const freshEquipState = createInitialState(equipmentScene, undefined, ITEM_START);
@@ -420,7 +420,7 @@ export default function checkInventory(run) {
       },
       GENERIC_ITEM_REGISTRY
     );
-    let state = createInitialState(twoFaced, "two-faced", NO_COMPANIONS);
+    let state = createInitialState(twoFaced, "two-faced");
     state = switchSide(state, 3);
     const picked = pickupItemEntity(state, "comp", "resistor", 1);
     run("deux faces : objet ramassé au sac", 1, ownedQuantity(picked.bag, "resistor"));

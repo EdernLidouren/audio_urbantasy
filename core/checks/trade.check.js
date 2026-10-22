@@ -24,7 +24,7 @@ import {
 import { validateShopCatalogs, validateCatalog, fullStockOf, articlePrice } from "../catalog.js";
 import { SHOP_CATALOGS } from "../../config/shop-values.js";
 import { auditNonSerializable, throws, fail } from "../../lib/check.js";
-import { NO_COMPANIONS, buildMoneyScene } from "./helpers.js";
+import { buildMoneyScene } from "./helpers.js";
 
 export default function checkTrade(run) {
   // Fixtures partagées avec d'autres domaines (voir ./helpers.js).
@@ -40,7 +40,7 @@ export default function checkTrade(run) {
 
   // Sac de test : 5 pommes (empilable), 2 clés (non empilable, deux
   // entrées), 1 paire de baskets (non empilable, vendable).
-  let tradeState = createInitialState(moneyScene, undefined, NO_COMPANIONS);
+  let tradeState = createInitialState(moneyScene);
   tradeState = addItem(tradeState, "apple", 5);
   tradeState = addItem(tradeState, "key_bronze", 2);
   tradeState = addItem(tradeState, "sneakers", 1);
@@ -118,7 +118,7 @@ export default function checkTrade(run) {
 
   const shopWorld = (s) => s.worlds[shopScene.id];
   const shopEntity = (s, id) => shopWorld(s).entities.find((e) => e.id === id);
-  const shopFresh = { ...createInitialState(shopScene, undefined, NO_COMPANIONS), bag: [] };
+  const shopFresh = { ...createInitialState(shopScene), bag: [] };
   run("achat : avant tout rechargement, les articles sont à stock 0", true, shopArticles(shopEntity(shopFresh, "counter-1")).every((a) => a.stock === 0));
 
   // Rechargement au CHARGEMENT (cycle de collecte, core/spawn.js) : un point
