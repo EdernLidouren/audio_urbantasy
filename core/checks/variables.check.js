@@ -11,7 +11,7 @@ import { evaluateCondition, selectMatchingAction } from "../presence.js";
 import { serializeGame, deserializeGame } from "../save.js";
 import { applyActionEffects, parseVariables, getVariable, setVariable } from "../variables.js";
 import { throws, auditNonSerializable, fail } from "../../lib/check.js";
-import { VAR_ACTION_REGISTRY, sceneWithActionEffect } from "./helpers.js";
+import { VAR_ACTION_REGISTRY, UNKNOWN_FIELD, sceneWithActionEffect, sceneParseMessage } from "./helpers.js";
 
 export default function checkVariables(run) {
   // --- STOCKAGE de variables (core/variables.js) : trois portées (entity/
@@ -751,4 +751,11 @@ export default function checkVariables(run) {
     auditNonSerializable(windowSession, "windowSession", new Set(), windowLeakFindings);
     run("fenêtre : sérialisation — aucune fuite de non-sérialisable", 0, windowLeakFindings.length);
   }
+
+  // --- Champs inconnus : une déclaration n'accepte que name, type,
+  // initial, persistent (voir core/variables.js/VARIABLE_FIELDS). ---
+  const declarationMessage = (declaration) =>
+    sceneParseMessage(sceneWithActionEffect({ type: "toggleVariable", scope: "entity", name: "isOpen" }, [declaration]), VAR_ACTION_REGISTRY);
+  run("champs inconnus : déclaration de référence acceptée", "accepté", declarationMessage({ name: "isOpen", type: "flag", initial: false, persistent: false }));
+  run("champs inconnus : déclaration (persistant)", true, declarationMessage({ name: "isOpen", type: "flag", initial: false, persistant: false }).includes(UNKNOWN_FIELD));
 }

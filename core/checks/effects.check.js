@@ -11,7 +11,7 @@ import { evaluateCondition, selectMatchingAction } from "../presence.js";
 import { setWeather } from "../weather.js";
 import { applyActionEffects, setVariable } from "../variables.js";
 import { throws } from "../../lib/check.js";
-import { VAR_ACTION_REGISTRY, sceneWithActionEffect } from "./helpers.js";
+import { VAR_ACTION_REGISTRY, UNKNOWN_FIELD, sceneWithActionEffect, sceneParseMessage } from "./helpers.js";
 
 export default function checkEffects(run) {
   // --- Effets d'action : RENDU (playSound/announce) et forme de l'effet
@@ -423,4 +423,17 @@ export default function checkEffects(run) {
     run("applyActionEffects : removeImprovement sur contexte sans session -> ne lève pas", false, removeThrew);
     run("applyActionEffects : removeImprovement sur contexte sans session -> contexte inchangé", contextWithoutSession, afterRemove);
   }
+
+  // --- Champs inconnus : chaque type d'effet d'action n'accepte que les
+  // siens (voir core/script-parse.js/ACTION_EFFECT_FIELDS). ---
+  const effectMessage = (effect) => sceneParseMessage(sceneWithActionEffect(effect), VAR_ACTION_REGISTRY);
+  run("champs inconnus : effet de référence accepté", "accepté", effectMessage({ type: "playSound", path: "assets/sounds/x", gain: 0.5 }));
+  run("champs inconnus : playSound (gian)", true, effectMessage({ type: "playSound", path: "assets/sounds/x", gian: 0.5 }).includes(UNKNOWN_FIELD));
+  run("champs inconnus : announce (assertif)", true, effectMessage({ type: "announce", key: "x.y", assertif: true }).includes(UNKNOWN_FIELD));
+  run(
+    "champs inconnus : setVariable (champ d'un autre type : amount)",
+    true,
+    effectMessage({ type: "setVariable", scope: "entity", name: "isOpen", value: true, amount: 1 }).includes(UNKNOWN_FIELD)
+  );
+  run("champs inconnus : teleport (targetX)", true, effectMessage({ type: "teleport", target: "demo", targetX: 3 }).includes(UNKNOWN_FIELD));
 }

@@ -9,7 +9,7 @@ import { tick } from "../actions.js";
 import { reduce } from "../reduce.js";
 import { serializeGame, deserializeGame } from "../save.js";
 import { DEFAULT_SURFACE, surfaceAt } from "../surfaces.js";
-import { EMPTY_REGISTRY, WORLD_A_REGISTRY, TWO_FACED_RAW_SCENE, expectSceneParseThrows } from "./helpers.js";
+import { EMPTY_REGISTRY, WORLD_A_REGISTRY, TWO_FACED_RAW_SCENE, UNKNOWN_FIELD, expectSceneParseThrows, sceneParseMessage } from "./helpers.js";
 
 export default function checkScene(run) {
   // --- Parsing TOTAL de scène (core/scene.js/parseScene) : l'ABSENCE de
@@ -126,17 +126,10 @@ export default function checkScene(run) {
   // champs optionnels restent optionnels (parseScene({}) plus haut).
   const base = { id: "unknown-fields", titleKey: "scene.demo.name", length: 10 };
   const dog = { id: "dog-1", type: "dog", x: 3 };
-  const message = (raw) => {
-    try {
-      parseScene(raw, WORLD_A_REGISTRY);
-    } catch (error) {
-      return error.message;
-    }
-    return "accepté";
-  };
+  const message = (raw) => sceneParseMessage(raw, WORLD_A_REGISTRY);
   // Rejeté POUR SON CHAMP INCONNU, jamais pour une autre erreur de la scène
   // de test.
-  const rejected = (raw) => message(raw).includes("champ(s) inconnu(s)");
+  const rejected = (raw) => message(raw).includes(UNKNOWN_FIELD);
   run("champs inconnus : la scène de référence est acceptée", "accepté", message({ ...base, entities: [dog] }));
   run("champs inconnus : racine de scène simple (lenght)", true, rejected({ ...base, lenght: 12 }));
   run("champs inconnus : racine de scène simple (ambience au lieu de ambiences)", true, rejected({ ...base, ambience: ["assets/ambiances/x"] }));

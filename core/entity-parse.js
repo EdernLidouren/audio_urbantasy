@@ -11,6 +11,39 @@ import { validateCatalog } from "./catalog.js";
 import { fail, isNonEmptyString, isFiniteNumber, parseBehavior, rejectUnknownFields } from "./parse-common.js";
 import { validateCondition, parsePresenceRule, parseSingleAction, parseTrigger } from "./script-parse.js";
 import { ACTION_KINDS } from "./action-kinds.js";
+import { TUNING_DEFAULTS } from "../config/tuning-values.js";
+
+// Clés de la cascade de réglages (voir config/tuning-values.js, qui les
+// liste toutes) : seules acceptées dans un `tuning` d'instance, dans un
+// descripteur de son et au premier niveau d'un archétype.
+const TUNING_KEYS = Object.keys(TUNING_DEFAULTS);
+
+// Rôles de son lus par la vue (voir doc/entity-model.md/"Vocabulaire de
+// sons") : un autre nom serait ignoré en silence, il est refusé. Ajouter un
+// rôle, c'est l'ajouter ici ET le faire lire par la vue.
+const SOUND_ROLES = ["beacon", "vocal", "movement", "enterSound", "exitSound", "pickup"];
+
+// Champs d'un descripteur de son, en plus des clés de réglage : `condition`
+// n'existe que pour la balise (voir applyBeaconCondition).
+const SOUND_FIELDS = ["path", "loop", "tracked", ...TUNING_KEYS];
+const BEACON_FIELDS = [...SOUND_FIELDS, "condition"];
+
+// `sounds` d'une instance ou d'un archétype : rôles connus, champs connus.
+// `allowNull` : une instance peut RETIRER un rôle de son archétype (null,
+// voir deepMergeOverride) ; un archétype, lui, n'a rien à retirer.
+function validateSounds(sounds, describe, allowNull, failWith = fail) {
+  if (typeof sounds !== "object" || sounds === null || Array.isArray(sounds)) {
+    failWith(`${describe} doit être un objet.`);
+  }
+  rejectUnknownFields(sounds, SOUND_ROLES, describe, failWith);
+  for (const [role, descriptor] of Object.entries(sounds)) {
+    if (descriptor === null && allowNull) continue;
+    if (typeof descriptor !== "object" || descriptor === null || Array.isArray(descriptor)) {
+      failWith(`${describe}.${role} doit être un objet${allowNull ? " (ou null)" : ""}.`);
+    }
+    rejectUnknownFields(descriptor, role === "beacon" ? BEACON_FIELDS : SOUND_FIELDS, `${describe}.${role}`, failWith);
+  }
+}
 
 // Fusion PROFONDE d'une surcharge sur une base — utilisée par `sounds`
 // (voir parseEntity plus bas), SEUL champ cascadé PAR FUSION plutôt que par
@@ -256,6 +289,7 @@ export function parseEntity(rawEntity, index, registry, length, seenIds, sceneVa
   if (sounds !== undefined && sounds !== null && (typeof sounds !== "object" || Array.isArray(sounds))) {
     fail(`${at} : sounds doit être un objet (ou null) si présent.`);
   }
+  if (sounds !== undefined && sounds !== null) validateSounds(sounds, `${at} : sounds`, true);
   // Objet au sol générique (type "item") : il reprend le nom, la description
   // et les sons de l'objet qu'il porte, comme un palier entre l'archétype et
   // l'instance. Placer un objet se réduit à { type: "item", x, action:
@@ -321,6 +355,7 @@ export function parseEntity(rawEntity, index, registry, length, seenIds, sceneVa
     if (typeof tuning !== "object" || tuning === null || Array.isArray(tuning)) {
       fail(`${at} : tuning doit être un objet si présent.`);
     }
+    rejectUnknownFields(tuning, TUNING_KEYS, `${at} : tuning`);
     entity.tuning = tuning;
   }
 
@@ -358,6 +393,50 @@ export function parseEntity(rawEntity, index, registry, length, seenIds, sceneVa
   }
 
   return entity;
+}
+
+// Champs qu'un ARCHÉTYPE peut porter (entities/types/), en plus des clés
+// de réglage, qu'il pose à son premier niveau (palier "type" de la cascade,
+// voir config/tuning.js). `collisionSound`/`muteOnConsumed` n'existent qu'à
+// ce niveau : la vue les lit directement dans le registre.
+const ARCHETYPE_FIELDS = [
+  "nameKey",
+  "descriptionKey",
+  "consumedDescriptionKey",
+  "sounds",
+  "blocksMovement",
+  "observable",
+  "interactable",
+  "isFlying",
+  "speed",
+  "action",
+  "presence",
+  "triggers",
+  "container",
+  "shop",
+  "collisionSound",
+  "muteOnConsumed",
+];
+
+function failRegistry(message) {
+  throw new Error(`entities/types : ${message}`);
+}
+
+// Valide le REGISTRE des types d'entité (injecté, comme partout dans le
+// core) : champs connus, sons connus. Appelée une fois au démarrage
+// (main.js) : un archétype n'est sinon relu qu'au travers d'une instance,
+// et un type qu'aucune scène n'utilise ne le serait jamais. Le CONTENU de
+// ses actions, règles et conteneurs est validé avec chaque instance, par
+// la cascade (voir parseEntity).
+export function validateEntityRegistry(registry) {
+  for (const [type, archetype] of Object.entries(registry)) {
+    const describe = `type "${type}"`;
+    if (typeof archetype !== "object" || archetype === null || Array.isArray(archetype)) {
+      failRegistry(`${describe} n'est pas un objet.`);
+    }
+    rejectUnknownFields(archetype, [...ARCHETYPE_FIELDS, ...TUNING_KEYS], describe, failRegistry);
+    if (archetype.sounds !== undefined) validateSounds(archetype.sounds, `${describe} : sounds`, false, failRegistry);
+  }
 }
 
 // Entité créée EN JEU par le moteur de collecte (core/spawn.js) : MÊME

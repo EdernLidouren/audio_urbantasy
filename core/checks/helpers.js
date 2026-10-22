@@ -150,6 +150,21 @@ export function expectSceneParseThrows(rawScene, registry) {
   return throws(() => parseScene(rawScene, registry));
 }
 
+// Message d'erreur de parseScene sur `rawScene`, ou "accepté" : pour vérifier
+// qu'un rejet vient bien de la raison attendue, jamais d'une autre erreur
+// de la scène de test.
+export function sceneParseMessage(rawScene, registry) {
+  try {
+    parseScene(rawScene, registry);
+  } catch (error) {
+    return error.message;
+  }
+  return "accepté";
+}
+
+// Fragment commun à tout message de champ inconnu (voir lib/validate.js).
+export const UNKNOWN_FIELD = "champ(s) inconnu(s)";
+
 // --- Effets d'action : scène de test portant UN effet sur une action ---
 
 export const VAR_ACTION_REGISTRY = { npc: { nameKey: "entity.npc.name" } };

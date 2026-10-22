@@ -3,7 +3,8 @@
 // jouant (une scène n'est chargée qu'à sa première visite, une clé i18n
 // absente n'est qu'un avertissement en console et se lit brute au lecteur
 // d'écran, un son introuvable n'échoue qu'au moment d'être joué) :
-//   - chaque scène de scenes/index.js se charge (parseScene, vrai registre) ;
+//   - chaque scène de scenes/index.js se charge (parseScene, vrai registre),
+//     et le registre des types d'entité lui-même est valide ;
 //   - chaque cible de "teleport", chaque scène de la carte de la ville et la
 //     scène de départ existent dans scenes/index.js ;
 //   - chaque clé i18n citée existe en fr ET en en ;
@@ -32,6 +33,7 @@ import player from "../entities/player.js";
 import scenePaths from "../scenes/index.js";
 import collections from "../collections/index.js";
 import { parseScene } from "../core/scene.js";
+import { validateEntityRegistry } from "../core/entity-parse.js";
 import { ITEM_REGISTRY } from "../core/items.js";
 import { IMPROVEMENT_REGISTRY } from "../core/improvements.js";
 import { collectionNameKey, entryTextKeys } from "../core/collections.js";
@@ -125,6 +127,11 @@ export async function auditContent() {
     checkStrings(source, raw);
   }
 
+  try {
+    validateEntityRegistry(registry);
+  } catch (error) {
+    report("types d'entité", "entities/types", "registre invalide", error.message);
+  }
   checkStrings("types d'entité", registry);
   checkStrings("joueur", player);
   checkStrings("objets", ITEM_REGISTRY);

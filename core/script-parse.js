@@ -4,7 +4,7 @@
 // donnée malformée échoue ici, jamais en jeu ; le SENS reste au moteur (core)
 // ou à la vue selon la nature de l'effet (voir core/effects.js). Pur.
 
-import { CONDITION_TYPES } from "./presence.js";
+import { CONDITION_TYPES, conditionFields } from "./presence.js";
 import { TAG_REGISTRY } from "./tags.js";
 import { IMPROVEMENT_REGISTRY } from "./improvements.js";
 import { WEATHER_STATES } from "../config/weather-values.js";
@@ -13,7 +13,7 @@ import { ACTION_EFFECT_TYPES, MIXED_EFFECT_TYPES } from "./effects.js";
 import { TRIGGER_KINDS } from "./triggers.js";
 import { validateActionKind } from "./action-kinds.js";
 import { TIME_CONFIG } from "../config/time-values.js";
-import { fail, isNonEmptyString, isFiniteNumber, parseBehavior } from "./parse-common.js";
+import { fail, isNonEmptyString, isFiniteNumber, parseBehavior, rejectUnknownFields } from "./parse-common.js";
 
 // Un effet porté par une règle de presence[] : { type: "presence", present:
 // boolean } ou { type: "behavior", behavior: <objet behavior, même forme
@@ -36,12 +36,14 @@ function parseEffect(rawEffect, describe, index, id) {
   }
   const { type } = rawEffect;
   if (type === "presence") {
+    rejectUnknownFields(rawEffect, ["type", "present"], describe);
     if (typeof rawEffect.present !== "boolean") {
       fail(`${describe}.present doit être un booléen.`);
     }
     return { type: "presence", present: rawEffect.present };
   }
   if (type === "behavior") {
+    rejectUnknownFields(rawEffect, ["type", "behavior"], describe);
     // behavior: null -> RETRAIT explicite du comportement actif (voir
     // doc/scripting.md, "Effets"/"behavior") : l'entité redevient immobile,
     // comme si elle n'en avait jamais eu — SEULE valeur acceptée en dehors
@@ -119,6 +121,31 @@ const PLAY_SOUND_NATURES = ["diegetic", "meta"];
 const TELEPORT_SIDES = ["recto", "verso"];
 const TELEPORT_TRANSITIONS = ["fade", "instant"];
 
+// Champs de chaque type d'effet d'action, en plus de `type` — tout autre
+// champ est rejeté (voir parseActionEffect). Mêmes types que
+// core/effects.js/ACTION_EFFECT_TYPES, vérifié au chargement du module :
+// un type ajouté là sans ses champs ici échoue tout de suite.
+const ACTION_EFFECT_FIELDS = {
+  setVariable: ["scope", "name", "value"],
+  toggleVariable: ["scope", "name"],
+  addVariable: ["scope", "name", "amount"],
+  giveImprovement: ["id"],
+  removeImprovement: ["id"],
+  playSound: ["path", "gain", "pitchVariation", "reverbSend", "at", "nature", "tracked"],
+  announce: ["key", "assertive"],
+  teleport: ["target", "x", "side", "reloadIfSame", "transition"],
+};
+{
+  const declared = Object.keys(ACTION_EFFECT_FIELDS);
+  const missing = ACTION_EFFECT_TYPES.filter((type) => !declared.includes(type));
+  const extra = declared.filter((type) => !ACTION_EFFECT_TYPES.includes(type));
+  if (missing.length > 0 || extra.length > 0) {
+    throw new Error(
+      `core/script-parse.js : ACTION_EFFECT_FIELDS désaccordé avec ACTION_EFFECT_TYPES (manquants : ${missing.join(", ") || "aucun"} ; en trop : ${extra.join(", ") || "aucun"}).`
+    );
+  }
+}
+
 // Un effet déclenché à l'ACTIVATION d'une action (voir core/effects.js pour
 // la partition CORE/VUE, core/variables.js/applyActionEffects,
 // view/effect-runner.js, doc/scripting.md/"Effets d'action") — AIGUILLAGE
@@ -164,6 +191,9 @@ function parseActionEffect(rawEffect, describe, entityVariables, sceneVariables)
     fail(`${describe} n'est pas un objet.`);
   }
   const { type, scope, name } = rawEffect;
+  if (Object.hasOwn(ACTION_EFFECT_FIELDS, type)) {
+    rejectUnknownFields(rawEffect, ["type", ...ACTION_EFFECT_FIELDS[type]], describe);
+  }
   if (type === "setVariable") {
     validateVariableReference(scope, name, entityVariables, sceneVariables, describe);
     const knownType = resolveKnownVariableType(scope, name, entityVariables, sceneVariables);
@@ -357,6 +387,7 @@ export function validateCondition(cond, describe, entityVariables, sceneVariable
   if (!CONDITION_TYPES.includes(cond.type)) {
     fail(`${describe}.type "${cond.type}" absent du registre de conditions.`);
   }
+  rejectUnknownFields(cond, ["type", ...conditionFields(cond.type)], describe);
   // "hasEquipmentTag" : EN PLUS de son type (déjà validé ci-dessus), son
   // champ `tag` référence un tag de contenu (core/tags.js/TAG_REGISTRY) —
   // même traitement qu'une surface de segment (voir parseSegment plus bas) :
@@ -468,6 +499,7 @@ export function parsePresenceRule(rawRule, ruleIndex, index, id, entityVariables
   if (typeof rawRule !== "object" || rawRule === null) {
     fail(`entities[${index}] ("${id}") : presence[${ruleIndex}] n'est pas un objet.`);
   }
+  rejectUnknownFields(rawRule, ["when", "present", "effects"], `entities[${index}] ("${id}") : presence[${ruleIndex}]`);
   const { when, present, effects } = rawRule;
   validateCondition(when, `entities[${index}] ("${id}") : presence[${ruleIndex}].when`, entityVariables, sceneVariables);
 

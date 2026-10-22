@@ -21,7 +21,7 @@ import { evaluateCondition, isPresent, isBlocking, presenceContextOf } from "../
 import { setWeather } from "../weather.js";
 import { auditNonSerializable } from "../../lib/check.js";
 import { TICK_MS } from "../../lib/loop.js";
-import { WANDER_REGISTRY, makeWanderScene, expectSceneParseThrows } from "./helpers.js";
+import { WANDER_REGISTRY, UNKNOWN_FIELD, makeWanderScene, expectSceneParseThrows, sceneParseMessage } from "./helpers.js";
 
 export default function checkConditions(run) {
   // Fixtures partagées avec d'autres domaines (voir ./helpers.js).
@@ -799,5 +799,34 @@ export default function checkConditions(run) {
     // sourceX (10) est le repli ultime, toujours accepté (voir
     // drawScatteredPosition) : seules les autres positions comptent.
     scattered.some((x) => x !== 10) && scattered.filter((x) => x !== 10).every((x) => Math.abs(x - 10) >= BODY_RADIUS)
+  );
+
+  // --- Champs inconnus : conditions et règles (voir CONDITION_EVALUATORS,
+  // `fields`) — rejetés POUR leur champ, jamais pour une autre erreur. ---
+  const ruleScene = (rule) =>
+    makeWanderScene({ entities: [{ id: "wander-1", type: "dog", x: 5, variables: [{ name: "n", type: "int", initial: 0 }], presence: [rule] }] });
+  const ruleMessage = (rule) => sceneParseMessage(ruleScene(rule), WANDER_REGISTRY);
+  run("champs inconnus : règle de référence acceptée", "accepté", ruleMessage({ when: { type: "timeRange", from: 8, to: 20, spread: 30 }, present: true }));
+  run("champs inconnus : timeRange (spred)", true, ruleMessage({ when: { type: "timeRange", from: 8, to: 20, spred: 30 }, present: true }).includes(UNKNOWN_FIELD));
+  run("champs inconnus : condition sans champ propre (arrived + target)", true, ruleMessage({ when: { type: "arrived", target: "door" }, present: false }).includes(UNKNOWN_FIELD));
+  run(
+    "champs inconnus : variable (comparateur mal orthographié)",
+    true,
+    ruleMessage({ when: { type: "variable", scope: "entity", name: "n", equals: 1, greaterThen: 2 }, present: true }).includes(UNKNOWN_FIELD)
+  );
+  run(
+    "champs inconnus : sous-condition d'un allOf",
+    true,
+    ruleMessage({ when: { type: "allOf", conditions: [{ type: "consumed", value: true }] }, present: false }).includes(UNKNOWN_FIELD)
+  );
+  run(
+    "champs inconnus : règle (efects)",
+    'parseScene: entities[0] ("wander-1") : presence[0] : champ(s) inconnu(s) "efects".',
+    ruleMessage({ when: { type: "consumed" }, present: false, efects: [] })
+  );
+  run(
+    "champs inconnus : effet de règle (presence + value)",
+    true,
+    ruleMessage({ when: { type: "consumed" }, effects: [{ type: "presence", present: false, value: 1 }] }).includes(UNKNOWN_FIELD)
   );
 }

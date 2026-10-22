@@ -21,6 +21,7 @@ import { loadSceneById } from "./scenes/load.js";
 import registry from "./entities/types/index.js";
 import { createInitialState } from "./core/state.js";
 import { parseNewGame } from "./core/new-game.js";
+import { validateEntityRegistry } from "./core/entity-parse.js";
 import { NEW_GAME } from "./config/new-game.js";
 import { getPref, setPref } from "./config/preferences.js";
 import { configureAssetManifest } from "./lib/assets.js";
@@ -39,9 +40,11 @@ configureMenuPreferences({ getPref, setPref });
 // view/menu-sounds.js.
 configureMenuSounds(playMenuSound);
 
-// Départ d'une partie neuve (config/new-game.js), validé UNE FOIS ici, au
-// démarrage : une erreur dans ce fichier arrête le jeu tout de suite, avec
-// son message, plutôt qu'au premier "Nouvelle partie".
+// Registre des types d'entité et départ d'une partie neuve
+// (config/new-game.js), validés UNE FOIS ici, au démarrage : une erreur
+// arrête le jeu tout de suite, avec son message, plutôt qu'au premier
+// "Nouvelle partie" ou à la première scène qui utilise le type fautif.
+validateEntityRegistry(registry);
 const newGame = parseNewGame(NEW_GAME, registry);
 
 // Un import n'expose rien au scope global : on l'attache explicitement à

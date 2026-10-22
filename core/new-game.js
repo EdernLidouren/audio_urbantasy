@@ -18,6 +18,7 @@ import { addItem } from "./bag.js";
 import { parseEntity } from "./entity-parse.js";
 import { parseVariables } from "./variables.js";
 import { isNonEmptyString } from "./parse-common.js";
+import { rejectUnknownFields as rejectUnknown } from "../lib/validate.js";
 import { MAX_COMPANIONS } from "../config/companions.js";
 
 const FIELDS = ["startSceneId", "money", "bag", "equipment", "companions", "partyVariables"];
@@ -32,10 +33,7 @@ function isPlainObject(value) {
 }
 
 function rejectUnknownFields(value, allowed, describe) {
-  const unknown = Object.keys(value).filter((field) => !allowed.includes(field));
-  if (unknown.length > 0) {
-    fail(`${describe} : champ(s) inconnu(s) ${unknown.map((field) => `"${field}"`).join(", ")}.`);
-  }
+  rejectUnknown(value, allowed, describe, fail);
 }
 
 // Déclaré `[{ type, count }]` (count : 1 par défaut), résolu par addItem

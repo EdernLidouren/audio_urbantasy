@@ -28,6 +28,7 @@
 // runEffects délègue TOUS les effets d'état ICI, en un seul appel).
 
 import { giveImprovement, removeImprovement } from "./improvements.js";
+import { rejectUnknownFields } from "../lib/validate.js";
 
 export const VARIABLE_TYPES = ["flag", "int"];
 
@@ -56,6 +57,9 @@ export function isValidValueForType(type, value) {
   if (type === "int") return typeof value === "number" && Number.isInteger(value);
   return false;
 }
+
+// Champs d'une déclaration de variable ; tout autre champ est rejeté.
+const VARIABLE_FIELDS = ["name", "type", "initial", "persistent"];
 
 // Valide et construit le sac de variables d'UN porteur — RÉUTILISÉE À
 // L'IDENTIQUE par core/entity-parse.js (entité), core/scene.js (scène) et
@@ -86,6 +90,7 @@ export function parseVariables(raw, describe, fail) {
     if (typeof rawVariable !== "object" || rawVariable === null) {
       fail(`${itemDescribe} n'est pas un objet.`);
     }
+    rejectUnknownFields(rawVariable, VARIABLE_FIELDS, itemDescribe, fail);
     const { name, type, initial, persistent } = rawVariable;
     if (!isNonEmptyString(name)) {
       fail(`${itemDescribe}.name manquant ou invalide.`);

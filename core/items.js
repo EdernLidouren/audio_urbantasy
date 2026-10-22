@@ -1,4 +1,5 @@
 import { TAG_REGISTRY } from "./tags.js";
+import { rejectUnknownFields } from "../lib/validate.js";
 
 // Registre d'OBJETS DU SAC — données pures, CORE (comme SURFACE_REGISTRY,
 // voir core/surfaces.js) : le core en a besoin STRUCTURELLEMENT pour
@@ -166,7 +167,15 @@ export function itemSounds(type) {
   return { beacon: { path: props.sound, loop: true }, pickup: { path: props.sound } };
 }
 
-// Valide que tout tag référencé par CHAQUE objet d'un registre existe dans
+// Champs d'un objet (voir l'en-tête) ; tout autre champ est rejeté.
+const ITEM_FIELDS = ["stackable", "label", "descriptionKey", "value", "rarity", "tags", "sound", "equippable", "slot", "gait"];
+
+function failItems(message) {
+  throw new Error(`core/items.js: ${message}`);
+}
+
+// Valide un registre d'objets : aucun champ inconnu (ITEM_FIELDS), et tout
+// tag référencé par CHAQUE objet existe dans
 // TAG_REGISTRY — même principe que la validation des surfaces contre
 // SURFACE_REGISTRY (core/scene.js), mais ITEM_REGISTRY est du CODE, pas du
 // contenu JSON passé à un parseur : ce module se valide donc LUI-MÊME, tout
@@ -176,8 +185,9 @@ export function itemSounds(type) {
 // sans avoir à corrompre ITEM_REGISTRY lui-même. Faute de frappe -> échec
 // CLAIR (tag + objet concerné), jamais un mismatch silencieux découvert en
 // jeu.
-export function validateItemTags(registry) {
+export function validateItemRegistry(registry) {
   for (const [type, props] of Object.entries(registry)) {
+    rejectUnknownFields(props, ITEM_FIELDS, `objet "${type}"`, failItems);
     for (const tag of props.tags || []) {
       if (!TAG_REGISTRY[tag]) {
         throw new Error(`core/items.js: tag "${tag}" (objet "${type}") absent de TAG_REGISTRY.`);
@@ -186,7 +196,7 @@ export function validateItemTags(registry) {
   }
 }
 
-validateItemTags(ITEM_REGISTRY);
+validateItemRegistry(ITEM_REGISTRY);
 
 // Valeur marchande d'un type d'objet (`value` du registre) — 0 si l'objet
 // est inconnu ou sans valeur entière positive. Lue par la vente (prix de

@@ -14,7 +14,7 @@
 // un tag ne doit jamais cesser de matcher au changement de langue.
 //
 // VALIDATION : tout tag référencé par un objet (voir core/items.js/
-// validateItemTags) ou une condition "hasEquipmentTag" (voir
+// validateItemRegistry) ou une condition "hasEquipmentTag" (voir
 // core/script-parse.js/validateCondition)
 // DOIT exister ici — une faute de frappe échoue clairement au chargement,
 // jamais un mismatch silencieux découvert en jeu.

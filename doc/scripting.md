@@ -18,6 +18,15 @@ si tu ajoutes un type/kind/tag, mets à jour le CODE d'abord, puis complète la
 section correspondante ICI (nouvel exemple si le concept le justifie) — cette
 maintenance fait partie du travail (voir `doc/README.md`).
 
+**Champs inconnus REJETÉS, partout** : chaque objet de ce format (condition,
+effet, règle, trigger, action, comportement, déclaration de variable) n'accepte
+que les champs de SON type ; tout autre champ fait échouer le chargement en le
+nommant (`... : champ(s) inconnu(s) "spred".`). Optionnel ne veut pas dire
+libre : une faute de frappe retomberait sinon en silence sur un défaut (une
+fenêtre horaire sans étalement, un son sans gain...). Les listes de champs
+vivent dans le code, à côté de ce qui les lit (voir "Sources de vérité" en fin
+de document).
+
 ## Vue d'ensemble : une seule couche de conditions, quatre consommateurs
 
 Le même objet condition (`{ type, ...champs }`) et le même évaluateur
@@ -487,8 +496,10 @@ filtrées par condition" plus bas).
 
 ### Ajouter un type de condition
 
-1. Un cas dans `CONDITION_EVALUATORS` (`core/presence.js`) : `(cond, context) ->
-   boolean`, jamais un throw (dégrade sur `false`).
+1. Une entrée dans `CONDITION_EVALUATORS` (`core/presence.js`) :
+   `{ evaluate, fields }` — `evaluate(cond, context) -> boolean`, jamais un
+   throw (dégrade sur `false`) ; `fields`, les champs qu'il lit en plus de
+   `type` (tout autre champ est rejeté au chargement).
 2. Rien à faire côté `CONDITION_TYPES` (dérivé automatiquement du registre) ni côté
    `isPresent`/`resolveEntityRules`/`core/reduce.js` — l'aiguillage est déjà
    générique.
@@ -1355,8 +1366,9 @@ se déplacerait entre des mondes que le core ne tique jamais simultanément
    `MIXED_EFFECT_TYPES` (MIXTE : la vue orchestre, en s'appuyant sur des
    fonctions du core DÉJÀ EXISTANTES pour l'état — voir `"teleport"` plus
    haut) — TOUTES trois dans `core/effects.js`, JAMAIS deux à la fois.
-2. Un cas dans `core/script-parse.js`/`parseActionEffect` : valide la FORME propre à
-   ce type.
+2. Ses champs dans `core/script-parse.js`/`ACTION_EFFECT_FIELDS` (un type absent
+   de cette table fait échouer le chargement du module) et un cas dans
+   `parseActionEffect` : valide la FORME propre à ce type.
 3. Effet d'ÉTAT → un cas dans `core/variables.js`/`applyActionEffects`. Effet
    de RENDU ou MIXTE → un cas dans `view/effect-runner.js`/`runEffects`, JAMAIS
    dans le core (un effet MIXTE y délègue son calcul d'état à une fonction du
@@ -1688,9 +1700,9 @@ high_heels: { /* ... */ tags: ["chic"] },
 
 **Validation stricte** : `ITEM_REGISTRY` est du CODE (pas du JSON parsé par
 `core/scene.js`/`parseScene`), donc `core/items.js` se valide LUI-MÊME au chargement du module
-(`validateItemTags(ITEM_REGISTRY)`, appelée en bas du fichier) — tout tag référencé
+(`validateItemRegistry(ITEM_REGISTRY)`, appelée en bas du fichier) — tout tag référencé
 par un objet DOIT exister dans `TAG_REGISTRY`, sinon `throw` immédiat, nommant le
-tag fautif et l'objet concerné. `validateItemTags` est exportée pour rester
+tag fautif et l'objet concerné. `validateItemRegistry` est exportée pour rester
 testable avec un registre de test (`core/checks/inventory.check.js`), sans avoir à
 corrompre le vrai registre.
 
@@ -1754,9 +1766,9 @@ n'empêche de l'ajouter plus tard (voir `doc/entity-model.md`/"Interaction
 
 | Vocabulaire | Registre / aiguillage | Fichier |
 |---|---|---|
-| Types de condition | `CONDITION_EVALUATORS` | `core/presence.js` |
+| Types de condition et leurs champs | `CONDITION_EVALUATORS` (`fields`) | `core/presence.js` |
 | Types d'effet (presence/behavior, TICK) | `parseEffect` + `resolveEntityRules` | `core/script-parse.js`, `core/presence.js` |
-| Types d'effet d'action (ACTIVATION, état + rendu + mixte) | `parseActionEffect` (forme) + `STATE_EFFECT_TYPES`/`RENDER_EFFECT_TYPES`/`MIXED_EFFECT_TYPES` (nature/routage) + `applyActionEffects` (état) + `runEffects` (rendu + mixte) | `core/script-parse.js`, `core/effects.js`, `core/variables.js`, `view/effect-runner.js` |
+| Types d'effet d'action (ACTIVATION, état + rendu + mixte) | `ACTION_EFFECT_FIELDS` (champs) + `parseActionEffect` (forme) + `STATE_EFFECT_TYPES`/`RENDER_EFFECT_TYPES`/`MIXED_EFFECT_TYPES` (nature/routage) + `applyActionEffects` (état) + `runEffects` (rendu + mixte) | `core/script-parse.js`, `core/effects.js`, `core/variables.js`, `view/effect-runner.js` |
 | Exécution de l'effet "teleport" (rechargement/repositionnement) | `executeTeleport`/`performTransition` + `placePlayer`/`travelToWorld` | `view/world-travel.js`, `core/state.js` |
 | Kinds de trigger (transition d'horloge) | `TRIGGER_KINDS` + `parseTrigger` (forme) + `applyDueTriggers` (détection, état) + `runRenderEffects` (rendu) | `core/triggers.js`, `core/script-parse.js`, `view/effect-runner.js` |
 | Kinds d'action (forme, validation) + exécution | `ACTION_KINDS` + `ACTION_HANDLERS` | `core/action-kinds.js`, `view/action-execution.js` |
@@ -1767,7 +1779,7 @@ n'empêche de l'ajouter plus tard (voir `doc/entity-model.md`/"Interaction
 | Tables de distribution de collecte (standard, référençables) | `SPAWN_TABLES` | `config/spawn-values.js` |
 | Catalogues de point de vente (standard, référençables) | `SHOP_CATALOGS` | `config/shop-values.js` |
 | Surfaces | `SURFACE_REGISTRY` | `core/surfaces.js` |
-| Types de variable | `VARIABLE_TYPES` | `core/variables.js` |
+| Types de variable, champs d'une déclaration | `VARIABLE_TYPES`, `VARIABLE_FIELDS` | `core/variables.js` |
 | Portées de variable | `VARIABLE_SCOPES` | `core/variables.js` |
 | Valeurs de gabarit de description | `buildDescriptionValues` | `view/description-resolver.js` |
 

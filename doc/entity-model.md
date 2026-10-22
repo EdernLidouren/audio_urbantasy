@@ -756,7 +756,7 @@ l'écriture du slot).
   via `labelKey` — jamais le texte traduit dans une vérification, qui
   cesserait de matcher au changement de langue. `TAG_REGISTRY` est la SOURCE
   DE VÉRITÉ : un tag référencé par un objet absent de ce registre échoue au
-  chargement (`core/items.js`/`validateItemTags`, appelée sur
+  chargement (`core/items.js`/`validateItemRegistry`, appelée sur
   `ITEM_REGISTRY` lui-même), même principe que les surfaces contre
   `SURFACE_REGISTRY`.
 - **Tags EFFECTIVEMENT portés — DÉRIVÉ, jamais stocké**
@@ -1058,9 +1058,14 @@ Un descripteur de son est un objet plat :
   "Résolution en cascade" ci-dessous. Absents, ils retombent sur le défaut
   du type puis sur le défaut global.
 
-`sounds` regroupe ces descripteurs **par rôle** (une clé arbitraire du type :
-`beacon`, `vocal`, `movement`, et d'autres à venir sans casser l'existant —
-ex. un son d'interaction ponctuel un jour). Un rôle donné a un mode
+`sounds` regroupe ces descripteurs **par rôle** : uniquement les rôles que la
+vue lit (`core/entity-parse.js`/`SOUND_ROLES` — `beacon`, `vocal`,
+`movement`, `enterSound`, `exitSound`, `pickup`). Un autre nom serait ignoré
+en silence : il est REJETÉ au chargement, comme tout champ d'un descripteur
+qui n'est ni `path`, ni `loop`, ni `tracked`, ni une clé de réglage de
+`config/tuning-values.js` (`condition` en plus pour `beacon`). Ajouter un
+rôle (ex. un son d'interaction ponctuel un jour), c'est l'ajouter à
+`SOUND_ROLES` ET le faire lire par la vue. Un rôle donné a un mode
 (`loop`/`beaconMode`) cohérent avec son usage, mais rien ne l'impose
 structurellement — c'est une convention respectée par ce projet, pas une
 contrainte du modèle.
@@ -1402,13 +1407,15 @@ un champ RÉSERVÉ, `tuning`, un objet plat de clés -> valeurs :
 ```
 
 `core/entity-parse.js`/`parseEntity` recopie ce champ TEL QUEL (`entity.tuning`) —
-validé en FORME (un objet, sinon `fail()`), jamais en CONTENU : le core
-ignore tout du sens de ces clés (sonore ou non), il se contente de les
-porter jusqu'à l'entité parsée, exactement comme `music`/`ambiences`/
-`reverbDurationSec`/`reverbDecay` au niveau de la SCÈNE (voir `doc/scene-format.md`).
-Aucune clé nommée en dur dans `parseEntity` : un futur paramètre ajouté à
-`config/tuning-values.js` devient surchargeable à l'instance sans jamais
-rouvrir ce fichier. `resolveTuning` lit ensuite `entity.tuning[key]` (palier
+validé en FORME (un objet, sinon `fail()`) et en CLÉS : chaque clé doit
+exister dans `config/tuning-values.js`, qui liste TOUTES les clés de la
+cascade (celles sans défaut global y figurent à `undefined`, ex. `gait`,
+`transitionSound`). Une faute de frappe échoue au chargement au lieu de
+retomber en silence sur le défaut. Les VALEURS, elles, ne sont pas
+interprétées : le core ignore tout du sens de ces clés (sonore ou non), il
+les porte jusqu'à l'entité parsée. Aucune clé nommée en dur dans
+`parseEntity` : un futur paramètre ajouté à `config/tuning-values.js`
+devient surchargeable à l'instance sans jamais rouvrir ce fichier. `resolveTuning` lit ensuite `entity.tuning[key]` (palier
 2) — voir `lib/tuning.js`. Absent, `entity.tuning` est simplement `undefined`
 et la résolution retombe sur le palier ARCHÉTYPE.
 

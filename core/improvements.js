@@ -10,6 +10,8 @@
 // improvement qui porterait ses propres variables) viendrait s'ajouter SI un
 // cas concret le réclame — ne PAS le construire par anticipation (pas
 // d'abstraction prématurée).
+
+import { rejectUnknownFields } from "../lib/validate.js";
 // `order` (entier >= 1, UNIQUE) : position d'affichage dans l'onglet
 // Améliorations (view/menus/inventory-menu.js) et numéro annoncé au joueur.
 // Déclaré, jamais dérivé de l'ordre d'insertion de cet objet : réarranger
@@ -33,9 +35,14 @@ export const IMPROVEMENT_REGISTRY = {
 // Ordres présents, entiers >= 1 et uniques — sinon une erreur claire à
 // l'import, jamais un onglet mal numéroté en silence. Exportée pour les
 // checks terminal (core/checks/improvements.check.js).
+function failImprovements(message) {
+  throw new Error(`IMPROVEMENT_REGISTRY : ${message}`);
+}
+
 export function validateImprovementRegistry(registry) {
   const seen = new Map();
   for (const [id, props] of Object.entries(registry)) {
+    rejectUnknownFields(props, ["order", "labelKey", "descriptionKey"], `"${id}"`, failImprovements);
     if (!Number.isInteger(props.order) || props.order < 1) {
       throw new Error(`IMPROVEMENT_REGISTRY : "${id}".order doit être un entier >= 1 (reçu : ${JSON.stringify(props.order)}).`);
     }

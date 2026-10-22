@@ -263,4 +263,10 @@ function checkImprovementsBody(run) {
       run("improvements : vieille save rebouchée -> sac vide, jamais d'exception", 0, Object.keys(oldSaveReload.session.improvements).length);
     }
   }
+
+  run(
+    "improvements : champ inconnu rejeté (lableKey)",
+    true,
+    throws(() => validateImprovementRegistry({ fake: { order: 1, lableKey: "improvement.fake.name" } }))
+  );
 }

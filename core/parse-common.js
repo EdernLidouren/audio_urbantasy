@@ -4,6 +4,7 @@
 // "behavior" d'une règle de présence). Pur.
 
 import BEHAVIORS from "./behaviors/index.js";
+import { rejectUnknownFields as rejectUnknown } from "../lib/validate.js";
 
 // Erreur de parsing : préfixe commun à tous les messages de chargement
 // d'une scène (les messages sont testés tels quels, voir core/checks/).
@@ -19,15 +20,11 @@ export function isFiniteNumber(value) {
   return typeof value === "number" && Number.isFinite(value);
 }
 
-// Un champ hors de `allowed` est une erreur de contenu : une faute de frappe
-// (`"descriptonKey"`, `"ambience"`) retomberait sinon EN SILENCE sur le
-// défaut du champ visé. Les champs optionnels restent optionnels : seul un
-// champ que le format ne connaît pas échoue.
-export function rejectUnknownFields(value, allowed, describe) {
-  const unknown = Object.keys(value).filter((field) => !allowed.includes(field));
-  if (unknown.length > 0) {
-    fail(`${describe} : champ(s) inconnu(s) ${unknown.map((field) => `"${field}"`).join(", ")}.`);
-  }
+// Champ inconnu -> erreur (voir lib/validate.js), avec l'erreur de scène par
+// défaut. `failWith` : l'erreur de l'appelant, pour un format qui n'est pas
+// une scène (départ, registre de types).
+export function rejectUnknownFields(value, allowed, describe, failWith = fail) {
+  rejectUnknown(value, allowed, describe, failWith);
 }
 
 // Générique : ne connaît aucun kind par son nom. Cherche kind dans le

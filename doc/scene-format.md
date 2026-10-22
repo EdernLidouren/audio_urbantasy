@@ -21,13 +21,16 @@ FACE recto/verso vide (`parseFace`, même mécanisme).
 
 **Champs inconnus REJETÉS** : optionnel ne veut pas dire libre. À chaque
 niveau (racine de scène, face, segment, plage de collecte, entité, `shop`,
-`container`), un champ que le format ne connaît pas fait échouer le
-chargement en le nommant (`parseScene: entities[0] ("dog-1") : champ(s)
+`container`, `sounds` et ses descripteurs, `tuning`, et tout le format
+déclaratif — voir `doc/scripting.md`), un champ que le format ne connaît pas
+fait échouer le chargement en le nommant (`parseScene: entities[0] ("dog-1") : champ(s)
 inconnu(s) "observabel".`) — une faute de frappe retomberait sinon en
 silence sur le défaut du champ visé. Les listes de champs acceptés vivent
 dans le code (`core/scene.js`/`SCENE_FIELDS`, `FACE_FIELDS` ;
-`core/entity-parse.js`/`ENTITY_FIELDS`) ; les tableaux de ce document les
-décrivent. Avant de jouer une scène neuve : `tools/content-audit.js` (voir
+`core/entity-parse.js`/`ENTITY_FIELDS`, `SOUND_ROLES`, `SOUND_FIELDS` ;
+les clés de `tuning` sont celles de `config/tuning-values.js`) ; les
+tableaux de ce document les décrivent. Le registre des types lui-même est
+validé au démarrage (voir "Registre de types"). Avant de jouer une scène neuve : `tools/content-audit.js` (voir
 `doc/README.md`/"Vérifier le contenu") les charge toutes d'un coup.
 
 | Champ         | Type     | Contrainte                                      |
@@ -344,6 +347,14 @@ rassemblés par `index.js` en un objet `{ [type]: TypeDef }` :
 | `muteOnConsumed` | boolean | vue           | optionnel, REGISTRE SEULEMENT (jamais cascadé par instance) : arrête le beacon continu une fois l'entité `consumed` — voir "Collectible persistant" plus haut, `doc/entity-model.md` |
 | `container` | `{ distribution, count?, regenerates? }` | core | optionnel : défaut de type d'un conteneur de collecte, cascadé comme `action` — voir tableau "Entité" plus haut, `doc/entity-model.md`/"Collecte" |
 | `shop` | `{ catalog }` | core | optionnel : défaut de type d'un point de vente, cascadé comme `action` — voir tableau "Entité" plus haut, `doc/entity-model.md`/"Vente et achat" |
+| `collisionSound` | string | vue | optionnel, REGISTRE SEULEMENT : son joué quand le joueur bute contre l'entité |
+
+Un archétype peut aussi porter, à son premier niveau, toute clé de réglage de
+`config/tuning-values.js` (palier "type" de la cascade, voir
+`doc/entity-model.md`/"Résolution en cascade"). Tout autre champ est REJETÉ :
+le registre est validé au démarrage du jeu
+(`core/entity-parse.js`/`validateEntityRegistry`, appelée par `main.js`), sans
+attendre qu'une scène utilise le type fautif.
 
 `blocksMovement`/`observable`/`interactable`/`isFlying` sont tous les quatre
 cascadés instance -> type -> défaut `false` (voir

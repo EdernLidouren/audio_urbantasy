@@ -7,8 +7,9 @@
 import { parseScene } from "../scene.js";
 import { createInitialState, getActiveWorld, applyEntityActionEffects } from "../state.js";
 import { evaluateCondition } from "../presence.js";
+import { validateEntityRegistry } from "../entity-parse.js";
 import { throws } from "../../lib/check.js";
-import { expectSceneParseThrows } from "./helpers.js";
+import { UNKNOWN_FIELD, expectSceneParseThrows, sceneParseMessage } from "./helpers.js";
 
 export default function checkEntities(run) {
   // --- Interaction niveau 0 : capacités observable/interactable ---
@@ -233,4 +234,48 @@ export default function checkEntities(run) {
   run("beacon conditionnel : allumé au départ -> condition vraie", true, evaluateCondition(projectorOf(beaconCondState).sounds.beacon.condition, { entity: projectorOf(beaconCondState) }));
   beaconCondState = applyEntityActionEffects(beaconCondState, "projector-1", [{ type: "setVariable", scope: "entity", name: "isOn", value: false }]);
   run("beacon conditionnel : éteint par effet -> condition fausse", false, evaluateCondition(projectorOf(beaconCondState).sounds.beacon.condition, { entity: projectorOf(beaconCondState) }));
+
+  // --- Champs inconnus : sons, tuning, registre des types (voir
+  // core/entity-parse.js/SOUND_ROLES, SOUND_FIELDS, TUNING_KEYS,
+  // validateEntityRegistry). ---
+  const SOUND_REGISTRY = { lamp: { nameKey: "entity.lamp.name", sounds: { beacon: { path: "assets/sounds/a", loop: true } } } };
+  const entityMessage = (fields) =>
+    sceneParseMessage({ id: "sounds-check", titleKey: "scene.demo.name", length: 10, entities: [{ id: "lamp-1", type: "lamp", x: 3, ...fields }] }, SOUND_REGISTRY);
+  run(
+    "champs inconnus : sons et tuning de référence acceptés",
+    "accepté",
+    entityMessage({ sounds: { beacon: { beaconInterval: 900, condition: { type: "consumed" } }, vocal: null }, tuning: { beaconGain: 1.2, transitionSound: "assets/sounds/b" } })
+  );
+  run("champs inconnus : rôle de son inconnu (bacon)", true, entityMessage({ sounds: { bacon: { path: "assets/sounds/a" } } }).includes(UNKNOWN_FIELD));
+  run("champs inconnus : champ de descripteur (beaconIntervall)", true, entityMessage({ sounds: { beacon: { beaconIntervall: 900 } } }).includes(UNKNOWN_FIELD));
+  run(
+    "champs inconnus : condition sur un rôle qui ne la lit pas (vocal)",
+    true,
+    entityMessage({ sounds: { vocal: { path: "assets/sounds/v", condition: { type: "consumed" } } } }).includes(UNKNOWN_FIELD)
+  );
+  run(
+    "champs inconnus : clé de tuning inconnue",
+    'parseScene: entities[0] ("lamp-1") : tuning : champ(s) inconnu(s) "audibleRang".',
+    entityMessage({ tuning: { audibleRang: 30 } })
+  );
+  const registryThrows = (registry) => {
+    try {
+      validateEntityRegistry(registry);
+    } catch (error) {
+      return error.message;
+    }
+    return "accepté";
+  };
+  run(
+    "registre des types : archétype de référence accepté (réglage au premier niveau)",
+    "accepté",
+    registryThrows({ lamp: { nameKey: "entity.lamp.name", highlight: 2, gait: "shoes", sounds: { movement: { path: "assets/sounds/m", movementGain: 0.5 } } } })
+  );
+  run(
+    "registre des types : champ inconnu nommé avec son type",
+    'entities/types : type "lamp" : champ(s) inconnu(s) "observabel".',
+    registryThrows({ lamp: { nameKey: "entity.lamp.name", observabel: true } })
+  );
+  run("registre des types : son d'archétype inconnu", true, registryThrows({ lamp: { sounds: { beacon: { pth: "assets/sounds/a" } } } }).includes(UNKNOWN_FIELD));
+  run("registre des types : un archétype ne retire pas de rôle (null)", true, registryThrows({ lamp: { sounds: { beacon: null } } }) !== "accepté");
 }

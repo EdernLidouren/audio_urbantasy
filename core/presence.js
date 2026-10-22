@@ -301,20 +301,33 @@ function evaluateVariable(cond, context) {
 // externe à valider). Même esprit pour "variable" : validateCondition
 // valide EN PLUS scope/name/comparateur (voir
 // core/script-parse.js/validateVariableReference).
+//
+// `fields` : les champs que lit l'évaluateur, en plus de `type` — tout autre
+// champ est rejeté au chargement (voir core/script-parse.js/
+// validateCondition), à côté de l'évaluateur qui les lit pour ne jamais
+// diverger.
 const CONDITION_EVALUATORS = {
-  timeRange: evaluateTimeRange,
-  arrived: evaluateArrived,
-  consumed: evaluateConsumed,
-  hasEquipmentTag: evaluateHasEquipmentTag,
-  hasImprovement: evaluateHasImprovement,
-  perceptionActive: evaluatePerceptionActive,
-  weather: evaluateWeather,
-  allOf: evaluateAllOf,
-  not: evaluateNot,
-  variable: evaluateVariable,
+  timeRange: { evaluate: evaluateTimeRange, fields: ["from", "to", "spread"] },
+  arrived: { evaluate: evaluateArrived, fields: [] },
+  consumed: { evaluate: evaluateConsumed, fields: [] },
+  hasEquipmentTag: { evaluate: evaluateHasEquipmentTag, fields: ["tag"] },
+  hasImprovement: { evaluate: evaluateHasImprovement, fields: ["id"] },
+  perceptionActive: { evaluate: evaluatePerceptionActive, fields: [] },
+  weather: { evaluate: evaluateWeather, fields: ["state"] },
+  allOf: { evaluate: evaluateAllOf, fields: ["conditions"] },
+  not: { evaluate: evaluateNot, fields: ["condition"] },
+  variable: {
+    evaluate: evaluateVariable,
+    fields: ["scope", "name", "equals", "greaterThan", "lessThan", "greaterOrEqual", "lessOrEqual"],
+  },
 };
 
 export const CONDITION_TYPES = Object.keys(CONDITION_EVALUATORS);
+
+// Champs propres à un type de condition (voir `fields` ci-dessus).
+export function conditionFields(type) {
+  return CONDITION_EVALUATORS[type].fields;
+}
 
 // Type inconnu -> false, jamais un throw : l'aiguillage runtime dégrade la
 // présence concernée plutôt que de faire planter toute la simulation
@@ -323,7 +336,7 @@ export const CONDITION_TYPES = Object.keys(CONDITION_EVALUATORS);
 // ex. depuis core/checks/conditions.check.js).
 export function evaluateCondition(cond, context) {
   const evaluator = CONDITION_EVALUATORS[cond.type];
-  return evaluator ? evaluator(cond, context) : false;
+  return evaluator ? evaluator.evaluate(cond, context) : false;
 }
 
 // Un effet d'un TYPE donné porté par une règle — accepte la forme CANONIQUE

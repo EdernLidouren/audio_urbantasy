@@ -8,6 +8,12 @@
 //
 // Dernier recours de la cascade (voir lib/tuning.js / resolveTuning) : le
 // registre d'entités et les instances peuvent tout ignorer, tout retombe ici.
+//
+// LISTE COMPLÈTE des clés de la cascade : une clé absente d'ici est refusée
+// au chargement dans un `tuning` d'instance, un descripteur de son ou un
+// archétype (voir core/entity-parse.js) — une faute de frappe ne retombe
+// jamais en silence sur un défaut. Une clé SANS défaut global y figure
+// quand même, à `undefined` (voir la fin de l'objet).
 
 // Durée (ms) du fondu de la PERCEPTION SURNATURELLE (voir
 // core/presence.js/"perceptionActive", view/audio/layers.js,
@@ -457,4 +463,22 @@ export const TUNING_DEFAULTS = {
   // comme les défauts de wander ci-dessus.
   followMinDistance: 1,
   followMaxDistance: 3,
+
+  // --- Clés de la cascade SANS défaut global (`undefined`) : leur valeur
+  // vient du son, de l'instance ou du type, sinon le consommateur a son
+  // propre repli. Présentes ici pour que la liste des clés reste complète.
+  // Gain d'un son PONCTUEL décrit par un effet "playSound" ou un rôle
+  // `pickup` (voir view/audio/oneshots.js) : neutre (1) si absent.
+  gain: undefined,
+  // Pas d'une ENTITÉ mobile (voir doc/entity-model.md/"Surfaces de sol et
+  // son de pas", view/audio/entity-sound-entry.js) : absent -> son propre
+  // son de mouvement (sounds.movement).
+  gait: undefined,
+  naturalWalk: undefined,
+  // Son d'une bascule de face par un passage (view/world-travel.js) :
+  // absent -> silence.
+  transitionSound: undefined,
+  // Surface des pas de TRAJET d'une bascule (view/audio/footsteps.js/
+  // playTransitionSteps) : absent -> surface par défaut de la face de départ.
+  transitionSurface: undefined,
 };

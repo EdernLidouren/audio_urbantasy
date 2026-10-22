@@ -8,7 +8,7 @@ import { parseScene } from "../scene.js";
 import { createInitialState, getActiveWorld, switchSide, removeEntity } from "../state.js";
 import { addMoney, pickupEntity, lootUniqueEntity } from "../money.js";
 import { addItem, pickupItemEntity, removeItem, dropItem } from "../bag.js";
-import { ITEM_REGISTRY, itemProps, validateItemTags, itemSounds } from "../items.js";
+import { ITEM_REGISTRY, itemProps, validateItemRegistry, itemSounds } from "../items.js";
 import { EQUIPMENT_SLOTS, createEmptyEquipment, gaitOf, equipItem, unequipItem, equippedTags } from "../equipment.js";
 import { TAG_REGISTRY, tagProps } from "../tags.js";
 import { evaluateCondition } from "../presence.js";
@@ -252,18 +252,18 @@ export default function checkInventory(run) {
   run("tags : ITEM_REGISTRY — les escarpins imposent le gait high_heels", "high_heels", ITEM_REGISTRY.high_heels.gait);
   run("gaitOf : escarpins équipés -> high_heels", "high_heels", gaitOf({ feet: { type: "high_heels" } }));
 
-  // validateItemTags : même filet que la validation des surfaces contre
+  // validateItemRegistry : même filet que la validation des surfaces contre
   // SURFACE_REGISTRY — un tag inconnu échoue clairement, jamais un mismatch
   // silencieux. ITEM_REGISTRY lui-même a déjà passé ce filet au chargement
   // de core/items.js (sinon ce fichier n'aurait jamais fini de s'importer) ;
   // testé ICI contre un registre de test pour prouver l'échec SANS corrompre
   // le vrai registre.
-  const unknownItemTagThrew = throws(() => validateItemTags({ fake_item: { stackable: false, tags: ["does-not-exist"] } }));
-  run("tags : validateItemTags — tag inconnu sur un objet -> échec clair", true, unknownItemTagThrew);
+  const unknownItemTagThrew = throws(() => validateItemRegistry({ fake_item: { stackable: false, tags: ["does-not-exist"] } }));
+  run("tags : validateItemRegistry — tag inconnu sur un objet -> échec clair", true, unknownItemTagThrew);
   run(
-    "tags : validateItemTags — tags valides ou absents -> aucune erreur",
+    "tags : validateItemRegistry — tags valides ou absents -> aucune erreur",
     false,
-    throws(() => validateItemTags({ a: { stackable: false, tags: ["military"] }, b: { stackable: false } }))
+    throws(() => validateItemRegistry({ a: { stackable: false, tags: ["military"] }, b: { stackable: false } }))
   );
 
   // equippedTags : UNIFIÉ — même fonction pour le joueur (session.equipment)
@@ -429,4 +429,11 @@ export default function checkInventory(run) {
     run("deux faces : argent ramassé", state.money + 5, paid.money);
     run("deux faces : loot unique -> consumed", true, getActiveWorld(lootUniqueEntity(state, "cash")).entities.find((e) => e.id === "cash").consumed);
   }
+
+  // Champs inconnus d'un objet (voir core/items.js/ITEM_FIELDS).
+  run(
+    "objets : champ inconnu rejeté (stackabel)",
+    true,
+    throws(() => validateItemRegistry({ fake_item: { stackabel: true, label: "item.apple.name" } }))
+  );
 }
