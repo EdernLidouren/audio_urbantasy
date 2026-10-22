@@ -43,7 +43,7 @@ export const REVERB_PRESETS = {
   // clocher, puits, cathédrale.
   stone_tower: { reverbDurationSec: 5, reverbDecay: 2.5 },
 
-  // Espace irréel, queue très longue : envers du monde, espace miroir,
+  // Espace irréel, queue très longue : envers du monde, côté miroir,
   // rêve.
   otherworldly: { reverbDurationSec: 7, reverbDecay: 1 },
 };

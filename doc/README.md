@@ -33,7 +33,7 @@ UN SEUL endroit, jamais recopié :
 | Une nouvelle FAMILLE de clés i18n, ou une convention de traduction | `doc/i18n.md` |
 | Une collection, ses entrées, la découverte ou l'onglet Collections | `doc/collections.md` |
 | Ce avec quoi commence une partie neuve (kit de départ, compagnons, scène de départ) | `doc/new-game.md` |
-| Le format de sauvegarde, sa migration, ou un RENOMMAGE de type/clé i18n/son (à reporter dans `config/save-renames.js`) | `doc/save.md` |
+| Le format de sauvegarde, sa migration, ou un RENOMMAGE de type/clé i18n/son/id de scène (à reporter dans `config/save-renames.js`) | `doc/save.md` |
 | Une liste EXHAUSTIVE (types de condition, kinds d'action, types d'entité, tags...) | **NULLE PART en doc** — elle vit dans le CODE (le registre/l'aiguillage concerné), la doc y RENVOIE toujours plutôt que de la recopier, pour ne jamais diverger |
 
 Si aucune ligne ne correspond : c'est un nouveau domaine — crée un fichier

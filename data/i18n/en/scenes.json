@@ -1,7 +1,7 @@
 {
   "scene.clock_tower_main.name": "clock tower, machine room",
   "scene.clock_tower_weight_shaft.name": "clock tower, counterweight shaft",
-  "scene.clock_tower_weight_shaft_mirror_space.name": "clock tower, counterweight shaft, mirror side",
+  "scene.clock_tower_weight_shaft_mirror_side.name": "clock tower, counterweight shaft, mirror side",
   "scene.default.name": "unnamed scene",
   "scene.demo.name": "demo scene",
   "scene.demo2.name": "back room",

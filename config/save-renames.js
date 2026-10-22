@@ -1,7 +1,7 @@
 // Renommages de contenu à appliquer aux SAUVEGARDES existantes (voir
 // core/save.js/migrateSave, doc/save.md). Une sauvegarde garde le monde tel
-// qu'il était à la première visite : nom de type, clés i18n et chemins de
-// sons y sont figés. Renommer l'un d'eux dans le contenu sans l'ajouter ici
+// qu'il était à la première visite : nom de type, clés i18n, chemins de
+// sons et ids de scènes y sont figés. Renommer l'un d'eux dans le contenu sans l'ajouter ici
 // laisse les anciennes parties pointer vers quelque chose qui n'existe plus.
 //
 // Donnée pure, aucun import. Chaque table : { ancien: nouveau }. Les
@@ -65,6 +65,8 @@ export const RENAMED_I18N_KEYS = {
   "item.key_bronze": "item.key_bronze.name",
   "item.leather_boots": "item.leather_boots.name",
   "item.sneakers": "item.sneakers.name",
+  // « côté miroir » plutôt que « espace miroir » (voir RENAMED_SCENE_IDS).
+  "scene.clock_tower_weight_shaft_mirror_space.name": "scene.clock_tower_weight_shaft_mirror_side.name",
 };
 
 // Chemins de sons (pools, sans suffixe de variante — voir assets/manifest.json),
@@ -74,4 +76,11 @@ export const RENAMED_ASSET_PATHS = {
   "assets/sounds/furniture/office_water_fountain_1_beacon": "assets/sounds/furniture/office_water_cooler_1_beacon",
   "assets/sounds/doors/passage_wind_beacon": "assets/sounds/doors/passage_outdoor_1_beacon",
   "assets/sounds/doors/passage_indoor_beacon": "assets/sounds/doors/passage_indoor_1_beacon",
+};
+
+// Ids de scène (scenes/index.js) : la clé du monde dans la partie
+// (session.worlds), le monde actif (activeWorldId), et toute valeur exacte
+// qui cite la scène (cible d'un "teleport", id recopié dans le monde).
+export const RENAMED_SCENE_IDS = {
+  clock_tower_weight_shaft_mirror_space: "clock_tower_weight_shaft_mirror_side",
 };

@@ -1,5 +1,5 @@
 // Archétype "reversed_large_winding_mechanism" — mécanisme d'attraction, côté miroir (voir
-// scenes/clock-tower-weight-shaft-mirror-space.json). Pendant inversé de
+// scenes/clock-tower-weight-shaft-mirror-side.json). Pendant inversé de
 // l'entité de même position dans le puits des contrepoids. Beacon continu,
 // observable, jamais interactif.
 export default {

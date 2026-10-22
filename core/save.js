@@ -20,7 +20,7 @@ import { ITEM_REGISTRY } from "./items.js";
 import { validateDistribution } from "./distribution.js";
 import { validateCatalog } from "./catalog.js";
 import { WEATHER_STATES, DEFAULT_WEATHER_STATE } from "../config/weather-values.js";
-import { RENAMED_ENTITY_TYPES, RENAMED_I18N_KEYS, RENAMED_ASSET_PATHS } from "../config/save-renames.js";
+import { RENAMED_ENTITY_TYPES, RENAMED_I18N_KEYS, RENAMED_ASSET_PATHS, RENAMED_SCENE_IDS } from "../config/save-renames.js";
 import { TICK_MS } from "../lib/loop.js";
 
 export const SAVE_VERSION = 1;
@@ -50,9 +50,15 @@ function resolveRenameChains(table, label) {
 const ENTITY_TYPE_RENAMES = resolveRenameChains(RENAMED_ENTITY_TYPES, "RENAMED_ENTITY_TYPES");
 // Clés i18n et chemins de sons ne peuvent pas se confondre (forme pointée
 // contre chemin de dossier) : une seule passe sur toutes les valeurs.
+const SCENE_ID_RENAMES = resolveRenameChains(RENAMED_SCENE_IDS, "RENAMED_SCENE_IDS");
+// Un id de scène (snake_case, sans point ni barre oblique) ne se confond
+// pas non plus avec une clé i18n ou un chemin : même passe sur les valeurs
+// (activeWorldId, cible d'un "teleport", id recopié dans le monde). La clé
+// du monde dans session.worlds, elle, est renommée à part (renameWorldIds).
 const VALUE_RENAMES = {
   ...resolveRenameChains(RENAMED_I18N_KEYS, "RENAMED_I18N_KEYS"),
   ...resolveRenameChains(RENAMED_ASSET_PATHS, "RENAMED_ASSET_PATHS"),
+  ...SCENE_ID_RENAMES,
 };
 
 // Parcourt toute la donnée en profondeur : `visit(value)` reçoit chaque
@@ -136,11 +142,27 @@ function renameEntityTypes(entities) {
   return changed ? out : entities;
 }
 
-// Renommages de contenu d'une partie déjà rebouchée : types d'entité, puis
-// clés i18n et chemins de sons. Idempotent : une sauvegarde déjà à jour
-// traverse sans changement.
+// Clés de session.worlds : un monde rangé sous l'ancien id de sa scène
+// passe sous le nouveau. Si les deux existent (scène revisitée après un
+// renommage manuel), le monde déjà rangé sous le nouvel id est gardé : c'est
+// le plus récent.
+function renameWorldIds(data) {
+  if (!data.worlds || typeof data.worlds !== "object") return data;
+  if (!Object.keys(data.worlds).some((id) => Object.hasOwn(SCENE_ID_RENAMES, id))) return data;
+  const worlds = {};
+  for (const [id, world] of Object.entries(data.worlds)) {
+    const renamed = Object.hasOwn(SCENE_ID_RENAMES, id) ? SCENE_ID_RENAMES[id] : id;
+    if (renamed !== id && Object.hasOwn(data.worlds, renamed)) continue;
+    worlds[renamed] = world;
+  }
+  return { ...data, worlds };
+}
+
+// Renommages de contenu d'une partie déjà rebouchée : types d'entité, ids
+// de mondes, puis clés i18n, chemins de sons et ids de scènes cités.
+// Idempotent : une sauvegarde déjà à jour traverse sans changement.
 function applyContentRenames(data) {
-  return renameValues(mapEntityLists(data, renameEntityTypes));
+  return renameValues(renameWorldIds(mapEntityLists(data, renameEntityTypes)));
 }
 
 // --- Durées d'errance en ticks (doc/save.md) ----------------------------

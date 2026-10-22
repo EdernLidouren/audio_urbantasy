@@ -101,9 +101,9 @@ enregistré cite un tel objet l'ignore simplement (`core/trade.js`/
 
 ## Renommer du contenu : `config/save-renames.js`
 
-Quand tu renommes un **type d'entité**, une **clé i18n** ou un **fichier de
-son**, ajoute l'ancien et le nouveau nom dans la table correspondante, dans
-la même tâche que le renommage :
+Quand tu renommes un **type d'entité**, une **clé i18n**, un **fichier de
+son** ou un **id de scène**, ajoute l'ancien et le nouveau nom dans la table
+correspondante, dans la même tâche que le renommage :
 
 ```js
 export const RENAMED_ENTITY_TYPES = { film_projector: "video_projector" };
@@ -111,6 +111,7 @@ export const RENAMED_I18N_KEYS = { "entity.film_projector.name": "entity.video_p
 export const RENAMED_ASSET_PATHS = {
   "assets/sounds/furniture/film_projector_1_beacon": "assets/sounds/furniture/video_projector_1_beacon",
 };
+export const RENAMED_SCENE_IDS = { clock_tower_weight_shaft_mirror_space: "clock_tower_weight_shaft_mirror_side" };
 ```
 
 - Les types sont remplacés dans le champ `type` des entités (mondes, deux
@@ -120,6 +121,12 @@ export const RENAMED_ASSET_PATHS = {
   d'une action...). Jamais les clés d'objet : noms de variables et ids de
   mondes ne sont pas concernés. Un chemin de son s'écrit comme dans le
   contenu : le pool, sans suffixe de variante.
+- Un id de scène est renommé comme CLÉ du monde dans `session.worlds`, et
+  comme valeur exacte partout ailleurs (`activeWorldId`, id recopié dans le
+  monde, cible d'un `"teleport"` figée dans n'importe quel monde). Renommer
+  une scène, c'est aussi renommer son fichier, son entrée de
+  `scenes/index.js`, sa clé de titre (`scene.<id>.name`, dans
+  `RENAMED_I18N_KEYS`) et les cibles qui la citent dans les autres scènes.
 - Les renommages successifs s'enchaînent (a -> b puis b -> c : une partie
   qui porte encore `a` reçoit `c`). Une boucle fait échouer le chargement du
   module, jamais une migration fausse en silence.
@@ -134,9 +141,8 @@ existantes au chargement (étape 6).
 **Non couvert aujourd'hui** : les ids d'objets du sac et de l'équipement
 (`core/items.js` — un objet renommé est RETIRÉ des sauvegardes, voir plus
 haut), les noms de tables de collecte, de catalogues et d'états météo
-(neutralisés, voir plus haut) et les ids de scènes (clés de
-`session.worlds`, cibles de `teleport`). Les renommer casserait les sauvegardes existantes ; une table
-dédiée s'ajoutera le jour où le cas se présente.
+(neutralisés, voir plus haut). Les renommer casserait les sauvegardes
+existantes ; une table dédiée s'ajoutera le jour où le cas se présente.
 
 **Champ de contenu renommé ou dont l'unité change** (paramètre d'un
 comportement, d'une action...) : aucune table, la conversion s'écrit dans
@@ -145,5 +151,5 @@ avec sa vérification. Précédent : `convertWanderTicks` (durées d'errance
 passées des ticks aux ms).
 
 Vérifications : `core/checks/save.check.js` (`runChecks("save")`), sections
-« save renommages », « save errance », « save références » et « save types
-inconnus ».
+« save renommages », « save errance », « save scène renommée », « save
+références » et « save types inconnus ».

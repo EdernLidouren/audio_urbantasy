@@ -587,7 +587,7 @@ MILLISECONDES (nombres `> 0`, min `<=` max), défauts dans
   pas), proche de 1 = ne revient presque jamais sur ses pas (seuls les bords et les
   obstacles la retournent).
 
-Exemple réel — le miravi de l'espace miroir (`scenes/clock-tower-weight-shaft-mirror-space.json`),
+Exemple réel — le miravi du côté miroir (`scenes/clock-tower-weight-shaft-mirror-side.json`),
 un ARPENTEUR : des marches plus longues que la traversée de la salle, courtes pauses,
 il parcourt la salle d'un bout à l'autre et fait demi-tour au bord :
 

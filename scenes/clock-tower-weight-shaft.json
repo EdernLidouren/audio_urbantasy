@@ -43,7 +43,7 @@
               },
               {
                 "type": "teleport",
-                "target": "clock_tower_weight_shaft_mirror_space",
+                "target": "clock_tower_weight_shaft_mirror_side",
                 "x": 1
               }
             ]

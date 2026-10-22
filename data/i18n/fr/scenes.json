@@ -1,7 +1,7 @@
 {
   "scene.clock_tower_main.name": "clocher, salle des machines",
   "scene.clock_tower_weight_shaft.name": "clocher, puits des contrepoids",
-  "scene.clock_tower_weight_shaft_mirror_space.name": "clocher, puits des contrepoids, côté miroir",
+  "scene.clock_tower_weight_shaft_mirror_side.name": "clocher, puits des contrepoids, côté miroir",
   "scene.default.name": "scène sans nom",
   "scene.demo.name": "scène de démo",
   "scene.demo2.name": "arrière-boutique",

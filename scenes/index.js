@@ -13,5 +13,5 @@ export default {
   town_square_town_hall_storeroom: "scenes/town-square-town-hall-storeroom.json",
   clock_tower_main: "scenes/clock-tower-main.json",
   clock_tower_weight_shaft: "scenes/clock-tower-weight-shaft.json",
-  clock_tower_weight_shaft_mirror_space: "scenes/clock-tower-weight-shaft-mirror-space.json",
+  clock_tower_weight_shaft_mirror_side: "scenes/clock-tower-weight-shaft-mirror-side.json",
 };

@@ -344,6 +344,49 @@ export default function checkSave(run) {
     deserializeGame({ version: SAVE_VERSION, data: wanderResult.session }).session
   );
 
+  // --- Id de scène renommé (config/save-renames.js/RENAMED_SCENE_IDS) ---
+  // Le monde rangé sous l'ancien id passe sous le nouveau, avec le monde
+  // actif, l'id recopié dans le monde, son titre, et la cible d'une porte
+  // figée dans un AUTRE monde.
+  const OLD_SCENE_ID = "clock_tower_weight_shaft_mirror_space";
+  const NEW_SCENE_ID = "clock_tower_weight_shaft_mirror_side";
+  const mirrorDoor = {
+    id: "mirror-door",
+    type: "dog",
+    x: 1,
+    sounds: {},
+    action: { kind: "applyEffects", effects: [{ type: "teleport", target: OLD_SCENE_ID, x: 3 }] },
+  };
+  const renamedSceneSave = {
+    version: SAVE_VERSION,
+    data: {
+      ...auditSession,
+      activeWorldId: OLD_SCENE_ID,
+      worlds: {
+        ...auditSession.worlds,
+        [renameWorldId]: { ...renameWorld, entities: [...renameWorld.entities, mirrorDoor] },
+        [OLD_SCENE_ID]: { ...renameWorld, id: OLD_SCENE_ID, titleKey: `scene.${OLD_SCENE_ID}.name` },
+      },
+    },
+  };
+  const renamedSceneResult = deserializeGame(renamedSceneSave);
+  const renamedSession = renamedSceneResult.session;
+  run("save scène renommée : partie chargée", true, renamedSceneResult.success);
+  run("save scène renommée : ancien id retiré des mondes", false, Boolean(renamedSession && renamedSession.worlds[OLD_SCENE_ID]));
+  run("save scène renommée : monde rangé sous le nouvel id", NEW_SCENE_ID, renamedSession && renamedSession.worlds[NEW_SCENE_ID].id);
+  run("save scène renommée : monde actif renommé", NEW_SCENE_ID, renamedSession && renamedSession.activeWorldId);
+  run("save scène renommée : titre renommé", `scene.${NEW_SCENE_ID}.name`, renamedSession && renamedSession.worlds[NEW_SCENE_ID].titleKey);
+  run(
+    "save scène renommée : cible de porte figée dans un autre monde renommée",
+    NEW_SCENE_ID,
+    renamedSession && renamedSession.worlds[renameWorldId].entities.find((e) => e.id === "mirror-door").action.effects[0].target
+  );
+  run.same(
+    "save scène renommée : idempotent",
+    renamedSession,
+    deserializeGame({ version: SAVE_VERSION, data: renamedSession }).session
+  );
+
   // Sauvegarde ANTÉRIEURE à defaultSurface/segments (voir
   // core/scene.js/parseScene) : ses mondes n'ont jamais eu ces clés, et une
   // relecture de sauvegarde ne repasse jamais par parseScene — sans
