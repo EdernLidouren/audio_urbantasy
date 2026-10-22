@@ -345,9 +345,9 @@ presence: [
 ```
 
 Côté VUE (`view/audio/layers.js`), un changement de `session.weather.state` déclenche
-AUSSI une AMBIANCE SONORE dédiée : une couche GLOBALE (`lib/audio.js`/
-`setWeatherAmbienceLayer`), SUPERPOSÉE à l'ambiance de la scène (jamais à sa place,
-contrairement à la couche `"state"` de perception qui REMPLACE celle de la scène) et persistante
+AUSSI une AMBIANCE SONORE dédiée : la surcouche GLOBALE `"overlay"` (`lib/audio.js`/
+`setAmbienceOverlay`), SUPERPOSÉE à l'ambiance de la scène (jamais à sa place,
+contrairement à la couche `"override"` de perception qui REMPLACE celle de la scène) et persistante
 au niveau module — elle continue SANS COUPURE à travers une transition de scène tant que
 NI la météo NI le contexte indoor/outdoor de la scène active ne changent (diffing PAR
 COUCHE, `lib/audio/ambience.js`/`syncAmbienceLayers` : une couche dont la source déclarée n'a pas

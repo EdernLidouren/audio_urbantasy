@@ -28,9 +28,12 @@ import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
 const STORAGE_KEY = "templeton-save";
 
 const OBFUSCATION_PREFIX = "OBF1:";
+// Clé d'obscurcissement des sauvegardes (voir lib/obfuscate.js). JAMAIS
+// modifiée : toute sauvegarde existante deviendrait illisible.
+const OBFUSCATION_KEY = "Templeton-obfuscation-key-v1";
 
 function encodeForStorage(text) {
-  return OBFUSCATION_PREFIX + obfuscate(text);
+  return OBFUSCATION_PREFIX + obfuscate(text, OBFUSCATION_KEY);
 }
 
 // Absence du préfixe connu -> contenu traité comme du JSON EN CLAIR : une
@@ -40,7 +43,7 @@ function encodeForStorage(text) {
 // obscurcie du tout.
 function decodeFromStorage(raw) {
   if (raw.startsWith(OBFUSCATION_PREFIX)) {
-    return deobfuscate(raw.slice(OBFUSCATION_PREFIX.length));
+    return deobfuscate(raw.slice(OBFUSCATION_PREFIX.length), OBFUSCATION_KEY);
   }
   return raw;
 }

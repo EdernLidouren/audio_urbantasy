@@ -1,8 +1,10 @@
 // COUCHES GLOBALES d'une scène : musique et ambiances, non spatialisées
 // (canaux globaux, voir lib/audio.js). Chaque canal superpose des couches
-// déclarées — "location" (la scène), "state" (la perception surnaturelle),
-// "weather" (ambiance météo) — et ne s'interrompt que si l'identité DÉCLARÉE
-// d'une couche change réellement, jamais pour "relancer la même chose" (voir
+// déclarées, nommées par leur rôle dans lib/audio : la scène est la couche
+// "base", la perception surnaturelle la couche "override" (elle prime sur la
+// scène), la météo la surcouche d'ambiance "overlay" (superposée). Un canal
+// ne s'interrompt que si l'identité DÉCLARÉE d'une couche change
+// réellement, jamais pour "relancer la même chose" (voir
 // lib/audio.js/setMusicLayer, syncAmbienceLayers).
 //
 // Suit trois états de la partie et réagit à leur bascule : la phase jour/
@@ -15,13 +17,15 @@ import {
   clearMusicLayers,
   setAmbienceLayer,
   clearAmbienceLayers,
-  setWeatherAmbienceLayer,
+  setAmbienceOverlay,
   declareAmbienceLayers,
+  setAmbienceLimit,
 } from "../../lib/audio.js";
 import { resolveAsset } from "../../lib/assets.js";
 import { TUNING_DEFAULTS } from "../../config/tuning.js";
 import { PERCEPTION_MUSIC_POOL, PERCEPTION_AMBIENCE_POOL } from "../../config/perception.js";
 import { WEATHER_STATES } from "../../config/weather-values.js";
+import { AMBIENCE_CHANNEL_LIMIT } from "../../config/audio-channels.js";
 import { phaseAt } from "../../core/time.js";
 import { musicVolumeFactor, ambienceVolumeFactor } from "./volume-factors.js";
 
@@ -34,6 +38,11 @@ const WEATHER_AMBIENCE_FADE_MS = TUNING_DEFAULTS.weatherAmbienceFadeMs;
 // Fondu de la perception : même durée pour les couches et pour la rampe
 // d'étouffement des entités (voir ./muffle.js).
 const PERCEPTION_FADE_MS = TUNING_DEFAULTS.perceptionFadeMs;
+
+// Capacité du canal ambiance : la MÊME limite que celle qui valide les
+// ambiances d'une scène (core/scene.js), fournie à lib/audio une fois, au
+// chargement de ce module — avant toute déclaration de couche.
+setAmbienceLimit(AMBIENCE_CHANNEL_LIMIT);
 
 // Musique d'une scène POUR UNE PHASE : musicDay/musicNight, sinon `music`.
 // Aucun des trois : pas de musique (undefined).
@@ -64,23 +73,24 @@ export function createSceneLayers(getSession, world) {
   setGlobalVolume("music", musicVolumeFactor());
   setGlobalVolume("ambience", ambienceVolumeFactor());
 
-  // Couche D'ÉTAT avant couche DE SCÈNE : si la perception est déjà active au
-  // montage (partie reprise, changement de scène en pleine perception), elle
-  // impose directement son identité et la couche de scène, déclarée juste
-  // après, est simplement ignorée (l'état prime) — rien n'est démarré puis
+  // Couche OVERRIDE (perception) avant couche BASE (scène) : si la
+  // perception est déjà active au montage (partie reprise, changement de
+  // scène en pleine perception), elle impose directement son identité et la couche de scène, déclarée juste
+  // après, est simplement ignorée (override prime) — rien n'est démarré puis
   // interrompu pour rien.
-  const musicStateParams = { pickPath: pickPerceptionMusicPath, loop: false, breatherRange: MUSIC_BREATHER_RANGE };
-  setMusicLayer("state", perceptionActive ? PERCEPTION_MUSIC_POOL : null, musicStateParams, PERCEPTION_FADE_MS);
+  const musicOverrideParams = { pickPath: pickPerceptionMusicPath, loop: false, breatherRange: MUSIC_BREATHER_RANGE };
+  setMusicLayer("override", perceptionActive ? PERCEPTION_MUSIC_POOL : null, musicOverrideParams, PERCEPTION_FADE_MS);
   setMusicLayer(
-    "location",
+    "base",
     resolveMusicForPhase(world, currentPhase),
     { pickPath: pickMusicPath(world, currentPhase), loop: musicLoop, breatherRange: MUSIC_BREATHER_RANGE },
     MUSIC_FADE_MS
   );
 
-  // Ambiance : état, scène et météo déclarés EN UNE FOIS. Le diffing se fait
-  // PAR COUCHE : un changement de météo seul ne touche jamais l'ambiance de
-  // scène, et inversement. La météo dépend de la NATURE de la scène
+  // Ambiance : perception (override), scène (base) et météo (overlay)
+  // déclarées EN UNE FOIS. Le diffing se fait PAR COUCHE : un changement de
+  // météo seul ne touche jamais l'ambiance de scène, et inversement. La
+  // météo dépend de la NATURE de la scène
   // (intérieur/extérieur), fixe pendant sa vie : passer de l'extérieur à
   // l'intérieur (nouveau montage) fond la seule couche météo vers le pool
   // intérieur.
@@ -92,15 +102,15 @@ export function createSceneLayers(getSession, world) {
   const mountWeatherPool = weatherAmbiencePool(weatherState);
   declareAmbienceLayers(
     {
-      state: {
+      override: {
         identity: perceptionActive ? [PERCEPTION_AMBIENCE_POOL] : null,
         resolvedPaths: perceptionActive ? [resolveAsset(PERCEPTION_AMBIENCE_POOL)] : null,
       },
-      location: {
+      base: {
         identity: ambiences && ambiences.length > 0 ? ambiences : null,
         resolvedPaths: ambiences && ambiences.length > 0 ? ambiences.map(resolveAsset) : null,
       },
-      weather: {
+      overlay: {
         identity: mountWeatherPool ? [mountWeatherPool] : null,
         resolvedPaths: mountWeatherPool ? [resolveAsset(mountWeatherPool)] : null,
       },
@@ -110,7 +120,7 @@ export function createSceneLayers(getSession, world) {
 
   function declareWeatherAmbience(state, fadeMs) {
     const pool = weatherAmbiencePool(state);
-    setWeatherAmbienceLayer(pool ? [pool] : null, pool ? [resolveAsset(pool)] : null, fadeMs);
+    setAmbienceOverlay(pool ? [pool] : null, pool ? [resolveAsset(pool)] : null, fadeMs);
   }
 
   // À chaque tick : réagit aux bascules de phase, de perception et de météo.
@@ -121,20 +131,20 @@ export function createSceneLayers(getSession, world) {
     if (phase !== currentPhase) {
       currentPhase = phase;
       setMusicLayer(
-        "location",
+        "base",
         resolveMusicForPhase(world, currentPhase),
         { pickPath: pickMusicPath(world, currentPhase), loop: musicLoop, breatherRange: MUSIC_BREATHER_RANGE },
         MUSIC_FADE_MS
       );
     }
 
-    // Perception : la couche d'état (musique et ambiance) apparaît ou
+    // Perception : la couche override (musique et ambiance) apparaît ou
     // disparaît en fondu, par-dessus la couche de scène.
     if (session.perceptionActive !== perceptionActive) {
       perceptionActive = session.perceptionActive;
-      setMusicLayer("state", perceptionActive ? PERCEPTION_MUSIC_POOL : null, musicStateParams, PERCEPTION_FADE_MS);
+      setMusicLayer("override", perceptionActive ? PERCEPTION_MUSIC_POOL : null, musicOverrideParams, PERCEPTION_FADE_MS);
       setAmbienceLayer(
-        "state",
+        "override",
         perceptionActive ? [PERCEPTION_AMBIENCE_POOL] : null,
         perceptionActive ? [resolveAsset(PERCEPTION_AMBIENCE_POOL)] : null,
         PERCEPTION_FADE_MS

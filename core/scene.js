@@ -240,9 +240,10 @@ function parseFace(raw, length, registry, describe, sceneVariables) {
     fail(`${prefix}musicLoop doit être un booléen si présent (reçu : ${JSON.stringify(musicLoop)}).`);
   }
   // ambiences : optionnel, tableau de 0 à AMBIENCE_CHANNEL_LIMIT chemins
-  // (voir view/audio/layers.js, lib/audio.js/setAmbienceLayer). Même
+  // (voir view/audio/layers.js, la couche "base" de lib/audio). Même
   // passage simple, juste la forme est vérifiée ici — la limite elle-même
-  // vient de la source unique partagée avec lib/audio.js.
+  // vient de la source unique que view/audio/layers.js fournit à lib/audio
+  // (setAmbienceLimit).
   checkAmbienceList(ambiences, `${prefix}ambiences`);
   // ambiencesDay/ambiencesNight : STRUCTURE RÉSERVÉE, même principe que
   // musicDay/musicNight ci-dessus, mais AUCUN consommateur ne les lit encore

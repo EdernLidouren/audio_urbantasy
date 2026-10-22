@@ -372,8 +372,8 @@ export const TUNING_DEFAULTS = {
   perceptionCooldownMs: PERCEPTION_FADE_MS + PERCEPTION_COOLDOWN_MARGIN_MS,
 
   // Durée (ms) du fondu de l'AMBIANCE MÉTÉO (voir core/weather.js,
-  // view/audio/layers.js) — couche d'ÉTAT superposée à l'ambiance de
-  // scène (lib/audio/ambience.js/setWeatherAmbienceLayer), fondue à chaque
+  // view/audio/layers.js) — surcouche superposée à l'ambiance de scène
+  // (lib/audio/ambience.js/setAmbienceOverlay), fondue à chaque
   // transition météo. Plus lent que perceptionFadeMs par défaut : une
   // bascule météo est un changement atmosphérique graduel, jamais aussi
   // net qu'un toggle de perception.
