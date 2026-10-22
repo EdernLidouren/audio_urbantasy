@@ -13,6 +13,7 @@
 // sonore/surface), jamais dupliqué entre les deux cas.
 
 import { AMBIENCE_CHANNEL_LIMIT } from "../config/audio-channels.js";
+import { REVERB_PRESETS } from "../config/reverb-values.js";
 import { BODY_RADIUS } from "./state.js";
 import { SURFACE_REGISTRY, DEFAULT_SURFACE } from "./surfaces.js";
 import { parseVariables } from "./variables.js";
@@ -110,8 +111,10 @@ const FACE_FIELDS = [
   "ambiences",
   "ambiencesDay",
   "ambiencesNight",
+  "reverbPreset",
   "reverbDurationSec",
   "reverbDecay",
+  "reverbWet",
   "defaultSurface",
   "segments",
   "indoor",
@@ -123,6 +126,58 @@ const FACE_FIELDS = [
 // champs de face (FACE_FIELDS) ; tout autre champ est rejeté (voir
 // rejectUnknownFields).
 const SCENE_FIELDS = ["id", "titleKey", "length", "playerStart", "variables", "faceMufflingGain", "faceMufflingLowpassHz", "recto", "verso"];
+
+// --- Réverbération (voir config/reverb-values.js, doc/scene-format.md) ---
+
+// Les trois champs de réverb d'une face, aussi portés par un préréglage.
+const REVERB_FIELDS = ["reverbDurationSec", "reverbDecay", "reverbWet"];
+
+// Chute minimale (dB) de la queue de réverb au moment où elle est coupée :
+// en deçà, la coupure tombe sur une queue encore audible. L'enveloppe est
+// e^(-decay × t), soit 8,69 dB par unité de decay × durée.
+const MIN_REVERB_TAIL_DROP_DB = 50;
+
+// Forme des champs de réverb présents dans `source` (face ou préréglage).
+function checkReverbFields(source, prefix, failWith) {
+  const { reverbDurationSec, reverbDecay, reverbWet } = source;
+  if (reverbDurationSec !== undefined && (!isFiniteNumber(reverbDurationSec) || reverbDurationSec <= 0)) {
+    failWith(`${prefix}reverbDurationSec doit être un nombre > 0 si présent (reçu : ${JSON.stringify(reverbDurationSec)}).`);
+  }
+  if (reverbDecay !== undefined && (!isFiniteNumber(reverbDecay) || reverbDecay <= 0)) {
+    failWith(`${prefix}reverbDecay doit être un nombre > 0 si présent (reçu : ${JSON.stringify(reverbDecay)}).`);
+  }
+  if (reverbWet !== undefined && (!isFiniteNumber(reverbWet) || reverbWet < 0 || reverbWet > 1)) {
+    failWith(`${prefix}reverbWet doit être un nombre entre 0 et 1 si présent (reçu : ${JSON.stringify(reverbWet)}).`);
+  }
+}
+
+function failPresets(message) {
+  throw new Error(`config/reverb-values.js : ${message}`);
+}
+
+// Un préréglage est une RÉFÉRENCE : en plus de sa forme, il fixe toujours
+// la couleur (durée ET decay) et sa queue n'est jamais coupée encore
+// audible. Une face qui surcharge ses champs reste libre (choix artistique).
+// Exportée pour les vérifications (core/checks/scene.check.js), appelée sur
+// la vraie table au chargement de ce module.
+export function validateReverbPresets(presets) {
+  for (const [name, preset] of Object.entries(presets)) {
+    const describe = `préréglage "${name}"`;
+    if (typeof preset !== "object" || preset === null || Array.isArray(preset)) {
+      failPresets(`${describe} n'est pas un objet.`);
+    }
+    rejectUnknownFields(preset, REVERB_FIELDS, describe, failPresets);
+    if (preset.reverbDurationSec === undefined || preset.reverbDecay === undefined) {
+      failPresets(`${describe} : reverbDurationSec et reverbDecay sont requis.`);
+    }
+    checkReverbFields(preset, `${describe} : `, failPresets);
+    const tailDropDb = 20 * Math.log10(Math.E) * preset.reverbDecay * preset.reverbDurationSec;
+    if (tailDropDb < MIN_REVERB_TAIL_DROP_DB) {
+      failPresets(`${describe} : queue coupée à -${Math.round(tailDropDb)} dB, encore audible (au moins -${MIN_REVERB_TAIL_DROP_DB} dB attendus : allonger reverbDurationSec ou monter reverbDecay).`);
+    }
+  }
+}
+validateReverbPresets(REVERB_PRESETS);
 
 // Une PLAGE de collecte (voir core/spawn.js, doc/entity-model.md/"Collecte")
 // : { from, to, count?, distribution } — bornes comme un segment (from < to,
@@ -177,8 +232,7 @@ function parseFace(raw, length, registry, describe, sceneVariables) {
     ambiences,
     ambiencesDay,
     ambiencesNight,
-    reverbDurationSec,
-    reverbDecay,
+    reverbPreset,
     defaultSurface,
     segments,
     indoor,
@@ -271,15 +325,21 @@ function parseFace(raw, length, registry, describe, sceneVariables) {
   // phase sera câblée.
   checkAmbienceList(ambiencesDay, `${prefix}ambiencesDay`);
   checkAmbienceList(ambiencesNight, `${prefix}ambiencesNight`);
-  // reverbDurationSec/reverbDecay : optionnels, surchargent par FACE les
-  // défauts globaux du bus de réverb (config/tuning-values.js) — voir
-  // view/audio/city-scene.js. Simple passage validé, comme music/ambiences ;
-  // aucune logique de résolution ici (ça reste dans la vue).
-  if (reverbDurationSec !== undefined && (!isFiniteNumber(reverbDurationSec) || reverbDurationSec <= 0)) {
-    fail(`${prefix}reverbDurationSec doit être un nombre > 0 si présent (reçu : ${JSON.stringify(reverbDurationSec)}).`);
+  // Réverb : surcharge PAR FACE des défauts globaux du bus de réverb
+  // (config/tuning-values.js), lue par view/audio/city-scene.js. Durée et
+  // decay donnent la COULEUR de la réverb (le navigateur en normalise
+  // l'énergie), reverbWet sa QUANTITÉ : c'est lui qui distingue un extérieur
+  // presque sec d'un hall. `reverbPreset` nomme un préréglage
+  // (config/reverb-values.js), RÉSOLU ICI en ses trois champs ; un champ
+  // déclaré par la face prime sur celui du préréglage. La face parsée ne
+  // porte que les champs résolus, jamais le nom.
+  if (reverbPreset !== undefined && (!isNonEmptyString(reverbPreset) || !Object.hasOwn(REVERB_PRESETS, reverbPreset))) {
+    fail(`${prefix}reverbPreset "${reverbPreset}" inconnu (voir config/reverb-values.js : ${Object.keys(REVERB_PRESETS).join(" | ")}).`);
   }
-  if (reverbDecay !== undefined && (!isFiniteNumber(reverbDecay) || reverbDecay <= 0)) {
-    fail(`${prefix}reverbDecay doit être un nombre > 0 si présent (reçu : ${JSON.stringify(reverbDecay)}).`);
+  checkReverbFields(raw, prefix, fail);
+  const reverb = { ...(reverbPreset !== undefined ? REVERB_PRESETS[reverbPreset] : {}) };
+  for (const field of REVERB_FIELDS) {
+    if (raw[field] !== undefined) reverb[field] = raw[field];
   }
 
   const seenIds = new Set();
@@ -303,8 +363,7 @@ function parseFace(raw, length, registry, describe, sceneVariables) {
   if (ambiences !== undefined) face.ambiences = ambiences;
   if (ambiencesDay !== undefined) face.ambiencesDay = ambiencesDay;
   if (ambiencesNight !== undefined) face.ambiencesNight = ambiencesNight;
-  if (reverbDurationSec !== undefined) face.reverbDurationSec = reverbDurationSec;
-  if (reverbDecay !== undefined) face.reverbDecay = reverbDecay;
+  Object.assign(face, reverb);
   if (parsedSpawnRanges !== undefined) face.spawnRanges = parsedSpawnRanges;
 
   return face;

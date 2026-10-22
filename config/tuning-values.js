@@ -141,32 +141,39 @@ export const TUNING_DEFAULTS = {
   cutoffMax: 20000,
 
   // Durée (s) de la réponse impulsionnelle générée du bus de réverb : la
-  // "taille" perçue de la scène. Plus haut = pièce plus grande/queue plus
-  // longue ; plus bas = espace plus petit/sec.
+  // longueur de la queue avant qu'elle soit coupée. Assez longue pour que la
+  // queue soit retombée d'au moins 50 dB à la coupure (reverbDecay ×
+  // reverbDurationSec >= 5,8), sinon la coupure tombe sur une queue encore
+  // audible.
   reverbDurationSec: 1.2,
 
   // Taux de déclin (1/s) de l'enveloppe de la réponse impulsionnelle : la
-  // "matière" de la scène. Plus haut = la queue s'éteint plus vite (surfaces
-  // absorbantes) ; plus bas = elle traîne plus longtemps (pièce réverbérante).
-  reverbDecay: 2.5,
+  // queue s'éteint en environ 7 ÷ reverbDecay secondes. Plus haut = surfaces
+  // absorbantes, espace sec ; plus bas = pièce réverbérante. Défaut : une
+  // pièce moyenne (~1,2 s), comme le préréglage "medium_room". Préréglages
+  // par type d'espace : config/reverb-values.js.
+  reverbDecay: 6,
 
-  // Niveau de retour (0-1) du bus de réverb vers la sortie. VOLONTAIREMENT
-  // BAS par défaut : la réverb ne doit jamais noyer le chemin sec — pan,
-  // filtre et volume portent toute la lisibilité spatiale (localisation,
-  // distance). Plus haut = sensation d'espace plus marquée, au risque de
-  // brouiller la scène sonore ; plus bas = quasi inaudible.
-  reverbWet: 0.18,
+  // Niveau de retour (0-1) du bus de réverb vers la sortie. Avec
+  // reverbSend/footstepReverbSend ci-dessous, il fixe le niveau de la réverb
+  // par rapport au son direct : environ -8 dB pour une entité, -14 dB pour
+  // le pas (voir lib/audio/reverb.js, WET_MAKEUP_GAIN). Assez pour SENTIR
+  // l'espace, jamais assez pour noyer le chemin sec — pan, filtre et volume
+  // portent la lisibilité spatiale (localisation, distance). Plus haut =
+  // espace plus marqué, au risque de brouiller la scène sonore ; plus bas =
+  // vite inaudible (à 0,18, la réverb était imperceptible).
+  reverbWet: 0.45,
 
   // Part (0-1) du signal de CHAQUE voix envoyée au bus de réverb. Ne varie
   // pas avec la distance. Plus haut = la voix nourrit davantage la réverb ; plus
   // bas = elle reste presque entièrement sèche.
-  reverbSend: 0.5,
+  reverbSend: 0.6,
 
   // Part (0-1) du bruit de pas envoyée au bus de réverb — DISTINCTE de
   // reverbSend (les entités) : le pas est proche et centré sur l'auditeur,
   // une valeur MODÉRÉE suffit à lui donner du corps sans noyer la cadence de
   // marche. Plus haut = pas plus "dans la pièce" ; plus bas = pas plus secs.
-  footstepReverbSend: 0.15,
+  footstepReverbSend: 0.3,
 
   // Durée (ms) du fondu de sortie UNIVERSEL de la musique (voir
   // lib/audio/music.js/fadeOutMusic, view/audio/layers.js) : la piste en cours

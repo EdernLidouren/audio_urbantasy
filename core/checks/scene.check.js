@@ -3,12 +3,14 @@
 // (voir ce fichier). Pur : aucun DOM, aucun fetch ; chaque scène est
 // construite en dur via un objet littéral passé à parseScene.
 
-import { parseScene } from "../scene.js";
+import { parseScene, validateReverbPresets } from "../scene.js";
+import { REVERB_PRESETS } from "../../config/reverb-values.js";
 import { createInitialState, getActiveWorld, MOVE_STEP } from "../state.js";
 import { tick } from "../actions.js";
 import { reduce } from "../reduce.js";
 import { serializeGame, deserializeGame } from "../save.js";
 import { DEFAULT_SURFACE, surfaceAt } from "../surfaces.js";
+import { throws } from "../../lib/check.js";
 import { EMPTY_REGISTRY, WORLD_A_REGISTRY, TWO_FACED_RAW_SCENE, UNKNOWN_FIELD, expectSceneParseThrows, sceneParseMessage } from "./helpers.js";
 
 export default function checkScene(run) {
@@ -166,5 +168,50 @@ export default function checkScene(run) {
     "champs inconnus : conteneur (container)",
     true,
     rejected({ ...base, entities: [{ ...dog, container: { distribution: { items: { apple: 1 } }, regenerate: false } }] })
+  );
+
+  // --- reverbWet : quantité de réverb par face (voir core/scene.js) ---
+  const reverbScene = (reverbWet) => ({ id: "reverb-wet", titleKey: "scene.demo.name", length: 10, reverbWet });
+  run("reverbWet : présent -> porté par la face", 0.12, parseScene(reverbScene(0.12), EMPTY_REGISTRY).reverbWet);
+  run("reverbWet : absent -> aucune clé (défaut résolu par la vue)", false, "reverbWet" in parseScene({ id: "x" }, EMPTY_REGISTRY));
+  run("reverbWet : 0 accepté (face sèche)", 0, parseScene(reverbScene(0), EMPTY_REGISTRY).reverbWet);
+  run("reverbWet : > 1 rejeté", true, expectSceneParseThrows(reverbScene(1.5), EMPTY_REGISTRY));
+  run("reverbWet : non numérique rejeté", true, expectSceneParseThrows(reverbScene("bas"), EMPTY_REGISTRY));
+  run(
+    "reverbWet : champ de face, dans recto/verso pour une scène à deux faces",
+    0.1,
+    parseScene({ ...TWO_FACED_RAW_SCENE, recto: { ...TWO_FACED_RAW_SCENE.recto, reverbWet: 0.1 } }, WORLD_A_REGISTRY).recto.reverbWet
+  );
+
+  // --- Préréglages de réverb (config/reverb-values.js) ---
+  const presetScene = (fields) => ({ id: "reverb-preset", titleKey: "scene.demo.name", length: 10, ...fields });
+  const hall = parseScene(presetScene({ reverbPreset: "large_hall" }), EMPTY_REGISTRY);
+  run(
+    "préréglage : résolu en ses champs sur la face",
+    `${REVERB_PRESETS.large_hall.reverbDurationSec}/${REVERB_PRESETS.large_hall.reverbDecay}`,
+    `${hall.reverbDurationSec}/${hall.reverbDecay}`
+  );
+  run("préréglage : le nom n'est pas porté par la face parsée", false, "reverbPreset" in hall);
+  run(
+    "préréglage : un champ de la face prime sur le préréglage",
+    "0.6/3",
+    (({ reverbWet, reverbDecay }) => `${reverbWet}/${reverbDecay}`)(parseScene(presetScene({ reverbPreset: "large_hall", reverbWet: 0.6 }), EMPTY_REGISTRY))
+  );
+  run(
+    "préréglage : nom inconnu rejeté en le nommant",
+    true,
+    sceneParseMessage(presetScene({ reverbPreset: "grand_hall" }), EMPTY_REGISTRY).includes('reverbPreset "grand_hall" inconnu')
+  );
+  run("préréglage : la vraie table est valide", false, throws(() => validateReverbPresets(REVERB_PRESETS)));
+  run(
+    "préréglage : queue coupée encore audible rejetée",
+    true,
+    throws(() => validateReverbPresets({ cut: { reverbDurationSec: 1.2, reverbDecay: 2.5 } }))
+  );
+  run("préréglage : couleur incomplète rejetée", true, throws(() => validateReverbPresets({ half: { reverbDecay: 9 } })));
+  run(
+    "préréglage : champ inconnu rejeté",
+    true,
+    throws(() => validateReverbPresets({ typo: { reverbDurationSec: 1, reverbDecay: 9, reverbWett: 0.2 } }))
   );
 }

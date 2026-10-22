@@ -17,8 +17,7 @@
         "surface": "metal"
       }
     ],
-    "reverbDurationSec": 5.0,
-    "reverbDecay": 2.5,
+    "reverbPreset": "stone_tower",
     "entities": [
       {
         "id": "mirror_r",
@@ -131,8 +130,7 @@
         "surface": "metal"
       }
     ],
-    "reverbDurationSec": 5.0,
-    "reverbDecay": 2.5,
+    "reverbPreset": "stone_tower",
     "entities": []
   }
 }

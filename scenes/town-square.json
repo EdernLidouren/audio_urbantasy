@@ -8,6 +8,7 @@
     "musicNight": "assets/musics/jazz_night",
     "ambiences": ["assets/ambiances/traffic_1.mp3"],
     "defaultSurface": "concrete",
+    "reverbPreset": "open_outdoor",
     "segments": [{ "from": 8, "to": 12, "surface": "wood" }],
     "entities": [
       { "id": "river_recto", "type": "river", "x": 10, "interactable": false },
@@ -60,6 +61,7 @@
     "musicNight": "assets/musics/jazz_night",
     "ambiences": ["assets/ambiances/traffic_1.mp3"],
     "defaultSurface": "gravel",
+    "reverbPreset": "street_outdoor",
     "segments": [
       { "from": 0, "to": 4, "surface": "grass" },
       { "from": 5, "to": 6, "surface": "mud" },

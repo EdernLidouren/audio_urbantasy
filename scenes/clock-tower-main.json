@@ -10,8 +10,7 @@
     "music": "assets/musics/sanctuary",
     "ambiences": [],
     "defaultSurface": "concrete",
-    "reverbDurationSec": 5.0,
-    "reverbDecay": 2.5,
+    "reverbPreset": "stone_tower",
     "entities": [
       {
         "id": "large_machinery_1_r",
@@ -109,8 +108,7 @@
     "music": "assets/musics/sanctuary",
     "ambiences": [],
     "defaultSurface": "concrete",
-    "reverbDurationSec": 5.0,
-    "reverbDecay": 2.5,
+    "reverbPreset": "stone_tower",
     "entities": [
       {
         "id": "machine_1_v",

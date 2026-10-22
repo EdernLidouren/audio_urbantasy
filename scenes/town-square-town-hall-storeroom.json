@@ -7,8 +7,7 @@
   "musicDay": "assets/musics/town_hall_day",
   "ambiences": [],
   "defaultSurface": "concrete",
-  "reverbDurationSec": 0.6,
-  "reverbDecay": 5.0,
+  "reverbPreset": "small_bare_room",
   "entities": [
     {
       "id": "office_supply_box_1",

@@ -4,8 +4,7 @@
   "length": 20,
   "playerStart": 2,
   "music": "assets/musics/streets_day",
-  "reverbDurationSec": 0.25,
-  "reverbDecay": 12,
+  "reverbPreset": "small_furnished_room",
   "indoor": true,
   "entities": [
     {

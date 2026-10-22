@@ -39,12 +39,12 @@ import { masterVolumeFactor, musicVolumeFactor, ambienceVolumeFactor } from "./v
 
 export { stopPersistentAudioLayers } from "./layers.js";
 
-// Bus de réverb : un seul par scène. Durée et decay surchargeables par la
-// scène (reverbDurationSec/reverbDecay, voir doc/scene-format.md), wet
-// global.
+// Bus de réverb : un seul par scène. Durée, decay et niveau de retour
+// surchargeables par la face (reverbDurationSec/reverbDecay/reverbWet, voir
+// doc/scene-format.md).
 const REVERB_DURATION_SEC_DEFAULT = TUNING_DEFAULTS.reverbDurationSec;
 const REVERB_DECAY_DEFAULT = TUNING_DEFAULTS.reverbDecay;
-const REVERB_WET = TUNING_DEFAULTS.reverbWet;
+const REVERB_WET_DEFAULT = TUNING_DEFAULTS.reverbWet;
 
 // Au plus une scène ville vivante à la fois : un menu ouvert par-dessus
 // (Options > Audio) peut la rafraîchir sans référence explicite (voir
@@ -72,7 +72,7 @@ export function createCityAudioScene(getSession, { handover = null } = {}) {
   const reverbBus = createReverbBus({
     durationSec: world.reverbDurationSec ?? REVERB_DURATION_SEC_DEFAULT,
     decay: world.reverbDecay ?? REVERB_DECAY_DEFAULT,
-    wet: REVERB_WET,
+    wet: world.reverbWet ?? REVERB_WET_DEFAULT,
   });
   entities.connectReverb(reverbBus);
 

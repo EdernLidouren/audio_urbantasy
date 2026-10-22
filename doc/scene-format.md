@@ -46,7 +46,9 @@ validé au démarrage (voir "Registre de types"). Avant de jouer une scène neuv
 | `ambiences`   | string[] | optionnel : 0 à `AMBIENCE_CHANNEL_LIMIT` chemins d'ambiance (`assets/ambiances/...`, voir `config/audio-channels.js`), canal global non spatialisé, jusqu'à autant de couches simultanées — voir `view/audio/layers.js` |
 | `ambiencesDay` / `ambiencesNight` | string[] | optionnels, même forme que `ambiences`. **RÉSERVÉS** : structure validée par `parseScene` mais AUCUN consommateur ne les lit encore — seule la musique réagit à la phase pour l'instant (voir `doc/time.md`). |
 | `reverbDurationSec` | number | optionnel, `> 0` : surcharge PAR SCÈNE la durée de la réponse impulsionnelle du bus de réverb (défaut global : `config/tuning-values.js`) |
-| `reverbDecay` | number | optionnel, `> 0` : surcharge PAR SCÈNE le taux de déclin de la réverb (défaut global : `config/tuning-values.js`) |
+| `reverbPreset` | string | optionnel : nom d'un préréglage de réverb (`config/reverb-values.js`), résolu au chargement en `reverbDurationSec`/`reverbDecay`/`reverbWet` ; un de ces champs déclaré par la face prime sur le préréglage. Voir "Réverbération" plus bas |
+| `reverbDecay` | number | optionnel, `> 0` : surcharge PAR SCÈNE le taux de déclin de la réverb (défaut global : `config/tuning-values.js`). La queue s'éteint en environ `7 ÷ reverbDecay` secondes : garder `reverbDurationSec` assez long pour qu'elle soit retombée d'au moins 50 dB à la coupure (`reverbDecay × reverbDurationSec >= 5,8`) |
+| `reverbWet` | number | optionnel, entre `0` et `1` : surcharge PAR SCÈNE le niveau de retour de la réverb, donc sa QUANTITÉ (défaut global : `config/tuning-values.js`). Durée et decay n'en changent que la COULEUR : le navigateur normalise l'énergie de la réverb. Un extérieur se distingue d'un intérieur surtout par une valeur basse (environ 0,1) |
 | `defaultSurface` | string | optionnel : nom de surface (voir "Surfaces de sol" plus bas) couvrant tout le `x` non-segmenté. **FILET SILENCIEUX si absent** (repli sur `DEFAULT_SURFACE`, `core/surfaces.js` — comportement audible inchangé pour toute scène qui n'en déclare pas). **Échec clair si fourni mais absent du registre** (comme un type d'entité inconnu) — une référence de contenu erronée n'est jamais dégradée en silence. |
 | `segments`    | Segment[] | optionnel : zones qui PATCHENT `defaultSurface` sur des portions de la scène (voir "Surfaces de sol" plus bas). Absent -> `[]`, `defaultSurface` partout. |
 | `spawnRanges` | SpawnRange[] | optionnel : PLAGES de collecte au sol (voir `doc/entity-model.md`/"Collecte", `core/spawn.js`) — `{ from, to, count?, distribution }` : bornes comme un segment (`from < to`, dans `[0, length]`), `count` entier `>= 1` (défaut `config/spawn-values.js`/`SPAWN_RANGE_DEFAULT_COUNT`), `distribution` = `{ table: "<nom de SPAWN_TABLES>" }`, `{ items: { <objet ITEM_REGISTRY>: <poids> } }` ou `{ tables: [{ table | items, weight? }, ...] }` (plusieurs tables, voir `doc/entity-model.md`/"Collecte") ; dans toute table, la clé réservée `nothing` est une issue « rien » pondérée (validée au chargement, échec clair). `count` = nombre de TIRAGES : un tirage « rien » ne pose rien. SPARSE : absent -> aucune clé. Champ de FACE (chaque face d'une scène à deux faces déclare les siennes). À chaque cycle quotidien (au CHARGEMENT du monde), `count` collectibles y sont posés à des positions tirées au PRNG seedé — entités RUNTIME marquées `spawned: true`, ramassables via `"pickup"`, remplacées au cycle suivant. |
@@ -63,8 +65,8 @@ ci-dessus, `entities`/`music`/... à la racine) OU À DEUX FACES — `recto` ET
 `playerStart` restent TOUJOURS à la racine, PARTAGÉS par les deux faces
 (même longueur d'axe x) ; tous les autres champs du tableau "Scène"
 ci-dessus (`entities`, `music`/`musicDay`/`musicNight`/`musicLoop`,
-`ambiences`/`ambiencesDay`/`ambiencesNight`, `reverbDurationSec`/
-`reverbDecay`, `defaultSurface`, `segments`, `indoor`, `spawnRanges`) sont des champs de FACE :
+`ambiences`/`ambiencesDay`/`ambiencesNight`, `reverbPreset`,
+`reverbDurationSec`/`reverbDecay`/`reverbWet`, `defaultSurface`, `segments`, `indoor`, `spawnRanges`) sont des champs de FACE :
 déclarés dans `recto`/`verso` pour une scène à deux faces, à la racine pour
 une scène simple — **jamais mélangés** : `parseScene` échoue clairement si
 un de ces champs apparaît à la racine EN MÊME TEMPS que `recto`/`verso`.
@@ -195,6 +197,41 @@ PATCHER par endroits (bornes `from`/`to` incluses). `core/surfaces.js`
 Aucune mécanique n'exploite encore ce champ au-delà du son de pas (voir
 `doc/entity-model.md`) : pas de position Y, pas de ralentissement réel — le
 registre est prêt à en accueillir, rien de plus aujourd'hui.
+
+## Réverbération
+
+Trois champs de face (voir le tableau "Scène") : `reverbDurationSec` et
+`reverbDecay` donnent la COULEUR de la réverb (courte et serrée, ou longue et
+traînante), `reverbWet` sa QUANTITÉ — le navigateur normalise l'énergie de la
+réverb, seul `reverbWet` la rend plus ou moins présente. Un extérieur se
+distingue d'un intérieur surtout par un `reverbWet` bas.
+
+**Préréglages** : plutôt que de recopier des nombres, une face nomme un type
+d'espace avec `reverbPreset`. La liste, avec ce que chaque préréglage
+représente et des exemples, vit dans `config/reverb-values.js` (jamais
+recopiée ici). Un nom inconnu fait échouer le chargement. Le préréglage est
+RÉSOLU au chargement de la scène en ses trois champs ; un champ déclaré par la
+face prime sur le sien :
+
+```json
+"reverbPreset": "large_hall",
+"reverbWet": 0.6
+```
+
+Chaque préréglage est vérifié au chargement : couleur complète, et queue
+retombée d'au moins 50 dB à la coupure (`reverbDecay × reverbDurationSec >=
+5,8`). Une face qui écrit ses propres nombres reste libre, mais une queue
+coupée trop tôt s'entend comme une porte qu'on referme sur la réverb.
+
+Exemples réels : `town-square.json` (`open_outdoor` au recto,
+`street_outdoor` au verso), `town-square-town-hall-main.json` (`large_hall`),
+`clock-tower-main.json` (`stone_tower`). Sans réglage, une face prend le
+défaut global de `config/tuning-values.js`, une pièce moyenne.
+
+Une ENTITÉ peut en plus doser sa propre part envoyée à la réverb
+(`reverbSend` dans un descripteur de son ou dans `tuning`, voir
+`doc/entity-model.md`/"Paramètres sonores") : par exemple une machinerie qui
+doit remplir un clocher.
 
 ## Phase jour/nuit
 

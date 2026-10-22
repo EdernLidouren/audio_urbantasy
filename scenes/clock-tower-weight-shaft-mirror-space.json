@@ -16,8 +16,7 @@
       "surface": "metal"
     }
   ],
-  "reverbDurationSec": 5.0,
-  "reverbDecay": 2.5,
+  "reverbPreset": "stone_tower",
   "entities": [
     {
       "id": "magic_mirror_r",

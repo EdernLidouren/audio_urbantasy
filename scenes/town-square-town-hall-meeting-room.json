@@ -9,8 +9,7 @@
     "musicDay": "assets/musics/town_hall_day",
     "ambiences": [],
     "defaultSurface": "carpet",
-    "reverbDurationSec": 3.5,
-    "reverbDecay": 3.0,
+    "reverbPreset": "large_hall",
     "entities": [
       {
         "id": "main_room_door_1_r",
@@ -142,8 +141,7 @@
     "musicDay": "assets/musics/town_hall_day",
     "ambiences": [],
     "defaultSurface": "carpet",
-    "reverbDurationSec": 3.5,
-    "reverbDecay": 3.0,
+    "reverbPreset": "large_hall",
     "entities": [
       {
         "id": "office_water_cooler_1_v",
