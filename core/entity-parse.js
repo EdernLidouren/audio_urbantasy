@@ -8,7 +8,7 @@ import { parseVariables } from "./variables.js";
 import { ITEM_REGISTRY, itemSounds } from "./items.js";
 import { validateDistribution } from "./distribution.js";
 import { validateCatalog } from "./catalog.js";
-import { fail, isNonEmptyString, isFiniteNumber, parseBehavior } from "./parse-common.js";
+import { fail, isNonEmptyString, isFiniteNumber, parseBehavior, rejectUnknownFields } from "./parse-common.js";
 import { validateCondition, parsePresenceRule, parseSingleAction, parseTrigger } from "./script-parse.js";
 import { ACTION_KINDS } from "./action-kinds.js";
 
@@ -166,10 +166,7 @@ function parseContainer(container, at) {
   if (container.regenerates !== undefined && typeof container.regenerates !== "boolean") {
     fail(`${at} : container.regenerates doit être un booléen si présent.`);
   }
-  const unknownContainerKeys = Object.keys(container).filter((key) => !["distribution", "count", "regenerates"].includes(key));
-  if (unknownContainerKeys.length > 0) {
-    fail(`${at} : container : clé(s) inconnue(s) ${unknownContainerKeys.map((key) => `"${key}"`).join(", ")}.`);
-  }
+  rejectUnknownFields(container, ["distribution", "count", "regenerates"], `${at} : container`);
   const parsed = { distribution: container.distribution };
   if (container.count !== undefined) parsed.count = container.count;
   if (container.regenerates === false) parsed.regenerates = false;
@@ -182,9 +179,37 @@ function parseShop(shop, at) {
   if (typeof shop !== "object" || shop === null || Array.isArray(shop)) {
     fail(`${at} : shop doit être un objet si présent.`);
   }
+  rejectUnknownFields(shop, ["catalog"], `${at} : shop`);
   validateCatalog(shop.catalog, `${at} : shop.catalog`, fail);
   return { catalog: shop.catalog };
 }
+
+// Champs qu'une INSTANCE d'entité peut déclarer (voir doc/scene-format.md/
+// "Entité") ; tout autre champ est rejeté (voir rejectUnknownFields). Les
+// champs RUNTIME (stock, shopStock, ephemeral, spawned...) n'en font pas
+// partie : ils ne s'écrivent jamais dans une scène.
+const ENTITY_FIELDS = [
+  "id",
+  "type",
+  "x",
+  "nameKey",
+  "descriptionKey",
+  "consumedDescriptionKey",
+  "behavior",
+  "blocksMovement",
+  "observable",
+  "interactable",
+  "isFlying",
+  "speed",
+  "action",
+  "tuning",
+  "presence",
+  "variables",
+  "sounds",
+  "container",
+  "shop",
+  "triggers",
+];
 
 // Parse UNE entité d'une face. `seenIds` : ids déjà vus dans la face
 // (unicité) ; `sceneVariables` : le sac de variables de la scène, qu'une
@@ -221,6 +246,7 @@ export function parseEntity(rawEntity, index, registry, length, seenIds, sceneVa
 
   validateIdentity(rawEntity, index, registry, length, seenIds);
   const at = `entities[${index}] ("${id}")`;
+  rejectUnknownFields(rawEntity, ENTITY_FIELDS, at);
   const archetype = registry[type];
 
   // sounds : FUSION PROFONDE instance -> archétype (voir deepMergeOverride,

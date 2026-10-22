@@ -19,14 +19,24 @@ export function isFiniteNumber(value) {
   return typeof value === "number" && Number.isFinite(value);
 }
 
+// Un champ hors de `allowed` est une erreur de contenu : une faute de frappe
+// (`"descriptonKey"`, `"ambience"`) retomberait sinon EN SILENCE sur le
+// défaut du champ visé. Les champs optionnels restent optionnels : seul un
+// champ que le format ne connaît pas échoue.
+export function rejectUnknownFields(value, allowed, describe) {
+  const unknown = Object.keys(value).filter((field) => !allowed.includes(field));
+  if (unknown.length > 0) {
+    fail(`${describe} : champ(s) inconnu(s) ${unknown.map((field) => `"${field}"`).join(", ")}.`);
+  }
+}
+
 // Générique : ne connaît aucun kind par son nom. Cherche kind dans le
 // registre (comme registry[type] pour les types d'entité),
 // puis délègue la validation propre au comportement à son module (voir
 // core/behaviors/wander.js) — parseParams ne renvoie que les champs fournis,
 // les défauts se résolvent ailleurs (voir le contrat documenté dans le
 // module), jamais ici. Un champ hors de la liste PARAMS du module est
-// rejeté, comme pour une action (core/action-kinds.js) : un paramètre mal
-// orthographié retomberait sinon en silence sur son défaut.
+// rejeté (voir rejectUnknownFields).
 export function parseBehavior(behavior, index, id) {
   if (typeof behavior !== "object" || behavior === null) {
     fail(`entities[${index}] ("${id}") : behavior doit être un objet si présent.`);
@@ -37,10 +47,7 @@ export function parseBehavior(behavior, index, id) {
   if (!module) {
     fail(`entities[${index}] ("${id}") : behavior.kind "${kind}" inconnu.`);
   }
-  const unknown = Object.keys(behavior).filter((field) => field !== "kind" && !module.PARAMS.includes(field));
-  if (unknown.length > 0) {
-    fail(`entities[${index}] ("${id}") : behavior : champ(s) inconnu(s) pour "${kind}" : ${unknown.map((field) => `"${field}"`).join(", ")}.`);
-  }
+  rejectUnknownFields(behavior, ["kind", ...module.PARAMS], `entities[${index}] ("${id}") : behavior "${kind}"`);
 
   const params = module.parseParams(behavior, (message) => fail(`entities[${index}] ("${id}") : ${message}`));
   return { kind, ...params };

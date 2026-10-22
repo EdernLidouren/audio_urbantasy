@@ -19,6 +19,17 @@ surface uniforme, longueur minimale traversable, titre générique, silence
 ne plante (rendu, tick, audio, interaction, sauvegarde). Vaut aussi pour une
 FACE recto/verso vide (`parseFace`, même mécanisme).
 
+**Champs inconnus REJETÉS** : optionnel ne veut pas dire libre. À chaque
+niveau (racine de scène, face, segment, plage de collecte, entité, `shop`,
+`container`), un champ que le format ne connaît pas fait échouer le
+chargement en le nommant (`parseScene: entities[0] ("dog-1") : champ(s)
+inconnu(s) "observabel".`) — une faute de frappe retomberait sinon en
+silence sur le défaut du champ visé. Les listes de champs acceptés vivent
+dans le code (`core/scene.js`/`SCENE_FIELDS`, `FACE_FIELDS` ;
+`core/entity-parse.js`/`ENTITY_FIELDS`) ; les tableaux de ce document les
+décrivent. Avant de jouer une scène neuve : `tools/content-audit.js` (voir
+`doc/README.md`/"Vérifier le contenu") les charge toutes d'un coup.
+
 | Champ         | Type     | Contrainte                                      |
 |---------------|----------|--------------------------------------------------|
 | `id`          | string   | optionnel, non vide si présent — **FILET si absent** : repli sur `"scene"` (`DEFAULT_SCENE_ID`) |
@@ -385,7 +396,8 @@ supplémentaire.
 
 - `core/scene.js` — `parseScene(raw, registry)` : fonction pure, valide et
   normalise un objet déjà parsé. Utilisable en Node/console, sans réseau ni
-  DOM. Toute violation lève une `Error` nommant le champ ou l'entité fautive.
+  DOM. Toute violation, champ inconnu compris (voir "Scène"), lève une
+  `Error` nommant le champ ou l'entité fautive.
 - `scenes/load.js` — `loadScene(url, registry)` : chargeur au bord (`fetch` +
   `parseScene`). Erreurs réseau et JSON invalide remontées avec un message
   clair. `loadSceneById(id, registry)` : résout `id` en chemin via

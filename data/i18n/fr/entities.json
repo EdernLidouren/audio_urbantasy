@@ -48,6 +48,7 @@
   "entity.crate.name": "caisse",
   "entity.cumulo_lupus.description": "Un loup fait de brume et de fumée, qui ne se laisse voir — ou entendre — qu'à la perception surnaturelle.",
   "entity.cumulo_lupus.name": "Cumulo Lupus",
+  "entity.decor.name": "élément de décor",
   "entity.default_statue.description": "Une statue.",
   "entity.default_statue.name": "statue",
   "entity.dog.description": "Un chien qui erre dans les environs.",

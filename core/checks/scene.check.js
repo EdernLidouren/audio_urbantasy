@@ -9,7 +9,7 @@ import { tick } from "../actions.js";
 import { reduce } from "../reduce.js";
 import { serializeGame, deserializeGame } from "../save.js";
 import { DEFAULT_SURFACE, surfaceAt } from "../surfaces.js";
-import { EMPTY_REGISTRY, expectSceneParseThrows } from "./helpers.js";
+import { EMPTY_REGISTRY, WORLD_A_REGISTRY, TWO_FACED_RAW_SCENE, expectSceneParseThrows } from "./helpers.js";
 
 export default function checkScene(run) {
   // --- Parsing TOTAL de scène (core/scene.js/parseScene) : l'ABSENCE de
@@ -118,5 +118,60 @@ export default function checkScene(run) {
     "parseScene : entities présent mais pas un tableau -> erreur",
     true,
     expectSceneParseThrows({ id: "x", titleKey: "scene.demo.name", length: 5, entities: "oops" }, EMPTY_REGISTRY)
+  );
+
+  // --- Champs inconnus (voir core/parse-common.js/rejectUnknownFields) ---
+  // Une faute de frappe échoue au chargement au lieu de retomber en silence
+  // sur le défaut du champ visé, à chaque niveau du format de scène. Les
+  // champs optionnels restent optionnels (parseScene({}) plus haut).
+  const base = { id: "unknown-fields", titleKey: "scene.demo.name", length: 10 };
+  const dog = { id: "dog-1", type: "dog", x: 3 };
+  const message = (raw) => {
+    try {
+      parseScene(raw, WORLD_A_REGISTRY);
+    } catch (error) {
+      return error.message;
+    }
+    return "accepté";
+  };
+  // Rejeté POUR SON CHAMP INCONNU, jamais pour une autre erreur de la scène
+  // de test.
+  const rejected = (raw) => message(raw).includes("champ(s) inconnu(s)");
+  run("champs inconnus : la scène de référence est acceptée", "accepté", message({ ...base, entities: [dog] }));
+  run("champs inconnus : racine de scène simple (lenght)", true, rejected({ ...base, lenght: 12 }));
+  run("champs inconnus : racine de scène simple (ambience au lieu de ambiences)", true, rejected({ ...base, ambience: ["assets/ambiances/x"] }));
+  run(
+    "champs inconnus : le message nomme le champ fautif",
+    'parseScene: scène : champ(s) inconnu(s) "musicloop".',
+    message({ ...base, musicloop: true })
+  );
+  run("champs inconnus : racine d'une scène à deux faces", true, rejected({ ...TWO_FACED_RAW_SCENE, titlekey: "x" }));
+  run(
+    "champs inconnus : dans une face (recto)",
+    true,
+    rejected({ ...TWO_FACED_RAW_SCENE, recto: { ...TWO_FACED_RAW_SCENE.recto, indor: true } })
+  );
+  run("champs inconnus : face qui n'est pas un objet", "parseScene: verso doit être un objet.", message({ ...TWO_FACED_RAW_SCENE, verso: "vide" }));
+  run("champs inconnus : segment", true, rejected({ ...base, segments: [{ from: 0, to: 5, surface: "grass", surfce: "grass" }] }));
+  run(
+    "champs inconnus : plage de collecte",
+    true,
+    rejected({ ...base, spawnRanges: [{ from: 0, to: 5, distribution: { items: { apple: 1 } }, cuont: 2 }] })
+  );
+  run("champs inconnus : entité (descriptonKey)", true, rejected({ ...base, entities: [{ ...dog, descriptonKey: "entity.dog.description" }] }));
+  run(
+    "champs inconnus : le message situe l'entité",
+    'parseScene: entities[0] ("dog-1") : champ(s) inconnu(s) "observabel".',
+    message({ ...base, entities: [{ ...dog, observabel: true }] })
+  );
+  run(
+    "champs inconnus : point de vente (shop)",
+    true,
+    rejected({ ...base, entities: [{ ...dog, shop: { catalog: { items: { apple: { stock: 1 } } }, catalogue: {} } }] })
+  );
+  run(
+    "champs inconnus : conteneur (container)",
+    true,
+    rejected({ ...base, entities: [{ ...dog, container: { distribution: { items: { apple: 1 } }, regenerate: false } }] })
   );
 }

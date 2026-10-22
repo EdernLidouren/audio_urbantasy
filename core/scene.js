@@ -17,7 +17,7 @@ import { BODY_RADIUS } from "./state.js";
 import { SURFACE_REGISTRY, DEFAULT_SURFACE } from "./surfaces.js";
 import { parseVariables } from "./variables.js";
 import { validateDistribution } from "./distribution.js";
-import { fail, isNonEmptyString, isFiniteNumber } from "./parse-common.js";
+import { fail, isNonEmptyString, isFiniteNumber, rejectUnknownFields } from "./parse-common.js";
 import { parseEntity } from "./entity-parse.js";
 
 // Parsing TOTAL (voir header) : l'ABSENCE d'un champ de scène retombe
@@ -76,6 +76,7 @@ function parseSegment(rawSegment, index, length) {
     fail(`segments[${index}] n'est pas un objet.`);
   }
 
+  rejectUnknownFields(rawSegment, ["from", "to", "surface"], `segments[${index}]`);
   const { from, to, surface } = rawSegment;
   checkSceneSpan(from, to, length, `segments[${index}]`);
   if (!isNonEmptyString(surface) || !SURFACE_REGISTRY[surface]) {
@@ -117,6 +118,12 @@ const FACE_FIELDS = [
   "spawnRanges",
 ];
 
+// Champs de la RACINE d'une scène (voir parseScene), partagés par les deux
+// faces d'une scène à deux faces. Une scène SIMPLE accepte en plus les
+// champs de face (FACE_FIELDS) ; tout autre champ est rejeté (voir
+// rejectUnknownFields).
+const SCENE_FIELDS = ["id", "titleKey", "length", "playerStart", "variables", "faceMufflingGain", "faceMufflingLowpassHz", "recto", "verso"];
+
 // Une PLAGE de collecte (voir core/spawn.js, doc/entity-model.md/"Collecte")
 // : { from, to, count?, distribution } — bornes comme un segment (from < to,
 // dans [0, length]), count entier >= 1 optionnel (défaut :
@@ -127,6 +134,7 @@ function parseSpawnRange(rawRange, index, length, prefix) {
   if (typeof rawRange !== "object" || rawRange === null) {
     fail(`${describe} n'est pas un objet.`);
   }
+  rejectUnknownFields(rawRange, ["from", "to", "count", "distribution"], describe);
   const { from, to, count, distribution } = rawRange;
   checkSceneSpan(from, to, length, describe);
   if (count !== undefined && (!Number.isInteger(count) || count < 1)) {
@@ -151,6 +159,15 @@ function parseSpawnRange(rawRange, index, length, prefix) {
 // ici : une face ne PORTE pas son propre sac de scène.
 function parseFace(raw, length, registry, describe, sceneVariables) {
   const prefix = describe ? `${describe}.` : "";
+  // Face d'une scène à deux faces : objet requis, et rien d'autre que des
+  // champs de face. Une scène simple est vérifiée par parseScene, qui
+  // connaît aussi ses champs de racine.
+  if (describe) {
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+      fail(`${describe} doit être un objet.`);
+    }
+    rejectUnknownFields(raw, FACE_FIELDS, describe);
+  }
   const {
     entities,
     music,
@@ -384,6 +401,7 @@ export function parseScene(raw, registry) {
     if (leakedField) {
       fail(`"${leakedField}" est un champ de FACE : une scène à deux faces le déclare dans recto/verso, jamais à la racine.`);
     }
+    rejectUnknownFields(raw, SCENE_FIELDS, "scène");
     const parsedRecto = parseFace(recto, resolvedLength, registry, "recto", resolvedVariables);
     const parsedVerso = parseFace(verso, resolvedLength, registry, "verso", resolvedVariables);
     warnOnOverlaps(parsedRecto.entities, resolvedPlayerStart);
@@ -400,6 +418,7 @@ export function parseScene(raw, registry) {
     };
   }
 
+  rejectUnknownFields(raw, [...SCENE_FIELDS, ...FACE_FIELDS], "scène");
   const face = parseFace(raw, resolvedLength, registry, null, resolvedVariables);
   warnOnOverlaps(face.entities, resolvedPlayerStart);
 
