@@ -6,7 +6,8 @@
   "recto": {
     "musicDay": "assets/musics/jazz_day",
     "musicNight": "assets/musics/jazz_night",
-    "ambiences": ["assets/ambiances/quiet_traffic"],
+    "ambiencesDay": ["assets/ambiances/quiet_traffic"],
+    "ambiencesNight": [],
     "defaultSurface": "concrete",
     "reverbPreset": "street_outdoor",
     "entities": [
@@ -23,7 +24,8 @@
   "verso": {
     "musicDay": "assets/musics/jazz_day",
     "musicNight": "assets/musics/jazz_night",
-    "ambiences": ["assets/ambiances/quiet_traffic"],
+    "ambiencesDay": ["assets/ambiances/quiet_traffic"],
+    "ambiencesNight": [],
     "defaultSurface": "concrete",
     "reverbPreset": "street_outdoor",
     "entities": []

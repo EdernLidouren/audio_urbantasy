@@ -52,6 +52,25 @@ export function resolveMusicForPhase(world, phase) {
   return world.music;
 }
 
+// Ambiances d'une scène POUR UNE PHASE : ambiencesDay/ambiencesNight si la
+// face déclare celle de la phase, sinon `ambiences`. Contrairement à la
+// musique, une liste VIDE déclarée pour une phase compte : `[]` veut dire
+// « silence à cette phase » (ex. une rue commerçante calme la nuit), jamais
+// « retomber sur ambiences ». Rien de déclaré : pas d'ambiance (undefined).
+export function resolveAmbiencesForPhase(world, phase) {
+  if (phase === "day" && world.ambiencesDay !== undefined) return world.ambiencesDay;
+  if (phase === "night" && world.ambiencesNight !== undefined) return world.ambiencesNight;
+  return world.ambiences;
+}
+
+// Couche d'ambiance de SCÈNE (base) pour une liste : identité = la liste
+// déclarée (comparée par ensemble, voir lib/audio/ambience.js), null si
+// rien à jouer.
+function sceneAmbienceLayer(ambiences) {
+  const playing = ambiences && ambiences.length > 0;
+  return { identity: playing ? ambiences : null, resolvedPaths: playing ? ambiences.map(resolveAsset) : null };
+}
+
 // Tirage du morceau suivant d'une séquence : resolveAsset est déjà un tirage
 // "sans répétition immédiate" (voir lib/assets.js), appelé à chaque morceau.
 // La phase est figée à la création de la fonction : une bascule en crée une
@@ -64,7 +83,6 @@ function pickMusicPath(world, phase) {
 export function createSceneLayers(getSession, world) {
   let currentPhase = phaseAt(getSession().time);
   const musicLoop = Boolean(world.musicLoop);
-  const ambiences = world.ambiences;
   let perceptionActive = getSession().perceptionActive;
   const pickPerceptionMusicPath = () => resolveAsset(PERCEPTION_MUSIC_POOL);
 
@@ -106,10 +124,7 @@ export function createSceneLayers(getSession, world) {
         identity: perceptionActive ? [PERCEPTION_AMBIENCE_POOL] : null,
         resolvedPaths: perceptionActive ? [resolveAsset(PERCEPTION_AMBIENCE_POOL)] : null,
       },
-      base: {
-        identity: ambiences && ambiences.length > 0 ? ambiences : null,
-        resolvedPaths: ambiences && ambiences.length > 0 ? ambiences.map(resolveAsset) : null,
-      },
+      base: sceneAmbienceLayer(resolveAmbiencesForPhase(world, currentPhase)),
       overlay: {
         identity: mountWeatherPool ? [mountWeatherPool] : null,
         resolvedPaths: mountWeatherPool ? [resolveAsset(mountWeatherPool)] : null,
@@ -125,8 +140,10 @@ export function createSceneLayers(getSession, world) {
 
   // À chaque tick : réagit aux bascules de phase, de perception et de météo.
   function update(session, world) {
-    // Phase : la couche de scène se redéclare (fondu vers la musique de la
-    // nouvelle phase).
+    // Phase : la couche de scène se redéclare (fondu vers la musique et les
+    // ambiances de la nouvelle phase). Une ambiance identique d'une phase à
+    // l'autre n'est pas touchée : même identité, aucun fondu (voir
+    // lib/audio/ambience.js).
     const phase = phaseAt(session.time);
     if (phase !== currentPhase) {
       currentPhase = phase;
@@ -136,6 +153,8 @@ export function createSceneLayers(getSession, world) {
         { pickPath: pickMusicPath(world, currentPhase), loop: musicLoop, breatherRange: MUSIC_BREATHER_RANGE },
         MUSIC_FADE_MS
       );
+      const { identity, resolvedPaths } = sceneAmbienceLayer(resolveAmbiencesForPhase(world, currentPhase));
+      setAmbienceLayer("base", identity, resolvedPaths, MUSIC_FADE_MS);
     }
 
     // Perception : la couche override (musique et ambiance) apparaît ou

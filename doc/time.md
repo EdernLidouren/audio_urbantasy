@@ -133,11 +133,11 @@ existants.
 
 **Musique par phase, propriété de la scène** (`doc/scene-format.md`) : `musicDay` /
 `musicNight`, optionnels — une scène qui n'en déclare aucun retombe sur `music`
-pour les deux phases. Même structure prévue pour l'ambiance (`ambiencesDay` / `ambiencesNight`,
-validés par `parseScene`) mais **non exploitée** — seule la musique réagit à la
-phase pour l'instant.
+pour les deux phases. Même structure pour l'ambiance (`ambiencesDay` /
+`ambiencesNight`, retombant sur `ambiences`) — une liste vide déclarée pour une
+phase y signifie silence.
 
-**Réaction en VUE, sur la TRANSITION uniquement** (musique : `view/audio/layers.js` ;
+**Réaction en VUE, sur la TRANSITION uniquement** (musique et ambiances : `view/audio/layers.js` ;
 annonce « La nuit tombe. » / « Le jour se lève. » : `view/ambient-announcements.js`) :
 - `phaseAt` reste pur ; c'est la vue qui compare, à chaque tick, la phase courante
   à une phase MÉMORISÉE (`currentPhase`) — n'agit que sur la différence, jamais en
@@ -158,6 +158,9 @@ annonce « La nuit tombe. » / « Le jour se lève. » : `view/ambient-announcem
   coup) : un compteur de génération dans `lib/audio/music.js` invalide toute
   respiration/enchaînement en attente d'une séquence périmée — jamais de
   Howl fantôme, jamais deux fondus qui se disputent le canal.
+- Les AMBIANCES suivent la même transition, plus simplement : fondu croisé
+  vers celles de la nouvelle phase (`resolveAmbiencesForPhase`), sans
+  respiration, et rien du tout si la liste est la même aux deux phases.
 
 ## Présence conditionnelle d'entité — deuxième consommateur
 
@@ -217,12 +220,10 @@ retirer un composant ne touche QUE ce gabarit, jamais le code. `weekday`
 
 ## Chantiers réservés, pas câblés
 
-Au-delà de la phase jour/nuit (musique), de la présence conditionnelle
+Au-delà de la phase jour/nuit (musique, ambiances), de la présence conditionnelle
 d'entité, du cycle de collecte quotidien, des triggers horaires et de
 l'annonce de test ci-dessus, rien d'autre ne consomme encore `session.time` :
 
-- `ambiencesDay` / `ambiencesNight` : structure validée (voir plus haut), aucun
-  fondu ni réaction câblés — même principe que la musique, pas encore fait.
 - présence conditionnelle : seule `"timeRange"` dérive du TEMPS (les autres
   types de condition, voir `doc/scripting.md`, lisent autre chose) — aucune
   condition `"season"` ni autre dérivation calendaire n'existe encore ;

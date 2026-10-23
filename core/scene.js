@@ -316,13 +316,11 @@ function parseFace(raw, length, registry, describe, sceneVariables) {
   // vient de la source unique que view/audio/layers.js fournit à lib/audio
   // (setAmbienceLimit).
   checkAmbienceList(ambiences, `${prefix}ambiences`);
-  // ambiencesDay/ambiencesNight : STRUCTURE RÉSERVÉE, même principe que
-  // musicDay/musicNight ci-dessus, mais AUCUN consommateur ne les lit encore
-  // (voir view/audio/layers.js — seule la musique réagit à la phase
-  // pour l'instant, voir doc/time.md). Validées en FORME dès maintenant
-  // pour qu'une face qui les déclare échoue clairement en cas d'erreur,
-  // plutôt que de découvrir une faute de frappe le jour où l'ambiance de
-  // phase sera câblée.
+  // ambiencesDay/ambiencesNight : optionnels, ambiances PAR PHASE, même
+  // principe que musicDay/musicNight ci-dessus (voir
+  // view/audio/layers.js/resolveAmbiencesForPhase) — à ceci près qu'une
+  // liste vide déclarée pour une phase signifie « silence » à cette phase,
+  // sans retomber sur `ambiences`.
   checkAmbienceList(ambiencesDay, `${prefix}ambiencesDay`);
   checkAmbienceList(ambiencesNight, `${prefix}ambiencesNight`);
   // Réverb : surcharge PAR FACE des défauts globaux du bus de réverb

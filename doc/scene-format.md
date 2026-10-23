@@ -44,7 +44,7 @@ validé au démarrage (voir "Registre de types"). Avant de jouer une scène neuv
 | `musicDay` / `musicNight` | string | optionnels : musique PAR PHASE jour/nuit (voir `core/time.js`/`phaseAt`, "Phase jour/nuit" plus bas), même forme que `music` (pool ou membre précis). Une scène qui n'en déclare aucune des deux retombe sur `music` pour les deux phases. Bascule en cours de jeu par FONDU UNIVERSEL puis respiration puis nouvelle séquence (`view/audio/layers.js`) ; à l'entrée dans une scène, la phase courante joue directement, sans fondu. |
 | `musicLoop`   | boolean  | optionnel, défaut `false` : `true` fait jouer la musique de la scène en BOUCLE CONTINUE, sans enchaînement ni respiration — pour les deux phases, un seul drapeau par scène. Voir "Musique : séquence avec respiration" plus bas. |
 | `ambiences`   | string[] | optionnel : 0 à `AMBIENCE_CHANNEL_LIMIT` chemins d'ambiance (`assets/ambiances/...`, voir `config/audio-channels.js`), canal global non spatialisé, jusqu'à autant de couches simultanées — voir `view/audio/layers.js` |
-| `ambiencesDay` / `ambiencesNight` | string[] | optionnels, même forme que `ambiences`. **RÉSERVÉS** : structure validée par `parseScene` mais AUCUN consommateur ne les lit encore — seule la musique réagit à la phase pour l'instant (voir `doc/time.md`). |
+| `ambiencesDay` / `ambiencesNight` | string[] | optionnels, même forme que `ambiences` : ambiances PAR PHASE jour/nuit, comme `musicDay`/`musicNight`. La phase qui n'en déclare pas retombe sur `ambiences` ; une liste VIDE déclarée (`"ambiencesNight": []`) veut dire silence à cette phase. Bascule en cours de jeu par fondu (`view/audio/layers.js`), sauf si la liste est la même d'une phase à l'autre. Exemple réel : `scenes/main-street.json` (trafic le jour, rien la nuit). |
 | `reverbDurationSec` | number | optionnel, `> 0` : surcharge PAR SCÈNE la durée de la réponse impulsionnelle du bus de réverb (défaut global : `config/tuning-values.js`) |
 | `reverbPreset` | string | optionnel : nom d'un préréglage de réverb (`config/reverb-values.js`), résolu au chargement en `reverbDurationSec`/`reverbDecay`/`reverbWet` ; un de ces champs déclaré par la face prime sur le préréglage. Voir "Réverbération" plus bas |
 | `reverbDecay` | number | optionnel, `> 0` : surcharge PAR SCÈNE le taux de déclin de la réverb (défaut global : `config/tuning-values.js`). La queue s'éteint en environ `7 ÷ reverbDecay` secondes : garder `reverbDurationSec` assez long pour qu'elle soit retombée d'au moins 50 dB à la coupure (`reverbDecay × reverbDurationSec >= 5,8`) |
@@ -241,7 +241,8 @@ doit remplir un clocher.
 consommateur de l'horloge : `musicDay`/`musicNight` (voir tableau "Scène"
 ci-dessus) en tirent la musique de la scène, avec un fondu universel puis une
 respiration puis la nouvelle séquence à chaque bascule en cours de jeu
-(`view/audio/layers.js`, voir section suivante). Détail complet de
+(`view/audio/layers.js`, voir section suivante). `ambiencesDay`/
+`ambiencesNight` en tirent les ambiances, par simple fondu croisé. Détail complet de
 l'horloge : `doc/time.md`.
 
 ## Musique : séquence avec respiration
