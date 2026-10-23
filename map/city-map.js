@@ -46,6 +46,15 @@ const TOWN_SQUARE_ZONE = {
   spawnX: 26,
 };
 
+// La rue commerçante, à gauche de la grand place, à son point de départ
+// habituel (playerStart de scenes/main-street.json).
+const MAIN_STREET_ZONE = {
+  sceneId: "main_street",
+  nameKey: "scene.main_street.name",
+  descriptionKey: "cityMap.main_street.description",
+  spawnX: 25,
+};
+
 // La scène de démo (scène de test, lancée directement par main.js/
 // startTestCityGame), HORS PLAN tant que le joueur n'a pas les anciens
 // plans (amélioration "old_plans", donnée par le vieux cadastre).
@@ -59,12 +68,12 @@ const DEMO_ZONE = {
 
 // Grille littérale, lisible d'un coup d'œil (une ligne de source = une
 // ligne de la carte, jamais générée par boucle) : la grand place au centre
-// (x:2, y:2), la démo juste à sa droite (x:3, y:2) ; tout le reste en
-// chantier.
+// (x:2, y:2), la rue commerçante à sa gauche (x:1, y:2), la démo à sa
+// droite (x:3, y:2) ; tout le reste en chantier.
 export const CITY_MAP_GRID = [
   [UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION],
   [UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION],
-  [UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, TOWN_SQUARE_ZONE, DEMO_ZONE, UNDER_CONSTRUCTION],
+  [UNDER_CONSTRUCTION, MAIN_STREET_ZONE, TOWN_SQUARE_ZONE, DEMO_ZONE, UNDER_CONSTRUCTION],
   [UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION],
   [UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION],
 ];

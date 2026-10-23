@@ -21,6 +21,7 @@ import { resolveTuning } from "../config/tuning.js";
 import { sessionProvider } from "./interaction-handlers.js";
 import { runEffects } from "./effect-runner.js";
 import { executeAction } from "./action-execution.js";
+import { openConfirmation } from "./menus/confirmation.js";
 
 // Description RICHE d'une entité (interaction "describe"), distincte du nom
 // annoncé à l'approche (occupation, voir view/occupancy.js).
@@ -119,7 +120,35 @@ function departsWithTeleport(effects) {
   return Boolean(effects && effects.some((effect) => effect.type === "teleport"));
 }
 
-export function interact(entity, kind) {
+// Exécute l'action RÉSOLUE (candidate choisie, condition vérifiée, et
+// confirmation donnée s'il en fallait une) : effets de succès, PUIS handler
+// propre au kind.
+function runResolvedAction(entity, action) {
+  if (!departsWithTeleport(action.effects)) lastActivationAt.set(entity.id, performance.now());
+
+  // Effets de succès exécutés GÉNÉRIQUEMENT pour TOUT kind (voir
+  // view/effect-runner.js/runEffects), AVANT le handler propre au kind :
+  // n'importe quel kind peut déclarer `effects`, pas seulement
+  // "applyEffects" (voir view/action-execution.js/handleApplyEffects, NO-OP
+  // pour cette raison).
+  runEffects(entity, action.effects);
+  executeAction(entity, action);
+}
+
+// Question de CONFIRMATION d'une action `confirm` (voir
+// core/script-parse.js/parseSingleAction, doc/scripting.md/"Confirmation
+// d'une action") : elle nomme la scène de DESTINATION de son "teleport",
+// par la convention de titre `scene.<id>.name` (voir doc/i18n.md, vérifiée
+// par tools/content-audit.js) — la scène cible n'est pas chargée à ce
+// stade, son titre ne peut pas être lu dans son fichier.
+function confirmationParams(action) {
+  const teleport = action.effects.find((effect) => effect.type === "teleport");
+  return { scene: t(`scene.${teleport.target}.name`) };
+}
+
+// `getWorldView` : la vue du monde courante, dont les balises se taisent
+// pendant un menu ouvert par l'interaction (confirmation).
+export function interact(entity, kind, getWorldView) {
   if (kind === "describe") {
     const description = resolveDescription(entity);
     if (!description) return;
@@ -169,16 +198,19 @@ export function interact(entity, kind) {
       return;
     }
 
-    if (!departsWithTeleport(resolvedAction.effects)) lastActivationAt.set(entity.id, performance.now());
+    // Action à CONFIRMER (ex. sortie vers une autre scène majeure) : RIEN ne
+    // s'exécute avant la réponse — ni son de départ, ni état. Annuler (ou
+    // Échap) ne laisse aucune trace. La condition, elle, est déjà vérifiée :
+    // un refus reste un refus, sans question.
+    if (resolvedAction.confirm) {
+      openConfirmation("interaction.travelConfirm", () => runResolvedAction(entity, resolvedAction), {
+        titleParams: confirmationParams(resolvedAction),
+        getWorldView,
+      });
+      return;
+    }
 
-    // Condition VRAIE (ou absente) -> effets de succès exécutés
-    // GÉNÉRIQUEMENT pour TOUT kind (voir view/effect-runner.js/runEffects),
-    // AVANT le handler propre au kind : n'importe quel kind peut déclarer
-    // `effects`, pas seulement "applyEffects" (voir
-    // view/action-execution.js/handleApplyEffects, NO-OP pour cette raison).
-    runEffects(entity, resolvedAction.effects);
-
-    executeAction(entity, resolvedAction);
+    runResolvedAction(entity, resolvedAction);
     return;
   }
 }
@@ -204,7 +236,7 @@ function openDisambiguationMenu(candidates, kind, getWorldView) {
       label: entity.labelKey,
       onActivate: () => {
         popScreen();
-        interact(entity, kind);
+        interact(entity, kind, getWorldView);
       },
     })),
   };

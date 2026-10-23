@@ -95,6 +95,7 @@ import reversedLargeWindingMechanism from "./reversed_large_winding_mechanism.js
 import reversedWeightShaft from "./reversed_weight_shaft.js";
 import river from "./river.js";
 import rock from "./rock.js";
+import sceneExit from "./scene_exit.js";
 import shopCounter from "./shop_counter.js";
 import soundEmitter from "./sound_emitter.js";
 import statue from "./statue.js";
@@ -150,6 +151,7 @@ export default {
   reversed_weight_shaft: reversedWeightShaft,
   river,
   rock,
+  scene_exit: sceneExit,
   shop_counter: shopCounter,
   sound_emitter: soundEmitter,
   statue,

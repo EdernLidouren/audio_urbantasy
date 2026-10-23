@@ -228,4 +228,24 @@ export default function checkActions(run) {
     true,
     kindThrows([{ kind: "applyEffects", effects: [{ type: "announce", key: "entity.dog.name" }] }, { kind: "pickup" }])
   );
+
+  // --- Confirmation d'une action (`confirm`, voir core/script-parse.js/
+  // parseSingleAction) : la FORME seulement — la question elle-même est
+  // posée par la vue (view/interaction.js), vérifiée en jeu. ---
+  const CONFIRM_REGISTRY = { dog: { nameKey: "entity.dog.name" } };
+  const confirmThrows = (action) =>
+    throws(() =>
+      parseScene({ id: "confirm-check", titleKey: "scene.demo.name", length: 10, entities: [{ id: "exit", type: "dog", x: 0, action }] }, CONFIRM_REGISTRY)
+    );
+  const teleport = { type: "teleport", target: "main_street", x: 49 };
+  run("confirm : action qui téléporte, acceptée", false, confirmThrows({ kind: "applyEffects", confirm: true, effects: [teleport] }));
+  run(
+    "confirm : son de départ avant le teleport, accepté",
+    false,
+    confirmThrows({ kind: "applyEffects", confirm: true, effects: [{ type: "playSound", path: "assets/sounds/a", nature: "meta" }, teleport] })
+  );
+  run("confirm : false accepté (aucune question)", false, confirmThrows({ kind: "applyEffects", confirm: false, effects: [{ type: "announce", key: "x.y" }] }));
+  run("confirm : non booléen rejeté", true, confirmThrows({ kind: "applyEffects", confirm: "yes", effects: [teleport] }));
+  run("confirm : sans teleport rejeté (rien à nommer)", true, confirmThrows({ kind: "applyEffects", confirm: true, effects: [{ type: "announce", key: "x.y" }] }));
+  run("confirm : deux teleport rejetés (destination ambiguë)", true, confirmThrows({ kind: "applyEffects", confirm: true, effects: [teleport, teleport] }));
 }

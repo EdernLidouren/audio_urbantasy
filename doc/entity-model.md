@@ -125,6 +125,23 @@ spécifique au MODÈLE d'entité :
   verdict de la porte immédiatement, sans code de synchro (même dérivation
   que `equippedTags`).
 
+## Sorties de scène (`scene_exit`)
+
+Une **porte** (`door`) relie deux scènes par un objet qui sonne (grincement,
+ouverture) ; un **passage** (`passage`) relie les deux faces d'une même scène.
+Une **sortie de scène** (`entities/types/scene_exit.js`) relie deux scènes là où
+il n'y a RIEN de concret à faire entendre : un bord de scène en plein air, le bout
+d'une rue qui continue ailleurs. Sa balise est donc un son synthétique
+(extradiégétique), seulement là pour repérer la sortie à l'oreille.
+
+Elle fonctionne exactement comme une porte : pas d'action par défaut, chaque
+instance déclare la sienne (`applyEffects` + `"teleport"`), et ses textes sous la
+famille `scene_exit.*` (voir `doc/i18n.md`). Entre deux scènes MAJEURES (deux
+cases de la carte de la ville), l'action porte `"confirm": true` : le joueur
+confirme avant de partir (voir `doc/scripting.md`/"Confirmation d'une action").
+Exemple réel : `main_street_exit` dans `scenes/town-square.json`, et son pendant
+`town_square_exit` dans `scenes/main-street.json`.
+
 ## Collectible persistant
 
 Contrairement à l'action `"pickup"` (`money`, ci-dessus — l'entité DISPARAÎT

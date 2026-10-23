@@ -8,6 +8,7 @@
   "interaction.searchNothing": "Vous ne trouvez rien.",
   "interaction.searchSpawn": "{count} objets tombent tout autour.",
   "interaction.searchSpawnOne": "Un objet tombe tout près.",
+  "interaction.travelConfirm": "Partir vers {scene} ?",
   "menu.interaction.observe.title": "Observer",
   "menu.interaction.title": "Interagir"
 }

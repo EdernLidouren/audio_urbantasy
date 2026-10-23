@@ -1,0 +1,31 @@
+{
+  "id": "main_street",
+  "titleKey": "scene.main_street.name",
+  "length": 50,
+  "playerStart": 25,
+  "recto": {
+    "musicDay": "assets/musics/jazz_day",
+    "musicNight": "assets/musics/jazz_night",
+    "ambiences": ["assets/ambiances/quiet_traffic"],
+    "defaultSurface": "concrete",
+    "reverbPreset": "street_outdoor",
+    "entities": [
+      {
+        "id": "town_square_exit",
+        "type": "scene_exit",
+        "x": 50,
+        "nameKey": "scene_exit.main_street_town_square.name",
+        "descriptionKey": "scene_exit.main_street_town_square.description",
+        "action": { "kind": "applyEffects", "confirm": true, "effects": [{ "type": "teleport", "target": "town_square", "x": 1, "side": "recto" }] }
+      }
+    ]
+  },
+  "verso": {
+    "musicDay": "assets/musics/jazz_day",
+    "musicNight": "assets/musics/jazz_night",
+    "ambiences": ["assets/ambiances/quiet_traffic"],
+    "defaultSurface": "concrete",
+    "reverbPreset": "street_outdoor",
+    "entities": []
+  }
+}

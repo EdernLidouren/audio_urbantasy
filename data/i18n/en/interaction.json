@@ -8,6 +8,7 @@
   "interaction.searchNothing": "You find nothing.",
   "interaction.searchSpawn": "{count} items fall all around.",
   "interaction.searchSpawnOne": "An item falls nearby.",
+  "interaction.travelConfirm": "Head to {scene}?",
   "menu.interaction.observe.title": "Observe",
   "menu.interaction.title": "Interact"
 }

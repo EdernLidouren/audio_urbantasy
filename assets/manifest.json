@@ -2,6 +2,9 @@
   "assets/ambiances/altitude_wind": [
     "assets/ambiances/altitude_wind_1.mp3"
   ],
+  "assets/ambiances/quiet_traffic": [
+    "assets/ambiances/quiet_traffic_1.mp3"
+  ],
   "assets/ambiances/rain_indoor": [
     "assets/ambiances/rain_indoor_1.mp3"
   ],
@@ -263,6 +266,9 @@
   ],
   "assets/sounds/doors/passage_outdoor_1_beacon": [
     "assets/sounds/doors/passage_outdoor_1_beacon_1.mp3"
+  ],
+  "assets/sounds/doors/scene_exit_1_beacon": [
+    "assets/sounds/doors/scene_exit_1_beacon_1.mp3"
   ],
   "assets/sounds/effects/big_rock_collision": [
     "assets/sounds/effects/big_rock_collision_1.mp3"

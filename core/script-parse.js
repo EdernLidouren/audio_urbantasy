@@ -562,6 +562,20 @@ export function parseSingleAction(rawAction, describe, entityVariables, sceneVar
   if (rawAction.condition !== undefined) {
     validateCondition(rawAction.condition, `${describe}.condition`, entityVariables, sceneVariables);
   }
+  // `confirm` : la vue demande confirmation au joueur AVANT tout effet (voir
+  // view/interaction.js/interact, doc/scripting.md/"Confirmation d'une
+  // action"). La question nomme la DESTINATION, donc l'action doit
+  // téléporter : un seul "teleport" dans ses effets, sinon la question
+  // n'aurait rien à nommer. `false` équivaut à l'absence du champ.
+  if (rawAction.confirm !== undefined) {
+    if (typeof rawAction.confirm !== "boolean") {
+      fail(`${describe}.confirm doit être un booléen si présent.`);
+    }
+    const teleports = Array.isArray(rawAction.effects) ? rawAction.effects.filter((effect) => effect && effect.type === "teleport") : [];
+    if (rawAction.confirm && teleports.length !== 1) {
+      fail(`${describe}.confirm demande exactement un effet "teleport" dans effects (la question nomme la destination).`);
+    }
+  }
   const result = { ...rawAction };
   if (rawAction.effects !== undefined) {
     if (!Array.isArray(rawAction.effects) || rawAction.effects.length === 0) {

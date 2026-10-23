@@ -7,6 +7,7 @@ export default {
   demo2: "scenes/demo2.json",
   demo3: "scenes/demo3.json",
   town_square: "scenes/town-square.json",
+  main_street: "scenes/main-street.json",
   town_square_town_hall_main: "scenes/town-square-town-hall-main.json",
   town_square_town_hall_mayor_office: "scenes/town-square-town-hall-mayor-office.json",
   town_square_town_hall_meeting_room: "scenes/town-square-town-hall-meeting-room.json",

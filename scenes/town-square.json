@@ -11,6 +11,14 @@
     "reverbPreset": "open_outdoor",
     "segments": [{ "from": 8, "to": 12, "surface": "wood" }],
     "entities": [
+      {
+        "id": "main_street_exit",
+        "type": "scene_exit",
+        "x": 0,
+        "nameKey": "scene_exit.town_square_main_street.name",
+        "descriptionKey": "scene_exit.town_square_main_street.description",
+        "action": { "kind": "applyEffects", "confirm": true, "effects": [{ "type": "teleport", "target": "main_street", "x": 49, "side": "recto" }] }
+      },
       { "id": "river_recto", "type": "river", "x": 10, "interactable": false },
       {
         "id": "town_hall_main_door",

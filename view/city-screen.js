@@ -47,7 +47,7 @@ export function makeCityScreen(getSession, setSession) {
     const worldView = travel.current();
     const target = chooseInteractionTarget(worldView.getInteractionCandidates(kind), kind, travel.current);
     if (!target) return;
-    interact(target, kind);
+    interact(target, kind, travel.current);
   }
 
   // Touches de l'écran (actions résolues par view/input.js/CITY_BINDINGS).

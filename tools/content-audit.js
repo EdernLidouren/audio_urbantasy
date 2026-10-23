@@ -4,7 +4,8 @@
 // absente n'est qu'un avertissement en console et se lit brute au lecteur
 // d'écran, un son introuvable n'échoue qu'au moment d'être joué) :
 //   - chaque scène de scenes/index.js se charge (parseScene, vrai registre),
-//     et le registre des types d'entité lui-même est valide ;
+//     porte l'id de son entrée et un titre `scene.<id>.name`, et le
+//     registre des types d'entité lui-même est valide ;
 //   - chaque cible de "teleport", chaque scène de la carte de la ville et la
 //     scène de départ existent dans scenes/index.js ;
 //   - chaque clé i18n citée existe en fr ET en en ;
@@ -124,6 +125,10 @@ export async function auditContent() {
     // Un id absent prendrait le défaut de parseScene ("scene") : la scène se
     // chargerait, mais sous un autre nom que celui de scenes/index.js.
     if (raw.id !== id) report(source, "id", "id absent ou différent de scenes/index.js", String(raw.id));
+    // Convention de titre : la confirmation d'une sortie nomme la scène
+    // cible par `scene.<id>.name` sans la charger (voir
+    // view/interaction.js/confirmationParams).
+    if (raw.titleKey !== `scene.${id}.name`) report(source, "titleKey", "titre hors convention scene.<id>.name", String(raw.titleKey));
     checkStrings(source, raw);
   }
 

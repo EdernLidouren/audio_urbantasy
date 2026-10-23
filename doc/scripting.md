@@ -1441,6 +1441,40 @@ comportent donc IDENTIQUEMENT sur `action.condition` et sur `presence[].when`.
 réutiliseraient cette MÊME vérification, sans y toucher — `action.condition` ne
 connaît rien du `kind` qu'il protège.
 
+## Confirmation d'une action
+
+Une action peut porter `"confirm": true` : avant d'exécuter QUOI QUE CE SOIT
+(son de départ, état, voyage), la vue pose une question au joueur, dans le menu
+habituel « Annuler / Confirmer » (« Annuler » par défaut, Échap annule aussi).
+Confirmer exécute l'action entière ; annuler ne laisse aucune trace. La
+`condition` éventuelle est vérifiée AVANT : un refus reste un refus, sans
+question.
+
+```json
+// scenes/town-square.json, main_street_exit — sortie vers une autre scène majeure
+{
+  "id": "main_street_exit",
+  "type": "scene_exit",
+  "x": 0,
+  "action": {
+    "kind": "applyEffects",
+    "confirm": true,
+    "effects": [{ "type": "teleport", "target": "main_street", "x": 49, "side": "recto" }]
+  }
+}
+```
+
+La question nomme la DESTINATION (« Partir vers rue commerçante ? », clé
+`interaction.travelConfirm`) : l'action doit donc porter EXACTEMENT un effet
+`"teleport"`, vérifié au chargement. Le nom vient de la convention de titre de
+scène `scene.<id>.name` (voir `doc/i18n.md`) : la scène cible n'est pas encore
+chargée au moment de la question. Usage prévu : quitter une scène MAJEURE (une
+case de la carte de la ville) pour une autre, jamais pour entrer dans une de ses
+sous-scènes — c'est un choix de contenu, déclaré par l'action, jamais déduit.
+Champ commun à tous les kinds (`core/action-kinds.js`/`COMMON_ACTION_FIELDS`).
+Mise en œuvre : `core/script-parse.js`/`parseSingleAction` (forme),
+`view/interaction.js`/`interact` (question).
+
 ## Actions multiples filtrées par condition
 
 `entity.action` peut être soit un OBJET UNIQUE (tout ce qui précède), soit un TABLEAU de candidates — chacune une action complète
