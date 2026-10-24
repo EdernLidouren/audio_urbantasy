@@ -23,7 +23,8 @@
 // applyActionEffects (plus bas) est en réalité le point d'entrée PARTAGÉ de
 // TOUT effet d'ÉTAT d'une action, pas seulement les variables — voir
 // core/effects.js/STATE_EFFECT_TYPES : giveImprovement/removeImprovement
-// (core/improvements.js) y sont appliqués dans le MÊME passage, faute
+// (core/improvements.js) et startle (core/startle.js) y sont appliqués dans
+// le MÊME passage, faute
 // d'un second point d'entrée générique côté vue (view/effect-runner.js/
 // runEffects délègue TOUS les effets d'état ICI, en un seul appel).
 
@@ -203,6 +204,15 @@ export function applyActionEffects(effects, context) {
     if (effect.type === "removeImprovement") {
       if (!ctx.session) return ctx;
       return { ...ctx, session: { ...ctx.session, improvements: removeImprovement(ctx.session.improvements, effect.id) } };
+    }
+    // startle : l'entité qui porte l'action s'enfuit — même drapeau que la
+    // fuite à l'approche (voir core/startle.js, qui le lit et le retire au
+    // chargement du monde). Écrit ici plutôt qu'importé de core/startle.js,
+    // qui dépend de core/state.js, lui-même client de ce module. Déjà
+    // envolée, ou contexte sans entité -> `ctx` inchangé.
+    if (effect.type === "startle") {
+      if (!ctx.entity || ctx.entity.startled) return ctx;
+      return { ...ctx, entity: { ...ctx.entity, startled: true } };
     }
     return ctx;
   }, context);

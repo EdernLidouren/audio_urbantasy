@@ -426,6 +426,46 @@ facilement, une entrée de menu non. Dernière entrée : « Vider le journal ».
   contenu incohérent), jamais du bruit technique. Chaque avertissement part
   aussi dans la console avec son détail brut.
 
+## Entités farouches
+
+Une entité FAROUCHE s'enfuit quand le joueur s'approche, et revient quand
+on recharge la scène : un oiseau posé qui s'envole, puis reprend sa place.
+Elle le déclare par `startle: { range? }` (cascade instance -> archétype,
+l'instance remplace en bloc), `range` en unités de scène, défaut
+`config/tuning-values.js`/`startleRange` (2,5 : plus loin que la portée
+d'interaction, on l'entend partir avant de pouvoir l'observer). Mécanique
+dans `core/startle.js`, un seul drapeau runtime `startled` (comme
+`consumed`, jamais écrit dans le JSON de scène) :
+
+- **À l'approche** — en fin de tick (`core/reduce.js`), une entité farouche
+  présente de la face du joueur, à `range` ou moins de lui, est marquée.
+  La distance seule compte : un oiseau qui erre vers un joueur immobile
+  s'envole aussi. L'autre face n'est jamais concernée.
+- **À l'interaction** — l'effet d'action d'état `"startle"` (voir
+  `doc/scripting.md`/"Effets d'action") marque l'entité qui porte
+  l'action, farouche ou non. Utile pour une instance confiante, dont
+  `range` est plus court que la portée d'interaction.
+- **Dormance** — une entité marquée est dormante (voir "Présence
+  conditionnelle" plus bas), quoi que disent ses règles. Le marquage se
+  fait en fin de tick, la dormance au tick suivant : la bascule `"exited"`
+  est donc toujours observée, même quand le joueur arrive dans la scène à
+  côté de l'entité. Le son de la fuite est simplement son `exitSound`
+  (voir "Sons de transition"), joué et positionné par la vue.
+- **Retour** — à CHAQUE chargement du monde (`view/world-travel.js`, avec
+  le regarnissage de collecte), `returnStartledEntities` retire la marque
+  sur les deux faces, et oublie la présence mémorisée : aucune bascule
+  fantôme au retour. Revenir dans la scène, ou continuer une partie
+  sauvegardée pendant la visite, ramène l'entité. Aucun tirage PRNG :
+  le déterminisme ne dépend que des positions.
+
+**Exemple réel** — les oiseaux posés (`entities/types/perched_bird_1.js`,
+`_2`, `_3`, une voix chacun, celles de `bird_1`/`_2`/`_3`), dans
+`scenes/demo.json` : vocal seul, serré et varié en hauteur, pas
+d'`isFlying` (posés), errance très lente déclarée à l'instance, envol en
+`exitSound` (pool `bird_taking_off_fly`), Entrée qui les effraie aussi
+(effet `"startle"`). L'un d'eux, `perched_bird_tame`, porte `startle:
+{ range: 0.5 }` : il se laisse approcher, observer, puis effrayer.
+
 ## Collecte — conteneurs régénérants et plages au sol
 
 Mécanique de SPAWN de collectibles (`core/distribution.js`, `core/spawn.js`) :
@@ -839,6 +879,9 @@ matchent mais n'en portent pas — ex. une règle purement comportementale —
 sont ignorées pour CETTE décision, la recherche continue). Aucune règle
 couvrante -> DORMANTE par défaut (une entité n'est "montrée" que par une
 règle qui la couvre explicitement).
+
+Une entité ENVOLÉE (voir "Entités farouches" plus haut) est dormante quoi
+que disent ses règles.
 
 Dormante = un seul drapeau qui coupe TROIS plans d'un coup, "comme si
 absente" mais réversible :
@@ -1812,7 +1855,9 @@ surcoût.
 que `hound`, voir "Beacon vs vocal" plus haut), pool DÉDIÉ `bird_1_vocal`,
 interval/variation surchargés pour un chant largement espacé. `isFlying:true`
 y suffit à lui seul, quel que soit le rôle de son porté (beacon OU vocal) —
-aucune autre déclaration nécessaire.
+aucune autre déclaration nécessaire. Un oiseau en vol ne réagit pas au
+joueur ; son pendant posé, qui s'envole à l'approche, est un autre type
+(voir "Entités farouches").
 
 ## Le joueur : même modèle, mais AUDITEUR
 

@@ -45,8 +45,9 @@
 import BEHAVIORS from "./behaviors/index.js";
 import { resolvePlayerMove, resolveBodyMove } from "./physics/collision.js";
 import { resolveOverlaps, resolveEntityOverlaps } from "./physics/overlap.js";
-import { resolveEntityRules, presenceContextOf } from "./presence.js";
+import { resolveEntityRules, presenceContextOf, tracksPresence } from "./presence.js";
 import { resolveFace, withFace, withActiveWorld, isTwoSided } from "./state.js";
+import { startleNearby } from "./startle.js";
 
 // Résout la position d'une CIBLE par id — "player" (convention reconnue
 // ici, voir follow.js/DEFAULTS.targetId) pour le joueur, sinon une entité
@@ -90,10 +91,11 @@ function resolveTargetPosition(state, face, targetId) {
 // comportement (ni mouvement, ni tirage PRNG consommé) : rngState traverse
 // intact pour cette entité, déterminisme préservé pour les entités
 // RESTÉES actives, quel que soit l'état de présence des autres. Les
-// champs `present`/`presenceChanged`/`ruleActive` ne sont ajoutés à
-// l'entité QUE si elle porte une règle `presence` (jamais sur une entité
-// qui n'en a pas : sa forme sérialisée reste celle de sa scène, voir
-// core/checks/save.check.js, audit de sérialisabilité).
+// champs `present`/`presenceChanged` ne sont ajoutés à l'entité QUE si
+// elle porte une règle `presence` ou peut s'envoler (voir
+// core/presence.js/tracksPresence), `ruleActive` seulement avec des
+// règles (jamais sur une autre entité : sa forme sérialisée reste celle de
+// sa scène, voir core/checks/save.check.js, audit de sérialisabilité).
 //
 // presenceChanged ("entered" | "exited" | null) : la BASCULE de présence
 // OBSERVÉE, exposée pour la vue (sons de transition, voir
@@ -117,8 +119,12 @@ function stepEntities(entities, context) {
     const resolved = resolveEntityRules(entity, context.presenceContext);
     const { present, presenceChanged, ruleActive, behaviorEffect } = resolved;
     const effectiveEntity = behaviorEffect !== undefined ? { ...entity, behavior: behaviorEffect } : entity;
-    const withPresence = (e) =>
-      entity.presence ? { ...e, present, presenceChanged, ruleActive } : e;
+    // ruleActive : seulement avec des règles (une entité farouche sans
+    // règle porte sa présence, jamais un `ruleActive` vide).
+    const withPresence = (e) => {
+      if (!tracksPresence(entity)) return e;
+      return entity.presence ? { ...e, present, presenceChanged, ruleActive } : { ...e, present, presenceChanged };
+    };
 
     if (!present) {
       return { entity: withPresence(effectiveEntity), intent: undefined };
@@ -260,9 +266,12 @@ export function reduce(state, action) {
       const finalWorldEntities = overlapFix.entities.slice(0, worldEntityCount);
       const finalCompanions = overlapFix.entities.slice(worldEntityCount);
 
+      // Entités FAROUCHES (voir core/startle.js) : marquées en FIN de tick,
+      // contre la position FINALE du joueur, sur sa face seulement — leur
+      // dormance prend effet au tick suivant, où la bascule est observée.
       // Réécrit la face COURANTE (voir core/state.js/withFace).
       let nextWorld = withFace(world, state.player.side, {
-        entities: finalWorldEntities,
+        entities: startleNearby(finalWorldEntities, overlapFix.playerX),
         rngState: worldStep.rngState,
       });
 

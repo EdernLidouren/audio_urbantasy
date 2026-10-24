@@ -131,6 +131,7 @@ const ACTION_EFFECT_FIELDS = {
   addVariable: ["scope", "name", "amount"],
   giveImprovement: ["id"],
   removeImprovement: ["id"],
+  startle: [],
   playSound: ["path", "gain", "pitchVariation", "reverbSend", "at", "nature", "tracked"],
   announce: ["key", "assertive"],
   teleport: ["target", "x", "side", "reloadIfSame", "transition"],
@@ -233,6 +234,11 @@ function parseActionEffect(rawEffect, describe, entityVariables, sceneVariables)
       fail(`${describe}.id "${rawEffect.id}" absent du registre d'improvements.`);
     }
     return { type, id: rawEffect.id };
+  }
+  // "startle" (sans champ) — ÉTAT : l'entité qui porte l'action s'enfuit
+  // (voir core/startle.js, core/variables.js/applyActionEffects).
+  if (type === "startle") {
+    return { type: "startle" };
   }
   if (type === "playSound") {
     if (!isNonEmptyString(rawEffect.path)) {

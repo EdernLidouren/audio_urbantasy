@@ -1098,6 +1098,25 @@ clé de contexte `context.session` que la portée `"party"`. Idempotents
 (donner une improvement déjà possédée, ou en retirer une déjà absente,
 laisse `session.improvements` à une RÉFÉRENCE INCHANGÉE).
 
+### `"startle"` — l'entité s'enfuit, état, CORE
+
+```js
+{ type: "startle" }
+```
+
+Sans champ — l'entité qui PORTE l'action (ou le trigger) s'enfuit : même
+drapeau runtime `startled` que la fuite à l'approche d'une entité farouche,
+même dormance observée (son de sortie joué par la vue), même retour au
+chargement du monde (voir `doc/entity-model.md`/"Entités farouches",
+`core/startle.js`). Vaut pour toute entité, farouche ou non. Appliqué par
+`applyActionEffects` dans le même passage que les autres effets d'état ;
+idempotent (déjà envolée : session inchangée). Exemple réel : l'action des
+oiseaux posés (`entities/types/perched_bird_1.js`), Entrée les effraie :
+
+```js
+action: { kind: "applyEffects", effects: [{ type: "startle" }] }
+```
+
 ### `"playSound"` — son ponctuel, VUE, DEUX natures de rendu
 
 ```js

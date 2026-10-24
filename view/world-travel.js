@@ -15,6 +15,7 @@ import registry from "../entities/types/index.js";
 import { loadSceneById } from "../scenes/load.js";
 import { travelToWorld, switchSide, placePlayer, reloadActiveWorld } from "../core/state.js";
 import { refillDueSpawns } from "../core/spawn.js";
+import { returnStartledEntities } from "../core/startle.js";
 import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";
 import { resolveTuning } from "../config/tuning.js";
@@ -48,17 +49,18 @@ function playSideSwitchSound(entity) {
 export function createWorldTravel({ getSession, setSession }) {
   let worldView = null;
 
-  // Garnissage de collecte dû sur le monde actif (voir core/spawn.js/
-  // refillDueSpawns) — à CHAQUE chargement d'un monde, TOUJOURS avant le
-  // montage de la vue : les collectibles posés sont des entités ordinaires,
-  // découvertes au montage comme les autres.
-  function refreshSpawns() {
-    setSession(refillDueSpawns(getSession(), registry));
+  // À CHAQUE chargement d'un monde, TOUJOURS avant le montage de la vue :
+  // le garnissage de collecte dû (voir core/spawn.js/refillDueSpawns — les
+  // collectibles posés sont des entités ordinaires, découvertes au montage
+  // comme les autres), et le retour des entités farouches envolées lors
+  // d'une visite précédente (voir core/startle.js/returnStartledEntities).
+  function prepareLoadedWorld() {
+    setSession(returnStartledEntities(refillDueSpawns(getSession(), registry)));
   }
 
   // Première entrée en ville.
   function mountInitial() {
-    refreshSpawns();
+    prepareLoadedWorld();
     worldView = createWorldView(getSession);
   }
 
@@ -105,7 +107,7 @@ export function createWorldTravel({ getSession, setSession }) {
     worldView = null;
     setSession(travelToWorld(getSession(), targetId, freshScene, { x, side }));
     clearInteractionCooldowns();
-    refreshSpawns();
+    prepareLoadedWorld();
     worldView = createWorldView(getSession);
     announceSceneName(getSession());
 
@@ -218,7 +220,7 @@ export function createWorldTravel({ getSession, setSession }) {
     worldView = null;
     muteNextDiscoveryCheck();
     setSession(newSession);
-    refreshSpawns();
+    prepareLoadedWorld();
     worldView = createWorldView(getSession);
     worldView.pauseBeacons();
   }
@@ -244,7 +246,7 @@ export function createWorldTravel({ getSession, setSession }) {
     worldView = null;
     setSession(reloadActiveWorld(getSession(), freshScene));
     clearInteractionCooldowns();
-    refreshSpawns();
+    prepareLoadedWorld();
     worldView = createWorldView(getSession);
     announce(t("teleport.debug.reloaded"), { assertive: true });
   }

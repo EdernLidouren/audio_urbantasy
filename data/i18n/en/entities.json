@@ -97,6 +97,8 @@
   "entity.old_survey_map.description": "A large map of the town, rolled up and yellowed, covered in faded ink annotations.",
   "entity.old_survey_map.name": "old survey map",
   "entity.old_survey_map.taken": "You take the old survey map.",
+  "entity.perched_bird.description": "A small bird hopping about, pecking at the ground.",
+  "entity.perched_bird.name": "bird",
   "entity.potted_plant.description": "A terracotta pot holding a very common plant species.",
   "entity.potted_plant.name": "potted plant",
   "entity.reversed_clock_tower_escapement.description": "Watching this pendulum's unnatural swing for too long slowly fills the mind with a terrible sense of doom.",

@@ -142,6 +142,19 @@ function parseSpeed(speed, archetypeSpeed, at) {
   return speed !== undefined ? speed : archetypeSpeed !== undefined ? archetypeSpeed : 1;
 }
 
+// `startle` : `{ range? }`, portée de fuite (> 0) — sans elle, le défaut de
+// ressenti, résolu à la lecture (voir core/startle.js/startleRangeOf).
+function parseStartle(startle, at) {
+  if (typeof startle !== "object" || startle === null || Array.isArray(startle)) {
+    fail(`${at} : startle doit être un objet ({ range? }) si présent.`);
+  }
+  rejectUnknownFields(startle, ["range"], `${at} : startle`);
+  if (startle.range !== undefined && (!isFiniteNumber(startle.range) || startle.range <= 0)) {
+    fail(`${at} : startle.range doit être un nombre > 0 si présent.`);
+  }
+  return startle.range !== undefined ? { range: startle.range } : {};
+}
+
 // Action : un objet unique, ou un TABLEAU de candidates (la vue choisit à
 // l'activation celle dont la condition est vraie, voir doc/scripting.md/
 // "Actions multiples filtrées par condition"). Chaque candidate est validée
@@ -248,6 +261,7 @@ const ENTITY_FIELDS = [
   "container",
   "shop",
   "triggers",
+  "startle",
 ];
 
 // Parse UNE entité d'une face. `seenIds` : ids déjà vus dans la face
@@ -281,6 +295,7 @@ export function parseEntity(rawEntity, index, registry, length, seenIds, sceneVa
     container,
     shop,
     triggers,
+    startle,
   } = rawEntity;
 
   validateIdentity(rawEntity, index, registry, length, seenIds);
@@ -377,6 +392,13 @@ export function parseEntity(rawEntity, index, registry, length, seenIds, sceneVa
 
   if (entity.action !== undefined) checkActionRequirements(entity, at);
 
+  // Entité farouche (voir core/startle.js) : l'instance remplace
+  // l'archétype en bloc.
+  const resolvedStartle = startle !== undefined ? startle : archetype.startle;
+  if (resolvedStartle !== undefined) {
+    entity.startle = parseStartle(resolvedStartle, at);
+  }
+
   // Triggers horaires (voir core/triggers.js, doc/scripting.md/"Triggers").
   const resolvedTriggers = triggers !== undefined ? triggers : archetype.triggers;
   if (resolvedTriggers !== undefined) {
@@ -420,6 +442,7 @@ const ARCHETYPE_FIELDS = [
   "triggers",
   "container",
   "shop",
+  "startle",
   "collisionSound",
   "muteOnConsumed",
 ];

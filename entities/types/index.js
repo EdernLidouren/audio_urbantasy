@@ -90,6 +90,9 @@ import officeTable from "./office_table.js";
 import officeWaterCooler from "./office_water_cooler.js";
 import oldSurveyMap from "./old_survey_map.js";
 import passage from "./passage.js";
+import perchedBird1 from "./perched_bird_1.js";
+import perchedBird2 from "./perched_bird_2.js";
+import perchedBird3 from "./perched_bird_3.js";
 import pottedPlant from "./potted_plant.js";
 import reversedClockTowerEscapement from "./reversed_clock_tower_escapement.js";
 import reversedLargeWindingMechanism from "./reversed_large_winding_mechanism.js";
@@ -147,6 +150,9 @@ export default {
   office_water_cooler: officeWaterCooler,
   old_survey_map: oldSurveyMap,
   passage,
+  perched_bird_1: perchedBird1,
+  perched_bird_2: perchedBird2,
+  perched_bird_3: perchedBird3,
   potted_plant: pottedPlant,
   reversed_clock_tower_escapement: reversedClockTowerEscapement,
   reversed_large_winding_mechanism: reversedLargeWindingMechanism,

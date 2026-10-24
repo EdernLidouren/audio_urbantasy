@@ -368,12 +368,19 @@
     "assets/sounds/entities/bird_3_vocal_3.mp3",
     "assets/sounds/entities/bird_3_vocal_4.mp3"
   ],
+  "assets/sounds/entities/bird_taking_off_fly": [
+    "assets/sounds/entities/bird_taking_off_fly_1.mp3",
+    "assets/sounds/entities/bird_taking_off_fly_2.mp3"
+  ],
   "assets/sounds/entities/dog_medium_vocal": [
     "assets/sounds/entities/dog_medium_vocal_1.mp3",
     "assets/sounds/entities/dog_medium_vocal_2.mp3",
     "assets/sounds/entities/dog_medium_vocal_3.mp3",
     "assets/sounds/entities/dog_medium_vocal_4.mp3",
     "assets/sounds/entities/dog_medium_vocal_5.mp3"
+  ],
+  "assets/sounds/entities/flock_of_birds_1_beacon": [
+    "assets/sounds/entities/flock_of_birds_1_beacon_1.mp3"
   ],
   "assets/sounds/entities/miravi_vocal": [
     "assets/sounds/entities/miravi_vocal_1.mp3",

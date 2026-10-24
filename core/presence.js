@@ -372,11 +372,13 @@ function ruleEffect(rule, type) {
 //     si aucun effet "behavior" n'a basculé — trois valeurs distinctes,
 //     jamais confondues par l'appelant (core/reduce.js compare à
 //     `undefined`, jamais un test de vérité).
-// Sans `entity.presence` : present toujours vrai, rien d'autre à calculer —
-// une entité sans règle n'est jamais touchée par ce mécanisme.
+// Sans `entity.presence` : présente, rien d'autre à calculer.
+// ENVOLÉE (`entity.startled`, voir core/startle.js) : dormante quoi que
+// disent ses règles, jusqu'à son retour au chargement du monde.
 export function resolveEntityRules(entity, context) {
   if (!entity.presence) {
-    return { present: true, presenceChanged: null, ruleActive: undefined, behaviorEffect: undefined };
+    const present = !entity.startled;
+    return { present, presenceChanged: presenceChangeOf(entity, present), ruleActive: undefined, behaviorEffect: undefined };
   }
 
   const ruleContext = { ...context, entity };
@@ -421,11 +423,25 @@ export function resolveEntityRules(entity, context) {
     }
   });
 
-  const previousPresent = entity.present;
-  const presenceChanged =
-    typeof previousPresent === "boolean" && previousPresent !== present ? (present ? "entered" : "exited") : null;
+  if (entity.startled) present = false;
 
-  return { present, presenceChanged, ruleActive, behaviorEffect };
+  return { present, presenceChanged: presenceChangeOf(entity, present), ruleActive, behaviorEffect };
+}
+
+// Bascule de présence OBSERVÉE : comparée à la présence du tick précédent,
+// portée par l'entité. `entity.present` absent (jamais tiqué) ne compte
+// jamais comme une bascule.
+function presenceChangeOf(entity, present) {
+  const previousPresent = entity.present;
+  return typeof previousPresent === "boolean" && previousPresent !== present ? (present ? "entered" : "exited") : null;
+}
+
+// L'entité porte-t-elle sa présence (`present`, `presenceChanged`) d'un
+// tick à l'autre ? Oui si elle a des règles, ou si elle peut s'envoler
+// (core/startle.js) : sa dormance doit alors être observable par la vue.
+// Les autres gardent la forme de leur scène (voir core/reduce.js).
+export function tracksPresence(entity) {
+  return Boolean(entity.presence || entity.startle || entity.startled);
 }
 
 // Contexte d'évaluation des règles de présence pour le monde ACTIF — SOURCE

@@ -494,6 +494,14 @@ export const TUNING_DEFAULTS = {
   followMinDistance: 1,
   followMaxDistance: 3,
 
+  // Distance (unités de scène) à laquelle une entité FAROUCHE (champ
+  // `startle`, voir core/startle.js) s'enfuit à l'approche du joueur.
+  // Volontairement PLUS GRANDE que interactRange : un oiseau posé s'envole
+  // avant qu'on soit assez près pour l'observer. Surchargeable par
+  // `startle.range` (archétype ou instance), jamais via resolveTuning : le
+  // core lit cette valeur DIRECTEMENT, comme les défauts de wander.
+  startleRange: 2.5,
+
   // --- Clés de la cascade SANS défaut global (`undefined`) : leur valeur
   // vient du son, de l'instance ou du type, sinon le consommateur a son
   // propre repli. Présentes ici pour que la liste des clés reste complète.

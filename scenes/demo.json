@@ -41,6 +41,9 @@
     { "id": "transistor_1", "type": "item", "x": 14, "action": { "kind": "pickup", "item": "transistor", "count": 1 } },
     { "id": "object_neon", "type": "neon", "x": 30 },
     { "id": "bird_1", "type": "bird_1", "x": 33 },
+    { "id": "perched_bird_1", "type": "perched_bird_2", "x": 16, "behavior": { "kind": "wander", "speed": 0.15, "walkMinMs": 1000, "walkMaxMs": 2500, "pauseMinMs": 3000, "pauseMaxMs": 8000 } },
+    { "id": "perched_bird_2", "type": "perched_bird_3", "x": 23, "behavior": { "kind": "wander", "speed": 0.15, "walkMinMs": 1000, "walkMaxMs": 2500, "pauseMinMs": 3000, "pauseMaxMs": 8000 } },
+    { "id": "perched_bird_tame", "type": "perched_bird_1", "x": 31, "startle": { "range": 0.5 }, "behavior": { "kind": "wander", "speed": 0.15, "walkMinMs": 1000, "walkMaxMs": 2500, "pauseMinMs": 3000, "pauseMaxMs": 8000 } },
     { "id": "spirit_1", "type": "ghost", "x": 36 },
     {
       "id": "npc_resident",

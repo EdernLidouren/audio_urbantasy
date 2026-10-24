@@ -97,6 +97,8 @@
   "entity.old_survey_map.description": "Un grand plan de la ville, roulé et jauni, couvert d'annotations à l'encre délavée.",
   "entity.old_survey_map.name": "vieux cadastre",
   "entity.old_survey_map.taken": "Vous emportez le vieux cadastre.",
+  "entity.perched_bird.description": "Un petit oiseau posé, qui sautille en picorant le sol.",
+  "entity.perched_bird.name": "oiseau",
   "entity.potted_plant.description": "Un pot en terre cuite contenant une espèce végétale très commune.",
   "entity.potted_plant.name": "plante en pot",
   "entity.reversed_clock_tower_escapement.description": "Observer trop longtemps ce balancier au mouvement contre-nature emplit peu à peu l'esprit d'un terrible sentiment de fatalité.",
