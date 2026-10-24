@@ -441,14 +441,14 @@ export function validateCondition(cond, describe, entityVariables, sceneVariable
       fail(`${describe}.spread doit être un nombre de minutes >= 0 si présent (reçu : ${JSON.stringify(cond.spread)}).`);
     }
   }
-  // "allOf" : composite — son champ `conditions` doit être un tableau NON
-  // VIDE, chaque élément revalidé RÉCURSIVEMENT par cette même fonction
-  // (une sous-condition peut être de n'importe quel type du registre, y
-  // compris un autre "allOf" imbriqué) — jamais un second chemin de
-  // validation, voir doc/scripting.md.
-  if (cond.type === "allOf") {
+  // "allOf"/"anyOf" : composites — leur champ `conditions` doit être un
+  // tableau NON VIDE, chaque élément revalidé RÉCURSIVEMENT par cette même
+  // fonction (une sous-condition peut être de n'importe quel type du
+  // registre, y compris un autre composite imbriqué) — jamais un second
+  // chemin de validation, voir doc/scripting.md.
+  if (cond.type === "allOf" || cond.type === "anyOf") {
     if (!Array.isArray(cond.conditions) || cond.conditions.length === 0) {
-      fail(`${describe}.conditions doit être un tableau non vide pour "allOf".`);
+      fail(`${describe}.conditions doit être un tableau non vide pour "${cond.type}".`);
     }
     cond.conditions.forEach((subCond, i) =>
       validateCondition(subCond, `${describe}.conditions[${i}]`, entityVariables, sceneVariables)

@@ -1,6 +1,6 @@
 // Vérifications du core — domaine « conditions ». Présence conditionnelle et
 // conditions : intégration au réducteur, bascule observée, weather, allOf,
-// not, variable de scène. Lancées par core/checks/index.js/runChecks (voir ce
+// anyOf, not, variable de scène. Lancées par core/checks/index.js/runChecks (voir ce
 // fichier). Pur : aucun DOM, aucun fetch ; chaque scène est construite en dur
 // via un objet littéral passé à parseScene.
 
@@ -655,6 +655,46 @@ export default function checkConditions(run) {
   let bothThenOffState = togglePerception(bothState);
   bothThenOffState = reduce(bothThenOffState, tick(0));
   run("allOf (intégration) : perception redevient inactive -> redevient dormante", false, allOfWolf(bothThenOffState).present);
+
+  // --- Condition "anyOf" (core/presence.js/evaluateAnyOf) : composite, OU
+  // logique — cas réel : la bouche d'égout qui ne coule que par temps
+  // pluvieux (pluie OU orage, entities/types/storm_drain.js).
+  const RAINY = { type: "anyOf", conditions: [{ type: "weather", state: "rain" }, { type: "weather", state: "stormy" }] };
+  run("anyOf : première sous-condition vraie -> vraie", true, evaluateCondition(RAINY, { weather: "rain" }));
+  run("anyOf : seconde sous-condition vraie -> vraie", true, evaluateCondition(RAINY, { weather: "stormy" }));
+  run("anyOf : aucune sous-condition vraie -> fausse", false, evaluateCondition(RAINY, { weather: "clear" }));
+  run(
+    "anyOf : imbriqué (allOf dans anyOf) -> délègue au même évaluateur",
+    true,
+    evaluateCondition(
+      { type: "anyOf", conditions: [{ type: "consumed" }, { type: "allOf", conditions: [{ type: "perceptionActive" }, { type: "weather", state: "fog" }] }] },
+      { perceptionActive: true, weather: "fog", entity: {} }
+    )
+  );
+  run(
+    "anyOf : conditions vide -> erreur claire au chargement",
+    true,
+    expectSceneParseThrows(
+      { id: "movement-check-anyof-empty", titleKey: "scene.demo.name", length: 20, playerStart: 0, entities: [{ id: "wolf-1", type: "wolf", x: 10, presence: [{ when: { type: "anyOf", conditions: [] }, present: true }] }] },
+      { wolf: { nameKey: "entity.cumulo_lupus.name" } }
+    )
+  );
+  run(
+    "anyOf : sous-condition mal formée (état météo inconnu) -> erreur claire au chargement, RÉCURSIVE",
+    true,
+    expectSceneParseThrows(
+      { id: "movement-check-anyof-bad-sub", titleKey: "scene.demo.name", length: 20, playerStart: 0, entities: [{ id: "wolf-1", type: "wolf", x: 10, presence: [{ when: { type: "anyOf", conditions: [{ type: "weather", state: "rain" }, { type: "weather", state: "drizzle" }] }, present: true }] }] },
+      { wolf: { nameKey: "entity.cumulo_lupus.name" } }
+    )
+  );
+  run(
+    "anyOf : sous-condition valide -> légal au chargement (pas d'erreur)",
+    false,
+    expectSceneParseThrows(
+      { id: "movement-check-anyof-ok", titleKey: "scene.demo.name", length: 20, playerStart: 0, entities: [{ id: "wolf-1", type: "wolf", x: 10, presence: [{ when: RAINY, present: true }] }] },
+      { wolf: { nameKey: "entity.cumulo_lupus.name" } }
+    )
+  );
 
   // --- Condition "not" (core/presence.js/evaluateNot) : négation, composable ---
   const NOT_PERCEPTION = { type: "not", condition: { type: "perceptionActive" } };

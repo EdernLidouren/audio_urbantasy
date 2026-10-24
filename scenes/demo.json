@@ -84,6 +84,9 @@
         "refusalEffects": [{ "type": "announce", "key": "door.club.dresscode_refused" }],
         "effects": [{ "type": "playSound", "path": "assets/sounds/doors/door_1_open" }, { "type": "teleport", "target": "demo2" }]
       }
-    }
+    },
+    { "id": "storm_drain_1", "type": "storm_drain", "x": 7 },
+    { "id": "wood_bench_1", "type": "wood_bench", "x": 27 },
+    { "id": "wall_air_conditioner_1", "type": "wall_air_conditioner", "x": 35 }
   ]
 }

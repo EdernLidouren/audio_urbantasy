@@ -105,7 +105,8 @@ export function resolveTransitionSound(entity, descriptor, keys) {
 
 // Une condition EXIGE-t-elle la perception, seule ou dans un "allOf" à
 // n'importe quelle profondeur ? "not" n'est jamais parcouru : { not:
-// perceptionActive } décrit une entité MONDAINE.
+// perceptionActive } décrit une entité MONDAINE. "anyOf" non plus : une
+// perception parmi d'autres alternatives ne l'EXIGE pas.
 function conditionRequiresPerception(cond) {
   if (!cond) return false;
   if (cond.type === "perceptionActive") return true;

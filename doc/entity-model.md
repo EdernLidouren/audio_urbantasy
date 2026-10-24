@@ -1297,6 +1297,10 @@ Règles :
   aujourd'hui (aucun cas concret), ce serait la même mécanique le jour où il
   en faut une. Une `condition` sur un autre rôle est refusée au chargement.
 
+La condition peut lire n'importe quel état du script, pas seulement une
+variable : la bouche d'égout (`entities/types/storm_drain.js`) ne coule que
+par temps pluvieux, pluie OU orage (`"anyOf"`, voir `doc/scripting.md`).
+
 **Sons de proximité conditionnels** (`approachSound`, `leaveSound`,
 `proximityLoop`, voir "Sons de proximité") : mêmes règles, avec un effet
 propre à chaque rôle. `approachSound` fausse : l'entité NE S'OUVRE PAS, elle

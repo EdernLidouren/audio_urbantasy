@@ -383,6 +383,33 @@ orpheline). MÊME principe pour la bascule de PHASE jour/nuit (`phaseAt`,
 `time.phase.dayBegins`/`time.phase.nightBegins`) — deux clés fixes, aucune composition
 nécessaire (une seule phase à la fois, jamais de fragment à assembler).
 
+### `anyOf` — composite, OU logique entre plusieurs conditions
+
+```js
+{ type: "anyOf", conditions: [{ type: "weather", state: "rain" }, { type: "weather", state: "stormy" }] }
+```
+
+Symétrique d'`"allOf"` : vraie si AU MOINS UNE sous-condition de `conditions` l'est.
+Même registre, même évaluateur, même validation au chargement (tableau NON VIDE,
+chaque élément revalidé RÉCURSIVEMENT) ; imbricable dans les deux sens avec `"allOf"`
+et `"not"`.
+
+Exemple réel — la bouche d'égout (`entities/types/storm_drain.js`), dont le beacon ne
+coule que par temps PLUVIEUX, pluie ou orage (voir `doc/entity-model.md`/"Sons
+conditionnels") :
+
+```js
+beacon: {
+  path: "assets/sounds/decor/water_drain", loop: true,
+  condition: { type: "anyOf", conditions: [{ type: "weather", state: "rain" }, { type: "weather", state: "stormy" }] },
+},
+```
+
+**Piège à connaître** : comme pour `"not"` (plus bas), un inspecteur de structure qui
+cherche une condition EXIGÉE ne descend pas dans un `"anyOf"` : `{ anyOf: [perception,
+brume] }` n'exige pas la perception, `conditionRequiresPerception`
+(`view/audio/entity-sound-entry.js`) l'ignore donc.
+
 ### `not` — composite, négation logique
 
 ```js
@@ -398,9 +425,9 @@ OBLIGATOIRE (un objet, jamais un tableau), revalidée RÉCURSIVEMENT au chargeme
 fois perception et brume »).
 
 Utile surtout pour la PRÉSENCE : une entité qu'aucune règle ne couvre est dormante par
-défaut, `"not"` est donc le moyen d'écrire « présente SAUF quand… ». Pas de `anyOf`
-pour l'instant : aucun cas concret (un « ou » d'action s'écrit en candidates
-multiples, voir "Actions multiples filtrées par condition").
+défaut, `"not"` est donc le moyen d'écrire « présente SAUF quand… ». Un « ou »
+s'écrit avec `"anyOf"` (plus haut) ; un « ou » entre ACTIONS reste des candidates
+multiples (voir "Actions multiples filtrées par condition").
 
 **Piège à connaître — inverse de celui d'`"allOf"`** : un inspecteur de structure qui
 cherche une condition dans `presence[].when` (ex. `view/audio/entity-sound-entry.js`/

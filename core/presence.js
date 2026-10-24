@@ -253,6 +253,15 @@ function evaluateAllOf(cond, context) {
   return cond.conditions.every((sub) => evaluateCondition(sub, context));
 }
 
+// "anyOf" : condition COMPOSITE, symétrique d'allOf — vraie si AU MOINS UNE
+// sous-condition de cond.conditions l'est (OU logique). Même délégation,
+// même validation au chargement (tableau non vide, éléments revalidés
+// récursivement). Court-circuite via Array.prototype.some, sans effet
+// observable pour la même raison.
+function evaluateAnyOf(cond, context) {
+  return cond.conditions.some((sub) => evaluateCondition(sub, context));
+}
+
 // "not" : condition COMPOSITE — vraie si SA sous-condition (cond.condition)
 // est fausse (négation logique). Même patron qu'allOf : délègue à
 // evaluateCondition, n'importe quel type du registre (y compris allOf ou un
@@ -315,6 +324,7 @@ const CONDITION_EVALUATORS = {
   perceptionActive: { evaluate: evaluatePerceptionActive, fields: [] },
   weather: { evaluate: evaluateWeather, fields: ["state"] },
   allOf: { evaluate: evaluateAllOf, fields: ["conditions"] },
+  anyOf: { evaluate: evaluateAnyOf, fields: ["conditions"] },
   not: { evaluate: evaluateNot, fields: ["condition"] },
   variable: {
     evaluate: evaluateVariable,

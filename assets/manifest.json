@@ -169,6 +169,9 @@
     "assets/sounds/decor/machine_1_vocal_4.mp3",
     "assets/sounds/decor/machine_1_vocal_5.mp3"
   ],
+  "assets/sounds/decor/manhole_cover_1_beacon": [
+    "assets/sounds/decor/manhole_cover_1_beacon_1.mp3"
+  ],
   "assets/sounds/decor/organic_rope_1_vocal": [
     "assets/sounds/decor/organic_rope_1_vocal_1.mp3",
     "assets/sounds/decor/organic_rope_1_vocal_2.mp3",
@@ -214,6 +217,9 @@
   ],
   "assets/sounds/decor/wall_air_conditioner_1_beacon": [
     "assets/sounds/decor/wall_air_conditioner_1_beacon_1.mp3"
+  ],
+  "assets/sounds/decor/water_drain": [
+    "assets/sounds/decor/water_drain_1.mp3"
   ],
   "assets/sounds/decor/weight_machine_1_beacon": [
     "assets/sounds/decor/weight_machine_1_beacon_1.mp3"
