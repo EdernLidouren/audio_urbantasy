@@ -158,9 +158,15 @@ export function buildEntitySoundEntry(entity, session, { otherFace = false, disa
     : null;
   // Sons de PROXIMITÉ (voir ./proximity-sounds.js) : ils répondent au
   // joueur, qui n'est jamais sur l'autre face — jamais construits pour elle.
-  const approachSound = otherFace ? null : resolveTransitionSound(entity, sounds.approachSound, APPROACH_SOUND_TUNING_KEYS);
-  const leaveSound = otherFace ? null : resolveTransitionSound(entity, sounds.leaveSound, LEAVE_SOUND_TUNING_KEYS);
-  const proximityLoop = otherFace ? null : resolveTransitionSound(entity, sounds.proximityLoop, PROXIMITY_LOOP_TUNING_KEYS);
+  // Leur `condition` éventuelle (sons conditionnels) voyage avec eux.
+  const proximitySound = (descriptor, keys) => {
+    if (otherFace) return null;
+    const resolved = resolveTransitionSound(entity, descriptor, keys);
+    return resolved && descriptor.condition !== undefined ? { ...resolved, condition: descriptor.condition } : resolved;
+  };
+  const approachSound = proximitySound(sounds.approachSound, APPROACH_SOUND_TUNING_KEYS);
+  const leaveSound = proximitySound(sounds.leaveSound, LEAVE_SOUND_TUNING_KEYS);
+  const proximityLoop = proximitySound(sounds.proximityLoop, PROXIMITY_LOOP_TUNING_KEYS);
 
   // Propriétés de l'ENTITÉ, partagées par tous ses rôles.
   const audibleRange = resolveTuning("audibleRange", entity);

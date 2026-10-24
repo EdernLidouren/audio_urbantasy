@@ -1,5 +1,5 @@
 // Archétype "video_projector" — vidéoprojecteur qu'on allume et éteint.
-// Beacon CONDITIONNEL (voir doc/entity-model.md/"Beacon conditionnel") :
+// Beacon CONDITIONNEL (voir doc/entity-model.md/"Sons conditionnels") :
 // il ne tourne que tant que la variable d'entité `isOn` vaut true. L'action
 // ne touche jamais au son directement : elle bascule `isOn` (approche B,
 // deux candidates aux conditions opposées, voir doc/scripting.md/"Actions

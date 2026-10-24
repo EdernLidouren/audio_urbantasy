@@ -239,6 +239,12 @@
   "assets/sounds/doors/door_2_open": [
     "assets/sounds/doors/door_2_open_1.mp3"
   ],
+  "assets/sounds/doors/garage_door_1_close": [
+    "assets/sounds/doors/garage_door_1_close_1.mp3"
+  ],
+  "assets/sounds/doors/garage_door_1_open": [
+    "assets/sounds/doors/garage_door_1_open_1.mp3"
+  ],
   "assets/sounds/doors/heavy_door_1_close": [
     "assets/sounds/doors/heavy_door_1_close_1.mp3"
   ],
@@ -272,6 +278,9 @@
   ],
   "assets/sounds/doors/passage_outdoor_1_beacon": [
     "assets/sounds/doors/passage_outdoor_1_beacon_1.mp3"
+  ],
+  "assets/sounds/doors/roller_shutter_1_close": [
+    "assets/sounds/doors/roller_shutter_1_close_1.mp3"
   ],
   "assets/sounds/doors/scene_exit_1_beacon": [
     "assets/sounds/doors/scene_exit_1_beacon_1.mp3"

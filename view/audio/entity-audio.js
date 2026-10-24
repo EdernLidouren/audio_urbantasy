@@ -24,7 +24,7 @@ function jitteredIntervalMs(interval, variation) {
 export function createEntityAudio({ getSession, entities, effectiveMuffle, fullFaceMuffle, oneShots }) {
   const { entitySounds, otherEntitySounds } = entities;
 
-  // Beacon conditionnel (voir doc/entity-model.md/"Beacon conditionnel") :
+  // Beacon conditionnel (voir doc/entity-model.md/"Sons conditionnels") :
   // même contexte que les conditions d'action, relu à chaque appel contre
   // l'entité VIVANTE (ses variables courantes). Sans condition : autorisé.
   function beaconConditionAllows(condition, live) {

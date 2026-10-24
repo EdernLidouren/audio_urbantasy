@@ -17,6 +17,7 @@
   "door.default.description": "A door.",
   "door.default.master_key_refusal": "It's locked.",
   "door.default.name": "door",
+  "door.default.shop_hours_refusal": "The shop only opens its doors between 8am and 8pm.",
   "door.exit.description": "A wooden door left ajar, cool air drifting in from outside.",
   "door.exit.name": "exit door",
   "door.main_room_door.description": "A door leading to the main hall.",

@@ -40,9 +40,10 @@ jamais quatre mécanismes séparés :
    `"behavior"`).
 3. **Conditions d'action** — `entity.action.condition` décide si une action
    (applyEffects, pickup, loot...) s'exécute ou déclenche un refus.
-4. **Beacon conditionnel** — `sounds.beacon.condition` décide si le beacon d'une
-   entité sonne (ex. un vidéoprojecteur allumé/éteint par une variable) ; voir
-   `doc/entity-model.md`/"Beacon conditionnel".
+4. **Sons conditionnels** — `sounds.<rôle>.condition` décide si un son d'une
+   entité sonne : sa balise (ex. un vidéoprojecteur allumé/éteint par une
+   variable) ou ses sons de proximité (ex. une boutique fermée la nuit) ; voir
+   `doc/entity-model.md`/"Sons conditionnels (balise et proximité)".
 
 Un futur PNJ qui ne parle qu'à condition, ou un dialogue conditionnel, RÉUTILISERAIT
 cette même couche (nouveau CONSOMMATEUR du même évaluateur), jamais un système de

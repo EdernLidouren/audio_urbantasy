@@ -21,6 +21,14 @@
 // l'entité ouverte et aucun son en cours ; elle s'éteint en fondu
 // (proximityLoopFadeMs) dès qu'il en sort.
 //
+// SONS CONDITIONNELS : chaque rôle peut porter une `condition` du script,
+// comme la balise (voir doc/entity-model.md/"Sons conditionnels"), relue à
+// chaque tick. approachSound fausse : l'entité NE S'OUVRE PAS, elle reste
+// fermée (une boutique fermée ne s'ouvre pas à votre approche ; si vous êtes
+// devant quand la condition redevient vraie, elle s'ouvre à ce moment-là).
+// leaveSound fausse : elle se ferme en silence. proximityLoop fausse : la
+// boucle s'éteint en fondu.
+//
 // Temps compté en TICKS de la scène (voir lib/loop.js/TICK_MS), jamais à
 // l'horloge murale : un menu ouvert fige la scène, et le délai avec elle.
 // Une entité déjà dans la zone à la première mise à jour (le joueur arrive
@@ -40,7 +48,9 @@ import { beaconVolumeFactor } from "./volume-factors.js";
 // pas un réglage de ressenti.
 const MAX_PROXIMITY_SOUND_MS = 15000;
 
-export function createProximitySounds({ entities, oneShots, effectiveMuffle, reverbBusInput }) {
+// `conditionAllows(condition, live)` : l'évaluateur des sons conditionnels
+// (voir ./entity-audio.js/beaconConditionAllows), vrai sans condition.
+export function createProximitySounds({ entities, oneShots, effectiveMuffle, reverbBusInput, conditionAllows }) {
   // id d'entité -> { open, busy, busyMs, outsideMs, loop, loopOn, loopStopMs }.
   // outsideMs : temps passé hors de la zone depuis la dernière sortie (0
   // dans la zone) ; busyMs : depuis le début du son en cours (voir le
@@ -142,16 +152,17 @@ export function createProximitySounds({ entities, oneShots, effectiveMuffle, rev
         state.busyMs += TICK_MS;
         if (state.busyMs >= MAX_PROXIMITY_SOUND_MS) state.busy = false;
       }
+      const allows = (sound) => Boolean(sound) && conditionAllows(sound.condition, live);
       if (!state.busy) {
-        if (inside && !state.open) {
+        if (inside && !state.open && (!entry.approachSound || allows(entry.approachSound))) {
           state.open = true;
           if (entry.approachSound) play(entry, live, entry.approachSound, state, x);
         } else if (!inside && state.open && state.outsideMs >= entry.proximityHoldMs) {
           state.open = false;
-          if (entry.leaveSound) play(entry, live, entry.leaveSound, state, x);
+          if (allows(entry.leaveSound)) play(entry, live, entry.leaveSound, state, x);
         }
       }
-      updateLoop(entry, live, state, inside && state.open && !state.busy, x);
+      updateLoop(entry, live, state, inside && state.open && !state.busy && allows(entry.proximityLoop), x);
     }
   }
 

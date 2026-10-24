@@ -19,8 +19,22 @@
       "id": "door_exit",
       "type": "automatic_sliding_door",
       "x": 9,
-      "sounds": { "proximityLoop": { "path": "assets/sounds/doors/shop_door_bell_1_beacon" } },
-      "action": { "kind": "applyEffects", "effects": [{ "type": "teleport", "target": "demo2" }] }
+      "sounds": {
+        "beacon": { "path": "assets/sounds/doors/roller_shutter_1_close", "loop": true, "condition": { "type": "timeRange", "from": 20, "to": 8 } },
+        "approachSound": { "condition": { "type": "timeRange", "from": 8, "to": 20 } },
+        "leaveSound": { "condition": { "type": "timeRange", "from": 8, "to": 20 } },
+        "proximityLoop": { "path": "assets/sounds/doors/shop_door_bell_1_beacon", "condition": { "type": "timeRange", "from": 8, "to": 20 } }
+      },
+      "triggers": [
+        { "on": "hour", "hour": 8, "effects": [{ "type": "playSound", "path": "assets/sounds/doors/garage_door_1_open" }] },
+        { "on": "hour", "hour": 20, "effects": [{ "type": "playSound", "path": "assets/sounds/doors/garage_door_1_close" }] }
+      ],
+      "action": {
+        "kind": "applyEffects",
+        "condition": { "type": "timeRange", "from": 8, "to": 20 },
+        "refusalEffects": [{ "type": "announce", "key": "door.default.shop_hours_refusal" }],
+        "effects": [{ "type": "teleport", "target": "demo2" }]
+      }
     },
     { "id": "apple_1", "type": "apple", "x": 17 },
     { "id": "resistor_1", "type": "item", "x": 3, "action": { "kind": "pickup", "item": "resistor", "count": 1 } },

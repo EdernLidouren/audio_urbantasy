@@ -283,4 +283,42 @@ export default function checkEntities(run) {
   );
   run("registre des types : son d'archétype inconnu", true, registryThrows({ lamp: { sounds: { beacon: { pth: "assets/sounds/a" } } } }).includes(UNKNOWN_FIELD));
   run("registre des types : un archétype ne retire pas de rôle (null)", true, registryThrows({ lamp: { sounds: { beacon: null } } }) !== "accepté");
+
+  // --- Sons conditionnels : balise ET sons de proximité (voir
+  // core/entity-parse.js/applySoundConditions). La condition de l'instance
+  // REMPLACE celle de l'archétype, jamais fusionnée clé par clé. ---
+  const CONDITIONAL_REGISTRY = {
+    shop_door: {
+      nameKey: "entity.lamp.name",
+      sounds: { proximityLoop: { path: "assets/sounds/bell", condition: { type: "timeRange", from: 8, to: 20, spread: 30 } } },
+    },
+  };
+  const conditionalDoor = (sounds) =>
+    parseScene({ id: "conditional-sounds", titleKey: "scene.demo.name", length: 10, entities: [{ id: "door-1", type: "shop_door", x: 3, sounds }] }, CONDITIONAL_REGISTRY).entities[0];
+  run.same(
+    "sons conditionnels : condition d'archétype gardée sans surcharge",
+    { type: "timeRange", from: 8, to: 20, spread: 30 },
+    conditionalDoor(undefined).sounds.proximityLoop.condition
+  );
+  run.same(
+    "sons conditionnels : condition d'instance remplace celle de l'archétype en entier",
+    { type: "perceptionActive" },
+    conditionalDoor({ proximityLoop: { condition: { type: "perceptionActive" } } }).sounds.proximityLoop.condition
+  );
+  run(
+    "sons conditionnels : condition acceptée sur approachSound et leaveSound",
+    "accepté",
+    sceneParseMessage(
+      { id: "conditional-sounds", titleKey: "scene.demo.name", length: 10, entities: [{ id: "door-1", type: "shop_door", x: 3, sounds: { approachSound: { path: "a", condition: { type: "consumed" } }, leaveSound: { path: "b", condition: { type: "consumed" } } } }] },
+      CONDITIONAL_REGISTRY
+    )
+  );
+  run(
+    "sons conditionnels : condition invalide d'un son de proximité rejetée",
+    true,
+    sceneParseMessage(
+      { id: "conditional-sounds", titleKey: "scene.demo.name", length: 10, entities: [{ id: "door-1", type: "shop_door", x: 3, sounds: { approachSound: { condition: { type: "timeRange", from: 8, to: 8 } } } }] },
+      CONDITIONAL_REGISTRY
+    ).includes("approachSound.condition")
+  );
 }

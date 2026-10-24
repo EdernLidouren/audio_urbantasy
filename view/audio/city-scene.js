@@ -101,6 +101,7 @@ export function createCityAudioScene(getSession, { handover = null } = {}) {
     oneShots,
     effectiveMuffle: muffle.effectiveMuffle,
     reverbBusInput: reverbBus.input,
+    conditionAllows: entityAudio.beaconConditionAllows,
   });
   const footsteps = createPlayerFootsteps({
     getSession,

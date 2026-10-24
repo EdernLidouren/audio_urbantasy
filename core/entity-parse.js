@@ -24,9 +24,12 @@ const TUNING_KEYS = Object.keys(TUNING_DEFAULTS);
 const SOUND_ROLES = ["beacon", "vocal", "movement", "enterSound", "exitSound", "pickup", "approachSound", "leaveSound", "proximityLoop"];
 
 // Champs d'un descripteur de son, en plus des clés de réglage : `condition`
-// n'existe que pour la balise (voir applyBeaconCondition).
+// n'existe que pour les rôles qui la LISENT, la balise et les sons de
+// proximité (voir applySoundConditions) — ailleurs, elle serait ignorée en
+// silence.
 const SOUND_FIELDS = ["path", "loop", "tracked", ...TUNING_KEYS];
-const BEACON_FIELDS = [...SOUND_FIELDS, "condition"];
+const CONDITIONAL_SOUND_ROLES = ["beacon", "approachSound", "leaveSound", "proximityLoop"];
+const CONDITIONAL_SOUND_FIELDS = [...SOUND_FIELDS, "condition"];
 
 // `sounds` d'une instance ou d'un archétype : rôles connus, champs connus.
 // `allowNull` : une instance peut RETIRER un rôle de son archétype (null,
@@ -41,7 +44,7 @@ function validateSounds(sounds, describe, allowNull, failWith = fail) {
     if (typeof descriptor !== "object" || descriptor === null || Array.isArray(descriptor)) {
       failWith(`${describe}.${role} doit être un objet${allowNull ? " (ou null)" : ""}.`);
     }
-    rejectUnknownFields(descriptor, role === "beacon" ? BEACON_FIELDS : SOUND_FIELDS, `${describe}.${role}`, failWith);
+    rejectUnknownFields(descriptor, CONDITIONAL_SOUND_ROLES.includes(role) ? CONDITIONAL_SOUND_FIELDS : SOUND_FIELDS, `${describe}.${role}`, failWith);
   }
 }
 
@@ -170,17 +173,20 @@ function checkActionRequirements(entity, at) {
   }
 }
 
-// Condition du beacon (voir doc/entity-model.md/"Beacon conditionnel") :
-// celle de l'instance REMPLACE celle de l'archétype (une condition est un
-// tout, jamais fusionnée clé par clé comme le reste de `sounds`), puis elle
-// est validée comme toute condition. Modifie `resolvedSounds` en place.
-function applyBeaconCondition(resolvedSounds, instanceSounds, at, entityVariables, sceneVariables) {
-  const instanceBeaconCondition = instanceSounds && instanceSounds.beacon ? instanceSounds.beacon.condition : undefined;
-  if (resolvedSounds.beacon && instanceBeaconCondition) {
-    resolvedSounds.beacon = { ...resolvedSounds.beacon, condition: instanceBeaconCondition };
-  }
-  if (resolvedSounds.beacon && resolvedSounds.beacon.condition !== undefined) {
-    validateCondition(resolvedSounds.beacon.condition, `${at} : sounds.beacon.condition`, entityVariables, sceneVariables);
+// Conditions des rôles de son conditionnels (balise, sons de proximité, voir
+// doc/entity-model.md/"Sons conditionnels") : celle de l'instance REMPLACE
+// celle de l'archétype (une condition est un tout, jamais fusionnée clé par
+// clé comme le reste de `sounds`), puis elle est validée comme toute
+// condition. Modifie `resolvedSounds` en place.
+function applySoundConditions(resolvedSounds, instanceSounds, at, entityVariables, sceneVariables) {
+  for (const role of CONDITIONAL_SOUND_ROLES) {
+    const instanceCondition = instanceSounds && instanceSounds[role] ? instanceSounds[role].condition : undefined;
+    if (resolvedSounds[role] && instanceCondition) {
+      resolvedSounds[role] = { ...resolvedSounds[role], condition: instanceCondition };
+    }
+    if (resolvedSounds[role] && resolvedSounds[role].condition !== undefined) {
+      validateCondition(resolvedSounds[role].condition, `${at} : sounds.${role}.condition`, entityVariables, sceneVariables);
+    }
   }
 }
 
@@ -346,7 +352,7 @@ export function parseEntity(rawEntity, index, registry, length, seenIds, sceneVa
     entity.action = parseEntityAction(resolvedAction, at, entity.variables, sceneVariables, { registry, length });
   }
 
-  applyBeaconCondition(resolvedSounds, sounds, at, entity.variables, sceneVariables);
+  applySoundConditions(resolvedSounds, sounds, at, entity.variables, sceneVariables);
 
   // Réglages d'INSTANCE pour la cascade (config/tuning.js) : transportés tels
   // quels, jamais interprétés — tout nouveau réglage devient surchargeable

@@ -1198,7 +1198,7 @@ un beacon seul, un vocal seul, les deux, ou ni l'un ni l'autre :
 - `npc.js` (le "passant") a les DEUX : un beacon "tic tic" pour le suivre,
   un vocal (sifflement) pour l'ambiance.
 
-### Beacon conditionnel
+### Sons conditionnels (balise et proximité)
 
 `sounds.beacon.condition` (optionnel) : une condition du script (même forme
 et même évaluateur que `action.condition`, voir `doc/scripting.md`/
@@ -1245,8 +1245,29 @@ Règles :
   entité dormante.
 - **Partout où un beacon peut sonner** : reprise après un menu, balises
   temporaires du croisement recto/verso — une balise éteinte reste éteinte.
-- **Beacon seulement** : le `vocal` n'a pas de condition aujourd'hui (aucun
-  cas concret), ce serait la même mécanique le jour où il en faut une.
+- **Balise et sons de proximité seulement** : le `vocal` n'a pas de condition
+  aujourd'hui (aucun cas concret), ce serait la même mécanique le jour où il
+  en faut une. Une `condition` sur un autre rôle est refusée au chargement.
+
+**Sons de proximité conditionnels** (`approachSound`, `leaveSound`,
+`proximityLoop`, voir "Sons de proximité") : mêmes règles, avec un effet
+propre à chaque rôle. `approachSound` fausse : l'entité NE S'OUVRE PAS, elle
+reste fermée — si le joueur est devant quand la condition redevient vraie,
+elle s'ouvre à ce moment-là. `leaveSound` fausse : elle se ferme en silence.
+`proximityLoop` fausse : la boucle s'éteint en fondu.
+
+**Exemple réel — la porte de boutique de demo** (`door_exit`, dans
+`scenes/demo.json`, une `automatic_sliding_door`) : ouverte de 8h à 20h
+(porte coulissante, clochette), rideau baissé de 20h à 8h. Tout se déclare sur
+l'INSTANCE, avec les mêmes horaires à chaque endroit :
+- `sounds.approachSound`, `leaveSound` et `proximityLoop` (la clochette) :
+  condition `timeRange` 8 -> 20 ;
+- `sounds.beacon` (le rideau baissé, `roller_shutter_1_close`) : condition
+  `timeRange` 20 -> 8 ;
+- `triggers` : le rideau qui se lève à 8h et s'abaisse à 20h (`playSound`,
+  positionné sur la porte, voir `doc/scripting.md`/"Triggers") ;
+- `action` : même condition 8 -> 20, et un refus qui annonce l'horaire
+  (`door.default.shop_hours_refusal`).
 
 ## Paramètres sonores
 
