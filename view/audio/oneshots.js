@@ -45,7 +45,11 @@ export function createOneShots({ getSession, reverbBus, findEntitySource, effect
   //     être modulé après coup : pendant une rampe de perception, c'est la
   //     suite des déclenchements qui porte le fondu) ;
   //   - entityLayer false : hors de la couche entités, jamais éteint par le
-  //     fondu du sas (son de départ, voir playEntityOneShot).
+  //     fondu du sas (son de départ, voir playEntityOneShot) ;
+  //   - onEnd : appelé quand CETTE lecture se termine (fin ou arrêt), pour
+  //     enchaîner un son sur un autre sans jamais le couper (voir
+  //     ./proximity-sounds.js). Appelé aussitôt si la lecture n'a pas pu
+  //     démarrer : l'appelant n'attend jamais une fin qui ne viendra pas.
   // Chaque lecture a sa propre chaîne (voir lib/audio/oneshots.js) : une
   // version étouffée et une version nette du même fichier ne se gênent
   // jamais.
@@ -64,12 +68,24 @@ export function createOneShots({ getSession, reverbBus, findEntitySource, effect
       muffle = NO_MUFFLE,
       highlighted = false,
       entityLayer = true,
+      onEnd,
     }
   ) {
+    // Son introuvable (manifeste incomplet, voir tools/content-audit.js) :
+    // averti et sauté, jamais une exception qui casserait le tick de la
+    // scène — même politique que startTrackedOneShot plus bas.
+    let file;
+    try {
+      file = resolveAsset(path);
+    } catch (error) {
+      console.warn(`oneshots: son ponctuel indisponible ("${path}") : ${error.message}`);
+      if (onEnd) onEnd();
+      return;
+    }
     const dist = Math.abs(relX);
     const pan = clamp(relX / panSaturation, -1, 1);
     const volume = applyMuffleToVolume(volumeForDistance(dist, audibleRange, highlighted) * volumeFactor * gain * heightGain, muffle);
-    playOneShot(resolveAsset(path), {
+    const options = {
       reverbSend,
       reverbBusInput: reverbBus.input,
       volume,
@@ -78,15 +94,25 @@ export function createOneShots({ getSession, reverbBus, findEntitySource, effect
       highpassHz,
       lowpassHz: muffle.amount > 0 ? muffle.lowpassHz : undefined,
       entityLayer,
-    });
+    };
+    if (!onEnd) {
+      playOneShot(file, options);
+      return;
+    }
+    // Poignée de lecture pour connaître sa fin ; jamais re-spatialisée :
+    // le son reste ANCRÉ comme un autre.
+    const handle = playTrackedOneShot(file, options);
+    if (handle) handle.onEnd(onEnd);
+    else onEnd();
   }
 
   // Son de TRANSITION (enterSound/exitSound, playSound ancré) d'une entrée :
   // volume dans la catégorie "balises" (il accompagne la présence de
   // l'entité). Jamais concerné par la pause des balises.
-  function playTransitionSound(entry, relX, transitionSound, muffle = NO_MUFFLE, { entityLayer = true } = {}) {
+  function playTransitionSound(entry, relX, transitionSound, muffle = NO_MUFFLE, { entityLayer = true, onEnd } = {}) {
     playPositionedOneShot(transitionSound.path, {
       entityLayer,
+      onEnd,
       relX,
       audibleRange: entry.audibleRange,
       panSaturation: entry.panSaturation,

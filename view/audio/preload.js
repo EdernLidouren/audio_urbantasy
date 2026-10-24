@@ -53,16 +53,18 @@ function warmUpFootsteps(session, world, entitySounds) {
 // TOUS les membres des pools que la scène pourrait tirer : sources
 // intermittentes, pas possibles de chaque entité et du joueur (tous ses
 // gaits : on peut changer de chaussures en pleine visite), sons de collision
-// et de transition, sols de la scène (sol par défaut compris).
+// et de transition, sons de proximité, sols de la scène (sol par défaut compris).
 function preloadSceneSounds(world, entitySounds, collisionSoundFor) {
   const preloadKeys = new Set();
-  for (const { intermittentSources, movementPath, gait, naturalWalk, entity, enterSound, exitSound } of entitySounds) {
+  for (const { intermittentSources, movementPath, gait, naturalWalk, entity, enterSound, exitSound, approachSound, leaveSound } of entitySounds) {
     for (const src of intermittentSources) preloadKeys.add(src.path);
     for (const key of footstepCandidateKeys({ gait, naturalWalk, ownPath: movementPath })) preloadKeys.add(key);
     const collisionSound = collisionSoundFor(entity.id);
     if (collisionSound) preloadKeys.add(collisionSound);
     if (enterSound) preloadKeys.add(enterSound.path);
     if (exitSound) preloadKeys.add(exitSound.path);
+    if (approachSound) preloadKeys.add(approachSound.path);
+    if (leaveSound) preloadKeys.add(leaveSound.path);
   }
   for (const gait of PLAYER_GAIT_POOL) {
     for (const key of footstepCandidateKeys({ gait, naturalWalk: player.naturalWalk, ownPath: MOVEMENT_SOUND.path })) {

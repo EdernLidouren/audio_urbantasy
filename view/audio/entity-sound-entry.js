@@ -10,6 +10,8 @@
 //   - vocal (EXPRESSION) : toujours intermittent, à intervalle long et
 //     variable, pour peupler l'ambiance ;
 //   - enterSound/exitSound : ponctuels, à une bascule de présence ;
+//   - approachSound/leaveSound : ponctuels, quand le joueur entre dans la
+//     zone d'interaction ou en sort (voir ./proximity-sounds.js) ;
 //   - movement : les pas d'une entité mobile.
 // Tous optionnels et indépendants.
 //
@@ -42,6 +44,8 @@ const BEACON_TUNING_KEYS = { interval: "beaconInterval", intervalVariation: "bea
 const VOCAL_TUNING_KEYS = { interval: "vocalInterval", intervalVariation: "vocalIntervalVariation", gain: "vocalGain" };
 const ENTER_SOUND_TUNING_KEYS = { gain: "enterSoundGain" };
 const EXIT_SOUND_TUNING_KEYS = { gain: "exitSoundGain" };
+const APPROACH_SOUND_TUNING_KEYS = { gain: "approachSoundGain" };
+const LEAVE_SOUND_TUNING_KEYS = { gain: "leaveSoundGain" };
 
 // Effet "playSound" diégétique (voir ./oneshots.js/playEntityOneShot) :
 // résolu comme un enterSound/exitSound, avec la clé de gain littérale "gain"
@@ -150,6 +154,10 @@ export function buildEntitySoundEntry(entity, session, { otherFace = false, disa
   const exitSound = heardHere(vocalCrossFaceGain)
     ? withFaceGain(resolveTransitionSound(entity, sounds.exitSound, EXIT_SOUND_TUNING_KEYS))
     : null;
+  // Sons de PROXIMITÉ (voir ./proximity-sounds.js) : ils répondent au
+  // joueur, qui n'est jamais sur l'autre face — jamais construits pour elle.
+  const approachSound = otherFace ? null : resolveTransitionSound(entity, sounds.approachSound, APPROACH_SOUND_TUNING_KEYS);
+  const leaveSound = otherFace ? null : resolveTransitionSound(entity, sounds.leaveSound, LEAVE_SOUND_TUNING_KEYS);
 
   // Propriétés de l'ENTITÉ, partagées par tous ses rôles.
   const audibleRange = resolveTuning("audibleRange", entity);
@@ -258,6 +266,9 @@ export function buildEntitySoundEntry(entity, session, { otherFace = false, disa
     intermittentSources,
     enterSound,
     exitSound,
+    approachSound,
+    leaveSound,
+    proximityHoldMs: resolveTuning("proximityHoldMs", entity),
     muteOnConsumed,
     // Condition de la balise CONTINUE, réévaluée à chaque tick contre
     // l'entité vivante. beaconSilenced : balise arrêtée parce que la

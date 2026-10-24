@@ -215,6 +215,12 @@
   "assets/sounds/decor/weight_machine_1_beacon": [
     "assets/sounds/decor/weight_machine_1_beacon_1.mp3"
   ],
+  "assets/sounds/doors/automatic_sliding_door_1_close": [
+    "assets/sounds/doors/automatic_sliding_door_1_close_1.mp3"
+  ],
+  "assets/sounds/doors/automatic_sliding_door_1_open": [
+    "assets/sounds/doors/automatic_sliding_door_1_open_1.mp3"
+  ],
   "assets/sounds/doors/closet_door_1_close": [
     "assets/sounds/doors/closet_door_1_close_1.mp3"
   ],

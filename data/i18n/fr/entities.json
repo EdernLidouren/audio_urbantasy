@@ -3,6 +3,8 @@
   "door.alley.name": "porte de la ruelle",
   "door.alley_back.description": "Cette même porte de service, vue de la ruelle : elle mène à l'arrière-boutique.",
   "door.alley_back.name": "porte de service",
+  "door.automatic_sliding.description": "Une porte vitrée qui coulisse d'elle-même à votre approche.",
+  "door.automatic_sliding.name": "porte automatique",
   "door.back.description": "La même porte, vue de l'intérieur : elle mène dehors.",
   "door.back.name": "porte de retour",
   "door.clock_tower_backdoor.description": "Une vieille porte de service dont les parties métalliques présentent une couche de rouille ancienne.",

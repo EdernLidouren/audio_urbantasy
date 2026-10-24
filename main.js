@@ -259,7 +259,10 @@ loadSceneById(newGame.startSceneId, registry)
 // relit jamais le disque. Échec (réseau, JSON invalide, fichier absent) :
 // signalé clairement, jamais silencieux — mais ne bloque pas le reste du
 // jeu, exactement comme le chargement de la scène ci-dessus.
-fetch("assets/manifest.json")
+// "no-cache" : revalidé à chaque démarrage, comme les scènes (voir
+// scenes/load.js) — un manifeste régénéré après l'ajout de sons ne doit pas
+// être servi dans une version gardée en cache.
+fetch("assets/manifest.json", { cache: "no-cache" })
   .then((response) => {
     if (!response.ok) {
       throw new Error(`réponse HTTP ${response.status}`);

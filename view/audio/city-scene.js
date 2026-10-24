@@ -5,6 +5,7 @@
 //   - ./entity-sound-entry.js : construction d'une entrée sonore d'entité ;
 //   - ./entity-audio.js    : balises, vocaux, pas des entités ;
 //   - ./oneshots.js        : sons ponctuels ancrés ou suivis ;
+//   - ./proximity-sounds.js : sons d'approche et d'éloignement du joueur ;
 //   - ./footsteps.js       : pas et collisions du joueur ;
 //   - ./layers.js          : musique, ambiances, météo, perception ;
 //   - ./muffle.js          : étouffement (autre face, perception) ;
@@ -30,6 +31,7 @@ import { getActiveWorld, getInactiveFace } from "../../core/state.js";
 import { createEntitySounds } from "./entity-sounds.js";
 import { createEntityAudio } from "./entity-audio.js";
 import { createOneShots, stopForeignTrackedOneShots } from "./oneshots.js";
+import { createProximitySounds } from "./proximity-sounds.js";
 import { createPlayerFootsteps } from "./footsteps.js";
 import { createSceneLayers } from "./layers.js";
 import { createMuffle } from "./muffle.js";
@@ -94,6 +96,7 @@ export function createCityAudioScene(getSession, { handover = null } = {}) {
     fullFaceMuffle: muffle.fullFaceMuffle,
     oneShots,
   });
+  const proximitySounds = createProximitySounds({ entities, oneShots, effectiveMuffle: muffle.effectiveMuffle });
   const footsteps = createPlayerFootsteps({
     getSession,
     reverbBusInput: reverbBus.input,
@@ -129,6 +132,7 @@ export function createCityAudioScene(getSession, { handover = null } = {}) {
     const liveById = entities.liveEntitiesById();
     entityAudio.updateIntermittentSources(entities.entitySounds, x, liveById);
     entityAudio.updateEntityMovementSounds(entities.entitySounds, x, world, liveById);
+    proximitySounds.update(x, liveById);
 
     footsteps.update(world, x, blockedBy);
 
@@ -157,6 +161,7 @@ export function createCityAudioScene(getSession, { handover = null } = {}) {
       if (sound) beacons.set(entity.id, sound);
     }
     faceCrossfade.temporaries.clear();
+    proximitySounds.destroy();
     if (!handover) {
       for (const sound of beacons.values()) sound.stop();
     }

@@ -15,14 +15,11 @@
     { "id": "counter_1", "type": "shop_counter", "x": 38,
       "shop": { "catalog": { "items": {"apple": {"stock": 5}, "coin": {"stock": 20}, "sneakers": {"stock": 1}, "leather_boots": {"stock": 1}, "ceramic_capacitor": {"stock": 3}} } } },
     { "id": "miravi_test", "type": "miravi", "x": 5, "isFlying": true, "behavior": { "kind": "wander" } },
-    { "id": "object_toolbox", "type": "object", "x": 8, "nameKey": "object.toolbox.name", "descriptionKey": "object.toolbox.description" },
     {
       "id": "door_exit",
-      "type": "door",
+      "type": "automatic_sliding_door",
       "x": 9,
-      "nameKey": "door.exit.name",
-      "descriptionKey": "door.exit.description",
-      "action": { "kind": "applyEffects", "effects": [{ "type": "playSound", "path": "assets/sounds/doors/door_1_open" }, { "type": "teleport", "target": "demo2" }] }
+      "action": { "kind": "applyEffects", "effects": [{ "type": "teleport", "target": "demo2" }] }
     },
     { "id": "apple_1", "type": "apple", "x": 17 },
     { "id": "resistor_1", "type": "item", "x": 3, "action": { "kind": "pickup", "item": "resistor", "count": 1 } },

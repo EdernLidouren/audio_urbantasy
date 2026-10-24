@@ -50,6 +50,7 @@
 // (voir dog.js) : le comportement se déclare toujours à l'instance.
 
 import apple from "./apple.js";
+import automaticSlidingDoor from "./automatic_sliding_door.js";
 import bird1 from "./bird_1.js";
 import bird2 from "./bird_2.js";
 import bird3 from "./bird_3.js";
@@ -106,6 +107,7 @@ import weightShaft from "./weight_shaft.js";
 
 export default {
   apple,
+  automatic_sliding_door: automaticSlidingDoor,
   bird_1: bird1,
   bird_2: bird2,
   bird_3: bird3,

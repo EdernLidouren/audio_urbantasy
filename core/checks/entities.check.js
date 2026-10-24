@@ -246,6 +246,11 @@ export default function checkEntities(run) {
     "accepté",
     entityMessage({ sounds: { beacon: { beaconInterval: 900, condition: { type: "consumed" } }, vocal: null }, tuning: { beaconGain: 1.2, transitionSound: "assets/sounds/b" } })
   );
+  run(
+    "sons de proximité : approachSound, leaveSound et proximityHoldMs acceptés",
+    "accepté",
+    entityMessage({ sounds: { beacon: null, approachSound: { path: "assets/sounds/o" }, leaveSound: { path: "assets/sounds/c", leaveSoundGain: 0.8 } }, tuning: { proximityHoldMs: 2000 } })
+  );
   run("champs inconnus : rôle de son inconnu (bacon)", true, entityMessage({ sounds: { bacon: { path: "assets/sounds/a" } } }).includes(UNKNOWN_FIELD));
   run("champs inconnus : champ de descripteur (beaconIntervall)", true, entityMessage({ sounds: { beacon: { beaconIntervall: 900 } } }).includes(UNKNOWN_FIELD));
   run(

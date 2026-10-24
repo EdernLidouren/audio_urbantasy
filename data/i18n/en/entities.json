@@ -3,6 +3,8 @@
   "door.alley.name": "alley door",
   "door.alley_back.description": "This same service door, seen from the alley: it leads to the back room.",
   "door.alley_back.name": "service door",
+  "door.automatic_sliding.description": "A glass door that slides open by itself as you approach.",
+  "door.automatic_sliding.name": "automatic door",
   "door.back.description": "The same door, seen from inside: it leads outside.",
   "door.back.name": "way back",
   "door.clock_tower_backdoor.description": "An old service door whose metal parts wear a layer of ancient rust.",

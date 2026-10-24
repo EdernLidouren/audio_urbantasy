@@ -1034,6 +1034,33 @@ reprise du beacon. Ni l'un ni l'autre n'est soumis à la pause sélective des
 balises (`sound.pause`/`resume`, réservée à la voix CONTINUE) : un one-shot
 Howler joue jusqu'au bout une fois lancé.
 
+### Sons de proximité
+
+`sounds.approachSound` / `sounds.leaveSound` (optionnels, indépendants) : rôles
+PONCTUELS et POSITIONNÉS par lesquels une entité RÉPOND au joueur —
+`approachSound` quand il entre dans sa zone d'interaction (`interactRange`,
+la même portée que l'annonce et Entrée), `leaveSound` quand il en sort.
+Purement sonore : rien dans le core ni dans la sauvegarde, et l'interaction
+reste libre quel que soit l'état de ces sons. Exemple réel : la porte
+automatique (`entities/types/automatic_sliding_door.js`, sans balise), qui
+s'ouvre à l'approche et se referme après votre passage.
+
+Enchaînement (`view/audio/proximity-sounds.js`), à la manière d'une vraie
+porte automatique :
+- le `leaveSound` attend la fin de l'`approachSound` ET un délai de maintien
+  après le départ du joueur (`proximityHoldMs`, cascade comme tout réglage) ;
+  revenir dans la zone pendant ce délai l'annule ;
+- revenir pendant le `leaveSound` rejoue l'`approachSound` à sa fin : un son
+  n'est jamais coupé ;
+- arriver dans une scène déjà dans la zone (on vient de franchir la porte)
+  compte comme « déjà ouverte », sans son ;
+- le délai se compte en temps de jeu : un menu ouvert le fige.
+
+Même cascade de gain que les autres rôles (`approachSoundGain`/
+`leaveSoundGain`, `reverbSend`, `pitchVariation` — voir "Paramètres
+sonores"), même catégorie de volume que la balise. Seule la face du joueur
+répond : une entité de l'autre face ne joue jamais ces sons.
+
 ### Son de ramassage
 
 `sounds.pickup` (optionnel) : rôle PONCTUEL joué quand l'entité est
@@ -1077,7 +1104,8 @@ Un descripteur de son est un objet plat :
 
 `sounds` regroupe ces descripteurs **par rôle** : uniquement les rôles que la
 vue lit (`core/entity-parse.js`/`SOUND_ROLES` — `beacon`, `vocal`,
-`movement`, `enterSound`, `exitSound`, `pickup`). Un autre nom serait ignoré
+`movement`, `enterSound`, `exitSound`, `pickup`, `approachSound`,
+`leaveSound`). Un autre nom serait ignoré
 en silence : il est REJETÉ au chargement, comme tout champ d'un descripteur
 qui n'est ni `path`, ni `loop`, ni `tracked`, ni une clé de réglage de
 `config/tuning-values.js` (`condition` en plus pour `beacon`). Ajouter un

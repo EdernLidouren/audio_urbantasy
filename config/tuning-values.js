@@ -289,6 +289,21 @@ export const TUNING_DEFAULTS = {
   enterSoundGain: 1,
   exitSoundGain: 1,
 
+  // Sons de PROXIMITÉ (voir view/audio/proximity-sounds.js,
+  // doc/entity-model.md/"Sons de proximité") : approachSound quand le joueur
+  // entre dans la zone d'interaction de l'entité, leaveSound quand il en
+  // sort — ex. une porte automatique qui s'ouvre puis se referme. Un facteur
+  // propre par rôle, même principe que enterSoundGain/exitSoundGain.
+  approachSoundGain: 1,
+  leaveSoundGain: 1,
+  // Délai (ms, temps de jeu) entre le départ du joueur et le leaveSound :
+  // une porte automatique reste ouverte un instant après votre passage. Le
+  // leaveSound attend en plus la fin de l'approachSound, jamais coupé. Plus
+  // haut = l'entité « attend » plus longtemps ; plus bas = elle réagit
+  // presque aussitôt. Revenir dans la zone pendant ce délai annule le
+  // leaveSound.
+  proximityHoldMs: 1500,
+
   // --- Hauteur suggérée (voir doc/entity-model.md, isFlying) : chaîne de
   // filtres appliquée aux sons d'une entité isFlying — SUGGÈRE l'altitude,
   // ne simule PAS un axe Y. Bac à sable de réglage : ces trois valeurs sont
