@@ -11,7 +11,8 @@
 //     variable, pour peupler l'ambiance ;
 //   - enterSound/exitSound : ponctuels, à une bascule de présence ;
 //   - approachSound/leaveSound : ponctuels, quand le joueur entre dans la
-//     zone d'interaction ou en sort (voir ./proximity-sounds.js) ;
+//     zone d'interaction ou en sort ; proximityLoop : boucle tant qu'il y
+//     reste (voir ./proximity-sounds.js) ;
 //   - movement : les pas d'une entité mobile.
 // Tous optionnels et indépendants.
 //
@@ -46,6 +47,7 @@ const ENTER_SOUND_TUNING_KEYS = { gain: "enterSoundGain" };
 const EXIT_SOUND_TUNING_KEYS = { gain: "exitSoundGain" };
 const APPROACH_SOUND_TUNING_KEYS = { gain: "approachSoundGain" };
 const LEAVE_SOUND_TUNING_KEYS = { gain: "leaveSoundGain" };
+const PROXIMITY_LOOP_TUNING_KEYS = { gain: "proximityLoopGain" };
 
 // Effet "playSound" diégétique (voir ./oneshots.js/playEntityOneShot) :
 // résolu comme un enterSound/exitSound, avec la clé de gain littérale "gain"
@@ -158,6 +160,7 @@ export function buildEntitySoundEntry(entity, session, { otherFace = false, disa
   // joueur, qui n'est jamais sur l'autre face — jamais construits pour elle.
   const approachSound = otherFace ? null : resolveTransitionSound(entity, sounds.approachSound, APPROACH_SOUND_TUNING_KEYS);
   const leaveSound = otherFace ? null : resolveTransitionSound(entity, sounds.leaveSound, LEAVE_SOUND_TUNING_KEYS);
+  const proximityLoop = otherFace ? null : resolveTransitionSound(entity, sounds.proximityLoop, PROXIMITY_LOOP_TUNING_KEYS);
 
   // Propriétés de l'ENTITÉ, partagées par tous ses rôles.
   const audibleRange = resolveTuning("audibleRange", entity);
@@ -268,7 +271,9 @@ export function buildEntitySoundEntry(entity, session, { otherFace = false, disa
     exitSound,
     approachSound,
     leaveSound,
+    proximityLoop,
     proximityHoldMs: resolveTuning("proximityHoldMs", entity),
+    proximityLoopFadeMs: resolveTuning("proximityLoopFadeMs", entity),
     muteOnConsumed,
     // Condition de la balise CONTINUE, réévaluée à chaque tick contre
     // l'entité vivante. beaconSilenced : balise arrêtée parce que la

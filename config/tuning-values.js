@@ -303,6 +303,14 @@ export const TUNING_DEFAULTS = {
   // presque aussitôt. Revenir dans la zone pendant ce délai annule le
   // leaveSound.
   proximityHoldMs: 1500,
+  // Boucle de proximité (rôle proximityLoop, ex. la clochette d'une porte de
+  // boutique) : jouée tant que le joueur se tient dans la zone, une fois
+  // l'approachSound terminé. Facteur propre du rôle, même principe que les
+  // autres gains, et durée (ms) du fondu qui l'éteint quand le joueur sort.
+  // Plus long = la boucle s'efface doucement ; plus court = elle s'arrête
+  // net.
+  proximityLoopGain: 1,
+  proximityLoopFadeMs: 300,
 
   // --- Hauteur suggérée (voir doc/entity-model.md, isFlying) : chaîne de
   // filtres appliquée aux sons d'une entité isFlying — SUGGÈRE l'altitude,

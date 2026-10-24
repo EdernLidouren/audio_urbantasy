@@ -96,7 +96,12 @@ export function createCityAudioScene(getSession, { handover = null } = {}) {
     fullFaceMuffle: muffle.fullFaceMuffle,
     oneShots,
   });
-  const proximitySounds = createProximitySounds({ entities, oneShots, effectiveMuffle: muffle.effectiveMuffle });
+  const proximitySounds = createProximitySounds({
+    entities,
+    oneShots,
+    effectiveMuffle: muffle.effectiveMuffle,
+    reverbBusInput: reverbBus.input,
+  });
   const footsteps = createPlayerFootsteps({
     getSession,
     reverbBusInput: reverbBus.input,
@@ -173,8 +178,16 @@ export function createCityAudioScene(getSession, { handover = null } = {}) {
   const api = {
     update,
     destroy,
-    pauseBeacons: entityAudio.pauseBeacons,
-    resumeBeacons: entityAudio.resumeBeacons,
+    // Les boucles de proximité se taisent avec les balises (même raison :
+    // un menu par-dessus le jeu).
+    pauseBeacons: () => {
+      entityAudio.pauseBeacons();
+      proximitySounds.pauseLoops();
+    },
+    resumeBeacons: () => {
+      entityAudio.resumeBeacons();
+      proximitySounds.resumeLoops();
+    },
     refreshBeaconVolumes: entityAudio.refreshBeaconVolumes,
     crossfadeFaceSwap: faceCrossfade.crossfadeFaceSwap,
     playEntityOneShot: oneShots.playEntityOneShot,

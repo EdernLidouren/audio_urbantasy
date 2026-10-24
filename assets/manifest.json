@@ -276,6 +276,9 @@
   "assets/sounds/doors/scene_exit_1_beacon": [
     "assets/sounds/doors/scene_exit_1_beacon_1.mp3"
   ],
+  "assets/sounds/doors/shop_door_bell_1_beacon": [
+    "assets/sounds/doors/shop_door_bell_1_beacon_1.mp3"
+  ],
   "assets/sounds/effects/big_rock_collision": [
     "assets/sounds/effects/big_rock_collision_1.mp3"
   ],

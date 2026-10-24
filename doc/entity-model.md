@@ -1036,10 +1036,12 @@ Howler joue jusqu'au bout une fois lancé.
 
 ### Sons de proximité
 
-`sounds.approachSound` / `sounds.leaveSound` (optionnels, indépendants) : rôles
-PONCTUELS et POSITIONNÉS par lesquels une entité RÉPOND au joueur —
-`approachSound` quand il entre dans sa zone d'interaction (`interactRange`,
-la même portée que l'annonce et Entrée), `leaveSound` quand il en sort.
+`sounds.approachSound` / `sounds.leaveSound` / `sounds.proximityLoop`
+(optionnels, indépendants) : rôles POSITIONNÉS par lesquels une entité RÉPOND
+au joueur — `approachSound` (ponctuel) quand il entre dans sa zone
+d'interaction (`interactRange`, la même portée que l'annonce et Entrée),
+`leaveSound` (ponctuel) quand il en sort, `proximityLoop` (boucle) tant
+qu'il s'y tient.
 Purement sonore : rien dans le core ni dans la sauvegarde, et l'interaction
 reste libre quel que soit l'état de ces sons. Exemple réel : la porte
 automatique (`entities/types/automatic_sliding_door.js`, sans balise), qui
@@ -1054,11 +1056,20 @@ porte automatique :
   n'est jamais coupé ;
 - arriver dans une scène déjà dans la zone (on vient de franchir la porte)
   compte comme « déjà ouverte », sans son ;
-- le délai se compte en temps de jeu : un menu ouvert le fige.
+- la boucle joue quand le joueur est dans la zone, l'entité ouverte et aucun
+  des deux sons en cours (donc APRÈS l'approachSound), avec le rendu d'une
+  balise continue ; elle s'éteint en fondu (`proximityLoopFadeMs`) dès qu'il
+  sort, et se tait avec les balises derrière un menu. Exemple réel : la
+  clochette de boutique de `door_exit` dans `scenes/demo.json`, déclarée sur
+  l'INSTANCE (une porte automatique n'a pas toujours de clochette) ;
+- le délai se compte en temps de jeu : un menu ouvert le fige ;
+- filet : un son dont la fin ne serait jamais signalée (contexte audio
+  suspendu) libère l'entité au bout de 15 s de jeu, au lieu de la laisser
+  « en cours » pour toujours.
 
 Même cascade de gain que les autres rôles (`approachSoundGain`/
-`leaveSoundGain`, `reverbSend`, `pitchVariation` — voir "Paramètres
-sonores"), même catégorie de volume que la balise. Seule la face du joueur
+`leaveSoundGain`/`proximityLoopGain`, `reverbSend`, `pitchVariation` — voir
+"Paramètres sonores"), même catégorie de volume que la balise. Seule la face du joueur
 répond : une entité de l'autre face ne joue jamais ces sons.
 
 ### Son de ramassage
@@ -1105,7 +1116,7 @@ Un descripteur de son est un objet plat :
 `sounds` regroupe ces descripteurs **par rôle** : uniquement les rôles que la
 vue lit (`core/entity-parse.js`/`SOUND_ROLES` — `beacon`, `vocal`,
 `movement`, `enterSound`, `exitSound`, `pickup`, `approachSound`,
-`leaveSound`). Un autre nom serait ignoré
+`leaveSound`, `proximityLoop`). Un autre nom serait ignoré
 en silence : il est REJETÉ au chargement, comme tout champ d'un descripteur
 qui n'est ni `path`, ni `loop`, ni `tracked`, ni une clé de réglage de
 `config/tuning-values.js` (`condition` en plus pour `beacon`). Ajouter un

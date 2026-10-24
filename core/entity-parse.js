@@ -21,7 +21,7 @@ const TUNING_KEYS = Object.keys(TUNING_DEFAULTS);
 // Rôles de son lus par la vue (voir doc/entity-model.md/"Vocabulaire de
 // sons") : un autre nom serait ignoré en silence, il est refusé. Ajouter un
 // rôle, c'est l'ajouter ici ET le faire lire par la vue.
-const SOUND_ROLES = ["beacon", "vocal", "movement", "enterSound", "exitSound", "pickup", "approachSound", "leaveSound"];
+const SOUND_ROLES = ["beacon", "vocal", "movement", "enterSound", "exitSound", "pickup", "approachSound", "leaveSound", "proximityLoop"];
 
 // Champs d'un descripteur de son, en plus des clés de réglage : `condition`
 // n'existe que pour la balise (voir applyBeaconCondition).

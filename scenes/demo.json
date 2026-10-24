@@ -19,6 +19,7 @@
       "id": "door_exit",
       "type": "automatic_sliding_door",
       "x": 9,
+      "sounds": { "proximityLoop": { "path": "assets/sounds/doors/shop_door_bell_1_beacon" } },
       "action": { "kind": "applyEffects", "effects": [{ "type": "teleport", "target": "demo2" }] }
     },
     { "id": "apple_1", "type": "apple", "x": 17 },
