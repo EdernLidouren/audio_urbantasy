@@ -47,8 +47,16 @@ son absence.
 
 ## Vérifier le contenu
 
-Après une session de contenu (scènes, types d'entité, objets, textes, sons),
-lancer au terminal :
+Après une session de travail, code ou contenu, une seule commande enchaîne
+tout — syntaxe de tous les .js, vérifications du core, audit du contenu,
+parité i18n — et résume chaque étape en une ligne :
+
+```
+node tools/verify.js
+```
+
+(ou double-cliquer `verify.bat` à la racine du projet). L'audit du contenu
+seul :
 
 ```
 node tools/run-content-audit.js
