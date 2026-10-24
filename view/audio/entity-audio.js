@@ -29,6 +29,13 @@ function stepBeaconEnvelope(current, target, elapsedMs, fadeMs) {
   return target > current ? Math.min(target, current + step) : Math.max(target, current - step);
 }
 
+// Vitesse de lecture d'une balise selon son enveloppe : de `fadeRate`
+// (enveloppe à 0) à 1 (enveloppe à 1), linéaire — la montée en régime
+// d'une machine suit son volume. fadeRate 1 : toujours 1.
+function beaconRateFactor(envelope, fadeRate) {
+  return fadeRate + (1 - fadeRate) * envelope;
+}
+
 // Prochain délai (ms) d'une source intermittente, jamais négatif.
 function jitteredIntervalMs(interval, variation) {
   return Math.max(0, interval + (Math.random() * 2 - 1) * variation);
@@ -145,6 +152,9 @@ export function createEntityAudio({ getSession, entities, effectiveMuffle, fullF
     // puis s'arrête une fois à zéro ; redevenue vraie : reprise, et remontée
     // en fondu. Une balise coupée pour consommation ne revient jamais.
     entry.beaconEnvelope = stepBeaconEnvelope(entry.beaconEnvelope, allowed ? 1 : 0, elapsedMs, entry.beaconFadeMs);
+    // Vitesse posée AVANT une éventuelle reprise : la voix repart à la
+    // vitesse du bas de la rampe, jamais un instant à plein régime.
+    sound.setRateFactor(beaconRateFactor(entry.beaconEnvelope, entry.beaconFadeRate));
     if (entry.beaconEnvelope === 0) {
       if (!entry.beaconSilenced) {
         sound.stop();

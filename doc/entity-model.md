@@ -1268,7 +1268,8 @@ type -> instance), avec la valeur de départ voulue :
 ```js
 sounds: {
   beacon: { path: "assets/sounds/furniture/video_projector_1_beacon", loop: true,
-            condition: { type: "variable", scope: "entity", name: "isOn", equals: true } },
+            condition: { type: "variable", scope: "entity", name: "isOn", equals: true },
+            beaconFadeMs: 2500, beaconFadeRate: 0.3 },
 },
 ```
 
@@ -1286,9 +1287,7 @@ Règles :
 - **Évaluée à chaque tick** par la vue (`view/audio/entity-audio.js`/
   `beaconConditionAllows`) contre l'entité VIVANTE : le changement s'entend
   dès le tick qui suit l'action. Par défaut, coupure et reprise sont
-  franches (`stop()`/`resume()`, même geste qu'une bascule de présence) :
-  pour le vidéoprojecteur, le son de l'interrupteur joué par l'action couvre
-  la transition.
+  franches (`stop()`/`resume()`, même geste qu'une bascule de présence).
 - **Fondu optionnel** (`beaconFadeMs`, réglage en cascade, défaut 0) : quand
   rien ne couvre la bascule, la balise s'éteint en fondu puis s'arrête, et
   repart de zéro en fondu. Le fondu avance avec les ticks (figé derrière un
@@ -1297,6 +1296,14 @@ Règles :
   une bascule de face s'imposent sans fondu. Rendu pur : rien n'entre dans
   l'état ni la sauvegarde. Exemple réel : la bouche d'égout, 3000 ms, la
   durée du fondu de l'ambiance météo.
+- **Montée en régime** (`beaconFadeRate`, réglage en cascade, défaut 1) : la
+  vitesse de lecture de la balise quand son fondu est à zéro. Pendant le
+  fondu, elle va de cette valeur à 1 avec le volume ; hauteur et tempo
+  bougent ensemble, comme une bande qu'on freine (Howler ne les sépare
+  pas). Une machine qu'on allume part grave et lente puis rejoint son
+  régime ; éteinte, elle ralentit en s'effaçant. Linéaire, comme le volume.
+  Exemple réel : le vidéoprojecteur, 2500 ms et 0.3, le son de
+  l'interrupteur marquant le début de la rampe.
 - **Continu ou intermittent** : un beacon intermittent dont la condition est
   fausse ne déclenche plus rien, sa cadence est gelée comme celle d'une
   entité dormante.
@@ -1406,6 +1413,11 @@ code. Consulter directement ce fichier pour la valeur courante d'un défaut.
   par défaut à tout démarrage groupé.
 - **`beaconFadeMs`** — durée (ms) du fondu d'une balise CONTINUE dont la
   condition bascule, défaut 0 (coupure franche). Voir "Sons conditionnels".
+  Nombre >= 0, vérifié au chargement.
+- **`beaconFadeRate`** — vitesse de lecture de cette balise au bas de son
+  fondu, défaut 1 (le fondu ne touche que le volume). Nombre > 0, vérifié
+  au chargement ; sous 0.2 environ, le son devient granuleux. Voir "Sons
+  conditionnels".
 - **`vocalInterval`** / **`vocalIntervalVariation`** — mêmes rôles que
   `beaconInterval`/`beaconIntervalVariation`, mais pour le VOCAL (toujours
   intermittent — ces deux réglages s'appliquent donc TOUJOURS, contrairement

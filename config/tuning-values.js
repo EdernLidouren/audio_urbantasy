@@ -252,6 +252,13 @@ export const TUNING_DEFAULTS = {
   // l'interrupteur du vidéoprojecteur). Sans effet sur une balise
   // intermittente (chaque lecture est un one-shot complet).
   beaconFadeMs: 0,
+  // Vitesse de lecture (hauteur ET tempo, liés comme sur une bande) de la
+  // balise quand son fondu est à zéro : pendant le fondu, elle va de cette
+  // valeur à 1 en même temps que le volume — une machine qui monte en
+  // régime ou ralentit jusqu'à l'arrêt. 1 (défaut) = aucune variation, le
+  // fondu ne touche que le volume. Sans effet si beaconFadeMs vaut 0.
+  // Strictement positif ; sous 0.2 environ, le son devient granuleux.
+  beaconFadeRate: 1,
   // Variation de hauteur (fraction du taux de lecture, 0-1) appliquée
   // aléatoirement à chaque lecture d'un son PONCTUEL (balise intermittente
   // ou son de déplacement) : le taux de lecture est tiré uniformément dans

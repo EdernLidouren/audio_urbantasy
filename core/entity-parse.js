@@ -31,6 +31,21 @@ const SOUND_FIELDS = ["path", "loop", "tracked", ...TUNING_KEYS];
 const CONDITIONAL_SOUND_ROLES = ["beacon", "approachSound", "leaveSound", "proximityLoop"];
 const CONDITIONAL_SOUND_FIELDS = [...SOUND_FIELDS, "condition"];
 
+// Réglages de fondu d'une balise (voir config/tuning-values.js) : une valeur
+// hors bornes ne casserait rien au chargement mais rendrait un son absurde
+// (durée négative, vitesse nulle), refusée ici. Vérifiés partout où une clé
+// de réglage peut se poser : descripteur de son, `tuning` d'instance,
+// premier niveau d'archétype.
+function validateFadeTuning(holder, describe, failWith = fail) {
+  const { beaconFadeMs, beaconFadeRate } = holder;
+  if (beaconFadeMs !== undefined && !(Number.isFinite(beaconFadeMs) && beaconFadeMs >= 0)) {
+    failWith(`${describe}.beaconFadeMs doit être un nombre de ms >= 0 (reçu : ${JSON.stringify(beaconFadeMs)}).`);
+  }
+  if (beaconFadeRate !== undefined && !(Number.isFinite(beaconFadeRate) && beaconFadeRate > 0)) {
+    failWith(`${describe}.beaconFadeRate doit être un nombre > 0 (reçu : ${JSON.stringify(beaconFadeRate)}).`);
+  }
+}
+
 // `sounds` d'une instance ou d'un archétype : rôles connus, champs connus.
 // `allowNull` : une instance peut RETIRER un rôle de son archétype (null,
 // voir deepMergeOverride) ; un archétype, lui, n'a rien à retirer.
@@ -45,6 +60,7 @@ function validateSounds(sounds, describe, allowNull, failWith = fail) {
       failWith(`${describe}.${role} doit être un objet${allowNull ? " (ou null)" : ""}.`);
     }
     rejectUnknownFields(descriptor, CONDITIONAL_SOUND_ROLES.includes(role) ? CONDITIONAL_SOUND_FIELDS : SOUND_FIELDS, `${describe}.${role}`, failWith);
+    validateFadeTuning(descriptor, `${describe}.${role}`, failWith);
   }
 }
 
@@ -377,6 +393,7 @@ export function parseEntity(rawEntity, index, registry, length, seenIds, sceneVa
       fail(`${at} : tuning doit être un objet si présent.`);
     }
     rejectUnknownFields(tuning, TUNING_KEYS, `${at} : tuning`);
+    validateFadeTuning(tuning, `${at} : tuning`);
     entity.tuning = tuning;
   }
 
@@ -464,6 +481,7 @@ export function validateEntityRegistry(registry) {
       failRegistry(`${describe} n'est pas un objet.`);
     }
     rejectUnknownFields(archetype, [...ARCHETYPE_FIELDS, ...TUNING_KEYS], describe, failRegistry);
+    validateFadeTuning(archetype, describe, failRegistry);
     if (archetype.sounds !== undefined) validateSounds(archetype.sounds, `${describe} : sounds`, false, failRegistry);
   }
 }

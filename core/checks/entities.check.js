@@ -263,6 +263,17 @@ export default function checkEntities(run) {
     'parseScene: entities[0] ("lamp-1") : tuning : champ(s) inconnu(s) "audibleRang".',
     entityMessage({ tuning: { audibleRang: 30 } })
   );
+  // Réglages de fondu (core/entity-parse.js/validateFadeTuning) : bornes
+  // vérifiées dans un descripteur, un `tuning` d'instance et un archétype.
+  run(
+    "fondu de balise : durée et vitesse valides acceptées",
+    "accepté",
+    entityMessage({ sounds: { beacon: { beaconFadeMs: 2500, beaconFadeRate: 0.3 } }, tuning: { beaconFadeMs: 0, beaconFadeRate: 1 } })
+  );
+  run("fondu de balise : vitesse nulle refusée (descripteur)", true, entityMessage({ sounds: { beacon: { beaconFadeRate: 0 } } }).includes("beaconFadeRate"));
+  run("fondu de balise : vitesse négative refusée (tuning)", true, entityMessage({ tuning: { beaconFadeRate: -1 } }).includes("beaconFadeRate"));
+  run("fondu de balise : durée négative refusée", true, entityMessage({ sounds: { beacon: { beaconFadeMs: -100 } } }).includes("beaconFadeMs"));
+  run("fondu de balise : durée non numérique refusée", true, entityMessage({ tuning: { beaconFadeMs: "3000" } }).includes("beaconFadeMs"));
   const registryThrows = (registry) => {
     try {
       validateEntityRegistry(registry);
@@ -283,6 +294,8 @@ export default function checkEntities(run) {
   );
   run("registre des types : son d'archétype inconnu", true, registryThrows({ lamp: { sounds: { beacon: { pth: "assets/sounds/a" } } } }).includes(UNKNOWN_FIELD));
   run("registre des types : un archétype ne retire pas de rôle (null)", true, registryThrows({ lamp: { sounds: { beacon: null } } }) !== "accepté");
+  run("registre des types : vitesse de fondu nulle refusée (premier niveau)", true, registryThrows({ lamp: { nameKey: "entity.lamp.name", beaconFadeRate: 0 } }).includes("beaconFadeRate"));
+  run("registre des types : vitesse de fondu nulle refusée (descripteur)", true, registryThrows({ lamp: { nameKey: "entity.lamp.name", sounds: { beacon: { path: "assets/sounds/a", beaconFadeRate: 0 } } } }).includes("beaconFadeRate"));
 
   // --- Sons conditionnels : balise ET sons de proximité (voir
   // core/entity-parse.js/applySoundConditions). La condition de l'instance

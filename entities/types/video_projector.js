@@ -10,6 +10,11 @@
 // sa propre `isOn` (sinon le chargement échoue), par exemple allumée au
 // départ et mémorisée dans la sauvegarde :
 //   "variables": [{ "name": "isOn", "type": "flag", "initial": true }]
+//
+// Montée en régime et ralentissement (beaconFadeMs, beaconFadeRate) : à
+// l'allumage, le ventilateur part grave et lent puis rejoint son régime ;
+// à l'extinction, il ralentit en s'éteignant. L'interrupteur, joué par
+// l'action, marque le début de la rampe.
 const IS_ON = { type: "variable", scope: "entity", name: "isOn", equals: true };
 const IS_OFF = { type: "variable", scope: "entity", name: "isOn", equals: false };
 
@@ -19,7 +24,14 @@ export default {
   sounds: {
     // Légèrement audible depuis l'autre face d'une scène recto/verso (voir
     // config/tuning-values.js/beaconCrossFaceGain) : un appareil bruyant.
-    beacon: { path: "assets/sounds/furniture/video_projector_1_beacon", loop: true, condition: IS_ON, beaconCrossFaceGain: 0.3 },
+    beacon: {
+      path: "assets/sounds/furniture/video_projector_1_beacon",
+      loop: true,
+      condition: IS_ON,
+      beaconCrossFaceGain: 0.3,
+      beaconFadeMs: 2500,
+      beaconFadeRate: 0.3,
+    },
   },
   action: [
     {

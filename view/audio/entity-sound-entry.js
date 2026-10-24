@@ -293,6 +293,7 @@ export function buildEntitySoundEntry(entity, session, { otherFace = false, disa
     // ne l'a pas posé — l'état de départ s'impose sans fondu, comme pour la
     // présence.
     beaconFadeMs: beacon ? resolveTuning("beaconFadeMs", entity, beacon) : 0,
+    beaconFadeRate: beacon ? resolveTuning("beaconFadeRate", entity, beacon) : 1,
     beaconEnvelope: null,
     perceptionGated: isPerceptionGated(entity),
     ...movementFields,
