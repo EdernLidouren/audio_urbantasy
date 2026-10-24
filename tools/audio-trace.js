@@ -16,8 +16,15 @@
 //   3. après le remaniement : recharger la page, puis
 //      const t = await import("/tools/audio-trace.js");
 //      await t.compareAudioTraceToBaseline();
-// La référence vit dans le localStorage du navigateur
-// (clé AUDIO_TRACE_BASELINE_KEY).
+// La référence COMPLÈTE (toutes les lignes, pour situer une différence) vit
+// dans le localStorage du navigateur (clé AUDIO_TRACE_BASELINE_KEY), qui peut
+// être vidé à tout moment. Son EMPREINTE (hash, count) est aussi versionnée
+// dans tools/audio-trace-baseline.json : sans référence complète, la
+// comparaison s'y rabat et dit seulement si le rendu a bougé. Après un
+// changement de rendu VALIDÉ à l'oreille, saveAudioTraceBaseline() puis
+// reporter le hash et le count rendus dans ce fichier, dans le même commit.
+// Pour situer une différence sans référence complète : remettre de côté les
+// changements (git stash), enregistrer la référence, les restaurer, comparer.
 //
 // Déterminisme : pendant la trace, le hasard (Math.random, tiré d'une graine
 // fixe), l'horloge (performance.now, AudioContext.currentTime) et les
@@ -47,6 +54,8 @@ import { refreshActiveBeaconVolumes } from "../view/audio/city-scene.js";
 import { createWorldView, stopPersistentAudioLayers } from "../view/world-view.js";
 
 export const AUDIO_TRACE_BASELINE_KEY = "templeton:audioTraceBaseline";
+// Empreinte versionnée de la référence (voir l'en-tête).
+const BASELINE_FILE = "tools/audio-trace-baseline.json";
 
 // Durée simulée d'un son ponctuel (son "end" émis au bout de ce délai).
 const FAKE_SOUND_DURATION_MS = 900;
@@ -510,15 +519,47 @@ export async function saveAudioTraceBaseline(options) {
   return { hash: trace.hash, count: trace.count };
 }
 
+// Empreinte versionnée de la référence (voir l'en-tête), ou null si le
+// fichier est absent ou illisible.
+async function fetchBaselineFile() {
+  try {
+    const response = await fetch(BASELINE_FILE, { cache: "no-cache" });
+    return response.ok ? await response.json() : null;
+  } catch {
+    return null;
+  }
+}
+
 // Compare la trace courante à la référence : { same, hash, baselineHash,
-// count, firstDifference } — firstDifference donne l'index et quelques
-// lignes de contexte des deux côtés.
+// count, baselineSource, firstDifference } — firstDifference (référence
+// complète seulement) donne l'index et quelques lignes de contexte des deux
+// côtés. `fileHash` signale une empreinte versionnée qui ne correspond plus
+// à la référence complète (fichier pas mis à jour après un réenregistrement).
 export async function compareAudioTraceToBaseline(options) {
   const stored = localStorage.getItem(AUDIO_TRACE_BASELINE_KEY);
-  if (!stored) throw new Error("audio-trace : aucune référence enregistrée (saveAudioTraceBaseline).");
-  const baseline = JSON.parse(stored);
+  const file = await fetchBaselineFile();
+  if (!stored && !file) throw new Error(`audio-trace : aucune référence (ni saveAudioTraceBaseline, ni ${BASELINE_FILE}).`);
   const trace = await runAudioTrace(options);
-  const result = { same: trace.hash === baseline.hash, hash: trace.hash, baselineHash: baseline.hash, count: trace.count, baselineCount: baseline.lines.length };
+  if (!stored) {
+    return {
+      same: trace.hash === file.hash,
+      hash: trace.hash,
+      baselineHash: file.hash,
+      count: trace.count,
+      baselineCount: file.count,
+      baselineSource: BASELINE_FILE,
+    };
+  }
+  const baseline = JSON.parse(stored);
+  const result = {
+    same: trace.hash === baseline.hash,
+    hash: trace.hash,
+    baselineHash: baseline.hash,
+    count: trace.count,
+    baselineCount: baseline.lines.length,
+    baselineSource: "localStorage",
+  };
+  if (file && file.hash !== baseline.hash) result.fileHash = file.hash;
   if (!result.same) {
     const length = Math.max(trace.lines.length, baseline.lines.length);
     let i = 0;

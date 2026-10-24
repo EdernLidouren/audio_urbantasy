@@ -1,7 +1,6 @@
-// Point d'entrée des vérifications du core, exécutables depuis la console du
-// navigateur (Node n'est pas disponible sur cette machine ; rien ici ne
-// dépend du DOM, la suite tournerait aussi sous Node). Exposé par main.js
-// sur `window` :
+// Point d'entrée des vérifications du core, sans DOM : au terminal avec Node
+// (`node tools/run-checks.js`, voir son en-tête), ou depuis la console du
+// navigateur. Exposé par main.js sur `window` :
 //   runChecks()                    -> tous les domaines
 //   runChecks("spawn")             -> un seul domaine
 //   runChecks(["save", "faces"])   -> plusieurs domaines
