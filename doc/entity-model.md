@@ -1285,9 +1285,18 @@ Règles :
   (voir "Cascade de sounds"). `condition: null` à l'instance la retire.
 - **Évaluée à chaque tick** par la vue (`view/audio/entity-audio.js`/
   `beaconConditionAllows`) contre l'entité VIVANTE : le changement s'entend
-  dès le tick qui suit l'action. Coupure et reprise sont franches
-  (`stop()`/`resume()`, même geste qu'une bascule de présence) : le son de
-  l'interrupteur joué par l'action couvre la transition.
+  dès le tick qui suit l'action. Par défaut, coupure et reprise sont
+  franches (`stop()`/`resume()`, même geste qu'une bascule de présence) :
+  pour le vidéoprojecteur, le son de l'interrupteur joué par l'action couvre
+  la transition.
+- **Fondu optionnel** (`beaconFadeMs`, réglage en cascade, défaut 0) : quand
+  rien ne couvre la bascule, la balise s'éteint en fondu puis s'arrête, et
+  repart de zéro en fondu. Le fondu avance avec les ticks (figé derrière un
+  menu) ; une bascule en plein fondu repart dans l'autre sens depuis le
+  niveau atteint. L'état de départ d'un monde, une bascule de présence et
+  une bascule de face s'imposent sans fondu. Rendu pur : rien n'entre dans
+  l'état ni la sauvegarde. Exemple réel : la bouche d'égout, 3000 ms, la
+  durée du fondu de l'ambiance météo.
 - **Continu ou intermittent** : un beacon intermittent dont la condition est
   fausse ne déclenche plus rien, sa cadence est gelée comme celle d'une
   entité dormante.
@@ -1395,6 +1404,8 @@ code. Consulter directement ce fichier pour la valeur courante d'un défaut.
   d'attaques (voir "Désempilement d'attaques" plus bas) : `false` fait
   démarrer CETTE balise précisément, sans le léger délai aléatoire appliqué
   par défaut à tout démarrage groupé.
+- **`beaconFadeMs`** — durée (ms) du fondu d'une balise CONTINUE dont la
+  condition bascule, défaut 0 (coupure franche). Voir "Sons conditionnels".
 - **`vocalInterval`** / **`vocalIntervalVariation`** — mêmes rôles que
   `beaconInterval`/`beaconIntervalVariation`, mais pour le VOCAL (toujours
   intermittent — ces deux réglages s'appliquent donc TOUJOURS, contrairement

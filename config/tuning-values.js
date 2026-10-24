@@ -244,6 +244,14 @@ export const TUNING_DEFAULTS = {
   // temporel exact). Résolu comme tout autre paramètre sonore (cascade
   // son -> instance -> archétype -> ce défaut).
   staggerBeacon: true,
+  // Durée (ms) du fondu d'une balise CONTINUE dont la condition bascule
+  // (voir doc/entity-model.md/"Sons conditionnels") : elle s'éteint en
+  // fondu quand sa condition devient fausse, et repart de zéro en fondu
+  // quand elle redevient vraie. 0 (défaut) = coupure et reprise franches,
+  // pour une balise dont la bascule est déjà couverte par un son (ex.
+  // l'interrupteur du vidéoprojecteur). Sans effet sur une balise
+  // intermittente (chaque lecture est un one-shot complet).
+  beaconFadeMs: 0,
   // Variation de hauteur (fraction du taux de lecture, 0-1) appliquée
   // aléatoirement à chaque lecture d'un son PONCTUEL (balise intermittente
   // ou son de déplacement) : le taux de lecture est tiré uniformément dans

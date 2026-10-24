@@ -288,6 +288,12 @@ export function buildEntitySoundEntry(entity, session, { otherFace = false, disa
     // volume : la voix démarre à 0, sans blip).
     beaconCondition: beacon ? beacon.condition : undefined,
     beaconSilenced: false,
+    // Fondu de la condition (voir ./entity-audio.js/stepBeaconEnvelope) :
+    // beaconEnvelope, facteur de volume 0..1, null tant que le premier tick
+    // ne l'a pas posé — l'état de départ s'impose sans fondu, comme pour la
+    // présence.
+    beaconFadeMs: beacon ? resolveTuning("beaconFadeMs", entity, beacon) : 0,
+    beaconEnvelope: null,
     perceptionGated: isPerceptionGated(entity),
     ...movementFields,
   };

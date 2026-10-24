@@ -48,7 +48,9 @@ export function createFaceCrossfade({ getSession, entities, faceMuffle, beaconCo
       if (!live || live.present === false) continue;
       const open = spatialRendering(entry, live.x - x, NO_MUFFLE);
       const pan = open.pan;
-      const openVolume = open.volume * beaconFactor * entry.beaconGain * entry.flyingVolumeFactor;
+      // × l'enveloppe de fondu d'une balise conditionnelle (voir
+      // ./entity-audio.js) : on part du niveau réellement entendu.
+      const openVolume = open.volume * beaconFactor * entry.beaconGain * entry.flyingVolumeFactor * (entry.beaconEnvelope ?? 1);
       const openCutoff = open.cutoff;
       entry.sound.update(pan, openVolume);
       entry.sound.setCutoff(openCutoff);

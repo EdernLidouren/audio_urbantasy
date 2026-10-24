@@ -27,6 +27,7 @@
 
 import { keepAudioContextAwake, createReverbBus, setMasterVolume, setGlobalVolume } from "../../lib/audio.js";
 import { TUNING_DEFAULTS } from "../../config/tuning.js";
+import { TICK_MS } from "../../lib/loop.js";
 import { getActiveWorld, getInactiveFace } from "../../core/state.js";
 import { createEntitySounds } from "./entity-sounds.js";
 import { createEntityAudio } from "./entity-audio.js";
@@ -131,7 +132,7 @@ export function createCityAudioScene(getSession, { handover = null } = {}) {
     layers.update(session, world);
     muffle.update(session);
 
-    entityAudio.applyEntityAudio(x);
+    entityAudio.applyEntityAudio(x, TICK_MS);
     oneShots.updateTrackedOneShots(x);
 
     // Une seule photo des entités vivantes pour le reste du tick.
@@ -148,7 +149,7 @@ export function createCityAudioScene(getSession, { handover = null } = {}) {
       entities.syncNewOtherEntitySounds(otherWorld);
       const otherLiveById = entities.liveOtherEntitiesById(otherWorld);
       entityAudio.applyMuffledPresenceTransitions(x, otherLiveById);
-      entityAudio.applyOtherFaceBeacons(x, otherLiveById);
+      entityAudio.applyOtherFaceBeacons(x, otherLiveById, TICK_MS);
       entityAudio.updateIntermittentSources(entities.otherEntitySounds, x, otherLiveById, 1);
       entityAudio.updateEntityMovementSounds(entities.otherEntitySounds, x, otherWorld, otherLiveById, 1);
     }

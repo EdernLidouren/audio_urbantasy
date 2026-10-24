@@ -14,6 +14,21 @@ import { spatialRendering } from "./spatial.js";
 import { beaconVolumeFactor, footstepVolumeFactor } from "./volume-factors.js";
 import { resolveFootstepPath, stepWalker } from "./footsteps.js";
 
+// Enveloppe de fondu d'une balise conditionnelle (voir doc/entity-model.md/
+// "Sons conditionnels") : un facteur de volume 0..1 qui rejoint sa cible
+// (1 si la condition permet la balise, 0 sinon) à raison de `elapsedMs /
+// fadeMs` par appel. Avancée par le temps des TICKS, jamais par l'horloge
+// murale : un menu ouvert la fige avec le jeu. Pas de Howler.fade ici : le
+// volume est recalculé à chaque tick (distance, pan), il écraserait la
+// rampe. `current` null (premier tick, bascule de présence) ou fadeMs 0 :
+// la cible s'impose aussitôt. Une bascule en plein fondu repart
+// simplement dans l'autre sens, depuis le niveau atteint.
+function stepBeaconEnvelope(current, target, elapsedMs, fadeMs) {
+  if (current === null || fadeMs <= 0) return target;
+  const step = elapsedMs / fadeMs;
+  return target > current ? Math.min(target, current + step) : Math.max(target, current - step);
+}
+
 // Prochain délai (ms) d'une source intermittente, jamais négatif.
 function jitteredIntervalMs(interval, variation) {
   return Math.max(0, interval + (Math.random() * 2 - 1) * variation);
@@ -105,23 +120,32 @@ export function createEntityAudio({ getSession, entities, effectiveMuffle, fullF
   }
 
   // Balise CONTINUE d'une entrée pour ce tick (les deux faces) : bascule de
-  // présence (arrêt / reprise), beacon conditionnel, filet anti-blocage,
-  // puis rendu spatial. Les sons de transition restent à l'appelant.
-  function updateBeaconSound(entry, live, relX, muffle, beaconFactor) {
+  // présence (arrêt / reprise), beacon conditionnel et son fondu, filet
+  // anti-blocage, puis rendu spatial. Les sons de transition restent à
+  // l'appelant. `elapsedMs` : temps de jeu écoulé depuis l'appel précédent
+  // (TICK_MS au tick, 0 hors tick : un rafraîchissement depuis un menu
+  // n'avance pas le fondu).
+  function updateBeaconSound(entry, live, relX, muffle, beaconFactor, elapsedMs) {
     const { entity, sound, beaconGain, flyingHighpassHz, flyingVolumeFactor } = entry;
     if (!sound) return;
 
+    const allowed = beaconConditionAllows(entry.beaconCondition, live);
     if (live.presenceChanged === "exited") {
       sound.stop();
-    } else if (live.presenceChanged === "entered" && beaconConditionAllows(entry.beaconCondition, live)) {
+    } else if (live.presenceChanged === "entered" && allowed) {
       sound.resume();
       entry.beaconSilenced = false;
     }
+    // Une bascule de présence est SÈCHE (voir doc/entity-model.md) : le
+    // fondu de la condition repart de l'état atteint, sans rampe.
+    if (live.presenceChanged) entry.beaconEnvelope = null;
     if (live.present === false) return;
 
-    // Condition fausse : balise arrêtée une fois ; redevenue vraie :
-    // reprise. Une balise coupée pour consommation ne revient jamais.
-    if (!beaconConditionAllows(entry.beaconCondition, live)) {
+    // Condition fausse : la balise s'éteint (en fondu si beaconFadeMs),
+    // puis s'arrête une fois à zéro ; redevenue vraie : reprise, et remontée
+    // en fondu. Une balise coupée pour consommation ne revient jamais.
+    entry.beaconEnvelope = stepBeaconEnvelope(entry.beaconEnvelope, allowed ? 1 : 0, elapsedMs, entry.beaconFadeMs);
+    if (entry.beaconEnvelope === 0) {
       if (!entry.beaconSilenced) {
         sound.stop();
         entry.beaconSilenced = true;
@@ -140,14 +164,14 @@ export function createEntityAudio({ getSession, entities, effectiveMuffle, fullF
     // beaconGain inclut déjà le gain "autre face" d'une entrée de l'autre
     // face ; flyingVolumeFactor et le passe-haut ne concernent que isFlying.
     const { pan, volume, cutoff } = spatialRendering(entry, relX, muffle);
-    sound.update(pan, volume * beaconFactor * beaconGain * flyingVolumeFactor);
+    sound.update(pan, volume * beaconFactor * beaconGain * flyingVolumeFactor * entry.beaconEnvelope);
     sound.setCutoff(cutoff);
     if (entity.isFlying) sound.setHighpass(flyingHighpassHz);
   }
 
   // Face courante : sons de transition (exitSound joue AVANT l'arrêt de la
   // balise — deux Howl distincts), puis la balise continue.
-  function applyEntityAudio(x) {
+  function applyEntityAudio(x, elapsedMs) {
     const beaconFactor = beaconVolumeFactor();
     const liveById = entities.liveEntitiesById();
     for (const entry of entitySounds) {
@@ -160,7 +184,7 @@ export function createEntityAudio({ getSession, entities, effectiveMuffle, fullF
       } else if (live.presenceChanged === "entered" && entry.enterSound) {
         oneShots.playTransitionSound(entry, relX, entry.enterSound, muffle);
       }
-      updateBeaconSound(entry, live, relX, muffle, beaconFactor);
+      updateBeaconSound(entry, live, relX, muffle, beaconFactor, elapsedMs);
     }
   }
 
@@ -179,12 +203,12 @@ export function createEntityAudio({ getSession, entities, effectiveMuffle, fullF
 
   // Autre face : balises continues entendues à travers (gain "autre face" >
   // 0, sinon jamais construites), entièrement étouffées.
-  function applyOtherFaceBeacons(x, otherLiveById) {
+  function applyOtherFaceBeacons(x, otherLiveById, elapsedMs) {
     const beaconFactor = beaconVolumeFactor();
     for (const entry of otherEntitySounds) {
       if (!entry.sound) continue;
       const live = otherLiveById.get(entry.entity.id);
-      updateBeaconSound(entry, live, live.x - x, fullFaceMuffle, beaconFactor);
+      updateBeaconSound(entry, live, live.x - x, fullFaceMuffle, beaconFactor, elapsedMs);
     }
   }
 
@@ -192,8 +216,8 @@ export function createEntityAudio({ getSession, entities, effectiveMuffle, fullF
   // depuis un menu (jeu arrêté) prend effet aussitôt.
   function refreshBeaconVolumes() {
     const session = getSession();
-    applyEntityAudio(session.player.x);
-    if (otherEntitySounds) applyOtherFaceBeacons(session.player.x, entities.liveOtherEntitiesById(getInactiveFace(session)));
+    applyEntityAudio(session.player.x, 0);
+    if (otherEntitySounds) applyOtherFaceBeacons(session.player.x, entities.liveOtherEntitiesById(getInactiveFace(session)), 0);
   }
 
   // Pause / reprise des balises continues des deux faces, derrière un menu
