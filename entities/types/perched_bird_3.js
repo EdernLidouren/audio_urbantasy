@@ -11,7 +11,7 @@ export default {
       vocalIntervalVariation: 1200,
       pitchVariation: 0.12,
     },
-    exitSound: { path: "assets/sounds/entities/bird_taking_off_fly" },
+    exitSound: { path: "assets/sounds/entities/bird_taking_off_fly", pitchVariation: 0.15 },
   },
   startle: {},
   action: { kind: "applyEffects", effects: [{ type: "startle" }] },

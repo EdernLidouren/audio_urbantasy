@@ -15,7 +15,8 @@
 // sans cesse), avec une variation de hauteur marquée pour que les cris ne
 // sonnent jamais deux fois pareil. L'envol est son exitSound, joué par la
 // vue sur sa bascule de dormance (voir doc/entity-model.md/"Sons de
-// transition") ; le pool en a plusieurs variantes.
+// transition"), avec sa propre variation de hauteur : le pool n'a qu'un
+// fichier, deux envols ne doivent pas sonner à l'identique.
 //
 // Observable et interactable : Entrée l'effraie aussi (effet "startle"),
 // pour une instance assez confiante pour se laisser approcher (startle
@@ -32,7 +33,7 @@ export default {
       vocalIntervalVariation: 1200,
       pitchVariation: 0.12,
     },
-    exitSound: { path: "assets/sounds/entities/bird_taking_off_fly" },
+    exitSound: { path: "assets/sounds/entities/bird_taking_off_fly", pitchVariation: 0.15 },
   },
   startle: {},
   action: { kind: "applyEffects", effects: [{ type: "startle" }] },

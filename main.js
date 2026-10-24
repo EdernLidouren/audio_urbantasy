@@ -222,6 +222,23 @@ window.debugPlayerX = () => {
   console.log(session.player.x);
 };
 
+// Vérif console, MODE DEBUG seulement : rend une COPIE de la partie en
+// cours (positions, présence, variables...), pour inspecter l'état pendant
+// un test sans passer par une sauvegarde. Une copie, jamais la session
+// elle-même : la modifier depuis la console ne touche pas au jeu. L'état
+// est sérialisable par contrat, structuredClone suffit.
+window.debugSession = () => {
+  if (!isDebugEnabled()) {
+    console.log("debugSession: mode debug désactivé (toggleDebug() ou Ctrl+D).");
+    return undefined;
+  }
+  if (!session) {
+    console.log("debugSession: aucune session en cours (hors ville).");
+    return undefined;
+  }
+  return structuredClone(session);
+};
+
 // Le jeu démarre TOUJOURS sur le menu principal, jamais en partie : la
 // session naît d'un choix ("Continuer"/"Nouvelle partie" ci-dessus), jamais
 // d'office. Tant qu'aucun choix n'est fait, session reste null — onTick de

@@ -382,7 +382,11 @@ Consommateurs, tous derrière ce MÊME drapeau (jamais un drapeau par outil) :
   (`core/presence.js`/`evaluateHasImprovement`, voir
   `doc/scripting.md`/"Améliorations") ;
 - l'annonce de position (touche "x", `view/status-announcements.js`/
-  `announcePlayerX`), plus précise en mode debug.
+  `announcePlayerX`), plus précise en mode debug ;
+- `window.debugSession()` dans la console (`main.js`) : une COPIE de la
+  partie en cours, pour inspecter l'état pendant un test (positions,
+  présence, variables) sans passer par une sauvegarde. Hors mode debug, ou
+  hors partie, elle ne rend rien.
 
 **Outils de scène** (en tête du menu Shift+M, chacun derrière une
 confirmation). Une partie fige chaque monde à sa première visite (voir
@@ -462,7 +466,8 @@ dans `core/startle.js`, un seul drapeau runtime `startled` (comme
 `_2`, `_3`, une voix chacun, celles de `bird_1`/`_2`/`_3`), dans
 `scenes/demo.json` : vocal seul, serré et varié en hauteur, pas
 d'`isFlying` (posés), errance très lente déclarée à l'instance, envol en
-`exitSound` (pool `bird_taking_off_fly`), Entrée qui les effraie aussi
+`exitSound` (pool `bird_taking_off_fly`, varié en hauteur par son
+`pitchVariation`), Entrée qui les effraie aussi
 (effet `"startle"`). L'un d'eux, `perched_bird_tame`, porte `startle:
 { range: 0.5 }` : il se laisse approcher, observer, puis effrayer.
 

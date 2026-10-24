@@ -212,6 +212,9 @@
     "assets/sounds/decor/tree_beacon_4.mp3",
     "assets/sounds/decor/tree_beacon_5.mp3"
   ],
+  "assets/sounds/decor/wall_air_conditioner_1_beacon": [
+    "assets/sounds/decor/wall_air_conditioner_1_beacon_1.mp3"
+  ],
   "assets/sounds/decor/weight_machine_1_beacon": [
     "assets/sounds/decor/weight_machine_1_beacon_1.mp3"
   ],
@@ -369,7 +372,6 @@
     "assets/sounds/entities/bird_3_vocal_4.mp3"
   ],
   "assets/sounds/entities/bird_taking_off_fly": [
-    "assets/sounds/entities/bird_taking_off_fly_1.mp3",
     "assets/sounds/entities/bird_taking_off_fly_2.mp3"
   ],
   "assets/sounds/entities/dog_medium_vocal": [
