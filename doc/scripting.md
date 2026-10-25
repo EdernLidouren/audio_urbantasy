@@ -948,8 +948,8 @@ AU SOL, une entité ÉPHÉMÈRE par objet, éparpillée autour du conteneur
 (`spawnScatteredEphemerals`, MÊME geste que le `"loot"` à spawn ci-dessus),
 à ramasser ensuite via `"pickup"` ou à laisser ; le conteneur est noté vidé
 (`stock: null`) pour le cycle courant. Retour : une annonce seule (les
-balises des objets tombés font le reste) — `interaction.searchSpawn`,
-`interaction.searchSpawnOne` (un objet) ou `interaction.searchNothing`
+balises des objets tombés font le reste) — `interaction.searchSpawn` (un
+ou plusieurs objets, pluriel accordé par le gabarit) ou `interaction.searchNothing`
 (tous les tirages tombés sur `nothing`) ; aucun son de fouille imposé.
 
 **Candidature liée à l'état** (`core/spawn.js`/`containerStatus`) : un
@@ -1512,11 +1512,15 @@ question.
 }
 ```
 
-La question nomme la DESTINATION (« Partir vers rue commerçante ? », clé
-`interaction.travelConfirm`) : l'action doit donc porter EXACTEMENT un effet
-`"teleport"`, vérifié au chargement. Le nom vient de la convention de titre de
-scène `scene.<id>.name` (voir `doc/i18n.md`) : la scène cible n'est pas encore
-chargée au moment de la question.
+La question nomme la DESTINATION (« Partir vers la rue commerçante ? », « Head to
+Main Street? », clé `interaction.travelConfirm`) : l'action doit donc porter
+EXACTEMENT un effet `"teleport"`, vérifié au chargement. Le nom vient de la
+convention de titre de scène `scene.<id>.name` (voir `doc/i18n.md`) : la scène
+cible n'est pas encore chargée au moment de la question. Il est passé par
+RÉFÉRENCE (`nameRef`) et le gabarit en demande la forme `def`
+(`{scene:def}`, voir `doc/i18n.md`/"Grammaire des textes") : chaque scène
+principale porte donc cette forme dans chaque langue, vérifié par l'audit du
+contenu.
 
 `confirm` SIGNIFIE « changement de scène principale » : il ne relie que deux
 scènes de `scenes/index.js`/`MAIN_SCENE_IDS` (voir `doc/scene-format.md`),

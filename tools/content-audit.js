@@ -14,6 +14,8 @@
 //     changements de scène principale, jamais sur une sous-scène) ;
 //   - chaque scène est soit principale, soit rattachée à une scène
 //     principale (MAIN_SCENE_OF), jamais les deux ni aucune ;
+//   - chaque nom passé par référence à un gabarit (NAME_SLOTS) porte, dans
+//     chaque langue, toutes les formes que ce gabarit demande ({scene:def}) ;
 //   - chaque clé i18n citée existe en fr ET en en ;
 //   - chaque son cité (chemin "assets/...") existe dans le manifeste audio.
 //
@@ -53,6 +55,24 @@ import { LOCALE_TABLES } from "../data/i18n/index.js";
 import { configureAssetManifest, hasAsset } from "../lib/assets.js";
 
 const KEY_PATTERN = /^[a-z][a-zA-Z0-9_]*(\.[a-zA-Z0-9_]+)+$/;
+
+// Gabarits qui reçoivent un NOM par référence (nameRef), et les clés de nom
+// qu'ils peuvent recevoir : le jeu ne saurait le dire avant d'afficher, il
+// est déclaré ici pour que l'audit vérifie les formes en amont (en jeu, une
+// forme absente retombe sur la base, signalée). Un nouvel appel de nameRef
+// dans la vue ajoute sa ligne ici.
+const NAME_SLOTS = [
+  // view/interaction.js/confirmationParams : la scène cible d'une action
+  // "confirm", toujours une scène principale (vérifié plus bas).
+  { template: "interaction.travelConfirm", param: "scene", names: () => MAIN_SCENE_IDS.map((id) => `scene.${id}.name`) },
+];
+
+// Formes que `template` demande pour le paramètre `param` : chaque
+// « {param:forme} », où qu'il soit (branches comprises).
+function formsRequested(template, param) {
+  const pattern = new RegExp(`\\{\\s*${param}:(\\w+)\\s*\\}`, "g");
+  return [...String(template).matchAll(pattern)].map((match) => match[1]);
+}
 
 // Parcourt `value` en profondeur et appelle visit(chaîne, chemin) pour
 // chaque chaîne, et visitObject(objet, chemin) pour chaque objet. Le chemin
@@ -205,6 +225,20 @@ export async function auditContent() {
     })
   );
   checkStrings("carte de la ville", CITY_MAP_GRID);
+
+  for (const { template, param, names } of NAME_SLOTS) {
+    for (const [lang, table] of Object.entries(LOCALE_TABLES)) {
+      const forms = formsRequested(table[template], param);
+      for (const nameKey of names()) {
+        const value = table[nameKey];
+        for (const form of forms) {
+          if (value === undefined || typeof value === "string" || typeof value[form] !== "string") {
+            report("formes de nom", `${lang} ${template}`, `forme « ${form} » absente`, nameKey);
+          }
+        }
+      }
+    }
+  }
 
   if (!sceneExists(NEW_GAME.startSceneId)) report("départ", "startSceneId", "scène inconnue", NEW_GAME.startSceneId);
   checkStrings("départ", NEW_GAME);

@@ -11,7 +11,7 @@
 //     écrivent l'état.
 
 import { announce } from "../lib/announce.js";
-import { t } from "../data/i18n/index.js";
+import { t, nameRef } from "../data/i18n/index.js";
 import { pushScreen, popScreen } from "../lib/screens.js";
 import { withPausedBeacons } from "./paused-beacons.js";
 import { makeMenuScreen } from "../lib/menu.js";
@@ -141,10 +141,13 @@ function runResolvedAction(entity, action) {
 // d'une action") : elle nomme la scène de DESTINATION de son "teleport",
 // par la convention de titre `scene.<id>.name` (voir doc/i18n.md, vérifiée
 // par tools/content-audit.js) — la scène cible n'est pas chargée à ce
-// stade, son titre ne peut pas être lu dans son fichier.
+// stade, son titre ne peut pas être lu dans son fichier. Une RÉFÉRENCE au
+// nom, pas un texte traduit : le gabarit de chaque langue en choisit la
+// forme (« la grand place », « Main Street »), voir doc/i18n.md/
+// "Grammaire des textes".
 function confirmationParams(action) {
   const teleport = action.effects.find((effect) => effect.type === "teleport");
-  return { scene: t(`scene.${teleport.target}.name`) };
+  return { scene: nameRef(`scene.${teleport.target}.name`) };
 }
 
 // `getWorldView` : la vue du monde courante, dont les balises se taisent

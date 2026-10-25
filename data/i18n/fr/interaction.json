@@ -1,14 +1,13 @@
 {
-  "interaction.loot": "Trouvé : {amount} pièces.",
-  "interaction.lootSpawn": "{count} pièces éparpillées tout autour.",
-  "interaction.pickup": "Ramassé : {amount} pièces.",
+  "interaction.loot": "Trouvé : {amount, plural, one {# pièce} many {# de pièces} other {# pièces}}.",
+  "interaction.lootSpawn": "{count, plural, one {# pièce éparpillée} many {# de pièces éparpillées} other {# pièces éparpillées}} tout autour.",
+  "interaction.pickup": "Ramassé : {amount, plural, one {# pièce} many {# de pièces} other {# pièces}}.",
   "interaction.pickupItem": "Ramassé : {item}.",
   "interaction.searchAlreadyToday": "Déjà fouillé aujourd'hui.",
   "interaction.searchDepleted": "Il n'y a plus rien ici.",
   "interaction.searchNothing": "Vous ne trouvez rien.",
-  "interaction.searchSpawn": "{count} objets tombent tout autour.",
-  "interaction.searchSpawnOne": "Un objet tombe tout près.",
-  "interaction.travelConfirm": "Partir vers {scene} ?",
+  "interaction.searchSpawn": "{count, plural, one {Un objet apparaît} many {# d'objets apparaissent} other {# objets apparaissent}}.",
+  "interaction.travelConfirm": "Partir vers {scene:def} ?",
   "menu.interaction.observe.title": "Observer",
   "menu.interaction.title": "Interagir"
 }

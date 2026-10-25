@@ -563,8 +563,8 @@ persiste avec le monde.
   : bornes, obstacles, décalage d'attaques des balises), à ramasser ensuite
   objet par objet ou à laisser (purgée au départ comme tout éphémère) ; puis
   `stock: null`. Rien ne va JAMAIS directement au sac. Retour : une annonce
-  seule — `interaction.searchSpawn` (« 3 objets tombent tout autour. »),
-  `interaction.searchSpawnOne` (un seul objet), ou `interaction.searchNothing`
+  seule — `interaction.searchSpawn` (« 3 objets apparaissent. », « Un objet
+  apparaît. », pluriel accordé par le gabarit), ou `interaction.searchNothing`
   (« Vous ne trouvez rien. », tous les tirages tombés sur `nothing`). PLAGE ET objets tombés : ramassage
   ordinaire via l'action `"pickup"` que porte chaque collectible
   (`core/bag.js`/`pickupItemEntity`, aucun cas spécial).

@@ -3,11 +3,20 @@
   "scene.clock_tower_weight_shaft.name": "clocher, puits des contrepoids",
   "scene.clock_tower_weight_shaft_mirror_side.name": "clocher, puits des contrepoids, côté miroir",
   "scene.default.name": "scène sans nom",
-  "scene.demo.name": "scène de démo",
+  "scene.demo.name": {
+    "base": "scène de démo",
+    "def": "la scène de démo"
+  },
   "scene.demo2.name": "arrière-boutique",
-  "scene.demo3.name": "la ruelle",
-  "scene.main_street.name": "rue commerçante",
-  "scene.town_square.name": "grand place",
+  "scene.demo3.name": "ruelle",
+  "scene.main_street.name": {
+    "base": "rue commerçante",
+    "def": "la rue commerçante"
+  },
+  "scene.town_square.name": {
+    "base": "grand place",
+    "def": "la grand place"
+  },
   "scene.town_square_town_hall_main.name": "hôtel de ville, salle principale",
   "scene.town_square_town_hall_mayor_office.name": "hôtel de ville, bureau de la maire",
   "scene.town_square_town_hall_meeting_room.name": "hôtel de ville, salle de réunion",

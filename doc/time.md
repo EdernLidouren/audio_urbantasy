@@ -211,7 +211,9 @@ résolues AVANT d'être passées au gabarit) : le code ignore tout de l'ORDRE d'
 gabarit `time.announce` de chaque locale — forme commune "heure, jour mois, saison,
 année" (`data/i18n/fr/status.json` place le jour avant le mois ;
 `data/i18n/en/status.json` le mois avant le jour, forme "heure, mois jour, saison,
-année") — changer de langue, réordonner, ou
+année"). Le jour est un NOMBRE, accordé en ordinal par le gabarit
+(`selectordinal`, voir `doc/i18n.md`/"Grammaire des textes") : « 1er janvier »,
+« 2 janvier » ; « January 1st », « January 22nd ». Changer de langue, réordonner, ou
 retirer un composant ne touche QUE ce gabarit, jamais le code. `weekday`
 (`core/time.js`/`weekdayOf`, `WEEKDAY_KEYS`) reste dérivable mais n'est pas fourni
 à ce gabarit — sa dérivation pure est testée indépendamment (voir

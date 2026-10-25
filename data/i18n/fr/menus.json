@@ -22,8 +22,7 @@
   "menu.pause.resume": "Retour au jeu",
   "menu.pause.title": "Pause",
   "menu.position": "{index} sur {total}",
-  "menu.skipped.one": "{count} élément ignoré",
-  "menu.skipped.other": "{count} éléments ignorés",
+  "menu.skipped": "{count, plural, one {# élément ignoré} many {# d'éléments ignorés} other {# éléments ignorés}}",
   "menu.toggle.no": "Non",
   "menu.toggle.yes": "Oui"
 }

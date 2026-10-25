@@ -1,14 +1,13 @@
 {
-  "interaction.loot": "Found: {amount} coins.",
-  "interaction.lootSpawn": "{count} coins scattered around.",
-  "interaction.pickup": "Picked up: {amount} coins.",
+  "interaction.loot": "Found: {amount, plural, one {# coin} other {# coins}}.",
+  "interaction.lootSpawn": "{count, plural, one {# coin} other {# coins}} scattered around.",
+  "interaction.pickup": "Picked up: {amount, plural, one {# coin} other {# coins}}.",
   "interaction.pickupItem": "Picked up: {item}.",
   "interaction.searchAlreadyToday": "Already searched today.",
   "interaction.searchDepleted": "There is nothing left here.",
   "interaction.searchNothing": "You find nothing.",
-  "interaction.searchSpawn": "{count} items fall all around.",
-  "interaction.searchSpawnOne": "An item falls nearby.",
-  "interaction.travelConfirm": "Head to {scene}?",
+  "interaction.searchSpawn": "{count, plural, one {An item appears} other {# items appear}}.",
+  "interaction.travelConfirm": "Head to {scene:def}?",
   "menu.interaction.observe.title": "Observe",
   "menu.interaction.title": "Interact"
 }

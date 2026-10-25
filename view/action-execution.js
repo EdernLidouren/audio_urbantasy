@@ -151,9 +151,9 @@ function handleSearch(entity) {
     return;
   }
   if (status !== "searchable") return; // pas un conteneur de la face active (dégradation silencieuse)
-  // Fouille faite : tous les tirages ont pu tomber sur "nothing".
+  // Fouille faite : tous les tirages ont pu tomber sur "nothing". Un ou
+  // plusieurs objets : le gabarit accorde lui-même son pluriel.
   if (count === 0) announce(t("interaction.searchNothing"), { assertive: true });
-  else if (count === 1) announce(t("interaction.searchSpawnOne"), { assertive: true });
   else announce(t("interaction.searchSpawn", { count }), { assertive: true });
 }
 

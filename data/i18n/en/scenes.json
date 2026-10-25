@@ -3,11 +3,20 @@
   "scene.clock_tower_weight_shaft.name": "clock tower, counterweight shaft",
   "scene.clock_tower_weight_shaft_mirror_side.name": "clock tower, counterweight shaft, mirror side",
   "scene.default.name": "unnamed scene",
-  "scene.demo.name": "demo scene",
+  "scene.demo.name": {
+    "base": "demo scene",
+    "def": "the demo scene"
+  },
   "scene.demo2.name": "back room",
-  "scene.demo3.name": "the alley",
-  "scene.main_street.name": "main street",
-  "scene.town_square.name": "town square",
+  "scene.demo3.name": "alley",
+  "scene.main_street.name": {
+    "base": "main street",
+    "def": "Main Street"
+  },
+  "scene.town_square.name": {
+    "base": "town square",
+    "def": "the town square"
+  },
   "scene.town_square_town_hall_main.name": "town hall, main hall",
   "scene.town_square_town_hall_mayor_office.name": "town hall, mayor's office",
   "scene.town_square_town_hall_meeting_room.name": "town hall, meeting room",
