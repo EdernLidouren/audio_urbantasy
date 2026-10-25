@@ -102,7 +102,9 @@ function isValidPrefValue(key, value) {
   if (!constraint) return false;
   if (typeof value !== constraint.type) return false;
   if (constraint.type === "number" && (value < constraint.min || value > constraint.max)) return false;
-  if (constraint.type === "string" && !constraint.values.includes(value)) return false;
+  // Une préférence texte n'existe qu'avec la liste de ses valeurs : sans
+  // elle, aucune valeur n'est valide (jamais une exception sur `values`).
+  if (constraint.type === "string" && !(constraint.values ?? []).includes(value)) return false;
   return true;
 }
 

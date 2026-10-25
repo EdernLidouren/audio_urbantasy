@@ -26,7 +26,10 @@ function pad2(n) {
 // Valeurs de temps des gabarits i18n (heure, minute, jour, mois, saison,
 // année) — les mêmes pour une description et pour l'annonce de l'heure
 // (view/status-announcements.js). Mois et saison sont traduits avant
-// insertion.
+// insertion. Le jour reste un NOMBRE (le gabarit l'accorde en ordinal,
+// « 1er ») ; l'année passe en TEXTE : un nombre serait groupé par
+// Intl.NumberFormat (« année 1 000 »), ce qui ne se fait jamais pour une
+// année.
 export function timeTemplateValues(time) {
   return {
     hour: pad2(hourOfDay(time)),
@@ -34,7 +37,7 @@ export function timeTemplateValues(time) {
     day: dayOfMonth(time),
     month: t(MONTH_KEYS[monthOfYear(time) - 1]),
     season: t(SEASON_KEYS[seasonOfYear(time)]),
-    year: yearNumber(time),
+    year: String(yearNumber(time)),
   };
 }
 
