@@ -24,6 +24,7 @@ const DOMAINS = [
   "audio",
   "collections",
   "entities",
+  "help",
   "improvements",
   "interaction",
   "inventory",

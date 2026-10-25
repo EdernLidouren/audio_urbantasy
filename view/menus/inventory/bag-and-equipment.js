@@ -14,7 +14,7 @@ import { announce, stripTrailingPeriod } from "../../../lib/announce.js";
 import { playMenuSound } from "../../menu-sounds.js";
 import { ITEM_REGISTRY } from "../../../core/items.js";
 import { EQUIPMENT_SLOTS } from "../../../core/equipment.js";
-import { resolveAction, checkBindingsForCollisions } from "../../../lib/input.js";
+import { resolveAction, defineBindings } from "../../../lib/input.js";
 import { TUNING_DEFAULTS } from "../../../config/tuning-values.js";
 
 // Bindings du sélecteur de quantité (voir openQuantitySelector plus bas) —
@@ -23,7 +23,7 @@ import { TUNING_DEFAULTS } from "../../../config/tuning-values.js";
 // (mods exige une correspondance EXACTE, voir lib/input.js) plutôt qu'une
 // amplitude lue sur l'évènement. Mêmes noms d'action que la liste de la
 // boutique (view/menus/shop-quantity-list.js).
-const QUANTITY_BINDINGS = {
+const QUANTITY_BINDINGS = defineBindings("dropQuantity", {
   decrease: { keys: ["ArrowLeft"], mods: [] },
   decreaseMedium: { keys: ["ArrowLeft"], mods: ["shift"] },
   decreaseBig: { keys: ["ArrowLeft"], mods: ["ctrl"] },
@@ -32,8 +32,7 @@ const QUANTITY_BINDINGS = {
   increaseBig: { keys: ["ArrowRight"], mods: ["ctrl"] },
   confirm: { keys: ["Enter", " "], mods: [] },
   cancel: { keys: ["Escape"], mods: [] },
-};
-checkBindingsForCollisions(QUANTITY_BINDINGS, "view/menus/inventory/bag-and-equipment.js QUANTITY_BINDINGS");
+});
 
 // Amplitude d'un cran selon le modificateur (config/tuning-values.js).
 const QUANTITY_STEPS = {
@@ -404,6 +403,8 @@ function openQuantitySelector(getSession, entry, itemLabelKey, max, index) {
   }
 
   const screen = {
+    // Aide des touches (lib/help.js).
+    helpSections: () => [{ id: "dropQuantity" }],
     // Maintien gauche/droite (même modèle que lib/menu.js : modificateur
     // relu à chaque cran).
     onTick() {

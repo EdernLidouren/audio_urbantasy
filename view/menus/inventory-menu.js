@@ -31,7 +31,7 @@
 
 import { pushScreen } from "../../lib/screens.js";
 import { withPausedBeacons } from "../paused-beacons.js";
-import { resolveAction, checkBindingsForCollisions } from "../../lib/input.js";
+import { resolveAction, defineBindings } from "../../lib/input.js";
 import { buildBagTabScreen, buildEquipmentTabScreen, setCurrentTabsScreen } from "./inventory/bag-and-equipment.js";
 import { buildImprovementsTabScreen, buildCollectionsTabScreen } from "./inventory/progress-tabs.js";
 
@@ -42,11 +42,10 @@ export { setDropItemHandler, setEquipItemHandler, setUnequipItemHandler } from "
 // Bascule d'onglet — GÉNÉRIQUE (aucune connaissance des onglets dans les
 // noms d'action eux-mêmes, comme MENU_BINDINGS de lib/menu.js) : Tab avance,
 // Maj+Tab recule, en cycle sur TABS (voir cycleTab).
-const TAB_BINDINGS = {
+const TAB_BINDINGS = defineBindings("inventoryTabs", {
   nextTab: { keys: ["Tab"], mods: [] },
   prevTab: { keys: ["Tab"], mods: ["shift"] },
-};
-checkBindingsForCollisions(TAB_BINDINGS, "view/menus/inventory-menu.js TAB_BINDINGS");
+});
 
 // Ordre des onglets, celui du cycle Tab / Maj+Tab.
 const TABS = ["bag", "equipment", "improvements", "collections"];
@@ -110,6 +109,9 @@ function buildInventoryTabsScreen(getWorldView, getSession, initialTab) {
     onTick() {
       if (inner.onTick) inner.onTick();
     },
+    // Aide des touches (lib/help.js) : les onglets, puis ce que propose
+    // l'onglet courant.
+    helpSections: () => [{ id: "inventoryTabs" }, ...(inner.helpSections?.() ?? [])],
     onKeyDown(event) {
       const action = resolveAction(TAB_BINDINGS, event.key, event.mods);
       if (action === "nextTab" || action === "prevTab") {

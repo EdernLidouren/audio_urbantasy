@@ -17,6 +17,7 @@ domaine, le détail du code vivant dans les en-têtes de fichiers.
 | [`collections.md`](collections.md) | Collections : modèle (un fichier par collection), découverte par acquisition (`addItem`), textes, onglet Collections, sauvegarde, debug, extension par observation. |
 | [`new-game.md`](new-game.md) | Départ d'une partie neuve : scène, argent, sac, équipement, compagnons et variables de partie (`config/new-game.js`), validation au démarrage. |
 | [`save.md`](save.md) | Sauvegarde : contenu, relecture (rebouchage, renommages de contenu, types inconnus), table `config/save-renames.js`. |
+| [`help.md`](help.md) | Raccourcis clavier : tables déclarées par `defineBindings`, aide des touches générée et contextuelle (F1, Maj+H), descriptions et noms de touches. |
 
 ## Où va une nouvelle info ? (convention)
 
@@ -34,6 +35,7 @@ UN SEUL endroit, jamais recopié :
 | Une collection, ses entrées, la découverte ou l'onglet Collections | `doc/collections.md` |
 | Ce avec quoi commence une partie neuve (kit de départ, compagnons, scène de départ) | `doc/new-game.md` |
 | Le format de sauvegarde, sa migration, ou un RENOMMAGE de type/clé i18n/son/id de scène (à reporter dans `config/save-renames.js`) | `doc/save.md` |
+| Un raccourci clavier, une table de raccourcis, ou l'aide des touches | `doc/help.md` |
 | Une liste EXHAUSTIVE (types de condition, kinds d'action, types d'entité, tags...) | **NULLE PART en doc** — elle vit dans le CODE (le registre/l'aiguillage concerné), la doc y RENVOIE toujours plutôt que de la recopier, pour ne jamais diverger |
 
 Si aucune ligne ne correspond : c'est un nouveau domaine — crée un fichier

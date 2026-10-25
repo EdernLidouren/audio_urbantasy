@@ -47,6 +47,7 @@ import checkStartle from "./startle.check.js";
 // Domaines de lib/ (mécanismes portables), lancés par le même point
 // d'entrée : une seule commande, un seul récapitulatif.
 import checkI18n from "../../lib/checks/i18n.check.js";
+import checkInput from "../../lib/checks/input.check.js";
 
 const SUITES = [
   { name: "movement", check: checkMovement },
@@ -76,6 +77,7 @@ const SUITES = [
   { name: "new-game", check: checkNewGame },
   { name: "startle", check: checkStartle },
   { name: "i18n", check: checkI18n },
+  { name: "input", check: checkInput },
 ];
 
 // Noms des domaines, dans l'ordre d'exécution.

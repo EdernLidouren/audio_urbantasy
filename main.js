@@ -5,6 +5,7 @@
 
 import { pushScreen, popScreen, activeScreen, tickActive, tickFrame } from "./lib/screens.js";
 import { initInput, onGlobalPress } from "./lib/input.js";
+import { openHelp } from "./lib/help.js";
 import { ensureAudioUnlocked } from "./lib/audio.js";
 import { applyVolumePreferences } from "./view/audio/city-scene.js";
 import { applyLocalePreference } from "./view/locale.js";
@@ -110,8 +111,13 @@ initInput(gameZone, { onFirstInput: ensureAudioUnlocked, preventDefaultKeys: MOV
 // ajout aux favoris — sans lui). Ctrl plutôt qu'Alt (voir view/input.js/
 // GLOBAL_BINDINGS) : Alt seul déplace le focus vers la barre de menus sur
 // certains navigateurs, gênant même une fois la combinaison interceptée.
+// Raccourcis globaux montrés par l'aide, sous ceux de l'écran actif : la
+// bascule debug seulement en mode debug (outil de développement).
+const GLOBAL_HELP_SECTIONS = [{ id: "global", include: (action) => action !== "toggleDebug" || isDebugEnabled() }];
+
 onGlobalPress(GLOBAL_BINDINGS, (action) => {
   if (action === "toggleDebug") toggleDebug();
+  if (action === "openHelp" || action === "openHelpAlt") openHelp(t, { globalSections: GLOBAL_HELP_SECTIONS });
 });
 
 gameZone.focus();

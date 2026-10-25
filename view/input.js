@@ -5,18 +5,17 @@
 // objets (structure prête, aucune interface de remappage construite ici :
 // pas d'abstraction avant le besoin).
 
-import { isActionActive, checkBindingsForCollisions } from "../lib/input.js";
+import { isActionActive, defineBindings } from "../lib/input.js";
 
 // Mouvement — CONTINU (voir isActionActive) : plusieurs touches physiques
 // pour une même action (flèches + ZQSD). mods:[] exige l'ABSENCE de tout
 // modificateur — c'est cette exigence qui empêche Ctrl+D de déclencher
 // "moveRight" (voir la RÈGLE D'ARBITRAGE des modificateurs, en-tête de
 // lib/input.js).
-const MOVE_BINDINGS = {
+const MOVE_BINDINGS = defineBindings("move", {
   moveLeft: { keys: ["ArrowLeft", "q", "a"], mods: [] },
   moveRight: { keys: ["ArrowRight", "d"], mods: [] },
-};
-checkBindingsForCollisions(MOVE_BINDINGS, "view/input.js MOVE_BINDINGS");
+});
 
 // Toutes les touches de mouvement, à plat — fournies telles quelles à
 // lib/input.js/initInput (preventDefaultKeys, voir main.js) : lib/input.js
@@ -47,7 +46,7 @@ export const MOVE_KEYS = [...MOVE_BINDINGS.moveLeft.keys, ...MOVE_BINDINGS.moveR
 // tique, voir lib/screens.js) — presser "q" ouvre donc l'équipement SANS jamais
 // faire bouger le joueur, même si la touche reste techniquement "tenue"
 // pendant que l'écran est ouvert.
-export const CITY_BINDINGS = {
+export const CITY_BINDINGS = defineBindings("city", {
   pauseMenu: { keys: ["Escape"], mods: [] },
   // Shift+S : sauvegarde rapide, la même que "Sauvegarder" du menu pause,
   // sans l'ouvrir. Une touche tenue ne sauvegarde qu'une fois : lib/input.js
@@ -105,8 +104,7 @@ export const CITY_BINDINGS = {
   debugSpawn: { keys: ["e"], mods: [] },
   interactDescribe: { keys: [" "], mods: [] },
   interactActivate: { keys: ["Enter"], mods: [] },
-};
-checkBindingsForCollisions(CITY_BINDINGS, "view/input.js CITY_BINDINGS");
+});
 
 // Bindings GLOBAUX — indépendants de la pile d'écrans, voir
 // lib/input.js/onGlobalPress (câblé depuis main.js) : disponibles quel que
@@ -118,10 +116,16 @@ checkBindingsForCollisions(CITY_BINDINGS, "view/input.js CITY_BINDINGS");
 // preventDefault sur la combinaison ; Alt reste réservé à l'utilisateur/au
 // navigateur/au lecteur d'écran, jamais au jeu — seuls Ctrl et Shift servent
 // de modificateurs ici.
-export const GLOBAL_BINDINGS = {
+export const GLOBAL_BINDINGS = defineBindings("global", {
   toggleDebug: { keys: ["d"], mods: ["ctrl"] },
-};
-checkBindingsForCollisions(GLOBAL_BINDINGS, "view/input.js GLOBAL_BINDINGS");
+  // Aide des touches (lib/help.js), contextuelle : ce que propose l'écran
+  // actif. F1, la touche d'aide usuelle (son comportement navigateur est
+  // neutralisé, comme tout binding global) ; Maj+H en secours si un
+  // navigateur ou une configuration la prend malgré tout. Globales : jamais
+  // utilisables par un écran.
+  openHelp: { keys: ["F1"], mods: [] },
+  openHelpAlt: { keys: ["h"], mods: ["shift"] },
+});
 
 // -1 (gauche), 0 (immobile), +1 (droite). Gauche+droite tenues ensemble
 // s'annulent. Réévalué à chaque appel (voir lib/input.js/isActionActive) :

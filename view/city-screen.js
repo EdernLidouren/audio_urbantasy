@@ -16,6 +16,7 @@ import { ensureAudioUnlocked } from "../lib/audio.js";
 import { stopPersistentAudioLayers } from "./world-view.js";
 import { interact, chooseInteractionTarget } from "./interaction.js";
 import { openPauseMenu } from "./menus/pause-menu.js";
+import { withPausedBeacons } from "./paused-beacons.js";
 import { saveGame } from "./save-storage.js";
 import { openWeatherDebugMenu } from "./menus/debug-weather-menu.js";
 import { openTimeDebugMenu } from "./menus/debug-time-menu.js";
@@ -90,6 +91,14 @@ export function makeCityScreen(getSession, setSession) {
   };
 
   return {
+    // Aide des touches (lib/help.js) : déplacement puis raccourcis du jeu,
+    // ceux de debug seulement en mode debug (même garde que onKeyDown).
+    helpSections: () => [
+      { id: "move" },
+      { id: "city", include: (action) => !KEY_ACTIONS[action]?.debugOnly || isDebugEnabled() },
+    ],
+    // L'aide se lit balises coupées, comme tout menu ouvert sur la ville.
+    wrapOverlay: (screen) => withPausedBeacons(screen, travel.current),
     onEnter() {
       // Un menu poussé par-dessus la ville rappelle onEnter en se retirant
       // (lib/screens.js/popScreen) : seule la toute première entrée monte la

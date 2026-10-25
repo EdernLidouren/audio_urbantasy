@@ -27,7 +27,7 @@
 import { t } from "../../data/i18n/index.js";
 import { pushScreen, popScreen } from "../../lib/screens.js";
 import { withPausedBeacons } from "../paused-beacons.js";
-import { resolveAction, checkBindingsForCollisions } from "../../lib/input.js";
+import { resolveAction, defineBindings } from "../../lib/input.js";
 import { announce } from "../../lib/announce.js";
 import { formatCoordinate } from "../../lib/coordinate-label.js";
 import { getPref, PREF_CONSTRAINTS } from "../../config/preferences.js";
@@ -72,7 +72,7 @@ function isZoneOnMap(cell, session) {
   return evaluateCondition(cell.onMapWhen, { ...presenceContextOf(session), debugShortCircuit: false });
 }
 
-const CITY_MAP_BINDINGS = {
+const CITY_MAP_BINDINGS = defineBindings("cityMap", {
   up: { keys: ["ArrowUp"], mods: [] },
   down: { keys: ["ArrowDown"], mods: [] },
   left: { keys: ["ArrowLeft"], mods: [] },
@@ -84,8 +84,7 @@ const CITY_MAP_BINDINGS = {
   // view/input.js/CITY_BINDINGS (tables de bindings totalement indépendantes, voir
   // lib/screens.js : seul le sommet de la pile reçoit le clavier).
   coordinates: { keys: ["x"], mods: [] },
-};
-checkBindingsForCollisions(CITY_MAP_BINDINGS, "view/menus/city-map-menu.js CITY_MAP_BINDINGS");
+});
 
 function cityMapAlphaPref() {
   return getPref("cityMapAlphaCoordinates", PREF_CONSTRAINTS.cityMapAlphaCoordinates.default);
@@ -215,6 +214,8 @@ export function openCityMapMenu(getWorldView, getSession, onSelectZone) {
   };
 
   const screen = {
+    // Aide des touches (lib/help.js).
+    helpSections: () => [{ id: "cityMap" }],
     onEnter() {
       announceMaybeStarred(cellAnnouncementText(cursorX, cursorY, getSession()), false);
     },

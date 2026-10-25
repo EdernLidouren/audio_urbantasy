@@ -16,6 +16,10 @@
 //     principale (MAIN_SCENE_OF), jamais les deux ni aucune ;
 //   - chaque nom passé par référence à un gabarit (NAME_SLOTS) porte, dans
 //     chaque langue, toutes les formes que ce gabarit demande ({scene:def}) ;
+//   - chaque raccourci clavier (tables déclarées par lib/input.js/
+//     defineBindings) a sa description d'aide "help.<table>.<action>" et le
+//     nom de ses touches dans chaque langue, et aucune description d'aide
+//     ne reste sans raccourci ;
 //   - chaque clé i18n citée existe en fr ET en en ;
 //   - chaque son cité (chemin "assets/...") existe dans le manifeste audio.
 //
@@ -53,6 +57,17 @@ import { PERCEPTION_MUSIC_POOL, PERCEPTION_AMBIENCE_POOL } from "../config/perce
 import { SHOP_CATALOGS } from "../config/shop-values.js";
 import { LOCALE_TABLES } from "../data/i18n/index.js";
 import { configureAssetManifest, hasAsset } from "../lib/assets.js";
+import { bindingTableIds, bindingTable, needsKeyName, keyNameKey } from "../lib/input.js";
+import { helpKey } from "../lib/help.js";
+// Modules qui DÉCLARENT les tables de raccourcis (defineBindings, à leur
+// chargement) : importés ici pour que l'audit les voie toutes. Une nouvelle
+// table dans un autre module ajoute son import à cette liste.
+import "../view/input.js";
+import "../lib/menu.js";
+import "../view/menus/city-map-menu.js";
+import "../view/menus/inventory-menu.js";
+import "../view/menus/inventory/bag-and-equipment.js";
+import "../view/menus/shop-quantity-list.js";
 
 const KEY_PATTERN = /^[a-z][a-zA-Z0-9_]*(\.[a-zA-Z0-9_]+)+$/;
 
@@ -237,6 +252,26 @@ export async function auditContent() {
           }
         }
       }
+    }
+  }
+
+  // Aide des touches (lib/help.js) : générée des tables, elle n'a besoin
+  // que d'une phrase par action et d'un nom par touche.
+  const helpTexts = new Set(["help.title", "help.entry"]);
+  for (const id of bindingTableIds()) {
+    for (const [action, binding] of Object.entries(bindingTable(id))) {
+      const keys = [helpKey(id, action), ...binding.mods.map((mod) => `key.mod.${mod}`)];
+      for (const key of binding.keys) if (needsKeyName(key)) keys.push(keyNameKey(key));
+      helpTexts.add(helpKey(id, action));
+      for (const key of keys) {
+        const missing = Object.keys(LOCALE_TABLES).filter((lang) => LOCALE_TABLES[lang][key] === undefined);
+        if (missing.length > 0) report("aide des touches", `${id}.${action}`, `texte absent (${missing.join(", ")})`, key);
+      }
+    }
+  }
+  for (const [lang, table] of Object.entries(LOCALE_TABLES)) {
+    for (const key of Object.keys(table)) {
+      if (key.startsWith("help.") && !helpTexts.has(key)) report("aide des touches", lang, "description sans raccourci", key);
     }
   }
 

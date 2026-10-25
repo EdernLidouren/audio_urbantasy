@@ -21,7 +21,7 @@ import { createHoldRepeat, heldStep, shouldAnnounceAdjustment } from "../../lib/
 import { TUNING_DEFAULTS } from "../../config/tuning-values.js";
 import { announce, stripTrailingPeriod } from "../../lib/announce.js";
 import { playMenuSound } from "../menu-sounds.js";
-import { resolveAction, checkBindingsForCollisions } from "../../lib/input.js";
+import { resolveAction, defineBindings } from "../../lib/input.js";
 import { getPref } from "../../config/preferences.js";
 
 // Bindings du menu à sliders. Entrée/Espace : +1 sur une ligne, ACTIVE une
@@ -31,7 +31,7 @@ import { getPref } from "../../config/preferences.js";
 // parce que les lettres NUES restent réservées à un futur saut par initiale
 // dans les listes d'objets. Chaque combinaison est une action DISTINCTE
 // (mods exige une correspondance EXACTE, voir lib/input.js).
-const LIST_BINDINGS = {
+const LIST_BINDINGS = defineBindings("shopList", {
   up: { keys: ["ArrowUp"], mods: [] },
   down: { keys: ["ArrowDown"], mods: [] },
   home: { keys: ["Home"], mods: [] },
@@ -48,8 +48,7 @@ const LIST_BINDINGS = {
   validate: { keys: ["a"], mods: ["shift"] },
   money: { keys: ["g"], mods: ["shift"] },
   cancel: { keys: ["Escape"], mods: [] },
-};
-checkBindingsForCollisions(LIST_BINDINGS, "view/menus/shop-quantity-list.js LIST_BINDINGS");
+});
 
 // Amplitude d'un cran selon le modificateur (config/tuning-values.js).
 const QUANTITY_STEPS = {
@@ -263,6 +262,8 @@ export function openQuantityList(spec) {
   };
 
   pushScreen({
+    // Aide des touches (lib/help.js).
+    helpSections: () => [{ id: "shopList" }],
     onEnter() {
       // Ouverture ET retour depuis une confirmation (sélection préservée :
       // `lines` vit dans ce closure) — titre + entrée courante, comme un

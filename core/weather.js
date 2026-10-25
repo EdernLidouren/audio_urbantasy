@@ -98,7 +98,7 @@ export function validateWeatherStates(states) {
 }
 
 // Auto-validation de la VRAIE table au chargement du module — même
-// garantie que view/input.js/checkBindingsForCollisions pour les
+// garantie que lib/input.js/defineBindings pour les
 // bindings : un contenu cassé échoue au DÉMARRAGE de l'app, jamais
 // silencieusement en cours de partie.
 validateWeatherStates(WEATHER_STATES);
