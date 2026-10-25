@@ -22,6 +22,8 @@
   "menu.pause.resume": "Resume game",
   "menu.pause.title": "Pause",
   "menu.position": "{index} of {total}",
+  "menu.skipped.one": "{count} item skipped",
+  "menu.skipped.other": "{count} items skipped",
   "menu.toggle.no": "No",
   "menu.toggle.yes": "Yes"
 }

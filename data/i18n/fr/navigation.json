@@ -3,6 +3,8 @@
   "menu.navigation.city_map_alpha.description": "Sur la carte de la ville, affiche la colonne sous forme de lettre plutôt que de chiffre.",
   "menu.navigation.city_map_invert_y": "Carte de la ville : inversion des ordonnées",
   "menu.navigation.city_map_invert_y.description": "Sur la carte de la ville, inverse le sens de comptage des lignes : depuis le haut plutôt que depuis le bas.",
+  "menu.navigation.confirm_scene_change": "Confirmer les changements de scène principale",
+  "menu.navigation.confirm_scene_change.description": "Demande une confirmation avant de quitter une grande zone de la ville pour une autre. Les intérieurs et les étages n'en demandent jamais.",
   "menu.navigation.cycling": "Cyclage des menus",
   "menu.navigation.cycling.description": "Fait boucler le curseur d'une extrémité à l'autre d'une liste ou d'une grille, au lieu de s'arrêter au bord.",
   "menu.navigation.index_suffix": "Annoncer la position (« 1 sur 2 »)",

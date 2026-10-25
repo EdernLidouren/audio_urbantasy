@@ -455,4 +455,13 @@ supplémentaire.
   `scenes/index.js` puis délègue à `loadScene` — utilisé pour l'effet
   "teleport" (`target` = id, pas un chemin, voir `doc/scripting.md`/"Effets
   d'action").
-- `scenes/index.js` — registre `{ id: chemin }` des scènes existantes.
+- `scenes/index.js` — registre `{ id: chemin }` des scènes existantes, et
+  `MAIN_SCENE_IDS`, la liste des scènes PRINCIPALES : les grandes zones de
+  la ville, celles que pointent les cases de la carte (`doc/city-map.md`).
+  Toute autre scène est une SOUS-SCÈNE (un intérieur, un étage). Déclarée à
+  la main, jamais déduite, et tenue hors des fichiers de scène : une
+  sauvegarde fige un monde à sa première visite (`doc/save.md`), un drapeau
+  recopié dans le monde ne suivrait pas un changement d'avis. L'audit du
+  contenu vérifie que chaque id existe, que chaque case de la carte pointe
+  vers une scène principale et qu'une action `confirm` n'en relie que deux
+  (voir `doc/scripting.md`/"Confirmation d'une action").

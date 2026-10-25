@@ -49,6 +49,10 @@ export const MOVE_KEYS = [...MOVE_BINDINGS.moveLeft.keys, ...MOVE_BINDINGS.moveR
 // pendant que l'écran est ouvert.
 export const CITY_BINDINGS = {
   pauseMenu: { keys: ["Escape"], mods: [] },
+  // Shift+S : sauvegarde rapide, la même que "Sauvegarder" du menu pause,
+  // sans l'ouvrir. Une touche tenue ne sauvegarde qu'une fois : lib/input.js
+  // ignore l'auto-répétition pour toute pression ponctuelle.
+  quickSave: { keys: ["s"], mods: ["shift"] },
   // Retour arrière : miroir de lib/menu.js/MENU_BINDINGS.backspace (annonce
   // "titre. entrée courante" dans un menu) — ici, annonce le nom de la
   // scène (voir view/status-announcements.js/announceSceneName), l'équivalent le

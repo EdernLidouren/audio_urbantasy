@@ -8,6 +8,10 @@
 //     registre des types d'entité lui-même est valide ;
 //   - chaque cible de "teleport", chaque scène de la carte de la ville et la
 //     scène de départ existent dans scenes/index.js ;
+//   - les scènes principales (MAIN_SCENE_IDS) existent, chaque case de la
+//     carte pointe vers l'une d'elles, et une action "confirm" ne relie que
+//     deux d'entre elles (la préférence confirmSceneChange porte sur les
+//     changements de scène principale, jamais sur une sous-scène) ;
 //   - chaque clé i18n citée existe en fr ET en en ;
 //   - chaque son cité (chemin "assets/...") existe dans le manifeste audio.
 //
@@ -31,7 +35,7 @@
 
 import registry from "../entities/types/index.js";
 import player from "../entities/player.js";
-import scenePaths from "../scenes/index.js";
+import scenePaths, { MAIN_SCENE_IDS } from "../scenes/index.js";
 import collections from "../collections/index.js";
 import { parseScene } from "../core/scene.js";
 import { validateEntityRegistry } from "../core/entity-parse.js";
@@ -84,6 +88,26 @@ export async function auditContent() {
   const namespaces = new Set(Object.values(LOCALE_TABLES).flatMap((table) => Object.keys(table).map((key) => key.split(".")[0])));
   const isKey = (text) => KEY_PATTERN.test(text) && namespaces.has(text.split(".")[0]);
   const sceneExists = (id) => Object.hasOwn(scenePaths, id);
+  const isMainScene = (id) => MAIN_SCENE_IDS.includes(id);
+
+  for (const id of MAIN_SCENE_IDS) {
+    if (!sceneExists(id)) report("scènes principales", "MAIN_SCENE_IDS", "scène inconnue", id);
+  }
+
+  // Une action "confirm" demande « Partir vers ... ? » sous la préférence
+  // confirmSceneChange : elle n'a de sens qu'entre deux scènes principales.
+  // Sa forme (un seul "teleport") est déjà vérifiée par parseScene.
+  function checkConfirmedActions(sceneId, raw) {
+    walk(raw, "", () => {}, (object, where) => {
+      if (object.confirm !== true || !Array.isArray(object.effects)) return;
+      if (!isMainScene(sceneId)) report(`scène ${sceneId}`, where, "confirmation hors scène principale", sceneId);
+      for (const effect of object.effects) {
+        if (effect.type === "teleport" && !isMainScene(effect.target)) {
+          report(`scène ${sceneId}`, where, "confirmation vers une sous-scène", effect.target);
+        }
+      }
+    });
+  }
 
   // Clés et sons d'une source, à n'importe quelle profondeur.
   function checkStrings(source, value, path = "") {
@@ -130,6 +154,7 @@ export async function auditContent() {
     // view/interaction.js/confirmationParams).
     if (raw.titleKey !== `scene.${id}.name`) report(source, "titleKey", "titre hors convention scene.<id>.name", String(raw.titleKey));
     checkStrings(source, raw);
+    checkConfirmedActions(id, raw);
   }
 
   try {
@@ -160,6 +185,8 @@ export async function auditContent() {
     row.forEach((cell, x) => {
       if (cell.sceneId !== undefined && !sceneExists(cell.sceneId)) {
         report("carte de la ville", `[${x}, ${y}]`, "scène inconnue", cell.sceneId);
+      } else if (cell.sceneId !== undefined && !isMainScene(cell.sceneId)) {
+        report("carte de la ville", `[${x}, ${y}]`, "sous-scène sur la carte", cell.sceneId);
       }
     })
   );

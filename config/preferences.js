@@ -57,6 +57,12 @@ export const PREF_CONSTRAINTS = {
   // lib/coordinate-label.js/formatCoordinateY pour la convention exacte).
   cityMapAlphaCoordinates: { type: "boolean", default: true },
   cityMapInvertY: { type: "boolean", default: false },
+  // Question « Partir vers ... ? » avant de passer d'une scène principale à
+  // une autre (action "confirm", voir view/interaction.js, doc/scripting.md/
+  // "Confirmation d'une action"). Les sous-scènes n'en ont jamais. Activée
+  // par défaut : une sortie de scène principale fait changer de quartier,
+  // mieux vaut qu'elle ne parte pas sur un appui distrait.
+  confirmSceneChange: { type: "boolean", default: true },
   // Sauvegarde automatique à chaque changement de scène réussi (voir
   // view/world-travel.js/performTransition) — pas un réglage audio ni de
   // menu, mais suit le même patron de persistance que le reste. Activée par

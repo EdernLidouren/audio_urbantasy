@@ -16,6 +16,7 @@ import { ensureAudioUnlocked } from "../lib/audio.js";
 import { stopPersistentAudioLayers } from "./world-view.js";
 import { interact, chooseInteractionTarget } from "./interaction.js";
 import { openPauseMenu } from "./menus/pause-menu.js";
+import { saveGame } from "./save-storage.js";
 import { openWeatherDebugMenu } from "./menus/debug-weather-menu.js";
 import { openTimeDebugMenu } from "./menus/debug-time-menu.js";
 import { openTeleportDebugMenu } from "./menus/debug-teleport-menu.js";
@@ -55,6 +56,12 @@ export function makeCityScreen(getSession, setSession) {
   // aussi un comportement navigateur à neutraliser.
   const KEY_ACTIONS = {
     pauseMenu: { preventDefault: true, run: () => openPauseMenu(travel.current, getSession, travel.travelViaCityMap) },
+    // Même appel que l'entrée "Sauvegarder" du menu pause : même son de
+    // confirmation (préférence saveSoundEnabled), aucun son si l'écriture
+    // échoue. N'agit qu'en jeu : un menu ou une bascule de face au sommet
+    // de la pile ne reçoit pas cette table, jamais de sauvegarde en pleine
+    // transition.
+    quickSave: { run: () => saveGame(getSession()) },
     announceSceneName: { preventDefault: true, run: () => announceSceneName(getSession()) },
     announceTime: { run: () => announceGameTime(getSession()) },
     announceMoney: { run: () => announceMoney(getSession()) },

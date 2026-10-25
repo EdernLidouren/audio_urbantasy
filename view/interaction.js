@@ -22,6 +22,7 @@ import { sessionProvider } from "./interaction-handlers.js";
 import { runEffects } from "./effect-runner.js";
 import { executeAction } from "./action-execution.js";
 import { openConfirmation } from "./menus/confirmation.js";
+import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
 
 // Description RICHE d'une entité (interaction "describe"), distincte du nom
 // annoncé à l'approche (occupation, voir view/occupancy.js).
@@ -198,11 +199,14 @@ export function interact(entity, kind, getWorldView) {
       return;
     }
 
-    // Action à CONFIRMER (ex. sortie vers une autre scène majeure) : RIEN ne
-    // s'exécute avant la réponse — ni son de départ, ni état. Annuler (ou
-    // Échap) ne laisse aucune trace. La condition, elle, est déjà vérifiée :
-    // un refus reste un refus, sans question.
-    if (resolvedAction.confirm) {
+    // Action à CONFIRMER (une sortie d'une scène principale vers une autre,
+    // vérifié par l'audit du contenu) : RIEN ne s'exécute avant la réponse —
+    // ni son de départ, ni état. Annuler (ou Échap) ne laisse aucune trace.
+    // La condition, elle, est déjà vérifiée : un refus reste un refus, sans
+    // question. Préférence confirmSceneChange désactivée : l'action part
+    // directement, comme une porte.
+    const confirmWanted = getPref("confirmSceneChange", PREF_CONSTRAINTS.confirmSceneChange.default);
+    if (resolvedAction.confirm && confirmWanted) {
       openConfirmation("interaction.travelConfirm", () => runResolvedAction(entity, resolvedAction), {
         titleParams: confirmationParams(resolvedAction),
         getWorldView,

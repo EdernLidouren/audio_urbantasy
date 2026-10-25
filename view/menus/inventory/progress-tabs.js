@@ -15,12 +15,13 @@ import collections from "../../../collections/index.js";
 // Ligne d'UNE amélioration de l'onglet Améliorations. Débloquée :
 // "{order} - {nom} : {description}", Espace/Entrée la réannonce. Non
 // débloquée : "{order} - Inconnue" — le numéro révèle qu'un pouvoir existe
-// sans dire lequel ; l'activer ne fait rien de plus. Aucune action
+// sans dire lequel ; l'activer ne fait rien de plus, et Ctrl+haut/bas la
+// saute (placeholder, voir lib/menu.js). Aucune action
 // "utiliser" : les pouvoirs s'activent ailleurs (ex. "p" pour la perception).
 function improvementEntry(id, owned) {
   const props = IMPROVEMENT_REGISTRY[id];
   if (!owned) {
-    return { label: "improvements.entry.unknown", labelParams: { order: props.order }, onActivate: () => {} };
+    return { label: "improvements.entry.unknown", labelParams: { order: props.order }, placeholder: true, onActivate: () => {} };
   }
   const labelParams = {
     order: props.order,
@@ -53,10 +54,11 @@ export function buildImprovementsTabScreen(getSession) {
 }
 
 // Ligne d'UNE entrée de collection. Découverte : "{nom} : {description}",
-// Espace/Entrée la réannonce. Non découverte : "Inconnu". Sans numéro,
-// contrairement aux améliorations.
+// Espace/Entrée la réannonce. Non découverte : "Inconnu", sautée par
+// Ctrl+haut/bas (placeholder, voir lib/menu.js). Sans numéro, contrairement
+// aux améliorations.
 function collectionEntryLine(entry) {
-  if (!entry.discovered) return { label: "collections.entry.unknown", onActivate: () => {} };
+  if (!entry.discovered) return { label: "collections.entry.unknown", placeholder: true, onActivate: () => {} };
   const labelParams = { name: t(entry.nameKey), description: stripTrailingPeriod(t(entry.descriptionKey)) };
   return {
     label: "collections.entry.known",

@@ -19,6 +19,7 @@ const STAR_PREFIX = PREF_CONSTRAINTS.menuStarPrefix;
 const INDEX_SUFFIX = PREF_CONSTRAINTS.menuIndexSuffix;
 const CITY_MAP_ALPHA = PREF_CONSTRAINTS.cityMapAlphaCoordinates;
 const CITY_MAP_INVERT_Y = PREF_CONSTRAINTS.cityMapInvertY;
+const CONFIRM_SCENE_CHANGE = PREF_CONSTRAINTS.confirmSceneChange;
 
 export function createNavigationMenu() {
   return {
@@ -59,6 +60,13 @@ export function createNavigationMenu() {
         descriptionKey: "menu.navigation.city_map_invert_y.description",
         prefKey: "cityMapInvertY",
         default: CITY_MAP_INVERT_Y.default,
+      },
+      {
+        kind: "toggle",
+        labelKey: "menu.navigation.confirm_scene_change",
+        descriptionKey: "menu.navigation.confirm_scene_change.description",
+        prefKey: "confirmSceneChange",
+        default: CONFIRM_SCENE_CHANGE.default,
       },
       {
         label: "menu.options.back",

@@ -23,7 +23,10 @@ Une case a l'une de TROIS natures, jamais confondues :
 | En chantier | le marqueur partagé `UNDER_CONSTRUCTION` (interne au module) | Non |
 | Vide | `null` | Non |
 
-- `sceneId` : référence `scenes/index.js` (chargeable via `scenes/load.js`).
+- `sceneId` : référence `scenes/index.js` (chargeable via `scenes/load.js`),
+  et TOUJOURS une scène principale (`MAIN_SCENE_IDS`, voir
+  `doc/scene-format.md`), vérifié par l'audit du contenu : la carte montre
+  les grandes zones, jamais un intérieur.
 - `nameKey` / `descriptionKey` : clés i18n, jamais des chaînes déjà
   résolues (même convention que `entities/types/*.js`).
 - `spawnX` : point de TÉLÉPORTATION PAR DÉFAUT de cette case — PAS

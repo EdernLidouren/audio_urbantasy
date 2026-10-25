@@ -12,12 +12,15 @@
 // Comme une porte : pas d'action ici, la destination varie par instance ;
 // et pas de son d'ouverture dans l'action, la porte est déjà ouverte quand
 // on est assez près pour la franchir.
+//
+// Gain x2 sur l'ouverture et la fermeture : les fichiers sont au plafond de
+// leur volume, impossibles à remonter sans les abîmer.
 export default {
   nameKey: "door.automatic_sliding.name",
   descriptionKey: "door.automatic_sliding.description",
   sounds: {
-    approachSound: { path: "assets/sounds/doors/automatic_sliding_door_1_open" },
-    leaveSound: { path: "assets/sounds/doors/automatic_sliding_door_1_close" },
+    approachSound: { path: "assets/sounds/doors/automatic_sliding_door_1_open", approachSoundGain: 2 },
+    leaveSound: { path: "assets/sounds/doors/automatic_sliding_door_1_close", leaveSoundGain: 2 },
   },
   blocksMovement: false,
   observable: true,

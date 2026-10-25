@@ -3,6 +3,8 @@
   "menu.navigation.city_map_alpha.description": "On the city map, displays the column as a letter instead of a number.",
   "menu.navigation.city_map_invert_y": "City map: invert Y coordinates",
   "menu.navigation.city_map_invert_y.description": "On the city map, reverses how rows are counted: from the top instead of from the bottom.",
+  "menu.navigation.confirm_scene_change": "Confirm main scene changes",
+  "menu.navigation.confirm_scene_change.description": "Asks for confirmation before leaving one large area of the town for another. Interiors and floors never ask.",
   "menu.navigation.cycling": "Menu cycling",
   "menu.navigation.cycling.description": "Makes the cursor wrap from one end of a list or grid to the other, instead of stopping at the edge.",
   "menu.navigation.index_suffix": "Announce position (\"1 of 2\")",

@@ -1516,9 +1516,16 @@ La question nomme la DESTINATION (« Partir vers rue commerçante ? », clé
 `interaction.travelConfirm`) : l'action doit donc porter EXACTEMENT un effet
 `"teleport"`, vérifié au chargement. Le nom vient de la convention de titre de
 scène `scene.<id>.name` (voir `doc/i18n.md`) : la scène cible n'est pas encore
-chargée au moment de la question. Usage prévu : quitter une scène MAJEURE (une
-case de la carte de la ville) pour une autre, jamais pour entrer dans une de ses
-sous-scènes — c'est un choix de contenu, déclaré par l'action, jamais déduit.
+chargée au moment de la question.
+
+`confirm` SIGNIFIE « changement de scène principale » : il ne relie que deux
+scènes de `scenes/index.js`/`MAIN_SCENE_IDS` (voir `doc/scene-format.md`),
+jamais une sous-scène, vérifié par l'audit du contenu. C'est un choix de
+contenu, déclaré par l'action, jamais déduit. La question est un confort du
+joueur : la préférence `confirmSceneChange` (Options > Navigation, activée
+par défaut) la supprime, et l'action part alors directement, comme une porte.
+Une confirmation que le jeu imposerait toujours (un passage sans retour)
+serait un autre champ, pas celui-ci.
 Champ commun à tous les kinds (`core/action-kinds.js`/`COMMON_ACTION_FIELDS`).
 Mise en œuvre : `core/script-parse.js`/`parseSingleAction` (forme),
 `view/interaction.js`/`interact` (question).
