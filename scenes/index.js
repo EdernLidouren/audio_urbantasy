@@ -33,7 +33,7 @@ export const MAIN_SCENE_IDS = ["town_square", "main_street", "demo"];
 // trouve géographiquement, pas celle d'où l'on vient (un lieu à deux
 // entrées garde un seul quartier). La carte s'ouvre sur la case de cette
 // scène principale (view/menus/city-map-menu.js) : depuis le fond du
-// clocher, resélectionner sa case ramène sur la grand place, un retour
+// clocher, resélectionner sa case ramène sur la grand-place, un retour
 // propre qui ne laisse jamais le joueur perdu. Vérifié par l'audit du
 // contenu : toute scène est soit principale, soit rattachée ici à une
 // scène principale, jamais les deux ni aucune.

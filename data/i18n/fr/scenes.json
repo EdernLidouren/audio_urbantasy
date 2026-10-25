@@ -14,8 +14,8 @@
     "def": "la rue commerçante"
   },
   "scene.town_square.name": {
-    "base": "grand place",
-    "def": "la grand place"
+    "base": "grand-place",
+    "def": "la grand-place"
   },
   "scene.town_square_town_hall_main.name": "hôtel de ville, salle principale",
   "scene.town_square_town_hall_mayor_office.name": "hôtel de ville, bureau de la maire",

@@ -143,7 +143,7 @@ function runResolvedAction(entity, action) {
 // par tools/content-audit.js) — la scène cible n'est pas chargée à ce
 // stade, son titre ne peut pas être lu dans son fichier. Une RÉFÉRENCE au
 // nom, pas un texte traduit : le gabarit de chaque langue en choisit la
-// forme (« la grand place », « Main Street »), voir doc/i18n.md/
+// forme (« la grand-place », « Main Street »), voir doc/i18n.md/
 // "Grammaire des textes".
 function confirmationParams(action) {
   const teleport = action.effects.find((effect) => effect.type === "teleport");

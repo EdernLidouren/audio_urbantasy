@@ -160,8 +160,8 @@
   "passage.town_hall_meeting_room.description": "Un passage ménagé entre le mur et les chaises qui permet de traverser la salle de réunion.",
   "scene_exit.default.description": "Le chemin continue vers une autre partie de la ville.",
   "scene_exit.default.name": "sortie",
-  "scene_exit.main_street_town_square.description": "La rue débouche sur la grand place.",
-  "scene_exit.main_street_town_square.name": "vers la grand place",
+  "scene_exit.main_street_town_square.description": "La rue débouche sur la grand-place.",
+  "scene_exit.main_street_town_square.name": "vers la grand-place",
   "scene_exit.town_square_main_street.description": "La place se prolonge par la rue commerçante.",
   "scene_exit.town_square_main_street.name": "vers la rue commerçante"
 }

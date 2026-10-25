@@ -41,7 +41,7 @@ Une case a l'une de TROIS natures, jamais confondues :
   `hasImprovement`, amélioration existante) : une condition mal écrite
   échoue tout de suite, jamais une case hors plan pour toujours en silence.
 
-**Exemple réel** — la grand place au centre, la démo hors plan à sa droite
+**Exemple réel** — la grand-place au centre, la démo hors plan à sa droite
 jusqu'à l'obtention des anciens plans (le vieux cadastre de la réserve de
 l'hôtel de ville) :
 

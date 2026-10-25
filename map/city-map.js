@@ -37,7 +37,7 @@ export const CITY_MAP_HEIGHT = 5;
 // (voir isCityMapUnderConstruction) — pas un nouvel objet par case.
 const UNDER_CONSTRUCTION = { underConstruction: true };
 
-// La grand place, au centre de la carte, à son point de départ habituel
+// La grand-place, au centre de la carte, à son point de départ habituel
 // (playerStart de scenes/town-square.json).
 const TOWN_SQUARE_ZONE = {
   sceneId: "town_square",
@@ -46,7 +46,7 @@ const TOWN_SQUARE_ZONE = {
   spawnX: 26,
 };
 
-// La rue commerçante, à gauche de la grand place, à son point de départ
+// La rue commerçante, à gauche de la grand-place, à son point de départ
 // habituel (playerStart de scenes/main-street.json).
 const MAIN_STREET_ZONE = {
   sceneId: "main_street",
@@ -67,7 +67,7 @@ const DEMO_ZONE = {
 };
 
 // Grille littérale, lisible d'un coup d'œil (une ligne de source = une
-// ligne de la carte, jamais générée par boucle) : la grand place au centre
+// ligne de la carte, jamais générée par boucle) : la grand-place au centre
 // (x:2, y:2), la rue commerçante à sa gauche (x:1, y:2), la démo à sa
 // droite (x:3, y:2) ; tout le reste en chantier.
 export const CITY_MAP_GRID = [
