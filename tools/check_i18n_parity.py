@@ -32,6 +32,10 @@ est une divergence ; --sort la remplace. On tape donc des espaces
 ordinaires (une insécable est invisible dans un éditeur) et l'outil pose
 la bonne. Pour le lecteur d'écran, rien ne change ; une plage braille ne
 coupe plus la ligne juste avant le signe.
+
+GUILLEMETS DROITS (") : signalés dans toutes les langues, jamais corrigés
+d'office (l'outil ne peut pas deviner lequel ouvre et lequel ferme). En
+français « », en anglais “ ”.
 """
 
 import argparse
@@ -104,6 +108,13 @@ def typeset(lang, value):
     for pattern, space in rules:
         value = pattern.sub(space, value)
     return value
+
+
+def has_straight_quote(value):
+    """Un guillemet droit (") dans la valeur, ou dans l'une de ses formes."""
+    if isinstance(value, dict):
+        return any(has_straight_quote(v) for v in value.values())
+    return isinstance(value, str) and '"' in value
 
 
 def is_empty(value):
@@ -218,6 +229,7 @@ def analyze(languages, per_lang_files):
             empty = sorted(k for k, v in info["data"].items() if is_empty(v) and k not in intentionally_empty.get(domain, set()))
             unsorted = list(info["data"]) != sorted(info["data"])
             mistyped = sorted(k for k, v in info["data"].items() if typeset(lang, v) != v)
+            quoted = sorted(k for k, v in info["data"].items() if has_straight_quote(v))
 
             missing, extra, identical = [], [], []
             if lang != REFERENCE_LANG:
@@ -232,12 +244,12 @@ def analyze(languages, per_lang_files):
                         if ref_data[k] == lang_data[k] and not is_empty(ref_data[k])
                     )
 
-            if missing or extra or empty or identical or unsorted or mistyped:
+            if missing or extra or empty or identical or unsorted or mistyped or quoted:
                 per_file.append({
                     "lang": lang, "domain": domain,
                     "missing": missing, "extra": extra,
                     "empty": empty, "identical": identical,
-                    "unsorted": unsorted, "mistyped": mistyped,
+                    "unsorted": unsorted, "mistyped": mistyped, "quoted": quoted,
                 })
 
             label = rel_label(lang, domain)
@@ -247,6 +259,7 @@ def analyze(languages, per_lang_files):
             if unsorted:
                 problems.append(f"{label} : clés non triées (lancer avec --sort)")
             problems.extend(f'{label} : espace ordinaire avant ou dans une ponctuation pour "{k}" (lancer avec --sort)' for k in mistyped)
+            problems.extend(f'{label} : guillemets droits pour "{k}" (« » en français, “ ” en anglais)' for k in quoted)
 
     return counts, parse_errors, file_parity, per_file, problems
 
@@ -290,7 +303,7 @@ def render_report(languages, counts, parse_errors, file_parity, per_file, proble
     # identiques (voir "identical" ci-dessous, ex. "Templeton" légitimement
     # pareil dans les deux langues) — jamais une divergence en soi, donc
     # jamais suffisant pour éviter le repli "Aucune." ici.
-    divergent_sections = [s for s in per_file if s["missing"] or s["extra"] or s["empty"] or s["unsorted"] or s["mistyped"]]
+    divergent_sections = [s for s in per_file if s["missing"] or s["extra"] or s["empty"] or s["unsorted"] or s["mistyped"] or s["quoted"]]
     if divergent_sections:
         for section in divergent_sections:
             lines.append(f'  {rel_label(section["lang"], section["domain"])}')
@@ -304,6 +317,8 @@ def render_report(languages, counts, parse_errors, file_parity, per_file, proble
                 lines.append("    clés non triées par ordre alphabétique (lancer avec --sort)")
             for k in section["mistyped"]:
                 lines.append(f'    espace ordinaire avant ou dans une ponctuation : "{k}" (lancer avec --sort)')
+            for k in section["quoted"]:
+                lines.append(f'    guillemets droits : "{k}" (« » en français, “ ” en anglais)')
     else:
         lines.append("  Aucune.")
     lines.append("")

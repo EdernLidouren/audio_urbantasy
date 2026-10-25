@@ -26,7 +26,8 @@ export default {
 // Vérifié par l'audit du contenu (tools/content-audit.js) : chaque id
 // existe ci-dessus, chaque case de la carte pointe vers l'une d'elles, et
 // une action "confirm" ne relie que deux d'entre elles. La démo en fait
-// partie : c'est une case de la carte, même hors plan.
+// partie (scène de test, lancée par « Ville test ») : ses sous-scènes s'y
+// rattachent, même si elle ne figure plus sur la carte.
 export const MAIN_SCENE_IDS = ["town_square", "main_street", "demo"];
 
 // Rattachement de chaque SOUS-SCÈNE à sa scène principale : celle où elle se
