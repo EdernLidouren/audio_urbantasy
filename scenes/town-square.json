@@ -84,7 +84,7 @@
         "x": 0,
         "nameKey": "scene_exit.town_square_main_street.name",
         "descriptionKey": "scene_exit.town_square_main_street.description",
-        "action": { "kind": "applyEffects", "confirm": true, "effects": [{ "type": "teleport", "target": "main_street", "x": 50, "side": "verso" }] }
+        "action": { "kind": "applyEffects", "confirm": true, "effects": [{ "type": "teleport", "target": "main_street", "x": 49, "side": "verso" }] }
       },
       { "id": "river_verso", "type": "river", "x": 10, "interactable": false, "blocksMovement": true },
       {

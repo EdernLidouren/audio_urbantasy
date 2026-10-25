@@ -90,7 +90,7 @@
         "x": 50,
         "nameKey": "scene_exit.main_street_town_square.name",
         "descriptionKey": "scene_exit.main_street_town_square.description",
-        "action": { "kind": "applyEffects", "confirm": true, "effects": [{ "type": "teleport", "target": "town_square", "x": 0, "side": "verso" }] }
+        "action": { "kind": "applyEffects", "confirm": true, "effects": [{ "type": "teleport", "target": "town_square", "x": 1, "side": "verso" }] }
       }
     ]
   }
