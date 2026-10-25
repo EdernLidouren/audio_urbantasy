@@ -14,7 +14,7 @@ import { setGameStartHandler } from "./view/menus/save-menu.js";
 import { makeMenuScreen, configureMenuPreferences, configureMenuSounds } from "./lib/menu.js";
 import { playMenuSound } from "./view/menu-sounds.js";
 import { makeCityScreen } from "./view/city-screen.js";
-import { t } from "./data/i18n/index.js";
+import { t, setI18nWarningHandler } from "./data/i18n/index.js";
 import { runChecks } from "./core/checks/index.js";
 import { isDebugEnabled, setDebugEnabled } from "./config/debug.js";
 import { startLoop } from "./lib/loop.js";
@@ -28,7 +28,7 @@ import { getPref, setPref } from "./config/preferences.js";
 import { configureAssetManifest } from "./lib/assets.js";
 import { checkAutoSaveTimer } from "./view/autosave-timer.js";
 import { loadGame } from "./view/save-storage.js";
-import { reportSaveRepairs } from "./view/debug-warnings.js";
+import { reportSaveRepairs, reportI18nWarning } from "./view/debug-warnings.js";
 import { announceNewDiscoveries } from "./view/collection-discoveries.js";
 
 // Préférences de menu (sliders/toggles + cyclage/étoile/suffixe, voir
@@ -40,6 +40,10 @@ configureMenuPreferences({ getPref, setPref });
 // patron d'injection que les préférences ci-dessus — voir lib/menu.js et
 // view/menu-sounds.js.
 configureMenuSounds(playMenuSound);
+// Avertissements de rendu des textes (clé, paramètre ou forme de nom
+// manquants) : au journal d'avertissements, lisible au lecteur d'écran
+// (Shift+L en mode debug), et toujours en console.
+setI18nWarningHandler(reportI18nWarning);
 
 // Registre des types d'entité et départ d'une partie neuve
 // (config/new-game.js), validés UNE FOIS ici, au démarrage : une erreur

@@ -49,7 +49,18 @@ const [fr, en, grammar] = await Promise.all([
   loadJson("data/i18n/grammar.json"),
 ]);
 
-export const { t, hasKey, setLocale, getLocale, availableLocales, browserLocale } = createI18n({ fr, en }, { grammar });
+export const {
+  t,
+  hasKey,
+  setLocale,
+  getLocale,
+  availableLocales,
+  browserLocale,
+  // Branché par main.js sur le journal d'avertissements (voir
+  // view/debug-warnings.js/reportI18nWarning) : pas ici, le journal
+  // importe lui-même t.
+  setWarningHandler: setI18nWarningHandler,
+} = createI18n({ fr, en }, { grammar });
 
 // Grammaire déclarée, en LECTURE pour les vérifications (lib/checks/
 // i18n.check.js) et l'audit du contenu.

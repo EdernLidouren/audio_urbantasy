@@ -9,6 +9,7 @@
   "debug.warnings.droppedEntity": "Sauvegarde : entité {entityId} retirée de la scène {worldId}, type inconnu {type}",
   "debug.warnings.droppedEquippedItem": "Sauvegarde : objet {type} retiré de l'équipement ({slot}), type inconnu",
   "debug.warnings.empty": "Aucun avertissement",
+  "debug.warnings.i18n": "Texte : {message}",
   "debug.warnings.sceneLoadFailed": "Chargement de la scène {sceneId} impossible : {message}",
   "debug.warnings.sceneReloadFailed": "Rechargement de la scène {sceneId} impossible : {message}",
   "debug.warnings.title": "Avertissements : {count}",

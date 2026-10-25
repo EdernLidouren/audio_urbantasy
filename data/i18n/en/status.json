@@ -9,6 +9,7 @@
   "debug.warnings.droppedEntity": "Save: entity {entityId} removed from scene {worldId}, unknown type {type}",
   "debug.warnings.droppedEquippedItem": "Save: item {type} removed from equipment ({slot}), unknown type",
   "debug.warnings.empty": "No warnings",
+  "debug.warnings.i18n": "Text: {message}",
   "debug.warnings.sceneLoadFailed": "Could not load scene {sceneId}: {message}",
   "debug.warnings.sceneReloadFailed": "Could not reload scene {sceneId}: {message}",
   "debug.warnings.title": "Warnings: {count}",

@@ -95,6 +95,25 @@ function reportBrokenReferences(brokenReferences) {
   }
 }
 
+// Texte rendu de travers en jeu (voir lib/i18n.js, branché par main.js) :
+// clé introuvable, paramètre manquant ou du mauvais type, forme de nom
+// absente. Le texte s'annonce quand même, dégradé ; le journal dit quoi
+// corriger. Une même faute n'est notée qu'une fois tant qu'elle est au
+// journal : une annonce répétée à chaque pas le noierait sous la même
+// entrée. Vider le journal la laisse revenir.
+export function reportI18nWarning(message) {
+  const alreadyLogged = warningLog
+    .entries()
+    .some((entry) => entry.key === "debug.warnings.i18n" && entry.params.raw === message);
+  if (alreadyLogged) {
+    console.warn(`i18n: ${message}`);
+    return;
+  }
+  // Point final retiré : le menu en ajoute un après chaque entrée. `raw`
+  // garde le message exact pour reconnaître un doublon.
+  reportWarning("debug.warnings.i18n", { message: stripTrailingPeriod(message), raw: message }, `i18n: ${message}`);
+}
+
 // Tout ce que la relecture d'une sauvegarde a réparé (voir
 // view/save-storage.js/loadGame, importGame), signalé quand elle devient la
 // partie en cours.
