@@ -6,5 +6,6 @@
   "cityMap.offMapHere": "Off the map, you are here.",
   "cityMap.offMapRefusal": "This scene is not on your map.",
   "cityMap.town_square.description": "The heart of the town, overlooked by the town hall and its clock tower.",
-  "cityMap.underConstruction": "Under construction."
+  "cityMap.underConstruction": "Under construction.",
+  "cityMap.zone": "{name}: {description}"
 }

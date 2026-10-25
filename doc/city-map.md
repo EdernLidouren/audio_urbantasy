@@ -117,7 +117,9 @@ jeu, jamais sur la pause restée en dessous.
   `(0, 0)` si cette scène n'est pas sur la carte (l'audit du contenu
   l'interdit).
 - **Annonce à chaque déplacement**, trois natures distinctes :
-  - zone réelle : `"<nom> : <description>"` (`t(nameKey)`/`t(descriptionKey)`).
+  - zone réelle : `"<nom> : <description>"` (`t(nameKey)`/`t(descriptionKey)`),
+    assemblés par le gabarit `cityMap.zone` (ponctuation propre à chaque langue,
+    `"<nom>: <description>"` en anglais).
   - en chantier : `t("cityMap.underConstruction")`.
   - vide : `t("cityMap.empty")`.
 - **Touche "x" — coordonnées** : annonce la position de la case courante,

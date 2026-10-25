@@ -1,6 +1,6 @@
 {
-  "weather.announce": "Météo : {state}.",
-  "weather.debug.force": "Forcer : {state}",
+  "weather.announce": "Météo : {state}.",
+  "weather.debug.force": "Forcer : {state}",
   "weather.debug.title": "Météo (debug)",
   "weather.debug.triggerTransition": "Déclencher la transition suivante",
   "weather.state.clear": "dégagé",

@@ -110,7 +110,7 @@ function cellAnnouncementText(x, y, session) {
   if (isRealCityMapZone(cell) && !isZoneOnMap(cell, session)) {
     return t(cell.sceneId === currentMainSceneId(session) ? "cityMap.offMapHere" : "cityMap.offMap");
   }
-  if (isRealCityMapZone(cell)) return `${t(cell.nameKey)} : ${t(cell.descriptionKey)}`;
+  if (isRealCityMapZone(cell)) return t("cityMap.zone", { name: t(cell.nameKey), description: t(cell.descriptionKey) });
   if (isCityMapUnderConstruction(cell)) return t("cityMap.underConstruction");
   return t("cityMap.empty");
 }

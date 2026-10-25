@@ -24,10 +24,19 @@ clés (door.*, entity.*, passage.*...) reste d'un seul bloc. Un fichier non
 trié est une divergence. --sort réécrit les fichiers non triés dans l'ordre
 attendu (même format : indentation de 2, UTF-8, saut de ligne final), avant
 l'analyse : ajouter une clé n'importe où puis lancer --sort suffit.
+
+TYPOGRAPHIE PROPRE À UNE LANGUE (TYPOGRAPHY) : en français, espace
+insécable avant « : » et à l'intérieur des guillemets, espace fine
+insécable avant « ; », « ! » et « ? ». Une espace ordinaire à ces places
+est une divergence ; --sort la remplace. On tape donc des espaces
+ordinaires (une insécable est invisible dans un éditeur) et l'outil pose
+la bonne. Pour le lecteur d'écran, rien ne change ; une plage braille ne
+coupe plus la ligne juste avant le signe.
 """
 
 import argparse
 import json
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -67,6 +76,36 @@ def load_domain_files(lang_dir):
     return files
 
 
+NBSP = "\u00a0"   # espace insécable
+NNBSP = "\u202f"  # espace fine insécable
+
+# Règles par langue : (motif d'une espace ORDINAIRE mal placée, espace à
+# mettre). Une langue absente n'a aucune règle.
+TYPOGRAPHY = {
+    "fr": [
+        (re.compile(r" (?=[;!?])"), NNBSP),
+        (re.compile(r" (?=:)"), NBSP),
+        (re.compile(r"(?<=«) "), NBSP),
+        (re.compile(r" (?=»)"), NBSP),
+    ],
+}
+
+
+def typeset(lang, value):
+    """Valeur avec les espaces de la typographie de `lang` (voir
+    TYPOGRAPHY) ; un nom en objet de formes l'est forme par forme."""
+    rules = TYPOGRAPHY.get(lang)
+    if not rules:
+        return value
+    if isinstance(value, dict):
+        return {k: typeset(lang, v) for k, v in value.items()}
+    if not isinstance(value, str):
+        return value
+    for pattern, space in rules:
+        value = pattern.sub(space, value)
+    return value
+
+
 def is_empty(value):
     """Valeur vide : une chaîne vide, ou un nom écrit en objet de formes
     ({ "base": ..., "def": ... }, voir doc/i18n.md/"Grammaire des textes")
@@ -86,16 +125,20 @@ def dump_sorted(path, data):
 
 def sort_files(per_lang_files):
     """--sort : réécrit les fichiers lisibles dont les clés ne sont pas
-    triées, met à jour les données chargées. Renvoie les étiquettes des
-    fichiers réécrits."""
+    triées ou dont la typographie est à reprendre (voir TYPOGRAPHY), met à
+    jour les données chargées. Renvoie les étiquettes des fichiers
+    réécrits."""
     rewritten = []
     for lang, files in per_lang_files.items():
         for domain, info in files.items():
             data = info["data"]
-            if data is None or list(data) == sorted(data):
+            if data is None:
                 continue
-            dump_sorted(info["path"], data)
-            info["data"] = dict(sorted(data.items()))
+            typeset_data = {k: typeset(lang, v) for k, v in data.items()}
+            if list(data) == sorted(data) and typeset_data == data:
+                continue
+            dump_sorted(info["path"], typeset_data)
+            info["data"] = dict(sorted(typeset_data.items()))
             rewritten.append(rel_label(lang, domain))
     return rewritten
 
@@ -174,6 +217,7 @@ def analyze(languages, per_lang_files):
 
             empty = sorted(k for k, v in info["data"].items() if is_empty(v) and k not in intentionally_empty.get(domain, set()))
             unsorted = list(info["data"]) != sorted(info["data"])
+            mistyped = sorted(k for k, v in info["data"].items() if typeset(lang, v) != v)
 
             missing, extra, identical = [], [], []
             if lang != REFERENCE_LANG:
@@ -188,12 +232,12 @@ def analyze(languages, per_lang_files):
                         if ref_data[k] == lang_data[k] and not is_empty(ref_data[k])
                     )
 
-            if missing or extra or empty or identical or unsorted:
+            if missing or extra or empty or identical or unsorted or mistyped:
                 per_file.append({
                     "lang": lang, "domain": domain,
                     "missing": missing, "extra": extra,
                     "empty": empty, "identical": identical,
-                    "unsorted": unsorted,
+                    "unsorted": unsorted, "mistyped": mistyped,
                 })
 
             label = rel_label(lang, domain)
@@ -202,6 +246,7 @@ def analyze(languages, per_lang_files):
             problems.extend(f'{label} : valeur vide pour "{k}"' for k in empty)
             if unsorted:
                 problems.append(f"{label} : clés non triées (lancer avec --sort)")
+            problems.extend(f'{label} : espace ordinaire avant ou dans une ponctuation pour "{k}" (lancer avec --sort)' for k in mistyped)
 
     return counts, parse_errors, file_parity, per_file, problems
 
@@ -245,7 +290,7 @@ def render_report(languages, counts, parse_errors, file_parity, per_file, proble
     # identiques (voir "identical" ci-dessous, ex. "Templeton" légitimement
     # pareil dans les deux langues) — jamais une divergence en soi, donc
     # jamais suffisant pour éviter le repli "Aucune." ici.
-    divergent_sections = [s for s in per_file if s["missing"] or s["extra"] or s["empty"] or s["unsorted"]]
+    divergent_sections = [s for s in per_file if s["missing"] or s["extra"] or s["empty"] or s["unsorted"] or s["mistyped"]]
     if divergent_sections:
         for section in divergent_sections:
             lines.append(f'  {rel_label(section["lang"], section["domain"])}')
@@ -257,6 +302,8 @@ def render_report(languages, counts, parse_errors, file_parity, per_file, proble
                 lines.append(f'    valeur vide : "{k}"')
             if section["unsorted"]:
                 lines.append("    clés non triées par ordre alphabétique (lancer avec --sort)")
+            for k in section["mistyped"]:
+                lines.append(f'    espace ordinaire avant ou dans une ponctuation : "{k}" (lancer avec --sort)')
     else:
         lines.append("  Aucune.")
     lines.append("")
@@ -290,7 +337,7 @@ def main():
 
     parser = argparse.ArgumentParser(description="Vérifie la parité des traductions i18n contre REFERENCE_LANG.")
     parser.add_argument("--verbose", action="store_true", help="ajoute la liste des valeurs identiques à la référence (indicatif, n'affecte pas le code de sortie)")
-    parser.add_argument("--sort", action="store_true", help="réécrit les fichiers dont les clés ne sont pas triées, avant l'analyse")
+    parser.add_argument("--sort", action="store_true", help="réécrit les fichiers dont les clés ne sont pas triées ou dont la typographie est à reprendre, avant l'analyse")
     parser.add_argument("--output", default=str(DEFAULT_REPORT_PATH), help=f"chemin du rapport à écrire (défaut : {DEFAULT_REPORT_PATH})")
     args = parser.parse_args()
 

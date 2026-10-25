@@ -11,7 +11,7 @@
   "improvement.skeleton_key.name": "sésame",
   "improvement.supernatural_perception.description": "Ouvre vos sens au monde de l'invisible jusqu'à ce que vous révoquiez ce pouvoir. Tandis que vous devinez la magie et les entités qui y sont affiliées, vous perdez une partie de vos perceptions ordinaires.",
   "improvement.supernatural_perception.name": "perception surnaturelle",
-  "improvements.entry.known": "{order} - {name} : {description}",
+  "improvements.entry.known": "{order} - {name} : {description}",
   "improvements.entry.unknown": "{order} - Inconnue",
-  "improvements.title": "Améliorations : {unlocked} sur {total}"
+  "improvements.title": "Améliorations : {unlocked} sur {total}"
 }

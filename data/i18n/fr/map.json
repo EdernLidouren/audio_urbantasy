@@ -6,5 +6,6 @@
   "cityMap.offMapHere": "Hors plan, vous êtes ici.",
   "cityMap.offMapRefusal": "Cette scène ne figure pas sur votre plan.",
   "cityMap.town_square.description": "Le cœur de la ville, dominé par l'hôtel de ville et son clocher.",
-  "cityMap.underConstruction": "En chantier."
+  "cityMap.underConstruction": "En chantier.",
+  "cityMap.zone": "{name} : {description}"
 }
