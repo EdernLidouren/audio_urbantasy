@@ -67,6 +67,16 @@ def load_domain_files(lang_dir):
     return files
 
 
+def is_empty(value):
+    """Valeur vide : une chaîne vide, ou un nom écrit en objet de formes
+    ({ "base": ..., "def": ... }, voir doc/i18n.md/"Grammaire des textes")
+    dont la base est vide ou absente. Les autres formes d'un objet sont
+    propres à chaque langue : jamais comparées entre langues."""
+    if isinstance(value, dict):
+        return value.get("base", "") == ""
+    return value == ""
+
+
 def dump_sorted(path, data):
     """Écrit un fichier de domaine trié, au format commun de data/i18n/."""
     text = json.dumps(dict(sorted(data.items())), ensure_ascii=False, indent=2) + "\n"
@@ -154,7 +164,7 @@ def analyze(languages, per_lang_files):
             for lang in languages
             if domain in per_lang_files[lang] and per_lang_files[lang][domain]["data"] is not None
         ]
-        keys = set.intersection(*(set(k for k, v in data.items() if v == "") for data in datas)) if datas else set()
+        keys = set.intersection(*(set(k for k, v in data.items() if is_empty(v)) for data in datas)) if datas else set()
         intentionally_empty[domain] = keys
 
     for lang in languages:
@@ -162,7 +172,7 @@ def analyze(languages, per_lang_files):
             if info["data"] is None:
                 continue  # JSON invalide, déjà signalé plus haut
 
-            empty = sorted(k for k, v in info["data"].items() if v == "" and k not in intentionally_empty.get(domain, set()))
+            empty = sorted(k for k, v in info["data"].items() if is_empty(v) and k not in intentionally_empty.get(domain, set()))
             unsorted = list(info["data"]) != sorted(info["data"])
 
             missing, extra, identical = [], [], []
@@ -175,7 +185,7 @@ def analyze(languages, per_lang_files):
                     extra = sorted(lang_keys - ref_keys)
                     identical = sorted(
                         k for k in (ref_keys & lang_keys)
-                        if ref_data[k] == lang_data[k] and ref_data[k] != ""
+                        if ref_data[k] == lang_data[k] and not is_empty(ref_data[k])
                     )
 
             if missing or extra or empty or identical or unsorted:

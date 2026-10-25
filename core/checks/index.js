@@ -13,7 +13,9 @@
 //
 // Ajouter un domaine : un fichier ./<domaine>.check.js qui exporte par
 // défaut `function check<Domaine>(run)`, et sa ligne dans SUITES (l'ordre
-// de SUITES est l'ordre d'exécution et d'affichage).
+// de SUITES est l'ordre d'exécution et d'affichage). Un mécanisme PORTABLE
+// de lib/ range ses vérifications dans lib/checks/<domaine>.check.js, même
+// forme, et passe par ce même point d'entrée (domaine "i18n").
 
 import { runCheckSuites } from "../../lib/check.js";
 import checkMovement from "./movement.check.js";
@@ -42,6 +44,9 @@ import checkCollections from "./collections.check.js";
 import checkTriggers from "./triggers.check.js";
 import checkNewGame from "./new-game.check.js";
 import checkStartle from "./startle.check.js";
+// Domaines de lib/ (mécanismes portables), lancés par le même point
+// d'entrée : une seule commande, un seul récapitulatif.
+import checkI18n from "../../lib/checks/i18n.check.js";
 
 const SUITES = [
   { name: "movement", check: checkMovement },
@@ -70,6 +75,7 @@ const SUITES = [
   { name: "triggers", check: checkTriggers },
   { name: "new-game", check: checkNewGame },
   { name: "startle", check: checkStartle },
+  { name: "i18n", check: checkI18n },
 ];
 
 // Noms des domaines, dans l'ordre d'exécution.

@@ -2,7 +2,7 @@
 // DYNAMIQUES d'entité (voir doc/entity-model.md/"Interaction (niveau 0)",
 // doc/scripting.md/"Descriptions dynamiques"). Niveau SIMPLE aujourd'hui :
 // un gabarit i18n à variables (MÊME mécanisme que time.announce/
-// weather.announce, voir lib/i18n.js/interpolate — jamais dupliqué ici),
+// weather.announce, voir lib/i18n.js/t — jamais dupliqué ici),
 // rempli avec des valeurs dérivées du CONTEXTE au moment de la LECTURE.
 // JAMAIS de description stockée ni mise à jour par effet — recalculée à
 // CHAQUE appel, avec le contexte du moment.
@@ -46,8 +46,8 @@ export function timeTemplateValues(time) {
 // resolveDescriptionText ci-dessous, qui reste agnostique de ce qu'elle
 // contient. `context.time` absent (cas limite, hors partie) -> dictionnaire
 // vide : chaque placeholder se dégrade alors PROPREMENT via
-// lib/i18n.js/interpolate (laissé tel quel + avertissement), jamais un
-// crash.
+// lib/i18n/message.js/renderMessage (laissé tel quel + avertissement),
+// jamais un crash.
 function buildDescriptionValues(context) {
   if (!context || context.time === undefined) return {};
   const values = timeTemplateValues(context.time);

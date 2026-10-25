@@ -108,8 +108,8 @@ export function setCurrentTabsScreen(screen) {
 // annoncé D'ABORD, la description EN QUEUE : qui ne veut que le nom l'a déjà
 // entendu et peut passer à l'objet suivant, la description reste
 // non-bloquante par construction. Le nom et la description sont déjà résolus
-// ICI (t(...)) avant interpolation dans lib/menu.js : interpolate() ne fait
-// que remplacer des chaînes dans un gabarit, jamais une traduction imbriquée.
+// ICI (t(...)) avant d'être passés au gabarit de lib/menu.js, qui les
+// insère tels quels.
 // Point final de la description RETIRÉ avant interpolation : cette ligne
 // n'est pas la fin de la phrase (lib/menu.js/actionLine lui ajoute encore
 // ". <position>", voir "1 sur 2") — sans ce retrait, la description

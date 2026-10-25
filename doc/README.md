@@ -13,7 +13,7 @@ domaine, le détail du code vivant dans les en-têtes de fichiers.
 | [`entity-model.md`](entity-model.md) | Modèle d'entité spécifique-Templeton : capacités d'interaction, dormance, collectible persistant, entités éphémères, collecte (conteneurs régénérants, plages au sol, cycle quotidien), vente et achat (point de vente, catalogue à stock cyclique, menu à sliders inline), mode debug, sac/équipement, vocabulaire de sons et cascade de réglages, presets, recto/verso (isolation), le joueur. |
 | [`time.md`](time.md) | Horloge de partie : le compteur, ses dérivations, le calendrier simplifié, l'avancement accéléré, la persistance, la phase jour/nuit. |
 | [`city-map.md`](city-map.md) | Topologie de la carte de la ville et le menu-carte. |
-| [`i18n.md`](i18n.md) | Convention `data/i18n/` : découpage par domaine, parité fr/en, où va une nouvelle clé de traduction. |
+| [`i18n.md`](i18n.md) | Convention `data/i18n/` : découpage par domaine, parité fr/en, où va une nouvelle clé de traduction, grammaire des gabarits (pluriel, ordinaux, choix, formes de nom, listes). |
 | [`collections.md`](collections.md) | Collections : modèle (un fichier par collection), découverte par acquisition (`addItem`), textes, onglet Collections, sauvegarde, debug, extension par observation. |
 | [`new-game.md`](new-game.md) | Départ d'une partie neuve : scène, argent, sac, équipement, compagnons et variables de partie (`config/new-game.js`), validation au démarrage. |
 | [`save.md`](save.md) | Sauvegarde : contenu, relecture (rebouchage, renommages de contenu, types inconnus), table `config/save-renames.js`. |

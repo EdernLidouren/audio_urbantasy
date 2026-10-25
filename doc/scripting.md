@@ -1815,8 +1815,8 @@ toucher — un objet peut alors le référencer dans son `tags: [...]`.
 `resolveDescription`, l'INDIRECTION déjà en place pour "Espace"), JAMAIS
 stocké ni mis à jour par effet. Une description SANS `{variable}` reste
 STATIQUE (le gabarit ne fait que
-réutiliser `lib/i18n.js`/`interpolate`, qui traverse un gabarit sans
-placeholder sans y toucher).
+réutiliser `lib/i18n.js`/`t`, qui rend un gabarit sans placeholder tel
+quel).
 
 ```json
 "entity.clock.description": "Une horloge murale... Il est {hour} h {minute}."
@@ -1833,7 +1833,8 @@ COURANTE (voir `entities/types/clock.js`).
 ce dictionnaire, jamais dans le mécanisme de remplissage
 (`resolveDescriptionText`), qui reste agnostique de ce qu'il contient.
 Variable de gabarit inconnue ou valeur manquante → dégradation PROPRE
-(`{placeholder}` laissé tel quel + avertissement, voir `lib/i18n.js`),
+(`{placeholder}` laissé tel quel + avertissement, voir
+`lib/i18n/message.js`),
 jamais un plantage.
 
 **Contexte de résolution** : EXACTEMENT `actionContext(entity)` (voir

@@ -7,8 +7,15 @@
 // ni chargées par le réseau.
 // `await` au niveau module : tout consommateur qui importe ce module attend
 // que les données soient prêtes avant que son propre code ne s'exécute.
+// Un texte invalide (gabarit mal formé, forme non déclarée...) fait échouer
+// cet import, donc le démarrage, avec la liste des fautes (lib/i18n.js/
+// createI18n).
 
-import { createI18n, loadLocale } from "../../lib/i18n.js";
+import { createI18n, loadLocale, loadJson } from "../../lib/i18n.js";
+
+// Référence à un nom, à passer en paramètre de t() quand un gabarit en
+// choisit la forme ({scene:def}, voir doc/i18n.md/"Grammaire des textes").
+export { nameRef } from "../../lib/i18n.js";
 
 // Domaines (noms de fichiers .json), les MÊMES pour toutes les langues —
 // une seule liste, la parité des contenus est vérifiée par
@@ -32,9 +39,21 @@ const DOMAINS = [
   "weather",
 ];
 
-const [fr, en] = await Promise.all([loadLocale("data/i18n/fr", DOMAINS), loadLocale("data/i18n/en", DOMAINS)]);
+// Formes et attributs de nom reconnus par chaque langue (data/i18n/
+// grammar.json) : une donnée, hors des domaines de clés, que la parité ne
+// compare pas — chaque langue déclare ce dont ses propres gabarits ont
+// besoin.
+const [fr, en, grammar] = await Promise.all([
+  loadLocale("data/i18n/fr", DOMAINS),
+  loadLocale("data/i18n/en", DOMAINS),
+  loadJson("data/i18n/grammar.json"),
+]);
 
-export const { t, hasKey, setLocale, getLocale, availableLocales } = createI18n({ fr, en });
+export const { t, hasKey, setLocale, getLocale, availableLocales } = createI18n({ fr, en }, { grammar });
+
+// Grammaire déclarée, en LECTURE pour les vérifications (lib/checks/
+// i18n.check.js) et l'audit du contenu.
+export const GRAMMAR = grammar;
 
 // Tables brutes par langue, en LECTURE pour les outils de dev qui vérifient
 // une clé langue par langue (tools/content-audit.js) — hasKey, lui, se

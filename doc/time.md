@@ -207,8 +207,7 @@ mois suivant, fin d'année → saison qui repart à `printemps`).
 `view/status-announcements.js`/`announceGameTime` fournit à `t("time.announce", {...})` des
 composants NOMMÉS déjà résolus (`day`, `month`, `season`, `year`, `hour`, `minute` —
 `month`/`season` déjà traduits via leur propre clé, comme des sous-traductions
-résolues AVANT interpolation, `interpolate()` ne faisant jamais de traduction
-imbriquée) : le code ignore tout de l'ORDRE d'affichage, qui vit ENTIÈREMENT dans le
+résolues AVANT d'être passées au gabarit) : le code ignore tout de l'ORDRE d'affichage, qui vit ENTIÈREMENT dans le
 gabarit `time.announce` de chaque locale — forme commune "heure, jour mois, saison,
 année" (`data/i18n/fr/status.json` place le jour avant le mois ;
 `data/i18n/en/status.json` le mois avant le jour, forme "heure, mois jour, saison,
