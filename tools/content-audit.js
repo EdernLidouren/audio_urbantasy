@@ -20,6 +20,12 @@
 //     defineBindings) a sa description d'aide "help.<table>.<action>" et le
 //     nom de ses touches dans chaque langue, et aucune description d'aide
 //     ne reste sans raccourci ;
+//   - chaque série de messages en rotation (rotations/) est valide, a le
+//     texte de chacun de ses messages dans chaque langue, et aucun texte
+//     "rotation.*" ne reste sans série ; chaque archétype qui cite une série
+//     la trouve, et sa description (comme celle de ses instances) porte
+//     {message} dans chaque langue — l'inverse, {message} sans série, se
+//     lirait brut ;
 //   - chaque clé i18n citée existe en fr ET en en ;
 //   - chaque son cité (chemin "assets/...") existe dans le manifeste audio.
 //
@@ -30,9 +36,9 @@
 // tout va bien). Chaque problème : { source, where, kind, detail }.
 //
 // Sources parcourues : les scènes (JSON brut), le registre des types
-// d'entité, le joueur, les objets, les améliorations, les collections, la
-// carte de la ville, le départ de partie, la météo, la perception et les
-// catalogues des boutiques.
+// d'entité, le joueur, les objets, les améliorations, les collections, les
+// séries de messages en rotation, la carte de la ville, le départ de partie,
+// la météo, la perception et les catalogues des boutiques.
 //
 // Repérage : toute valeur chaîne, à n'importe quelle profondeur. Une CLÉ
 // i18n est une chaîne pointée en minuscules dont le premier segment est un
@@ -45,11 +51,13 @@ import registry from "../entities/types/index.js";
 import player from "../entities/player.js";
 import scenePaths, { MAIN_SCENE_IDS, MAIN_SCENE_OF } from "../scenes/index.js";
 import collections from "../collections/index.js";
+import rotations from "../rotations/index.js";
 import { parseScene } from "../core/scene.js";
 import { validateEntityRegistry } from "../core/entity-parse.js";
 import { ITEM_REGISTRY } from "../core/items.js";
 import { IMPROVEMENT_REGISTRY } from "../core/improvements.js";
 import { collectionNameKey, entryTextKeys } from "../core/collections.js";
+import { validateRotation, rotationTextKey } from "../core/rotation.js";
 import { CITY_MAP_GRID } from "../map/city-map.js";
 import { NEW_GAME } from "../config/new-game.js";
 import { WEATHER_STATES } from "../config/weather-values.js";
@@ -179,6 +187,21 @@ export async function auditContent() {
     );
   }
 
+  // Description d'une entité qui affiche une série (ou qui devrait) : le
+  // gabarit doit porter {message} dans chaque langue si son type cite une
+  // série, et jamais sinon (le placeholder se lirait brut).
+  const MESSAGE_PLACEHOLDER = /\{\s*message\s*\}/;
+  function checkMessagePlaceholder(source, where, type, descriptionKey) {
+    if (typeof descriptionKey !== "string" || !registry[type]) return;
+    const expected = registry[type].messageRotation !== undefined;
+    for (const [lang, table] of Object.entries(LOCALE_TABLES)) {
+      const text = table[descriptionKey];
+      if (typeof text !== "string") continue;
+      if (expected && !MESSAGE_PLACEHOLDER.test(text)) report(source, where, `{message} absent de la description (${lang})`, descriptionKey);
+      if (!expected && MESSAGE_PLACEHOLDER.test(text)) report(source, where, `{message} sans série de messages (${lang})`, descriptionKey);
+    }
+  }
+
   // Scènes : chargement réel (une erreur par scène, celle que verrait le
   // jeu), puis références du JSON brut, même si la scène est invalide.
   for (const [id, url] of Object.entries(scenePaths)) {
@@ -204,6 +227,11 @@ export async function auditContent() {
     if (raw.titleKey !== `scene.${id}.name`) report(source, "titleKey", "titre hors convention scene.<id>.name", String(raw.titleKey));
     checkStrings(source, raw);
     checkConfirmedActions(id, raw);
+    walk(raw, "", () => {}, (object, where) => {
+      if (typeof object.type === "string" && object.descriptionKey !== undefined) {
+        checkMessagePlaceholder(source, where, object.type, object.descriptionKey);
+      }
+    });
   }
 
   try {
@@ -228,6 +256,32 @@ export async function auditContent() {
       keys.push(nameKey, descriptionKey);
     }
     checkStrings(`collection ${id}`, keys);
+  }
+
+  // Messages en rotation : clés DÉDUITES des ids (core/rotation.js), comme
+  // les collections.
+  const rotationTexts = new Set();
+  for (const [id, rotation] of Object.entries(rotations)) {
+    try {
+      validateRotation(id, rotation);
+    } catch (error) {
+      report(`série ${id}`, "rotations", "série invalide", error.message);
+      continue;
+    }
+    const keys = rotation.entries.map((entry) => rotationTextKey(id, entry));
+    keys.forEach((key) => rotationTexts.add(key));
+    checkStrings(`série ${id}`, keys);
+  }
+  for (const [lang, table] of Object.entries(LOCALE_TABLES)) {
+    for (const key of Object.keys(table)) {
+      if (key.startsWith("rotation.") && !rotationTexts.has(key)) report("messages en rotation", lang, "texte sans série", key);
+    }
+  }
+  for (const [type, archetype] of Object.entries(registry)) {
+    if (archetype.messageRotation !== undefined && !Object.hasOwn(rotations, archetype.messageRotation)) {
+      report("types d'entité", type, "série de messages inconnue", archetype.messageRotation);
+    }
+    checkMessagePlaceholder("types d'entité", type, type, archetype.descriptionKey);
   }
 
   CITY_MAP_GRID.forEach((row, y) =>

@@ -698,6 +698,59 @@ prévu, pas construit). Prix d'achat : `price` de l'article, sinon `value`
 Contenu de test : `scenes/demo.json`, `counter_1` (x=38, catalogue
 `general`).
 
+## Messages en rotation — un texte qui change avec l'heure
+
+Une entité peut AFFICHER un message qui change à intervalle régulier de temps
+de jeu, lu dans sa description : le panneau publicitaire motorisé
+(`entities/types/motorised_billboard.js`, `scenes/main-street.json`, x 20
+au recto) passe une nouvelle réclame à chaque heure.
+
+**Le contenu** : une SÉRIE de messages, un fichier par série dans
+`rotations/` (donnée pure, registre `rotations/index.js`), une liste d'ids :
+
+```js
+export default { entries: ["arpulse", "gremlins", "macarons"] };
+```
+
+Le texte de chaque message vit sous `rotation.<série>.<id>`
+(`data/i18n/<langue>/rotations.json`), clé DÉDUITE des ids, jamais écrite
+dans la série. L'id nomme le message, pas sa phrase : chaque langue écrit
+le sien, adaptation plutôt que traduction (une blague ne se traduit pas mot
+à mot), et la parité garantit qu'aucun message ne manque d'une langue.
+
+**L'entité** cite sa série à l'ARCHÉTYPE, `messageRotation: "billboard_ads"`
+(champ d'archétype seulement, lu par la vue dans le registre comme
+`collisionSound` : jamais copié dans l'entité, donc jamais figé par une
+sauvegarde), et sa description porte `{message}` :
+« Le panneau affiche : « {message} » ». La période est un réglage en
+cascade, `messageRotationMinutes` (`config/tuning-values.js`, 60 : à
+l'heure pile), surchargeable par archétype ou par instance (`tuning`).
+
+**Le message n'est JAMAIS stocké** (`core/rotation.js`) : il se DÉDUIT, à
+chaque observation, de l'heure de jeu, de la série et d'un sel propre au
+panneau (son monde et son id, `view/message-rotation.js`). Rien à
+sauvegarder ni à migrer ; gelé avec le temps de jeu ; aucun rattrapage si
+des heures passent loin du panneau ; même sel + même heure -> même message.
+Deux panneaux ne passent pas la même réclame à la même heure. (Toute partie
+a aujourd'hui la même seed, que la session ne garde pas ; une seed de
+partie rejoindrait ce sel.)
+
+**Tirage en pioche** : sur un cycle d'autant de périodes que la série a de
+messages, chacun passe UNE fois, dans un ordre mélangé, puis le cycle
+suivant remélange. Jamais deux fois le même message de suite, jonction de
+deux cycles comprise ; deux messages alternent, un seul ne change pas.
+
+**Validation** : une série invalide (vide, doublon, id hors minuscules,
+champ inconnu) ou un archétype qui cite une série inconnue arrête le jeu au
+démarrage (`view/message-rotation.js`). L'audit du contenu signale un
+message sans texte dans une langue, un texte `rotation.*` sans série, une
+description sans `{message}` alors que le type cite une série, et
+l'inverse. Vérifications : `node tools/run-checks.js rotation`.
+
+Le mécanisme ne connaît pas les panneaux : une radio, des gros titres de
+journal ou des bribes de conversation s'y brancheront de la même façon,
+une série et un `{message}`.
+
 ## Objet au sol générique (type `item`)
 
 Un objet du sac sans archétype dédié devient au sol une entité du type

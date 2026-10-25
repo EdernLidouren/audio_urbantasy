@@ -16,6 +16,7 @@
 // fragments, jamais une seconde forme à maintenir en parallèle.
 
 import { t } from "../data/i18n/index.js";
+import { rotationMessage } from "./message-rotation.js";
 import { hourOfDay, minuteOfHour, dayOfMonth, monthOfYear, seasonOfYear, yearNumber, MONTH_KEYS, SEASON_KEYS } from "../core/time.js";
 
 // Deux chiffres pour une lecture d'horloge stable ("09 h 05", jamais "9 h 5").
@@ -57,6 +58,11 @@ function buildDescriptionValues(context) {
   if (context.weather !== undefined) {
     values.weather = t(`weather.state.${context.weather}`);
   }
+  // Message en rotation de l'entité observée (ex. la réclame du panneau
+  // publicitaire), seulement si elle en affiche une : voir
+  // view/message-rotation.js.
+  const message = rotationMessage(context);
+  if (message !== undefined) values.message = message;
   return values;
 }
 

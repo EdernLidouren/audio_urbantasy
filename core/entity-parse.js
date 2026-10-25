@@ -38,7 +38,7 @@ const CONDITIONAL_SOUND_FIELDS = [...SOUND_FIELDS, "condition"];
 // `tuning` d'instance, premier niveau d'archétype.
 const TRANSITION_SOUND_NATURES = ["diegetic", "meta"];
 function validateTuningValues(holder, describe, failWith = fail) {
-  const { beaconFadeMs, beaconFadeRate, transitionSoundNature } = holder;
+  const { beaconFadeMs, beaconFadeRate, transitionSoundNature, messageRotationMinutes } = holder;
   if (beaconFadeMs !== undefined && !(Number.isFinite(beaconFadeMs) && beaconFadeMs >= 0)) {
     failWith(`${describe}.beaconFadeMs doit être un nombre de ms >= 0 (reçu : ${JSON.stringify(beaconFadeMs)}).`);
   }
@@ -47,6 +47,9 @@ function validateTuningValues(holder, describe, failWith = fail) {
   }
   if (transitionSoundNature !== undefined && !TRANSITION_SOUND_NATURES.includes(transitionSoundNature)) {
     failWith(`${describe}.transitionSoundNature doit valoir ${TRANSITION_SOUND_NATURES.map((n) => `"${n}"`).join(" ou ")} (reçu : ${JSON.stringify(transitionSoundNature)}).`);
+  }
+  if (messageRotationMinutes !== undefined && !(Number.isFinite(messageRotationMinutes) && messageRotationMinutes > 0)) {
+    failWith(`${describe}.messageRotationMinutes doit être un nombre de minutes > 0 (reçu : ${JSON.stringify(messageRotationMinutes)}).`);
   }
 }
 
@@ -446,8 +449,9 @@ export function parseEntity(rawEntity, index, registry, length, seenIds, sceneVa
 
 // Champs qu'un ARCHÉTYPE peut porter (entities/types/), en plus des clés
 // de réglage, qu'il pose à son premier niveau (palier "type" de la cascade,
-// voir config/tuning.js). `collisionSound`/`muteOnConsumed` n'existent qu'à
-// ce niveau : la vue les lit directement dans le registre.
+// voir config/tuning.js). `collisionSound`/`muteOnConsumed`/`messageRotation`
+// n'existent qu'à ce niveau : la vue les lit directement dans le registre
+// (jamais copiés dans l'entité, donc jamais figés par une sauvegarde).
 const ARCHETYPE_FIELDS = [
   "nameKey",
   "descriptionKey",
@@ -466,6 +470,7 @@ const ARCHETYPE_FIELDS = [
   "startle",
   "collisionSound",
   "muteOnConsumed",
+  "messageRotation",
 ];
 
 function failRegistry(message) {
@@ -487,6 +492,11 @@ export function validateEntityRegistry(registry) {
     rejectUnknownFields(archetype, [...ARCHETYPE_FIELDS, ...TUNING_KEYS], describe, failRegistry);
     validateTuningValues(archetype, describe, failRegistry);
     if (archetype.sounds !== undefined) validateSounds(archetype.sounds, `${describe} : sounds`, false, failRegistry);
+    // L'EXISTENCE de la série citée se vérifie côté vue
+    // (view/message-rotation.js), qui seule importe le registre des séries.
+    if (archetype.messageRotation !== undefined && !isNonEmptyString(archetype.messageRotation)) {
+      failRegistry(`${describe} : messageRotation doit être un id de série de messages (rotations/index.js).`);
+    }
   }
 }
 

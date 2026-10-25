@@ -178,6 +178,10 @@
   "assets/sounds/decor/manhole_cover_1_beacon": [
     "assets/sounds/decor/manhole_cover_1_beacon_1.mp3"
   ],
+  "assets/sounds/decor/motorised_sign_1_vocal": [
+    "assets/sounds/decor/motorised_sign_1_vocal_1.mp3",
+    "assets/sounds/decor/motorised_sign_1_vocal_2.mp3"
+  ],
   "assets/sounds/decor/organic_rope_1_vocal": [
     "assets/sounds/decor/organic_rope_1_vocal_1.mp3",
     "assets/sounds/decor/organic_rope_1_vocal_2.mp3",

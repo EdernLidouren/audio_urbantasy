@@ -23,6 +23,7 @@
         "descriptionKey": "passage.main_street_sidewalk.description",
         "action": { "kind": "switchSide", "arrivalX": 9 }
       },
+      { "id": "motorised_billboard_1_r", "type": "motorised_billboard", "x": 20 },
       {
         "id": "general_store_door_1_r",
         "type": "automatic_sliding_door",

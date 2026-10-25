@@ -1833,7 +1833,9 @@ COURANTE (voir `entities/types/clock.js`).
 **Valeurs disponibles** : dictionnaire dérivé du CONTEXTE
 (`resolveDescriptionText`/`buildDescriptionValues`), MÊMES noms que
 `time.announce`/`weather.announce` (`hour`, `minute`, `day`, `month`,
-`season`, `year`, `weather`) — EXTENSIBLE : une valeur de plus s'ajoute dans
+`season`, `year`, `weather`), plus `message` pour une entité qui affiche
+une série de messages en rotation (le panneau publicitaire, voir
+`doc/entity-model.md`/"Messages en rotation") — EXTENSIBLE : une valeur de plus s'ajoute dans
 ce dictionnaire, jamais dans le mécanisme de remplissage
 (`resolveDescriptionText`), qui reste agnostique de ce qu'il contient.
 Variable de gabarit inconnue ou valeur manquante → dégradation PROPRE

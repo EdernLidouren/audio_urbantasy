@@ -388,6 +388,7 @@ rassemblés par `index.js` en un objet `{ [type]: TypeDef }` :
 | `container` | `{ distribution, count?, regenerates? }` | core | optionnel : défaut de type d'un conteneur de collecte, cascadé comme `action` — voir tableau "Entité" plus haut, `doc/entity-model.md`/"Collecte" |
 | `shop` | `{ catalog }` | core | optionnel : défaut de type d'un point de vente, cascadé comme `action` — voir tableau "Entité" plus haut, `doc/entity-model.md`/"Vente et achat" |
 | `collisionSound` | string | vue | optionnel, REGISTRE SEULEMENT : son joué quand le joueur bute contre l'entité |
+| `messageRotation` | string | vue | optionnel, REGISTRE SEULEMENT : id d'une série de `rotations/`, dont le message du moment remplit `{message}` dans la description — voir `doc/entity-model.md`/"Messages en rotation" |
 
 Un archétype peut aussi porter, à son premier niveau, toute clé de réglage de
 `config/tuning-values.js` (palier "type" de la cascade, voir

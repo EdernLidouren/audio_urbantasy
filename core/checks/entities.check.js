@@ -298,6 +298,12 @@ export default function checkEntities(run) {
   run("registre des types : un archétype ne retire pas de rôle (null)", true, registryThrows({ lamp: { sounds: { beacon: null } } }) !== "accepté");
   run("registre des types : vitesse de fondu nulle refusée (premier niveau)", true, registryThrows({ lamp: { nameKey: "entity.lamp.name", beaconFadeRate: 0 } }).includes("beaconFadeRate"));
   run("registre des types : nature de son de passage inconnue refusée", true, registryThrows({ lamp: { nameKey: "entity.lamp.name", transitionSoundNature: "Meta" } }).includes("transitionSoundNature"));
+  // Messages en rotation : la FORME se vérifie ici, l'existence de la série
+  // côté vue (view/message-rotation.js, seule à importer rotations/).
+  run("registre des types : messageRotation et sa période acceptés", "accepté", registryThrows({ sign: { nameKey: "entity.sign.name", messageRotation: "ads", messageRotationMinutes: 30 } }));
+  run("registre des types : messageRotation vide refusé", true, registryThrows({ sign: { messageRotation: "" } }).includes("messageRotation"));
+  run("registre des types : période de rotation nulle refusée", true, registryThrows({ sign: { messageRotationMinutes: 0 } }).includes("messageRotationMinutes"));
+  run("tuning : période de rotation négative refusée (instance)", true, entityMessage({ tuning: { messageRotationMinutes: -60 } }).includes("messageRotationMinutes"));
   run("registre des types : vitesse de fondu nulle refusée (descripteur)", true, registryThrows({ lamp: { nameKey: "entity.lamp.name", sounds: { beacon: { path: "assets/sounds/a", beaconFadeRate: 0 } } } }).includes("beaconFadeRate"));
 
   // --- Sons conditionnels : balise ET sons de proximité (voir

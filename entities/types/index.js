@@ -77,6 +77,7 @@ import largeWindingMechanism from "./large_winding_mechanism.js";
 import machine1 from "./machine_1.js";
 import magicMirror from "./magic_mirror.js";
 import miravi from "./miravi.js";
+import motorisedBillboard from "./motorised_billboard.js";
 import mirror from "./mirror.js";
 import mopAndBucket from "./mop_and_bucket.js";
 import money from "./money.js";
@@ -142,6 +143,7 @@ export default {
   machine_1: machine1,
   magic_mirror: magicMirror,
   miravi,
+  motorised_billboard: motorisedBillboard,
   mirror,
   money,
   mop_and_bucket: mopAndBucket,

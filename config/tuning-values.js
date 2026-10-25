@@ -524,6 +524,11 @@ export const TUNING_DEFAULTS = {
   // core lit cette valeur DIRECTEMENT, comme les défauts de wander.
   startleRange: 2.5,
 
+  // Durée d'affichage d'un message en rotation (minutes de JEU, voir
+  // core/rotation.js) : le panneau publicitaire change de réclame au début
+  // de chaque période, donc à l'heure pile pour 60. Strictement positive.
+  messageRotationMinutes: 60,
+
   // --- Clés de la cascade SANS défaut global (`undefined`) : leur valeur
   // vient du son, de l'instance ou du type, sinon le consommateur a son
   // propre repli. Présentes ici pour que la liste des clés reste complète.

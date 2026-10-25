@@ -33,6 +33,7 @@ UN SEUL endroit, jamais recopié :
 | La grille de la ville ou le menu-carte | `doc/city-map.md` |
 | Une nouvelle FAMILLE de clés i18n, ou une convention de traduction | `doc/i18n.md` |
 | Une collection, ses entrées, la découverte ou l'onglet Collections | `doc/collections.md` |
+| Une série de messages en rotation (le panneau publicitaire) | `doc/entity-model.md`/"Messages en rotation" |
 | Ce avec quoi commence une partie neuve (kit de départ, compagnons, scène de départ) | `doc/new-game.md` |
 | Le format de sauvegarde, sa migration, ou un RENOMMAGE de type/clé i18n/son/id de scène (à reporter dans `config/save-renames.js`) | `doc/save.md` |
 | Un raccourci clavier, une table de raccourcis, ou l'aide des touches | `doc/help.md` |

@@ -82,6 +82,8 @@
   "entity.money.name": "money",
   "entity.mop_and_bucket.description": "A plain metal bucket with a wooden-handled mop resting in it.",
   "entity.mop_and_bucket.name": "mop and bucket",
+  "entity.motorised_billboard.description": "The billboard reads: “{message}”",
+  "entity.motorised_billboard.name": "motorized billboard",
   "entity.neon.description": "A neon sign, buzzing softly.",
   "entity.neon.name": "neon sign",
   "entity.npc.description": "A character.",

@@ -33,6 +33,7 @@ const DOMAINS = [
   "menus",
   "navigation",
   "perception",
+  "rotations",
   "save",
   "scenes",
   "shop",

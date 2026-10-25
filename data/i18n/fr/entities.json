@@ -82,6 +82,8 @@
   "entity.money.name": "argent",
   "entity.mop_and_bucket.description": "Un simple seau en métal dans lequel repose une serpillère à manche de bois.",
   "entity.mop_and_bucket.name": "seau et serpillère",
+  "entity.motorised_billboard.description": "Le panneau affiche : « {message} »",
+  "entity.motorised_billboard.name": "panneau publicitaire motorisé",
   "entity.neon.description": "Une enseigne au néon qui bourdonne doucement.",
   "entity.neon.name": "enseigne au néon",
   "entity.npc.description": "Un personnage.",

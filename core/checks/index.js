@@ -44,6 +44,7 @@ import checkCollections from "./collections.check.js";
 import checkTriggers from "./triggers.check.js";
 import checkNewGame from "./new-game.check.js";
 import checkStartle from "./startle.check.js";
+import checkRotation from "./rotation.check.js";
 // Domaines de lib/ (mécanismes portables), lancés par le même point
 // d'entrée : une seule commande, un seul récapitulatif.
 import checkI18n from "../../lib/checks/i18n.check.js";
@@ -76,6 +77,7 @@ const SUITES = [
   { name: "triggers", check: checkTriggers },
   { name: "new-game", check: checkNewGame },
   { name: "startle", check: checkStartle },
+  { name: "rotation", check: checkRotation },
   { name: "i18n", check: checkI18n },
   { name: "input", check: checkInput },
 ];
