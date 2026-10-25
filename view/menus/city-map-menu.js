@@ -43,6 +43,7 @@ import {
 } from "../../map/city-map.js";
 import { evaluateCondition, presenceContextOf, CONDITION_TYPES } from "../../core/presence.js";
 import { IMPROVEMENT_REGISTRY } from "../../core/improvements.js";
+import { MAIN_SCENE_OF } from "../../scenes/index.js";
 
 // La grille est déclarée à la main (map/city-map.js) : une condition
 // onMapWhen mal écrite échoue ICI, au chargement du module, plutôt que de
@@ -93,6 +94,13 @@ function cityMapInvertYPref() {
   return getPref("cityMapInvertY", PREF_CONSTRAINTS.cityMapInvertY.default);
 }
 
+// Scène principale où se trouve le joueur : la scène active elle-même si
+// elle est principale, sinon celle à laquelle sa sous-scène est rattachée
+// (scenes/index.js/MAIN_SCENE_OF). C'est la case « où il est » sur la carte.
+function currentMainSceneId(session) {
+  return MAIN_SCENE_OF[session.activeWorldId] ?? session.activeWorldId;
+}
+
 // "<nom> : <description>" (zone réelle) / "Hors plan." / "En chantier." /
 // "Vide." — textes distincts, jamais confondus (voir header du fichier).
 // Hors plan sur la case où se trouve le joueur : il est situé ("vous êtes
@@ -100,7 +108,7 @@ function cityMapInvertYPref() {
 function cellAnnouncementText(x, y, session) {
   const cell = cityMapCellAt(x, y);
   if (isRealCityMapZone(cell) && !isZoneOnMap(cell, session)) {
-    return t(cell.sceneId === session.activeWorldId ? "cityMap.offMapHere" : "cityMap.offMap");
+    return t(cell.sceneId === currentMainSceneId(session) ? "cityMap.offMapHere" : "cityMap.offMap");
   }
   if (isRealCityMapZone(cell)) return `${t(cell.nameKey)} : ${t(cell.descriptionKey)}`;
   if (isCityMapUnderConstruction(cell)) return t("cityMap.underConstruction");
@@ -116,16 +124,16 @@ function announceMaybeStarred(text, starred) {
   announce(prefixed, { assertive: true });
 }
 
-// getSession : pour situer le curseur de DÉPART sur la case du monde actif
-// (voir findCityMapCoordinates) — lu UNE FOIS à l'ouverture, jamais
-// resuivi ensuite (la carte ne change pas pendant qu'elle est ouverte,
-// consultation non destructive — voir header). Monde actif absent de la
-// carte (pas encore atteignable autrement, cas limite) -> repli sur (0,0),
-// jamais une exception. onSelectZone(sceneId, spawnX) : effet de sélection
+// getSession : pour situer le curseur de DÉPART sur la case de la scène
+// principale où se trouve le joueur (voir currentMainSceneId,
+// findCityMapCoordinates) — lu UNE FOIS à l'ouverture, jamais resuivi
+// ensuite (la carte ne change pas pendant qu'elle est ouverte, consultation
+// non destructive — voir header). Scène absente de la carte (cas limite,
+// l'audit du contenu l'interdit) -> repli sur (0,0), jamais une exception. onSelectZone(sceneId, spawnX) : effet de sélection
 // fourni par l'appelant (voir view/world-travel.js/travelViaCityMap).
 // getWorldView : la vue du monde courante, voir header.
 export function openCityMapMenu(getWorldView, getSession, onSelectZone) {
-  const start = findCityMapCoordinates(getSession().activeWorldId) ?? { x: 0, y: 0 };
+  const start = findCityMapCoordinates(currentMainSceneId(getSession())) ?? { x: 0, y: 0 };
   let cursorX = start.x;
   let cursorY = start.y;
 

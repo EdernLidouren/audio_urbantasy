@@ -12,6 +12,8 @@
 //     carte pointe vers l'une d'elles, et une action "confirm" ne relie que
 //     deux d'entre elles (la préférence confirmSceneChange porte sur les
 //     changements de scène principale, jamais sur une sous-scène) ;
+//   - chaque scène est soit principale, soit rattachée à une scène
+//     principale (MAIN_SCENE_OF), jamais les deux ni aucune ;
 //   - chaque clé i18n citée existe en fr ET en en ;
 //   - chaque son cité (chemin "assets/...") existe dans le manifeste audio.
 //
@@ -35,7 +37,7 @@
 
 import registry from "../entities/types/index.js";
 import player from "../entities/player.js";
-import scenePaths, { MAIN_SCENE_IDS } from "../scenes/index.js";
+import scenePaths, { MAIN_SCENE_IDS, MAIN_SCENE_OF } from "../scenes/index.js";
 import collections from "../collections/index.js";
 import { parseScene } from "../core/scene.js";
 import { validateEntityRegistry } from "../core/entity-parse.js";
@@ -92,6 +94,18 @@ export async function auditContent() {
 
   for (const id of MAIN_SCENE_IDS) {
     if (!sceneExists(id)) report("scènes principales", "MAIN_SCENE_IDS", "scène inconnue", id);
+  }
+  // Rattachement : la carte s'ouvre sur la scène principale d'une
+  // sous-scène (view/menus/city-map-menu.js), aucune ne doit en manquer.
+  for (const [id, mainId] of Object.entries(MAIN_SCENE_OF)) {
+    if (!sceneExists(id)) report("scènes principales", `MAIN_SCENE_OF.${id}`, "scène inconnue", id);
+    if (isMainScene(id)) report("scènes principales", `MAIN_SCENE_OF.${id}`, "scène principale rattachée", id);
+    if (!isMainScene(mainId)) report("scènes principales", `MAIN_SCENE_OF.${id}`, "rattachée à une sous-scène", mainId);
+  }
+  for (const id of Object.keys(scenePaths)) {
+    if (!isMainScene(id) && !Object.hasOwn(MAIN_SCENE_OF, id)) {
+      report("scènes principales", "MAIN_SCENE_OF", "sous-scène sans scène principale", id);
+    }
   }
 
   // Une action "confirm" demande « Partir vers ... ? » sous la préférence

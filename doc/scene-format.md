@@ -458,10 +458,13 @@ supplémentaire.
 - `scenes/index.js` — registre `{ id: chemin }` des scènes existantes, et
   `MAIN_SCENE_IDS`, la liste des scènes PRINCIPALES : les grandes zones de
   la ville, celles que pointent les cases de la carte (`doc/city-map.md`).
-  Toute autre scène est une SOUS-SCÈNE (un intérieur, un étage). Déclarée à
-  la main, jamais déduite, et tenue hors des fichiers de scène : une
+  Toute autre scène est une SOUS-SCÈNE (un intérieur, un étage), rattachée
+  par `MAIN_SCENE_OF` à la scène principale où elle se trouve
+  géographiquement (la carte s'ouvre sur celle-ci, voir `doc/city-map.md`).
+  Déclarées à la main, jamais déduites, et tenues hors des fichiers de scène : une
   sauvegarde fige un monde à sa première visite (`doc/save.md`), un drapeau
   recopié dans le monde ne suivrait pas un changement d'avis. L'audit du
-  contenu vérifie que chaque id existe, que chaque case de la carte pointe
-  vers une scène principale et qu'une action `confirm` n'en relie que deux
+  contenu vérifie que chaque id existe, que chaque scène est soit
+  principale soit rattachée à une principale, que chaque case de la carte
+  pointe vers une scène principale et qu'une action `confirm` n'en relie que deux
   (voir `doc/scripting.md`/"Confirmation d'une action").

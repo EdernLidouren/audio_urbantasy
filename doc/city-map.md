@@ -63,9 +63,10 @@ joueur, à distinguer d'une case **en chantier** (pas encore construite) :
 - annoncée **« Hors plan. »** à la place de son nom et de sa description ;
 - Entrée : **refusée**, son de refus des menus et « Cette scène ne figure pas
   sur votre plan. » ;
-- le joueur peut pourtant s'y trouver (arrivé par une porte) : la carte
-  s'ouvre sur sa case, annoncée **« Hors plan, vous êtes ici. »**, toujours
-  refusée — situer sans révéler, ce n'est pas une incohérence ;
+- le joueur peut pourtant s'y trouver (arrivé par une porte, ou dans une
+  de ses sous-scènes) : la carte s'ouvre sur sa case, annoncée **« Hors
+  plan, vous êtes ici. »**, toujours refusée — situer sans révéler, ce
+  n'est pas une incohérence ;
 - la condition est évaluée sur l'état RÉEL de la partie, **jamais
   court-circuitée par le mode debug** (contrairement à `hasImprovement`
   ailleurs) : la carte se montre telle que le joueur la voit, comme
@@ -109,10 +110,12 @@ jeu, jamais sur la pause restée en dessous.
   - dans les DEUX cas, ré-annonce de la case courante, ÉTOILÉE (`"* ..."`,
     préférence `menuStarPrefix`, même clé/mêmes règles que les menus
     classiques) — l'utilisateur doit savoir qu'il est à une limite.
-- **Curseur de départ** : sur la case du monde ACTUELLEMENT actif
-  (`findCityMapCoordinates(session.activeWorldId)`), lu UNE FOIS à
-  l'ouverture — repli sur `(0, 0)` si ce monde n'est pas représenté sur la
-  carte.
+- **Curseur de départ** : sur la case de la scène principale où se trouve
+  le joueur — la scène active si elle est principale, sinon celle à
+  laquelle sa sous-scène est rattachée (`scenes/index.js`/`MAIN_SCENE_OF`,
+  voir `doc/scene-format.md`). Lu UNE FOIS à l'ouverture — repli sur
+  `(0, 0)` si cette scène n'est pas sur la carte (l'audit du contenu
+  l'interdit).
 - **Annonce à chaque déplacement**, trois natures distinctes :
   - zone réelle : `"<nom> : <description>"` (`t(nameKey)`/`t(descriptionKey)`).
   - en chantier : `t("cityMap.underConstruction")`.
@@ -172,7 +175,10 @@ Entrée sur une case :
 - **Re-sélectionner sa PROPRE zone** : AUCUN cas spécial — `travelToWorld`
   range puis re-ressort le MÊME monde (éphémères purgés, comme toute
   sortie de scène), joueur replacé à `spawnX`. Recentrage volontaire
-  (confort assumé, jeu sans challenge) : pas de "vous y êtes déjà".
+  (confort assumé, jeu sans challenge) : pas de "vous y êtes déjà". Depuis
+  une sous-scène, le curseur s'ouvre sur la case de sa scène principale :
+  Entrée tout de suite ramène à son point par défaut. Un retour propre
+  depuis le fond du clocher, qui exclut tout blocage.
 
 `view/world-travel.js`/`travelViaCityMap(sceneId, spawnX)` réutilise
 `performTransition` — LA MÊME transition franche qu'une porte (voir
