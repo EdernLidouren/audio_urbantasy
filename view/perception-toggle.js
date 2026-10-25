@@ -29,10 +29,17 @@ export function createPerceptionToggle({ getSession, setSession }) {
   // plein fondu ne le contourne pas.
   let cooldownUntil = 0;
 
+  // La touche a-t-elle un effet ? Lu aussi par l'aide des touches
+  // (view/city-screen.js), qui ne la montre que débloquée : une seule règle
+  // pour la touche et pour l'aide.
+  function isAvailable() {
+    return evaluateCondition(SUPERNATURAL_PERCEPTION_IMPROVEMENT, presenceContextOf(getSession()));
+  }
+
   // Sans l'amélioration ou pendant le délai : rien du tout (ni son ni
   // annonce), comme une touche non attribuée.
   function toggle() {
-    if (!evaluateCondition(SUPERNATURAL_PERCEPTION_IMPROVEMENT, presenceContextOf(getSession()))) return;
+    if (!isAvailable()) return;
 
     const now = performance.now();
     if (now < cooldownUntil) return;
@@ -44,5 +51,5 @@ export function createPerceptionToggle({ getSession, setSession }) {
     announce(t(active ? "perception.activated" : "perception.deactivated"), { assertive: true });
   }
 
-  return { toggle };
+  return { toggle, isAvailable };
 }

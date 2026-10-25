@@ -54,7 +54,9 @@ export function makeCityScreen(getSession, setSession) {
 
   // Touches de l'écran (actions résolues par view/input.js/CITY_BINDINGS).
   // `debugOnly` : sans effet hors mode debug ; `preventDefault` : la touche a
-  // aussi un comportement navigateur à neutraliser.
+  // aussi un comportement navigateur à neutraliser ; `available()` (facultatif) :
+  // la touche n'a d'effet que si elle rend vrai — l'aide des touches ne la
+  // montre qu'alors (voir helpSections).
   const KEY_ACTIONS = {
     pauseMenu: { preventDefault: true, run: () => openPauseMenu(travel.current, getSession, travel.travelViaCityMap) },
     // Même appel que l'entrée "Sauvegarder" du menu pause : même son de
@@ -72,7 +74,7 @@ export function makeCityScreen(getSession, setSession) {
     openEquipment: { run: () => openEquipmentMenu(travel.current, getSession) },
     openImprovements: { run: () => openImprovementsMenu(travel.current, getSession) },
     openCollections: { run: () => openCollectionsMenu(travel.current, getSession) },
-    togglePerception: { run: perception.toggle },
+    togglePerception: { run: perception.toggle, available: perception.isAvailable },
     interactDescribe: { preventDefault: true, run: () => interactWith("describe") },
     interactActivate: { preventDefault: true, run: () => interactWith("activate") },
     debugSpawn: { debugOnly: true, run: debug.spawnCoin },
@@ -92,10 +94,19 @@ export function makeCityScreen(getSession, setSession) {
 
   return {
     // Aide des touches (lib/help.js) : déplacement puis raccourcis du jeu,
-    // ceux de debug seulement en mode debug (même garde que onKeyDown).
+    // ceux de debug seulement en mode debug (même garde que onKeyDown), une
+    // touche à condition seulement quand elle a un effet (ex. la perception
+    // surnaturelle, une fois débloquée).
     helpSections: () => [
       { id: "move" },
-      { id: "city", include: (action) => !KEY_ACTIONS[action]?.debugOnly || isDebugEnabled() },
+      {
+        id: "city",
+        include: (action) => {
+          const binding = KEY_ACTIONS[action];
+          if (binding?.debugOnly && !isDebugEnabled()) return false;
+          return binding?.available ? binding.available() : true;
+        },
+      },
     ],
     // L'aide se lit balises coupées, comme tout menu ouvert sur la ville.
     wrapOverlay: (screen) => withPausedBeacons(screen, travel.current),
