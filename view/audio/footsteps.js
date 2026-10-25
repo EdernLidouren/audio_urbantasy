@@ -37,6 +37,7 @@ const MIN_STEP_INTERVAL_MS = TUNING_DEFAULTS.minStepIntervalMs;
 
 // Cadence des pas de trajet d'une bascule de face (voir playTransitionSteps).
 const TRANSITION_STEP_INTERVAL_MS = TUNING_DEFAULTS.transitionStepIntervalMs;
+const TRANSITION_STEP_DELAY_MS = TUNING_DEFAULTS.transitionStepDelayMs;
 
 // Clé d'asset "<name>_walk" sous assets/sounds/footsteps/<catégorie>/ —
 // "surfaces" (le sol) ou "gaits" (chaussure/allure, et pas naturel : un
@@ -215,6 +216,10 @@ export function createPlayerFootsteps({ getSession, reverbBusInput, collisionSou
   // simple minuterie par pas sur `durationMs`. Sol : celui déclaré par le
   // passage (transitionSurface), sinon le sol par défaut de la face de
   // départ. `transitionSteps` à false (cascade) : aucun pas.
+  // Le nombre de pas se compte sur TOUTE la durée ; le premier attend
+  // TRANSITION_STEP_DELAY_MS (le son du passage attaque d'abord) et les
+  // suivants se répartissent dans le reste : aucun pas perdu, et le pas
+  // d'arrivée tombe à la même cadence que les autres.
   function playTransitionSteps(entity, durationMs) {
     if (!resolveTuning("transitionSteps", entity)) return;
     const departureFace = getActiveWorld(getSession());
@@ -222,8 +227,9 @@ export function createPlayerFootsteps({ getSession, reverbBusInput, collisionSou
     const transitWorld = { defaultSurface: surfaceName, segments: [] };
     const gait = gaitOf(getSession().equipment);
     const stepCount = Math.max(1, Math.round(durationMs / TRANSITION_STEP_INTERVAL_MS));
+    const delayMs = Math.min(TRANSITION_STEP_DELAY_MS, durationMs);
     for (let i = 0; i < stepCount; i++) {
-      setTimeout(() => playMetaFootstepAt(transitWorld, 0, gait), (i * durationMs) / stepCount);
+      setTimeout(() => playMetaFootstepAt(transitWorld, 0, gait), delayMs + (i * (durationMs - delayMs)) / stepCount);
     }
   }
 

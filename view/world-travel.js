@@ -38,12 +38,21 @@ function wait(ms) {
 }
 
 // Son d'un passage de face, s'il en déclare un (`transitionSound`, cascade
-// instance -> archétype, absent par défaut : silence). Non positionné,
-// volume de l'interface.
-function playSideSwitchSound(entity) {
+// instance -> archétype, absent par défaut : silence). Diégétique par
+// défaut : positionné sur le passage, ANCRÉ (joué avant le croisement, il
+// n'a pas à en suivre l'étouffement — on passe à travers la grille, on ne
+// s'en éloigne pas), avec la réverb de la face quittée, dont la scène
+// audio garde la queue après la bascule (voir view/audio/city-scene.js/
+// destroy). `transitionSoundNature: "meta"` : non positionné, volume de
+// l'interface, pour un passage qui n'est pas un objet du monde.
+function playSideSwitchSound(worldView, entity) {
   const path = resolveTuning("transitionSound", entity);
   if (!path) return; // rien de déclaré : silence, pas une erreur
-  playInterfaceSound(path, "bascule de face");
+  if (resolveTuning("transitionSoundNature", entity) === "meta") {
+    playInterfaceSound(path, "bascule de face");
+    return;
+  }
+  worldView.playEntityOneShot(entity.id, { path, tracked: false });
 }
 
 export function createWorldTravel({ getSession, setSession }) {
@@ -188,7 +197,7 @@ export function createWorldTravel({ getSession, setSession }) {
   async function sideSwitch(arrivalX, entity) {
     pushScreen({});
     try {
-      playSideSwitchSound(entity);
+      playSideSwitchSound(worldView, entity);
       worldView.playTransitionSteps(entity, FACE_SWITCH_FADE_MS);
       await worldView.crossfadeFaceSwap(FACE_SWITCH_FADE_MS);
 

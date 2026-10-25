@@ -274,6 +274,8 @@ export default function checkEntities(run) {
   run("fondu de balise : vitesse négative refusée (tuning)", true, entityMessage({ tuning: { beaconFadeRate: -1 } }).includes("beaconFadeRate"));
   run("fondu de balise : durée négative refusée", true, entityMessage({ sounds: { beacon: { beaconFadeMs: -100 } } }).includes("beaconFadeMs"));
   run("fondu de balise : durée non numérique refusée", true, entityMessage({ tuning: { beaconFadeMs: "3000" } }).includes("beaconFadeMs"));
+  run("son de passage : nature meta acceptée", "accepté", entityMessage({ tuning: { transitionSound: "assets/sounds/b", transitionSoundNature: "meta" } }));
+  run("son de passage : nature inconnue refusée", true, entityMessage({ tuning: { transitionSoundNature: "positioned" } }).includes("transitionSoundNature"));
   const registryThrows = (registry) => {
     try {
       validateEntityRegistry(registry);
@@ -295,6 +297,7 @@ export default function checkEntities(run) {
   run("registre des types : son d'archétype inconnu", true, registryThrows({ lamp: { sounds: { beacon: { pth: "assets/sounds/a" } } } }).includes(UNKNOWN_FIELD));
   run("registre des types : un archétype ne retire pas de rôle (null)", true, registryThrows({ lamp: { sounds: { beacon: null } } }) !== "accepté");
   run("registre des types : vitesse de fondu nulle refusée (premier niveau)", true, registryThrows({ lamp: { nameKey: "entity.lamp.name", beaconFadeRate: 0 } }).includes("beaconFadeRate"));
+  run("registre des types : nature de son de passage inconnue refusée", true, registryThrows({ lamp: { nameKey: "entity.lamp.name", transitionSoundNature: "Meta" } }).includes("transitionSoundNature"));
   run("registre des types : vitesse de fondu nulle refusée (descripteur)", true, registryThrows({ lamp: { nameKey: "entity.lamp.name", sounds: { beacon: { path: "assets/sounds/a", beaconFadeRate: 0 } } } }).includes("beaconFadeRate"));
 
   // --- Sons conditionnels : balise ET sons de proximité (voir

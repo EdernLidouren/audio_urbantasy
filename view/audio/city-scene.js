@@ -72,8 +72,9 @@ export function createCityAudioScene(getSession, { handover = null } = {}) {
   // sans aucune balise continue n'aurait pas de bus.
   const entities = createEntitySounds({ getSession, handover });
   const world = getActiveWorld(getSession());
+  const reverbDurationSec = world.reverbDurationSec ?? REVERB_DURATION_SEC_DEFAULT;
   const reverbBus = createReverbBus({
-    durationSec: world.reverbDurationSec ?? REVERB_DURATION_SEC_DEFAULT,
+    durationSec: reverbDurationSec,
     decay: world.reverbDecay ?? REVERB_DECAY_DEFAULT,
     wet: world.reverbWet ?? REVERB_WET_DEFAULT,
   });
@@ -158,7 +159,13 @@ export function createCityAudioScene(getSession, { handover = null } = {}) {
   // Détruit la scène. Avec `handover` (bascule de face), les balises
   // continues ne sont PAS arrêtées mais RENDUES (Map id -> balise) pour que
   // la scène reconstruite sur l'autre face les reprenne sans coupure ; sans
-  // lui, tout s'arrête. Ne touche jamais musique ni ambiances (couches
+  // lui, tout s'arrête. Le bus de réverb, lui, survit à une bascule de face
+  // le temps de sa propre durée : un son encore en train de résonner (le
+  // son du passage, un son suivi) garde sa queue au lieu d'être asséché net.
+  // Les balises reprises se rebranchent sur le bus de la nouvelle scène
+  // (lib/audio/positioned.js/sendToReverb), l'ancien ne reçoit plus rien de
+  // neuf. Un changement de scène, lui, l'éteint aussitôt : le sas a déjà
+  // fondu la couche entités au silence. Ne touche jamais musique ni ambiances (couches
   // persistantes : c'est le montage de la scène SUIVANTE qui décide, voir
   // ./layers.js) ni les sons suivis (la scène suivante les reprend ou les
   // arrête, voir ./oneshots.js).
@@ -171,8 +178,10 @@ export function createCityAudioScene(getSession, { handover = null } = {}) {
     proximitySounds.destroy();
     if (!handover) {
       for (const sound of beacons.values()) sound.stop();
+      reverbBus.destroy();
+    } else {
+      setTimeout(() => reverbBus.destroy(), reverbDurationSec * 1000);
     }
-    reverbBus.destroy();
     if (activeScene === api) activeScene = null;
     return handover ? beacons : null;
   }

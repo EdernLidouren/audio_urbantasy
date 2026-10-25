@@ -1832,7 +1832,10 @@ mi-trajet-mi-arrivée :
 - **Trajet**, cadencé sur `transitionStepIntervalMs`
   (`config/tuning-values.js`) EN PARALLÈLE du croisement de filtres — sur la
   surface déclarée par `transitionSurface` (nom de surface, cascade comme
-  `transitionSteps`) SINON celle de la face de DÉPART.
+  `transitionSteps`) SINON celle de la face de DÉPART. Le premier pas attend
+  `transitionStepDelayMs` (100 ms) pour laisser attaquer le son du passage ;
+  le nombre de pas se compte toujours sur toute la durée, les suivants se
+  resserrent dans le reste, aucun n'est perdu.
 - **Arrivée**, UN SEUL pas, joué APRÈS `switchSide` — sur la surface RÉELLE
   du point d'atterrissage (`surfaceAt`, comme un pas normal), pour un
   contraste net si elle diffère de celle du trajet (ex. pavé -> herbe).
@@ -1856,6 +1859,19 @@ en SILENCE côté son de passage — les pas de trajet/arrivée ci-dessus jouent
 quand même, DEUX choses sonores INDÉPENDANTES qui se composent, jamais
 mélangées (voir `demo3.json`, `alley_gap_recto`/`alley_gap_verso`, pour un
 exemple de déclaration).
+
+Son rendu selon `transitionSoundNature` (cascade, même vocabulaire que la
+nature d'un effet `playSound`, voir `doc/scripting.md`), vérifié au
+chargement :
+- `"diegetic"` (défaut) — un objet du monde, comme le grincement d'une
+  porte : positionné sur le passage (pan, distance, réverb de la face
+  quittée, volume des balises), ANCRÉ. Joué juste après le gel, avant le
+  croisement, il n'en suit pas l'étouffement : on passe à travers la grille,
+  on ne s'en éloigne pas. La scène audio garde le bus de réverb de la face
+  quittée le temps de sa durée après la bascule (`view/audio/city-scene.js`/
+  `destroy`), la queue du son n'est jamais coupée net.
+- `"meta"` — non positionné, sans réverb, au volume de l'interface : pour un
+  passage qui n'est pas un objet du monde (un futur passe-miroir).
 
 ## `isFlying` — hauteur SUGGÉRÉE par le son, jamais un axe Y
 

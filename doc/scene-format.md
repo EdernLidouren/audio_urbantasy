@@ -124,7 +124,7 @@ son filtre (nette → étouffée) pendant que l'autre ouvre le sien (étouffée 
 nette), en parallèle, toutes deux restant audibles. Un marqueur sonore de
 passage DÉCLARÉ (`transitionSound`, cascade instance -> archétype -> défaut
 ABSENT — voir `doc/entity-model.md`/"Recto/verso") joue juste après le gel
-s'il y en a un ; sinon, silence côté son de passage (défensif si le fichier
+s'il y en a un, positionné sur le passage par défaut (`transitionSoundNature`) ; sinon, silence côté son de passage (défensif si le fichier
 venait à manquer, même si déclaré). Des pas de trajet/arrivée jouent en
 plus, indépendamment (voir `doc/entity-model.md`, même section). Le
 croisement terminé, `scene.destroy()` puis reconstruction sur la

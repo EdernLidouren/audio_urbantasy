@@ -472,6 +472,13 @@ export const TUNING_DEFAULTS = {
   // pour ça. Lu DIRECTEMENT (comme faceSwitchFadeMs ci-dessus), jamais via
   // la cascade resolveTuning : un réglage PARTAGÉ, pas par passage.
   transitionStepIntervalMs: 250,
+  // Retard (ms) du PREMIER pas de trajet d'une bascule de face : laisse au
+  // son du passage (une grille qui s'ouvre) le temps d'attaquer avant qu'on
+  // marche. Les pas suivants se resserrent dans le reste du croisement,
+  // jamais un pas perdu (voir view/audio/footsteps.js/playTransitionSteps).
+  // Court délibérément : au-delà, la traversée se sentirait en retard sur
+  // l'appui. Lu DIRECTEMENT, comme transitionStepIntervalMs.
+  transitionStepDelayMs: 100,
 
   // Pas des SÉLECTEURS DE QUANTITÉ (flèches gauche/droite), même convention
   // partout : Maj = pas intermédiaire, Ctrl = grand pas (sans modificateur :
@@ -531,6 +538,12 @@ export const TUNING_DEFAULTS = {
   // Son d'une bascule de face par un passage (view/world-travel.js) :
   // absent -> silence.
   transitionSound: undefined,
+  // Rendu de ce son, même vocabulaire que la nature d'un effet playSound
+  // (doc/scripting.md) : "diegetic" (défaut) — positionné sur le passage,
+  // avec la réverb de la face quittée, comme le grincement d'une porte ;
+  // "meta" — non positionné, sans réverb, au volume de l'interface, pour un
+  // passage qui n'est pas un objet du monde (un futur passe-miroir).
+  transitionSoundNature: "diegetic",
   // Surface des pas de TRAJET d'une bascule (view/audio/footsteps.js/
   // playTransitionSteps) : absent -> surface par défaut de la face de départ.
   transitionSurface: undefined,

@@ -1000,7 +1000,8 @@ aucun Howl résiduel), et joue le marqueur sonore de bascule DÉCLARÉ par le
 passage (`transitionSound`, cascade instance -> archétype -> défaut ABSENT
 — voir `doc/entity-model.md`/"Recto/verso", `config/tuning-values.js`) :
 silence côté son de passage si rien n'est déclaré, jamais un son générique
-imposé. `arrivalX` est validé au chargement : un nombre dans `[0, length]` de la
+imposé. Positionné sur le passage par défaut, ou méta avec
+`transitionSoundNature: "meta"`. `arrivalX` est validé au chargement : un nombre dans `[0, length]` de la
 scène. Détail complet du modèle à deux faces (persistance, coexistence
 isolée des deux faces) : `doc/scene-format.md`/"Scène à deux faces (recto/verso)".
 
