@@ -153,6 +153,9 @@
   "assets/sounds/decor/gear_3_beacon": [
     "assets/sounds/decor/gear_3_beacon_1.mp3"
   ],
+  "assets/sounds/decor/highway_traffic_1_beacon": [
+    "assets/sounds/decor/highway_traffic_1_beacon.mp3"
+  ],
   "assets/sounds/decor/large_gear_1_beacon": [
     "assets/sounds/decor/large_gear_1_beacon_1.mp3"
   ],
@@ -207,6 +210,9 @@
   "assets/sounds/decor/stone_slab_beacon": [
     "assets/sounds/decor/stone_slab_beacon_1.mp3",
     "assets/sounds/decor/stone_slab_beacon_2.mp3"
+  ],
+  "assets/sounds/decor/traffic_signal_relay": [
+    "assets/sounds/decor/traffic_signal_relay_1.mp3"
   ],
   "assets/sounds/decor/tree_beacon": [
     "assets/sounds/decor/tree_beacon_1.mp3",
@@ -296,6 +302,9 @@
   ],
   "assets/sounds/doors/shop_door_bell_1_beacon": [
     "assets/sounds/doors/shop_door_bell_1_beacon_1.mp3"
+  ],
+  "assets/sounds/effects/accessible_pedestrian_signal": [
+    "assets/sounds/effects/accessible_pedestrian_signal_1.mp3"
   ],
   "assets/sounds/effects/big_rock_collision": [
     "assets/sounds/effects/big_rock_collision_1.mp3"

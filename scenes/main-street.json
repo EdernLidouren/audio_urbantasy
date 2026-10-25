@@ -10,7 +10,41 @@
     "ambiencesNight": [],
     "defaultSurface": "concrete",
     "reverbPreset": "street_outdoor",
+    "segments": [{ "from": 45, "to": 50, "surface": "wood" }],
     "entities": [
+      { "id": "highway_traffic_1_r", "type": "highway_traffic", "x": 5 },
+      { "id": "traffic_light_1_r", "type": "traffic_light", "x": 7 },
+      {
+        "id": "passage_1_r",
+        "type": "passage",
+        "x": 9,
+        "nameKey": "passage.sidewalk.name",
+        "descriptionKey": "passage.main_street_sidewalk.description",
+        "action": { "kind": "switchSide", "arrivalX": 9 }
+      },
+      {
+        "id": "general_store_door_1_r",
+        "type": "automatic_sliding_door",
+        "x": 25,
+        "sounds": {
+          "beacon": { "path": "assets/sounds/doors/roller_shutter_1_close", "loop": true, "condition": { "type": "timeRange", "from": 20, "to": 8 } },
+          "approachSound": { "condition": { "type": "timeRange", "from": 8, "to": 20 } },
+          "leaveSound": { "condition": { "type": "timeRange", "from": 8, "to": 20 } },
+          "proximityLoop": { "path": "assets/sounds/doors/shop_door_bell_1_beacon", "condition": { "type": "timeRange", "from": 8, "to": 20 } }
+        },
+        "triggers": [
+          { "on": "hour", "hour": 8, "effects": [{ "type": "playSound", "path": "assets/sounds/doors/garage_door_1_open" }] },
+          { "on": "hour", "hour": 20, "effects": [{ "type": "playSound", "path": "assets/sounds/doors/garage_door_1_close" }] }
+        ],
+        "action": {
+          "kind": "applyEffects",
+          "condition": { "type": "timeRange", "from": 8, "to": 20 },
+          "refusalEffects": [{ "type": "announce", "key": "door.default.shop_hours_refusal" }],
+          "effects": [{ "type": "teleport", "target": "demo2" }]
+        }
+      },
+      { "id": "storm_drain_1_r", "type": "storm_drain", "x": 45 },
+      { "id": "river_1_r", "type": "river", "x": 49 },
       {
         "id": "town_square_exit",
         "type": "scene_exit",
@@ -28,6 +62,30 @@
     "ambiencesNight": [],
     "defaultSurface": "concrete",
     "reverbPreset": "street_outdoor",
-    "entities": []
+    "segments": [
+      { "from": 31, "to": 33, "surface": "metal" },
+      { "from": 45, "to": 50, "surface": "wood" }
+    ],
+    "entities": [
+      { "id": "highway_traffic_1_v", "type": "highway_traffic", "x": 5 },
+      {
+        "id": "passage_1_v",
+        "type": "passage",
+        "x": 9,
+        "nameKey": "passage.sidewalk.name",
+        "descriptionKey": "passage.main_street_sidewalk.description",
+        "action": { "kind": "switchSide", "arrivalX": 9 }
+      },
+      { "id": "wall_air_conditioner_1_v", "type": "wall_air_conditioner", "x": 20 },
+      {
+        "id": "manhole_cover_1_v",
+        "type": "door",
+        "x": 32,
+        "nameKey": "door.manhole_cover.name",
+        "descriptionKey": "door.manhole_cover.description",
+        "sounds": { "beacon": { "path": "assets/sounds/decor/manhole_cover_1_beacon" } }
+      },
+      { "id": "river_1_v", "type": "river", "x": 49 }
+    ]
   }
 }

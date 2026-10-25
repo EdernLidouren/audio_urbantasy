@@ -96,6 +96,8 @@ import perchedBird3 from "./perched_bird_3.js";
 import wallAirConditioner from "./wall_air_conditioner.js";
 import woodBench from "./wood_bench.js";
 import stormDrain from "./storm_drain.js";
+import trafficLight from "./traffic_light.js";
+import highwayTraffic from "./highway_traffic.js";
 import pottedPlant from "./potted_plant.js";
 import reversedClockTowerEscapement from "./reversed_clock_tower_escapement.js";
 import reversedLargeWindingMechanism from "./reversed_large_winding_mechanism.js";
@@ -159,6 +161,8 @@ export default {
   wall_air_conditioner: wallAirConditioner,
   wood_bench: woodBench,
   storm_drain: stormDrain,
+  traffic_light: trafficLight,
+  highway_traffic: highwayTraffic,
   potted_plant: pottedPlant,
   reversed_clock_tower_escapement: reversedClockTowerEscapement,
   reversed_large_winding_mechanism: reversedLargeWindingMechanism,
