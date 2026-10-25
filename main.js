@@ -7,6 +7,7 @@ import { pushScreen, popScreen, activeScreen, tickActive, tickFrame } from "./li
 import { initInput, onGlobalPress } from "./lib/input.js";
 import { ensureAudioUnlocked } from "./lib/audio.js";
 import { applyVolumePreferences } from "./view/audio/city-scene.js";
+import { applyLocalePreference } from "./view/locale.js";
 import { MOVE_KEYS, GLOBAL_BINDINGS } from "./view/input.js";
 import { createMainMenu } from "./view/menus/main-menu.js";
 import { setGameStartHandler } from "./view/menus/save-menu.js";
@@ -79,6 +80,12 @@ const gameZone = document.getElementById("game");
 // d'accessibilité visée par le défaut BAS du volume principal (voir
 // config/preferences.js/PREF_CONSTRAINTS.masterVolume).
 applyVolumePreferences();
+
+// Langue des préférences appliquée AVANT le premier écran : le menu
+// principal s'annonce dans la langue choisie, et l'attribut lang de la page
+// la suit (voir view/locale.js), pour que le lecteur d'écran prenne la
+// bonne voix.
+applyLocalePreference();
 
 // lib/input.js ne connaît pas l'audio : c'est ici, au point de composition,
 // qu'on branche le déverrouillage sur le tout premier appui touche.

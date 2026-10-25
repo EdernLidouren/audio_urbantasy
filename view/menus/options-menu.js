@@ -12,6 +12,8 @@ import { t } from "../../data/i18n/index.js";
 import { resetAllPrefs } from "../../config/preferences.js";
 import { playMenuSound } from "../menu-sounds.js";
 import { applyVolumePreferences } from "../audio/city-scene.js";
+import { applyLocalePreference } from "../locale.js";
+import { PREF_CONSTRAINTS } from "../../config/preferences.js";
 import { openConfirmation } from "./confirmation.js";
 import { createAudioMenu } from "./audio-menu.js";
 import { createNavigationMenu } from "./navigation-menu.js";
@@ -29,6 +31,7 @@ function openResetAllConfirmation() {
     resetAllPrefs();
     playMenuSound("reset");
     applyVolumePreferences();
+    applyLocalePreference();
     // Écran-message plutôt qu'une simple annonce : le résultat doit être
     // entendu en entier, jamais écrasé par une ré-annonce immédiate de la
     // ligne de menu courante (voir lib/menu.js/makeMessageScreen).
@@ -43,6 +46,19 @@ export function createOptionsMenu(getSession) {
     title: "menu.options.title",
     closable: true,
     entries: [
+      {
+        // En TÊTE : un joueur qui ne comprend pas la langue affichée tombe
+        // dessus dès l'ouverture. Chaque langue est nommée dans sa propre
+        // langue (« Français », « English »), lisible quelle que soit celle
+        // de l'interface.
+        kind: "choice",
+        labelKey: "menu.options.language",
+        descriptionKey: "menu.options.language.description",
+        prefKey: "locale",
+        default: PREF_CONSTRAINTS.locale.default,
+        choices: PREF_CONSTRAINTS.locale.values.map((value) => ({ value, labelKey: `menu.options.language.${value}` })),
+        onChange: applyLocalePreference,
+      },
       {
         label: "menu.options.audio",
         // getPref/setPref des sliders/toggles viennent des préférences de

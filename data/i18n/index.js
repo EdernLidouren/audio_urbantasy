@@ -49,7 +49,7 @@ const [fr, en, grammar] = await Promise.all([
   loadJson("data/i18n/grammar.json"),
 ]);
 
-export const { t, hasKey, setLocale, getLocale, availableLocales } = createI18n({ fr, en }, { grammar });
+export const { t, hasKey, setLocale, getLocale, availableLocales, browserLocale } = createI18n({ fr, en }, { grammar });
 
 // Grammaire déclarée, en LECTURE pour les vérifications (lib/checks/
 // i18n.check.js) et l'audit du contenu.

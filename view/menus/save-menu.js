@@ -19,6 +19,7 @@ import { makeMessageScreen } from "../../lib/menu.js";
 import { t } from "../../data/i18n/index.js";
 import { PREF_CONSTRAINTS, exportPreferences, importPreferences } from "../../config/preferences.js";
 import { applyVolumePreferences } from "../audio/city-scene.js";
+import { applyLocalePreference } from "../locale.js";
 import { exportGame, importGame, playSaveSound, hasSave } from "../save-storage.js";
 import { canChooseSaveLocation } from "../../lib/download.js";
 import { getActiveWorld } from "../../core/state.js";
@@ -102,8 +103,9 @@ function ensurePrefsFileInput() {
   prefsFileInput = createHiddenFileInput(async (file) => {
     const result = await importPreferences(file);
 
-    // Les volumes importés prennent effet aussitôt.
+    // Les volumes et la langue importés prennent effet aussitôt.
     applyVolumePreferences();
+    applyLocalePreference();
 
     // Écran-message plutôt qu'une simple annonce : le résultat doit être
     // entendu en entier, jamais écrasé par une ré-annonce immédiate de la

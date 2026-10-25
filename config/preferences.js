@@ -20,8 +20,14 @@ const PREFS_VERSION = 1;
 // view/menus/*.js, qui lisent min/max/default d'ici plutôt que de les
 // redéfinir) : jamais deux définitions divergentes des bornes d'une même
 // préférence. type ∈ "number" (borné [min,max]) | "boolean" (bornes non
-// pertinentes, ignorées par isValidPrefValue).
+// pertinentes, ignorées par isValidPrefValue) | "string" (une valeur parmi
+// `values`).
 export const PREF_CONSTRAINTS = {
+  // Langue des textes et des annonces (voir view/locale.js). "auto" suit la
+  // langue du navigateur ; sinon une langue fournie par data/i18n/ — liste
+  // tenue à jour à la main, vérifiée contre les langues réellement chargées
+  // (lib/checks/i18n.check.js).
+  locale: { type: "string", values: ["auto", "fr", "en"], default: "auto" },
   // Gain de sortie GLOBAL, en bout de chaîne (voir lib/audio/channels.js/
   // setMasterVolume) — AU-DESSUS de tous les volumes par canal ci-dessous,
   // jamais un remplaçant. Défaut délibérément BAS (20%, pas 50% comme les
@@ -96,6 +102,7 @@ function isValidPrefValue(key, value) {
   if (!constraint) return false;
   if (typeof value !== constraint.type) return false;
   if (constraint.type === "number" && (value < constraint.min || value > constraint.max)) return false;
+  if (constraint.type === "string" && !constraint.values.includes(value)) return false;
   return true;
 }
 
