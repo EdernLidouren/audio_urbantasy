@@ -9,7 +9,7 @@ export default {
   nameKey: "entity.traffic_light.name",
   descriptionKey: "entity.traffic_light.description",
   sounds: {
-    beacon: { path: "assets/sounds/decor/traffic_signal_relay", loop: true },
+    beacon: { path: "assets/sounds/decor/traffic_signal_relay_1_beacon", loop: true },
   },
   action: {
     kind: "applyEffects",

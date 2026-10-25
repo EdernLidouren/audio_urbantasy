@@ -76,6 +76,7 @@ export const RENAMED_ASSET_PATHS = {
   "assets/sounds/furniture/office_water_fountain_1_beacon": "assets/sounds/furniture/office_water_cooler_1_beacon",
   "assets/sounds/doors/passage_wind_beacon": "assets/sounds/doors/passage_outdoor_1_beacon",
   "assets/sounds/doors/passage_indoor_beacon": "assets/sounds/doors/passage_indoor_1_beacon",
+  "assets/sounds/decor/traffic_signal_relay": "assets/sounds/decor/traffic_signal_relay_1_beacon",
 };
 
 // Ids de scène (scenes/index.js) : la clé du monde dans la partie

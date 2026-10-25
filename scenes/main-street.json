@@ -12,7 +12,8 @@
     "reverbPreset": "street_outdoor",
     "segments": [{ "from": 45, "to": 50, "surface": "wood" }],
     "entities": [
-      { "id": "highway_traffic_1_r", "type": "highway_traffic", "x": 5 },
+      { "id": "highway_traffic_1_r", "type": "highway_traffic", "x": 3 },
+      { "id": "highway_traffic_2_r", "type": "highway_traffic", "x": 5, "sounds": { "beacon": { "path": "assets/sounds/decor/highway_traffic_2_beacon" } } },
       { "id": "traffic_light_1_r", "type": "traffic_light", "x": 7 },
       {
         "id": "passage_1_r",
@@ -43,8 +44,8 @@
           "effects": [{ "type": "teleport", "target": "demo2" }]
         }
       },
-      { "id": "storm_drain_1_r", "type": "storm_drain", "x": 45 },
-      { "id": "river_1_r", "type": "river", "x": 49 },
+      { "id": "storm_drain_1_r", "type": "storm_drain", "x": 35 },
+      { "id": "river_1_r", "type": "river", "x": 49, "tuning": { "beaconCrossFaceGain": 0.5 } },
       {
         "id": "town_square_exit",
         "type": "scene_exit",
@@ -62,12 +63,10 @@
     "ambiencesNight": [],
     "defaultSurface": "concrete",
     "reverbPreset": "street_outdoor",
-    "segments": [
-      { "from": 31, "to": 33, "surface": "metal" },
-      { "from": 45, "to": 50, "surface": "wood" }
-    ],
+    "segments": [{ "from": 31, "to": 33, "surface": "metal" }],
     "entities": [
-      { "id": "highway_traffic_1_v", "type": "highway_traffic", "x": 5 },
+      { "id": "highway_traffic_1_v", "type": "highway_traffic", "x": 3 },
+      { "id": "highway_traffic_2_v", "type": "highway_traffic", "x": 5, "sounds": { "beacon": { "path": "assets/sounds/decor/highway_traffic_2_beacon" } } },
       {
         "id": "passage_1_v",
         "type": "passage",
@@ -85,7 +84,14 @@
         "descriptionKey": "door.manhole_cover.description",
         "sounds": { "beacon": { "path": "assets/sounds/decor/manhole_cover_1_beacon" } }
       },
-      { "id": "river_1_v", "type": "river", "x": 49 }
+      {
+        "id": "town_square_exit_v",
+        "type": "scene_exit",
+        "x": 50,
+        "nameKey": "scene_exit.main_street_town_square.name",
+        "descriptionKey": "scene_exit.main_street_town_square.description",
+        "action": { "kind": "applyEffects", "confirm": true, "effects": [{ "type": "teleport", "target": "town_square", "x": 0, "side": "verso" }] }
+      }
     ]
   }
 }
