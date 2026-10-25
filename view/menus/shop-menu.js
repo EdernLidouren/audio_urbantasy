@@ -79,12 +79,14 @@ function selectedQuantities(lines) {
   return lines.filter((line) => line.selected > 0).map((line) => ({ type: line.type, quantity: line.selected }));
 }
 
-// "Pomme × 3, Pièce × 2" — récapitulatif (confirmation, résultat).
+// ["pomme × 3", "pièce × 2"] — récapitulatif (confirmation, résultat), une
+// ligne par objet. Le gabarit l'assemble lui-même ({details, list},
+// Intl.ListFormat de la langue) : « pomme × 3 et pièce × 2 », « apple × 3
+// and coin × 2 » — jamais une virgule collée ici.
 function details(lines) {
   return lines
     .filter((line) => line.selected > 0)
-    .map((line) => t("shop.detail", { item: t(line.labelKey), quantity: line.selected }))
-    .join(", ");
+    .map((line) => t("shop.detail", { item: t(line.labelKey), quantity: line.selected }));
 }
 
 // Confirmation de TRANSACTION (voir ./confirmation.js). Titre DYNAMIQUE :
