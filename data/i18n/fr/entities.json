@@ -164,7 +164,6 @@
   "passage.default.description": "Un passage étroit vers l'autre côté du lieu.",
   "passage.default.name": "passage",
   "passage.main_street_sidewalk.description": "Un trottoir large qui longe le bloc principal de la rue commerçante.",
-  "passage.sidewalk.name": "trottoir",
   "passage.town_hall.description": "Un passage ombragé qui longe le bâtiment de l'hôtel de ville.",
   "passage.town_hall_meeting_room.description": "Un passage ménagé entre le mur et les chaises qui permet de traverser la salle de réunion.",
   "scene_exit.default.description": "Le chemin continue vers une autre partie de la ville.",

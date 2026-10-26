@@ -58,6 +58,9 @@ export const RENAMED_I18N_KEYS = {
   "door.default_passage.name": "passage.default.name",
   "door.town_hall_passage.description": "passage.town_hall.description",
   "door.clocktower_passage.description": "passage.clock_tower.description",
+  // Les passages de Main Street ne s'appellent plus « trottoir » : le nom
+  // ordinaire « passage » dit qu'on peut l'emprunter.
+  "passage.sidewalk.name": "passage.default.name",
   // Objets : nom en feuille `.name` sous le namespace de l'objet, comme sa
   // description (voir doc/i18n.md) — figé dans un objet posé au sol.
   "item.combat_boots": "item.combat_boots.name",

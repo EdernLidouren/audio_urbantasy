@@ -313,7 +313,7 @@ export function searchContainer(session, entityId, registry) {
   let nextSession = updateActiveFace(session, { entities, rngState }, side);
   for (const item of stock) {
     const spec = buildCollectibleSpec(item, `${entityId}-drop`, entity.x, registry, world.length, world.variables);
-    nextSession = spawnScatteredEphemerals(nextSession, spec, entity.x, 1);
+    nextSession = spawnScatteredEphemerals(nextSession, spec, entity.x, 1, TUNING_DEFAULTS.searchScatterSpread);
   }
   return { session: nextSession, items: stock, status };
 }

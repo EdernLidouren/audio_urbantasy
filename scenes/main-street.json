@@ -19,7 +19,6 @@
         "id": "passage_1_r",
         "type": "passage",
         "x": 9,
-        "nameKey": "passage.sidewalk.name",
         "descriptionKey": "passage.main_street_sidewalk.description",
         "action": { "kind": "switchSide", "arrivalX": 9 }
       },
@@ -68,7 +67,10 @@
     "ambiencesNight": [],
     "defaultSurface": "concrete",
     "reverbPreset": "street_outdoor",
-    "segments": [{ "from": 31, "to": 33, "surface": "metal" }],
+    "segments": [
+      { "from": 31, "to": 33, "surface": "metal" },
+      { "from": 45, "to": 50, "surface": "grass" }
+    ],
     "entities": [
       { "id": "highway_traffic_1_v", "type": "highway_traffic", "x": 3 },
       { "id": "highway_traffic_2_v", "type": "highway_traffic", "x": 5, "sounds": { "beacon": { "path": "assets/sounds/decor/highway_traffic_2_beacon" } } },
@@ -76,12 +78,11 @@
         "id": "passage_1_v",
         "type": "passage",
         "x": 9,
-        "nameKey": "passage.sidewalk.name",
         "descriptionKey": "passage.main_street_sidewalk.description",
         "action": { "kind": "switchSide", "arrivalX": 9 }
       },
       { "id": "metal_trash_can_1_v", "type": "metal_trash_can", "x": 12 },
-      { "id": "neon_1_v", "type": "neon", "x": 13 },
+      { "id": "neon_1_v", "type": "neon", "x": 14 },
       { "id": "wall_air_conditioner_1_v", "type": "wall_air_conditioner", "x": 20 },
       { "id": "neon_2_v", "type": "neon", "x": 25 },
       {

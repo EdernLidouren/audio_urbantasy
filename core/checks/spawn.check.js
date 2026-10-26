@@ -196,7 +196,8 @@ export default function checkSpawn(run) {
   const spawnDropped = (s) => spawnWorld(s).entities.filter((e) => e.ephemeral);
   run.same("collecte : fouiller un conteneur garni -> les objets du stock tombent", spawnWorld(spawnFilled).entities[0].stock, spawnSearch1.items);
   run("collecte : fouiller -> une entité ÉPHÉMÈRE par objet tombé", spawnSearch1.items.length, spawnDropped(spawnSearch1.session).length);
-  run("collecte : fouiller -> objets tombés éparpillés AUTOUR du conteneur", true, spawnDropped(spawnSearch1.session).every((e) => Math.abs(e.x - 5) <= TUNING_DEFAULTS.ephemeralScatterSpread));
+  run("collecte : fouiller -> objets tombés éparpillés AUTOUR du conteneur", true, spawnDropped(spawnSearch1.session).every((e) => Math.abs(e.x - 5) <= TUNING_DEFAULTS.searchScatterSpread));
+  run("collecte : la fouille éparpille moins large que le défaut des éphémères", true, TUNING_DEFAULTS.searchScatterSpread < TUNING_DEFAULTS.ephemeralScatterSpread);
   run("collecte : fouiller -> objets tombés ramassables (action pickup vers le sac)", true, spawnDropped(spawnSearch1.session).every((e) => e.action.kind === "pickup" && spawnSearch1.items.includes(e.action.item)));
   run("collecte : fouiller -> objets tombés jamais marqués spawned (pas un lot de plage)", true, spawnDropped(spawnSearch1.session).every((e) => !e.spawned));
   run("collecte : fouiller -> RIEN au sac directement", 0, spawnSearch1.session.bag.length);

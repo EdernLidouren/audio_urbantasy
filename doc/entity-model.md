@@ -564,7 +564,9 @@ persiste avec le monde.
   `doc/scripting.md`) -> `core/spawn.js`/`searchContainer` : le stock TOMBE
   AU SOL — une entité ÉPHÉMÈRE par objet, éparpillée autour du conteneur
   (`spawnScatteredEphemerals`, MÊME geste que la caisse qui lâche des pièces
-  : bornes, obstacles, décalage d'attaques des balises), à ramasser ensuite
+  : bornes, obstacles, décalage d'attaques des balises — dans un rayon un peu
+  plus serré, `searchScatterSpread` de `config/tuning-values.js`, pour
+  ramasser le contenu au pied du conteneur), à ramasser ensuite
   objet par objet ou à laisser (purgée au départ comme tout éphémère) ; puis
   `stock: null`. Rien ne va JAMAIS directement au sac. Retour : une annonce
   seule — `interaction.searchSpawn` (« 3 objets apparaissent. », « Un objet

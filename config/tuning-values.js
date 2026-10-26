@@ -402,6 +402,12 @@ export const TUNING_DEFAULTS = {
   // éparpillement large.
   ephemeralScatterSpread: 2.5,
 
+  // Même rôle que ephemeralScatterSpread, pour les objets qui TOMBENT d'un
+  // conteneur fouillé (voir core/spawn.js/searchContainer). Un peu plus
+  // serré : on ramasse le contenu d'une poubelle à ses pieds, sans avoir à
+  // le chercher plus loin. Lu DIRECTEMENT, comme ephemeralScatterSpread.
+  searchScatterSpread: 2,
+
   // Écart minimal (unités x) entre deux collectibles posés dans une même
   // PLAGE de spawn (voir core/spawn.js, doc/entity-model.md/"Collecte") :
   // évite l'empilement sonore de deux balises au même point. Lu
