@@ -15,7 +15,7 @@ import { t, nameRef } from "../data/i18n/index.js";
 import { pushScreen, popScreen } from "../lib/screens.js";
 import { withPausedBeacons } from "./paused-beacons.js";
 import { makeMenuScreen } from "../lib/menu.js";
-import { evaluateCondition, selectMatchingAction, actionContextOf } from "../core/presence.js";
+import { evaluateCondition, selectMatchingAction, selectDescriptionKey, actionContextOf } from "../core/presence.js";
 import { resolveDescriptionText } from "./description-resolver.js";
 import { resolveTuning } from "../config/tuning.js";
 import { sessionProvider } from "./interaction-handlers.js";
@@ -45,10 +45,17 @@ import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
 // descriptionKey normal (une entité consommée sans description alternative
 // déclarée garde simplement la même description qu'avant). Cette clé PEUT
 // elle aussi porter un gabarit, comme n'importe quelle descriptionKey.
+//
+// descriptionRules (voir doc/scripting.md/"Descriptions conditionnelles") :
+// une description choisie par CONDITION (ex. la porte du magasin, rideau
+// baissé la nuit), prioritaire sur les deux précédentes. Le choix de la clé
+// est fait par le core (selectDescriptionKey), contre le MÊME contexte que
+// le remplissage du gabarit.
 function resolveDescription(entity) {
-  const key = entity.consumed && entity.consumedDescriptionKey ? entity.consumedDescriptionKey : entity.descriptionKey;
+  const context = actionContext(entity);
+  const key = selectDescriptionKey(entity, context);
   if (!key) return undefined;
-  return resolveDescriptionText(key, actionContext(entity));
+  return resolveDescriptionText(key, context);
 }
 
 // ACTIONS CONDITIONNELLES (voir core/script-parse.js/parseSingleAction,

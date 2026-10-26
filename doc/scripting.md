@@ -27,11 +27,11 @@ fenêtre horaire sans étalement, un son sans gain...). Les listes de champs
 vivent dans le code, à côté de ce qui les lit (voir "Sources de vérité" en fin
 de document).
 
-## Vue d'ensemble : une seule couche de conditions, quatre consommateurs
+## Vue d'ensemble : une seule couche de conditions, cinq consommateurs
 
 Le même objet condition (`{ type, ...champs }`) et le même évaluateur
-(`core/presence.js`/`evaluateCondition`) servent à QUATRE usages, sans
-jamais quatre mécanismes séparés :
+(`core/presence.js`/`evaluateCondition`) servent à CINQ usages, sans
+jamais cinq mécanismes séparés :
 
 1. **Présence conditionnelle** — `entity.presence` décide si une entité est
    affichée/simulée (voir "Règles" plus bas).
@@ -44,6 +44,9 @@ jamais quatre mécanismes séparés :
    entité sonne : sa balise (ex. un vidéoprojecteur allumé/éteint par une
    variable) ou ses sons de proximité (ex. une boutique fermée la nuit) ; voir
    `doc/entity-model.md`/"Sons conditionnels (balise et proximité)".
+5. **Descriptions conditionnelles** — `entity.descriptionRules` choisit la
+   description lue à Espace selon l'état (ex. la porte du magasin, rideau de
+   fer baissé la nuit) ; voir "Descriptions conditionnelles" plus bas.
 
 Un futur PNJ qui ne parle qu'à condition, ou un dialogue conditionnel, RÉUTILISERAIT
 cette même couche (nouveau CONSOMMATEUR du même évaluateur), jamais un système de
@@ -96,10 +99,10 @@ contenu (ex. `"from": "20"` en chaîne) échoue donc au chargement, au lieu d'un
 règle qui ne serait jamais vraie.
 
 Exemple réel complet — le néon (`entities/types/neon.js`), présent uniquement la
-nuit :
+nuit, de 22 h à 6 h :
 
 ```js
-presence: [{ when: { type: "timeRange", from: 20, to: 6 }, present: true }],
+presence: [{ when: { type: "timeRange", from: 22, to: 6 }, present: true }],
 ```
 
 #### Variation de seuil par instance (`spread`)
@@ -1499,9 +1502,9 @@ Confirmer exécute l'action entière ; annuler ne laisse aucune trace. La
 question.
 
 ```json
-// scenes/town-square.json, main_street_exit — sortie vers une autre scène majeure
+// scenes/town-square.json, main_street_exit_r — sortie vers une autre scène majeure
 {
-  "id": "main_street_exit",
+  "id": "main_street_exit_r",
   "type": "scene_exit",
   "x": 0,
   "action": {
@@ -1849,14 +1852,51 @@ condition (`entity`, `time`, `perceptionActive`, `weather`, `world`,
 `session`), construit par l'appelant (la vue), jamais lu directement par le
 résolveur (PUR : aucun accès à l'horloge réelle ni à un état global).
 
-**Axe d'évolution — niveau RICHE (pas construit)** : le gabarit à variables
-est une version DÉGÉNÉRÉE d'une forme future qui choisirait des FRAGMENTS de
-texte selon des CONDITIONS (ex. la position d'une grenouille selon la
-météo), réutilisant `evaluateCondition` (`core/presence.js`) contre ce MÊME
-contexte — jamais une seconde forme de contexte à maintenir. Le riche est
-une EXTENSION du simple, jamais un remplacement ; rien dans ce mécanisme
-n'empêche de l'ajouter plus tard (voir `doc/entity-model.md`/"Interaction
-(niveau 0)").
+**Axe d'évolution — niveau RICHE** : choisir le texte selon des CONDITIONS,
+en réutilisant `evaluateCondition` (`core/presence.js`) contre ce MÊME
+contexte — jamais une seconde forme de contexte à maintenir. Un premier
+palier est construit : le choix de la DESCRIPTION ENTIÈRE par condition
+(voir "Descriptions conditionnelles" ci-dessous). Reste à construire, si un
+besoin apparaît : des FRAGMENTS de phrase choisis par condition à
+l'intérieur d'une même description (ex. la position d'une grenouille selon
+la météo). Le riche est une EXTENSION du simple, jamais un remplacement.
+
+## Descriptions conditionnelles
+
+`descriptionRules` (entité ou archétype, l'instance remplace l'archétype EN
+BLOC, comme `presence`) : un tableau de règles `{ when, descriptionKey }`.
+À chaque observation (Espace), la PREMIÈRE règle dont la condition est vraie
+donne la clé de description ; aucune règle vraie -> la description
+habituelle. Choix fait par le core (`core/presence.js`/
+`selectDescriptionKey`), contre le contexte d'une action
+(`actionContextOf` : heure, météo, perception, variables, `consumed`...),
+le MÊME que celui qui remplit ensuite le gabarit (voir "Descriptions
+dynamiques" ci-dessus) : la clé choisie peut porter des `{variables}`.
+
+Ordre de choix : 1. la première règle vraie ; 2. `consumedDescriptionKey`
+si l'entité est consommée (voir `doc/entity-model.md`/"Collectible
+persistant") ; 3. `descriptionKey`. Une règle peut elle-même tester
+`consumed` : `consumedDescriptionKey` reste le raccourci du cas le plus
+courant.
+
+Validation au chargement (`core/entity-parse.js`/`parseDescriptionRules`) :
+tableau non vide, chaque règle avec une condition valide (même validateur
+que partout, `validateCondition`) et une clé non vide, aucun autre champ.
+L'audit du contenu vérifie que chaque clé existe dans chaque langue.
+
+Exemple réel — la porte du magasin de Main Street (`scenes/main-street.json`,
+`general_store_door_1_r`), rideau de fer baissé hors des heures d'ouverture,
+les MÊMES que ses sons et son action :
+
+```json
+"descriptionRules": [
+  { "when": { "type": "timeRange", "from": 20, "to": 8 }, "descriptionKey": "door.general_store.closed_description" }
+]
+```
+
+De 8 h à 20 h : « Une porte vitrée qui coulisse d'elle-même à votre
+approche. » (la description de l'archétype) ; de 20 h à 8 h : « Un accès
+protégé par un lourd rideau de fer. »
 
 ## Sources de vérité — où lire la liste exhaustive, jamais ici
 

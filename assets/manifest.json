@@ -725,7 +725,8 @@
     "assets/sounds/furniture/metal_container_1_close_1.mp3"
   ],
   "assets/sounds/furniture/metal_container_1_open": [
-    "assets/sounds/furniture/metal_container_1_open_1.mp3"
+    "assets/sounds/furniture/metal_container_1_open_1.mp3",
+    "assets/sounds/furniture/metal_container_1_open_2.mp3"
   ],
   "assets/sounds/furniture/mirror_1_beacon": [
     "assets/sounds/furniture/mirror_1_beacon_1.mp3"
@@ -745,11 +746,18 @@
   "assets/sounds/furniture/table_1_beacon": [
     "assets/sounds/furniture/table_1_beacon_1.mp3"
   ],
+  "assets/sounds/furniture/trash_can_1_beacon": [
+    "assets/sounds/furniture/trash_can_1_beacon_1.mp3",
+    "assets/sounds/furniture/trash_can_1_beacon_2.mp3"
+  ],
   "assets/sounds/furniture/video_projection_1_beacon": [
     "assets/sounds/furniture/video_projection_1_beacon_1.mp3"
   ],
   "assets/sounds/furniture/video_projector_1_beacon": [
     "assets/sounds/furniture/video_projector_1_beacon_1.mp3"
+  ],
+  "assets/sounds/furniture/wind_chime_1_beacon": [
+    "assets/sounds/furniture/wind_chime_1_beacon_1.mp3"
   ],
   "assets/sounds/items/book_1_beacon": [
     "assets/sounds/items/book_1_beacon_1.mp3"

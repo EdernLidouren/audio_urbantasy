@@ -41,6 +41,10 @@ export const SPAWN_TABLES = {
   // Tous les composants électroniques (collection "electronics"), chacun
   // selon sa rareté.
   electronics: { fromTag: "electronic" },
+  // PROVISOIRES (copie de "default") : les tables dédiées de la poubelle et
+  // du conteneur métallique, en attendant leur vrai contenu.
+  metal_trash_can: { apple: 80, coin: 20 },
+  metal_container: { apple: 80, coin: 20 },
 };
 
 // Heure de jeu (0-23) du re-garnissage quotidien : un cycle commence à

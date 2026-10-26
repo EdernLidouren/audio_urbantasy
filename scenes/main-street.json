@@ -23,6 +23,7 @@
         "descriptionKey": "passage.main_street_sidewalk.description",
         "action": { "kind": "switchSide", "arrivalX": 9 }
       },
+      { "id": "neon_1_r", "type": "neon", "x": 13 },
       { "id": "motorised_billboard_1_r", "type": "motorised_billboard", "x": 20 },
       {
         "id": "general_store_door_1_r",
@@ -34,6 +35,7 @@
           "leaveSound": { "condition": { "type": "timeRange", "from": 8, "to": 20 } },
           "proximityLoop": { "path": "assets/sounds/doors/shop_door_bell_1_beacon", "condition": { "type": "timeRange", "from": 8, "to": 20 } }
         },
+        "descriptionRules": [{ "when": { "type": "timeRange", "from": 20, "to": 8 }, "descriptionKey": "door.general_store.closed_description" }],
         "triggers": [
           { "on": "hour", "hour": 8, "effects": [{ "type": "playSound", "path": "assets/sounds/doors/garage_door_1_open" }] },
           { "on": "hour", "hour": 20, "effects": [{ "type": "playSound", "path": "assets/sounds/doors/garage_door_1_close" }] }
@@ -45,10 +47,12 @@
           "effects": [{ "type": "teleport", "target": "demo2" }]
         }
       },
+      { "id": "neon_2_r", "type": "neon", "x": 27 },
       { "id": "storm_drain_1_r", "type": "storm_drain", "x": 35 },
+      { "id": "metal_trash_can_1_r", "type": "metal_trash_can", "x": 45 },
       { "id": "river_1_r", "type": "river", "x": 49, "tuning": { "beaconCrossFaceGain": 0.5 } },
       {
-        "id": "town_square_exit",
+        "id": "town_square_exit_r",
         "type": "scene_exit",
         "x": 50,
         "nameKey": "scene_exit.main_street_town_square.name",
@@ -76,7 +80,10 @@
         "descriptionKey": "passage.main_street_sidewalk.description",
         "action": { "kind": "switchSide", "arrivalX": 9 }
       },
+      { "id": "metal_trash_can_1_v", "type": "metal_trash_can", "x": 12 },
+      { "id": "neon_1_v", "type": "neon", "x": 13 },
       { "id": "wall_air_conditioner_1_v", "type": "wall_air_conditioner", "x": 20 },
+      { "id": "neon_2_v", "type": "neon", "x": 25 },
       {
         "id": "manhole_cover_1_v",
         "type": "door",
@@ -85,6 +92,7 @@
         "descriptionKey": "door.manhole_cover.description",
         "sounds": { "beacon": { "path": "assets/sounds/decor/manhole_cover_1_beacon" } }
       },
+      { "id": "neon_3_v", "type": "neon", "x": 38 },
       {
         "id": "town_square_exit_v",
         "type": "scene_exit",

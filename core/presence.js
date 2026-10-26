@@ -525,3 +525,20 @@ export function isBlocking(entity, context) {
 export function selectMatchingAction(actions, context) {
   return actions.find((action) => !action.condition || evaluateCondition(action.condition, context));
 }
+
+// Clé de la description d'une entité dans l'état COURANT (`context` : celui
+// d'une action, voir actionContextOf), dans cet ordre :
+//   1. la PREMIÈRE règle de `descriptionRules` dont la condition est vraie
+//      (même priorité que selectMatchingAction) ;
+//   2. `consumedDescriptionKey` si l'entité est consommée (collectible
+//      persistant, voir doc/entity-model.md) ;
+//   3. `descriptionKey`.
+// Une règle peut elle-même tester `consumed` : les règles sont le cas
+// général, consumedDescriptionKey le raccourci du cas le plus courant.
+// undefined si l'entité n'a rien à décrire.
+export function selectDescriptionKey(entity, context) {
+  const rule = entity.descriptionRules?.find((candidate) => evaluateCondition(candidate.when, context));
+  if (rule) return rule.descriptionKey;
+  if (entity.consumed && entity.consumedDescriptionKey) return entity.consumedDescriptionKey;
+  return entity.descriptionKey;
+}

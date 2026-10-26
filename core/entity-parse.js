@@ -259,6 +259,28 @@ function parseShop(shop, at) {
   return { catalog: shop.catalog };
 }
 
+// Descriptions CONDITIONNELLES (voir doc/scripting.md/"Descriptions
+// conditionnelles") : `[{ when, descriptionKey }]`, la première règle vraie
+// donne la description, sinon la description habituelle. MÊME condition que
+// partout ailleurs (validateCondition), jamais un second format.
+function parseDescriptionRules(rules, at, entityVariables, sceneVariables) {
+  if (!Array.isArray(rules) || rules.length === 0) {
+    fail(`${at} : descriptionRules doit être un tableau non vide si présent.`);
+  }
+  return rules.map((rule, i) => {
+    const where = `${at} : descriptionRules[${i}]`;
+    if (typeof rule !== "object" || rule === null || Array.isArray(rule)) {
+      fail(`${where} doit être un objet { when, descriptionKey }.`);
+    }
+    rejectUnknownFields(rule, ["when", "descriptionKey"], where);
+    validateCondition(rule.when, `${where}.when`, entityVariables, sceneVariables);
+    if (!isNonEmptyString(rule.descriptionKey)) {
+      fail(`${where} : descriptionKey doit être une clé i18n.`);
+    }
+    return { when: rule.when, descriptionKey: rule.descriptionKey };
+  });
+}
+
 // Champs qu'une INSTANCE d'entité peut déclarer (voir doc/scene-format.md/
 // "Entité") ; tout autre champ est rejeté (voir rejectUnknownFields). Les
 // champs RUNTIME (stock, shopStock, ephemeral, spawned...) n'en font pas
@@ -270,6 +292,7 @@ const ENTITY_FIELDS = [
   "nameKey",
   "descriptionKey",
   "consumedDescriptionKey",
+  "descriptionRules",
   "behavior",
   "blocksMovement",
   "observable",
@@ -304,6 +327,7 @@ export function parseEntity(rawEntity, index, registry, length, seenIds, sceneVa
     nameKey,
     descriptionKey,
     consumedDescriptionKey,
+    descriptionRules,
     behavior,
     blocksMovement,
     observable,
@@ -434,6 +458,13 @@ export function parseEntity(rawEntity, index, registry, length, seenIds, sceneVa
     );
   }
 
+  // Descriptions conditionnelles : l'instance remplace l'archétype en bloc,
+  // comme `presence`. Après les variables, qu'une condition peut lire.
+  const resolvedDescriptionRules = descriptionRules !== undefined ? descriptionRules : archetype.descriptionRules;
+  if (resolvedDescriptionRules !== undefined) {
+    entity.descriptionRules = parseDescriptionRules(resolvedDescriptionRules, at, entity.variables, sceneVariables);
+  }
+
   // Présence conditionnelle (voir core/presence.js) : sans règle, l'entité
   // est toujours présente.
   const resolvedPresence = presence !== undefined ? presence : archetype.presence;
@@ -456,6 +487,7 @@ const ARCHETYPE_FIELDS = [
   "nameKey",
   "descriptionKey",
   "consumedDescriptionKey",
+  "descriptionRules",
   "sounds",
   "blocksMovement",
   "observable",

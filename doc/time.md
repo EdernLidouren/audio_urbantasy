@@ -168,7 +168,7 @@ annonce « La nuit tombe. » / « Le jour se lève. » : `view/ambient-announcem
 via ses règles déclaratives (`presence: [{ when, present }]`) — condition
 `"timeRange"` aujourd'hui, même dérivation d'heure que `phaseAt` mais totalement
 DÉCOUPLÉE de la phase jour/nuit (une entité déclare son propre horaire, ex.
-`entities/types/neon.js`, "présent 20h..6h", indépendant de `dayStartHour`/
+`entities/types/neon.js`, "présent 22h..6h", indépendant de `dayStartHour`/
 `nightStartHour`). Détail complet (l'aiguillage extensible, les trois plans
 coupés par l'état dormant, la réaction vue par diff) : `doc/entity-model.md`,
 `doc/scripting.md`, `doc/scene-format.md`.

@@ -83,7 +83,10 @@ Deux niveaux de PERCEPTION, à ne pas confondre :
   le contexte COURANT à chaque lecture, jamais stocké (voir
   `view/description-resolver.js`, `doc/scripting.md`/"Descriptions
   dynamiques" pour le détail et l'axe d'évolution vers des fragments choisis
-  par condition).
+  par condition). La CLÉ elle-même peut dépendre de l'état :
+  `descriptionRules`, la première règle `{ when, descriptionKey }` vraie
+  l'emporte (ex. la porte du magasin, rideau baissé la nuit, voir
+  `doc/scripting.md`/"Descriptions conditionnelles").
 
 Résolution de candidats PAR VERBE
 (`view/occupancy.js`/`getInteractionCandidates(kind)`) : filtre
@@ -139,8 +142,8 @@ instance déclare la sienne (`applyEffects` + `"teleport"`), et ses textes sous 
 famille `scene_exit.*` (voir `doc/i18n.md`). Entre deux scènes MAJEURES (deux
 cases de la carte de la ville), l'action porte `"confirm": true` : le joueur
 confirme avant de partir (voir `doc/scripting.md`/"Confirmation d'une action").
-Exemple réel : `main_street_exit` dans `scenes/town-square.json`, et son pendant
-`town_square_exit` dans `scenes/main-street.json`.
+Exemple réel : `main_street_exit_r` dans `scenes/town-square.json`, et son pendant
+`town_square_exit_r` dans `scenes/main-street.json`.
 
 ## Collectible persistant
 
@@ -601,7 +604,10 @@ persiste avec le monde.
   (`core/checks/spawn.check.js`).
 
 Contenu de test : `scenes/demo.json` ("Ville test") — `bush_1` (x=12, table
-`default`) et une plage `[27, 34]` de 3 collectibles.
+`default`) et une plage `[27, 34]` de 3 collectibles. En ville : les
+poubelles (`metal_trash_can`, Main Street et la grand-place) et le conteneur
+métallique (`metal_container`, pas encore placé), chacun avec sa table
+dédiée dans `config/spawn-values.js`, provisoire pour l'instant.
 `scenes/town-square-town-hall-storeroom.json` (réserve de l'hôtel de ville) :
 trois `office_supply_box` régénérantes (2 tirages, une chance sur deux de
 rien) et un `broken_computer` non régénérant (3 tirages, trois chances sur
@@ -1331,6 +1337,11 @@ sounds: {
 { "id": "video_projector_1", "type": "video_projector", "x": 3,
   "variables": [{ "name": "isOn", "type": "flag", "initial": true }] }
 ```
+
+**Exemple réel — le carillon éolien** (`entities/types/wind_chime.js`) :
+beacon soumis à la MÉTÉO, il ne tinte que par temps venteux et se tait le
+reste du temps, sans aucune action ni variable :
+`condition: { type: "weather", state: "windy" }`.
 
 Règles :
 - **Validation au chargement** (`core/entity-parse.js`/`parseEntity`), comme une

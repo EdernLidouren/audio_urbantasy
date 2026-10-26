@@ -12,16 +12,16 @@
     "segments": [{ "from": 0, "to": 5, "surface": "wood" }],
     "entities": [
       {
-        "id": "main_street_exit",
+        "id": "main_street_exit_r",
         "type": "scene_exit",
         "x": 0,
         "nameKey": "scene_exit.town_square_main_street.name",
         "descriptionKey": "scene_exit.town_square_main_street.description",
         "action": { "kind": "applyEffects", "confirm": true, "effects": [{ "type": "teleport", "target": "main_street", "x": 49, "side": "recto" }] }
       },
-      { "id": "river_recto", "type": "river", "x": 0, "interactable": false },
+      { "id": "river_1_r", "type": "river", "x": 0, "interactable": false },
       {
-        "id": "town_hall_main_door",
+        "id": "town_hall_main_door_1_r",
         "type": "door",
         "x": 25,
         "nameKey": "door.town_hall_main.name",
@@ -35,33 +35,36 @@
         }
       },
       {
-        "id": "clocktower_1",
+        "id": "clock_tower_1_r",
         "type": "clock_tower",
         "x": 35,
         "isFlying": false,
         "triggers": [{ "on": "hour", "effects": [{ "type": "playSound", "path": "assets/sounds/effects/clock_tower_bell", "gain": 2 }] }]
       },
       {
-        "id": "shellter_statue_1",
+        "id": "shellter_statue_1_r",
         "type": "statue",
         "x": 28,
         "nameKey": "entity.shellter_statue.name",
         "descriptionKey": "entity.shellter_statue.description"
       },
       {
-        "id": "town_hall_passage_recto",
+        "id": "town_hall_passage_1_r",
         "type": "passage",
         "x": 19,
         "descriptionKey": "passage.town_hall.description",
         "action": { "kind": "switchSide", "arrivalX": 19 }
       },
       {
-        "id": "clocktower_passage_recto",
+        "id": "clock_tower_passage_1_r",
         "type": "passage",
         "x": 41,
         "descriptionKey": "passage.clock_tower.description",
         "action": { "kind": "switchSide", "arrivalX": 41 }
-      }
+      },
+      { "id": "neon_1_r", "type": "neon", "x": 21 },
+      { "id": "neon_2_r", "type": "neon", "x": 37 },
+      { "id": "wind_chime_1_r", "type": "wind_chime", "x": 45 }
     ]
   },
   "verso": {
@@ -86,9 +89,9 @@
         "descriptionKey": "scene_exit.town_square_main_street.description",
         "action": { "kind": "applyEffects", "confirm": true, "effects": [{ "type": "teleport", "target": "main_street", "x": 49, "side": "verso" }] }
       },
-      { "id": "river_verso", "type": "river", "x": 10, "interactable": false, "blocksMovement": true },
+      { "id": "river_1_v", "type": "river", "x": 10, "interactable": false, "blocksMovement": true },
       {
-        "id": "clocktower_1_v",
+        "id": "clock_tower_1_v",
         "type": "clock_tower",
         "x": 35,
         "isFlying": true
@@ -111,19 +114,20 @@
         }
       },
       {
-        "id": "town_hall_passage_verso",
+        "id": "town_hall_passage_1_v",
         "type": "passage",
         "x": 19,
         "descriptionKey": "passage.town_hall.description",
         "action": { "kind": "switchSide", "arrivalX": 19 }
       },
       {
-        "id": "clocktower_passage_verso",
+        "id": "clock_tower_passage_1_v",
         "type": "passage",
         "x": 41,
         "descriptionKey": "passage.clock_tower.description",
         "action": { "kind": "switchSide", "arrivalX": 41 }
-      }
+      },
+      { "id": "metal_trash_can_1_v", "type": "metal_trash_can", "x": 43 }
     ]
   }
 }

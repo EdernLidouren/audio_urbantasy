@@ -17,7 +17,7 @@ import { tick } from "../actions.js";
 import { reduce } from "../reduce.js";
 import { advanceTime } from "../time.js";
 import { TIME_CONFIG } from "../../config/time-values.js";
-import { evaluateCondition, isPresent, isBlocking, presenceContextOf } from "../presence.js";
+import { evaluateCondition, isPresent, isBlocking, presenceContextOf, selectDescriptionKey } from "../presence.js";
 import { setWeather } from "../weather.js";
 import { auditNonSerializable } from "../../lib/check.js";
 import { TICK_MS } from "../../lib/loop.js";
@@ -869,4 +869,49 @@ export default function checkConditions(run) {
     true,
     ruleMessage({ when: { type: "consumed" }, effects: [{ type: "presence", present: false, value: 1 }] }).includes(UNKNOWN_FIELD)
   );
+
+  // --- Descriptions conditionnelles (core/entity-parse.js/descriptionRules,
+  // core/presence.js/selectDescriptionKey) : la première règle vraie, sinon
+  // la description consommée, sinon la description habituelle. ---
+  const SHUTTER_RULES = [{ when: { type: "timeRange", from: 20, to: 8 }, descriptionKey: "door.closed" }];
+  const DESC_REGISTRY = {
+    shop_door: { nameKey: "door.name", descriptionKey: "door.open" },
+    shuttered_door: { nameKey: "door.name", descriptionKey: "door.open", descriptionRules: SHUTTER_RULES },
+    box: { nameKey: "box.name", descriptionKey: "box.full", consumedDescriptionKey: "box.empty" },
+  };
+  const descScene = (entities) => ({ id: "desc", titleKey: "scene.demo.name", length: 20, playerStart: 0, entities });
+  const descEntities = parseScene(
+    descScene([
+      { id: "door-instance", type: "shop_door", x: 2, descriptionRules: SHUTTER_RULES },
+      { id: "door-archetype", type: "shuttered_door", x: 4 },
+      { id: "door-plain", type: "shop_door", x: 6 },
+      { id: "door-override", type: "shuttered_door", x: 8, descriptionRules: [{ when: { type: "timeRange", from: 22, to: 6 }, descriptionKey: "door.late" }] },
+      { id: "box-rule", type: "box", x: 10, descriptionRules: [{ when: { type: "weather", state: "rain" }, descriptionKey: "box.wet" }] },
+    ]),
+    DESC_REGISTRY
+  ).entities;
+  const descById = Object.fromEntries(descEntities.map((entity) => [entity.id, entity]));
+  const atHour = (hour, extra = {}) => ({ time: hour * 60, ...extra });
+  run("descriptions : règle d'instance, de jour -> description habituelle", "door.open", selectDescriptionKey(descById["door-instance"], atHour(10)));
+  run("descriptions : règle d'instance, la nuit -> description de la règle", "door.closed", selectDescriptionKey(descById["door-instance"], atHour(21)));
+  run("descriptions : règle d'archétype héritée par l'instance", "door.closed", selectDescriptionKey(descById["door-archetype"], atHour(3)));
+  run("descriptions : sans règle -> description habituelle", "door.open", selectDescriptionKey(descById["door-plain"], atHour(21)));
+  run("descriptions : l'instance remplace les règles de l'archétype en bloc (21 h)", "door.open", selectDescriptionKey(descById["door-override"], atHour(21)));
+  run("descriptions : l'instance remplace les règles de l'archétype en bloc (23 h)", "door.late", selectDescriptionKey(descById["door-override"], atHour(23)));
+  const consumedBox = { ...descById["box-rule"], consumed: true };
+  run("descriptions : consommée, aucune règle vraie -> description consommée", "box.empty", selectDescriptionKey(consumedBox, atHour(10, { weather: "clear" })));
+  run("descriptions : une règle vraie l'emporte sur la description consommée", "box.wet", selectDescriptionKey(consumedBox, atHour(10, { weather: "rain" })));
+  run(
+    "descriptions : la première règle vraie l'emporte",
+    "a",
+    selectDescriptionKey({ descriptionKey: "base", descriptionRules: [{ when: { type: "timeRange", from: 0, to: 24 }, descriptionKey: "a" }, { when: { type: "timeRange", from: 0, to: 24 }, descriptionKey: "b" }] }, atHour(5))
+  );
+  run("descriptions : règles sérialisables (aller-retour JSON)", JSON.stringify(descById["door-instance"].descriptionRules), JSON.stringify(JSON.parse(JSON.stringify(descById["door-instance"])).descriptionRules));
+  const descMessage = (rules) => sceneParseMessage(descScene([{ id: "d", type: "shop_door", x: 2, descriptionRules: rules }]), DESC_REGISTRY);
+  run("descriptions : tableau vide refusé", true, descMessage([]).includes("descriptionRules"));
+  run("descriptions : pas un tableau refusé", true, descMessage({ when: { type: "consumed" }, descriptionKey: "k" }).includes("descriptionRules"));
+  run("descriptions : clé absente refusée", true, descMessage([{ when: { type: "consumed" } }]).includes("descriptionKey"));
+  run("descriptions : condition absente refusée", true, descMessage([{ descriptionKey: "k" }]).includes("when"));
+  run("descriptions : condition inconnue refusée", true, descMessage([{ when: { type: "sunny" }, descriptionKey: "k" }]).includes("sunny"));
+  run("descriptions : champ inconnu refusé", true, descMessage([{ when: { type: "consumed" }, descriptionKey: "k", key: "x" }]).includes(UNKNOWN_FIELD));
 }

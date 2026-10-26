@@ -77,6 +77,8 @@ import largeWindingMechanism from "./large_winding_mechanism.js";
 import machine1 from "./machine_1.js";
 import magicMirror from "./magic_mirror.js";
 import miravi from "./miravi.js";
+import metalContainer from "./metal_container.js";
+import metalTrashCan from "./metal_trash_can.js";
 import motorisedBillboard from "./motorised_billboard.js";
 import mirror from "./mirror.js";
 import mopAndBucket from "./mop_and_bucket.js";
@@ -96,6 +98,7 @@ import perchedBird2 from "./perched_bird_2.js";
 import perchedBird3 from "./perched_bird_3.js";
 import wallAirConditioner from "./wall_air_conditioner.js";
 import woodBench from "./wood_bench.js";
+import windChime from "./wind_chime.js";
 import stormDrain from "./storm_drain.js";
 import trafficLight from "./traffic_light.js";
 import highwayTraffic from "./highway_traffic.js";
@@ -143,6 +146,8 @@ export default {
   machine_1: machine1,
   magic_mirror: magicMirror,
   miravi,
+  metal_container: metalContainer,
+  metal_trash_can: metalTrashCan,
   motorised_billboard: motorisedBillboard,
   mirror,
   money,
@@ -162,6 +167,7 @@ export default {
   perched_bird_3: perchedBird3,
   wall_air_conditioner: wallAirConditioner,
   wood_bench: woodBench,
+  wind_chime: windChime,
   storm_drain: stormDrain,
   traffic_light: trafficLight,
   highway_traffic: highwayTraffic,
