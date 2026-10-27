@@ -1,6 +1,7 @@
 {
   "emote.clap.description": "A sharp clap of both hands.",
   "emote.clap.name": "hand clap",
+  "emote.shortcutSet": "Emote shortcut: {emote}.",
   "emote.whistle.description": "A short, piercing call whistle that carries far.",
   "emote.whistle.name": "whistle",
   "menu.emotes.title": "Emotes"

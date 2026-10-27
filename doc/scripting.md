@@ -1802,14 +1802,26 @@ mode debug, elle fonctionne TOUJOURS.
 
 ## Émotes
 
-Gestes SONORES du joueur (siffler, claquer des mains...), faits par la
-touche "e" : un menu des émotes connues, Entrée joue celle choisie, centrée
-sur le joueur, dans la réverb de la scène (`view/emotes.js`,
-`view/audio/footsteps.js`/`playEmoteSound`). Le menu se rouvre sur la
-dernière émote faite. Délai minimal entre deux émotes : `emoteCooldownMs`
-(`config/tuning-values.js`, horloge murale comme la perception) ; réverb :
-`emoteReverbSend`. Sans émote connue, la touche ne fait rien et l'aide des
-touches ne la montre pas.
+Gestes SONORES du joueur (siffler, claquer des mains...), joués centrés sur
+le joueur, dans la réverb de la scène (`view/emotes.js`,
+`view/audio/footsteps.js`/`playEmoteSound`) :
+
+- **Maj+E** ouvre le choix : les émotes connues, une ligne
+  « nom : description » chacune, ouvert sur celle du raccourci. Entrée la
+  place en RACCOURCI (annonce « Raccourci d'émote : sifflement. ») et
+  ferme le menu, sans la jouer.
+- **E** joue l'émote du raccourci ; sans raccourci, il ouvre le choix.
+
+Le raccourci (`session.emoteShortcut`, `core/emotes.js`/`setEmoteShortcut`)
+est sauvegardé avec la partie, vide au départ. Visant une émote que le
+joueur ne connaît plus (oubliée, ou choisie en mode debug), il se lit comme
+vide, sans être effacé.
+
+Délai minimal entre deux émotes : `emoteCooldownMs` (`config/tuning-values.js`,
+horloge murale comme la perception) ; réverb : `emoteReverbSend` ; variation
+de ton : `emotePitchVariation`. Comme pour tout pool, le même fichier ne
+sort jamais deux fois de suite (`lib/assets.js`/`resolveAsset`). Sans émote
+connue, les deux touches ne font rien et l'aide ne les montre pas.
 
 Pour l'instant une émote ne fait que SONNER : rien dans le monde n'y réagit
 encore.
@@ -1834,7 +1846,8 @@ comme les textes. Validé à l'import (`validateEmoteRegistry`).
 **Stockage** — `session.emotes` : `{ [id]: true }`, SPARSE, cercle PARTIE,
 PERSISTANT, comme `session.improvements`. À la création d'une partie neuve :
 celles du départ (`config/new-game.js`/`emotes`, voir `doc/new-game.md`) ;
-rebouché vide pour une sauvegarde antérieure (`core/save.js`/`migrateSave`).
+rebouché vide pour une sauvegarde antérieure (`core/save.js`/`migrateSave`),
+de même que le raccourci (`null`).
 
 **Lecture** : condition `knowsEmote` ; **écriture** : effets `learnEmote`/
 `forgetEmote` (voir plus haut). Le court-circuit debug est celui des

@@ -13,6 +13,7 @@ import {
   knowsEmote,
   learnEmote,
   forgetEmote,
+  setEmoteShortcut,
   validateEmoteRegistry,
   orderedEmoteIds,
 } from "../emotes.js";
@@ -84,6 +85,13 @@ function checkEmotesBody(run) {
   const withVariableToo = applyEntityActionEffects(session, "teacher", [{ type: "learnEmote", id: "clap" }, { type: "forgetEmote", id: "whistle" }]);
   run.same("applyEntityActionEffects : learn puis forget dans la même liste", { clap: true }, withVariableToo.emotes);
 
+  // --- Raccourci ---
+  run("emotes : partie neuve -> aucun raccourci", null, createInitialState(world, 1).emoteShortcut);
+  session = setEmoteShortcut(session, "whistle");
+  run("emotes : setEmoteShortcut pose le raccourci", "whistle", session.emoteShortcut);
+  run("emotes : setEmoteShortcut identique -> même référence", session, setEmoteShortcut(session, "whistle"));
+  run("emotes : setEmoteShortcut id inconnu -> exception", true, throws(() => setEmoteShortcut(session, "moonwalk")));
+
   // --- Court-circuit debug : la lecture ment, l'écriture jamais ---
   setDebugEnabled(true);
   run("knowsEmote debug : vrai sans émote réelle", true, evaluateCondition(knowsClap, { session: { emotes: {} } }));
@@ -98,9 +106,12 @@ function checkEmotesBody(run) {
   const reload = deserializeGame(serializeGame(session));
   run("emotes : save/load réussit", true, reload.success);
   if (reload.success) run("emotes : émote apprise -> survit au rechargement", true, knowsEmote(reload.session.emotes, "whistle"));
+  if (reload.success) run("emotes : raccourci -> survit au rechargement", "whistle", reload.session.emoteShortcut);
   const oldSave = { version: SAVE_VERSION, data: { ...session } };
   delete oldSave.data.emotes;
+  delete oldSave.data.emoteShortcut;
   const oldReload = deserializeGame(oldSave);
   run("emotes : vieille save sans le champ -> rechargement réussit", true, oldReload.success);
   if (oldReload.success) run.same("emotes : vieille save rebouchée -> aucune émote", {}, oldReload.session.emotes);
+  if (oldReload.success) run("emotes : vieille save rebouchée -> aucun raccourci", null, oldReload.session.emoteShortcut);
 }

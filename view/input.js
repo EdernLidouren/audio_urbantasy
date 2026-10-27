@@ -102,9 +102,11 @@ export const CITY_BINDINGS = defineBindings("city", {
   // ce binding ne fait que router l'appui, comme tout le reste de cette
   // table.
   togglePerception: { keys: ["p"], mods: [] },
-  // "e" (émote) : menu des émotes connues (voir view/emotes.js). Sans
-  // aucune émote connue, la touche ne fait rien, comme la perception.
-  openEmotes: { keys: ["e"], mods: [] },
+  // "e" (émote) : refait l'émote en raccourci, ou ouvre le choix s'il n'y
+  // en a pas ; Maj+E ouvre toujours le choix (voir view/emotes.js). Sans
+  // aucune émote connue, les deux ne font rien, comme la perception.
+  performEmote: { keys: ["e"], mods: [] },
+  chooseEmote: { keys: ["e"], mods: ["shift"] },
   interactDescribe: { keys: [" "], mods: [] },
   interactActivate: { keys: ["Enter"], mods: [] },
 });

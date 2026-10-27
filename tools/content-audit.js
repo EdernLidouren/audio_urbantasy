@@ -89,6 +89,8 @@ const NAME_SLOTS = [
   // view/interaction.js/confirmationParams : la scène cible d'une action
   // "confirm", toujours une scène principale (vérifié plus bas).
   { template: "interaction.travelConfirm", param: "scene", names: () => MAIN_SCENE_IDS.map((id) => `scene.${id}.name`) },
+  // view/emotes.js/chooseShortcut : l'émote placée en raccourci.
+  { template: "emote.shortcutSet", param: "emote", names: () => Object.values(EMOTE_REGISTRY).map((emote) => emote.nameKey) },
 ];
 
 // Formes que `template` demande pour le paramètre `param` : chaque

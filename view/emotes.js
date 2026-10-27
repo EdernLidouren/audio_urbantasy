@@ -1,28 +1,24 @@
-// ÉMOTES DU JOUEUR (touche "e") : un menu des émotes connues, puis le son de
-// celle choisie, joué sur le joueur (voir core/emotes.js pour le registre et
-// la connaissance, view/audio/footsteps.js/playEmoteSound pour le rendu).
-// Pour l'instant une émote ne fait que sonner : rien dans le monde n'y
-// réagit encore, d'où aucun appel au core ici en dehors de la lecture.
+// ÉMOTES DU JOUEUR : Maj+E choisit l'émote du RACCOURCI dans un menu des
+// émotes connues, E la joue sur le joueur (voir core/emotes.js pour le
+// registre, la connaissance et le raccourci, view/audio/footsteps.js/
+// playEmoteSound pour le rendu). Pour l'instant une émote ne fait que
+// sonner : rien dans le monde n'y réagit encore.
 
 import { pushScreen, popScreen } from "../lib/screens.js";
 import { makeMenuScreen } from "../lib/menu.js";
-import { t } from "../data/i18n/index.js";
-import { EMOTE_REGISTRY, orderedEmoteIds } from "../core/emotes.js";
+import { announce } from "../lib/announce.js";
+import { t, nameRef } from "../data/i18n/index.js";
+import { EMOTE_REGISTRY, orderedEmoteIds, setEmoteShortcut } from "../core/emotes.js";
 import { evaluateCondition, presenceContextOf } from "../core/presence.js";
 import { withPausedBeacons } from "./paused-beacons.js";
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";
 
 // `getWorldView` : la vue du monde COURANTE, relue à chaque usage (voir
 // view/world-travel.js/current) — un voyage la remplace.
-export function createEmotes({ getSession, getWorldView }) {
+export function createEmotes({ getSession, setSession, getWorldView }) {
   // Délai minimal entre deux émotes (emoteCooldownMs), sur l'horloge MURALE
-  // comme la perception (view/perception-toggle.js) : il court aussi
-  // pendant que le menu est ouvert.
+  // comme la perception (view/perception-toggle.js).
   let cooldownUntil = 0;
-  // Dernière émote faite : le menu se rouvre dessus, Entrée la refait.
-  // Confort de navigation, comme le curseur d'un menu, jamais un état de
-  // partie.
-  let lastEmoteId = null;
 
   // Émotes connues, dans l'ordre du registre — lues par la condition
   // knowsEmote, la MÊME qu'un script déclarerait : en mode debug, toutes.
@@ -31,8 +27,15 @@ export function createEmotes({ getSession, getWorldView }) {
     return orderedEmoteIds().filter((id) => evaluateCondition({ type: "knowsEmote", id }, context));
   }
 
-  // La touche a-t-elle un effet ? Lu aussi par l'aide des touches
-  // (view/city-screen.js) : la touche n'y figure qu'avec au moins une émote.
+  // Le raccourci, s'il vise une émote connue ; sinon null (aucun, ou une
+  // émote oubliée depuis, voir core/emotes.js/setEmoteShortcut).
+  function usableShortcut() {
+    const id = getSession().emoteShortcut;
+    return id && knownEmoteIds().includes(id) ? id : null;
+  }
+
+  // Les touches ont-elles un effet ? Lu aussi par l'aide des touches
+  // (view/city-screen.js) : elles n'y figurent qu'avec au moins une émote.
   function isAvailable() {
     return knownEmoteIds().length > 0;
   }
@@ -42,29 +45,41 @@ export function createEmotes({ getSession, getWorldView }) {
     const now = performance.now();
     if (now < cooldownUntil) return;
     cooldownUntil = now + TUNING_DEFAULTS.emoteCooldownMs;
-    lastEmoteId = id;
     getWorldView()?.playEmoteSound(EMOTE_REGISTRY[id].soundPath);
   }
 
-  // Le menu se ferme AVANT le son : les balises reprennent, et l'émote
-  // sonne dans la scène vivante.
+  // Le choix ferme le menu PUIS s'annonce : rien ne vient couvrir
+  // l'annonce. L'émote n'est pas jouée.
+  function chooseShortcut(id) {
+    popScreen();
+    setSession(setEmoteShortcut(getSession(), id));
+    announce(t("emote.shortcutSet", { emote: nameRef(EMOTE_REGISTRY[id].nameKey) }), { assertive: true });
+  }
+
+  // Maj+E (et E sans raccourci) : « nom : description » par émote, ouvert
+  // sur celle du raccourci.
   function openMenu() {
     const ids = knownEmoteIds();
     if (ids.length === 0) return;
     const menu = {
       title: "menu.emotes.title",
       closable: true,
-      cursor: Math.max(0, ids.indexOf(lastEmoteId)),
+      cursor: Math.max(0, ids.indexOf(usableShortcut())),
       entries: ids.map((id) => ({
         label: EMOTE_REGISTRY[id].nameKey,
-        onActivate: () => {
-          popScreen();
-          perform(id);
-        },
+        descriptionKey: EMOTE_REGISTRY[id].descriptionKey,
+        onActivate: () => chooseShortcut(id),
       })),
     };
     pushScreen(withPausedBeacons(makeMenuScreen(menu, t), getWorldView));
   }
 
-  return { openMenu, isAvailable };
+  // E : l'émote du raccourci, sinon le choix.
+  function performShortcut() {
+    const id = usableShortcut();
+    if (id) perform(id);
+    else openMenu();
+  }
+
+  return { performShortcut, openMenu, isAvailable };
 }

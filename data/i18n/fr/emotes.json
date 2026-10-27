@@ -1,6 +1,7 @@
 {
   "emote.clap.description": "Un claquement sec des deux mains.",
   "emote.clap.name": "claquement de mains",
+  "emote.shortcutSet": "Raccourci d'émote : {emote}.",
   "emote.whistle.description": "Un sifflement d'appel, bref et perçant, qui porte loin.",
   "emote.whistle.name": "sifflement",
   "menu.emotes.title": "Émotes"

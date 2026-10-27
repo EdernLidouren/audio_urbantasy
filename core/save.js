@@ -670,6 +670,10 @@ function migrateSave(raw) {
   if (!data.emotes || typeof data.emotes !== "object") {
     data = { ...data, emotes: {} };
   }
+  // Raccourci d'émote (core/emotes.js/setEmoteShortcut) : absent -> aucun.
+  if (typeof data.emoteShortcut !== "string") {
+    data = { ...data, emoteShortcut: null };
+  }
 
   // acquiredItems (voir core/bag.js/addItem, core/collections.js) : absent
   // d'une sauvegarde antérieure -> RECONSTITUÉ à partir du sac et de

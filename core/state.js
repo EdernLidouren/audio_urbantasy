@@ -336,6 +336,9 @@ export function createInitialState(
     // que improvements, SPARSE et PERSISTANT. Celles du départ d'une partie
     // neuve (config/new-game.js), aucune par défaut.
     emotes,
+    // Émote en raccourci (touche "e", voir core/emotes.js/
+    // setEmoteShortcut) : aucune au départ, le premier "e" ouvre le choix.
+    emoteShortcut: null,
   };
 }
 

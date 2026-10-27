@@ -40,7 +40,7 @@ export function makeCityScreen(getSession, setSession) {
   const travel = createWorldTravel({ getSession, setSession });
   const clock = createGameClock({ getSession, setSession });
   const perception = createPerceptionToggle({ getSession, setSession });
-  const emotes = createEmotes({ getSession, getWorldView: () => travel.current() });
+  const emotes = createEmotes({ getSession, setSession, getWorldView: () => travel.current() });
   const debug = createDebugEffects({ getSession, setSession, clock });
   // Branchés pour la durée de vie de l'écran, débranchés à sa sortie.
   const unregisterActionHandlers = registerActionHandlers({ getSession, setSession, travel });
@@ -78,7 +78,8 @@ export function makeCityScreen(getSession, setSession) {
     openImprovements: { run: () => openImprovementsMenu(travel.current, getSession) },
     openCollections: { run: () => openCollectionsMenu(travel.current, getSession) },
     togglePerception: { run: perception.toggle, available: perception.isAvailable },
-    openEmotes: { run: emotes.openMenu, available: emotes.isAvailable },
+    performEmote: { run: emotes.performShortcut, available: emotes.isAvailable },
+    chooseEmote: { run: emotes.openMenu, available: emotes.isAvailable },
     interactDescribe: { preventDefault: true, run: () => interactWith("describe") },
     interactActivate: { preventDefault: true, run: () => interactWith("activate") },
     openWeatherDebugMenu: { debugOnly: true, run: () => openWeatherDebugMenu(debug.forceWeather, debug.triggerWeatherTransition) },

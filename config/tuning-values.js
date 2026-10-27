@@ -181,6 +181,12 @@ export const TUNING_DEFAULTS = {
   // réverb dit la taille du lieu (une salle ne répond pas comme une place).
   emoteReverbSend: 0.45,
 
+  // Variation de ton des émotes, même sens que pitchVariation : vitesse de
+  // lecture tirée dans [1-v, 1+v] à chaque émote. MODÉRÉE : deux sifflements
+  // ne sonnent jamais tout à fait pareil, sans changer de caractère. Plus
+  // haut = émotes plus changeantes ; 0 = toujours le même ton.
+  emotePitchVariation: 0.08,
+
   // Durée (ms) du fondu de sortie UNIVERSEL de la musique (voir
   // lib/audio/music.js/fadeOutMusic, view/audio/layers.js) : la piste en cours
   // descend à 0 puis s'arrête, JAMAIS une coupure sèche — réutilisée par

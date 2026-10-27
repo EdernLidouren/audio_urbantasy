@@ -3,7 +3,7 @@
 // d'arrivée d'une bascule de face, sons de collision, émotes. Les pas des ENTITÉS
 // mobiles réutilisent les mêmes briques (voir ./entity-audio.js).
 
-import { playOneShot } from "../../lib/audio.js";
+import { playOneShot, randomRate } from "../../lib/audio.js";
 import { resolveAsset, hasAsset } from "../../lib/assets.js";
 import { TUNING_DEFAULTS, resolveTuning } from "../../config/tuning.js";
 import { MOVE_STEP, getActiveWorld } from "../../core/state.js";
@@ -34,6 +34,7 @@ const FOOTSTEP_REVERB_SEND =
 // Réverb des émotes (voir playEmoteSound) : leur propre niveau, plus
 // généreux que celui du pas.
 const EMOTE_REVERB_SEND = TUNING_DEFAULTS.emoteReverbSend;
+const EMOTE_PITCH_VARIATION = TUNING_DEFAULTS.emotePitchVariation;
 
 // Anti-mitraillette du son de COLLISION seulement : le pas, lui, est borné
 // par la distance (voir stepWalker), jamais par le temps.
@@ -250,10 +251,13 @@ export function createPlayerFootsteps({ getSession, reverbBusInput, collisionSou
   // Son d'une ÉMOTE (voir view/emotes.js) : centré sur le joueur comme son
   // pas, dans la couche entités et la réverb de la scène — c'est le joueur
   // qui siffle ICI, la scène lui répond. Volume de la catégorie "pas", celle
-  // des sons du corps du joueur. Le délai entre deux émotes est géré par
+  // des sons du corps du joueur. Ton légèrement varié à chaque fois ; le
+  // pool ne rejoue jamais deux fois de suite le même fichier (voir
+  // lib/assets.js/resolveAsset). Le délai entre deux émotes est géré par
   // l'appelant.
   function playEmoteSound(path) {
     playOneShot(resolveAsset(path), {
+      rate: randomRate(EMOTE_PITCH_VARIATION),
       reverbSend: EMOTE_REVERB_SEND,
       reverbBusInput,
       volume: footstepVolumeFactor(),

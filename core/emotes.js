@@ -9,6 +9,10 @@
 // les apprend au fil de la partie (effet learnEmote, ou départ d'une partie
 // neuve, config/new-game.js). Pour l'instant, faire une émote ne joue que
 // son son : les réactions du monde viendront s'y brancher.
+//
+// RACCOURCI : une émote choisie par le joueur (Maj+E) que la touche "e"
+// refait d'un coup, sans menu — session.emoteShortcut, voir
+// setEmoteShortcut plus bas.
 
 import { rejectUnknownFields, isNonEmptyString } from "../lib/validate.js";
 
@@ -84,4 +88,20 @@ export function forgetEmote(emotes, id) {
   const next = { ...emotes };
   delete next[id];
   return next;
+}
+
+// RACCOURCI — session.emoteShortcut : l'id de l'émote que "e" refait, ou
+// null (aucune). Cercle PARTIE, sauvegardé avec la partie : c'est un choix
+// du joueur sur SES émotes, pas une préférence de l'application. Un id
+// inconnu du registre est une erreur de programmation (le menu ne propose
+// que des émotes du registre) : exception immédiate.
+//
+// Le raccourci peut viser une émote que le joueur ne connaît plus (oubliée
+// par forgetEmote, ou choisie en mode debug, où toutes se lisent connues) :
+// la vue le relit alors comme VIDE (voir view/emotes.js), sans jamais
+// l'effacer — réapprise, l'émote retrouve sa place.
+export function setEmoteShortcut(session, id) {
+  if (!Object.hasOwn(EMOTE_REGISTRY, id)) throw new Error(`setEmoteShortcut : émote "${id}" absente du registre.`);
+  if (session.emoteShortcut === id) return session;
+  return { ...session, emoteShortcut: id };
 }
