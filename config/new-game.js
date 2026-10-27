@@ -7,7 +7,8 @@
 // Contenu de TEST pour l'instant : les rangers et les escarpins dans le sac
 // servent à essayer les pas "boots"/"high_heels" et le tag "chic" (porte à
 // dresscode de scenes/demo.json) sans rien ramasser ; les baskets équipées
-// donnent un pas chaussé dès le premier mètre ; le chien suit le joueur.
+// donnent un pas chaussé dès le premier mètre ; le chien suit le joueur ;
+// les deux émotes sont connues d'emblée, faute encore de quoi les apprendre.
 
 export const NEW_GAME = {
   // Scène où commence la partie (id de scenes/index.js).
@@ -20,4 +21,6 @@ export const NEW_GAME = {
   // Compagnons : déclarés comme une entité de scène, sans x (toujours placés
   // près du joueur). Au plus MAX_COMPANIONS (config/companions.js).
   companions: [{ id: "companion-test-dog", type: "buddy", behavior: { kind: "follow" } }],
+  // Émotes connues (ids de core/emotes.js).
+  emotes: ["whistle", "clap"],
 };

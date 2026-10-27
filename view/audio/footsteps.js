@@ -1,6 +1,6 @@
 // PAS — choix du fichier de pas (pur), déclenchement à la distance
 // parcourue (pur), et sons du JOUEUR : pas de marche, pas de trajet et
-// d'arrivée d'une bascule de face, sons de collision. Les pas des ENTITÉS
+// d'arrivée d'une bascule de face, sons de collision, émotes. Les pas des ENTITÉS
 // mobiles réutilisent les mêmes briques (voir ./entity-audio.js).
 
 import { playOneShot } from "../../lib/audio.js";
@@ -30,6 +30,10 @@ export const PLAYER_GAIT_POOL = [
 export const MOVEMENT_SOUND = player.sounds.movement;
 const FOOTSTEP_REVERB_SEND =
   MOVEMENT_SOUND.reverbSend !== undefined ? MOVEMENT_SOUND.reverbSend : TUNING_DEFAULTS.footstepReverbSend;
+
+// Réverb des émotes (voir playEmoteSound) : leur propre niveau, plus
+// généreux que celui du pas.
+const EMOTE_REVERB_SEND = TUNING_DEFAULTS.emoteReverbSend;
 
 // Anti-mitraillette du son de COLLISION seulement : le pas, lui, est borné
 // par la distance (voir stepWalker), jamais par le temps.
@@ -243,5 +247,19 @@ export function createPlayerFootsteps({ getSession, reverbBusInput, collisionSou
     playMetaFootstepAt(destinationFace, arrivalX, gait);
   }
 
-  return { update, playTransitionSteps, playArrivalStep };
+  // Son d'une ÉMOTE (voir view/emotes.js) : centré sur le joueur comme son
+  // pas, dans la couche entités et la réverb de la scène — c'est le joueur
+  // qui siffle ICI, la scène lui répond. Volume de la catégorie "pas", celle
+  // des sons du corps du joueur. Le délai entre deux émotes est géré par
+  // l'appelant.
+  function playEmoteSound(path) {
+    playOneShot(resolveAsset(path), {
+      reverbSend: EMOTE_REVERB_SEND,
+      reverbBusInput,
+      volume: footstepVolumeFactor(),
+      entityLayer: true,
+    });
+  }
+
+  return { update, playTransitionSteps, playArrivalStep, playEmoteSound };
 }

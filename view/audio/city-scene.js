@@ -6,7 +6,7 @@
 //   - ./entity-audio.js    : balises, vocaux, pas des entités ;
 //   - ./oneshots.js        : sons ponctuels ancrés ou suivis ;
 //   - ./proximity-sounds.js : sons d'approche et d'éloignement du joueur ;
-//   - ./footsteps.js       : pas et collisions du joueur ;
+//   - ./footsteps.js       : pas, collisions et émotes du joueur ;
 //   - ./layers.js          : musique, ambiances, météo, perception ;
 //   - ./muffle.js          : étouffement (autre face, perception) ;
 //   - ./face-crossfade.js  : bascule animée recto <-> verso ;
@@ -204,6 +204,7 @@ export function createCityAudioScene(getSession, { handover = null } = {}) {
     playEntityOneShot: oneShots.playEntityOneShot,
     playTransitionSteps: footsteps.playTransitionSteps,
     playArrivalStep: footsteps.playArrivalStep,
+    playEmoteSound: footsteps.playEmoteSound,
   };
   activeScene = api;
   return api;

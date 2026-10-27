@@ -175,6 +175,12 @@ export const TUNING_DEFAULTS = {
   // marche. Plus haut = pas plus "dans la pièce" ; plus bas = pas plus secs.
   footstepReverbSend: 0.3,
 
+  // Envoi de réverb des ÉMOTES (sifflement, claquement de mains... voir
+  // core/emotes.js), jouées sur le joueur comme ses pas. Plus haut que le
+  // pas : une émote est un son qu'on PROJETTE dans l'espace, sa queue de
+  // réverb dit la taille du lieu (une salle ne répond pas comme une place).
+  emoteReverbSend: 0.45,
+
   // Durée (ms) du fondu de sortie UNIVERSEL de la musique (voir
   // lib/audio/music.js/fadeOutMusic, view/audio/layers.js) : la piste en cours
   // descend à 0 puis s'arrête, JAMAIS une coupure sèche — réutilisée par
@@ -427,6 +433,12 @@ export const TUNING_DEFAULTS = {
   // (jamais deux fondus qui se chevauchent/se battent, voir
   // view/perception-toggle.js). Ne jamais remplacer par un littéral indépendant.
   perceptionCooldownMs: PERCEPTION_FADE_MS + PERCEPTION_COOLDOWN_MARGIN_MS,
+
+  // Délai minimal entre deux émotes (voir view/emotes.js), sur l'horloge
+  // MURALE comme la perception : une émote demandée plus tôt est ignorée.
+  // Plus haut = émotes plus espacées ; plus bas = enchaînements plus
+  // rapides.
+  emoteCooldownMs: 1000,
 
   // Durée (ms) du fondu de l'AMBIANCE MÉTÉO (voir core/weather.js,
   // view/audio/layers.js) — surcouche superposée à l'ambiance de scène

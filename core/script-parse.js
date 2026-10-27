@@ -7,6 +7,7 @@
 import { CONDITION_TYPES, conditionFields } from "./presence.js";
 import { TAG_REGISTRY } from "./tags.js";
 import { IMPROVEMENT_REGISTRY } from "./improvements.js";
+import { EMOTE_REGISTRY } from "./emotes.js";
 import { WEATHER_STATES } from "../config/weather-values.js";
 import { VARIABLE_SCOPES, VARIABLE_TYPES, isValidValueForType } from "./variables.js";
 import { ACTION_EFFECT_TYPES, MIXED_EFFECT_TYPES } from "./effects.js";
@@ -131,6 +132,8 @@ const ACTION_EFFECT_FIELDS = {
   addVariable: ["scope", "name", "amount"],
   giveImprovement: ["id"],
   removeImprovement: ["id"],
+  learnEmote: ["id"],
+  forgetEmote: ["id"],
   startle: [],
   playSound: ["path", "gain", "pitchVariation", "reverbSend", "at", "nature", "tracked"],
   announce: ["key", "assertive"],
@@ -232,6 +235,15 @@ function parseActionEffect(rawEffect, describe, entityVariables, sceneVariables)
   if (type === "giveImprovement" || type === "removeImprovement") {
     if (!isNonEmptyString(rawEffect.id) || !IMPROVEMENT_REGISTRY[rawEffect.id]) {
       fail(`${describe}.id "${rawEffect.id}" absent du registre d'improvements.`);
+    }
+    return { type, id: rawEffect.id };
+  }
+  // "learnEmote"/"forgetEmote" { id } — ÉTAT, même forme et même sévérité
+  // que giveImprovement/removeImprovement ci-dessus, contre EMOTE_REGISTRY
+  // (core/emotes.js).
+  if (type === "learnEmote" || type === "forgetEmote") {
+    if (!isNonEmptyString(rawEffect.id) || !EMOTE_REGISTRY[rawEffect.id]) {
+      fail(`${describe}.id "${rawEffect.id}" absent du registre d'émotes.`);
     }
     return { type, id: rawEffect.id };
   }
@@ -412,6 +424,11 @@ export function validateCondition(cond, describe, entityVariables, sceneVariable
   // debug — voir son commentaire), donc refusée ICI, au chargement.
   if (cond.type === "hasImprovement" && (!isNonEmptyString(cond.id) || !IMPROVEMENT_REGISTRY[cond.id])) {
     fail(`${describe}.id "${cond.id}" absent du registre d'improvements.`);
+  }
+  // "knowsEmote" : même traitement, contre le registre des émotes
+  // (core/emotes.js/EMOTE_REGISTRY).
+  if (cond.type === "knowsEmote" && (!isNonEmptyString(cond.id) || !EMOTE_REGISTRY[cond.id])) {
+    fail(`${describe}.id "${cond.id}" absent du registre d'émotes.`);
   }
   // "weather" : EN PLUS de son type, son champ `state` référence un état de
   // la table météo (config/weather-values.js/WEATHER_STATES) — même

@@ -371,6 +371,16 @@
   "assets/sounds/effects/window_blinds_open": [
     "assets/sounds/effects/window_blinds_open_1.mp3"
   ],
+  "assets/sounds/emotes/calling_whistle": [
+    "assets/sounds/emotes/calling_whistle_1.mp3",
+    "assets/sounds/emotes/calling_whistle_2.mp3",
+    "assets/sounds/emotes/calling_whistle_3.mp3"
+  ],
+  "assets/sounds/emotes/hand_clap": [
+    "assets/sounds/emotes/hand_clap_1.mp3",
+    "assets/sounds/emotes/hand_clap_2.mp3",
+    "assets/sounds/emotes/hand_clap_3.mp3"
+  ],
   "assets/sounds/entities/bird_1_vocal": [
     "assets/sounds/entities/bird_1_vocal_1.mp3",
     "assets/sounds/entities/bird_1_vocal_2.mp3",

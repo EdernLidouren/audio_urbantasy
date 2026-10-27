@@ -1,0 +1,87 @@
+// Registre des ÉMOTES — gestes SONORES du joueur (siffler, claquer des
+// mains...), joués sur sa position (touche "e", voir view/emotes.js).
+// Structuré comme core/improvements.js/IMPROVEMENT_REGISTRY : SOURCE DE
+// VÉRITÉ des émotes existantes, valide la condition knowsEmote et les effets
+// learnEmote/forgetEmote (voir core/script-parse.js). Ajouter une émote =
+// une entrée ici, jamais une chaîne en dur ailleurs.
+//
+// Une émote se CONNAÎT ou non, comme une amélioration se possède : le joueur
+// les apprend au fil de la partie (effet learnEmote, ou départ d'une partie
+// neuve, config/new-game.js). Pour l'instant, faire une émote ne joue que
+// son son : les réactions du monde viendront s'y brancher.
+
+import { rejectUnknownFields, isNonEmptyString } from "../lib/validate.js";
+
+// `order` (entier >= 1, UNIQUE) : position dans le menu des émotes, déclarée
+// comme pour les améliorations (réarranger le registre ne renumérote rien).
+// `soundPath` : la clé d'asset jouée sur le joueur (un pool, voir
+// lib/assets.js), vérifiée par l'audit du contenu comme tout son cité.
+export const EMOTE_REGISTRY = {
+  whistle: {
+    order: 1,
+    nameKey: "emote.whistle.name",
+    descriptionKey: "emote.whistle.description",
+    soundPath: "assets/sounds/emotes/calling_whistle",
+  },
+  clap: {
+    order: 2,
+    nameKey: "emote.clap.name",
+    descriptionKey: "emote.clap.description",
+    soundPath: "assets/sounds/emotes/hand_clap",
+  },
+};
+
+function failEmotes(message) {
+  throw new Error(`EMOTE_REGISTRY : ${message}`);
+}
+
+// Champs connus, ordres entiers >= 1 et uniques, textes et son présents —
+// sinon une erreur claire à l'import. Exportée pour les checks terminal
+// (core/checks/emotes.check.js).
+export function validateEmoteRegistry(registry) {
+  const seen = new Map();
+  for (const [id, props] of Object.entries(registry)) {
+    rejectUnknownFields(props, ["order", "nameKey", "descriptionKey", "soundPath"], `"${id}"`, failEmotes);
+    if (!Number.isInteger(props.order) || props.order < 1) {
+      failEmotes(`"${id}".order doit être un entier >= 1 (reçu : ${JSON.stringify(props.order)}).`);
+    }
+    if (seen.has(props.order)) failEmotes(`order ${props.order} partagé par "${seen.get(props.order)}" et "${id}".`);
+    seen.set(props.order, id);
+    for (const field of ["nameKey", "descriptionKey", "soundPath"]) {
+      if (!isNonEmptyString(props[field])) failEmotes(`"${id}".${field} doit être une chaîne non vide.`);
+    }
+  }
+}
+validateEmoteRegistry(EMOTE_REGISTRY);
+
+// Ids du registre triés par `order` — l'ordre du menu des émotes.
+export function orderedEmoteIds(registry = EMOTE_REGISTRY) {
+  return Object.keys(registry).sort((a, b) => registry[a].order - registry[b].order);
+}
+
+export function emoteProps(id) {
+  return EMOTE_REGISTRY[id];
+}
+
+// STOCKAGE — session.emotes : { [id]: true }, SPARSE (une émote inconnue n'a
+// PAS de clé), cercle PARTIE et PERSISTANT, exactement comme
+// session.improvements (voir core/state.js/createInitialState,
+// core/save.js/migrateSave). Trois primitives PURES sur ce sac, même patron
+// que core/improvements.js : un id inconnu du registre n'est jamais vérifié
+// ICI, la validation vit au CHARGEMENT (core/script-parse.js,
+// core/new-game.js).
+export function knowsEmote(emotes, id) {
+  return Boolean(emotes && emotes[id]);
+}
+
+export function learnEmote(emotes, id) {
+  if (knowsEmote(emotes, id)) return emotes;
+  return { ...emotes, [id]: true };
+}
+
+export function forgetEmote(emotes, id) {
+  if (!knowsEmote(emotes, id)) return emotes;
+  const next = { ...emotes };
+  delete next[id];
+  return next;
+}

@@ -33,6 +33,8 @@ export const STATE_EFFECT_TYPES = [
   "addVariable",
   "giveImprovement",
   "removeImprovement",
+  "learnEmote",
+  "forgetEmote",
   "startle",
 ];
 export const RENDER_EFFECT_TYPES = ["playSound", "announce"];

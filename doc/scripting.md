@@ -231,6 +231,18 @@ cette condition répond TOUJOURS vraie, SANS même consulter
 `context.session.improvements` — voir "Améliorations (improvements)" plus
 bas pour le principe complet (lecture ment, écriture jamais touchée).
 
+### `knowsEmote` — le joueur connaît une ÉMOTE
+
+```js
+{ type: "knowsEmote", id: "whistle" }
+```
+
+Vraie si le joueur connaît l'émote `id` (voir "Émotes" plus bas). Même
+lecture que `hasImprovement` (`context.session.emotes`, repli à faux sans
+`session`), `id` validé contre `core/emotes.js`/`EMOTE_REGISTRY` au
+chargement, et MÊME court-circuit debug : en mode debug, toujours vraie.
+Lue aussi par la vue pour lister les émotes du menu (`view/emotes.js`).
+
 ### `perceptionActive` — perception surnaturelle active
 
 ```js
@@ -1129,6 +1141,20 @@ clé de contexte `context.session` que la portée `"party"`. Idempotents
 (donner une improvement déjà possédée, ou en retirer une déjà absente,
 laisse `session.improvements` à une RÉFÉRENCE INCHANGÉE).
 
+### `"learnEmote"` / `"forgetEmote"` — état, CORE
+
+```js
+{ type: "learnEmote", id: "clap" }
+{ type: "forgetEmote", id: "clap" }
+```
+
+`{ id }` — le joueur apprend/oublie l'émote `id` (`session.emotes`, voir
+"Émotes" plus bas). Exactement le patron de `giveImprovement`/
+`removeImprovement` : `id` validé contre `core/emotes.js`/`EMOTE_REGISTRY`
+au chargement, portée PARTIE sans champ `scope`, appliqués par
+`applyActionEffects` dans le même passage que les autres effets d'état,
+idempotents.
+
 ### `"startle"` — l'entité s'enfuit, état, CORE
 
 ```js
@@ -1774,6 +1800,46 @@ vérification maison) AVANT toute bascule — sans l'amélioration, la touche
 est SILENCIEUSE (comme une touche non attribuée, aucun son ni annonce) ; en
 mode debug, elle fonctionne TOUJOURS.
 
+## Émotes
+
+Gestes SONORES du joueur (siffler, claquer des mains...), faits par la
+touche "e" : un menu des émotes connues, Entrée joue celle choisie, centrée
+sur le joueur, dans la réverb de la scène (`view/emotes.js`,
+`view/audio/footsteps.js`/`playEmoteSound`). Le menu se rouvre sur la
+dernière émote faite. Délai minimal entre deux émotes : `emoteCooldownMs`
+(`config/tuning-values.js`, horloge murale comme la perception) ; réverb :
+`emoteReverbSend`. Sans émote connue, la touche ne fait rien et l'aide des
+touches ne la montre pas.
+
+Pour l'instant une émote ne fait que SONNER : rien dans le monde n'y réagit
+encore.
+
+**Registre** (`core/emotes.js`/`EMOTE_REGISTRY`) — même patron que les
+améliorations : SOURCE DE VÉRITÉ des émotes (valide `knowsEmote`/
+`learnEmote`/`forgetEmote`), une entrée par émote :
+
+```js
+whistle: {
+  order: 1,
+  nameKey: "emote.whistle.name",
+  descriptionKey: "emote.whistle.description",
+  soundPath: "assets/sounds/emotes/calling_whistle",
+},
+```
+
+`order` (entier >= 1, UNIQUE) : position dans le menu, déclarée. `soundPath` :
+le pool joué, préchargé avec chaque scène, vérifié par l'audit du contenu
+comme les textes. Validé à l'import (`validateEmoteRegistry`).
+
+**Stockage** — `session.emotes` : `{ [id]: true }`, SPARSE, cercle PARTIE,
+PERSISTANT, comme `session.improvements`. À la création d'une partie neuve :
+celles du départ (`config/new-game.js`/`emotes`, voir `doc/new-game.md`) ;
+rebouché vide pour une sauvegarde antérieure (`core/save.js`/`migrateSave`).
+
+**Lecture** : condition `knowsEmote` ; **écriture** : effets `learnEmote`/
+`forgetEmote` (voir plus haut). Le court-circuit debug est celui des
+améliorations : la lecture ment, l'écriture jamais.
+
 ## Tags
 
 Registre de mots-étiquettes (`core/tags.js`/`TAG_REGISTRY`) pour la classification
@@ -1911,6 +1977,7 @@ protégé par un lourd rideau de fer. »
 | Kinds de comportement | `BEHAVIORS` | `core/behaviors/index.js` |
 | Tags | `TAG_REGISTRY` | `core/tags.js` |
 | Améliorations (improvements) | `IMPROVEMENT_REGISTRY` | `core/improvements.js` |
+| Émotes | `EMOTE_REGISTRY` | `core/emotes.js` |
 | Objets et leurs tags/gait | `ITEM_REGISTRY` | `core/items.js` |
 | Tables de distribution de collecte (standard, référençables) | `SPAWN_TABLES` | `config/spawn-values.js` |
 | Catalogues de point de vente (standard, référençables) | `SHOP_CATALOGS` | `config/shop-values.js` |

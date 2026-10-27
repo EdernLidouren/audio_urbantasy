@@ -31,6 +31,7 @@ import checkSurfaces from "./surfaces.check.js";
 import checkSave from "./save.check.js";
 import checkInventory from "./inventory.check.js";
 import checkImprovements from "./improvements.check.js";
+import checkEmotes from "./emotes.check.js";
 import checkActions from "./actions.check.js";
 import checkPerception from "./perception.check.js";
 import checkWeather from "./weather.check.js";
@@ -64,6 +65,7 @@ const SUITES = [
   { name: "save", check: checkSave },
   { name: "inventory", check: checkInventory },
   { name: "improvements", check: checkImprovements },
+  { name: "emotes", check: checkEmotes },
   { name: "actions", check: checkActions },
   { name: "perception", check: checkPerception },
   { name: "weather", check: checkWeather },

@@ -5,6 +5,7 @@
 //   - view/action-handlers.js    : les effets d'état des actions ;
 //   - view/game-clock.js         : l'horloge de partie ;
 //   - view/perception-toggle.js  : la perception surnaturelle ;
+//   - view/emotes.js             : les émotes du joueur ;
 //   - view/debug-effects.js      : les outils de debug ;
 //   - view/status-announcements.js : les annonces d'état à la demande.
 // Seul le sommet de la pile reçoit tick, frame et clavier : un menu ouvert
@@ -31,6 +32,7 @@ import { createWorldTravel } from "./world-travel.js";
 import { registerActionHandlers } from "./action-handlers.js";
 import { createGameClock } from "./game-clock.js";
 import { createPerceptionToggle } from "./perception-toggle.js";
+import { createEmotes } from "./emotes.js";
 import { createDebugEffects } from "./debug-effects.js";
 import { announceGameTime, announceSceneName, announceMoney, announceWeather, announcePlayerX } from "./status-announcements.js";
 
@@ -38,6 +40,7 @@ export function makeCityScreen(getSession, setSession) {
   const travel = createWorldTravel({ getSession, setSession });
   const clock = createGameClock({ getSession, setSession });
   const perception = createPerceptionToggle({ getSession, setSession });
+  const emotes = createEmotes({ getSession, getWorldView: () => travel.current() });
   const debug = createDebugEffects({ getSession, setSession, clock });
   // Branchés pour la durée de vie de l'écran, débranchés à sa sortie.
   const unregisterActionHandlers = registerActionHandlers({ getSession, setSession, travel });
@@ -75,9 +78,9 @@ export function makeCityScreen(getSession, setSession) {
     openImprovements: { run: () => openImprovementsMenu(travel.current, getSession) },
     openCollections: { run: () => openCollectionsMenu(travel.current, getSession) },
     togglePerception: { run: perception.toggle, available: perception.isAvailable },
+    openEmotes: { run: emotes.openMenu, available: emotes.isAvailable },
     interactDescribe: { preventDefault: true, run: () => interactWith("describe") },
     interactActivate: { preventDefault: true, run: () => interactWith("activate") },
-    debugSpawn: { debugOnly: true, run: debug.spawnCoin },
     openWeatherDebugMenu: { debugOnly: true, run: () => openWeatherDebugMenu(debug.forceWeather, debug.triggerWeatherTransition) },
     openTimeDebugMenu: { debugOnly: true, run: () => openTimeDebugMenu(getSession, debug.advanceTime, debug.changeTimeScale) },
     openTeleportDebugMenu: {

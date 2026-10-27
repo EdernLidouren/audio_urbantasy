@@ -23,12 +23,14 @@
 // applyActionEffects (plus bas) est en réalité le point d'entrée PARTAGÉ de
 // TOUT effet d'ÉTAT d'une action, pas seulement les variables — voir
 // core/effects.js/STATE_EFFECT_TYPES : giveImprovement/removeImprovement
-// (core/improvements.js) et startle (core/startle.js) y sont appliqués dans
+// (core/improvements.js), learnEmote/forgetEmote (core/emotes.js) et
+// startle (core/startle.js) y sont appliqués dans
 // le MÊME passage, faute
 // d'un second point d'entrée générique côté vue (view/effect-runner.js/
 // runEffects délègue TOUS les effets d'état ICI, en un seul appel).
 
 import { giveImprovement, removeImprovement } from "./improvements.js";
+import { learnEmote, forgetEmote } from "./emotes.js";
 import { isNonEmptyString, rejectUnknownFields } from "../lib/validate.js";
 
 export const VARIABLE_TYPES = ["flag", "int"];
@@ -204,6 +206,16 @@ export function applyActionEffects(effects, context) {
     if (effect.type === "removeImprovement") {
       if (!ctx.session) return ctx;
       return { ...ctx, session: { ...ctx.session, improvements: removeImprovement(ctx.session.improvements, effect.id) } };
+    }
+    // learnEmote/forgetEmote (core/emotes.js) : exactement comme les
+    // améliorations juste au-dessus, sur session.emotes.
+    if (effect.type === "learnEmote") {
+      if (!ctx.session) return ctx;
+      return { ...ctx, session: { ...ctx.session, emotes: learnEmote(ctx.session.emotes, effect.id) } };
+    }
+    if (effect.type === "forgetEmote") {
+      if (!ctx.session) return ctx;
+      return { ...ctx, session: { ...ctx.session, emotes: forgetEmote(ctx.session.emotes, effect.id) } };
     }
     // startle : l'entité qui porte l'action s'enfuit — même drapeau que la
     // fuite à l'approche (voir core/startle.js, qui le lit et le retire au

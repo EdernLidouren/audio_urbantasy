@@ -56,6 +56,7 @@ import { parseScene } from "../core/scene.js";
 import { validateEntityRegistry } from "../core/entity-parse.js";
 import { ITEM_REGISTRY } from "../core/items.js";
 import { IMPROVEMENT_REGISTRY } from "../core/improvements.js";
+import { EMOTE_REGISTRY } from "../core/emotes.js";
 import { collectionNameKey, entryTextKeys } from "../core/collections.js";
 import { validateRotation, rotationTextKey } from "../core/rotation.js";
 import { CITY_MAP_GRID } from "../map/city-map.js";
@@ -243,6 +244,7 @@ export async function auditContent() {
   checkStrings("joueur", player);
   checkStrings("objets", ITEM_REGISTRY);
   checkStrings("améliorations", IMPROVEMENT_REGISTRY);
+  checkStrings("émotes", EMOTE_REGISTRY);
   checkStrings("météo", WEATHER_STATES);
   checkStrings("perception", { PERCEPTION_MUSIC_POOL, PERCEPTION_AMBIENCE_POOL });
   checkStrings("boutiques", SHOP_CATALOGS);

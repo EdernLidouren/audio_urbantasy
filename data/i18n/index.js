@@ -23,6 +23,7 @@ export { nameRef } from "../../lib/i18n.js";
 const DOMAINS = [
   "audio",
   "collections",
+  "emotes",
   "entities",
   "help",
   "improvements",

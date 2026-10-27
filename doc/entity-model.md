@@ -229,8 +229,7 @@ JSON de scène, une entité ÉPHÉMÈRE n'est par définition jamais DÉCLARÉE.
 
 - **Création** — `core/state.js`/`spawnEphemeral(session, spec, x)` : point
   d'entrée UNIQUE et RÉUTILISABLE pour toute création d'entité en jeu.
-  Appelants : la touche debug "e" (`view/debug-effects.js`/`spawnCoin`,
-  voir "Mode debug" plus bas), l'objet posé depuis l'inventaire
+  Appelants : l'objet posé depuis l'inventaire
   (`core/bag.js`/`dropItem`), et, via `core/state.js`/
   `spawnScatteredEphemerals` (plusieurs éphémères éparpillés autour d'une
   source), le butin d'une action (`core/money.js`/`lootEntitySpawn`, voir
@@ -364,15 +363,6 @@ focus vers la barre de menus sur certains navigateurs) — jamais un menu, jamai
 page ni à une sauvegarde, contrairement à `config/preferences.js`).
 Consommateurs, tous derrière ce MÊME drapeau (jamais un drapeau par outil) :
 
-- la touche "e" en ville (`view/debug-effects.js`/`spawnCoin`, binding
-  `debugSpawn` dans `view/input.js`), qui fait apparaître une pièce
-  éphémère (`spec` = archétype `money` existant, `entities/types/money.js`,
-  réutilisé tel quel) à la position du joueur — active SEULEMENT si le
-  drapeau est levé, sinon "e" ne fait RIEN. Pas "d", lié au déplacement à
-  droite (`view/input.js`, `MOVE_BINDINGS.moveRight`, convention ZQSD) :
-  l'arbitrage des modificateurs de `lib/input.js` les distinguerait ("d"
-  seul = mouvement, "d"+Ctrl = bascule debug), mais "e" reste plus clair à
-  retenir ;
 - les menus de debug, en ville : Shift+W (météo,
   `view/menus/debug-weather-menu.js`), Shift+T (temps,
   `view/menus/debug-time-menu.js`), Shift+M (téléportation vers n'importe
@@ -384,6 +374,8 @@ Consommateurs, tous derrière ce MÊME drapeau (jamais un drapeau par outil) :
 - la condition `hasImprovement`, qui répond toujours vrai en mode debug
   (`core/presence.js`/`evaluateHasImprovement`, voir
   `doc/scripting.md`/"Améliorations") ;
+- la condition `knowsEmote`, de même (toutes les émotes se jouent, voir
+  `doc/scripting.md`/"Émotes") ;
 - l'annonce de position (touche "x", `view/status-announcements.js`/
   `announcePlayerX`), plus précise en mode debug ;
 - `window.debugSession()` dans la console (`main.js`) : une COPIE de la

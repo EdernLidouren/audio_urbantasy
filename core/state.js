@@ -272,7 +272,7 @@ export function deriveAcquiredItems(bag, equipment) {
 export function createInitialState(
   scene,
   seed = DEFAULT_SEED,
-  { money = 0, bag = [], equipment = createEmptyEquipment(), companions = [], partyVariables } = {}
+  { money = 0, bag = [], equipment = createEmptyEquipment(), companions = [], partyVariables, emotes = {} } = {}
 ) {
   const world = createWorldState(scene, seed);
   return {
@@ -332,6 +332,10 @@ export function createInitialState(
     // (une improvement débloquée le reste, jamais réinitialisée comme une
     // variable volatile — voir core/save.js).
     improvements: {},
+    // émotes CONNUES (voir core/emotes.js/EMOTE_REGISTRY) : même stockage
+    // que improvements, SPARSE et PERSISTANT. Celles du départ d'une partie
+    // neuve (config/new-game.js), aucune par défaut.
+    emotes,
   };
 }
 
@@ -402,7 +406,7 @@ export function markConsumed(session, entityId) {
 // mélanger les trois portées — entity/scene/party — dans la MÊME
 // activation, voir doc/scripting.md/"Actions multiples filtrées par
 // condition") : chaque portée non touchée traverse par RÉFÉRENCE INCHANGÉE.
-// `result.session` : SEULS `.variables`/`.improvements` en sont repris
+// `result.session` : SEULS `.variables`/`.improvements`/`.emotes` en sont repris
 // (portée "party") — jamais le reste de l'objet, qui resterait le SESSION
 // PRÉ-effets (worlds pas encore patché par un éventuel effet "entity"/
 // "scene" de la MÊME liste) si on le reprenait tel quel. id absent du monde
@@ -433,6 +437,7 @@ export function applyEntityActionEffects(session, entityId, effects, side = sess
     ...withWorld,
     variables: partyChanged ? result.session.variables : session.variables,
     improvements: partyChanged ? result.session.improvements : session.improvements,
+    emotes: partyChanged ? result.session.emotes : session.emotes,
   };
 }
 

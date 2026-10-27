@@ -1,7 +1,7 @@
 # Départ d'une partie
 
 Ce avec quoi commence une partie neuve : la scène, l'argent, le sac,
-l'équipement, les compagnons et les variables de partie. Déclaré dans
+l'équipement, les compagnons, les variables de partie et les émotes connues. Déclaré dans
 `config/new-game.js` (donnée pure), lu et validé par
 `core/new-game.js`/`parseNewGame(raw, registry)`, appliqué par
 `core/state.js`/`createInitialState(scene, seed, start)`.
@@ -17,6 +17,7 @@ export const NEW_GAME = {
   bag: [{ type: "combat_boots" }, { type: "high_heels" }],
   equipment: { feet: "sneakers" },
   companions: [{ id: "companion-test-dog", type: "buddy", behavior: { kind: "follow" } }],
+  emotes: ["whistle", "clap"],
 };
 ```
 
@@ -37,6 +38,10 @@ export const NEW_GAME = {
   `MAX_COMPANIONS` (`config/companions.js`).
 - `partyVariables` : variables de portée partie, même forme que toute
   déclaration de variables (voir `doc/scripting.md`/"Variables").
+- `emotes` : ids des émotes connues d'emblée (`core/emotes.js`), chacune
+  une seule fois. Aucune par défaut. Résolues par `learnEmote` en
+  `session.emotes`, comme un apprentissage en jeu (voir
+  `doc/scripting.md`/"Émotes").
 
 Tout champ inconnu est rejeté.
 

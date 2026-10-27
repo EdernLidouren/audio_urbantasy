@@ -9,8 +9,9 @@
 // Forme résolue : { startSceneId, start }, où `start` porte money, bag
 // (entrées de sac, forme de core/bag.js), equipment (slots, forme de
 // core/equipment.js), companions (entités complètes, cascade de leur
-// archétype comprise) et partyVariables (déclarations brutes, validées ici,
-// résolues par createInitialState comme pour tout appelant).
+// archétype comprise), partyVariables (déclarations brutes, validées ici,
+// résolues par createInitialState comme pour tout appelant) et emotes
+// (émotes connues, forme de session.emotes, voir core/emotes.js).
 
 import { ITEM_REGISTRY } from "./items.js";
 import { EQUIPMENT_SLOTS, createEmptyEquipment } from "./equipment.js";
@@ -20,8 +21,9 @@ import { parseVariables } from "./variables.js";
 import { isNonEmptyString } from "./parse-common.js";
 import { rejectUnknownFields as rejectUnknown } from "../lib/validate.js";
 import { MAX_COMPANIONS } from "../config/companions.js";
+import { EMOTE_REGISTRY, learnEmote } from "./emotes.js";
 
-const FIELDS = ["startSceneId", "money", "bag", "equipment", "companions", "partyVariables"];
+const FIELDS = ["startSceneId", "money", "bag", "equipment", "companions", "partyVariables", "emotes"];
 const BAG_ENTRY_FIELDS = ["type", "count"];
 
 function fail(message) {
@@ -93,10 +95,23 @@ function parseCompanions(companions, registry) {
   });
 }
 
+// Déclaré `["<id>", ...]` : chaque émote doit exister dans le registre,
+// une seule fois. Résolu par learnEmote, comme un apprentissage en jeu.
+function parseEmotes(emotes) {
+  if (!Array.isArray(emotes)) fail("emotes doit être un tableau d'ids d'émote.");
+  let known = {};
+  emotes.forEach((id, index) => {
+    if (!Object.hasOwn(EMOTE_REGISTRY, id)) fail(`emotes[${index}] : émote "${id}" absente de core/emotes.js.`);
+    if (known[id]) fail(`emotes[${index}] : émote "${id}" déclarée deux fois.`);
+    known = learnEmote(known, id);
+  });
+  return known;
+}
+
 export function parseNewGame(raw, registry) {
   if (!isPlainObject(raw)) fail("le départ doit être un objet.");
   rejectUnknownFields(raw, FIELDS, "départ");
-  const { startSceneId, money = 0, bag = [], equipment = {}, companions = [], partyVariables } = raw;
+  const { startSceneId, money = 0, bag = [], equipment = {}, companions = [], partyVariables, emotes = [] } = raw;
 
   if (!isNonEmptyString(startSceneId)) fail("startSceneId est requis (id de scène, voir scenes/index.js).");
   if (!Number.isInteger(money) || money < 0) fail("money doit être un entier >= 0.");
@@ -110,6 +125,7 @@ export function parseNewGame(raw, registry) {
       equipment: parseEquipment(equipment),
       companions: parseCompanions(companions, registry),
       partyVariables,
+      emotes: parseEmotes(emotes),
     },
   };
 }

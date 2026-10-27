@@ -60,6 +60,7 @@ import { TIME_CONFIG } from "../config/time-values.js";
 import { MINUTES_PER_DAY } from "./time.js";
 import { getVariable } from "./variables.js";
 import { hasImprovement } from "./improvements.js";
+import { knowsEmote } from "./emotes.js";
 import { isDebugEnabled } from "../config/debug.js";
 
 // Valeur numérique importée directement (le core peut lire une valeur de
@@ -213,6 +214,15 @@ function evaluateHasImprovement(cond, context) {
   return hasImprovement(context.session && context.session.improvements, cond.id);
 }
 
+// "knowsEmote" : vraie si le joueur connaît l'ÉMOTE `cond.id` (voir
+// core/emotes.js/EMOTE_REGISTRY, session.emotes). Même lecture que
+// hasImprovement, MÊME court-circuit debug (la lecture ment, l'écriture
+// learnEmote/forgetEmote jamais) : en debug, toutes les émotes se jouent.
+function evaluateKnowsEmote(cond, context) {
+  if (isDebugEnabled() && context.debugShortCircuit !== false) return true;
+  return knowsEmote(context.session && context.session.emotes, cond.id);
+}
+
 // "perceptionActive" : vraie si la PERCEPTION SURNATURELLE (voir
 // core/state.js/togglePerception, session.perceptionActive) est actuellement
 // active. Sans champ propre — comme "arrived"/"consumed" — elle lit
@@ -321,6 +331,7 @@ const CONDITION_EVALUATORS = {
   consumed: { evaluate: evaluateConsumed, fields: [] },
   hasEquipmentTag: { evaluate: evaluateHasEquipmentTag, fields: ["tag"] },
   hasImprovement: { evaluate: evaluateHasImprovement, fields: ["id"] },
+  knowsEmote: { evaluate: evaluateKnowsEmote, fields: ["id"] },
   perceptionActive: { evaluate: evaluatePerceptionActive, fields: [] },
   weather: { evaluate: evaluateWeather, fields: ["state"] },
   allOf: { evaluate: evaluateAllOf, fields: ["conditions"] },

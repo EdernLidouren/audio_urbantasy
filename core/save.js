@@ -664,6 +664,13 @@ function migrateSave(raw) {
     data = { ...data, improvements: {} };
   }
 
+  // emotes (voir core/emotes.js, core/state.js/createInitialState) : même
+  // politique que improvements juste au-dessus — une partie déjà en cours
+  // n'apprend rétroactivement aucune émote.
+  if (!data.emotes || typeof data.emotes !== "object") {
+    data = { ...data, emotes: {} };
+  }
+
   // acquiredItems (voir core/bag.js/addItem, core/collections.js) : absent
   // d'une sauvegarde antérieure -> RECONSTITUÉ à partir du sac et de
   // l'équipement actuels. Approximatif par nature : un objet déjà revendu

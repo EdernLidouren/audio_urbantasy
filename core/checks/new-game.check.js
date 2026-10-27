@@ -33,6 +33,7 @@ export default function checkNewGame(run) {
       equipment: { feet: "sneakers" },
       companions: [{ id: "buddy-1", type: "dog", behavior: { kind: "follow" } }],
       partyVariables: [{ name: "met_mayor", type: "flag", initial: false }],
+      emotes: ["whistle"],
     },
     REGISTRY
   );
@@ -51,6 +52,7 @@ export default function checkNewGame(run) {
   run("départ : argent posé", 12, session.money);
   run("départ : compagnon placé près du joueur", scene.playerStart, session.companions[0].x);
   run("départ : variables de partie déclarées", false, session.variables.met_mayor.value);
+  run.same("départ : émotes connues posées", { whistle: true }, session.emotes);
   run(
     "départ : objets du sac ET de l'équipement notés acquis, sans liste à la main",
     "apple,key_bronze,sneakers",
@@ -63,6 +65,7 @@ export default function checkNewGame(run) {
   run("départ minimal : slots vides", null, minimal.equipment.feet);
   run("départ minimal : aucun compagnon", 0, minimal.companions.length);
   run("départ minimal : argent à 0", 0, minimal.money);
+  run.same("départ minimal : aucune émote connue", {}, minimal.emotes);
 
   // --- Rejets au chargement ---
   const rejected = (raw) => throws(() => parseNewGame({ startSceneId: "demo", ...raw }, REGISTRY));
@@ -90,6 +93,9 @@ export default function checkNewGame(run) {
     rejected({ companions: Array.from({ length: MAX_COMPANIONS + 1 }, (_, i) => ({ id: `c${i}`, type: "dog" })) })
   );
   run("départ : variable de partie invalide rejetée", true, rejected({ partyVariables: [{ name: "x", type: "flag", initial: "oui" }] }));
+  run("départ : émote inconnue rejetée", true, rejected({ emotes: ["moonwalk"] }));
+  run("départ : émote déclarée deux fois rejetée", true, rejected({ emotes: ["clap", "clap"] }));
+  run("départ : émotes hors tableau rejetées", true, rejected({ emotes: "clap" }));
   run(
     "départ : le message dit où chercher",
     true,

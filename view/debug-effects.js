@@ -1,5 +1,5 @@
 // EFFETS DES OUTILS DE DEBUG de l'écran de ville (mode debug seulement) :
-// pièce de test, forçage météo (Shift+W), saut et vitesse du temps
+// forçage météo (Shift+W), saut et vitesse du temps
 // (Shift+T), oubli des scènes visitées (Shift+M). Chaque effet modifie l'état
 // par le core, puis annonce le résultat. Le rechargement d'une scène depuis
 // son fichier, qui reconstruit la vue du monde, est dans
@@ -7,21 +7,13 @@
 
 import { announce } from "../lib/announce.js";
 import { t } from "../data/i18n/index.js";
-import { spawnEphemeral, forgetInactiveWorlds } from "../core/state.js";
+import { forgetInactiveWorlds } from "../core/state.js";
 import { setWeather, triggerNextWeatherTransition } from "../core/weather.js";
 import { TIME_CONFIG, DEFAULT_TIME_SCALE, setTimeScale, resetTimeScale } from "../config/time-values.js";
 import { announceGameTime, announceWeather } from "./status-announcements.js";
-import { ephemeralArchetypeSpec } from "../core/spawn.js";
-import registry from "../entities/types/index.js";
 
 // `clock` : voir view/game-clock.js.
 export function createDebugEffects({ getSession, setSession, clock }) {
-  // Une pièce ramassable aux pieds du joueur (touche "e").
-  function spawnCoin() {
-    const session = getSession();
-    setSession(spawnEphemeral(session, ephemeralArchetypeSpec(session, "money", registry), session.player.x));
-  }
-
   function forceWeather(targetState) {
     setSession(setWeather(getSession(), targetState));
     announceWeather(getSession());
@@ -59,5 +51,5 @@ export function createDebugEffects({ getSession, setSession, clock }) {
     announce(t("teleport.debug.forgotten", { count }), { assertive: true });
   }
 
-  return { spawnCoin, forceWeather, triggerWeatherTransition, advanceTime, changeTimeScale, forgetOtherScenes };
+  return { forceWeather, triggerWeatherTransition, advanceTime, changeTimeScale, forgetOtherScenes };
 }

@@ -12,6 +12,7 @@
 import { playOneShot, preloadOneShot, preloadMusic } from "../../lib/audio.js";
 import { resolveAsset, assetKeyMembers } from "../../lib/assets.js";
 import { gaitOf } from "../../core/equipment.js";
+import { EMOTE_REGISTRY } from "../../core/emotes.js";
 import player from "../../entities/player.js";
 import {
   PLAYER_GAIT_POOL,
@@ -53,7 +54,8 @@ function warmUpFootsteps(session, world, entitySounds) {
 // TOUS les membres des pools que la scène pourrait tirer : sources
 // intermittentes, pas possibles de chaque entité et du joueur (tous ses
 // gaits : on peut changer de chaussures en pleine visite), sons de collision
-// et de transition, sons de proximité, sols de la scène (sol par défaut compris).
+// et de transition, sons de proximité, sols de la scène (sol par défaut
+// compris), émotes (toutes : une émote s'apprend en pleine visite).
 function preloadSceneSounds(world, entitySounds, collisionSoundFor) {
   const preloadKeys = new Set();
   for (const { intermittentSources, movementPath, gait, naturalWalk, entity, enterSound, exitSound, approachSound, leaveSound } of entitySounds) {
@@ -71,6 +73,7 @@ function preloadSceneSounds(world, entitySounds, collisionSoundFor) {
       preloadKeys.add(key);
     }
   }
+  for (const { soundPath } of Object.values(EMOTE_REGISTRY)) preloadKeys.add(soundPath);
   preloadKeys.add(FOOTSTEP_FLOOR_PATH);
   preloadKeys.add(footstepKey("surfaces", world.defaultSurface));
   for (const segment of world.segments) preloadKeys.add(footstepKey("surfaces", segment.surface));

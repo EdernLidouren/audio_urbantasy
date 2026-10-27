@@ -31,9 +31,10 @@ export const MOVE_KEYS = [...MOVE_BINDINGS.moveLeft.keys, ...MOVE_BINDINGS.moveR
 // fichier pour ça.
 
 // Raccourcis de la ville — APPUI (voir view/city-screen.js/onKeyDown, qui
-// résout cette table via lib/input.js/resolveAction). "debugSpawn" reste
-// bindée inconditionnellement ; c'est la CONSOMMATION (city-screen.js,
-// KEY_ACTIONS `debugOnly`) qui l'ignore hors mode debug. "announcePosition"
+// résout cette table via lib/input.js/resolveAction). Les raccourcis de
+// debug restent bindés inconditionnellement ; c'est la CONSOMMATION
+// (city-screen.js, KEY_ACTIONS `debugOnly`) qui les ignore hors mode debug.
+// "announcePosition"
 // (touche "x") est DISPONIBLE en jeu normal comme announceTime/announceMoney
 // — seule la PRÉCISION de ce qu'elle annonce varie avec isDebugEnabled(),
 // côté consommation (voir view/status-announcements.js/announcePlayerX).
@@ -101,7 +102,9 @@ export const CITY_BINDINGS = defineBindings("city", {
   // ce binding ne fait que router l'appui, comme tout le reste de cette
   // table.
   togglePerception: { keys: ["p"], mods: [] },
-  debugSpawn: { keys: ["e"], mods: [] },
+  // "e" (émote) : menu des émotes connues (voir view/emotes.js). Sans
+  // aucune émote connue, la touche ne fait rien, comme la perception.
+  openEmotes: { keys: ["e"], mods: [] },
   interactDescribe: { keys: [" "], mods: [] },
   interactActivate: { keys: ["Enter"], mods: [] },
 });
