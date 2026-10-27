@@ -445,6 +445,9 @@ dans `core/startle.js`, un seul drapeau runtime `startled` (comme
   `doc/scripting.md`/"Effets d'action") marque l'entité qui porte
   l'action, farouche ou non. Utile pour une instance confiante, dont
   `range` est plus court que la portée d'interaction.
+- **À une émote** — le même effet, porté par un trigger d'émote (voir
+  `doc/scripting.md`/"Triggers d'émote") : les oiseaux posés s'envolent à
+  un claquement de mains à 8 ou moins.
 - **Dormance** — une entité marquée est dormante (voir "Présence
   conditionnelle" plus bas), quoi que disent ses règles. Le marquage se
   fait en fin de tick, la dormance au tick suivant : la bascule `"exited"`
@@ -1085,7 +1088,7 @@ pas à changer, seul le CONTEXTE qu'on lui passe grossirait (comme `{ time }`
 -> `{ time, weather }` plus haut). Délibérément DIFFÉRÉ, pas un oubli —
 aucun consommateur n'en a besoin aujourd'hui.
 
-### Triggers horaires — voir `doc/scripting.md`/"Triggers"
+### Triggers horaires et d'émote — voir `doc/scripting.md`/"Triggers"
 
 Distincts des triggers de COMPORTEMENT ci-dessus (portés par une règle de
 présence, réévalués au tick) : `entity.triggers` déclare des EFFETS D'ACTION
@@ -1097,6 +1100,11 @@ l'entité : depuis l'autre face il s'entend étouffé, par la chaîne
 d'occlusion ordinaire (voir "Recto/verso"). Premier client : la cloche du
 clocher (`scenes/town-square.json`, recto seulement). Grammaire, sauts de
 temps, portée : `doc/scripting.md`/"Triggers".
+
+Le même `entity.triggers` porte aussi des triggers d'ÉMOTE (`on: "emote"`) :
+des effets exécutés quand le joueur fait une émote à portée, sur SA face
+seulement. Premier client : les oiseaux posés, qui s'envolent à un
+claquement de mains proche (voir "Entités farouches").
 
 ### Bascule observée : `presenceChanged`
 

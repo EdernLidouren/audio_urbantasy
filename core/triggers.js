@@ -24,16 +24,24 @@
 // de RENDU dus (`fired`), que la vue rejoue (view/effect-runner.js/
 // runRenderEffects) — même partition que core/effects.js. Les effets MIXTES
 // (teleport) sont refusés au chargement (core/script-parse.js/parseTrigger).
+//
+// TRIGGERS D'ÉMOTE — `{ on: "emote", emote?, range?, effects }` : les
+// effets s'exécutent quand le joueur fait une émote (voir core/emotes.js)
+// à portée de l'entité. Ce n'est pas une transition d'horloge mais un
+// évènement ponctuel, résolu par applyEmoteTriggers plus bas ; même
+// frontière core/vue, même vocabulaire d'effets.
 
 import { TIME_CONFIG } from "../config/time-values.js";
 import { hourOfDay } from "./time.js";
-import { isTwoSided, applyEntityActionEffects } from "./state.js";
+import { isTwoSided, resolveFace, applyEntityActionEffects } from "./state.js";
 import { isRenderEffect } from "./effects.js";
+import { EMOTE_REGISTRY } from "./emotes.js";
 
 // Kinds de trigger reconnus (`on`) — SEULE liste, lue par
-// core/script-parse.js/parseTrigger pour la validation. Un kind de plus demain (météo, phase...) = une entrée
-// ici + sa détection dans dueTriggerEffects.
-export const TRIGGER_KINDS = ["hour"];
+// core/script-parse.js/parseTrigger pour la validation. Un kind de plus
+// demain (météo, phase...) = une entrée ici + sa détection (dueTriggerEffects
+// pour l'horloge, emoteTriggerEffects pour les émotes).
+export const TRIGGER_KINDS = ["hour", "emote"];
 
 // Index ABSOLU de l'heure (pas l'heure du jour) : un saut de 24 h exactes
 // change bien d'heure au sens de ce compteur, même si hourOfDay est égal.
@@ -75,6 +83,62 @@ export function applyDueTriggers(session, previousTime) {
       const renderEffects = effects.filter(isRenderEffect);
       if (renderEffects.length > 0) fired.push({ entity, effects: renderEffects });
     }
+  }
+
+  return { session: next, fired };
+}
+
+// Portée EFFECTIVE d'un trigger d'émote : celle du trigger (la sensibilité
+// de l'entité), bornée par celle de l'émote (jusqu'où le son porte). Sans
+// `range`, l'entité réagit dès qu'elle entend. La borne compte aussi pour
+// un trigger sans `emote` (toute émote), dont la portée ne peut pas être
+// vérifiée au chargement contre une émote précise.
+export function emoteTriggerRange(trigger, emoteId) {
+  const emoteRange = EMOTE_REGISTRY[emoteId].range;
+  return trigger.range === undefined ? emoteRange : Math.min(trigger.range, emoteRange);
+}
+
+// Effets dus pour UNE entité quand l'émote `emoteId` est faite à `distance`
+// d'elle, dans l'ordre déclaré : TOUS les triggers qui répondent (même
+// règle que l'horloge, aucun « premier gagnant »). Un trigger sans `emote`
+// répond à toutes. Une entité dormante (règle de présence) ou déjà enfuie
+// (core/startle.js : `startled`, dormante seulement au tick suivant) ne
+// réagit pas : elle n'est déjà plus là.
+export function emoteTriggerEffects(entity, emoteId, distance) {
+  if (!entity.triggers || entity.present === false || entity.startled) return [];
+  return entity.triggers
+    .filter(
+      (trigger) =>
+        trigger.on === "emote" &&
+        (trigger.emote === undefined || trigger.emote === emoteId) &&
+        distance <= emoteTriggerRange(trigger, emoteId)
+    )
+    .flatMap((trigger) => trigger.effects);
+}
+
+// Le joueur fait l'émote `emoteId` depuis `sourceX` (sa position — passée
+// explicitement : demain, un autre émetteur). Applique les triggers
+// d'émote des entités de la FACE DU JOUEUR : l'autre face est isolée en
+// simulation, comme pour la fuite à l'approche. Distance sur l'axe X seul,
+// en unités de scène. Les compagnons ne sont pas concernés (pas encore de
+// trigger chez eux).
+//
+// Renvoie { session, fired }, exactement comme applyDueTriggers : la session
+// après les effets d'ÉTAT, les effets de RENDU dus par entité pour la vue.
+// Aucun trigger dû -> MÊME référence de session, fired vide. Pur et sans
+// tirage : même session + même émote = même résultat.
+export function applyEmoteTriggers(session, emoteId, sourceX) {
+  const world = session.worlds[session.activeWorldId];
+  const side = session.player.side;
+  let next = session;
+  const fired = [];
+
+  for (const entity of resolveFace(world, side).entities) {
+    const effects = emoteTriggerEffects(entity, emoteId, Math.abs(entity.x - sourceX));
+    if (effects.length === 0) continue;
+    next = applyEntityActionEffects(next, entity.id, effects, side);
+    const renderEffects = effects.filter(isRenderEffect);
+    if (renderEffects.length > 0) fired.push({ entity, effects: renderEffects });
   }
 
   return { session: next, fired };

@@ -325,14 +325,17 @@ function parseActionEffect(rawEffect, describe, entityVariables, sceneVariables)
   fail(`${describe}.type "${type}" inconnu (attendu : ${ACTION_EFFECT_TYPES.map((t) => `"${t}"`).join(" | ")}).`);
 }
 
-// Un TRIGGER de transition d'horloge (voir core/triggers.js,
-// doc/scripting.md/"Triggers") : { on: "hour", hour?: 0..23, effects }.
+// Un TRIGGER (voir core/triggers.js, doc/scripting.md/"Triggers") :
+// { on: "hour", hour?: 0..23, effects } ou
+// { on: "emote", emote?, range?, effects }.
 // `effects` : MÊME vocabulaire et MÊME validation qu'une action
 // (parseActionEffect ci-dessus), SAUF les effets MIXTES (teleport) — un
 // déplacement du JOUEUR déclenché par l'horloge n'a pas de sens, refusé au
 // chargement plutôt que silencieusement ignoré. Un trigger sans effet
-// échoue, comme une règle muette (voir parsePresenceRule).
-const TRIGGER_FIELDS = ["on", "hour", "effects"];
+// échoue, comme une règle muette (voir parsePresenceRule). Un champ propre
+// à un AUTRE kind (`hour` sur un trigger d'émote...) échoue aussi.
+const TRIGGER_FIELDS = ["on", "hour", "emote", "range", "effects"];
+const TRIGGER_KIND_FIELDS = { hour: ["hour"], emote: ["emote", "range"] };
 
 export function parseTrigger(rawTrigger, describe, entityVariables, sceneVariables) {
   if (typeof rawTrigger !== "object" || rawTrigger === null || Array.isArray(rawTrigger)) {
@@ -347,6 +350,30 @@ export function parseTrigger(rawTrigger, describe, entityVariables, sceneVariabl
   }
   if (!TRIGGER_KINDS.includes(rawTrigger.on)) {
     fail(`${describe}.on "${rawTrigger.on}" inconnu (attendu : ${TRIGGER_KINDS.map((k) => `"${k}"`).join(" | ")}).`);
+  }
+  const foreign = Object.entries(TRIGGER_KIND_FIELDS)
+    .filter(([kind]) => kind !== rawTrigger.on)
+    .flatMap(([, fields]) => fields)
+    .find((field) => rawTrigger[field] !== undefined);
+  if (foreign !== undefined) {
+    fail(`${describe}.${foreign} n'a pas de sens sur un trigger "${rawTrigger.on}".`);
+  }
+  // Émote : `emote` absent = toutes les émotes. `range` (nombre > 0) ne
+  // peut que RACCOURCIR la portée de l'émote nommée : plus long, ce serait
+  // une portée jamais atteinte, donc une erreur de contenu. Sans `emote`,
+  // la borne s'applique au moment de l'émote (core/triggers.js/
+  // emoteTriggerRange).
+  if (rawTrigger.emote !== undefined && !Object.hasOwn(EMOTE_REGISTRY, rawTrigger.emote)) {
+    fail(`${describe}.emote "${rawTrigger.emote}" absente du registre (core/emotes.js).`);
+  }
+  if (rawTrigger.range !== undefined) {
+    if (!isFiniteNumber(rawTrigger.range) || rawTrigger.range <= 0) {
+      fail(`${describe}.range doit être un nombre > 0 si présent.`);
+    }
+    const emote = rawTrigger.emote !== undefined ? EMOTE_REGISTRY[rawTrigger.emote] : undefined;
+    if (emote && rawTrigger.range > emote.range) {
+      fail(`${describe}.range ${rawTrigger.range} dépasse la portée de l'émote "${rawTrigger.emote}" (${emote.range}).`);
+    }
   }
   if (
     rawTrigger.hour !== undefined &&
@@ -366,6 +393,8 @@ export function parseTrigger(rawTrigger, describe, entityVariables, sceneVariabl
   }
   const trigger = { on: rawTrigger.on, effects };
   if (rawTrigger.hour !== undefined) trigger.hour = rawTrigger.hour;
+  if (rawTrigger.emote !== undefined) trigger.emote = rawTrigger.emote;
+  if (rawTrigger.range !== undefined) trigger.range = rawTrigger.range;
   return trigger;
 }
 

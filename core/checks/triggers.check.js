@@ -1,5 +1,6 @@
 // Vérifications du core — domaine « triggers ». Triggers horaires
-// (core/triggers.js). Lancées par core/checks/index.js/runChecks (voir ce
+// (core/triggers.js) ; les triggers d'émote sont vérifiés avec les émotes
+// (core/checks/emotes.check.js). Lancées par core/checks/index.js/runChecks (voir ce
 // fichier). Pur : aucun DOM, aucun fetch ; chaque scène est construite en dur
 // via un objet littéral passé à parseScene.
 

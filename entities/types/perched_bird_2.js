@@ -15,6 +15,10 @@ export default {
   },
   startle: {},
   action: { kind: "applyEffects", effects: [{ type: "startle" }] },
+  // Un claquement de mains à 8 ou moins l'effraie aussi (trigger d'émote,
+  // voir core/triggers.js) : plus loin que l'approche, moins loin que
+  // le claquement ne porte.
+  triggers: [{ on: "emote", emote: "clap", range: 8, effects: [{ type: "startle" }] }],
   blocksMovement: false,
   observable: true,
   interactable: true,

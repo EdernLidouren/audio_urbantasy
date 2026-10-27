@@ -755,12 +755,18 @@ indépendamment de l'ordre) — et pourquoi le personnage vit en DEUX instances
 totalement indépendantes, sans état partagé entre les deux mondes (voir
 `doc/entity-model.md` pour la discussion complète de ce choix).
 
-## Triggers — effets déclenchés par une TRANSITION d'horloge
+## Triggers — effets déclenchés par un ÉVÈNEMENT
 
 `entity.triggers` (optionnel, cascade instance -> type comme `action`) : un
-TABLEAU non vide de `{ on: "hour", hour?: 0..23, effects: [<effet d'action>,
-...] }`. Point d'accroche GÉNÉRAL (`core/triggers.js`) : le clocher n'est que
-son premier client. Un seul mécanisme, paramétré :
+TABLEAU non vide de triggers, chacun `{ on, ...champs du kind, effects:
+[<effet d'action>, ...] }`. Deux kinds (`core/triggers.js`/`TRIGGER_KINDS`) :
+`"hour"`, une TRANSITION d'horloge, et `"emote"`, une émote du joueur (voir
+"Triggers d'émote" plus bas). Point d'accroche GÉNÉRAL : le clocher et les
+oiseaux n'en sont que les premiers clients.
+
+### `on: "hour"` — transition d'horloge
+
+`{ on: "hour", hour?: 0..23, effects }`. Un seul mécanisme, paramétré :
 
 - `hour` ABSENT -> les effets s'exécutent à CHAQUE nouvelle heure (le
   clocher) ;
@@ -819,15 +825,57 @@ Un trigger CIBLÉ, forme complète (pas encore de contenu réel) :
 ]
 ```
 
-Un trigger n'accepte QUE `on`, `hour` et `effects` : toute autre clé échoue
-au chargement — un réglage de son (`gain`, `pitchVariation`...) se déclare
+### `on: "emote"` — Triggers d'émote
+
+```js
+// entities/types/perched_bird_1.js (et _2, _3)
+triggers: [{ on: "emote", emote: "clap", range: 8, effects: [{ type: "startle" }] }]
+```
+
+Les effets s'exécutent quand le joueur fait une émote (voir "Émotes" plus
+bas) à portée de l'entité. Résolus par `core/triggers.js`/
+`applyEmoteTriggers`, appelé par `view/emotes.js` APRÈS le son de l'émote
+(et seulement si le délai entre deux émotes laisse l'émote se faire).
+
+- `emote` (id de `core/emotes.js`/`EMOTE_REGISTRY`, validé au chargement) :
+  l'émote qui déclenche. ABSENT -> TOUTES les émotes (une bête que tout
+  bruit fait fuir), comme un trigger horaire sans `hour` tire à chaque
+  heure.
+- `range` (nombre > 0, unités de scène, facultatif) : la SENSIBILITÉ de
+  l'entité. Elle réagit si la distance au joueur (axe X seul) est
+  `<= range`. ABSENT -> elle réagit dès qu'elle entend. La portée
+  effective est `min(range, portée de l'émote)` (`emoteTriggerRange`) : le
+  `range` de l'émote dit jusqu'où le son PORTE, celui du trigger à quelle
+  distance l'entité s'en SOUCIE. Un `range` plus long que celui de l'émote
+  NOMMÉE échoue au chargement (portée jamais atteinte) ; sans `emote`, la
+  borne s'applique à l'émote faite.
+
+Une réaction graduée (fuir de près, se taire de loin) n'a pas encore de
+forme : il lui faudrait un `minRange`, à ajouter le jour où un contenu
+en a besoin.
+
+**Tous** les triggers qui répondent tirent, dans l'ordre déclaré (même
+règle que l'horloge). **Portée** : la FACE DU JOUEUR seulement — l'autre
+face est isolée en simulation, comme pour la fuite à l'approche (voir
+`doc/entity-model.md`/"Entités farouches"). Les compagnons ne réagissent
+pas encore. Une entité DORMANTE, ou déjà enfuie (`startled`, dormante au
+tick suivant seulement), ne réagit pas. Pur, sans tirage : même session et
+même émote donnent le même résultat. Même partition des effets que
+l'horloge (état par le core, rendu rejoué par la vue, mixtes refusés).
+
+### Commun à tous les kinds
+
+Un trigger n'accepte QUE `on`, `effects` et les champs de SON kind (`hour`
+pour `"hour"`, `emote`/`range` pour `"emote"`) : toute autre clé échoue au
+chargement — un réglage de son (`gain`, `pitchVariation`...) se déclare
 sur l'EFFET `playSound`, jamais sur le trigger, et une faute de niveau ne
 doit pas passer en silence.
 
 Un kind de trigger de plus demain (météo, phase...) = une entrée dans
-`TRIGGER_KINDS` (`core/triggers.js`) + sa détection dans
-`dueTriggerEffects`, jamais un second mécanisme. Vérification terminal :
-`core/checks/triggers.check.js`.
+`TRIGGER_KINDS` (`core/triggers.js`) + sa détection (comme
+`dueTriggerEffects` ou `emoteTriggerEffects`), jamais un second mécanisme.
+Vérification terminal : `core/checks/triggers.check.js` (horloge),
+`core/checks/emotes.check.js` (émotes).
 
 ## Actions
 
@@ -1823,8 +1871,10 @@ de ton : `emotePitchVariation`. Comme pour tout pool, le même fichier ne
 sort jamais deux fois de suite (`lib/assets.js`/`resolveAsset`). Sans émote
 connue, les deux touches ne font rien et l'aide ne les montre pas.
 
-Pour l'instant une émote ne fait que SONNER : rien dans le monde n'y réagit
-encore.
+**Portée** — chaque émote déclare jusqu'où elle porte (`range`, en unités
+de scène : sifflement 25, claquement de mains 12). Le monde y réagit par
+les triggers `on: "emote"` de ses entités, dans cette portée (voir
+"Triggers d'émote" plus haut).
 
 **Registre** (`core/emotes.js`/`EMOTE_REGISTRY`) — même patron que les
 améliorations : SOURCE DE VÉRITÉ des émotes (valide `knowsEmote`/
@@ -1836,6 +1886,7 @@ whistle: {
   nameKey: "emote.whistle.name",
   descriptionKey: "emote.whistle.description",
   soundPath: "assets/sounds/emotes/calling_whistle",
+  range: 25,
 },
 ```
 

@@ -7,31 +7,37 @@
 //
 // Une émote se CONNAÎT ou non, comme une amélioration se possède : le joueur
 // les apprend au fil de la partie (effet learnEmote, ou départ d'une partie
-// neuve, config/new-game.js). Pour l'instant, faire une émote ne joue que
-// son son : les réactions du monde viendront s'y brancher.
+// neuve, config/new-game.js). Le monde y RÉAGIT par les triggers
+// `on: "emote"` de ses entités (voir core/triggers.js/applyEmoteTriggers),
+// jusqu'à la portée de l'émote.
 //
 // RACCOURCI : une émote choisie par le joueur (Maj+E) que la touche "e"
 // refait d'un coup, sans menu — session.emoteShortcut, voir
 // setEmoteShortcut plus bas.
 
-import { rejectUnknownFields, isNonEmptyString } from "../lib/validate.js";
+import { rejectUnknownFields, isNonEmptyString, isFiniteNumber } from "../lib/validate.js";
 
 // `order` (entier >= 1, UNIQUE) : position dans le menu des émotes, déclarée
 // comme pour les améliorations (réarranger le registre ne renumérote rien).
 // `soundPath` : la clé d'asset jouée sur le joueur (un pool, voir
 // lib/assets.js), vérifiée par l'audit du contenu comme tout son cité.
+// `range` (nombre > 0, unités de scène) : jusqu'où l'émote PORTE — au-delà,
+// aucune entité ne l'entend, aucun trigger n'est même examiné. Un trigger
+// peut la raccourcir (sa propre sensibilité), jamais l'allonger.
 export const EMOTE_REGISTRY = {
   whistle: {
     order: 1,
     nameKey: "emote.whistle.name",
     descriptionKey: "emote.whistle.description",
     soundPath: "assets/sounds/emotes/calling_whistle",
+    range: 25,
   },
   clap: {
     order: 2,
     nameKey: "emote.clap.name",
     descriptionKey: "emote.clap.description",
     soundPath: "assets/sounds/emotes/hand_clap",
+    range: 12,
   },
 };
 
@@ -39,13 +45,13 @@ function failEmotes(message) {
   throw new Error(`EMOTE_REGISTRY : ${message}`);
 }
 
-// Champs connus, ordres entiers >= 1 et uniques, textes et son présents —
-// sinon une erreur claire à l'import. Exportée pour les checks terminal
+// Champs connus, ordres entiers >= 1 et uniques, textes, son et portée
+// présents — sinon une erreur claire à l'import. Exportée pour les checks terminal
 // (core/checks/emotes.check.js).
 export function validateEmoteRegistry(registry) {
   const seen = new Map();
   for (const [id, props] of Object.entries(registry)) {
-    rejectUnknownFields(props, ["order", "nameKey", "descriptionKey", "soundPath"], `"${id}"`, failEmotes);
+    rejectUnknownFields(props, ["order", "nameKey", "descriptionKey", "soundPath", "range"], `"${id}"`, failEmotes);
     if (!Number.isInteger(props.order) || props.order < 1) {
       failEmotes(`"${id}".order doit être un entier >= 1 (reçu : ${JSON.stringify(props.order)}).`);
     }
@@ -53,6 +59,9 @@ export function validateEmoteRegistry(registry) {
     seen.set(props.order, id);
     for (const field of ["nameKey", "descriptionKey", "soundPath"]) {
       if (!isNonEmptyString(props[field])) failEmotes(`"${id}".${field} doit être une chaîne non vide.`);
+    }
+    if (!isFiniteNumber(props.range) || props.range <= 0) {
+      failEmotes(`"${id}".range doit être un nombre > 0 (reçu : ${JSON.stringify(props.range)}).`);
     }
   }
 }

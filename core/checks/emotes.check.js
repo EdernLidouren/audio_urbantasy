@@ -1,6 +1,6 @@
 // Vérifications du core — domaine « emotes ». Émotes (core/emotes.js) :
 // registre, stockage, effets learnEmote/forgetEmote, condition knowsEmote et
-// son court-circuit debug, sauvegarde. Lancées par
+// son court-circuit debug, triggers d'émote (core/triggers.js), sauvegarde. Lancées par
 // core/checks/index.js/runChecks. Pur : aucun DOM, aucun fetch.
 
 import { parseScene } from "../scene.js";
@@ -17,6 +17,7 @@ import {
   validateEmoteRegistry,
   orderedEmoteIds,
 } from "../emotes.js";
+import { applyEmoteTriggers, emoteTriggerRange } from "../triggers.js";
 import { isDebugEnabled, setDebugEnabled } from "../../config/debug.js";
 import { throws } from "../../lib/check.js";
 
@@ -38,8 +39,9 @@ function checkEmotesBody(run) {
   run("emotes : ordre du menu suit order", "whistle,clap", orderedEmoteIds().join(","));
   run("emotes : tri indépendant de l'ordre d'insertion", "b,a", orderedEmoteIds({ a: { order: 2 }, b: { order: 1 } }).join(","));
   run("emotes : emoteProps id inconnu -> undefined", undefined, emoteProps("moonwalk"));
-  const entry = { nameKey: "emote.x.name", descriptionKey: "emote.x.description", soundPath: "assets/sounds/emotes/x" };
+  const entry = { nameKey: "emote.x.name", descriptionKey: "emote.x.description", soundPath: "assets/sounds/emotes/x", range: 10 };
   const rejected = (registry) => throws(() => validateEmoteRegistry(registry));
+  run("emotes : entrée de test complète acceptée", false, rejected({ a: { ...entry, order: 1 } }));
   run("emotes : order dupliqué rejeté", true, rejected({ a: { ...entry, order: 1 }, b: { ...entry, order: 1 } }));
   run("emotes : order non entier rejeté", true, rejected({ a: { ...entry, order: 1.5 } }));
   run("emotes : son manquant rejeté", true, rejected({ a: { order: 1, nameKey: entry.nameKey, descriptionKey: entry.descriptionKey } }));
@@ -91,6 +93,77 @@ function checkEmotesBody(run) {
   run("emotes : setEmoteShortcut pose le raccourci", "whistle", session.emoteShortcut);
   run("emotes : setEmoteShortcut identique -> même référence", session, setEmoteShortcut(session, "whistle"));
   run("emotes : setEmoteShortcut id inconnu -> exception", true, throws(() => setEmoteShortcut(session, "moonwalk")));
+
+  // --- Triggers d'émote (core/triggers.js) : validation, portée,
+  // application sur la face du joueur ---
+  run("emotes : portée manquante rejetée", true, rejected({ a: { ...entry, order: 1, range: undefined } }));
+  run("emotes : portée nulle rejetée", true, rejected({ a: { ...entry, order: 1, range: 0 } }));
+
+  const BELL = { type: "playSound", path: "assets/sounds/effects/clock_tower_bell" };
+  const withTrigger = (trigger) => sceneWith({ triggers: [trigger] });
+  const triggerLoads = (trigger) => !throws(() => parseScene(withTrigger(trigger), TEST_REGISTRY));
+  run("emote trigger : forme complète chargée", true, triggerLoads({ on: "emote", emote: "clap", range: 8, effects: [BELL] }));
+  run("emote trigger : sans emote ni range chargé", true, triggerLoads({ on: "emote", effects: [BELL] }));
+  run("emote trigger : range égal à la portée de l'émote chargé", true, triggerLoads({ on: "emote", emote: "clap", range: 12, effects: [BELL] }));
+  run("emote trigger : range plus long que l'émote nommée rejeté", false, triggerLoads({ on: "emote", emote: "clap", range: 13, effects: [BELL] }));
+  run("emote trigger : range > 12 sans emote chargé (borné à l'émote faite)", true, triggerLoads({ on: "emote", range: 20, effects: [BELL] }));
+  run("emote trigger : range nul rejeté", false, triggerLoads({ on: "emote", range: 0, effects: [BELL] }));
+  run("emote trigger : range non numérique rejeté", false, triggerLoads({ on: "emote", range: "8", effects: [BELL] }));
+  run("emote trigger : émote inconnue rejetée", false, triggerLoads({ on: "emote", emote: "moonwalk", effects: [BELL] }));
+  run("emote trigger : hour sur un trigger d'émote rejeté", false, triggerLoads({ on: "emote", hour: 8, effects: [BELL] }));
+  run("emote trigger : emote sur un trigger horaire rejeté", false, triggerLoads({ on: "hour", emote: "clap", effects: [BELL] }));
+  run("emote trigger : range sur un trigger horaire rejeté", false, triggerLoads({ on: "hour", range: 3, effects: [BELL] }));
+  run("emote trigger : effet mixte rejeté", false, triggerLoads({ on: "emote", effects: [{ type: "teleport", target: "x" }] }));
+  const parsedTrigger = parseScene(withTrigger({ on: "emote", effects: [BELL] }), TEST_REGISTRY).entities[0].triggers[0];
+  run("emote trigger : champs absents -> absents (sparse)", "effects,on", Object.keys(parsedTrigger).sort().join(","));
+
+  run("emoteTriggerRange : sans range -> portée de l'émote", 12, emoteTriggerRange({}, "clap"));
+  run("emoteTriggerRange : range plus court -> le sien", 8, emoteTriggerRange({ range: 8 }, "clap"));
+  run("emoteTriggerRange : range plus long (sans emote) -> borné par l'émote", 12, emoteTriggerRange({ range: 20 }, "clap"));
+  run("emoteTriggerRange : même trigger, émote qui porte plus loin", 20, emoteTriggerRange({ range: 20 }, "whistle"));
+
+  // Scène à deux faces, joueur au recto en x 0. Le pigeon fuit à 8, le
+  // chat à 3, l'écho répond à toute émote qu'il entend, le pigeon du verso
+  // est sur l'autre face (isolée).
+  const startleAndBell = [{ type: "startle" }, BELL];
+  const emoteScene = parseScene(
+    {
+      id: "emotes-check-triggers",
+      titleKey: "scene.demo.name",
+      length: 40,
+      playerStart: 0,
+      recto: {
+        entities: [
+          { id: "pigeon", type: "npc", x: 8, triggers: [{ on: "emote", emote: "clap", range: 8, effects: startleAndBell }] },
+          { id: "cat", type: "npc", x: 5, triggers: [{ on: "emote", emote: "clap", range: 3, effects: startleAndBell }] },
+          { id: "echo", type: "npc", x: 20, triggers: [{ on: "emote", effects: [BELL] }] },
+        ],
+      },
+      verso: {
+        entities: [{ id: "pigeon_v", type: "npc", x: 1, triggers: [{ on: "emote", emote: "clap", effects: startleAndBell }] }],
+      },
+    },
+    TEST_REGISTRY
+  );
+  const emoteBase = createInitialState(emoteScene, 1);
+  const rectoOf = (s, id) => s.worlds[emoteScene.id].recto.entities.find((e) => e.id === id);
+  const firedIds = (result) => result.fired.map((f) => f.entity.id).join(",");
+
+  const clapped = applyEmoteTriggers(emoteBase, "clap", 0);
+  run("applyEmoteTriggers : claquement à 0 -> le pigeon (8 <= 8) seul", "pigeon", firedIds(clapped));
+  run("applyEmoteTriggers : effet d'état appliqué (pigeon enfui)", true, rectoOf(clapped.session, "pigeon").startled);
+  run("applyEmoteTriggers : le chat (5 > 3) ne bouge pas", undefined, rectoOf(clapped.session, "cat").startled);
+  run("applyEmoteTriggers : effets de rendu seuls dans `fired`", "playSound", clapped.fired[0].effects.map((e) => e.type).join(","));
+  run("applyEmoteTriggers : l'autre face n'entend rien", true, Object.is(clapped.session.worlds[emoteScene.id].verso, emoteBase.worlds[emoteScene.id].verso));
+  run("applyEmoteTriggers : claquement depuis x 4 -> pigeon et chat", "pigeon,cat", firedIds(applyEmoteTriggers(emoteBase, "clap", 4)));
+  run("applyEmoteTriggers : sifflement -> l'écho (20 <= 25), pas les triggers du claquement", "echo", firedIds(applyEmoteTriggers(emoteBase, "whistle", 0)));
+  run("applyEmoteTriggers : claquement depuis x 7 -> l'écho à 13 n'entend pas (portée 12)", "pigeon,cat", firedIds(applyEmoteTriggers(emoteBase, "clap", 7)));
+  run("applyEmoteTriggers : déjà enfui -> ne réagit plus", "", firedIds(applyEmoteTriggers(clapped.session, "clap", 0)));
+  const nothing = applyEmoteTriggers(emoteBase, "clap", 30);
+  run("applyEmoteTriggers : rien à portée -> MÊME référence de session", true, Object.is(nothing.session, emoteBase));
+  run.same("applyEmoteTriggers : déterministe", firedIds(applyEmoteTriggers(emoteBase, "clap", 4)), firedIds(applyEmoteTriggers(emoteBase, "clap", 4)));
+  const onVerso = { ...emoteBase, player: { ...emoteBase.player, side: "verso" } };
+  run("applyEmoteTriggers : joueur au verso -> le pigeon du verso, pas ceux du recto", "pigeon_v", firedIds(applyEmoteTriggers(onVerso, "clap", 0)));
 
   // --- Court-circuit debug : la lecture ment, l'écriture jamais ---
   setDebugEnabled(true);

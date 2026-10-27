@@ -447,7 +447,8 @@ export function parseEntity(rawEntity, index, registry, length, seenIds, sceneVa
     entity.startle = parseStartle(resolvedStartle, at);
   }
 
-  // Triggers horaires (voir core/triggers.js, doc/scripting.md/"Triggers").
+  // Triggers d'horloge et d'émote (voir core/triggers.js,
+  // doc/scripting.md/"Triggers").
   const resolvedTriggers = triggers !== undefined ? triggers : archetype.triggers;
   if (resolvedTriggers !== undefined) {
     if (!Array.isArray(resolvedTriggers) || resolvedTriggers.length === 0) {

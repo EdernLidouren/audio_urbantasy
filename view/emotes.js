@@ -1,8 +1,9 @@
 // ÉMOTES DU JOUEUR : Maj+E choisit l'émote du RACCOURCI dans un menu des
 // émotes connues, E la joue sur le joueur (voir core/emotes.js pour le
 // registre, la connaissance et le raccourci, view/audio/footsteps.js/
-// playEmoteSound pour le rendu). Pour l'instant une émote ne fait que
-// sonner : rien dans le monde n'y réagit encore.
+// playEmoteSound pour le rendu). Le monde y réagit par les triggers
+// d'émote de ses entités : le core les résout (core/triggers.js/
+// applyEmoteTriggers), la vue ne fait que rejouer leur rendu.
 
 import { pushScreen, popScreen } from "../lib/screens.js";
 import { makeMenuScreen } from "../lib/menu.js";
@@ -10,7 +11,9 @@ import { announce } from "../lib/announce.js";
 import { t, nameRef } from "../data/i18n/index.js";
 import { EMOTE_REGISTRY, orderedEmoteIds, setEmoteShortcut } from "../core/emotes.js";
 import { evaluateCondition, presenceContextOf } from "../core/presence.js";
+import { applyEmoteTriggers } from "../core/triggers.js";
 import { withPausedBeacons } from "./paused-beacons.js";
+import { runRenderEffects } from "./effect-runner.js";
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";
 
 // `getWorldView` : la vue du monde COURANTE, relue à chaque usage (voir
@@ -40,12 +43,19 @@ export function createEmotes({ getSession, setSession, getWorldView }) {
     return knownEmoteIds().length > 0;
   }
 
-  // Pendant le délai : rien du tout, comme une touche non attribuée.
+  // Pendant le délai : rien du tout, comme une touche non attribuée — ni
+  // son, ni réaction. Le son d'abord, puis les réactions du monde (comme
+  // view/game-clock.js/advance pour les triggers horaires) : un oiseau
+  // effrayé s'envole au tick suivant, après le claquement.
   function perform(id) {
     const now = performance.now();
     if (now < cooldownUntil) return;
     cooldownUntil = now + TUNING_DEFAULTS.emoteCooldownMs;
     getWorldView()?.playEmoteSound(EMOTE_REGISTRY[id].soundPath);
+    const before = getSession();
+    const { session, fired } = applyEmoteTriggers(before, id, before.player.x);
+    setSession(session);
+    for (const { entity, effects } of fired) runRenderEffects(entity, effects);
   }
 
   // Le choix ferme le menu PUIS s'annonce : rien ne vient couvrir

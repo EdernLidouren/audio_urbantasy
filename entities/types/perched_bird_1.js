@@ -18,7 +18,8 @@
 // transition"), avec sa propre variation de hauteur : le pool n'a qu'un
 // fichier, deux envols ne doivent pas sonner à l'identique.
 //
-// Observable et interactable : Entrée l'effraie aussi (effet "startle"),
+// Un claquement de mains proche l'effraie (trigger d'émote), comme
+// Entrée : observable et interactable, l'action fait aussi "startle",
 // pour une instance assez confiante pour se laisser approcher (startle
 // plus court que interactRange). Comme pour le chien, l'errance (très
 // lente) se déclare à l'instance.
@@ -37,6 +38,10 @@ export default {
   },
   startle: {},
   action: { kind: "applyEffects", effects: [{ type: "startle" }] },
+  // Un claquement de mains à 8 ou moins l'effraie aussi (trigger d'émote,
+  // voir core/triggers.js) : plus loin que l'approche, moins loin que
+  // le claquement ne porte.
+  triggers: [{ on: "emote", emote: "clap", range: 8, effects: [{ type: "startle" }] }],
   blocksMovement: false,
   observable: true,
   interactable: true,
