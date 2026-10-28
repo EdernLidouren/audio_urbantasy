@@ -33,7 +33,7 @@
 
 import { TIME_CONFIG } from "../config/time-values.js";
 import { hourOfDay } from "./time.js";
-import { isTwoSided, resolveFace, applyEntityActionEffects } from "./state.js";
+import { isTwoSided, resolveFace, applyEntityActionEffects, applyCompanionActionEffects } from "./state.js";
 import { isRenderEffect } from "./effects.js";
 import { EMOTE_REGISTRY } from "./emotes.js";
 
@@ -119,9 +119,9 @@ export function emoteTriggerEffects(entity, emoteId, distance) {
 // Le joueur fait l'émote `emoteId` depuis `sourceX` (sa position — passée
 // explicitement : demain, un autre émetteur). Applique les triggers
 // d'émote des entités de la FACE DU JOUEUR : l'autre face est isolée en
-// simulation, comme pour la fuite à l'approche. Distance sur l'axe X seul,
-// en unités de scène. Les compagnons ne sont pas concernés (pas encore de
-// trigger chez eux).
+// simulation, comme pour la fuite à l'approche — PUIS ceux des COMPAGNONS,
+// toujours avec le joueur (le buddy qu'on siffle). Distance sur l'axe X
+// seul, en unités de scène.
 //
 // Renvoie { session, fired }, exactement comme applyDueTriggers : la session
 // après les effets d'ÉTAT, les effets de RENDU dus par entité pour la vue.
@@ -139,6 +139,13 @@ export function applyEmoteTriggers(session, emoteId, sourceX) {
     next = applyEntityActionEffects(next, entity.id, effects, side);
     const renderEffects = effects.filter(isRenderEffect);
     if (renderEffects.length > 0) fired.push({ entity, effects: renderEffects });
+  }
+  for (const companion of session.companions) {
+    const effects = emoteTriggerEffects(companion, emoteId, Math.abs(companion.x - sourceX));
+    if (effects.length === 0) continue;
+    next = applyCompanionActionEffects(next, companion.id, effects);
+    const renderEffects = effects.filter(isRenderEffect);
+    if (renderEffects.length > 0) fired.push({ entity: companion, effects: renderEffects });
   }
 
   return { session: next, fired };

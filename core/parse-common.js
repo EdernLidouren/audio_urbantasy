@@ -32,17 +32,24 @@ export function rejectUnknownFields(value, allowed, describe, failWith = fail) {
 // module), jamais ici. Un champ hors de la liste PARAMS du module est
 // rejeté (voir rejectUnknownFields).
 export function parseBehavior(behavior, index, id) {
+  return parseBehaviorAt(behavior, `entities[${index}] ("${id}")`);
+}
+
+// Même validation, situé par un préfixe libre (`at`) : pour un objet
+// behavior qui n'est pas porté par une entité indexée, comme celui de
+// l'effet d'action "temporaryBehavior" (core/script-parse.js).
+export function parseBehaviorAt(behavior, at) {
   if (typeof behavior !== "object" || behavior === null) {
-    fail(`entities[${index}] ("${id}") : behavior doit être un objet si présent.`);
+    fail(`${at} : behavior doit être un objet si présent.`);
   }
 
   const { kind } = behavior;
   const module = BEHAVIORS[kind];
   if (!module) {
-    fail(`entities[${index}] ("${id}") : behavior.kind "${kind}" inconnu.`);
+    fail(`${at} : behavior.kind "${kind}" inconnu.`);
   }
-  rejectUnknownFields(behavior, ["kind", ...module.PARAMS], `entities[${index}] ("${id}") : behavior "${kind}"`);
+  rejectUnknownFields(behavior, ["kind", ...module.PARAMS], `${at} : behavior "${kind}"`);
 
-  const params = module.parseParams(behavior, (message) => fail(`entities[${index}] ("${id}") : ${message}`));
+  const params = module.parseParams(behavior, (message) => fail(`${at} : ${message}`));
   return { kind, ...params };
 }

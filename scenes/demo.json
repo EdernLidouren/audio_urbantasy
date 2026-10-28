@@ -87,6 +87,22 @@
     },
     { "id": "storm_drain_1", "type": "storm_drain", "x": 7 },
     { "id": "wood_bench_1", "type": "wood_bench", "x": 27 },
-    { "id": "wall_air_conditioner_1", "type": "wall_air_conditioner", "x": 35 }
+    { "id": "wall_air_conditioner_1", "type": "wall_air_conditioner", "x": 35 },
+    {
+      "id": "stray_dog_1",
+      "type": "dog",
+      "x": 29,
+      "behavior": { "kind": "wander", "walkMinMs": 1000, "walkMaxMs": 2500, "pauseMinMs": 2000, "pauseMaxMs": 6000 },
+      "triggers": [
+        {
+          "on": "emote",
+          "emote": "whistle",
+          "effects": [
+            { "type": "temporaryBehavior", "behavior": { "kind": "follow", "speed": 1.6, "maxDistance": 1.5 }, "durationMs": 10000 },
+            { "type": "playSound", "path": "assets/sounds/entities/dog_medium_vocal" }
+          ]
+        }
+      ]
+    }
   ]
 }

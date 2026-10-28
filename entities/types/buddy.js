@@ -13,6 +13,11 @@
 // dog.js. Ne pas lui en ajouter : un gait ou un naturalWalk dont le pool
 // existe (ex. "barefoot_walk") court-circuite la résolution AVANT le son
 // propre, et ferait marcher le compagnon pieds nus au lieu de chien.
+//
+// SIFFLEMENT : il jappe et accourt — suivi serré et rapide pendant 10 s
+// (comportement temporaire, voir core/temporary-behavior.js), puis il
+// retombe sur son suivi lâche du départ (config/new-game.js). Surtout
+// cosmétique tant que ce suivi lâche le garde à portée.
 
 export default {
   nameKey: "entity.dog.name",
@@ -33,6 +38,16 @@ export default {
       // source, sans compensation logicielle.
     },
   },
+  triggers: [
+    {
+      on: "emote",
+      emote: "whistle",
+      effects: [
+        { type: "temporaryBehavior", behavior: { kind: "follow", speed: 1.6, maxDistance: 1.5 }, durationMs: 10000 },
+        { type: "playSound", path: "assets/sounds/entities/dog_medium_vocal" },
+      ],
+    },
+  ],
   blocksMovement: false,
   // Non observable : il suit le joueur de près, il entrerait et sortirait
   // sans cesse de sa zone d'interaction, et serait annoncé à chaque fois

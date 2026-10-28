@@ -14,7 +14,7 @@ import { ACTION_EFFECT_TYPES, MIXED_EFFECT_TYPES } from "./effects.js";
 import { TRIGGER_KINDS } from "./triggers.js";
 import { validateActionKind } from "./action-kinds.js";
 import { TIME_CONFIG } from "../config/time-values.js";
-import { fail, isNonEmptyString, isFiniteNumber, parseBehavior, rejectUnknownFields } from "./parse-common.js";
+import { fail, isNonEmptyString, isFiniteNumber, parseBehavior, parseBehaviorAt, rejectUnknownFields } from "./parse-common.js";
 
 // Un effet porté par une règle de presence[] : { type: "presence", present:
 // boolean } ou { type: "behavior", behavior: <objet behavior, même forme
@@ -135,6 +135,7 @@ const ACTION_EFFECT_FIELDS = {
   learnEmote: ["id"],
   forgetEmote: ["id"],
   startle: [],
+  temporaryBehavior: ["behavior", "durationMs"],
   playSound: ["path", "gain", "pitchVariation", "reverbSend", "at", "nature", "tracked"],
   announce: ["key", "assertive"],
   teleport: ["target", "x", "side", "reloadIfSame", "transition"],
@@ -251,6 +252,21 @@ function parseActionEffect(rawEffect, describe, entityVariables, sceneVariables)
   // (voir core/startle.js, core/variables.js/applyActionEffects).
   if (type === "startle") {
     return { type: "startle" };
+  }
+  // "temporaryBehavior" { behavior, durationMs } — ÉTAT : un comportement
+  // posé PAR-DESSUS celui de l'entité, pour une durée bornée (voir
+  // core/variables.js/applyActionEffects, core/reduce.js/stepEntities).
+  // `behavior` : même forme et même validation qu'un behavior d'entité,
+  // jamais `null` (retirer la base n'est pas son rôle). `durationMs`
+  // OBLIGATOIRE et > 0 : un comportement temporaire sans fin ne doit pas
+  // pouvoir s'écrire — c'est le filet qui empêche une entité de rester
+  // coincée dessus.
+  if (type === "temporaryBehavior") {
+    const behavior = parseBehaviorAt(rawEffect.behavior, describe);
+    if (!isFiniteNumber(rawEffect.durationMs) || rawEffect.durationMs <= 0) {
+      fail(`${describe}.durationMs doit être un nombre > 0 (reçu : ${JSON.stringify(rawEffect.durationMs)}).`);
+    }
+    return { type, behavior, durationMs: rawEffect.durationMs };
   }
   if (type === "playSound") {
     if (!isNonEmptyString(rawEffect.path)) {

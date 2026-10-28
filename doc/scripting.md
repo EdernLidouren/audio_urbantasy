@@ -854,11 +854,30 @@ Une réaction graduée (fuir de près, se taire de loin) n'a pas encore de
 forme : il lui faudrait un `minRange`, à ajouter le jour où un contenu
 en a besoin.
 
+Exemple réel — le sifflement appelle un chien (`stray_dog_1` de
+`scenes/demo.json`, et le buddy, `entities/types/buddy.js`) : il jappe et
+accourt, puis reprend ce qu'il faisait (voir `"temporaryBehavior"` plus
+bas) :
+
+```json
+"triggers": [
+  {
+    "on": "emote",
+    "emote": "whistle",
+    "effects": [
+      { "type": "temporaryBehavior", "behavior": { "kind": "follow", "speed": 1.6, "maxDistance": 1.5 }, "durationMs": 10000 },
+      { "type": "playSound", "path": "assets/sounds/entities/dog_medium_vocal" }
+    ]
+  }
+]
+```
+
 **Tous** les triggers qui répondent tirent, dans l'ordre déclaré (même
 règle que l'horloge). **Portée** : la FACE DU JOUEUR seulement — l'autre
 face est isolée en simulation, comme pour la fuite à l'approche (voir
-`doc/entity-model.md`/"Entités farouches"). Les compagnons ne réagissent
-pas encore. Une entité DORMANTE, ou déjà enfuie (`startled`, dormante au
+`doc/entity-model.md`/"Entités farouches") — puis les COMPAGNONS, qui
+sont toujours avec le joueur (`core/state.js`/`applyCompanionActionEffects`).
+Une entité DORMANTE, ou déjà enfuie (`startled`, dormante au
 tick suivant seulement), ne réagit pas. Pur, sans tirage : même session et
 même émote donnent le même résultat. Même partition des effets que
 l'horloge (état par le core, rendu rejoué par la vue, mixtes refusés).
@@ -875,7 +894,8 @@ Un kind de trigger de plus demain (météo, phase...) = une entrée dans
 `TRIGGER_KINDS` (`core/triggers.js`) + sa détection (comme
 `dueTriggerEffects` ou `emoteTriggerEffects`), jamais un second mécanisme.
 Vérification terminal : `core/checks/triggers.check.js` (horloge),
-`core/checks/emotes.check.js` (émotes).
+`core/checks/emotes.check.js` (émotes), `core/checks/temporary-behavior.check.js`
+(appel d'un compagnon par le sifflement).
 
 ## Actions
 
@@ -1221,6 +1241,35 @@ oiseaux posés (`entities/types/perched_bird_1.js`), Entrée les effraie :
 ```js
 action: { kind: "applyEffects", effects: [{ type: "startle" }] }
 ```
+
+### `"temporaryBehavior"` — comportement pour un temps, état, CORE
+
+```js
+{ type: "temporaryBehavior", behavior: { kind: "follow", speed: 1.6, maxDistance: 1.5 }, durationMs: 10000 }
+```
+
+L'entité qui PORTE l'action (ou le trigger) prend le comportement
+`behavior` PAR-DESSUS le sien, pendant `durationMs` millisecondes de jeu,
+puis retombe sur son comportement de base (`core/temporary-behavior.js`,
+voir `doc/entity-model.md`/"Comportement temporaire") :
+
+- `behavior` (objet, requis) : MÊME forme et MÊME validation que le champ
+  `behavior` d'une entité (`core/parse-common.js`/`parseBehaviorAt`), `speed`
+  compris. Jamais `null` : retirer la base est le rôle de l'effet de règle
+  `"behavior"`, pas de celui-ci.
+- `durationMs` (nombre > 0, REQUIS) : c'est le filet de sécurité. Un
+  comportement temporaire sans fin ne peut pas s'écrire, une entité ne peut
+  donc pas rester coincée dessus (même un `follow` bloqué derrière un
+  obstacle).
+
+La base n'est jamais écrasée : à l'échéance, l'entité retrouve son
+comportement TEL QU'IL EST ALORS (une règle de présence a pu le changer
+entre-temps), et un comportement à état (`wander`) reprend où il en était.
+Un second effet REMPLACE le premier et relance le décompte (siffler deux
+fois). Oublié au chargement du monde. Différent de l'effet de RÈGLE
+`"behavior"` (voir "Effets"), qui change la base elle-même, sur une
+bascule de condition. Exemple réel : le sifflement (voir "Triggers
+d'émote" plus haut).
 
 ### `"playSound"` — son ponctuel, VUE, DEUX natures de rendu
 

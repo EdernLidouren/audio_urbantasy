@@ -48,6 +48,7 @@ import { resolveOverlaps, resolveEntityOverlaps } from "./physics/overlap.js";
 import { resolveEntityRules, presenceContextOf, tracksPresence } from "./presence.js";
 import { resolveFace, withFace, withActiveWorld, isTwoSided } from "./state.js";
 import { startleNearby } from "./startle.js";
+import { activeBehaviorOf, countDownTemporaryBehavior, withBaseBehavior } from "./temporary-behavior.js";
 
 // Résout la position d'une CIBLE par id — "player" (convention reconnue
 // ici, voir follow.js/DEFAULTS.targetId) pour le joueur, sinon une entité
@@ -113,12 +114,22 @@ function resolveTargetPosition(state, face, targetId) {
 // (retrait EXPLICITE, voir core/script-parse.js/parseEffect) : `!== undefined`,
 // jamais un simple test de vérité, sinon `null` serait confondu avec
 // "rien à faire" et le comportement resterait figé sur son ancien `kind`.
+//
+// COMPORTEMENT TEMPORAIRE (`entity.temporaryBehavior`, voir
+// core/temporary-behavior.js) : décompté ici à chaque tick, APRÈS un
+// éventuel effet "behavior" (qui change la BASE, dessous), il PRIME sur
+// la base tant qu'il dure. Le module de comportement le reçoit sous
+// `behavior` (il ne connaît que ce champ), puis la base est remise en
+// place. L'état interne d'un module (ex. `entity.wander`) traverse la
+// parenthèse : le comportement de base reprend où il en était.
 function stepEntities(entities, context) {
   let rngState = context.rngState;
   const results = entities.map((entity) => {
     const resolved = resolveEntityRules(entity, context.presenceContext);
     const { present, presenceChanged, ruleActive, behaviorEffect } = resolved;
-    const effectiveEntity = behaviorEffect !== undefined ? { ...entity, behavior: behaviorEffect } : entity;
+    const effectiveEntity = countDownTemporaryBehavior(
+      behaviorEffect !== undefined ? { ...entity, behavior: behaviorEffect } : entity
+    );
     // ruleActive : seulement avec des règles (une entité farouche sans
     // règle porte sa présence, jamais un `ruleActive` vide).
     const withPresence = (e) => {
@@ -130,11 +141,17 @@ function stepEntities(entities, context) {
       return { entity: withPresence(effectiveEntity), intent: undefined };
     }
 
-    const module = effectiveEntity.behavior && BEHAVIORS[effectiveEntity.behavior.kind];
+    const active = activeBehaviorOf(effectiveEntity);
+    const module = active && BEHAVIORS[active.kind];
     if (!module) return { entity: withPresence(effectiveEntity), intent: undefined };
-    const stepped = module.step(effectiveEntity, { ...context, rngState });
+    if (!effectiveEntity.temporaryBehavior) {
+      const stepped = module.step(effectiveEntity, { ...context, rngState });
+      rngState = stepped.rngState;
+      return { entity: withPresence(stepped.entity), intent: stepped.intent };
+    }
+    const stepped = module.step({ ...effectiveEntity, behavior: active }, { ...context, rngState });
     rngState = stepped.rngState;
-    return { entity: withPresence(stepped.entity), intent: stepped.intent };
+    return { entity: withPresence(withBaseBehavior(stepped.entity, effectiveEntity.behavior)), intent: stepped.intent };
   });
   return { results, rngState };
 }
@@ -161,7 +178,7 @@ function resolveIntents(results, blockerPool, length, presenceContext) {
   return results.map(({ entity, intent }) => {
     if (intent === undefined) return entity;
     const blockers = blockerPool.filter((other) => other.id !== entity.id);
-    const speed = entity.behavior?.speed ?? entity.speed ?? 1;
+    const speed = activeBehaviorOf(entity)?.speed ?? entity.speed ?? 1;
     const { x: resolvedX } = resolveBodyMove(entity.x, intent, blockers, length, presenceContext, speed);
     return { ...entity, x: resolvedX };
   });

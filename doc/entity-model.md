@@ -1088,6 +1088,29 @@ pas à changer, seul le CONTEXTE qu'on lui passe grossirait (comme `{ time }`
 -> `{ time, weather }` plus haut). Délibérément DIFFÉRÉ, pas un oubli —
 aucun consommateur n'en a besoin aujourd'hui.
 
+### Comportement temporaire
+
+Un comportement posé PAR-DESSUS celui de l'entité, pour une durée bornée,
+par l'effet d'action `"temporaryBehavior"` (voir
+`doc/scripting.md`/"Effets d'action") : le chien qu'on siffle accourt, suit
+le joueur dix secondes, puis reprend son errance. Mécanique dans
+`core/temporary-behavior.js`, un seul champ runtime
+`temporaryBehavior: { behavior, ticksLeft }` (comme `startled`, jamais écrit
+dans le JSON de scène) :
+
+- **Priorité** — tant qu'il dure, c'est lui qui s'exécute (pas et allure,
+  `core/reduce.js`/`stepEntities`) ; `entity.behavior`, la BASE, reste
+  dessous, intacte. Un effet de règle `"behavior"` qui bascule pendant ce
+  temps change la base, et c'est sur elle que l'entité retombe.
+- **Échéance** — décompté à chaque tick, entité dormante comprise, et
+  retiré au tick qui suit sa dernière unité. La durée est obligatoire :
+  aucun état où l'entité resterait bloquée dessus.
+- **Oubli** — à chaque chargement du monde (`view/world-travel.js`, avec le
+  retour des entités envolées), sur ses deux faces et chez les compagnons.
+- **Compagnons** — le même champ vaut pour eux (tiqués par le même
+  `stepEntities`) ; le buddy du départ suit le joueur de loin et accourt au
+  sifflement.
+
 ### Triggers horaires et d'émote — voir `doc/scripting.md`/"Triggers"
 
 Distincts des triggers de COMPORTEMENT ci-dessus (portés par une règle de
@@ -1103,8 +1126,9 @@ temps, portée : `doc/scripting.md`/"Triggers".
 
 Le même `entity.triggers` porte aussi des triggers d'ÉMOTE (`on: "emote"`) :
 des effets exécutés quand le joueur fait une émote à portée, sur SA face
-seulement. Premier client : les oiseaux posés, qui s'envolent à un
-claquement de mains proche (voir "Entités farouches").
+et chez ses compagnons. Premiers clients : les oiseaux posés, qui
+s'envolent à un claquement de mains proche (voir "Entités farouches"), et
+les chiens qui accourent au sifflement (voir "Comportement temporaire").
 
 ### Bascule observée : `presenceChanged`
 

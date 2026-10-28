@@ -444,6 +444,31 @@ export function applyEntityActionEffects(session, entityId, effects, side = sess
   };
 }
 
+// Même chose pour un COMPAGNON (session.companions) : il n'est sur aucune
+// face, il suit le joueur. Ses effets voient le monde actif comme porteur
+// des variables de scène, comme une entité de la face du joueur. id absent
+// -> session INCHANGÉE.
+export function applyCompanionActionEffects(session, companionId, effects) {
+  const companion = session.companions.find((c) => c.id === companionId);
+  if (!companion) return session;
+  const world = session.worlds[session.activeWorldId];
+
+  const result = applyActionEffects(effects, { entity: companion, world, session });
+  const entityChanged = result.entity !== companion;
+  const worldChanged = result.world !== world;
+  const partyChanged = result.session !== session;
+  if (!entityChanged && !worldChanged && !partyChanged) return session;
+
+  const withWorld = worldChanged ? withActiveWorld(session, result.world) : session;
+  return {
+    ...withWorld,
+    companions: entityChanged ? session.companions.map((c) => (c.id === companionId ? result.entity : c)) : session.companions,
+    variables: partyChanged ? result.session.variables : session.variables,
+    improvements: partyChanged ? result.session.improvements : session.improvements,
+    emotes: partyChanged ? result.session.emotes : session.emotes,
+  };
+}
+
 // Crée UNE entité ÉPHÉMÈRE dans le monde ACTIF, à la position x — point
 // d'entrée UNIQUE et RÉUTILISABLE pour toute création d'entité EN COURS DE
 // JEU (voir doc/entity-model.md/"Entités éphémères"). Appelants

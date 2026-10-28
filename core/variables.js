@@ -31,6 +31,7 @@
 
 import { giveImprovement, removeImprovement } from "./improvements.js";
 import { learnEmote, forgetEmote } from "./emotes.js";
+import { TICK_MS } from "../lib/loop.js";
 import { isNonEmptyString, rejectUnknownFields } from "../lib/validate.js";
 
 export const VARIABLE_TYPES = ["flag", "int"];
@@ -225,6 +226,17 @@ export function applyActionEffects(effects, context) {
     if (effect.type === "startle") {
       if (!ctx.entity || ctx.entity.startled) return ctx;
       return { ...ctx, entity: { ...ctx.entity, startled: true } };
+    }
+    // temporaryBehavior : comportement posé PAR-DESSUS celui de l'entité
+    // (voir core/temporary-behavior.js), pour `durationMs` convertis en
+    // ticks (au moins un). La base (`entity.behavior`) n'est jamais
+    // touchée. Un nouvel effet REMPLACE le précédent et relance le
+    // décompte (siffler deux fois). Écrit ici plutôt qu'importé, comme
+    // startle juste au-dessus (même dépendance circulaire évitée).
+    if (effect.type === "temporaryBehavior") {
+      if (!ctx.entity) return ctx;
+      const ticksLeft = Math.max(1, Math.round(effect.durationMs / TICK_MS));
+      return { ...ctx, entity: { ...ctx.entity, temporaryBehavior: { behavior: effect.behavior, ticksLeft } } };
     }
     return ctx;
   }, context);

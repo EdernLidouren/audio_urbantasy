@@ -16,7 +16,7 @@ export const NEW_GAME = {
   money: 0,
   bag: [{ type: "combat_boots" }, { type: "high_heels" }],
   equipment: { feet: "sneakers" },
-  companions: [{ id: "companion-test-dog", type: "buddy", behavior: { kind: "follow" } }],
+  companions: [{ id: "companion-test-dog", type: "buddy", behavior: { kind: "follow", minDistance: 2, maxDistance: 8 } }],
   emotes: ["whistle", "clap"],
 };
 ```

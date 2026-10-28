@@ -16,6 +16,7 @@ import { loadSceneById } from "../scenes/load.js";
 import { travelToWorld, switchSide, placePlayer, reloadActiveWorld } from "../core/state.js";
 import { refillDueSpawns } from "../core/spawn.js";
 import { returnStartledEntities } from "../core/startle.js";
+import { forgetTemporaryBehaviors } from "../core/temporary-behavior.js";
 import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";
 import { resolveTuning } from "../config/tuning.js";
@@ -61,10 +62,12 @@ export function createWorldTravel({ getSession, setSession }) {
   // À CHAQUE chargement d'un monde, TOUJOURS avant le montage de la vue :
   // le garnissage de collecte dû (voir core/spawn.js/refillDueSpawns — les
   // collectibles posés sont des entités ordinaires, découvertes au montage
-  // comme les autres), et le retour des entités farouches envolées lors
-  // d'une visite précédente (voir core/startle.js/returnStartledEntities).
+  // comme les autres), le retour des entités farouches envolées lors
+  // d'une visite précédente (voir core/startle.js/returnStartledEntities),
+  // et l'oubli des comportements temporaires en cours (un chien sifflé
+  // juste avant de partir, voir core/temporary-behavior.js).
   function prepareLoadedWorld() {
-    setSession(returnStartledEntities(refillDueSpawns(getSession(), registry)));
+    setSession(forgetTemporaryBehaviors(returnStartledEntities(refillDueSpawns(getSession(), registry))));
   }
 
   // Première entrée en ville.
