@@ -97,7 +97,25 @@ export function makeCityScreen(getSession, setSession) {
     openCollectionsDebugMenu: { debugOnly: true, run: () => openCollectionsDebugMenu(getSession, setSession) },
   };
 
+  // Accès CONSOLE réservé aux tests en jeu (tools/test-kit.js), relayé par
+  // main.js en MODE DEBUG seulement : les fonctions que les touches et les
+  // menus de debug appellent déjà, sans menu à parcourir. Aucune logique
+  // propre ici.
+  const debugActions = {
+    // Téléportation instantanée (pas de sas) ; promesse résolue à l'arrivée.
+    teleport: (target, { x, side, reloadIfSame = false } = {}) =>
+      travel.executeTeleport({ target, x, side, reloadIfSame, transition: "instant" }),
+    switchSide: travel.debugSwitchSide,
+    advanceTime: debug.advanceTime,
+    forceWeather: debug.forceWeather,
+    togglePerception: perception.toggle,
+    performEmote: emotes.perform,
+    reloadSceneFromFile: travel.reloadSceneFromFile,
+    worldView: travel.current,
+  };
+
   return {
+    debugActions,
     // Aide des touches (lib/help.js) : déplacement puis raccourcis du jeu,
     // ceux de debug seulement en mode debug (même garde que onKeyDown), une
     // touche à condition seulement quand elle a un effet (ex. la perception

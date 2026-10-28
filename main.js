@@ -159,10 +159,18 @@ let loadableSave = null;
 // la nouvelle partie ne remplacera l'ancien save qu'à sa PROCHAINE écriture
 // (manuelle ou auto), jamais à cet instant. Quitter avant toute sauvegarde
 // laisse donc l'ancien save intact.
+// L'écran de ville de la partie en cours, gardé pour l'accès console des
+// tests (window.debugActions plus bas). Seul point d'entrée en ville.
+let cityScreen = null;
+function enterCity() {
+  cityScreen = makeCityScreen(getSession, setSession);
+  pushScreen(cityScreen);
+}
+
 function startNewGame() {
   if (!scene) return; // scène pas encore chargée : cas limite improbable
   session = createInitialState(scene, undefined, newGame.start);
-  pushScreen(makeCityScreen(getSession, setSession));
+  enterCity();
 }
 
 // "Ville test" (entrée de tête du menu principal, voir main-menu.js) :
@@ -179,7 +187,7 @@ function startTestCityGame() {
   loadSceneById("demo", registry)
     .then((testScene) => {
       session = createInitialState(testScene, undefined, newGame.start);
-      pushScreen(makeCityScreen(getSession, setSession));
+      enterCity();
     })
     .catch((error) => {
       console.error(error.message);
@@ -195,7 +203,7 @@ function continueGame() {
   // La sauvegarde devient la partie : c'est ici, et pas à la lecture, que
   // ses réparations sont signalées (voir view/debug-warnings.js).
   reportSaveRepairs(loadableSave.repairs);
-  pushScreen(makeCityScreen(getSession, setSession));
+  enterCity();
 }
 
 // Écran-menu du menu principal : construit UNE FOIS puis réutilisé pour
@@ -225,7 +233,7 @@ mainMenuScreen.onEnter = () => {
 function startImportedGame(importedSession) {
   while (activeScreen() && activeScreen() !== mainMenuScreen) popScreen();
   session = importedSession;
-  pushScreen(makeCityScreen(getSession, setSession));
+  enterCity();
 }
 setGameStartHandler(startImportedGame);
 
@@ -237,6 +245,18 @@ window.debugPlayerX = () => {
     return;
   }
   console.log(session.player.x);
+};
+
+// Accès CONSOLE des tests en jeu (tools/test-kit.js), MODE DEBUG seulement :
+// les actions de debug de l'écran de ville en cours (view/city-screen.js/
+// debugActions), ou null hors partie. Une fonction, relue à chaque appel :
+// une nouvelle partie remplace l'écran.
+window.debugActions = () => {
+  if (!isDebugEnabled()) {
+    console.log("debugActions: mode debug désactivé (toggleDebug() ou Ctrl+D).");
+    return null;
+  }
+  return session && cityScreen ? cityScreen.debugActions : null;
 };
 
 // Vérif console, MODE DEBUG seulement : rend une COPIE de la partie en

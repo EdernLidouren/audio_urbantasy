@@ -174,20 +174,17 @@ export function createWorldTravel({ getSession, setSession }) {
   //     pour le monde actif ;
   //   - transition "fade" (sas, défaut) ou "instant" (déplacement d'autorité).
   // `side` n'est pas résolue ici : son défaut dépend du chemin (recto pour un
-  // rechargement, face courante pour un repositionnement).
+  // rechargement, face courante pour un repositionnement). Rend une promesse
+  // résolue à l'arrivée : les effets ne l'attendent pas, l'accès console
+  // des tests si (view/city-screen.js/debugActions).
   function executeTeleport({ target, x, side, reloadIfSame = false, transition = "fade" }) {
     const sameWorld = target === getSession().activeWorldId;
     const needsReload = !sameWorld || reloadIfSame;
 
-    if (transition === "fade") {
-      runTeleportSas(target, x, side, needsReload);
-      return;
-    }
-    if (needsReload) {
-      performTransition(target, x, side);
-      return;
-    }
+    if (transition === "fade") return runTeleportSas(target, x, side, needsReload);
+    if (needsReload) return performTransition(target, x, side);
     placeInCurrentWorld(x, side);
+    return Promise.resolve();
   }
 
   // Carte de la ville (voir view/menus/city-map-menu.js) : même transition

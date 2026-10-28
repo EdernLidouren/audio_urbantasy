@@ -91,5 +91,7 @@ export function createEmotes({ getSession, setSession, getWorldView }) {
     else openMenu();
   }
 
-  return { performShortcut, openMenu, isAvailable };
+  // `perform` : aussi pour l'accès console des tests (view/city-screen.js/
+  // debugActions), qui joue une émote précise sans passer par le raccourci.
+  return { perform, performShortcut, openMenu, isAvailable };
 }
