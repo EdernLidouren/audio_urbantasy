@@ -209,6 +209,37 @@ function checkActionRequirements(entity, at) {
   }
 }
 
+// Toutes les listes d'effets que porte une entité, avec leur chemin pour
+// les messages : actions (effets et effets de refus) et triggers.
+function entityEffectLists(entity) {
+  const lists = [];
+  if (entity.action !== undefined) {
+    const actions = Array.isArray(entity.action) ? entity.action : [entity.action];
+    actions.forEach((action, i) => {
+      const where = Array.isArray(entity.action) ? `action[${i}]` : "action";
+      if (action.effects) lists.push([`${where}.effects`, action.effects]);
+      if (action.refusalEffects) lists.push([`${where}.refusalEffects`, action.refusalEffects]);
+    });
+  }
+  (entity.triggers || []).forEach((trigger, i) => lists.push([`triggers[${i}].effects`, trigger.effects]));
+  return lists;
+}
+
+// Un "playSound" par `role` (voir core/script-parse.js) qui émane de
+// l'entité PORTEUSE (sans `at`) doit viser un rôle qu'elle a, après la
+// cascade de ses sons : sinon le son ne jouerait jamais, en silence. Avec
+// `at`, le rôle appartient à une AUTRE entité, inconnue ici.
+function checkPlaySoundRoles(entity, at) {
+  for (const [where, effects] of entityEffectLists(entity)) {
+    effects.forEach((effect, i) => {
+      if (effect.type !== "playSound" || effect.role === undefined || effect.at !== undefined) return;
+      if (!entity.sounds || !entity.sounds[effect.role]) {
+        fail(`${at} : ${where}[${i}] joue le rôle "${effect.role}", que l'entité n'a pas (sounds.${effect.role}).`);
+      }
+    });
+  }
+}
+
 // Conditions des rôles de son conditionnels (balise, sons de proximité, voir
 // doc/entity-model.md/"Sons conditionnels") : celle de l'instance REMPLACE
 // celle de l'archétype (une condition est un tout, jamais fusionnée clé par
@@ -458,6 +489,8 @@ export function parseEntity(rawEntity, index, registry, length, seenIds, sceneVa
       parseTrigger(trigger, `${at} : triggers[${i}]`, entity.variables, sceneVariables)
     );
   }
+
+  checkPlaySoundRoles(entity, at);
 
   // Descriptions conditionnelles : l'instance remplace l'archétype en bloc,
   // comme `presence`. Après les variables, qu'une condition peut lire.

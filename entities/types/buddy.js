@@ -14,10 +14,13 @@
 // existe (ex. "barefoot_walk") court-circuite la résolution AVANT le son
 // propre, et ferait marcher le compagnon pieds nus au lieu de chien.
 //
-// SIFFLEMENT : il jappe et accourt — suivi serré et rapide pendant 10 s
-// (comportement temporaire, voir core/temporary-behavior.js), puis il
-// retombe sur son suivi lâche du départ (config/new-game.js). Surtout
-// cosmétique tant que ce suivi lâche le garde à portée.
+// SIFFLEMENT : une petite séquence (voir doc/scripting.md/"Séquences :
+// wait") — il se fige le temps que le sifflement passe et qu'il dresse
+// l'oreille, jappe (son propre vocal), marque un temps, puis accourt :
+// suivi serré et rapide pendant 10 s (comportements temporaires, voir
+// core/temporary-behavior.js), avant de retomber sur son suivi lâche du
+// départ (config/new-game.js). Surtout cosmétique tant que ce suivi lâche
+// le garde à portée.
 
 export default {
   nameKey: "entity.dog.name",
@@ -43,8 +46,11 @@ export default {
       on: "emote",
       emote: "whistle",
       effects: [
+        { type: "temporaryBehavior", behavior: { kind: "stay" }, durationMs: 1500 },
+        { type: "wait", ms: 700 },
+        { type: "playSound", role: "vocal" },
+        { type: "wait", ms: 500 },
         { type: "temporaryBehavior", behavior: { kind: "follow", speed: 1.6, maxDistance: 1.5 }, durationMs: 10000 },
-        { type: "playSound", path: "assets/sounds/entities/dog_medium_vocal" },
       ],
     },
   ],

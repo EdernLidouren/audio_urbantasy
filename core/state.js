@@ -73,6 +73,7 @@ import { isBlocking, presenceContextOf } from "./presence.js";
 import { INITIAL_TIME } from "./time.js";
 import { createInitialWeather } from "./weather.js";
 import { parseVariables, applyActionEffects } from "./variables.js";
+import { sequenceHead, sequenceTail } from "./sequence.js";
 import { createEmptyEquipment } from "./equipment.js";
 
 function fail(message) {
@@ -417,13 +418,19 @@ export function markConsumed(session, entityId) {
 // removeEntity. `side` : face qui porte l'entité — celle du joueur par
 // défaut (une action s'active toujours sur sa face), explicite pour un
 // trigger horaire de l'AUTRE face (voir core/triggers.js).
+//
+// SÉQUENCE (voir core/sequence.js) : seule la tranche de TÊTE (avant le
+// premier `wait`) s'applique ici ; les suivantes attendent sur l'entité
+// (`pendingEffects`), qu'elles REMPLACENT — une entité ne suit qu'un fil à
+// la fois (le chien sifflé deux fois reprend sa réaction au début). Une
+// liste sans `wait` ne touche pas aux tranches en attente.
 export function applyEntityActionEffects(session, entityId, effects, side = session.player.side) {
   const world = session.worlds[session.activeWorldId];
   const face = resolveFace(world, side);
   const entity = face.entities.find((e) => e.id === entityId);
   if (!entity) return session;
 
-  const result = applyActionEffects(effects, { entity, world, session });
+  const result = applyHeadAndSchedule(effects, { entity, world, session });
   const entityChanged = result.entity !== entity;
   const worldChanged = result.world !== world;
   const partyChanged = result.session !== session;
@@ -444,6 +451,15 @@ export function applyEntityActionEffects(session, entityId, effects, side = sess
   };
 }
 
+// Tête appliquée, suite mise en attente sur l'entité (voir
+// applyEntityActionEffects). Même forme de résultat qu'applyActionEffects.
+function applyHeadAndSchedule(effects, context) {
+  const result = applyActionEffects(sequenceHead(effects), context);
+  const tail = sequenceTail(effects);
+  if (tail.length === 0) return result;
+  return { ...result, entity: { ...result.entity, pendingEffects: tail } };
+}
+
 // Même chose pour un COMPAGNON (session.companions) : il n'est sur aucune
 // face, il suit le joueur. Ses effets voient le monde actif comme porteur
 // des variables de scène, comme une entité de la face du joueur. id absent
@@ -453,7 +469,7 @@ export function applyCompanionActionEffects(session, companionId, effects) {
   if (!companion) return session;
   const world = session.worlds[session.activeWorldId];
 
-  const result = applyActionEffects(effects, { entity: companion, world, session });
+  const result = applyHeadAndSchedule(effects, { entity: companion, world, session });
   const entityChanged = result.entity !== companion;
   const worldChanged = result.world !== world;
   const partyChanged = result.session !== session;

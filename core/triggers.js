@@ -36,6 +36,7 @@ import { hourOfDay } from "./time.js";
 import { isTwoSided, resolveFace, applyEntityActionEffects, applyCompanionActionEffects } from "./state.js";
 import { isRenderEffect } from "./effects.js";
 import { EMOTE_REGISTRY } from "./emotes.js";
+import { sequenceHead } from "./sequence.js";
 
 // Kinds de trigger reconnus (`on`) — SEULE liste, lue par
 // core/script-parse.js/parseTrigger pour la validation. Un kind de plus
@@ -53,14 +54,35 @@ export function hourChanged(previousTime, nextTime) {
   return hourIndex(previousTime) !== hourIndex(nextTime);
 }
 
-// Effets dus pour UNE entité entre deux instants, dans l'ordre déclaré.
-export function dueTriggerEffects(entity, previousTime, nextTime) {
+// Triggers horaires dus pour UNE entité entre deux instants, dans l'ordre
+// déclaré.
+export function dueTriggers(entity, previousTime, nextTime) {
   if (!entity.triggers || entity.present === false) return [];
   if (!hourChanged(previousTime, nextTime)) return [];
   const hour = hourOfDay(nextTime);
-  return entity.triggers
-    .filter((trigger) => trigger.on === "hour" && (trigger.hour === undefined || trigger.hour === hour))
-    .flatMap((trigger) => trigger.effects);
+  return entity.triggers.filter((trigger) => trigger.on === "hour" && (trigger.hour === undefined || trigger.hour === hour));
+}
+
+// Leurs effets, mis bout à bout (lecture seule, pour les vérifications).
+export function dueTriggerEffects(entity, previousTime, nextTime) {
+  return dueTriggers(entity, previousTime, nextTime).flatMap((trigger) => trigger.effects);
+}
+
+// Applique les triggers `triggers` d'UNE entité, UN PAR UN : chaque liste
+// d'effets est une séquence à part (core/sequence.js), dont seule la tête
+// s'exécute maintenant — mises bout à bout, le `wait` de l'une retarderait
+// les effets de la suivante. `apply(session, effects)` : l'application
+// (entité d'une face ou compagnon). Les effets de RENDU de la tête de
+// chaque séquence vont dans `fired`, regroupés par entité.
+function applyTriggers(session, entity, triggers, apply, fired) {
+  let next = session;
+  const renderEffects = [];
+  for (const trigger of triggers) {
+    next = apply(next, trigger.effects);
+    renderEffects.push(...sequenceHead(trigger.effects).filter(isRenderEffect));
+  }
+  if (renderEffects.length > 0) fired.push({ entity, effects: renderEffects });
+  return next;
 }
 
 // Applique les triggers dus entre `previousTime` et `session.time` sur le
@@ -77,11 +99,9 @@ export function applyDueTriggers(session, previousTime) {
   for (const side of sides) {
     const face = isTwoSided(world) ? world[side] : world;
     for (const entity of face.entities) {
-      const effects = dueTriggerEffects(entity, previousTime, session.time);
-      if (effects.length === 0) continue;
-      next = applyEntityActionEffects(next, entity.id, effects, side);
-      const renderEffects = effects.filter(isRenderEffect);
-      if (renderEffects.length > 0) fired.push({ entity, effects: renderEffects });
+      const triggers = dueTriggers(entity, previousTime, session.time);
+      if (triggers.length === 0) continue;
+      next = applyTriggers(next, entity, triggers, (s, effects) => applyEntityActionEffects(s, entity.id, effects, side), fired);
     }
   }
 
@@ -98,22 +118,25 @@ export function emoteTriggerRange(trigger, emoteId) {
   return trigger.range === undefined ? emoteRange : Math.min(trigger.range, emoteRange);
 }
 
-// Effets dus pour UNE entité quand l'émote `emoteId` est faite à `distance`
-// d'elle, dans l'ordre déclaré : TOUS les triggers qui répondent (même
-// règle que l'horloge, aucun « premier gagnant »). Un trigger sans `emote`
+// Triggers d'émote qui répondent pour UNE entité quand l'émote `emoteId`
+// est faite à `distance` d'elle, dans l'ordre déclaré : TOUS (même règle
+// que l'horloge, aucun « premier gagnant »). Un trigger sans `emote`
 // répond à toutes. Une entité dormante (règle de présence) ou déjà enfuie
 // (core/startle.js : `startled`, dormante seulement au tick suivant) ne
 // réagit pas : elle n'est déjà plus là.
-export function emoteTriggerEffects(entity, emoteId, distance) {
+export function emoteTriggers(entity, emoteId, distance) {
   if (!entity.triggers || entity.present === false || entity.startled) return [];
-  return entity.triggers
-    .filter(
-      (trigger) =>
-        trigger.on === "emote" &&
-        (trigger.emote === undefined || trigger.emote === emoteId) &&
-        distance <= emoteTriggerRange(trigger, emoteId)
-    )
-    .flatMap((trigger) => trigger.effects);
+  return entity.triggers.filter(
+    (trigger) =>
+      trigger.on === "emote" &&
+      (trigger.emote === undefined || trigger.emote === emoteId) &&
+      distance <= emoteTriggerRange(trigger, emoteId)
+  );
+}
+
+// Leurs effets, mis bout à bout (lecture seule, pour les vérifications).
+export function emoteTriggerEffects(entity, emoteId, distance) {
+  return emoteTriggers(entity, emoteId, distance).flatMap((trigger) => trigger.effects);
 }
 
 // Le joueur fait l'émote `emoteId` depuis `sourceX` (sa position — passée
@@ -134,18 +157,14 @@ export function applyEmoteTriggers(session, emoteId, sourceX) {
   const fired = [];
 
   for (const entity of resolveFace(world, side).entities) {
-    const effects = emoteTriggerEffects(entity, emoteId, Math.abs(entity.x - sourceX));
-    if (effects.length === 0) continue;
-    next = applyEntityActionEffects(next, entity.id, effects, side);
-    const renderEffects = effects.filter(isRenderEffect);
-    if (renderEffects.length > 0) fired.push({ entity, effects: renderEffects });
+    const triggers = emoteTriggers(entity, emoteId, Math.abs(entity.x - sourceX));
+    if (triggers.length === 0) continue;
+    next = applyTriggers(next, entity, triggers, (s, effects) => applyEntityActionEffects(s, entity.id, effects, side), fired);
   }
   for (const companion of session.companions) {
-    const effects = emoteTriggerEffects(companion, emoteId, Math.abs(companion.x - sourceX));
-    if (effects.length === 0) continue;
-    next = applyCompanionActionEffects(next, companion.id, effects);
-    const renderEffects = effects.filter(isRenderEffect);
-    if (renderEffects.length > 0) fired.push({ entity: companion, effects: renderEffects });
+    const triggers = emoteTriggers(companion, emoteId, Math.abs(companion.x - sourceX));
+    if (triggers.length === 0) continue;
+    next = applyTriggers(next, companion, triggers, (s, effects) => applyCompanionActionEffects(s, companion.id, effects), fired);
   }
 
   return { session: next, fired };

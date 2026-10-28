@@ -46,6 +46,7 @@ import checkTriggers from "./triggers.check.js";
 import checkNewGame from "./new-game.check.js";
 import checkStartle from "./startle.check.js";
 import checkTemporaryBehavior from "./temporary-behavior.check.js";
+import checkSequence from "./sequence.check.js";
 import checkRotation from "./rotation.check.js";
 // Domaines de lib/ (mécanismes portables), lancés par le même point
 // d'entrée : une seule commande, un seul récapitulatif.
@@ -81,6 +82,7 @@ const SUITES = [
   { name: "new-game", check: checkNewGame },
   { name: "startle", check: checkStartle },
   { name: "temporary-behavior", check: checkTemporaryBehavior },
+  { name: "sequence", check: checkSequence },
   { name: "rotation", check: checkRotation },
   { name: "i18n", check: checkI18n },
   { name: "input", check: checkInput },

@@ -1092,8 +1092,10 @@ aucun consommateur n'en a besoin aujourd'hui.
 
 Un comportement posé PAR-DESSUS celui de l'entité, pour une durée bornée,
 par l'effet d'action `"temporaryBehavior"` (voir
-`doc/scripting.md`/"Effets d'action") : le chien qu'on siffle accourt, suit
-le joueur dix secondes, puis reprend son errance. Mécanique dans
+`doc/scripting.md`/"Effets d'action") : le chien qu'on siffle se fige
+(`stay`), jappe, puis accourt, suit le joueur dix secondes et reprend son
+errance — une séquence de deux comportements temporaires séparés par des
+`wait` (voir `doc/scripting.md`/"Séquences : wait"). Mécanique dans
 `core/temporary-behavior.js`, un seul champ runtime
 `temporaryBehavior: { behavior, ticksLeft }` (comme `startled`, jamais écrit
 dans le JSON de scène) :

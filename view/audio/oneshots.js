@@ -11,9 +11,18 @@ import { TUNING_DEFAULTS } from "../../config/tuning.js";
 import { NO_MUFFLE, applyMuffleToVolume, volumeForDistance, spatialRendering } from "./spatial.js";
 import { clamp } from "../../lib/math.js";
 import { beaconVolumeFactor } from "./volume-factors.js";
-import { PLAY_SOUND_TUNING_KEYS, resolveTransitionSound } from "./entity-sound-entry.js";
+import { PLAY_SOUND_TUNING_KEYS, resolveTransitionSound, resolveRoleSound } from "./entity-sound-entry.js";
 
 const SCENE_EXIT_SOUND_FADE_MS = TUNING_DEFAULTS.sceneExitSoundFadeMs;
+
+// Un vocal joué par un EFFET (playSound role "vocal", le jappement du chien
+// sifflé) repousse l'échéance du vocal régulier de l'entité d'un intervalle
+// plein : il ne réaboie pas juste après. Horloge murale, comme l'échéance
+// elle-même (voir ./entity-audio.js/updateIntermittentSources).
+function postponeVocal(entry) {
+  const vocal = entry.intermittentSources && entry.intermittentSources.find((src) => src.role === "vocal");
+  if (vocal) vocal.nextAt = Math.max(vocal.nextAt, performance.now() + vocal.interval);
+}
 
 // Sons SUIVIS en cours : { entityId, worldId, gain, handle }. Au niveau du
 // MODULE, pas de la scène : une bascule de face reconstruit la scène pendant
@@ -143,7 +152,15 @@ export function createOneShots({ getSession, reverbBus, findEntitySource, effect
       console.warn(`oneshots: playEntityOneShot("${targetId}") : entité dormante ou introuvable.`);
       return;
     }
-    const resolved = resolveTransitionSound(found.entry.entity, descriptor, PLAY_SOUND_TUNING_KEYS);
+    const resolved =
+      descriptor.role !== undefined
+        ? resolveRoleSound(found.entry.entity, descriptor)
+        : resolveTransitionSound(found.entry.entity, descriptor, PLAY_SOUND_TUNING_KEYS);
+    if (!resolved) {
+      console.warn(`oneshots: playEntityOneShot("${targetId}") : aucun son de rôle "${descriptor.role}".`);
+      return;
+    }
+    if (descriptor.role === "vocal") postponeVocal(found.entry);
     if (departing) {
       playTransitionSound(found.entry, found.live.x - getSession().player.x, resolved, effectiveMuffle(found.entry, found.forcedMuffle), {
         entityLayer: false,

@@ -12,6 +12,7 @@ import { playDescribedOneShot } from "../lib/audio.js";
 import { resolveAsset } from "../lib/assets.js";
 import { interfaceVolumeFactor } from "./audio/volume-factors.js";
 import { teleportHandler, variableEffectsHandler, positionedSoundPlayer } from "./interaction-handlers.js";
+import { sequenceHead } from "../core/sequence.js";
 
 // Son de RAMASSAGE : rôle `sounds.pickup` DÉCLARÉ par l'archétype de l'objet
 // (cascade instance -> archétype par fusion, comme tout rôle de `sounds` —
@@ -103,6 +104,12 @@ function runPlaySoundEffect(entity, effect, options = {}) {
     positionedSoundPlayer(targetId, effect, options);
     return;
   }
+  // Un son de RÔLE (`role` au lieu de `path`) n'existe que sur une entité
+  // dans l'espace : sans cible positionnable, rien à rejouer en méta.
+  if (effect.role !== undefined) {
+    console.warn(`interact: son de rôle "${effect.role}" sans entité où le jouer.`);
+    return;
+  }
   playMetaSound(effect);
 }
 
@@ -132,11 +139,18 @@ function runPlaySoundEffect(entity, effect, options = {}) {
 // `departing` : positionnés, mais hors du fondu du sas (voir
 // view/audio/oneshots.js/playEntityOneShot), pour finir de résonner
 // pendant la transition au lieu d'être coupés.
+//
+// SÉQUENCE (`wait`, voir core/sequence.js) : le core reçoit la liste
+// ENTIÈRE (il applique la tête et met la suite en attente sur l'entité) ;
+// ici, seule la TÊTE se rejoue — la suite reviendra par
+// core/pending-effects.js, tick après tick. Un teleport n'est jamais après
+// un `wait` (refusé au chargement).
 export function runEffects(entity, effects) {
   if (!effects) return;
   if (variableEffectsHandler) variableEffectsHandler(entity, effects);
-  const departing = effects.some((effect) => effect.type === "teleport");
-  for (const effect of effects) {
+  const head = sequenceHead(effects);
+  const departing = head.some((effect) => effect.type === "teleport");
+  for (const effect of head) {
     if (effect.type === "teleport") {
       if (teleportHandler) teleportHandler(effect);
     } else {

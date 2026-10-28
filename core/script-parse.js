@@ -114,6 +114,14 @@ function validateVariableReference(scope, name, entityVariables, sceneVariables,
 // codé ici (voir view/effect-runner.js/resolvePlaySoundNature).
 const PLAY_SOUND_NATURES = ["diegetic", "meta"];
 
+// Rôles de son qu'un "playSound" peut jouer par `role` au lieu d'un `path`
+// (voir plus bas) : les rôles PONCTUELS d'une entité. Pas la balise ni les
+// pas ni la boucle de proximité (sons continus ou cadencés par le
+// mouvement), pas le ramassage (son MÉTA d'un objet, voir
+// view/effect-runner.js/playPickupSound). Exporté pour la vérification du
+// rôle sur l'entité porteuse (core/entity-parse.js).
+export const PLAY_SOUND_ROLES = ["vocal", "enterSound", "exitSound", "approachSound", "leaveSound"];
+
 // Faces et modes de transition reconnus pour l'effet "teleport" (voir plus
 // bas) — "side" : face d'arrivée si la cible est une scène à deux faces
 // (ignorée sinon, comme partout ailleurs) ; "transition" : "fade" (sas +
@@ -136,7 +144,8 @@ const ACTION_EFFECT_FIELDS = {
   forgetEmote: ["id"],
   startle: [],
   temporaryBehavior: ["behavior", "durationMs"],
-  playSound: ["path", "gain", "pitchVariation", "reverbSend", "at", "nature", "tracked"],
+  wait: ["ms"],
+  playSound: ["path", "role", "gain", "pitchVariation", "reverbSend", "at", "nature", "tracked"],
   announce: ["key", "assertive"],
   teleport: ["target", "x", "side", "reloadIfSame", "transition"],
 };
@@ -248,6 +257,15 @@ function parseActionEffect(rawEffect, describe, entityVariables, sceneVariables)
     }
     return { type, id: rawEffect.id };
   }
+  // "wait" { ms } — pas de SÉQUENCE, pas un effet (voir core/sequence.js) :
+  // la suite de la liste attend `ms` millisecondes de jeu. Sa place dans
+  // la liste est validée avec la liste entière (validateSequence).
+  if (type === "wait") {
+    if (!isFiniteNumber(rawEffect.ms) || rawEffect.ms <= 0) {
+      fail(`${describe}.ms doit être un nombre > 0 (reçu : ${JSON.stringify(rawEffect.ms)}).`);
+    }
+    return { type: "wait", ms: rawEffect.ms };
+  }
   // "startle" (sans champ) — ÉTAT : l'entité qui porte l'action s'enfuit
   // (voir core/startle.js, core/variables.js/applyActionEffects).
   if (type === "startle") {
@@ -269,8 +287,21 @@ function parseActionEffect(rawEffect, describe, entityVariables, sceneVariables)
     return { type, behavior, durationMs: rawEffect.durationMs };
   }
   if (type === "playSound") {
-    if (!isNonEmptyString(rawEffect.path)) {
+    // `path` (un pool, ou un fichier) OU `role` (le son de rôle de l'entité
+    // qui émet, avec ses propres réglages — le jappement du chien sifflé),
+    // exactement l'un des deux. Un rôle est un son de l'entité DANS
+    // L'ESPACE : jamais méta.
+    if ((rawEffect.path === undefined) === (rawEffect.role === undefined)) {
+      fail(`${describe} : "path" OU "role", exactement l'un des deux.`);
+    }
+    if (rawEffect.path !== undefined && !isNonEmptyString(rawEffect.path)) {
       fail(`${describe}.path doit être une chaîne non vide.`);
+    }
+    if (rawEffect.role !== undefined && !PLAY_SOUND_ROLES.includes(rawEffect.role)) {
+      fail(`${describe}.role "${rawEffect.role}" inconnu (attendu : ${PLAY_SOUND_ROLES.map((r) => `"${r}"`).join(" | ")}).`);
+    }
+    if (rawEffect.role !== undefined && rawEffect.nature === "meta") {
+      fail(`${describe} : un son de rôle est toujours diégétique (nature "meta" refusée).`);
     }
     for (const field of ["gain", "pitchVariation", "reverbSend"]) {
       if (rawEffect[field] !== undefined && !isFiniteNumber(rawEffect[field])) {
@@ -295,7 +326,7 @@ function parseActionEffect(rawEffect, describe, entityVariables, sceneVariables)
     if (rawEffect.tracked !== undefined && typeof rawEffect.tracked !== "boolean") {
       fail(`${describe}.tracked doit être un booléen si présent.`);
     }
-    const effect = { type: "playSound", path: rawEffect.path };
+    const effect = rawEffect.role !== undefined ? { type: "playSound", role: rawEffect.role } : { type: "playSound", path: rawEffect.path };
     if (rawEffect.gain !== undefined) effect.gain = rawEffect.gain;
     if (rawEffect.pitchVariation !== undefined) effect.pitchVariation = rawEffect.pitchVariation;
     if (rawEffect.reverbSend !== undefined) effect.reverbSend = rawEffect.reverbSend;
@@ -403,6 +434,7 @@ export function parseTrigger(rawTrigger, describe, entityVariables, sceneVariabl
   const effects = rawTrigger.effects.map((effect, i) =>
     parseActionEffect(effect, `${describe}.effects[${i}]`, entityVariables, sceneVariables)
   );
+  validateSequence(effects, `${describe}.effects`);
   const mixed = effects.find((effect) => MIXED_EFFECT_TYPES.includes(effect.type));
   if (mixed) {
     fail(`${describe}.effects : "${mixed.type}" (effet mixte, joueur) n'est pas admis sur un trigger.`);
@@ -652,6 +684,7 @@ export function parseSingleAction(rawAction, describe, entityVariables, sceneVar
     result.effects = rawAction.effects.map((effect, i) =>
       parseActionEffect(effect, `${describe}.effects[${i}]`, entityVariables, sceneVariables)
     );
+    validateSequence(result.effects, `${describe}.effects`);
   }
   if (rawAction.refusalEffects !== undefined) {
     if (!Array.isArray(rawAction.refusalEffects) || rawAction.refusalEffects.length === 0) {
@@ -660,6 +693,24 @@ export function parseSingleAction(rawAction, describe, entityVariables, sceneVar
     result.refusalEffects = rawAction.refusalEffects.map((effect, i) =>
       parseActionEffect(effect, `${describe}.refusalEffects[${i}]`, entityVariables, sceneVariables)
     );
+    validateSequence(result.refusalEffects, `${describe}.refusalEffects`);
   }
   return result;
+}
+
+// Place des `wait` dans une liste d'effets (voir core/sequence.js) :
+//   - jamais en DERNIER : il n'attendrait rien, sûrement un oubli ;
+//   - aucun effet MIXTE (teleport) APRÈS un `wait` : le sas et le fondu se
+//     jouent à l'activation, pas au détour d'un tick. Pas encore de besoin
+//     d'une téléportation différée ; refusée plutôt que mal jouée.
+function validateSequence(effects, describe) {
+  if (effects.length > 0 && effects[effects.length - 1].type === "wait") {
+    fail(`${describe} : un "wait" en dernier n'attend rien.`);
+  }
+  const firstWait = effects.findIndex((effect) => effect.type === "wait");
+  if (firstWait < 0) return;
+  const lateMixed = effects.slice(firstWait).find((effect) => MIXED_EFFECT_TYPES.includes(effect.type));
+  if (lateMixed) {
+    fail(`${describe} : "${lateMixed.type}" (effet mixte) n'est pas admis après un "wait".`);
+  }
 }

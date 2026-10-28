@@ -56,6 +56,33 @@ const PROXIMITY_LOOP_TUNING_KEYS = { gain: "proximityLoopGain" };
 // positionné.
 export const PLAY_SOUND_TUNING_KEYS = { gain: "gain" };
 
+// Clés de gain des rôles qu'un effet "playSound" peut jouer par `role`
+// (voir core/script-parse.js/PLAY_SOUND_ROLES).
+const ROLE_TUNING_KEYS = {
+  vocal: VOCAL_TUNING_KEYS,
+  enterSound: ENTER_SOUND_TUNING_KEYS,
+  exitSound: EXIT_SOUND_TUNING_KEYS,
+  approachSound: APPROACH_SOUND_TUNING_KEYS,
+  leaveSound: LEAVE_SOUND_TUNING_KEYS,
+};
+
+// Effet "playSound" par `role` : le son de CE rôle de l'entité, résolu avec
+// ses propres réglages (cascade son -> instance -> archétype -> défaut,
+// clé de gain du rôle). Les champs de l'effet s'y ajoutent : `gain` en
+// FACTEUR du gain du rôle, `pitchVariation`/`reverbSend` en remplacement.
+// Rôle absent de l'entité -> null (l'appelant avertit).
+export function resolveRoleSound(entity, effect) {
+  const descriptor = entity.sounds && entity.sounds[effect.role];
+  if (!descriptor) return null;
+  const resolved = resolveTransitionSound(entity, descriptor, ROLE_TUNING_KEYS[effect.role]);
+  return {
+    ...resolved,
+    gain: resolved.gain * (effect.gain ?? 1),
+    pitchVariation: effect.pitchVariation ?? resolved.pitchVariation,
+    reverbSend: effect.reverbSend ?? resolved.reverbSend,
+  };
+}
+
 // Cœur commun d'un descripteur de son : gain, pitchVariation et reverbSend,
 // résolus en cascade (son -> instance -> archétype -> défaut global, voir
 // config/tuning.js/resolveTuning). `gainKey` est la seule clé qui varie par
@@ -248,7 +275,8 @@ export function buildEntitySoundEntry(entity, session, { otherFace = false, disa
 
   if (vocal) {
     const source = resolveIntermittentSource(entity, vocal, VOCAL_TUNING_KEYS);
-    intermittentSources.push({ ...source, gain: source.gain * faceGain(vocalCrossFaceGain) });
+    // `role` : retrouvé par ./oneshots.js/postponeVocal.
+    intermittentSources.push({ ...source, gain: source.gain * faceGain(vocalCrossFaceGain), role: "vocal" });
   }
 
   // Présence de départ, avec le MÊME contexte que le tick (presenceContextOf)

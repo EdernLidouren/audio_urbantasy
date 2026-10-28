@@ -27,6 +27,8 @@ import { openCollectionsDebugMenu } from "./menus/debug-collections-menu.js";
 import { openInventoryMenu, openEquipmentMenu, openImprovementsMenu, openCollectionsMenu } from "./menus/inventory-menu.js";
 import { tick } from "../core/actions.js";
 import { reduce } from "../core/reduce.js";
+import { applyDuePendingEffects } from "../core/pending-effects.js";
+import { runRenderEffects } from "./effect-runner.js";
 import { isDebugEnabled } from "../config/debug.js";
 import { createWorldTravel } from "./world-travel.js";
 import { registerActionHandlers } from "./action-handlers.js";
@@ -130,10 +132,15 @@ export function makeCityScreen(getSession, setSession) {
     },
     // Pas de simulation sans vue du monde (hors partie : jamais en jeu, un
     // voyage gèle le jeu par un écran vide pendant son chargement).
+    // Après le réducteur, les tranches de séquence arrivées à échéance
+    // (core/pending-effects.js) : le core applique leur état, leur rendu
+    // est rejoué ici, avant la mise à jour de la vue.
     onTick() {
       const worldView = travel.current();
       if (!worldView) return;
-      setSession(reduce(getSession(), tick(getMoveIntent())));
+      const { session, fired } = applyDuePendingEffects(reduce(getSession(), tick(getMoveIntent())));
+      setSession(session);
+      for (const { entity, effects } of fired) runRenderEffects(entity, effects);
       worldView.update();
     },
     // Horloge de partie : même garde que onTick.

@@ -21,6 +21,8 @@
 // L'humain lit une liste d'effets comme UN SEUL script ("effects":
 // [setVariable, giveImprovement, playSound, teleport, ...]) ; le système la
 // ROUTE par nature.
+// À part, un pas de SÉQUENCE (SEQUENCE_EFFECT_TYPES : "wait"), qui n'est
+// PAS un effet : il découpe une liste dans le temps (core/sequence.js).
 // Frontière STRICTE, jamais mélangée : ajouter un effet demain = choisir SA
 // nature (une seule des trois listes) + son cas dans
 // core/script-parse.js/parseActionEffect (validation de forme) + son exécution
@@ -40,7 +42,12 @@ export const STATE_EFFECT_TYPES = [
 ];
 export const RENDER_EFFECT_TYPES = ["playSound", "announce"];
 export const MIXED_EFFECT_TYPES = ["teleport"];
-export const ACTION_EFFECT_TYPES = [...STATE_EFFECT_TYPES, ...RENDER_EFFECT_TYPES, ...MIXED_EFFECT_TYPES];
+// Pas de SÉQUENCE : PAS un effet, aucune des trois natures — `wait` découpe
+// une liste en tranches dans le temps (core/sequence.js) et n'atteint
+// jamais un exécuteur. Listé ici pour être reconnu par la validation des
+// listes d'effets, comme le reste du vocabulaire.
+export const SEQUENCE_EFFECT_TYPES = ["wait"];
+export const ACTION_EFFECT_TYPES = [...STATE_EFFECT_TYPES, ...RENDER_EFFECT_TYPES, ...MIXED_EFFECT_TYPES, ...SEQUENCE_EFFECT_TYPES];
 
 export function isRenderEffect(effect) {
   return RENDER_EFFECT_TYPES.includes(effect.type);

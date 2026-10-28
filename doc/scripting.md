@@ -610,8 +610,14 @@ comportement de repos pour autant.
 
 #### Allure : `speed` (commun) et paramètres de `wander`
 
-`speed` (nombre `> 0`, optionnel) est accepté par les TROIS kinds (`wander`,
-`follow`, `goto`) : facteur de vitesse, 1 = allure du joueur (2,4 cases par
+`stay` (`core/behaviors/stay.js`) — l'entité reste où elle est : aucun
+paramètre, aucun mouvement. Différent d'une entité SANS comportement : il se
+POSE, surtout comme comportement temporaire par-dessus une errance ou un
+suivi, pour la figer un instant (voir `"temporaryBehavior"` et l'exemple du
+sifflement).
+
+`speed` (nombre `> 0`, optionnel) est accepté par les TROIS kinds mobiles
+(`wander`, `follow`, `goto` — pas `stay`) : facteur de vitesse, 1 = allure du joueur (2,4 cases par
 seconde). Il PRIME sur le `speed` de l'entité (champ d'entité, défaut 1). Une règle
 qui change de comportement change donc aussi d'allure — « calme le jour, frénétique
 la nuit » s'écrit avec deux objets `behavior` qui portent chacun leur `speed`. Jamais
@@ -855,9 +861,10 @@ forme : il lui faudrait un `minRange`, à ajouter le jour où un contenu
 en a besoin.
 
 Exemple réel — le sifflement appelle un chien (`stray_dog_1` de
-`scenes/demo.json`, et le buddy, `entities/types/buddy.js`) : il jappe et
-accourt, puis reprend ce qu'il faisait (voir `"temporaryBehavior"` plus
-bas) :
+`scenes/demo.json`, et le buddy, `entities/types/buddy.js`) : il se fige le
+temps que le sifflement passe, dresse l'oreille, jappe, marque un temps,
+puis accourt, et reprend enfin ce qu'il faisait (voir "Séquences : wait",
+`"temporaryBehavior"` et `"playSound"`/`role` plus bas) :
 
 ```json
 "triggers": [
@@ -865,12 +872,18 @@ bas) :
     "on": "emote",
     "emote": "whistle",
     "effects": [
-      { "type": "temporaryBehavior", "behavior": { "kind": "follow", "speed": 1.6, "maxDistance": 1.5 }, "durationMs": 10000 },
-      { "type": "playSound", "path": "assets/sounds/entities/dog_medium_vocal" }
+      { "type": "temporaryBehavior", "behavior": { "kind": "stay" }, "durationMs": 1500 },
+      { "type": "wait", "ms": 700 },
+      { "type": "playSound", "role": "vocal" },
+      { "type": "wait", "ms": 500 },
+      { "type": "temporaryBehavior", "behavior": { "kind": "follow", "speed": 1.6, "maxDistance": 1.5 }, "durationMs": 10000 }
     ]
   }
 ]
 ```
+
+Chaque trigger qui répond est une séquence À PART : le `wait` de l'un ne
+retarde jamais les effets d'un autre.
 
 **Tous** les triggers qui répondent tirent, dans l'ordre déclaré (même
 règle que l'horloge). **Portée** : la FACE DU JOUEUR seulement — l'autre
@@ -1168,6 +1181,53 @@ ROUTE par nature, frontière STRICTE :
   importance observable ; seul l'ordre ENTRE effets de rendu compte, ex. le
   son AVANT la confirmation parlée).
 
+Une liste peut aussi S'ÉCOULER DANS LE TEMPS, découpée par des `wait` (voir
+"Séquences : wait" juste après) : le même routage vaut pour chaque tranche,
+à son heure.
+
+### Séquences : `"wait"` — pas un effet, une attente
+
+```js
+effects: [
+  { type: "temporaryBehavior", behavior: { kind: "stay" }, durationMs: 1500 },
+  { type: "wait", ms: 700 },
+  { type: "playSound", role: "vocal" },
+  { type: "wait", ms: 500 },
+  { type: "temporaryBehavior", behavior: { kind: "follow", speed: 1.6, maxDistance: 1.5 }, durationMs: 10000 },
+]
+```
+
+`{ ms }` (nombre > 0) : la suite de la liste attend `ms` millisecondes de
+jeu. Ni état, ni rendu, ni mixte (`core/effects.js`/`SEQUENCE_EFFECT_TYPES`) :
+`wait` DÉCOUPE la liste en TRANCHES (`core/sequence.js`) et n'atteint
+jamais un exécuteur. Valable partout où vit une liste d'effets d'action :
+`effects`, `refusalEffects`, `triggers[].effects`.
+
+- **Tête** — les effets avant le premier `wait` s'exécutent tout de suite,
+  comme une liste ordinaire.
+- **Suite** — les tranches suivantes attendent sur l'entité qui porte la
+  liste (`entity.pendingEffects = [{ ticksLeft, effects }]`, délais CUMULÉS,
+  au moins un tick ; deux `wait` accolés s'additionnent). À chaque tick, juste
+  après le réducteur, `core/pending-effects.js`/`applyDuePendingEffects`
+  applique les effets d'état des tranches échues et rend leurs effets de
+  rendu à la vue (`view/city-screen.js`/`onTick`), même aller-retour que les
+  triggers horaires.
+- **Un fil à la fois** — une nouvelle liste AVEC `wait` sur la même entité
+  REMPLACE ses tranches en attente (siffler deux fois relance la réaction au
+  début) ; une liste SANS `wait` n'y touche pas.
+- **Temps** — ticks de simulation : gelé sous un menu, déterministe.
+  Donnée pure, sauvegardée ; oubliée au chargement du monde
+  (`forgetPendingEffects`, avec les comportements temporaires). Une entité
+  DORMANTE à l'échéance reçoit l'état, pas le rendu (elle n'est pas là pour
+  l'émettre).
+- **Portée** — le monde actif, ses deux faces (une séquence lancée par un
+  trigger horaire de l'autre face va à son terme), et les compagnons.
+
+Refusés au chargement (`core/script-parse.js`/`validateSequence`) : un
+`wait` en DERNIER (il n'attendrait rien), un effet MIXTE (`teleport`) après
+un `wait` (le sas se joue à l'activation ; pas encore de téléportation
+différée). Vérification terminal : `core/checks/sequence.check.js`.
+
 ### `"setVariable"` / `"toggleVariable"` / `"addVariable"` — état, CORE
 
 ```js
@@ -1281,10 +1341,25 @@ d'émote" plus haut).
 // Surcharges explicites, cas exotiques :
 { type: "playSound", path: "...", at: "far-away-bell" }        // provenance : une AUTRE entité
 { type: "playSound", path: "...", nature: "meta" }              // nature forcée, ignore les filtres
+
+// Le son d'un RÔLE de l'entité, avec ses propres réglages :
+{ type: "playSound", role: "vocal" }
 ```
 
-`path` (requis) : chemin/pool résolu via `lib/assets.js`/`resolveAsset`, comme
-tout chemin de son du projet. `gain`/`pitchVariation`/`reverbSend` (optionnels,
+`path` OU `role`, exactement l'un des deux. `path` : chemin/pool résolu via
+`lib/assets.js`/`resolveAsset`, comme tout chemin de son du projet. `role` :
+le son de ce rôle de l'entité qui émet (`"vocal"`, `"enterSound"`,
+`"exitSound"`, `"approachSound"`, `"leaveSound"` — les rôles ponctuels,
+`core/script-parse.js`/`PLAY_SOUND_ROLES`), joué avec SES réglages en cascade
+et SA clé de gain (`vocalGain`...) — le jappement du chien sifflé est son
+propre vocal, sans recopier son chemin (`view/audio/entity-sound-entry.js`/
+`resolveRoleSound`). Sur un `role`, `gain` est un FACTEUR du gain du rôle,
+`pitchVariation`/`reverbSend` le remplacent. Toujours diégétique (`nature:
+"meta"` refusée) ; sans `at`, l'entité porteuse doit avoir ce rôle, vérifié
+au chargement (`core/entity-parse.js`/`checkPlaySoundRoles`). Un `"vocal"`
+ainsi joué repousse d'un intervalle plein le vocal régulier de l'entité
+(`view/audio/oneshots.js`/`postponeVocal`) : le chien ne réaboie pas juste
+après son jappement. `gain`/`pitchVariation`/`reverbSend` (optionnels,
 nombres) : le **DESCRIPTEUR DE SON PARTAGÉ** — les sous-champs COMMUNS aux
 rôles de son POSITIONNÉS (`sounds.beacon`/`sounds.vocal`, voir
 `doc/entity-model.md`/"Paramètres sonores").
