@@ -189,12 +189,24 @@ export default function checkSave(run) {
     sounds: { beacon: { path: "assets/sounds/furniture/film_projector_1_beacon", loop: true } },
   };
   const ghostEntity = { id: "vanished", type: "type_that_no_longer_exists", x: 2, sounds: {} };
+  // Un effet "spawn" fige aussi un type, dans son spec (trigger, action,
+  // séquence en attente).
+  const legacySpawn = { type: "spawn", spec: { type: "film_projector", labelKey: "entity.film_projector.name", sounds: {} } };
+  const legacySpawner = {
+    id: "legacy-spawner",
+    type: "video_projector",
+    x: 3,
+    sounds: {},
+    action: { kind: "applyEffects", effects: [legacySpawn] },
+    triggers: [{ on: "hour", effects: [legacySpawn] }],
+    pendingEffects: [{ ticksLeft: 5, effects: [legacySpawn] }],
+  };
   const ghostCompanion = { id: "vanished-companion", type: "type_that_no_longer_exists", x: 0, sounds: {} };
   const renameSave = {
     version: SAVE_VERSION,
     data: {
       ...auditSession,
-      worlds: { ...auditSession.worlds, [renameWorldId]: { ...renameWorld, entities: [...renameWorld.entities, legacyProjector, ghostEntity] } },
+      worlds: { ...auditSession.worlds, [renameWorldId]: { ...renameWorld, entities: [...renameWorld.entities, legacyProjector, ghostEntity, legacySpawner] } },
       companions: [...auditSession.companions, ghostCompanion],
     },
   };
@@ -205,6 +217,13 @@ export default function checkSave(run) {
   run("save renommages : type renommé", "video_projector", migratedProjector && migratedProjector.type);
   run("save renommages : clé i18n renommée", "entity.video_projector.name", migratedProjector && migratedProjector.nameKey);
   run("save renommages : chemin de son renommé", "assets/sounds/furniture/video_projector_1_beacon", migratedProjector && migratedProjector.sounds.beacon.path);
+  const migratedSpawner = renameResult.success ? renameResult.session.worlds[renameWorldId].entities.find((e) => e.id === "legacy-spawner") : undefined;
+  run(
+    "save renommages : type du spec d'un spawn renommé (action, trigger, séquence)",
+    "video_projector,video_projector,video_projector",
+    migratedSpawner && [migratedSpawner.action.effects[0], migratedSpawner.triggers[0].effects[0], migratedSpawner.pendingEffects[0].effects[0]].map((e) => e.spec.type).join(",")
+  );
+  run("save renommages : clé i18n du spec renommée aussi", "entity.video_projector.name", migratedSpawner && migratedSpawner.triggers[0].effects[0].spec.labelKey);
   run.same(
     "save renommages : idempotent (une partie déjà migrée ne change plus)",
     renameResult.session,

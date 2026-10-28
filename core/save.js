@@ -135,11 +135,47 @@ function mapEntityLists(data, transform) {
 function renameEntityTypes(entities) {
   let changed = false;
   const out = entities.map((entity) => {
-    if (!entity || !Object.hasOwn(ENTITY_TYPE_RENAMES, entity.type)) return entity;
-    changed = true;
-    return { ...entity, type: ENTITY_TYPE_RENAMES[entity.type] };
+    if (!entity) return entity;
+    const typed = Object.hasOwn(ENTITY_TYPE_RENAMES, entity.type) ? { ...entity, type: ENTITY_TYPE_RENAMES[entity.type] } : entity;
+    const next = renameSpawnSpecTypes(typed);
+    if (next !== entity) changed = true;
+    return next;
   });
   return changed ? out : entities;
+}
+
+// Le `spec` d'un effet "spawn" (core/script-parse.js) porte lui aussi un
+// type d'entité, figé avec la scène dans les listes d'effets de l'entité :
+// action (et ses refus), triggers, séquence en attente. Référence inchangée
+// si rien n'est renommé.
+function renameSpawnSpecTypes(entity) {
+  let next = entity;
+  if (entity.action && typeof entity.action === "object") {
+    const actions = Array.isArray(entity.action) ? entity.action : [entity.action];
+    const renamed = actions.map((action) => renameSpawnsIn(action, ["effects", "refusalEffects"]));
+    if (renamed.some((action, i) => action !== actions[i])) next = { ...next, action: Array.isArray(entity.action) ? renamed : renamed[0] };
+  }
+  for (const key of ["triggers", "pendingEffects"]) {
+    if (!Array.isArray(entity[key])) continue;
+    const renamed = entity[key].map((holder) => renameSpawnsIn(holder, ["effects"]));
+    if (renamed.some((holder, i) => holder !== entity[key][i])) next = { ...next, [key]: renamed };
+  }
+  return next;
+}
+
+function renameSpawnsIn(holder, keys) {
+  let next = holder;
+  for (const key of keys) {
+    if (!holder || !Array.isArray(holder[key])) continue;
+    let changed = false;
+    const effects = holder[key].map((effect) => {
+      if (!effect || effect.type !== "spawn" || !effect.spec || !Object.hasOwn(ENTITY_TYPE_RENAMES, effect.spec.type)) return effect;
+      changed = true;
+      return { ...effect, spec: { ...effect.spec, type: ENTITY_TYPE_RENAMES[effect.spec.type] } };
+    });
+    if (changed) next = { ...next, [key]: effects };
+  }
+  return next;
 }
 
 // Clés de session.worlds : un monde rangé sous l'ancien id de sa scène
