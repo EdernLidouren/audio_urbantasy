@@ -14,6 +14,7 @@ import { beaconVolumeFactor } from "./volume-factors.js";
 import { PLAY_SOUND_TUNING_KEYS, resolveTransitionSound, resolveRoleSound } from "./entity-sound-entry.js";
 
 const SCENE_EXIT_SOUND_FADE_MS = TUNING_DEFAULTS.sceneExitSoundFadeMs;
+const STOP_SOUNDS_FADE_MS = TUNING_DEFAULTS.stopSoundsFadeMs;
 
 // Un vocal joué par un EFFET (playSound role "vocal", le jappement du chien
 // sifflé) repousse l'échéance du vocal régulier de l'entité d'un intervalle
@@ -24,11 +25,12 @@ function postponeVocal(entry) {
   if (vocal) vocal.nextAt = Math.max(vocal.nextAt, performance.now() + vocal.interval);
 }
 
-// Sons SUIVIS en cours : { entityId, worldId, gain, handle }. Au niveau du
+// Sons SUIVIS en cours : { entityId, worldId, gain, handle, role }. Au niveau du
 // MODULE, pas de la scène : une bascule de face reconstruit la scène pendant
 // que le son continue, la nouvelle scène le reprend. `worldId` : le monde
 // d'émission — deux mondes peuvent avoir une entité au même id, un son
-// appartient à son monde. Retirés à la fin du son.
+// appartient à son monde. Retirés à la fin du son. `role` : le rôle joué
+// ("vocal"...), absent pour un son par chemin — lu par stopEntityOneShots.
 const trackedOneShots = [];
 
 // Arrête (fondu bref) tout son suivi émis dans un AUTRE monde que le monde
@@ -171,12 +173,14 @@ export function createOneShots({ getSession, reverbBus, findEntitySource, effect
       playTransitionSound(found.entry, found.live.x - getSession().player.x, resolved, effectiveMuffle(found.entry, found.forcedMuffle));
       return;
     }
-    startTrackedOneShot(targetId, found, resolved);
+    startTrackedOneShot(targetId, found, resolved, descriptor.role);
   }
 
   // Démarre un son SUIVI (rendu initial = celui d'une balise continue au même
-  // endroit). `found` : voir findEntitySource.
-  function startTrackedOneShot(entityId, found, resolved) {
+  // endroit). `found` : voir findEntitySource. `role` : celui de la source
+  // (le vocal régulier porte le sien, voir ./entity-sound-entry.js), ou du
+  // playSound qui l'a demandé.
+  function startTrackedOneShot(entityId, found, resolved, role = resolved.role) {
     let file;
     try {
       file = resolveAsset(resolved.path);
@@ -198,7 +202,7 @@ export function createOneShots({ getSession, reverbBus, findEntitySource, effect
       entityLayer: true,
     });
     if (!handle) return;
-    const source = { entityId, worldId: getSession().activeWorldId, gain, handle };
+    const source = { entityId, worldId: getSession().activeWorldId, gain, handle, role };
     trackedOneShots.push(source);
     handle.onEnd(() => {
       const index = trackedOneShots.indexOf(source);
@@ -221,6 +225,21 @@ export function createOneShots({ getSession, reverbBus, findEntitySource, effect
       }
       const rendering = spatialRendering(found.entry, found.live.x - x, effectiveMuffle(found.entry, found.forcedMuffle));
       source.handle.update(rendering.pan, rendering.volume * volumeFactor * source.gain, rendering.cutoff);
+    }
+  }
+
+  // Effet "stopSounds" (voir view/effect-runner.js) : coupe, en fondu bref,
+  // les sons SUIVIS en cours de l'entité `entityId` — tous, ou ceux du rôle
+  // `role`. Les sons ANCRÉS (tracked:false) ne gardent aucune poignée et
+  // finissent leur lecture ; le vocal régulier, lui, est suivi par défaut.
+  // La balise continue n'est pas concernée : elle suit la présence.
+  function stopEntityOneShots(entityId, role) {
+    const worldId = getSession().activeWorldId;
+    for (const source of [...trackedOneShots]) {
+      if (source.entityId !== entityId || source.worldId !== worldId) continue;
+      if (role !== undefined && source.role !== role) continue;
+      trackedOneShots.splice(trackedOneShots.indexOf(source), 1);
+      source.handle.stop(STOP_SOUNDS_FADE_MS);
     }
   }
 
@@ -247,6 +266,7 @@ export function createOneShots({ getSession, reverbBus, findEntitySource, effect
     playTransitionSound,
     playEntityOneShot,
     startTrackedOneShot,
+    stopEntityOneShots,
     updateTrackedOneShots,
     crossfadeTrackedOneShots,
   };

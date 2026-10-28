@@ -42,7 +42,7 @@ export const STATE_EFFECT_TYPES = [
   "dormantUntil",
   "spawn",
 ];
-export const RENDER_EFFECT_TYPES = ["playSound", "announce"];
+export const RENDER_EFFECT_TYPES = ["playSound", "stopSounds", "announce"];
 export const MIXED_EFFECT_TYPES = ["teleport"];
 // Pas de SÉQUENCE : PAS un effet, aucune des trois natures — `wait` découpe
 // une liste en tranches dans le temps (core/sequence.js) et n'atteint

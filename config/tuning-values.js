@@ -481,6 +481,12 @@ export const TUNING_DEFAULTS = {
   // éteint la couche entités, ce fondu y est inaudible.
   sceneExitSoundFadeMs: 150,
 
+  // Durée (ms) du fondu de l'effet "stopSounds" (voir
+  // view/audio/oneshots.js/stopEntityOneShots) : les sons en cours d'une
+  // entité se taisent sans le clic d'un arrêt net, assez vite pour qu'un
+  // son qui suit (l'éclatement du néon) ne les entende pas traîner.
+  stopSoundsFadeMs: 80,
+
   // Durée (ms) du CROISEMENT DE FILTRES d'occlusion pendant une bascule
   // recto/verso (voir view/audio/face-crossfade.js/crossfadeFaceSwap,
   // view/world-travel.js/sideSwitch) — la face courante se referme

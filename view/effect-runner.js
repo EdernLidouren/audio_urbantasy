@@ -11,7 +11,7 @@ import { t } from "../data/i18n/index.js";
 import { playDescribedOneShot } from "../lib/audio.js";
 import { resolveAsset } from "../lib/assets.js";
 import { interfaceVolumeFactor } from "./audio/volume-factors.js";
-import { teleportHandler, variableEffectsHandler, positionedSoundPlayer } from "./interaction-handlers.js";
+import { teleportHandler, variableEffectsHandler, positionedSoundPlayer, entitySoundStopper } from "./interaction-handlers.js";
 import { sequenceHead } from "../core/sequence.js";
 
 // Son de RAMASSAGE : rôle `sounds.pickup` DÉCLARÉ par l'archétype de l'objet
@@ -159,7 +159,18 @@ export function runEffects(entity, effects) {
   }
 }
 
-// Effets de RENDU seuls (playSound/announce, voir core/effects.js/
+// Effet "stopSounds" : les sons en cours de l'entité PORTEUSE se taisent
+// (voir view/audio/oneshots.js/stopEntityOneShots). Sans entité (effet hors
+// contexte d'entité), il n'y a rien à faire taire : averti.
+function runStopSoundsEffect(entity, effect) {
+  if (!entity) {
+    console.warn("interact: stopSounds sans entité dont couper les sons.");
+    return;
+  }
+  if (entitySoundStopper) entitySoundStopper(entity.id, effect.role);
+}
+
+// Effets de RENDU seuls (playSound/stopSounds/announce, voir core/effects.js/
 // RENDER_EFFECT_TYPES), dans l'ordre déclaré — les autres types traversent
 // sans effet. Exporté pour les triggers horaires (view/game-clock.js/
 // advance) : le core a DÉJÀ appliqué leurs effets d'état
@@ -169,6 +180,8 @@ export function runRenderEffects(entity, effects, options = {}) {
   for (const effect of effects) {
     if (effect.type === "playSound") {
       runPlaySoundEffect(entity, effect, options);
+    } else if (effect.type === "stopSounds") {
+      runStopSoundsEffect(entity, effect);
     } else if (effect.type === "announce") {
       announce(t(effect.key), { assertive: effect.assertive !== false });
     }

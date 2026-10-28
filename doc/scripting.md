@@ -1410,8 +1410,8 @@ ABSENTE : le tick suivant observe son ENTRÉE, et la vue joue son
 hors de la perception surnaturelle n'apparaît, avec son son, qu'à
 l'activation de celle-ci). Exemple réel — le néon défectueux de la rue
 principale (`defective_neon_1_v`, `scenes/main-street.json`) qui, en
-éclatant, libère le ghosten : `[playSound, dormantUntil, wait 300 ms,
-spawn]`, la naissance arrivant après la dormance du néon (les effets d'état
+éclatant, libère le ghosten : `[stopSounds, playSound, dormantUntil,
+wait 300 ms, spawn]`, la naissance arrivant après la dormance du néon (les effets d'état
 d'une séquence s'appliquent même à une entité dormante).
 
 ### `"temporaryBehavior"` — comportement pour un temps, état, CORE
@@ -1625,6 +1625,40 @@ d'une entité — `sounds.vocal` et `sounds.beacon` en mode `"intermittent"`
 rapide la suit au lieu de rester derrière elle. La balise CONTINUE est suivie
 par nature (boucle réévaluée à chaque tick) ; les pas (`sounds.movement`) restent
 ANCRÉS, chacun émis là où l'entité pose le pied.
+
+### `"stopSounds"` — coupe les sons en cours d'une entité, VUE
+
+```js
+{ type: "stopSounds" }
+{ type: "stopSounds", role: "vocal" }
+```
+
+`{ role? }` — les sons ponctuels EN COURS de l'entité qui PORTE l'action
+ou le trigger se taisent, dans un fondu bref (`config/tuning-values.js`/
+`stopSoundsFadeMs`, juste de quoi éviter le clic d'un arrêt net) : tous,
+ou seulement ceux du rôle `role` (seul `"vocal"` aujourd'hui, validé au
+chargement ; un autre rôle viendra avec un besoin). Exécuté par la vue
+(`view/audio/oneshots.js`/`stopEntityOneShots`), comme `playSound`.
+
+Ne concerne que les sons SUIVIS, ceux qui gardent une poignée de lecture :
+le vocal régulier (suivi par défaut) et les `playSound` positionnés suivis
+(le défaut). Un son ANCRÉ (`tracked: false`) finit sa lecture. La balise
+continue n'est pas concernée : elle suit la présence de l'entité (une
+dormance l'arrête). L'échéance du prochain vocal n'est pas touchée.
+
+Exemple réel — le néon défectueux de la rue principale
+(`defective_neon_1_v`, `scenes/main-street.json`) fait taire son
+grésillement en cours avant d'éclater, plutôt que de le laisser traîner
+après le crash :
+
+```json
+"effects": [
+  { "type": "stopSounds", "role": "vocal" },
+  { "type": "playSound", "path": "assets/sounds/effects/neon_bulb_burst" },
+  { "type": "dormantUntil", "hour": 22 },
+  "..."
+]
+```
 
 ### `"announce"` — message parlé, VUE
 

@@ -16,8 +16,8 @@ export default {
     beacon: { path: "assets/sounds/furniture/neon_beacon", loop: true },
     vocal: {
       path: "assets/sounds/effects/neon_malfunction",
-      vocalInterval: 5000,
-      vocalIntervalVariation: 1000,
+      vocalInterval: 12000,
+      vocalIntervalVariation: 2000,
       pitchVariation: 0.2,
     },
     enterSound: { path: "assets/sounds/effects/electrical_flickering" },

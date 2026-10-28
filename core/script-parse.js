@@ -127,6 +127,9 @@ export const PLAY_SOUND_ROLES = ["vocal", "enterSound", "exitSound", "approachSo
 // (ignorée sinon, comme partout ailleurs) ; "transition" : "fade" (sas +
 // fondu, le défaut d'une porte) ou "instant" (aucun sas, déplacement
 // immédiat).
+// Rôles qu'un "stopSounds" peut cibler (voir parseActionEffect).
+const STOP_SOUNDS_ROLES = ["vocal"];
+
 const TELEPORT_SIDES = ["recto", "verso"];
 const TELEPORT_TRANSITIONS = ["fade", "instant"];
 
@@ -148,6 +151,7 @@ const ACTION_EFFECT_FIELDS = {
   spawn: ["spec"],
   wait: ["ms", "variationMs"],
   playSound: ["path", "role", "gain", "pitchVariation", "reverbSend", "at", "nature", "tracked"],
+  stopSounds: ["role"],
   announce: ["key", "assertive"],
   teleport: ["target", "x", "side", "reloadIfSame", "transition"],
 };
@@ -368,6 +372,18 @@ function parseActionEffect(rawEffect, describe, entityVariables, sceneVariables)
     if (rawEffect.nature !== undefined) effect.nature = rawEffect.nature;
     if (rawEffect.tracked !== undefined) effect.tracked = rawEffect.tracked;
     return effect;
+  }
+  // "stopSounds" { role? } — RENDU : coupe, en fondu bref, les sons
+  // ponctuels EN COURS de l'entité qui porte l'effet (voir
+  // view/audio/oneshots.js/stopEntityOneShots) — tous, ou seulement ceux
+  // du rôle `role`. Le néon qui éclate fait taire son grésillement en
+  // cours. Seul "vocal" se distingue aujourd'hui ; un autre rôle viendra
+  // avec un besoin.
+  if (type === "stopSounds") {
+    if (rawEffect.role !== undefined && !STOP_SOUNDS_ROLES.includes(rawEffect.role)) {
+      fail(`${describe}.role "${rawEffect.role}" inconnu (attendu : ${STOP_SOUNDS_ROLES.map((r) => `"${r}"`).join(" | ")}).`);
+    }
+    return rawEffect.role !== undefined ? { type, role: rawEffect.role } : { type };
   }
   if (type === "announce") {
     if (!isNonEmptyString(rawEffect.key)) {

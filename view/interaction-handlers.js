@@ -155,3 +155,13 @@ export let positionedSoundPlayer = null;
 export function setPositionedSoundPlayer(provider) {
   positionedSoundPlayer = provider;
 }
+
+// (entityId, role?) => coupe les sons en cours de l'entité (effet
+// "stopSounds", voir view/audio/oneshots.js/stopEntityOneShots), câblé par
+// view/action-handlers.js comme positionedSoundPlayer. Sans provider (hors
+// ville) : rien à couper.
+export let entitySoundStopper = null;
+
+export function setEntitySoundStopper(provider) {
+  entitySoundStopper = provider;
+}

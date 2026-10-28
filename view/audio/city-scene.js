@@ -202,6 +202,7 @@ export function createCityAudioScene(getSession, { handover = null } = {}) {
     refreshBeaconVolumes: entityAudio.refreshBeaconVolumes,
     crossfadeFaceSwap: faceCrossfade.crossfadeFaceSwap,
     playEntityOneShot: oneShots.playEntityOneShot,
+    stopEntityOneShots: oneShots.stopEntityOneShots,
     playTransitionSteps: footsteps.playTransitionSteps,
     playArrivalStep: footsteps.playArrivalStep,
     playEmoteSound: footsteps.playEmoteSound,

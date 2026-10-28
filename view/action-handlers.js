@@ -18,6 +18,7 @@ import {
   setSideSwitchHandler,
   setSessionProvider,
   setPositionedSoundPlayer,
+  setEntitySoundStopper,
   setVariableEffectsHandler,
   setSearchHandler,
   setShopHandler,
@@ -108,6 +109,14 @@ export function registerActionHandlers({ getSession, setSession, travel }) {
       (entityId, descriptor, options) => {
         const worldView = travel.current();
         return worldView && worldView.playEntityOneShot(entityId, descriptor, options);
+      },
+    ],
+    // Effet "stopSounds", sur la vue COURANTE.
+    [
+      setEntitySoundStopper,
+      (entityId, role) => {
+        const worldView = travel.current();
+        if (worldView) worldView.stopEntityOneShots(entityId, role);
       },
     ],
   ];

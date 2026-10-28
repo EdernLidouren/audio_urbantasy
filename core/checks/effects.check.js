@@ -10,6 +10,7 @@ import { createInitialState, togglePerception } from "../state.js";
 import { evaluateCondition, selectMatchingAction } from "../presence.js";
 import { setWeather } from "../weather.js";
 import { applyActionEffects, setVariable } from "../variables.js";
+import { isRenderEffect } from "../effects.js";
 import { throws } from "../../lib/check.js";
 import { VAR_ACTION_REGISTRY, UNKNOWN_FIELD, sceneWithActionEffect, sceneParseMessage } from "./helpers.js";
 
@@ -87,6 +88,15 @@ export default function checkEffects(run) {
       true,
       throws(() => parseScene(sceneWithActionEffect({ type: "announce", key: "x", assertive: "oui" }), VAR_ACTION_REGISTRY))
     );
+
+    // "stopSounds" { role? } : rendu, forme seule (la coupure elle-même est
+    // dans la vue, view/audio/oneshots.js/stopEntityOneShots).
+    const stopSoundsOf = (effect) => parseScene(sceneWithActionEffect(effect), VAR_ACTION_REGISTRY).entities[0].action.effects[0];
+    run.same("stopSounds : sans rôle -> tous les sons, chargé tel quel", { type: "stopSounds" }, stopSoundsOf({ type: "stopSounds" }));
+    run.same("stopSounds : rôle vocal transporté", { type: "stopSounds", role: "vocal" }, stopSoundsOf({ type: "stopSounds", role: "vocal" }));
+    run("stopSounds : rôle inconnu -> erreur au chargement", true, throws(() => stopSoundsOf({ type: "stopSounds", role: "beep" })));
+    run("stopSounds : champ inconnu -> erreur au chargement", true, throws(() => stopSoundsOf({ type: "stopSounds", fadeMs: 50 })));
+    run("stopSounds : effet de RENDU (remonte dans `fired`)", true, isRenderEffect({ type: "stopSounds" }));
 
     // --- Effet MIXTE "teleport" (JOUEUR uniquement, voir core/effects.js)
     // — validé en FORME ici comme playSound/announce ; l'EXÉCUTION (core/
