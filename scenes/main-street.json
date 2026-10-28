@@ -117,6 +117,7 @@
             "range": 5,
             "condition": { "type": "variable", "scope": "entity", "name": "phase", "equals": 2 },
             "effects": [
+              { "type": "wait", "ms": 1000 },
               { "type": "stopSounds", "role": "vocal" },
               { "type": "playSound", "path": "assets/sounds/effects/neon_bulb_burst" },
               { "type": "dormantUntil", "hour": 22 },

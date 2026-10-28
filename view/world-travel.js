@@ -13,7 +13,7 @@ import { pushScreen, popScreen } from "../lib/screens.js";
 import { t } from "../data/i18n/index.js";
 import registry from "../entities/types/index.js";
 import { loadSceneById } from "../scenes/load.js";
-import { travelToWorld, switchSide, placePlayer, reloadActiveWorld } from "../core/state.js";
+import { travelToWorld, switchSide, placePlayer, reloadActiveWorld, isTwoSided } from "../core/state.js";
 import { refillDueSpawns } from "../core/spawn.js";
 import { returnStartledEntities } from "../core/startle.js";
 import { forgetTemporaryBehaviors } from "../core/temporary-behavior.js";
@@ -226,6 +226,25 @@ export function createWorldTravel({ getSession, setSession }) {
     }
   }
 
+  // DEBUG (Shift+X) : bascule de face SÈCHE — ni passage, ni son, ni
+  // croisement des filtres : le joueur passe à la même position sur l'autre
+  // face, même sans entité pour l'y accueillir. La vue est reconstruite
+  // comme après un passage, sans relais des balises (elles redémarrent :
+  // acceptable en debug). Scène à une seule face : annoncé, rien ne bouge.
+  function debugSwitchSide() {
+    const session = getSession();
+    if (!isTwoSided(session.worlds[session.activeWorldId])) {
+      announce(t("side.debug.singleSided"), { assertive: true });
+      return;
+    }
+    worldView.destroy();
+    worldView = null;
+    setSession(switchSide(session, session.player.x));
+    clearInteractionCooldowns();
+    worldView = createWorldView(getSession);
+    announce(t("side.debug.switched", { side: t(`side.${getSession().player.side}`) }), { assertive: true });
+  }
+
   // Remplace la partie en cours par une partie importée (voir
   // view/menus/save-menu.js) : vue détruite puis remontée sur la nouvelle
   // partie. Rien n'est annoncé comme "nouvelle découverte". Le son et
@@ -276,6 +295,7 @@ export function createWorldTravel({ getSession, setSession }) {
     executeTeleport,
     travelViaCityMap,
     sideSwitch,
+    debugSwitchSide,
     replaceCurrentGame,
     reloadSceneFromFile,
   };

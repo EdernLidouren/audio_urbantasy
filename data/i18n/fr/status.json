@@ -28,6 +28,8 @@
   "month.9": "septembre",
   "position.announce": "Position x : {x} sur {length}.",
   "position.announceWithSide": "Position x : {x} sur {length}. Face : {side}.",
+  "side.debug.singleSided": "Cette scène n'a qu'une face.",
+  "side.debug.switched": "Face : {side}.",
   "side.recto": "recto",
   "side.verso": "verso",
   "teleport.debug.entry": "{name}",

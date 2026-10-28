@@ -374,6 +374,11 @@ Consommateurs, tous derrière ce MÊME drapeau (jamais un drapeau par outil) :
   `instant`, jamais par un chemin de chargement parallèle), Shift+L (journal
   des avertissements, voir ci-dessous), Shift+C (tout révéler / tout
   réinitialiser dans les collections, `view/menus/debug-collections-menu.js`) ;
+- Shift+X, en ville : bascule recto <-> verso SÈCHE, sans passage, sans son
+  ni croisement des filtres — le joueur passe à la même position sur l'autre
+  face, même sans entité pour l'y accueillir, et la face d'arrivée est
+  annoncée (`view/world-travel.js`/`debugSwitchSide`). Scène à une face :
+  annoncé, rien ne bouge ;
 - la condition `hasImprovement`, qui répond toujours vrai en mode debug
   (`core/presence.js`/`evaluateHasImprovement`, voir
   `doc/scripting.md`/"Améliorations") ;

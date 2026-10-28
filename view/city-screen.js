@@ -92,6 +92,7 @@ export function makeCityScreen(getSession, setSession) {
           forgetOtherScenes: debug.forgetOtherScenes,
         }),
     },
+    switchSideDebug: { debugOnly: true, run: travel.debugSwitchSide },
     openWarningsDebugMenu: { debugOnly: true, run: openDebugWarningsMenu },
     openCollectionsDebugMenu: { debugOnly: true, run: () => openCollectionsDebugMenu(getSession, setSession) },
   };
