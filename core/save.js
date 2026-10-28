@@ -736,6 +736,13 @@ function migrateSave(raw) {
     data = { ...data, acquiredItems: deriveAcquiredItems(data.bag, data.equipment) };
   }
 
+  // observedEntityTypes (voir core/observations.js) : absent d'une
+  // sauvegarde antérieure -> aucun, rien ne permet de le reconstituer. Les
+  // entités déjà décrites se redécouvrent à la prochaine observation.
+  if (!data.observedEntityTypes || typeof data.observedEntityTypes !== "object") {
+    data = { ...data, observedEntityTypes: {} };
+  }
+
   if (data.worlds && typeof data.worlds === "object") {
     const patchedWorlds = {};
     let anyChanged = false;

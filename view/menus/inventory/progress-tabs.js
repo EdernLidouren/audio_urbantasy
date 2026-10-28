@@ -1,16 +1,23 @@
 // Onglets de PROGRESSION de l'inventaire (voir la coquille à onglets,
-// view/menus/inventory-menu.js) : AMÉLIORATIONS et COLLECTIONS, en lecture
-// seule — ce que le joueur a débloqué ou découvert, lu dans l'ÉTAT RÉEL de
-// la partie, jamais via une condition (court-circuit debug, voir
-// buildImprovementsTabScreen).
+// view/menus/inventory-menu.js) : AMÉLIORATIONS, ÉMOTES et COLLECTIONS, en
+// lecture seule — ce que le joueur a débloqué, appris ou découvert, lu dans
+// l'ÉTAT RÉEL de la partie, jamais via une condition (court-circuit debug,
+// voir buildImprovementsTabScreen).
 
 import { t } from "../../../data/i18n/index.js";
 import { pushScreen } from "../../../lib/screens.js";
 import { makeMenuScreen } from "../../../lib/menu.js";
 import { announce, stripTrailingPeriod } from "../../../lib/announce.js";
 import { IMPROVEMENT_REGISTRY, orderedImprovementIds } from "../../../core/improvements.js";
-import { collectionEntries, collectionNameKey, collectionProgress } from "../../../core/collections.js";
+import { EMOTE_REGISTRY, orderedEmoteIds } from "../../../core/emotes.js";
+import { collectionEntries, collectionNameKey, collectionProgress, discoveryFacts } from "../../../core/collections.js";
 import collections from "../../../collections/index.js";
+import entityRegistry from "../../../entities/types/index.js";
+import { entryNameKey } from "../../collection-discoveries.js";
+import { playDescribedOneShot } from "../../../lib/audio.js";
+import { resolveAsset } from "../../../lib/assets.js";
+import { resolveTuning } from "../../../config/tuning.js";
+import { interfaceVolumeFactor } from "../../audio/volume-factors.js";
 
 // Ligne d'UNE amélioration de l'onglet Améliorations. Débloquée :
 // "{order} - {nom} : {description}", Espace/Entrée la réannonce. Non
@@ -53,12 +60,55 @@ export function buildImprovementsTabScreen(getSession) {
   return makeMenuScreen(menu, t);
 }
 
-// Ligne d'UNE entrée de collection. Découverte : "{nom} : {description}",
-// Espace/Entrée la réannonce. Non découverte : "Inconnu", sautée par
-// Ctrl+haut/bas (placeholder, voir lib/menu.js). Sans numéro, contrairement
-// aux améliorations.
-function collectionEntryLine(entry) {
+// Ligne d'UNE émote de l'onglet Émotes, sur le patron des améliorations :
+// connue, "{order} - {nom} : {description}", avec la mention du raccourci
+// pour celle de la touche "e" ; inconnue, "{order} - Inconnue", sautée par
+// Ctrl+haut/bas. Lecture seule : le raccourci se choisit avec Maj+E.
+function emoteEntry(id, known, isShortcut) {
+  const props = EMOTE_REGISTRY[id];
+  if (!known) {
+    return { label: "emotes.tab.entry.unknown", labelParams: { order: props.order }, placeholder: true, onActivate: () => {} };
+  }
+  const label = isShortcut ? "emotes.tab.entry.shortcut" : "emotes.tab.entry.known";
+  const labelParams = {
+    order: props.order,
+    name: t(props.nameKey),
+    description: stripTrailingPeriod(t(props.descriptionKey)),
+  };
+  return { label, labelParams, onActivate: () => announce(t(label, labelParams), { assertive: true }) };
+}
+
+// Onglet Émotes : toutes les émotes du registre, dans leur `order`.
+// "Connue" se lit dans l'ÉTAT RÉEL (session.emotes), jamais via la
+// condition knowsEmote, qui répond toujours vrai en mode debug — même
+// raison que l'onglet Améliorations.
+export function buildEmotesTabScreen(getSession) {
+  const session = getSession();
+  const known = session.emotes || {};
+  const ids = orderedEmoteIds();
+  const menu = {
+    title: "emotes.tab.title",
+    titleParams: { known: ids.filter((id) => known[id]).length, total: ids.length },
+    closable: true,
+    entries: ids.map((id) => emoteEntry(id, Boolean(known[id]), session.emoteShortcut === id)),
+  };
+  return makeMenuScreen(menu, t);
+}
+
+// Ligne d'UNE entrée de collection. Non découverte : "Inconnu", sautée par
+// Ctrl+haut/bas (placeholder, voir lib/menu.js). Découverte : un OBJET se lit
+// "{nom} : {description}", Espace/Entrée la réannonce ; une ENTITÉ se lit
+// par son nom, Entrée ouvre sa fiche. Sans numéro, contrairement aux
+// améliorations.
+function collectionEntryLine(collectionId, entry) {
   if (!entry.discovered) return { label: "collections.entry.unknown", placeholder: true, onActivate: () => {} };
+  if (entry.entity !== undefined) {
+    return {
+      label: "collections.entry.entity",
+      labelParams: { name: t(entryNameKey(collectionId, entry)) },
+      onActivate: () => openEntitySheet(collectionId, entry),
+    };
+  }
   const labelParams = { name: t(entry.nameKey), description: stripTrailingPeriod(t(entry.descriptionKey)) };
   return {
     label: "collections.entry.known",
@@ -67,28 +117,71 @@ function collectionEntryLine(entry) {
   };
 }
 
+// Le vocal d'une entité, joué depuis sa fiche : centré, au volume de
+// l'interface (comme un son d'effet méta, view/effect-runner.js), avec le
+// gain et la variation de ton de son type. Un fichier différent à chaque
+// écoute, comme en jeu (pool).
+function playEntityVocal(type, vocal) {
+  try {
+    playDescribedOneShot(resolveAsset(vocal.path), {
+      gain: resolveTuning("vocalGain", { type }, vocal),
+      pitchVariation: resolveTuning("pitchVariation", { type }, vocal),
+      volumeFactor: interfaceVolumeFactor(),
+    });
+  } catch (error) {
+    console.warn(`collections: vocal de "${type}" indisponible (${vocal.path}) : ${error.message}`);
+  }
+}
+
+// FICHE d'une entité découverte, empilée par-dessus la collection : nom,
+// description (celle que donne Espace en jeu), texte encyclopédique, lieux
+// de rencontre (écrits, jamais déduits du contenu), et "Écouter" si elle a
+// un vocal. Chaque ligne se réannonce à Entrée ; Échap revient à la liste.
+function openEntitySheet(collectionId, entry) {
+  const archetype = entityRegistry[entry.entity];
+  const name = t(archetype.nameKey);
+  const lines = [
+    ["collections.sheet.name", { name }],
+    ["collections.sheet.description", { description: stripTrailingPeriod(t(archetype.descriptionKey)) }],
+    ["collections.sheet.lore", { lore: stripTrailingPeriod(t(entry.loreKey)) }],
+    ["collections.sheet.places", { places: stripTrailingPeriod(t(entry.placesKey)) }],
+  ];
+  const entries = lines.map(([label, labelParams]) => ({
+    label,
+    labelParams,
+    onActivate: () => announce(t(label, labelParams), { assertive: true }),
+  }));
+  const vocal = archetype.sounds && archetype.sounds.vocal;
+  if (vocal) entries.push({ label: "collections.sheet.listen", onActivate: () => playEntityVocal(entry.entity, vocal) });
+  pushScreen(makeMenuScreen({ title: "collections.sheet.title", titleParams: { name }, closable: true, entries }, t));
+}
+
 // Sous-menu d'UNE collection, empilé PAR-DESSUS l'onglet (qui reste ouvert
 // dessous) : ses entrées dans l'ordre déclaré. Échap le ferme et revient à
 // la liste des collections, réannoncée par l'onglet révélé.
 function openCollectionEntriesMenu(collectionId, getSession) {
-  const entries = collectionEntries(collectionId, collections[collectionId], getSession().acquiredItems);
+  const entries = collectionEntries(collectionId, collections[collectionId], discoveryFacts(getSession()));
   pushScreen(
-    makeMenuScreen({ title: collectionNameKey(collectionId), closable: true, entries: entries.map(collectionEntryLine) }, t)
+    makeMenuScreen(
+      { title: collectionNameKey(collectionId), closable: true, entries: entries.map((entry) => collectionEntryLine(collectionId, entry)) },
+      t
+    )
   );
 }
 
 // Onglet Collections : toutes les collections du registre
 // (collections/index.js), chacune avec sa progression ("{nom}, 1 sur 3").
-// Découvert se lit dans l'ÉTAT RÉEL (session.acquiredItems, voir
-// core/collections.js), comme l'onglet Améliorations.
+// Découvert se lit dans l'ÉTAT RÉEL (session.acquiredItems et
+// observedEntityTypes, voir core/collections.js), comme l'onglet
+// Améliorations.
 export function buildCollectionsTabScreen(getSession) {
-  const acquired = getSession().acquiredItems;
+  const facts = discoveryFacts(getSession());
   const menu = {
     title: "collections.title",
     closable: true,
     entries: Object.entries(collections).map(([collectionId, collection]) => ({
       label: "collections.entry",
-      labelParams: { name: t(collectionNameKey(collectionId)), ...collectionProgress(collection, acquired) },
+      labelParams: { name: t(collectionNameKey(collectionId)), ...collectionProgress(collection, facts) },
       onActivate: () => openCollectionEntriesMenu(collectionId, getSession),
     })),
   };

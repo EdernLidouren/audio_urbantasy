@@ -156,6 +156,15 @@ export function setPositionedSoundPlayer(provider) {
   positionedSoundPlayer = provider;
 }
 
+// (entity) => note son type comme observé (core/observations.js), après
+// une description réussie (touche Espace, voir view/interaction.js) : le
+// bestiaire s'en déduit. Câblé par view/action-handlers.js.
+export let observationHandler = null;
+
+export function setObservationHandler(provider) {
+  observationHandler = provider;
+}
+
 // (entityId, role?) => coupe les sons en cours de l'entité (effet
 // "stopSounds", voir view/audio/oneshots.js/stopEntityOneShots), câblé par
 // view/action-handlers.js comme positionedSoundPlayer. Sans provider (hors

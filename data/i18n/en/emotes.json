@@ -4,5 +4,9 @@
   "emote.shortcutSet": "Emote shortcut: {emote}.",
   "emote.whistle.description": "A short, piercing call whistle that carries far.",
   "emote.whistle.name": "whistle",
+  "emotes.tab.entry.known": "{order} - {name}: {description}",
+  "emotes.tab.entry.shortcut": "{order} - {name}, on shortcut: {description}",
+  "emotes.tab.entry.unknown": "{order} - Unknown",
+  "emotes.tab.title": "Emotes: {known} of {total}",
   "menu.emotes.title": "Emotes"
 }

@@ -1,9 +1,11 @@
 # Collections
 
-Des listes d'objets à découvrir, consultables dans le menu global. Première
-collection : les composants électroniques. Code : `core/collections.js` (logique
-pure), `collections/` (données), `view/collection-discoveries.js` (validation,
-annonce de découverte), `view/menus/inventory/progress-tabs.js` (onglet),
+Des listes d'objets à acquérir ou d'entités à observer, consultables dans le
+menu global. Deux collections : les composants électroniques et les entités
+surnaturelles. Code : `core/collections.js` (logique pure), `collections/`
+(données), `core/observations.js` (le fait « observé »),
+`view/collection-discoveries.js` (validation, annonce de découverte),
+`view/menus/inventory/progress-tabs.js` (onglet et fiches),
 `view/menus/debug-collections-menu.js` (outils de debug).
 
 Les **améliorations** ne sont pas une collection : ce sont des capacités, elles
@@ -23,6 +25,11 @@ gardent leur propre système (`core/improvements.js`).
 - Contenu de test : deux composants à ramasser et un en vente dans la démo ;
   dix composants, un par son, au verso de la démo 3 (x 12 à 48), pour juger
   les sons à l'oreille.
+- **`supernatural`** — le bestiaire : le ghosten (rue commerçante, après
+  l'éclatement du néon défectueux), le Cumulo Lupus et le miravi. Chaque
+  entrée est un TYPE d'entité, découvert à sa première observation (Espace) :
+  il faut approcher l'entité, perception surnaturelle active. Fiches
+  provisoires (textes « à venir »).
 
 ## Modèle
 
@@ -41,19 +48,25 @@ export default {
 
 - `entries` : liste ORDONNÉE ; l'ordre d'affichage est l'ordre de
   déclaration, fixe — une entrée ne change pas de place en étant découverte.
-- `item` : un objet du sac (`core/items.js`/`ITEM_REGISTRY`), qui sert aussi
-  d'identifiant de l'entrée (unique dans sa collection).
+- Une entrée est `{ item }` OU `{ entity }`, jamais les deux (une même
+  collection peut mêler les deux genres) :
+  - `item` : un objet du sac (`core/items.js`/`ITEM_REGISTRY`) ;
+  - `entity` : un type d'entité (`entities/types/index.js`, la clé du
+    registre, ex. `cumuloLupus`).
+  L'objet ou le type sert aussi d'identifiant de l'entrée (unique dans sa
+  collection).
 - `discoverySound` (optionnel) : le son joué à chaque découverte de CETTE
   collection.
 - L'ordre des collections dans `collections/index.js` est leur ordre dans
   l'onglet.
 
 **Validation au démarrage** (`core/collections.js`/`validateCollection`,
-appelée par `view/collection-discoveries.js`) : entrées non vides, objets
-existants, aucun doublon. Une collection mal écrite fait échouer le
+appelée par `view/collection-discoveries.js`, registres d'objets et de types
+injectés) : entrées non vides, objets et types existants, un seul genre par
+entrée, aucun doublon. Une collection mal écrite fait échouer le
 chargement, jamais une entrée introuvable en silence.
 
-## Découverte : un fait neutre, lu par les collections
+## Découverte : deux faits neutres, lus par les collections
 
 Le core n'importe jamais de contenu. La découverte n'est donc pas stockée par
 collection : `core/bag.js`/`addItem`, **point unique d'entrée dans le sac**
@@ -78,12 +91,15 @@ collection. Plusieurs découvertes simultanées : une seule annonce. Rien n'est
 annoncé quand la partie est remplacée en bloc (import) ou modifiée par un outil
 de debug (`muteNextDiscoveryCheck`).
 
-**Extension prévue, pas construite — découverte par observation** (futur
-bestiaire) : une entrée déclarerait `{ entity: <type> }` au lieu de
-`{ item }`, et se lirait dans un second fait neutre
-(`session.observedEntityTypes`), écrit par l'examen (Espace) via une fonction
-du core. Seul le test de découverte de `core/collections.js` aurait à choisir
-le bon fait ; l'onglet, l'annonce et la sauvegarde restent tels quels.
+**Découverte par observation** (entrées `{ entity }`) : second fait neutre,
+`session.observedEntityTypes = { [type]: true }`, écrit par
+`core/observations.js`/`markObserved` après une description réussie (Espace,
+`view/interaction.js`, par le gestionnaire injecté `setObservationHandler`).
+Toute entité observée y entre, de la collection ou non ; définitif comme
+`acquiredItems`, vide au départ d'une partie. Les deux faits se passent
+ensemble aux fonctions de `core/collections.js` (`discoveryFacts(session)`) ;
+seul le test de découverte choisit le bon. La découverte s'annonce juste
+APRÈS la description.
 
 Pas de condition « entrée découverte » ou « collection complète » dans le
 format déclaratif pour l'instant.
@@ -95,7 +111,11 @@ dans le fichier de collection) :
 
 - `collection.<id>.name` : nom de la collection ;
 - `collection.<id>.entry.<objet>.name` / `.description` : textes de
-  l'entrée, distincts de ceux de l'objet.
+  l'entrée, distincts de ceux de l'objet ;
+- entrée d'entité : son NOM et sa DESCRIPTION sont ceux de son type
+  (`nameKey`/`descriptionKey`, ceux qu'annonce le jeu) ; sa fiche ajoute
+  `collection.<id>.entry.<type>.lore` (texte encyclopédique) et `.places`
+  (lieux de rencontre, ÉCRITS à la main, jamais déduits des scènes).
 
 **Pas de repli** sur les textes de l'objet : un texte manquant est signalé au
 démarrage dans le journal d'avertissements (Shift+L) et la console, sans
@@ -103,36 +123,44 @@ bloquer le jeu (la clé brute s'affiche à sa place).
 
 ## Interface
 
-Onglet **Collections**, 4ᵉ du menu global (après Améliorations, Tab /
+Onglet **Collections**, 5ᵉ et dernier du menu global (après Émotes, Tab /
 Maj+Tab), ouvrable directement avec **C** en ville.
 
 - L'onglet liste les collections avec leur progression : « Composants
   électroniques, 1 sur 3 ».
 - Entrée sur une collection ouvre ses entrées PAR-DESSUS l'onglet ; Échap
   revient à la liste.
-- Entrée découverte : « nom : description » ; non découverte : « Inconnu ».
-  Sans numéro, contrairement aux améliorations.
+- Entrée d'objet découverte : « nom : description » ; non découverte :
+  « Inconnu ». Sans numéro, contrairement aux améliorations.
+- Entrée d'entité découverte : son nom ; Entrée ouvre sa FICHE par-dessus la
+  collection, une ligne par rubrique, chacune réannoncée à Entrée :
+  « Nom : … », « Description : … », « Encyclopédie : … », « Lieux de
+  rencontre : … », puis « Écouter » si le type a un vocal (joué centré, au
+  volume de l'interface, avec le gain et la variation de ton du type, un
+  fichier différent du pool à chaque écoute). Échap revient à la liste.
 - La progression se lit dans l'état réel, comme l'onglet Améliorations.
 
 ## Sauvegarde
 
-`acquiredItems` fait partie de l'état, donc de la sauvegarde. Une sauvegarde
-antérieure le reconstitue à partir du sac et de l'équipement actuels
-(`core/save.js`/`migrateSave`) — approximatif : un objet déjà revendu n'y
-figure plus. Un id inconnu (objet retiré depuis) est simplement ignoré : les
+`acquiredItems` et `observedEntityTypes` font partie de l'état, donc de la
+sauvegarde. Une sauvegarde antérieure reconstitue le premier à partir du sac
+et de l'équipement actuels (`core/save.js`/`migrateSave`) — approximatif : un
+objet déjà revendu n'y figure plus ; le second repart vide (rien ne permet de
+le reconstituer, une entité se redécouvre à la prochaine observation). Un id inconnu (objet retiré depuis) est simplement ignoré : les
 collections LISENT ce fait, elles ne le parcourent jamais.
 
 ## Debug
 
 **Shift+C** (mode debug) : « Tout révéler » / « Tout réinitialiser », chacun
 derrière une confirmation. Ils écrivent RÉELLEMENT le fait « acquis », pour les
-seuls objets des collections (`revealAllCollections`, `resetAllCollections`),
-sans annonce de découverte.
+seuls objets des collections, et le fait « observé » pour leurs seuls types
+(`revealAllCollections`, `resetAllCollections`), sans annonce de découverte.
 
 ## Ajouter une collection
 
 1. Un fichier `collections/<id>.js` et sa ligne dans `collections/index.js`.
-2. Ses objets dans `core/items.js` s'ils n'existent pas.
+2. Ses objets dans `core/items.js` s'ils n'existent pas (ou ses types dans
+   `entities/types/`).
 3. Ses textes dans `collections.json`, dans les deux langues.
 
 Vérifications : `core/checks/collections.check.js` (`runChecks("collections")`).

@@ -18,7 +18,7 @@ import { makeMenuScreen } from "../lib/menu.js";
 import { evaluateCondition, selectMatchingAction, selectDescriptionKey, actionContextOf } from "../core/presence.js";
 import { resolveDescriptionText } from "./description-resolver.js";
 import { resolveTuning } from "../config/tuning.js";
-import { sessionProvider } from "./interaction-handlers.js";
+import { sessionProvider, observationHandler } from "./interaction-handlers.js";
 import { runEffects } from "./effect-runner.js";
 import { executeAction } from "./action-execution.js";
 import { openConfirmation } from "./menus/confirmation.js";
@@ -160,10 +160,14 @@ function confirmationParams(action) {
 // `getWorldView` : la vue du monde courante, dont les balises se taisent
 // pendant un menu ouvert par l'interaction (confirmation).
 export function interact(entity, kind, getWorldView) {
+  // Une description réussie note le type comme OBSERVÉ (bestiaire, voir
+  // core/observations.js) ; la découverte éventuelle s'annonce après elle
+  // (view/collection-discoveries.js).
   if (kind === "describe") {
     const description = resolveDescription(entity);
     if (!description) return;
     announce(description, { assertive: true });
+    if (observationHandler) observationHandler(entity);
     return;
   }
 

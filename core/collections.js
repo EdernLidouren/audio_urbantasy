@@ -1,39 +1,53 @@
 // Collections — logique PURE, sans aucune connaissance du contenu : les
-// collections (fichiers de données, collections/*.js) sont toujours PASSÉES
-// en paramètre, jamais importées ici (le core n'importe pas de contenu).
-// Référence : doc/collections.md.
+// collections (fichiers de données, collections/*.js) et les registres sont
+// toujours PASSÉS en paramètre, jamais importés ici (le core n'importe pas
+// de contenu). Référence : doc/collections.md.
 //
-// Une collection = { discoverySound?, entries: [{ item }, ...] } : une liste
-// ORDONNÉE d'entrées, chacune référençant un objet du sac
-// (core/items.js/ITEM_REGISTRY). L'ordre d'affichage est l'ordre de
-// déclaration, fixe. Une entrée est DÉCOUVERTE dès que son objet a été
-// acquis au moins une fois (session.acquiredItems, posé par
-// core/bag.js/addItem) : la découverte n'est jamais stockée, elle se LIT dans
-// ce fait neutre. Conséquence assumée : une entrée ajoutée plus tard pour un
-// objet déjà acquis apparaît découverte d'emblée.
-//
-// Extension prévue, pas construite : une entrée découverte par OBSERVATION
-// d'une entité (futur bestiaire) déclarerait `{ entity: <type> }` et se lirait
-// dans un second fait neutre (session.observedEntityTypes) — seul
-// isEntryDiscovered ci-dessous aurait à choisir le bon fait.
+// Une collection = { discoverySound?, entries: [...] } : une liste ORDONNÉE
+// d'entrées, de DEUX genres :
+//   - `{ item }` : un objet du sac (core/items.js/ITEM_REGISTRY), DÉCOUVERT
+//     dès qu'il a été acquis une fois (session.acquiredItems, posé par
+//     core/bag.js/addItem) ;
+//   - `{ entity }` : un type d'entité (entities/types/), DÉCOUVERT dès que
+//     le joueur l'a observé une fois (session.observedEntityTypes, posé par
+//     core/observations.js/markObserved) — le bestiaire surnaturel.
+// L'ordre d'affichage est l'ordre de déclaration, fixe. La découverte n'est
+// jamais stockée : elle se LIT dans ces deux faits neutres (`facts`, voir
+// discoveryFacts). Conséquence assumée : une entrée ajoutée plus tard pour
+// un objet acquis ou une entité observée apparaît découverte d'emblée.
+
+// Les deux faits neutres d'une partie dont se déduit la découverte.
+export function discoveryFacts(session) {
+  return { items: session.acquiredItems, entities: session.observedEntityTypes };
+}
+
+// Identifiant d'une entrée dans sa collection : l'objet ou le type.
+export function entryId(entry) {
+  return entry.entity !== undefined ? entry.entity : entry.item;
+}
 
 // Clés i18n d'une collection et de ses entrées, DÉDUITES de leurs ids
 // (data/i18n/<langue>/collections.json) : jamais déclarées dans le fichier de
-// collection, donc jamais divergentes.
+// collection, donc jamais divergentes. Une entrée d'objet a son nom et sa
+// description de collection ; une entrée d'entité garde le nom et la
+// description de son type (lus par la vue dans le registre) et ajoute sa
+// fiche : texte encyclopédique (`lore`) et lieux de rencontre (`places`).
 export function collectionNameKey(collectionId) {
   return `collection.${collectionId}.name`;
 }
-export function entryTextKeys(collectionId, item) {
-  const base = `collection.${collectionId}.entry.${item}`;
+export function entryTextKeys(collectionId, entry) {
+  const base = `collection.${collectionId}.entry.${entryId(entry)}`;
+  if (entry.entity !== undefined) return { loreKey: `${base}.lore`, placesKey: `${base}.places` };
   return { nameKey: `${base}.name`, descriptionKey: `${base}.description` };
 }
 
-// Valide UNE collection : entrées non vides, chacune un objet du registre,
-// aucun doublon, son de découverte (optionnel) en chaîne. `itemRegistry`
-// injecté (core/items.js/ITEM_REGISTRY). Lève une erreur claire : une
-// collection mal écrite échoue au chargement, jamais une entrée introuvable
-// en silence (même politique que la table météo, core/weather.js).
-export function validateCollection(collectionId, collection, itemRegistry) {
+// Valide UNE collection : entrées non vides, chacune un objet du registre
+// OU un type d'entité du registre (jamais les deux), aucun doublon, son de
+// découverte (optionnel) en chaîne. Registres injectés. Lève une erreur
+// claire : une collection mal écrite échoue au chargement, jamais une
+// entrée introuvable en silence (même politique que la table météo,
+// core/weather.js).
+export function validateCollection(collectionId, collection, itemRegistry, entityRegistry) {
   const where = `collection "${collectionId}"`;
   if (typeof collection !== "object" || collection === null) {
     throw new Error(`${where} : doit être un objet.`);
@@ -46,46 +60,55 @@ export function validateCollection(collectionId, collection, itemRegistry) {
   }
   const seen = new Set();
   collection.entries.forEach((entry, index) => {
-    const item = entry && entry.item;
-    if (typeof item !== "string" || !Object.hasOwn(itemRegistry, item)) {
-      throw new Error(`${where} : entries[${index}].item "${item}" absent du registre d'objets.`);
+    const at = `${where} : entries[${index}]`;
+    if (typeof entry !== "object" || entry === null || (entry.item === undefined) === (entry.entity === undefined)) {
+      throw new Error(`${at} doit être { item } ou { entity }, exactement l'un des deux.`);
     }
-    if (seen.has(item)) {
-      throw new Error(`${where} : entries[${index}] répète l'objet "${item}".`);
+    const unknown = Object.keys(entry).find((key) => key !== "item" && key !== "entity");
+    if (unknown !== undefined) throw new Error(`${at}.${unknown} inconnu.`);
+    if (entry.item !== undefined && (typeof entry.item !== "string" || !Object.hasOwn(itemRegistry, entry.item))) {
+      throw new Error(`${at}.item "${entry.item}" absent du registre d'objets.`);
     }
-    seen.add(item);
+    if (entry.entity !== undefined && (typeof entry.entity !== "string" || !Object.hasOwn(entityRegistry, entry.entity))) {
+      throw new Error(`${at}.entity "${entry.entity}" absent du registre des types d'entité.`);
+    }
+    const id = entryId(entry);
+    if (seen.has(id)) throw new Error(`${at} répète "${id}".`);
+    seen.add(id);
   });
 }
 
-function isEntryDiscovered(entry, acquired) {
-  return Boolean(acquired && acquired[entry.item]);
+function isEntryDiscovered(entry, facts) {
+  const fact = entry.entity !== undefined ? facts.entities : facts.items;
+  return Boolean(fact && fact[entryId(entry)]);
 }
 
 // Les entrées d'une collection, dans leur ordre déclaré, avec leur état.
-export function collectionEntries(collectionId, collection, acquired) {
+// `facts` : voir discoveryFacts.
+export function collectionEntries(collectionId, collection, facts) {
   return collection.entries.map((entry) => ({
-    item: entry.item,
-    discovered: isEntryDiscovered(entry, acquired),
-    ...entryTextKeys(collectionId, entry.item),
+    ...entry,
+    discovered: isEntryDiscovered(entry, facts),
+    ...entryTextKeys(collectionId, entry),
   }));
 }
 
-export function collectionProgress(collection, acquired) {
-  const discovered = collection.entries.filter((entry) => isEntryDiscovered(entry, acquired)).length;
+export function collectionProgress(collection, facts) {
+  const discovered = collection.entries.filter((entry) => isEntryDiscovered(entry, facts)).length;
   return { discovered, total: collection.entries.length };
 }
 
-// Entrées découvertes ENTRE deux états du fait "acquis" (diff, pour
-// l'annonce de découverte côté vue) : celles découvertes dans `next` mais
-// pas dans `prev`, dans l'ordre des collections puis des entrées.
-// `collections` : { [id]: collection }.
-export function newlyDiscoveredEntries(collections, prevAcquired, nextAcquired) {
-  if (prevAcquired === nextAcquired) return [];
+// Entrées découvertes ENTRE deux états des faits (diff, pour l'annonce de
+// découverte côté vue) : celles découvertes dans `next` mais pas dans
+// `prev`, dans l'ordre des collections puis des entrées.
+// `collections` : { [id]: collection } ; -> [{ collectionId, entry }].
+export function newlyDiscoveredEntries(collections, prevFacts, nextFacts) {
+  if (prevFacts.items === nextFacts.items && prevFacts.entities === nextFacts.entities) return [];
   const found = [];
   for (const [collectionId, collection] of Object.entries(collections)) {
     for (const entry of collection.entries) {
-      if (isEntryDiscovered(entry, nextAcquired) && !isEntryDiscovered(entry, prevAcquired)) {
-        found.push({ collectionId, item: entry.item });
+      if (isEntryDiscovered(entry, nextFacts) && !isEntryDiscovered(entry, prevFacts)) {
+        found.push({ collectionId, entry });
       }
     }
   }
@@ -93,19 +116,30 @@ export function newlyDiscoveredEntries(collections, prevAcquired, nextAcquired) 
 }
 
 // OUTILS DE DEBUG (menu Shift+C, voir view/menus/debug-collections-menu.js)
-// : écrivent RÉELLEMENT le fait "acquis", pour les seuls objets des
-// collections — jamais un court-circuit de lecture comme hasImprovement,
-// puisqu'on veut aussi pouvoir tout réinitialiser.
-function collectionItems(collections) {
-  return Object.values(collections).flatMap((collection) => collection.entries.map((entry) => entry.item));
+// : écrivent RÉELLEMENT les faits "acquis" et "observé", pour les seules
+// entrées des collections — jamais un court-circuit de lecture comme
+// hasImprovement, puisqu'on veut aussi pouvoir tout réinitialiser.
+function collectionIds(collections, kind) {
+  return Object.values(collections).flatMap((collection) =>
+    collection.entries.filter((entry) => entry[kind] !== undefined).map((entry) => entry[kind])
+  );
+}
+function writeFacts(session, collections, value) {
+  const acquiredItems = { ...(session.acquiredItems || {}) };
+  const observedEntityTypes = { ...(session.observedEntityTypes || {}) };
+  for (const item of collectionIds(collections, "item")) {
+    if (value) acquiredItems[item] = true;
+    else delete acquiredItems[item];
+  }
+  for (const type of collectionIds(collections, "entity")) {
+    if (value) observedEntityTypes[type] = true;
+    else delete observedEntityTypes[type];
+  }
+  return { ...session, acquiredItems, observedEntityTypes };
 }
 export function revealAllCollections(session, collections) {
-  const acquiredItems = { ...(session.acquiredItems || {}) };
-  for (const item of collectionItems(collections)) acquiredItems[item] = true;
-  return { ...session, acquiredItems };
+  return writeFacts(session, collections, true);
 }
 export function resetAllCollections(session, collections) {
-  const acquiredItems = { ...(session.acquiredItems || {}) };
-  for (const item of collectionItems(collections)) delete acquiredItems[item];
-  return { ...session, acquiredItems };
+  return writeFacts(session, collections, false);
 }

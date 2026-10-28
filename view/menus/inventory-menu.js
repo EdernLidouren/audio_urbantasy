@@ -1,5 +1,6 @@
-// Écran d'INVENTAIRE à QUATRE ONGLETS — Sac ("i"), Équipement ("q"),
-// Améliorations ("m") et Collections ("c"), voir view/city-screen.js. UN SEUL écran RÉEL sur la
+// Écran d'INVENTAIRE à CINQ ONGLETS — Sac ("i"), Équipement ("q"),
+// Améliorations ("m"), Émotes (par Tab depuis les Améliorations) et
+// Collections ("c"), voir view/city-screen.js. UN SEUL écran RÉEL sur la
 // pile (lib/screens.js) : il délègue à un écran-menu INTERNE
 // (lib/menu.js/makeMenuScreen), reconstruit pour l'onglet actif à CHAQUE
 // affichage/bascule — jamais un écran séparé par onglet. Tab / Maj+Tab
@@ -27,13 +28,14 @@
 // ./inventory/ :
 //   - bag-and-equipment.js : Sac et Équipement, menus d'actions, sélecteur
 //     de quantité, retour silencieux après une action ;
-//   - progress-tabs.js : Améliorations et Collections (lecture seule).
+//   - progress-tabs.js : Améliorations, Émotes et Collections (lecture
+//     seule).
 
 import { pushScreen } from "../../lib/screens.js";
 import { withPausedBeacons } from "../paused-beacons.js";
 import { resolveAction, defineBindings } from "../../lib/input.js";
 import { buildBagTabScreen, buildEquipmentTabScreen, setCurrentTabsScreen } from "./inventory/bag-and-equipment.js";
-import { buildImprovementsTabScreen, buildCollectionsTabScreen } from "./inventory/progress-tabs.js";
+import { buildImprovementsTabScreen, buildEmotesTabScreen, buildCollectionsTabScreen } from "./inventory/progress-tabs.js";
 
 // Gestionnaires d'état des actions du sac et de l'équipement, injectés par
 // view/action-handlers.js.
@@ -48,7 +50,7 @@ const TAB_BINDINGS = defineBindings("inventoryTabs", {
 });
 
 // Ordre des onglets, celui du cycle Tab / Maj+Tab.
-const TABS = ["bag", "equipment", "improvements", "collections"];
+const TABS = ["bag", "equipment", "improvements", "emotes", "collections"];
 
 function cycleTab(tab, direction) {
   const index = TABS.indexOf(tab);
@@ -61,6 +63,7 @@ function cycleTab(tab, direction) {
 function buildTabScreen(tab, getWorldView, getSession, cursor) {
   if (tab === "equipment") return buildEquipmentTabScreen(getWorldView, getSession);
   if (tab === "improvements") return buildImprovementsTabScreen(getSession);
+  if (tab === "emotes") return buildEmotesTabScreen(getSession);
   if (tab === "collections") return buildCollectionsTabScreen(getSession);
   return buildBagTabScreen(getWorldView, getSession, cursor);
 }

@@ -301,6 +301,9 @@ export function createInitialState(
     // Le départ ne passe pas par addItem : ses objets sont notés acquis
     // ici, déduits du sac et de l'équipement, jamais listés à la main.
     acquiredItems: deriveAcquiredItems(bag, equipment),
+    // Types d'entité observés au moins une fois (core/observations.js) :
+    // aucun au départ.
+    observedEntityTypes: {},
     companions: repositionCompanions(companions.slice(0, MAX_COMPANIONS), scene.playerStart, scene.length),
     // Flux PRNG dédié aux compagnons (voir header) : dérivé du même seed,
     // mais hashé sous une clé distincte — jamais la même suite que le

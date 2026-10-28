@@ -2139,6 +2139,14 @@ le joueur, dans la réverb de la scène (`view/emotes.js`,
   place en RACCOURCI (annonce « Raccourci d'émote : sifflement. ») et
   ferme le menu, sans la jouer.
 - **E** joue l'émote du raccourci ; sans raccourci, il ouvre le choix.
+- **Onglet Émotes** du menu global (`view/menus/inventory/progress-tabs.js`,
+  après Améliorations, par Tab depuis la touche "m") : toutes les émotes du
+  registre, par `order`, sur le patron de l'onglet Améliorations. Connue :
+  `"{order} - {nom} : {description}"`, avec « en raccourci » pour celle de
+  la touche E ; inconnue : `"{order} - Inconnue"`. Titre : `"Émotes :
+  {connues} sur {total}"`. Lecture seule (le raccourci se choisit avec
+  Maj+E). L'onglet lit `session.emotes` DIRECTEMENT, jamais `knowsEmote`,
+  qui répond toujours vrai en debug.
 
 Le raccourci (`session.emoteShortcut`, `core/emotes.js`/`setEmoteShortcut`)
 est sauvegardé avec la partie, vide au départ. Visant une émote que le

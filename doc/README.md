@@ -14,7 +14,7 @@ domaine, le détail du code vivant dans les en-têtes de fichiers.
 | [`time.md`](time.md) | Horloge de partie : le compteur, ses dérivations, le calendrier simplifié, l'avancement accéléré, la persistance, la phase jour/nuit. |
 | [`city-map.md`](city-map.md) | Topologie de la carte de la ville et le menu-carte. |
 | [`i18n.md`](i18n.md) | Convention `data/i18n/` : découpage par domaine, parité fr/en, où va une nouvelle clé de traduction, grammaire des gabarits (pluriel, ordinaux, choix, formes de nom, listes). |
-| [`collections.md`](collections.md) | Collections : modèle (un fichier par collection), découverte par acquisition (`addItem`), textes, onglet Collections, sauvegarde, debug, extension par observation. |
+| [`collections.md`](collections.md) | Collections : modèle (un fichier par collection), découverte par acquisition (`addItem`) ou par observation (Espace), textes, onglet Collections et fiches d'entité, sauvegarde, debug. |
 | [`new-game.md`](new-game.md) | Départ d'une partie neuve : scène, argent, sac, équipement, compagnons et variables de partie (`config/new-game.js`), validation au démarrage. |
 | [`save.md`](save.md) | Sauvegarde : contenu, relecture (rebouchage, renommages de contenu, types inconnus), table `config/save-renames.js`. |
 | [`help.md`](help.md) | Raccourcis clavier : tables déclarées par `defineBindings`, aide des touches générée et contextuelle (F1, Maj+H), descriptions et noms de touches. |

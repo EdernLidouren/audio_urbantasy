@@ -4,5 +4,9 @@
   "emote.shortcutSet": "Raccourci d'émote : {emote}.",
   "emote.whistle.description": "Un sifflement d'appel, bref et perçant, qui porte loin.",
   "emote.whistle.name": "sifflement",
+  "emotes.tab.entry.known": "{order} - {name} : {description}",
+  "emotes.tab.entry.shortcut": "{order} - {name}, en raccourci : {description}",
+  "emotes.tab.entry.unknown": "{order} - Inconnue",
+  "emotes.tab.title": "Émotes : {known} sur {total}",
   "menu.emotes.title": "Émotes"
 }

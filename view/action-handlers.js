@@ -19,6 +19,7 @@ import {
   setSessionProvider,
   setPositionedSoundPlayer,
   setEntitySoundStopper,
+  setObservationHandler,
   setVariableEffectsHandler,
   setSearchHandler,
   setShopHandler,
@@ -32,6 +33,7 @@ import { pickupEntity, lootEntity, lootUniqueEntity, lootEntitySpawn } from "../
 import { pickupItemEntity, dropItem } from "../core/bag.js";
 import { searchContainer, ephemeralArchetypeSpec, ephemeralItemSpec } from "../core/spawn.js";
 import { equipItem, unequipItem } from "../core/equipment.js";
+import { markObserved } from "../core/observations.js";
 import { sellItems, buyItems, restockShopIfDue } from "../core/trade.js";
 
 // Branche tous les gestionnaires et rend la fonction qui les débranche.
@@ -111,6 +113,8 @@ export function registerActionHandlers({ getSession, setSession, travel }) {
         return worldView && worldView.playEntityOneShot(entityId, descriptor, options);
       },
     ],
+    // Description réussie : le type est noté observé (bestiaire).
+    [setObservationHandler, (entity) => setSession(markObserved(getSession(), entity.type))],
     // Effet "stopSounds", sur la vue COURANTE.
     [
       setEntitySoundStopper,

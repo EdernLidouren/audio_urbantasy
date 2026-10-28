@@ -282,9 +282,8 @@ export async function auditContent() {
   // jamais écrites dans la donnée — on les reconstruit pour les vérifier.
   for (const [id, collection] of Object.entries(collections)) {
     const keys = [collectionNameKey(id)];
-    for (const { item } of collection.entries) {
-      const { nameKey, descriptionKey } = entryTextKeys(id, item);
-      keys.push(nameKey, descriptionKey);
+    for (const entry of collection.entries) {
+      keys.push(...Object.values(entryTextKeys(id, entry)));
     }
     checkStrings(`collection ${id}`, keys);
   }
