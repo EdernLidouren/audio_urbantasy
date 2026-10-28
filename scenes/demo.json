@@ -99,9 +99,9 @@
           "emote": "whistle",
           "effects": [
             { "type": "temporaryBehavior", "behavior": { "kind": "stay" }, "durationMs": 1500 },
-            { "type": "wait", "ms": 700 },
+            { "type": "wait", "ms": 700, "variationMs": 150 },
             { "type": "playSound", "role": "vocal" },
-            { "type": "wait", "ms": 500 },
+            { "type": "wait", "ms": 500, "variationMs": 100 },
             { "type": "temporaryBehavior", "behavior": { "kind": "follow", "speed": 1.6, "maxDistance": 1.5 }, "durationMs": 10000 }
           ]
         }

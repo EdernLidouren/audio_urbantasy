@@ -25,9 +25,7 @@ import { openTeleportDebugMenu } from "./menus/debug-teleport-menu.js";
 import { openDebugWarningsMenu, openDebugWarningsIfUnseen } from "./menus/debug-warnings-menu.js";
 import { openCollectionsDebugMenu } from "./menus/debug-collections-menu.js";
 import { openInventoryMenu, openEquipmentMenu, openImprovementsMenu, openCollectionsMenu } from "./menus/inventory-menu.js";
-import { tick } from "../core/actions.js";
-import { reduce } from "../core/reduce.js";
-import { applyDuePendingEffects } from "../core/pending-effects.js";
+import { advanceTick } from "../core/advance.js";
 import { runRenderEffects } from "./effect-runner.js";
 import { isDebugEnabled } from "../config/debug.js";
 import { createWorldTravel } from "./world-travel.js";
@@ -132,13 +130,13 @@ export function makeCityScreen(getSession, setSession) {
     },
     // Pas de simulation sans vue du monde (hors partie : jamais en jeu, un
     // voyage gèle le jeu par un écran vide pendant son chargement).
-    // Après le réducteur, les tranches de séquence arrivées à échéance
-    // (core/pending-effects.js) : le core applique leur état, leur rendu
-    // est rejoué ici, avant la mise à jour de la vue.
+    // Un tick complet (core/advance.js) : le core rend aussi les effets de
+    // rendu des séquences arrivées à échéance, rejoués ici, avant la mise
+    // à jour de la vue.
     onTick() {
       const worldView = travel.current();
       if (!worldView) return;
-      const { session, fired } = applyDuePendingEffects(reduce(getSession(), tick(getMoveIntent())));
+      const { session, fired } = advanceTick(getSession(), getMoveIntent());
       setSession(session);
       for (const { entity, effects } of fired) runRenderEffects(entity, effects);
       worldView.update();

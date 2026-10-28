@@ -16,7 +16,9 @@
 //
 // SIFFLEMENT : une petite séquence (voir doc/scripting.md/"Séquences :
 // wait") — il se fige le temps que le sifflement passe et qu'il dresse
-// l'oreille, jappe (son propre vocal), marque un temps, puis accourt :
+// l'oreille, jappe (son propre vocal), marque un temps, puis accourt —
+// chaque attente à quelques dixièmes près, pour ne jamais réagir pile en
+// même temps qu'un autre chien :
 // suivi serré et rapide pendant 10 s (comportements temporaires, voir
 // core/temporary-behavior.js), avant de retomber sur son suivi lâche du
 // départ (config/new-game.js). Surtout cosmétique tant que ce suivi lâche
@@ -47,9 +49,9 @@ export default {
       emote: "whistle",
       effects: [
         { type: "temporaryBehavior", behavior: { kind: "stay" }, durationMs: 1500 },
-        { type: "wait", ms: 700 },
+        { type: "wait", ms: 700, variationMs: 150 },
         { type: "playSound", role: "vocal" },
-        { type: "wait", ms: 500 },
+        { type: "wait", ms: 500, variationMs: 100 },
         { type: "temporaryBehavior", behavior: { kind: "follow", speed: 1.6, maxDistance: 1.5 }, durationMs: 10000 },
       ],
     },

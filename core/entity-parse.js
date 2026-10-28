@@ -210,8 +210,10 @@ function checkActionRequirements(entity, at) {
 }
 
 // Toutes les listes d'effets que porte une entité, avec leur chemin pour
-// les messages : actions (effets et effets de refus) et triggers.
-function entityEffectLists(entity) {
+// les messages : actions (effets et effets de refus) et triggers. Exportée
+// pour l'audit du contenu (tools/content-audit.js), qui contrôle les cibles
+// `at` sur la scène entière.
+export function entityEffectLists(entity) {
   const lists = [];
   if (entity.action !== undefined) {
     const actions = Array.isArray(entity.action) ? entity.action : [entity.action];

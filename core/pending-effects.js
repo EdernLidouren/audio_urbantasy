@@ -6,8 +6,8 @@
 // sauvegardée, gelée sous un menu (aucun tick), oubliée au chargement du
 // monde.
 //
-// Un passage par TICK (applyDuePendingEffects), appelé par la vue juste
-// après le réducteur (view/city-screen.js/onTick), exactement comme les
+// Un passage par TICK (applyDuePendingEffects), juste après le réducteur,
+// dans le tick complet (core/advance.js/advanceTick), exactement comme les
 // triggers horaires le sont par l'horloge : le core applique les effets
 // d'ÉTAT dus et RENVOIE les effets de RENDU, que la vue rejoue. Portée : le
 // monde actif, ses DEUX faces (une séquence lancée par un trigger horaire

@@ -6,9 +6,8 @@
 // Lancées par core/checks/index.js/runChecks. Pur : aucun DOM, aucun fetch.
 
 import { parseScene } from "../scene.js";
-import { createInitialState, applyEntityActionEffects } from "../state.js";
-import { tick } from "../actions.js";
-import { reduce } from "../reduce.js";
+import { createInitialState, applyEntityActionEffects, applyCompanionActionEffects } from "../state.js";
+import { advanceTick } from "../advance.js";
 import { parseNewGame } from "../new-game.js";
 import { applyEmoteTriggers, applyDueTriggers } from "../triggers.js";
 import { serializeGame, deserializeGame } from "../save.js";
@@ -28,15 +27,25 @@ export default function checkSequence(run) {
   // --- Découpage pur ---
   const plain = [BELL, { type: "startle" }];
   run("sequenceHead : sans wait -> même référence", plain, sequenceHead(plain));
-  run("sequenceTail : sans wait -> aucune tranche", 0, sequenceTail(plain).length);
+  run("sequenceTail : sans wait -> aucune tranche", 0, sequenceTail(plain, 1).chunks.length);
   const list = [BELL, { type: "wait", ms: 500 }, { type: "startle" }, { type: "wait", ms: 250 }, { type: "wait", ms: 250 }, BELL];
   run("sequenceHead : effets avant le premier wait", "playSound", sequenceHead(list).map((e) => e.type).join(","));
-  const tail = sequenceTail(list);
+  const tail = sequenceTail(list, 1).chunks;
   run("sequenceTail : une tranche par segment, les wait accolés additionnés", 2, tail.length);
   run("sequenceTail : délai de la première tranche", ticksOf(500), tail[0].ticksLeft);
   run("sequenceTail : délais CUMULÉS (500 + 250 + 250)", ticksOf(500) + ticksOf(250) + ticksOf(250), tail[1].ticksLeft);
-  run("sequenceTail : wait en tête -> tête vide, tout attend", "0,1", [sequenceHead([{ type: "wait", ms: 100 }, BELL]).length, sequenceTail([{ type: "wait", ms: 100 }, BELL]).length].join(","));
-  run("sequenceTail : jamais moins d'un tick", 1, sequenceTail([{ type: "wait", ms: 1 }, BELL])[0].ticksLeft);
+  run("sequenceTail : wait en tête -> tête vide, tout attend", "0,1", [sequenceHead([{ type: "wait", ms: 100 }, BELL]).length, sequenceTail([{ type: "wait", ms: 100 }, BELL], 1).chunks.length].join(","));
+  run("sequenceTail : jamais moins d'un tick", 1, sequenceTail([{ type: "wait", ms: 1 }, BELL], 1).chunks[0].ticksLeft);
+
+  // Variation seedée : dans [ms - v, ms + v], même graine -> même délai,
+  // aucun tirage sans variation.
+  run("variation : sans variationMs, le PRNG n'avance pas", 42, sequenceTail(list, 42).rngState);
+  const varied = [{ type: "wait", ms: 700, variationMs: 150 }, BELL];
+  const draws = Array.from({ length: 40 }, (_, seed) => sequenceTail(varied, seed + 1).chunks[0].ticksLeft);
+  run("variation : toujours dans la fourchette", true, draws.every((t) => t >= ticksOf(550) && t <= ticksOf(850)));
+  run("variation : les délais varient d'une graine à l'autre", true, new Set(draws).size > 5);
+  run("variation : même graine -> même délai", sequenceTail(varied, 7).chunks[0].ticksLeft, sequenceTail(varied, 7).chunks[0].ticksLeft);
+  run("variation : le PRNG avance d'un pas par wait qui varie", true, sequenceTail(varied, 7).rngState !== 7);
   const counted = countDownPending([{ ticksLeft: 1, effects: [BELL] }, { ticksLeft: 3, effects: [BELL] }]);
   run("countDownPending : échue d'un côté, décomptée de l'autre", "1,2", [counted.due.length, counted.remaining[0].ticksLeft].join(","));
 
@@ -46,7 +55,10 @@ export default function checkSequence(run) {
   run("wait : séquence valide chargée", true, actionLoads([BELL, { type: "wait", ms: 300 }, { type: "startle" }]));
   run("wait : ms manquant rejeté", false, actionLoads([BELL, { type: "wait" }, BELL]));
   run("wait : ms nul rejeté", false, actionLoads([BELL, { type: "wait", ms: 0 }, BELL]));
-  run("wait : champ inconnu rejeté", false, actionLoads([BELL, { type: "wait", ms: 300, variationMs: 50 }, BELL]));
+  run("wait : champ inconnu rejeté", false, actionLoads([BELL, { type: "wait", ms: 300, jitter: 50 }, BELL]));
+  run("wait : variationMs chargée", true, actionLoads([BELL, { type: "wait", ms: 300, variationMs: 50 }, BELL]));
+  run("wait : variationMs plus grande que ms rejetée", false, actionLoads([BELL, { type: "wait", ms: 300, variationMs: 301 }, BELL]));
+  run("wait : variationMs négative rejetée", false, actionLoads([BELL, { type: "wait", ms: 300, variationMs: -1 }, BELL]));
   run("wait : en dernier rejeté (il n'attend rien)", false, actionLoads([BELL, { type: "wait", ms: 300 }]));
   run("wait : teleport après un wait rejeté", false, actionLoads([BELL, { type: "wait", ms: 300 }, { type: "teleport", target: "demo" }]));
   run("wait : teleport avant le wait accepté", true, actionLoads([{ type: "teleport", target: "demo" }, { type: "wait", ms: 300 }, BELL]));
@@ -104,8 +116,8 @@ export default function checkSequence(run) {
     REGISTRY
   );
   const dogOf = (s, id = "dog") => s.worlds[scene.id].entities.find((e) => e.id === id);
-  // Un tick de jeu complet, comme view/city-screen.js/onTick.
-  const step = (s) => applyDuePendingEffects(reduce(s, tick(0)));
+  // Un tick de jeu complet, celui de la vue (core/advance.js).
+  const step = (s) => advanceTick(s, 0);
   const steps = (s, n) => {
     let next = s;
     const fired = [];
@@ -134,6 +146,29 @@ export default function checkSequence(run) {
   run("à 1,2 s : plus rien en attente (champ retiré)", false, "pendingEffects" in dogOf(running.session));
   run("ensuite : il accourt", true, dogOf(steps(running.session, 30).session).x < x0 - 1);
   run("rien en attente -> même référence de session", running.session, applyDuePendingEffects(running.session).session);
+
+  // Variation en jeu : deux chiens sifflés ensemble, des délais tirés dans
+  // le PRNG de leur face, qui avance ; même partie rejouée, mêmes délais.
+  const VARIED = [
+    { type: "temporaryBehavior", behavior: { kind: "stay" }, durationMs: 1500 },
+    { type: "wait", ms: 700, variationMs: 150 },
+    { type: "playSound", role: "vocal" },
+  ];
+  const pack = parseScene(
+    {
+      ...sceneWith({}),
+      id: "sequence-check-pack",
+      length: 40,
+      entities: ["a", "b", "c", "d"].map((id, i) => ({ id, type: "dog", x: 5 + i, triggers: [{ on: "emote", emote: "whistle", effects: VARIED }] })),
+    },
+    REGISTRY
+  );
+  const packStart = createInitialState(pack, 9);
+  const packWhistled = applyEmoteTriggers(packStart, "whistle", 0).session;
+  const delays = packWhistled.worlds[pack.id].entities.map((e) => e.pendingEffects[0].ticksLeft);
+  run("variation en jeu : les chiens ne jappent pas tous au même tick", true, new Set(delays).size > 1);
+  run("variation en jeu : le PRNG de la face a avancé", true, packWhistled.worlds[pack.id].rngState !== packStart.worlds[pack.id].rngState);
+  run.same("variation en jeu : même partie rejouée -> mêmes délais", delays, applyEmoteTriggers(packStart, "whistle", 0).session.worlds[pack.id].entities.map((e) => e.pendingEffects[0].ticksLeft));
 
   // Un second sifflement pendant la réaction : elle reprend au début.
   const again = applyEmoteTriggers(steps(whistled.session, 30).session, "whistle", 2).session;
@@ -211,6 +246,8 @@ export default function checkSequence(run) {
   const withBuddy = createInitialState(scene, 5, companionStart);
   const buddyWhistled = applyEmoteTriggers(withBuddy, "whistle", withBuddy.player.x).session;
   run("compagnon : séquence posée", 2, buddyWhistled.companions[0].pendingEffects.length);
+  const buddyVaried = applyCompanionActionEffects(withBuddy, "buddy", VARIED);
+  run("compagnon : variation tirée dans le PRNG des compagnons", true, buddyVaried.companionsRngState !== withBuddy.companionsRngState);
   const buddyBark = steps(buddyWhistled, ticksOf(700));
   run("compagnon : son jappement à l'échéance", true, buddyBark.fired.some((f) => f === `${ticksOf(700)}:buddy:playSound`));
   run("compagnon : accourt à 1,2 s", "follow,1.5", [activeBehaviorOf(steps(buddyWhistled, ticksOf(1200)).session.companions[0])].map((b) => `${b.kind},${b.maxDistance}`).join(""));

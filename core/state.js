@@ -423,14 +423,16 @@ export function markConsumed(session, entityId) {
 // premier `wait`) s'applique ici ; les suivantes attendent sur l'entité
 // (`pendingEffects`), qu'elles REMPLACENT — une entité ne suit qu'un fil à
 // la fois (le chien sifflé deux fois reprend sa réaction au début). Une
-// liste sans `wait` ne touche pas aux tranches en attente.
+// liste sans `wait` ne touche pas aux tranches en attente. Les variations
+// de `wait` se tirent dans le PRNG de la FACE qui porte l'entité, comme la
+// dispersion du butin (spawnScatteredEphemerals).
 export function applyEntityActionEffects(session, entityId, effects, side = session.player.side) {
   const world = session.worlds[session.activeWorldId];
   const face = resolveFace(world, side);
   const entity = face.entities.find((e) => e.id === entityId);
   if (!entity) return session;
 
-  const result = applyHeadAndSchedule(effects, { entity, world, session });
+  const result = applyHeadAndSchedule(effects, { entity, world, session }, face.rngState);
   const entityChanged = result.entity !== entity;
   const worldChanged = result.world !== world;
   const partyChanged = result.session !== session;
@@ -439,7 +441,8 @@ export function applyEntityActionEffects(session, entityId, effects, side = sess
   let nextWorld = worldChanged ? result.world : world;
   if (entityChanged) {
     const entities = face.entities.map((e) => (e.id === entityId ? result.entity : e));
-    nextWorld = withFace(nextWorld, side, { entities });
+    const patch = result.rngState !== face.rngState ? { entities, rngState: result.rngState } : { entities };
+    nextWorld = withFace(nextWorld, side, patch);
   }
 
   const withWorld = worldChanged || entityChanged ? withActiveWorld(session, nextWorld) : session;
@@ -452,24 +455,27 @@ export function applyEntityActionEffects(session, entityId, effects, side = sess
 }
 
 // Tête appliquée, suite mise en attente sur l'entité (voir
-// applyEntityActionEffects). Même forme de résultat qu'applyActionEffects.
-function applyHeadAndSchedule(effects, context) {
+// applyEntityActionEffects). Même forme de résultat qu'applyActionEffects,
+// plus `rngState` : le PRNG des variations, avancé seulement si un `wait`
+// varie (la suite d'une séquence fait toujours changer l'entité).
+function applyHeadAndSchedule(effects, context, rngState) {
   const result = applyActionEffects(sequenceHead(effects), context);
-  const tail = sequenceTail(effects);
-  if (tail.length === 0) return result;
-  return { ...result, entity: { ...result.entity, pendingEffects: tail } };
+  const tail = sequenceTail(effects, rngState);
+  if (tail.chunks.length === 0) return { ...result, rngState };
+  return { ...result, entity: { ...result.entity, pendingEffects: tail.chunks }, rngState: tail.rngState };
 }
 
 // Même chose pour un COMPAGNON (session.companions) : il n'est sur aucune
 // face, il suit le joueur. Ses effets voient le monde actif comme porteur
 // des variables de scène, comme une entité de la face du joueur. id absent
-// -> session INCHANGÉE.
+// -> session INCHANGÉE. Variations de `wait` : dans le PRNG des compagnons
+// (companionsRngState), le leur.
 export function applyCompanionActionEffects(session, companionId, effects) {
   const companion = session.companions.find((c) => c.id === companionId);
   if (!companion) return session;
   const world = session.worlds[session.activeWorldId];
 
-  const result = applyHeadAndSchedule(effects, { entity: companion, world, session });
+  const result = applyHeadAndSchedule(effects, { entity: companion, world, session }, session.companionsRngState);
   const entityChanged = result.entity !== companion;
   const worldChanged = result.world !== world;
   const partyChanged = result.session !== session;
@@ -478,6 +484,7 @@ export function applyCompanionActionEffects(session, companionId, effects) {
   const withWorld = worldChanged ? withActiveWorld(session, result.world) : session;
   return {
     ...withWorld,
+    companionsRngState: result.rngState,
     companions: entityChanged ? session.companions.map((c) => (c.id === companionId ? result.entity : c)) : session.companions,
     variables: partyChanged ? result.session.variables : session.variables,
     improvements: partyChanged ? result.session.improvements : session.improvements,

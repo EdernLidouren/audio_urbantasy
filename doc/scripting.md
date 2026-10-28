@@ -808,7 +808,8 @@ jour). La PAUSE gèle l'horloge (aucun delta injecté, voir `doc/time.md`),
 donc ne déclenche rien — aucun code dédié.
 
 **Portée** : le MONDE ACTIF, ses DEUX faces (recto ET verso, même si le
-joueur n'en occupe qu'une). Les autres mondes sont gelés, comme le reste de
+joueur n'en occupe qu'une), puis les COMPAGNONS, toujours avec le joueur
+(un buddy qui réclame à manger à 19 h). Les autres mondes sont gelés, comme le reste de
 leur simulation. Une entité DORMANTE (`present: false`, voir "Règles") ne
 tire pas ; une entité dont la présence n'a pas encore été résolue par un
 tick compte comme présente.
@@ -873,9 +874,9 @@ puis accourt, et reprend enfin ce qu'il faisait (voir "Séquences : wait",
     "emote": "whistle",
     "effects": [
       { "type": "temporaryBehavior", "behavior": { "kind": "stay" }, "durationMs": 1500 },
-      { "type": "wait", "ms": 700 },
+      { "type": "wait", "ms": 700, "variationMs": 150 },
       { "type": "playSound", "role": "vocal" },
-      { "type": "wait", "ms": 500 },
+      { "type": "wait", "ms": 500, "variationMs": 100 },
       { "type": "temporaryBehavior", "behavior": { "kind": "follow", "speed": 1.6, "maxDistance": 1.5 }, "durationMs": 10000 }
     ]
   }
@@ -1190,15 +1191,20 @@ Une liste peut aussi S'ÉCOULER DANS LE TEMPS, découpée par des `wait` (voir
 ```js
 effects: [
   { type: "temporaryBehavior", behavior: { kind: "stay" }, durationMs: 1500 },
-  { type: "wait", ms: 700 },
+  { type: "wait", ms: 700, variationMs: 150 },
   { type: "playSound", role: "vocal" },
-  { type: "wait", ms: 500 },
+  { type: "wait", ms: 500, variationMs: 100 },
   { type: "temporaryBehavior", behavior: { kind: "follow", speed: 1.6, maxDistance: 1.5 }, durationMs: 10000 },
 ]
 ```
 
-`{ ms }` (nombre > 0) : la suite de la liste attend `ms` millisecondes de
-jeu. Ni état, ni rendu, ni mixte (`core/effects.js`/`SEQUENCE_EFFECT_TYPES`) :
+`{ ms, variationMs? }` : la suite de la liste attend `ms` millisecondes de
+jeu (nombre > 0), à `variationMs` près (nombre entre 0 et `ms`, facultatif) :
+un écart tiré dans `[-variationMs, +variationMs]` au moment où la séquence
+démarre, avec le PRNG SEEDÉ de la face qui porte l'entité (celui des
+compagnons pour un compagnon), comme la dispersion du butin. Deux chiens
+sifflés ensemble ne jappent donc pas au même tick, et la même partie
+rejouée donne les mêmes écarts. Sans variation, aucun tirage. Ni état, ni rendu, ni mixte (`core/effects.js`/`SEQUENCE_EFFECT_TYPES`) :
 `wait` DÉCOUPE la liste en TRANCHES (`core/sequence.js`) et n'atteint
 jamais un exécuteur. Valable partout où vit une liste d'effets d'action :
 `effects`, `refusalEffects`, `triggers[].effects`.
@@ -1210,8 +1216,10 @@ jamais un exécuteur. Valable partout où vit une liste d'effets d'action :
   au moins un tick ; deux `wait` accolés s'additionnent). À chaque tick, juste
   après le réducteur, `core/pending-effects.js`/`applyDuePendingEffects`
   applique les effets d'état des tranches échues et rend leurs effets de
-  rendu à la vue (`view/city-screen.js`/`onTick`), même aller-retour que les
-  triggers horaires.
+  rendu à la vue, même aller-retour que les triggers horaires. Les deux
+  forment UN tick de jeu complet, `core/advance.js`/`advanceTick` : le seul
+  point d'entrée pour faire avancer le monde (la vue, les vérifications),
+  jamais le réducteur seul.
 - **Un fil à la fois** — une nouvelle liste AVEC `wait` sur la même entité
   REMPLACE ses tranches en attente (siffler deux fois relance la réaction au
   début) ; une liste SANS `wait` n'y touche pas.

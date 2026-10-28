@@ -53,7 +53,7 @@ import scenePaths, { MAIN_SCENE_IDS, MAIN_SCENE_OF } from "../scenes/index.js";
 import collections from "../collections/index.js";
 import rotations from "../rotations/index.js";
 import { parseScene } from "../core/scene.js";
-import { validateEntityRegistry } from "../core/entity-parse.js";
+import { validateEntityRegistry, entityEffectLists } from "../core/entity-parse.js";
 import { ITEM_REGISTRY } from "../core/items.js";
 import { IMPROVEMENT_REGISTRY } from "../core/improvements.js";
 import { EMOTE_REGISTRY } from "../core/emotes.js";
@@ -190,6 +190,33 @@ export async function auditContent() {
     );
   }
 
+  // Provenance d'un "playSound" (`at`, voir doc/scripting.md/"playSound") :
+  // l'entité visée doit exister dans la scène (une face ou l'autre, le son
+  // traverse) ou être un compagnon du départ ; un son de RÔLE doit être un
+  // rôle qu'elle a. Le chargement ne peut pas le vérifier : il lit une
+  // entité à la fois. Rôle chez un compagnon : non vérifié ici.
+  const companionIds = new Set((NEW_GAME.companions || []).map((companion) => companion.id));
+  function checkPlaySoundTargets(source, scene) {
+    const entities = scene.recto ? [...scene.recto.entities, ...scene.verso.entities] : scene.entities;
+    const byId = new Map(entities.map((entity) => [entity.id, entity]));
+    for (const entity of entities) {
+      for (const [where, effects] of entityEffectLists(entity)) {
+        effects.forEach((effect, i) => {
+          if (effect.type !== "playSound" || effect.at === undefined) return;
+          const at = `${entity.id}.${where}[${i}]`;
+          const target = byId.get(effect.at);
+          if (!target) {
+            if (!companionIds.has(effect.at)) report(source, at, "cible at inconnue", effect.at);
+            return;
+          }
+          if (effect.role !== undefined && !(target.sounds && target.sounds[effect.role])) {
+            report(source, at, `rôle "${effect.role}" absent de la cible`, effect.at);
+          }
+        });
+      }
+    }
+  }
+
   // Description d'une entité qui affiche une série (ou qui devrait) : le
   // gabarit doit porter {message} dans chaque langue si son type cite une
   // série, et jamais sinon (le placeholder se lirait brut).
@@ -217,7 +244,7 @@ export async function auditContent() {
       continue;
     }
     try {
-      parseScene(raw, registry);
+      checkPlaySoundTargets(source, parseScene(raw, registry));
     } catch (error) {
       report(source, url, "scène invalide", error.message);
     }

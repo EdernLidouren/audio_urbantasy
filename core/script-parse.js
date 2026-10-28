@@ -144,7 +144,7 @@ const ACTION_EFFECT_FIELDS = {
   forgetEmote: ["id"],
   startle: [],
   temporaryBehavior: ["behavior", "durationMs"],
-  wait: ["ms"],
+  wait: ["ms", "variationMs"],
   playSound: ["path", "role", "gain", "pitchVariation", "reverbSend", "at", "nature", "tracked"],
   announce: ["key", "assertive"],
   teleport: ["target", "x", "side", "reloadIfSame", "transition"],
@@ -257,14 +257,20 @@ function parseActionEffect(rawEffect, describe, entityVariables, sceneVariables)
     }
     return { type, id: rawEffect.id };
   }
-  // "wait" { ms } — pas de SÉQUENCE, pas un effet (voir core/sequence.js) :
-  // la suite de la liste attend `ms` millisecondes de jeu. Sa place dans
-  // la liste est validée avec la liste entière (validateSequence).
+  // "wait" { ms, variationMs? } — pas de SÉQUENCE, pas un effet (voir
+  // core/sequence.js) : la suite de la liste attend `ms` millisecondes de
+  // jeu, à `variationMs` près (tiré dans un PRNG seedé, jamais au-delà de
+  // `ms` : une attente ne devient jamais négative). Sa place dans la liste
+  // est validée avec la liste entière (validateSequence).
   if (type === "wait") {
     if (!isFiniteNumber(rawEffect.ms) || rawEffect.ms <= 0) {
       fail(`${describe}.ms doit être un nombre > 0 (reçu : ${JSON.stringify(rawEffect.ms)}).`);
     }
-    return { type: "wait", ms: rawEffect.ms };
+    const { variationMs } = rawEffect;
+    if (variationMs !== undefined && (!isFiniteNumber(variationMs) || variationMs < 0 || variationMs > rawEffect.ms)) {
+      fail(`${describe}.variationMs doit être un nombre entre 0 et ms (${rawEffect.ms}) si présent.`);
+    }
+    return variationMs ? { type: "wait", ms: rawEffect.ms, variationMs } : { type: "wait", ms: rawEffect.ms };
   }
   // "startle" (sans champ) — ÉTAT : l'entité qui porte l'action s'enfuit
   // (voir core/startle.js, core/variables.js/applyActionEffects).

@@ -15,7 +15,8 @@
 // PORTÉE : le MONDE ACTIF, ses DEUX faces (une cloche au recto doit se
 // faire entendre, étouffée, depuis le verso — le rendu diégétique de
 // "playSound" emprunte la chaîne d'occlusion existante, voir
-// view/audio/oneshots.js/playEntityOneShot). Les autres mondes ne tirent
+// view/audio/oneshots.js/playEntityOneShot), PUIS les COMPAGNONS, toujours
+// avec le joueur (comme pour les émotes). Les autres mondes ne tirent
 // pas : ils sont gelés, comme le reste de leur simulation. Une entité
 // DORMANTE (present:false) ne tire pas non plus, comme elle ne tique pas.
 //
@@ -103,6 +104,11 @@ export function applyDueTriggers(session, previousTime) {
       if (triggers.length === 0) continue;
       next = applyTriggers(next, entity, triggers, (s, effects) => applyEntityActionEffects(s, entity.id, effects, side), fired);
     }
+  }
+  for (const companion of session.companions) {
+    const triggers = dueTriggers(companion, previousTime, session.time);
+    if (triggers.length === 0) continue;
+    next = applyTriggers(next, companion, triggers, (s, effects) => applyCompanionActionEffects(s, companion.id, effects), fired);
   }
 
   return { session: next, fired };

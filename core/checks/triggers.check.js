@@ -12,6 +12,7 @@ import { TIME_CONFIG } from "../../config/time-values.js";
 import { hourChanged, dueTriggerEffects, applyDueTriggers } from "../triggers.js";
 import { auditNonSerializable, diffStructure, throws } from "../../lib/check.js";
 import { RAW_SCENE } from "./helpers.js";
+import { parseNewGame } from "../new-game.js";
 
 export default function checkTriggers(run) {
   // --- Triggers horaires (core/triggers.js) : validation, détection sur
@@ -156,6 +157,17 @@ export default function checkTriggers(run) {
   );
   const triggerSimple = atTime(createInitialState(triggerSimpleScene, 3), 9 * HOUR);
   run("triggers : monde simple -> la cloche tire", 1, applyDueTriggers(atTime(triggerSimple, 10 * HOUR), triggerSimple.time).fired.length);
+
+  // Compagnon : un trigger horaire le concerne aussi (il suit le joueur).
+  const companionStart = parseNewGame(
+    { startSceneId: "check", companions: [{ id: "buddy", type: "lamp", variables: [{ name: "fed", type: "flag", initial: false }], triggers: [{ on: "hour", hour: 19, effects: [{ type: "setVariable", scope: "entity", name: "fed", value: true }, BELL_TRIGGER.effects[0]] }] }] },
+    HOUR_TRIGGER_REGISTRY
+  ).start;
+  const withBuddy = atTime(createInitialState(triggerSimpleScene, 3, companionStart), 19 * HOUR);
+  const buddyHour = applyDueTriggers(withBuddy, 18 * HOUR + 59);
+  run("triggers : compagnon — effet d'état appliqué à son heure", true, buddyHour.session.companions[0].variables.fed.value);
+  run("triggers : compagnon — son rendu remonte, après la cloche du monde", "bell,buddy", buddyHour.fired.map((f) => f.entity.id).join(","));
+  run("triggers : compagnon — rien hors de son heure", false, applyDueTriggers(atTime(withBuddy, 20 * HOUR), 19 * HOUR + 59).session.companions[0].variables.fed.value);
 
   // Sérialisabilité : `triggers` est de la donnée pure sur l'entité.
   const triggerLeaks = [];
