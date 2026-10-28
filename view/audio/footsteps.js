@@ -101,7 +101,7 @@ export function footstepCandidateKeys({ gait, naturalWalk, ownPath } = {}) {
 
 // État d'un "marcheur" (le joueur ou une entité mobile), voir stepWalker.
 export function createWalkerState(x) {
-  return { lastStepX: x, wasMoving: false, previousX: x };
+  return { lastStepX: x, wasMoving: false, previousX: x, stoppedAt: -Infinity };
 }
 
 // Déclenchement des pas, UNIQUE pour le joueur et les entités : le débit est
@@ -111,17 +111,28 @@ export function createWalkerState(x) {
 //   - wasMoving : le marcheur bougeait-il au tick précédent ;
 //   - previousX : sa position au tick précédent — seule façon fiable de
 //     distinguer "à l'arrêt" de "entre deux jalons" (lastStepX n'avance que
-//     par sauts de stepDistance).
+//     par sauts de stepDistance) ;
+//   - stoppedAt : l'instant où il s'est arrêté (voir restartDelayMs).
 // Au DÉMARRAGE, un pas immédiat (un tapotement bref ne perd jamais son
 // premier pas) ; ensuite, un pas par jalon franchi, chacun à SA position
 // (donc sur sa propre surface). Un changement de sol ne déclenche rien en
 // soi : c'est le jalon suivant qui le fait entendre. Symétrique par
 // construction. `playStepAt(atX)` : l'appelant décide COMMENT jouer.
-export function stepWalker(walker, x, stepDistance, playStepAt) {
+//
+// `restartDelayMs` (0 par défaut : le joueur) : un arrêt plus court que ce
+// délai ne compte pas comme un arrêt — la reprise ne rejoue pas de pas
+// immédiat, les pas restent cadencés par la seule distance, depuis le
+// dernier jalon. C'est ce qu'il faut à une entité qui avance par à-coups
+// (un suiveur plus rapide que sa cible s'arrête et repart à chaque tick
+// au bord de sa zone, voir core/behaviors/follow.js) : sans lui, chaque
+// micro-reprise serait un pas, une rafale frénétique. `now` : l'horloge de
+// l'appelant, en ms (lue seulement avec un délai).
+export function stepWalker(walker, x, stepDistance, playStepAt, { restartDelayMs = 0, now = 0 } = {}) {
   const isMoving = x !== walker.previousX;
 
   if (isMoving) {
-    if (!walker.wasMoving) {
+    const restarting = !walker.wasMoving && (restartDelayMs === 0 || now - walker.stoppedAt >= restartDelayMs);
+    if (restarting) {
       playStepAt(x);
       walker.lastStepX = x;
     } else {
@@ -130,6 +141,8 @@ export function stepWalker(walker, x, stepDistance, playStepAt) {
         playStepAt(walker.lastStepX);
       }
     }
+  } else if (walker.wasMoving) {
+    walker.stoppedAt = now;
   }
 
   walker.wasMoving = isMoving;

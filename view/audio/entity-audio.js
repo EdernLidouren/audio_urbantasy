@@ -13,6 +13,11 @@ import { evaluateCondition, actionContextOf } from "../../core/presence.js";
 import { spatialRendering } from "./spatial.js";
 import { beaconVolumeFactor, footstepVolumeFactor } from "./volume-factors.js";
 import { resolveFootstepPath, stepWalker } from "./footsteps.js";
+import { TUNING_DEFAULTS } from "../../config/tuning-values.js";
+
+// Arrêt minimal d'une entité pour que sa reprise rejoue un pas immédiat
+// (voir footsteps.js/stepWalker, restartDelayMs).
+const ENTITY_STEP_RESTART_MS = TUNING_DEFAULTS.entityStepRestartMs;
 
 // Enveloppe de fondu d'une balise conditionnelle (voir doc/entity-model.md/
 // "Sons conditionnels") : un facteur de volume 0..1 qui rejoint sa cible
@@ -94,9 +99,13 @@ export function createEntityAudio({ getSession, entities, effectiveMuffle, fullF
   }
 
   // Pas des entités mobiles : même mécanisme que le joueur (stepWalker),
-  // chaque pas positionné et sur le sol de l'ENTITÉ.
+  // chaque pas positionné et sur le sol de l'ENTITÉ — à une différence
+  // près : un arrêt plus court que entityStepRestartMs ne compte pas, la
+  // reprise ne rejoue pas de pas immédiat (une entité qui avance par
+  // à-coups, comme un suiveur collé au joueur, garde une cadence de marche).
   function updateEntityMovementSounds(entries, x, world, liveById, forcedMuffle = 0) {
     const volumeFactor = footstepVolumeFactor();
+    const stepOptions = { restartDelayMs: ENTITY_STEP_RESTART_MS, now: performance.now() };
 
     for (const entry of entries) {
       if (!entry.movementPath) continue;
@@ -122,7 +131,7 @@ export function createEntityAudio({ getSession, entities, effectiveMuffle, fullF
           muffle,
           highlighted: entry.highlight && Math.abs(atX - x) <= entry.interactRange,
         });
-      });
+      }, stepOptions);
     }
   }
 

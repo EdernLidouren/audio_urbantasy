@@ -40,6 +40,15 @@ export const TUNING_DEFAULTS = {
   // pas plus rapprochés.
   stepDistance: 0.6,
 
+  // Arrêt minimal (ms, horloge murale) d'une ENTITÉ pour que sa reprise
+  // rejoue un pas immédiat (view/audio/footsteps.js/stepWalker). En deçà,
+  // ses pas restent cadencés par la seule distance : un suiveur collé au
+  // joueur, qui s'arrête et repart à chaque tick, marche à sa cadence au
+  // lieu de piétiner. Plus haut = davantage d'arrêts traités comme des
+  // à-coups ; plus bas = de vraies pauses brèves rendent un pas à la
+  // reprise. Le joueur n'est pas concerné (chaque tapotement garde son pas).
+  entityStepRestartMs: 250,
+
   // Distance au-delà de laquelle une entité devient inaudible (volume 0).
   // Plus haut = on l'entend de plus loin ; plus bas = elle disparaît vite.
   audibleRange: 20,

@@ -1532,7 +1532,13 @@ code. Consulter directement ce fichier pour la valeur courante d'un défaut.
   joueur (`stepDistance`, `config/tuning-values.js`), divisée par ce
   facteur. 1 = même cadence que le joueur à distance parcourue égale — voir
   "Ce qui n'est PAS un paramètre sonore" pour pourquoi la vitesse elle-même
-  n'est jamais réglée ici.
+  n'est jamais réglée ici. Une différence avec le joueur : à la reprise
+  après un arrêt, le joueur rejoue toujours un pas immédiat (un tapotement
+  ne perd jamais son pas), une entité seulement si l'arrêt a duré au moins
+  `entityStepRestartMs` (`config/tuning-values.js`, 250 ms). En deçà, ses
+  pas restent cadencés par la seule distance : un suiveur plus rapide que
+  le joueur, qui s'arrête et repart à chaque tick au bord de sa zone (le
+  chien sifflé, collé au joueur), marche à sa cadence au lieu de piétiner.
 - **`movementGain`** — facteur multiplicatif propre au son de déplacement
   (1 = neutre), même principe que `beaconGain` mais pour le rôle `movement`.
   Peut compenser un fichier source enregistré à un niveau différent des
