@@ -27,11 +27,11 @@ fenêtre horaire sans étalement, un son sans gain...). Les listes de champs
 vivent dans le code, à côté de ce qui les lit (voir "Sources de vérité" en fin
 de document).
 
-## Vue d'ensemble : une seule couche de conditions, cinq consommateurs
+## Vue d'ensemble : une seule couche de conditions, six consommateurs
 
 Le même objet condition (`{ type, ...champs }`) et le même évaluateur
-(`core/presence.js`/`evaluateCondition`) servent à CINQ usages, sans
-jamais cinq mécanismes séparés :
+(`core/presence.js`/`evaluateCondition`) servent à SIX usages, sans
+jamais six mécanismes séparés :
 
 1. **Présence conditionnelle** — `entity.presence` décide si une entité est
    affichée/simulée (voir "Règles" plus bas).
@@ -43,10 +43,16 @@ jamais cinq mécanismes séparés :
 4. **Sons conditionnels** — `sounds.<rôle>.condition` décide si un son d'une
    entité sonne : sa balise (ex. un vidéoprojecteur allumé/éteint par une
    variable) ou ses sons de proximité (ex. une boutique fermée la nuit) ; voir
-   `doc/entity-model.md`/"Sons conditionnels (balise et proximité)".
+   `doc/entity-model.md`/"Sons conditionnels (balise et proximité)". La
+   CADENCE du vocal suit la même couche (`sounds.vocal.rules`, voir
+   "Cadence conditionnelle du vocal" au même endroit).
 5. **Descriptions conditionnelles** — `entity.descriptionRules` choisit la
    description lue à Espace selon l'état (ex. la porte du magasin, rideau de
    fer baissé la nuit) ; voir "Descriptions conditionnelles" plus bas.
+6. **Triggers conditionnels** — `triggers[].condition` décide si un trigger
+   répond à son évènement (ex. le néon défectueux, qui se dérègle au
+   premier sifflement et éclate au second) ; voir "Triggers"/"Commun à
+   tous les kinds" plus bas.
 
 Un futur PNJ qui ne parle qu'à condition, ou un dialogue conditionnel, RÉUTILISERAIT
 cette même couche (nouveau CONSOMMATEUR du même évaluateur), jamais un système de
@@ -898,11 +904,41 @@ l'horloge (état par le core, rendu rejoué par la vue, mixtes refusés).
 
 ### Commun à tous les kinds
 
-Un trigger n'accepte QUE `on`, `effects` et les champs de SON kind (`hour`
-pour `"hour"`, `emote`/`range` pour `"emote"`) : toute autre clé échoue au
-chargement — un réglage de son (`gain`, `pitchVariation`...) se déclare
-sur l'EFFET `playSound`, jamais sur le trigger, et une faute de niveau ne
-doit pas passer en silence.
+Un trigger n'accepte QUE `on`, `effects`, `condition` et les champs de SON
+kind (`hour` pour `"hour"`, `emote`/`range` pour `"emote"`) : toute autre
+clé échoue au chargement — un réglage de son (`gain`, `pitchVariation`...)
+se déclare sur l'EFFET `playSound`, jamais sur le trigger, et une faute de
+niveau ne doit pas passer en silence.
+
+**`condition`** (facultative, tous kinds) : une condition ordinaire (voir
+"Conditions"), validée au chargement comme partout ailleurs. Le trigger ne
+répond que si elle est vraie, évaluée dans le contexte d'une condition
+d'action (l'entité qui porte le trigger, sa scène, la partie,
+l'équipement du joueur). Toutes les conditions d'un même évènement se
+lisent sur l'état d'AVANT l'évènement : un trigger qui fait passer une
+variable de 1 à 2 ne réveille pas, dans la même passe, celui qui attend 2.
+Exemple réel — le néon défectueux de la rue principale
+(`defective_neon_1_v`, `scenes/main-street.json`) se dérègle au premier
+sifflement et n'éclate qu'au second :
+
+```json
+"triggers": [
+  {
+    "on": "emote", "emote": "whistle", "range": 5,
+    "condition": { "type": "variable", "scope": "entity", "name": "phase", "equals": 1 },
+    "effects": [
+      { "type": "setVariable", "scope": "entity", "name": "phase", "value": 2 },
+      { "type": "wait", "ms": 200 },
+      { "type": "playSound", "path": "assets/sounds/effects/electrical_flickering" }
+    ]
+  },
+  {
+    "on": "emote", "emote": "whistle", "range": 5,
+    "condition": { "type": "variable", "scope": "entity", "name": "phase", "equals": 2 },
+    "effects": [ "... l'éclatement, voir dormantUntil et spawn ..." ]
+  }
+]
+```
 
 Un kind de trigger de plus demain (météo, phase...) = une entrée dans
 `TRIGGER_KINDS` (`core/triggers.js`) + sa détection (comme
@@ -1309,6 +1345,74 @@ oiseaux posés (`entities/types/perched_bird_1.js`), Entrée les effraie :
 ```js
 action: { kind: "applyEffects", effects: [{ type: "startle" }] }
 ```
+
+### `"dormantUntil"` — l'entité dort jusqu'à une heure, état, CORE
+
+```js
+{ type: "dormantUntil", hour: 22 }
+```
+
+`{ hour }` (entier de 0 à 23) — l'entité qui PORTE l'action ou le trigger
+devient DORMANTE (voir `doc/entity-model.md`/"Dormance forcée") jusqu'au
+PROCHAIN début de l'heure `hour`, strictement après maintenant : à 23 h,
+le 22 h du lendemain ; à 3 h, celui du soir même
+(`core/time.js`/`nextHourStart`). L'échéance est un instant ABSOLU posé
+sur l'entité (`dormantUntil`, champ runtime, sauvegardé) et comparé à
+l'horloge à chaque résolution de présence
+(`core/presence.js`/`isForcedDormant`) : elle tient que le joueur reste,
+quitte la scène (le monde gelé la relit à son retour) ou recharge sa
+partie, ce qu'un trigger horaire ne ferait pas (une entité dormante ne
+tire pas, un monde quitté ne tique pas). Elle prime sur les règles de
+présence ; l'échéance passée, l'entité retrouve ses règles (le néon se
+rallume à 22 h comme chaque soir, avec son `enterSound`). Un nouvel effet
+remplace l'échéance.
+
+La sortie qu'elle provoque est MUETTE : pas d'`exitSound`, la séquence qui
+la pose joue son propre son. Exemple réel — l'éclatement du néon
+défectueux (`defective_neon_1_v`, `scenes/main-street.json`), qui ne
+reviendra que le soir suivant :
+
+```json
+"effects": [
+  { "type": "playSound", "path": "assets/sounds/effects/neon_bulb_burst" },
+  { "type": "dormantUntil", "hour": 22 },
+  "..."
+]
+```
+
+Les effets d'état d'une séquence s'appliquent même à une entité dormante
+(voir "Séquences : wait") : un `wait` suivi d'un `spawn` après la
+dormance fonctionne, ses effets de rendu, eux, ne sonnent plus.
+
+### `"spawn"` — fait naître une entité éphémère, état, CORE
+
+```js
+{ type: "spawn", spec: { type: "ghosten", behavior: { kind: "wander", speed: 0.4 } } }
+```
+
+`{ spec }` — une entité ÉPHÉMÈRE (voir `doc/entity-model.md`/"Entités
+éphémères") naît à la position de l'entité qui PORTE l'action ou le
+trigger, sur SA face (celle du joueur pour un compagnon). `spec` a la forme
+d'une instance de scène sans `id` ni `x` : `type` (du registre) et toute
+surcharge d'instance (`behavior`, `sounds`, `variables`...). Il est
+résolu AU CHARGEMENT, comme une instance (`core/entity-parse.js`/
+`resolveSpawnSpecs` : type connu, cascade de l'archétype, validation
+complète) : une faute échoue avec la scène, jamais au moment de la
+naissance. `id` et `x` sont refusés (l'éphémère prend un id à sa
+naissance, `spawnEphemeral`, et la position de l'entité qui le fait
+naître). Une entité née d'un `spawn` ne peut pas en porter un elle-même.
+
+Une éphémère ne survit ni à un changement de scène ni à une sauvegarde :
+revenir, ou recharger, la fait disparaître, sans aucune remise à zéro à
+écrire. Une entité qui porte sa présence (règles, entité farouche) naît
+ABSENTE : le tick suivant observe son ENTRÉE, et la vue joue son
+`enterSound` — ou plus tard, quand ses règles l'admettent (un spectre né
+hors de la perception surnaturelle n'apparaît, avec son son, qu'à
+l'activation de celle-ci). Exemple réel — le néon défectueux de la rue
+principale (`defective_neon_1_v`, `scenes/main-street.json`) qui, en
+éclatant, libère le ghosten : `[playSound, dormantUntil, wait 300 ms,
+spawn]`, la naissance arrivant après la dormance du néon (les effets d'état
+d'une séquence s'appliquent même à une entité dormante).
 
 ### `"temporaryBehavior"` — comportement pour un temps, état, CORE
 
@@ -1878,6 +1982,16 @@ que la lire telle quelle. Une variable PERSISTANTE (le défaut) traverse
 INCHANGÉE. Sauvegarde antérieure à ce mécanisme -> sac vide `{}` (`variables`
 absente, portées "scene"/"party" seulement — voir `core/save.js`/
 `backfillWorld`/`migrateSave`, même politique que `defaultSurface`/`indoor`).
+
+**Une volatile vaut pour UNE VISITE.** En plus de la sauvegarde, les
+volatiles de portée "scene" et "entity" reviennent à leur `initial` à
+CHAQUE chargement de leur monde (`core/save.js`/`resetVisitVariables`,
+appelée par `view/world-travel.js`/`prepareLoadedWorld`, comme le retour
+des entités farouches) : revenir dans une scène, ou continuer une partie,
+la retrouve comme neuve — les fenêtres de la mairie refermées, le néon
+défectueux de la rue principale de nouveau en phase 1. Les volatiles de
+portée "party" (et celles des compagnons) voyagent avec le joueur : elles
+ne reviennent à leur initiale qu'à la sauvegarde.
 
 **Accès** (`core/variables.js`) — point d'entrée UNIQUE que le futur type de
 condition et les futures actions d'écriture réutiliseront :

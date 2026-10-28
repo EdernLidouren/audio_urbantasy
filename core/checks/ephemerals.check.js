@@ -14,7 +14,12 @@ import {
   spawnScatteredEphemerals,
   drawScatteredPosition,
   BODY_RADIUS,
+  applyEntityActionEffects,
 } from "../state.js";
+import { advanceTick } from "../advance.js";
+
+// Un tick complet, la session seule (voir core/advance.js).
+const stepOnce = (session) => advanceTick(session, 0).session;
 import { SAVE_VERSION, serializeGame, deserializeGame } from "../save.js";
 import { pickupEntity, lootEntity, lootUniqueEntity, lootEntitySpawn } from "../money.js";
 import { createSeed } from "../rng.js";
@@ -432,4 +437,105 @@ export default function checkEphemerals(run) {
     scatterState,
     lootEntitySpawn(scatterState, "does-not-exist", SCATTER_SPEC, 4, 3)
   );
+
+  checkSpawnEffect(run);
+}
+
+// --- Effet d'action "spawn" (core/script-parse.js, core/entity-parse.js/
+// resolveSpawnSpecs, core/state.js/applySpawns) : le néon défectueux qui
+// éclate et laisse naître le ghosten, sur SA face, à SA position. ---
+const SPAWN_REGISTRY = {
+  neon: { nameKey: "entity.neon.name" },
+  // Un spectre, perceptible seulement en perception surnaturelle.
+  ghost: { nameKey: "entity.ghost.name", observable: true, presence: [{ when: { type: "perceptionActive" }, present: true }] },
+  rock: { nameKey: "entity.rock.name" },
+};
+
+function spawnScene(neonFields, side = "verso") {
+  const neon = { id: "neon", type: "neon", x: 12, ...neonFields };
+  return {
+    id: "spawn-effect-check",
+    titleKey: "scene.demo.name",
+    length: 20,
+    playerStart: 1,
+    recto: { entities: side === "recto" ? [neon] : [] },
+    verso: { entities: side === "verso" ? [neon] : [] },
+  };
+}
+
+function checkSpawnEffect(run) {
+  const withEffects = (effects, side) => spawnScene({ triggers: [{ on: "hour", effects }] }, side);
+  const loads = (effects) => {
+    try {
+      parseScene(withEffects(effects), SPAWN_REGISTRY);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  run("spawn : forme valide chargée", true, loads([{ type: "spawn", spec: { type: "ghost", behavior: { kind: "wander" } } }]));
+  run("spawn : type inconnu rejeté", false, loads([{ type: "spawn", spec: { type: "wraith" } }]));
+  run("spawn : spec sans type rejeté", false, loads([{ type: "spawn", spec: { behavior: { kind: "wander" } } }]));
+  run("spawn : id dans le spec rejeté", false, loads([{ type: "spawn", spec: { type: "ghost", id: "g" } }]));
+  run("spawn : x dans le spec rejeté", false, loads([{ type: "spawn", spec: { type: "ghost", x: 3 } }]));
+  run("spawn : champ inconnu dans le spec rejeté", false, loads([{ type: "spawn", spec: { type: "ghost", colour: "blue" } }]));
+  run("spawn : comportement malformé dans le spec rejeté", false, loads([{ type: "spawn", spec: { type: "ghost", behavior: { kind: "moonwalk" } } }]));
+  run("spawn : champ inconnu sur l'effet rejeté", false, loads([{ type: "spawn", spec: { type: "ghost" }, count: 2 }]));
+  run(
+    "spawn : une entité née d'un spawn n'en fait pas naître d'autre",
+    false,
+    loads([{ type: "spawn", spec: { type: "rock", triggers: [{ on: "hour", effects: [{ type: "spawn", spec: { type: "rock" } }] }] } }])
+  );
+
+  // Spec résolu au chargement, comme une instance : nom et présence de
+  // l'archétype, comportement de l'instance, ni id ni x.
+  const GHOST_SPAWN = { type: "spawn", spec: { type: "ghost", behavior: { kind: "wander" } } };
+  const parsed = parseScene(withEffects([GHOST_SPAWN]), SPAWN_REGISTRY);
+  const resolved = parsed.verso.entities[0].triggers[0].effects[0].spec;
+  run("spawn : spec résolu (nom de l'archétype)", "entity.ghost.name", resolved.labelKey);
+  run("spawn : spec résolu (présence de l'archétype)", 1, resolved.presence.length);
+  run("spawn : spec résolu (comportement de l'instance)", "wander", resolved.behavior.kind);
+  run("spawn : spec sans id ni x", "false,false", ["id" in resolved, "x" in resolved].join(","));
+
+  // Application : l'éclatement à 23 h, joueur au RECTO, néon au VERSO. Le
+  // spectre naît au verso, à la position du néon, après 300 ms ; le néon
+  // est déjà endormi, la séquence va quand même à son terme.
+  const burst = [{ type: "dormantUntil", hour: 22 }, { type: "wait", ms: 300 }, GHOST_SPAWN];
+  const scene = parseScene(spawnScene({ triggers: [{ on: "hour", effects: burst }] }), SPAWN_REGISTRY);
+  const neonOf = (state) => state.worlds[scene.id].verso.entities[0];
+  const ghostsOf = (state, side = "verso") => state.worlds[scene.id][side].entities.filter((e) => e.type === "ghost");
+  const start = { ...createInitialState(scene, 4), time: 23 * 60 };
+  // Les effets PARSÉS (spec résolu), comme en jeu.
+  const fired = applyEntityActionEffects(start, "neon", neonOf(start).triggers[0].effects, "verso");
+  run("spawn : rien avant le wait", 0, ghostsOf(fired).length);
+  let state = fired;
+  for (let i = 0; i < 40 && ghostsOf(state).length === 0; i++) state = stepOnce(state);
+  run("spawn : né après l'attente, même endormi", 1, ghostsOf(state).length);
+  run("spawn : le néon dort", false, neonOf(state).present);
+  const ghost = ghostsOf(state)[0];
+  run("spawn : né sur la face de l'entité (verso), pas celle du joueur", 0, ghostsOf(state, "recto").length);
+  run("spawn : à la position de l'entité", 12, ghost.x);
+  run("spawn : éphémère, avec un id de naissance", "true,true", [ghost.ephemeral, ghost.id.startsWith("ephemeral-")].join(","));
+  run("spawn : avec des règles de présence -> naît absent", false, ghost.present);
+
+  // Perception inactive : il reste absent ; activée, son entrée est
+  // OBSERVÉE (la vue joue son enterSound).
+  const unseen = stepOnce(state);
+  run("spawn : perception inactive -> toujours absent, sans bascule", "false,null", [ghostsOf(unseen)[0].present, ghostsOf(unseen)[0].presenceChanged].map(String).join(","));
+  const seen = stepOnce({ ...unseen, perceptionActive: true });
+  run("spawn : perception activée -> entrée observée", "true,entered", [ghostsOf(seen)[0].present, ghostsOf(seen)[0].presenceChanged].join(","));
+
+  // Sans règle de présence : simplement là, sans champ de présence.
+  const rockScene = parseScene(spawnScene({ triggers: [{ on: "hour", effects: [{ type: "spawn", spec: { type: "rock" } }] }] }, "recto"), SPAWN_REGISTRY);
+  const rocked = applyEntityActionEffects(createInitialState(rockScene, 4), "neon", [{ type: "spawn", spec: rockScene.recto.entities[0].triggers[0].effects[0].spec }]);
+  const rock = rocked.worlds[rockScene.id].recto.entities.find((e) => e.type === "rock");
+  run("spawn : sans règle -> né présent (aucun champ present)", false, "present" in rock);
+
+  // Déterminisme et sauvegarde : même partie, même naissance ; l'éphémère
+  // ne survit pas à la sauvegarde.
+  let replay = fired;
+  for (let i = 0; i < 40 && ghostsOf(replay).length === 0; i++) replay = stepOnce(replay);
+  run.same("spawn : déterministe", ghostsOf(state), ghostsOf(replay));
+  const reload = deserializeGame(serializeGame(state));
+  run("spawn : exclu de la sauvegarde", 0, reload.success ? ghostsOf(reload.session).length : -1);
 }

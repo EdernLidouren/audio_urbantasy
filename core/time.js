@@ -81,6 +81,15 @@ export function hourOfDay(time) {
   return Math.floor(wholeMinutes(time) / minutesPerHour) % hoursPerDay;
 }
 
+// Instant ABSOLU (minutes de jeu) du PROCHAIN début de l'heure `hour`,
+// strictement après `time` : à 23 h 10, le prochain 22 h est celui du
+// lendemain ; à 3 h, celui du soir même. Lu par l'effet "dormantUntil"
+// (core/variables.js/applyActionEffects).
+export function nextHourStart(time, hour) {
+  const sameDay = Math.floor(wholeMinutes(time) / MINUTES_PER_DAY) * MINUTES_PER_DAY + hour * minutesPerHour;
+  return sameDay > time ? sameDay : sameDay + MINUTES_PER_DAY;
+}
+
 // Jour dans le mois courant, 1-indexé (1 à daysPerMonth).
 export function dayOfMonth(time) {
   return (Math.floor(wholeMinutes(time) / MINUTES_PER_DAY) % daysPerMonth) + 1;

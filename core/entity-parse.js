@@ -31,6 +31,47 @@ const SOUND_FIELDS = ["path", "loop", "tracked", ...TUNING_KEYS];
 const CONDITIONAL_SOUND_ROLES = ["beacon", "approachSound", "leaveSound", "proximityLoop"];
 const CONDITIONAL_SOUND_FIELDS = [...SOUND_FIELDS, "condition"];
 
+// Règles de CADENCE du vocal (voir doc/entity-model.md/"Cadence
+// conditionnelle du vocal") : `rules: [{ when, vocalInterval?,
+// vocalIntervalVariation? }]`, la première règle vraie donne la cadence,
+// relue par la vue à chaque échéance — le néon défectueux grésille plus
+// souvent une fois déréglé. Seulement la cadence : un son qui CHANGE de
+// fichier selon l'état serait un autre rôle.
+const VOCAL_SOUND_FIELDS = [...SOUND_FIELDS, "rules"];
+const VOCAL_RULE_SETTINGS = ["vocalInterval", "vocalIntervalVariation"];
+
+function soundFieldsOf(role) {
+  if (role === "vocal") return VOCAL_SOUND_FIELDS;
+  return CONDITIONAL_SOUND_ROLES.includes(role) ? CONDITIONAL_SOUND_FIELDS : SOUND_FIELDS;
+}
+
+// FORME des règles de cadence du vocal ; leurs conditions, qui peuvent lire
+// les variables de l'entité, sont validées avec l'instance
+// (validateVocalRuleConditions). Une règle sans réglage ne changerait rien :
+// refusée.
+function validateVocalRules(rules, describe, failWith) {
+  if (!Array.isArray(rules) || rules.length === 0) {
+    failWith(`${describe} doit être un tableau non vide si présent.`);
+  }
+  rules.forEach((rule, i) => {
+    const where = `${describe}[${i}]`;
+    if (typeof rule !== "object" || rule === null || Array.isArray(rule)) {
+      failWith(`${where} doit être un objet { when, vocalInterval?, vocalIntervalVariation? }.`);
+    }
+    rejectUnknownFields(rule, ["when", ...VOCAL_RULE_SETTINGS], where, failWith);
+    if (rule.when === undefined) failWith(`${where}.when manquant.`);
+    if (!VOCAL_RULE_SETTINGS.some((key) => rule[key] !== undefined)) {
+      failWith(`${where} ne règle rien (attendu : ${VOCAL_RULE_SETTINGS.join(" et/ou ")}).`);
+    }
+    if (rule.vocalInterval !== undefined && !(isFiniteNumber(rule.vocalInterval) && rule.vocalInterval > 0)) {
+      failWith(`${where}.vocalInterval doit être un nombre de ms > 0.`);
+    }
+    if (rule.vocalIntervalVariation !== undefined && !(isFiniteNumber(rule.vocalIntervalVariation) && rule.vocalIntervalVariation >= 0)) {
+      failWith(`${where}.vocalIntervalVariation doit être un nombre de ms >= 0.`);
+    }
+  });
+}
+
 // Réglages dont une valeur hors bornes ne casserait rien au chargement mais
 // rendrait un son absurde (durée négative, vitesse nulle) ou serait ignorée
 // en silence (nature inconnue), refusée ici (voir config/tuning-values.js).
@@ -66,8 +107,9 @@ function validateSounds(sounds, describe, allowNull, failWith = fail) {
     if (typeof descriptor !== "object" || descriptor === null || Array.isArray(descriptor)) {
       failWith(`${describe}.${role} doit être un objet${allowNull ? " (ou null)" : ""}.`);
     }
-    rejectUnknownFields(descriptor, CONDITIONAL_SOUND_ROLES.includes(role) ? CONDITIONAL_SOUND_FIELDS : SOUND_FIELDS, `${describe}.${role}`, failWith);
+    rejectUnknownFields(descriptor, soundFieldsOf(role), `${describe}.${role}`, failWith);
     validateTuningValues(descriptor, `${describe}.${role}`, failWith);
+    if (descriptor.rules !== undefined) validateVocalRules(descriptor.rules, `${describe}.${role}.rules`, failWith);
   }
 }
 
@@ -227,6 +269,30 @@ export function entityEffectLists(entity) {
   return lists;
 }
 
+// Effets "spawn" (voir core/script-parse.js) : le `spec` brut est résolu
+// ICI, au chargement, comme une instance de scène (type connu, cascade de
+// l'archétype, validation complète) — le core n'a plus de registre au
+// moment de l'appliquer. Le résultat n'a ni id ni x : spawnEphemeral les
+// pose (core/state.js). Les listes d'effets viennent d'être construites
+// par le parsing de cette entité : remplacer un effet en place n'atteint
+// aucune donnée partagée. Une entité née d'un spawn ne peut pas en porter
+// un elle-même (`insideSpawn`) : une chaîne A -> B -> A ne finirait jamais
+// de se résoudre.
+const SPAWN_SPEC_ID = "spawn-spec";
+function resolveSpawnSpecs(entity, at, registry, length, sceneVariables, insideSpawn) {
+  for (const [where, effects] of entityEffectLists(entity)) {
+    effects.forEach((effect, i) => {
+      if (effect.type !== "spawn") return;
+      if (insideSpawn) {
+        fail(`${at} : ${where}[${i}] : une entité née d'un "spawn" n'en fait pas naître d'autre.`);
+      }
+      const raw = { ...effect.spec, id: SPAWN_SPEC_ID, x: 0 };
+      const { id, x, ...spec } = parseEntity(raw, 0, registry, length, new Set(), sceneVariables, { insideSpawn: true });
+      effects[i] = { ...effect, spec };
+    });
+  }
+}
+
 // Un "playSound" par `role` (voir core/script-parse.js) qui émane de
 // l'entité PORTEUSE (sans `at`) doit viser un rôle qu'elle a, après la
 // cascade de ses sons : sinon le son ne jouerait jamais, en silence. Avec
@@ -257,6 +323,15 @@ function applySoundConditions(resolvedSounds, instanceSounds, at, entityVariable
       validateCondition(resolvedSounds[role].condition, `${at} : sounds.${role}.condition`, entityVariables, sceneVariables);
     }
   }
+}
+
+// Conditions des règles de cadence du vocal (voir validateVocalRules), après
+// la cascade : celles de l'instance remplacent celles de l'archétype en
+// bloc (un tableau n'est jamais fusionné, voir deepMergeOverride).
+function validateVocalRuleConditions(resolvedSounds, at, entityVariables, sceneVariables) {
+  const rules = resolvedSounds.vocal && resolvedSounds.vocal.rules;
+  if (!rules) return;
+  rules.forEach((rule, i) => validateCondition(rule.when, `${at} : sounds.vocal.rules[${i}].when`, entityVariables, sceneVariables));
 }
 
 // Conteneur de collecte (voir doc/entity-model.md/"Collecte") :
@@ -347,8 +422,9 @@ const ENTITY_FIELDS = [
 // (unicité) ; `sceneVariables` : le sac de variables de la scène, qu'une
 // condition ou un effet peut référencer. Une clé n'est ajoutée à l'entité
 // que si elle est résolue (jamais un `undefined` explicite) : l'état reste de
-// la donnée pure, inchangée par un aller-retour JSON.
-export function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables) {
+// la donnée pure, inchangée par un aller-retour JSON. `insideSpawn` : le
+// `spec` d'un effet "spawn" (voir resolveSpawnSpecs).
+export function parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables, { insideSpawn = false } = {}) {
   if (typeof rawEntity !== "object" || rawEntity === null) {
     fail(`entities[${index}] n'est pas un objet.`);
   }
@@ -448,6 +524,7 @@ export function parseEntity(rawEntity, index, registry, length, seenIds, sceneVa
   }
 
   applySoundConditions(resolvedSounds, sounds, at, entity.variables, sceneVariables);
+  validateVocalRuleConditions(resolvedSounds, at, entity.variables, sceneVariables);
 
   // Réglages d'INSTANCE pour la cascade (config/tuning.js) : transportés tels
   // quels, jamais interprétés — tout nouveau réglage devient surchargeable
@@ -492,6 +569,7 @@ export function parseEntity(rawEntity, index, registry, length, seenIds, sceneVa
     );
   }
 
+  resolveSpawnSpecs(entity, at, registry, length, sceneVariables, insideSpawn);
   checkPlaySoundRoles(entity, at);
 
   // Descriptions conditionnelles : l'instance remplace l'archétype en bloc,

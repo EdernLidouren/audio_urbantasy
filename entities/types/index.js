@@ -65,10 +65,12 @@ import coin from "./coin.js";
 import crate from "./crate.js";
 import cumuloLupus from "./cumulo-lupus.js";
 import decor from "./decor.js";
+import defectiveNeon from "./defective_neon.js";
 import dog from "./dog.js";
 import door from "./door.js";
 import fountain from "./fountain.js";
 import ghost from "./ghost.js";
+import ghosten from "./ghosten.js";
 import glassWindow from "./glass-window.js";
 import hound from "./hound.js";
 import item from "./item.js";
@@ -134,10 +136,12 @@ export default {
   crate,
   cumuloLupus,
   decor,
+  defective_neon: defectiveNeon,
   dog,
   door,
   fountain,
   ghost,
+  ghosten,
   glass_window: glassWindow,
   hound,
   item,

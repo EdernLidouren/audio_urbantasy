@@ -31,10 +31,19 @@
 // à portée de l'entité. Ce n'est pas une transition d'horloge mais un
 // évènement ponctuel, résolu par applyEmoteTriggers plus bas ; même
 // frontière core/vue, même vocabulaire d'effets.
+//
+// CONDITION (`condition`, tous kinds, facultative) : le trigger ne répond
+// que si elle est vraie. Évaluée sur l'état d'AVANT le déclenchement, pour
+// TOUS les triggers d'un même évènement : sans cela, un trigger qui fait
+// passer une variable de 1 à 2 réveillerait aussitôt, dans la même passe,
+// celui qui attend 2 (un seul sifflement ferait éclater le néon défectueux
+// au lieu de le dérégler). `context` : celui d'une condition d'action
+// (core/presence.js/actionContextOf), construit sur la session d'avant.
 
 import { TIME_CONFIG } from "../config/time-values.js";
 import { hourOfDay } from "./time.js";
 import { isTwoSided, resolveFace, applyEntityActionEffects, applyCompanionActionEffects } from "./state.js";
+import { evaluateCondition, actionContextOf } from "./presence.js";
 import { isRenderEffect } from "./effects.js";
 import { EMOTE_REGISTRY } from "./emotes.js";
 import { sequenceHead } from "./sequence.js";
@@ -55,18 +64,28 @@ export function hourChanged(previousTime, nextTime) {
   return hourIndex(previousTime) !== hourIndex(nextTime);
 }
 
+// La condition d'un trigger est-elle remplie ? Sans condition : oui. Sans
+// session (vérifications qui interrogent un trigger seul) : une condition
+// ne peut pas être évaluée, le trigger ne répond pas.
+function conditionHolds(trigger, entity, session) {
+  if (!trigger.condition) return true;
+  return session !== undefined && evaluateCondition(trigger.condition, actionContextOf(session, entity));
+}
+
 // Triggers horaires dus pour UNE entité entre deux instants, dans l'ordre
-// déclaré.
-export function dueTriggers(entity, previousTime, nextTime) {
+// déclaré. `session` : l'état d'avant, pour les conditions.
+export function dueTriggers(entity, previousTime, nextTime, session) {
   if (!entity.triggers || entity.present === false) return [];
   if (!hourChanged(previousTime, nextTime)) return [];
   const hour = hourOfDay(nextTime);
-  return entity.triggers.filter((trigger) => trigger.on === "hour" && (trigger.hour === undefined || trigger.hour === hour));
+  return entity.triggers.filter(
+    (trigger) => trigger.on === "hour" && (trigger.hour === undefined || trigger.hour === hour) && conditionHolds(trigger, entity, session)
+  );
 }
 
 // Leurs effets, mis bout à bout (lecture seule, pour les vérifications).
-export function dueTriggerEffects(entity, previousTime, nextTime) {
-  return dueTriggers(entity, previousTime, nextTime).flatMap((trigger) => trigger.effects);
+export function dueTriggerEffects(entity, previousTime, nextTime, session) {
+  return dueTriggers(entity, previousTime, nextTime, session).flatMap((trigger) => trigger.effects);
 }
 
 // Applique les triggers `triggers` d'UNE entité, UN PAR UN : chaque liste
@@ -90,7 +109,7 @@ function applyTriggers(session, entity, triggers, apply, fired) {
 // monde actif (les deux faces). Renvoie { session, fired } : la session
 // après les effets d'ÉTAT, et les effets de RENDU dus, par entité, à
 // rejouer par la vue. Aucun trigger dû -> MÊME référence de session, fired
-// vide.
+// vide. Les conditions se lisent toutes sur `session`, l'état d'avant.
 export function applyDueTriggers(session, previousTime) {
   const world = session.worlds[session.activeWorldId];
   const sides = isTwoSided(world) ? ["recto", "verso"] : [session.player.side];
@@ -100,13 +119,13 @@ export function applyDueTriggers(session, previousTime) {
   for (const side of sides) {
     const face = isTwoSided(world) ? world[side] : world;
     for (const entity of face.entities) {
-      const triggers = dueTriggers(entity, previousTime, session.time);
+      const triggers = dueTriggers(entity, previousTime, session.time, session);
       if (triggers.length === 0) continue;
       next = applyTriggers(next, entity, triggers, (s, effects) => applyEntityActionEffects(s, entity.id, effects, side), fired);
     }
   }
   for (const companion of session.companions) {
-    const triggers = dueTriggers(companion, previousTime, session.time);
+    const triggers = dueTriggers(companion, previousTime, session.time, session);
     if (triggers.length === 0) continue;
     next = applyTriggers(next, companion, triggers, (s, effects) => applyCompanionActionEffects(s, companion.id, effects), fired);
   }
@@ -129,20 +148,22 @@ export function emoteTriggerRange(trigger, emoteId) {
 // que l'horloge, aucun « premier gagnant »). Un trigger sans `emote`
 // répond à toutes. Une entité dormante (règle de présence) ou déjà enfuie
 // (core/startle.js : `startled`, dormante seulement au tick suivant) ne
-// réagit pas : elle n'est déjà plus là.
-export function emoteTriggers(entity, emoteId, distance) {
+// réagit pas : elle n'est déjà plus là. `session` : l'état d'avant
+// l'émote, pour les conditions.
+export function emoteTriggers(entity, emoteId, distance, session) {
   if (!entity.triggers || entity.present === false || entity.startled) return [];
   return entity.triggers.filter(
     (trigger) =>
       trigger.on === "emote" &&
       (trigger.emote === undefined || trigger.emote === emoteId) &&
-      distance <= emoteTriggerRange(trigger, emoteId)
+      distance <= emoteTriggerRange(trigger, emoteId) &&
+      conditionHolds(trigger, entity, session)
   );
 }
 
 // Leurs effets, mis bout à bout (lecture seule, pour les vérifications).
-export function emoteTriggerEffects(entity, emoteId, distance) {
-  return emoteTriggers(entity, emoteId, distance).flatMap((trigger) => trigger.effects);
+export function emoteTriggerEffects(entity, emoteId, distance, session) {
+  return emoteTriggers(entity, emoteId, distance, session).flatMap((trigger) => trigger.effects);
 }
 
 // Le joueur fait l'émote `emoteId` depuis `sourceX` (sa position — passée
@@ -155,7 +176,8 @@ export function emoteTriggerEffects(entity, emoteId, distance) {
 // Renvoie { session, fired }, exactement comme applyDueTriggers : la session
 // après les effets d'ÉTAT, les effets de RENDU dus par entité pour la vue.
 // Aucun trigger dû -> MÊME référence de session, fired vide. Pur et sans
-// tirage : même session + même émote = même résultat.
+// tirage : même session + même émote = même résultat. Les conditions se
+// lisent toutes sur `session`, l'état d'avant l'émote.
 export function applyEmoteTriggers(session, emoteId, sourceX) {
   const world = session.worlds[session.activeWorldId];
   const side = session.player.side;
@@ -163,12 +185,12 @@ export function applyEmoteTriggers(session, emoteId, sourceX) {
   const fired = [];
 
   for (const entity of resolveFace(world, side).entities) {
-    const triggers = emoteTriggers(entity, emoteId, Math.abs(entity.x - sourceX));
+    const triggers = emoteTriggers(entity, emoteId, Math.abs(entity.x - sourceX), session);
     if (triggers.length === 0) continue;
     next = applyTriggers(next, entity, triggers, (s, effects) => applyEntityActionEffects(s, entity.id, effects, side), fired);
   }
   for (const companion of session.companions) {
-    const triggers = emoteTriggers(companion, emoteId, Math.abs(companion.x - sourceX));
+    const triggers = emoteTriggers(companion, emoteId, Math.abs(companion.x - sourceX), session);
     if (triggers.length === 0) continue;
     next = applyTriggers(next, companion, triggers, (s, effects) => applyCompanionActionEffects(s, companion.id, effects), fired);
   }

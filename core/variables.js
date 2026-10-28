@@ -32,6 +32,7 @@
 import { giveImprovement, removeImprovement } from "./improvements.js";
 import { learnEmote, forgetEmote } from "./emotes.js";
 import { TICK_MS } from "../lib/loop.js";
+import { nextHourStart } from "./time.js";
 import { isNonEmptyString, rejectUnknownFields } from "../lib/validate.js";
 
 export const VARIABLE_TYPES = ["flag", "int"];
@@ -237,6 +238,26 @@ export function applyActionEffects(effects, context) {
       if (!ctx.entity) return ctx;
       const ticksLeft = Math.max(1, Math.round(effect.durationMs / TICK_MS));
       return { ...ctx, entity: { ...ctx.entity, temporaryBehavior: { behavior: effect.behavior, ticksLeft } } };
+    }
+    // dormantUntil : l'entité dort jusqu'au prochain début de l'heure
+    // `hour` — un instant ABSOLU (core/time.js/nextHourStart), comparé à
+    // l'horloge à chaque résolution de présence (core/presence.js/
+    // isForcedDormant) : il tient que le joueur reste, parte (monde gelé,
+    // relu à son retour) ou recharge sa partie. Un nouvel effet remplace
+    // l'échéance. Contexte sans entité ou sans partie (pas d'horloge) ->
+    // `ctx` inchangé.
+    if (effect.type === "dormantUntil") {
+      if (!ctx.entity || !ctx.session) return ctx;
+      return { ...ctx, entity: { ...ctx.entity, dormantUntil: nextHourStart(ctx.session.time, effect.hour) } };
+    }
+    // spawn : une entité ÉPHÉMÈRE naît sur la position de l'entité qui porte
+    // l'effet. Ce module ne connaît pas les faces : il NOTE la naissance
+    // (`ctx.spawns`, dans l'ordre), que core/state.js/
+    // applyEntityActionEffects réalise ensuite sur la face de l'entité.
+    // Contexte sans entité -> `ctx` inchangé.
+    if (effect.type === "spawn") {
+      if (!ctx.entity) return ctx;
+      return { ...ctx, spawns: [...(ctx.spawns || []), { spec: effect.spec, x: ctx.entity.x }] };
     }
     return ctx;
   }, context);

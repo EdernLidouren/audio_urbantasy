@@ -18,6 +18,7 @@ import { refillDueSpawns } from "../core/spawn.js";
 import { returnStartledEntities } from "../core/startle.js";
 import { forgetTemporaryBehaviors } from "../core/temporary-behavior.js";
 import { forgetPendingEffects } from "../core/pending-effects.js";
+import { resetVisitVariables } from "../core/save.js";
 import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";
 import { resolveTuning } from "../config/tuning.js";
@@ -65,12 +66,14 @@ export function createWorldTravel({ getSession, setSession }) {
   // collectibles posés sont des entités ordinaires, découvertes au montage
   // comme les autres), le retour des entités farouches envolées lors
   // d'une visite précédente (voir core/startle.js/returnStartledEntities),
-  // et l'oubli des comportements temporaires et des séquences en cours (un
-  // chien sifflé juste avant de partir, voir core/temporary-behavior.js et
+  // le retour des variables volatiles à leur initiale (une volatile ne vaut
+  // que pour une visite, voir core/save.js/resetVisitVariables), et l'oubli
+  // des comportements temporaires et des séquences en cours (un chien
+  // sifflé juste avant de partir, voir core/temporary-behavior.js et
   // core/pending-effects.js).
   function prepareLoadedWorld() {
     const refilled = returnStartledEntities(refillDueSpawns(getSession(), registry));
-    setSession(forgetPendingEffects(forgetTemporaryBehaviors(refilled)));
+    setSession(forgetPendingEffects(forgetTemporaryBehaviors(resetVisitVariables(refilled))));
   }
 
   // Première entrée en ville.

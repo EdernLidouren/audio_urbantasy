@@ -39,6 +39,8 @@ export const STATE_EFFECT_TYPES = [
   "forgetEmote",
   "startle",
   "temporaryBehavior",
+  "dormantUntil",
+  "spawn",
 ];
 export const RENDER_EFFECT_TYPES = ["playSound", "announce"];
 export const MIXED_EFFECT_TYPES = ["teleport"];

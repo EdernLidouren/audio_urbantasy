@@ -69,7 +69,7 @@ import { MAX_COMPANIONS } from "../config/companions.js";
 import { MAX_EPHEMERALS } from "../config/ephemerals.js";
 import { createSeed, nextRandom } from "./rng.js";
 import { clamp } from "../lib/math.js";
-import { isBlocking, presenceContextOf } from "./presence.js";
+import { isBlocking, presenceContextOf, tracksPresence } from "./presence.js";
 import { INITIAL_TIME } from "./time.js";
 import { createInitialWeather } from "./weather.js";
 import { parseVariables, applyActionEffects } from "./variables.js";
@@ -436,7 +436,7 @@ export function applyEntityActionEffects(session, entityId, effects, side = sess
   const entityChanged = result.entity !== entity;
   const worldChanged = result.world !== world;
   const partyChanged = result.session !== session;
-  if (!entityChanged && !worldChanged && !partyChanged) return session;
+  if (!entityChanged && !worldChanged && !partyChanged && !result.spawns) return session;
 
   let nextWorld = worldChanged ? result.world : world;
   if (entityChanged) {
@@ -446,12 +446,25 @@ export function applyEntityActionEffects(session, entityId, effects, side = sess
   }
 
   const withWorld = worldChanged || entityChanged ? withActiveWorld(session, nextWorld) : session;
-  return {
+  const next = {
     ...withWorld,
     variables: partyChanged ? result.session.variables : session.variables,
     improvements: partyChanged ? result.session.improvements : session.improvements,
     emotes: partyChanged ? result.session.emotes : session.emotes,
   };
+  return applySpawns(next, result.spawns, side);
+}
+
+// Naissances notées par l'effet "spawn" (voir core/variables.js/
+// applyActionEffects), réalisées dans l'ordre sur la face `side` par
+// spawnEphemeral. Une entité qui porte sa présence (règles, voir
+// core/presence.js/tracksPresence) naît ABSENTE (`present: false`) : le
+// tick suivant observe son ENTRÉE et la vue joue son enterSound (le
+// ghosten qui apparaît) — ou plus tard, quand ses règles l'admettent (la
+// perception activée). Sans règle, elle est simplement là.
+function applySpawns(session, spawns, side) {
+  if (!spawns) return session;
+  return spawns.reduce((next, { spec, x }) => spawnEphemeral(next, tracksPresence(spec) ? { ...spec, present: false } : spec, x, side), session);
 }
 
 // Tête appliquée, suite mise en attente sur l'entité (voir
@@ -479,10 +492,10 @@ export function applyCompanionActionEffects(session, companionId, effects) {
   const entityChanged = result.entity !== companion;
   const worldChanged = result.world !== world;
   const partyChanged = result.session !== session;
-  if (!entityChanged && !worldChanged && !partyChanged) return session;
+  if (!entityChanged && !worldChanged && !partyChanged && !result.spawns) return session;
 
   const withWorld = worldChanged ? withActiveWorld(session, result.world) : session;
-  return {
+  const next = {
     ...withWorld,
     companionsRngState: result.rngState,
     companions: entityChanged ? session.companions.map((c) => (c.id === companionId ? result.entity : c)) : session.companions,
@@ -490,6 +503,8 @@ export function applyCompanionActionEffects(session, companionId, effects) {
     improvements: partyChanged ? result.session.improvements : session.improvements,
     emotes: partyChanged ? result.session.emotes : session.emotes,
   };
+  // Un compagnon suit le joueur : ce qu'il fait naître naît sur SA face.
+  return applySpawns(next, result.spawns, session.player.side);
 }
 
 // Crée UNE entité ÉPHÉMÈRE dans le monde ACTIF, à la position x — point
@@ -529,9 +544,12 @@ export function applyCompanionActionEffects(session, companionId, effects) {
 // éphémère trouvée). Transitoire par nature : cohérent qu'il cède la place
 // plutôt que de refuser la création demandée (alternative "refuser le
 // nouveau" possible, non retenue ici).
-export function spawnEphemeral(session, spec, x) {
+//
+// `side` : la face où l'entité naît — celle du joueur par défaut, celle de
+// l'entité qui la fait naître pour l'effet "spawn" (applySpawns).
+export function spawnEphemeral(session, spec, x, side = session.player.side) {
   const world = session.worlds[session.activeWorldId];
-  const face = resolveFace(world, session.player.side);
+  const face = resolveFace(world, side);
   const entity = { ...spec, id: `ephemeral-${face.nextEphemeralId}`, x, ephemeral: true };
   let entities = [...face.entities, entity];
 
@@ -540,7 +558,7 @@ export function spawnEphemeral(session, spec, x) {
     entities = [...entities.slice(0, oldestIndex), ...entities.slice(oldestIndex + 1)];
   }
 
-  return updateActiveFace(session, { entities, nextEphemeralId: face.nextEphemeralId + 1 });
+  return updateActiveFace(session, { entities, nextEphemeralId: face.nextEphemeralId + 1 }, side);
 }
 
 // Tentatives maximum avant d'abandonner un tirage éparpillé et de retomber

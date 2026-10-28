@@ -144,6 +144,8 @@ const ACTION_EFFECT_FIELDS = {
   forgetEmote: ["id"],
   startle: [],
   temporaryBehavior: ["behavior", "durationMs"],
+  dormantUntil: ["hour"],
+  spawn: ["spec"],
   wait: ["ms", "variationMs"],
   playSound: ["path", "role", "gain", "pitchVariation", "reverbSend", "at", "nature", "tracked"],
   announce: ["key", "assertive"],
@@ -292,6 +294,32 @@ function parseActionEffect(rawEffect, describe, entityVariables, sceneVariables)
     }
     return { type, behavior, durationMs: rawEffect.durationMs };
   }
+  // "dormantUntil" { hour } — ÉTAT : l'entité qui porte l'effet devient
+  // DORMANTE jusqu'au prochain début de l'heure `hour` (voir
+  // core/variables.js/applyActionEffects, core/presence.js/
+  // isForcedDormant), même si le joueur n'est plus là pour le voir.
+  if (type === "dormantUntil") {
+    if (!Number.isInteger(rawEffect.hour) || rawEffect.hour < 0 || rawEffect.hour >= TIME_CONFIG.hoursPerDay) {
+      fail(`${describe}.hour doit être un entier entre 0 et ${TIME_CONFIG.hoursPerDay - 1} (reçu : ${JSON.stringify(rawEffect.hour)}).`);
+    }
+    return { type, hour: rawEffect.hour };
+  }
+  // "spawn" { spec } — ÉTAT : fait naître une entité ÉPHÉMÈRE (voir
+  // doc/entity-model.md/"Entités éphémères") à la position de l'entité qui
+  // porte l'effet. `spec` a la forme d'une instance de scène sans id ni x :
+  // seule sa FORME est vérifiée ici ; core/entity-parse.js/
+  // resolveSpawnSpecs le résout avec le registre (type connu, cascade de
+  // l'archétype), ce module n'en a pas.
+  if (type === "spawn") {
+    const { spec } = rawEffect;
+    if (typeof spec !== "object" || spec === null || Array.isArray(spec) || !isNonEmptyString(spec.type)) {
+      fail(`${describe}.spec doit être un objet { type, ...champs d'une instance }.`);
+    }
+    if (spec.id !== undefined || spec.x !== undefined) {
+      fail(`${describe}.spec : ni id ni x (l'éphémère prend un id à sa naissance et la position de l'entité qui le fait naître).`);
+    }
+    return { type, spec };
+  }
   if (type === "playSound") {
     // `path` (un pool, ou un fichier) OU `role` (le son de rôle de l'entité
     // qui émet, avec ses propres réglages — le jappement du chien sifflé),
@@ -387,7 +415,10 @@ function parseActionEffect(rawEffect, describe, entityVariables, sceneVariables)
 // chargement plutôt que silencieusement ignoré. Un trigger sans effet
 // échoue, comme une règle muette (voir parsePresenceRule). Un champ propre
 // à un AUTRE kind (`hour` sur un trigger d'émote...) échoue aussi.
-const TRIGGER_FIELDS = ["on", "hour", "emote", "range", "effects"];
+// `condition` (tous kinds, facultative) : même condition que partout
+// ailleurs, le trigger ne répond que si elle est vraie (évaluée sur l'état
+// d'AVANT le déclenchement, voir core/triggers.js).
+const TRIGGER_FIELDS = ["on", "hour", "emote", "range", "condition", "effects"];
 const TRIGGER_KIND_FIELDS = { hour: ["hour"], emote: ["emote", "range"] };
 
 export function parseTrigger(rawTrigger, describe, entityVariables, sceneVariables) {
@@ -434,6 +465,9 @@ export function parseTrigger(rawTrigger, describe, entityVariables, sceneVariabl
   ) {
     fail(`${describe}.hour doit être un entier entre 0 et ${TIME_CONFIG.hoursPerDay - 1} si présent.`);
   }
+  if (rawTrigger.condition !== undefined) {
+    validateCondition(rawTrigger.condition, `${describe}.condition`, entityVariables, sceneVariables);
+  }
   if (!Array.isArray(rawTrigger.effects) || rawTrigger.effects.length === 0) {
     fail(`${describe}.effects doit être un tableau non vide.`);
   }
@@ -449,6 +483,7 @@ export function parseTrigger(rawTrigger, describe, entityVariables, sceneVariabl
   if (rawTrigger.hour !== undefined) trigger.hour = rawTrigger.hour;
   if (rawTrigger.emote !== undefined) trigger.emote = rawTrigger.emote;
   if (rawTrigger.range !== undefined) trigger.range = rawTrigger.range;
+  if (rawTrigger.condition !== undefined) trigger.condition = rawTrigger.condition;
   return trigger;
 }
 

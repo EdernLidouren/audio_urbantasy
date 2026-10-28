@@ -234,9 +234,12 @@ JSON de scène, une entité ÉPHÉMÈRE n'est par définition jamais DÉCLARÉE.
   `spawnScatteredEphemerals` (plusieurs éphémères éparpillés autour d'une
   source), le butin d'une action (`core/money.js`/`lootEntitySpawn`, voir
   "Spawn déclenché par une action" plus bas) et la fouille d'un conteneur
-  (`core/spawn.js`/`searchContainer`). Rien dans le mécanisme n'est
-  spécifique à l'un d'eux : un objet lâché par un compagnon, un effet,
-  s'y greffent de la même façon. `spec` est un
+  (`core/spawn.js`/`searchContainer`), et l'effet d'action `"spawn"`
+  (`core/state.js`/`applySpawns`, voir `doc/scripting.md`/"Effets
+  d'action"), qui fait naître l'éphémère sur la face de l'entité qui le
+  porte, absente si elle porte sa présence, pour que son entrée soit
+  observée (`enterSound`). Rien dans le mécanisme n'est spécifique à l'un
+  d'eux : un objet lâché par un compagnon s'y greffe de la même façon. `spec` est un
   descripteur d'entité DÉJÀ RÉSOLU
   (`type`, `labelKey`, `sounds`, `blocksMovement`, `observable`,
   `interactable`, `action`...) — EXACTEMENT la forme qu'une entité obtient
@@ -1113,6 +1116,29 @@ dans le JSON de scène) :
   `stepEntities`) ; le buddy du départ suit le joueur de loin et accourt au
   sifflement.
 
+### Dormance forcée
+
+L'effet d'action `"dormantUntil"` (voir `doc/scripting.md`/"Effets
+d'action") endort l'entité qui le porte jusqu'au prochain début d'une
+heure donnée : le néon défectueux de la rue principale, une fois éclaté,
+ne revient que le soir suivant (la ville l'a remplacé, sans qu'on le
+représente). Un seul champ runtime, `dormantUntil` (un instant absolu en
+minutes de jeu, jamais écrit dans le JSON de scène, sauvegardé) :
+
+- **Priorité** — tant que l'horloge n'a pas atteint l'échéance, l'entité est
+  dormante quoi que disent ses règles de présence, avec ses trois plans
+  coupés (`core/presence.js`/`isForcedDormant`, lu par
+  `resolveEntityRules`). Une entité sans règle de présence porte sa
+  présence dès qu'elle est endormie (`tracksPresence`).
+- **Échéance** — comparée à l'horloge à chaque tick, jamais décomptée : elle
+  tient quand le monde est gelé (le joueur ailleurs), au retour, et à travers
+  une sauvegarde. Rien ne l'oublie au chargement du monde, contrairement à
+  `startled`. Passée, le champ reste, inerte.
+- **Sortie muette** — la bascule `"exited"` qu'elle provoque arrête la
+  balise mais ne joue PAS l'`exitSound` (`view/audio/entity-audio.js`) : la
+  séquence qui pose la dormance joue son propre son. Le réveil, lui, est
+  une entrée ordinaire (`enterSound`).
+
 ### Triggers horaires et d'émote — voir `doc/scripting.md`/"Triggers"
 
 Distincts des triggers de COMPORTEMENT ci-dessus (portés par une règle de
@@ -1404,7 +1430,9 @@ Règles :
   temporaires du croisement recto/verso — une balise éteinte reste éteinte.
 - **Balise et sons de proximité seulement** : le `vocal` n'a pas de condition
   aujourd'hui (aucun cas concret), ce serait la même mécanique le jour où il
-  en faut une. Une `condition` sur un autre rôle est refusée au chargement.
+  en faut une ; sa CADENCE, elle, peut dépendre de l'état (voir "Cadence
+  conditionnelle du vocal" plus bas). Une `condition` sur un autre rôle est
+  refusée au chargement.
 
 La condition peut lire n'importe quel état du script, pas seulement une
 variable : la bouche d'égout (`entities/types/storm_drain.js`) ne coule que
@@ -1429,6 +1457,37 @@ l'INSTANCE, avec les mêmes horaires à chaque endroit :
   positionné sur la porte, voir `doc/scripting.md`/"Triggers") ;
 - `action` : même condition 8 -> 20, et un refus qui annonce l'horaire
   (`door.default.shop_hours_refusal`).
+
+### Cadence conditionnelle du vocal
+
+`sounds.vocal.rules` (facultatif) : `[{ when, vocalInterval?,
+vocalIntervalVariation? }]`. La PREMIÈRE règle dont la condition est vraie
+donne la cadence du vocal, relue par la vue à chaque échéance
+(`view/audio/entity-audio.js`/`nextOccurrenceAt`), dans le même contexte
+qu'une balise conditionnelle (variables COURANTES de l'entité). Aucune règle
+vraie : la cadence du rôle. Un réglage absent d'une règle garde celui du
+rôle. Un changement d'état vaut à partir du vocal suivant : l'échéance déjà
+tirée n'est pas recalculée.
+
+- **Seulement la cadence** : une règle n'accepte que `when`,
+  `vocalInterval` (ms > 0) et `vocalIntervalVariation` (ms >= 0), au moins
+  l'un des deux réglages. Un vocal qui changerait de fichier selon l'état
+  serait un autre besoin.
+- **Validation** : la forme avec le descripteur (archétype comme instance),
+  les conditions avec l'instance, qui déclare les variables qu'elles lisent.
+  Les règles de l'instance remplacent celles de l'archétype en bloc.
+
+Exemple réel — le néon défectueux de la rue principale
+(`defective_neon_1_v`, `scenes/main-street.json`), qui grésille plus souvent
+une fois déréglé par un premier sifflement :
+
+```json
+"sounds": {
+  "vocal": {
+    "rules": [{ "when": { "type": "variable", "scope": "entity", "name": "phase", "equals": 2 }, "vocalInterval": 2000, "vocalIntervalVariation": 1000 }]
+  }
+}
+```
 
 ## Paramètres sonores
 

@@ -6,10 +6,13 @@
 //
 // Présence conditionnelle (voir core/presence.js) : une entité dormante est
 // "comme si absente" — ni balise, ni déclenchement, ni pas. Ses bascules
-// (live.presenceChanged, posé par le core) jouent enterSound/exitSound.
+// (live.presenceChanged, posé par le core) jouent enterSound/exitSound —
+// sauf une sortie due à une dormance FORCÉE (effet "dormantUntil", voir
+// core/presence.js/isForcedDormant), muette : la séquence qui l'a posée
+// joue son propre son (le néon qui éclate ne grésille pas en plus).
 
 import { getInactiveFace } from "../../core/state.js";
-import { evaluateCondition, actionContextOf } from "../../core/presence.js";
+import { evaluateCondition, actionContextOf, isForcedDormant } from "../../core/presence.js";
 import { spatialRendering } from "./spatial.js";
 import { beaconVolumeFactor, footstepVolumeFactor } from "./volume-factors.js";
 import { resolveFootstepPath, stepWalker } from "./footsteps.js";
@@ -59,6 +62,18 @@ export function createEntityAudio({ getSession, entities, effectiveMuffle, fullF
     return evaluateCondition(condition, actionContextOf(getSession(), live));
   }
 
+  // Prochaine échéance d'une source intermittente : sa cadence, ou celle de
+  // la première de ses règles dont la condition est vraie pour l'entité
+  // VIVANTE (même contexte que la balise conditionnelle) — le néon
+  // défectueux déréglé grésille plus souvent. Relue à chaque échéance : un
+  // changement d'état vaut à partir du son suivant.
+  function nextOccurrenceAt(src, live, now) {
+    const rule = src.cadenceRules && src.cadenceRules.find((candidate) => beaconConditionAllows(candidate.when, live));
+    const interval = (rule && rule.interval) ?? src.interval;
+    const variation = (rule && rule.intervalVariation) ?? src.intervalVariation;
+    return now + jitteredIntervalMs(interval, variation);
+  }
+
   // Sources INTERMITTENTES (beacon intermittent, vocal) : à l'échéance, un
   // son ponctuel puis une nouvelle échéance. SUIVI par défaut (une entité
   // rapide n'abandonne pas son vocal derrière elle), ancré sinon. Échéances
@@ -77,7 +92,7 @@ export function createEntityAudio({ getSession, entities, effectiveMuffle, fullF
 
         if (src.tracked) {
           oneShots.startTrackedOneShot(entry.entity.id, { entry, live: liveById.get(entry.entity.id), forcedMuffle }, src);
-          src.nextAt = now + jitteredIntervalMs(src.interval, src.intervalVariation);
+          src.nextAt = nextOccurrenceAt(src, liveById.get(entry.entity.id), now);
           continue;
         }
         oneShots.playPositionedOneShot(src.path, {
@@ -93,7 +108,7 @@ export function createEntityAudio({ getSession, entities, effectiveMuffle, fullF
           muffle,
           highlighted: entry.highlight && Math.abs(liveById.get(entry.entity.id).x - x) <= entry.interactRange,
         });
-        src.nextAt = now + jitteredIntervalMs(src.interval, src.intervalVariation);
+        src.nextAt = nextOccurrenceAt(src, liveById.get(entry.entity.id), now);
       }
     }
   }
@@ -198,7 +213,7 @@ export function createEntityAudio({ getSession, entities, effectiveMuffle, fullF
       const relX = live.x - x;
       const muffle = effectiveMuffle(entry, 0);
 
-      if (live.presenceChanged === "exited" && entry.exitSound) {
+      if (live.presenceChanged === "exited" && entry.exitSound && !isForcedDormant(live, getSession().time)) {
         oneShots.playTransitionSound(entry, relX, entry.exitSound, muffle);
       } else if (live.presenceChanged === "entered" && entry.enterSound) {
         oneShots.playTransitionSound(entry, relX, entry.enterSound, muffle);
@@ -212,7 +227,7 @@ export function createEntityAudio({ getSession, entities, effectiveMuffle, fullF
     for (const entry of otherEntitySounds) {
       const live = otherLiveById.get(entry.entity.id);
       const relX = live.x - x;
-      if (live.presenceChanged === "exited" && entry.exitSound) {
+      if (live.presenceChanged === "exited" && entry.exitSound && !isForcedDormant(live, getSession().time)) {
         oneShots.playTransitionSound(entry, relX, entry.exitSound, fullFaceMuffle);
       } else if (live.presenceChanged === "entered" && entry.enterSound) {
         oneShots.playTransitionSound(entry, relX, entry.enterSound, fullFaceMuffle);

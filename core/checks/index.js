@@ -45,6 +45,7 @@ import checkCollections from "./collections.check.js";
 import checkTriggers from "./triggers.check.js";
 import checkNewGame from "./new-game.check.js";
 import checkStartle from "./startle.check.js";
+import checkDormancy from "./dormancy.check.js";
 import checkTemporaryBehavior from "./temporary-behavior.check.js";
 import checkSequence from "./sequence.check.js";
 import checkRotation from "./rotation.check.js";
@@ -81,6 +82,7 @@ const SUITES = [
   { name: "triggers", check: checkTriggers },
   { name: "new-game", check: checkNewGame },
   { name: "startle", check: checkStartle },
+  { name: "dormancy", check: checkDormancy },
   { name: "temporary-behavior", check: checkTemporaryBehavior },
   { name: "sequence", check: checkSequence },
   { name: "rotation", check: checkRotation },

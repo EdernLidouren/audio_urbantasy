@@ -306,6 +306,37 @@ export default function checkEntities(run) {
   run("tuning : période de rotation négative refusée (instance)", true, entityMessage({ tuning: { messageRotationMinutes: -60 } }).includes("messageRotationMinutes"));
   run("registre des types : vitesse de fondu nulle refusée (descripteur)", true, registryThrows({ lamp: { nameKey: "entity.lamp.name", sounds: { beacon: { path: "assets/sounds/a", beaconFadeRate: 0 } } } }).includes("beaconFadeRate"));
 
+  // --- Cadence conditionnelle du vocal (sounds.vocal.rules, voir
+  // core/entity-parse.js/validateVocalRules) : forme validée avec le
+  // descripteur, conditions avec l'instance (ses variables), règles de
+  // l'instance qui remplacent celles de l'archétype en bloc. ---
+  const PHASE_TWO = { type: "variable", scope: "entity", name: "phase", equals: 2 };
+  const PHASE_VARIABLE = [{ name: "phase", type: "int", initial: 1 }];
+  const vocalRules = (rules, fields = { variables: PHASE_VARIABLE }) => entityMessage({ ...fields, sounds: { vocal: { path: "assets/sounds/v", rules } } });
+  run("vocal rules : règle valide acceptée", "accepté", vocalRules([{ when: PHASE_TWO, vocalInterval: 2000, vocalIntervalVariation: 1000 }]));
+  run("vocal rules : un seul réglage accepté", "accepté", vocalRules([{ when: PHASE_TWO, vocalInterval: 2000 }]));
+  run("vocal rules : tableau vide refusé", true, vocalRules([]).includes("rules"));
+  run("vocal rules : règle sans when refusée", true, vocalRules([{ vocalInterval: 2000 }]).includes("when"));
+  run("vocal rules : règle qui ne règle rien refusée", true, vocalRules([{ when: PHASE_TWO }]).includes("ne règle rien"));
+  run("vocal rules : intervalle nul refusé", true, vocalRules([{ when: PHASE_TWO, vocalInterval: 0 }]).includes("vocalInterval"));
+  run("vocal rules : variation négative refusée", true, vocalRules([{ when: PHASE_TWO, vocalIntervalVariation: -1 }]).includes("vocalIntervalVariation"));
+  run("vocal rules : autre réglage refusé (gain)", true, vocalRules([{ when: PHASE_TWO, vocalGain: 2 }]).includes(UNKNOWN_FIELD));
+  run("vocal rules : condition sur une variable non déclarée refusée", true, vocalRules([{ when: PHASE_TWO, vocalInterval: 2000 }], {}).includes("phase"));
+  run("vocal rules : refusées sur un autre rôle (beacon)", true, entityMessage({ sounds: { beacon: { rules: [{ when: PHASE_TWO, vocalInterval: 2000 }] } } }).includes(UNKNOWN_FIELD));
+  run(
+    "registre des types : règles du vocal vérifiées en forme",
+    true,
+    registryThrows({ lamp: { nameKey: "entity.lamp.name", sounds: { vocal: { path: "assets/sounds/v", rules: [{ when: PHASE_TWO }] } } } }).includes("ne règle rien")
+  );
+  const RULES_REGISTRY = {
+    neon: { nameKey: "entity.lamp.name", sounds: { vocal: { path: "assets/sounds/v", vocalInterval: 5000, rules: [{ when: PHASE_TWO, vocalInterval: 2000 }] } } },
+  };
+  const rulesNeon = (fields) =>
+    parseScene({ id: "vocal-rules", titleKey: "scene.demo.name", length: 10, entities: [{ id: "neon-1", type: "neon", x: 3, variables: PHASE_VARIABLE, ...fields }] }, RULES_REGISTRY).entities[0];
+  run("vocal rules : héritées de l'archétype", 2000, rulesNeon({}).sounds.vocal.rules[0].vocalInterval);
+  run("vocal rules : celles de l'instance remplacent en bloc", 1500, rulesNeon({ sounds: { vocal: { rules: [{ when: PHASE_TWO, vocalInterval: 1500 }] } } }).sounds.vocal.rules[0].vocalInterval);
+  run("vocal rules : cadence de base gardée", 5000, rulesNeon({}).sounds.vocal.vocalInterval);
+
   // --- Sons conditionnels : balise ET sons de proximité (voir
   // core/entity-parse.js/applySoundConditions). La condition de l'instance
   // REMPLACE celle de l'archétype, jamais fusionnée clé par clé. ---

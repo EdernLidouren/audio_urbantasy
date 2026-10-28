@@ -93,7 +93,39 @@
         "descriptionKey": "door.manhole_cover.description",
         "sounds": { "beacon": { "path": "assets/sounds/decor/manhole_cover_1_beacon" } }
       },
-      { "id": "neon_3_v", "type": "neon", "x": 38 },
+      {
+        "id": "defective_neon_1_v",
+        "type": "defective_neon",
+        "x": 38,
+        "variables": [{ "name": "phase", "type": "int", "initial": 1, "persistent": false }],
+        "sounds": { "vocal": { "rules": [{ "when": { "type": "variable", "scope": "entity", "name": "phase", "equals": 2 }, "vocalInterval": 2000, "vocalIntervalVariation": 1000 }] } },
+        "triggers": [
+          {
+            "on": "emote",
+            "emote": "whistle",
+            "range": 5,
+            "condition": { "type": "variable", "scope": "entity", "name": "phase", "equals": 1 },
+            "effects": [
+              { "type": "wait", "ms": 200 },
+              { "type": "playSound", "path": "assets/sounds/effects/electrical_flickering" },
+              { "type": "setVariable", "scope": "entity", "name": "phase", "value": 2 }
+            ]
+          },
+          {
+            "on": "emote",
+            "emote": "whistle",
+            "range": 5,
+            "condition": { "type": "variable", "scope": "entity", "name": "phase", "equals": 2 },
+            "effects": [
+              { "type": "playSound", "path": "assets/sounds/effects/neon_bulb_burst" },
+              { "type": "dormantUntil", "hour": 22 },
+              { "type": "setVariable", "scope": "entity", "name": "phase", "value": 1 },
+              { "type": "wait", "ms": 300 },
+              { "type": "spawn", "spec": { "type": "ghosten", "behavior": { "kind": "wander" } } }
+            ]
+          }
+        ]
+      },
       {
         "id": "town_square_exit_v",
         "type": "scene_exit",

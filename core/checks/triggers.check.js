@@ -142,6 +142,18 @@ export default function checkTriggers(run) {
   run("triggers : 6h le lendemain -> lampe éteinte (effet d'état sans rendu, absente de `fired`)", false, lampOf(triggerSix.session).variables.lit.value);
   run("triggers : ... et absente de `fired` (aucun effet de rendu)", false, triggerSix.fired.some((f) => f.entity.id === "lamp"));
 
+  // Condition : la lampe ne s'allume à 20h que si elle est éteinte — lue
+  // sur l'état d'avant (une lampe déjà allumée ne réannonce rien).
+  const litIs = (equals) => ({ type: "variable", scope: "entity", name: "lit", equals });
+  const conditionalLamp = {
+    ...triggerLamp,
+    triggers: [{ ...triggerLamp.triggers[0], condition: litIs(false) }],
+  };
+  run("triggers : condition vraie -> dû", 2, dueTriggerEffects(conditionalLamp, 19 * HOUR + 50, 20 * HOUR, triggerT0).length);
+  const litLamp = { ...conditionalLamp, variables: { lit: { ...conditionalLamp.variables.lit, value: true } } };
+  run("triggers : condition fausse -> rien", 0, dueTriggerEffects(litLamp, 19 * HOUR + 50, 20 * HOUR, triggerT0).length);
+  run("triggers : condition sans session -> rien (non évaluable)", 0, dueTriggerEffects(conditionalLamp, 19 * HOUR + 50, 20 * HOUR).length);
+
   // Dormance : `sleeper` n'est présente qu'entre 0h et 1h — dormante depuis
   // le tick de triggerT0, elle ne tire pas ; AVANT toute résolution de
   // présence (session jamais tiquée), elle compte comme présente et tire.

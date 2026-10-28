@@ -14,7 +14,7 @@
 import { DEFAULT_SURFACE } from "./surfaces.js";
 import { INITIAL_TIME } from "./time.js";
 import { createEmptyEquipment } from "./equipment.js";
-import { stripEphemeralsFromWorld, isTwoSided, deriveAcquiredItems } from "./state.js";
+import { stripEphemeralsFromWorld, isTwoSided, deriveAcquiredItems, withActiveWorld } from "./state.js";
 import { createInitialWeather } from "./weather.js";
 import { ITEM_REGISTRY } from "./items.js";
 import { validateDistribution } from "./distribution.js";
@@ -413,6 +413,10 @@ function stripEphemeralEntities(session) {
 // quelle, exactement comme une variable qui n'aurait jamais changé.
 // Référence INCHANGÉE si rien à réinitialiser, même politique que le reste
 // de ce fichier (stripEphemeralEntities/backfillFace).
+//
+// Une volatile vaut pour UNE VISITE : elle revient aussi à son initiale à
+// chaque CHARGEMENT de son monde (resetVisitVariables plus bas), pas
+// seulement à l'écriture d'une sauvegarde.
 function resetVolatileInBag(variables) {
   if (!variables) return variables;
   let changed = false;
@@ -455,6 +459,19 @@ function resetVolatileVariablesInWorld(world) {
     return { ...patched, recto, verso };
   }
   return resetVolatileInFaceEntities(patched);
+}
+
+// Variables VOLATILES du monde ACTIF, à son CHARGEMENT (appelé par
+// view/world-travel.js/prepareLoadedWorld, comme le retour des entités
+// farouches) : une volatile de scène ou d'entité ne dure que le temps
+// d'une visite — la fenêtre ouverte se retrouve fermée, le néon déréglé
+// redevient un néon qui grésille. Les variables de PARTIE et des
+// compagnons voyagent avec le joueur : elles ne reviennent à leur
+// initiale qu'à la sauvegarde. Référence inchangée si rien à faire.
+export function resetVisitVariables(session) {
+  const world = session.worlds[session.activeWorldId];
+  const reset = resetVolatileVariablesInWorld(world);
+  return reset === world ? session : withActiveWorld(session, reset);
 }
 
 // Toute la SESSION : variables de partie (racine), de chaque monde (tous,

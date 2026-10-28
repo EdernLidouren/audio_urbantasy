@@ -165,6 +165,39 @@ function checkEmotesBody(run) {
   const onVerso = { ...emoteBase, player: { ...emoteBase.player, side: "verso" } };
   run("applyEmoteTriggers : joueur au verso -> le pigeon du verso, pas ceux du recto", "pigeon_v", firedIds(applyEmoteTriggers(onVerso, "clap", 0)));
 
+  // Condition d'un trigger : validée au chargement comme toute condition,
+  // évaluée sur l'état d'AVANT l'émote pour TOUS les triggers. Le néon à
+  // deux étapes : un premier sifflement le dérègle (phase 1 -> 2), le
+  // second seulement le fait éclater — jamais les deux en un.
+  const phaseIs = (equals) => ({ type: "variable", scope: "entity", name: "phase", equals });
+  const PHASE = [{ name: "phase", type: "int", initial: 1 }];
+  const conditionLoads = (condition) =>
+    !throws(() => parseScene(sceneWith({ variables: PHASE, triggers: [{ on: "emote", condition, effects: [BELL] }] }), TEST_REGISTRY));
+  run("emote trigger : condition chargée", true, conditionLoads(phaseIs(1)));
+  run("emote trigger : condition sur une variable inconnue rejetée", false, conditionLoads({ type: "variable", scope: "entity", name: "stage", equals: 1 }));
+  run("emote trigger : condition malformée rejetée", false, conditionLoads({ type: "moonPhase" }));
+  run("hour trigger : condition chargée aussi", true, !throws(() => parseScene(sceneWith({ variables: PHASE, triggers: [{ on: "hour", condition: phaseIs(1), effects: [BELL] }] }), TEST_REGISTRY)));
+  const neonScene = parseScene(
+    sceneWith({
+      variables: PHASE,
+      triggers: [
+        { on: "emote", emote: "whistle", condition: phaseIs(1), effects: [{ type: "setVariable", scope: "entity", name: "phase", value: 2 }] },
+        { on: "emote", emote: "whistle", condition: phaseIs(2), effects: [{ type: "startle" }, BELL] },
+      ],
+    }),
+    TEST_REGISTRY
+  );
+  const neonBase = createInitialState(neonScene, 1);
+  const neonOf = (s) => s.worlds[neonScene.id].entities[0];
+  const firstWhistle = applyEmoteTriggers(neonBase, "whistle", 0);
+  run("condition : premier sifflement -> phase 2", 2, neonOf(firstWhistle.session).variables.phase.value);
+  run("condition : premier sifflement -> le trigger de phase 2 ne répond PAS dans la même passe", undefined, neonOf(firstWhistle.session).startled);
+  run("condition : premier sifflement -> aucun rendu (la phase 1 n'en a pas)", "", firedIds(firstWhistle));
+  const secondWhistle = applyEmoteTriggers(firstWhistle.session, "whistle", 0);
+  run("condition : second sifflement -> le trigger de phase 2 répond", true, neonOf(secondWhistle.session).startled);
+  run("condition : second sifflement -> phase inchangée", 2, neonOf(secondWhistle.session).variables.phase.value);
+  run("condition : second sifflement -> son rendu", "e1", firedIds(secondWhistle));
+
   // --- Court-circuit debug : la lecture ment, l'écriture jamais ---
   setDebugEnabled(true);
   run("knowsEmote debug : vrai sans émote réelle", true, evaluateCondition(knowsClap, { session: { emotes: {} } }));

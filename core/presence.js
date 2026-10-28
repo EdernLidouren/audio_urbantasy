@@ -395,10 +395,11 @@ function ruleEffect(rule, type) {
 //     `undefined`, jamais un test de vérité).
 // Sans `entity.presence` : présente, rien d'autre à calculer.
 // ENVOLÉE (`entity.startled`, voir core/startle.js) : dormante quoi que
-// disent ses règles, jusqu'à son retour au chargement du monde.
+// disent ses règles, jusqu'à son retour au chargement du monde. De même
+// pour une dormance FORCÉE (isForcedDormant), jusqu'à son échéance.
 export function resolveEntityRules(entity, context) {
   if (!entity.presence) {
-    const present = !entity.startled;
+    const present = !entity.startled && !isForcedDormant(entity, context.time);
     return { present, presenceChanged: presenceChangeOf(entity, present), ruleActive: undefined, behaviorEffect: undefined };
   }
 
@@ -444,9 +445,20 @@ export function resolveEntityRules(entity, context) {
     }
   });
 
-  if (entity.startled) present = false;
+  if (entity.startled || isForcedDormant(entity, context.time)) present = false;
 
   return { present, presenceChanged: presenceChangeOf(entity, present), ruleActive, behaviorEffect };
+}
+
+// DORMANCE FORCÉE par l'effet "dormantUntil" (voir core/variables.js) :
+// l'entité dort tant que l'horloge n'a pas atteint `entity.dormantUntil`,
+// un instant absolu, quoi que disent ses règles. L'échéance passée, le
+// champ reste, inerte, jusqu'au prochain effet. Lue aussi par la vue : la
+// sortie qu'elle provoque est MUETTE (pas d'exitSound, voir
+// view/audio/entity-audio.js) — la séquence qui la pose joue son propre
+// son, comme l'éclatement du néon défectueux.
+export function isForcedDormant(entity, time) {
+  return entity.dormantUntil !== undefined && time < entity.dormantUntil;
 }
 
 // Bascule de présence OBSERVÉE : comparée à la présence du tick précédent,
@@ -458,11 +470,12 @@ function presenceChangeOf(entity, present) {
 }
 
 // L'entité porte-t-elle sa présence (`present`, `presenceChanged`) d'un
-// tick à l'autre ? Oui si elle a des règles, ou si elle peut s'envoler
-// (core/startle.js) : sa dormance doit alors être observable par la vue.
-// Les autres gardent la forme de leur scène (voir core/reduce.js).
+// tick à l'autre ? Oui si elle a des règles, si elle peut s'envoler
+// (core/startle.js) ou si un effet l'a endormie (isForcedDormant) : sa
+// dormance doit alors être observable par la vue. Les autres gardent la
+// forme de leur scène (voir core/reduce.js).
 export function tracksPresence(entity) {
-  return Boolean(entity.presence || entity.startle || entity.startled);
+  return Boolean(entity.presence || entity.startle || entity.startled || entity.dormantUntil !== undefined);
 }
 
 // Contexte d'évaluation des règles de présence pour le monde ACTIF — SOURCE

@@ -275,8 +275,14 @@ export function buildEntitySoundEntry(entity, session, { otherFace = false, disa
 
   if (vocal) {
     const source = resolveIntermittentSource(entity, vocal, VOCAL_TUNING_KEYS);
-    // `role` : retrouvé par ./oneshots.js/postponeVocal.
-    intermittentSources.push({ ...source, gain: source.gain * faceGain(vocalCrossFaceGain), role: "vocal" });
+    // `role` : retrouvé par ./oneshots.js/postponeVocal. `cadenceRules` :
+    // la cadence selon l'état (voir doc/entity-model.md/"Cadence
+    // conditionnelle du vocal"), relue à chaque échéance par
+    // ./entity-audio.js ; un réglage absent d'une règle garde celui du rôle.
+    const cadenceRules = vocal.rules
+      ? vocal.rules.map((rule) => ({ when: rule.when, interval: rule.vocalInterval, intervalVariation: rule.vocalIntervalVariation }))
+      : undefined;
+    intermittentSources.push({ ...source, gain: source.gain * faceGain(vocalCrossFaceGain), role: "vocal", cadenceRules });
   }
 
   // Présence de départ, avec le MÊME contexte que le tick (presenceContextOf)

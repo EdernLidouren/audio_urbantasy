@@ -331,11 +331,19 @@
     "assets/sounds/effects/electrical_flickering_6.mp3",
     "assets/sounds/effects/electrical_flickering_7.mp3"
   ],
+  "assets/sounds/effects/ghostly_apparition": [
+    "assets/sounds/effects/ghostly_apparition_1.mp3"
+  ],
   "assets/sounds/effects/light_switch_off": [
     "assets/sounds/effects/light_switch_off_1.mp3"
   ],
   "assets/sounds/effects/light_switch_on": [
     "assets/sounds/effects/light_switch_on_1.mp3"
+  ],
+  "assets/sounds/effects/neon_bulb_burst": [
+    "assets/sounds/effects/neon_bulb_burst_1.mp3",
+    "assets/sounds/effects/neon_bulb_burst_2.mp3",
+    "assets/sounds/effects/neon_bulb_burst_3.mp3"
   ],
   "assets/sounds/effects/neon_malfunction": [
     "assets/sounds/effects/neon_malfunction_1.mp3",
@@ -413,8 +421,18 @@
     "assets/sounds/entities/dog_medium_vocal_4.mp3",
     "assets/sounds/entities/dog_medium_vocal_5.mp3"
   ],
+  "assets/sounds/entities/dog_shake": [
+    "assets/sounds/entities/dog_shake_1.mp3"
+  ],
   "assets/sounds/entities/flock_of_birds_1_beacon": [
     "assets/sounds/entities/flock_of_birds_1_beacon_1.mp3"
+  ],
+  "assets/sounds/entities/ghosten_vocal": [
+    "assets/sounds/entities/ghosten_vocal_1.mp3",
+    "assets/sounds/entities/ghosten_vocal_2.mp3",
+    "assets/sounds/entities/ghosten_vocal_3.mp3",
+    "assets/sounds/entities/ghosten_vocal_4.mp3",
+    "assets/sounds/entities/ghosten_vocal_5.mp3"
   ],
   "assets/sounds/entities/miravi_vocal": [
     "assets/sounds/entities/miravi_vocal_1.mp3",
@@ -813,6 +831,9 @@
   ],
   "assets/sounds/items/fruit_beacon": [
     "assets/sounds/items/fruit_beacon_1.mp3"
+  ],
+  "assets/sounds/reactions/reaction_interrogation": [
+    "assets/sounds/reactions/reaction_interrogation_1.mp3"
   ],
   "assets/sounds/ui/block": [
     "assets/sounds/ui/block_1.mp3"

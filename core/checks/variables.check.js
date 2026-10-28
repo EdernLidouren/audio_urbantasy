@@ -8,7 +8,7 @@
 import { parseScene } from "../scene.js";
 import { createInitialState, applyEntityActionEffects } from "../state.js";
 import { evaluateCondition, selectMatchingAction } from "../presence.js";
-import { serializeGame, deserializeGame } from "../save.js";
+import { serializeGame, deserializeGame, resetVisitVariables } from "../save.js";
 import { applyActionEffects, parseVariables, getVariable, setVariable } from "../variables.js";
 import { throws, auditNonSerializable, fail } from "../../lib/check.js";
 import { VAR_ACTION_REGISTRY, UNKNOWN_FIELD, sceneWithActionEffect, sceneParseMessage } from "./helpers.js";
@@ -163,6 +163,20 @@ export default function checkVariables(run) {
       run("save/load : entité — affinity (volatile) repart de son initial (0)", 0, reloadedEntity.variables.affinity.value);
       run("save/load : partie — score (persistante) reprend sa valeur modifiée (42)", 42, rtReload.session.variables.score.value);
     }
+
+    // 3 bis) Une volatile ne vaut que pour une VISITE : au chargement du
+    // monde (resetVisitVariables), scène et entité reviennent à leur
+    // initiale, les persistantes et la PARTIE (qui voyage avec le joueur)
+    // ne bougent pas.
+    const visited = resetVisitVariables(rtSession);
+    const visitedWorld = visited.worlds[variablesScene.id];
+    const visitedEntity = visitedWorld.entities.find((e) => e.id === "npc-1");
+    run("visite : scène — doorUnlocked (volatile) revient à son initial", false, visitedWorld.variables.doorUnlocked.value);
+    run("visite : scène — visits (persistante) garde sa valeur", 7, visitedWorld.variables.visits.value);
+    run("visite : entité — affinity (volatile) revient à son initial", 0, visitedEntity.variables.affinity.value);
+    run("visite : entité — metOnce (persistante) garde sa valeur", true, visitedEntity.variables.metOnce.value);
+    run("visite : partie — score garde sa valeur", 42, visited.variables.score.value);
+    run("visite : rien de volatile modifié -> MÊME référence", true, Object.is(resetVisitVariables(visited), visited));
 
     // Audit de sérialisabilité générique (auditNonSerializable, lib/check.js)
     // appliqué à une session qui exerce RÉELLEMENT les trois portées : aucune
