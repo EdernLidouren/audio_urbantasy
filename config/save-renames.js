@@ -26,6 +26,8 @@ export const RENAMED_ENTITY_TYPES = {
 // Clés i18n (nameKey, descriptionKey, titleKey, clés d'annonce...),
 // remplacées partout où elles apparaissent comme valeur exacte.
 export const RENAMED_I18N_KEYS = {
+  // Le magasin de la rue commerçante est devenu le Bazar Quasar.
+  "door.general_store.closed_description": "door.quasar_bazaar_entrance.closed_description",
   "entity.film_projector.name": "entity.video_projector.name",
   "entity.film_projector.description": "entity.video_projector.description",
   "entity.office_water_fountain.name": "entity.office_water_cooler.name",

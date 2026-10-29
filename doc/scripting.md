@@ -2313,13 +2313,13 @@ tableau non vide, chaque règle avec une condition valide (même validateur
 que partout, `validateCondition`) et une clé non vide, aucun autre champ.
 L'audit du contenu vérifie que chaque clé existe dans chaque langue.
 
-Exemple réel — la porte du magasin de Main Street (`scenes/main-street.json`,
-`general_store_door_1_r`), rideau de fer baissé hors des heures d'ouverture,
+Exemple réel — l'entrée du Bazar Quasar, rue commerçante (`scenes/main-street.json`,
+`quasar_bazaar_door_1_r`), rideau de fer baissé hors des heures d'ouverture,
 les MÊMES que ses sons et son action :
 
 ```json
 "descriptionRules": [
-  { "when": { "type": "timeRange", "from": 20, "to": 8 }, "descriptionKey": "door.general_store.closed_description" }
+  { "when": { "type": "timeRange", "from": 20, "to": 8 }, "descriptionKey": "door.quasar_bazaar_entrance.closed_description" }
 ]
 ```
 

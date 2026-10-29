@@ -25,16 +25,18 @@
       { "id": "neon_1_r", "type": "neon", "x": 13 },
       { "id": "motorised_billboard_1_r", "type": "motorised_billboard", "x": 20 },
       {
-        "id": "general_store_door_1_r",
+        "id": "quasar_bazaar_door_1_r",
         "type": "automatic_sliding_door",
         "x": 25,
+        "nameKey": "door.quasar_bazaar_entrance.name",
+        "descriptionKey": "door.quasar_bazaar_entrance.description",
         "sounds": {
           "beacon": { "path": "assets/sounds/doors/roller_shutter_1_close", "loop": true, "condition": { "type": "timeRange", "from": 20, "to": 8 } },
           "approachSound": { "condition": { "type": "timeRange", "from": 8, "to": 20 } },
           "leaveSound": { "condition": { "type": "timeRange", "from": 8, "to": 20 } },
           "proximityLoop": { "path": "assets/sounds/doors/shop_door_bell_1_beacon", "condition": { "type": "timeRange", "from": 8, "to": 20 } }
         },
-        "descriptionRules": [{ "when": { "type": "timeRange", "from": 20, "to": 8 }, "descriptionKey": "door.general_store.closed_description" }],
+        "descriptionRules": [{ "when": { "type": "timeRange", "from": 20, "to": 8 }, "descriptionKey": "door.quasar_bazaar_entrance.closed_description" }],
         "triggers": [
           { "on": "hour", "hour": 8, "effects": [{ "type": "playSound", "path": "assets/sounds/doors/garage_door_1_open" }] },
           { "on": "hour", "hour": 20, "effects": [{ "type": "playSound", "path": "assets/sounds/doors/garage_door_1_close" }] }
