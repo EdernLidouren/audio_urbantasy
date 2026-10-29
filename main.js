@@ -138,8 +138,9 @@ function getSession() {
   return session;
 }
 // Toute mise à jour de la partie passe ici : c'est donc ici que la vue
-// compare l'avant et l'après pour annoncer les découvertes de collection
-// (voir view/collection-discoveries.js).
+// compare l'avant et l'après pour annoncer les découvertes de collection et
+// sonner les améliorations et émotes acquises (voir
+// view/collection-discoveries.js).
 function setSession(next) {
   announceNewDiscoveries(session, next);
   session = next;

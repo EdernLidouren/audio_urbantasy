@@ -41,7 +41,7 @@ appartenance.
 ```js
 // collections/electronics.js
 export default {
-  discoverySound: "assets/sounds/effects/reward",
+  discoverySound: "assets/sounds/ui/scientific_reward",
   entries: [{ item: "resistor" }, { item: "capacitor" }, { item: "transistor" }],
 };
 ```
@@ -56,7 +56,9 @@ export default {
   L'objet ou le type sert aussi d'identifiant de l'entrée (unique dans sa
   collection).
 - `discoverySound` (optionnel) : le son joué à chaque découverte de CETTE
-  collection.
+  collection. Un son d'INTERFACE (`assets/sounds/ui/`), joué non spatialisé,
+  au volume de l'interface : `ui/scientific_reward` pour les composants,
+  `ui/supernatural_reward` pour le bestiaire.
 - L'ordre des collections dans `collections/index.js` est leur ordre dans
   l'onglet.
 
@@ -87,7 +89,9 @@ deux états de la partie (`newlyDiscoveredEntries`), au `setSession` de
 sources d'acquisition. Une annonce POLIE dédiée, « Nouvelle découverte :
 résistance, composants électroniques. », différée d'un instant pour passer
 APRÈS l'annonce de ramassage ou d'achat, plus le `discoverySound` de la
-collection. Plusieurs découvertes simultanées : une seule annonce. Rien n'est
+collection, retardé de `discoverySoundDelayMs` (`config/tuning-values.js`,
+0 par défaut) pour ne pas chevaucher le son de ramassage. Plusieurs
+découvertes simultanées : une seule annonce, un son par collection. Rien n'est
 annoncé quand la partie est remplacée en bloc (import) ou modifiée par un outil
 de debug (`muteNextDiscoveryCheck`).
 

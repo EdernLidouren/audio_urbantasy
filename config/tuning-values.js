@@ -519,6 +519,13 @@ export const TUNING_DEFAULTS = {
   // l'appui. Lu DIRECTEMENT, comme transitionStepIntervalMs.
   transitionStepDelayMs: 100,
 
+  // Retard (ms) des sons de DÉCOUVERTE (collection, amélioration, émote
+  // apprise, voir view/collection-discoveries.js) : laisse finir le son de
+  // ramassage ou d'achat qui l'a provoquée, pour qu'ils ne se chevauchent
+  // pas. N'affecte que le son, jamais l'annonce. Lu DIRECTEMENT, comme
+  // transitionStepDelayMs.
+  discoverySoundDelayMs: 0,
+
   // Pas des SÉLECTEURS DE QUANTITÉ (flèches gauche/droite), même convention
   // partout : Maj = pas intermédiaire, Ctrl = grand pas (sans modificateur :
   // 1). Boutique (view/menus/shop-quantity-list.js) : stocks et budgets petits ;

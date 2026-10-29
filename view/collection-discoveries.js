@@ -1,5 +1,6 @@
 // Découvertes de collection, côté VUE (voir core/collections.js,
-// doc/collections.md). Trois rôles :
+// doc/collections.md), et sons de récompense des autres progrès du joueur
+// (amélioration obtenue, émote apprise). Quatre rôles :
 //   1. VALIDER les collections au chargement du module (structure, objets
 //      référencés) : une collection mal écrite fait échouer le démarrage,
 //      jamais une entrée introuvable en silence. Les TEXTES manquants, eux,
@@ -12,6 +13,12 @@
 //   3. Se TAIRE quand la partie est remplacée en bloc (import) ou modifiée
 //      par un outil de debug : tout annoncer d'un coup n'aurait pas de sens
 //      (muteNextDiscoveryCheck).
+//   4. SONNER une amélioration obtenue ou une émote apprise, déduites du
+//      même diff (session.improvements, session.emotes) : le son seul, la
+//      source (ex. le vieux cadastre) porte déjà son annonce.
+//
+// Tous ces sons sont des sons d'INTERFACE (assets/sounds/ui/), non
+// spatialisés, au volume de l'interface (playInterfaceSound).
 
 import collections from "../collections/index.js";
 import entityRegistry from "../entities/types/index.js";
@@ -27,6 +34,12 @@ import { t, hasKey } from "../data/i18n/index.js";
 import { announce } from "../lib/announce.js";
 import { playInterfaceSound } from "./menu-sounds.js";
 import { reportCollectionTextMissing } from "./debug-warnings.js";
+import { TUNING_DEFAULTS } from "../config/tuning.js";
+
+// Sons de récompense hors collections : un par genre de progrès, pas par
+// amélioration ni par émote (aucune n'en réclame un propre aujourd'hui).
+const IMPROVEMENT_REWARD_SOUND = "assets/sounds/ui/global_reward";
+const EMOTE_REWARD_SOUND = "assets/sounds/ui/emote_reward";
 
 for (const [collectionId, collection] of Object.entries(collections)) {
   validateCollection(collectionId, collection, ITEM_REGISTRY, entityRegistry);
@@ -62,8 +75,27 @@ export function muteNextDiscoveryCheck() {
   muted = true;
 }
 
-function playDiscoverySound(path) {
-  playInterfaceSound(path, "découverte de collection");
+// Retardé de discoverySoundDelayMs (config/tuning-values.js) : laisse finir
+// le son de ramassage ou d'achat qui a provoqué la découverte.
+function playDiscoverySound(path, what) {
+  setTimeout(() => playInterfaceSound(path, what), TUNING_DEFAULTS.discoverySoundDelayMs);
+}
+
+// Vrai si `next` porte une clé absente de `prev` (faits SPARSE
+// { [id]: true }). Même référence -> rien de neuf, sans parcours.
+function gainedKey(prev, next) {
+  if (prev === next || !next) return false;
+  return Object.keys(next).some((id) => !(prev && prev[id]));
+}
+
+// Rôle 4 : un son par genre de progrès, même si plusieurs arrivent ensemble.
+function playProgressRewards(prev, next) {
+  if (gainedKey(prev.improvements, next.improvements)) {
+    playDiscoverySound(IMPROVEMENT_REWARD_SOUND, "amélioration obtenue");
+  }
+  if (gainedKey(prev.emotes, next.emotes)) {
+    playDiscoverySound(EMOTE_REWARD_SOUND, "émote apprise");
+  }
 }
 
 // prev/next : deux états successifs de la partie (null hors partie -> rien).
@@ -76,6 +108,7 @@ export function announceNewDiscoveries(prev, next) {
     return;
   }
   if (!prev || !next) return;
+  playProgressRewards(prev, next);
   const found = newlyDiscoveredEntries(collections, discoveryFacts(prev), discoveryFacts(next));
   if (found.length === 0) return;
 
@@ -94,7 +127,7 @@ export function announceNewDiscoveries(prev, next) {
     .join(" ");
   const sounds = [...new Set(found.map(({ collectionId }) => collections[collectionId].discoverySound).filter(Boolean))];
   setTimeout(() => {
-    for (const path of sounds) playDiscoverySound(path);
+    for (const path of sounds) playDiscoverySound(path, "découverte de collection");
     announce(text);
   }, 0);
 }

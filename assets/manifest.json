@@ -364,9 +364,6 @@
   "assets/sounds/effects/reversed_clock_tower_bell": [
     "assets/sounds/effects/reversed_clock_tower_bell_1.mp3"
   ],
-  "assets/sounds/effects/reward": [
-    "assets/sounds/effects/reward_1.mp3"
-  ],
   "assets/sounds/effects/switch_off": [
     "assets/sounds/effects/switch_off_1.mp3"
   ],
@@ -841,6 +838,15 @@
   "assets/sounds/ui/cancel": [
     "assets/sounds/ui/cancel_1.mp3"
   ],
+  "assets/sounds/ui/emote_reward": [
+    "assets/sounds/ui/emote_reward.mp3"
+  ],
+  "assets/sounds/ui/global_reward": [
+    "assets/sounds/ui/global_reward.mp3"
+  ],
+  "assets/sounds/ui/musical_reward": [
+    "assets/sounds/ui/musical_reward.mp3"
+  ],
   "assets/sounds/ui/refusal": [
     "assets/sounds/ui/refusal_1.mp3"
   ],
@@ -849,6 +855,9 @@
   ],
   "assets/sounds/ui/save": [
     "assets/sounds/ui/save_1.mp3"
+  ],
+  "assets/sounds/ui/scientific_reward": [
+    "assets/sounds/ui/scientific_reward.mp3"
   ],
   "assets/sounds/ui/select": [
     "assets/sounds/ui/select_1.mp3"
@@ -864,6 +873,9 @@
   ],
   "assets/sounds/ui/supernatural_perception_disactivation": [
     "assets/sounds/ui/supernatural_perception_disactivation_1.mp3"
+  ],
+  "assets/sounds/ui/supernatural_reward": [
+    "assets/sounds/ui/supernatural_reward.mp3"
   ],
   "assets/sounds/ui/toggle": [
     "assets/sounds/ui/toggle_1.mp3"

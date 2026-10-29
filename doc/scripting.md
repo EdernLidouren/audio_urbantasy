@@ -2108,6 +2108,12 @@ pendant qu'on joue en debug.
 `"giveImprovement"`/`"removeImprovement"` plus haut) : effets d'ÉTAT,
 appliqués comme les effets de variable.
 
+**Son de récompense** : toute amélioration NOUVELLEMENT obtenue joue
+`assets/sounds/ui/global_reward` (son d'interface, non spatialisé), déduit
+du diff de `session.improvements` comme les découvertes de collection
+(`view/collection-discoveries.js`, retard `discoverySoundDelayMs`). Le son
+seul : l'annonce reste à la source (ex. `entity.old_survey_map.taken`).
+
 **COURT-CIRCUIT DEBUG — le principe central** (`config/debug.js`/
 `isDebugEnabled`, mode activable par `window.toggleDebug()`/Ctrl+D) : tant
 que le debug est actif, TOUTE RÉSOLUTION de `hasImprovement` répond VRAIE,
@@ -2191,6 +2197,11 @@ de même que le raccourci (`null`).
 **Lecture** : condition `knowsEmote` ; **écriture** : effets `learnEmote`/
 `forgetEmote` (voir plus haut). Le court-circuit debug est celui des
 améliorations : la lecture ment, l'écriture jamais.
+
+**Son de récompense** : une émote NOUVELLEMENT apprise joue
+`assets/sounds/ui/emote_reward`, sur le patron des améliorations (voir
+"Améliorations"/"Son de récompense"). Les émotes du départ d'une partie
+n'en jouent pas (aucun état « avant »).
 
 ## Tags
 

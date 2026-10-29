@@ -286,6 +286,9 @@ export async function auditContent() {
       keys.push(...Object.values(entryTextKeys(id, entry)));
     }
     checkStrings(`collection ${id}`, keys);
+    if (collection.discoverySound !== undefined) {
+      checkStrings(`collection ${id}`, { discoverySound: collection.discoverySound });
+    }
   }
 
   // Messages en rotation : clés DÉDUITES des ids (core/rotation.js), comme

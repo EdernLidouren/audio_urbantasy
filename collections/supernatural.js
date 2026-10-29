@@ -7,7 +7,7 @@
 // lieux de rencontre) vit sous collection.supernatural.entry.<type>.*
 // (collections.json).
 export default {
-  // Son joué à chaque nouvelle découverte de cette collection. Provisoire.
-  discoverySound: "assets/sounds/effects/reward",
+  // Son d'interface joué à chaque nouvelle découverte de cette collection.
+  discoverySound: "assets/sounds/ui/supernatural_reward",
   entries: [{ entity: "ghosten" }, { entity: "cumuloLupus" }, { entity: "miravi" }],
 };
