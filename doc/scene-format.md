@@ -21,7 +21,7 @@ FACE recto/verso vide (`parseFace`, même mécanisme).
 
 **Champs inconnus REJETÉS** : optionnel ne veut pas dire libre. À chaque
 niveau (racine de scène, face, segment, plage de collecte, entité, `shop`,
-`container`, `sounds` et ses descripteurs, `tuning`, et tout le format
+`container`, `display`, `sounds` et ses descripteurs, `tuning`, et tout le format
 déclaratif — voir `doc/scripting.md`), un champ que le format ne connaît pas
 fait échouer le chargement en le nommant (`parseScene: entities[0] ("dog-1") : champ(s)
 inconnu(s) "observabel".`) — une faute de frappe retomberait sinon en
@@ -298,6 +298,7 @@ exemple) : jamais de voix orpheline ni de fondus qui se disputent le canal.
 | `variables` | Variable[] | optionnel : déclarations de portée **"entity"** (voir `doc/scripting.md`/"Variables"). PAS de cascade instance -> type (contrairement à `behavior`/`action`/`presence`) : une variable est un compteur/flag D'INSTANCE, jamais un défaut d'archétype. SPARSE : absente si non déclarée (`entity.variables` reste `undefined`), jamais un sac vide imposé. |
 | `shop` | `{ catalog }` | optionnel : POINT DE VENTE (voir `doc/entity-model.md`/"Vente et achat", `core/catalog.js`, `core/trade.js`), cascade instance -> type comme `action`. `catalog` : `{ table: "<nom de SHOP_CATALOGS>" }` (`config/shop-values.js`) ou `{ items: { <objet ITEM_REGISTRY>: { stock, price? } } }` — `stock` entier `>= 0` (rayon PAR CYCLE), `price` entier `> 0` optionnel (défaut : `value` de l'objet ; un article sans prix résolvable est rejeté). L'action `"shop"` (voir `doc/scripting.md`) l'exploite. Champs RUNTIME associés, jamais en entrée : `shopStock` (`{ <objet>: n }`, décrémenté aux achats, rechargé au cycle), `shopCycle`. |
 | `container` | `{ distribution, count?, regenerates? }` | optionnel : CONTENEUR de collecte (voir `doc/entity-model.md`/"Collecte", `core/spawn.js`), cascade instance -> type comme `action`. `distribution` : même forme que pour `spawnRanges` ci-dessus (`{ table }`, `{ items }` ou `{ tables }`, clé `nothing` permise), validée au chargement ; `count` entier `>= 1` (défaut `config/spawn-values.js`/`SPAWN_CONTAINER_DEFAULT_COUNT`), tirages par cycle ; `regenerates` booléen (défaut `true`) — `false` : garni une seule fois, jamais regarni. Toute autre clé est refusée. L'action `"search"` (voir `doc/scripting.md`) fait tomber le stock au sol. Champs RUNTIME associés, jamais en entrée : `stock` (tableau des objets tirés, éventuellement vide, ou `null` une fois fouillé — un conteneur vidé n'est plus candidat à Entrée que s'il est seul à portée, pour annoncer son état), `stockCycle` (cycle du dernier stock). |
+| `display` | `{ distribution }` | optionnel : PRÉSENTOIR du magasin (voir `doc/entity-model.md`/"Présentoirs", `core/display.js`), cascade instance -> type comme `action`. `distribution` : `{ table: "<nom de DISPLAY_TABLES>" }` (`config/shop-values.js`) ou `{ articles: { <article de DISPLAY_ARTICLES>: <poids> } }` — poids nombre ou niveau de rareté, clé `nothing` permise, au moins un vrai article de poids `> 0`. Jamais combiné avec `container` ni `shop`. Toute autre clé est refusée. Champ RUNTIME associé, jamais en entrée : `offer` (id de l'article exposé, `null` une fois vendu ou si rien n'a été tiré, absent avant le premier garnissage). |
 
 `parseScene` normalise chaque entité en ajoutant `labelKey` et
 `descriptionKey` : `entity.nameKey` (du JSON) si présent sinon
@@ -389,6 +390,7 @@ rassemblés par `index.js` en un objet `{ [type]: TypeDef }` :
 | `muteOnConsumed` | boolean | vue           | optionnel, REGISTRE SEULEMENT (jamais cascadé par instance) : arrête le beacon continu une fois l'entité `consumed` — voir "Collectible persistant" plus haut, `doc/entity-model.md` |
 | `container` | `{ distribution, count?, regenerates? }` | core | optionnel : défaut de type d'un conteneur de collecte, cascadé comme `action` — voir tableau "Entité" plus haut, `doc/entity-model.md`/"Collecte" |
 | `shop` | `{ catalog }` | core | optionnel : défaut de type d'un point de vente, cascadé comme `action` — voir tableau "Entité" plus haut, `doc/entity-model.md`/"Vente et achat" |
+| `display` | `{ distribution }` | core | optionnel : défaut de type d'un présentoir, cascadé comme `action` — voir tableau "Entité" plus haut, `doc/entity-model.md`/"Présentoirs" |
 | `collisionSound` | string | vue | optionnel, REGISTRE SEULEMENT : son joué quand le joueur bute contre l'entité |
 | `messageRotation` | string | vue | optionnel, REGISTRE SEULEMENT : id d'une série de `rotations/`, dont le message du moment remplit `{message}` dans la description — voir `doc/entity-model.md`/"Messages en rotation" |
 

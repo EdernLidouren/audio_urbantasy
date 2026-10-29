@@ -23,6 +23,9 @@
 //     de plage est VISIBLE dès qu'il existe : le poser sous les pieds du
 //     joueur ferait "popper" une balise sans cause audible — d'où l'attente
 //     du chargement pour les plages seulement, voir searchContainer.
+//   Le même garnissage recharge les POINTS DE VENTE (core/catalog.js) et
+//   tire l'article du jour de chaque PRÉSENTOIR (core/display.js, sans
+//   remise sur tout le monde, voir refillDueSpawns).
 //   - MATÉRIALISATION (comment) : fouille (searchContainer, action "search"
 //     côté vue) -> le stock TOMBE AU SOL, éparpillé autour du conteneur
 //     (spawnScatteredEphemerals, MÊME geste que la caisse qui lâche des
@@ -52,6 +55,7 @@ import { TIME_CONFIG } from "../config/time-values.js";
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";
 import { drawItem } from "./distribution.js";
 import { restockShopEntity } from "./catalog.js";
+import { drawOffer, ownedImprovementArticles } from "./display.js";
 import {
   isTwoSided,
   resolveFace,
@@ -111,10 +115,11 @@ export function isSearchable(entity, time) {
   return containerStatus(entity, time) === "searchable";
 }
 
-// Sources garnies au cycle : plages, conteneurs ET points de vente (leur
-// rayon se recharge au même point temporel, voir core/catalog.js).
+// Sources garnies au cycle : plages, conteneurs, points de vente (leur
+// rayon se recharge au même point temporel, voir core/catalog.js) ET
+// présentoirs (core/display.js).
 function faceHasSources(face) {
-  return (face.spawnRanges !== undefined && face.spawnRanges.length > 0) || face.entities.some((e) => e.container || e.shop);
+  return (face.spawnRanges !== undefined && face.spawnRanges.length > 0) || face.entities.some((e) => e.container || e.shop || e.display);
 }
 
 // Tire `count` objets dans une distribution, en enchaînant le PRNG. Les
@@ -202,17 +207,28 @@ function drawRangePosition(range, obstacles, placed, length, presenceContext, rn
 }
 
 // Garnit UNE face pour le cycle donné : conteneurs re-stockés (sauf un
-// conteneur non régénérant déjà garni une fois, laissé tel quel), anciens
-// collectibles posés retirés puis remplacés. Tirages enchaînés sur
-// face.rngState, dans l'ordre des entités puis des plages — ordre stable,
-// déterminisme préservé.
-function refillFace(face, world, cycle, registry, companions, presenceContext) {
+// conteneur non régénérant déjà garni une fois, laissé tel quel), article du
+// jour tiré pour chaque présentoir, anciens collectibles posés retirés puis
+// remplacés. Tirages enchaînés sur face.rngState, dans l'ordre des entités
+// puis des plages — ordre stable, déterminisme préservé. `offered` : Set
+// LOCAL au garnissage du monde (voir refillDueSpawns), complété ici par
+// chaque article exposé, pour qu'aucun présentoir suivant ne le retire.
+function refillFace(face, world, cycle, registry, companions, presenceContext, offered) {
   let rngState = face.rngState;
   const entities = [];
   for (const entity of face.entities) {
     if (entity.spawned) continue;
     if (entity.shop) {
       entities.push(restockShopEntity(entity, cycle));
+      continue;
+    }
+    // Présentoir : toujours re-tiré (l'invendu de la veille ne reste pas),
+    // emplacement vidé par un achat compris.
+    if (entity.display) {
+      const drawn = drawOffer(entity.display.distribution, offered, rngState);
+      rngState = drawn.rngState;
+      if (drawn.offer !== null) offered.add(drawn.offer);
+      entities.push({ ...entity, offer: drawn.offer });
       continue;
     }
     if (!entity.container || !isRestockDue(entity, cycle)) {
@@ -255,6 +271,9 @@ function refillFace(face, world, cycle, registry, companions, presenceContext) {
 // INCHANGÉE (cycle déjà matérialisé, ou monde sans aucune source). Scène à
 // deux faces : LES DEUX faces sont garnies (on charge le monde entier),
 // chacune sur son propre flux PRNG ; le marqueur reste au niveau du monde.
+// Les présentoirs du monde entier (deux faces comprises) tirent SANS REMISE
+// : jamais deux fois le même article dans un magasin, jamais l'article d'une
+// amélioration déjà possédée (core/display.js).
 export function refillDueSpawns(session, registry) {
   const world = session.worlds[session.activeWorldId];
   const cycle = spawnCycleAt(session.time);
@@ -264,11 +283,12 @@ export function refillDueSpawns(session, registry) {
   if (!faces.some((side) => faceHasSources(resolveFace(world, side)))) return session;
 
   const presenceContext = presenceContextOf(session);
+  const offered = ownedImprovementArticles(session.improvements);
   let nextWorld = world;
   for (const side of faces) {
     const face = resolveFace(world, side);
     const companions = side === null || side === session.player.side ? session.companions : [];
-    const refilled = refillFace(face, world, cycle, registry, companions, presenceContext);
+    const refilled = refillFace(face, world, cycle, registry, companions, presenceContext, offered);
     nextWorld = withFace(nextWorld, side, { entities: refilled.entities, rngState: refilled.rngState });
   }
   return withActiveWorld(session, { ...nextWorld, spawnCycle: cycle });

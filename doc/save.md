@@ -76,7 +76,7 @@ la partie (voir `doc/entity-model.md`/"Mode debug").
 la donnée du core — `core/save.js`/`repairContentReferences`) : une partie
 garde aussi, telles qu'à la première visite, les distributions de collecte
 (conteneurs, plages), les stocks déjà tirés, les catalogues des points de
-vente, et l'état météo. Elles sont revalidées avec les MÊMES validateurs que
+vente, les tables et articles des présentoirs, et l'état météo. Elles sont revalidées avec les MÊMES validateurs que
 le chargement d'une scène ; une référence cassée (table, catalogue, objet ou
 état retiré ou renommé depuis) est neutralisée plutôt que de faire planter
 la partie :
@@ -85,6 +85,12 @@ la partie :
 - objet inconnu dans un stock tiré -> retiré du stock ;
 - catalogue invalide -> `catalog: null`, le rayon est vide (« Acheter » est
   refusé comme pour un point de vente sans catalogue) ;
+- table de présentoir invalide -> `distribution: null`, le présentoir
+  n'expose plus rien ;
+- article exposé inconnu (retiré ou renommé de `DISPLAY_ARTICLES`) ->
+  `offer: null`, le présentoir est vide jusqu'au prochain garnissage. Un
+  renommage d'article ne coûte donc qu'au plus l'offre du jour : pas de
+  table de renommage pour eux ;
 - état météo inconnu -> état par défaut, même rendez-vous de transition.
 Chaque neutralisation est listée dans `brokenReferences` (`{ worldId,
 source, problem }`, `worldId` null pour la météo) et signalée au même moment

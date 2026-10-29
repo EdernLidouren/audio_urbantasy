@@ -8,6 +8,7 @@ import { parseVariables } from "./variables.js";
 import { ITEM_REGISTRY, itemSounds } from "./items.js";
 import { validateDistribution } from "./distribution.js";
 import { validateCatalog } from "./catalog.js";
+import { validateDisplayDistribution } from "./display.js";
 import { fail, isNonEmptyString, isFiniteNumber, parseBehavior, rejectUnknownFields } from "./parse-common.js";
 import { validateCondition, parsePresenceRule, parseSingleAction, parseTrigger } from "./script-parse.js";
 import { ACTION_KINDS } from "./action-kinds.js";
@@ -367,6 +368,18 @@ function parseShop(shop, at) {
   return { catalog: shop.catalog };
 }
 
+// Présentoir du magasin (voir doc/entity-model.md/"Présentoirs") :
+// { distribution }. L'article du jour (offer) reste au moteur
+// (core/spawn.js, core/display.js).
+function parseDisplay(display, at) {
+  if (typeof display !== "object" || display === null || Array.isArray(display)) {
+    fail(`${at} : display doit être un objet si présent.`);
+  }
+  rejectUnknownFields(display, ["distribution"], `${at} : display`);
+  validateDisplayDistribution(display.distribution, `${at} : display.distribution`, fail);
+  return { distribution: display.distribution };
+}
+
 // Descriptions CONDITIONNELLES (voir doc/scripting.md/"Descriptions
 // conditionnelles") : `[{ when, descriptionKey }]`, la première règle vraie
 // donne la description, sinon la description habituelle. MÊME condition que
@@ -414,6 +427,7 @@ const ENTITY_FIELDS = [
   "sounds",
   "container",
   "shop",
+  "display",
   "triggers",
   "startle",
 ];
@@ -450,6 +464,7 @@ export function parseEntity(rawEntity, index, registry, length, seenIds, sceneVa
     sounds,
     container,
     shop,
+    display,
     triggers,
     startle,
   } = rawEntity;
@@ -548,6 +563,16 @@ export function parseEntity(rawEntity, index, registry, length, seenIds, sceneVa
     entity.shop = parseShop(resolvedShop, at);
   }
 
+  // Un présentoir n'est QUE présentoir : le garnissage (core/spawn.js/
+  // refillFace) traite une entité comme UNE seule source, jamais deux.
+  const resolvedDisplay = display !== undefined ? display : archetype.display;
+  if (resolvedDisplay !== undefined) {
+    if (entity.container || entity.shop) {
+      fail(`${at} : display ne se combine ni avec container ni avec shop.`);
+    }
+    entity.display = parseDisplay(resolvedDisplay, at);
+  }
+
   if (entity.action !== undefined) checkActionRequirements(entity, at);
 
   // Entité farouche (voir core/startle.js) : l'instance remplace
@@ -613,6 +638,7 @@ const ARCHETYPE_FIELDS = [
   "triggers",
   "container",
   "shop",
+  "display",
   "startle",
   "collisionSound",
   "muteOnConsumed",

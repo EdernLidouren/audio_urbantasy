@@ -46,7 +46,9 @@ const RARITY_WEIGHTS = Object.fromEntries(RARITY_LEVELS.map((level) => [level.na
 
 // Poids d'une entrée de table : un nombre tel quel, ou le nom d'un niveau
 // de rareté. undefined si ni l'un ni l'autre (refusé à la validation).
-function entryWeight(value) {
+// Exporté pour les tables de présentoir (core/display.js) : mêmes poids
+// partout, jamais une seconde lecture des raretés.
+export function entryWeight(value) {
   if (typeof value === "number") return value;
   if (typeof value === "string" && Object.hasOwn(RARITY_WEIGHTS, value)) return RARITY_WEIGHTS[value];
   return undefined;

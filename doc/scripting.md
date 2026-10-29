@@ -2351,6 +2351,7 @@ protégé par un lourd rideau de fer. »
 | Objets et leurs tags/gait | `ITEM_REGISTRY` | `core/items.js` |
 | Tables de distribution de collecte (standard, référençables) | `SPAWN_TABLES` | `config/spawn-values.js` |
 | Catalogues de point de vente (standard, référençables) | `SHOP_CATALOGS` | `config/shop-values.js` |
+| Articles de présentoir et tables de présentoir (standard, référençables) | `DISPLAY_ARTICLES`, `DISPLAY_TABLES` | `config/shop-values.js` |
 | Surfaces | `SURFACE_REGISTRY` | `core/surfaces.js` |
 | Types de variable, champs d'une déclaration | `VARIABLE_TYPES`, `VARIABLE_FIELDS` | `core/variables.js` |
 | Portées de variable | `VARIABLE_SCOPES` | `core/variables.js` |

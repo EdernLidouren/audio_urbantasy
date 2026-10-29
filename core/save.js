@@ -19,6 +19,7 @@ import { createInitialWeather } from "./weather.js";
 import { ITEM_REGISTRY } from "./items.js";
 import { validateDistribution } from "./distribution.js";
 import { validateCatalog } from "./catalog.js";
+import { validateDisplayDistribution, displayArticleInfo } from "./display.js";
 import { WEATHER_STATES, DEFAULT_WEATHER_STATE } from "../config/weather-values.js";
 import { RENAMED_ENTITY_TYPES, RENAMED_I18N_KEYS, RENAMED_ASSET_PATHS, RENAMED_SCENE_IDS } from "../config/save-renames.js";
 import { TICK_MS } from "../lib/loop.js";
@@ -273,9 +274,10 @@ function dropUnknownItems(data) {
 //
 // Une sauvegarde garde, telles qu'à la première visite, les distributions
 // de collecte (conteneurs, plages), les stocks tirés, les catalogues des
-// points de vente, et l'état météo. Une table, un catalogue, un objet ou un
-// état météo retiré ou renommé depuis ferait planter le garnissage, la
-// boutique ou la météo. Ces références sont revalidées avec les MÊMES
+// points de vente, les tables et articles des présentoirs, et l'état météo.
+// Une table, un catalogue, un objet, un article ou un état météo retiré ou
+// renommé depuis ferait planter le garnissage, la boutique ou la météo. Ces
+// références sont revalidées avec les MÊMES
 // validateurs que le chargement d'une scène ; une référence cassée est
 // NEUTRALISÉE et listée pour que l'appelant avertisse : on perd la
 // référence, jamais la partie.
@@ -283,6 +285,10 @@ function dropUnknownItems(data) {
 //     rien (core/spawn.js) ;
 //   - objet inconnu dans un stock tiré -> retiré du stock ;
 //   - catalogue invalide -> `catalog: null`, rayon vide (core/catalog.js) ;
+//   - table de présentoir invalide -> `distribution: null`, le présentoir
+//     n'expose plus rien (core/display.js/drawOffer) ;
+//   - article exposé inconnu -> `offer: null`, présentoir vide jusqu'au
+//     prochain garnissage ;
 //   - état météo inconnu -> état par défaut, même rendez-vous.
 
 // Message d'erreur d'un validateur de contenu (qui lève via `fail`), ou
@@ -323,6 +329,17 @@ function repairEntityReferences(entity, report) {
       report(entity.id, problem);
       next = { ...next, shop: { ...next.shop, catalog: null } };
     }
+  }
+  if (entity.display && entity.display.distribution !== null) {
+    const problem = validationProblem(validateDisplayDistribution, entity.display.distribution, "display.distribution");
+    if (problem) {
+      report(entity.id, problem);
+      next = { ...next, display: { ...next.display, distribution: null } };
+    }
+  }
+  if (entity.display && entity.offer !== undefined && entity.offer !== null && displayArticleInfo(entity.offer) === null) {
+    report(entity.id, `article ${JSON.stringify(entity.offer)} retiré du présentoir, absent de DISPLAY_ARTICLES.`);
+    next = { ...next, offer: null };
   }
   return next;
 }

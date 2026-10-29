@@ -551,7 +551,8 @@ persiste avec le monde.
   collectibles posés retirés (ramassés ou non), nouveaux posés ; chaque
   conteneur régénérant reçoit un `stock`/`stockCycle` neufs (un conteneur non
   régénérant déjà garni une fois est laissé tel quel) ; chaque POINT DE VENTE
-  recharge son rayon (`shopStock`, voir "Vente et achat"). Scène à deux
+  recharge son rayon (`shopStock`, voir "Vente et achat") ; chaque
+  PRÉSENTOIR tire son article du jour (`offer`, voir "Présentoirs"). Scène à deux
   faces : LES DEUX faces garnies (on charge le monde entier), chacune sur son
   PRNG.
   Exception assumée pour le CONTENEUR : à la fouille, si son `stockCycle`
@@ -645,7 +646,8 @@ prévu, pas construit). Prix d'achat : `price` de l'article, sinon `value`
   source garnie : `restockShopEntity`, jamais un cumul avec l'invendu), et
   PARESSEUSEMENT à l'activation du comptoir si un cycle est passé sur place
   (`core/trade.js`/`restockShopIfDue` — contenu caché, même asymétrie qu'un
-  conteneur). Catalogue dynamique/aléatoire par jour : plus tard.
+  conteneur). L'offre tirée au hasard chaque jour passe par les
+  PRÉSENTOIRS (voir "Présentoirs" plus bas), pas par le comptoir.
 - **Menu d'actions** — TOUJOURS un menu, titre = nom du comptoir : "Acheter",
   "Vendre", "Annuler". "Acheter" sans catalogue, "Vendre" sans rien de
   vendable au sac -> annonce seule, aucune liste vide.
@@ -708,6 +710,76 @@ prévu, pas construit). Prix d'achat : `price` de l'article, sinon `value`
 
 Contenu de test : `scenes/demo.json`, `counter_1` (x=38, catalogue
 `general`).
+
+## Présentoirs — l'offre du jour, posée à des emplacements fixes
+
+Le magasin expose ses articles à des EMPLACEMENTS FIXES de la scène, comme
+dans les vieux jeux : chaque emplacement est une entité PRÉSENTOIR, qui
+tire chaque jour UN article dans sa table et l'expose jusqu'à ce qu'il soit
+acheté. Des positions fixes s'apprennent à l'oreille (les améliorations ici,
+l'équipement là-bas) ; c'est l'article qui change, pas le plan du magasin.
+Le comptoir (voir "Vente et achat") reste le lieu de la REVENTE.
+
+**Statut** : le core est en place (`core/display.js`, garnissage, achat,
+sauvegarde, `node tools/run-checks.js display`). Pas encore d'archétype, de
+rendu (balise, Espace, Entrée) ni de présentoir dans une scène.
+
+- **Article** (`config/shop-values.js`/`DISPLAY_ARTICLES`) — ce qu'on
+  achète, un exemplaire à la fois, d'UNE des deux natures :
+  `{ item, price? }` (un objet du sac, prix par défaut = sa `value`) ou
+  `{ improvement, price }` (une amélioration, prix obligatoire). Nom et
+  description viennent du registre visé (`ITEM_REGISTRY`,
+  `IMPROVEMENT_REGISTRY`), jamais recopiés. Deux articles ne visent jamais
+  la même chose : l'id d'article identifie ce qu'il donne. Validés à
+  l'import (`validateDisplayArticles`). À ne pas confondre avec un article
+  de CATALOGUE de comptoir (un objet en stock, `core/catalog.js`).
+
+  ```js
+  flashlight: { improvement: "flashlight", price: 200 },
+  sneakers: { item: "sneakers" },
+  ```
+
+- **Table de présentoir** (`DISPLAY_TABLES`) — `{ <article>: <poids> }`,
+  mêmes poids que la collecte (nombre ou niveau de rareté), même issue
+  réservée `nothing` (présentoir vide ce jour-là). Une table doit pouvoir
+  exposer au moins un vrai article. Résolue à chaque tirage : un monde
+  sauvegardé tire toujours dans la table courante.
+- **Le présentoir** — une entité portant `display: { distribution }`
+  (cascade instance -> type, comme `container`), `distribution` valant
+  `{ table: "<nom de DISPLAY_TABLES>" }` ou `{ articles: { ... } }` inline.
+  Jamais combiné avec `container` ni `shop` (une entité = une seule source
+  au garnissage). Champ RUNTIME : `offer`, l'id de l'article exposé, ou
+  `null` (vendu, tirage `nothing`, plus aucun article possible) ; absent
+  avant le premier garnissage.
+- **Garnissage** — au cycle de collecte, au CHARGEMENT du monde comme les
+  plages (`core/spawn.js`/`refillDueSpawns`) : le contenu est VISIBLE, il
+  ne se regarnit jamais sur place. Tout présentoir est RE-TIRÉ, l'invendu
+  de la veille ne reste pas, et un emplacement vidé par un achat se
+  regarnit. Tirage **sans remise** sur tout le monde (faces, puis entités,
+  dans l'ordre de la scène) : jamais deux fois le même article dans un
+  magasin ; les poids restants se renormalisent, et un présentoir qui n'a
+  plus aucun article possible reste vide, sans tirage. Les articles d'une
+  amélioration **déjà possédée** ne sont jamais tirés, lus sur l'état RÉEL
+  (`session.improvements`), jamais via la condition `hasImprovement` que
+  le mode debug court-circuite. Un objet acheté, lui, peut revenir un autre
+  jour. Déterministe : tirages sur `face.rngState`.
+- **Achat** (`core/trade.js`/`buyOfferedArticle`) — un seul effet d'état :
+  débite le prix, donne l'article (objet -> sac par `addItem`, donc noté
+  acquis ; amélioration -> `giveImprovement`) et vide le présentoir
+  (`offer: null`). Rend `{ session, status }` ; tout refus laisse la
+  référence inchangée : `"empty"`, `"alreadyOwned"` (amélioration obtenue
+  ailleurs depuis le garnissage du jour), `"insufficientFunds"` (jamais de
+  débit partiel), ou `null` (pas un présentoir de la face active). Les sons
+  de récompense (nouvel objet de collection, nouvelle amélioration) suivent
+  d'eux-mêmes, dérivés du diff par la vue.
+- **Sauvegarde** — `offer` est un champ plat sérialisé. Une table de
+  présentoir disparue est neutralisée (`distribution: null`, plus rien
+  d'exposé), un article exposé disparu vide le présentoir jusqu'au
+  prochain garnissage (voir `doc/save.md`).
+
+Prévu, pas construit : une condition `when` par entrée de table (format du
+script, partagé avec la collecte), et le rendu (son propre à chaque article,
+son de catégorie en repli).
 
 ## Messages en rotation — un texte qui change avec l'heure
 

@@ -3,16 +3,20 @@
 // `value` sur l'objet (core/items.js/ITEM_REGISTRY), pleine valeur, aucune
 // marge ; un objet sans `value` (ou 0) n'est pas vendable. Achat : catalogue
 // du point de vente (core/catalog.js — articles, prix, stock FINI rechargé
-// au cycle de collecte), fonds vérifiés, stock clampé. Compose
-// addItem/removeItem (core/bag.js) et addMoney (core/money.js) : aucune
-// seconde logique de sac ni d'argent.
+// au cycle de collecte), fonds vérifiés, stock clampé. Achat à un
+// PRÉSENTOIR (core/display.js) : l'article du jour, un exemplaire, objet ou
+// amélioration. Compose addItem/removeItem (core/bag.js), giveImprovement
+// (core/improvements.js) et addMoney (core/money.js) : aucune seconde
+// logique de sac, d'amélioration ni d'argent.
 
 import { ITEM_REGISTRY, itemValue } from "./items.js";
 import { addItem, removeItem } from "./bag.js";
 import { addMoney } from "./money.js";
+import { hasImprovement, giveImprovement } from "./improvements.js";
 import { resolveFace, updateActiveFace } from "./state.js";
 import { spawnCycleAt } from "./spawn.js";
 import { resolveCatalog, articlePrice, restockShopEntity } from "./catalog.js";
+import { offeredArticle } from "./display.js";
 
 // Prix de vente unitaire d'un type d'objet — 0 si non vendable (absent du
 // registre, sans `value`, ou `value` non entier positif).
@@ -52,15 +56,19 @@ export function sellItems(session, sales) {
 
 // --- Achat ---
 
-function findShop(session, entityId) {
+// Entité de la FACE ACTIVE qui porte le champ `field` ("shop", "display"),
+// avec sa position pour la remplacer ensuite — null sinon.
+function findMerchant(session, entityId, field) {
   const world = session.worlds[session.activeWorldId];
   const face = resolveFace(world, session.player.side);
   const index = face.entities.findIndex((e) => e.id === entityId);
   const entity = face.entities[index];
-  return entity && entity.shop ? { world, face, index, entity } : null;
+  return entity && entity[field] ? { world, face, index, entity } : null;
 }
 
-function replaceShop(session, found, entity) {
+const findShop = (session, entityId) => findMerchant(session, entityId, "shop");
+
+function replaceMerchant(session, found, entity) {
   const entities = found.face.entities.map((e, i) => (i === found.index ? entity : e));
   return updateActiveFace(session, { entities });
 }
@@ -92,7 +100,7 @@ export function restockShopIfDue(session, entityId) {
   if (!found) return session;
   const cycle = spawnCycleAt(session.time);
   if (found.entity.shopCycle === cycle) return session;
-  return replaceShop(session, found, restockShopEntity(found.entity, cycle));
+  return replaceMerchant(session, found, restockShopEntity(found.entity, cycle));
 }
 
 // Effet d'ÉTAT de l'achat : DÉBITE session.money, AJOUTE les articles au sac,
@@ -125,6 +133,39 @@ export function buyItems(session, entityId, purchases) {
     next = addItem(next, type, count);
     stock[type] = (stock[type] ?? 0) - count;
   }
-  next = replaceShop(next, found, { ...found.entity, shopStock: stock });
+  next = replaceMerchant(next, found, { ...found.entity, shopStock: stock });
   return addMoney(next, -total);
+}
+
+// --- Achat à un présentoir (core/display.js) ---
+
+// Effet d'ÉTAT de l'achat de l'article exposé par un présentoir de la FACE
+// ACTIVE : DÉBITE son prix, DONNE l'article (objet -> sac via addItem, qui
+// le note acquis ; amélioration -> giveImprovement) et VIDE le présentoir
+// (`offer: null`, jusqu'au prochain garnissage) — dans le MÊME nouvel état.
+// Rend { session, status } ; tout refus laisse la RÉFÉRENCE INCHANGÉE :
+//   - "bought" : achat fait ;
+//   - "empty" : présentoir vide (vendu, tirage "rien", jamais garni) ;
+//   - "alreadyOwned" : l'amélioration exposée est déjà possédée (obtenue
+//     ailleurs depuis le garnissage du jour) — lue sur l'état RÉEL, jamais
+//     via le court-circuit debug de la condition hasImprovement ;
+//   - "insufficientFunds" : prix au-delà de l'argent possédé, jamais de
+//     débit partiel ;
+//   - null : l'id n'est pas un présentoir de la face active.
+export function buyOfferedArticle(session, entityId) {
+  const found = findMerchant(session, entityId, "display");
+  if (!found) return { session, status: null };
+  const article = offeredArticle(found.entity);
+  if (!article) return { session, status: "empty" };
+  if (article.improvement !== undefined && hasImprovement(session.improvements, article.improvement)) {
+    return { session, status: "alreadyOwned" };
+  }
+  if (article.price > session.money) return { session, status: "insufficientFunds" };
+
+  let next =
+    article.item !== undefined
+      ? addItem(session, article.item, 1)
+      : { ...session, improvements: giveImprovement(session.improvements, article.improvement) };
+  next = replaceMerchant(next, found, { ...found.entity, offer: null });
+  return { session: addMoney(next, -article.price), status: "bought" };
 }

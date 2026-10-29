@@ -40,6 +40,7 @@ import checkScene from "./scene.check.js";
 import checkVariables from "./variables.check.js";
 import checkEffects from "./effects.check.js";
 import checkTrade from "./trade.check.js";
+import checkDisplay from "./display.check.js";
 import checkSpawn from "./spawn.check.js";
 import checkCollections from "./collections.check.js";
 import checkTriggers from "./triggers.check.js";
@@ -77,6 +78,7 @@ const SUITES = [
   { name: "variables", check: checkVariables },
   { name: "effects", check: checkEffects },
   { name: "trade", check: checkTrade },
+  { name: "display", check: checkDisplay },
   { name: "spawn", check: checkSpawn },
   { name: "collections", check: checkCollections },
   { name: "triggers", check: checkTriggers },
