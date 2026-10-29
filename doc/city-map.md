@@ -72,7 +72,7 @@ joueur, à distinguer d'une case **en chantier** (pas encore construite) :
 - la condition est évaluée sur l'état RÉEL de la partie, **jamais
   court-circuitée par le mode debug** (contrairement à `hasImprovement`
   ailleurs) : la carte se montre telle que le joueur la voit, comme
-  l'onglet Améliorations.
+  le menu des améliorations.
 
 Accesseurs exportés (seule interface recommandée, jamais indexer
 `CITY_MAP_GRID` directement en dehors de ce fichier) :

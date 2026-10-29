@@ -208,7 +208,7 @@ function evaluateHasEquipmentTag(cond, context) {
 // l'effet réel d'un giveImprovement n'est jamais court-circuité.
 // `context.debugShortCircuit === false` : l'appelant veut l'état RÉEL même
 // en debug (la carte de la ville, qui montre le plan tel que le joueur le
-// voit — même choix que l'onglet Améliorations).
+// voit — même choix que le menu des améliorations).
 function evaluateHasImprovement(cond, context) {
   if (isDebugEnabled() && context.debugShortCircuit !== false) return true;
   return hasImprovement(context.session && context.session.improvements, cond.id);

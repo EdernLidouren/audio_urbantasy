@@ -1,4 +1,8 @@
 {
+  "capacities.emotes.name": "émotes",
+  "capacities.entry": "{name}, {known} sur {total}",
+  "capacities.improvements.name": "améliorations",
+  "capacities.title": "Capacités",
   "equipment.slot.feet": "pieds",
   "inventory.actions.cancel": "Annuler",
   "inventory.actions.drop": "Poser",

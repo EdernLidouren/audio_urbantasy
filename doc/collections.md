@@ -5,7 +5,7 @@ menu global. Deux collections : les composants électroniques et les entités
 surnaturelles. Code : `core/collections.js` (logique pure), `collections/`
 (données), `core/observations.js` (le fait « observé »),
 `view/collection-discoveries.js` (validation, annonce de découverte),
-`view/menus/inventory/progress-tabs.js` (onglet et fiches),
+`view/menus/inventory/collections-tab.js` (onglet et fiches),
 `view/menus/debug-collections-menu.js` (outils de debug).
 
 Les **améliorations** ne sont pas une collection : ce sont des capacités, elles
@@ -90,7 +90,7 @@ sources d'acquisition. Une annonce POLIE dédiée, « Nouvelle découverte :
 résistance, composants électroniques. », différée d'un instant pour passer
 APRÈS l'annonce de ramassage ou d'achat, plus le `discoverySound` de la
 collection, retardé de `discoverySoundDelayMs` (`config/tuning-values.js`,
-0 par défaut) pour ne pas chevaucher le son de ramassage. Plusieurs
+300 ms) pour ne pas chevaucher le son de ramassage. Plusieurs
 découvertes simultanées : une seule annonce, un son par collection. Rien n'est
 annoncé quand la partie est remplacée en bloc (import) ou modifiée par un outil
 de debug (`muteNextDiscoveryCheck`).
@@ -127,13 +127,20 @@ bloquer le jeu (la clé brute s'affiche à sa place).
 
 ## Interface
 
-Onglet **Collections**, 5ᵉ et dernier du menu global (après Émotes, Tab /
-Maj+Tab), ouvrable directement avec **C** en ville.
+Onglet **Collections**, 4ᵉ et dernier du menu global (après Capacités, Tab /
+Maj+Tab), ouvrable directement avec **C** en ville
+(`view/menus/inventory/collections-tab.js`).
 
 - L'onglet liste les collections avec leur progression : « Composants
   électroniques, 1 sur 3 ».
 - Entrée sur une collection ouvre ses entrées PAR-DESSUS l'onglet ; Échap
-  revient à la liste.
+  revient à la liste, sur la ligne de la collection affichée.
+- Dans une collection, **Tab / Maj+Tab** passe à la collection suivante /
+  précédente, dans l'ordre de l'onglet, annoncée comme à l'ouverture (titre
+  puis entrée courante). À la borne : cycle si la préférence « cyclage des
+  menus » est active (son « wrap »), sinon on reste (son « block ») ;
+  l'annonce est étoilée dans les deux cas, comme une flèche contre la borne
+  d'un menu.
 - Entrée d'objet découverte : « nom : description » ; non découverte :
   « Inconnu ». Sans numéro, contrairement aux améliorations.
 - Entrée d'entité découverte : son nom ; Entrée ouvre sa FICHE par-dessus la
@@ -141,8 +148,17 @@ Maj+Tab), ouvrable directement avec **C** en ville.
   « Nom : … », « Description : … », « Encyclopédie : … », « Lieux de
   rencontre : … », puis « Écouter » si le type a un vocal (joué centré, au
   volume de l'interface, avec le gain et la variation de ton du type, un
-  fichier différent du pool à chaque écoute). Échap revient à la liste.
-- La progression se lit dans l'état réel, comme l'onglet Améliorations.
+  fichier différent du pool à chaque écoute). Une seule écoute à la fois :
+  un nouvel appui coupe la précédente (court fondu) avant de relancer ;
+  fermer la fiche ou passer à une autre la coupe aussi. Échap revient à la
+  liste, sur la ligne de la fiche affichée.
+- Dans une fiche, **Tab / Maj+Tab** passe à la fiche DÉCOUVERTE suivante /
+  précédente de la même collection, du même saut que Ctrl+haut/bas (les
+  entrées inconnues sautées, et les objets, qui n'ont pas de fiche), en
+  gardant la ligne courante (bornée à la nouvelle fiche) : on compare ainsi
+  deux vocaux d'un Tab. Annonce : celle de Retour arrière (titre puis ligne
+  courante). Pas de cycle : à la borne, son « block » et annonce étoilée.
+- La progression se lit dans l'état réel, comme le menu des améliorations.
 
 ## Sauvegarde
 

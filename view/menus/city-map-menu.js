@@ -66,7 +66,7 @@ for (const row of CITY_MAP_GRID) {
 // Une zone figure-t-elle sur le plan du joueur ? Sans onMapWhen : toujours.
 // Évaluée sur l'état RÉEL de la partie, jamais court-circuitée par le mode
 // debug (debugShortCircuit: false) : la carte se montre telle que le
-// joueur la voit, comme l'onglet Améliorations.
+// joueur la voit, comme le menu des améliorations.
 function isZoneOnMap(cell, session) {
   if (!cell.onMapWhen) return true;
   return evaluateCondition(cell.onMapWhen, { ...presenceContextOf(session), debugShortCircuit: false });

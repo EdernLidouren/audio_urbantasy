@@ -1,6 +1,6 @@
-// Écran d'INVENTAIRE à CINQ ONGLETS — Sac ("i"), Équipement ("q"),
-// Améliorations ("m"), Émotes (par Tab depuis les Améliorations) et
-// Collections ("c"), voir view/city-screen.js. UN SEUL écran RÉEL sur la
+// Écran d'INVENTAIRE à QUATRE ONGLETS — Sac ("i"), Équipement ("q"),
+// Capacités ("m" : améliorations et émotes) et Collections ("c"), voir
+// view/city-screen.js. UN SEUL écran RÉEL sur la
 // pile (lib/screens.js) : il délègue à un écran-menu INTERNE
 // (lib/menu.js/makeMenuScreen), reconstruit pour l'onglet actif à CHAQUE
 // affichage/bascule — jamais un écran séparé par onglet. Tab / Maj+Tab
@@ -28,14 +28,21 @@
 // ./inventory/ :
 //   - bag-and-equipment.js : Sac et Équipement, menus d'actions, sélecteur
 //     de quantité, retour silencieux après une action ;
-//   - progress-tabs.js : Améliorations, Émotes et Collections (lecture
-//     seule).
+//   - progress-tabs.js : Capacités, et ses menus Améliorations et Émotes
+//     (lecture seule) ;
+//   - collections-tab.js : Collections, leurs entrées et les fiches
+//     d'entité (lecture seule).
+//
+// Retour d'un sous-menu de liste (Capacités, Collections) : Échap revient
+// sur la ligne qui l'a ouvert, pas sur la première — le sous-menu la note
+// par setReturnCursor (voir pendingCursor).
 
 import { pushScreen } from "../../lib/screens.js";
 import { withPausedBeacons } from "../paused-beacons.js";
 import { resolveAction, defineBindings } from "../../lib/input.js";
 import { buildBagTabScreen, buildEquipmentTabScreen, setCurrentTabsScreen } from "./inventory/bag-and-equipment.js";
-import { buildImprovementsTabScreen, buildEmotesTabScreen, buildCollectionsTabScreen } from "./inventory/progress-tabs.js";
+import { buildCapacitiesTabScreen } from "./inventory/progress-tabs.js";
+import { buildCollectionsTabScreen } from "./inventory/collections-tab.js";
 
 // Gestionnaires d'état des actions du sac et de l'équipement, injectés par
 // view/action-handlers.js.
@@ -50,21 +57,21 @@ const TAB_BINDINGS = defineBindings("inventoryTabs", {
 });
 
 // Ordre des onglets, celui du cycle Tab / Maj+Tab.
-const TABS = ["bag", "equipment", "improvements", "emotes", "collections"];
+const TABS = ["bag", "equipment", "capacities", "collections"];
 
 function cycleTab(tab, direction) {
   const index = TABS.indexOf(tab);
   return TABS[(index + direction + TABS.length) % TABS.length];
 }
 
-// `cursor` : seul l'onglet Sac en a l'usage (voir buildBagTabScreen) — les
-// listes des autres onglets ne changent pas de longueur pendant qu'on les
-// parcourt, rien à repositionner de ce côté.
-function buildTabScreen(tab, getWorldView, getSession, cursor) {
+// `cursor` : la ligne où rouvrir l'onglet — celle du sac après le retrait
+// d'une entrée (voir buildBagTabScreen), ou celle d'où l'on a ouvert un
+// sous-menu de Capacités ou de Collections (`setReturnCursor`). Absent :
+// la première ligne.
+function buildTabScreen(tab, getWorldView, getSession, cursor, setReturnCursor) {
   if (tab === "equipment") return buildEquipmentTabScreen(getWorldView, getSession);
-  if (tab === "improvements") return buildImprovementsTabScreen(getSession);
-  if (tab === "emotes") return buildEmotesTabScreen(getSession);
-  if (tab === "collections") return buildCollectionsTabScreen(getSession);
+  if (tab === "capacities") return buildCapacitiesTabScreen(getSession, setReturnCursor, cursor);
+  if (tab === "collections") return buildCollectionsTabScreen(getSession, setReturnCursor, cursor);
   return buildBagTabScreen(getWorldView, getSession, cursor);
 }
 
@@ -91,9 +98,16 @@ function buildInventoryTabsScreen(getWorldView, getSession, initialTab) {
   // lib/menu.js/makeMenuScreen.
   let pendingCursor;
 
+  // Noté par un sous-menu de liste (voir header) : consommé par le PROCHAIN
+  // rebuild, celui du retour (ou d'une bascule d'onglet, qui l'oublie).
+  function setReturnCursor(cursor) {
+    pendingCursor = cursor;
+  }
+
   function rebuildInner() {
-    inner = buildTabScreen(activeTab, getWorldView, getSession, pendingCursor);
+    const cursor = pendingCursor;
     pendingCursor = undefined;
+    inner = buildTabScreen(activeTab, getWorldView, getSession, cursor, setReturnCursor);
   }
 
   return withPausedBeacons({
@@ -121,6 +135,7 @@ function buildInventoryTabsScreen(getWorldView, getSession, initialTab) {
         // Comportement navigateur de Tab déjà neutralisé en amont, voir
         // lib/input.js/ALWAYS_NEUTRALIZED_BINDINGS — rien à prévenir ici.
         activeTab = cycleTab(activeTab, action === "nextTab" ? 1 : -1);
+        pendingCursor = undefined;
         rebuildInner();
         inner.onEnter(); // annonce "<Nom de l'onglet>. <contenu>" — voir header.
         return;
@@ -157,7 +172,7 @@ export function openEquipmentMenu(getWorldView, getSession) {
 
 // "m" — voir view/city-screen.js.
 export function openImprovementsMenu(getWorldView, getSession) {
-  openInventoryTabs(getWorldView, getSession, "improvements");
+  openInventoryTabs(getWorldView, getSession, "capacities");
 }
 
 // "c" — voir view/city-screen.js.

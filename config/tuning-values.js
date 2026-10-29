@@ -524,7 +524,7 @@ export const TUNING_DEFAULTS = {
   // ramassage ou d'achat qui l'a provoquée, pour qu'ils ne se chevauchent
   // pas. N'affecte que le son, jamais l'annonce. Lu DIRECTEMENT, comme
   // transitionStepDelayMs.
-  discoverySoundDelayMs: 0,
+  discoverySoundDelayMs: 300,
 
   // Pas des SÉLECTEURS DE QUANTITÉ (flèches gauche/droite), même convention
   // partout : Maj = pas intermédiaire, Ctrl = grand pas (sans modificateur :

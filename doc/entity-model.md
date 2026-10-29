@@ -917,10 +917,11 @@ l'écriture du slot).
   l'activer annonce juste "Emplacement vide."
 - **Interface à onglets** (`view/menus/inventory-menu.js`, la coquille ; le
   contenu des onglets dans `view/menus/inventory/`) — UN SEUL
-  écran réel sur la pile, cinq onglets (Sac, Équipement, Améliorations,
-  Émotes, Collections) et quatre portes d'entrée ("i" -> Sac, "q" ->
-  Équipement, "m" -> Améliorations, voir `doc/scripting.md`/"Améliorations",
-  "c" -> Collections), Tab/Maj+Tab pour parcourir les onglets en cycle une
+  écran réel sur la pile, quatre onglets (Sac, Équipement, Capacités —
+  améliorations et émotes —, Collections) et quatre portes d'entrée ("i" ->
+  Sac, "q" -> Équipement, "m" -> Capacités, voir
+  `doc/scripting.md`/"Améliorations", "c" -> Collections, voir
+  `doc/collections.md`), Tab/Maj+Tab pour parcourir les onglets en cycle une
   fois ouvert. Le nom de
   l'onglet est TOUJOURS annoncé avant son contenu à la bascule — obtenu
   gratuitement en réutilisant `menu.title` (déjà le nom de l'onglet) et

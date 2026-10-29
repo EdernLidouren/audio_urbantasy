@@ -56,6 +56,7 @@ helpSections: () => [{ id: "move" }, { id: "city", include: (action) => ... }],
 | Jeu (`view/city-screen.js`) | `move`, `city` — les raccourcis de debug seulement en mode debug ; une touche à condition (`available()` dans `KEY_ACTIONS`) seulement quand elle a un effet : la perception surnaturelle (P) une fois l'amélioration débloquée, ou en mode debug, où elle l'est toujours (même règle que la touche) |
 | Tout menu (`lib/menu.js`) | `menu`, sans ce qui ne sert à rien dans CE menu : gauche/droite sans entrée réglable, Ctrl+gauche/droite sans curseur gradué, Ctrl+haut/bas sans entrée inconnue, Échap dans un menu qu'on ne ferme pas ainsi |
 | Inventaire | `inventoryTabs`, puis les sections de l'onglet courant |
+| Une collection, une fiche d'entité | `collectionNav` / `entitySheetNav` (Tab / Maj+Tab), puis `menu` |
 | Carte de la ville | `cityMap` |
 | Choix de la quantité à poser | `dropQuantity` |
 | Liste d'achat ou de vente | `shopList` |

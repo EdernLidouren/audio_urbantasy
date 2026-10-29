@@ -3,8 +3,8 @@
 // SOURCE DE VÉRITÉ des improvements existantes, valide give/remove/has à
 // l'instar de hasEquipmentTag/tag (voir core/script-parse.js/validateCondition,
 // parseActionEffect). Ajouter une improvement = une entrée ici, jamais une
-// chaîne en dur ailleurs — affichée dans l'onglet Améliorations du menu
-// global (view/menus/inventory-menu.js).
+// chaîne en dur ailleurs — affichée dans le menu des améliorations, onglet
+// Capacités du menu global (view/menus/inventory-menu.js).
 //
 // FLAG SIMPLE pour l'instant (possédée ou non) : un état interne riche (une
 // improvement qui porterait ses propres variables) viendrait s'ajouter SI un

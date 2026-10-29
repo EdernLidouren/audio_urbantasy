@@ -2067,8 +2067,8 @@ portées dans la MÊME activation), point d'entrée de
 **Registre** (`core/improvements.js`/`IMPROVEMENT_REGISTRY`) — données pures,
 structuré comme `core/tags.js`/`TAG_REGISTRY` : SOURCE DE VÉRITÉ des
 améliorations existantes (valide `hasImprovement`/`giveImprovement`/
-`removeImprovement`), affichées dans l'onglet Améliorations du menu global
-(voir plus bas). Ajouter une amélioration = une entrée ici :
+`removeImprovement`), affichées dans le menu des améliorations, onglet Capacités du menu
+global (voir plus bas). Ajouter une amélioration = une entrée ici :
 
 ```js
 { order: 1, labelKey: "improvement.supernatural_perception.name", descriptionKey: "improvement.supernatural_perception.description" }
@@ -2092,14 +2092,17 @@ réinitialisée comme une variable volatile). Vide à la création d'une partie
 neuve ; rebouché vide pour une sauvegarde antérieure à ce mécanisme (voir
 `core/save.js`/`migrateSave`).
 
-**Onglet Améliorations** (`view/menus/inventory/progress-tabs.js`, touche "m", troisième
-onglet du menu global après Sac et Équipement) : toutes les améliorations du
-registre, triées par `order`. Débloquée : `"{order} - {nom} : {description}"` ;
+**Menu des améliorations** (`view/menus/inventory/progress-tabs.js`) : ouvert
+depuis l'onglet **Capacités** (touche "m", troisième onglet du menu global
+après Sac et Équipement), une liste simple « améliorations, {débloquées} sur
+{total} » puis « émotes, {connues} sur {total} », dont chaque ligne ouvre son
+menu par-dessus l'onglet (Échap y revient, sur la même ligne). Toutes les
+améliorations du registre, triées par `order`. Débloquée : `"{order} - {nom} : {description}"` ;
 non débloquée : `"{order} - Inconnue"` — le numéro trahit qu'un pouvoir existe,
 jamais lequel. Titre : `"Améliorations : {débloquées} sur {total}"`. Aucune
-action (les pouvoirs s'activent ailleurs). L'onglet lit `session.improvements`
+action (les pouvoirs s'activent ailleurs). Le menu lit `session.improvements`
 DIRECTEMENT, jamais la condition `hasImprovement` : en debug, celle-ci répond
-toujours vrai (court-circuit plus bas), alors que l'onglet doit montrer ce que
+toujours vrai (court-circuit plus bas), alors que le menu doit montrer ce que
 le joueur possède RÉELLEMENT — c'est le seul endroit où vérifier cet état
 pendant qu'on joue en debug.
 
@@ -2145,14 +2148,18 @@ le joueur, dans la réverb de la scène (`view/emotes.js`,
   place en RACCOURCI (annonce « Raccourci d'émote : sifflement. ») et
   ferme le menu, sans la jouer.
 - **E** joue l'émote du raccourci ; sans raccourci, il ouvre le choix.
-- **Onglet Émotes** du menu global (`view/menus/inventory/progress-tabs.js`,
-  après Améliorations, par Tab depuis la touche "m") : toutes les émotes du
-  registre, par `order`, sur le patron de l'onglet Améliorations. Connue :
-  `"{order} - {nom} : {description}"`, avec « en raccourci » pour celle de
-  la touche E ; inconnue : `"{order} - Inconnue"`. Titre : `"Émotes :
-  {connues} sur {total}"`. Lecture seule (le raccourci se choisit avec
-  Maj+E). L'onglet lit `session.emotes` DIRECTEMENT, jamais `knowsEmote`,
-  qui répond toujours vrai en debug.
+- **Menu des émotes** (`view/menus/inventory/progress-tabs.js`), seconde
+  ligne de l'onglet **Capacités** (touche "m", voir "Améliorations") :
+  toutes les émotes du registre, par `order`, sur le patron du menu des
+  améliorations. Connue : `"{order} - {nom} : {description}"`, avec « en
+  raccourci » pour celle de la touche E ; inconnue : `"{order} -
+  Inconnue"`. Titre : `"Émotes : {connues} sur {total}"`. Entrée sur une
+  émote connue JOUE son son (un fichier du pool, centré, au volume de
+  l'interface, avec la variation de hauteur du jeu), une écoute à la fois
+  : un nouvel appui coupe la précédente, fermer le menu la coupe aussi.
+  Une écoute, pas un geste : aucun trigger, et le raccourci ne bouge pas
+  (il se choisit avec Maj+E). Le menu lit `session.emotes` DIRECTEMENT,
+  jamais `knowsEmote`, qui répond toujours vrai en debug.
 
 Le raccourci (`session.emoteShortcut`, `core/emotes.js`/`setEmoteShortcut`)
 est sauvegardé avec la partie, vide au départ. Visant une émote que le
