@@ -8,6 +8,7 @@ export default {
   demo3: "scenes/demo3.json",
   town_square: "scenes/town-square.json",
   main_street: "scenes/main-street.json",
+  main_street_quasar_bazaar_main: "scenes/main-street-quasar-bazaar-main.json",
   town_square_town_hall_main: "scenes/town-square-town-hall-main.json",
   town_square_town_hall_mayor_office: "scenes/town-square-town-hall-mayor-office.json",
   town_square_town_hall_meeting_room: "scenes/town-square-town-hall-meeting-room.json",
@@ -41,6 +42,7 @@ export const MAIN_SCENE_IDS = ["town_square", "main_street", "demo"];
 export const MAIN_SCENE_OF = {
   demo2: "demo",
   demo3: "demo",
+  main_street_quasar_bazaar_main: "main_street",
   town_square_town_hall_main: "town_square",
   town_square_town_hall_mayor_office: "town_square",
   town_square_town_hall_meeting_room: "town_square",

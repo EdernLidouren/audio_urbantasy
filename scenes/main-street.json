@@ -43,7 +43,7 @@
           "kind": "applyEffects",
           "condition": { "type": "timeRange", "from": 8, "to": 20 },
           "refusalEffects": [{ "type": "announce", "key": "door.default.shop_hours_refusal" }],
-          "effects": [{ "type": "teleport", "target": "demo2" }]
+          "effects": [{ "type": "teleport", "target": "main_street_quasar_bazaar_main", "x": 15 }]
         }
       },
       { "id": "neon_2_r", "type": "neon", "x": 27 },

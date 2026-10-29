@@ -1,0 +1,21 @@
+{
+  "id": "main_street_quasar_bazaar_main",
+  "titleKey": "scene.main_street_quasar_bazaar_main.name",
+  "length": 30,
+  "playerStart": 15,
+  "indoor": true,
+  "musicDay": "assets/musics/shop_day",
+  "ambiencesDay": ["assets/ambiances/shopping_mall"],
+  "ambiencesNight": [],
+  "defaultSurface": "concrete",
+  "reverbPreset": "medium_room",
+  "entities": [
+    {
+      "id": "quasar_bazaar_door_1",
+      "type": "automatic_sliding_door",
+      "descriptionKey": "door.quasar_bazaar.description",
+      "x": 15,
+      "action": { "kind": "applyEffects", "effects": [{ "type": "teleport", "target": "main_street", "x": 25, "side": "recto" }] }
+    }
+  ]
+}

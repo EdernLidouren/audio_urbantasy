@@ -13,6 +13,7 @@
     "base": "main street",
     "def": "Main Street"
   },
+  "scene.main_street_quasar_bazaar_main.name": "quasar bazaar, superstore",
   "scene.town_square.name": {
     "base": "town square",
     "def": "the town square"
