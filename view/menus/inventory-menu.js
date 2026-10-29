@@ -28,7 +28,7 @@
 // ./inventory/ :
 //   - bag-and-equipment.js : Sac et Équipement, menus d'actions, sélecteur
 //     de quantité, retour silencieux après une action ;
-//   - progress-tabs.js : Capacités, et ses menus Améliorations et Émotes
+//   - capacities-tab.js : Capacités, et ses menus Améliorations et Émotes
 //     (lecture seule) ;
 //   - collections-tab.js : Collections, leurs entrées et les fiches
 //     d'entité (lecture seule).
@@ -41,7 +41,7 @@ import { pushScreen } from "../../lib/screens.js";
 import { withPausedBeacons } from "../paused-beacons.js";
 import { resolveAction, defineBindings } from "../../lib/input.js";
 import { buildBagTabScreen, buildEquipmentTabScreen, setCurrentTabsScreen } from "./inventory/bag-and-equipment.js";
-import { buildCapacitiesTabScreen } from "./inventory/progress-tabs.js";
+import { buildCapacitiesTabScreen } from "./inventory/capacities-tab.js";
 import { buildCollectionsTabScreen } from "./inventory/collections-tab.js";
 
 // Gestionnaires d'état des actions du sac et de l'équipement, injectés par

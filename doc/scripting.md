@@ -2092,7 +2092,7 @@ réinitialisée comme une variable volatile). Vide à la création d'une partie
 neuve ; rebouché vide pour une sauvegarde antérieure à ce mécanisme (voir
 `core/save.js`/`migrateSave`).
 
-**Menu des améliorations** (`view/menus/inventory/progress-tabs.js`) : ouvert
+**Menu des améliorations** (`view/menus/inventory/capacities-tab.js`) : ouvert
 depuis l'onglet **Capacités** (touche "m", troisième onglet du menu global
 après Sac et Équipement), une liste simple « améliorations, {débloquées} sur
 {total} » puis « émotes, {connues} sur {total} », dont chaque ligne ouvre son
@@ -2114,7 +2114,7 @@ appliqués comme les effets de variable.
 **Son de récompense** : toute amélioration NOUVELLEMENT obtenue joue
 `assets/sounds/ui/global_reward` (son d'interface, non spatialisé), déduit
 du diff de `session.improvements` comme les découvertes de collection
-(`view/collection-discoveries.js`, retard `discoverySoundDelayMs`). Le son
+(`view/discoveries.js`, retard `discoverySoundDelayMs`). Le son
 seul : l'annonce reste à la source (ex. `entity.old_survey_map.taken`).
 
 **COURT-CIRCUIT DEBUG — le principe central** (`config/debug.js`/
@@ -2148,7 +2148,7 @@ le joueur, dans la réverb de la scène (`view/emotes.js`,
   place en RACCOURCI (annonce « Raccourci d'émote : sifflement. ») et
   ferme le menu, sans la jouer.
 - **E** joue l'émote du raccourci ; sans raccourci, il ouvre le choix.
-- **Menu des émotes** (`view/menus/inventory/progress-tabs.js`), seconde
+- **Menu des émotes** (`view/menus/inventory/capacities-tab.js`), seconde
   ligne de l'onglet **Capacités** (touche "m", voir "Améliorations") :
   toutes les émotes du registre, par `order`, sur le patron du menu des
   améliorations. Connue : `"{order} - {nom} : {description}"`, avec « en

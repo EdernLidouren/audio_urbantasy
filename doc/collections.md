@@ -4,7 +4,7 @@ Des listes d'objets à acquérir ou d'entités à observer, consultables dans le
 menu global. Deux collections : les composants électroniques et les entités
 surnaturelles. Code : `core/collections.js` (logique pure), `collections/`
 (données), `core/observations.js` (le fait « observé »),
-`view/collection-discoveries.js` (validation, annonce de découverte),
+`view/discoveries.js` (validation, annonce de découverte),
 `view/menus/inventory/collections-tab.js` (onglet et fiches),
 `view/menus/debug-collections-menu.js` (outils de debug).
 
@@ -63,7 +63,7 @@ export default {
   l'onglet.
 
 **Validation au démarrage** (`core/collections.js`/`validateCollection`,
-appelée par `view/collection-discoveries.js`, registres d'objets et de types
+appelée par `view/discoveries.js`, registres d'objets et de types
 injectés) : entrées non vides, objets et types existants, un seul genre par
 entrée, aucun doublon. Une collection mal écrite fait échouer le
 chargement, jamais une entrée introuvable en silence.
@@ -83,7 +83,7 @@ son objet y figure (`collectionEntries`, `collectionProgress`).
 - **Conséquence assumée** : une entrée ajoutée plus tard pour un objet déjà
   acquis apparaît découverte d'emblée.
 
-**Annonce et son** (`view/collection-discoveries.js`) : déduits du DIFF entre
+**Annonce et son** (`view/discoveries.js`) : déduits du DIFF entre
 deux états de la partie (`newlyDiscoveredEntries`), au `setSession` de
 `main.js`, qui voit passer toute mise à jour — jamais d'émission dans les
 sources d'acquisition. Une annonce POLIE dédiée, « Nouvelle découverte :

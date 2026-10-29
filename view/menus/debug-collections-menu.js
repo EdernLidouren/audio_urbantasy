@@ -13,7 +13,7 @@ import { makeMenuScreen } from "../../lib/menu.js";
 import { revealAllCollections, resetAllCollections } from "../../core/collections.js";
 import { openConfirmation } from "./confirmation.js";
 import collections from "../../collections/index.js";
-import { muteNextDiscoveryCheck } from "../collection-discoveries.js";
+import { muteNextDiscoveryCheck } from "../discoveries.js";
 export function openCollectionsDebugMenu(getSession, setSession) {
   function apply(transform, doneKey) {
     popScreen(); // ferme le menu debug lui-même

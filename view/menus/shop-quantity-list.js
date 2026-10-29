@@ -17,7 +17,7 @@
 import { t } from "../../data/i18n/index.js";
 import { pushScreen, popScreen } from "../../lib/screens.js";
 import { openConfirmation } from "./confirmation.js";
-import { createHoldRepeat, heldStep, shouldAnnounceAdjustment } from "../../lib/menu.js";
+import { createHoldRepeat, heldStep, shouldAnnounceAdjustment, announceMenuLine, stepMenuCursor } from "../../lib/menu.js";
 import { TUNING_DEFAULTS } from "../../config/tuning-values.js";
 import { announce, stripTrailingPeriod } from "../../lib/announce.js";
 import { playMenuSound } from "../menu-sounds.js";
@@ -128,23 +128,11 @@ export function openQuantityList(spec) {
     return t(spec.totalKey, { count: selectedCount(lines), total: selectedTotal(lines) });
   }
 
-  function announceStarred(text, starred) {
-    announce(starred && getPref("menuStarPrefix", true) ? `* ${text}` : text, { assertive: true });
-  }
-
+  // Bornes : celles des menus (lib/menu.js/stepMenuCursor).
   function moveCursor(delta) {
-    const count = total();
-    const atStart = cursor === 0 && delta < 0;
-    const atEnd = cursor === count - 1 && delta > 0;
-    if (atStart || atEnd) {
-      const cycling = getPref("menuCycling", false);
-      playMenuSound(cycling ? "wrap" : "block");
-      if (cycling) cursor = (cursor + delta + count) % count;
-      announceStarred(entryLine(cursor), true);
-      return;
-    }
-    cursor += delta;
-    announce(entryLine(cursor), { assertive: true });
+    const step = stepMenuCursor(cursor, delta, total());
+    cursor = step.index;
+    announceMenuLine(entryLine(cursor), step.boundary);
   }
 
   function moveCursorTo(index) {

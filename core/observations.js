@@ -8,7 +8,7 @@
 // collections : toute entité observée y entre. Pur.
 
 // Note `type` comme observé. Déjà noté -> MÊME session (rien de neuf à
-// signaler à un observateur, voir view/collection-discoveries.js).
+// signaler à un observateur, voir view/discoveries.js).
 export function markObserved(session, type) {
   const observed = session.observedEntityTypes || {};
   if (observed[type]) return session;

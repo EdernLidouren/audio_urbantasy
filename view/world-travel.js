@@ -26,7 +26,7 @@ import { createWorldView } from "./world-view.js";
 import { clearInteractionCooldowns } from "./interaction.js";
 import { announceSceneName } from "./status-announcements.js";
 import { reportSceneLoadFailure, reportSceneReloadFailure } from "./debug-warnings.js";
-import { muteNextDiscoveryCheck } from "./collection-discoveries.js";
+import { muteNextDiscoveryCheck } from "./discoveries.js";
 import { saveGame } from "./save-storage.js";
 
 // Fondu de la couche entités pendant le sas d'une téléportation.

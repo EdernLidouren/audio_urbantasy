@@ -162,7 +162,7 @@ function confirmationParams(action) {
 export function interact(entity, kind, getWorldView) {
   // Une description réussie note le type comme OBSERVÉ (bestiaire, voir
   // core/observations.js) ; la découverte éventuelle s'annonce après elle
-  // (view/collection-discoveries.js).
+  // (view/discoveries.js).
   if (kind === "describe") {
     const description = resolveDescription(entity);
     if (!description) return;

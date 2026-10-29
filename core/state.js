@@ -402,6 +402,20 @@ export function markConsumed(session, entityId) {
   return updateActiveFace(session, { entities });
 }
 
+// Champs de la session qu'un effet d'action peut écrire (portée "party",
+// voir core/variables.js/applyActionEffects) : les SEULS repris de
+// `result.session`, pour une entité comme pour un compagnon. Un effet qui
+// écrirait un nouveau champ de partie l'ajoute ICI, une seule fois.
+const PARTY_EFFECT_FIELDS = ["variables", "improvements", "emotes"];
+
+// Les champs de partie écrits par les effets, à étaler sur la session
+// suivante ; rien si la partie n'a pas bougé (ils traversent alors par
+// RÉFÉRENCE inchangée).
+function partyEffectFields(session, result) {
+  if (result.session === session) return {};
+  return Object.fromEntries(PARTY_EFFECT_FIELDS.map((field) => [field, result.session[field]]));
+}
+
 // Applique une LISTE d'effets D'ÉCRITURE de variable (voir core/script-parse.js/
 // parseActionEffect, core/variables.js/applyActionEffects) déclenchés par
 // l'ACTIVATION d'une action portée par UNE entité du monde ACTIF (par id) —
@@ -413,7 +427,7 @@ export function markConsumed(session, entityId) {
 // mélanger les trois portées — entity/scene/party — dans la MÊME
 // activation, voir doc/scripting.md/"Actions multiples filtrées par
 // condition") : chaque portée non touchée traverse par RÉFÉRENCE INCHANGÉE.
-// `result.session` : SEULS `.variables`/`.improvements`/`.emotes` en sont repris
+// `result.session` : SEULS les champs de PARTY_EFFECT_FIELDS en sont repris
 // (portée "party") — jamais le reste de l'objet, qui resterait le SESSION
 // PRÉ-effets (worlds pas encore patché par un éventuel effet "entity"/
 // "scene" de la MÊME liste) si on le reprenait tel quel. id absent du monde
@@ -449,12 +463,7 @@ export function applyEntityActionEffects(session, entityId, effects, side = sess
   }
 
   const withWorld = worldChanged || entityChanged ? withActiveWorld(session, nextWorld) : session;
-  const next = {
-    ...withWorld,
-    variables: partyChanged ? result.session.variables : session.variables,
-    improvements: partyChanged ? result.session.improvements : session.improvements,
-    emotes: partyChanged ? result.session.emotes : session.emotes,
-  };
+  const next = { ...withWorld, ...partyEffectFields(session, result) };
   return applySpawns(next, result.spawns, side);
 }
 
@@ -502,9 +511,7 @@ export function applyCompanionActionEffects(session, companionId, effects) {
     ...withWorld,
     companionsRngState: result.rngState,
     companions: entityChanged ? session.companions.map((c) => (c.id === companionId ? result.entity : c)) : session.companions,
-    variables: partyChanged ? result.session.variables : session.variables,
-    improvements: partyChanged ? result.session.improvements : session.improvements,
-    emotes: partyChanged ? result.session.emotes : session.emotes,
+    ...partyEffectFields(session, result),
   };
   // Un compagnon suit le joueur : ce qu'il fait naître naît sur SA face.
   return applySpawns(next, result.spawns, session.player.side);

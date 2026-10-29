@@ -9,7 +9,7 @@
 //   - une collection : ses entrées. Tab / Maj+Tab passe à la collection
 //     suivante / précédente, dans l'ordre de l'onglet, en cycle si la
 //     préférence menuCycling le permet (son et étoile de limite, comme
-//     lib/menu.js/moveCursor) ;
+//     lib/menu.js/stepMenuCursor) ;
 //   - une fiche d'entité. Tab / Maj+Tab passe à la fiche découverte
 //     suivante / précédente de la même collection, du même saut que
 //     Ctrl+haut/bas (les inconnues sautées), sans cycle : à la borne, son
@@ -21,16 +21,15 @@
 
 import { t } from "../../../data/i18n/index.js";
 import { pushScreen } from "../../../lib/screens.js";
-import { makeMenuScreen } from "../../../lib/menu.js";
+import { makeMenuScreen, announceMenuLine, stepMenuCursor } from "../../../lib/menu.js";
 import { announce, stripTrailingPeriod } from "../../../lib/announce.js";
 import { resolveAction, defineBindings } from "../../../lib/input.js";
 import { randomRate } from "../../../lib/audio.js";
-import { getPref, PREF_CONSTRAINTS } from "../../../config/preferences.js";
 import { resolveTuning } from "../../../config/tuning.js";
 import { collectionEntries, collectionNameKey, collectionProgress, discoveryFacts } from "../../../core/collections.js";
 import collections from "../../../collections/index.js";
 import entityRegistry from "../../../entities/types/index.js";
-import { entryNameKey } from "../../collection-discoveries.js";
+import { entryNameKey } from "../../discoveries.js";
 import { playMenuSound } from "../../menu-sounds.js";
 import { createSoundPreview } from "./sound-preview.js";
 
@@ -46,14 +45,6 @@ const SHEET_BINDINGS = defineBindings("entitySheetNav", {
 
 // Ordre de l'onglet, celui du passage d'une collection à l'autre.
 const COLLECTION_IDS = Object.keys(collections);
-
-// Étoile en tête d'annonce ("* ..."), désactivable via "menuStarPrefix" —
-// MÊME préférence, MÊME principe que lib/menu.js/announceMaybeStarred :
-// une limite atteinte se lit aussi sans le son.
-function announceMaybeStarred(text, starred) {
-  const prefixed = starred && getPref("menuStarPrefix", PREF_CONSTRAINTS.menuStarPrefix.default) ? `* ${text}` : text;
-  announce(prefixed, { assertive: true });
-}
 
 // Une entrée qui a une fiche : une entité découverte.
 function hasSheet(entry) {
@@ -146,14 +137,14 @@ function openEntitySheet(collectionId, entries, startIndex, listMenu) {
     const next = findSheetIndex(entries, index, action === "nextSheet" ? 1 : -1);
     if (next < 0) {
       playMenuSound("block");
-      announceMaybeStarred(screen.openAnnouncementText(), true);
+      announceMenuLine(screen.openAnnouncementText(), true);
       return;
     }
     preview.stop();
     index = next;
     listMenu.cursor = next;
     build(menu.cursor);
-    announceMaybeStarred(screen.openAnnouncementText(), false);
+    announceMenuLine(screen.openAnnouncementText());
   }
 
   build(0);
@@ -207,26 +198,15 @@ function openCollectionMenu(startIndex, getSession, setReturnCursor) {
     setReturnCursor(index);
   }
 
-  // À la borne : cycle si menuCycling le permet ("wrap"), sinon on reste
-  // ("block") ; l'annonce est étoilée dans les deux cas, comme une flèche
-  // contre la borne d'un menu.
+  // Bornes : celles d'une flèche dans un menu (lib/menu.js/stepMenuCursor)
+  // — cycle si la préférence le permet, annonce étoilée à la borne.
   function switchCollection(action) {
-    const delta = action === "nextCollection" ? 1 : -1;
-    const total = COLLECTION_IDS.length;
-    const next = index + delta;
-    if (next >= 0 && next < total) {
-      index = next;
-      build();
-      announceMaybeStarred(screen.openAnnouncementText(), false);
-      return;
-    }
-    const cycling = getPref("menuCycling", PREF_CONSTRAINTS.menuCycling.default);
-    playMenuSound(cycling ? "wrap" : "block");
-    if (cycling) {
-      index = (next + total) % total;
+    const step = stepMenuCursor(index, action === "nextCollection" ? 1 : -1, COLLECTION_IDS.length);
+    if (step.index !== index) {
+      index = step.index;
       build();
     }
-    announceMaybeStarred(screen.openAnnouncementText(), true);
+    announceMenuLine(screen.openAnnouncementText(), step.boundary);
   }
 
   build();

@@ -61,7 +61,7 @@ export function reportSceneReloadFailure(sceneId, message) {
   );
 }
 
-// Texte de collection manquant (voir view/collection-discoveries.js) : nom
+// Texte de collection manquant (voir view/discoveries.js) : nom
 // d'une collection, ou nom/description d'une de ses entrées, absent de
 // data/i18n/<langue>/collections.json. Pas de repli sur les textes de
 // l'objet : l'oubli doit se voir.

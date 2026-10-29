@@ -8,7 +8,7 @@
 // les valide à son chargement, et vérifie que chaque archétype qui cite une
 // série (messageRotation) cite une série connue — une erreur arrête le jeu
 // au démarrage, jamais un message introuvable en silence (même politique
-// que view/collection-discoveries.js).
+// que view/discoveries.js).
 
 import rotations from "../rotations/index.js";
 import registry from "../entities/types/index.js";

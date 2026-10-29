@@ -5,7 +5,7 @@
 // parseScene.
 
 import { parseScene } from "../scene.js";
-import { createInitialState, getActiveWorld, travelToWorld, addCompanion } from "../state.js";
+import { createInitialState, getActiveWorld, travelToWorld, addCompanion, applyCompanionActionEffects } from "../state.js";
 import { tick } from "../actions.js";
 import { reduce } from "../reduce.js";
 import { MAX_COMPANIONS } from "../../config/companions.js";
@@ -170,4 +170,32 @@ export default function checkCompanions(run) {
     fullCompanions,
     refusedResult.companions
   );
+
+  // --- Effets d'action d'un compagnon : les champs de PARTIE écrits par
+  // ses effets (variable "party", amélioration, émote) sont tous repris
+  // dans la session, comme pour une entité (core/state.js/
+  // PARTY_EFFECT_FIELDS) ; sans effet de partie, ils traversent par
+  // référence inchangée. ---
+  const PARTY_START = parseNewGame(
+    {
+      startSceneId: "check",
+      companions: [{ id: "companion-test-dog", type: "dog", behavior: { kind: "follow" } }],
+      partyVariables: [{ name: "petted", type: "flag", initial: false }],
+    },
+    COMPANION_REGISTRY
+  ).start;
+  const partyStart = createInitialState(companionScene, 1, PARTY_START);
+  const partyAfter = applyCompanionActionEffects(partyStart, "companion-test-dog", [
+    { type: "setVariable", scope: "party", name: "petted", value: true },
+    { type: "giveImprovement", id: "supernatural_perception" },
+    { type: "learnEmote", id: "clap" },
+  ]);
+  run("compagnons : effet de partie -> variable de partie reprise", true, partyAfter.variables.petted.value);
+  run("compagnons : effet de partie -> amélioration reprise", true, Boolean(partyAfter.improvements.supernatural_perception));
+  run("compagnons : effet de partie -> émote reprise", true, Boolean(partyAfter.emotes.clap));
+  const entityOnly = applyCompanionActionEffects(partyStart, "companion-test-dog", [
+    { type: "setVariable", scope: "entity", name: "sniffed", value: true },
+  ]);
+  run("compagnons : sans effet de partie -> variables de partie inchangées (référence)", partyStart.variables, entityOnly.variables);
+  run("compagnons : sans effet de partie -> améliorations inchangées (référence)", partyStart.improvements, entityOnly.improvements);
 }

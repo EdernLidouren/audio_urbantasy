@@ -520,7 +520,7 @@ export const TUNING_DEFAULTS = {
   transitionStepDelayMs: 100,
 
   // Retard (ms) des sons de DÉCOUVERTE (collection, amélioration, émote
-  // apprise, voir view/collection-discoveries.js) : laisse finir le son de
+  // apprise, voir view/discoveries.js) : laisse finir le son de
   // ramassage ou d'achat qui l'a provoquée, pour qu'ils ne se chevauchent
   // pas. N'affecte que le son, jamais l'annonce. Lu DIRECTEMENT, comme
   // transitionStepDelayMs.

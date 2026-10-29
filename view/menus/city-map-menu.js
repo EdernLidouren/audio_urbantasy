@@ -5,11 +5,9 @@
 // avec un déplacement de curseur 2D — même patron générique que
 // view/city-screen.js (objet plat consommé par lib/screens.js), juste bâti
 // à la main. Reproduit malgré tout les COMPORTEMENTS DE BORDURE des menus
-// verticaux (voir lib/menu.js/moveCursor) : son de bordure (wrap/block),
-// ré-annonce étoilée, cyclage — mêmes préférences (menuCycling/
-// menuStarPrefix), même son (view/menu-sounds.js), lus DIRECTEMENT ici
-// (jamais via lib/menu.js, qui reste un module portable et ignore tout de
-// ce fichier).
+// verticaux : son de bordure (wrap/block), ré-annonce étoilée, cyclage —
+// par les MÊMES briques (lib/menu.js/stepMenuCursor, announceMenuLine),
+// appliquées à chaque axe.
 //
 // CONSULTATION NON DESTRUCTIVE : ouvrir/naviguer/refermer (Échap) ne
 // charge ni ne décharge RIEN — seule une SÉLECTION (Entrée) sur une zone
@@ -31,6 +29,7 @@ import { resolveAction, defineBindings } from "../../lib/input.js";
 import { announce } from "../../lib/announce.js";
 import { formatCoordinate } from "../../lib/coordinate-label.js";
 import { getPref, PREF_CONSTRAINTS } from "../../config/preferences.js";
+import { announceMenuLine, stepMenuCursor } from "../../lib/menu.js";
 import { playMenuSound } from "../menu-sounds.js";
 import {
   CITY_MAP_WIDTH,
@@ -114,15 +113,6 @@ function cellAnnouncementText(x, y, session) {
   return t("cityMap.empty");
 }
 
-// Étoile en tête d'annonce ("* ..."), désactivable via "menuStarPrefix" —
-// MÊME préférence, MÊME principe que lib/menu.js/announceMaybeStarred :
-// marqueur pour les utilisateurs braille/sans son face à une bordure
-// atteinte (cyclage bouclé ou refusé). starred=false : jamais d'étoile.
-function announceMaybeStarred(text, starred) {
-  const prefixed = starred && getPref("menuStarPrefix", PREF_CONSTRAINTS.menuStarPrefix.default) ? `* ${text}` : text;
-  announce(prefixed, { assertive: true });
-}
-
 // getSession : pour situer le curseur de DÉPART sur la case de la scène
 // principale où se trouve le joueur (voir currentMainSceneId,
 // findCityMapCoordinates) — lu UNE FOIS à l'ouverture, jamais resuivi
@@ -136,37 +126,14 @@ export function openCityMapMenu(getWorldView, getSession, onSelectZone) {
   let cursorX = start.x;
   let cursorY = start.y;
 
-  // Bordure : MÊME comportement que lib/menu.js/moveCursor, transposé aux
-  // DEUX axes indépendamment — un appel ne fait jamais varier x ET y à la
-  // fois (chaque touche fléchée ne bouge qu'un seul axe, voir
-  // keyHandlers), donc au plus UNE des deux conditions ci-dessous est
-  // vraie par appel. À la bordure : son (wrap si le cyclage a lieu, block
-  // sinon), cyclage EFFECTIF seulement si la préférence l'autorise
-  // (menuCycling), ré-annonce TOUJOURS étoilée (bouclé ou refusé,
-  // l'utilisateur doit savoir qu'il est à une limite). Le modulo
-  // (x+dx+WIDTH)%WIDTH est un no-op sûr sur l'axe qui n'a pas bougé (dx ou
-  // dy vaut 0), appliqué aux deux sans distinction.
+  // Un pas sur UN axe (chaque flèche n'en bouge qu'un, voir keyHandlers),
+  // avec le comportement de bordure des menus (lib/menu.js/stepMenuCursor) :
+  // son, cyclage si la préférence le permet, annonce étoilée à la borne.
   function moveCursor(dx, dy) {
-    const hitBoundary =
-      (dx < 0 && cursorX === 0) ||
-      (dx > 0 && cursorX === CITY_MAP_WIDTH - 1) ||
-      (dy < 0 && cursorY === 0) ||
-      (dy > 0 && cursorY === CITY_MAP_HEIGHT - 1);
-
-    if (hitBoundary) {
-      const cyclingAllowed = getPref("menuCycling", PREF_CONSTRAINTS.menuCycling.default);
-      playMenuSound(cyclingAllowed ? "wrap" : "block");
-      if (cyclingAllowed) {
-        cursorX = (cursorX + dx + CITY_MAP_WIDTH) % CITY_MAP_WIDTH;
-        cursorY = (cursorY + dy + CITY_MAP_HEIGHT) % CITY_MAP_HEIGHT;
-      }
-      announceMaybeStarred(cellAnnouncementText(cursorX, cursorY, getSession()), true);
-      return;
-    }
-
-    cursorX += dx;
-    cursorY += dy;
-    announceMaybeStarred(cellAnnouncementText(cursorX, cursorY, getSession()), false);
+    const step = dx !== 0 ? stepMenuCursor(cursorX, dx, CITY_MAP_WIDTH) : stepMenuCursor(cursorY, dy, CITY_MAP_HEIGHT);
+    if (dx !== 0) cursorX = step.index;
+    else cursorY = step.index;
+    announceMenuLine(cellAnnouncementText(cursorX, cursorY, getSession()), step.boundary);
   }
 
   // Coordonnées de la case COURANTE (touche "x", voir header) — jamais
@@ -187,7 +154,7 @@ export function openCityMapMenu(getWorldView, getSession, onSelectZone) {
   function selectCurrent() {
     const cell = cityMapCellAt(cursorX, cursorY);
     if (!isRealCityMapZone(cell)) {
-      announceMaybeStarred(cellAnnouncementText(cursorX, cursorY, getSession()), false);
+      announceMenuLine(cellAnnouncementText(cursorX, cursorY, getSession()));
       return;
     }
     // Hors plan : refus (son + message), même si le joueur s'y trouve.
@@ -217,7 +184,7 @@ export function openCityMapMenu(getWorldView, getSession, onSelectZone) {
     // Aide des touches (lib/help.js).
     helpSections: () => [{ id: "cityMap" }],
     onEnter() {
-      announceMaybeStarred(cellAnnouncementText(cursorX, cursorY, getSession()), false);
+      announceMenuLine(cellAnnouncementText(cursorX, cursorY, getSession()));
     },
     onKeyDown(event) {
       const action = resolveAction(CITY_MAP_BINDINGS, event.key, event.mods);

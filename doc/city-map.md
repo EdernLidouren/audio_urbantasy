@@ -101,9 +101,10 @@ sélection ne ferme donc que CET écran pour retomber directement sur le
 jeu, jamais sur la pause restée en dessous.
 
 - **Navigation** : flèches haut/bas/gauche/droite déplacent le curseur de
-  case en case. **Comportements de bordure REPRODUITS depuis les menus
-  verticaux** (`lib/menu.js`/`moveCursor`), transposés aux deux axes
-  indépendamment (une touche fléchée ne bouge jamais qu'un seul axe) :
+  case en case. **Comportements de bordure des menus verticaux**, par les
+  mêmes briques (`lib/menu.js`/`stepMenuCursor`, `announceMenuLine`),
+  appliquées à chaque axe (une touche fléchée ne bouge jamais qu'un seul
+  axe) :
   - un bord atteint joue un son (`view/menu-sounds.js`/`playMenuSound`) —
     `"wrap"` si le cyclage boucle effectivement, `"block"` sinon ;
   - le CYCLAGE (préférence `menuCycling`, même clé que les menus
