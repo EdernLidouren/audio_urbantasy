@@ -27,11 +27,11 @@ fenêtre horaire sans étalement, un son sans gain...). Les listes de champs
 vivent dans le code, à côté de ce qui les lit (voir "Sources de vérité" en fin
 de document).
 
-## Vue d'ensemble : une seule couche de conditions, six consommateurs
+## Vue d'ensemble : une seule couche de conditions, sept consommateurs
 
 Le même objet condition (`{ type, ...champs }`) et le même évaluateur
-(`core/presence.js`/`evaluateCondition`) servent à SIX usages, sans
-jamais six mécanismes séparés :
+(`core/presence.js`/`evaluateCondition`) servent à SEPT usages, sans
+jamais sept mécanismes séparés :
 
 1. **Présence conditionnelle** — `entity.presence` décide si une entité est
    affichée/simulée (voir "Règles" plus bas).
@@ -53,6 +53,16 @@ jamais six mécanismes séparés :
    répond à son évènement (ex. le néon défectueux, qui se dérègle au
    premier sifflement et éclate au second) ; voir "Triggers"/"Commun à
    tous les kinds" plus bas.
+7. **Apparition d'un article de présentoir** — `when` d'un article de
+   `config/shop-values.js`/`DISPLAY_ARTICLES` décide s'il peut être tiré au
+   garnissage du magasin. Lue sur la PARTIE, sans entité, et sur l'état
+   RÉEL même en debug (`debugShortCircuit: false`) ; `arrived`, `consumed`
+   et les variables de portée `"entity"`/`"scene"` y sont refusés au
+   chargement. Voir `doc/entity-model.md`/"Présentoirs".
+
+   ```js
+   mining_kit: { improvement: "mining_kit", price: 500, when: { type: "hasImprovement", id: "flashlight" } },
+   ```
 
 Un futur PNJ qui ne parle qu'à condition, ou un dialogue conditionnel, RÉUTILISERAIT
 cette même couche (nouveau CONSOMMATEUR du même évaluateur), jamais un système de
@@ -2087,7 +2097,7 @@ améliorations existantes (valide `hasImprovement`/`giveImprovement`/
 global (voir plus bas). Ajouter une amélioration = une entrée ici :
 
 ```js
-{ order: 1, labelKey: "improvement.supernatural_perception.name", descriptionKey: "improvement.supernatural_perception.description" }
+flashlight: { order: 1, labelKey: "improvement.flashlight.name", descriptionKey: "improvement.flashlight.description" },
 ```
 
 `order` (entier >= 1, UNIQUE, validé à l'import par

@@ -373,7 +373,9 @@ Consommateurs, tous derrière ce MÊME drapeau (jamais un drapeau par outil) :
   `view/menus/debug-teleport-menu.js` — passe par l'effet `teleport` en mode
   `instant`, jamais par un chemin de chargement parallèle), Shift+L (journal
   des avertissements, voir ci-dessous), Shift+C (tout révéler / tout
-  réinitialiser dans les collections, `view/menus/debug-collections-menu.js`) ;
+  réinitialiser dans les collections, `view/menus/debug-collections-menu.js`),
+  Shift+G (argent : un montant à ajouter — slider sans maximum, pas de 1,
+  Ctrl pour 50 — et une remise à zéro, `view/menus/debug-money-menu.js`) ;
 - Shift+X, en ville : bascule recto <-> verso SÈCHE, sans passage, sans son
   ni croisement des filtres — le joueur passe à la même position sur l'autre
   face, même sans entité pour l'y accueillir, et la face d'arrivée est
@@ -653,9 +655,9 @@ prévu, pas construit). Prix d'achat : `price` de l'article, sinon `value`
   vendable au sac -> annonce seule, aucune liste vide.
 - **Menu à sliders inline** — UN SEUL écran CUSTOM paramétré pour les deux
   sens (`view/menus/shop-quantity-list.js`/`openQuantityList` ; pas un
-  slider `lib/menu.js`, valeur TRANSITOIRE, voir
-  `view/menus/inventory/bag-and-equipment.js`/`openQuantitySelector` pour
-  les mêmes raisons). VENTE : une LIGNE par TYPE vendable du sac (agrégée : un
+  slider `lib/menu.js`, trois paliers d'incrément, voir
+  `view/menus/inventory/bag-and-equipment.js`/`openQuantitySelector`).
+  VENTE : une LIGNE par TYPE vendable du sac (agrégée : un
   non-empilable possédé en N exemplaires = une ligne, plafond N). ACHAT :
   une ligne par ARTICLE du catalogue, ÉPUISÉS COMPRIS (lus "épuisé", le
   joueur sait qu'ils reviendront au cycle suivant), plafond = STOCK
@@ -722,15 +724,20 @@ Le comptoir (voir "Vente et achat") reste le lieu de la REVENTE.
 
 Vérifications : `node tools/run-checks.js display`. Contenu réel :
 `scenes/main-street-quasar-bazaar-main.json`, le bazar Quasar — un
-présentoir d'améliorations en x 2 (table `improvements`, la lampe-torche
-seule pour l'instant) et deux d'équipement en x 7 et x 12 (table
-`equipment`, les quatre paires de chaussures).
+présentoir d'améliorations en x 2 (table `improvements` : la lampe-torche,
+puis le matériel de minage une fois la lampe-torche acquise) et deux
+d'équipement en x 7 et x 12 (table `equipment`, les quatre paires de
+chaussures). Un comptoir d'achat et de vente (catalogue `general`) y est
+posé en x 20, provisoirement.
 
 - **Article** (`config/shop-values.js`/`DISPLAY_ARTICLES`) — ce qu'on
   achète, un exemplaire à la fois, d'UNE des deux natures :
-  `{ item, price?, sound? }` (un objet du sac, prix par défaut = sa
-  `value`) ou `{ improvement, price, sound? }` (une amélioration, prix
-  obligatoire). Nom et description viennent du registre visé
+  `{ item, price?, sound?, when? }` (un objet du sac, prix par défaut = sa
+  `value`) ou `{ improvement, price, sound?, when? }` (une amélioration, prix
+  obligatoire). `when` : condition d'APPARITION, au format des conditions
+  du script (`doc/scripting.md`/"Conditions"), lue sur la partie au
+  garnissage — l'article n'est tiré que si elle est vraie ce jour-là.
+  Nom et description viennent du registre visé
   (`ITEM_REGISTRY`, `IMPROVEMENT_REGISTRY`), jamais recopiés. `sound` :
   pool de la balise de l'article sur son présentoir, par défaut le `sound`
   de l'objet visé (voir "Rendu" plus bas). Deux articles ne visent jamais
@@ -740,6 +747,7 @@ seule pour l'instant) et deux d'équipement en x 7 et x 12 (table
 
   ```js
   flashlight: { improvement: "flashlight", price: 200, sound: "assets/sounds/items/flashlight_1_beacon" },
+  mining_kit: { improvement: "mining_kit", price: 500, sound: "assets/sounds/items/mining_kit_1_beacon", when: { type: "hasImprovement", id: "flashlight" } },
   sneakers: { item: "sneakers" },
   ```
 
@@ -768,10 +776,12 @@ seule pour l'instant) et deux d'équipement en x 7 et x 12 (table
   regarnit. Tirage **sans remise** sur tout le monde (faces, puis entités,
   dans l'ordre de la scène) : jamais deux fois le même article dans un
   magasin ; les poids restants se renormalisent, et un présentoir qui n'a
-  plus aucun article possible reste vide, sans tirage. Les articles d'une
-  amélioration **déjà possédée** ne sont jamais tirés, lus sur l'état RÉEL
-  (`session.improvements`), jamais via la condition `hasImprovement` que
-  le mode debug court-circuite. Un objet acheté, lui, peut revenir un autre
+  plus aucun article possible reste vide, sans tirage. Les articles
+  INDISPONIBLES (`core/display.js`/`unavailableArticles`) ne sont jamais
+  tirés : une amélioration **déjà possédée**, ou une condition `when`
+  fausse. Les deux se lisent sur l'état RÉEL de la partie, jamais via le
+  court-circuit debug de `hasImprovement` : le magasin montre en debug ce
+  qu'il montrerait en jeu. Un objet acheté, lui, peut revenir un autre
   jour. Déterministe : tirages sur `face.rngState`.
 - **Achat** (`core/trade.js`/`buyOfferedArticle`) — un seul effet d'état :
   débite le prix, donne l'article (objet -> sac par `addItem`, donc noté
@@ -919,12 +929,9 @@ notés à la main.
   bascule jamais entre "menu" et "agit tout de suite" selon le contenu.
   Objet UNIQUE (quantité 1, ou non empilable) : "Poser" agit DIRECTEMENT,
   aucun sélecteur. Stack > 1 : ouvre un SÉLECTEUR DE QUANTITÉ — un écran
-  CUSTOM, délibérément PAS le mécanisme `kind:"slider"` de `lib/menu.js`,
-  pour deux raisons structurelles (voir le commentaire d'`openQuantitySelector`,
-  `view/menus/inventory/bag-and-equipment.js`) : la valeur y est TRANSITOIRE (propre à
-  cette seule ouverture) alors que le slider existant porte la sienne via
-  une PRÉFÉRENCE PERSISTÉE (`prefKey`/`config/preferences.js`, localStorage
-  réel) ; et ce sélecteur veut TROIS paliers d'incrément (aucun -> ±1, Maj
+  CUSTOM, délibérément PAS le mécanisme `kind:"slider"` de `lib/menu.js`
+  (voir le commentaire d'`openQuantitySelector`,
+  `view/menus/inventory/bag-and-equipment.js`) : ce sélecteur veut TROIS paliers d'incrément (aucun -> ±1, Maj
   -> ±10, Ctrl -> ±100, `bagQuantityMediumStep`/`bagQuantityBigStep`,
   `config/tuning-values.js`) alors que le slider n'en connaît qu'UN (Ctrl ->
   `bigStep`). Même convention partout : Maj = pas intermédiaire, Ctrl =

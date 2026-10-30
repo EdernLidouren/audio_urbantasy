@@ -22,7 +22,7 @@ import {
   displayArticleInfo,
   offeredArticle,
   presentedLabelKey,
-  ownedImprovementArticles,
+  unavailableArticles,
   drawOffer,
 } from "../display.js";
 import { auditNonSerializable, throws, fail } from "../../lib/check.js";
@@ -60,12 +60,28 @@ export default function checkDisplay(run) {
     displayArticleInfo("r", { r: { item: "resistor" } }).sound);
   run("articles : objet sans son -> aucun son (repli du présentoir côté vue)", undefined, sneakers.sound);
   run("articles : sound vide -> rejeté", true, throws(() => validateDisplayArticles({ a: { item: "sneakers", sound: "" } })));
-  run.same(
-    "articles : ownedImprovementArticles lit les améliorations possédées",
-    ["flashlight"],
-    [...ownedImprovementArticles(giveImprovement({}, "flashlight"))]
-  );
-  run("articles : aucune amélioration possédée -> aucun article exclu", 0, ownedImprovementArticles({}).size);
+  // Condition d'apparition (`when`) : le validateur partagé du script, sans
+  // les conditions qui n'ont de sens que sur une entité.
+  const hasFlashlight = { type: "hasImprovement", id: "flashlight" };
+  run("articles : when valide -> accepté", false, throws(() => validateDisplayArticles({ a: { item: "sneakers", when: hasFlashlight } })));
+  run("articles : when de type inconnu -> rejeté", true, throws(() => validateDisplayArticles({ a: { item: "sneakers", when: { type: "nope" } } })));
+  run("articles : when visant une amélioration inconnue -> rejeté", true,
+    throws(() => validateDisplayArticles({ a: { item: "sneakers", when: { type: "hasImprovement", id: "nope" } } })));
+  run("articles : when « consumed » (fait d'entité) -> rejeté", true,
+    throws(() => validateDisplayArticles({ a: { item: "sneakers", when: { type: "consumed" } } })));
+  run("articles : when « arrived » imbriqué -> rejeté", true,
+    throws(() => validateDisplayArticles({ a: { item: "sneakers", when: { type: "not", condition: { type: "arrived" } } } })));
+  run("articles : when sur une variable de scène -> rejeté", true,
+    throws(() => validateDisplayArticles({ a: { item: "sneakers", when: { type: "variable", scope: "scene", name: "x", equals: 1 } } })));
+
+  // Articles indisponibles : amélioration possédée, condition fausse.
+  const gated = { torch: { improvement: "flashlight", price: 5 }, kit: { improvement: "mining_kit", price: 5, when: hasFlashlight } };
+  const party = (improvements) => ({ improvements, emotes: {}, equipment: {}, time: 0, weather: { state: "clear" }, worlds: {} });
+  run.same("indisponibles : rien possédé -> l'article conditionnel est écarté", ["kit"], [...unavailableArticles(party({}), gated)]);
+  run.same("indisponibles : condition vraie -> l'amélioration possédée seule est écartée", ["torch"],
+    [...unavailableArticles(party(giveImprovement({}, "flashlight")), gated)]);
+  run("indisponibles : sans condition ni amélioration possédée -> aucun article écarté", 0,
+    unavailableArticles(party({}), { s: { item: "sneakers" } }).size);
 
   // --- Tables et distributions ---
 
@@ -151,8 +167,13 @@ export default function checkDisplay(run) {
     shoeIds.map((id) => offerOf(refillDueSpawns(fresh, DISPLAY_REGISTRY), id)).join(","));
   run("garnissage : déjà fait ce cycle -> référence INCHANGÉE", loaded, refillDueSpawns(loaded, DISPLAY_REGISTRY));
 
+  // Table "improvements" réelle : la lampe-torche, puis le matériel de
+  // minage, qui n'apparaît qu'une fois la lampe-torche possédée.
   const owning = { ...fresh, improvements: giveImprovement(fresh.improvements, "flashlight") };
-  run("garnissage : amélioration déjà possédée -> jamais exposée", null, offerOf(refillDueSpawns(owning, DISPLAY_REGISTRY), "improvement-stand"));
+  run("garnissage : amélioration déjà possédée -> jamais exposée, la suivante prend sa place", "mining_kit",
+    offerOf(refillDueSpawns(owning, DISPLAY_REGISTRY), "improvement-stand"));
+  const owningAll = { ...owning, improvements: giveImprovement(owning.improvements, "mining_kit") };
+  run("garnissage : toutes les améliorations possédées -> présentoir vide", null, offerOf(refillDueSpawns(owningAll, DISPLAY_REGISTRY), "improvement-stand"));
 
   // --- Achat (core/trade.js/buyOfferedArticle) ---
 
@@ -190,7 +211,7 @@ export default function checkDisplay(run) {
   // Lendemain : tout est re-tiré, l'amélioration achetée ne revient plus.
   const DAY = TIME_CONFIG.minutesPerHour * TIME_CONFIG.hoursPerDay;
   const nextDay = refillDueSpawns(advanceTime(bought.session, DAY), DISPLAY_REGISTRY);
-  run("lendemain : l'amélioration achetée n'est plus jamais exposée", null, offerOf(nextDay, "improvement-stand"));
+  run("lendemain : l'amélioration achetée n'est plus exposée, celle qu'elle débloque l'est", "mining_kit", offerOf(nextDay, "improvement-stand"));
   run("lendemain : les autres présentoirs sont re-garnis", equipmentCount, shoeIds.filter((id) => offerOf(nextDay, id) !== null).length);
   const shoeNextDay = refillDueSpawns(advanceTime(shoeBought.session, DAY), DISPLAY_REGISTRY);
   run("lendemain : un objet acheté peut revenir (seules les améliorations sont exclues)", equipmentCount,

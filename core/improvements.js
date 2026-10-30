@@ -18,18 +18,22 @@ import { rejectUnknownFields } from "../lib/validate.js";
 // le registre ne doit pas renuméroter les pouvoirs. Validé à l'import
 // (validateImprovementRegistry plus bas).
 export const IMPROVEMENT_REGISTRY = {
+  flashlight: { order: 1, labelKey: "improvement.flashlight.name", descriptionKey: "improvement.flashlight.description" },
+  // Sans effet direct pour l'instant : les veines et filons deviendront
+  // exploitables avec lui. En vente au bazar après la lampe-torche
+  // (config/shop-values.js).
+  mining_kit: { order: 2, labelKey: "improvement.mining_kit.name", descriptionKey: "improvement.mining_kit.description" },
   supernatural_perception: {
-    order: 1,
+    order: 3,
     labelKey: "improvement.supernatural_perception.name",
     descriptionKey: "improvement.supernatural_perception.description",
   },
-  flashlight: { order: 2, labelKey: "improvement.flashlight.name", descriptionKey: "improvement.flashlight.description" },
-  mirror_pass: { order: 3, labelKey: "improvement.mirror_pass.name", descriptionKey: "improvement.mirror_pass.description" },
-  master_key: { order: 4, labelKey: "improvement.master_key.name", descriptionKey: "improvement.master_key.description" },
-  skeleton_key: { order: 5, labelKey: "improvement.skeleton_key.name", descriptionKey: "improvement.skeleton_key.description" },
+  mirror_pass: { order: 4, labelKey: "improvement.mirror_pass.name", descriptionKey: "improvement.mirror_pass.description" },
+  master_key: { order: 5, labelKey: "improvement.master_key.name", descriptionKey: "improvement.master_key.description" },
+  skeleton_key: { order: 6, labelKey: "improvement.skeleton_key.name", descriptionKey: "improvement.skeleton_key.description" },
   // Révèle les cases "hors plan" de la carte de la ville (voir
   // map/city-map.js/onMapWhen). Obtenue en ramassant le vieux cadastre.
-  old_plans: { order: 6, labelKey: "improvement.old_plans.name", descriptionKey: "improvement.old_plans.description" },
+  old_plans: { order: 7, labelKey: "improvement.old_plans.name", descriptionKey: "improvement.old_plans.description" },
 };
 
 // Ordres présents, entiers >= 1 et uniques — sinon une erreur claire à

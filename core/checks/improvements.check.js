@@ -42,7 +42,7 @@ function checkImprovementsBody(run) {
     run("improvements : improvementProps id inconnu -> undefined", undefined, improvementProps("does-not-exist"));
     // `order` : déclaré, unique, et seul critère de tri de l'onglet.
     run("improvements : chaque entrée porte un order entier >= 1", true, Object.values(IMPROVEMENT_REGISTRY).every((p) => Number.isInteger(p.order) && p.order >= 1));
-    run("improvements : ordre d'affichage suit order", "supernatural_perception,flashlight,mirror_pass,master_key,skeleton_key,old_plans", orderedImprovementIds().join(","));
+    run("improvements : ordre d'affichage suit order", "flashlight,mining_kit,supernatural_perception,mirror_pass,master_key,skeleton_key,old_plans", orderedImprovementIds().join(","));
     run("improvements : tri indépendant de l'ordre d'insertion", "b,a", orderedImprovementIds({ a: { order: 2 }, b: { order: 1 } }).join(","));
     const improvementRegistryRejected = (registry) => {
       return throws(() => validateImprovementRegistry(registry));

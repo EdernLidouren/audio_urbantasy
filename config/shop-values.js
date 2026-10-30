@@ -33,9 +33,19 @@ export const SHOP_CATALOGS = {
 // `sound` optionnel : pool de la balise de l'article sur son présentoir ;
 // défaut = `sound` de l'objet visé, sinon la balise de repli du présentoir
 // (entities/types/shop_display.js).
+// `when` optionnel : condition d'APPARITION, au format des conditions du
+// script (doc/scripting.md/"Conditions"), lue sur la partie au garnissage —
+// l'article n'est tiré que si elle est vraie ce jour-là.
 // Prix PROVISOIRES, à doser avec la boucle de jeu.
 export const DISPLAY_ARTICLES = {
   flashlight: { improvement: "flashlight", price: 200, sound: "assets/sounds/items/flashlight_1_beacon" },
+  // Après la lampe-torche : les carrières se visitent éclairé.
+  mining_kit: {
+    improvement: "mining_kit",
+    price: 500,
+    sound: "assets/sounds/items/mining_kit_1_beacon",
+    when: { type: "hasImprovement", id: "flashlight" },
+  },
   sneakers: { item: "sneakers" },
   leather_boots: { item: "leather_boots" },
   combat_boots: { item: "combat_boots" },
@@ -49,8 +59,9 @@ export const DISPLAY_ARTICLES = {
 // son nom ({ table: "improvements" }) ou déclare la sienne inline
 // ({ articles: { ... } }).
 export const DISPLAY_TABLES = {
-  // Premier présentoir du bazar : les améliorations. La lampe torche, seule
-  // pour l'instant, sort tant qu'elle n'est pas achetée.
-  improvements: { flashlight: 1 },
+  // Premier présentoir du bazar : les améliorations, une à la fois dans
+  // les faits — la lampe-torche tant qu'elle n'est pas achetée, puis le
+  // matériel de minage (sa condition d'apparition).
+  improvements: { flashlight: 1, mining_kit: 1 },
   equipment: { sneakers: "common", leather_boots: "uncommon", high_heels: "uncommon", combat_boots: "rare" },
 };

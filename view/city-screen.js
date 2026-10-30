@@ -24,6 +24,7 @@ import { openTimeDebugMenu } from "./menus/debug-time-menu.js";
 import { openTeleportDebugMenu } from "./menus/debug-teleport-menu.js";
 import { openDebugWarningsMenu, openDebugWarningsIfUnseen } from "./menus/debug-warnings-menu.js";
 import { openCollectionsDebugMenu } from "./menus/debug-collections-menu.js";
+import { openMoneyDebugMenu } from "./menus/debug-money-menu.js";
 import { openInventoryMenu, openEquipmentMenu, openImprovementsMenu, openCollectionsMenu } from "./menus/inventory-menu.js";
 import { advanceTick } from "../core/advance.js";
 import { addMoney } from "../core/money.js";
@@ -96,6 +97,7 @@ export function makeCityScreen(getSession, setSession) {
     switchSideDebug: { debugOnly: true, run: travel.debugSwitchSide },
     openWarningsDebugMenu: { debugOnly: true, run: openDebugWarningsMenu },
     openCollectionsDebugMenu: { debugOnly: true, run: () => openCollectionsDebugMenu(getSession, setSession) },
+    openMoneyDebugMenu: { debugOnly: true, run: () => openMoneyDebugMenu(debug.giveMoney, debug.resetMoney) },
   };
 
   // Accès CONSOLE réservé aux tests en jeu (tools/test-kit.js), relayé par

@@ -12,6 +12,7 @@
   "help.city.openEquipment": "Ouvrir l'équipement",
   "help.city.openImprovements": "Ouvrir les capacités (améliorations et émotes)",
   "help.city.openInventory": "Ouvrir le sac",
+  "help.city.openMoneyDebugMenu": "Debug : gagner de l'argent",
   "help.city.openTeleportDebugMenu": "Debug : se téléporter",
   "help.city.openTimeDebugMenu": "Debug : régler le temps",
   "help.city.openWarningsDebugMenu": "Debug : journal des avertissements",

@@ -24,12 +24,22 @@
 // chaque tirage, jamais figée : un monde sauvegardé tire toujours dans la
 // table COURANTE.
 //
+// CONDITION D'APPARITION (`when`, facultative) : une condition du script
+// (core/presence.js, MÊME format que partout — jamais un système parallèle),
+// lue sur la PARTIE au garnissage : l'article n'est tiré que si elle est
+// vraie ce jour-là (ex. le matériel de minage, une fois la lampe-torche
+// acquise). Seules les conditions qui ont un sens hors de toute entité y
+// sont permises (pas "arrived", "consumed", ni de variable de portée
+// "entity" ou "scene"), validées à l'import.
+//
 // TIRAGE SANS REMISE (drawOffer) : le garnissage d'un monde tire ses
 // présentoirs dans un ordre stable (faces, puis entités) en EXCLUANT les
 // articles déjà exposés — jamais deux fois le même article dans un magasin —
-// et ceux d'une amélioration déjà POSSÉDÉE (ownedImprovementArticles), lue
-// sur l'état RÉEL de la partie, jamais via la condition hasImprovement que le
-// mode debug court-circuite (elle exclurait alors toutes les améliorations).
+// et les articles INDISPONIBLES (unavailableArticles) : amélioration déjà
+// POSSÉDÉE, ou condition d'apparition fausse. Les deux se lisent sur l'état
+// RÉEL de la partie, jamais via le court-circuit debug de hasImprovement
+// (il exclurait toutes les améliorations, et ouvrirait toutes les
+// conditions) : le magasin montre en debug ce qu'il montrerait en jeu.
 // Les poids restants se renormalisent d'eux-mêmes (core/rng.js/
 // pickWeighted). Plus aucun article possible : présentoir vide, sans tirage.
 //
@@ -42,9 +52,37 @@ import { ITEM_REGISTRY, itemValue } from "./items.js";
 import { IMPROVEMENT_REGISTRY, hasImprovement } from "./improvements.js";
 import { NOTHING, entryWeight } from "./distribution.js";
 import { pickWeighted } from "./rng.js";
+import { evaluateCondition, actionContextOf } from "./presence.js";
+import { validateCondition } from "./script-parse.js";
 import { rejectUnknownFields } from "../lib/validate.js";
 
 const isPlainObject = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+
+// Types de condition qui lisent un FAIT d'entité : sans objet au
+// garnissage, où aucune entité ne porte la condition (ils vaudraient
+// toujours faux, en silence).
+const ENTITY_CONDITION_TYPES = ["arrived", "consumed"];
+
+// Tous les types d'une condition, composites parcourus (allOf/anyOf : leurs
+// `conditions`, not : sa `condition`). Condition déjà validée.
+function conditionTypes(cond) {
+  const nested = [...(cond.conditions ?? []), ...(cond.condition ? [cond.condition] : [])];
+  return [cond.type, ...nested.flatMap(conditionTypes)];
+}
+
+// Valide la condition d'apparition d'un article : le validateur PARTAGÉ du
+// script (sans variables d'entité ni de scène : toute référence à ces
+// portées y est refusée), puis les types sans objet hors entité. Son
+// erreur ("parseScene: ...") est reprise dans celle de l'article.
+function validateWhen(when, describe, fail) {
+  try {
+    validateCondition(when, `${describe}.when`, undefined, undefined);
+  } catch (error) {
+    fail(error.message.replace(/^parseScene: /, ""));
+  }
+  const entityType = conditionTypes(when).find((type) => ENTITY_CONDITION_TYPES.includes(type));
+  if (entityType) fail(`${describe}.when : condition "${entityType}" sans objet au garnissage (aucune entité ne la porte).`);
+}
 
 // --- Articles ---
 
@@ -70,10 +108,11 @@ export function validateDisplayArticles(articles) {
     const describe = `article "${id}"`;
     if (id === NOTHING) fail(`"${NOTHING}" est une clé réservée des tables, jamais un article.`);
     if (!isPlainObject(article)) fail(`${describe} doit être un objet.`);
-    rejectUnknownFields(article, ["item", "improvement", "price", "sound"], describe, fail);
+    rejectUnknownFields(article, ["item", "improvement", "price", "sound", "when"], describe, fail);
     if (article.sound !== undefined && (typeof article.sound !== "string" || article.sound === "")) {
       fail(`${describe} : sound doit être un chemin de pool de sons si présent.`);
     }
+    if (article.when !== undefined) validateWhen(article.when, describe, fail);
     if ((article.item === undefined) === (article.improvement === undefined)) {
       fail(`${describe} doit déclarer SOIT item SOIT improvement, jamais les deux ni aucun.`);
     }
@@ -136,16 +175,21 @@ export function presentedLabelKey(entity) {
   return article ? article.labelKey : entity.labelKey;
 }
 
-// Articles d'une amélioration que la partie POSSÈDE déjà : exclus de tout
-// tirage. `improvements` : session.improvements, l'état RÉEL (voir header,
-// jamais la condition court-circuitée par le debug). Un Set NEUF à chaque
-// appel : le garnissage y ajoute ensuite ce qu'il expose (core/spawn.js).
-export function ownedImprovementArticles(improvements, articles = DISPLAY_ARTICLES) {
-  const owned = new Set();
+// Articles INDISPONIBLES ce jour-là pour la partie : exclus de tout tirage.
+// Une amélioration que la partie POSSÈDE déjà, ou une condition
+// d'apparition (`when`) fausse — les deux lues sur l'état RÉEL (voir
+// header : `debugShortCircuit: false`). Contexte d'une condition d'action
+// (heure, météo, variables de partie, équipement du joueur...), sans
+// entité. Un Set NEUF à chaque appel : le garnissage y ajoute ensuite ce
+// qu'il expose (core/spawn.js).
+export function unavailableArticles(session, articles = DISPLAY_ARTICLES) {
+  const context = { ...actionContextOf(session, undefined), debugShortCircuit: false };
+  const unavailable = new Set();
   for (const [id, article] of Object.entries(articles)) {
-    if (article.improvement !== undefined && hasImprovement(improvements, article.improvement)) owned.add(id);
+    const owned = article.improvement !== undefined && hasImprovement(session.improvements, article.improvement);
+    if (owned || (article.when !== undefined && !evaluateCondition(article.when, context))) unavailable.add(id);
   }
-  return owned;
+  return unavailable;
 }
 
 // --- Tables ---

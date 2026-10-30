@@ -55,7 +55,7 @@ import { TIME_CONFIG } from "../config/time-values.js";
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";
 import { drawItem } from "./distribution.js";
 import { restockShopEntity } from "./catalog.js";
-import { drawOffer, ownedImprovementArticles } from "./display.js";
+import { drawOffer, unavailableArticles } from "./display.js";
 import {
   isTwoSided,
   resolveFace,
@@ -272,8 +272,9 @@ function refillFace(face, world, cycle, registry, companions, presenceContext, o
 // deux faces : LES DEUX faces sont garnies (on charge le monde entier),
 // chacune sur son propre flux PRNG ; le marqueur reste au niveau du monde.
 // Les présentoirs du monde entier (deux faces comprises) tirent SANS REMISE
-// : jamais deux fois le même article dans un magasin, jamais l'article d'une
-// amélioration déjà possédée (core/display.js).
+// : jamais deux fois le même article dans un magasin, jamais un article
+// indisponible — amélioration déjà possédée, condition d'apparition fausse
+// (core/display.js).
 export function refillDueSpawns(session, registry) {
   const world = session.worlds[session.activeWorldId];
   const cycle = spawnCycleAt(session.time);
@@ -283,7 +284,7 @@ export function refillDueSpawns(session, registry) {
   if (!faces.some((side) => faceHasSources(resolveFace(world, side)))) return session;
 
   const presenceContext = presenceContextOf(session);
-  const offered = ownedImprovementArticles(session.improvements);
+  const offered = unavailableArticles(session);
   let nextWorld = world;
   for (const side of faces) {
     const face = resolveFace(world, side);

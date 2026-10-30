@@ -3,9 +3,8 @@
 // plafond = possédé) et l'ACHAT (lignes = articles du catalogue, plafond =
 // STOCK, condition d'incrément = ARGENT). Écran custom plutôt qu'un slider
 // lib/menu.js pour les mêmes raisons structurelles que le sélecteur de
-// quantité de l'inventaire (valeur TRANSITOIRE, pas une préférence
-// persistée ; Entrée = +1 ; Suppr = 0 ; Maj = pas intermédiaire, Ctrl =
-// grand pas) — voir view/menus/inventory/bag-and-equipment.js/
+// quantité de l'inventaire (Entrée = +1 ; Suppr = 0 ; Maj = pas
+// intermédiaire, Ctrl = grand pas) — voir view/menus/inventory/bag-and-equipment.js/
 // openQuantitySelector. Même maintien, mêmes sons et même règle d'annonce
 // à la borne que les sliders de lib/menu.js (createHoldRepeat,
 // shouldAnnounceAdjustment).

@@ -841,6 +841,9 @@
   "assets/sounds/items/fruit_beacon": [
     "assets/sounds/items/fruit_beacon_1.mp3"
   ],
+  "assets/sounds/items/mining_kit_1_beacon": [
+    "assets/sounds/items/mining_kit_1_beacon_1.mp3"
+  ],
   "assets/sounds/reactions/reaction_interrogation": [
     "assets/sounds/reactions/reaction_interrogation_1.mp3"
   ],

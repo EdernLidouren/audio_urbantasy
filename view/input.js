@@ -100,6 +100,10 @@ export const CITY_BINDINGS = defineBindings("city", {
   // Shift+C, MODE DEBUG UNIQUEMENT : tout révéler / tout réinitialiser dans
   // les collections (voir view/menus/debug-collections-menu.js).
   openCollectionsDebugMenu: { keys: ["c"], mods: ["shift"] },
+  // Shift+G, MODE DEBUG UNIQUEMENT : gagner de l'argent ou le remettre à
+  // zéro (voir view/menus/debug-money-menu.js). Canal indépendant de
+  // "announceMoney" (g, mods:[]).
+  openMoneyDebugMenu: { keys: ["g"], mods: ["shift"] },
   // "p" (perception) : bascule la PERCEPTION SURNATURELLE (voir
   // core/state.js/togglePerception, view/perception-toggle.js/toggle)
   // — COOLDOWN anti-spam entièrement côté consommation (perception-toggle.js),

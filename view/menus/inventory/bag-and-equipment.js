@@ -358,16 +358,10 @@ function buildDropMessage(getSession, entry, itemLabelKey, quantity, index) {
 }
 
 // Sélecteur de QUANTITÉ à poser (stack > 1 uniquement) — écran CUSTOM,
-// PAS un slider lib/menu.js. Deux raisons, toutes deux structurelles :
-//   - le slider existant porte sa valeur via une PRÉFÉRENCE PERSISTÉE
-//     (prefKey/menuGetPref/menuSetPref, config/preferences.js — localStorage
-//     RÉEL) ; la quantité à poser est TRANSITOIRE, propre à CETTE seule
-//     ouverture du sélecteur — la détourner vers une fausse préférence
-//     écrirait sur disque une valeur qui ne doit jamais survivre à la
-//     fermeture de cet écran ;
-//   - le slider existant ne connaît qu'UN SEUL palier d'incrément (Ctrl ->
-//     bigStep) ; ce sélecteur en veut TROIS (aucun, Maj, Ctrl — voir
-//     QUANTITY_STEPS).
+// PAS un slider lib/menu.js (qui sait pourtant porter une valeur
+// transitoire, getValue/setValue) : le slider ne connaît qu'UN SEUL palier
+// d'incrément (Ctrl -> bigStep) ; ce sélecteur en veut TROIS (aucun, Maj,
+// Ctrl — voir QUANTITY_STEPS).
 // L'écran slider de lib/menu.js reste donc inutilisé ici, mais ses briques
 // d'ajustement sont partagées : maintien (createHoldRepeat, heldStep) et
 // règle d'annonce à la borne (shouldAnnounceAdjustment), comme la liste de
