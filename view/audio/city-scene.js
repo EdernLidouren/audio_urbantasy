@@ -128,7 +128,7 @@ export function createCityAudioScene(getSession, { handover = null } = {}) {
     // consommation.
     entities.syncNewEntitySounds(world);
     entities.cleanupRemovedEntities(world);
-    entities.muteConsumedBeacons(world);
+    entities.muteSpentBeacons(world);
 
     layers.update(session, world);
     muffle.update(session);
@@ -200,6 +200,11 @@ export function createCityAudioScene(getSession, { handover = null } = {}) {
       proximitySounds.resumeLoops();
     },
     refreshBeaconVolumes: entityAudio.refreshBeaconVolumes,
+    // Éteint AUSSITÔT les balises devenues muettes (voir ./entity-sounds.js/
+    // muteSpentBeacons), sans attendre le tick : un achat confirmé depuis une
+    // question ferme d'abord le menu, qui relance les balises — sans cet
+    // appel, celle de l'article vendu rejouerait un instant.
+    muteSpentBeacons: () => entities.muteSpentBeacons(getActiveWorld(getSession())),
     crossfadeFaceSwap: faceCrossfade.crossfadeFaceSwap,
     playEntityOneShot: oneShots.playEntityOneShot,
     stopEntityOneShots: oneShots.stopEntityOneShots,

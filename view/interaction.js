@@ -23,6 +23,7 @@ import { runEffects } from "./effect-runner.js";
 import { executeAction } from "./action-execution.js";
 import { openConfirmation } from "./menus/confirmation.js";
 import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
+import { offeredArticle, presentedLabelKey } from "../core/display.js";
 
 // Description RICHE d'une entité (interaction "describe"), distincte du nom
 // annoncé à l'approche (occupation, voir view/occupancy.js).
@@ -51,7 +52,13 @@ import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
 // baissé la nuit), prioritaire sur les deux précédentes. Le choix de la clé
 // est fait par le core (selectDescriptionKey), contre le MÊME contexte que
 // le remplissage du gabarit.
+//
+// Présentoir GARNI (voir doc/entity-model.md/"Présentoirs") : il décrit
+// l'article qu'il expose, prix en tête — le nom vient d'être dit par
+// l'occupation. Vide : sa propre description, par le chemin ordinaire.
 function resolveDescription(entity) {
+  const article = offeredArticle(entity);
+  if (article) return t("shop.display.offer", { price: article.price, description: t(article.descriptionKey) });
   const context = actionContext(entity);
   const key = selectDescriptionKey(entity, context);
   if (!key) return undefined;
@@ -251,7 +258,8 @@ function openDisambiguationMenu(candidates, kind, getWorldView) {
     title: kind === "describe" ? "menu.interaction.observe.title" : "menu.interaction.title",
     closable: true, // Échap ferme sans rien faire
     entries: candidates.map((entity) => ({
-      label: entity.labelKey,
+      // Même nom que l'occupation (un présentoir garni : son article).
+      label: presentedLabelKey(entity),
       onActivate: () => {
         popScreen();
         interact(entity, kind, getWorldView);

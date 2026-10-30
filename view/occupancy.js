@@ -9,6 +9,15 @@ import { resolveTuning } from "../config/tuning.js";
 import { t } from "../data/i18n/index.js";
 import { getActiveWorld } from "../core/state.js";
 import { isSearchable } from "../core/spawn.js";
+import { offeredArticle, presentedLabelKey } from "../core/display.js";
+
+// Entité qui n'a PLUS rien à offrir à Entrée, sans pour autant disparaître :
+// conteneur vidé, présentoir vide.
+function isSpentForActivation(entity, time) {
+  if (entity.container) return !isSearchable(entity, time);
+  if (entity.display) return offeredArticle(entity) === null;
+  return false;
+}
 
 // Entités dont la zone d'interaction (interactRange de chaque entité, en
 // cascade) englobe le joueur, triées de gauche à droite. Exclues : les
@@ -49,7 +58,8 @@ export function createOccupancy(getSession) {
     const occupiedIdsNow = new Set(occupied.map((entity) => entity.id));
     if (!setsEqual(occupiedIdsNow, occupiedIds)) {
       if (occupiedIdsNow.size > 0) {
-        announce(occupied.map((entity) => t(entity.labelKey)).join(", "));
+        // Un présentoir garni se présente sous le nom de son article.
+        announce(occupied.map((entity) => t(presentedLabelKey(entity))).join(", "));
       }
       occupiedIds = occupiedIdsNow;
     }
@@ -57,15 +67,15 @@ export function createOccupancy(getSession) {
 
   // Candidats pour un verbe ("describe" -> Espace, "activate" -> Entrée) :
   // l'occupation courante filtrée par la capacité du verbe. Un conteneur
-  // VIDÉ ne reste candidat à Entrée que s'il n'y a rien d'autre à activer :
-  // ramasser les objets tombés autour ne propose jamais de menu de
-  // désambiguïsation avec lui, et seul il annonce son état (voir
-  // view/action-execution.js/handleSearch).
+  // VIDÉ ou un présentoir VIDE ne reste candidat à Entrée que s'il n'y a
+  // rien d'autre à activer : ramasser les objets tombés autour ne propose
+  // jamais de menu de désambiguïsation avec lui, et seul il annonce son état
+  // (voir view/action-execution.js/handleSearch, handleBuy).
   function getInteractionCandidates(kind) {
     if (kind === "describe") return currentOccupied.filter((entity) => entity.observable);
     const time = getSession().time;
     const interactable = currentOccupied.filter((entity) => entity.interactable);
-    const live = interactable.filter((entity) => !entity.container || isSearchable(entity, time));
+    const live = interactable.filter((entity) => !isSpentForActivation(entity, time));
     return live.length > 0 ? live : interactable;
   }
 

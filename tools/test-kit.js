@@ -14,6 +14,7 @@
 //      await k.start();                       // partie "Ville test", debug, espions
 //      await k.goTo("main_street", { side: "verso", x: 35 });
 //      k.setTime(23);                         // 23 h 00, jour courant ou suivant
+//      k.giveMoney(500);                      // argent pour tester un achat
 //      k.mark(); await k.emote("whistle"); await k.wait(1500);
 //      k.sounds({ match: /neon|whistle/ });   // sons depuis mark(), dt en ms
 //      k.entity("defective_neon_1_v");        // l'entité, avec sa face
@@ -176,6 +177,13 @@ export function setTime(hour, minute = 0) {
   if (delta > 0) actions().advanceTime(delta);
   tick(2);
   return clock();
+}
+
+// Ajoute `amount` pièces à la partie (achats) ; rend le nouveau solde.
+export function giveMoney(amount) {
+  actions().giveMoney(amount);
+  tick(1);
+  return window.debugSession().money;
 }
 
 // Saute de `minutes` minutes de jeu.

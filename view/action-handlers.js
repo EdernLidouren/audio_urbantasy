@@ -23,8 +23,10 @@ import {
   setVariableEffectsHandler,
   setSearchHandler,
   setShopHandler,
+  setDisplayHandler,
 } from "./interaction-handlers.js";
 import { openShopMenu, setSellHandler, setBuyHandler } from "./menus/shop-menu.js";
+import { openDisplayPurchase, setDisplayBuyHandler } from "./menus/display-purchase.js";
 import { setDropItemHandler, setEquipItemHandler, setUnequipItemHandler } from "./menus/inventory-menu.js";
 import { setGameReplaceHandler } from "./menus/save-menu.js";
 import registry from "../entities/types/index.js";
@@ -34,7 +36,7 @@ import { pickupItemEntity, dropItem } from "../core/bag.js";
 import { searchContainer, ephemeralArchetypeSpec, ephemeralItemSpec } from "../core/spawn.js";
 import { equipItem, unequipItem } from "../core/equipment.js";
 import { markObserved } from "../core/observations.js";
-import { sellItems, buyItems, restockShopIfDue } from "../core/trade.js";
+import { sellItems, buyItems, restockShopIfDue, buyOfferedArticle } from "../core/trade.js";
 
 // Branche tous les gestionnaires et rend la fonction qui les débranche.
 // `travel` : view/world-travel.js (voyages, vue du monde COURANTE).
@@ -86,6 +88,18 @@ export function registerActionHandlers({ getSession, setSession, travel }) {
     ],
     [setSellHandler, (sales) => setSession(sellItems(getSession(), sales))],
     [setBuyHandler, (entityId, purchases) => setSession(buyItems(getSession(), entityId, purchases))],
+    // Présentoir : question puis achat (qui a besoin de la vue du monde pour
+    // mettre les balises en pause) ; l'achat rend son statut, annoncé par
+    // view/menus/display-purchase.js.
+    [setDisplayHandler, (entity) => openDisplayPurchase(travel.current, getSession, entity)],
+    [
+      setDisplayBuyHandler,
+      (entityId) => {
+        const result = buyOfferedArticle(getSession(), entityId);
+        if (result.session !== getSession()) setSession(result.session);
+        return result.status;
+      },
+    ],
     // Poser un objet du sac : il apparaît au sol, aux pieds du joueur.
     [
       setDropItemHandler,

@@ -26,6 +26,7 @@ import { resolveAsset } from "../../lib/assets.js";
 import registry from "../../entities/types/index.js";
 import { TUNING_DEFAULTS, resolveTuning } from "../../config/tuning.js";
 import { isPresent, presenceContextOf } from "../../core/presence.js";
+import { offeredArticle } from "../../core/display.js";
 import { STEP_DISTANCE, createWalkerState } from "./footsteps.js";
 
 // Délai de démarrage aléatoire des balises continues : désempile les
@@ -150,6 +151,21 @@ function isPerceptionGated(entity) {
   return Boolean(entity.presence && entity.presence.some((rule) => conditionRequiresPerception(rule.when)));
 }
 
+// Descripteur de BALISE d'une entité. Un PRÉSENTOIR (voir doc/entity-model.md/
+// "Présentoirs") sonne l'article qu'il expose : le son de l'article
+// (core/display.js/displayArticleInfo), sinon sa propre balise, qui n'est
+// qu'un repli ; vide, il ne sonne RIEN. Lu au montage : l'article ne change
+// qu'au garnissage, toujours avant le montage (voir view/world-travel.js),
+// et un achat en cours de scène éteint la balise (./entity-sounds.js/
+// muteSpentBeacons).
+function beaconOf(entity) {
+  if (!entity.display) return entity.sounds.beacon;
+  const article = offeredArticle(entity);
+  if (!article) return undefined;
+  if (article.sound === undefined) return entity.sounds.beacon;
+  return { ...entity.sounds.beacon, path: article.sound, loop: true };
+}
+
 // Construit l'entrée sonore d'UNE entité.
 //   - `session` : la partie courante, pour la présence de départ.
 //   - `otherFace` : entité de l'AUTRE face d'une scène à deux faces, rendue
@@ -175,7 +191,7 @@ export function buildEntitySoundEntry(entity, session, { otherFace = false, disa
   const movementCrossFaceGain = resolveTuning("movementCrossFaceGain", entity, sounds.movement);
   const faceGain = (crossFaceGain) => (otherFace ? crossFaceGain : 1);
   const heardHere = (crossFaceGain) => !otherFace || crossFaceGain > 0;
-  const beacon = heardHere(beaconCrossFaceGain) ? sounds.beacon : undefined;
+  const beacon = heardHere(beaconCrossFaceGain) ? beaconOf(entity) : undefined;
   const vocal = heardHere(vocalCrossFaceGain) ? sounds.vocal : undefined;
   const withFaceGain = (resolved) => (resolved ? { ...resolved, gain: resolved.gain * faceGain(vocalCrossFaceGain) } : null);
   const enterSound = heardHere(vocalCrossFaceGain)

@@ -129,6 +129,15 @@ export function setShopHandler(handler) {
   shopHandler = handler;
 }
 
+// (entity) => void — ouvre l'achat à un PRÉSENTOIR (voir view/menus/
+// display-purchase.js/openDisplayPurchase), même patron que setShopHandler :
+// fourni par view/action-handlers.js, qui détient la vue du monde.
+export let displayHandler = null;
+
+export function setDisplayHandler(handler) {
+  displayHandler = handler;
+}
+
 // () => session — fournit LA SESSION pour l'évaluation d'une condition
 // d'action (voir view/interaction.js/actionContext), même principe d'injection que les
 // gestionnaires ci-dessus. L'évaluateur reste un PUR consommateur de

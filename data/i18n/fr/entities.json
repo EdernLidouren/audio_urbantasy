@@ -133,6 +133,8 @@
   "entity.shellter_statue.name": "statue de Matasîle",
   "entity.shop_counter.description": "Un comptoir de vente, avec son tiroir-caisse. On peut y vendre ce qu'on porte.",
   "entity.shop_counter.name": "comptoir",
+  "entity.shop_display.description": "Un meuble destiné à mettre en valeur un article, actuellement vide.",
+  "entity.shop_display.name": "présentoir",
   "entity.sound_emitter.name": "émetteur sonore",
   "entity.storm_drain.description": "Une grille de métal sombre ménagée au bas d'un trottoir afin d'évacuer les eaux de pluie vers les égouts de la ville.",
   "entity.storm_drain.name": "bouche d'égout",

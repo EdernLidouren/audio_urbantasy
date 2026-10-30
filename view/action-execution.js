@@ -18,6 +18,7 @@ import {
   sideSwitchHandler,
   searchHandler,
   shopHandler,
+  displayHandler,
 } from "./interaction-handlers.js";
 
 // "switchSide" (point de passage recto<->verso, voir entities/types/
@@ -166,6 +167,17 @@ function handleShop(entity) {
   shopHandler(entity);
 }
 
+// "buy" : PRÉSENTOIR du magasin (voir entities/types/shop_display.js,
+// doc/entity-model.md/"Présentoirs") — confirmation puis achat de l'article
+// exposé, ou l'annonce de ce qui l'empêche (vide, déjà possédé, fonds) :
+// tout vit dans view/menus/display-purchase.js. Un présentoir VIDE n'arrive
+// ici que s'il était le seul candidat à portée (voir view/occupancy.js/
+// getInteractionCandidates).
+function handleBuy(entity) {
+  if (!displayHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
+  displayHandler(entity);
+}
+
 const ACTION_HANDLERS = {
   pickup: handlePickup,
   loot: handleLoot,
@@ -173,6 +185,7 @@ const ACTION_HANDLERS = {
   applyEffects: handleApplyEffects,
   search: handleSearch,
   shop: handleShop,
+  buy: handleBuy,
 };
 
 // Un handler par kind du registre du core, ni plus ni moins : un kind

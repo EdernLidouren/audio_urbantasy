@@ -117,6 +117,7 @@ export const ACTION_KINDS = {
   applyEffects: { fields: [], validate: validateApplyEffects },
   search: { fields: [], validate: noFields, requires: "container" },
   shop: { fields: [], validate: noFields, requires: "shop" },
+  buy: { fields: [], validate: noFields, requires: "display" },
 };
 
 // Kind connu, aucun champ hors de ceux du kind et des champs communs, puis

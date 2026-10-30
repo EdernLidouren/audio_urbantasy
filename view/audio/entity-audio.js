@@ -188,7 +188,7 @@ export function createEntityAudio({ getSession, entities, effectiveMuffle, fullF
     }
     if (entry.beaconSilenced) {
       entry.beaconSilenced = false;
-      if (!entities.isMutedOnConsumed(entity.id)) sound.resume();
+      if (!entities.isBeaconSpent(entity.id)) sound.resume();
     }
 
     // Filet anti-blocage : une boucle peut, rarement et selon le navigateur,
@@ -259,7 +259,9 @@ export function createEntityAudio({ getSession, entities, effectiveMuffle, fullF
   // ambiances. Une entité dormante ou retirée (present === false) est
   // exclue : sa balise est déjà arrêtée, resume() la relancerait depuis le
   // début — un fantôme. `present` undefined (sans règle de présence) reste
-  // inclus.
+  // inclus. Même exclusion, à la reprise, pour une balise coupée pour de bon
+  // (collectible consommé, présentoir vidé — voir ./entity-sounds.js/
+  // muteSpentBeacons), qu'aucun menu refermé ne doit relancer.
   function eachLiveBeacon(visit) {
     const liveById = entities.liveEntitiesById();
     for (const entry of entitySounds) visit(entry, liveById.get(entry.entity.id));
@@ -273,8 +275,8 @@ export function createEntityAudio({ getSession, entities, effectiveMuffle, fullF
     });
   }
   function resumeBeacons() {
-    eachLiveBeacon(({ sound, beaconSilenced }, live) => {
-      if (sound && !beaconSilenced && live.present !== false) sound.resume();
+    eachLiveBeacon(({ entity, sound, beaconSilenced }, live) => {
+      if (sound && !beaconSilenced && live.present !== false && !entities.isBeaconSpent(entity.id)) sound.resume();
     });
   }
 

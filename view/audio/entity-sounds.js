@@ -7,6 +7,7 @@
 
 import registry from "../../entities/types/index.js";
 import { getActiveWorld, getInactiveFace } from "../../core/state.js";
+import { offeredArticle } from "../../core/display.js";
 import { buildEntitySoundEntry } from "./entity-sound-entry.js";
 
 // `handover` : balises continues transmises par la scène précédente (voir
@@ -34,10 +35,10 @@ export function createEntitySounds({ getSession, handover = null }) {
   const collisionSoundByEntityId = new Map(entitySounds.map(({ entity }) => [entity.id, registry[entity.type].collisionSound]));
 
   // Ids déjà traités, pour n'arrêter une balise qu'une fois : entité
-  // disparue du monde, ou balise coupée pour consommation (l'entité, elle,
-  // reste dans le monde).
+  // disparue du monde, ou balise coupée pour de bon — collectible consommé,
+  // présentoir vidé (l'entité, elle, reste dans le monde).
   const removedEntityIds = new Set();
-  const mutedOnConsumedIds = new Set();
+  const spentBeaconIds = new Set();
 
   let reverbBusInput = null;
 
@@ -141,16 +142,26 @@ export function createEntitySounds({ getSession, handover = null }) {
     }
   }
 
-  // Coupe pour de bon la balise d'une entité consommée si son type déclare
-  // muteOnConsumed (voir doc/entity-model.md/"Collectible persistant") —
-  // y compris une entité déjà consommée retrouvée au montage.
-  function muteConsumedBeacons(world) {
+  // Vrai si la balise de l'entité vivante doit se taire pour de bon : un
+  // collectible consommé dont le type déclare muteOnConsumed (voir
+  // doc/entity-model.md/"Collectible persistant"), ou un présentoir dont
+  // l'article vient d'être acheté (voir doc/entity-model.md/"Présentoirs" —
+  // un présentoir vide ne sonne rien ; au montage suivant, sa balise n'est
+  // même pas construite).
+  function isSpent(entry, live) {
+    if (entry.muteOnConsumed && live.consumed) return true;
+    return Boolean(live.display) && offeredArticle(live) === null;
+  }
+
+  // Coupe pour de bon les balises éteintes (voir isSpent) — y compris une
+  // entité déjà consommée retrouvée au montage.
+  function muteSpentBeacons(world) {
     for (const entry of entitySounds) {
-      if (!entry.muteOnConsumed || !entry.sound || mutedOnConsumedIds.has(entry.entity.id)) continue;
+      if (!entry.sound || spentBeaconIds.has(entry.entity.id)) continue;
       const live = world.entities.find((entity) => entity.id === entry.entity.id);
-      if (live && live.consumed) {
+      if (live && isSpent(entry, live)) {
         entry.sound.stop();
-        mutedOnConsumedIds.add(entry.entity.id);
+        spentBeaconIds.add(entry.entity.id);
       }
     }
   }
@@ -166,8 +177,8 @@ export function createEntitySounds({ getSession, handover = null }) {
     liveOtherEntitiesById,
     findEntitySource,
     cleanupRemovedEntities,
-    muteConsumedBeacons,
-    isMutedOnConsumed: (entityId) => mutedOnConsumedIds.has(entityId),
+    muteSpentBeacons,
+    isBeaconSpent: (entityId) => spentBeaconIds.has(entityId),
     collisionSoundFor: (entityId) => collisionSoundByEntityId.get(entityId),
   };
 }

@@ -835,6 +835,9 @@
   "assets/sounds/items/electronic_component_switch_1_beacon": [
     "assets/sounds/items/electronic_component_switch_1_beacon_1.mp3"
   ],
+  "assets/sounds/items/flashlight_1_beacon": [
+    "assets/sounds/items/flashlight_1_beacon_1.mp3"
+  ],
   "assets/sounds/items/fruit_beacon": [
     "assets/sounds/items/fruit_beacon_1.mp3"
   ],

@@ -63,7 +63,7 @@ import { CITY_MAP_GRID } from "../map/city-map.js";
 import { NEW_GAME } from "../config/new-game.js";
 import { WEATHER_STATES } from "../config/weather-values.js";
 import { PERCEPTION_MUSIC_POOL, PERCEPTION_AMBIENCE_POOL } from "../config/perception.js";
-import { SHOP_CATALOGS } from "../config/shop-values.js";
+import { SHOP_CATALOGS, DISPLAY_ARTICLES } from "../config/shop-values.js";
 import { LOCALE_TABLES } from "../data/i18n/index.js";
 import { configureAssetManifest, hasAsset } from "../lib/assets.js";
 import { bindingTableIds, bindingTable, needsKeyName, keyNameKey } from "../lib/input.js";
@@ -277,6 +277,9 @@ export async function auditContent() {
   checkStrings("météo", WEATHER_STATES);
   checkStrings("perception", { PERCEPTION_MUSIC_POOL, PERCEPTION_AMBIENCE_POOL });
   checkStrings("boutiques", SHOP_CATALOGS);
+  // Articles de présentoir : leur son (les noms viennent des registres
+  // d'objets et d'améliorations, déjà vérifiés ci-dessus).
+  checkStrings("présentoirs", DISPLAY_ARTICLES);
 
   // Collections : leurs clés sont DÉDUITES des ids (voir core/collections.js),
   // jamais écrites dans la donnée — on les reconstruit pour les vérifier.

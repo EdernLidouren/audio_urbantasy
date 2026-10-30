@@ -180,7 +180,7 @@ d'ÉTAT. Le mécanisme, en trois couches strictement séparées :
     (booléen, REGISTRE SEULEMENT — jamais cascadé par instance, contrairement
     à `consumedDescriptionKey`) : arrête PERMANEMMENT le beacon continu de
     l'entité dès que `consumed` passe à `true` (voir
-    `view/audio/entity-sounds.js`/`muteConsumedBeacons`, appelée une fois par tick comme
+    `view/audio/entity-sounds.js`/`muteSpentBeacons`, appelée une fois par tick comme
     `cleanupRemovedEntities`). **Limite volontaire** : seule l'ABSENCE du
     beacon est supportée, jamais un son DIFFÉRENT (un second fichier) —
     remplacer la voix elle-même exigerait de recréer un Howl en cours de
@@ -720,22 +720,26 @@ acheté. Des positions fixes s'apprennent à l'oreille (les améliorations ici,
 l'équipement là-bas) ; c'est l'article qui change, pas le plan du magasin.
 Le comptoir (voir "Vente et achat") reste le lieu de la REVENTE.
 
-**Statut** : le core est en place (`core/display.js`, garnissage, achat,
-sauvegarde, `node tools/run-checks.js display`). Pas encore d'archétype, de
-rendu (balise, Espace, Entrée) ni de présentoir dans une scène.
+Vérifications : `node tools/run-checks.js display`. Contenu réel :
+`scenes/main-street-quasar-bazaar-main.json`, le bazar Quasar — un
+présentoir d'améliorations en x 2 (table `improvements`, la lampe-torche
+seule pour l'instant) et deux d'équipement en x 7 et x 12 (table
+`equipment`, les quatre paires de chaussures).
 
 - **Article** (`config/shop-values.js`/`DISPLAY_ARTICLES`) — ce qu'on
   achète, un exemplaire à la fois, d'UNE des deux natures :
-  `{ item, price? }` (un objet du sac, prix par défaut = sa `value`) ou
-  `{ improvement, price }` (une amélioration, prix obligatoire). Nom et
-  description viennent du registre visé (`ITEM_REGISTRY`,
-  `IMPROVEMENT_REGISTRY`), jamais recopiés. Deux articles ne visent jamais
+  `{ item, price?, sound? }` (un objet du sac, prix par défaut = sa
+  `value`) ou `{ improvement, price, sound? }` (une amélioration, prix
+  obligatoire). Nom et description viennent du registre visé
+  (`ITEM_REGISTRY`, `IMPROVEMENT_REGISTRY`), jamais recopiés. `sound` :
+  pool de la balise de l'article sur son présentoir, par défaut le `sound`
+  de l'objet visé (voir "Rendu" plus bas). Deux articles ne visent jamais
   la même chose : l'id d'article identifie ce qu'il donne. Validés à
   l'import (`validateDisplayArticles`). À ne pas confondre avec un article
   de CATALOGUE de comptoir (un objet en stock, `core/catalog.js`).
 
   ```js
-  flashlight: { improvement: "flashlight", price: 200 },
+  flashlight: { improvement: "flashlight", price: 200, sound: "assets/sounds/items/flashlight_1_beacon" },
   sneakers: { item: "sneakers" },
   ```
 
@@ -750,7 +754,13 @@ rendu (balise, Espace, Entrée) ni de présentoir dans une scène.
   Jamais combiné avec `container` ni `shop` (une entité = une seule source
   au garnissage). Champ RUNTIME : `offer`, l'id de l'article exposé, ou
   `null` (vendu, tirage `nothing`, plus aucun article possible) ; absent
-  avant le premier garnissage.
+  avant le premier garnissage. Archétype : `entities/types/shop_display.js`
+  (« présentoir », action `{ kind: "buy" }`, voir `doc/scripting.md`), qui
+  ne fixe AUCUNE table : chaque instance déclare la sienne.
+
+  ```json
+  { "id": "quasar_bazaar_display_1", "type": "shop_display", "x": 2, "display": { "distribution": { "table": "improvements" } } }
+  ```
 - **Garnissage** — au cycle de collecte, au CHARGEMENT du monde comme les
   plages (`core/spawn.js`/`refillDueSpawns`) : le contenu est VISIBLE, il
   ne se regarnit jamais sur place. Tout présentoir est RE-TIRÉ, l'invendu
@@ -772,14 +782,40 @@ rendu (balise, Espace, Entrée) ni de présentoir dans une scène.
   débit partiel), ou `null` (pas un présentoir de la face active). Les sons
   de récompense (nouvel objet de collection, nouvelle amélioration) suivent
   d'eux-mêmes, dérivés du diff par la vue.
+- **Rendu** — vue pure, lue dans l'état :
+  - **Nom** : un présentoir garni se présente sous le nom de son article
+    (`core/display.js`/`presentedLabelKey`), à l'occupation comme dans le
+    menu de choix — on s'approche d'une « lampe-torche » ; vide, il
+    s'appelle « présentoir ».
+  - **Balise** : garni, le son de l'article (`sound` de l'article, sinon de
+    l'objet visé), sinon la balise de l'archétype, qui n'est qu'un REPLI ;
+    vide, AUCUNE balise, pour qu'un magasin dévalisé ne bourdonne pas
+    (`view/audio/entity-sound-entry.js`/`beaconOf`). Lue au montage
+    (l'article ne change qu'au garnissage, avant le montage) ; un achat
+    l'éteint aussitôt et pour de bon, comme un collectible `muteOnConsumed`
+    (`view/audio/entity-sounds.js`/`muteSpentBeacons`) — aucun menu
+    refermé ne la relance.
+  - **Espace** : garni, « 200 pièces : <description de l'article> »
+    (`shop.display.offer`, le nom vient d'être dit) ; vide, la description
+    du présentoir.
+  - **Entrée** (`view/menus/display-purchase.js`) : la question
+    « Acheter cet article ? Lampe-torche, 200 pièces. » (« Annuler »
+    d'abord), puis « Acheté : … ». Les refus se disent SANS question :
+    présentoir vide (« Ce présentoir est vide. », annonce seule, comme un
+    conteneur déjà fouillé), amélioration déjà possédée ou fonds
+    insuffisants (son « refusal », avec le prix et l'argent possédé). Un
+    présentoir vide n'est candidat à Entrée que s'il est seul à portée,
+    comme un conteneur vidé (`view/occupancy.js`).
 - **Sauvegarde** — `offer` est un champ plat sérialisé. Une table de
   présentoir disparue est neutralisée (`distribution: null`, plus rien
   d'exposé), un article exposé disparu vide le présentoir jusqu'au
-  prochain garnissage (voir `doc/save.md`).
+  prochain garnissage (voir `doc/save.md`). Une partie qui avait déjà
+  visité le bazar l'a figé sans présentoirs (voir `doc/save.md`) : ils
+  n'y apparaissent qu'après un oubli de la scène (debug, Maj+M) ou dans une
+  partie neuve.
 
 Prévu, pas construit : une condition `when` par entrée de table (format du
-script, partagé avec la collecte), et le rendu (son propre à chaque article,
-son de catégorie en repli).
+script, partagé avec la collecte).
 
 ## Messages en rotation — un texte qui change avec l'heure
 
@@ -1726,7 +1762,7 @@ démarreraient sinon toutes dans la même fenêtre :
   une par une".
 - **Annulation propre** : si l'entité disparaît ou devient dormante AVANT la
   fin de son délai, `stop()` (déjà appelé dans ces deux cas, voir
-  `cleanupRemovedEntities`/`muteConsumedBeacons`/`applyEntityAudio`)
+  `cleanupRemovedEntities`/`muteSpentBeacons`/`applyEntityAudio`)
   ANNULE le démarrage différé (timer explicitement annulé, jamais un simple
   drapeau ignoré) — jamais de son fantôme qui partirait quand même après
   coup. Les appelants n'ont rien à faire : TOUT appel à `sound.stop()` en

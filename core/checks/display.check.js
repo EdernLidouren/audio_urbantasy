@@ -21,6 +21,7 @@ import {
   validateDisplayDistribution,
   displayArticleInfo,
   offeredArticle,
+  presentedLabelKey,
   ownedImprovementArticles,
   drawOffer,
 } from "../display.js";
@@ -53,6 +54,12 @@ export default function checkDisplay(run) {
   run("articles : objet résolu, prix par défaut = value de l'objet", true,
     sneakers.item === "sneakers" && sneakers.improvement === undefined && sneakers.price === ITEM_REGISTRY.sneakers.value && sneakers.labelKey === ITEM_REGISTRY.sneakers.label);
   run("articles : id inconnu -> null, jamais une exception", null, displayArticleInfo("nope"));
+  run("articles : son de l'article repris (amélioration)", DISPLAY_ARTICLES.flashlight.sound, flashlight.sound);
+  // Registre fabriqué : aucun article réel ne vise encore un objet sonore.
+  run("articles : sans son déclaré, le son de l'objet visé", ITEM_REGISTRY.resistor.sound,
+    displayArticleInfo("r", { r: { item: "resistor" } }).sound);
+  run("articles : objet sans son -> aucun son (repli du présentoir côté vue)", undefined, sneakers.sound);
+  run("articles : sound vide -> rejeté", true, throws(() => validateDisplayArticles({ a: { item: "sneakers", sound: "" } })));
   run.same(
     "articles : ownedImprovementArticles lit les améliorations possédées",
     ["flashlight"],
@@ -113,6 +120,10 @@ export default function checkDisplay(run) {
     throws(() => parseScene(rawScene([{ id: "s", type: "stand", x: 2, container: { distribution: { table: "default" } } }]), DISPLAY_REGISTRY)));
   run("parsing : display sans distribution valide -> rejeté", true,
     throws(() => parseScene(rawScene([{ id: "s", type: "stand", x: 2, display: { distribution: { table: "nope" } } }]), DISPLAY_REGISTRY)));
+  run("parsing : action « buy » sans display -> rejetée", true,
+    throws(() => parseScene(rawScene([{ id: "s", type: "dog", x: 2, interactable: true, action: { kind: "buy" } }]), DISPLAY_REGISTRY)));
+  run("parsing : action « buy » sur un présentoir -> acceptée", false,
+    throws(() => parseScene(rawScene([{ id: "s", type: "stand", x: 2, action: { kind: "buy" } }]), DISPLAY_REGISTRY)));
   run("parsing : champ inconnu dans display -> rejeté", true,
     throws(() => parseScene(rawScene([{ id: "s", type: "stand", x: 2, display: { distribution: { table: "equipment" }, count: 2 } }]), DISPLAY_REGISTRY)));
 
@@ -133,6 +144,9 @@ export default function checkDisplay(run) {
   run("garnissage : jamais deux fois le même article", shoeOffers.length, new Set(shoeOffers).size);
   run("garnissage : table épuisée -> le présentoir suivant reste vide", null, offerOf(loaded, "shoes-5"));
   run("garnissage : une entité qui n'est pas un présentoir n'a pas d'offre", undefined, entity(loaded, "dog-1").offer);
+  run("nom présenté : présentoir garni -> nom de son article", "improvement.flashlight.name", presentedLabelKey(entity(loaded, "improvement-stand")));
+  run("nom présenté : présentoir vide -> son propre nom", "entity.dog.name", presentedLabelKey(entity(loaded, "shoes-5")));
+  run("nom présenté : autre entité -> son propre nom", "entity.dog.name", presentedLabelKey(entity(loaded, "dog-1")));
   run("garnissage : même seed -> mêmes articles", shoeIds.map((id) => offerOf(loaded, id)).join(","),
     shoeIds.map((id) => offerOf(refillDueSpawns(fresh, DISPLAY_REGISTRY), id)).join(","));
   run("garnissage : déjà fait ce cycle -> référence INCHANGÉE", loaded, refillDueSpawns(loaded, DISPLAY_REGISTRY));

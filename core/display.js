@@ -70,7 +70,10 @@ export function validateDisplayArticles(articles) {
     const describe = `article "${id}"`;
     if (id === NOTHING) fail(`"${NOTHING}" est une clé réservée des tables, jamais un article.`);
     if (!isPlainObject(article)) fail(`${describe} doit être un objet.`);
-    rejectUnknownFields(article, ["item", "improvement", "price"], describe, fail);
+    rejectUnknownFields(article, ["item", "improvement", "price", "sound"], describe, fail);
+    if (article.sound !== undefined && (typeof article.sound !== "string" || article.sound === "")) {
+      fail(`${describe} : sound doit être un chemin de pool de sons si présent.`);
+    }
     if ((article.item === undefined) === (article.improvement === undefined)) {
       fail(`${describe} doit déclarer SOIT item SOIT improvement, jamais les deux ni aucun.`);
     }
@@ -94,20 +97,27 @@ export function validateDisplayArticles(articles) {
 
 validateDisplayArticles(DISPLAY_ARTICLES);
 
-// Article RÉSOLU, tel que la vue l'annonce et que l'achat l'applique :
-// { id, item | improvement, price, labelKey, descriptionKey }. null pour un
-// id inconnu (jamais une exception : un présentoir sauvegardé peut citer un
-// article retiré depuis, voir core/save.js/repairEntityReferences).
-export function displayArticleInfo(id) {
-  if (typeof id !== "string" || !Object.hasOwn(DISPLAY_ARTICLES, id)) return null;
-  const article = DISPLAY_ARTICLES[id];
+// Article RÉSOLU, tel que la vue l'annonce, le sonne et que l'achat
+// l'applique : { id, item | improvement, price, labelKey, descriptionKey,
+// sound? }. `sound` : celui de l'article, sinon celui de l'objet visé,
+// absent sinon (la vue prend alors la balise de repli du présentoir). null
+// pour un id inconnu (jamais une exception : un présentoir sauvegardé peut
+// citer un article retiré depuis, voir core/save.js/repairEntityReferences).
+// `articles` : paramètre pour les vérifications (registre fabriqué).
+export function displayArticleInfo(id, articles = DISPLAY_ARTICLES) {
+  if (typeof id !== "string" || !Object.hasOwn(articles, id)) return null;
+  const article = articles[id];
   const price = priceOf(article);
+  const withSound = (info, fallback) => {
+    const sound = article.sound ?? fallback;
+    return sound === undefined ? info : { ...info, sound };
+  };
   if (article.item !== undefined) {
     const props = ITEM_REGISTRY[article.item];
-    return { id, item: article.item, price, labelKey: props.label, descriptionKey: props.descriptionKey };
+    return withSound({ id, item: article.item, price, labelKey: props.label, descriptionKey: props.descriptionKey }, props.sound);
   }
   const props = IMPROVEMENT_REGISTRY[article.improvement];
-  return { id, improvement: article.improvement, price, labelKey: props.labelKey, descriptionKey: props.descriptionKey };
+  return withSound({ id, improvement: article.improvement, price, labelKey: props.labelKey, descriptionKey: props.descriptionKey });
 }
 
 // Article exposé par un présentoir, résolu — null si le présentoir est vide
@@ -115,6 +125,15 @@ export function displayArticleInfo(id) {
 export function offeredArticle(entity) {
   if (!entity || !entity.display || entity.offer === undefined || entity.offer === null) return null;
   return displayArticleInfo(entity.offer);
+}
+
+// Clé du NOM sous lequel une entité se présente au joueur (occupation, menu
+// de choix) : l'article exposé pour un présentoir garni — on s'approche
+// d'une lampe-torche, pas d'un meuble —, son propre nom sinon (présentoir
+// vide compris).
+export function presentedLabelKey(entity) {
+  const article = offeredArticle(entity);
+  return article ? article.labelKey : entity.labelKey;
 }
 
 // Articles d'une amélioration que la partie POSSÈDE déjà : exclus de tout

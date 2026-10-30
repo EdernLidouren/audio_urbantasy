@@ -1115,6 +1115,22 @@ ou `{ items: { <objet>: { stock, price? } } }`, `config/shop-values.js`),
 stock FINI rechargé au cycle de collecte. Détail (ergonomie, annonces,
 confirmations, double plafond) : `doc/entity-model.md`/"Vente et achat".
 
+### `"buy"` — PRÉSENTOIR du magasin, achète l'article exposé
+
+```js
+// entities/types/shop_display.js
+action: { kind: "buy" },
+```
+
+Aucun paramètre sur l'action, mais l'entité DOIT avoir un `display` (sinon,
+erreur au chargement). Activer l'entité pose une question de confirmation
+(`view/menus/display-purchase.js`), puis achète l'article du jour : un seul
+effet d'état du core (`core/trade.js`/`buyOfferedArticle` — débit, objet au
+sac ou amélioration acquise, présentoir vidé). Un présentoir vide, une
+amélioration déjà possédée ou des fonds insuffisants s'annoncent sans
+question. Détail (tirage, nom présenté, balise, annonces) :
+`doc/entity-model.md`/"Présentoirs".
+
 ### `"switchSide"` — bascule recto/verso (scène à deux faces)
 
 ```json

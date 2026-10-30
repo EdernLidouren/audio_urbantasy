@@ -26,6 +26,7 @@ import { openDebugWarningsMenu, openDebugWarningsIfUnseen } from "./menus/debug-
 import { openCollectionsDebugMenu } from "./menus/debug-collections-menu.js";
 import { openInventoryMenu, openEquipmentMenu, openImprovementsMenu, openCollectionsMenu } from "./menus/inventory-menu.js";
 import { advanceTick } from "../core/advance.js";
+import { addMoney } from "../core/money.js";
 import { runRenderEffects } from "./effect-runner.js";
 import { isDebugEnabled } from "../config/debug.js";
 import { createWorldTravel } from "./world-travel.js";
@@ -112,6 +113,8 @@ export function makeCityScreen(getSession, setSession) {
     performEmote: emotes.perform,
     reloadSceneFromFile: travel.reloadSceneFromFile,
     worldView: travel.current,
+    // Argent à volonté (achats au magasin), sans annonce.
+    giveMoney: (amount) => setSession(addMoney(getSession(), amount)),
   };
 
   return {

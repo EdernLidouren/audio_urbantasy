@@ -10,6 +10,9 @@
   "defaultSurface": "concrete",
   "reverbPreset": "medium_room",
   "entities": [
+    { "id": "quasar_bazaar_display_1", "type": "shop_display", "x": 2, "display": { "distribution": { "table": "improvements" } } },
+    { "id": "quasar_bazaar_display_2", "type": "shop_display", "x": 7, "display": { "distribution": { "table": "equipment" } } },
+    { "id": "quasar_bazaar_display_3", "type": "shop_display", "x": 12, "display": { "distribution": { "table": "equipment" } } },
     {
       "id": "quasar_bazaar_door_1",
       "type": "automatic_sliding_door",

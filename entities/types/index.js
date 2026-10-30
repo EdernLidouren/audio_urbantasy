@@ -112,6 +112,7 @@ import river from "./river.js";
 import rock from "./rock.js";
 import sceneExit from "./scene_exit.js";
 import shopCounter from "./shop_counter.js";
+import shopDisplay from "./shop_display.js";
 import soundEmitter from "./sound_emitter.js";
 import statue from "./statue.js";
 import turretClockwork from "./turret_clockwork.js";
@@ -183,6 +184,7 @@ export default {
   rock,
   scene_exit: sceneExit,
   shop_counter: shopCounter,
+  shop_display: shopDisplay,
   sound_emitter: soundEmitter,
   statue,
   turret_clockwork: turretClockwork,

@@ -133,6 +133,8 @@
   "entity.shellter_statue.name": "statue of Shellter",
   "entity.shop_counter.description": "A sales counter with its cash drawer. You can sell what you carry here.",
   "entity.shop_counter.name": "counter",
+  "entity.shop_display.description": "A piece of furniture meant to showcase an item, currently empty.",
+  "entity.shop_display.name": "display stand",
   "entity.sound_emitter.name": "sound emitter",
   "entity.storm_drain.description": "A dark metal grate set at the foot of a sidewalk to carry rainwater down to the city sewers.",
   "entity.storm_drain.name": "storm drain",

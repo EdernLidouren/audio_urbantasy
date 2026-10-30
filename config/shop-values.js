@@ -30,9 +30,12 @@ export const SHOP_CATALOGS = {
 //     est acquise ; `price` OBLIGATOIRE (une amélioration n'a pas de valeur).
 // Nom et description viennent du registre visé, jamais d'ici. Deux articles
 // ne visent jamais le même objet ni la même amélioration (validé à l'import).
+// `sound` optionnel : pool de la balise de l'article sur son présentoir ;
+// défaut = `sound` de l'objet visé, sinon la balise de repli du présentoir
+// (entities/types/shop_display.js).
 // Prix PROVISOIRES, à doser avec la boucle de jeu.
 export const DISPLAY_ARTICLES = {
-  flashlight: { improvement: "flashlight", price: 200 },
+  flashlight: { improvement: "flashlight", price: 200, sound: "assets/sounds/items/flashlight_1_beacon" },
   sneakers: { item: "sneakers" },
   leather_boots: { item: "leather_boots" },
   combat_boots: { item: "combat_boots" },
