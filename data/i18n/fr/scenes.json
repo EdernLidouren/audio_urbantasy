@@ -14,6 +14,10 @@
     "def": "la rue commerçante"
   },
   "scene.main_street_quasar_bazaar_main.name": "Bazar Quasar, grande surface",
+  "scene.old_quarries.name": {
+    "base": "anciennes carrières",
+    "def": "les anciennes carrières"
+  },
   "scene.town_square.name": {
     "base": "grand-place",
     "def": "la grand-place"

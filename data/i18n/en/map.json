@@ -4,6 +4,7 @@
   "cityMap.offMap": "Off the map.",
   "cityMap.offMapHere": "Off the map, you are here.",
   "cityMap.offMapRefusal": "This scene is not on your map.",
+  "cityMap.old_quarries.description": "Sunk at the foot of the towering cliff that runs along the town, set apart from it, these old quarries now echo with little more than silence and oblivion.",
   "cityMap.town_square.description": "The heart of the town, overlooked by the town hall and its clock tower.",
   "cityMap.underConstruction": "Under construction.",
   "cityMap.zone": "{name}: {description}"

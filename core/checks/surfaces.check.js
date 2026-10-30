@@ -16,6 +16,7 @@ export default function checkSurfaces(run) {
 
   run("surfaces : registre — concrete est neutre", true, surfaceProps("concrete").neutral);
   run("surfaces : registre — sand est spécial", false, surfaceProps("sand").neutral);
+  run("surfaces : registre — rock est spécial", false, surfaceProps("rock").neutral);
   run("surfaces : registre — nom inconnu -> undefined", undefined, surfaceProps("does-not-exist"));
 
   const surfaceScene = parseScene(

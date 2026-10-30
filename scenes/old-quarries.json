@@ -1,0 +1,31 @@
+{
+  "id": "old_quarries",
+  "titleKey": "scene.old_quarries.name",
+  "length": 50,
+  "playerStart": 0,
+  "recto": {
+    "musicDay": "assets/musics/old_quarries_day",
+    "musicNight": "assets/musics/old_quarries_night",
+    "ambiences": ["assets/ambiances/badlands_1.mp3"],
+    "defaultSurface": "rock",
+    "reverbPreset": "open_outdoor",
+    "segments": [
+      { "from": 0, "to": 5, "surface": "gravel" },
+      { "from": 20, "to": 30, "surface": "metal" },
+      { "from": 32, "to": 40, "surface": "shallow_water" }
+    ],
+    "entities": []
+  },
+  "verso": {
+    "musicDay": "assets/musics/old_quarries_day",
+    "musicNight": "assets/musics/old_quarries_night",
+    "ambiences": ["assets/ambiances/badlands_1.mp3"],
+    "defaultSurface": "rock",
+    "reverbPreset": "open_outdoor",
+    "segments": [
+      { "from": 0, "to": 5, "surface": "gravel" },
+      { "from": 20, "to": 30, "surface": "metal" }
+    ],
+    "entities": []
+  }
+}

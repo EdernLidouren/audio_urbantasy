@@ -2,6 +2,9 @@
   "assets/ambiances/altitude_wind": [
     "assets/ambiances/altitude_wind_1.mp3"
   ],
+  "assets/ambiances/badlands": [
+    "assets/ambiances/badlands_1.mp3"
+  ],
   "assets/ambiances/quiet_traffic": [
     "assets/ambiances/quiet_traffic_1.mp3"
   ],
@@ -98,6 +101,12 @@
     "assets/musics/nightlife_district_night_1.mp3",
     "assets/musics/nightlife_district_night_2.mp3"
   ],
+  "assets/musics/old_quarries_day": [
+    "assets/musics/old_quarries_day_1.mp3"
+  ],
+  "assets/musics/old_quarries_night": [
+    "assets/musics/old_quarries_night_1.mp3"
+  ],
   "assets/musics/pier_day": [
     "assets/musics/pier_day_1.mp3",
     "assets/musics/pier_day_2.mp3"
@@ -168,6 +177,9 @@
   "assets/sounds/decor/large_gear_2_beacon": [
     "assets/sounds/decor/large_gear_2_beacon_1.mp3"
   ],
+  "assets/sounds/decor/large_metal_structure_1_beacon": [
+    "assets/sounds/decor/large_metal_structure_1_beacon_1.mp3"
+  ],
   "assets/sounds/decor/large_weight_machine_1_beacon": [
     "assets/sounds/decor/large_weight_machine_1_beacon_1.mp3"
   ],
@@ -180,6 +192,9 @@
   ],
   "assets/sounds/decor/manhole_cover_1_beacon": [
     "assets/sounds/decor/manhole_cover_1_beacon_1.mp3"
+  ],
+  "assets/sounds/decor/mine_shaft_1_beacon": [
+    "assets/sounds/decor/mine_shaft_1_beacon_1.mp3"
   ],
   "assets/sounds/decor/motorised_sign_1_vocal": [
     "assets/sounds/decor/motorised_sign_1_vocal_1.mp3",
@@ -647,6 +662,25 @@
     "assets/sounds/footsteps/surfaces/mud_walk_7.mp3",
     "assets/sounds/footsteps/surfaces/mud_walk_8.mp3",
     "assets/sounds/footsteps/surfaces/mud_walk_9.mp3"
+  ],
+  "assets/sounds/footsteps/surfaces/rock_walk": [
+    "assets/sounds/footsteps/surfaces/rock_walk_1.mp3",
+    "assets/sounds/footsteps/surfaces/rock_walk_2.mp3",
+    "assets/sounds/footsteps/surfaces/rock_walk_3.mp3",
+    "assets/sounds/footsteps/surfaces/rock_walk_4.mp3",
+    "assets/sounds/footsteps/surfaces/rock_walk_5.mp3",
+    "assets/sounds/footsteps/surfaces/rock_walk_6.mp3",
+    "assets/sounds/footsteps/surfaces/rock_walk_7.mp3",
+    "assets/sounds/footsteps/surfaces/rock_walk_8.mp3",
+    "assets/sounds/footsteps/surfaces/rock_walk_9.mp3",
+    "assets/sounds/footsteps/surfaces/rock_walk_10.mp3",
+    "assets/sounds/footsteps/surfaces/rock_walk_11.mp3",
+    "assets/sounds/footsteps/surfaces/rock_walk_12.mp3",
+    "assets/sounds/footsteps/surfaces/rock_walk_13.mp3",
+    "assets/sounds/footsteps/surfaces/rock_walk_14.mp3",
+    "assets/sounds/footsteps/surfaces/rock_walk_15.mp3",
+    "assets/sounds/footsteps/surfaces/rock_walk_16.mp3",
+    "assets/sounds/footsteps/surfaces/rock_walk_17.mp3"
   ],
   "assets/sounds/footsteps/surfaces/sand_walk": [
     "assets/sounds/footsteps/surfaces/sand_walk_1.mp3",

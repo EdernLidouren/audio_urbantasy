@@ -55,13 +55,23 @@ const MAIN_STREET_ZONE = {
   spawnX: 25,
 };
 
+// Les anciennes carrières, au pied de la falaise, à l'écart de la ville,
+// à leur point de départ habituel (playerStart de scenes/old-quarries.json).
+const OLD_QUARRIES_ZONE = {
+  sceneId: "old_quarries",
+  nameKey: "scene.old_quarries.name",
+  descriptionKey: "cityMap.old_quarries.description",
+  spawnX: 0,
+};
+
 // Grille littérale, lisible d'un coup d'œil (une ligne de source = une
 // ligne de la carte, jamais générée par boucle) : la grand-place au centre
-// (x:2, y:2), la rue commerçante à sa gauche (x:1, y:2) ; tout le reste en
-// chantier. La scène de démo (scène de test, lancée par « Ville test ») n'y
-// figure plus.
+// (x:2, y:2), la rue commerçante à sa gauche (x:1, y:2), les anciennes
+// carrières tout en haut à gauche (x:0, y:0) ; tout le reste en chantier.
+// La scène de démo (scène de test, lancée par « Ville test ») n'y figure
+// plus.
 export const CITY_MAP_GRID = [
-  [UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION],
+  [OLD_QUARRIES_ZONE, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION],
   [UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION],
   [UNDER_CONSTRUCTION, MAIN_STREET_ZONE, TOWN_SQUARE_ZONE, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION],
   [UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION, UNDER_CONSTRUCTION],

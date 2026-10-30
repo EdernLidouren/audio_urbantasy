@@ -33,6 +33,7 @@ export const SURFACE_REGISTRY = {
   light_snow: { neutral: false },
   metal: { neutral: false },
   mud: { neutral: false },
+  rock: { neutral: false },
   sand: { neutral: false },
   shallow_water: { neutral: false },
   snow: { neutral: false },

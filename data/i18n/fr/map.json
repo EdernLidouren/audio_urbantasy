@@ -4,6 +4,7 @@
   "cityMap.offMap": "Hors plan.",
   "cityMap.offMapHere": "Hors plan, vous êtes ici.",
   "cityMap.offMapRefusal": "Cette scène ne figure pas sur votre plan.",
+  "cityMap.old_quarries.description": "Encaissées au pied de l'immense falaise qui longe la ville, établies à l'écart de celle-ci, ces anciennes carrières ne résonnent plus guère que du silence et de l'oubli.",
   "cityMap.town_square.description": "Le cœur de la ville, dominé par l'hôtel de ville et son clocher.",
   "cityMap.underConstruction": "En chantier.",
   "cityMap.zone": "{name} : {description}"

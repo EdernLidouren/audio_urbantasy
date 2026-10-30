@@ -16,6 +16,7 @@ export default {
   clock_tower_main: "scenes/clock-tower-main.json",
   clock_tower_weight_shaft: "scenes/clock-tower-weight-shaft.json",
   clock_tower_weight_shaft_mirror_side: "scenes/clock-tower-weight-shaft-mirror-side.json",
+  old_quarries: "scenes/old-quarries.json",
 };
 
 // Scènes PRINCIPALES : les grandes zones de la ville, celles que pointent
@@ -29,7 +30,7 @@ export default {
 // une action "confirm" ne relie que deux d'entre elles. La démo en fait
 // partie (scène de test, lancée par « Ville test ») : ses sous-scènes s'y
 // rattachent, même si elle ne figure plus sur la carte.
-export const MAIN_SCENE_IDS = ["town_square", "main_street", "demo"];
+export const MAIN_SCENE_IDS = ["town_square", "main_street", "old_quarries", "demo"];
 
 // Rattachement de chaque SOUS-SCÈNE à sa scène principale : celle où elle se
 // trouve géographiquement, pas celle d'où l'on vient (un lieu à deux
