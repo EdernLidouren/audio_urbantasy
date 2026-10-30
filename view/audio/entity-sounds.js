@@ -132,14 +132,19 @@ export function createEntitySounds({ getSession, handover = null }) {
 
   // Arrête pour de bon la balise d'une entité disparue du monde (jamais de
   // résidu sonore après un ramassage). Pas d'exitSound : une disparition
-  // n'est pas une bascule de présence.
+  // n'est pas une bascule de présence. Rend les ids disparus À CE TICK : ses
+  // sons ponctuels en cours (vocal, balise intermittente) se coupent aussi,
+  // côté ./oneshots.js/stopEntityVoices (voir ./city-scene.js).
   function cleanupRemovedEntities(world) {
     const liveIds = new Set(world.entities.map((entity) => entity.id));
+    const removedNow = [];
     for (const entry of entitySounds) {
       if (liveIds.has(entry.entity.id) || removedEntityIds.has(entry.entity.id)) continue;
       removedEntityIds.add(entry.entity.id);
+      removedNow.push(entry.entity.id);
       if (entry.sound) entry.sound.stop();
     }
+    return removedNow;
   }
 
   // Vrai si la balise de l'entité vivante doit se taire pour de bon : un

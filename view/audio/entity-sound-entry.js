@@ -285,7 +285,8 @@ export function buildEntitySoundEntry(entity, session, { otherFace = false, disa
       // La condition de beacon (voir doc/entity-model.md/"Beacon
       // conditionnel") appartient au rôle beacon, jamais au vocal.
       const source = resolveIntermittentSource(entity, beacon, BEACON_TUNING_KEYS);
-      intermittentSources.push({ ...source, gain: source.gain * faceGain(beaconCrossFaceGain), condition: beacon.condition });
+      // `role` : retrouvé par ./oneshots.js/stopEntityVoices (ramassage).
+      intermittentSources.push({ ...source, gain: source.gain * faceGain(beaconCrossFaceGain), condition: beacon.condition, role: "beacon" });
     }
   }
 

@@ -127,7 +127,9 @@ export function createCityAudioScene(getSession, { handover = null } = {}) {
     // D'abord, suivre la vie des entités : apparitions, disparitions,
     // consommation.
     entities.syncNewEntitySounds(world);
-    entities.cleanupRemovedEntities(world);
+    // Une entité disparue (ramassée) se tait tout entière : balise continue
+    // ET sons ponctuels encore en cours.
+    for (const entityId of entities.cleanupRemovedEntities(world)) oneShots.stopEntityVoices(entityId);
     entities.muteSpentBeacons(world);
 
     layers.update(session, world);

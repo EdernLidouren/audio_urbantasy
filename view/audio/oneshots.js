@@ -212,7 +212,9 @@ export function createOneShots({ getSession, reverbBus, findEntitySource, effect
 
   // À chaque tick : re-spatialise chaque son suivi (face, étouffement et
   // distance relus). Entité disparue du monde : on cesse de suivre, le son
-  // finit sur son dernier rendu.
+  // finit sur son dernier rendu — ses voix, elles, viennent d'être coupées
+  // (voir stopEntityVoices) : il ne reste que les sons d'effet, comme celui
+  // du ramassage.
   function updateTrackedOneShots(x) {
     if (trackedOneShots.length === 0) return;
     stopForeignTrackedOneShots(getSession().activeWorldId);
@@ -243,6 +245,18 @@ export function createOneShots({ getSession, reverbBus, findEntitySource, effect
     }
   }
 
+  // Entité RETIRÉE du monde — ramassée, le plus souvent (voir
+  // ./entity-sounds.js/cleanupRemovedEntities) : ses PROPRES voix en cours,
+  // vocal et balise intermittente, se coupent en fondu bref, pour ne pas
+  // chevaucher le son de ramassage. Celui-ci, joué par chemin (sans rôle,
+  // voir view/effect-runner.js/playEntityPickupSound), continue, comme tout
+  // son d'effet. Appelée AVANT updateTrackedOneShots, qui cesserait sinon de
+  // suivre ces sons et les laisserait finir.
+  const VOICE_ROLES = ["beacon", "vocal"];
+  function stopEntityVoices(entityId) {
+    for (const role of VOICE_ROLES) stopEntityOneShots(entityId, role);
+  }
+
   // Bascule de face (voir ./face-crossfade.js) : chaque son suivi fond vers
   // le rendu qu'il aura sur la face d'arrivée — net s'il est sur l'autre
   // face, entièrement étouffé sinon. Le premier tick après la bascule repart
@@ -267,6 +281,7 @@ export function createOneShots({ getSession, reverbBus, findEntitySource, effect
     playEntityOneShot,
     startTrackedOneShot,
     stopEntityOneShots,
+    stopEntityVoices,
     updateTrackedOneShots,
     crossfadeTrackedOneShots,
   };

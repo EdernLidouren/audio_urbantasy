@@ -1365,6 +1365,14 @@ positionné sur l'entité, filtres de scène), joué AVANT le retrait de
 l'entité — tant qu'elle a encore une voix dans la scène. Même descripteur
 qu'un `"playSound"` (`{ path, gain?, pitchVariation?, reverbSend? }`).
 
+Une entité retirée du monde (ramassée) se TAIT tout entière au tick
+suivant, pour que le son de ramassage ne se superpose à rien d'elle : sa
+balise continue s'arrête (`view/audio/entity-sounds.js`/
+`cleanupRemovedEntities`), et ses sons ponctuels encore en cours, vocal et
+balise intermittente, se coupent en fondu bref (`stopSoundsFadeMs`,
+`view/audio/oneshots.js`/`stopEntityVoices`). Le son de ramassage, lui,
+joué par chemin et non par rôle, va jusqu'au bout.
+
 ## Vocabulaire de sons
 
 Un descripteur de son est un objet plat :
