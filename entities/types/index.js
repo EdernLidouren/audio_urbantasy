@@ -66,6 +66,7 @@ import crate from "./crate.js";
 import cumuloLupus from "./cumulo-lupus.js";
 import decor from "./decor.js";
 import defectiveNeon from "./defective_neon.js";
+import dieselElectricGenerator from "./diesel_electric_generator.js";
 import dog from "./dog.js";
 import door from "./door.js";
 import fountain from "./fountain.js";
@@ -78,8 +79,10 @@ import largeMachinery from "./large_machinery.js";
 import largeWindingMechanism from "./large_winding_mechanism.js";
 import machine1 from "./machine_1.js";
 import magicMirror from "./magic_mirror.js";
+import mainHeadframe from "./main_headframe.js";
 import miravi from "./miravi.js";
 import metalContainer from "./metal_container.js";
+import metalFence from "./metal_fence.js";
 import metalTrashCan from "./metal_trash_can.js";
 import motorisedBillboard from "./motorised_billboard.js";
 import mirror from "./mirror.js";
@@ -138,6 +141,7 @@ export default {
   cumuloLupus,
   decor,
   defective_neon: defectiveNeon,
+  diesel_electric_generator: dieselElectricGenerator,
   dog,
   door,
   fountain,
@@ -150,8 +154,10 @@ export default {
   large_winding_mechanism: largeWindingMechanism,
   machine_1: machine1,
   magic_mirror: magicMirror,
+  main_headframe: mainHeadframe,
   miravi,
   metal_container: metalContainer,
+  metal_fence: metalFence,
   metal_trash_can: metalTrashCan,
   motorised_billboard: motorisedBillboard,
   mirror,

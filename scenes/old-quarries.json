@@ -14,7 +14,18 @@
       { "from": 20, "to": 30, "surface": "metal" },
       { "from": 32, "to": 40, "surface": "shallow_water" }
     ],
-    "entities": []
+    "entities": [
+      { "id": "metal_fence_1_r", "type": "metal_fence", "x": 10 },
+      {
+        "id": "electric_generator_1_r",
+        "type": "diesel_electric_generator",
+        "x": 21,
+        "variables": [{ "name": "isOn", "type": "flag", "initial": false }],
+        "tuning": { "beaconCrossFaceGain": 0.3 }
+      },
+      { "id": "main_headframe_1_r", "type": "main_headframe", "x": 25, "tuning": { "beaconCrossFaceGain": 0.5 } },
+      { "id": "mine_shaft_emitter_1_r", "type": "sound_emitter", "x": 25, "sounds": { "beacon": { "path": "assets/sounds/decor/mine_shaft_1_beacon", "loop": true } } }
+    ]
   },
   "verso": {
     "musicDay": "assets/musics/old_quarries_day",
@@ -26,6 +37,9 @@
       { "from": 0, "to": 5, "surface": "gravel" },
       { "from": 20, "to": 30, "surface": "metal" }
     ],
-    "entities": []
+    "entities": [
+      { "id": "metal_fence_1_v", "type": "metal_fence", "x": 10, "blocksMovement": true },
+      { "id": "mine_shaft_emitter_1_v", "type": "sound_emitter", "x": 25, "sounds": { "beacon": { "path": "assets/sounds/decor/mine_shaft_1_beacon", "loop": true } } }
+    ]
   }
 }

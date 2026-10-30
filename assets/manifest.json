@@ -193,6 +193,9 @@
   "assets/sounds/decor/manhole_cover_1_beacon": [
     "assets/sounds/decor/manhole_cover_1_beacon_1.mp3"
   ],
+  "assets/sounds/decor/metal_fence_1_beacon": [
+    "assets/sounds/decor/metal_fence_1_beacon_1.mp3"
+  ],
   "assets/sounds/decor/mine_shaft_1_beacon": [
     "assets/sounds/decor/mine_shaft_1_beacon_1.mp3"
   ],
@@ -771,6 +774,9 @@
   ],
   "assets/sounds/furniture/desk_chair_1_beacon": [
     "assets/sounds/furniture/desk_chair_1_beacon_1.mp3"
+  ],
+  "assets/sounds/furniture/electric_generator_1_beacon": [
+    "assets/sounds/furniture/electric_generator_1_beacon_1.mp3"
   ],
   "assets/sounds/furniture/furniture_heavy_1_beacon": [
     "assets/sounds/furniture/furniture_heavy_1_beacon_1.mp3"

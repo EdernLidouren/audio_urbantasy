@@ -48,7 +48,10 @@ une balise `interactable:false` jamais candidate à Entrée, même à portée.
   référence pour ce cas, voir `entities/types/decor.js`), `sound_emitter`
   (aucune des deux, et aucun son propre : un ÉMETTEUR INVISIBLE, une
   position + des `triggers` déclarés par instance — voir
-  `entities/types/sound_emitter.js`, `doc/scripting.md`/"Triggers").
+  `entities/types/sound_emitter.js`, `doc/scripting.md`/"Triggers" — ou
+  une balise continue d'instance, posée au x d'une autre entité pour
+  superposer deux balises, comme le souffle du puits sous le chevalement
+  de `scenes/old-quarries.json`).
 - **Cooldown d'interaction** (`interactCooldownMs`, cascade instance ->
   archétype -> défaut `config/tuning-values.js`, comme `interactRange`) :
   pendant ce délai, un nouvel appui sur Entrée sur la MÊME entité est ignoré
