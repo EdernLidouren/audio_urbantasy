@@ -374,8 +374,9 @@ Consommateurs, tous derrière ce MÊME drapeau (jamais un drapeau par outil) :
   `instant`, jamais par un chemin de chargement parallèle), Shift+L (journal
   des avertissements, voir ci-dessous), Shift+C (tout révéler / tout
   réinitialiser dans les collections, `view/menus/debug-collections-menu.js`),
-  Shift+G (argent : un montant à ajouter — slider sans maximum, pas de 1,
-  Ctrl pour 50 — et une remise à zéro, `view/menus/debug-money-menu.js`) ;
+  Shift+G (argent : un montant à ajouter — slider de 0 à 1 000 000, pas de
+  1, Ctrl pour 50 — et une remise à zéro de l'argent possédé,
+  `view/menus/debug-money-menu.js`) ;
 - Shift+X, en ville : bascule recto <-> verso SÈCHE, sans passage, sans son
   ni croisement des filtres — le joueur passe à la même position sur l'autre
   face, même sans entité pour l'y accueillir, et la face d'arrivée est
