@@ -25,7 +25,14 @@
 //
 // Filet de sécurité de tout remaniement : tools/audio-trace.js.
 
-import { keepAudioContextAwake, createReverbBus, setMasterVolume, setGlobalVolume } from "../../lib/audio.js";
+import {
+  keepAudioContextAwake,
+  createReverbBus,
+  setMasterVolume,
+  setGlobalVolume,
+  enterAudioScope,
+  releaseStaleAudio,
+} from "../../lib/audio.js";
 import { TUNING_DEFAULTS } from "../../config/tuning.js";
 import { TICK_MS } from "../../lib/loop.js";
 import { getActiveWorld, getInactiveFace } from "../../core/state.js";
@@ -49,6 +56,12 @@ const REVERB_DURATION_SEC_DEFAULT = TUNING_DEFAULTS.reverbDurationSec;
 const REVERB_DECAY_DEFAULT = TUNING_DEFAULTS.reverbDecay;
 const REVERB_WET_DEFAULT = TUNING_DEFAULTS.reverbWet;
 
+// Nombre de mondes dont les sons décodés restent en mémoire : le monde
+// courant et le précédent. Un aller-retour par une porte (un intérieur et
+// la rue qui y mène) reste instantané ; revenir dans un monde quitté depuis
+// plus longtemps redécode ses sons pendant la transition.
+const RETAINED_AUDIO_WORLDS = 2;
+
 // Au plus une scène ville vivante à la fois : un menu ouvert par-dessus
 // (Options > Audio) peut la rafraîchir sans référence explicite (voir
 // refreshActiveBeaconVolumes).
@@ -65,6 +78,13 @@ export function createCityAudioScene(getSession, { handover = null } = {}) {
   // Les sons suivis du monde QUITTÉ s'arrêtent (le monde actif est déjà le
   // nouveau).
   stopForeignTrackedOneShots(getSession().activeWorldId);
+
+  // Portée audio = le MONDE (voir lib/audio/retention.js) : tout ce que ce
+  // montage crée ou précharge est marqué de son id, et la purge de fin de
+  // montage décharge les sons des mondes plus anciens que les
+  // RETAINED_AUDIO_WORLDS derniers. Une bascule recto/verso remonte la
+  // scène dans le MÊME monde : rien n'est oublié.
+  enterAudioScope(getSession().activeWorldId, RETAINED_AUDIO_WORLDS);
 
   // ORDRE de montage : les entrées sonores (qui créent les premiers Howl,
   // donc Howler.ctx) AVANT le bus de réverb, qui a besoin du contexte tout de
@@ -117,6 +137,11 @@ export function createCityAudioScene(getSession, { handover = null } = {}) {
     beaconConditionAllows: entityAudio.beaconConditionAllows,
     oneShots,
   });
+
+  // APRÈS le montage et le préchargement (voir enterAudioScope plus haut) :
+  // un fichier commun à ce monde et à un monde oublié vient d'être marqué
+  // de ce monde, il reste décodé.
+  releaseStaleAudio();
 
   function update() {
     const session = getSession();

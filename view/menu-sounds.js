@@ -35,10 +35,12 @@ const MENU_SOUND_KEYS = {
 // découverte...) : centré, au volume de la catégorie "interface" (Options >
 // Audio), relu à CHAQUE déclenchement. `path` : clé d'asset ou de pool ;
 // `what` : ce que c'est, pour l'avertissement si le son manque — jamais un
-// plantage.
+// plantage. PERMANENT (jamais déchargé au changement de scène, voir
+// lib/audio/retention.js) : un son d'interface s'entend partout, il ne doit
+// jamais revenir "à froid", en retard sur la touche.
 export function playInterfaceSound(path, what) {
   try {
-    playOneShot(resolveAsset(path), { volume: interfaceVolumeFactor() });
+    playOneShot(resolveAsset(path), { volume: interfaceVolumeFactor(), permanent: true });
   } catch (error) {
     console.warn(`son d'interface indisponible (${what}, "${path}") : ${error.message}`);
   }

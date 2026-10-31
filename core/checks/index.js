@@ -54,6 +54,7 @@ import checkRotation from "./rotation.check.js";
 // d'entrée : une seule commande, un seul récapitulatif.
 import checkI18n from "../../lib/checks/i18n.check.js";
 import checkInput from "../../lib/checks/input.check.js";
+import checkAudioRetention from "../../lib/checks/audio-retention.check.js";
 
 const SUITES = [
   { name: "movement", check: checkMovement },
@@ -90,6 +91,7 @@ const SUITES = [
   { name: "rotation", check: checkRotation },
   { name: "i18n", check: checkI18n },
   { name: "input", check: checkInput },
+  { name: "audio-retention", check: checkAudioRetention },
 ];
 
 // Noms des domaines, dans l'ordre d'exécution.
