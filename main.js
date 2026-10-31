@@ -66,8 +66,8 @@ console.log("Vérifs dispo : tape runChecks()");
 // CONSOLE (window.toggleDebug, comme runChecks ci-dessus) OU par la
 // combinaison Ctrl+D EN JEU (voir onGlobalPress plus bas, lib/input.js) —
 // deux chemins, UNE seule fonction, jamais deux logiques à maintenir.
-// Une fois activé, il ouvre aussi les touches de debug en ville (ex. "e",
-// voir view/city-screen.js/KEY_ACTIONS et view/debug-effects.js).
+// Une fois activé, il ouvre aussi les touches de debug en ville (ex.
+// Maj+M, voir view/city-screen.js/KEY_ACTIONS et view/debug-effects.js).
 function toggleDebug() {
   setDebugEnabled(!isDebugEnabled());
   console.log(`Mode debug : ${isDebugEnabled() ? "activé" : "désactivé"}`);
@@ -156,12 +156,6 @@ function setSession(next) {
 // repairs } (voir view/save-storage.js/loadGame), ou null.
 let loadableSave = null;
 
-// "Nouvelle partie" (confirmée au préalable si un save existe, voir
-// main-menu.js/activateNewGame) : construit une partie NEUVE sur la scène
-// de départ. ÉCRASEMENT PARESSEUX voulu : n'efface PAS le save disque ici —
-// la nouvelle partie ne remplacera l'ancien save qu'à sa PROCHAINE écriture
-// (manuelle ou auto), jamais à cet instant. Quitter avant toute sauvegarde
-// laisse donc l'ancien save intact.
 // L'écran de ville de la partie en cours, gardé pour l'accès console des
 // tests (window.debugActions plus bas). Seul point d'entrée en ville.
 let cityScreen = null;
@@ -189,6 +183,12 @@ async function loadStartScene(sceneId) {
   }
 }
 
+// "Nouvelle partie" (confirmée au préalable si un save existe, voir
+// main-menu.js/activateNewGame) : construit une partie NEUVE sur la scène
+// de départ. ÉCRASEMENT PARESSEUX voulu : n'efface PAS le save disque ici —
+// la nouvelle partie ne remplacera l'ancien save qu'à sa PROCHAINE écriture
+// (manuelle ou auto), jamais à cet instant. Quitter avant toute sauvegarde
+// laisse donc l'ancien save intact.
 async function startNewGame() {
   const startScene = scene ?? (await loadStartScene(newGame.startSceneId));
   if (!startScene) return;

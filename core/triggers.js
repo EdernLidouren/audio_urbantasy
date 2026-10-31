@@ -50,8 +50,8 @@ import { sequenceHead } from "./sequence.js";
 
 // Kinds de trigger reconnus (`on`) — SEULE liste, lue par
 // core/script-parse.js/parseTrigger pour la validation. Un kind de plus
-// demain (météo, phase...) = une entrée ici + sa détection (dueTriggerEffects
-// pour l'horloge, emoteTriggerEffects pour les émotes).
+// demain (météo, phase...) = une entrée ici + sa détection (dueTriggers
+// pour l'horloge, emoteTriggers pour les émotes).
 export const TRIGGER_KINDS = ["hour", "emote"];
 
 // Index ABSOLU de l'heure (pas l'heure du jour) : un saut de 24 h exactes
@@ -109,7 +109,7 @@ function applyTriggers(session, entity, triggers, apply, fired) {
 }
 
 // Applique les triggers dus entre `previousTime` et `session.time` sur le
-// monde actif (les deux faces). Renvoie { session, fired } : la session
+// monde actif (les deux faces) et sur les compagnons. Renvoie { session, fired } : la session
 // après les effets d'ÉTAT, et les effets de RENDU dus, par entité, à
 // rejouer par la vue. Aucun trigger dû -> MÊME référence de session, fired
 // vide. Les conditions se lisent toutes sur `session`, l'état d'avant.
@@ -164,11 +164,6 @@ export function emoteTriggers(entity, emoteId, distance, session) {
   );
 }
 
-// Leurs effets, mis bout à bout (lecture seule, pour les vérifications).
-export function emoteTriggerEffects(entity, emoteId, distance, session) {
-  return emoteTriggers(entity, emoteId, distance, session).flatMap((trigger) => trigger.effects);
-}
-
 // Le joueur fait l'émote `emoteId` depuis `sourceX` (sa position — passée
 // explicitement : demain, un autre émetteur). Applique les triggers
 // d'émote des entités de la FACE DU JOUEUR : l'autre face est isolée en
@@ -178,9 +173,10 @@ export function emoteTriggerEffects(entity, emoteId, distance, session) {
 //
 // Renvoie { session, fired }, exactement comme applyDueTriggers : la session
 // après les effets d'ÉTAT, les effets de RENDU dus par entité pour la vue.
-// Aucun trigger dû -> MÊME référence de session, fired vide. Pur et sans
-// tirage : même session + même émote = même résultat. Les conditions se
-// lisent toutes sur `session`, l'état d'avant l'émote.
+// Aucun trigger dû -> MÊME référence de session, fired vide. Pur et
+// déterministe : même session + même émote = même résultat (une variation
+// de `wait` se tire dans le PRNG seedé de la face ou des compagnons). Les
+// conditions se lisent toutes sur `session`, l'état d'avant l'émote.
 export function applyEmoteTriggers(session, emoteId, sourceX) {
   const world = session.worlds[session.activeWorldId];
   const side = session.player.side;

@@ -36,22 +36,22 @@ export const IMPROVEMENT_REGISTRY = {
   old_plans: { order: 7, labelKey: "improvement.old_plans.name", descriptionKey: "improvement.old_plans.description" },
 };
 
-// Ordres présents, entiers >= 1 et uniques — sinon une erreur claire à
-// l'import, jamais un onglet mal numéroté en silence. Exportée pour les
-// checks terminal (core/checks/improvements.check.js).
 function failImprovements(message) {
   throw new Error(`IMPROVEMENT_REGISTRY : ${message}`);
 }
 
+// Ordres présents, entiers >= 1 et uniques — sinon une erreur claire à
+// l'import, jamais un onglet mal numéroté en silence. Exportée pour les
+// checks terminal (core/checks/improvements.check.js).
 export function validateImprovementRegistry(registry) {
   const seen = new Map();
   for (const [id, props] of Object.entries(registry)) {
     rejectUnknownFields(props, ["order", "labelKey", "descriptionKey"], `"${id}"`, failImprovements);
     if (!Number.isInteger(props.order) || props.order < 1) {
-      throw new Error(`IMPROVEMENT_REGISTRY : "${id}".order doit être un entier >= 1 (reçu : ${JSON.stringify(props.order)}).`);
+      failImprovements(`"${id}".order doit être un entier >= 1 (reçu : ${JSON.stringify(props.order)}).`);
     }
     if (seen.has(props.order)) {
-      throw new Error(`IMPROVEMENT_REGISTRY : order ${props.order} partagé par "${seen.get(props.order)}" et "${id}".`);
+      failImprovements(`order ${props.order} partagé par "${seen.get(props.order)}" et "${id}".`);
     }
     seen.set(props.order, id);
   }

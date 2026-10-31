@@ -53,7 +53,7 @@ export function registerActionHandlers({ getSession, setSession, travel }) {
     // Effet "teleport" (portes et tout autre effet).
     [setTeleportHandler, travel.executeTeleport],
     // Ramassage d'argent (`amount` déjà extrait de l'action résolue par
-    // view/interaction.js).
+    // view/action-execution.js/handlePickup).
     [setPickupHandler, (entity, amount) => setSession(pickupEntity(getSession(), entity.id, amount))],
     // Ramassage vers le sac.
     [setItemPickupHandler, (entity, item, count) => setSession(pickupItemEntity(getSession(), entity.id, item, count))],
@@ -76,7 +76,8 @@ export function registerActionHandlers({ getSession, setSession, travel }) {
     // core résout seul la portée de chaque effet.
     [setVariableEffectsHandler, (entity, effects) => setSession(applyEntityActionEffects(getSession(), entity.id, effects))],
     // Fouille d'un conteneur : rend l'état du conteneur avant la fouille et le
-    // nombre d'objets tombés, que view/interaction.js annonce.
+    // nombre d'objets tombés, que view/action-execution.js/handleSearch
+    // annonce.
     [
       setSearchHandler,
       (entity) => {

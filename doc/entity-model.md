@@ -124,7 +124,7 @@ spécifique au MODÈLE d'entité :
   du mécanisme. Consultable à tout moment via la touche "g"
   (`view/status-announcements.js`/`announceMoney`, binding dans
   `view/input.js`), lecture pure, canal liveRegion.
-- **Exemple de test — dresscode** (`scenes/demo.json`, `door-club`) : une
+- **Exemple de test — dresscode** (`scenes/demo.json`, `door_club`) : une
   porte conditionnée `hasEquipmentTag: "chic"`. Le sac de départ contient
   déjà des escarpins (`high_heels`, tag `"chic"`, gait `"high_heels"` — voir
   "Objets équipables" plus haut) : équiper/déséquiper fait basculer le
@@ -193,7 +193,7 @@ d'ÉTAT. Le mécanisme, en trois couches strictement séparées :
   - **Devenir dormant** — PAS un champ propre à ce système : se déclare avec
     le mécanisme de présence EXISTANT (`core/presence.js`), à l'INSTANCE (pas
     à l'archétype, voir `entities/types/crate.js` qui n'en déclare aucune par
-    défaut) — voir `scenes/demo2.json`, `crate-warehouse`. Une entité
+    défaut) — voir `scenes/demo2.json`, `crate_warehouse`. Une entité
     `consumed` alimente le registre de conditions (`core/presence.js`/
     `CONDITION_EVALUATORS.consumed`) exactement comme `"timeRange"`/
     `"arrived"`, sans aucun cas spécial dans `isPresent`/`resolveEntityRules`/
@@ -213,9 +213,9 @@ d'ÉTAT. Le mécanisme, en trois couches strictement séparées :
     ET non examinable, contrairement à l'effet précédent seul.
 
 Exemple de référence — deux caisses, `scenes/demo2.json` :
-`crate-port` (perceptible seul : desc devient "vide", beacon coupé,
+`crate_port` (perceptible seul : desc devient "vide", beacon coupé,
 reste interactable — réactiver ne redonne rien, silencieusement) et
-`crate-warehouse` (devient dormant : donne son contenu puis disparaît de
+`crate_warehouse` (devient dormant : donne son contenu puis disparaît de
 toute perception, définitivement). Même archétype `crate` pour les deux —
 seule la présence D'INSTANCE distingue les deux comportements, illustrant que
 ce sont des PRESETS de propriétés composables, jamais une hiérarchie de
@@ -303,7 +303,7 @@ JSON de scène, une entité ÉPHÉMÈRE n'est par définition jamais DÉCLARÉE.
 Un VRAI déclencheur en jeu (au-delà de la touche debug) : une entité peut
 déclarer, sur son `action` (voir "Types d'action" plus haut), un effet
 `spawn` qui fait naître PLUSIEURS éphémères ÉPARPILLÉS autour d'elle à
-l'activation — ex. `crate-stash` (`scenes/demo2.json`), une caisse dont le
+l'activation — ex. `crate_stash` (`scenes/demo2.json`), une caisse dont le
 `"loot"` LÂCHE des pièces au lieu d'en créditer une directement :
 
 ```json
@@ -832,8 +832,9 @@ posé en x 20, provisoirement.
   n'y apparaissent qu'après un oubli de la scène (debug, Maj+M) ou dans une
   partie neuve.
 
-Prévu, pas construit : une condition `when` par entrée de table (format du
-script, partagé avec la collecte).
+Prévu, pas construit : une condition par entrée de TABLE (format du script,
+partagé avec la collecte) — la condition `when` d'un ARTICLE, elle, existe
+(voir plus haut).
 
 ## Messages en rotation — un texte qui change avec l'heure
 
@@ -846,6 +847,7 @@ au recto) passe une nouvelle réclame à chaque heure.
 `rotations/` (donnée pure, registre `rotations/index.js`), une liste d'ids :
 
 ```js
+// Extrait : la série en compte d'autres, voir rotations/billboard-ads.js.
 export default { entries: ["arpulse", "gremlins", "macarons"] };
 ```
 
@@ -1146,11 +1148,11 @@ un crash).
 **`behavior: null` — RETRAIT explicite** (au lieu d'un objet behavior) : vide
 le comportement actif de l'entité, qui redevient immobile comme si elle
 n'en avait jamais eu. Nécessaire pour une entité qui n'a PAS de comportement
-de repos vers lequel revenir (voir `npc-resident-home` ci-dessous) : la
+de repos vers lequel revenir (voir `npc_resident_home` ci-dessous) : la
 condition `"arrived"` reste vraie tant que `behavior.kind` reste `"goto"`
 (`entity.gotoArrived` n'est jamais remis à `false` par `core/behaviors/
 goto.js`, voir plus bas) — sans un changement de `kind` (vers `"wander"`,
-comme `npc-resident`) OU ce retrait explicite, une entité resterait bloquée
+comme `npc_resident`) OU ce retrait explicite, une entité resterait bloquée
 dormante pour toujours dès sa PREMIÈRE arrivée, incapable de redevenir
 présente au cycle suivant. Validé par `core/script-parse.js`/`parseEffect` comme
 seule valeur spéciale acceptée pour ce champ.
@@ -1179,8 +1181,8 @@ cette même règle. Accepté tel quel pour l'instant (hors de portée d'un
 plafonnement de l'horloge ou d'un rattrapage multi-monde, ni l'un ni
 l'autre demandé).
 
-**Exemple de référence — l'habitant** (`npc-resident` dans `scenes/demo.json`) :
-présent et erre de 8h à 20h ; à 20h, part vers `door-exit` (`"behavior"` ->
+**Exemple de référence — l'habitant** (`npc_resident` dans `scenes/demo.json`) :
+présent et erre de 8h à 20h ; à 20h, part vers `door_exit` (`"behavior"` ->
 `goto`) tout en restant présent (en chemin) ; à l'arrivée (`"arrived"`),
 devient dormant ; FILET DE SECOURS à 23h (`"timeRange"` de 23h à 8h) —
 dormant QUAND MÊME, qu'il soit arrivé ou non (cible manquante, obstacle, trop
@@ -1194,13 +1196,13 @@ tick par tick d'un cycle équivalent, y compris le cas obstrué et le cas de
 cible manquante.
 
 **Le même personnage, deux scènes — DEUX déclarations séparées, sans état
-partagé, DEUX cycles inversés** : `npc-resident` (demo1, présent le jour,
-ci-dessus) et `npc-resident-home` (`scenes/demo2.json`, présent la nuit — 20h
+partagé, DEUX cycles inversés** : `npc_resident` (demo1, présent le jour,
+ci-dessus) et `npc_resident_home` (`scenes/demo2.json`, présent la nuit — 20h
 à 8h) sont deux entités INDÉPENDANTES : un NPC appartient à UNE scène
 (contrairement à un compagnon, voir `core/state.js`), la porte qu'il rejoint
 n'est que de la couleur narrative ("il rentre chez lui, de l'autre côté") —
 jamais une vraie transition d'entité entre scènes, jamais besoin de
-synchroniser les deux mondes. `npc-resident-home` suit le MÊME schéma,
+synchroniser les deux mondes. `npc_resident_home` suit le MÊME schéma,
 inversé et sans comportement de repos (`"aucun"`, contrairement au `wander`
 de son double diurne) : présent la nuit (immobile), part vers `door-back` à
 8h, dormant à l'arrivée, filet de secours à 11h — via `behavior: null`
@@ -1210,8 +1212,8 @@ ci-dessus, `behavior: null`).
 **Chevauchement ASSUMÉ, pas une garantie de complémentarité stricte** : avec
 CES horaires précis (fenêtres de transit 20h-23h ET 8h-11h partagées par les
 deux instances), le personnage peut être VISIBLE DANS LES DEUX MONDES À LA
-FOIS pendant ces créneaux (ex. `npc-resident` encore en chemin vers
-`door-exit` à 21h, `npc-resident-home` déjà présente à demo2 depuis 20h) —
+FOIS pendant ces créneaux (ex. `npc_resident` encore en chemin vers
+`door_exit` à 21h, `npc_resident_home` déjà présente à demo2 depuis 20h) —
 sans état partagé entre les deux déclarations, rien n'empêche
 STRUCTURELLEMENT cette simultanéité ; un contenu qui voudrait l'éviter
 choisirait des horaires DÉCALÉS (ex. démarrer la présence nocturne à 21h
@@ -1852,7 +1854,7 @@ Une instance de scène (`scenes/*.json`) surcharge un paramètre en cascade via
 un champ RÉSERVÉ, `tuning`, un objet plat de clés -> valeurs :
 
 ```json
-{ "id": "bird-loud", "type": "bird_1", "x": 12, "tuning": { "beaconInterval": 1500, "beaconGain": 1.4 } }
+{ "id": "bird_loud", "type": "bird_1", "x": 12, "tuning": { "beaconInterval": 1500, "beaconGain": 1.4 } }
 ```
 
 `core/entity-parse.js`/`parseEntity` recopie ce champ TEL QUEL (`entity.tuning`) —

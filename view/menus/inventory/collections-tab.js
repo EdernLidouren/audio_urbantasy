@@ -64,11 +64,9 @@ function findSheetIndex(entries, index, delta) {
 // `sectionId`) avant de lui passer le reste du clavier.
 function makeSwitchingScreen({ current, bindings, sectionId, onSwitch, onExit }) {
   return {
-    isMenuScreen: true,
     onEnter: () => current().onEnter(),
     onTick: () => current().onTick?.(),
     onExit,
-    reannounceCurrentEntry: () => current().reannounceCurrentEntry(),
     helpSections: () => [{ id: sectionId }, ...(current().helpSections?.() ?? [])],
     onKeyDown(event) {
       const action = resolveAction(bindings, event.key, event.mods);

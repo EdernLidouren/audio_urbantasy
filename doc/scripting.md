@@ -191,7 +191,7 @@ Sans champ propre. Vraie si `context.entity.consumed === true` (posé par
 PERMANENT : `consumed` ne repasse jamais à `false`, donc une règle sur cette
 condition bascule une fois pour toutes.
 
-Exemple réel complet — `crate-warehouse` (`scenes/demo2.json`), qui devient
+Exemple réel complet — `crate_warehouse` (`scenes/demo2.json`), qui devient
 dormante une fois son contenu récupéré (DEUX règles requises, la seconde étant le
 filet "présente sinon" — sans elle, l'entité serait dormante en permanence, avant
 *et* après activation) :
@@ -513,7 +513,7 @@ porteurs, plus l'équipement du joueur.
 (`scenes/town-square-town-hall-meeting-room.json`). Le vidéoprojecteur du recto
 écrit une variable de SCÈNE `projectorOn` (son instance remplace l'action et la
 condition de beacon de son archétype par leur version `scope: "scene"`) ; la projection est
-présente quand elle vaut `true`, une porte cachée quand elle vaut `false`
+présente quand elle vaut `true`, la porte de la réserve quand elle vaut `false`
 (même principe que les deux miroirs et `perceptionActive`). Une entité ne lit
 jamais les variables d'une AUTRE entité : un état partagé par plusieurs
 entités appartient à la scène.
@@ -521,9 +521,9 @@ entités appartient à la scène.
 ```json
 "variables": [{ "name": "projectorOn", "type": "flag", "initial": true }],
 "entities": [
-  { "id": "video_projection_1", "type": "video_projection", "x": 5,
+  { "id": "video_projection_1_v", "type": "video_projection", "x": 15,
     "presence": [{ "when": { "type": "variable", "scope": "scene", "name": "projectorOn", "equals": true }, "present": true }] },
-  { "id": "hidden_door_1", "type": "door", "x": 5,
+  { "id": "storeroom_door_1_v", "type": "door", "x": 15,
     "presence": [{ "when": { "type": "variable", "scope": "scene", "name": "projectorOn", "equals": false }, "present": true }] }
 ]
 ```
@@ -617,7 +617,7 @@ bascule ; en cas de chevauchement (non recommandé), le dernier de la liste gagn
 de changer `behavior.kind` pour autre chose que `"goto"`. Une entité qui alterne
 `wander` ↔ `goto` (comme l'habitant de `demo.json`, voir "Règles" plus bas) le fait
 naturellement à chaque cycle. Une entité qui n'a AUCUN comportement de repos
-(`"aucun"`, ex. `npc-resident-home` de `demo2.json`) n'a rien d'autre vers quoi
+(`"aucun"`, ex. `npc_resident_home` de `demo2.json`) n'a rien d'autre vers quoi
 "changer" — sans ce retrait explicite, elle resterait bloquée `arrived` (donc
 dormante) pour toujours dès sa première arrivée. `behavior: null` comble ce vide :
 il fait basculer `behavior.kind` à `undefined` (via `entity.behavior = null`),
@@ -702,13 +702,13 @@ présent la nuit, aucune règle ne couvre le jour → dormant par défaut, sans
 deuxième règle explicite.
 
 **Exemple réel complet — le même PNJ, DEUX déclarations séparées, DEUX cycles
-complémentaires** (`scenes/demo.json`/`npc-resident` et
-`scenes/demo2.json`/`npc-resident-home` — voir `doc/entity-model.md`/"Présence
+complémentaires** (`scenes/demo.json`/`npc_resident` et
+`scenes/demo2.json`/`npc_resident_home` — voir `doc/entity-model.md`/"Présence
 conditionnelle et triggers de comportement" pour la sémantique complète, et
 `core/checks/routines.check.js`, section "Routine complète", pour la vérification tick
 par tick d'un cycle équivalent) :
 
-`npc-resident` (`scenes/demo.json`) — présent le jour (8h-20h, erre), part vers
+`npc_resident` (`scenes/demo.json`) — présent le jour (8h-20h, erre), part vers
 la porte de sortie à 20h, dormant à l'arrivée, filet de sécurité à 23h :
 
 ```json
@@ -727,13 +727,13 @@ la porte de sortie à 20h, dormant à l'arrivée, filet de sécurité à 23h :
     "when": { "type": "timeRange", "from": 20, "to": 23 },
     "effects": [
       { "type": "presence", "present": true },
-      { "type": "behavior", "behavior": { "kind": "goto", "targetId": "door-exit" } }
+      { "type": "behavior", "behavior": { "kind": "goto", "targetId": "door_exit" } }
     ]
   }
 ]
 ```
 
-`npc-resident-home` (`scenes/demo2.json`) — CYCLE INVERSÉ ET COMPLÉMENTAIRE :
+`npc_resident_home` (`scenes/demo2.json`) — CYCLE INVERSÉ ET COMPLÉMENTAIRE :
 présent la nuit (20h-8h, immobile — "aucun" comportement de repos, contrairement
 à son double diurne), part vers la porte à 8h, dormant à l'arrivée, filet de
 sécurité à 11h :
@@ -759,12 +759,12 @@ sécurité à 11h :
 ]
 ```
 
-Sans comportement de repos vers lequel revenir, `npc-resident-home` a besoin du
+Sans comportement de repos vers lequel revenir, `npc_resident_home` a besoin du
 retrait explicite `behavior: null` (voir "Effets"/`"behavior"` plus haut) au
 moment où la présence reprend (20h) — SINON `entity.gotoArrived`, jamais remis à
 `false`, et `behavior.kind` resté à `"goto"` depuis le trajet du matin
 laisseraient la condition `"arrived"` durablement vraie, et l'entité durablement
-dormante dès la deuxième journée. `npc-resident` n'a pas ce problème : sa règle
+dormante dès la deuxième journée. `npc_resident` n'a pas ce problème : sa règle
 diurne réassigne `wander` (un `kind` différent de `"goto"`), ce qui neutralise
 `"arrived"` par le même mécanisme, sans retrait explicite nécessaire — DEUX
 solutions au même problème structurel, à choisir selon qu'une entité a ou non un
@@ -830,13 +830,13 @@ leur simulation. Une entité DORMANTE (`present: false`, voir "Règles") ne
 tire pas ; une entité dont la présence n'a pas encore été résolue par un
 tick compte comme présente.
 
-**Exemple réel — le clocher** (`scenes/town-square.json`, `clocktower_1`, au
+**Exemple réel — le clocher** (`scenes/town-square.json`, `clock_tower_1_r`, au
 RECTO seulement — pas sur son miroir du verso, pour ne pas doubler la
 cloche : c'est justement l'écho étouffé qui traverse depuis le recto qu'on
 entend de l'autre face) :
 
 ```json
-"triggers": [{ "on": "hour", "effects": [{ "type": "playSound", "path": "assets/sounds/effects/clock_tower_bell" }] }]
+"triggers": [{ "on": "hour", "effects": [{ "type": "playSound", "path": "assets/sounds/effects/clock_tower_bell", "gain": 2 }] }]
 ```
 
 Un trigger CIBLÉ, forme complète (pas encore de contenu réel) :
@@ -1013,7 +1013,7 @@ action: { kind: "loot", amount: 100 },
 Éparpillement d'entités éphémères autour de la source, au lieu d'un crédit direct :
 
 ```json
-// scenes/demo2.json, crate-stash
+// scenes/demo2.json, crate_stash
 "action": {
   "kind": "loot",
   "spawn": { "spec": { "type": "money", "amount": 20 }, "count": 3, "spread": 1.5 }
@@ -1147,7 +1147,7 @@ question. Détail (tirage, nom présenté, balise, annonces) :
 
 ```json
 // entities/types/passage.js (défaut) + instance de scène (scenes/demo3.json)
-{ "id": "alley-gap-recto", "type": "passage", "x": 8, "action": { "kind": "switchSide", "arrivalX": 8 } }
+{ "id": "alley_gap_recto", "type": "passage", "x": 8, "action": { "kind": "switchSide", "arrivalX": 8 } }
 ```
 
 `arrivalX` (nombre, requis) : point d'arrivée sur l'AUTRE face du MÊME monde —
@@ -1748,7 +1748,8 @@ CET effet (voir `scenes/demo.json`/`door_exit`).
   teleport dans la même liste, voir "Son de départ" plus haut). Le
   déplacement se fait au début, comme toujours, puis le jeu reste gelé tant
   que le son joue. Vers un autre monde, la musique et les ambiances du monde
-  quitté fondent au silence dès le départ (`musicFadeMs`), comme ses
+  quitté fondent au silence dès que la scène cible est lue (`musicFadeMs`),
+  comme ses
   balises : le son de transition se joue seul. La scène d'arrivée n'est
   montée qu'à la fin du son : sa musique et ses ambiances démarrent alors,
   et l'annonce du nom de la scène, ses balises et un pas sur le sol
@@ -2392,9 +2393,9 @@ les MÊMES que ses sons et son action :
 ]
 ```
 
-De 8 h à 20 h : « Une porte vitrée qui coulisse d'elle-même à votre
-approche. » (la description de l'archétype) ; de 20 h à 8 h : « Un accès
-protégé par un lourd rideau de fer. »
+De 8 h à 20 h : sa description d'instance (l'enseigne bleu nuit du Bazar
+Quasar, `door.quasar_bazaar_entrance.description`) ; de 20 h à 8 h : « Un
+accès protégé par un lourd rideau de fer. »
 
 ## Sources de vérité — où lire la liste exhaustive, jamais ici
 

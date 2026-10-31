@@ -5,6 +5,20 @@ renomme ou supprime du contenu. Code : `core/save.js` (forme, migration, pur),
 `view/save-storage.js` (disque, obscurcissement, import/export de fichier),
 `config/save-renames.js` (table des renommages).
 
+## Quand la partie est sauvegardée
+
+Toujours dans la même sauvegarde locale (`view/save-storage.js/saveGame`) :
+- **à la demande** : Maj+S en jeu (binding `quickSave`, `view/input.js`), ou
+  « Sauvegarder » dans le menu pause ; un son confirme, sans annonce ;
+- **à chaque changement de monde** (porte, carte de la ville), si la
+  préférence `autoSaveOnTransition` est active (oui par défaut) — en
+  silence ;
+- **toutes les N minutes de temps réel** (`autoSaveIntervalMinutes`, 5 par
+  défaut, 0 la désactive, `view/autosave-timer.js`), même menu ouvert.
+
+Les deux sauvegardes automatiques sont indépendantes, chacune sa
+préférence (Options > Sauvegarde, `config/preferences.js`).
+
 ## Export et import de fichier
 
 Menu Options > Sauvegarde. L'**export** (partie ou préférences) ouvre la

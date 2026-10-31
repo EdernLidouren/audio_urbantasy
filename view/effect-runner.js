@@ -3,8 +3,10 @@
 // délégués au core par le gestionnaire injecté, les effets de RENDU
 // (playSound, announce) et l'effet MIXTE (teleport) sont joués ici, dans
 // l'ordre déclaré. Utilisé par l'interaction (view/interaction.js), par les
-// handlers de kind (son de ramassage, view/action-execution.js) et par les
-// triggers horaires (rendu seul, view/game-clock.js).
+// handlers de kind (son de ramassage, view/action-execution.js), et pour le
+// rendu seul des triggers horaires (view/game-clock.js), des triggers
+// d'émote (view/emotes.js) et des tranches de séquence dues
+// (view/city-screen.js/onTick).
 
 import { announce } from "../lib/announce.js";
 import { t } from "../data/i18n/index.js";

@@ -198,8 +198,9 @@ export function applyActionEffects(effects, context) {
     // joueur, contrairement à une variable). `ctx.session` absent -> `ctx`
     // INCHANGÉ (même repli défensif que carrierForScope/setVariable
     // ci-dessus sur un contexte incomplet), jamais une exception : latent
-    // aujourd'hui (le seul appelant, core/state.js/applyEntityActionEffects,
-    // fournit toujours `session`), mais aligné sur la même discipline
+    // aujourd'hui (les appelants, core/state.js/applyEntityActionEffects et
+    // applyCompanionActionEffects, fournissent toujours `session`), mais
+    // aligné sur la même discipline
     // défensive que le reste de ce fichier plutôt que de faire exception.
     if (effect.type === "giveImprovement") {
       if (!ctx.session) return ctx;

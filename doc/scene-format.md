@@ -112,7 +112,7 @@ d'action, voir le tableau "Entité" plus bas) ; `core/state.js`/`switchSide`
 le borne encore à l'exécution.
 
 ```json
-{ "id": "gap-recto", "type": "passage", "x": 8, "action": { "kind": "switchSide", "arrivalX": 8 } }
+{ "id": "gap_recto", "type": "passage", "x": 8, "action": { "kind": "switchSide", "arrivalX": 8 } }
 ```
 
 **Audio de bascule (VUE)** : un SAS animé (jeu gelé, même mécanisme qu'un
@@ -290,6 +290,7 @@ exemple) : jamais de voix orpheline ni de fondus qui se disputent le canal.
 | `observable` | boolean | optionnel : idem, candidate à l'interaction "describe" (voir "Interaction (niveau 0)", `doc/entity-model.md`) |
 | `interactable` | boolean | optionnel : idem, candidate à l'interaction "activate" |
 | `isFlying` | boolean | optionnel : idem (cascade, défaut `false`) — marqueur PUR, aucune logique ici ni ailleurs dans le core (pas d'axe Y). Fait passer les sons de l'entité par une chaîne de filtres qui SUGGÈRE la hauteur, côté vue uniquement (voir "Verticalité" et `isFlying`, `doc/entity-model.md`, `config/tuning-values.js`) |
+| `speed` | number | optionnel, `> 0` : facteur de vitesse de l'entité mobile, 1 = allure du joueur (cascade instance -> type, défaut 1). Le `speed` d'un comportement prime sur lui — voir `doc/scripting.md`/"Allure" |
 | `action` | `{ kind, condition?, refusalEffects?, effects?, ... }` OU un TABLEAU de plusieurs objets de cette forme | optionnel : TYPE D'ACTION pour l'interaction "activate", cascade instance -> type comme `behavior`. Validée au chargement, candidate par candidate : `kind` connu du registre (`core/action-kinds.js`/`ACTION_KINDS`), champs propres du kind bien formés, aucun champ inconnu. Objet UNIQUE : une seule action. TABLEAU (non vide) : PLUSIEURS candidates, chacune filtrée par sa propre `condition`, sélection SILENCIEUSE de la première qui matche à l'activation — voir `doc/scripting.md`/"Actions"/"Effets d'action"/"Actions multiples filtrées par condition" pour la grammaire complète (kinds, `condition`/`refusalEffects`, le vocabulaire `effects` — état ET rendu). |
 | `descriptionRules` | `{ when, descriptionKey }[]` | optionnel : descriptions CONDITIONNELLES, la première règle vraie donne la description lue à Espace, sinon la description habituelle. Cascade instance -> type, EN BLOC comme `presence`. Voir `doc/scripting.md`/"Descriptions conditionnelles" |
 | `presence` | `PresenceRule[]` | optionnel : règles DÉCLARATIVES de présence conditionnelle, cascade instance -> type (voir `doc/scripting.md`/"Règles" pour la grammaire, `doc/entity-model.md` pour la sémantique de dormance). Sans règle (ni à l'instance ni au type) : toujours présente. |
@@ -299,6 +300,21 @@ exemple) : jamais de voix orpheline ni de fondus qui se disputent le canal.
 | `shop` | `{ catalog }` | optionnel : POINT DE VENTE (voir `doc/entity-model.md`/"Vente et achat", `core/catalog.js`, `core/trade.js`), cascade instance -> type comme `action`. `catalog` : `{ table: "<nom de SHOP_CATALOGS>" }` (`config/shop-values.js`) ou `{ items: { <objet ITEM_REGISTRY>: { stock, price? } } }` — `stock` entier `>= 0` (rayon PAR CYCLE), `price` entier `> 0` optionnel (défaut : `value` de l'objet ; un article sans prix résolvable est rejeté). L'action `"shop"` (voir `doc/scripting.md`) l'exploite. Champs RUNTIME associés, jamais en entrée : `shopStock` (`{ <objet>: n }`, décrémenté aux achats, rechargé au cycle), `shopCycle`. |
 | `container` | `{ distribution, count?, regenerates? }` | optionnel : CONTENEUR de collecte (voir `doc/entity-model.md`/"Collecte", `core/spawn.js`), cascade instance -> type comme `action`. `distribution` : même forme que pour `spawnRanges` ci-dessus (`{ table }`, `{ items }` ou `{ tables }`, clé `nothing` permise), validée au chargement ; `count` entier `>= 1` (défaut `config/spawn-values.js`/`SPAWN_CONTAINER_DEFAULT_COUNT`), tirages par cycle ; `regenerates` booléen (défaut `true`) — `false` : garni une seule fois, jamais regarni. Toute autre clé est refusée. L'action `"search"` (voir `doc/scripting.md`) fait tomber le stock au sol. Champs RUNTIME associés, jamais en entrée : `stock` (tableau des objets tirés, éventuellement vide, ou `null` une fois fouillé — un conteneur vidé n'est plus candidat à Entrée que s'il est seul à portée, pour annoncer son état), `stockCycle` (cycle du dernier stock). |
 | `display` | `{ distribution }` | optionnel : PRÉSENTOIR du magasin (voir `doc/entity-model.md`/"Présentoirs", `core/display.js`), cascade instance -> type comme `action`. `distribution` : `{ table: "<nom de DISPLAY_TABLES>" }` (`config/shop-values.js`) ou `{ articles: { <article de DISPLAY_ARTICLES>: <poids> } }` — poids nombre ou niveau de rareté, clé `nothing` permise, au moins un vrai article de poids `> 0`. Jamais combiné avec `container` ni `shop`. Toute autre clé est refusée. Champ RUNTIME associé, jamais en entrée : `offer` (id de l'article exposé, `null` une fois vendu ou si rien n'a été tiré, absent avant le premier garnissage). |
+
+### Nommer les ids d'entités
+
+Convention de contenu (pas une règle validée au chargement, sauf l'unicité) :
+- scène à une face : `<nom>_<n>` ; scène à deux faces : `<nom>_<n>_r` au
+  recto, `<nom>_<n>_v` au verso ;
+- `<nom>` : le type, ou un nom parlant de ce qu'est l'entité dans la scène ;
+- `<n>` : l'occurrence de ce nom (`passage_1`, `passage_2`...), écrite même
+  s'il n'y en a qu'une, et numérotée autant que possible dans l'ordre de
+  lecture de la scène, de la gauche (x 0) vers la droite.
+
+Renommer un id d'instance ne demande aucune entrée dans
+`config/save-renames.js` (un monde déjà visité garde ses ids). Les petites
+zones inaccessibles d'une face (derrière un obstacle infranchissable) sont un
+choix de contenu, pour le relief d'une scène, jamais une erreur.
 
 `parseScene` normalise chaque entité en ajoutant `labelKey` et
 `descriptionKey` : `entity.nameKey` (du JSON) si présent sinon
@@ -462,7 +478,8 @@ supplémentaire.
   d'action").
 - `scenes/index.js` — registre `{ id: chemin }` des scènes existantes, et
   `MAIN_SCENE_IDS`, la liste des scènes PRINCIPALES : les grandes zones de
-  la ville, celles que pointent les cases de la carte (`doc/city-map.md`).
+  la ville, celles que pointent les cases de la carte (`doc/city-map.md`),
+  plus la démo, scène de test hors carte.
   Toute autre scène est une SOUS-SCÈNE (un intérieur, un étage), rattachée
   par `MAIN_SCENE_OF` à la scène principale où elle se trouve
   géographiquement (la carte s'ouvre sur celle-ci, voir `doc/city-map.md`).

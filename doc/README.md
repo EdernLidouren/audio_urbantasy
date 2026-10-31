@@ -9,7 +9,7 @@ domaine, le détail du code vivant dans les en-têtes de fichiers.
 | Document | Domaine |
 |---|---|
 | [`scene-format.md`](scene-format.md) | Contrat JSON d'un fichier `scenes/*.json` : scène simple ou à deux faces (recto/verso), entité, segment, surfaces de sol, musique/ambiance, registre de types. |
-| [`scripting.md`](scripting.md) | Le format déclaratif du jeu ("le script") : conditions, effets, règles, triggers horaires, actions (et leurs conditions d'accès), variables, tags — LA grammaire, jamais dupliquée ailleurs. |
+| [`scripting.md`](scripting.md) | Le format déclaratif du jeu ("le script") : conditions, effets, règles, triggers (heure, émote), actions (et leurs conditions d'accès), variables, tags — LA grammaire, jamais dupliquée ailleurs. |
 | [`entity-model.md`](entity-model.md) | Modèle d'entité spécifique-Templeton : capacités d'interaction, dormance, collectible persistant, entités éphémères, collecte (conteneurs régénérants, plages au sol, cycle quotidien), vente et achat (point de vente, catalogue à stock cyclique, menu à sliders inline), présentoirs du magasin (offre du jour tirée sans remise), mode debug, sac/équipement, vocabulaire de sons et cascade de réglages, presets, recto/verso (isolation), le joueur. |
 | [`time.md`](time.md) | Horloge de partie : le compteur, ses dérivations, le calendrier simplifié, l'avancement accéléré, la persistance, la phase jour/nuit. |
 | [`city-map.md`](city-map.md) | Topologie de la carte de la ville et le menu-carte. |
@@ -37,6 +37,7 @@ UN SEUL endroit, jamais recopié :
 | Ce avec quoi commence une partie neuve (kit de départ, compagnons, scène de départ) | `doc/new-game.md` |
 | Le format de sauvegarde, sa migration, ou un RENOMMAGE de type/clé i18n/son/id de scène (à reporter dans `config/save-renames.js`) | `doc/save.md` |
 | Un raccourci clavier, une table de raccourcis, ou l'aide des touches | `doc/help.md` |
+| Un mécanisme du moteur audio (canaux, caches et leur rétention, chaînes de filtres, réverb) | L'en-tête du module concerné de `lib/audio/` — le moteur est portable, sa doc voyage avec lui |
 | Une liste EXHAUSTIVE (types de condition, kinds d'action, types d'entité, tags...) | **NULLE PART en doc** — elle vit dans le CODE (le registre/l'aiguillage concerné), la doc y RENVOIE toujours plutôt que de la recopier, pour ne jamais diverger |
 
 Si aucune ligne ne correspond : c'est un nouveau domaine — crée un fichier

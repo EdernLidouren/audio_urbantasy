@@ -420,7 +420,9 @@ function partyEffectFields(session, result) {
 // parseActionEffect, core/variables.js/applyActionEffects) déclenchés par
 // l'ACTIVATION d'une action portée par UNE entité du monde ACTIF (par id) —
 // POINT D'ENTRÉE unique pour la vue (voir view/interaction-handlers.js/
-// setVariableEffectsHandler), qui ne connaît ni resolveFace/withFace ni la
+// setVariableEffectsHandler), comme pour les triggers (core/triggers.js) et
+// les tranches de séquence dues (core/pending-effects.js) ; la vue ne
+// connaît ni resolveFace/withFace ni la
 // forme de session.worlds : construit le contexte { entity, world, session }
 // attendu par applyActionEffects depuis LA FACE ACTIVE, puis SPLICE le
 // résultat aux emplacements RÉELLEMENT touchés (une liste d'effets peut
@@ -531,10 +533,10 @@ export function applyCompanionActionEffects(session, companionId, effects, { app
 // JEU (voir doc/entity-model.md/"Entités éphémères"). Appelants
 // aujourd'hui : spawnScatteredEphemerals plus bas (butin d'un collectible,
 // core/money.js/lootEntitySpawn ; fouille, core/spawn.js/searchContainer),
-// le dépôt d'un objet du sac (core/bag.js/dropItem) et la touche debug "e"
-// (view/debug-effects.js) ; demain : un objet lâché par un compagnon, un
-// autre effet... — tous passent par cette même fonction, jamais une
-// variante par appelant.
+// le dépôt d'un objet du sac (core/bag.js/dropItem), l'effet "spawn"
+// (applySpawns) et la touche debug "e" (view/debug-effects.js) ; demain :
+// un objet lâché par un compagnon... — tous passent par cette même
+// fonction, jamais une variante par appelant.
 //
 // `spec` est un descripteur d'entité DÉJÀ RÉSOLU (type, labelKey,
 // blocksMovement, observable, interactable, action...) — EXACTEMENT la

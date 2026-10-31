@@ -256,8 +256,9 @@ function displayWeights(distribution) {
 }
 
 // Tire l'article du jour d'un présentoir, SANS REMISE : `excluded` (Set
-// d'ids) écarte les articles déjà exposés ailleurs dans le magasin et ceux
-// d'une amélioration possédée (voir header). `nothing` n'est jamais exclu.
+// d'ids) écarte les articles déjà exposés ailleurs dans le magasin, ceux
+// d'une amélioration possédée et ceux dont la condition `when` est fausse
+// (voir header, unavailableArticles). `nothing` n'est jamais exclu.
 // Rend { offer: id | null, rngState } ; un tirage consommé, sauf s'il ne
 // reste aucun article possible (présentoir vide sans tirage — le résultat
 // ne dépend toujours que de l'état, déterminisme préservé). Distribution

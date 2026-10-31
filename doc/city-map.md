@@ -45,7 +45,8 @@ Une case a l'une de TROIS natures, jamais confondues :
 cadastre de la réserve de l'hôtel de ville). C'était la démo, à droite de la
 grand-place, jusqu'à son retrait de la carte : aucune case n'utilise `onMapWhen`
 aujourd'hui, les anciens plans ne révèlent donc rien pour l'instant (le mécanisme et
-sa validation restent en place) :
+sa validation restent en place). La clé de description de la démo a été retirée
+avec sa case : l'exemple la garde pour montrer la forme complète.
 
 ```js
 const DEMO_ZONE = {

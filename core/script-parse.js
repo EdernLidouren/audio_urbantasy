@@ -122,14 +122,14 @@ const PLAY_SOUND_NATURES = ["diegetic", "meta"];
 // rôle sur l'entité porteuse (core/entity-parse.js).
 export const PLAY_SOUND_ROLES = ["vocal", "enterSound", "exitSound", "approachSound", "leaveSound"];
 
+// Rôles qu'un "stopSounds" peut cibler (voir parseActionEffect).
+const STOP_SOUNDS_ROLES = ["vocal"];
+
 // Faces et modes de transition reconnus pour l'effet "teleport" (voir plus
 // bas) — "side" : face d'arrivée si la cible est une scène à deux faces
 // (ignorée sinon, comme partout ailleurs) ; "transition" : "fade" (sas +
 // fondu, le défaut d'une porte) ou "instant" (aucun sas, déplacement
 // immédiat).
-// Rôles qu'un "stopSounds" peut cibler (voir parseActionEffect).
-const STOP_SOUNDS_ROLES = ["vocal"];
-
 const TELEPORT_SIDES = ["recto", "verso"];
 const TELEPORT_TRANSITIONS = ["fade", "instant"];
 
@@ -176,14 +176,16 @@ const ACTION_EFFECT_FIELDS = {
 // (condition ÉCHOUE, voir parseSingleAction) — MÊME vocabulaire, MÊME
 // validation, un effet ne sait pas duquel des deux il fait partie.
 //
-// TROIS types d'ÉTAT (setVariable/toggleVariable/addVariable, appliqués par
-// le CORE) : même esprit d'extensibilité (un cas de plus par type) et même
+// Les types d'ÉTAT (appliqués par le CORE, liste : core/effects.js) : même
+// esprit d'extensibilité (un cas de plus par type). Ceux qui écrivent une
+// variable (setVariable/toggleVariable/addVariable) ont la même
 // validation de RÉFÉRENCE que la condition "variable" (voir
 // validateVariableReference/resolveKnownVariableType) — scope/name
 // existants, opération cohérente avec le TYPE réel de la variable quand il
 // est connu (toggle sur un "flag", add sur un "int" — jamais l'inverse).
 //
-// DEUX types de RENDU (playSound/announce, exécutés par la VUE, jamais ici) :
+// Les types de RENDU (exécutés par la VUE, jamais ici, liste :
+// core/effects.js) :
 // validés en FORME SEULEMENT — le core ignore tout du SENS (quel fichier, quelle traduction), il ne fait que garantir
 // qu'un contenu malformé échoue au CHARGEMENT plutôt qu'à l'interaction.
 //

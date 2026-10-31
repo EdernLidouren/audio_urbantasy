@@ -187,7 +187,8 @@ tick ni dans `onFrame` — le temps avance, la collecte le LIT. Détail complet
 
 `core/triggers.js`/`applyDueTriggers` compare l'index d'heure ABSOLU d'avant
 et d'après chaque avancement (`hourChanged`) et exécute les triggers
-`{ on: "hour", hour?, effects }` déclarés par les entités du monde actif —
+`{ on: "hour", hour?, condition?, effects }` déclarés par les entités du
+monde actif (ses deux faces) et par les compagnons —
 sur TRANSITION seulement, à l'heure d'ARRIVÉE seulement (un saut de
 plusieurs heures ne rejoue pas les heures franchies). Câblé au SEUL point
 d'avancement de l'horloge en ville (`view/game-clock.js`/`advance` :

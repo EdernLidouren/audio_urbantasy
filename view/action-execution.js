@@ -75,10 +75,10 @@ function handlePickup(entity, action) {
 //
 // DEUX formes possibles pour action.kind:"loot", jamais mélangées sur une
 // même entité — voir doc/entity-model.md/"Entités éphémères" :
-//   - action.amount : crédite directement (ex. crate-port/crate-warehouse) ;
+//   - action.amount : crédite directement (ex. crate_port/crate_warehouse) ;
 //   - action.spawn : { spec, count, spread } — fait naître `count` entités
 //     éphémères ÉPARPILLÉES autour de la source AU LIEU de créditer
-//     directement (ex. crate-stash, scenes/demo2.json) ; chacune se
+//     directement (ex. crate_stash, scenes/demo2.json) ; chacune se
 //     ramasse ensuite individuellement via sa PROPRE action "pickup" (déjà
 //     robuste, rien à ajouter). `spec` (minimal, ex. { type: "money",
 //     amount: 20 }) est résolu en descripteur COMPLET par lootSpawnHandler

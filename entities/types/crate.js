@@ -20,7 +20,7 @@
 // "Devenir dormant" n'est PAS un champ de cet archétype : ça se déclare
 // avec le système de présence EXISTANT (core/presence.js), en ajoutant une
 // règle { when: { type: "consumed" }, present: false } à l'INSTANCE qui
-// veut cet effet (voir scenes/demo2.json, "crate-warehouse") — cet
+// veut cet effet (voir scenes/demo2.json, "crate_warehouse") — cet
 // archétype n'en déclare AUCUNE par défaut : silence perceptible SEUL par
 // défaut (desc + beacon), pas dormance — une caisse looté reste
 // observable/interactable tant qu'aucune instance ne surcharge `presence`.
