@@ -27,5 +27,6 @@
   "shop.sell.entry": "{item} {selected} sur {max}, {price, plural, one {# pièce} many {# de pièces} other {# pièces}} : {description}",
   "shop.sell.nothingSelected": "Aucun objet sélectionné.",
   "shop.sell.total": "Vendre {count, plural, one {# objet} many {# d'objets} other {# objets}} pour {total, plural, one {# pièce} many {# de pièces} other {# pièces}}",
-  "shop.sell.validate": "Valider la vente"
+  "shop.sell.validate": "Valider la vente",
+  "shop.transaction.refused": "La transaction n'a pas pu se faire."
 }

@@ -22,7 +22,8 @@ import { ITEM_REGISTRY } from "../../core/items.js";
 import { getActiveWorld } from "../../core/state.js";
 import { isSellable, sellValueOf, ownedQuantity, shopArticles } from "../../core/trade.js";
 
-// (sales: [{ type, quantity }]) => void — effet d'ÉTAT de la vente
+// (sales: [{ type, quantity }]) => boolean — effet d'ÉTAT de la vente, vrai
+// si elle a eu lieu
 // (core/trade.js/sellItems), fourni par view/action-handlers.js qui seul détient
 // getSession/setSession — même injection que inventory-menu.js/
 // setDropItemHandler.
@@ -32,8 +33,8 @@ export function setSellHandler(handler) {
   sellHandler = handler;
 }
 
-// (entityId, purchases: [{ type, quantity }]) => void — effet d'ÉTAT de
-// l'achat (core/trade.js/buyItems), même injection.
+// (entityId, purchases: [{ type, quantity }]) => boolean — effet d'ÉTAT de
+// l'achat (core/trade.js/buyItems), vrai s'il a eu lieu, même injection.
 let buyHandler = null;
 
 export function setBuyHandler(handler) {
@@ -94,11 +95,18 @@ function details(lines) {
 // DIRECT au jeu (confirmation, liste et menu d'actions retirés — le jeu ne
 // réannonce rien à son reveal, voir view/city-screen.js/onEnter) et annonce
 // du résultat, DERNIÈRE écriture donc jamais écrasée.
+// `apply()` rend vrai si la transaction a eu lieu. Refusée par le core
+// (l'état a changé pendant la question, cas limite), la liste reste
+// ouverte et le refus est dit, jamais un faux "acheté".
 function openTransactionConfirmation(titleKey, titleParams, apply, doneMessage) {
   openConfirmation(
     titleKey,
     () => {
-      if (apply() === false) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
+      if (!apply()) {
+        playMenuSound("refusal");
+        announce(t("shop.transaction.refused"), { assertive: true });
+        return;
+      }
       popScreen(); // la liste
       popScreen(); // le menu d'actions
       announce(doneMessage(), { assertive: true });
@@ -125,10 +133,7 @@ function openSellMenu(getSession) {
       openTransactionConfirmation(
         "shop.sell.confirm.title",
         { count, total, details: summary },
-        () => {
-          if (!sellHandler) return false;
-          sellHandler(sales);
-        },
+        () => Boolean(sellHandler) && sellHandler(sales),
         () => t("shop.sell.done", { details: summary, total })
       );
     },
@@ -164,10 +169,7 @@ function openBuyMenu(getSession, entityId) {
       openTransactionConfirmation(
         "shop.buy.confirm.title",
         { count, total, details: summary },
-        () => {
-          if (!buyHandler) return false;
-          buyHandler(entityId, purchases);
-        },
+        () => Boolean(buyHandler) && buyHandler(entityId, purchases),
         () => t("shop.buy.done", { details: summary, total })
       );
     },

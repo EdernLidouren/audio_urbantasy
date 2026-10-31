@@ -14,7 +14,7 @@ import { ITEM_REGISTRY } from "../items.js";
 import { TIME_CONFIG } from "../../config/time-values.js";
 import { DISPLAY_ARTICLES, DISPLAY_TABLES } from "../../config/shop-values.js";
 import { refillDueSpawns } from "../spawn.js";
-import { buyOfferedArticle, ownedQuantity } from "../trade.js";
+import { buyOfferedArticle, offeredArticleRefusal, ownedQuantity } from "../trade.js";
 import {
   validateDisplayArticles,
   validateDisplayTables,
@@ -198,6 +198,14 @@ export default function checkDisplay(run) {
   const owned = { ...rich, improvements: giveImprovement(rich.improvements, "flashlight") };
   const ownedResult = buyOfferedArticle(owned, "improvement-stand");
   run("achat : amélioration obtenue ailleurs depuis -> « alreadyOwned »", "alreadyOwned", ownedResult.status);
+
+  // La règle de refus, lue d'avance par la vue (pas de question vouée au
+  // refus) : la MÊME que celle de l'achat.
+  const flashlightArticle = DISPLAY_ARTICLES.flashlight;
+  run("refus d'avance : rien d'exposé -> « empty »", "empty", offeredArticleRefusal(rich, null));
+  run("refus d'avance : fonds insuffisants", "insufficientFunds", offeredArticleRefusal(poor, flashlightArticle));
+  run("refus d'avance : déjà possédée", "alreadyOwned", offeredArticleRefusal(owned, flashlightArticle));
+  run("refus d'avance : achat possible -> null", null, offeredArticleRefusal(rich, flashlightArticle));
   run("achat : « alreadyOwned » -> référence INCHANGÉE", owned, ownedResult.session);
 
   const shoe = offerOf(loaded, "shoes-1");

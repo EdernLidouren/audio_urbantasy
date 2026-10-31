@@ -41,6 +41,14 @@ import { sellItems, buyItems, restockShopIfDue, buyOfferedArticle } from "../cor
 // Branche tous les gestionnaires et rend la fonction qui les débranche.
 // `travel` : view/world-travel.js (voyages, vue du monde COURANTE).
 export function registerActionHandlers({ getSession, setSession, travel }) {
+  // Pose le résultat d'une transaction du core ; vrai si elle a eu lieu
+  // (un refus rend la session inchangée, même référence).
+  function applyTransaction(next) {
+    if (next === getSession()) return false;
+    setSession(next);
+    return true;
+  }
+
   const bindings = [
     // Effet "teleport" (portes et tout autre effet).
     [setTeleportHandler, travel.executeTeleport],
@@ -86,8 +94,12 @@ export function registerActionHandlers({ getSession, setSession, travel }) {
         openShopMenu(travel.current, getSession, entity);
       },
     ],
-    [setSellHandler, (sales) => setSession(sellItems(getSession(), sales))],
-    [setBuyHandler, (entityId, purchases) => setSession(buyItems(getSession(), entityId, purchases))],
+    // Vente et achat au comptoir : le core refuse en rendant la MÊME
+    // session (rien de vendable, fonds ou stock insuffisants) ; le
+    // gestionnaire rend vrai si la transaction a eu lieu, pour que le menu
+    // ne l'annonce jamais faite à tort.
+    [setSellHandler, (sales) => applyTransaction(sellItems(getSession(), sales))],
+    [setBuyHandler, (entityId, purchases) => applyTransaction(buyItems(getSession(), entityId, purchases))],
     // Présentoir : question puis achat (qui a besoin de la vue du monde pour
     // mettre les balises en pause) ; l'achat rend son statut, annoncé par
     // view/menus/display-purchase.js.

@@ -27,5 +27,6 @@
   "shop.sell.entry": "{item} {selected} of {max}, {price, plural, one {# coin} other {# coins}}: {description}",
   "shop.sell.nothingSelected": "No item selected.",
   "shop.sell.total": "Sell {count, plural, one {# item} other {# items}} for {total, plural, one {# coin} other {# coins}}",
-  "shop.sell.validate": "Confirm sale"
+  "shop.sell.validate": "Confirm sale",
+  "shop.transaction.refused": "The transaction could not go through."
 }

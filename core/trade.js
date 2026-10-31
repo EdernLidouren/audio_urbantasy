@@ -139,28 +139,37 @@ export function buyItems(session, entityId, purchases) {
 
 // --- Achat à un présentoir (core/display.js) ---
 
+// Le refus que recevrait l'achat de `article` (l'article exposé, voir
+// core/display.js/offeredArticle), ou null s'il passerait. SEULE source de
+// cette règle : buyOfferedArticle l'applique, la vue la lit d'avance pour
+// ne pas poser une question vouée au refus (view/menus/display-purchase.js).
+//   - "empty" : présentoir vide (vendu, tirage "rien", jamais garni) ;
+//   - "alreadyOwned" : l'amélioration exposée est déjà possédée (obtenue
+//     ailleurs depuis le garnissage du jour) — lue sur l'état RÉEL, jamais
+//     via le court-circuit debug de la condition hasImprovement ;
+//   - "insufficientFunds" : prix au-delà de l'argent possédé, jamais de
+//     débit partiel.
+export function offeredArticleRefusal(session, article) {
+  if (!article) return "empty";
+  if (article.improvement !== undefined && hasImprovement(session.improvements, article.improvement)) return "alreadyOwned";
+  if (article.price > session.money) return "insufficientFunds";
+  return null;
+}
+
 // Effet d'ÉTAT de l'achat de l'article exposé par un présentoir de la FACE
 // ACTIVE : DÉBITE son prix, DONNE l'article (objet -> sac via addItem, qui
 // le note acquis ; amélioration -> giveImprovement) et VIDE le présentoir
 // (`offer: null`, jusqu'au prochain garnissage) — dans le MÊME nouvel état.
 // Rend { session, status } ; tout refus laisse la RÉFÉRENCE INCHANGÉE :
 //   - "bought" : achat fait ;
-//   - "empty" : présentoir vide (vendu, tirage "rien", jamais garni) ;
-//   - "alreadyOwned" : l'amélioration exposée est déjà possédée (obtenue
-//     ailleurs depuis le garnissage du jour) — lue sur l'état RÉEL, jamais
-//     via le court-circuit debug de la condition hasImprovement ;
-//   - "insufficientFunds" : prix au-delà de l'argent possédé, jamais de
-//     débit partiel ;
+//   - un refus de offeredArticleRefusal ci-dessous ;
 //   - null : l'id n'est pas un présentoir de la face active.
 export function buyOfferedArticle(session, entityId) {
   const found = findMerchant(session, entityId, "display");
   if (!found) return { session, status: null };
   const article = offeredArticle(found.entity);
-  if (!article) return { session, status: "empty" };
-  if (article.improvement !== undefined && hasImprovement(session.improvements, article.improvement)) {
-    return { session, status: "alreadyOwned" };
-  }
-  if (article.price > session.money) return { session, status: "insufficientFunds" };
+  const refusal = offeredArticleRefusal(session, article);
+  if (refusal) return { session, status: refusal };
 
   let next =
     article.item !== undefined

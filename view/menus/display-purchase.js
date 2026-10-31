@@ -1,9 +1,10 @@
 // ACHAT À UN PRÉSENTOIR (voir doc/entity-model.md/"Présentoirs",
 // entities/types/shop_display.js) : Entrée sur un présentoir garni pose la
 // question de confirmation ("Annuler" d'abord, view/menus/confirmation.js),
-// puis achète. Ce module ne lit la session qu'en LECTURE : l'article, le prix,
-// l'argent et la possession choisissent la réponse SANS ouvrir de question
-// inutile (présentoir vide, amélioration déjà possédée, fonds insuffisants).
+// puis achète. Ce module ne lit la session qu'en LECTURE : le refus que
+// recevrait l'achat (core/trade.js/offeredArticleRefusal, la règle du core
+// lue d'avance) répond SANS ouvrir de question inutile (présentoir vide,
+// amélioration déjà possédée, fonds insuffisants).
 // La transaction est l'effet d'état du core (core/trade.js/
 // buyOfferedArticle), injecté depuis view/action-handlers.js : il revérifie
 // tout et rend son statut, annoncé ici.
@@ -12,7 +13,7 @@ import { announce } from "../../lib/announce.js";
 import { t } from "../../data/i18n/index.js";
 import { getActiveWorld } from "../../core/state.js";
 import { offeredArticle } from "../../core/display.js";
-import { hasImprovement } from "../../core/improvements.js";
+import { offeredArticleRefusal } from "../../core/trade.js";
 import { playMenuSound } from "../menu-sounds.js";
 import { openConfirmation } from "./confirmation.js";
 
@@ -30,16 +31,6 @@ export function setDisplayBuyHandler(handler) {
 function currentArticle(getSession, entityId) {
   const display = getActiveWorld(getSession()).entities.find((entity) => entity.id === entityId);
   return offeredArticle(display);
-}
-
-// Le refus qu'un achat recevrait du core, lu d'avance (même ordre que
-// core/trade.js/buyOfferedArticle) — null si l'achat passerait. L'état
-// RÉEL des améliorations, jamais le court-circuit debug.
-function predictedRefusal(session, article) {
-  if (!article) return "empty";
-  if (article.improvement !== undefined && hasImprovement(session.improvements, article.improvement)) return "alreadyOwned";
-  if (article.price > session.money) return "insufficientFunds";
-  return null;
 }
 
 // Annonce d'un refus. Un présentoir vide se dit simplement, comme un
@@ -63,7 +54,7 @@ function announceRefusal(status, article, session) {
 // question.
 export function openDisplayPurchase(getWorldView, getSession, entity) {
   const article = currentArticle(getSession, entity.id);
-  const refusal = predictedRefusal(getSession(), article);
+  const refusal = offeredArticleRefusal(getSession(), article);
   if (refusal) {
     announceRefusal(refusal, article, getSession());
     return;
