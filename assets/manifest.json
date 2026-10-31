@@ -147,8 +147,8 @@
   "assets/musics/town_hall_day": [
     "assets/musics/town_hall_day_1.mp3"
   ],
-  "assets/sounds/decor/big_rock_beacon": [
-    "assets/sounds/decor/big_rock_beacon_1.mp3"
+  "assets/sounds/decor/big_rock_1_beacon": [
+    "assets/sounds/decor/big_rock_1_beacon_1.mp3"
   ],
   "assets/sounds/decor/clocktower_beacon": [
     "assets/sounds/decor/clocktower_beacon_1.mp3"
@@ -209,6 +209,9 @@
     "assets/sounds/decor/organic_rope_1_vocal_3.mp3",
     "assets/sounds/decor/organic_rope_1_vocal_4.mp3",
     "assets/sounds/decor/organic_rope_1_vocal_5.mp3"
+  ],
+  "assets/sounds/decor/pond_1_beacon": [
+    "assets/sounds/decor/pond_1_beacon_1.mp3"
   ],
   "assets/sounds/decor/pulley_1_beacon": [
     "assets/sounds/decor/pulley_1_beacon_1.mp3"

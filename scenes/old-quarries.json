@@ -3,6 +3,8 @@
   "titleKey": "scene.old_quarries.name",
   "length": 50,
   "playerStart": 0,
+  "faceMufflingGain": 0.7,
+  "faceMufflingLowpassHz": 2500,
   "recto": {
     "musicDay": "assets/musics/old_quarries_day",
     "musicNight": "assets/musics/old_quarries_night",
