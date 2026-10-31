@@ -237,6 +237,7 @@ export function createCityAudioScene(getSession, { handover = null } = {}) {
     stopEntityOneShots: oneShots.stopEntityOneShots,
     playTransitionSteps: footsteps.playTransitionSteps,
     playArrivalStep: footsteps.playArrivalStep,
+    playLandingStep: footsteps.playLandingStep,
     playEmoteSound: footsteps.playEmoteSound,
   };
   activeScene = api;

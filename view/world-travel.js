@@ -22,7 +22,7 @@ import { resetVisitVariables } from "../core/save.js";
 import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";
 import { resolveTuning } from "../config/tuning.js";
-import { createWorldView } from "./world-view.js";
+import { createWorldView, stopPersistentAudioLayers } from "./world-view.js";
 import { clearInteractionCooldowns } from "./interaction.js";
 import { announceSceneName } from "./status-announcements.js";
 import { reportSceneLoadFailure, reportSceneReloadFailure } from "./debug-warnings.js";
@@ -40,6 +40,13 @@ const FACE_SWITCH_FADE_MS = TUNING_DEFAULTS.faceSwitchFadeMs;
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Attend la fin d'un son de départ (`holdUntil`, voir runTeleportSas),
+// jamais plus de TELEPORT_HOLD_MAX_MS : un son qui ne signalerait pas sa
+// fin ne bloque pas le joueur.
+function holdFor(holdUntil) {
+  return Promise.race([holdUntil, wait(TELEPORT_HOLD_MAX_MS)]);
 }
 
 // Son d'un passage de face, s'il en déclare un (`transitionSound`, cascade
@@ -117,19 +124,35 @@ export function createWorldTravel({ getSession, setSession }) {
   // à ce qui joue et ne fond que ce qui change. x/side absents : playerStart
   // de la cible, recto. Puis, si la préférence est active, une sauvegarde
   // automatique SILENCIEUSE.
-  async function performTransition(targetId, x, side) {
+  // `holdUntil` (teleport holdForSound, voir runTeleportSas) : le monde
+  // d'arrivée est rejoint aussitôt, mais sa VUE n'est montée qu'à la fin du
+  // son de départ — musique, ambiances et balises de l'arrivée démarrent
+  // alors seulement (celles du monde quitté continuent jusque-là, puis
+  // fondent vers les nouvelles comme à toute transition), et l'annonce du
+  // nom de la scène dit au joueur qu'il peut de nouveau bouger. Un pas sur
+  // le sol d'arrivée marque la sortie de la cabine. Musique et ambiances du
+  // monde quitté, elles, fondent au silence dès que la cible est lue : le
+  // son de transition se joue seul (le trajet, le changement brutal de
+  // décor), et le montage de l'arrivée les redéclare toutes. Pas avant la
+  // lecture : si elle échoue, le joueur reste où il est, avec sa musique.
+  async function performTransition(targetId, x, side, { holdUntil } = {}) {
     const freshScene = await loadTargetScene(targetId);
     // Lecture échouée, ou partie quittée entre-temps (par sécurité : le jeu
     // était gelé).
     if (freshScene === undefined || !worldView) return;
 
+    if (holdUntil) stopPersistentAudioLayers();
     worldView.destroy();
     worldView = null;
     setSession(travelToWorld(getSession(), targetId, freshScene, { x, side }));
     clearInteractionCooldowns();
     prepareLoadedWorld();
+    // Jamais d'`await` sans attente réelle : hors sas (carte de la ville),
+    // rendre la main ici laisserait tiquer le jeu sans vue montée.
+    if (holdUntil) await holdFor(holdUntil);
     worldView = createWorldView(getSession);
     announceSceneName(getSession());
+    if (holdUntil) worldView.playLandingStep(getSession().player.x);
 
     if (getPref("autoSaveOnTransition", PREF_CONSTRAINTS.autoSaveOnTransition.default)) {
       saveGame(getSession(), { playSound: false });
@@ -150,11 +173,12 @@ export function createWorldTravel({ getSession, setSession }) {
   // retiré quoi qu'il arrive. Fondu sortant -> déplacement -> fondu entrant.
   // `holdUntil` (teleport `holdForSound`, voir view/effect-runner.js/
   // runEffects) : une promesse résolue à la fin du son de départ. Le sas
-  // reste fermé jusque-là, déplacement fait, scène d'arrivée muette : le
-  // joueur reprend la main quand le son s'achève (une cabine d'ascenseur
-  // qui descend puis rouvre ses portes), quelle que soit la durée du
-  // fichier. Plafonné par TELEPORT_HOLD_MAX_MS : un son qui ne finirait
-  // jamais ne bloque pas le joueur.
+  // reste fermé jusque-là, déplacement fait : le joueur reprend la main
+  // quand le son s'achève (une cabine d'ascenseur qui descend puis rouvre
+  // ses portes), quelle que soit la durée du fichier. Vers un autre monde,
+  // c'est performTransition qui attend, pour ne monter la scène d'arrivée
+  // qu'à la fin, après avoir fait taire musique et ambiances (voir
+  // là-bas).
   async function runTeleportSas(target, x, side, needsReload, holdUntil) {
     pushScreen({});
     try {
@@ -162,14 +186,13 @@ export function createWorldTravel({ getSession, setSession }) {
       await wait(DOOR_TRANSITION_FADE_OUT_MS);
 
       if (needsReload) {
-        await performTransition(target, x, side);
+        await performTransition(target, x, side, { holdUntil });
       } else {
         // Même monde : la vue relit déjà la position à chaque tick, rien à
         // reconstruire.
         placeInCurrentWorld(x, side);
+        if (holdUntil) await holdFor(holdUntil);
       }
-
-      if (holdUntil) await Promise.race([holdUntil, wait(TELEPORT_HOLD_MAX_MS)]);
 
       rampEntityLayerGain(1, DOOR_TRANSITION_FADE_IN_MS);
       await wait(DOOR_TRANSITION_FADE_IN_MS);

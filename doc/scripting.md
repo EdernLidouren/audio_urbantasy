@@ -1739,9 +1739,14 @@ CET effet (voir `scenes/demo.json`/`door_exit`).
 - **`holdForSound`** (optionnel, booléen, **défaut `false`**) : le sas reste
   fermé jusqu'à la FIN du son de départ (les `playSound` placés avant le
   teleport dans la même liste, voir "Son de départ" plus haut). Le
-  déplacement se fait au début, comme toujours, puis la scène d'arrivée
-  reste muette et le jeu gelé tant que le son joue ; ses sons reviennent et
-  le joueur reprend la main quand il s'achève. Pour une transition qui
+  déplacement se fait au début, comme toujours, puis le jeu reste gelé tant
+  que le son joue. Vers un autre monde, la musique et les ambiances du monde
+  quitté fondent au silence dès le départ (`musicFadeMs`), comme ses
+  balises : le son de transition se joue seul. La scène d'arrivée n'est
+  montée qu'à la fin du son : sa musique et ses ambiances démarrent alors,
+  et l'annonce du nom de la scène, ses balises et un pas sur le sol
+  d'arrivée disent au joueur qu'il a repris la main. Dans le même monde,
+  rien n'est remonté : musique et ambiances continuent. Pour une transition qui
   DURE : une cabine d'ascenseur qui ferme ses portes, descend et les
   rouvre, dans UN SEUL fichier dont la durée règle le gel — changer le
   fichier suffit, rien à recompter. Refusé au chargement sans `playSound`

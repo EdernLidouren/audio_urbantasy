@@ -256,9 +256,16 @@ export function createPlayerFootsteps({ getSession, reverbBusInput, collisionSou
   // pose le pied de l'autre côté".
   function playArrivalStep(entity, arrivalX) {
     if (!resolveTuning("transitionSteps", entity)) return;
-    const destinationFace = getActiveWorld(getSession());
-    const gait = gaitOf(getSession().equipment);
-    playMetaFootstepAt(destinationFace, arrivalX, gait);
+    playLandingStep(arrivalX);
+  }
+
+  // Un pas sur le VRAI sol de la face active, au point `atX` : celui d'une
+  // arrivée, sans condition (le pas d'arrivée d'un passage le précède de
+  // son réglage transitionSteps ; la sortie d'une cabine d'ascenseur le
+  // joue toujours, voir view/world-travel.js/performTransition). Hors couche
+  // entités : audible même pendant que le sas la fait remonter.
+  function playLandingStep(atX) {
+    playMetaFootstepAt(getActiveWorld(getSession()), atX, gaitOf(getSession().equipment));
   }
 
   // Son d'une ÉMOTE (voir view/emotes.js) : centré sur le joueur comme son
@@ -278,5 +285,5 @@ export function createPlayerFootsteps({ getSession, reverbBusInput, collisionSou
     });
   }
 
-  return { update, playTransitionSteps, playArrivalStep, playEmoteSound };
+  return { update, playTransitionSteps, playArrivalStep, playLandingStep, playEmoteSound };
 }

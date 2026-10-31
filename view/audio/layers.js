@@ -183,7 +183,10 @@ export function createSceneLayers(getSession, world) {
 
 // Arrête POUR DE BON musique et ambiances : sortie réelle de la partie
 // (retour au menu principal), quand aucune scène suivante ne reprendra ces
-// couches. Une scène détruite, elle, ne les touche jamais.
+// couches ; ou silence VOULU d'un teleport holdForSound (voir
+// view/world-travel.js/performTransition), dont la scène d'arrivée, montée
+// à la fin du son de départ, redéclare toutes les couches. Une scène
+// détruite, elle, ne les touche jamais.
 export function stopPersistentAudioLayers() {
   clearMusicLayers(MUSIC_FADE_MS);
   clearAmbienceLayers(MUSIC_FADE_MS);
