@@ -147,6 +147,40 @@ export default function checkEffects(run) {
       throws(() => parseScene(sceneWithActionEffect({ type: "teleport", target: "x", transition: "boom" }), VAR_ACTION_REGISTRY))
     );
 
+    // holdForSound : le sas attend la fin du son de départ, qui doit donc
+    // précéder le teleport dans la même liste.
+    const departureScene = (effects) => {
+      const scene = sceneWithActionEffect(effects[0]);
+      scene.entities[0].action.effects = effects;
+      return scene;
+    };
+    const departureSound = { type: "playSound", path: "assets/sounds/doors/door_1_open" };
+    const heldTeleport = parseScene(
+      departureScene([departureSound, { type: "teleport", target: "elsewhere", holdForSound: true }]),
+      VAR_ACTION_REGISTRY
+    ).entities[0].action.effects[1];
+    run("teleport : holdForSound après un playSound -> transporté", true, heldTeleport.holdForSound);
+    run(
+      "teleport : holdForSound false -> champ absent de la forme chargée",
+      false,
+      "holdForSound" in parseScene(sceneWithActionEffect({ type: "teleport", target: "x", holdForSound: false }), VAR_ACTION_REGISTRY).entities[0].action.effects[0]
+    );
+    run(
+      "teleport : holdForSound non booléen -> erreur au chargement",
+      true,
+      throws(() => parseScene(departureScene([departureSound, { type: "teleport", target: "x", holdForSound: "oui" }]), VAR_ACTION_REGISTRY))
+    );
+    run(
+      "teleport : holdForSound sans playSound avant lui -> erreur au chargement",
+      true,
+      throws(() => parseScene(departureScene([{ type: "teleport", target: "x", holdForSound: true }, departureSound]), VAR_ACTION_REGISTRY))
+    );
+    run(
+      "teleport : holdForSound avec transition instant -> erreur au chargement",
+      true,
+      throws(() => parseScene(departureScene([departureSound, { type: "teleport", target: "x", holdForSound: true, transition: "instant" }]), VAR_ACTION_REGISTRY))
+    );
+
     // Liste MIXTE (état + rendu) : le core la valide/transporte comme UN
     // SEUL vocabulaire, jamais deux registres — voir core/effects.js.
     const mixedRenderStateScene = parseScene(

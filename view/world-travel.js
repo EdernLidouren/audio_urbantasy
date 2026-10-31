@@ -32,6 +32,8 @@ import { saveGame } from "./save-storage.js";
 // Fondu de la couche entités pendant le sas d'une téléportation.
 const DOOR_TRANSITION_FADE_OUT_MS = TUNING_DEFAULTS.doorTransitionFadeOutMs;
 const DOOR_TRANSITION_FADE_IN_MS = TUNING_DEFAULTS.doorTransitionFadeInMs;
+// Attente maximale du son de départ d'un teleport holdForSound.
+const TELEPORT_HOLD_MAX_MS = TUNING_DEFAULTS.teleportHoldMaxMs;
 // Durée du croisement de faces ; le nombre de pas de trajet en découle
 // (voir view/audio/footsteps.js/TRANSITION_STEP_INTERVAL_MS).
 const FACE_SWITCH_FADE_MS = TUNING_DEFAULTS.faceSwitchFadeMs;
@@ -146,7 +148,14 @@ export function createWorldTravel({ getSession, setSession }) {
   // Musique et ambiances n'y sont pas touchées. Le jeu est GELÉ par un écran
   // vide poussé sur la pile (seul le sommet tique et reçoit le clavier),
   // retiré quoi qu'il arrive. Fondu sortant -> déplacement -> fondu entrant.
-  async function runTeleportSas(target, x, side, needsReload) {
+  // `holdUntil` (teleport `holdForSound`, voir view/effect-runner.js/
+  // runEffects) : une promesse résolue à la fin du son de départ. Le sas
+  // reste fermé jusque-là, déplacement fait, scène d'arrivée muette : le
+  // joueur reprend la main quand le son s'achève (une cabine d'ascenseur
+  // qui descend puis rouvre ses portes), quelle que soit la durée du
+  // fichier. Plafonné par TELEPORT_HOLD_MAX_MS : un son qui ne finirait
+  // jamais ne bloque pas le joueur.
+  async function runTeleportSas(target, x, side, needsReload, holdUntil) {
     pushScreen({});
     try {
       rampEntityLayerGain(0, DOOR_TRANSITION_FADE_OUT_MS);
@@ -159,6 +168,8 @@ export function createWorldTravel({ getSession, setSession }) {
         // reconstruire.
         placeInCurrentWorld(x, side);
       }
+
+      if (holdUntil) await Promise.race([holdUntil, wait(TELEPORT_HOLD_MAX_MS)]);
 
       rampEntityLayerGain(1, DOOR_TRANSITION_FADE_IN_MS);
       await wait(DOOR_TRANSITION_FADE_IN_MS);
@@ -176,12 +187,13 @@ export function createWorldTravel({ getSession, setSession }) {
   // `side` n'est pas résolue ici : son défaut dépend du chemin (recto pour un
   // rechargement, face courante pour un repositionnement). Rend une promesse
   // résolue à l'arrivée : les effets ne l'attendent pas, l'accès console
-  // des tests si (view/city-screen.js/debugActions).
-  function executeTeleport({ target, x, side, reloadIfSame = false, transition = "fade" }) {
+  // des tests si (view/city-screen.js/debugActions). `holdUntil` : voir
+  // runTeleportSas (le chargement refuse holdForSound sans sas).
+  function executeTeleport({ target, x, side, reloadIfSame = false, transition = "fade" }, { holdUntil } = {}) {
     const sameWorld = target === getSession().activeWorldId;
     const needsReload = !sameWorld || reloadIfSame;
 
-    if (transition === "fade") return runTeleportSas(target, x, side, needsReload);
+    if (transition === "fade") return runTeleportSas(target, x, side, needsReload, holdUntil);
     if (needsReload) return performTransition(target, x, side);
     placeInCurrentWorld(x, side);
     return Promise.resolve();

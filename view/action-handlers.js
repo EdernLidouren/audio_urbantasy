@@ -124,7 +124,11 @@ export function registerActionHandlers({ getSession, setSession, travel }) {
       setPositionedSoundPlayer,
       (entityId, descriptor, options) => {
         const worldView = travel.current();
-        return worldView && worldView.playEntityOneShot(entityId, descriptor, options);
+        if (worldView) return worldView.playEntityOneShot(entityId, descriptor, options);
+        // Aucun monde affiché : le son ne jouera pas, un sas qui l'attend
+        // (holdForSound) ne doit pas l'attendre.
+        if (options && options.onEnd) options.onEnd();
+        return undefined;
       },
     ],
     // Description réussie : le type est noté observé (bestiaire).

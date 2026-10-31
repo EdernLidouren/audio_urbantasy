@@ -295,6 +295,9 @@
   "assets/sounds/doors/door_2_open": [
     "assets/sounds/doors/door_2_open_1.mp3"
   ],
+  "assets/sounds/doors/freight_elevator_transition": [
+    "assets/sounds/doors/freight_elevator_transition_1.mp3"
+  ],
   "assets/sounds/doors/garage_door_1_close": [
     "assets/sounds/doors/garage_door_1_close_1.mp3"
   ],

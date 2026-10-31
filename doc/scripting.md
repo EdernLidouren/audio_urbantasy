@@ -1736,6 +1736,30 @@ CET effet (voir `scenes/demo.json`/`door_exit`).
   `runTeleportSas`) ; `"instant"` saute le sas — déplacement IMMÉDIAT,
   pour un teleport D'AUTORITÉ (le joueur ne choisit pas le moment : un
   vigile qui éjecte, une boutique qui ferme à l'heure).
+- **`holdForSound`** (optionnel, booléen, **défaut `false`**) : le sas reste
+  fermé jusqu'à la FIN du son de départ (les `playSound` placés avant le
+  teleport dans la même liste, voir "Son de départ" plus haut). Le
+  déplacement se fait au début, comme toujours, puis la scène d'arrivée
+  reste muette et le jeu gelé tant que le son joue ; ses sons reviennent et
+  le joueur reprend la main quand il s'achève. Pour une transition qui
+  DURE : une cabine d'ascenseur qui ferme ses portes, descend et les
+  rouvre, dans UN SEUL fichier dont la durée règle le gel — changer le
+  fichier suffit, rien à recompter. Refusé au chargement sans `playSound`
+  avant le teleport, ou avec `transition: "instant"` (pas de sas à
+  prolonger). Seul un son de départ DIÉGÉTIQUE (positionné sur une entité,
+  le cas courant) est attendu : un son méta ne signale pas sa fin, le sas
+  repart aussitôt. Filet : jamais plus de `teleportHoldMaxMs`
+  (`config/tuning-values.js`). Comme tout son de départ, sa réverb s'éteint
+  avec le monde quitté, au début du sas : la suite du fichier joue sèche,
+  ce qui sied à une cabine fermée. Exemple réel, le chevalement de
+  `scenes/old-quarries.json` :
+
+```json
+"effects": [
+  { "type": "playSound", "path": "assets/sounds/doors/freight_elevator_transition" },
+  { "type": "teleport", "target": "old_quarries_underground_1_main", "x": 15, "side": "recto", "holdForSound": true }
+]
+```
 
 `reloadIfSame` et `transition` sont ORTHOGONAUX — les QUATRE combinaisons sont
 valides (ex. `transition:"instant"` + `reloadIfSame:true` : rechargement sans

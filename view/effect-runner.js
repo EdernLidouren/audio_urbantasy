@@ -104,6 +104,9 @@ function runPlaySoundEffect(entity, effect, options = {}) {
     positionedSoundPlayer(targetId, effect, options);
     return;
   }
+  // Un son MÉTA ne dit pas quand il finit : un sas qui l'attendrait
+  // (`options.onEnd`, voir runEffects) repart aussitôt, comme sans son.
+  if (options.onEnd) options.onEnd();
   // Un son de RÔLE (`role` au lieu de `path`) n'existe que sur une entité
   // dans l'espace : sans cible positionnable, rien à rejouer en méta.
   if (effect.role !== undefined) {
@@ -138,7 +141,10 @@ function runPlaySoundEffect(entity, effect, options = {}) {
 // PARTIR — ses playSound (ex. le grincement de la porte) sont joués
 // `departing` : positionnés, mais hors du fondu du sas (voir
 // view/audio/oneshots.js/playEntityOneShot), pour finir de résonner
-// pendant la transition au lieu d'être coupés.
+// pendant la transition au lieu d'être coupés. Un teleport `holdForSound`
+// garde le sas fermé jusqu'à la fin de ces sons (`holdUntil`, une promesse
+// résolue quand le DERNIER s'achève) : seulement dans ce cas, pour ne rien
+// changer aux portes ordinaires.
 //
 // SÉQUENCE (`wait`, voir core/sequence.js) : le core reçoit la liste
 // ENTIÈRE (il applique la tête et met la suite en attente sur l'entité) ;
@@ -150,9 +156,14 @@ export function runEffects(entity, effects) {
   if (variableEffectsHandler) variableEffectsHandler(entity, effects);
   const head = sequenceHead(effects);
   const departing = head.some((effect) => effect.type === "teleport");
+  const holding = head.some((effect) => effect.type === "teleport" && effect.holdForSound);
+  const departureEnds = [];
   for (const effect of head) {
     if (effect.type === "teleport") {
-      if (teleportHandler) teleportHandler(effect);
+      const holdUntil = effect.holdForSound ? Promise.all(departureEnds) : undefined;
+      if (teleportHandler) teleportHandler(effect, { holdUntil });
+    } else if (holding && effect.type === "playSound") {
+      departureEnds.push(new Promise((resolve) => runRenderEffects(entity, [effect], { departing, onEnd: resolve })));
     } else {
       runRenderEffects(entity, [effect], { departing });
     }

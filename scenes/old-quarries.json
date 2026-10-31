@@ -44,7 +44,10 @@
           },
           {
             "kind": "applyEffects",
-            "effects": [{ "type": "teleport", "target": "old_quarries_underground_1_main", "x": 15, "side": "recto" }]
+            "effects": [
+              { "type": "playSound", "path": "assets/sounds/doors/freight_elevator_transition" },
+              { "type": "teleport", "target": "old_quarries_underground_1_main", "x": 15, "side": "recto", "holdForSound": true }
+            ]
           }
         ]
       },

@@ -143,15 +143,21 @@ export function createOneShots({ getSession, reverbBus, findEntitySource, effect
   //   - suivi par défaut (descriptor.tracked) ; tracked:false -> ancré ;
   //   - `departing` : le son accompagne un DÉPART (même liste d'effets qu'un
   //     teleport) — ancré et hors couche entités, il survit au fondu du sas
-  //     et finit de résonner.
-  function playEntityOneShot(targetId, descriptor, { departing = false } = {}) {
+  //     et finit de résonner ;
+  //   - `onEnd` (départ seulement) : appelé à la fin de ce son, ou aussitôt
+  //     s'il n'a pas pu jouer — le sas d'un teleport `holdForSound`
+  //     l'attend (voir view/world-travel.js/runTeleportSas), jamais une fin
+  //     qui ne viendrait pas.
+  function playEntityOneShot(targetId, descriptor, { departing = false, onEnd } = {}) {
     const found = findEntitySource(targetId);
     if (!found) {
       console.warn(`oneshots: playEntityOneShot("${targetId}") : id absent de la scène.`);
+      if (onEnd) onEnd();
       return;
     }
     if (!found.live || found.live.present === false) {
       console.warn(`oneshots: playEntityOneShot("${targetId}") : entité dormante ou introuvable.`);
+      if (onEnd) onEnd();
       return;
     }
     const resolved =
@@ -160,15 +166,18 @@ export function createOneShots({ getSession, reverbBus, findEntitySource, effect
         : resolveTransitionSound(found.entry.entity, descriptor, PLAY_SOUND_TUNING_KEYS);
     if (!resolved) {
       console.warn(`oneshots: playEntityOneShot("${targetId}") : aucun son de rôle "${descriptor.role}".`);
+      if (onEnd) onEnd();
       return;
     }
     if (descriptor.role === "vocal") postponeVocal(found.entry);
     if (departing) {
       playTransitionSound(found.entry, found.live.x - getSession().player.x, resolved, effectiveMuffle(found.entry, found.forcedMuffle), {
         entityLayer: false,
+        onEnd,
       });
       return;
     }
+    if (onEnd) onEnd();
     if (descriptor.tracked === false) {
       playTransitionSound(found.entry, found.live.x - getSession().player.x, resolved, effectiveMuffle(found.entry, found.forcedMuffle));
       return;

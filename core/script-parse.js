@@ -153,7 +153,7 @@ const ACTION_EFFECT_FIELDS = {
   playSound: ["path", "role", "gain", "pitchVariation", "reverbSend", "at", "nature", "tracked"],
   stopSounds: ["role"],
   announce: ["key", "assertive"],
-  teleport: ["target", "x", "side", "reloadIfSame", "transition"],
+  teleport: ["target", "x", "side", "reloadIfSame", "transition", "holdForSound"],
 };
 {
   const declared = Object.keys(ACTION_EFFECT_FIELDS);
@@ -412,11 +412,25 @@ function parseActionEffect(rawEffect, describe, entityVariables, sceneVariables)
     if (rawEffect.transition !== undefined && !TELEPORT_TRANSITIONS.includes(rawEffect.transition)) {
       fail(`${describe}.transition "${rawEffect.transition}" inconnue (attendu : ${TELEPORT_TRANSITIONS.map((t) => `"${t}"`).join(" | ")}).`);
     }
+    // `holdForSound` : le sas reste fermé jusqu'à la fin du son de départ
+    // (voir view/world-travel.js/runTeleportSas). Sans sas
+    // (transition "instant"), il n'y a rien à prolonger : refusé. La
+    // présence d'un son de départ se vérifie sur la liste entière (voir
+    // validateSequence).
+    if (rawEffect.holdForSound !== undefined) {
+      if (typeof rawEffect.holdForSound !== "boolean") {
+        fail(`${describe}.holdForSound doit être un booléen si présent.`);
+      }
+      if (rawEffect.holdForSound && rawEffect.transition === "instant") {
+        fail(`${describe}.holdForSound demande un sas : incompatible avec transition "instant".`);
+      }
+    }
     const effect = { type: "teleport", target: rawEffect.target };
     if (rawEffect.x !== undefined) effect.x = rawEffect.x;
     if (rawEffect.side !== undefined) effect.side = rawEffect.side;
     if (rawEffect.reloadIfSame !== undefined) effect.reloadIfSame = rawEffect.reloadIfSame;
     if (rawEffect.transition !== undefined) effect.transition = rawEffect.transition;
+    if (rawEffect.holdForSound) effect.holdForSound = true;
     return effect;
   }
   fail(`${describe}.type "${type}" inconnu (attendu : ${ACTION_EFFECT_TYPES.map((t) => `"${t}"`).join(" | ")}).`);
@@ -760,9 +774,15 @@ export function parseSingleAction(rawAction, describe, entityVariables, sceneVar
 //   - aucun effet MIXTE (teleport) APRÈS un `wait` : le sas et le fondu se
 //     jouent à l'activation, pas au détour d'un tick. Pas encore de besoin
 //     d'une téléportation différée ; refusée plutôt que mal jouée.
+// Et un teleport `holdForSound` suit au moins un playSound de la même liste
+// : c'est la fin de ce son de départ que le sas attend.
 function validateSequence(effects, describe) {
   if (effects.length > 0 && effects[effects.length - 1].type === "wait") {
     fail(`${describe} : un "wait" en dernier n'attend rien.`);
+  }
+  const holding = effects.findIndex((effect) => effect.type === "teleport" && effect.holdForSound);
+  if (holding >= 0 && !effects.slice(0, holding).some((effect) => effect.type === "playSound")) {
+    fail(`${describe} : "teleport" holdForSound demande un "playSound" avant lui (le son de départ à attendre).`);
   }
   const firstWait = effects.findIndex((effect) => effect.type === "wait");
   if (firstWait < 0) return;

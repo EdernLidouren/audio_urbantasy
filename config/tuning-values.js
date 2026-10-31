@@ -474,6 +474,13 @@ export const TUNING_DEFAULTS = {
   doorTransitionFadeOutMs: 250,
   doorTransitionFadeInMs: 300,
 
+  // Attente MAXIMALE (ms) du son de départ d'un teleport `holdForSound`
+  // (voir view/world-travel.js/runTeleportSas) : le sas reste fermé jusqu'à
+  // la fin du son, jamais plus longtemps que ceci. Un filet, pas un réglage
+  // de rendu : bien au-delà de toute transition prévue (un ascenseur), il
+  // ne sert que si le son ne signale jamais sa fin.
+  teleportHoldMaxMs: 30000,
+
   // Durée (ms) du fondu qui arrête un son SUIVI (cloche, cri...) quand le
   // joueur QUITTE le monde où il a été émis (voir
   // view/audio/oneshots.js/stopForeignTrackedOneShots). Court : il évite
