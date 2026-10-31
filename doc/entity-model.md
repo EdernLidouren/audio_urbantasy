@@ -1442,7 +1442,7 @@ instance ne déclare QUE ce qu'elle CHANGE — le reste du rôle, et les autres
 rôles, restent HÉRITÉS de l'archétype.
 
 ```json
-// entities/types/X.js : sounds: { beacon: { path: "a", gain: 0.5, reverbSend: 0.5 } }
+// entities/types/<type>.js : sounds: { beacon: { path: "a", gain: 0.5, reverbSend: 0.5 } }
 { "id": "x1", "type": "X", "sounds": { "beacon": { "gain": 0.8 } } }
 // -> entity.sounds.beacon = { path: "a", gain: 0.8, reverbSend: 0.5 }
 ```

@@ -9,7 +9,7 @@
 //   1. Modules modifiés depuis le dernier chargement : les relire, PUIS
 //      recharger la page (sinon le navigateur garde l'ancienne version) :
 //        const k = await import("/tools/test-kit.js");
-//        await k.refresh(["/core/x.js", "/view/y.js"]); location.reload();
+//        await k.refresh(["/core/<fichier>.js", "/view/<fichier>.js"]); location.reload();
 //   2. const k = await import("/tools/test-kit.js");
 //      await k.start();                       // partie "Ville test", debug, espions
 //      await k.goTo("main_street", { side: "verso", x: 35 });

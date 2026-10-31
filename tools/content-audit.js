@@ -29,11 +29,18 @@
 //   - chaque clé i18n citée existe en fr ET en en ;
 //   - chaque son cité (chemin "assets/...") existe dans le manifeste audio.
 //
+// AVERTISSEMENTS, qui ne font pas échouer l'audit : un id d'entité hors de
+// la convention de nommage (doc/scene-format.md/"Nommer les ids d'entités" :
+// `<nom>_<n>`, ou `<nom>_<n>_r` / `<nom>_<n>_v` selon la face). Les scènes
+// de test (la démo et ses sous-scènes) en sont exemptées : leurs ids sont
+// cités tels quels par la trace audio et par la doc.
+//
 // Utilisation, depuis la console du jeu (serveur de dev lancé) :
 //   const a = await import("/tools/content-audit.js");
 //   await a.auditContent();
-// Rend { problems, sources } et affiche les problèmes en console (rien si
-// tout va bien). Chaque problème : { source, where, kind, detail }.
+// Rend { problems, warnings, sources } et affiche problèmes et
+// avertissements en console (rien si tout va bien). Chaque entrée :
+// { source, where, kind, detail }.
 //
 // Sources parcourues : les scènes (JSON brut), le registre des types
 // d'entité, le joueur, les objets, les améliorations, les collections, les
@@ -132,6 +139,8 @@ export async function auditContent() {
   await loadManifest();
   const problems = [];
   const report = (source, where, kind, detail) => problems.push({ source, where, kind, detail });
+  const warnings = [];
+  const warn = (source, where, kind, detail) => warnings.push({ source, where, kind, detail });
 
   const namespaces = new Set(Object.values(LOCALE_TABLES).flatMap((table) => Object.keys(table).map((key) => key.split(".")[0])));
   const isKey = (text) => KEY_PATTERN.test(text) && namespaces.has(text.split(".")[0]);
@@ -232,6 +241,25 @@ export async function auditContent() {
     }
   }
 
+  // Convention de nommage des ids (voir l'en-tête) : un avertissement par
+  // id qui s'en écarte. `<nom>` : mots en minuscules séparés par "_",
+  // `<n>` : l'occurrence, toujours écrite.
+  const isTestScene = (id) => id === "demo" || MAIN_SCENE_OF[id] === "demo";
+  function checkIdConvention(sceneId, raw) {
+    if (isTestScene(sceneId)) return;
+    const faces = raw.recto || raw.verso ? [["recto", "_r"], ["verso", "_v"]] : [[null, ""]];
+    for (const [side, suffix] of faces) {
+      const face = side ? raw[side] : raw;
+      const pattern = new RegExp(`^[a-z0-9]+(?:_[a-z0-9]+)*_\\d+${suffix}$`);
+      for (const entity of face?.entities ?? []) {
+        if (typeof entity.id === "string" && !pattern.test(entity.id)) {
+          const expected = side ? `<nom>_<n>${suffix} (${side})` : "<nom>_<n>";
+          warn(`scène ${sceneId}`, side ?? "entités", `id hors convention, attendu ${expected}`, entity.id);
+        }
+      }
+    }
+  }
+
   // Scènes : chargement réel (une erreur par scène, celle que verrait le
   // jeu), puis références du JSON brut, même si la scène est invalide.
   for (const [id, url] of Object.entries(scenePaths)) {
@@ -257,6 +285,7 @@ export async function auditContent() {
     if (raw.titleKey !== `scene.${id}.name`) report(source, "titleKey", "titre hors convention scene.<id>.name", String(raw.titleKey));
     checkStrings(source, raw);
     checkConfirmedActions(id, raw);
+    checkIdConvention(id, raw);
     walk(raw, "", () => {}, (object, where) => {
       if (typeof object.type === "string" && object.descriptionKey !== undefined) {
         checkMessagePlaceholder(source, where, object.type, object.descriptionKey);
@@ -368,11 +397,16 @@ export async function auditContent() {
   if (!sceneExists(NEW_GAME.startSceneId)) report("départ", "startSceneId", "scène inconnue", NEW_GAME.startSceneId);
   checkStrings("départ", NEW_GAME);
 
+  if (warnings.length > 0) {
+    console.warn(`Audit du contenu : ${warnings.length} avertissement(s) de nommage.`);
+    console.table(warnings);
+  }
+  const warningNote = warnings.length > 0 ? `, ${warnings.length} avertissement(s) de nommage` : "";
   if (problems.length === 0) {
-    console.log("Audit du contenu : aucun problème.");
+    console.log(`Audit du contenu : aucun problème${warningNote}.`);
   } else {
-    console.warn(`Audit du contenu : ${problems.length} problème(s).`);
+    console.warn(`Audit du contenu : ${problems.length} problème(s)${warningNote}.`);
     console.table(problems);
   }
-  return { problems, sources: Object.keys(scenePaths).length };
+  return { problems, warnings, sources: Object.keys(scenePaths).length };
 }

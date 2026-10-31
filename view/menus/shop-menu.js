@@ -179,7 +179,7 @@ function openBuyMenu(getSession, entityId) {
 // Activation du point de vente (action "shop", voir view/interaction.js) :
 // MENU D'ACTIONS ("Acheter" d'abord, "Vendre", "Annuler"), titre = le nom du
 // point de vente lui-même (entity.labelKey, déjà une clé i18n — même idiome
-// que inventory-menu.js/openItemActionsMenu). "Acheter" sans catalogue,
+// que inventory/bag-and-equipment.js/openItemActionsMenu). "Acheter" sans catalogue,
 // "Vendre" sans rien de vendable au sac -> son "refusal" + annonce seule,
 // aucune liste vide.
 // Balises en pause tant que ce menu (ou un écran au-dessus) est ouvert.

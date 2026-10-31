@@ -263,7 +263,7 @@ export default function checkEntities(run) {
     'parseScene: entities[0] ("lamp-1") : tuning : champ(s) inconnu(s) "audibleRang".',
     entityMessage({ tuning: { audibleRang: 30 } })
   );
-  // Réglages de fondu (core/entity-parse.js/validateFadeTuning) : bornes
+  // Réglages de fondu (core/entity-parse.js/validateTuningValues) : bornes
   // vérifiées dans un descripteur, un `tuning` d'instance et un archétype.
   run(
     "fondu de balise : durée et vitesse valides acceptées",

@@ -118,7 +118,7 @@ const PLAY_SOUND_NATURES = ["diegetic", "meta"];
 // (voir plus bas) : les rôles PONCTUELS d'une entité. Pas la balise ni les
 // pas ni la boucle de proximité (sons continus ou cadencés par le
 // mouvement), pas le ramassage (son MÉTA d'un objet, voir
-// view/effect-runner.js/playPickupSound). Exporté pour la vérification du
+// view/effect-runner.js/playEntityPickupSound). Exporté pour la vérification du
 // rôle sur l'entité porteuse (core/entity-parse.js).
 export const PLAY_SOUND_ROLES = ["vocal", "enterSound", "exitSound", "approachSound", "leaveSound"];
 

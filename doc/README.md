@@ -53,7 +53,8 @@ son absence.
 
 Après une session de travail, code ou contenu, une seule commande enchaîne
 tout — syntaxe de tous les .js, vérifications du core, audit du contenu,
-parité i18n — et résume chaque étape en une ligne :
+parité i18n, audit de la doc, rapport des exports sans usage — et résume
+chaque étape en une ligne :
 
 ```
 node tools/verify.js
@@ -77,8 +78,24 @@ Charge TOUTES les scènes (une scène n'est sinon chargée qu'à sa première
 visite) et vérifie que chaque clé i18n citée existe en fr et en en, que
 chaque son cité existe dans le manifeste audio, et que chaque scène citée
 (téléportation, carte, départ) existe. Détail et limites : en-tête de
-`tools/content-audit.js`. Complète `node tools/run-checks.js` (le core) et
+`tools/content-audit.js`. Il AVERTIT aussi, sans échouer, de chaque id
+d'entité hors de la convention de nommage (voir `doc/scene-format.md`/"Nommer
+les ids d'entités"). Complète `node tools/run-checks.js` (le core) et
 `python tools/check_i18n_parity.py` (la parité fr/en).
+
+**La doc elle-même** : `node tools/doc-audit.js` vérifie que chaque fichier
+cité par la doc et par les commentaires existe encore, que chaque
+identifiant cité derrière un fichier de code (`core/world-load.js`/
+`prepareLoadedWorld`) y apparaît encore, et que chaque section citée
+derrière un fichier de doc (`doc/scripting.md`/"Triggers") en est encore un
+titre (ou un paragraphe qui s'ouvre en gras). Une citation qui ne doit pas
+être vérifiée s'écrit comme un motif : `<type>.js`, `*-values.js`.
+
+**Le code** : `node tools/dead-exports.js` liste les exports qu'aucun autre
+fichier ne cite — sans usage, utilisés seulement dans leur fichier, ou
+seulement par les vérifications et les outils. Un rapport à trier à la main
+(un point d'entrée de console ou une API de `lib/` se garde exprès), jamais
+un échec.
 
 ## Principe anti-divergence
 
