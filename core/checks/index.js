@@ -53,6 +53,7 @@ import checkRotation from "./rotation.check.js";
 // Domaines de lib/ (mécanismes portables), lancés par le même point
 // d'entrée : une seule commande, un seul récapitulatif.
 import checkI18n from "../../lib/checks/i18n.check.js";
+import checkI18nContent from "./i18n-content.check.js";
 import checkInput from "../../lib/checks/input.check.js";
 import checkAudioRetention from "../../lib/checks/audio-retention.check.js";
 
@@ -90,6 +91,7 @@ const SUITES = [
   { name: "sequence", check: checkSequence },
   { name: "rotation", check: checkRotation },
   { name: "i18n", check: checkI18n },
+  { name: "i18n-content", check: checkI18nContent },
   { name: "input", check: checkInput },
   { name: "audio-retention", check: checkAudioRetention },
 ];
