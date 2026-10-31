@@ -55,6 +55,8 @@ import checkRotation from "./rotation.check.js";
 import checkI18n from "../../lib/checks/i18n.check.js";
 import checkI18nContent from "./i18n-content.check.js";
 import checkInput from "../../lib/checks/input.check.js";
+import checkMenu from "../../lib/checks/menu.check.js";
+import checkHelp from "../../lib/checks/help.check.js";
 import checkAudioRetention from "../../lib/checks/audio-retention.check.js";
 
 const SUITES = [
@@ -93,6 +95,8 @@ const SUITES = [
   { name: "i18n", check: checkI18n },
   { name: "i18n-content", check: checkI18nContent },
   { name: "input", check: checkInput },
+  { name: "menu", check: checkMenu },
+  { name: "help", check: checkHelp },
   { name: "audio-retention", check: checkAudioRetention },
 ];
 
