@@ -10,7 +10,7 @@
 
 import { t } from "../../data/i18n/index.js";
 import { announce } from "../../lib/announce.js";
-import { pushScreen, popScreen } from "../../lib/screens.js";
+import { pushScreen } from "../../lib/screens.js";
 import { makeMenuScreen, makeMessageScreen } from "../../lib/menu.js";
 import { isDebugEnabled } from "../../config/debug.js";
 import { warningLog } from "../debug-warnings.js";
@@ -32,9 +32,9 @@ export function openDebugWarningsMenu() {
   }));
   entries.push({
     label: "debug.warnings.clear",
+    closesMenu: true,
     onActivate: () => {
       warningLog.clear();
-      popScreen();
       announce(t("debug.warnings.cleared"), { assertive: true });
     },
   });

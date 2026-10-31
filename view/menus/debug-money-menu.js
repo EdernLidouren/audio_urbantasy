@@ -12,7 +12,7 @@
 // disque ; il repart de 0 à chaque ouverture.
 
 import { t } from "../../data/i18n/index.js";
-import { pushScreen, popScreen } from "../../lib/screens.js";
+import { pushScreen } from "../../lib/screens.js";
 import { makeMenuScreen } from "../../lib/menu.js";
 
 const AMOUNT_STEP = 1;
@@ -21,13 +21,6 @@ const AMOUNT_MAX = 1000000;
 
 export function openMoneyDebugMenu(giveMoneyEffect, resetMoneyEffect) {
   let amount = 0;
-
-  function closeThen(effect) {
-    return () => {
-      popScreen();
-      effect();
-    };
-  }
 
   const entries = [
     {
@@ -42,8 +35,8 @@ export function openMoneyDebugMenu(giveMoneyEffect, resetMoneyEffect) {
       step: AMOUNT_STEP,
       bigStep: AMOUNT_BIG_STEP,
     },
-    { label: "money.debug.add", onActivate: closeThen(() => giveMoneyEffect(amount)) },
-    { label: "money.debug.reset", onActivate: closeThen(resetMoneyEffect) },
+    { label: "money.debug.add", closesMenu: true, onActivate: () => giveMoneyEffect(amount) },
+    { label: "money.debug.reset", closesMenu: true, onActivate: resetMoneyEffect },
   ];
 
   pushScreen(makeMenuScreen({ title: "money.debug.title", closable: true, entries }, t));

@@ -18,7 +18,7 @@
 // cohérence.
 
 import { t } from "../../data/i18n/index.js";
-import { pushScreen, popScreen } from "../../lib/screens.js";
+import { pushScreen } from "../../lib/screens.js";
 import { makeMenuScreen } from "../../lib/menu.js";
 import { WEATHER_STATES } from "../../config/weather-values.js";
 
@@ -26,10 +26,8 @@ export function openWeatherDebugMenu(forceWeather, triggerTransition) {
   const entries = [
     {
       label: "weather.debug.triggerTransition",
-      onActivate: () => {
-        triggerTransition();
-        popScreen();
-      },
+      closesMenu: true,
+      onActivate: triggerTransition,
     },
     // Une entrée par état déclaré, DANS L'ORDRE de la table (voir header) —
     // labelParams interpole le nom d'état déjà résolu (t(`weather.state.
@@ -37,10 +35,8 @@ export function openWeatherDebugMenu(forceWeather, triggerTransition) {
     ...Object.keys(WEATHER_STATES).map((state) => ({
       label: "weather.debug.force",
       labelParams: { state: t(`weather.state.${state}`) },
-      onActivate: () => {
-        forceWeather(state);
-        popScreen();
-      },
+      closesMenu: true,
+      onActivate: () => forceWeather(state),
     })),
   ];
 

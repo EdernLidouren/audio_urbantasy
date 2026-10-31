@@ -203,6 +203,19 @@ export function createEntityAudio({ getSession, entities, effectiveMuffle, fullF
     if (entity.isFlying) sound.setHighpass(flyingHighpassHz);
   }
 
+  // Son de TRANSITION d'une entité dont la présence vient de basculer
+  // (exitSound au départ, enterSound à l'arrivée), sous l'étouffement
+  // `muffle` de sa face. Pas d'exitSound pour une dormance FORCÉE
+  // (core/presence.js/isForcedDormant) : la séquence qui la pose joue son
+  // propre son, comme l'éclatement du néon défectueux.
+  function playPresenceTransition(entry, live, relX, muffle) {
+    if (live.presenceChanged === "exited" && entry.exitSound && !isForcedDormant(live, getSession().time)) {
+      oneShots.playTransitionSound(entry, relX, entry.exitSound, muffle);
+    } else if (live.presenceChanged === "entered" && entry.enterSound) {
+      oneShots.playTransitionSound(entry, relX, entry.enterSound, muffle);
+    }
+  }
+
   // Face courante : sons de transition (exitSound joue AVANT l'arrêt de la
   // balise — deux Howl distincts), puis la balise continue.
   function applyEntityAudio(x, elapsedMs) {
@@ -212,12 +225,7 @@ export function createEntityAudio({ getSession, entities, effectiveMuffle, fullF
       const live = liveById.get(entry.entity.id);
       const relX = live.x - x;
       const muffle = effectiveMuffle(entry, 0);
-
-      if (live.presenceChanged === "exited" && entry.exitSound && !isForcedDormant(live, getSession().time)) {
-        oneShots.playTransitionSound(entry, relX, entry.exitSound, muffle);
-      } else if (live.presenceChanged === "entered" && entry.enterSound) {
-        oneShots.playTransitionSound(entry, relX, entry.enterSound, muffle);
-      }
+      playPresenceTransition(entry, live, relX, muffle);
       updateBeaconSound(entry, live, relX, muffle, beaconFactor, elapsedMs);
     }
   }
@@ -226,12 +234,7 @@ export function createEntityAudio({ getSession, entities, effectiveMuffle, fullF
   function applyMuffledPresenceTransitions(x, otherLiveById) {
     for (const entry of otherEntitySounds) {
       const live = otherLiveById.get(entry.entity.id);
-      const relX = live.x - x;
-      if (live.presenceChanged === "exited" && entry.exitSound && !isForcedDormant(live, getSession().time)) {
-        oneShots.playTransitionSound(entry, relX, entry.exitSound, fullFaceMuffle);
-      } else if (live.presenceChanged === "entered" && entry.enterSound) {
-        oneShots.playTransitionSound(entry, relX, entry.enterSound, fullFaceMuffle);
-      }
+      playPresenceTransition(entry, live, live.x - x, fullFaceMuffle);
     }
   }
 

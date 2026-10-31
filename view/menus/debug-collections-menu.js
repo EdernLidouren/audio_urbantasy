@@ -15,8 +15,10 @@ import { openConfirmation } from "./confirmation.js";
 import collections from "../../collections/index.js";
 import { muteNextDiscoveryCheck } from "../discoveries.js";
 export function openCollectionsDebugMenu(getSession, setSession) {
+  // Confirmée : la question s'est fermée, le menu debug se ferme à son tour
+  // (pas closesMenu : la question s'ouvre par-dessus lui, Annuler y ramène).
   function apply(transform, doneKey) {
-    popScreen(); // ferme le menu debug lui-même
+    popScreen();
     muteNextDiscoveryCheck();
     setSession(transform(getSession(), collections));
     announce(t(doneKey), { assertive: true });

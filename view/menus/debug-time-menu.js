@@ -14,7 +14,7 @@
 // minutes aurait produite. Les réactions qui dépendent d'un TICK (présence
 // conditionnelle, routine PNJ, crossfade jour/nuit) ne se rejouent, elles,
 // qu'au tick SUIVANT — automatique dès la fermeture du menu (chaque entrée
-// ferme le menu après action, voir plus bas), puisque la ville n'est plus au
+// ferme le menu puis agit, `closesMenu`, voir lib/menu.js), puisque la ville n'est plus au
 // sommet de la pile pendant que ce menu est ouvert (aucun tick, donc le jeu
 // GÈLE bien pendant la navigation) et reprend son tick normal juste après.
 //
@@ -30,7 +30,7 @@
 // dans le menu).
 
 import { t } from "../../data/i18n/index.js";
-import { pushScreen, popScreen } from "../../lib/screens.js";
+import { pushScreen } from "../../lib/screens.js";
 import { makeMenuScreen } from "../../lib/menu.js";
 import { TIME_CONFIG } from "../../config/time-values.js";
 
@@ -67,20 +67,16 @@ export function openTimeDebugMenu(getSession, advanceTimeEffect, setTimeScaleEff
   function advanceEntry(labelKey, minutes) {
     return {
       label: labelKey,
-      onActivate: () => {
-        advanceTimeEffect(minutes);
-        popScreen();
-      },
+      closesMenu: true,
+      onActivate: () => advanceTimeEffect(minutes),
     };
   }
 
   function speedEntry(labelKey, scale) {
     return {
       label: labelKey,
-      onActivate: () => {
-        setTimeScaleEffect(scale);
-        popScreen();
-      },
+      closesMenu: true,
+      onActivate: () => setTimeScaleEffect(scale),
     };
   }
 

@@ -26,7 +26,7 @@
 // se voit qu'en nouvelle partie.
 
 import { t } from "../../data/i18n/index.js";
-import { pushScreen, popScreen, activeScreen } from "../../lib/screens.js";
+import { pushScreen, activeScreen } from "../../lib/screens.js";
 import { makeMenuScreen } from "../../lib/menu.js";
 import { openConfirmation } from "./confirmation.js";
 import scenePaths from "../../scenes/index.js";
@@ -56,8 +56,8 @@ export async function openTeleportDebugMenu(getSession, teleportEffect, sceneToo
     return {
       label: isCurrent ? "teleport.debug.entryHere" : "teleport.debug.entry",
       labelParams: { name },
+      closesMenu: true,
       onActivate: () => {
-        popScreen();
         teleportEffect({
           target: scene.id,
           x: scene.playerStart,
@@ -72,18 +72,14 @@ export async function openTeleportDebugMenu(getSession, teleportEffect, sceneToo
   const toolEntries = [
     {
       label: "teleport.debug.reloadScene",
-      onActivate: () => {
-        popScreen();
-        openConfirmation("teleport.debug.reloadConfirm", sceneTools.reloadSceneFromFile);
-      },
+      closesMenu: true,
+      onActivate: () => openConfirmation("teleport.debug.reloadConfirm", sceneTools.reloadSceneFromFile),
     },
     {
       label: "teleport.debug.forgetOthers",
       labelParams: { count: otherCount },
-      onActivate: () => {
-        popScreen();
-        openConfirmation("teleport.debug.forgetConfirm", sceneTools.forgetOtherScenes, { titleParams: { count: otherCount } });
-      },
+      closesMenu: true,
+      onActivate: () => openConfirmation("teleport.debug.forgetConfirm", sceneTools.forgetOtherScenes, { titleParams: { count: otherCount } }),
     },
   ];
   // Curseur sur la scène courante, décalé des outils placés en tête.
