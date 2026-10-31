@@ -18,6 +18,7 @@
     "base": "anciennes carrières",
     "def": "les anciennes carrières"
   },
+  "scene.old_quarries_underground_1_main.name": "anciennes carrières, premier sous-sol, accès principal",
   "scene.town_square.name": {
     "base": "grand-place",
     "def": "la grand-place"

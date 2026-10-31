@@ -11,6 +11,11 @@
 // sa propre `isOn`, éteinte au départ et mémorisée dans la sauvegarde
 // (`persistent` vaut true par défaut) :
 //   "variables": [{ "name": "isOn", "type": "flag", "initial": false }]
+// Quand une AUTRE entité doit lire l'état du groupe (le chevalement des
+// anciennes carrières, alimenté par lui), l'instance remplace `isOn` par une
+// variable de SCÈNE, en surchargeant la condition du beacon et les deux
+// actions (comme le vidéoprojecteur de la salle de réunion de l'hôtel de
+// ville) : une variable d'entité ne se lit que depuis l'entité qui la porte.
 //
 // Démarrage et arrêt avec les réglages du vidéoprojecteur (beaconFadeMs,
 // beaconFadeRate) : le moteur part grave et lent puis rejoint son régime,

@@ -1,0 +1,24 @@
+{
+  "id": "old_quarries_underground_1_main",
+  "titleKey": "scene.old_quarries_underground_1_main.name",
+  "length": 30,
+  "playerStart": 15,
+  "recto": {
+    "indoor": true,
+    "musicDay": "assets/musics/underground",
+    "musicNight": "assets/musics/underground",
+    "ambiences": ["assets/ambiances/shaft"],
+    "defaultSurface": "rock",
+    "reverbPreset": "cave",
+    "entities": []
+  },
+  "verso": {
+    "indoor": true,
+    "musicDay": "assets/musics/underground",
+    "musicNight": "assets/musics/underground",
+    "ambiences": ["assets/ambiances/shaft"],
+    "defaultSurface": "rock",
+    "reverbPreset": "cave",
+    "entities": []
+  }
+}

@@ -4,8 +4,9 @@
 // jour au fond du puits. Donnée pure : aucun import.
 //
 // Comme une porte : pas d'action ici, la destination varie par instance.
-// Tant que la sous-scène du puits n'existe pas, l'instance n'en déclare
-// aucune et Entrée ne fait rien (voir view/interaction.js/interact).
+// Celle des anciennes carrières vérifie deux choses avant de descendre :
+// le groupe électrogène allumé (variable de scène, il est sur l'autre
+// face), puis la lampe-torche — un refus annoncé pour chacune.
 //
 // Balise : la grande structure métallique qui grince au vent. L'instance de
 // la scène lui superpose le souffle du puits par un émetteur invisible

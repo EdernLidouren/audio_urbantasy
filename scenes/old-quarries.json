@@ -5,6 +5,7 @@
   "playerStart": 0,
   "faceMufflingGain": 0.7,
   "faceMufflingLowpassHz": 2500,
+  "variables": [{ "name": "generatorOn", "type": "flag", "initial": false }],
   "recto": {
     "musicDay": "assets/musics/old_quarries_day",
     "musicNight": "assets/musics/old_quarries_night",
@@ -25,7 +26,28 @@
         "descriptionKey": "passage.old_quarries_fence.description",
         "action": { "kind": "switchSide", "arrivalX": 6 }
       },
-      { "id": "main_headframe_1_r", "type": "main_headframe", "x": 25, "tuning": { "beaconCrossFaceGain": 0.5 } },
+      {
+        "id": "main_headframe_1_r",
+        "type": "main_headframe",
+        "x": 25,
+        "tuning": { "beaconCrossFaceGain": 0.5 },
+        "action": [
+          {
+            "kind": "applyEffects",
+            "condition": { "type": "variable", "scope": "scene", "name": "generatorOn", "equals": false },
+            "effects": [{ "type": "announce", "key": "door.main_headframe.no_power_refusal" }]
+          },
+          {
+            "kind": "applyEffects",
+            "condition": { "type": "not", "condition": { "type": "hasImprovement", "id": "flashlight" } },
+            "effects": [{ "type": "announce", "key": "door.main_headframe.darkness_refusal" }]
+          },
+          {
+            "kind": "applyEffects",
+            "effects": [{ "type": "teleport", "target": "old_quarries_underground_1_main", "x": 15, "side": "recto" }]
+          }
+        ]
+      },
       { "id": "mine_shaft_emitter_1_r", "type": "sound_emitter", "x": 25, "sounds": { "beacon": { "path": "assets/sounds/decor/mine_shaft_1_beacon", "loop": true } } },
       { "id": "old_quarries_pond_1_r", "type": "old_quarries_pond", "x": 36 },
       {
@@ -61,8 +83,26 @@
         "id": "electric_generator_1_v",
         "type": "diesel_electric_generator",
         "x": 21,
-        "variables": [{ "name": "isOn", "type": "flag", "initial": false }],
-        "tuning": { "beaconCrossFaceGain": 0.3 }
+        "tuning": { "beaconCrossFaceGain": 0.3 },
+        "sounds": { "beacon": { "condition": { "type": "variable", "scope": "scene", "name": "generatorOn", "equals": true } } },
+        "action": [
+          {
+            "kind": "applyEffects",
+            "condition": { "type": "variable", "scope": "scene", "name": "generatorOn", "equals": true },
+            "effects": [
+              { "type": "playSound", "path": "assets/sounds/effects/switch_off" },
+              { "type": "setVariable", "scope": "scene", "name": "generatorOn", "value": false }
+            ]
+          },
+          {
+            "kind": "applyEffects",
+            "condition": { "type": "variable", "scope": "scene", "name": "generatorOn", "equals": false },
+            "effects": [
+              { "type": "playSound", "path": "assets/sounds/effects/switch_on" },
+              { "type": "setVariable", "scope": "scene", "name": "generatorOn", "value": true }
+            ]
+          }
+        ]
       },
       { "id": "mine_shaft_emitter_1_v", "type": "sound_emitter", "x": 25, "sounds": { "beacon": { "path": "assets/sounds/decor/mine_shaft_1_beacon", "loop": true } } },
       {

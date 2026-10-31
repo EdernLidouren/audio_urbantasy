@@ -129,7 +129,8 @@
     "assets/musics/science_day_2.mp3"
   ],
   "assets/musics/shop_day": [
-    "assets/musics/shop_day_1.mp3"
+    "assets/musics/shop_day_1.mp3",
+    "assets/musics/shop_day_2.mp3"
   ],
   "assets/musics/slums_night": [
     "assets/musics/slums_night_1.mp3"
@@ -146,6 +147,9 @@
   ],
   "assets/musics/town_hall_day": [
     "assets/musics/town_hall_day_1.mp3"
+  ],
+  "assets/musics/underground": [
+    "assets/musics/underground_1.mp3"
   ],
   "assets/sounds/decor/big_rock_1_beacon": [
     "assets/sounds/decor/big_rock_1_beacon_1.mp3"
