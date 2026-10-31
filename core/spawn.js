@@ -11,7 +11,7 @@
 //   - CYCLE (quand) : quotidien, index de cycle dérivé de session.time
 //     (spawnCycleAt). Rien ne se matérialise JAMAIS pendant que le joueur
 //     est dans la scène : refillDueSpawns ne s'exécute qu'au CHARGEMENT du
-//     monde actif (view/world-travel.js), et `world.spawnCycle` (dernier
+//     monde actif (core/world-load.js), et `world.spawnCycle` (dernier
 //     cycle matérialisé) tient lieu de FILE — un seul marqueur, écrasé,
 //     jamais une accumulation : après N cycles d'absence, UN garnissage, tiré
 //     avec la distribution DU MOMENT. Un garnissage REMPLACE toujours (les
@@ -267,7 +267,7 @@ function refillFace(face, world, cycle, registry, companions, presenceContext, o
 
 // Garnit le monde ACTIF si un cycle est dû (world.spawnCycle absent ou
 // différent du cycle courant) — appelé à CHAQUE chargement du monde actif
-// (voir view/world-travel.js), idempotent : rien à faire -> RÉFÉRENCE
+// (voir core/world-load.js), idempotent : rien à faire -> RÉFÉRENCE
 // INCHANGÉE (cycle déjà matérialisé, ou monde sans aucune source). Scène à
 // deux faces : LES DEUX faces sont garnies (on charge le monde entier),
 // chacune sur son propre flux PRNG ; le marqueur reste au niveau du monde.

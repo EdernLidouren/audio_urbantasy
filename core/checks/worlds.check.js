@@ -18,6 +18,7 @@ import { tick } from "../actions.js";
 import { reduce } from "../reduce.js";
 import { addMoney } from "../money.js";
 import { INITIAL_TIME } from "../time.js";
+import { prepareLoadedWorld } from "../world-load.js";
 import { throws } from "../../lib/check.js";
 import { WORLD_A_REGISTRY } from "./helpers.js";
 
@@ -160,4 +161,25 @@ export default function checkWorlds(run) {
   run("oubli : seul le monde actif reste", "reload-a", Object.keys(forgotten.worlds).join(","));
   run("oubli : monde actif intact (même référence)", reloadState.worlds["reload-a"], forgotten.worlds["reload-a"]);
   run("oubli : joueur et argent intacts", "15/5", `${forgotten.player.x}/${forgotten.money}`);
+
+  // --- Chargement d'un monde (core/world-load.js/prepareLoadedWorld) ---
+  // Toutes les étapes, d'un seul appel : une entité envolée revient, une
+  // séquence en attente et un comportement temporaire sont oubliés.
+  const loadScene = parseScene(
+    { id: "world-load", titleKey: "scene.demo.name", length: 20, playerStart: 0, entities: [{ id: "d", type: "dog", x: 10 }] },
+    WORLD_A_REGISTRY
+  );
+  const dogIn = (s) => s.worlds["world-load"].entities.find((e) => e.id === "d");
+  const disturbed = applyEntityActionEffects(
+    applyEntityActionEffects(createInitialState(loadScene, 1), "d", [{ type: "startle" }]),
+    "d",
+    [{ type: "temporaryBehavior", behavior: { kind: "stay" }, durationMs: 5000 }, { type: "wait", ms: 500 }, { type: "startle" }]
+  );
+  run("chargement : l'état de départ est bien perturbé", true, dogIn(disturbed).startled && Boolean(dogIn(disturbed).pendingEffects) && Boolean(dogIn(disturbed).temporaryBehavior));
+  const loaded = prepareLoadedWorld(disturbed, WORLD_A_REGISTRY);
+  run("chargement : entité envolée revenue", false, "startled" in dogIn(loaded));
+  run("chargement : séquence en attente oubliée", false, "pendingEffects" in dogIn(loaded));
+  run("chargement : comportement temporaire oublié", false, "temporaryBehavior" in dogIn(loaded));
+  const calm = createInitialState(loadScene, 1);
+  run("chargement : rien à faire -> même session", calm, prepareLoadedWorld(calm, WORLD_A_REGISTRY));
 }

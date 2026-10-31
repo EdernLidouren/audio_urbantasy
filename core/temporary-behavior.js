@@ -14,7 +14,7 @@
 //     l'entité retombe sur elle telle qu'elle est À CE MOMENT (une règle de
 //     présence a pu la changer entre-temps).
 //   - OUBLI AU CHARGEMENT du monde (forgetTemporaryBehaviors, appelé par
-//     view/world-travel.js à chaque chargement, avec le retour des entités
+//     core/world-load.js à chaque chargement, avec le retour des entités
 //     envolées) : un monde quitté pendant un appel ne garde pas l'appel en
 //     suspens jusqu'au retour.
 //

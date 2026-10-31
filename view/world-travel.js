@@ -3,8 +3,11 @@
 // il la monte, la détruit et la remonte à chaque changement de monde, de
 // face ou de partie. Tous les autres la lisent AU MOMENT de s'en servir, via
 // current() — jamais une copie gardée, qui désignerait l'ancien monde après
-// un voyage. current() ne vaut null qu'hors partie : une scène à charger est
-// lue AVANT de démonter quoi que ce soit, et le remontage est synchrone.
+// un voyage. current() vaut null hors partie, et pendant l'attente d'un
+// teleport holdForSound (la vue d'arrivée n'est montée qu'à la fin du son
+// de départ, voir performTransition) — jeu gelé dans les deux cas. Sinon,
+// une scène à charger est lue AVANT de démonter quoi que ce soit, et le
+// remontage est synchrone.
 
 import { announce } from "../lib/announce.js";
 import { rampEntityLayerGain } from "../lib/audio.js";
@@ -14,11 +17,7 @@ import { t } from "../data/i18n/index.js";
 import registry from "../entities/types/index.js";
 import { loadSceneById } from "../scenes/load.js";
 import { travelToWorld, switchSide, placePlayer, reloadActiveWorld, isTwoSided } from "../core/state.js";
-import { refillDueSpawns } from "../core/spawn.js";
-import { returnStartledEntities } from "../core/startle.js";
-import { forgetTemporaryBehaviors } from "../core/temporary-behavior.js";
-import { forgetPendingEffects } from "../core/pending-effects.js";
-import { resetVisitVariables } from "../core/save.js";
+import { prepareLoadedWorld } from "../core/world-load.js";
 import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";
 import { resolveTuning } from "../config/tuning.js";
@@ -70,24 +69,34 @@ function playSideSwitchSound(worldView, entity) {
 export function createWorldTravel({ getSession, setSession }) {
   let worldView = null;
 
-  // À CHAQUE chargement d'un monde, TOUJOURS avant le montage de la vue :
-  // le garnissage de collecte dû (voir core/spawn.js/refillDueSpawns — les
-  // collectibles posés sont des entités ordinaires, découvertes au montage
-  // comme les autres), le retour des entités farouches envolées lors
-  // d'une visite précédente (voir core/startle.js/returnStartledEntities),
-  // le retour des variables volatiles à leur initiale (une volatile ne vaut
-  // que pour une visite, voir core/save.js/resetVisitVariables), et l'oubli
-  // des comportements temporaires et des séquences en cours (un chien
-  // sifflé juste avant de partir, voir core/temporary-behavior.js et
-  // core/pending-effects.js).
-  function prepareLoadedWorld() {
-    const refilled = returnStartledEntities(refillDueSpawns(getSession(), registry));
-    setSession(forgetPendingEffects(forgetTemporaryBehaviors(resetVisitVariables(refilled))));
+  // Pose l'état dans lequel la prochaine vue sera montée : la session, les
+  // délais d'activation vidés (ils valent pour une entité d'UNE vue, voir
+  // view/interaction.js/clearInteractionCooldowns), et, quand un monde
+  // (re)devient celui du joueur (`loaded`), sa préparation par le core
+  // (core/world-load.js/prepareLoadedWorld, TOUJOURS avant le montage : les
+  // collectibles posés sont découverts au montage comme les autres
+  // entités). Une bascule de face reste dans le même monde : pas de
+  // préparation.
+  function enterSession(nextSession, { loaded }) {
+    setSession(loaded ? prepareLoadedWorld(nextSession, registry) : nextSession);
+    clearInteractionCooldowns();
+  }
+
+  // Remplace la vue du monde par une neuve, montée sur `nextSession` (voir
+  // enterSession). `keepBeacons` (bascule de face) : les balises continues
+  // passent de l'ancienne vue à la nouvelle sans coupure, celles qu'elle ne
+  // reprend pas sont arrêtées (voir view/audio/city-scene.js/destroy).
+  function remount(nextSession, { loaded, keepBeacons = false }) {
+    const handover = worldView.destroy({ handover: keepBeacons });
+    worldView = null;
+    enterSession(nextSession, { loaded });
+    worldView = createWorldView(getSession, { handover });
+    if (handover) for (const unused of handover.values()) unused.stop();
   }
 
   // Première entrée en ville.
   function mountInitial() {
-    prepareLoadedWorld();
+    enterSession(getSession(), { loaded: true });
     worldView = createWorldView(getSession);
   }
 
@@ -127,9 +136,8 @@ export function createWorldTravel({ getSession, setSession }) {
   // `holdUntil` (teleport holdForSound, voir runTeleportSas) : le monde
   // d'arrivée est rejoint aussitôt, mais sa VUE n'est montée qu'à la fin du
   // son de départ — musique, ambiances et balises de l'arrivée démarrent
-  // alors seulement (celles du monde quitté continuent jusque-là, puis
-  // fondent vers les nouvelles comme à toute transition), et l'annonce du
-  // nom de la scène dit au joueur qu'il peut de nouveau bouger. Un pas sur
+  // alors seulement, et l'annonce du nom de la scène dit au joueur qu'il
+  // peut de nouveau bouger. Un pas sur
   // le sol d'arrivée marque la sortie de la cabine. Musique et ambiances du
   // monde quitté, elles, fondent au silence dès que la cible est lue : le
   // son de transition se joue seul (le trajet, le changement brutal de
@@ -142,11 +150,11 @@ export function createWorldTravel({ getSession, setSession }) {
     if (freshScene === undefined || !worldView) return;
 
     if (holdUntil) stopPersistentAudioLayers();
+    // Pas de remount : l'attente du son de départ se glisse entre l'état
+    // posé et la vue montée.
     worldView.destroy();
     worldView = null;
-    setSession(travelToWorld(getSession(), targetId, freshScene, { x, side }));
-    clearInteractionCooldowns();
-    prepareLoadedWorld();
+    enterSession(travelToWorld(getSession(), targetId, freshScene, { x, side }), { loaded: true });
     // Jamais d'`await` sans attente réelle : hors sas (carte de la ville),
     // rendre la main ici laisserait tiquer le jeu sans vue montée.
     if (holdUntil) await holdFor(holdUntil);
@@ -246,12 +254,7 @@ export function createWorldTravel({ getSession, setSession }) {
       // elle a besoin, déjà au bon niveau grâce au fondu, sans les relancer
       // (aucune micro-coupure). Les autres, que le fondu a amenées au
       // silence, sont arrêtées ensuite.
-      const handover = worldView.destroy({ handover: true });
-      worldView = null;
-      setSession(switchSide(getSession(), arrivalX));
-      clearInteractionCooldowns();
-      worldView = createWorldView(getSession, { handover });
-      for (const unused of handover.values()) unused.stop();
+      remount(switchSide(getSession(), arrivalX), { loaded: false, keepBeacons: true });
       worldView.playArrivalStep(entity, arrivalX);
     } finally {
       popScreen();
@@ -269,11 +272,7 @@ export function createWorldTravel({ getSession, setSession }) {
       announce(t("side.debug.singleSided"), { assertive: true });
       return;
     }
-    worldView.destroy();
-    worldView = null;
-    setSession(switchSide(session, session.player.x));
-    clearInteractionCooldowns();
-    worldView = createWorldView(getSession);
+    remount(switchSide(session, session.player.x), { loaded: false });
     announce(t("side.debug.switched", { side: t(`side.${getSession().player.side}`) }), { assertive: true });
   }
 
@@ -285,12 +284,8 @@ export function createWorldTravel({ getSession, setSession }) {
   // remplace, et le menu les reprendra en se fermant (voir
   // view/paused-beacons.js).
   function replaceCurrentGame(newSession) {
-    worldView.destroy();
-    worldView = null;
     muteNextDiscoveryCheck();
-    setSession(newSession);
-    prepareLoadedWorld();
-    worldView = createWorldView(getSession);
+    remount(newSession, { loaded: true });
     worldView.pauseBeacons();
   }
 
@@ -317,12 +312,7 @@ export function createWorldTravel({ getSession, setSession }) {
     // monde actif a changé : rien n'est démonté.
     if (!worldView || getSession().activeWorldId !== sceneId) return;
 
-    worldView.destroy();
-    worldView = null;
-    setSession(reloadActiveWorld(getSession(), freshScene));
-    clearInteractionCooldowns();
-    prepareLoadedWorld();
-    worldView = createWorldView(getSession);
+    remount(reloadActiveWorld(getSession(), freshScene), { loaded: true });
     announce(t("teleport.debug.reloaded"), { assertive: true });
   }
 

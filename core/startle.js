@@ -14,7 +14,7 @@
 //     (core/variables.js/applyActionEffects), sans champ, marque l'entité
 //     qui porte l'action. Il vaut pour toute entité, farouche ou non.
 //   - RETOUR AU CHARGEMENT du monde (returnStartledEntities, appelé par
-//     view/world-travel.js à CHAQUE chargement, comme le regarnissage de
+//     core/world-load.js à CHAQUE chargement, comme le regarnissage de
 //     collecte) : l'entité reprend sa place, comme un oiseau dérangé qui
 //     revient quand on n'est plus là. Revenir dans la scène, ou continuer
 //     une partie sauvegardée pendant la visite, la ramène. Un COMPAGNON

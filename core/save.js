@@ -561,7 +561,7 @@ function resetVolatileVariablesInWorld(world) {
 }
 
 // Variables VOLATILES du monde ACTIF, à son CHARGEMENT (appelé par
-// view/world-travel.js/prepareLoadedWorld, comme le retour des entités
+// core/world-load.js/prepareLoadedWorld, comme le retour des entités
 // farouches) : une volatile de scène ou d'entité ne dure que le temps
 // d'une visite — la fenêtre ouverte se retrouve fermée, le néon déréglé
 // redevient un néon qui grésille. Les variables de PARTIE et des

@@ -2082,7 +2082,7 @@ absente, portées "scene"/"party" seulement — voir `core/save.js`/
 **Une volatile vaut pour UNE VISITE.** En plus de la sauvegarde, les
 volatiles de portée "scene" et "entity" reviennent à leur `initial` à
 CHAQUE chargement de leur monde (`core/save.js`/`resetVisitVariables`,
-appelée par `view/world-travel.js`/`prepareLoadedWorld`, comme le retour
+appelée par `core/world-load.js`/`prepareLoadedWorld`, comme le retour
 des entités farouches) : revenir dans une scène, ou continuer une partie,
 la retrouve comme neuve — les fenêtres de la mairie refermées, le néon
 défectueux de la rue principale de nouveau en phase 1. Les volatiles de

@@ -552,8 +552,9 @@ persiste avec le monde.
   commencer : chaque source garnie à chaque cycle, ni plafond ni
   probabilité (à doser plus tard). Rien ne se matérialise JAMAIS pendant que
   le joueur est dans la scène — aucun code au tick : `refillDueSpawns`
-  s'exécute au CHARGEMENT du monde actif (`view/world-travel.js`/
-  `refreshSpawns` : première entrée, transition, partie remplacée), et
+  s'exécute au CHARGEMENT du monde actif (`core/world-load.js`/
+  `prepareLoadedWorld`, appelé par `view/world-travel.js` : première
+  entrée, transition, partie remplacée, relecture de debug), et
   `world.spawnCycle` (dernier cycle matérialisé) tient lieu de FILE — un seul
   marqueur, ÉCRASÉ par nature : après N cycles d'absence, UN garnissage, avec
   la distribution du moment, jamais une accumulation. Au garnissage : anciens

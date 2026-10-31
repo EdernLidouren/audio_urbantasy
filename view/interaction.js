@@ -113,9 +113,10 @@ function actionConditionMet(condition, entity) {
 // config/tuning-values.js), un nouvel appui sur la même entité est ignoré EN
 // SILENCE — l'action entière, succès comme refus, quelle que soit la
 // candidate qui aurait été choisie : état et rendu restent synchronisés.
-// Purgé à chaque changement de scène ou de face (clearInteractionCooldowns,
-// appelée par view/world-travel.js/performTransition et sideSwitch) :
-// un ancien horodatage ne bloque jamais une entité après un aller-retour.
+// Purgé à chaque nouvelle vue du monde (clearInteractionCooldowns, appelée
+// par view/world-travel.js/enterSession : changement de monde ou de face,
+// nouvelle partie, partie importée, relecture de debug) : un ancien
+// horodatage ne bloque jamais une entité après un aller-retour.
 const lastActivationAt = new Map();
 
 export function clearInteractionCooldowns() {
