@@ -22,7 +22,7 @@ export function discoveryFacts(session) {
 }
 
 // Identifiant d'une entrée dans sa collection : l'objet ou le type.
-export function entryId(entry) {
+function entryId(entry) {
   return entry.entity !== undefined ? entry.entity : entry.item;
 }
 

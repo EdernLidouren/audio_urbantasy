@@ -145,8 +145,8 @@ instance déclare la sienne (`applyEffects` + `"teleport"`), et ses textes sous 
 famille `scene_exit.*` (voir `doc/i18n.md`). Entre deux scènes MAJEURES (deux
 cases de la carte de la ville), l'action porte `"confirm": true` : le joueur
 confirme avant de partir (voir `doc/scripting.md`/"Confirmation d'une action").
-Exemple réel : `main_street_exit_r` dans `scenes/town-square.json`, et son pendant
-`town_square_exit_r` dans `scenes/main-street.json`.
+Exemple réel : `main_street_exit_1_r` dans `scenes/town-square.json`, et son pendant
+`town_square_exit_1_r` dans `scenes/main-street.json`.
 
 ## Collectible persistant
 

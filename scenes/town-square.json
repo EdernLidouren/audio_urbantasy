@@ -12,7 +12,7 @@
     "segments": [{ "from": 0, "to": 5, "surface": "wood" }],
     "entities": [
       {
-        "id": "main_street_exit_r",
+        "id": "main_street_exit_1_r",
         "type": "scene_exit",
         "x": 0,
         "nameKey": "scene_exit.town_square_main_street.name",
@@ -82,7 +82,7 @@
     ],
     "entities": [
       {
-        "id": "main_street_exit_v",
+        "id": "main_street_exit_1_v",
         "type": "scene_exit",
         "x": 0,
         "nameKey": "scene_exit.town_square_main_street.name",

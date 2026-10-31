@@ -3,7 +3,8 @@
 // qu'aucun autre fichier ne cite est soit du code mort, soit un export
 // superflu (la fonction ne sert que dans son propre fichier), soit un
 // point d'entrée gardé exprès (une API de console, un mécanisme de lib/
-// prêt pour un autre jeu). À trier à la main, jamais retiré en aveugle.
+// prêt pour un autre jeu). À trier à la main, jamais retiré en aveugle ;
+// un export gardé exprès s'inscrit, avec sa raison, dans KEPT_ON_PURPOSE.
 //
 //   node tools/dead-exports.js
 //
@@ -81,6 +82,15 @@ function exportedNames(code) {
 const isCheckInfrastructure = (file) =>
   /[\\/](?:core|lib)[\\/]checks[\\/]/.test(file) || file === join(ROOT, "lib", "check.js");
 
+// Exports GARDÉS EXPRÈS, avec leur raison : jamais rapportés. Un ajout ici
+// est une décision, pas une façon de faire taire le rapport.
+const KEPT_ON_PURPOSE = {
+  "core/effects.js:RENDER_EFFECT_TYPES": "une des listes publiées des types d'effet (doc/scripting.md/\"Sources de vérité\")",
+  "core/effects.js:SEQUENCE_EFFECT_TYPES": "une des listes publiées des types d'effet",
+  "lib/announce.js:setAnnounceChannel": "appelée depuis la console (window.setAnnounceChannel)",
+  "lib/coordinate-label.js:formatCoordinateY": "API documentée de la brique portable (doc/city-map.md)",
+};
+
 const isCheckOrTool = (file) => /[\\/](?:core|lib)[\\/]checks[\\/]/.test(file) || file.startsWith(join(ROOT, "tools") + sep);
 
 export function findDeadExports() {
@@ -93,6 +103,7 @@ export function findDeadExports() {
   for (const file of files) {
     if (file.startsWith(join(ROOT, "tools") + sep) || isCheckInfrastructure(file)) continue;
     for (const name of exportedNames(code.get(file))) {
+      if (Object.hasOwn(KEPT_ON_PURPOSE, `${relative(ROOT, file).split(sep).join("/")}:${name}`)) continue;
       const pattern = word(name);
       const users = files.filter((other) => other !== file && pattern.test(code.get(other)) && ((pattern.lastIndex = 0), true));
       pattern.lastIndex = 0;

@@ -74,7 +74,7 @@ function conditionHolds(trigger, entity, session) {
 
 // Triggers horaires dus pour UNE entité entre deux instants, dans l'ordre
 // déclaré. `session` : l'état d'avant, pour les conditions.
-export function dueTriggers(entity, previousTime, nextTime, session) {
+function dueTriggers(entity, previousTime, nextTime, session) {
   if (!entity.triggers || entity.present === false) return [];
   if (!hourChanged(previousTime, nextTime)) return [];
   const hour = hourOfDay(nextTime);
@@ -153,7 +153,7 @@ export function emoteTriggerRange(trigger, emoteId) {
 // (core/startle.js : `startled`, dormante seulement au tick suivant) ne
 // réagit pas : elle n'est déjà plus là. `session` : l'état d'avant
 // l'émote, pour les conditions.
-export function emoteTriggers(entity, emoteId, distance, session) {
+function emoteTriggers(entity, emoteId, distance, session) {
   if (!entity.triggers || entity.present === false || entity.startled) return [];
   return entity.triggers.filter(
     (trigger) =>

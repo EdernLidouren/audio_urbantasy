@@ -20,12 +20,12 @@
     "reverbPreset": "stone_tower",
     "entities": [
       {
-        "id": "mirror_r",
+        "id": "mirror_1_r",
         "type": "mirror",
         "x": 0
       },
       {
-        "id": "magic_mirror_r",
+        "id": "magic_mirror_1_r",
         "type": "magic_mirror",
         "x": 0,
         "action": [
@@ -60,12 +60,12 @@
         ]
       },
       {
-        "id": "weight_shaft_r",
+        "id": "weight_shaft_1_r",
         "type": "weight_shaft",
         "x": 25
       },
       {
-        "id": "bell_emitter_r",
+        "id": "bell_emitter_1_r",
         "type": "sound_emitter",
         "x": 25,
         "triggers": [
@@ -83,17 +83,17 @@
         ]
       },
       {
-        "id": "winding_mechanism_r",
+        "id": "winding_mechanism_1_r",
         "type": "large_winding_mechanism",
         "x": 30
       },
       {
-        "id": "clock_tower_escapement_r",
+        "id": "clock_tower_escapement_1_r",
         "type": "clock_tower_escapement",
         "x": 40
       },
       {
-        "id": "clock_tower_ladder_r",
+        "id": "clock_tower_ladder_1_r",
         "type": "door",
         "x": 45,
         "nameKey": "door.clock_tower_ladder.name",

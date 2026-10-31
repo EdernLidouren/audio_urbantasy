@@ -57,7 +57,7 @@ export function resolveMusicForPhase(world, phase) {
 // musique, une liste VIDE déclarée pour une phase compte : `[]` veut dire
 // « silence à cette phase » (ex. une rue commerçante calme la nuit), jamais
 // « retomber sur ambiences ». Rien de déclaré : pas d'ambiance (undefined).
-export function resolveAmbiencesForPhase(world, phase) {
+function resolveAmbiencesForPhase(world, phase) {
   if (phase === "day" && world.ambiencesDay !== undefined) return world.ambiencesDay;
   if (phase === "night" && world.ambiencesNight !== undefined) return world.ambiencesNight;
   return world.ambiences;

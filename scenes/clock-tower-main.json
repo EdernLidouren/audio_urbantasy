@@ -18,7 +18,7 @@
         "x": 4
       },
       {
-        "id": "clock_tower_backdoor_r",
+        "id": "clock_tower_backdoor_1_r",
         "type": "door",
         "x": 12,
         "nameKey": "door.clock_tower_backdoor.name",
@@ -55,7 +55,7 @@
         "x": 22
       },
       {
-        "id": "clockwork_r",
+        "id": "clockwork_1_r",
         "type": "turret_clockwork",
         "x": 25
       },
@@ -80,7 +80,7 @@
         }
       },
       {
-        "id": "clock_tower_ladder_r",
+        "id": "clock_tower_ladder_1_r",
         "type": "door",
         "x": 45,
         "nameKey": "door.clock_tower_ladder.name",

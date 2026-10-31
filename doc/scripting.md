@@ -1909,9 +1909,9 @@ Confirmer exécute l'action entière ; annuler ne laisse aucune trace. La
 question.
 
 ```json
-// scenes/town-square.json, main_street_exit_r — sortie vers une autre scène majeure
+// scenes/town-square.json, main_street_exit_1_r — sortie vers une autre scène majeure
 {
-  "id": "main_street_exit_r",
+  "id": "main_street_exit_1_r",
   "type": "scene_exit",
   "x": 0,
   "action": {

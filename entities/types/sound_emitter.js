@@ -7,8 +7,8 @@
 //     déclenché ainsi est diégétique, positionné sur l'émetteur, soumis à
 //     la même chaîne que n'importe quelle balise (distance, pan, occlusion
 //     de face, réverb de la scène). Clients : les cloches du puits des
-//     contrepoids et de son côté miroir (bell_emitter_r dans
-//     scenes/clock-tower-weight-shaft.json et
+//     contrepoids et de son côté miroir (bell_emitter_1_r dans
+//     scenes/clock-tower-weight-shaft.json, bell_emitter_1 dans
 //     scenes/clock-tower-weight-shaft-mirror-side.json) ;
 //   - une `sounds.beacon` continue, posée au même x qu'une autre entité
 //     pour SUPERPOSER deux balises continues sans dupliquer un objet qu'on

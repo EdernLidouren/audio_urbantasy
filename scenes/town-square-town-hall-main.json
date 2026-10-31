@@ -22,7 +22,7 @@
       "variables": [{ "name": "isOpen", "type": "flag", "initial": false, "persistent": false }]
     },
     {
-      "id": "town_hall_door",
+      "id": "town_hall_door_1",
       "type": "door",
       "nameKey": "door.town_hall_main.name",
       "descriptionKey": "door.town_hall_main.description",
@@ -31,7 +31,7 @@
       "action": { "kind": "applyEffects", "effects": [{ "type": "playSound", "path": "assets/sounds/doors/door_2_open" }, { "type": "teleport", "target": "town_square", "x": 25 }] }
     },
     {
-      "id": "mayor_office_door",
+      "id": "mayor_office_door_1",
       "type": "door",
       "nameKey": "door.mayor_office.name",
       "descriptionKey": "door.mayor_office.description",
@@ -42,7 +42,7 @@
       "action": { "kind": "applyEffects", "effects": [{ "type": "playSound", "path": "assets/sounds/doors/door_2_open" }, { "type": "teleport", "target": "town_square_town_hall_mayor_office", "x": 8 }] }
     },
     {
-      "id": "meeting_room_door",
+      "id": "meeting_room_door_1",
       "type": "door",
       "nameKey": "door.meeting_room.name",
       "descriptionKey": "door.meeting_room.description",

@@ -14,7 +14,7 @@
 import { TICK_MS } from "../lib/loop.js";
 import { nextRandom } from "./rng.js";
 
-export function isWait(effect) {
+function isWait(effect) {
   return effect.type === "wait";
 }
 

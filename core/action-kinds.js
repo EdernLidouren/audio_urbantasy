@@ -23,7 +23,7 @@ import { ITEM_REGISTRY } from "./items.js";
 // Champs permis sur TOUTE action, quel que soit son kind (voir
 // doc/scripting.md/"Conditions d'action", "Effets d'action", "Confirmation
 // d'une action").
-export const COMMON_ACTION_FIELDS = ["kind", "condition", "confirm", "effects", "refusalEffects"];
+const COMMON_ACTION_FIELDS = ["kind", "condition", "confirm", "effects", "refusalEffects"];
 
 function isPositiveInteger(value) {
   return Number.isInteger(value) && value > 0;

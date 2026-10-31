@@ -19,7 +19,7 @@
   "reverbPreset": "stone_tower",
   "entities": [
     {
-      "id": "magic_mirror_r",
+      "id": "magic_mirror_1",
       "type": "magic_mirror",
       "x": 0,
       "action": [
@@ -54,7 +54,7 @@
       ]
     },
     {
-      "id": "bell_emitter_r",
+      "id": "bell_emitter_1",
       "type": "sound_emitter",
       "x": 25,
       "triggers": [
@@ -72,7 +72,7 @@
       ]
     },
     {
-      "id": "miravi_1_r",
+      "id": "miravi_1",
       "type": "miravi",
       "x": 25,
       "isFlying": true,
@@ -86,17 +86,17 @@
       }
     },
     {
-      "id": "reversed_weight_shaft_r",
+      "id": "reversed_weight_shaft_1",
       "type": "reversed_weight_shaft",
       "x": 25
     },
     {
-      "id": "reversed_winding_mechanism_r",
+      "id": "reversed_winding_mechanism_1",
       "type": "reversed_large_winding_mechanism",
       "x": 30
     },
     {
-      "id": "reversed_clock_tower_escapement_r",
+      "id": "reversed_clock_tower_escapement_1",
       "type": "reversed_clock_tower_escapement",
       "x": 40
     }
