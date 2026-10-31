@@ -226,6 +226,12 @@ export default function checkStartle(run) {
   const facesBack = returnStartledEntities(facesScared);
   run("retour : les DEUX faces du monde", false, "startled" in facesBack.worlds[facesBack.activeWorldId].verso.entities[0]);
 
+  // Un compagnon effarouché (effet "startle" d'un de ses triggers) revient
+  // lui aussi : il suit le joueur, aucun monde ne le ramènerait.
+  const scaredCompanion = { ...firstTick, companions: [{ id: "c", type: "dog", x: 1, startled: true, present: false }] };
+  const companionBack = returnStartledEntities(scaredCompanion).companions[0];
+  run("retour : compagnon effarouché ramené", false, "startled" in companionBack || "present" in companionBack);
+
   // --- Déterminisme et sérialisabilité ---
   const replay = tickUntilStartled(firstTick, "b");
   run("déterminisme : même suite d'actions -> même tick d'envol", reached.ticks, replay.ticks);

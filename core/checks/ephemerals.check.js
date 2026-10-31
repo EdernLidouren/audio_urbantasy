@@ -300,6 +300,20 @@ export default function checkEphemerals(run) {
     getActiveWorld(evictionState).entities.some((e) => e.id === "declared-1")
   );
 
+  // Monde à deux faces : chaque face a son compteur, l'id porte la face —
+  // jamais deux "ephemeral-0" dans le même monde.
+  const twoFacedEphemerals = parseScene(
+    { id: "movement-check-ephemeral-faces", titleKey: "scene.demo.name", length: 10, playerStart: 0, recto: { entities: [] }, verso: { entities: [] } },
+    EPHEMERAL_REGISTRY
+  );
+  const bothFaces = spawnEphemeral(spawnEphemeral(createInitialState(twoFacedEphemerals), EPHEMERAL_SPEC, 2, "recto"), EPHEMERAL_SPEC, 3, "verso");
+  const facesWorld = bothFaces.worlds["movement-check-ephemeral-faces"];
+  run.same(
+    "éphémère : deux faces -> ids distincts, la face dans l'id",
+    ["ephemeral-recto-0", "ephemeral-verso-0"],
+    [facesWorld.recto.entities[0].id, facesWorld.verso.entities[0].id]
+  );
+
   // --- Spawn d'éphémères ÉPARPILLÉS (core/state.js/spawnScatteredEphemerals
   // + drawScatteredPosition, core/money.js/lootEntitySpawn) ---
   // Voir doc/entity-model.md/"Spawn déclenché par une action".

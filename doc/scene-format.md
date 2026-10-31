@@ -280,7 +280,7 @@ exemple) : jamais de voix orpheline ni de fondus qui se disputent le canal.
 
 | Champ     | Type   | Contrainte                                                    |
 |-----------|--------|------------------------------------------------------------------|
-| `id`      | string | non vide, unique dans la scène                                  |
+| `id`      | string | non vide, unique dans la scène, les DEUX faces confondues (la vue audio rend les deux faces ensemble et repère une entité par son id) |
 | `type`    | string | doit exister dans le registre `entities/types/index.js`          |
 | `x`       | number | dans `[0, length]`                                                |
 | `nameKey` | string | optionnel (npc/object) : clé i18n spécifique à l'instance, forme `<namespace>.name` (ex. `door.club.name`) |

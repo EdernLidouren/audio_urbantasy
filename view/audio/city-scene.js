@@ -133,6 +133,7 @@ export function createCityAudioScene(getSession, { handover = null } = {}) {
   const faceCrossfade = createFaceCrossfade({
     getSession,
     entities,
+    reverbBusInput: reverbBus.input,
     faceMuffle: muffle.faceMuffle,
     beaconConditionAllows: entityAudio.beaconConditionAllows,
     oneShots,

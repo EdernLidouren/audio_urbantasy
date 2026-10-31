@@ -147,6 +147,17 @@ export default function checkScene(run) {
     rejected({ ...TWO_FACED_RAW_SCENE, recto: { ...TWO_FACED_RAW_SCENE.recto, indor: true } })
   );
   run("champs inconnus : face qui n'est pas un objet", "parseScene: verso doit être un objet.", message({ ...TWO_FACED_RAW_SCENE, verso: "vide" }));
+  // Un id ne sert qu'une fois dans toute la scène, faces confondues (la vue
+  // audio rend les deux faces ensemble et repère une entité par son id).
+  run(
+    "ids : le même id sur les deux faces est refusé",
+    true,
+    message({
+      ...TWO_FACED_RAW_SCENE,
+      verso: { ...TWO_FACED_RAW_SCENE.verso, entities: [{ ...TWO_FACED_RAW_SCENE.verso.entities[0], id: "recto-dog" }] },
+    }).includes('"recto-dog" est dupliqué')
+  );
+  run("ids : deux faces aux ids distincts acceptées", "accepté", message(TWO_FACED_RAW_SCENE));
   run("champs inconnus : segment", true, rejected({ ...base, segments: [{ from: 0, to: 5, surface: "grass", surfce: "grass" }] }));
   run(
     "champs inconnus : plage de collecte",

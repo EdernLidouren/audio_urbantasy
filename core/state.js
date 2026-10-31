@@ -551,7 +551,11 @@ export function applyCompanionActionEffects(session, companionId, effects, { app
 //   - id dérivé de `world.nextEphemeralId` (compteur dédié, voir
 //     createWorldState) — JAMAIS Date.now()/Math.random() : le core reste
 //     déterministe, un id ne doit dépendre que d'un état déjà threadé
-//     explicitement, comme tout le reste de ce fichier.
+//     explicitement, comme tout le reste de ce fichier. Chaque face a son
+//     compteur : dans un monde à deux faces, l'id porte aussi la face
+//     ("ephemeral-verso-0"), pour rester unique dans tout le monde — la vue
+//     audio rend les deux faces à la fois et repère une entité par son id
+//     (voir core/scene.js, même règle pour les entités déclarées).
 //
 // Limite anti-prolifération (MAX_EPHEMERALS, config/ephemerals.js) : SEULES
 // les entités éphémères comptent (jamais les entités déclarées, dont le
@@ -569,7 +573,8 @@ export function applyCompanionActionEffects(session, companionId, effects, { app
 export function spawnEphemeral(session, spec, x, side = session.player.side) {
   const world = session.worlds[session.activeWorldId];
   const face = resolveFace(world, side);
-  const entity = { ...spec, id: `ephemeral-${face.nextEphemeralId}`, x, ephemeral: true };
+  const id = isTwoSided(world) ? `ephemeral-${side}-${face.nextEphemeralId}` : `ephemeral-${face.nextEphemeralId}`;
+  const entity = { ...spec, id, x, ephemeral: true };
   let entities = [...face.entities, entity];
 
   if (entities.filter((e) => e.ephemeral).length > MAX_EPHEMERALS) {

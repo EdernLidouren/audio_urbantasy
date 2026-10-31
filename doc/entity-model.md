@@ -253,9 +253,10 @@ JSON de scène, une entité ÉPHÉMÈRE n'est par définition jamais DÉCLARÉE.
   registre directement, donc un spec fabriqué à la main qui l'omettrait
   perdrait tout son. Le core ne connaît AUCUN registre de types,
   `spec.type` reste une étiquette opaque. `spawnEphemeral` pose lui-même
-  `id` (dérivé d'un compteur DÉDIÉ par monde, `world.nextEphemeralId` —
-  JAMAIS `Date.now()`/`Math.random()`, le core reste déterministe), `x` et
-  `ephemeral: true`.
+  `id` (dérivé d'un compteur DÉDIÉ par face, `nextEphemeralId` —
+  JAMAIS `Date.now()`/`Math.random()`, le core reste déterministe ; dans un
+  monde à deux faces l'id porte la face, `ephemeral-verso-0`, pour rester
+  unique dans tout le monde), `x` et `ephemeral: true`.
 - **Rendu** — une entité éphémère est une entité COMME UNE AUTRE côté vue :
   `view/audio/entity-sounds.js` la découvre au tick suivant sa création
   (`syncNewEntitySounds`, appelée avant tout calcul positionné) et lui
@@ -470,7 +471,9 @@ dans `core/startle.js`, un seul drapeau runtime `startled` (comme
   (voir "Sons de transition"), joué et positionné par la vue.
 - **Retour** — à CHAQUE chargement du monde (`view/world-travel.js`, avec
   le regarnissage de collecte), `returnStartledEntities` retire la marque
-  sur les deux faces, et oublie la présence mémorisée : aucune bascule
+  sur les deux faces et sur les compagnons (un compagnon effarouché par un
+  de ses triggers suit le joueur, aucun monde ne le ramènerait), et oublie
+  la présence mémorisée : aucune bascule
   fantôme au retour. Revenir dans la scène, ou continuer une partie
   sauvegardée pendant la visite, ramène l'entité. Aucun tirage PRNG :
   le déterminisme ne dépend que des positions.

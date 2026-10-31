@@ -184,6 +184,10 @@ export function createEntitySounds({ getSession, handover = null }) {
     cleanupRemovedEntities,
     muteSpentBeacons,
     isBeaconSpent: (entityId) => spentBeaconIds.has(entityId),
+    // Le même jugement sur une entrée et son entité vivante, quelle que soit
+    // la face (la bascule de face, voir ./face-crossfade.js, n'ouvre jamais
+    // une balise éteinte de l'autre face).
+    isSpent,
     collisionSoundFor: (entityId) => collisionSoundByEntityId.get(entityId),
   };
 }

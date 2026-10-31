@@ -212,7 +212,9 @@ function parseSpawnRange(rawRange, index, length, prefix) {
 // parseScene (racine, PARTAGÉ entre les deux faces — voir son commentaire) —
 // simplement RELAYÉ jusqu'à chaque entité (voir parseEntity), jamais relu
 // ici : une face ne PORTE pas son propre sac de scène.
-function parseFace(raw, length, registry, describe, sceneVariables) {
+// `seenIds` : ids déjà pris, PARTAGÉ par les deux faces d'une scène à
+// deux faces (voir parseScene).
+function parseFace(raw, length, registry, describe, sceneVariables, seenIds = new Set()) {
   const prefix = describe ? `${describe}.` : "";
   // Face d'une scène à deux faces : objet requis, et rien d'autre que des
   // champs de face. Une scène simple est vérifiée par parseScene, qui
@@ -340,7 +342,6 @@ function parseFace(raw, length, registry, describe, sceneVariables) {
     if (raw[field] !== undefined) reverb[field] = raw[field];
   }
 
-  const seenIds = new Set();
   const parsedEntities = resolvedEntities.map((rawEntity, index) =>
     parseEntity(rawEntity, index, registry, length, seenIds, sceneVariables)
   );
@@ -459,8 +460,13 @@ export function parseScene(raw, registry) {
       fail(`"${leakedField}" est un champ de FACE : une scène à deux faces le déclare dans recto/verso, jamais à la racine.`);
     }
     rejectUnknownFields(raw, SCENE_FIELDS, "scène");
-    const parsedRecto = parseFace(recto, resolvedLength, registry, "recto", resolvedVariables);
-    const parsedVerso = parseFace(verso, resolvedLength, registry, "verso", resolvedVariables);
+    // Un id ne sert qu'UNE fois dans toute la scène, faces confondues : la
+    // vue audio rend les deux faces ensemble et repère une entité par son
+    // id (bascule de face, sons d'une entité de l'autre face). D'où la
+    // convention `_r` / `_v` des scènes à deux faces.
+    const sceneIds = new Set();
+    const parsedRecto = parseFace(recto, resolvedLength, registry, "recto", resolvedVariables, sceneIds);
+    const parsedVerso = parseFace(verso, resolvedLength, registry, "verso", resolvedVariables, sceneIds);
     warnOnOverlaps(parsedRecto.entities, resolvedPlayerStart);
     warnOnOverlaps(parsedVerso.entities, resolvedPlayerStart);
     return {

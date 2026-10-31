@@ -17,7 +17,10 @@
 //     view/world-travel.js à CHAQUE chargement, comme le regarnissage de
 //     collecte) : l'entité reprend sa place, comme un oiseau dérangé qui
 //     revient quand on n'est plus là. Revenir dans la scène, ou continuer
-//     une partie sauvegardée pendant la visite, la ramène.
+//     une partie sauvegardée pendant la visite, la ramène. Un COMPAGNON
+//     effarouché (l'effet "startle" d'un de ses triggers) revient de même
+//     au chargement suivant : il suit le joueur, aucun monde ne le
+//     ramènerait sinon.
 //
 // DORMANCE : une entité marquée est dormante (core/presence.js/
 // resolveEntityRules), avec ses trois plans coupés (comportement, son,
@@ -62,7 +65,8 @@ function settle(entity) {
 }
 
 // Chargement du monde ACTIF (voir l'en-tête) : ses DEUX faces s'il en a
-// deux. Aucune entité envolée -> MÊME référence de session.
+// deux, et les compagnons. Aucune entité envolée -> MÊME référence de
+// session.
 export function returnStartledEntities(session) {
   const world = session.worlds[session.activeWorldId];
   const sides = isTwoSided(world) ? ["recto", "verso"] : [null];
@@ -73,5 +77,7 @@ export function returnStartledEntities(session) {
     const entities = face.entities.map((entity) => (entity.startled ? settle(entity) : entity));
     nextWorld = withFace(nextWorld, side, { entities });
   }
-  return nextWorld === world ? session : withActiveWorld(session, nextWorld);
+  const next = nextWorld === world ? session : withActiveWorld(session, nextWorld);
+  if (!session.companions.some((companion) => companion.startled)) return next;
+  return { ...next, companions: next.companions.map((companion) => (companion.startled ? settle(companion) : companion)) };
 }

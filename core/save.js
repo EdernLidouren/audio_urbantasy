@@ -49,17 +49,17 @@ function resolveRenameChains(table, label) {
 }
 
 const ENTITY_TYPE_RENAMES = resolveRenameChains(RENAMED_ENTITY_TYPES, "RENAMED_ENTITY_TYPES");
-// Clés i18n et chemins de sons ne peuvent pas se confondre (forme pointée
-// contre chemin de dossier) : une seule passe sur toutes les valeurs.
+// Un id de scène (snake_case) a la même forme qu'un id ou un type
+// d'entité, un id d'objet ou une valeur de variable : il n'est renommé
+// QU'AUX endroits où il figure (voir renameSceneIds), jamais par une passe
+// sur toutes les valeurs, qui renommerait aussi une entité homonyme.
 const SCENE_ID_RENAMES = resolveRenameChains(RENAMED_SCENE_IDS, "RENAMED_SCENE_IDS");
-// Un id de scène (snake_case, sans point ni barre oblique) ne se confond
-// pas non plus avec une clé i18n ou un chemin : même passe sur les valeurs
-// (activeWorldId, cible d'un "teleport", id recopié dans le monde). La clé
-// du monde dans session.worlds, elle, est renommée à part (renameWorldIds).
+// Clés i18n et chemins de sons ne peuvent pas se confondre (forme pointée
+// contre chemin de dossier), ni avec rien d'autre : une seule passe sur
+// toutes les valeurs.
 const VALUE_RENAMES = {
   ...resolveRenameChains(RENAMED_I18N_KEYS, "RENAMED_I18N_KEYS"),
   ...resolveRenameChains(RENAMED_ASSET_PATHS, "RENAMED_ASSET_PATHS"),
-  ...SCENE_ID_RENAMES,
 };
 
 // Parcourt toute la donnée en profondeur : `visit(value)` reçoit chaque
@@ -138,7 +138,7 @@ function renameEntityTypes(entities) {
   const out = entities.map((entity) => {
     if (!entity) return entity;
     const typed = Object.hasOwn(ENTITY_TYPE_RENAMES, entity.type) ? { ...entity, type: ENTITY_TYPE_RENAMES[entity.type] } : entity;
-    const next = renameSpawnSpecTypes(typed);
+    const next = mapEntityEffects(typed, renameSpawnSpecType);
     if (next !== entity) changed = true;
     return next;
   });
@@ -146,37 +146,82 @@ function renameEntityTypes(entities) {
 }
 
 // Le `spec` d'un effet "spawn" (core/script-parse.js) porte lui aussi un
-// type d'entité, figé avec la scène dans les listes d'effets de l'entité :
-// action (et ses refus), triggers, séquence en attente. Référence inchangée
-// si rien n'est renommé.
-function renameSpawnSpecTypes(entity) {
+// type d'entité, figé avec la scène dans les listes d'effets de l'entité.
+function renameSpawnSpecType(effect) {
+  if (effect.type !== "spawn" || !effect.spec || !Object.hasOwn(ENTITY_TYPE_RENAMES, effect.spec.type)) return effect;
+  return { ...effect, spec: { ...effect.spec, type: ENTITY_TYPE_RENAMES[effect.spec.type] } };
+}
+
+// La cible d'un "teleport" (une porte figée dans un monde) est un id de
+// scène.
+function renameTeleportTarget(effect) {
+  if (effect.type !== "teleport" || !Object.hasOwn(SCENE_ID_RENAMES, effect.target)) return effect;
+  return { ...effect, target: SCENE_ID_RENAMES[effect.target] };
+}
+
+// Applique `mapEffect(effect) -> effect` à chaque effet figé avec la scène
+// dans une entité : action (et ses refus), triggers, séquence en attente.
+// Référence inchangée si rien ne change.
+function mapEntityEffects(entity, mapEffect) {
   let next = entity;
   if (entity.action && typeof entity.action === "object") {
     const actions = Array.isArray(entity.action) ? entity.action : [entity.action];
-    const renamed = actions.map((action) => renameSpawnsIn(action, ["effects", "refusalEffects"]));
-    if (renamed.some((action, i) => action !== actions[i])) next = { ...next, action: Array.isArray(entity.action) ? renamed : renamed[0] };
+    const mapped = actions.map((action) => mapEffectsIn(action, ["effects", "refusalEffects"], mapEffect));
+    if (mapped.some((action, i) => action !== actions[i])) next = { ...next, action: Array.isArray(entity.action) ? mapped : mapped[0] };
   }
   for (const key of ["triggers", "pendingEffects"]) {
     if (!Array.isArray(entity[key])) continue;
-    const renamed = entity[key].map((holder) => renameSpawnsIn(holder, ["effects"]));
-    if (renamed.some((holder, i) => holder !== entity[key][i])) next = { ...next, [key]: renamed };
+    const mapped = entity[key].map((holder) => mapEffectsIn(holder, ["effects"], mapEffect));
+    if (mapped.some((holder, i) => holder !== entity[key][i])) next = { ...next, [key]: mapped };
   }
   return next;
 }
 
-function renameSpawnsIn(holder, keys) {
+function mapEffectsIn(holder, keys, mapEffect) {
   let next = holder;
   for (const key of keys) {
     if (!holder || !Array.isArray(holder[key])) continue;
     let changed = false;
     const effects = holder[key].map((effect) => {
-      if (!effect || effect.type !== "spawn" || !effect.spec || !Object.hasOwn(ENTITY_TYPE_RENAMES, effect.spec.type)) return effect;
-      changed = true;
-      return { ...effect, spec: { ...effect.spec, type: ENTITY_TYPE_RENAMES[effect.spec.type] } };
+      if (!effect) return effect;
+      const mapped = mapEffect(effect);
+      if (mapped !== effect) changed = true;
+      return mapped;
     });
     if (changed) next = { ...next, [key]: effects };
   }
   return next;
+}
+
+function renameTeleportTargets(entities) {
+  let changed = false;
+  const out = entities.map((entity) => {
+    if (!entity) return entity;
+    const next = mapEntityEffects(entity, renameTeleportTarget);
+    if (next !== entity) changed = true;
+    return next;
+  });
+  return changed ? out : entities;
+}
+
+// Ids de scène, là où ils figurent : le monde actif, l'id recopié dans
+// chaque monde, et la cible des "teleport" figés dans les entités. Les clés
+// de session.worlds sont renommées à part (renameWorldIds).
+function renameSceneIds(data) {
+  if (Object.keys(SCENE_ID_RENAMES).length === 0) return data;
+  let result = mapEntityLists(data, renameTeleportTargets);
+  if (Object.hasOwn(SCENE_ID_RENAMES, result.activeWorldId)) {
+    result = { ...result, activeWorldId: SCENE_ID_RENAMES[result.activeWorldId] };
+  }
+  if (result.worlds && typeof result.worlds === "object") {
+    const ids = Object.entries(result.worlds).filter(([, world]) => world && Object.hasOwn(SCENE_ID_RENAMES, world.id));
+    if (ids.length > 0) {
+      const worlds = { ...result.worlds };
+      for (const [key, world] of ids) worlds[key] = { ...world, id: SCENE_ID_RENAMES[world.id] };
+      result = { ...result, worlds };
+    }
+  }
+  return result;
 }
 
 // Clés de session.worlds : un monde rangé sous l'ancien id de sa scène
@@ -196,10 +241,11 @@ function renameWorldIds(data) {
 }
 
 // Renommages de contenu d'une partie déjà rebouchée : types d'entité, ids
-// de mondes, puis clés i18n, chemins de sons et ids de scènes cités.
-// Idempotent : une sauvegarde déjà à jour traverse sans changement.
+// de scènes (clés des mondes, puis là où ils sont cités), puis clés i18n et
+// chemins de sons. Idempotent : une sauvegarde déjà à jour traverse sans
+// changement.
 function applyContentRenames(data) {
-  return renameValues(renameWorldIds(mapEntityLists(data, renameEntityTypes)));
+  return renameValues(renameSceneIds(renameWorldIds(mapEntityLists(data, renameEntityTypes))));
 }
 
 // --- Durées d'errance en ticks (doc/save.md) ----------------------------

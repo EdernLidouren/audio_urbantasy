@@ -405,6 +405,19 @@ export default function checkSave(run) {
     renamedSession,
     deserializeGame({ version: SAVE_VERSION, data: renamedSession }).session
   );
+  // Une entité dont l'id porte, par hasard, l'ancien id de scène n'est pas
+  // renommée : seuls le monde actif, l'id du monde et les cibles de
+  // "teleport" le sont.
+  const homonym = { id: OLD_SCENE_ID, type: "dog", x: 2, sounds: {} };
+  const homonymResult = deserializeGame({
+    version: SAVE_VERSION,
+    data: { ...auditSession, worlds: { ...auditSession.worlds, [renameWorldId]: { ...renameWorld, entities: [...renameWorld.entities, homonym] } } },
+  });
+  run(
+    "save scène renommée : entité homonyme laissée telle quelle",
+    true,
+    homonymResult.success && homonymResult.session.worlds[renameWorldId].entities.some((e) => e.id === OLD_SCENE_ID)
+  );
 
   // Sauvegarde ANTÉRIEURE à defaultSurface/segments (voir
   // core/scene.js/parseScene) : ses mondes n'ont jamais eu ces clés, et une

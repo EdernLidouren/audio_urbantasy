@@ -130,8 +130,11 @@ export const RENAMED_SCENE_IDS = { clock_tower_weight_shaft_mirror_space: "clock
   mondes ne sont pas concernés. Un chemin de son s'écrit comme dans le
   contenu : le pool, sans suffixe de variante.
 - Un id de scène est renommé comme CLÉ du monde dans `session.worlds`, et
-  comme valeur exacte partout ailleurs (`activeWorldId`, id recopié dans le
-  monde, cible d'un `"teleport"` figée dans n'importe quel monde). Renommer
+  aux seuls endroits où il figure : `activeWorldId`, id recopié dans le
+  monde, cible d'un `"teleport"` figée dans n'importe quel monde (action et
+  refus, triggers, séquence en attente). Jamais par une passe sur toutes les
+  valeurs : un id de scène a la forme d'un id ou d'un type d'entité, qu'une
+  telle passe renommerait aussi. Renommer
   une scène, c'est aussi renommer son fichier, son entrée de
   `scenes/index.js`, sa clé de titre (`scene.<id>.name`, dans
   `RENAMED_I18N_KEYS`) et les cibles qui la citent dans les autres scènes.
