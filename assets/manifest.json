@@ -370,6 +370,9 @@
   "assets/sounds/effects/light_switch_on": [
     "assets/sounds/effects/light_switch_on_1.mp3"
   ],
+  "assets/sounds/effects/metal_fence_collision": [
+    "assets/sounds/effects/metal_fence_collision_1.mp3"
+  ],
   "assets/sounds/effects/neon_bulb_burst": [
     "assets/sounds/effects/neon_bulb_burst_1.mp3",
     "assets/sounds/effects/neon_bulb_burst_2.mp3",

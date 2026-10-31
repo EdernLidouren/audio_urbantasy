@@ -28,6 +28,13 @@
       { "id": "main_headframe_1_r", "type": "main_headframe", "x": 25, "tuning": { "beaconCrossFaceGain": 0.5 } },
       { "id": "mine_shaft_emitter_1_r", "type": "sound_emitter", "x": 25, "sounds": { "beacon": { "path": "assets/sounds/decor/mine_shaft_1_beacon", "loop": true } } },
       { "id": "old_quarries_pond_1_r", "type": "old_quarries_pond", "x": 36 },
+      {
+        "id": "passage_2_r",
+        "type": "passage",
+        "x": 39,
+        "descriptionKey": "passage.old_quarries_excavations.description",
+        "action": { "kind": "switchSide", "arrivalX": 39 }
+      },
       { "id": "cliff_foot_1_r", "type": "cliff_foot", "x": 50 }
     ]
   },
@@ -58,6 +65,13 @@
         "tuning": { "beaconCrossFaceGain": 0.3 }
       },
       { "id": "mine_shaft_emitter_1_v", "type": "sound_emitter", "x": 25, "sounds": { "beacon": { "path": "assets/sounds/decor/mine_shaft_1_beacon", "loop": true } } },
+      {
+        "id": "passage_2_v",
+        "type": "passage",
+        "x": 39,
+        "descriptionKey": "passage.old_quarries_excavations.description",
+        "action": { "kind": "switchSide", "arrivalX": 39 }
+      },
       { "id": "cliff_foot_1_v", "type": "cliff_foot", "x": 50 }
     ]
   }
