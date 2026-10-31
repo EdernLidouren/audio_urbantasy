@@ -17,16 +17,18 @@
       { "from": 32, "to": 40, "surface": "shallow_water" }
     ],
     "entities": [
-      { "id": "metal_fence_1_r", "type": "metal_fence", "x": 10 },
+      { "id": "metal_fence_1_r", "type": "metal_fence", "x": 5 },
       {
-        "id": "electric_generator_1_r",
-        "type": "diesel_electric_generator",
-        "x": 21,
-        "variables": [{ "name": "isOn", "type": "flag", "initial": false }],
-        "tuning": { "beaconCrossFaceGain": 0.3 }
+        "id": "passage_1_r",
+        "type": "passage",
+        "x": 6,
+        "descriptionKey": "passage.old_quarries_fence.description",
+        "action": { "kind": "switchSide", "arrivalX": 6 }
       },
       { "id": "main_headframe_1_r", "type": "main_headframe", "x": 25, "tuning": { "beaconCrossFaceGain": 0.5 } },
-      { "id": "mine_shaft_emitter_1_r", "type": "sound_emitter", "x": 25, "sounds": { "beacon": { "path": "assets/sounds/decor/mine_shaft_1_beacon", "loop": true } } }
+      { "id": "mine_shaft_emitter_1_r", "type": "sound_emitter", "x": 25, "sounds": { "beacon": { "path": "assets/sounds/decor/mine_shaft_1_beacon", "loop": true } } },
+      { "id": "old_quarries_pond_1_r", "type": "old_quarries_pond", "x": 36 },
+      { "id": "cliff_foot_1_r", "type": "cliff_foot", "x": 50 }
     ]
   },
   "verso": {
@@ -40,8 +42,23 @@
       { "from": 20, "to": 30, "surface": "metal" }
     ],
     "entities": [
-      { "id": "metal_fence_1_v", "type": "metal_fence", "x": 10, "blocksMovement": true },
-      { "id": "mine_shaft_emitter_1_v", "type": "sound_emitter", "x": 25, "sounds": { "beacon": { "path": "assets/sounds/decor/mine_shaft_1_beacon", "loop": true } } }
+      { "id": "metal_fence_1_v", "type": "metal_fence", "x": 5, "blocksMovement": true },
+      {
+        "id": "passage_1_v",
+        "type": "passage",
+        "x": 6,
+        "descriptionKey": "passage.old_quarries_fence.description",
+        "action": { "kind": "switchSide", "arrivalX": 6 }
+      },
+      {
+        "id": "electric_generator_1_v",
+        "type": "diesel_electric_generator",
+        "x": 21,
+        "variables": [{ "name": "isOn", "type": "flag", "initial": false }],
+        "tuning": { "beaconCrossFaceGain": 0.3 }
+      },
+      { "id": "mine_shaft_emitter_1_v", "type": "sound_emitter", "x": 25, "sounds": { "beacon": { "path": "assets/sounds/decor/mine_shaft_1_beacon", "loop": true } } },
+      { "id": "cliff_foot_1_v", "type": "cliff_foot", "x": 50 }
     ]
   }
 }

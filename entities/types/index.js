@@ -61,6 +61,7 @@ import chair from "./chair.js";
 import clock from "./clock.js";
 import clockTower from "./clock_tower.js";
 import clockTowerEscapement from "./clock_tower_escapement.js";
+import cliffFoot from "./cliff_foot.js";
 import coin from "./coin.js";
 import crate from "./crate.js";
 import cumuloLupus from "./cumulo-lupus.js";
@@ -96,6 +97,7 @@ import officeComputer from "./office_computer.js";
 import officeSupplyBox from "./office_supply_box.js";
 import officeTable from "./office_table.js";
 import officeWaterCooler from "./office_water_cooler.js";
+import oldQuarriesPond from "./old_quarries_pond.js";
 import oldSurveyMap from "./old_survey_map.js";
 import passage from "./passage.js";
 import perchedBird1 from "./perched_bird_1.js";
@@ -136,6 +138,7 @@ export default {
   clock,
   clock_tower: clockTower,
   clock_tower_escapement: clockTowerEscapement,
+  cliff_foot: cliffFoot,
   coin,
   crate,
   cumuloLupus,
@@ -171,6 +174,7 @@ export default {
   office_supply_box: officeSupplyBox,
   office_table: officeTable,
   office_water_cooler: officeWaterCooler,
+  old_quarries_pond: oldQuarriesPond,
   old_survey_map: oldSurveyMap,
   passage,
   perched_bird_1: perchedBird1,

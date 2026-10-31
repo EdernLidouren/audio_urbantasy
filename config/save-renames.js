@@ -82,6 +82,9 @@ export const RENAMED_ASSET_PATHS = {
   "assets/sounds/doors/passage_wind_beacon": "assets/sounds/doors/passage_outdoor_1_beacon",
   "assets/sounds/doors/passage_indoor_beacon": "assets/sounds/doors/passage_indoor_1_beacon",
   "assets/sounds/decor/traffic_signal_relay": "assets/sounds/decor/traffic_signal_relay_1_beacon",
+  // Le rocher citait un membre précis du pool, pas le pool : c'est ce
+  // chemin exact qu'une sauvegarde a figé.
+  "assets/sounds/decor/big_rock_beacon_1.mp3": "assets/sounds/decor/big_rock_1_beacon_1.mp3",
 };
 
 // Ids de scène (scenes/index.js) : la clé du monde dans la partie
