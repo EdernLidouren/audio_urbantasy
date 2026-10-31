@@ -79,11 +79,13 @@ import item from "./item.js";
 import largeMachinery from "./large_machinery.js";
 import largeWindingMechanism from "./large_winding_mechanism.js";
 import machine1 from "./machine_1.js";
+import memorialStone from "./memorial_stone.js";
 import magicMirror from "./magic_mirror.js";
 import mainHeadframe from "./main_headframe.js";
 import miravi from "./miravi.js";
 import metalContainer from "./metal_container.js";
 import metalFence from "./metal_fence.js";
+import metalSign from "./metal_sign.js";
 import metalTrashCan from "./metal_trash_can.js";
 import motorisedBillboard from "./motorised_billboard.js";
 import mirror from "./mirror.js";
@@ -156,11 +158,13 @@ export default {
   large_machinery: largeMachinery,
   large_winding_mechanism: largeWindingMechanism,
   machine_1: machine1,
+  memorial_stone: memorialStone,
   magic_mirror: magicMirror,
   main_headframe: mainHeadframe,
   miravi,
   metal_container: metalContainer,
   metal_fence: metalFence,
+  metal_sign: metalSign,
   metal_trash_can: metalTrashCan,
   motorised_billboard: motorisedBillboard,
   mirror,

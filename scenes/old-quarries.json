@@ -18,6 +18,12 @@
       { "from": 32, "to": 40, "surface": "shallow_water" }
     ],
     "entities": [
+      {
+        "id": "memorial_stone_1_r",
+        "type": "memorial_stone",
+        "x": 3,
+        "descriptionKey": "entity.old_quarries_memorial_stone.description"
+      },
       { "id": "metal_fence_1_r", "type": "metal_fence", "x": 5 },
       {
         "id": "passage_1_r",
@@ -52,6 +58,12 @@
         ]
       },
       { "id": "mine_shaft_emitter_1_r", "type": "sound_emitter", "x": 25, "sounds": { "beacon": { "path": "assets/sounds/decor/mine_shaft_1_beacon", "loop": true } } },
+      {
+        "id": "warning_sign_1_r",
+        "type": "metal_sign",
+        "x": 27,
+        "descriptionKey": "entity.old_quarries_warning_sign.description"
+      },
       { "id": "old_quarries_pond_1_r", "type": "old_quarries_pond", "x": 36 },
       {
         "id": "passage_2_r",
