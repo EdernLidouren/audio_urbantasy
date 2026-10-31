@@ -6,6 +6,7 @@
   "menu.main.new_game": "New game",
   "menu.main.new_game_confirm_title": "A save exists. Starting a new game will overwrite it. Confirm?",
   "menu.main.options": "Options",
+  "menu.main.start_failed": "The game cannot be started right now. Details in the console.",
   "menu.main.test_city": "Test city",
   "menu.main.title": "Templeton",
   "menu.message.ok": "OK",

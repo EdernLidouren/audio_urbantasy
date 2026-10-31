@@ -900,7 +900,9 @@ puis accourt, et reprend enfin ce qu'il faisait (voir "Séquences : wait",
 ```
 
 Chaque trigger qui répond est une séquence À PART : le `wait` de l'un ne
-retarde jamais les effets d'un autre.
+retarde jamais les effets d'un autre, et les suites de deux triggers
+avec `wait` vont toutes deux à leur terme (voir "Séquences : wait"/"Un fil
+à la fois").
 
 **Tous** les triggers qui répondent tirent, dans l'ordre déclaré (même
 règle que l'horloge). **Portée** : la FACE DU JOUEUR seulement — l'autre
@@ -1284,7 +1286,10 @@ jamais un exécuteur. Valable partout où vit une liste d'effets d'action :
   jamais le réducteur seul.
 - **Un fil à la fois** — une nouvelle liste AVEC `wait` sur la même entité
   REMPLACE ses tranches en attente (siffler deux fois relance la réaction au
-  début) ; une liste SANS `wait` n'y touche pas.
+  début) ; une liste SANS `wait` n'y touche pas. Plusieurs triggers d'une
+  entité qui répondent au MÊME évènement forment un seul fil : le premier
+  remplace ce qui attendait, les suivants s'y ajoutent, et toutes leurs
+  suites vont à leur terme, chacune à son heure.
 - **Temps** — ticks de simulation : gelé sous un menu, déterministe.
   Donnée pure, sauvegardée ; oubliée au chargement du monde
   (`forgetPendingEffects`, avec les comportements temporaires). Une entité
@@ -1294,9 +1299,11 @@ jamais un exécuteur. Valable partout où vit une liste d'effets d'action :
   trigger horaire de l'autre face va à son terme), et les compagnons.
 
 Refusés au chargement (`core/script-parse.js`/`validateSequence`) : un
-`wait` en DERNIER (il n'attendrait rien), un effet MIXTE (`teleport`) après
-un `wait` (le sas se joue à l'activation ; pas encore de téléportation
-différée). Vérification terminal : `core/checks/sequence.check.js`.
+`wait` en DERNIER (il n'attendrait rien), un effet MIXTE (`teleport`) dans
+une liste qui contient un `wait` — après lui, le sas se jouerait au détour
+d'un tick (pas encore de téléportation différée) ; avant lui, la suite
+attendrait sur une entité du monde quitté et serait oubliée sans jamais
+jouer. Vérification terminal : `core/checks/sequence.check.js`.
 
 ### `"setVariable"` / `"toggleVariable"` / `"addVariable"` — état, CORE
 

@@ -200,6 +200,9 @@
   "assets/sounds/decor/metal_fence_1_beacon": [
     "assets/sounds/decor/metal_fence_1_beacon_1.mp3"
   ],
+  "assets/sounds/decor/metal_sign_1_beacon": [
+    "assets/sounds/decor/metal_sign_1_beacon_1.mp3"
+  ],
   "assets/sounds/decor/mine_shaft_1_beacon": [
     "assets/sounds/decor/mine_shaft_1_beacon_1.mp3"
   ],

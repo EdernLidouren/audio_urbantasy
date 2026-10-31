@@ -6,6 +6,7 @@
   "menu.main.new_game": "Nouvelle partie",
   "menu.main.new_game_confirm_title": "Une sauvegarde existe. Démarrer une nouvelle partie l'écrasera. Confirmer ?",
   "menu.main.options": "Options",
+  "menu.main.start_failed": "Impossible de lancer la partie pour le moment. Détail dans la console.",
   "menu.main.test_city": "Ville test",
   "menu.main.title": "Templeton",
   "menu.message.ok": "OK",

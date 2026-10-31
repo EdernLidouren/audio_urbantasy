@@ -440,16 +440,20 @@ function partyEffectFields(session, result) {
 // premier `wait`) s'applique ici ; les suivantes attendent sur l'entité
 // (`pendingEffects`), qu'elles REMPLACENT — une entité ne suit qu'un fil à
 // la fois (le chien sifflé deux fois reprend sa réaction au début). Une
-// liste sans `wait` ne touche pas aux tranches en attente. Les variations
+// liste sans `wait` ne touche pas aux tranches en attente. `append` : les
+// tranches s'AJOUTENT à celles en attente au lieu de les remplacer — pour
+// plusieurs séquences lancées par UN MÊME évènement (deux triggers qui
+// répondent au même sifflet, voir core/triggers.js/applyTriggers), qui
+// forment un seul fil et vont toutes à leur terme. Les variations
 // de `wait` se tirent dans le PRNG de la FACE qui porte l'entité, comme la
 // dispersion du butin (spawnScatteredEphemerals).
-export function applyEntityActionEffects(session, entityId, effects, side = session.player.side) {
+export function applyEntityActionEffects(session, entityId, effects, side = session.player.side, { append = false } = {}) {
   const world = session.worlds[session.activeWorldId];
   const face = resolveFace(world, side);
   const entity = face.entities.find((e) => e.id === entityId);
   if (!entity) return session;
 
-  const result = applyHeadAndSchedule(effects, { entity, world, session }, face.rngState);
+  const result = applyHeadAndSchedule(effects, { entity, world, session }, face.rngState, append);
   const entityChanged = result.entity !== entity;
   const worldChanged = result.world !== world;
   const partyChanged = result.session !== session;
@@ -483,11 +487,16 @@ function applySpawns(session, spawns, side) {
 // applyEntityActionEffects). Même forme de résultat qu'applyActionEffects,
 // plus `rngState` : le PRNG des variations, avancé seulement si un `wait`
 // varie (la suite d'une séquence fait toujours changer l'entité).
-function applyHeadAndSchedule(effects, context, rngState) {
+// `append` : voir applyEntityActionEffects. Chaque tranche porte son délai
+// depuis MAINTENANT (core/sequence.js/sequenceTail) : deux séquences mises
+// bout à bout restent chacune à l'heure, le décompte les traite toutes
+// (core/pending-effects.js/countDownPending).
+function applyHeadAndSchedule(effects, context, rngState, append = false) {
   const result = applyActionEffects(sequenceHead(effects), context);
   const tail = sequenceTail(effects, rngState);
   if (tail.chunks.length === 0) return { ...result, rngState };
-  return { ...result, entity: { ...result.entity, pendingEffects: tail.chunks }, rngState: tail.rngState };
+  const pending = append ? [...(result.entity.pendingEffects ?? []), ...tail.chunks] : tail.chunks;
+  return { ...result, entity: { ...result.entity, pendingEffects: pending }, rngState: tail.rngState };
 }
 
 // Même chose pour un COMPAGNON (session.companions) : il n'est sur aucune
@@ -495,12 +504,12 @@ function applyHeadAndSchedule(effects, context, rngState) {
 // des variables de scène, comme une entité de la face du joueur. id absent
 // -> session INCHANGÉE. Variations de `wait` : dans le PRNG des compagnons
 // (companionsRngState), le leur.
-export function applyCompanionActionEffects(session, companionId, effects) {
+export function applyCompanionActionEffects(session, companionId, effects, { append = false } = {}) {
   const companion = session.companions.find((c) => c.id === companionId);
   if (!companion) return session;
   const world = session.worlds[session.activeWorldId];
 
-  const result = applyHeadAndSchedule(effects, { entity: companion, world, session }, session.companionsRngState);
+  const result = applyHeadAndSchedule(effects, { entity: companion, world, session }, session.companionsRngState, append);
   const entityChanged = result.entity !== companion;
   const worldChanged = result.world !== world;
   const partyChanged = result.session !== session;

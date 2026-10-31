@@ -298,18 +298,24 @@ export function createWorldTravel({ getSession, setSession }) {
   // son monde par un monde neuf. Le fichier est lu AVANT de rien démonter :
   // un fichier invalide laisse la scène intacte, l'erreur part dans le
   // journal des avertissements (Shift+L). Pas de sauvegarde automatique.
+  // Jeu GELÉ pendant la lecture (comme loadTargetScene) : une porte
+  // franchie entre-temps changerait de monde sous la relecture.
   async function reloadSceneFromFile() {
     const sceneId = getSession().activeWorldId;
     let freshScene;
+    pushScreen({});
     try {
       freshScene = await loadSceneById(sceneId, registry);
     } catch (error) {
       reportSceneReloadFailure(sceneId, error.message);
       announce(t("teleport.debug.reloadFailed"), { assertive: true });
       return;
+    } finally {
+      popScreen();
     }
-    // La partie a pu être quittée pendant la lecture.
-    if (!worldView) return;
+    // La partie a pu être quittée pendant la lecture, ou (par sécurité) le
+    // monde actif a changé : rien n'est démonté.
+    if (!worldView || getSession().activeWorldId !== sceneId) return;
 
     worldView.destroy();
     worldView = null;

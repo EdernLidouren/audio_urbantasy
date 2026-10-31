@@ -5,6 +5,7 @@
 
 import { pushScreen, popScreen, activeScreen, tickActive, tickFrame } from "./lib/screens.js";
 import { initInput, onGlobalPress } from "./lib/input.js";
+import { announce } from "./lib/announce.js";
 import { openHelp } from "./lib/help.js";
 import { ensureAudioUnlocked } from "./lib/audio.js";
 import { applyVolumePreferences } from "./view/audio/city-scene.js";
@@ -123,7 +124,8 @@ onGlobalPress(GLOBAL_BINDINGS, (action) => {
 gameZone.focus();
 
 // Scène chargée en tâche de fond ; startNewGame() la lit au moment de
-// l'activation (cas limite improbable : scène pas encore chargée -> no-op).
+// l'activation (pas encore chargée, ou lecture échouée : relue à ce
+// moment-là, voir loadStartScene).
 // "Continuer" n'en a pas besoin : une partie sauvegardée embarque déjà l'état
 // complet de ses mondes (voir view/save-storage.js/loadGame), aucun fetch
 // requis.
@@ -168,9 +170,30 @@ function enterCity() {
   pushScreen(cityScreen);
 }
 
-function startNewGame() {
-  if (!scene) return; // scène pas encore chargée : cas limite improbable
-  session = createInitialState(scene, undefined, newGame.start);
+// Lecture d'une scène de DÉPART à la demande, menu GELÉ par un écran vide
+// le temps du fetch (comme une porte, voir view/world-travel.js/
+// loadTargetScene) : un second Entrée ne lance pas une seconde partie, et
+// aucun menu ne s'ouvre pour se retrouver ensuite SOUS l'écran de ville.
+// Échec : annoncé au lecteur d'écran (jamais un Entrée sans réponse), le
+// détail en console ; rend null.
+async function loadStartScene(sceneId) {
+  pushScreen({});
+  try {
+    return await loadSceneById(sceneId, registry);
+  } catch (error) {
+    console.error(error.message);
+    announce(t("menu.main.start_failed"), { assertive: true });
+    return null;
+  } finally {
+    popScreen();
+  }
+}
+
+async function startNewGame() {
+  const startScene = scene ?? (await loadStartScene(newGame.startSceneId));
+  if (!startScene) return;
+  scene = startScene;
+  session = createInitialState(startScene, undefined, newGame.start);
   enterCity();
 }
 
@@ -184,15 +207,11 @@ function startNewGame() {
 // bas), "demo" n'est chargé qu'à la demande via loadSceneById (même chemin
 // que la traversée d'une porte, voir view/world-travel.js/performTransition)
 // — un raccourci de test n'a pas besoin d'être préchargé au démarrage.
-function startTestCityGame() {
-  loadSceneById("demo", registry)
-    .then((testScene) => {
-      session = createInitialState(testScene, undefined, newGame.start);
-      enterCity();
-    })
-    .catch((error) => {
-      console.error(error.message);
-    });
+async function startTestCityGame() {
+  const testScene = await loadStartScene("demo");
+  if (!testScene) return;
+  session = createInitialState(testScene, undefined, newGame.start);
+  enterCity();
 }
 
 // "Continuer" : réutilise la session déjà chargée par mainMenuScreen.onEnter

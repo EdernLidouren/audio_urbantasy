@@ -91,14 +91,17 @@ export function dueTriggerEffects(entity, previousTime, nextTime, session) {
 // Applique les triggers `triggers` d'UNE entité, UN PAR UN : chaque liste
 // d'effets est une séquence à part (core/sequence.js), dont seule la tête
 // s'exécute maintenant — mises bout à bout, le `wait` de l'une retarderait
-// les effets de la suivante. `apply(session, effects)` : l'application
-// (entité d'une face ou compagnon). Les effets de RENDU de la tête de
-// chaque séquence vont dans `fired`, regroupés par entité.
+// les effets de la suivante. `apply(session, effects, options)` :
+// l'application (entité d'une face ou compagnon). La PREMIÈRE séquence de
+// l'évènement remplace ce qui attendait sur l'entité (un nouveau sifflet
+// reprend la réaction au début), les suivantes s'y AJOUTENT (`append`) :
+// toutes vont à leur terme. Les effets de RENDU de la tête de chaque
+// séquence vont dans `fired`, regroupés par entité.
 function applyTriggers(session, entity, triggers, apply, fired) {
   let next = session;
   const renderEffects = [];
-  for (const trigger of triggers) {
-    next = apply(next, trigger.effects);
+  for (const [index, trigger] of triggers.entries()) {
+    next = apply(next, trigger.effects, { append: index > 0 });
     renderEffects.push(...sequenceHead(trigger.effects).filter(isRenderEffect));
   }
   if (renderEffects.length > 0) fired.push({ entity, effects: renderEffects });
@@ -121,13 +124,13 @@ export function applyDueTriggers(session, previousTime) {
     for (const entity of face.entities) {
       const triggers = dueTriggers(entity, previousTime, session.time, session);
       if (triggers.length === 0) continue;
-      next = applyTriggers(next, entity, triggers, (s, effects) => applyEntityActionEffects(s, entity.id, effects, side), fired);
+      next = applyTriggers(next, entity, triggers, (s, effects, options) => applyEntityActionEffects(s, entity.id, effects, side, options), fired);
     }
   }
   for (const companion of session.companions) {
     const triggers = dueTriggers(companion, previousTime, session.time, session);
     if (triggers.length === 0) continue;
-    next = applyTriggers(next, companion, triggers, (s, effects) => applyCompanionActionEffects(s, companion.id, effects), fired);
+    next = applyTriggers(next, companion, triggers, (s, effects, options) => applyCompanionActionEffects(s, companion.id, effects, options), fired);
   }
 
   return { session: next, fired };
@@ -187,12 +190,12 @@ export function applyEmoteTriggers(session, emoteId, sourceX) {
   for (const entity of resolveFace(world, side).entities) {
     const triggers = emoteTriggers(entity, emoteId, Math.abs(entity.x - sourceX), session);
     if (triggers.length === 0) continue;
-    next = applyTriggers(next, entity, triggers, (s, effects) => applyEntityActionEffects(s, entity.id, effects, side), fired);
+    next = applyTriggers(next, entity, triggers, (s, effects, options) => applyEntityActionEffects(s, entity.id, effects, side, options), fired);
   }
   for (const companion of session.companions) {
     const triggers = emoteTriggers(companion, emoteId, Math.abs(companion.x - sourceX), session);
     if (triggers.length === 0) continue;
-    next = applyTriggers(next, companion, triggers, (s, effects) => applyCompanionActionEffects(s, companion.id, effects), fired);
+    next = applyTriggers(next, companion, triggers, (s, effects, options) => applyCompanionActionEffects(s, companion.id, effects, options), fired);
   }
 
   return { session: next, fired };

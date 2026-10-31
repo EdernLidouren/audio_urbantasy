@@ -26,7 +26,7 @@ import { createSoundPreview } from "./sound-preview.js";
 function improvementEntry(id, owned) {
   const props = IMPROVEMENT_REGISTRY[id];
   if (!owned) {
-    return { label: "improvements.entry.unknown", labelParams: { order: props.order }, placeholder: true, onActivate: () => {} };
+    return { label: "improvements.entry.unknown", labelParams: { order: props.order }, placeholder: true };
   }
   const labelParams = {
     order: props.order,
@@ -71,7 +71,7 @@ function buildImprovementsMenuScreen(getSession) {
 function emoteEntry(id, known, isShortcut, preview) {
   const props = EMOTE_REGISTRY[id];
   if (!known) {
-    return { label: "emotes.tab.entry.unknown", labelParams: { order: props.order }, placeholder: true, onActivate: () => {} };
+    return { label: "emotes.tab.entry.unknown", labelParams: { order: props.order }, placeholder: true };
   }
   return {
     label: isShortcut ? "emotes.tab.entry.shortcut" : "emotes.tab.entry.known",

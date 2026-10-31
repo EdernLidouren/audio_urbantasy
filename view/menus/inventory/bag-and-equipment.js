@@ -180,7 +180,7 @@ function buildBagEntries(getWorldView, getSession) {
   // ligne n'est pas la fin de la phrase, lib/menu.js/actionLine lui ajoute
   // encore ". <position>" — même raison que stripTrailingPeriod plus haut,
   // pour éviter un double point ("vide.. 1 sur 1").
-  if (bag.length === 0) return [{ label: "inventory.empty.entry", onActivate: () => {} }];
+  if (bag.length === 0) return [{ label: "inventory.empty.entry" }];
   return bag.map((entry, index) => bagEntryLine(getWorldView, getSession, entry, index));
 }
 

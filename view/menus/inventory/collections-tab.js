@@ -166,7 +166,7 @@ function openEntitySheet(collectionId, entries, startIndex, listMenu) {
 // améliorations.
 function collectionEntryLine(collectionId, entries, index, listMenu) {
   const entry = entries[index];
-  if (!entry.discovered) return { label: "collections.entry.unknown", placeholder: true, onActivate: () => {} };
+  if (!entry.discovered) return { label: "collections.entry.unknown", placeholder: true };
   if (entry.entity !== undefined) {
     return {
       label: "collections.entry.entity",

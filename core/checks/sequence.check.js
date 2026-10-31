@@ -61,7 +61,7 @@ export default function checkSequence(run) {
   run("wait : variationMs négative rejetée", false, actionLoads([BELL, { type: "wait", ms: 300, variationMs: -1 }, BELL]));
   run("wait : en dernier rejeté (il n'attend rien)", false, actionLoads([BELL, { type: "wait", ms: 300 }]));
   run("wait : teleport après un wait rejeté", false, actionLoads([BELL, { type: "wait", ms: 300 }, { type: "teleport", target: "demo" }]));
-  run("wait : teleport avant le wait accepté", true, actionLoads([{ type: "teleport", target: "demo" }, { type: "wait", ms: 300 }, BELL]));
+  run("wait : teleport avant le wait rejeté (la suite serait perdue dans le monde quitté)", false, actionLoads([{ type: "teleport", target: "demo" }, { type: "wait", ms: 300 }, BELL]));
   run(
     "wait : dans les effets de refus aussi",
     false,
@@ -205,6 +205,39 @@ export default function checkSequence(run) {
   );
   const both = applyEmoteTriggers(createInitialState(twoTriggers, 1), "clap", 0);
   run("deux triggers : le wait du premier ne retarde pas le second", "playSound", both.fired.map((f) => f.effects.map((e) => e.type).join("+")).join(","));
+
+  // Deux triggers AVEC wait sur le même évènement : les deux suites vont à
+  // leur terme, chacune à son heure (la seconde ne remplace pas la
+  // première).
+  const twoWaits = parseScene(
+    {
+      ...sceneWith({}),
+      id: "sequence-check-two-waits",
+      entities: [
+        {
+          id: "d",
+          type: "dog",
+          x: 5,
+          triggers: [
+            { on: "emote", effects: [{ type: "wait", ms: 500 }, { type: "startle" }] },
+            { on: "emote", effects: [{ type: "wait", ms: 200 }, BELL] },
+          ],
+        },
+      ],
+    },
+    REGISTRY
+  );
+  const bothWaits = applyEmoteTriggers(createInitialState(twoWaits, 1), "clap", 0).session;
+  const waitingDog = (s) => s.worlds["sequence-check-two-waits"].entities.find((e) => e.id === "d");
+  run("deux triggers avec wait : les deux suites attendent", 2, waitingDog(bothWaits).pendingEffects.length);
+  const afterShort = steps(bothWaits, ticksOf(200));
+  // Le son d'abord : l'effarouchement rend le chien absent, qui ne
+  // jouerait plus rien ensuite.
+  run("deux triggers avec wait : la plus courte arrive à son heure", true, afterShort.fired.some((f) => f.endsWith(":d:playSound")));
+  run("deux triggers avec wait : la plus longue attend encore", 1, waitingDog(afterShort.session).pendingEffects.length);
+  const afterLong = steps(afterShort.session, ticksOf(300));
+  run("deux triggers avec wait : la plus longue s'applique aussi", true, waitingDog(afterLong.session).startled === true);
+  run("deux triggers avec wait : plus rien n'attend", undefined, waitingDog(afterLong.session).pendingEffects);
 
   // Trigger horaire de l'AUTRE face : sa séquence va à son terme.
   const HOUR = TIME_CONFIG.minutesPerHour;

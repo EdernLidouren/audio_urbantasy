@@ -771,9 +771,11 @@ export function parseSingleAction(rawAction, describe, entityVariables, sceneVar
 
 // Place des `wait` dans une liste d'effets (voir core/sequence.js) :
 //   - jamais en DERNIER : il n'attendrait rien, sûrement un oubli ;
-//   - aucun effet MIXTE (teleport) APRÈS un `wait` : le sas et le fondu se
-//     jouent à l'activation, pas au détour d'un tick. Pas encore de besoin
-//     d'une téléportation différée ; refusée plutôt que mal jouée.
+//   - aucun effet MIXTE (teleport) dans une liste qui en contient un : après
+//     lui, le sas et le fondu se joueraient au détour d'un tick ; avant lui,
+//     la suite serait perdue dans le monde quitté (voir plus bas). Pas
+//     encore de besoin d'une téléportation différée ; refusée plutôt que mal
+//     jouée.
 // Et un teleport `holdForSound` suit au moins un playSound de la même liste
 // : c'est la fin de ce son de départ que le sas attend.
 function validateSequence(effects, describe) {
@@ -784,10 +786,13 @@ function validateSequence(effects, describe) {
   if (holding >= 0 && !effects.slice(0, holding).some((effect) => effect.type === "playSound")) {
     fail(`${describe} : "teleport" holdForSound demande un "playSound" avant lui (le son de départ à attendre).`);
   }
-  const firstWait = effects.findIndex((effect) => effect.type === "wait");
-  if (firstWait < 0) return;
-  const lateMixed = effects.slice(firstWait).find((effect) => MIXED_EFFECT_TYPES.includes(effect.type));
-  if (lateMixed) {
-    fail(`${describe} : "${lateMixed.type}" (effet mixte) n'est pas admis après un "wait".`);
+  // Ni avant : la suite d'une liste qui téléporte resterait en attente sur
+  // une entité du monde quitté, gelé, puis oubliée à son prochain
+  // chargement — jamais jouée. Une liste qui contient un effet mixte n'a
+  // donc aucun `wait`.
+  if (!effects.some((effect) => effect.type === "wait")) return;
+  const mixed = effects.find((effect) => MIXED_EFFECT_TYPES.includes(effect.type));
+  if (mixed) {
+    fail(`${describe} : "${mixed.type}" (effet mixte) n'est pas admis dans une liste qui contient un "wait".`);
   }
 }

@@ -131,12 +131,14 @@ export function openQuantityList(spec) {
   function moveCursor(delta) {
     const step = stepMenuCursor(cursor, delta, total());
     cursor = step.index;
+    hold.cancel();
     announceMenuLine(entryLine(cursor), step.boundary);
   }
 
   function moveCursorTo(index) {
     const previous = cursor;
     cursor = index;
+    hold.cancel();
     announceStarred(entryLine(cursor), previous === cursor);
   }
 

@@ -27,8 +27,8 @@ export function openDebugWarningsMenu() {
   const entries = warnings.map(({ key, params }) => ({
     label: key,
     labelParams: params,
-    // Lecture seule : Entrée ne fait rien, la flèche suffit à parcourir.
-    onActivate: () => {},
+    // Lecture seule, sans onActivate : Entrée n'y fait rien, la flèche
+    // suffit à parcourir.
   }));
   entries.push({
     label: "debug.warnings.clear",
