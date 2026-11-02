@@ -25,6 +25,9 @@ export const TAG_REGISTRY = {
   // Composants électroniques (collection "electronics") : sert aussi à la
   // table de garnissage déduite "electronics" (config/spawn-values.js).
   electronic: { labelKey: "tag.electronic" },
+  // Minéraux (collection "minerals") : table de garnissage déduite
+  // "minerals" (config/spawn-values.js).
+  mineral: { labelKey: "tag.mineral" },
 };
 
 // Propriétés d'UN tag par sa clé — même patron que core/surfaces.js/

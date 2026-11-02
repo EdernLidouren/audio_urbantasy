@@ -58,6 +58,13 @@ export default function checkSpawn(run) {
   );
   run("rareté : table fromTag -> poids selon la rareté de l'objet (resistor, 1)", rarityWeight("common"), electronicsWeights.resistor);
   run("rareté : table fromTag -> poids selon la rareté de l'objet (magic_eye, 5)", rarityWeight("legendary"), electronicsWeights.magic_eye);
+  const mineralsWeights = resolveDistribution({ table: "minerals" });
+  run(
+    "rareté : table minerals = tous les minéraux",
+    Object.entries(ITEM_REGISTRY).filter(([, props]) => (props.tags || []).includes("mineral")).length,
+    Object.keys(mineralsWeights).length
+  );
+  run("rareté : table minerals -> calcaire commun, diamant brut légendaire", `${rarityWeight("common")},${rarityWeight("legendary")}`, `${mineralsWeights.limestone},${mineralsWeights.rough_diamond}`);
   run("rareté : étiquette inconnue -> table rejetée", true, throws(() => validateSpawnTables({ t: { fromTag: "nope" } })));
   run("rareté : objets de l'étiquette sans rareté -> table rejetée", true, throws(() => validateSpawnTables({ t: { fromTag: "chic" } })));
   run("rareté : fromTag mêlé à des entrées -> table rejetée", true, throws(() => validateSpawnTables({ t: { fromTag: "electronic", apple: 1 } })));

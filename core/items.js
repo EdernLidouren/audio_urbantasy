@@ -143,6 +143,69 @@ export const ITEM_REGISTRY = {
   nixie_tube: { stackable: true, label: "item.nixie_tube.name", descriptionKey: "item.nixie_tube.description", value: 80, rarity: 4, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_glass_1_beacon" },
   magic_eye: { stackable: true, label: "item.magic_eye.name", descriptionKey: "item.magic_eye.description", value: 100, rarity: 5, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_glass_1_beacon" },
   core_memory: { stackable: true, label: "item.core_memory.name", descriptionKey: "item.core_memory.description", value: 100, rarity: 5, tags: ["electronic"], sound: "assets/sounds/items/electronic_component_rattle_1_beacon" },
+  // Minéraux — collection "minerals" (collections/minerals.js), générés
+  // depuis la liste fournie par l'auteur, même modèle que les composants :
+  // rarity 1 à 5, value = rarity × 20 (provisoire), étiquette "mineral",
+  // sound parmi neuf (items/mineral_<son>_1_beacon).
+  // Roches
+  limestone: { stackable: true, label: "item.limestone.name", descriptionKey: "item.limestone.description", value: 20, rarity: 1, tags: ["mineral"], sound: "assets/sounds/items/mineral_stones_small_1_beacon" },
+  sandstone: { stackable: true, label: "item.sandstone.name", descriptionKey: "item.sandstone.description", value: 20, rarity: 1, tags: ["mineral"], sound: "assets/sounds/items/mineral_stones_small_1_beacon" },
+  flint: { stackable: true, label: "item.flint.name", descriptionKey: "item.flint.description", value: 20, rarity: 1, tags: ["mineral"], sound: "assets/sounds/items/mineral_stones_small_1_beacon" },
+  slate: { stackable: true, label: "item.slate.name", descriptionKey: "item.slate.description", value: 20, rarity: 1, tags: ["mineral"], sound: "assets/sounds/items/mineral_stones_medium_1_beacon" },
+  granite: { stackable: true, label: "item.granite.name", descriptionKey: "item.granite.description", value: 20, rarity: 1, tags: ["mineral"], sound: "assets/sounds/items/mineral_stones_medium_1_beacon" },
+  basalt: { stackable: true, label: "item.basalt.name", descriptionKey: "item.basalt.description", value: 40, rarity: 2, tags: ["mineral"], sound: "assets/sounds/items/mineral_stones_medium_1_beacon" },
+  pumice: { stackable: true, label: "item.pumice.name", descriptionKey: "item.pumice.description", value: 40, rarity: 2, tags: ["mineral"], sound: "assets/sounds/items/mineral_stones_small_1_beacon" },
+  obsidian: { stackable: true, label: "item.obsidian.name", descriptionKey: "item.obsidian.description", value: 60, rarity: 3, tags: ["mineral"], sound: "assets/sounds/items/mineral_glass_stone_1_beacon" },
+  // Minerais
+  hematite: { stackable: true, label: "item.hematite.name", descriptionKey: "item.hematite.description", value: 40, rarity: 2, tags: ["mineral"], sound: "assets/sounds/items/mineral_stones_heavy_1_beacon" },
+  pyrite: { stackable: true, label: "item.pyrite.name", descriptionKey: "item.pyrite.description", value: 40, rarity: 2, tags: ["mineral"], sound: "assets/sounds/items/mineral_stones_heavy_1_beacon" },
+  chalcopyrite: { stackable: true, label: "item.chalcopyrite.name", descriptionKey: "item.chalcopyrite.description", value: 40, rarity: 2, tags: ["mineral"], sound: "assets/sounds/items/mineral_stones_heavy_1_beacon" },
+  bauxite: { stackable: true, label: "item.bauxite.name", descriptionKey: "item.bauxite.description", value: 40, rarity: 2, tags: ["mineral"], sound: "assets/sounds/items/mineral_stones_heavy_1_beacon" },
+  magnetite: { stackable: true, label: "item.magnetite.name", descriptionKey: "item.magnetite.description", value: 60, rarity: 3, tags: ["mineral"], sound: "assets/sounds/items/mineral_stones_heavy_1_beacon" },
+  galena: { stackable: true, label: "item.galena.name", descriptionKey: "item.galena.description", value: 60, rarity: 3, tags: ["mineral"], sound: "assets/sounds/items/mineral_stones_heavy_1_beacon" },
+  cassiterite: { stackable: true, label: "item.cassiterite.name", descriptionKey: "item.cassiterite.description", value: 60, rarity: 3, tags: ["mineral"], sound: "assets/sounds/items/mineral_stones_heavy_1_beacon" },
+  cinnabar: { stackable: true, label: "item.cinnabar.name", descriptionKey: "item.cinnabar.description", value: 80, rarity: 4, tags: ["mineral"], sound: "assets/sounds/items/mineral_stones_heavy_1_beacon" },
+  // Métaux natifs
+  native_copper: { stackable: true, label: "item.native_copper.name", descriptionKey: "item.native_copper.description", value: 60, rarity: 3, tags: ["mineral"], sound: "assets/sounds/items/mineral_metal_nuggets_1_beacon" },
+  native_silver: { stackable: true, label: "item.native_silver.name", descriptionKey: "item.native_silver.description", value: 80, rarity: 4, tags: ["mineral"], sound: "assets/sounds/items/mineral_metal_nuggets_1_beacon" },
+  gold_nugget: { stackable: true, label: "item.gold_nugget.name", descriptionKey: "item.gold_nugget.description", value: 80, rarity: 4, tags: ["mineral"], sound: "assets/sounds/items/mineral_metal_nuggets_1_beacon" },
+  platinum_nugget: { stackable: true, label: "item.platinum_nugget.name", descriptionKey: "item.platinum_nugget.description", value: 80, rarity: 4, tags: ["mineral"], sound: "assets/sounds/items/mineral_metal_nuggets_1_beacon" },
+  iron_meteorite: { stackable: true, label: "item.iron_meteorite.name", descriptionKey: "item.iron_meteorite.description", value: 100, rarity: 5, tags: ["mineral"], sound: "assets/sounds/items/mineral_stones_heavy_1_beacon" },
+  // Minéraux et cristaux
+  quartz: { stackable: true, label: "item.quartz.name", descriptionKey: "item.quartz.description", value: 20, rarity: 1, tags: ["mineral"], sound: "assets/sounds/items/mineral_crystal_1_beacon" },
+  calcite: { stackable: true, label: "item.calcite.name", descriptionKey: "item.calcite.description", value: 20, rarity: 1, tags: ["mineral"], sound: "assets/sounds/items/mineral_crystal_1_beacon" },
+  mica: { stackable: true, label: "item.mica.name", descriptionKey: "item.mica.description", value: 20, rarity: 1, tags: ["mineral"], sound: "assets/sounds/items/mineral_crystal_1_beacon" },
+  talc: { stackable: true, label: "item.talc.name", descriptionKey: "item.talc.description", value: 20, rarity: 1, tags: ["mineral"], sound: "assets/sounds/items/mineral_crumbly_stone_1_beacon" },
+  gypsum: { stackable: true, label: "item.gypsum.name", descriptionKey: "item.gypsum.description", value: 40, rarity: 2, tags: ["mineral"], sound: "assets/sounds/items/mineral_crumbly_stone_1_beacon" },
+  halite: { stackable: true, label: "item.halite.name", descriptionKey: "item.halite.description", value: 40, rarity: 2, tags: ["mineral"], sound: "assets/sounds/items/mineral_crystal_1_beacon" },
+  sulfur: { stackable: true, label: "item.sulfur.name", descriptionKey: "item.sulfur.description", value: 40, rarity: 2, tags: ["mineral"], sound: "assets/sounds/items/mineral_crumbly_stone_1_beacon" },
+  fluorite: { stackable: true, label: "item.fluorite.name", descriptionKey: "item.fluorite.description", value: 60, rarity: 3, tags: ["mineral"], sound: "assets/sounds/items/mineral_crystal_1_beacon" },
+  // Pierres fines
+  rose_quartz: { stackable: true, label: "item.rose_quartz.name", descriptionKey: "item.rose_quartz.description", value: 40, rarity: 2, tags: ["mineral"], sound: "assets/sounds/items/mineral_crystal_1_beacon" },
+  jasper: { stackable: true, label: "item.jasper.name", descriptionKey: "item.jasper.description", value: 40, rarity: 2, tags: ["mineral"], sound: "assets/sounds/items/mineral_stones_small_1_beacon" },
+  amethyst: { stackable: true, label: "item.amethyst.name", descriptionKey: "item.amethyst.description", value: 60, rarity: 3, tags: ["mineral"], sound: "assets/sounds/items/mineral_crystal_1_beacon" },
+  agate: { stackable: true, label: "item.agate.name", descriptionKey: "item.agate.description", value: 60, rarity: 3, tags: ["mineral"], sound: "assets/sounds/items/mineral_crystal_1_beacon" },
+  tigers_eye: { stackable: true, label: "item.tigers_eye.name", descriptionKey: "item.tigers_eye.description", value: 60, rarity: 3, tags: ["mineral"], sound: "assets/sounds/items/mineral_crystal_1_beacon" },
+  malachite: { stackable: true, label: "item.malachite.name", descriptionKey: "item.malachite.description", value: 60, rarity: 3, tags: ["mineral"], sound: "assets/sounds/items/mineral_stones_medium_1_beacon" },
+  turquoise: { stackable: true, label: "item.turquoise.name", descriptionKey: "item.turquoise.description", value: 60, rarity: 3, tags: ["mineral"], sound: "assets/sounds/items/mineral_stones_medium_1_beacon" },
+  lapis_lazuli: { stackable: true, label: "item.lapis_lazuli.name", descriptionKey: "item.lapis_lazuli.description", value: 80, rarity: 4, tags: ["mineral"], sound: "assets/sounds/items/mineral_stones_medium_1_beacon" },
+  // Pierres précieuses
+  garnet: { stackable: true, label: "item.garnet.name", descriptionKey: "item.garnet.description", value: 60, rarity: 3, tags: ["mineral"], sound: "assets/sounds/items/mineral_gemstone_1_beacon" },
+  opal: { stackable: true, label: "item.opal.name", descriptionKey: "item.opal.description", value: 80, rarity: 4, tags: ["mineral"], sound: "assets/sounds/items/mineral_gemstone_1_beacon" },
+  ruby: { stackable: true, label: "item.ruby.name", descriptionKey: "item.ruby.description", value: 80, rarity: 4, tags: ["mineral"], sound: "assets/sounds/items/mineral_gemstone_1_beacon" },
+  sapphire: { stackable: true, label: "item.sapphire.name", descriptionKey: "item.sapphire.description", value: 80, rarity: 4, tags: ["mineral"], sound: "assets/sounds/items/mineral_gemstone_1_beacon" },
+  emerald: { stackable: true, label: "item.emerald.name", descriptionKey: "item.emerald.description", value: 80, rarity: 4, tags: ["mineral"], sound: "assets/sounds/items/mineral_gemstone_1_beacon" },
+  alexandrite: { stackable: true, label: "item.alexandrite.name", descriptionKey: "item.alexandrite.description", value: 100, rarity: 5, tags: ["mineral"], sound: "assets/sounds/items/mineral_gemstone_1_beacon" },
+  rough_diamond: { stackable: true, label: "item.rough_diamond.name", descriptionKey: "item.rough_diamond.description", value: 100, rarity: 5, tags: ["mineral"], sound: "assets/sounds/items/mineral_gemstone_1_beacon" },
+  geode: { stackable: true, label: "item.geode.name", descriptionKey: "item.geode.description", value: 100, rarity: 5, tags: ["mineral"], sound: "assets/sounds/items/mineral_crystal_1_beacon" },
+  // Fossiles et curiosités
+  ammonite: { stackable: true, label: "item.ammonite.name", descriptionKey: "item.ammonite.description", value: 40, rarity: 2, tags: ["mineral"], sound: "assets/sounds/items/mineral_fossile_1_beacon" },
+  shark_tooth: { stackable: true, label: "item.shark_tooth.name", descriptionKey: "item.shark_tooth.description", value: 40, rarity: 2, tags: ["mineral"], sound: "assets/sounds/items/mineral_fossile_1_beacon" },
+  fern_fossil: { stackable: true, label: "item.fern_fossil.name", descriptionKey: "item.fern_fossil.description", value: 40, rarity: 2, tags: ["mineral"], sound: "assets/sounds/items/mineral_stones_medium_1_beacon" },
+  trilobite: { stackable: true, label: "item.trilobite.name", descriptionKey: "item.trilobite.description", value: 60, rarity: 3, tags: ["mineral"], sound: "assets/sounds/items/mineral_fossile_1_beacon" },
+  amber: { stackable: true, label: "item.amber.name", descriptionKey: "item.amber.description", value: 80, rarity: 4, tags: ["mineral"], sound: "assets/sounds/items/mineral_stones_small_1_beacon" },
+  fulgurite: { stackable: true, label: "item.fulgurite.name", descriptionKey: "item.fulgurite.description", value: 80, rarity: 4, tags: ["mineral"], sound: "assets/sounds/items/mineral_glass_stone_1_beacon" },
+  fossil_egg: { stackable: true, label: "item.fossil_egg.name", descriptionKey: "item.fossil_egg.description", value: 100, rarity: 5, tags: ["mineral"], sound: "assets/sounds/items/mineral_fossile_1_beacon" },
 };
 
 // Propriétés d'UN objet par son type — point d'extension futur (même

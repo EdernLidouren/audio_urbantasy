@@ -1,8 +1,8 @@
 # Collections
 
 Des listes d'objets à acquérir ou d'entités à observer, consultables dans le
-menu global. Deux collections : les composants électroniques et les entités
-surnaturelles. Code : `core/collections.js` (logique pure), `collections/`
+menu global. Trois collections : les composants électroniques, les minéraux
+et les entités surnaturelles. Code : `core/collections.js` (logique pure), `collections/`
 (données), `core/observations.js` (le fait « observé »),
 `view/discoveries.js` (validation, annonce de découverte),
 `view/menus/inventory/collections-tab.js` (onglet et fiches),
@@ -22,9 +22,15 @@ gardent leur propre système (`core/improvements.js`).
   et de son de ramassage. La table de garnissage `electronics`
   (`config/spawn-values.js`) en est déduite, chaque composant pondéré par sa
   rareté.
-- Contenu de test : deux composants à ramasser et un en vente dans la démo ;
-  dix composants, un par son, au verso de la démo 3 (x 12 à 48), pour juger
-  les sons à l'oreille.
+- Contenu de test : deux composants à ramasser et un en vente dans la démo.
+- **`minerals`** — 52 minéraux, roches et fossiles (roches, minerais, métaux
+  natifs, minéraux et cristaux, pierres fines, pierres précieuses, fossiles et
+  curiosités), dans l'ordre de la liste de l'auteur. Même modèle que les
+  composants : objets empilables, rareté 1 à 5, valeur provisoire rareté × 20,
+  étiquette `mineral`, un son parmi neuf (`items/mineral_<son>_1_beacon`), et
+  la table de garnissage `minerals` déduite de l'étiquette.
+- Contenu de test : neuf minéraux, un par son, au verso de la démo 3 (x 12 à
+  44), pour juger les sons à l'oreille.
 - **`supernatural`** — le bestiaire : le ghosten (rue commerçante, après
   l'éclatement du néon défectueux), le Cumulo Lupus et le miravi. Chaque
   entrée est un TYPE d'entité, découvert à sa première observation (Espace) :

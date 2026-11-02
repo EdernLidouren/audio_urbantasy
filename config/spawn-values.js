@@ -41,6 +41,8 @@ export const SPAWN_TABLES = {
   // Tous les composants électroniques (collection "electronics"), chacun
   // selon sa rareté.
   electronics: { fromTag: "electronic" },
+  // Tous les minéraux (collection "minerals"), chacun selon sa rareté.
+  minerals: { fromTag: "mineral" },
   // PROVISOIRES (copie de "default") : les tables dédiées de la poubelle et
   // du conteneur métallique, en attendant leur vrai contenu.
   metal_trash_can: { apple: 80, coin: 20 },

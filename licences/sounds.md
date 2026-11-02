@@ -62,6 +62,7 @@ Sound Effect by <a href="https://pixabay.com/users/edr-1177074/?utm_source=link-
 Sound Effect by <a href="https://pixabay.com/users/daviddumaisaudio-41768500/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=188053">David Dumais</a> from <a href="https://pixabay.com//?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=188053">Pixabay</a>  
 Sound Effect by <a href="https://pixabay.com/users/jessequinnmedia-39511257/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=314080">Jesse P</a> from <a href="https://pixabay.com//?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=314080">Pixabay</a>
 Sound Effect by <a href="https://pixabay.com/users/scratchonix-50592769/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=423281">Advik Singh</a> from <a href="https://pixabay.com/sound-effects//?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=423281">Pixabay</a>
+Sound Effect by <a href="https://pixabay.com/users/irhouen-40320452/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=619090">Mary S.</a> from <a href="https://pixabay.com//?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=619090">Pixabay</a>
 
 Dog walking on hardwood floor by CUeckermann -- https://freesound.org/s/444816/ -- License: Attribution 3.0
 Gedeon_Dog_Call and approching_int_woodfloor_01_150913_.wav by Peobass -- https://freesound.org/s/321935/ -- License: Creative Commons 0
@@ -78,3 +79,7 @@ Slipper_Walking_1_para.mp3 by Paradoxxxical -- https://freesound.org/s/679291/ -
 metal gate 11.aif by ThenCameNow -- https://freesound.org/s/31240/ -- License: Attribution 4.0
 dragging chair on concrete floor, wide room 05 by funkysandwich -- https://freesound.org/s/871017/ -- License: Creative Commons 0
 Bird-Like-Chair-Squeak-1.flac by dland -- https://freesound.org/s/168439/ -- License: Creative Commons 0
+PICCONE 3 MURO.WAV by lollosound -- https://freesound.org/s/387001/ -- License: Creative Commons 0
+Steel - Combination drop short by ldezem -- https://freesound.org/s/386218/ -- License: Creative Commons 0
+Crumble #8.wav by abstraktgeneriert -- https://freesound.org/s/348955/ -- License: Creative Commons 0
+07628 small metal pieces shakes.wav by Robinhood76 -- https://freesound.org/s/470758/ -- License: Attribution NonCommercial 4.0

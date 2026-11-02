@@ -154,6 +154,12 @@
   "assets/sounds/decor/big_rock_1_beacon": [
     "assets/sounds/decor/big_rock_1_beacon_1.mp3"
   ],
+  "assets/sounds/decor/boulder_1_beacon": [
+    "assets/sounds/decor/boulder_1_beacon_1.mp3",
+    "assets/sounds/decor/boulder_1_beacon_2.mp3",
+    "assets/sounds/decor/boulder_1_beacon_3.mp3",
+    "assets/sounds/decor/boulder_1_beacon_4.mp3"
+  ],
   "assets/sounds/decor/clocktower_beacon": [
     "assets/sounds/decor/clocktower_beacon_1.mp3"
   ],
@@ -168,6 +174,9 @@
   ],
   "assets/sounds/decor/gear_3_beacon": [
     "assets/sounds/decor/gear_3_beacon_1.mp3"
+  ],
+  "assets/sounds/decor/geode_1_beacon": [
+    "assets/sounds/decor/geode_1_beacon_1.mp3"
   ],
   "assets/sounds/decor/highway_traffic_1_beacon": [
     "assets/sounds/decor/highway_traffic_1_beacon_1.mp3"
@@ -209,6 +218,12 @@
   "assets/sounds/decor/motorised_sign_1_vocal": [
     "assets/sounds/decor/motorised_sign_1_vocal_1.mp3",
     "assets/sounds/decor/motorised_sign_1_vocal_2.mp3"
+  ],
+  "assets/sounds/decor/ore_vein_1_beacon": [
+    "assets/sounds/decor/ore_vein_1_beacon_1.mp3",
+    "assets/sounds/decor/ore_vein_1_beacon_2.mp3",
+    "assets/sounds/decor/ore_vein_1_beacon_3.mp3",
+    "assets/sounds/decor/ore_vein_1_beacon_4.mp3"
   ],
   "assets/sounds/decor/organic_rope_1_vocal": [
     "assets/sounds/decor/organic_rope_1_vocal_1.mp3",
@@ -356,6 +371,16 @@
   "assets/sounds/effects/big_rock_collision": [
     "assets/sounds/effects/big_rock_collision_1.mp3"
   ],
+  "assets/sounds/effects/boulder_destruction": [
+    "assets/sounds/effects/boulder_destruction_1.mp3"
+  ],
+  "assets/sounds/effects/boulder_mining": [
+    "assets/sounds/effects/boulder_mining_1.mp3",
+    "assets/sounds/effects/boulder_mining_2.mp3",
+    "assets/sounds/effects/boulder_mining_3.mp3",
+    "assets/sounds/effects/boulder_mining_4.mp3",
+    "assets/sounds/effects/boulder_mining_5.mp3"
+  ],
   "assets/sounds/effects/clock_tower_bell": [
     "assets/sounds/effects/clock_tower_bell_1.mp3"
   ],
@@ -371,6 +396,17 @@
     "assets/sounds/effects/electrical_flickering_6.mp3",
     "assets/sounds/effects/electrical_flickering_7.mp3"
   ],
+  "assets/sounds/effects/geode_mining": [
+    "assets/sounds/effects/geode_mining_1.mp3",
+    "assets/sounds/effects/geode_mining_2.mp3",
+    "assets/sounds/effects/geode_mining_3.mp3",
+    "assets/sounds/effects/geode_mining_4.mp3",
+    "assets/sounds/effects/geode_mining_5.mp3",
+    "assets/sounds/effects/geode_mining_6.mp3",
+    "assets/sounds/effects/geode_mining_7.mp3",
+    "assets/sounds/effects/geode_mining_8.mp3",
+    "assets/sounds/effects/geode_mining_9.mp3"
+  ],
   "assets/sounds/effects/ghostly_apparition": [
     "assets/sounds/effects/ghostly_apparition_1.mp3"
   ],
@@ -383,6 +419,12 @@
   "assets/sounds/effects/metal_fence_collision": [
     "assets/sounds/effects/metal_fence_collision_1.mp3"
   ],
+  "assets/sounds/effects/mining_action": [
+    "assets/sounds/effects/mining_action_1.mp3"
+  ],
+  "assets/sounds/effects/mining_final_action": [
+    "assets/sounds/effects/mining_final_action_1.mp3"
+  ],
   "assets/sounds/effects/neon_bulb_burst": [
     "assets/sounds/effects/neon_bulb_burst_1.mp3",
     "assets/sounds/effects/neon_bulb_burst_2.mp3",
@@ -394,6 +436,11 @@
     "assets/sounds/effects/neon_malfunction_3.mp3",
     "assets/sounds/effects/neon_malfunction_4.mp3",
     "assets/sounds/effects/neon_malfunction_5.mp3"
+  ],
+  "assets/sounds/effects/ore_vein_mining": [
+    "assets/sounds/effects/ore_vein_mining_1.mp3",
+    "assets/sounds/effects/ore_vein_mining_2.mp3",
+    "assets/sounds/effects/ore_vein_mining_4.mp3"
   ],
   "assets/sounds/effects/plant_shake": [
     "assets/sounds/effects/plant_shake_1.mp3"
@@ -897,8 +944,44 @@
   "assets/sounds/items/fruit_beacon": [
     "assets/sounds/items/fruit_beacon_1.mp3"
   ],
+  "assets/sounds/items/mineral_crumbly_stone_1_beacon": [
+    "assets/sounds/items/mineral_crumbly_stone_1_beacon_1.mp3"
+  ],
+  "assets/sounds/items/mineral_crystal_1_beacon": [
+    "assets/sounds/items/mineral_crystal_1_beacon_1.mp3"
+  ],
+  "assets/sounds/items/mineral_fossile_1_beacon": [
+    "assets/sounds/items/mineral_fossile_1_beacon_1.mp3"
+  ],
+  "assets/sounds/items/mineral_gemstone_1_beacon": [
+    "assets/sounds/items/mineral_gemstone_1_beacon_1.mp3"
+  ],
+  "assets/sounds/items/mineral_glass_stone_1_beacon": [
+    "assets/sounds/items/mineral_glass_stone_1_beacon_1.mp3"
+  ],
+  "assets/sounds/items/mineral_metal_nuggets_1_beacon": [
+    "assets/sounds/items/mineral_metal_nuggets_1_beacon_1.mp3"
+  ],
+  "assets/sounds/items/mineral_stone_small_1_beacon": [
+    "assets/sounds/items/mineral_stone_small_1_beacon_2.mp3"
+  ],
+  "assets/sounds/items/mineral_stones_heavy_1_beacon": [
+    "assets/sounds/items/mineral_stones_heavy_1_beacon_1.mp3",
+    "assets/sounds/items/mineral_stones_heavy_1_beacon_2.mp3",
+    "assets/sounds/items/mineral_stones_heavy_1_beacon_3.mp3"
+  ],
+  "assets/sounds/items/mineral_stones_medium_1_beacon": [
+    "assets/sounds/items/mineral_stones_medium_1_beacon_1.mp3"
+  ],
+  "assets/sounds/items/mineral_stones_small_1_beacon": [
+    "assets/sounds/items/mineral_stones_small_1_beacon_1.mp3",
+    "assets/sounds/items/mineral_stones_small_1_beacon_2.mp3"
+  ],
   "assets/sounds/items/mining_kit_1_beacon": [
     "assets/sounds/items/mining_kit_1_beacon_1.mp3"
+  ],
+  "assets/sounds/items/small_pieces_1_beacon": [
+    "assets/sounds/items/small_pieces_1_beacon_1.mp3"
   ],
   "assets/sounds/reactions/reaction_interrogation": [
     "assets/sounds/reactions/reaction_interrogation_1.mp3"
