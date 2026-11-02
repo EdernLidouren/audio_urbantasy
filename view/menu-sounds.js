@@ -37,10 +37,12 @@ const MENU_SOUND_KEYS = {
 // `what` : ce que c'est, pour l'avertissement si le son manque — jamais un
 // plantage. PERMANENT (jamais déchargé au changement de scène, voir
 // lib/audio/retention.js) : un son d'interface s'entend partout, il ne doit
-// jamais revenir "à froid", en retard sur la touche.
-export function playInterfaceSound(path, what) {
+// jamais revenir "à froid", en retard sur la touche. `rate` (optionnel,
+// défaut 1) : vitesse de lecture, donc hauteur (ex. le geste de minage qui
+// monte, view/action-execution.js/handleMine).
+export function playInterfaceSound(path, what, { rate = 1 } = {}) {
   try {
-    playOneShot(resolveAsset(path), { volume: interfaceVolumeFactor(), permanent: true });
+    playOneShot(resolveAsset(path), { volume: interfaceVolumeFactor(), rate, permanent: true });
   } catch (error) {
     console.warn(`son d'interface indisponible (${what}, "${path}") : ${error.message}`);
   }

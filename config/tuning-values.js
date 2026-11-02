@@ -595,6 +595,17 @@ export const TUNING_DEFAULTS = {
   // Vide ("") : rien de plus que le son de l'entité.
   mineStrikeSound: "assets/sounds/effects/mining_action",
   mineFinalStrikeSound: "assets/sounds/effects/mining_final_action",
+  // Montée du son du geste (mineStrikeSound), coup après coup, comme un
+  // COMBO : le N-ième coup joue la N-ième note de cette gamme, en
+  // demi-tons au-dessus de la hauteur d'origine, puis la DERNIÈRE note
+  // reste en plafond pour les coups suivants. Sauts FIXES : la mélodie est
+  // la même quelle que soit la résistance de l'entité, et la casse arrive
+  // sans prévenir. Défaut : pentatonique majeure jusqu'à l'octave (do ré
+  // mi sol la do) — toutes ses notes sonnent bien ensemble. La hauteur
+  // passe par la vitesse de lecture : une note plus haute est aussi plus
+  // courte (une octave : deux fois). Le dernier coup, lui, joue
+  // mineFinalStrikeSound à sa hauteur d'origine. [0] : aucune montée.
+  mineStrikeScale: [0, 2, 4, 7, 9, 12],
 
   // --- Clés de la cascade SANS défaut global (`undefined`) : leur valeur
   // vient du son, de l'instance ou du type, sinon le consommateur a son

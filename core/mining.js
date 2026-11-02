@@ -10,10 +10,13 @@
 //
 // La résistance n'est PAS tirée au chargement : elle l'est au PREMIER coup
 // (`hitsLeft`, champ runtime plat sérialisé avec la partie), dans la
-// fourchette `hits`. Une entité jamais frappée ne porte donc rien de plus
-// que sa scène. Le nombre de tirages à la destruction est tiré à ce moment
-// dans la fourchette `count` ; un tirage "nothing" ne donne rien (voir
-// core/distribution.js), l'entité peut donc se briser sans rien lâcher.
+// fourchette `hits`. Les coups déjà portés sont comptés à part (`strikes`,
+// même nature) : la vue en fait monter le son du geste, note après note
+// (voir view/action-execution.js/handleMine). Une entité jamais frappée ne
+// porte donc rien de plus que sa scène. Le nombre de tirages à la
+// destruction est tiré à ce moment dans la fourchette `count` ; un tirage
+// "nothing" ne donne rien (voir core/distribution.js), l'entité peut donc
+// se briser sans rien lâcher.
 //
 // Déterministe : tous les tirages consomment le PRNG de la FACE
 // (face.rngState), comme la collecte. Une entité détruite est RETIRÉE du
@@ -36,18 +39,19 @@ function drawInRange(range, rngState) {
 }
 
 // Un coup sur l'entité minable `entityId` de la FACE ACTIVE. Rend
-// `{ session, status, items }` :
+// `{ session, status, strike, items }` :
 //   - `status` : "hit" (l'entité a encaissé, elle tient encore), "broken"
 //     (dernier coup : elle est retirée, ses objets sont au sol), ou null si
 //     l'id n'est pas une entité minable de la face active (session
 //     inchangée) ;
+//   - `strike` : le numéro de CE coup, à partir de 1 (0 si status null) ;
 //   - `items` : les objets tombés ("broken" seulement, peut être vide).
 export function mineEntity(session, entityId, registry) {
   const world = session.worlds[session.activeWorldId];
   const side = session.player.side;
   const face = resolveFace(world, side);
   const entity = face.entities.find((e) => e.id === entityId);
-  if (!entity || !entity.mineable) return { session, status: null, items: [] };
+  if (!entity || !entity.mineable) return { session, status: null, strike: 0, items: [] };
 
   let rngState = face.rngState;
   let hitsLeft = entity.hitsLeft;
@@ -57,10 +61,13 @@ export function mineEntity(session, entityId, registry) {
     rngState = drawn.rngState;
   }
   hitsLeft -= 1;
+  // `strikes` absent : entité jamais frappée (ou entamée avant que les coups
+  // ne soient comptés, dans une ancienne sauvegarde : on repart de 1).
+  const strike = (entity.strikes ?? 0) + 1;
 
   if (hitsLeft > 0) {
-    const entities = face.entities.map((e) => (e.id === entityId ? { ...e, hitsLeft } : e));
-    return { session: updateActiveFace(session, { entities, rngState }, side), status: "hit", items: [] };
+    const entities = face.entities.map((e) => (e.id === entityId ? { ...e, hitsLeft, strikes: strike } : e));
+    return { session: updateActiveFace(session, { entities, rngState }, side), status: "hit", strike, items: [] };
   }
 
   const count = drawInRange(entity.mineable.count, rngState);
@@ -70,5 +77,5 @@ export function mineEntity(session, entityId, registry) {
     const spec = buildCollectibleSpec(item, `${entityId}-drop`, entity.x, registry, world.length, world.variables);
     nextSession = spawnScatteredEphemerals(nextSession, spec, entity.x, 1, TUNING_DEFAULTS.mineScatterSpread);
   }
-  return { session: nextSession, status: "broken", items: drawn.items };
+  return { session: nextSession, status: "broken", strike, items: drawn.items };
 }

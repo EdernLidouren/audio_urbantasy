@@ -123,7 +123,8 @@ export function setSearchHandler(handler) {
 
 // (entity, beforeApply) => void — applique un COUP de minage
 // (voir core/mining.js/mineEntity, doc/entity-model.md/"Minage"), même
-// patron que setSearchHandler. `beforeApply(status)` est appelé APRÈS le
+// patron que setSearchHandler. `beforeApply(status, strike)` (strike : le
+// numéro du coup, à partir de 1) est appelé APRÈS le
 // calcul du coup et AVANT que la session ne change : au dernier coup,
 // l'entité est retirée du monde, et son son de destruction doit partir
 // tant qu'elle a encore une voix dans la scène (comme le son de

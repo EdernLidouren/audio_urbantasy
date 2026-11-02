@@ -64,6 +64,8 @@ export default function checkMining(run) {
   run("minage : entité jamais frappée -> aucune résistance notée", undefined, entityOf(fresh, "boulder-1").hitsLeft);
   const first = mineEntity(fresh, "boulder-1", MINING_REGISTRY);
   run("minage : premier coup sur une résistance >= 2 -> hit", "hit", first.status);
+  run("minage : premier coup -> numéro 1", 1, first.strike);
+  run("minage : premier coup -> un coup porté noté sur l'entité", 1, entityOf(first.session, "boulder-1").strikes);
   run("minage : premier coup -> résistance tirée dans la fourchette, moins un", true, (() => {
     const left = entityOf(first.session, "boulder-1").hitsLeft;
     return Number.isInteger(left) && left >= 1 && left <= 3;
@@ -76,12 +78,15 @@ export default function checkMining(run) {
   let result = first;
   const expected = entityOf(first.session, "boulder-1").hitsLeft;
   let strikes = 0;
+  const numbers = [first.strike];
   while (result.status === "hit" && strikes < 10) {
     result = mineEntity(session, "boulder-1", MINING_REGISTRY);
     session = result.session;
+    numbers.push(result.strike);
     strikes += 1;
   }
   run("minage : détruite au bout de la résistance tirée", expected, strikes);
+  run.same("minage : coups numérotés 1, 2, 3... jusqu'au dernier", numbers.map((_, i) => i + 1), numbers);
   run("minage : dernier coup -> broken", "broken", result.status);
   run("minage : entité détruite -> retirée du monde", undefined, entityOf(session, "boulder-1"));
   const dropped = worldOf(session).entities.filter((e) => e.ephemeral);
@@ -94,6 +99,7 @@ export default function checkMining(run) {
   // Une issue "nothing" : brisée, rien ne tombe.
   const empty = mineEntity(fresh, "boulder-2", MINING_REGISTRY);
   run("minage : résistance 1 -> brisée au premier coup", "broken", empty.status);
+  run("minage : brisée au premier coup -> numéro 1", 1, empty.strike);
   run("minage : tirage nothing -> rien ne tombe", 0, empty.items.length);
   run("minage : brisée sans butin -> retirée quand même", undefined, entityOf(empty.session, "boulder-2"));
 
@@ -110,6 +116,7 @@ export default function checkMining(run) {
   run("minage : save/load réussit", true, reload.success);
   if (reload.success) {
     run("minage : save/load — résistance entamée conservée", entityOf(first.session, "boulder-1").hitsLeft, entityOf(reload.session, "boulder-1").hitsLeft);
+    run("minage : save/load — le coup suivant continue la numérotation", 2, mineEntity(reload.session, "boulder-1", MINING_REGISTRY).strike);
   }
   const reloadBroken = deserializeGame(serializeGame(session));
   run("minage : save/load — entité détruite reste détruite", undefined, reloadBroken.success ? entityOf(reloadBroken.session, "boulder-1") : null);

@@ -642,7 +642,8 @@ renfermait tombe au sol. Moteur : `core/mining.js`/`mineEntity`, pur.
 - **Résistance** — `hits`, une fourchette `{ min, max }` (ou un entier
   seul) : le nombre de coups à porter, TIRÉ AU PREMIER COUP (PRNG de la
   face) et retenu dans le champ runtime `hitsLeft`, décompté à chaque coup
-  et sauvegardé avec la partie. Une entité jamais frappée ne porte rien de
+  et sauvegardé avec la partie, comme le nombre de coups déjà portés
+  (`strikes`). Une entité jamais frappée ne porte rien de
   plus que sa scène.
 - **Butin** — à la destruction, `count` (fourchette, défaut 1) tirages dans
   `distribution` (même forme qu'une distribution de collecte, voir
@@ -664,7 +665,12 @@ renfermait tombe au sol. Moteur : `core/mining.js`/`mineEntity`, pur.
   `break` au dernier coup, parti avant qu'elle ne disparaisse), et celui du
   GESTE, méta, au volume de l'interface (`mineStrikeSound`, ou
   `mineFinalStrikeSound` au dernier coup, `config/tuning-values.js`,
-  surchargeables par archétype). AUCUNE annonce, ni au coup ni à la
+  surchargeables par archétype). Le geste MONTE coup après coup, comme un
+  combo : le N-ième coup joue la N-ième note de `mineStrikeScale` (en
+  demi-tons, pentatonique majeure jusqu'à l'octave par défaut), la dernière
+  note servant de plafond. Sauts FIXES : même mélodie quelle que soit la
+  résistance, la casse arrive sans prévenir, et le geste du dernier coup
+  garde sa hauteur d'origine. AUCUNE annonce, ni au coup ni à la
   destruction : le son suffit, et les objets tombés se signalent par leurs
   balises. Seul le refus sans le kit s'annonce.
 

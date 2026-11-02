@@ -96,7 +96,7 @@ export function registerActionHandlers({ getSession, setSession, travel }) {
       (entity, beforeApply) => {
         const result = mineEntity(getSession(), entity.id, registry);
         if (result.status === null) return;
-        beforeApply(result.status);
+        beforeApply(result.status, result.strike);
         setSession(result.session);
       },
     ],

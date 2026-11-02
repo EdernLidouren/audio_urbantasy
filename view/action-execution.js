@@ -168,18 +168,27 @@ function handleSearch(entity) {
 // superposés : celui de l'ENTITÉ, positionné (rôle `hit`, ou `break` au
 // dernier coup, partis avant qu'elle ne disparaisse), et celui du GESTE,
 // méta (mineStrikeSound / mineFinalStrikeSound, config/tuning-values.js).
-// AUCUNE annonce : le son dit le coup et la destruction, et les objets
-// tombés s'entendent ensuite à leurs propres balises.
-function playMineSounds(entity, status) {
+// Le geste MONTE coup après coup (mineStrikeScale : la note du N-ième
+// coup, plafonnée à la dernière) ; celui du dernier coup reste à sa
+// hauteur d'origine. AUCUNE annonce : le son dit le coup et la
+// destruction, et les objets tombés s'entendent ensuite à leurs propres
+// balises.
+function strikeRate(entity, strike) {
+  const scale = resolveTuning("mineStrikeScale", entity);
+  const semitones = scale[Math.min(strike, scale.length) - 1];
+  return 2 ** (semitones / 12);
+}
+
+function playMineSounds(entity, status, strike) {
   const broken = status === "broken";
   playEntityRoleSound(entity, broken ? "break" : "hit");
   const gesture = resolveTuning(broken ? "mineFinalStrikeSound" : "mineStrikeSound", entity);
-  if (gesture) playInterfaceSound(gesture, "geste de minage");
+  if (gesture) playInterfaceSound(gesture, "geste de minage", { rate: broken ? 1 : strikeRate(entity, strike) });
 }
 
 function handleMine(entity) {
   if (!mineHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
-  mineHandler(entity, (strike) => playMineSounds(entity, strike));
+  mineHandler(entity, (status, strike) => playMineSounds(entity, status, strike));
 }
 
 // "shop" : POINT DE VENTE (voir entities/types/shop_counter.js, doc/
