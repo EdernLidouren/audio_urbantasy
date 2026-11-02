@@ -17,6 +17,7 @@ export let lootSpawnHandler = null;
 export let sideSwitchHandler = null;
 export let variableEffectsHandler = null;
 export let searchHandler = null;
+export let mineHandler = null;
 export let shopHandler = null;
 
 // (effect) => void — exécute l'effet MIXTE "teleport" (voir core/effects.js,
@@ -118,6 +119,18 @@ export function setVariableEffectsHandler(handler) {
 // reste dans view/action-execution.js/handleSearch.
 export function setSearchHandler(handler) {
   searchHandler = handler;
+}
+
+// (entity, beforeApply) => { status, count } — applique un COUP de minage
+// (voir core/mining.js/mineEntity, doc/entity-model.md/"Minage"), même
+// patron que setSearchHandler. `beforeApply(status)` est appelé APRÈS le
+// calcul du coup et AVANT que la session ne change : au dernier coup,
+// l'entité est retirée du monde, et son son de destruction doit partir
+// tant qu'elle a encore une voix dans la scène (comme le son de
+// ramassage). Le retour sensoriel reste dans
+// view/action-execution.js/handleMine.
+export function setMineHandler(handler) {
+  mineHandler = handler;
 }
 
 // (entity) => void — ouvre le menu du POINT DE VENTE (voir view/menus/

@@ -319,7 +319,7 @@ function dropUnknownItems(data) {
 // --- Références de contenu figées (doc/save.md) -------------------------
 //
 // Une sauvegarde garde, telles qu'à la première visite, les distributions
-// de collecte (conteneurs, plages), les stocks tirés, les catalogues des
+// de collecte (conteneurs, plages, entités minables), les stocks tirés, les catalogues des
 // points de vente, les tables et articles des présentoirs, et l'état météo.
 // Une table, un catalogue, un objet, un article ou un état météo retiré ou
 // renommé depuis ferait planter le garnissage, la boutique ou la météo. Ces
@@ -359,6 +359,13 @@ function repairEntityReferences(entity, report) {
     if (problem) {
       report(entity.id, problem);
       next = { ...next, container: { ...next.container, distribution: null } };
+    }
+  }
+  if (entity.mineable && entity.mineable.distribution !== null) {
+    const problem = validationProblem(validateDistribution, entity.mineable.distribution, "mineable.distribution");
+    if (problem) {
+      report(entity.id, problem);
+      next = { ...next, mineable: { ...next.mineable, distribution: null } };
     }
   }
   if (Array.isArray(entity.stock)) {

@@ -43,6 +43,68 @@ export const SPAWN_TABLES = {
   electronics: { fromTag: "electronic" },
   // Tous les minéraux (collection "minerals"), chacun selon sa rareté.
   minerals: { fromTag: "mineral" },
+  // MINAGE (voir doc/entity-model.md/"Minage") : un FOND commun à toutes
+  // les entités minables, et une table propre à chaque nature, chaque
+  // minéral pondéré par SA rareté (celle de la collection). Une entité
+  // combine le fond et sa table ({ tables }, voir entities/types/
+  // boulder.js) : plus elle est rare, moins le fond pèse.
+  mining_common: { limestone: "common", sandstone: "common", flint: "common", quartz: "common" },
+  // Rocher : la roche ordinaire et ce qu'elle emprisonne, fossiles compris.
+  boulder: {
+    slate: "common",
+    granite: "common",
+    basalt: "uncommon",
+    pumice: "uncommon",
+    obsidian: "rare",
+    mica: "common",
+    talc: "common",
+    gypsum: "uncommon",
+    halite: "uncommon",
+    jasper: "uncommon",
+    tigers_eye: "rare",
+    lapis_lazuli: "epic",
+    ammonite: "uncommon",
+    shark_tooth: "uncommon",
+    fern_fossil: "uncommon",
+    trilobite: "rare",
+    amber: "epic",
+    fossil_egg: "legendary",
+  },
+  // Filon : tout ce qui est métal.
+  ore_vein: {
+    hematite: "uncommon",
+    pyrite: "uncommon",
+    chalcopyrite: "uncommon",
+    bauxite: "uncommon",
+    magnetite: "rare",
+    galena: "rare",
+    cassiterite: "rare",
+    cinnabar: "epic",
+    malachite: "rare",
+    turquoise: "rare",
+    native_copper: "rare",
+    native_silver: "epic",
+    gold_nugget: "epic",
+    platinum_nugget: "epic",
+  },
+  // Géode : les cristaux et les pierres précieuses — la géode entière
+  // quand on parvient à l'extraire.
+  geode: {
+    calcite: "common",
+    sulfur: "uncommon",
+    fluorite: "rare",
+    rose_quartz: "uncommon",
+    amethyst: "rare",
+    agate: "rare",
+    garnet: "rare",
+    opal: "epic",
+    ruby: "epic",
+    sapphire: "epic",
+    emerald: "epic",
+    alexandrite: "legendary",
+    rough_diamond: "legendary",
+    geode: "legendary",
+  },
   // PROVISOIRES (copie de "default") : les tables dédiées de la poubelle et
   // du conteneur métallique, en attendant leur vrai contenu.
   metal_trash_can: { apple: 80, coin: 20 },

@@ -631,6 +631,64 @@ quatre d'un composant). Menu debug du temps
 (Shift+T, mode debug) : "Avancer d'une journée" puis refouiller/quitter et
 revenir pour observer le cycle.
 
+## Minage — entités qu'on frappe jusqu'à ce qu'elles cèdent
+
+Une entité MINABLE porte `mineable: { distribution, hits, count? }` (forme :
+`doc/scene-format.md`/"Entité", cascade instance -> archétype, l'instance
+remplace en bloc) et l'action `{ kind: "mine" }` (`doc/scripting.md`).
+Chaque Entrée est un COUP ; au dernier, l'entité est détruite et ce qu'elle
+renfermait tombe au sol. Moteur : `core/mining.js`/`mineEntity`, pur.
+
+- **Résistance** — `hits`, une fourchette `{ min, max }` (ou un entier
+  seul) : le nombre de coups à porter, TIRÉ AU PREMIER COUP (PRNG de la
+  face) et retenu dans le champ runtime `hitsLeft`, décompté à chaque coup
+  et sauvegardé avec la partie. Une entité jamais frappée ne porte rien de
+  plus que sa scène.
+- **Butin** — à la destruction, `count` (fourchette, défaut 1) tirages dans
+  `distribution` (même forme qu'une distribution de collecte, voir
+  "Collecte" : `{ table }`, `{ items }`, `{ tables }`, issue `nothing`
+  permise). Chaque objet tombe en entité ÉPHÉMÈRE éparpillée autour de
+  l'entité détruite (`mineScatterSpread`), MÊME geste qu'une fouille, à
+  ramasser par `"pickup"`. Tous les tirages peuvent tomber sur `nothing` :
+  l'entité se brise alors sans rien livrer.
+- **Destruction** — l'entité est RETIRÉE du monde (`core/state.js`/
+  `removeEntity`) ; la sauvegarde fige ce retrait. Elle ne revient pas : le
+  réapprovisionnement des entités minables viendra avec leur apparition
+  aléatoire.
+- **Accès** — la condition (le kit de minage, `hasImprovement`) n'est PAS
+  dans le moteur : l'action de l'archétype la porte, avec son refus annoncé
+  (`condition` + `refusalEffects`, comme toute action conditionnelle). En
+  mode debug, `hasImprovement` répond toujours vrai : on mine sans le kit.
+- **Rendu** (`view/action-execution.js`/`handleMine`) — deux sons
+  superposés par coup : celui de l'ENTITÉ, positionné (rôle `hit` ; rôle
+  `break` au dernier coup, parti avant qu'elle ne disparaisse), et celui du
+  GESTE, méta, au volume de l'interface (`mineStrikeSound`, ou
+  `mineFinalStrikeSound` au dernier coup, `config/tuning-values.js`,
+  surchargeables par archétype). Annonces : `interaction.mineHit` à chaque
+  coup, `interaction.mineBroken` (nombre d'objets tombés) ou
+  `interaction.mineBrokenEmpty` à la destruction ; le nom de l'entité y
+  passe par référence (forme `def`).
+
+Trois natures, de la plus commune à la plus rare, chacune avec SA table
+propre combinée à un fond commun (`config/spawn-values.js`,
+`mining_common`) — plus l'entité est rare, moins le fond pèse et plus elle
+donne :
+
+| Type | Table propre | Fond commun : table propre | Objets tombés |
+|---|---|---|---|
+| `boulder` (rocher) | `boulder` : roches, minéraux tendres, fossiles | 1 : 1 | 1 à 2 |
+| `ore_vein` (filon) | `ore_vein` : minerais et métaux natifs | 1 : 2 | 1 à 3 |
+| `geode` (géode) | `geode` : cristaux, pierres précieuses, la géode entière | 1 : 5 | 2 à 3 |
+
+Dans chaque table, un minéral pèse selon SA rareté de collection (niveaux
+de `RARITY_LEVELS`). Le météorite de fer et la fulgurite n'y sont pas :
+ils naîtront d'apparitions particulières. Résistance PROVISOIRE : 1 à 5
+coups pour les trois. Vérifications : `core/checks/mining.check.js`.
+
+Contenu de test : `scenes/old-quarries-underground-1-main.json` (le
+fond du puits des anciennes carrières), un rocher (x 6), un filon (x 21) et
+une géode (x 26) au recto.
+
 ## Vente et achat — point de vente et menu à sliders inline
 
 Une entité POINT DE VENTE (`entities/types/shop_counter.js`, action
@@ -1419,7 +1477,8 @@ Un descripteur de son est un objet plat :
 `sounds` regroupe ces descripteurs **par rôle** : uniquement les rôles que la
 vue lit (`core/entity-parse.js`/`SOUND_ROLES` — `beacon`, `vocal`,
 `movement`, `enterSound`, `exitSound`, `pickup`, `approachSound`,
-`leaveSound`, `proximityLoop`). Un autre nom serait ignoré
+`leaveSound`, `proximityLoop`, `hit`, `break` — ces deux derniers, sons
+ponctuels d'une entité minable, voir "Minage"). Un autre nom serait ignoré
 en silence : il est REJETÉ au chargement, comme tout champ d'un descripteur
 qui n'est ni `path`, ni `loop`, ni `tracked`, ni une clé de réglage de
 `config/tuning-values.js` (`condition` en plus pour `beacon`). Ajouter un

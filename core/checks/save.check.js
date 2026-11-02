@@ -276,6 +276,13 @@ export default function checkSave(run) {
               stockCycle: 0,
             },
             { id: "old-shop", type: "dog", x: 3, sounds: {}, shop: { catalog: { table: "catalog_that_no_longer_exists" } }, shopStock: {} },
+            {
+              id: "old-rock",
+              type: "dog",
+              x: 4,
+              sounds: {},
+              mineable: { distribution: { table: "table_that_no_longer_exists" }, hits: { min: 1, max: 1 }, count: { min: 1, max: 1 } },
+            },
           ],
         },
       },
@@ -288,11 +295,12 @@ export default function checkSave(run) {
   run("save références : distribution de conteneur inconnue -> neutralisée", null, brokenEntity("old-bush")?.container.distribution);
   run("save références : objet inconnu retiré du stock tiré", "apple", brokenEntity("old-bush")?.stock.join(","));
   run("save références : catalogue inconnu -> neutralisé", null, brokenEntity("old-shop")?.shop.catalog);
+  run("save références : distribution d'entité minable inconnue -> neutralisée", null, brokenEntity("old-rock")?.mineable.distribution);
   run("save références : distribution de plage inconnue -> neutralisée", null, brokenWorld?.spawnRanges[0].distribution);
   run("save références : état météo inconnu -> état par défaut", DEFAULT_WEATHER_STATE, brokenResult.session?.weather.state);
   run(
     "save références : chaque neutralisation listée, dans l'ordre",
-    "old-bush,old-bush,old-shop,spawnRanges[0],weather",
+    "old-bush,old-bush,old-shop,old-rock,spawnRanges[0],weather",
     brokenResult.brokenReferences?.map((r) => r.source).join(",")
   );
   run("save références : partie saine -> rien de neutralisé", 0, deserializeGame(saveEnvelope).brokenReferences.length);

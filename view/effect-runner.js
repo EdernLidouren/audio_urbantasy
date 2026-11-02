@@ -26,7 +26,14 @@ import { sequenceHead } from "../core/sequence.js";
 // l'effet d'état qui retire l'entité, tant qu'elle a encore une voix dans
 // la scène.
 export function playEntityPickupSound(entity) {
-  const descriptor = entity.sounds && entity.sounds.pickup;
+  playEntityRoleSound(entity, "pickup");
+}
+
+// Même rendu, pour tout rôle PONCTUEL déclaré par l'entité (ex. `hit` et
+// `break` d'une entité minable, voir view/action-execution.js/handleMine) :
+// absent -> silence, jamais un son imposé.
+export function playEntityRoleSound(entity, role) {
+  const descriptor = entity.sounds && entity.sounds[role];
   if (!descriptor) return;
   runPlaySoundEffect(entity, descriptor);
 }

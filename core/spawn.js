@@ -126,8 +126,9 @@ function faceHasSources(face) {
 // tirages "rien" (item null) sont écartés : `items` peut compter moins de
 // `count` objets, voire aucun — `count` tirages sont consommés quoi qu'il
 // arrive. Distribution `null` (neutralisée à la relecture d'une
-// sauvegarde, voir core/save.js/repairContentReferences) : rien.
-function drawItems(distribution, count, rngState) {
+// sauvegarde, voir core/save.js/repairContentReferences) : rien. Partagée
+// avec le minage (core/mining.js).
+export function drawItems(distribution, count, rngState) {
   if (distribution === null) return { items: [], rngState };
   const items = [];
   let state = rngState;
@@ -155,8 +156,8 @@ function collectibleRaw(item, registry, count) {
 // parseur qu'une instance de scène (cascade sounds/capacités/action de
 // l'archétype). Sert aux deux matérialisations : posé PERSISTANT par une
 // plage (marqué `spawned` par l'appelant), ou ÉPHÉMÈRE lâché par une fouille
-// (spawnEphemeral repose id/x/ephemeral lui-même).
-function buildCollectibleSpec(item, id, x, registry, length, sceneVariables) {
+// ou un minage (spawnEphemeral repose id/x/ephemeral lui-même).
+export function buildCollectibleSpec(item, id, x, registry, length, sceneVariables) {
   return parseSpawnedEntity({ id, x, ...collectibleRaw(item, registry) }, registry, length, sceneVariables);
 }
 

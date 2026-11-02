@@ -6,9 +6,11 @@
 // sont vérifiées contre ce registre au chargement du module.
 
 import { announce } from "../lib/announce.js";
-import { t } from "../data/i18n/index.js";
+import { t, nameRef } from "../data/i18n/index.js";
 import { ACTION_KINDS } from "../core/action-kinds.js";
-import { playEntityPickupSound } from "./effect-runner.js";
+import { resolveTuning } from "../config/tuning.js";
+import { playEntityPickupSound, playEntityRoleSound } from "./effect-runner.js";
+import { playInterfaceSound } from "./menu-sounds.js";
 import {
   pickupHandler,
   itemPickupHandler,
@@ -17,6 +19,7 @@ import {
   lootSpawnHandler,
   sideSwitchHandler,
   searchHandler,
+  mineHandler,
   shopHandler,
   displayHandler,
 } from "./interaction-handlers.js";
@@ -158,6 +161,32 @@ function handleSearch(entity) {
   else announce(t("interaction.searchSpawn", { count }), { assertive: true });
 }
 
+// "mine" : un COUP sur une entité minable (voir core/mining.js,
+// doc/entity-model.md/"Minage"). La condition d'accès (le kit de minage)
+// a déjà été vérifiée par view/interaction.js/interact, comme pour toute
+// action conditionnelle : on n'arrive ici qu'outillé. DEUX sons par coup,
+// superposés : celui de l'ENTITÉ, positionné (rôle `hit`, ou `break` au
+// dernier coup, partis avant qu'elle ne disparaisse), et celui du GESTE,
+// méta (mineStrikeSound / mineFinalStrikeSound, config/tuning-values.js).
+// Les objets tombés s'entendent ensuite à leurs propres balises.
+function playMineSounds(entity, status) {
+  const broken = status === "broken";
+  playEntityRoleSound(entity, broken ? "break" : "hit");
+  const gesture = resolveTuning(broken ? "mineFinalStrikeSound" : "mineStrikeSound", entity);
+  if (gesture) playInterfaceSound(gesture, "geste de minage");
+}
+
+function handleMine(entity) {
+  if (!mineHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
+  // { status, count } — voir core/mining.js/mineEntity.
+  const { status, count } = mineHandler(entity, (strike) => playMineSounds(entity, strike));
+  if (status === null) return; // pas une entité minable de la face active (dégradation silencieuse)
+  const name = nameRef(entity.labelKey);
+  if (status === "hit") announce(t("interaction.mineHit", { entity: name }), { assertive: true });
+  else if (count === 0) announce(t("interaction.mineBrokenEmpty", { entity: name }), { assertive: true });
+  else announce(t("interaction.mineBroken", { entity: name, count }), { assertive: true });
+}
+
 // "shop" : POINT DE VENTE (voir entities/types/shop_counter.js, doc/
 // entity-model.md/"Vente") — ouvre le menu d'actions du comptoir ; tout le
 // reste (liste de vente, confirmations, transaction) vit dans
@@ -184,6 +213,7 @@ const ACTION_HANDLERS = {
   switchSide: handleSwitchSide,
   applyEffects: handleApplyEffects,
   search: handleSearch,
+  mine: handleMine,
   shop: handleShop,
   buy: handleBuy,
 };

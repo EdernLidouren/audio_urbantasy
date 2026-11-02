@@ -42,6 +42,7 @@ import checkEffects from "./effects.check.js";
 import checkTrade from "./trade.check.js";
 import checkDisplay from "./display.check.js";
 import checkSpawn from "./spawn.check.js";
+import checkMining from "./mining.check.js";
 import checkCollections from "./collections.check.js";
 import checkTriggers from "./triggers.check.js";
 import checkNewGame from "./new-game.check.js";
@@ -84,6 +85,7 @@ const SUITES = [
   { name: "trade", check: checkTrade },
   { name: "display", check: checkDisplay },
   { name: "spawn", check: checkSpawn },
+  { name: "mining", check: checkMining },
   { name: "collections", check: checkCollections },
   { name: "triggers", check: checkTriggers },
   { name: "new-game", check: checkNewGame },

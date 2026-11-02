@@ -118,6 +118,7 @@ export const ACTION_KINDS = {
   search: { fields: [], validate: noFields, requires: "container" },
   shop: { fields: [], validate: noFields, requires: "shop" },
   buy: { fields: [], validate: noFields, requires: "display" },
+  mine: { fields: [], validate: noFields, requires: "mineable" },
 };
 
 // Kind connu, aucun champ hors de ceux du kind et des champs communs, puis

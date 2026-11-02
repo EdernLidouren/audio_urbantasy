@@ -43,6 +43,11 @@
   "door.town_hall_main.time_refusal": "The town hall only opens its doors between 8am and 8pm.",
   "entity.bird.description": "A bird that chirps every so often.",
   "entity.bird.name": "bird",
+  "entity.boulder.description": "A large block of rock broken away from the wall, waiting for a well-placed blow.",
+  "entity.boulder.name": {
+    "base": "boulder",
+    "def": "the boulder"
+  },
   "entity.broken_computer.description": "A computer tower and its screen, badly damaged and plainly beyond use.",
   "entity.broken_computer.name": "broken computer",
   "entity.buddy.description": "Your loyal four-legged companion.",
@@ -74,6 +79,11 @@
   "entity.dog.name": "dog",
   "entity.fountain.description": "A fountain running without interruption.",
   "entity.fountain.name": "fountain",
+  "entity.geode.description": "A rough ball of stone set in the wall, which sounds hollow when tapped.",
+  "entity.geode.name": {
+    "base": "geode",
+    "def": "the geode"
+  },
   "entity.ghost.description": "An indistinct presence, only revealed by supernatural perception.",
   "entity.ghost.name": "presence",
   "entity.ghosten.description": "The blurred, uncertain shape of a stooped human silhouette whose arms, tubular and endless, hang down to the ground, where they sink in without any logic. The light sources filtering through this apparition take on a vibrance at times spectral, at times electric.",
@@ -133,6 +143,11 @@
   "entity.old_survey_map.description": "A large map of the town, rolled up and yellowed, covered in faded ink annotations.",
   "entity.old_survey_map.name": "old survey map",
   "entity.old_survey_map.taken": "You take the old survey map.",
+  "entity.ore_vein.description": "A vein of ore running through the rock, darker and heavier than the stone around it.",
+  "entity.ore_vein.name": {
+    "base": "ore vein",
+    "def": "the ore vein"
+  },
   "entity.perched_bird.description": "A small bird hopping about, pecking at the ground.",
   "entity.perched_bird.name": "bird",
   "entity.potted_plant.description": "A terracotta pot holding a very common plant species.",

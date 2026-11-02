@@ -68,9 +68,11 @@ import cumuloLupus from "./cumulo-lupus.js";
 import decor from "./decor.js";
 import defectiveNeon from "./defective_neon.js";
 import dieselElectricGenerator from "./diesel_electric_generator.js";
+import boulder from "./boulder.js";
 import dog from "./dog.js";
 import door from "./door.js";
 import fountain from "./fountain.js";
+import geode from "./geode.js";
 import ghost from "./ghost.js";
 import ghosten from "./ghosten.js";
 import glassWindow from "./glass-window.js";
@@ -94,6 +96,7 @@ import money from "./money.js";
 import neon from "./neon.js";
 import npc from "./npc.js";
 import object from "./object.js";
+import oreVein from "./ore_vein.js";
 import officeChair from "./office_chair.js";
 import officeComputer from "./office_computer.js";
 import officeSupplyBox from "./office_supply_box.js";
@@ -147,9 +150,11 @@ export default {
   decor,
   defective_neon: defectiveNeon,
   diesel_electric_generator: dieselElectricGenerator,
+  boulder,
   dog,
   door,
   fountain,
+  geode,
   ghost,
   ghosten,
   glass_window: glassWindow,
@@ -173,6 +178,7 @@ export default {
   neon,
   npc,
   object,
+  ore_vein: oreVein,
   office_chair: officeChair,
   office_computer: officeComputer,
   office_supply_box: officeSupplyBox,

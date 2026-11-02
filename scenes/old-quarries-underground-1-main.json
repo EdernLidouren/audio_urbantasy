@@ -10,7 +10,11 @@
     "ambiences": ["assets/ambiances/shaft"],
     "defaultSurface": "rock",
     "reverbPreset": "cave",
-    "entities": []
+    "entities": [
+      { "id": "boulder_1_r", "type": "boulder", "x": 6 },
+      { "id": "ore_vein_1_r", "type": "ore_vein", "x": 21 },
+      { "id": "geode_1_r", "type": "geode", "x": 26 }
+    ]
   },
   "verso": {
     "indoor": true,

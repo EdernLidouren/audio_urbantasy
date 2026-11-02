@@ -22,6 +22,7 @@ import {
   setObservationHandler,
   setVariableEffectsHandler,
   setSearchHandler,
+  setMineHandler,
   setShopHandler,
   setDisplayHandler,
 } from "./interaction-handlers.js";
@@ -34,6 +35,7 @@ import { applyEntityActionEffects } from "../core/state.js";
 import { pickupEntity, lootEntity, lootUniqueEntity, lootEntitySpawn } from "../core/money.js";
 import { pickupItemEntity, dropItem } from "../core/bag.js";
 import { searchContainer, ephemeralArchetypeSpec, ephemeralItemSpec } from "../core/spawn.js";
+import { mineEntity } from "../core/mining.js";
 import { equipItem, unequipItem } from "../core/equipment.js";
 import { markObserved } from "../core/observations.js";
 import { sellItems, buyItems, restockShopIfDue, buyOfferedArticle } from "../core/trade.js";
@@ -83,6 +85,19 @@ export function registerActionHandlers({ getSession, setSession, travel }) {
       (entity) => {
         const result = searchContainer(getSession(), entity.id, registry);
         if (result.session !== getSession()) setSession(result.session);
+        return { status: result.status, count: result.items.length };
+      },
+    ],
+    // Coup de minage : le coup est calculé, son retour sonore part, PUIS la
+    // session change (au dernier coup, l'entité disparaît).
+    [
+      setMineHandler,
+      (entity, beforeApply) => {
+        const result = mineEntity(getSession(), entity.id, registry);
+        if (result.status !== null) {
+          beforeApply(result.status);
+          setSession(result.session);
+        }
         return { status: result.status, count: result.items.length };
       },
     ],

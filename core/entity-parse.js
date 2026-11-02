@@ -22,7 +22,7 @@ const TUNING_KEYS = Object.keys(TUNING_DEFAULTS);
 // Rôles de son lus par la vue (voir doc/entity-model.md/"Vocabulaire de
 // sons") : un autre nom serait ignoré en silence, il est refusé. Ajouter un
 // rôle, c'est l'ajouter ici ET le faire lire par la vue.
-const SOUND_ROLES = ["beacon", "vocal", "movement", "enterSound", "exitSound", "pickup", "approachSound", "leaveSound", "proximityLoop"];
+const SOUND_ROLES = ["beacon", "vocal", "movement", "enterSound", "exitSound", "pickup", "approachSound", "leaveSound", "proximityLoop", "hit", "break"];
 
 // Champs d'un descripteur de son, en plus des clés de réglage : `condition`
 // n'existe que pour les rôles qui la LISENT, la balise et les sons de
@@ -357,6 +357,40 @@ function parseContainer(container, at) {
   return parsed;
 }
 
+// Une fourchette d'entiers { min, max } (1 <= min <= max), ou un entier
+// seul (min = max) : rendue toujours sous la forme { min, max }.
+function parseIntRange(value, describe) {
+  const range = Number.isInteger(value) ? { min: value, max: value } : value;
+  if (typeof range !== "object" || range === null || Array.isArray(range)) {
+    fail(`${describe} doit être un entier >= 1 ou une fourchette { min, max }.`);
+  }
+  rejectUnknownFields(range, ["min", "max"], describe);
+  const { min, max } = range;
+  if (!Number.isInteger(min) || !Number.isInteger(max) || min < 1 || max < min) {
+    fail(`${describe} : min et max doivent être des entiers, 1 <= min <= max (reçu : ${JSON.stringify(value)}).`);
+  }
+  return { min, max };
+}
+
+// Entité MINABLE (voir doc/entity-model.md/"Minage", core/mining.js) :
+// { distribution, hits, count? }. `hits` : la fourchette du nombre de coups
+// avant destruction, tiré au premier coup ; `count` : la fourchette du
+// nombre de tirages dans `distribution` à la destruction (défaut 1). Seule
+// la FORME est validée ; le compteur courant (`hitsLeft`) reste au moteur.
+function parseMineable(mineable, at) {
+  if (typeof mineable !== "object" || mineable === null || Array.isArray(mineable)) {
+    fail(`${at} : mineable doit être un objet si présent.`);
+  }
+  rejectUnknownFields(mineable, ["distribution", "hits", "count"], `${at} : mineable`);
+  validateDistribution(mineable.distribution, `${at} : mineable.distribution`, fail);
+  if (mineable.hits === undefined) fail(`${at} : mineable.hits manquant (nombre de coups avant destruction).`);
+  return {
+    distribution: mineable.distribution,
+    hits: parseIntRange(mineable.hits, `${at} : mineable.hits`),
+    count: mineable.count === undefined ? { min: 1, max: 1 } : parseIntRange(mineable.count, `${at} : mineable.count`),
+  };
+}
+
 // Point de vente (voir doc/entity-model.md/"Vente et achat") : { catalog }.
 // Le stock courant (shopStock, shopCycle) reste au moteur.
 function parseShop(shop, at) {
@@ -428,6 +462,7 @@ const ENTITY_FIELDS = [
   "container",
   "shop",
   "display",
+  "mineable",
   "triggers",
   "startle",
 ];
@@ -465,6 +500,7 @@ export function parseEntity(rawEntity, index, registry, length, seenIds, sceneVa
     container,
     shop,
     display,
+    mineable,
     triggers,
     startle,
   } = rawEntity;
@@ -573,6 +609,12 @@ export function parseEntity(rawEntity, index, registry, length, seenIds, sceneVa
     entity.display = parseDisplay(resolvedDisplay, at);
   }
 
+  // Entité minable : l'instance remplace l'archétype en bloc.
+  const resolvedMineable = mineable !== undefined ? mineable : archetype.mineable;
+  if (resolvedMineable !== undefined) {
+    entity.mineable = parseMineable(resolvedMineable, at);
+  }
+
   if (entity.action !== undefined) checkActionRequirements(entity, at);
 
   // Entité farouche (voir core/startle.js) : l'instance remplace
@@ -639,6 +681,7 @@ const ARCHETYPE_FIELDS = [
   "container",
   "shop",
   "display",
+  "mineable",
   "startle",
   "collisionSound",
   "muteOnConsumed",

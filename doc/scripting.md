@@ -1106,6 +1106,32 @@ de nouveau dès qu'un cycle est passé) ou `interaction.searchDepleted` (non
 régénérant). Il reste occupé, observable (Espace) et audible. Contrairement
 à `"loot"`, l'entité n'est jamais `consumed`.
 
+### `"mine"` — un COUP sur une entité minable
+
+```js
+// entities/types/boulder.js
+mineable: {
+  distribution: { tables: [{ table: "mining_common", weight: 1 }, { table: "boulder", weight: 1 }] },
+  hits: { min: 1, max: 5 },
+  count: { min: 1, max: 2 },
+},
+action: {
+  kind: "mine",
+  condition: { type: "hasImprovement", id: "mining_kit" },
+  refusalEffects: [{ type: "announce", key: "interaction.mineNeedsTools" }],
+},
+```
+
+Aucun paramètre sur l'action elle-même, mais l'entité DOIT avoir un
+`mineable` (après la cascade instance -> archétype ; sinon, erreur au
+chargement). Chaque activation est un coup ; la résistance (`hits`) est
+tirée au premier, et au dernier l'entité est retirée du monde, ses objets
+(`count` tirages dans `distribution`) tombés au sol en éphémères. Effet
+d'état : `core/mining.js`/`mineEntity`. Retour : le son positionné de
+l'entité (rôle `hit`, `break` au dernier coup) sous le son méta du geste,
+puis `interaction.mineHit`, `interaction.mineBroken` ou
+`interaction.mineBrokenEmpty`. Détail : `doc/entity-model.md`/"Minage".
+
 ### `"shop"` — POINT DE VENTE, ouvre le menu du comptoir
 
 ```js

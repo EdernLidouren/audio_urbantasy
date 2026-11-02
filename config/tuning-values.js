@@ -429,6 +429,11 @@ export const TUNING_DEFAULTS = {
   // le chercher plus loin. Lu DIRECTEMENT, comme ephemeralScatterSpread.
   searchScatterSpread: 2,
 
+  // Même rôle, pour les objets qui TOMBENT d'une entité minée détruite
+  // (voir core/mining.js) : plus serré encore, le rocher se brise sur
+  // place. Lu DIRECTEMENT, comme ephemeralScatterSpread.
+  mineScatterSpread: 1.5,
+
   // Écart minimal (unités x) entre deux collectibles posés dans une même
   // PLAGE de spawn (voir core/spawn.js, doc/entity-model.md/"Collecte") :
   // évite l'empilement sonore de deux balises au même point. Lu
@@ -581,6 +586,15 @@ export const TUNING_DEFAULTS = {
   // core/rotation.js) : le panneau publicitaire change de réclame au début
   // de chaque période, donc à l'heure pile pour 60. Strictement positive.
   messageRotationMinutes: 60,
+
+  // Sons MÉTA d'un coup de minage (view/action-execution.js/handleMine) :
+  // le geste du joueur, non positionné, au volume de l'interface, joué
+  // PAR-DESSUS le son positionné de l'entité (rôle `hit`, ou `break` au
+  // dernier coup). Un défaut global : tous les outils de minage sonnent
+  // pareil ; une entité peut en déclarer d'autres (archétype, instance).
+  // Vide ("") : rien de plus que le son de l'entité.
+  mineStrikeSound: "assets/sounds/effects/mining_action",
+  mineFinalStrikeSound: "assets/sounds/effects/mining_final_action",
 
   // --- Clés de la cascade SANS défaut global (`undefined`) : leur valeur
   // vient du son, de l'instance ou du type, sinon le consommateur a son
