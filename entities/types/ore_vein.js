@@ -26,6 +26,9 @@ export default {
   // Surlignage audio de proximité (voir doc/entity-model.md) : une prise à
   // frapper se repère nettement une fois à portée, comme un conteneur.
   highlight: true,
+  // Délai entre deux coups (interactCooldownMs, voir view/interaction.js) :
+  // bien plus court que le défaut, pour enchaîner les coups en rythme.
+  interactCooldownMs: 300,
   action: {
     kind: "mine",
     condition: { type: "hasImprovement", id: "mining_kit" },

@@ -669,8 +669,10 @@ renfermait tombe au sol. Moteur : `core/mining.js`/`mineEntity`, pur.
   combo : le N-ième coup joue la N-ième note de `mineStrikeScale` (en
   demi-tons, pentatonique majeure jusqu'à l'octave par défaut), la dernière
   note servant de plafond. Sauts FIXES : même mélodie quelle que soit la
-  résistance, la casse arrive sans prévenir, et le geste du dernier coup
-  garde sa hauteur d'origine. AUCUNE annonce, ni au coup ni à la
+  résistance, et la casse arrive sans prévenir. Le geste du dernier coup
+  joue lui aussi la note de son rang (`mineFinalStrikeRises`, à l'essai ;
+  `false` : sa hauteur d'origine). Délai entre deux coups : 300 ms
+  (`interactCooldownMs` des trois archétypes). AUCUNE annonce, ni au coup ni à la
   destruction : le son suffit, et les objets tombés se signalent par leurs
   balises. Seul le refus sans le kit s'annonce.
 

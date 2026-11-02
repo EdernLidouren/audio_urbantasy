@@ -603,9 +603,14 @@ export const TUNING_DEFAULTS = {
   // sans prévenir. Défaut : pentatonique majeure jusqu'à l'octave (do ré
   // mi sol la do) — toutes ses notes sonnent bien ensemble. La hauteur
   // passe par la vitesse de lecture : une note plus haute est aussi plus
-  // courte (une octave : deux fois). Le dernier coup, lui, joue
-  // mineFinalStrikeSound à sa hauteur d'origine. [0] : aucune montée.
+  // courte (une octave : deux fois). [0] : aucune montée.
   mineStrikeScale: [0, 2, 4, 7, 9, 12],
+  // Le son du DERNIER coup (mineFinalStrikeSound) continue-t-il la montée ?
+  // true : il joue la note de son rang, comme un coup ordinaire (la casse
+  // au 5e coup sonne sur le la) ; false : sa hauteur d'origine.
+  // ESSAI : si on le garde à false, retirer cette clé et son seul lecteur
+  // (view/action-execution.js/playMineSounds).
+  mineFinalStrikeRises: true,
 
   // --- Clés de la cascade SANS défaut global (`undefined`) : leur valeur
   // vient du son, de l'instance ou du type, sinon le consommateur a son

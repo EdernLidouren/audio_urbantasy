@@ -169,8 +169,8 @@ function handleSearch(entity) {
 // dernier coup, partis avant qu'elle ne disparaisse), et celui du GESTE,
 // méta (mineStrikeSound / mineFinalStrikeSound, config/tuning-values.js).
 // Le geste MONTE coup après coup (mineStrikeScale : la note du N-ième
-// coup, plafonnée à la dernière) ; celui du dernier coup reste à sa
-// hauteur d'origine. AUCUNE annonce : le son dit le coup et la
+// coup, plafonnée à la dernière) ; celui du dernier coup aussi si
+// mineFinalStrikeRises, sinon il garde sa hauteur d'origine. AUCUNE annonce : le son dit le coup et la
 // destruction, et les objets tombés s'entendent ensuite à leurs propres
 // balises.
 function strikeRate(entity, strike) {
@@ -183,7 +183,8 @@ function playMineSounds(entity, status, strike) {
   const broken = status === "broken";
   playEntityRoleSound(entity, broken ? "break" : "hit");
   const gesture = resolveTuning(broken ? "mineFinalStrikeSound" : "mineStrikeSound", entity);
-  if (gesture) playInterfaceSound(gesture, "geste de minage", { rate: broken ? 1 : strikeRate(entity, strike) });
+  const rises = !broken || resolveTuning("mineFinalStrikeRises", entity);
+  if (gesture) playInterfaceSound(gesture, "geste de minage", { rate: rises ? strikeRate(entity, strike) : 1 });
 }
 
 function handleMine(entity) {
