@@ -671,7 +671,7 @@ renfermait tombe au sol. Moteur : `core/mining.js`/`mineEntity`, pur.
   note servant de plafond. Sauts FIXES : même mélodie quelle que soit la
   résistance, et la casse arrive sans prévenir. Le geste du dernier coup
   joue lui aussi la note de son rang (`mineFinalStrikeRises`, à l'essai ;
-  `false` : sa hauteur d'origine). Délai entre deux coups : 300 ms
+  `false` : sa hauteur d'origine). Délai entre deux coups : 200 ms
   (`interactCooldownMs` des trois archétypes). AUCUNE annonce, ni au coup ni à la
   destruction : le son suffit, et les objets tombés se signalent par leurs
   balises. Seul le refus sans le kit s'annonce.
@@ -681,16 +681,16 @@ propre combinée à un fond commun (`config/spawn-values.js`,
 `mining_common`) — plus l'entité est rare, moins le fond pèse et plus elle
 donne :
 
-| Type | Table propre | Fond commun : table propre | Objets tombés |
-|---|---|---|---|
-| `boulder` (rocher) | `boulder` : roches, minéraux tendres, fossiles | 1 : 1 | 1 à 2 |
-| `ore_vein` (filon) | `ore_vein` : minerais et métaux natifs | 1 : 2 | 1 à 3 |
-| `geode` (géode) | `geode` : cristaux, pierres précieuses, la géode entière | 1 : 5 | 2 à 3 |
+| Type | Table propre | Fond commun : table propre | Coups | Objets tombés |
+|---|---|---|---|---|
+| `boulder` (rocher) | `boulder` : roches, minéraux tendres, fossiles | 1 : 1 | 2 à 4 | 1 à 2 |
+| `ore_vein` (filon) | `ore_vein` : minerais et métaux natifs | 1 : 2 | 3 à 6 | 1 à 3 |
+| `geode` (géode) | `geode` : cristaux, pierres précieuses, la géode entière | 1 : 5 | 4 à 7 | 2 à 3 |
 
 Dans chaque table, un minéral pèse selon SA rareté de collection (niveaux
 de `RARITY_LEVELS`). Le météorite de fer et la fulgurite n'y sont pas :
-ils naîtront d'apparitions particulières. Résistance PROVISOIRE : 1 à 5
-coups pour les trois. Vérifications : `core/checks/mining.check.js`.
+ils naîtront d'apparitions particulières. Résistances et nombres d'objets
+PROVISOIRES, à régler à l'usage. Vérifications : `core/checks/mining.check.js`.
 
 Contenu de test : `scenes/old-quarries-underground-1-main.json` (le
 fond du puits des anciennes carrières), un rocher (x 6), un filon (x 21) et

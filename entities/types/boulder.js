@@ -4,7 +4,7 @@
 // table propre (config/spawn-values.js, "mining_common" et "boulder").
 // Sans le kit de minage, l'action refuse et le dit (condition +
 // refusalEffects, voir doc/scripting.md/"Actions"). Résistance (`hits`) :
-// PROVISOIRE, 1 à 5 coups pour les tests. Son de destruction : celui du
+// 2 à 4 coups, provisoire. Son de destruction : celui du
 // rocher pour l'instant, faute de son propre.
 export default {
   nameKey: "entity.boulder.name",
@@ -16,7 +16,7 @@ export default {
   },
   mineable: {
     distribution: { tables: [{ table: "mining_common", weight: 1 }, { table: "boulder", weight: 1 }] },
-    hits: { min: 1, max: 5 },
+    hits: { min: 2, max: 4 },
     count: { min: 1, max: 2 },
   },
   blocksMovement: false,
@@ -27,7 +27,7 @@ export default {
   highlight: true,
   // Délai entre deux coups (interactCooldownMs, voir view/interaction.js) :
   // bien plus court que le défaut, pour enchaîner les coups en rythme.
-  interactCooldownMs: 300,
+  interactCooldownMs: 200,
   action: {
     kind: "mine",
     condition: { type: "hasImprovement", id: "mining_kit" },

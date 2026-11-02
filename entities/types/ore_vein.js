@@ -5,7 +5,7 @@
 // peu plus qu'un rocher.
 // Sans le kit de minage, l'action refuse et le dit (condition +
 // refusalEffects, voir doc/scripting.md/"Actions"). Résistance (`hits`) :
-// PROVISOIRE, 1 à 5 coups pour les tests. Son de destruction : celui du
+// 3 à 6 coups, provisoire. Son de destruction : celui du
 // rocher pour l'instant, faute de son propre.
 export default {
   nameKey: "entity.ore_vein.name",
@@ -17,7 +17,7 @@ export default {
   },
   mineable: {
     distribution: { tables: [{ table: "mining_common", weight: 1 }, { table: "ore_vein", weight: 2 }] },
-    hits: { min: 1, max: 5 },
+    hits: { min: 3, max: 6 },
     count: { min: 1, max: 3 },
   },
   blocksMovement: false,
@@ -28,7 +28,7 @@ export default {
   highlight: true,
   // Délai entre deux coups (interactCooldownMs, voir view/interaction.js) :
   // bien plus court que le défaut, pour enchaîner les coups en rythme.
-  interactCooldownMs: 300,
+  interactCooldownMs: 200,
   action: {
     kind: "mine",
     condition: { type: "hasImprovement", id: "mining_kit" },
