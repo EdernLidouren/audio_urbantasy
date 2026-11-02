@@ -12,6 +12,21 @@
     "reverbPreset": "cave",
     "entities": [
       { "id": "boulder_1_r", "type": "boulder", "x": 6 },
+      {
+        "id": "shaft_cage_1_r",
+        "type": "door",
+        "x": 15,
+        "nameKey": "door.shaft_cage.name",
+        "descriptionKey": "door.shaft_cage.description",
+        "sounds": { "beacon": { "path": "assets/sounds/doors/old_elevator_bell_1_beacon" } },
+        "action": {
+          "kind": "applyEffects",
+          "effects": [
+            { "type": "playSound", "path": "assets/sounds/doors/freight_elevator_transition" },
+            { "type": "teleport", "target": "old_quarries", "x": 25, "side": "recto", "holdForSound": true }
+          ]
+        }
+      },
       { "id": "ore_vein_1_r", "type": "ore_vein", "x": 21 },
       { "id": "geode_1_r", "type": "geode", "x": 26 }
     ]

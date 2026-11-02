@@ -350,6 +350,9 @@
   "assets/sounds/doors/metal_ladder_1_beacon": [
     "assets/sounds/doors/metal_ladder_1_beacon_1.mp3"
   ],
+  "assets/sounds/doors/old_elevator_bell_1_beacon": [
+    "assets/sounds/doors/old_elevator_bell_1_beacon_1.mp3"
+  ],
   "assets/sounds/doors/passage_indoor_1_beacon": [
     "assets/sounds/doors/passage_indoor_1_beacon_1.mp3"
   ],

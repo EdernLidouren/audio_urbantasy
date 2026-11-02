@@ -36,6 +36,8 @@
   "door.quasar_bazaar_entrance.closed_description": "Un accès protégé par un lourd rideau de fer.",
   "door.quasar_bazaar_entrance.description": "Au-dessus d'une paire de larges portes automatiques, une enseigne bleu nuit au lettrage blanc et or annonce « Bazar Quasar ». Des étoiles et des comètes stylisées ornent le panneau vitré des portes.",
   "door.quasar_bazaar_entrance.name": "entrée du Bazar Quasar",
+  "door.shaft_cage.description": "La cage grillagée du puits principal attend au fond, sa porte entrouverte. Une vieille cloche de signalisation, fixée au montant, servait autrefois à prévenir la surface avant la remontée.",
+  "door.shaft_cage.name": "cage du puits",
   "door.storeroom.description": "Une porte discrète donnant sur la réserve.",
   "door.storeroom.name": "porte de la réserve",
   "door.town_hall_main.description": "La porte de l'hôtel de ville. Elle est grande, faite d'un bois clair et ajourée de vitres en losange.",

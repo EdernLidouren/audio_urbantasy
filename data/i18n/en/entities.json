@@ -36,6 +36,8 @@
   "door.quasar_bazaar_entrance.closed_description": "An entrance guarded by a heavy metal roller shutter.",
   "door.quasar_bazaar_entrance.description": "Above a pair of wide automatic doors, a midnight-blue sign with white and gold lettering reads “Quasar Bazaar”. Stylized stars and comets adorn the glass panel of the doors.",
   "door.quasar_bazaar_entrance.name": "Quasar Bazaar entrance",
+  "door.shaft_cage.description": "The wire-mesh cage of the main shaft waits at the bottom, its gate ajar. An old signal bell, fixed to the frame, once warned the surface before the ascent.",
+  "door.shaft_cage.name": "shaft cage",
   "door.storeroom.description": "A discreet door leading to the storeroom.",
   "door.storeroom.name": "storeroom door",
   "door.town_hall_main.description": "The town hall's front door. It is tall, made of pale wood, with diamond-paned glass.",

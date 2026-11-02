@@ -1,7 +1,9 @@
 // Archétype "main_headframe" — chevalement du puits d'extraction principal
 // des anciennes carrières (scenes/old-quarries.json), de la famille des
-// portes (voir entities/types/door.js, textes sous `door.*`) : il mènera un
-// jour au fond du puits. Donnée pure : aucun import.
+// portes (voir entities/types/door.js, textes sous `door.*`) : il mène au
+// fond du puits (scenes/old-quarries-underground-1-main.json), d'où la
+// cage du puits, une porte ordinaire, remonte avec la même animation.
+// Donnée pure : aucun import.
 //
 // Comme une porte : pas d'action ici, la destination varie par instance.
 // Celle des anciennes carrières vérifie deux choses avant de descendre :
