@@ -6,7 +6,7 @@
 // sont vérifiées contre ce registre au chargement du module.
 
 import { announce } from "../lib/announce.js";
-import { t, nameRef } from "../data/i18n/index.js";
+import { t } from "../data/i18n/index.js";
 import { ACTION_KINDS } from "../core/action-kinds.js";
 import { resolveTuning } from "../config/tuning.js";
 import { playEntityPickupSound, playEntityRoleSound } from "./effect-runner.js";
@@ -168,7 +168,8 @@ function handleSearch(entity) {
 // superposés : celui de l'ENTITÉ, positionné (rôle `hit`, ou `break` au
 // dernier coup, partis avant qu'elle ne disparaisse), et celui du GESTE,
 // méta (mineStrikeSound / mineFinalStrikeSound, config/tuning-values.js).
-// Les objets tombés s'entendent ensuite à leurs propres balises.
+// AUCUNE annonce : le son dit le coup et la destruction, et les objets
+// tombés s'entendent ensuite à leurs propres balises.
 function playMineSounds(entity, status) {
   const broken = status === "broken";
   playEntityRoleSound(entity, broken ? "break" : "hit");
@@ -178,13 +179,7 @@ function playMineSounds(entity, status) {
 
 function handleMine(entity) {
   if (!mineHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
-  // { status, count } — voir core/mining.js/mineEntity.
-  const { status, count } = mineHandler(entity, (strike) => playMineSounds(entity, strike));
-  if (status === null) return; // pas une entité minable de la face active (dégradation silencieuse)
-  const name = nameRef(entity.labelKey);
-  if (status === "hit") announce(t("interaction.mineHit", { entity: name }), { assertive: true });
-  else if (count === 0) announce(t("interaction.mineBrokenEmpty", { entity: name }), { assertive: true });
-  else announce(t("interaction.mineBroken", { entity: name, count }), { assertive: true });
+  mineHandler(entity, (strike) => playMineSounds(entity, strike));
 }
 
 // "shop" : POINT DE VENTE (voir entities/types/shop_counter.js, doc/

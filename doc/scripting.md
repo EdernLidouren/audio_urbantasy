@@ -1129,8 +1129,7 @@ tirée au premier, et au dernier l'entité est retirée du monde, ses objets
 (`count` tirages dans `distribution`) tombés au sol en éphémères. Effet
 d'état : `core/mining.js`/`mineEntity`. Retour : le son positionné de
 l'entité (rôle `hit`, `break` au dernier coup) sous le son méta du geste,
-puis `interaction.mineHit`, `interaction.mineBroken` ou
-`interaction.mineBrokenEmpty`. Détail : `doc/entity-model.md`/"Minage".
+sans annonce. Détail : `doc/entity-model.md`/"Minage".
 
 ### `"shop"` — POINT DE VENTE, ouvre le menu du comptoir
 

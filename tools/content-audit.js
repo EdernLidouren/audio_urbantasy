@@ -98,13 +98,6 @@ const NAME_SLOTS = [
   { template: "interaction.travelConfirm", param: "scene", names: () => MAIN_SCENE_IDS.map((id) => `scene.${id}.name`) },
   // view/emotes.js/chooseShortcut : l'émote placée en raccourci.
   { template: "emote.shortcutSet", param: "emote", names: () => Object.values(EMOTE_REGISTRY).map((emote) => emote.nameKey) },
-  // view/action-execution.js/handleMine : l'entité minée, d'un archétype
-  // minable.
-  ...["interaction.mineHit", "interaction.mineBroken", "interaction.mineBrokenEmpty"].map((template) => ({
-    template,
-    param: "entity",
-    names: () => Object.values(registry).filter((archetype) => archetype.mineable).map((archetype) => archetype.nameKey),
-  })),
 ];
 
 // Formes que `template` demande pour le paramètre `param` : chaque

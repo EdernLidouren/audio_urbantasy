@@ -44,10 +44,7 @@
   "entity.bird.description": "Un oiseau qui pépie de temps en temps.",
   "entity.bird.name": "oiseau",
   "entity.boulder.description": "Un gros bloc de roche détaché de la paroi, qui n'attend qu'un coup bien placé.",
-  "entity.boulder.name": {
-    "base": "rocher",
-    "def": "le rocher"
-  },
+  "entity.boulder.name": "rocher",
   "entity.broken_computer.description": "Une tour d'ordinateur et son écran, très abîmé et de toute évidence inutilisable.",
   "entity.broken_computer.name": "ordinateur cassé",
   "entity.buddy.description": "Votre fidèle compagnon à quatre pattes.",
@@ -80,10 +77,7 @@
   "entity.fountain.description": "Une fontaine qui coule sans interruption.",
   "entity.fountain.name": "fontaine",
   "entity.geode.description": "Une boule de pierre rugueuse, prise dans la paroi, qui sonne creux quand on la tapote.",
-  "entity.geode.name": {
-    "base": "géode",
-    "def": "la géode"
-  },
+  "entity.geode.name": "géode",
   "entity.ghost.description": "Une présence indistincte, qui ne se révèle qu'à la perception surnaturelle.",
   "entity.ghost.name": "présence",
   "entity.ghosten.description": "La forme floue et incertaine d'une silhouette humaine et voûtée dont les bras, tubulaires et interminables, tombent jusqu'au sol où ils s'enfoncent sans logique. Les sources de lumière qui filtrent à travers cette apparition prennent une vibrance tantôt spectrale, tantôt électrique.",
@@ -144,10 +138,7 @@
   "entity.old_survey_map.name": "vieux cadastre",
   "entity.old_survey_map.taken": "Vous emportez le vieux cadastre.",
   "entity.ore_vein.description": "Une veine de minerai qui court dans la roche, plus sombre et plus lourde que la pierre autour.",
-  "entity.ore_vein.name": {
-    "base": "filon",
-    "def": "le filon"
-  },
+  "entity.ore_vein.name": "filon",
   "entity.perched_bird.description": "Un petit oiseau posé, qui sautille en picorant le sol.",
   "entity.perched_bird.name": "oiseau",
   "entity.potted_plant.description": "Un pot en terre cuite contenant une espèce végétale très commune.",

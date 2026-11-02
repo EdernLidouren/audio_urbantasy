@@ -1,9 +1,6 @@
 {
   "interaction.loot": "Found: {amount, plural, one {# coin} other {# coins}}.",
   "interaction.lootSpawn": "{count, plural, one {# coin} other {# coins}} scattered around.",
-  "interaction.mineBroken": "{entity:def} breaks apart. {count, plural, one {An item falls} other {# items fall}}.",
-  "interaction.mineBrokenEmpty": "{entity:def} breaks apart, yielding nothing.",
-  "interaction.mineHit": "You strike {entity:def}.",
   "interaction.mineNeedsTools": "You would need tools to break into it.",
   "interaction.pickup": "Picked up: {amount, plural, one {# coin} other {# coins}}.",
   "interaction.pickupItem": "Picked up: {item}.",

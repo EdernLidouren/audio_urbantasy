@@ -1,9 +1,6 @@
 {
   "interaction.loot": "Trouvé : {amount, plural, one {# pièce} many {# de pièces} other {# pièces}}.",
   "interaction.lootSpawn": "{count, plural, one {# pièce éparpillée} many {# de pièces éparpillées} other {# pièces éparpillées}} tout autour.",
-  "interaction.mineBroken": "{entity:def} se brise. {count, plural, one {Un objet tombe} many {# d'objets tombent} other {# objets tombent}}.",
-  "interaction.mineBrokenEmpty": "{entity:def} se brise sans rien livrer.",
-  "interaction.mineHit": "Vous frappez {entity:def}.",
   "interaction.mineNeedsTools": "Il vous faudrait des outils pour l'entamer.",
   "interaction.pickup": "Ramassé : {amount, plural, one {# pièce} many {# de pièces} other {# pièces}}.",
   "interaction.pickupItem": "Ramassé : {item}.",

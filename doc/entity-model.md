@@ -664,10 +664,9 @@ renfermait tombe au sol. Moteur : `core/mining.js`/`mineEntity`, pur.
   `break` au dernier coup, parti avant qu'elle ne disparaisse), et celui du
   GESTE, méta, au volume de l'interface (`mineStrikeSound`, ou
   `mineFinalStrikeSound` au dernier coup, `config/tuning-values.js`,
-  surchargeables par archétype). Annonces : `interaction.mineHit` à chaque
-  coup, `interaction.mineBroken` (nombre d'objets tombés) ou
-  `interaction.mineBrokenEmpty` à la destruction ; le nom de l'entité y
-  passe par référence (forme `def`).
+  surchargeables par archétype). AUCUNE annonce, ni au coup ni à la
+  destruction : le son suffit, et les objets tombés se signalent par leurs
+  balises. Seul le refus sans le kit s'annonce.
 
 Trois natures, de la plus commune à la plus rare, chacune avec SA table
 propre combinée à un fond commun (`config/spawn-values.js`,
