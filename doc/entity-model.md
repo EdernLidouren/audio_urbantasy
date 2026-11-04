@@ -705,14 +705,18 @@ Le gros rocher est aussi un OBSTACLE (`blocksMovement`) : un minage peut
 barrer une route tant que le joueur n'a pas le kit, et la libérer pour de
 bon une fois l'entité brisée. Il est placé à la main au verso de
 `scenes/old-quarries-underground-1-main.json` (le fond du puits des
-anciennes carrières, x 5).
+anciennes carrières, x 5) et sur les deux faces de
+`scenes/old-quarries-underground-1-flooded-gallery.json`, où les deux rochers
+(x 12 au verso, puis x 17 au recto) ouvrent tour à tour la suite du parcours.
 
 Les autres apparaissent par des PLAGES de types (`entities`, voir
 `doc/scene-format.md`/"Scène") : combien d'abord (`count`, une fourchette dont
 le maximum est plafonné au chargement), lesquels ensuite. Chaque nouvelle
 entité garde `spawnEntitySpacing` d'écart avec tout ce qui s'active sur la
 face, posé à la main ou non, pour qu'Entrée frappe toujours sans menu de
-choix ; sans place, l'emplacement reste vide. Le garnissage quotidien remplace
+choix ; sans place, l'emplacement reste vide. Un gros rocher encore debout
+compte donc aussi : autour de lui, la zone reste presque vide tant qu'il n'est
+pas brisé, et se remplit normalement aux garnissages suivants. Le garnissage quotidien remplace
 tout ce que la plage a posé : les rochers brisés reviennent, ceux entamés sont
 remis à neuf, les autres changent de place. Exemple réel : les trois zones du
 même souterrain, en rochers avec du filon en rare.

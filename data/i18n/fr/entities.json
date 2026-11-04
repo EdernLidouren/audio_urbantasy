@@ -76,6 +76,8 @@
   "entity.diesel_electric_generator.name": "groupe électrogène",
   "entity.dog.description": "Un chien qui erre dans les environs.",
   "entity.dog.name": "chien",
+  "entity.flooded_gallery.description": "L'eau a envahi le tunnel à cet endroit, et vous n'aurez pas pied.",
+  "entity.flooded_gallery.name": "galerie inondée",
   "entity.fountain.description": "Une fontaine qui coule sans interruption.",
   "entity.fountain.name": "fontaine",
   "entity.geode.description": "Une boule de pierre rugueuse, prise dans la paroi, qui sonne creux quand on la tapote.",

@@ -13,7 +13,32 @@
     "ambiences": ["assets/ambiances/shaft", "assets/ambiances/water_dreeping_heavy"],
     "defaultSurface": "shallow_water",
     "reverbPreset": "flooded_cave",
-    "entities": []
+    "segments": [
+      { "from": 8, "to": 11, "surface": "mud" },
+      { "from": 11, "to": 23, "surface": "rock" }
+    ],
+    "spawnRanges": [
+      { "from": 15, "to": 20, "count": { "min": 1, "max": 3 }, "entities": { "boulder": "common", "ore_vein": "rare", "geode": "epic" } }
+    ],
+    "entities": [
+      { "id": "flooded_gallery_1_r", "type": "flooded_gallery", "x": 5 },
+      {
+        "id": "passage_1_r",
+        "type": "passage",
+        "x": 13,
+        "tuning": { "transitionSurface": "rock" },
+        "action": { "kind": "switchSide", "arrivalX": 13 }
+      },
+      { "id": "large_boulder_1_r", "type": "large_boulder", "x": 17 },
+      {
+        "id": "passage_2_r",
+        "type": "passage",
+        "x": 22,
+        "tuning": { "transitionSurface": "rock" },
+        "action": { "kind": "switchSide", "arrivalX": 22 }
+      },
+      { "id": "flooded_gallery_2_r", "type": "flooded_gallery", "x": 28 }
+    ]
   },
   "verso": {
     "indoor": true,
@@ -28,7 +53,11 @@
     "segments": [
       { "from": 0, "to": 8, "surface": "wood" },
       { "from": 8, "to": 14, "surface": "rock" },
-      { "from": 21, "to": 30, "surface": "rock" }
+      { "from": 21, "to": 28, "surface": "rock" }
+    ],
+    "spawnRanges": [
+      { "from": 8, "to": 11, "count": { "min": 0, "max": 2 }, "entities": { "boulder": "common" } },
+      { "from": 24, "to": 28, "count": { "min": 1, "max": 2 }, "entities": { "boulder": "common", "ore_vein": "uncommon", "geode": "rare" } }
     ],
     "entities": [
       {
@@ -41,7 +70,25 @@
           "kind": "applyEffects",
           "effects": [{ "type": "teleport", "target": "old_quarries_underground_1_main", "x": 29, "side": "verso" }]
         }
-      }
+      },
+      { "id": "large_boulder_1_v", "type": "large_boulder", "x": 12 },
+      {
+        "id": "passage_1_v",
+        "type": "passage",
+        "x": 13,
+        "tuning": { "transitionSurface": "rock" },
+        "action": { "kind": "switchSide", "arrivalX": 13 }
+      },
+      { "id": "flooded_gallery_1_v", "type": "flooded_gallery", "x": 16 },
+      { "id": "flooded_gallery_2_v", "type": "flooded_gallery", "x": 19 },
+      {
+        "id": "passage_2_v",
+        "type": "passage",
+        "x": 22,
+        "tuning": { "transitionSurface": "rock" },
+        "action": { "kind": "switchSide", "arrivalX": 22 }
+      },
+      { "id": "flooded_gallery_3_v", "type": "flooded_gallery", "x": 30 }
     ]
   }
 }

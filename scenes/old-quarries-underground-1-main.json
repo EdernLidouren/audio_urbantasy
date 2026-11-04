@@ -42,7 +42,8 @@
         "descriptionKey": "passage.old_quarries_flooded_galleries.description",
         "tuning": { "transitionSurface": "shallow_water" },
         "action": { "kind": "switchSide", "arrivalX": 25 }
-      }
+      },
+      { "id": "flooded_gallery_1_r", "type": "flooded_gallery", "x": 29 }
     ]
   },
   "verso": {

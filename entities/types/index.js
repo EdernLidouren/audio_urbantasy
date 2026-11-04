@@ -71,6 +71,7 @@ import dieselElectricGenerator from "./diesel_electric_generator.js";
 import boulder from "./boulder.js";
 import dog from "./dog.js";
 import door from "./door.js";
+import floodedGallery from "./flooded_gallery.js";
 import fountain from "./fountain.js";
 import geode from "./geode.js";
 import ghost from "./ghost.js";
@@ -154,6 +155,7 @@ export default {
   boulder,
   dog,
   door,
+  flooded_gallery: floodedGallery,
   fountain,
   geode,
   ghost,

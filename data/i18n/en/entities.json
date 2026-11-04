@@ -76,6 +76,8 @@
   "entity.diesel_electric_generator.name": "generator",
   "entity.dog.description": "A dog wandering nearby.",
   "entity.dog.name": "dog",
+  "entity.flooded_gallery.description": "Water has flooded the tunnel here, too deep for you to stand.",
+  "entity.flooded_gallery.name": "flooded gallery",
   "entity.fountain.description": "A fountain running without interruption.",
   "entity.fountain.name": "fountain",
   "entity.geode.description": "A rough ball of stone set in the wall, which sounds hollow when tapped.",
