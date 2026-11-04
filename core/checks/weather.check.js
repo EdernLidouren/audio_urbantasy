@@ -275,7 +275,10 @@ export default function checkWeather(run) {
   const flagsDefault = parseScene(flagsRaw, {});
   run("face coupée : ambiance météo par défaut", true, flagsDefault.weatherAmbience);
   run("face coupée : annonces météo par défaut", true, flagsDefault.weatherAnnouncements);
+  run("face coupée : annonces jour/nuit par défaut", true, flagsDefault.phaseAnnouncements);
   run("face coupée : indoor n'y change rien", true, parseScene({ ...flagsRaw, indoor: true }, {}).weatherAmbience);
+  run("face coupée : jour/nuit indépendant de la météo", "false,true", (({ phaseAnnouncements, weatherAnnouncements }) => `${phaseAnnouncements},${weatherAnnouncements}`)(parseScene({ ...flagsRaw, phaseAnnouncements: false }, {})));
+  run("face coupée : non booléen (jour/nuit) -> rejeté", true, throws(() => parseScene({ ...flagsRaw, phaseAnnouncements: "non" }, {})));
   run("face coupée : ambiance seule", "false,true", (({ weatherAmbience, weatherAnnouncements }) => `${weatherAmbience},${weatherAnnouncements}`)(parseScene({ ...flagsRaw, weatherAmbience: false }, {})));
   run("face coupée : annonces seules", "true,false", (({ weatherAmbience, weatherAnnouncements }) => `${weatherAmbience},${weatherAnnouncements}`)(parseScene({ ...flagsRaw, weatherAnnouncements: false }, {})));
   run("face coupée : non booléen -> rejeté", true, throws(() => parseScene({ ...flagsRaw, weatherAmbience: "non" }, {})));
@@ -285,12 +288,12 @@ export default function checkWeather(run) {
     {}
   );
   run("face coupée : réglage propre à chaque face", "false,true", `${flagsTwoFaces.recto.weatherAmbience},${flagsTwoFaces.verso.weatherAmbience}`);
-  const flagsSession = createInitialState(parseScene({ ...flagsRaw, weatherAmbience: false, weatherAnnouncements: false }, {}));
+  const flagsSession = createInitialState(parseScene({ ...flagsRaw, weatherAmbience: false, weatherAnnouncements: false, phaseAnnouncements: false }, {}));
   run("face coupée : lue sur le monde actif", false, getActiveWorld(flagsSession).weatherAnnouncements);
   const flagsWorld = flagsSession.worlds[flagsRaw.id];
-  const { weatherAmbience: _a, weatherAnnouncements: _b, ...oldWorld } = flagsWorld;
+  const { weatherAmbience: _a, weatherAnnouncements: _b, phaseAnnouncements: _c, ...oldWorld } = flagsWorld;
   const flagsOldSave = deserializeGame({ version: SAVE_VERSION, data: { ...flagsSession, worlds: { [flagsRaw.id]: oldWorld } } });
-  run("face coupée : ancienne sauvegarde -> rebouchée à true", true, flagsOldSave.session.worlds[flagsRaw.id].weatherAmbience && flagsOldSave.session.worlds[flagsRaw.id].weatherAnnouncements);
+  run("face coupée : ancienne sauvegarde -> rebouchée à true", true, flagsOldSave.session.worlds[flagsRaw.id].weatherAmbience && flagsOldSave.session.worlds[flagsRaw.id].weatherAnnouncements && flagsOldSave.session.worlds[flagsRaw.id].phaseAnnouncements);
   const flagsNewSave = deserializeGame(serializeGame(flagsSession));
   run("face coupée : conservée par la sauvegarde", false, flagsNewSave.session.worlds[flagsRaw.id].weatherAnnouncements);
 }

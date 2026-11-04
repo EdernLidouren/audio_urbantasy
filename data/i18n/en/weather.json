@@ -22,5 +22,6 @@
   "weather.transition.stormy.end": "the storm subsides",
   "weather.transition.stormy.start": "the storm begins to rumble",
   "weather.transition.windy.end": "the wind dies down",
-  "weather.transition.windy.start": "the wind picks up"
+  "weather.transition.windy.start": "the wind picks up",
+  "weather.unavailable": "unavailable"
 }

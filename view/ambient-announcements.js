@@ -31,7 +31,10 @@ export function createAmbientAnnouncements(getSession) {
     const phase = phaseAt(session.time);
     if (phase !== currentPhase) {
       currentPhase = phase;
-      announce(t(currentPhase === "night" ? "time.phase.nightBegins" : "time.phase.dayBegins"));
+      // Même règle que la météo ci-dessous, pour une face qui ne voit pas le ciel.
+      if (getActiveWorld(session).phaseAnnouncements) {
+        announce(t(currentPhase === "night" ? "time.phase.nightBegins" : "time.phase.dayBegins"));
+      }
     }
     if (session.weather.state !== weatherState) {
       const previousWeatherState = weatherState;

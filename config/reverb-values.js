@@ -48,6 +48,11 @@ export const REVERB_PRESETS = {
   // Carrière souterraine, grotte, mine.
   cave: { reverbDurationSec: 4, reverbDecay: 2.2 },
 
+  // La même roche au-dessus d'une nappe d'eau : le sol ne retient plus rien,
+  // chaque son revient une fois de plus. Queue plus longue et plus présente
+  // que `cave`. Galerie inondée, citerne, grotte à lac.
+  flooded_cave: { reverbDurationSec: 5, reverbDecay: 1.7, reverbWet: 0.55 },
+
   // Espace irréel, queue très longue : envers du monde, côté miroir,
   // rêve.
   otherworldly: { reverbDurationSec: 7, reverbDecay: 1 },

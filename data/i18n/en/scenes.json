@@ -18,6 +18,10 @@
     "base": "old quarries",
     "def": "the old quarries"
   },
+  "scene.old_quarries_underground_1_flooded_gallery.name": {
+    "base": "old quarries, first underground level, flooded gallery",
+    "def": "the flooded gallery"
+  },
   "scene.old_quarries_underground_1_main.name": "old quarries, first underground level, main access",
   "scene.town_square.name": {
     "base": "town square",

@@ -11,18 +11,18 @@ import { forgetInactiveWorlds } from "../core/state.js";
 import { addMoney } from "../core/money.js";
 import { setWeather, triggerNextWeatherTransition } from "../core/weather.js";
 import { TIME_CONFIG, DEFAULT_TIME_SCALE, setTimeScale, resetTimeScale } from "../config/time-values.js";
-import { announceGameTime, announceWeather, announceMoney } from "./status-announcements.js";
+import { announceGameTime, announceActualWeather, announceMoney } from "./status-announcements.js";
 
 // `clock` : voir view/game-clock.js.
 export function createDebugEffects({ getSession, setSession, clock }) {
   function forceWeather(targetState) {
     setSession(setWeather(getSession(), targetState));
-    announceWeather(getSession());
+    announceActualWeather(getSession());
   }
 
   function triggerWeatherTransition() {
     setSession(triggerNextWeatherTransition(getSession()));
-    announceWeather(getSession());
+    announceActualWeather(getSession());
   }
 
   // Saut de temps : exactement le même chemin qu'un écoulement réel (temps,

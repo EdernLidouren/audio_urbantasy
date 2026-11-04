@@ -34,6 +34,9 @@
   "assets/ambiances/traffic": [
     "assets/ambiances/traffic_1.mp3"
   ],
+  "assets/ambiances/water_dreeping_heavy": [
+    "assets/ambiances/water_dreeping_heavy_1.mp3"
+  ],
   "assets/ambiances/wind_indoor": [
     "assets/ambiances/wind_indoor_1.mp3"
   ],
@@ -280,6 +283,9 @@
   "assets/sounds/decor/water_drain": [
     "assets/sounds/decor/water_drain_1.mp3"
   ],
+  "assets/sounds/decor/water_stream_1_beacon": [
+    "assets/sounds/decor/water_stream_1_beacon_1.mp3"
+  ],
   "assets/sounds/decor/weight_machine_1_beacon": [
     "assets/sounds/decor/weight_machine_1_beacon_1.mp3"
   ],
@@ -462,6 +468,9 @@
   ],
   "assets/sounds/effects/switch_on": [
     "assets/sounds/effects/switch_on_1.mp3"
+  ],
+  "assets/sounds/effects/water_collision": [
+    "assets/sounds/effects/water_collision_1.mp3"
   ],
   "assets/sounds/effects/window_blinds_close": [
     "assets/sounds/effects/window_blinds_close_1.mp3"

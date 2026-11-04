@@ -146,7 +146,11 @@ famille `scene_exit.*` (voir `doc/i18n.md`). Entre deux scènes MAJEURES (deux
 cases de la carte de la ville), l'action porte `"confirm": true` : le joueur
 confirme avant de partir (voir `doc/scripting.md`/"Confirmation d'une action").
 Exemple réel : `main_street_exit_1_r` dans `scenes/town-square.json`, et son pendant
-`town_square_exit_1_r` dans `scenes/main-street.json`.
+`town_square_exit_1_r` dans `scenes/main-street.json`. Vers une sous-scène, l'action
+ne porte pas `confirm` et part directement, pour une galerie ouverte qui ne se
+prête ni à une porte ni à un passage. Exemple réel : `scene_exit_2_v` dans
+`scenes/old-quarries-underground-1-main.json`, et son pendant `scene_exit_1_v` dans
+`scenes/old-quarries-underground-1-flooded-gallery.json`.
 
 ## Collectible persistant
 

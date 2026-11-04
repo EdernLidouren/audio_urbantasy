@@ -8,6 +8,7 @@ export default {
   sounds: {
     beacon: { path: "assets/sounds/decor/pond_1_beacon", loop: true },
   },
+  collisionSound: "assets/sounds/effects/water_collision",
   blocksMovement: true,
   observable: true,
   interactable: false,

@@ -122,6 +122,7 @@ const FACE_FIELDS = [
   "indoor",
   "weatherAmbience",
   "weatherAnnouncements",
+  "phaseAnnouncements",
   "spawnRanges",
 ];
 
@@ -257,6 +258,7 @@ function parseFace(raw, length, registry, describe, sceneVariables, seenIds = ne
     indoor,
     weatherAmbience,
     weatherAnnouncements,
+    phaseAnnouncements,
     spawnRanges,
   } = raw;
 
@@ -294,10 +296,14 @@ function parseFace(raw, length, registry, describe, sceneVariables, seenIds = ne
   // intérieur), mais rien ne traverse des dizaines de mètres de roche.
   // `weatherAmbience` : la couche sonore météo (view/audio/layers.js) ;
   // `weatherAnnouncements` : les messages de changement de météo
-  // (view/ambient-announcements.js). Défaut `true`, toujours résolus en
-  // booléen comme `indoor`. La météo continue d'avancer dans tous les cas :
-  // elle est globale, seul son rendu s'efface dans cette face.
-  for (const [name, value] of [["weatherAmbience", weatherAmbience], ["weatherAnnouncements", weatherAnnouncements]]) {
+  // (view/ambient-announcements.js), et la consultation à la touche, qui
+  // répond alors « indisponible » (view/status-announcements.js) : ce qu'on
+  // ne peut pas sentir, on ne peut pas non plus le dire. `phaseAnnouncements` :
+  // le message du passage au jour ou à la nuit, pour une face qui ne voit pas
+  // le ciel. Défaut `true`, toujours résolus en booléen comme `indoor`. La
+  // météo et l'heure continuent d'avancer dans tous les cas : elles sont
+  // globales, seul leur rendu s'efface dans cette face.
+  for (const [name, value] of [["weatherAmbience", weatherAmbience], ["weatherAnnouncements", weatherAnnouncements], ["phaseAnnouncements", phaseAnnouncements]]) {
     if (value !== undefined && typeof value !== "boolean") {
       fail(`${prefix}${name} doit être un booléen si présent (reçu : ${JSON.stringify(value)}).`);
     }
@@ -385,6 +391,7 @@ function parseFace(raw, length, registry, describe, sceneVariables, seenIds = ne
     indoor: resolvedIndoor,
     weatherAmbience: weatherAmbience !== undefined ? weatherAmbience : true,
     weatherAnnouncements: weatherAnnouncements !== undefined ? weatherAnnouncements : true,
+    phaseAnnouncements: phaseAnnouncements !== undefined ? phaseAnnouncements : true,
   };
   // Clés ajoutées SEULEMENT si présentes (jamais explicitement undefined) :
   // l'état doit rester de la donnée pure, un aller-retour JSON ne doit rien

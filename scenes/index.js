@@ -18,6 +18,7 @@ export default {
   clock_tower_weight_shaft_mirror_side: "scenes/clock-tower-weight-shaft-mirror-side.json",
   old_quarries: "scenes/old-quarries.json",
   old_quarries_underground_1_main: "scenes/old-quarries-underground-1-main.json",
+  old_quarries_underground_1_flooded_gallery: "scenes/old-quarries-underground-1-flooded-gallery.json",
 };
 
 // Scènes PRINCIPALES : les grandes zones de la ville, celles que pointent
@@ -46,6 +47,7 @@ export const MAIN_SCENE_OF = {
   demo3: "demo",
   main_street_quasar_bazaar_main: "main_street",
   old_quarries_underground_1_main: "old_quarries",
+  old_quarries_underground_1_flooded_gallery: "old_quarries",
   town_square_town_hall_main: "town_square",
   town_square_town_hall_mayor_office: "town_square",
   town_square_town_hall_meeting_room: "town_square",

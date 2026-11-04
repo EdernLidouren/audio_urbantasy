@@ -415,8 +415,9 @@ en partant) omet proprement sa partie de la phrase (gabarit "un seul", pas de vi
 orpheline). MÊME principe pour la bascule de PHASE jour/nuit (`phaseAt`,
 `time.phase.dayBegins`/`time.phase.nightBegins`) — deux clés fixes, aucune composition
 nécessaire (une seule phase à la fois, jamais de fragment à assembler). Une face peut
-taire les seuls changements de météo (`weatherAnnouncements: false`,
-`doc/scene-format.md`) : la bascule de phase continue de s'y annoncer.
+taire chacun des deux (`weatherAnnouncements: false`, `phaseAnnouncements: false`,
+`doc/scene-format.md`) ; sans annonce météo, la touche de consultation y répond
+« indisponible ».
 
 ### `anyOf` — composite, OU logique entre plusieurs conditions
 

@@ -22,5 +22,6 @@
   "weather.transition.stormy.end": "l'orage s'apaise",
   "weather.transition.stormy.start": "l'orage commence à gronder",
   "weather.transition.windy.end": "le vent se calme",
-  "weather.transition.windy.start": "le vent se lève"
+  "weather.transition.windy.start": "le vent se lève",
+  "weather.unavailable": "indisponible"
 }

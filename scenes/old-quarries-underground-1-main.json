@@ -7,6 +7,7 @@
     "indoor": true,
     "weatherAmbience": false,
     "weatherAnnouncements": false,
+    "phaseAnnouncements": false,
     "musicDay": "assets/musics/underground",
     "musicNight": "assets/musics/underground",
     "ambiences": ["assets/ambiances/shaft"],
@@ -48,6 +49,7 @@
     "indoor": true,
     "weatherAmbience": false,
     "weatherAnnouncements": false,
+    "phaseAnnouncements": false,
     "musicDay": "assets/musics/underground",
     "musicNight": "assets/musics/underground",
     "ambiences": ["assets/ambiances/shaft"],
@@ -68,6 +70,17 @@
         "descriptionKey": "passage.old_quarries_flooded_galleries.description",
         "tuning": { "transitionSurface": "shallow_water" },
         "action": { "kind": "switchSide", "arrivalX": 25 }
+      },
+      {
+        "id": "scene_exit_2_v",
+        "type": "scene_exit",
+        "x": 30,
+        "nameKey": "scene_exit.underground_1_main_flooded_gallery.name",
+        "descriptionKey": "scene_exit.underground_1_main_flooded_gallery.description",
+        "action": {
+          "kind": "applyEffects",
+          "effects": [{ "type": "teleport", "target": "old_quarries_underground_1_flooded_gallery", "x": 1, "side": "verso" }]
+        }
       }
     ]
   }

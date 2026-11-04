@@ -6,6 +6,7 @@
   "indoor": true,
   "weatherAmbience": false,
   "weatherAnnouncements": false,
+  "phaseAnnouncements": false,
   "music": "assets/musics/sanctuary",
   "ambiences": [
     "assets/ambiances/shaft_1.mp3"

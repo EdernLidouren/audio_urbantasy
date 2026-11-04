@@ -211,5 +211,9 @@
   "scene_exit.main_street_town_square.description": "The street opens onto the town square.",
   "scene_exit.main_street_town_square.name": "towards the town square",
   "scene_exit.town_square_main_street.description": "The square leads on to main street.",
-  "scene_exit.town_square_main_street.name": "towards main street"
+  "scene_exit.town_square_main_street.name": "towards main street",
+  "scene_exit.underground_1_flooded_gallery_main.description": "Rotten planks lead back to a drier, more passable stretch of the tunnels.",
+  "scene_exit.underground_1_flooded_gallery_main.name": "towards the main access",
+  "scene_exit.underground_1_main_flooded_gallery.description": "A few old planks in poor condition have been thrown on the ground to give access to a flooded gallery.",
+  "scene_exit.underground_1_main_flooded_gallery.name": "towards the flooded gallery"
 }

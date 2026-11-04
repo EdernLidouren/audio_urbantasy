@@ -1,0 +1,47 @@
+{
+  "id": "old_quarries_underground_1_flooded_gallery",
+  "titleKey": "scene.old_quarries_underground_1_flooded_gallery.name",
+  "length": 30,
+  "playerStart": 1,
+  "recto": {
+    "indoor": true,
+    "weatherAmbience": false,
+    "weatherAnnouncements": false,
+    "phaseAnnouncements": false,
+    "musicDay": "assets/musics/underground",
+    "musicNight": "assets/musics/underground",
+    "ambiences": ["assets/ambiances/shaft", "assets/ambiances/water_dreeping_heavy"],
+    "defaultSurface": "shallow_water",
+    "reverbPreset": "flooded_cave",
+    "entities": []
+  },
+  "verso": {
+    "indoor": true,
+    "weatherAmbience": false,
+    "weatherAnnouncements": false,
+    "phaseAnnouncements": false,
+    "musicDay": "assets/musics/underground",
+    "musicNight": "assets/musics/underground",
+    "ambiences": ["assets/ambiances/shaft", "assets/ambiances/water_dreeping_heavy"],
+    "defaultSurface": "shallow_water",
+    "reverbPreset": "flooded_cave",
+    "segments": [
+      { "from": 0, "to": 8, "surface": "wood" },
+      { "from": 8, "to": 14, "surface": "rock" },
+      { "from": 21, "to": 30, "surface": "rock" }
+    ],
+    "entities": [
+      {
+        "id": "scene_exit_1_v",
+        "type": "scene_exit",
+        "x": 0,
+        "nameKey": "scene_exit.underground_1_flooded_gallery_main.name",
+        "descriptionKey": "scene_exit.underground_1_flooded_gallery_main.description",
+        "action": {
+          "kind": "applyEffects",
+          "effects": [{ "type": "teleport", "target": "old_quarries_underground_1_main", "x": 29, "side": "verso" }]
+        }
+      }
+    ]
+  }
+}

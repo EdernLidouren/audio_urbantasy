@@ -8,7 +8,8 @@
 // ici, la destination (`teleport.target`) varie par INSTANCE, chaque sortie
 // déclare sa propre `action` complète. Entre deux scènes MAJEURES, l'action
 // porte `"confirm": true` : le joueur confirme avant de partir (voir
-// doc/scripting.md/"Confirmation d'une action").
+// doc/scripting.md/"Confirmation d'une action") ; vers une sous-scène, elle
+// part directement, comme une porte.
 //
 // Balise : un son SYNTHÉTIQUE (extradiégétique), faute d'objet réel à faire
 // entendre, comme le passage intérieur — il ne sert qu'à repérer la sortie à

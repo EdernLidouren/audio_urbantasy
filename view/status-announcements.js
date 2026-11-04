@@ -25,9 +25,17 @@ export function announceMoney(session) {
   announce(t("money.announce", { amount: session.money }));
 }
 
-// Météo (touche "w", et après un forçage de debug).
-export function announceWeather(session) {
+// Météo réelle, quelle que soit la face : la confirmation d'un forçage de
+// debug, qui doit dire ce qu'elle a fait même au fond d'un puits.
+export function announceActualWeather(session) {
   announce(t("weather.announce", { state: t(`weather.state.${session.weather.state}`) }));
+}
+
+// Météo (touche "w") : « indisponible » dans une face coupée de la météo
+// (`weatherAnnouncements`, voir core/scene.js/parseFace).
+export function announceWeather(session) {
+  if (getActiveWorld(session).weatherAnnouncements) announceActualWeather(session);
+  else announce(t("weather.announce", { state: t("weather.unavailable") }));
 }
 
 // Position (touche "x") : entier arrondi en jeu normal ; deux décimales en

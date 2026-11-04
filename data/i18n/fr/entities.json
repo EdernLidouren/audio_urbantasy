@@ -211,5 +211,9 @@
   "scene_exit.main_street_town_square.description": "La rue débouche sur la grand-place.",
   "scene_exit.main_street_town_square.name": "vers la grand-place",
   "scene_exit.town_square_main_street.description": "La place se prolonge par la rue commerçante.",
-  "scene_exit.town_square_main_street.name": "vers la rue commerçante"
+  "scene_exit.town_square_main_street.name": "vers la rue commerçante",
+  "scene_exit.underground_1_flooded_gallery_main.description": "Des madriers vermoulus ramènent vers un tronçon plus sec et praticable des souterrains.",
+  "scene_exit.underground_1_flooded_gallery_main.name": "vers l'accès principal",
+  "scene_exit.underground_1_main_flooded_gallery.description": "Quelques vieux madriers en mauvais état ont été jetés au sol pour permettre d'accéder à une galerie inondée.",
+  "scene_exit.underground_1_main_flooded_gallery.name": "vers la galerie inondée"
 }
