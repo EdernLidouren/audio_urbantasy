@@ -399,7 +399,9 @@ déclare DEUX pools DISTINCTS par contexte (`{ outdoor?, indoor? }`, modèle A �
 matériaux sonores réels, jamais un filtre) : le rendu LIT le pool du contexte de la scène
 active (`indoor`, propriété de FACE — voir `core/scene.js`/`parseFace` et
 `doc/scene-format.md`), il ne le COMPOSE jamais. Un contexte absent pour un état donné
-reste silencieux dans CE contexte (ex. la brume, inaudible à l'intérieur). Hors de
+reste silencieux dans CE contexte (ex. la brume, inaudible à l'intérieur), et une face
+peut couper entièrement cette couche (`weatherAmbience: false`, `doc/scene-format.md`,
+ex. au fond d'un puits). Hors de
 portée de ce document (format déclaratif du core) : détail complet côté vue dans les
 commentaires de `view/audio/layers.js` (`declareWeatherAmbience`) et `lib/audio/ambience.js`
 (`syncAmbienceLayers`, `desiredAmbienceSlots`).
@@ -412,7 +414,9 @@ dur — un fragment i18n vide (ex. `weather.transition.clear.end`, "dégagé" n'
 en partant) omet proprement sa partie de la phrase (gabarit "un seul", pas de virgule
 orpheline). MÊME principe pour la bascule de PHASE jour/nuit (`phaseAt`,
 `time.phase.dayBegins`/`time.phase.nightBegins`) — deux clés fixes, aucune composition
-nécessaire (une seule phase à la fois, jamais de fragment à assembler).
+nécessaire (une seule phase à la fois, jamais de fragment à assembler). Une face peut
+taire les seuls changements de météo (`weatherAnnouncements: false`,
+`doc/scene-format.md`) : la bascule de phase continue de s'y annoncer.
 
 ### `anyOf` — composite, OU logique entre plusieurs conditions
 

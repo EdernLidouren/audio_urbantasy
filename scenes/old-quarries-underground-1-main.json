@@ -5,6 +5,8 @@
   "playerStart": 15,
   "recto": {
     "indoor": true,
+    "weatherAmbience": false,
+    "weatherAnnouncements": false,
     "musicDay": "assets/musics/underground",
     "musicNight": "assets/musics/underground",
     "ambiences": ["assets/ambiances/shaft"],
@@ -44,6 +46,8 @@
   },
   "verso": {
     "indoor": true,
+    "weatherAmbience": false,
+    "weatherAnnouncements": false,
     "musicDay": "assets/musics/underground",
     "musicNight": "assets/musics/underground",
     "ambiences": ["assets/ambiances/shaft"],

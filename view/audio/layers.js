@@ -111,10 +111,12 @@ export function createSceneLayers(getSession, world) {
   // météo dépend de la NATURE de la scène
   // (intérieur/extérieur), fixe pendant sa vie : passer de l'extérieur à
   // l'intérieur (nouveau montage) fond la seule couche météo vers le pool
-  // intérieur.
+  // intérieur. Une face où la météo ne s'entend pas (`weatherAmbience`, ex.
+  // au fond d'un puits) n'en déclare aucun : la couche s'y éteint en fondu.
   let weatherState = getSession().weather.state;
   const indoor = Boolean(world.indoor);
   function weatherAmbiencePool(state) {
+    if (!world.weatherAmbience) return undefined;
     return WEATHER_STATES[state]?.ambience?.[indoor ? "indoor" : "outdoor"];
   }
   const mountWeatherPool = weatherAmbiencePool(weatherState);

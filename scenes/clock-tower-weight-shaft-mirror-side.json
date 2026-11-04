@@ -4,6 +4,8 @@
   "length": 50,
   "playerStart": 25,
   "indoor": true,
+  "weatherAmbience": false,
+  "weatherAnnouncements": false,
   "music": "assets/musics/sanctuary",
   "ambiences": [
     "assets/ambiances/shaft_1.mp3"

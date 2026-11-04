@@ -120,6 +120,8 @@ const FACE_FIELDS = [
   "defaultSurface",
   "segments",
   "indoor",
+  "weatherAmbience",
+  "weatherAnnouncements",
   "spawnRanges",
 ];
 
@@ -253,6 +255,8 @@ function parseFace(raw, length, registry, describe, sceneVariables, seenIds = ne
     defaultSurface,
     segments,
     indoor,
+    weatherAmbience,
+    weatherAnnouncements,
     spawnRanges,
   } = raw;
 
@@ -285,6 +289,19 @@ function parseFace(raw, length, registry, describe, sceneVariables, seenIds = ne
     fail(`${prefix}indoor doit être un booléen si présent (reçu : ${JSON.stringify(indoor)}).`);
   }
   const resolvedIndoor = indoor !== undefined ? indoor : false;
+  // La météo se fait-elle sentir ici ? Deux questions indépendantes de
+  // `indoor` : un intérieur ordinaire entend la pluie sur le toit (son pool
+  // intérieur), mais rien ne traverse des dizaines de mètres de roche.
+  // `weatherAmbience` : la couche sonore météo (view/audio/layers.js) ;
+  // `weatherAnnouncements` : les messages de changement de météo
+  // (view/ambient-announcements.js). Défaut `true`, toujours résolus en
+  // booléen comme `indoor`. La météo continue d'avancer dans tous les cas :
+  // elle est globale, seul son rendu s'efface dans cette face.
+  for (const [name, value] of [["weatherAmbience", weatherAmbience], ["weatherAnnouncements", weatherAnnouncements]]) {
+    if (value !== undefined && typeof value !== "boolean") {
+      fail(`${prefix}${name} doit être un booléen si présent (reçu : ${JSON.stringify(value)}).`);
+    }
+  }
   // segments : optionnel, PATCHE defaultSurface sur des zones précises (voir
   // parseSegment) — absent -> tableau vide, toujours resolvedDefaultSurface
   // partout. Chaque segment est TOUJOURS explicite
@@ -366,6 +383,8 @@ function parseFace(raw, length, registry, describe, sceneVariables, seenIds = ne
     segments: parsedSegments,
     entities: parsedEntities,
     indoor: resolvedIndoor,
+    weatherAmbience: weatherAmbience !== undefined ? weatherAmbience : true,
+    weatherAnnouncements: weatherAnnouncements !== undefined ? weatherAnnouncements : true,
   };
   // Clés ajoutées SEULEMENT si présentes (jamais explicitement undefined) :
   // l'état doit rester de la donnée pure, un aller-retour JSON ne doit rien

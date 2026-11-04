@@ -5,6 +5,7 @@
 import { announce } from "../lib/announce.js";
 import { t } from "../data/i18n/index.js";
 import { phaseAt } from "../core/time.js";
+import { getActiveWorld } from "../core/state.js";
 
 // Message d'un changement de météo : fin de l'ancien état + début du
 // nouveau, assemblés par les gabarits i18n ("weather.transition.both" /
@@ -35,7 +36,12 @@ export function createAmbientAnnouncements(getSession) {
     if (session.weather.state !== weatherState) {
       const previousWeatherState = weatherState;
       weatherState = session.weather.state;
-      announce(composeWeatherTransitionMessage(previousWeatherState, weatherState));
+      // Une face coupée de la météo (`weatherAnnouncements`) la laisse passer
+      // sans rien dire. L'état reste suivi : en sortir n'annonce pas après
+      // coup un changement que personne n'a vu venir.
+      if (getActiveWorld(session).weatherAnnouncements) {
+        announce(composeWeatherTransitionMessage(previousWeatherState, weatherState));
+      }
     }
   }
 

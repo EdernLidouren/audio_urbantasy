@@ -641,7 +641,9 @@ function backfillFace(face) {
     face.defaultSurface !== undefined &&
     face.segments !== undefined &&
     face.nextEphemeralId !== undefined &&
-    face.indoor !== undefined
+    face.indoor !== undefined &&
+    face.weatherAmbience !== undefined &&
+    face.weatherAnnouncements !== undefined
   ) {
     return face;
   }
@@ -660,6 +662,11 @@ function backfillFace(face) {
     // antérieure à cette propriété -> false (extérieur), même politique que
     // defaultSurface juste au-dessus.
     indoor: face.indoor !== undefined ? face.indoor : false,
+    // weatherAmbience, weatherAnnouncements : voir core/scene.js/parseFace.
+    // Absents d'une sauvegarde antérieure -> true, la météo se fait sentir
+    // comme elle l'a toujours fait.
+    weatherAmbience: face.weatherAmbience !== undefined ? face.weatherAmbience : true,
+    weatherAnnouncements: face.weatherAnnouncements !== undefined ? face.weatherAnnouncements : true,
   };
 }
 

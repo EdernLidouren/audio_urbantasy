@@ -4,7 +4,7 @@
 // via un objet littéral passé à parseScene.
 
 import { parseScene } from "../scene.js";
-import { createInitialState } from "../state.js";
+import { createInitialState, getActiveWorld } from "../state.js";
 import { SAVE_VERSION, serializeGame, deserializeGame } from "../save.js";
 import { createSeed, pickWeighted } from "../rng.js";
 import { INITIAL_TIME } from "../time.js";
@@ -268,4 +268,29 @@ export default function checkWeather(run) {
   }
   run(`triggerNextWeatherTransition : chaque cible (${TRIGGER_SAMPLES} tirages enchaînés) appartient aux transitions de l'état quitté`, true, allTriggerTargetsValid);
   run("triggerNextWeatherTransition : produit une variété de cibles (pas toujours la même)", true, triggerTargetsSeen.size > 1);
+
+  // Une face coupée de la météo (core/scene.js/parseFace) : deux réglages,
+  // indépendants entre eux et de `indoor`, par face.
+  const flagsRaw = { id: "weather-flags", titleKey: "scene.demo.name", length: 10, playerStart: 1, entities: [] };
+  const flagsDefault = parseScene(flagsRaw, {});
+  run("face coupée : ambiance météo par défaut", true, flagsDefault.weatherAmbience);
+  run("face coupée : annonces météo par défaut", true, flagsDefault.weatherAnnouncements);
+  run("face coupée : indoor n'y change rien", true, parseScene({ ...flagsRaw, indoor: true }, {}).weatherAmbience);
+  run("face coupée : ambiance seule", "false,true", (({ weatherAmbience, weatherAnnouncements }) => `${weatherAmbience},${weatherAnnouncements}`)(parseScene({ ...flagsRaw, weatherAmbience: false }, {})));
+  run("face coupée : annonces seules", "true,false", (({ weatherAmbience, weatherAnnouncements }) => `${weatherAmbience},${weatherAnnouncements}`)(parseScene({ ...flagsRaw, weatherAnnouncements: false }, {})));
+  run("face coupée : non booléen -> rejeté", true, throws(() => parseScene({ ...flagsRaw, weatherAmbience: "non" }, {})));
+  run("face coupée : non booléen (annonces) -> rejeté", true, throws(() => parseScene({ ...flagsRaw, weatherAnnouncements: 0 }, {})));
+  const flagsTwoFaces = parseScene(
+    { id: "weather-flags-faces", titleKey: "scene.demo.name", length: 10, playerStart: 1, recto: { weatherAmbience: false, entities: [] }, verso: { entities: [] } },
+    {}
+  );
+  run("face coupée : réglage propre à chaque face", "false,true", `${flagsTwoFaces.recto.weatherAmbience},${flagsTwoFaces.verso.weatherAmbience}`);
+  const flagsSession = createInitialState(parseScene({ ...flagsRaw, weatherAmbience: false, weatherAnnouncements: false }, {}));
+  run("face coupée : lue sur le monde actif", false, getActiveWorld(flagsSession).weatherAnnouncements);
+  const flagsWorld = flagsSession.worlds[flagsRaw.id];
+  const { weatherAmbience: _a, weatherAnnouncements: _b, ...oldWorld } = flagsWorld;
+  const flagsOldSave = deserializeGame({ version: SAVE_VERSION, data: { ...flagsSession, worlds: { [flagsRaw.id]: oldWorld } } });
+  run("face coupée : ancienne sauvegarde -> rebouchée à true", true, flagsOldSave.session.worlds[flagsRaw.id].weatherAmbience && flagsOldSave.session.worlds[flagsRaw.id].weatherAnnouncements);
+  const flagsNewSave = deserializeGame(serializeGame(flagsSession));
+  run("face coupée : conservée par la sauvegarde", false, flagsNewSave.session.worlds[flagsRaw.id].weatherAnnouncements);
 }
