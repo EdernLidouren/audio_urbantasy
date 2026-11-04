@@ -443,12 +443,13 @@ export const TUNING_DEFAULTS = {
 
   // Même rôle pour une plage qui pose des TYPES D'ENTITÉS (`entities`, voir
   // core/scene.js/parseSpawnRange), mesuré à tout ce qui s'active sur la
-  // face. Nettement au-dessus du double de interactRange : le joueur doit
-  // pouvoir se tenir devant une entité sans en avoir une seconde à portée, ce
-  // qui ouvrirait un menu de choix au lieu de frapper. Plus haut = zones plus
-  // clairsemées, et moins d'entités possibles par zone (le chargement refuse
-  // un count max que la zone ne peut pas contenir). Lu DIRECTEMENT.
-  spawnEntitySpacing: 2.5,
+  // face. Le double de interactRange : à cet écart, les portées de deux
+  // entités se touchent sans se recouvrir, le joueur n'en a jamais deux à
+  // portée, ce qui ouvrirait un menu de choix au lieu de frapper. Ne pas
+  // descendre en dessous. Plus haut = zones plus clairsemées, et moins
+  // d'entités possibles par zone (le chargement refuse un count max que la
+  // zone ne peut pas contenir). Lu DIRECTEMENT.
+  spawnEntitySpacing: 2,
 
   // Durée (ms) du fondu de la perception surnaturelle — voir
   // PERCEPTION_FADE_MS ci-dessus, seule définition, jamais dupliquée ici.
