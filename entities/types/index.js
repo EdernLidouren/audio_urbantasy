@@ -78,6 +78,7 @@ import ghosten from "./ghosten.js";
 import glassWindow from "./glass-window.js";
 import hound from "./hound.js";
 import item from "./item.js";
+import largeBoulder from "./large_boulder.js";
 import largeMachinery from "./large_machinery.js";
 import largeWindingMechanism from "./large_winding_mechanism.js";
 import machine1 from "./machine_1.js";
@@ -160,6 +161,7 @@ export default {
   glass_window: glassWindow,
   hound,
   item,
+  large_boulder: largeBoulder,
   large_machinery: largeMachinery,
   large_winding_mechanism: largeWindingMechanism,
   machine_1: machine1,

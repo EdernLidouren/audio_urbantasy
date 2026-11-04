@@ -686,15 +686,19 @@ donne :
 | `boulder` (rocher) | `boulder` : roches, minéraux tendres, fossiles | 1 : 1 | 2 à 4 | 1 à 2 |
 | `ore_vein` (filon) | `ore_vein` : minerais et métaux natifs | 1 : 2 | 3 à 6 | 1 à 3 |
 | `geode` (géode) | `geode` : cristaux, pierres précieuses, la géode entière | 1 : 5 | 4 à 7 | 2 à 3 |
+| `large_boulder` (gros rocher) | `boulder`, comme le rocher | 1 : 1 | 5 à 6 | 2 à 4 |
 
 Dans chaque table, un minéral pèse selon SA rareté de collection (niveaux
 de `RARITY_LEVELS`). Le météorite de fer et la fulgurite n'y sont pas :
 ils naîtront d'apparitions particulières. Résistances et nombres d'objets
 PROVISOIRES, à régler à l'usage. Vérifications : `core/checks/mining.check.js`.
 
-Contenu de test : `scenes/old-quarries-underground-1-main.json` (le
-fond du puits des anciennes carrières), un rocher (x 6), un filon (x 21) et
-une géode (x 26) au recto.
+Le gros rocher est aussi un OBSTACLE (`blocksMovement`) : un minage peut
+barrer une route tant que le joueur n'a pas le kit, et la libérer pour de
+bon une fois l'entité brisée. Il est placé au verso de
+`scenes/old-quarries-underground-1-main.json` (le fond du puits des
+anciennes carrières, x 5). Les trois autres ne sont posés nulle part pour
+l'instant : leurs zones d'apparition restent à établir.
 
 ## Vente et achat — point de vente et menu à sliders inline
 

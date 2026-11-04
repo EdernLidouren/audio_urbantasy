@@ -151,9 +151,6 @@
   "assets/musics/underground": [
     "assets/musics/underground_1.mp3"
   ],
-  "assets/sounds/decor/big_rock_1_beacon": [
-    "assets/sounds/decor/big_rock_1_beacon_1.mp3"
-  ],
   "assets/sounds/decor/boulder_1_beacon": [
     "assets/sounds/decor/boulder_1_beacon_1.mp3",
     "assets/sounds/decor/boulder_1_beacon_2.mp3",
@@ -183,6 +180,9 @@
   ],
   "assets/sounds/decor/highway_traffic_2_beacon": [
     "assets/sounds/decor/highway_traffic_2_beacon_1.mp3"
+  ],
+  "assets/sounds/decor/large_boulder_1_beacon": [
+    "assets/sounds/decor/large_boulder_1_beacon_1.mp3"
   ],
   "assets/sounds/decor/large_gear_1_beacon": [
     "assets/sounds/decor/large_gear_1_beacon_1.mp3"
@@ -371,8 +371,8 @@
   "assets/sounds/effects/accessible_pedestrian_signal": [
     "assets/sounds/effects/accessible_pedestrian_signal_1.mp3"
   ],
-  "assets/sounds/effects/big_rock_collision": [
-    "assets/sounds/effects/big_rock_collision_1.mp3"
+  "assets/sounds/effects/boulder_collision": [
+    "assets/sounds/effects/boulder_collision_1.mp3"
   ],
   "assets/sounds/effects/boulder_destruction": [
     "assets/sounds/effects/boulder_destruction_1.mp3"

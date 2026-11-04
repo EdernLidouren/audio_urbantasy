@@ -10,14 +10,15 @@
     "ambiences": ["assets/ambiances/shaft"],
     "defaultSurface": "rock",
     "reverbPreset": "cave",
+    "segments": [{ "from": 23, "to": 30, "surface": "shallow_water" }],
     "entities": [
-      { "id": "boulder_1_r", "type": "boulder", "x": 6 },
       {
         "id": "shaft_cage_1_r",
         "type": "door",
         "x": 15,
         "nameKey": "door.shaft_cage.name",
         "descriptionKey": "door.shaft_cage.description",
+        "tuning": { "beaconCrossFaceGain": 0.5 },
         "sounds": { "beacon": { "path": "assets/sounds/doors/old_elevator_bell_1_beacon" } },
         "action": {
           "kind": "applyEffects",
@@ -27,8 +28,13 @@
           ]
         }
       },
-      { "id": "ore_vein_1_r", "type": "ore_vein", "x": 21 },
-      { "id": "geode_1_r", "type": "geode", "x": 26 }
+      {
+        "id": "passage_1_r",
+        "type": "passage",
+        "x": 25,
+        "descriptionKey": "passage.old_quarries_flooded_galleries.description",
+        "action": { "kind": "switchSide", "arrivalX": 25 }
+      }
     ]
   },
   "verso": {
@@ -38,6 +44,20 @@
     "ambiences": ["assets/ambiances/shaft"],
     "defaultSurface": "rock",
     "reverbPreset": "cave",
-    "entities": []
+    "segments": [
+      { "from": 0, "to": 12, "surface": "gravel" },
+      { "from": 23, "to": 25, "surface": "shallow_water" },
+      { "from": 26, "to": 30, "surface": "wood" }
+    ],
+    "entities": [
+      { "id": "large_boulder_1_v", "type": "large_boulder", "x": 5 },
+      {
+        "id": "passage_1_v",
+        "type": "passage",
+        "x": 25,
+        "descriptionKey": "passage.old_quarries_flooded_galleries.description",
+        "action": { "kind": "switchSide", "arrivalX": 25 }
+      }
+    ]
   }
 }

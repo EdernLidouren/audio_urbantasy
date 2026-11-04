@@ -1648,7 +1648,7 @@ que le rendu DIÉGÉTIQUE : un son méta n'a pas de position, rien à suivre ni
 { type: "playSound", path: "assets/sounds/effects/clock_tower_bell" }
 
 // Ancré : l'éboulement s'est produit là-bas, à cet instant — figé.
-{ type: "playSound", path: "assets/sounds/effects/big_rock_collision", tracked: false }
+{ type: "playSound", path: "assets/sounds/effects/boulder_collision", tracked: false }
 ```
 
 Déclaré sur l'EFFET, jamais sur le fichier : le même son peut être suivi

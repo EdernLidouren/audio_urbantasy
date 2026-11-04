@@ -7,9 +7,9 @@ export default {
   nameKey: "entity.cliff_foot.name",
   descriptionKey: "entity.cliff_foot.description",
   sounds: {
-    beacon: { path: "assets/sounds/decor/big_rock_1_beacon", loop: true },
+    beacon: { path: "assets/sounds/decor/large_boulder_1_beacon", loop: true },
   },
-  collisionSound: "assets/sounds/effects/big_rock_collision",
+  collisionSound: "assets/sounds/effects/boulder_collision",
   blocksMovement: true,
   observable: true,
   interactable: false,
