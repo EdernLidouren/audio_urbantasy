@@ -14,6 +14,7 @@ import { TUNING_DEFAULTS } from "../../config/tuning-values.js";
 import { INITIAL_TIME, advanceTime } from "../time.js";
 import { TIME_CONFIG } from "../../config/time-values.js";
 import { validateSpawnTables, validateDistribution, resolveDistribution, drawItem, NOTHING } from "../distribution.js";
+import { mineEntity } from "../mining.js";
 import { spawnCycleAt, refillDueSpawns, searchContainer, isSearchable, containerStatus, ephemeralArchetypeSpec, ephemeralItemSpec } from "../spawn.js";
 import {
   SPAWN_TABLES,
@@ -24,6 +25,8 @@ import {
 import { auditNonSerializable, diffStructure, throws, fail } from "../../lib/check.js";
 
 export default function checkSpawn(run) {
+  checkEntityRanges(run);
+
   // --- Collecte (core/distribution.js + core/spawn.js) ---
   // Distribution, sources (conteneur/plage), cycle quotidien + file,
   // matérialisation (fouille/pickup), persistance, déterminisme.
@@ -158,6 +161,7 @@ export default function checkSpawn(run) {
     parseScene({ ...spawnRaw, entities: [{ id: "b", type: "bush", x: 1, container: { distribution: { table: "default" }, count: 3 } }] }, SPAWN_REGISTRY).entities[0].container.count
   );
 
+  // Plages de TYPES et fourchette de count : voir plus bas, avec leur scène.
   // Premier chargement : garnissage (conteneurs stockés, plage posée).
   const spawnFresh = { ...createInitialState(spawnScene), bag: [] };
   const spawnFilled = refillDueSpawns(spawnFresh, SPAWN_REGISTRY);
@@ -478,4 +482,150 @@ export default function checkSpawn(run) {
   const fallenResistor = searchedResistor.session.worlds[specSession.activeWorldId].entities.find((e) => e.ephemeral);
   const withoutPlacement = ({ id, x, ephemeral, action, ...rest }) => ({ ...rest, action: { ...action, count: 0 } });
   run.same("objet posé = objet tombé d'une fouille (hors id/x/quantité)", withoutPlacement(droppedResistor), fallenResistor && withoutPlacement(fallenResistor));
+}
+
+// Plages de TYPES D'ENTITÉS (`entities`) et fourchette de `count` : combien
+// d'abord, lesquels ensuite, espacés, remplacés au cycle suivant.
+function checkEntityRanges(run) {
+  const REGISTRY = {
+    boulder: {
+      nameKey: "entity.boulder.name",
+      sounds: { beacon: { path: "assets/sounds/decor/boulder_1_beacon", loop: true } },
+      mineable: { distribution: { items: { granite: 1 } }, hits: { min: 2, max: 2 } },
+      observable: true,
+      interactable: true,
+      action: { kind: "mine" },
+    },
+    vein: {
+      nameKey: "entity.ore_vein.name",
+      sounds: {},
+      mineable: { distribution: { items: { granite: 1 } }, hits: { min: 2, max: 2 } },
+      interactable: true,
+      action: { kind: "mine" },
+    },
+    wall: { nameKey: "entity.rock.name", blocksMovement: true },
+    door: { nameKey: "door.default.name", interactable: true },
+    item: { nameKey: "entity.item.name", sounds: {}, interactable: true },
+    apple: { nameKey: "item.apple.name", sounds: {}, interactable: true, action: { kind: "pickup", item: "apple", count: 1 } },
+  };
+  const rawScene = (spawnRanges, entities = []) => ({
+    id: "entity-ranges-check",
+    titleKey: "scene.demo.name",
+    length: 40,
+    playerStart: 1,
+    spawnRanges,
+    entities,
+  });
+  const parse = (range) => parseScene(rawScene([range]), REGISTRY);
+  const refused = (range) => throws(() => parse(range));
+  const BOTH = { boulder: "common", vein: "rare" };
+
+  // Forme.
+  run("plage de types : acceptée", false, refused({ from: 2, to: 20, entities: BOTH }));
+  run("plage de types : ni distribution ni entities -> rejetée", true, refused({ from: 2, to: 20 }));
+  run("plage de types : distribution ET entities -> rejetée", true, refused({ from: 2, to: 20, entities: BOTH, distribution: { items: { apple: 1 } } }));
+  run("plage de types : type inconnu -> rejeté", true, refused({ from: 2, to: 20, entities: { nope: 1 } }));
+  run("plage de types : type bloquant -> rejeté", true, refused({ from: 2, to: 20, entities: { wall: 1 } }));
+  run("plage de types : rien que nothing -> rejetée", true, refused({ from: 2, to: 20, entities: { nothing: 1 } }));
+  run("plage de types : poids invalide -> rejeté", true, refused({ from: 2, to: 20, entities: { boulder: "mythic" } }));
+  run("plage de types : nothing pondéré -> accepté", false, refused({ from: 2, to: 20, entities: { boulder: 1, nothing: 1 } }));
+
+  // Fourchette de count, sur les deux sortes de plages.
+  const items = { items: { apple: 1 } };
+  run("count : fourchette -> acceptée, gardée telle quelle", 3, parse({ from: 2, to: 20, count: { min: 0, max: 3 }, entities: BOTH }).spawnRanges[0].count.max);
+  run("count : fourchette sur une plage d'objets -> acceptée", false, refused({ from: 2, to: 20, count: { min: 1, max: 2 }, distribution: items }));
+  run("count : entier -> gardé tel quel", 2, parse({ from: 2, to: 20, count: 2, distribution: items }).spawnRanges[0].count);
+  run("count : 0 seul -> rejeté", true, refused({ from: 2, to: 20, count: 0, entities: BOTH }));
+  run("count : { 0, 0 } -> rejeté", true, refused({ from: 2, to: 20, count: { min: 0, max: 0 }, entities: BOTH }));
+  run("count : min > max -> rejeté", true, refused({ from: 2, to: 20, count: { min: 3, max: 2 }, entities: BOTH }));
+  run("count : min négatif -> rejeté", true, refused({ from: 2, to: 20, count: { min: -1, max: 2 }, entities: BOTH }));
+
+  // Plafond : ce que la zone peut contenir à l'espacement voulu.
+  const spacing = TUNING_DEFAULTS.spawnEntitySpacing;
+  const width = 10;
+  const capacity = Math.floor(width / spacing) + 1;
+  run("capacité : count max au plafond -> accepté", false, refused({ from: 2, to: 2 + width, count: { min: 0, max: capacity }, entities: BOTH }));
+  run("capacité : count max au-delà -> rejeté", true, refused({ from: 2, to: 2 + width, count: { min: 0, max: capacity + 1 }, entities: BOTH }));
+  run("capacité : le défaut de count compte aussi", true, refused({ from: 2, to: 3, entities: BOTH }));
+  run("capacité : plage d'objets, à SON espacement", true, refused({ from: 2, to: 3, count: 3, distribution: items }));
+
+  // Garnissage.
+  const scene = parseScene(
+    rawScene(
+      [
+        { from: 2, to: 20, count: { min: 2, max: 4 }, entities: BOTH },
+        { from: 24, to: 26, count: { min: 0, max: 1 }, entities: { vein: 1 } },
+      ],
+      [{ id: "door-1", type: "door", x: 10 }]
+    ),
+    REGISTRY
+  );
+  const spawnedOf = (s) => s.worlds[scene.id].entities.filter((e) => e.spawned);
+  const counts = new Set();
+  const first = refillDueSpawns(createInitialState(scene), REGISTRY);
+  run("garnissage : entités posées marquées spawned", true, spawnedOf(first).length > 0);
+  run("garnissage : portent leur mineable", true, spawnedOf(first).every((e) => e.mineable !== undefined && e.action.kind === "mine"));
+  run("garnissage : ids de plage déterministes", true, spawnedOf(first).every((e) => e.id.startsWith("spawn-0-")));
+
+  // Plusieurs graines : le nombre varie, reste dans la fourchette, et l'écart
+  // tient toujours, porte posée à la main comprise.
+  let inRange = true;
+  let spaced = true;
+  let inZone = true;
+  const typesSeen = new Set();
+  for (let seed = 1; seed <= 200; seed++) {
+    const session = refillDueSpawns(createInitialState(scene, seed), REGISTRY);
+    const zoneA = spawnedOf(session).filter((e) => e.x <= 20);
+    const zoneB = spawnedOf(session).filter((e) => e.x >= 24);
+    counts.add(zoneA.length);
+    if (zoneA.length > 4 || zoneB.length > 1) inRange = false;
+    if (!zoneA.concat(zoneB).every((e) => (e.x >= 2 && e.x <= 20) || (e.x >= 24 && e.x <= 26))) inZone = false;
+    zoneA.forEach((e) => typesSeen.add(e.type));
+    const active = session.worlds[scene.id].entities.filter((e) => e.interactable);
+    if (!active.every((a, i) => active.every((b, j) => i === j || Math.abs(a.x - b.x) >= spacing))) spaced = false;
+  }
+  run("fourchette : le nombre posé varie d'une graine à l'autre", true, counts.size >= 2);
+  run("fourchette : jamais au-dessus du max", true, inRange);
+  run("garnissage : toujours dans la zone", true, inZone);
+  run("écart : tenu entre toutes les entités actives, porte comprise", true, spaced);
+  run("table : les deux types finissent par sortir", true, typesSeen.has("boulder") && typesSeen.has("vein"));
+
+  // Déterminisme.
+  run.same(
+    "déterminisme : même graine -> mêmes entités",
+    spawnedOf(refillDueSpawns(createInitialState(scene, 7), REGISTRY)).map((e) => `${e.type}@${e.x}`),
+    spawnedOf(refillDueSpawns(createInitialState(scene, 7), REGISTRY)).map((e) => `${e.type}@${e.x}`)
+  );
+
+  // Cycle : une entité entamée est remplacée, un nouveau tirage a lieu.
+  const DAY = TIME_CONFIG.minutesPerHour * TIME_CONFIG.hoursPerDay;
+  const struck = mineEntity(first, spawnedOf(first)[0].id, REGISTRY).session;
+  const nextDay = refillDueSpawns(advanceTime(struck, DAY), REGISTRY);
+  run("cycle : entité entamée -> résistance oubliée au garnissage suivant", true, spawnedOf(nextDay).every((e) => e.hitsLeft === undefined));
+  run("cycle : nouveaux ids au garnissage suivant", true, spawnedOf(nextDay).every((e) => e.id.startsWith("spawn-1-")));
+
+  // Deux faces : les mêmes plages ne donnent jamais le même id, objets ou
+  // types (la scène audio repère ses sources par id, les deux faces ensemble).
+  const twoFaces = parseScene(
+    {
+      id: "entity-ranges-two-faces",
+      titleKey: "scene.demo.name",
+      length: 40,
+      playerStart: 1,
+      recto: { spawnRanges: [{ from: 2, to: 20, count: 2, entities: BOTH }, { from: 24, to: 30, count: 2, distribution: items }], entities: [] },
+      verso: { spawnRanges: [{ from: 2, to: 20, count: 2, entities: BOTH }, { from: 24, to: 30, count: 2, distribution: items }], entities: [] },
+    },
+    REGISTRY
+  );
+  const twoFilled = refillDueSpawns(createInitialState(twoFaces), REGISTRY).worlds[twoFaces.id];
+  const twoIds = [...twoFilled.recto.entities, ...twoFilled.verso.entities].map((e) => e.id);
+  run("deux faces : 8 entités posées", 8, twoIds.length);
+  run("deux faces : ids uniques dans le monde", twoIds.length, new Set(twoIds).size);
+
+  // Sauvegarde : la plage survit telle quelle, et un type retiré du registre
+  // depuis ne fait pas planter le garnissage.
+  const reload = deserializeGame(serializeGame(first));
+  run("save : partie chargée, plage de types non neutralisée", 0, reload.brokenReferences.length);
+  run("save : entités posées conservées", spawnedOf(first).length, spawnedOf(reload.session).length);
+  run("save : type retiré du registre -> ignoré, aucune erreur", false, throws(() => refillDueSpawns(advanceTime(reload.session, DAY), { door: REGISTRY.door })));
 }

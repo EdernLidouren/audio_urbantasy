@@ -4,10 +4,13 @@
 //   - SOURCES (où) : un CONTENEUR est une entité qui porte `container:
 //     { distribution, count? }` (cascade instance -> type, voir core/entity-parse.js/
 //     parseEntity) ; une PLAGE est une entrée de `face.spawnRanges`
-//     ({ from, to, count?, distribution }, voir core/scene.js/parseFace).
-//     Même logique de garnissage dessous, seule la MATÉRIALISATION diffère :
-//     un conteneur mémorise des objets cachés (`stock`), une plage pose des
-//     entités ramassables au sol (`spawned: true`).
+//     ({ from, to, count?, distribution | entities }, voir core/scene.js/
+//     parseSpawnRange). Même logique de garnissage dessous, seule la
+//     MATÉRIALISATION diffère : un conteneur mémorise des objets cachés
+//     (`stock`), une plage pose des entités au sol (`spawned: true`) —
+//     ramassables si elle tire des objets (`distribution`), de n'importe quel
+//     type non bloquant si elle tire des types (`entities`, ex. les rochers à
+//     miner). Combien : `count`, entier ou fourchette, tiré AVANT le contenu.
 //   - CYCLE (quand) : quotidien, index de cycle dérivé de session.time
 //     (spawnCycleAt). Rien ne se matérialise JAMAIS pendant que le joueur
 //     est dans la scène : refillDueSpawns ne s'exécute qu'au CHARGEMENT du
@@ -53,7 +56,8 @@
 import { SPAWN_CYCLE_HOUR, SPAWN_RANGE_DEFAULT_COUNT, SPAWN_CONTAINER_DEFAULT_COUNT } from "../config/spawn-values.js";
 import { TIME_CONFIG } from "../config/time-values.js";
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";
-import { drawItem } from "./distribution.js";
+import { drawItem, drawEntityType } from "./distribution.js";
+import { drawIntInRange } from "./rng.js";
 import { restockShopEntity } from "./catalog.js";
 import { drawOffer, unavailableArticles } from "./display.js";
 import {
@@ -189,22 +193,52 @@ export function ephemeralItemSpec(session, item, count, registry) {
 }
 
 // Position dans [from, to] : drawScatteredPosition (bornes carte + corps
-// bloquants) autour du centre de la plage, RE-TIRÉE si trop proche d'un
-// collectible déjà posé dans ce garnissage (spawnMinSpacing) — filet : le
-// dernier candidat, jamais un refus.
-function drawRangePosition(range, obstacles, placed, length, presenceContext, rngState) {
+// bloquants) autour du centre de la plage, RE-TIRÉE si trop proche d'une
+// position de `placed` (à moins de minSpacing). Rend aussi `spaced` : faux si
+// aucune tentative n'a convenu, le dernier candidat étant alors rendu tel
+// quel — à l'appelant de décider s'il s'en contente.
+function drawRangePosition(range, obstacles, placed, minSpacing, length, presenceContext, rngState) {
   const center = (range.from + range.to) / 2;
   const spread = (range.to - range.from) / 2;
-  const minSpacing = TUNING_DEFAULTS.spawnMinSpacing;
   let state = rngState;
   let candidate = center;
   for (let attempt = 0; attempt < SPACING_MAX_ATTEMPTS; attempt++) {
     const draw = drawScatteredPosition(center, spread, length, obstacles, presenceContext, state);
     state = draw.rngState;
     candidate = draw.x;
-    if (placed.every((x) => Math.abs(x - candidate) >= minSpacing)) break;
+    if (placed.every((x) => Math.abs(x - candidate) >= minSpacing)) return { x: candidate, spaced: true, rngState: state };
   }
-  return { x: candidate, rngState: state };
+  return { x: candidate, spaced: false, rngState: state };
+}
+
+// Nombre d'emplacements d'une plage pour ce garnissage. Un entier (ou rien,
+// le défaut) ne consomme aucun pas de PRNG : seule une fourchette en tire un.
+function drawRangeCount(range, rngState) {
+  const count = range.count ?? SPAWN_RANGE_DEFAULT_COUNT;
+  return typeof count === "number" ? { value: count, rngState } : drawIntInRange(count, rngState);
+}
+
+// Pose les entités d'une plage de TYPES (`range.entities`). L'écart se mesure
+// à TOUT ce qui s'active sur la face, posé à la main ou par une autre plage :
+// deux entités à portée l'une de l'autre, et Entrée ouvrirait un menu de choix
+// au lieu de frapper. Sans place, l'emplacement reste vide : jamais une entité
+// collée à une autre. Un type disparu du registre depuis la première visite
+// (une sauvegarde fige la plage, voir doc/save.md) est simplement ignoré.
+function placeRangeEntities(range, spawnId, count, entities, world, registry, companions, presenceContext, rngState) {
+  let state = rngState;
+  for (let i = 0; i < count; i++) {
+    const draw = drawEntityType(range.entities, state);
+    state = draw.rngState;
+    if (draw.type === null || !registry[draw.type]) continue;
+    const placed = entities.filter((e) => e.interactable).map((e) => e.x);
+    const obstacles = [...entities, ...companions];
+    const position = drawRangePosition(range, obstacles, placed, TUNING_DEFAULTS.spawnEntitySpacing, world.length, presenceContext, state);
+    state = position.rngState;
+    if (!position.spaced) continue;
+    const raw = { id: spawnId(i), x: position.x, type: draw.type };
+    entities.push({ ...parseSpawnedEntity(raw, registry, world.length, world.variables), spawned: true });
+  }
+  return state;
 }
 
 // Garnit UNE face pour le cycle donné : conteneurs re-stockés (sauf un
@@ -214,7 +248,7 @@ function drawRangePosition(range, obstacles, placed, length, presenceContext, rn
 // puis des plages — ordre stable, déterminisme préservé. `offered` : Set
 // LOCAL au garnissage du monde (voir refillDueSpawns), complété ici par
 // chaque article exposé, pour qu'aucun présentoir suivant ne le retire.
-function refillFace(face, world, cycle, registry, companions, presenceContext, offered) {
+function refillFace(face, side, world, cycle, registry, companions, presenceContext, offered) {
   let rngState = face.rngState;
   const entities = [];
   for (const entity of face.entities) {
@@ -244,7 +278,17 @@ function refillFace(face, world, cycle, registry, companions, presenceContext, o
   (face.spawnRanges ?? []).forEach((range, rangeIndex) => {
     // Distribution neutralisée (voir drawItems) : la plage ne pose rien.
     if (range.distribution === null) return;
-    const count = range.count ?? SPAWN_RANGE_DEFAULT_COUNT;
+    // Id déterministe, et unique dans le MONDE : la face en fait partie, comme
+    // pour un éphémère, car la scène audio joue les deux faces ensemble et
+    // repère ses sources par id.
+    const spawnId = (i) => `spawn-${side === null ? "" : `${side}-`}${cycle}-${rangeIndex}-${i}`;
+    const drawnCount = drawRangeCount(range, rngState);
+    const count = drawnCount.value;
+    rngState = drawnCount.rngState;
+    if (range.entities !== undefined) {
+      rngState = placeRangeEntities(range, spawnId, count, entities, world, registry, companions, presenceContext, rngState);
+      return;
+    }
     const placed = [];
     for (let i = 0; i < count; i++) {
       const draw = drawItem(range.distribution, rngState);
@@ -255,10 +299,12 @@ function refillFace(face, world, cycle, registry, companions, presenceContext, o
         continue;
       }
       const obstacles = [...entities, ...companions];
-      const position = drawRangePosition(range, obstacles, placed, world.length, presenceContext, draw.rngState);
+      // Un objet trop près d'un autre reste posé : plusieurs objets à portée
+      // ne gênent pas, il suffit de les ramasser l'un après l'autre.
+      const position = drawRangePosition(range, obstacles, placed, TUNING_DEFAULTS.spawnMinSpacing, world.length, presenceContext, draw.rngState);
       rngState = position.rngState;
       placed.push(position.x);
-      const spec = buildCollectibleSpec(draw.item, `spawn-${cycle}-${rangeIndex}-${i}`, position.x, registry, world.length, world.variables);
+      const spec = buildCollectibleSpec(draw.item, spawnId(i), position.x, registry, world.length, world.variables);
       entities.push({ ...spec, spawned: true });
     }
   });
@@ -290,7 +336,7 @@ export function refillDueSpawns(session, registry) {
   for (const side of faces) {
     const face = resolveFace(world, side);
     const companions = side === null || side === session.player.side ? session.companions : [];
-    const refilled = refillFace(face, world, cycle, registry, companions, presenceContext, offered);
+    const refilled = refillFace(face, side, world, cycle, registry, companions, presenceContext, offered);
     nextWorld = withFace(nextWorld, side, { entities: refilled.entities, rngState: refilled.rngState });
   }
   return withActiveWorld(session, { ...nextWorld, spawnCycle: cycle });

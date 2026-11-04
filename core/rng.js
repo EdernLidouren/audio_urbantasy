@@ -29,6 +29,13 @@ export function nextRandom(state) {
   return { value, state: a >>> 0 };
 }
 
+// Entier uniforme dans [range.min, range.max], en enchaînant le PRNG. Toujours
+// un pas de PRNG, même si min = max : le déterminisme ne dépend pas de l'issue.
+export function drawIntInRange(range, rngState) {
+  const { value, state } = nextRandom(rngState);
+  return { value: range.min + Math.floor(value * (range.max - range.min + 1)), rngState: state };
+}
+
 // Tire une clé de `weights` ({ clé: poids }) au prorata de son poids — poids
 // RELATIFS, normalisés ici par leur somme ; un poids nul ou négatif n'est
 // jamais tiré. Un seul pas de PRNG. Partagé par la météo (transitions) et

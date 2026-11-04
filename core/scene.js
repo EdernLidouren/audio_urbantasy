@@ -17,8 +17,10 @@ import { REVERB_PRESETS } from "../config/reverb-values.js";
 import { BODY_RADIUS } from "./state.js";
 import { SURFACE_REGISTRY, DEFAULT_SURFACE } from "./surfaces.js";
 import { parseVariables } from "./variables.js";
-import { validateDistribution } from "./distribution.js";
-import { fail, isNonEmptyString, isFiniteNumber, rejectUnknownFields } from "./parse-common.js";
+import { SPAWN_RANGE_DEFAULT_COUNT } from "../config/spawn-values.js";
+import { TUNING_DEFAULTS } from "../config/tuning-values.js";
+import { validateDistribution, validateEntityTable } from "./distribution.js";
+import { fail, isNonEmptyString, isFiniteNumber, rejectUnknownFields, parseIntRange } from "./parse-common.js";
 import { parseEntity } from "./entity-parse.js";
 
 // Parsing TOTAL (voir header) : l'ABSENCE d'un champ de scène retombe
@@ -184,19 +186,32 @@ validateReverbPresets(REVERB_PRESETS);
 // dans [0, length]), count entier >= 1 optionnel (défaut :
 // config/spawn-values.js/SPAWN_RANGE_DEFAULT_COUNT, résolu par le moteur),
 // distribution validée comme celle d'un conteneur.
-function parseSpawnRange(rawRange, index, length, prefix) {
+function parseSpawnRange(rawRange, index, length, prefix, registry) {
   const describe = `${prefix}spawnRanges[${index}]`;
   if (typeof rawRange !== "object" || rawRange === null) {
     fail(`${describe} n'est pas un objet.`);
   }
-  rejectUnknownFields(rawRange, ["from", "to", "count", "distribution"], describe);
-  const { from, to, count, distribution } = rawRange;
+  rejectUnknownFields(rawRange, ["from", "to", "count", "distribution", "entities"], describe);
+  const { from, to, count, distribution, entities } = rawRange;
   checkSceneSpan(from, to, length, describe);
-  if (count !== undefined && (!Number.isInteger(count) || count < 1)) {
-    fail(`${describe} : count doit être un entier >= 1 si présent (reçu : ${JSON.stringify(count)}).`);
+  if ((distribution === undefined) === (entities === undefined)) {
+    fail(`${describe} : déclarer soit distribution (des objets), soit entities (des types d'entités), jamais les deux.`);
   }
-  validateDistribution(distribution, `${describe}.distribution`, fail);
-  const range = { from, to, distribution };
+  if (entities !== undefined) validateEntityTable(entities, registry, `${describe}.entities`, fail);
+  else validateDistribution(distribution, `${describe}.distribution`, fail);
+
+  // `count` : combien d'emplacements, entier fixe ou fourchette (0 permis :
+  // une zone peut rester vide certains jours). Plafonné par ce que la zone
+  // peut contenir à l'espacement voulu : au-delà, le nombre écrit ne pourrait
+  // jamais être atteint.
+  const countRange = count === undefined ? { min: SPAWN_RANGE_DEFAULT_COUNT, max: SPAWN_RANGE_DEFAULT_COUNT } : parseIntRange(count, `${describe}.count`, { lowest: 0 });
+  const spacing = entities !== undefined ? TUNING_DEFAULTS.spawnEntitySpacing : TUNING_DEFAULTS.spawnMinSpacing;
+  const capacity = Math.floor((to - from) / spacing) + 1;
+  if (countRange.max > capacity) {
+    fail(`${describe} : au plus ${capacity} emplacement(s) entre ${from} et ${to} à l'espacement ${spacing} (count max : ${countRange.max}).`);
+  }
+
+  const range = entities !== undefined ? { from, to, entities } : { from, to, distribution };
   if (count !== undefined) range.count = count;
   return range;
 }
@@ -286,7 +301,7 @@ function parseFace(raw, length, registry, describe, sceneVariables, seenIds = ne
     fail(`${prefix}spawnRanges doit être un tableau si présent (reçu : ${JSON.stringify(spawnRanges)}).`);
   }
   const parsedSpawnRanges =
-    spawnRanges !== undefined ? spawnRanges.map((rawRange, index) => parseSpawnRange(rawRange, index, length, prefix)) : undefined;
+    spawnRanges !== undefined ? spawnRanges.map((rawRange, index) => parseSpawnRange(rawRange, index, length, prefix, registry)) : undefined;
   // music : optionnel, chemin vers la musique de la scène (voir
   // view/audio/layers.js). Simple passage : parseScene ne connaît ni
   // Howler ni la lecture audio, juste la présence d'une chaîne.

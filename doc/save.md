@@ -137,7 +137,10 @@ export const RENAMED_SCENE_IDS = { clock_tower_weight_shaft_mirror_space: "clock
 - Les types sont remplacés dans le champ `type` des entités (mondes, deux
   faces comprises, et compagnons), et dans le `spec` des effets `"spawn"`
   qu'elles portent (action et refus, triggers, séquence en attente) : il
-  est résolu au chargement de la scène et figé avec elle.
+  est résolu au chargement de la scène et figé avec elle. Pas dans les clés
+  d'une plage de types (`entities`), qui ne sont pas des valeurs : un type
+  renommé ou retiré y est simplement ignoré au garnissage, la plage continue
+  avec ses autres types.
 - Clés i18n et chemins de sons sont remplacés partout où ils apparaissent
   comme **valeur exacte** (nom, description, titre de scène, clé d'annonce
   d'une action...). Jamais les clés d'objet : noms de variables et ids de

@@ -406,7 +406,9 @@ function repairFaceReferences(face, report) {
   }
   if (Array.isArray(face.spawnRanges)) {
     const spawnRanges = face.spawnRanges.map((range, index) => {
-      if (!range || range.distribution === null) return range;
+      // Une plage de types (`entities`) n'a pas de distribution : sans
+      // registre ici, ses types se vérifient au garnissage (core/spawn.js).
+      if (!range || range.distribution === null || range.distribution === undefined) return range;
       const source = `spawnRanges[${index}]`;
       const problem = validationProblem(validateDistribution, range.distribution, "distribution");
       if (!problem) return range;

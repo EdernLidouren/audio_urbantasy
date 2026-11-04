@@ -219,6 +219,42 @@ export function validateDistribution(distribution, describe, fail) {
   }
 }
 
+// Table de TYPES D'ENTITÉS d'une plage ({ <type>: <poids> }, champ `entities`
+// de core/scene.js/parseSpawnRange) : mêmes poids que les tables d'objets
+// (nombre ou niveau de rareté, clé `nothing` permise), mais chaque clé est un
+// type du registre INJECTÉ. Un type BLOQUANT est refusé : posé au hasard, il
+// pourrait enfermer le joueur ou couper une route ; un obstacle se place à la
+// main.
+export function validateEntityTable(entities, registry, describe, failWith) {
+  if (typeof entities !== "object" || entities === null || Array.isArray(entities)) {
+    failWith(`${describe} doit être un objet { type: poids }.`);
+  }
+  const weights = {};
+  for (const [type, value] of Object.entries(entities)) {
+    if (type !== NOTHING && !registry[type]) {
+      failWith(`${describe} : type "${type}" absent du registre.`);
+    }
+    if (type !== NOTHING && registry[type].blocksMovement) {
+      failWith(`${describe} : type "${type}" bloquant, à placer à la main (il pourrait barrer la route ou enfermer le joueur).`);
+    }
+    const weight = entryWeight(value);
+    if (typeof weight !== "number" || !Number.isFinite(weight) || weight < 0) {
+      failWith(`${describe} : poids invalide pour "${type}" (${JSON.stringify(value)}) — un nombre, ou un niveau de rareté.`);
+    }
+    weights[type] = weight;
+  }
+  if (!canYieldItem(weights)) {
+    failWith(`${describe} ne peut jamais donner d'entité.`);
+  }
+}
+
+// Tire UN type dans une table déjà validée. `type` vaut null sur NOTHING ; le
+// pas de PRNG est consommé quand même, comme drawItem.
+export function drawEntityType(entities, rngState) {
+  const picked = pickWeighted(toWeights(entities), rngState);
+  return { type: picked.key === NOTHING ? null : picked.key, rngState: picked.rngState };
+}
+
 // Poids NUMÉRIQUES d'une table simple ({ table } ou { items }).
 function singleTableWeights(source) {
   return toWeights(source.table !== undefined ? SPAWN_TABLES[source.table] : source.items);

@@ -11,6 +11,10 @@
     "defaultSurface": "rock",
     "reverbPreset": "cave",
     "segments": [{ "from": 23, "to": 30, "surface": "shallow_water" }],
+    "spawnRanges": [
+      { "from": 3, "to": 13, "count": { "min": 1, "max": 3 }, "entities": { "boulder": "common", "ore_vein": "rare" } },
+      { "from": 17, "to": 23, "count": { "min": 1, "max": 2 }, "entities": { "boulder": "common", "ore_vein": "rare" } }
+    ],
     "entities": [
       {
         "id": "shaft_cage_1_r",
@@ -33,6 +37,7 @@
         "type": "passage",
         "x": 25,
         "descriptionKey": "passage.old_quarries_flooded_galleries.description",
+        "tuning": { "transitionSurface": "shallow_water" },
         "action": { "kind": "switchSide", "arrivalX": 25 }
       }
     ]
@@ -49,6 +54,7 @@
       { "from": 23, "to": 25, "surface": "shallow_water" },
       { "from": 26, "to": 30, "surface": "wood" }
     ],
+    "spawnRanges": [{ "from": 7, "to": 23, "count": { "min": 2, "max": 4 }, "entities": { "boulder": "common", "ore_vein": "rare" } }],
     "entities": [
       { "id": "large_boulder_1_v", "type": "large_boulder", "x": 5 },
       {
@@ -56,6 +62,7 @@
         "type": "passage",
         "x": 25,
         "descriptionKey": "passage.old_quarries_flooded_galleries.description",
+        "tuning": { "transitionSurface": "shallow_water" },
         "action": { "kind": "switchSide", "arrivalX": 25 }
       }
     ]

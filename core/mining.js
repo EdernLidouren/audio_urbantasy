@@ -28,15 +28,9 @@
 // `registry` est INJECTÉ (comme pour core/spawn.js), jamais importé.
 
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";
-import { nextRandom } from "./rng.js";
+import { drawIntInRange } from "./rng.js";
 import { resolveFace, updateActiveFace, removeEntity, spawnScatteredEphemerals } from "./state.js";
 import { drawItems, buildCollectibleSpec } from "./spawn.js";
-
-// Entier uniforme dans [range.min, range.max], en enchaînant le PRNG.
-function drawInRange(range, rngState) {
-  const { value, state } = nextRandom(rngState);
-  return { value: range.min + Math.floor(value * (range.max - range.min + 1)), rngState: state };
-}
 
 // Un coup sur l'entité minable `entityId` de la FACE ACTIVE. Rend
 // `{ session, status, strike, items }` :
@@ -56,7 +50,7 @@ export function mineEntity(session, entityId, registry) {
   let rngState = face.rngState;
   let hitsLeft = entity.hitsLeft;
   if (hitsLeft === undefined) {
-    const drawn = drawInRange(entity.mineable.hits, rngState);
+    const drawn = drawIntInRange(entity.mineable.hits, rngState);
     hitsLeft = drawn.value;
     rngState = drawn.rngState;
   }
@@ -70,7 +64,7 @@ export function mineEntity(session, entityId, registry) {
     return { session: updateActiveFace(session, { entities, rngState }, side), status: "hit", strike, items: [] };
   }
 
-  const count = drawInRange(entity.mineable.count, rngState);
+  const count = drawIntInRange(entity.mineable.count, rngState);
   const drawn = drawItems(entity.mineable.distribution, count.value, count.rngState);
   let nextSession = removeEntity(updateActiveFace(session, { rngState: drawn.rngState }, side), entityId);
   for (const item of drawn.items) {

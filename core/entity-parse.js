@@ -9,7 +9,7 @@ import { ITEM_REGISTRY, itemSounds } from "./items.js";
 import { validateDistribution } from "./distribution.js";
 import { validateCatalog } from "./catalog.js";
 import { validateDisplayDistribution } from "./display.js";
-import { fail, isNonEmptyString, isFiniteNumber, parseBehavior, rejectUnknownFields } from "./parse-common.js";
+import { fail, isNonEmptyString, isFiniteNumber, parseBehavior, parseIntRange, rejectUnknownFields } from "./parse-common.js";
 import { validateCondition, parsePresenceRule, parseSingleAction, parseTrigger } from "./script-parse.js";
 import { ACTION_KINDS } from "./action-kinds.js";
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";
@@ -355,21 +355,6 @@ function parseContainer(container, at) {
   if (container.count !== undefined) parsed.count = container.count;
   if (container.regenerates === false) parsed.regenerates = false;
   return parsed;
-}
-
-// Une fourchette d'entiers { min, max } (1 <= min <= max), ou un entier
-// seul (min = max) : rendue toujours sous la forme { min, max }.
-function parseIntRange(value, describe) {
-  const range = Number.isInteger(value) ? { min: value, max: value } : value;
-  if (typeof range !== "object" || range === null || Array.isArray(range)) {
-    fail(`${describe} doit être un entier >= 1 ou une fourchette { min, max }.`);
-  }
-  rejectUnknownFields(range, ["min", "max"], describe);
-  const { min, max } = range;
-  if (!Number.isInteger(min) || !Number.isInteger(max) || min < 1 || max < min) {
-    fail(`${describe} : min et max doivent être des entiers, 1 <= min <= max (reçu : ${JSON.stringify(value)}).`);
-  }
-  return { min, max };
 }
 
 // Entité MINABLE (voir doc/entity-model.md/"Minage", core/mining.js) :

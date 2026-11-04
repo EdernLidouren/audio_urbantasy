@@ -24,6 +24,27 @@ export function rejectUnknownFields(value, allowed, describe, failWith = fail) {
   rejectUnknown(value, allowed, describe, failWith);
 }
 
+// Une fourchette d'entiers { min, max }, ou un entier seul (min = max) :
+// rendue toujours sous la forme { min, max }. `lowest` : le plus petit `min`
+// permis (0 pour une plage de collecte qui peut rester vide). Un entier seul
+// vaut toujours au moins 1, et `max` aussi : une fourchette qui ne donnerait
+// jamais rien est une erreur de contenu.
+export function parseIntRange(value, describe, { lowest = 1 } = {}) {
+  if (Number.isInteger(value)) {
+    if (value < 1) fail(`${describe} : un entier seul doit valoir au moins 1 (reçu : ${value}).`);
+    return { min: value, max: value };
+  }
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    fail(`${describe} doit être un entier >= 1 ou une fourchette { min, max }.`);
+  }
+  rejectUnknownFields(value, ["min", "max"], describe);
+  const { min, max } = value;
+  if (!Number.isInteger(min) || !Number.isInteger(max) || min < lowest || max < min || max < 1) {
+    fail(`${describe} : min et max doivent être des entiers, ${lowest} <= min <= max et max >= 1 (reçu : ${JSON.stringify(value)}).`);
+  }
+  return { min, max };
+}
+
 // Générique : ne connaît aucun kind par son nom. Cherche kind dans le
 // registre (comme registry[type] pour les types d'entité),
 // puis délègue la validation propre au comportement à son module (voir

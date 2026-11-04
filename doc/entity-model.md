@@ -537,8 +537,9 @@ persiste avec le monde.
   UNE SEULE fois (premier garnissage ou première fouille), jamais regarni ni
   retiré ensuite — une fois vidé, vidé pour de bon (exemple réel :
   `entities/types/broken_computer.js`, qu'on démonte une fois). PLAGE : `face.spawnRanges`
-  (`{ from, to, count?, distribution }`, voir `doc/scene-format.md`) ;
-  collectibles posés AU SOL à des positions VARIÉES — `drawScatteredPosition`
+  (`{ from, to, count?, distribution | entities }`, voir `doc/scene-format.md`) ;
+  `count`, entier ou fourchette `{ min, max }` (0 permis), est tiré d'abord,
+  puis chaque emplacement tire son contenu ; collectibles posés AU SOL à des positions VARIÉES — `drawScatteredPosition`
   (bornes carte, corps bloquants) autour du centre de la plage, re-tirée si
   trop proche d'un collectible déjà posé (`config/tuning-values.js`/
   `spawnMinSpacing`). Chaque collectible posé passe par le MÊME parseur qu'une
@@ -546,7 +547,10 @@ persiste avec le monde.
   comme pour `parseScene`) : archétype du même nom que l'objet s'il existe
   (`apple`), sinon l'archétype générique `item` (voir "Objet au sol
   générique" plus bas). Marqué `spawned: true`
-  (RUNTIME) ; id `spawn-<cycle>-<plage>-<i>`, déterministe.
+  (RUNTIME) ; id `spawn-<cycle>-<plage>-<i>`, déterministe, préfixé de la face
+  sur une scène à deux faces (`spawn-verso-…`) : unique dans le monde.
+  Une plage peut aussi poser des TYPES D'ENTITÉS plutôt que des objets
+  (`entities: { <type>: <poids> }`, jamais un type bloquant) : voir "Minage".
 - **Cycle (quand)** — quotidien : `spawnCycleAt(time)` = index de jour
   depuis l'origine, frontière à `SPAWN_CYCLE_HOUR` (minuit). SIMPLE pour
   commencer : chaque source garnie à chaque cycle, ni plafond ni
@@ -695,10 +699,19 @@ PROVISOIRES, à régler à l'usage. Vérifications : `core/checks/mining.check.j
 
 Le gros rocher est aussi un OBSTACLE (`blocksMovement`) : un minage peut
 barrer une route tant que le joueur n'a pas le kit, et la libérer pour de
-bon une fois l'entité brisée. Il est placé au verso de
+bon une fois l'entité brisée. Il est placé à la main au verso de
 `scenes/old-quarries-underground-1-main.json` (le fond du puits des
-anciennes carrières, x 5). Les trois autres ne sont posés nulle part pour
-l'instant : leurs zones d'apparition restent à établir.
+anciennes carrières, x 5).
+
+Les autres apparaissent par des PLAGES de types (`entities`, voir
+`doc/scene-format.md`/"Scène") : combien d'abord (`count`, une fourchette dont
+le maximum est plafonné au chargement), lesquels ensuite. Chaque nouvelle
+entité garde `spawnEntitySpacing` d'écart avec tout ce qui s'active sur la
+face, posé à la main ou non, pour qu'Entrée frappe toujours sans menu de
+choix ; sans place, l'emplacement reste vide. Le garnissage quotidien remplace
+tout ce que la plage a posé : les rochers brisés reviennent, ceux entamés sont
+remis à neuf, les autres changent de place. Exemple réel : les trois zones du
+même souterrain, en rochers avec du filon en rare.
 
 ## Vente et achat — point de vente et menu à sliders inline
 
