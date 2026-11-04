@@ -89,11 +89,19 @@ export const MOVE_STEP = TUNING_DEFAULTS.moveStep;
 // chargement) ET core/physics/ (résolution au tick) — une seule source.
 export const BODY_RADIUS = 0.25;
 
-// Graine par défaut du PRNG : fixe, jamais Date.now() — le déterminisme
-// s'applique aussi en jeu réel, pas seulement en test. Utilisée pour CHAQUE
-// monde nouvellement créé (première visite) : chaque monde porte son
-// propre flux, jamais un flux de partie entière.
+// Graine d'une partie construite sans en préciser une (vérifications,
+// outils) : fixe, jamais Date.now(). Une vraie partie reçoit la sienne de
+// main.js/createGameSeed, puis la garde (`session.seed`, sauvegardée) : le
+// core ne tire jamais lui-même de graine, même graine + mêmes actions = même
+// état.
 const DEFAULT_SEED = 1;
+
+// Graine d'un monde créé en cours de partie (première visite) : dérivée de
+// celle de la partie et de l'id du monde. Chaque monde porte son propre flux,
+// différent d'une partie à l'autre, et jamais le même que son voisin.
+function worldSeedOf(session, worldId) {
+  return `${session.seed}:${worldId}`;
+}
 
 // Écart minimal entre deux compagnons repositionnés côte à côte (voir
 // repositionCompanions) — réutilise BODY_RADIUS (déjà la référence
@@ -260,8 +268,9 @@ export function deriveAcquiredItems(bag, equipment) {
 }
 
 // Construit une PARTIE avec un premier monde actif. Le joueur démarre à
-// scene.playerStart (filet à 0 déjà géré par parseScene). seed optionnel,
-// transmise au premier monde.
+// scene.playerStart (filet à 0 déjà géré par parseScene). seed optionnel :
+// la graine de la PARTIE, transmise telle quelle au premier monde, et d'où
+// dérivent ceux visités ensuite (worldSeedOf), les compagnons et la météo.
 // Le troisième paramètre est le DÉPART (argent, sac, équipement,
 // compagnons, variables de partie), déjà résolu par
 // core/new-game.js/parseNewGame pour une vraie partie (voir
@@ -277,6 +286,7 @@ export function createInitialState(
 ) {
   const world = createWorldState(scene, seed);
   return {
+    seed,
     // blockedBy : id de l'entité bloquante contre laquelle le joueur bute CE
     // tick, ou null. pushedBy : id de l'entité dont la résolution de
     // chevauchement a forcé le joueur à se déplacer CE tick (cas curatif,
@@ -771,7 +781,7 @@ export function travelToWorld(session, targetId, freshScene = null, { x, side = 
   if (!existingTarget && !freshScene) {
     throw new Error(`travelToWorld: monde "${targetId}" introuvable et aucune scène fournie pour le créer.`);
   }
-  const targetWorld = existingTarget ?? createWorldState(freshScene, DEFAULT_SEED);
+  const targetWorld = existingTarget ?? createWorldState(freshScene, worldSeedOf(session, targetId));
   const arrivalX = x !== undefined ? clamp(x, 0, targetWorld.length) : targetWorld.playerStart;
 
   return {
@@ -800,7 +810,7 @@ export function reloadActiveWorld(session, freshScene) {
   if (freshScene.id !== worldId) {
     throw new Error(`reloadActiveWorld: la scène relue a l'id "${freshScene.id}", attendu "${worldId}".`);
   }
-  const world = createWorldState(freshScene, DEFAULT_SEED);
+  const world = createWorldState(freshScene, worldSeedOf(session, worldId));
   const side = isTwoSided(world) ? session.player.side : "recto";
   const x = clamp(session.player.x, 0, world.length);
   return {

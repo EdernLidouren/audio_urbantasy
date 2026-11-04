@@ -19,6 +19,7 @@ import { reduce } from "../reduce.js";
 import { addMoney } from "../money.js";
 import { INITIAL_TIME } from "../time.js";
 import { prepareLoadedWorld } from "../world-load.js";
+import { SAVE_VERSION, serializeGame, deserializeGame } from "../save.js";
 import { throws } from "../../lib/check.js";
 import { WORLD_A_REGISTRY } from "./helpers.js";
 
@@ -182,4 +183,27 @@ export default function checkWorlds(run) {
   run("chargement : comportement temporaire oublié", false, "temporaryBehavior" in dogIn(loaded));
   const calm = createInitialState(loadScene, 1);
   run("chargement : rien à faire -> même session", calm, prepareLoadedWorld(calm, WORLD_A_REGISTRY));
+
+  // Graine de partie : gardée par la session, sauvegardée, et chaque monde
+  // créé ensuite en dérive son propre flux.
+  const seedSceneOf = (id) => parseScene({ id, titleKey: "scene.demo.name", length: 20, playerStart: 1, entities: [] }, WORLD_A_REGISTRY);
+  const firstScene = seedSceneOf("seed-first");
+  const laterScene = seedSceneOf("seed-later");
+  const otherScene = seedSceneOf("seed-other");
+  const gameWith = (seed) => createInitialState(firstScene, seed);
+  const rngOf = (session, id) => session.worlds[id].rngState;
+  const visited = (seed, scene) => travelToWorld(gameWith(seed), scene.id, scene);
+  run("graine : gardée par la session", 42, gameWith(42).seed);
+  run("graine : sans précision -> fixe", gameWith(undefined).seed, gameWith(undefined).seed);
+  run("graine : monde suivant, même graine -> même flux", rngOf(visited(42, laterScene), laterScene.id), rngOf(visited(42, laterScene), laterScene.id));
+  run("graine : monde suivant, autre graine -> autre flux", true, rngOf(visited(42, laterScene), laterScene.id) !== rngOf(visited(43, laterScene), laterScene.id));
+  run("graine : deux mondes d'une partie -> deux flux", true, rngOf(visited(42, laterScene), laterScene.id) !== rngOf(visited(42, otherScene), otherScene.id));
+  const reloadedWorld = reloadActiveWorld(visited(42, laterScene), laterScene);
+  run("graine : recharger un monde depuis son fichier -> même flux", rngOf(visited(42, laterScene), laterScene.id), rngOf(reloadedWorld, laterScene.id));
+  const roundTrip = deserializeGame(serializeGame(gameWith(42)));
+  run("graine : conservée par la sauvegarde", 42, roundTrip.session.seed);
+  const { seed: _ignored, ...withoutSeed } = gameWith(42);
+  const migrated = deserializeGame({ version: SAVE_VERSION, data: withoutSeed }).session;
+  run("graine : ancienne sauvegarde -> rebouchée", "migrated", migrated.seed);
+  run("graine : ancienne sauvegarde -> monde neuf sans erreur", true, rngOf(travelToWorld(migrated, laterScene.id, laterScene), laterScene.id) !== undefined);
 }

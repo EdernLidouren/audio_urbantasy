@@ -66,8 +66,15 @@ l'équipement (`core/state.js`/`deriveAcquiredItems`), comme pour une
 sauvegarde antérieure aux collections.
 
 Le départ ne concerne que les parties NEUVES : une sauvegarde garde son
-propre sac, son équipement et ses compagnons. La graine de partie, elle,
-reste fixe (`DEFAULT_SEED`, `core/state.js`).
+propre sac, son équipement et ses compagnons.
+
+**Graine.** Chaque partie neuve tire la sienne (`main.js`/`createGameSeed`,
+« Nouvelle partie » comme « Ville test ») et la garde dans `session.seed` : les
+mondes, la météo et les compagnons varient d'une partie à l'autre, et restent
+identiques à la relecture de sa sauvegarde. Le premier monde reçoit la graine
+telle quelle, chaque monde visité ensuite en dérive son propre flux
+(`core/state.js`/`worldSeedOf`). Le core ne tire jamais de graine lui-même : sans
+précision (vérifications, outils), elle vaut `DEFAULT_SEED`.
 
 Vérifications : `core/checks/new-game.check.js` (`runChecks("new-game")`),
 y compris la validité du vrai `config/new-game.js`.

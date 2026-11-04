@@ -46,7 +46,9 @@ La partie (`session`) est sérialisable de bout en bout : elle EST le format de
 sauvegarde, dans une enveloppe versionnée `{ version, data }`
 (`serializeGame`). Chaque monde déjà visité y figure tel qu'il était dans la
 partie : ses entités avec leur type, leurs clés i18n, leurs chemins de sons,
-leurs actions, leurs variables.
+leurs actions, leurs variables. La graine de la partie (`seed`, voir
+`doc/new-game.md`) en fait partie : les mondes encore à visiter en dériveront
+leur flux, même après un rechargement.
 
 **Conséquence à garder en tête** : la relecture d'une sauvegarde
 (`deserializeGame`) ne relit jamais le JSON de la scène. Une scène modifiée

@@ -183,6 +183,14 @@ async function loadStartScene(sceneId) {
   }
 }
 
+// Graine d'une partie neuve : c'est ici, hors du core, qu'entre le seul aléa
+// non seedé. Elle fait varier les mondes, la météo et les compagnons d'une
+// partie à l'autre ; ensuite elle est sauvegardée, et tout en découle de façon
+// déterministe (voir core/state.js/createInitialState).
+function createGameSeed() {
+  return Math.floor(Math.random() * 2 ** 32);
+}
+
 // "Nouvelle partie" (confirmée au préalable si un save existe, voir
 // main-menu.js/activateNewGame) : construit une partie NEUVE sur la scène
 // de départ. ÉCRASEMENT PARESSEUX voulu : n'efface PAS le save disque ici —
@@ -193,7 +201,7 @@ async function startNewGame() {
   const startScene = scene ?? (await loadStartScene(newGame.startSceneId));
   if (!startScene) return;
   scene = startScene;
-  session = createInitialState(startScene, undefined, newGame.start);
+  session = createInitialState(startScene, createGameSeed(), newGame.start);
   enterCity();
 }
 
@@ -210,7 +218,7 @@ async function startNewGame() {
 async function startTestCityGame() {
   const testScene = await loadStartScene("demo");
   if (!testScene) return;
-  session = createInitialState(testScene, undefined, newGame.start);
+  session = createInitialState(testScene, createGameSeed(), newGame.start);
   enterCity();
 }
 

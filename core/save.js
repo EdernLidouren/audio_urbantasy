@@ -772,6 +772,13 @@ function migrateSave(raw) {
     data = { ...data, weather: createInitialWeather("migrated", data.time) };
   }
 
+  // seed : absente d'une sauvegarde antérieure aux graines de partie ->
+  // graine fixe, même politique que la météo ci-dessus. Les mondes déjà
+  // visités gardent leur flux ; elle ne sert qu'à ceux qui restent à créer.
+  if (data.seed === undefined) {
+    data = { ...data, seed: "migrated" };
+  }
+
   // variables (portée "party", voir core/state.js/createInitialState,
   // core/variables.js) : absent d'une sauvegarde antérieure à ce mécanisme
   // -> sac vide `{}`, même politique que perceptionActive/weather ci-dessus.
