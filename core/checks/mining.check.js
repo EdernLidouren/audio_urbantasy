@@ -60,6 +60,32 @@ export default function checkMining(run) {
   run("minage : action mine sans mineable -> rejetée", true, throws(() => parse([{ id: "b", type: "dog", x: 1, interactable: true, action: { kind: "mine" } }])));
   run("minage : le kind mine exige mineable", "mineable", ACTION_KINDS.mine.requires);
 
+  // Butin fixe (`drops`) : ni tirage, ni distribution, tout tombe.
+  const withDrops = (mineable) => [{ id: "b", type: "dog", x: 10, interactable: true, action: { kind: "mine" }, mineable }];
+  run("minage : drops et distribution -> rejeté", true, throws(() => parse(withDrops({ drops: { granite: 1 }, distribution: { items: { granite: 1 } }, hits: 1 }))));
+  run("minage : drops et count -> rejeté", true, throws(() => parse(withDrops({ drops: { granite: 1 }, count: 2, hits: 1 }))));
+  run("minage : drops vide -> rejeté", true, throws(() => parse(withDrops({ drops: {}, hits: 1 }))));
+  run("minage : drops d'un objet inconnu -> rejeté", true, throws(() => parse(withDrops({ drops: { dynamite: 1 }, hits: 1 }))));
+  run("minage : drops de quantité nulle -> rejeté", true, throws(() => parse(withDrops({ drops: { granite: 0 }, hits: 1 }))));
+  run("minage : drops sans hits -> rejeté", true, throws(() => parse(withDrops({ drops: { granite: 1 } }))));
+  {
+    const scene = parseScene({ ...miningRaw, entities: withDrops({ drops: { hematite: 3, quartz: 1 }, hits: 1 }) }, MINING_REGISTRY);
+    const before = createInitialState(scene);
+    const broken = mineEntity(before, "b", MINING_REGISTRY);
+    run("minage : drops -> détruite au dernier coup", "broken", broken.status);
+    run.same("minage : drops -> toutes les quantités tombent, dans l'ordre", ["hematite", "hematite", "hematite", "quartz"], broken.items);
+    run("minage : drops -> autant d'entités au sol", 4, broken.session.worlds[scene.id].entities.filter((e) => e.action && e.action.kind === "pickup").length);
+    run.same("minage : drops -> déterministe", broken.session.worlds[scene.id].entities, mineEntity(before, "b", MINING_REGISTRY).session.worlds[scene.id].entities);
+    // Sauvegarde : le butin fixe survit tel quel, un objet disparu en est retiré.
+    const worldIn = (session) => session.worlds[scene.id];
+    const revived = deserializeGame(serializeGame(before));
+    run.same("minage : drops -> intact après sauvegarde", { hematite: 3, quartz: 1 }, worldIn(revived.session).entities[0].mineable.drops);
+    const staleSave = structuredClone(serializeGame(before));
+    staleSave.data.worlds[scene.id].entities[0].mineable.drops = { hematite: 1, vanished_item: 2 };
+    const repaired = deserializeGame(staleSave);
+    run.same("minage : drops -> objet disparu retiré au chargement", { hematite: 1 }, worldIn(repaired.session).entities[0].mineable.drops);
+  }
+
   // Coups : la résistance est tirée au PREMIER coup, puis décomptée.
   const fresh = createInitialState(miningScene);
   run("minage : entité jamais frappée -> aucune résistance notée", undefined, entityOf(fresh, "boulder-1").hitsLeft);

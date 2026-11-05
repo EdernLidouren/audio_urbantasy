@@ -5,7 +5,7 @@
 
 import { BODY_RADIUS } from "../state.js";
 import { clamp } from "../../lib/math.js";
-import { isBlocking } from "../presence.js";
+import { isBlocking, isPresent } from "../presence.js";
 
 // Sépare deux positions sur l'axe pour atteindre un écart minGap, borné à
 // [0, length]. weightA/weightB pondèrent qui bouge en priorité (0 = ne bouge
@@ -54,6 +54,13 @@ export function resolveEntityOverlaps(entities, length, presenceContext) {
       const a = resolved[i];
       const b = resolved[j];
       if (!isBlocking(a, presenceContext) && !isBlocking(b, presenceContext)) continue;
+      // Une entité DORMANTE n'occupe aucune place, comme si absente : ni elle
+      // ne s'écarte, ni elle n'écarte l'autre. Deux corps qui ne sont jamais là
+      // en même temps peuvent donc partager un même x (un champ de force et sa
+      // doublure hors perception, entities/types/unseen_force_field.js) ; sinon
+      // chacun dériverait d'un rayon, et basculer entre eux laisserait le
+      // joueur de l'autre côté.
+      if (!isPresent(a, presenceContext) || !isPresent(b, presenceContext)) continue;
 
       const { xA, xB } = separate(a.x, 0.5, b.x, 0.5, 2 * BODY_RADIUS, length);
       if (xA !== a.x) resolved[i] = { ...a, x: xA };
@@ -68,7 +75,7 @@ export function resolveEntityOverlaps(entities, length, presenceContext) {
 // tous les mobiles au tick. Une entité NON BLOQUANTE (isBlocking : passable,
 // OU impassable mais DORMANTE — voir core/presence.js) n'a pas de zone
 // d'exclusion propre : seule une paire impliquant AU MOINS UNE entité
-// bloquante est résolue. Une seule passe déterministe (ordre = celui de
+// bloquante, et sans entité dormante, est résolue. Une seule passe déterministe (ordre = celui de
 // `entities`), pas une résolution multi-corps itérative jusqu'à
 // convergence — hors périmètre pour un cas que la conception des scènes évite par
 // construction. Idempotente sur un état déjà sans chevauchement (aucune

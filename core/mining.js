@@ -1,8 +1,8 @@
 // MINAGE — pur, headless. Voir doc/entity-model.md/"Minage".
 //
-// Une entité MINABLE porte `mineable: { distribution, hits, count }` (forme
-// validée par core/entity-parse.js/parseMineable, cascade instance ->
-// archétype). Chaque coup (action "mine" côté vue, view/action-execution.js)
+// Une entité MINABLE porte `mineable: { distribution, hits, count }`, ou
+// `{ drops, hits }` pour un butin FIXE (forme validée par
+// core/entity-parse.js/parseMineable, cascade instance -> archétype). Chaque coup (action "mine" côté vue, view/action-execution.js)
 // lui retire un point de résistance ; au dernier, elle est DÉTRUITE et ce
 // qu'elle renfermait TOMBE AU SOL — une entité éphémère par objet, éparpillée
 // autour d'elle, MÊME geste que la fouille d'un conteneur
@@ -44,6 +44,17 @@ import { applyBreakTriggers } from "./triggers.js";
 //   - `items` : les objets tombés ("broken" seulement, peut être vide) ;
 //   - `fired` : les effets de RENDU de ses triggers de destruction, par entité,
 //     à rejouer par la vue (même forme que core/triggers.js/applyDueTriggers).
+// Ce qui tombe à la destruction. Un butin fixe ne tire rien : le PRNG de la
+// face n'avance pas.
+function drawLoot(mineable, rngState) {
+  if (mineable.drops) {
+    const items = Object.entries(mineable.drops).flatMap(([item, quantity]) => Array(quantity).fill(item));
+    return { items, rngState };
+  }
+  const count = drawIntInRange(mineable.count, rngState);
+  return drawItems(mineable.distribution, count.value, count.rngState);
+}
+
 export function mineEntity(session, entityId, registry) {
   const world = session.worlds[session.activeWorldId];
   const side = session.player.side;
@@ -68,8 +79,7 @@ export function mineEntity(session, entityId, registry) {
     return { session: updateActiveFace(session, { entities, rngState }, side), status: "hit", strike, items: [], fired: [] };
   }
 
-  const count = drawIntInRange(entity.mineable.count, rngState);
-  const drawn = drawItems(entity.mineable.distribution, count.value, count.rngState);
+  const drawn = drawLoot(entity.mineable, rngState);
   const triggered = applyBreakTriggers(updateActiveFace(session, { rngState: drawn.rngState }, side), entity, side);
   let nextSession = removeEntity(triggered.session, entityId);
   for (const item of drawn.items) {

@@ -259,6 +259,21 @@ lecture que `hasImprovement` (`context.session.emotes`, repli à faux sans
 chargement, et MÊME court-circuit debug : en mode debug, toujours vraie.
 Lue aussi par la vue pour lister les émotes du menu (`view/emotes.js`).
 
+### `hasObserved` — le joueur a observé un TYPE d'entité
+
+```js
+{ type: "hasObserved", id: "sacrystal" }
+```
+
+Vraie si le type d'entité `id` figure dans `session.observedEntityTypes` : le
+fait neutre noté par Espace ou par l'effet `"markObserved"`, celui que lit le
+bestiaire (`doc/collections.md`). Repli à faux sans `session`, et PAS de
+court-circuit debug : répondre toujours vrai ferait disparaître en debug les
+entités qui s'en servent. `id` : sa forme se vérifie au chargement, l'existence
+du type à l'audit du contenu (le registre est injecté, comme pour la cible d'un
+`teleport`). Exemple réel : `entities/types/sacrystal.js`, présent tant qu'il
+n'a pas été observé.
+
 ### `perceptionActive` — perception surnaturelle active
 
 ```js
@@ -1162,7 +1177,9 @@ Aucun paramètre sur l'action elle-même, mais l'entité DOIT avoir un
 chargement). Chaque activation est un coup ; la résistance (`hits`) est
 tirée au premier, et au dernier l'entité est retirée du monde, ses objets
 (`count` tirages dans `distribution`) tombés au sol en éphémères, et ses
-triggers `"break"` tirent (voir "Triggers"). Effet d'état : `core/mining.js`/
+triggers `"break"` tirent (voir "Triggers"). Un butin fixe s'écrit `drops` à
+la place de `distribution` et `count` (`entities/types/blood_pyramidion.js`).
+Effet d'état : `core/mining.js`/
 `mineEntity`. Retour : le son positionné de l'entité (rôle `hit`, `break` au
 dernier coup) sous le son méta du geste, sans annonce. Détail :
 `doc/entity-model.md`/"Minage".
@@ -1420,6 +1437,19 @@ laisse `session.improvements` à une RÉFÉRENCE INCHANGÉE).
 au chargement, portée PARTIE sans champ `scope`, appliqués par
 `applyActionEffects` dans le même passage que les autres effets d'état,
 idempotents.
+
+### `"markObserved"` — le type de l'entité compte comme observé, état, CORE
+
+```js
+{ type: "markObserved" }
+```
+
+Sans champ : note le type de l'entité qui porte l'action dans
+`session.observedEntityTypes`, MÊME fait que la touche Espace (voir
+`core/observations.js`, `doc/collections.md`). Une découverte du bestiaire
+s'annonce donc de la même façon. Il ne dit rien par lui-même : le contenu déclare
+ce qu'il faut entendre. Exemple réel : `entities/types/sacrystal.js`, où Entrée
+annonce la description puis note l'observation.
 
 ### `"startle"` — l'entité s'enfuit, état, CORE
 

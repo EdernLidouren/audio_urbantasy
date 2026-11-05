@@ -71,7 +71,11 @@ import dieselElectricGenerator from "./diesel_electric_generator.js";
 import boulder from "./boulder.js";
 import dog from "./dog.js";
 import door from "./door.js";
+import bloodPyramidion from "./blood_pyramidion.js";
 import floodedGallery from "./flooded_gallery.js";
+import forceField from "./force_field.js";
+import sacrystal from "./sacrystal.js";
+import unseenForceField from "./unseen_force_field.js";
 import fountain from "./fountain.js";
 import geode from "./geode.js";
 import ghost from "./ghost.js";
@@ -155,7 +159,11 @@ export default {
   boulder,
   dog,
   door,
+  blood_pyramidion: bloodPyramidion,
   flooded_gallery: floodedGallery,
+  force_field: forceField,
+  sacrystal,
+  unseen_force_field: unseenForceField,
   fountain,
   geode,
   ghost,

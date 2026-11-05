@@ -166,6 +166,9 @@
   "assets/sounds/decor/creepy_bell": [
     "assets/sounds/decor/creepy_bell_1.mp3"
   ],
+  "assets/sounds/decor/force_field_1_beacon": [
+    "assets/sounds/decor/force_field_1_beacon_1.mp3"
+  ],
   "assets/sounds/decor/gear_1_beacon": [
     "assets/sounds/decor/gear_1_beacon_1.mp3"
   ],
@@ -405,6 +408,9 @@
     "assets/sounds/effects/electrical_flickering_6.mp3",
     "assets/sounds/effects/electrical_flickering_7.mp3"
   ],
+  "assets/sounds/effects/force_field_collision": [
+    "assets/sounds/effects/force_field_collision_1.mp3"
+  ],
   "assets/sounds/effects/geode_mining": [
     "assets/sounds/effects/geode_mining_1.mp3",
     "assets/sounds/effects/geode_mining_2.mp3",
@@ -418,6 +424,9 @@
   ],
   "assets/sounds/effects/ghostly_apparition": [
     "assets/sounds/effects/ghostly_apparition_1.mp3"
+  ],
+  "assets/sounds/effects/laser_beam_1_beacon": [
+    "assets/sounds/effects/laser_beam_1_beacon_1.mp3"
   ],
   "assets/sounds/effects/light_switch_off": [
     "assets/sounds/effects/light_switch_off_1.mp3"
@@ -544,6 +553,9 @@
   ],
   "assets/sounds/entities/npc_beacon": [
     "assets/sounds/entities/npc_beacon_1.mp3"
+  ],
+  "assets/sounds/entities/sacrystal_1_beacon": [
+    "assets/sounds/entities/sacrystal_1_beacon_1.mp3"
   ],
   "assets/sounds/entities/spectral_wolf_growl": [
     "assets/sounds/entities/spectral_wolf_growl_1.mp3"

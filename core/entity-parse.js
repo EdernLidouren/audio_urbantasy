@@ -80,7 +80,10 @@ function validateVocalRules(rules, describe, failWith) {
 // `tuning` d'instance, premier niveau d'archétype.
 const TRANSITION_SOUND_NATURES = ["diegetic", "meta"];
 function validateTuningValues(holder, describe, failWith = fail) {
-  const { beaconFadeMs, beaconFadeRate, transitionSoundNature, messageRotationMinutes } = holder;
+  const { beaconFadeMs, beaconFadeRate, presenceExitFadeMs, transitionSoundNature, messageRotationMinutes } = holder;
+  if (presenceExitFadeMs !== undefined && !(Number.isFinite(presenceExitFadeMs) && presenceExitFadeMs >= 0)) {
+    failWith(`${describe}.presenceExitFadeMs doit être un nombre de ms >= 0 (reçu : ${JSON.stringify(presenceExitFadeMs)}).`);
+  }
   if (beaconFadeMs !== undefined && !(Number.isFinite(beaconFadeMs) && beaconFadeMs >= 0)) {
     failWith(`${describe}.beaconFadeMs doit être un nombre de ms >= 0 (reçu : ${JSON.stringify(beaconFadeMs)}).`);
   }
@@ -366,14 +369,37 @@ function parseMineable(mineable, at) {
   if (typeof mineable !== "object" || mineable === null || Array.isArray(mineable)) {
     fail(`${at} : mineable doit être un objet si présent.`);
   }
-  rejectUnknownFields(mineable, ["distribution", "hits", "count"], `${at} : mineable`);
-  validateDistribution(mineable.distribution, `${at} : mineable.distribution`, fail);
+  rejectUnknownFields(mineable, ["distribution", "hits", "count", "drops"], `${at} : mineable`);
   if (mineable.hits === undefined) fail(`${at} : mineable.hits manquant (nombre de coups avant destruction).`);
+  // Butin FIXE : aucun tirage, donc ni distribution ni nombre de tirages. Les
+  // deux formes s'excluent : aucune règle de priorité à retenir.
+  if (mineable.drops !== undefined) {
+    if (mineable.distribution !== undefined || mineable.count !== undefined) {
+      fail(`${at} : mineable.drops exclut distribution et count (butin fixe, aucun tirage).`);
+    }
+    return { drops: parseMineableDrops(mineable.drops, `${at} : mineable.drops`), hits: parseIntRange(mineable.hits, `${at} : mineable.hits`) };
+  }
+  validateDistribution(mineable.distribution, `${at} : mineable.distribution`, fail);
   return {
     distribution: mineable.distribution,
     hits: parseIntRange(mineable.hits, `${at} : mineable.hits`),
     count: mineable.count === undefined ? { min: 1, max: 1 } : parseIntRange(mineable.count, `${at} : mineable.count`),
   };
+}
+
+// Butin fixe d'une entité minable : { <objet>: <quantité> }, tous livrés à
+// la destruction.
+function parseMineableDrops(drops, at) {
+  if (typeof drops !== "object" || drops === null || Array.isArray(drops) || Object.keys(drops).length === 0) {
+    fail(`${at} doit être un objet { <objet>: <quantité> } non vide.`);
+  }
+  for (const [item, quantity] of Object.entries(drops)) {
+    if (!Object.hasOwn(ITEM_REGISTRY, item)) fail(`${at} : objet "${item}" absent de ITEM_REGISTRY.`);
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      fail(`${at}.${item} doit être un entier > 0 (reçu : ${JSON.stringify(quantity)}).`);
+    }
+  }
+  return drops;
 }
 
 // Point de vente (voir doc/entity-model.md/"Vente et achat") : { catalog }.

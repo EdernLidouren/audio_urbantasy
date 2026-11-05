@@ -32,7 +32,8 @@ gardent leur propre système (`core/improvements.js`).
 - Contenu de test : neuf minéraux, un par son, au verso de la démo 3 (x 12 à
   44), pour juger les sons à l'oreille.
 - **`supernatural`** — le bestiaire : le ghosten (rue commerçante, après
-  l'éclatement du néon défectueux), le Cumulo Lupus et le miravi. Chaque
+  l'éclatement du néon défectueux), le Cumulo Lupus, le miravi et le sacristal
+  (galerie inondée, côté miroir, qui disparaît une fois découvert). Chaque
   entrée est un TYPE d'entité, découvert à sa première observation (Espace) :
   il faut approcher l'entité, perception surnaturelle active. Fiches
   provisoires (textes « à venir »).
@@ -111,8 +112,12 @@ ensemble aux fonctions de `core/collections.js` (`discoveryFacts(session)`) ;
 seul le test de découverte choisit le bon. La découverte s'annonce juste
 APRÈS la description.
 
-Pas de condition « entrée découverte » ou « collection complète » dans le
-format déclaratif pour l'instant.
+Le format déclaratif lit et écrit ce fait, condition `hasObserved` et effet
+`markObserved` (`doc/scripting.md`) : une entité peut ainsi se découvrir à
+l'activation autant qu'à l'observation, et disparaître ensuite
+(`entities/types/sacrystal.js`). Pas de condition « entrée découverte » ou
+« collection complète » : le core ne connaît pas les collections, et
+`hasObserved` dit la même chose pour une entrée d'entité.
 
 ## Textes
 

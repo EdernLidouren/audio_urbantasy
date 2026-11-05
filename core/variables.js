@@ -29,6 +29,7 @@
 // d'un second point d'entrée générique côté vue (view/effect-runner.js/
 // runEffects délègue TOUS les effets d'état ICI, en un seul appel).
 
+import { markObserved } from "./observations.js";
 import { giveImprovement, removeImprovement } from "./improvements.js";
 import { learnEmote, forgetEmote } from "./emotes.js";
 import { TICK_MS } from "../lib/loop.js";
@@ -219,6 +220,13 @@ export function applyActionEffects(effects, context) {
     if (effect.type === "forgetEmote") {
       if (!ctx.session) return ctx;
       return { ...ctx, session: { ...ctx.session, emotes: forgetEmote(ctx.session.emotes, effect.id) } };
+    }
+    // markObserved : le type de l'entité qui porte l'action compte comme
+    // observé (core/observations.js), MÊME fait que la touche Espace : une
+    // éventuelle découverte s'annonce donc de la même façon (view/discoveries.js).
+    if (effect.type === "markObserved") {
+      if (!ctx.session || !ctx.entity) return ctx;
+      return { ...ctx, session: markObserved(ctx.session, ctx.entity.type) };
     }
     // startle : l'entité qui porte l'action s'enfuit — même drapeau que la
     // fuite à l'approche (voir core/startle.js, qui le lit et le retire au

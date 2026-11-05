@@ -329,7 +329,7 @@ function dropUnknownItems(data) {
 // référence, jamais la partie.
 //   - distribution invalide -> `distribution: null`, la source ne donne plus
 //     rien (core/spawn.js) ;
-//   - objet inconnu dans un stock tiré -> retiré du stock ;
+//   - objet inconnu dans un stock tiré ou un butin fixe -> retiré ;
 //   - catalogue invalide -> `catalog: null`, rayon vide (core/catalog.js) ;
 //   - table de présentoir invalide -> `distribution: null`, le présentoir
 //     n'expose plus rien (core/display.js/drawOffer) ;
@@ -361,7 +361,17 @@ function repairEntityReferences(entity, report) {
       next = { ...next, container: { ...next.container, distribution: null } };
     }
   }
-  if (entity.mineable && entity.mineable.distribution !== null) {
+  // Butin fixe : pas de distribution à valider, seulement ses objets.
+  if (entity.mineable && entity.mineable.drops) {
+    const drops = Object.entries(entity.mineable.drops).filter(([item]) => {
+      if (Object.hasOwn(ITEM_REGISTRY, item)) return true;
+      report(entity.id, `objet ${JSON.stringify(item)} retiré du butin, absent de ITEM_REGISTRY.`);
+      return false;
+    });
+    if (drops.length !== Object.keys(entity.mineable.drops).length) {
+      next = { ...next, mineable: { ...next.mineable, drops: Object.fromEntries(drops) } };
+    }
+  } else if (entity.mineable && entity.mineable.distribution !== null) {
     const problem = validationProblem(validateDistribution, entity.mineable.distribution, "mineable.distribution");
     if (problem) {
       report(entity.id, problem);

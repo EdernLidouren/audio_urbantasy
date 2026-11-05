@@ -9,5 +9,5 @@
 export default {
   // Son d'interface joué à chaque nouvelle découverte de cette collection.
   discoverySound: "assets/sounds/ui/supernatural_reward",
-  entries: [{ entity: "ghosten" }, { entity: "cumuloLupus" }, { entity: "miravi" }],
+  entries: [{ entity: "ghosten" }, { entity: "cumuloLupus" }, { entity: "miravi" }, { entity: "sacrystal" }],
 };

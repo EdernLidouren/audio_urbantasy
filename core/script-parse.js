@@ -148,6 +148,7 @@ const ACTION_EFFECT_FIELDS = {
   temporaryBehavior: ["behavior", "durationMs"],
   dormantUntil: ["hour"],
   spawn: ["spec"],
+  markObserved: [],
   wait: ["ms", "variationMs"],
   playSound: ["path", "role", "gain", "pitchVariation", "reverbSend", "at", "nature", "tracked"],
   stopSounds: ["role"],
@@ -278,6 +279,12 @@ function parseActionEffect(rawEffect, describe, entityVariables, sceneVariables)
       fail(`${describe}.variationMs doit être un nombre entre 0 et ms (${rawEffect.ms}) si présent.`);
     }
     return variationMs ? { type: "wait", ms: rawEffect.ms, variationMs } : { type: "wait", ms: rawEffect.ms };
+  }
+  // "markObserved" (sans champ) — ÉTAT : le type de l'entité qui porte l'action
+  // compte comme observé, sans passer par Espace (voir core/observations.js,
+  // core/variables.js/applyActionEffects).
+  if (type === "markObserved") {
+    return { type: "markObserved" };
   }
   // "startle" (sans champ) — ÉTAT : l'entité qui porte l'action s'enfuit
   // (voir core/startle.js, core/variables.js/applyActionEffects).
@@ -588,6 +595,13 @@ export function validateCondition(cond, describe, entityVariables, sceneVariable
   // (core/emotes.js/EMOTE_REGISTRY).
   if (cond.type === "knowsEmote" && (!isNonEmptyString(cond.id) || !EMOTE_REGISTRY[cond.id])) {
     fail(`${describe}.id "${cond.id}" absent du registre d'émotes.`);
+  }
+  // "hasObserved" : un type d'entité, dont le registre est injecté et n'arrive
+  // pas jusqu'ici. Seule la FORME se vérifie au chargement ; l'existence du
+  // type, à l'audit du contenu (tools/content-audit.js), comme la cible d'un
+  // teleport.
+  if (cond.type === "hasObserved" && !isNonEmptyString(cond.id)) {
+    fail(`${describe}.id doit être un type d'entité non vide (reçu : ${JSON.stringify(cond.id)}).`);
   }
   // "weather" : EN PLUS de son type, son champ `state` référence un état de
   // la table météo (config/weather-values.js/WEATHER_STATES) — même

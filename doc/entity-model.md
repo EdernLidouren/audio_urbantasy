@@ -653,6 +653,10 @@ renfermait tombe au sol. Moteur : `core/mining.js`/`mineEntity`, pur.
   et sauvegardé avec la partie, comme le nombre de coups déjà portés
   (`strikes`). Une entité jamais frappée ne porte rien de
   plus que sa scène.
+- **Butin fixe** — `drops: { <objet>: <quantité> }`, à la place de
+  `distribution` et `count` (les deux formes s'excluent, refus au chargement) :
+  tout tombe, sans aucun tirage. Exemple réel :
+  `entities/types/blood_pyramidion.js`.
 - **Butin** — à la destruction, `count` (fourchette, défaut 1) tirages dans
   `distribution` (même forme qu'une distribution de collecte, voir
   "Collecte" : `{ table }`, `{ items }`, `{ tables }`, issue `nothing`
@@ -700,6 +704,9 @@ donne :
 | `geode` (géode) | `geode` : cristaux, pierres précieuses, la géode entière | 1 : 5 | 4 à 7 | 2 à 3 |
 | `large_boulder` (gros rocher) | `boulder`, comme le rocher | 1 : 1 | 5 à 6 | 2 à 4 |
 
+Hors de ces tables, `blood_pyramidion` (pyramidion sanglant, surnaturel) a un
+butin FIXE : 3 coups, 3 hématites et 1 cristal de roche.
+
 Dans chaque table, un minéral pèse selon SA rareté de collection (niveaux
 de `RARITY_LEVELS`). Le météorite de fer et la fulgurite n'y sont pas :
 ils naîtront d'apparitions particulières. Résistances et nombres d'objets
@@ -712,6 +719,15 @@ bon une fois l'entité brisée. Il est placé à la main au verso de
 anciennes carrières, x 5) et sur les deux faces de
 `scenes/old-quarries-underground-1-flooded-gallery.json`, où les deux rochers
 (x 12 au verso, puis x 17 au recto) ouvrent tour à tour la suite du parcours.
+
+Une énigme de minage, côté miroir de cette même galerie
+(`scenes/old-quarries-underground-1-flooded-gallery-mirror-side.json`) : trois
+pyramidions sanglants, chacun doublé d'un `sound_emitter` pour son rayon,
+alimentent deux champs de force autour du sacristal. Chaque destruction écrit
+un drapeau de scène par son trigger `"break"` : le sien coupe son rayon, les
+trois ensemble éteignent les champs. Le champ `force_field` est surnaturel, donc
+absent hors perception : un `unseen_force_field` lui est superposé, muet et
+inobservable, pour qu'on ne le franchisse pas en coupant sa perception.
 
 Les autres apparaissent par des PLAGES de types (`entities`, voir
 `doc/scene-format.md`/"Scène") : combien d'abord (`count`, une fourchette dont
@@ -1419,6 +1435,9 @@ voir "Paramètres sonores" plus bas) et même catégorie de préférence volume
 que le beacon ("Volume des balises" — ces sons accompagnent la présence
 d'une entité comme le beacon lui-même).
 
+Une bascule de présence coupe le beacon net, sauf si l'entité déclare un fondu
+de sortie (`presenceExitFadeMs`, exemple réel : `entities/types/sacrystal.js`).
+
 Ordre à la bascule (`view/audio/entity-audio.js`/`applyEntityAudio`) :
 `exitSound` joué AVANT l'arrêt du beacon (Howl entièrement séparé — l'arrêt
 du beacon ne coupe jamais le one-shot en cours) ; `enterSound` joué AVANT la
@@ -1804,6 +1823,9 @@ code. Consulter directement ce fichier pour la valeur courante d'un défaut.
   par défaut à tout démarrage groupé.
 - **`beaconFadeMs`** — durée (ms) du fondu d'une balise CONTINUE dont la
   condition bascule, défaut 0 (coupure franche). Voir "Sons conditionnels".
+  Nombre >= 0, vérifié au chargement.
+- **`presenceExitFadeMs`** — durée (ms) du fondu de la balise CONTINUE quand
+  l'entité disparaît, défaut 0 (coupure franche). Voir "Sons de transition".
   Nombre >= 0, vérifié au chargement.
 - **`beaconFadeRate`** — vitesse de lecture de cette balise au bas de son
   fondu, défaut 1 (le fondu ne touche que le volume). Nombre > 0, vérifié

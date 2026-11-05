@@ -7,6 +7,7 @@
 // DOM, aucun fetch ; chaque scène est construite en dur via un objet
 // littéral passé à parseScene.
 
+import { resolveEntityOverlaps } from "../physics/overlap.js";
 import { parseScene } from "../scene.js";
 import { createInitialState, getActiveWorld, applyEntityActionEffects } from "../state.js";
 import { tick } from "../actions.js";
@@ -36,6 +37,20 @@ function entityOf(state, id) {
 const BURST = [{ type: "dormantUntil", hour: 22 }];
 
 export default function checkDormancy(run) {
+  // Une entité dormante n'écarte personne : un corps et sa doublure, jamais
+  // présents ensemble, gardent le même x (core/physics/overlap.js).
+  {
+    const context = { perceptionActive: true };
+    const seen = { id: "seen", x: 15, blocksMovement: true, presence: [{ when: { type: "perceptionActive" }, effects: [{ type: "presence", present: true }] }] };
+    const unseen = { id: "unseen", x: 15, blocksMovement: true, presence: [{ when: { type: "not", condition: { type: "perceptionActive" } }, effects: [{ type: "presence", present: true }] }] };
+    const passer = { id: "passer", x: 15 };
+    const xs = (entities, ctx) => resolveEntityOverlaps(entities, 40, ctx).map((e) => e.x).join(",");
+    run("recouvrement : un corps présent et un dormant au même x -> aucun écart", "15,15", xs([seen, unseen], context));
+    run("recouvrement : idem une fois la perception coupée", "15,15", xs([seen, unseen], {}));
+    run("recouvrement : un corps présent écarte toujours un passant présent", "14.75,15.25", xs([{ id: "wall", x: 15, blocksMovement: true }, passer], context));
+    run("recouvrement : un passant dormant n'est pas écarté", "15,15", xs([{ id: "wall", x: 15, blocksMovement: true }, { ...unseen, blocksMovement: false }], context));
+  }
+
   // --- Échéance : le prochain début de l'heure, strictement après ---
   run("nextHourStart : à 23 h 10, le 22 h du lendemain", MINUTES_PER_DAY + 22 * HOUR, nextHourStart(23 * HOUR + 10, 22));
   run("nextHourStart : à 3 h, le 22 h du soir même", 22 * HOUR, nextHourStart(3 * HOUR, 22));

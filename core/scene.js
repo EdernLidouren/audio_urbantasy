@@ -40,7 +40,9 @@ const DEFAULT_SCENE_LENGTH = 10;
 // playerStart plus bas, un console.warn clair, jamais un fail(). Une
 // entité passable n'a pas de zone d'exclusion propre (voir
 // core/physics/overlap.js/resolveOverlaps) : seules les paires impliquant au moins
-// une entité impassable sont vérifiées.
+// une entité impassable sont vérifiées. Une paire dont un membre a des règles
+// de présence ne l'est pas : deux corps peuvent se partager un x en n'étant
+// jamais là ensemble, et lire ces règles ne se fait pas ici.
 function warnOnOverlaps(entities, playerStart) {
   for (let i = 0; i < entities.length; i++) {
     const a = entities[i];
@@ -51,7 +53,7 @@ function warnOnOverlaps(entities, playerStart) {
     }
     for (let j = i + 1; j < entities.length; j++) {
       const b = entities[j];
-      if (a.blocksMovement && b.blocksMovement && Math.abs(a.x - b.x) < 2 * BODY_RADIUS) {
+      if (a.blocksMovement && b.blocksMovement && !a.presence && !b.presence && Math.abs(a.x - b.x) < 2 * BODY_RADIUS) {
         console.warn(
           `parseScene: entités impassables "${a.id}" (x=${a.x}) et "${b.id}" (x=${b.x}) se chevauchent au chargement.`
         );

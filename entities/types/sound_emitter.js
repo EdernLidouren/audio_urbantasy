@@ -14,7 +14,8 @@
 //     pour SUPERPOSER deux balises continues sans dupliquer un objet qu'on
 //     pourrait annoncer ou décrire deux fois. Client : le souffle du puits
 //     sous le chevalement des anciennes carrières (mine_shaft_emitter_1_r
-//     et _v dans scenes/old-quarries.json).
+//     et _v dans scenes/old-quarries.json), le rayon de chaque pyramidion
+//     (laser_beam_* dans scenes/old-quarries-underground-1-flooded-gallery-mirror-side.json).
 // nameKey requis par le format, jamais lu à l'oreille.
 export default {
   nameKey: "entity.sound_emitter.name",

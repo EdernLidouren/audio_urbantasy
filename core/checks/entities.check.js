@@ -274,6 +274,8 @@ export default function checkEntities(run) {
   run("fondu de balise : vitesse négative refusée (tuning)", true, entityMessage({ tuning: { beaconFadeRate: -1 } }).includes("beaconFadeRate"));
   run("fondu de balise : durée négative refusée", true, entityMessage({ sounds: { beacon: { beaconFadeMs: -100 } } }).includes("beaconFadeMs"));
   run("fondu de balise : durée non numérique refusée", true, entityMessage({ tuning: { beaconFadeMs: "3000" } }).includes("beaconFadeMs"));
+  run("fondu de disparition : durée valide acceptée", "accepté", entityMessage({ tuning: { presenceExitFadeMs: 500 } }));
+  run("fondu de disparition : durée négative refusée", true, entityMessage({ tuning: { presenceExitFadeMs: -1 } }).includes("presenceExitFadeMs"));
   run("son de passage : nature meta acceptée", "accepté", entityMessage({ tuning: { transitionSound: "assets/sounds/b", transitionSoundNature: "meta" } }));
   run("son de passage : nature inconnue refusée", true, entityMessage({ tuning: { transitionSoundNature: "positioned" } }).includes("transitionSoundNature"));
   const registryThrows = (registry) => {

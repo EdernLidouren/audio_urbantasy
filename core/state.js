@@ -416,7 +416,7 @@ export function markConsumed(session, entityId) {
 // voir core/variables.js/applyActionEffects) : les SEULS repris de
 // `result.session`, pour une entité comme pour un compagnon. Un effet qui
 // écrirait un nouveau champ de partie l'ajoute ICI, une seule fois.
-const PARTY_EFFECT_FIELDS = ["variables", "improvements", "emotes"];
+const PARTY_EFFECT_FIELDS = ["variables", "improvements", "emotes", "observedEntityTypes"];
 
 // Les champs de partie écrits par les effets, à étaler sur la session
 // suivante ; rien si la partie n'a pas bougé (ils traversent alors par

@@ -4,11 +4,14 @@
 // via un objet littéral passé à parseScene.
 
 import { parseScene } from "../scene.js";
-import { createInitialState } from "../state.js";
+import { createInitialState, applyEntityActionEffects } from "../state.js";
 import { SAVE_VERSION, serializeGame, deserializeGame } from "../save.js";
 import { addItem, removeItem } from "../bag.js";
 import { ITEM_REGISTRY } from "../items.js";
 import { markObserved } from "../observations.js";
+import { evaluateCondition } from "../presence.js";
+import { validateCondition } from "../script-parse.js";
+import { applyActionEffects } from "../variables.js";
 import {
   discoveryFacts,
   validateCollection,
@@ -92,6 +95,41 @@ export default function checkCollections(run) {
   run("bestiaire : champ inconnu refusé", true, collCollectionThrows({ entries: [{ entity: "spectre", rarity: 3 }] }));
   run("bestiaire : doublon refusé", true, collCollectionThrows({ entries: [{ entity: "wisp" }, { entity: "wisp" }] }));
   run("bestiaire : départ -> rien d'observé", 0, Object.keys(collFreshCollections.observedEntityTypes).length);
+  // Condition "hasObserved" et effet "markObserved" : le même fait, lu par le
+  // format déclaratif.
+  {
+    const cond = { type: "hasObserved", id: "spectre" };
+    const session = collFreshCollections;
+    run("hasObserved : type jamais observé -> faux", false, evaluateCondition(cond, { session }));
+    run("hasObserved : type observé -> vrai", true, evaluateCondition(cond, { session: markObserved(session, "spectre") }));
+    run("hasObserved : autre type observé -> faux", false, evaluateCondition(cond, { session: markObserved(session, "wisp") }));
+    run("hasObserved : sans session -> faux", false, evaluateCondition(cond, {}));
+    run("hasObserved : id manquant -> rejeté", true, throws(() => validateCondition({ type: "hasObserved" }, "cond")));
+    run("hasObserved : champ inconnu -> rejeté", true, throws(() => validateCondition({ type: "hasObserved", id: "spectre", state: 1 }, "cond")));
+    const sceneWithEffect = (effect) =>
+      parseScene(
+        {
+          id: "observed-check",
+          titleKey: "scene.demo.name",
+          length: 10,
+          playerStart: 1,
+          entities: [{ id: "s-1", type: "spectre", x: 5, interactable: true, action: { kind: "applyEffects", effects: [effect] } }],
+        },
+        ENTITY_REGISTRY
+      );
+    const effects = sceneWithEffect({ type: "markObserved" }).entities[0].action.effects;
+    run("markObserved : champ en trop -> rejeté", true, throws(() => sceneWithEffect({ type: "markObserved", id: "spectre" })));
+    const applied = applyActionEffects(effects, { session, entity: { id: "s-1", type: "spectre" } });
+    run("markObserved : note le type de l'entité porteuse", true, Boolean(applied.session.observedEntityTypes.spectre));
+    run("markObserved : découvre l'entrée du bestiaire", true, evaluateCondition(cond, { session: applied.session }));
+    // Le vrai chemin d'une activation : l'effet doit traverser jusqu'à la session.
+    const activationScene = sceneWithEffect({ type: "markObserved" });
+    const activated = applyEntityActionEffects(createInitialState(activationScene), "s-1", effects);
+    run("markObserved : à l'activation, écrit dans la session", true, evaluateCondition(cond, { session: activated }));
+    const noEntity = applyActionEffects(effects, { session });
+    run("markObserved : sans entité -> session inchangée", true, Object.is(noEntity.session, session));
+  }
+
   const seen = markObserved(collFreshCollections, "spectre");
   run("bestiaire : markObserved note le type", true, Boolean(seen.observedEntityTypes.spectre));
   run("bestiaire : déjà observé -> MÊME session", true, Object.is(markObserved(seen, "spectre"), seen));

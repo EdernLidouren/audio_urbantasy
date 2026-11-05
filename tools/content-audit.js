@@ -8,6 +8,7 @@
 //     registre des types d'entité lui-même est valide ;
 //   - chaque cible de "teleport", chaque scène de la carte de la ville et la
 //     scène de départ existent dans scenes/index.js ;
+//   - chaque type lu par une condition "hasObserved" existe ;
 //   - les scènes principales (MAIN_SCENE_IDS) existent, chaque case de la
 //     carte pointe vers l'une d'elles, et une action "confirm" ne relie que
 //     deux d'entre elles (la préférence confirmSceneChange porte sur les
@@ -194,6 +195,9 @@ export async function auditContent() {
       (object, where) => {
         if (object.type === "teleport" && typeof object.target === "string" && !sceneExists(object.target)) {
           report(source, where, "scène cible inconnue", object.target);
+        }
+        if (object.type === "hasObserved" && !Object.hasOwn(registry, object.id)) {
+          report(source, where, "type d'entité inconnu", object.id);
         }
       }
     );

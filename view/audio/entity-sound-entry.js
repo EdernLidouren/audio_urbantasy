@@ -345,6 +345,7 @@ export function buildEntitySoundEntry(entity, session, { otherFace = false, disa
     // présence.
     beaconFadeMs: beacon ? resolveTuning("beaconFadeMs", entity, beacon) : 0,
     beaconFadeRate: beacon ? resolveTuning("beaconFadeRate", entity, beacon) : 1,
+    presenceExitFadeMs: beacon ? resolveTuning("presenceExitFadeMs", entity, beacon) : 0,
     beaconEnvelope: null,
     perceptionGated: isPerceptionGated(entity),
     ...movementFields,

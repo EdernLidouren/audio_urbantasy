@@ -41,6 +41,7 @@ export const STATE_EFFECT_TYPES = [
   "temporaryBehavior",
   "dormantUntil",
   "spawn",
+  "markObserved",
 ];
 export const RENDER_EFFECT_TYPES = ["playSound", "stopSounds", "announce"];
 export const MIXED_EFFECT_TYPES = ["teleport"];

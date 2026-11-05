@@ -280,6 +280,11 @@ export const TUNING_DEFAULTS = {
   // fondu ne touche que le volume. Sans effet si beaconFadeMs vaut 0.
   // Strictement positif ; sous 0.2 environ, le son devient granuleux.
   beaconFadeRate: 1,
+  // Durée (ms) du fondu de la balise CONTINUE quand l'entité DISPARAÎT
+  // (bascule de présence, voir doc/entity-model.md/"Sons de transition"). 0
+  // (défaut) = coupure franche, le cas de presque toutes les entités : leur
+  // disparition est couverte par un exitSound, ou voulue nette.
+  presenceExitFadeMs: 0,
   // Variation de hauteur (fraction du taux de lecture, 0-1) appliquée
   // aléatoirement à chaque lecture d'un son PONCTUEL (balise intermittente
   // ou son de déplacement) : le taux de lecture est tiré uniformément dans

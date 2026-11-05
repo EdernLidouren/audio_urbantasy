@@ -3,6 +3,11 @@
   "titleKey": "scene.old_quarries_underground_1_flooded_gallery_mirror_side.name",
   "length": 30,
   "playerStart": 1,
+  "variables": [
+    { "name": "bloodPyramidion1RectoBroken", "type": "flag", "initial": false },
+    { "name": "bloodPyramidion1VersoBroken", "type": "flag", "initial": false },
+    { "name": "bloodPyramidion2VersoBroken", "type": "flag", "initial": false }
+  ],
   "recto": {
     "indoor": true,
     "weatherAmbience": false,
@@ -17,6 +22,7 @@
       { "from": 11, "to": 23, "surface": "rock" }
     ],
     "entities": [
+      { "id": "flooded_gallery_1_r", "type": "flooded_gallery", "x": 5, "descriptionKey": "flooded_gallery.mirror_side.description" },
       {
         "id": "passage_1_r",
         "type": "passage",
@@ -25,12 +31,42 @@
         "action": { "kind": "switchSide", "arrivalX": 13 }
       },
       {
+        "id": "blood_pyramidion_1_r",
+        "type": "blood_pyramidion",
+        "x": 17,
+        "triggers": [
+          {
+            "on": "break",
+            "effects": [{ "type": "setVariable", "scope": "scene", "name": "bloodPyramidion1RectoBroken", "value": true }]
+          }
+        ]
+      },
+      {
+        "id": "laser_beam_1_r",
+        "type": "sound_emitter",
+        "x": 17,
+        "sounds": { "beacon": { "path": "assets/sounds/effects/laser_beam_1_beacon", "loop": true } },
+        "presence": [
+          {
+            "when": {
+              "type": "allOf",
+              "conditions": [
+                { "type": "perceptionActive" },
+                { "type": "not", "condition": { "type": "variable", "scope": "scene", "name": "bloodPyramidion1RectoBroken", "equals": true } }
+              ]
+            },
+            "present": true
+          }
+        ]
+      },
+      {
         "id": "passage_2_r",
         "type": "passage",
         "x": 22,
         "tuning": { "transitionSurface": "rock" },
         "action": { "kind": "switchSide", "arrivalX": 22 }
-      }
+      },
+      { "id": "flooded_gallery_2_r", "type": "flooded_gallery", "x": 28, "descriptionKey": "flooded_gallery.mirror_side.description" }
     ]
   },
   "verso": {
@@ -48,6 +84,36 @@
       { "from": 21, "to": 28, "surface": "rock" }
     ],
     "entities": [
+      { "id": "flooded_gallery_1_v", "type": "flooded_gallery", "x": 0, "descriptionKey": "flooded_gallery.mirror_side.description" },
+      {
+        "id": "blood_pyramidion_1_v",
+        "type": "blood_pyramidion",
+        "x": 11,
+        "triggers": [
+          {
+            "on": "break",
+            "effects": [{ "type": "setVariable", "scope": "scene", "name": "bloodPyramidion1VersoBroken", "value": true }]
+          }
+        ]
+      },
+      {
+        "id": "laser_beam_1_v",
+        "type": "sound_emitter",
+        "x": 11,
+        "sounds": { "beacon": { "path": "assets/sounds/effects/laser_beam_1_beacon", "loop": true } },
+        "presence": [
+          {
+            "when": {
+              "type": "allOf",
+              "conditions": [
+                { "type": "perceptionActive" },
+                { "type": "not", "condition": { "type": "variable", "scope": "scene", "name": "bloodPyramidion1VersoBroken", "equals": true } }
+              ]
+            },
+            "present": true
+          }
+        ]
+      },
       {
         "id": "passage_1_v",
         "type": "passage",
@@ -56,11 +122,113 @@
         "action": { "kind": "switchSide", "arrivalX": 13 }
       },
       {
+        "id": "force_field_1_v",
+        "type": "force_field",
+        "x": 15,
+        "presence": [
+          {
+            "when": {
+              "type": "allOf",
+              "conditions": [
+                { "type": "perceptionActive" },
+                { "type": "not", "condition": { "type": "hasObserved", "id": "sacrystal" } },
+                { "type": "not", "condition": { "type": "allOf", "conditions": [{ "type": "variable", "scope": "scene", "name": "bloodPyramidion1RectoBroken", "equals": true }, { "type": "variable", "scope": "scene", "name": "bloodPyramidion1VersoBroken", "equals": true }, { "type": "variable", "scope": "scene", "name": "bloodPyramidion2VersoBroken", "equals": true }] } }
+              ]
+            },
+            "present": true
+          }
+        ]
+      },
+      {
+        "id": "unseen_force_field_1_v",
+        "type": "unseen_force_field",
+        "x": 15,
+        "presence": [
+          {
+            "when": {
+              "type": "allOf",
+              "conditions": [
+                { "type": "not", "condition": { "type": "perceptionActive" } },
+                { "type": "not", "condition": { "type": "hasObserved", "id": "sacrystal" } },
+                { "type": "not", "condition": { "type": "allOf", "conditions": [{ "type": "variable", "scope": "scene", "name": "bloodPyramidion1RectoBroken", "equals": true }, { "type": "variable", "scope": "scene", "name": "bloodPyramidion1VersoBroken", "equals": true }, { "type": "variable", "scope": "scene", "name": "bloodPyramidion2VersoBroken", "equals": true }] } }
+              ]
+            },
+            "present": true
+          }
+        ]
+      },
+      { "id": "sacrystal_1_v", "type": "sacrystal", "x": 17 },
+      {
+        "id": "force_field_2_v",
+        "type": "force_field",
+        "x": 19,
+        "presence": [
+          {
+            "when": {
+              "type": "allOf",
+              "conditions": [
+                { "type": "perceptionActive" },
+                { "type": "not", "condition": { "type": "hasObserved", "id": "sacrystal" } },
+                { "type": "not", "condition": { "type": "allOf", "conditions": [{ "type": "variable", "scope": "scene", "name": "bloodPyramidion1RectoBroken", "equals": true }, { "type": "variable", "scope": "scene", "name": "bloodPyramidion1VersoBroken", "equals": true }, { "type": "variable", "scope": "scene", "name": "bloodPyramidion2VersoBroken", "equals": true }] } }
+              ]
+            },
+            "present": true
+          }
+        ]
+      },
+      {
+        "id": "unseen_force_field_2_v",
+        "type": "unseen_force_field",
+        "x": 19,
+        "presence": [
+          {
+            "when": {
+              "type": "allOf",
+              "conditions": [
+                { "type": "not", "condition": { "type": "perceptionActive" } },
+                { "type": "not", "condition": { "type": "hasObserved", "id": "sacrystal" } },
+                { "type": "not", "condition": { "type": "allOf", "conditions": [{ "type": "variable", "scope": "scene", "name": "bloodPyramidion1RectoBroken", "equals": true }, { "type": "variable", "scope": "scene", "name": "bloodPyramidion1VersoBroken", "equals": true }, { "type": "variable", "scope": "scene", "name": "bloodPyramidion2VersoBroken", "equals": true }] } }
+              ]
+            },
+            "present": true
+          }
+        ]
+      },
+      {
         "id": "passage_2_v",
         "type": "passage",
         "x": 22,
         "tuning": { "transitionSurface": "rock" },
         "action": { "kind": "switchSide", "arrivalX": 22 }
+      },
+      {
+        "id": "blood_pyramidion_2_v",
+        "type": "blood_pyramidion",
+        "x": 24,
+        "triggers": [
+          {
+            "on": "break",
+            "effects": [{ "type": "setVariable", "scope": "scene", "name": "bloodPyramidion2VersoBroken", "value": true }]
+          }
+        ]
+      },
+      {
+        "id": "laser_beam_2_v",
+        "type": "sound_emitter",
+        "x": 24,
+        "sounds": { "beacon": { "path": "assets/sounds/effects/laser_beam_1_beacon", "loop": true } },
+        "presence": [
+          {
+            "when": {
+              "type": "allOf",
+              "conditions": [
+                { "type": "perceptionActive" },
+                { "type": "not", "condition": { "type": "variable", "scope": "scene", "name": "bloodPyramidion2VersoBroken", "equals": true } }
+              ]
+            },
+            "present": true
+          }
+        ]
       },
       {
         "id": "mirror_1_v",
@@ -88,7 +256,8 @@
             "effects": [{ "type": "announce", "key": "magic_mirror.flooded_gallery.pass_refusal" }]
           }
         ]
-      }
+      },
+      { "id": "flooded_gallery_2_v", "type": "flooded_gallery", "x": 30, "descriptionKey": "flooded_gallery.mirror_side.description" }
     ]
   }
 }

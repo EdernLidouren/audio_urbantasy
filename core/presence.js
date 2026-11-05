@@ -325,6 +325,18 @@ function evaluateVariable(cond, context) {
 // champ est rejeté au chargement (voir core/script-parse.js/
 // validateCondition), à côté de l'évaluateur qui les lit pour ne jamais
 // diverger.
+// "hasObserved" : vraie si le joueur a déjà observé ce TYPE d'entité (voir
+// core/observations.js, session.observedEntityTypes) — le fait neutre que lit
+// le bestiaire. Une entité peut ainsi disparaître une fois découverte
+// (entities/types/sacrystal.js). Pas de court-circuit debug, contrairement à
+// hasImprovement : répondre toujours vrai ferait disparaître ces entités en
+// mode debug, au lieu de les rendre accessibles. Contexte sans `session` ->
+// false, même repli que les autres.
+function evaluateHasObserved(cond, context) {
+  const observed = context.session && context.session.observedEntityTypes;
+  return Boolean(observed && observed[cond.id]);
+}
+
 const CONDITION_EVALUATORS = {
   timeRange: { evaluate: evaluateTimeRange, fields: ["from", "to", "spread"] },
   arrived: { evaluate: evaluateArrived, fields: [] },
@@ -332,6 +344,7 @@ const CONDITION_EVALUATORS = {
   hasEquipmentTag: { evaluate: evaluateHasEquipmentTag, fields: ["tag"] },
   hasImprovement: { evaluate: evaluateHasImprovement, fields: ["id"] },
   knowsEmote: { evaluate: evaluateKnowsEmote, fields: ["id"] },
+  hasObserved: { evaluate: evaluateHasObserved, fields: ["id"] },
   perceptionActive: { evaluate: evaluatePerceptionActive, fields: [] },
   weather: { evaluate: evaluateWeather, fields: ["state"] },
   allOf: { evaluate: evaluateAllOf, fields: ["conditions"] },
