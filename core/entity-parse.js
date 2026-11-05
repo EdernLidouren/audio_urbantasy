@@ -80,10 +80,7 @@ function validateVocalRules(rules, describe, failWith) {
 // `tuning` d'instance, premier niveau d'archétype.
 const TRANSITION_SOUND_NATURES = ["diegetic", "meta"];
 function validateTuningValues(holder, describe, failWith = fail) {
-  const { beaconFadeMs, beaconFadeRate, presenceExitFadeMs, transitionSoundNature, messageRotationMinutes } = holder;
-  if (presenceExitFadeMs !== undefined && !(Number.isFinite(presenceExitFadeMs) && presenceExitFadeMs >= 0)) {
-    failWith(`${describe}.presenceExitFadeMs doit être un nombre de ms >= 0 (reçu : ${JSON.stringify(presenceExitFadeMs)}).`);
-  }
+  const { beaconFadeMs, beaconFadeRate, transitionSoundNature, messageRotationMinutes } = holder;
   if (beaconFadeMs !== undefined && !(Number.isFinite(beaconFadeMs) && beaconFadeMs >= 0)) {
     failWith(`${describe}.beaconFadeMs doit être un nombre de ms >= 0 (reçu : ${JSON.stringify(beaconFadeMs)}).`);
   }

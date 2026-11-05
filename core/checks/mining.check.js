@@ -5,7 +5,10 @@
 // construite en dur via un objet littéral passé à parseScene.
 
 import { parseScene } from "../scene.js";
-import { createInitialState } from "../state.js";
+import { createInitialState, togglePerception, applyEntityActionEffects, BODY_RADIUS } from "../state.js";
+import { reduce } from "../reduce.js";
+import { addItem, dropItem, pickupItemEntity } from "../bag.js";
+import { ephemeralItemSpec } from "../spawn.js";
 import { serializeGame, deserializeGame } from "../save.js";
 import { mineEntity } from "../mining.js";
 import { isPresent, presenceContextOf } from "../presence.js";
@@ -84,6 +87,106 @@ export default function checkMining(run) {
     staleSave.data.worlds[scene.id].entities[0].mineable.drops = { hematite: 1, vanished_item: 2 };
     const repaired = deserializeGame(staleSave);
     run.same("minage : drops -> objet disparu retiré au chargement", { hematite: 1 }, worldIn(repaired.session).entities[0].mineable.drops);
+  }
+
+  // Une énigme de bout en bout, sur le modèle du côté miroir de la galerie
+  // inondée : deux sources minables alimentent un champ de force et sa doublure
+  // hors perception, autour d'une entité qui disparaît une fois découverte. Le
+  // réducteur joue le joueur : ce sont les passages interdits qui comptent.
+  {
+    const not = (condition) => ({ type: "not", condition });
+    const flag = (name) => ({ type: "variable", scope: "scene", name, equals: true });
+    const allOf = (...conditions) => ({ type: "allOf", conditions });
+    const when = (condition) => [{ when: condition, present: true }];
+    const perceived = { type: "perceptionActive" };
+    const gemKnown = { type: "hasObserved", id: "gem" };
+    const fieldUp = allOf(not(gemKnown), not(allOf(flag("source1Broken"), flag("source2Broken"))));
+    const source = (id, x, name) => ({
+      id,
+      type: "source",
+      x,
+      triggers: [{ on: "break", effects: [{ type: "setVariable", scope: "scene", name, value: true }] }],
+    });
+    const puzzle = parseScene(
+      {
+        id: "puzzle-check",
+        titleKey: "scene.demo.name",
+        length: 40,
+        playerStart: 2,
+        variables: [
+          { name: "source1Broken", type: "flag", initial: false },
+          { name: "source2Broken", type: "flag", initial: false },
+        ],
+        entities: [
+          source("source-1", 5, "source1Broken"),
+          source("source-2", 8, "source2Broken"),
+          { id: "field", type: "wall", x: 15, presence: when(allOf(perceived, fieldUp)) },
+          { id: "field-unseen", type: "wall", x: 15, presence: when(allOf(not(perceived), fieldUp)) },
+          { id: "gem-1", type: "gem", x: 17 },
+        ],
+      },
+      {
+        ...MINING_REGISTRY,
+        source: { nameKey: "entity.boulder.name", observable: true, interactable: true, mineable: { drops: { granite: 2 }, hits: 1 }, action: { kind: "mine" } },
+        wall: { nameKey: "entity.boulder.name", blocksMovement: true },
+        gem: {
+          nameKey: "entity.boulder.name",
+          presence: when(allOf(perceived, not(gemKnown))),
+          observable: true,
+          interactable: true,
+          action: { kind: "applyEffects", effects: [{ type: "markObserved" }] },
+        },
+      }
+    );
+    let game = { ...createInitialState(puzzle, 3), perceptionActive: true };
+    const entity = (id) => game.worlds[puzzle.id].entities.find((e) => e.id === id);
+    const walk = (dir, ticks = 400) => {
+      for (let i = 0; i < ticks; i++) game = reduce(game, { type: "TICK", dir });
+    };
+    const reach = TUNING_DEFAULTS.interactRange;
+    const cannotReachGem = () => Math.abs(entity("gem-1").x - game.player.x) > reach;
+
+    walk(1);
+    const stop = 15 - BODY_RADIUS;
+    run("énigme : le champ arrête le joueur", stop, game.player.x);
+    game = togglePerception(game);
+    walk(1);
+    run("énigme : perception coupée, la doublure l'arrête au même endroit", stop, game.player.x);
+    run("énigme : c'est bien la doublure qui bloque", "field-unseen", game.player.blockedBy);
+    game = togglePerception(game);
+    walk(1);
+    run("énigme : perception rallumée, toujours arrêté", stop, game.player.x);
+
+    // Le premier exploit du projet : poser, ramasser, avancer, recommencer.
+    game = addItem(game, "apple", 1);
+    for (let i = 0; i < 12; i++) {
+      game = dropItem(game, "apple", 1, ephemeralItemSpec(game, "apple", 1, MINING_REGISTRY), game.player.x);
+      walk(0, 3);
+      const apple = game.worlds[puzzle.id].entities.find((e) => e.ephemeral || e.id.startsWith("ephemeral"));
+      game = pickupItemEntity(game, apple.id, "apple", 1);
+      walk(1, 60);
+    }
+    run("énigme : poser et ramasser un objet ne pousse pas le champ", 15, entity("field").x);
+    run("énigme : ni sa doublure", 15, entity("field-unseen").x);
+    run("énigme : le joueur reste arrêté", stop, game.player.x);
+    run("énigme : le joyau reste hors de portée", true, cannotReachGem());
+
+    const broke = (id) => {
+      game = mineEntity(game, id, { ...MINING_REGISTRY }).session;
+      walk(0, 1);
+    };
+    broke("source-1");
+    walk(1, 60);
+    run("énigme : une source brisée, le champ tient", stop, game.player.x);
+    broke("source-2");
+    run("énigme : deux sources brisées, le champ tombe", false, entity("field").present);
+    run("énigme : sa doublure aussi", false, entity("field-unseen").present);
+    walk(1, 400);
+    run("énigme : la voie est libre", true, game.player.x > 17);
+    game = applyEntityActionEffects(game, "gem-1", entity("gem-1").action.effects);
+    walk(0, 1);
+    run("énigme : l'activation découvre le joyau", true, Boolean(game.observedEntityTypes.gem));
+    run("énigme : découvert, il disparaît", false, entity("gem-1").present);
   }
 
   // Coups : la résistance est tirée au PREMIER coup, puis décomptée.

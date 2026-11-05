@@ -91,14 +91,15 @@ la partie (voir `doc/entity-model.md`/"Mode debug").
 **Références de contenu cassées** (toujours, ces tables étant du code ou de
 la donnée du core — `core/save.js`/`repairContentReferences`) : une partie
 garde aussi, telles qu'à la première visite, les distributions de collecte
-(conteneurs, plages), les stocks déjà tirés, les catalogues des points de
+(conteneurs, plages, entités minables), les butins fixes, les stocks déjà tirés, les catalogues des points de
 vente, les tables et articles des présentoirs, et l'état météo. Elles sont revalidées avec les MÊMES validateurs que
 le chargement d'une scène ; une référence cassée (table, catalogue, objet ou
 état retiré ou renommé depuis) est neutralisée plutôt que de faire planter
 la partie :
 - distribution invalide -> `distribution: null`, la source ne donne plus
   rien (le conteneur reste fouillable, il est vide) ;
-- objet inconnu dans un stock tiré -> retiré du stock ;
+- objet inconnu dans un stock tiré ou un butin fixe (`mineable.drops`) ->
+  retiré ;
 - catalogue invalide -> `catalog: null`, le rayon est vide (« Acheter » est
   refusé comme pour un point de vente sans catalogue) ;
 - table de présentoir invalide -> `distribution: null`, le présentoir

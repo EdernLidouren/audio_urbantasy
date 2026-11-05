@@ -343,7 +343,9 @@ l'activation — ex. `crate_stash` (`scenes/demo2.json`), une caisse dont le
   une entité dormante ne compte jamais, voir "Présence conditionnelle"
   ci-dessous), RE-TIRÉ (quelques tentatives) — filet ultime : `sourceX`
   lui-même, toujours valide (un collectible n'est jamais `blocksMovement`).
-  Aucun éphémère ne peut naître hors map ni dans un mur.
+  Aucun éphémère ne peut naître hors map ni dans un mur. Trop près d'un corps
+  bloquant, c'est lui qui s'écarte, jamais le corps : un objet posé ne pousse
+  pas un mur (`core/physics/overlap.js`/`resolveEntityOverlaps`).
   `spread` optionnel -> `config/tuning-values.js`/`ephemeralScatterSpread`
   (défaut PAR ACTION, lu directement, pas via la cascade `resolveTuning` —
   ce n'est pas un réglage par entité/son).
@@ -1435,9 +1437,6 @@ voir "Paramètres sonores" plus bas) et même catégorie de préférence volume
 que le beacon ("Volume des balises" — ces sons accompagnent la présence
 d'une entité comme le beacon lui-même).
 
-Une bascule de présence coupe le beacon net, sauf si l'entité déclare un fondu
-de sortie (`presenceExitFadeMs`, exemple réel : `entities/types/sacrystal.js`).
-
 Ordre à la bascule (`view/audio/entity-audio.js`/`applyEntityAudio`) :
 `exitSound` joué AVANT l'arrêt du beacon (Howl entièrement séparé — l'arrêt
 du beacon ne coupe jamais le one-shot en cours) ; `enterSound` joué AVANT la
@@ -1655,6 +1654,12 @@ beacon soumis à la MÉTÉO, il ne tinte que par temps venteux et se tait le
 reste du temps, sans aucune action ni variable :
 `condition: { type: "weather", state: "windy" }`.
 
+**Exemple réel — le sacristal** (`entities/types/sacrystal.js`) : sa balise
+porte la condition qui décide aussi de sa présence (`not hasObserved`). Une
+bascule de présence coupe le beacon net ; mais si sa condition tombe au même
+instant, c'est son fondu qui s'applique. Il s'éteint donc en fondu quand il est
+découvert, et net quand on coupe la perception.
+
 Règles :
 - **Validation au chargement** (`core/entity-parse.js`/`parseEntity`), comme une
   condition d'action : type inconnu ou variable non déclarée -> erreur.
@@ -1823,9 +1828,6 @@ code. Consulter directement ce fichier pour la valeur courante d'un défaut.
   par défaut à tout démarrage groupé.
 - **`beaconFadeMs`** — durée (ms) du fondu d'une balise CONTINUE dont la
   condition bascule, défaut 0 (coupure franche). Voir "Sons conditionnels".
-  Nombre >= 0, vérifié au chargement.
-- **`presenceExitFadeMs`** — durée (ms) du fondu de la balise CONTINUE quand
-  l'entité disparaît, défaut 0 (coupure franche). Voir "Sons de transition".
   Nombre >= 0, vérifié au chargement.
 - **`beaconFadeRate`** — vitesse de lecture de cette balise au bas de son
   fondu, défaut 1 (le fondu ne touche que le volume). Nombre > 0, vérifié

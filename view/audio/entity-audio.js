@@ -162,14 +162,15 @@ export function createEntityAudio({ getSession, entities, effectiveMuffle, fullF
 
     const allowed = beaconConditionAllows(entry.beaconCondition, live);
     if (live.presenceChanged === "exited") {
-      sound.stop(entry.presenceExitFadeMs);
+      // Condition tombée en même temps que la présence : son fondu s'applique
+      // (le sacristal découvert). Sinon, coupure nette (la perception coupée).
+      sound.stop(allowed ? 0 : entry.beaconFadeMs);
     } else if (live.presenceChanged === "entered" && allowed) {
       sound.resume();
       entry.beaconSilenced = false;
     }
-    // Une bascule de présence est SÈCHE, sauf presenceExitFadeMs à la sortie
-    // (voir doc/entity-model.md) : le fondu de la condition repart de l'état
-    // atteint, sans rampe.
+    // Une bascule de présence est SÈCHE (voir doc/entity-model.md) : le
+    // fondu de la condition repart de l'état atteint, sans rampe.
     if (live.presenceChanged) entry.beaconEnvelope = null;
     if (live.present === false) return;
 

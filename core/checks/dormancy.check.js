@@ -47,7 +47,11 @@ export default function checkDormancy(run) {
     const xs = (entities, ctx) => resolveEntityOverlaps(entities, 40, ctx).map((e) => e.x).join(",");
     run("recouvrement : un corps présent et un dormant au même x -> aucun écart", "15,15", xs([seen, unseen], context));
     run("recouvrement : idem une fois la perception coupée", "15,15", xs([seen, unseen], {}));
-    run("recouvrement : un corps présent écarte toujours un passant présent", "14.75,15.25", xs([{ id: "wall", x: 15, blocksMovement: true }, passer], context));
+    const wall = { id: "wall", x: 15, blocksMovement: true };
+    run("recouvrement : un mur écarte un passant présent, sans bouger", "15,15.5", xs([wall, passer], context));
+    run("recouvrement : idem, le passant déclaré d'abord", "14.5,15", xs([passer, wall], context));
+    run("recouvrement : un objet posé contre un mur ne le pousse pas", "15,14.5", xs([wall, { id: "item", x: 14.75 }], context));
+    run("recouvrement : deux corps bloquants se partagent l'écart", "14.75,15.25", xs([wall, { id: "wall-2", x: 15, blocksMovement: true }], context));
     run("recouvrement : un passant dormant n'est pas écarté", "15,15", xs([{ id: "wall", x: 15, blocksMovement: true }, { ...unseen, blocksMovement: false }], context));
   }
 

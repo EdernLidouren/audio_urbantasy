@@ -2,8 +2,9 @@
 //
 // Une entité MINABLE porte `mineable: { distribution, hits, count }`, ou
 // `{ drops, hits }` pour un butin FIXE (forme validée par
-// core/entity-parse.js/parseMineable, cascade instance -> archétype). Chaque coup (action "mine" côté vue, view/action-execution.js)
-// lui retire un point de résistance ; au dernier, elle est DÉTRUITE et ce
+// core/entity-parse.js/parseMineable, cascade instance -> archétype). Chaque
+// coup (action "mine" côté vue, view/action-execution.js) lui retire un point
+// de résistance ; au dernier, elle est DÉTRUITE et ce
 // qu'elle renfermait TOMBE AU SOL — une entité éphémère par objet, éparpillée
 // autour d'elle, MÊME geste que la fouille d'un conteneur
 // (core/spawn.js/searchContainer).
@@ -34,16 +35,6 @@ import { resolveFace, updateActiveFace, removeEntity, spawnScatteredEphemerals }
 import { drawItems, buildCollectibleSpec } from "./spawn.js";
 import { applyBreakTriggers } from "./triggers.js";
 
-// Un coup sur l'entité minable `entityId` de la FACE ACTIVE. Rend
-// `{ session, status, strike, items, fired }` :
-//   - `status` : "hit" (l'entité a encaissé, elle tient encore), "broken"
-//     (dernier coup : elle est retirée, ses objets sont au sol), ou null si
-//     l'id n'est pas une entité minable de la face active (session
-//     inchangée) ;
-//   - `strike` : le numéro de CE coup, à partir de 1 (0 si status null) ;
-//   - `items` : les objets tombés ("broken" seulement, peut être vide) ;
-//   - `fired` : les effets de RENDU de ses triggers de destruction, par entité,
-//     à rejouer par la vue (même forme que core/triggers.js/applyDueTriggers).
 // Ce qui tombe à la destruction. Un butin fixe ne tire rien : le PRNG de la
 // face n'avance pas.
 function drawLoot(mineable, rngState) {
@@ -55,6 +46,16 @@ function drawLoot(mineable, rngState) {
   return drawItems(mineable.distribution, count.value, count.rngState);
 }
 
+// Un coup sur l'entité minable `entityId` de la FACE ACTIVE. Rend
+// `{ session, status, strike, items, fired }` :
+//   - `status` : "hit" (l'entité a encaissé, elle tient encore), "broken"
+//     (dernier coup : elle est retirée, ses objets sont au sol), ou null si
+//     l'id n'est pas une entité minable de la face active (session
+//     inchangée) ;
+//   - `strike` : le numéro de CE coup, à partir de 1 (0 si status null) ;
+//   - `items` : les objets tombés ("broken" seulement, peut être vide) ;
+//   - `fired` : les effets de RENDU de ses triggers de destruction, par entité,
+//     à rejouer par la vue (même forme que core/triggers.js/applyDueTriggers).
 export function mineEntity(session, entityId, registry) {
   const world = session.worlds[session.activeWorldId];
   const side = session.player.side;

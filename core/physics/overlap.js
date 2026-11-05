@@ -42,7 +42,8 @@ function separate(xA, weightA, xB, weightB, minGap, length) {
 }
 
 // Sépare toute paire d'ENTITÉS (hors joueur) impliquant au moins une
-// bloquante — deuxième moitié de resolveOverlaps, exportée À PART pour
+// bloquante, l'entité passable s'écartant seule d'un corps bloquant —
+// deuxième moitié de resolveOverlaps, exportée À PART pour
 // servir aussi SANS joueur (voir core/reduce.js, RECTO/VERSO : la face NON
 // courante d'une scène à deux faces tique elle aussi, mais isolée — aucun
 // joueur sur cette face, seulement ses propres entités entre elles). O(n²) mais le nombre d'entités par face reste petit — pas un
@@ -53,16 +54,24 @@ export function resolveEntityOverlaps(entities, length, presenceContext) {
     for (let j = i + 1; j < resolved.length; j++) {
       const a = resolved[i];
       const b = resolved[j];
-      if (!isBlocking(a, presenceContext) && !isBlocking(b, presenceContext)) continue;
+      const aBlocks = isBlocking(a, presenceContext);
+      const bBlocks = isBlocking(b, presenceContext);
+      if (!aBlocks && !bBlocks) continue;
       // Une entité DORMANTE n'occupe aucune place, comme si absente : ni elle
       // ne s'écarte, ni elle n'écarte l'autre. Deux corps qui ne sont jamais là
       // en même temps peuvent donc partager un même x (un champ de force et sa
       // doublure hors perception, entities/types/unseen_force_field.js) ; sinon
       // chacun dériverait d'un rayon, et basculer entre eux laisserait le
-      // joueur de l'autre côté.
-      if (!isPresent(a, presenceContext) || !isPresent(b, presenceContext)) continue;
+      // joueur de l'autre côté. Un corps bloquant est présent par définition :
+      // seul l'autre membre de la paire reste à interroger.
+      if (!isPresent(aBlocks ? b : a, presenceContext)) continue;
 
-      const { xA, xB } = separate(a.x, 0.5, b.x, 0.5, 2 * BODY_RADIUS, length);
+      // Deux corps bloquants se partagent l'écart. Face à une entité passable,
+      // le corps bloquant ne bouge pas : sinon poser un objet contre un mur le
+      // pousserait, et de proche en proche on déplacerait n'importe quel
+      // obstacle jusqu'à passer.
+      const weightA = aBlocks && bBlocks ? 0.5 : aBlocks ? 0 : 1;
+      const { xA, xB } = separate(a.x, weightA, b.x, 1 - weightA, 2 * BODY_RADIUS, length);
       if (xA !== a.x) resolved[i] = { ...a, x: xA };
       if (xB !== b.x) resolved[j] = { ...b, x: xB };
     }
@@ -75,7 +84,8 @@ export function resolveEntityOverlaps(entities, length, presenceContext) {
 // tous les mobiles au tick. Une entité NON BLOQUANTE (isBlocking : passable,
 // OU impassable mais DORMANTE — voir core/presence.js) n'a pas de zone
 // d'exclusion propre : seule une paire impliquant AU MOINS UNE entité
-// bloquante, et sans entité dormante, est résolue. Une seule passe déterministe (ordre = celui de
+// bloquante, et sans entité dormante, est résolue ; l'entité passable s'y
+// écarte seule. Une seule passe déterministe (ordre = celui de
 // `entities`), pas une résolution multi-corps itérative jusqu'à
 // convergence — hors périmètre pour un cas que la conception des scènes évite par
 // construction. Idempotente sur un état déjà sans chevauchement (aucune
