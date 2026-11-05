@@ -22,6 +22,10 @@
     "base": "anciennes carrières, premier sous-sol, galerie inondée",
     "def": "la galerie inondée"
   },
+  "scene.old_quarries_underground_1_flooded_gallery_mirror_side.name": {
+    "base": "anciennes carrières, premier sous-sol, galerie inondée, côté miroir",
+    "def": "la galerie inondée, côté miroir"
+  },
   "scene.old_quarries_underground_1_main.name": "anciennes carrières, premier sous-sol, accès principal",
   "scene.town_square.name": {
     "base": "grand-place",

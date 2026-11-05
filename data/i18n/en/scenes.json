@@ -22,6 +22,10 @@
     "base": "old quarries, first underground level, flooded gallery",
     "def": "the flooded gallery"
   },
+  "scene.old_quarries_underground_1_flooded_gallery_mirror_side.name": {
+    "base": "old quarries, first underground level, flooded gallery, mirror side",
+    "def": "the flooded gallery, mirror side"
+  },
   "scene.old_quarries_underground_1_main.name": "old quarries, first underground level, main access",
   "scene.town_square.name": {
     "base": "town square",

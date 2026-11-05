@@ -1,0 +1,67 @@
+{
+  "id": "old_quarries_underground_1_flooded_gallery_mirror_side",
+  "titleKey": "scene.old_quarries_underground_1_flooded_gallery_mirror_side.name",
+  "length": 30,
+  "playerStart": 1,
+  "recto": {
+    "indoor": true,
+    "weatherAmbience": false,
+    "weatherAnnouncements": false,
+    "phaseAnnouncements": false,
+    "musicDay": "assets/musics/underground",
+    "musicNight": "assets/musics/underground",
+    "ambiences": ["assets/ambiances/shaft", "assets/ambiances/water_dreeping_heavy"],
+    "defaultSurface": "mud",
+    "reverbPreset": "flooded_cave",
+    "segments": [
+      { "from": 11, "to": 23, "surface": "rock" }
+    ],
+    "entities": [
+      {
+        "id": "passage_1_r",
+        "type": "passage",
+        "x": 13,
+        "tuning": { "transitionSurface": "rock" },
+        "action": { "kind": "switchSide", "arrivalX": 13 }
+      },
+      {
+        "id": "passage_2_r",
+        "type": "passage",
+        "x": 22,
+        "tuning": { "transitionSurface": "rock" },
+        "action": { "kind": "switchSide", "arrivalX": 22 }
+      }
+    ]
+  },
+  "verso": {
+    "indoor": true,
+    "weatherAmbience": false,
+    "weatherAnnouncements": false,
+    "phaseAnnouncements": false,
+    "musicDay": "assets/musics/underground",
+    "musicNight": "assets/musics/underground",
+    "ambiences": ["assets/ambiances/shaft", "assets/ambiances/water_dreeping_heavy"],
+    "defaultSurface": "mud",
+    "reverbPreset": "flooded_cave",
+    "segments": [
+      { "from": 8, "to": 14, "surface": "rock" },
+      { "from": 21, "to": 28, "surface": "rock" }
+    ],
+    "entities": [
+      {
+        "id": "passage_1_v",
+        "type": "passage",
+        "x": 13,
+        "tuning": { "transitionSurface": "rock" },
+        "action": { "kind": "switchSide", "arrivalX": 13 }
+      },
+      {
+        "id": "passage_2_v",
+        "type": "passage",
+        "x": 22,
+        "tuning": { "transitionSurface": "rock" },
+        "action": { "kind": "switchSide", "arrivalX": 22 }
+      }
+    ]
+  }
+}
