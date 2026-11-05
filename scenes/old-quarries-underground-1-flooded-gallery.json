@@ -2,7 +2,7 @@
   "id": "old_quarries_underground_1_flooded_gallery",
   "titleKey": "scene.old_quarries_underground_1_flooded_gallery.name",
   "length": 30,
-  "playerStart": 1,
+  "playerStart": 15,
   "variables": [{ "name": "parietalMirrorRevealed", "type": "flag", "initial": false }],
   "recto": {
     "indoor": true,
