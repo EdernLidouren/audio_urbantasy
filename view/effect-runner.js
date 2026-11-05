@@ -5,7 +5,8 @@
 // l'ordre déclaré. Utilisé par l'interaction (view/interaction.js), par les
 // handlers de kind (son de ramassage, view/action-execution.js), et pour le
 // rendu seul des triggers horaires (view/game-clock.js), des triggers
-// d'émote (view/emotes.js) et des tranches de séquence dues
+// d'émote (view/emotes.js), des triggers de destruction
+// (view/action-execution.js/handleMine) et des tranches de séquence dues
 // (view/city-screen.js/onTick).
 
 import { announce } from "../lib/announce.js";

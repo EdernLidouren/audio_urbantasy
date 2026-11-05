@@ -32,6 +32,12 @@
 // évènement ponctuel, résolu par applyEmoteTriggers plus bas ; même
 // frontière core/vue, même vocabulaire d'effets.
 //
+// TRIGGERS DE DESTRUCTION — `{ on: "break", effects }` : les effets
+// s'exécutent quand une entité MINABLE cède, au dernier coup (voir
+// core/mining.js/mineEntity, qui appelle applyBreakTriggers juste AVANT de la
+// retirer). L'entité n'ayant plus de suite, le chargement refuse ce qui
+// s'appliquerait à elle seule (core/script-parse.js/parseTrigger).
+//
 // CONDITION (`condition`, tous kinds, facultative) : le trigger ne répond
 // que si elle est vraie. Évaluée sur l'état d'AVANT le déclenchement, pour
 // TOUS les triggers d'un même évènement : sans cela, un trigger qui fait
@@ -51,8 +57,9 @@ import { sequenceHead } from "./sequence.js";
 // Kinds de trigger reconnus (`on`) — SEULE liste, lue par
 // core/script-parse.js/parseTrigger pour la validation. Un kind de plus
 // demain (météo, phase...) = une entrée ici + sa détection (dueTriggers
-// pour l'horloge, emoteTriggers pour les émotes).
-export const TRIGGER_KINDS = ["hour", "emote"];
+// pour l'horloge, emoteTriggers pour les émotes, applyBreakTriggers pour la
+// destruction).
+export const TRIGGER_KINDS = ["hour", "emote", "break"];
 
 // Index ABSOLU de l'heure (pas l'heure du jour) : un saut de 24 h exactes
 // change bien d'heure au sens de ce compteur, même si hourOfDay est égal.
@@ -194,5 +201,17 @@ export function applyEmoteTriggers(session, emoteId, sourceX) {
     next = applyTriggers(next, companion, triggers, (s, effects, options) => applyCompanionActionEffects(s, companion.id, effects, options), fired);
   }
 
+  return { session: next, fired };
+}
+
+// L'entité minable `entity` de la face `side` cède : applique ses triggers de
+// destruction, dans l'ordre déclaré. À appeler AVANT de la retirer du monde :
+// les effets s'appliquent sur elle comme ceux d'une action (un "spawn" part de
+// sa position). Renvoie { session, fired }, exactement comme applyDueTriggers.
+// Les conditions se lisent toutes sur `session`, l'état d'avant la destruction.
+export function applyBreakTriggers(session, entity, side) {
+  const triggers = (entity.triggers ?? []).filter((trigger) => trigger.on === "break" && conditionHolds(trigger, entity, session));
+  const fired = [];
+  const next = applyTriggers(session, entity, triggers, (s, effects, options) => applyEntityActionEffects(s, entity.id, effects, side, options), fired);
   return { session: next, fired };
 }

@@ -5,7 +5,9 @@
 // passage vers le côté miroir : l'action (condition passe-miroir,
 // destination, son de passage) est déclarée PAR INSTANCE, elle dépend de
 // la scène (voir scenes/clock-tower-weight-shaft.json et
-// scenes/clock-tower-weight-shaft-mirror-side.json).
+// scenes/clock-tower-weight-shaft-mirror-side.json, ou
+// scenes/old-quarries-underground-1-flooded-gallery.json, où le miroir n'apparaît
+// qu'une fois le filon qui le cache brisé).
 export default {
   nameKey: "magic_mirror.default.name",
   descriptionKey: "magic_mirror.default.description",

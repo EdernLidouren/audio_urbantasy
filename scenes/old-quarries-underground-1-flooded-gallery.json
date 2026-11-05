@@ -3,6 +3,7 @@
   "titleKey": "scene.old_quarries_underground_1_flooded_gallery.name",
   "length": 30,
   "playerStart": 1,
+  "variables": [{ "name": "parietalMirrorRevealed", "type": "flag", "initial": false }],
   "recto": {
     "indoor": true,
     "weatherAmbience": false,
@@ -87,6 +88,68 @@
         "x": 22,
         "tuning": { "transitionSurface": "rock" },
         "action": { "kind": "switchSide", "arrivalX": 22 }
+      },
+      {
+        "id": "ore_vein_1_v",
+        "type": "ore_vein",
+        "x": 28,
+        "triggers": [
+          {
+            "on": "break",
+            "effects": [{ "type": "setVariable", "scope": "scene", "name": "parietalMirrorRevealed", "value": true }]
+          }
+        ]
+      },
+      {
+        "id": "mirror_1_v",
+        "type": "mirror",
+        "x": 28,
+        "nameKey": "mirror.flooded_gallery.name",
+        "descriptionKey": "mirror.flooded_gallery.description",
+        "presence": [
+          {
+            "when": {
+              "type": "allOf",
+              "conditions": [
+                { "type": "not", "condition": { "type": "perceptionActive" } },
+                { "type": "variable", "scope": "scene", "name": "parietalMirrorRevealed", "equals": true }
+              ]
+            },
+            "present": true
+          }
+        ]
+      },
+      {
+        "id": "magic_mirror_1_v",
+        "type": "magic_mirror",
+        "x": 28,
+        "descriptionKey": "mirror.flooded_gallery.description",
+        "presence": [
+          {
+            "when": {
+              "type": "allOf",
+              "conditions": [
+                { "type": "perceptionActive" },
+                { "type": "variable", "scope": "scene", "name": "parietalMirrorRevealed", "equals": true }
+              ]
+            },
+            "present": true
+          }
+        ],
+        "action": [
+          {
+            "kind": "applyEffects",
+            "condition": { "type": "hasImprovement", "id": "mirror_pass" },
+            "effects": [
+              { "type": "playSound", "path": "assets/sounds/ui/supernatural_mirror_pass_in", "nature": "meta" },
+              { "type": "teleport", "target": "old_quarries_underground_1_flooded_gallery_mirror_side", "x": 28, "side": "verso" }
+            ]
+          },
+          {
+            "kind": "applyEffects",
+            "effects": [{ "type": "announce", "key": "magic_mirror.flooded_gallery.pass_refusal" }]
+          }
+        ]
       },
       { "id": "flooded_gallery_3_v", "type": "flooded_gallery", "x": 30 }
     ]

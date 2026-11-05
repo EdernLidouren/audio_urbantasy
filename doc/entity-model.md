@@ -661,9 +661,13 @@ renfermait tombe au sol. Moteur : `core/mining.js`/`mineEntity`, pur.
   ramasser par `"pickup"`. Tous les tirages peuvent tomber sur `nothing` :
   l'entité se brise alors sans rien livrer.
 - **Destruction** — l'entité est RETIRÉE du monde (`core/state.js`/
-  `removeEntity`) ; la sauvegarde fige ce retrait. Elle ne revient pas : le
-  réapprovisionnement des entités minables viendra avec leur apparition
-  aléatoire.
+  `removeEntity`) ; la sauvegarde fige ce retrait. Placée à la main, elle ne
+  revient jamais ; posée par une plage, le garnissage quotidien la remplace.
+  Ses triggers `"break"` tirent à cet instant (`doc/scripting.md`/"Triggers") :
+  c'est ainsi qu'une destruction peut en révéler une autre, en écrivant une
+  variable de scène que lisent les entités cachées. Exemple réel : le filon
+  `ore_vein_1_v` de `scenes/old-quarries-underground-1-flooded-gallery.json`,
+  qui cache un miroir.
 - **Accès** — la condition (le kit de minage, `hasImprovement`) n'est PAS
   dans le moteur : l'action de l'archétype la porte, avec son refus annoncé
   (`condition` + `refusalEffects`, comme toute action conditionnelle). En
@@ -1362,7 +1366,7 @@ minutes de jeu, jamais écrit dans le JSON de scène, sauvegardé) :
   séquence qui pose la dormance joue son propre son. Le réveil, lui, est
   une entrée ordinaire (`enterSound`).
 
-### Triggers horaires et d'émote — voir `doc/scripting.md`/"Triggers"
+### Triggers horaires, d'émote et de destruction — voir `doc/scripting.md`/"Triggers"
 
 Distincts des triggers de COMPORTEMENT ci-dessus (portés par une règle de
 présence, réévalués au tick) : `entity.triggers` déclare des EFFETS D'ACTION
@@ -1380,6 +1384,9 @@ des effets exécutés quand le joueur fait une émote à portée, sur SA face
 et chez ses compagnons. Premiers clients : les oiseaux posés, qui
 s'envolent à un claquement de mains proche (voir "Entités farouches"), et
 les chiens qui accourent au sifflement (voir "Comportement temporaire").
+
+Et des triggers de DESTRUCTION (`on: "break"`), au dernier coup porté à une
+entité minable (voir "Minage").
 
 ### Bascule observée : `presenceChanged`
 

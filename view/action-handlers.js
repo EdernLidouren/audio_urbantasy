@@ -88,15 +88,16 @@ export function registerActionHandlers({ getSession, setSession, travel }) {
         return { status: result.status, count: result.items.length };
       },
     ],
-    // Coup de minage : le coup est calculé, son retour sonore part, PUIS la
-    // session change (au dernier coup, l'entité disparaît). Rien à faire
-    // pour une entité qui n'est pas minable sur la face active.
+    // Coup de minage : le coup est calculé, son retour sonore part (avec le
+    // rendu des triggers de destruction), PUIS la session change (au dernier
+    // coup, l'entité disparaît). Rien à faire pour une entité qui n'est pas
+    // minable sur la face active.
     [
       setMineHandler,
       (entity, beforeApply) => {
         const result = mineEntity(getSession(), entity.id, registry);
         if (result.status === null) return;
-        beforeApply(result.status, result.strike);
+        beforeApply(result.status, result.strike, result.fired);
         setSession(result.session);
       },
     ],

@@ -61,6 +61,33 @@
         "x": 22,
         "tuning": { "transitionSurface": "rock" },
         "action": { "kind": "switchSide", "arrivalX": 22 }
+      },
+      {
+        "id": "mirror_1_v",
+        "type": "mirror",
+        "x": 28,
+        "nameKey": "mirror.flooded_gallery.name",
+        "descriptionKey": "mirror.flooded_gallery_mirror_side.description"
+      },
+      {
+        "id": "magic_mirror_1_v",
+        "type": "magic_mirror",
+        "x": 28,
+        "descriptionKey": "mirror.flooded_gallery_mirror_side.description",
+        "action": [
+          {
+            "kind": "applyEffects",
+            "condition": { "type": "hasImprovement", "id": "mirror_pass" },
+            "effects": [
+              { "type": "playSound", "path": "assets/sounds/ui/supernatural_mirror_pass_out", "nature": "meta" },
+              { "type": "teleport", "target": "old_quarries_underground_1_flooded_gallery", "x": 28, "side": "verso" }
+            ]
+          },
+          {
+            "kind": "applyEffects",
+            "effects": [{ "type": "announce", "key": "magic_mirror.flooded_gallery.pass_refusal" }]
+          }
+        ]
       }
     ]
   }

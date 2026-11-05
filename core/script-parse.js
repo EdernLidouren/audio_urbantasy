@@ -451,6 +451,10 @@ function parseActionEffect(rawEffect, describe, entityVariables, sceneVariables)
 // d'AVANT le déclenchement, voir core/triggers.js).
 const TRIGGER_FIELDS = ["on", "hour", "emote", "range", "condition", "effects"];
 const TRIGGER_KIND_FIELDS = { hour: ["hour"], emote: ["emote", "range"] };
+// Sur un trigger "break", l'entité disparaît aussitôt : ces effets, qui ne
+// valent que pour SA suite (une tranche après `wait`, un comportement, une
+// fuite, un sommeil), seraient perdus en silence.
+const BREAK_REFUSED_EFFECT_TYPES = ["wait", "startle", "temporaryBehavior", "dormantUntil"];
 
 export function parseTrigger(rawTrigger, describe, entityVariables, sceneVariables) {
   if (typeof rawTrigger !== "object" || rawTrigger === null || Array.isArray(rawTrigger)) {
@@ -509,6 +513,12 @@ export function parseTrigger(rawTrigger, describe, entityVariables, sceneVariabl
   const mixed = effects.find((effect) => MIXED_EFFECT_TYPES.includes(effect.type));
   if (mixed) {
     fail(`${describe}.effects : "${mixed.type}" (effet mixte, joueur) n'est pas admis sur un trigger.`);
+  }
+  if (rawTrigger.on === "break") {
+    const lost = effects.find((effect) => BREAK_REFUSED_EFFECT_TYPES.includes(effect.type) || effect.scope === "entity");
+    if (lost) {
+      fail(`${describe}.effects : "${lost.type}"${lost.scope ? ` (portée "${lost.scope}")` : ""} se perdrait avec l'entité détruite, il n'est pas admis sur un trigger "break".`);
+    }
   }
   const trigger = { on: rawTrigger.on, effects };
   if (rawTrigger.hour !== undefined) trigger.hour = rawTrigger.hour;

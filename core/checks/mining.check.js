@@ -8,6 +8,7 @@ import { parseScene } from "../scene.js";
 import { createInitialState } from "../state.js";
 import { serializeGame, deserializeGame } from "../save.js";
 import { mineEntity } from "../mining.js";
+import { isPresent, presenceContextOf } from "../presence.js";
 import { resolveDistribution } from "../distribution.js";
 import { ACTION_KINDS } from "../action-kinds.js";
 import { TUNING_DEFAULTS } from "../../config/tuning-values.js";
@@ -107,6 +108,68 @@ export default function checkMining(run) {
   run("minage : entité non minable -> status null", null, mineEntity(fresh, "dog-1", MINING_REGISTRY).status);
   run("minage : entité non minable -> session INCHANGÉE", fresh, mineEntity(fresh, "dog-1", MINING_REGISTRY).session);
   run("minage : id absent -> session INCHANGÉE", fresh, mineEntity(fresh, "nope", MINING_REGISTRY).session);
+
+  // Trigger de destruction (`on: "break"`, core/triggers.js/applyBreakTriggers) :
+  // au dernier coup seulement, état par le core, rendu rendu à la vue.
+  const breakRaw = {
+    ...miningRaw,
+    id: "mining-break",
+    variables: [
+      { name: "revealed", type: "flag", initial: false },
+      { name: "locked", type: "flag", initial: false },
+    ],
+    entities: [
+      {
+        id: "vein-1",
+        type: "boulder",
+        x: 10,
+        mineable: { distribution: { items: { granite: 1 } }, hits: 2 },
+        triggers: [
+          {
+            on: "break",
+            effects: [
+              { type: "setVariable", scope: "scene", name: "revealed", value: true },
+              { type: "playSound", path: "assets/sounds/effects/boulder_destruction" },
+            ],
+          },
+          {
+            on: "break",
+            condition: { type: "variable", scope: "scene", name: "locked", equals: true },
+            effects: [{ type: "announce", key: "interaction.mineNeedsTools" }],
+          },
+        ],
+      },
+      { id: "revealed-1", type: "dog", x: 20, presence: [{ when: { type: "variable", scope: "scene", name: "revealed", equals: true }, present: true }] },
+    ],
+  };
+  const breakScene = parseScene(breakRaw, MINING_REGISTRY);
+  const breakWorld = (s) => s.worlds[breakScene.id];
+  const breakEntity = (s, id) => breakWorld(s).entities.find((e) => e.id === id);
+  const revealedHere = (s) => isPresent(breakEntity(s, "revealed-1"), presenceContextOf(s));
+  const breakFresh = createInitialState(breakScene);
+  run("minage, destruction : avant -> l'entité révélée dort", false, revealedHere(breakFresh));
+  const breakHit = mineEntity(breakFresh, "vein-1", MINING_REGISTRY);
+  run("minage, destruction : coup ordinaire -> ne tire pas", false, breakWorld(breakHit.session).variables.revealed.value);
+  run.same("minage, destruction : coup ordinaire -> aucun rendu", [], breakHit.fired);
+  const breakDone = mineEntity(breakHit.session, "vein-1", MINING_REGISTRY);
+  run("minage, destruction : dernier coup -> broken", "broken", breakDone.status);
+  run("minage, destruction : effet d'état appliqué par le core", true, breakWorld(breakDone.session).variables.revealed.value);
+  run("minage, destruction : l'entité révélée apparaît", true, revealedHere(breakDone.session));
+  run("minage, destruction : l'entité détruite est bien retirée", undefined, breakEntity(breakDone.session, "vein-1"));
+  run("minage, destruction : objets tombés quand même", true, breakDone.items.length >= 1);
+  run("minage, destruction : rendu dû, porté par l'entité détruite", "vein-1", breakDone.fired[0]?.entity.id);
+  run.same("minage, destruction : seuls les effets de RENDU reviennent à la vue, condition fausse écartée", ["playSound"], breakDone.fired.flatMap((f) => f.effects.map((e) => e.type)));
+  run.same("minage, destruction : hors de propos -> aucun rendu", [], mineEntity(breakFresh, "revealed-1", MINING_REGISTRY).fired);
+  const breakReload = deserializeGame(serializeGame(breakDone.session));
+  run("minage, destruction : save/load — révélation conservée", true, breakReload.success && revealedHere(breakReload.session));
+  const parseBreak = (entity) => parseScene({ ...breakRaw, entities: [entity] }, MINING_REGISTRY);
+  const breakOf = (effects) => ({ id: "b", type: "boulder", x: 1, variables: [{ name: "own", type: "flag", initial: false }], triggers: [{ on: "break", effects }] });
+  run("minage, destruction : forme valide acceptée", false, throws(() => parseBreak(breakOf([{ type: "setVariable", scope: "scene", name: "revealed", value: true }]))));
+  run("minage, destruction : entité non minable -> rejeté", true, throws(() => parseBreak({ id: "b", type: "dog", x: 1, triggers: [{ on: "break", effects: [{ type: "setVariable", scope: "scene", name: "revealed", value: true }] }] })));
+  run("minage, destruction : wait -> rejeté", true, throws(() => parseBreak(breakOf([{ type: "wait", ms: 100 }, { type: "setVariable", scope: "scene", name: "revealed", value: true }]))));
+  run("minage, destruction : variable de l'entité -> rejetée", true, throws(() => parseBreak(breakOf([{ type: "setVariable", scope: "entity", name: "own", value: true }]))));
+  run("minage, destruction : teleport -> rejeté", true, throws(() => parseBreak(breakOf([{ type: "teleport", target: "demo", x: 1 }]))));
+  run("minage, destruction : champ d'un autre kind -> rejeté", true, throws(() => parseBreak({ ...breakOf([{ type: "setVariable", scope: "scene", name: "revealed", value: true }]), triggers: [{ on: "break", hour: 3, effects: [{ type: "setVariable", scope: "scene", name: "revealed", value: true }] }] })));
 
   // Persistance : la résistance entamée survit à la sauvegarde.
   const leaks = [];

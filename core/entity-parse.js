@@ -609,7 +609,7 @@ export function parseEntity(rawEntity, index, registry, length, seenIds, sceneVa
     entity.startle = parseStartle(resolvedStartle, at);
   }
 
-  // Triggers d'horloge et d'émote (voir core/triggers.js,
+  // Triggers d'horloge, d'émote et de destruction (voir core/triggers.js,
   // doc/scripting.md/"Triggers").
   const resolvedTriggers = triggers !== undefined ? triggers : archetype.triggers;
   if (resolvedTriggers !== undefined) {
@@ -619,6 +619,10 @@ export function parseEntity(rawEntity, index, registry, length, seenIds, sceneVa
     entity.triggers = resolvedTriggers.map((trigger, i) =>
       parseTrigger(trigger, `${at} : triggers[${i}]`, entity.variables, sceneVariables)
     );
+    // Sans `mineable`, l'entité ne cède jamais : le trigger ne tirerait jamais.
+    if (!entity.mineable && entity.triggers.some((trigger) => trigger.on === "break")) {
+      fail(`${at} : un trigger "break" exige une entité minable (mineable).`);
+    }
   }
 
   resolveSpawnSpecs(entity, at, registry, length, sceneVariables, insideSpawn);

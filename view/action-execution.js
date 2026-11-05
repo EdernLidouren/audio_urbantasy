@@ -9,7 +9,7 @@ import { announce } from "../lib/announce.js";
 import { t } from "../data/i18n/index.js";
 import { ACTION_KINDS } from "../core/action-kinds.js";
 import { resolveTuning } from "../config/tuning.js";
-import { playEntityPickupSound, playEntityRoleSound } from "./effect-runner.js";
+import { playEntityPickupSound, playEntityRoleSound, runRenderEffects } from "./effect-runner.js";
 import { playInterfaceSound } from "./menu-sounds.js";
 import {
   pickupHandler,
@@ -189,7 +189,12 @@ function playMineSounds(entity, status, strike) {
 
 function handleMine(entity) {
   if (!mineHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
-  mineHandler(entity, (status, strike) => playMineSounds(entity, status, strike));
+  // Le rendu des triggers de destruction part avec le dernier coup, tant que
+  // l'entité a encore une voix dans la scène (un playSound émane d'elle).
+  mineHandler(entity, (status, strike, fired) => {
+    playMineSounds(entity, status, strike);
+    for (const { entity: source, effects } of fired) runRenderEffects(source, effects);
+  });
 }
 
 // "shop" : POINT DE VENTE (voir entities/types/shop_counter.js, doc/

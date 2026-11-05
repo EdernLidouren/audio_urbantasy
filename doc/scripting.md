@@ -786,10 +786,11 @@ totalement indépendantes, sans état partagé entre les deux mondes (voir
 
 `entity.triggers` (optionnel, cascade instance -> type comme `action`) : un
 TABLEAU non vide de triggers, chacun `{ on, ...champs du kind, effects:
-[<effet d'action>, ...] }`. Deux kinds (`core/triggers.js`/`TRIGGER_KINDS`) :
-`"hour"`, une TRANSITION d'horloge, et `"emote"`, une émote du joueur (voir
-"Triggers d'émote" plus bas). Point d'accroche GÉNÉRAL : le clocher et les
-oiseaux n'en sont que les premiers clients.
+[<effet d'action>, ...] }`. Trois kinds (`core/triggers.js`/`TRIGGER_KINDS`) :
+`"hour"`, une TRANSITION d'horloge, `"emote"`, une émote du joueur (voir
+"Triggers d'émote" plus bas), et `"break"`, la destruction d'une entité
+minable. Point d'accroche GÉNÉRAL : le clocher et les oiseaux n'en sont que
+les premiers clients.
 
 ### `on: "hour"` — transition d'horloge
 
@@ -918,6 +919,35 @@ Une entité DORMANTE, ou déjà enfuie (`startled`, dormante au
 tick suivant seulement), ne réagit pas. Pur, sans tirage : même session et
 même émote donnent le même résultat. Même partition des effets que
 l'horloge (état par le core, rendu rejoué par la vue, mixtes refusés).
+
+### `on: "break"` — destruction d'une entité minable
+
+`{ on: "break", effects }`, sans champ propre. Les effets s'exécutent quand
+l'entité cède, au dernier coup (voir `"mine"` plus bas et
+`doc/entity-model.md`/"Minage"), jamais aux coups précédents. Résolus par
+`core/triggers.js`/`applyBreakTriggers`, appelé par `core/mining.js`/
+`mineEntity` juste AVANT le retrait de l'entité ; la vue rejoue le rendu avec
+le son du dernier coup (`view/action-execution.js`/`handleMine`).
+
+Refusé au chargement : un trigger `"break"` sur une entité sans `mineable`
+(il ne tirerait jamais), et tout effet qui se perdrait avec l'entité : `wait`,
+`startle`, `temporaryBehavior`, `dormantUntil`, écriture d'une variable de
+portée `"entity"`. Pour que la destruction change durablement quelque chose,
+elle écrit une variable de SCÈNE que d'autres entités lisent.
+
+Exemple réel — le filon qui cache un miroir (`ore_vein_1_v`,
+`scenes/old-quarries-underground-1-flooded-gallery.json`) ; `mirror_1_v` et
+`magic_mirror_1_v`, déjà sur la scène, attendent cette variable dans leur
+`presence` (`allOf`, avec ou sans perception) :
+
+```json
+"triggers": [
+  {
+    "on": "break",
+    "effects": [{ "type": "setVariable", "scope": "scene", "name": "parietalMirrorRevealed", "value": true }]
+  }
+]
+```
 
 ### Commun à tous les kinds
 
@@ -1131,10 +1161,11 @@ Aucun paramètre sur l'action elle-même, mais l'entité DOIT avoir un
 `mineable` (après la cascade instance -> archétype ; sinon, erreur au
 chargement). Chaque activation est un coup ; la résistance (`hits`) est
 tirée au premier, et au dernier l'entité est retirée du monde, ses objets
-(`count` tirages dans `distribution`) tombés au sol en éphémères. Effet
-d'état : `core/mining.js`/`mineEntity`. Retour : le son positionné de
-l'entité (rôle `hit`, `break` au dernier coup) sous le son méta du geste,
-sans annonce. Détail : `doc/entity-model.md`/"Minage".
+(`count` tirages dans `distribution`) tombés au sol en éphémères, et ses
+triggers `"break"` tirent (voir "Triggers"). Effet d'état : `core/mining.js`/
+`mineEntity`. Retour : le son positionné de l'entité (rôle `hit`, `break` au
+dernier coup) sous le son méta du geste, sans annonce. Détail :
+`doc/entity-model.md`/"Minage".
 
 ### `"shop"` — POINT DE VENTE, ouvre le menu du comptoir
 
