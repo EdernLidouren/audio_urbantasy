@@ -1,10 +1,15 @@
 {
   "en": {
-    "forms": ["def"],
+    "forms": [
+      "def"
+    ],
     "attributes": {}
   },
   "fr": {
-    "forms": ["def"],
+    "forms": [
+      "def",
+      "de"
+    ],
     "attributes": {}
   }
 }

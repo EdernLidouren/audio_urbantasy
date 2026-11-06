@@ -1,39 +1,64 @@
-// Jeu des billes : réglages du prototype et table des billes. Donnée pure,
-// zéro import ; validée au chargement par core/marbles.js/validateMarbleTypes.
+// Jeu des billes : réglages et table des billes. Donnée pure, zéro import ;
+// validée au chargement par core/marbles.js/validateMarbleTypes.
 //
-// Une bille :
-//   base        effet joué sur une base (obligatoire, {} : aucun effet) ;
-//   apex        effet joué sur la pointe (obligatoire, {} : aucun effet) ;
-//   baseVariant (facultatif) effet propre à UNE base, { leftBase?, rightBase? },
-//               qui remplace `base` sur cette base seulement : l'exception,
-//               jamais un champ de plus à remplir pour les autres billes ;
-//   maxWear     (facultatif) usure maximale, sinon MARBLES_SETTINGS.defaultMaxWear.
-// Un effet : { speed?, mass? }, des entiers ajoutés (ou retirés, si négatifs)
-// à la Vitesse et à la Masse du tour.
+// Une bille, chaque champ d'effet étant facultatif (absent : aucun effet) :
+//   base        effet joué sur une base ;
+//   baseVariant effet propre à UNE base, { leftBase?, rightBase? }, qui
+//               remplace `base` sur cette base seulement ;
+//   apex        effet joué sur la pointe ;
+//   hit         le Tic : effet joué quand la bille est posée sur un emplacement
+//               occupé, après l'éjection de l'occupante ;
+//   knockout    l'Éjection : effet joué quand la bille est remplacée ;
+//   maxWear     usure maximale, sinon MARBLES_SETTINGS.defaultMaxWear.
+//
+// Un effet est une LISTE DE CLAUSES ; une clause (core/marbles-effects.js) :
+//   action  ce qu'elle fait : "speed" ou "mass", qui ajoutent `amount` (entier,
+//           négatif permis) à la Vitesse ou à la Masse ;
+//   amount  la valeur ;
+//   target  (facultatif) l'emplacement dont elle modifie l'effet de phase, au
+//           lieu d'agir sur le compteur du tour ;
+//   when    (facultatif) sa condition, évaluée au déclenchement. Une condition
+//           lit toujours l'effet IMPRIMÉ d'une bille, jamais un effet déjà
+//           modifié : aucune dépendance circulaire n'est possible.
 //
 // Le nom d'une bille se déduit de son id : `marble.<id>.name`
 // (data/i18n/<langue>/marbles.json), vérifié par les vérifications
 // (domaine marbles-view).
 
 export const MARBLES_SETTINGS = {
-  handSize: 5,
+  firstTurnDraw: 5, // billes piochées au premier tour
+  drawPerTurn: 1, // billes piochées à chaque tour suivant
+  maxHandSize: 5, // main pleine : la pioche du tour est sautée
   turnCount: 9,
   defaultMaxWear: 3,
 };
 
+// Formes courtes des clauses de la table : elle se lit mieux, et reste de la
+// donnée une fois évaluée.
+const speed = (amount) => ({ action: "speed", amount });
+const mass = (amount) => ({ action: "mass", amount });
+
 export const MARBLE_TYPES = {
-  clay: { base: { speed: 1 }, apex: { speed: 4 } },
-  glass: { base: { mass: 1 }, apex: { speed: 2 } },
-  shooter: { base: {}, apex: { speed: 8 } },
-  agate: { base: { mass: 1 }, apex: { mass: 2 } },
-  cats_eye: { base: { speed: 3 }, baseVariant: { rightBase: { mass: 1 } }, apex: { speed: 3 } },
-  porcelain: { base: { speed: 2 }, apex: { speed: 5 }, maxWear: 2 },
-  leaded: { base: { mass: 2 }, apex: { speed: -3 } },
-  mica: { base: { speed: 1 }, apex: { speed: 1 }, maxWear: 6 },
-  sulphide: { base: {}, apex: { mass: 3 } },
-  stoneware: { base: { speed: 2 }, apex: {} },
-  tiger: { base: { speed: 3 }, apex: { speed: -1 }, maxWear: 4 },
-  giant: { base: { speed: 6 }, apex: { speed: 6 }, maxWear: 1 },
+  clay: { base: [speed(1)], apex: [speed(4)], hit: [speed(2)] },
+  glass: { base: [mass(1)], apex: [speed(2)] },
+  shooter: { apex: [speed(8)], knockout: [speed(3)] },
+  agate: { base: [mass(1)], apex: [mass(2)], hit: [mass(1)] },
+  cats_eye: { base: [speed(3)], baseVariant: { rightBase: [mass(1)] }, apex: [speed(3)] },
+  porcelain: { base: [speed(2)], apex: [speed(5)], maxWear: 2 },
+  leaded: { base: [mass(2)], apex: [speed(-3)], knockout: [mass(1)] },
+  mica: { base: [speed(1)], apex: [speed(1)], maxWear: 6 },
+  sulphide: { apex: [mass(3)] },
+  stoneware: { base: [speed(2)] },
+  tiger: { base: [speed(3)], apex: [speed(-1)], maxWear: 4 },
+  giant: { base: [speed(6)], apex: [speed(6)], maxWear: 1 },
+  // En base gauche, renforce la pointe si elle donne de la Vitesse.
+  magnifier: {
+    base: [speed(1)],
+    baseVariant: {
+      leftBase: [{ ...speed(4), target: "apex", when: { type: "printedStat", slot: "apex", stat: "speed", atLeast: 1 } }],
+    },
+    apex: [speed(2)],
+  },
 };
 
 // Sac de test : un exemplaire de chaque bille. Une liste d'ids, pas un
@@ -51,4 +76,5 @@ export const STARTING_BAG = [
   "stoneware",
   "tiger",
   "giant",
+  "magnifier",
 ];

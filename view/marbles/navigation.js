@@ -29,3 +29,8 @@ export function stepCursor(cursor, direction) {
   const lastBase = place === "leftBase" || place === "rightBase" ? place : cursor.lastBase;
   return { ...cursor, place, lastBase };
 }
+
+// La zone d'une place : "hand" ou "triangle". Changer de zone s'annonce.
+export function zoneOf(place) {
+  return place === "hand" ? "hand" : "triangle";
+}

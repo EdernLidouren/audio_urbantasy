@@ -3,12 +3,19 @@
 //
 // ÉTAT sérialisable, à part entière (jamais lié à la session du jeu principal,
 // aucune persistance aujourd'hui) :
-//   { rngState, handSize, turnCount, turn, score, stage, endReason,
-//     bag, hand, discard, triangle, swapUsed, hasPlaced }
+//   { rngState, maxHandSize, firstTurnDraw, drawPerTurn, turnCount, turn, score,
+//     speed, mass, stage, endReason, bag, hand, discard, triangle, swapUsed,
+//     hasPlaced }
 // bag, hand et discard sont des listes d'ids de billes (doublons permis). Une
-// bille n'a d'usure que SUR le triangle, { marble, wear } : une bille qui en
-// sort perd donc son usure par construction, et repart à zéro quand elle
-// revient. Le sommet du sac est bag[0].
+// bille n'a d'usure que SUR le triangle, { marble, wear, bonus? } : une bille
+// qui en sort perd donc son usure et son bonus par construction. `bonus`
+// ({ speed, mass }), présent seulement si une autre bille lui en a donné un, va
+// avec la bille dans un échange et disparaît à la fin de la résolution.
+// Le sommet du sac est bag[0].
+//
+// `speed` et `mass` sont les compteurs du tour : Tic et Éjection les modifient
+// avant la résolution, qui part de ces valeurs. Ils reviennent à 0 et 1 à la fin
+// de chaque résolution.
 //
 // `stage` découpe le tour : "draw" (la pioche reste à faire), "play" (échange
 // et pose, jusqu'à la résolution), "over" (partie finie, endReason dit
@@ -26,28 +33,41 @@
 // (son texte : `marbles.error.<code>`). Rien n'est jamais levé pour une
 // action interdite.
 //
+// BUS ET ÉCOUTEURS — chaque action passe ses évènements par un bus
+// (core/marbles-bus.js) : chacun entre au journal, puis les billes l'écoutent,
+// toujours dans cet ordre : base gauche, base droite, pointe, puis la main de
+// la première à la dernière (marbleListeners). EVENT_TRIGGERS dit quels
+// évènements déclenchent un effet de bille ; les autres passent au journal sans
+// effet associé, prêts à servir.
+//
 // JOURNAL — `events`, dans l'ordre où ça se passe. Interface et son s'appuient
 // sur lui seul (view/marbles/narration.js, view/marbles/sounds.js) :
-//   turnStarted { turn, turnCount }, draw { marble }, bagRegenerated { size },
-//   swapped { a, b }, replaced { slot, marble }, placed { slot, marble },
+//   turnStarted { turn, turnCount }, draw { marble }, drawSkipped { reason },
+//   bagRegenerated { size }, swapped { a, b },
+//   knockout { slot, marble }, removed { slot, marble, cause },
+//   discarded { slot, marble, cause }, placed { slot, marble },
+//   hit { slot, marble },
 //   phase { slot, marble }, phaseSkipped { slot },
-//   effect { slot, marble, speedDelta, massDelta, speed, mass },
+//   effect { trigger, slot, marble, speedDelta, massDelta, given, speed, mass },
 //   wear { slot, marble, wear, maxWear },
 //   impact { speed, mass, impact, score },
-//   retired { slot, marble }, rotation { triangle },
-//   gameOver { reason, score }.
+//   rotation { triangle }, turnEnded { turn }, gameOver { reason, score }.
+// `cause` : "replacement" ou "wear". `trigger` : "phase", "hit" ou "knockout".
+// `given` : ce que l'effet a donné aux autres emplacements occupés,
+// [{ slot, marble, speed, mass }]. `speedDelta` et `massDelta` comptent le bonus
+// reçu : c'est le total effectif de la bille, tel qu'il s'annonce.
 //
-// `types` (dernier paramètre des fonctions qui lisent une bille) : la table des
-// billes, par défaut celle du jeu. Injectable pour les vérifications, qui
-// testent ainsi ce qu'aucune bille actuelle ne produit (une Masse négative).
+// `types` (paramètre des fonctions qui lisent une bille) : la table des billes,
+// par défaut celle du jeu. Injectable pour les vérifications, qui testent ainsi
+// ce qu'aucune bille actuelle ne produit (une Masse négative).
 
 import { MARBLES_SETTINGS, MARBLE_TYPES, STARTING_BAG } from "../config/marbles-values.js";
 import { createSeed, nextRandom } from "./rng.js";
 import { rejectUnknownFields } from "../lib/validate.js";
+import { MarbleEventLimitError, createEventBus } from "./marbles-bus.js";
+import { SLOTS, addDeltas, effectAt, evaluateEffect, validateEffect } from "./marbles-effects.js";
 
-// Emplacements, dans l'ordre de RÉSOLUTION (phases de base gauche, de base
-// droite, de pointe).
-export const SLOTS = ["leftBase", "rightBase", "apex"];
+export { SLOTS, effectAt };
 
 // Codes de refus (voir l'en-tête). Une liste pour que chaque code ait son
 // texte, vérifié par les vérifications (domaine marbles-view).
@@ -64,17 +84,10 @@ export const MARBLE_ERRORS = [
   "swapBothEmpty",
   "placementBlocksTriangle",
   "triangleIncomplete",
+  "eventLimit",
 ];
 
 // --- Table des billes ---
-
-function validateEffect(effect, describe, fail) {
-  if (!effect || typeof effect !== "object" || Array.isArray(effect)) fail(`${describe} : effet absent ({} : aucun effet).`);
-  rejectUnknownFields(effect, ["speed", "mass"], describe, fail);
-  for (const [field, value] of Object.entries(effect)) {
-    if (!Number.isInteger(value)) fail(`${describe} : ${field} doit être un entier.`);
-  }
-}
 
 // Échoue au chargement sur une table mal formée. Exportée pour vérifier le
 // rejet sur des tables fabriquées ; ce module valide la vraie plus bas.
@@ -84,9 +97,10 @@ export function validateMarbleTypes(types) {
   };
   if (Object.keys(types).length === 0) fail("table des billes vide.");
   for (const [id, type] of Object.entries(types)) {
-    rejectUnknownFields(type, ["base", "apex", "baseVariant", "maxWear"], `bille "${id}"`, fail);
-    validateEffect(type.base, `bille "${id}", base`, fail);
-    validateEffect(type.apex, `bille "${id}", apex`, fail);
+    rejectUnknownFields(type, ["base", "baseVariant", "apex", "hit", "knockout", "maxWear"], `bille "${id}"`, fail);
+    for (const field of ["base", "apex", "hit", "knockout"]) {
+      if (type[field] !== undefined) validateEffect(type[field], `bille "${id}", ${field}`, fail);
+    }
     if (type.baseVariant !== undefined) {
       rejectUnknownFields(type.baseVariant, ["leftBase", "rightBase"], `bille "${id}", baseVariant`, fail);
       for (const [slot, effect] of Object.entries(type.baseVariant)) {
@@ -99,11 +113,16 @@ export function validateMarbleTypes(types) {
   }
 }
 
-// Une partie à trois emplacements ne se joue pas sans au moins une bille en
-// main et un tour : la valeur fausse échouerait sinon en pleine partie.
-function validateGameSettings({ handSize, turnCount, bag }, types) {
-  if (!Number.isInteger(handSize) || handSize < 1) throw new Error("marbles : handSize doit être un entier >= 1.");
-  if (!Number.isInteger(turnCount) || turnCount < 1) throw new Error("marbles : turnCount doit être un entier >= 1.");
+// La valeur fausse échouerait sinon en pleine partie. Le premier tour exige un
+// triangle plein et la main ne se recomplète qu'au tour suivant : une première
+// pioche plus petite que le triangle laisserait la partie sans issue.
+function validateGameSettings({ maxHandSize, firstTurnDraw, drawPerTurn, turnCount, bag }, types) {
+  const positive = { maxHandSize, firstTurnDraw, drawPerTurn, turnCount };
+  for (const [name, value] of Object.entries(positive)) {
+    if (!Number.isInteger(value) || value < 1) throw new Error(`marbles : ${name} doit être un entier >= 1.`);
+  }
+  if (firstTurnDraw < SLOTS.length) throw new Error(`marbles : firstTurnDraw doit valoir au moins ${SLOTS.length}.`);
+  if (maxHandSize < firstTurnDraw) throw new Error("marbles : maxHandSize doit valoir au moins firstTurnDraw.");
   for (const id of bag) {
     if (!Object.hasOwn(types, id)) throw new Error(`marbles : bille inconnue "${id}" dans le sac.`);
   }
@@ -114,13 +133,6 @@ validateGameSettings({ ...MARBLES_SETTINGS, bag: STARTING_BAG }, MARBLE_TYPES);
 
 export function maxWearOf(marble, types = MARBLE_TYPES) {
   return types[marble].maxWear ?? MARBLES_SETTINGS.defaultMaxWear;
-}
-
-// L'effet d'une bille à un emplacement, variante de base comprise.
-export function effectAt(marble, slot, types = MARBLE_TYPES) {
-  const type = types[marble];
-  if (slot === "apex") return type.apex;
-  return type.baseVariant?.[slot] ?? type.base;
 }
 
 // Vitesse × Masse d'un tour. Les planchers valent pour ce calcul final, jamais
@@ -148,17 +160,27 @@ function shuffled(list, rngState) {
 // --- Mise en place ---
 
 // `seed` : nombre ou chaîne (core/rng.js/createSeed). `options` (facultatif) :
-// bag, handSize, turnCount, sinon les réglages du prototype.
+// bag et les réglages de MARBLES_SETTINGS propres à une partie.
 export function createMarblesGame(seed, options = {}, types = MARBLE_TYPES) {
-  const { bag = STARTING_BAG, handSize = MARBLES_SETTINGS.handSize, turnCount = MARBLES_SETTINGS.turnCount } = options;
-  validateGameSettings({ handSize, turnCount, bag }, types);
+  const {
+    bag = STARTING_BAG,
+    maxHandSize = MARBLES_SETTINGS.maxHandSize,
+    firstTurnDraw = MARBLES_SETTINGS.firstTurnDraw,
+    drawPerTurn = MARBLES_SETTINGS.drawPerTurn,
+    turnCount = MARBLES_SETTINGS.turnCount,
+  } = options;
+  validateGameSettings({ maxHandSize, firstTurnDraw, drawPerTurn, turnCount, bag }, types);
   const shuffle = shuffled(bag, createSeed(seed));
   return {
     rngState: shuffle.rngState,
-    handSize,
+    maxHandSize,
+    firstTurnDraw,
+    drawPerTurn,
     turnCount,
     turn: 1,
     score: 0,
+    speed: 0,
+    mass: 1,
     stage: "draw",
     endReason: null,
     bag: shuffle.list,
@@ -172,7 +194,8 @@ export function createMarblesGame(seed, options = {}, types = MARBLE_TYPES) {
 
 // --- Refus ---
 
-function stageRefusal(state, expected) {
+// Exportée pour la prévision, qui suit la même règle.
+export function stageRefusal(state, expected) {
   if (state.stage === "over") return "gameOver";
   if (state.stage === expected) return null;
   return expected === "draw" ? "alreadyDrawn" : "mustDraw";
@@ -198,7 +221,7 @@ export function swapRefusal(state) {
 }
 
 // Cette pose est-elle permise ? Le code du refus, ou null. Exportée pour que
-// l'interface ne demande pas de confirmer un remplacement qui serait refusé.
+// l'interface ne demande pas de confirmer une pose qui serait refusée.
 //
 // Au premier tour, le triangle doit être plein pour résoudre, et la main ne se
 // recomplète qu'au tour suivant : remplacer trop de billes laisserait la
@@ -216,83 +239,173 @@ export function placeRefusal(state, handIndex, slot) {
   return null;
 }
 
-// --- Actions ---
-
 function refused(state, error) {
   return { ok: false, state, events: [], error };
 }
 
-function accepted(state, events) {
-  return { ok: true, state, events, error: null };
+// --- Écouteurs ---
+
+// Les billes qui écoutent le bus, dans leur ordre fixe : base gauche, base
+// droite, pointe, puis la main de la première à la dernière. Une liste relue à
+// chaque évènement : elle suit le triangle tel qu'il est à cet instant.
+export function marbleListeners(state) {
+  const onTriangle = SLOTS.filter((slot) => state.triangle[slot] !== null).map((slot) => ({
+    zone: "triangle",
+    slot,
+    marble: state.triangle[slot].marble,
+  }));
+  const inHand = state.hand.map((marble, index) => ({ zone: "hand", index, marble }));
+  return [...onTriangle, ...inHand];
 }
 
-// Pioche : compléter la main. Sac vide alors qu'il manque encore une bille :
-// la défausse, mélangée, devient le sac, et la partie s'arrête s'il compte
-// moins de billes que le triangle n'a d'emplacements. Ce test n'a lieu qu'à
-// une régénération : un sac qui se vide juste quand la main est complète ne
-// régénère rien tant qu'aucune bille n'est demandée.
-function draw(state) {
-  const refusal = stageRefusal(state, "draw");
-  if (refusal) return refused(state, refusal);
+function isOnEventSlot(event, listener) {
+  return listener.zone === "triangle" && listener.slot === event.slot;
+}
 
-  const events = [{ type: "turnStarted", turn: state.turn, turnCount: state.turnCount }];
-  let { rngState, bag, discard } = state;
-  const hand = [...state.hand];
-  bag = [...bag];
+// Quels évènements déclenchent un effet, et chez quelle bille : les clauses à
+// jouer, ou null. La bille concernée est chaque fois celle de l'emplacement de
+// l'évènement : l'occupante avant son retrait (Éjection), la nouvelle venue
+// après sa pose (Tic). Une bille sans Tic ni Éjection ne réagit pas du tout :
+// pas d'évènement `effect`, à la différence d'une phase, qui en a toujours un.
+// Un futur déclencheur est une ligne de plus ici.
+const EVENT_TRIGGERS = {
+  phase: (event, listener, types) => (isOnEventSlot(event, listener) ? effectAt(listener.marble, listener.slot, types) : null),
+  knockout: (event, listener, types) => (isOnEventSlot(event, listener) ? types[listener.marble].knockout ?? null : null),
+  hit: (event, listener, types) => (isOnEventSlot(event, listener) ? types[listener.marble].hit ?? null : null),
+};
 
-  while (hand.length < state.handSize) {
-    if (bag.length === 0) {
-      const shuffle = shuffled(discard, rngState);
-      rngState = shuffle.rngState;
-      bag = shuffle.list;
-      discard = [];
-      events.push({ type: "bagRegenerated", size: bag.length });
-      if (bag.length < SLOTS.length) {
-        events.push({ type: "gameOver", reason: "bagExhausted", score: state.score });
-        return accepted({ ...state, rngState, bag, discard, hand, stage: "over", endReason: "bagExhausted" }, events);
-      }
-    }
-    const marble = bag.shift();
-    hand.push(marble);
-    events.push({ type: "draw", marble });
+// --- Le déroulé d'une action ---
+
+function update(run, changes) {
+  run.state = { ...run.state, ...changes };
+}
+
+// Joue un effet de bille : les compteurs du tour d'abord, ce qui va aux autres
+// emplacements ensuite (un cadeau à un emplacement vide est perdu), le bonus
+// reçu compté au moment de la phase de la bille.
+function fireEffect(run, event, listener, clauses) {
+  const { slot, marble } = listener;
+  const { self, gifts } = evaluateEffect(clauses, run.state.triangle, run.types);
+  const bonus = event.type === "phase" ? run.state.triangle[slot].bonus : undefined;
+  const { speed: speedDelta, mass: massDelta } = bonus ? addDeltas(self, bonus) : self;
+
+  let { triangle } = run.state;
+  const given = [];
+  for (const { slot: target, speed: giftSpeed, mass: giftMass } of gifts) {
+    const placed = triangle[target];
+    if (placed === null) continue;
+    const gift = { speed: giftSpeed, mass: giftMass };
+    triangle = { ...triangle, [target]: { ...placed, bonus: placed.bonus ? addDeltas(placed.bonus, gift) : gift } };
+    given.push({ slot: target, marble: placed.marble, ...gift });
   }
 
-  return accepted({ ...state, rngState, bag, discard, hand, stage: "play", swapUsed: false, hasPlaced: false }, events);
+  const speed = run.state.speed + speedDelta;
+  const mass = run.state.mass + massDelta;
+  update(run, { triangle, speed, mass });
+  run.emit({ type: "effect", trigger: event.type, slot, marble, speedDelta, massDelta, given, speed, mass });
+}
+
+// Le traitement d'un évènement par le bus : le journal, puis les écouteurs.
+function handleEvent(run, event) {
+  run.journal.push(event);
+  const trigger = EVENT_TRIGGERS[event.type];
+  if (!trigger) return;
+  for (const listener of marbleListeners(run.state)) {
+    const clauses = trigger(event, listener, run.types);
+    if (clauses !== null) fireEffect(run, event, listener, clauses);
+  }
+}
+
+// Déroule une action sur un état de travail, avec son bus et son journal. Une
+// boucle d'évènements l'annule tout entière : l'état reçu n'a jamais été touché.
+function transact(state, types, eventLimit, body) {
+  const run = { state, types, journal: [] };
+  run.emit = createEventBus((event) => handleEvent(run, event), eventLimit).emit;
+  try {
+    body(run);
+  } catch (error) {
+    if (error instanceof MarbleEventLimitError) return refused(state, "eventLimit");
+    throw error;
+  }
+  return { ok: true, state: run.state, events: run.journal, error: null };
+}
+
+// --- Actions ---
+
+// Pioche : `firstTurnDraw` billes au premier tour, puis `drawPerTurn`. Main
+// pleine : la pioche s'arrête là et la bille reste au sac. Sac vide alors qu'il
+// faut une bille : la défausse, mélangée, devient le sac, et la partie s'arrête
+// s'il compte moins de billes que le triangle n'a d'emplacements. Ce test n'a
+// lieu qu'à une régénération : un sac qui se vide sans qu'aucune bille ne soit
+// demandée ne régénère rien.
+function drawTurn(run) {
+  const { state } = run;
+  run.emit({ type: "turnStarted", turn: state.turn, turnCount: state.turnCount });
+  const count = state.turn === 1 ? state.firstTurnDraw : state.drawPerTurn;
+
+  for (let drawn = 0; drawn < count; drawn++) {
+    if (run.state.hand.length >= run.state.maxHandSize) {
+      run.emit({ type: "drawSkipped", reason: "handFull" });
+      break;
+    }
+    if (run.state.bag.length === 0) {
+      const shuffle = shuffled(run.state.discard, run.state.rngState);
+      update(run, { rngState: shuffle.rngState, bag: shuffle.list, discard: [] });
+      run.emit({ type: "bagRegenerated", size: shuffle.list.length });
+      if (shuffle.list.length < SLOTS.length) {
+        update(run, { stage: "over", endReason: "bagExhausted" });
+        run.emit({ type: "gameOver", reason: "bagExhausted", score: run.state.score });
+        return;
+      }
+    }
+    const [marble, ...bag] = run.state.bag;
+    update(run, { bag, hand: [...run.state.hand, marble] });
+    run.emit({ type: "draw", marble });
+  }
+
+  update(run, { stage: "play", swapUsed: false, hasPlaced: false });
 }
 
 // Échange : le contenu de deux emplacements, usure comprise. Un emplacement
 // vide fait de l'échange un simple déplacement ; deux vides n'échangeraient
-// rien et gâcheraient l'échange du tour, c'est refusé.
-function swap(state, { a, b }) {
+// rien et gâcheraient l'échange du tour, c'est refusé. Ni Tic ni Éjection.
+function swapRefused(state, { a, b }) {
   const refusal = swapRefusal(state);
-  if (refusal) return refused(state, refusal);
-  if (!isSlot(a) || !isSlot(b)) return refused(state, "invalidSlot");
-  if (a === b) return refused(state, "swapSameSlot");
-  if (state.triangle[a] === null && state.triangle[b] === null) return refused(state, "swapBothEmpty");
-
-  const triangle = { ...state.triangle, [a]: state.triangle[b], [b]: state.triangle[a] };
-  return accepted({ ...state, triangle, swapUsed: true }, [{ type: "swapped", a, b }]);
+  if (refusal) return refusal;
+  if (!isSlot(a) || !isSlot(b)) return "invalidSlot";
+  if (a === b) return "swapSameSlot";
+  if (state.triangle[a] === null && state.triangle[b] === null) return "swapBothEmpty";
+  return null;
 }
 
-// Pose : la bille quitte la main ; une bille déjà là part à la défausse (la
-// confirmation est l'affaire de l'interface).
-function place(state, { handIndex, slot }) {
-  const refusal = placeRefusal(state, handIndex, slot);
-  if (refusal) return refused(state, refusal);
+function swapSlots(run, { a, b }) {
+  const { triangle } = run.state;
+  update(run, { triangle: { ...triangle, [a]: triangle[b], [b]: triangle[a] }, swapUsed: true });
+  run.emit({ type: "swapped", a, b });
+}
 
-  const marble = state.hand[handIndex];
-  const hand = state.hand.filter((_, index) => index !== handIndex);
-  const previous = state.triangle[slot];
-  const events = [];
-  let { discard } = state;
+// Pose (la confirmation est l'affaire de l'interface). Sur un emplacement
+// occupé, dans cet ordre : Éjection de l'occupante, son retrait, son départ à la
+// défausse, la nouvelle bille rejoint l'emplacement, son Tic. Sur un emplacement
+// vide, la pose seule.
+function placeMarble(run, { handIndex, slot }) {
+  const marble = run.state.hand[handIndex];
+  const previous = run.state.triangle[slot];
   if (previous !== null) {
-    discard = [...discard, previous.marble];
-    events.push({ type: "replaced", slot, marble: previous.marble });
+    const ejected = { slot, marble: previous.marble };
+    run.emit({ type: "knockout", ...ejected });
+    update(run, { triangle: { ...run.state.triangle, [slot]: null } });
+    run.emit({ type: "removed", ...ejected, cause: "replacement" });
+    update(run, { discard: [...run.state.discard, previous.marble] });
+    run.emit({ type: "discarded", ...ejected, cause: "replacement" });
   }
-  events.push({ type: "placed", slot, marble });
-
-  const triangle = { ...state.triangle, [slot]: { marble, wear: 0 } };
-  return accepted({ ...state, hand, discard, triangle, hasPlaced: true }, events);
+  update(run, {
+    hand: run.state.hand.filter((_, index) => index !== handIndex),
+    triangle: { ...run.state.triangle, [slot]: { marble, wear: 0 } },
+    hasPlaced: true,
+  });
+  run.emit({ type: "placed", slot, marble });
+  if (previous !== null) run.emit({ type: "hit", slot, marble });
 }
 
 // Base gauche -> pointe, pointe -> base droite, base droite -> base gauche ;
@@ -301,77 +414,89 @@ function rotated(triangle) {
   return { apex: triangle.leftBase, rightBase: triangle.apex, leftBase: triangle.rightBase };
 }
 
-// Résolution, retrait, rotation : tout s'enchaîne d'un bloc, le journal garde
-// le détail pour le dire étape par étape.
-function resolve(state, types) {
-  const refusal = stageRefusal(state, "play");
-  if (refusal) return refused(state, refusal);
-  if (state.turn === 1 && emptySlotCount(state.triangle) > 0) return refused(state, "triangleIncomplete");
+// Plus de bonus une fois la résolution finie : il ne vaut que pour ce tour.
+function withoutBonus(placed) {
+  return placed === null ? null : { marble: placed.marble, wear: placed.wear };
+}
 
-  const events = [];
-  const triangle = { ...state.triangle };
-  let speed = 0;
-  let mass = 1;
-
+function resolvePhases(run) {
   for (const slot of SLOTS) {
-    const placed = triangle[slot];
+    const placed = run.state.triangle[slot];
     if (placed === null) {
-      events.push({ type: "phaseSkipped", slot });
+      run.emit({ type: "phaseSkipped", slot });
       continue;
     }
     const { marble } = placed;
-    events.push({ type: "phase", slot, marble });
-
-    const effect = effectAt(marble, slot, types);
-    const speedDelta = effect.speed ?? 0;
-    const massDelta = effect.mass ?? 0;
-    speed += speedDelta;
-    mass += massDelta;
-    events.push({ type: "effect", slot, marble, speedDelta, massDelta, speed, mass });
-
+    run.emit({ type: "phase", slot, marble });
     // Une bille joue son effet même si cette usure l'amène à son maximum.
     const wear = placed.wear + 1;
-    triangle[slot] = { marble, wear };
-    events.push({ type: "wear", slot, marble, wear, maxWear: maxWearOf(marble, types) });
+    update(run, { triangle: { ...run.state.triangle, [slot]: { marble, wear } } });
+    run.emit({ type: "wear", slot, marble, wear, maxWear: maxWearOf(marble, run.types) });
   }
+}
 
-  const impact = impactOf(speed, mass);
-  const score = state.score + impact;
-  events.push({ type: "impact", speed, mass, impact, score });
-
-  const discard = [...state.discard];
+function retireWornMarbles(run) {
   for (const slot of SLOTS) {
-    const placed = triangle[slot];
-    if (placed !== null && placed.wear >= maxWearOf(placed.marble, types)) {
-      discard.push(placed.marble);
-      triangle[slot] = null;
-      events.push({ type: "retired", slot, marble: placed.marble });
+    const placed = run.state.triangle[slot];
+    if (placed === null || placed.wear < maxWearOf(placed.marble, run.types)) continue;
+    const worn = { slot, marble: placed.marble, cause: "wear" };
+    update(run, { triangle: { ...run.state.triangle, [slot]: null } });
+    run.emit({ type: "removed", ...worn });
+    update(run, { discard: [...run.state.discard, placed.marble] });
+    run.emit({ type: "discarded", ...worn });
+  }
+}
+
+// La résolution, sans les refus : phases, Impact, retraits, rotation, fin de
+// tour. La vraie, celle de l'action "resolve" comme celle de la prévision
+// (core/marbles-forecast.js), qui la lance aussi sur un triangle du premier tour
+// encore incomplet. Ne pioche jamais et ne touche pas au hasard.
+export function runResolution(state, types = MARBLE_TYPES, { eventLimit } = {}) {
+  return transact(state, types, eventLimit, (run) => {
+    resolvePhases(run);
+
+    const { speed, mass } = run.state;
+    const impact = impactOf(speed, mass);
+    const score = run.state.score + impact;
+    update(run, { score });
+    run.emit({ type: "impact", speed, mass, impact, score });
+
+    retireWornMarbles(run);
+
+    const { leftBase, rightBase, apex } = run.state.triangle;
+    const triangle = rotated({ leftBase: withoutBonus(leftBase), rightBase: withoutBonus(rightBase), apex: withoutBonus(apex) });
+    update(run, { triangle, speed: 0, mass: 1 });
+    run.emit({ type: "rotation", triangle });
+    run.emit({ type: "turnEnded", turn: run.state.turn });
+
+    if (run.state.turn >= run.state.turnCount) {
+      update(run, { stage: "over", endReason: "turnsCompleted" });
+      run.emit({ type: "gameOver", reason: "turnsCompleted", score });
+    } else {
+      update(run, { turn: run.state.turn + 1, stage: "draw" });
     }
-  }
-
-  const nextTriangle = rotated(triangle);
-  events.push({ type: "rotation", triangle: nextTriangle });
-
-  const after = { ...state, score, discard, triangle: nextTriangle };
-  if (state.turn >= state.turnCount) {
-    events.push({ type: "gameOver", reason: "turnsCompleted", score });
-    return accepted({ ...after, stage: "over", endReason: "turnsCompleted" }, events);
-  }
-  return accepted({ ...after, turn: state.turn + 1, stage: "draw" }, events);
+  });
 }
 
 // Le réducteur : pur, ne modifie jamais `state`. Même état + même action =
-// même résultat.
-export function marblesReduce(state, action, types = MARBLE_TYPES) {
+// même résultat. `eventLimit` (facultatif) : la limite du bus pour cette action,
+// abaissée par les vérifications.
+export function marblesReduce(state, action, types = MARBLE_TYPES, { eventLimit } = {}) {
+  let refusal;
   switch (action?.type) {
     case "draw":
-      return draw(state);
+      refusal = stageRefusal(state, "draw");
+      return refusal ? refused(state, refusal) : transact(state, types, eventLimit, drawTurn);
     case "swap":
-      return swap(state, action);
+      refusal = swapRefused(state, action);
+      return refusal ? refused(state, refusal) : transact(state, types, eventLimit, (run) => swapSlots(run, action));
     case "place":
-      return place(state, action);
+      refusal = placeRefusal(state, action.handIndex, action.slot);
+      return refusal ? refused(state, refusal) : transact(state, types, eventLimit, (run) => placeMarble(run, action));
     case "resolve":
-      return resolve(state, types);
+      refusal = stageRefusal(state, "play");
+      if (!refusal && state.turn === 1 && emptySlotCount(state.triangle) > 0) refusal = "triangleIncomplete";
+      return refusal ? refused(state, refusal) : runResolution(state, types, { eventLimit });
     default:
       return refused(state, "unknownAction");
   }

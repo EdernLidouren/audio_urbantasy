@@ -1,23 +1,67 @@
 {
-  "marble.agate.name": "agate",
-  "marble.cats_eye.name": "œil-de-chat",
-  "marble.clay.name": "argile",
-  "marble.giant.name": "géante",
-  "marble.glass.name": "verre",
-  "marble.leaded.name": "plombée",
-  "marble.mica.name": "mica",
-  "marble.porcelain.name": "porcelaine",
-  "marble.shooter.name": "calot",
-  "marble.stoneware.name": "grès",
-  "marble.sulphide.name": "sulfure",
-  "marble.tiger.name": "tigrée",
+  "marble.agate.name": {
+    "base": "agate",
+    "de": "d'agate"
+  },
+  "marble.cats_eye.name": {
+    "base": "œil-de-chat",
+    "de": "d'œil-de-chat"
+  },
+  "marble.clay.name": {
+    "base": "argile",
+    "de": "d'argile"
+  },
+  "marble.giant.name": {
+    "base": "géante",
+    "de": "de géante"
+  },
+  "marble.glass.name": {
+    "base": "verre",
+    "de": "de verre"
+  },
+  "marble.leaded.name": {
+    "base": "plombée",
+    "de": "de plombée"
+  },
+  "marble.magnifier.name": {
+    "base": "loupe",
+    "de": "de loupe"
+  },
+  "marble.mica.name": {
+    "base": "mica",
+    "de": "de mica"
+  },
+  "marble.porcelain.name": {
+    "base": "porcelaine",
+    "de": "de porcelaine"
+  },
+  "marble.shooter.name": {
+    "base": "calot",
+    "de": "de calot"
+  },
+  "marble.stoneware.name": {
+    "base": "grès",
+    "de": "de grès"
+  },
+  "marble.sulphide.name": {
+    "base": "sulfure",
+    "de": "de sulfure"
+  },
+  "marble.tiger.name": {
+    "base": "tigrée",
+    "de": "de tigrée"
+  },
+  "marbles.condition.printedStat": "son effet de {slot} donne au moins {effect}",
   "marbles.effect.combined": "{parts, list}",
-  "marbles.effect.mass_down": "masse moins {amount}",
-  "marbles.effect.mass_up": "masse plus {amount}",
+  "marbles.effect.conditional": "{effect} si {condition}",
+  "marbles.effect.given": "{effect} à la {slot}",
+  "marbles.effect.mass_down": "Masse moins {amount}",
+  "marbles.effect.mass_up": "Masse +{amount}",
   "marbles.effect.none": "aucun effet",
-  "marbles.effect.speed_down": "vitesse moins {amount}",
-  "marbles.effect.speed_up": "vitesse plus {amount}",
+  "marbles.effect.speed_down": "Vitesse moins {amount}",
+  "marbles.effect.speed_up": "Vitesse +{amount}",
   "marbles.error.alreadyDrawn": "La pioche de ce tour est déjà faite.",
+  "marbles.error.eventLimit": "Trop d'effets en chaîne : action annulée.",
   "marbles.error.gameOver": "La partie est terminée.",
   "marbles.error.invalidHandIndex": "Cette bille n'est pas dans la main.",
   "marbles.error.invalidSlot": "Emplacement inconnu.",
@@ -30,29 +74,35 @@
   "marbles.error.triangleIncomplete": "Au premier tour, remplissez les trois emplacements avant la résolution.",
   "marbles.error.unknownAction": "Action inconnue.",
   "marbles.event.bag_regenerated": "Sac vide : la défausse mélangée donne un nouveau sac de {size, plural, one {# bille} other {# billes}}.",
+  "marbles.event.discarded.replacement": "Défausse : {marble}.",
+  "marbles.event.discarded.wear": "Retrait : {marble}, usure au maximum.",
   "marbles.event.draw": "Pioche : {marbles, list}.",
-  "marbles.event.effect": "{effect}. Vitesse {speed}, masse {mass}.",
+  "marbles.event.draw_skipped": "Main pleine : pas de pioche.",
+  "marbles.event.effect": "{effect}. Vitesse {speed}, Masse {mass}.",
+  "marbles.event.effect_hit": "Tic {marble:de} : {effect}. Vitesse {speed}, Masse {mass}.",
+  "marbles.event.effect_knockout": "Éjection {marble:de} : {effect}. Vitesse {speed}, Masse {mass}.",
   "marbles.event.game_over.bagExhausted": "Moins de 3 billes dans le sac : partie terminée. Score final : {score}.",
   "marbles.event.game_over.turnsCompleted": "Partie terminée. Score final : {score}.",
   "marbles.event.impact": "Vitesse {speed}, Masse {mass}. Impact {impact}. Score {score}.",
   "marbles.event.phase": "{slot} : {marble}.",
   "marbles.event.phase_skipped": "{slot} : vide, phase sautée.",
   "marbles.event.placed": "Pose : {marble} en {slot}.",
-  "marbles.event.replaced": "Défausse : {marble}.",
-  "marbles.event.retired": "Retrait : {marble}, usure au maximum.",
   "marbles.event.rotation": "Rotation. Pointe : {apex}. Base gauche : {leftBase}. Base droite : {rightBase}.",
   "marbles.event.swapped": "Échange : {a} et {b}.",
   "marbles.event.turn_started": "Tour {turn} sur {turnCount}.",
   "marbles.event.wear": "Usure {wear} sur {maxWear}.",
-  "marbles.hand.effects": "Base : {base}. Pointe : {apex}.",
-  "marbles.hand.effects_variant": "Base gauche : {left}. Base droite : {right}. Pointe : {apex}.",
+  "marbles.hand.base": "Base, {effect}",
+  "marbles.hand.base_variant": "Base gauche, {left}. Base droite, {right}",
   "marbles.hand.empty": "Main vide.",
   "marbles.hand.held": "Sélectionnée.",
-  "marbles.hand.line": "Main, {index} sur {total} : {name}. {effects} Usure maximale {maxWear}.",
+  "marbles.hand.line": "{name} : pointe, {apex}. {base}",
   "marbles.intro": "Partie de billes. F1 pour l'aide.",
   "marbles.over_hint": "Entrée pour revenir au menu principal.",
+  "marbles.place.hit": "Tic {marble:de} : {effect}",
+  "marbles.place.knockout": "Éjection {marble:de} : {effect}",
+  "marbles.place.menu_title": "Confirmer la pose",
+  "marbles.place.question": "Poser {marble} en {slot} ? {effect}",
   "marbles.quit.confirm": "Abandonner cette partie de billes ?",
-  "marbles.replace.confirm": "{slot} : remplacer {old} par {new} ? {old} part à la défausse.",
   "marbles.resolution.hint": "Résolution. Entrée : étape suivante. R : tout entendre d'un coup.",
   "marbles.slot.apex": "pointe",
   "marbles.slot.empty": "vide",
@@ -61,10 +111,14 @@
   "marbles.slot_line.empty": "{slot} : vide.",
   "marbles.slot_line.held": "Sélectionné pour l'échange.",
   "marbles.slot_line.occupied": "{slot} : {name}. {effect}. Usure {wear} sur {maxWear}.",
-  "marbles.status.line": "Tour {turn} sur {turnCount}. Score {score}. Sac : {bag, plural, one {# bille} other {# billes}}. Défausse : {discard, plural, one {# bille} other {# billes}}.",
+  "marbles.slot_line.placing_empty": "{slot}",
+  "marbles.slot_line.placing_occupied": "{slot}, {name} : {effect}.",
+  "marbles.status.line": "Tour {turn} sur {turnCount}. Score {score}. Vitesse {speed}, Masse {mass}. Sac : {bag, plural, one {# bille} other {# billes}}. Défausse : {discard, plural, one {# bille} other {# billes}}.",
   "marbles.status.swap_available": "Échange disponible.",
   "marbles.status.swap_unavailable": "Échange indisponible.",
   "marbles.take.hand": "Sélection : {name}. Choisissez un emplacement.",
   "marbles.take.released": "Sélection annulée.",
-  "marbles.take.slot": "Échange depuis {slot}. Choisissez l'autre emplacement."
+  "marbles.take.slot": "Échange depuis {slot}. Choisissez l'autre emplacement.",
+  "marbles.zone.hand": "Main.",
+  "marbles.zone.triangle": "Triangle."
 }

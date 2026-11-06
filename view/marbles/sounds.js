@@ -9,23 +9,30 @@
 // Une étape porte plusieurs évènements (phase, effet, usure) : leurs sons
 // partent ENSEMBLE. Les étaler dans le temps (l'usure juste après l'effet, une
 // hauteur qui monte avec l'Impact...) se fera ici, le jour où ils existeront.
+// Un évènement `effect` dit aussi ce qui l'a déclenché (`trigger` : "phase",
+// "hit", "knockout"), pour un son propre au Tic ou à l'Éjection ; de même
+// `discarded` et sa cause ("replacement", "wear").
 
 import { playInterfaceSound } from "../menu-sounds.js";
 
 export const MARBLE_EVENT_SOUNDS = {
   turnStarted: null,
   draw: null,
+  drawSkipped: null,
   bagRegenerated: null,
   swapped: null,
-  replaced: null,
+  knockout: null,
+  removed: null,
+  discarded: null,
   placed: null,
+  hit: null,
   phase: null,
   phaseSkipped: null,
   effect: null,
   wear: null,
   impact: null,
-  retired: null,
   rotation: null,
+  turnEnded: null,
   gameOver: null,
 };
 

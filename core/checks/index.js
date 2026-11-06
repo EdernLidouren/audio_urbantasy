@@ -52,6 +52,8 @@ import checkTemporaryBehavior from "./temporary-behavior.check.js";
 import checkSequence from "./sequence.check.js";
 import checkRotation from "./rotation.check.js";
 import checkMarbles from "./marbles.check.js";
+import checkMarblesBus from "./marbles-bus.check.js";
+import checkMarblesForecast from "./marbles-forecast.check.js";
 import checkMarblesView from "./marbles-view.check.js";
 // Domaines de lib/ (mécanismes portables), lancés par le même point
 // d'entrée : une seule commande, un seul récapitulatif.
@@ -97,6 +99,8 @@ const SUITES = [
   { name: "sequence", check: checkSequence },
   { name: "rotation", check: checkRotation },
   { name: "marbles", check: checkMarbles },
+  { name: "marbles-bus", check: checkMarblesBus },
+  { name: "marbles-forecast", check: checkMarblesForecast },
   { name: "marbles-view", check: checkMarblesView },
   { name: "i18n", check: checkI18n },
   { name: "i18n-content", check: checkI18nContent },

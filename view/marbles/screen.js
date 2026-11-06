@@ -5,7 +5,8 @@
 // sélection et les étapes de résolution à dire, le temps d'un écran.
 //
 // PRENDRE ET POSER, un seul geste (Entrée) : sur une bille de la main, la
-// sélectionne ; sur un emplacement ensuite, la pose (confirmation si occupé).
+// sélectionne ; sur un emplacement ensuite, ouvre le menu de confirmation de la
+// pose, qui dit ce qu'elle produirait (prévision, core/marbles-forecast.js).
 // Sur un emplacement sans sélection, le prend pour l'échange ; sur un second
 // emplacement ensuite, échange les deux. Refaire Entrée sur la sélection, ou
 // Échap, l'annule.
@@ -17,15 +18,26 @@
 // refusés : l'état est déjà celui d'après la résolution, et les dévoilerait.
 
 import { announce } from "../../lib/announce.js";
-import { popScreen } from "../../lib/screens.js";
+import { popScreen, pushScreen } from "../../lib/screens.js";
 import { resolveAction, defineBindings } from "../../lib/input.js";
-import { stepMenuCursor, announceMenuLine } from "../../lib/menu.js";
+import { jumpMenuCursor, makeMenuScreen, stepMenuCursor, announceMenuLine } from "../../lib/menu.js";
 import { t } from "../../data/i18n/index.js";
 import { marblesReduce, swapRefusal, placeRefusal } from "../../core/marbles.js";
 import { playMenuSound } from "../menu-sounds.js";
 import { openConfirmation } from "../menus/confirmation.js";
-import { INITIAL_CURSOR, stepCursor } from "./navigation.js";
-import { buildSteps, stepsText, describeHandFocus, describeSlotFocus, describeStatus, marbleName, slotName } from "./narration.js";
+import { INITIAL_CURSOR, stepCursor, zoneOf } from "./navigation.js";
+import {
+  buildSteps,
+  stepsText,
+  describeHandFocus,
+  describeSlotFocus,
+  describeSlotForPlacement,
+  describeStatus,
+  marbleName,
+  placementLines,
+  slotName,
+  withHeldMark,
+} from "./narration.js";
 import { playMarbleEventSounds } from "./sounds.js";
 
 const MARBLES_BINDINGS = defineBindings("marbles", {
@@ -33,12 +45,38 @@ const MARBLES_BINDINGS = defineBindings("marbles", {
   down: { keys: ["ArrowDown"], mods: [] },
   left: { keys: ["ArrowLeft"], mods: [] },
   right: { keys: ["ArrowRight"], mods: [] },
+  home: { keys: ["Home"], mods: [] },
+  end: { keys: ["End"], mods: [] },
   activate: { keys: ["Enter", " "], mods: [] },
   back: { keys: ["Escape"], mods: [] },
   reannounce: { keys: ["Backspace"], mods: [] },
   status: { keys: ["s"], mods: [] },
   resolve: { keys: ["r"], mods: [] },
 });
+
+// Le menu de confirmation d'une pose : ses lignes à lire d'abord, en lecture
+// seule, puis Confirmer et Annuler. Échap annule aussi.
+function openPlaceMenu(lines, onConfirm) {
+  const screen = makeMenuScreen(
+    {
+      title: "marbles.place.menu_title",
+      closable: true,
+      entries: [
+        ...lines.map(({ key, params }) => ({ label: key, labelParams: params })),
+        {
+          label: "menu.confirm.confirm",
+          onActivate: () => {
+            popScreen();
+            onConfirm();
+          },
+        },
+        { label: "menu.confirm.cancel", onActivate: () => popScreen() },
+      ],
+    },
+    t
+  );
+  pushScreen(screen);
+}
 
 export function makeMarblesScreen(getGame, setGame) {
   let cursor = INITIAL_CURSOR;
@@ -88,8 +126,9 @@ export function makeMarblesScreen(getGame, setGame) {
     if (cursor.place === "hand") {
       const index = clampedHandIndex();
       const line = describeHandFocus(game, index, t);
-      return held?.kind === "hand" && held.index === index ? `${line} ${t("marbles.hand.held")}` : line;
+      return held?.kind === "hand" && held.index === index ? withHeldMark(line, t) : line;
     }
+    if (held?.kind === "hand") return describeSlotForPlacement(game, cursor.place, t);
     const line = describeSlotFocus(game, cursor.place, t);
     return held?.kind === "slot" && held.slot === cursor.place ? `${line} ${t("marbles.slot_line.held")}` : line;
   }
@@ -105,12 +144,17 @@ export function makeMarblesScreen(getGame, setGame) {
     else announceFocus();
   }
 
+  // Tant que la résolution se dit, ou la partie finie, le curseur ne bouge pas :
+  // on redit ce qu'on écoutait. Rend vrai si le geste s'arrête là.
+  function blockedByNarration() {
+    if (!isNarrating() && !isOver()) return false;
+    playMenuSound("block");
+    speak(spoken);
+    return true;
+  }
+
   function move(direction) {
-    if (isNarrating() || isOver()) {
-      playMenuSound("block");
-      speak(spoken);
-      return;
-    }
+    if (blockedByNarration()) return;
     if (cursor.place === "hand" && (direction === "left" || direction === "right")) {
       const total = getGame().hand.length;
       if (total === 0) {
@@ -129,8 +173,25 @@ export function makeMarblesScreen(getGame, setGame) {
       announceFocus(true);
       return;
     }
+    const zone = zoneOf(next.place);
+    const zoneChanged = zone !== zoneOf(cursor.place);
     cursor = { ...next, handIndex: clampedHandIndex() };
-    announceFocus();
+    // Le point final du nom de zone fait marquer une pause au lecteur d'écran.
+    announceMenuLine(zoneChanged ? `${t(`marbles.zone.${zone}`)} ${focusLine()}` : focusLine());
+  }
+
+  // Origine et Fin : première et dernière bille, comme dans un menu. Sans effet
+  // dans le triangle.
+  function jump(target) {
+    if (blockedByNarration()) return;
+    const total = getGame().hand.length;
+    if (cursor.place !== "hand" || total === 0) {
+      playMenuSound("block");
+      return;
+    }
+    const { index, boundary } = jumpMenuCursor(clampedHandIndex(), target === "first" ? 0 : total - 1);
+    cursor = { ...cursor, handIndex: index };
+    announceFocus(boundary);
   }
 
   function releaseSelection() {
@@ -139,12 +200,12 @@ export function makeMarblesScreen(getGame, setGame) {
     announce(t("marbles.take.released"), { assertive: true });
   }
 
+  // Le son d'une pose est celui de la confirmation qui vient de la lancer.
   function performPlace(handIndex, slot) {
     const events = dispatch({ type: "place", handIndex, slot });
     if (!events) return;
     held = null;
     cursor = { ...cursor, handIndex: clampedHandIndex() };
-    playMenuSound("select");
     playMarbleEventSounds(events);
     speak(stepsText(buildSteps(events, t)));
   }
@@ -177,24 +238,14 @@ export function makeMarblesScreen(getGame, setGame) {
 
   function placeHeldOn(slot) {
     const game = getGame();
-    const refusal = placeRefusal(game, held.index, slot);
+    const handIndex = held.index;
+    const refusal = placeRefusal(game, handIndex, slot);
     if (refusal) {
       refuse(refusal);
       return;
     }
-    const occupant = game.triangle[slot];
-    if (occupant === null) {
-      performPlace(held.index, slot);
-      return;
-    }
-    const handIndex = held.index;
-    openConfirmation("marbles.replace.confirm", () => performPlace(handIndex, slot), {
-      titleParams: {
-        slot: slotName(slot, t),
-        old: marbleName(occupant.marble, t),
-        new: marbleName(game.hand[handIndex], t),
-      },
-    });
+    playMenuSound("select");
+    openPlaceMenu(placementLines(game, handIndex, slot, t), () => performPlace(handIndex, slot));
   }
 
   function activateSlot() {
@@ -280,6 +331,8 @@ export function makeMarblesScreen(getGame, setGame) {
     down: () => move("down"),
     left: () => move("left"),
     right: () => move("right"),
+    home: () => jump("first"),
+    end: () => jump("last"),
     activate,
     back,
     reannounce,

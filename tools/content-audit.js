@@ -86,6 +86,7 @@ import "../view/menus/inventory-menu.js";
 import "../view/menus/inventory/bag-and-equipment.js";
 import "../view/menus/shop-quantity-list.js";
 import "../view/marbles/screen.js";
+import { MARBLE_TYPES } from "../config/marbles-values.js";
 
 const KEY_PATTERN = /^[a-z][a-zA-Z0-9_]*(\.[a-zA-Z0-9_]+)+$/;
 
@@ -100,6 +101,12 @@ const NAME_SLOTS = [
   { template: "interaction.travelConfirm", param: "scene", names: () => MAIN_SCENE_IDS.map((id) => `scene.${id}.name`) },
   // view/emotes.js/chooseShortcut : l'émote placée en raccourci.
   { template: "emote.shortcutSet", param: "emote", names: () => Object.values(EMOTE_REGISTRY).map((emote) => emote.nameKey) },
+  // view/marbles/narration.js : la bille qui joue son Tic ou son Éjection.
+  ...["marbles.place.hit", "marbles.place.knockout", "marbles.event.effect_hit", "marbles.event.effect_knockout"].map((template) => ({
+    template,
+    param: "marble",
+    names: () => Object.keys(MARBLE_TYPES).map((id) => `marble.${id}.name`),
+  })),
 ];
 
 // Formes que `template` demande pour le paramètre `param` : chaque

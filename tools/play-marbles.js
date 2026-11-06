@@ -16,6 +16,8 @@
 //   etat | state                     afficher l'état
 //   poser | place <n> <emplacement>  poser la bille n de la main (à partir de 1)
 //   echanger | swap <empl.> <empl.>  échanger deux emplacements
+//   prevoir | forecast               prévoir le tour sur le triangle actuel
+//   prevoir | forecast <n> <empl.>   prévoir la pose de la bille n (rien ne bouge)
 //   fin | end                        résoudre et finir le tour
 //   journal                          afficher le journal brut, en JSON
 //   aide | help                      cette liste
@@ -45,7 +47,8 @@ const seed = seedOption === undefined ? Math.floor(Math.random() * 2 ** 32) : /^
 installFileFetch();
 const { t, setLocale } = await import("../data/i18n/index.js");
 const { createMarblesGame, marblesReduce, swapRefusal, SLOTS } = await import("../core/marbles.js");
-const { buildSteps, describeHandFocus, describeSlotFocus, describeStatus } = await import("../view/marbles/narration.js");
+const { forecast } = await import("../core/marbles-forecast.js");
+const { buildSteps, describeEffect, describeHandFocus, describeSlotFocus, describeStatus, marbleName, placementLines, slotName } = await import("../view/marbles/narration.js");
 setLocale(lang);
 
 const SLOT_ALIASES = {
@@ -66,6 +69,8 @@ const HELP = [
   "etat | state                     afficher l'état",
   "poser | place <n> <emplacement>  poser la bille n de la main (à partir de 1)",
   "echanger | swap <empl.> <empl.>  échanger deux emplacements",
+  "prevoir | forecast               prévoir le tour sur le triangle actuel",
+  "prevoir | forecast <n> <empl.>   prévoir la pose de la bille n (rien ne bouge)",
   "fin | end                        résoudre et finir le tour",
   "journal                          afficher le journal brut, en JSON",
   "aide | help                      cette liste",
@@ -99,6 +104,24 @@ function printState() {
   console.log(`  [défausse : ${game.discard.join(", ") || "-"}]`);
 }
 
+// La prévision, dite avec les mêmes phrases que l'écran. `action` : null pour le
+// triangle actuel, sinon la pose envisagée.
+function printForecast(action) {
+  const predicted = forecast(game, action);
+  if (!predicted.ok) {
+    console.log(`Refusé : ${t(`marbles.error.${predicted.error}`)} (${predicted.error})`);
+    return;
+  }
+  if (action !== null) {
+    for (const line of placementLines(game, action.handIndex, action.slot, t)) console.log(`  ${t(line.key, line.params)}`);
+  }
+  for (const slot of SLOTS) {
+    const phase = predicted.phases[slot];
+    if (phase !== null) console.log(`  [${slotName(slot, t)}, ${marbleName(phase.marble, t)} : ${describeEffect(phase, t)}]`);
+  }
+  console.log(`  [Vitesse ${predicted.speed}, Masse ${predicted.mass}, Impact ${predicted.impact}]`);
+}
+
 // La commande d'une ligne ; rend faux pour arrêter.
 function runCommand(line) {
   const [command, ...params] = line.trim().split(/\s+/);
@@ -120,6 +143,17 @@ function runCommand(line) {
       const b = SLOT_ALIASES[params[1]?.toLowerCase()];
       if (!a || !b) console.log("Usage : echanger <gauche|droite|pointe> <gauche|droite|pointe>");
       else act({ type: "swap", a, b });
+      break;
+    }
+    case "prevoir":
+    case "forecast": {
+      if (params.length === 0) {
+        printForecast(null);
+        break;
+      }
+      const slot = SLOT_ALIASES[params[1]?.toLowerCase()];
+      if (!/^\d+$/.test(params[0] ?? "") || !slot) console.log("Usage : prevoir [<n> <gauche|droite|pointe>]");
+      else printForecast({ type: "place", handIndex: Number(params[0]) - 1, slot });
       break;
     }
     case "fin":
