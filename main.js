@@ -16,6 +16,7 @@ import { setGameStartHandler } from "./view/menus/save-menu.js";
 import { makeMenuScreen, configureMenuPreferences, configureMenuSounds } from "./lib/menu.js";
 import { playMenuSound } from "./view/menu-sounds.js";
 import { makeCityScreen } from "./view/city-screen.js";
+import { makeMarblesScreen } from "./view/marbles/screen.js";
 import { t, setI18nWarningHandler } from "./data/i18n/index.js";
 import { runChecks } from "./core/checks/index.js";
 import { isDebugEnabled, setDebugEnabled } from "./config/debug.js";
@@ -23,6 +24,7 @@ import { startLoop } from "./lib/loop.js";
 import { loadSceneById } from "./scenes/load.js";
 import registry from "./entities/types/index.js";
 import { createInitialState } from "./core/state.js";
+import { createMarblesGame } from "./core/marbles.js";
 import { parseNewGame } from "./core/new-game.js";
 import { validateEntityRegistry } from "./core/entity-parse.js";
 import { NEW_GAME } from "./config/new-game.js";
@@ -234,6 +236,23 @@ function continueGame() {
   enterCity();
 }
 
+// Partie de billes en cours (voir core/marbles.js), null hors partie : comme
+// la session, c'est ici qu'elle vit, l'écran n'en détient pas de copie.
+// Indépendante de la session, jamais sauvegardée. `seed` : imposée par la
+// console de test (window.debugStartMarbles plus bas), sinon tirée au hasard.
+let marblesGame = null;
+function startMarblesGame(seed = createGameSeed()) {
+  marblesGame = createMarblesGame(seed);
+  pushScreen(
+    makeMarblesScreen(
+      () => marblesGame,
+      (next) => {
+        marblesGame = next;
+      }
+    )
+  );
+}
+
 // Écran-menu du menu principal : construit UNE FOIS puis réutilisé pour
 // toute la durée de vie de l'appli (revient au sommet de la pile par
 // "reveal" quand on quitte une partie, voir pause-menu.js/main_menu) — mais
@@ -243,12 +262,12 @@ function continueGame() {
 // Pas composeHook (lib/screens.js) ici : l'ordre compte — le
 // rafraîchissement doit avoir lieu AVANT l'annonce d'ouverture, alors que
 // composeHook exécute toujours le hook de base (l'annonce) en premier.
-const mainMenuDef = createMainMenu({ canContinue: false, continueGame, startNewGame, startTestCityGame, getSession });
+const mainMenuDef = createMainMenu({ canContinue: false, continueGame, startNewGame, startTestCityGame, startMarblesGame, getSession });
 const mainMenuScreen = makeMenuScreen(mainMenuDef, t);
 const baseMainMenuOnEnter = mainMenuScreen.onEnter;
 mainMenuScreen.onEnter = () => {
   loadableSave = loadGame();
-  const fresh = createMainMenu({ canContinue: loadableSave !== null, continueGame, startNewGame, startTestCityGame, getSession });
+  const fresh = createMainMenu({ canContinue: loadableSave !== null, continueGame, startNewGame, startTestCityGame, startMarblesGame, getSession });
   mainMenuDef.entries.splice(0, mainMenuDef.entries.length, ...fresh.entries);
   mainMenuDef.cursor = 0;
   baseMainMenuOnEnter();
@@ -302,6 +321,23 @@ window.debugSession = () => {
     return undefined;
   }
   return structuredClone(session);
+};
+
+// Vérif console, MODE DEBUG seulement : lance une partie de billes à graine
+// imposée, et rend une COPIE de la partie en cours (comme debugSession).
+window.debugStartMarbles = (seed) => {
+  if (!isDebugEnabled()) {
+    console.log("debugStartMarbles: mode debug désactivé (toggleDebug() ou Ctrl+D).");
+    return;
+  }
+  startMarblesGame(seed);
+};
+window.debugMarbles = () => {
+  if (!isDebugEnabled()) {
+    console.log("debugMarbles: mode debug désactivé (toggleDebug() ou Ctrl+D).");
+    return undefined;
+  }
+  return structuredClone(marblesGame);
 };
 
 // Le jeu démarre TOUJOURS sur le menu principal, jamais en partie : la

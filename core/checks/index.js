@@ -51,6 +51,8 @@ import checkDormancy from "./dormancy.check.js";
 import checkTemporaryBehavior from "./temporary-behavior.check.js";
 import checkSequence from "./sequence.check.js";
 import checkRotation from "./rotation.check.js";
+import checkMarbles from "./marbles.check.js";
+import checkMarblesView from "./marbles-view.check.js";
 // Domaines de lib/ (mécanismes portables), lancés par le même point
 // d'entrée : une seule commande, un seul récapitulatif.
 import checkI18n from "../../lib/checks/i18n.check.js";
@@ -94,6 +96,8 @@ const SUITES = [
   { name: "temporary-behavior", check: checkTemporaryBehavior },
   { name: "sequence", check: checkSequence },
   { name: "rotation", check: checkRotation },
+  { name: "marbles", check: checkMarbles },
+  { name: "marbles-view", check: checkMarblesView },
   { name: "i18n", check: checkI18n },
   { name: "i18n-content", check: checkI18nContent },
   { name: "input", check: checkInput },

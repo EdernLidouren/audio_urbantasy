@@ -31,6 +31,7 @@ const DOMAINS = [
   "inventory",
   "items",
   "map",
+  "marbles",
   "menus",
   "navigation",
   "perception",

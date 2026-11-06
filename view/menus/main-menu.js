@@ -46,10 +46,11 @@ function activateNewGame(startGame) {
   }
 }
 
-// canContinue/continueGame/startNewGame/startTestCityGame/getSession : état
-// + callbacks fournis par main.js (seul propriétaire de session/scene).
+// canContinue/continueGame/startNewGame/startTestCityGame/startMarblesGame/
+// getSession : état + callbacks fournis par main.js (seul propriétaire de
+// session/scene).
 // Menu racine : jamais fermable (rien en dessous vers quoi revenir).
-export function createMainMenu({ canContinue, continueGame, startNewGame, startTestCityGame, getSession }) {
+export function createMainMenu({ canContinue, continueGame, startNewGame, startTestCityGame, startMarblesGame, getSession }) {
   const entries = [];
 
   // "Ville test" : EN TÊTE de menu (avant même "Continuer"), raccourci de
@@ -73,6 +74,13 @@ export function createMainMenu({ canContinue, continueGame, startNewGame, startT
   entries.push({
     label: "menu.main.new_game",
     onActivate: () => activateNewGame(startNewGame),
+  });
+
+  // Partie de billes (voir doc/marbles.md) : indépendante de la partie
+  // principale, sans sauvegarde, donc rien à confirmer.
+  entries.push({
+    label: "menu.main.marbles",
+    onActivate: () => startMarblesGame(),
   });
 
   entries.push({

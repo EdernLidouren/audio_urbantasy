@@ -85,6 +85,7 @@ import "../view/menus/city-map-menu.js";
 import "../view/menus/inventory-menu.js";
 import "../view/menus/inventory/bag-and-equipment.js";
 import "../view/menus/shop-quantity-list.js";
+import "../view/marbles/screen.js";
 
 const KEY_PATTERN = /^[a-z][a-zA-Z0-9_]*(\.[a-zA-Z0-9_]+)+$/;
 

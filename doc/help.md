@@ -26,7 +26,7 @@ Tables actuelles : `move`, `city`, `global` (`view/input.js`), `menu` (`lib/menu
 `cityMap` (`view/menus/city-map-menu.js`), `inventoryTabs`
 (`view/menus/inventory-menu.js`), `dropQuantity`
 (`view/menus/inventory/bag-and-equipment.js`), `shopList`
-(`view/menus/shop-quantity-list.js`). Une table déclarée dans un nouveau module
+(`view/menus/shop-quantity-list.js`), `marbles` (`view/marbles/screen.js`). Une table déclarée dans un nouveau module
 ajoute l'import de ce module en tête de `tools/content-audit.js`, pour que l'audit la
 voie.
 
@@ -60,6 +60,7 @@ helpSections: () => [{ id: "move" }, { id: "city", include: (action) => ... }],
 | Carte de la ville | `cityMap` |
 | Choix de la quantité à poser | `dropQuantity` |
 | Liste d'achat ou de vente | `shopList` |
+| Partie de billes | `marbles` |
 | Toujours, à la suite | `global` — la bascule debug seulement en mode debug (`main.js`) |
 
 Un écran SANS `helpSections` n'ouvre pas d'aide : c'est le cas de l'écran vide qui
