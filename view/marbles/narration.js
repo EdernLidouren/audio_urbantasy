@@ -18,8 +18,14 @@ export function slotName(slot, t) {
   return t(`marbles.slot.${slot}`);
 }
 
-// { speed, mass } -> ses morceaux à dire. Un négatif s'écrit en toutes lettres :
-// un lecteur d'écran peut taire un « - », et « Vitesse 3 » dirait le contraire.
+// Un compteur qui peut être négatif (Vitesse, Masse), avec le vrai signe moins
+// (U+2212) : un lecteur d'écran le lit, là où il peut taire un trait d'union, et
+// « Vitesse 3 » dirait le contraire. Les gabarits d'effet font de même.
+export function formatCounter(value) {
+  return String(value).replace("-", "−");
+}
+
+// { speed, mass } -> ses morceaux à dire.
 function statParts({ speed = 0, mass = 0 }, t) {
   const parts = [];
   const add = (value, up, down) => {
@@ -71,26 +77,19 @@ export function describePrinted(clauses, t) {
   return combined(clauses.map((clause) => describeClause(clause, t)), t);
 }
 
-// L'effet de base d'une bille en main : les deux bases à part si elles diffèrent.
-function describeBase(marble, t) {
-  const left = effectAt(marble, "leftBase");
-  const right = effectAt(marble, "rightBase");
-  if (left === right) return t("marbles.hand.base", { effect: describePrinted(left, t) });
-  return t("marbles.hand.base_variant", { left: describePrinted(left, t), right: describePrinted(right, t) });
+// L'annonce principale d'une bille hors du triangle (main, sac, défausse) : son
+// nom, son usure maximale, puis « x sur y ». Le détail est dans sa fiche
+// (view/marbles/card.js).
+export function describeMarbleInList(marble, index, total, t) {
+  const line = t("marbles.list.line", { name: marbleName(marble, t), maxWear: maxWearOf(marble) });
+  const position = formatMenuPosition(index, total, t);
+  return position ? `${line}. ${position}` : `${line}.`;
 }
 
-// Une place de la main sous le curseur, ce qu'elle a d'imprimé, puis « x sur y ».
-// Main vide : le dit.
+// Une place de la main sous le curseur. Main vide : le dit.
 export function describeHandFocus(game, index, t) {
   if (game.hand.length === 0) return t("marbles.hand.empty");
-  const marble = game.hand[index];
-  const line = t("marbles.hand.line", {
-    name: marbleName(marble, t),
-    apex: describePrinted(effectAt(marble, "apex"), t),
-    base: describeBase(marble, t),
-  });
-  const position = formatMenuPosition(index, game.hand.length, t);
-  return position ? `${line}. ${position}` : `${line}.`;
+  return describeMarbleInList(game.hand[index], index, game.hand.length, t);
 }
 
 // La bille sélectionnée : la même ligne, et le rappel qu'elle est prise.
@@ -106,15 +105,14 @@ function phaseText(game, slot, t) {
   return describePrinted(effectAt(game.triangle[slot].marble, slot), t);
 }
 
-// Un emplacement sous le curseur : la position, la bille ou « vide », son effet
-// réel de ce tour, son usure.
+// L'annonce principale d'un emplacement sous le curseur : la bille, sa place et
+// son usure, ou « vide ». Le détail est dans sa fiche.
 export function describeSlotFocus(game, slot, t) {
   const placed = game.triangle[slot];
   if (placed === null) return t("marbles.slot_line.empty", { slot: slotName(slot, t) });
   return t("marbles.slot_line.occupied", {
     slot: slotName(slot, t),
     name: marbleName(placed.marble, t),
-    effect: phaseText(game, slot, t),
     wear: placed.wear,
     maxWear: maxWearOf(placed.marble),
   });
@@ -161,19 +159,33 @@ export function placementLines(game, handIndex, slot, t) {
   return lines;
 }
 
-// La touche d'état. Avec la disponibilité de l'échange : rien d'autre ne
-// permet de la savoir sans essayer.
-export function describeStatus(game, swapAvailable, t) {
-  const line = t("marbles.status.line", {
+// Le sac : combien il en reste, et combien on en pioche à chaque tour.
+export function describeBag(game, t) {
+  return t("marbles.status.bag", { count: game.bag.length, draw: game.drawPerTurn });
+}
+
+export function describeDiscard(game, t) {
+  return t("marbles.status.discard", { count: game.discard.length });
+}
+
+// Où en est le tour. Avec la disponibilité de l'échange : rien d'autre ne permet
+// de la savoir sans essayer.
+export function describeTurn(game, swapAvailable, t) {
+  const line = t("marbles.status.turn", {
     turn: game.turn,
     turnCount: game.turnCount,
     score: game.score,
-    speed: game.speed,
-    mass: game.mass,
-    bag: game.bag.length,
-    discard: game.discard.length,
+    speed: formatCounter(game.speed),
+    mass: formatCounter(game.mass),
   });
   return `${line} ${t(swapAvailable ? "marbles.status.swap_available" : "marbles.status.swap_unavailable")}`;
+}
+
+// L'ordre dans lequel le menu du sac se dit : alphabétique, sur le nom prononcé.
+// Il ne doit jamais révéler l'ordre de la pioche : il ne dépend donc que du contenu
+// du sac, et ne demande aucun hasard, ni celui de la partie ni un autre.
+export function bagDisplayOrder(bag, t) {
+  return [...bag].sort((a, b) => marbleName(a, t).localeCompare(marbleName(b, t)));
 }
 
 function nameOrEmpty(placed, t) {
@@ -212,12 +224,12 @@ const EVENT_TEXTS = {
     t(EFFECT_TEMPLATES[event.trigger], {
       marble: nameRef(`marble.${event.marble}.name`),
       effect: describeEffect({ speed: event.speedDelta, mass: event.massDelta, given: event.given }, t),
-      speed: event.speed,
-      mass: event.mass,
+      speed: formatCounter(event.speed),
+      mass: formatCounter(event.mass),
     }),
   wear: (event, t) => t("marbles.event.wear", { wear: event.wear, maxWear: event.maxWear }),
   impact: (event, t) =>
-    t("marbles.event.impact", { speed: event.speed, mass: event.mass, impact: event.impact, score: event.score }),
+    t("marbles.event.impact", { speed: formatCounter(event.speed), mass: formatCounter(event.mass), impact: event.impact, score: event.score }),
   rotation: (event, t) =>
     t("marbles.event.rotation", {
       apex: nameOrEmpty(event.triangle.apex, t),

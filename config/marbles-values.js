@@ -31,6 +31,30 @@ export const MARBLES_SETTINGS = {
   maxHandSize: 5, // main pleine : la pioche du tour est sautée
   turnCount: 9,
   defaultMaxWear: 3,
+  // Fiches : le curseur secondaire revient à l'annonce principale dès que le
+  // curseur principal se déplace. Pourra devenir une option.
+  cardResetOnMove: true,
+};
+
+// La fiche d'une bille (lib/detail-card.js, view/marbles/card.js) : l'ordre de ses
+// champs autour de l'annonce principale, du plus proche au plus éloigné. Ajouter
+// un nouveau type d'effet à la fiche : sa ligne ici et son gabarit, rien d'autre.
+//   field            le champ de la bille dans MARBLE_TYPES ;
+//   labelKey         son gabarit, qui reçoit {effect} ;
+//   variantLabelKey  (facultatif) son gabarit quand l'effet diffère selon la base ;
+//   required         champ toujours présent, « aucun effet » s'il est vide ; sinon,
+//                    il n'existe que si la bille l'a.
+// emptyBelowKey : le champ de repli au-dessous, si aucun n'y existe.
+export const MARBLE_CARD_MODEL = {
+  above: [
+    { field: "apex", labelKey: "marbles.card.apex", required: true },
+    { field: "base", labelKey: "marbles.card.base", variantLabelKey: "marbles.card.base_variant", required: true },
+  ],
+  below: [
+    { field: "hit", labelKey: "marbles.card.hit" },
+    { field: "knockout", labelKey: "marbles.card.knockout" },
+  ],
+  emptyBelowKey: "marbles.card.no_special_effect",
 };
 
 // Formes courtes des clauses de la table : elle se lit mieux, et reste de la

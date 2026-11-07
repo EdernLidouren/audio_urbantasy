@@ -48,7 +48,8 @@ installFileFetch();
 const { t, setLocale } = await import("../data/i18n/index.js");
 const { createMarblesGame, marblesReduce, swapRefusal, SLOTS } = await import("../core/marbles.js");
 const { forecast } = await import("../core/marbles-forecast.js");
-const { buildSteps, describeEffect, describeHandFocus, describeSlotFocus, describeStatus, marbleName, placementLines, slotName } = await import("../view/marbles/narration.js");
+const { buildSteps, describeBag, describeDiscard, describeEffect, describeHandFocus, describeSlotFocus, describeTurn, formatCounter, marbleName, placementLines, slotName } = await import("../view/marbles/narration.js");
+const { marbleCard } = await import("../view/marbles/card.js");
 setLocale(lang);
 
 const SLOT_ALIASES = {
@@ -95,11 +96,23 @@ function act(action) {
   return true;
 }
 
+// Une bille et sa fiche, à plat : ce que l'écran donne champ par champ.
+function printMarble(marble, main) {
+  console.log(`  ${main}`);
+  const { above, below } = marbleCard(marble, main, t);
+  for (const field of [...above, ...below]) console.log(`      ${field}`);
+}
+
 function printState() {
-  console.log(describeStatus(game, swapRefusal(game) === null, t));
-  for (const slot of SLOTS) console.log(`  ${describeSlotFocus(game, slot, t)}`);
+  console.log(`${describeBag(game, t)} ${describeDiscard(game, t)}`);
+  console.log(describeTurn(game, swapRefusal(game) === null, t));
+  for (const slot of SLOTS) {
+    const placed = game.triangle[slot];
+    if (placed === null) console.log(`  ${describeSlotFocus(game, slot, t)}`);
+    else printMarble(placed.marble, describeSlotFocus(game, slot, t));
+  }
   if (game.hand.length === 0) console.log(`  ${describeHandFocus(game, 0, t)}`);
-  game.hand.forEach((_, index) => console.log(`  ${describeHandFocus(game, index, t)}`));
+  game.hand.forEach((marble, index) => printMarble(marble, describeHandFocus(game, index, t)));
   console.log(`  [sac, du haut vers le bas : ${game.bag.join(", ") || "-"}]`);
   console.log(`  [défausse : ${game.discard.join(", ") || "-"}]`);
 }
@@ -119,7 +132,7 @@ function printForecast(action) {
     const phase = predicted.phases[slot];
     if (phase !== null) console.log(`  [${slotName(slot, t)}, ${marbleName(phase.marble, t)} : ${describeEffect(phase, t)}]`);
   }
-  console.log(`  [Vitesse ${predicted.speed}, Masse ${predicted.mass}, Impact ${predicted.impact}]`);
+  console.log(`  [Vitesse ${formatCounter(predicted.speed)}, Masse ${formatCounter(predicted.mass)}, Impact ${predicted.impact}]`);
 }
 
 // La commande d'une ligne ; rend faux pour arrêter.

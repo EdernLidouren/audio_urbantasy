@@ -12,7 +12,10 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
 | `core/marbles-effects.js` | Le modèle d'effet : clauses, actions, conditions, effet imprimé |
 | `core/marbles-bus.js` | Le bus d'évènements interne à la simulation |
 | `core/marbles-forecast.js` | La prévision : le vrai moteur sur une copie de l'état |
-| `view/marbles/screen.js` | L'écran de jeu, sa table de touches, le menu de confirmation |
+| `view/marbles/screen.js` | L'écran de jeu et sa table de touches |
+| `view/marbles/pile-screen.js` | Le menu d'une pile de billes, sac ou défausse |
+| `view/marbles/card.js` | La fiche d'une bille, lue dans le modèle `MARBLE_CARD_MODEL` |
+| `lib/detail-card.js` | Le mécanisme générique des fiches : assemblage et curseur secondaire |
 | `view/marbles/narration.js` | Ce qui se dit, à partir de l'état, du journal et de la prévision (pur) |
 | `view/marbles/navigation.js` | Le curseur dans le triangle, les zones (pur) |
 | `view/marbles/sounds.js` | Les points d'accroche sonores |
@@ -149,8 +152,10 @@ que l'action `resolve` refuse : c'est ce qui permet de prévoir la première pos
 
 Haut et bas changent d'étage (main, bases, pointe), gauche et droite parcourent la main
 ou passent d'une base à l'autre. Origine et Fin vont à la première et à la dernière bille,
-comme dans un menu ; sans effet dans le triangle. Changer de zone s'annonce d'abord
-(« Triangle. », « Main. »), le point final faisant marquer une pause au lecteur d'écran.
+comme dans un menu ; dans le triangle, elles sont silencieuses. Dans la main, gauche et
+droite suivent l'option de cyclage des menus ; jamais dans le triangle. Changer de zone
+s'annonce d'abord (« Triangle. », « Main. »), le point final faisant marquer une pause au
+lecteur d'écran.
 Les touches sont dans la table `marbles` de `view/marbles/screen.js`, l'aide (F1) en est
 générée (`doc/help.md`).
 
@@ -158,24 +163,65 @@ Ce qui se dit, selon l'endroit :
 
 | Où | Annonce |
 |---|---|
-| Bille en main | « argile : pointe, Vitesse +4. Base, Vitesse +1. 1 sur 5 » (l'imprimé) |
-| Emplacement, sans sélection | « pointe : calot. Vitesse +12. Usure 1 sur 3. » (la prévision) |
-| Emplacement occupé, bille sélectionnée | « pointe, calot : Vitesse +12. » |
+| Bille en main, au sac, en défausse | « argile, usure 3. 1 sur 5 » |
+| Bille active, sans sélection | « calot, pointe, usure 1 sur 3. » |
+| Emplacement vide, sans sélection | « pointe : vide. » |
+| Emplacement occupé, bille sélectionnée | « pointe, calot : Vitesse +12. » (la prévision) |
 | Emplacement vide, bille sélectionnée | « pointe » |
-| Touche d'état | tour, score, Vitesse et Masse du tour, sac, défausse, échange |
+| I | tour, score, Vitesse et Masse du tour, échange |
+| S | nombre de billes au sac, pioche par tour |
+| D | nombre de billes en défausse |
 
-Une valeur négative se dit en toutes lettres (« Vitesse moins 3 ») : un lecteur d'écran
-peut taire un trait d'union, et le joueur entendrait le contraire.
+Une valeur négative porte le vrai signe moins, collé au nombre (« Vitesse −3 », U+2212) :
+un lecteur d'écran le lit, là où il peut taire un trait d'union. Un gabarit d'effet
+l'écrit lui-même ; un compteur passe par `view/marbles/narration.js`/`formatCounter`.
 
-**Poser** : Entrée sur une bille la sélectionne, Entrée sur un emplacement ouvre un menu de
-confirmation (`lib/menu.js`), toujours, même sur un emplacement vide. Ses premières lignes
-se lisent et ne s'activent pas :
+**Poser** : Entrée sur une bille la sélectionne, Entrée sur un emplacement ouvre une
+confirmation (`view/menus/confirmation.js`, le modèle commun à tout le jeu), toujours, même
+sur un emplacement vide. Ses premières lignes se lisent et ne s'activent pas :
 
 1. « Poser argile en pointe ? Vitesse +8 », l'effet de phase sur le triangle simulé ;
 2. sur un emplacement occupé, « Éjection de calot : Vitesse +3 », ou « aucun effet » ;
 3. sur un emplacement occupé, « Tic d'argile : Vitesse +2 », ou « aucun effet » ;
-4. Confirmer ;
-5. Annuler (Échap aussi : la bille reste sélectionnée).
+4. Annuler (Échap aussi : la bille reste sélectionnée) ;
+5. Confirmer.
+
+### Fiches de détail
+
+Une bille porte trop d'informations pour une seule annonce. Le curseur principal annonce
+court ; **Ctrl+haut** et **Ctrl+bas** parcourent ses champs un par un, sur un axe vertical
+autour de cette annonce :
+
+```
+Base : Vitesse +1.          <- 2 fois Ctrl+haut
+Pointe : Vitesse +4.        <- Ctrl+haut
+argile, usure 3. 1 sur 5    <- position par défaut
+Tic : Vitesse +2.           <- Ctrl+bas
+```
+
+Les champs disent les effets IMPRIMÉS. En butée, le champ se réannonce, sans son ni
+cyclage. Revenir à la position par défaut réannonce l'annonce principale. Tout geste du
+curseur principal y ramène le curseur secondaire (`MARBLES_SETTINGS.cardResetOnMove`).
+Désactivé, le curseur secondaire reste où il est : arriver sur une bille dit alors son
+annonce principale et le même champ, pour comparer plusieurs billes.
+
+Les fiches fonctionnent dans la main, sur le triangle (pendant une pose aussi : l'annonce
+principale reste alors la prévision) et dans les menus du sac et de la défausse.
+
+**Ajouter un champ** : sa ligne dans `config/marbles-values.js`/`MARBLE_CARD_MODEL` et son
+gabarit, sans toucher à la navigation. Le mécanisme (`lib/detail-card.js`) ne sait rien des
+billes : une fiche est une annonce principale et une liste de champs.
+
+### Sac et défausse
+
+**Maj+S** et **Maj+D** ouvrent un menu horizontal : une entrée par bille, puis « Retour » ;
+Échap ferme aussi. Bornes, cyclage et étoile sont ceux des menus.
+
+Le menu du sac se dit par ordre alphabétique (`bagDisplayOrder`) : l'ordre ne dépend que
+du contenu du sac, et ne révèle donc jamais l'ordre de la pioche. Aucun hasard n'y entre,
+ni celui de la partie ni un autre. Le menu de la défausse suit l'ordre d'arrivée, de la plus
+ancienne à la plus récente. Les deux menus ne font que lire : les ouvrir ne change rien à la
+partie.
 
 **La résolution avance au rythme du joueur**, une étape par appui sur Entrée, jamais
 minutée : on ignore à quelle vitesse parle son lecteur d'écran. Une étape regroupe
@@ -192,7 +238,7 @@ servent au son et aux futurs effets.
 ## Tester
 
 ```
-node tools/run-checks.js marbles marbles-bus marbles-forecast marbles-view
+node tools/run-checks.js marbles marbles-bus marbles-forecast marbles-view detail-card
 node tools/play-marbles.js --seed 42
 ```
 

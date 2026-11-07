@@ -86,6 +86,7 @@ import "../view/menus/inventory-menu.js";
 import "../view/menus/inventory/bag-and-equipment.js";
 import "../view/menus/shop-quantity-list.js";
 import "../view/marbles/screen.js";
+import "../view/marbles/pile-screen.js";
 import { MARBLE_TYPES } from "../config/marbles-values.js";
 
 const KEY_PATTERN = /^[a-z][a-zA-Z0-9_]*(\.[a-zA-Z0-9_]+)+$/;

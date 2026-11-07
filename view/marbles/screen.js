@@ -5,8 +5,8 @@
 // sélection et les étapes de résolution à dire, le temps d'un écran.
 //
 // PRENDRE ET POSER, un seul geste (Entrée) : sur une bille de la main, la
-// sélectionne ; sur un emplacement ensuite, ouvre le menu de confirmation de la
-// pose, qui dit ce qu'elle produirait (prévision, core/marbles-forecast.js).
+// sélectionne ; sur un emplacement ensuite, ouvre la confirmation de la pose, qui
+// dit ce qu'elle produirait (prévision, core/marbles-forecast.js).
 // Sur un emplacement sans sélection, le prend pour l'échange ; sur un second
 // emplacement ensuite, échange les deux. Refaire Entrée sur la sélection, ou
 // Échap, l'annule.
@@ -14,25 +14,36 @@
 // RÉSOLUTION : au rythme du joueur (Entrée, étape suivante), jamais minutée. On
 // ignore à quelle vitesse parle son lecteur d'écran : une étape minutée serait
 // coupée ou le ferait attendre. R dit tout le reste d'un coup, sans les sons.
-// Tant qu'il reste des étapes, le déplacement et la touche d'état sont
-// refusés : l'état est déjà celui d'après la résolution, et les dévoilerait.
+// Tant qu'il reste des étapes, le déplacement et les touches qui disent l'état
+// sont refusés : l'état est déjà celui d'après la résolution, et les dévoilerait.
+//
+// FICHES : le curseur principal annonce court, Ctrl+haut et Ctrl+bas parcourent le
+// détail de la bille sous lui (view/marbles/card.js, lib/detail-card.js). Maj+S et
+// Maj+D ouvrent les menus du sac et de la défausse (view/marbles/pile-screen.js).
 
 import { announce } from "../../lib/announce.js";
-import { popScreen, pushScreen } from "../../lib/screens.js";
+import { popScreen } from "../../lib/screens.js";
 import { resolveAction, defineBindings } from "../../lib/input.js";
-import { jumpMenuCursor, makeMenuScreen, stepMenuCursor, announceMenuLine } from "../../lib/menu.js";
+import { jumpMenuCursor, stepMenuCursor, announceMenuLine } from "../../lib/menu.js";
+import { detailAfterMainMove, detailLine, mainWithDetail, stepDetail } from "../../lib/detail-card.js";
 import { t } from "../../data/i18n/index.js";
+import { MARBLES_SETTINGS } from "../../config/marbles-values.js";
 import { marblesReduce, swapRefusal, placeRefusal } from "../../core/marbles.js";
 import { playMenuSound } from "../menu-sounds.js";
 import { openConfirmation } from "../menus/confirmation.js";
 import { INITIAL_CURSOR, stepCursor, zoneOf } from "./navigation.js";
+import { marbleCard } from "./card.js";
+import { openPileMenu } from "./pile-screen.js";
 import {
+  bagDisplayOrder,
   buildSteps,
   stepsText,
+  describeBag,
+  describeDiscard,
   describeHandFocus,
   describeSlotFocus,
   describeSlotForPlacement,
-  describeStatus,
+  describeTurn,
   marbleName,
   placementLines,
   slotName,
@@ -47,39 +58,23 @@ const MARBLES_BINDINGS = defineBindings("marbles", {
   right: { keys: ["ArrowRight"], mods: [] },
   home: { keys: ["Home"], mods: [] },
   end: { keys: ["End"], mods: [] },
+  detailUp: { keys: ["ArrowUp"], mods: ["ctrl"] },
+  detailDown: { keys: ["ArrowDown"], mods: ["ctrl"] },
   activate: { keys: ["Enter", " "], mods: [] },
   back: { keys: ["Escape"], mods: [] },
   reannounce: { keys: ["Backspace"], mods: [] },
-  status: { keys: ["s"], mods: [] },
+  turnInfo: { keys: ["i"], mods: [] },
+  bag: { keys: ["s"], mods: [] },
+  discard: { keys: ["d"], mods: [] },
+  bagMenu: { keys: ["s"], mods: ["shift"] },
+  discardMenu: { keys: ["d"], mods: ["shift"] },
   resolve: { keys: ["r"], mods: [] },
 });
 
-// Le menu de confirmation d'une pose : ses lignes à lire d'abord, en lecture
-// seule, puis Confirmer et Annuler. Échap annule aussi.
-function openPlaceMenu(lines, onConfirm) {
-  const screen = makeMenuScreen(
-    {
-      title: "marbles.place.menu_title",
-      closable: true,
-      entries: [
-        ...lines.map(({ key, params }) => ({ label: key, labelParams: params })),
-        {
-          label: "menu.confirm.confirm",
-          onActivate: () => {
-            popScreen();
-            onConfirm();
-          },
-        },
-        { label: "menu.confirm.cancel", onActivate: () => popScreen() },
-      ],
-    },
-    t
-  );
-  pushScreen(screen);
-}
-
 export function makeMarblesScreen(getGame, setGame) {
   let cursor = INITIAL_CURSOR;
+  // Le curseur secondaire, dans la fiche de ce qui est sous le curseur principal.
+  let detail = 0;
   // Ce qui est sélectionné : null, { kind: "hand", index } ou { kind: "slot", slot }.
   let held = null;
   // Étapes de résolution qui restent à dire, et la dernière dite (Retour arrière).
@@ -133,8 +128,27 @@ export function makeMarblesScreen(getGame, setGame) {
     return held?.kind === "slot" && held.slot === cursor.place ? `${line} ${t("marbles.slot_line.held")}` : line;
   }
 
+  // La fiche de la bille sous le curseur, avec ce qu'on entendrait à sa position
+  // par défaut ; null sur un emplacement vide ou une main vide.
+  function currentCard() {
+    const game = getGame();
+    const marble = cursor.place === "hand" ? game.hand[clampedHandIndex()] : game.triangle[cursor.place]?.marble;
+    return marble === undefined ? null : marbleCard(marble, focusLine(), t);
+  }
+
+  // Ce qui se dit du curseur : l'annonce principale, et le champ où se trouve le
+  // curseur secondaire s'il n'a pas été réinitialisé.
+  function currentLine() {
+    const card = currentCard();
+    return card === null ? focusLine() : mainWithDetail(card, detail);
+  }
+
   function announceFocus(boundary = false) {
-    announceMenuLine(focusLine(), boundary);
+    announceMenuLine(currentLine(), boundary);
+  }
+
+  function resetDetailAfterMove() {
+    detail = detailAfterMainMove(detail, MARBLES_SETTINGS.cardResetOnMove);
   }
 
   // Dit ce qu'on est en train d'écouter : l'étape, la fin de partie ou le
@@ -153,8 +167,18 @@ export function makeMarblesScreen(getGame, setGame) {
     return true;
   }
 
+  // Pendant les étapes de résolution, l'état est déjà celui d'après : ce qui le
+  // dirait attend. Rend vrai si le geste s'arrête là.
+  function blockedDuringSteps() {
+    if (!isNarrating()) return false;
+    playMenuSound("block");
+    speak(spoken);
+    return true;
+  }
+
   function move(direction) {
     if (blockedByNarration()) return;
+    resetDetailAfterMove();
     if (cursor.place === "hand" && (direction === "left" || direction === "right")) {
       const total = getGame().hand.length;
       if (total === 0) {
@@ -177,21 +201,31 @@ export function makeMarblesScreen(getGame, setGame) {
     const zoneChanged = zone !== zoneOf(cursor.place);
     cursor = { ...next, handIndex: clampedHandIndex() };
     // Le point final du nom de zone fait marquer une pause au lecteur d'écran.
-    announceMenuLine(zoneChanged ? `${t(`marbles.zone.${zone}`)} ${focusLine()}` : focusLine());
+    announceMenuLine(zoneChanged ? `${t(`marbles.zone.${zone}`)} ${currentLine()}` : currentLine());
   }
 
-  // Origine et Fin : première et dernière bille, comme dans un menu. Sans effet
-  // dans le triangle.
+  // Origine et Fin : première et dernière bille, comme dans un menu. Là où elles
+  // n'ont pas d'effet, elles sont silencieuses, sans son de blocage.
   function jump(target) {
-    if (blockedByNarration()) return;
     const total = getGame().hand.length;
-    if (cursor.place !== "hand" || total === 0) {
-      playMenuSound("block");
-      return;
-    }
+    if (isNarrating() || isOver() || cursor.place !== "hand" || total === 0) return;
     const { index, boundary } = jumpMenuCursor(clampedHandIndex(), target === "first" ? 0 : total - 1);
     cursor = { ...cursor, handIndex: index };
+    resetDetailAfterMove();
     announceFocus(boundary);
+  }
+
+  // Le curseur secondaire : en butée, le champ se réannonce, sans son ni cyclage.
+  // Rien sous le curseur principal : il se redit.
+  function moveDetail(direction) {
+    if (blockedByNarration()) return;
+    const card = currentCard();
+    if (card === null) {
+      announceFocus();
+      return;
+    }
+    detail = stepDetail(detail, card, direction);
+    announce(detailLine(card, detail), { assertive: true });
   }
 
   function releaseSelection() {
@@ -206,6 +240,7 @@ export function makeMarblesScreen(getGame, setGame) {
     if (!events) return;
     held = null;
     cursor = { ...cursor, handIndex: clampedHandIndex() };
+    resetDetailAfterMove();
     playMarbleEventSounds(events);
     speak(stepsText(buildSteps(events, t)));
   }
@@ -214,6 +249,7 @@ export function makeMarblesScreen(getGame, setGame) {
     const events = dispatch({ type: "swap", a, b });
     held = null;
     if (!events) return;
+    resetDetailAfterMove();
     playMenuSound("select");
     playMarbleEventSounds(events);
     speak(stepsText(buildSteps(events, t)));
@@ -245,7 +281,9 @@ export function makeMarblesScreen(getGame, setGame) {
       return;
     }
     playMenuSound("select");
-    openPlaceMenu(placementLines(game, handIndex, slot, t), () => performPlace(handIndex, slot));
+    openConfirmation("marbles.place.menu_title", () => performPlace(handIndex, slot), {
+      lines: placementLines(game, handIndex, slot, t),
+    });
   }
 
   function activateSlot() {
@@ -291,6 +329,7 @@ export function makeMarblesScreen(getGame, setGame) {
     const drawn = getGame().stage === "draw" ? dispatch({ type: "draw" }) : [];
     held = null;
     cursor = { ...cursor, place: "hand", handIndex: 0 };
+    detail = 0;
     pendingSteps = buildSteps([...resolved, ...drawn], t);
     // La première fois, le mode d'emploi de la résolution.
     if (firstTurn) pendingSteps[0].text = `${t("marbles.resolution.hint")} ${pendingSteps[0].text}`;
@@ -310,14 +349,33 @@ export function makeMarblesScreen(getGame, setGame) {
     }
   }
 
-  function status() {
-    if (isNarrating()) {
-      playMenuSound("block");
-      speak(spoken);
-      return;
-    }
+  function announceTurn() {
+    if (blockedDuringSteps()) return;
     const game = getGame();
-    announce(describeStatus(game, swapRefusal(game) === null, t), { assertive: true });
+    announce(describeTurn(game, swapRefusal(game) === null, t), { assertive: true });
+  }
+
+  function announceBag() {
+    if (blockedDuringSteps()) return;
+    announce(describeBag(getGame(), t), { assertive: true });
+  }
+
+  function announceDiscard() {
+    if (blockedDuringSteps()) return;
+    announce(describeDiscard(getGame(), t), { assertive: true });
+  }
+
+  function openBagMenu() {
+    if (blockedDuringSteps()) return;
+    playMenuSound("select");
+    openPileMenu("marbles.pile.bag", bagDisplayOrder(getGame().bag, t));
+  }
+
+  // Dans l'ordre d'arrivée : de la plus ancienne à la plus récente.
+  function openDiscardMenu() {
+    if (blockedDuringSteps()) return;
+    playMenuSound("select");
+    openPileMenu("marbles.pile.discard", getGame().discard);
   }
 
   function back() {
@@ -333,10 +391,16 @@ export function makeMarblesScreen(getGame, setGame) {
     right: () => move("right"),
     home: () => jump("first"),
     end: () => jump("last"),
+    detailUp: () => moveDetail(1),
+    detailDown: () => moveDetail(-1),
     activate,
     back,
     reannounce,
-    status,
+    turnInfo: announceTurn,
+    bag: announceBag,
+    discard: announceDiscard,
+    bagMenu: openBagMenu,
+    discardMenu: openDiscardMenu,
     resolve: resolveKey,
   };
 
