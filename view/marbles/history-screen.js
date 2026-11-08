@@ -6,19 +6,18 @@
 
 import { pushScreen, popScreen } from "../../lib/screens.js";
 import { makeMenuScreen } from "../../lib/menu.js";
-import { stripTrailingPeriod } from "../../lib/announce.js";
 import { t } from "../../data/i18n/index.js";
 
-// Une ligne lue telle quelle. Sans son point final : le menu en ajoute un avant la
-// position (« 3 sur 12 »), qui ferait sinon « .. ».
+// Une ligne lue telle quelle (le menu n'ajoute pas de second point avant la
+// position, lib/announce.js/joinSentences).
 function readOnly(text) {
-  return { label: "marbles.history.entry", labelParams: { text: stripTrailingPeriod(text) } };
+  return { label: "marbles.history.entry", labelParams: { text } };
 }
 
 // Les entrées du menu, sans l'ouvrir (vérifiable au terminal). `previous` : le tour
 // précédent, { turn, messages }, ou null au premier tour.
 export function historyMenu(previous) {
-  const lines = previous === null ? [readOnly(t("marbles.history.empty"))] : previous.messages.map(readOnly);
+  const lines = previous === null ? [{ label: "marbles.history.empty" }] : previous.messages.map(readOnly);
   return {
     title: previous === null ? "marbles.history.title_none" : "marbles.history.title",
     titleParams: previous === null ? undefined : { turn: previous.turn },

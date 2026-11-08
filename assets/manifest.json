@@ -1007,6 +1007,15 @@
   "assets/sounds/items/small_pieces_1_beacon": [
     "assets/sounds/items/small_pieces_1_beacon_1.mp3"
   ],
+  "assets/sounds/marbles/marble_large_1_beacon": [
+    "assets/sounds/marbles/marble_large_1_beacon_1.mp3"
+  ],
+  "assets/sounds/marbles/marble_medium_1_beacon": [
+    "assets/sounds/marbles/marble_medium_1_beacon_1.mp3"
+  ],
+  "assets/sounds/marbles/marble_small_1_beacon": [
+    "assets/sounds/marbles/marble_small_1_beacon_1.mp3"
+  ],
   "assets/sounds/reactions/reaction_interrogation": [
     "assets/sounds/reactions/reaction_interrogation_1.mp3"
   ],

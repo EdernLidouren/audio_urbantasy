@@ -1,11 +1,12 @@
 // KIT TERMINAL du jeu des billes : jouer une partie au clavier ou par un script
-// de commandes, sans interface. Outil de développement, jamais chargé par le
-// jeu. Il passe par le même réducteur (core/marbles.js) et dit les mêmes
-// phrases (view/marbles/narration.js) que l'écran du jeu.
+// de commandes, sans interface. Outil de la boîte à outils des billes
+// (doc/marbles-tools.md), jamais chargé par le jeu. Il passe par le même
+// réducteur (core/marbles.js) et dit les mêmes phrases (view/marbles/narration.js)
+// que l'écran du jeu.
 //
-//   node tools/play-marbles.js --seed 42
-//   node tools/play-marbles.js --seed 42 --lang en
-//   node tools/play-marbles.js --seed 42 --json < commandes.txt
+//   node tools/marbles/play.js --seed 42
+//   node tools/marbles/play.js --seed 42 --lang en
+//   node tools/marbles/play.js --seed 42 --json < commandes.txt
 //
 // --seed : graine imposée (sinon tirée au hasard, et affichée pour rejouer).
 // --lang : fr (défaut) ou en.
@@ -13,24 +14,28 @@
 //          journal complet) pour comparer deux parties.
 //
 // Commandes, une par ligne, sur l'entrée standard (ligne vide ou # : ignorée) :
-//   etat | state                     afficher l'état
+//   etat | state                     afficher l'état, comme l'écran le dit
+//   brut | raw                       afficher l'état complet (format.js), sac compris
 //   poser | place <n> <emplacement>  poser la bille n de la main (à partir de 1)
 //   echanger | swap <empl.> <empl.>  échanger deux emplacements
 //   prevoir | forecast | r           la vue d'ensemble du tour (touche R)
 //   prevoir | forecast <n> <empl.>   prévoir la pose de la bille n (rien ne bouge)
 //   fin | end                        résoudre et finir le tour (Maj+R) : une ligne
 //                                    par étape de la séquence, sans les pauses
-//   journal                          afficher le journal brut, en JSON
+//   journal                          le journal de la partie, une ligne par évènement
+//   journal json                     le même, brut, en JSON
 //   aide | help                      cette liste
 //   quitter | quit
-// Emplacements : gauche (g, left), droite (d, right), pointe (p, apex).
+// Emplacements : gauche (g, left), droite (d, right), pointe (p, apex)
+// (tools/marbles/commands.js).
 //
 // La pioche est automatique, en début de partie et après chaque tour. Le
 // remplacement d'une bille ne demande pas de confirmation : c'est l'affaire de
 // l'interface, comme dans le réducteur.
 
 import { createInterface } from "node:readline";
-import { installFileFetch } from "./node-fetch.js";
+import { installFileFetch } from "../node-fetch.js";
+import { parseCommand } from "./commands.js";
 
 function optionValue(args, name) {
   const index = args.indexOf(name);
@@ -46,35 +51,27 @@ const seed = seedOption === undefined ? Math.floor(Math.random() * 2 ** 32) : /^
 
 // Avant d'importer les textes, qui se chargent par fetch (voir tools/node-fetch.js).
 installFileFetch();
-const { t, setLocale } = await import("../data/i18n/index.js");
-const { createMarblesGame, marblesReduce, swapRefusal, SLOTS } = await import("../core/marbles.js");
-const { forecast } = await import("../core/marbles-forecast.js");
-const { buildSteps, resolutionSteps, describeBag, describeDiscard, describeHandFocus, describeOverview, describeSlotFocus, describeTurn, placementLines } = await import("../view/marbles/narration.js");
-const { marbleCard } = await import("../view/marbles/card.js");
+const { t, setLocale } = await import("../../data/i18n/index.js");
+const { createMarblesGame, marblesReduce, swapRefusal, SLOTS } = await import("../../core/marbles.js");
+const { forecast } = await import("../../core/marbles-forecast.js");
+const { buildSteps, resolutionSteps, describeBag, describeDiscard, describeHandFocus, describeOverview, describeSlotFocus, describeTurn, placementLines } = await import(
+  "../../view/marbles/narration.js"
+);
+const { marbleCard } = await import("../../view/marbles/card.js");
+const { formatEvent, formatState } = await import("./format.js");
 setLocale(lang);
-
-const SLOT_ALIASES = {
-  gauche: "leftBase",
-  g: "leftBase",
-  left: "leftBase",
-  leftbase: "leftBase",
-  droite: "rightBase",
-  d: "rightBase",
-  right: "rightBase",
-  rightbase: "rightBase",
-  pointe: "apex",
-  p: "apex",
-  apex: "apex",
-};
+const name = (id) => t(`marble.${id}.name`);
 
 const HELP = [
   "etat | state                     afficher l'état",
+  "brut | raw                       afficher l'état complet, sac compris",
   "poser | place <n> <emplacement>  poser la bille n de la main (à partir de 1)",
   "echanger | swap <empl.> <empl.>  échanger deux emplacements",
   "prevoir | forecast | r           la vue d'ensemble du tour (touche R)",
   "prevoir | forecast <n> <empl.>   prévoir la pose de la bille n (rien ne bouge)",
   "fin | end                        résoudre et finir le tour (Maj+R)",
-  "journal                          afficher le journal brut, en JSON",
+  "journal                          le journal, une ligne par évènement",
+  "journal json                     le journal brut, en JSON",
   "aide | help                      cette liste",
   "quitter | quit",
   "Emplacements : gauche (g, left), droite (d, right), pointe (p, apex).",
@@ -147,45 +144,38 @@ function printForecast(action) {
 
 // La commande d'une ligne ; rend faux pour arrêter.
 function runCommand(line) {
-  const [command, ...params] = line.trim().split(/\s+/);
-  switch (command.toLowerCase()) {
+  const command = parseCommand(line);
+  if (command.kind === "error") {
+    console.log(command.error);
+    return true;
+  }
+  if (command.kind === "forecast") {
+    printForecast(command.action);
+    return true;
+  }
+  if (command.kind === "action") {
+    // La pioche reste automatique, et la résolution passe par « fin », qui pioche
+    // dans la foulée comme l'écran.
+    if (command.action.type === "resolve") resolveTurn();
+    else if (command.action.type === "draw") console.log("La pioche est automatique ici.");
+    else act(command.action);
+    return true;
+  }
+  switch (command.word) {
     case "etat":
     case "state":
       printState();
       break;
-    case "poser":
-    case "place": {
-      const slot = SLOT_ALIASES[params[1]?.toLowerCase()];
-      if (!/^\d+$/.test(params[0] ?? "") || !slot) console.log("Usage : poser <n> <gauche|droite|pointe>");
-      else act({ type: "place", handIndex: Number(params[0]) - 1, slot });
+    case "brut":
+    case "raw":
+      formatState(game, name).forEach((text) => console.log(text));
       break;
-    }
-    case "echanger":
-    case "swap": {
-      const a = SLOT_ALIASES[params[0]?.toLowerCase()];
-      const b = SLOT_ALIASES[params[1]?.toLowerCase()];
-      if (!a || !b) console.log("Usage : echanger <gauche|droite|pointe> <gauche|droite|pointe>");
-      else act({ type: "swap", a, b });
-      break;
-    }
-    case "prevoir":
-    case "forecast":
-    case "r": {
-      if (params.length === 0) {
-        printForecast(null);
-        break;
-      }
-      const slot = SLOT_ALIASES[params[1]?.toLowerCase()];
-      if (!/^\d+$/.test(params[0] ?? "") || !slot) console.log("Usage : prevoir [<n> <gauche|droite|pointe>]");
-      else printForecast({ type: "place", handIndex: Number(params[0]) - 1, slot });
-      break;
-    }
     case "fin":
     case "end":
       resolveTurn();
       break;
     case "journal":
-      for (const event of journal) console.log(JSON.stringify(event));
+      for (const event of journal) console.log(command.params[0] === "json" ? JSON.stringify(event) : formatEvent(event, name));
       break;
     case "aide":
     case "help":
@@ -195,7 +185,7 @@ function runCommand(line) {
     case "quit":
       return false;
     default:
-      console.log(`Commande inconnue : ${command} (aide : help)`);
+      console.log(`Commande inconnue : ${command.word} (aide : help)`);
   }
   return true;
 }

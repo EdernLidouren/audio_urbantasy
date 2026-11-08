@@ -1,7 +1,7 @@
 // Jeu des billes : tout ce qui se DIT, à partir de l'état, du journal
 // (core/marbles.js) et de la prévision (core/marbles-forecast.js). Pur : rend du
 // texte, n'annonce rien. `t` est reçu en paramètre, pour que l'écran et le kit
-// terminal (tools/play-marbles.js) disent exactement les mêmes phrases.
+// terminal (tools/marbles/play.js) disent exactement les mêmes phrases.
 
 import { nameRef } from "../../data/i18n/index.js";
 import { SLOTS, effectAt, maxWearOf } from "../../core/marbles.js";

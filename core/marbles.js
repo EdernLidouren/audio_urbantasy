@@ -239,6 +239,33 @@ export function placeRefusal(state, handIndex, slot) {
   return null;
 }
 
+// Peut-on résoudre le tour ? Le code du refus, ou null : au premier tour, le
+// triangle doit être plein.
+function resolveRefusal(state) {
+  const refusal = stageRefusal(state, "play");
+  if (refusal) return refusal;
+  if (state.turn === 1 && emptySlotCount(state.triangle) > 0) return "triangleIncomplete";
+  return null;
+}
+
+// LECTURE PURE, sans effet sur les règles : toutes les actions que le réducteur
+// accepterait maintenant, dans un ordre fixe (pioche ; échanges, chaque paire une
+// fois, dans l'ordre des emplacements ; poses, bille de la main puis emplacement ;
+// résolution). Elle passe par les mêmes refus que le réducteur, sans en recopier
+// aucun. Sert aux joueurs automatiques des outils (tools/marbles/players.js).
+export function legalActions(state) {
+  if (stageRefusal(state, "draw") === null) return [{ type: "draw" }];
+  const actions = [];
+  SLOTS.forEach((a, index) => {
+    for (const b of SLOTS.slice(index + 1)) if (swapRefused(state, { a, b }) === null) actions.push({ type: "swap", a, b });
+  });
+  state.hand.forEach((_, handIndex) => {
+    for (const slot of SLOTS) if (placeRefusal(state, handIndex, slot) === null) actions.push({ type: "place", handIndex, slot });
+  });
+  if (resolveRefusal(state) === null) actions.push({ type: "resolve" });
+  return actions;
+}
+
 function refused(state, error) {
   return { ok: false, state, events: [], error };
 }
@@ -494,8 +521,7 @@ export function marblesReduce(state, action, types = MARBLE_TYPES, { eventLimit 
       refusal = placeRefusal(state, action.handIndex, action.slot);
       return refusal ? refused(state, refusal) : transact(state, types, eventLimit, (run) => placeMarble(run, action));
     case "resolve":
-      refusal = stageRefusal(state, "play");
-      if (!refusal && state.turn === 1 && emptySlotCount(state.triangle) > 0) refusal = "triangleIncomplete";
+      refusal = resolveRefusal(state);
       return refusal ? refused(state, refusal) : runResolution(state, types, { eventLimit });
     default:
       return refused(state, "unknownAction");

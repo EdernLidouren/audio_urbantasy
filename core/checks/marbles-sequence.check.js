@@ -334,8 +334,8 @@ function checkTexts(run) {
     // Le menu : les messages, puis Fermer ; seul Fermer agit.
     const menu = historyMenu({ turn: 4, messages: ["un.", "deux"] });
     run.same(
-      "historique, menu : les messages dans l'ordre, sans point final (le menu ajoute le sien), puis Fermer",
-      ["un", "deux", "Fermer"],
+      "historique, menu : les messages dans l'ordre, puis Fermer",
+      ["un.", "deux", "Fermer"],
       menu.entries.map((entry) => t(entry.label, entry.labelParams))
     );
     run.same("historique, menu : les messages sans action", [false, false, true], menu.entries.map((entry) => typeof entry.onActivate === "function"));
@@ -343,7 +343,7 @@ function checkTexts(run) {
     run("historique, menu : Échap ferme", true, menu.closable);
     run.same(
       "historique, menu : premier tour",
-      ["Aucun historique pour l'instant", "Fermer"],
+      ["Aucun historique pour l'instant.", "Fermer"],
       historyMenu(null).entries.map((entry) => t(entry.label, entry.labelParams))
     );
 
@@ -359,7 +359,7 @@ function checkTexts(run) {
       texts({ ...worn, turn: 9 }).slice(3)
     );
     run("anglais : ouverture et base gauche", "Resolving turn 9. left base, giant: Speed +6.", texts({ ...worn, turn: 9 })[0]);
-    run.same("anglais : historique, premier tour", ["No history yet", "Close"], historyMenu(null).entries.map((entry) => t(entry.label, entry.labelParams)));
+    run.same("anglais : historique, premier tour", ["No history yet.", "Close"], historyMenu(null).entries.map((entry) => t(entry.label, entry.labelParams)));
     run("anglais : rotation", "The triangle turns one notch clockwise.", t("marbles.event.rotation", { steps: 1, direction: "clockwise" }));
   } finally {
     setLocale(previousLocale);

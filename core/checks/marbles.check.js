@@ -13,6 +13,7 @@ import {
   marblesReduce,
   effectAt,
   impactOf,
+  legalActions,
   maxWearOf,
   swapRefusal,
   placeRefusal,
@@ -79,6 +80,7 @@ export default function checkMarbles(run) {
   checkDeterminism(run);
   checkSerialization(run);
   checkSmoke(run);
+  checkLegalActions(run);
 }
 
 function checkTable(run) {
@@ -824,4 +826,42 @@ function checkSmoke(run) {
     "bagRegenerated,discarded,draw,drawSkipped,effect,gameOver,hit,impact,knockout,phase,phaseSkipped,placed,removed,rotation,swapped,turnEnded,turnStarted,wear",
     [...seen].sort().join()
   );
+}
+
+// legalActions : une lecture pure, qui dit exactement ce que le réducteur
+// accepterait, ni plus ni moins. Chaque action candidate (toutes les poses, tous
+// les échanges, la résolution, la pioche) est passée au réducteur et comparée à la
+// liste.
+function checkLegalActions(run) {
+  const candidates = (state) => [
+    { type: "draw" },
+    ...SLOTS.flatMap((a) => SLOTS.map((b) => ({ type: "swap", a, b }))),
+    ...state.hand.flatMap((_, handIndex) => SLOTS.map((slot) => ({ type: "place", handIndex, slot }))),
+    { type: "resolve" },
+  ];
+  // Un échange se liste une fois par paire : (a, b) et (b, a) sont le même.
+  const key = (action) => (action.type === "swap" ? `swap:${[action.a, action.b].sort().join("-")}` : JSON.stringify(action));
+  const accepted = (state) => [...new Set(candidates(state).filter((action) => marblesReduce(state, action).ok).map(key))].sort();
+  const listed = (state) => legalActions(state).map(key).sort();
+
+  const cases = {
+    "pioche à faire": createMarblesGame(1),
+    "premier tour, triangle vide": apply(createMarblesGame(1), { type: "draw" }).state,
+    "tour 2, échange possible": playState({ hand: ["clay", "glass"], triangle: triangleOf(placed("agate"), null, placed("mica")) }),
+    "tour 2, échange déjà fait": playState({ hand: ["clay"], swapUsed: true, triangle: triangleOf(placed("agate"), null, null) }),
+    "tour 2, triangle vide, main vide": playState({ hand: [] }),
+    "partie finie": playState({ stage: "over", endReason: "turnsCompleted" }),
+  };
+  for (const [label, state] of Object.entries(cases)) {
+    run.same(`actions légales : ${label}, celles que le réducteur accepte`, accepted(state), listed(state));
+  }
+  run.same("actions légales : la pioche seule quand elle est due", [{ type: "draw" }], legalActions(createMarblesGame(1)));
+  run.same("actions légales : rien en fin de partie", [], legalActions(cases["partie finie"]));
+  run(
+    "actions légales : pas de résolution au premier tour sur un triangle vide",
+    false,
+    legalActions(cases["premier tour, triangle vide"]).some((action) => action.type === "resolve")
+  );
+  const frozen = deepFreeze(structuredClone(cases["tour 2, échange possible"]));
+  run("actions légales : lecture pure, l'état n'est pas touché", false, throws(() => legalActions(frozen)));
 }

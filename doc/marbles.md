@@ -22,7 +22,7 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
 | `view/marbles/history-screen.js` | Le menu de l'historique |
 | `view/marbles/navigation.js` | Le curseur dans le triangle, les zones, l'ouverture de la sélection d'emplacement (pur) |
 | `view/marbles/sounds.js` | Les points d'accroche sonores |
-| `tools/play-marbles.js` | Partie au terminal |
+| `tools/marbles/` | La boîte à outils : partie au terminal, cas construits, simulateur (`doc/marbles-tools.md`) |
 | `core/checks/marbles.check.js`, `marbles-bus.check.js`, `marbles-forecast.check.js`, `marbles-view.check.js`, `marbles-sequence.check.js` | Vérifications |
 
 ## Déroulement d'un tour
@@ -338,11 +338,13 @@ de l'écran, comme la séquence : la partie de billes n'a pas de sauvegarde.
 ## Tester
 
 ```
-node tools/run-checks.js marbles marbles-bus marbles-forecast marbles-view marbles-sequence detail-card
-node tools/play-marbles.js --seed 42
+node tools/run-checks.js marbles marbles-bus marbles-forecast marbles-view marbles-sequence marbles-tools detail-card
+node tools/marbles/play.js --seed 42
 ```
 
-Le mode d'emploi du kit terminal est en tête de `tools/play-marbles.js` : une partie se
+Les autres outils (cas construit à la main, simulateur) : `doc/marbles-tools.md`.
+
+Le mode d'emploi du kit terminal est en tête de `tools/marbles/play.js` : une partie se
 joue au clavier ou par un fichier de commandes, `prevoir` dit la prévision sans rien
 changer, et `--json` sort le journal complet pour comparer deux parties. En jeu, mode
 debug : `window.debugStartMarbles(seed)` et `window.debugMarbles()`.
