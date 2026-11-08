@@ -32,7 +32,7 @@ import {
 import { marbleCard } from "../../view/marbles/card.js";
 import { confirmationEntries } from "../../view/menus/confirmation.js";
 import { INITIAL_CURSOR, placementStart, stepCursor, zoneOf } from "../../view/marbles/navigation.js";
-import { MARBLE_EVENT_CUES, eventCues, validateMarbleSounds } from "../../view/marbles/sounds.js";
+import { MARBLE_EVENT_CUES, eventCues, handPlace, panAt, slotPlace, validateMarbleSounds, validateSoundPlaces } from "../../view/marbles/sounds.js";
 import { EMPTY_SOUND_QUEUE, advanceSoundQueue, enqueueCues } from "../../view/marbles/sound-queue.js";
 import { throws } from "../../lib/check.js";
 
@@ -264,23 +264,52 @@ function checkSounds(run) {
     ["shuffle@0", "beacon@900"],
     eventCues([{ type: "bagRegenerated", size: 4 }, draws[0]], {}, settings).map((cue) => `${cue.sound}@${cue.atMs}`)
   );
-  run.same("repères : une pose, la chute de la bille posée", [{ atMs: 0, sound: "drop", marble: "agate" }], eventCues([{ type: "placed", slot: "apex", marble: "agate" }], {}, settings));
+  run.same(
+    "repères : une pose, la chute de la bille posée, à son emplacement",
+    [{ atMs: 0, sound: "drop", marble: "agate", place: slotPlace("apex") }],
+    eventCues([{ type: "placed", slot: "apex", marble: "agate" }], {}, settings)
+  );
   // Échange : la bille choisie (en `a` avant l'échange, en `b` après), puis l'autre.
   const swapped = { type: "swapped", a: "leftBase", b: "apex" };
   run.same(
     "repères : un échange, la bille choisie puis l'autre",
     [
-      { atMs: 0, sound: "drop", marble: "giant" },
-      { atMs: 150, sound: "drop", marble: "mica" },
+      { atMs: 0, sound: "drop", marble: "giant", place: slotPlace("apex") },
+      { atMs: 150, sound: "drop", marble: "mica", place: slotPlace("leftBase") },
     ],
     eventCues([swapped], { triangleAfter: { leftBase: { marble: "mica", wear: 0 }, rightBase: null, apex: { marble: "giant", wear: 1 } } }, settings)
   );
   run.same(
     "repères : un déplacement vers un vide, une seule chute, aussitôt",
-    [{ atMs: 0, sound: "drop", marble: "giant" }],
+    [{ atMs: 0, sound: "drop", marble: "giant", place: slotPlace("apex") }],
     eventCues([swapped], { triangleAfter: { leftBase: null, rightBase: null, apex: { marble: "giant", wear: 0 } } }, settings)
   );
-  run.same("repères : une phase reste muette aujourd'hui", [], eventCues([{ type: "phase", slot: "apex", marble: "clay" }], {}, settings));
+  run.same(
+    "repères : une phase, la balise de la bille active, à son emplacement",
+    [{ atMs: 0, sound: "beacon", marble: "clay", place: slotPlace("apex") }],
+    eventCues([{ type: "phase", slot: "apex", marble: "clay" }], {}, settings)
+  );
+
+  // Stéréo : chaque bille piochée s'entend à sa place dans la main, de gauche à
+  // droite ; les places rendent leur panoramique.
+  run.same(
+    "repères : les billes piochées, les dernières de la main, dans l'ordre",
+    [handPlace(3, 5), handPlace(4, 5)],
+    eventCues(draws.slice(0, 2), { handAfter: ["agate", "mica", "tiger", "clay", "glass"] }, settings).map((cue) => cue.place)
+  );
+  run("repères : sans main connue, la pioche au centre", undefined, eventCues(draws.slice(0, 1), {}, settings)[0].place);
+  const places = { hand: { fromX: -0.6, toX: 0.6 }, leftBase: { x: -0.4 }, rightBase: { x: 0.4 }, apex: { x: 0 } };
+  run.same(
+    "stéréo : la main de gauche à droite",
+    [-0.6, -0.3, 0, 0.3, 0.6],
+    [0, 1, 2, 3, 4].map((index) => Math.round(panAt(handPlace(index, 5), places) * 100) / 100)
+  );
+  run("stéréo : une bille seule au milieu", 0, panAt(handPlace(0, 1), places));
+  run.same("stéréo : les emplacements", [-0.4, 0.4, 0], ["leftBase", "rightBase", "apex"].map((slot) => panAt(slotPlace(slot), places)));
+  run("stéréo : sans place, au centre", 0, panAt(undefined, places));
+  run("stéréo : panoramique hors bornes refusé", true, throws(() => validateSoundPlaces({ ...places, apex: { x: 1.5 } })));
+  run("stéréo : place manquante refusée", true, throws(() => validateSoundPlaces({ hand: places.hand, leftBase: places.leftBase })));
+  run.same("repères : une phase sur un emplacement vide reste muette", [], eventCues([{ type: "phaseSkipped", slot: "apex" }], {}, settings));
 
   // La file : les immédiats aussitôt, les autres à leur échéance, dans l'ordre.
   let queue = enqueueCues(EMPTY_SOUND_QUEUE, eventCues(draws, { shuffleFirst: true }, settings));

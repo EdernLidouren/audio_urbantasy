@@ -335,6 +335,8 @@ et quand, sur la ligne de temps du geste (`eventCues`) :
 - pioche : la balise de chaque bille piochée, l'une après l'autre ; la première attend
   `shuffleToDrawMs` (900 ms) après un brassage, les suivantes `drawSoundIntervalMs` (350 ms) ;
 - pose : la chute de la bille posée (remplacement compris, en attendant un son de tic) ;
+- phase : pendant la séquence de résolution, la balise de la bille active quand vient la
+  phase de son emplacement, avec l'étape qui la dit ; un emplacement vide reste muet ;
 - échange : la chute de la bille choisie, puis celle de l'autre `swapSoundDelayMs` (150 ms)
   plus tard ; vers un emplacement vide, une seule chute.
 
@@ -348,7 +350,15 @@ un emplacement occupé (à l'ouverture de la sélection d'emplacement aussi), et
 du sac et de la défausse (à l'ouverture et à chaque déplacement). Une seule à la fois : la
 suivante coupe la précédente. Une butée, qui laisse le curseur en place, n'en joue pas.
 
-**Volumes** : balises (pioche et survol) au volume des balises, elles ont vocation à être
+**Stéréo** : un son de bille s'entend à sa place sur la table, en panoramique gauche-droite
+(`MARBLES_SOUND_PLACES`, `panAt`) : la main de −0,6 à +0,6, la première bille tout à gauche
+(une bille seule au milieu) ; base gauche −0,4, base droite +0,4, pointe au centre. La balise
+d'une bille piochée s'entend à sa place dans la main, la cascade de pioche va donc de gauche
+à droite ; la chute d'une pose et la balise de phase à l'emplacement ; la balise au survol là
+où est le curseur. Le brassage et les menus du sac et de la défausse restent au centre. Pas
+encore de profondeur.
+
+**Volumes** : balises (pioche, phase et survol) au volume des balises, elles ont vocation à être
 positionnées ; brassage et chutes au volume de l'interface. Tous les sons des billes sont
 permanents et préchargés à l'ouverture de l'écran. Les gestes de l'écran gardent les sons de
 menu (`select`, `cancel`, `block`, `refusal`).

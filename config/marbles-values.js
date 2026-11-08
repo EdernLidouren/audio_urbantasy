@@ -64,6 +64,19 @@ export const MARBLE_SOUND_PROFILES = {
   large: { beacon: "assets/sounds/marbles/marble_large_1_beacon", drop: "assets/sounds/marbles/marble_large_drop" },
 };
 
+// OÙ S'ENTEND chaque place de la table, de gauche (-1) à droite (+1) : le
+// panoramique des sons des billes (view/marbles/sounds.js/panAt). Les billes de la
+// main se répartissent de fromX à toX selon leur rang, la première tout à gauche ;
+// une bille seule s'entend au milieu. Jamais aux extrêmes : un son tout d'un côté
+// disparaît d'une oreille, fatigant au casque. Le triangle, plus resserré que la
+// main, prépare la perspective de la profondeur à venir.
+export const MARBLES_SOUND_PLACES = {
+  hand: { fromX: -0.6, toX: 0.6 },
+  leftBase: { x: -0.4 },
+  rightBase: { x: 0.4 },
+  apex: { x: 0 },
+};
+
 // Les sons de l'écran des billes qui ne sont pas ceux d'une bille : la musique
 // (en boucle s'il n'y a qu'un morceau, sinon enchaînée) et le brassage du sac.
 export const MARBLES_AUDIO = {

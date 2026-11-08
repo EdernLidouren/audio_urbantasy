@@ -67,7 +67,17 @@ import {
   placementLines,
   slotName,
 } from "./narration.js";
-import { eventCues, playCue, playFocusBeacon, preloadMarblesAudio, startMarblesMusic, stopFocusBeacon, stopMarblesMusic } from "./sounds.js";
+import {
+  eventCues,
+  handPlace,
+  playCue,
+  playFocusBeacon,
+  preloadMarblesAudio,
+  slotPlace,
+  startMarblesMusic,
+  stopFocusBeacon,
+  stopMarblesMusic,
+} from "./sounds.js";
 import { EMPTY_SOUND_QUEUE, advanceSoundQueue, enqueueCues } from "./sound-queue.js";
 import { advanceSequence, restartPause, skipSequence, startSequence } from "./sequence.js";
 import { EMPTY_HISTORY, recordSteps } from "./history.js";
@@ -136,7 +146,8 @@ export function makeMarblesScreen(getGame, setGame) {
   // Les sons d'un geste, d'après son journal : en file, les immédiats aussitôt.
   // `shuffleFirst` : le sac vient d'être constitué (ouverture de la partie).
   function playEventSounds(events, { shuffleFirst = false } = {}) {
-    soundQueue = enqueueCues(soundQueue, eventCues(events, { triangleAfter: getGame().triangle, shuffleFirst }));
+    const { triangle, hand } = getGame();
+    soundQueue = enqueueCues(soundQueue, eventCues(events, { triangleAfter: triangle, handAfter: hand, shuffleFirst }));
     flushSounds(0);
   }
 
@@ -180,10 +191,13 @@ export function makeMarblesScreen(getGame, setGame) {
     return cursor.place === "hand" ? game.hand[clampedHandIndex()] : game.triangle[cursor.place]?.marble;
   }
 
-  // Le curseur vient d'arriver quelque part : la voix de la bille qui s'y trouve.
+  // Le curseur vient d'arriver quelque part : la voix de la bille qui s'y trouve,
+  // là où elle est sur la table.
   function beaconUnderCursor() {
     const marble = marbleUnderCursor();
-    if (marble !== undefined) playFocusBeacon(marble);
+    if (marble === undefined) return;
+    const place = cursor.place === "hand" ? handPlace(clampedHandIndex(), getGame().hand.length) : slotPlace(cursor.place);
+    playFocusBeacon(marble, place);
   }
 
   // La fiche de la bille sous le curseur, avec ce qu'on entendrait à sa position

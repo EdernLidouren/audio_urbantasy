@@ -8,13 +8,21 @@
 //   (MARBLE_EVENT_CUES) : il dit quels REPÈRES l'évènement produit, et quand, sur
 //   une ligne de temps propre au geste (eventCues). Le brassage du sac, puis chaque
 //   pioche, une balise après l'autre ; la chute d'une bille posée ; les deux
-//   chutes d'un échange. L'écran les met dans sa file de sons
+//   chutes d'un échange ; la balise de la bille active à la phase de son
+//   emplacement. L'écran les met dans sa file de sons
 //   (view/marbles/sound-queue.js) et les joue à leur échéance : le son seul
 //   attend, jamais le joueur ;
 // - la BALISE AU SURVOL (playFocusBeacon) : la voix de la bille sur laquelle le
 //   curseur arrive, une seule à la fois : la suivante coupe la précédente, pour que
 //   des flèches rapides ne s'empilent pas ;
 // - la MUSIQUE de l'écran (startMarblesMusic, stopMarblesMusic).
+//
+// STÉRÉO : un son de bille s'entend à sa PLACE sur la table, un repère
+// { kind: "hand", index, size } ou { kind: "slot", slot } que panAt traduit en
+// panoramique (config/marbles-values.js/MARBLES_SOUND_PLACES) : la balise d'une
+// bille piochée à sa place dans la main, la chute d'une pose et la balise de phase
+// à l'emplacement, la balise au survol là où est le curseur. Sans place (brassage,
+// menus du sac et de la défausse), au centre. Pas encore de profondeur.
 //
 // VOLUMES : les balises (pioche, survol) suivent le volume des balises du jeu, elles
 // ont vocation à être positionnées ; brassage et chutes, celui de l'interface ; la
@@ -23,7 +31,8 @@
 // (preloadMarblesAudio) : la première balise ne part pas en retard sur la touche.
 // Un son manquant avertit en console, jamais de plantage.
 
-import { MARBLE_SOUND_PROFILES, MARBLE_TYPES, MARBLES_AUDIO, MARBLES_SETTINGS } from "../../config/marbles-values.js";
+import { MARBLE_SOUND_PROFILES, MARBLE_TYPES, MARBLES_AUDIO, MARBLES_SETTINGS, MARBLES_SOUND_PLACES } from "../../config/marbles-values.js";
+import { SLOTS } from "../../core/marbles.js";
 import { TUNING_DEFAULTS } from "../../config/tuning.js";
 import {
   clearMusicLayers,
@@ -60,27 +69,62 @@ export function validateMarbleSounds(types, profiles, settings) {
 
 validateMarbleSounds(MARBLE_TYPES, MARBLE_SOUND_PROFILES, MARBLES_SETTINGS);
 
+// Chaque place a son panoramique, dans [-1, 1].
+export function validateSoundPlaces(places) {
+  const check = (value, name) => {
+    if (typeof value !== "number" || !Number.isFinite(value) || value < -1 || value > 1) {
+      throw new Error(`marbles : ${name} doit être un nombre entre -1 et 1.`);
+    }
+  };
+  check(places.hand?.fromX, "hand.fromX");
+  check(places.hand?.toX, "hand.toX");
+  for (const slot of SLOTS) check(places[slot]?.x, `${slot}.x`);
+}
+
+validateSoundPlaces(MARBLES_SOUND_PLACES);
+
+// --- Stéréo (pur) ---
+
+// Le panoramique d'une place (voir l'en-tête), 0 sans place.
+export function panAt(place, places = MARBLES_SOUND_PLACES) {
+  if (!place) return 0;
+  if (place.kind === "slot") return places[place.slot].x;
+  const { fromX, toX } = places.hand;
+  if (place.size <= 1) return (fromX + toX) / 2;
+  return fromX + ((toX - fromX) * place.index) / (place.size - 1);
+}
+
+export const slotPlace = (slot) => ({ kind: "slot", slot });
+export const handPlace = (index, size) => ({ kind: "hand", index, size });
+
 // --- Repères d'évènement (pur) ---
 
 // La ligne de temps d'un geste : les repères déjà posés, et l'échéance de la
-// prochaine balise de pioche (la suivante attend la précédente).
+// prochaine balise de pioche (la suivante attend la précédente). Un repère :
+// { atMs, sound, marble?, place? }.
 function createTimeline(settings) {
   const cues = [];
   let nextDrawAt = 0;
+  const cue = (atMs, sound, marble, place) => ({
+    atMs,
+    sound,
+    ...(marble === undefined ? {} : { marble }),
+    ...(place === undefined ? {} : { place }),
+  });
   return {
     cues,
-    now(sound, marble) {
-      cues.push(marble === undefined ? { atMs: 0, sound } : { atMs: 0, sound, marble });
+    now(sound, marble, place) {
+      cues.push(cue(0, sound, marble, place));
     },
-    at(atMs, sound, marble) {
-      cues.push({ atMs, sound, marble });
+    at(atMs, sound, marble, place) {
+      cues.push(cue(atMs, sound, marble, place));
     },
     shuffle() {
-      cues.push({ atMs: 0, sound: "shuffle" });
+      cues.push(cue(0, "shuffle"));
       nextDrawAt = Math.max(nextDrawAt, settings.shuffleToDrawMs);
     },
-    draw(marble) {
-      cues.push({ atMs: nextDrawAt, sound: "beacon", marble });
+    draw(marble, place) {
+      cues.push(cue(nextDrawAt, "beacon", marble, place));
       nextDrawAt += settings.drawSoundIntervalMs;
     },
   };
@@ -88,12 +132,13 @@ function createTimeline(settings) {
 
 // Un point d'accroche par type d'évènement du journal : ce qu'il ajoute à la ligne
 // de temps, ou null s'il est muet aujourd'hui. Un nouvel évènement a sa ligne ici
-// (vérifié par le domaine marbles-view). `context.triangleAfter` : le triangle
+// (vérifié par le domaine marbles-view). `context` : `triangleAfter`, le triangle
 // juste après l'action, pour l'échange, dont l'évènement ne nomme que les
-// emplacements.
+// emplacements ; `nextDrawPlace()`, la place dans la main de la bille piochée
+// suivante.
 export const MARBLE_EVENT_CUES = {
   turnStarted: null,
-  draw: (event, timeline) => timeline.draw(event.marble),
+  draw: (event, timeline, context) => timeline.draw(event.marble, context.nextDrawPlace()),
   drawSkipped: null,
   bagRegenerated: (event, timeline) => timeline.shuffle(),
   // La bille choisie d'abord (elle était en `a`, elle est maintenant en `b`), puis
@@ -101,15 +146,17 @@ export const MARBLE_EVENT_CUES = {
   swapped: (event, timeline, context, settings) => {
     const chosen = context.triangleAfter[event.b];
     const other = context.triangleAfter[event.a];
-    if (chosen !== null) timeline.now("drop", chosen.marble);
-    if (other !== null) timeline.at(chosen === null ? 0 : settings.swapSoundDelayMs, "drop", other.marble);
+    if (chosen !== null) timeline.now("drop", chosen.marble, slotPlace(event.b));
+    if (other !== null) timeline.at(chosen === null ? 0 : settings.swapSoundDelayMs, "drop", other.marble, slotPlace(event.a));
   },
   knockout: null,
   removed: null,
   discarded: null,
-  placed: (event, timeline) => timeline.now("drop", event.marble),
+  placed: (event, timeline) => timeline.now("drop", event.marble, slotPlace(event.slot)),
   hit: null,
-  phase: null,
+  // La bille active fait entendre sa voix quand vient la phase de son emplacement,
+  // avec l'étape de la séquence qui dit ce qu'elle produit.
+  phase: (event, timeline) => timeline.now("beacon", event.marble, slotPlace(event.slot)),
   phaseSkipped: null,
   effect: null,
   wear: null,
@@ -121,13 +168,22 @@ export const MARBLE_EVENT_CUES = {
 
 // Les repères des évènements d'un geste, dans l'ordre du journal. `shuffleFirst` :
 // le sac vient d'être constitué (ouverture de la partie), ce que le journal ne dit
-// pas, la simulation mélangeant le sac à sa création.
-export function eventCues(events, { triangleAfter = null, shuffleFirst = false } = {}, settings = MARBLES_SETTINGS) {
+// pas, la simulation mélangeant le sac à sa création. `handAfter` : la main après le
+// geste ; une pioche ajoute sa bille au bout de la main, les billes piochées sont
+// donc les dernières, dans l'ordre. Sans elle, les balises de pioche s'entendent au
+// centre.
+export function eventCues(events, { triangleAfter = null, handAfter = null, shuffleFirst = false } = {}, settings = MARBLES_SETTINGS) {
   const timeline = createTimeline(settings);
+  const drawCount = events.filter((event) => event.type === "draw").length;
+  let drawn = 0;
+  const context = {
+    triangleAfter,
+    nextDrawPlace: () => (handAfter === null ? undefined : handPlace(handAfter.length - drawCount + drawn++, handAfter.length)),
+  };
   if (shuffleFirst) timeline.shuffle();
   for (const event of events) {
     const cue = MARBLE_EVENT_CUES[event.type];
-    if (cue) cue(event, timeline, { triangleAfter }, settings);
+    if (cue) cue(event, timeline, context, settings);
   }
   return timeline.cues;
 }
@@ -146,7 +202,7 @@ function cueSound(cue) {
 export function playCue(cue) {
   const { key, volume } = cueSound(cue);
   try {
-    playOneShot(resolveAsset(key), { volume, permanent: true });
+    playOneShot(resolveAsset(key), { volume, stereo: panAt(cue.place), permanent: true });
   } catch (error) {
     console.warn(`son des billes indisponible (${cue.sound}, "${key}") : ${error.message}`);
   }
@@ -155,11 +211,13 @@ export function playCue(cue) {
 // La balise au survol en cours, pour la couper à la suivante.
 let focusBeacon = null;
 
-export function playFocusBeacon(marble) {
+// `place` : où est le curseur (voir l'en-tête) ; sans place, au centre (menus du
+// sac et de la défausse).
+export function playFocusBeacon(marble, place) {
   stopFocusBeacon();
   const key = profileOf(marble).beacon;
   try {
-    focusBeacon = playTrackedOneShot(resolveAsset(key), { volume: beaconVolumeFactor(), permanent: true });
+    focusBeacon = playTrackedOneShot(resolveAsset(key), { volume: beaconVolumeFactor(), stereo: panAt(place), permanent: true });
   } catch (error) {
     console.warn(`balise de bille indisponible ("${key}") : ${error.message}`);
   }

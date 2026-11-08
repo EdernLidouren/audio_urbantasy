@@ -352,7 +352,9 @@ export function mark() {
   return kit.markAt;
 }
 
-// Sons depuis mark() : [{ dt, kind: "play"|"stop"|"fade", src, args? }].
+// Sons depuis mark() : [{ dt, kind: "play"|"stop"|"fade", src, args?, pan? }].
+// `pan` : le panoramique posé sur la lecture dans la foulée de play() (sons
+// ponctuels, voir lib/audio/oneshots.js) ; absent, le son est au centre.
 // `match` (RegExp) filtre sur src ; `kind` sur le type ; `all: true` depuis
 // le début.
 export function sounds({ match, kind, all = false } = {}) {
@@ -360,7 +362,7 @@ export function sounds({ match, kind, all = false } = {}) {
   return kit.spies.entries
     .slice(all ? 0 : kit.markSound)
     .filter((e) => (!match || match.test(e.src)) && (!kind || e.kind === kind))
-    .map((e) => ({ dt: Math.round(e.t - kit.markAt), kind: e.kind, src: e.src, ...(e.args ? { args: e.args } : {}) }));
+    .map((e) => ({ dt: Math.round(e.t - kit.markAt), kind: e.kind, src: e.src, ...(e.args ? { args: e.args } : {}), ...(e.pan !== undefined ? { pan: e.pan } : {}) }));
 }
 
 // Écarts (ms) entre lectures successives des sons qui satisfont `match`,
@@ -432,15 +434,30 @@ function shortSrc(howl) {
 
 function installSoundSpy() {
   if (kit.spies || typeof Howl === "undefined") return;
-  const originals = { play: Howl.prototype.play, stop: Howl.prototype.stop, fade: Howl.prototype.fade };
+  const originals = { play: Howl.prototype.play, stop: Howl.prototype.stop, fade: Howl.prototype.fade, stereo: Howl.prototype.stereo };
   const entries = [];
   const lastPlay = new WeakMap();
+  const lastPlayEntry = new WeakMap();
   Howl.prototype.play = function (...args) {
     const t = performance.now();
     const previous = lastPlay.get(this);
-    if (previous === undefined || t - previous > REPLAY_MERGE_MS) entries.push({ t, kind: "play", src: shortSrc(this) });
+    if (previous === undefined || t - previous > REPLAY_MERGE_MS) {
+      const entry = { t, kind: "play", src: shortSrc(this) };
+      entries.push(entry);
+      lastPlayEntry.set(this, entry);
+    }
     lastPlay.set(this, t);
     return originals.play.apply(this, args);
+  };
+  // Le panoramique d'une lecture, posé dans la même tâche que son play() : noté
+  // sur l'entrée de cette lecture. Les mises à jour suivantes (balises suivies au
+  // tick) ne sont pas journalisées, elles noieraient le relevé.
+  Howl.prototype.stereo = function (...args) {
+    const entry = lastPlayEntry.get(this);
+    if (typeof args[0] === "number" && entry && entry.pan === undefined && performance.now() - entry.t < 5) {
+      entry.pan = Math.round(args[0] * 100) / 100;
+    }
+    return originals.stereo.apply(this, args);
   };
   Howl.prototype.stop = function (...args) {
     entries.push({ t: performance.now(), kind: "stop", src: shortSrc(this) });
