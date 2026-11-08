@@ -10,7 +10,14 @@
 // (`node tools/run-checks.js marbles-view`).
 
 import { LOCALE_TABLES, t, setLocale, getLocale } from "../../data/i18n/index.js";
-import { MARBLE_CARD_MODEL, MARBLE_SOUND_PROFILES, MARBLES_SETTINGS } from "../../config/marbles-values.js";
+import {
+  MARBLE_CARD_MODEL,
+  MARBLE_SIZES,
+  MARBLE_SOUND_PROFILES,
+  MARBLES_COLLISION,
+  MARBLES_PITCH_VARIATION,
+  MARBLES_SETTINGS,
+} from "../../config/marbles-values.js";
 import { detailLine, stepDetail } from "../../lib/detail-card.js";
 import { createMarblesGame, marblesReduce, MARBLE_ERRORS, SLOTS } from "../marbles.js";
 import {
@@ -45,6 +52,10 @@ import {
   slotPlace,
   validateMarbleSounds,
   validateRolls,
+  collisionStrength,
+  validateCollision,
+  validateMarbleSizes,
+  validatePitchVariation,
   validateSoundDepth,
   validateSoundPlaces,
 } from "../../view/marbles/sounds.js";
@@ -257,6 +268,32 @@ function checkSounds(run) {
   run("profils : chaque bille a un profil sonore connu", true, Object.values(MARBLE_TYPES).every((type) => Object.hasOwn(MARBLE_SOUND_PROFILES, type.sound)));
   run("profils : bille sans profil refusée", true, throws(() => validateMarbleSounds({ x: {} }, MARBLE_SOUND_PROFILES, MARBLES_SETTINGS)));
   run("profils : profil sans chute refusé", true, throws(() => validateMarbleSounds({}, { small: { beacon: "a" } }, MARBLES_SETTINGS)));
+  // Taille et son : deux champs, aucun déduit de l'autre.
+  run("tailles : chaque bille a une taille connue", true, Object.values(MARBLE_TYPES).every((type) => Object.hasOwn(MARBLE_SIZES, type.size)));
+  run("tailles : taille inconnue refusée", true, throws(() => validateMarbleSizes({ x: { size: "huge" } }, MARBLE_SIZES)));
+  run("tailles : poids nul refusé", true, throws(() => validateMarbleSizes({}, { small: { weight: 0 } })));
+  run(
+    "tailles : une grosse bille peut porter le son d'une moyenne",
+    false,
+    throws(() => validateMarbleSizes({ x: { size: "large", sound: "classic_medium" } }, MARBLE_SIZES))
+  );
+  run("collision : réglages du jeu valides", false, throws(() => validateCollision(MARBLES_COLLISION)));
+  run("collision : écart négatif refusé", true, throws(() => validateCollision({ ...MARBLES_COLLISION, flamMs: -1 })));
+  run("ton : réglages du jeu valides", false, throws(() => validatePitchVariation(MARBLES_PITCH_VARIATION)));
+  run("ton : variation sans chute refusée", true, throws(() => validatePitchVariation({ impact: 0.04, roll: 0.02 })));
+  const strengthTable = {
+    types: { pebble: { size: "small" }, boulder: { size: "large" }, twin: { size: "small" } },
+    sizes: { small: { weight: 1 }, large: { weight: 4 } },
+    collision: { flamMs: 10, weightExponent: 0.5 },
+  };
+  run("collision : deux billes de même taille, force 1", 1, collisionStrength("pebble", "twin", strengthTable));
+  run("collision : une lourde sur une légère frappe plus fort", 2, collisionStrength("boulder", "pebble", strengthTable));
+  run("collision : une légère sur une lourde frappe moins fort", 0.5, collisionStrength("pebble", "boulder", strengthTable));
+  run(
+    "collision : exposant nul, force toujours 1",
+    1,
+    collisionStrength("boulder", "pebble", { ...strengthTable, collision: { flamMs: 10, weightExponent: 0 } })
+  );
   run(
     "profils : profil sans roulement refusé",
     true,
@@ -299,6 +336,8 @@ function checkSounds(run) {
     place: { speed: 1, endRatio: 1 },
     swap: { speed: 1, endRatio: 1 },
     out: { speed: 1, endRatio: 0.6 },
+    strike: { speed: 2, endRatio: 1 },
+    knocked: { speed: 1, endRatio: 0.6 },
     rotation: { notchMs: 700, endRatio: 0.5, gain: 0.6, dropGain: 0.5 },
     restRate: 0.5,
     fadeMs: 100,
@@ -311,7 +350,7 @@ function checkSounds(run) {
     cues.map((cue) =>
       cue.sound === "roll"
         ? `roll ${cue.marble} ${cue.path.map(placeName).join(">")} @${cue.atMs}+${Math.round(cue.durationMs)}`
-        : `${cue.sound} ${cue.marble} ${placeName(cue.place)} @${Math.round(cue.atMs)}${cue.gain === undefined ? "" : ` x${cue.gain}`}`
+        : `${cue.sound} ${cue.marble}${cue.struck ? `>${cue.struck}` : ""} ${placeName(cue.place)} @${Math.round(cue.atMs)}${cue.gain === undefined ? "" : ` x${cue.gain}`}`
     );
   run.same(
     "repères : une pose, la bille roule de la main à l'emplacement, puis y tombe",
@@ -329,31 +368,49 @@ function checkSounds(run) {
     positionOf(eventCues([{ type: "placed", slot: "apex", marble: "agate" }], {}, settings, motion)[0].path[0], places)
   );
   // Remplacement, dans l'ordre du journal : l'éjection, le retrait, la défausse,
-  // la pose, le tic. Le choc attend l'arrivée de la bille posée.
+  // la pose, le tic. La bille posée est tirée (deux fois plus vite ici) ; la
+  // collision attend son arrivée, à la force du choc (une grosse, poids 2, sur une
+  // petite, poids 1 : 2) ; la délogée part 30 ms après, lancée deux fois plus vite.
+  // L'écart entre les deux sons de la collision se programme à la lecture.
   const knockedOut = { slot: "apex", marble: "mica" };
+  const replacement = [
+    { type: "knockout", ...knockedOut },
+    { type: "removed", ...knockedOut, cause: "replacement" },
+    { type: "discarded", ...knockedOut, cause: "replacement" },
+    { type: "placed", slot: "apex", marble: "agate" },
+    { type: "hit", slot: "apex", marble: "agate" },
+  ];
+  const collisionMotion = {
+    ...motion,
+    collision: { flamMs: 10, weightExponent: 1 },
+    types: { agate: { size: "large" }, mica: { size: "small" } },
+    sizes: { small: { weight: 1 }, large: { weight: 2 } },
+  };
   run.same(
-    "repères : un remplacement, le roulement, le choc des deux billes, puis la délogée roule à la défausse",
+    "repères : un remplacement, la bille tirée, la collision des deux billes, puis la délogée lancée à la défausse",
     [
-      "roll agate hand>apex @0+1000",
-      "impact agate apex @1000",
-      "impact mica apex @1000",
-      "roll mica apex>discard @1030+1000",
-      "drop mica discard @2030",
+      "roll agate hand>apex @0+500",
+      "collision agate>mica apex @500 x2",
+      "roll mica apex>discard @530+500",
+      "drop mica discard @1030",
     ],
-    rolled(
-      eventCues(
-        [
-          { type: "knockout", ...knockedOut },
-          { type: "removed", ...knockedOut, cause: "replacement" },
-          { type: "discarded", ...knockedOut, cause: "replacement" },
-          { type: "placed", slot: "apex", marble: "agate" },
-          { type: "hit", slot: "apex", marble: "agate" },
-        ],
-        {},
-        settings,
-        motion
-      )
-    )
+    rolled(eventCues(replacement, {}, settings, collisionMotion))
+  );
+  run.same(
+    "repères : la bille qui frappe est tirée, celle qui se pose ne l'est pas",
+    ["strike", "place"],
+    [
+      eventCues(replacement, {}, settings, collisionMotion)[0].style,
+      eventCues([{ type: "placed", slot: "apex", marble: "agate" }], {}, settings, collisionMotion)[0].style,
+    ]
+  );
+  run(
+    "repères : la délogée part à la défausse en style knocked, l'usée en style out",
+    "knocked out",
+    [
+      eventCues(replacement, {}, settings, collisionMotion).find((cue) => cue.marble === "mica" && cue.sound === "roll").style,
+      eventCues([{ type: "discarded", slot: "apex", marble: "mica", cause: "wear" }], {}, settings, collisionMotion)[0].style,
+    ].join(" ")
   );
   // Échange : la bille choisie (en `a` avant l'échange, en `b` après), puis l'autre.
   const swapped = { type: "swapped", a: "leftBase", b: "rightBase" };

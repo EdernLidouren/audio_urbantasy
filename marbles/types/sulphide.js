@@ -4,5 +4,6 @@ import { mass } from "../effects.js";
 
 export default {
   apex: [mass(3)],
-  sound: "large",
+  size: "large",
+  sound: "classic_large",
 };

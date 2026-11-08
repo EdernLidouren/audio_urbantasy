@@ -100,9 +100,9 @@ export function validateMarbleTypes(types) {
   };
   if (Object.keys(types).length === 0) fail("table des billes vide.");
   for (const [id, type] of Object.entries(types)) {
-    // `sound` : le profil sonore, présentation seulement, jamais lu ici (validé par
-    // la vue, view/marbles/sounds.js).
-    rejectUnknownFields(type, ["base", "baseVariant", "apex", "hit", "knockout", "maxWear", "sound"], `bille "${id}"`, fail);
+    // `size` et `sound` : la taille et le profil sonore, présentation seulement,
+    // jamais lus ici (validés par la vue, view/marbles/sounds.js).
+    rejectUnknownFields(type, ["base", "baseVariant", "apex", "hit", "knockout", "maxWear", "size", "sound"], `bille "${id}"`, fail);
     for (const field of ["base", "apex", "hit", "knockout"]) {
       if (type[field] !== undefined) validateEffect(type[field], `bille "${id}", ${field}`, fail);
     }

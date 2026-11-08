@@ -9,5 +9,6 @@ export default {
     leftBase: [{ ...speed(4), target: "apex", when: { type: "printedStat", slot: "apex", stat: "speed", atLeast: 1 } }],
   },
   apex: [speed(2)],
-  sound: "medium",
+  size: "medium",
+  sound: "classic_medium",
 };

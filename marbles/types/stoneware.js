@@ -4,5 +4,6 @@ import { speed } from "../effects.js";
 
 export default {
   base: [speed(2)],
-  sound: "medium",
+  size: "medium",
+  sound: "classic_medium",
 };

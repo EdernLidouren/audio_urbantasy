@@ -6,5 +6,6 @@ export default {
   base: [mass(1)],
   apex: [mass(2)],
   hit: [mass(1)],
-  sound: "medium",
+  size: "medium",
+  sound: "classic_medium",
 };

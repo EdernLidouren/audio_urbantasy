@@ -17,10 +17,15 @@
 //               occupé, après l'éjection de l'occupante ;
 //   knockout    l'Éjection : effet joué quand la bille est remplacée ;
 //   maxWear     usure maximale, sinon MARBLES_SETTINGS.defaultMaxWear ;
+//   size        sa taille, une clé de MARBLE_SIZES (config/marbles-values.js) : ce
+//               qu'EST la bille. Règle la force de ses collisions ;
 //   sound       son profil sonore, une clé de MARBLE_SOUND_PROFILES
-//               (config/marbles-values.js). Présentation seulement : la simulation
-//               l'accepte sans jamais le lire ; la vue le valide au chargement
-//               (view/marbles/sounds.js).
+//               (config/marbles-values.js) : ce qu'on ENTEND. Jamais déduit de la
+//               taille, ni l'inverse : une grosse bille peut porter le son d'une
+//               moyenne si c'est ce qui sonne juste.
+// `size` et `sound` sont de la présentation, obligatoires : la simulation les
+// accepte sans jamais les lire ; la vue les valide au chargement
+// (view/marbles/sounds.js).
 //
 // Un effet est une LISTE DE CLAUSES ; une clause (core/marbles-effects.js) :
 //   action  ce qu'elle fait : "speed" ou "mass", qui ajoutent `amount` (entier,

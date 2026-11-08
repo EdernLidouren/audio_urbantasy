@@ -78,7 +78,8 @@ export default {
     leftBase: [{ ...speed(4), target: "apex", when: { type: "printedStat", slot: "apex", stat: "speed", atLeast: 1 } }],
   },
   apex: [speed(2)],
-  sound: "medium",
+  size: "medium",
+  sound: "classic_medium",
 };
 ```
 
@@ -90,9 +91,17 @@ démarrage, avec le sac de test (`core/marbles.js`/`validateMarblesContent`, app
 simulateur y tirent leurs billes.
 
 Les champs d'effet (`base`, `baseVariant`, `apex`, `hit`, `knockout`) sont tous facultatifs :
-absent, aucun effet. `maxWear` vaut 3 par défaut. `sound`, obligatoire, est son profil sonore
-(`small`, `medium` ou `large`, voir « Sons ») : de la présentation, que la simulation accepte
-sans jamais le lire. **Ajouter une bille** : son fichier dans `marbles/types/` avec son
+absent, aucun effet. `maxWear` vaut 3 par défaut. Deux champs obligatoires, de la
+présentation que la simulation accepte sans jamais les lire, validés par la vue :
+
+- `size`, sa **taille**, ce qu'EST la bille (`small`, `medium` ou `large`, `MARBLE_SIZES`),
+  qui règle la force de ses collisions (voir « Sons ») ;
+- `sound`, son **profil sonore**, ce qu'on ENTEND (`classic_small`, `classic_medium` ou
+  `classic_large`, `MARBLE_SOUND_PROFILES`).
+
+Aucun ne se déduit de l'autre : une grosse bille peut porter le son d'une moyenne si c'est ce
+qui sonne juste, et une famille de sons à venir (`metal_large`…) s'ajoute sans toucher aux
+tailles. **Ajouter une bille** : son fichier dans `marbles/types/` avec sa taille et son
 profil, sa ligne dans `marbles/types/index.js`, son nom dans chaque langue (vérifié par le
 domaine `marbles-view`), et sa place dans `STARTING_BAG` pour la mettre en jeu. En français, le nom porte sa forme `de` (« d'argile »,
 « de calot ») : `{ "base": "argile", "de": "d'argile" }`, pour « Tic d'argile ». Un sac est
@@ -327,11 +336,13 @@ par l'audit du contenu ; la lecture, dans `view/marbles/sounds.js`.
 
 **Profils** : chaque bille a un profil sonore (`sound`), qui lui donne sa **balise** (sa
 voix, à la pioche et sous le curseur), sa **chute** (à l'arrivée d'un roulement), son
-**roulement** (une boucle, `marble_<profil>_rolling`) et son **choc** (quand elle en déloge
-une autre, ou qu'on la déloge ; en attendant de vrais sons de choc, la balise). Trois profils
-aujourd'hui, `small`, `medium` et `large` (`MARBLE_SOUND_PROFILES`), une voix chacun ; les
-noms de fichier prévoient plusieurs voix par profil (`marble_small_2_beacon`…). Une bille sans
-profil connu, ou un profil incomplet, fait échouer le chargement.
+**roulement** (une boucle, `marble_<taille>_rolling`) et sa **collision** (`impact`,
+`marble_<taille>_collision`, quand elle en déloge une autre ou qu'on la déloge). Trois profils
+aujourd'hui, `classic_small`, `classic_medium` et `classic_large` (`MARBLE_SOUND_PROFILES`),
+une voix chacun ; les noms de fichier prévoient plusieurs voix par profil
+(`marble_small_2_beacon`…). Le nom d'un profil est libre et ne dit rien de la taille de la
+bille. Une bille sans profil connu ou sans taille connue, ou un profil incomplet, fait échouer
+le chargement.
 
 **Musique** : `marbles_classic`, de l'ouverture de l'écran au retour au menu principal, en
 fondu, au volume de la musique. Un seul morceau : en boucle ; plusieurs : enchaînés avec une
@@ -347,10 +358,10 @@ et quand, sur la ligne de temps du geste (`eventCues`) :
   `shuffleToDrawMs` (900 ms) après un brassage, les suivantes `drawSoundIntervalMs` (350 ms) ;
 - pose sur un emplacement vide : la bille roule de sa place dans la main à l'emplacement,
   puis y tombe ;
-- pose sur un emplacement occupé (remplacement) : la bille roule jusqu'à l'emplacement, puis
-  le choc des deux billes, puis la délogée roule à la défausse, plus lentement, en
-  s'essoufflant, et y tombe. Le journal dit l'éjection avant la pose : le choc attend
-  l'arrivée de la bille posée ;
+- pose sur un emplacement occupé (remplacement) : la bille est **tirée** jusqu'à
+  l'emplacement, plus vite et presque sans ralentir, puis la **collision** (voir plus bas),
+  puis la délogée part à la défausse, lancée par le choc, s'essouffle et y tombe. Le journal
+  dit l'éjection avant la pose : la collision attend l'arrivée de la bille tirée ;
 - phase : pendant la séquence de résolution, la balise de la bille active quand vient la
   phase de son emplacement, avec l'étape qui la dit ; un emplacement vide reste muet ;
 - échange : la bille choisie roule vers l'autre emplacement, puis l'autre part en sens inverse
@@ -381,9 +392,11 @@ Réglages, un style par trajet (`MARBLES_ROLLS`) :
 
 | Style | Trajet | Vitesse au départ | À l'arrivée |
 |---|---|---|---|
-| `place` | de la main à l'emplacement | 2 | 80 % |
+| `place` | de la main à un emplacement vide | 2 | 80 % |
+| `strike` | de la main à un emplacement occupé, la bille tirée | 3 | 95 % |
 | `swap` | d'un emplacement à l'autre | 2 | 80 % |
-| `out` | d'un emplacement à la défausse | 1,6 | 20 % |
+| `knocked` | la délogée, de son emplacement à la défausse | 2 × force du choc | 20 % |
+| `out` | l'usée, de son emplacement à la défausse | 1,6 | 20 % |
 | `rotation` | d'un emplacement au suivant | 700 ms par cran | 40 % |
 
 La rotation est un bloc rigide : ses billes partent et arrivent ensemble, chacune à sa
@@ -400,6 +413,24 @@ délogée part `impactToOutMs` (30 ms) plus tard. Un menu ouvert par-dessus fige
 déplacement avec l'écran ; chaque roulement a aussi une échéance en temps réel, qui le coupe
 s'il ne reçoit plus de frames. Passer la séquence ou quitter l'écran coupe les roulements en
 cours.
+
+**Collision** : quand une bille tirée en déloge une autre, les sons de collision des deux
+billes, la frappeuse puis la frappée `flamMs` (12 ms) plus tard (`MARBLES_COLLISION`). Sous
+une vingtaine de millisecondes, l'oreille entend un seul choc, plus épais : deux corps. Un
+seul repère, `collision`, porte les deux billes ; l'écart est un retard posé sur l'horloge
+audio à la lecture (`delayMs` de `lib/audio.js`, précis à l'échantillon), car la file de sons
+avance par frames (environ 17 ms), un grain plus gros que l'écart lui-même, et un minuteur JS
+flotte de plusieurs millisecondes. La
+**force** du choc vient des tailles : le rapport des poids (`MARBLE_SIZES`, 1, 2 et 3),
+frappeuse sur frappée, élevé à `weightExponent` (0,3). Une grosse sur une petite frappe à
+1,39, une petite sur une grosse à 0,72, deux billes de même taille à 1. La force règle le
+volume des deux sons et la vitesse de départ de la délogée (`collisionStrength`).
+
+**Variations de ton** : collisions, chutes et roulements jouent chacun à une vitesse de
+lecture tirée au hasard autour de 1 (`MARBLES_PITCH_VARIATION` : ±4 %, ±3 %, ±2 %, le
+roulement une fois par trajet), pour que deux sons de suite ne soient jamais identiques.
+Jamais les balises : la balise est l'identité de la bille. Un hasard de rendu, que la
+simulation ne voit pas.
 
 **Balise au survol** : la balise de la bille sur laquelle le curseur arrive, dans la main, sur
 un emplacement occupé (à l'ouverture de la sélection d'emplacement aussi), et dans les menus
@@ -432,7 +463,7 @@ centre, secs.
   ne fait rien et n'est pas dans l'aide.
 
 **Volumes** : balises (pioche, phase et survol) au volume des balises, elles ont vocation à être
-positionnées ; brassage, chutes, chocs et roulements au volume de l'interface. Tous les sons des billes sont
+positionnées ; brassage, chutes, collisions et roulements au volume de l'interface. Tous les sons des billes sont
 permanents et préchargés à l'ouverture de l'écran. Les gestes de l'écran gardent les sons de
 menu (`select`, `cancel`, `block`, `refusal`).
 

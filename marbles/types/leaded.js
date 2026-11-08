@@ -6,5 +6,6 @@ export default {
   base: [mass(2)],
   apex: [speed(-3)],
   knockout: [mass(1)],
-  sound: "large",
+  size: "large",
+  sound: "classic_large",
 };

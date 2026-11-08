@@ -6,5 +6,6 @@ export default {
   base: [speed(3)],
   baseVariant: { rightBase: [mass(1)] },
   apex: [speed(3)],
-  sound: "small",
+  size: "small",
+  sound: "classic_small",
 };

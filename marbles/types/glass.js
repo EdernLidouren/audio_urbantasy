@@ -5,5 +5,6 @@ import { speed, mass } from "../effects.js";
 export default {
   base: [mass(1)],
   apex: [speed(2)],
-  sound: "small",
+  size: "small",
+  sound: "classic_small",
 };

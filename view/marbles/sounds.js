@@ -8,8 +8,8 @@
 //   (MARBLE_EVENT_CUES) : il dit quels REPÈRES l'évènement produit, et quand, sur
 //   une ligne de temps propre au geste (eventCues). Le brassage du sac, puis chaque
 //   pioche, une balise après l'autre ; la bille posée qui roule de la main à son
-//   emplacement, puis sa chute, ou son choc contre l'occupante, qui roule à la
-//   défausse ; les deux billes d'un échange qui roulent l'une vers l'autre ; la
+//   emplacement, puis sa chute ; ou, tirée plus vite, sa collision avec
+//   l'occupante, qui roule à la défausse ; les deux billes d'un échange qui roulent l'une vers l'autre ; la
 //   balise de la bille active à la phase de son emplacement ; la bille usée qui
 //   roule à la défausse ; les billes du triangle qui tournent ensemble, chacune
 //   vers l'emplacement suivant. L'écran les met dans sa file de sons
@@ -38,6 +38,19 @@
 // menu ouvert par-dessus fige l'écran, donc le déplacement : chaque roulement a
 // aussi une échéance en temps réel, qui le coupe s'il n'a plus de frames.
 //
+// COLLISION : un seul repère, "collision", qui joue les sons des deux billes, la
+// frappeuse puis la frappée `flamMs` plus tard, au volume de la FORCE du choc,
+// tirée de leurs tailles (collisionStrength, config/marbles-values.js/
+// MARBLES_COLLISION). L'écart est un retard posé sur l'horloge audio, à la lecture
+// (lib/audio.js, `delayMs`), pas sur la ligne de temps : la file avance par frames
+// (environ 17 ms), plus gros grain que l'écart lui-même, et un minuteur JS flotte
+// de plusieurs millisecondes. La taille d'une
+// bille (`size`) n'est jamais déduite de son profil sonore (`sound`), ni l'inverse.
+//
+// VARIATIONS DE TON : collisions, chutes et roulements jouent chacun à une vitesse
+// tirée au hasard autour de 1 (MARBLES_PITCH_VARIATION) ; jamais les balises. Un
+// hasard de rendu seulement, que la simulation ne voit pas.
+//
 // VOLUMES : les balises (pioche, survol) suivent le volume des balises du jeu, elles
 // ont vocation à être positionnées ; brassage, chutes, chocs et roulements, celui de
 // l'interface ; la musique, celui de la musique. Tous les sons des billes sont PERMANENTS (jamais
@@ -46,8 +59,11 @@
 // Un son manquant avertit en console, jamais de plantage.
 
 import {
+  MARBLE_SIZES,
   MARBLE_SOUND_PROFILES,
   MARBLES_AUDIO,
+  MARBLES_COLLISION,
+  MARBLES_PITCH_VARIATION,
   MARBLES_ROLLS,
   MARBLES_SETTINGS,
   MARBLES_SOUND_DEPTH,
@@ -62,6 +78,7 @@ import {
   playTrackedOneShot,
   preloadMusic,
   preloadOneShot,
+  randomRate,
   setGlobalVolume,
   setMusicLayer,
 } from "../../lib/audio.js";
@@ -92,6 +109,21 @@ export function validateMarbleSounds(types, profiles, settings) {
 }
 
 validateMarbleSounds(MARBLE_TYPES, MARBLE_SOUND_PROFILES, MARBLES_SETTINGS);
+
+// Chaque bille a une taille connue, chaque taille un poids. Ce module en est le seul
+// lecteur aujourd'hui (la force des collisions) : il la valide.
+export function validateMarbleSizes(types, sizes) {
+  for (const [id, type] of Object.entries(types)) {
+    if (!Object.hasOwn(sizes, type.size)) throw new Error(`marbles : bille "${id}", taille inconnue "${type.size}".`);
+  }
+  for (const [name, size] of Object.entries(sizes)) {
+    if (typeof size.weight !== "number" || !Number.isFinite(size.weight) || size.weight <= 0) {
+      throw new Error(`marbles : taille "${name}", poids invalide.`);
+    }
+  }
+}
+
+validateMarbleSizes(MARBLE_TYPES, MARBLE_SIZES);
 
 function checkNumber(value, name, min, max) {
   if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max) {
@@ -138,11 +170,31 @@ export function validateRolls(rolls) {
 }
 
 // Les styles dont la durée vient de la vitesse ; la rotation a ses crans.
-const SPEED_STYLES = ["place", "swap", "out"];
+const SPEED_STYLES = ["place", "strike", "swap", "knocked", "out"];
+
+export function validateCollision(collision) {
+  checkNumber(collision.flamMs, "flamMs", 0, 200);
+  checkNumber(collision.weightExponent, "weightExponent", 0, 3);
+}
+
+// Une variation au-delà de la moitié ferait d'un son un autre son.
+export function validatePitchVariation(variation) {
+  for (const sound of ["impact", "drop", "roll"]) checkNumber(variation[sound], `pitchVariation.${sound}`, 0, 0.5);
+}
 
 validateSoundPlaces(MARBLES_SOUND_PLACES);
 validateSoundDepth(MARBLES_SOUND_DEPTH);
 validateRolls(MARBLES_ROLLS);
+validateCollision(MARBLES_COLLISION);
+validatePitchVariation(MARBLES_PITCH_VARIATION);
+
+// La FORCE d'une collision : le rapport des poids de la frappeuse et de la frappée,
+// élevé à `weightExponent`. 1 entre deux billes de même taille ; plus quand une
+// lourde frappe une légère, moins dans l'autre sens.
+export function collisionStrength(striker, struck, { types = MARBLE_TYPES, sizes = MARBLE_SIZES, collision = MARBLES_COLLISION } = {}) {
+  const ratio = sizes[types[striker].size].weight / sizes[types[struck].size].weight;
+  return ratio ** collision.weightExponent;
+}
 
 // --- Espace (pur) ---
 
@@ -205,7 +257,8 @@ export function rollRendering(roll, elapsedMs, volume, rolls = MARBLES_ROLLS, de
 // prochain départ d'une bille usée. Un repère : { atMs, sound, marble?, place?,
 // gain? } (`gain` multiplie le volume de sa catégorie) ; un roulement : { atMs,
 // sound: "roll", marble, path, style, durationMs }, `path` étant la suite des places
-// par où passe la bille.
+// par où passe la bille ; une collision : { atMs, sound: "collision", marble (la
+// frappeuse), struck (la frappée), place, gain }.
 function createTimeline(settings, { rolls, places }) {
   const cues = [];
   let nextDrawAt = 0;
@@ -222,8 +275,8 @@ function createTimeline(settings, { rolls, places }) {
     now(sound, marble, place) {
       cues.push(cue(0, sound, marble, place));
     },
-    at(atMs, sound, marble, place) {
-      cues.push(cue(atMs, sound, marble, place));
+    at(atMs, sound, marble, place, gain) {
+      cues.push(cue(atMs, sound, marble, place, gain));
     },
     shuffle() {
       cues.push(cue(0, "shuffle"));
@@ -234,18 +287,25 @@ function createTimeline(settings, { rolls, places }) {
       nextDrawAt += settings.drawSoundIntervalMs;
     },
     // Une bille roule le long de `path` (des places) à partir de `atMs` :
-    // l'échéance de son arrivée.
-    roll(atMs, marble, path, style) {
-      const durationMs = rollDurationMs(
-        path.map((place) => positionOf(place, places)),
-        rolls[style]
-      );
+    // l'échéance de son arrivée. `speedFactor` multiplie la vitesse du style (la
+    // bille délogée, lancée par la force du choc).
+    roll(atMs, marble, path, style, speedFactor = 1) {
+      const durationMs =
+        rollDurationMs(
+          path.map((place) => positionOf(place, places)),
+          rolls[style]
+        ) / speedFactor;
       cues.push({ atMs, sound: "roll", marble, path, style, durationMs });
       return atMs + durationMs;
     },
-    // Une bille quitte `slot` pour la défausse à partir de `atMs`, et y tombe.
-    out(atMs, marble, slot) {
-      const arrival = this.roll(atMs, marble, [slotPlace(slot), discardPlace()], "out");
+    // La collision de `marble` contre `struck`, à `place`, à la force `gain`.
+    collision(atMs, marble, struck, place, gain) {
+      cues.push({ ...cue(atMs, "collision", marble, place, gain), struck });
+    },
+    // Une bille quitte `slot` pour la défausse à partir de `atMs`, et y tombe. Usée
+    // par défaut (`out`) ; délogée, `knocked`, à la force du choc.
+    out(atMs, marble, slot, style = "out", speedFactor = 1) {
+      const arrival = this.roll(atMs, marble, [slotPlace(slot), discardPlace()], style, speedFactor);
       cues.push(cue(arrival, "drop", marble, discardPlace()));
     },
     // Le triangle tourne de `notches` crans : chaque bille roule d'emplacement en
@@ -314,18 +374,20 @@ export const MARBLE_EVENT_CUES = {
   discarded: (event, timeline) => {
     if (event.cause === "wear") timeline.worn(event.marble, event.slot);
   },
-  // La bille roule de la main à l'emplacement. Vide : elle y tombe. Occupé : le
-  // choc des deux billes, puis la délogée roule à la défausse.
-  placed: (event, timeline, context, settings, rolls) => {
+  // La bille roule de la main à l'emplacement. Vide : elle s'y pose et y tombe.
+  // Occupé : elle est tirée (strike), puis la collision, à la force du choc ; la
+  // délogée part à la défausse, lancée d'autant.
+  placed: (event, timeline, context, settings, table) => {
     const to = slotPlace(event.slot);
-    const arrival = timeline.roll(0, event.marble, [context.placeFrom, to], "place");
-    if (context.struck === null) {
+    const struck = context.struck;
+    const arrival = timeline.roll(0, event.marble, [context.placeFrom, to], struck === null ? "place" : "strike");
+    if (struck === null) {
       timeline.at(arrival, "drop", event.marble, to);
       return;
     }
-    timeline.at(arrival, "impact", event.marble, to);
-    timeline.at(arrival, "impact", context.struck, to);
-    timeline.out(arrival + rolls.impactToOutMs, context.struck, event.slot);
+    const strength = collisionStrength(event.marble, struck, table);
+    timeline.collision(arrival, event.marble, struck, to, strength);
+    timeline.out(arrival + table.rolls.impactToOutMs, struck, event.slot, "knocked", strength);
     context.struck = null;
   },
   hit: null,
@@ -349,15 +411,23 @@ export const MARBLE_EVENT_CUES = {
 // geste ; une pioche ajoute sa bille au bout de la main, les billes piochées sont
 // donc les dernières, dans l'ordre. Sans elle, les balises de pioche s'entendent au
 // centre. `placeFrom` : d'où part la bille posée, sa place dans la main AVANT la
-// pose (le journal ne la dit pas) ; sans elle, du milieu de la main. `motion` :
-// les réglages des roulements et les places, pour les durées des trajets.
+// pose (le journal ne la dit pas) ; sans elle, du milieu de la main. `table` : ce
+// qui règle les trajets et les chocs, par défaut ceux du jeu : les roulements, les
+// places, la collision, les billes et leurs tailles.
 export function eventCues(
   events,
   { triangleAfter = null, handAfter = null, shuffleFirst = false, placeFrom = handPlace(0, 1) } = {},
   settings = MARBLES_SETTINGS,
-  { rolls = MARBLES_ROLLS, places = MARBLES_SOUND_PLACES } = {}
+  {
+    rolls = MARBLES_ROLLS,
+    places = MARBLES_SOUND_PLACES,
+    collision = MARBLES_COLLISION,
+    types = MARBLE_TYPES,
+    sizes = MARBLE_SIZES,
+  } = {}
 ) {
-  const timeline = createTimeline(settings, { rolls, places });
+  const table = { rolls, places, collision, types, sizes };
+  const timeline = createTimeline(settings, table);
   const drawCount = events.filter((event) => event.type === "draw").length;
   let drawn = 0;
   const context = {
@@ -369,7 +439,7 @@ export function eventCues(
   if (shuffleFirst) timeline.shuffle();
   for (const event of events) {
     const cue = MARBLE_EVENT_CUES[event.type];
-    if (cue) cue(event, timeline, context, settings, rolls);
+    if (cue) cue(event, timeline, context, settings, table);
   }
   return timeline.cues;
 }
@@ -383,9 +453,12 @@ function cueSound(cue) {
   const gain = cue.gain ?? 1;
   if (cue.sound === "shuffle") return { key: MARBLES_AUDIO.shuffle, volume: gain * interfaceVolumeFactor() };
   if (cue.sound === "drop") return { key: profileOf(cue.marble).drop, volume: gain * interfaceVolumeFactor() };
-  if (cue.sound === "impact") return { key: profileOf(cue.marble).impact, volume: gain * interfaceVolumeFactor() };
   return { key: profileOf(cue.marble).beacon, volume: gain * beaconVolumeFactor() };
 }
+
+// La vitesse de lecture d'un son : tirée autour de 1 pour les familles qui varient
+// (MARBLES_PITCH_VARIATION), 1 pour les autres, balises comprises.
+const pitchOf = (sound) => randomRate(MARBLES_PITCH_VARIATION[sound] ?? 0);
 
 // La réverbération de la table, le temps de l'écran (null : aucune, hors écran ou
 // sans contexte audio).
@@ -401,10 +474,11 @@ export function closeTableReverb() {
   tableReverb = null;
 }
 
-// Les options de lecture d'un son à `place`, au volume `volume` de sa catégorie.
-function placedOptions(place, volume) {
+// Les options de lecture d'un son à `place`, au volume `volume` de sa catégorie,
+// à la vitesse de lecture `rate`.
+function placedOptions(place, volume, rate = 1) {
   const { pan, gain, lowpassHz, reverbSend } = renderAt(place);
-  const options = { volume: volume * gain, stereo: pan, permanent: true };
+  const options = { volume: volume * gain, stereo: pan, rate, permanent: true };
   if (lowpassHz !== undefined) options.lowpassHz = lowpassHz;
   if (reverbSend > 0 && tableReverb?.input) Object.assign(options, { reverbSend, reverbBusInput: tableReverb.input });
   return options;
@@ -415,17 +489,36 @@ export function playCue(cue) {
     startRoll(cue);
     return;
   }
-  const { key, volume } = cueSound(cue);
-  try {
-    playOneShot(resolveAsset(key), placedOptions(cue.place, volume));
-  } catch (error) {
-    console.warn(`son des billes indisponible (${cue.sound}, "${key}") : ${error.message}`);
+  if (cue.sound === "collision") {
+    playCollision(cue);
+    return;
   }
+  const { key, volume } = cueSound(cue);
+  playAt(key, cue.place, volume, pitchOf(cue.sound), cue.sound);
+}
+
+function playAt(key, place, volume, rate, label, delayMs = 0) {
+  try {
+    playOneShot(resolveAsset(key), { ...placedOptions(place, volume, rate), delayMs });
+  } catch (error) {
+    console.warn(`son des billes indisponible (${label}, "${key}") : ${error.message}`);
+  }
+}
+
+// La frappeuse tout de suite, la frappée `flamMs` plus tard, retardée par la chaîne
+// audio (voir l'en-tête) ; chacune avec sa propre variation de ton.
+function playCollision(cue) {
+  const volume = (cue.gain ?? 1) * interfaceVolumeFactor();
+  const impact = (marble, delayMs) => playAt(profileOf(marble).impact, cue.place, volume, pitchOf("impact"), "impact", delayMs);
+  impact(cue.marble, 0);
+  impact(cue.struck, MARBLES_COLLISION.flamMs);
 }
 
 // --- Roulements (voir l'en-tête) ---
 
-// Les billes qui roulent en ce moment : { roll, elapsedMs, volume, voice, deadline }.
+// Les billes qui roulent en ce moment : { roll, elapsedMs, volume, pitch, voice,
+// deadline }. `pitch` : la variation de ton tirée pour ce trajet, qui multiplie la
+// vitesse de lecture du rendu.
 const rollingVoices = new Set();
 
 // Marge de l'échéance en temps réel d'un roulement, au-delà de sa durée : assez
@@ -441,7 +534,7 @@ function startRoll(cue) {
     endRatio: style.endRatio,
     gain: style.gain ?? 1,
   };
-  const rolling = { roll, elapsedMs: 0, volume: interfaceVolumeFactor(), voice: null, deadline: null };
+  const rolling = { roll, elapsedMs: 0, volume: interfaceVolumeFactor(), pitch: pitchOf("roll"), voice: null, deadline: null };
   const start = rollRendering(roll, 0, rolling.volume);
   // L'envoi de réverbération n'est pilotable que s'il existe dès le départ : posé au
   // plus fort du chemin, puis ramené aussitôt à celui du départ.
@@ -452,7 +545,7 @@ function startRoll(cue) {
       permanent: true,
       volume: start.volume,
       stereo: start.pan,
-      rate: start.rate,
+      rate: start.rate * rolling.pitch,
       lowpassHz: start.lowpassHz,
       ...(send > 0 && tableReverb?.input ? { reverbSend: send, reverbBusInput: tableReverb.input } : {}),
     });
@@ -481,7 +574,7 @@ export function advanceRolls(deltaMs) {
     }
     const { pan, volume, rate, lowpassHz, reverbSend } = rollRendering(rolling.roll, rolling.elapsedMs, rolling.volume);
     rolling.voice.update(pan, volume, lowpassHz);
-    rolling.voice.setRate(rate);
+    rolling.voice.setRate(rate * rolling.pitch);
     rolling.voice.setReverbSend(reverbSend);
   }
 }

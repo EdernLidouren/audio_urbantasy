@@ -31,29 +31,69 @@ export const MARBLES_SETTINGS = {
 //   beacon  sa balise, la voix de la bille, à la pioche et sous le curseur ;
 //   drop    son bruit de chute, à l'arrivée d'une bille qui roule ;
 //   roll    sa boucle de roulement, quand elle va d'une place à l'autre ;
-//   impact  le choc, quand une bille posée en déloge une autre. En attendant de
-//           vrais sons de choc : la balise.
+//   impact  son bruit de collision, quand elle en déloge une autre ou qu'on la
+//           déloge (voir MARBLES_COLLISION).
 // Des clés d'asset ou de pool (assets/manifest.json), vérifiées par l'audit du
 // contenu. Un profil aura un jour plusieurs voix (marble_small_2_beacon...).
+// Le NOM d'un profil est libre et ne dit rien de la taille de la bille (champ
+// `size`, MARBLE_SIZES) : `classic_large` est le son classique d'une grosse bille,
+// qu'une moyenne peut aussi porter. D'autres familles viendront à côté
+// (`metal_large`, `glass_small`...).
 export const MARBLE_SOUND_PROFILES = {
-  small: {
+  classic_small: {
     beacon: "assets/sounds/marbles/marble_small_1_beacon",
     drop: "assets/sounds/marbles/marble_small_drop",
     roll: "assets/sounds/marbles/marble_small_rolling",
-    impact: "assets/sounds/marbles/marble_small_1_beacon",
+    impact: "assets/sounds/marbles/marble_small_collision",
   },
-  medium: {
+  classic_medium: {
     beacon: "assets/sounds/marbles/marble_medium_1_beacon",
     drop: "assets/sounds/marbles/marble_medium_drop",
     roll: "assets/sounds/marbles/marble_medium_rolling",
-    impact: "assets/sounds/marbles/marble_medium_1_beacon",
+    impact: "assets/sounds/marbles/marble_medium_collision",
   },
-  large: {
+  classic_large: {
     beacon: "assets/sounds/marbles/marble_large_1_beacon",
     drop: "assets/sounds/marbles/marble_large_drop",
     roll: "assets/sounds/marbles/marble_large_rolling",
-    impact: "assets/sounds/marbles/marble_large_1_beacon",
+    impact: "assets/sounds/marbles/marble_large_collision",
   },
+};
+
+// Les TAILLES des billes (champ `size` d'une bille) : ce qu'EST la bille, jamais
+// déduit de son profil sonore. Présentation seulement aujourd'hui : la simulation
+// accepte le champ sans le lire.
+//   weight  son poids, qui règle la force d'une collision (MARBLES_COLLISION).
+export const MARBLE_SIZES = {
+  small: { weight: 1 },
+  medium: { weight: 2 },
+  large: { weight: 3 },
+};
+
+// La COLLISION, quand une bille posée en déloge une autre :
+//   flamMs          l'écart entre le son de la frappeuse et celui de la frappée.
+//                   Sous une vingtaine de millisecondes, l'oreille entend UN choc,
+//                   plus épais, deux corps ; au-delà de 30 à 40, deux coups ;
+//   weightExponent  la FORCE du choc : le rapport des poids (MARBLE_SIZES),
+//                   frappeuse sur frappée, élevé à cette puissance. 0 : toujours 1 ;
+//                   0,3 : une grosse sur une petite (3 sur 1) frappe à 1,39, une
+//                   petite sur une grosse à 0,72. La force règle le volume des deux
+//                   sons, et la vitesse de départ de la bille délogée (roulement
+//                   knocked, MARBLES_ROLLS).
+export const MARBLES_COLLISION = {
+  flamMs: 12,
+  weightExponent: 0.3,
+};
+
+// VARIATIONS DE TON : à chaque son, une vitesse de lecture tirée dans
+// [1 - v, 1 + v], pour que deux sons de suite ne soient jamais identiques. Par
+// famille de son : collision, chute, roulement (sa boucle, tirée une fois par
+// trajet). Jamais sur les balises : la balise est l'identité de la bille, la
+// faire varier brouillerait ce qu'elle permet de reconnaître.
+export const MARBLES_PITCH_VARIATION = {
+  impact: 0.04,
+  drop: 0.03,
+  roll: 0.02,
 };
 
 // OÙ S'ENTEND chaque place de la table (view/marbles/sounds.js/renderAt) :
@@ -100,14 +140,19 @@ export const MARBLES_SOUND_DEPTH = {
 // de roulement de son profil, déplacée en continu sur la table (panoramique et
 // profondeur, comme une place), puis sa chute ou son choc à l'arrivée.
 // Un style par trajet :
-//   place  de la main à l'emplacement, à la pose ;
-//   swap   d'un emplacement à l'autre, à l'échange ;
-//   out    d'un emplacement à la défausse : éjectée par une pose, ou usée. Plus
-//          lente, et qui s'essouffle ;
+//   place    de la main à un emplacement vide, à la pose : elle ralentit pour se
+//            poser ;
+//   strike   de la main à un emplacement occupé : elle est TIRÉE, plus vite et
+//            presque sans ralentir, et l'oreille anticipe le choc ;
+//   swap     d'un emplacement à l'autre, à l'échange ;
+//   knocked  la bille délogée, de son emplacement à la défausse. Sa vitesse de
+//            départ est multipliée par la force du choc (MARBLES_COLLISION) ;
+//   out      la bille usée, de son emplacement à la défausse. Plus lente, et qui
+//            s'essouffle ;
 //   rotation  le triangle qui tourne : chaque bille roule vers l'emplacement
 //          suivant, toutes ensemble. Un seul élan pour plusieurs crans, qui passe
 //          par les emplacements sans s'y arrêter.
-// Pour place, swap et out :
+// Pour place, strike, swap, knocked et out :
 //   speed     la vitesse au départ, en unités de la table par seconde (la largeur
 //             de la table, de x = -1 à x = 1, fait 2 ; de la main à la pointe, 1) ;
 //   endRatio  la vitesse à l'arrivée, en part de celle du départ : 1, elle ne
@@ -130,7 +175,9 @@ export const MARBLES_SOUND_DEPTH = {
 //   outStaggerMs   l'écart entre les départs de plusieurs billes usées à la fois.
 export const MARBLES_ROLLS = {
   place: { speed: 2, endRatio: 0.8 },
+  strike: { speed: 3, endRatio: 0.95 },
   swap: { speed: 2, endRatio: 0.8 },
+  knocked: { speed: 2, endRatio: 0.2 },
   out: { speed: 1.6, endRatio: 0.2 },
   rotation: { notchMs: 700, endRatio: 0.4, gain: 0.6, dropGain: 0.5 },
   restRate: 0.7,

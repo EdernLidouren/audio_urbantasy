@@ -6,5 +6,6 @@ export default {
   base: [speed(2)],
   apex: [speed(5)],
   maxWear: 2,
-  sound: "small",
+  size: "small",
+  sound: "classic_small",
 };

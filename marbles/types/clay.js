@@ -6,5 +6,6 @@ export default {
   base: [speed(1)],
   apex: [speed(4)],
   hit: [speed(2)],
-  sound: "medium",
+  size: "medium",
+  sound: "classic_medium",
 };
