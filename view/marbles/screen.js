@@ -28,6 +28,12 @@
 // dure, tout le reste est refusé d'un son de blocage, sans parole pour ne pas la
 // couper : l'état est déjà celui d'après la résolution, et le dévoilerait.
 //
+// SONS (view/marbles/sounds.js) : la musique de l'écran, de son ouverture à sa
+// sortie ; les sons des gestes (brassage, pioche, pose, échange) passent par une
+// file de sons (view/marbles/sound-queue.js) qui les étale sans jamais faire
+// attendre le joueur, avancée par onFrame comme la séquence ; la balise d'une
+// bille quand le curseur arrive sur elle, dans la main ou sur le triangle.
+//
 // FICHES : le curseur principal annonce court, Ctrl+haut et Ctrl+bas parcourent le
 // détail de la bille sous lui (view/marbles/card.js, lib/detail-card.js). Maj+S et
 // Maj+D ouvrent les menus du sac et de la défausse (view/marbles/pile-screen.js).
@@ -61,7 +67,8 @@ import {
   placementLines,
   slotName,
 } from "./narration.js";
-import { playMarbleEventSounds } from "./sounds.js";
+import { eventCues, playCue, playFocusBeacon, preloadMarblesAudio, startMarblesMusic, stopFocusBeacon, stopMarblesMusic } from "./sounds.js";
+import { EMPTY_SOUND_QUEUE, advanceSoundQueue, enqueueCues } from "./sound-queue.js";
 import { advanceSequence, restartPause, skipSequence, startSequence } from "./sequence.js";
 import { EMPTY_HISTORY, recordSteps } from "./history.js";
 import { openHistoryMenu } from "./history-screen.js";
@@ -101,6 +108,8 @@ export function makeMarblesScreen(getGame, setGame) {
   let started = false;
   // Les messages de jeu du tour en cours et du précédent (view/marbles/history.js).
   let history = EMPTY_HISTORY;
+  // Les sons encore à venir d'un geste (view/marbles/sound-queue.js).
+  let soundQueue = EMPTY_SOUND_QUEUE;
 
   const isNarrating = () => sequence !== null;
   const isOver = () => getGame().stage === "over" && !isNarrating();
@@ -115,6 +124,20 @@ export function makeMarblesScreen(getGame, setGame) {
   function recorded(steps) {
     history = recordSteps(history, steps);
     return steps;
+  }
+
+  // Les repères dus partent ; les autres attendent leur échéance.
+  function flushSounds(deltaMs) {
+    const { queue, due } = advanceSoundQueue(soundQueue, deltaMs);
+    soundQueue = queue;
+    due.forEach(playCue);
+  }
+
+  // Les sons d'un geste, d'après son journal : en file, les immédiats aussitôt.
+  // `shuffleFirst` : le sac vient d'être constitué (ouverture de la partie).
+  function playEventSounds(events, { shuffleFirst = false } = {}) {
+    soundQueue = enqueueCues(soundQueue, eventCues(events, { triangleAfter: getGame().triangle, shuffleFirst }));
+    flushSounds(0);
   }
 
   // À la fin de la partie, la dernière phrase dit aussi comment sortir.
@@ -151,11 +174,22 @@ export function makeMarblesScreen(getGame, setGame) {
     return held?.kind === "slot" && held.slot === cursor.place ? `${line} ${t("marbles.slot_line.held")}` : line;
   }
 
+  // La bille sous le curseur, ou undefined (emplacement vide, main vide).
+  function marbleUnderCursor() {
+    const game = getGame();
+    return cursor.place === "hand" ? game.hand[clampedHandIndex()] : game.triangle[cursor.place]?.marble;
+  }
+
+  // Le curseur vient d'arriver quelque part : la voix de la bille qui s'y trouve.
+  function beaconUnderCursor() {
+    const marble = marbleUnderCursor();
+    if (marble !== undefined) playFocusBeacon(marble);
+  }
+
   // La fiche de la bille sous le curseur, avec ce qu'on entendrait à sa position
   // par défaut ; null sur un emplacement vide ou une main vide.
   function currentCard() {
-    const game = getGame();
-    const marble = cursor.place === "hand" ? game.hand[clampedHandIndex()] : game.triangle[cursor.place]?.marble;
+    const marble = marbleUnderCursor();
     return marble === undefined ? null : marbleCard(marble, focusLine(), t);
   }
 
@@ -211,9 +245,12 @@ export function makeMarblesScreen(getGame, setGame) {
         announceFocus(true);
         return;
       }
-      const { index, boundary } = stepMenuCursor(clampedHandIndex(), direction === "left" ? -1 : 1, total);
+      const before = clampedHandIndex();
+      const { index, boundary } = stepMenuCursor(before, direction === "left" ? -1 : 1, total);
       cursor = { ...cursor, handIndex: index };
       announceFocus(boundary);
+      // Une butée sans cyclage laisse le curseur en place : pas de balise.
+      if (index !== before) beaconUnderCursor();
       return;
     }
     const next = stepCursor(cursor, direction, held?.kind === "hand");
@@ -227,6 +264,7 @@ export function makeMarblesScreen(getGame, setGame) {
     cursor = { ...next, handIndex: clampedHandIndex() };
     // Le point final du nom de zone fait marquer une pause au lecteur d'écran.
     announceMenuLine(zoneChanged ? `${t(`marbles.zone.${zone}`)} ${currentLine()}` : currentLine());
+    beaconUnderCursor();
   }
 
   // Origine et Fin : première et dernière bille, comme dans un menu. Là où elles
@@ -238,6 +276,7 @@ export function makeMarblesScreen(getGame, setGame) {
     cursor = { ...cursor, handIndex: index };
     resetDetailAfterMove();
     announceFocus(boundary);
+    if (!boundary) beaconUnderCursor();
   }
 
   // Le curseur secondaire : en butée, le champ se réannonce, sans son ni cyclage.
@@ -266,6 +305,7 @@ export function makeMarblesScreen(getGame, setGame) {
     cursor = { ...cursor, place: "hand", handIndex: fromHand };
     resetDetailAfterMove();
     announce(`${t("marbles.take.released")} ${t("marbles.zone.hand")} ${currentLine()}`, { assertive: true });
+    beaconUnderCursor();
   }
 
   // Le son d'une pose est celui de la confirmation qui vient de la lancer. La
@@ -276,7 +316,7 @@ export function makeMarblesScreen(getGame, setGame) {
     held = null;
     cursor = { ...cursor, place: "hand", handIndex: Math.min(handIndex, Math.max(0, getGame().hand.length - 1)) };
     resetDetailAfterMove();
-    playMarbleEventSounds(events);
+    playEventSounds(events);
     speak(stepsText(recorded(buildSteps(events, t))));
   }
 
@@ -286,7 +326,7 @@ export function makeMarblesScreen(getGame, setGame) {
     if (!events) return;
     resetDetailAfterMove();
     playMenuSound("select");
-    playMarbleEventSounds(events);
+    playEventSounds(events);
     speak(stepsText(recorded(buildSteps(events, t))));
   }
 
@@ -304,6 +344,7 @@ export function makeMarblesScreen(getGame, setGame) {
     resetDetailAfterMove();
     playMenuSound("select");
     announce(`${t("marbles.take.hand", { name: marbleName(game.hand[index], t) })} ${focusLine()}`, { assertive: true });
+    beaconUnderCursor();
   }
 
   function placeHeldOn(slot) {
@@ -347,13 +388,16 @@ export function makeMarblesScreen(getGame, setGame) {
   function follow({ sequence: next, step }) {
     sequence = next;
     if (step === null) return;
-    playMarbleEventSounds(step.events);
+    playEventSounds(step.events);
     speak(withOverHint(step.text));
   }
 
   function activate() {
-    if (isNarrating()) follow(skipSequence(sequence));
-    else if (isOver()) popScreen();
+    if (isNarrating()) {
+      // Passer coupe aussi les sons encore à venir des étapes passées.
+      soundQueue = EMPTY_SOUND_QUEUE;
+      follow(skipSequence(sequence));
+    } else if (isOver()) popScreen();
     else if (cursor.place === "hand") activateHand();
     else activateSlot();
   }
@@ -450,12 +494,14 @@ export function makeMarblesScreen(getGame, setGame) {
     history: openHistory,
   };
 
-  // Première ouverture : la pioche du tour 1. Ensuite (retour d'une
-  // confirmation, de l'aide), l'écran redit où l'on en est.
+  // Première ouverture : la musique, le sac qu'on brasse et la pioche du tour 1.
+  // Ensuite (retour d'une confirmation, de l'aide), l'écran redit où l'on en est.
   function start() {
     started = true;
+    preloadMarblesAudio();
+    startMarblesMusic();
     const events = dispatch({ type: "draw" });
-    playMarbleEventSounds(events);
+    playEventSounds(events, { shuffleFirst: true });
     speak(withOverHint(`${t("marbles.intro")} ${stepsText(recorded(buildSteps(events, t)))} ${isOver() ? "" : focusLine()}`));
   }
 
@@ -466,12 +512,16 @@ export function makeMarblesScreen(getGame, setGame) {
       else start();
     },
     onExit() {
+      soundQueue = EMPTY_SOUND_QUEUE;
+      stopFocusBeacon();
+      stopMarblesMusic();
       setGame(null);
     },
-    // Le temps réel de la séquence : seul l'écran du sommet le reçoit, un menu
-    // ouvert par-dessus (aide, abandon) la fige donc.
+    // Le temps réel de la séquence et de la file de sons : seul l'écran du sommet
+    // le reçoit, un menu ouvert par-dessus (aide, abandon) les fige donc.
     onFrame(deltaMs) {
       if (isNarrating()) follow(advanceSequence(sequence, deltaMs));
+      flushSounds(deltaMs);
     },
     onKeyDown(event) {
       const action = resolveAction(MARBLES_BINDINGS, event.key, event.mods);

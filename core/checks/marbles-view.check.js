@@ -10,7 +10,7 @@
 // (`node tools/run-checks.js marbles-view`).
 
 import { LOCALE_TABLES, t, setLocale, getLocale } from "../../data/i18n/index.js";
-import { MARBLE_CARD_MODEL, MARBLE_TYPES } from "../../config/marbles-values.js";
+import { MARBLE_CARD_MODEL, MARBLE_SOUND_PROFILES, MARBLE_TYPES, MARBLES_SETTINGS } from "../../config/marbles-values.js";
 import { detailLine, stepDetail } from "../../lib/detail-card.js";
 import { createMarblesGame, marblesReduce, MARBLE_ERRORS, SLOTS } from "../marbles.js";
 import {
@@ -32,7 +32,8 @@ import {
 import { marbleCard } from "../../view/marbles/card.js";
 import { confirmationEntries } from "../../view/menus/confirmation.js";
 import { INITIAL_CURSOR, placementStart, stepCursor, zoneOf } from "../../view/marbles/navigation.js";
-import { MARBLE_EVENT_SOUNDS } from "../../view/marbles/sounds.js";
+import { MARBLE_EVENT_CUES, eventCues, validateMarbleSounds } from "../../view/marbles/sounds.js";
+import { EMPTY_SOUND_QUEUE, advanceSoundQueue, enqueueCues } from "../../view/marbles/sound-queue.js";
 import { throws } from "../../lib/check.js";
 
 // Un gabarit resté brut (accolade, clé non traduite), ou un nombre négatif écrit
@@ -233,11 +234,74 @@ function checkBagOrder(run) {
   run.same("défausse : de la plus ancienne à la plus récente", ["giant", "mica", "tiger"], state.discard);
 }
 
+// Les sons : profils, repères d'un geste et leur ligne de temps, file de sons.
+// Rien n'est joué : on vérifie QUAND chaque son partirait.
+function checkSounds(run) {
+  run("profils : chaque bille a un profil sonore connu", true, Object.values(MARBLE_TYPES).every((type) => Object.hasOwn(MARBLE_SOUND_PROFILES, type.sound)));
+  run("profils : bille sans profil refusée", true, throws(() => validateMarbleSounds({ x: {} }, MARBLE_SOUND_PROFILES, MARBLES_SETTINGS)));
+  run("profils : profil sans chute refusé", true, throws(() => validateMarbleSounds({}, { small: { beacon: "a" } }, MARBLES_SETTINGS)));
+  run("profils : délai négatif refusé", true, throws(() => validateMarbleSounds({}, {}, { ...MARBLES_SETTINGS, drawSoundIntervalMs: -1 })));
+
+  const settings = { shuffleToDrawMs: 900, drawSoundIntervalMs: 350, swapSoundDelayMs: 150 };
+  const draws = ["clay", "glass", "giant"].map((marble) => ({ type: "draw", marble }));
+  run.same(
+    "repères : ouverture, le brassage puis une balise après l'autre",
+    [
+      { atMs: 0, sound: "shuffle" },
+      { atMs: 900, sound: "beacon", marble: "clay" },
+      { atMs: 1250, sound: "beacon", marble: "glass" },
+      { atMs: 1600, sound: "beacon", marble: "giant" },
+    ],
+    eventCues([{ type: "turnStarted", turn: 1, turnCount: 9 }, ...draws], { shuffleFirst: true }, settings)
+  );
+  run.same(
+    "repères : une pioche sans brassage part aussitôt",
+    [0, 350],
+    eventCues(draws.slice(0, 2), {}, settings).map((cue) => cue.atMs)
+  );
+  run.same(
+    "repères : sac régénéré, le brassage avant la pioche",
+    ["shuffle@0", "beacon@900"],
+    eventCues([{ type: "bagRegenerated", size: 4 }, draws[0]], {}, settings).map((cue) => `${cue.sound}@${cue.atMs}`)
+  );
+  run.same("repères : une pose, la chute de la bille posée", [{ atMs: 0, sound: "drop", marble: "agate" }], eventCues([{ type: "placed", slot: "apex", marble: "agate" }], {}, settings));
+  // Échange : la bille choisie (en `a` avant l'échange, en `b` après), puis l'autre.
+  const swapped = { type: "swapped", a: "leftBase", b: "apex" };
+  run.same(
+    "repères : un échange, la bille choisie puis l'autre",
+    [
+      { atMs: 0, sound: "drop", marble: "giant" },
+      { atMs: 150, sound: "drop", marble: "mica" },
+    ],
+    eventCues([swapped], { triangleAfter: { leftBase: { marble: "mica", wear: 0 }, rightBase: null, apex: { marble: "giant", wear: 1 } } }, settings)
+  );
+  run.same(
+    "repères : un déplacement vers un vide, une seule chute, aussitôt",
+    [{ atMs: 0, sound: "drop", marble: "giant" }],
+    eventCues([swapped], { triangleAfter: { leftBase: null, rightBase: null, apex: { marble: "giant", wear: 0 } } }, settings)
+  );
+  run.same("repères : une phase reste muette aujourd'hui", [], eventCues([{ type: "phase", slot: "apex", marble: "clay" }], {}, settings));
+
+  // La file : les immédiats aussitôt, les autres à leur échéance, dans l'ordre.
+  let queue = enqueueCues(EMPTY_SOUND_QUEUE, eventCues(draws, { shuffleFirst: true }, settings));
+  const step = (deltaMs) => {
+    const result = advanceSoundQueue(queue, deltaMs);
+    queue = result.queue;
+    return result.due.map((cue) => cue.marble ?? cue.sound);
+  };
+  run.same("file : l'immédiat part aussitôt", ["shuffle"], step(0));
+  run.same("file : rien avant l'échéance", [], step(899));
+  run.same("file : la première balise à son échéance", ["clay"], step(1));
+  run.same("file : une longue absence rend tout ce qui est dû, dans l'ordre", ["glass", "giant"], step(5000));
+  run("file : vide une fois tout joué", 0, queue.length);
+}
+
 export default function checkMarblesView(run) {
   const { events, state } = sampleEvents();
   const seenTypes = [...new Set(events.map((event) => event.type))].sort();
 
-  run.same("sons : un point d'accroche par évènement du journal", Object.keys(MARBLE_EVENT_SOUNDS).sort(), seenTypes);
+  run.same("sons : un point d'accroche par évènement du journal", Object.keys(MARBLE_EVENT_CUES).sort(), seenTypes);
+  checkSounds(run);
   checkCards(run);
   checkBagOrder(run);
   run("narration : évènement inconnu refusé", true, throws(() => buildSteps([{ type: "nope" }], (key) => key)));

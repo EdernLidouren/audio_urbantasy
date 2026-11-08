@@ -136,6 +136,9 @@ function validatePrefs(rawPrefs) {
 // illisible) -> store vide (défauts), jamais d'exception : le jeu démarre
 // toujours.
 function loadFromStorage() {
+  // Aucun stockage du tout (outils lancés avec Node, qui importent des modules de
+  // la vue) : les défauts, sans avertir, ce n'est pas une défaillance.
+  if (typeof localStorage === "undefined") return;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return;

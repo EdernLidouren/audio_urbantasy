@@ -9,7 +9,11 @@
 //   hit         le Tic : effet joué quand la bille est posée sur un emplacement
 //               occupé, après l'éjection de l'occupante ;
 //   knockout    l'Éjection : effet joué quand la bille est remplacée ;
-//   maxWear     usure maximale, sinon MARBLES_SETTINGS.defaultMaxWear.
+//   maxWear     usure maximale, sinon MARBLES_SETTINGS.defaultMaxWear ;
+//   sound       son profil sonore, une clé de MARBLE_SOUND_PROFILES : sa balise
+//               et son bruit de chute. Présentation seulement : la simulation
+//               l'accepte sans jamais le lire ; la vue le valide au chargement
+//               (view/marbles/sounds.js).
 //
 // Un effet est une LISTE DE CLAUSES ; une clause (core/marbles-effects.js) :
 //   action  ce qu'elle fait : "speed" ou "mass", qui ajoutent `amount` (entier,
@@ -40,6 +44,31 @@ export const MARBLES_SETTINGS = {
   // suivante. Ni R ni les autres annonces n'en ont.
   resolutionPauseBaseMs: 400,
   resolutionPausePerCharMs: 40,
+  // Enchaînement des sons (view/marbles/sounds.js), pour le son seulement : le
+  // joueur n'attend jamais. Après un brassage du sac, la première balise de
+  // pioche part au bout de shuffleToDrawMs, puis une balise toutes les
+  // drawSoundIntervalMs ; un échange fait entendre la bille choisie, puis
+  // l'autre swapSoundDelayMs plus tard.
+  shuffleToDrawMs: 900,
+  drawSoundIntervalMs: 350,
+  swapSoundDelayMs: 150,
+};
+
+// Les PROFILS SONORES des billes (champ `sound` d'une bille) : sa balise (la
+// voix de la bille, à la pioche et sous le curseur) et son bruit de chute (à la
+// pose). Des clés d'asset ou de pool (assets/manifest.json), vérifiées par l'audit
+// du contenu. Un profil aura un jour plusieurs voix (marble_small_2_beacon...).
+export const MARBLE_SOUND_PROFILES = {
+  small: { beacon: "assets/sounds/marbles/marble_small_1_beacon", drop: "assets/sounds/marbles/marble_small_drop" },
+  medium: { beacon: "assets/sounds/marbles/marble_medium_1_beacon", drop: "assets/sounds/marbles/marble_medium_drop" },
+  large: { beacon: "assets/sounds/marbles/marble_large_1_beacon", drop: "assets/sounds/marbles/marble_large_drop" },
+};
+
+// Les sons de l'écran des billes qui ne sont pas ceux d'une bille : la musique
+// (en boucle s'il n'y a qu'un morceau, sinon enchaînée) et le brassage du sac.
+export const MARBLES_AUDIO = {
+  music: "assets/musics/marbles_classic",
+  shuffle: "assets/sounds/marbles/marbles_shuffling",
 };
 
 // La fiche d'une bille (lib/detail-card.js, view/marbles/card.js) : l'ordre de ses
@@ -69,18 +98,18 @@ const speed = (amount) => ({ action: "speed", amount });
 const mass = (amount) => ({ action: "mass", amount });
 
 export const MARBLE_TYPES = {
-  clay: { base: [speed(1)], apex: [speed(4)], hit: [speed(2)] },
-  glass: { base: [mass(1)], apex: [speed(2)] },
-  shooter: { apex: [speed(8)], knockout: [speed(3)] },
-  agate: { base: [mass(1)], apex: [mass(2)], hit: [mass(1)] },
-  cats_eye: { base: [speed(3)], baseVariant: { rightBase: [mass(1)] }, apex: [speed(3)] },
-  porcelain: { base: [speed(2)], apex: [speed(5)], maxWear: 2 },
-  leaded: { base: [mass(2)], apex: [speed(-3)], knockout: [mass(1)] },
-  mica: { base: [speed(1)], apex: [speed(1)], maxWear: 6 },
-  sulphide: { apex: [mass(3)] },
-  stoneware: { base: [speed(2)] },
-  tiger: { base: [speed(3)], apex: [speed(-1)], maxWear: 4 },
-  giant: { base: [speed(6)], apex: [speed(6)], maxWear: 1 },
+  clay: { base: [speed(1)], apex: [speed(4)], hit: [speed(2)], sound: "medium" },
+  glass: { base: [mass(1)], apex: [speed(2)], sound: "small" },
+  shooter: { apex: [speed(8)], knockout: [speed(3)], sound: "large" },
+  agate: { base: [mass(1)], apex: [mass(2)], hit: [mass(1)], sound: "medium" },
+  cats_eye: { base: [speed(3)], baseVariant: { rightBase: [mass(1)] }, apex: [speed(3)], sound: "small" },
+  porcelain: { base: [speed(2)], apex: [speed(5)], maxWear: 2, sound: "small" },
+  leaded: { base: [mass(2)], apex: [speed(-3)], knockout: [mass(1)], sound: "large" },
+  mica: { base: [speed(1)], apex: [speed(1)], maxWear: 6, sound: "small" },
+  sulphide: { apex: [mass(3)], sound: "large" },
+  stoneware: { base: [speed(2)], sound: "medium" },
+  tiger: { base: [speed(3)], apex: [speed(-1)], maxWear: 4, sound: "medium" },
+  giant: { base: [speed(6)], apex: [speed(6)], maxWear: 1, sound: "large" },
   // En base gauche, renforce la pointe si elle donne de la Vitesse.
   magnifier: {
     base: [speed(1)],
@@ -88,6 +117,7 @@ export const MARBLE_TYPES = {
       leftBase: [{ ...speed(4), target: "apex", when: { type: "printedStat", slot: "apex", stat: "speed", atLeast: 1 } }],
     },
     apex: [speed(2)],
+    sound: "medium",
   },
 };
 

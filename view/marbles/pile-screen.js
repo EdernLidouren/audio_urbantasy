@@ -7,6 +7,9 @@
 //
 // Rien de la partie n'est lu ni modifié ici : la liste est reçue à l'ouverture,
 // dans l'ordre où elle doit se dire. C'est l'appelant qui décide de cet ordre.
+//
+// Comme sur l'écran de jeu, le curseur qui arrive sur une bille (à l'ouverture,
+// ou en se déplaçant) fait entendre sa balise (view/marbles/sounds.js).
 
 import { announce } from "../../lib/announce.js";
 import { popScreen, pushScreen } from "../../lib/screens.js";
@@ -18,6 +21,7 @@ import { MARBLES_SETTINGS } from "../../config/marbles-values.js";
 import { playMenuSound } from "../menu-sounds.js";
 import { marbleCard } from "./card.js";
 import { describeMarbleInList } from "./narration.js";
+import { playFocusBeacon } from "./sounds.js";
 
 const PILE_BINDINGS = defineBindings("marblesPile", {
   left: { keys: ["ArrowLeft"], mods: [] },
@@ -35,6 +39,7 @@ function makePileScreen(titleKey, marbles) {
   const total = marbles.length + 1; // « Retour » compte comme une entrée
   let index = 0;
   let detail = 0;
+  let opened = false;
 
   const isOnBack = () => index === marbles.length;
 
@@ -55,10 +60,17 @@ function makePileScreen(titleKey, marbles) {
     return card === null ? backLine() : mainWithDetail(card, detail);
   }
 
+  // La balise de l'entrée courante, si c'est une bille.
+  function beacon() {
+    if (!isOnBack()) playFocusBeacon(marbles[index]);
+  }
+
   function goTo({ index: next, boundary }) {
+    const moved = next !== index;
     index = next;
     detail = detailAfterMainMove(detail, MARBLES_SETTINGS.cardResetOnMove);
     announceMenuLine(currentLine(), boundary);
+    if (moved) beacon();
   }
 
   // Curseur secondaire : en butée, le champ se réannonce, sans son. Sur « Retour »,
@@ -106,7 +118,12 @@ function makePileScreen(titleKey, marbles) {
 
   return {
     helpSections: () => [{ id: "marblesPile" }],
-    onEnter: announceOpening,
+    // À l'ouverture seulement : au retour de l'aide, le curseur n'a pas bougé.
+    onEnter() {
+      announceOpening();
+      if (!opened) beacon();
+      opened = true;
+    },
     onKeyDown(event) {
       const action = resolveAction(PILE_BINDINGS, event.key, event.mods);
       const handler = keyHandlers[action];

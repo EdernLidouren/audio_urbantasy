@@ -21,7 +21,8 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
 | `view/marbles/history.js` | L'historique : les messages de jeu du tour précédent (pur) |
 | `view/marbles/history-screen.js` | Le menu de l'historique |
 | `view/marbles/navigation.js` | Le curseur dans le triangle, les zones, l'ouverture de la sélection d'emplacement (pur) |
-| `view/marbles/sounds.js` | Les points d'accroche sonores |
+| `view/marbles/sounds.js` | Les sons de l'écran : repères des évènements, balise au survol, musique |
+| `view/marbles/sound-queue.js` | La file de sons, qui étale ceux d'un même geste (pur) |
 | `tools/marbles/` | La boîte à outils : partie au terminal, cas construits, simulateur (`doc/marbles-tools.md`) |
 | `core/checks/marbles.check.js`, `marbles-bus.check.js`, `marbles-forecast.check.js`, `marbles-view.check.js`, `marbles-sequence.check.js` | Vérifications |
 
@@ -67,21 +68,24 @@ Une entrée de `MARBLE_TYPES`, de la donnée validée au chargement
 les champs :
 
 ```js
-clay: { base: [speed(1)], apex: [speed(4)], hit: [speed(2)] },
-cats_eye: { base: [speed(3)], baseVariant: { rightBase: [mass(1)] }, apex: [speed(3)] },
+clay: { base: [speed(1)], apex: [speed(4)], hit: [speed(2)], sound: "medium" },
+cats_eye: { base: [speed(3)], baseVariant: { rightBase: [mass(1)] }, apex: [speed(3)], sound: "small" },
 magnifier: {
   base: [speed(1)],
   baseVariant: {
     leftBase: [{ ...speed(4), target: "apex", when: { type: "printedStat", slot: "apex", stat: "speed", atLeast: 1 } }],
   },
   apex: [speed(2)],
+  sound: "medium",
 },
 ```
 
 Les champs d'effet (`base`, `baseVariant`, `apex`, `hit`, `knockout`) sont tous facultatifs :
-absent, aucun effet. `maxWear` vaut 3 par défaut. **Ajouter une bille** : sa ligne dans la
-table, son nom dans chaque langue (vérifié par le domaine `marbles-view`), et sa place dans
-`STARTING_BAG` pour la mettre en jeu. En français, le nom porte sa forme `de` (« d'argile »,
+absent, aucun effet. `maxWear` vaut 3 par défaut. `sound`, obligatoire, est son profil sonore
+(`small`, `medium` ou `large`, voir « Sons ») : de la présentation, que la simulation accepte
+sans jamais le lire. **Ajouter une bille** : sa ligne dans la table, avec son profil, son nom
+dans chaque langue (vérifié par le domaine `marbles-view`), et sa place dans `STARTING_BAG`
+pour la mettre en jeu. En français, le nom porte sa forme `de` (« d'argile »,
 « de calot ») : `{ "base": "argile", "de": "d'argile" }`, pour « Tic d'argile ». Un sac est
 une liste d'ids : les doublons y sont permis.
 
@@ -306,10 +310,48 @@ qu'elle se dit.
 suivant, ou à la fin de partie, sans dire les étapes d'avant ni jouer leurs sons. L'état
 ne change pas : il était déjà complet avant la première étape.
 
-**Sons** : un point d'accroche par type d'évènement, tous vides aujourd'hui
-(`view/marbles/sounds.js`/`MARBLE_EVENT_SOUNDS`). Brancher un son, c'est remplacer son
-`null` par une clé d'asset. Les gestes de l'écran gardent les sons de menu (`select`,
-`cancel`, `block`, `refusal`).
+### Sons
+
+Les sons du minijeu sont rangés à part, dans `assets/sounds/marbles/` et
+`assets/musics/marbles_classic`. Les clés vivent dans `config/marbles-values.js`, vérifiées
+par l'audit du contenu ; la lecture, dans `view/marbles/sounds.js`.
+
+**Profils** : chaque bille a un profil sonore (`sound`), qui lui donne sa **balise** (sa
+voix, à la pioche et sous le curseur) et sa **chute** (à la pose). Trois profils aujourd'hui,
+`small`, `medium` et `large` (`MARBLE_SOUND_PROFILES`), une voix chacun ; les noms de fichier
+prévoient plusieurs voix par profil (`marble_small_2_beacon`…). Une bille sans profil connu
+fait échouer le chargement.
+
+**Musique** : `marbles_classic`, de l'ouverture de l'écran au retour au menu principal, en
+fondu, au volume de la musique. Un seul morceau : en boucle ; plusieurs : enchaînés avec une
+respiration, comme en ville. Elle continue sous l'aide et les menus des billes.
+
+**Sons d'évènement** : un point d'accroche par type d'évènement du journal
+(`MARBLE_EVENT_CUES`), muet s'il vaut `null`. Il dit quels **repères** l'évènement produit,
+et quand, sur la ligne de temps du geste (`eventCues`) :
+
+- brassage du sac (`marbles_shuffling`), à l'ouverture de la partie (la simulation mélange le
+  sac à sa création, sans évènement : l'écran le joue) et à chaque `bagRegenerated` ;
+- pioche : la balise de chaque bille piochée, l'une après l'autre ; la première attend
+  `shuffleToDrawMs` (900 ms) après un brassage, les suivantes `drawSoundIntervalMs` (350 ms) ;
+- pose : la chute de la bille posée (remplacement compris, en attendant un son de tic) ;
+- échange : la chute de la bille choisie, puis celle de l'autre `swapSoundDelayMs` (150 ms)
+  plus tard ; vers un emplacement vide, une seule chute.
+
+Les repères passent par une **file de sons** (`view/marbles/sound-queue.js`), avancée par
+`onFrame` comme la séquence : le son seul attend, le joueur garde la main. Un menu ouvert
+par-dessus la fige ; passer la séquence (Entrée) vide ce qui restait à venir. Pendant la
+séquence, les sons d'une étape partent avec elle.
+
+**Balise au survol** : la balise de la bille sur laquelle le curseur arrive, dans la main, sur
+un emplacement occupé (à l'ouverture de la sélection d'emplacement aussi), et dans les menus
+du sac et de la défausse (à l'ouverture et à chaque déplacement). Une seule à la fois : la
+suivante coupe la précédente. Une butée, qui laisse le curseur en place, n'en joue pas.
+
+**Volumes** : balises (pioche et survol) au volume des balises, elles ont vocation à être
+positionnées ; brassage et chutes au volume de l'interface. Tous les sons des billes sont
+permanents et préchargés à l'ouverture de l'écran. Les gestes de l'écran gardent les sons de
+menu (`select`, `cancel`, `block`, `refusal`).
 
 ### Historique (L)
 
