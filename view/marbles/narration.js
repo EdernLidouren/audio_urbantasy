@@ -4,7 +4,7 @@
 // terminal (tools/play-marbles.js) disent exactement les mêmes phrases.
 
 import { nameRef } from "../../data/i18n/index.js";
-import { effectAt, maxWearOf } from "../../core/marbles.js";
+import { SLOTS, effectAt, maxWearOf } from "../../core/marbles.js";
 import { CLAUSE_ACTIONS } from "../../core/marbles-effects.js";
 import { forecast } from "../../core/marbles-forecast.js";
 import { formatMenuPosition } from "../../lib/menu.js";
@@ -188,117 +188,173 @@ export function bagDisplayOrder(bag, t) {
   return [...bag].sort((a, b) => marbleName(a, t).localeCompare(marbleName(b, t)));
 }
 
-function nameOrEmpty(placed, t) {
-  return placed === null ? t("marbles.slot.empty") : marbleName(placed.marble, t);
+// Ce qu'une bille produit À SON EMPLACEMENT, sur le triangle prévu ou pendant la
+// résolution : « base gauche, argile : Vitesse +1. », « base droite, vide. ».
+// `outcome` : { marble, speed, mass }, ou null pour un emplacement vide. Seules les
+// valeurs effectivement produites se disent, bonus reçu compris, sans texte d'effet
+// ni de condition : ce que la bille donne à une autre s'entend chez celle-ci.
+function outcomeLine(slot, outcome, t) {
+  if (outcome === null) return t("marbles.outcome.empty", { slot: slotName(slot, t) });
+  return t("marbles.outcome.slot", {
+    slot: slotName(slot, t),
+    marble: marbleName(outcome.marble, t),
+    effect: combined(statParts(outcome, t), t),
+  });
 }
 
-// Ces évènements ne se disent pas eux-mêmes : ils existent pour le son et pour
-// de futurs effets. Ce qu'on entend, c'est l'effet qu'ils déclenchent (Tic,
-// Éjection) ou l'évènement qui les suit (la défausse après le retrait).
-const silent = () => null;
+// La vue d'ensemble du tour (touche R), d'un bloc : la prévision d'abord, Vitesse et
+// Masse comprenant ce que le tour a déjà gagné (Tic, Éjection), l'Impact avec ses
+// planchers ; puis chaque emplacement dans l'ordre des phases. Le triangle actuel,
+// sans action envisagée. null hors de la phase de jeu, où rien ne se prévoit.
+export function describeOverview(game, t) {
+  const predicted = forecast(game);
+  if (!predicted.ok) return null;
+  const summary = t("marbles.overview.summary", {
+    speed: formatCounter(predicted.speed),
+    mass: formatCounter(predicted.mass),
+    impact: predicted.impact,
+  });
+  return [summary, ...SLOTS.map((slot) => outcomeLine(slot, predicted.phases[slot], t))].join(" ");
+}
 
-// Le gabarit d'un effet, selon ce qui l'a déclenché ; celui d'une phase n'a pas
-// à nommer la bille, l'annonce de la phase vient de le faire.
+// La rotation du moteur (core/marbles.js/rotated) : un cran, dans le sens horaire
+// (base gauche -> pointe -> base droite). Paramètres du texte, pour le jour où elle
+// variera ; son évènement les portera alors.
+const ROTATION = { steps: 1, direction: "clockwise" };
+
+// Le gabarit d'un effet déclenché par un évènement : celui d'une phase se dit comme
+// le résultat de son emplacement (outcomeLine). Un futur déclencheur a besoin de son
+// gabarit ici ; sans lui, buildSteps lève.
 const EFFECT_TEMPLATES = {
-  phase: "marbles.event.effect",
   hit: "marbles.event.effect_hit",
   knockout: "marbles.event.effect_knockout",
 };
 
-// Le texte de chaque type d'évènement. Les pioches ne sont pas ici : une
-// suite de pioches se dit en une liste (voir buildSteps).
+function effectText(event, t) {
+  if (event.trigger === "phase") {
+    return outcomeLine(event.slot, { marble: event.marble, speed: event.speedDelta, mass: event.massDelta }, t);
+  }
+  const template = EFFECT_TEMPLATES[event.trigger];
+  if (!template) throw new Error(`marbles : effet sans gabarit pour le déclencheur "${event.trigger}".`);
+  return t(template, {
+    marble: nameRef(`marble.${event.marble}.name`),
+    effect: describeEffect({ speed: event.speedDelta, mass: event.massDelta, given: event.given }, t),
+    speed: formatCounter(event.speed),
+    mass: formatCounter(event.mass),
+  });
+}
+
+// Ce qui ne se dit pas : l'évènement rejoint l'étape SUIVANTE (son son avec elle).
+// La phase se dit par son effet, qui la suit toujours ; le retrait, par la défausse ;
+// le Tic et l'Éjection, par leur effet s'ils en ont un.
+const SILENT = () => null;
+// Ce qui ne se dit pas et prolonge l'étape PRÉCÉDENTE : l'usure suit l'effet de sa
+// phase, la fin de tour suit la rotation.
+const TRAILING = new Set(["wear", "turnEnded"]);
+
+// Le texte de chaque type d'évènement, ou null s'il ne se dit pas. `context` :
+// { gameEndsBeforeNextTurn(index) }, pour la rotation.
 const EVENT_TEXTS = {
-  turnStarted: (event, t) => t("marbles.event.turn_started", { turn: event.turn, turnCount: event.turnCount }),
+  turnStarted: (event, t) => t("marbles.event.turn_started", { turn: event.turn }),
+  // Les pioches consécutives se disent en une liste : buildSteps les regroupe.
+  draw: (event, t) => marbleName(event.marble, t),
   drawSkipped: (event, t) => t("marbles.event.draw_skipped"),
   bagRegenerated: (event, t) => t("marbles.event.bag_regenerated", { size: event.size }),
   swapped: (event, t) => t("marbles.event.swapped", { a: slotName(event.a, t), b: slotName(event.b, t) }),
-  knockout: silent,
-  removed: silent,
-  hit: silent,
-  turnEnded: silent,
-  discarded: (event, t) => t(`marbles.event.discarded.${event.cause}`, { marble: marbleName(event.marble, t) }),
+  knockout: SILENT,
+  removed: SILENT,
+  hit: SILENT,
+  phase: SILENT,
+  wear: SILENT,
+  turnEnded: SILENT,
+  discarded: (event, t) => t(`marbles.event.discarded.${event.cause}`, { marble: nameRef(`marble.${event.marble}.name`) }),
   placed: (event, t) => t("marbles.event.placed", { marble: marbleName(event.marble, t), slot: slotName(event.slot, t) }),
-  phase: (event, t) => t("marbles.event.phase", { slot: slotName(event.slot, t), marble: marbleName(event.marble, t) }),
-  phaseSkipped: (event, t) => t("marbles.event.phase_skipped", { slot: slotName(event.slot, t) }),
-  effect: (event, t) =>
-    t(EFFECT_TEMPLATES[event.trigger], {
-      marble: nameRef(`marble.${event.marble}.name`),
-      effect: describeEffect({ speed: event.speedDelta, mass: event.massDelta, given: event.given }, t),
-      speed: formatCounter(event.speed),
-      mass: formatCounter(event.mass),
-    }),
-  wear: (event, t) => t("marbles.event.wear", { wear: event.wear, maxWear: event.maxWear }),
-  impact: (event, t) =>
-    t("marbles.event.impact", { speed: formatCounter(event.speed), mass: formatCounter(event.mass), impact: event.impact, score: event.score }),
-  rotation: (event, t) =>
-    t("marbles.event.rotation", {
-      apex: nameOrEmpty(event.triangle.apex, t),
-      leftBase: nameOrEmpty(event.triangle.leftBase, t),
-      rightBase: nameOrEmpty(event.triangle.rightBase, t),
-    }),
+  phaseSkipped: (event, t) => outcomeLine(event.slot, null, t),
+  effect: effectText,
+  impact: (event, t) => t("marbles.event.impact", { impact: event.impact, score: event.score }),
+  // Au dernier tour, la partie finit avant que le triangle ne serve : la rotation
+  // ne se dit pas.
+  rotation: (event, t, context) => (context.endsBeforeNextTurn ? null : t("marbles.event.rotation", ROTATION)),
   gameOver: (event, t) => t(`marbles.event.game_over.${event.reason}`, { score: event.score }),
 };
 
-// `event` prolonge-t-il l'étape en cours, qui finit par `previous` ? Une phase
-// se dit d'un bloc (bille, effet, usure), comme le début d'un tour (tour,
-// pioche, régénération) et l'après-Impact (retraits, rotation, fin de tour).
-function continuesStep(event, previous) {
-  if (previous === null) return false;
-  switch (event.type) {
-    case "draw":
-    case "drawSkipped":
-    case "bagRegenerated":
-    case "effect":
-    case "wear":
-    case "discarded":
-    case "hit":
-    case "turnEnded":
-      return true;
-    case "rotation":
-      return previous.type === "discarded";
-    default:
-      return false;
-  }
+// La partie finit-elle après `index`, avant tout nouveau tour ?
+function endsBeforeNextTurn(events, index) {
+  const next = events.slice(index + 1).find((event) => event.type === "gameOver" || event.type === "turnStarted");
+  return next?.type === "gameOver";
 }
 
-// Le journal découpé en ÉTAPES à dire : [{ text, events }]. Un type d'évènement
-// inconnu lève : c'est une faute de programmation, qu'une partie de fumée
-// (domaine marbles-view) trouve avant le joueur.
+// Le journal découpé en ÉTAPES à dire, dans l'ordre chronologique :
+// [{ text, events }]. Chaque évènement qui se dit ouvre son étape ; un évènement
+// muet rejoint la suivante (ou la précédente, TRAILING) ; tout évènement appartient
+// à une étape et une seule. Deux règles d'ordre :
+// - les pioches consécutives se disent en une liste (« Vous piochez argile et verre. ») ;
+// - le début de tour se dit APRÈS sa pioche, à la fin du journal reçu : « Début du
+//   tour 3, jouez vos billes. » vient quand le joueur a sa main. Une fin de partie
+//   avant lui le remplace.
+// Un nouvel évènement qui se dit (un effet d'un nouveau déclencheur) devient ainsi une
+// étape à sa place, sans autre changement. Un type inconnu lève : c'est une faute de
+// programmation, qu'une partie de fumée (domaine marbles-view) trouve avant le joueur.
 export function buildSteps(events, t) {
   const steps = [];
-  let current = null;
-  let draws = [];
-  let previous = null;
+  let waiting = [];
+  let turnStart = null;
 
-  const flushDraws = () => {
-    if (draws.length > 0) current.parts.push(t("marbles.event.draw", { marbles: draws }));
-    draws = [];
+  const open = (text, event) => {
+    const step = { text, events: [...waiting, event] };
+    waiting = [];
+    steps.push(step);
+    return step;
   };
 
-  for (const event of events) {
-    // Une étape qui n'a encore rien à dire accueille l'évènement suivant :
-    // jamais d'étape silencieuse, où Entrée semblerait sans effet.
-    const isSilentSoFar = current !== null && current.parts.length === 0 && draws.length === 0;
-    if (!continuesStep(event, previous) && !isSilentSoFar) {
-      if (current) flushDraws();
-      current = { parts: [], events: [] };
-      steps.push(current);
-    }
-    current.events.push(event);
-    if (event.type === "draw") {
-      draws.push(marbleName(event.marble, t));
-    } else {
-      flushDraws();
-      const text = EVENT_TEXTS[event.type];
-      if (!text) throw new Error(`marbles : évènement sans texte "${event.type}".`);
-      const spoken = text(event, t);
-      if (spoken !== null) current.parts.push(spoken);
-    }
-    previous = event;
-  }
-  if (current) flushDraws();
+  events.forEach((event, index) => {
+    const text = EVENT_TEXTS[event.type];
+    if (!text) throw new Error(`marbles : évènement sans texte "${event.type}".`);
 
-  return steps.map((step) => ({ text: step.parts.join(" "), events: step.events }));
+    // Le début de tour se dit plus tard, mais son évènement reste à sa place : il
+    // part (son son avec lui) avec l'étape suivante, la pioche.
+    if (event.type === "turnStarted") {
+      turnStart = text(event, t);
+      waiting.push(event);
+      return;
+    }
+    // Le tour qui allait commencer n'aura pas lieu.
+    if (event.type === "gameOver") turnStart = null;
+
+    const last = steps[steps.length - 1];
+    if (event.type === "draw") {
+      if (last?.draws && waiting.length === 0) {
+        last.draws.push(marbleName(event.marble, t));
+        last.events.push(event);
+      } else {
+        open(null, event).draws = [marbleName(event.marble, t)];
+      }
+      return;
+    }
+    if (TRAILING.has(event.type) && last !== undefined && waiting.length === 0) {
+      last.events.push(event);
+      return;
+    }
+    const spoken = text(event, t, { endsBeforeNextTurn: endsBeforeNextTurn(events, index) });
+    if (spoken === null) waiting.push(event);
+    else open(spoken, event);
+  });
+
+  if (turnStart !== null) steps.push({ text: turnStart, events: waiting });
+  else if (waiting.length > 0 && steps.length > 0) steps[steps.length - 1].events.push(...waiting);
+  else if (waiting.length > 0) steps.push({ text: "", events: waiting });
+
+  return steps.map((step) => ({
+    text: step.draws ? t("marbles.event.draw", { marbles: step.draws }) : step.text,
+    events: step.events,
+  }));
+}
+
+// Les étapes d'une RÉSOLUTION (journal de la résolution puis de la pioche qui la
+// suit), précédées de son ouverture, « Résolution du tour 3. », qui n'est pas un
+// évènement : c'est le geste du joueur qui l'ouvre.
+export function resolutionSteps(turn, events, t) {
+  return [{ text: t("marbles.resolution.opening", { turn }), events: [] }, ...buildSteps(events, t)];
 }
 
 // Toutes les étapes d'un coup, pour ce qui n'a pas à se dire étape par étape.

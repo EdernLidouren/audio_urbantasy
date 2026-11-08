@@ -2,8 +2,10 @@
 // sonne, sur les vraies tables de textes : chaque bille et chaque refus a son
 // texte, chaque évènement du journal se dit et a son point d'accroche sonore,
 // aucun gabarit ne reste brut, dans chaque langue. Plus les fiches des billes,
-// l'ordre du menu du sac et de la confirmation, et le déplacement du curseur. Rien n'est annoncé ni joué ici : runChecks() se lance aussi dans le
-// jeu. Lancées par core/checks/index.js/runChecks
+// l'ordre du menu du sac et de la confirmation, et le déplacement du curseur.
+// La vue d'ensemble et la séquence de résolution ont leur domaine,
+// marbles-sequence. Rien n'est annoncé ni joué ici : runChecks() se lance aussi
+// dans le jeu. Lancées par core/checks/index.js/runChecks
 // (`node tools/run-checks.js marbles-view`).
 
 import { LOCALE_TABLES, t, setLocale, getLocale } from "../../data/i18n/index.js";
@@ -244,7 +246,11 @@ export default function checkMarblesView(run) {
   run.same("étapes : aucun évènement perdu", events, buildSteps(events, (key) => key).flatMap((step) => step.events));
   const turn = createMarblesGame(4);
   const drawn = marblesReduce(turn, { type: "draw" });
-  run("étapes : le début de tour et sa pioche, une seule étape", 1, buildSteps(drawn.events, (key) => key).length);
+  run.same(
+    "étapes : la pioche, puis le début de tour",
+    ["marbles.event.draw", "marbles.event.turn_started"],
+    buildSteps(drawn.events, (key) => key).map((step) => step.text)
+  );
 
   const previousLocale = getLocale();
   try {
@@ -316,14 +322,9 @@ export default function checkMarblesView(run) {
     run("texte : compteur négatif", "−3", formatCounter(-3));
     run("texte : compteur positif", "3", formatCounter(3));
     run(
-      "texte : Impact, compteurs négatifs",
-      "Vitesse −3, Masse −1. Impact 0. Score 0.",
-      said(stepsText(buildSteps([{ type: "impact", speed: -3, mass: -1, impact: 0, score: 0 }], t)))
-    );
-    run(
-      "texte : effet, compteurs négatifs",
-      "Vitesse −3. Vitesse −3, Masse 1.",
-      said(stepsText(buildSteps([{ type: "phase", slot: "apex", marble: "leaded" }, { type: "effect", trigger: "phase", slot: "apex", marble: "leaded", speedDelta: -3, massDelta: 0, given: [], speed: -3, mass: 1 }], t))).replace(/^.*?\. /, "")
+      "texte : effet de phase négatif",
+      "pointe, plombée : Vitesse −3.",
+      said(stepsText(buildSteps([{ type: "phase", slot: "apex", marble: "leaded" }, { type: "effect", trigger: "phase", slot: "apex", marble: "leaded", speedDelta: -3, massDelta: 0, given: [], speed: -3, mass: 1 }], t)))
     );
     run("texte : deux effets", "Vitesse +1 et Masse +2", said(describeEffect({ speed: 1, mass: 2 }, t)));
     run("texte : effet donné", "Vitesse +4 à la pointe", said(describeEffect({ speed: 0, mass: 0, given: [{ slot: "apex", marble: "shooter", speed: 4, mass: 0 }] }, t)));
@@ -332,23 +333,7 @@ export default function checkMarblesView(run) {
       "Vitesse +4 à la pointe si son effet de pointe donne au moins Vitesse +1",
       said(describePrinted(MARBLE_TYPES.magnifier.baseVariant.leftBase, t))
     );
-    run(
-      "texte : Impact",
-      "Vitesse 3, Masse 2. Impact 6. Score 14.",
-      said(stepsText(buildSteps([{ type: "impact", speed: 3, mass: 2, impact: 6, score: 14 }], t)))
-    );
-    run.same(
-      "texte : pioche en liste",
-      ["Tour 1 sur 9. Pioche : argile et verre."],
-      buildSteps(
-        [
-          { type: "turnStarted", turn: 1, turnCount: 9 },
-          { type: "draw", marble: "clay" },
-          { type: "draw", marble: "glass" },
-        ],
-        t
-      ).map((step) => said(step.text))
-    );
+    run("texte : Impact", "Impact 6. Score 14.", said(stepsText(buildSteps([{ type: "impact", speed: 3, mass: 2, impact: 6, score: 14 }], t))));
 
     // Annonces principales : courtes, le détail est dans la fiche.
     const inHand = { ...state, hand: ["clay", "cats_eye", "shooter"] };
@@ -403,8 +388,8 @@ export default function checkMarblesView(run) {
       said(stepsText(buildSteps(placing.events, t)))
     );
     const lensedSteps = buildSteps(marblesReduce(lensed, { type: "resolve" }).events, t).map((step) => said(step.text));
-    run("texte : la loupe dit ce qu'elle donne", "base gauche : loupe. Vitesse +4 à la pointe. Vitesse 0, Masse 1. Usure 1 sur 3.", lensedSteps[0]);
-    run("texte : le bonus s'entend chez qui le reçoit", "pointe : calot. Vitesse +12. Vitesse 12, Masse 1. Usure 2 sur 3.", lensedSteps[2]);
+    run("texte : la loupe ne produit rien elle-même", "base gauche, loupe : aucun effet.", lensedSteps[0]);
+    run("texte : le bonus s'entend chez qui le reçoit", "pointe, calot : Vitesse +12.", lensedSteps[2]);
     run.same("étapes : aucune étape silencieuse", [], buildSteps(events, t).filter((step) => step.text === ""));
     run(
       "texte : le tour, compteurs compris",

@@ -16,9 +16,10 @@
 //   etat | state                     afficher l'état
 //   poser | place <n> <emplacement>  poser la bille n de la main (à partir de 1)
 //   echanger | swap <empl.> <empl.>  échanger deux emplacements
-//   prevoir | forecast               prévoir le tour sur le triangle actuel
+//   prevoir | forecast | r           la vue d'ensemble du tour (touche R)
 //   prevoir | forecast <n> <empl.>   prévoir la pose de la bille n (rien ne bouge)
-//   fin | end                        résoudre et finir le tour
+//   fin | end                        résoudre et finir le tour (Maj+R) : une ligne
+//                                    par étape de la séquence, sans les pauses
 //   journal                          afficher le journal brut, en JSON
 //   aide | help                      cette liste
 //   quitter | quit
@@ -48,7 +49,7 @@ installFileFetch();
 const { t, setLocale } = await import("../data/i18n/index.js");
 const { createMarblesGame, marblesReduce, swapRefusal, SLOTS } = await import("../core/marbles.js");
 const { forecast } = await import("../core/marbles-forecast.js");
-const { buildSteps, describeBag, describeDiscard, describeEffect, describeHandFocus, describeSlotFocus, describeTurn, formatCounter, marbleName, placementLines, slotName } = await import("../view/marbles/narration.js");
+const { buildSteps, resolutionSteps, describeBag, describeDiscard, describeHandFocus, describeOverview, describeSlotFocus, describeTurn, placementLines } = await import("../view/marbles/narration.js");
 const { marbleCard } = await import("../view/marbles/card.js");
 setLocale(lang);
 
@@ -70,9 +71,9 @@ const HELP = [
   "etat | state                     afficher l'état",
   "poser | place <n> <emplacement>  poser la bille n de la main (à partir de 1)",
   "echanger | swap <empl.> <empl.>  échanger deux emplacements",
-  "prevoir | forecast               prévoir le tour sur le triangle actuel",
+  "prevoir | forecast | r           la vue d'ensemble du tour (touche R)",
   "prevoir | forecast <n> <empl.>   prévoir la pose de la bille n (rien ne bouge)",
-  "fin | end                        résoudre et finir le tour",
+  "fin | end                        résoudre et finir le tour (Maj+R)",
   "journal                          afficher le journal brut, en JSON",
   "aide | help                      cette liste",
   "quitter | quit",
@@ -82,18 +83,32 @@ const HELP = [
 let game = createMarblesGame(seed);
 const journal = [];
 
-// Applique une action, journalise et affiche ce qu'elle a produit ; rend vrai
-// si elle est passée.
-function act(action) {
+// Applique une action et la journalise ; rend ses évènements, ou null si elle
+// est refusée (déjà dit).
+function apply(action) {
   const result = marblesReduce(game, action);
   if (!result.ok) {
     console.log(`Refusé : ${t(`marbles.error.${result.error}`)} (${result.error})`);
-    return false;
+    return null;
   }
   game = result.state;
   journal.push(...result.events);
-  for (const step of buildSteps(result.events, t)) console.log(step.text);
-  return true;
+  return result.events;
+}
+
+// Applique une action et affiche ce qu'elle a produit.
+function act(action) {
+  const events = apply(action);
+  if (events) for (const step of buildSteps(events, t)) console.log(step.text);
+}
+
+// La résolution et la pioche du tour suivant, dites comme la séquence de l'écran.
+function resolveTurn() {
+  const { turn } = game;
+  const resolved = apply({ type: "resolve" });
+  if (!resolved) return;
+  const drawn = game.stage === "draw" ? apply({ type: "draw" }) : [];
+  for (const step of resolutionSteps(turn, [...resolved, ...drawn], t)) console.log(step.text);
 }
 
 // Une bille et sa fiche, à plat : ce que l'écran donne champ par champ.
@@ -117,22 +132,17 @@ function printState() {
   console.log(`  [défausse : ${game.discard.join(", ") || "-"}]`);
 }
 
-// La prévision, dite avec les mêmes phrases que l'écran. `action` : null pour le
-// triangle actuel, sinon la pose envisagée.
+// La prévision, dite avec les mêmes phrases que l'écran. `action` : null pour la
+// vue d'ensemble du triangle actuel (touche R), sinon la confirmation de la pose
+// envisagée.
 function printForecast(action) {
   const predicted = forecast(game, action);
   if (!predicted.ok) {
     console.log(`Refusé : ${t(`marbles.error.${predicted.error}`)} (${predicted.error})`);
     return;
   }
-  if (action !== null) {
-    for (const line of placementLines(game, action.handIndex, action.slot, t)) console.log(`  ${t(line.key, line.params)}`);
-  }
-  for (const slot of SLOTS) {
-    const phase = predicted.phases[slot];
-    if (phase !== null) console.log(`  [${slotName(slot, t)}, ${marbleName(phase.marble, t)} : ${describeEffect(phase, t)}]`);
-  }
-  console.log(`  [Vitesse ${formatCounter(predicted.speed)}, Masse ${formatCounter(predicted.mass)}, Impact ${predicted.impact}]`);
+  if (action === null) console.log(`  ${describeOverview(game, t)}`);
+  else for (const line of placementLines(game, action.handIndex, action.slot, t)) console.log(`  ${t(line.key, line.params)}`);
 }
 
 // La commande d'une ligne ; rend faux pour arrêter.
@@ -159,7 +169,8 @@ function runCommand(line) {
       break;
     }
     case "prevoir":
-    case "forecast": {
+    case "forecast":
+    case "r": {
       if (params.length === 0) {
         printForecast(null);
         break;
@@ -171,7 +182,7 @@ function runCommand(line) {
     }
     case "fin":
     case "end":
-      if (act({ type: "resolve" }) && game.stage === "draw") act({ type: "draw" });
+      resolveTurn();
       break;
     case "journal":
       for (const event of journal) console.log(JSON.stringify(event));

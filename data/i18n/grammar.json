@@ -10,6 +10,11 @@
       "def",
       "de"
     ],
-    "attributes": {}
+    "attributes": {
+      "gender": [
+        "m",
+        "f"
+      ]
+    }
   }
 }

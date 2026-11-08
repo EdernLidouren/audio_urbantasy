@@ -55,6 +55,7 @@ import checkMarbles from "./marbles.check.js";
 import checkMarblesBus from "./marbles-bus.check.js";
 import checkMarblesForecast from "./marbles-forecast.check.js";
 import checkMarblesView from "./marbles-view.check.js";
+import checkMarblesSequence from "./marbles-sequence.check.js";
 // Domaines de lib/ (mécanismes portables), lancés par le même point
 // d'entrée : une seule commande, un seul récapitulatif.
 import checkI18n from "../../lib/checks/i18n.check.js";
@@ -103,6 +104,7 @@ const SUITES = [
   { name: "marbles-bus", check: checkMarblesBus },
   { name: "marbles-forecast", check: checkMarblesForecast },
   { name: "marbles-view", check: checkMarblesView },
+  { name: "marbles-sequence", check: checkMarblesSequence },
   { name: "i18n", check: checkI18n },
   { name: "i18n-content", check: checkI18nContent },
   { name: "input", check: checkInput },

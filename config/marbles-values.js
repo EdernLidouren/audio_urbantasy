@@ -34,6 +34,12 @@ export const MARBLES_SETTINGS = {
   // Fiches : le curseur secondaire revient à l'annonce principale dès que le
   // curseur principal se déplace. Pourra devenir une option.
   cardResetOnMove: true,
+  // Séquence de résolution (view/marbles/sequence.js) : après chaque étape, une
+  // pause de resolutionPauseBaseMs + resolutionPausePerCharMs × le nombre de
+  // caractères de l'annonce, pour que le lecteur d'écran finisse avant la
+  // suivante. Ni R ni les autres annonces n'en ont.
+  resolutionPauseBaseMs: 400,
+  resolutionPausePerCharMs: 40,
 };
 
 // La fiche d'une bille (lib/detail-card.js, view/marbles/card.js) : l'ordre de ses

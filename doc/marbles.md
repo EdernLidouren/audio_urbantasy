@@ -17,10 +17,11 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
 | `view/marbles/card.js` | La fiche d'une bille, lue dans le modèle `MARBLE_CARD_MODEL` |
 | `lib/detail-card.js` | Le mécanisme générique des fiches : assemblage et curseur secondaire |
 | `view/marbles/narration.js` | Ce qui se dit, à partir de l'état, du journal et de la prévision (pur) |
+| `view/marbles/sequence.js` | La file d'étapes de la séquence de résolution et ses pauses (pur) |
 | `view/marbles/navigation.js` | Le curseur dans le triangle, les zones (pur) |
 | `view/marbles/sounds.js` | Les points d'accroche sonores |
 | `tools/play-marbles.js` | Partie au terminal |
-| `core/checks/marbles.check.js`, `marbles-bus.check.js`, `marbles-forecast.check.js`, `marbles-view.check.js` | Vérifications |
+| `core/checks/marbles.check.js`, `marbles-bus.check.js`, `marbles-forecast.check.js`, `marbles-view.check.js`, `marbles-sequence.check.js` | Vérifications |
 
 ## Déroulement d'un tour
 
@@ -168,6 +169,7 @@ Ce qui se dit, selon l'endroit :
 | Emplacement vide, sans sélection | « pointe : vide. » |
 | Emplacement occupé, bille sélectionnée | « pointe, calot : Vitesse +12. » (la prévision) |
 | Emplacement vide, bille sélectionnée | « pointe » |
+| R | la vue d'ensemble du tour (voir plus bas) |
 | I | tour, score, Vitesse et Masse du tour, échange |
 | S | nombre de billes au sac, pioche par tour |
 | D | nombre de billes en défausse |
@@ -223,12 +225,69 @@ ni celui de la partie ni un autre. Le menu de la défausse suit l'ordre d'arriv�
 ancienne à la plus récente. Les deux menus ne font que lire : les ouvrir ne change rien à la
 partie.
 
-**La résolution avance au rythme du joueur**, une étape par appui sur Entrée, jamais
-minutée : on ignore à quelle vitesse parle son lecteur d'écran. Une étape regroupe
-plusieurs évènements (`view/marbles/narration.js`/`buildSteps`) : une phase se dit d'un
-bloc (bille, effet, cumul, usure), et le tour suivant vient avec sa pioche. Certains
-évènements ne se disent pas eux-mêmes (`knockout`, `hit`, `removed`, `turnEnded`) : ils
-servent au son et aux futurs effets.
+### Vue d'ensemble (R)
+
+Une seule annonce, d'un bloc et sans pause, tirée de la prévision du triangle actuel
+(`describeOverview`) : d'abord le résumé, l'information la plus souvent cherchée, puis
+chaque emplacement dans l'ordre des phases.
+
+```
+Prévision : Vitesse 9, Masse 2, Impact 18. Base gauche, argile : Vitesse +1.
+Base droite, vide. Pointe, calot : Vitesse +8.
+```
+
+Vitesse et Masse comprennent ce que le tour a déjà gagné (Tic, Éjection) ; l'Impact
+applique les planchers. Un emplacement dit les valeurs que sa bille PRODUIT, après
+conditions et bonus reçus, jamais un texte d'effet : valeurs nulles omises, « aucun
+effet » si rien. Un bonus se compte chez la bille qui le reçoit : la loupe en base gauche
+dit « aucun effet », le calot qu'elle renforce « Vitesse +12 ». Même gabarit que les
+phases de la séquence (`outcomeLine`) : la prévision et la résolution se disent pareil.
+
+### Séquence de résolution (Maj+R)
+
+**Maj+R** lance la résolution, le modificateur évitant une fausse manipulation. La
+simulation résout le tour et pioche le suivant tout de suite ; ce qui suit n'est que de la
+présentation, une file d'étapes (`view/marbles/sequence.js`) dite avec une pause après
+chacune :
+
+1. « Résolution du tour 3. » (au tour 1, suivi de « Entrée pour passer la résolution. ») ;
+2. à 4. chaque phase, dans l'ordre : « Base gauche, argile : Vitesse +1. », « Base
+   droite, vide. », avec les règles de la vue d'ensemble ;
+5. « Impact 18. Score 42. » ;
+6. une étape par bille usée : « Calot est usé et part à la défausse. » (l'adjectif
+   s'accorde au genre du nom, attribut `gender` des noms français) ;
+7. « Le triangle tourne d'un cran dans le sens horaire. » (le nombre de crans et le sens
+   sont des paramètres du texte, constante `ROTATION` de `narration.js`) ;
+8. la pioche : « Vous piochez agate. » ou « Main pleine, pas de pioche. », précédée s'il
+   y a lieu de « Le sac est vide : la défausse est mélangée et forme un nouveau sac. » ;
+9. « Début du tour 4, jouez vos billes. »
+
+Au dernier tour, ni rotation ni pioche : l'Impact et les retraits mènent à la fin de
+partie. Sur un sac régénéré trop petit, la fin de partie remplace la suite.
+
+**Construite du journal** (`buildSteps`, la même pour une pose, un échange et la pioche
+du tour 1) : chaque évènement qui se dit devient une étape, à sa place chronologique ;
+un évènement muet (`phase`, `knockout`, `hit`, `removed`) rejoint l'étape suivante,
+l'usure et la fin de tour la précédente, pour que leurs sons partent avec elle. Deux
+règles d'ordre seulement : les pioches consécutives se disent en une liste, et le début
+de tour vient après sa pioche. Un effet d'un nouveau déclencheur s'insère donc comme une
+étape de plus, sans retoucher la séquence ; il lui faut son gabarit (`EFFECT_TEMPLATES`),
+sans quoi `buildSteps` lève.
+
+**Pauses** : base plus supplément par caractère de l'annonce, deux réglages de
+`MARBLES_SETTINGS` (`resolutionPauseBaseMs`, 400 ; `resolutionPausePerCharMs`, 40), validés
+au chargement. La file avance par `onFrame` : un menu ouvert par-dessus (aide, abandon) la
+fige. Retour arrière redit l'étape et relance sa pause. Une étape pourra un jour attendre
+la fin d'un son au lieu d'une durée.
+
+**Pendant la séquence**, tout le reste est refusé d'un son de blocage, sans parole pour ne
+pas couper l'étape : pose, échange, Maj+R, R, déplacements, I, S, D et leurs menus. La
+séquence se termine quand sa dernière étape est dite : le joueur a la main pendant
+qu'elle se dit.
+
+**Passer** : Entrée (ou Espace, la même action) amène directement au début du tour
+suivant, ou à la fin de partie, sans dire les étapes d'avant ni jouer leurs sons. L'état
+ne change pas : il était déjà complet avant la première étape.
 
 **Sons** : un point d'accroche par type d'évènement, tous vides aujourd'hui
 (`view/marbles/sounds.js`/`MARBLE_EVENT_SOUNDS`). Brancher un son, c'est remplacer son
@@ -238,7 +297,7 @@ servent au son et aux futurs effets.
 ## Tester
 
 ```
-node tools/run-checks.js marbles marbles-bus marbles-forecast marbles-view detail-card
+node tools/run-checks.js marbles marbles-bus marbles-forecast marbles-view marbles-sequence detail-card
 node tools/play-marbles.js --seed 42
 ```
 

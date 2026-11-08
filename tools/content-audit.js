@@ -16,7 +16,8 @@
 //   - chaque scène est soit principale, soit rattachée à une scène
 //     principale (MAIN_SCENE_OF), jamais les deux ni aucune ;
 //   - chaque nom passé par référence à un gabarit (NAME_SLOTS) porte, dans
-//     chaque langue, toutes les formes que ce gabarit demande ({scene:def}) ;
+//     chaque langue, toutes les formes que ce gabarit demande ({scene:def})
+//     et tous les attributs sur lesquels il choisit ({marble:gender, select}) ;
 //   - chaque raccourci clavier (tables déclarées par lib/input.js/
 //     defineBindings) a sa description d'aide "help.<table>.<action>" et le
 //     nom de ses touches dans chaque langue, et aucune description d'aide
@@ -102,8 +103,16 @@ const NAME_SLOTS = [
   { template: "interaction.travelConfirm", param: "scene", names: () => MAIN_SCENE_IDS.map((id) => `scene.${id}.name`) },
   // view/emotes.js/chooseShortcut : l'émote placée en raccourci.
   { template: "emote.shortcutSet", param: "emote", names: () => Object.values(EMOTE_REGISTRY).map((emote) => emote.nameKey) },
-  // view/marbles/narration.js : la bille qui joue son Tic ou son Éjection.
-  ...["marbles.place.hit", "marbles.place.knockout", "marbles.event.effect_hit", "marbles.event.effect_knockout"].map((template) => ({
+  // view/marbles/narration.js : la bille qui joue son Tic ou son Éjection, et
+  // celle qui part à la défausse.
+  ...[
+    "marbles.place.hit",
+    "marbles.place.knockout",
+    "marbles.event.effect_hit",
+    "marbles.event.effect_knockout",
+    "marbles.event.discarded.replacement",
+    "marbles.event.discarded.wear",
+  ].map((template) => ({
     template,
     param: "marble",
     names: () => Object.keys(MARBLE_TYPES).map((id) => `marble.${id}.name`),
@@ -114,6 +123,14 @@ const NAME_SLOTS = [
 // « {param:forme} », où qu'il soit (branches comprises).
 function formsRequested(template, param) {
   const pattern = new RegExp(`\\{\\s*${param}:(\\w+)\\s*\\}`, "g");
+  return [...String(template).matchAll(pattern)].map((match) => match[1]);
+}
+
+// Attributs sur lesquels `template` choisit pour le paramètre `param` : chaque
+// « {param:attribut, select, …} ». Un nom sans l'attribut prendrait en silence
+// la branche `other` (« argile est usé »).
+function attributesRequested(template, param) {
+  const pattern = new RegExp(`\\{\\s*${param}:(\\w+)\\s*,\\s*select\\b`, "g");
   return [...String(template).matchAll(pattern)].map((match) => match[1]);
 }
 
@@ -376,11 +393,17 @@ export async function auditContent() {
   for (const { template, param, names } of NAME_SLOTS) {
     for (const [lang, table] of Object.entries(LOCALE_TABLES)) {
       const forms = formsRequested(table[template], param);
+      const attributes = attributesRequested(table[template], param);
       for (const nameKey of names()) {
         const value = table[nameKey];
         for (const form of forms) {
           if (value === undefined || typeof value === "string" || typeof value[form] !== "string") {
             report("formes de nom", `${lang} ${template}`, `forme « ${form} » absente`, nameKey);
+          }
+        }
+        for (const attribute of attributes) {
+          if (value === undefined || typeof value === "string" || typeof value[attribute] !== "string") {
+            report("formes de nom", `${lang} ${template}`, `attribut « ${attribute} » absent`, nameKey);
           }
         }
       }
