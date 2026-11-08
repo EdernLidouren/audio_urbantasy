@@ -21,8 +21,9 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
 | `view/marbles/history.js` | L'historique : les messages de jeu du tour précédent (pur) |
 | `view/marbles/history-screen.js` | Le menu de l'historique |
 | `view/marbles/navigation.js` | Le curseur dans le triangle, les zones, l'ouverture de la sélection d'emplacement (pur) |
-| `view/marbles/sounds.js` | Les sons de l'écran : repères des évènements, balise au survol, musique |
+| `view/marbles/sounds.js` | Les sons de l'écran : repères des évènements, roulements, balise au survol, musique |
 | `view/marbles/sound-queue.js` | La file de sons, qui étale ceux d'un même geste (pur) |
+| `view/marbles/rolls.js` | Le mouvement d'une bille qui roule : durée, position, vitesse (pur) |
 | `tools/marbles/` | La boîte à outils : partie au terminal, cas construits, simulateur (`doc/marbles-tools.md`) |
 | `core/checks/marbles.check.js`, `marbles-bus.check.js`, `marbles-forecast.check.js`, `marbles-view.check.js`, `marbles-sequence.check.js` | Vérifications |
 
@@ -317,10 +318,12 @@ Les sons du minijeu sont rangés à part, dans `assets/sounds/marbles/` et
 par l'audit du contenu ; la lecture, dans `view/marbles/sounds.js`.
 
 **Profils** : chaque bille a un profil sonore (`sound`), qui lui donne sa **balise** (sa
-voix, à la pioche et sous le curseur) et sa **chute** (à la pose). Trois profils aujourd'hui,
-`small`, `medium` et `large` (`MARBLE_SOUND_PROFILES`), une voix chacun ; les noms de fichier
-prévoient plusieurs voix par profil (`marble_small_2_beacon`…). Une bille sans profil connu
-fait échouer le chargement.
+voix, à la pioche et sous le curseur), sa **chute** (à l'arrivée d'un roulement), son
+**roulement** (une boucle, `marble_<profil>_rolling`) et son **choc** (quand elle en déloge
+une autre, ou qu'on la déloge ; en attendant de vrais sons de choc, la balise). Trois profils
+aujourd'hui, `small`, `medium` et `large` (`MARBLE_SOUND_PROFILES`), une voix chacun ; les
+noms de fichier prévoient plusieurs voix par profil (`marble_small_2_beacon`…). Une bille sans
+profil connu, ou un profil incomplet, fait échouer le chargement.
 
 **Musique** : `marbles_classic`, de l'ouverture de l'écran au retour au menu principal, en
 fondu, au volume de la musique. Un seul morceau : en boucle ; plusieurs : enchaînés avec une
@@ -334,16 +337,61 @@ et quand, sur la ligne de temps du geste (`eventCues`) :
   sac à sa création, sans évènement : l'écran le joue) et à chaque `bagRegenerated` ;
 - pioche : la balise de chaque bille piochée, l'une après l'autre ; la première attend
   `shuffleToDrawMs` (900 ms) après un brassage, les suivantes `drawSoundIntervalMs` (350 ms) ;
-- pose : la chute de la bille posée (remplacement compris, en attendant un son de tic) ;
+- pose sur un emplacement vide : la bille roule de sa place dans la main à l'emplacement,
+  puis y tombe ;
+- pose sur un emplacement occupé (remplacement) : la bille roule jusqu'à l'emplacement, puis
+  le choc des deux billes, puis la délogée roule à la défausse, plus lentement, en
+  s'essoufflant, et y tombe. Le journal dit l'éjection avant la pose : le choc attend
+  l'arrivée de la bille posée ;
 - phase : pendant la séquence de résolution, la balise de la bille active quand vient la
   phase de son emplacement, avec l'étape qui la dit ; un emplacement vide reste muet ;
-- échange : la chute de la bille choisie, puis celle de l'autre `swapSoundDelayMs` (150 ms)
-  plus tard ; vers un emplacement vide, une seule chute.
+- échange : la bille choisie roule vers l'autre emplacement, puis l'autre part en sens inverse
+  `swapSoundDelayMs` (150 ms) plus tard ; chacune tombe à son arrivée. Vers un emplacement
+  vide, une seule bille roule ;
+- retrait par usure : la bille usée roule de son emplacement à la défausse et y tombe ;
+  plusieurs, l'une après l'autre (`outStaggerMs`) ;
+- rotation : les billes du triangle roulent ensemble, chacune vers l'emplacement suivant
+  (l'ordre du cœur, `ROTATION_NEXT`), puis s'y calent avec une chute discrète ; un
+  emplacement vide reste muet. Pas de son de rotation à part : les billes suffisent.
 
 Les repères passent par une **file de sons** (`view/marbles/sound-queue.js`), avancée par
 `onFrame` comme la séquence : le son seul attend, le joueur garde la main. Un menu ouvert
 par-dessus la fige ; passer la séquence (Entrée) vide ce qui restait à venir. Pendant la
 séquence, les sons d'une étape partent avec elle.
+
+**Roulements** : un repère de roulement suit un **chemin**, la suite des places par où passe
+la bille (deux au moins, le départ et l'arrivée) ; elle passe par les étapes sans s'y
+arrêter. La boucle de roulement du profil joue tout le trajet, et chaque frame la déplace
+sur la table : position et vitesse
+viennent de `view/marbles/rolls.js`, le rendu de la position est celui d'une place
+(panoramique et profondeur, voir « Espace »). La bille part à sa vitesse et ralentit
+régulièrement jusqu'à sa vitesse d'arrivée : la durée du trajet est la distance divisée par
+la vitesse moyenne, et l'arrivée (chute ou choc) tombe à la fin. Le volume suit la vitesse, et
+la vitesse de lecture aussi : une bille qui s'essouffle sonne plus doux et plus grave, comme
+une bande qu'on freine. Un fondu de `fadeMs` à l'entrée et à la sortie évite les clics.
+Réglages, un style par trajet (`MARBLES_ROLLS`) :
+
+| Style | Trajet | Vitesse au départ | À l'arrivée |
+|---|---|---|---|
+| `place` | de la main à l'emplacement | 2 | 80 % |
+| `swap` | d'un emplacement à l'autre | 2 | 80 % |
+| `out` | d'un emplacement à la défausse | 1,6 | 20 % |
+| `rotation` | d'un emplacement au suivant | 700 ms par cran | 40 % |
+
+La rotation est un bloc rigide : ses billes partent et arrivent ensemble, chacune à sa
+vitesse (les côtés du triangle n'ont pas la même longueur), d'où une durée par cran
+(`notchMs`) plutôt qu'une vitesse. Chaque bille y joue à `gain` (0,6), trois boucles ensemble
+sonnant plus fort qu'une seule, et se cale avec une chute à `dropGain` (0,5). Plusieurs crans
+(jusqu'à 3, un tour complet) font un seul élan qui passe par les emplacements et ralentit
+sur l'ensemble, comme une roue lancée (`rotationPath`) ; le cœur ne tourne aujourd'hui que
+d'un cran par tour, et l'évènement `rotation` dira combien le jour où un effet en ajoutera.
+
+Les vitesses sont en unités de la table par seconde : la table fait 2 de large et 1 de la main
+à la pointe. Une bille presque arrêtée lit sa boucle à `restRate` (0,7). Après un choc, la
+délogée part `impactToOutMs` (30 ms) plus tard. Un menu ouvert par-dessus fige le
+déplacement avec l'écran ; chaque roulement a aussi une échéance en temps réel, qui le coupe
+s'il ne reçoit plus de frames. Passer la séquence ou quitter l'écran coupe les roulements en
+cours.
 
 **Balise au survol** : la balise de la bille sur laquelle le curseur arrive, dans la main, sur
 un emplacement occupé (à l'ouverture de la sélection d'emplacement aussi), et dans les menus
@@ -353,8 +401,12 @@ suivante coupe la précédente. Une butée, qui laisse le curseur en place, n'en
 **Espace** : un son de bille s'entend à sa place sur la table (`MARBLES_SOUND_PLACES`,
 `renderAt`), en stéréo et en volume, jamais en HRTF. La balise d'une bille piochée s'entend à
 sa place dans la main, la cascade de pioche va donc de gauche à droite ; la chute d'une pose
-et la balise de phase à l'emplacement ; la balise au survol là où est le curseur. Le brassage
-et les menus du sac et de la défausse restent au centre, secs.
+et la balise de phase à l'emplacement ; la balise au survol là où est le curseur ; un
+roulement d'une place à l'autre. Le brassage et les menus du sac et de la défausse restent au
+centre, secs.
+
+- **Défausse** : à droite, derrière les bases (x 0,8, y 0,7), où roulent et tombent les
+  billes délogées ou usées ; le joueur apprend où elles partent.
 
 - **Gauche-droite** (`x`) : la main de −0,6 à +0,6, la première bille tout à gauche (une
   bille seule au milieu) ; base gauche −0,4, base droite +0,4, pointe au centre. Le triangle,
@@ -372,7 +424,7 @@ et les menus du sac et de la défausse restent au centre, secs.
   ne fait rien et n'est pas dans l'aide.
 
 **Volumes** : balises (pioche, phase et survol) au volume des balises, elles ont vocation à être
-positionnées ; brassage et chutes au volume de l'interface. Tous les sons des billes sont
+positionnées ; brassage, chutes, chocs et roulements au volume de l'interface. Tous les sons des billes sont
 permanents et préchargés à l'ouverture de l'écran. Les gestes de l'écran gardent les sons de
 menu (`select`, `cancel`, `block`, `refusal`).
 

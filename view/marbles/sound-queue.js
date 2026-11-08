@@ -5,8 +5,8 @@
 // frame (onFrame : un menu ouvert par-dessus la fige, comme la séquence de
 // résolution) et joue les repères qu'elle lui rend.
 //
-// Un REPÈRE : { atMs, sound, marble? }, à jouer `atMs` après sa mise en file
-// (view/marbles/sounds.js/eventCues). La file : une liste de { remainingMs, cue },
+// Un REPÈRE : { atMs, sound, ... }, à jouer `atMs` après sa mise en file
+// (view/marbles/sounds.js/eventCues) ; pour la file, le reste ne compte pas. La file : une liste de { remainingMs, cue },
 // dans l'ordre de mise en file.
 
 export const EMPTY_SOUND_QUEUE = [];

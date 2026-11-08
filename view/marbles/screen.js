@@ -69,6 +69,7 @@ import {
   slotName,
 } from "./narration.js";
 import {
+  advanceRolls,
   closeTableReverb,
   eventCues,
   handPlace,
@@ -81,6 +82,7 @@ import {
   startMarblesMusic,
   stopFocusBeacon,
   stopMarblesMusic,
+  stopRolls,
 } from "./sounds.js";
 import { EMPTY_SOUND_QUEUE, advanceSoundQueue, enqueueCues } from "./sound-queue.js";
 import { advanceSequence, restartPause, skipSequence, startSequence } from "./sequence.js";
@@ -154,10 +156,17 @@ export function makeMarblesScreen(getGame, setGame) {
 
   // Les sons d'un geste, d'après son journal : en file, les immédiats aussitôt.
   // `shuffleFirst` : le sac vient d'être constitué (ouverture de la partie).
-  function playEventSounds(events, { shuffleFirst = false } = {}) {
+  // `placeFrom` : d'où part la bille posée, sa place dans la main avant la pose.
+  function playEventSounds(events, { shuffleFirst = false, placeFrom } = {}) {
     const { triangle, hand } = getGame();
-    soundQueue = enqueueCues(soundQueue, eventCues(events, { triangleAfter: triangle, handAfter: hand, shuffleFirst }));
+    soundQueue = enqueueCues(soundQueue, eventCues(events, { triangleAfter: triangle, handAfter: hand, shuffleFirst, placeFrom }));
     flushSounds(0);
+  }
+
+  // Plus aucun son à venir ni en cours de route.
+  function silenceSounds() {
+    soundQueue = EMPTY_SOUND_QUEUE;
+    stopRolls();
   }
 
   // À la fin de la partie, la dernière phrase dit aussi comment sortir.
@@ -334,12 +343,14 @@ export function makeMarblesScreen(getGame, setGame) {
   // Le son d'une pose est celui de la confirmation qui vient de la lancer. La
   // sélection d'emplacement finie, le curseur revient dans la main.
   function performPlace(handIndex, slot) {
+    // La bille roule d'où elle était dans la main, avant que la pose ne l'en retire.
+    const placeFrom = handPlace(handIndex, getGame().hand.length);
     const events = dispatch({ type: "place", handIndex, slot });
     if (!events) return;
     held = null;
     cursor = { ...cursor, place: "hand", handIndex: Math.min(handIndex, Math.max(0, getGame().hand.length - 1)) };
     resetDetailAfterMove();
-    playEventSounds(events);
+    playEventSounds(events, { placeFrom });
     speak(stepsText(recorded(buildSteps(events, t))));
   }
 
@@ -418,7 +429,7 @@ export function makeMarblesScreen(getGame, setGame) {
   function activate() {
     if (isNarrating()) {
       // Passer coupe aussi les sons encore à venir des étapes passées.
-      soundQueue = EMPTY_SOUND_QUEUE;
+      silenceSounds();
       follow(skipSequence(sequence));
     } else if (isOver()) popScreen();
     else if (cursor.place === "hand") activateHand();
@@ -547,7 +558,7 @@ export function makeMarblesScreen(getGame, setGame) {
       else start();
     },
     onExit() {
-      soundQueue = EMPTY_SOUND_QUEUE;
+      silenceSounds();
       stopFocusBeacon();
       closeTableReverb();
       stopMarblesMusic();
@@ -557,6 +568,9 @@ export function makeMarblesScreen(getGame, setGame) {
     // le reçoit, un menu ouvert par-dessus (aide, abandon) les fige donc.
     onFrame(deltaMs) {
       if (isNarrating()) follow(advanceSequence(sequence, deltaMs));
+      // Les billes déjà en route avancent avant que d'autres ne partent : un
+      // roulement qui part à cette frame commence au début de son trajet.
+      advanceRolls(deltaMs);
       flushSounds(deltaMs);
     },
     onKeyDown(event) {

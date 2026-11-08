@@ -34,16 +34,21 @@ import { confirmationEntries } from "../../view/menus/confirmation.js";
 import { INITIAL_CURSOR, placementStart, stepCursor, zoneOf } from "../../view/marbles/navigation.js";
 import {
   MARBLE_EVENT_CUES,
+  discardPlace,
   eventCues,
   handPlace,
   placesDemoCues,
   positionOf,
   renderAt,
+  rollRendering,
+  rotationPath,
   slotPlace,
   validateMarbleSounds,
+  validateRolls,
   validateSoundDepth,
   validateSoundPlaces,
 } from "../../view/marbles/sounds.js";
+import { pathLength, rollAt, rollDurationMs, rollEnvelope } from "../../view/marbles/rolls.js";
 import { EMPTY_SOUND_QUEUE, advanceSoundQueue, enqueueCues } from "../../view/marbles/sound-queue.js";
 import { throws } from "../../lib/check.js";
 
@@ -251,6 +256,11 @@ function checkSounds(run) {
   run("profils : chaque bille a un profil sonore connu", true, Object.values(MARBLE_TYPES).every((type) => Object.hasOwn(MARBLE_SOUND_PROFILES, type.sound)));
   run("profils : bille sans profil refusée", true, throws(() => validateMarbleSounds({ x: {} }, MARBLE_SOUND_PROFILES, MARBLES_SETTINGS)));
   run("profils : profil sans chute refusé", true, throws(() => validateMarbleSounds({}, { small: { beacon: "a" } }, MARBLES_SETTINGS)));
+  run(
+    "profils : profil sans roulement refusé",
+    true,
+    throws(() => validateMarbleSounds({}, { small: { beacon: "a", drop: "b", impact: "c" } }, MARBLES_SETTINGS))
+  );
   run("profils : délai négatif refusé", true, throws(() => validateMarbleSounds({}, {}, { ...MARBLES_SETTINGS, drawSoundIntervalMs: -1 })));
 
   const settings = { shuffleToDrawMs: 900, drawSoundIntervalMs: 350, swapSoundDelayMs: 150 };
@@ -275,26 +285,173 @@ function checkSounds(run) {
     ["shuffle@0", "beacon@900"],
     eventCues([{ type: "bagRegenerated", size: 4 }, draws[0]], {}, settings).map((cue) => `${cue.sound}@${cue.atMs}`)
   );
+  // Roulements, sur une table aux distances rondes : de la main au milieu à la
+  // pointe, 1 ; d'une base à l'autre, 0,8 ; de la pointe à la défausse, 0,8.
+  const places = {
+    hand: { fromX: -0.6, toX: 0.6, y: 0 },
+    leftBase: { x: -0.4, y: 0.5 },
+    rightBase: { x: 0.4, y: 0.5 },
+    apex: { x: 0, y: 1 },
+    discard: { x: 0.8, y: 1 },
+  };
+  const rolls = {
+    place: { speed: 1, endRatio: 1 },
+    swap: { speed: 1, endRatio: 1 },
+    out: { speed: 1, endRatio: 0.6 },
+    rotation: { notchMs: 700, endRatio: 0.5, gain: 0.6, dropGain: 0.5 },
+    restRate: 0.5,
+    fadeMs: 100,
+    impactToOutMs: 30,
+    outStaggerMs: 200,
+  };
+  const motion = { rolls, places };
+  const placeName = (place) => place.slot ?? place.kind;
+  const rolled = (cues) =>
+    cues.map((cue) =>
+      cue.sound === "roll"
+        ? `roll ${cue.marble} ${cue.path.map(placeName).join(">")} @${cue.atMs}+${Math.round(cue.durationMs)}`
+        : `${cue.sound} ${cue.marble} ${placeName(cue.place)} @${Math.round(cue.atMs)}${cue.gain === undefined ? "" : ` x${cue.gain}`}`
+    );
   run.same(
-    "repères : une pose, la chute de la bille posée, à son emplacement",
-    [{ atMs: 0, sound: "drop", marble: "agate", place: slotPlace("apex") }],
-    eventCues([{ type: "placed", slot: "apex", marble: "agate" }], {}, settings)
+    "repères : une pose, la bille roule de la main à l'emplacement, puis y tombe",
+    ["roll agate hand>apex @0+1000", "drop agate apex @1000"],
+    rolled(eventCues([{ type: "placed", slot: "apex", marble: "agate" }], { placeFrom: handPlace(1, 3) }, settings, motion))
+  );
+  run.same(
+    "repères : une pose part de la place de la bille dans la main",
+    handPlace(4, 5),
+    eventCues([{ type: "placed", slot: "apex", marble: "agate" }], { placeFrom: handPlace(4, 5) }, settings, motion)[0].path[0]
+  );
+  run.same(
+    "repères : sans place connue, la pose part du milieu de la main",
+    { x: 0, y: 0 },
+    positionOf(eventCues([{ type: "placed", slot: "apex", marble: "agate" }], {}, settings, motion)[0].path[0], places)
+  );
+  // Remplacement, dans l'ordre du journal : l'éjection, le retrait, la défausse,
+  // la pose, le tic. Le choc attend l'arrivée de la bille posée.
+  const knockedOut = { slot: "apex", marble: "mica" };
+  run.same(
+    "repères : un remplacement, le roulement, le choc des deux billes, puis la délogée roule à la défausse",
+    [
+      "roll agate hand>apex @0+1000",
+      "impact agate apex @1000",
+      "impact mica apex @1000",
+      "roll mica apex>discard @1030+1000",
+      "drop mica discard @2030",
+    ],
+    rolled(
+      eventCues(
+        [
+          { type: "knockout", ...knockedOut },
+          { type: "removed", ...knockedOut, cause: "replacement" },
+          { type: "discarded", ...knockedOut, cause: "replacement" },
+          { type: "placed", slot: "apex", marble: "agate" },
+          { type: "hit", slot: "apex", marble: "agate" },
+        ],
+        {},
+        settings,
+        motion
+      )
+    )
   );
   // Échange : la bille choisie (en `a` avant l'échange, en `b` après), puis l'autre.
-  const swapped = { type: "swapped", a: "leftBase", b: "apex" };
+  const swapped = { type: "swapped", a: "leftBase", b: "rightBase" };
   run.same(
-    "repères : un échange, la bille choisie puis l'autre",
+    "repères : un échange, la bille choisie roule puis l'autre, chacune tombe à l'arrivée",
+    ["roll giant leftBase>rightBase @0+800", "drop giant rightBase @800", "roll mica rightBase>leftBase @150+800", "drop mica leftBase @950"],
+    rolled(
+      eventCues([swapped], { triangleAfter: { leftBase: { marble: "mica", wear: 0 }, rightBase: { marble: "giant", wear: 1 }, apex: null } }, settings, motion)
+    )
+  );
+  run.same(
+    "repères : un déplacement vers un vide, une seule bille roule, aussitôt",
+    ["roll giant leftBase>rightBase @0+800", "drop giant rightBase @800"],
+    rolled(eventCues([swapped], { triangleAfter: { leftBase: null, rightBase: { marble: "giant", wear: 0 }, apex: null } }, settings, motion))
+  );
+  run.same(
+    "repères : les billes usées roulent à la défausse l'une après l'autre",
+    ["roll clay apex>discard @0+1000", "drop clay discard @1000", "roll tiger apex>discard @200+1000", "drop tiger discard @1200"],
+    rolled(
+      eventCues(
+        ["clay", "tiger"].flatMap((marble) => [
+          { type: "removed", slot: "apex", marble, cause: "wear" },
+          { type: "discarded", slot: "apex", marble, cause: "wear" },
+        ]),
+        {},
+        settings,
+        motion
+      )
+    )
+  );
+  // Rotation : chaque bille roule vers l'emplacement suivant, toutes ensemble ; un
+  // emplacement vide reste muet. Les chutes, plus discrètes, à l'arrivée.
+  const rotation = (triangle) => ({ type: "rotation", triangle });
+  run.same(
+    "repères : une rotation, les billes tournent ensemble, puis se calent",
     [
-      { atMs: 0, sound: "drop", marble: "giant", place: slotPlace("apex") },
-      { atMs: 150, sound: "drop", marble: "mica", place: slotPlace("leftBase") },
+      "roll clay leftBase>apex @0+700",
+      "drop clay apex @700 x0.5",
+      "roll tiger rightBase>leftBase @0+700",
+      "drop tiger leftBase @700 x0.5",
+      "roll mica apex>rightBase @0+700",
+      "drop mica rightBase @700 x0.5",
     ],
-    eventCues([swapped], { triangleAfter: { leftBase: { marble: "mica", wear: 0 }, rightBase: null, apex: { marble: "giant", wear: 1 } } }, settings)
+    rolled(
+      eventCues(
+        [rotation({ apex: { marble: "clay", wear: 1 }, rightBase: { marble: "mica", wear: 1 }, leftBase: { marble: "tiger", wear: 1 } })],
+        {},
+        settings,
+        motion
+      )
+    )
   );
   run.same(
-    "repères : un déplacement vers un vide, une seule chute, aussitôt",
-    [{ atMs: 0, sound: "drop", marble: "giant", place: slotPlace("apex") }],
-    eventCues([swapped], { triangleAfter: { leftBase: null, rightBase: null, apex: { marble: "giant", wear: 0 } } }, settings)
+    "repères : une rotation avec un seul emplacement occupé, une seule bille tourne",
+    ["roll giant rightBase>leftBase @0+700", "drop giant leftBase @700 x0.5"],
+    rolled(eventCues([rotation({ apex: null, rightBase: null, leftBase: { marble: "giant", wear: 0 } })], {}, settings, motion))
   );
+  run.same("rotation : un cran, l'emplacement suivant", ["leftBase", "apex"], rotationPath("leftBase", 1));
+  run.same("rotation : trois crans, le tour complet", ["apex", "rightBase", "leftBase", "apex"], rotationPath("apex", 3));
+  run.same(
+    "rotation : l'ordre de la vue est celui du cœur",
+    ["apex", "rightBase", "leftBase"],
+    ["leftBase", "apex", "rightBase"].map((slot) => rotationPath(slot, 1)[1])
+  );
+  run("rotation : plusieurs crans, une durée par cran", 2100, rollDurationMs([{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: 0 }], rolls.rotation));
+  run("roulements : rotation sans durée de cran refusée", true, throws(() => validateRolls({ ...rolls, rotation: { endRatio: 0.5, gain: 0.6, dropGain: 0.5 } })));
+  run("roulements : vitesse nulle refusée", true, throws(() => validateRolls({ ...rolls, out: { speed: 0, endRatio: 0.5 } })));
+  run("roulements : style manquant refusé", true, throws(() => validateRolls({ ...rolls, swap: undefined })));
+  run("roulements : réglages du jeu valides", false, throws(() => validateRolls(rolls)));
+
+  // Le mouvement : une bille qui ralentit fait plus de chemin au début qu'à la fin.
+  const from = { x: 0, y: 0 };
+  const to = { x: 0, y: 1 };
+  run("mouvement : durée, distance sur vitesse moyenne", 1250, rollDurationMs([from, to], { speed: 1, endRatio: 0.6 }));
+  const slowing = { path: [from, to], durationMs: 1000, endRatio: 0.2 };
+  run.same("mouvement : au départ, à la place de départ, à pleine vitesse", { position: from, speedRatio: 1, done: false }, rollAt(slowing, 0));
+  const arrived = rollAt(slowing, 1000);
+  run.same("mouvement : à l'arrivée, à la place d'arrivée, ralentie", { position: to, speedRatio: 0.2, done: true }, { ...arrived, speedRatio: Math.round(arrived.speedRatio * 100) / 100 });
+  run("mouvement : à mi-temps, plus de la moitié du chemin", true, rollAt(slowing, 500).position.y > 0.5);
+  run("mouvement : sans ralentir, à mi-temps, à mi-chemin", 0.5, rollAt({ ...slowing, endRatio: 1 }, 500).position.y);
+  // Un chemin à plusieurs étapes : la bille passe par chacune sans s'arrêter.
+  const turn = { path: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }], durationMs: 1000, endRatio: 1 };
+  run("mouvement : longueur d'un chemin, étape par étape", 2, pathLength(turn.path));
+  run.same("mouvement : à mi-temps, à l'étape du milieu", { x: 1, y: 0 }, rollAt(turn, 500).position);
+  run.same("mouvement : aux trois quarts, sur la seconde étape", { x: 1, y: 0.5 }, rollAt(turn, 750).position);
+  run.same("mouvement : à l'arrivée, au bout du chemin", { x: 1, y: 1 }, rollAt(turn, 1000).position);
+  run.same("mouvement : enveloppe, fondu d'entrée, plein, fondu de sortie", [0, 0.5, 1, 0.5, 0], [0, 50, 500, 950, 1000].map((ms) => rollEnvelope(ms, 1000, 100)));
+
+  // Le rendu d'une bille qui roule : il suit la position (profondeur) et la vitesse
+  // (volume, vitesse de lecture).
+  const depthOf = { farGainDb: -6, nearLowpassHz: 20000, farLowpassHz: 7000, nearReverbSend: 0.05, farReverbSend: 0.35, reverb: { durationSec: 1, decay: 3, wet: 0.5 } };
+  const render = (ms) => rollRendering(slowing, ms, 1, rolls, depthOf);
+  run("rendu du roulement : muet au tout départ, le fondu d'entrée", 0, render(0).volume);
+  run("rendu du roulement : vitesse de lecture d'origine au départ", 1, render(0).rate);
+  run("rendu du roulement : passe-bas toujours présent, ouvert au plus près", 20000, render(0).lowpassHz);
+  run("rendu du roulement : plus grave en ralentissant", true, render(900).rate < render(100).rate && render(900).rate > 0.5);
+  run("rendu du roulement : plus loin, plus réverbéré", true, render(900).reverbSend > render(100).reverbSend);
+  run("rendu du roulement : plus lente, plus douce", true, render(800).volume < render(200).volume);
+  run("rendu du roulement : le gain du style s'applique", 0.6, Math.round((rollRendering({ ...slowing, gain: 0.6 }, 500, 1, rolls, depthOf).volume / render(500).volume) * 100) / 100);
   run.same(
     "repères : une phase, la balise de la bille active, à son emplacement",
     [{ atMs: 0, sound: "beacon", marble: "clay", place: slotPlace("apex") }],
@@ -309,7 +466,6 @@ function checkSounds(run) {
     eventCues(draws.slice(0, 2), { handAfter: ["agate", "mica", "tiger", "clay", "glass"] }, settings).map((cue) => cue.place)
   );
   run("repères : sans main connue, la pioche au centre", undefined, eventCues(draws.slice(0, 1), {}, settings)[0].place);
-  const places = { hand: { fromX: -0.6, toX: 0.6, y: 0 }, leftBase: { x: -0.4, y: 0.5 }, rightBase: { x: 0.4, y: 0.5 }, apex: { x: 0, y: 1 } };
   const round = (value) => Math.round(value * 100) / 100;
   run.same(
     "stéréo : la main de gauche à droite",
@@ -320,6 +476,9 @@ function checkSounds(run) {
   run.same("stéréo : les emplacements", [-0.4, 0.4, 0], ["leftBase", "rightBase", "apex"].map((slot) => positionOf(slotPlace(slot), places).x));
   run("stéréo : panoramique hors bornes refusé", true, throws(() => validateSoundPlaces({ ...places, apex: { x: 1.5, y: 1 } })));
   run("stéréo : place manquante refusée", true, throws(() => validateSoundPlaces({ hand: places.hand, leftBase: places.leftBase })));
+  run("stéréo : défausse manquante refusée", true, throws(() => validateSoundPlaces({ ...places, discard: undefined })));
+  run("stéréo : places complètes acceptées", false, throws(() => validateSoundPlaces(places)));
+  run.same("stéréo : la défausse a sa place", { x: 0.8, y: 1 }, positionOf(discardPlace(), places));
   run("profondeur : profondeur hors bornes refusée", true, throws(() => validateSoundPlaces({ ...places, apex: { x: 0, y: 2 } })));
 
   // Profondeur : volume, passe-bas et réverbération suivent y, de la main à la pointe.

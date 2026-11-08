@@ -437,10 +437,15 @@ function placeMarble(run, { handIndex, slot }) {
   if (previous !== null) run.emit({ type: "hit", slot, marble });
 }
 
-// Base gauche -> pointe, pointe -> base droite, base droite -> base gauche ;
-// les emplacements vides tournent aussi.
+// Où va la bille de chaque emplacement à la rotation : base gauche -> pointe,
+// pointe -> base droite, base droite -> base gauche. Exporté pour la vue, qui fait
+// rouler les billes de place en place (view/marbles/sounds.js) sans recopier la
+// règle.
+export const ROTATION_NEXT = Object.freeze({ leftBase: "apex", apex: "rightBase", rightBase: "leftBase" });
+
+// Les emplacements vides tournent aussi.
 function rotated(triangle) {
-  return { apex: triangle.leftBase, rightBase: triangle.apex, leftBase: triangle.rightBase };
+  return Object.fromEntries(SLOTS.map((slot) => [ROTATION_NEXT[slot], triangle[slot]]));
 }
 
 // Plus de bonus une fois la résolution finie : il ne vaut que pour ce tour.

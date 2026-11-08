@@ -47,21 +47,40 @@ export const MARBLES_SETTINGS = {
   // Enchaînement des sons (view/marbles/sounds.js), pour le son seulement : le
   // joueur n'attend jamais. Après un brassage du sac, la première balise de
   // pioche part au bout de shuffleToDrawMs, puis une balise toutes les
-  // drawSoundIntervalMs ; un échange fait entendre la bille choisie, puis
+  // drawSoundIntervalMs ; un échange fait rouler la bille choisie, puis
   // l'autre swapSoundDelayMs plus tard.
   shuffleToDrawMs: 900,
   drawSoundIntervalMs: 350,
   swapSoundDelayMs: 150,
 };
 
-// Les PROFILS SONORES des billes (champ `sound` d'une bille) : sa balise (la
-// voix de la bille, à la pioche et sous le curseur) et son bruit de chute (à la
-// pose). Des clés d'asset ou de pool (assets/manifest.json), vérifiées par l'audit
-// du contenu. Un profil aura un jour plusieurs voix (marble_small_2_beacon...).
+// Les PROFILS SONORES des billes (champ `sound` d'une bille) :
+//   beacon  sa balise, la voix de la bille, à la pioche et sous le curseur ;
+//   drop    son bruit de chute, à l'arrivée d'une bille qui roule ;
+//   roll    sa boucle de roulement, quand elle va d'une place à l'autre ;
+//   impact  le choc, quand une bille posée en déloge une autre. En attendant de
+//           vrais sons de choc : la balise.
+// Des clés d'asset ou de pool (assets/manifest.json), vérifiées par l'audit du
+// contenu. Un profil aura un jour plusieurs voix (marble_small_2_beacon...).
 export const MARBLE_SOUND_PROFILES = {
-  small: { beacon: "assets/sounds/marbles/marble_small_1_beacon", drop: "assets/sounds/marbles/marble_small_drop" },
-  medium: { beacon: "assets/sounds/marbles/marble_medium_1_beacon", drop: "assets/sounds/marbles/marble_medium_drop" },
-  large: { beacon: "assets/sounds/marbles/marble_large_1_beacon", drop: "assets/sounds/marbles/marble_large_drop" },
+  small: {
+    beacon: "assets/sounds/marbles/marble_small_1_beacon",
+    drop: "assets/sounds/marbles/marble_small_drop",
+    roll: "assets/sounds/marbles/marble_small_rolling",
+    impact: "assets/sounds/marbles/marble_small_1_beacon",
+  },
+  medium: {
+    beacon: "assets/sounds/marbles/marble_medium_1_beacon",
+    drop: "assets/sounds/marbles/marble_medium_drop",
+    roll: "assets/sounds/marbles/marble_medium_rolling",
+    impact: "assets/sounds/marbles/marble_medium_1_beacon",
+  },
+  large: {
+    beacon: "assets/sounds/marbles/marble_large_1_beacon",
+    drop: "assets/sounds/marbles/marble_large_drop",
+    roll: "assets/sounds/marbles/marble_large_rolling",
+    impact: "assets/sounds/marbles/marble_large_1_beacon",
+  },
 };
 
 // OÙ S'ENTEND chaque place de la table (view/marbles/sounds.js/renderAt) :
@@ -73,11 +92,14 @@ export const MARBLE_SOUND_PROFILES = {
 //      d'un dessin ; un son qui se déplacera d'une place à l'autre la suivra donc.
 //   y  la profondeur, de la main (0, au plus près) à la pointe (1, au plus loin),
 //      rendue par MARBLES_SOUND_DEPTH.
+// La défausse, où roulent les billes éjectées ou usées : à droite, derrière les
+// bases, pour que le joueur apprenne où elles « tombent ».
 export const MARBLES_SOUND_PLACES = {
   hand: { fromX: -0.6, toX: 0.6, y: 0 },
   leftBase: { x: -0.4, y: 0.5 },
   rightBase: { x: 0.4, y: 0.5 },
   apex: { x: 0, y: 1 },
+  discard: { x: 0.8, y: 0.7 },
 };
 
 // La PROFONDEUR, interpolée de la main (y = 0) à la pointe (y = 1). Trois indices,
@@ -99,6 +121,49 @@ export const MARBLES_SOUND_DEPTH = {
   nearReverbSend: 0.05,
   farReverbSend: 0.35,
   reverb: { durationSec: 1.2, decay: 3, wet: 0.6 },
+};
+
+// Les ROULEMENTS : une bille qui va d'une place à l'autre fait entendre la boucle
+// de roulement de son profil, déplacée en continu sur la table (panoramique et
+// profondeur, comme une place), puis sa chute ou son choc à l'arrivée.
+// Un style par trajet :
+//   place  de la main à l'emplacement, à la pose ;
+//   swap   d'un emplacement à l'autre, à l'échange ;
+//   out    d'un emplacement à la défausse : éjectée par une pose, ou usée. Plus
+//          lente, et qui s'essouffle ;
+//   rotation  le triangle qui tourne : chaque bille roule vers l'emplacement
+//          suivant, toutes ensemble. Un seul élan pour plusieurs crans, qui passe
+//          par les emplacements sans s'y arrêter.
+// Pour place, swap et out :
+//   speed     la vitesse au départ, en unités de la table par seconde (la largeur
+//             de la table, de x = -1 à x = 1, fait 2 ; de la main à la pointe, 1) ;
+//   endRatio  la vitesse à l'arrivée, en part de celle du départ : 1, elle ne
+//             ralentit pas ; 0,2, elle arrive presque arrêtée. La durée du trajet
+//             en découle : distance divisée par la vitesse moyenne.
+// Pour rotation, un bloc rigide : les billes partent et arrivent ensemble, chacune
+// à sa vitesse, les côtés du triangle n'ayant pas la même longueur :
+//   notchMs   la durée d'un cran ; plusieurs crans s'enchaînent d'un seul élan ;
+//   endRatio  comme ci-dessus, sur tout l'élan ;
+//   gain      le volume de chaque bille : trois boucles ensemble sonnent plus fort
+//             qu'une seule ;
+//   dropGain  le volume des chutes à l'arrivée, le triangle qui se cale : plus
+//             discrètes que celle d'une pose.
+// Et pour tous :
+//   restRate     la vitesse de lecture de la boucle d'une bille presque arrêtée (1 à
+//                sa vitesse de départ) : elle ralentit ET grave, comme une bande
+//                qu'on freine. Le volume suit aussi la vitesse ;
+//   fadeMs       le fondu d'entrée et de sortie de la boucle, contre les clics ;
+//   impactToOutMs  après un choc, le délai avant que la bille délogée ne parte ;
+//   outStaggerMs   l'écart entre les départs de plusieurs billes usées à la fois.
+export const MARBLES_ROLLS = {
+  place: { speed: 2, endRatio: 0.8 },
+  swap: { speed: 2, endRatio: 0.8 },
+  out: { speed: 1.6, endRatio: 0.2 },
+  rotation: { notchMs: 700, endRatio: 0.4, gain: 0.6, dropGain: 0.5 },
+  restRate: 0.7,
+  fadeMs: 50,
+  impactToOutMs: 30,
+  outStaggerMs: 200,
 };
 
 // Les sons de l'écran des billes qui ne sont pas ceux d'une bille : la musique
