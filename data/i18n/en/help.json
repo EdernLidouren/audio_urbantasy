@@ -61,6 +61,7 @@
   "help.marbles.home": "Go to the first marble in hand",
   "help.marbles.left": "Go left, to the previous marble or the left base",
   "help.marbles.overview": "Announce the turn forecast, then each slot",
+  "help.marbles.placesDemo": "Debug: play a beacon at each place, from the hand to the apex",
   "help.marbles.reannounce": "Hear the position or the resolution step again",
   "help.marbles.resolve": "Start the turn resolution",
   "help.marbles.right": "Go right, to the next marble or the right base",

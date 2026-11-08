@@ -45,6 +45,7 @@ import { jumpMenuCursor, stepMenuCursor, announceMenuLine } from "../../lib/menu
 import { detailAfterMainMove, detailLine, mainWithDetail, stepDetail } from "../../lib/detail-card.js";
 import { t } from "../../data/i18n/index.js";
 import { MARBLES_SETTINGS } from "../../config/marbles-values.js";
+import { isDebugEnabled } from "../../config/debug.js";
 import { SLOTS, marblesReduce, swapRefusal, placeRefusal } from "../../core/marbles.js";
 import { playMenuSound } from "../menu-sounds.js";
 import { openConfirmation } from "../menus/confirmation.js";
@@ -68,8 +69,11 @@ import {
   slotName,
 } from "./narration.js";
 import {
+  closeTableReverb,
   eventCues,
   handPlace,
+  openTableReverb,
+  placesDemoCues,
   playCue,
   playFocusBeacon,
   preloadMarblesAudio,
@@ -103,7 +107,12 @@ const MARBLES_BINDINGS = defineBindings("marbles", {
   overview: { keys: ["r"], mods: [] },
   resolve: { keys: ["r"], mods: ["shift"] },
   history: { keys: ["l"], mods: [] },
+  // Mode debug seulement (voir DEBUG_ACTIONS).
+  placesDemo: { keys: ["p"], mods: ["shift"] },
 });
+
+// Les actions sans effet hors mode debug, absentes alors de l'aide.
+const DEBUG_ACTIONS = new Set(["placesDemo"]);
 
 export function makeMarblesScreen(getGame, setGame) {
   let cursor = INITIAL_CURSOR;
@@ -480,6 +489,15 @@ export function makeMarblesScreen(getGame, setGame) {
     openHistoryMenu(history.previous);
   }
 
+  // Maj+P, mode debug : une balise à chaque place, pour régler l'espace à l'oreille.
+  // Celle de la bille sous le curseur, sinon de l'argile.
+  function playPlacesDemo() {
+    if (blockedDuringSequence()) return;
+    soundQueue = enqueueCues(soundQueue, placesDemoCues(marbleUnderCursor() ?? "clay"));
+    flushSounds(0);
+    announce(t("marbles.debug.places_demo"), { assertive: true });
+  }
+
   function back() {
     if (isOver()) popScreen();
     else if (held) releaseSelection();
@@ -506,6 +524,7 @@ export function makeMarblesScreen(getGame, setGame) {
     overview: announceOverview,
     resolve: resolveKey,
     history: openHistory,
+    placesDemo: playPlacesDemo,
   };
 
   // Première ouverture : la musique, le sac qu'on brasse et la pioche du tour 1.
@@ -513,6 +532,8 @@ export function makeMarblesScreen(getGame, setGame) {
   function start() {
     started = true;
     preloadMarblesAudio();
+    // Après le préchargement : la réverbération a besoin du contexte audio.
+    openTableReverb();
     startMarblesMusic();
     const events = dispatch({ type: "draw" });
     playEventSounds(events, { shuffleFirst: true });
@@ -520,7 +541,7 @@ export function makeMarblesScreen(getGame, setGame) {
   }
 
   return {
-    helpSections: () => [{ id: "marbles" }],
+    helpSections: () => [{ id: "marbles", include: (action) => !DEBUG_ACTIONS.has(action) || isDebugEnabled() }],
     onEnter() {
       if (started) reannounce();
       else start();
@@ -528,6 +549,7 @@ export function makeMarblesScreen(getGame, setGame) {
     onExit() {
       soundQueue = EMPTY_SOUND_QUEUE;
       stopFocusBeacon();
+      closeTableReverb();
       stopMarblesMusic();
       setGame(null);
     },
@@ -540,7 +562,7 @@ export function makeMarblesScreen(getGame, setGame) {
     onKeyDown(event) {
       const action = resolveAction(MARBLES_BINDINGS, event.key, event.mods);
       const handler = keyHandlers[action];
-      if (!handler) return;
+      if (!handler || (DEBUG_ACTIONS.has(action) && !isDebugEnabled())) return;
       event.preventDefault();
       handler();
     },

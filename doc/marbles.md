@@ -350,13 +350,26 @@ un emplacement occupé (à l'ouverture de la sélection d'emplacement aussi), et
 du sac et de la défausse (à l'ouverture et à chaque déplacement). Une seule à la fois : la
 suivante coupe la précédente. Une butée, qui laisse le curseur en place, n'en joue pas.
 
-**Stéréo** : un son de bille s'entend à sa place sur la table, en panoramique gauche-droite
-(`MARBLES_SOUND_PLACES`, `panAt`) : la main de −0,6 à +0,6, la première bille tout à gauche
-(une bille seule au milieu) ; base gauche −0,4, base droite +0,4, pointe au centre. La balise
-d'une bille piochée s'entend à sa place dans la main, la cascade de pioche va donc de gauche
-à droite ; la chute d'une pose et la balise de phase à l'emplacement ; la balise au survol là
-où est le curseur. Le brassage et les menus du sac et de la défausse restent au centre. Pas
-encore de profondeur.
+**Espace** : un son de bille s'entend à sa place sur la table (`MARBLES_SOUND_PLACES`,
+`renderAt`), en stéréo et en volume, jamais en HRTF. La balise d'une bille piochée s'entend à
+sa place dans la main, la cascade de pioche va donc de gauche à droite ; la chute d'une pose
+et la balise de phase à l'emplacement ; la balise au survol là où est le curseur. Le brassage
+et les menus du sac et de la défausse restent au centre, secs.
+
+- **Gauche-droite** (`x`) : la main de −0,6 à +0,6, la première bille tout à gauche (une
+  bille seule au milieu) ; base gauche −0,4, base droite +0,4, pointe au centre. Le triangle,
+  plus resserré que la main, fait la perspective : plus c'est loin, plus c'est près du centre.
+- **Profondeur** (`y`) : la main à 0, les bases à 0,5, la pointe à 1. Trois indices,
+  interpolés de la main à la pointe (`MARBLES_SOUND_DEPTH`) : le volume (−6 dB au plus loin),
+  un passe-bas discret (de 20 000 à 7 000 Hz, sur une échelle logarithmique ; marqué, il
+  voudrait dire « derrière une paroi », comme en ville) et surtout la part de réverbération
+  (de 0,05 à 0,35), l'indice qui convainc le plus. La table a sa propre réverbération, créée à
+  l'ouverture de l'écran et défaite à sa sortie. Pas de passe-haut : il amincit le son au lieu
+  de l'éloigner.
+- **Régler à l'oreille** : en mode debug, **Maj+P** fait entendre la balise de la bille sous
+  le curseur (de l'argile sinon) à chaque place, de la plus proche à la plus lointaine : la
+  main à gauche, au centre, à droite, les deux bases, la pointe. Hors mode debug, la touche
+  ne fait rien et n'est pas dans l'aide.
 
 **Volumes** : balises (pioche, phase et survol) au volume des balises, elles ont vocation à être
 positionnées ; brassage et chutes au volume de l'interface. Tous les sons des billes sont

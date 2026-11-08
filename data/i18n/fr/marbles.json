@@ -71,6 +71,7 @@
   "marbles.card.knockout": "Éjection : {effect}.",
   "marbles.card.no_special_effect": "Aucun effet particulier.",
   "marbles.condition.printedStat": "son effet de {slot} donne au moins {effect}",
+  "marbles.debug.places_demo": "Démonstration des places : main à gauche, au centre, à droite, base gauche, base droite, pointe.",
   "marbles.effect.combined": "{parts, list}",
   "marbles.effect.conditional": "{effect} si {condition}",
   "marbles.effect.given": "{effect} à la {slot}",

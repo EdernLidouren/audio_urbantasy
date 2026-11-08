@@ -32,7 +32,18 @@ import {
 import { marbleCard } from "../../view/marbles/card.js";
 import { confirmationEntries } from "../../view/menus/confirmation.js";
 import { INITIAL_CURSOR, placementStart, stepCursor, zoneOf } from "../../view/marbles/navigation.js";
-import { MARBLE_EVENT_CUES, eventCues, handPlace, panAt, slotPlace, validateMarbleSounds, validateSoundPlaces } from "../../view/marbles/sounds.js";
+import {
+  MARBLE_EVENT_CUES,
+  eventCues,
+  handPlace,
+  placesDemoCues,
+  positionOf,
+  renderAt,
+  slotPlace,
+  validateMarbleSounds,
+  validateSoundDepth,
+  validateSoundPlaces,
+} from "../../view/marbles/sounds.js";
 import { EMPTY_SOUND_QUEUE, advanceSoundQueue, enqueueCues } from "../../view/marbles/sound-queue.js";
 import { throws } from "../../lib/check.js";
 
@@ -298,17 +309,45 @@ function checkSounds(run) {
     eventCues(draws.slice(0, 2), { handAfter: ["agate", "mica", "tiger", "clay", "glass"] }, settings).map((cue) => cue.place)
   );
   run("repères : sans main connue, la pioche au centre", undefined, eventCues(draws.slice(0, 1), {}, settings)[0].place);
-  const places = { hand: { fromX: -0.6, toX: 0.6 }, leftBase: { x: -0.4 }, rightBase: { x: 0.4 }, apex: { x: 0 } };
+  const places = { hand: { fromX: -0.6, toX: 0.6, y: 0 }, leftBase: { x: -0.4, y: 0.5 }, rightBase: { x: 0.4, y: 0.5 }, apex: { x: 0, y: 1 } };
+  const round = (value) => Math.round(value * 100) / 100;
   run.same(
     "stéréo : la main de gauche à droite",
     [-0.6, -0.3, 0, 0.3, 0.6],
-    [0, 1, 2, 3, 4].map((index) => Math.round(panAt(handPlace(index, 5), places) * 100) / 100)
+    [0, 1, 2, 3, 4].map((index) => round(positionOf(handPlace(index, 5), places).x))
   );
-  run("stéréo : une bille seule au milieu", 0, panAt(handPlace(0, 1), places));
-  run.same("stéréo : les emplacements", [-0.4, 0.4, 0], ["leftBase", "rightBase", "apex"].map((slot) => panAt(slotPlace(slot), places)));
-  run("stéréo : sans place, au centre", 0, panAt(undefined, places));
-  run("stéréo : panoramique hors bornes refusé", true, throws(() => validateSoundPlaces({ ...places, apex: { x: 1.5 } })));
+  run("stéréo : une bille seule au milieu", 0, positionOf(handPlace(0, 1), places).x);
+  run.same("stéréo : les emplacements", [-0.4, 0.4, 0], ["leftBase", "rightBase", "apex"].map((slot) => positionOf(slotPlace(slot), places).x));
+  run("stéréo : panoramique hors bornes refusé", true, throws(() => validateSoundPlaces({ ...places, apex: { x: 1.5, y: 1 } })));
   run("stéréo : place manquante refusée", true, throws(() => validateSoundPlaces({ hand: places.hand, leftBase: places.leftBase })));
+  run("profondeur : profondeur hors bornes refusée", true, throws(() => validateSoundPlaces({ ...places, apex: { x: 0, y: 2 } })));
+
+  // Profondeur : volume, passe-bas et réverbération suivent y, de la main à la pointe.
+  const depth = { farGainDb: -6, nearLowpassHz: 20000, farLowpassHz: 7000, nearReverbSend: 0.05, farReverbSend: 0.35, reverb: { durationSec: 1, decay: 3, wet: 0.5 } };
+  const at = (place) => renderAt(place, places, depth);
+  run.same("profondeur : sans place, centre, plein volume, sec", { pan: 0, gain: 1, lowpassHz: undefined, reverbSend: 0 }, at(undefined));
+  run.same("profondeur : la main, au plus près, sans filtre", { pan: -0.6, gain: 1, lowpassHz: undefined, reverbSend: 0.05 }, at(handPlace(0, 5)));
+  run("profondeur : la pointe, au volume le plus bas", -6, round(20 * Math.log10(at(slotPlace("apex")).gain)));
+  run("profondeur : la pointe, passe-bas au plus bas", 7000, Math.round(at(slotPlace("apex")).lowpassHz));
+  run("profondeur : la pointe, le plus de réverbération", 0.35, round(at(slotPlace("apex")).reverbSend));
+  run("profondeur : les bases à mi-chemin, en décibels", -3, round(20 * Math.log10(at(slotPlace("leftBase")).gain)));
+  run("profondeur : passe-bas logarithmique à mi-chemin", Math.round(Math.sqrt(20000 * 7000)), Math.round(at(slotPlace("rightBase")).lowpassHz));
+  run.same(
+    "profondeur : de plus en plus loin, de plus en plus bas et réverbéré",
+    [true, true],
+    [
+      at(handPlace(0, 5)).gain > at(slotPlace("leftBase")).gain && at(slotPlace("leftBase")).gain > at(slotPlace("apex")).gain,
+      at(handPlace(0, 5)).reverbSend < at(slotPlace("leftBase")).reverbSend && at(slotPlace("leftBase")).reverbSend < at(slotPlace("apex")).reverbSend,
+    ]
+  );
+  run("profondeur : gain positif refusé", true, throws(() => validateSoundDepth({ ...depth, farGainDb: 3 })));
+  run("profondeur : envoi hors bornes refusé", true, throws(() => validateSoundDepth({ ...depth, farReverbSend: 2 })));
+  run("profondeur : réverbération sans durée refusée", true, throws(() => validateSoundDepth({ ...depth, reverb: { decay: 3, wet: 0.5 } })));
+  run.same(
+    "démonstration : six places, de la main à la pointe, espacées",
+    ["hand@0", "hand@700", "hand@1400", "leftBase@2100", "rightBase@2800", "apex@3500"],
+    placesDemoCues("clay").map((cue) => `${cue.place.slot ?? cue.place.kind}@${cue.atMs}`)
+  );
   run.same("repères : une phase sur un emplacement vide reste muette", [], eventCues([{ type: "phaseSkipped", slot: "apex" }], {}, settings));
 
   // La file : les immédiats aussitôt, les autres à leur échéance, dans l'ordre.

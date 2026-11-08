@@ -61,6 +61,7 @@
   "help.marbles.home": "Aller à la première bille de la main",
   "help.marbles.left": "Aller à gauche, vers la bille précédente ou la base gauche",
   "help.marbles.overview": "Annoncer la prévision du tour, puis chaque emplacement",
+  "help.marbles.placesDemo": "Debug : faire entendre une balise à chaque place, de la main à la pointe",
   "help.marbles.reannounce": "Réentendre la position ou l'étape de résolution",
   "help.marbles.resolve": "Lancer la résolution du tour",
   "help.marbles.right": "Aller à droite, vers la bille suivante ou la base droite",

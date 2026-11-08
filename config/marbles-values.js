@@ -64,17 +64,41 @@ export const MARBLE_SOUND_PROFILES = {
   large: { beacon: "assets/sounds/marbles/marble_large_1_beacon", drop: "assets/sounds/marbles/marble_large_drop" },
 };
 
-// OÙ S'ENTEND chaque place de la table, de gauche (-1) à droite (+1) : le
-// panoramique des sons des billes (view/marbles/sounds.js/panAt). Les billes de la
-// main se répartissent de fromX à toX selon leur rang, la première tout à gauche ;
-// une bille seule s'entend au milieu. Jamais aux extrêmes : un son tout d'un côté
-// disparaît d'une oreille, fatigant au casque. Le triangle, plus resserré que la
-// main, prépare la perspective de la profondeur à venir.
+// OÙ S'ENTEND chaque place de la table (view/marbles/sounds.js/renderAt) :
+//   x  de gauche (-1) à droite (+1), le panoramique. Les billes de la main se
+//      répartissent de fromX à toX selon leur rang, la première tout à gauche ; une
+//      bille seule s'entend au milieu. Jamais aux extrêmes : un son tout d'un côté
+//      disparaît d'une oreille, fatigant au casque. C'est déjà la PERSPECTIVE : plus
+//      une place est loin, plus elle est resserrée vers le centre, comme les lignes
+//      d'un dessin ; un son qui se déplacera d'une place à l'autre la suivra donc.
+//   y  la profondeur, de la main (0, au plus près) à la pointe (1, au plus loin),
+//      rendue par MARBLES_SOUND_DEPTH.
 export const MARBLES_SOUND_PLACES = {
-  hand: { fromX: -0.6, toX: 0.6 },
-  leftBase: { x: -0.4 },
-  rightBase: { x: 0.4 },
-  apex: { x: 0 },
+  hand: { fromX: -0.6, toX: 0.6, y: 0 },
+  leftBase: { x: -0.4, y: 0.5 },
+  rightBase: { x: 0.4, y: 0.5 },
+  apex: { x: 0, y: 1 },
+};
+
+// La PROFONDEUR, interpolée de la main (y = 0) à la pointe (y = 1). Trois indices,
+// qui ne marchent bien qu'ensemble :
+//   farGainDb                    le volume au plus loin, en décibels ;
+//   nearLowpassHz, farLowpassHz  le passe-bas (l'air absorbe les aigus), sur une
+//                                échelle logarithmique ; discret : un passe-bas marqué
+//                                veut dire « derrière une paroi » en ville ;
+//   nearReverbSend, farReverbSend  la part envoyée à la réverbération de la table,
+//                                l'indice le plus convaincant : un son lointain a plus
+//                                d'écho par rapport au son direct ;
+//   reverb                       la « pièce » de la table : durée, déclin, niveau de
+//                                retour (lib/audio/reverb.js).
+// Un son sans place (brassage, menus) reste sec, au centre, à plein volume.
+export const MARBLES_SOUND_DEPTH = {
+  farGainDb: -6,
+  nearLowpassHz: 20000,
+  farLowpassHz: 7000,
+  nearReverbSend: 0.05,
+  farReverbSend: 0.35,
+  reverb: { durationSec: 1.2, decay: 3, wet: 0.6 },
 };
 
 // Les sons de l'écran des billes qui ne sont pas ceux d'une bille : la musique

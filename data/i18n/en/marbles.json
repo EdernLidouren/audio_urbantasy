@@ -19,6 +19,7 @@
   "marbles.card.knockout": "Knockout: {effect}.",
   "marbles.card.no_special_effect": "No special effect.",
   "marbles.condition.printedStat": "its {slot} effect gives at least {effect}",
+  "marbles.debug.places_demo": "Places demo: hand left, center, right, left base, right base, apex.",
   "marbles.effect.combined": "{parts, list}",
   "marbles.effect.conditional": "{effect} if {condition}",
   "marbles.effect.given": "{effect} to the {slot}",

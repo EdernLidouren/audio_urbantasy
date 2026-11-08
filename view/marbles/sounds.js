@@ -17,12 +17,15 @@
 //   des flèches rapides ne s'empilent pas ;
 // - la MUSIQUE de l'écran (startMarblesMusic, stopMarblesMusic).
 //
-// STÉRÉO : un son de bille s'entend à sa PLACE sur la table, un repère
-// { kind: "hand", index, size } ou { kind: "slot", slot } que panAt traduit en
-// panoramique (config/marbles-values.js/MARBLES_SOUND_PLACES) : la balise d'une
-// bille piochée à sa place dans la main, la chute d'une pose et la balise de phase
-// à l'emplacement, la balise au survol là où est le curseur. Sans place (brassage,
-// menus du sac et de la défausse), au centre. Pas encore de profondeur.
+// ESPACE : un son de bille s'entend à sa PLACE sur la table, un repère
+// { kind: "hand", index, size } ou { kind: "slot", slot } : la balise d'une bille
+// piochée à sa place dans la main, la chute d'une pose et la balise de phase à
+// l'emplacement, la balise au survol là où est le curseur. renderAt traduit la
+// place en rendu : panoramique gauche-droite et PROFONDEUR (volume, passe-bas, part
+// de réverbération), d'après config/marbles-values.js/MARBLES_SOUND_PLACES et
+// MARBLES_SOUND_DEPTH. Stéréo et volume, jamais de HRTF (CLAUDE.md). La table a sa
+// propre réverbération, créée à l'ouverture de l'écran et défaite à sa sortie. Sans
+// place (brassage, menus du sac et de la défausse) : au centre, sec, plein volume.
 //
 // VOLUMES : les balises (pioche, survol) suivent le volume des balises du jeu, elles
 // ont vocation à être positionnées ; brassage et chutes, celui de l'interface ; la
@@ -31,11 +34,19 @@
 // (preloadMarblesAudio) : la première balise ne part pas en retard sur la touche.
 // Un son manquant avertit en console, jamais de plantage.
 
-import { MARBLE_SOUND_PROFILES, MARBLE_TYPES, MARBLES_AUDIO, MARBLES_SETTINGS, MARBLES_SOUND_PLACES } from "../../config/marbles-values.js";
+import {
+  MARBLE_SOUND_PROFILES,
+  MARBLE_TYPES,
+  MARBLES_AUDIO,
+  MARBLES_SETTINGS,
+  MARBLES_SOUND_DEPTH,
+  MARBLES_SOUND_PLACES,
+} from "../../config/marbles-values.js";
 import { SLOTS } from "../../core/marbles.js";
 import { TUNING_DEFAULTS } from "../../config/tuning.js";
 import {
   clearMusicLayers,
+  createReverbBus,
   playOneShot,
   playTrackedOneShot,
   preloadMusic,
@@ -69,29 +80,61 @@ export function validateMarbleSounds(types, profiles, settings) {
 
 validateMarbleSounds(MARBLE_TYPES, MARBLE_SOUND_PROFILES, MARBLES_SETTINGS);
 
-// Chaque place a son panoramique, dans [-1, 1].
+function checkNumber(value, name, min, max) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max) {
+    throw new Error(`marbles : ${name} doit être un nombre entre ${min} et ${max}.`);
+  }
+}
+
+// Chaque place a son panoramique dans [-1, 1] et sa profondeur dans [0, 1].
 export function validateSoundPlaces(places) {
-  const check = (value, name) => {
-    if (typeof value !== "number" || !Number.isFinite(value) || value < -1 || value > 1) {
-      throw new Error(`marbles : ${name} doit être un nombre entre -1 et 1.`);
-    }
-  };
-  check(places.hand?.fromX, "hand.fromX");
-  check(places.hand?.toX, "hand.toX");
-  for (const slot of SLOTS) check(places[slot]?.x, `${slot}.x`);
+  checkNumber(places.hand?.fromX, "hand.fromX", -1, 1);
+  checkNumber(places.hand?.toX, "hand.toX", -1, 1);
+  checkNumber(places.hand?.y, "hand.y", 0, 1);
+  for (const slot of SLOTS) {
+    checkNumber(places[slot]?.x, `${slot}.x`, -1, 1);
+    checkNumber(places[slot]?.y, `${slot}.y`, 0, 1);
+  }
+}
+
+export function validateSoundDepth(depth) {
+  checkNumber(depth.farGainDb, "farGainDb", -60, 0);
+  checkNumber(depth.nearLowpassHz, "nearLowpassHz", 20, 24000);
+  checkNumber(depth.farLowpassHz, "farLowpassHz", 20, 24000);
+  checkNumber(depth.nearReverbSend, "nearReverbSend", 0, 1);
+  checkNumber(depth.farReverbSend, "farReverbSend", 0, 1);
+  checkNumber(depth.reverb?.durationSec, "reverb.durationSec", 0.05, 10);
+  checkNumber(depth.reverb?.decay, "reverb.decay", 0.1, 100);
+  checkNumber(depth.reverb?.wet, "reverb.wet", 0, 1);
 }
 
 validateSoundPlaces(MARBLES_SOUND_PLACES);
+validateSoundDepth(MARBLES_SOUND_DEPTH);
 
-// --- Stéréo (pur) ---
+// --- Espace (pur) ---
 
-// Le panoramique d'une place (voir l'en-tête), 0 sans place.
-export function panAt(place, places = MARBLES_SOUND_PLACES) {
-  if (!place) return 0;
-  if (place.kind === "slot") return places[place.slot].x;
-  const { fromX, toX } = places.hand;
-  if (place.size <= 1) return (fromX + toX) / 2;
-  return fromX + ((toX - fromX) * place.index) / (place.size - 1);
+// La position d'une place : { x, y } (voir l'en-tête).
+export function positionOf(place, places = MARBLES_SOUND_PLACES) {
+  if (place.kind === "slot") return places[place.slot];
+  const { fromX, toX, y } = places.hand;
+  if (place.size <= 1) return { x: (fromX + toX) / 2, y };
+  return { x: fromX + ((toX - fromX) * place.index) / (place.size - 1), y };
+}
+
+// Le rendu d'une place : { pan, gain, lowpassHz, reverbSend }. `gain` multiplie le
+// volume de la catégorie ; `lowpassHz` est absent au plus près (aucun filtre).
+// Sans place : centre, plein volume, sec.
+export function renderAt(place, places = MARBLES_SOUND_PLACES, depth = MARBLES_SOUND_DEPTH) {
+  if (!place) return { pan: 0, gain: 1, lowpassHz: undefined, reverbSend: 0 };
+  const { x, y } = positionOf(place, places);
+  return {
+    pan: x,
+    gain: 10 ** ((depth.farGainDb * y) / 20),
+    // L'oreille entend la fréquence sur une échelle logarithmique : une rampe
+    // linéaire sonnerait comme un saut puis presque rien.
+    lowpassHz: y > 0 ? depth.nearLowpassHz * (depth.farLowpassHz / depth.nearLowpassHz) ** y : undefined,
+    reverbSend: depth.nearReverbSend + (depth.farReverbSend - depth.nearReverbSend) * y,
+  };
 }
 
 export const slotPlace = (slot) => ({ kind: "slot", slot });
@@ -199,13 +242,47 @@ function cueSound(cue) {
   return { key: profileOf(cue.marble).beacon, volume: beaconVolumeFactor() };
 }
 
+// La réverbération de la table, le temps de l'écran (null : aucune, hors écran ou
+// sans contexte audio).
+let tableReverb = null;
+
+export function openTableReverb() {
+  closeTableReverb();
+  tableReverb = createReverbBus(MARBLES_SOUND_DEPTH.reverb);
+}
+
+export function closeTableReverb() {
+  tableReverb?.destroy();
+  tableReverb = null;
+}
+
+// Les options de lecture d'un son à `place`, au volume `volume` de sa catégorie.
+function placedOptions(place, volume) {
+  const { pan, gain, lowpassHz, reverbSend } = renderAt(place);
+  const options = { volume: volume * gain, stereo: pan, permanent: true };
+  if (lowpassHz !== undefined) options.lowpassHz = lowpassHz;
+  if (reverbSend > 0 && tableReverb?.input) Object.assign(options, { reverbSend, reverbBusInput: tableReverb.input });
+  return options;
+}
+
 export function playCue(cue) {
   const { key, volume } = cueSound(cue);
   try {
-    playOneShot(resolveAsset(key), { volume, stereo: panAt(cue.place), permanent: true });
+    playOneShot(resolveAsset(key), placedOptions(cue.place, volume));
   } catch (error) {
     console.warn(`son des billes indisponible (${cue.sound}, "${key}") : ${error.message}`);
   }
+}
+
+// DÉMONSTRATION des places (mode debug, Maj+P) : la même balise à chaque place,
+// de la plus proche à la plus lointaine, pour régler l'espace à l'oreille
+// (MARBLES_SOUND_PLACES, MARBLES_SOUND_DEPTH). Une main de 5 : à gauche, au
+// centre, à droite ; puis les deux bases et la pointe.
+const DEMO_INTERVAL_MS = 700;
+
+export function placesDemoCues(marble) {
+  const places = [handPlace(0, 5), handPlace(2, 5), handPlace(4, 5), slotPlace("leftBase"), slotPlace("rightBase"), slotPlace("apex")];
+  return places.map((place, index) => ({ atMs: index * DEMO_INTERVAL_MS, sound: "beacon", marble, place }));
 }
 
 // La balise au survol en cours, pour la couper à la suivante.
@@ -217,7 +294,7 @@ export function playFocusBeacon(marble, place) {
   stopFocusBeacon();
   const key = profileOf(marble).beacon;
   try {
-    focusBeacon = playTrackedOneShot(resolveAsset(key), { volume: beaconVolumeFactor(), stereo: panAt(place), permanent: true });
+    focusBeacon = playTrackedOneShot(resolveAsset(key), placedOptions(place, beaconVolumeFactor()));
   } catch (error) {
     console.warn(`balise de bille indisponible ("${key}") : ${error.message}`);
   }
