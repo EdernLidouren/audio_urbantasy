@@ -18,7 +18,9 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
 | `lib/detail-card.js` | Le mécanisme générique des fiches : assemblage et curseur secondaire |
 | `view/marbles/narration.js` | Ce qui se dit, à partir de l'état, du journal et de la prévision (pur) |
 | `view/marbles/sequence.js` | La file d'étapes de la séquence de résolution et ses pauses (pur) |
-| `view/marbles/navigation.js` | Le curseur dans le triangle, les zones (pur) |
+| `view/marbles/history.js` | L'historique : les messages de jeu du tour précédent (pur) |
+| `view/marbles/history-screen.js` | Le menu de l'historique |
+| `view/marbles/navigation.js` | Le curseur dans le triangle, les zones, l'ouverture de la sélection d'emplacement (pur) |
 | `view/marbles/sounds.js` | Les points d'accroche sonores |
 | `tools/play-marbles.js` | Partie au terminal |
 | `core/checks/marbles.check.js`, `marbles-bus.check.js`, `marbles-forecast.check.js`, `marbles-view.check.js`, `marbles-sequence.check.js` | Vérifications |
@@ -170,6 +172,7 @@ Ce qui se dit, selon l'endroit :
 | Emplacement occupé, bille sélectionnée | « pointe, calot : Vitesse +12. » (la prévision) |
 | Emplacement vide, bille sélectionnée | « pointe » |
 | R | la vue d'ensemble du tour (voir plus bas) |
+| L | le menu de l'historique (voir plus bas) |
 | I | tour, score, Vitesse et Masse du tour, échange |
 | S | nombre de billes au sac, pioche par tour |
 | D | nombre de billes en défausse |
@@ -178,15 +181,26 @@ Une valeur négative porte le vrai signe moins, collé au nombre (« Vitesse −
 un lecteur d'écran le lit, là où il peut taire un trait d'union. Un gabarit d'effet
 l'écrit lui-même ; un compteur passe par `view/marbles/narration.js`/`formatCounter`.
 
-**Poser** : Entrée sur une bille la sélectionne, Entrée sur un emplacement ouvre une
-confirmation (`view/menus/confirmation.js`, le modèle commun à tout le jeu), toujours, même
-sur un emplacement vide. Ses premières lignes se lisent et ne s'activent pas :
+**Poser** : Entrée sur une bille la sélectionne et ouvre la **sélection d'emplacement**.
+Le curseur passe sur le premier emplacement vide dans l'ordre des phases (base gauche,
+base droite, pointe), sur la base gauche si tout est occupé, et le dit : « Sélection :
+agate. Choisissez un emplacement. Base droite ». Tant qu'elle dure, seuls les trois
+emplacements sont accessibles : la main n'existe plus pour le curseur, Bas sous une base
+bute (`stepCursor(…, triangleOnly)`). Échap l'annule et ramène sur la bille, dans la main ;
+après la pose, le curseur revient aussi dans la main.
 
-1. « Poser argile en pointe ? Vitesse +8 », l'effet de phase sur le triangle simulé ;
-2. sur un emplacement occupé, « Éjection de calot : Vitesse +3 », ou « aucun effet » ;
-3. sur un emplacement occupé, « Tic d'argile : Vitesse +2 », ou « aucun effet » ;
-4. Annuler (Échap aussi : la bille reste sélectionnée) ;
-5. Confirmer.
+Entrée sur un emplacement ouvre une confirmation (`view/menus/confirmation.js`, le modèle
+commun à tout le jeu), toujours, même sur un emplacement vide. Ses lignes d'information se
+lisent et ne s'activent pas (Entrée n'y fait rien) :
+
+1. « Poser argile en pointe ? » ;
+2. les valeurs prévues, sur leur propre ligne, au format de la vue d'ensemble (R) :
+   « Vitesse +8 », valeurs produites seulement, non nulles, bonus reçu compris, sans
+   texte d'effet ; « aucun effet » si rien ;
+3. sur un emplacement occupé, « Éjection de calot : Vitesse +3 », ou « … : aucun effet » ;
+4. sur un emplacement occupé, « Tic d'argile : Vitesse +2 », ou « … : aucun effet » ;
+5. Annuler (Échap aussi : la sélection d'emplacement reprend) ;
+6. Confirmer.
 
 ### Fiches de détail
 
@@ -250,7 +264,10 @@ simulation résout le tour et pioche le suivant tout de suite ; ce qui suit n'es
 présentation, une file d'étapes (`view/marbles/sequence.js`) dite avec une pause après
 chacune :
 
-1. « Résolution du tour 3. » (au tour 1, suivi de « Entrée pour passer la résolution. ») ;
+1. « Résolution du tour 3. » (au tour 1, suivi de « Entrée pour passer la résolution. »),
+   enchaînée SANS PAUSE sur la phase de base gauche : les deux partagent la première
+   étape (`resolutionSteps`), une pause nulle entre deux étapes ferait couper la première
+   annonce par la seconde ;
 2. à 4. chaque phase, dans l'ordre : « Base gauche, argile : Vitesse +1. », « Base
    droite, vide. », avec les règles de la vue d'ensemble ;
 5. « Impact 18. Score 42. » ;
@@ -281,7 +298,7 @@ fige. Retour arrière redit l'étape et relance sa pause. Une étape pourra un j
 la fin d'un son au lieu d'une durée.
 
 **Pendant la séquence**, tout le reste est refusé d'un son de blocage, sans parole pour ne
-pas couper l'étape : pose, échange, Maj+R, R, déplacements, I, S, D et leurs menus. La
+pas couper l'étape : pose, échange, Maj+R, R, déplacements, I, S, D, L et leurs menus. La
 séquence se termine quand sa dernière étape est dite : le joueur a la main pendant
 qu'elle se dit.
 
@@ -293,6 +310,30 @@ ne change pas : il était déjà complet avant la première étape.
 (`view/marbles/sounds.js`/`MARBLE_EVENT_SOUNDS`). Brancher un son, c'est remplacer son
 `null` par une clé d'asset. Les gestes de l'écran gardent les sons de menu (`select`,
 `cancel`, `block`, `refusal`).
+
+### Historique (L)
+
+**L** ouvre un menu vertical (`view/marbles/history-screen.js`, un menu de `lib/menu.js`) :
+les messages de jeu du tour précédent, du plus ancien en haut au plus récent, puis
+« Fermer » ; Échap ferme aussi. Les messages se lisent, Entrée n'y fait rien. Titre :
+« Historique du tour 3 ».
+
+Portée : un tour complet, de « Début du tour n−1… » à « Début du tour n… » inclus, rien
+d'avant. Il couvre les messages de la phase de jeu (pose, éjection, tic, défausse,
+échange) comme ceux de la séquence (ouverture, phases, résultat, retraits, rotation,
+pioche). La pioche du tour 1, dite avant le premier début de tour, n'appartient à aucun
+tour. Au premier tour : « Aucun historique pour l'instant. », puis « Fermer ». En fin de
+partie, L reste permise : la fin de partie ferme le dernier tour, dont l'historique va
+jusqu'à elle.
+
+Ne sont retenus que les messages des étapes (`buildSteps`, `resolutionSteps`), qui portent
+chacune leurs `messages` (l'ouverture et la base gauche, une étape, restent deux
+messages) : jamais une annonce de navigation (curseur, zone, fiche, R, S, D, I), une
+sélection, un refus, ni l'indication « Entrée pour passer la résolution. ». L'écran
+(`recorded`) les fait entrer au moment où il construit les étapes, pas au moment où elles
+se disent : l'historique est complet même après une séquence passée. Pendant la séquence,
+L est refusée comme le reste. L'historique (`view/marbles/history.js`) ne vit que le temps
+de l'écran, comme la séquence : la partie de billes n'a pas de sauvegarde.
 
 ## Tester
 

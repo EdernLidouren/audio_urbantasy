@@ -2,7 +2,8 @@
 // sonne, sur les vraies tables de textes : chaque bille et chaque refus a son
 // texte, chaque évènement du journal se dit et a son point d'accroche sonore,
 // aucun gabarit ne reste brut, dans chaque langue. Plus les fiches des billes,
-// l'ordre du menu du sac et de la confirmation, et le déplacement du curseur.
+// l'ordre du menu du sac et de la confirmation, le déplacement du curseur et la
+// sélection d'emplacement.
 // La vue d'ensemble et la séquence de résolution ont leur domaine,
 // marbles-sequence. Rien n'est annoncé ni joué ici : runChecks() se lance aussi
 // dans le jeu. Lancées par core/checks/index.js/runChecks
@@ -27,11 +28,10 @@ import {
   describeTurn,
   formatCounter,
   placementLines,
-  withHeldMark,
 } from "../../view/marbles/narration.js";
 import { marbleCard } from "../../view/marbles/card.js";
 import { confirmationEntries } from "../../view/menus/confirmation.js";
-import { INITIAL_CURSOR, stepCursor, zoneOf } from "../../view/marbles/navigation.js";
+import { INITIAL_CURSOR, placementStart, stepCursor, zoneOf } from "../../view/marbles/navigation.js";
 import { MARBLE_EVENT_SOUNDS } from "../../view/marbles/sounds.js";
 import { throws } from "../../lib/check.js";
 
@@ -339,7 +339,6 @@ export default function checkMarblesView(run) {
     const inHand = { ...state, hand: ["clay", "cats_eye", "shooter"] };
     run("texte : bille en main", "argile, usure 3. 1 sur 3", said(describeHandFocus(inHand, 0, t)));
     run("texte : usure maximale propre", "géante, usure 1. 2 sur 5", said(describeMarbleInList("giant", 1, 5, t)));
-    run("texte : bille sélectionnée", "calot, usure 3. 3 sur 3. Sélectionnée.", said(withHeldMark(describeHandFocus(inHand, 2, t), t)));
 
     const lensed = {
       ...state,
@@ -368,16 +367,42 @@ export default function checkMarblesView(run) {
 
     // Confirmation d'une pose : structure et texte exacts.
     const menuLines = (handIndex, slot) => placementLines(lensed, handIndex, slot, t).map(({ key, params }) => said(t(key, params)));
-    run.same("confirmation sur vide : une ligne", ["Poser argile en base droite ? Vitesse +1"], menuLines(0, "rightBase"));
+    run.same("confirmation sur vide : la question, puis les valeurs prévues", ["Poser argile en base droite ?", "Vitesse +1"], menuLines(0, "rightBase"));
     run.same(
-      "confirmation sur occupé : dans l'ordre réel, élision comprise",
-      ["Poser argile en pointe ? Vitesse +8", "Éjection de calot : Vitesse +3", "Tic d'argile : Vitesse +2"],
+      "confirmation sur occupé : dans l'ordre réel, élision comprise, bonus reçu compté",
+      ["Poser argile en pointe ?", "Vitesse +8", "Éjection de calot : Vitesse +3", "Tic d'argile : Vitesse +2"],
       menuLines(0, "apex")
     );
     run.same(
       "confirmation : aucun effet dit, même structure",
-      ["Poser verre en base gauche ? Masse +1", "Éjection de loupe : aucun effet", "Tic de verre : aucun effet"],
+      ["Poser verre en base gauche ?", "Masse +1", "Éjection de loupe : aucun effet", "Tic de verre : aucun effet"],
       menuLines(2, "leftBase")
+    );
+    // Les valeurs prévues au format de R : ce que la loupe donne s'entend chez le
+    // calot, pas chez elle.
+    const lensToPlace = { ...lensed, hand: ["magnifier"], triangle: { ...lensed.triangle, leftBase: null } };
+    run.same(
+      "confirmation : valeurs produites seulement, sans bonus donné",
+      ["Poser loupe en base gauche ?", "aucun effet"],
+      placementLines(lensToPlace, 0, "leftBase", t).map(({ key, params }) => said(t(key, params)))
+    );
+    // Le menu entier : question, valeurs, Éjection, Tic, puis Annuler avant Confirmer ;
+    // seules ces deux-là agissent.
+    const entries = confirmationEntries(() => {}, placementLines(lensed, 0, "apex", t));
+    run.same(
+      "confirmation : ordre complet du menu sur occupé",
+      ["marbles.place.question", "marbles.place.values", "marbles.place.knockout", "marbles.place.hit", "menu.confirm.cancel", "menu.confirm.confirm"],
+      entries.map((entry) => entry.label)
+    );
+    run.same(
+      "confirmation : les entrées d'information sans action",
+      [false, false, false, false, true, true],
+      entries.map((entry) => typeof entry.onActivate === "function")
+    );
+    run.same(
+      "confirmation : ordre complet du menu sur vide",
+      ["marbles.place.question", "marbles.place.values", "menu.confirm.cancel", "menu.confirm.confirm"],
+      confirmationEntries(() => {}, placementLines(lensed, 0, "rightBase", t)).map((entry) => entry.label)
     );
 
     // Ce qui se dit d'une pose et d'une résolution réelles.
@@ -401,7 +426,7 @@ export default function checkMarblesView(run) {
     setLocale("en");
     run.same(
       "anglais : confirmation sur occupé",
-      ["Place clay on the apex? Speed +8", "Knockout of shooter: Speed +3", "Hit from clay: Speed +2"],
+      ["Place clay on the apex?", "Speed +8", "Knockout of shooter: Speed +3", "Hit from clay: Speed +2"],
       placementLines(lensed, 0, "apex", t).map(({ key, params }) => t(key, params))
     );
     run("anglais : bille en main", "clay, wear 3. 1 of 3", describeHandFocus(inHand, 0, t));
@@ -445,4 +470,20 @@ export default function checkMarblesView(run) {
   run("zones : la main", "hand", zoneOf("hand"));
   run.same("zones : le triangle", ["triangle", "triangle", "triangle"], SLOTS.map(zoneOf));
   run("curseur : garde sa place dans la main", 3, stepCursor(stepCursor({ ...INITIAL_CURSOR, handIndex: 3 }, "up"), "down").handIndex);
+
+  // Sélection d'emplacement : la main n'existe plus pour le curseur, le triangle
+  // se parcourt comme d'habitude.
+  const inTriangle = (place, lastBase = "leftBase") => ({ ...INITIAL_CURSOR, place, lastBase });
+  run("sélection : rien sous la base gauche", null, stepCursor(inTriangle("leftBase"), "down", true));
+  run("sélection : rien sous la base droite", null, stepCursor(inTriangle("rightBase", "rightBase"), "down", true));
+  run("sélection : de la pointe vers la dernière base", "rightBase", stepCursor(inTriangle("apex", "rightBase"), "down", true).place);
+  run("sélection : d'une base à l'autre", "rightBase", stepCursor(inTriangle("leftBase"), "right", true).place);
+  run("sélection : vers la pointe", "apex", stepCursor(inTriangle("rightBase", "rightBase"), "up", true).place);
+  const marble = { marble: "clay", wear: 0 };
+  const start = (leftBase, rightBase, apex) => placementStart({ leftBase, rightBase, apex }, SLOTS);
+  run("sélection : tout vide, base gauche", "leftBase", start(null, null, null));
+  run("sélection : premier vide, base droite", "rightBase", start(marble, null, null));
+  run("sélection : seule la pointe est vide", "apex", start(marble, marble, null));
+  run("sélection : base gauche avant pointe", "leftBase", start(null, marble, null));
+  run("sélection : tout occupé, base gauche", "leftBase", start(marble, marble, marble));
 }

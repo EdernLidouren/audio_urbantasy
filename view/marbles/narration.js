@@ -8,7 +8,6 @@ import { SLOTS, effectAt, maxWearOf } from "../../core/marbles.js";
 import { CLAUSE_ACTIONS } from "../../core/marbles-effects.js";
 import { forecast } from "../../core/marbles-forecast.js";
 import { formatMenuPosition } from "../../lib/menu.js";
-import { stripTrailingPeriod } from "../../lib/announce.js";
 
 export function marbleName(marble, t) {
   return t(`marble.${marble}.name`);
@@ -92,11 +91,6 @@ export function describeHandFocus(game, index, t) {
   return describeMarbleInList(game.hand[index], index, game.hand.length, t);
 }
 
-// La bille sélectionnée : la même ligne, et le rappel qu'elle est prise.
-export function withHeldMark(line, t) {
-  return `${stripTrailingPeriod(line)}. ${t("marbles.hand.held")}`;
-}
-
 // L'effet de phase de ce tour d'une bille active : la prévision si le tour se
 // joue, sinon ce qu'elle a d'imprimé.
 function phaseText(game, slot, t) {
@@ -131,17 +125,18 @@ export function describeSlotForPlacement(game, slot, t) {
 }
 
 // Les lignes de lecture d'une confirmation de pose, chacune { key, params } : la
-// question et l'effet de phase sur le triangle simulé, puis, sur un emplacement
-// occupé, Éjection et Tic dans l'ordre réel des évènements, toujours présentes :
-// le menu garde la même structure. La pose doit être permise (placeRefusal).
+// question, puis, sur sa propre ligne, ce que la bille produirait à sa phase sur le
+// triangle simulé, au format de la vue d'ensemble (valeurs produites seulement, bonus
+// reçus compris, ni texte d'effet ni bonus donné : celui-là s'entend chez qui le
+// reçoit) ; puis, sur un emplacement occupé, Éjection et Tic dans l'ordre réel des
+// évènements, toujours présentes : le menu garde la même structure. La pose doit être
+// permise (placeRefusal).
 export function placementLines(game, handIndex, slot, t) {
   const marble = game.hand[handIndex];
   const predicted = forecast(game, { type: "place", handIndex, slot });
   const lines = [
-    {
-      key: "marbles.place.question",
-      params: { marble: marbleName(marble, t), slot: slotName(slot, t), effect: describeEffect(predicted.phases[slot], t) },
-    },
+    { key: "marbles.place.question", params: { marble: marbleName(marble, t), slot: slotName(slot, t) } },
+    { key: "marbles.place.values", params: { effect: combined(statParts(predicted.phases[slot], t), t) } },
   ];
   const occupant = game.triangle[slot];
   if (occupant !== null) {
@@ -285,7 +280,10 @@ function endsBeforeNextTurn(events, index) {
 }
 
 // Le journal découpé en ÉTAPES à dire, dans l'ordre chronologique :
-// [{ text, events }]. Chaque évènement qui se dit ouvre son étape ; un évènement
+// [{ text, events, messages, startsTurn?, endsGame? }]. `messages` : les messages de
+// jeu que l'étape porte, pour l'historique (view/marbles/history.js), d'ordinaire
+// son seul texte ; `startsTurn` (le numéro du tour) marque le début de tour,
+// `endsGame` la fin de partie : ce sont les bornes de l'historique. Chaque évènement qui se dit ouvre son étape ; un évènement
 // muet rejoint la suivante (ou la précédente, TRAILING) ; tout évènement appartient
 // à une étape et une seule. Deux règles d'ordre :
 // - les pioches consécutives se disent en une liste (« Vous piochez argile et verre. ») ;
@@ -314,7 +312,7 @@ export function buildSteps(events, t) {
     // Le début de tour se dit plus tard, mais son évènement reste à sa place : il
     // part (son son avec lui) avec l'étape suivante, la pioche.
     if (event.type === "turnStarted") {
-      turnStart = text(event, t);
+      turnStart = { text: text(event, t), turn: event.turn };
       waiting.push(event);
       return;
     }
@@ -340,21 +338,33 @@ export function buildSteps(events, t) {
     else open(spoken, event);
   });
 
-  if (turnStart !== null) steps.push({ text: turnStart, events: waiting });
+  if (turnStart !== null) steps.push({ text: turnStart.text, events: waiting, startsTurn: turnStart.turn });
   else if (waiting.length > 0 && steps.length > 0) steps[steps.length - 1].events.push(...waiting);
   else if (waiting.length > 0) steps.push({ text: "", events: waiting });
 
-  return steps.map((step) => ({
-    text: step.draws ? t("marbles.event.draw", { marbles: step.draws }) : step.text,
-    events: step.events,
-  }));
+  return steps.map((step) => {
+    const text = step.draws ? t("marbles.event.draw", { marbles: step.draws }) : step.text;
+    const built = { text, events: step.events, messages: text === "" ? [] : [text] };
+    if (step.startsTurn !== undefined) built.startsTurn = step.startsTurn;
+    if (step.events.some((event) => event.type === "gameOver")) built.endsGame = true;
+    return built;
+  });
 }
 
 // Les étapes d'une RÉSOLUTION (journal de la résolution puis de la pioche qui la
-// suit), précédées de son ouverture, « Résolution du tour 3. », qui n'est pas un
-// évènement : c'est le geste du joueur qui l'ouvre.
-export function resolutionSteps(turn, events, t) {
-  return [{ text: t("marbles.resolution.opening", { turn }), events: [] }, ...buildSteps(events, t)];
+// suit), ouvertes par « Résolution du tour 3. », qui n'est pas un évènement : c'est
+// le geste du joueur qui l'ouvre. L'ouverture se dit SANS PAUSE avant la phase de
+// base gauche : elle partage sa première étape. Deux étapes à pause nulle ne
+// suffiraient pas, la seconde annonce couperait la première. Elles restent deux
+// messages pour l'historique. `hint` : la première fois, comment passer la
+// résolution, dit après l'ouverture mais hors de l'historique (ce n'est pas un
+// message de jeu).
+export function resolutionSteps(turn, events, t, { hint = false } = {}) {
+  const opening = t("marbles.resolution.opening", { turn });
+  const spoken = hint ? `${opening} ${t("marbles.resolution.hint")}` : opening;
+  const [first, ...rest] = buildSteps(events, t);
+  if (first === undefined) return [{ text: spoken, events: [], messages: [opening] }];
+  return [{ ...first, text: `${spoken} ${first.text}`, messages: [opening, ...first.messages] }, ...rest];
 }
 
 // Toutes les étapes d'un coup, pour ce qui n'a pas à se dire étape par étape.

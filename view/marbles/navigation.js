@@ -21,11 +21,23 @@ const MOVES = {
 export const INITIAL_CURSOR = { place: "hand", handIndex: 0, lastBase: "leftBase" };
 
 // Le curseur après un pas dans `direction` (up, down, left, right), ou null
-// s'il n'y a rien par là.
-export function stepCursor(cursor, direction) {
+// s'il n'y a rien par là. `triangleOnly` : pendant la sélection d'un emplacement
+// pour poser, la main n'existe pas pour le curseur.
+export function stepCursor(cursor, direction, triangleOnly = false) {
   const target = MOVES[cursor.place][direction];
-  if (!target) return null;
-  const place = target === "lastBase" ? cursor.lastBase : target;
+  if (!target || (triangleOnly && target === "hand")) return null;
+  return cursorOn(cursor, target === "lastBase" ? cursor.lastBase : target);
+}
+
+// Où s'ouvre la sélection d'un emplacement pour poser : le premier emplacement
+// vide dans l'ordre des phases (`slots`, base gauche, base droite, pointe), sinon
+// le premier de tous. `triangle` : { slot: occupant ou null }.
+export function placementStart(triangle, slots) {
+  return slots.find((slot) => triangle[slot] === null) ?? slots[0];
+}
+
+// Le curseur posé sur `place`, un emplacement : la dernière base suit.
+export function cursorOn(cursor, place) {
   const lastBase = place === "leftBase" || place === "rightBase" ? place : cursor.lastBase;
   return { ...cursor, place, lastBase };
 }

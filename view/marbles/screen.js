@@ -5,11 +5,19 @@
 // sélection et les étapes de résolution à dire, le temps d'un écran.
 //
 // PRENDRE ET POSER, un seul geste (Entrée) : sur une bille de la main, la
-// sélectionne ; sur un emplacement ensuite, ouvre la confirmation de la pose, qui
-// dit ce qu'elle produirait (prévision, core/marbles-forecast.js).
+// sélectionne et ouvre la SÉLECTION D'EMPLACEMENT : le curseur passe sur le premier
+// emplacement vide (dans l'ordre des phases, base gauche sinon) et ne quitte plus le
+// triangle, la main n'existe plus pour lui. Entrée sur un emplacement ouvre la
+// confirmation de la pose, qui dit ce qu'elle produirait (prévision,
+// core/marbles-forecast.js) ; Échap annule et ramène sur la bille dans la main, où
+// le curseur revient aussi après la pose.
 // Sur un emplacement sans sélection, le prend pour l'échange ; sur un second
 // emplacement ensuite, échange les deux. Refaire Entrée sur la sélection, ou
 // Échap, l'annule.
+//
+// HISTORIQUE (L) : les messages de jeu du tour précédent, dans un menu
+// (view/marbles/history.js, history-screen.js). Tout ce qui se dit par une étape y
+// entre, au moment où l'étape est construite : une séquence passée y est entière.
 //
 // VUE D'ENSEMBLE (R) : la prévision du tour puis chaque emplacement, d'un bloc.
 //
@@ -31,10 +39,10 @@ import { jumpMenuCursor, stepMenuCursor, announceMenuLine } from "../../lib/menu
 import { detailAfterMainMove, detailLine, mainWithDetail, stepDetail } from "../../lib/detail-card.js";
 import { t } from "../../data/i18n/index.js";
 import { MARBLES_SETTINGS } from "../../config/marbles-values.js";
-import { marblesReduce, swapRefusal, placeRefusal } from "../../core/marbles.js";
+import { SLOTS, marblesReduce, swapRefusal, placeRefusal } from "../../core/marbles.js";
 import { playMenuSound } from "../menu-sounds.js";
 import { openConfirmation } from "../menus/confirmation.js";
-import { INITIAL_CURSOR, stepCursor, zoneOf } from "./navigation.js";
+import { INITIAL_CURSOR, cursorOn, placementStart, stepCursor, zoneOf } from "./navigation.js";
 import { marbleCard } from "./card.js";
 import { openPileMenu } from "./pile-screen.js";
 import {
@@ -52,10 +60,11 @@ import {
   marbleName,
   placementLines,
   slotName,
-  withHeldMark,
 } from "./narration.js";
 import { playMarbleEventSounds } from "./sounds.js";
 import { advanceSequence, restartPause, skipSequence, startSequence } from "./sequence.js";
+import { EMPTY_HISTORY, recordSteps } from "./history.js";
+import { openHistoryMenu } from "./history-screen.js";
 
 const MARBLES_BINDINGS = defineBindings("marbles", {
   up: { keys: ["ArrowUp"], mods: [] },
@@ -76,6 +85,7 @@ const MARBLES_BINDINGS = defineBindings("marbles", {
   discardMenu: { keys: ["d"], mods: ["shift"] },
   overview: { keys: ["r"], mods: [] },
   resolve: { keys: ["r"], mods: ["shift"] },
+  history: { keys: ["l"], mods: [] },
 });
 
 export function makeMarblesScreen(getGame, setGame) {
@@ -89,6 +99,8 @@ export function makeMarblesScreen(getGame, setGame) {
   let sequence = null;
   let spoken = "";
   let started = false;
+  // Les messages de jeu du tour en cours et du précédent (view/marbles/history.js).
+  let history = EMPTY_HISTORY;
 
   const isNarrating = () => sequence !== null;
   const isOver = () => getGame().stage === "over" && !isNarrating();
@@ -96,6 +108,13 @@ export function makeMarblesScreen(getGame, setGame) {
   function speak(text) {
     spoken = text;
     announce(text, { assertive: true });
+  }
+
+  // Le seul chemin des messages de jeu : chaque étape construite entre dans
+  // l'historique, qu'elle soit dite d'un coup, en séquence, ou passée.
+  function recorded(steps) {
+    history = recordSteps(history, steps);
+    return steps;
   }
 
   // À la fin de la partie, la dernière phrase dit aussi comment sortir.
@@ -126,11 +145,7 @@ export function makeMarblesScreen(getGame, setGame) {
 
   function focusLine() {
     const game = getGame();
-    if (cursor.place === "hand") {
-      const index = clampedHandIndex();
-      const line = describeHandFocus(game, index, t);
-      return held?.kind === "hand" && held.index === index ? withHeldMark(line, t) : line;
-    }
+    if (cursor.place === "hand") return describeHandFocus(game, clampedHandIndex(), t);
     if (held?.kind === "hand") return describeSlotForPlacement(game, cursor.place, t);
     const line = describeSlotFocus(game, cursor.place, t);
     return held?.kind === "slot" && held.slot === cursor.place ? `${line} ${t("marbles.slot_line.held")}` : line;
@@ -201,7 +216,7 @@ export function makeMarblesScreen(getGame, setGame) {
       announceFocus(boundary);
       return;
     }
-    const next = stepCursor(cursor, direction);
+    const next = stepCursor(cursor, direction, held?.kind === "hand");
     if (next === null) {
       playMenuSound("block");
       announceFocus(true);
@@ -238,21 +253,31 @@ export function makeMarblesScreen(getGame, setGame) {
     announce(detailLine(card, detail), { assertive: true });
   }
 
+  // Annuler une sélection d'emplacement pour poser ramène sur la bille, dans la
+  // main : c'est dit, le curseur ayant changé de zone.
   function releaseSelection() {
+    const fromHand = held?.kind === "hand" ? held.index : null;
     held = null;
     playMenuSound("cancel");
-    announce(t("marbles.take.released"), { assertive: true });
+    if (fromHand === null) {
+      announce(t("marbles.take.released"), { assertive: true });
+      return;
+    }
+    cursor = { ...cursor, place: "hand", handIndex: fromHand };
+    resetDetailAfterMove();
+    announce(`${t("marbles.take.released")} ${t("marbles.zone.hand")} ${currentLine()}`, { assertive: true });
   }
 
-  // Le son d'une pose est celui de la confirmation qui vient de la lancer.
+  // Le son d'une pose est celui de la confirmation qui vient de la lancer. La
+  // sélection d'emplacement finie, le curseur revient dans la main.
   function performPlace(handIndex, slot) {
     const events = dispatch({ type: "place", handIndex, slot });
     if (!events) return;
     held = null;
-    cursor = { ...cursor, handIndex: clampedHandIndex() };
+    cursor = { ...cursor, place: "hand", handIndex: Math.min(handIndex, Math.max(0, getGame().hand.length - 1)) };
     resetDetailAfterMove();
     playMarbleEventSounds(events);
-    speak(stepsText(buildSteps(events, t)));
+    speak(stepsText(recorded(buildSteps(events, t))));
   }
 
   function performSwap(a, b) {
@@ -262,7 +287,7 @@ export function makeMarblesScreen(getGame, setGame) {
     resetDetailAfterMove();
     playMenuSound("select");
     playMarbleEventSounds(events);
-    speak(stepsText(buildSteps(events, t)));
+    speak(stepsText(recorded(buildSteps(events, t))));
   }
 
   function activateHand() {
@@ -272,14 +297,13 @@ export function makeMarblesScreen(getGame, setGame) {
       announceFocus();
       return;
     }
+    // La sélection d'emplacement s'ouvre sur le premier emplacement vide, et le dit.
     const index = clampedHandIndex();
-    if (held?.kind === "hand" && held.index === index) {
-      releaseSelection();
-      return;
-    }
     held = { kind: "hand", index };
+    cursor = cursorOn(cursor, placementStart(game.triangle, SLOTS));
+    resetDetailAfterMove();
     playMenuSound("select");
-    announce(t("marbles.take.hand", { name: marbleName(game.hand[index], t) }), { assertive: true });
+    announce(`${t("marbles.take.hand", { name: marbleName(game.hand[index], t) })} ${focusLine()}`, { assertive: true });
   }
 
   function placeHeldOn(slot) {
@@ -345,9 +369,8 @@ export function makeMarblesScreen(getGame, setGame) {
     held = null;
     cursor = { ...cursor, place: "hand", handIndex: 0 };
     detail = 0;
-    const steps = resolutionSteps(turn, [...resolved, ...drawn], t);
     // La première fois, comment la passer.
-    if (turn === 1) steps[0] = { ...steps[0], text: `${steps[0].text} ${t("marbles.resolution.hint")}` };
+    const steps = recorded(resolutionSteps(turn, [...resolved, ...drawn], t, { hint: turn === 1 }));
     follow(startSequence(steps));
   }
 
@@ -391,6 +414,14 @@ export function makeMarblesScreen(getGame, setGame) {
     openPileMenu("marbles.pile.discard", getGame().discard);
   }
 
+  // L : l'historique du tour précédent. Aussi en fin de partie : celui du dernier
+  // tour. Pas pendant la séquence, qui le remplit.
+  function openHistory() {
+    if (blockedDuringSequence()) return;
+    playMenuSound("select");
+    openHistoryMenu(history.previous);
+  }
+
   function back() {
     if (isOver()) popScreen();
     else if (held) releaseSelection();
@@ -416,6 +447,7 @@ export function makeMarblesScreen(getGame, setGame) {
     discardMenu: openDiscardMenu,
     overview: announceOverview,
     resolve: resolveKey,
+    history: openHistory,
   };
 
   // Première ouverture : la pioche du tour 1. Ensuite (retour d'une
@@ -424,7 +456,7 @@ export function makeMarblesScreen(getGame, setGame) {
     started = true;
     const events = dispatch({ type: "draw" });
     playMarbleEventSounds(events);
-    speak(withOverHint(`${t("marbles.intro")} ${stepsText(buildSteps(events, t))} ${isOver() ? "" : focusLine()}`));
+    speak(withOverHint(`${t("marbles.intro")} ${stepsText(recorded(buildSteps(events, t)))} ${isOver() ? "" : focusLine()}`));
   }
 
   return {
