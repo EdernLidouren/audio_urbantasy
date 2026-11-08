@@ -36,6 +36,7 @@
 import { createInterface } from "node:readline";
 import { installFileFetch } from "../node-fetch.js";
 import { parseCommand } from "./commands.js";
+import MARBLE_TYPES from "../../marbles/types/index.js";
 
 function optionValue(args, name) {
   const index = args.indexOf(name);
@@ -77,13 +78,13 @@ const HELP = [
   "Emplacements : gauche (g, left), droite (d, right), pointe (p, apex).",
 ];
 
-let game = createMarblesGame(seed);
+let game = createMarblesGame(seed, {}, MARBLE_TYPES);
 const journal = [];
 
 // Applique une action et la journalise ; rend ses évènements, ou null si elle
 // est refusée (déjà dit).
 function apply(action) {
-  const result = marblesReduce(game, action);
+  const result = marblesReduce(game, action, MARBLE_TYPES);
   if (!result.ok) {
     console.log(`Refusé : ${t(`marbles.error.${result.error}`)} (${result.error})`);
     return null;
@@ -133,7 +134,7 @@ function printState() {
 // vue d'ensemble du triangle actuel (touche R), sinon la confirmation de la pose
 // envisagée.
 function printForecast(action) {
-  const predicted = forecast(game, action);
+  const predicted = forecast(game, action, MARBLE_TYPES);
   if (!predicted.ok) {
     console.log(`Refusé : ${t(`marbles.error.${predicted.error}`)} (${predicted.error})`);
     return;

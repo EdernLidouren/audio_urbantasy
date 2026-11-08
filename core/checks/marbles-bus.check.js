@@ -7,6 +7,7 @@
 import { throws } from "../../lib/check.js";
 import { MAX_EVENTS_PER_ACTION, MarbleEventLimitError, createEventBus } from "../marbles-bus.js";
 import { createMarblesGame, marbleListeners, marblesReduce } from "../marbles.js";
+import MARBLE_TYPES from "../../marbles/types/index.js";
 
 export default function checkMarblesBus(run) {
   // File : un évènement émis pendant un traitement attend son tour.
@@ -55,13 +56,13 @@ export default function checkMarblesBus(run) {
   run("limite : largement au-dessus d'une action réelle", true, MAX_EVENTS_PER_ACTION >= 100);
 
   // Le réducteur refuse proprement : un code, l'état d'avant, un journal vide.
-  const game = createMarblesGame(3);
-  const refused = marblesReduce(game, { type: "draw" }, undefined, { eventLimit: 3 });
+  const game = createMarblesGame(3, {}, MARBLE_TYPES);
+  const refused = marblesReduce(game, { type: "draw" }, MARBLE_TYPES, { eventLimit: 3 });
   run("réducteur : au-delà de la limite, refus", false, refused.ok);
   run("réducteur : code du refus", "eventLimit", refused.error);
   run("réducteur : état inchangé", game, refused.state);
   run.same("réducteur : journal vide", [], refused.events);
-  run("réducteur : sous la limite, l'action passe", true, marblesReduce(game, { type: "draw" }, undefined, { eventLimit: 6 }).ok);
+  run("réducteur : sous la limite, l'action passe", true, marblesReduce(game, { type: "draw" }, MARBLE_TYPES, { eventLimit: 6 }).ok);
 
   // L'ordre fixe des écouteurs : base gauche, base droite, pointe, puis la main.
   const listening = {

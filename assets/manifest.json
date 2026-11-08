@@ -1013,6 +1013,9 @@
   "assets/sounds/marbles/marble_large_1_beacon": [
     "assets/sounds/marbles/marble_large_1_beacon_1.mp3"
   ],
+  "assets/sounds/marbles/marble_large_collision": [
+    "assets/sounds/marbles/marble_large_collision_1.mp3"
+  ],
   "assets/sounds/marbles/marble_large_drop": [
     "assets/sounds/marbles/marble_large_drop_1.mp3"
   ],
@@ -1022,6 +1025,9 @@
   "assets/sounds/marbles/marble_medium_1_beacon": [
     "assets/sounds/marbles/marble_medium_1_beacon_1.mp3"
   ],
+  "assets/sounds/marbles/marble_medium_collision": [
+    "assets/sounds/marbles/marble_medium_collision_1.mp3"
+  ],
   "assets/sounds/marbles/marble_medium_drop": [
     "assets/sounds/marbles/marble_medium_drop_1.mp3"
   ],
@@ -1030,6 +1036,9 @@
   ],
   "assets/sounds/marbles/marble_small_1_beacon": [
     "assets/sounds/marbles/marble_small_1_beacon_1.mp3"
+  ],
+  "assets/sounds/marbles/marble_small_collision": [
+    "assets/sounds/marbles/marble_small_collision_1.mp3"
   ],
   "assets/sounds/marbles/marble_small_drop": [
     "assets/sounds/marbles/marble_small_drop_1.mp3"

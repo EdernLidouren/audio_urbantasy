@@ -7,7 +7,9 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
 
 | Fichier | Rôle |
 |---|---|
-| `config/marbles-values.js` | Réglages, table des billes, sac de test (donnée pure) |
+| `marbles/types/` | Les billes, une par fichier, et leur registre `index.js` (donnée pure) |
+| `marbles/effects.js` | Les formes courtes des clauses, `speed(n)` et `mass(n)` |
+| `config/marbles-values.js` | Réglages, modèle de fiche, sac de test, sons (donnée pure) |
 | `core/marbles.js` | La simulation : état, réducteur, écouteurs, journal, codes de refus |
 | `core/marbles-effects.js` | Le modèle d'effet : clauses, actions, conditions, effet imprimé |
 | `core/marbles-bus.js` | Le bus d'évènements interne à la simulation |
@@ -64,29 +66,35 @@ bille B, la pose d'une bille A se déroule dans cet ordre, visible au journal :
 
 ## Une bille
 
-Une entrée de `MARBLE_TYPES`, de la donnée validée au chargement
-(`core/marbles.js`/`validateMarbleTypes`). L'en-tête de `config/marbles-values.js` détaille
-les champs :
+Un fichier de `marbles/types/`, de la donnée pure, inscrit dans le registre
+`marbles/types/index.js`, dont l'en-tête détaille les champs. Seul import permis : les
+formes courtes des clauses (`marbles/effects.js`). Par exemple `marbles/types/magnifier.js` :
 
 ```js
-clay: { base: [speed(1)], apex: [speed(4)], hit: [speed(2)], sound: "medium" },
-cats_eye: { base: [speed(3)], baseVariant: { rightBase: [mass(1)] }, apex: [speed(3)], sound: "small" },
-magnifier: {
+export default {
   base: [speed(1)],
+  // En base gauche, renforce la pointe si elle donne de la Vitesse.
   baseVariant: {
     leftBase: [{ ...speed(4), target: "apex", when: { type: "printedStat", slot: "apex", stat: "speed", atLeast: 1 } }],
   },
   apex: [speed(2)],
   sound: "medium",
-},
+};
 ```
+
+Le registre est un **contenu** : le core ne l'importe jamais (CLAUDE.md). Chaque fonction de
+la simulation qui lit une bille le reçoit en paramètre `types`, obligatoire ; la vue, les
+outils et les vérifications, qui ont le droit de l'importer, le lui passent. Il est validé au
+démarrage, avec le sac de test (`core/marbles.js`/`validateMarblesContent`, appelé par
+`main.js` et par l'audit du contenu). L'ordre du registre compte : les sacs aléatoires du
+simulateur y tirent leurs billes.
 
 Les champs d'effet (`base`, `baseVariant`, `apex`, `hit`, `knockout`) sont tous facultatifs :
 absent, aucun effet. `maxWear` vaut 3 par défaut. `sound`, obligatoire, est son profil sonore
 (`small`, `medium` ou `large`, voir « Sons ») : de la présentation, que la simulation accepte
-sans jamais le lire. **Ajouter une bille** : sa ligne dans la table, avec son profil, son nom
-dans chaque langue (vérifié par le domaine `marbles-view`), et sa place dans `STARTING_BAG`
-pour la mettre en jeu. En français, le nom porte sa forme `de` (« d'argile »,
+sans jamais le lire. **Ajouter une bille** : son fichier dans `marbles/types/` avec son
+profil, sa ligne dans `marbles/types/index.js`, son nom dans chaque langue (vérifié par le
+domaine `marbles-view`), et sa place dans `STARTING_BAG` pour la mettre en jeu. En français, le nom porte sa forme `de` (« d'argile »,
 « de calot ») : `{ "base": "argile", "de": "d'argile" }`, pour « Tic d'argile ». Un sac est
 une liste d'ids : les doublons y sont permis.
 

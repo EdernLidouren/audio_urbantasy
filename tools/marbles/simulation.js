@@ -17,10 +17,11 @@
 // Ne change aucune règle ni aucun réglage : les surcharges (`settings`) passent par
 // les options de createMarblesGame, celles d'une partie.
 
-import { MARBLE_TYPES, STARTING_BAG } from "../../config/marbles-values.js";
+import { STARTING_BAG } from "../../config/marbles-values.js";
 import { createMarblesGame, legalActions, marblesReduce } from "../../core/marbles.js";
 import { createSeed, nextRandom } from "../../core/rng.js";
 import { PLAYERS, publicView } from "./players.js";
+import MARBLE_TYPES from "../../marbles/types/index.js";
 
 export const MARBLE_IDS = Object.keys(MARBLE_TYPES);
 export const SETTING_NAMES = ["maxHandSize", "firstTurnDraw", "drawPerTurn", "turnCount"];
@@ -160,7 +161,7 @@ function recordEvents(record, events) {
 export function playGame({ index, seed, player, playerOptions = {}, bagMode, settings = {} }) {
   const bag = bagFor(bagMode, seed, index);
   const gameSeed = deriveSeed(seed, index, "game");
-  let state = createMarblesGame(gameSeed, { ...settings, bag });
+  let state = createMarblesGame(gameSeed, { ...settings, bag }, MARBLE_TYPES);
   const session = PLAYERS[player].startGame({ seed: deriveSeed(seed, index, "player"), options: playerOptions });
   const record = {
     index,
@@ -180,11 +181,11 @@ export function playGame({ index, seed, player, playerOptions = {}, bagMode, set
   for (let count = 0; state.stage !== "over"; count++) {
     if (count >= MAX_ACTIONS_PER_GAME) throw new Error(`simulation : partie ${index} sans fin (joueur ${player}).`);
     let action = state.stage === "draw" ? { type: "draw" } : session.next(publicView(state));
-    let result = marblesReduce(state, action);
+    let result = marblesReduce(state, action, MARBLE_TYPES);
     if (!result.ok) {
       record.refusals.push({ turn: state.turn, action, error: result.error });
       action = legalActions(state).find((legal) => legal.type !== "draw") ?? legalActions(state)[0];
-      result = marblesReduce(state, action);
+      result = marblesReduce(state, action, MARBLE_TYPES);
     }
     recordEvents(record, result.events);
     state = result.state;
@@ -216,7 +217,7 @@ export function normalizeParams(params) {
   }
   validateBagMode(normalized.bagMode);
   // Les surcharges passent par la validation de la simulation elle-même.
-  createMarblesGame(0, { ...normalized.settings, bag: bagFor(normalized.bagMode, normalized.seed, 0) });
+  createMarblesGame(0, { ...normalized.settings, bag: bagFor(normalized.bagMode, normalized.seed, 0) }, MARBLE_TYPES);
   return normalized;
 }
 

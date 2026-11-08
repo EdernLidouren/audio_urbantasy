@@ -1,33 +1,6 @@
-// Jeu des billes : réglages et table des billes. Donnée pure, zéro import ;
-// validée au chargement par core/marbles.js/validateMarbleTypes.
-//
-// Une bille, chaque champ d'effet étant facultatif (absent : aucun effet) :
-//   base        effet joué sur une base ;
-//   baseVariant effet propre à UNE base, { leftBase?, rightBase? }, qui
-//               remplace `base` sur cette base seulement ;
-//   apex        effet joué sur la pointe ;
-//   hit         le Tic : effet joué quand la bille est posée sur un emplacement
-//               occupé, après l'éjection de l'occupante ;
-//   knockout    l'Éjection : effet joué quand la bille est remplacée ;
-//   maxWear     usure maximale, sinon MARBLES_SETTINGS.defaultMaxWear ;
-//   sound       son profil sonore, une clé de MARBLE_SOUND_PROFILES : sa balise
-//               et son bruit de chute. Présentation seulement : la simulation
-//               l'accepte sans jamais le lire ; la vue le valide au chargement
-//               (view/marbles/sounds.js).
-//
-// Un effet est une LISTE DE CLAUSES ; une clause (core/marbles-effects.js) :
-//   action  ce qu'elle fait : "speed" ou "mass", qui ajoutent `amount` (entier,
-//           négatif permis) à la Vitesse ou à la Masse ;
-//   amount  la valeur ;
-//   target  (facultatif) l'emplacement dont elle modifie l'effet de phase, au
-//           lieu d'agir sur le compteur du tour ;
-//   when    (facultatif) sa condition, évaluée au déclenchement. Une condition
-//           lit toujours l'effet IMPRIMÉ d'une bille, jamais un effet déjà
-//           modifié : aucune dépendance circulaire n'est possible.
-//
-// Le nom d'une bille se déduit de son id : `marble.<id>.name`
-// (data/i18n/<langue>/marbles.json), vérifié par les vérifications
-// (domaine marbles-view).
+// Jeu des billes : réglages, modèle de fiche, sac de test, et tout ce que la vue
+// fait entendre. Donnée pure, zéro import. Les billes elles-mêmes sont du contenu,
+// une par fichier : marbles/types/ (champs décrits dans marbles/types/index.js).
 
 export const MARBLES_SETTINGS = {
   firstTurnDraw: 5, // billes piochées au premier tour
@@ -194,37 +167,9 @@ export const MARBLE_CARD_MODEL = {
   emptyBelowKey: "marbles.card.no_special_effect",
 };
 
-// Formes courtes des clauses de la table : elle se lit mieux, et reste de la
-// donnée une fois évaluée.
-const speed = (amount) => ({ action: "speed", amount });
-const mass = (amount) => ({ action: "mass", amount });
-
-export const MARBLE_TYPES = {
-  clay: { base: [speed(1)], apex: [speed(4)], hit: [speed(2)], sound: "medium" },
-  glass: { base: [mass(1)], apex: [speed(2)], sound: "small" },
-  shooter: { apex: [speed(8)], knockout: [speed(3)], sound: "large" },
-  agate: { base: [mass(1)], apex: [mass(2)], hit: [mass(1)], sound: "medium" },
-  cats_eye: { base: [speed(3)], baseVariant: { rightBase: [mass(1)] }, apex: [speed(3)], sound: "small" },
-  porcelain: { base: [speed(2)], apex: [speed(5)], maxWear: 2, sound: "small" },
-  leaded: { base: [mass(2)], apex: [speed(-3)], knockout: [mass(1)], sound: "large" },
-  mica: { base: [speed(1)], apex: [speed(1)], maxWear: 6, sound: "small" },
-  sulphide: { apex: [mass(3)], sound: "large" },
-  stoneware: { base: [speed(2)], sound: "medium" },
-  tiger: { base: [speed(3)], apex: [speed(-1)], maxWear: 4, sound: "medium" },
-  giant: { base: [speed(6)], apex: [speed(6)], maxWear: 1, sound: "large" },
-  // En base gauche, renforce la pointe si elle donne de la Vitesse.
-  magnifier: {
-    base: [speed(1)],
-    baseVariant: {
-      leftBase: [{ ...speed(4), target: "apex", when: { type: "printedStat", slot: "apex", stat: "speed", atLeast: 1 } }],
-    },
-    apex: [speed(2)],
-    sound: "medium",
-  },
-};
-
 // Sac de test : un exemplaire de chaque bille. Une liste d'ids, pas un
-// dérivé de la table : un sac peut porter plusieurs exemplaires d'une bille.
+// dérivé du registre (marbles/types/) : un sac peut porter plusieurs exemplaires
+// d'une bille. Validé au démarrage (core/marbles.js/validateMarblesContent).
 export const STARTING_BAG = [
   "clay",
   "glass",

@@ -8,7 +8,6 @@
 // CONDITIONS, le moteur n'a pas à changer. Une cible est un emplacement, ou
 // rien pour la bille elle-même.
 
-import { MARBLE_TYPES } from "../config/marbles-values.js";
 import { rejectUnknownFields } from "../lib/validate.js";
 
 // Emplacements, dans l'ordre de RÉSOLUTION (phases de base gauche, de base
@@ -20,7 +19,7 @@ export const SLOTS = ["leftBase", "rightBase", "apex"];
 const NO_EFFECT = Object.freeze([]);
 
 // L'effet de PHASE d'une bille à un emplacement, variante de base comprise.
-export function effectAt(marble, slot, types = MARBLE_TYPES) {
+export function effectAt(marble, slot, types) {
   const type = types[marble];
   if (slot === "apex") return type.apex ?? NO_EFFECT;
   return type.baseVariant?.[slot] ?? type.base ?? NO_EFFECT;
@@ -87,7 +86,7 @@ export function validateEffect(effect, describe, fail) {
 // Évalue des clauses sur un triangle, au moment du déclenchement :
 //   self    ce qui va au compteur du tour (ou s'ajoute à l'effet de la bille) ;
 //   gifts   ce qui va à d'autres emplacements, [{ slot, speed, mass }].
-export function evaluateEffect(clauses, triangle, types = MARBLE_TYPES) {
+export function evaluateEffect(clauses, triangle, types) {
   let self = ZERO;
   const gifts = [];
   for (const clause of clauses) {

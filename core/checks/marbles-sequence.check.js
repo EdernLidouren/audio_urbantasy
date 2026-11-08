@@ -23,6 +23,7 @@ import {
 import { EMPTY_HISTORY, recordSteps } from "../../view/marbles/history.js";
 import { historyMenu } from "../../view/marbles/history-screen.js";
 import { throws } from "../../lib/check.js";
+import MARBLE_TYPES from "../../marbles/types/index.js";
 
 // Traduction de test : la clé seule, sans son préfixe, pour lire la FORME d'une
 // séquence sans dépendre des textes.
@@ -59,11 +60,11 @@ function skipAtOnce(steps) {
 // `onTurn({ before, overviewFr, forecastImpact, events, steps, history })` reçoit
 // chaque tour résolu, avec l'historique tenu comme l'écran le tient.
 function playGame(seed, options, present, onTurn = () => {}) {
-  let state = createMarblesGame(seed, options);
+  let state = createMarblesGame(seed, options, MARBLE_TYPES);
   const journal = [];
   let history = EMPTY_HISTORY;
   const apply = (action) => {
-    const result = marblesReduce(state, action);
+    const result = marblesReduce(state, action, MARBLE_TYPES);
     if (!result.ok) return null;
     state = result.state;
     journal.push(...result.events);
@@ -84,7 +85,7 @@ function playGame(seed, options, present, onTurn = () => {}) {
 
     const before = state;
     const overviewFr = describeOverview(state, t);
-    const forecastImpact = forecast(state).impact;
+    const forecastImpact = forecast(state, null, MARBLE_TYPES).impact;
     const resolved = apply({ type: "resolve" });
     const drawn = state.stage === "draw" ? apply({ type: "draw" }) : [];
     const events = [...resolved, ...drawn];
@@ -185,7 +186,7 @@ function checkRealGames(run) {
 
 // Un état de partie fabriqué, en phase de jeu.
 function playState(changes) {
-  return { ...createMarblesGame(1, { bag: [] }), stage: "play", turn: 2, score: 0, hand: ["clay", "glass", "mica"], ...changes };
+  return { ...createMarblesGame(1, { bag: [] }, MARBLE_TYPES), stage: "play", turn: 2, score: 0, hand: ["clay", "glass", "mica"], ...changes };
 }
 
 const EMPTY_TRIANGLE = { leftBase: null, rightBase: null, apex: null };
@@ -225,8 +226,8 @@ function checkTexts(run) {
 
     // La séquence, texte exact.
     const texts = (state) => {
-      const resolved = marblesReduce(state, { type: "resolve" });
-      const drawn = resolved.state.stage === "draw" ? marblesReduce(resolved.state, { type: "draw" }).events : [];
+      const resolved = marblesReduce(state, { type: "resolve" }, MARBLE_TYPES);
+      const drawn = resolved.state.stage === "draw" ? marblesReduce(resolved.state, { type: "draw" }, MARBLE_TYPES).events : [];
       return resolutionSteps(state.turn, [...resolved.events, ...drawn], t).map((step) => said(step.text));
     };
     run.same(
@@ -294,7 +295,7 @@ function checkTexts(run) {
     // reste un message à part pour l'historique ; l'indication du tour 1 se dit
     // sans y entrer.
     const opening = (hint) => {
-      const resolved = marblesReduce(lensed, { type: "resolve" });
+      const resolved = marblesReduce(lensed, { type: "resolve" }, MARBLE_TYPES);
       return resolutionSteps(1, resolved.events, t, { hint })[0];
     };
     run("ouverture : avec la base gauche, d'un seul tenant", "Résolution du tour 1. base gauche, loupe : aucun effet.", said(opening(false).text));
@@ -306,9 +307,9 @@ function checkTexts(run) {
     // début.
     const game = playGame(7, {}, playOut);
     let history = EMPTY_HISTORY;
-    let state = createMarblesGame(7);
+    let state = createMarblesGame(7, {}, MARBLE_TYPES);
     const step = (action) => {
-      const result = marblesReduce(state, action);
+      const result = marblesReduce(state, action, MARBLE_TYPES);
       state = result.state;
       return result.events;
     };

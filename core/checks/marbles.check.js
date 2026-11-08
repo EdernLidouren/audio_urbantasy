@@ -20,13 +20,14 @@ import {
   validateMarbleTypes,
 } from "../marbles.js";
 import { printedStat } from "../marbles-effects.js";
-import { MARBLE_TYPES, STARTING_BAG, MARBLES_SETTINGS } from "../../config/marbles-values.js";
+import { STARTING_BAG, MARBLES_SETTINGS } from "../../config/marbles-values.js";
+import MARBLE_TYPES from "../../marbles/types/index.js";
 
 // Partie en cours de tour : le tour 2 par défaut, sans contrainte de triangle
 // plein. `over` remplace ce que le test veut fixer.
 function playState(over = {}) {
   return {
-    ...createMarblesGame(1, { bag: [] }),
+    ...createMarblesGame(1, { bag: [] }, MARBLE_TYPES),
     turn: 2,
     stage: "play",
     ...over,
@@ -41,7 +42,7 @@ function triangleOf(leftBase, rightBase, apex) {
 
 // Applique une action qui doit passer ; une action refusée est une faute du
 // test, nommée telle quelle plutôt qu'un échec plus loin.
-function apply(state, action, types) {
+function apply(state, action, types = MARBLE_TYPES) {
   const result = marblesReduce(state, action, types);
   if (!result.ok) throw new Error(`action refusée (${result.error}) : ${JSON.stringify(action)}`);
   return result;
@@ -86,29 +87,29 @@ export default function checkMarbles(run) {
 function checkTable(run) {
   run("table : 13 billes", 13, Object.keys(MARBLE_TYPES).length);
   run.same("sac de test : un exemplaire de chaque", Object.keys(MARBLE_TYPES).sort(), [...STARTING_BAG].sort());
-  run("usure par défaut", 3, maxWearOf("clay"));
-  run("usure propre", 6, maxWearOf("mica"));
-  run("usure 1 de la géante", 1, maxWearOf("giant"));
-  run("usure de la loupe", 3, maxWearOf("magnifier"));
+  run("usure par défaut", 3, maxWearOf("clay", MARBLE_TYPES));
+  run("usure propre", 6, maxWearOf("mica", MARBLE_TYPES));
+  run("usure 1 de la géante", 1, maxWearOf("giant", MARBLE_TYPES));
+  run("usure de la loupe", 3, maxWearOf("magnifier", MARBLE_TYPES));
 
   const amount = (clauses) => clauses[0].amount;
-  run("variante : œil-de-chat, base gauche", 3, amount(effectAt("cats_eye", "leftBase")));
-  run("variante : œil-de-chat, base droite", "mass", effectAt("cats_eye", "rightBase")[0].action);
-  run("variante : la base droite n'a pas la Vitesse de base", 0, printedStat(effectAt("cats_eye", "rightBase"), "speed"));
-  run("sans variante : même effet sur les deux bases", effectAt("clay", "leftBase"), effectAt("clay", "rightBase"));
-  run("pointe", 4, amount(effectAt("clay", "apex")));
-  run("effet absent : aucun effet", 0, effectAt("shooter", "leftBase").length);
-  run("effet absent : la même valeur partout", effectAt("shooter", "leftBase"), effectAt("stoneware", "apex"));
+  run("variante : œil-de-chat, base gauche", 3, amount(effectAt("cats_eye", "leftBase", MARBLE_TYPES)));
+  run("variante : œil-de-chat, base droite", "mass", effectAt("cats_eye", "rightBase", MARBLE_TYPES)[0].action);
+  run("variante : la base droite n'a pas la Vitesse de base", 0, printedStat(effectAt("cats_eye", "rightBase", MARBLE_TYPES), "speed"));
+  run("sans variante : même effet sur les deux bases", effectAt("clay", "leftBase", MARBLE_TYPES), effectAt("clay", "rightBase", MARBLE_TYPES));
+  run("pointe", 4, amount(effectAt("clay", "apex", MARBLE_TYPES)));
+  run("effet absent : aucun effet", 0, effectAt("shooter", "leftBase", MARBLE_TYPES).length);
+  run("effet absent : la même valeur partout", effectAt("shooter", "leftBase", MARBLE_TYPES), effectAt("stoneware", "apex", MARBLE_TYPES));
 
   run.same("Tic de l'argile", [{ action: "speed", amount: 2 }], MARBLE_TYPES.clay.hit);
   run.same("Tic de l'agate", [{ action: "mass", amount: 1 }], MARBLE_TYPES.agate.hit);
   run.same("Éjection du calot", [{ action: "speed", amount: 3 }], MARBLE_TYPES.shooter.knockout);
   run.same("Éjection de la plombée", [{ action: "mass", amount: 1 }], MARBLE_TYPES.leaded.knockout);
 
-  run("imprimé : ce que la clause donne", 8, printedStat(effectAt("shooter", "apex"), "speed"));
-  run("imprimé : une autre statistique ne compte pas", 0, printedStat(effectAt("agate", "apex"), "speed"));
-  run("imprimé : négatif", -3, printedStat(effectAt("leaded", "apex"), "speed"));
-  run("imprimé : une clause conditionnelle ne compte pas", 0, printedStat(effectAt("magnifier", "leftBase"), "speed"));
+  run("imprimé : ce que la clause donne", 8, printedStat(effectAt("shooter", "apex", MARBLE_TYPES), "speed"));
+  run("imprimé : une autre statistique ne compte pas", 0, printedStat(effectAt("agate", "apex", MARBLE_TYPES), "speed"));
+  run("imprimé : négatif", -3, printedStat(effectAt("leaded", "apex", MARBLE_TYPES), "speed"));
+  run("imprimé : une clause conditionnelle ne compte pas", 0, printedStat(effectAt("magnifier", "leftBase", MARBLE_TYPES), "speed"));
 
   const refused = (name, table) => run(`table refusée : ${name}`, true, throws(() => validateMarbleTypes(table)));
   const clause = { action: "speed", amount: 1 };
@@ -132,7 +133,7 @@ function checkTable(run) {
 }
 
 function checkSetup(run) {
-  const game = createMarblesGame(42);
+  const game = createMarblesGame(42, {}, MARBLE_TYPES);
   run("mise en place : sac complet", STARTING_BAG.length, game.bag.length);
   run.same("mise en place : sac mélangé, mêmes billes", [...STARTING_BAG].sort(), [...game.bag].sort());
   run("mise en place : sac réellement mélangé", false, game.bag.join() === STARTING_BAG.join());
@@ -147,30 +148,30 @@ function checkSetup(run) {
   run("réglages : main maximale dans l'état", MARBLES_SETTINGS.maxHandSize, game.maxHandSize);
   run("réglages : nombre de tours", MARBLES_SETTINGS.turnCount, game.turnCount);
 
-  run("sac : bille inconnue refusée", true, throws(() => createMarblesGame(1, { bag: ["clay", "nope"] })));
-  run("réglages : première pioche plus petite que le triangle refusée", true, throws(() => createMarblesGame(1, { firstTurnDraw: 2 })));
-  run("réglages : main plus petite que la première pioche refusée", true, throws(() => createMarblesGame(1, { maxHandSize: 4 })));
-  run("réglages : pioche par tour nulle refusée", true, throws(() => createMarblesGame(1, { drawPerTurn: 0 })));
-  const doubles = createMarblesGame(1, { bag: ["clay", "clay", "clay", "glass", "glass", "agate"] });
+  run("sac : bille inconnue refusée", true, throws(() => createMarblesGame(1, { bag: ["clay", "nope"] }, MARBLE_TYPES)));
+  run("réglages : première pioche plus petite que le triangle refusée", true, throws(() => createMarblesGame(1, { firstTurnDraw: 2 }, MARBLE_TYPES)));
+  run("réglages : main plus petite que la première pioche refusée", true, throws(() => createMarblesGame(1, { maxHandSize: 4 }, MARBLE_TYPES)));
+  run("réglages : pioche par tour nulle refusée", true, throws(() => createMarblesGame(1, { drawPerTurn: 0 }, MARBLE_TYPES)));
+  const doubles = createMarblesGame(1, { bag: ["clay", "clay", "clay", "glass", "glass", "agate"] }, MARBLE_TYPES);
   run("sac : doublons acceptés", 3, doubles.bag.filter((id) => id === "clay").length);
 
-  const fresh = createMarblesGame(42);
-  run("action inconnue refusée", "unknownAction", marblesReduce(fresh, { type: "cheat" }).error);
-  run("action sans type refusée", "unknownAction", marblesReduce(fresh, null).error);
+  const fresh = createMarblesGame(42, {}, MARBLE_TYPES);
+  run("action inconnue refusée", "unknownAction", marblesReduce(fresh, { type: "cheat" }, MARBLE_TYPES).error);
+  run("action sans type refusée", "unknownAction", marblesReduce(fresh, null, MARBLE_TYPES).error);
 }
 
 function checkDraw(run) {
-  const game = createMarblesGame(42);
-  run("pioche obligatoire : pas de pose avant", "mustDraw", marblesReduce(game, { type: "place", handIndex: 0, slot: "apex" }).error);
-  run("pioche obligatoire : pas d'échange avant", "mustDraw", marblesReduce(game, { type: "swap", a: "apex", b: "leftBase" }).error);
-  run("pioche obligatoire : pas de résolution avant", "mustDraw", marblesReduce(game, { type: "resolve" }).error);
+  const game = createMarblesGame(42, {}, MARBLE_TYPES);
+  run("pioche obligatoire : pas de pose avant", "mustDraw", marblesReduce(game, { type: "place", handIndex: 0, slot: "apex" }, MARBLE_TYPES).error);
+  run("pioche obligatoire : pas d'échange avant", "mustDraw", marblesReduce(game, { type: "swap", a: "apex", b: "leftBase" }, MARBLE_TYPES).error);
+  run("pioche obligatoire : pas de résolution avant", "mustDraw", marblesReduce(game, { type: "resolve" }, MARBLE_TYPES).error);
 
   const first = apply(game, { type: "draw" });
   run("pioche : 5 billes au premier tour", 5, first.state.hand.length);
   run("pioche : prend le haut du sac, dans l'ordre", game.bag.slice(0, 5).join(), first.state.hand.join());
   run("pioche : sac diminué", 8, first.state.bag.length);
   run.same("pioche : journal", ["turnStarted", "draw", "draw", "draw", "draw", "draw"], eventTypes(first.events));
-  run("pioche : refusée une seconde fois", "alreadyDrawn", marblesReduce(first.state, { type: "draw" }).error);
+  run("pioche : refusée une seconde fois", "alreadyDrawn", marblesReduce(first.state, { type: "draw" }, MARBLE_TYPES).error);
 
   // Tours suivants : une seule bille, ajoutée à ce qui reste en main.
   const later = apply({ ...playState({ hand: ["clay", "glass", "agate"], bag: ["mica", "tiger", "giant"] }), stage: "draw" }, { type: "draw" });
@@ -237,19 +238,19 @@ function checkSwap(run) {
   const moveBack = apply(playState({ triangle: triangleOf(null, null, clay) }), { type: "swap", a: "leftBase", b: "apex" });
   run.same("échange depuis un vide : même déplacement", triangleOf(clay, null, null), moveBack.state.triangle);
 
-  run("échange : une seule fois par tour", "swapAlreadyUsed", marblesReduce(both.state, { type: "swap", a: "leftBase", b: "apex" }).error);
-  run("échange : deux vides refusés", "swapBothEmpty", marblesReduce(playState({ triangle: triangleOf(clay, null, null) }), { type: "swap", a: "rightBase", b: "apex" }).error);
-  run("échange : même emplacement refusé", "swapSameSlot", marblesReduce(playState({ triangle: triangleOf(clay, null, null) }), { type: "swap", a: "leftBase", b: "leftBase" }).error);
-  run("échange : emplacement inconnu refusé", "invalidSlot", marblesReduce(playState(), { type: "swap", a: "leftBase", b: "top" }).error);
+  run("échange : une seule fois par tour", "swapAlreadyUsed", marblesReduce(both.state, { type: "swap", a: "leftBase", b: "apex" }, MARBLE_TYPES).error);
+  run("échange : deux vides refusés", "swapBothEmpty", marblesReduce(playState({ triangle: triangleOf(clay, null, null) }), { type: "swap", a: "rightBase", b: "apex" }, MARBLE_TYPES).error);
+  run("échange : même emplacement refusé", "swapSameSlot", marblesReduce(playState({ triangle: triangleOf(clay, null, null) }), { type: "swap", a: "leftBase", b: "leftBase" }, MARBLE_TYPES).error);
+  run("échange : emplacement inconnu refusé", "invalidSlot", marblesReduce(playState(), { type: "swap", a: "leftBase", b: "top" }, MARBLE_TYPES).error);
 
   // Un refus ne consomme rien : l'état rendu est l'état reçu.
   const state = playState({ triangle: triangleOf(clay, null, null) });
-  run("refus : état inchangé", state, marblesReduce(state, { type: "swap", a: "rightBase", b: "apex" }).state);
-  run.same("refus : journal vide", [], marblesReduce(state, { type: "swap", a: "rightBase", b: "apex" }).events);
+  run("refus : état inchangé", state, marblesReduce(state, { type: "swap", a: "rightBase", b: "apex" }, MARBLE_TYPES).state);
+  run.same("refus : journal vide", [], marblesReduce(state, { type: "swap", a: "rightBase", b: "apex" }, MARBLE_TYPES).events);
 
   // L'ordre du tour : l'échange vient avant la pose.
   const afterPlace = apply(playState({ hand: ["agate"], triangle: triangleOf(clay, null, null) }), { type: "place", handIndex: 0, slot: "apex" });
-  run("échange : refusé après une pose", "swapAfterPlacement", marblesReduce(afterPlace.state, { type: "swap", a: "leftBase", b: "apex" }).error);
+  run("échange : refusé après une pose", "swapAfterPlacement", marblesReduce(afterPlace.state, { type: "swap", a: "leftBase", b: "apex" }, MARBLE_TYPES).error);
   run("swapRefusal : disponible", null, swapRefusal(playState()));
   run("swapRefusal : même code que l'action", "swapAfterPlacement", swapRefusal(afterPlace.state));
 
@@ -286,9 +287,9 @@ function checkPlace(run) {
   const back = apply(playState({ hand: ["clay"], triangle: triangleOf(null, null, null) }), { type: "place", handIndex: 0, slot: "leftBase" });
   run("une bille qui revient repart à usure 0", 0, back.state.triangle.leftBase.wear);
 
-  run("pose : index hors main refusé", "invalidHandIndex", marblesReduce(playState({ hand: ["clay"] }), { type: "place", handIndex: 3, slot: "apex" }).error);
-  run("pose : index non entier refusé", "invalidHandIndex", marblesReduce(playState({ hand: ["clay"] }), { type: "place", handIndex: "0", slot: "apex" }).error);
-  run("pose : emplacement inconnu refusé", "invalidSlot", marblesReduce(playState({ hand: ["clay"] }), { type: "place", handIndex: 0, slot: "top" }).error);
+  run("pose : index hors main refusé", "invalidHandIndex", marblesReduce(playState({ hand: ["clay"] }), { type: "place", handIndex: 3, slot: "apex" }, MARBLE_TYPES).error);
+  run("pose : index non entier refusé", "invalidHandIndex", marblesReduce(playState({ hand: ["clay"] }), { type: "place", handIndex: "0", slot: "apex" }, MARBLE_TYPES).error);
+  run("pose : emplacement inconnu refusé", "invalidSlot", marblesReduce(playState({ hand: ["clay"] }), { type: "place", handIndex: 0, slot: "top" }, MARBLE_TYPES).error);
 
   // Plusieurs poses dans le même tour.
   let many = playState({ hand: ["clay", "glass", "agate"] });
@@ -309,7 +310,7 @@ function checkPlace(run) {
   firstTurn = apply(firstTurn, { type: "place", handIndex: 0, slot: "apex" }).state;
   firstTurn = apply(firstTurn, { type: "place", handIndex: 0, slot: "apex" }).state;
   firstTurn = apply(firstTurn, { type: "place", handIndex: 0, slot: "apex" }).state;
-  run("tour 1 : remplacement sans issue refusé", "placementBlocksTriangle", marblesReduce(firstTurn, { type: "place", handIndex: 0, slot: "apex" }).error);
+  run("tour 1 : remplacement sans issue refusé", "placementBlocksTriangle", marblesReduce(firstTurn, { type: "place", handIndex: 0, slot: "apex" }, MARBLE_TYPES).error);
   run("placeRefusal : même code que l'action", "placementBlocksTriangle", placeRefusal(firstTurn, 0, "apex"));
   run("tour 1 : remplir un vide reste permis", null, placeRefusal(firstTurn, 0, "leftBase"));
   run("placeRefusal : pose permise", null, placeRefusal(playState({ hand: ["clay"] }), 0, "apex"));
@@ -603,13 +604,13 @@ function checkResolution(run) {
   run("planchers : Vitesse remontée de -2 à 2, Masse -4 comptée 1", 2, recovered.state.score);
 
   // Tour 1 : triangle plein exigé ; ensuite, zéro pose permise.
-  const firstTurn = apply(createMarblesGame(7), { type: "draw" }).state;
-  run("tour 1 : résolution refusée, triangle vide", "triangleIncomplete", marblesReduce(firstTurn, { type: "resolve" }).error);
+  const firstTurn = apply(createMarblesGame(7, {}, MARBLE_TYPES), { type: "draw" }).state;
+  run("tour 1 : résolution refusée, triangle vide", "triangleIncomplete", marblesReduce(firstTurn, { type: "resolve" }, MARBLE_TYPES).error);
   let partial = apply(firstTurn, { type: "place", handIndex: 0, slot: "apex" }).state;
   partial = apply(partial, { type: "place", handIndex: 0, slot: "leftBase" }).state;
-  run("tour 1 : résolution refusée, triangle incomplet", "triangleIncomplete", marblesReduce(partial, { type: "resolve" }).error);
+  run("tour 1 : résolution refusée, triangle incomplet", "triangleIncomplete", marblesReduce(partial, { type: "resolve" }, MARBLE_TYPES).error);
   partial = apply(partial, { type: "place", handIndex: 0, slot: "rightBase" }).state;
-  run("tour 1 : résolution permise, triangle plein", true, marblesReduce(partial, { type: "resolve" }).ok);
+  run("tour 1 : résolution permise, triangle plein", true, marblesReduce(partial, { type: "resolve" }, MARBLE_TYPES).ok);
 
   const empty = apply(playState(), { type: "resolve" });
   run("tour 2 : zéro pose et triangle vide, Impact 0", 0, empty.events.find((event) => event.type === "impact").impact);
@@ -629,8 +630,8 @@ function checkEndOfGame(run) {
   run("fin : le tour reste à 9", 9, lastTurn.state.turn);
   run.same("fin : dernier du journal", { type: "gameOver", reason: "turnsCompleted", score: 4 }, lastTurn.events.at(-1));
   run.same("fin : la rotation et la fin du tour ont lieu avant", ["rotation", "turnEnded"], eventTypes(lastTurn.events).slice(-3, -1));
-  run("fin : plus aucune action", "gameOver", marblesReduce(lastTurn.state, { type: "draw" }).error);
-  run("fin : plus de résolution", "gameOver", marblesReduce(lastTurn.state, { type: "resolve" }).error);
+  run("fin : plus aucune action", "gameOver", marblesReduce(lastTurn.state, { type: "draw" }, MARBLE_TYPES).error);
+  run("fin : plus de résolution", "gameOver", marblesReduce(lastTurn.state, { type: "resolve" }, MARBLE_TYPES).error);
   run("fin : plus d'échange", "gameOver", swapRefusal(lastTurn.state));
   run("fin : plus de pose", "gameOver", placeRefusal(lastTurn.state, 0, "apex"));
 
@@ -658,15 +659,15 @@ function checkEndOfGame(run) {
   run("sac régénéré de 3 billes : une bille piochée", 3, exactly.state.hand.length);
 
   // Sac trop petit dès le départ : jamais de partie bloquée au tour 1.
-  const tiny = apply(createMarblesGame(1, { bag: ["clay", "glass"] }), { type: "draw" });
+  const tiny = apply(createMarblesGame(1, { bag: ["clay", "glass"] }, MARBLE_TYPES), { type: "draw" });
   run("sac de 2 billes : partie finie dès la pioche", "bagExhausted", tiny.state.endReason);
-  run("sac de 5 billes : la partie se joue", "play", apply(createMarblesGame(1, { bag: ["clay", "glass", "agate", "mica", "tiger"] }), { type: "draw" }).state.stage);
+  run("sac de 5 billes : la partie se joue", "play", apply(createMarblesGame(1, { bag: ["clay", "glass", "agate", "mica", "tiger"] }, MARBLE_TYPES), { type: "draw" }).state.stage);
 }
 
 // Une partie complète, décisions fixes : toujours la première bille sur les
 // emplacements vides, un échange au tour 3. Rend état et journal.
 function scriptedGame(seed) {
-  let state = createMarblesGame(seed);
+  let state = createMarblesGame(seed, {}, MARBLE_TYPES);
   const journal = [];
   const step = (action) => {
     const result = apply(state, action);
@@ -697,9 +698,9 @@ function checkDeterminism(run) {
   run("graine en chaîne acceptée", true, scriptedGame("billes").state.stage === "over");
 
   // Le réducteur ne touche jamais à l'état reçu.
-  const frozen = deepFreeze(apply(createMarblesGame(5), { type: "draw" }).state);
+  const frozen = deepFreeze(apply(createMarblesGame(5, {}, MARBLE_TYPES), { type: "draw" }).state);
   run("pureté : pose sur un état figé", false, throws(() => apply(frozen, { type: "place", handIndex: 0, slot: "apex" })));
-  run("pureté : résolution sur un état figé", false, throws(() => marblesReduce(deepFreeze(playState({ triangle: triangleOf(placed("clay"), null, placed("giant")) })), { type: "resolve" })));
+  run("pureté : résolution sur un état figé", false, throws(() => marblesReduce(deepFreeze(playState({ triangle: triangleOf(placed("clay"), null, placed("giant")) })), { type: "resolve" }, MARBLE_TYPES)));
   run("pureté : pioche sur un état figé", false, throws(() => apply(deepFreeze({ ...playState({ hand: [], bag: [], discard: ["clay", "glass", "agate", "mica", "tiger"] }), stage: "draw" }), { type: "draw" })));
 }
 
@@ -707,7 +708,7 @@ function checkSerialization(run) {
   // Aller-retour JSON à chaque action : la partie rejouée à travers la
   // sérialisation doit finir exactement comme l'originale.
   const original = scriptedGame(99);
-  let state = createMarblesGame(99);
+  let state = createMarblesGame(99, {}, MARBLE_TYPES);
   const journal = [];
   let findings = [];
   const step = (action) => {
@@ -744,7 +745,7 @@ function createPicker(seed) {
 // fautes d'invariants trouvées et les types d'évènements vus.
 function playRandomGame(seed, options, seenTypes) {
   const pick = createPicker(seed);
-  let state = createMarblesGame(seed, options);
+  let state = createMarblesGame(seed, options, MARBLE_TYPES);
   const total = marbleCount(state);
   const faults = [];
   let score = 0;
@@ -763,7 +764,7 @@ function playRandomGame(seed, options, seenTypes) {
     if (state.turn > state.turnCount) faults.push(`tour hors bornes : ${state.turn}`);
     for (const slot of SLOTS) {
       const placedHere = state.triangle[slot];
-      if (placedHere !== null && placedHere.wear >= maxWearOf(placedHere.marble) && state.stage === "draw") {
+      if (placedHere !== null && placedHere.wear >= maxWearOf(placedHere.marble, MARBLE_TYPES) && state.stage === "draw") {
         faults.push(`bille à usure maximale restée sur le triangle : ${placedHere.marble}`);
       }
       if (placedHere?.bonus !== undefined && state.stage !== "play") faults.push(`bonus resté après la résolution : ${placedHere.marble}`);
@@ -773,20 +774,20 @@ function playRandomGame(seed, options, seenTypes) {
   // Borne large : une partie sans issue la dépasserait, et serait signalée.
   while (state.stage !== "over" && actions < 2000) {
     if (state.stage === "draw") {
-      verify(marblesReduce(state, { type: "draw" }));
+      verify(marblesReduce(state, { type: "draw" }, MARBLE_TYPES));
       continue;
     }
     switch (pick(6)) {
       case 0:
-        verify(marblesReduce(state, { type: "swap", a: SLOTS[pick(3)], b: SLOTS[pick(3)] }));
+        verify(marblesReduce(state, { type: "swap", a: SLOTS[pick(3)], b: SLOTS[pick(3)] }, MARBLE_TYPES));
         break;
       case 1:
       case 2:
       case 3:
-        verify(marblesReduce(state, { type: "place", handIndex: pick(state.maxHandSize), slot: SLOTS[pick(3)] }));
+        verify(marblesReduce(state, { type: "place", handIndex: pick(state.maxHandSize), slot: SLOTS[pick(3)] }, MARBLE_TYPES));
         break;
       default:
-        verify(marblesReduce(state, { type: "resolve" }));
+        verify(marblesReduce(state, { type: "resolve" }, MARBLE_TYPES));
     }
   }
   if (state.stage !== "over") faults.push("partie sans issue");
@@ -841,12 +842,12 @@ function checkLegalActions(run) {
   ];
   // Un échange se liste une fois par paire : (a, b) et (b, a) sont le même.
   const key = (action) => (action.type === "swap" ? `swap:${[action.a, action.b].sort().join("-")}` : JSON.stringify(action));
-  const accepted = (state) => [...new Set(candidates(state).filter((action) => marblesReduce(state, action).ok).map(key))].sort();
+  const accepted = (state) => [...new Set(candidates(state).filter((action) => marblesReduce(state, action, MARBLE_TYPES).ok).map(key))].sort();
   const listed = (state) => legalActions(state).map(key).sort();
 
   const cases = {
-    "pioche à faire": createMarblesGame(1),
-    "premier tour, triangle vide": apply(createMarblesGame(1), { type: "draw" }).state,
+    "pioche à faire": createMarblesGame(1, {}, MARBLE_TYPES),
+    "premier tour, triangle vide": apply(createMarblesGame(1, {}, MARBLE_TYPES), { type: "draw" }).state,
     "tour 2, échange possible": playState({ hand: ["clay", "glass"], triangle: triangleOf(placed("agate"), null, placed("mica")) }),
     "tour 2, échange déjà fait": playState({ hand: ["clay"], swapUsed: true, triangle: triangleOf(placed("agate"), null, null) }),
     "tour 2, triangle vide, main vide": playState({ hand: [] }),
@@ -855,7 +856,7 @@ function checkLegalActions(run) {
   for (const [label, state] of Object.entries(cases)) {
     run.same(`actions légales : ${label}, celles que le réducteur accepte`, accepted(state), listed(state));
   }
-  run.same("actions légales : la pioche seule quand elle est due", [{ type: "draw" }], legalActions(createMarblesGame(1)));
+  run.same("actions légales : la pioche seule quand elle est due", [{ type: "draw" }], legalActions(createMarblesGame(1, {}, MARBLE_TYPES)));
   run.same("actions légales : rien en fin de partie", [], legalActions(cases["partie finie"]));
   run(
     "actions légales : pas de résolution au premier tour sur un triangle vide",

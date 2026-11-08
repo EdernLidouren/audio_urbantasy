@@ -88,6 +88,7 @@ import { EMPTY_SOUND_QUEUE, advanceSoundQueue, enqueueCues } from "./sound-queue
 import { advanceSequence, restartPause, skipSequence, startSequence } from "./sequence.js";
 import { EMPTY_HISTORY, recordSteps } from "./history.js";
 import { openHistoryMenu } from "./history-screen.js";
+import MARBLE_TYPES from "../../marbles/types/index.js";
 
 const MARBLES_BINDINGS = defineBindings("marbles", {
   up: { keys: ["ArrowUp"], mods: [] },
@@ -182,7 +183,7 @@ export function makeMarblesScreen(getGame, setGame) {
   // Passe une action au réducteur : ses évènements, ou null si elle est
   // refusée (déjà dit au joueur).
   function dispatch(action) {
-    const result = marblesReduce(getGame(), action);
+    const result = marblesReduce(getGame(), action, MARBLE_TYPES);
     if (!result.ok) {
       refuse(result.error);
       return null;

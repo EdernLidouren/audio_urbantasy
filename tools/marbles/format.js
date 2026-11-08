@@ -9,6 +9,7 @@
 
 import { SLOTS, maxWearOf } from "../../core/marbles.js";
 import { formatCounter } from "../../view/marbles/narration.js";
+import MARBLE_TYPES from "../../marbles/types/index.js";
 
 const SLOT_NAMES = { leftBase: "base gauche", rightBase: "base droite", apex: "pointe" };
 const CAUSES = { replacement: "remplacement", wear: "usure" };
@@ -32,7 +33,7 @@ function listOf(ids, name) {
 function slotLine(state, slot, name) {
   const placed = state.triangle[slot];
   if (placed === null) return `${slotLabel(slot)} : vide.`;
-  let line = `${slotLabel(slot)} : ${marbleLabel(placed.marble, name)}, usure ${placed.wear} sur ${maxWearOf(placed.marble)}`;
+  let line = `${slotLabel(slot)} : ${marbleLabel(placed.marble, name)}, usure ${placed.wear} sur ${maxWearOf(placed.marble, MARBLE_TYPES)}`;
   if (placed.bonus) line += `, bonus Vitesse ${signed(placed.bonus.speed)} et Masse ${signed(placed.bonus.mass)}`;
   return `${line}.`;
 }

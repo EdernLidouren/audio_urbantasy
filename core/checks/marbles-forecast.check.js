@@ -8,11 +8,12 @@
 import { nextRandom } from "../rng.js";
 import { SLOTS, createMarblesGame, marblesReduce } from "../marbles.js";
 import { forecast, readForecast } from "../marbles-forecast.js";
+import MARBLE_TYPES from "../../marbles/types/index.js";
 
 const placed = (marble, wear = 0) => ({ marble, wear });
 
 function playState(over = {}) {
-  return { ...createMarblesGame(1, { bag: [] }), turn: 2, stage: "play", ...over };
+  return { ...createMarblesGame(1, { bag: [] }, MARBLE_TYPES), turn: 2, stage: "play", ...over };
 }
 
 function deepFreeze(value) {
@@ -32,7 +33,7 @@ export default function checkMarblesForecast(run) {
 function checkCases(run) {
   // Bille active, sur le triangle actuel : bonus reçu annoncé chez elle.
   const triangle = { leftBase: placed("magnifier"), rightBase: placed("glass"), apex: placed("shooter") };
-  const current = forecast(playState({ triangle, hand: ["clay", "agate"] }));
+  const current = forecast(playState({ triangle, hand: ["clay", "agate"] }), null, MARBLE_TYPES);
   run.same("triangle actuel : le calot, bonus compris", { marble: "shooter", speed: 12, mass: 0, given: [] }, current.phases.apex);
   run.same(
     "triangle actuel : la loupe dit ce qu'elle donne",
@@ -43,89 +44,89 @@ function checkCases(run) {
   run("triangle actuel : ni Éjection", null, current.knockout);
   run("triangle actuel : ni Tic", null, current.hit);
   run("triangle actuel : Impact du tour", 24, current.impact);
-  const holes = forecast(playState({ triangle: { leftBase: null, rightBase: null, apex: placed("clay") } }));
+  const holes = forecast(playState({ triangle: { leftBase: null, rightBase: null, apex: placed("clay") } }), null, MARBLE_TYPES);
   run("triangle actuel : emplacement vide", null, holes.phases.leftBase);
 
   // Bille de la main, posée : triangle simulé, Éjection et Tic compris.
   const state = playState({ triangle, hand: ["clay", "agate"] });
-  const replacing = forecast(state, { type: "place", handIndex: 0, slot: "apex" });
+  const replacing = forecast(state, { type: "place", handIndex: 0, slot: "apex" }, MARBLE_TYPES);
   run.same("pose : effet de phase sur le triangle simulé", { marble: "clay", speed: 8, mass: 0, given: [] }, replacing.phases.apex);
   run.same("pose : Éjection de la bille remplacée", { marble: "shooter", speed: 3, mass: 0, given: [] }, replacing.knockout);
   run.same("pose : Tic de la bille posée", { marble: "clay", speed: 2, mass: 0, given: [] }, replacing.hit);
   run("pose : Vitesse totale, Éjection et Tic compris", 13, replacing.speed);
 
-  const noBonus = forecast(state, { type: "place", handIndex: 1, slot: "apex" });
+  const noBonus = forecast(state, { type: "place", handIndex: 1, slot: "apex" }, MARBLE_TYPES);
   run.same("pose : une agate ne reçoit rien de la loupe", { marble: "agate", speed: 0, mass: 2, given: [] }, noBonus.phases.apex);
   run.same("pose : la loupe ne donne plus rien", [], noBonus.phases.leftBase.given);
   run.same("pose : Tic de l'agate", { marble: "agate", speed: 0, mass: 1, given: [] }, noBonus.hit);
 
-  const withLens = forecast(playState({ hand: ["magnifier"], triangle: { leftBase: null, rightBase: null, apex: placed("clay") } }), { type: "place", handIndex: 0, slot: "leftBase" });
+  const withLens = forecast(playState({ hand: ["magnifier"], triangle: { leftBase: null, rightBase: null, apex: placed("clay") } }), { type: "place", handIndex: 0, slot: "leftBase" }, MARBLE_TYPES);
   run("pose sur vide : le bonus s'annonce chez la bille qui le reçoit", 8, withLens.phases.apex.speed);
   run("pose sur vide : ni Éjection", null, withLens.knockout);
   run("pose sur vide : ni Tic", null, withLens.hit);
 
-  const plain = forecast(playState({ hand: ["glass"], triangle: { leftBase: null, rightBase: null, apex: placed("mica") } }), { type: "place", handIndex: 0, slot: "apex" });
+  const plain = forecast(playState({ hand: ["glass"], triangle: { leftBase: null, rightBase: null, apex: placed("mica") } }), { type: "place", handIndex: 0, slot: "apex" }, MARBLE_TYPES);
   run("sans Éjection imprimée : rien à prévoir", null, plain.knockout);
   run("sans Tic imprimé : rien à prévoir", null, plain.hit);
 
   // Échange : le moteur le prend comme le reste, sans Tic ni Éjection.
-  const swapped = forecast(state, { type: "swap", a: "leftBase", b: "rightBase" });
+  const swapped = forecast(state, { type: "swap", a: "leftBase", b: "rightBase" }, MARBLE_TYPES);
   run("échange : la loupe en base droite, Vitesse +1", 1, swapped.phases.rightBase.speed);
   run("échange : plus de bonus sur le calot", 8, swapped.phases.apex.speed);
   run("échange : ni Éjection", null, swapped.knockout);
 
   // Compteurs déjà modifiés : la résolution en part.
-  const counters = forecast(playState({ speed: 5, mass: 2, triangle: { leftBase: null, rightBase: null, apex: placed("clay") } }));
+  const counters = forecast(playState({ speed: 5, mass: 2, triangle: { leftBase: null, rightBase: null, apex: placed("clay") } }), null, MARBLE_TYPES);
   run("compteurs : la prévision en part", 18, counters.impact);
 
   // Tour 1 : le triangle incomplet ne se résout pas encore, mais se prévoit.
-  const firstTurn = apply(createMarblesGame(42), { type: "draw" });
-  const partial = forecast(firstTurn, { type: "place", handIndex: 0, slot: "apex" });
+  const firstTurn = apply(createMarblesGame(42, {}, MARBLE_TYPES), { type: "draw" });
+  const partial = forecast(firstTurn, { type: "place", handIndex: 0, slot: "apex" }, MARBLE_TYPES);
   run("tour 1 : la prévision passe sur un triangle incomplet", true, partial.ok);
-  run("tour 1 : le triangle réel est refusé, lui", "triangleIncomplete", marblesReduce(firstTurn, { type: "resolve" }).error);
+  run("tour 1 : le triangle réel est refusé, lui", "triangleIncomplete", marblesReduce(firstTurn, { type: "resolve" }, MARBLE_TYPES).error);
 }
 
 function apply(state, action) {
-  const result = marblesReduce(state, action);
+  const result = marblesReduce(state, action, MARBLE_TYPES);
   if (!result.ok) throw new Error(`action refusée (${result.error}) : ${JSON.stringify(action)}`);
   return result.state;
 }
 
 function checkGuards(run) {
   // Jamais de modification : ni l'état réel, ni le générateur, ni le sac.
-  const game = apply(createMarblesGame(77), { type: "draw" });
+  const game = apply(createMarblesGame(77, {}, MARBLE_TYPES), { type: "draw" });
   const state = deepFreeze({
     ...game,
     turn: 2,
     triangle: { leftBase: placed("magnifier"), rightBase: placed("giant", 0), apex: placed("shooter", 2) },
   });
   const before = JSON.stringify(state);
-  forecast(state);
-  forecast(state, { type: "place", handIndex: 0, slot: "apex" });
-  forecast(state, { type: "swap", a: "leftBase", b: "apex" });
+  forecast(state, null, MARBLE_TYPES);
+  forecast(state, { type: "place", handIndex: 0, slot: "apex" }, MARBLE_TYPES);
+  forecast(state, { type: "swap", a: "leftBase", b: "apex" }, MARBLE_TYPES);
   run("garde-fou : état réel intact, sur un état figé", before, JSON.stringify(state));
 
   // Rien de caché n'influe : même prévision quel que soit le sac ou le hasard.
   const action = { type: "place", handIndex: 0, slot: "apex" };
-  const reference = forecast(state, action);
-  run.same("garde-fou : le sac n'influe pas", reference, forecast({ ...state, bag: ["giant", "giant"] }, action));
-  run.same("garde-fou : l'état du hasard n'influe pas", reference, forecast({ ...state, rngState: state.rngState + 1 }, action));
-  run.same("garde-fou : la défausse et l'ordre de pioche n'influent pas sur l'avenir", reference, forecast({ ...state, bag: [...state.bag].reverse() }, action));
+  const reference = forecast(state, action, MARBLE_TYPES);
+  run.same("garde-fou : le sac n'influe pas", reference, forecast({ ...state, bag: ["giant", "giant"] }, action, MARBLE_TYPES));
+  run.same("garde-fou : l'état du hasard n'influe pas", reference, forecast({ ...state, rngState: state.rngState + 1 }, action, MARBLE_TYPES));
+  run.same("garde-fou : la défausse et l'ordre de pioche n'influent pas sur l'avenir", reference, forecast({ ...state, bag: [...state.bag].reverse() }, action, MARBLE_TYPES));
 
   // Le réel se joue ensuite exactement comme sans prévision.
-  const untouched = apply(createMarblesGame(77), { type: "draw" });
-  const looked = apply(createMarblesGame(77), { type: "draw" });
-  forecast(looked, { type: "place", handIndex: 0, slot: "apex" });
-  run.same("garde-fou : prévoir ne change rien au réel", marblesReduce(untouched, { type: "place", handIndex: 0, slot: "apex" }), marblesReduce(looked, { type: "place", handIndex: 0, slot: "apex" }));
+  const untouched = apply(createMarblesGame(77, {}, MARBLE_TYPES), { type: "draw" });
+  const looked = apply(createMarblesGame(77, {}, MARBLE_TYPES), { type: "draw" });
+  forecast(looked, { type: "place", handIndex: 0, slot: "apex" }, MARBLE_TYPES);
+  run.same("garde-fou : prévoir ne change rien au réel", marblesReduce(untouched, { type: "place", handIndex: 0, slot: "apex" }, MARBLE_TYPES), marblesReduce(looked, { type: "place", handIndex: 0, slot: "apex" }, MARBLE_TYPES));
 
   // Refus : mêmes codes que le réducteur, jamais de pioche envisagée.
-  const before1 = createMarblesGame(77);
-  run("refus : avant la pioche", "mustDraw", forecast(before1).error);
-  run("refus : une pioche ne s'envisage pas", "unknownAction", forecast(state, { type: "draw" }).error);
-  run("refus : une résolution ne s'envisage pas", "unknownAction", forecast(state, { type: "resolve" }).error);
-  run("refus : pose impossible, code du réducteur", "invalidHandIndex", forecast(state, { type: "place", handIndex: 9, slot: "apex" }).error);
-  run("refus : échange impossible, code du réducteur", "swapSameSlot", forecast(state, { type: "swap", a: "apex", b: "apex" }).error);
-  run("refus : partie finie", "gameOver", forecast({ ...state, stage: "over" }).error);
+  const before1 = createMarblesGame(77, {}, MARBLE_TYPES);
+  run("refus : avant la pioche", "mustDraw", forecast(before1, null, MARBLE_TYPES).error);
+  run("refus : une pioche ne s'envisage pas", "unknownAction", forecast(state, { type: "draw" }, MARBLE_TYPES).error);
+  run("refus : une résolution ne s'envisage pas", "unknownAction", forecast(state, { type: "resolve" }, MARBLE_TYPES).error);
+  run("refus : pose impossible, code du réducteur", "invalidHandIndex", forecast(state, { type: "place", handIndex: 9, slot: "apex" }, MARBLE_TYPES).error);
+  run("refus : échange impossible, code du réducteur", "swapSameSlot", forecast(state, { type: "swap", a: "apex", b: "apex" }, MARBLE_TYPES).error);
+  run("refus : partie finie", "gameOver", forecast({ ...state, stage: "over" }, null, MARBLE_TYPES).error);
 }
 
 // Des billes fictives qui mêlent cibles, conditions et valeurs négatives : ce que
@@ -219,7 +220,7 @@ function checkMatchesReality(run) {
   const tally = { states: 0, actions: 0 };
   const mixedBag = ["plain", "plain", "heavy", "giver", "giver", "lens", "lens", "thief", "thief", "plain"];
   for (let seed = 1; seed <= 60; seed++) {
-    walkGame(seed, undefined, undefined, faults, tally);
+    walkGame(seed, {}, MARBLE_TYPES, faults, tally);
     walkGame(seed + 1000, { bag: mixedBag }, MIXED_TYPES, faults, tally);
   }
   run.same("propriété : la prévision correspond au résultat réel", [], faults.slice(0, 3));

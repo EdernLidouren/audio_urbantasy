@@ -1,6 +1,6 @@
 // Jeu des billes : les SONS de l'écran. Aucune règle ici : ce qui se passe vient
 // du journal (core/marbles.js), ce que chaque bille fait entendre de son profil
-// sonore (champ `sound` de config/marbles-values.js/MARBLE_TYPES, profils dans
+// sonore (champ `sound` de chaque bille, marbles/types/, profils dans
 // MARBLE_SOUND_PROFILES).
 //
 // TROIS FAMILLES :
@@ -47,7 +47,6 @@
 
 import {
   MARBLE_SOUND_PROFILES,
-  MARBLE_TYPES,
   MARBLES_AUDIO,
   MARBLES_ROLLS,
   MARBLES_SETTINGS,
@@ -69,6 +68,7 @@ import {
 import { assetKeyMembers, resolveAsset } from "../../lib/assets.js";
 import { beaconVolumeFactor, interfaceVolumeFactor, musicVolumeFactor } from "../audio/volume-factors.js";
 import { rollAt, rollDurationMs, rollEnvelope } from "./rolls.js";
+import MARBLE_TYPES from "../../marbles/types/index.js";
 
 // --- Validation au chargement ---
 

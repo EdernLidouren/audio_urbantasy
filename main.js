@@ -24,7 +24,7 @@ import { startLoop } from "./lib/loop.js";
 import { loadSceneById } from "./scenes/load.js";
 import registry from "./entities/types/index.js";
 import { createInitialState } from "./core/state.js";
-import { createMarblesGame } from "./core/marbles.js";
+import { createMarblesGame, validateMarblesContent } from "./core/marbles.js";
 import { parseNewGame } from "./core/new-game.js";
 import { validateEntityRegistry } from "./core/entity-parse.js";
 import { NEW_GAME } from "./config/new-game.js";
@@ -34,6 +34,7 @@ import { checkAutoSaveTimer } from "./view/autosave-timer.js";
 import { loadGame } from "./view/save-storage.js";
 import { reportSaveRepairs, reportI18nWarning } from "./view/debug-warnings.js";
 import { announceNewDiscoveries } from "./view/discoveries.js";
+import MARBLE_TYPES from "./marbles/types/index.js";
 
 // Préférences de menu (sliders/toggles + cyclage/étoile/suffixe, voir
 // lib/menu.js) injectées UNE FOIS ici, point de composition unique — tout
@@ -54,6 +55,8 @@ setI18nWarningHandler(reportI18nWarning);
 // arrête le jeu tout de suite, avec son message, plutôt qu'au premier
 // "Nouvelle partie" ou à la première scène qui utilise le type fautif.
 validateEntityRegistry(registry);
+// Les billes : un registre de contenu, que le core reçoit et n'importe jamais.
+validateMarblesContent(MARBLE_TYPES);
 const newGame = parseNewGame(NEW_GAME, registry);
 
 // Un import n'expose rien au scope global : on l'attache explicitement à
@@ -242,7 +245,7 @@ function continueGame() {
 // console de test (window.debugStartMarbles plus bas), sinon tirée au hasard.
 let marblesGame = null;
 function startMarblesGame(seed = createGameSeed()) {
-  marblesGame = createMarblesGame(seed);
+  marblesGame = createMarblesGame(seed, {}, MARBLE_TYPES);
   pushScreen(
     makeMarblesScreen(
       () => marblesGame,

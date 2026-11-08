@@ -17,7 +17,6 @@
 // emplacement vide). Un effet : { marble, speed, mass, given }, le total effectif
 // de la bille, bonus reçu compris.
 
-import { MARBLE_TYPES } from "../config/marbles-values.js";
 import { SLOTS, marblesReduce, runResolution, stageRefusal } from "./marbles.js";
 
 const FORECASTABLE_ACTIONS = ["place", "swap"];
@@ -50,8 +49,8 @@ export function readForecast(actionEvents, resolutionEvents) {
 }
 
 // `action` : la pose ou l'échange envisagé, ou null pour prévoir le triangle
-// actuel.
-export function forecast(state, action = null, types = MARBLE_TYPES) {
+// actuel. `types` : la table des billes (core/marbles.js, en-tête).
+export function forecast(state, action, types) {
   const refusal = stageRefusal(state, "play");
   if (refusal) return failed(refusal);
   if (action !== null && !FORECASTABLE_ACTIONS.includes(action?.type)) return failed("unknownAction");

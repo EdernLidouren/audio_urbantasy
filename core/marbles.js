@@ -23,7 +23,7 @@
 // `turn` passe au tour suivant, sauf si la partie s'arrête : il reste alors
 // sur le dernier tour joué, jamais « 10 sur 9 ».
 //
-// ACTIONS — marblesReduce(state, action) :
+// ACTIONS — marblesReduce(state, action, types) :
 //   { type: "draw" }                            pioche du tour
 //   { type: "swap", a, b }                      échange deux emplacements
 //   { type: "place", handIndex, slot }          pose une bille de la main
@@ -57,11 +57,13 @@
 // [{ slot, marble, speed, mass }]. `speedDelta` et `massDelta` comptent le bonus
 // reçu : c'est le total effectif de la bille, tel qu'il s'annonce.
 //
-// `types` (paramètre des fonctions qui lisent une bille) : la table des billes,
-// par défaut celle du jeu. Injectable pour les vérifications, qui testent ainsi
+// `types` (paramètre OBLIGATOIRE des fonctions qui lisent une bille) : la table
+// des billes, un registre de contenu (marbles/types/index.js) que ce module
+// n'importe jamais (CLAUDE.md) : la vue, les outils et les vérifications le lui
+// passent. Les vérifications y passent aussi des tables fabriquées, qui testent
 // ce qu'aucune bille actuelle ne produit (une Masse négative).
 
-import { MARBLES_SETTINGS, MARBLE_TYPES, STARTING_BAG } from "../config/marbles-values.js";
+import { MARBLES_SETTINGS, STARTING_BAG } from "../config/marbles-values.js";
 import { createSeed, nextRandom } from "./rng.js";
 import { rejectUnknownFields } from "../lib/validate.js";
 import { MarbleEventLimitError, createEventBus } from "./marbles-bus.js";
@@ -89,8 +91,9 @@ export const MARBLE_ERRORS = [
 
 // --- Table des billes ---
 
-// Échoue au chargement sur une table mal formée. Exportée pour vérifier le
-// rejet sur des tables fabriquées ; ce module valide la vraie plus bas.
+// Échoue sur une table mal formée. La vraie est validée au démarrage
+// (validateMarblesContent) ; exportée aussi pour vérifier le rejet sur des tables
+// fabriquées.
 export function validateMarbleTypes(types) {
   const fail = (message) => {
     throw new Error(`marbles : ${message}`);
@@ -130,10 +133,15 @@ function validateGameSettings({ maxHandSize, firstTurnDraw, drawPerTurn, turnCou
   }
 }
 
-validateMarbleTypes(MARBLE_TYPES);
-validateGameSettings({ ...MARBLES_SETTINGS, bag: STARTING_BAG }, MARBLE_TYPES);
+// Le contenu du jeu des billes, au démarrage (main.js, l'audit du contenu) : la
+// table, et les réglages avec le sac de test, qui ne doit citer que des billes
+// connues. Une erreur ici échouerait sinon en pleine partie.
+export function validateMarblesContent(types) {
+  validateMarbleTypes(types);
+  validateGameSettings({ ...MARBLES_SETTINGS, bag: STARTING_BAG }, types);
+}
 
-export function maxWearOf(marble, types = MARBLE_TYPES) {
+export function maxWearOf(marble, types) {
   return types[marble].maxWear ?? MARBLES_SETTINGS.defaultMaxWear;
 }
 
@@ -161,9 +169,9 @@ function shuffled(list, rngState) {
 
 // --- Mise en place ---
 
-// `seed` : nombre ou chaîne (core/rng.js/createSeed). `options` (facultatif) :
+// `seed` : nombre ou chaîne (core/rng.js/createSeed). `options` ({} pour aucune) :
 // bag et les réglages de MARBLES_SETTINGS propres à une partie.
-export function createMarblesGame(seed, options = {}, types = MARBLE_TYPES) {
+export function createMarblesGame(seed, options = {}, types) {
   const {
     bag = STARTING_BAG,
     maxHandSize = MARBLES_SETTINGS.maxHandSize,
@@ -485,7 +493,7 @@ function retireWornMarbles(run) {
 // tour. La vraie, celle de l'action "resolve" comme celle de la prévision
 // (core/marbles-forecast.js), qui la lance aussi sur un triangle du premier tour
 // encore incomplet. Ne pioche jamais et ne touche pas au hasard.
-export function runResolution(state, types = MARBLE_TYPES, { eventLimit } = {}) {
+export function runResolution(state, types, { eventLimit } = {}) {
   return transact(state, types, eventLimit, (run) => {
     resolvePhases(run);
 
@@ -515,7 +523,7 @@ export function runResolution(state, types = MARBLE_TYPES, { eventLimit } = {}) 
 // Le réducteur : pur, ne modifie jamais `state`. Même état + même action =
 // même résultat. `eventLimit` (facultatif) : la limite du bus pour cette action,
 // abaissée par les vérifications.
-export function marblesReduce(state, action, types = MARBLE_TYPES, { eventLimit } = {}) {
+export function marblesReduce(state, action, types, { eventLimit } = {}) {
   let refusal;
   switch (action?.type) {
     case "draw":

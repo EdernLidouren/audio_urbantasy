@@ -73,7 +73,8 @@ import { NEW_GAME } from "../config/new-game.js";
 import { WEATHER_STATES } from "../config/weather-values.js";
 import { PERCEPTION_MUSIC_POOL, PERCEPTION_AMBIENCE_POOL } from "../config/perception.js";
 import { SHOP_CATALOGS, DISPLAY_ARTICLES } from "../config/shop-values.js";
-import { MARBLE_SOUND_PROFILES, MARBLE_TYPES, MARBLES_AUDIO } from "../config/marbles-values.js";
+import { MARBLE_SOUND_PROFILES, MARBLES_AUDIO } from "../config/marbles-values.js";
+import { validateMarblesContent } from "../core/marbles.js";
 import { LOCALE_TABLES } from "../data/i18n/index.js";
 import { configureAssetManifest, hasAsset } from "../lib/assets.js";
 import { bindingTableIds, bindingTable, needsKeyName, keyNameKey } from "../lib/input.js";
@@ -89,6 +90,7 @@ import "../view/menus/inventory/bag-and-equipment.js";
 import "../view/menus/shop-quantity-list.js";
 import "../view/marbles/screen.js";
 import "../view/marbles/pile-screen.js";
+import MARBLE_TYPES from "../marbles/types/index.js";
 
 const KEY_PATTERN = /^[a-z][a-zA-Z0-9_]*(\.[a-zA-Z0-9_]+)+$/;
 
@@ -344,6 +346,13 @@ export async function auditContent() {
   // existe dans le manifeste. Le profil de chaque bille est validé au chargement
   // de view/marbles/sounds.js.
   checkStrings("billes, sons", { profiles: MARBLE_SOUND_PROFILES, audio: MARBLES_AUDIO });
+  // Les billes elles-mêmes (marbles/types/) et le sac de test, comme au démarrage
+  // du jeu.
+  try {
+    validateMarblesContent(MARBLE_TYPES);
+  } catch (error) {
+    report("billes", "marbles/types", "table invalide", error.message);
+  }
 
   // Collections : leurs clés sont DÉDUITES des ids (voir core/collections.js),
   // jamais écrites dans la donnée — on les reconstruit pour les vérifier.

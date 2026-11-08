@@ -10,7 +10,7 @@
 // (`node tools/run-checks.js marbles-view`).
 
 import { LOCALE_TABLES, t, setLocale, getLocale } from "../../data/i18n/index.js";
-import { MARBLE_CARD_MODEL, MARBLE_SOUND_PROFILES, MARBLE_TYPES, MARBLES_SETTINGS } from "../../config/marbles-values.js";
+import { MARBLE_CARD_MODEL, MARBLE_SOUND_PROFILES, MARBLES_SETTINGS } from "../../config/marbles-values.js";
 import { detailLine, stepDetail } from "../../lib/detail-card.js";
 import { createMarblesGame, marblesReduce, MARBLE_ERRORS, SLOTS } from "../marbles.js";
 import {
@@ -51,6 +51,7 @@ import {
 import { pathLength, rollAt, rollDurationMs, rollEnvelope } from "../../view/marbles/rolls.js";
 import { EMPTY_SOUND_QUEUE, advanceSoundQueue, enqueueCues } from "../../view/marbles/sound-queue.js";
 import { throws } from "../../lib/check.js";
+import MARBLE_TYPES from "../../marbles/types/index.js";
 
 // Un gabarit resté brut (accolade, clé non traduite), ou un nombre négatif écrit
 // avec un trait d'union, qu'un lecteur d'écran peut taire.
@@ -67,9 +68,9 @@ function plain(text) {
 // Une partie complète, puis une fin par sac épuisé : tous les types d'évènements.
 function sampleEvents() {
   const events = [];
-  let state = createMarblesGame(11);
+  let state = createMarblesGame(11, {}, MARBLE_TYPES);
   const step = (action) => {
-    const result = marblesReduce(state, action);
+    const result = marblesReduce(state, action, MARBLE_TYPES);
     if (result.ok) {
       state = result.state;
       events.push(...result.events);
@@ -86,14 +87,14 @@ function sampleEvents() {
     step({ type: "resolve" });
   }
   // Une main pleine, pour la pioche sautée.
-  const fullHand = marblesReduce({ ...createMarblesGame(4), stage: "draw", turn: 2, hand: ["clay", "glass", "agate", "mica", "tiger"] }, { type: "draw" });
+  const fullHand = marblesReduce({ ...createMarblesGame(4, {}, MARBLE_TYPES), stage: "draw", turn: 2, hand: ["clay", "glass", "agate", "mica", "tiger"] }, { type: "draw" }, MARBLE_TYPES);
   events.push(...fullHand.events);
-  let small = createMarblesGame(2, { bag: ["clay", "glass"] });
-  const end = marblesReduce(small, { type: "draw" });
+  let small = createMarblesGame(2, { bag: ["clay", "glass"] }, MARBLE_TYPES);
+  const end = marblesReduce(small, { type: "draw" }, MARBLE_TYPES);
   small = end.state;
   events.push(...end.events);
   // Un tour avec des emplacements vides, pour les phases sautées.
-  const skipped = marblesReduce({ ...createMarblesGame(3, { bag: [] }), turn: 2, stage: "play" }, { type: "resolve" });
+  const skipped = marblesReduce({ ...createMarblesGame(3, { bag: [] }, MARBLE_TYPES), turn: 2, stage: "play" }, { type: "resolve" }, MARBLE_TYPES);
   events.push(...skipped.events);
   return { events, state: { ...state, stage: "play" } };
 }
@@ -188,11 +189,11 @@ function checkCards(run) {
 // Une partie à décisions fixes, avec ou sans consultation du sac et de la défausse
 // entre deux actions.
 function playWithLookups(seed, lookup) {
-  let state = createMarblesGame(seed);
+  let state = createMarblesGame(seed, {}, MARBLE_TYPES);
   const journal = [];
   const step = (action) => {
     lookup(state);
-    const result = marblesReduce(state, action);
+    const result = marblesReduce(state, action, MARBLE_TYPES);
     if (result.ok) {
       state = result.state;
       journal.push(...result.events);
@@ -220,9 +221,9 @@ function checkBagOrder(run) {
   try {
     setLocale("fr");
     run.same("sac : alphabétique sur le nom dit", ["agate", "clay", "clay", "giant", "tiger"], bagDisplayOrder(bag, t));
-    const order = (seed) => bagDisplayOrder(createMarblesGame(seed).bag, t).join();
+    const order = (seed) => bagDisplayOrder(createMarblesGame(seed, {}, MARBLE_TYPES).bag, t).join();
     run("sac : même liste quelle que soit la graine", order(1), order(2));
-    run("sac : deux graines, deux vrais ordres de pioche", false, createMarblesGame(1).bag.join() === createMarblesGame(2).bag.join());
+    run("sac : deux graines, deux vrais ordres de pioche", false, createMarblesGame(1, {}, MARBLE_TYPES).bag.join() === createMarblesGame(2, {}, MARBLE_TYPES).bag.join());
   } finally {
     setLocale(previousLocale);
   }
@@ -244,9 +245,9 @@ function checkBagOrder(run) {
   run("sac : la partie comparée pioche bien", true, plainGame.journal.some((event) => event.type === "draw"));
 
   // La défausse : l'ordre d'arrivée, celui que tient l'état.
-  let state = { ...createMarblesGame(1, { bag: [] }), turn: 2, stage: "play", hand: ["clay", "glass", "agate"] };
+  let state = { ...createMarblesGame(1, { bag: [] }, MARBLE_TYPES), turn: 2, stage: "play", hand: ["clay", "glass", "agate"] };
   state = { ...state, triangle: { leftBase: { marble: "mica", wear: 0 }, rightBase: { marble: "tiger", wear: 0 }, apex: { marble: "giant", wear: 0 } } };
-  for (const slot of ["apex", "leftBase", "rightBase"]) state = marblesReduce(state, { type: "place", handIndex: 0, slot }).state;
+  for (const slot of ["apex", "leftBase", "rightBase"]) state = marblesReduce(state, { type: "place", handIndex: 0, slot }, MARBLE_TYPES).state;
   run.same("défausse : de la plus ancienne à la plus récente", ["giant", "mica", "tiger"], state.discard);
 }
 
@@ -535,8 +536,8 @@ export default function checkMarblesView(run) {
 
   // Le découpage en étapes : tous les évènements, chacun une fois, dans l'ordre.
   run.same("étapes : aucun évènement perdu", events, buildSteps(events, (key) => key).flatMap((step) => step.events));
-  const turn = createMarblesGame(4);
-  const drawn = marblesReduce(turn, { type: "draw" });
+  const turn = createMarblesGame(4, {}, MARBLE_TYPES);
+  const drawn = marblesReduce(turn, { type: "draw" }, MARBLE_TYPES);
   run.same(
     "étapes : la pioche, puis le début de tour",
     ["marbles.event.draw", "marbles.event.turn_started"],
@@ -697,13 +698,13 @@ export default function checkMarblesView(run) {
     );
 
     // Ce qui se dit d'une pose et d'une résolution réelles.
-    const placing = marblesReduce(lensed, { type: "place", handIndex: 0, slot: "apex" });
+    const placing = marblesReduce(lensed, { type: "place", handIndex: 0, slot: "apex" }, MARBLE_TYPES);
     run(
       "texte : pose sur occupé",
       "Éjection de calot : Vitesse +3. Vitesse 3, Masse 1. Défausse : calot. Pose : argile en pointe. Tic d'argile : Vitesse +2. Vitesse 5, Masse 1.",
       said(stepsText(buildSteps(placing.events, t)))
     );
-    const lensedSteps = buildSteps(marblesReduce(lensed, { type: "resolve" }).events, t).map((step) => said(step.text));
+    const lensedSteps = buildSteps(marblesReduce(lensed, { type: "resolve" }, MARBLE_TYPES).events, t).map((step) => said(step.text));
     run("texte : la loupe ne produit rien elle-même", "base gauche, loupe : aucun effet.", lensedSteps[0]);
     run("texte : le bonus s'entend chez qui le reçoit", "pointe, calot : Vitesse +12.", lensedSteps[2]);
     run.same("étapes : aucune étape silencieuse", [], buildSteps(events, t).filter((step) => step.text === ""));

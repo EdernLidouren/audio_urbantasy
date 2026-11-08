@@ -7,10 +7,11 @@
 // son gabarit, qui reçoit {effect}. `variantLabelKey` (facultatif) : l'effet peut
 // différer selon la base, et ce gabarit reçoit alors {left} et {right}.
 
-import { MARBLE_CARD_MODEL, MARBLE_TYPES } from "../../config/marbles-values.js";
+import { MARBLE_CARD_MODEL } from "../../config/marbles-values.js";
 import { effectAt } from "../../core/marbles-effects.js";
 import { assembleCard, validateCardModel } from "../../lib/detail-card.js";
 import { describePrinted } from "./narration.js";
+import MARBLE_TYPES from "../../marbles/types/index.js";
 
 validateCardModel(MARBLE_CARD_MODEL);
 
