@@ -21,9 +21,10 @@
 // emplacement inconnu, usure hors bornes) lève une erreur claire : jamais d'état
 // silencieusement faux.
 
-import { SLOTS, createMarblesGame, marblesReduce, maxWearOf } from "../../core/marbles.js";
+import { SLOTS } from "../../core/marbles.js";
 import { rejectUnknownFields } from "../../lib/validate.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
+import { GAME_RULES } from "./game-rules.js";
 
 const FIELDS = ["seed", "turn", "stage", "score", "speed", "mass", "swapUsed", "hasPlaced", "triangle", "hand", "bag", "discard", "settings"];
 const SETTINGS = ["maxHandSize", "firstTurnDraw", "drawPerTurn", "turnCount"];
@@ -50,8 +51,8 @@ function slotContent(value, slot) {
   checkMarble(placed.marble, slot);
   const wear = placed.wear ?? 0;
   // Une bille à son usure maximale a déjà quitté le triangle à la résolution.
-  if (!Number.isInteger(wear) || wear < 0 || wear >= maxWearOf(placed.marble, MARBLE_TYPES)) {
-    fail(`usure ${placed.wear} impossible pour ${placed.marble} en ${slot} (0 à ${maxWearOf(placed.marble, MARBLE_TYPES) - 1}).`);
+  if (!Number.isInteger(wear) || wear < 0 || wear >= GAME_RULES.maxWearOf(placed.marble)) {
+    fail(`usure ${placed.wear} impossible pour ${placed.marble} en ${slot} (0 à ${GAME_RULES.maxWearOf(placed.marble) - 1}).`);
   }
   return placed.bonus ? { marble: placed.marble, wear, bonus: { speed: 0, mass: 0, ...placed.bonus } } : { marble: placed.marble, wear };
 }
@@ -70,7 +71,7 @@ export function buildState(description = {}) {
 
   // La partie de départ porte les réglages validés et l'état du hasard ; le sac
   // est ensuite posé tel quel, sans mélange, dans l'ordre décrit.
-  const base = createMarblesGame(description.seed ?? 0, { ...settings, bag: [] }, MARBLE_TYPES);
+  const base = GAME_RULES.createGame(description.seed ?? 0, { ...settings, bag: [] });
   const stage = description.stage ?? "play";
   if (!STAGES.includes(stage)) fail(`étape inconnue "${stage}".`);
   const turn = checkInteger(description.turn ?? 2, "turn", 1);
@@ -102,7 +103,7 @@ export function applyActions(state, actions) {
   const steps = [];
   let current = state;
   for (const action of actions) {
-    const result = marblesReduce(current, action, MARBLE_TYPES);
+    const result = GAME_RULES.reduce(current, action);
     steps.push({ action, ok: result.ok, error: result.error, events: result.events });
     current = result.state;
   }

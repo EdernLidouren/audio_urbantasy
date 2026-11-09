@@ -4,11 +4,10 @@
 // terminal (tools/marbles/play.js) disent exactement les mêmes phrases.
 
 import { nameRef } from "../../data/i18n/index.js";
-import { SLOTS, effectAt, maxWearOf } from "../../core/marbles.js";
+import { SLOTS } from "../../core/marbles.js";
 import { CLAUSE_ACTIONS } from "../../core/marbles-effects.js";
 import { forecast } from "../../core/marbles-forecast.js";
 import { formatMenuPosition } from "../../lib/menu.js";
-import MARBLE_TYPES from "../../marbles/types/index.js";
 
 export function marbleName(marble, t) {
   return t(`marble.${marble}.name`);
@@ -80,48 +79,48 @@ export function describePrinted(clauses, t) {
 // L'annonce principale d'une bille hors du triangle (main, sac, défausse) : son
 // nom, son usure maximale, puis « x sur y ». Le détail est dans sa fiche
 // (view/marbles/card.js).
-export function describeMarbleInList(marble, index, total, t) {
-  const line = t("marbles.list.line", { name: marbleName(marble, t), maxWear: maxWearOf(marble, MARBLE_TYPES) });
+export function describeMarbleInList(marble, index, total, rules, t) {
+  const line = t("marbles.list.line", { name: marbleName(marble, t), maxWear: rules.maxWearOf(marble) });
   const position = formatMenuPosition(index, total, t);
   return position ? `${line}. ${position}` : `${line}.`;
 }
 
 // Une place de la main sous le curseur. Main vide : le dit.
-export function describeHandFocus(game, index, t) {
+export function describeHandFocus(game, index, rules, t) {
   if (game.hand.length === 0) return t("marbles.hand.empty");
-  return describeMarbleInList(game.hand[index], index, game.hand.length, t);
+  return describeMarbleInList(game.hand[index], index, game.hand.length, rules, t);
 }
 
 // L'effet de phase de ce tour d'une bille active : la prévision si le tour se
 // joue, sinon ce qu'elle a d'imprimé.
-function phaseText(game, slot, t) {
-  const predicted = forecast(game, null, MARBLE_TYPES);
+function phaseText(game, slot, rules, t) {
+  const predicted = rules.forecast(game);
   if (predicted.ok) return describeEffect(predicted.phases[slot], t);
-  return describePrinted(effectAt(game.triangle[slot].marble, slot, MARBLE_TYPES), t);
+  return describePrinted(rules.effectAt(game.triangle[slot].marble, slot), t);
 }
 
 // L'annonce principale d'un emplacement sous le curseur : la bille, sa place et
 // son usure, ou « vide ». Le détail est dans sa fiche.
-export function describeSlotFocus(game, slot, t) {
+export function describeSlotFocus(game, slot, rules, t) {
   const placed = game.triangle[slot];
   if (placed === null) return t("marbles.slot_line.empty", { slot: slotName(slot, t) });
   return t("marbles.slot_line.occupied", {
     slot: slotName(slot, t),
     name: marbleName(placed.marble, t),
     wear: placed.wear,
-    maxWear: maxWearOf(placed.marble, MARBLE_TYPES),
+    maxWear: rules.maxWearOf(placed.marble),
   });
 }
 
 // Un emplacement sous le curseur pendant qu'on cherche où poser : ce qui compte
 // pour décider, la bille déjà là et ce qu'elle ferait ce tour.
-export function describeSlotForPlacement(game, slot, t) {
+export function describeSlotForPlacement(game, slot, rules, t) {
   const placed = game.triangle[slot];
   if (placed === null) return t("marbles.slot_line.placing_empty", { slot: slotName(slot, t) });
   return t("marbles.slot_line.placing_occupied", {
     slot: slotName(slot, t),
     name: marbleName(placed.marble, t),
-    effect: phaseText(game, slot, t),
+    effect: phaseText(game, slot, rules, t),
   });
 }
 
@@ -132,9 +131,9 @@ export function describeSlotForPlacement(game, slot, t) {
 // reçoit) ; puis, sur un emplacement occupé, Éjection et Tic dans l'ordre réel des
 // évènements, toujours présentes : le menu garde la même structure. La pose doit être
 // permise (placeRefusal).
-export function placementLines(game, handIndex, slot, t) {
+export function placementLines(game, handIndex, slot, rules, t) {
   const marble = game.hand[handIndex];
-  const predicted = forecast(game, { type: "place", handIndex, slot }, MARBLE_TYPES);
+  const predicted = rules.forecast(game, { type: "place", handIndex, slot });
   const lines = [
     { key: "marbles.place.question", params: { marble: marbleName(marble, t), slot: slotName(slot, t) } },
     { key: "marbles.place.values", params: { effect: combined(statParts(predicted.phases[slot], t), t) } },
@@ -202,8 +201,8 @@ function outcomeLine(slot, outcome, t) {
 // Masse comprenant ce que le tour a déjà gagné (Tic, Éjection), l'Impact avec ses
 // planchers ; puis chaque emplacement dans l'ordre des phases. Le triangle actuel,
 // sans action envisagée. null hors de la phase de jeu, où rien ne se prévoit.
-export function describeOverview(game, t) {
-  const predicted = forecast(game, null, MARBLE_TYPES);
+export function describeOverview(game, rules, t) {
+  const predicted = rules.forecast(game);
   if (!predicted.ok) return null;
   const summary = t("marbles.overview.summary", {
     speed: formatCounter(predicted.speed),

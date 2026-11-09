@@ -15,10 +15,10 @@
 // l'action suivante pour la vue reçue (jamais une pioche : le simulateur s'en
 // charge). Ajouter un joueur : une entrée de plus ici, sans toucher au simulateur.
 
-import { SLOTS, legalActions, marblesReduce } from "../../core/marbles.js";
+import { SLOTS, legalActions } from "../../core/marbles.js";
 import { forecast } from "../../core/marbles-forecast.js";
 import { createSeed, nextRandom } from "../../core/rng.js";
-import MARBLE_TYPES from "../../marbles/types/index.js";
+import { GAME_RULES } from "./game-rules.js";
 
 // La vue publique d'un état : une copie, sac vidé et hasard retiré.
 export function publicView(state) {
@@ -75,7 +75,7 @@ function placementSequences(state, { maxPlacements, allowReplacement }) {
     for (const marble of distinct(current.hand)) {
       for (const slot of slots) {
         const choice = { type: "place", marble, slot };
-        const result = marblesReduce(current, toAction(choice, current), MARBLE_TYPES);
+        const result = GAME_RULES.reduce(current, toAction(choice, current));
         if (result.ok) walk(result.state, [...choices, choice]);
       }
     }
@@ -94,9 +94,9 @@ export function bestPlan(view, { maxPlacements = 1, allowReplacement = true } = 
   let best = null;
   let evaluated = 0;
   for (const swap of swaps) {
-    const start = swap === null ? view : marblesReduce(view, swap, MARBLE_TYPES).state;
+    const start = swap === null ? view : GAME_RULES.reduce(view, swap).state;
     for (const { choices, state } of placementSequences(start, { maxPlacements, allowReplacement })) {
-      const predicted = forecast(state, null, MARBLE_TYPES);
+      const predicted = GAME_RULES.forecast(state);
       evaluated += 1;
       if (!predicted.ok) continue;
       if (best === null || predicted.impact > best.impact) {

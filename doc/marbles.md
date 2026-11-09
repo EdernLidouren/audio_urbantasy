@@ -10,6 +10,7 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
 | `marbles/types/` | Les billes, une par fichier, et leur registre `index.js` (donnée pure) |
 | `marbles/effects.js` | Les formes courtes des clauses, `speed(n)` et `mass(n)` |
 | `config/marbles-values.js` | Réglages, modèle de fiche, sac de test, sons (donnée pure) |
+| `core/marbles-rules.js` | Les règles liées à une table de billes : le point d'entrée de la simulation hors du core |
 | `core/marbles.js` | La simulation : état, réducteur, écouteurs, journal, codes de refus |
 | `core/marbles-effects.js` | Le modèle d'effet : clauses, actions, conditions, effet imprimé |
 | `core/marbles-bus.js` | Le bus d'évènements interne à la simulation |
@@ -83,12 +84,34 @@ export default {
 };
 ```
 
-Le registre est un **contenu** : le core ne l'importe jamais (CLAUDE.md). Chaque fonction de
-la simulation qui lit une bille le reçoit en paramètre `types`, obligatoire ; la vue, les
-outils et les vérifications, qui ont le droit de l'importer, le lui passent. Il est validé au
-démarrage, avec le sac de test (`core/marbles.js`/`validateMarblesContent`, appelé par
-`main.js` et par l'audit du contenu). L'ordre du registre compte : les sacs aléatoires du
-simulateur y tirent leurs billes.
+Le registre est un **contenu** : le core ne l'importe jamais (CLAUDE.md). On le lie UNE fois
+aux règles du jeu, puis on joue avec elles :
+
+```js
+const marbles = createMarblesRules(MARBLE_TYPES); // core/marbles-rules.js
+let game = marbles.createGame(seed);
+const { ok, state, events } = marbles.reduce(game, { type: "draw" });
+marbles.forecast(state);
+```
+
+Les règles valident la table à la composition et exposent ce qui lit une bille :
+`createGame`, `reduce`, `forecast`, `maxWearOf`, `effectAt`, et la table elle-même
+(`types`). Ce qui ne lit aucune bille (`legalActions`, les refus, `SLOTS`…) s'importe
+directement de `core/marbles.js`. Les fonctions du core qui prennent `types` restent sa
+plomberie interne.
+
+- **Le jeu** compose ses règles dans `main.js`, qui les passe à l'écran des billes ; l'écran
+  les passe à la narration, aux fiches et aux menus des piles, comme il leur passe `t`.
+- **La boîte à outils** a son point de composition, `tools/marbles/game-rules.js`.
+- **Les vérifications** créent les leurs, avec la vraie table ou une table fabriquée ; une
+  table fabriquée ne retombe jamais en silence sur celle du jeu.
+- **Les sons** lisent la taille et le profil sonore d'une bille directement dans le
+  registre : des champs de présentation, que la simulation ne lit jamais.
+
+Le registre et le sac de test sont validés ensemble au démarrage
+(`core/marbles.js`/`validateMarblesContent`, appelé par `main.js` et par l'audit du
+contenu). L'ordre du registre compte : les sacs aléatoires du simulateur y tirent leurs
+billes.
 
 Les champs d'effet (`base`, `baseVariant`, `apex`, `hit`, `knockout`) sont tous facultatifs :
 absent, aucun effet. `maxWear` vaut 3 par défaut. Deux champs obligatoires, de la
@@ -134,7 +157,7 @@ ligne dans `core/marbles.js`/`EVENT_TRIGGERS`.
 
 ## Simulation
 
-`marblesReduce(state, action)` est pur et rend toujours `{ ok, state, events, error }`.
+Le réducteur, `reduce(state, action)` des règles (`core/marbles.js`/`marblesReduce` derrière), est pur et rend toujours `{ ok, state, events, error }`.
 L'en-tête de `core/marbles.js` décrit l'état, les actions et chaque évènement du journal.
 Une action interdite ne lève jamais : `ok` est faux, l'état inchangé, et `error` est un
 code de `MARBLE_ERRORS`, dont le texte est `marbles.error.<code>`.
@@ -163,7 +186,7 @@ et l'Éjection. Les autres passent au journal, prêts à servir.
 
 ### La prévision
 
-`forecast(state, action)` dit ce qu'une action produirait, sans écrire de règle : il copie
+La prévision, `forecast(state, action)` des règles (`core/marbles-forecast.js`), dit ce qu'une action produirait, sans écrire de règle : il copie
 l'état, applique l'action sur la copie (ou rien, pour le triangle actuel), lance la vraie
 résolution (`runResolution`) et lit le journal. Elle ne peut donc pas diverger du moteur :
 la vérification `marbles-forecast` le contrôle sur des centaines d'états aléatoires.

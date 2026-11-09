@@ -24,6 +24,10 @@ import { EMPTY_HISTORY, recordSteps } from "../../view/marbles/history.js";
 import { historyMenu } from "../../view/marbles/history-screen.js";
 import { throws } from "../../lib/check.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
+import { createMarblesRules } from "../marbles-rules.js";
+
+// Les règles du jeu, liées à la vraie table (core/marbles-rules.js).
+const rules = createMarblesRules(MARBLE_TYPES);
 
 // Traduction de test : la clé seule, sans son préfixe, pour lire la FORME d'une
 // séquence sans dépendre des textes.
@@ -60,11 +64,11 @@ function skipAtOnce(steps) {
 // `onTurn({ before, overviewFr, forecastImpact, events, steps, history })` reçoit
 // chaque tour résolu, avec l'historique tenu comme l'écran le tient.
 function playGame(seed, options, present, onTurn = () => {}) {
-  let state = createMarblesGame(seed, options, MARBLE_TYPES);
+  let state = rules.createGame(seed, options);
   const journal = [];
   let history = EMPTY_HISTORY;
   const apply = (action) => {
-    const result = marblesReduce(state, action, MARBLE_TYPES);
+    const result = rules.reduce(state, action);
     if (!result.ok) return null;
     state = result.state;
     journal.push(...result.events);
@@ -84,8 +88,8 @@ function playGame(seed, options, present, onTurn = () => {}) {
     for (const slot of slots) if (placeRefusal(state, 0, slot) === null) record(buildSteps(apply({ type: "place", handIndex: 0, slot }), t));
 
     const before = state;
-    const overviewFr = describeOverview(state, t);
-    const forecastImpact = forecast(state, null, MARBLE_TYPES).impact;
+    const overviewFr = describeOverview(state, rules, t);
+    const forecastImpact = rules.forecast(state).impact;
     const resolved = apply({ type: "resolve" });
     const drawn = state.stage === "draw" ? apply({ type: "draw" }) : [];
     const events = [...resolved, ...drawn];
@@ -186,7 +190,7 @@ function checkRealGames(run) {
 
 // Un état de partie fabriqué, en phase de jeu.
 function playState(changes) {
-  return { ...createMarblesGame(1, { bag: [] }, MARBLE_TYPES), stage: "play", turn: 2, score: 0, hand: ["clay", "glass", "mica"], ...changes };
+  return { ...rules.createGame(1, { bag: [] }), stage: "play", turn: 2, score: 0, hand: ["clay", "glass", "mica"], ...changes };
 }
 
 const EMPTY_TRIANGLE = { leftBase: null, rightBase: null, apex: null };
@@ -205,29 +209,29 @@ function checkTexts(run) {
     run(
       "R : vide, aucun effet, bonus chez qui le reçoit",
       "Prévision : Vitesse 12, Masse 1, Impact 12. base gauche, loupe : aucun effet. base droite, vide. pointe, calot : Vitesse +12.",
-      said(describeOverview(lensed, t))
+      said(describeOverview(lensed, rules, t))
     );
     run(
       "R : les gains du tour déjà comptés",
       "Prévision : Vitesse 15, Masse 2, Impact 30. base gauche, loupe : aucun effet. base droite, vide. pointe, calot : Vitesse +12.",
-      said(describeOverview({ ...lensed, speed: 3, mass: 2 }, t))
+      said(describeOverview({ ...lensed, speed: 3, mass: 2 }, rules, t))
     );
     run(
       "R : valeurs négatives, planchers de l'Impact",
       "Prévision : Vitesse −3, Masse 2, Impact 0. base gauche, vide. base droite, œil-de-chat : Masse +1. pointe, plombée : Vitesse −3.",
-      said(describeOverview(playState({ triangle: { ...EMPTY_TRIANGLE, rightBase: { marble: "cats_eye", wear: 0 }, apex: { marble: "leaded", wear: 0 } } }), t))
+      said(describeOverview(playState({ triangle: { ...EMPTY_TRIANGLE, rightBase: { marble: "cats_eye", wear: 0 }, apex: { marble: "leaded", wear: 0 } } }), rules, t))
     );
     run(
       "R : Vitesse et Masse de deux billes",
       "Prévision : Vitesse 3, Masse 3, Impact 9. base gauche, œil-de-chat : Vitesse +3. base droite, vide. pointe, agate : Masse +2.",
-      said(describeOverview(playState({ triangle: { ...EMPTY_TRIANGLE, leftBase: { marble: "cats_eye", wear: 0 }, apex: { marble: "agate", wear: 0 } } }), t))
+      said(describeOverview(playState({ triangle: { ...EMPTY_TRIANGLE, leftBase: { marble: "cats_eye", wear: 0 }, apex: { marble: "agate", wear: 0 } } }), rules, t))
     );
-    run("R : rien à prévoir, partie finie", null, describeOverview({ ...lensed, stage: "over" }, t));
+    run("R : rien à prévoir, partie finie", null, describeOverview({ ...lensed, stage: "over" }, rules, t));
 
     // La séquence, texte exact.
     const texts = (state) => {
-      const resolved = marblesReduce(state, { type: "resolve" }, MARBLE_TYPES);
-      const drawn = resolved.state.stage === "draw" ? marblesReduce(resolved.state, { type: "draw" }, MARBLE_TYPES).events : [];
+      const resolved = rules.reduce(state, { type: "resolve" });
+      const drawn = resolved.state.stage === "draw" ? rules.reduce(resolved.state, { type: "draw" }).events : [];
       return resolutionSteps(state.turn, [...resolved.events, ...drawn], t).map((step) => said(step.text));
     };
     run.same(
@@ -295,7 +299,7 @@ function checkTexts(run) {
     // reste un message à part pour l'historique ; l'indication du tour 1 se dit
     // sans y entrer.
     const opening = (hint) => {
-      const resolved = marblesReduce(lensed, { type: "resolve" }, MARBLE_TYPES);
+      const resolved = rules.reduce(lensed, { type: "resolve" });
       return resolutionSteps(1, resolved.events, t, { hint })[0];
     };
     run("ouverture : avec la base gauche, d'un seul tenant", "Résolution du tour 1. base gauche, loupe : aucun effet.", said(opening(false).text));
@@ -307,9 +311,9 @@ function checkTexts(run) {
     // début.
     const game = playGame(7, {}, playOut);
     let history = EMPTY_HISTORY;
-    let state = createMarblesGame(7, {}, MARBLE_TYPES);
+    let state = rules.createGame(7);
     const step = (action) => {
-      const result = marblesReduce(state, action, MARBLE_TYPES);
+      const result = rules.reduce(state, action);
       state = result.state;
       return result.events;
     };
@@ -352,7 +356,7 @@ function checkTexts(run) {
     run(
       "anglais : R",
       "Forecast: Speed 12, Mass 1, Impact 12. left base, magnifier: no effect. right base, empty. apex, shooter: Speed +12.",
-      describeOverview(lensed, t)
+      describeOverview(lensed, rules, t)
     );
     run.same(
       "anglais : séquence",

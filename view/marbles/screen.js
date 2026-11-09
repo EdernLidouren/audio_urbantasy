@@ -46,7 +46,7 @@ import { detailAfterMainMove, detailLine, mainWithDetail, stepDetail } from "../
 import { t } from "../../data/i18n/index.js";
 import { MARBLES_SETTINGS } from "../../config/marbles-values.js";
 import { isDebugEnabled } from "../../config/debug.js";
-import { SLOTS, marblesReduce, swapRefusal, placeRefusal } from "../../core/marbles.js";
+import { SLOTS, swapRefusal, placeRefusal } from "../../core/marbles.js";
 import { playMenuSound } from "../menu-sounds.js";
 import { openConfirmation } from "../menus/confirmation.js";
 import { INITIAL_CURSOR, cursorOn, placementStart, stepCursor, zoneOf } from "./navigation.js";
@@ -88,7 +88,6 @@ import { EMPTY_SOUND_QUEUE, advanceSoundQueue, enqueueCues } from "./sound-queue
 import { advanceSequence, restartPause, skipSequence, startSequence } from "./sequence.js";
 import { EMPTY_HISTORY, recordSteps } from "./history.js";
 import { openHistoryMenu } from "./history-screen.js";
-import MARBLE_TYPES from "../../marbles/types/index.js";
 
 const MARBLES_BINDINGS = defineBindings("marbles", {
   up: { keys: ["ArrowUp"], mods: [] },
@@ -117,7 +116,9 @@ const MARBLES_BINDINGS = defineBindings("marbles", {
 // Les actions sans effet hors mode debug, absentes alors de l'aide.
 const DEBUG_ACTIONS = new Set(["placesDemo"]);
 
-export function makeMarblesScreen(getGame, setGame) {
+// `rules` : les règles du jeu, liées à la table des billes une fois pour toutes
+// par main.js (core/marbles-rules.js) ; l'écran les passe à ce qui en a besoin.
+export function makeMarblesScreen(getGame, setGame, rules) {
   let cursor = INITIAL_CURSOR;
   // Le curseur secondaire, dans la fiche de ce qui est sous le curseur principal.
   let detail = 0;
@@ -183,7 +184,7 @@ export function makeMarblesScreen(getGame, setGame) {
   // Passe une action au réducteur : ses évènements, ou null si elle est
   // refusée (déjà dit au joueur).
   function dispatch(action) {
-    const result = marblesReduce(getGame(), action, MARBLE_TYPES);
+    const result = rules.reduce(getGame(), action);
     if (!result.ok) {
       refuse(result.error);
       return null;
@@ -198,9 +199,9 @@ export function makeMarblesScreen(getGame, setGame) {
 
   function focusLine() {
     const game = getGame();
-    if (cursor.place === "hand") return describeHandFocus(game, clampedHandIndex(), t);
-    if (held?.kind === "hand") return describeSlotForPlacement(game, cursor.place, t);
-    const line = describeSlotFocus(game, cursor.place, t);
+    if (cursor.place === "hand") return describeHandFocus(game, clampedHandIndex(), rules, t);
+    if (held?.kind === "hand") return describeSlotForPlacement(game, cursor.place, rules, t);
+    const line = describeSlotFocus(game, cursor.place, rules, t);
     return held?.kind === "slot" && held.slot === cursor.place ? `${line} ${t("marbles.slot_line.held")}` : line;
   }
 
@@ -223,7 +224,7 @@ export function makeMarblesScreen(getGame, setGame) {
   // par défaut ; null sur un emplacement vide ou une main vide.
   function currentCard() {
     const marble = marbleUnderCursor();
-    return marble === undefined ? null : marbleCard(marble, focusLine(), t);
+    return marble === undefined ? null : marbleCard(marble, focusLine(), rules, t);
   }
 
   // Ce qui se dit du curseur : l'annonce principale, et le champ où se trouve le
@@ -392,7 +393,7 @@ export function makeMarblesScreen(getGame, setGame) {
     }
     playMenuSound("select");
     openConfirmation("marbles.place.menu_title", () => performPlace(handIndex, slot), {
-      lines: placementLines(game, handIndex, slot, t),
+      lines: placementLines(game, handIndex, slot, rules, t),
     });
   }
 
@@ -461,7 +462,7 @@ export function makeMarblesScreen(getGame, setGame) {
   // R : la vue d'ensemble, d'un bloc et sans pause.
   function announceOverview() {
     if (blockedByNarration()) return;
-    announce(describeOverview(getGame(), t), { assertive: true });
+    announce(describeOverview(getGame(), rules, t), { assertive: true });
   }
 
   function announceTurn() {
@@ -483,14 +484,14 @@ export function makeMarblesScreen(getGame, setGame) {
   function openBagMenu() {
     if (blockedDuringSequence()) return;
     playMenuSound("select");
-    openPileMenu("marbles.pile.bag", bagDisplayOrder(getGame().bag, t));
+    openPileMenu("marbles.pile.bag", bagDisplayOrder(getGame().bag, t), rules);
   }
 
   // Dans l'ordre d'arrivée : de la plus ancienne à la plus récente.
   function openDiscardMenu() {
     if (blockedDuringSequence()) return;
     playMenuSound("select");
-    openPileMenu("marbles.pile.discard", getGame().discard);
+    openPileMenu("marbles.pile.discard", getGame().discard, rules);
   }
 
   // L : l'historique du tour précédent. Aussi en fin de partie : celui du dernier

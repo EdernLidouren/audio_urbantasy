@@ -21,7 +21,7 @@
 import { readFile } from "node:fs/promises";
 import { installFileFetch } from "../node-fetch.js";
 import { parseCommand } from "./commands.js";
-import MARBLE_TYPES from "../../marbles/types/index.js";
+import { GAME_RULES } from "./game-rules.js";
 
 const args = process.argv.slice(2);
 const file = args.find((arg) => !arg.startsWith("--"));
@@ -47,7 +47,7 @@ formatState(state, name).forEach((line) => console.log(`  ${line}`));
 
 // La prévision d'une pose envisagée (ou du triangle actuel), en chiffres bruts.
 function printForecast(action) {
-  const predicted = forecast(state, action, MARBLE_TYPES);
+  const predicted = GAME_RULES.forecast(state, action);
   if (!predicted.ok) {
     console.log(`  Prévision refusée : ${predicted.error}.`);
     return;

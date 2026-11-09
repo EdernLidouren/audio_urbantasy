@@ -18,6 +18,7 @@ Les modules qu'ils partagent, purs (sans Node, donc vérifiables) :
 
 | Module | Rôle |
 |---|---|
+| `tools/marbles/game-rules.js` | Les règles du jeu, liées une fois à la table des billes : le point de composition des outils |
 | `tools/marbles/commands.js` | Les commandes texte (« poser 1 pointe ») communes à `play.js` et `case.js` |
 | `tools/marbles/format.js` | L'état et le journal en lignes lisibles |
 | `tools/marbles/state-builder.js` | L'état construit à la main (`buildState`) et l'application d'actions (`applyActions`) |

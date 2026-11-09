@@ -36,7 +36,7 @@
 import { createInterface } from "node:readline";
 import { installFileFetch } from "../node-fetch.js";
 import { parseCommand } from "./commands.js";
-import MARBLE_TYPES from "../../marbles/types/index.js";
+import { GAME_RULES } from "./game-rules.js";
 
 function optionValue(args, name) {
   const index = args.indexOf(name);
@@ -78,13 +78,13 @@ const HELP = [
   "Emplacements : gauche (g, left), droite (d, right), pointe (p, apex).",
 ];
 
-let game = createMarblesGame(seed, {}, MARBLE_TYPES);
+let game = GAME_RULES.createGame(seed);
 const journal = [];
 
 // Applique une action et la journalise ; rend ses évènements, ou null si elle
 // est refusée (déjà dit).
 function apply(action) {
-  const result = marblesReduce(game, action, MARBLE_TYPES);
+  const result = GAME_RULES.reduce(game, action);
   if (!result.ok) {
     console.log(`Refusé : ${t(`marbles.error.${result.error}`)} (${result.error})`);
     return null;
@@ -112,7 +112,7 @@ function resolveTurn() {
 // Une bille et sa fiche, à plat : ce que l'écran donne champ par champ.
 function printMarble(marble, main) {
   console.log(`  ${main}`);
-  const { above, below } = marbleCard(marble, main, t);
+  const { above, below } = marbleCard(marble, main, GAME_RULES, t);
   for (const field of [...above, ...below]) console.log(`      ${field}`);
 }
 
@@ -121,11 +121,11 @@ function printState() {
   console.log(describeTurn(game, swapRefusal(game) === null, t));
   for (const slot of SLOTS) {
     const placed = game.triangle[slot];
-    if (placed === null) console.log(`  ${describeSlotFocus(game, slot, t)}`);
-    else printMarble(placed.marble, describeSlotFocus(game, slot, t));
+    if (placed === null) console.log(`  ${describeSlotFocus(game, slot, GAME_RULES, t)}`);
+    else printMarble(placed.marble, describeSlotFocus(game, slot, GAME_RULES, t));
   }
-  if (game.hand.length === 0) console.log(`  ${describeHandFocus(game, 0, t)}`);
-  game.hand.forEach((marble, index) => printMarble(marble, describeHandFocus(game, index, t)));
+  if (game.hand.length === 0) console.log(`  ${describeHandFocus(game, 0, GAME_RULES, t)}`);
+  game.hand.forEach((marble, index) => printMarble(marble, describeHandFocus(game, index, GAME_RULES, t)));
   console.log(`  [sac, du haut vers le bas : ${game.bag.join(", ") || "-"}]`);
   console.log(`  [défausse : ${game.discard.join(", ") || "-"}]`);
 }
@@ -134,13 +134,13 @@ function printState() {
 // vue d'ensemble du triangle actuel (touche R), sinon la confirmation de la pose
 // envisagée.
 function printForecast(action) {
-  const predicted = forecast(game, action, MARBLE_TYPES);
+  const predicted = GAME_RULES.forecast(game, action);
   if (!predicted.ok) {
     console.log(`Refusé : ${t(`marbles.error.${predicted.error}`)} (${predicted.error})`);
     return;
   }
-  if (action === null) console.log(`  ${describeOverview(game, t)}`);
-  else for (const line of placementLines(game, action.handIndex, action.slot, t)) console.log(`  ${t(line.key, line.params)}`);
+  if (action === null) console.log(`  ${describeOverview(game, GAME_RULES, t)}`);
+  else for (const line of placementLines(game, action.handIndex, action.slot, GAME_RULES, t)) console.log(`  ${t(line.key, line.params)}`);
 }
 
 // La commande d'une ligne ; rend faux pour arrêter.

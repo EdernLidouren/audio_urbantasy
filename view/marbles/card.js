@@ -8,28 +8,27 @@
 // différer selon la base, et ce gabarit reçoit alors {left} et {right}.
 
 import { MARBLE_CARD_MODEL } from "../../config/marbles-values.js";
-import { effectAt } from "../../core/marbles-effects.js";
 import { assembleCard, validateCardModel } from "../../lib/detail-card.js";
 import { describePrinted } from "./narration.js";
-import MARBLE_TYPES from "../../marbles/types/index.js";
 
 validateCardModel(MARBLE_CARD_MODEL);
 
-function readField(marble, entry, types, t) {
+function readField(marble, entry, rules, t) {
   if (entry.variantLabelKey !== undefined) {
-    const left = effectAt(marble, "leftBase", types);
-    const right = effectAt(marble, "rightBase", types);
+    const left = rules.effectAt(marble, "leftBase");
+    const right = rules.effectAt(marble, "rightBase");
     if (left !== right) return t(entry.variantLabelKey, { left: describePrinted(left, t), right: describePrinted(right, t) });
     return t(entry.labelKey, { effect: describePrinted(left, t) });
   }
-  const clauses = types[marble][entry.field];
+  const clauses = rules.types[marble][entry.field];
   if (clauses === undefined && !entry.required) return null;
   return t(entry.labelKey, { effect: describePrinted(clauses ?? [], t) });
 }
 
 // La fiche d'une bille. `main` : son annonce principale, qui dépend de l'endroit
-// où elle se trouve. `options` (facultatif) : un autre modèle ou une autre table,
-// pour les vérifications.
-export function marbleCard(marble, main, t, { model = MARBLE_CARD_MODEL, types = MARBLE_TYPES } = {}) {
-  return assembleCard(model, { main, readField: (entry) => readField(marble, entry, types, t), t });
+// où elle se trouve. `rules` : les règles du jeu (core/marbles-rules.js), d'où
+// viennent la table et les effets imprimés. `options` (facultatif) : un autre
+// modèle, pour les vérifications.
+export function marbleCard(marble, main, rules, t, { model = MARBLE_CARD_MODEL } = {}) {
+  return assembleCard(model, { main, readField: (entry) => readField(marble, entry, rules, t), t });
 }

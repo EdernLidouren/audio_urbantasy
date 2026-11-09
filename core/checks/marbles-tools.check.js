@@ -18,6 +18,10 @@ import { percentile, summarize } from "../../tools/marbles/stats.js";
 import { buildReport, frNumber } from "../../tools/marbles/report.js";
 import { MARBLE_COLUMNS, toCsv, toJson } from "../../tools/marbles/export.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
+import { createMarblesRules } from "../marbles-rules.js";
+
+// Les règles du jeu, liées à la vraie table (core/marbles-rules.js).
+const rules = createMarblesRules(MARBLE_TYPES);
 
 // Les parties de contrôle : assez pour que les moyennes parlent, assez peu pour
 // que la vérification reste rapide (elle tourne aussi dans le jeu).
@@ -46,7 +50,7 @@ function checkStateBuilder(run) {
   run.same("état construit : le sac dans l'ordre décrit, sans mélange", ["agate", "mica"], state.bag);
   run("état construit : réglage surchargé", 6, state.turnCount);
   run("état construit : phase de jeu par défaut", "play", state.stage);
-  run("état construit : un état que le réducteur accepte", true, marblesReduce(state, { type: "place", handIndex: 1, slot: "apex" }, MARBLE_TYPES).ok);
+  run("état construit : un état que le réducteur accepte", true, rules.reduce(state, { type: "place", handIndex: 1, slot: "apex" }).ok);
   run("état construit : bille inconnue refusée", true, throws(() => buildState({ hand: ["nope"] })));
   run("état construit : champ inconnu refusé", true, throws(() => buildState({ tour: 2 })));
   run("état construit : emplacement inconnu refusé", true, throws(() => buildState({ triangle: { middle: "clay" } })));
@@ -76,11 +80,11 @@ function checkCommandsAndFormat(run) {
   const types = new Set();
   let raw = 0;
   for (const index of [0, 1, 2]) {
-    const state = createMarblesGame(games[index].seed, { bag: games[index].bag, turnCount: 20 }, MARBLE_TYPES);
+    const state = rules.createGame(games[index].seed, { bag: games[index].bag, turnCount: 20 });
     let current = state;
     while (current.stage !== "over") {
       const action = current.stage === "draw" ? { type: "draw" } : legalActions(current).find((legal) => legal.type === "place") ?? { type: "resolve" };
-      const result = marblesReduce(current, action, MARBLE_TYPES);
+      const result = rules.reduce(current, action);
       for (const event of result.events) {
         types.add(event.type);
         if (formatEvent(event).startsWith(`${event.type} : {`)) raw += 1;
@@ -136,11 +140,11 @@ function checkPublicView(run) {
 function predictedAfter(state, actions) {
   let current = state;
   for (const action of actions) {
-    const result = marblesReduce(current, action, MARBLE_TYPES);
+    const result = rules.reduce(current, action);
     if (!result.ok) return null;
     current = result.state;
   }
-  const predicted = forecast(current, null, MARBLE_TYPES);
+  const predicted = rules.forecast(current);
   return predicted.ok ? predicted.impact : null;
 }
 
@@ -158,7 +162,7 @@ function checkGreedy(run) {
   const swaps = [[], ...legalActions(view).filter((action) => action.type === "swap").map((swap) => [swap])];
   let best = -Infinity;
   for (const swap of swaps) {
-    const afterSwap = swap.length === 0 ? view : marblesReduce(view, swap[0], MARBLE_TYPES).state;
+    const afterSwap = swap.length === 0 ? view : rules.reduce(view, swap[0]).state;
     best = Math.max(best, predictedAfter(view, swap));
     for (const place of legalActions(afterSwap).filter((action) => action.type === "place")) {
       best = Math.max(best, predictedAfter(view, [...swap, place]));
@@ -171,9 +175,9 @@ function checkGreedy(run) {
   let current = view;
   for (const choice of plan.choices) {
     const action = choice.type === "place" ? { type: "place", handIndex: current.hand.indexOf(choice.marble), slot: choice.slot } : choice;
-    current = marblesReduce(current, action, MARBLE_TYPES).state;
+    current = rules.reduce(current, action).state;
   }
-  run("glouton : son plan rejoué donne l'Impact annoncé", plan.impact, forecast(current, null, MARBLE_TYPES).impact);
+  run("glouton : son plan rejoué donne l'Impact annoncé", plan.impact, rules.forecast(current).impact);
   run("glouton : une pose au plus après le premier tour", true, plan.choices.filter((choice) => choice.type === "place").length <= 1);
   run("glouton : deux poses envisagées, jamais pire", true, bestPlan(view, { maxPlacements: 2 }).impact >= plan.impact);
 
@@ -187,7 +191,7 @@ function checkGreedy(run) {
 
   // Premier tour : toutes les attributions de la main au triangle, par recherche
   // exhaustive sur les places de la main.
-  const first = marblesReduce(createMarblesGame(7, {}, MARBLE_TYPES), { type: "draw" }, MARBLE_TYPES).state;
+  const first = rules.reduce(rules.createGame(7), { type: "draw" }).state;
   let firstBest = -Infinity;
   const hand = first.hand;
   for (const a of hand.keys()) {
@@ -195,7 +199,7 @@ function checkGreedy(run) {
       for (const c of hand.keys()) {
         if (new Set([a, b, c]).size < 3) continue;
         const triangle = { leftBase: { marble: hand[a], wear: 0 }, rightBase: { marble: hand[b], wear: 0 }, apex: { marble: hand[c], wear: 0 } };
-        firstBest = Math.max(firstBest, forecast({ ...first, triangle }, null, MARBLE_TYPES).impact);
+        firstBest = Math.max(firstBest, rules.forecast({ ...first, triangle }).impact);
       }
     }
   }
