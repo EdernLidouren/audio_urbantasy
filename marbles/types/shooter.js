@@ -3,7 +3,7 @@
 import { speed } from "../effects.js";
 
 export default {
-  apex: [speed(8)],
+  apex: [speed(6)],
   knockout: [speed(3)],
   size: "large",
   sound: "classic_large",

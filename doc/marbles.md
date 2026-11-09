@@ -8,7 +8,7 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
 | Fichier | Rôle |
 |---|---|
 | `marbles/types/` | Les billes, une par fichier, et leur registre `index.js` (donnée pure) |
-| `marbles/effects.js` | Les formes courtes des clauses, `speed(n)` et `mass(n)` |
+| `marbles/effects.js` | Les formes courtes des clauses, `speed(n)`, `mass(n)` et `draw(n)` |
 | `config/marbles-values.js` | Réglages, modèle de fiche, sac de test, sons (donnée pure) |
 | `core/marbles-rules.js` | Les règles liées à une table de billes : le point d'entrée de la simulation hors du core |
 | `core/marbles.js` | La simulation : état, réducteur, écouteurs, journal, codes de refus |
@@ -32,16 +32,21 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
 
 ## Déroulement d'un tour
 
-1. **Pioche** : 5 billes au premier tour, 1 ensuite (`firstTurnDraw`, `drawPerTurn`). Main
-   pleine (`maxHandSize`, 5) : la pioche est sautée et la bille reste au sac. Sac vide
-   alors qu'il faut une bille : la défausse mélangée devient le sac, et la partie s'arrête
-   si ce sac compte moins de 3 billes. Ce test n'a lieu qu'à une régénération.
+1. **Pioche** : 5 billes au premier tour, 1 ensuite (`firstTurnDraw`, `drawPerTurn`), par
+   la pioche unifiée (voir plus bas).
 2. **Échange** (facultatif, une fois par tour, avant toute pose) : le contenu de deux
    emplacements, usure comprise. Un emplacement vide en fait un déplacement ; deux vides
-   sont refusés, pour ne pas gâcher l'échange du tour. Ni Tic ni Éjection.
-3. **Pose** : autant de billes que voulu. Au tour 1, le triangle doit être plein pour
-   résoudre, et une pose qui ne laisserait plus assez de billes en main pour y arriver est
-   refusée (la partie serait sans issue, la main ne se recomplétant qu'au tour suivant).
+   sont refusés, pour ne pas gâcher l'échange du tour. Ni Tic ni Éjection. Ce n'est pas un
+   lancer.
+3. **Pose** : chaque pose depuis la main est un **lancer**, sur un emplacement vide ou
+   occupé ; `throwsPerTurn` (5) par tour, à côté de `maxHandSize` dans les réglages (deux
+   capacités du joueur, qui pourront devenir ses caractéristiques). Lancers épuisés : la
+   pose est refusée (`noThrowsLeft`), dès la prise de la bille dans l'écran. La limite
+   empêche une boucle pilotée par le joueur, un Tic qui pioche à chaque pose par exemple,
+   que la limite du bus ne couvre pas : ce sont des actions du joueur. Au tour 1, le
+   triangle doit être plein pour résoudre, et ses trois poses sont des lancers : une pose
+   qui ne laisserait plus assez de billes en main, ou plus assez de lancers, pour y arriver
+   est refusée (la partie serait sans issue).
 4. **Résolution** : base gauche, base droite, pointe ; un emplacement vide saute sa
    phase. Elle part des compteurs du tour : Vitesse (0 en début de tour) et Masse (1), que
    Tic et Éjection ont déjà pu modifier. Chaque bille applique son effet puis prend 1
@@ -50,7 +55,35 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
 5. **Retrait** : une bille à son usure maximale part à la défausse. Pas d'Éjection.
 6. **Rotation** : base gauche → pointe, pointe → base droite, base droite → base gauche.
 
-Fin de partie : après le dernier tour, ou sur un sac régénéré trop petit.
+### La pioche unifiée
+
+Toute pioche, celle du début de tour comme celle d'un effet (Pioche), suit la même mécanique,
+bille par bille (`core/marbles.js`/`drawOne`) :
+
+1. main pleine : la bille reste au sac, sans régénération ;
+2. sinon, le sac a une bille : on la pioche ;
+3. sinon, la défausse n'est pas vide : mélangée par le hasard de la partie, elle devient le
+   sac (`bagRegenerated`), puis on pioche ;
+4. sinon (sac et défausse vides) : rien à piocher.
+
+Le premier arrêt interrompt la pioche et se dit (`drawSkipped`, motif `handFull` ou
+`noMarbles`, « Plus aucune bille à piocher. ») : les billes restantes ne sont pas piochées.
+Une régénération peut donc avoir lieu à tout moment : en début de tour, pendant la phase de
+jeu (un Tic qui pioche) ou pendant la résolution.
+
+### Fin de partie
+
+Toutes les conditions de fin vivent à un seul endroit, `END_CONDITIONS` de
+`core/marbles.js`, chacune consultée à un moment du tour (après la pioche du début de tour,
+ou en fin de résolution). Aujourd'hui :
+
+- `outOfMarbles` : la pioche du début de tour n'a pu donner aucune bille, faute de billes
+  (sac et défausse vides dès la première). Une main pleine n'est jamais une fin de partie ;
+- `turnsCompleted` : le dernier tour est résolu.
+
+Un futur mode (un Impact minimal à atteindre…) y branche les siennes ; chaque raison a son
+texte, `marbles.event.game_over.<raison>`. Un sac de départ compte au moins 3 billes : plus
+petit, il bloquerait le premier tour (refusé à la création de la partie).
 
 ### Déroulé d'une pose
 
@@ -59,11 +92,11 @@ bille B, la pose d'une bille A se déroule dans cet ordre, visible au journal :
 
 | Étape | Évènement du journal |
 |---|---|
-| Éjection de B | `knockout`, puis `effect` si B en a une |
+| Éjection de B | `knockout`, puis `effect` si B en a une, suivi de ses pioches (`draw`…) si elle pioche |
 | B est retirée de son emplacement | `removed` (`cause: "replacement"`) |
 | B rejoint la défausse | `discarded` (`cause: "replacement"`) |
 | A rejoint l'emplacement | `placed` |
-| Tic de A | `hit`, puis `effect` si A en a un |
+| Tic de A | `hit`, puis `effect` si A en a un, suivi de ses pioches s'il pioche |
 
 ## Une bille
 
@@ -134,10 +167,17 @@ une liste d'ids : les doublons y sont permis.
 
 Un effet est une liste de clauses (`core/marbles-effects.js`) :
 
-- **action** : ce que fait la clause, aujourd'hui `speed` ou `mass`, avec son `amount` ;
-- **cible** (`target`, facultative) : un emplacement. Sans cible, la clause agit sur le
-  compteur du tour ou s'ajoute à l'effet de la bille ; avec une cible, elle donne un
-  **bonus** à la bille de cet emplacement ;
+- **action** : ce que fait la clause, avec son `amount` :
+  - `speed`, `mass` : ajoutent `amount` (négatif permis) à la Vitesse ou à la Masse ;
+  - `draw`, la **Pioche** : la bille pioche `amount` billes (au moins 1) par la pioche
+    unifiée, à tout moment du tour. Jamais de cible. Utilisable dans tout champ d'effet :
+    `{ ...draw(1) }` au Tic de l'œil-de-chat, à l'Éjection du grès, en base du mica.
+    Une bille piochée pendant la phase de jeu (par un Tic, une Éjection) se joue aussitôt,
+    dans la limite des lancers ; une bille piochée pendant la résolution attend le tour
+    suivant ;
+- **cible** (`target`, facultative, pour les actions qui l'acceptent) : un emplacement.
+  Sans cible, la clause agit sur le compteur du tour ou s'ajoute à l'effet de la bille ;
+  avec une cible, elle donne un **bonus** à la bille de cet emplacement ;
 - **condition** (`when`, facultative) : évaluée au déclenchement.
 
 **Règle anti-boucle** : une condition lit toujours l'effet IMPRIMÉ d'une bille
@@ -146,14 +186,25 @@ et le joueur raisonne à partir de ce qu'il entend. L'imprimé compte les clause
 et sans condition.
 
 **Le bonus** (`bonus`, sur l'entrée du triangle) s'ajoute à l'effet de phase de la bille
-qui le reçoit, et s'annonce chez elle avec son total effectif (« Vitesse +12 »). Il suit la
+qui le reçoit, et s'annonce chez elle avec son total effectif (« Vitesse +10 »). Il suit la
 bille dans un échange, se perd si elle est remplacée, et disparaît à la fin de la
 résolution : il ne vaut que s'il arrive avant la phase de sa cible. Donné à un emplacement
 vide, il est perdu.
 
-**Ajouter** une action ou une condition : une entrée dans `CLAUSE_ACTIONS` ou `CONDITIONS`,
-et son texte dans `view/marbles/narration.js`. Un nouveau moment de déclenchement : une
-ligne dans `core/marbles.js`/`EVENT_TRIGGERS`.
+**Les valeurs** d'un effet : une par action, sous son nom (`{ speed, mass, draw }`). Le
+core les applique, la vue les dit (« Vitesse +2 », « Pioche 1 »), la prévision les rend.
+
+**Ajouter** une action : une entrée dans `CLAUSE_ACTIONS` (`core/marbles-effects.js`), sur
+le modèle des conditions, qui déclare ses champs (`fields` : une action sans `target` refuse
+toute cible à la validation), sa validation (`validate`) et ce qu'elle ajoute aux valeurs
+(`apply`) ; puis ses textes dans `view/marbles/narration.js`/`ACTION_TEXTS` (`up` pour une
+valeur positive, `down` pour une négative), lus par les fiches, R, la confirmation et la
+séquence. Une action sans textes fait échouer le chargement. Si son application touche à
+l'état autrement qu'un compteur, comme la Pioche, `fireEffect` (`core/marbles.js`) l'exécute
+après l'annonce de l'effet. Une condition : une entrée dans `CONDITIONS` et son texte dans
+`CONDITION_TEXTS`. Un nouveau moment de déclenchement : une entrée dans
+`core/marbles.js`/`EVENT_TRIGGERS`, avec ses `zones` (où sont les billes qu'il peut
+concerner : `triangle`, `hand`).
 
 ## Simulation
 
@@ -191,10 +242,20 @@ l'état, applique l'action sur la copie (ou rien, pour le triangle actuel), lanc
 résolution (`runResolution`) et lit le journal. Elle ne peut donc pas diverger du moteur :
 la vérification `marbles-forecast` le contrôle sur des centaines d'états aléatoires.
 
-La copie n'a ni sac ni état de hasard, et seules une pose ou un échange s'envisagent : la
-prévision ne consomme ni ne révèle rien. Un futur effet de pioche devra s'annoncer
-« Pioche 1 » sans tirer. Elle résout aussi un triangle du premier tour encore incomplet,
-que l'action `resolve` refuse : c'est ce qui permet de prévoir la première pose.
+**À l'aveugle** : la copie (`blindCopy`) ne connaît du sac et de la défausse que leur nombre
+de billes, jamais leur identité ni leur ordre, et n'a pas le hasard de la partie ; le
+déroulé est aveugle (`reduce(…, { blind: true })`). Une Pioche y a lieu avec ses arrêts
+(main pleine, plus de billes) mais pioche une bille inconnue (`UNKNOWN_MARBLE`) ; une
+régénération s'annonce sans mélange. La prévision ne lit ni n'avance donc jamais le hasard
+réel, et seules une pose ou un échange s'envisagent. Elle rend, en plus des valeurs :
+`drawn`, les billes que l'action et la résolution piocheraient ; `regenerates`, vrai si le
+sac serait régénéré ; `uncertain`, vrai si une bille inconnue aurait pu réagir selon son
+identité (un déclencheur qui écoute la main : aucun aujourd'hui), ses chiffres n'étant alors
+pas sûrs. La vérification `marbles-forecast` contrôle que Vitesse, Masse, Impact, billes
+piochées et régénération prévues sont celles du réel.
+
+Elle résout aussi un triangle du premier tour encore incomplet, que l'action `resolve`
+refuse : c'est ce qui permet de prévoir la première pose.
 
 ## Écran de jeu
 
@@ -214,11 +275,11 @@ Ce qui se dit, selon l'endroit :
 | Bille en main, au sac, en défausse | « argile, usure 3. 1 sur 5 » |
 | Bille active, sans sélection | « calot, pointe, usure 1 sur 3. » |
 | Emplacement vide, sans sélection | « pointe : vide. » |
-| Emplacement occupé, bille sélectionnée | « pointe, calot : Vitesse +12. » (la prévision) |
+| Emplacement occupé, bille sélectionnée | « pointe, calot : Vitesse +10. » (la prévision) |
 | Emplacement vide, bille sélectionnée | « pointe » |
 | R | la vue d'ensemble du tour (voir plus bas) |
 | L | le menu de l'historique (voir plus bas) |
-| I | tour, score, Vitesse et Masse du tour, échange |
+| I | tour, score, Vitesse et Masse du tour, lancers restants, échange |
 | S | nombre de billes au sac, pioche par tour |
 | D | nombre de billes en défausse |
 
@@ -240,12 +301,16 @@ lisent et ne s'activent pas (Entrée n'y fait rien) :
 
 1. « Poser argile en pointe ? » ;
 2. les valeurs prévues, sur leur propre ligne, au format de la vue d'ensemble (R) :
-   « Vitesse +8 », valeurs produites seulement, non nulles, bonus reçu compris, sans
+   « Vitesse +6 », valeurs produites seulement, non nulles, bonus reçu compris, sans
    texte d'effet ; « aucun effet » si rien ;
 3. sur un emplacement occupé, « Éjection de calot : Vitesse +3 », ou « … : aucun effet » ;
 4. sur un emplacement occupé, « Tic d'argile : Vitesse +2 », ou « … : aucun effet » ;
-5. Annuler (Échap aussi : la sélection d'emplacement reprend) ;
-6. Confirmer.
+5. si la pose et la résolution régénéreraient le sac, « Le sac sera régénéré. » ;
+6. Annuler (Échap aussi : la sélection d'emplacement reprend) ;
+7. Confirmer.
+
+Une Pioche s'y dit comme une valeur (« Tic d'œil-de-chat : Pioche 1 »), sans jamais nommer
+une bille du sac.
 
 ### Fiches de détail
 
@@ -291,15 +356,17 @@ Une seule annonce, d'un bloc et sans pause, tirée de la prévision du triangle 
 chaque emplacement dans l'ordre des phases.
 
 ```
-Prévision : Vitesse 9, Masse 2, Impact 18. Base gauche, argile : Vitesse +1.
-Base droite, vide. Pointe, calot : Vitesse +8.
+Prévision : Vitesse 7, Masse 2, Impact 14. Base gauche, argile : Vitesse +1.
+Base droite, mica : Pioche 1. Pointe, calot : Vitesse +6.
 ```
 
 Vitesse et Masse comprennent ce que le tour a déjà gagné (Tic, Éjection) ; l'Impact
 applique les planchers. Un emplacement dit les valeurs que sa bille PRODUIT, après
 conditions et bonus reçus, jamais un texte d'effet : valeurs nulles omises, « aucun
-effet » si rien. Un bonus se compte chez la bille qui le reçoit : la loupe en base gauche
-dit « aucun effet », le calot qu'elle renforce « Vitesse +12 ». Même gabarit que les
+effet » si rien ; une Pioche est une valeur comme une autre (« Pioche 1 »). Un bonus se
+compte chez la bille qui le reçoit : la loupe en base gauche dit « aucun effet », le calot
+qu'elle renforce « Vitesse +10 ». Si la résolution régénérerait le sac, « Le sac sera
+régénéré. » termine l'annonce. Même gabarit que les
 phases de la séquence (`outcomeLine`) : la prévision et la résolution se disent pareil.
 
 ### Séquence de résolution (Maj+R)
@@ -314,18 +381,22 @@ chacune :
    étape (`resolutionSteps`), une pause nulle entre deux étapes ferait couper la première
    annonce par la seconde ;
 2. à 4. chaque phase, dans l'ordre : « Base gauche, argile : Vitesse +1. », « Base
-   droite, vide. », avec les règles de la vue d'ensemble ;
+   droite, vide. », avec les règles de la vue d'ensemble ; une phase qui pioche est suivie
+   de sa pioche (« Base gauche, mica : Pioche 1. », « Vous piochez agate. ») ;
 5. « Impact 18. Score 42. » ;
 6. une étape par bille usée : « Calot est usé et part à la défausse. » (l'adjectif
    s'accorde au genre du nom, attribut `gender` des noms français) ;
 7. « Le triangle tourne d'un cran dans le sens horaire. » (le nombre de crans et le sens
    sont des paramètres du texte, constante `ROTATION` de `narration.js`) ;
-8. la pioche : « Vous piochez agate. » ou « Main pleine, pas de pioche. », précédée s'il
-   y a lieu de « Le sac est vide : la défausse est mélangée et forme un nouveau sac. » ;
+8. la pioche : « Vous piochez agate. », « Main pleine, pas de pioche. » ou « Plus aucune
+   bille à piocher. », précédée s'il y a lieu de « Le sac est vide : la défausse est
+   mélangée et forme un nouveau sac. » ;
 9. « Début du tour 4, jouez vos billes. »
 
 Au dernier tour, ni rotation ni pioche : l'Impact et les retraits mènent à la fin de
-partie. Sur un sac régénéré trop petit, la fin de partie remplace la suite.
+partie. Si la pioche du tour suivant ne trouve plus aucune bille, la fin de partie suit
+son arrêt. Une pioche en cours de tour (Tic, Éjection) se dit de la même façon, juste
+après l'effet qui la provoque.
 
 **Construite du journal** (`buildSteps`, la même pour une pose, un échange et la pioche
 du tour 1) : chaque évènement qui se dit devient une étape, à sa place chronologique ;

@@ -3,9 +3,11 @@
 //
 // ÉTAT sérialisable, à part entière (jamais lié à la session du jeu principal,
 // aucune persistance aujourd'hui) :
-//   { rngState, maxHandSize, firstTurnDraw, drawPerTurn, turnCount, turn, score,
-//     speed, mass, stage, endReason, bag, hand, discard, triangle, swapUsed,
-//     hasPlaced }
+//   { rngState, maxHandSize, throwsPerTurn, firstTurnDraw, drawPerTurn, turnCount,
+//     turn, score, speed, mass, stage, endReason, bag, hand, discard, triangle,
+//     swapUsed, throwsUsed }
+// `throwsUsed` : les LANCERS joués ce tour (une pose depuis la main en est un,
+// l'échange non), jamais plus que `throwsPerTurn`.
 // bag, hand et discard sont des listes d'ids de billes (doublons permis). Une
 // bille n'a d'usure que SUR le triangle, { marble, wear, bonus? } : une bille
 // qui en sort perd donc son usure et son bonus par construction. `bonus`
@@ -19,9 +21,9 @@
 //
 // `stage` découpe le tour : "draw" (la pioche reste à faire), "play" (échange
 // et pose, jusqu'à la résolution), "over" (partie finie, endReason dit
-// pourquoi : "turnsCompleted" ou "bagExhausted"). À la fin d'une résolution,
-// `turn` passe au tour suivant, sauf si la partie s'arrête : il reste alors
-// sur le dernier tour joué, jamais « 10 sur 9 ».
+// pourquoi : une raison de END_CONDITIONS). À la fin d'une résolution, `turn`
+// passe au tour suivant, sauf si la partie s'arrête : il reste alors sur le
+// dernier tour joué, jamais « 10 sur 9 ».
 //
 // ACTIONS — marblesReduce(state, action, types) :
 //   { type: "draw" }                            pioche du tour
@@ -48,14 +50,20 @@
 //   discarded { slot, marble, cause }, placed { slot, marble },
 //   hit { slot, marble },
 //   phase { slot, marble }, phaseSkipped { slot },
-//   effect { trigger, slot, marble, speedDelta, massDelta, given, speed, mass },
+//   effect { trigger, slot, marble, speedDelta, massDelta, draw, given, speed, mass },
 //   wear { slot, marble, wear, maxWear },
 //   impact { speed, mass, impact, score },
 //   rotation { triangle }, turnEnded { turn }, gameOver { reason, score }.
 // `cause` : "replacement" ou "wear". `trigger` : "phase", "hit" ou "knockout".
+// drawSkipped `reason` : "handFull" (la bille reste au sac) ou "noMarbles" (sac
+// et défausse vides). Une pioche, une régénération ou un arrêt de pioche peuvent
+// avoir lieu à tout moment : début de tour, pose (un Tic qui pioche), résolution.
+// À l'aveugle (prévision), `draw` a pour bille UNKNOWN_MARBLE.
 // `given` : ce que l'effet a donné aux autres emplacements occupés,
 // [{ slot, marble, speed, mass }]. `speedDelta` et `massDelta` comptent le bonus
-// reçu : c'est le total effectif de la bille, tel qu'il s'annonce.
+// reçu : c'est le total effectif de la bille, tel qu'il s'annonce. `draw` : les
+// billes que l'effet demande à piocher (Pioche), dont les `draw` qui le suivent
+// disent combien l'ont vraiment été.
 //
 // `types` (paramètre OBLIGATOIRE des fonctions qui lisent une bille) : la table
 // des billes, un registre de contenu (marbles/types/index.js) que ce module
@@ -67,7 +75,7 @@ import { MARBLES_SETTINGS, STARTING_BAG } from "../config/marbles-values.js";
 import { createSeed, nextRandom } from "./rng.js";
 import { rejectUnknownFields } from "../lib/validate.js";
 import { MarbleEventLimitError, createEventBus } from "./marbles-bus.js";
-import { SLOTS, addDeltas, effectAt, evaluateEffect, validateEffect } from "./marbles-effects.js";
+import { SLOTS, addValues, effectAt, evaluateEffect, validateEffect } from "./marbles-effects.js";
 
 export { SLOTS, effectAt };
 
@@ -85,6 +93,7 @@ export const MARBLE_ERRORS = [
   "swapSameSlot",
   "swapBothEmpty",
   "placementBlocksTriangle",
+  "noThrowsLeft",
   "triangleIncomplete",
   "eventLimit",
 ];
@@ -121,16 +130,20 @@ export function validateMarbleTypes(types) {
 // La valeur fausse échouerait sinon en pleine partie. Le premier tour exige un
 // triangle plein et la main ne se recomplète qu'au tour suivant : une première
 // pioche plus petite que le triangle laisserait la partie sans issue.
-function validateGameSettings({ maxHandSize, firstTurnDraw, drawPerTurn, turnCount, bag }, types) {
-  const positive = { maxHandSize, firstTurnDraw, drawPerTurn, turnCount };
+function validateGameSettings({ maxHandSize, throwsPerTurn, firstTurnDraw, drawPerTurn, turnCount, bag }, types) {
+  const positive = { maxHandSize, throwsPerTurn, firstTurnDraw, drawPerTurn, turnCount };
   for (const [name, value] of Object.entries(positive)) {
     if (!Number.isInteger(value) || value < 1) throw new Error(`marbles : ${name} doit être un entier >= 1.`);
   }
   if (firstTurnDraw < SLOTS.length) throw new Error(`marbles : firstTurnDraw doit valoir au moins ${SLOTS.length}.`);
+  // Les poses obligatoires du premier tour sont des lancers.
+  if (throwsPerTurn < SLOTS.length) throw new Error(`marbles : throwsPerTurn doit valoir au moins ${SLOTS.length}.`);
   if (maxHandSize < firstTurnDraw) throw new Error("marbles : maxHandSize doit valoir au moins firstTurnDraw.");
   for (const id of bag) {
     if (!Object.hasOwn(types, id)) throw new Error(`marbles : bille inconnue "${id}" dans le sac.`);
   }
+  // Le premier tour exige un triangle plein : un sac plus petit le bloquerait.
+  if (bag.length < SLOTS.length) throw new Error(`marbles : le sac doit compter au moins ${SLOTS.length} billes.`);
 }
 
 // Le contenu du jeu des billes, au démarrage (main.js, l'audit du contenu) : la
@@ -151,6 +164,10 @@ export function maxWearOf(marble, types) {
 export function impactOf(speed, mass) {
   return Math.max(0, speed) * Math.max(1, mass);
 }
+
+// Une bille dont l'identité est cachée : au sac ou en défausse dans la copie de la
+// prévision, ou piochée à l'aveugle (drawOne). Jamais dans une vraie partie.
+export const UNKNOWN_MARBLE = null;
 
 // --- Hasard ---
 
@@ -175,15 +192,17 @@ export function createMarblesGame(seed, options = {}, types) {
   const {
     bag = STARTING_BAG,
     maxHandSize = MARBLES_SETTINGS.maxHandSize,
+    throwsPerTurn = MARBLES_SETTINGS.throwsPerTurn,
     firstTurnDraw = MARBLES_SETTINGS.firstTurnDraw,
     drawPerTurn = MARBLES_SETTINGS.drawPerTurn,
     turnCount = MARBLES_SETTINGS.turnCount,
   } = options;
-  validateGameSettings({ maxHandSize, firstTurnDraw, drawPerTurn, turnCount, bag }, types);
+  validateGameSettings({ maxHandSize, throwsPerTurn, firstTurnDraw, drawPerTurn, turnCount, bag }, types);
   const shuffle = shuffled(bag, createSeed(seed));
   return {
     rngState: shuffle.rngState,
     maxHandSize,
+    throwsPerTurn,
     firstTurnDraw,
     drawPerTurn,
     turnCount,
@@ -198,7 +217,7 @@ export function createMarblesGame(seed, options = {}, types) {
     discard: [],
     triangle: { leftBase: null, rightBase: null, apex: null },
     swapUsed: false,
-    hasPlaced: false,
+    throwsUsed: 0,
   };
 }
 
@@ -226,7 +245,21 @@ export function swapRefusal(state) {
   const refusal = stageRefusal(state, "play");
   if (refusal) return refusal;
   if (state.swapUsed) return "swapAlreadyUsed";
-  if (state.hasPlaced) return "swapAfterPlacement"; // l'échange précède la pose
+  if (state.throwsUsed > 0) return "swapAfterPlacement"; // l'échange précède la pose
+  return null;
+}
+
+// Les lancers qui restent ce tour.
+export function throwsLeft(state) {
+  return state.throwsPerTurn - state.throwsUsed;
+}
+
+// Peut-on encore lancer une bille ce tour-ci, avant même de la choisir ? Le code
+// du refus, ou null. Exportée pour que l'interface refuse dès la prise.
+export function throwRefusal(state) {
+  const refusal = stageRefusal(state, "play");
+  if (refusal) return refusal;
+  if (throwsLeft(state) <= 0) return "noThrowsLeft";
   return null;
 }
 
@@ -235,16 +268,18 @@ export function swapRefusal(state) {
 //
 // Au premier tour, le triangle doit être plein pour résoudre, et la main ne se
 // recomplète qu'au tour suivant : remplacer trop de billes laisserait la
-// partie sans issue. Une pose qui ne laisse plus assez de billes en main pour
-// remplir les emplacements vides est donc refusée.
+// partie sans issue. Une pose qui ne laisse plus assez de billes en main, ou
+// plus assez de lancers, pour remplir les emplacements vides est donc refusée.
 export function placeRefusal(state, handIndex, slot) {
-  const refusal = stageRefusal(state, "play");
+  const refusal = throwRefusal(state);
   if (refusal) return refusal;
   if (!isSlot(slot)) return "invalidSlot";
   if (!Number.isInteger(handIndex) || handIndex < 0 || handIndex >= state.hand.length) return "invalidHandIndex";
+  // Une bille piochée à l'aveugle n'a pas d'identité : rien à poser.
+  if (state.hand[handIndex] === UNKNOWN_MARBLE) return "invalidHandIndex";
   if (state.turn === 1) {
     const emptyAfter = emptySlotCount(state.triangle) - (state.triangle[slot] === null ? 1 : 0);
-    if (state.hand.length - 1 < emptyAfter) return "placementBlocksTriangle";
+    if (Math.min(state.hand.length, throwsLeft(state)) - 1 < emptyAfter) return "placementBlocksTriangle";
   }
   return null;
 }
@@ -280,6 +315,34 @@ function refused(state, error) {
   return { ok: false, state, events: [], error };
 }
 
+// --- Fin de partie ---
+
+// TOUTES les conditions de fin de partie, ici et nulle part ailleurs. Chacune est
+// consultée à un MOMENT du tour :
+//   "turnDraw"  après la pioche du début de tour ; `context` : { drawn, stopped },
+//               les billes piochées et ce qui a arrêté la pioche (drawMarbles) ;
+//   "turnEnd"   après la rotation, en fin de résolution.
+// La première qui répond l'emporte, sa `reason` devient endReason et a son texte,
+// `marbles.event.game_over.<reason>`. Un futur mode (un Impact minimal à
+// atteindre…) branche ici les siennes. Une main pleine n'arrête jamais la partie.
+const END_CONDITIONS = [
+  // La pioche du tour n'a pu donner aucune bille, faute de billes.
+  { reason: "outOfMarbles", moment: "turnDraw", test: (state, { drawn, stopped }) => drawn === 0 && stopped === "noMarbles" },
+  { reason: "turnsCompleted", moment: "turnEnd", test: (state) => state.turn >= state.turnCount },
+];
+
+export const END_REASONS = END_CONDITIONS.map((condition) => condition.reason);
+
+// La raison de finir à ce moment, ou null.
+function endReasonAt(moment, state, context = {}) {
+  return END_CONDITIONS.find((condition) => condition.moment === moment && condition.test(state, context))?.reason ?? null;
+}
+
+function endGame(run, reason) {
+  update(run, { stage: "over", endReason: reason });
+  run.emit({ type: "gameOver", reason, score: run.state.score });
+}
+
 // --- Écouteurs ---
 
 // Les billes qui écoutent le bus, dans leur ordre fixe : base gauche, base
@@ -304,11 +367,24 @@ function isOnEventSlot(event, listener) {
 // l'évènement : l'occupante avant son retrait (Éjection), la nouvelle venue
 // après sa pose (Tic). Une bille sans Tic ni Éjection ne réagit pas du tout :
 // pas d'évènement `effect`, à la différence d'une phase, qui en a toujours un.
-// Un futur déclencheur est une ligne de plus ici.
+// Un déclencheur : `zones`, où sont les billes qu'il peut concerner ("triangle",
+// "hand"), et `clauses(event, listener, types)`. Un futur déclencheur est une
+// entrée de plus ici ; s'il écoute la main, une bille piochée à l'aveugle y rend
+// la prévision incertaine (handleEvent).
+const ON_SLOT = ["triangle"];
 const EVENT_TRIGGERS = {
-  phase: (event, listener, types) => (isOnEventSlot(event, listener) ? effectAt(listener.marble, listener.slot, types) : null),
-  knockout: (event, listener, types) => (isOnEventSlot(event, listener) ? types[listener.marble].knockout ?? null : null),
-  hit: (event, listener, types) => (isOnEventSlot(event, listener) ? types[listener.marble].hit ?? null : null),
+  phase: {
+    zones: ON_SLOT,
+    clauses: (event, listener, types) => (isOnEventSlot(event, listener) ? effectAt(listener.marble, listener.slot, types) : null),
+  },
+  knockout: {
+    zones: ON_SLOT,
+    clauses: (event, listener, types) => (isOnEventSlot(event, listener) ? types[listener.marble].knockout ?? null : null),
+  },
+  hit: {
+    zones: ON_SLOT,
+    clauses: (event, listener, types) => (isOnEventSlot(event, listener) ? types[listener.marble].hit ?? null : null),
+  },
 };
 
 // --- Le déroulé d'une action ---
@@ -324,22 +400,25 @@ function fireEffect(run, event, listener, clauses) {
   const { slot, marble } = listener;
   const { self, gifts } = evaluateEffect(clauses, run.state.triangle, run.types);
   const bonus = event.type === "phase" ? run.state.triangle[slot].bonus : undefined;
-  const { speed: speedDelta, mass: massDelta } = bonus ? addDeltas(self, bonus) : self;
+  const { speed: speedDelta, mass: massDelta } = bonus ? addValues(self, bonus) : self;
 
   let { triangle } = run.state;
   const given = [];
-  for (const { slot: target, speed: giftSpeed, mass: giftMass } of gifts) {
+  for (const { slot: target, ...gift } of gifts) {
     const placed = triangle[target];
     if (placed === null) continue;
-    const gift = { speed: giftSpeed, mass: giftMass };
-    triangle = { ...triangle, [target]: { ...placed, bonus: placed.bonus ? addDeltas(placed.bonus, gift) : gift } };
+    triangle = { ...triangle, [target]: { ...placed, bonus: placed.bonus ? addValues(placed.bonus, gift) : gift } };
     given.push({ slot: target, marble: placed.marble, ...gift });
   }
 
   const speed = run.state.speed + speedDelta;
   const mass = run.state.mass + massDelta;
   update(run, { triangle, speed, mass });
-  run.emit({ type: "effect", trigger: event.type, slot, marble, speedDelta, massDelta, given, speed, mass });
+  // La Pioche : l'effet s'annonce, puis ses billes se piochent (drawMarbles), à
+  // tout moment du tour.
+  const { draw } = self;
+  run.emit({ type: "effect", trigger: event.type, slot, marble, speedDelta, massDelta, draw, given, speed, mass });
+  if (draw > 0) drawMarbles(run, draw);
 }
 
 // Le traitement d'un évènement par le bus : le journal, puis les écouteurs.
@@ -348,15 +427,24 @@ function handleEvent(run, event) {
   const trigger = EVENT_TRIGGERS[event.type];
   if (!trigger) return;
   for (const listener of marbleListeners(run.state)) {
-    const clauses = trigger(event, listener, run.types);
+    // Une bille inconnue (piochée à l'aveugle) que ce déclencheur pourrait
+    // concerner : sa réaction dépend de son identité, la prévision ne peut pas la
+    // dire et se déclare incertaine. Elle ne réagit pas.
+    if (listener.marble === UNKNOWN_MARBLE) {
+      if (trigger.zones.includes(listener.zone)) run.uncertain = true;
+      continue;
+    }
+    const clauses = trigger.clauses(event, listener, run.types);
     if (clauses !== null) fireEffect(run, event, listener, clauses);
   }
 }
 
 // Déroule une action sur un état de travail, avec son bus et son journal. Une
 // boucle d'évènements l'annule tout entière : l'état reçu n'a jamais été touché.
-function transact(state, types, eventLimit, body) {
-  const run = { state, types, journal: [] };
+// `options` : { eventLimit, blind } (voir marblesReduce). À l'aveugle, le résultat
+// porte aussi `uncertain` : une bille inconnue aurait pu réagir (handleEvent).
+function transact(state, types, { eventLimit, blind = false } = {}, body) {
+  const run = { state, types, blind, uncertain: false, journal: [] };
   run.emit = createEventBus((event) => handleEvent(run, event), eventLimit).emit;
   try {
     body(run);
@@ -364,43 +452,82 @@ function transact(state, types, eventLimit, body) {
     if (error instanceof MarbleEventLimitError) return refused(state, "eventLimit");
     throw error;
   }
-  return { ok: true, state: run.state, events: run.journal, error: null };
+  const result = { ok: true, state: run.state, events: run.journal, error: null };
+  return blind ? { ...result, uncertain: run.uncertain } : result;
+}
+
+// Une copie À L'AVEUGLE d'un état, celle de la prévision : le sac et la défausse
+// n'y gardent que leur nombre de billes, jamais leur identité ni leur ordre, et le
+// hasard de la partie en est retiré (null : un tirage y échouerait). Un déroulé à
+// l'aveugle (options.blind) n'en a jamais besoin.
+export function blindCopy(state) {
+  const hidden = (list) => list.map(() => UNKNOWN_MARBLE);
+  return { ...structuredClone(state), bag: hidden(state.bag), discard: hidden(state.discard), rngState: null };
 }
 
 // --- Actions ---
 
-// Pioche : `firstTurnDraw` billes au premier tour, puis `drawPerTurn`. Main
-// pleine : la pioche s'arrête là et la bille reste au sac. Sac vide alors qu'il
-// faut une bille : la défausse, mélangée, devient le sac, et la partie s'arrête
-// s'il compte moins de billes que le triangle n'a d'emplacements. Ce test n'a
-// lieu qu'à une régénération : un sac qui se vide sans qu'aucune bille ne soit
-// demandée ne régénère rien.
+// La défausse devient le sac : mélangée par le hasard de la partie, ou, à
+// l'aveugle, sans mélange ni hasard, ses billes devenant inconnues (la prévision
+// annonce la régénération sans rien en révéler).
+function regenerateBag(run) {
+  const { discard } = run.state;
+  if (run.blind) {
+    update(run, { bag: discard.map(() => UNKNOWN_MARBLE), discard: [] });
+  } else {
+    const shuffle = shuffled(discard, run.state.rngState);
+    update(run, { rngState: shuffle.rngState, bag: shuffle.list, discard: [] });
+  }
+  run.emit({ type: "bagRegenerated", size: run.state.bag.length });
+}
+
+// LA pioche d'une bille, la seule : celle du début de tour comme celle d'un effet,
+// à tout moment du tour. Dans l'ordre :
+//   1. main pleine : la bille reste au sac, sans régénération ;
+//   2. sinon, le sac a une bille : on la pioche ;
+//   3. sinon, la défausse n'est pas vide : elle devient le sac, puis on pioche ;
+//   4. sinon (sac et défausse vides) : rien à piocher.
+// À l'aveugle, la bille piochée est inconnue. -> "drawn", ou ce qui arrête la
+// pioche : "handFull", "noMarbles". La fin de partie n'est pas son affaire.
+function drawOne(run) {
+  if (run.state.hand.length >= run.state.maxHandSize) return "handFull";
+  if (run.state.bag.length === 0) {
+    if (run.state.discard.length === 0) return "noMarbles";
+    regenerateBag(run);
+  }
+  const [top, ...bag] = run.state.bag;
+  const marble = run.blind ? UNKNOWN_MARBLE : top;
+  update(run, { bag, hand: [...run.state.hand, marble] });
+  run.emit({ type: "draw", marble });
+  return "drawn";
+}
+
+// Pioche `count` billes une par une, jusqu'au premier arrêt, qui se dit
+// (drawSkipped) : les billes restantes ne sont pas piochées. -> { drawn, stopped },
+// `stopped` null si tout a été pioché.
+function drawMarbles(run, count) {
+  for (let drawn = 0; drawn < count; drawn++) {
+    const outcome = drawOne(run);
+    if (outcome !== "drawn") {
+      run.emit({ type: "drawSkipped", reason: outcome });
+      return { drawn, stopped: outcome };
+    }
+  }
+  return { drawn: count, stopped: null };
+}
+
+// Pioche du début de tour : `firstTurnDraw` billes au premier tour, puis
+// `drawPerTurn`. Elle peut finir la partie (END_CONDITIONS).
 function drawTurn(run) {
   const { state } = run;
   run.emit({ type: "turnStarted", turn: state.turn, turnCount: state.turnCount });
-  const count = state.turn === 1 ? state.firstTurnDraw : state.drawPerTurn;
-
-  for (let drawn = 0; drawn < count; drawn++) {
-    if (run.state.hand.length >= run.state.maxHandSize) {
-      run.emit({ type: "drawSkipped", reason: "handFull" });
-      break;
-    }
-    if (run.state.bag.length === 0) {
-      const shuffle = shuffled(run.state.discard, run.state.rngState);
-      update(run, { rngState: shuffle.rngState, bag: shuffle.list, discard: [] });
-      run.emit({ type: "bagRegenerated", size: shuffle.list.length });
-      if (shuffle.list.length < SLOTS.length) {
-        update(run, { stage: "over", endReason: "bagExhausted" });
-        run.emit({ type: "gameOver", reason: "bagExhausted", score: run.state.score });
-        return;
-      }
-    }
-    const [marble, ...bag] = run.state.bag;
-    update(run, { bag, hand: [...run.state.hand, marble] });
-    run.emit({ type: "draw", marble });
+  const result = drawMarbles(run, state.turn === 1 ? state.firstTurnDraw : state.drawPerTurn);
+  const reason = endReasonAt("turnDraw", run.state, result);
+  if (reason !== null) {
+    endGame(run, reason);
+    return;
   }
-
-  update(run, { stage: "play", swapUsed: false, hasPlaced: false });
+  update(run, { stage: "play", swapUsed: false, throwsUsed: 0 });
 }
 
 // Échange : le contenu de deux emplacements, usure comprise. Un emplacement
@@ -421,7 +548,7 @@ function swapSlots(run, { a, b }) {
   run.emit({ type: "swapped", a, b });
 }
 
-// Pose (la confirmation est l'affaire de l'interface). Sur un emplacement
+// Pose, un LANCER (la confirmation est l'affaire de l'interface). Sur un emplacement
 // occupé, dans cet ordre : Éjection de l'occupante, son retrait, son départ à la
 // défausse, la nouvelle bille rejoint l'emplacement, son Tic. Sur un emplacement
 // vide, la pose seule.
@@ -439,7 +566,7 @@ function placeMarble(run, { handIndex, slot }) {
   update(run, {
     hand: run.state.hand.filter((_, index) => index !== handIndex),
     triangle: { ...run.state.triangle, [slot]: { marble, wear: 0 } },
-    hasPlaced: true,
+    throwsUsed: run.state.throwsUsed + 1,
   });
   run.emit({ type: "placed", slot, marble });
   if (previous !== null) run.emit({ type: "hit", slot, marble });
@@ -493,8 +620,8 @@ function retireWornMarbles(run) {
 // tour. La vraie, celle de l'action "resolve" comme celle de la prévision
 // (core/marbles-forecast.js), qui la lance aussi sur un triangle du premier tour
 // encore incomplet. Ne pioche jamais et ne touche pas au hasard.
-export function runResolution(state, types, { eventLimit } = {}) {
-  return transact(state, types, eventLimit, (run) => {
+export function runResolution(state, types, options = {}) {
+  return transact(state, types, options, (run) => {
     resolvePhases(run);
 
     const { speed, mass } = run.state;
@@ -511,33 +638,32 @@ export function runResolution(state, types, { eventLimit } = {}) {
     run.emit({ type: "rotation", triangle });
     run.emit({ type: "turnEnded", turn: run.state.turn });
 
-    if (run.state.turn >= run.state.turnCount) {
-      update(run, { stage: "over", endReason: "turnsCompleted" });
-      run.emit({ type: "gameOver", reason: "turnsCompleted", score });
-    } else {
-      update(run, { turn: run.state.turn + 1, stage: "draw" });
-    }
+    const reason = endReasonAt("turnEnd", run.state);
+    if (reason !== null) endGame(run, reason);
+    else update(run, { turn: run.state.turn + 1, stage: "draw" });
   });
 }
 
 // Le réducteur : pur, ne modifie jamais `state`. Même état + même action =
-// même résultat. `eventLimit` (facultatif) : la limite du bus pour cette action,
-// abaissée par les vérifications.
-export function marblesReduce(state, action, types, { eventLimit } = {}) {
+// même résultat. `options` (facultatif) :
+//   eventLimit  la limite du bus pour cette action, abaissée par les vérifications ;
+//   blind       le déroulé À L'AVEUGLE, celui de la prévision : aucune pioche n'y lit
+//               l'identité d'une bille ni le hasard de la partie (drawOne).
+export function marblesReduce(state, action, types, options = {}) {
   let refusal;
   switch (action?.type) {
     case "draw":
       refusal = stageRefusal(state, "draw");
-      return refusal ? refused(state, refusal) : transact(state, types, eventLimit, drawTurn);
+      return refusal ? refused(state, refusal) : transact(state, types, options, drawTurn);
     case "swap":
       refusal = swapRefused(state, action);
-      return refusal ? refused(state, refusal) : transact(state, types, eventLimit, (run) => swapSlots(run, action));
+      return refusal ? refused(state, refusal) : transact(state, types, options, (run) => swapSlots(run, action));
     case "place":
       refusal = placeRefusal(state, action.handIndex, action.slot);
-      return refusal ? refused(state, refusal) : transact(state, types, eventLimit, (run) => placeMarble(run, action));
+      return refusal ? refused(state, refusal) : transact(state, types, options, (run) => placeMarble(run, action));
     case "resolve":
       refusal = resolveRefusal(state);
-      return refusal ? refused(state, refusal) : runResolution(state, types, { eventLimit });
+      return refusal ? refused(state, refusal) : runResolution(state, types, options);
     default:
       return refused(state, "unknownAction");
   }

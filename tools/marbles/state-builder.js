@@ -8,12 +8,12 @@
 //     "seed": 1,                      graine du hasard des régénérations à venir
 //     "turn": 3, "stage": "play",     "draw", "play" ou "over"
 //     "score": 12, "speed": 0, "mass": 1,
-//     "swapUsed": false, "hasPlaced": false,
+//     "swapUsed": false, "throwsUsed": 0,  lancers déjà joués ce tour
 //     "triangle": { "leftBase": "clay", "rightBase": "giant:0", "apex": null },
 //     "hand": ["agate", "shooter"],
 //     "bag": ["mica"],                du haut (prochaine pioche) vers le bas
 //     "discard": [],
-//     "settings": { "maxHandSize": 5, "firstTurnDraw": 5, "drawPerTurn": 1, "turnCount": 9 }
+//     "settings": { "maxHandSize": 5, "throwsPerTurn": 5, "firstTurnDraw": 5, "drawPerTurn": 1, "turnCount": 9 }
 //   }
 // Une bille du triangle : "id" (usure 0), "id:usure", ou { marble, wear, bonus? }.
 // Défauts : tour 2 en phase de jeu, triangle, main, sac et défausse vides,
@@ -21,13 +21,14 @@
 // emplacement inconnu, usure hors bornes) lève une erreur claire : jamais d'état
 // silencieusement faux.
 
+import { createSeed } from "../../core/rng.js";
 import { SLOTS } from "../../core/marbles.js";
 import { rejectUnknownFields } from "../../lib/validate.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
 import { GAME_RULES } from "./game-rules.js";
 
-const FIELDS = ["seed", "turn", "stage", "score", "speed", "mass", "swapUsed", "hasPlaced", "triangle", "hand", "bag", "discard", "settings"];
-const SETTINGS = ["maxHandSize", "firstTurnDraw", "drawPerTurn", "turnCount"];
+const FIELDS = ["seed", "turn", "stage", "score", "speed", "mass", "swapUsed", "throwsUsed", "triangle", "hand", "bag", "discard", "settings"];
+const SETTINGS = ["maxHandSize", "throwsPerTurn", "firstTurnDraw", "drawPerTurn", "turnCount"];
 const STAGES = ["draw", "play", "over"];
 
 function fail(message) {
@@ -71,7 +72,11 @@ export function buildState(description = {}) {
 
   // La partie de départ porte les réglages validés et l'état du hasard ; le sac
   // est ensuite posé tel quel, sans mélange, dans l'ordre décrit.
-  const base = GAME_RULES.createGame(description.seed ?? 0, { ...settings, bag: [] });
+  // Une partie exige un sac d'au moins 3 billes : elle naît d'un sac minimal, et
+  // garde le hasard d'une partie sans mélange, celui de la graine.
+  const seed = description.seed ?? 0;
+  const [first] = Object.keys(GAME_RULES.types);
+  const base = { ...GAME_RULES.createGame(seed, { ...settings, bag: [first, first, first] }), rngState: createSeed(seed) };
   const stage = description.stage ?? "play";
   if (!STAGES.includes(stage)) fail(`étape inconnue "${stage}".`);
   const turn = checkInteger(description.turn ?? 2, "turn", 1);
@@ -88,12 +93,18 @@ export function buildState(description = {}) {
     speed: Number.isInteger(description.speed ?? 0) ? description.speed ?? 0 : fail("speed doit être un entier."),
     mass: Number.isInteger(description.mass ?? 1) ? description.mass ?? 1 : fail("mass doit être un entier."),
     swapUsed: description.swapUsed ?? false,
-    hasPlaced: description.hasPlaced ?? false,
+    throwsUsed: checkThrowsUsed(description.throwsUsed ?? 0, base.throwsPerTurn),
     triangle: Object.fromEntries(SLOTS.map((slot) => [slot, slotContent(triangle[slot], slot)])),
     hand,
     bag: marbleList(description.bag, "bag"),
     discard: marbleList(description.discard, "discard"),
   };
+}
+
+// Les lancers déjà joués : entre 0 et la limite du tour.
+function checkThrowsUsed(value, throwsPerTurn) {
+  if (!Number.isInteger(value) || value < 0 || value > throwsPerTurn) fail(`throwsUsed doit être un entier entre 0 et ${throwsPerTurn}.`);
+  return value;
 }
 
 // Applique des actions dans l'ordre. -> { state, steps: [{ action, ok, error,

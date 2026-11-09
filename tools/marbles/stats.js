@@ -23,7 +23,7 @@ export function percentile(sorted, p) {
   return sorted[low] + (sorted[high] - sorted[low]) * (position - low);
 }
 
-const MARBLE_FIELDS = ["placed", "placedReplacing", "knockedOut", "worn", "phaseSpeed", "phaseMass", "hitSpeed", "hitMass", "knockoutSpeed", "knockoutMass"];
+const MARBLE_FIELDS = ["drawn", "placed", "placedReplacing", "knockedOut", "worn", "phaseSpeed", "phaseMass", "hitSpeed", "hitMass", "knockoutSpeed", "knockoutMass"];
 
 function marbleSummary(id, games, randomBags) {
   const present = games.filter((game) => game.bag.includes(id));
@@ -44,8 +44,10 @@ function marbleSummary(id, games, randomBags) {
 // -> le résumé :
 //   { games, score: { mean, median, min, max, p10, p25, p75, p90 },
 //     impact: { mean, perTurn: [{ turn, mean, games }] },
-//     end: { turnsCompleted, bagExhausted } (en % des parties),
+//     end: { turnsCompleted, outOfMarbles } (en % des parties),
 //     replacements: { perGame, hitSpeed, hitMass, knockoutSpeed, knockoutMass } (par partie),
+//     draws: { byEffect, regenerations, midTurnRegenerations } (par partie),
+//     throwsPerTurn (lancers par tour joué),
 //     refusals, marbles: [par bille, dans l'ordre de la table] }
 export function summarize({ params, games }) {
   const scores = games.map((game) => game.score).sort((a, b) => a - b);
@@ -71,7 +73,7 @@ export function summarize({ params, games }) {
       p90: round(percentile(scores, 90)),
     },
     impact: { mean: round(mean(games.flatMap((game) => game.impacts))), perTurn },
-    end: { turnsCompleted: share("turnsCompleted"), bagExhausted: share("bagExhausted") },
+    end: { turnsCompleted: share("turnsCompleted"), outOfMarbles: share("outOfMarbles") },
     replacements: {
       perGame: perGame((game) => game.replacements),
       hitSpeed: perGame((game) => game.hit.speed),
@@ -79,6 +81,12 @@ export function summarize({ params, games }) {
       knockoutSpeed: perGame((game) => game.knockout.speed),
       knockoutMass: perGame((game) => game.knockout.mass),
     },
+    draws: {
+      byEffect: perGame((game) => game.effectDraws),
+      regenerations: perGame((game) => game.regenerations),
+      midTurnRegenerations: perGame((game) => game.midTurnRegenerations),
+    },
+    throwsPerTurn: round(sum(games.map((game) => game.throws)) / Math.max(1, sum(games.map((game) => game.turns)))),
     refusals: sum(games.map((game) => game.refusals.length)),
     marbles: MARBLE_IDS.map((id) => marbleSummary(id, games, randomBags)),
   };

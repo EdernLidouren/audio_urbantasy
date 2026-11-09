@@ -19,7 +19,7 @@ import {
   MARBLES_SETTINGS,
 } from "../../config/marbles-values.js";
 import { detailLine, stepDetail } from "../../lib/detail-card.js";
-import { createMarblesGame, marblesReduce, MARBLE_ERRORS, SLOTS } from "../marbles.js";
+import { createMarblesGame, marblesReduce, END_REASONS, MARBLE_ERRORS, SLOTS } from "../marbles.js";
 import {
   bagDisplayOrder,
   buildSteps,
@@ -63,6 +63,7 @@ import { pathLength, rollAt, rollDurationMs, rollEnvelope } from "../../view/mar
 import { EMPTY_SOUND_QUEUE, advanceSoundQueue, enqueueCues } from "../../view/marbles/sound-queue.js";
 import { throws } from "../../lib/check.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
+import { emptyBagMarblesGame } from "./helpers.js";
 import { createMarblesRules } from "../marbles-rules.js";
 import { effectAt } from "../marbles-effects.js";
 
@@ -105,12 +106,14 @@ function sampleEvents() {
   // Une main pleine, pour la pioche sautée.
   const fullHand = rules.reduce({ ...rules.createGame(4), stage: "draw", turn: 2, hand: ["clay", "glass", "agate", "mica", "tiger"] }, { type: "draw" });
   events.push(...fullHand.events);
-  let small = rules.createGame(2, { bag: ["clay", "glass"] });
-  const end = rules.reduce(small, { type: "draw" });
-  small = end.state;
+  // Sac vide, défausse pleine : la défausse devient le sac.
+  const regenerated = rules.reduce({ ...emptyBagMarblesGame(rules, 5), turn: 2, stage: "draw", hand: [], discard: ["clay", "glass"] }, { type: "draw" });
+  events.push(...regenerated.events);
+  // Sac et défausse vides : la pioche s'arrête, la partie finit.
+  const end = rules.reduce({ ...emptyBagMarblesGame(rules, 2), turn: 2, stage: "draw", hand: ["clay"] }, { type: "draw" });
   events.push(...end.events);
   // Un tour avec des emplacements vides, pour les phases sautées.
-  const skipped = rules.reduce({ ...rules.createGame(3, { bag: [] }), turn: 2, stage: "play" }, { type: "resolve" });
+  const skipped = rules.reduce({ ...emptyBagMarblesGame(rules, 3), turn: 2, stage: "play" }, { type: "resolve" });
   events.push(...skipped.events);
   return { events, state: { ...state, stage: "play" } };
 }
@@ -137,7 +140,7 @@ function checkCards(run) {
     );
     run.same(
       "fiche : éjection au-dessous, base sans effet",
-      { above: ["Pointe : Vitesse +8.", "Base : aucun effet."], below: ["Éjection : Vitesse +3."] },
+      { above: ["Pointe : Vitesse +6.", "Base : aucun effet."], below: ["Éjection : Vitesse +3."] },
       fields("shooter")
     );
     run.same(
@@ -160,6 +163,12 @@ function checkCards(run) {
       "Base gauche : Vitesse +4 à la pointe si son effet de pointe donne au moins Vitesse +1. Base droite : Vitesse +1.",
       fields("magnifier").above[1]
     );
+    run.same("fiche : la Pioche en base", { above: ["Pointe : Vitesse +2.", "Base : Pioche 1."], below: ["Aucun effet particulier."] }, fields("mica"));
+    run.same("fiche : la Pioche au tic", ["Tic : Pioche 1."], fields("cats_eye").below);
+    run.same("fiche : la Pioche à l'éjection", ["Éjection : Pioche 1."], fields("stoneware").below);
+    setLocale("en");
+    run.same("fiche, anglais : la Pioche", ["Apex: Speed +2.", "Base: Draw 1."], fields("mica").above);
+    setLocale("fr");
     run.same(
       "fiche : tic et éjection dans l'ordre",
       ["Tic : Vitesse +1.", "Éjection : Masse +2."],
@@ -264,7 +273,7 @@ function checkBagOrder(run) {
   run("sac : la partie comparée pioche bien", true, plainGame.journal.some((event) => event.type === "draw"));
 
   // La défausse : l'ordre d'arrivée, celui que tient l'état.
-  let state = { ...rules.createGame(1, { bag: [] }), turn: 2, stage: "play", hand: ["clay", "glass", "agate"] };
+  let state = { ...emptyBagMarblesGame(rules, 1), turn: 2, stage: "play", hand: ["clay", "glass", "agate"] };
   state = { ...state, triangle: { leftBase: { marble: "mica", wear: 0 }, rightBase: { marble: "tiger", wear: 0 }, apex: { marble: "giant", wear: 0 } } };
   for (const slot of ["apex", "leftBase", "rightBase"]) state = rules.reduce(state, { type: "place", handIndex: 0, slot }).state;
   run.same("défausse : de la plus ancienne à la plus récente", ["giant", "mica", "tiger"], state.discard);
@@ -621,6 +630,8 @@ export default function checkMarblesView(run) {
       run.same(`${locale} : aucun nom sans bille`, [], orphanNames);
       const missingErrors = MARBLE_ERRORS.filter((code) => !Object.hasOwn(LOCALE_TABLES[locale], `marbles.error.${code}`));
       run.same(`${locale} : chaque refus a son texte`, [], missingErrors);
+      const missingEnds = END_REASONS.filter((reason) => !Object.hasOwn(LOCALE_TABLES[locale], `marbles.event.game_over.${reason}`));
+      run.same(`${locale} : chaque fin de partie a son texte`, [], missingEnds);
 
       const dirtySteps = buildSteps(events, t).map((step) => step.text).filter((text) => !isClean(text));
       run.same(`${locale} : chaque étape du journal se dit`, [], dirtySteps.slice(0, 3));
@@ -709,7 +720,7 @@ export default function checkMarblesView(run) {
     run("texte : bille active", "calot, pointe, usure 1 sur 3.", said(describeSlotFocus(lensed, "apex", rules, t)));
     run("texte : emplacement vide", "base droite : vide.", said(describeSlotFocus(lensed, "rightBase", rules, t)));
     // Pendant une pose, la prévision reste.
-    run("texte : pose, emplacement occupé", "pointe, calot : Vitesse +12.", said(describeSlotForPlacement(lensed, "apex", rules, t)));
+    run("texte : pose, emplacement occupé", "pointe, calot : Vitesse +10.", said(describeSlotForPlacement(lensed, "apex", rules, t)));
     run("texte : pose, emplacement vide", "base droite", said(describeSlotForPlacement(lensed, "rightBase", rules, t)));
 
     // S et D : les nombres et leurs accords.
@@ -771,11 +782,11 @@ export default function checkMarblesView(run) {
     );
     const lensedSteps = buildSteps(rules.reduce(lensed, { type: "resolve" }).events, t).map((step) => said(step.text));
     run("texte : la loupe ne produit rien elle-même", "base gauche, loupe : aucun effet.", lensedSteps[0]);
-    run("texte : le bonus s'entend chez qui le reçoit", "pointe, calot : Vitesse +12.", lensedSteps[2]);
+    run("texte : le bonus s'entend chez qui le reçoit", "pointe, calot : Vitesse +10.", lensedSteps[2]);
     run.same("étapes : aucune étape silencieuse", [], buildSteps(events, t).filter((step) => step.text === ""));
     run(
       "texte : le tour, compteurs compris",
-      "Tour 2 sur 9. Score 5. Vitesse 5, Masse 2. Échange disponible.",
+      "Tour 2 sur 9. Score 5. Vitesse 5, Masse 2. 4 lancers restants. Échange disponible.",
       said(describeTurn({ ...lensed, score: 5, speed: 5, mass: 2 }, true, t))
     );
 

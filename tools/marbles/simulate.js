@@ -13,13 +13,15 @@
 //   --seed <graine>        graine de départ (1) ; chaque partie a sa graine dérivée
 //   --player <id>          random, greedy (défaut), greedy-no-replacement
 //   --max-placements <n>   glouton : poses envisagées par tour après le premier (1)
+//   --drawn-value <x>      glouton : valeur d'une bille gagnée en main, en points
+//                          d'Impact, décimale permise (tools/marbles/drawn-value.js)
 //   --random-bag <n>       un sac aléatoire de n billes par partie, tirées dans la table
 //   --max-copies <n>       avec --random-bag : exemplaires d'une même bille au plus
 //                          (sans limite par défaut)
 //   --bag-file <chemin>    le sac d'un fichier (ids séparés par espaces, virgules ou
 //                          lignes, # commente ; ou liste JSON). Sans --random-bag ni
 //                          --bag-file : le sac de test.
-//   --hand-size <n>, --first-draw <n>, --draw <n>, --turns <n>
+//   --hand-size <n>, --throws <n>, --first-draw <n>, --draw <n>, --turns <n>
 //                          surcharges des réglages, pour cette simulation seulement
 //   --export <chemin>      résultats bruts : .json (un fichier) ou .csv (deux
 //                          fichiers, <nom>-games.csv et <nom>-marbles.csv)
@@ -48,10 +50,12 @@ const KNOWN_OPTIONS = [
   "--seed",
   "--player",
   "--max-placements",
+  "--drawn-value",
   "--random-bag",
   "--max-copies",
   "--bag-file",
   "--hand-size",
+  "--throws",
   "--first-draw",
   "--draw",
   "--turns",
@@ -78,18 +82,23 @@ try {
     bagMode = { kind: "list", source, marbles: parseBagText(await readFile(source, "utf-8")) };
   }
   const settings = {};
-  for (const [flag, setting] of [["--hand-size", "maxHandSize"], ["--first-draw", "firstTurnDraw"], ["--draw", "drawPerTurn"], ["--turns", "turnCount"]]) {
+  for (const [flag, setting] of [["--hand-size", "maxHandSize"], ["--throws", "throwsPerTurn"], ["--first-draw", "firstTurnDraw"], ["--draw", "drawPerTurn"], ["--turns", "turnCount"]]) {
     const value = integerOption(flag);
     if (value !== undefined) settings[setting] = value;
   }
   const maxPlacements = integerOption("--max-placements");
+  const drawnValueOption = option("--drawn-value");
+  if (drawnValueOption !== undefined && !/^\d+([.,]\d+)?$/.test(drawnValueOption)) throw new Error(`--drawn-value attend un nombre, pas "${drawnValueOption}".`);
+  const playerOptions = {};
+  if (maxPlacements !== undefined) playerOptions.maxPlacements = maxPlacements;
+  if (drawnValueOption !== undefined) playerOptions.drawnValue = Number(drawnValueOption.replace(",", "."));
 
   const started = performance.now();
   const result = simulate({
     games: integerOption("--games") ?? 1000,
     seed,
     player: option("--player") ?? "greedy",
-    playerOptions: maxPlacements === undefined ? {} : { maxPlacements },
+    playerOptions,
     bagMode,
     settings,
   });

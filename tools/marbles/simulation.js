@@ -25,7 +25,7 @@ import MARBLE_TYPES from "../../marbles/types/index.js";
 import { GAME_RULES } from "./game-rules.js";
 
 export const MARBLE_IDS = Object.keys(MARBLE_TYPES);
-export const SETTING_NAMES = ["maxHandSize", "firstTurnDraw", "drawPerTurn", "turnCount"];
+export const SETTING_NAMES = ["maxHandSize", "throwsPerTurn", "firstTurnDraw", "drawPerTurn", "turnCount"];
 
 // Au-delà, une partie ne finit pas : une faute de programmation, pas une partie.
 const MAX_ACTIONS_PER_GAME = 10_000;
@@ -100,6 +100,7 @@ export function parseBagText(text) {
 
 function emptyMarbleStats() {
   return {
+    drawn: 0,
     placed: 0,
     placedReplacing: 0,
     knockedOut: 0,
@@ -113,13 +114,29 @@ function emptyMarbleStats() {
   };
 }
 
-// Ce que le journal d'une action ajoute au relevé de la partie.
-function recordEvents(record, events) {
+// Ce que le journal d'une action ajoute au relevé de la partie. `actionType` : la
+// pioche du tour ("draw") pioche pour elle-même ; ailleurs, une pioche vient d'un
+// effet, celui de la bille du dernier évènement `effect`, et une régénération a lieu
+// en cours de tour.
+function recordEvents(record, events, actionType) {
   const stats = (id) => (record.marbles[id] ??= emptyMarbleStats());
+  const byEffect = actionType !== "draw";
+  let lastEffect = null;
   for (const event of events) {
     switch (event.type) {
+      case "draw":
+        if (byEffect) {
+          record.effectDraws += 1;
+          stats(lastEffect).drawn += 1;
+        }
+        break;
+      case "bagRegenerated":
+        record.regenerations += 1;
+        if (byEffect) record.midTurnRegenerations += 1;
+        break;
       case "placed":
         stats(event.marble).placed += 1;
+        record.throws += 1;
         break;
       case "hit":
         // Un Tic n'a lieu que sur un emplacement occupé : c'est un remplacement.
@@ -135,6 +152,7 @@ function recordEvents(record, events) {
       case "effect": {
         // speedDelta et massDelta comptent le bonus reçu : un bonus se compte chez
         // la bille qui le reçoit, comme dans la vue d'ensemble (touche R).
+        lastEffect = event.marble;
         const marble = stats(event.marble);
         marble[`${event.trigger}Speed`] += event.speedDelta;
         marble[`${event.trigger}Mass`] += event.massDelta;
@@ -157,7 +175,9 @@ function recordEvents(record, events) {
 
 // Une partie jouée de bout en bout. -> son relevé :
 //   { index, seed, bag, score, endReason, turns, impacts, replacements,
-//     hit: { speed, mass }, knockout: { speed, mass }, refusals, marbles: { id: stats } }
+//     hit: { speed, mass }, knockout: { speed, mass }, effectDraws, regenerations,
+//     midTurnRegenerations, throws, refusals, marbles: { id: stats } }
+// `effectDraws` : les billes piochées par des effets ; `throws` : les lancers joués.
 // `turns` : les tours résolus ; `impacts[k]` : l'Impact du tour k + 1.
 export function playGame({ index, seed, player, playerOptions = {}, bagMode, settings = {} }) {
   const bag = bagFor(bagMode, seed, index);
@@ -175,6 +195,10 @@ export function playGame({ index, seed, player, playerOptions = {}, bagMode, set
     replacements: 0,
     hit: { speed: 0, mass: 0 },
     knockout: { speed: 0, mass: 0 },
+    effectDraws: 0,
+    regenerations: 0,
+    midTurnRegenerations: 0,
+    throws: 0,
     refusals: [],
     marbles: {},
   };
@@ -188,7 +212,7 @@ export function playGame({ index, seed, player, playerOptions = {}, bagMode, set
       action = legalActions(state).find((legal) => legal.type !== "draw") ?? legalActions(state)[0];
       result = GAME_RULES.reduce(state, action);
     }
-    recordEvents(record, result.events);
+    recordEvents(record, result.events, action.type);
     state = result.state;
   }
 

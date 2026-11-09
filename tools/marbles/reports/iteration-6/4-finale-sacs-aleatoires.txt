@@ -1,0 +1,317 @@
+Itération 6, série 4 : finale avec des sacs aléatoires de 13 billes, 2 exemplaires au plus. 1000 parties, graine 1.
+
+=== Joueur random ===
+
+Simulation du jeu des billes.
+Joueur : aléatoire, uniforme parmi les actions légales.
+Parties : 1000, graine de départ 1.
+Sac : aléatoire, 13 billes tirées dans la table, 2 exemplaire(s) au plus par bille, un sac par partie.
+Réglages : main de 5, lancers par tour 5, pioche du premier tour 5, pioche par tour 1, tours 9.
+
+Score final.
+Moyenne 58,64. Médiane 57,5. Minimum 15, maximum 134.
+Centiles : 10e 37, 25e 46, 75e 70, 90e 83.
+
+Impact par tour.
+Moyenne 6,52 par tour joué.
+Tour 1 : 10,46.
+Tour 2 : 8,48.
+Tour 3 : 8,19.
+Tour 4 : 5,73.
+Tour 5 : 5,06.
+Tour 6 : 5,29.
+Tour 7 : 5,08.
+Tour 8 : 5,06.
+Tour 9 : 5,3.
+
+Fin de partie.
+Par le nombre de tours : 100 %. Par pioche impossible, faute de billes : 0 %.
+
+Remplacements, moyennes par partie.
+Poses sur un emplacement occupé : 8,73.
+Apporté par les tics : Vitesse 1,37, Masse 0,65.
+Apporté par les éjections : Vitesse 2,04, Masse 0,71.
+
+Pioche et lancers.
+Billes piochées par des effets : 2,48 par partie.
+Régénérations du sac : 0,86 par partie, dont 0,18 en cours de tour.
+Lancers : 1,66 par tour joué.
+Fins de partie par pioche impossible : 0 %.
+
+Par bille, moyennes par partie où elle est dans le sac.
+argile (clay), dans 706 parties.
+  Posée 1,63 fois, dont 0,97 en remplacement. Éjectée 1,01 fois, retirée par usure 0,44 fois.
+  Produit en phase Vitesse 4,99 et Masse 0, en tic Vitesse 1,95 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 59,17, sans elle 57,37 (294 parties), écart +1,8.
+verre (glass), dans 687 parties.
+  Posée 1,66 fois, dont 0,99 en remplacement. Éjectée 0,99 fois, retirée par usure 0,46 fois.
+  Produit en phase Vitesse 1,93 et Masse 1,71, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 57,94, sans elle 60,16 (313 parties), écart −2,22.
+calot (shooter), dans 671 parties.
+  Posée 1,64 fois, dont 0,99 en remplacement. Éjectée 1,01 fois, retirée par usure 0,46 fois.
+  Produit en phase Vitesse 5,23 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 3,04 et Masse 0.
+  Score moyen avec elle 60,48, sans elle 54,88 (329 parties), écart +5,6.
+agate, dans 695 parties.
+  Posée 1,64 fois, dont 0,93 en remplacement. Éjectée 1 fois, retirée par usure 0,44 fois.
+  Produit en phase Vitesse 0 et Masse 3,33, en tic Vitesse 0 et Masse 0,93, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 59,16, sans elle 57,46 (305 parties), écart +1,7.
+œil-de-chat (cats_eye), dans 699 parties.
+  Fait piocher 0,96 bille(s) par ses effets.
+  Posée 1,68 fois, dont 0,96 en remplacement. Éjectée 1,14 fois, retirée par usure 0,36 fois.
+  Produit en phase Vitesse 4,54 et Masse 0,7, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 60,12, sans elle 55,19 (301 parties), écart +4,93.
+porcelaine (porcelain), dans 682 parties.
+  Posée 1,66 fois, dont 0,96 en remplacement. Éjectée 0,76 fois, retirée par usure 0,77 fois.
+  Produit en phase Vitesse 6,36 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 58,34, sans elle 59,27 (318 parties), écart −0,93.
+plombée (leaded), dans 684 parties.
+  Posée 1,65 fois, dont 0,98 en remplacement. Éjectée 1,04 fois, retirée par usure 0,4 fois.
+  Produit en phase Vitesse −2,45 et Masse 3,22, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 1,04.
+  Score moyen avec elle 59,39, sans elle 57,02 (316 parties), écart +2,37.
+mica, dans 707 parties.
+  Fait piocher 1,6 bille(s) par ses effets.
+  Posée 1,7 fois, dont 0,99 en remplacement. Éjectée 1,19 fois, retirée par usure 0,32 fois.
+  Produit en phase Vitesse 1,76 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 57,74, sans elle 60,82 (293 parties), écart −3,08.
+sulfure (sulphide), dans 695 parties.
+  Posée 1,66 fois, dont 0,98 en remplacement. Éjectée 0,98 fois, retirée par usure 0,49 fois.
+  Produit en phase Vitesse 0 et Masse 2,73, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 56,76, sans elle 62,91 (305 parties), écart −6,15.
+grès (stoneware), dans 691 parties.
+  Fait piocher 0,97 bille(s) par ses effets.
+  Posée 1,71 fois, dont 0,96 en remplacement. Éjectée 0,97 fois, retirée par usure 0,5 fois.
+  Produit en phase Vitesse 3,69 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 58,39, sans elle 59,2 (309 parties), écart −0,81.
+tigrée (tiger), dans 701 parties.
+  Posée 1,63 fois, dont 0,92 en remplacement. Éjectée 1,14 fois, retirée par usure 0,26 fois.
+  Produit en phase Vitesse 4,62 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 58,24, sans elle 59,59 (299 parties), écart −1,35.
+géante (giant), dans 708 parties.
+  Posée 1,65 fois, dont 0,99 en remplacement. Éjectée 0,38 fois, retirée par usure 1,26 fois.
+  Produit en phase Vitesse 7,65 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 59,53, sans elle 56,48 (292 parties), écart +3,05.
+loupe (magnifier), dans 694 parties.
+  Posée 1,67 fois, dont 0,95 en remplacement. Éjectée 0,98 fois, retirée par usure 0,45 fois.
+  Produit en phase Vitesse 2,76 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 57,13, sans elle 62,07 (306 parties), écart −4,94.
+
+Observations.
+- La bille grès (stoneware) est la plus posée : 1,71 fois par partie.
+- La bille géante (giant) produit le plus de Vitesse en phase : 7,65 par partie.
+- La bille agate produit le plus de Masse en phase : 3,33 par partie.
+- La bille mica est la plus souvent éjectée : 1,19 fois par partie.
+- Plus forts écarts de score avec elle : calot (shooter) +5,6, œil-de-chat (cats_eye) +4,93, géante (giant) +3,05.
+- Plus faibles : sulfure (sulphide) −6,15, loupe (magnifier) −4,94, mica −3,08.
+
+Actions refusées : 0.
+Durée : 0,2 s.
+
+=== Joueur greedy ===
+
+Simulation du jeu des billes.
+Joueur : glouton, au plus 1 pose envisagée par tour après le premier, une bille gagnée en main valant 12,68 d'Impact.
+Parties : 1000, graine de départ 1.
+Sac : aléatoire, 13 billes tirées dans la table, 2 exemplaire(s) au plus par bille, un sac par partie.
+Réglages : main de 5, lancers par tour 5, pioche du premier tour 5, pioche par tour 1, tours 9.
+
+Score final.
+Moyenne 129,02. Médiane 128. Minimum 70, maximum 205.
+Centiles : 10e 94, 25e 110, 75e 147,25, 90e 163,1.
+
+Impact par tour.
+Moyenne 14,34 par tour joué.
+Tour 1 : 19,23.
+Tour 2 : 17,08.
+Tour 3 : 16,75.
+Tour 4 : 11,87.
+Tour 5 : 12,4.
+Tour 6 : 12,98.
+Tour 7 : 12,94.
+Tour 8 : 12,79.
+Tour 9 : 12,98.
+
+Fin de partie.
+Par le nombre de tours : 100 %. Par pioche impossible, faute de billes : 0 %.
+
+Remplacements, moyennes par partie.
+Poses sur un emplacement occupé : 2,69.
+Apporté par les tics : Vitesse 0,92, Masse 0,31.
+Apporté par les éjections : Vitesse 1,74, Masse 0,4.
+
+Pioche et lancers.
+Billes piochées par des effets : 4,06 par partie.
+Régénérations du sac : 0,95 par partie, dont 0,38 en cours de tour.
+Lancers : 1,21 par tour joué.
+Fins de partie par pioche impossible : 0 %.
+
+Par bille, moyennes par partie où elle est dans le sac.
+argile (clay), dans 706 parties.
+  Posée 1,12 fois, dont 0,65 en remplacement. Éjectée 0,23 fois, retirée par usure 0,72 fois.
+  Produit en phase Vitesse 10,71 et Masse 0, en tic Vitesse 1,3 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 128,88, sans elle 129,33 (294 parties), écart −0,45.
+verre (glass), dans 687 parties.
+  Posée 0,81 fois, dont 0,06 en remplacement. Éjectée 0,22 fois, retirée par usure 0,46 fois.
+  Produit en phase Vitesse 0,93 et Masse 1,59, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 127,24, sans elle 132,92 (313 parties), écart −5,68.
+calot (shooter), dans 671 parties.
+  Posée 1,5 fois, dont 0,2 en remplacement. Éjectée 0,86 fois, retirée par usure 0,39 fois.
+  Produit en phase Vitesse 16,89 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 2,59 et Masse 0.
+  Score moyen avec elle 134,82, sans elle 117,18 (329 parties), écart +17,64.
+agate, dans 695 parties.
+  Posée 1,07 fois, dont 0,44 en remplacement. Éjectée 0,22 fois, retirée par usure 0,7 fois.
+  Produit en phase Vitesse 0 et Masse 3,69, en tic Vitesse 0 et Masse 0,44, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 129,22, sans elle 128,56 (305 parties), écart +0,66.
+œil-de-chat (cats_eye), dans 699 parties.
+  Fait piocher 1,26 bille(s) par ses effets.
+  Posée 1,65 fois, dont 1,26 en remplacement. Éjectée 0,29 fois, retirée par usure 1,07 fois.
+  Produit en phase Vitesse 8,61 et Masse 1,36, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 126,72, sans elle 134,34 (301 parties), écart −7,62.
+porcelaine (porcelain), dans 682 parties.
+  Posée 1,27 fois, dont 0,13 en remplacement. Éjectée 0,09 fois, retirée par usure 1,07 fois.
+  Produit en phase Vitesse 11,43 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 128,9, sans elle 129,26 (318 parties), écart −0,36.
+plombée (leaded), dans 684 parties.
+  Posée 1,39 fois, dont 0,16 en remplacement. Éjectée 0,59 fois, retirée par usure 0,6 fois.
+  Produit en phase Vitesse −0,05 et Masse 5,8, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0,59.
+  Score moyen avec elle 134,91, sans elle 116,25 (316 parties), écart +18,66.
+mica, dans 707 parties.
+  Fait piocher 4,17 bille(s) par ses effets.
+  Posée 1,66 fois, dont 0,2 en remplacement. Éjectée 0,18 fois, retirée par usure 1,15 fois.
+  Produit en phase Vitesse 0,21 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 120,47, sans elle 149,64 (293 parties), écart −29,17.
+sulfure (sulphide), dans 695 parties.
+  Posée 1,09 fois, dont 0,22 en remplacement. Éjectée 0,25 fois, retirée par usure 0,62 fois.
+  Produit en phase Vitesse 0 et Masse 7,17, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 130,7, sans elle 125,19 (305 parties), écart +5,51.
+grès (stoneware), dans 691 parties.
+  Fait piocher 0,33 bille(s) par ses effets.
+  Posée 0,53 fois, dont 0,06 en remplacement. Éjectée 0,37 fois, retirée par usure 0,08 fois.
+  Produit en phase Vitesse 1,47 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 128,37, sans elle 130,45 (309 parties), écart −2,08.
+tigrée (tiger), dans 701 parties.
+  Posée 1,11 fois, dont 0,14 en remplacement. Éjectée 0,31 fois, retirée par usure 0,52 fois.
+  Produit en phase Vitesse 9,59 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 131,56, sans elle 123,05 (299 parties), écart +8,51.
+géante (giant), dans 708 parties.
+  Posée 1,65 fois, dont 0,29 en remplacement. Éjectée 0 fois, retirée par usure 1,65 fois.
+  Produit en phase Vitesse 10,2 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 128,66, sans elle 129,88 (292 parties), écart −1,22.
+loupe (magnifier), dans 694 parties.
+  Posée 0,87 fois, dont 0,06 en remplacement. Éjectée 0,3 fois, retirée par usure 0,43 fois.
+  Produit en phase Vitesse 1,21 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 128,98, sans elle 129,1 (306 parties), écart −0,12.
+
+Observations.
+- La bille mica est la plus posée : 1,66 fois par partie.
+- La bille calot (shooter) produit le plus de Vitesse en phase : 16,89 par partie.
+- La bille sulfure (sulphide) produit le plus de Masse en phase : 7,17 par partie.
+- La bille calot (shooter) est la plus souvent éjectée : 0,86 fois par partie.
+- Plus forts écarts de score avec elle : plombée (leaded) +18,66, calot (shooter) +17,64, tigrée (tiger) +8,51.
+- Plus faibles : mica −29,17, œil-de-chat (cats_eye) −7,62, verre (glass) −5,68.
+
+Actions refusées : 0.
+Durée : 3,7 s.
+
+=== Joueur greedy-no-replacement ===
+
+Simulation du jeu des billes.
+Joueur : glouton sans remplacement, au plus 1 pose envisagée par tour après le premier, une bille gagnée en main valant 12,68 d'Impact.
+Parties : 1000, graine de départ 1.
+Sac : aléatoire, 13 billes tirées dans la table, 2 exemplaire(s) au plus par bille, un sac par partie.
+Réglages : main de 5, lancers par tour 5, pioche du premier tour 5, pioche par tour 1, tours 9.
+
+Score final.
+Moyenne 121,64. Médiane 119. Minimum 42, maximum 199.
+Centiles : 10e 91, 25e 103, 75e 140, 90e 157.
+
+Impact par tour.
+Moyenne 13,52 par tour joué.
+Tour 1 : 19,23.
+Tour 2 : 13,78.
+Tour 3 : 15,23.
+Tour 4 : 7,3.
+Tour 5 : 10,69.
+Tour 6 : 14,11.
+Tour 7 : 13,79.
+Tour 8 : 13,87.
+Tour 9 : 13,63.
+
+Fin de partie.
+Par le nombre de tours : 100 %. Par pioche impossible, faute de billes : 0 %.
+
+Remplacements, moyennes par partie.
+Poses sur un emplacement occupé : 0.
+Apporté par les tics : Vitesse 0, Masse 0.
+Apporté par les éjections : Vitesse 0, Masse 0.
+
+Pioche et lancers.
+Billes piochées par des effets : 2,4 par partie.
+Régénérations du sac : 0,46 par partie, dont 0,24 en cours de tour.
+Lancers : 1,05 par tour joué.
+Fins de partie par pioche impossible : 0 %.
+
+Par bille, moyennes par partie où elle est dans le sac.
+argile (clay), dans 706 parties.
+  Posée 0,82 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,66 fois.
+  Produit en phase Vitesse 9,64 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 121,49, sans elle 121,98 (294 parties), écart −0,49.
+verre (glass), dans 687 parties.
+  Posée 0,84 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,63 fois.
+  Produit en phase Vitesse 1,07 et Masse 1,89, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 120,16, sans elle 124,87 (313 parties), écart −4,71.
+calot (shooter), dans 671 parties.
+  Posée 1,35 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 1,13 fois.
+  Produit en phase Vitesse 23,9 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 126,06, sans elle 112,6 (329 parties), écart +13,46.
+agate, dans 695 parties.
+  Posée 0,88 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,69 fois.
+  Produit en phase Vitesse 0 et Masse 3,12, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 121,36, sans elle 122,26 (305 parties), écart −0,9.
+œil-de-chat (cats_eye), dans 699 parties.
+  Posée 1,11 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,87 fois.
+  Produit en phase Vitesse 6,48 et Masse 1,04, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 121,44, sans elle 122,08 (301 parties), écart −0,64.
+porcelaine (porcelain), dans 682 parties.
+  Posée 1,24 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 1,14 fois.
+  Produit en phase Vitesse 11,46 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 122,69, sans elle 119,37 (318 parties), écart +3,32.
+plombée (leaded), dans 684 parties.
+  Posée 1,27 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 1,04 fois.
+  Produit en phase Vitesse −0,08 et Masse 6,89, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 126,88, sans elle 110,28 (316 parties), écart +16,6.
+mica, dans 707 parties.
+  Fait piocher 3,4 bille(s) par ses effets.
+  Posée 1,48 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 1,2 fois.
+  Produit en phase Vitesse 0,51 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 113,29, sans elle 141,76 (293 parties), écart −28,47.
+sulfure (sulphide), dans 695 parties.
+  Posée 0,87 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,66 fois.
+  Produit en phase Vitesse 0 et Masse 6,26, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 122,92, sans elle 118,71 (305 parties), écart +4,21.
+grès (stoneware), dans 691 parties.
+  Posée 0,45 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,34 fois.
+  Produit en phase Vitesse 2,32 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 121,19, sans elle 122,64 (309 parties), écart −1,45.
+tigrée (tiger), dans 701 parties.
+  Posée 0,98 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,64 fois.
+  Produit en phase Vitesse 9,73 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 123,08, sans elle 118,24 (299 parties), écart +4,84.
+géante (giant), dans 708 parties.
+  Posée 1,45 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 1,45 fois.
+  Produit en phase Vitesse 8,97 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 121,74, sans elle 121,37 (292 parties), écart +0,37.
+loupe (magnifier), dans 694 parties.
+  Posée 0,87 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,67 fois.
+  Produit en phase Vitesse 1,61 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Score moyen avec elle 121,1, sans elle 122,85 (306 parties), écart −1,75.
+
+Observations.
+- La bille mica est la plus posée : 1,48 fois par partie.
+- La bille calot (shooter) produit le plus de Vitesse en phase : 23,9 par partie.
+- La bille plombée (leaded) produit le plus de Masse en phase : 6,89 par partie.
+- Plus forts écarts de score avec elle : plombée (leaded) +16,6, calot (shooter) +13,46, tigrée (tiger) +4,84.
+- Plus faibles : mica −28,47, verre (glass) −4,71, loupe (magnifier) −1,75.
+
+Actions refusées : 0.
+Durée : 1,7 s.
+

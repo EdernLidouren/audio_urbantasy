@@ -1,79 +1,86 @@
 Simulation du jeu des billes.
-Joueur : glouton sans remplacement, au plus 1 pose envisagée par tour après le premier.
+Joueur : glouton sans remplacement, au plus 1 pose envisagée par tour après le premier, une bille gagnée en main valant 12,68 d'Impact.
 Parties : 1000, graine de départ 1.
 Sac : le sac de test.
-Réglages : main de 5, pioche du premier tour 5, pioche par tour 1, tours 9.
+Réglages : main de 5, lancers par tour 5, pioche du premier tour 5, pioche par tour 1, tours 9.
 
 Score final.
-Moyenne 153,6. Médiane 154. Minimum 93, maximum 208.
-Centiles : 10e 129, 25e 140, 75e 167, 90e 178.
+Moyenne 127,66. Médiane 128. Minimum 83, maximum 181.
+Centiles : 10e 105,9, 25e 116, 75e 139, 90e 150,1.
 
 Impact par tour.
-Moyenne 17,07 par tour joué.
-Tour 1 : 24,94.
-Tour 2 : 18,22.
-Tour 3 : 20,83.
-Tour 4 : 9,85.
-Tour 5 : 13,35.
-Tour 6 : 17,5.
-Tour 7 : 16.
-Tour 8 : 16,44.
-Tour 9 : 16,49.
+Moyenne 14,18 par tour joué.
+Tour 1 : 20,84.
+Tour 2 : 14,46.
+Tour 3 : 16,26.
+Tour 4 : 7,65.
+Tour 5 : 10,86.
+Tour 6 : 14,51.
+Tour 7 : 14,04.
+Tour 8 : 14,6.
+Tour 9 : 14,43.
 
 Fin de partie.
-Par le nombre de tours : 100 %. Par sac régénéré trop petit : 0 %.
+Par le nombre de tours : 100 %. Par pioche impossible, faute de billes : 0 %.
 
 Remplacements, moyennes par partie.
 Poses sur un emplacement occupé : 0.
 Apporté par les tics : Vitesse 0, Masse 0.
 Apporté par les éjections : Vitesse 0, Masse 0.
 
+Pioche et lancers.
+Billes piochées par des effets : 2,46 par partie.
+Régénérations du sac : 0,63 par partie, dont 0,23 en cours de tour.
+Lancers : 1,05 par tour joué.
+Fins de partie par pioche impossible : 0 %.
+
 Par bille, moyennes par partie où elle est dans le sac.
 argile (clay), dans 1000 parties.
-  Posée 0,69 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,55 fois.
-  Produit en phase Vitesse 7,58 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Posée 0,59 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,47 fois.
+  Produit en phase Vitesse 7,13 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
 verre (glass), dans 1000 parties.
-  Posée 0,67 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,52 fois.
-  Produit en phase Vitesse 0,76 et Masse 1,6, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Posée 0,56 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,42 fois.
+  Produit en phase Vitesse 0,61 et Masse 1,31, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
 calot (shooter), dans 1000 parties.
-  Posée 0,95 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,8 fois.
-  Produit en phase Vitesse 22,24 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Posée 0,96 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,79 fois.
+  Produit en phase Vitesse 17,35 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
 agate, dans 1000 parties.
-  Posée 0,73 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,56 fois.
-  Produit en phase Vitesse 0 et Masse 2,5, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Posée 0,64 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,48 fois.
+  Produit en phase Vitesse 0 et Masse 2,21, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
 œil-de-chat (cats_eye), dans 1000 parties.
-  Posée 0,84 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,7 fois.
-  Produit en phase Vitesse 4,92 et Masse 0,9, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Posée 0,72 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,59 fois.
+  Produit en phase Vitesse 4,23 et Masse 0,7, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
 porcelaine (porcelain), dans 1000 parties.
-  Posée 0,91 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,85 fois.
-  Produit en phase Vitesse 8,36 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Posée 0,9 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,82 fois.
+  Produit en phase Vitesse 8,63 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
 plombée (leaded), dans 1000 parties.
-  Posée 0,91 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,77 fois.
-  Produit en phase Vitesse 0 et Masse 5,03, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Posée 0,95 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,78 fois.
+  Produit en phase Vitesse −0,03 et Masse 5,15, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
 mica, dans 1000 parties.
-  Posée 0,07 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,04 fois.
-  Produit en phase Vitesse 0,41 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Fait piocher 2,46 bille(s) par ses effets.
+  Posée 1,03 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,82 fois.
+  Produit en phase Vitesse 0,16 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
 sulfure (sulphide), dans 1000 parties.
-  Posée 0,75 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,53 fois.
-  Produit en phase Vitesse 0 et Masse 5,39, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Posée 0,61 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,47 fois.
+  Produit en phase Vitesse 0 et Masse 4,39, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
 grès (stoneware), dans 1000 parties.
-  Posée 0,47 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,32 fois.
-  Produit en phase Vitesse 2,33 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Posée 0,24 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,19 fois.
+  Produit en phase Vitesse 1,29 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
 tigrée (tiger), dans 1000 parties.
-  Posée 0,84 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,51 fois.
-  Produit en phase Vitesse 8,13 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Posée 0,66 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,4 fois.
+  Produit en phase Vitesse 6,46 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
 géante (giant), dans 1000 parties.
-  Posée 0,96 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,96 fois.
-  Produit en phase Vitesse 6 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Posée 1 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 1 fois.
+  Produit en phase Vitesse 6,2 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
 loupe (magnifier), dans 1000 parties.
-  Posée 0,66 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,54 fois.
-  Produit en phase Vitesse 0,76 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
+  Posée 0,63 fois, dont 0 en remplacement. Éjectée 0 fois, retirée par usure 0,49 fois.
+  Produit en phase Vitesse 0,71 et Masse 0, en tic Vitesse 0 et Masse 0, en éjection Vitesse 0 et Masse 0.
 
 Observations.
-- La bille mica n'est presque jamais posée : 0,07 fois par partie.
-- La bille géante (giant) est la plus posée : 0,96 fois par partie.
-- La bille calot (shooter) produit le plus de Vitesse en phase : 22,24 par partie.
-- La bille sulfure (sulphide) produit le plus de Masse en phase : 5,39 par partie.
+- La bille grès (stoneware) n'est presque jamais posée : 0,24 fois par partie.
+- La bille mica est la plus posée : 1,03 fois par partie.
+- La bille calot (shooter) produit le plus de Vitesse en phase : 17,35 par partie.
+- La bille plombée (leaded) produit le plus de Masse en phase : 5,15 par partie.
 
 Actions refusées : 0.
-Durée : 1,4 s.
+Durée : 1,9 s.

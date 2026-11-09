@@ -13,6 +13,7 @@ import { parseCommand } from "../../tools/marbles/commands.js";
 import { formatEvent, formatState } from "../../tools/marbles/format.js";
 import { applyActions, buildState } from "../../tools/marbles/state-builder.js";
 import { PLAYERS, bestPlan, publicView } from "../../tools/marbles/players.js";
+import { MARBLES_DRAWN_VALUE } from "../../tools/marbles/drawn-value.js";
 import { MARBLE_IDS, deriveSeed, parseBagText, playGame, simulate } from "../../tools/marbles/simulation.js";
 import { percentile, summarize } from "../../tools/marbles/stats.js";
 import { buildReport, frNumber } from "../../tools/marbles/report.js";
@@ -32,6 +33,7 @@ export default function checkMarblesTools(run) {
   checkCommandsAndFormat(run);
   checkPublicView(run);
   checkGreedy(run);
+  checkDrawnValue(run);
   checkSimulation(run);
   checkReportAndExport(run);
 }
@@ -101,8 +103,8 @@ function checkCommandsAndFormat(run) {
 function checkPublicView(run) {
   const state = buildState({ hand: ["clay"], bag: ["agate", "mica", "giant"] });
   const view = publicView(state);
-  run.same("vue publique : sac vide", [], view.bag);
-  run("vue publique : le nombre de billes du sac reste", 3, view.bagSize);
+  run.same("vue publique : billes du sac inconnues", [null, null, null], view.bag);
+  run("vue publique : le nombre de billes du sac reste", 3, view.bag.length);
   run("vue publique : sans hasard de la partie", null, view.rngState);
   run("vue publique : une copie, l'état n'est pas touché", 3, state.bag.length);
 
@@ -118,7 +120,7 @@ function checkPublicView(run) {
           const inner = PLAYERS[id].startGame(args);
           return {
             next(seen) {
-              if (seen.bag.length > 0 || seen.rngState !== null) leaks.push(id);
+              if (seen.bag.some((marble) => marble !== null) || seen.rngState !== null) leaks.push(id);
               return inner.next(seen);
             },
           };
@@ -152,7 +154,8 @@ function checkGreedy(run) {
   // Un cas construit où le meilleur coup est un remplacement : la plombée éjecte le
   // calot de la pointe... ou l'inverse. Le glouton doit trouver le maximum que donne
   // une recherche exhaustive indépendante (pas d'échange ou chaque échange, puis
-  // aucune pose ou chaque pose).
+  // aucune pose ou chaque pose). Une bille gagnée en main n'y vaut rien
+  // (drawnValue 0) : le glouton ne compare alors que l'Impact.
   const state = buildState({
     turn: 4,
     triangle: { leftBase: "magnifier:1", rightBase: "glass", apex: "stoneware" },
@@ -168,7 +171,8 @@ function checkGreedy(run) {
       best = Math.max(best, predictedAfter(view, [...swap, place]));
     }
   }
-  const plan = bestPlan(view);
+  const impactOnly = { drawnValue: 0 };
+  const plan = bestPlan(view, impactOnly);
   run("glouton : l'Impact prévu maximal d'une recherche exhaustive", best, plan.impact);
   // Une pose du plan désigne sa bille : sa place dans la main se lit au moment de
   // jouer, comme le fait le joueur.
@@ -179,9 +183,9 @@ function checkGreedy(run) {
   }
   run("glouton : son plan rejoué donne l'Impact annoncé", plan.impact, rules.forecast(current).impact);
   run("glouton : une pose au plus après le premier tour", true, plan.choices.filter((choice) => choice.type === "place").length <= 1);
-  run("glouton : deux poses envisagées, jamais pire", true, bestPlan(view, { maxPlacements: 2 }).impact >= plan.impact);
+  run("glouton : deux poses envisagées, jamais pire", true, bestPlan(view, { ...impactOnly, maxPlacements: 2 }).impact >= plan.impact);
 
-  const careful = bestPlan(view, { allowReplacement: false });
+  const careful = bestPlan(view, { ...impactOnly, allowReplacement: false });
   run(
     "sans remplacement : jamais de pose sur un emplacement occupé",
     true,
@@ -203,9 +207,32 @@ function checkGreedy(run) {
       }
     }
   }
-  const firstPlan = bestPlan(publicView(first));
+  const firstPlan = bestPlan(publicView(first), impactOnly);
   run("glouton, premier tour : le meilleur remplissage", firstBest, firstPlan.impact);
   run.same("glouton, premier tour : les trois emplacements", [...SLOTS].sort(), firstPlan.choices.map((choice) => choice.slot).sort());
+}
+
+// La valeur d'une bille gagnée en main : sans elle, une bille qui pioche ne vaut rien
+// pour le glouton ; avec elle, il la joue quand elle rapporte plus que l'Impact perdu.
+function checkDrawnValue(run) {
+  run("bille gagnée : la valeur par défaut, mesurée sur la référence", 12.68, MARBLES_DRAWN_VALUE);
+  run("bille gagnée : dite dans la description du joueur", true, PLAYERS.greedy.describe({}).includes("12,68"));
+  // Le Tic de l'œil-de-chat pioche : une pose sur un emplacement occupé.
+  const view = publicView(buildState({ turn: 4, triangle: { leftBase: "clay", rightBase: "glass", apex: null }, hand: ["cats_eye", "agate"], bag: ["tiger", "giant"] }));
+  const greedy = bestPlan(view, { drawnValue: 100 });
+  run("bille gagnée : très chère, le glouton pioche", true, greedy.drawn >= 1);
+  run("bille gagnée : la valeur du plan", greedy.impact + 100 * greedy.drawn, greedy.value);
+  run("bille gagnée : sans valeur, l'Impact seul décide", true, bestPlan(view, { drawnValue: 0 }).impact >= greedy.impact);
+  run("bille gagnée : la planification ne révèle rien du sac", true, view.bag.every((marble) => marble === null));
+  run("bille gagnée : valeur négative refusée", true, throws(() => PLAYERS.greedy.startGame({ seed: 1, options: { drawnValue: -1 } })));
+
+  // La simulation compte les pioches d'effets, les régénérations et les lancers.
+  const summary = summarize(simulate({ games: 60, seed: 5, player: "greedy" }));
+  run("simulation : des billes piochées par des effets", true, summary.draws.byEffect > 0);
+  run("simulation : régénérations en cours de tour, comprises dans le total", true, summary.draws.midTurnRegenerations <= summary.draws.regenerations);
+  run("simulation : jamais plus de lancers que la limite", true, summary.throwsPerTurn > 0 && summary.throwsPerTurn <= MARBLES_SETTINGS.throwsPerTurn);
+  run("simulation : le mica fait piocher", true, summary.marbles.find((marble) => marble.id === "mica").drawn > 0);
+  run("simulation : l'argile ne fait jamais piocher", 0, summary.marbles.find((marble) => marble.id === "clay").drawn);
 }
 
 function checkSimulation(run) {

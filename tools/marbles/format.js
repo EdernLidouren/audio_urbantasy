@@ -45,7 +45,7 @@ export function formatState(state, name) {
   const lines = [
     `Tour ${state.turn} sur ${state.turnCount}, étape ${state.stage}${state.endReason ? `, fin : ${state.endReason}` : ""}.`,
     `Score ${state.score}. Vitesse ${formatCounter(state.speed)}, Masse ${formatCounter(state.mass)}.`,
-    `Échange utilisé : ${yesNo(state.swapUsed)}. Pose faite ce tour : ${yesNo(state.hasPlaced)}.`,
+    `Échange utilisé : ${yesNo(state.swapUsed)}. Lancers : ${state.throwsUsed} sur ${state.throwsPerTurn}.`,
     ...SLOTS.map((slot) => slotLine(state, slot, name)),
     `Main, ${state.hand.length} sur ${state.maxHandSize} : ${listOf(state.hand, name)}.`,
     `Sac, ${state.bag.length}, du haut vers le bas : ${listOf(state.bag, name)}.`,

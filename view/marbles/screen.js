@@ -46,7 +46,7 @@ import { detailAfterMainMove, detailLine, mainWithDetail, stepDetail } from "../
 import { t } from "../../data/i18n/index.js";
 import { MARBLES_SETTINGS } from "../../config/marbles-values.js";
 import { isDebugEnabled } from "../../config/debug.js";
-import { SLOTS, swapRefusal, placeRefusal } from "../../core/marbles.js";
+import { SLOTS, swapRefusal, placeRefusal, throwRefusal } from "../../core/marbles.js";
 import { playMenuSound } from "../menu-sounds.js";
 import { openConfirmation } from "../menus/confirmation.js";
 import { INITIAL_CURSOR, cursorOn, placementStart, stepCursor, zoneOf } from "./navigation.js";
@@ -371,6 +371,12 @@ export function makeMarblesScreen(getGame, setGame, rules) {
     if (game.hand.length === 0) {
       playMenuSound("block");
       announceFocus();
+      return;
+    }
+    // Plus de lancer : refusé dès la prise, comme l'échange.
+    const refusal = throwRefusal(game);
+    if (refusal) {
+      refuse(refusal);
       return;
     }
     // La sélection d'emplacement s'ouvre sur le premier emplacement vide, et le dit.

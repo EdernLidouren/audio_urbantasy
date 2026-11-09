@@ -31,7 +31,7 @@ export function createMarblesRules(types) {
     types,
     // Une partie neuve. `options` : bag et réglages propres à cette partie.
     createGame: (seed, options = {}) => createMarblesGame(seed, options, types),
-    // Le réducteur. `options` : { eventLimit }, pour les vérifications du bus.
+    // Le réducteur. `options` : { eventLimit, blind } (core/marbles.js/marblesReduce).
     reduce: (state, action, options) => marblesReduce(state, action, types, options),
     // La prévision du tour, `action` envisagée ou non.
     forecast: (state, action = null) => forecast(state, action, types),

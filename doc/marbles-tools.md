@@ -23,6 +23,7 @@ Les modules qu'ils partagent, purs (sans Node, donc vérifiables) :
 | `tools/marbles/format.js` | L'état et le journal en lignes lisibles |
 | `tools/marbles/state-builder.js` | L'état construit à la main (`buildState`) et l'application d'actions (`applyActions`) |
 | `tools/marbles/players.js` | Les joueurs automatiques et la vue publique qu'ils reçoivent |
+| `tools/marbles/drawn-value.js` | La valeur d'une bille gagnée en main pour le glouton, et comment elle a été mesurée |
 | `tools/marbles/simulation.js` | Les parties du simulateur, les graines dérivées, les sacs |
 | `tools/marbles/stats.js` | Le résumé chiffré d'une simulation |
 | `tools/marbles/report.js` | Le rapport en phrases, et ses observations |
@@ -62,31 +63,42 @@ node tools/marbles/simulate.js --games 200 --export resultats.csv
 ```
 
 Toutes les options sont en tête de `tools/marbles/simulate.js` : nombre de parties,
-graine de départ, joueur, poses envisagées par le glouton, sac (de test, aléatoire avec
-une limite d'exemplaires, ou d'un fichier), surcharges des réglages (taille de main,
-pioches, nombre de tours, pour cette simulation seulement) et export.
+graine de départ, joueur, poses envisagées par le glouton, valeur d'une bille gagnée en
+main (`--drawn-value`), sac (de test, aléatoire avec une limite d'exemplaires, ou d'un
+fichier), surcharges des réglages (taille de main, lancers, pioches, nombre de tours, pour
+cette simulation seulement) et export.
 
 **Déterminisme** : chaque partie reçoit ses graines dérivées de la graine de départ
 (partie, joueur, sac). Mêmes options, même rapport au caractère près, sauf la dernière
 ligne, la durée.
 
 **Les joueurs** (`tools/marbles/players.js`) ne savent que ce qu'un humain sait : ils
-reçoivent une vue publique de l'état, sac vidé (seul son nombre de billes reste) et
+reçoivent une vue publique de l'état, billes du sac inconnues (seul leur nombre reste) et
 hasard de la partie retiré, et n'agissent que par les actions du réducteur, validées
-comme celles d'un humain. Leurs choix aléatoires passent par leur propre générateur.
+comme celles d'un humain, lancers compris. Pour planifier, le glouton passe par le
+réducteur à l'aveugle : une Pioche y donne une bille inconnue, qu'il ne planifie pas. Leurs
+choix aléatoires passent par leur propre générateur.
 
 | Joueur | Ce qu'il fait |
 |---|---|
 | `random` | Uniforme parmi les actions légales (`core/marbles.js/legalActions`), résolution comprise : la référence basse |
-| `greedy` | Évalue par la prévision chaque combinaison du tour (pas d'échange ou chaque échange, puis jusqu'à `--max-placements` poses, 1 par défaut ; au premier tour, chaque remplissage du triangle) et joue celle de l'Impact prévu le plus haut ; à égalité, la plus simple |
+| `greedy` | Évalue par la prévision chaque combinaison du tour (pas d'échange ou chaque échange, puis jusqu'à `--max-placements` poses, 1 par défaut ; au premier tour, chaque remplissage du triangle) et joue celle de la plus haute valeur : l'Impact prévu, plus `--drawn-value` par bille que le plan piocherait ; à égalité, la plus simple |
 | `greedy-no-replacement` | Le même, sans jamais poser sur un emplacement occupé : l'écart avec `greedy` mesure ce que rapportent le tic et l'éjection |
 
 Ils sont myopes : aucun ne prévoit au-delà du tour. Un nouveau joueur est une entrée de
 plus dans `PLAYERS`, sans toucher au simulateur.
 
+**La valeur d'une bille gagnée en main** (`tools/marbles/drawn-value.js`, 12,68 par défaut) :
+le glouton ne voit que l'Impact du tour, et jugerait nulles les billes qui piochent. Elle est
+mesurée sur le rapport glouton de référence, d'avant la Pioche : score moyen 164,825 pour 13
+billes piochées par partie. `--drawn-value 0` rend le glouton d'avant.
+
 **Le rapport** : score final (moyenne, médiane, extrêmes, centiles 10, 25, 75 et 90,
 par interpolation linéaire), Impact moyen par tour et par numéro de tour, fins de partie,
-remplacements, puis chaque bille (poses et remplacements, éjections, retraits par usure,
+remplacements, pioche et lancers (billes piochées par des effets, régénérations du sac dont
+celles en cours de tour, lancers par tour joué, fins par pioche impossible), puis chaque
+bille (billes que ses effets ont fait piocher, s'il y en a, poses et remplacements,
+éjections, retraits par usure,
 Vitesse et Masse produites en phase, en tic et en éjection, et, avec des sacs
 aléatoires, le score moyen avec et sans elle). Les moyennes d'une bille sont prises sur
 les parties où elle est dans le sac ; un bonus reçu se compte chez la bille qui le

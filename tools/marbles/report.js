@@ -24,6 +24,7 @@ export function frNumber(value, { signed = false } = {}) {
 
 const SETTING_LABELS = {
   maxHandSize: "main de",
+  throwsPerTurn: "lancers par tour",
   firstTurnDraw: "pioche du premier tour",
   drawPerTurn: "pioche par tour",
   turnCount: "tours",
@@ -50,6 +51,8 @@ function marbleLines(marble, name, randomBags) {
   if (marble.games === 0) return [`${marbleLabel(marble.id, name)} : dans aucun sac.`];
   const lines = [
     `${marbleLabel(marble.id, name)}, dans ${marble.games} parties.`,
+    // Seulement pour une bille qui pioche : les autres gardent leurs deux lignes.
+    ...(marble.drawn > 0 ? [`  Fait piocher ${n(marble.drawn)} bille(s) par ses effets.`] : []),
     `  Posée ${n(marble.placed)} fois, dont ${n(marble.placedReplacing)} en remplacement. Éjectée ${n(marble.knockedOut)} fois, retirée par usure ${n(marble.worn)} fois.`,
     `  Produit en phase Vitesse ${n(marble.phaseSpeed)} et Masse ${n(marble.phaseMass)}, en tic Vitesse ${n(marble.hitSpeed)} et Masse ${n(marble.hitMass)}, en éjection Vitesse ${n(marble.knockoutSpeed)} et Masse ${n(marble.knockoutMass)}.`,
   ];
@@ -98,7 +101,7 @@ export function observations(summary, name) {
 // Le rapport, ligne par ligne. `name(id)` : le nom d'une bille (son id par défaut).
 export function buildReport({ params, summary, name }) {
   const n = frNumber;
-  const { score, impact, end, replacements } = summary;
+  const { score, impact, end, replacements, draws } = summary;
   const randomBags = params.bagMode.kind === "random";
   const lastTurns = impact.perTurn.map(({ turn, mean, games }) =>
     games === summary.games ? `Tour ${turn} : ${n(mean)}.` : `Tour ${turn} : ${n(mean)}, sur ${games} parties.`
@@ -119,12 +122,18 @@ export function buildReport({ params, summary, name }) {
     ...lastTurns,
     "",
     "Fin de partie.",
-    `Par le nombre de tours : ${n(end.turnsCompleted)} %. Par sac régénéré trop petit : ${n(end.bagExhausted)} %.`,
+    `Par le nombre de tours : ${n(end.turnsCompleted)} %. Par pioche impossible, faute de billes : ${n(end.outOfMarbles)} %.`,
     "",
     "Remplacements, moyennes par partie.",
     `Poses sur un emplacement occupé : ${n(replacements.perGame)}.`,
     `Apporté par les tics : Vitesse ${n(replacements.hitSpeed)}, Masse ${n(replacements.hitMass)}.`,
     `Apporté par les éjections : Vitesse ${n(replacements.knockoutSpeed)}, Masse ${n(replacements.knockoutMass)}.`,
+    "",
+    "Pioche et lancers.",
+    `Billes piochées par des effets : ${n(draws.byEffect)} par partie.`,
+    `Régénérations du sac : ${n(draws.regenerations)} par partie, dont ${n(draws.midTurnRegenerations)} en cours de tour.`,
+    `Lancers : ${n(summary.throwsPerTurn)} par tour joué.`,
+    `Fins de partie par pioche impossible : ${n(end.outOfMarbles)} %.`,
     "",
     "Par bille, moyennes par partie où elle est dans le sac.",
     ...summary.marbles.flatMap((marble) => marbleLines(marble, name, randomBags)),

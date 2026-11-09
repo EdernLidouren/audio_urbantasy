@@ -29,7 +29,8 @@
 //
 // Un effet est une LISTE DE CLAUSES ; une clause (core/marbles-effects.js) :
 //   action  ce qu'elle fait : "speed" ou "mass", qui ajoutent `amount` (entier,
-//           négatif permis) à la Vitesse ou à la Masse ;
+//           négatif permis) à la Vitesse ou à la Masse ; "draw", la Pioche, qui
+//           pioche `amount` billes (au moins 1, jamais de cible) ;
 //   amount  la valeur ;
 //   target  (facultatif) l'emplacement dont elle modifie l'effet de phase, au
 //           lieu d'agir sur le compteur du tour ;

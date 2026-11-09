@@ -9,6 +9,7 @@ import { nextRandom } from "../rng.js";
 import { SLOTS, createMarblesGame, marblesReduce } from "../marbles.js";
 import { forecast, readForecast } from "../marbles-forecast.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
+import { emptyBagMarblesGame } from "./helpers.js";
 import { createMarblesRules } from "../marbles-rules.js";
 
 // Les règles du jeu, liées à la vraie table (core/marbles-rules.js).
@@ -17,7 +18,7 @@ const rules = createMarblesRules(MARBLE_TYPES);
 const placed = (marble, wear = 0) => ({ marble, wear });
 
 function playState(over = {}) {
-  return { ...rules.createGame(1, { bag: [] }), turn: 2, stage: "play", ...over };
+  return { ...emptyBagMarblesGame(rules, 1), turn: 2, stage: "play", ...over };
 }
 
 function deepFreeze(value) {
@@ -30,39 +31,80 @@ function deepFreeze(value) {
 
 export default function checkMarblesForecast(run) {
   checkCases(run);
+  checkBlindDraws(run);
   checkGuards(run);
   checkMatchesReality(run);
+}
+
+// La pioche À L'AVEUGLE : la prévision compte les billes et annonce la
+// régénération, sans jamais dire lesquelles, ni toucher au hasard de la partie.
+function checkBlindDraws(run) {
+  const occupied = { leftBase: null, rightBase: null, apex: placed("stoneware") };
+  // Le sulfure n'est qu'au sac : la prévision ne doit jamais le nommer.
+  const state = playState({ hand: ["cats_eye"], bag: ["sulphide"], discard: [], triangle: occupied });
+  const predicted = rules.forecast(state, { type: "place", handIndex: 0, slot: "apex" });
+  run.same("aveugle : l'Éjection pioche 1", { marble: "stoneware", speed: 0, mass: 0, draw: 1, given: [] }, predicted.knockout);
+  run.same("aveugle : le Tic pioche 1", { marble: "cats_eye", speed: 0, mass: 0, draw: 1, given: [] }, predicted.hit);
+  run("aveugle : deux billes piochées", 2, predicted.drawn);
+  run("aveugle : la seconde régénère le sac (le grès éjecté)", true, predicted.regenerates);
+  run("aveugle : aucune bille du sac révélée", false, JSON.stringify(predicted).includes("sulphide"));
+  run("aveugle : rien d'incertain, aucune bille n'écoute la main", false, predicted.uncertain);
+
+  // Le réel : mêmes comptes.
+  const real = rules.reduce(state, { type: "place", handIndex: 0, slot: "apex" });
+  const resolved = rules.reduce(real.state, { type: "resolve" });
+  const actual = readForecast(real.events, resolved.events);
+  run("aveugle : le réel pioche autant", predicted.drawn, actual.drawn);
+  run("aveugle : le réel régénère aussi", true, actual.regenerates);
+
+  // Le hasard de la partie n'est ni lu ni avancé : deux états qui ne diffèrent que
+  // par lui donnent la même prévision, et l'état reçu (figé) n'est pas touché.
+  const other = { ...state, rngState: state.rngState + 12345 };
+  run(
+    "aveugle : le hasard de la partie n'y change rien",
+    JSON.stringify(predicted),
+    JSON.stringify(rules.forecast(other, { type: "place", handIndex: 0, slot: "apex" }))
+  );
+  const frozen = deepFreeze(structuredClone(state));
+  run("aveugle : l'état reçu n'est pas modifié", true, rules.forecast(frozen, { type: "place", handIndex: 0, slot: "apex" }).ok);
+  run("aveugle : son hasard non plus", state.rngState, frozen.rngState);
+
+  // Une phase qui pioche, sur le triangle actuel : sa Pioche est une valeur finale.
+  const phase = rules.forecast(playState({ hand: [], bag: [], discard: [], triangle: { leftBase: placed("mica"), rightBase: null, apex: null } }));
+  run.same("aveugle : la phase du mica, Pioche 1", { marble: "mica", speed: 0, mass: 0, draw: 1, given: [] }, phase.phases.leftBase);
+  run("aveugle : rien à piocher, rien de pioché", 0, phase.drawn);
+  run("aveugle : ni régénération", false, phase.regenerates);
 }
 
 function checkCases(run) {
   // Bille active, sur le triangle actuel : bonus reçu annoncé chez elle.
   const triangle = { leftBase: placed("magnifier"), rightBase: placed("glass"), apex: placed("shooter") };
   const current = rules.forecast(playState({ triangle, hand: ["clay", "agate"] }));
-  run.same("triangle actuel : le calot, bonus compris", { marble: "shooter", speed: 12, mass: 0, given: [] }, current.phases.apex);
+  run.same("triangle actuel : le calot, bonus compris", { marble: "shooter", speed: 10, mass: 0, draw: 0, given: [] }, current.phases.apex);
   run.same(
     "triangle actuel : la loupe dit ce qu'elle donne",
-    { marble: "magnifier", speed: 0, mass: 0, given: [{ slot: "apex", marble: "shooter", speed: 4, mass: 0 }] },
+    { marble: "magnifier", speed: 0, mass: 0, draw: 0, given: [{ slot: "apex", marble: "shooter", speed: 4, mass: 0 }] },
     current.phases.leftBase
   );
-  run.same("triangle actuel : le verre", { marble: "glass", speed: 0, mass: 1, given: [] }, current.phases.rightBase);
+  run.same("triangle actuel : le verre", { marble: "glass", speed: 0, mass: 1, draw: 0, given: [] }, current.phases.rightBase);
   run("triangle actuel : ni Éjection", null, current.knockout);
   run("triangle actuel : ni Tic", null, current.hit);
-  run("triangle actuel : Impact du tour", 24, current.impact);
+  run("triangle actuel : Impact du tour", 20, current.impact);
   const holes = rules.forecast(playState({ triangle: { leftBase: null, rightBase: null, apex: placed("clay") } }));
   run("triangle actuel : emplacement vide", null, holes.phases.leftBase);
 
   // Bille de la main, posée : triangle simulé, Éjection et Tic compris.
   const state = playState({ triangle, hand: ["clay", "agate"] });
   const replacing = rules.forecast(state, { type: "place", handIndex: 0, slot: "apex" });
-  run.same("pose : effet de phase sur le triangle simulé", { marble: "clay", speed: 8, mass: 0, given: [] }, replacing.phases.apex);
-  run.same("pose : Éjection de la bille remplacée", { marble: "shooter", speed: 3, mass: 0, given: [] }, replacing.knockout);
-  run.same("pose : Tic de la bille posée", { marble: "clay", speed: 2, mass: 0, given: [] }, replacing.hit);
+  run.same("pose : effet de phase sur le triangle simulé", { marble: "clay", speed: 8, mass: 0, draw: 0, given: [] }, replacing.phases.apex);
+  run.same("pose : Éjection de la bille remplacée", { marble: "shooter", speed: 3, mass: 0, draw: 0, given: [] }, replacing.knockout);
+  run.same("pose : Tic de la bille posée", { marble: "clay", speed: 2, mass: 0, draw: 0, given: [] }, replacing.hit);
   run("pose : Vitesse totale, Éjection et Tic compris", 13, replacing.speed);
 
   const noBonus = rules.forecast(state, { type: "place", handIndex: 1, slot: "apex" });
-  run.same("pose : une agate ne reçoit rien de la loupe", { marble: "agate", speed: 0, mass: 2, given: [] }, noBonus.phases.apex);
+  run.same("pose : une agate ne reçoit rien de la loupe", { marble: "agate", speed: 0, mass: 2, draw: 0, given: [] }, noBonus.phases.apex);
   run.same("pose : la loupe ne donne plus rien", [], noBonus.phases.leftBase.given);
-  run.same("pose : Tic de l'agate", { marble: "agate", speed: 0, mass: 1, given: [] }, noBonus.hit);
+  run.same("pose : Tic de l'agate", { marble: "agate", speed: 0, mass: 1, draw: 0, given: [] }, noBonus.hit);
 
   const withLens = rules.forecast(playState({ hand: ["magnifier"], triangle: { leftBase: null, rightBase: null, apex: placed("clay") } }), { type: "place", handIndex: 0, slot: "leftBase" });
   run("pose sur vide : le bonus s'annonce chez la bille qui le reçoit", 8, withLens.phases.apex.speed);
@@ -76,7 +118,7 @@ function checkCases(run) {
   // Échange : le moteur le prend comme le reste, sans Tic ni Éjection.
   const swapped = rules.forecast(state, { type: "swap", a: "leftBase", b: "rightBase" });
   run("échange : la loupe en base droite, Vitesse +1", 1, swapped.phases.rightBase.speed);
-  run("échange : plus de bonus sur le calot", 8, swapped.phases.apex.speed);
+  run("échange : plus de bonus sur le calot", 6, swapped.phases.apex.speed);
   run("échange : ni Éjection", null, swapped.knockout);
 
   // Compteurs déjà modifiés : la résolution en part.
@@ -182,7 +224,9 @@ function compareState(state, marbles, faults, tally) {
     }
     tally.actions += 1;
     const actual = readForecast(real.events, resolved.events);
-    if (JSON.stringify(predicted) !== JSON.stringify(actual)) {
+    const { uncertain, ...certain } = predicted;
+    if (uncertain) faults.push(`prévision incertaine sans bille qui écoute la main : ${JSON.stringify(action)}`);
+    if (JSON.stringify(certain) !== JSON.stringify(actual)) {
       faults.push(`écart sur ${JSON.stringify(action)} : ${JSON.stringify(predicted)} au lieu de ${JSON.stringify(actual)}`);
     }
     if (resolved.state.score - state.score !== predicted.impact) {

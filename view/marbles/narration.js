@@ -4,7 +4,7 @@
 // terminal (tools/marbles/play.js) disent exactement les mêmes phrases.
 
 import { nameRef } from "../../data/i18n/index.js";
-import { SLOTS } from "../../core/marbles.js";
+import { SLOTS, throwsLeft } from "../../core/marbles.js";
 import { CLAUSE_ACTIONS } from "../../core/marbles-effects.js";
 import { forecast } from "../../core/marbles-forecast.js";
 import { formatMenuPosition } from "../../lib/menu.js";
@@ -24,15 +24,32 @@ export function formatCounter(value) {
   return String(value).replace("-", "−");
 }
 
-// { speed, mass } -> ses morceaux à dire.
-function statParts({ speed = 0, mass = 0 }, t) {
+// Les textes de chaque action de clause (core/marbles-effects.js/CLAUSE_ACTIONS),
+// dans l'ordre où ses valeurs se disent : `up` pour une valeur positive, `down`
+// pour une négative (absent : l'action n'en produit jamais, sa validation le
+// refuse). Chacun reçoit {amount}, toujours positif.
+const ACTION_TEXTS = {
+  speed: { up: "marbles.effect.speed_up", down: "marbles.effect.speed_down" },
+  mass: { up: "marbles.effect.mass_up", down: "marbles.effect.mass_down" },
+  draw: { up: "marbles.effect.draw" },
+};
+
+// Une action sans texte, ou un texte sans action, échoue au chargement.
+for (const action of new Set([...Object.keys(CLAUSE_ACTIONS), ...Object.keys(ACTION_TEXTS)])) {
+  if (!Object.hasOwn(CLAUSE_ACTIONS, action) || !Object.hasOwn(ACTION_TEXTS, action)) {
+    throw new Error(`marbles : l'action "${action}" doit avoir ses textes (ACTION_TEXTS) et son entrée (CLAUSE_ACTIONS).`);
+  }
+}
+
+// Les valeurs d'un effet ({ speed, mass }, une absente comptant zéro) -> ses
+// morceaux à dire.
+function valueParts(values, t) {
   const parts = [];
-  const add = (value, up, down) => {
+  for (const [action, { up, down }] of Object.entries(ACTION_TEXTS)) {
+    const value = values[action] ?? 0;
     if (value > 0) parts.push(t(up, { amount: value }));
     if (value < 0) parts.push(t(down, { amount: -value }));
-  };
-  add(speed, "marbles.effect.speed_up", "marbles.effect.speed_down");
-  add(mass, "marbles.effect.mass_up", "marbles.effect.mass_down");
+  }
   return parts;
 }
 
@@ -40,12 +57,12 @@ function combined(parts, t) {
   return parts.length === 0 ? t("marbles.effect.none") : t("marbles.effect.combined", { parts });
 }
 
-// Un effet JOUÉ ou PRÉVU : { speed, mass, given } -> « Vitesse +1 et Masse +2 »,
-// « Vitesse +4 à la pointe », « aucun effet ».
+// Un effet JOUÉ ou PRÉVU : { speed, mass, draw, given } -> « Vitesse +1 et Masse
+// +2 », « Pioche 1 », « Vitesse +4 à la pointe », « aucun effet ».
 export function describeEffect(effect, t) {
-  const parts = statParts(effect, t);
+  const parts = valueParts(effect, t);
   for (const gift of effect.given ?? []) {
-    parts.push(t("marbles.effect.given", { effect: combined(statParts(gift, t), t), slot: slotName(gift.slot, t) }));
+    parts.push(t("marbles.effect.given", { effect: combined(valueParts(gift, t), t), slot: slotName(gift.slot, t) }));
   }
   return combined(parts, t);
 }
@@ -59,13 +76,14 @@ const CONDITION_TEXTS = {
   printedStat: (when, t) =>
     t("marbles.condition.printedStat", {
       slot: slotName(when.slot, t),
-      effect: combined(statParts({ [when.stat]: when.atLeast }, t), t),
+      effect: combined(valueParts({ [when.stat]: when.atLeast }, t), t),
     }),
 };
 
 // Une clause IMPRIMÉE : ce que la bille promet, sa cible et sa condition comprises.
+// Son action dit sa valeur par ses propres textes.
 function describeClause(clause, t) {
-  let text = combined(statParts(CLAUSE_ACTIONS[clause.action](clause), t), t);
+  let text = combined(valueParts({ [clause.action]: clause.amount }, t), t);
   if (clause.target !== undefined) text = t("marbles.effect.given", { effect: text, slot: slotName(clause.target, t) });
   if (clause.when !== undefined) text = t("marbles.effect.conditional", { effect: text, condition: CONDITION_TEXTS[clause.when.type](clause.when, t) });
   return text;
@@ -129,14 +147,15 @@ export function describeSlotForPlacement(game, slot, rules, t) {
 // triangle simulé, au format de la vue d'ensemble (valeurs produites seulement, bonus
 // reçus compris, ni texte d'effet ni bonus donné : celui-là s'entend chez qui le
 // reçoit) ; puis, sur un emplacement occupé, Éjection et Tic dans l'ordre réel des
-// évènements, toujours présentes : le menu garde la même structure. La pose doit être
-// permise (placeRefusal).
+// évènements, toujours présentes : le menu garde la même structure ; enfin, si la
+// pose et la résolution régénéreraient le sac, une ligne pour le dire. La pose doit
+// être permise (placeRefusal).
 export function placementLines(game, handIndex, slot, rules, t) {
   const marble = game.hand[handIndex];
   const predicted = rules.forecast(game, { type: "place", handIndex, slot });
   const lines = [
     { key: "marbles.place.question", params: { marble: marbleName(marble, t), slot: slotName(slot, t) } },
-    { key: "marbles.place.values", params: { effect: combined(statParts(predicted.phases[slot], t), t) } },
+    { key: "marbles.place.values", params: { effect: combined(valueParts(predicted.phases[slot], t), t) } },
   ];
   const occupant = game.triangle[slot];
   if (occupant !== null) {
@@ -151,6 +170,7 @@ export function placementLines(game, handIndex, slot, rules, t) {
       }
     );
   }
+  if (predicted.regenerates) lines.push({ key: "marbles.forecast.regenerates" });
   return lines;
 }
 
@@ -163,8 +183,8 @@ export function describeDiscard(game, t) {
   return t("marbles.status.discard", { count: game.discard.length });
 }
 
-// Où en est le tour. Avec la disponibilité de l'échange : rien d'autre ne permet
-// de la savoir sans essayer.
+// Où en est le tour. Avec les lancers restants et la disponibilité de l'échange :
+// rien d'autre ne permet de les savoir sans essayer.
 export function describeTurn(game, swapAvailable, t) {
   const line = t("marbles.status.turn", {
     turn: game.turn,
@@ -173,7 +193,8 @@ export function describeTurn(game, swapAvailable, t) {
     speed: formatCounter(game.speed),
     mass: formatCounter(game.mass),
   });
-  return `${line} ${t(swapAvailable ? "marbles.status.swap_available" : "marbles.status.swap_unavailable")}`;
+  const throws = t("marbles.status.throws", { count: throwsLeft(game) });
+  return `${line} ${throws} ${t(swapAvailable ? "marbles.status.swap_available" : "marbles.status.swap_unavailable")}`;
 }
 
 // L'ordre dans lequel le menu du sac se dit : alphabétique, sur le nom prononcé.
@@ -193,14 +214,22 @@ function outcomeLine(slot, outcome, t) {
   return t("marbles.outcome.slot", {
     slot: slotName(slot, t),
     marble: marbleName(outcome.marble, t),
-    effect: combined(statParts(outcome, t), t),
+    effect: combined(valueParts(outcome, t), t),
   });
+}
+
+// Ce que la prévision sait du sac sans le dévoiler : qu'il serait régénéré en
+// chemin. Rien sinon.
+function forecastNotes(predicted, t) {
+  return predicted.regenerates ? [t("marbles.forecast.regenerates")] : [];
 }
 
 // La vue d'ensemble du tour (touche R), d'un bloc : la prévision d'abord, Vitesse et
 // Masse comprenant ce que le tour a déjà gagné (Tic, Éjection), l'Impact avec ses
-// planchers ; puis chaque emplacement dans l'ordre des phases. Le triangle actuel,
-// sans action envisagée. null hors de la phase de jeu, où rien ne se prévoit.
+// planchers ; puis chaque emplacement dans l'ordre des phases (une Pioche y est une
+// valeur comme une autre, « Pioche 1 ») ; enfin la régénération du sac, si la
+// résolution la provoquerait. Le triangle actuel, sans action envisagée. null hors
+// de la phase de jeu, où rien ne se prévoit.
 export function describeOverview(game, rules, t) {
   const predicted = rules.forecast(game);
   if (!predicted.ok) return null;
@@ -209,7 +238,7 @@ export function describeOverview(game, rules, t) {
     mass: formatCounter(predicted.mass),
     impact: predicted.impact,
   });
-  return [summary, ...SLOTS.map((slot) => outcomeLine(slot, predicted.phases[slot], t))].join(" ");
+  return [summary, ...SLOTS.map((slot) => outcomeLine(slot, predicted.phases[slot], t)), ...forecastNotes(predicted, t)].join(" ");
 }
 
 // La rotation du moteur (core/marbles.js/rotated) : un cran, dans le sens horaire
@@ -227,13 +256,13 @@ const EFFECT_TEMPLATES = {
 
 function effectText(event, t) {
   if (event.trigger === "phase") {
-    return outcomeLine(event.slot, { marble: event.marble, speed: event.speedDelta, mass: event.massDelta }, t);
+    return outcomeLine(event.slot, { marble: event.marble, speed: event.speedDelta, mass: event.massDelta, draw: event.draw }, t);
   }
   const template = EFFECT_TEMPLATES[event.trigger];
   if (!template) throw new Error(`marbles : effet sans gabarit pour le déclencheur "${event.trigger}".`);
   return t(template, {
     marble: nameRef(`marble.${event.marble}.name`),
-    effect: describeEffect({ speed: event.speedDelta, mass: event.massDelta, given: event.given }, t),
+    effect: describeEffect({ speed: event.speedDelta, mass: event.massDelta, draw: event.draw, given: event.given }, t),
     speed: formatCounter(event.speed),
     mass: formatCounter(event.mass),
   });
@@ -253,7 +282,7 @@ const EVENT_TEXTS = {
   turnStarted: (event, t) => t("marbles.event.turn_started", { turn: event.turn }),
   // Les pioches consécutives se disent en une liste : buildSteps les regroupe.
   draw: (event, t) => marbleName(event.marble, t),
-  drawSkipped: (event, t) => t("marbles.event.draw_skipped"),
+  drawSkipped: (event, t) => t(`marbles.event.draw_skipped.${event.reason}`),
   bagRegenerated: (event, t) => t("marbles.event.bag_regenerated", { size: event.size }),
   swapped: (event, t) => t("marbles.event.swapped", { a: slotName(event.a, t), b: slotName(event.b, t) }),
   knockout: SILENT,

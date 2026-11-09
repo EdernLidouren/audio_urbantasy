@@ -9,6 +9,7 @@ import { auditNonSerializable, throws } from "../../lib/check.js";
 import { nextRandom } from "../rng.js";
 import {
   SLOTS,
+  END_REASONS,
   createMarblesGame,
   marblesReduce,
   effectAt,
@@ -17,11 +18,14 @@ import {
   maxWearOf,
   swapRefusal,
   placeRefusal,
+  throwRefusal,
+  throwsLeft,
   validateMarbleTypes,
 } from "../marbles.js";
 import { printedStat } from "../marbles-effects.js";
 import { STARTING_BAG, MARBLES_SETTINGS } from "../../config/marbles-values.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
+import { emptyBagMarblesGame } from "./helpers.js";
 import { createMarblesRules } from "../marbles-rules.js";
 
 // Les règles du jeu, liées à la vraie table (core/marbles-rules.js).
@@ -31,7 +35,7 @@ const rules = createMarblesRules(MARBLE_TYPES);
 // plein. `over` remplace ce que le test veut fixer.
 function playState(over = {}) {
   return {
-    ...rules.createGame(1, { bag: [] }),
+    ...emptyBagMarblesGame(rules, 1),
     turn: 2,
     stage: "play",
     ...over,
@@ -80,6 +84,8 @@ export default function checkMarbles(run) {
   checkDraw(run);
   checkSwap(run);
   checkPlace(run);
+  checkThrows(run);
+  checkDrawEffects(run);
   checkHitAndKnockout(run);
   checkMagnifier(run);
   checkBonus(run);
@@ -95,7 +101,7 @@ function checkTable(run) {
   run("table : 13 billes", 13, Object.keys(MARBLE_TYPES).length);
   run.same("sac de test : un exemplaire de chaque", Object.keys(MARBLE_TYPES).sort(), [...STARTING_BAG].sort());
   run("usure par défaut", 3, rules.maxWearOf("clay"));
-  run("usure propre", 6, rules.maxWearOf("mica"));
+  run("usure propre", 4, rules.maxWearOf("tiger"));
   run("usure 1 de la géante", 1, rules.maxWearOf("giant"));
   run("usure de la loupe", 3, rules.maxWearOf("magnifier"));
 
@@ -113,7 +119,7 @@ function checkTable(run) {
   run.same("Éjection du calot", [{ action: "speed", amount: 3 }], MARBLE_TYPES.shooter.knockout);
   run.same("Éjection de la plombée", [{ action: "mass", amount: 1 }], MARBLE_TYPES.leaded.knockout);
 
-  run("imprimé : ce que la clause donne", 8, printedStat(rules.effectAt("shooter", "apex"), "speed"));
+  run("imprimé : ce que la clause donne", 6, printedStat(rules.effectAt("shooter", "apex"), "speed"));
   run("imprimé : une autre statistique ne compte pas", 0, printedStat(rules.effectAt("agate", "apex"), "speed"));
   run("imprimé : négatif", -3, printedStat(rules.effectAt("leaded", "apex"), "speed"));
   run("imprimé : une clause conditionnelle ne compte pas", 0, printedStat(rules.effectAt("magnifier", "leftBase"), "speed"));
@@ -277,6 +283,144 @@ function checkSwap(run) {
   run("pose : l'échange revient au tour suivant", null, swapRefusal(placeThenDraw.state));
 }
 
+// Les LANCERS : une pose depuis la main en est un, l'échange non ; la limite du
+// tour borne ce que le joueur peut enchaîner.
+function checkThrows(run) {
+  run("lancers : 5 par tour, réglage du jeu", 5, MARBLES_SETTINGS.throwsPerTurn);
+  run("lancers : une partie neuve n'en a joué aucun", 0, rules.createGame(1).throwsUsed);
+  run("lancers : la limite vient du réglage", 5, rules.createGame(1).throwsPerTurn);
+  run("lancers : moins de 3 refusés (les poses du premier tour en sont)", true, throws(() => rules.createGame(1, { throwsPerTurn: 2 })));
+
+  // Cinq poses, puis plus rien. Le sac de la main : six billes pour en avoir une de trop.
+  let state = playState({ hand: ["clay", "glass", "agate", "mica", "tiger"], maxHandSize: 6, throwsPerTurn: 5 });
+  state = { ...state, hand: [...state.hand, "giant"] };
+  for (let count = 0; count < 5; count++) state = apply(state, { type: "place", handIndex: 0, slot: SLOTS[count % 3] }).state;
+  run("lancers : cinq poses jouées", 5, state.throwsUsed);
+  run("lancers : plus aucun", 0, throwsLeft(state));
+  const sixth = rules.reduce(state, { type: "place", handIndex: 0, slot: "apex" });
+  run("lancers : la sixième pose refusée", "noThrowsLeft", sixth.error);
+  run("lancers : refus sans effet", state, sixth.state);
+  run("lancers : refusé dès la prise", "noThrowsLeft", throwRefusal(state));
+  run("lancers : placeRefusal dit pareil", "noThrowsLeft", placeRefusal(state, 0, "leftBase"));
+  run("lancers : la résolution reste permise", true, rules.reduce(state, { type: "resolve" }).ok);
+  run("lancers : plus de pose dans les actions légales", false, legalActions(state).some((action) => action.type === "place"));
+
+  // L'échange n'est pas un lancer.
+  const swapped = apply(playState({ hand: ["clay"], triangle: triangleOf(placed("glass"), null, null) }), { type: "swap", a: "leftBase", b: "apex" });
+  run("lancers : l'échange n'en compte pas", 0, swapped.state.throwsUsed);
+
+  // Remis à zéro à la pioche du tour.
+  const next = apply({ ...state, stage: "draw", bag: ["clay"] }, { type: "draw" });
+  run("lancers : remis à zéro à la pioche", 0, next.state.throwsUsed);
+
+  // Au premier tour, les poses obligatoires sont des lancers : une pose qui ne
+  // laisserait plus assez de lancers pour remplir le triangle est refusée.
+  const firstTurn = playState({ turn: 1, hand: ["clay", "glass", "agate", "mica"], throwsUsed: 2, triangle: triangleOf(placed("tiger"), null, null) });
+  run("premier tour : il reste 3 lancers pour 2 emplacements vides, une pose sur l'occupé passe", null, placeRefusal(firstTurn, 0, "leftBase"));
+  const tight = { ...firstTurn, throwsUsed: 3 };
+  run("premier tour : 2 lancers pour 2 vides, remplacer bloquerait le triangle", "placementBlocksTriangle", placeRefusal(tight, 0, "leftBase"));
+  run("premier tour : 2 lancers pour 2 vides, remplir passe", null, placeRefusal(tight, 0, "apex"));
+}
+
+// La PIOCHE, mot-clé d'effet : la pioche unifiée (drawOne), déclenchée par un Tic,
+// une Éjection ou une phase, à tout moment du tour.
+function checkDrawEffects(run) {
+  // Validation : jamais de cible, au moins une bille, dans tout champ d'effet.
+  const draw1 = { action: "draw", amount: 1 };
+  run("pioche : une cible refusée", true, throws(() => validateMarbleTypes({ a: { hit: [{ ...draw1, target: "apex" }] } })));
+  run("pioche : zéro bille refusée", true, throws(() => validateMarbleTypes({ a: { hit: [{ action: "draw", amount: 0 }] } })));
+  run("pioche : une valeur non entière refusée", true, throws(() => validateMarbleTypes({ a: { apex: [{ action: "draw", amount: 1.5 }] } })));
+  run(
+    "pioche : acceptée en base, variante, pointe, tic et éjection",
+    false,
+    throws(() => validateMarbleTypes({ a: { base: [draw1], baseVariant: { leftBase: [draw1] }, apex: [draw1], hit: [draw1], knockout: [draw1] } }))
+  );
+  run("pioche : avec une condition", false, throws(() => validateMarbleTypes({ a: { apex: [{ ...draw1, when: { type: "printedStat", slot: "apex", stat: "speed", atLeast: 1 } }] } })));
+  run.same("imprimé : la Pioche se lit comme une autre valeur", 1, printedStat(rules.effectAt("mica", "leftBase"), "draw"));
+
+  // Tic qui pioche : l'effet, puis la bille. Elle se joue dans le même tour.
+  const hit = apply(
+    playState({ hand: ["cats_eye"], bag: ["sulphide", "agate"], triangle: triangleOf(null, null, placed("glass")) }),
+    { type: "place", handIndex: 0, slot: "apex" }
+  );
+  run.same("tic qui pioche : journal", ["knockout", "removed", "discarded", "placed", "hit", "effect", "draw"], eventTypes(hit.events));
+  run("tic qui pioche : l'effet dit sa Pioche", 1, hit.events[5].draw);
+  run("tic qui pioche : le haut du sac", "sulphide", hit.events[6].marble);
+  run("tic qui pioche : en main", "sulphide", hit.state.hand.join());
+  const replay = rules.reduce(hit.state, { type: "place", handIndex: 0, slot: "leftBase" });
+  run("tic qui pioche : la bille piochée se joue dans le même tour", true, replay.ok);
+
+  // Éjection qui pioche.
+  const knockout = apply(
+    playState({ hand: ["clay"], bag: ["agate"], triangle: triangleOf(null, null, placed("stoneware")) }),
+    { type: "place", handIndex: 0, slot: "apex" }
+  );
+  run.same("éjection qui pioche : journal", ["knockout", "effect", "draw", "removed", "discarded", "placed", "hit", "effect"], eventTypes(knockout.events));
+  run("éjection qui pioche : en main", "agate", knockout.state.hand.join());
+
+  // Phase qui pioche : la bille attend le tour suivant (elle est en main à sa pioche).
+  const phase = apply(playState({ hand: [], bag: ["agate", "tiger"], triangle: triangleOf(placed("mica"), null, null) }), { type: "resolve" });
+  run.same("phase qui pioche : l'effet puis la bille", ["phase", "effect", "draw", "wear"], eventTypes(phase.events).slice(0, 4));
+  run("phase qui pioche : la Pioche ne touche ni Vitesse ni Masse", 0, phase.events[1].speedDelta + phase.events[1].massDelta);
+  run("phase qui pioche : en main après la résolution", "agate", phase.state.hand.join());
+  run("phase qui pioche : le tour suivant reste à piocher", "draw", phase.state.stage);
+  run("phase qui pioche : pas jouable avant la pioche du tour", "mustDraw", placeRefusal(phase.state, 0, "apex"));
+  const nextTurn = apply(phase.state, { type: "draw" });
+  run("phase qui pioche : jouable au tour suivant", null, placeRefusal(nextTurn.state, 0, "apex"));
+
+  // Régénération pendant la phase de jeu (un Tic) et pendant la résolution.
+  const regenPlay = apply(
+    playState({ hand: ["cats_eye"], bag: [], discard: ["agate", "tiger"], triangle: triangleOf(null, null, placed("glass")) }),
+    { type: "place", handIndex: 0, slot: "apex" }
+  );
+  run.same("régénération en jeu : dans le journal de la pose", ["hit", "effect", "bagRegenerated", "draw"], eventTypes(regenPlay.events).slice(-4));
+  run("régénération en jeu : la défausse entière, bille remplacée comprise", 3, regenPlay.events.find((event) => event.type === "bagRegenerated").size);
+  run("régénération en jeu : la partie continue", "play", regenPlay.state.stage);
+  const regenResolve = apply(playState({ hand: [], bag: [], discard: ["agate"], triangle: triangleOf(placed("mica"), null, null) }), { type: "resolve" });
+  run.same("régénération en résolution : dans le journal", ["phase", "effect", "bagRegenerated", "draw"], eventTypes(regenResolve.events).slice(0, 4));
+  run("régénération en résolution : la bille en main", "agate", regenResolve.state.hand.join());
+
+  // Arrêts : main pleine (pas de régénération), plus de billes (pas de fin de partie).
+  const full = apply(
+    playState({ hand: ["cats_eye", "clay", "glass", "agate", "tiger"], bag: [], discard: ["giant"], triangle: triangleOf(null, null, placed("sulphide")) }),
+    { type: "place", handIndex: 0, slot: "apex" }
+  );
+  run("tic qui pioche, main pleine après la pose : la pioche passe", "draw", eventTypes(full.events).at(-1));
+  const fuller = { ...playState({ hand: ["cats_eye", "clay", "glass", "agate", "tiger"], maxHandSize: 4 }) };
+  const stopped = apply({ ...fuller, bag: [], discard: ["giant"], triangle: triangleOf(null, null, placed("sulphide")) }, { type: "place", handIndex: 0, slot: "apex" });
+  run.same("tic qui pioche, main pleine : arrêt sans régénération", ["effect", "drawSkipped"], eventTypes(stopped.events).slice(-2));
+  run("tic qui pioche, main pleine : motif", "handFull", stopped.events.at(-1).reason);
+  const none = apply(playState({ hand: ["cats_eye"], bag: [], discard: [], triangle: triangleOf(null, null, placed("glass")) }), { type: "place", handIndex: 0, slot: "apex" });
+  // La bille remplacée vient d'arriver en défausse : elle est repiochée.
+  run("tic qui pioche, sac vide : la remplacée revient", "glass", none.state.hand.join());
+  const nothing = apply(playState({ hand: [], bag: [], discard: [], triangle: triangleOf(placed("mica"), null, null) }), { type: "resolve" });
+  run("phase qui pioche, rien à piocher : arrêt annoncé", "noMarbles", nothing.events.find((event) => event.type === "drawSkipped").reason);
+  run("phase qui pioche, rien à piocher : jamais une fin de partie en cours de tour", "draw", nothing.state.stage);
+
+  // ANTI-BOUCLE : un Tic qui pioche à chaque pose, avec régénération possible ;
+  // les lancers arrêtent le joueur à 5 poses.
+  let loop = playState({
+    hand: ["cats_eye"],
+    bag: [],
+    discard: [],
+    triangle: triangleOf(placed("cats_eye"), placed("cats_eye"), placed("cats_eye")),
+  });
+  let accepted = 0;
+  let lastError = null;
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const result = rules.reduce(loop, { type: "place", handIndex: 0, slot: SLOTS[attempt % 3] });
+    if (!result.ok) {
+      lastError = result.error;
+      break;
+    }
+    accepted += 1;
+    loop = result.state;
+  }
+  run("anti-boucle : la main se recharge à chaque pose", 1, loop.hand.length);
+  run("anti-boucle : 5 poses au plus dans le tour", 5, accepted);
+  run("anti-boucle : la suivante refusée", "noThrowsLeft", lastError);
+}
+
 function checkPlace(run) {
   const onEmpty = apply(playState({ hand: ["clay", "glass"], triangle: triangleOf(null, null, null) }), { type: "place", handIndex: 1, slot: "apex" });
   run.same("pose : la bille va sur l'emplacement, usure 0", placed("glass"), onEmpty.state.triangle.apex);
@@ -351,12 +495,12 @@ function checkHitAndKnockout(run) {
   );
   run.same(
     "Éjection : son effet et le cumul",
-    { type: "effect", trigger: "knockout", slot: "apex", marble: "shooter", speedDelta: 3, massDelta: 0, given: [], speed: 3, mass: 1 },
+    { type: "effect", trigger: "knockout", slot: "apex", marble: "shooter", speedDelta: 3, massDelta: 0, draw: 0, given: [], speed: 3, mass: 1 },
     both.events[1]
   );
   run.same(
     "Tic : son effet et le cumul",
-    { type: "effect", trigger: "hit", slot: "apex", marble: "clay", speedDelta: 2, massDelta: 0, given: [], speed: 5, mass: 1 },
+    { type: "effect", trigger: "hit", slot: "apex", marble: "clay", speedDelta: 2, massDelta: 0, draw: 0, given: [], speed: 5, mass: 1 },
     both.events[6]
   );
 
@@ -401,7 +545,7 @@ function checkHitAndKnockout(run) {
   run.same("échange : ni Tic ni Éjection, même sur des billes qui en ont", [], noReaction(swapped));
   const worn = apply(playState({ triangle: triangleOf(null, null, placed("shooter", 2)) }), { type: "resolve" });
   run("retrait par usure : pas d'Éjection", false, eventTypes(worn.events).includes("knockout"));
-  run("retrait par usure : Impact de la phase seule", 8, worn.state.score);
+  run("retrait par usure : Impact de la phase seule", 6, worn.state.score);
   run("retrait par usure : cause", "wear", worn.events.find((event) => event.type === "discarded").cause);
 
   // Un plancher ne vaut qu'à l'Impact : une Éjection négative pèse dans le compteur.
@@ -423,8 +567,8 @@ function checkMagnifier(run) {
   const apexEffect = (result) => result.events.find((event) => event.type === "effect" && event.slot === "apex");
 
   const shooter = withApex("shooter");
-  run("loupe : calot en pointe, Vitesse +12", 12, apexEffect(shooter).speedDelta);
-  run("loupe : Impact 12", 12, shooter.state.score);
+  run("loupe : calot en pointe, Vitesse +10", 10, apexEffect(shooter).speedDelta);
+  run("loupe : Impact 10", 10, shooter.state.score);
   run.same(
     "loupe : ce qu'elle donne, dans son effet",
     [{ slot: "apex", marble: "shooter", speed: 4, mass: 0 }],
@@ -450,7 +594,7 @@ function checkMagnifier(run) {
 
   // Sur l'autre base et en pointe, ses autres effets.
   const right = apply(playState({ triangle: triangleOf(null, placed("magnifier"), placed("shooter")) }), { type: "resolve" });
-  run("loupe en base droite : Vitesse +1, pas de bonus", 9, right.state.score);
+  run("loupe en base droite : Vitesse +1, pas de bonus", 7, right.state.score);
   const onApex = apply(playState({ triangle: triangleOf(null, null, placed("magnifier")) }), { type: "resolve" });
   run("loupe en pointe : Vitesse +2", 2, onApex.state.score);
 }
@@ -540,7 +684,7 @@ function checkResolution(run) {
   const effect = result.events.find((event) => event.type === "effect" && event.slot === "rightBase");
   run.same(
     "effet : deltas et cumul",
-    { type: "effect", trigger: "phase", slot: "rightBase", marble: "glass", speedDelta: 0, massDelta: 1, given: [], speed: 1, mass: 2 },
+    { type: "effect", trigger: "phase", slot: "rightBase", marble: "glass", speedDelta: 0, massDelta: 1, draw: 0, given: [], speed: 1, mass: 2 },
     effect
   );
 
@@ -568,8 +712,8 @@ function checkResolution(run) {
 
   const porcelain = apply(playState({ triangle: triangleOf(null, null, placed("porcelain", 1)) }), { type: "resolve" });
   run("porcelaine : retirée à usure 2", "porcelain", porcelain.state.discard.join());
-  const mica = apply(playState({ triangle: triangleOf(null, null, placed("mica", 4)) }), { type: "resolve" });
-  run("mica : pas retiré à usure 5 sur 6", 0, mica.state.discard.length);
+  const tiger = apply(playState({ triangle: triangleOf(null, null, placed("tiger", 2)) }), { type: "resolve" });
+  run("tigrée : pas retirée à usure 3 sur 4", 0, tiger.state.discard.length);
 
   const twoRetired = apply(playState({ triangle: triangleOf(placed("giant"), placed("clay", 2), placed("glass")) }), { type: "resolve" });
   run("retrait : dans l'ordre des emplacements", "giant,clay", twoRetired.state.discard.join());
@@ -655,33 +799,37 @@ function checkEndOfGame(run) {
   run("fin : plus d'échange", "gameOver", swapRefusal(lastTurn.state));
   run("fin : plus de pose", "gameOver", placeRefusal(lastTurn.state, 0, "apex"));
 
-  // Sac régénéré de moins de 3 billes.
+  // Plus de règle « sac régénéré de moins de 3 billes » : un sac de 2 se joue.
   const small = apply(
     { ...playState({ score: 12, hand: ["clay"], bag: [], discard: ["agate", "mica"] }), stage: "draw" },
     { type: "draw" }
   );
-  run("sac régénéré < 3 : partie finie", "over", small.state.stage);
-  run("sac régénéré < 3 : motif", "bagExhausted", small.state.endReason);
-  run.same(
-    "sac régénéré < 3 : journal",
-    ["turnStarted", "bagRegenerated", "gameOver"],
-    eventTypes(small.events)
-  );
-  run("sac régénéré < 3 : taille annoncée", 2, small.events[1].size);
-  run("sac régénéré < 3 : score compté", 12, small.events[2].score);
-  run("sac régénéré < 3 : rien de perdu", 3, marbleCount(small.state));
+  run("sac régénéré de 2 billes : la partie continue", "play", small.state.stage);
+  run.same("sac régénéré de 2 billes : journal", ["turnStarted", "bagRegenerated", "draw"], eventTypes(small.events));
 
-  const exactly = apply(
-    { ...playState({ hand: ["clay", "glass"], bag: [], discard: ["agate", "mica", "tiger"] }), stage: "draw" },
-    { type: "draw" }
-  );
-  run("sac régénéré de 3 billes : la partie continue", "play", exactly.state.stage);
-  run("sac régénéré de 3 billes : une bille piochée", 3, exactly.state.hand.length);
+  // Pioche impossible, faute de billes : la partie finit.
+  const empty = apply({ ...playState({ score: 12, hand: ["clay"], bag: [], discard: [] }), stage: "draw" }, { type: "draw" });
+  run("sac et défausse vides : partie finie", "over", empty.state.stage);
+  run("sac et défausse vides : motif", "outOfMarbles", empty.state.endReason);
+  run.same("sac et défausse vides : journal", ["turnStarted", "drawSkipped", "gameOver"], eventTypes(empty.events));
+  run("sac et défausse vides : arrêt annoncé", "noMarbles", empty.events[1].reason);
+  run.same("sac et défausse vides : score compté", { type: "gameOver", reason: "outOfMarbles", score: 12 }, empty.events[2]);
+  run("sac et défausse vides : plus de pose", "gameOver", placeRefusal(empty.state, 0, "apex"));
 
-  // Sac trop petit dès le départ : jamais de partie bloquée au tour 1.
-  const tiny = apply(rules.createGame(1, { bag: ["clay", "glass"] }), { type: "draw" });
-  run("sac de 2 billes : partie finie dès la pioche", "bagExhausted", tiny.state.endReason);
-  run("sac de 5 billes : la partie se joue", "play", apply(rules.createGame(1, { bag: ["clay", "glass", "agate", "mica", "tiger"] }), { type: "draw" }).state.stage);
+  // Une seule bille piochée sur trois : la partie continue.
+  const partial = apply({ ...playState({ hand: [], bag: ["glass"], discard: [], drawPerTurn: 3 }), stage: "draw" }, { type: "draw" });
+  run("pioche partielle : la partie continue", "play", partial.state.stage);
+  run.same("pioche partielle : journal", ["turnStarted", "draw", "drawSkipped"], eventTypes(partial.events));
+
+  // Main pleine, sac et défausse vides : jamais une fin de partie.
+  const full = apply({ ...playState({ hand: ["clay", "glass", "agate", "mica", "tiger"], bag: [], discard: [] }), stage: "draw" }, { type: "draw" });
+  run("main pleine, rien à piocher : la partie continue", "play", full.state.stage);
+  run("main pleine, rien à piocher : motif de l'arrêt", "handFull", full.events[1].reason);
+
+  // Un sac plus petit que le triangle bloquerait le premier tour : refusé.
+  run("sac de 2 billes : refusé à la création", true, throws(() => rules.createGame(1, { bag: ["clay", "glass"] })));
+  run("sac de 3 billes : la partie se joue", "play", apply(rules.createGame(1, { bag: ["clay", "glass", "agate"] }), { type: "draw" }).state.stage);
+  run.same("fins de partie : les raisons, dans l'ordre", ["outOfMarbles", "turnsCompleted"], END_REASONS);
 }
 
 // Une partie complète, décisions fixes : toujours la première bille sur les
@@ -822,7 +970,7 @@ function checkSmoke(run) {
     { bag: ["giant", "giant", "giant", "giant", "giant", "giant"] },
     { bag: ["clay", "glass", "agate", "mica", "tiger"] },
     { bag: ["clay", "glass", "agate"] },
-    { bag: ["mica"] },
+    { bag: ["mica", "mica", "mica"] }, // le plus petit sac permis : la pioche finit par manquer de billes
   ];
   const faults = [];
   let games = 0;

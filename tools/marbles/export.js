@@ -23,6 +23,10 @@ const GAME_COLUMNS = [
   ["hitMass", (game) => game.hit.mass],
   ["knockoutSpeed", (game) => game.knockout.speed],
   ["knockoutMass", (game) => game.knockout.mass],
+  ["effectDraws", (game) => game.effectDraws],
+  ["regenerations", (game) => game.regenerations],
+  ["midTurnRegenerations", (game) => game.midTurnRegenerations],
+  ["throws", (game) => game.throws],
   ["refusals", (game) => game.refusals.length],
   ["impacts", (game) => game.impacts.join(" ")],
   ["bag", (game) => game.bag.join(" ")],
@@ -31,6 +35,7 @@ const GAME_COLUMNS = [
 export const MARBLE_COLUMNS = [
   "id",
   "games",
+  "drawn",
   "placed",
   "placedReplacing",
   "knockedOut",

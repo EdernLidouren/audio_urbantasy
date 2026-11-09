@@ -4,9 +4,14 @@
 // il ne touche à aucun état : appliquer le résultat est l'affaire de
 // core/marbles.js.
 //
-// AJOUTER une action ou une condition : une ligne dans CLAUSE_ACTIONS ou dans
-// CONDITIONS, le moteur n'a pas à changer. Une cible est un emplacement, ou
-// rien pour la bille elle-même.
+// AJOUTER une action ou une condition : une entrée dans CLAUSE_ACTIONS ou dans
+// CONDITIONS, et ses textes dans la vue (view/marbles/narration.js, ACTION_TEXTS
+// ou CONDITION_TEXTS). Une cible est un emplacement, ou rien pour la bille
+// elle-même.
+//
+// VALEURS : ce qu'un effet produit, une valeur par action, sous le nom de
+// l'action (`{ speed, mass, draw }`). Le core les applique (core/marbles.js/fireEffect),
+// la vue les dit, la prévision les rend.
 
 import { rejectUnknownFields } from "../lib/validate.js";
 
@@ -34,17 +39,55 @@ export function printedStat(clauses, stat) {
     .reduce((total, clause) => total + clause.amount, 0);
 }
 
-const ZERO = Object.freeze({ speed: 0, mass: 0 });
+// Les champs d'une clause. `target` n'appartient qu'aux actions qui ont un sens
+// pour un autre emplacement : une action qui ne le déclare pas refuse toute cible
+// à la validation.
+const TARGETED_FIELDS = ["action", "amount", "target", "when"];
+const SELF_FIELDS = ["action", "amount", "when"];
 
-export function addDeltas(a, b) {
-  return { speed: a.speed + b.speed, mass: a.mass + b.mass };
+function validateInteger(clause, describe, fail) {
+  if (!Number.isInteger(clause.amount)) fail(`${describe} : amount doit être un entier.`);
 }
 
-// Ce que fait chaque action : un apport à la Vitesse et à la Masse.
+function validatePositive(clause, describe, fail) {
+  if (!Number.isInteger(clause.amount) || clause.amount < 1) fail(`${describe} : amount doit être un entier >= 1.`);
+}
+
+// Ajoute le montant de la clause à la valeur de son action.
+function addAmount(values, clause) {
+  return { ...values, [clause.action]: values[clause.action] + clause.amount };
+}
+
+// Chaque action, sur le modèle des conditions :
+//   fields    les champs qu'elle accepte ;
+//   validate  la validation de ses valeurs ;
+//   apply     ce qu'elle ajoute aux valeurs d'un effet, (values, clause) -> values.
+// Ses textes : view/marbles/narration.js/ACTION_TEXTS.
 export const CLAUSE_ACTIONS = {
-  speed: (clause) => ({ ...ZERO, speed: clause.amount }),
-  mass: (clause) => ({ ...ZERO, mass: clause.amount }),
+  // Ajoute `amount` (négatif permis) à la Vitesse.
+  speed: { fields: TARGETED_FIELDS, validate: validateInteger, apply: addAmount },
+  // Ajoute `amount` (négatif permis) à la Masse.
+  mass: { fields: TARGETED_FIELDS, validate: validateInteger, apply: addAmount },
+  // Pioche : `amount` billes (au moins 1), piochées par la bille elle-même au
+  // déclenchement (core/marbles.js/drawMarbles), à tout moment du tour. Sans
+  // cible : piocher pour une autre bille n'a pas de sens.
+  draw: { fields: SELF_FIELDS, validate: validatePositive, apply: addAmount },
 };
+
+// Les valeurs à zéro : toutes celles d'un effet, et celles qu'un effet peut
+// DONNER à un autre emplacement (les actions qui acceptent une cible).
+function zeroValues(actions) {
+  return Object.freeze(Object.fromEntries(actions.map((action) => [action, 0])));
+}
+const ZERO = zeroValues(Object.keys(CLAUSE_ACTIONS));
+const GIFT_ZERO = zeroValues(Object.keys(CLAUSE_ACTIONS).filter((action) => CLAUSE_ACTIONS[action].fields.includes("target")));
+
+// La somme de deux jeux de valeurs ; une valeur absente de l'un compte zéro.
+export function addValues(a, b) {
+  const sum = { ...a };
+  for (const [key, value] of Object.entries(b)) sum[key] = (sum[key] ?? 0) + value;
+  return sum;
+}
 
 // Chaque condition : ses champs, leur validation, et son test sur le triangle.
 export const CONDITIONS = {
@@ -70,9 +113,10 @@ export const CONDITIONS = {
 export function validateEffect(effect, describe, fail) {
   if (!Array.isArray(effect)) fail(`${describe} : un effet est une liste de clauses.`);
   for (const clause of effect) {
-    rejectUnknownFields(clause, ["action", "amount", "target", "when"], describe, fail);
+    const action = CLAUSE_ACTIONS[clause.action];
     if (!Object.hasOwn(CLAUSE_ACTIONS, clause.action)) fail(`${describe} : action inconnue "${clause.action}".`);
-    if (!Number.isInteger(clause.amount)) fail(`${describe} : amount doit être un entier.`);
+    rejectUnknownFields(clause, action.fields, describe, fail);
+    action.validate(clause, describe, fail);
     if (clause.target !== undefined && !SLOTS.includes(clause.target)) fail(`${describe} : cible inconnue "${clause.target}".`);
     if (clause.when !== undefined) {
       const condition = CONDITIONS[clause.when.type];
@@ -84,16 +128,16 @@ export function validateEffect(effect, describe, fail) {
 }
 
 // Évalue des clauses sur un triangle, au moment du déclenchement :
-//   self    ce qui va au compteur du tour (ou s'ajoute à l'effet de la bille) ;
-//   gifts   ce qui va à d'autres emplacements, [{ slot, speed, mass }].
+//   self    les valeurs de la bille elle-même, toutes présentes ;
+//   gifts   ce qui va à d'autres emplacements, [{ slot, ...valeurs donnables }].
 export function evaluateEffect(clauses, triangle, types) {
   let self = ZERO;
   const gifts = [];
   for (const clause of clauses) {
     if (clause.when !== undefined && !CONDITIONS[clause.when.type].test(clause.when, triangle, types)) continue;
-    const delta = CLAUSE_ACTIONS[clause.action](clause);
-    if (clause.target === undefined) self = addDeltas(self, delta);
-    else gifts.push({ slot: clause.target, ...delta });
+    const { apply } = CLAUSE_ACTIONS[clause.action];
+    if (clause.target === undefined) self = apply(self, clause);
+    else gifts.push({ slot: clause.target, ...apply(GIFT_ZERO, clause) });
   }
   return { self, gifts };
 }

@@ -4,26 +4,33 @@
 // pas diverger du moteur.
 //
 // Garde-fous :
-// - la copie n'a ni sac ni état de hasard : même un futur effet ne pourrait y
-//   lire ce qui reste à piocher. Un effet de pioche s'annoncera « Pioche 1 »,
-//   sans tirer : c'est à lui d'écrire cela dans le journal le jour où il existe ;
-// - seules une pose et un échange s'envisagent, jamais une pioche ;
+// - À L'AVEUGLE : la copie (core/marbles.js/blindCopy) ne connaît du sac et de la
+//   défausse que leur nombre de billes, et n'a pas le hasard de la partie ; le
+//   déroulé est aveugle (options.blind). Une pioche y a lieu, avec ses arrêts
+//   (main pleine, plus de billes), mais sa bille est inconnue ; une régénération
+//   s'annonce sans mélange. Rien n'est révélé, rien n'avance le hasard réel ;
+// - seules une pose et un échange s'envisagent, jamais une pioche de tour ;
 // - l'état reçu n'est jamais modifié.
 //
 // Résultat : { ok: false, error } si l'action serait refusée (mêmes codes que le
 // réducteur), sinon { ok: true, error: null, knockout, hit, phases, speed, mass,
-// impact }, où knockout et hit sont l'effet de l'action envisagée (null : pas de
-// tel effet) et phases, par emplacement, l'effet de phase de sa bille (null :
-// emplacement vide). Un effet : { marble, speed, mass, given }, le total effectif
-// de la bille, bonus reçu compris.
+// impact, drawn, regenerates, uncertain }, où :
+//   knockout, hit  l'effet de l'action envisagée (null : pas de tel effet) ;
+//   phases         par emplacement, l'effet de phase de sa bille (null : vide) ;
+//   drawn          les billes que l'action et la résolution piocheraient ;
+//   regenerates    vrai si le sac serait régénéré en chemin ;
+//   uncertain      vrai si une bille piochée aurait pu réagir selon son identité,
+//                  que la prévision ignore : ses chiffres ne sont alors pas sûrs.
+// Un effet : { marble, speed, mass, draw, given }, le total effectif de la bille,
+// bonus reçu compris.
 
-import { SLOTS, marblesReduce, runResolution, stageRefusal } from "./marbles.js";
+import { SLOTS, blindCopy, marblesReduce, runResolution, stageRefusal } from "./marbles.js";
 
 const FORECASTABLE_ACTIONS = ["place", "swap"];
 
 function outcomeOf(event) {
   if (event === undefined) return null;
-  return { marble: event.marble, speed: event.speedDelta, mass: event.massDelta, given: event.given };
+  return { marble: event.marble, speed: event.speedDelta, mass: event.massDelta, draw: event.draw, given: event.given };
 }
 
 function failed(error) {
@@ -31,8 +38,10 @@ function failed(error) {
 }
 
 // Ce que disent les journaux de l'action et de la résolution. Exportée pour
-// comparer la prévision au résultat réel, lu de la même façon.
+// comparer la prévision au résultat réel, lu de la même façon (sans `uncertain`,
+// qui n'existe qu'à l'aveugle).
 export function readForecast(actionEvents, resolutionEvents) {
+  const all = [...actionEvents, ...resolutionEvents];
   const fromAction = (trigger) => actionEvents.find((event) => event.type === "effect" && event.trigger === trigger);
   const phaseOf = (slot) => resolutionEvents.find((event) => event.type === "effect" && event.trigger === "phase" && event.slot === slot);
   const { speed, mass, impact } = resolutionEvents.find((event) => event.type === "impact");
@@ -45,6 +54,8 @@ export function readForecast(actionEvents, resolutionEvents) {
     speed,
     mass,
     impact,
+    drawn: all.filter((event) => event.type === "draw").length,
+    regenerates: all.some((event) => event.type === "bagRegenerated"),
   };
 }
 
@@ -55,10 +66,10 @@ export function forecast(state, action, types) {
   if (refusal) return failed(refusal);
   if (action !== null && !FORECASTABLE_ACTIONS.includes(action?.type)) return failed("unknownAction");
 
-  const copy = { ...structuredClone(state), bag: [], rngState: 0 };
-  const applied = action === null ? { ok: true, state: copy, events: [] } : marblesReduce(copy, action, types);
+  const copy = blindCopy(state);
+  const applied = action === null ? { ok: true, state: copy, events: [], uncertain: false } : marblesReduce(copy, action, types, { blind: true });
   if (!applied.ok) return failed(applied.error);
-  const resolved = runResolution(applied.state, types);
+  const resolved = runResolution(applied.state, types, { blind: true });
   if (!resolved.ok) return failed(resolved.error);
-  return readForecast(applied.events, resolved.events);
+  return { ...readForecast(applied.events, resolved.events), uncertain: applied.uncertain || resolved.uncertain };
 }

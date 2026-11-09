@@ -11,7 +11,7 @@ import { t, setLocale, getLocale } from "../../data/i18n/index.js";
 import { MARBLES_SETTINGS, STARTING_BAG } from "../../config/marbles-values.js";
 import { createMarblesGame, marblesReduce, placeRefusal, SLOTS } from "../marbles.js";
 import { forecast } from "../marbles-forecast.js";
-import { buildSteps, describeOverview, resolutionSteps } from "../../view/marbles/narration.js";
+import { buildSteps, describeOverview, placementLines, resolutionSteps } from "../../view/marbles/narration.js";
 import {
   advanceSequence,
   pauseAfter,
@@ -24,6 +24,7 @@ import { EMPTY_HISTORY, recordSteps } from "../../view/marbles/history.js";
 import { historyMenu } from "../../view/marbles/history-screen.js";
 import { throws } from "../../lib/check.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
+import { emptyBagMarblesGame } from "./helpers.js";
 import { createMarblesRules } from "../marbles-rules.js";
 
 // Les règles du jeu, liées à la vraie table (core/marbles-rules.js).
@@ -100,14 +101,16 @@ function playGame(seed, options, present, onTurn = () => {}) {
   return { state, journal, history };
 }
 
-// La forme attendue d'une résolution : ouverture, trois phases, Impact, les
+// La forme attendue d'une résolution : ouverture, trois phases (chacune suivie de
+// ses pioches éventuelles, Pioche oblige), Impact, les
 // billes usées, puis la rotation et la pioche du tour suivant, ou la fin de
-// partie (dernier tour : sans rotation ni pioche ; sac régénéré trop petit : la
-// fin remplace la pioche).
+// partie (dernier tour : sans rotation ni pioche ; sac et défausse vides : la
+// fin suit l'arrêt de la pioche).
 const SEQUENCE_SHAPE = new RegExp(
-  "^resolution\\.opening (outcome\\.(slot|empty) ){3}event\\.impact (event\\.discarded\\.wear )*" +
-    "(event\\.rotation (event\\.bag_regenerated )?((event\\.draw|event\\.draw_skipped) )+event\\.turn_started" +
-    "|event\\.rotation event\\.bag_regenerated event\\.game_over\\.bagExhausted" +
+  "^resolution\\.opening (outcome\\.(slot|empty) (event\\.bag_regenerated |event\\.draw |event\\.draw_skipped\\.(handFull|noMarbles) )*){3}" +
+    "event\\.impact (event\\.discarded\\.wear )*" +
+    "(event\\.rotation (event\\.bag_regenerated )?((event\\.draw|event\\.draw_skipped\\.(handFull|noMarbles)) )+event\\.turn_started" +
+    "|event\\.rotation event\\.draw_skipped\\.noMarbles event\\.game_over\\.outOfMarbles" +
     "|event\\.game_over\\.turnsCompleted)$"
 );
 
@@ -149,7 +152,7 @@ function checkRealGames(run) {
           .map((step) => step.text)
           .join(" ");
         if (!SEQUENCE_SHAPE.test(shape)) badShapes.push(`${seed}/${before.turn} : ${shape}`);
-        for (const marker of ["event.bag_regenerated event.draw", "game_over.bagExhausted", "game_over.turnsCompleted", "draw_skipped", "discarded.wear", "outcome.empty"]) {
+        for (const marker of ["event.bag_regenerated event.draw", "game_over.outOfMarbles", "game_over.turnsCompleted", "draw_skipped", "discarded.wear", "outcome.empty"]) {
           if (shape.includes(marker)) seen.add(marker);
         }
         if (JSON.stringify(steps.flatMap((step) => step.events)) !== JSON.stringify(events)) lostEvents.push(`${seed}/${before.turn}`);
@@ -170,7 +173,7 @@ function checkRealGames(run) {
   run.same("séquence : ordre des étapes sur de vraies parties", [], badShapes.slice(0, 3));
   run.same(
     "séquence : chaque cas rencontré au moins une fois",
-    ["discarded.wear", "draw_skipped", "event.bag_regenerated event.draw", "game_over.bagExhausted", "game_over.turnsCompleted", "outcome.empty"],
+    ["discarded.wear", "draw_skipped", "event.bag_regenerated event.draw", "game_over.outOfMarbles", "game_over.turnsCompleted", "outcome.empty"],
     [...seen].sort()
   );
   run.same("séquence : chaque évènement dans une étape et une seule, dans l'ordre", [], lostEvents.slice(0, 3));
@@ -190,7 +193,7 @@ function checkRealGames(run) {
 
 // Un état de partie fabriqué, en phase de jeu.
 function playState(changes) {
-  return { ...rules.createGame(1, { bag: [] }), stage: "play", turn: 2, score: 0, hand: ["clay", "glass", "mica"], ...changes };
+  return { ...emptyBagMarblesGame(rules, 1), stage: "play", turn: 2, score: 0, hand: ["clay", "glass", "mica"], ...changes };
 }
 
 const EMPTY_TRIANGLE = { leftBase: null, rightBase: null, apex: null };
@@ -208,12 +211,12 @@ function checkTexts(run) {
     // R : la prévision d'abord, puis chaque emplacement dans l'ordre des phases.
     run(
       "R : vide, aucun effet, bonus chez qui le reçoit",
-      "Prévision : Vitesse 12, Masse 1, Impact 12. base gauche, loupe : aucun effet. base droite, vide. pointe, calot : Vitesse +12.",
+      "Prévision : Vitesse 10, Masse 1, Impact 10. base gauche, loupe : aucun effet. base droite, vide. pointe, calot : Vitesse +10.",
       said(describeOverview(lensed, rules, t))
     );
     run(
       "R : les gains du tour déjà comptés",
-      "Prévision : Vitesse 15, Masse 2, Impact 30. base gauche, loupe : aucun effet. base droite, vide. pointe, calot : Vitesse +12.",
+      "Prévision : Vitesse 13, Masse 2, Impact 26. base gauche, loupe : aucun effet. base droite, vide. pointe, calot : Vitesse +10.",
       said(describeOverview({ ...lensed, speed: 3, mass: 2 }, rules, t))
     );
     run(
@@ -239,8 +242,8 @@ function checkTexts(run) {
       [
         "Résolution du tour 2. base gauche, loupe : aucun effet.",
         "base droite, vide.",
-        "pointe, calot : Vitesse +12.",
-        "Impact 12. Score 12.",
+        "pointe, calot : Vitesse +10.",
+        "Impact 10. Score 10.",
         "Le triangle tourne d'un cran dans le sens horaire.",
         "Vous piochez agate.",
         "Début du tour 3, jouez vos billes.",
@@ -258,7 +261,7 @@ function checkTexts(run) {
     );
     run.same(
       "séquence : dernier tour, ni rotation ni pioche",
-      ["Impact 15. Score 15.", "géante est usée et part à la défausse.", "calot est usé et part à la défausse.", "Partie terminée. Score final : 15."],
+      ["Impact 13. Score 13.", "géante est usée et part à la défausse.", "calot est usé et part à la défausse.", "Partie terminée. Score final : 13."],
       texts({ ...worn, turn: 9 }).slice(3)
     );
     run.same(
@@ -272,9 +275,9 @@ function checkTexts(run) {
       texts({ ...lensed, bag: [], discard: ["tiger", "tiger", "tiger"] }).slice(-3)
     );
     run.same(
-      "séquence : sac régénéré trop petit, la fin remplace la suite",
-      ["Le sac est vide : la défausse est mélangée et forme un nouveau sac.", "Moins de 3 billes dans le sac : partie terminée. Score final : 12."],
-      texts({ ...lensed, bag: [], discard: ["tiger"] }).slice(-2)
+      "séquence : sac et défausse vides, la fin remplace la suite",
+      ["Plus aucune bille à piocher.", "Partie terminée faute de billes. Score final : 10."],
+      texts({ ...lensed, bag: [], discard: [] }).slice(-2)
     );
     run(
       "séquence : crans et sens, paramètres du texte",
@@ -352,15 +355,67 @@ function checkTexts(run) {
       historyMenu(null).entries.map((entry) => t(entry.label, entry.labelParams))
     );
 
+    // La Pioche : une valeur comme une autre, dans R, la confirmation et la séquence.
+    const drawing = playState({
+      hand: ["cats_eye"],
+      bag: ["agate"],
+      triangle: { leftBase: { marble: "mica", wear: 0 }, rightBase: null, apex: { marble: "stoneware", wear: 0 } },
+    });
+    run(
+      "pioche, R : une valeur finale",
+      "Prévision : Vitesse 0, Masse 1, Impact 0. base gauche, mica : Pioche 1. base droite, vide. pointe, grès : aucun effet.",
+      said(describeOverview(drawing, rules, t))
+    );
+    run(
+      "pioche, R : la régénération annoncée, sans rien révéler",
+      "Prévision : Vitesse 0, Masse 1, Impact 0. base gauche, mica : Pioche 1. base droite, vide. pointe, grès : aucun effet. Le sac sera régénéré.",
+      said(describeOverview({ ...drawing, bag: [], discard: ["tiger"] }, rules, t))
+    );
+    run.same(
+      "pioche, confirmation : Éjection et Tic qui piochent, puis la régénération",
+      ["Poser œil-de-chat en pointe ?", "Vitesse +3", "Éjection de grès : Pioche 1", "Tic d'œil-de-chat : Pioche 1", "Le sac sera régénéré."],
+      placementLines(drawing, 0, "apex", rules, t).map(({ key, params }) => said(t(key, params)))
+    );
+    run.same(
+      "pioche, séquence : la Pioche de la phase, puis la bille",
+      ["Résolution du tour 2. base gauche, mica : Pioche 1.", "Vous piochez agate."],
+      texts(drawing).slice(0, 2)
+    );
+    const placedEvents = rules.reduce(drawing, { type: "place", handIndex: 0, slot: "apex" }).events;
+    run.same(
+      "pioche, pose : les billes piochées en cours de tour se disent, régénération comprise",
+      [
+        "Éjection de grès : Pioche 1. Vitesse 0, Masse 1.",
+        "Vous piochez agate.",
+        "Défausse : grès.",
+        "Pose : œil-de-chat en pointe.",
+        "Tic d'œil-de-chat : Pioche 1. Vitesse 0, Masse 1.",
+        "Le sac est vide : la défausse est mélangée et forme un nouveau sac.",
+        "Vous piochez grès.",
+      ],
+      buildSteps(placedEvents, t).map((step) => said(step.text))
+    );
+
     setLocale("en");
     run(
+      "anglais, pioche : R",
+      "Forecast: Speed 0, Mass 1, Impact 0. left base, mica: Draw 1. right base, empty. apex, stoneware: no effect.",
+      describeOverview(drawing, rules, t)
+    );
+    run(
+      "anglais, pioche : la régénération annoncée",
+      true,
+      describeOverview({ ...drawing, bag: [], discard: ["tiger"] }, rules, t).endsWith("The bag will be regenerated.")
+    );
+    run.same("anglais, pioche : séquence", ["Resolving turn 2. left base, mica: Draw 1.", "You draw agate."], texts(drawing).slice(0, 2));
+    run(
       "anglais : R",
-      "Forecast: Speed 12, Mass 1, Impact 12. left base, magnifier: no effect. right base, empty. apex, shooter: Speed +12.",
+      "Forecast: Speed 10, Mass 1, Impact 10. left base, magnifier: no effect. right base, empty. apex, shooter: Speed +10.",
       describeOverview(lensed, rules, t)
     );
     run.same(
       "anglais : séquence",
-      ["Impact 15. Score 15.", "giant is worn out and goes to the discard.", "shooter is worn out and goes to the discard.", "Game over. Final score: 15."],
+      ["Impact 13. Score 13.", "giant is worn out and goes to the discard.", "shooter is worn out and goes to the discard.", "Game over. Final score: 13."],
       texts({ ...worn, turn: 9 }).slice(3)
     );
     run("anglais : ouverture et base gauche", "Resolving turn 9. left base, giant: Speed +6.", texts({ ...worn, turn: 9 })[0]);

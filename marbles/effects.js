@@ -8,3 +8,6 @@ export const speed = (amount) => ({ action: "speed", amount });
 
 // Ajoute `amount` à la Masse.
 export const mass = (amount) => ({ action: "mass", amount });
+
+// Pioche `amount` billes.
+export const draw = (amount) => ({ action: "draw", amount });

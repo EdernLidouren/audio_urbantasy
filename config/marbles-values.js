@@ -5,7 +5,13 @@
 export const MARBLES_SETTINGS = {
   firstTurnDraw: 5, // billes piochées au premier tour
   drawPerTurn: 1, // billes piochées à chaque tour suivant
-  maxHandSize: 5, // main pleine : la pioche du tour est sautée
+  // Capacités du joueur, qui pourront devenir ses caractéristiques :
+  maxHandSize: 5, // main pleine : la pioche est sautée, la bille reste au sac
+  // Lancers par tour : un lancer est une pose depuis la main, sur un emplacement
+  // vide ou occupé (l'échange n'en est pas un). Borne ce qu'un joueur peut
+  // enchaîner dans un tour, une pose qui pioche à chaque fois comprise. Au moins 3 :
+  // les trois poses obligatoires du premier tour en sont.
+  throwsPerTurn: 5,
   turnCount: 9,
   defaultMaxWear: 3,
   // Fiches : le curseur secondaire revient à l'annonce principale dès que le
