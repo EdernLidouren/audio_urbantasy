@@ -1,6 +1,7 @@
 // Registre des billes : id -> archétype. Connecteur pur, zéro logique, même patron
-// que collections/index.js. Une bille par fichier, de la donnée pure (seul import
-// permis : les formes courtes des clauses, marbles/effects.js).
+// que collections/index.js. Une bille par fichier, de la donnée pure (seuls imports
+// permis : les formes courtes des clauses, marbles/effects.js, et les constantes de
+// calibre, config/marbles-values.js).
 //
 // Le core ne l'importe JAMAIS (CLAUDE.md) : la vue, les outils et les vérifications
 // le lui passent en paramètre (`types`). Validé au démarrage
@@ -19,15 +20,10 @@
 //   final       le Final : effet joué quand la bille est retirée par usure, une fois
 //               à la défausse, avant l'Impact du tour ;
 //   maxWear     usure maximale, sinon MARBLES_SETTINGS.defaultMaxWear ;
-//   size        sa taille, une clé de MARBLE_SIZES (config/marbles-values.js) : ce
-//               qu'EST la bille. Règle la force de ses collisions ;
-//   sound       son profil sonore, une clé de MARBLE_SOUND_PROFILES
-//               (config/marbles-values.js) : ce qu'on ENTEND. Jamais déduit de la
-//               taille, ni l'inverse : une grosse bille peut porter le son d'une
-//               moyenne si c'est ce qui sonne juste.
-// `size` et `sound` sont de la présentation, obligatoires : la simulation les
-// accepte sans jamais les lire ; la vue les valide au chargement
-// (view/marbles/sounds.js).
+//   size        son CALIBRE, obligatoire : SMALL, MEDIUM ou LARGE, toujours par ces
+//               constantes (config/marbles-values.js), validé au chargement. Statique.
+//               Lu par les conditions de calibre, et par le son : le profil sonore
+//               et la force des chocs de la bille viennent de lui.
 //
 // Un effet est une LISTE DE CLAUSES ; une clause (core/marbles-effects.js) :
 //   action  ce qu'elle fait : "speed" ou "mass", qui ajoutent `amount` (entier,
@@ -51,7 +47,7 @@
 // config/marbles-values.js/STARTING_BAG pour la mettre en jeu.
 import clay from "./clay.js";
 import glass from "./glass.js";
-import shooter from "./shooter.js";
+import gorilla from "./gorilla.js";
 import agate from "./agate.js";
 import cats_eye from "./cats_eye.js";
 import porcelain from "./porcelain.js";
@@ -66,7 +62,7 @@ import magnifier from "./magnifier.js";
 export default {
   clay,
   glass,
-  shooter,
+  gorilla,
   agate,
   cats_eye,
   porcelain,

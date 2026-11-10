@@ -44,10 +44,10 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
    capacités du joueur, qui pourront devenir ses caractéristiques). Lancers épuisés : la
    pose est refusée (`noThrowsLeft`), dès la prise de la bille dans l'écran. La limite
    empêche une boucle pilotée par le joueur, un Tic qui pioche à chaque pose par exemple,
-   que la limite du bus ne couvre pas : ce sont des actions du joueur. Au tour 1, le
-   triangle doit être plein pour résoudre, et ses trois poses sont des lancers : une pose
-   qui ne laisserait plus assez de billes en main, ou plus assez de lancers, pour y arriver
-   est refusée (la partie serait sans issue).
+   que la limite du bus ne couvre pas : ce sont des actions du joueur. Le joueur est
+   **seul responsable de ses poses** : la résolution se lance à tout moment de la phase de
+   jeu, quel que soit l'état du triangle (plein, partiel ou vide), premier tour compris, et
+   rien ne refuse une pose qui laisserait des emplacements impossibles à remplir.
 4. **Phases** : base gauche, base droite, pointe ; un emplacement vide saute sa phase.
    Elles partent des compteurs du tour : Vitesse (0 en début de tour) et Masse (1), que
    Tic et Éjection ont déjà pu modifier. Chaque bille applique son effet (un Polissage ou
@@ -87,8 +87,8 @@ ou en fin de résolution). Aujourd'hui :
 - `turnsCompleted` : le dernier tour est résolu.
 
 Un futur mode (un Impact minimal à atteindre…) y branche les siennes ; chaque raison a son
-texte, `marbles.event.game_over.<raison>`. Un sac de départ compte au moins 3 billes : plus
-petit, il bloquerait le premier tour (refusé à la création de la partie).
+texte, `marbles.event.game_over.<raison>`. Un sac de départ peut compter moins de billes
+que le triangle ; vide, la partie s'arrête à la première pioche (`outOfMarbles`).
 
 ### Déroulé d'une pose
 
@@ -103,11 +103,15 @@ bille B, la pose d'une bille A se déroule dans cet ordre, visible au journal :
 | A rejoint l'emplacement | `placed` |
 | Tic de A | `hit`, puis `effect` si A en a un, suivi de ses pioches s'il pioche |
 
+`knockout` et `hit` portent le remplacement en cours, `replacement: { placed, ejected }`
+(les ids de A et de B), que lit la condition de calibre relatif (voir « Conditions »).
+
 ## Une bille
 
 Un fichier de `marbles/types/`, de la donnée pure, inscrit dans le registre
-`marbles/types/index.js`, dont l'en-tête détaille les champs. Seul import permis : les
-formes courtes des clauses (`marbles/effects.js`). Par exemple `marbles/types/magnifier.js` :
+`marbles/types/index.js`, dont l'en-tête détaille les champs. Seuls imports permis : les
+formes courtes des clauses (`marbles/effects.js`) et les constantes de calibre
+(`config/marbles-values.js`). Par exemple `marbles/types/magnifier.js` :
 
 ```js
 export default {
@@ -117,8 +121,7 @@ export default {
     leftBase: [{ ...speed(4), target: "apex", when: { type: "printedStat", slot: "apex", stat: "speed", atLeast: 1 } }],
   },
   apex: [speed(2)],
-  size: "medium",
-  sound: "classic_medium",
+  size: SMALL,
 };
 ```
 
@@ -143,8 +146,8 @@ plomberie interne.
 - **La boîte à outils** a son point de composition, `tools/marbles/game-rules.js`.
 - **Les vérifications** créent les leurs, avec la vraie table ou une table fabriquée ; une
   table fabriquée ne retombe jamais en silence sur celle du jeu.
-- **Les sons** lisent la taille et le profil sonore d'une bille directement dans le
-  registre : des champs de présentation, que la simulation ne lit jamais.
+- **Les sons** lisent le calibre d'une bille directement dans le registre : son profil
+  sonore et la force de ses chocs en viennent.
 
 Le registre et le sac de test sont validés ensemble au démarrage
 (`core/marbles.js`/`validateMarblesContent`, appelé par `main.js` et par l'audit du
@@ -153,21 +156,22 @@ billes.
 
 Les champs d'effet (`base`, `baseVariant`, `apex`, et un par déclencheur : `hit`, `knockout`,
 `final`) sont tous facultatifs :
-absent, aucun effet. `maxWear` vaut 3 par défaut. Deux champs obligatoires, de la
-présentation que la simulation accepte sans jamais les lire, validés par la vue :
+absent, aucun effet. `maxWear` vaut 3 par défaut. Un champ obligatoire, validé au
+chargement par la simulation (`validateMarbleTypes`) :
 
-- `size`, sa **taille**, ce qu'EST la bille (`small`, `medium` ou `large`, `MARBLE_SIZES`),
-  qui règle la force de ses collisions (voir « Sons ») ;
-- `sound`, son **profil sonore**, ce qu'on ENTEND (`classic_small`, `classic_medium` ou
-  `classic_large`, `MARBLE_SOUND_PROFILES`).
+- `size`, son **calibre** (Size) : `SMALL`, `MEDIUM` ou `LARGE`, toujours par ces
+  constantes de `config/marbles-values.js`. Un entier derrière elles (1, 2, 3), pour que les
+  comparaisons (plus petit, plus grand, écart) se fassent sur lui, et seulement là. Ses noms :
+  minibille, normale, calot (peewee, standard, boulder), `marbles.size.<id>.name`, l'id
+  venant de `MARBLE_SIZES`. **Statique** : aucune action ne le change. Lu par les
+  conditions de calibre et par le son, qui en tire le profil sonore et la force des chocs
+  (voir « Sons ») : une seule source de vérité pour la taille d'une bille.
 
-Aucun ne se déduit de l'autre : une grosse bille peut porter le son d'une moyenne si c'est ce
-qui sonne juste, et une famille de sons à venir (`metal_large`…) s'ajoute sans toucher aux
-tailles. **Ajouter une bille** : son fichier dans `marbles/types/` avec sa taille et son
-profil, sa ligne dans `marbles/types/index.js`, son nom dans chaque langue (vérifié par le
-domaine `marbles-view`), et sa place dans `STARTING_BAG` pour la mettre en jeu. En français, le nom porte sa forme `de` (« d'argile »,
-« de calot ») : `{ "base": "argile", "de": "d'argile" }`, pour « Tic d'argile ». Un sac est
-une liste d'ids : les doublons y sont permis.
+**Ajouter une bille** : son fichier dans `marbles/types/` avec son calibre, sa ligne dans
+`marbles/types/index.js`, son nom dans chaque langue (vérifié par le domaine
+`marbles-view`), et sa place dans `STARTING_BAG` pour la mettre en jeu. En français, le nom
+porte sa forme `de` (« d'argile », « de gorille ») : `{ "base": "argile", "de": "d'argile" }`,
+pour « Tic d'argile ». Un sac est une liste d'ids : les doublons y sont permis.
 
 ### Effets et clauses
 
@@ -196,12 +200,39 @@ Un effet est une liste de clauses (`core/marbles-effects.js`) :
   cet emplacement. Pour un Polissage ou une Fêlure, sans cible, la bille elle-même ; avec
   une cible, la bille de cet emplacement (un emplacement vide : sans effet, noté au
   journal, `targetEmpty`) ;
-- **condition** (`when`, facultative) : évaluée au déclenchement.
+- **condition** (`when`, facultative) : évaluée au déclenchement ; fausse, la clause ne
+  produit rien ;
+- **comptage** (`per`, facultatif) : `amount` est multiplié par ce qu'il compte au
+  déclenchement ; zéro, la clause ne produit rien.
+
+### Conditions
+
+Une condition ou un comptage lit la **situation** de l'effet au déclenchement
+(`core/marbles-effects.js`) : le triangle, la bille qui joue l'effet (sur le triangle ou
+déjà retirée) et, pendant un Tic ou une Éjection, le remplacement en cours.
+
+| Condition (`when`) | Vraie si | Exemple (fiche) |
+|---|---|---|
+| `{ type: "printedStat", slot, stat, atLeast }` | la bille de `slot` a, imprimé à cet emplacement, au moins `atLeast` de `stat` ; emplacement vide : faux | « Vitesse +4 à la pointe si son effet de pointe donne au moins Vitesse +1 » (loupe) |
+| `{ type: "relativeSize", marble, is }` | pendant un remplacement, la bille `marble` (`ejected`, l'éjectée, ou `placed`, la posée) est `is` (`smaller` ou `larger`) que l'autre ; calibres égaux : ni l'un ni l'autre | « Tic : Vitesse +4 si la bille éjectée est plus petite. » (gorille), « Éjection : Pioche 1 si la bille posée est plus grosse. » (mica) |
+| `{ type: "sizeAt", slot, size }` | la bille de `slot` est de calibre `size` ; emplacement vide : faux | « Pointe : Masse +1 et Masse +2 si la base gauche est un calot. » (agate) |
+
+`relativeSize` n'existe que pendant un remplacement : la validation la refuse hors d'un champ
+de déclencheur marqué `replacement` dans `MARBLE_TRIGGERS` (le Tic, vu par la posée ;
+l'Éjection, vue par l'éjectée).
+
+| Comptage (`per`) | Compte | Exemple (fiche) |
+|---|---|---|
+| `{ type: "activeSize", size }` | les billes actives (sur le triangle) de calibre `size`, la bille elle-même comprise si elle en est (déjà retirée, dans un Final, elle s'ajoute) | « Base : Vitesse +1 par minibille active. » (grès) |
+
+Dans R, la confirmation et la séquence, seules les **valeurs finales** se disent (« base
+gauche, grès : Vitesse +2. »), jamais la condition ni le comptage : ils ne s'entendent que
+dans la fiche.
 
 **Règle anti-boucle** : une condition lit toujours l'effet IMPRIMÉ d'une bille
-(`printedStat`), jamais un effet déjà modifié. Aucune dépendance circulaire n'est possible,
-et le joueur raisonne à partir de ce qu'il entend. L'imprimé compte les clauses sans cible
-et sans condition.
+(`printedStat`), jamais un effet déjà modifié ; le calibre est statique. Aucune dépendance
+circulaire n'est possible, et le joueur raisonne à partir de ce qu'il entend. L'imprimé
+compte les clauses sans cible, sans condition ni comptage.
 
 **Le bonus** (`bonus`, sur l'entrée du triangle) s'ajoute à l'effet de phase de la bille
 qui le reçoit, et s'annonce chez elle avec son total effectif (« Vitesse +10 »). Il suit la
@@ -245,7 +276,10 @@ valeur positive, `down` pour une négative), lus par les fiches, R, la confirmat
 séquence. Une action sans textes fait échouer le chargement. Si son application touche à
 l'état autrement qu'un compteur, comme la Pioche, `fireEffect` (`core/marbles.js`) l'exécute
 après l'annonce de l'effet. Une condition : une entrée dans `CONDITIONS` et son texte dans
-`CONDITION_TEXTS`.
+`CONDITION_TEXTS` ; un comptage : une entrée dans `COUNTS` et son texte dans `COUNT_TEXTS`.
+Une condition ou un comptage sans texte fait échouer le chargement. Un nom de calibre glissé
+dans un texte passe par `nameRef`, avec ses formes françaises et anglaises `indef` (« un
+calot ») et `noun` (« bille normale »).
 
 ### Les déclencheurs
 
@@ -333,9 +367,6 @@ identité (un déclencheur qui écoute la main : aucun aujourd'hui), ses chiffre
 pas sûrs. La vérification `marbles-forecast` contrôle que Vitesse, Masse, Impact, billes
 piochées et régénération prévues sont celles du réel.
 
-Elle résout aussi un triangle du premier tour encore incomplet, que l'action `resolve`
-refuse : c'est ce qui permet de prévoir la première pose.
-
 ## Écran de jeu
 
 Haut et bas changent d'étage (main, bases, pointe), gauche et droite parcourent la main
@@ -351,10 +382,13 @@ Ce qui se dit, selon l'endroit :
 
 | Où | Annonce |
 |---|---|
-| Bille en main, au sac, en défausse | « argile, usure 3. 1 sur 5 » |
-| Bille active, sans sélection | « calot, pointe, usure 1 sur 3. » |
+| Bille en main, au sac, en défausse | « argile, normale, usure 3. 1 sur 5 » |
+| Bille active, sans sélection | « gorille, calot, pointe, usure 1 sur 3. » |
 | Emplacement vide, sans sélection | « pointe : vide. » |
-| Emplacement occupé, bille sélectionnée | « pointe, calot : Vitesse +10. » (la prévision) |
+| Emplacement occupé, bille sélectionnée | « pointe, gorille : Vitesse +10. » (la prévision) |
+
+Le calibre se dit juste après le nom, dans l'annonce principale seulement ; la fiche n'en dit
+rien de plus, ses conditions de calibre passant par les champs d'effet.
 | Emplacement vide, bille sélectionnée | « pointe » |
 | R | la vue d'ensemble du tour (voir plus bas) |
 | L | le menu de l'historique (voir plus bas) |
@@ -383,7 +417,7 @@ lisent et ne s'activent pas (Entrée n'y fait rien) :
    « Vitesse +6 », valeurs produites seulement, non nulles, bonus reçu compris, sans
    texte d'effet ; « aucun effet » si rien ; suivies du Final de la bille posée si elle
    atteint son usure maximale ce tour (« Vitesse +6. Final : Pioche 1. ») ;
-3. sur un emplacement occupé, « Éjection de calot : Vitesse +3 », ou « … : aucun effet » ;
+3. sur un emplacement occupé, « Éjection de gorille : Vitesse +3 », ou « … : aucun effet » ;
 4. sur un emplacement occupé, « Tic d'argile : Vitesse +2 », ou « … : aucun effet » ;
 5. si la pose et la résolution régénéreraient le sac, « Le sac sera régénéré. » ;
 6. Annuler (Échap aussi : la sélection d'emplacement reprend) ;
@@ -440,7 +474,7 @@ chaque emplacement dans l'ordre des phases.
 
 ```
 Prévision : Vitesse 7, Masse 2, Impact 14. Base gauche, argile : Vitesse +1.
-Base droite, mica : Pioche 1. Pointe, calot : Vitesse +6.
+Base droite, mica : Pioche 1. Pointe, gorille : Vitesse +6.
 ```
 
 Une bille qui atteint son usure maximale ce tour fait suivre sa phase de son Final, compté
@@ -453,14 +487,15 @@ Vitesse et Masse comprennent ce que le tour a déjà gagné (Tic, Éjection) ; l
 applique les planchers. Un emplacement dit les valeurs que sa bille PRODUIT, après
 conditions et bonus reçus, jamais un texte d'effet : valeurs nulles omises, « aucun
 effet » si rien ; une Pioche est une valeur comme une autre (« Pioche 1 »). Un bonus se
-compte chez la bille qui le reçoit : la loupe en base gauche dit « aucun effet », le calot
+compte chez la bille qui le reçoit : la loupe en base gauche dit « aucun effet », le gorille
 qu'elle renforce « Vitesse +10 ». Si la résolution régénérerait le sac, « Le sac sera
 régénéré. » termine l'annonce. Même gabarit que les
 phases de la séquence (`outcomeLine`) : la prévision et la résolution se disent pareil.
 
 ### Séquence de résolution (Maj+R)
 
-**Maj+R** lance la résolution, le modificateur évitant une fausse manipulation. La
+**Maj+R** lance la résolution, à tout moment de la phase de jeu et quel que soit le
+triangle, le modificateur évitant une fausse manipulation. La
 simulation résout le tour et pioche le suivant tout de suite ; ce qui suit n'est que de la
 présentation, une file d'étapes (`view/marbles/sequence.js`) dite avec une pause après
 chacune :
@@ -475,7 +510,7 @@ chacune :
    Polissage ou une Fêlure, de son application (« Porcelaine se fêle : usure 2 sur 2. »,
    « Porcelaine est polie : usure 1 sur 2. », « Pointe vide : sans effet. ») et des retraits
    qu'une Fêlure provoque, avec leur Final ;
-5. une étape par bille usée : « Calot est usé et part à la défausse. » (l'adjectif
+5. une étape par bille usée : « Gorille est usé et part à la défausse. » (l'adjectif
    s'accorde au genre du nom, attribut `gender` des noms français), suivie de son Final
    s'il en a un (« Final de porcelaine : Vitesse +4. ») et de ses pioches ;
 6. « Impact 18. Score 42. » ;
@@ -531,15 +566,15 @@ Les sons du minijeu sont rangés à part, dans `assets/sounds/marbles/` et
 `assets/musics/marbles_classic`. Les clés vivent dans `config/marbles-values.js`, vérifiées
 par l'audit du contenu ; la lecture, dans `view/marbles/sounds.js`.
 
-**Profils** : chaque bille a un profil sonore (`sound`), qui lui donne sa **balise** (sa
+**Profils** : le son d'une bille dépend de son **calibre** (couplage voulu, une seule
+source de vérité) : un profil sonore par calibre (`MARBLE_SOUND_PROFILES`, indexé par
+`SMALL`, `MEDIUM`, `LARGE`), qui lui donne sa **balise** (sa
 voix, à la pioche et sous le curseur), sa **chute** (à l'arrivée d'un roulement), son
 **roulement** (une boucle, `marble_<taille>_rolling`) et sa **collision** (`impact`,
-`marble_<taille>_collision`, quand elle en déloge une autre ou qu'on la déloge). Trois profils
-aujourd'hui, `classic_small`, `classic_medium` et `classic_large` (`MARBLE_SOUND_PROFILES`),
-une voix chacun ; les noms de fichier prévoient plusieurs voix par profil
-(`marble_small_2_beacon`…). Le nom d'un profil est libre et ne dit rien de la taille de la
-bille. Une bille sans profil connu ou sans taille connue, ou un profil incomplet, fait échouer
-le chargement.
+`marble_<taille>_collision`, quand elle en déloge une autre ou qu'on la déloge), les fichiers
+`small`, `medium` et `large` allant aux calibres minibille, normale et calot. Une voix par
+profil aujourd'hui ; les noms de fichier en prévoient plusieurs (`marble_small_2_beacon`…).
+Un calibre sans profil, ou un profil incomplet, fait échouer le chargement.
 
 **Musique** : `marbles_classic`, de l'ouverture de l'écran au retour au menu principal, en
 fondu, au volume de la musique. Un seul morceau : en boucle ; plusieurs : enchaînés avec une
@@ -621,9 +656,10 @@ seul repère, `collision`, porte les deux billes ; l'écart est un retard posé 
 audio à la lecture (`delayMs` de `lib/audio.js`, précis à l'échantillon), car la file de sons
 avance par frames (environ 17 ms), un grain plus gros que l'écart lui-même, et un minuteur JS
 flotte de plusieurs millisecondes. La
-**force** du choc vient des tailles : le rapport des poids (`MARBLE_SIZES`, 1, 2 et 3),
-frappeuse sur frappée, élevé à `weightExponent` (0,3). Une grosse sur une petite frappe à
-1,39, une petite sur une grosse à 0,72, deux billes de même taille à 1. La force règle le
+**force** du choc vient de l'écart de calibre entre la posée et l'éjectée : le rapport des
+poids de leurs calibres (`weights` de `MARBLES_COLLISION`, 1, 2 et 3, pour le son seulement),
+frappeuse sur frappée, élevé à `weightExponent` (0,3). Un calot sur une minibille frappe à
+1,39, une minibille sur un calot à 0,72, deux billes de même calibre à 1. La force règle le
 volume des deux sons et la vitesse de départ de la délogée (`collisionStrength`).
 
 **Variations de ton** : collisions, chutes et roulements jouent chacun à une vitesse de

@@ -4,9 +4,9 @@
 // terminal (tools/marbles/play.js) disent exactement les mêmes phrases.
 
 import { nameRef } from "../../data/i18n/index.js";
-import { MARBLE_TRIGGERS } from "../../config/marbles-values.js";
+import { MARBLE_SIZES, MARBLE_TRIGGERS } from "../../config/marbles-values.js";
 import { SLOTS, throwsLeft } from "../../core/marbles.js";
-import { CLAUSE_ACTIONS } from "../../core/marbles-effects.js";
+import { CLAUSE_ACTIONS, CONDITIONS, COUNTS } from "../../core/marbles-effects.js";
 import { forecast } from "../../core/marbles-forecast.js";
 import { formatMenuPosition } from "../../lib/menu.js";
 
@@ -16,6 +16,17 @@ export function marbleName(marble, t) {
 
 export function slotName(slot, t) {
   return t(`marbles.slot.${slot}`);
+}
+
+// Le nom d'un calibre (config/marbles-values.js/MARBLE_SIZES) : « calot ».
+function sizeName(size, t) {
+  return t(`marbles.size.${MARBLE_SIZES[size]}.name`);
+}
+
+// La référence au nom d'un calibre, pour un gabarit qui en choisit la forme
+// (« un calot », « par minibille active »).
+function sizeRef(size) {
+  return nameRef(`marbles.size.${MARBLE_SIZES[size]}.name`);
 }
 
 // Un compteur qui peut être négatif (Vitesse, Masse), avec le vrai signe moins
@@ -91,18 +102,37 @@ function describeOutcome(outcome, t) {
   return outcome === null ? t("marbles.effect.none") : describeEffect(outcome, t);
 }
 
+// Le texte de chaque condition (core/marbles-effects.js/CONDITIONS), lu dans une
+// fiche après « si » : « si la bille éjectée est plus petite ».
 const CONDITION_TEXTS = {
   printedStat: (when, t) =>
     t("marbles.condition.printedStat", {
       slot: slotName(when.slot, t),
       effect: combined(valueParts({ [when.stat]: when.atLeast }, t), t),
     }),
+  relativeSize: (when, t) => t("marbles.condition.relativeSize", { marble: when.marble, is: when.is }),
+  sizeAt: (when, t) => t("marbles.condition.sizeAt", { slot: slotName(when.slot, t), size: sizeRef(when.size) }),
 };
 
-// Une clause IMPRIMÉE : ce que la bille promet, sa cible et sa condition comprises.
-// Son action dit sa valeur par ses propres textes.
+// Le texte de chaque comptage (COUNTS), après la valeur : « Vitesse +1 par minibille
+// active ».
+const COUNT_TEXTS = {
+  activeSize: (per, effect, t) => t("marbles.effect.per_active_size", { effect, size: sizeRef(per.size) }),
+};
+
+// Une condition ou un comptage sans texte, ou un texte sans entrée, échoue au
+// chargement.
+for (const [table, texts, label] of [[CONDITIONS, CONDITION_TEXTS, "la condition"], [COUNTS, COUNT_TEXTS, "le comptage"]]) {
+  for (const type of new Set([...Object.keys(table), ...Object.keys(texts)])) {
+    if (!Object.hasOwn(table, type) || !Object.hasOwn(texts, type)) throw new Error(`marbles : ${label} "${type}" doit avoir son texte et son entrée.`);
+  }
+}
+
+// Une clause IMPRIMÉE : ce que la bille promet, son comptage, sa cible et sa
+// condition comprises. Son action dit sa valeur par ses propres textes.
 function describeClause(clause, t) {
   let text = combined(valueParts({ [clause.action]: clause.amount }, t), t);
+  if (clause.per !== undefined) text = COUNT_TEXTS[clause.per.type](clause.per, text, t);
   if (clause.target !== undefined) text = t("marbles.effect.given", { effect: text, slot: slotName(clause.target, t) });
   if (clause.when !== undefined) text = t("marbles.effect.conditional", { effect: text, condition: CONDITION_TEXTS[clause.when.type](clause.when, t) });
   return text;
@@ -114,10 +144,10 @@ export function describePrinted(clauses, t) {
 }
 
 // L'annonce principale d'une bille hors du triangle (main, sac, défausse) : son
-// nom, son usure maximale, puis « x sur y ». Le détail est dans sa fiche
-// (view/marbles/card.js).
+// nom, son calibre juste après, son usure maximale, puis « x sur y » : « gorille,
+// calot, usure 3. ». Le détail est dans sa fiche (view/marbles/card.js).
 export function describeMarbleInList(marble, index, total, rules, t) {
-  const line = t("marbles.list.line", { name: marbleName(marble, t), maxWear: rules.maxWearOf(marble) });
+  const line = t("marbles.list.line", { name: marbleName(marble, t), size: sizeName(rules.types[marble].size, t), maxWear: rules.maxWearOf(marble) });
   const position = formatMenuPosition(index, total, t);
   return position ? `${line}. ${position}` : `${line}.`;
 }
@@ -136,14 +166,15 @@ function phaseText(game, slot, rules, t) {
   return describePrinted(rules.effectAt(game.triangle[slot].marble, slot), t);
 }
 
-// L'annonce principale d'un emplacement sous le curseur : la bille, sa place et
-// son usure, ou « vide ». Le détail est dans sa fiche.
+// L'annonce principale d'un emplacement sous le curseur : la bille, son calibre
+// juste après, sa place et son usure, ou « vide ». Le détail est dans sa fiche.
 export function describeSlotFocus(game, slot, rules, t) {
   const placed = game.triangle[slot];
   if (placed === null) return t("marbles.slot_line.empty", { slot: slotName(slot, t) });
   return t("marbles.slot_line.occupied", {
     slot: slotName(slot, t),
     name: marbleName(placed.marble, t),
+    size: sizeName(rules.types[placed.marble].size, t),
     wear: placed.wear,
     maxWear: rules.maxWearOf(placed.marble),
   });

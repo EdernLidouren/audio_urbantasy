@@ -12,7 +12,7 @@ import { addMoney } from "../money.js";
 import { addItem } from "../bag.js";
 import { parseNewGame } from "../new-game.js";
 import { throws } from "../../lib/check.js";
-import { createSeed } from "../rng.js";
+import { MEDIUM } from "../../config/marbles-values.js";
 
 // Départ d'OBJETS des vérifications d'inventaire et de collections : le kit
 // de test de config/new-game.js (rangers et escarpins dans le sac, baskets
@@ -24,14 +24,17 @@ export const ITEM_START = parseNewGame(
   {}
 ).start;
 
+// Une table de billes FABRIQUÉE, complétée d'un calibre (obligatoire) pour chaque
+// bille qui n'en déclare pas : MEDIUM, quand la vérification ne porte pas sur lui.
+export function withSizes(table) {
+  return Object.fromEntries(Object.entries(table).map(([id, type]) => [id, { size: MEDIUM, ...type }]));
+}
+
 // Une partie des billes au sac VIDE, base des états fabriqués par les domaines
-// marbles* : une vraie partie exige un sac d'au moins 3 billes (core/marbles.js),
-// elle naît donc d'un sac minimal qu'on vide ensuite. Son hasard reste celui
-// d'une partie créée sac vide (aucun mélange) : les régénérations fabriquées
-// gardent leur ordre. `rules` : core/marbles-rules.js.
+// marbles* : rien n'y est mélangé, son hasard reste celui de la graine, et les
+// régénérations fabriquées gardent leur ordre. `rules` : core/marbles-rules.js.
 export function emptyBagMarblesGame(rules, seed) {
-  const [first] = Object.keys(rules.types);
-  return { ...rules.createGame(seed, { bag: [first, first, first] }), bag: [], rngState: createSeed(seed) };
+  return rules.createGame(seed, { bag: [] });
 }
 
 export const RAW_SCENE = {

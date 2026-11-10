@@ -10,7 +10,7 @@
 //     "score": 12, "speed": 0, "mass": 1,
 //     "swapUsed": false, "throwsUsed": 0,  lancers déjà joués ce tour
 //     "triangle": { "leftBase": "clay", "rightBase": "giant:0", "apex": null },
-//     "hand": ["agate", "shooter"],
+//     "hand": ["agate", "gorilla"],
 //     "bag": ["mica"],                du haut (prochaine pioche) vers le bas
 //     "discard": [],
 //     "settings": { "maxHandSize": 5, "throwsPerTurn": 5, "firstTurnDraw": 5, "drawPerTurn": 1, "turnCount": 9 }

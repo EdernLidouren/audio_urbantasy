@@ -70,19 +70,26 @@ const drawsIn = (events) => events.filter((event) => event.type === "draw").leng
 const blindReduce = (state, action) => GAME_RULES.reduce(state, action, { blind: true });
 
 // Les suites de poses envisagées depuis `state`, chacune avec l'état où elle mène et
-// les billes que ses poses ont piochées : au premier tour, toutes les façons de
-// remplir le triangle ; ensuite, de zéro à `maxPlacements` poses, sur tout
-// emplacement, ou sur un vide seulement sans remplacement. Plus courtes d'abord.
+// les billes que ses poses ont piochées : au premier tour, le triangle vide, toutes
+// les façons d'en remplir tout ou partie (aucune règle ne l'exige, c'est une
+// stratégie : poser une bille sur un vide ne retire rien) ; ensuite, de zéro à
+// `maxPlacements` poses, sur tout emplacement, ou sur un vide seulement sans
+// remplacement. Plus courtes d'abord.
 function placementSequences(state, { maxPlacements, allowReplacement }, drawnBefore = 0) {
   const sequences = [];
   const firstTurn = state.turn === 1;
   const walk = (current, choices, drawn) => {
-    const empty = SLOTS.filter((slot) => current.triangle[slot] === null);
-    if (firstTurn ? empty.length === 0 : true) sequences.push({ choices, state: current, drawn });
-    if (firstTurn ? empty.length === 0 : choices.length >= maxPlacements) return;
-    // Au premier tour, les emplacements se remplissent dans l'ordre des phases :
-    // toutes les attributions sont couvertes sans compter deux fois la même.
-    const slots = firstTurn ? [empty[0]] : allowReplacement ? SLOTS : empty;
+    sequences.push({ choices, state: current, drawn });
+    if (!firstTurn && choices.length >= maxPlacements) return;
+    // Au premier tour, les emplacements vides se remplissent dans l'ordre des
+    // phases, chacun après le dernier rempli : chaque sous-ensemble d'emplacements,
+    // chaque attribution, est couvert sans compter deux fois le même.
+    const after = choices.length === 0 ? -1 : SLOTS.indexOf(choices.at(-1).slot);
+    const slots = firstTurn
+      ? SLOTS.filter((slot, index) => index > after && current.triangle[slot] === null)
+      : allowReplacement
+        ? SLOTS
+        : SLOTS.filter((slot) => current.triangle[slot] === null);
     for (const marble of distinct(current.hand)) {
       for (const slot of slots) {
         const choice = { type: "place", marble, slot };

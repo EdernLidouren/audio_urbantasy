@@ -82,7 +82,7 @@ choix aléatoires passent par leur propre générateur.
 | Joueur | Ce qu'il fait |
 |---|---|
 | `random` | Uniforme parmi les actions légales (`core/marbles.js/legalActions`), résolution comprise : la référence basse |
-| `greedy` | Évalue par la prévision chaque combinaison du tour (pas d'échange ou chaque échange, puis jusqu'à `--max-placements` poses, 1 par défaut ; au premier tour, chaque remplissage du triangle) et joue celle de la plus haute valeur : l'Impact prévu, plus `--drawn-value` par bille que le plan piocherait ; à égalité, la plus simple |
+| `greedy` | Évalue par la prévision chaque combinaison du tour (pas d'échange ou chaque échange, puis jusqu'à `--max-placements` poses, 1 par défaut ; au premier tour, chaque remplissage de tout ou partie du triangle, aucune règle ne l'exigeant) et joue celle de la plus haute valeur : l'Impact prévu, plus `--drawn-value` par bille que le plan piocherait ; à égalité, la plus simple |
 | `greedy-no-replacement` | Le même, sans jamais poser sur un emplacement occupé : l'écart avec `greedy` mesure ce que rapportent le tic et l'éjection |
 
 Ils sont myopes : aucun ne prévoit au-delà du tour. Un nouveau joueur est une entrée de

@@ -4,10 +4,20 @@
 // il ne touche à aucun état : appliquer le résultat est l'affaire de
 // core/marbles.js.
 //
-// AJOUTER une action ou une condition : une entrée dans CLAUSE_ACTIONS ou dans
-// CONDITIONS, et ses textes dans la vue (view/marbles/narration.js, ACTION_TEXTS
-// ou CONDITION_TEXTS). Une cible est un emplacement, ou rien pour la bille
-// elle-même.
+// AJOUTER une action, une condition ou un comptage : une entrée dans
+// CLAUSE_ACTIONS, CONDITIONS ou COUNTS, et ses textes dans la vue
+// (view/marbles/narration.js, ACTION_TEXTS, CONDITION_TEXTS ou COUNT_TEXTS). Une
+// cible est un emplacement, ou rien pour la bille elle-même.
+//
+// LA SITUATION d'un effet, ce que ses conditions et ses comptages lisent au
+// déclenchement : { triangle, holder, replacement } ;
+//   triangle     le triangle à cet instant ;
+//   holder       la bille qui joue l'effet, { marble, onTriangle } : `onTriangle`
+//                faux quand elle a déjà quitté le triangle (le Final) ;
+//   replacement  pendant un Tic ou une Éjection, le remplacement en cours,
+//                { placed, ejected } (deux ids de bille) ; null sinon.
+// Une condition ne lit jamais un effet déjà modifié (printedStat lit l'effet
+// IMPRIMÉ) ; le calibre est statique : aucune dépendance circulaire.
 //
 // DEUX SORTES D'ACTIONS (`kind`) : les VALEURS (Vitesse, Masse, Pioche), qui
 // s'additionnent en un effet, et les actions SUR UNE BILLE (Polissage, Fêlure), qui
@@ -28,7 +38,13 @@
 // l'action (`{ speed, mass, draw }`). Le core les applique (core/marbles.js/fireEffect),
 // la vue les dit, la prévision les rend.
 
+import { MARBLE_SIZES } from "../config/marbles-values.js";
 import { rejectUnknownFields } from "../lib/validate.js";
+
+// Un calibre connu (config/marbles-values.js/MARBLE_SIZES) ?
+export function isMarbleSize(size) {
+  return Number.isInteger(size) && Object.hasOwn(MARBLE_SIZES, size);
+}
 
 // Emplacements, dans l'ordre de RÉSOLUTION (phases de base gauche, de base
 // droite, de pointe).
@@ -46,19 +62,20 @@ export function effectAt(marble, slot, types) {
 }
 
 // Ce que des clauses donnent à coup sûr pour `stat` : les clauses sans cible
-// (celles d'une autre bille ne sont pas l'effet de celle-ci) et sans condition
-// (l'évaluer rouvrirait la porte aux dépendances circulaires).
+// (celles d'une autre bille ne sont pas l'effet de celle-ci), sans condition ni
+// comptage (les évaluer rouvrirait la porte aux dépendances circulaires).
 export function printedStat(clauses, stat) {
   return clauses
-    .filter((clause) => clause.action === stat && clause.target === undefined && clause.when === undefined)
+    .filter((clause) => clause.action === stat && clause.target === undefined && clause.when === undefined && clause.per === undefined)
     .reduce((total, clause) => total + clause.amount, 0);
 }
 
 // Les champs d'une clause. `target` n'appartient qu'aux actions qui ont un sens
 // pour un autre emplacement : une action qui ne le déclare pas refuse toute cible
-// à la validation.
-const TARGETED_FIELDS = ["action", "amount", "target", "when"];
-const SELF_FIELDS = ["action", "amount", "when"];
+// à la validation. `when` : sa condition ; `per` : son comptage, qui multiplie
+// `amount` (CONDITIONS, COUNTS).
+const TARGETED_FIELDS = ["action", "amount", "target", "when", "per"];
+const SELF_FIELDS = ["action", "amount", "when", "per"];
 
 function validateInteger(clause, describe, fail) {
   if (!Number.isInteger(clause.amount)) fail(`${describe} : amount doit être un entier.`);
@@ -160,24 +177,102 @@ export function addValues(a, b) {
   return sum;
 }
 
-// Chaque condition : ses champs, leur validation, et son test sur le triangle.
+// Les comparaisons de CALIBRE, sur l'entier (config/marbles-values.js : SMALL <
+// MEDIUM < LARGE) et nulle part ailleurs. Deux calibres égaux : ni plus petit ni
+// plus gros.
+const SIZE_COMPARISONS = {
+  smaller: (size, other) => size < other,
+  larger: (size, other) => size > other,
+};
+
+function validateSize(size, describe, fail) {
+  if (!isMarbleSize(size)) fail(`${describe} : calibre inconnu "${size}".`);
+}
+
+function validateSlot(slot, describe, fail) {
+  if (!SLOTS.includes(slot)) fail(`${describe} : emplacement inconnu "${slot}".`);
+}
+
+// Les billes d'un remplacement que relativeSize compare : celle qu'elle nomme,
+// comparée à l'autre.
+const REPLACEMENT_MARBLES = { ejected: "placed", placed: "ejected" };
+
+// Chaque condition : ses champs, leur validation (`context` : le moment du champ
+// d'effet, voir targetProblem), et son test sur la situation (en-tête).
 export const CONDITIONS = {
   // La bille à `slot` a-t-elle, IMPRIMÉ à cet emplacement, au moins `atLeast`
   // de `stat` ? Emplacement vide : non, il n'y a rien à lire.
   printedStat: {
     fields: ["type", "slot", "stat", "atLeast"],
     validate(when, describe, fail) {
-      if (!SLOTS.includes(when.slot)) fail(`${describe} : emplacement inconnu "${when.slot}".`);
+      validateSlot(when.slot, describe, fail);
       if (!Object.hasOwn(CLAUSE_ACTIONS, when.stat)) fail(`${describe} : statistique inconnue "${when.stat}".`);
       if (!Number.isInteger(when.atLeast)) fail(`${describe} : atLeast doit être un entier.`);
     },
-    test(when, triangle, types) {
+    test(when, { triangle }, types) {
       const placed = triangle[when.slot];
       if (placed === null) return false;
       return printedStat(effectAt(placed.marble, when.slot, types), when.stat) >= when.atLeast;
     },
   },
+  // Pendant un remplacement : la bille `marble` ("ejected", l'éjectée, ou
+  // "placed", la posée) est-elle `is` ("smaller" ou "larger") que l'autre ? Ni
+  // l'un ni l'autre à calibre égal. Seulement dans un Tic (vu par la posée) ou une
+  // Éjection (vu par l'éjectée) : ailleurs, il n'y a pas de remplacement.
+  relativeSize: {
+    fields: ["type", "marble", "is"],
+    validate(when, describe, fail, context) {
+      if (!Object.hasOwn(REPLACEMENT_MARBLES, when.marble)) fail(`${describe} : bille de remplacement inconnue "${when.marble}".`);
+      if (!Object.hasOwn(SIZE_COMPARISONS, when.is)) fail(`${describe} : comparaison inconnue "${when.is}".`);
+      if (context.replacement !== true) fail(`${describe} : relativeSize ne vaut que pendant un remplacement (Tic, Éjection).`);
+    },
+    test(when, { replacement }, types) {
+      const subject = replacement[when.marble];
+      const other = replacement[REPLACEMENT_MARBLES[when.marble]];
+      return SIZE_COMPARISONS[when.is](types[subject].size, types[other].size);
+    },
+  },
+  // La bille à `slot` est-elle de calibre `size` ? Emplacement vide : non.
+  sizeAt: {
+    fields: ["type", "slot", "size"],
+    validate(when, describe, fail) {
+      validateSlot(when.slot, describe, fail);
+      validateSize(when.size, describe, fail);
+    },
+    test(when, { triangle }, types) {
+      const placed = triangle[when.slot];
+      return placed !== null && types[placed.marble].size === when.size;
+    },
+  },
 };
+
+// Chaque COMPTAGE (`per` d'une clause) : ses champs, leur validation, et ce qu'il
+// compte dans la situation. Le montant de la clause est multiplié par ce nombre ;
+// zéro : la clause ne produit rien.
+export const COUNTS = {
+  // Les billes ACTIVES (sur le triangle) de calibre `size`, la bille elle-même
+  // comprise si elle en est : sur le triangle, elle s'y compte ; déjà retirée (le
+  // Final), elle s'ajoute.
+  activeSize: {
+    fields: ["type", "size"],
+    validate(per, describe, fail) {
+      validateSize(per.size, describe, fail);
+    },
+    count(per, { triangle, holder }, types) {
+      const onTriangle = SLOTS.filter((slot) => triangle[slot] !== null && types[triangle[slot].marble].size === per.size).length;
+      const self = !holder.onTriangle && types[holder.marble].size === per.size ? 1 : 0;
+      return onTriangle + self;
+    },
+  },
+};
+
+// Valide une condition ou un comptage d'après sa table.
+function validateRule(rule, table, label, describe, fail, context) {
+  const entry = table[rule?.type];
+  if (!entry) fail(`${describe} : ${label} inconnu(e) "${rule?.type}".`);
+  rejectUnknownFields(rule, entry.fields, describe, fail);
+  entry.validate(rule, describe, fail, context);
+}
 
 // Échoue au chargement sur un effet mal formé. Un effet absent se vérifie en
 // amont : ici, il existe. `context` : le moment où il joue (voir targetProblem),
@@ -192,26 +287,27 @@ export function validateEffect(effect, describe, fail, context = {}) {
     if (clause.target !== undefined && !SLOTS.includes(clause.target)) fail(`${describe} : cible inconnue "${clause.target}".`);
     const problem = targetProblem(clause, context);
     if (problem !== null) fail(`${describe} : ${problem}.`);
-    if (clause.when !== undefined) {
-      const condition = CONDITIONS[clause.when.type];
-      if (!condition) fail(`${describe} : condition inconnue "${clause.when.type}".`);
-      rejectUnknownFields(clause.when, condition.fields, describe, fail);
-      condition.validate(clause.when, describe, fail);
-    }
+    if (clause.when !== undefined) validateRule(clause.when, CONDITIONS, "condition", describe, fail, context);
+    if (clause.per !== undefined) validateRule(clause.per, COUNTS, "comptage", describe, fail, context);
   }
 }
 
-// Évalue des clauses sur un triangle, au moment du déclenchement :
+// Évalue des clauses dans une SITUATION (en-tête), au moment du déclenchement :
 //   self        les valeurs de la bille elle-même, toutes présentes ;
 //   gifts       ce qui va à d'autres emplacements, [{ slot, ...valeurs donnables }] ;
 //   operations  les actions sur une bille, dans l'ordre des clauses,
 //               [{ action, amount, target }] (`target` absent : la bille elle-même).
-export function evaluateEffect(clauses, triangle, types) {
+// Une clause dont la condition échoue, ou dont le comptage donne zéro, ne produit
+// rien. Seules les valeurs finales en sortent : le montant déjà multiplié.
+export function evaluateEffect(clauses, situation, types) {
   let self = ZERO;
   const gifts = [];
   const operations = [];
-  for (const clause of clauses) {
-    if (clause.when !== undefined && !CONDITIONS[clause.when.type].test(clause.when, triangle, types)) continue;
+  for (const printed of clauses) {
+    if (printed.when !== undefined && !CONDITIONS[printed.when.type].test(printed.when, situation, types)) continue;
+    const times = printed.per === undefined ? 1 : COUNTS[printed.per.type].count(printed.per, situation, types);
+    if (times === 0) continue;
+    const clause = { ...printed, amount: printed.amount * times };
     const { kind, apply } = CLAUSE_ACTIONS[clause.action];
     if (kind === "marble") operations.push({ action: clause.action, amount: clause.amount, ...(clause.target === undefined ? {} : { target: clause.target }) });
     else if (clause.target === undefined) self = apply(self, clause);

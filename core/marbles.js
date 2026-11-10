@@ -46,9 +46,9 @@
 // sur lui seul (view/marbles/narration.js, view/marbles/sounds.js) :
 //   turnStarted { turn, turnCount }, draw { marble }, drawSkipped { reason },
 //   bagRegenerated { size }, swapped { a, b },
-//   knockout { slot, marble }, removed { slot, marble, cause },
+//   knockout { slot, marble, replacement }, removed { slot, marble, cause },
 //   discarded { slot, marble, cause }, placed { slot, marble },
-//   hit { slot, marble }, final { slot, marble },
+//   hit { slot, marble, replacement }, final { slot, marble },
 //   phase { slot, marble }, phaseSkipped { slot },
 //   effect { trigger, slot, marble, speedDelta, massDelta, draw, operations, given, lost, speed, mass },
 //   polished { slot, marble, amount, wear, maxWear }, cracked { slot, marble, amount, wear, maxWear },
@@ -56,6 +56,8 @@
 //   wear { slot, marble, wear, maxWear },
 //   impact { speed, mass, impact, score },
 //   rotation { triangle }, turnEnded { turn }, gameOver { reason, score }.
+// `replacement` (Tic, Éjection) : le remplacement en cours, { placed, ejected }, lu
+// par les conditions de calibre relatif (core/marbles-effects.js/relativeSize).
 // `cause` : "replacement" ou "wear". `trigger` : "phase" ou l'id d'un déclencheur
 // (config/marbles-values.js/MARBLE_TRIGGERS : "hit", "knockout", "final"). `final` :
 // une bille usée vient de rejoindre la défausse depuis `slot`.
@@ -82,7 +84,7 @@ import { MARBLE_TRIGGERS, MARBLES_SETTINGS, STARTING_BAG } from "../config/marbl
 import { createSeed, nextRandom } from "./rng.js";
 import { rejectUnknownFields } from "../lib/validate.js";
 import { MarbleEventLimitError, createEventBus } from "./marbles-bus.js";
-import { CLAUSE_ACTIONS, SLOTS, addValues, effectAt, evaluateEffect, validateEffect } from "./marbles-effects.js";
+import { CLAUSE_ACTIONS, SLOTS, addValues, effectAt, evaluateEffect, isMarbleSize, validateEffect } from "./marbles-effects.js";
 
 export { SLOTS, effectAt };
 
@@ -99,9 +101,7 @@ export const MARBLE_ERRORS = [
   "swapAfterPlacement",
   "swapSameSlot",
   "swapBothEmpty",
-  "placementBlocksTriangle",
   "noThrowsLeft",
-  "triangleIncomplete",
   "eventLimit",
 ];
 
@@ -123,7 +123,8 @@ export function validateMarbleTriggers(triggers) {
   const seen = { id: new Set(), field: new Set(), event: new Set() };
   for (const trigger of triggers) {
     const describe = `déclencheur "${trigger.id}"`;
-    rejectUnknownFields(trigger, ["id", "field", "event", "marble", "moment", "forecast", "texts", "card"], describe, fail);
+    rejectUnknownFields(trigger, ["id", "field", "event", "marble", "moment", "replacement", "forecast", "texts", "card"], describe, fail);
+    if (trigger.replacement !== undefined && typeof trigger.replacement !== "boolean") fail(`${describe} : replacement doit valoir true ou false.`);
     for (const key of ["id", "field", "event"]) {
       if (typeof trigger[key] !== "string" || trigger[key] === "") fail(`${describe} : ${key} doit être un texte.`);
       if (seen[key].has(trigger[key])) fail(`${describe} : ${key} "${trigger[key]}" en double.`);
@@ -154,12 +155,16 @@ validateMarbleTriggers(MARBLE_TRIGGERS);
 // Les champs d'effet d'une bille : ceux de la phase, puis un par déclencheur.
 const EFFECT_FIELDS = [...PHASE_FIELDS, ...MARBLE_TRIGGERS.map((trigger) => trigger.field)];
 
-// Le moment où joue chaque champ d'effet, pour la règle des cibles
-// (core/marbles-effects.js/validateEffect) ; une variante de base joue sur sa base.
+// Le moment où joue chaque champ d'effet, pour la règle des cibles et les
+// conditions qui n'ont de sens qu'à certains moments (core/marbles-effects.js/
+// validateEffect) ; une variante de base joue sur sa base. `replacement` : un
+// remplacement est en cours (Tic, Éjection).
 const FIELD_CONTEXTS = {
   base: { phaseSlots: ["leftBase", "rightBase"] },
   apex: { phaseSlots: ["apex"] },
-  ...Object.fromEntries(MARBLE_TRIGGERS.map((trigger) => [trigger.field, { moment: trigger.moment, removed: trigger.marble === "removed" }])),
+  ...Object.fromEntries(
+    MARBLE_TRIGGERS.map((trigger) => [trigger.field, { moment: trigger.moment, removed: trigger.marble === "removed", replacement: trigger.replacement === true }])
+  ),
 };
 
 // --- Table des billes ---
@@ -173,9 +178,9 @@ export function validateMarbleTypes(types) {
   };
   if (Object.keys(types).length === 0) fail("table des billes vide.");
   for (const [id, type] of Object.entries(types)) {
-    // `size` et `sound` : la taille et le profil sonore, présentation seulement,
-    // jamais lus ici (validés par la vue, view/marbles/sounds.js).
-    rejectUnknownFields(type, [...EFFECT_FIELDS, "baseVariant", "maxWear", "size", "sound"], `bille "${id}"`, fail);
+    rejectUnknownFields(type, [...EFFECT_FIELDS, "baseVariant", "maxWear", "size"], `bille "${id}"`, fail);
+    // Le calibre, obligatoire : lu par les conditions de calibre et par le son.
+    if (!isMarbleSize(type.size)) fail(`bille "${id}" : calibre (size) absent ou inconnu "${type.size}".`);
     for (const field of EFFECT_FIELDS) {
       if (type[field] !== undefined) validateEffect(type[field], `bille "${id}", ${field}`, fail, FIELD_CONTEXTS[field]);
     }
@@ -191,23 +196,19 @@ export function validateMarbleTypes(types) {
   }
 }
 
-// La valeur fausse échouerait sinon en pleine partie. Le premier tour exige un
-// triangle plein et la main ne se recomplète qu'au tour suivant : une première
-// pioche plus petite que le triangle laisserait la partie sans issue.
+// La valeur fausse échouerait sinon en pleine partie. Aucun minimum lié au
+// triangle : le joueur est seul responsable de ses poses, et la résolution se lance
+// quel que soit l'état du triangle, au premier tour comme ensuite. Un sac vide fait
+// une partie qui s'arrête à la première pioche, faute de billes.
 function validateGameSettings({ maxHandSize, throwsPerTurn, firstTurnDraw, drawPerTurn, turnCount, bag }, types) {
   const positive = { maxHandSize, throwsPerTurn, firstTurnDraw, drawPerTurn, turnCount };
   for (const [name, value] of Object.entries(positive)) {
     if (!Number.isInteger(value) || value < 1) throw new Error(`marbles : ${name} doit être un entier >= 1.`);
   }
-  if (firstTurnDraw < SLOTS.length) throw new Error(`marbles : firstTurnDraw doit valoir au moins ${SLOTS.length}.`);
-  // Les poses obligatoires du premier tour sont des lancers.
-  if (throwsPerTurn < SLOTS.length) throw new Error(`marbles : throwsPerTurn doit valoir au moins ${SLOTS.length}.`);
   if (maxHandSize < firstTurnDraw) throw new Error("marbles : maxHandSize doit valoir au moins firstTurnDraw.");
   for (const id of bag) {
     if (!Object.hasOwn(types, id)) throw new Error(`marbles : bille inconnue "${id}" dans le sac.`);
   }
-  // Le premier tour exige un triangle plein : un sac plus petit le bloquerait.
-  if (bag.length < SLOTS.length) throw new Error(`marbles : le sac doit compter au moins ${SLOTS.length} billes.`);
 }
 
 // Le contenu du jeu des billes, au démarrage (main.js, l'audit du contenu) : la
@@ -298,10 +299,6 @@ function isSlot(slot) {
   return SLOTS.includes(slot);
 }
 
-function emptySlotCount(triangle) {
-  return SLOTS.filter((slot) => triangle[slot] === null).length;
-}
-
 // Peut-on encore lancer un échange ce tour-ci, avant même de choisir les
 // emplacements ? Le code du refus, ou null. Exportée pour que l'interface
 // refuse dès la prise, avec la règle du core au lieu d'une copie.
@@ -328,12 +325,9 @@ export function throwRefusal(state) {
 }
 
 // Cette pose est-elle permise ? Le code du refus, ou null. Exportée pour que
-// l'interface ne demande pas de confirmer une pose qui serait refusée.
-//
-// Au premier tour, le triangle doit être plein pour résoudre, et la main ne se
-// recomplète qu'au tour suivant : remplacer trop de billes laisserait la
-// partie sans issue. Une pose qui ne laisse plus assez de billes en main, ou
-// plus assez de lancers, pour remplir les emplacements vides est donc refusée.
+// l'interface ne demande pas de confirmer une pose qui serait refusée. Le joueur
+// est seul responsable de ses poses : rien ne le protège d'un triangle qu'il ne
+// pourrait plus remplir, au premier tour comme ensuite.
 export function placeRefusal(state, handIndex, slot) {
   const refusal = throwRefusal(state);
   if (refusal) return refusal;
@@ -341,20 +335,14 @@ export function placeRefusal(state, handIndex, slot) {
   if (!Number.isInteger(handIndex) || handIndex < 0 || handIndex >= state.hand.length) return "invalidHandIndex";
   // Une bille piochée à l'aveugle n'a pas d'identité : rien à poser.
   if (state.hand[handIndex] === UNKNOWN_MARBLE) return "invalidHandIndex";
-  if (state.turn === 1) {
-    const emptyAfter = emptySlotCount(state.triangle) - (state.triangle[slot] === null ? 1 : 0);
-    if (Math.min(state.hand.length, throwsLeft(state)) - 1 < emptyAfter) return "placementBlocksTriangle";
-  }
   return null;
 }
 
-// Peut-on résoudre le tour ? Le code du refus, ou null : au premier tour, le
-// triangle doit être plein.
+// Peut-on résoudre le tour ? Le code du refus, ou null : à tout moment de la phase
+// de jeu, quel que soit l'état du triangle (plein, partiel ou vide), premier tour
+// compris. Un emplacement vide saute sa phase.
 function resolveRefusal(state) {
-  const refusal = stageRefusal(state, "play");
-  if (refusal) return refusal;
-  if (state.turn === 1 && emptySlotCount(state.triangle) > 0) return "triangleIncomplete";
-  return null;
+  return stageRefusal(state, "play");
 }
 
 // LECTURE PURE, sans effet sur les règles : toutes les actions que le réducteur
@@ -474,10 +462,16 @@ function update(run, changes) {
 
 // Joue un effet de bille : les compteurs du tour d'abord, ce qui va aux autres
 // emplacements ensuite (un cadeau à un emplacement vide est perdu), le bonus
-// reçu compté au moment de la phase de la bille.
-function fireEffect(run, trigger, listener, clauses) {
+// reçu compté au moment de la phase de la bille. `event` : l'évènement qui le
+// déclenche, d'où vient le remplacement en cours (Tic, Éjection).
+function fireEffect(run, trigger, listener, clauses, event) {
   const { slot, marble } = listener;
-  const { self, gifts, operations } = evaluateEffect(clauses, run.state.triangle, run.types);
+  const situation = {
+    triangle: run.state.triangle,
+    holder: { marble, onTriangle: listener.zone === "triangle" },
+    replacement: event.replacement ?? null,
+  };
+  const { self, gifts, operations } = evaluateEffect(clauses, situation, run.types);
   const bonus = trigger === "phase" ? run.state.triangle[slot].bonus : undefined;
   const { speed: speedDelta, mass: massDelta } = bonus ? addValues(self, bonus) : self;
 
@@ -544,7 +538,7 @@ function handleEvent(run, event) {
       continue;
     }
     const clauses = trigger.clauses(event, listener, run.types);
-    if (clauses !== null) fireEffect(run, trigger.id, listener, clauses);
+    if (clauses !== null) fireEffect(run, trigger.id, listener, clauses, event);
   }
 }
 
@@ -666,9 +660,11 @@ function swapSlots(run, { a, b }) {
 function placeMarble(run, { handIndex, slot }) {
   const marble = run.state.hand[handIndex];
   const previous = run.state.triangle[slot];
+  // Le remplacement en cours, que Tic et Éjection portent (conditions de calibre).
+  const replacement = previous === null ? null : { placed: marble, ejected: previous.marble };
   if (previous !== null) {
     const ejected = { slot, marble: previous.marble };
-    run.emit({ type: "knockout", ...ejected });
+    run.emit({ type: "knockout", ...ejected, replacement });
     // Son Éjection a pu la retirer déjà (une Fêlure sur elle-même) : elle est alors
     // partie, usée, et ne part pas une seconde fois.
     if (run.state.triangle[slot] !== null) {
@@ -684,7 +680,7 @@ function placeMarble(run, { handIndex, slot }) {
     throwsUsed: run.state.throwsUsed + 1,
   });
   run.emit({ type: "placed", slot, marble });
-  if (previous !== null) run.emit({ type: "hit", slot, marble });
+  if (previous !== null) run.emit({ type: "hit", slot, marble, replacement });
 }
 
 // Où va la bille de chaque emplacement à la rotation : base gauche -> pointe,
@@ -754,8 +750,8 @@ function retireMarble(run, slot) {
 // ce qu'ils déclenchent), Impact, rotation, fin de tour. Les retraits passent
 // AVANT l'Impact : ce qu'ils déclenchent compte pour le tour en cours. La vraie,
 // celle de l'action "resolve" comme celle de la prévision
-// (core/marbles-forecast.js), qui la lance aussi sur un triangle du premier tour
-// encore incomplet. Jamais la pioche du tour : seuls des effets y piochent.
+// (core/marbles-forecast.js). Jamais la pioche du tour : seuls des effets y
+// piochent.
 export function runResolution(state, types, options = {}) {
   return transact(state, types, options, (run) => {
     resolvePhases(run);

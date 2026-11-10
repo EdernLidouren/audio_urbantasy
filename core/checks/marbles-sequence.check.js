@@ -209,18 +209,18 @@ function checkTexts(run) {
     const said = (text) => plain(text);
     const lensed = playState({
       bag: ["agate"],
-      triangle: { leftBase: { marble: "magnifier", wear: 0 }, rightBase: null, apex: { marble: "shooter", wear: 1 } },
+      triangle: { leftBase: { marble: "magnifier", wear: 0 }, rightBase: null, apex: { marble: "gorilla", wear: 1 } },
     });
 
     // R : la prévision d'abord, puis chaque emplacement dans l'ordre des phases.
     run(
       "R : vide, aucun effet, bonus chez qui le reçoit",
-      "Prévision : Vitesse 10, Masse 1, Impact 10. base gauche, loupe : aucun effet. base droite, vide. pointe, calot : Vitesse +10.",
+      "Prévision : Vitesse 10, Masse 1, Impact 10. base gauche, loupe : aucun effet. base droite, vide. pointe, gorille : Vitesse +10.",
       said(describeOverview(lensed, rules, t))
     );
     run(
       "R : les gains du tour déjà comptés",
-      "Prévision : Vitesse 13, Masse 2, Impact 26. base gauche, loupe : aucun effet. base droite, vide. pointe, calot : Vitesse +10.",
+      "Prévision : Vitesse 13, Masse 2, Impact 26. base gauche, loupe : aucun effet. base droite, vide. pointe, gorille : Vitesse +10.",
       said(describeOverview({ ...lensed, speed: 3, mass: 2 }, rules, t))
     );
     run(
@@ -230,7 +230,7 @@ function checkTexts(run) {
     );
     run(
       "R : Vitesse et Masse de deux billes",
-      "Prévision : Vitesse 3, Masse 3, Impact 9. base gauche, œil-de-chat : Vitesse +3. base droite, vide. pointe, agate : Masse +2.",
+      "Prévision : Vitesse 3, Masse 2, Impact 6. base gauche, œil-de-chat : Vitesse +3. base droite, vide. pointe, agate : Masse +1.",
       said(describeOverview(playState({ triangle: { ...EMPTY_TRIANGLE, leftBase: { marble: "cats_eye", wear: 0 }, apex: { marble: "agate", wear: 0 } } }), rules, t))
     );
     run("R : rien à prévoir, partie finie", null, describeOverview({ ...lensed, stage: "over" }, rules, t));
@@ -246,7 +246,7 @@ function checkTexts(run) {
       [
         "Résolution du tour 2. base gauche, loupe : aucun effet.",
         "base droite, vide.",
-        "pointe, calot : Vitesse +10.",
+        "pointe, gorille : Vitesse +10.",
         "Impact 10. Score 10.",
         "Le triangle tourne d'un cran dans le sens horaire.",
         "Vous piochez agate.",
@@ -256,11 +256,11 @@ function checkTexts(run) {
     );
     const worn = playState({
       bag: ["agate"],
-      triangle: { leftBase: { marble: "giant", wear: 0 }, rightBase: { marble: "clay", wear: 0 }, apex: { marble: "shooter", wear: 2 } },
+      triangle: { leftBase: { marble: "giant", wear: 0 }, rightBase: { marble: "clay", wear: 0 }, apex: { marble: "gorilla", wear: 2 } },
     });
     run.same(
       "séquence : une étape par bille usée, accordée au genre de son nom",
-      ["géante est usée et part à la défausse.", "calot est usé et part à la défausse."],
+      ["géante est usée et part à la défausse.", "gorille est usé et part à la défausse."],
       texts(worn).filter((text) => text.includes("part à la défausse"))
     );
     run.same(
@@ -269,7 +269,7 @@ function checkTexts(run) {
         "géante est usée et part à la défausse.",
         "Final de géante : Pioche 1.",
         "Vous piochez agate.",
-        "calot est usé et part à la défausse.",
+        "gorille est usé et part à la défausse.",
         "Impact 13. Score 13.",
         "Partie terminée. Score final : 13.",
       ],
@@ -468,7 +468,35 @@ function checkTexts(run) {
       texts(saving).slice(3, 7)
     );
 
+    // Conditions de calibre : R, la confirmation et la séquence ne disent que les
+    // valeurs finales, jamais la condition.
+    const sized = playState({
+      hand: ["gorilla"],
+      triangle: { leftBase: { marble: "stoneware", wear: 0 }, rightBase: { marble: "porcelain", wear: 0 }, apex: { marble: "agate", wear: 0 } },
+    });
+    run(
+      "calibre, R : le grès compte une minibille, l'agate sans calot en base gauche",
+      "Prévision : Vitesse 3, Masse 2, Impact 6. base gauche, grès : Vitesse +1. base droite, porcelaine : Vitesse +2. pointe, agate : Masse +1.",
+      said(describeOverview(sized, rules, t))
+    );
+    run.same(
+      "calibre, confirmation : le Tic du gorille, sa valeur finale",
+      ["Éjection de porcelaine : aucun effet", "Tic de gorille : Vitesse +4"],
+      placementLines(sized, 0, "rightBase", rules, t).map(({ key, params }) => said(t(key, params))).slice(2)
+    );
+    const boulderLeft = { ...sized, triangle: { ...sized.triangle, leftBase: { marble: "giant", wear: 0 } } };
+    run(
+      "calibre, séquence : l'agate avec un calot en base gauche",
+      "pointe, agate : Masse +3.",
+      texts(boulderLeft)[2]
+    );
+
     setLocale("en");
+    run(
+      "anglais, calibre : R",
+      "Forecast: Speed 3, Mass 2, Impact 6. left base, stoneware: Speed +1. right base, porcelain: Speed +2. apex, agate: Mass +1.",
+      describeOverview(sized, rules, t)
+    );
     run(
       "anglais, Fêlure : R",
       "Forecast: Speed 4, Mass 1, Impact 4. left base, sulphide: Crack 1 to the apex. right base, empty. apex, porcelain: removed before its phase. Final: Speed +4.",
@@ -494,7 +522,7 @@ function checkTexts(run) {
     run.same("anglais, pioche : séquence", ["Resolving turn 2. left base, mica: Draw 1.", "You draw agate."], texts(drawing).slice(0, 2));
     run(
       "anglais : R",
-      "Forecast: Speed 10, Mass 1, Impact 10. left base, magnifier: no effect. right base, empty. apex, shooter: Speed +10.",
+      "Forecast: Speed 10, Mass 1, Impact 10. left base, magnifier: no effect. right base, empty. apex, gorilla: Speed +10.",
       describeOverview(lensed, rules, t)
     );
     run.same(
@@ -503,7 +531,7 @@ function checkTexts(run) {
         "giant is worn out and goes to the discard.",
         "Final of giant: Draw 1.",
         "You draw agate.",
-        "shooter is worn out and goes to the discard.",
+        "gorilla is worn out and goes to the discard.",
         "Impact 13. Score 13.",
         "Game over. Final score: 13.",
       ],

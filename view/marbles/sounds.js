@@ -1,6 +1,6 @@
 // Jeu des billes : les SONS de l'écran. Aucune règle ici : ce qui se passe vient
-// du journal (core/marbles.js), ce que chaque bille fait entendre de son profil
-// sonore (champ `sound` de chaque bille, marbles/types/, profils dans
+// du journal (core/marbles.js), ce que chaque bille fait entendre du profil sonore
+// de son CALIBRE (champ `size` de chaque bille, marbles/types/, profils dans
 // MARBLE_SOUND_PROFILES).
 //
 // TROIS FAMILLES :
@@ -40,12 +40,11 @@
 //
 // COLLISION : un seul repère, "collision", qui joue les sons des deux billes, la
 // frappeuse puis la frappée `flamMs` plus tard, au volume de la FORCE du choc,
-// tirée de leurs tailles (collisionStrength, config/marbles-values.js/
+// tirée de leurs calibres (collisionStrength, config/marbles-values.js/
 // MARBLES_COLLISION). L'écart est un retard posé sur l'horloge audio, à la lecture
 // (lib/audio.js, `delayMs`), pas sur la ligne de temps : la file avance par frames
 // (environ 17 ms), plus gros grain que l'écart lui-même, et un minuteur JS flotte
-// de plusieurs millisecondes. La taille d'une
-// bille (`size`) n'est jamais déduite de son profil sonore (`sound`), ni l'inverse.
+// de plusieurs millisecondes.
 //
 // VARIATIONS DE TON : collisions, chutes et roulements jouent chacun à une vitesse
 // tirée au hasard autour de 1 (MARBLES_PITCH_VARIATION) ; jamais les balises. Un
@@ -91,15 +90,15 @@ import MARBLE_TYPES from "../../marbles/types/index.js";
 
 const TIMING_SETTINGS = ["shuffleToDrawMs", "drawSoundIntervalMs", "swapSoundDelayMs"];
 
-// Échoue au chargement : une bille sans profil, ou un profil incomplet, se
-// découvrirait sinon en pleine partie, en silence.
-export function validateMarbleSounds(types, profiles, settings) {
-  for (const [id, type] of Object.entries(types)) {
-    if (!Object.hasOwn(profiles, type.sound)) throw new Error(`marbles : bille "${id}", profil sonore inconnu "${type.sound}".`);
-  }
-  for (const [name, profile] of Object.entries(profiles)) {
+// Échoue au chargement : un calibre sans profil, ou un profil incomplet, se
+// découvrirait sinon en pleine partie, en silence. Le calibre de chaque bille, lui,
+// est validé par la simulation (core/marbles.js/validateMarbleTypes).
+export function validateMarbleSounds(sizes, profiles, settings) {
+  for (const [size, id] of Object.entries(sizes)) {
+    const profile = profiles[size];
+    if (profile === undefined) throw new Error(`marbles : calibre "${id}" sans profil sonore.`);
     for (const role of ["beacon", "drop", "roll", "impact"]) {
-      if (typeof profile[role] !== "string") throw new Error(`marbles : profil sonore "${name}" sans ${role}.`);
+      if (typeof profile[role] !== "string") throw new Error(`marbles : profil sonore du calibre "${id}" sans ${role}.`);
     }
   }
   for (const name of TIMING_SETTINGS) {
@@ -108,22 +107,7 @@ export function validateMarbleSounds(types, profiles, settings) {
   }
 }
 
-validateMarbleSounds(MARBLE_TYPES, MARBLE_SOUND_PROFILES, MARBLES_SETTINGS);
-
-// Chaque bille a une taille connue, chaque taille un poids. Ce module en est le seul
-// lecteur aujourd'hui (la force des collisions) : il la valide.
-export function validateMarbleSizes(types, sizes) {
-  for (const [id, type] of Object.entries(types)) {
-    if (!Object.hasOwn(sizes, type.size)) throw new Error(`marbles : bille "${id}", taille inconnue "${type.size}".`);
-  }
-  for (const [name, size] of Object.entries(sizes)) {
-    if (typeof size.weight !== "number" || !Number.isFinite(size.weight) || size.weight <= 0) {
-      throw new Error(`marbles : taille "${name}", poids invalide.`);
-    }
-  }
-}
-
-validateMarbleSizes(MARBLE_TYPES, MARBLE_SIZES);
+validateMarbleSounds(MARBLE_SIZES, MARBLE_SOUND_PROFILES, MARBLES_SETTINGS);
 
 function checkNumber(value, name, min, max) {
   if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max) {
@@ -172,9 +156,12 @@ export function validateRolls(rolls) {
 // Les styles dont la durée vient de la vitesse ; la rotation a ses crans.
 const SPEED_STYLES = ["place", "strike", "swap", "knocked", "out"];
 
-export function validateCollision(collision) {
+// Chaque calibre a son poids, strictement positif (un rapport de poids nuls n'a pas
+// de sens).
+export function validateCollision(collision, sizes = MARBLE_SIZES) {
   checkNumber(collision.flamMs, "flamMs", 0, 200);
   checkNumber(collision.weightExponent, "weightExponent", 0, 3);
+  for (const [size, id] of Object.entries(sizes)) checkNumber(collision.weights?.[size], `weights.${id}`, 0.01, 100);
 }
 
 // Une variation au-delà de la moitié ferait d'un son un autre son.
@@ -188,11 +175,12 @@ validateRolls(MARBLES_ROLLS);
 validateCollision(MARBLES_COLLISION);
 validatePitchVariation(MARBLES_PITCH_VARIATION);
 
-// La FORCE d'une collision : le rapport des poids de la frappeuse et de la frappée,
-// élevé à `weightExponent`. 1 entre deux billes de même taille ; plus quand une
-// lourde frappe une légère, moins dans l'autre sens.
-export function collisionStrength(striker, struck, { types = MARBLE_TYPES, sizes = MARBLE_SIZES, collision = MARBLES_COLLISION } = {}) {
-  const ratio = sizes[types[striker].size].weight / sizes[types[struck].size].weight;
+// La FORCE d'une collision : le rapport des poids des CALIBRES de la frappeuse (la
+// posée) et de la frappée (l'éjectée), élevé à `weightExponent`. 1 entre deux
+// billes de même calibre ; plus quand une grosse frappe une petite, moins dans
+// l'autre sens.
+export function collisionStrength(striker, struck, { types = MARBLE_TYPES, collision = MARBLES_COLLISION } = {}) {
+  const ratio = collision.weights[types[striker].size] / collision.weights[types[struck].size];
   return ratio ** collision.weightExponent;
 }
 
@@ -430,10 +418,9 @@ export function eventCues(
     places = MARBLES_SOUND_PLACES,
     collision = MARBLES_COLLISION,
     types = MARBLE_TYPES,
-    sizes = MARBLE_SIZES,
   } = {}
 ) {
-  const table = { rolls, places, collision, types, sizes };
+  const table = { rolls, places, collision, types };
   const timeline = createTimeline(settings, table);
   const drawCount = events.filter((event) => event.type === "draw").length;
   let drawn = 0;
@@ -453,7 +440,8 @@ export function eventCues(
 
 // --- Lecture ---
 
-const profileOf = (marble) => MARBLE_SOUND_PROFILES[MARBLE_TYPES[marble].sound];
+// Le profil sonore d'une bille : celui de son calibre.
+const profileOf = (marble) => MARBLE_SOUND_PROFILES[MARBLE_TYPES[marble].size];
 
 // Le chemin et le volume d'un repère ponctuel.
 function cueSound(cue) {

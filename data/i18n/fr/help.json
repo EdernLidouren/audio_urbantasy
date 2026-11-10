@@ -63,7 +63,7 @@
   "help.marbles.overview": "Annoncer la prévision du tour, puis chaque emplacement",
   "help.marbles.placesDemo": "Debug : faire entendre une balise à chaque place, de la main à la pointe",
   "help.marbles.reannounce": "Réentendre la position ou l'étape de résolution",
-  "help.marbles.resolve": "Lancer la résolution du tour",
+  "help.marbles.resolve": "Lancer la résolution du tour, à tout moment, même avec des emplacements vides",
   "help.marbles.right": "Aller à droite, vers la bille suivante ou la base droite",
   "help.marbles.turnInfo": "Annoncer le tour, le score, la Vitesse, la Masse et l'échange",
   "help.marbles.up": "Monter, de la main vers les bases et des bases vers la pointe",

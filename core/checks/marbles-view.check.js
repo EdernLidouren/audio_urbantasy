@@ -11,8 +11,11 @@
 
 import { LOCALE_TABLES, t, setLocale, getLocale } from "../../data/i18n/index.js";
 import {
+  LARGE,
   MARBLE_CARD_MODEL,
   MARBLE_SIZES,
+  MEDIUM,
+  SMALL,
   MARBLE_SOUND_PROFILES,
   MARBLES_COLLISION,
   MARBLES_PITCH_VARIATION,
@@ -55,7 +58,6 @@ import {
   validateRolls,
   collisionStrength,
   validateCollision,
-  validateMarbleSizes,
   validatePitchVariation,
   validateSoundDepth,
   validateSoundPlaces,
@@ -64,9 +66,12 @@ import { pathLength, rollAt, rollDurationMs, rollEnvelope } from "../../view/mar
 import { EMPTY_SOUND_QUEUE, advanceSoundQueue, enqueueCues } from "../../view/marbles/sound-queue.js";
 import { throws } from "../../lib/check.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
-import { emptyBagMarblesGame } from "./helpers.js";
+import { emptyBagMarblesGame, withSizes } from "./helpers.js";
 import { createMarblesRules } from "../marbles-rules.js";
 import { effectAt } from "../marbles-effects.js";
+
+// Tables fabriquées : complétées d'un calibre (core/checks/helpers.js/withSizes).
+const fabricatedRules = (table) => createMarblesRules(withSizes(table));
 
 // Les règles du jeu, liées à la vraie table (core/marbles-rules.js).
 const rules = createMarblesRules(MARBLE_TYPES);
@@ -149,8 +154,8 @@ function checkCards(run) {
     );
     run.same(
       "fiche : éjection au-dessous, base sans effet",
-      { above: ["Pointe : Vitesse +6.", "Base : aucun effet."], below: ["Éjection : Vitesse +3."] },
-      fields("shooter")
+      { above: ["Pointe : Vitesse +6.", "Base : aucun effet."], below: ["Tic : Vitesse +4 si la bille éjectée est plus petite.", "Éjection : Vitesse +3."] },
+      fields("gorilla")
     );
     run.same(
       "fiche : sans champ facultatif, le repli ; une Fêlure ciblée",
@@ -172,7 +177,14 @@ function checkCards(run) {
       "Base gauche : Vitesse +4 à la pointe si son effet de pointe donne au moins Vitesse +1. Base droite : Vitesse +1.",
       fields("magnifier").above[1]
     );
-    run.same("fiche : la Pioche en base, un Polissage sur soi", { above: ["Pointe : Vitesse +2 et Polissage 1.", "Base : Pioche 1."], below: ["Aucun effet particulier."] }, fields("mica"));
+    run.same(
+      "fiche : la Pioche en base, un Polissage sur soi, une Éjection conditionnée au calibre",
+      { above: ["Pointe : Vitesse +2 et Polissage 1.", "Base : Pioche 1."], below: ["Éjection : Pioche 1 si la bille posée est plus grosse."] },
+      fields("mica")
+    );
+    // Les conditions de calibre, lisibles à l'oreille.
+    run("fiche : comptage par calibre", "Base : Vitesse +1 par minibille active.", fields("stoneware").above[1]);
+    run("fiche : calibre d'un emplacement", "Pointe : Masse +1 et Masse +2 si la base gauche est un calot.", fields("agate").above[0]);
     run.same("fiche : un Polissage ciblé au Tic", ["Tic : Polissage 1 à la pointe."], fields("glass").below);
     run.same("fiche : un Polissage ciblé au Final", ["Tic : Masse +1.", "Final : Polissage 1 à la pointe."], fields("agate").below);
     run.same("fiche : la Pioche au tic", ["Tic : Pioche 1."], fields("cats_eye").below);
@@ -185,18 +197,23 @@ function checkCards(run) {
       marbleCard(
         "all",
         "x",
-        createMarblesRules({ all: { final: [{ action: "draw", amount: 1 }], knockout: [{ action: "mass", amount: 2 }], hit: [{ action: "speed", amount: 1 }] } }),
+        fabricatedRules({ all: { final: [{ action: "draw", amount: 1 }], knockout: [{ action: "mass", amount: 2 }], hit: [{ action: "speed", amount: 1 }] } }),
         t
       ).below.map(plain)
     );
     setLocale("en");
     run.same("fiche, anglais : la Pioche et le Polissage", ["Apex: Speed +2 and Polish 1.", "Base: Draw 1."], fields("mica").above);
     run.same("fiche, anglais : la Fêlure ciblée", ["Apex: Mass +3.", "Base: Crack 1 to the apex."], fields("sulphide").above);
+    run.same("fiche, anglais : comparaison de calibre au Tic", ["Hit: Speed +4 if the knocked-out marble is smaller.", "Knockout: Speed +3."], fields("gorilla").below);
+    run.same("fiche, anglais : comparaison de calibre à l'Éjection", ["Knockout: Draw 1 if the placed marble is larger."], fields("mica").below);
+    run("fiche, anglais : comptage par calibre", "Base: Speed +1 per active peewee.", fields("stoneware").above[1]);
+    run("fiche, anglais : calibre d'un emplacement", "Apex: Mass +1 and Mass +2 if the left base is a boulder.", fields("agate").above[0]);
+    run("anglais : bille en liste, calibre après le nom", "gorilla, boulder, wear 3. 1 of 2", describeMarbleInList("gorilla", 0, 2, rules, t));
     setLocale("fr");
     run.same(
       "fiche : tic et éjection dans l'ordre",
       ["Tic : Vitesse +1.", "Éjection : Masse +2."],
-      marbleCard("both", "x", createMarblesRules({ both: { knockout: [{ action: "mass", amount: 2 }], hit: [{ action: "speed", amount: 1 }] } }), t).below.map(
+      marbleCard("both", "x", fabricatedRules({ both: { knockout: [{ action: "mass", amount: 2 }], hit: [{ action: "speed", amount: 1 }] } }), t).below.map(
         plain
       )
     );
@@ -298,34 +315,44 @@ function checkBagOrder(run) {
 
   // La défausse : l'ordre d'arrivée, celui que tient l'état.
   let state = { ...emptyBagMarblesGame(rules, 1), turn: 2, stage: "play", hand: ["clay", "glass", "agate"] };
-  state = { ...state, triangle: { leftBase: { marble: "mica", wear: 0 }, rightBase: { marble: "tiger", wear: 0 }, apex: { marble: "giant", wear: 0 } } };
+  state = { ...state, triangle: { leftBase: { marble: "porcelain", wear: 0 }, rightBase: { marble: "tiger", wear: 0 }, apex: { marble: "giant", wear: 0 } } };
   for (const slot of ["apex", "leftBase", "rightBase"]) state = rules.reduce(state, { type: "place", handIndex: 0, slot }).state;
-  run.same("défausse : de la plus ancienne à la plus récente", ["giant", "mica", "tiger"], state.discard);
+  run.same("défausse : de la plus ancienne à la plus récente", ["giant", "porcelain", "tiger"], state.discard);
 }
 
 // Les sons : profils, repères d'un geste et leur ligne de temps, file de sons.
 // Rien n'est joué : on vérifie QUAND chaque son partirait.
 function checkSounds(run) {
-  run("profils : chaque bille a un profil sonore connu", true, Object.values(MARBLE_TYPES).every((type) => Object.hasOwn(MARBLE_SOUND_PROFILES, type.sound)));
-  run("profils : bille sans profil refusée", true, throws(() => validateMarbleSounds({ x: {} }, MARBLE_SOUND_PROFILES, MARBLES_SETTINGS)));
-  run("profils : profil sans chute refusé", true, throws(() => validateMarbleSounds({}, { small: { beacon: "a" } }, MARBLES_SETTINGS)));
-  // Taille et son : deux champs, aucun déduit de l'autre.
-  run("tailles : chaque bille a une taille connue", true, Object.values(MARBLE_TYPES).every((type) => Object.hasOwn(MARBLE_SIZES, type.size)));
-  run("tailles : taille inconnue refusée", true, throws(() => validateMarbleSizes({ x: { size: "huge" } }, MARBLE_SIZES)));
-  run("tailles : poids nul refusé", true, throws(() => validateMarbleSizes({}, { small: { weight: 0 } })));
+  // Le son suit le calibre : un profil par calibre, aucun champ sonore par bille.
+  run("profils : chaque calibre a son profil", true, Object.keys(MARBLE_SIZES).every((size) => Object.hasOwn(MARBLE_SOUND_PROFILES, size)));
+  run("profils : les réglages du jeu sont valides", false, throws(() => validateMarbleSounds(MARBLE_SIZES, MARBLE_SOUND_PROFILES, MARBLES_SETTINGS)));
+  run("profils : calibre sans profil refusé", true, throws(() => validateMarbleSounds(MARBLE_SIZES, { [SMALL]: MARBLE_SOUND_PROFILES[SMALL] }, MARBLES_SETTINGS)));
+  run("profils : profil sans chute refusé", true, throws(() => validateMarbleSounds({ [SMALL]: "small" }, { [SMALL]: { beacon: "a" } }, MARBLES_SETTINGS)));
+  run("profils : plus aucun champ sonore sur une bille", true, Object.values(MARBLE_TYPES).every((type) => !Object.hasOwn(type, "sound")));
   run(
-    "tailles : une grosse bille peut porter le son d'une moyenne",
-    false,
-    throws(() => validateMarbleSizes({ x: { size: "large", sound: "classic_medium" } }, MARBLE_SIZES))
+    "profils : le son d'une bille est celui de son calibre",
+    "assets/sounds/marbles/marble_large_1_beacon assets/sounds/marbles/marble_small_1_beacon",
+    [MARBLE_SOUND_PROFILES[MARBLE_TYPES.giant.size].beacon, MARBLE_SOUND_PROFILES[MARBLE_TYPES.porcelain.size].beacon].join(" ")
   );
   run("collision : réglages du jeu valides", false, throws(() => validateCollision(MARBLES_COLLISION)));
   run("collision : écart négatif refusé", true, throws(() => validateCollision({ ...MARBLES_COLLISION, flamMs: -1 })));
+  run("collision : calibre sans poids refusé", true, throws(() => validateCollision({ ...MARBLES_COLLISION, weights: { [SMALL]: 1, [LARGE]: 3 } })));
+  run("collision : poids nul refusé", true, throws(() => validateCollision({ ...MARBLES_COLLISION, weights: { ...MARBLES_COLLISION.weights, [MEDIUM]: 0 } })));
+  // Comme avant pour des tailles équivalentes : poids 1, 2, 3, exposant 0,3.
+  run(
+    "collision : un calot sur une minibille, 1,39 ; l'inverse, 0,72 ; même calibre, 1",
+    "1.39 0.72 1",
+    [
+      collisionStrength("giant", "porcelain"),
+      collisionStrength("porcelain", "giant"),
+      collisionStrength("giant", "leaded"),
+    ].map((strength) => Math.round(strength * 100) / 100).join(" ")
+  );
   run("ton : réglages du jeu valides", false, throws(() => validatePitchVariation(MARBLES_PITCH_VARIATION)));
   run("ton : variation sans chute refusée", true, throws(() => validatePitchVariation({ impact: 0.04, roll: 0.02 })));
   const strengthTable = {
-    types: { pebble: { size: "small" }, boulder: { size: "large" }, twin: { size: "small" } },
-    sizes: { small: { weight: 1 }, large: { weight: 4 } },
-    collision: { flamMs: 10, weightExponent: 0.5 },
+    types: { pebble: { size: SMALL }, boulder: { size: LARGE }, twin: { size: SMALL } },
+    collision: { flamMs: 10, weights: { [SMALL]: 1, [LARGE]: 4 }, weightExponent: 0.5 },
   };
   run("collision : deux billes de même taille, force 1", 1, collisionStrength("pebble", "twin", strengthTable));
   run("collision : une lourde sur une légère frappe plus fort", 2, collisionStrength("boulder", "pebble", strengthTable));
@@ -333,12 +360,12 @@ function checkSounds(run) {
   run(
     "collision : exposant nul, force toujours 1",
     1,
-    collisionStrength("boulder", "pebble", { ...strengthTable, collision: { flamMs: 10, weightExponent: 0 } })
+    collisionStrength("boulder", "pebble", { ...strengthTable, collision: { ...strengthTable.collision, weightExponent: 0 } })
   );
   run(
     "profils : profil sans roulement refusé",
     true,
-    throws(() => validateMarbleSounds({}, { small: { beacon: "a", drop: "b", impact: "c" } }, MARBLES_SETTINGS))
+    throws(() => validateMarbleSounds({ [SMALL]: "small" }, { [SMALL]: { beacon: "a", drop: "b", impact: "c" } }, MARBLES_SETTINGS))
   );
   run("profils : délai négatif refusé", true, throws(() => validateMarbleSounds({}, {}, { ...MARBLES_SETTINGS, drawSoundIntervalMs: -1 })));
 
@@ -423,9 +450,8 @@ function checkSounds(run) {
   ];
   const collisionMotion = {
     ...motion,
-    collision: { flamMs: 10, weightExponent: 1 },
-    types: { agate: { size: "large" }, mica: { size: "small" } },
-    sizes: { small: { weight: 1 }, large: { weight: 2 } },
+    collision: { flamMs: 10, weights: { [SMALL]: 1, [LARGE]: 2 }, weightExponent: 1 },
+    types: { agate: { size: LARGE }, mica: { size: SMALL } },
   };
   run.same(
     "repères : un remplacement, la bille tirée, la collision des deux billes, puis la délogée lancée à la défausse",
@@ -721,7 +747,7 @@ export default function checkMarblesView(run) {
       said(stepsText(buildSteps([{ type: "phase", slot: "apex", marble: "leaded" }, { type: "effect", trigger: "phase", slot: "apex", marble: "leaded", speedDelta: -3, massDelta: 0, given: [], speed: -3, mass: 1 }], t)))
     );
     run("texte : deux effets", "Vitesse +1 et Masse +2", said(describeEffect({ speed: 1, mass: 2 }, t)));
-    run("texte : effet donné", "Vitesse +4 à la pointe", said(describeEffect({ speed: 0, mass: 0, given: [{ slot: "apex", marble: "shooter", speed: 4, mass: 0 }] }, t)));
+    run("texte : effet donné", "Vitesse +4 à la pointe", said(describeEffect({ speed: 0, mass: 0, given: [{ slot: "apex", marble: "gorilla", speed: 4, mass: 0 }] }, t)));
     run(
       "texte : effet imprimé de la loupe",
       "Vitesse +4 à la pointe si son effet de pointe donne au moins Vitesse +1",
@@ -730,9 +756,9 @@ export default function checkMarblesView(run) {
     run("texte : Impact", "Impact 6. Score 14.", said(stepsText(buildSteps([{ type: "impact", speed: 3, mass: 2, impact: 6, score: 14 }], t))));
 
     // Annonces principales : courtes, le détail est dans la fiche.
-    const inHand = { ...state, hand: ["clay", "cats_eye", "shooter"] };
-    run("texte : bille en main", "argile, usure 3. 1 sur 3", said(describeHandFocus(inHand, 0, rules, t)));
-    run("texte : usure maximale propre", "géante, usure 1. 2 sur 5", said(describeMarbleInList("giant", 1, 5, rules, t)));
+    const inHand = { ...state, hand: ["clay", "cats_eye", "gorilla"] };
+    run("texte : bille en main", "argile, normale, usure 3. 1 sur 3", said(describeHandFocus(inHand, 0, rules, t)));
+    run("texte : usure maximale propre", "géante, calot, usure 1. 2 sur 5", said(describeMarbleInList("giant", 1, 5, rules, t)));
 
     const lensed = {
       ...state,
@@ -741,12 +767,13 @@ export default function checkMarblesView(run) {
       speed: 0,
       mass: 1,
       hand: ["clay", "agate", "glass"],
-      triangle: { leftBase: { marble: "magnifier", wear: 0 }, rightBase: null, apex: { marble: "shooter", wear: 1 } },
+      throwsUsed: 1,
+      triangle: { leftBase: { marble: "magnifier", wear: 0 }, rightBase: null, apex: { marble: "gorilla", wear: 1 } },
     };
-    run("texte : bille active", "calot, pointe, usure 1 sur 3.", said(describeSlotFocus(lensed, "apex", rules, t)));
+    run("texte : bille active", "gorille, calot, pointe, usure 1 sur 3.", said(describeSlotFocus(lensed, "apex", rules, t)));
     run("texte : emplacement vide", "base droite : vide.", said(describeSlotFocus(lensed, "rightBase", rules, t)));
     // Pendant une pose, la prévision reste.
-    run("texte : pose, emplacement occupé", "pointe, calot : Vitesse +10.", said(describeSlotForPlacement(lensed, "apex", rules, t)));
+    run("texte : pose, emplacement occupé", "pointe, gorille : Vitesse +10.", said(describeSlotForPlacement(lensed, "apex", rules, t)));
     run("texte : pose, emplacement vide", "base droite", said(describeSlotForPlacement(lensed, "rightBase", rules, t)));
 
     // S et D : les nombres et leurs accords.
@@ -764,7 +791,7 @@ export default function checkMarblesView(run) {
     run.same("confirmation sur vide : la question, puis les valeurs prévues", ["Poser argile en base droite ?", "Vitesse +1"], menuLines(0, "rightBase"));
     run.same(
       "confirmation sur occupé : dans l'ordre réel, élision comprise, bonus reçu compté",
-      ["Poser argile en pointe ?", "Vitesse +8", "Éjection de calot : Vitesse +3", "Tic d'argile : Vitesse +2"],
+      ["Poser argile en pointe ?", "Vitesse +8", "Éjection de gorille : Vitesse +3", "Tic d'argile : Vitesse +2"],
       menuLines(0, "apex")
     );
     run.same(
@@ -773,7 +800,7 @@ export default function checkMarblesView(run) {
       menuLines(2, "leftBase")
     );
     // Les valeurs prévues au format de R : ce que la loupe donne s'entend chez le
-    // calot, pas chez elle.
+    // gorille, pas chez elle.
     const lensToPlace = { ...lensed, hand: ["magnifier"], triangle: { ...lensed.triangle, leftBase: null } };
     run.same(
       "confirmation : valeurs produites seulement, sans bonus donné",
@@ -803,12 +830,12 @@ export default function checkMarblesView(run) {
     const placing = rules.reduce(lensed, { type: "place", handIndex: 0, slot: "apex" });
     run(
       "texte : pose sur occupé",
-      "Éjection de calot : Vitesse +3. Vitesse 3, Masse 1. Défausse : calot. Pose : argile en pointe. Tic d'argile : Vitesse +2. Vitesse 5, Masse 1.",
+      "Éjection de gorille : Vitesse +3. Vitesse 3, Masse 1. Défausse : gorille. Pose : argile en pointe. Tic d'argile : Vitesse +2. Vitesse 5, Masse 1.",
       said(stepsText(buildSteps(placing.events, t)))
     );
     const lensedSteps = buildSteps(rules.reduce(lensed, { type: "resolve" }).events, t).map((step) => said(step.text));
     run("texte : la loupe ne produit rien elle-même", "base gauche, loupe : aucun effet.", lensedSteps[0]);
-    run("texte : le bonus s'entend chez qui le reçoit", "pointe, calot : Vitesse +10.", lensedSteps[2]);
+    run("texte : le bonus s'entend chez qui le reçoit", "pointe, gorille : Vitesse +10.", lensedSteps[2]);
     run.same("étapes : aucune étape silencieuse", [], buildSteps(events, t).filter((step) => step.text === ""));
     run(
       "texte : le tour, compteurs compris",
@@ -820,11 +847,11 @@ export default function checkMarblesView(run) {
     setLocale("en");
     run.same(
       "anglais : confirmation sur occupé",
-      ["Place clay on the apex?", "Speed +8", "Knockout of shooter: Speed +3", "Hit from clay: Speed +2"],
+      ["Place clay on the apex?", "Speed +8", "Knockout of gorilla: Speed +3", "Hit from clay: Speed +2"],
       placementLines(lensed, 0, "apex", rules, t).map(({ key, params }) => t(key, params))
     );
-    run("anglais : bille en main", "clay, wear 3. 1 of 3", describeHandFocus(inHand, 0, rules, t));
-    run("anglais : bille active", "shooter, apex, wear 1 of 3.", describeSlotFocus(lensed, "apex", rules, t));
+    run("anglais : bille en main", "clay, standard, wear 3. 1 of 3", describeHandFocus(inHand, 0, rules, t));
+    run("anglais : bille active", "gorilla, boulder, apex, wear 1 of 3.", describeSlotFocus(lensed, "apex", rules, t));
     run("anglais : effet négatif", "Speed −3", describeEffect({ speed: -3 }, t));
     run("anglais : sac, une bille", "1 marble left in the bag, 1 marble to draw at the start of the turn.", describeBag({ ...state, bag: ["clay"], drawPerTurn: 1 }, t));
     run("anglais : sac vide", "0 marbles left in the bag, 1 marble to draw at the start of the turn.", describeBag({ ...state, bag: [], drawPerTurn: 1 }, t));

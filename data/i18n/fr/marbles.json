@@ -24,6 +24,11 @@
     "de": "de verre",
     "gender": "m"
   },
+  "marble.gorilla.name": {
+    "base": "gorille",
+    "de": "de gorille",
+    "gender": "m"
+  },
   "marble.leaded.name": {
     "base": "plombée",
     "de": "de plombée",
@@ -43,11 +48,6 @@
     "base": "porcelaine",
     "de": "de porcelaine",
     "gender": "f"
-  },
-  "marble.shooter.name": {
-    "base": "calot",
-    "de": "de calot",
-    "gender": "m"
   },
   "marble.stoneware.name": {
     "base": "grès",
@@ -72,6 +72,8 @@
   "marbles.card.knockout": "Éjection : {effect}.",
   "marbles.card.no_special_effect": "Aucun effet particulier.",
   "marbles.condition.printedStat": "son effet de {slot} donne au moins {effect}",
+  "marbles.condition.relativeSize": "la bille {marble, select, ejected {éjectée} other {posée}} est {is, select, smaller {plus petite} other {plus grosse}}",
+  "marbles.condition.sizeAt": "la {slot} est {size:indef}",
   "marbles.debug.places_demo": "Démonstration des places : main à gauche, au centre, à droite, base gauche, base droite, pointe.",
   "marbles.effect.combined": "{parts, list}",
   "marbles.effect.conditional": "{effect} si {condition}",
@@ -81,6 +83,7 @@
   "marbles.effect.mass_down": "Masse −{amount}",
   "marbles.effect.mass_up": "Masse +{amount}",
   "marbles.effect.none": "aucun effet",
+  "marbles.effect.per_active_size": "{effect} par {size:noun} {size:gender, select, f {active} other {actif}}",
   "marbles.effect.polish": "Polissage {amount}",
   "marbles.effect.speed_down": "Vitesse −{amount}",
   "marbles.effect.speed_up": "Vitesse +{amount}",
@@ -91,12 +94,10 @@
   "marbles.error.invalidSlot": "Emplacement inconnu.",
   "marbles.error.mustDraw": "Il faut d'abord piocher.",
   "marbles.error.noThrowsLeft": "Plus aucun lancer ce tour-ci : résolvez le tour pour continuer.",
-  "marbles.error.placementBlocksTriangle": "Impossible : il ne resterait pas assez de billes en main pour remplir le triangle.",
   "marbles.error.swapAfterPlacement": "L'échange se fait avant la pose : plus possible ce tour-ci.",
   "marbles.error.swapAlreadyUsed": "Échange déjà utilisé ce tour-ci.",
   "marbles.error.swapBothEmpty": "Ces deux emplacements sont vides : rien à échanger.",
   "marbles.error.swapSameSlot": "Choisissez deux emplacements différents.",
-  "marbles.error.triangleIncomplete": "Au premier tour, remplissez les trois emplacements avant la résolution.",
   "marbles.error.unknownAction": "Action inconnue.",
   "marbles.event.bag_regenerated": "Le sac est vide : la défausse est mélangée et forme un nouveau sac.",
   "marbles.event.cracked": "{marble} se fêle : usure {wear} sur {maxWear}.",
@@ -125,7 +126,7 @@
   "marbles.history.title": "Historique du tour {turn}",
   "marbles.history.title_none": "Historique",
   "marbles.intro": "Partie de billes. F1 pour l'aide.",
-  "marbles.list.line": "{name}, usure {maxWear}",
+  "marbles.list.line": "{name}, {size}, usure {maxWear}",
   "marbles.outcome.empty": "{slot}, vide.",
   "marbles.outcome.final": "Final : {effect}.",
   "marbles.outcome.removed": "{slot}, {marble} : {marble:gender, select, f {retirée} other {retiré}} avant sa phase.",
@@ -143,13 +144,31 @@
   "marbles.quit.confirm": "Abandonner cette partie de billes ?",
   "marbles.resolution.hint": "Entrée pour passer la résolution.",
   "marbles.resolution.opening": "Résolution du tour {turn}.",
+  "marbles.size.large.name": {
+    "base": "calot",
+    "indef": "un calot",
+    "noun": "calot",
+    "gender": "m"
+  },
+  "marbles.size.medium.name": {
+    "base": "normale",
+    "indef": "une bille normale",
+    "noun": "bille normale",
+    "gender": "f"
+  },
+  "marbles.size.small.name": {
+    "base": "minibille",
+    "indef": "une minibille",
+    "noun": "minibille",
+    "gender": "f"
+  },
   "marbles.slot.apex": "pointe",
   "marbles.slot.empty": "vide",
   "marbles.slot.leftBase": "base gauche",
   "marbles.slot.rightBase": "base droite",
   "marbles.slot_line.empty": "{slot} : vide.",
   "marbles.slot_line.held": "Sélectionné pour l'échange.",
-  "marbles.slot_line.occupied": "{name}, {slot}, usure {wear} sur {maxWear}.",
+  "marbles.slot_line.occupied": "{name}, {size}, {slot}, usure {wear} sur {maxWear}.",
   "marbles.slot_line.placing_empty": "{slot}",
   "marbles.slot_line.placing_occupied": "{slot}, {name} : {effect}.",
   "marbles.status.bag": "Encore {count, plural, one {# bille} other {# billes}} dans le sac, {draw, plural, one {# bille} other {# billes}} à piocher en début de tour.",

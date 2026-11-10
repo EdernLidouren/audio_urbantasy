@@ -73,7 +73,7 @@ import { NEW_GAME } from "../config/new-game.js";
 import { WEATHER_STATES } from "../config/weather-values.js";
 import { PERCEPTION_MUSIC_POOL, PERCEPTION_AMBIENCE_POOL } from "../config/perception.js";
 import { SHOP_CATALOGS, DISPLAY_ARTICLES } from "../config/shop-values.js";
-import { MARBLE_SOUND_PROFILES, MARBLES_AUDIO } from "../config/marbles-values.js";
+import { MARBLE_SIZES, MARBLE_SOUND_PROFILES, MARBLES_AUDIO } from "../config/marbles-values.js";
 import { validateMarblesContent } from "../core/marbles.js";
 import { LOCALE_TABLES } from "../data/i18n/index.js";
 import { configureAssetManifest, hasAsset } from "../lib/assets.js";
@@ -118,6 +118,12 @@ const NAME_SLOTS = [
     template,
     param: "marble",
     names: () => Object.keys(MARBLE_TYPES).map((id) => `marble.${id}.name`),
+  })),
+  // view/marbles/narration.js : le calibre d'une condition ou d'un comptage.
+  ...["marbles.condition.sizeAt", "marbles.effect.per_active_size"].map((template) => ({
+    template,
+    param: "size",
+    names: () => Object.values(MARBLE_SIZES).map((id) => `marbles.size.${id}.name`),
   })),
 ];
 

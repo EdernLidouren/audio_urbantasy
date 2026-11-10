@@ -2,7 +2,7 @@
   "state": {
     "turn": 4,
     "score": 30,
-    "triangle": { "leftBase": "magnifier:1", "rightBase": "clay", "apex": "shooter:2" },
+    "triangle": { "leftBase": "magnifier:1", "rightBase": "clay", "apex": "gorilla:2" },
     "hand": ["clay", "leaded"],
     "bag": ["agate", "mica"],
     "discard": ["giant"]

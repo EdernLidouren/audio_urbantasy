@@ -42,7 +42,7 @@ function checkStateBuilder(run) {
   const state = buildState({
     turn: 4,
     score: 30,
-    triangle: { leftBase: "magnifier:1", rightBase: "clay", apex: { marble: "shooter", wear: 2 } },
+    triangle: { leftBase: "magnifier:1", rightBase: "clay", apex: { marble: "gorilla", wear: 2 } },
     hand: ["clay", "leaded"],
     bag: ["agate", "mica"],
     settings: { turnCount: 6 },
@@ -152,14 +152,14 @@ function predictedAfter(state, actions) {
 
 function checkGreedy(run) {
   // Un cas construit où le meilleur coup est un remplacement : la plombée éjecte le
-  // calot de la pointe... ou l'inverse. Le glouton doit trouver le maximum que donne
+  // gorille de la pointe... ou l'inverse. Le glouton doit trouver le maximum que donne
   // une recherche exhaustive indépendante (pas d'échange ou chaque échange, puis
   // aucune pose ou chaque pose). Une bille gagnée en main n'y vaut rien
   // (drawnValue 0) : le glouton ne compare alors que l'Impact.
   const state = buildState({
     turn: 4,
     triangle: { leftBase: "magnifier:1", rightBase: "glass", apex: "stoneware" },
-    hand: ["clay", "shooter", "agate"],
+    hand: ["clay", "gorilla", "agate"],
   });
   const view = publicView(state);
   const swaps = [[], ...legalActions(view).filter((action) => action.type === "swap").map((swap) => [swap])];
@@ -193,23 +193,30 @@ function checkGreedy(run) {
   );
   run("sans remplacement : jamais mieux que le glouton", true, careful.impact <= plan.impact);
 
-  // Premier tour : toutes les attributions de la main au triangle, par recherche
-  // exhaustive sur les places de la main.
+  // Premier tour : toutes les attributions de la main au triangle, emplacements
+  // laissés vides compris (aucune règle n'exige de le remplir), par recherche
+  // exhaustive sur les places de la main (-1 : emplacement laissé vide).
   const first = rules.reduce(rules.createGame(7), { type: "draw" }).state;
   let firstBest = -Infinity;
   const hand = first.hand;
-  for (const a of hand.keys()) {
-    for (const b of hand.keys()) {
-      for (const c of hand.keys()) {
-        if (new Set([a, b, c]).size < 3) continue;
-        const triangle = { leftBase: { marble: hand[a], wear: 0 }, rightBase: { marble: hand[b], wear: 0 }, apex: { marble: hand[c], wear: 0 } };
+  const choicesOf = [-1, ...hand.keys()];
+  const placedAt = (index) => (index === -1 ? null : { marble: hand[index], wear: 0 });
+  for (const a of choicesOf) {
+    for (const b of choicesOf) {
+      for (const c of choicesOf) {
+        const used = [a, b, c].filter((index) => index !== -1);
+        if (new Set(used).size < used.length) continue;
+        const triangle = { leftBase: placedAt(a), rightBase: placedAt(b), apex: placedAt(c) };
         firstBest = Math.max(firstBest, rules.forecast({ ...first, triangle }).impact);
       }
     }
   }
   const firstPlan = bestPlan(publicView(first), impactOnly);
-  run("glouton, premier tour : le meilleur remplissage", firstBest, firstPlan.impact);
-  run.same("glouton, premier tour : les trois emplacements", [...SLOTS].sort(), firstPlan.choices.map((choice) => choice.slot).sort());
+  run("glouton, premier tour : le meilleur remplissage, partiel compris", firstBest, firstPlan.impact);
+  run.same("glouton, premier tour : ici, les trois emplacements", [...SLOTS].sort(), firstPlan.choices.map((choice) => choice.slot).sort());
+  // Un triangle partiel s'envisage : une main d'une bille au premier tour donne un plan d'une pose.
+  const single = { ...first, hand: [first.hand[0]] };
+  run("glouton, premier tour : une seule bille, une seule pose", 1, bestPlan(publicView(single), impactOnly).choices.length);
 }
 
 // La valeur d'une bille gagnée en main : sans elle, une bille qui pioche ne vaut rien
@@ -259,7 +266,7 @@ function checkSimulation(run) {
   run("surcharge : 4 tours", true, short.games.every((game) => game.turns === 4));
   run.same("surcharge : réglages par défaut intacts", settingsBefore, MARBLES_SETTINGS);
   run("surcharge : réglage inconnu refusé", true, throws(() => simulate({ games: 1, settings: { tours: 3 } })));
-  run("surcharge : valeur refusée par la simulation", true, throws(() => simulate({ games: 1, settings: { firstTurnDraw: 2 } })));
+  run("surcharge : valeur refusée par la simulation", true, throws(() => simulate({ games: 1, settings: { firstTurnDraw: 0 } })));
   run("joueur inconnu refusé", true, throws(() => simulate({ games: 1, player: "nope" })));
 
   // Sacs.

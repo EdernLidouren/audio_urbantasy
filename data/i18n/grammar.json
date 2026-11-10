@@ -1,14 +1,18 @@
 {
   "en": {
     "forms": [
-      "def"
+      "def",
+      "indef",
+      "noun"
     ],
     "attributes": {}
   },
   "fr": {
     "forms": [
       "def",
-      "de"
+      "de",
+      "indef",
+      "noun"
     ],
     "attributes": {
       "gender": [

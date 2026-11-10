@@ -9,8 +9,7 @@ export const MARBLES_SETTINGS = {
   maxHandSize: 5, // main pleine : la pioche est sautée, la bille reste au sac
   // Lancers par tour : un lancer est une pose depuis la main, sur un emplacement
   // vide ou occupé (l'échange n'en est pas un). Borne ce qu'un joueur peut
-  // enchaîner dans un tour, une pose qui pioche à chaque fois comprise. Au moins 3 :
-  // les trois poses obligatoires du premier tour en sont.
+  // enchaîner dans un tour, une pose qui pioche à chaque fois comprise.
   throwsPerTurn: 5,
   turnCount: 9,
   defaultMaxWear: 3,
@@ -33,7 +32,26 @@ export const MARBLES_SETTINGS = {
   swapSoundDelayMs: 150,
 };
 
-// Les PROFILS SONORES des billes (champ `sound` d'une bille) :
+// Les CALIBRES (Size) : ce qu'EST une bille par sa taille, champ `size` obligatoire
+// de chaque bille, statique (aucune action ne le change). Un entier, pour que les
+// comparaisons (plus petit, plus grand, écart) se fassent sur lui ; mais jamais
+// écrit en chiffre ailleurs que dans ces comparaisons : toujours par ces constantes.
+// Lu par la simulation (les conditions de calibre, core/marbles-effects.js) et par
+// le son (le profil et la force des chocs, plus bas).
+export const SMALL = 1;
+export const MEDIUM = 2;
+export const LARGE = 3;
+
+// Chaque calibre et son identifiant de texte : son nom est `marbles.size.<id>.name`
+// (data/i18n/<langue>/marbles.json). La liste des calibres valides.
+export const MARBLE_SIZES = Object.freeze({
+  [SMALL]: "small",
+  [MEDIUM]: "medium",
+  [LARGE]: "large",
+});
+
+// Les PROFILS SONORES, un par CALIBRE : le son d'une bille dépend de son calibre
+// (couplage voulu, une seule source de vérité). Chacun :
 //   beacon  sa balise, la voix de la bille, à la pioche et sous le curseur ;
 //   drop    son bruit de chute, à l'arrivée d'une bille qui roule ;
 //   roll    sa boucle de roulement, quand elle va d'une place à l'autre ;
@@ -41,24 +59,20 @@ export const MARBLES_SETTINGS = {
 //           déloge (voir MARBLES_COLLISION).
 // Des clés d'asset ou de pool (assets/manifest.json), vérifiées par l'audit du
 // contenu. Un profil aura un jour plusieurs voix (marble_small_2_beacon...).
-// Le NOM d'un profil est libre et ne dit rien de la taille de la bille (champ
-// `size`, MARBLE_SIZES) : `classic_large` est le son classique d'une grosse bille,
-// qu'une moyenne peut aussi porter. D'autres familles viendront à côté
-// (`metal_large`, `glass_small`...).
 export const MARBLE_SOUND_PROFILES = {
-  classic_small: {
+  [SMALL]: {
     beacon: "assets/sounds/marbles/marble_small_1_beacon",
     drop: "assets/sounds/marbles/marble_small_drop",
     roll: "assets/sounds/marbles/marble_small_rolling",
     impact: "assets/sounds/marbles/marble_small_collision",
   },
-  classic_medium: {
+  [MEDIUM]: {
     beacon: "assets/sounds/marbles/marble_medium_1_beacon",
     drop: "assets/sounds/marbles/marble_medium_drop",
     roll: "assets/sounds/marbles/marble_medium_rolling",
     impact: "assets/sounds/marbles/marble_medium_collision",
   },
-  classic_large: {
+  [LARGE]: {
     beacon: "assets/sounds/marbles/marble_large_1_beacon",
     drop: "assets/sounds/marbles/marble_large_drop",
     roll: "assets/sounds/marbles/marble_large_rolling",
@@ -66,28 +80,21 @@ export const MARBLE_SOUND_PROFILES = {
   },
 };
 
-// Les TAILLES des billes (champ `size` d'une bille) : ce qu'EST la bille, jamais
-// déduit de son profil sonore. Présentation seulement aujourd'hui : la simulation
-// accepte le champ sans le lire.
-//   weight  son poids, qui règle la force d'une collision (MARBLES_COLLISION).
-export const MARBLE_SIZES = {
-  small: { weight: 1 },
-  medium: { weight: 2 },
-  large: { weight: 3 },
-};
-
 // La COLLISION, quand une bille posée en déloge une autre :
 //   flamMs          l'écart entre le son de la frappeuse et celui de la frappée.
 //                   Sous une vingtaine de millisecondes, l'oreille entend UN choc,
 //                   plus épais, deux corps ; au-delà de 30 à 40, deux coups ;
-//   weightExponent  la FORCE du choc : le rapport des poids (MARBLE_SIZES),
-//                   frappeuse sur frappée, élevé à cette puissance. 0 : toujours 1 ;
-//                   0,3 : une grosse sur une petite (3 sur 1) frappe à 1,39, une
-//                   petite sur une grosse à 0,72. La force règle le volume des deux
+//   weights         le POIDS de chaque calibre, pour le son seulement ;
+//   weightExponent  la FORCE du choc : le rapport des poids des calibres de la
+//                   posée (frappeuse) et de l'éjectée (frappée), élevé à cette
+//                   puissance. 0 : toujours 1 ; 0,3 : un calot sur une minibille (3
+//                   sur 1) frappe à 1,39, une minibille sur un calot à 0,72 ; deux
+//                   billes de même calibre, à 1. La force règle le volume des deux
 //                   sons, et la vitesse de départ de la bille délogée (roulement
 //                   knocked, MARBLES_ROLLS).
 export const MARBLES_COLLISION = {
   flamMs: 12,
+  weights: { [SMALL]: 1, [MEDIUM]: 2, [LARGE]: 3 },
   weightExponent: 0.3,
 };
 
@@ -213,6 +220,9 @@ export const MARBLES_AUDIO = {
 //   moment    quand il joue : "play", pendant la phase de jeu (toutes les phases
 //             restent à venir) ; "afterPhases", après toutes les phases (une Vitesse
 //             ou une Masse ciblée n'y a plus de sens : core/marbles-effects.js) ;
+//   replacement  (facultatif) vrai s'il joue pendant un REMPLACEMENT : son
+//             évènement porte la posée et l'éjectée, que la condition de calibre
+//             relatif compare (relativeSize, refusée ailleurs) ;
 //   forecast  où sa prévision se dit :
 //               { line: "placement", marble, order } : pendant une pose, sa propre
 //               ligne de la confirmation, toujours présente, pour la bille
@@ -234,6 +244,7 @@ export const MARBLE_TRIGGERS = [
     event: "hit",
     marble: "onSlot",
     moment: "play",
+    replacement: true,
     forecast: { line: "placement", marble: "placed", order: 2 },
     texts: { card: "marbles.card.hit", effect: "marbles.event.effect_hit", placement: "marbles.place.hit" },
     card: "below",
@@ -244,6 +255,7 @@ export const MARBLE_TRIGGERS = [
     event: "knockout",
     marble: "onSlot",
     moment: "play",
+    replacement: true,
     forecast: { line: "placement", marble: "occupant", order: 1 },
     texts: { card: "marbles.card.knockout", effect: "marbles.event.effect_knockout", placement: "marbles.place.knockout" },
     card: "below",
@@ -287,7 +299,7 @@ export const MARBLE_CARD_MODEL = {
 export const STARTING_BAG = [
   "clay",
   "glass",
-  "shooter",
+  "gorilla",
   "agate",
   "cats_eye",
   "porcelain",

@@ -63,7 +63,7 @@
   "help.marbles.overview": "Announce the turn forecast, then each slot",
   "help.marbles.placesDemo": "Debug: play a beacon at each place, from the hand to the apex",
   "help.marbles.reannounce": "Hear the position or the resolution step again",
-  "help.marbles.resolve": "Start the turn resolution",
+  "help.marbles.resolve": "Start the turn resolution, at any time, even with empty slots",
   "help.marbles.right": "Go right, to the next marble or the right base",
   "help.marbles.turnInfo": "Announce the turn, the score, Speed, Mass and the swap",
   "help.marbles.up": "Go up, from the hand to the bases and from the bases to the apex",
