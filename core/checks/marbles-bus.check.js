@@ -38,6 +38,33 @@ export default function checkMarblesBus(run) {
   chained.emit("c");
   run("bus : synchrone, et réutilisable", "c", order.at(-1));
 
+  // Interruption (settle) : réglée jusqu'au bout tout de suite, ce qu'elle émet
+  // compris, avant ce qui attendait déjà ; la file en attente reprend ensuite.
+  const interrupted = [];
+  const interrupting = createEventBus((event) => {
+    interrupted.push(event);
+    if (event === "pose") {
+      interrupting.emit("en attente");
+      interrupting.settle("régénération");
+      interrupting.emit("pioche");
+    }
+    if (event === "régénération") interrupting.emit("trouvaille");
+  });
+  interrupting.emit("pose");
+  run.same("interruption : réglée avant ce qui attendait", ["pose", "régénération", "trouvaille", "en attente", "pioche"], interrupted);
+  const outside = [];
+  const alone = createEventBus((event) => outside.push(event));
+  alone.settle("seul");
+  run.same("interruption : hors de tout traitement, comme emit", ["seul"], outside);
+  let interruptionCaught = null;
+  const loopingSettle = createEventBus((event) => loopingSettle.settle(event), 10);
+  try {
+    loopingSettle.settle("tour");
+  } catch (error) {
+    interruptionCaught = error;
+  }
+  run("interruption : une boucle d'interruptions lève aussi", true, interruptionCaught instanceof MarbleEventLimitError);
+
   // Limite de sécurité : une boucle lève, avec une erreur qui se comprend.
   let caught = null;
   const looping = createEventBus((event) => looping.emit(event), 10);

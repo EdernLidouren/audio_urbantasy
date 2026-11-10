@@ -37,6 +37,7 @@
 // FICHES : le curseur principal annonce court, Ctrl+haut et Ctrl+bas parcourent le
 // détail de la bille sous lui (view/marbles/card.js, lib/detail-card.js). Maj+S et
 // Maj+D ouvrent les menus du sac et de la défausse (view/marbles/pile-screen.js).
+// En mode debug, Maj+L ouvre celui des valeurs de partie (view/marbles/tally-screen.js).
 //
 // TEMPS RÉEL : la séquence, la file de sons et les roulements avancent par un même
 // battement (lib/real-time.js), appelé à chaque image (onFrame) ET par une
@@ -97,6 +98,7 @@ import { EMPTY_SOUND_QUEUE, advanceSoundQueue, enqueueCues } from "./sound-queue
 import { advanceSequence, restartPause, skipSequence, startSequence } from "./sequence.js";
 import { EMPTY_HISTORY, recordSteps } from "./history.js";
 import { openHistoryMenu } from "./history-screen.js";
+import { openTallyMenu } from "./tally-screen.js";
 
 const MARBLES_BINDINGS = defineBindings("marbles", {
   up: { keys: ["ArrowUp"], mods: [] },
@@ -120,10 +122,12 @@ const MARBLES_BINDINGS = defineBindings("marbles", {
   history: { keys: ["l"], mods: [] },
   // Mode debug seulement (voir DEBUG_ACTIONS).
   placesDemo: { keys: ["p"], mods: ["shift"] },
+  tally: { keys: ["l"], mods: ["shift"] },
 });
 
-// Les actions sans effet hors mode debug, absentes alors de l'aide.
-const DEBUG_ACTIONS = new Set(["placesDemo"]);
+// Les actions sans effet hors mode debug, absentes alors de l'aide. Le mode debug
+// est celui de tout le projet (config/debug.js, Ctrl+D ou toggleDebug() en console).
+const DEBUG_ACTIONS = new Set(["placesDemo", "tally"]);
 
 // La minuterie du temps réel (voir l'en-tête), en millisecondes : assez fine pour
 // que les sons tombent juste quand les images manquent, le navigateur la ralentit
@@ -236,12 +240,14 @@ export function makeMarblesScreen(getGame, setGame, rules) {
 
   // La fiche de la bille sous le curseur, avec ce qu'on entendrait à sa position
   // par défaut ; null sur un emplacement vide ou une main vide.
-  // En main, ses montants calculés se disent avec son compteur de tours en main.
+  // Ses montants calculés se disent avec les valeurs de partie, et, en main, avec son
+  // compteur de tours en main.
   function currentCard() {
     const marble = marbleUnderCursor();
     if (marble === undefined) return null;
-    const turnsInHand = cursor.place === "hand" ? getGame().hand[clampedHandIndex()].turnsInHand : 0;
-    return marbleCard(marble, focusLine(), rules, t, { turnsInHand });
+    const game = getGame();
+    const turnsInHand = cursor.place === "hand" ? game.hand[clampedHandIndex()].turnsInHand : 0;
+    return marbleCard(marble, focusLine(), rules, t, { turnsInHand, tally: game.tally });
   }
 
   // Ce qui se dit du curseur : l'annonce principale, et le champ où se trouve le
@@ -507,14 +513,14 @@ export function makeMarblesScreen(getGame, setGame, rules) {
   function openBagMenu() {
     if (blockedDuringSequence()) return;
     playMenuSound("select");
-    openPileMenu("marbles.pile.bag", bagDisplayOrder(getGame().bag, t), rules);
+    openPileMenu("marbles.pile.bag", bagDisplayOrder(getGame().bag, t), rules, getGame().tally);
   }
 
   // Dans l'ordre d'arrivée : de la plus ancienne à la plus récente.
   function openDiscardMenu() {
     if (blockedDuringSequence()) return;
     playMenuSound("select");
-    openPileMenu("marbles.pile.discard", getGame().discard, rules);
+    openPileMenu("marbles.pile.discard", getGame().discard, rules, getGame().tally);
   }
 
   // L : l'historique du tour précédent. Aussi en fin de partie : celui du dernier
@@ -532,6 +538,14 @@ export function makeMarblesScreen(getGame, setGame, rules) {
     soundQueue = enqueueCues(soundQueue, placesDemoCues(marbleUnderCursor() ?? "clay"));
     flushSounds(0);
     announce(t("marbles.debug.places_demo"), { assertive: true });
+  }
+
+  // Maj+L, mode debug : les valeurs de partie. Pas pendant la séquence, dont l'état
+  // est déjà celui d'après la résolution : ce serait la dévoiler.
+  function openTally() {
+    if (blockedDuringSequence()) return;
+    playMenuSound("select");
+    openTallyMenu(getGame().tally);
   }
 
   function back() {
@@ -561,6 +575,7 @@ export function makeMarblesScreen(getGame, setGame, rules) {
     resolve: resolveKey,
     history: openHistory,
     placesDemo: playPlacesDemo,
+    tally: openTally,
   };
 
   // Première ouverture : la musique, le sac qu'on brasse et la pioche du tour 1.

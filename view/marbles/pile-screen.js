@@ -35,7 +35,7 @@ const PILE_BINDINGS = defineBindings("marblesPile", {
   back: { keys: ["Escape"], mods: [] },
 });
 
-function makePileScreen(titleKey, marbles, rules) {
+function makePileScreen(titleKey, marbles, rules, tally) {
   const total = marbles.length + 1; // « Retour » compte comme une entrée
   let index = 0;
   let detail = 0;
@@ -52,7 +52,7 @@ function makePileScreen(titleKey, marbles, rules) {
   // La fiche de l'entrée courante ; « Retour » n'en a pas.
   function currentCard() {
     if (isOnBack()) return null;
-    return marbleCard(marbles[index], describeMarbleInList(marbles[index], index, total, rules, t), rules, t);
+    return marbleCard(marbles[index], describeMarbleInList(marbles[index], index, total, rules, t), rules, t, { tally });
   }
 
   function currentLine() {
@@ -135,7 +135,8 @@ function makePileScreen(titleKey, marbles, rules) {
 }
 
 // `titleKey` : le titre du menu, une clé i18n ; `marbles` : les ids à dire, dans
-// l'ordre voulu ; `rules` : les règles du jeu, pour les fiches.
-export function openPileMenu(titleKey, marbles, rules) {
-  pushScreen(makePileScreen(titleKey, marbles, rules));
+// l'ordre voulu ; `rules` : les règles du jeu, pour les fiches ; `tally` : les
+// valeurs de partie, pour la valeur actuelle des montants calculés.
+export function openPileMenu(titleKey, marbles, rules, tally) {
+  pushScreen(makePileScreen(titleKey, marbles, rules, tally));
 }

@@ -38,6 +38,8 @@ export default function checkMarblesForecast(run) {
   checkFinalForecast(run);
   checkWearForecast(run);
   checkFlickForecast(run);
+  checkWindfallForecast(run);
+  checkTallyForecast(run);
   checkGuards(run);
   checkMatchesReality(run);
 }
@@ -52,16 +54,16 @@ function checkBlindDraws(run) {
   run.same("aveugle : l'Éjection pioche 1", { marble: "stoneware", speed: 0, mass: 0, draw: 1, operations: [], given: [] }, predicted.knockout);
   run.same("aveugle : le Tic pioche 1", { marble: "cats_eye", speed: 0, mass: 0, draw: 1, operations: [], given: [] }, predicted.hit);
   run("aveugle : deux billes piochées", 2, predicted.drawn);
-  run("aveugle : la seconde régénère le sac (le grès éjecté)", true, predicted.regenerates);
+  run("aveugle : la seconde régénère le sac (le grès éjecté)", 1, predicted.regenerations.length);
   run("aveugle : aucune bille du sac révélée", false, JSON.stringify(predicted).includes("sulphide"));
   run("aveugle : rien d'incertain, aucune bille n'écoute la main", false, predicted.uncertain);
 
   // Le réel : mêmes comptes.
   const real = rules.reduce(state, { type: "place", handIndex: 0, slot: "apex" });
   const resolved = rules.reduce(real.state, { type: "resolve" });
-  const actual = readForecast(real.events, resolved.events);
+  const actual = readForecast(real.events, resolved.events, resolved.state);
   run("aveugle : le réel pioche autant", predicted.drawn, actual.drawn);
-  run("aveugle : le réel régénère aussi", true, actual.regenerates);
+  run("aveugle : le réel régénère aussi", 1, actual.regenerations.length);
 
   // Le hasard de la partie n'est ni lu ni avancé : deux états qui ne diffèrent que
   // par lui donnent la même prévision, et l'état reçu (figé) n'est pas touché.
@@ -79,7 +81,7 @@ function checkBlindDraws(run) {
   const phase = rules.forecast(playState({ hand: inHand([]), bag: [], discard: [], triangle: { leftBase: placed("mica"), rightBase: null, apex: null } }));
   run.same("aveugle : la phase du mica, Pioche 1", { marble: "mica", speed: 0, mass: 0, draw: 1, operations: [], given: [] }, phase.phases.leftBase);
   run("aveugle : rien à piocher, rien de pioché", 0, phase.drawn);
-  run("aveugle : ni régénération", false, phase.regenerates);
+  run.same("aveugle : ni régénération", [], phase.regenerations);
 }
 
 // Le Final se prévoit avec l'emplacement de sa bille, seulement si elle atteint son
@@ -106,7 +108,7 @@ function checkFlickForecast(run) {
     const real = rules.reduce(state, action);
     const resolved = rules.reduce(real.state, { type: "resolve" });
     const { uncertain, ...predicted } = rules.forecast(state, action);
-    return JSON.stringify(predicted) === JSON.stringify(readForecast(real.events, resolved.events));
+    return JSON.stringify(predicted) === JSON.stringify(readForecast(real.events, resolved.events, resolved.state));
   };
 
   const clay = playState({ hand: inHand(["clay"], 3), triangle: { leftBase: null, rightBase: null, apex: placed("tiger") } });
@@ -126,6 +128,93 @@ function checkFlickForecast(run) {
   run("chiquenaude prévue : sans le champ, null", null, rules.forecast(playState({ hand: inHand(["tiger"]) }), toApex).flick);
 }
 
+// Les Trouvailles dans la prévision : prévues chez les billes actives, connues ;
+// seules les billes piochées restent cachées. Toujours égales au réel.
+function checkWindfallForecast(run) {
+  const matches = (state, action) => {
+    const real = action === null ? { state, events: [] } : rules.reduce(state, action);
+    const resolved = rules.reduce(real.state, { type: "resolve" });
+    const { uncertain, ...predicted } = rules.forecast(state, action);
+    return JSON.stringify(predicted) === JSON.stringify(readForecast(real.events, resolved.events, resolved.state));
+  };
+  const toApex = { type: "place", handIndex: 0, slot: "apex" };
+  const play = playState({
+    hand: inHand(["cats_eye"]),
+    bag: [],
+    discard: ["clay"],
+    triangle: { leftBase: placed("tiger"), rightBase: placed("agate", 1), apex: placed("glass") },
+  });
+  const predicted = rules.forecast(play, toApex);
+  run.same(
+    "trouvaille prévue, pose : chez les billes actives, dans l'ordre",
+    [
+      { trigger: "windfall", slot: "leftBase", marble: "tiger", speed: 3 },
+      { trigger: "windfall", slot: "rightBase", marble: "agate", speed: 0 },
+    ],
+    predicted.regenerations[0].effects.map(({ trigger, slot, marble, speed }) => ({ trigger, slot, marble, speed }))
+  );
+  run("trouvaille prévue, pose : aucune bille du sac révélée", false, JSON.stringify(predicted).includes("clay"));
+  run("trouvaille prévue, pose : certaine, les billes actives sont connues", false, predicted.uncertain);
+  run("trouvaille prévue, pose : égale au réel", true, matches(play, toApex));
+
+  const resolving = playState({ bag: [], discard: ["clay"], triangle: { leftBase: placed("mica"), rightBase: placed("giant"), apex: placed("tiger") } });
+  // Deux régénérations : la Pioche du mica, puis celle du Final de la géante ; la
+  // tigrée trouve à chacune, et chaque Trouvaille reste avec la sienne.
+  run.same(
+    "trouvaille prévue, résolution : deux régénérations, la tigrée à chacune",
+    [["tiger"], ["tiger"]],
+    rules.forecast(resolving).regenerations.map(({ effects }) => effects.map((effect) => effect.marble))
+  );
+  run("trouvaille prévue, résolution : égale au réel", true, matches(resolving, null));
+  const cracking = playState({
+    hand: inHand(["cats_eye"]),
+    bag: [],
+    discard: ["clay"],
+    triangle: { leftBase: placed("sulphide"), rightBase: placed("porcelain", 1), apex: placed("glass") },
+  });
+  run("trouvaille prévue, Fêlure et Final : égale au réel", true, matches(cracking, toApex));
+  run.same("trouvaille prévue : rien sans régénération", [], rules.forecast(playState({ triangle: { leftBase: placed("tiger"), rightBase: null, apex: null } })).regenerations);
+}
+
+// Les valeurs de partie dans la prévision : la copie porte le registre, qui y évolue
+// comme dans la partie (une Chiquenaude se compte elle-même, une régénération compte
+// une trouvaille) ; le registre réel n'est jamais touché.
+function checkTallyForecast(run) {
+  const toApex = { type: "place", handIndex: 0, slot: "apex" };
+  const matches = (state, action) => {
+    const real = rules.reduce(state, action);
+    const resolved = rules.reduce(real.state, { type: "resolve" });
+    const { uncertain, ...predicted } = rules.forecast(state, action);
+    return JSON.stringify(predicted) === JSON.stringify(readForecast(real.events, resolved.events, resolved.state));
+  };
+  const tally = (values) => ({ flicksThisTurn: 0, windfallsThisGame: 0, ...values });
+
+  // La loupe : sa Chiquenaude lit le registre de la copie, elle-même comprise.
+  const first = playState({ hand: inHand(["magnifier"]) });
+  run("valeurs prévues : première chiquenaude du tour de la loupe, Vitesse +2", 2, rules.forecast(first, toApex).flick.speed);
+  run("valeurs prévues : égales au réel", true, matches(first, toApex));
+  const second = playState({ hand: inHand(["magnifier"]), tally: tally({ flicksThisTurn: 1 }) });
+  run("valeurs prévues : deuxième chiquenaude, Vitesse +4", 4, rules.forecast(second, toApex).flick.speed);
+  run("valeurs prévues : deuxième, égale au réel", true, matches(second, toApex));
+  const capped = playState({ hand: inHand(["magnifier"]), tally: tally({ flicksThisTurn: 7 }) });
+  run("valeurs prévues : plafond de la loupe, Vitesse +6", 6, rules.forecast(capped, toApex).flick.speed);
+
+  // Le verre à la pointe : une régénération en chemin compte avant sa phase.
+  const regenerating = playState({
+    hand: inHand(["cats_eye"]),
+    bag: [],
+    discard: ["clay"],
+    triangle: { leftBase: null, rightBase: placed("glass"), apex: placed("tiger") },
+    tally: tally({ windfallsThisGame: 2 }),
+  });
+  const predicted = rules.forecast(regenerating, toApex);
+  run("valeurs prévues : la régénération du Tic comptée dans le registre de la copie", 3, predicted.tally.windfallsThisGame);
+  run("valeurs prévues : égales au réel, régénération comprise", true, matches(regenerating, toApex));
+  const frozen = deepFreeze(structuredClone(regenerating));
+  run("valeurs prévues : l'état reçu n'est pas modifié", true, rules.forecast(frozen, toApex).ok);
+  run.same("valeurs prévues : le registre réel non plus", tally({ windfallsThisGame: 2 }), frozen.tally);
+}
+
 // Polissage et Fêlure : la prévision montre leurs conséquences, comme le réel.
 function checkWearForecast(run) {
   const cracking = playState({ hand: inHand([]), bag: ["clay"], triangle: { leftBase: placed("sulphide"), rightBase: null, apex: placed("porcelain", 1) } });
@@ -136,7 +225,7 @@ function checkWearForecast(run) {
   run("Fêlure prévue : son Final", 4, predicted.slotEffects.apex[0].speed);
   run.same("Fêlure prévue : les retraits", [{ slot: "apex", marble: "porcelain" }], predicted.retired);
   const real = rules.reduce(cracking, { type: "resolve" });
-  run.same("Fêlure prévue : comme le réel, usure comprise", JSON.stringify((({ uncertain, ...rest }) => rest)(predicted)), JSON.stringify(readForecast([], real.events)));
+  run.same("Fêlure prévue : comme le réel, usure comprise", JSON.stringify((({ uncertain, ...rest }) => rest)(predicted)), JSON.stringify(readForecast([], real.events, real.state)));
 
   const saving = playState({ hand: inHand([]), bag: ["clay"], triangle: { leftBase: placed("agate", 2), rightBase: null, apex: placed("porcelain", 1) } });
   const saved = rules.forecast(saving);
@@ -300,7 +389,7 @@ function compareState(state, marbles, faults, tally) {
       continue;
     }
     tally.actions += 1;
-    const actual = readForecast(real.events, resolved.events);
+    const actual = readForecast(real.events, resolved.events, resolved.state);
     const { uncertain, ...certain } = predicted;
     if (uncertain) faults.push(`prévision incertaine sans bille qui écoute la main : ${JSON.stringify(action)}`);
     if (JSON.stringify(certain) !== JSON.stringify(actual)) {
@@ -316,6 +405,7 @@ function compareState(state, marbles, faults, tally) {
       predicted.hit,
       ...SLOTS.map((slot) => predicted.phases[slot]),
       ...SLOTS.flatMap((slot) => predicted.slotEffects[slot]),
+      ...predicted.regenerations.flatMap(({ effects }) => effects),
     ].filter((part) => part !== null);
     const speed = parts.reduce((total, part) => total + part.speed, state.speed);
     if (speed !== predicted.speed) faults.push(`Vitesse prévue ${predicted.speed}, somme des effets ${speed}`);

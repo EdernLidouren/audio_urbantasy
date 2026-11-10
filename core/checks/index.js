@@ -53,6 +53,7 @@ import checkSequence from "./sequence.check.js";
 import checkRotation from "./rotation.check.js";
 import checkMarbles from "./marbles.check.js";
 import checkMarblesBus from "./marbles-bus.check.js";
+import checkMarblesTally from "./marbles-tally.check.js";
 import checkMarblesForecast from "./marbles-forecast.check.js";
 import checkMarblesView from "./marbles-view.check.js";
 import checkMarblesSequence from "./marbles-sequence.check.js";
@@ -104,6 +105,7 @@ const SUITES = [
   { name: "rotation", check: checkRotation },
   { name: "marbles", check: checkMarbles },
   { name: "marbles-bus", check: checkMarblesBus },
+  { name: "marbles-tally", check: checkMarblesTally },
   { name: "marbles-forecast", check: checkMarblesForecast },
   { name: "marbles-view", check: checkMarblesView },
   { name: "marbles-sequence", check: checkMarblesSequence },

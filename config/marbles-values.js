@@ -221,6 +221,8 @@ export const MARBLES_AUDIO = {
 //   moment    quand il joue : "play", pendant la phase de jeu (toutes les phases
 //             restent à venir) ; "afterPhases", après toutes les phases (une Vitesse
 //             ou une Masse ciblée n'y a plus de sens : core/marbles-effects.js) ;
+//             "anytime", à tout moment du tour (rien ne se refuse à la validation :
+//             un bonus ciblé dont la phase est passée se perd à l'exécution) ;
 //   replacement  (facultatif) vrai s'il joue pendant un REMPLACEMENT : son
 //             évènement porte la posée et l'éjectée, que la condition de calibre
 //             relatif compare (relativeSize, refusée ailleurs) ;
@@ -232,10 +234,13 @@ export const MARBLES_AUDIO = {
 //               seulement pour un déclencheur de remplacement (`replacement`) ;
 //               { line: "slot" } : avec l'emplacement de la bille, après son effet
 //               de phase (R, valeurs de la confirmation) ;
+//               { line: "regeneration" } : juste après l'annonce de la régénération
+//               du sac (R, confirmation), une phrase par effet, qui nomme sa bille ;
 //   texts     ses gabarits i18n : `card`, son champ de fiche ({effect}) ; `effect`,
 //             son effet joué dans le journal ({marble}, {effect}, {speed}, {mass}) ;
-//             `placement` (ligne "placement") ou `slot` (ligne "slot"), sa
-//             prévision ({marble}, {effect} ; {effect} seul pour "slot") ;
+//             `placement` (ligne "placement"), `slot` (ligne "slot") ou
+//             `regeneration` (ligne "regeneration"), sa prévision ({marble},
+//             {effect} ; {effect} seul pour "slot") ;
 //   card      sa place dans la fiche : "below", au-dessous de l'annonce principale.
 // AJOUTER un déclencheur : une entrée ici, son champ dans les billes, ses textes, et
 // l'émission de son évènement dans core/marbles.js au bon moment du tour.
@@ -263,6 +268,19 @@ export const MARBLE_TRIGGERS = [
     texts: { card: "marbles.card.hit", effect: "marbles.event.effect_hit", placement: "marbles.place.hit" },
     card: "below",
   },
+  // La Trouvaille : à chaque régénération du sac depuis la défausse, à tout moment du
+  // tour, chez chaque bille ACTIVE (sur le triangle), dans l'ordre des phases, avant
+  // que la pioche interrompue ne reprenne.
+  {
+    id: "windfall",
+    field: "windfall",
+    event: "windfall",
+    marble: "onSlot",
+    moment: "anytime",
+    forecast: { line: "regeneration" },
+    texts: { card: "marbles.card.windfall", effect: "marbles.event.effect_windfall", regeneration: "marbles.forecast.windfall" },
+    card: "below",
+  },
   {
     id: "knockout",
     field: "knockout",
@@ -285,6 +303,43 @@ export const MARBLE_TRIGGERS = [
     forecast: { line: "slot" },
     texts: { card: "marbles.card.final", effect: "marbles.event.effect_final", slot: "marbles.outcome.final" },
     card: "below",
+  },
+];
+
+// Les VALEURS DE PARTIE (Tally) : des compteurs tenus par la simulation, dans l'état
+// (`tally`, sérialisé avec lui), alimentés par le journal (core/marbles-tally.js, le
+// seul à les écrire). Chacun :
+//   id      son identifiant, aussi celui de sa source de montant calculé
+//           (core/marbles-effects.js/AMOUNT_SOURCES) : « par chiquenaude ce tour » ;
+//   scope   sa portée : "turn", remis à zéro au début de chaque tour, avant sa
+//           pioche (à l'émission de `turnStarted`) ; "game", à zéro en début de
+//           partie seulement ;
+//   events  les types d'évènements du journal qui l'augmentent de 1
+//           (core/marbles.js/JOURNAL_EVENTS) ;
+//   filter  (facultatif) ce que l'évènement doit vérifier pour compter :
+//           { type: "size", size }, la bille qu'il nomme est de ce calibre (un
+//           évènement qui nomme toujours une bille connue, jamais la pioche, dont la
+//           bille est cachée dans la prévision) ;
+//   texts   ses gabarits i18n : `name`, son nom (menu de debug, Maj+L) ; `source`,
+//           le texte de sa source de montant, qui reçoit {effect} (le pas déjà dit).
+// Il compte À L'ÉMISSION de l'évènement, avant que les billes n'y réagissent : une
+// Chiquenaude qui lit « par chiquenaude ce tour » se compte elle-même.
+// AJOUTER un compteur : une entrée ici et ses deux textes dans chaque langue, rien
+// d'autre.
+export const MARBLE_TALLIES = [
+  {
+    id: "flicksThisTurn",
+    scope: "turn",
+    events: ["flick"],
+    texts: { name: "marbles.tally.flicks_this_turn", source: "marbles.effect.per_flick_this_turn" },
+  },
+  // Une trouvaille, c'est une régénération du sac depuis la défausse, qu'une bille
+  // active ait un effet de Trouvaille ou non.
+  {
+    id: "windfallsThisGame",
+    scope: "game",
+    events: ["bagRegenerated"],
+    texts: { name: "marbles.tally.windfalls_this_game", source: "marbles.effect.per_windfall_this_game" },
   },
 ];
 

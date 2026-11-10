@@ -8,6 +8,7 @@ export default {
   // Pointe : Masse +1, et Masse +2 si la base gauche est un calot.
   apex: [mass(1), { ...mass(2), when: { type: "sizeAt", slot: "leftBase", size: LARGE } }],
   hit: [mass(1)],
+  windfall: [polish(1)],
   final: [polish(1, "apex")],
   size: MEDIUM,
 };

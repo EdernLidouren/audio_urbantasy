@@ -354,8 +354,10 @@ export const MARBLE_EVENT_CUES = {
     }
   },
   // Le choc se joue avec la pose qui suit, à l'arrivée de la bille posée.
-  // La Chiquenaude : un point d'accroche, muet aujourd'hui (aucun son dédié).
+  // La Chiquenaude et la Trouvaille : des points d'accroche, muets aujourd'hui
+  // (aucun son dédié).
   flick: null,
+  windfall: null,
   knockout: (event, timeline, context) => {
     context.struck = event.marble;
   },

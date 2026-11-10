@@ -59,7 +59,7 @@ const { buildSteps, resolutionSteps, describeBag, describeDiscard, describeHandF
   "../../view/marbles/narration.js"
 );
 const { marbleCard } = await import("../../view/marbles/card.js");
-const { formatEvent, formatState } = await import("./format.js");
+const { formatEvent, formatState, tallyList } = await import("./format.js");
 setLocale(lang);
 const name = (id) => t(`marble.${id}.name`);
 
@@ -112,7 +112,7 @@ function resolveTurn() {
 // Une bille et sa fiche, à plat : ce que l'écran donne champ par champ.
 function printMarble(marble, main, turnsInHand = 0) {
   console.log(`  ${main}`);
-  const { above, below } = marbleCard(marble, main, GAME_RULES, t, { turnsInHand });
+  const { above, below } = marbleCard(marble, main, GAME_RULES, t, { turnsInHand, tally: game.tally });
   for (const field of [...above, ...below]) console.log(`      ${field}`);
 }
 
@@ -128,6 +128,7 @@ function printState() {
   game.hand.forEach(({ marble, turnsInHand }, index) => printMarble(marble, describeHandFocus(game, index, GAME_RULES, t), turnsInHand));
   console.log(`  [sac, du haut vers le bas : ${game.bag.join(", ") || "-"}]`);
   console.log(`  [défausse : ${game.discard.join(", ") || "-"}]`);
+  console.log(`  [valeurs de partie : ${tallyList(game.tally)}]`);
 }
 
 // La prévision, dite avec les mêmes phrases que l'écran. `action` : null pour la

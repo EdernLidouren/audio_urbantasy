@@ -5,7 +5,9 @@
 // aucune persistance aujourd'hui) :
 //   { rngState, maxHandSize, throwsPerTurn, firstTurnDraw, drawPerTurn, turnCount,
 //     turn, score, speed, mass, stage, endReason, bag, hand, discard, triangle,
-//     swapUsed, throwsUsed }
+//     swapUsed, throwsUsed, tally }
+// `tally` : les VALEURS DE PARTIE, { <id>: nombre } (core/marbles-tally.js, le seul à
+// les écrire), tenues à l'émission de chaque évènement du journal (transact).
 // `throwsUsed` : les LANCERS joués ce tour (une pose depuis la main en est un,
 // l'échange non), jamais plus que `throwsPerTurn`.
 // bag et discard sont des listes d'ids de billes (doublons permis). Une bille
@@ -51,7 +53,7 @@
 // sur lui seul (view/marbles/narration.js, view/marbles/sounds.js) :
 //   turnStarted { turn, turnCount }, draw { marble }, drawSkipped { reason },
 //   bagRegenerated { size }, swapped { a, b },
-//   flick { slot, marble, turnsInHand },
+//   flick { slot, marble, turnsInHand }, windfall { slot, marble },
 //   knockout { slot, marble, replacement }, removed { slot, marble, cause },
 //   discarded { slot, marble, cause }, placed { slot, marble },
 //   hit { slot, marble, replacement }, final { slot, marble },
@@ -64,10 +66,13 @@
 //   rotation { triangle }, turnEnded { turn }, gameOver { reason, score }.
 // `flick` : la bille vient de quitter la main pour être posée en `slot` ;
 // `turnsInHand`, le compteur qu'elle avait en main, que lit sa Chiquenaude.
+// `windfall` : après un `bagRegenerated`, une par bille active, dans l'ordre des
+// phases ; sa Trouvaille et tout ce qui en découle se règlent avant la suite.
 // `replacement` (Tic, Éjection) : le remplacement en cours, { placed, ejected }, lu
 // par les conditions de calibre relatif (core/marbles-effects.js/relativeSize).
 // `cause` : "replacement" ou "wear". `trigger` : "phase" ou l'id d'un déclencheur
-// (config/marbles-values.js/MARBLE_TRIGGERS : "flick", "hit", "knockout", "final").
+// (config/marbles-values.js/MARBLE_TRIGGERS : "flick", "hit", "windfall", "knockout",
+// "final").
 // `final` : une bille usée vient de rejoindre la défausse depuis `slot`.
 // drawSkipped `reason` : "handFull" (la bille reste au sac) ou "noMarbles" (sac
 // et défausse vides). Une pioche, une régénération ou un arrêt de pioche peuvent
@@ -88,11 +93,12 @@
 // passent. Les vérifications y passent aussi des tables fabriquées, qui testent
 // ce qu'aucune bille actuelle ne produit (une Masse négative).
 
-import { MARBLE_TRIGGERS, MARBLES_SETTINGS, STARTING_BAG } from "../config/marbles-values.js";
+import { MARBLE_TALLIES, MARBLE_TRIGGERS, MARBLES_SETTINGS, STARTING_BAG } from "../config/marbles-values.js";
 import { createSeed, nextRandom } from "./rng.js";
 import { rejectUnknownFields } from "../lib/validate.js";
 import { MarbleEventLimitError, createEventBus } from "./marbles-bus.js";
 import { CLAUSE_ACTIONS, SLOTS, addValues, effectAt, evaluateEffect, isMarbleSize, validateEffect } from "./marbles-effects.js";
+import { emptyTally, recordTally, validateTallies } from "./marbles-tally.js";
 
 export { SLOTS, effectAt };
 
@@ -113,12 +119,46 @@ export const MARBLE_ERRORS = [
   "eventLimit",
 ];
 
+// Les types d'évènements du journal (voir l'en-tête), chacun avec vrai s'il nomme
+// toujours une bille CONNUE, même dans la prévision : faux pour la pioche, dont la
+// bille y est cachée, et pour ceux qui ne nomment aucune bille. Lu par la validation
+// des valeurs de partie (un compteur ne peut compter qu'un évènement qui existe ;
+// un filtre sur la bille, qu'un évènement qui la connaît).
+export const JOURNAL_EVENTS = Object.freeze({
+  turnStarted: false,
+  draw: false,
+  drawSkipped: false,
+  bagRegenerated: false,
+  swapped: false,
+  flick: true,
+  windfall: true,
+  knockout: true,
+  removed: true,
+  discarded: true,
+  placed: true,
+  hit: true,
+  final: true,
+  phase: true,
+  phaseSkipped: false,
+  effect: true,
+  polished: true,
+  cracked: true,
+  targetEmpty: false,
+  wear: true,
+  impact: false,
+  rotation: false,
+  turnEnded: false,
+  gameOver: false,
+});
+
+validateTallies(MARBLE_TALLIES, JOURNAL_EVENTS);
+
 // --- Déclencheurs ---
 
 // Les champs d'effet de PHASE d'une bille, à part des déclencheurs.
 const PHASE_FIELDS = ["base", "apex"];
 const TRIGGER_MARBLES = ["onSlot", "removed", "thrown"];
-const TRIGGER_MOMENTS = ["play", "afterPhases"];
+const TRIGGER_MOMENTS = ["play", "afterPhases", "anytime"];
 const PLACEMENT_MARBLES = ["occupant", "placed"];
 
 // Échoue sur une liste de déclencheurs mal formée (config/marbles-values.js/
@@ -148,11 +188,11 @@ export function validateMarbleTriggers(triggers) {
       if (!PLACEMENT_MARBLES.includes(forecast.marble)) fail(`${describe} : forecast.marble inconnu "${forecast.marble}".`);
       if (!Number.isInteger(forecast.order)) fail(`${describe} : forecast.order doit être un entier.`);
       if (typeof texts.placement !== "string") fail(`${describe} : texte placement obligatoire.`);
-    } else if (forecast?.line === "slot") {
+    } else if (forecast?.line === "slot" || forecast?.line === "regeneration") {
       rejectUnknownFields(forecast, ["line"], describe, fail);
-      if (typeof texts.slot !== "string") fail(`${describe} : texte slot obligatoire.`);
+      if (typeof texts[forecast.line] !== "string") fail(`${describe} : texte ${forecast.line} obligatoire.`);
     } else {
-      fail(`${describe} : forecast.line doit valoir "placement" ou "slot".`);
+      fail(`${describe} : forecast.line doit valoir "placement", "slot" ou "regeneration".`);
     }
     if (trigger.card !== undefined && trigger.card !== "below") fail(`${describe} : card doit valoir "below".`);
   }
@@ -292,6 +332,8 @@ export function createMarblesGame(seed, options = {}, types) {
     triangle: { leftBase: null, rightBase: null, apex: null },
     swapUsed: false,
     throwsUsed: 0,
+    // Les valeurs de partie, à zéro : la portée "game" ne revient à zéro qu'ici.
+    tally: emptyTally(),
   };
 }
 
@@ -488,6 +530,7 @@ function fireEffect(run, trigger, listener, clauses, event) {
     triangle: run.state.triangle,
     holder: { marble, zone: listener.zone, turnsInHand: listener.turnsInHand ?? 0 },
     replacement: event.replacement ?? null,
+    tally: run.state.tally,
   };
   const { self, gifts, operations } = evaluateEffect(clauses, situation, run.types);
   const bonus = trigger === "phase" ? run.state.triangle[slot].bonus : undefined;
@@ -541,9 +584,8 @@ function applyMarbleAction(run, action, amount, slot) {
   if (rule.retires && wear >= maxWear) retireMarble(run, slot);
 }
 
-// Le traitement d'un évènement par le bus : le journal, puis les écouteurs.
+// Le traitement d'un évènement par le bus : ses écouteurs (il est déjà au journal).
 function handleEvent(run, event) {
-  run.journal.push(event);
   const trigger = EVENT_TRIGGERS[event.type];
   if (!trigger) return;
   const listeners = trigger.listeners ? trigger.listeners(event) : marbleListeners(run.state);
@@ -568,7 +610,24 @@ function transact(state, types, { eventLimit, blind = false } = {}, body) {
   // `phasesStarted` : les emplacements dont la phase a commencé (ou a été sautée)
   // pendant cette action ; un bonus qui les vise est perdu (fireEffect).
   const run = { state, types, blind, uncertain: false, phasesStarted: new Set(), journal: [] };
-  run.emit = createEventBus((event) => handleEvent(run, event), eventLimit).emit;
+  const bus = createEventBus((event) => handleEvent(run, event), eventLimit);
+  // Le journal s'écrit À L'ÉMISSION, dans l'ordre où l'état change : la file du bus
+  // étant premier entré, premier sorti, c'est aussi l'ordre de traitement, sauf
+  // pour une interruption (settle), réglée avant ce qui attendait, mais émise après.
+  // Les valeurs de partie aussi : un évènement compte dès qu'il est émis, avant que
+  // les billes n'y réagissent (core/marbles-tally.js).
+  const record = (event) => {
+    update(run, { tally: recordTally(run.state.tally, event, types) });
+    run.journal.push(event);
+  };
+  run.emit = (event) => {
+    record(event);
+    bus.emit(event);
+  };
+  run.settle = (event) => {
+    record(event);
+    bus.settle(event);
+  };
   try {
     body(run);
   } catch (error) {
@@ -592,7 +651,12 @@ export function blindCopy(state) {
 
 // La défausse devient le sac : mélangée par le hasard de la partie, ou, à
 // l'aveugle, sans mélange ni hasard, ses billes devenant inconnues (la prévision
-// annonce la régénération sans rien en révéler).
+// annonce la régénération sans rien en révéler). Puis la TROUVAILLE de chaque bille
+// active, dans l'ordre des phases : une INTERRUPTION (run.settle), réglée jusqu'au
+// bout, ce qu'elle déclenche compris (Pioche, Fêlure et Final), avant la bille
+// suivante et avant que la pioche interrompue ne reprenne. L'emplacement se relit
+// à chaque bille : une bille retirée par une Trouvaille précédente n'a pas la
+// sienne. Une bille en main, au sac, en défausse ou en cours de lancer n'en a pas.
 function regenerateBag(run) {
   const { discard } = run.state;
   if (run.blind) {
@@ -602,6 +666,10 @@ function regenerateBag(run) {
     update(run, { rngState: shuffle.rngState, bag: shuffle.list, discard: [] });
   }
   run.emit({ type: "bagRegenerated", size: run.state.bag.length });
+  for (const slot of SLOTS) {
+    const placed = run.state.triangle[slot];
+    if (placed !== null) run.settle({ type: "windfall", slot, marble: placed.marble });
+  }
 }
 
 // LA pioche d'une bille, la seule : celle du début de tour comme celle d'un effet,
@@ -612,11 +680,14 @@ function regenerateBag(run) {
 //   4. sinon (sac et défausse vides) : rien à piocher.
 // À l'aveugle, la bille piochée est inconnue. -> "drawn", ou ce qui arrête la
 // pioche : "handFull", "noMarbles". La fin de partie n'est pas son affaire.
+// Après une régénération, la pioche reprend en relisant ses conditions : les
+// Trouvailles ont pu remplir la main, vider le sac ou remplir la défausse.
 function drawOne(run) {
   if (run.state.hand.length >= run.state.maxHandSize) return "handFull";
   if (run.state.bag.length === 0) {
     if (run.state.discard.length === 0) return "noMarbles";
     regenerateBag(run);
+    return drawOne(run);
   }
   const [top, ...bag] = run.state.bag;
   const marble = run.blind ? UNKNOWN_MARBLE : top;

@@ -104,6 +104,7 @@ export default function checkMarbles(run) {
   checkFlick(run);
   checkTurnsInHand(run);
   checkComputedAmounts(run);
+  checkWindfall(run);
   checkBonus(run);
   checkResolution(run);
   checkEndOfGame(run);
@@ -409,11 +410,13 @@ function checkDrawEffects(run) {
     playState({ hand: inHand(["cats_eye"]), bag: [], discard: ["agate", "tiger"], triangle: triangleOf(null, null, placed("glass")) }),
     { type: "place", handIndex: 0, slot: "apex" }
   );
-  run.same("régénération en jeu : dans le journal de la pose", ["hit", "effect", "bagRegenerated", "draw"], eventTypes(regenPlay.events).slice(-4));
+  // La régénération, puis la Trouvaille de chaque bille active (ici l'œil-de-chat, sans
+  // ce champ : l'évènement passe, sans effet), puis la pioche reprend.
+  run.same("régénération en jeu : dans le journal de la pose", ["hit", "effect", "bagRegenerated", "windfall", "draw"], eventTypes(regenPlay.events).slice(-5));
   run("régénération en jeu : la défausse entière, bille remplacée comprise", 3, regenPlay.events.find((event) => event.type === "bagRegenerated").size);
   run("régénération en jeu : la partie continue", "play", regenPlay.state.stage);
   const regenResolve = apply(playState({ hand: inHand([]), bag: [], discard: ["agate"], triangle: triangleOf(placed("mica"), null, null) }), { type: "resolve" });
-  run.same("régénération en résolution : dans le journal", ["phase", "effect", "bagRegenerated", "draw"], eventTypes(regenResolve.events).slice(0, 4));
+  run.same("régénération en résolution : dans le journal", ["phase", "effect", "bagRegenerated", "windfall", "draw"], eventTypes(regenResolve.events).slice(0, 5));
   run("régénération en résolution : la bille en main", "agate", handIds(regenResolve.state).join());
 
   // Arrêts : main pleine (pas de régénération), plus de billes (pas de fin de partie).
@@ -459,7 +462,7 @@ function checkDrawEffects(run) {
 
 // La liste des déclencheurs, déclarée une fois (config/marbles-values.js).
 function checkTriggers(run) {
-  run.same("déclencheurs : chiquenaude, tic, éjection, final, dans l'ordre de la fiche", ["flick", "hit", "knockout", "final"], MARBLE_TRIGGERS.map((trigger) => trigger.id));
+  run.same("déclencheurs : chiquenaude, tic, trouvaille, éjection, final, dans l'ordre de la fiche", ["flick", "hit", "windfall", "knockout", "final"], MARBLE_TRIGGERS.map((trigger) => trigger.id));
   run("déclencheurs : la vraie liste acceptée", false, throws(() => validateMarbleTriggers(MARBLE_TRIGGERS)));
   const [hit] = MARBLE_TRIGGERS;
   const refused = (name, list) => run(`déclencheurs refusés : ${name}`, true, throws(() => validateMarbleTriggers(list)));
@@ -1066,11 +1069,11 @@ function checkSizeConditions(run) {
     twin: { size: LARGE },
     plain: { size: MEDIUM },
     // Base : Vitesse +1 par minibille active.
-    counter: { size: MEDIUM, base: [{ action: "speed", amount: 1, per: { type: "activeSize", size: SMALL } }] },
+    counter: { size: MEDIUM, base: [{ action: "speed", amount: { base: 0, step: 1, source: { type: "activeSize", size: SMALL } } }] },
     // Base : Vitesse +1 par minibille active, elle-même minibille.
-    selfish: { size: SMALL, base: [{ action: "speed", amount: 1, per: { type: "activeSize", size: SMALL } }] },
+    selfish: { size: SMALL, base: [{ action: "speed", amount: { base: 0, step: 1, source: { type: "activeSize", size: SMALL } } }] },
     // Final : Vitesse +2 par minibille active, déjà retirée.
-    ghost: { size: SMALL, maxWear: 1, final: [{ action: "speed", amount: 2, per: { type: "activeSize", size: SMALL } }] },
+    ghost: { size: SMALL, maxWear: 1, final: [{ action: "speed", amount: { base: 0, step: 2, source: { type: "activeSize", size: SMALL } } }] },
     // Pointe : Masse +1, et Masse +2 si la base gauche est un calot.
     watcher: { size: MEDIUM, apex: [{ action: "mass", amount: 1 }, { action: "mass", amount: 2, when: { type: "sizeAt", slot: "leftBase", size: LARGE } }] },
   };
@@ -1090,10 +1093,11 @@ function checkSizeConditions(run) {
   accepted("calibre d'un emplacement", { apex: speedIf({ type: "sizeAt", slot: "leftBase", size: LARGE }) });
   refused("calibre d'un emplacement inconnu", { apex: speedIf({ type: "sizeAt", slot: "top", size: LARGE }) });
   refused("calibre d'emplacement inconnu", { apex: speedIf({ type: "sizeAt", slot: "leftBase", size: "large" }) });
-  accepted("comptage par calibre", { base: [{ action: "speed", amount: 1, per: { type: "activeSize", size: SMALL } }] });
-  refused("comptage d'un calibre inconnu", { base: [{ action: "speed", amount: 1, per: { type: "activeSize", size: 0 } }] });
-  refused("comptage inconnu", { base: [{ action: "speed", amount: 1, per: { type: "nope" } }] });
-  refused("comptage, champ inconnu", { base: [{ action: "speed", amount: 1, per: { type: "activeSize", size: SMALL, zone: "hand" } }] });
+  accepted("source par calibre", { base: [{ action: "speed", amount: { base: 0, step: 1, source: { type: "activeSize", size: SMALL } } }] });
+  refused("source d'un calibre inconnu", { base: [{ action: "speed", amount: { base: 0, step: 1, source: { type: "activeSize", size: 0 } } }] });
+  refused("source inconnue", { base: [{ action: "speed", amount: { base: 0, step: 1, source: { type: "nope" } } }] });
+  refused("comptage per, remplacé par les montants calculés", { base: [{ action: "speed", amount: 1, per: { type: "activeSize", size: SMALL } }] });
+  refused("source, champ inconnu", { base: [{ action: "speed", amount: { base: 0, step: 1, source: { type: "activeSize", size: SMALL, zone: "hand" } } }] });
 
   // Comparaison relative en Tic, vue par la posée : plus petite, égale, plus grosse.
   const hitOn = (occupant) =>
@@ -1215,7 +1219,7 @@ function checkFlick(run) {
   // En cours de lancer : ni en main, ni parmi les billes actives.
   const ghost = {
     drawer: { flick: [{ action: "draw", amount: 1 }] },
-    counter: { flick: [{ action: "speed", amount: 1, per: { type: "activeSize", size: MEDIUM } }] },
+    counter: { flick: [{ action: "speed", amount: { base: 0, step: 1, source: { type: "activeSize", size: MEDIUM } } }] },
     plain: {},
   };
   const drew = apply(playState({ maxHandSize: 1, hand: inHand(["drawer"]), bag: ["plain"] }), toApex, ghost);
@@ -1336,6 +1340,153 @@ function checkComputedAmounts(run) {
   run("montant calculé : champ inconnu, refusé", true, throws(computed({ base: 0, step: 1, source, min: 0 })));
   run("montant calculé : ni entier ni objet, refusé", true, throws(computed("2")));
   run("montant calculé : sur une phase aussi", false, throws(() => validateTable({ a: { apex: [{ action: "mass", amount: { base: 1, step: 1, source } }] } })));
+}
+
+// La Trouvaille (doc/marbles.md, « Les déclencheurs ») : à chaque régénération du
+// sac, chez les billes actives, dans l'ordre des phases, avant que la pioche ne
+// reprenne ; aux trois moments où une régénération arrive.
+function checkWindfall(run) {
+  // Chaque évènement, avec sa bille ; une pioche sans la sienne, que le mélange choisit.
+  const typesAndMarbles = (events) => events.map((event) => (event.marble === undefined || event.type === "draw" ? event.type : `${event.type}:${event.marble}`));
+  // De `first` à la première entrée `last` qui le suit.
+  const between = (events, first, last) => {
+    const types = typesAndMarbles(events);
+    const from = types.indexOf(first);
+    return types.slice(from, types.indexOf(last, from) + 1);
+  };
+
+  // Phase de jeu : le Tic de l'œil-de-chat pioche, la défausse devient le sac.
+  const play = apply(
+    playState({ hand: inHand(["cats_eye"]), bag: [], discard: ["clay"], triangle: triangleOf(placed("tiger"), placed("agate", 1), placed("glass")) }),
+    { type: "place", handIndex: 0, slot: "apex" }
+  );
+  run.same(
+    "trouvaille, phase de jeu : régénération, trouvailles dans l'ordre des phases, puis la pioche",
+    [
+      "bagRegenerated",
+      "windfall:tiger",
+      "effect:tiger",
+      "windfall:agate",
+      "effect:agate",
+      "polished:agate",
+      "windfall:cats_eye",
+      "draw",
+    ],
+    between(play.events, "bagRegenerated", "draw")
+  );
+  run("trouvaille, phase de jeu : la Vitesse au compteur du tour", 3, play.state.speed);
+  run("trouvaille, phase de jeu : le Polissage sur elle-même", 0, play.state.triangle.rightBase.wear);
+
+  // Résolution : la Pioche du mica en phase, puis celle du Final de la géante.
+  const resolved = apply(playState({ bag: [], discard: ["clay"], triangle: triangleOf(placed("mica"), placed("giant"), placed("tiger")) }), { type: "resolve" });
+  const regenerations = resolved.events.filter((event) => event.type === "bagRegenerated").length;
+  run("trouvaille, résolution : deux régénérations, en phase et au Final", 2, regenerations);
+  run.same(
+    "trouvaille, résolution : chez les billes encore actives, la géante retirée n'en a plus",
+    ["windfall:mica", "windfall:giant", "windfall:tiger", "windfall:mica", "windfall:tiger"],
+    typesAndMarbles(resolved.events).filter((entry) => entry.startsWith("windfall"))
+  );
+  run("trouvaille, résolution : comptée dans l'Impact (6 − 1 + 3 + 3)", 11, resolved.events.find((event) => event.type === "impact").impact);
+
+  // Début de tour : les compteurs, remis à zéro par la résolution, reçoivent la
+  // Trouvaille du nouveau tour.
+  const ended = apply(playState({ hand: inHand(["glass"]), bag: [], discard: ["clay"], triangle: triangleOf(placed("tiger"), null, null) }), { type: "resolve" });
+  run("trouvaille, début de tour : compteurs remis à zéro après la résolution", "0,1", `${ended.state.speed},${ended.state.mass}`);
+  const started = apply(ended.state, { type: "draw" });
+  run.same(
+    "trouvaille, début de tour : régénération, trouvaille, pioche",
+    ["turnStarted", "bagRegenerated", "windfall:tiger", "effect:tiger", "draw"],
+    typesAndMarbles(started.events)
+  );
+  run("trouvaille, début de tour : la Vitesse au compteur du nouveau tour", 3, started.state.speed);
+
+  // Seulement les billes actives : en main, au sac, en défausse, rien.
+  const idle = apply(playState({ hand: inHand(["tiger", "cats_eye"]), bag: [], discard: ["tiger", "agate"], triangle: triangleOf(null, null, placed("glass")) }), {
+    type: "place",
+    handIndex: 1,
+    slot: "apex",
+  });
+  run.same(
+    "trouvaille : seulement chez les billes actives",
+    ["windfall:cats_eye"],
+    typesAndMarbles(idle.events).filter((entry) => entry.startsWith("windfall"))
+  );
+  run("trouvaille : aucun effet sans bille active qui en a une", 0, idle.state.speed);
+  // En cours de lancer : la Chiquenaude qui pioche régénère, la bille lancée n'a pas
+  // la sienne.
+  const thrownTable = { thrower: { flick: [{ action: "draw", amount: 1 }], windfall: [{ action: "speed", amount: 5 }] }, plain: {} };
+  const thrown = apply(playState({ hand: inHand(["thrower"]), bag: [], discard: ["plain"] }), { type: "place", handIndex: 0, slot: "apex" }, thrownTable);
+  run.same("trouvaille : pas chez la bille en cours de lancer", [], typesAndMarbles(thrown.events).filter((entry) => entry.startsWith("windfall")));
+
+  // Retrait immédiat par Fêlure après une régénération : le sulfure fêle la
+  // porcelaine (usure maximale 2), qui rejoint la défausse tout juste vidée, son
+  // Final compris, avant la reprise de la pioche.
+  const cracked = apply(
+    { ...playState({ bag: [], discard: ["clay"], triangle: triangleOf(placed("sulphide"), placed("porcelain", 1), null) }), stage: "draw" },
+    { type: "draw" }
+  );
+  run.same(
+    "trouvaille, Fêlure : retrait, défausse, Final, puis la pioche",
+    ["windfall:sulphide", "effect:sulphide", "cracked:porcelain", "removed:porcelain", "discarded:porcelain", "final:porcelain", "effect:porcelain", "draw"],
+    between(cracked.events, "windfall:sulphide", "draw")
+  );
+  run.same("trouvaille, Fêlure : la porcelaine seule dans la défausse vidée", ["porcelain"], cracked.state.discard);
+  run("trouvaille, Fêlure : aucune bille perdue", 3, marbleCount(cracked.state));
+  run("trouvaille, Fêlure : le Final compte au tour", 4, cracked.state.speed);
+
+  // Règle des cibles : un bonus dont la phase est passée se perd, noté au journal.
+  const gifts = {
+    gifter: { windfall: [{ action: "speed", amount: 2, target: "apex" }] },
+    finisher: { maxWear: 1, final: [{ action: "draw", amount: 1 }] },
+    plain: {},
+  };
+  const late = apply(playState({ bag: [], discard: ["plain"], triangle: triangleOf(placed("finisher"), placed("gifter"), placed("plain")) }), { type: "resolve" }, gifts);
+  run.same(
+    "trouvaille, cible : après les phases, le bonus perdu, noté",
+    [{ slot: "apex", reason: "phasePassed", speed: 2, mass: 0 }],
+    late.events.find((event) => event.trigger === "windfall").lost
+  );
+  const early = apply(
+    { ...playState({ hand: inHand(["plain"]), bag: [], discard: ["plain"], triangle: triangleOf(null, placed("gifter"), placed("plain")) }), stage: "draw" },
+    { type: "draw" },
+    gifts
+  );
+  run("trouvaille, cible : avant les phases, le bonus donné", 2, early.ok && early.state.triangle.apex.bonus?.speed);
+
+  // La Pioche d'une Trouvaille suit la pioche unifiée, et la pioche interrompue
+  // relit ses conditions : la Trouvaille a pris la seule bille, plus rien à piocher.
+  const greedy = { taker: { windfall: [{ action: "draw", amount: 1 }] }, dropper: { flick: [{ action: "draw", amount: 1 }] }, plain: {} };
+  const taken = apply(
+    playState({ hand: inHand(["dropper"]), bag: [], discard: ["plain"], triangle: triangleOf(placed("taker"), null, null) }),
+    { type: "place", handIndex: 0, slot: "apex" },
+    greedy
+  );
+  run.same(
+    "trouvaille, Pioche : la bille prise par la Trouvaille, la pioche reprise s'arrête",
+    ["bagRegenerated", "windfall:taker", "effect:taker", "draw", "drawSkipped"],
+    between(taken.events, "bagRegenerated", "drawSkipped")
+  );
+  // Une boucle de Trouvailles (chaque Pioche régénère, chaque Fêlure remplit la
+  // défausse) reste bornée : la limite du bus, ou la fin des billes.
+  const looping = {
+    looper: { windfall: [{ action: "draw", amount: 1 }, { action: "polish", amount: 1 }] },
+    dropper: { hit: [{ action: "draw", amount: 1 }] },
+  };
+  const bounded = fabricatedRules(looping).reduce(
+    playState({ hand: inHand(["dropper"]), bag: [], discard: ["looper"], triangle: triangleOf(placed("looper"), placed("looper"), placed("looper")) }),
+    { type: "place", handIndex: 0, slot: "apex" }
+  );
+  run("trouvaille, boucle : l'action aboutit ou est refusée, jamais de gel", true, bounded.ok || bounded.error === "eventLimit");
+
+  // Validation : une Vitesse ciblée et une action sur elle-même sont permises ; pas
+  // de comparaison de calibre (aucun remplacement en cours).
+  run("trouvaille : une Vitesse ciblée est permise", false, throws(() => validateTable({ a: { windfall: [{ action: "speed", amount: 1, target: "apex" }] } })));
+  run("trouvaille : un Polissage sur elle-même est permis", false, throws(() => validateTable({ a: { windfall: [{ action: "polish", amount: 1 }] } })));
+  run(
+    "trouvaille : pas de calibre relatif",
+    true,
+    throws(() => validateTable({ a: { windfall: [{ action: "speed", amount: 1, when: { type: "relativeSize", marble: "placed", is: "larger" } }] } }))
+  );
 }
 
 function pickTotals(result) {
@@ -1550,7 +1701,7 @@ function checkSmoke(run) {
   run.same("fumée : invariants tenus", [], faults.slice(0, 5));
   run(
     "fumée : tous les évènements rencontrés",
-    "bagRegenerated,cracked,discarded,draw,drawSkipped,effect,final,flick,gameOver,hit,impact,knockout,phase,phaseSkipped,placed,polished,removed,rotation,swapped,targetEmpty,turnEnded,turnStarted,wear",
+    "bagRegenerated,cracked,discarded,draw,drawSkipped,effect,final,flick,gameOver,hit,impact,knockout,phase,phaseSkipped,placed,polished,removed,rotation,swapped,targetEmpty,turnEnded,turnStarted,wear,windfall",
     [...seen].sort().join()
   );
 }

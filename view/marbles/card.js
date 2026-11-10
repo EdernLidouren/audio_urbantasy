@@ -8,7 +8,8 @@
 // différer selon la base, et ce gabarit reçoit alors {left} et {right}.
 //
 // Un montant calculé se dit avec sa valeur ACTUELLE, là où se trouve la bille : son
-// compteur de tours en main dans la main, 0 ailleurs (narration.js/cardSituation).
+// compteur de tours en main dans la main, 0 ailleurs, et les valeurs de partie de la
+// partie en cours (narration.js/cardSituation).
 
 import { MARBLE_CARD_MODEL } from "../../config/marbles-values.js";
 import { assembleCard, validateCardModel } from "../../lib/detail-card.js";
@@ -31,9 +32,10 @@ function readField(marble, entry, situation, rules, t) {
 // La fiche d'une bille. `main` : son annonce principale, qui dépend de l'endroit
 // où elle se trouve. `rules` : les règles du jeu (core/marbles-rules.js), d'où
 // viennent la table et les effets imprimés. `options` (facultatif) : `turnsInHand`,
-// le compteur de la bille si elle est en main (0 sinon) ; `model`, un autre modèle,
-// pour les vérifications.
-export function marbleCard(marble, main, rules, t, { turnsInHand = 0, model = MARBLE_CARD_MODEL } = {}) {
-  const situation = cardSituation(marble, turnsInHand);
+// le compteur de la bille si elle est en main (0 sinon) ; `tally`, les valeurs de
+// partie de la partie en cours (à zéro sinon) ; `model`, un autre modèle, pour les
+// vérifications.
+export function marbleCard(marble, main, rules, t, { turnsInHand = 0, tally, model = MARBLE_CARD_MODEL } = {}) {
+  const situation = cardSituation(marble, turnsInHand, tally);
   return assembleCard(model, { main, readField: (entry) => readField(marble, entry, situation, rules, t), t });
 }

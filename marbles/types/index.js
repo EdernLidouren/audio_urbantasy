@@ -20,6 +20,9 @@
 //               de Polissage ni de Fêlure sur elle-même) ;
 //   hit         le Tic : effet joué quand la bille est posée sur un emplacement
 //               occupé, après l'éjection de l'occupante ;
+//   windfall    la Trouvaille : effet joué à chaque régénération du sac depuis la
+//               défausse, à tout moment du tour, si la bille est active (sur le
+//               triangle), dans l'ordre des phases, avant que la pioche ne reprenne ;
 //   knockout    l'Éjection : effet joué quand la bille est remplacée ;
 //   final       le Final : effet joué quand la bille est retirée par usure, une fois
 //               à la défausse, avant l'Impact du tour ;
@@ -37,12 +40,12 @@
 //           d'usure (au moins 1) à la bille elle-même ou à celle de `target` ;
 //   amount  la valeur : un entier, ou un MONTANT CALCULÉ { base, step, source,
 //           max? }, base + step × la valeur de la source, plafonné à max, évalué
-//           au déclenchement (source : turnsInHand(), marbles/effects.js) ;
+//           au déclenchement (sources : turnsInHand(), activeSize(calibre),
+//           tally(valeur de partie), marbles/effects.js) ;
 //   target  (facultatif) pour une Vitesse ou une Masse, l'emplacement dont elle
 //           modifie l'effet de phase, au lieu d'agir sur le compteur du tour (jamais
 //           une phase toujours passée, ni dans un Final) ; pour un Polissage ou une
 //           Fêlure, l'emplacement dont la bille la reçoit ;
-//   per     (facultatif) son comptage, qui multiplie le montant ;
 //   when    (facultatif) sa condition, évaluée au déclenchement. Une condition
 //           lit toujours l'effet IMPRIMÉ d'une bille, jamais un effet déjà
 //           modifié : aucune dépendance circulaire n'est possible.

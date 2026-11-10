@@ -108,12 +108,17 @@ function playGame(seed, options, present, onTurn = () => {}) {
 // rotation et la pioche du tour suivant, ou la fin de
 // partie (dernier tour : sans rotation ni pioche ; sac et défausse vides : la
 // fin suit l'arrêt de la pioche).
+// Une régénération du sac, suivie des Trouvailles des billes actives et de ce
+// qu'elles déclenchent (actions sur une bille, retraits, Finals).
+const REGENERATION =
+  "(event\\.bag_regenerated (event\\.effect_windfall |event\\.polished |event\\.cracked |event\\.target_empty |event\\.discarded\\.wear |event\\.effect_final )*)";
+
 const SEQUENCE_SHAPE = new RegExp(
-  "^resolution\\.opening (outcome\\.(slot|empty) (event\\.bag_regenerated |event\\.draw |event\\.draw_skipped\\.(handFull|noMarbles) |" +
+  "^resolution\\.opening (outcome\\.(slot|empty) (" + REGENERATION + "|event\\.draw |event\\.draw_skipped\\.(handFull|noMarbles) |" +
     "event\\.polished |event\\.cracked |event\\.target_empty |event\\.discarded\\.wear |event\\.effect_final )*){3}" +
-    "(event\\.discarded\\.wear (event\\.effect_final )?(event\\.bag_regenerated |event\\.draw |event\\.draw_skipped\\.(handFull|noMarbles) )*)*" +
+    "(event\\.discarded\\.wear (event\\.effect_final )?(" + REGENERATION + "|event\\.draw |event\\.draw_skipped\\.(handFull|noMarbles) )*)*" +
     "event\\.impact " +
-    "(event\\.rotation (event\\.bag_regenerated )?((event\\.draw|event\\.draw_skipped\\.(handFull|noMarbles)) )+event\\.turn_started" +
+    "(event\\.rotation " + REGENERATION + "?((event\\.draw|event\\.draw_skipped\\.(handFull|noMarbles)) )+event\\.turn_started" +
     "|event\\.rotation event\\.draw_skipped\\.noMarbles event\\.game_over\\.outOfMarbles" +
     "|event\\.game_over\\.turnsCompleted)$"
 );
@@ -491,6 +496,62 @@ function checkTexts(run) {
         "Pose : plombée en pointe.",
       ],
       buildSteps(rules.reduce(clearing, { type: "place", handIndex: 0, slot: "apex" }).events, t).map((step) => said(step.text))
+    );
+
+    // La Trouvaille : juste après la régénération, chez la bille qui la produit, dans
+    // R, la confirmation et la séquence.
+    const windfalls = playState({
+      hand: inHand(["cats_eye"]),
+      bag: [],
+      discard: ["clay"],
+      triangle: { leftBase: { marble: "tiger", wear: 0 }, rightBase: { marble: "agate", wear: 1 }, apex: { marble: "glass", wear: 0 } },
+    });
+    run.same(
+      "trouvaille, confirmation : après la régénération, une ligne par bille",
+      ["Le sac sera régénéré.", "Trouvaille de tigrée : Vitesse +3.", "Trouvaille d'agate : Polissage 1."],
+      placementLines(windfalls, 0, "apex", rules, t).map(({ key, params }) => said(t(key, params))).slice(-3)
+    );
+    run.same(
+      "trouvaille, pose dite : la régénération, puis les trouvailles, puis la pioche",
+      [
+        "Le sac est vide : la défausse est mélangée et forme un nouveau sac.",
+        "Trouvaille de tigrée : Vitesse +3. Vitesse 3, Masse 1.",
+        "Trouvaille d'agate : Polissage 1. Vitesse 3, Masse 1.",
+        "agate est polie : usure 0 sur 3.",
+        "Vous piochez argile.",
+      ],
+      buildSteps(rules.reduce(windfalls, { type: "place", handIndex: 0, slot: "apex" }).events, t).map((step) => said(step.text)).slice(-5)
+    );
+    const resolvingWindfall = playState({
+      hand: inHand([]),
+      bag: [],
+      discard: ["clay"],
+      triangle: { leftBase: { marble: "mica", wear: 0 }, rightBase: null, apex: { marble: "tiger", wear: 0 } },
+    });
+    run(
+      "trouvaille, R : après la régénération, chez la bille qui la produit",
+      "Prévision : Vitesse 2, Masse 1, Impact 2. base gauche, mica : Pioche 1. base droite, vide. pointe, tigrée : Vitesse −1. Le sac sera régénéré. Trouvaille de tigrée : Vitesse +3.",
+      said(describeOverview(resolvingWindfall, rules, t))
+    );
+    // Deux régénérations : chacune se dit avec ses propres Trouvailles, la seconde
+    // « de nouveau » (la Pioche du mica, puis celle du Final de la géante).
+    const twice = playState({
+      hand: inHand([]),
+      bag: [],
+      discard: ["clay"],
+      triangle: { leftBase: { marble: "mica", wear: 0 }, rightBase: { marble: "giant", wear: 0 }, apex: { marble: "tiger", wear: 0 } },
+    });
+    run(
+      "trouvaille, R : chaque régénération avec ses trouvailles",
+      true,
+      said(describeOverview(twice, rules, t)).endsWith(
+        "Le sac sera régénéré. Trouvaille de tigrée : Vitesse +3. Le sac sera de nouveau régénéré. Trouvaille de tigrée : Vitesse +3."
+      )
+    );
+    run.same(
+      "trouvaille, séquence : juste après la régénération",
+      ["Le sac est vide : la défausse est mélangée et forme un nouveau sac.", "Trouvaille de tigrée : Vitesse +3. Vitesse 3, Masse 1.", "Vous piochez argile."],
+      texts(resolvingWindfall).slice(1, 4)
     );
 
     // Conditions de calibre : R, la confirmation et la séquence ne disent que les

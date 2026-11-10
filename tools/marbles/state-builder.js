@@ -13,6 +13,7 @@
 //     "hand": ["agate", "gorilla:2"],     "id:tours en main"
 //     "bag": ["mica"],                du haut (prochaine pioche) vers le bas
 //     "discard": [],
+//     "tally": { "flicksThisTurn": 1 },   valeurs de partie, les autres à 0
 //     "settings": { "maxHandSize": 5, "throwsPerTurn": 5, "firstTurnDraw": 5, "drawPerTurn": 1, "turnCount": 9 }
 //   }
 // Une bille du triangle : "id" (usure 0), "id:usure", ou { marble, wear, bonus? }.
@@ -28,7 +29,7 @@ import { rejectUnknownFields } from "../../lib/validate.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
 import { GAME_RULES } from "./game-rules.js";
 
-const FIELDS = ["seed", "turn", "stage", "score", "speed", "mass", "swapUsed", "throwsUsed", "triangle", "hand", "bag", "discard", "settings"];
+const FIELDS = ["seed", "turn", "stage", "score", "speed", "mass", "swapUsed", "throwsUsed", "triangle", "hand", "bag", "discard", "tally", "settings"];
 const SETTINGS = ["maxHandSize", "throwsPerTurn", "firstTurnDraw", "drawPerTurn", "turnCount"];
 const STAGES = ["draw", "play", "over"];
 
@@ -65,6 +66,13 @@ function slotContent(value, slot) {
     fail(`usure ${placed.wear} impossible pour ${placed.marble} en ${slot} (0 à ${GAME_RULES.maxWearOf(placed.marble) - 1}).`);
   }
   return placed.bonus ? { marble: placed.marble, wear, bonus: { speed: 0, mass: 0, ...placed.bonus } } : { marble: placed.marble, wear };
+}
+
+// Les valeurs de partie : celles décrites, les autres à zéro (celles d'une partie
+// neuve, `base`). Un compteur inconnu ou une valeur négative lève une erreur.
+function tallyContent(values = {}, base) {
+  rejectUnknownFields(values, Object.keys(base), "tally", fail);
+  return { ...base, ...Object.fromEntries(Object.entries(values).map(([id, value]) => [id, checkInteger(value, `valeur de partie ${id}`, 0)])) };
 }
 
 function marbleList(list = [], where) {
@@ -108,6 +116,7 @@ export function buildState(description = {}) {
     hand,
     bag: marbleList(description.bag, "bag"),
     discard: marbleList(description.discard, "discard"),
+    tally: tallyContent(description.tally, base.tally),
   };
 }
 

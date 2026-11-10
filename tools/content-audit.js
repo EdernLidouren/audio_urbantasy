@@ -119,7 +119,7 @@ const NAME_SLOTS = [
     param: "marble",
     names: () => Object.keys(MARBLE_TYPES).map((id) => `marble.${id}.name`),
   })),
-  // view/marbles/narration.js : le calibre d'une condition ou d'un comptage.
+  // view/marbles/narration.js : le calibre d'une condition ou d'une source de montant.
   ...["marbles.condition.sizeAt", "marbles.effect.per_active_size"].map((template) => ({
     template,
     param: "size",

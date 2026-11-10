@@ -10,11 +10,12 @@
 //   (main pleine, plus de billes), mais sa bille est inconnue ; une régénération
 //   s'annonce sans mélange. Rien n'est révélé, rien n'avance le hasard réel ;
 // - seules une pose et un échange s'envisagent, jamais une pioche de tour ;
-// - l'état reçu n'est jamais modifié.
+// - l'état reçu n'est jamais modifié, ses valeurs de partie comprises : la copie
+//   porte le registre (core/marbles-tally.js), qui y évolue comme dans la partie.
 //
 // Résultat : { ok: false, error } si l'action serait refusée (mêmes codes que le
 // réducteur), sinon { ok: true, error: null, flick, knockout, hit, phases, speed,
-// mass, impact, drawn, regenerates, uncertain }, où :
+// mass, impact, drawn, regenerations, tally, uncertain }, où :
 //   flick, knockout, hit  l'effet de l'action envisagée (null : pas de tel effet),
 //                  une clé par déclencheur prévu pendant une pose (forecast.line
 //                  "placement" de MARBLE_TRIGGERS). Une Chiquenaude qui vide
@@ -29,8 +30,14 @@
 //   slotEffects    par emplacement, les effets des déclencheurs qui se prévoient avec
 //                  lui (forecast.line "slot" : le Final d'une bille qui atteindra son
 //                  usure maximale ce tour), chacun { trigger, ...effet } ; [] sinon ;
+//   regenerations  les régénérations du sac en chemin, dans l'ordre, chacune
+//                  { effects } : les effets des déclencheurs prévus avec elle
+//                  (forecast.line "regeneration" : les Trouvailles des billes
+//                  actives, qui sont connues), dans l'ordre, chacun { trigger, slot,
+//                  ...effet } ; seule l'identité des billes piochées reste cachée ;
+//                  [] si le sac ne serait pas régénéré ;
 //   drawn          les billes que l'action et la résolution piocheraient ;
-//   regenerates    vrai si le sac serait régénéré en chemin ;
+//   tally          les valeurs de partie à la fin de la résolution ;
 //   uncertain      vrai si une bille piochée aurait pu réagir selon son identité,
 //                  que la prévision ignore : ses chiffres ne sont alors pas sûrs.
 // Un effet : { marble, speed, mass, draw, operations, given }, le total effectif de
@@ -42,14 +49,31 @@ import { SLOTS, blindCopy, marblesReduce, runResolution, stageRefusal } from "./
 // Les déclencheurs prévus pendant une pose (config/marbles-values.js) : chacun a sa
 // clé dans le résultat, son effet ou null.
 const PLACEMENT_TRIGGERS = MARBLE_TRIGGERS.filter((trigger) => trigger.forecast.line === "placement");
-// Ceux qui se prévoient avec l'emplacement de leur bille (le Final).
-const SLOT_TRIGGERS = new Set(MARBLE_TRIGGERS.filter((trigger) => trigger.forecast.line === "slot").map((trigger) => trigger.id));
+// Ceux qui se prévoient avec l'emplacement de leur bille (le Final), et ceux qui se
+// prévoient avec une régénération (la Trouvaille).
+const triggerIds = (line) => new Set(MARBLE_TRIGGERS.filter((trigger) => trigger.forecast.line === line).map((trigger) => trigger.id));
+const SLOT_TRIGGERS = triggerIds("slot");
+const REGENERATION_TRIGGERS = triggerIds("regeneration");
 
 const FORECASTABLE_ACTIONS = ["place", "swap"];
 
 function outcomeOf(event) {
   if (event === undefined) return null;
   return { marble: event.marble, speed: event.speedDelta, mass: event.massDelta, draw: event.draw, operations: event.operations, given: event.given };
+}
+
+// Les régénérations d'un journal, chacune avec les effets prévus qu'elle déclenche :
+// une Trouvaille se règle juste après sa régénération (core/marbles.js/
+// regenerateBag), avant toute autre : elle appartient à la dernière émise.
+function regenerationsOf(events) {
+  const regenerations = [];
+  for (const event of events) {
+    if (event.type === "bagRegenerated") regenerations.push({ effects: [] });
+    if (event.type === "effect" && REGENERATION_TRIGGERS.has(event.trigger)) {
+      regenerations.at(-1).effects.push({ trigger: event.trigger, slot: event.slot, ...outcomeOf(event) });
+    }
+  }
+  return regenerations;
 }
 
 function failed(error) {
@@ -70,10 +94,11 @@ function clearedBeforePhase(events) {
   return cleared;
 }
 
-// Ce que disent les journaux de l'action et de la résolution. Exportée pour
-// comparer la prévision au résultat réel, lu de la même façon (sans `uncertain`,
-// qui n'existe qu'à l'aveugle).
-export function readForecast(actionEvents, resolutionEvents) {
+// Ce que disent les journaux de l'action et de la résolution, et l'état d'après
+// (`finalState`, ses valeurs de partie). Exportée pour comparer la prévision au
+// résultat réel, lu de la même façon (sans `uncertain`, qui n'existe qu'à
+// l'aveugle).
+export function readForecast(actionEvents, resolutionEvents, finalState) {
   const all = [...actionEvents, ...resolutionEvents];
   const fromAction = (trigger) => actionEvents.find((event) => event.type === "effect" && event.trigger === trigger);
   const phaseOf = (slot) => resolutionEvents.find((event) => event.type === "effect" && event.trigger === "phase" && event.slot === slot);
@@ -91,6 +116,7 @@ export function readForecast(actionEvents, resolutionEvents) {
           .map((event) => ({ trigger: event.trigger, ...outcomeOf(event) })),
       ])
     ),
+    regenerations: regenerationsOf(all),
     speed,
     mass,
     impact,
@@ -98,7 +124,7 @@ export function readForecast(actionEvents, resolutionEvents) {
     wear: all.filter((event) => WEAR_EVENTS.has(event.type)).map(({ type, slot, marble, wear }) => ({ type, slot, marble, wear })),
     retired: all.filter((event) => event.type === "removed" && event.cause === "wear").map(({ slot, marble }) => ({ slot, marble })),
     drawn: all.filter((event) => event.type === "draw").length,
-    regenerates: all.some((event) => event.type === "bagRegenerated"),
+    tally: finalState.tally,
   };
 }
 
@@ -114,5 +140,5 @@ export function forecast(state, action, types) {
   if (!applied.ok) return failed(applied.error);
   const resolved = runResolution(applied.state, types, { blind: true });
   if (!resolved.ok) return failed(resolved.error);
-  return { ...readForecast(applied.events, resolved.events), uncertain: applied.uncertain || resolved.uncertain };
+  return { ...readForecast(applied.events, resolved.events, resolved.state), uncertain: applied.uncertain || resolved.uncertain };
 }

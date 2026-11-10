@@ -4,14 +4,15 @@
 // il ne touche à aucun état : appliquer le résultat est l'affaire de
 // core/marbles.js.
 //
-// AJOUTER une action, une condition, un comptage ou une source de montant : une
-// entrée dans CLAUSE_ACTIONS, CONDITIONS, COUNTS ou AMOUNT_SOURCES, et ses textes
-// dans la vue (view/marbles/narration.js, ACTION_TEXTS, CONDITION_TEXTS,
-// COUNT_TEXTS ou SOURCE_TEXTS). Une cible est un emplacement, ou rien pour la bille
+// AJOUTER une action ou une condition : une entrée dans CLAUSE_ACTIONS ou
+// CONDITIONS, et ses textes dans la vue (view/marbles/narration.js, ACTION_TEXTS ou
+// CONDITION_TEXTS). AJOUTER une source de montant : une entrée dans AMOUNT_SOURCES,
+// textes compris, rien d'autre ; chaque valeur de partie en est une d'office
+// (config/marbles-values.js/MARBLE_TALLIES). Une cible est un emplacement, ou rien pour la bille
 // elle-même.
 //
-// LA SITUATION d'un effet, ce que ses conditions, ses comptages et ses montants
-// calculés lisent au déclenchement : { triangle, holder, replacement } ;
+// LA SITUATION d'un effet, ce que ses conditions et ses montants calculés lisent au
+// déclenchement : { triangle, holder, replacement, tally } ;
 //   triangle     le triangle à cet instant ;
 //   holder       la bille qui joue l'effet, { marble, zone, turnsInHand } : `zone`
 //                dit où elle est ("triangle" ; "removed", déjà retirée du triangle,
@@ -19,11 +20,15 @@
 //                "hand") ; `turnsInHand`, son compteur de tours en main (0 hors de
 //                la main ; pendant son lancer, celui qu'elle avait en la quittant) ;
 //   replacement  pendant un Tic ou une Éjection, le remplacement en cours,
-//                { placed, ejected } (deux ids de bille) ; null sinon.
+//                { placed, ejected } (deux ids de bille) ; null sinon ;
+//   tally        les valeurs de partie à cet instant (core/marbles-tally.js), lues
+//                par tallyValue seulement.
 //
 // MONTANT CALCULÉ : `amount` est un entier, ou { base, step, source, max? } :
 // base + step × la valeur de `source` (AMOUNT_SOURCES), plafonné à `max` s'il est
-// donné, évalué au déclenchement (amountOf).
+// donné, évalué au déclenchement (amountOf). Le seul mécanisme d'un montant qui
+// dépend du moment : « Vitesse +1 par minibille active » en est un, base 0, pas 1,
+// source activeSize.
 // Une condition ne lit jamais un effet déjà modifié (printedStat lit l'effet
 // IMPRIMÉ) ; le calibre est statique : aucune dépendance circulaire.
 //
@@ -46,8 +51,9 @@
 // l'action (`{ speed, mass, draw }`). Le core les applique (core/marbles.js/fireEffect),
 // la vue les dit, la prévision les rend.
 
-import { MARBLE_SIZES } from "../config/marbles-values.js";
+import { MARBLE_SIZES, MARBLE_TALLIES } from "../config/marbles-values.js";
 import { rejectUnknownFields } from "../lib/validate.js";
+import { tallyValue } from "./marbles-tally.js";
 
 // Un calibre connu (config/marbles-values.js/MARBLE_SIZES) ?
 export function isMarbleSize(size) {
@@ -70,25 +76,22 @@ export function effectAt(marble, slot, types) {
 }
 
 // Ce que des clauses donnent à coup sûr pour `stat` : les clauses sans cible
-// (celles d'une autre bille ne sont pas l'effet de celle-ci), sans condition ni
-// comptage, à montant fixe (les évaluer rouvrirait la porte aux dépendances
-// circulaires).
+// (celles d'une autre bille ne sont pas l'effet de celle-ci), sans condition, à
+// montant fixe (les évaluer rouvrirait la porte aux dépendances circulaires).
 export function printedStat(clauses, stat) {
-  const printed = (clause) =>
-    clause.action === stat && clause.target === undefined && clause.when === undefined && clause.per === undefined && Number.isInteger(clause.amount);
+  const printed = (clause) => clause.action === stat && clause.target === undefined && clause.when === undefined && Number.isInteger(clause.amount);
   return clauses.filter(printed).reduce((total, clause) => total + clause.amount, 0);
 }
 
 // Les champs d'une clause. `target` n'appartient qu'aux actions qui ont un sens
 // pour un autre emplacement : une action qui ne le déclare pas refuse toute cible
-// à la validation. `when` : sa condition ; `per` : son comptage, qui multiplie
-// `amount` (CONDITIONS, COUNTS).
-const TARGETED_FIELDS = ["action", "amount", "target", "when", "per"];
-const SELF_FIELDS = ["action", "amount", "when", "per"];
+// à la validation. `when` : sa condition (CONDITIONS).
+const TARGETED_FIELDS = ["action", "amount", "target", "when"];
+const SELF_FIELDS = ["action", "amount", "when"];
 
 // Le montant d'une clause : un entier (au moins `minimum`, s'il y en a un), ou un
 // montant calculé (en-tête). Calculé, sa base peut valoir `minimum - 1` : un montant
-// évalué à 0 ne produit rien, comme un comptage à zéro.
+// évalué à 0 ne produit rien.
 function validateAmount(clause, describe, fail, minimum) {
   const { amount } = clause;
   if (Number.isInteger(amount)) {
@@ -178,7 +181,9 @@ const GIFT_ZERO = zeroValues(VALUE_ACTIONS.filter((action) => CLAUSE_ACTIONS[act
 //   { phaseSlots }  une phase, jouée à l'un de ces emplacements (base : les deux
 //                   bases ; une variante : la sienne ; pointe : la pointe) ;
 //   { moment }      un déclencheur : "play" (pendant la phase de jeu, avant toute
-//                   phase) ou "afterPhases" (après toutes les phases : le Final) ;
+//                   phase), "afterPhases" (après toutes les phases : le Final) ou
+//                   "anytime" (n'importe quand : la Trouvaille, tranchée à
+//                   l'exécution) ;
 //                   `marble`, sa bille (config/marbles-values.js/MARBLE_TRIGGERS) :
 //                   "removed" (déjà retirée) et "thrown" (en cours de lancer) ne
 //                   sont pas sur le triangle.
@@ -277,32 +282,22 @@ export const CONDITIONS = {
   },
 };
 
-// Chaque COMPTAGE (`per` d'une clause) : ses champs, leur validation, et ce qu'il
-// compte dans la situation. Le montant de la clause est multiplié par ce nombre ;
-// zéro : la clause ne produit rien.
-export const COUNTS = {
-  // Les billes ACTIVES (sur le triangle) de calibre `size`, la bille elle-même
-  // comprise si elle en est : sur le triangle, elle s'y compte ; déjà retirée (le
-  // Final), elle s'ajoute. En cours de lancer (la Chiquenaude), elle n'est pas
-  // active : elle ne compte pas.
-  activeSize: {
-    fields: ["type", "size"],
-    validate(per, describe, fail) {
-      validateSize(per.size, describe, fail);
-    },
-    count(per, { triangle, holder }, types) {
-      const onTriangle = SLOTS.filter((slot) => triangle[slot] !== null && types[triangle[slot].marble].size === per.size).length;
-      const self = holder.zone === "removed" && types[holder.marble].size === per.size ? 1 : 0;
-      return onTriangle + self;
-    },
-  },
-};
-
-// Chaque SOURCE d'un montant calculé (en-tête) : ses champs, leur validation, et
-// sa valeur dans la situation, un entier >= 0. Une future valeur de partie s'y
-// branche par une entrée ici et son texte (view/marbles/narration.js/SOURCE_TEXTS),
-// rien d'autre.
-export const AMOUNT_SOURCES = {
+// Chaque SOURCE d'un montant calculé (en-tête), déclarée ICI ET NULLE PART AILLEURS :
+//   fields    ses champs ;
+//   validate  leur validation ;
+//   value     sa valeur dans la situation, un entier >= 0, (source, situation, types) ;
+//   text      son gabarit i18n, après le pas : il reçoit {effect} (« Vitesse +1 »),
+//             puis les paramètres de `params` et les références de nom de `names` ;
+//   params    (facultatif) ses paramètres de texte, des valeurs simples, (source) -> {} ;
+//   names     (facultatif) ses paramètres de texte qui sont des NOMS, par clé i18n,
+//             (source) -> { param: clé } : la vue en fait des références de nom
+//             (nameRef), dont le gabarit choisit la forme ;
+//   current   vrai si sa valeur se connaît hors de tout déclenchement, à partir de
+//             la bille seule : la fiche dit alors la valeur actuelle (« actuellement
+//             +2 ») ; faux si elle dépend du moment (le triangle au déclenchement).
+// Une future valeur de partie s'y branche par une entrée ici, son gabarit dans
+// chaque langue, rien d'autre.
+const BUILT_IN_SOURCES = {
   // Les tours passés en main par la bille elle-même (core/marbles.js, en-tête) :
   // 0 hors de la main ; pendant son lancer, ceux qu'elle avait en la quittant.
   turnsInHand: {
@@ -311,18 +306,61 @@ export const AMOUNT_SOURCES = {
     value(source, { holder }) {
       return holder.turnsInHand;
     },
+    text: "marbles.effect.per_turn_in_hand",
+    current: true,
+  },
+  // Les billes ACTIVES (sur le triangle) de calibre `size`, la bille elle-même
+  // comprise si elle en est : sur le triangle, elle s'y compte ; déjà retirée (le
+  // Final), elle s'ajoute. En cours de lancer (la Chiquenaude), elle n'est pas
+  // active : elle ne compte pas.
+  activeSize: {
+    fields: ["type", "size"],
+    validate(source, describe, fail) {
+      validateSize(source.size, describe, fail);
+    },
+    value(source, { triangle, holder }, types) {
+      const onTriangle = SLOTS.filter((slot) => triangle[slot] !== null && types[triangle[slot].marble].size === source.size).length;
+      const self = holder.zone === "removed" && types[holder.marble].size === source.size ? 1 : 0;
+      return onTriangle + self;
+    },
+    text: "marbles.effect.per_active_size",
+    names: (source) => ({ size: `marbles.size.${MARBLE_SIZES[source.size]}.name` }),
+    current: false,
   },
 };
 
+// Chaque VALEUR DE PARTIE (config/marbles-values.js/MARBLE_TALLIES) est une source,
+// sous son identifiant : « par chiquenaude ce tour », { type: "flicksThisTurn" }. Sa
+// valeur se lit dans le registre de l'état, hors de tout déclenchement aussi
+// (`current`). Un identifiant déjà pris par une autre source échoue au chargement.
+function tallySources(tallies) {
+  return Object.fromEntries(
+    tallies.map((tally) => {
+      if (Object.hasOwn(BUILT_IN_SOURCES, tally.id)) throw new Error(`marbles : la valeur de partie "${tally.id}" porte le nom d'une autre source de montant.`);
+      const source = {
+        fields: ["type"],
+        validate() {},
+        value: (rule, { tally: values }) => tallyValue(values, tally.id),
+        text: tally.texts.source,
+        current: true,
+      };
+      return [tally.id, source];
+    })
+  );
+}
+
+export const AMOUNT_SOURCES = { ...BUILT_IN_SOURCES, ...tallySources(MARBLE_TALLIES) };
+
 // Un montant (entier, ou calculé : en-tête) évalué dans une situation. La fiche s'en
-// sert aussi, pour dire la valeur actuelle d'un montant calculé.
-export function amountOf(amount, situation) {
+// sert aussi, pour dire la valeur actuelle d'un montant calculé dont la source est
+// `current` (elle ne lit alors que la bille, sans `types`).
+export function amountOf(amount, situation, types) {
   if (Number.isInteger(amount)) return amount;
-  const value = amount.base + amount.step * AMOUNT_SOURCES[amount.source.type].value(amount.source, situation);
+  const value = amount.base + amount.step * AMOUNT_SOURCES[amount.source.type].value(amount.source, situation, types);
   return amount.max === undefined ? value : Math.min(amount.max, value);
 }
 
-// Valide une condition, un comptage ou une source d'après sa table.
+// Valide une condition ou une source d'après sa table.
 function validateRule(rule, table, label, describe, fail, context) {
   const entry = table[rule?.type];
   if (!entry) fail(`${describe} : ${label} inconnu(e) "${rule?.type}".`);
@@ -344,7 +382,6 @@ export function validateEffect(effect, describe, fail, context = {}) {
     const problem = targetProblem(clause, context);
     if (problem !== null) fail(`${describe} : ${problem}.`);
     if (clause.when !== undefined) validateRule(clause.when, CONDITIONS, "condition", describe, fail, context);
-    if (clause.per !== undefined) validateRule(clause.per, COUNTS, "comptage", describe, fail, context);
   }
 }
 
@@ -353,17 +390,15 @@ export function validateEffect(effect, describe, fail, context = {}) {
 //   gifts       ce qui va à d'autres emplacements, [{ slot, ...valeurs donnables }] ;
 //   operations  les actions sur une bille, dans l'ordre des clauses,
 //               [{ action, amount, target }] (`target` absent : la bille elle-même).
-// Une clause dont la condition échoue, ou dont le montant (calculé s'il l'est, puis
-// multiplié par son comptage) vaut zéro, ne produit rien. Seules les valeurs finales
-// en sortent.
+// Une clause dont la condition échoue, ou dont le montant (calculé s'il l'est) vaut
+// zéro, ne produit rien. Seules les valeurs finales en sortent.
 export function evaluateEffect(clauses, situation, types) {
   let self = ZERO;
   const gifts = [];
   const operations = [];
   for (const printed of clauses) {
     if (printed.when !== undefined && !CONDITIONS[printed.when.type].test(printed.when, situation, types)) continue;
-    const times = printed.per === undefined ? 1 : COUNTS[printed.per.type].count(printed.per, situation, types);
-    const amount = amountOf(printed.amount, situation) * times;
+    const amount = amountOf(printed.amount, situation, types);
     if (amount === 0) continue;
     const clause = { ...printed, amount };
     const { kind, apply } = CLAUSE_ACTIONS[clause.action];

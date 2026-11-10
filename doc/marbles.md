@@ -8,12 +8,13 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
 | Fichier | Rôle |
 |---|---|
 | `marbles/types/` | Les billes, une par fichier, et leur registre `index.js` (donnée pure) |
-| `marbles/effects.js` | Les formes courtes des clauses, `speed(n)`, `mass(n)`, `draw(n)`, `polish(n, cible?)` et `crack(n, cible?)`, et la source `turnsInHand()` des montants calculés |
-| `config/marbles-values.js` | Réglages, modèle de fiche, sac de test, sons (donnée pure) |
+| `marbles/effects.js` | Les formes courtes des clauses, `speed(n)`, `mass(n)`, `draw(n)`, `polish(n, cible?)` et `crack(n, cible?)`, et les sources `turnsInHand()`, `activeSize(calibre)` et `tally(valeur de partie)` des montants calculés |
+| `config/marbles-values.js` | Réglages, déclencheurs, valeurs de partie, modèle de fiche, sac de test, sons (donnée pure) |
 | `core/marbles-rules.js` | Les règles liées à une table de billes : le point d'entrée de la simulation hors du core |
 | `core/marbles.js` | La simulation : état, réducteur, écouteurs, journal, codes de refus |
 | `core/marbles-effects.js` | Le modèle d'effet : clauses, actions, conditions, effet imprimé |
 | `core/marbles-bus.js` | Le bus d'évènements interne à la simulation |
+| `core/marbles-tally.js` | Le registre des valeurs de partie : le seul à les écrire, et leur lecture publique |
 | `core/marbles-forecast.js` | La prévision : le vrai moteur sur une copie de l'état |
 | `view/marbles/screen.js` | L'écran de jeu et sa table de touches |
 | `view/marbles/pile-screen.js` | Le menu d'une pile de billes, sac ou défausse |
@@ -24,12 +25,13 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
 | `view/marbles/sequence.js` | La file d'étapes de la séquence de résolution et ses pauses (pur) |
 | `view/marbles/history.js` | L'historique : les messages de jeu du tour précédent (pur) |
 | `view/marbles/history-screen.js` | Le menu de l'historique |
+| `view/marbles/tally-screen.js` | Le menu de debug des valeurs de partie (Maj+L) |
 | `view/marbles/navigation.js` | Le curseur dans le triangle, les zones, l'ouverture de la sélection d'emplacement (pur) |
 | `view/marbles/sounds.js` | Les sons de l'écran : repères des évènements, roulements, balise au survol, musique |
 | `view/marbles/sound-queue.js` | La file de sons, qui étale ceux d'un même geste (pur) |
 | `view/marbles/rolls.js` | Le mouvement d'une bille qui roule : durée, position, vitesse (pur) |
 | `tools/marbles/` | La boîte à outils : partie au terminal, cas construits, simulateur (`doc/marbles-tools.md`) |
-| `core/checks/marbles.check.js`, `marbles-bus.check.js`, `marbles-forecast.check.js`, `marbles-view.check.js`, `marbles-sequence.check.js` | Vérifications |
+| `core/checks/marbles.check.js`, `marbles-bus.check.js`, `marbles-tally.check.js`, `marbles-forecast.check.js`, `marbles-view.check.js`, `marbles-sequence.check.js` | Vérifications |
 
 ## Déroulement d'un tour
 
@@ -71,13 +73,18 @@ bille par bille (`core/marbles.js`/`drawOne`) :
 1. main pleine : la bille reste au sac, sans régénération ;
 2. sinon, le sac a une bille : on la pioche ;
 3. sinon, la défausse n'est pas vide : mélangée par le hasard de la partie, elle devient le
-   sac (`bagRegenerated`), puis on pioche ;
+   sac (`bagRegenerated`) ; puis la **Trouvaille** de chaque bille active, dans l'ordre des
+   phases (voir « Les déclencheurs ») ; puis la pioche reprend, en relisant ces conditions
+   depuis le début (une Trouvaille a pu remplir la main, prendre la bille ou remplir la
+   défausse) ;
 4. sinon (sac et défausse vides) : rien à piocher.
 
 Le premier arrêt interrompt la pioche et se dit (`drawSkipped`, motif `handFull` ou
 `noMarbles`, « Plus aucune bille à piocher. ») : les billes restantes ne sont pas piochées.
 Une régénération peut donc avoir lieu à tout moment : en début de tour, pendant la phase de
-jeu (un Tic qui pioche) ou pendant la résolution.
+jeu (un Tic qui pioche) ou pendant la résolution. Ses Trouvailles vont aux compteurs du tour
+en cours : en début de tour, celui qui commence, la résolution précédente ayant remis
+Vitesse et Masse à 0 et 1.
 
 ### Fin de partie
 
@@ -98,7 +105,8 @@ que le triangle ; vide, la partie s'arrête à la première pioche (`outOfMarble
 Toute pose d'une bille A commence par sa **Chiquenaude** : A quitte la main (son compteur de
 tours en main avec elle) et, **en cours de lancer**, n'est ni en main ni sur le triangle ;
 elle ne compte ni dans la main (une Pioche y trouve sa place libre) ni parmi les billes
-actives (le comptage `activeSize`). L'emplacement visé se lit ensuite : sur un emplacement
+actives (la source `activeSize`) ; une régénération pendant son lancer ne lui donne pas de
+Trouvaille. L'emplacement visé se lit ensuite : sur un emplacement
 vide, A le rejoint, sans Éjection ni Tic. Sur un emplacement occupé par une bille B, dans
 cet ordre, visible au journal :
 
@@ -215,9 +223,7 @@ Un effet est une liste de clauses (`core/marbles-effects.js`) :
   une cible, la bille de cet emplacement (un emplacement vide : sans effet, noté au
   journal, `targetEmpty`) ;
 - **condition** (`when`, facultative) : évaluée au déclenchement ; fausse, la clause ne
-  produit rien ;
-- **comptage** (`per`, facultatif) : `amount` est multiplié par ce qu'il compte au
-  déclenchement ; zéro, la clause ne produit rien.
+  produit rien.
 
 ### Montants calculés
 
@@ -225,28 +231,41 @@ Un `amount` peut être **calculé** au déclenchement : `{ base, step, source, m
 `base + step × la valeur de source`, plafonné à `max` s'il est donné
 (`core/marbles-effects.js`/`amountOf`). `step` vaut au moins 1, `max` dépasse `base` ; pour
 une action à montant positif (Pioche, Polissage, Fêlure), `base` vaut au moins 0. Évalué à
-0, la clause ne produit rien ; un comptage le multiplie ensuite. Il n'entre jamais dans
-l'imprimé (`printedStat`). L'argile :
+0, la clause ne produit rien. Il n'entre jamais dans l'imprimé (`printedStat`). C'est le
+SEUL mécanisme d'un montant qui dépend du moment : un « par » (« Vitesse +1 par minibille
+active ») en est un, base 0, pas 1. L'argile et le grès :
 
 ```js
 flick: [speed({ base: 0, step: 1, source: turnsInHand(), max: 5 })],
+base: [speed({ base: 0, step: 1, source: activeSize(SMALL) })],
+apex: [speed({ base: 0, step: 1, source: tally("windfallsThisGame"), max: 10 })], // le verre
 ```
 
 | Source (`source`) | Vaut | Fiche |
 |---|---|---|
 | `{ type: "turnsInHand" }` | le compteur de tours en main de la bille elle-même : 0 hors de la main ; pendant sa Chiquenaude, celui qu'elle avait en quittant la main | « Chiquenaude : Vitesse +1 par tour en main, maximum +5, actuellement +2. » |
+| `{ type: "activeSize", size }` | les billes actives (sur le triangle) de calibre `size`, la bille elle-même comprise si elle en est (déjà retirée, dans un Final, elle s'ajoute ; en cours de lancer, dans une Chiquenaude, non) | « Base : Vitesse +1 par minibille active. » (grès) |
+| `{ type: "flicksThisTurn" }`, `{ type: "windfallsThisGame" }` (`tally(id)`) | la valeur de partie de ce nom, lue dans le registre au déclenchement (voir « Valeurs de partie ») | « Chiquenaude : Vitesse +2 par chiquenaude ce tour, maximum +6, actuellement +4. » (loupe) |
 
-La fiche dit la **valeur actuelle** (« actuellement ») là où la bille se trouve : avec son
-compteur dans la main, 0 au sac, en défausse et sur le triangle. Avec une base : « Vitesse
-+2, +1 par tour en main, actuellement +3 ». R, la confirmation et la séquence ne disent que
-la valeur finale. **Ajouter une source** (une future valeur de partie) : une entrée dans
-`AMOUNT_SOURCES`, qui déclare ses champs, sa validation et sa valeur dans la situation, et
-son texte dans `view/marbles/narration.js`/`SOURCE_TEXTS` ; une source sans texte fait
-échouer le chargement.
+Chaque source est déclarée UNE fois, dans `core/marbles-effects.js`/`AMOUNT_SOURCES` :
+ses champs et leur validation, sa valeur dans la situation (`value`), son gabarit (`text`,
+qui reçoit `{effect}`, le pas déjà dit), ses paramètres de texte (`params`, des valeurs ;
+`names`, des noms par clé i18n, dont la vue fait des références de nom), et `current` :
+vrai si sa valeur se connaît hors de tout déclenchement, à partir de la bille seule. La
+fiche dit alors la **valeur actuelle** (« actuellement ») là où la bille se trouve : avec
+son compteur dans la main, 0 au sac, en défausse et sur le triangle (« Vitesse +2, +1 par
+tour en main, actuellement +3 » avec une base), et la valeur de partie du moment, lue
+dans le registre de la partie en cours, où que soit la bille (à zéro hors de toute
+partie) ; une source qui dépend du moment (`activeSize`) n'en dit pas. R, la
+confirmation et la séquence ne disent que la valeur finale, celle de la prévision, qui
+fait évoluer le registre sur sa copie (une Chiquenaude de loupe s'y compte elle-même).
+**Ajouter une source** : son entrée dans `AMOUNT_SOURCES` et son gabarit dans chaque
+langue (vérifié par le domaine `marbles-view`), rien d'autre ; une valeur de partie y
+entre d'office, sous son identifiant (un identifiant déjà pris échoue au chargement).
 
 ### Conditions
 
-Une condition ou un comptage lit la **situation** de l'effet au déclenchement
+Une condition ou un montant calculé lit la **situation** de l'effet au déclenchement
 (`core/marbles-effects.js`) : le triangle, la bille qui joue l'effet (sur le triangle, en
 main, déjà retirée ou en cours de lancer, avec son compteur de tours en main) et, pendant un
 Tic ou une Éjection, le remplacement en cours.
@@ -261,18 +280,17 @@ Tic ou une Éjection, le remplacement en cours.
 de déclencheur marqué `replacement` dans `MARBLE_TRIGGERS` (le Tic, vu par la posée ;
 l'Éjection, vue par l'éjectée).
 
-| Comptage (`per`) | Compte | Exemple (fiche) |
-|---|---|---|
-| `{ type: "activeSize", size }` | les billes actives (sur le triangle) de calibre `size`, la bille elle-même comprise si elle en est (déjà retirée, dans un Final, elle s'ajoute ; en cours de lancer, dans une Chiquenaude, non) | « Base : Vitesse +1 par minibille active. » (grès) |
+Le calibre se compte aussi, par la source `activeSize` d'un montant calculé (voir
+« Montants calculés »).
 
 Dans R, la confirmation et la séquence, seules les **valeurs finales** se disent (« base
-gauche, grès : Vitesse +2. »), jamais la condition ni le comptage : ils ne s'entendent que
+gauche, grès : Vitesse +2. »), jamais la condition ni la source : elles ne s'entendent que
 dans la fiche.
 
 **Règle anti-boucle** : une condition lit toujours l'effet IMPRIMÉ d'une bille
 (`printedStat`), jamais un effet déjà modifié ; le calibre est statique. Aucune dépendance
 circulaire n'est possible, et le joueur raisonne à partir de ce qu'il entend. L'imprimé
-compte les clauses sans cible, sans condition ni comptage.
+compte les clauses sans cible, sans condition, à montant fixe.
 
 **Le bonus** (`bonus`, sur l'entrée du triangle) s'ajoute à l'effet de phase de la bille
 qui le reçoit, et s'annonce chez elle avec son total effectif (« Vitesse +10 »). Il suit la
@@ -309,7 +327,9 @@ Une cible n'a de sens que si l'effet ciblé peut encore se produire.
   valide, toutes les phases restant à venir.
 
 Le moment de chaque champ vient de la phase (ses emplacements) ou du déclencheur
-(`moment` de `MARBLE_TRIGGERS` : `play` ou `afterPhases` ; `marble`, pour la bille hors du
+(`moment` de `MARBLE_TRIGGERS` : `play`, `afterPhases` ou `anytime`, la Trouvaille, que la
+validation ne refuse jamais : un bonus ciblé dont la phase est passée se perd à l'exécution,
+noté dans `lost` ; `marble`, pour la bille hors du
 triangle).
 
 **Ajouter** une action : une entrée dans `CLAUSE_ACTIONS` (`core/marbles-effects.js`), sur
@@ -320,8 +340,8 @@ valeur positive, `down` pour une négative), lus par les fiches, R, la confirmat
 séquence. Une action sans textes fait échouer le chargement. Si son application touche à
 l'état autrement qu'un compteur, comme la Pioche, `fireEffect` (`core/marbles.js`) l'exécute
 après l'annonce de l'effet. Une condition : une entrée dans `CONDITIONS` et son texte dans
-`CONDITION_TEXTS` ; un comptage : une entrée dans `COUNTS` et son texte dans `COUNT_TEXTS`.
-Une condition ou un comptage sans texte fait échouer le chargement. Un nom de calibre glissé
+`CONDITION_TEXTS` ; une condition sans texte fait échouer le chargement. Une source de
+montant : voir « Montants calculés ». Un nom de calibre glissé
 dans un texte passe par `nameRef`, avec ses formes françaises et anglaises `indef` (« un
 calot ») et `noun` (« bille normale »).
 
@@ -330,7 +350,12 @@ calot ») et `noun` (« bille normale »).
 Hors la phase (base, pointe), une bille réagit par ses **déclencheurs** : la
 **Chiquenaude** (`flick`, à chaque pose depuis la main, vide ou occupé, avant tout le reste,
 la bille en cours de lancer), le **Tic** (`hit`,
-posée sur un emplacement occupé, après l'éjection de l'occupante), l'**Éjection**
+posée sur un emplacement occupé, après l'éjection de l'occupante), la **Trouvaille**
+(`windfall`, à chaque régénération du sac depuis la défausse, à tout moment du tour, chez
+chaque bille ACTIVE, dans l'ordre des phases, avant que la pioche ne reprenne : une
+interruption du bus, voir « Le bus d'évènements » ; ses valeurs vont aux compteurs du tour
+en cours ; une bille en main, au sac, en défausse ou en cours de lancer n'en a pas ; une
+bille retirée par une Trouvaille précédente non plus), l'**Éjection**
 (`knockout`, remplacée) et le **Final** (`final`, retirée par usure, une fois à la
 défausse ; jamais à une éjection, un échange ou une pose). Ils sont déclarés UNE fois, dans
 `config/marbles-values.js`/`MARBLE_TRIGGERS`, une entrée chacun :
@@ -343,9 +368,10 @@ défausse ; jamais à une éjection, un échange ou une pose). Ils sont déclar�
   marble: "removed",        // la bille concernée : "onSlot" (sur l'emplacement de
                             // l'évènement), "removed" (déjà retirée, que l'évènement nomme)
                             // ou "thrown" (en cours de lancer, que l'évènement nomme)
-  forecast: { line: "slot" }, // sa prévision : avec l'emplacement de la bille, ou
+  forecast: { line: "slot" }, // sa prévision : avec l'emplacement de la bille ;
                             // { line: "placement", marble, order }, une ligne de confirmation
-                            // (sur un emplacement occupé seulement si `replacement`)
+                            // (sur un emplacement occupé seulement si `replacement`) ; ou
+                            // { line: "regeneration" }, après « Le sac sera régénéré. »
   texts: { card: "marbles.card.final", effect: "marbles.event.effect_final", slot: "marbles.outcome.final" },
   card: "below",            // sa place dans la fiche, au-dessous de l'annonce principale
 }
@@ -356,7 +382,7 @@ champs permis), les écouteurs du core (`EVENT_TRIGGERS`, construit depuis elle,
 seule y étant écrite à la main), la prévision, la narration (gabarits, lignes de
 confirmation, évènements muets), le modèle de fiche (`MARBLE_CARD_MODEL.below` en est
 dérivé, dans l'ordre de la liste, celui de la vie d'une bille : chiquenaude, tic,
-éjection, final) et les outils (chiffres par
+trouvaille, éjection, final) et les outils (chiffres par
 déclencheur ; leurs mots, `tools/marbles/format.js`/`TRIGGER_WORDS`, échouent au
 chargement s'il en manque un). La liste est validée au chargement du core
 (`validateMarbleTriggers`) ; ses textes, par le domaine `marbles-view`. **Ajouter un
@@ -377,6 +403,50 @@ un simple id. Une bille qui revient repart donc à zéro par construction : quit
 tour pour les billes déjà en main avant la pioche ; il se sérialise avec l'état et n'est lu
 que par les montants calculés (source `turnsInHand`).
 
+### Valeurs de partie (Tally)
+
+Des compteurs tenus par la simulation, dans l'état (`tally`, `{ <id>: nombre }`, sérialisé
+avec lui), que lisent les montants calculés, la prévision, le menu de debug (Maj+L) et, plus
+tard, les succès. Chacun est déclaré UNE fois, dans
+`config/marbles-values.js`/`MARBLE_TALLIES` :
+
+```js
+{
+  id: "flicksThisTurn",          // aussi l'identifiant de sa source de montant
+  scope: "turn",                 // "turn" ou "game"
+  events: ["flick"],             // les évènements du journal qui l'augmentent de 1
+  // filter: { type: "size", size: MEDIUM },  facultatif : la bille de l'évènement
+  texts: { name: "marbles.tally.flicks_this_turn", source: "marbles.effect.per_flick_this_turn" },
+}
+```
+
+| Valeur | Portée | Compte | Texte de source |
+|---|---|---|---|
+| `flicksThisTurn` | ce tour | chaque Chiquenaude (`flick`), qu'elle ait un effet ou non | « Vitesse +2 par chiquenaude ce tour » |
+| `windfallsThisGame` | cette partie | chaque régénération du sac depuis la défausse (`bagRegenerated`), qu'une bille active ait une Trouvaille ou non | « Vitesse +1 par trouvaille cette partie » |
+
+- **Portée** : `"turn"` revient à zéro au début de chaque tour, avant sa pioche (à
+  l'émission de `turnStarted`, le premier évènement de la pioche du tour) ; `"game"`
+  n'est à zéro qu'en début de partie (`createGame`).
+- **Moment** : un compteur augmente À L'ÉMISSION de l'évènement, avant que le bus ne le
+  traite, donc avant que les billes qui y réagissent ne soient évaluées. Conséquence
+  voulue : une Chiquenaude qui compte « par chiquenaude ce tour » se compte elle-même (la
+  première du tour lit 1), une Trouvaille sa propre régénération.
+- **Filtre** (facultatif) : `{ type: "size", size }`, la bille que nomme l'évènement est de
+  ce calibre. Seulement sur des évènements qui nomment une bille toujours connue
+  (`core/marbles.js`/`JOURNAL_EVENTS`) : jamais la pioche, dont la bille est cachée dans la
+  prévision.
+- **Un seul écrivain** : `core/marbles-tally.js` (`recordTally`, appelé par `transact` à
+  chaque émission, et `emptyTally`). Tout le reste lit par `tallyValue(tally, id)`, qui lève
+  sur un identifiant inconnu.
+- **Validation au chargement** : portée, évènements (dans `JOURNAL_EVENTS`, dont la
+  vérification `marbles-tally` contrôle qu'il suit le moteur), filtre, textes ; les textes
+  dans chaque langue, par le domaine `marbles-view`.
+
+**Ajouter une valeur de partie** : une entrée dans `MARBLE_TALLIES` et ses deux textes
+(`name`, `source`) dans chaque langue, rien d'autre : elle devient une source de montant
+et une ligne du menu de debug d'office.
+
 ### Le bus d'évènements
 
 Chaque action déroule ses évènements par un bus (`core/marbles-bus.js`), synchrone et
@@ -389,12 +459,19 @@ dans le réducteur, et rien d'extérieur ne s'y abonne.
   première à la dernière (`marbleListeners`).
 - **Pas de récursion** : un évènement émis pendant le traitement d'un autre attend dans une
   file, premier entré, premier sorti.
+- **Une exception, l'interruption** (`settle`) : son évènement et tout ce qui en découle se
+  règlent jusqu'au bout tout de suite, dans une file à part, avant ce qui attendait. Seule
+  la Trouvaille en est une : elle se joue entre la régénération et la reprise de la pioche,
+  même quand cette pioche vient d'un effet en plein traitement (un Tic qui pioche).
+- **Le journal s'écrit à l'émission**, dans l'ordre où l'état change : la file étant premier
+  entré, premier sorti, c'est l'ordre de traitement, sauf pour une interruption, réglée
+  avant ce qui attendait mais émise après. Les valeurs de partie aussi (voir plus haut).
 - **Limite de sécurité** : `MAX_EVENTS_PER_ACTION`. Au-delà, le bus lève
   `MarbleEventLimitError` et le réducteur refuse l'action (`eventLimit`), l'état reçu
   n'ayant jamais été touché.
 
 `EVENT_TRIGGERS` dit quels évènements déclenchent un effet : les phases, et les
-déclencheurs de `MARBLE_TRIGGERS` (Chiquenaude, Tic, Éjection, Final). Les autres passent au journal,
+déclencheurs de `MARBLE_TRIGGERS` (Chiquenaude, Tic, Trouvaille, Éjection, Final). Les autres passent au journal,
 prêts à servir.
 
 ### La prévision
@@ -411,11 +488,15 @@ déroulé est aveugle (`reduce(…, { blind: true })`). Une Pioche y a lieu avec
 régénération s'annonce sans mélange. La prévision ne lit ni n'avance donc jamais le hasard
 réel, et seules une pose ou un échange s'envisagent. Elle rend, en plus des valeurs :
 `slotEffects`, par emplacement, les effets prévus avec lui (le Final d'une bille qui
-atteindra son usure maximale ce tour, rien sinon) ; `cleared`, par emplacement, la bille
+atteindra son usure maximale ce tour, rien sinon) ; `regenerations`, chaque régénération
+du sac en chemin, dans l'ordre, `{ effects }` : les effets prévus avec elle (les
+Trouvailles des billes actives, connues : seule l'identité des billes piochées reste
+cachée), `[]` sans régénération ; `cleared`, par emplacement, la bille
 retirée avant sa phase par une Fêlure ; `wear` et `retired`, les changements d'usure et les
 retraits, dans l'ordre ; `drawn`, les billes que l'action et la
-résolution piocheraient ; `regenerates`, vrai si le
-sac serait régénéré ; `uncertain`, vrai si une bille inconnue aurait pu réagir selon son
+résolution piocheraient ; `tally`, les valeurs de partie à la fin de la résolution (la
+copie porte le registre, qui y évolue comme dans la partie ; le registre réel n'est jamais
+touché) ; `uncertain`, vrai si une bille inconnue aurait pu réagir selon son
 identité (un déclencheur qui écoute la main : aucun aujourd'hui ; la Chiquenaude ne concerne
 que la bille lancée, toujours connue), ses chiffres n'étant alors
 pas sûrs. La vérification `marbles-forecast` contrôle que Vitesse, Masse, Impact, billes
@@ -474,7 +555,9 @@ lisent et ne s'activent pas (Entrée n'y fait rien) :
 3. toujours, « Chiquenaude d'argile : Vitesse +2 », ou « … : aucun effet » ;
 4. sur un emplacement occupé, « Éjection de gorille : Vitesse +3 », ou « … : aucun effet » ;
 5. sur un emplacement occupé, « Tic d'argile : Vitesse +2 », ou « … : aucun effet » ;
-6. si la pose et la résolution régénéreraient le sac, « Le sac sera régénéré. » ;
+6. pour chaque régénération du sac que la pose et la résolution provoqueraient, « Le sac
+   sera régénéré. » (« Le sac sera de nouveau régénéré. » pour les suivantes), puis une
+   ligne par Trouvaille qu'elle déclencherait (« Trouvaille de tigrée : Vitesse +3. ») ;
 7. Annuler (Échap aussi : la sélection d'emplacement reprend) ;
 8. Confirmer.
 
@@ -499,7 +582,7 @@ Tic : Vitesse +2.           <- Ctrl+bas
 ```
 
 Au-dessous, les champs des déclencheurs, facultatifs, dans l'ordre de la vie d'une bille :
-chiquenaude, tic, éjection, final (« Final : Masse +1. ») ; ils viennent de
+chiquenaude, tic, trouvaille, éjection, final (« Final : Masse +1. ») ; ils viennent de
 `MARBLE_TRIGGERS`. Un montant calculé s'y dit avec sa valeur actuelle (voir « Montants
 calculés »).
 
@@ -550,7 +633,11 @@ conditions et bonus reçus, jamais un texte d'effet : valeurs nulles omises, « 
 effet » si rien ; une Pioche est une valeur comme une autre (« Pioche 1 »). Un bonus se
 compte chez la bille qui le reçoit : la loupe en base gauche dit « aucun effet », le gorille
 qu'elle renforce « Vitesse +10 ». Si la résolution régénérerait le sac, « Le sac sera
-régénéré. » termine l'annonce. Même gabarit que les
+régénéré. » termine l'annonce, suivi d'une phrase par Trouvaille qu'elle déclencherait, qui
+nomme sa bille (« Trouvaille de tigrée : Vitesse +3. »). Chaque régénération se dit ainsi
+avec ses propres Trouvailles, comme dans la séquence, la deuxième « de nouveau » : « Le sac
+sera régénéré. Trouvaille de tigrée : Vitesse +3. Le sac sera de nouveau régénéré.
+Trouvaille de tigrée : Vitesse +3. ». Même gabarit que les
 phases de la séquence (`outcomeLine`) : la prévision et la résolution se disent pareil.
 
 ### Séquence de résolution (Maj+R)
@@ -788,10 +875,23 @@ se disent : l'historique est complet même après une séquence passée. Pendant
 L est refusée comme le reste. L'historique (`view/marbles/history.js`) ne vit que le temps
 de l'écran, comme la séquence : la partie de billes n'a pas de sauvegarde.
 
+### Valeurs de partie (Maj+L, mode debug)
+
+En mode debug seulement (le mode du projet, `config/debug.js` : Ctrl+D, ou
+`toggleDebug()` dans la console), **Maj+L** ouvre un menu vertical
+(`view/marbles/tally-screen.js`, un menu de `lib/menu.js`) : une ligne par valeur de partie
+déclarée, dans l'ordre de `MARBLE_TALLIES`, avec sa valeur (« Chiquenaudes ce tour : 2 »,
+« Trouvailles cette partie : 1 »), puis « Fermer » ; Échap ferme aussi. Les lignes se
+lisent, Entrée n'y fait rien. Hors mode debug, la touche ne fait rien et n'est pas dans
+l'aide. Refusée pendant la séquence, dont l'état est déjà celui d'après la résolution. Pas
+de conflit : dans l'écran des billes, L seule ouvre l'historique, et le Maj+L de l'écran
+de ville (journal d'avertissements) n'est jamais actif en même temps (seul le sommet de la
+pile reçoit le clavier).
+
 ## Tester
 
 ```
-node tools/run-checks.js marbles marbles-bus marbles-forecast marbles-view marbles-sequence marbles-tools detail-card
+node tools/run-checks.js marbles marbles-bus marbles-tally marbles-forecast marbles-view marbles-sequence marbles-tools detail-card
 node tools/marbles/play.js --seed 42
 ```
 

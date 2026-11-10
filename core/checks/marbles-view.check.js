@@ -14,6 +14,7 @@ import {
   LARGE,
   MARBLE_CARD_MODEL,
   MARBLE_SIZES,
+  MARBLE_TALLIES,
   MEDIUM,
   SMALL,
   MARBLE_SOUND_PROFILES,
@@ -24,6 +25,7 @@ import {
 } from "../../config/marbles-values.js";
 import { detailLine, stepDetail } from "../../lib/detail-card.js";
 import { createMarblesGame, marblesReduce, END_REASONS, MARBLE_ERRORS, SLOTS } from "../marbles.js";
+import { emptyTally } from "../marbles-tally.js";
 import {
   bagDisplayOrder,
   buildSteps,
@@ -42,6 +44,7 @@ import {
   placementLines,
 } from "../../view/marbles/narration.js";
 import { marbleCard } from "../../view/marbles/card.js";
+import { tallyMenu } from "../../view/marbles/tally-screen.js";
 import { confirmationEntries } from "../../view/menus/confirmation.js";
 import { INITIAL_CURSOR, placementStart, stepCursor, zoneOf } from "../../view/marbles/navigation.js";
 import {
@@ -69,7 +72,7 @@ import { throws } from "../../lib/check.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
 import { emptyBagMarblesGame, inHand, withSizes } from "./helpers.js";
 import { createMarblesRules } from "../marbles-rules.js";
-import { effectAt } from "../marbles-effects.js";
+import { AMOUNT_SOURCES, effectAt } from "../marbles-effects.js";
 
 // Tables fabriquées : complétées d'un calibre (core/checks/helpers.js/withSizes).
 const fabricatedRules = (table) => createMarblesRules(withSizes(table));
@@ -163,7 +166,7 @@ function checkCards(run) {
     );
     run.same(
       "fiche : sans champ facultatif, le repli ; une Fêlure ciblée",
-      { above: ["Pointe : Masse +3.", "Base : Fêlure 1 à la pointe."], below: ["Aucun effet particulier."] },
+      { above: ["Pointe : Masse +3.", "Base : Fêlure 1 à la pointe."], below: ["Trouvaille : Fêlure 1 à la base droite."] },
       fields("sulphide")
     );
     run.same(
@@ -190,7 +193,11 @@ function checkCards(run) {
     run("fiche : comptage par calibre", "Base : Vitesse +1 par minibille active.", fields("stoneware").above[1]);
     run("fiche : calibre d'un emplacement", "Pointe : Masse +1 et Masse +2 si la base gauche est un calot.", fields("agate").above[0]);
     run.same("fiche : un Polissage ciblé au Tic", ["Tic : Polissage 1 à la pointe."], fields("glass").below);
-    run.same("fiche : un Polissage ciblé au Final", ["Tic : Masse +1.", "Final : Polissage 1 à la pointe."], fields("agate").below);
+    run.same(
+      "fiche : un Polissage ciblé au Final, une Trouvaille entre Tic et Final",
+      ["Tic : Masse +1.", "Trouvaille : Polissage 1.", "Final : Polissage 1 à la pointe."],
+      fields("agate").below
+    );
     run.same("fiche : la Pioche au tic", ["Tic : Pioche 1."], fields("cats_eye").below);
     run.same("fiche : la Pioche à l'éjection", ["Éjection : Pioche 1."], fields("stoneware").below);
     run.same("fiche : la Chiquenaude puis le Final de la porcelaine", ["Chiquenaude : Masse +1.", "Final : Vitesse +4."], fields("porcelain").below);
@@ -199,6 +206,43 @@ function checkCards(run) {
     run("fiche : montant calculé en main, valeur actuelle", "Chiquenaude : Vitesse +1 par tour en main, maximum +5, actuellement +2.", flickLine(2));
     run("fiche : montant calculé en main, plafonné", "Chiquenaude : Vitesse +1 par tour en main, maximum +5, actuellement +5.", flickLine(8));
     run("fiche : la Fêlure ciblée de la plombée", "Chiquenaude : Fêlure 3 à la pointe.", fields("leaded").below[0]);
+    // Une valeur de partie : la valeur actuelle se lit dans le registre de la partie,
+    // où que soit la bille ; hors de toute partie, à zéro.
+    const withTally = (marble, values) => marbleCard(marble, "principal", rules, t, { tally: { ...emptyTally(), ...values } });
+    run(
+      "fiche : valeur de partie, chiquenaudes ce tour",
+      "Chiquenaude : Vitesse +2 par chiquenaude ce tour, maximum +6, actuellement +4.",
+      plain(withTally("magnifier", { flicksThisTurn: 2 }).below[0])
+    );
+    run(
+      "fiche : valeur de partie, plafonnée",
+      "Chiquenaude : Vitesse +2 par chiquenaude ce tour, maximum +6, actuellement +6.",
+      plain(withTally("magnifier", { flicksThisTurn: 5 }).below[0])
+    );
+    run(
+      "fiche : valeur de partie, trouvailles cette partie",
+      "Pointe : Vitesse +1 par trouvaille cette partie, maximum +10, actuellement +2.",
+      plain(withTally("glass", { windfallsThisGame: 2 }).above[0])
+    );
+    run(
+      "fiche : hors de toute partie, valeur actuelle à zéro",
+      "Pointe : Vitesse +1 par trouvaille cette partie, maximum +10, actuellement 0.",
+      plain(marbleCard("glass", "principal", rules, t).above[0])
+    );
+    // Sur le triangle, en pose : sans prévision possible, l'effet imprimé, avec le
+    // registre de la partie.
+    run(
+      "texte : effet imprimé d'une bille active, avec le registre",
+      "pointe, verre : Vitesse +1 par trouvaille cette partie, maximum +10, actuellement +3.",
+      plain(
+        describeSlotForPlacement(
+          { ...createMarblesGame(1, {}, MARBLE_TYPES), stage: "over", triangle: { leftBase: null, rightBase: null, apex: { marble: "glass", wear: 0 } }, tally: { ...emptyTally(), windfallsThisGame: 3 } },
+          "apex",
+          rules,
+          t
+        )
+      )
+    );
     // Les autres formes d'un montant calculé : avec une base, sans plafond, négatif,
     // une action non signée.
     const source = { type: "turnsInHand" };
@@ -295,6 +339,25 @@ function playWithLookups(seed, lookup) {
     step({ type: "resolve" });
   }
   return { journal, state };
+}
+
+// Le menu de debug des valeurs de partie (Maj+L) : une ligne par compteur déclaré,
+// dans l'ordre, avec sa valeur lue dans le registre, puis « Fermer », la seule entrée
+// qui agisse ; Échap ferme aussi (closable).
+function checkTallyMenu(run) {
+  const locale = getLocale();
+  const menu = tallyMenu({ ...emptyTally(), flicksThisTurn: 2, windfallsThisGame: 1 });
+  const lines = (built) => built.entries.map((entry) => plain(t(entry.label, entry.labelParams)));
+  setLocale("fr");
+  run.same("menu des valeurs : une ligne par compteur, puis Fermer", ["chiquenaudes ce tour : 2", "trouvailles cette partie : 1", "Fermer"], lines(menu));
+  run("menu des valeurs : titre", "Valeurs de partie", t(menu.title));
+  run("menu des valeurs : Échap ferme", true, menu.closable);
+  run.same("menu des valeurs : seule Fermer agit", [false, false, true], menu.entries.map((entry) => typeof entry.onActivate === "function"));
+  run.same("menu des valeurs : autant de lignes que de compteurs déclarés", MARBLE_TALLIES.length + 1, tallyMenu(emptyTally()).entries.length);
+  run("menu des valeurs : un compteur absent du registre lève", true, throws(() => tallyMenu({})));
+  setLocale("en");
+  run.same("menu des valeurs, anglais", ["flicks this turn: 2", "windfalls this game: 1", "Close"], lines(menu));
+  setLocale(locale);
 }
 
 function checkBagOrder(run) {
@@ -677,6 +740,7 @@ export default function checkMarblesView(run) {
   checkSounds(run);
   checkCards(run);
   checkBagOrder(run);
+  checkTallyMenu(run);
   run("narration : évènement inconnu refusé", true, throws(() => buildSteps([{ type: "nope" }], (key) => key)));
 
   // Le découpage en étapes : tous les évènements, chacun une fois, dans l'ordre.
@@ -705,6 +769,10 @@ export default function checkMarblesView(run) {
       run.same(`${locale} : chaque fin de partie a son texte`, [], missingEnds);
       const missingTriggerTexts = MARBLE_TRIGGERS.flatMap((trigger) => Object.values(trigger.texts)).filter((key) => !Object.hasOwn(LOCALE_TABLES[locale], key));
       run.same(`${locale} : chaque déclencheur a ses textes`, [], missingTriggerTexts);
+      const missingSourceTexts = Object.values(AMOUNT_SOURCES).map((source) => source.text).filter((key) => !Object.hasOwn(LOCALE_TABLES[locale], key));
+      run.same(`${locale} : chaque source de montant a son texte`, [], missingSourceTexts);
+      const missingTallyTexts = MARBLE_TALLIES.flatMap((tally) => Object.values(tally.texts)).filter((key) => !Object.hasOwn(LOCALE_TABLES[locale], key));
+      run.same(`${locale} : chaque valeur de partie a ses textes`, [], missingTallyTexts);
 
       const dirtySteps = buildSteps(events, t).map((step) => step.text).filter((text) => !isClean(text));
       run.same(`${locale} : chaque étape du journal se dit`, [], dirtySteps.slice(0, 3));
@@ -826,10 +894,11 @@ export default function checkMarblesView(run) {
     );
     // Les valeurs prévues au format de R : ce que la loupe donne s'entend chez le
     // gorille, pas chez elle.
-    const lensToPlace = { ...lensed, hand: inHand(["magnifier"]), triangle: { ...lensed.triangle, leftBase: null } };
+    // Aucune chiquenaude encore ce tour : celle de la loupe se compte elle-même.
+    const lensToPlace = { ...lensed, hand: inHand(["magnifier"]), triangle: { ...lensed.triangle, leftBase: null }, tally: emptyTally() };
     run.same(
       "confirmation : valeurs produites seulement, sans bonus donné",
-      ["Poser loupe en base gauche ?", "aucun effet", "Chiquenaude de loupe : aucun effet"],
+      ["Poser loupe en base gauche ?", "aucun effet", "Chiquenaude de loupe : Vitesse +2"],
       placementLines(lensToPlace, 0, "leftBase", rules, t).map(({ key, params }) => said(t(key, params)))
     );
     // Le menu entier : question, valeurs, Chiquenaude, Éjection, Tic, puis Annuler

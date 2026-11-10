@@ -22,6 +22,7 @@ export const TRIGGER_WORDS = {
   phase: { name: "Phase", effect: "Effet de phase", produced: "en phase" },
   flick: { name: "Chiquenaude", effect: "Effet de chiquenaude", produced: "en chiquenaude", brought: "les chiquenaudes" },
   hit: { name: "Tic", effect: "Effet de tic", produced: "en tic", brought: "les tics" },
+  windfall: { name: "Trouvaille", effect: "Effet de trouvaille", produced: "en trouvaille" },
   knockout: { name: "Éjection", effect: "Effet d'éjection", produced: "en éjection", brought: "les éjections" },
   final: { name: "Final", effect: "Effet final", produced: "en final" },
 };
@@ -67,6 +68,12 @@ function slotLine(state, slot, name) {
   return `${line}.`;
 }
 
+// Les valeurs de partie (core/marbles-tally.js), sous leur identifiant :
+// « flicksThisTurn 2, windfallsThisGame 1 ».
+export function tallyList(tally) {
+  return Object.entries(tally).map(([id, value]) => `${id} ${value}`).join(", ");
+}
+
 // L'état entier, une ligne par élément. Le sac se lit du haut (prochaine pioche)
 // vers le bas : c'est un outil de test, il voit ce que le joueur ne voit pas.
 export function formatState(state, name) {
@@ -80,6 +87,7 @@ export function formatState(state, name) {
     `Sac, ${state.bag.length}, du haut vers le bas : ${listOf(state.bag, name)}.`,
     `Défausse, ${state.discard.length} : ${listOf(state.discard, name)}.`,
     `Pioche : ${state.firstTurnDraw} au premier tour, ${state.drawPerTurn} ensuite.`,
+    `Valeurs de partie : ${tallyList(state.tally)}.`,
   ];
   return lines;
 }
@@ -99,6 +107,7 @@ const EVENT_LINES = {
   bagRegenerated: (event) => `Sac régénéré depuis la défausse : ${event.size} billes.`,
   swapped: (event) => `Échange : ${slotLabel(event.a)} et ${slotLabel(event.b)}.`,
   flick: (event, name) => `Chiquenaude : ${marbleLabel(event.marble, name)} lancée vers ${slotLabel(event.slot)}, ${turnsLabel(event.turnsInHand)}.`,
+  windfall: (event, name) => `Trouvaille : ${marbleLabel(event.marble, name)} en ${slotLabel(event.slot)}.`,
   knockout: (event, name) => `Éjection : ${marbleLabel(event.marble, name)} en ${slotLabel(event.slot)}.`,
   removed: (event, name) => `Retrait : ${marbleLabel(event.marble, name)}, ${slotLabel(event.slot)} (${CAUSES[event.cause] ?? event.cause}).`,
   discarded: (event, name) => `Défausse : ${marbleLabel(event.marble, name)} (${CAUSES[event.cause] ?? event.cause}).`,
