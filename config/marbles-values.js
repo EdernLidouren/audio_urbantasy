@@ -216,7 +216,8 @@ export const MARBLES_AUDIO = {
 //   event     l'évènement du journal qui le déclenche ;
 //   marble    la bille concernée : "onSlot", celle qui est sur l'emplacement de
 //             l'évènement ; "removed", celle que l'évènement nomme, déjà retirée du
-//             triangle ;
+//             triangle ; "thrown", celle que l'évènement nomme, EN COURS DE LANCER :
+//             sortie de la main, pas encore sur le triangle ;
 //   moment    quand il joue : "play", pendant la phase de jeu (toutes les phases
 //             restent à venir) ; "afterPhases", après toutes les phases (une Vitesse
 //             ou une Masse ciblée n'y a plus de sens : core/marbles-effects.js) ;
@@ -225,9 +226,10 @@ export const MARBLES_AUDIO = {
 //             relatif compare (relativeSize, refusée ailleurs) ;
 //   forecast  où sa prévision se dit :
 //               { line: "placement", marble, order } : pendant une pose, sa propre
-//               ligne de la confirmation, toujours présente, pour la bille
-//               "occupant" (la remplacée) ou "placed" (la posée), à la place
-//               `order` (l'ordre réel des évènements) ;
+//               ligne de la confirmation, pour la bille "occupant" (la remplacée)
+//               ou "placed" (la posée), à la place `order` (l'ordre réel des
+//               évènements) ; toujours présente, sur un emplacement occupé
+//               seulement pour un déclencheur de remplacement (`replacement`) ;
 //               { line: "slot" } : avec l'emplacement de la bille, après son effet
 //               de phase (R, valeurs de la confirmation) ;
 //   texts     ses gabarits i18n : `card`, son champ de fiche ({effect}) ; `effect`,
@@ -238,6 +240,18 @@ export const MARBLES_AUDIO = {
 // AJOUTER un déclencheur : une entrée ici, son champ dans les billes, ses textes, et
 // l'émission de son évènement dans core/marbles.js au bon moment du tour.
 export const MARBLE_TRIGGERS = [
+  // La Chiquenaude : à chaque pose depuis la main, sur un emplacement vide ou occupé,
+  // avant tout le reste, la bille en cours de lancer (ni en main ni sur le triangle).
+  {
+    id: "flick",
+    field: "flick",
+    event: "flick",
+    marble: "thrown",
+    moment: "play",
+    forecast: { line: "placement", marble: "placed", order: 0 },
+    texts: { card: "marbles.card.flick", effect: "marbles.event.effect_flick", placement: "marbles.place.flick" },
+    card: "below",
+  },
   {
     id: "hit",
     field: "hit",

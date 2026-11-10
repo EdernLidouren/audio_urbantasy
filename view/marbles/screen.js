@@ -222,7 +222,7 @@ export function makeMarblesScreen(getGame, setGame, rules) {
   // La bille sous le curseur, ou undefined (emplacement vide, main vide).
   function marbleUnderCursor() {
     const game = getGame();
-    return cursor.place === "hand" ? game.hand[clampedHandIndex()] : game.triangle[cursor.place]?.marble;
+    return cursor.place === "hand" ? game.hand[clampedHandIndex()]?.marble : game.triangle[cursor.place]?.marble;
   }
 
   // Le curseur vient d'arriver quelque part : la voix de la bille qui s'y trouve,
@@ -236,9 +236,12 @@ export function makeMarblesScreen(getGame, setGame, rules) {
 
   // La fiche de la bille sous le curseur, avec ce qu'on entendrait à sa position
   // par défaut ; null sur un emplacement vide ou une main vide.
+  // En main, ses montants calculés se disent avec son compteur de tours en main.
   function currentCard() {
     const marble = marbleUnderCursor();
-    return marble === undefined ? null : marbleCard(marble, focusLine(), rules, t);
+    if (marble === undefined) return null;
+    const turnsInHand = cursor.place === "hand" ? getGame().hand[clampedHandIndex()].turnsInHand : 0;
+    return marbleCard(marble, focusLine(), rules, t, { turnsInHand });
   }
 
   // Ce qui se dit du curseur : l'annonce principale, et le champ où se trouve le
@@ -399,7 +402,7 @@ export function makeMarblesScreen(getGame, setGame, rules) {
     cursor = cursorOn(cursor, placementStart(game.triangle, SLOTS));
     resetDetailAfterMove();
     playMenuSound("select");
-    announce(`${t("marbles.take.hand", { name: marbleName(game.hand[index], t) })} ${focusLine()}`, { assertive: true });
+    announce(`${t("marbles.take.hand", { name: marbleName(game.hand[index].marble, t) })} ${focusLine()}`, { assertive: true });
     beaconUnderCursor();
   }
 

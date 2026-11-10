@@ -45,8 +45,8 @@ function marbleSummary(id, games, randomBags) {
 //   { games, score: { mean, median, min, max, p10, p25, p75, p90 },
 //     impact: { mean, perTurn: [{ turn, mean, games }] },
 //     end: { turnsCompleted, outOfMarbles } (en % des parties),
-//     replacements: { perGame, <déclencheur de pose>Speed, …Mass } (par partie : hit,
-//       knockout),
+//     replacements: { perGame, <déclencheur de pose>Speed, …Mass } (par partie : flick,
+//       hit, knockout ; la Chiquenaude, à chaque pose, s'y range avec eux),
 //     draws: { byEffect, regenerations, midTurnRegenerations } (par partie),
 //     throwsPerTurn (lancers par tour joué),
 //     refusals, marbles: [par bille, dans l'ordre de la table] }

@@ -13,11 +13,12 @@
 // - l'état reçu n'est jamais modifié.
 //
 // Résultat : { ok: false, error } si l'action serait refusée (mêmes codes que le
-// réducteur), sinon { ok: true, error: null, knockout, hit, phases, speed, mass,
-// impact, drawn, regenerates, uncertain }, où :
-//   knockout, hit  l'effet de l'action envisagée (null : pas de tel effet), une clé
-//                  par déclencheur prévu pendant une pose (forecast.line
-//                  "placement" de MARBLE_TRIGGERS) ;
+// réducteur), sinon { ok: true, error: null, flick, knockout, hit, phases, speed,
+// mass, impact, drawn, regenerates, uncertain }, où :
+//   flick, knockout, hit  l'effet de l'action envisagée (null : pas de tel effet),
+//                  une clé par déclencheur prévu pendant une pose (forecast.line
+//                  "placement" de MARBLE_TRIGGERS). Une Chiquenaude qui vide
+//                  l'emplacement visé n'a ni Éjection ni Tic après elle : null ;
 //   phases         par emplacement, l'effet de phase de sa bille (null : pas de
 //                  phase, emplacement vide ou bille retirée avant) ;
 //   cleared        par emplacement, la bille retirée AVANT sa phase (une Fêlure qui

@@ -17,3 +17,8 @@ export const polish = (amount, target) => ({ action: "polish", amount, ...(targe
 
 // Fêlure : ajoute `amount` d'usure, à la bille elle-même ou à celle de `target`.
 export const crack = (amount, target) => ({ action: "crack", amount, ...(target === undefined ? {} : { target }) });
+
+// Source d'un montant calculé : les tours passés en main par la bille elle-même.
+// Un montant calculé s'écrit { base, step, source, max? } (core/marbles-effects.js) :
+// speed({ base: 0, step: 1, source: turnsInHand(), max: 5 }).
+export const turnsInHand = () => ({ type: "turnsInHand" });

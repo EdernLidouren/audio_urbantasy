@@ -33,6 +33,7 @@ import {
   describeEffect,
   describeHandFocus,
   describeMarbleInList,
+  cardSituation,
   describePrinted,
   describeSlotFocus,
   describeSlotForPlacement,
@@ -66,7 +67,7 @@ import { pathLength, rollAt, rollDurationMs, rollEnvelope } from "../../view/mar
 import { EMPTY_SOUND_QUEUE, advanceSoundQueue, enqueueCues } from "../../view/marbles/sound-queue.js";
 import { throws } from "../../lib/check.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
-import { emptyBagMarblesGame, withSizes } from "./helpers.js";
+import { emptyBagMarblesGame, inHand, withSizes } from "./helpers.js";
 import { createMarblesRules } from "../marbles-rules.js";
 import { effectAt } from "../marbles-effects.js";
 
@@ -110,21 +111,21 @@ function sampleEvents() {
     step({ type: "resolve" });
   }
   // Une main pleine, pour la pioche sautée.
-  const fullHand = rules.reduce({ ...rules.createGame(4), stage: "draw", turn: 2, hand: ["clay", "glass", "agate", "mica", "tiger"] }, { type: "draw" });
+  const fullHand = rules.reduce({ ...rules.createGame(4), stage: "draw", turn: 2, hand: inHand(["clay", "glass", "agate", "mica", "tiger"]) }, { type: "draw" });
   events.push(...fullHand.events);
   // Polissage, Fêlure, cible vide : le Tic du verre sur une pointe vide, puis le
   // sulfure qui fêle une porcelaine.
-  const polishedNothing = rules.reduce({ ...emptyBagMarblesGame(rules, 6), turn: 2, stage: "play", hand: ["glass"], triangle: { leftBase: { marble: "clay", wear: 0 }, rightBase: null, apex: null } }, { type: "place", handIndex: 0, slot: "leftBase" });
+  const polishedNothing = rules.reduce({ ...emptyBagMarblesGame(rules, 6), turn: 2, stage: "play", hand: inHand(["glass"]), triangle: { leftBase: { marble: "clay", wear: 0 }, rightBase: null, apex: null } }, { type: "place", handIndex: 0, slot: "leftBase" });
   events.push(...polishedNothing.events);
   const cracked = rules.reduce({ ...emptyBagMarblesGame(rules, 7), turn: 2, stage: "play", bag: ["clay"], triangle: { leftBase: { marble: "sulphide", wear: 0 }, rightBase: null, apex: { marble: "porcelain", wear: 0 } } }, { type: "resolve" });
   events.push(...cracked.events);
   const polished = rules.reduce({ ...emptyBagMarblesGame(rules, 8), turn: 2, stage: "play", bag: ["clay"], triangle: { leftBase: null, rightBase: null, apex: { marble: "mica", wear: 1 } } }, { type: "resolve" });
   events.push(...polished.events);
   // Sac vide, défausse pleine : la défausse devient le sac.
-  const regenerated = rules.reduce({ ...emptyBagMarblesGame(rules, 5), turn: 2, stage: "draw", hand: [], discard: ["clay", "glass"] }, { type: "draw" });
+  const regenerated = rules.reduce({ ...emptyBagMarblesGame(rules, 5), turn: 2, stage: "draw", hand: inHand([]), discard: ["clay", "glass"] }, { type: "draw" });
   events.push(...regenerated.events);
   // Sac et défausse vides : la pioche s'arrête, la partie finit.
-  const end = rules.reduce({ ...emptyBagMarblesGame(rules, 2), turn: 2, stage: "draw", hand: ["clay"] }, { type: "draw" });
+  const end = rules.reduce({ ...emptyBagMarblesGame(rules, 2), turn: 2, stage: "draw", hand: inHand(["clay"]) }, { type: "draw" });
   events.push(...end.events);
   // Un tour avec des emplacements vides, pour les phases sautées.
   const skipped = rules.reduce({ ...emptyBagMarblesGame(rules, 3), turn: 2, stage: "play" }, { type: "resolve" });
@@ -148,8 +149,11 @@ function checkCards(run) {
       return { above: card.above.map(plain), below: card.below.map(plain) };
     };
     run.same(
-      "fiche : pointe puis base au-dessus, tic au-dessous",
-      { above: ["Pointe : Vitesse +4.", "Base : Vitesse +1."], below: ["Tic : Vitesse +2."] },
+      "fiche : pointe puis base au-dessus, chiquenaude puis tic au-dessous, montant calculé à 0 hors de la main",
+      {
+        above: ["Pointe : Vitesse +4.", "Base : Vitesse +1."],
+        below: ["Chiquenaude : Vitesse +1 par tour en main, maximum +5, actuellement 0.", "Tic : Vitesse +2."],
+      },
       fields("clay")
     );
     run.same(
@@ -189,7 +193,24 @@ function checkCards(run) {
     run.same("fiche : un Polissage ciblé au Final", ["Tic : Masse +1.", "Final : Polissage 1 à la pointe."], fields("agate").below);
     run.same("fiche : la Pioche au tic", ["Tic : Pioche 1."], fields("cats_eye").below);
     run.same("fiche : la Pioche à l'éjection", ["Éjection : Pioche 1."], fields("stoneware").below);
-    run.same("fiche : le Final de la porcelaine", ["Final : Vitesse +4."], fields("porcelain").below);
+    run.same("fiche : la Chiquenaude puis le Final de la porcelaine", ["Chiquenaude : Masse +1.", "Final : Vitesse +4."], fields("porcelain").below);
+    // Un montant calculé, avec sa valeur actuelle : en main, celle de son compteur.
+    const flickLine = (turnsInHand) => plain(marbleCard("clay", "principal", rules, t, { turnsInHand }).below[0]);
+    run("fiche : montant calculé en main, valeur actuelle", "Chiquenaude : Vitesse +1 par tour en main, maximum +5, actuellement +2.", flickLine(2));
+    run("fiche : montant calculé en main, plafonné", "Chiquenaude : Vitesse +1 par tour en main, maximum +5, actuellement +5.", flickLine(8));
+    run("fiche : la Fêlure ciblée de la plombée", "Chiquenaude : Fêlure 3 à la pointe.", fields("leaded").below[0]);
+    // Les autres formes d'un montant calculé : avec une base, sans plafond, négatif,
+    // une action non signée.
+    const source = { type: "turnsInHand" };
+    const computedCard = (amount, action, turnsInHand) =>
+      plain(marbleCard("x", "principal", fabricatedRules({ x: { flick: [{ action, amount }] } }), t, { turnsInHand }).below[0]);
+    run("fiche : montant calculé avec une base", "Chiquenaude : Vitesse +2, +1 par tour en main, actuellement +3.", computedCard({ base: 2, step: 1, source }, "speed", 1));
+    run(
+      "fiche : montant calculé négatif",
+      "Chiquenaude : Masse −2, +1 par tour en main, maximum +1, actuellement −2.",
+      computedCard({ base: -2, step: 1, source, max: 1 }, "mass", 0)
+    );
+    run("fiche : montant calculé d'une Pioche", "Chiquenaude : Pioche 1 par tour en main, maximum 3, actuellement 3.", computedCard({ base: 0, step: 1, source, max: 3 }, "draw", 4));
     run.same("fiche : le Final de la géante", ["Final : Pioche 1."], fields("giant").below);
     run.same(
       "fiche : tic, éjection, final, dans cet ordre",
@@ -231,8 +252,8 @@ function checkCards(run) {
     });
   };
   run.same(
-    "fiche : pointe, base, réannonce, retour, annonce principale, tic",
-    ["marbles.card.apex", "marbles.card.base", "marbles.card.base", "marbles.card.apex", "principal", "marbles.card.hit"],
+    "fiche : pointe, base, réannonce, retour, annonce principale, chiquenaude",
+    ["marbles.card.apex", "marbles.card.base", "marbles.card.base", "marbles.card.apex", "principal", "marbles.card.flick"],
     walk(1, 1, 1, -1, -1, -1)
   );
 
@@ -314,7 +335,7 @@ function checkBagOrder(run) {
   run("sac : la partie comparée pioche bien", true, plainGame.journal.some((event) => event.type === "draw"));
 
   // La défausse : l'ordre d'arrivée, celui que tient l'état.
-  let state = { ...emptyBagMarblesGame(rules, 1), turn: 2, stage: "play", hand: ["clay", "glass", "agate"] };
+  let state = { ...emptyBagMarblesGame(rules, 1), turn: 2, stage: "play", hand: inHand(["clay", "glass", "agate"]) };
   state = { ...state, triangle: { leftBase: { marble: "porcelain", wear: 0 }, rightBase: { marble: "tiger", wear: 0 }, apex: { marble: "giant", wear: 0 } } };
   for (const slot of ["apex", "leftBase", "rightBase"]) state = rules.reduce(state, { type: "place", handIndex: 0, slot }).state;
   run.same("défausse : de la plus ancienne à la plus récente", ["giant", "porcelain", "tiger"], state.discard);
@@ -697,13 +718,13 @@ export default function checkMarblesView(run) {
         describeDiscard(state, t),
         describeTurn({ ...state, speed: -3, mass: -1 }, true, t),
         stepsText(buildSteps([{ type: "impact", speed: -3, mass: -1, impact: 0, score: 0 }], t)),
-        describeHandFocus({ ...state, hand: [] }, 0, rules, t),
+        describeHandFocus({ ...state, hand: inHand([]) }, 0, rules, t),
         // Chaque champ de chaque fiche, et le repli.
         ...ids.flatMap((id) => {
           const card = marbleCard(id, "x", rules, t);
           return [...card.above, ...card.below];
         }),
-        ...ids.map((id) => describeHandFocus({ ...state, hand: [id] }, 0, rules, t)),
+        ...ids.map((id) => describeHandFocus({ ...state, hand: inHand([id]) }, 0, rules, t)),
         ...SLOTS.map((slot) => describeSlotFocus({ ...state, triangle: emptyTriangle }, slot, rules, t)),
         ...SLOTS.map((slot) => describeSlotForPlacement({ ...state, triangle: emptyTriangle }, slot, rules, t)),
         ...ids.flatMap((id) =>
@@ -716,10 +737,10 @@ export default function checkMarblesView(run) {
         // les formes de nom demandées par les gabarits.
         ...ids.flatMap((id) =>
           ids.flatMap((old) =>
-            placementLines({ ...state, turn: 2, hand: [id], triangle: { ...emptyTriangle, apex: { marble: old, wear: 0 } } }, 0, "apex", rules, t).map(({ key, params }) => t(key, params))
+            placementLines({ ...state, turn: 2, hand: inHand([id]), triangle: { ...emptyTriangle, apex: { marble: old, wear: 0 } } }, 0, "apex", rules, t).map(({ key, params }) => t(key, params))
           )
         ),
-        ...ids.flatMap((id) => placementLines({ ...state, turn: 2, hand: [id], triangle: emptyTriangle }, 0, "leftBase", rules, t).map(({ key, params }) => t(key, params))),
+        ...ids.flatMap((id) => placementLines({ ...state, turn: 2, hand: inHand([id]), triangle: emptyTriangle }, 0, "leftBase", rules, t).map(({ key, params }) => t(key, params))),
         t("marbles.zone.hand"),
         t("marbles.zone.triangle"),
         t("marbles.place.menu_title"),
@@ -751,13 +772,13 @@ export default function checkMarblesView(run) {
     run(
       "texte : effet imprimé de la loupe",
       "Vitesse +4 à la pointe si son effet de pointe donne au moins Vitesse +1",
-      said(describePrinted(MARBLE_TYPES.magnifier.baseVariant.leftBase, t))
+      said(describePrinted(MARBLE_TYPES.magnifier.baseVariant.leftBase, cardSituation("magnifier"), t))
     );
     run("texte : Impact", "Impact 6. Score 14.", said(stepsText(buildSteps([{ type: "impact", speed: 3, mass: 2, impact: 6, score: 14 }], t))));
 
     // Annonces principales : courtes, le détail est dans la fiche.
-    const inHand = { ...state, hand: ["clay", "cats_eye", "gorilla"] };
-    run("texte : bille en main", "argile, normale, usure 3. 1 sur 3", said(describeHandFocus(inHand, 0, rules, t)));
+    const holding = { ...state, hand: inHand(["clay", "cats_eye", "gorilla"]) };
+    run("texte : bille en main", "argile, normale, usure 3. 1 sur 3", said(describeHandFocus(holding, 0, rules, t)));
     run("texte : usure maximale propre", "géante, calot, usure 1. 2 sur 5", said(describeMarbleInList("giant", 1, 5, rules, t)));
 
     const lensed = {
@@ -766,7 +787,7 @@ export default function checkMarblesView(run) {
       turn: 2,
       speed: 0,
       mass: 1,
-      hand: ["clay", "agate", "glass"],
+      hand: inHand(["clay", "agate", "glass"]),
       throwsUsed: 1,
       triangle: { leftBase: { marble: "magnifier", wear: 0 }, rightBase: null, apex: { marble: "gorilla", wear: 1 } },
     };
@@ -788,41 +809,45 @@ export default function checkMarblesView(run) {
 
     // Confirmation d'une pose : structure et texte exacts.
     const menuLines = (handIndex, slot) => placementLines(lensed, handIndex, slot, rules, t).map(({ key, params }) => said(t(key, params)));
-    run.same("confirmation sur vide : la question, puis les valeurs prévues", ["Poser argile en base droite ?", "Vitesse +1"], menuLines(0, "rightBase"));
+    run.same(
+      "confirmation sur vide : la question, les valeurs prévues, puis la Chiquenaude",
+      ["Poser argile en base droite ?", "Vitesse +1", "Chiquenaude d'argile : aucun effet"],
+      menuLines(0, "rightBase")
+    );
     run.same(
       "confirmation sur occupé : dans l'ordre réel, élision comprise, bonus reçu compté",
-      ["Poser argile en pointe ?", "Vitesse +8", "Éjection de gorille : Vitesse +3", "Tic d'argile : Vitesse +2"],
+      ["Poser argile en pointe ?", "Vitesse +8", "Chiquenaude d'argile : aucun effet", "Éjection de gorille : Vitesse +3", "Tic d'argile : Vitesse +2"],
       menuLines(0, "apex")
     );
     run.same(
       "confirmation : aucun effet dit, même structure ; un Polissage ciblé chez qui le produit",
-      ["Poser verre en base gauche ?", "Masse +1", "Éjection de loupe : aucun effet", "Tic de verre : Polissage 1 à la pointe"],
+      ["Poser verre en base gauche ?", "Masse +1", "Chiquenaude de verre : aucun effet", "Éjection de loupe : aucun effet", "Tic de verre : Polissage 1 à la pointe"],
       menuLines(2, "leftBase")
     );
     // Les valeurs prévues au format de R : ce que la loupe donne s'entend chez le
     // gorille, pas chez elle.
-    const lensToPlace = { ...lensed, hand: ["magnifier"], triangle: { ...lensed.triangle, leftBase: null } };
+    const lensToPlace = { ...lensed, hand: inHand(["magnifier"]), triangle: { ...lensed.triangle, leftBase: null } };
     run.same(
       "confirmation : valeurs produites seulement, sans bonus donné",
-      ["Poser loupe en base gauche ?", "aucun effet"],
+      ["Poser loupe en base gauche ?", "aucun effet", "Chiquenaude de loupe : aucun effet"],
       placementLines(lensToPlace, 0, "leftBase", rules, t).map(({ key, params }) => said(t(key, params)))
     );
-    // Le menu entier : question, valeurs, Éjection, Tic, puis Annuler avant Confirmer ;
-    // seules ces deux-là agissent.
+    // Le menu entier : question, valeurs, Chiquenaude, Éjection, Tic, puis Annuler
+    // avant Confirmer ; seules ces deux-là agissent.
     const entries = confirmationEntries(() => {}, placementLines(lensed, 0, "apex", rules, t));
     run.same(
       "confirmation : ordre complet du menu sur occupé",
-      ["marbles.place.question", "marbles.place.values", "marbles.place.knockout", "marbles.place.hit", "menu.confirm.cancel", "menu.confirm.confirm"],
+      ["marbles.place.question", "marbles.place.values", "marbles.place.flick", "marbles.place.knockout", "marbles.place.hit", "menu.confirm.cancel", "menu.confirm.confirm"],
       entries.map((entry) => entry.label)
     );
     run.same(
       "confirmation : les entrées d'information sans action",
-      [false, false, false, false, true, true],
+      [false, false, false, false, false, true, true],
       entries.map((entry) => typeof entry.onActivate === "function")
     );
     run.same(
       "confirmation : ordre complet du menu sur vide",
-      ["marbles.place.question", "marbles.place.values", "menu.confirm.cancel", "menu.confirm.confirm"],
+      ["marbles.place.question", "marbles.place.values", "marbles.place.flick", "menu.confirm.cancel", "menu.confirm.confirm"],
       confirmationEntries(() => {}, placementLines(lensed, 0, "rightBase", rules, t)).map((entry) => entry.label)
     );
 
@@ -830,7 +855,7 @@ export default function checkMarblesView(run) {
     const placing = rules.reduce(lensed, { type: "place", handIndex: 0, slot: "apex" });
     run(
       "texte : pose sur occupé",
-      "Éjection de gorille : Vitesse +3. Vitesse 3, Masse 1. Défausse : gorille. Pose : argile en pointe. Tic d'argile : Vitesse +2. Vitesse 5, Masse 1.",
+      "Chiquenaude d'argile : aucun effet. Vitesse 0, Masse 1. Éjection de gorille : Vitesse +3. Vitesse 3, Masse 1. Défausse : gorille. Pose : argile en pointe. Tic d'argile : Vitesse +2. Vitesse 5, Masse 1.",
       said(stepsText(buildSteps(placing.events, t)))
     );
     const lensedSteps = buildSteps(rules.reduce(lensed, { type: "resolve" }).events, t).map((step) => said(step.text));
@@ -847,16 +872,17 @@ export default function checkMarblesView(run) {
     setLocale("en");
     run.same(
       "anglais : confirmation sur occupé",
-      ["Place clay on the apex?", "Speed +8", "Knockout of gorilla: Speed +3", "Hit from clay: Speed +2"],
+      ["Place clay on the apex?", "Speed +8", "Flick of clay: no effect", "Knockout of gorilla: Speed +3", "Hit from clay: Speed +2"],
       placementLines(lensed, 0, "apex", rules, t).map(({ key, params }) => t(key, params))
     );
-    run("anglais : bille en main", "clay, standard, wear 3. 1 of 3", describeHandFocus(inHand, 0, rules, t));
+    run("anglais : bille en main", "clay, standard, wear 3. 1 of 3", describeHandFocus(holding, 0, rules, t));
     run("anglais : bille active", "gorilla, boulder, apex, wear 1 of 3.", describeSlotFocus(lensed, "apex", rules, t));
     run("anglais : effet négatif", "Speed −3", describeEffect({ speed: -3 }, t));
     run("anglais : sac, une bille", "1 marble left in the bag, 1 marble to draw at the start of the turn.", describeBag({ ...state, bag: ["clay"], drawPerTurn: 1 }, t));
     run("anglais : sac vide", "0 marbles left in the bag, 1 marble to draw at the start of the turn.", describeBag({ ...state, bag: [], drawPerTurn: 1 }, t));
     run("anglais : défausse", "2 marbles in the discard.", describeDiscard({ ...state, discard: ["clay", "glass"] }, t));
     run.same("anglais : fiche", ["Apex: Speed +4.", "Base: Speed +1."], marbleCard("clay", "x", rules, t).above);
+    run("anglais : montant calculé", "Flick: Speed +1 per turn in hand, maximum +5, currently +2.", marbleCard("clay", "x", rules, t, { turnsInHand: 2 }).below[0]);
   } finally {
     setLocale(previousLocale);
   }

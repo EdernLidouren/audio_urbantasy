@@ -8,11 +8,16 @@
 //     swapUsed, throwsUsed }
 // `throwsUsed` : les LANCERS joués ce tour (une pose depuis la main en est un,
 // l'échange non), jamais plus que `throwsPerTurn`.
-// bag, hand et discard sont des listes d'ids de billes (doublons permis). Une
-// bille n'a d'usure que SUR le triangle, { marble, wear, bonus? } : une bille
-// qui en sort perd donc son usure et son bonus par construction. `bonus`
+// bag et discard sont des listes d'ids de billes (doublons permis). Une bille
+// n'a d'usure que SUR le triangle, { marble, wear, bonus? } : une bille qui en
+// sort perd donc son usure et son bonus par construction. `bonus`
 // ({ speed, mass }), présent seulement si une autre bille lui en a donné un, va
 // avec la bille dans un échange et disparaît à la fin de la résolution.
+// De même, une bille n'a de compteur de tours en main que DANS la main,
+// { marble, turnsInHand } : +1 au début de chaque tour pour les billes déjà en main
+// avant sa pioche (une bille piochée ce tour reste à 0) ; une bille qui quitte la
+// main (pose ou tout autre départ) le perd par construction. Lu par les montants
+// calculés (core/marbles-effects.js/AMOUNT_SOURCES).
 // Le sommet du sac est bag[0].
 //
 // `speed` et `mass` sont les compteurs du tour : Tic et Éjection les modifient
@@ -46,6 +51,7 @@
 // sur lui seul (view/marbles/narration.js, view/marbles/sounds.js) :
 //   turnStarted { turn, turnCount }, draw { marble }, drawSkipped { reason },
 //   bagRegenerated { size }, swapped { a, b },
+//   flick { slot, marble, turnsInHand },
 //   knockout { slot, marble, replacement }, removed { slot, marble, cause },
 //   discarded { slot, marble, cause }, placed { slot, marble },
 //   hit { slot, marble, replacement }, final { slot, marble },
@@ -56,11 +62,13 @@
 //   wear { slot, marble, wear, maxWear },
 //   impact { speed, mass, impact, score },
 //   rotation { triangle }, turnEnded { turn }, gameOver { reason, score }.
+// `flick` : la bille vient de quitter la main pour être posée en `slot` ;
+// `turnsInHand`, le compteur qu'elle avait en main, que lit sa Chiquenaude.
 // `replacement` (Tic, Éjection) : le remplacement en cours, { placed, ejected }, lu
 // par les conditions de calibre relatif (core/marbles-effects.js/relativeSize).
 // `cause` : "replacement" ou "wear". `trigger` : "phase" ou l'id d'un déclencheur
-// (config/marbles-values.js/MARBLE_TRIGGERS : "hit", "knockout", "final"). `final` :
-// une bille usée vient de rejoindre la défausse depuis `slot`.
+// (config/marbles-values.js/MARBLE_TRIGGERS : "flick", "hit", "knockout", "final").
+// `final` : une bille usée vient de rejoindre la défausse depuis `slot`.
 // drawSkipped `reason` : "handFull" (la bille reste au sac) ou "noMarbles" (sac
 // et défausse vides). Une pioche, une régénération ou un arrêt de pioche peuvent
 // avoir lieu à tout moment : début de tour, pose (un Tic qui pioche), résolution.
@@ -109,7 +117,7 @@ export const MARBLE_ERRORS = [
 
 // Les champs d'effet de PHASE d'une bille, à part des déclencheurs.
 const PHASE_FIELDS = ["base", "apex"];
-const TRIGGER_MARBLES = ["onSlot", "removed"];
+const TRIGGER_MARBLES = ["onSlot", "removed", "thrown"];
 const TRIGGER_MOMENTS = ["play", "afterPhases"];
 const PLACEMENT_MARBLES = ["occupant", "placed"];
 
@@ -157,13 +165,14 @@ const EFFECT_FIELDS = [...PHASE_FIELDS, ...MARBLE_TRIGGERS.map((trigger) => trig
 
 // Le moment où joue chaque champ d'effet, pour la règle des cibles et les
 // conditions qui n'ont de sens qu'à certains moments (core/marbles-effects.js/
-// validateEffect) ; une variante de base joue sur sa base. `replacement` : un
-// remplacement est en cours (Tic, Éjection).
+// validateEffect) ; une variante de base joue sur sa base. `marble` : la bille
+// concernée par le déclencheur ; `replacement` : un remplacement est en cours (Tic,
+// Éjection).
 const FIELD_CONTEXTS = {
   base: { phaseSlots: ["leftBase", "rightBase"] },
   apex: { phaseSlots: ["apex"] },
   ...Object.fromEntries(
-    MARBLE_TRIGGERS.map((trigger) => [trigger.field, { moment: trigger.moment, removed: trigger.marble === "removed", replacement: trigger.replacement === true }])
+    MARBLE_TRIGGERS.map((trigger) => [trigger.field, { moment: trigger.moment, marble: trigger.marble, replacement: trigger.replacement === true }])
   ),
 };
 
@@ -334,7 +343,7 @@ export function placeRefusal(state, handIndex, slot) {
   if (!isSlot(slot)) return "invalidSlot";
   if (!Number.isInteger(handIndex) || handIndex < 0 || handIndex >= state.hand.length) return "invalidHandIndex";
   // Une bille piochée à l'aveugle n'a pas d'identité : rien à poser.
-  if (state.hand[handIndex] === UNKNOWN_MARBLE) return "invalidHandIndex";
+  if (state.hand[handIndex].marble === UNKNOWN_MARBLE) return "invalidHandIndex";
   return null;
 }
 
@@ -406,7 +415,8 @@ export function marbleListeners(state) {
     slot,
     marble: state.triangle[slot].marble,
   }));
-  const inHand = state.hand.map((marble, index) => ({ zone: "hand", index, marble }));
+  // Une bille en cours de lancer n'est plus en main, ni encore sur le triangle.
+  const inHand = state.hand.map(({ marble, turnsInHand }, index) => ({ zone: "hand", index, marble, turnsInHand }));
   return [...onTriangle, ...inHand];
 }
 
@@ -423,18 +433,26 @@ function isOnEventSlot(event, listener) {
 //              bille piochée à l'aveugle dans l'une d'elles rend la prévision
 //              incertaine (handleEvent) ;
 //   listeners  (facultatif) les billes concernées, quand ce ne sont pas les
-//              écouteurs (marbleListeners) : une bille déjà retirée ;
+//              écouteurs (marbleListeners) : une bille déjà retirée, ou en cours de
+//              lancer, toujours connue ;
 //   clauses(event, listener, types).
 // La phase est écrite ici ; les autres viennent de MARBLE_TRIGGERS.
 const ON_SLOT = ["triangle"];
 
+// La bille que nomme l'évènement, hors du triangle : sa zone ("removed",
+// "thrown") est la valeur `marble` du déclencheur.
+const NAMED_MARBLE = {
+  removed: (event) => ({ zone: "removed", slot: event.slot, marble: event.marble }),
+  thrown: (event) => ({ zone: "thrown", slot: event.slot, marble: event.marble, turnsInHand: event.turnsInHand }),
+};
+
 function eventTrigger(trigger) {
   const clausesOf = (listener, types) => types[listener.marble][trigger.field] ?? null;
-  if (trigger.marble === "removed") {
+  if (Object.hasOwn(NAMED_MARBLE, trigger.marble)) {
     return {
       id: trigger.id,
       zones: [],
-      listeners: (event) => [{ zone: "removed", slot: event.slot, marble: event.marble }],
+      listeners: (event) => [NAMED_MARBLE[trigger.marble](event)],
       clauses: (event, listener, types) => clausesOf(listener, types),
     };
   }
@@ -468,7 +486,7 @@ function fireEffect(run, trigger, listener, clauses, event) {
   const { slot, marble } = listener;
   const situation = {
     triangle: run.state.triangle,
-    holder: { marble, onTriangle: listener.zone === "triangle" },
+    holder: { marble, zone: listener.zone, turnsInHand: listener.turnsInHand ?? 0 },
     replacement: event.replacement ?? null,
   };
   const { self, gifts, operations } = evaluateEffect(clauses, situation, run.types);
@@ -602,7 +620,7 @@ function drawOne(run) {
   }
   const [top, ...bag] = run.state.bag;
   const marble = run.blind ? UNKNOWN_MARBLE : top;
-  update(run, { bag, hand: [...run.state.hand, marble] });
+  update(run, { bag, hand: [...run.state.hand, { marble, turnsInHand: 0 }] });
   run.emit({ type: "draw", marble });
   return "drawn";
 }
@@ -621,11 +639,13 @@ function drawMarbles(run, count) {
   return { drawn: count, stopped: null };
 }
 
-// Pioche du début de tour : `firstTurnDraw` billes au premier tour, puis
-// `drawPerTurn`. Elle peut finir la partie (END_CONDITIONS).
+// Début de tour : les billes déjà en main y passent un tour de plus, puis la pioche,
+// `firstTurnDraw` billes au premier tour, `drawPerTurn` ensuite ; une bille piochée
+// maintenant reste donc à 0. La pioche peut finir la partie (END_CONDITIONS).
 function drawTurn(run) {
   const { state } = run;
   run.emit({ type: "turnStarted", turn: state.turn, turnCount: state.turnCount });
+  update(run, { hand: run.state.hand.map((held) => ({ ...held, turnsInHand: held.turnsInHand + 1 })) });
   const result = drawMarbles(run, state.turn === 1 ? state.firstTurnDraw : state.drawPerTurn);
   const reason = endReasonAt("turnDraw", run.state, result);
   if (reason !== null) {
@@ -653,12 +673,19 @@ function swapSlots(run, { a, b }) {
   run.emit({ type: "swapped", a, b });
 }
 
-// Pose, un LANCER (la confirmation est l'affaire de l'interface). Sur un emplacement
+// Pose, un LANCER (la confirmation est l'affaire de l'interface). D'abord, toujours,
+// la bille quitte la main (son compteur avec elle) et sa Chiquenaude joue : en cours
+// de lancer, elle n'est ni en main ni sur le triangle. Puis, sur un emplacement
 // occupé, dans cet ordre : Éjection de l'occupante, son retrait, son départ à la
 // défausse, la nouvelle bille rejoint l'emplacement, son Tic. Sur un emplacement
-// vide, la pose seule.
+// vide, la bille le rejoint seulement. L'emplacement se lit APRÈS la Chiquenaude :
+// si elle l'a vidé (une Fêlure qui retire l'occupante, Final compris), la pose se
+// poursuit comme sur un vide, sans Éjection ni Tic.
 function placeMarble(run, { handIndex, slot }) {
-  const marble = run.state.hand[handIndex];
+  const { marble, turnsInHand } = run.state.hand[handIndex];
+  update(run, { hand: run.state.hand.filter((_, index) => index !== handIndex), throwsUsed: run.state.throwsUsed + 1 });
+  run.emit({ type: "flick", slot, marble, turnsInHand });
+
   const previous = run.state.triangle[slot];
   // Le remplacement en cours, que Tic et Éjection portent (conditions de calibre).
   const replacement = previous === null ? null : { placed: marble, ejected: previous.marble };
@@ -674,11 +701,7 @@ function placeMarble(run, { handIndex, slot }) {
       run.emit({ type: "discarded", ...ejected, cause: "replacement" });
     }
   }
-  update(run, {
-    hand: run.state.hand.filter((_, index) => index !== handIndex),
-    triangle: { ...run.state.triangle, [slot]: { marble, wear: 0 } },
-    throwsUsed: run.state.throwsUsed + 1,
-  });
+  update(run, { triangle: { ...run.state.triangle, [slot]: { marble, wear: 0 } } });
   run.emit({ type: "placed", slot, marble });
   if (previous !== null) run.emit({ type: "hit", slot, marble, replacement });
 }

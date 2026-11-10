@@ -24,7 +24,7 @@ import { EMPTY_HISTORY, recordSteps } from "../../view/marbles/history.js";
 import { historyMenu } from "../../view/marbles/history-screen.js";
 import { throws } from "../../lib/check.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
-import { emptyBagMarblesGame } from "./helpers.js";
+import { emptyBagMarblesGame, inHand } from "./helpers.js";
 import { createMarblesRules } from "../marbles-rules.js";
 
 // Les règles du jeu, liées à la vraie table (core/marbles-rules.js).
@@ -197,7 +197,7 @@ function checkRealGames(run) {
 
 // Un état de partie fabriqué, en phase de jeu.
 function playState(changes) {
-  return { ...emptyBagMarblesGame(rules, 1), stage: "play", turn: 2, score: 0, hand: ["clay", "glass", "mica"], ...changes };
+  return { ...emptyBagMarblesGame(rules, 1), stage: "play", turn: 2, score: 0, hand: inHand(["clay", "glass", "mica"]), ...changes };
 }
 
 const EMPTY_TRIANGLE = { leftBase: null, rightBase: null, apex: null };
@@ -278,7 +278,7 @@ function checkTexts(run) {
     run.same(
       "séquence : main pleine",
       ["Main pleine, pas de pioche.", "Début du tour 3, jouez vos billes."],
-      texts({ ...lensed, hand: ["clay", "glass", "mica", "agate", "tiger"] }).slice(-2)
+      texts({ ...lensed, hand: inHand(["clay", "glass", "mica", "agate", "tiger"]) }).slice(-2)
     );
     run.same(
       "séquence : sac régénéré",
@@ -368,7 +368,7 @@ function checkTexts(run) {
 
     // La Pioche : une valeur comme une autre, dans R, la confirmation et la séquence.
     const drawing = playState({
-      hand: ["cats_eye"],
+      hand: inHand(["cats_eye"]),
       bag: ["agate"],
       triangle: { leftBase: { marble: "mica", wear: 0 }, rightBase: null, apex: { marble: "stoneware", wear: 0 } },
     });
@@ -384,7 +384,7 @@ function checkTexts(run) {
     );
     run.same(
       "pioche, confirmation : Éjection et Tic qui piochent, puis la régénération",
-      ["Poser œil-de-chat en pointe ?", "Vitesse +3", "Éjection de grès : Pioche 1", "Tic d'œil-de-chat : Pioche 1", "Le sac sera régénéré."],
+      ["Poser œil-de-chat en pointe ?", "Vitesse +3", "Chiquenaude d'œil-de-chat : aucun effet", "Éjection de grès : Pioche 1", "Tic d'œil-de-chat : Pioche 1", "Le sac sera régénéré."],
       placementLines(drawing, 0, "apex", rules, t).map(({ key, params }) => said(t(key, params)))
     );
     run.same(
@@ -409,7 +409,7 @@ function checkTexts(run) {
 
     // Le Final : après la phase de sa bille dans R et la confirmation, à son retrait
     // dans la séquence, avant l'Impact.
-    const finalState = playState({ hand: ["giant"], bag: ["agate"], triangle: { leftBase: null, rightBase: null, apex: { marble: "porcelain", wear: 1 } } });
+    const finalState = playState({ hand: inHand(["giant"]), bag: ["agate"], triangle: { leftBase: null, rightBase: null, apex: { marble: "porcelain", wear: 1 } } });
     run(
       "final, R : après la phase, compté dans la prévision",
       "Prévision : Vitesse 9, Masse 1, Impact 9. base gauche, vide. base droite, vide. pointe, porcelaine : Vitesse +5. Final : Vitesse +4.",
@@ -422,7 +422,7 @@ function checkTexts(run) {
     );
     run.same(
       "final, confirmation : avec les valeurs prévues de la bille posée",
-      ["Poser géante en base gauche ?", "Vitesse +6. Final : Pioche 1."],
+      ["Poser géante en base gauche ?", "Vitesse +6. Final : Pioche 1.", "Chiquenaude de géante : aucun effet"],
       placementLines(finalState, 0, "leftBase", rules, t).map(({ key, params }) => said(t(key, params)))
     );
     run.same(
@@ -432,7 +432,7 @@ function checkTexts(run) {
     );
 
     // Polissage et Fêlure : chez la bille qui les produit ; les conséquences prévues.
-    const cracking = playState({ hand: ["sulphide"], bag: ["clay"], triangle: { leftBase: { marble: "sulphide", wear: 0 }, rightBase: null, apex: { marble: "porcelain", wear: 1 } } });
+    const cracking = playState({ hand: inHand(["sulphide"]), bag: ["clay"], triangle: { leftBase: { marble: "sulphide", wear: 0 }, rightBase: null, apex: { marble: "porcelain", wear: 1 } } });
     run(
       "Fêlure, R : chez le sulfure ; la porcelaine retirée avant sa phase, son Final",
       "Prévision : Vitesse 4, Masse 1, Impact 4. base gauche, sulfure : Fêlure 1 à la pointe. base droite, vide. pointe, porcelaine : retirée avant sa phase. Final : Vitesse +4.",
@@ -453,7 +453,7 @@ function checkTexts(run) {
     );
     run.same(
       "Fêlure, confirmation : dans les valeurs prévues de la bille posée",
-      ["Poser sulfure en base droite ?", "Fêlure 1 à la pointe"],
+      ["Poser sulfure en base droite ?", "Fêlure 1 à la pointe", "Chiquenaude de sulfure : aucun effet"],
       placementLines({ ...cracking, triangle: { ...cracking.triangle, leftBase: null } }, 0, "rightBase", rules, t).map(({ key, params }) => said(t(key, params)))
     );
     const saving = playState({ bag: ["clay"], triangle: { leftBase: { marble: "agate", wear: 2 }, rightBase: null, apex: { marble: "porcelain", wear: 1 } } });
@@ -468,10 +468,35 @@ function checkTexts(run) {
       texts(saving).slice(3, 7)
     );
 
+    // La Chiquenaude : sa ligne de confirmation, toujours là, avec la valeur calculée ;
+    // celle qui vide l'emplacement laisse l'Éjection et le Tic sans effet.
+    const flicking = playState({ hand: inHand(["clay"], 2), triangle: { ...EMPTY_TRIANGLE, apex: { marble: "tiger", wear: 0 } } });
+    run.same(
+      "chiquenaude, confirmation : la valeur calculée, dans l'ordre réel",
+      ["Chiquenaude d'argile : Vitesse +2", "Éjection de tigrée : aucun effet", "Tic d'argile : Vitesse +2"],
+      placementLines(flicking, 0, "apex", rules, t).map(({ key, params }) => said(t(key, params))).slice(2)
+    );
+    const clearing = playState({ hand: inHand(["leaded"]), triangle: { ...EMPTY_TRIANGLE, apex: { marble: "clay", wear: 0 } } });
+    run.same(
+      "chiquenaude, confirmation : l'emplacement vidé, Éjection et Tic sans effet",
+      ["Poser plombée en pointe ?", "Vitesse −3", "Chiquenaude de plombée : Fêlure 3 à la pointe", "Éjection d'argile : aucun effet", "Tic de plombée : aucun effet"],
+      placementLines(clearing, 0, "apex", rules, t).map(({ key, params }) => said(t(key, params)))
+    );
+    run.same(
+      "chiquenaude, journal dit : la Fêlure, le retrait par usure, la pose",
+      [
+        "Chiquenaude de plombée : Fêlure 3 à la pointe. Vitesse 0, Masse 1.",
+        "argile se fêle : usure 3 sur 3.",
+        "argile est usée et part à la défausse.",
+        "Pose : plombée en pointe.",
+      ],
+      buildSteps(rules.reduce(clearing, { type: "place", handIndex: 0, slot: "apex" }).events, t).map((step) => said(step.text))
+    );
+
     // Conditions de calibre : R, la confirmation et la séquence ne disent que les
     // valeurs finales, jamais la condition.
     const sized = playState({
-      hand: ["gorilla"],
+      hand: inHand(["gorilla"]),
       triangle: { leftBase: { marble: "stoneware", wear: 0 }, rightBase: { marble: "porcelain", wear: 0 }, apex: { marble: "agate", wear: 0 } },
     });
     run(
@@ -481,7 +506,7 @@ function checkTexts(run) {
     );
     run.same(
       "calibre, confirmation : le Tic du gorille, sa valeur finale",
-      ["Éjection de porcelaine : aucun effet", "Tic de gorille : Vitesse +4"],
+      ["Chiquenaude de gorille : aucun effet", "Éjection de porcelaine : aucun effet", "Tic de gorille : Vitesse +4"],
       placementLines(sized, 0, "rightBase", rules, t).map(({ key, params }) => said(t(key, params))).slice(2)
     );
     const boulderLeft = { ...sized, triangle: { ...sized.triangle, leftBase: { marble: "giant", wear: 0 } } };

@@ -6,7 +6,7 @@
 import { nameRef } from "../../data/i18n/index.js";
 import { MARBLE_SIZES, MARBLE_TRIGGERS } from "../../config/marbles-values.js";
 import { SLOTS, throwsLeft } from "../../core/marbles.js";
-import { CLAUSE_ACTIONS, CONDITIONS, COUNTS } from "../../core/marbles-effects.js";
+import { AMOUNT_SOURCES, CLAUSE_ACTIONS, CONDITIONS, COUNTS, amountOf } from "../../core/marbles-effects.js";
 import { forecast } from "../../core/marbles-forecast.js";
 import { formatMenuPosition } from "../../lib/menu.js";
 
@@ -120,27 +120,67 @@ const COUNT_TEXTS = {
   activeSize: (per, effect, t) => t("marbles.effect.per_active_size", { effect, size: sizeRef(per.size) }),
 };
 
-// Une condition ou un comptage sans texte, ou un texte sans entrée, échoue au
-// chargement.
-for (const [table, texts, label] of [[CONDITIONS, CONDITION_TEXTS, "la condition"], [COUNTS, COUNT_TEXTS, "le comptage"]]) {
+// Le texte de chaque source de montant calculé (AMOUNT_SOURCES), après le pas :
+// « Vitesse +1 par tour en main ». `step` : le pas déjà dit.
+const SOURCE_TEXTS = {
+  turnsInHand: (source, step, t) => t("marbles.effect.per_turn_in_hand", { effect: step }),
+};
+
+// Une condition, un comptage ou une source sans texte, ou un texte sans entrée,
+// échoue au chargement.
+for (const [table, texts, label] of [
+  [CONDITIONS, CONDITION_TEXTS, "la condition"],
+  [COUNTS, COUNT_TEXTS, "le comptage"],
+  [AMOUNT_SOURCES, SOURCE_TEXTS, "la source"],
+]) {
   for (const type of new Set([...Object.keys(table), ...Object.keys(texts)])) {
     if (!Object.hasOwn(table, type) || !Object.hasOwn(texts, type)) throw new Error(`marbles : ${label} "${type}" doit avoir son texte et son entrée.`);
   }
 }
 
-// Une clause IMPRIMÉE : ce que la bille promet, son comptage, sa cible et sa
-// condition comprises. Son action dit sa valeur par ses propres textes.
-function describeClause(clause, t) {
-  let text = combined(valueParts({ [clause.action]: clause.amount }, t), t);
+// Un nombre d'une action signée (Vitesse, Masse : celles qui ont un texte `down`)
+// avec son signe, « +5 », « −2 », « 0 » ; celui d'une autre action, tel quel.
+function amountNumber(action, value) {
+  if (ACTION_TEXTS[action].down === undefined || value === 0) return String(value);
+  return value > 0 ? `+${value}` : formatCounter(value);
+}
+
+// Un MONTANT CALCULÉ (core/marbles-effects.js, en-tête), avec sa valeur actuelle dans
+// `situation` : « Vitesse +1 par tour en main, maximum +5, actuellement +2 », ou, avec
+// une base, « Vitesse +2, +1 par tour en main… ».
+function computedText(action, amount, situation, t) {
+  const step = amount.base === 0 ? combined(valueParts({ [action]: amount.step }, t), t) : amountNumber(action, amount.step);
+  let text = SOURCE_TEXTS[amount.source.type](amount.source, step, t);
+  if (amount.base !== 0) text = t("marbles.effect.computed_base", { base: combined(valueParts({ [action]: amount.base }, t), t), effect: text });
+  if (amount.max !== undefined) text = t("marbles.effect.computed_max", { effect: text, max: amountNumber(action, amount.max) });
+  return t("marbles.effect.computed_current", { effect: text, current: amountNumber(action, amountOf(amount, situation)) });
+}
+
+// La situation d'une bille HORS de tout déclenchement, pour dire la valeur actuelle
+// de ses montants calculés : seule la bille elle-même y est connue, avec son compteur
+// de tours en main (0 hors de la main). Une source qui lirait autre chose (une
+// future valeur de partie) y ajoutera ce qu'elle lit.
+export function cardSituation(marble, turnsInHand = 0) {
+  return { triangle: null, holder: { marble, zone: null, turnsInHand }, replacement: null };
+}
+
+// Une clause IMPRIMÉE : ce que la bille promet, son montant calculé (avec sa valeur
+// actuelle dans `situation`), son comptage, sa cible et sa condition comprises. Son
+// action dit sa valeur par ses propres textes.
+function describeClause(clause, situation, t) {
+  let text = Number.isInteger(clause.amount)
+    ? combined(valueParts({ [clause.action]: clause.amount }, t), t)
+    : computedText(clause.action, clause.amount, situation, t);
   if (clause.per !== undefined) text = COUNT_TEXTS[clause.per.type](clause.per, text, t);
   if (clause.target !== undefined) text = t("marbles.effect.given", { effect: text, slot: slotName(clause.target, t) });
   if (clause.when !== undefined) text = t("marbles.effect.conditional", { effect: text, condition: CONDITION_TEXTS[clause.when.type](clause.when, t) });
   return text;
 }
 
-// Un effet imprimé : une liste de clauses.
-export function describePrinted(clauses, t) {
-  return combined(clauses.map((clause) => describeClause(clause, t)), t);
+// Un effet imprimé : une liste de clauses. `situation` (cardSituation) : où en est la
+// bille, pour la valeur actuelle de ses montants calculés.
+export function describePrinted(clauses, situation, t) {
+  return combined(clauses.map((clause) => describeClause(clause, situation, t)), t);
 }
 
 // L'annonce principale d'une bille hors du triangle (main, sac, défausse) : son
@@ -155,7 +195,7 @@ export function describeMarbleInList(marble, index, total, rules, t) {
 // Une place de la main sous le curseur. Main vide : le dit.
 export function describeHandFocus(game, index, rules, t) {
   if (game.hand.length === 0) return t("marbles.hand.empty");
-  return describeMarbleInList(game.hand[index], index, game.hand.length, rules, t);
+  return describeMarbleInList(game.hand[index].marble, index, game.hand.length, rules, t);
 }
 
 // L'effet de phase de ce tour d'une bille active : la prévision si le tour se
@@ -163,7 +203,8 @@ export function describeHandFocus(game, index, rules, t) {
 function phaseText(game, slot, rules, t) {
   const predicted = rules.forecast(game);
   if (predicted.ok) return describeEffect(predicted.phases[slot], t);
-  return describePrinted(rules.effectAt(game.triangle[slot].marble, slot), t);
+  const { marble } = game.triangle[slot];
+  return describePrinted(rules.effectAt(marble, slot), cardSituation(marble), t);
 }
 
 // L'annonce principale d'un emplacement sous le curseur : la bille, son calibre
@@ -211,27 +252,28 @@ const PLACEMENT_LINES = MARBLE_TRIGGERS.filter((trigger) => trigger.forecast.lin
 // question, puis, sur sa propre ligne, ce que la bille produirait à sa phase sur le
 // triangle simulé, au format de la vue d'ensemble (valeurs produites seulement, bonus
 // reçus compris, ni texte d'effet ni bonus donné : celui-là s'entend chez qui le
-// reçoit) ; puis, sur un emplacement occupé, Éjection et Tic dans l'ordre réel des
-// évènements, toujours présentes : le menu garde la même structure ; enfin, si la
-// pose et la résolution régénéreraient le sac, une ligne pour le dire. La pose doit
+// reçoit) ; puis une ligne par déclencheur de la pose, dans l'ordre réel des
+// évènements, toujours présentes, « aucun effet » s'il n'y en a pas : la Chiquenaude,
+// puis, sur un emplacement occupé, Éjection et Tic (ceux-là disent « aucun effet »
+// si la Chiquenaude vide l'emplacement) ; le menu garde la même structure. Enfin, si
+// la pose et la résolution régénéreraient le sac, une ligne pour le dire. La pose doit
 // être permise (placeRefusal).
 export function placementLines(game, handIndex, slot, rules, t) {
-  const marble = game.hand[handIndex];
+  const { marble } = game.hand[handIndex];
   const predicted = rules.forecast(game, { type: "place", handIndex, slot });
   const lines = [
     { key: "marbles.place.question", params: { marble: marbleName(marble, t), slot: slotName(slot, t) } },
     { key: "marbles.place.values", params: { effect: placedValues(predicted, slot, t) } },
   ];
   const occupant = game.triangle[slot];
-  if (occupant !== null) {
-    // Une ligne par déclencheur prévu pendant une pose, dans l'ordre réel.
-    const concerned = { occupant: occupant.marble, placed: marble };
-    for (const trigger of PLACEMENT_LINES) {
-      lines.push({
-        key: trigger.texts.placement,
-        params: { marble: nameRef(`marble.${concerned[trigger.forecast.marble]}.name`), effect: describeOutcome(predicted[trigger.id], t) },
-      });
-    }
+  const concerned = { occupant: occupant?.marble, placed: marble };
+  for (const trigger of PLACEMENT_LINES) {
+    // Un déclencheur de remplacement n'a sa ligne que s'il y a une occupante.
+    if (trigger.replacement === true && occupant === null) continue;
+    lines.push({
+      key: trigger.texts.placement,
+      params: { marble: nameRef(`marble.${concerned[trigger.forecast.marble]}.name`), effect: describeOutcome(predicted[trigger.id], t) },
+    });
   }
   if (predicted.regenerates) lines.push({ key: "marbles.forecast.regenerates" });
   return lines;

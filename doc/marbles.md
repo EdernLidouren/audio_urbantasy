@@ -8,7 +8,7 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
 | Fichier | Rôle |
 |---|---|
 | `marbles/types/` | Les billes, une par fichier, et leur registre `index.js` (donnée pure) |
-| `marbles/effects.js` | Les formes courtes des clauses, `speed(n)`, `mass(n)`, `draw(n)`, `polish(n, cible?)` et `crack(n, cible?)` |
+| `marbles/effects.js` | Les formes courtes des clauses, `speed(n)`, `mass(n)`, `draw(n)`, `polish(n, cible?)` et `crack(n, cible?)`, et la source `turnsInHand()` des montants calculés |
 | `config/marbles-values.js` | Réglages, modèle de fiche, sac de test, sons (donnée pure) |
 | `core/marbles-rules.js` | Les règles liées à une table de billes : le point d'entrée de la simulation hors du core |
 | `core/marbles.js` | La simulation : état, réducteur, écouteurs, journal, codes de refus |
@@ -34,12 +34,15 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
 ## Déroulement d'un tour
 
 1. **Pioche** : 5 billes au premier tour, 1 ensuite (`firstTurnDraw`, `drawPerTurn`), par
-   la pioche unifiée (voir plus bas).
+   la pioche unifiée (voir plus bas). Juste avant, chaque bille déjà en main gagne un tour
+   à son **compteur de tours en main** (voir « Simulation ») ; une bille piochée ce tour
+   reste à 0.
 2. **Échange** (facultatif, une fois par tour, avant toute pose) : le contenu de deux
    emplacements, usure comprise. Un emplacement vide en fait un déplacement ; deux vides
    sont refusés, pour ne pas gâcher l'échange du tour. Ni Tic ni Éjection. Ce n'est pas un
    lancer.
-3. **Pose** : chaque pose depuis la main est un **lancer**, sur un emplacement vide ou
+3. **Pose** : chaque pose depuis la main est un **lancer**, ouvert par la **Chiquenaude** de
+   la bille (voir « Déroulé d'une pose »), sur un emplacement vide ou
    occupé ; `throwsPerTurn` (5) par tour, à côté de `maxHandSize` dans les réglages (deux
    capacités du joueur, qui pourront devenir ses caractéristiques). Lancers épuisés : la
    pose est refusée (`noThrowsLeft`), dès la prise de la bille dans l'écran. La limite
@@ -50,7 +53,7 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
    rien ne refuse une pose qui laisserait des emplacements impossibles à remplir.
 4. **Phases** : base gauche, base droite, pointe ; un emplacement vide saute sa phase.
    Elles partent des compteurs du tour : Vitesse (0 en début de tour) et Masse (1), que
-   Tic et Éjection ont déjà pu modifier. Chaque bille applique son effet (un Polissage ou
+   Chiquenaude, Tic et Éjection ont déjà pu modifier. Chaque bille applique son effet (un Polissage ou
    une Fêlure sur elle-même compris) puis prend 1 d'usure, même si cela l'amène à son
    maximum. Une bille qu'une Fêlure a retirée avant sa phase la saute.
 5. **Retraits par usure**, dans l'ordre des phases : chaque bille à son usure maximale
@@ -92,11 +95,16 @@ que le triangle ; vide, la partie s'arrête à la première pioche (`outOfMarble
 
 ### Déroulé d'une pose
 
-Sur un emplacement vide, la bille le rejoint, sans Tic. Sur un emplacement occupé par une
-bille B, la pose d'une bille A se déroule dans cet ordre, visible au journal :
+Toute pose d'une bille A commence par sa **Chiquenaude** : A quitte la main (son compteur de
+tours en main avec elle) et, **en cours de lancer**, n'est ni en main ni sur le triangle ;
+elle ne compte ni dans la main (une Pioche y trouve sa place libre) ni parmi les billes
+actives (le comptage `activeSize`). L'emplacement visé se lit ensuite : sur un emplacement
+vide, A le rejoint, sans Éjection ni Tic. Sur un emplacement occupé par une bille B, dans
+cet ordre, visible au journal :
 
 | Étape | Évènement du journal |
 |---|---|
+| Chiquenaude de A | `flick` (`turnsInHand` : son compteur en quittant la main), puis `effect` si A en a une, suivi de ses pioches et de ses actions sur une bille |
 | Éjection de B | `knockout`, puis `effect` si B en a une, suivi de ses pioches (`draw`…) si elle pioche |
 | B est retirée de son emplacement | `removed` (`cause: "replacement"`) |
 | B rejoint la défausse | `discarded` (`cause: "replacement"`) |
@@ -105,6 +113,11 @@ bille B, la pose d'une bille A se déroule dans cet ordre, visible au journal :
 
 `knockout` et `hit` portent le remplacement en cours, `replacement: { placed, ejected }`
 (les ids de A et de B), que lit la condition de calibre relatif (voir « Conditions »).
+
+**Une Chiquenaude qui vide l'emplacement visé** (une Fêlure qui amène B à son usure
+maximale, comme celle de la plombée) : B suit le retrait par usure habituel (`removed` et
+`discarded`, `cause: "wear"`, puis son Final), et la pose se poursuit comme sur un
+emplacement vide, sans Éjection ni Tic. La pose reste un lancer dans tous les cas.
 
 ## Une bille
 
@@ -154,8 +167,8 @@ Le registre et le sac de test sont validés ensemble au démarrage
 contenu). L'ordre du registre compte : les sacs aléatoires du simulateur y tirent leurs
 billes.
 
-Les champs d'effet (`base`, `baseVariant`, `apex`, et un par déclencheur : `hit`, `knockout`,
-`final`) sont tous facultatifs :
+Les champs d'effet (`base`, `baseVariant`, `apex`, et un par déclencheur : `flick`, `hit`,
+`knockout`, `final`) sont tous facultatifs :
 absent, aucun effet. `maxWear` vaut 3 par défaut. Un champ obligatoire, validé au
 chargement par la simulation (`validateMarbleTypes`) :
 
@@ -177,7 +190,8 @@ pour « Tic d'argile ». Un sac est une liste d'ids : les doublons y sont permis
 
 Un effet est une liste de clauses (`core/marbles-effects.js`) :
 
-- **action** : ce que fait la clause, avec son `amount` :
+- **action** : ce que fait la clause, avec son `amount` (un entier, ou un **montant
+  calculé**, voir plus bas) :
   - `speed`, `mass` : ajoutent `amount` (négatif permis) à la Vitesse ou à la Masse ;
   - `draw`, la **Pioche** : la bille pioche `amount` billes (au moins 1) par la pioche
     unifiée, à tout moment du tour. Jamais de cible. Utilisable dans tout champ d'effet :
@@ -205,11 +219,37 @@ Un effet est une liste de clauses (`core/marbles-effects.js`) :
 - **comptage** (`per`, facultatif) : `amount` est multiplié par ce qu'il compte au
   déclenchement ; zéro, la clause ne produit rien.
 
+### Montants calculés
+
+Un `amount` peut être **calculé** au déclenchement : `{ base, step, source, max? }`, soit
+`base + step × la valeur de source`, plafonné à `max` s'il est donné
+(`core/marbles-effects.js`/`amountOf`). `step` vaut au moins 1, `max` dépasse `base` ; pour
+une action à montant positif (Pioche, Polissage, Fêlure), `base` vaut au moins 0. Évalué à
+0, la clause ne produit rien ; un comptage le multiplie ensuite. Il n'entre jamais dans
+l'imprimé (`printedStat`). L'argile :
+
+```js
+flick: [speed({ base: 0, step: 1, source: turnsInHand(), max: 5 })],
+```
+
+| Source (`source`) | Vaut | Fiche |
+|---|---|---|
+| `{ type: "turnsInHand" }` | le compteur de tours en main de la bille elle-même : 0 hors de la main ; pendant sa Chiquenaude, celui qu'elle avait en quittant la main | « Chiquenaude : Vitesse +1 par tour en main, maximum +5, actuellement +2. » |
+
+La fiche dit la **valeur actuelle** (« actuellement ») là où la bille se trouve : avec son
+compteur dans la main, 0 au sac, en défausse et sur le triangle. Avec une base : « Vitesse
++2, +1 par tour en main, actuellement +3 ». R, la confirmation et la séquence ne disent que
+la valeur finale. **Ajouter une source** (une future valeur de partie) : une entrée dans
+`AMOUNT_SOURCES`, qui déclare ses champs, sa validation et sa valeur dans la situation, et
+son texte dans `view/marbles/narration.js`/`SOURCE_TEXTS` ; une source sans texte fait
+échouer le chargement.
+
 ### Conditions
 
 Une condition ou un comptage lit la **situation** de l'effet au déclenchement
-(`core/marbles-effects.js`) : le triangle, la bille qui joue l'effet (sur le triangle ou
-déjà retirée) et, pendant un Tic ou une Éjection, le remplacement en cours.
+(`core/marbles-effects.js`) : le triangle, la bille qui joue l'effet (sur le triangle, en
+main, déjà retirée ou en cours de lancer, avec son compteur de tours en main) et, pendant un
+Tic ou une Éjection, le remplacement en cours.
 
 | Condition (`when`) | Vraie si | Exemple (fiche) |
 |---|---|---|
@@ -223,7 +263,7 @@ l'Éjection, vue par l'éjectée).
 
 | Comptage (`per`) | Compte | Exemple (fiche) |
 |---|---|---|
-| `{ type: "activeSize", size }` | les billes actives (sur le triangle) de calibre `size`, la bille elle-même comprise si elle en est (déjà retirée, dans un Final, elle s'ajoute) | « Base : Vitesse +1 par minibille active. » (grès) |
+| `{ type: "activeSize", size }` | les billes actives (sur le triangle) de calibre `size`, la bille elle-même comprise si elle en est (déjà retirée, dans un Final, elle s'ajoute ; en cours de lancer, dans une Chiquenaude, non) | « Base : Vitesse +1 par minibille active. » (grès) |
 
 Dans R, la confirmation et la séquence, seules les **valeurs finales** se disent (« base
 gauche, grès : Vitesse +2. »), jamais la condition ni le comptage : ils ne s'entendent que
@@ -262,11 +302,15 @@ Une cible n'a de sens que si l'effet ciblé peut encore se produire.
   note dans `lost` (`{ slot, reason, ...valeurs }`, `reason` : `phasePassed` ou
   `emptySlot`), et la prévision n'en montre rien.
 - Un **Polissage ou une Fêlure** peut viser un emplacement depuis n'importe quel moment,
-  Final compris : la bille visée reste sur le triangle. Mais pas la bille elle-même dans
-  un Final, qui a déjà quitté le triangle (refusé à la validation).
+  Final et Chiquenaude compris : la bille visée reste sur le triangle. Mais pas la bille
+  elle-même dans un Final, qui a déjà quitté le triangle, ni dans une Chiquenaude, où elle
+  n'y est pas encore (refusé à la validation).
+- Une **Chiquenaude** joue pendant la phase de jeu : une Vitesse ou une Masse ciblée y est
+  valide, toutes les phases restant à venir.
 
 Le moment de chaque champ vient de la phase (ses emplacements) ou du déclencheur
-(`moment` de `MARBLE_TRIGGERS` : `play` ou `afterPhases`).
+(`moment` de `MARBLE_TRIGGERS` : `play` ou `afterPhases` ; `marble`, pour la bille hors du
+triangle).
 
 **Ajouter** une action : une entrée dans `CLAUSE_ACTIONS` (`core/marbles-effects.js`), sur
 le modèle des conditions, qui déclare ses champs (`fields` : une action sans `target` refuse
@@ -283,7 +327,9 @@ calot ») et `noun` (« bille normale »).
 
 ### Les déclencheurs
 
-Hors la phase (base, pointe), une bille réagit par ses **déclencheurs** : le **Tic** (`hit`,
+Hors la phase (base, pointe), une bille réagit par ses **déclencheurs** : la
+**Chiquenaude** (`flick`, à chaque pose depuis la main, vide ou occupé, avant tout le reste,
+la bille en cours de lancer), le **Tic** (`hit`,
 posée sur un emplacement occupé, après l'éjection de l'occupante), l'**Éjection**
 (`knockout`, remplacée) et le **Final** (`final`, retirée par usure, une fois à la
 défausse ; jamais à une éjection, un échange ou une pose). Ils sont déclarés UNE fois, dans
@@ -295,9 +341,11 @@ défausse ; jamais à une éjection, un échange ou une pose). Ils sont déclar�
   field: "final",           // le champ d'effet de la bille
   event: "final",           // l'évènement du journal qui le déclenche
   marble: "removed",        // la bille concernée : "onSlot" (sur l'emplacement de
-                            // l'évènement) ou "removed" (déjà retirée, que l'évènement nomme)
+                            // l'évènement), "removed" (déjà retirée, que l'évènement nomme)
+                            // ou "thrown" (en cours de lancer, que l'évènement nomme)
   forecast: { line: "slot" }, // sa prévision : avec l'emplacement de la bille, ou
                             // { line: "placement", marble, order }, une ligne de confirmation
+                            // (sur un emplacement occupé seulement si `replacement`)
   texts: { card: "marbles.card.final", effect: "marbles.event.effect_final", slot: "marbles.outcome.final" },
   card: "below",            // sa place dans la fiche, au-dessous de l'annonce principale
 }
@@ -307,7 +355,8 @@ Tout ce qui les connaît lit cette liste, jamais une copie : la validation de la
 champs permis), les écouteurs du core (`EVENT_TRIGGERS`, construit depuis elle, la phase
 seule y étant écrite à la main), la prévision, la narration (gabarits, lignes de
 confirmation, évènements muets), le modèle de fiche (`MARBLE_CARD_MODEL.below` en est
-dérivé, dans l'ordre de la liste : tic, éjection, final) et les outils (chiffres par
+dérivé, dans l'ordre de la liste, celui de la vie d'une bille : chiquenaude, tic,
+éjection, final) et les outils (chiffres par
 déclencheur ; leurs mots, `tools/marbles/format.js`/`TRIGGER_WORDS`, échouent au
 chargement s'il en manque un). La liste est validée au chargement du core
 (`validateMarbleTriggers`) ; ses textes, par le domaine `marbles-view`. **Ajouter un
@@ -321,8 +370,12 @@ L'en-tête de `core/marbles.js` décrit l'état, les actions et chaque évèneme
 Une action interdite ne lève jamais : `ok` est faux, l'état inchangé, et `error` est un
 code de `MARBLE_ERRORS`, dont le texte est `marbles.error.<code>`.
 
-Une bille n'a d'usure que sur le triangle (`{ marble, wear, bonus? }`) ; partout ailleurs
-c'est un simple id. Une bille qui revient repart donc à zéro par construction.
+Une bille n'a d'usure que sur le triangle (`{ marble, wear, bonus? }`), et de **compteur de
+tours en main** que dans la main (`{ marble, turnsInHand }`) ; au sac et en défausse, c'est
+un simple id. Une bille qui revient repart donc à zéro par construction : quitter la main
+(pose ou tout autre départ) remet son compteur à 0. Le compteur gagne 1 au début de chaque
+tour pour les billes déjà en main avant la pioche ; il se sérialise avec l'état et n'est lu
+que par les montants calculés (source `turnsInHand`).
 
 ### Le bus d'évènements
 
@@ -341,7 +394,7 @@ dans le réducteur, et rien d'extérieur ne s'y abonne.
   n'ayant jamais été touché.
 
 `EVENT_TRIGGERS` dit quels évènements déclenchent un effet : les phases, et les
-déclencheurs de `MARBLE_TRIGGERS` (Tic, Éjection, Final). Les autres passent au journal,
+déclencheurs de `MARBLE_TRIGGERS` (Chiquenaude, Tic, Éjection, Final). Les autres passent au journal,
 prêts à servir.
 
 ### La prévision
@@ -363,7 +416,8 @@ retirée avant sa phase par une Fêlure ; `wear` et `retired`, les changements d
 retraits, dans l'ordre ; `drawn`, les billes que l'action et la
 résolution piocheraient ; `regenerates`, vrai si le
 sac serait régénéré ; `uncertain`, vrai si une bille inconnue aurait pu réagir selon son
-identité (un déclencheur qui écoute la main : aucun aujourd'hui), ses chiffres n'étant alors
+identité (un déclencheur qui écoute la main : aucun aujourd'hui ; la Chiquenaude ne concerne
+que la bille lancée, toujours connue), ses chiffres n'étant alors
 pas sûrs. La vérification `marbles-forecast` contrôle que Vitesse, Masse, Impact, billes
 piochées et régénération prévues sont celles du réel.
 
@@ -417,11 +471,16 @@ lisent et ne s'activent pas (Entrée n'y fait rien) :
    « Vitesse +6 », valeurs produites seulement, non nulles, bonus reçu compris, sans
    texte d'effet ; « aucun effet » si rien ; suivies du Final de la bille posée si elle
    atteint son usure maximale ce tour (« Vitesse +6. Final : Pioche 1. ») ;
-3. sur un emplacement occupé, « Éjection de gorille : Vitesse +3 », ou « … : aucun effet » ;
-4. sur un emplacement occupé, « Tic d'argile : Vitesse +2 », ou « … : aucun effet » ;
-5. si la pose et la résolution régénéreraient le sac, « Le sac sera régénéré. » ;
-6. Annuler (Échap aussi : la sélection d'emplacement reprend) ;
-7. Confirmer.
+3. toujours, « Chiquenaude d'argile : Vitesse +2 », ou « … : aucun effet » ;
+4. sur un emplacement occupé, « Éjection de gorille : Vitesse +3 », ou « … : aucun effet » ;
+5. sur un emplacement occupé, « Tic d'argile : Vitesse +2 », ou « … : aucun effet » ;
+6. si la pose et la résolution régénéreraient le sac, « Le sac sera régénéré. » ;
+7. Annuler (Échap aussi : la sélection d'emplacement reprend) ;
+8. Confirmer.
+
+Une Chiquenaude qui viderait l'emplacement visé (la plombée sur une argile en pointe) laisse
+les lignes d'Éjection et de Tic à « aucun effet » : elles n'auront pas lieu, et le menu
+garde sa structure.
 
 Une Pioche s'y dit comme une valeur (« Tic d'œil-de-chat : Pioche 1 »), sans jamais nommer
 une bille du sac.
@@ -439,8 +498,10 @@ argile, usure 3. 1 sur 5    <- position par défaut
 Tic : Vitesse +2.           <- Ctrl+bas
 ```
 
-Au-dessous, les champs des déclencheurs, facultatifs, dans l'ordre tic, éjection, final
-(« Final : Masse +1. ») : ils viennent de `MARBLE_TRIGGERS`.
+Au-dessous, les champs des déclencheurs, facultatifs, dans l'ordre de la vie d'une bille :
+chiquenaude, tic, éjection, final (« Final : Masse +1. ») ; ils viennent de
+`MARBLE_TRIGGERS`. Un montant calculé s'y dit avec sa valeur actuelle (voir « Montants
+calculés »).
 
 Les champs disent les effets IMPRIMÉS. En butée, le champ se réannonce, sans son ni
 cyclage. Revenir à la position par défaut réannonce l'annonce principale. Tout geste du

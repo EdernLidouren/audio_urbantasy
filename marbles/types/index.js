@@ -14,6 +14,10 @@
 //   baseVariant effet propre à UNE base, { leftBase?, rightBase? }, qui
 //               remplace `base` sur cette base seulement ;
 //   apex        effet joué sur la pointe ;
+//   flick       la Chiquenaude : effet joué à chaque pose de la bille depuis la
+//               main, sur un emplacement vide ou occupé, avant tout le reste ; la
+//               bille, en cours de lancer, n'est ni en main ni sur le triangle (pas
+//               de Polissage ni de Fêlure sur elle-même) ;
 //   hit         le Tic : effet joué quand la bille est posée sur un emplacement
 //               occupé, après l'éjection de l'occupante ;
 //   knockout    l'Éjection : effet joué quand la bille est remplacée ;
@@ -31,11 +35,14 @@
 //           pioche `amount` billes (au moins 1, jamais de cible) ; "polish", le
 //           Polissage, et "crack", la Fêlure, qui retirent ou ajoutent `amount`
 //           d'usure (au moins 1) à la bille elle-même ou à celle de `target` ;
-//   amount  la valeur ;
+//   amount  la valeur : un entier, ou un MONTANT CALCULÉ { base, step, source,
+//           max? }, base + step × la valeur de la source, plafonné à max, évalué
+//           au déclenchement (source : turnsInHand(), marbles/effects.js) ;
 //   target  (facultatif) pour une Vitesse ou une Masse, l'emplacement dont elle
 //           modifie l'effet de phase, au lieu d'agir sur le compteur du tour (jamais
 //           une phase toujours passée, ni dans un Final) ; pour un Polissage ou une
 //           Fêlure, l'emplacement dont la bille la reçoit ;
+//   per     (facultatif) son comptage, qui multiplie le montant ;
 //   when    (facultatif) sa condition, évaluée au déclenchement. Une condition
 //           lit toujours l'effet IMPRIMÉ d'une bille, jamais un effet déjà
 //           modifié : aucune dépendance circulaire n'est possible.

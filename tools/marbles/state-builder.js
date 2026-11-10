@@ -10,12 +10,13 @@
 //     "score": 12, "speed": 0, "mass": 1,
 //     "swapUsed": false, "throwsUsed": 0,  lancers déjà joués ce tour
 //     "triangle": { "leftBase": "clay", "rightBase": "giant:0", "apex": null },
-//     "hand": ["agate", "gorilla"],
+//     "hand": ["agate", "gorilla:2"],     "id:tours en main"
 //     "bag": ["mica"],                du haut (prochaine pioche) vers le bas
 //     "discard": [],
 //     "settings": { "maxHandSize": 5, "throwsPerTurn": 5, "firstTurnDraw": 5, "drawPerTurn": 1, "turnCount": 9 }
 //   }
 // Une bille du triangle : "id" (usure 0), "id:usure", ou { marble, wear, bonus? }.
+// Une bille de la main : "id" (0 tour en main), "id:tours", ou { marble, turnsInHand }.
 // Défauts : tour 2 en phase de jeu, triangle, main, sac et défausse vides,
 // compteurs de début de tour. Une description fausse (champ, bille ou
 // emplacement inconnu, usure hors bornes) lève une erreur claire : jamais d'état
@@ -43,6 +44,14 @@ function checkMarble(id, where) {
 function checkInteger(value, name, min) {
   if (!Number.isInteger(value) || value < min) fail(`${name} doit être un entier >= ${min}.`);
   return value;
+}
+
+// Une bille de la main, avec son compteur de tours en main.
+function handContent(value) {
+  const held = typeof value === "string" ? { marble: value.split(":")[0], turnsInHand: Number(value.split(":")[1] ?? 0) } : value;
+  rejectUnknownFields(held, ["marble", "turnsInHand"], "main", fail);
+  checkMarble(held.marble, "hand");
+  return { marble: held.marble, turnsInHand: checkInteger(held.turnsInHand ?? 0, `tours en main de ${held.marble}`, 0) };
 }
 
 function slotContent(value, slot) {
@@ -81,7 +90,8 @@ export function buildState(description = {}) {
   if (!STAGES.includes(stage)) fail(`étape inconnue "${stage}".`);
   const turn = checkInteger(description.turn ?? 2, "turn", 1);
   if (turn > base.turnCount) fail(`tour ${turn} au-delà des ${base.turnCount} tours de la partie.`);
-  const hand = marbleList(description.hand, "hand");
+  if (description.hand !== undefined && !Array.isArray(description.hand)) fail("hand doit être une liste.");
+  const hand = (description.hand ?? []).map(handContent);
   if (hand.length > base.maxHandSize) fail(`main de ${hand.length} billes, plus que maxHandSize (${base.maxHandSize}).`);
 
   return {

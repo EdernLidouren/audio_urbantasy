@@ -20,6 +20,7 @@ import { buildReport, frNumber } from "../../tools/marbles/report.js";
 import { MARBLE_COLUMNS, toCsv, toJson } from "../../tools/marbles/export.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
 import { createMarblesRules } from "../marbles-rules.js";
+import { handIds } from "./helpers.js";
 
 // Les règles du jeu, liées à la vraie table (core/marbles-rules.js).
 const rules = createMarblesRules(MARBLE_TYPES);
@@ -43,7 +44,7 @@ function checkStateBuilder(run) {
     turn: 4,
     score: 30,
     triangle: { leftBase: "magnifier:1", rightBase: "clay", apex: { marble: "gorilla", wear: 2 } },
-    hand: ["clay", "leaded"],
+    hand: ["clay", "leaded:2"],
     bag: ["agate", "mica"],
     settings: { turnCount: 6 },
   });
@@ -58,6 +59,18 @@ function checkStateBuilder(run) {
   run("état construit : emplacement inconnu refusé", true, throws(() => buildState({ triangle: { middle: "clay" } })));
   run("état construit : usure au maximum refusée", true, throws(() => buildState({ triangle: { apex: "giant:1" } })));
   run("état construit : main trop grande refusée", true, throws(() => buildState({ hand: Array(6).fill("clay") })));
+  run.same(
+    "état construit : la main avec ses compteurs de tours en main",
+    [{ marble: "clay", turnsInHand: 0 }, { marble: "leaded", turnsInHand: 2 }],
+    state.hand
+  );
+  run.same("état construit : une bille de main en objet", [{ marble: "tiger", turnsInHand: 1 }], buildState({ hand: [{ marble: "tiger", turnsInHand: 1 }] }).hand);
+  run("état construit : compteur négatif refusé", true, throws(() => buildState({ hand: ["clay:-1"] })));
+  run(
+    "état lisible : la main dit les tours en main",
+    "Main, 2 sur 5 : clay, 0 tour en main ; leaded, 2 tours en main.",
+    formatState(state).find((line) => line.startsWith("Main"))
+  );
 
   const { state: after, steps } = applyActions(state, [
     { type: "place", handIndex: 9, slot: "apex" },
@@ -178,7 +191,7 @@ function checkGreedy(run) {
   // jouer, comme le fait le joueur.
   let current = view;
   for (const choice of plan.choices) {
-    const action = choice.type === "place" ? { type: "place", handIndex: current.hand.indexOf(choice.marble), slot: choice.slot } : choice;
+    const action = choice.type === "place" ? { type: "place", handIndex: handIds(current).indexOf(choice.marble), slot: choice.slot } : choice;
     current = rules.reduce(current, action).state;
   }
   run("glouton : son plan rejoué donne l'Impact annoncé", plan.impact, rules.forecast(current).impact);
@@ -195,19 +208,25 @@ function checkGreedy(run) {
 
   // Premier tour : toutes les attributions de la main au triangle, emplacements
   // laissés vides compris (aucune règle n'exige de le remplir), par recherche
-  // exhaustive sur les places de la main (-1 : emplacement laissé vide).
+  // exhaustive sur les places de la main (-1 : emplacement laissé vide). Les billes
+  // se posent vraiment, dans l'ordre des phases comme le glouton : leurs
+  // Chiquenaudes comptent.
   const first = rules.reduce(rules.createGame(7), { type: "draw" }).state;
   let firstBest = -Infinity;
-  const hand = first.hand;
+  const hand = handIds(first);
   const choicesOf = [-1, ...hand.keys()];
-  const placedAt = (index) => (index === -1 ? null : { marble: hand[index], wear: 0 });
   for (const a of choicesOf) {
     for (const b of choicesOf) {
       for (const c of choicesOf) {
         const used = [a, b, c].filter((index) => index !== -1);
         if (new Set(used).size < used.length) continue;
-        const triangle = { leftBase: placedAt(a), rightBase: placedAt(b), apex: placedAt(c) };
-        firstBest = Math.max(firstBest, rules.forecast({ ...first, triangle }).impact);
+        let current = first;
+        [a, b, c].forEach((index, slotIndex) => {
+          if (index === -1) return;
+          const action = { type: "place", handIndex: handIds(current).indexOf(hand[index]), slot: SLOTS[slotIndex] };
+          current = rules.reduce(current, action, { blind: true }).state;
+        });
+        firstBest = Math.max(firstBest, rules.forecast(current).impact);
       }
     }
   }
@@ -215,7 +234,7 @@ function checkGreedy(run) {
   run("glouton, premier tour : le meilleur remplissage, partiel compris", firstBest, firstPlan.impact);
   run.same("glouton, premier tour : ici, les trois emplacements", [...SLOTS].sort(), firstPlan.choices.map((choice) => choice.slot).sort());
   // Un triangle partiel s'envisage : une main d'une bille au premier tour donne un plan d'une pose.
-  const single = { ...first, hand: [first.hand[0]] };
+  const single = { ...first, hand: first.hand.slice(0, 1) };
   run("glouton, premier tour : une seule bille, une seule pose", 1, bestPlan(publicView(single), impactOnly).choices.length);
 }
 

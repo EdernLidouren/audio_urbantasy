@@ -37,6 +37,18 @@ export function emptyBagMarblesGame(rules, seed) {
   return rules.createGame(seed, { bag: [] });
 }
 
+// Une main de billes (core/marbles.js, en-tête) depuis leurs ids, toutes à
+// `turnsInHand` tours en main (0 par défaut), pour les états fabriqués des
+// domaines marbles*.
+export function inHand(ids, turnsInHand = 0) {
+  return ids.map((marble) => ({ marble, turnsInHand }));
+}
+
+// Les ids des billes d'une main, dans l'ordre : ce que les attentes comparent.
+export function handIds(state) {
+  return state.hand.map((held) => held.marble);
+}
+
 export const RAW_SCENE = {
   id: "movement-check",
   titleKey: "scene.demo.name",

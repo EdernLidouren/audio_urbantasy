@@ -110,9 +110,9 @@ function resolveTurn() {
 }
 
 // Une bille et sa fiche, à plat : ce que l'écran donne champ par champ.
-function printMarble(marble, main) {
+function printMarble(marble, main, turnsInHand = 0) {
   console.log(`  ${main}`);
-  const { above, below } = marbleCard(marble, main, GAME_RULES, t);
+  const { above, below } = marbleCard(marble, main, GAME_RULES, t, { turnsInHand });
   for (const field of [...above, ...below]) console.log(`      ${field}`);
 }
 
@@ -125,7 +125,7 @@ function printState() {
     else printMarble(placed.marble, describeSlotFocus(game, slot, GAME_RULES, t));
   }
   if (game.hand.length === 0) console.log(`  ${describeHandFocus(game, 0, GAME_RULES, t)}`);
-  game.hand.forEach((marble, index) => printMarble(marble, describeHandFocus(game, index, GAME_RULES, t)));
+  game.hand.forEach(({ marble, turnsInHand }, index) => printMarble(marble, describeHandFocus(game, index, GAME_RULES, t), turnsInHand));
   console.log(`  [sac, du haut vers le bas : ${game.bag.join(", ") || "-"}]`);
   console.log(`  [défausse : ${game.discard.join(", ") || "-"}]`);
 }

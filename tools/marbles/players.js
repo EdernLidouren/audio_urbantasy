@@ -51,7 +51,7 @@ function startRandom({ seed }) {
 // Une pose désigne sa BILLE, pas une place dans la main, qui bouge à chaque pose :
 // la place n'est calculée qu'au moment de jouer (handIndexIn).
 function handIndexIn(hand, marble) {
-  return hand.indexOf(marble);
+  return hand.findIndex((held) => held.marble === marble);
 }
 
 function toAction(choice, state) {
@@ -61,7 +61,7 @@ function toAction(choice, state) {
 // Les billes distinctes de la main : deux exemplaires donnent la même issue, un
 // seul s'évalue. Une bille piochée pendant la planification est inconnue : elle ne
 // se planifie pas.
-const distinct = (hand) => [...new Set(hand)].filter((marble) => marble !== UNKNOWN_MARBLE);
+const distinct = (hand) => [...new Set(hand.map((held) => held.marble))].filter((marble) => marble !== UNKNOWN_MARBLE);
 
 // Les billes que des journaux disent piochées.
 const drawsIn = (events) => events.filter((event) => event.type === "draw").length;

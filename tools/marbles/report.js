@@ -124,7 +124,7 @@ export function buildReport({ params, summary, name }) {
     "Fin de partie.",
     `Par le nombre de tours : ${n(end.turnsCompleted)} %. Par pioche impossible, faute de billes : ${n(end.outOfMarbles)} %.`,
     "",
-    "Remplacements, moyennes par partie.",
+    "Poses, moyennes par partie.",
     `Poses sur un emplacement occupé : ${n(replacements.perGame)}.`,
     ...PLACEMENT_TRIGGERS.map(({ id }) => `Apporté par ${TRIGGER_WORDS[id].brought} : Vitesse ${n(replacements[`${id}Speed`])}, Masse ${n(replacements[`${id}Mass`])}.`),
     "",

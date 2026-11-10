@@ -20,6 +20,7 @@ const CAUSES = { replacement: "remplacement", wear: "usure" };
 // (config/marbles-values.js) : un déclencheur sans ses mots lève au chargement.
 export const TRIGGER_WORDS = {
   phase: { name: "Phase", effect: "Effet de phase", produced: "en phase" },
+  flick: { name: "Chiquenaude", effect: "Effet de chiquenaude", produced: "en chiquenaude", brought: "les chiquenaudes" },
   hit: { name: "Tic", effect: "Effet de tic", produced: "en tic", brought: "les tics" },
   knockout: { name: "Éjection", effect: "Effet d'éjection", produced: "en éjection", brought: "les éjections" },
   final: { name: "Final", effect: "Effet final", produced: "en final" },
@@ -48,6 +49,15 @@ function listOf(ids, name) {
   return ids.length === 0 ? "aucune" : ids.map((id) => marbleLabel(id, name)).join(", ");
 }
 
+// La main, avec le compteur de tours en main de chaque bille : « argile (clay), 2
+// tours en main ».
+function handList(hand, name) {
+  if (hand.length === 0) return "aucune";
+  return hand.map(({ marble, turnsInHand }) => `${marbleLabel(marble, name)}, ${turnsLabel(turnsInHand)}`).join(" ; ");
+}
+
+const turnsLabel = (turns) => `${turns} tour${turns > 1 ? "s" : ""} en main`;
+
 // Un emplacement : « base gauche : argile (clay), usure 1 sur 3, bonus Vitesse +4. »
 function slotLine(state, slot, name) {
   const placed = state.triangle[slot];
@@ -66,7 +76,7 @@ export function formatState(state, name) {
     `Score ${state.score}. Vitesse ${formatCounter(state.speed)}, Masse ${formatCounter(state.mass)}.`,
     `Échange utilisé : ${yesNo(state.swapUsed)}. Lancers : ${state.throwsUsed} sur ${state.throwsPerTurn}.`,
     ...SLOTS.map((slot) => slotLine(state, slot, name)),
-    `Main, ${state.hand.length} sur ${state.maxHandSize} : ${listOf(state.hand, name)}.`,
+    `Main, ${state.hand.length} sur ${state.maxHandSize} : ${handList(state.hand, name)}.`,
     `Sac, ${state.bag.length}, du haut vers le bas : ${listOf(state.bag, name)}.`,
     `Défausse, ${state.discard.length} : ${listOf(state.discard, name)}.`,
     `Pioche : ${state.firstTurnDraw} au premier tour, ${state.drawPerTurn} ensuite.`,
@@ -88,6 +98,7 @@ const EVENT_LINES = {
   drawSkipped: (event) => `Pioche sautée (${event.reason}).`,
   bagRegenerated: (event) => `Sac régénéré depuis la défausse : ${event.size} billes.`,
   swapped: (event) => `Échange : ${slotLabel(event.a)} et ${slotLabel(event.b)}.`,
+  flick: (event, name) => `Chiquenaude : ${marbleLabel(event.marble, name)} lancée vers ${slotLabel(event.slot)}, ${turnsLabel(event.turnsInHand)}.`,
   knockout: (event, name) => `Éjection : ${marbleLabel(event.marble, name)} en ${slotLabel(event.slot)}.`,
   removed: (event, name) => `Retrait : ${marbleLabel(event.marble, name)}, ${slotLabel(event.slot)} (${CAUSES[event.cause] ?? event.cause}).`,
   discarded: (event, name) => `Défausse : ${marbleLabel(event.marble, name)} (${CAUSES[event.cause] ?? event.cause}).`,
