@@ -23,6 +23,7 @@ import { createSeed, nextRandom } from "../../core/rng.js";
 import { PLAYERS, publicView } from "./players.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
 import { GAME_RULES } from "./game-rules.js";
+import { TRIGGER_IDS } from "./format.js";
 
 export const MARBLE_IDS = Object.keys(MARBLE_TYPES);
 export const SETTING_NAMES = ["maxHandSize", "throwsPerTurn", "firstTurnDraw", "drawPerTurn", "turnCount"];
@@ -98,20 +99,24 @@ export function parseBagText(text) {
 
 // --- Une partie ---
 
+// Les chiffres d'une bille : ses gestes, puis Vitesse et Masse produites par chaque
+// déclencheur (`<déclencheur>Speed`, `<déclencheur>Mass`), la phase en tête.
+export const MARBLE_STAT_FIELDS = [
+  "drawn",
+  "placed",
+  "placedReplacing",
+  "knockedOut",
+  "worn",
+  ...TRIGGER_IDS.flatMap((trigger) => [`${trigger}Speed`, `${trigger}Mass`]),
+];
+
 function emptyMarbleStats() {
-  return {
-    drawn: 0,
-    placed: 0,
-    placedReplacing: 0,
-    knockedOut: 0,
-    worn: 0,
-    phaseSpeed: 0,
-    phaseMass: 0,
-    hitSpeed: 0,
-    hitMass: 0,
-    knockoutSpeed: 0,
-    knockoutMass: 0,
-  };
+  return Object.fromEntries(MARBLE_STAT_FIELDS.map((field) => [field, 0]));
+}
+
+// Ce que chaque déclencheur (hors phase) a apporté aux compteurs dans la partie.
+function emptyTriggerTotals() {
+  return Object.fromEntries(TRIGGER_IDS.filter((trigger) => trigger !== "phase").map((trigger) => [trigger, { speed: 0, mass: 0 }]));
 }
 
 // Ce que le journal d'une action ajoute au relevé de la partie. `actionType` : la
@@ -156,7 +161,7 @@ function recordEvents(record, events, actionType) {
         const marble = stats(event.marble);
         marble[`${event.trigger}Speed`] += event.speedDelta;
         marble[`${event.trigger}Mass`] += event.massDelta;
-        if (event.trigger === "hit" || event.trigger === "knockout") {
+        if (event.trigger !== "phase") {
           record[event.trigger].speed += event.speedDelta;
           record[event.trigger].mass += event.massDelta;
         }
@@ -175,7 +180,7 @@ function recordEvents(record, events, actionType) {
 
 // Une partie jouée de bout en bout. -> son relevé :
 //   { index, seed, bag, score, endReason, turns, impacts, replacements,
-//     hit: { speed, mass }, knockout: { speed, mass }, effectDraws, regenerations,
+//     <déclencheur>: { speed, mass } (hit, knockout…), effectDraws, regenerations,
 //     midTurnRegenerations, throws, refusals, marbles: { id: stats } }
 // `effectDraws` : les billes piochées par des effets ; `throws` : les lancers joués.
 // `turns` : les tours résolus ; `impacts[k]` : l'Impact du tour k + 1.
@@ -193,8 +198,7 @@ export function playGame({ index, seed, player, playerOptions = {}, bagMode, set
     turns: 0,
     impacts: [],
     replacements: 0,
-    hit: { speed: 0, mass: 0 },
-    knockout: { speed: 0, mass: 0 },
+    ...emptyTriggerTotals(),
     effectDraws: 0,
     regenerations: 0,
     midTurnRegenerations: 0,

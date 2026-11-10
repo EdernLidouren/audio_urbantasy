@@ -32,6 +32,7 @@ function deepFreeze(value) {
 export default function checkMarblesForecast(run) {
   checkCases(run);
   checkBlindDraws(run);
+  checkFinalForecast(run);
   checkGuards(run);
   checkMatchesReality(run);
 }
@@ -74,6 +75,22 @@ function checkBlindDraws(run) {
   run.same("aveugle : la phase du mica, Pioche 1", { marble: "mica", speed: 0, mass: 0, draw: 1, given: [] }, phase.phases.leftBase);
   run("aveugle : rien à piocher, rien de pioché", 0, phase.drawn);
   run("aveugle : ni régénération", false, phase.regenerates);
+}
+
+// Le Final se prévoit avec l'emplacement de sa bille, seulement si elle atteint son
+// usure maximale ce tour.
+function checkFinalForecast(run) {
+  const worn = rules.forecast(playState({ hand: [], bag: ["clay"], triangle: { leftBase: null, rightBase: null, apex: placed("porcelain", 1) } }));
+  run.same("final prévu : la porcelaine usée ce tour", [{ trigger: "final", marble: "porcelain", speed: 4, mass: 0, draw: 0, given: [] }], worn.slotEffects.apex);
+  run("final prévu : compté dans l'Impact (5 + 4)", 9, worn.impact);
+  run.same("final prévu : rien ailleurs", [[], []], [worn.slotEffects.leftBase, worn.slotEffects.rightBase]);
+  const fresh = rules.forecast(playState({ hand: [], bag: ["clay"], triangle: { leftBase: null, rightBase: null, apex: placed("porcelain", 0) } }));
+  run.same("final prévu : pas usée ce tour, pas de Final", [], fresh.slotEffects.apex);
+  run("final prévu : ni dans l'Impact", 5, fresh.impact);
+  const giant = rules.forecast(playState({ hand: ["giant"], bag: ["agate"] }), { type: "place", handIndex: 0, slot: "leftBase" });
+  run("final prévu : la géante posée pioche à son Final", 1, giant.slotEffects.leftBase[0].draw);
+  run("final prévu : une bille piochée", 1, giant.drawn);
+  run("final prévu : aucune bille du sac révélée", false, JSON.stringify(giant).includes("agate"));
 }
 
 function checkCases(run) {
@@ -233,7 +250,12 @@ function compareState(state, marbles, faults, tally) {
       faults.push(`Impact prévu ${predicted.impact}, réel ${resolved.state.score - state.score}`);
     }
     // Les comptes tombent juste, lus indépendamment du journal d'Impact.
-    const parts = [predicted.knockout, predicted.hit, ...SLOTS.map((slot) => predicted.phases[slot])].filter((part) => part !== null);
+    const parts = [
+      predicted.knockout,
+      predicted.hit,
+      ...SLOTS.map((slot) => predicted.phases[slot]),
+      ...SLOTS.flatMap((slot) => predicted.slotEffects[slot]),
+    ].filter((part) => part !== null);
     const speed = parts.reduce((total, part) => total + part.speed, state.speed);
     if (speed !== predicted.speed) faults.push(`Vitesse prévue ${predicted.speed}, somme des effets ${speed}`);
   }

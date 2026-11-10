@@ -17,6 +17,7 @@ import {
   MARBLES_COLLISION,
   MARBLES_PITCH_VARIATION,
   MARBLES_SETTINGS,
+  MARBLE_TRIGGERS,
 } from "../../config/marbles-values.js";
 import { detailLine, stepDetail } from "../../lib/detail-card.js";
 import { createMarblesGame, marblesReduce, END_REASONS, MARBLE_ERRORS, SLOTS } from "../marbles.js";
@@ -166,6 +167,18 @@ function checkCards(run) {
     run.same("fiche : la Pioche en base", { above: ["Pointe : Vitesse +2.", "Base : Pioche 1."], below: ["Aucun effet particulier."] }, fields("mica"));
     run.same("fiche : la Pioche au tic", ["Tic : Pioche 1."], fields("cats_eye").below);
     run.same("fiche : la Pioche à l'éjection", ["Éjection : Pioche 1."], fields("stoneware").below);
+    run.same("fiche : le Final de la porcelaine", ["Final : Vitesse +4."], fields("porcelain").below);
+    run.same("fiche : le Final de la géante", ["Final : Pioche 1."], fields("giant").below);
+    run.same(
+      "fiche : tic, éjection, final, dans cet ordre",
+      ["Tic : Vitesse +1.", "Éjection : Masse +2.", "Final : Pioche 1."],
+      marbleCard(
+        "all",
+        "x",
+        createMarblesRules({ all: { final: [{ action: "draw", amount: 1 }], knockout: [{ action: "mass", amount: 2 }], hit: [{ action: "speed", amount: 1 }] } }),
+        t
+      ).below.map(plain)
+    );
     setLocale("en");
     run.same("fiche, anglais : la Pioche", ["Apex: Speed +2.", "Base: Draw 1."], fields("mica").above);
     setLocale("fr");
@@ -632,6 +645,8 @@ export default function checkMarblesView(run) {
       run.same(`${locale} : chaque refus a son texte`, [], missingErrors);
       const missingEnds = END_REASONS.filter((reason) => !Object.hasOwn(LOCALE_TABLES[locale], `marbles.event.game_over.${reason}`));
       run.same(`${locale} : chaque fin de partie a son texte`, [], missingEnds);
+      const missingTriggerTexts = MARBLE_TRIGGERS.flatMap((trigger) => Object.values(trigger.texts)).filter((key) => !Object.hasOwn(LOCALE_TABLES[locale], key));
+      run.same(`${locale} : chaque déclencheur a ses textes`, [], missingTriggerTexts);
 
       const dirtySteps = buildSteps(events, t).map((step) => step.text).filter((text) => !isClean(text));
       run.same(`${locale} : chaque étape du journal se dit`, [], dirtySteps.slice(0, 3));

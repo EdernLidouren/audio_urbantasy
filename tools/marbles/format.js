@@ -7,13 +7,32 @@
 // `name(id)` : le nom d'une bille ; par défaut son id. Les lanceurs passent le nom
 // français (data/i18n), les vérifications l'id.
 
+import { MARBLE_TRIGGERS } from "../../config/marbles-values.js";
 import { SLOTS } from "../../core/marbles.js";
 import { formatCounter } from "../../view/marbles/narration.js";
 import { GAME_RULES } from "./game-rules.js";
 
 const SLOT_NAMES = { leftBase: "base gauche", rightBase: "base droite", apex: "pointe" };
 const CAUSES = { replacement: "remplacement", wear: "usure" };
-const TRIGGERS = { phase: "Effet de phase", hit: "Effet de tic", knockout: "Effet d'éjection" };
+// Les mots du terminal pour chaque déclencheur, la phase comprise : son nom, son
+// effet, ce qu'il produit (rapport) et, pour un déclencheur de pose, ce qu'il apporte
+// (rapport, section des remplacements). Un par entrée de MARBLE_TRIGGERS
+// (config/marbles-values.js) : un déclencheur sans ses mots lève au chargement.
+export const TRIGGER_WORDS = {
+  phase: { name: "Phase", effect: "Effet de phase", produced: "en phase" },
+  hit: { name: "Tic", effect: "Effet de tic", produced: "en tic", brought: "les tics" },
+  knockout: { name: "Éjection", effect: "Effet d'éjection", produced: "en éjection", brought: "les éjections" },
+  final: { name: "Final", effect: "Effet final", produced: "en final" },
+};
+for (const trigger of MARBLE_TRIGGERS) {
+  if (!Object.hasOwn(TRIGGER_WORDS, trigger.id)) throw new Error(`outils des billes : le déclencheur "${trigger.id}" n'a pas ses mots (TRIGGER_WORDS).`);
+}
+
+// Les déclencheurs, la phase en tête : l'ordre des chiffres dans les outils.
+export const TRIGGER_IDS = ["phase", ...MARBLE_TRIGGERS.map((trigger) => trigger.id)];
+// Les déclencheurs d'une pose, avec leur effet dans la prévision.
+export const PLACEMENT_TRIGGERS = MARBLE_TRIGGERS.filter((trigger) => trigger.forecast.line === "placement");
+export const triggerLabel = (id) => TRIGGER_WORDS[id].name;
 
 export const slotLabel = (slot) => SLOT_NAMES[slot] ?? slot;
 export const counter = formatCounter;
@@ -56,7 +75,7 @@ export function formatState(state, name) {
 }
 
 function effectLine(event, name) {
-  let line = `${TRIGGERS[event.trigger] ?? `Effet ${event.trigger}`}, ${marbleLabel(event.marble, name)} en ${slotLabel(event.slot)} : Vitesse ${signed(event.speedDelta)}, Masse ${signed(event.massDelta)}`;
+  let line = `${TRIGGER_WORDS[event.trigger]?.effect ?? `Effet ${event.trigger}`}, ${marbleLabel(event.marble, name)} en ${slotLabel(event.slot)} : Vitesse ${signed(event.speedDelta)}, Masse ${signed(event.massDelta)}`;
   for (const gift of event.given ?? []) {
     line += `, donne Vitesse ${signed(gift.speed)} et Masse ${signed(gift.mass)} à ${slotLabel(gift.slot)}`;
   }
@@ -74,6 +93,7 @@ const EVENT_LINES = {
   discarded: (event, name) => `Défausse : ${marbleLabel(event.marble, name)} (${CAUSES[event.cause] ?? event.cause}).`,
   placed: (event, name) => `Pose : ${marbleLabel(event.marble, name)} en ${slotLabel(event.slot)}.`,
   hit: (event, name) => `Tic : ${marbleLabel(event.marble, name)} en ${slotLabel(event.slot)}.`,
+  final: (event, name) => `Final : ${marbleLabel(event.marble, name)}, usée, partie de ${slotLabel(event.slot)}.`,
   phase: (event, name) => `Phase de ${slotLabel(event.slot)} : ${marbleLabel(event.marble, name)}.`,
   phaseSkipped: (event) => `Phase de ${slotLabel(event.slot)} : vide.`,
   effect: (event, name) => effectLine(event, name),

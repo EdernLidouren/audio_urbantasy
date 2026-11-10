@@ -391,6 +391,8 @@ export const MARBLE_EVENT_CUES = {
     context.struck = null;
   },
   hit: null,
+  // Le Final d'une bille usée : un point d'accroche, muet pour l'instant.
+  final: null,
   // La bille active fait entendre sa voix quand vient la phase de son emplacement,
   // avec l'étape de la séquence qui dit ce qu'elle produit.
   phase: (event, timeline) => timeline.now("beacon", event.marble, slotPlace(event.slot)),

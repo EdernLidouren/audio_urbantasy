@@ -20,8 +20,10 @@ import {
   placeRefusal,
   throwRefusal,
   throwsLeft,
+  validateMarbleTriggers,
   validateMarbleTypes,
 } from "../marbles.js";
+import { MARBLE_TRIGGERS } from "../../config/marbles-values.js";
 import { printedStat } from "../marbles-effects.js";
 import { STARTING_BAG, MARBLES_SETTINGS } from "../../config/marbles-values.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
@@ -86,6 +88,8 @@ export default function checkMarbles(run) {
   checkPlace(run);
   checkThrows(run);
   checkDrawEffects(run);
+  checkTriggers(run);
+  checkFinal(run);
   checkHitAndKnockout(run);
   checkMagnifier(run);
   checkBonus(run);
@@ -421,6 +425,86 @@ function checkDrawEffects(run) {
   run("anti-boucle : la suivante refusée", "noThrowsLeft", lastError);
 }
 
+// La liste des déclencheurs, déclarée une fois (config/marbles-values.js).
+function checkTriggers(run) {
+  run.same("déclencheurs : tic, éjection, final, dans l'ordre de la fiche", ["hit", "knockout", "final"], MARBLE_TRIGGERS.map((trigger) => trigger.id));
+  run("déclencheurs : la vraie liste acceptée", false, throws(() => validateMarbleTriggers(MARBLE_TRIGGERS)));
+  const [hit] = MARBLE_TRIGGERS;
+  const refused = (name, list) => run(`déclencheurs refusés : ${name}`, true, throws(() => validateMarbleTriggers(list)));
+  refused("id en double", [hit, { ...hit, field: "other", event: "other" }]);
+  refused("champ en double", [hit, { ...hit, id: "other", event: "other" }]);
+  refused("la phase n'en est pas un", [{ ...hit, id: "phase" }]);
+  refused("un champ de phase", [{ ...hit, field: "apex" }]);
+  refused("bille concernée inconnue", [{ ...hit, marble: "hand" }]);
+  refused("ligne de prévision inconnue", [{ ...hit, forecast: { line: "elsewhere" } }]);
+  refused("ligne de pose sans son texte", [{ ...hit, texts: { card: "a", effect: "b" } }]);
+  refused("ligne d'emplacement sans son texte", [{ ...hit, forecast: { line: "slot" } }]);
+  refused("place dans la fiche inconnue", [{ ...hit, card: "above" }]);
+  refused("champ inconnu", [{ ...hit, extra: 1 }]);
+  run("table : le champ final accepté", false, throws(() => validateMarbleTypes({ a: { final: [{ action: "speed", amount: 1 }] } })));
+  run("table : un champ de déclencheur inconnu refusé", true, throws(() => validateMarbleTypes({ a: { finale: [] } })));
+}
+
+// Le FINAL : au retrait par usure seulement, la bille déjà à la défausse, avant
+// l'Impact, ses valeurs comptant pour le tour.
+function checkFinal(run) {
+  // Porcelaine (usure 2) en pointe, déjà usée une fois : elle s'use, part, son Final joue.
+  const worn = apply(playState({ hand: [], bag: ["clay"], triangle: triangleOf(null, null, placed("porcelain", 1)) }), { type: "resolve" });
+  run.same(
+    "final : retrait, défausse, Final, puis l'Impact",
+    ["phase", "effect", "wear", "removed", "discarded", "final", "effect", "impact"],
+    eventTypes(worn.events).slice(eventTypes(worn.events).indexOf("phase"), eventTypes(worn.events).indexOf("impact") + 1)
+  );
+  const final = worn.events.filter((event) => event.type === "effect").at(-1);
+  run.same("final : son effet", { trigger: "final", slot: "apex", marble: "porcelain", speedDelta: 4, massDelta: 0, draw: 0 }, {
+    trigger: final.trigger,
+    slot: final.slot,
+    marble: final.marble,
+    speedDelta: final.speedDelta,
+    massDelta: final.massDelta,
+    draw: final.draw,
+  });
+  run("final : la bille est déjà à la défausse", "porcelain", worn.state.discard.join());
+  run("final : sa Vitesse compte pour l'Impact du tour (5 de phase + 4)", 9, worn.events.find((event) => event.type === "impact").impact);
+
+  // Tigrée : la Masse du Final compte aussi.
+  const tiger = apply(playState({ hand: [], bag: ["clay"], triangle: triangleOf(placed("tiger", 3), null, null) }), { type: "resolve" });
+  run.same("final : la Masse compte (Vitesse 3, Masse 1 + 1)", { speed: 3, mass: 2, impact: 6 }, (({ speed, mass, impact }) => ({ speed, mass, impact }))(tiger.events.find((event) => event.type === "impact")));
+
+  // Pas usée : pas de Final.
+  const fresh = apply(playState({ hand: [], bag: ["clay"], triangle: triangleOf(null, null, placed("porcelain", 0)) }), { type: "resolve" });
+  run("final : pas d'usure maximale, pas de Final", false, eventTypes(fresh.events).includes("final"));
+
+  // Jamais à une éjection, un échange, une pose.
+  const knocked = apply(playState({ hand: ["clay"], bag: ["glass"], triangle: triangleOf(null, null, placed("porcelain", 1)) }), { type: "place", handIndex: 0, slot: "apex" });
+  run("final : jamais à une éjection", false, eventTypes(knocked.events).includes("final"));
+  const swapped = apply(playState({ hand: [], triangle: triangleOf(placed("porcelain", 1), null, placed("tiger", 3)) }), { type: "swap", a: "leftBase", b: "apex" });
+  run("final : jamais à un échange", false, eventTypes(swapped.events).includes("final"));
+  const placedGiant = apply(playState({ hand: ["giant"], bag: ["glass"] }), { type: "place", handIndex: 0, slot: "apex" });
+  run("final : jamais à une pose, même d'une bille d'usure 1", false, eventTypes(placedGiant.events).includes("final"));
+
+  // Plusieurs retraits : dans l'ordre des phases, chacun avec son Final.
+  const both = apply(playState({ hand: [], bag: ["clay"], triangle: triangleOf(placed("tiger", 3), null, placed("porcelain", 1)) }), { type: "resolve" });
+  run.same(
+    "final : dans l'ordre des phases",
+    ["tiger", "porcelain"],
+    both.events.filter((event) => event.type === "effect" && event.trigger === "final").map((event) => event.marble)
+  );
+
+  // Géante : son Final pioche par la pioche unifiée ; la bille attend le tour suivant.
+  const giant = apply(playState({ hand: [], bag: ["agate"], triangle: triangleOf(null, null, placed("giant")) }), { type: "resolve" });
+  run.same("final, pioche : l'effet, puis la bille, avant l'Impact", ["final", "effect", "draw", "impact"], eventTypes(giant.events).filter((type) => ["final", "effect", "draw", "impact"].includes(type)).slice(-4));
+  run("final, pioche : en main", "agate", giant.state.hand.join());
+  run("final, pioche : pas jouable avant la pioche du tour", "mustDraw", placeRefusal(giant.state, 0, "apex"));
+  run("final, pioche : jouable au tour suivant", null, placeRefusal(apply(giant.state, { type: "draw" }).state, 0, "apex"));
+
+  // Sac vide : la défausse, géante comprise (elle vient d'y arriver), devient le sac.
+  const regen = apply(playState({ hand: [], bag: [], discard: ["clay"], triangle: triangleOf(null, null, placed("giant")) }), { type: "resolve" });
+  run.same("final, pioche : régénération au cours de la résolution", ["final", "effect", "bagRegenerated", "draw"], eventTypes(regen.events).filter((type) => ["final", "effect", "bagRegenerated", "draw"].includes(type)).slice(-4));
+  run("final, pioche : la défausse entière, géante comprise", 2, regen.events.find((event) => event.type === "bagRegenerated").size);
+  run("final, pioche : aucune bille perdue", 2, marbleCount(regen.state));
+}
+
 function checkPlace(run) {
   const onEmpty = apply(playState({ hand: ["clay", "glass"], triangle: triangleOf(null, null, null) }), { type: "place", handIndex: 1, slot: "apex" });
   run.same("pose : la bille va sur l'emplacement, usure 0", placed("glass"), onEmpty.state.triangle.apex);
@@ -701,12 +785,12 @@ function checkResolution(run) {
   run("retrait : part à la défausse", "clay", last.state.discard.join());
   run.same("retrait : emplacement vidé", triangleOf(null, null, null), last.state.triangle);
   run.same(
-    "retrait : après l'Impact, avant la rotation",
-    ["impact", "removed", "discarded", "rotation", "turnEnded"],
-    eventTypes(last.events).slice(-5)
+    "retrait : après les phases, avant l'Impact et la rotation",
+    ["removed", "discarded", "final", "impact", "rotation", "turnEnded"],
+    eventTypes(last.events).slice(-6)
   );
 
-  const giant = apply(playState({ triangle: triangleOf(null, null, placed("giant")) }), { type: "resolve" });
+  const giant = apply(playState({ bag: ["agate"], triangle: triangleOf(null, null, placed("giant")) }), { type: "resolve" });
   run("géante : joue puis part dès le premier tour", 6, giant.state.score);
   run("géante : retirée", "giant", giant.state.discard.join());
 
@@ -715,7 +799,7 @@ function checkResolution(run) {
   const tiger = apply(playState({ triangle: triangleOf(null, null, placed("tiger", 2)) }), { type: "resolve" });
   run("tigrée : pas retirée à usure 3 sur 4", 0, tiger.state.discard.length);
 
-  const twoRetired = apply(playState({ triangle: triangleOf(placed("giant"), placed("clay", 2), placed("glass")) }), { type: "resolve" });
+  const twoRetired = apply(playState({ bag: ["agate"], triangle: triangleOf(placed("giant"), placed("clay", 2), placed("glass")) }), { type: "resolve" });
   run("retrait : dans l'ordre des emplacements", "giant,clay", twoRetired.state.discard.join());
 
   // Rotation : base gauche -> pointe, pointe -> base droite, base droite -> base gauche.
@@ -992,7 +1076,7 @@ function checkSmoke(run) {
   run.same("fumée : invariants tenus", [], faults.slice(0, 5));
   run(
     "fumée : tous les évènements rencontrés",
-    "bagRegenerated,discarded,draw,drawSkipped,effect,gameOver,hit,impact,knockout,phase,phaseSkipped,placed,removed,rotation,swapped,turnEnded,turnStarted,wear",
+    "bagRegenerated,discarded,draw,drawSkipped,effect,final,gameOver,hit,impact,knockout,phase,phaseSkipped,placed,removed,rotation,swapped,turnEnded,turnStarted,wear",
     [...seen].sort().join()
   );
 }

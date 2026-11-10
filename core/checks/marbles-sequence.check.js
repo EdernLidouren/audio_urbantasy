@@ -102,13 +102,15 @@ function playGame(seed, options, present, onTurn = () => {}) {
 }
 
 // La forme attendue d'une résolution : ouverture, trois phases (chacune suivie de
-// ses pioches éventuelles, Pioche oblige), Impact, les
-// billes usées, puis la rotation et la pioche du tour suivant, ou la fin de
+// ses pioches éventuelles, Pioche oblige), les billes usées (chacune suivie de son
+// Final et de ses pioches éventuelles), l'Impact, puis la
+// rotation et la pioche du tour suivant, ou la fin de
 // partie (dernier tour : sans rotation ni pioche ; sac et défausse vides : la
 // fin suit l'arrêt de la pioche).
 const SEQUENCE_SHAPE = new RegExp(
   "^resolution\\.opening (outcome\\.(slot|empty) (event\\.bag_regenerated |event\\.draw |event\\.draw_skipped\\.(handFull|noMarbles) )*){3}" +
-    "event\\.impact (event\\.discarded\\.wear )*" +
+    "(event\\.discarded\\.wear (event\\.effect_final )?(event\\.bag_regenerated |event\\.draw |event\\.draw_skipped\\.(handFull|noMarbles) )*)*" +
+    "event\\.impact " +
     "(event\\.rotation (event\\.bag_regenerated )?((event\\.draw|event\\.draw_skipped\\.(handFull|noMarbles)) )+event\\.turn_started" +
     "|event\\.rotation event\\.draw_skipped\\.noMarbles event\\.game_over\\.outOfMarbles" +
     "|event\\.game_over\\.turnsCompleted)$"
@@ -257,11 +259,18 @@ function checkTexts(run) {
     run.same(
       "séquence : une étape par bille usée, accordée au genre de son nom",
       ["géante est usée et part à la défausse.", "calot est usé et part à la défausse."],
-      texts(worn).filter((text) => text.includes("défausse"))
+      texts(worn).filter((text) => text.includes("part à la défausse"))
     );
     run.same(
       "séquence : dernier tour, ni rotation ni pioche",
-      ["Impact 13. Score 13.", "géante est usée et part à la défausse.", "calot est usé et part à la défausse.", "Partie terminée. Score final : 13."],
+      [
+        "géante est usée et part à la défausse.",
+        "Final de géante : Pioche 1.",
+        "Vous piochez agate.",
+        "calot est usé et part à la défausse.",
+        "Impact 13. Score 13.",
+        "Partie terminée. Score final : 13.",
+      ],
       texts({ ...worn, turn: 9 }).slice(3)
     );
     run.same(
@@ -396,7 +405,37 @@ function checkTexts(run) {
       buildSteps(placedEvents, t).map((step) => said(step.text))
     );
 
+    // Le Final : après la phase de sa bille dans R et la confirmation, à son retrait
+    // dans la séquence, avant l'Impact.
+    const finalState = playState({ hand: ["giant"], bag: ["agate"], triangle: { leftBase: null, rightBase: null, apex: { marble: "porcelain", wear: 1 } } });
+    run(
+      "final, R : après la phase, compté dans la prévision",
+      "Prévision : Vitesse 9, Masse 1, Impact 9. base gauche, vide. base droite, vide. pointe, porcelaine : Vitesse +5. Final : Vitesse +4.",
+      said(describeOverview(finalState, rules, t))
+    );
+    run(
+      "final, R : absent si la bille ne s'use pas ce tour",
+      "Prévision : Vitesse 5, Masse 1, Impact 5. base gauche, vide. base droite, vide. pointe, porcelaine : Vitesse +5.",
+      said(describeOverview({ ...finalState, triangle: { ...finalState.triangle, apex: { marble: "porcelain", wear: 0 } } }, rules, t))
+    );
+    run.same(
+      "final, confirmation : avec les valeurs prévues de la bille posée",
+      ["Poser géante en base gauche ?", "Vitesse +6. Final : Pioche 1."],
+      placementLines(finalState, 0, "leftBase", rules, t).map(({ key, params }) => said(t(key, params)))
+    );
+    run.same(
+      "final, séquence : le retrait, son Final, puis l'Impact",
+      ["porcelaine est usée et part à la défausse.", "Final de porcelaine : Vitesse +4.", "Impact 9. Score 9."],
+      texts(finalState).slice(3, 6)
+    );
+
     setLocale("en");
+    run(
+      "anglais, final : R",
+      "Forecast: Speed 9, Mass 1, Impact 9. left base, empty. right base, empty. apex, porcelain: Speed +5. Final: Speed +4.",
+      describeOverview(finalState, rules, t)
+    );
+    run.same("anglais, final : séquence", ["porcelain is worn out and goes to the discard.", "Final of porcelain: Speed +4.", "Impact 9. Score 9."], texts(finalState).slice(3, 6));
     run(
       "anglais, pioche : R",
       "Forecast: Speed 0, Mass 1, Impact 0. left base, mica: Draw 1. right base, empty. apex, stoneware: no effect.",
@@ -415,7 +454,14 @@ function checkTexts(run) {
     );
     run.same(
       "anglais : séquence",
-      ["Impact 13. Score 13.", "giant is worn out and goes to the discard.", "shooter is worn out and goes to the discard.", "Game over. Final score: 13."],
+      [
+        "giant is worn out and goes to the discard.",
+        "Final of giant: Draw 1.",
+        "You draw agate.",
+        "shooter is worn out and goes to the discard.",
+        "Impact 13. Score 13.",
+        "Game over. Final score: 13.",
+      ],
       texts({ ...worn, turn: 9 }).slice(3)
     );
     run("anglais : ouverture et base gauche", "Resolving turn 9. left base, giant: Speed +6.", texts({ ...worn, turn: 9 })[0]);

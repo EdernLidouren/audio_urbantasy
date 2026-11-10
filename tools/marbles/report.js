@@ -9,7 +9,7 @@
 import { MARBLES_SETTINGS } from "../../config/marbles-values.js";
 import { PLAYERS } from "./players.js";
 import { SETTING_NAMES } from "./simulation.js";
-import { marbleLabel } from "./format.js";
+import { PLACEMENT_TRIGGERS, TRIGGER_IDS, TRIGGER_WORDS, marbleLabel } from "./format.js";
 
 // Seuil des billes « presque jamais posées », en poses par partie.
 export const RARELY_PLACED = 0.25;
@@ -54,7 +54,7 @@ function marbleLines(marble, name, randomBags) {
     // Seulement pour une bille qui pioche : les autres gardent leurs deux lignes.
     ...(marble.drawn > 0 ? [`  Fait piocher ${n(marble.drawn)} bille(s) par ses effets.`] : []),
     `  Posée ${n(marble.placed)} fois, dont ${n(marble.placedReplacing)} en remplacement. Éjectée ${n(marble.knockedOut)} fois, retirée par usure ${n(marble.worn)} fois.`,
-    `  Produit en phase Vitesse ${n(marble.phaseSpeed)} et Masse ${n(marble.phaseMass)}, en tic Vitesse ${n(marble.hitSpeed)} et Masse ${n(marble.hitMass)}, en éjection Vitesse ${n(marble.knockoutSpeed)} et Masse ${n(marble.knockoutMass)}.`,
+    `  Produit ${TRIGGER_IDS.map((id) => `${TRIGGER_WORDS[id].produced} Vitesse ${n(marble[`${id}Speed`])} et Masse ${n(marble[`${id}Mass`])}`).join(", ")}.`,
   ];
   if (randomBags) {
     lines.push(
@@ -126,8 +126,7 @@ export function buildReport({ params, summary, name }) {
     "",
     "Remplacements, moyennes par partie.",
     `Poses sur un emplacement occupé : ${n(replacements.perGame)}.`,
-    `Apporté par les tics : Vitesse ${n(replacements.hitSpeed)}, Masse ${n(replacements.hitMass)}.`,
-    `Apporté par les éjections : Vitesse ${n(replacements.knockoutSpeed)}, Masse ${n(replacements.knockoutMass)}.`,
+    ...PLACEMENT_TRIGGERS.map(({ id }) => `Apporté par ${TRIGGER_WORDS[id].brought} : Vitesse ${n(replacements[`${id}Speed`])}, Masse ${n(replacements[`${id}Mass`])}.`),
     "",
     "Pioche et lancers.",
     `Billes piochées par des effets : ${n(draws.byEffect)} par partie.`,

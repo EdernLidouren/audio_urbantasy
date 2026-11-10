@@ -35,7 +35,7 @@ const { t } = await import("../../data/i18n/index.js");
 const { forecast } = await import("../../core/marbles-forecast.js");
 const { SLOTS } = await import("../../core/marbles.js");
 const { buildState, applyActions } = await import("./state-builder.js");
-const { counter, formatEvent, formatState, marbleLabel, slotLabel } = await import("./format.js");
+const { PLACEMENT_TRIGGERS, counter, formatEvent, formatState, marbleLabel, slotLabel, triggerLabel } = await import("./format.js");
 const name = (id) => t(`marble.${id}.name`);
 
 const spec = JSON.parse(await readFile(file, "utf-8"));
@@ -52,12 +52,16 @@ function printForecast(action) {
     console.log(`  Prévision refusée : ${predicted.error}.`);
     return;
   }
-  for (const [label, outcome] of [["Éjection", predicted.knockout], ["Tic", predicted.hit]]) {
-    if (outcome) console.log(`  ${label} : Vitesse ${counter(outcome.speed)}, Masse ${counter(outcome.mass)}.`);
+  for (const trigger of PLACEMENT_TRIGGERS) {
+    const outcome = predicted[trigger.id];
+    if (outcome) console.log(`  ${triggerLabel(trigger.id)} : Vitesse ${counter(outcome.speed)}, Masse ${counter(outcome.mass)}.`);
   }
   for (const slot of SLOTS) {
     const phase = predicted.phases[slot];
     console.log(`  ${slotLabel(slot)} : ${phase === null ? "vide" : `${marbleLabel(phase.marble, name)}, Vitesse ${counter(phase.speed)}, Masse ${counter(phase.mass)}`}.`);
+    for (const effect of predicted.slotEffects[slot]) {
+      console.log(`    ${triggerLabel(effect.trigger)} : Vitesse ${counter(effect.speed)}, Masse ${counter(effect.mass)}, Pioche ${effect.draw}.`);
+    }
   }
   console.log(`  Prévu : Vitesse ${counter(predicted.speed)}, Masse ${counter(predicted.mass)}, Impact ${predicted.impact}.`);
 }

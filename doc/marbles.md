@@ -47,13 +47,16 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
    triangle doit être plein pour résoudre, et ses trois poses sont des lancers : une pose
    qui ne laisserait plus assez de billes en main, ou plus assez de lancers, pour y arriver
    est refusée (la partie serait sans issue).
-4. **Résolution** : base gauche, base droite, pointe ; un emplacement vide saute sa
-   phase. Elle part des compteurs du tour : Vitesse (0 en début de tour) et Masse (1), que
+4. **Phases** : base gauche, base droite, pointe ; un emplacement vide saute sa phase.
+   Elles partent des compteurs du tour : Vitesse (0 en début de tour) et Masse (1), que
    Tic et Éjection ont déjà pu modifier. Chaque bille applique son effet puis prend 1
-   d'usure, même si cela l'amène à son maximum. Impact = max(0, Vitesse) × max(1, Masse),
-   ces planchers ne valant que pour ce calcul final. Il s'ajoute au Score.
-5. **Retrait** : une bille à son usure maximale part à la défausse. Pas d'Éjection.
-6. **Rotation** : base gauche → pointe, pointe → base droite, base droite → base gauche.
+   d'usure, même si cela l'amène à son maximum.
+5. **Retraits par usure**, dans l'ordre des phases : chaque bille à son usure maximale
+   quitte son emplacement, rejoint la défausse, puis son **Final** se déclenche (voir
+   « Les déclencheurs »). Pas d'Éjection.
+6. **Impact** = max(0, Vitesse) × max(1, Masse), ces planchers ne valant que pour ce
+   calcul final, Final compris : les retraits passent avant lui. Il s'ajoute au Score.
+7. **Rotation** : base gauche → pointe, pointe → base droite, base droite → base gauche.
 
 ### La pioche unifiée
 
@@ -146,7 +149,8 @@ Le registre et le sac de test sont validés ensemble au démarrage
 contenu). L'ordre du registre compte : les sacs aléatoires du simulateur y tirent leurs
 billes.
 
-Les champs d'effet (`base`, `baseVariant`, `apex`, `hit`, `knockout`) sont tous facultatifs :
+Les champs d'effet (`base`, `baseVariant`, `apex`, et un par déclencheur : `hit`, `knockout`,
+`final`) sont tous facultatifs :
 absent, aucun effet. `maxWear` vaut 3 par défaut. Deux champs obligatoires, de la
 présentation que la simulation accepte sans jamais les lire, validés par la vue :
 
@@ -202,9 +206,40 @@ valeur positive, `down` pour une négative), lus par les fiches, R, la confirmat
 séquence. Une action sans textes fait échouer le chargement. Si son application touche à
 l'état autrement qu'un compteur, comme la Pioche, `fireEffect` (`core/marbles.js`) l'exécute
 après l'annonce de l'effet. Une condition : une entrée dans `CONDITIONS` et son texte dans
-`CONDITION_TEXTS`. Un nouveau moment de déclenchement : une entrée dans
-`core/marbles.js`/`EVENT_TRIGGERS`, avec ses `zones` (où sont les billes qu'il peut
-concerner : `triangle`, `hand`).
+`CONDITION_TEXTS`.
+
+### Les déclencheurs
+
+Hors la phase (base, pointe), une bille réagit par ses **déclencheurs** : le **Tic** (`hit`,
+posée sur un emplacement occupé, après l'éjection de l'occupante), l'**Éjection**
+(`knockout`, remplacée) et le **Final** (`final`, retirée par usure, une fois à la
+défausse ; jamais à une éjection, un échange ou une pose). Ils sont déclarés UNE fois, dans
+`config/marbles-values.js`/`MARBLE_TRIGGERS`, une entrée chacun :
+
+```js
+{
+  id: "final",              // la valeur `trigger` de l'évènement `effect`
+  field: "final",           // le champ d'effet de la bille
+  event: "final",           // l'évènement du journal qui le déclenche
+  marble: "removed",        // la bille concernée : "onSlot" (sur l'emplacement de
+                            // l'évènement) ou "removed" (déjà retirée, que l'évènement nomme)
+  forecast: { line: "slot" }, // sa prévision : avec l'emplacement de la bille, ou
+                            // { line: "placement", marble, order }, une ligne de confirmation
+  texts: { card: "marbles.card.final", effect: "marbles.event.effect_final", slot: "marbles.outcome.final" },
+  card: "below",            // sa place dans la fiche, au-dessous de l'annonce principale
+}
+```
+
+Tout ce qui les connaît lit cette liste, jamais une copie : la validation de la table (les
+champs permis), les écouteurs du core (`EVENT_TRIGGERS`, construit depuis elle, la phase
+seule y étant écrite à la main), la prévision, la narration (gabarits, lignes de
+confirmation, évènements muets), le modèle de fiche (`MARBLE_CARD_MODEL.below` en est
+dérivé, dans l'ordre de la liste : tic, éjection, final) et les outils (chiffres par
+déclencheur ; leurs mots, `tools/marbles/format.js`/`TRIGGER_WORDS`, échouent au
+chargement s'il en manque un). La liste est validée au chargement du core
+(`validateMarbleTriggers`) ; ses textes, par le domaine `marbles-view`. **Ajouter un
+déclencheur** : son entrée, ses textes FR et EN, ses mots dans les outils, et l'émission de
+son évènement dans `core/marbles.js` au bon moment du tour.
 
 ## Simulation
 
@@ -232,8 +267,9 @@ dans le réducteur, et rien d'extérieur ne s'y abonne.
   `MarbleEventLimitError` et le réducteur refuse l'action (`eventLimit`), l'état reçu
   n'ayant jamais été touché.
 
-`EVENT_TRIGGERS` dit quels évènements déclenchent un effet : aujourd'hui les phases, le Tic
-et l'Éjection. Les autres passent au journal, prêts à servir.
+`EVENT_TRIGGERS` dit quels évènements déclenchent un effet : les phases, et les
+déclencheurs de `MARBLE_TRIGGERS` (Tic, Éjection, Final). Les autres passent au journal,
+prêts à servir.
 
 ### La prévision
 
@@ -248,7 +284,9 @@ déroulé est aveugle (`reduce(…, { blind: true })`). Une Pioche y a lieu avec
 (main pleine, plus de billes) mais pioche une bille inconnue (`UNKNOWN_MARBLE`) ; une
 régénération s'annonce sans mélange. La prévision ne lit ni n'avance donc jamais le hasard
 réel, et seules une pose ou un échange s'envisagent. Elle rend, en plus des valeurs :
-`drawn`, les billes que l'action et la résolution piocheraient ; `regenerates`, vrai si le
+`slotEffects`, par emplacement, les effets prévus avec lui (le Final d'une bille qui
+atteindra son usure maximale ce tour, rien sinon) ; `drawn`, les billes que l'action et la
+résolution piocheraient ; `regenerates`, vrai si le
 sac serait régénéré ; `uncertain`, vrai si une bille inconnue aurait pu réagir selon son
 identité (un déclencheur qui écoute la main : aucun aujourd'hui), ses chiffres n'étant alors
 pas sûrs. La vérification `marbles-forecast` contrôle que Vitesse, Masse, Impact, billes
@@ -302,7 +340,8 @@ lisent et ne s'activent pas (Entrée n'y fait rien) :
 1. « Poser argile en pointe ? » ;
 2. les valeurs prévues, sur leur propre ligne, au format de la vue d'ensemble (R) :
    « Vitesse +6 », valeurs produites seulement, non nulles, bonus reçu compris, sans
-   texte d'effet ; « aucun effet » si rien ;
+   texte d'effet ; « aucun effet » si rien ; suivies du Final de la bille posée si elle
+   atteint son usure maximale ce tour (« Vitesse +6. Final : Pioche 1. ») ;
 3. sur un emplacement occupé, « Éjection de calot : Vitesse +3 », ou « … : aucun effet » ;
 4. sur un emplacement occupé, « Tic d'argile : Vitesse +2 », ou « … : aucun effet » ;
 5. si la pose et la résolution régénéreraient le sac, « Le sac sera régénéré. » ;
@@ -324,6 +363,9 @@ Pointe : Vitesse +4.        <- Ctrl+haut
 argile, usure 3. 1 sur 5    <- position par défaut
 Tic : Vitesse +2.           <- Ctrl+bas
 ```
+
+Au-dessous, les champs des déclencheurs, facultatifs, dans l'ordre tic, éjection, final
+(« Final : Masse +1. ») : ils viennent de `MARBLE_TRIGGERS`.
 
 Les champs disent les effets IMPRIMÉS. En butée, le champ se réannonce, sans son ni
 cyclage. Revenir à la position par défaut réannonce l'annonce principale. Tout geste du
@@ -360,6 +402,10 @@ Prévision : Vitesse 7, Masse 2, Impact 14. Base gauche, argile : Vitesse +1.
 Base droite, mica : Pioche 1. Pointe, calot : Vitesse +6.
 ```
 
+Une bille qui atteint son usure maximale ce tour fait suivre sa phase de son Final, compté
+dans le résumé : « Pointe, porcelaine : Vitesse +5. Final : Vitesse +4. ». Une bille qui
+ne s'use pas ce tour n'en dit rien.
+
 Vitesse et Masse comprennent ce que le tour a déjà gagné (Tic, Éjection) ; l'Impact
 applique les planchers. Un emplacement dit les valeurs que sa bille PRODUIT, après
 conditions et bonus reçus, jamais un texte d'effet : valeurs nulles omises, « aucun
@@ -383,9 +429,10 @@ chacune :
 2. à 4. chaque phase, dans l'ordre : « Base gauche, argile : Vitesse +1. », « Base
    droite, vide. », avec les règles de la vue d'ensemble ; une phase qui pioche est suivie
    de sa pioche (« Base gauche, mica : Pioche 1. », « Vous piochez agate. ») ;
-5. « Impact 18. Score 42. » ;
-6. une étape par bille usée : « Calot est usé et part à la défausse. » (l'adjectif
-   s'accorde au genre du nom, attribut `gender` des noms français) ;
+5. une étape par bille usée : « Calot est usé et part à la défausse. » (l'adjectif
+   s'accorde au genre du nom, attribut `gender` des noms français), suivie de son Final
+   s'il en a un (« Final de porcelaine : Vitesse +4. ») et de ses pioches ;
+6. « Impact 18. Score 42. » ;
 7. « Le triangle tourne d'un cran dans le sens horaire. » (le nombre de crans et le sens
    sont des paramètres du texte, constante `ROTATION` de `narration.js`) ;
 8. la pioche : « Vous piochez agate. », « Main pleine, pas de pioche. » ou « Plus aucune
@@ -393,7 +440,7 @@ chacune :
    mélangée et forme un nouveau sac. » ;
 9. « Début du tour 4, jouez vos billes. »
 
-Au dernier tour, ni rotation ni pioche : l'Impact et les retraits mènent à la fin de
+Au dernier tour, ni rotation ni pioche : les retraits et l'Impact mènent à la fin de
 partie. Si la pioche du tour suivant ne trouve plus aucune bille, la fin de partie suit
 son arrêt. Une pioche en cours de tour (Tic, Éjection) se dit de la même façon, juste
 après l'effet qui la provoque.
@@ -462,7 +509,9 @@ et quand, sur la ligne de temps du geste (`eventCues`) :
   `swapSoundDelayMs` (150 ms) plus tard ; chacune tombe à son arrivée. Vers un emplacement
   vide, une seule bille roule ;
 - retrait par usure : la bille usée roule de son emplacement à la défausse et y tombe ;
-  plusieurs, l'une après l'autre (`outStaggerMs`) ;
+  plusieurs, l'une après l'autre (`outStaggerMs`). Son
+  Final n'a pas encore de son propre : l'évènement `final` est un point d'accroche muet
+  (`MARBLE_EVENT_CUES`) ;
 - rotation : les billes du triangle roulent ensemble, chacune vers l'emplacement suivant
   (l'ordre du cœur, `ROTATION_NEXT`), puis s'y calent avec une chute discrète ; un
   emplacement vide reste muet. Pas de son de rotation à part : les billes suffisent.

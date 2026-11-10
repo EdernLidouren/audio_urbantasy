@@ -9,7 +9,8 @@
 // (avec le sac de test, toutes). Centiles : interpolation linéaire entre les deux
 // rangs voisins (la médiane est le 50e).
 
-import { MARBLE_IDS } from "./simulation.js";
+import { MARBLE_IDS, MARBLE_STAT_FIELDS } from "./simulation.js";
+import { PLACEMENT_TRIGGERS } from "./format.js";
 
 export const round = (value) => Math.round(value * 100) / 100;
 const sum = (values) => values.reduce((total, value) => total + value, 0);
@@ -23,13 +24,12 @@ export function percentile(sorted, p) {
   return sorted[low] + (sorted[high] - sorted[low]) * (position - low);
 }
 
-const MARBLE_FIELDS = ["drawn", "placed", "placedReplacing", "knockedOut", "worn", "phaseSpeed", "phaseMass", "hitSpeed", "hitMass", "knockoutSpeed", "knockoutMass"];
 
 function marbleSummary(id, games, randomBags) {
   const present = games.filter((game) => game.bag.includes(id));
   const absent = games.filter((game) => !game.bag.includes(id));
   const line = { id, games: present.length };
-  for (const field of MARBLE_FIELDS) line[field] = round(mean(present.map((game) => game.marbles[id]?.[field] ?? 0)));
+  for (const field of MARBLE_STAT_FIELDS) line[field] = round(mean(present.map((game) => game.marbles[id]?.[field] ?? 0)));
   // Indicateur de force marginale : il n'a de sens que si la bille manque à
   // certains sacs, donc avec des sacs aléatoires.
   if (randomBags) {
@@ -45,7 +45,8 @@ function marbleSummary(id, games, randomBags) {
 //   { games, score: { mean, median, min, max, p10, p25, p75, p90 },
 //     impact: { mean, perTurn: [{ turn, mean, games }] },
 //     end: { turnsCompleted, outOfMarbles } (en % des parties),
-//     replacements: { perGame, hitSpeed, hitMass, knockoutSpeed, knockoutMass } (par partie),
+//     replacements: { perGame, <déclencheur de pose>Speed, …Mass } (par partie : hit,
+//       knockout),
 //     draws: { byEffect, regenerations, midTurnRegenerations } (par partie),
 //     throwsPerTurn (lancers par tour joué),
 //     refusals, marbles: [par bille, dans l'ordre de la table] }
@@ -76,10 +77,12 @@ export function summarize({ params, games }) {
     end: { turnsCompleted: share("turnsCompleted"), outOfMarbles: share("outOfMarbles") },
     replacements: {
       perGame: perGame((game) => game.replacements),
-      hitSpeed: perGame((game) => game.hit.speed),
-      hitMass: perGame((game) => game.hit.mass),
-      knockoutSpeed: perGame((game) => game.knockout.speed),
-      knockoutMass: perGame((game) => game.knockout.mass),
+      ...Object.fromEntries(
+        PLACEMENT_TRIGGERS.flatMap(({ id }) => [
+          [`${id}Speed`, perGame((game) => game[id].speed)],
+          [`${id}Mass`, perGame((game) => game[id].mass)],
+        ])
+      ),
     },
     draws: {
       byEffect: perGame((game) => game.effectDraws),

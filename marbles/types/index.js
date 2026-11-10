@@ -16,6 +16,8 @@
 //   hit         le Tic : effet joué quand la bille est posée sur un emplacement
 //               occupé, après l'éjection de l'occupante ;
 //   knockout    l'Éjection : effet joué quand la bille est remplacée ;
+//   final       le Final : effet joué quand la bille est retirée par usure, une fois
+//               à la défausse, avant l'Impact du tour ;
 //   maxWear     usure maximale, sinon MARBLES_SETTINGS.defaultMaxWear ;
 //   size        sa taille, une clé de MARBLE_SIZES (config/marbles-values.js) : ce
 //               qu'EST la bille. Règle la force de ses collisions ;

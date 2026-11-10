@@ -8,6 +8,9 @@
 // séparatrice, point décimal ; dans une cellule, les listes (Impacts par tour,
 // sac) sont séparées par des espaces.
 
+import { TRIGGER_IDS } from "./format.js";
+import { MARBLE_STAT_FIELDS } from "./simulation.js";
+
 export function toJson({ params, summary, games }) {
   return `${JSON.stringify({ params, summary, games }, null, 2)}\n`;
 }
@@ -19,10 +22,11 @@ const GAME_COLUMNS = [
   ["endReason", (game) => game.endReason],
   ["turns", (game) => game.turns],
   ["replacements", (game) => game.replacements],
-  ["hitSpeed", (game) => game.hit.speed],
-  ["hitMass", (game) => game.hit.mass],
-  ["knockoutSpeed", (game) => game.knockout.speed],
-  ["knockoutMass", (game) => game.knockout.mass],
+  // Ce que chaque déclencheur (hors phase) a apporté : <déclencheur>Speed, …Mass.
+  ...TRIGGER_IDS.filter((id) => id !== "phase").flatMap((id) => [
+    [`${id}Speed`, (game) => game[id].speed],
+    [`${id}Mass`, (game) => game[id].mass],
+  ]),
   ["effectDraws", (game) => game.effectDraws],
   ["regenerations", (game) => game.regenerations],
   ["midTurnRegenerations", (game) => game.midTurnRegenerations],
@@ -35,17 +39,7 @@ const GAME_COLUMNS = [
 export const MARBLE_COLUMNS = [
   "id",
   "games",
-  "drawn",
-  "placed",
-  "placedReplacing",
-  "knockedOut",
-  "worn",
-  "phaseSpeed",
-  "phaseMass",
-  "hitSpeed",
-  "hitMass",
-  "knockoutSpeed",
-  "knockoutMass",
+  ...MARBLE_STAT_FIELDS,
   "withScore",
   "withoutScore",
   "withoutGames",

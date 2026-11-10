@@ -15,8 +15,13 @@
 // Résultat : { ok: false, error } si l'action serait refusée (mêmes codes que le
 // réducteur), sinon { ok: true, error: null, knockout, hit, phases, speed, mass,
 // impact, drawn, regenerates, uncertain }, où :
-//   knockout, hit  l'effet de l'action envisagée (null : pas de tel effet) ;
+//   knockout, hit  l'effet de l'action envisagée (null : pas de tel effet), une clé
+//                  par déclencheur prévu pendant une pose (forecast.line
+//                  "placement" de MARBLE_TRIGGERS) ;
 //   phases         par emplacement, l'effet de phase de sa bille (null : vide) ;
+//   slotEffects    par emplacement, les effets des déclencheurs qui se prévoient avec
+//                  lui (forecast.line "slot" : le Final d'une bille qui atteindra son
+//                  usure maximale ce tour), chacun { trigger, ...effet } ; [] sinon ;
 //   drawn          les billes que l'action et la résolution piocheraient ;
 //   regenerates    vrai si le sac serait régénéré en chemin ;
 //   uncertain      vrai si une bille piochée aurait pu réagir selon son identité,
@@ -24,7 +29,14 @@
 // Un effet : { marble, speed, mass, draw, given }, le total effectif de la bille,
 // bonus reçu compris.
 
+import { MARBLE_TRIGGERS } from "../config/marbles-values.js";
 import { SLOTS, blindCopy, marblesReduce, runResolution, stageRefusal } from "./marbles.js";
+
+// Les déclencheurs prévus pendant une pose (config/marbles-values.js) : chacun a sa
+// clé dans le résultat, son effet ou null.
+const PLACEMENT_TRIGGERS = MARBLE_TRIGGERS.filter((trigger) => trigger.forecast.line === "placement");
+// Ceux qui se prévoient avec l'emplacement de leur bille (le Final).
+const SLOT_TRIGGERS = new Set(MARBLE_TRIGGERS.filter((trigger) => trigger.forecast.line === "slot").map((trigger) => trigger.id));
 
 const FORECASTABLE_ACTIONS = ["place", "swap"];
 
@@ -48,9 +60,16 @@ export function readForecast(actionEvents, resolutionEvents) {
   return {
     ok: true,
     error: null,
-    knockout: outcomeOf(fromAction("knockout")),
-    hit: outcomeOf(fromAction("hit")),
+    ...Object.fromEntries(PLACEMENT_TRIGGERS.map((trigger) => [trigger.id, outcomeOf(fromAction(trigger.id))])),
     phases: Object.fromEntries(SLOTS.map((slot) => [slot, outcomeOf(phaseOf(slot))])),
+    slotEffects: Object.fromEntries(
+      SLOTS.map((slot) => [
+        slot,
+        all
+          .filter((event) => event.type === "effect" && SLOT_TRIGGERS.has(event.trigger) && event.slot === slot)
+          .map((event) => ({ trigger: event.trigger, ...outcomeOf(event) })),
+      ])
+    ),
     speed,
     mass,
     impact,

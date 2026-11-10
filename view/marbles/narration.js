@@ -4,6 +4,7 @@
 // terminal (tools/marbles/play.js) disent exactement les mêmes phrases.
 
 import { nameRef } from "../../data/i18n/index.js";
+import { MARBLE_TRIGGERS } from "../../config/marbles-values.js";
 import { SLOTS, throwsLeft } from "../../core/marbles.js";
 import { CLAUSE_ACTIONS } from "../../core/marbles-effects.js";
 import { forecast } from "../../core/marbles-forecast.js";
@@ -142,6 +143,19 @@ export function describeSlotForPlacement(game, slot, rules, t) {
   });
 }
 
+// La ligne des valeurs prévues d'une pose : celles de la phase de la bille posée,
+// puis ce qui s'y ajoute avec son emplacement (son Final, si elle s'use ce tour) :
+// « Vitesse +6. Final : Pioche 1. ».
+function placedValues(predicted, slot, t) {
+  const values = combined(valueParts(predicted.phases[slot], t), t);
+  const notes = slotNotes(predicted, slot, t);
+  return notes.length === 0 ? values : [`${values}.`, ...notes].join(" ");
+}
+
+// Les déclencheurs qui ont leur ligne dans la confirmation (config/marbles-values.js/
+// MARBLE_TRIGGERS), dans l'ordre réel de leurs évènements.
+const PLACEMENT_LINES = MARBLE_TRIGGERS.filter((trigger) => trigger.forecast.line === "placement").sort((a, b) => a.forecast.order - b.forecast.order);
+
 // Les lignes de lecture d'une confirmation de pose, chacune { key, params } : la
 // question, puis, sur sa propre ligne, ce que la bille produirait à sa phase sur le
 // triangle simulé, au format de la vue d'ensemble (valeurs produites seulement, bonus
@@ -155,20 +169,18 @@ export function placementLines(game, handIndex, slot, rules, t) {
   const predicted = rules.forecast(game, { type: "place", handIndex, slot });
   const lines = [
     { key: "marbles.place.question", params: { marble: marbleName(marble, t), slot: slotName(slot, t) } },
-    { key: "marbles.place.values", params: { effect: combined(valueParts(predicted.phases[slot], t), t) } },
+    { key: "marbles.place.values", params: { effect: placedValues(predicted, slot, t) } },
   ];
   const occupant = game.triangle[slot];
   if (occupant !== null) {
-    lines.push(
-      {
-        key: "marbles.place.knockout",
-        params: { marble: nameRef(`marble.${occupant.marble}.name`), effect: describeOutcome(predicted.knockout, t) },
-      },
-      {
-        key: "marbles.place.hit",
-        params: { marble: nameRef(`marble.${marble}.name`), effect: describeOutcome(predicted.hit, t) },
-      }
-    );
+    // Une ligne par déclencheur prévu pendant une pose, dans l'ordre réel.
+    const concerned = { occupant: occupant.marble, placed: marble };
+    for (const trigger of PLACEMENT_LINES) {
+      lines.push({
+        key: trigger.texts.placement,
+        params: { marble: nameRef(`marble.${concerned[trigger.forecast.marble]}.name`), effect: describeOutcome(predicted[trigger.id], t) },
+      });
+    }
   }
   if (predicted.regenerates) lines.push({ key: "marbles.forecast.regenerates" });
   return lines;
@@ -209,13 +221,28 @@ export function bagDisplayOrder(bag, t) {
 // `outcome` : { marble, speed, mass }, ou null pour un emplacement vide. Seules les
 // valeurs effectivement produites se disent, bonus reçu compris, sans texte d'effet
 // ni de condition : ce que la bille donne à une autre s'entend chez celle-ci.
-function outcomeLine(slot, outcome, t) {
+// `notes` : ce qui se prévoit en plus avec cet emplacement (slotNotes), à la suite.
+function outcomeLine(slot, outcome, t, notes = []) {
   if (outcome === null) return t("marbles.outcome.empty", { slot: slotName(slot, t) });
-  return t("marbles.outcome.slot", {
+  const line = t("marbles.outcome.slot", {
     slot: slotName(slot, t),
     marble: marbleName(outcome.marble, t),
     effect: combined(valueParts(outcome, t), t),
   });
+  return [line, ...notes].join(" ");
+}
+
+// Les gabarits des déclencheurs prévus avec un emplacement (MARBLE_TRIGGERS,
+// forecast.line "slot", `texts.slot`).
+const SLOT_TEMPLATES = Object.fromEntries(
+  MARBLE_TRIGGERS.filter((trigger) => trigger.forecast.line === "slot").map((trigger) => [trigger.id, trigger.texts.slot])
+);
+
+// Ce que la prévision ajoute à un emplacement après l'effet de phase de sa bille :
+// « Final : Vitesse +4. » si elle atteint son usure maximale ce tour. Les valeurs
+// produites seulement, comme une phase.
+function slotNotes(predicted, slot, t) {
+  return predicted.slotEffects[slot].map((effect) => t(SLOT_TEMPLATES[effect.trigger], { effect: combined(valueParts(effect, t), t) }));
 }
 
 // Ce que la prévision sait du sac sans le dévoiler : qu'il serait régénéré en
@@ -238,7 +265,8 @@ export function describeOverview(game, rules, t) {
     mass: formatCounter(predicted.mass),
     impact: predicted.impact,
   });
-  return [summary, ...SLOTS.map((slot) => outcomeLine(slot, predicted.phases[slot], t)), ...forecastNotes(predicted, t)].join(" ");
+  const slots = SLOTS.map((slot) => outcomeLine(slot, predicted.phases[slot], t, slotNotes(predicted, slot, t)));
+  return [summary, ...slots, ...forecastNotes(predicted, t)].join(" ");
 }
 
 // La rotation du moteur (core/marbles.js/rotated) : un cran, dans le sens horaire
@@ -246,13 +274,10 @@ export function describeOverview(game, rules, t) {
 // variera ; son évènement les portera alors.
 const ROTATION = { steps: 1, direction: "clockwise" };
 
-// Le gabarit d'un effet déclenché par un évènement : celui d'une phase se dit comme
-// le résultat de son emplacement (outcomeLine). Un futur déclencheur a besoin de son
-// gabarit ici ; sans lui, buildSteps lève.
-const EFFECT_TEMPLATES = {
-  hit: "marbles.event.effect_hit",
-  knockout: "marbles.event.effect_knockout",
-};
+// Le gabarit d'un effet déclenché par un évènement, celui de son déclencheur
+// (MARBLE_TRIGGERS, `texts.effect`) ; celui d'une phase se dit comme le résultat de
+// son emplacement (outcomeLine).
+const EFFECT_TEMPLATES = Object.fromEntries(MARBLE_TRIGGERS.map((trigger) => [trigger.id, trigger.texts.effect]));
 
 function effectText(event, t) {
   if (event.trigger === "phase") {
@@ -285,9 +310,9 @@ const EVENT_TEXTS = {
   drawSkipped: (event, t) => t(`marbles.event.draw_skipped.${event.reason}`),
   bagRegenerated: (event, t) => t("marbles.event.bag_regenerated", { size: event.size }),
   swapped: (event, t) => t("marbles.event.swapped", { a: slotName(event.a, t), b: slotName(event.b, t) }),
-  knockout: SILENT,
+  // L'évènement d'un déclencheur se dit par son effet, s'il en a un.
+  ...Object.fromEntries(MARBLE_TRIGGERS.map((trigger) => [trigger.event, SILENT])),
   removed: SILENT,
-  hit: SILENT,
   phase: SILENT,
   wear: SILENT,
   turnEnded: SILENT,

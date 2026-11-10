@@ -5,6 +5,7 @@ import { speed } from "../effects.js";
 export default {
   base: [speed(2)],
   apex: [speed(5)],
+  final: [speed(4)],
   maxWear: 2,
   size: "small",
   sound: "classic_small",

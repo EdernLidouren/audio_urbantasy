@@ -99,7 +99,8 @@ remplacements, pioche et lancers (billes piochées par des effets, régénérati
 celles en cours de tour, lancers par tour joué, fins par pioche impossible), puis chaque
 bille (billes que ses effets ont fait piocher, s'il y en a, poses et remplacements,
 éjections, retraits par usure,
-Vitesse et Masse produites en phase, en tic et en éjection, et, avec des sacs
+Vitesse et Masse produites en phase et par chaque déclencheur, en tic, en éjection et
+en final, et, avec des sacs
 aléatoires, le score moyen avec et sans elle). Les moyennes d'une bille sont prises sur
 les parties où elle est dans le sac ; un bonus reçu se compte chez la bille qui le
 reçoit, comme dans la vue d'ensemble. Il finit par des observations, sans jamais

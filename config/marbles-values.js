@@ -199,9 +199,67 @@ export const MARBLES_AUDIO = {
   shuffle: "assets/sounds/marbles/marbles_shuffling",
 };
 
+// Les DÉCLENCHEURS propres d'une bille, déclarés UNE fois : la validation de la
+// table, les écouteurs du core (core/marbles.js), la prévision, la narration, la
+// fiche et les outils lisent cette liste, jamais une copie. La phase, l'effet de
+// base ou de pointe, est à part : elle a ses propres champs et se dit par son
+// emplacement. L'ordre de la liste est celui de la fiche.
+//   id        son identifiant : la valeur `trigger` de l'évènement `effect` ;
+//   field     le champ d'effet de la bille (marbles/types/index.js) ;
+//   event     l'évènement du journal qui le déclenche ;
+//   marble    la bille concernée : "onSlot", celle qui est sur l'emplacement de
+//             l'évènement ; "removed", celle que l'évènement nomme, déjà retirée du
+//             triangle ;
+//   forecast  où sa prévision se dit :
+//               { line: "placement", marble, order } : pendant une pose, sa propre
+//               ligne de la confirmation, toujours présente, pour la bille
+//               "occupant" (la remplacée) ou "placed" (la posée), à la place
+//               `order` (l'ordre réel des évènements) ;
+//               { line: "slot" } : avec l'emplacement de la bille, après son effet
+//               de phase (R, valeurs de la confirmation) ;
+//   texts     ses gabarits i18n : `card`, son champ de fiche ({effect}) ; `effect`,
+//             son effet joué dans le journal ({marble}, {effect}, {speed}, {mass}) ;
+//             `placement` (ligne "placement") ou `slot` (ligne "slot"), sa
+//             prévision ({marble}, {effect} ; {effect} seul pour "slot") ;
+//   card      sa place dans la fiche : "below", au-dessous de l'annonce principale.
+// AJOUTER un déclencheur : une entrée ici, son champ dans les billes, ses textes, et
+// l'émission de son évènement dans core/marbles.js au bon moment du tour.
+export const MARBLE_TRIGGERS = [
+  {
+    id: "hit",
+    field: "hit",
+    event: "hit",
+    marble: "onSlot",
+    forecast: { line: "placement", marble: "placed", order: 2 },
+    texts: { card: "marbles.card.hit", effect: "marbles.event.effect_hit", placement: "marbles.place.hit" },
+    card: "below",
+  },
+  {
+    id: "knockout",
+    field: "knockout",
+    event: "knockout",
+    marble: "onSlot",
+    forecast: { line: "placement", marble: "occupant", order: 1 },
+    texts: { card: "marbles.card.knockout", effect: "marbles.event.effect_knockout", placement: "marbles.place.knockout" },
+    card: "below",
+  },
+  // Le Final : au retrait par USURE seulement, la bille déjà à la défausse. Ses
+  // valeurs comptent pour le tour en cours (les retraits précèdent l'Impact).
+  {
+    id: "final",
+    field: "final",
+    event: "final",
+    marble: "removed",
+    forecast: { line: "slot" },
+    texts: { card: "marbles.card.final", effect: "marbles.event.effect_final", slot: "marbles.outcome.final" },
+    card: "below",
+  },
+];
+
 // La fiche d'une bille (lib/detail-card.js, view/marbles/card.js) : l'ordre de ses
-// champs autour de l'annonce principale, du plus proche au plus éloigné. Ajouter
-// un nouveau type d'effet à la fiche : sa ligne ici et son gabarit, rien d'autre.
+// champs autour de l'annonce principale, du plus proche au plus éloigné. Les champs
+// des déclencheurs viennent de MARBLE_TRIGGERS (`card`), dans son ordre ; un autre
+// type d'effet : sa ligne ici et son gabarit, rien d'autre.
 //   field            le champ de la bille dans MARBLE_TYPES ;
 //   labelKey         son gabarit, qui reçoit {effect} ;
 //   variantLabelKey  (facultatif) son gabarit quand l'effet diffère selon la base ;
@@ -213,10 +271,7 @@ export const MARBLE_CARD_MODEL = {
     { field: "apex", labelKey: "marbles.card.apex", required: true },
     { field: "base", labelKey: "marbles.card.base", variantLabelKey: "marbles.card.base_variant", required: true },
   ],
-  below: [
-    { field: "hit", labelKey: "marbles.card.hit" },
-    { field: "knockout", labelKey: "marbles.card.knockout" },
-  ],
+  below: MARBLE_TRIGGERS.filter((trigger) => trigger.card === "below").map((trigger) => ({ field: trigger.field, labelKey: trigger.texts.card })),
   emptyBelowKey: "marbles.card.no_special_effect",
 };
 

@@ -48,13 +48,15 @@
 //   bagRegenerated { size }, swapped { a, b },
 //   knockout { slot, marble }, removed { slot, marble, cause },
 //   discarded { slot, marble, cause }, placed { slot, marble },
-//   hit { slot, marble },
+//   hit { slot, marble }, final { slot, marble },
 //   phase { slot, marble }, phaseSkipped { slot },
 //   effect { trigger, slot, marble, speedDelta, massDelta, draw, given, speed, mass },
 //   wear { slot, marble, wear, maxWear },
 //   impact { speed, mass, impact, score },
 //   rotation { triangle }, turnEnded { turn }, gameOver { reason, score }.
-// `cause` : "replacement" ou "wear". `trigger` : "phase", "hit" ou "knockout".
+// `cause` : "replacement" ou "wear". `trigger` : "phase" ou l'id d'un déclencheur
+// (config/marbles-values.js/MARBLE_TRIGGERS : "hit", "knockout", "final"). `final` :
+// une bille usée vient de rejoindre la défausse depuis `slot`.
 // drawSkipped `reason` : "handFull" (la bille reste au sac) ou "noMarbles" (sac
 // et défausse vides). Une pioche, une régénération ou un arrêt de pioche peuvent
 // avoir lieu à tout moment : début de tour, pose (un Tic qui pioche), résolution.
@@ -71,7 +73,7 @@
 // passent. Les vérifications y passent aussi des tables fabriquées, qui testent
 // ce qu'aucune bille actuelle ne produit (une Masse négative).
 
-import { MARBLES_SETTINGS, STARTING_BAG } from "../config/marbles-values.js";
+import { MARBLE_TRIGGERS, MARBLES_SETTINGS, STARTING_BAG } from "../config/marbles-values.js";
 import { createSeed, nextRandom } from "./rng.js";
 import { rejectUnknownFields } from "../lib/validate.js";
 import { MarbleEventLimitError, createEventBus } from "./marbles-bus.js";
@@ -98,6 +100,53 @@ export const MARBLE_ERRORS = [
   "eventLimit",
 ];
 
+// --- Déclencheurs ---
+
+// Les champs d'effet de PHASE d'une bille, à part des déclencheurs.
+const PHASE_FIELDS = ["base", "apex"];
+const TRIGGER_MARBLES = ["onSlot", "removed"];
+const PLACEMENT_MARBLES = ["occupant", "placed"];
+
+// Échoue sur une liste de déclencheurs mal formée (config/marbles-values.js/
+// MARBLE_TRIGGERS, décrite là) : la vraie est validée au chargement de ce module.
+// Les textes, eux, sont vérifiés par le domaine marbles-view.
+export function validateMarbleTriggers(triggers) {
+  const fail = (message) => {
+    throw new Error(`marbles, déclencheurs : ${message}`);
+  };
+  const seen = { id: new Set(), field: new Set(), event: new Set() };
+  for (const trigger of triggers) {
+    const describe = `déclencheur "${trigger.id}"`;
+    rejectUnknownFields(trigger, ["id", "field", "event", "marble", "forecast", "texts", "card"], describe, fail);
+    for (const key of ["id", "field", "event"]) {
+      if (typeof trigger[key] !== "string" || trigger[key] === "") fail(`${describe} : ${key} doit être un texte.`);
+      if (seen[key].has(trigger[key])) fail(`${describe} : ${key} "${trigger[key]}" en double.`);
+      seen[key].add(trigger[key]);
+    }
+    if (trigger.id === "phase" || [...PHASE_FIELDS, "baseVariant"].includes(trigger.field)) fail(`${describe} : la phase n'est pas un déclencheur.`);
+    if (!TRIGGER_MARBLES.includes(trigger.marble)) fail(`${describe} : marble inconnu "${trigger.marble}".`);
+    const { forecast, texts } = trigger;
+    if (typeof texts?.card !== "string" || typeof texts?.effect !== "string") fail(`${describe} : textes card et effect obligatoires.`);
+    if (forecast?.line === "placement") {
+      rejectUnknownFields(forecast, ["line", "marble", "order"], describe, fail);
+      if (!PLACEMENT_MARBLES.includes(forecast.marble)) fail(`${describe} : forecast.marble inconnu "${forecast.marble}".`);
+      if (!Number.isInteger(forecast.order)) fail(`${describe} : forecast.order doit être un entier.`);
+      if (typeof texts.placement !== "string") fail(`${describe} : texte placement obligatoire.`);
+    } else if (forecast?.line === "slot") {
+      rejectUnknownFields(forecast, ["line"], describe, fail);
+      if (typeof texts.slot !== "string") fail(`${describe} : texte slot obligatoire.`);
+    } else {
+      fail(`${describe} : forecast.line doit valoir "placement" ou "slot".`);
+    }
+    if (trigger.card !== undefined && trigger.card !== "below") fail(`${describe} : card doit valoir "below".`);
+  }
+}
+
+validateMarbleTriggers(MARBLE_TRIGGERS);
+
+// Les champs d'effet d'une bille : ceux de la phase, puis un par déclencheur.
+const EFFECT_FIELDS = [...PHASE_FIELDS, ...MARBLE_TRIGGERS.map((trigger) => trigger.field)];
+
 // --- Table des billes ---
 
 // Échoue sur une table mal formée. La vraie est validée au démarrage
@@ -111,8 +160,8 @@ export function validateMarbleTypes(types) {
   for (const [id, type] of Object.entries(types)) {
     // `size` et `sound` : la taille et le profil sonore, présentation seulement,
     // jamais lus ici (validés par la vue, view/marbles/sounds.js).
-    rejectUnknownFields(type, ["base", "baseVariant", "apex", "hit", "knockout", "maxWear", "size", "sound"], `bille "${id}"`, fail);
-    for (const field of ["base", "apex", "hit", "knockout"]) {
+    rejectUnknownFields(type, [...EFFECT_FIELDS, "baseVariant", "maxWear", "size", "sound"], `bille "${id}"`, fail);
+    for (const field of EFFECT_FIELDS) {
       if (type[field] !== undefined) validateEffect(type[field], `bille "${id}", ${field}`, fail);
     }
     if (type.baseVariant !== undefined) {
@@ -363,28 +412,43 @@ function isOnEventSlot(event, listener) {
 }
 
 // Quels évènements déclenchent un effet, et chez quelle bille : les clauses à
-// jouer, ou null. La bille concernée est chaque fois celle de l'emplacement de
-// l'évènement : l'occupante avant son retrait (Éjection), la nouvelle venue
-// après sa pose (Tic). Une bille sans Tic ni Éjection ne réagit pas du tout :
+// jouer, ou null. Une bille sans le champ d'un déclencheur ne réagit pas du tout :
 // pas d'évènement `effect`, à la différence d'une phase, qui en a toujours un.
-// Un déclencheur : `zones`, où sont les billes qu'il peut concerner ("triangle",
-// "hand"), et `clauses(event, listener, types)`. Un futur déclencheur est une
-// entrée de plus ici ; s'il écoute la main, une bille piochée à l'aveugle y rend
-// la prévision incertaine (handleEvent).
+// Une entrée, par type d'évènement :
+//   id         l'identifiant du déclencheur (`trigger` de l'évènement `effect`) ;
+//   zones      où sont les billes qu'il peut concerner ("triangle", "hand") : une
+//              bille piochée à l'aveugle dans l'une d'elles rend la prévision
+//              incertaine (handleEvent) ;
+//   listeners  (facultatif) les billes concernées, quand ce ne sont pas les
+//              écouteurs (marbleListeners) : une bille déjà retirée ;
+//   clauses(event, listener, types).
+// La phase est écrite ici ; les autres viennent de MARBLE_TRIGGERS.
 const ON_SLOT = ["triangle"];
+
+function eventTrigger(trigger) {
+  const clausesOf = (listener, types) => types[listener.marble][trigger.field] ?? null;
+  if (trigger.marble === "removed") {
+    return {
+      id: trigger.id,
+      zones: [],
+      listeners: (event) => [{ zone: "removed", slot: event.slot, marble: event.marble }],
+      clauses: (event, listener, types) => clausesOf(listener, types),
+    };
+  }
+  return {
+    id: trigger.id,
+    zones: ON_SLOT,
+    clauses: (event, listener, types) => (isOnEventSlot(event, listener) ? clausesOf(listener, types) : null),
+  };
+}
+
 const EVENT_TRIGGERS = {
   phase: {
+    id: "phase",
     zones: ON_SLOT,
     clauses: (event, listener, types) => (isOnEventSlot(event, listener) ? effectAt(listener.marble, listener.slot, types) : null),
   },
-  knockout: {
-    zones: ON_SLOT,
-    clauses: (event, listener, types) => (isOnEventSlot(event, listener) ? types[listener.marble].knockout ?? null : null),
-  },
-  hit: {
-    zones: ON_SLOT,
-    clauses: (event, listener, types) => (isOnEventSlot(event, listener) ? types[listener.marble].hit ?? null : null),
-  },
+  ...Object.fromEntries(MARBLE_TRIGGERS.map((trigger) => [trigger.event, eventTrigger(trigger)])),
 };
 
 // --- Le déroulé d'une action ---
@@ -396,10 +460,10 @@ function update(run, changes) {
 // Joue un effet de bille : les compteurs du tour d'abord, ce qui va aux autres
 // emplacements ensuite (un cadeau à un emplacement vide est perdu), le bonus
 // reçu compté au moment de la phase de la bille.
-function fireEffect(run, event, listener, clauses) {
+function fireEffect(run, trigger, listener, clauses) {
   const { slot, marble } = listener;
   const { self, gifts } = evaluateEffect(clauses, run.state.triangle, run.types);
-  const bonus = event.type === "phase" ? run.state.triangle[slot].bonus : undefined;
+  const bonus = trigger === "phase" ? run.state.triangle[slot].bonus : undefined;
   const { speed: speedDelta, mass: massDelta } = bonus ? addValues(self, bonus) : self;
 
   let { triangle } = run.state;
@@ -417,7 +481,7 @@ function fireEffect(run, event, listener, clauses) {
   // La Pioche : l'effet s'annonce, puis ses billes se piochent (drawMarbles), à
   // tout moment du tour.
   const { draw } = self;
-  run.emit({ type: "effect", trigger: event.type, slot, marble, speedDelta, massDelta, draw, given, speed, mass });
+  run.emit({ type: "effect", trigger, slot, marble, speedDelta, massDelta, draw, given, speed, mass });
   if (draw > 0) drawMarbles(run, draw);
 }
 
@@ -426,7 +490,8 @@ function handleEvent(run, event) {
   run.journal.push(event);
   const trigger = EVENT_TRIGGERS[event.type];
   if (!trigger) return;
-  for (const listener of marbleListeners(run.state)) {
+  const listeners = trigger.listeners ? trigger.listeners(event) : marbleListeners(run.state);
+  for (const listener of listeners) {
     // Une bille inconnue (piochée à l'aveugle) que ce déclencheur pourrait
     // concerner : sa réaction dépend de son identité, la prévision ne peut pas la
     // dire et se déclare incertaine. Elle ne réagit pas.
@@ -435,7 +500,7 @@ function handleEvent(run, event) {
       continue;
     }
     const clauses = trigger.clauses(event, listener, run.types);
-    if (clauses !== null) fireEffect(run, event, listener, clauses);
+    if (clauses !== null) fireEffect(run, trigger.id, listener, clauses);
   }
 }
 
@@ -604,6 +669,10 @@ function resolvePhases(run) {
   }
 }
 
+// Les retraits par usure, dans l'ordre des phases. Pour chaque bille usée : elle
+// quitte son emplacement, rejoint la défausse, puis son Final se déclenche (le seul
+// retrait qui en ait un : ni l'éjection ni l'échange). Ses valeurs comptent pour le
+// tour en cours ; une Pioche y passe par la pioche unifiée.
 function retireWornMarbles(run) {
   for (const slot of SLOTS) {
     const placed = run.state.triangle[slot];
@@ -613,24 +682,26 @@ function retireWornMarbles(run) {
     run.emit({ type: "removed", ...worn });
     update(run, { discard: [...run.state.discard, placed.marble] });
     run.emit({ type: "discarded", ...worn });
+    run.emit({ type: "final", slot, marble: placed.marble });
   }
 }
 
-// La résolution, sans les refus : phases, Impact, retraits, rotation, fin de
-// tour. La vraie, celle de l'action "resolve" comme celle de la prévision
+// La résolution, sans les refus, dans cet ordre : phases, retraits par usure (et
+// ce qu'ils déclenchent), Impact, rotation, fin de tour. Les retraits passent
+// AVANT l'Impact : ce qu'ils déclenchent compte pour le tour en cours. La vraie,
+// celle de l'action "resolve" comme celle de la prévision
 // (core/marbles-forecast.js), qui la lance aussi sur un triangle du premier tour
-// encore incomplet. Ne pioche jamais et ne touche pas au hasard.
+// encore incomplet. Jamais la pioche du tour : seuls des effets y piochent.
 export function runResolution(state, types, options = {}) {
   return transact(state, types, options, (run) => {
     resolvePhases(run);
+    retireWornMarbles(run);
 
     const { speed, mass } = run.state;
     const impact = impactOf(speed, mass);
     const score = run.state.score + impact;
     update(run, { score });
     run.emit({ type: "impact", speed, mass, impact, score });
-
-    retireWornMarbles(run);
 
     const { leftBase, rightBase, apex } = run.state.triangle;
     const triangle = rotated({ leftBase: withoutBonus(leftBase), rightBase: withoutBonus(rightBase), apex: withoutBonus(apex) });
