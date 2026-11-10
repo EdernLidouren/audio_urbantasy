@@ -32,10 +32,14 @@
 // Un effet est une LISTE DE CLAUSES ; une clause (core/marbles-effects.js) :
 //   action  ce qu'elle fait : "speed" ou "mass", qui ajoutent `amount` (entier,
 //           négatif permis) à la Vitesse ou à la Masse ; "draw", la Pioche, qui
-//           pioche `amount` billes (au moins 1, jamais de cible) ;
+//           pioche `amount` billes (au moins 1, jamais de cible) ; "polish", le
+//           Polissage, et "crack", la Fêlure, qui retirent ou ajoutent `amount`
+//           d'usure (au moins 1) à la bille elle-même ou à celle de `target` ;
 //   amount  la valeur ;
-//   target  (facultatif) l'emplacement dont elle modifie l'effet de phase, au
-//           lieu d'agir sur le compteur du tour ;
+//   target  (facultatif) pour une Vitesse ou une Masse, l'emplacement dont elle
+//           modifie l'effet de phase, au lieu d'agir sur le compteur du tour (jamais
+//           une phase toujours passée, ni dans un Final) ; pour un Polissage ou une
+//           Fêlure, l'emplacement dont la bille la reçoit ;
 //   when    (facultatif) sa condition, évaluée au déclenchement. Une condition
 //           lit toujours l'effet IMPRIMÉ d'une bille, jamais un effet déjà
 //           modifié : aucune dépendance circulaire n'est possible.

@@ -107,6 +107,14 @@ function sampleEvents() {
   // Une main pleine, pour la pioche sautée.
   const fullHand = rules.reduce({ ...rules.createGame(4), stage: "draw", turn: 2, hand: ["clay", "glass", "agate", "mica", "tiger"] }, { type: "draw" });
   events.push(...fullHand.events);
+  // Polissage, Fêlure, cible vide : le Tic du verre sur une pointe vide, puis le
+  // sulfure qui fêle une porcelaine.
+  const polishedNothing = rules.reduce({ ...emptyBagMarblesGame(rules, 6), turn: 2, stage: "play", hand: ["glass"], triangle: { leftBase: { marble: "clay", wear: 0 }, rightBase: null, apex: null } }, { type: "place", handIndex: 0, slot: "leftBase" });
+  events.push(...polishedNothing.events);
+  const cracked = rules.reduce({ ...emptyBagMarblesGame(rules, 7), turn: 2, stage: "play", bag: ["clay"], triangle: { leftBase: { marble: "sulphide", wear: 0 }, rightBase: null, apex: { marble: "porcelain", wear: 0 } } }, { type: "resolve" });
+  events.push(...cracked.events);
+  const polished = rules.reduce({ ...emptyBagMarblesGame(rules, 8), turn: 2, stage: "play", bag: ["clay"], triangle: { leftBase: null, rightBase: null, apex: { marble: "mica", wear: 1 } } }, { type: "resolve" });
+  events.push(...polished.events);
   // Sac vide, défausse pleine : la défausse devient le sac.
   const regenerated = rules.reduce({ ...emptyBagMarblesGame(rules, 5), turn: 2, stage: "draw", hand: [], discard: ["clay", "glass"] }, { type: "draw" });
   events.push(...regenerated.events);
@@ -145,9 +153,9 @@ function checkCards(run) {
       fields("shooter")
     );
     run.same(
-      "fiche : sans champ facultatif, le repli",
-      { above: ["Pointe : Vitesse +2.", "Base : Masse +1."], below: ["Aucun effet particulier."] },
-      fields("glass")
+      "fiche : sans champ facultatif, le repli ; une Fêlure ciblée",
+      { above: ["Pointe : Masse +3.", "Base : Fêlure 1 à la pointe."], below: ["Aucun effet particulier."] },
+      fields("sulphide")
     );
     run.same(
       "fiche : effet négatif avec le vrai signe moins",
@@ -164,7 +172,9 @@ function checkCards(run) {
       "Base gauche : Vitesse +4 à la pointe si son effet de pointe donne au moins Vitesse +1. Base droite : Vitesse +1.",
       fields("magnifier").above[1]
     );
-    run.same("fiche : la Pioche en base", { above: ["Pointe : Vitesse +2.", "Base : Pioche 1."], below: ["Aucun effet particulier."] }, fields("mica"));
+    run.same("fiche : la Pioche en base, un Polissage sur soi", { above: ["Pointe : Vitesse +2 et Polissage 1.", "Base : Pioche 1."], below: ["Aucun effet particulier."] }, fields("mica"));
+    run.same("fiche : un Polissage ciblé au Tic", ["Tic : Polissage 1 à la pointe."], fields("glass").below);
+    run.same("fiche : un Polissage ciblé au Final", ["Tic : Masse +1.", "Final : Polissage 1 à la pointe."], fields("agate").below);
     run.same("fiche : la Pioche au tic", ["Tic : Pioche 1."], fields("cats_eye").below);
     run.same("fiche : la Pioche à l'éjection", ["Éjection : Pioche 1."], fields("stoneware").below);
     run.same("fiche : le Final de la porcelaine", ["Final : Vitesse +4."], fields("porcelain").below);
@@ -180,7 +190,8 @@ function checkCards(run) {
       ).below.map(plain)
     );
     setLocale("en");
-    run.same("fiche, anglais : la Pioche", ["Apex: Speed +2.", "Base: Draw 1."], fields("mica").above);
+    run.same("fiche, anglais : la Pioche et le Polissage", ["Apex: Speed +2 and Polish 1.", "Base: Draw 1."], fields("mica").above);
+    run.same("fiche, anglais : la Fêlure ciblée", ["Apex: Mass +3.", "Base: Crack 1 to the apex."], fields("sulphide").above);
     setLocale("fr");
     run.same(
       "fiche : tic et éjection dans l'ordre",
@@ -757,8 +768,8 @@ export default function checkMarblesView(run) {
       menuLines(0, "apex")
     );
     run.same(
-      "confirmation : aucun effet dit, même structure",
-      ["Poser verre en base gauche ?", "Masse +1", "Éjection de loupe : aucun effet", "Tic de verre : aucun effet"],
+      "confirmation : aucun effet dit, même structure ; un Polissage ciblé chez qui le produit",
+      ["Poser verre en base gauche ?", "Masse +1", "Éjection de loupe : aucun effet", "Tic de verre : Polissage 1 à la pointe"],
       menuLines(2, "leftBase")
     );
     // Les valeurs prévues au format de R : ce que la loupe donne s'entend chez le

@@ -50,7 +50,9 @@
 //   discarded { slot, marble, cause }, placed { slot, marble },
 //   hit { slot, marble }, final { slot, marble },
 //   phase { slot, marble }, phaseSkipped { slot },
-//   effect { trigger, slot, marble, speedDelta, massDelta, draw, given, speed, mass },
+//   effect { trigger, slot, marble, speedDelta, massDelta, draw, operations, given, lost, speed, mass },
+//   polished { slot, marble, amount, wear, maxWear }, cracked { slot, marble, amount, wear, maxWear },
+//   targetEmpty { action, slot },
 //   wear { slot, marble, wear, maxWear },
 //   impact { speed, mass, impact, score },
 //   rotation { triangle }, turnEnded { turn }, gameOver { reason, score }.
@@ -63,7 +65,10 @@
 // À l'aveugle (prévision), `draw` a pour bille UNKNOWN_MARBLE.
 // `given` : ce que l'effet a donné aux autres emplacements occupés,
 // [{ slot, marble, speed, mass }]. `speedDelta` et `massDelta` comptent le bonus
-// reçu : c'est le total effectif de la bille, tel qu'il s'annonce. `draw` : les
+// reçu : c'est le total effectif de la bille, tel qu'il s'annonce. `operations` :
+// les actions sur une bille que l'effet joue ([{ action, amount, target? }], ce que
+// la bille promet) ; chacune est suivie de son évènement (polished, cracked), ou de
+// targetEmpty si l'emplacement visé est vide. `wear` y est l'usure d'après. `draw` : les
 // billes que l'effet demande à piocher (Pioche), dont les `draw` qui le suivent
 // disent combien l'ont vraiment été.
 //
@@ -77,7 +82,7 @@ import { MARBLE_TRIGGERS, MARBLES_SETTINGS, STARTING_BAG } from "../config/marbl
 import { createSeed, nextRandom } from "./rng.js";
 import { rejectUnknownFields } from "../lib/validate.js";
 import { MarbleEventLimitError, createEventBus } from "./marbles-bus.js";
-import { SLOTS, addValues, effectAt, evaluateEffect, validateEffect } from "./marbles-effects.js";
+import { CLAUSE_ACTIONS, SLOTS, addValues, effectAt, evaluateEffect, validateEffect } from "./marbles-effects.js";
 
 export { SLOTS, effectAt };
 
@@ -105,6 +110,7 @@ export const MARBLE_ERRORS = [
 // Les champs d'effet de PHASE d'une bille, à part des déclencheurs.
 const PHASE_FIELDS = ["base", "apex"];
 const TRIGGER_MARBLES = ["onSlot", "removed"];
+const TRIGGER_MOMENTS = ["play", "afterPhases"];
 const PLACEMENT_MARBLES = ["occupant", "placed"];
 
 // Échoue sur une liste de déclencheurs mal formée (config/marbles-values.js/
@@ -117,7 +123,7 @@ export function validateMarbleTriggers(triggers) {
   const seen = { id: new Set(), field: new Set(), event: new Set() };
   for (const trigger of triggers) {
     const describe = `déclencheur "${trigger.id}"`;
-    rejectUnknownFields(trigger, ["id", "field", "event", "marble", "forecast", "texts", "card"], describe, fail);
+    rejectUnknownFields(trigger, ["id", "field", "event", "marble", "moment", "forecast", "texts", "card"], describe, fail);
     for (const key of ["id", "field", "event"]) {
       if (typeof trigger[key] !== "string" || trigger[key] === "") fail(`${describe} : ${key} doit être un texte.`);
       if (seen[key].has(trigger[key])) fail(`${describe} : ${key} "${trigger[key]}" en double.`);
@@ -125,6 +131,7 @@ export function validateMarbleTriggers(triggers) {
     }
     if (trigger.id === "phase" || [...PHASE_FIELDS, "baseVariant"].includes(trigger.field)) fail(`${describe} : la phase n'est pas un déclencheur.`);
     if (!TRIGGER_MARBLES.includes(trigger.marble)) fail(`${describe} : marble inconnu "${trigger.marble}".`);
+    if (!TRIGGER_MOMENTS.includes(trigger.moment)) fail(`${describe} : moment inconnu "${trigger.moment}".`);
     const { forecast, texts } = trigger;
     if (typeof texts?.card !== "string" || typeof texts?.effect !== "string") fail(`${describe} : textes card et effect obligatoires.`);
     if (forecast?.line === "placement") {
@@ -147,6 +154,14 @@ validateMarbleTriggers(MARBLE_TRIGGERS);
 // Les champs d'effet d'une bille : ceux de la phase, puis un par déclencheur.
 const EFFECT_FIELDS = [...PHASE_FIELDS, ...MARBLE_TRIGGERS.map((trigger) => trigger.field)];
 
+// Le moment où joue chaque champ d'effet, pour la règle des cibles
+// (core/marbles-effects.js/validateEffect) ; une variante de base joue sur sa base.
+const FIELD_CONTEXTS = {
+  base: { phaseSlots: ["leftBase", "rightBase"] },
+  apex: { phaseSlots: ["apex"] },
+  ...Object.fromEntries(MARBLE_TRIGGERS.map((trigger) => [trigger.field, { moment: trigger.moment, removed: trigger.marble === "removed" }])),
+};
+
 // --- Table des billes ---
 
 // Échoue sur une table mal formée. La vraie est validée au démarrage
@@ -162,12 +177,12 @@ export function validateMarbleTypes(types) {
     // jamais lus ici (validés par la vue, view/marbles/sounds.js).
     rejectUnknownFields(type, [...EFFECT_FIELDS, "baseVariant", "maxWear", "size", "sound"], `bille "${id}"`, fail);
     for (const field of EFFECT_FIELDS) {
-      if (type[field] !== undefined) validateEffect(type[field], `bille "${id}", ${field}`, fail);
+      if (type[field] !== undefined) validateEffect(type[field], `bille "${id}", ${field}`, fail, FIELD_CONTEXTS[field]);
     }
     if (type.baseVariant !== undefined) {
       rejectUnknownFields(type.baseVariant, ["leftBase", "rightBase"], `bille "${id}", baseVariant`, fail);
       for (const [slot, effect] of Object.entries(type.baseVariant)) {
-        validateEffect(effect, `bille "${id}", baseVariant.${slot}`, fail);
+        validateEffect(effect, `bille "${id}", baseVariant.${slot}`, fail, { phaseSlots: [slot] });
       }
     }
     if (type.maxWear !== undefined && (!Number.isInteger(type.maxWear) || type.maxWear < 1)) {
@@ -462,15 +477,22 @@ function update(run, changes) {
 // reçu compté au moment de la phase de la bille.
 function fireEffect(run, trigger, listener, clauses) {
   const { slot, marble } = listener;
-  const { self, gifts } = evaluateEffect(clauses, run.state.triangle, run.types);
+  const { self, gifts, operations } = evaluateEffect(clauses, run.state.triangle, run.types);
   const bonus = trigger === "phase" ? run.state.triangle[slot].bonus : undefined;
   const { speed: speedDelta, mass: massDelta } = bonus ? addValues(self, bonus) : self;
 
+  // Un bonus ne vaut que si la phase de sa cible peut encore avoir lieu ce tour :
+  // sinon (emplacement vide, phase déjà passée ou en cours), il est perdu, et
+  // l'évènement le note dans `lost`, { slot, reason, ...valeurs }.
   let { triangle } = run.state;
   const given = [];
+  const lost = [];
   for (const { slot: target, ...gift } of gifts) {
     const placed = triangle[target];
-    if (placed === null) continue;
+    if (placed === null || run.phasesStarted.has(target)) {
+      lost.push({ slot: target, reason: placed === null ? "emptySlot" : "phasePassed", ...gift });
+      continue;
+    }
     triangle = { ...triangle, [target]: { ...placed, bonus: placed.bonus ? addValues(placed.bonus, gift) : gift } };
     given.push({ slot: target, marble: placed.marble, ...gift });
   }
@@ -481,8 +503,30 @@ function fireEffect(run, trigger, listener, clauses) {
   // La Pioche : l'effet s'annonce, puis ses billes se piochent (drawMarbles), à
   // tout moment du tour.
   const { draw } = self;
-  run.emit({ type: "effect", trigger, slot, marble, speedDelta, massDelta, draw, given, speed, mass });
+  run.emit({ type: "effect", trigger, slot, marble, speedDelta, massDelta, draw, operations, given, lost, speed, mass });
   if (draw > 0) drawMarbles(run, draw);
+  // Les actions sur une bille, après la pioche, dans l'ordre des clauses : sur la
+  // bille elle-même (son emplacement) ou sur celle de l'emplacement visé.
+  for (const operation of operations) applyMarbleAction(run, operation.action, operation.amount, operation.target ?? slot);
+}
+
+// Une action sur une bille (Polissage, Fêlure : CLAUSE_ACTIONS), appliquée à la
+// bille de `slot`. Emplacement vide : sans effet, noté au journal. Une Fêlure qui
+// amène la bille à son maximum la retire aussitôt (retireMarble) : en résolution,
+// une phase qui n'avait pas eu lieu est alors sautée ; en phase de jeu,
+// l'emplacement vide peut recevoir une pose, sans Tic.
+function applyMarbleAction(run, action, amount, slot) {
+  const placed = run.state.triangle[slot];
+  if (placed === null) {
+    run.emit({ type: "targetEmpty", action, slot });
+    return;
+  }
+  const rule = CLAUSE_ACTIONS[action];
+  const maxWear = maxWearOf(placed.marble, run.types);
+  const wear = rule.wear(placed.wear, amount, maxWear);
+  update(run, { triangle: { ...run.state.triangle, [slot]: { ...placed, wear } } });
+  run.emit({ type: rule.event, slot, marble: placed.marble, amount, wear, maxWear });
+  if (rule.retires && wear >= maxWear) retireMarble(run, slot);
 }
 
 // Le traitement d'un évènement par le bus : le journal, puis les écouteurs.
@@ -509,7 +553,9 @@ function handleEvent(run, event) {
 // `options` : { eventLimit, blind } (voir marblesReduce). À l'aveugle, le résultat
 // porte aussi `uncertain` : une bille inconnue aurait pu réagir (handleEvent).
 function transact(state, types, { eventLimit, blind = false } = {}, body) {
-  const run = { state, types, blind, uncertain: false, journal: [] };
+  // `phasesStarted` : les emplacements dont la phase a commencé (ou a été sautée)
+  // pendant cette action ; un bonus qui les vise est perdu (fireEffect).
+  const run = { state, types, blind, uncertain: false, phasesStarted: new Set(), journal: [] };
   run.emit = createEventBus((event) => handleEvent(run, event), eventLimit).emit;
   try {
     body(run);
@@ -623,10 +669,14 @@ function placeMarble(run, { handIndex, slot }) {
   if (previous !== null) {
     const ejected = { slot, marble: previous.marble };
     run.emit({ type: "knockout", ...ejected });
-    update(run, { triangle: { ...run.state.triangle, [slot]: null } });
-    run.emit({ type: "removed", ...ejected, cause: "replacement" });
-    update(run, { discard: [...run.state.discard, previous.marble] });
-    run.emit({ type: "discarded", ...ejected, cause: "replacement" });
+    // Son Éjection a pu la retirer déjà (une Fêlure sur elle-même) : elle est alors
+    // partie, usée, et ne part pas une seconde fois.
+    if (run.state.triangle[slot] !== null) {
+      update(run, { triangle: { ...run.state.triangle, [slot]: null } });
+      run.emit({ type: "removed", ...ejected, cause: "replacement" });
+      update(run, { discard: [...run.state.discard, previous.marble] });
+      run.emit({ type: "discarded", ...ejected, cause: "replacement" });
+    }
   }
   update(run, {
     hand: run.state.hand.filter((_, index) => index !== handIndex),
@@ -655,6 +705,7 @@ function withoutBonus(placed) {
 
 function resolvePhases(run) {
   for (const slot of SLOTS) {
+    run.phasesStarted.add(slot);
     const placed = run.state.triangle[slot];
     if (placed === null) {
       run.emit({ type: "phaseSkipped", slot });
@@ -662,8 +713,13 @@ function resolvePhases(run) {
     }
     const { marble } = placed;
     run.emit({ type: "phase", slot, marble });
-    // Une bille joue son effet même si cette usure l'amène à son maximum.
-    const wear = placed.wear + 1;
+    // L'effet d'abord (un Polissage ou une Fêlure sur elle-même compris), puis son
+    // +1 d'usure, sur l'usure d'après l'effet. Une bille retirée par sa propre
+    // Fêlure ne s'use plus. Elle joue son effet même si cette usure l'amène à son
+    // maximum.
+    const after = run.state.triangle[slot];
+    if (after === null) continue;
+    const wear = after.wear + 1;
     update(run, { triangle: { ...run.state.triangle, [slot]: { marble, wear } } });
     run.emit({ type: "wear", slot, marble, wear, maxWear: maxWearOf(marble, run.types) });
   }
@@ -677,13 +733,21 @@ function retireWornMarbles(run) {
   for (const slot of SLOTS) {
     const placed = run.state.triangle[slot];
     if (placed === null || placed.wear < maxWearOf(placed.marble, run.types)) continue;
-    const worn = { slot, marble: placed.marble, cause: "wear" };
-    update(run, { triangle: { ...run.state.triangle, [slot]: null } });
-    run.emit({ type: "removed", ...worn });
-    update(run, { discard: [...run.state.discard, placed.marble] });
-    run.emit({ type: "discarded", ...worn });
-    run.emit({ type: "final", slot, marble: placed.marble });
+    retireMarble(run, slot);
   }
+}
+
+// LE retrait par usure d'une bille, le seul : à l'étape des retraits, ou aussitôt
+// quand une Fêlure l'amène à son maximum. Elle quitte son emplacement, rejoint la
+// défausse, puis son Final se déclenche.
+function retireMarble(run, slot) {
+  const { marble } = run.state.triangle[slot];
+  const worn = { slot, marble, cause: "wear" };
+  update(run, { triangle: { ...run.state.triangle, [slot]: null } });
+  run.emit({ type: "removed", ...worn });
+  update(run, { discard: [...run.state.discard, marble] });
+  run.emit({ type: "discarded", ...worn });
+  run.emit({ type: "final", slot, marble });
 }
 
 // La résolution, sans les refus, dans cet ordre : phases, retraits par usure (et

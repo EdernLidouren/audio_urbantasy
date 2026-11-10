@@ -210,6 +210,9 @@ export const MARBLES_AUDIO = {
 //   marble    la bille concernée : "onSlot", celle qui est sur l'emplacement de
 //             l'évènement ; "removed", celle que l'évènement nomme, déjà retirée du
 //             triangle ;
+//   moment    quand il joue : "play", pendant la phase de jeu (toutes les phases
+//             restent à venir) ; "afterPhases", après toutes les phases (une Vitesse
+//             ou une Masse ciblée n'y a plus de sens : core/marbles-effects.js) ;
 //   forecast  où sa prévision se dit :
 //               { line: "placement", marble, order } : pendant une pose, sa propre
 //               ligne de la confirmation, toujours présente, pour la bille
@@ -230,6 +233,7 @@ export const MARBLE_TRIGGERS = [
     field: "hit",
     event: "hit",
     marble: "onSlot",
+    moment: "play",
     forecast: { line: "placement", marble: "placed", order: 2 },
     texts: { card: "marbles.card.hit", effect: "marbles.event.effect_hit", placement: "marbles.place.hit" },
     card: "below",
@@ -239,6 +243,7 @@ export const MARBLE_TRIGGERS = [
     field: "knockout",
     event: "knockout",
     marble: "onSlot",
+    moment: "play",
     forecast: { line: "placement", marble: "occupant", order: 1 },
     texts: { card: "marbles.card.knockout", effect: "marbles.event.effect_knockout", placement: "marbles.place.knockout" },
     card: "below",
@@ -250,6 +255,7 @@ export const MARBLE_TRIGGERS = [
     field: "final",
     event: "final",
     marble: "removed",
+    moment: "afterPhases",
     forecast: { line: "slot" },
     texts: { card: "marbles.card.final", effect: "marbles.event.effect_final", slot: "marbles.outcome.final" },
     card: "below",

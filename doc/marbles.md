@@ -8,7 +8,7 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
 | Fichier | Rôle |
 |---|---|
 | `marbles/types/` | Les billes, une par fichier, et leur registre `index.js` (donnée pure) |
-| `marbles/effects.js` | Les formes courtes des clauses, `speed(n)`, `mass(n)` et `draw(n)` |
+| `marbles/effects.js` | Les formes courtes des clauses, `speed(n)`, `mass(n)`, `draw(n)`, `polish(n, cible?)` et `crack(n, cible?)` |
 | `config/marbles-values.js` | Réglages, modèle de fiche, sac de test, sons (donnée pure) |
 | `core/marbles-rules.js` | Les règles liées à une table de billes : le point d'entrée de la simulation hors du core |
 | `core/marbles.js` | La simulation : état, réducteur, écouteurs, journal, codes de refus |
@@ -19,6 +19,7 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
 | `view/marbles/pile-screen.js` | Le menu d'une pile de billes, sac ou défausse |
 | `view/marbles/card.js` | La fiche d'une bille, lue dans le modèle `MARBLE_CARD_MODEL` |
 | `lib/detail-card.js` | Le mécanisme générique des fiches : assemblage et curseur secondaire |
+| `lib/real-time.js` | L'horloge temps réel à deux moteurs (images et minuterie) de l'écran |
 | `view/marbles/narration.js` | Ce qui se dit, à partir de l'état, du journal et de la prévision (pur) |
 | `view/marbles/sequence.js` | La file d'étapes de la séquence de résolution et ses pauses (pur) |
 | `view/marbles/history.js` | L'historique : les messages de jeu du tour précédent (pur) |
@@ -49,8 +50,9 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
    est refusée (la partie serait sans issue).
 4. **Phases** : base gauche, base droite, pointe ; un emplacement vide saute sa phase.
    Elles partent des compteurs du tour : Vitesse (0 en début de tour) et Masse (1), que
-   Tic et Éjection ont déjà pu modifier. Chaque bille applique son effet puis prend 1
-   d'usure, même si cela l'amène à son maximum.
+   Tic et Éjection ont déjà pu modifier. Chaque bille applique son effet (un Polissage ou
+   une Fêlure sur elle-même compris) puis prend 1 d'usure, même si cela l'amène à son
+   maximum. Une bille qu'une Fêlure a retirée avant sa phase la saute.
 5. **Retraits par usure**, dans l'ordre des phases : chaque bille à son usure maximale
    quitte son emplacement, rejoint la défausse, puis son **Final** se déclenche (voir
    « Les déclencheurs »). Pas d'Éjection.
@@ -179,9 +181,21 @@ Un effet est une liste de clauses (`core/marbles-effects.js`) :
     Une bille piochée pendant la phase de jeu (par un Tic, une Éjection) se joue aussitôt,
     dans la limite des lancers ; une bille piochée pendant la résolution attend le tour
     suivant ;
+  - `polish`, le **Polissage** : retire `amount` d'usure (au moins 1), jamais sous 0. Une
+    bille arrivée à son maximum pendant la résolution, puis polie avant l'étape des
+    retraits, n'est plus retirée ;
+  - `crack`, la **Fêlure** : ajoute `amount` d'usure (au moins 1), jamais au-delà du
+    maximum. Si elle l'y amène, la bille est retirée AUSSITÔT, comme par usure : elle
+    rejoint la défausse et son Final se déclenche, son emplacement devient vide. En
+    résolution, sa phase est sautée si elle n'avait pas eu lieu ; en phase de jeu,
+    l'emplacement peut recevoir une pose, sans Tic. L'usure de phase (+1) continue de
+    retirer les billes à l'étape des retraits ;
 - **cible** (`target`, facultative, pour les actions qui l'acceptent) : un emplacement.
-  Sans cible, la clause agit sur le compteur du tour ou s'ajoute à l'effet de la bille ;
-  avec une cible, elle donne un **bonus** à la bille de cet emplacement ;
+  Pour une Vitesse ou une Masse, sans cible, la clause agit sur le compteur du tour ou
+  s'ajoute à l'effet de la bille ; avec une cible, elle donne un **bonus** à la bille de
+  cet emplacement. Pour un Polissage ou une Fêlure, sans cible, la bille elle-même ; avec
+  une cible, la bille de cet emplacement (un emplacement vide : sans effet, noté au
+  journal, `targetEmpty`) ;
 - **condition** (`when`, facultative) : évaluée au déclenchement.
 
 **Règle anti-boucle** : une condition lit toujours l'effet IMPRIMÉ d'une bille
@@ -195,8 +209,33 @@ bille dans un échange, se perd si elle est remplacée, et disparaît à la fin 
 résolution : il ne vaut que s'il arrive avant la phase de sa cible. Donné à un emplacement
 vide, il est perdu.
 
-**Les valeurs** d'un effet : une par action, sous son nom (`{ speed, mass, draw }`). Le
-core les applique, la vue les dit (« Vitesse +2 », « Pioche 1 »), la prévision les rend.
+**Les valeurs** d'un effet : une par action de valeur, sous son nom (`{ speed, mass,
+draw }`). Le core les applique, la vue les dit (« Vitesse +2 », « Pioche 1 »), la prévision
+les rend. Les **actions sur une bille** (`polish`, `crack`, `kind: "marble"` dans
+`CLAUSE_ACTIONS`) ne s'additionnent pas : chaque clause s'applique, dans l'ordre, après
+l'annonce de l'effet et sa pioche, et émet son évènement (`polished`, `cracked`). Elles
+se disent chez la bille qui les produit (« Base gauche, sulfure : Fêlure 1 à la
+pointe. »), jamais dans la valeur de phase de celle qui les reçoit.
+
+### La règle des cibles
+
+Une cible n'a de sens que si l'effet ciblé peut encore se produire.
+
+- Une **Vitesse ou une Masse ciblée** modifie l'effet de phase de la bille visée : elle ne
+  vaut que si cette phase peut encore avoir lieu ce tour. La validation refuse les cas
+  TOUJOURS impossibles : une cible dans un Final (après toutes les phases : sa Vitesse et
+  sa Masse vont toujours aux compteurs), une pointe qui vise un emplacement, une base qui
+  vise la base gauche, une variante de base qui vise sa propre base ou une phase passée.
+  Les cas qui dépendent de la position (une base qui vise la base droite, jouée depuis la
+  base droite) se tranchent à l'exécution : le bonus est perdu, l'évènement `effect` le
+  note dans `lost` (`{ slot, reason, ...valeurs }`, `reason` : `phasePassed` ou
+  `emptySlot`), et la prévision n'en montre rien.
+- Un **Polissage ou une Fêlure** peut viser un emplacement depuis n'importe quel moment,
+  Final compris : la bille visée reste sur le triangle. Mais pas la bille elle-même dans
+  un Final, qui a déjà quitté le triangle (refusé à la validation).
+
+Le moment de chaque champ vient de la phase (ses emplacements) ou du déclencheur
+(`moment` de `MARBLE_TRIGGERS` : `play` ou `afterPhases`).
 
 **Ajouter** une action : une entrée dans `CLAUSE_ACTIONS` (`core/marbles-effects.js`), sur
 le modèle des conditions, qui déclare ses champs (`fields` : une action sans `target` refuse
@@ -285,7 +324,9 @@ déroulé est aveugle (`reduce(…, { blind: true })`). Une Pioche y a lieu avec
 régénération s'annonce sans mélange. La prévision ne lit ni n'avance donc jamais le hasard
 réel, et seules une pose ou un échange s'envisagent. Elle rend, en plus des valeurs :
 `slotEffects`, par emplacement, les effets prévus avec lui (le Final d'une bille qui
-atteindra son usure maximale ce tour, rien sinon) ; `drawn`, les billes que l'action et la
+atteindra son usure maximale ce tour, rien sinon) ; `cleared`, par emplacement, la bille
+retirée avant sa phase par une Fêlure ; `wear` et `retired`, les changements d'usure et les
+retraits, dans l'ordre ; `drawn`, les billes que l'action et la
 résolution piocheraient ; `regenerates`, vrai si le
 sac serait régénéré ; `uncertain`, vrai si une bille inconnue aurait pu réagir selon son
 identité (un déclencheur qui écoute la main : aucun aujourd'hui), ses chiffres n'étant alors
@@ -404,7 +445,9 @@ Base droite, mica : Pioche 1. Pointe, calot : Vitesse +6.
 
 Une bille qui atteint son usure maximale ce tour fait suivre sa phase de son Final, compté
 dans le résumé : « Pointe, porcelaine : Vitesse +5. Final : Vitesse +4. ». Une bille qui
-ne s'use pas ce tour n'en dit rien.
+ne s'use pas ce tour n'en dit rien, une bille sauvée par un Polissage non plus. Une bille
+qu'une Fêlure retirera avant sa phase n'a pas d'effet de phase : « Pointe, porcelaine :
+retirée avant sa phase. Final : Vitesse +4. ».
 
 Vitesse et Masse comprennent ce que le tour a déjà gagné (Tic, Éjection) ; l'Impact
 applique les planchers. Un emplacement dit les valeurs que sa bille PRODUIT, après
@@ -428,7 +471,10 @@ chacune :
    annonce par la seconde ;
 2. à 4. chaque phase, dans l'ordre : « Base gauche, argile : Vitesse +1. », « Base
    droite, vide. », avec les règles de la vue d'ensemble ; une phase qui pioche est suivie
-   de sa pioche (« Base gauche, mica : Pioche 1. », « Vous piochez agate. ») ;
+   de sa pioche (« Base gauche, mica : Pioche 1. », « Vous piochez agate. ») ; un
+   Polissage ou une Fêlure, de son application (« Porcelaine se fêle : usure 2 sur 2. »,
+   « Porcelaine est polie : usure 1 sur 2. », « Pointe vide : sans effet. ») et des retraits
+   qu'une Fêlure provoque, avec leur Final ;
 5. une étape par bille usée : « Calot est usé et part à la défausse. » (l'adjectif
    s'accorde au genre du nom, attribut `gender` des noms français), suivie de son Final
    s'il en a un (« Final de porcelaine : Vitesse +4. ») et de ses pioches ;
@@ -456,8 +502,18 @@ sans quoi `buildSteps` lève.
 
 **Pauses** : base plus supplément par caractère de l'annonce, deux réglages de
 `MARBLES_SETTINGS` (`resolutionPauseBaseMs`, 400 ; `resolutionPausePerCharMs`, 40), validés
-au chargement. La file avance par `onFrame` : un menu ouvert par-dessus (aide, abandon) la
-fige. Retour arrière redit l'étape et relance sa pause. Une étape pourra un jour attendre
+au chargement.
+
+**Rythme** : la file avance par le temps réel de l'écran (`lib/real-time.js`), un même
+battement appelé à chaque image (`onFrame`) ET par une minuterie (50 ms). Les images
+s'arrêtent quand la fenêtre passe en arrière-plan ou que le panneau est masqué ; la
+minuterie continue, ralentie par le navigateur (environ une fois par seconde), et la
+séquence avec elle. Chaque battement mesure le temps écoulé depuis le précédent, quel que
+soit le moteur : rien n'est compté deux fois. Une étape au plus commence par battement
+(`advanceSequence`) : au retour au premier plan, aucune étape sautée, aucune annonce en
+rafale. La file de sons et les roulements suivent le même battement. Un menu ouvert
+par-dessus (aide, abandon) la fige : seul l'écran du sommet reçoit le temps, et
+l'horloge se recale au retour. Retour arrière redit l'étape et relance sa pause. Une étape pourra un jour attendre
 la fin d'un son au lieu d'une durée.
 
 **Pendant la séquence**, tout le reste est refusé d'un son de blocage, sans parole pour ne
@@ -511,7 +567,8 @@ et quand, sur la ligne de temps du geste (`eventCues`) :
 - retrait par usure : la bille usée roule de son emplacement à la défausse et y tombe ;
   plusieurs, l'une après l'autre (`outStaggerMs`). Son
   Final n'a pas encore de son propre : l'évènement `final` est un point d'accroche muet
-  (`MARBLE_EVENT_CUES`) ;
+  (`MARBLE_EVENT_CUES`), comme `polished`, `cracked` et `targetEmpty` ; une bille retirée
+  par une Fêlure part comme une bille usée ;
 - rotation : les billes du triangle roulent ensemble, chacune vers l'emplacement suivant
   (l'ordre du cœur, `ROTATION_NEXT`), puis s'y calent avec une chute discrète ; un
   emplacement vide reste muet. Pas de son de rotation à part : les billes suffisent.

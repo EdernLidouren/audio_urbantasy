@@ -92,6 +92,9 @@ export default function checkMarbles(run) {
   checkFinal(run);
   checkHitAndKnockout(run);
   checkMagnifier(run);
+  checkTargetRule(run);
+  checkWearActions(run);
+  checkWearMarbles(run);
   checkBonus(run);
   checkResolution(run);
   checkEndOfGame(run);
@@ -579,12 +582,12 @@ function checkHitAndKnockout(run) {
   );
   run.same(
     "Éjection : son effet et le cumul",
-    { type: "effect", trigger: "knockout", slot: "apex", marble: "shooter", speedDelta: 3, massDelta: 0, draw: 0, given: [], speed: 3, mass: 1 },
+    { type: "effect", trigger: "knockout", slot: "apex", marble: "shooter", speedDelta: 3, massDelta: 0, draw: 0, operations: [], given: [], lost: [], speed: 3, mass: 1 },
     both.events[1]
   );
   run.same(
     "Tic : son effet et le cumul",
-    { type: "effect", trigger: "hit", slot: "apex", marble: "clay", speedDelta: 2, massDelta: 0, draw: 0, given: [], speed: 5, mass: 1 },
+    { type: "effect", trigger: "hit", slot: "apex", marble: "clay", speedDelta: 2, massDelta: 0, draw: 0, operations: [], given: [], lost: [], speed: 5, mass: 1 },
     both.events[6]
   );
 
@@ -617,7 +620,7 @@ function checkHitAndKnockout(run) {
   run("compteurs : deux poses, Masse", 3, twice.state.mass);
 
   // Une bille sans Tic ni Éjection : les évènements passent, aucun effet.
-  const plain = apply(playState({ hand: ["glass"], triangle: triangleOf(null, null, placed("mica")) }), { type: "place", handIndex: 0, slot: "apex" });
+  const plain = apply(playState({ hand: ["tiger"], triangle: triangleOf(null, null, placed("mica")) }), { type: "place", handIndex: 0, slot: "apex" });
   run.same("sans Tic ni Éjection : aucun effet", ["knockout", "removed", "discarded", "placed", "hit"], eventTypes(plain.events));
   run("sans Tic ni Éjection : compteurs intacts", "0,1", `${plain.state.speed},${plain.state.mass}`);
 
@@ -683,13 +686,149 @@ function checkMagnifier(run) {
   run("loupe en pointe : Vitesse +2", 2, onApex.state.score);
 }
 
+// POLISSAGE et FÊLURE, sur des billes fictives.
+function checkWearActions(run) {
+  const polish = (amount, target) => ({ action: "polish", amount, ...(target ? { target } : {}) });
+  const crack = (amount, target) => ({ action: "crack", amount, ...(target ? { target } : {}) });
+  const accepted = (name, type) => run(`usure, table acceptée : ${name}`, false, throws(() => validateMarbleTypes({ a: type })));
+  const refused = (name, type) => run(`usure, table refusée : ${name}`, true, throws(() => validateMarbleTypes({ a: type })));
+  accepted("Polissage ciblé depuis un Final", { final: [polish(1, "apex")] });
+  accepted("Fêlure ciblée depuis un Final", { final: [crack(1, "leftBase")] });
+  accepted("Fêlure d'une pointe vers une base", { apex: [crack(1, "leftBase")] });
+  accepted("Polissage sur soi en pointe", { apex: [polish(1)] });
+  refused("Polissage sur soi dans un Final (la bille est partie)", { final: [polish(1)] });
+  refused("Fêlure de 0", { base: [crack(0)] });
+  refused("Polissage vers un emplacement inconnu", { base: [polish(1, "hand")] });
+
+  const table = {
+    plain: { apex: [{ action: "speed", amount: 1 }], base: [{ action: "speed", amount: 1 }] },
+    fragile: { apex: [{ action: "speed", amount: 2 }], final: [{ action: "speed", amount: 4 }], maxWear: 2 },
+    polisher: { base: [polish(2, "apex")] },
+    savior: { apex: [polish(1, "leftBase")] },
+    selfPolish: { apex: [{ action: "speed", amount: 1 }, polish(1)] },
+    cracker: { base: [crack(1, "apex")], hit: [crack(1, "leftBase")] },
+    breaker: { base: [crack(5, "apex")] },
+    finalPolisher: { final: [polish(1, "apex")], maxWear: 1 },
+    selfBreaker: { knockout: [crack(5)] },
+    emptyHitter: { hit: [polish(1, "rightBase")] },
+  };
+  const wearRules = createMarblesRules(table);
+  const act = (state, action) => apply(state, action, wearRules);
+  const resolveOf = (state) => act(state, { type: "resolve" });
+  const types = (result) => eventTypes(result.events);
+  const find = (result, type) => result.events.find((event) => event.type === type);
+
+  // Polissage : jamais sous 0.
+  const floor = resolveOf(playState({ bag: ["plain"], triangle: triangleOf(placed("polisher"), null, placed("plain", 1)) }));
+  run.same("Polissage : jamais sous 0", { slot: "apex", marble: "plain", amount: 2, wear: 0, maxWear: 3 }, (({ type, ...rest }) => rest)(find(floor, "polished")));
+
+  // Une bille à son maximum, polie avant l'étape des retraits, n'est plus retirée.
+  const saved = resolveOf(playState({ bag: ["plain"], triangle: triangleOf(placed("plain", 2), null, placed("savior")) }));
+  run("Polissage : la bille arrivée au maximum puis polie reste", false, saved.events.some((event) => event.type === "removed" && event.marble === "plain"));
+  run("Polissage : ni Final ni défausse", "", saved.state.discard.join());
+  const finalSave = resolveOf(playState({ bag: ["plain"], triangle: triangleOf(placed("finalPolisher"), null, placed("plain", 2)) }));
+  run("Polissage depuis un Final : la pointe usée est sauvée", 1, finalSave.events.filter((event) => event.type === "removed").length);
+  run("Polissage depuis un Final : appliqué à la pointe", "apex", find(finalSave, "polished").slot);
+
+  // Fêlure en phase : jusqu'au maximum, retrait aussitôt, Final, phase sautée.
+  const broken = resolveOf(playState({ bag: ["plain"], triangle: triangleOf(placed("cracker"), null, placed("fragile", 1)) }));
+  run.same(
+    "Fêlure : l'effet, la fêlure, le retrait, le Final, avant la suite",
+    ["phase", "effect", "cracked", "removed", "discarded", "final", "effect", "wear", "phaseSkipped", "phaseSkipped"],
+    types(broken).slice(0, 10)
+  );
+  run("Fêlure : la phase de la bille retirée est sautée", "apex", broken.events.filter((event) => event.type === "phaseSkipped").at(-1).slot);
+  run("Fêlure : son Final compte pour le tour", 4, find(broken, "impact").impact);
+  run("Fêlure : jamais au-delà du maximum", 3, find(resolveOf(playState({ bag: ["plain"], triangle: triangleOf(placed("breaker"), null, placed("plain")) })), "cracked").wear);
+  const notYet = resolveOf(playState({ bag: ["plain"], triangle: triangleOf(placed("cracker"), null, placed("plain")) }));
+  run("Fêlure : sous le maximum, la bille reste et joue", 1, find(notYet, "impact").impact);
+
+  // Fêlure en phase de jeu : l'emplacement vidé reçoit une pose, sans Tic.
+  const played = act(playState({ hand: ["cracker", "plain"], triangle: triangleOf(placed("fragile", 1), placed("plain"), null) }), { type: "place", handIndex: 0, slot: "rightBase" });
+  run("Fêlure en jeu : retirée aussitôt", null, played.state.triangle.leftBase);
+  run("Fêlure en jeu : son Final se déclenche", true, played.events.some((event) => event.type === "effect" && event.trigger === "final"));
+  const refill = act(played.state, { type: "place", handIndex: 0, slot: "leftBase" });
+  run("Fêlure en jeu : l'emplacement vidé se pose sans Tic", false, types(refill).includes("hit"));
+
+  // Ordre : l'effet (Polissage sur soi compris), puis le +1 d'usure.
+  const ordered = resolveOf(playState({ bag: ["plain"], triangle: triangleOf(null, null, placed("selfPolish", 2)) }));
+  run.same("ordre : effet, Polissage, puis l'usure", ["effect", "polished", "wear"], types(ordered).filter((type) => ["effect", "polished", "wear"].includes(type)));
+  run.same("ordre : usure 2, polie à 1, puis 2", [1, 2], [find(ordered, "polished").wear, find(ordered, "wear").wear]);
+
+  // Cible vide : sans effet, noté au journal.
+  const empty = act(playState({ hand: ["emptyHitter"], triangle: triangleOf(placed("plain"), null, null) }), { type: "place", handIndex: 0, slot: "leftBase" });
+  run.same("cible vide : notée au journal", { type: "targetEmpty", action: "polish", slot: "rightBase" }, find(empty, "targetEmpty"));
+
+  // Une bille fêlée jusqu'au retrait par sa propre Éjection ne part qu'une fois.
+  const self = act(playState({ hand: ["plain"], triangle: triangleOf(null, null, placed("selfBreaker")) }), { type: "place", handIndex: 0, slot: "apex" });
+  run("Éjection qui se fêle : une seule défausse", "selfBreaker", self.state.discard.join());
+  run("Éjection qui se fêle : la posée arrive", "plain", self.state.triangle.apex.marble);
+  run("Éjection qui se fêle : aucune bille perdue ni dupliquée", marbleCount(playState({ hand: ["plain"], triangle: triangleOf(null, null, placed("selfBreaker")) })), marbleCount(self.state));
+}
+
+// Polissage et Fêlure sur les billes de test du jeu : par un Tic, en phase avec
+// retrait immédiat, sur soi, depuis un Final.
+function checkWearMarbles(run) {
+  const find = (result, type) => result.events.find((event) => event.type === type);
+  // Verre : son Tic polit la pointe.
+  const glass = apply(playState({ hand: ["glass"], triangle: triangleOf(placed("clay"), null, placed("porcelain", 1)) }), { type: "place", handIndex: 0, slot: "leftBase" });
+  run.same("verre : le Tic polit la pointe", { slot: "apex", marble: "porcelain", wear: 0 }, (({ slot, marble, wear }) => ({ slot, marble, wear }))(find(glass, "polished")));
+
+  // Sulfure en base : Fêlure de la pointe ; la porcelaine (usure 1 sur 2) part aussitôt,
+  // son Final joue, sa phase est sautée.
+  const sulphide = apply(playState({ bag: ["clay"], triangle: triangleOf(placed("sulphide"), null, placed("porcelain", 1)) }), { type: "resolve" });
+  run.same(
+    "sulfure : Fêlure, retrait, Final de la porcelaine, puis la suite",
+    ["phase", "effect", "cracked", "removed", "discarded", "final", "effect", "wear", "phaseSkipped", "phaseSkipped"],
+    eventTypes(sulphide.events).slice(0, 10)
+  );
+  run("sulfure : la Vitesse du Final compte, la phase de la porcelaine non", 4, find(sulphide, "impact").impact);
+
+  // Mica en pointe : Vitesse +2 et Polissage sur lui-même, puis son +1 d'usure.
+  const mica = apply(playState({ bag: ["clay"], triangle: triangleOf(null, null, placed("mica", 2)) }), { type: "resolve" });
+  run.same("mica : l'effet, le Polissage, puis l'usure", ["effect", "polished", "wear"], eventTypes(mica.events).filter((type) => ["effect", "polished", "wear"].includes(type)));
+  run.same("mica : usure 2, polie à 1, puis 2 : il reste", [1, 2, false], [find(mica, "polished").wear, find(mica, "wear").wear, mica.events.some((event) => event.type === "removed")]);
+
+  // Agate : son Final polit la pointe, qui n'est alors plus retirée.
+  const agate = apply(
+    playState({ bag: ["clay"], triangle: triangleOf({ ...placed("agate", 2) }, null, placed("porcelain", 1)) }),
+    { type: "resolve" }
+  );
+  run.same("agate : Final ciblé, la porcelaine usée est sauvée", ["agate"], agate.events.filter((event) => event.type === "removed").map((event) => event.marble));
+  run("agate : la porcelaine polie de 2 à 1", 1, find(agate, "polished").wear);
+}
+
 // Le bonus, sur des billes fictives : ce que la table du jeu ne fait pas encore.
+// La RÈGLE DES CIBLES à la validation : une Vitesse ou une Masse ciblée qui ne peut
+// jamais atteindre sa phase est refusée au chargement.
+function checkTargetRule(run) {
+  const speedTo = (target) => ({ action: "speed", amount: 1, target });
+  const massTo = (target) => ({ action: "mass", amount: 1, target });
+  const refused = (name, type) => run(`cible refusée : ${name}`, true, throws(() => validateMarbleTypes({ a: type })));
+  const accepted = (name, type) => run(`cible acceptée : ${name}`, false, throws(() => validateMarbleTypes({ a: type })));
+  refused("Vitesse ciblée dans un Final", { final: [speedTo("apex")] });
+  refused("Masse ciblée dans un Final", { final: [massTo("leftBase")] });
+  refused("pointe vers la base gauche", { apex: [speedTo("leftBase")] });
+  refused("pointe vers la base droite", { apex: [massTo("rightBase")] });
+  refused("pointe vers elle-même", { apex: [speedTo("apex")] });
+  refused("base vers la base gauche (toujours passée)", { base: [speedTo("leftBase")] });
+  refused("variante de base droite vers la base droite", { baseVariant: { rightBase: [speedTo("rightBase")] } });
+  accepted("base vers la base droite (depuis la base gauche)", { base: [speedTo("rightBase")] });
+  accepted("base vers la pointe", { base: [speedTo("apex")] });
+  accepted("variante de base gauche vers la base droite", { baseVariant: { leftBase: [speedTo("rightBase")] } });
+  accepted("tic vers n'importe quel emplacement", { hit: [speedTo("leftBase"), speedTo("apex")] });
+  accepted("éjection vers la base gauche", { knockout: [massTo("leftBase")] });
+  accepted("Final sans cible", { final: [{ action: "speed", amount: 2 }] });
+}
+
 function checkBonus(run) {
   const toApex = (amount, action = "speed") => ({ action, amount, target: "apex" });
   const table = {
     plain: { apex: [{ action: "speed", amount: 1 }], base: [{ action: "speed", amount: 1 }] },
     giver: { hit: [toApex(2)], knockout: [toApex(3), toApex(1, "mass")] },
-    late: { apex: [{ action: "speed", amount: 1, target: "leftBase" }] },
+    // Une base qui vise la base droite : possible depuis la base gauche, perdu depuis
+    // la base droite (sa propre phase a commencé).
+    late: { base: [{ action: "speed", amount: 1, target: "rightBase" }] },
     both: { base: [{ action: "speed", amount: 5 }, toApex(2)] },
     conditional: { hit: [{ action: "speed", amount: 9, when: { type: "printedStat", slot: "apex", stat: "mass", atLeast: 1 } }] },
   };
@@ -725,9 +864,18 @@ function checkBonus(run) {
   const replaced = act(playState({ hand: ["plain"], triangle: triangleOf(null, null, { ...placed("plain"), bonus: { speed: 2, mass: 0 } }) }), { type: "place", handIndex: 0, slot: "apex" });
   run("bonus : perdu avec une bille remplacée", undefined, replaced.state.triangle.apex.bonus);
 
-  const tooLate = resolveOf(playState({ triangle: triangleOf(placed("plain"), null, placed("late")) }));
-  run("bonus : après la phase de la cible, sans effet sur l'Impact", 1, tooLate.state.score);
-  run("bonus : après la phase de la cible, ne survit pas au tour", undefined, tooLate.state.triangle.apex.bonus);
+  const tooLate = resolveOf(playState({ triangle: triangleOf(placed("plain"), placed("late"), null) }));
+  run("bonus : phase de la cible commencée, sans effet sur l'Impact", 1, tooLate.state.score);
+  run("bonus : phase de la cible commencée, ne survit pas au tour", undefined, tooLate.state.triangle.leftBase.bonus);
+  run.same(
+    "bonus : perdu, noté au journal",
+    [{ slot: "rightBase", reason: "phasePassed", speed: 1, mass: 0 }],
+    tooLate.events.find((event) => event.type === "effect" && event.marble === "late").lost
+  );
+  run.same("bonus : perdu, rien de donné", [], tooLate.events.find((event) => event.type === "effect" && event.marble === "late").given);
+  const inTime = resolveOf(playState({ triangle: triangleOf(placed("late"), placed("plain"), null) }));
+  run("bonus : depuis la base gauche, la base droite le reçoit (1 + 1)", 2, inTime.events.find((event) => event.type === "effect" && event.slot === "rightBase").speedDelta);
+  run.same("bonus : emplacement vide, noté au journal", [{ slot: "apex", reason: "emptySlot", speed: 2, mass: 0 }], toEmpty.events.find((event) => event.trigger === "hit").lost);
 
   const mixed = resolveOf(playState({ triangle: triangleOf(placed("both"), null, placed("plain")) }));
   const mixedEffect = mixed.events.find((event) => event.slot === "leftBase" && event.type === "effect");
@@ -768,7 +916,7 @@ function checkResolution(run) {
   const effect = result.events.find((event) => event.type === "effect" && event.slot === "rightBase");
   run.same(
     "effet : deltas et cumul",
-    { type: "effect", trigger: "phase", slot: "rightBase", marble: "glass", speedDelta: 0, massDelta: 1, draw: 0, given: [], speed: 1, mass: 2 },
+    { type: "effect", trigger: "phase", slot: "rightBase", marble: "glass", speedDelta: 0, massDelta: 1, draw: 0, operations: [], given: [], lost: [], speed: 1, mass: 2 },
     effect
   );
 
@@ -1076,7 +1224,7 @@ function checkSmoke(run) {
   run.same("fumée : invariants tenus", [], faults.slice(0, 5));
   run(
     "fumée : tous les évènements rencontrés",
-    "bagRegenerated,discarded,draw,drawSkipped,effect,final,gameOver,hit,impact,knockout,phase,phaseSkipped,placed,removed,rotation,swapped,turnEnded,turnStarted,wear",
+    "bagRegenerated,cracked,discarded,draw,drawSkipped,effect,final,gameOver,hit,impact,knockout,phase,phaseSkipped,placed,polished,removed,rotation,swapped,targetEmpty,turnEnded,turnStarted,wear",
     [...seen].sort().join()
   );
 }

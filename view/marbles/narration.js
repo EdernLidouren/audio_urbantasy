@@ -33,6 +33,8 @@ const ACTION_TEXTS = {
   speed: { up: "marbles.effect.speed_up", down: "marbles.effect.speed_down" },
   mass: { up: "marbles.effect.mass_up", down: "marbles.effect.mass_down" },
   draw: { up: "marbles.effect.draw" },
+  polish: { up: "marbles.effect.polish" },
+  crack: { up: "marbles.effect.crack" },
 };
 
 // Une action sans texte, ou un texte sans action, échoue au chargement.
@@ -54,6 +56,22 @@ function valueParts(values, t) {
   return parts;
 }
 
+// Les actions sur une bille d'un effet ([{ action, amount, target? }]) -> leurs
+// morceaux : « Polissage 1 », « Fêlure 1 à la pointe ». Elles se disent chez la bille
+// qui les produit, jamais chez celle qui les reçoit.
+function operationParts(operations = [], t) {
+  return operations.map(({ action, amount, target }) => {
+    const text = t(ACTION_TEXTS[action].up, { amount });
+    return target === undefined ? text : t("marbles.effect.given", { effect: text, slot: slotName(target, t) });
+  });
+}
+
+// Tout ce qu'un effet joué ou prévu produit chez sa bille : ses valeurs, puis ses
+// actions sur une bille.
+function effectParts(effect, t) {
+  return [...valueParts(effect, t), ...operationParts(effect.operations, t)];
+}
+
 function combined(parts, t) {
   return parts.length === 0 ? t("marbles.effect.none") : t("marbles.effect.combined", { parts });
 }
@@ -61,7 +79,7 @@ function combined(parts, t) {
 // Un effet JOUÉ ou PRÉVU : { speed, mass, draw, given } -> « Vitesse +1 et Masse
 // +2 », « Pioche 1 », « Vitesse +4 à la pointe », « aucun effet ».
 export function describeEffect(effect, t) {
-  const parts = valueParts(effect, t);
+  const parts = effectParts(effect, t);
   for (const gift of effect.given ?? []) {
     parts.push(t("marbles.effect.given", { effect: combined(valueParts(gift, t), t), slot: slotName(gift.slot, t) }));
   }
@@ -147,7 +165,9 @@ export function describeSlotForPlacement(game, slot, rules, t) {
 // puis ce qui s'y ajoute avec son emplacement (son Final, si elle s'use ce tour) :
 // « Vitesse +6. Final : Pioche 1. ».
 function placedValues(predicted, slot, t) {
-  const values = combined(valueParts(predicted.phases[slot], t), t);
+  // Retirée avant sa phase (une Fêlure de son Tic) : elle n'a pas de valeurs.
+  if (predicted.phases[slot] === null) return forecastSlotLine(predicted, slot, t);
+  const values = combined(effectParts(predicted.phases[slot], t), t);
   const notes = slotNotes(predicted, slot, t);
   return notes.length === 0 ? values : [`${values}.`, ...notes].join(" ");
 }
@@ -227,7 +247,7 @@ function outcomeLine(slot, outcome, t, notes = []) {
   const line = t("marbles.outcome.slot", {
     slot: slotName(slot, t),
     marble: marbleName(outcome.marble, t),
-    effect: combined(valueParts(outcome, t), t),
+    effect: combined(effectParts(outcome, t), t),
   });
   return [line, ...notes].join(" ");
 }
@@ -238,11 +258,23 @@ const SLOT_TEMPLATES = Object.fromEntries(
   MARBLE_TRIGGERS.filter((trigger) => trigger.forecast.line === "slot").map((trigger) => [trigger.id, trigger.texts.slot])
 );
 
+// Un emplacement dans la prévision : sa bille et son effet de phase, ou la bille
+// retirée avant sa phase (« pointe, porcelaine : retirée avant sa phase. »), suivis de
+// ce que la prévision y ajoute (son Final).
+function forecastSlotLine(predicted, slot, t) {
+  const notes = slotNotes(predicted, slot, t);
+  const cleared = predicted.cleared[slot];
+  if (predicted.phases[slot] === null && cleared !== null) {
+    return [t("marbles.outcome.removed", { slot: slotName(slot, t), marble: nameRef(`marble.${cleared}.name`) }), ...notes].join(" ");
+  }
+  return outcomeLine(slot, predicted.phases[slot], t, notes);
+}
+
 // Ce que la prévision ajoute à un emplacement après l'effet de phase de sa bille :
 // « Final : Vitesse +4. » si elle atteint son usure maximale ce tour. Les valeurs
 // produites seulement, comme une phase.
 function slotNotes(predicted, slot, t) {
-  return predicted.slotEffects[slot].map((effect) => t(SLOT_TEMPLATES[effect.trigger], { effect: combined(valueParts(effect, t), t) }));
+  return predicted.slotEffects[slot].map((effect) => t(SLOT_TEMPLATES[effect.trigger], { effect: combined(effectParts(effect, t), t) }));
 }
 
 // Ce que la prévision sait du sac sans le dévoiler : qu'il serait régénéré en
@@ -265,7 +297,7 @@ export function describeOverview(game, rules, t) {
     mass: formatCounter(predicted.mass),
     impact: predicted.impact,
   });
-  const slots = SLOTS.map((slot) => outcomeLine(slot, predicted.phases[slot], t, slotNotes(predicted, slot, t)));
+  const slots = SLOTS.map((slot) => forecastSlotLine(predicted, slot, t));
   return [summary, ...slots, ...forecastNotes(predicted, t)].join(" ");
 }
 
@@ -281,13 +313,13 @@ const EFFECT_TEMPLATES = Object.fromEntries(MARBLE_TRIGGERS.map((trigger) => [tr
 
 function effectText(event, t) {
   if (event.trigger === "phase") {
-    return outcomeLine(event.slot, { marble: event.marble, speed: event.speedDelta, mass: event.massDelta, draw: event.draw }, t);
+    return outcomeLine(event.slot, { marble: event.marble, speed: event.speedDelta, mass: event.massDelta, draw: event.draw, operations: event.operations }, t);
   }
   const template = EFFECT_TEMPLATES[event.trigger];
   if (!template) throw new Error(`marbles : effet sans gabarit pour le déclencheur "${event.trigger}".`);
   return t(template, {
     marble: nameRef(`marble.${event.marble}.name`),
-    effect: describeEffect({ speed: event.speedDelta, mass: event.massDelta, draw: event.draw, given: event.given }, t),
+    effect: describeEffect({ speed: event.speedDelta, mass: event.massDelta, draw: event.draw, operations: event.operations, given: event.given }, t),
     speed: formatCounter(event.speed),
     mass: formatCounter(event.mass),
   });
@@ -316,6 +348,10 @@ const EVENT_TEXTS = {
   phase: SILENT,
   wear: SILENT,
   turnEnded: SILENT,
+  // Polissage, Fêlure : la bille qui les reçoit, et son usure d'après.
+  polished: (event, t) => t("marbles.event.polished", { marble: nameRef(`marble.${event.marble}.name`), wear: event.wear, maxWear: event.maxWear }),
+  cracked: (event, t) => t("marbles.event.cracked", { marble: nameRef(`marble.${event.marble}.name`), wear: event.wear, maxWear: event.maxWear }),
+  targetEmpty: (event, t) => t("marbles.event.target_empty", { slot: slotName(event.slot, t) }),
   discarded: (event, t) => t(`marbles.event.discarded.${event.cause}`, { marble: nameRef(`marble.${event.marble}.name`) }),
   placed: (event, t) => t("marbles.event.placed", { marble: marbleName(event.marble, t), slot: slotName(event.slot, t) }),
   phaseSkipped: (event, t) => outcomeLine(event.slot, null, t),

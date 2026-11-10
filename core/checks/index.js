@@ -66,6 +66,7 @@ import checkMenu from "../../lib/checks/menu.check.js";
 import checkDetailCard from "../../lib/checks/detail-card.check.js";
 import checkHelp from "../../lib/checks/help.check.js";
 import checkAudioRetention from "../../lib/checks/audio-retention.check.js";
+import checkRealTime from "../../lib/checks/real-time.check.js";
 
 const SUITES = [
   { name: "movement", check: checkMovement },
@@ -114,6 +115,7 @@ const SUITES = [
   { name: "detail-card", check: checkDetailCard },
   { name: "help", check: checkHelp },
   { name: "audio-retention", check: checkAudioRetention },
+  { name: "real-time", check: checkRealTime },
 ];
 
 // Noms des domaines, dans l'ordre d'exécution.

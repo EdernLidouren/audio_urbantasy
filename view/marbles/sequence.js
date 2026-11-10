@@ -1,9 +1,9 @@
 // Jeu des billes : la FILE D'ÉTAPES de la séquence de résolution. Présentation
 // seulement : la simulation a déjà tout résolu quand la file commence, la passer
 // ou l'écouter jusqu'au bout ne change rien à la partie. Pur : aucune annonce,
-// aucun minuteur ; l'écran (view/marbles/screen.js) la fait avancer à chaque
-// frame (onFrame : un menu ouvert par-dessus la fige) et dit les étapes qu'elle
-// lui rend.
+// aucun minuteur ; l'écran (view/marbles/screen.js) la fait avancer par son temps
+// réel (images et minuterie, lib/real-time.js : elle continue en arrière-plan ; un
+// menu ouvert par-dessus la fige) et dit les étapes qu'elle lui rend.
 //
 // Une étape : { text, events, pauseMs }. Elle se dit, ses sons se jouent, puis
 // la pause s'écoule avant la suivante. La pause vaut une base plus un

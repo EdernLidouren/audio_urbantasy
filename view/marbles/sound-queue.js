@@ -1,9 +1,9 @@
 // Jeu des billes : la FILE DE SONS, qui étale dans le temps les sons d'un même
 // geste (le brassage puis chaque balise de pioche, les deux billes d'un échange).
 // Pour le son seulement : rien n'attend la file, le joueur garde la main. Pure :
-// aucun son ni minuteur ; l'écran (view/marbles/screen.js) la fait avancer à chaque
-// frame (onFrame : un menu ouvert par-dessus la fige, comme la séquence de
-// résolution) et joue les repères qu'elle lui rend.
+// aucun son ni minuteur ; l'écran (view/marbles/screen.js) la fait avancer par son
+// temps réel (images et minuterie, lib/real-time.js ; un menu ouvert par-dessus la
+// fige, comme la séquence de résolution) et joue les repères qu'elle lui rend.
 //
 // Un REPÈRE : { atMs, sound, ... }, à jouer `atMs` après sa mise en file
 // (view/marbles/sounds.js/eventCues) ; pour la file, le reste ne compte pas. La file : une liste de { remainingMs, cue },

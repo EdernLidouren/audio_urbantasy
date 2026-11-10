@@ -18,7 +18,13 @@
 //   knockout, hit  l'effet de l'action envisagée (null : pas de tel effet), une clé
 //                  par déclencheur prévu pendant une pose (forecast.line
 //                  "placement" de MARBLE_TRIGGERS) ;
-//   phases         par emplacement, l'effet de phase de sa bille (null : vide) ;
+//   phases         par emplacement, l'effet de phase de sa bille (null : pas de
+//                  phase, emplacement vide ou bille retirée avant) ;
+//   cleared        par emplacement, la bille retirée AVANT sa phase (une Fêlure qui
+//                  l'amène à son maximum), ou null : sa phase est sautée ;
+//   wear           les changements d'usure, dans l'ordre : [{ type, slot, marble,
+//                  wear }] (usure de phase, Polissage, Fêlure) ;
+//   retired        les billes retirées par usure, [{ slot, marble }], dans l'ordre ;
 //   slotEffects    par emplacement, les effets des déclencheurs qui se prévoient avec
 //                  lui (forecast.line "slot" : le Final d'une bille qui atteindra son
 //                  usure maximale ce tour), chacun { trigger, ...effet } ; [] sinon ;
@@ -26,8 +32,8 @@
 //   regenerates    vrai si le sac serait régénéré en chemin ;
 //   uncertain      vrai si une bille piochée aurait pu réagir selon son identité,
 //                  que la prévision ignore : ses chiffres ne sont alors pas sûrs.
-// Un effet : { marble, speed, mass, draw, given }, le total effectif de la bille,
-// bonus reçu compris.
+// Un effet : { marble, speed, mass, draw, operations, given }, le total effectif de
+// la bille, bonus reçu compris, et ses actions sur une bille (Polissage, Fêlure).
 
 import { MARBLE_TRIGGERS } from "../config/marbles-values.js";
 import { SLOTS, blindCopy, marblesReduce, runResolution, stageRefusal } from "./marbles.js";
@@ -42,11 +48,25 @@ const FORECASTABLE_ACTIONS = ["place", "swap"];
 
 function outcomeOf(event) {
   if (event === undefined) return null;
-  return { marble: event.marble, speed: event.speedDelta, mass: event.massDelta, draw: event.draw, given: event.given };
+  return { marble: event.marble, speed: event.speedDelta, mass: event.massDelta, draw: event.draw, operations: event.operations, given: event.given };
 }
 
 function failed(error) {
   return { ok: false, error };
+}
+
+const WEAR_EVENTS = new Set(["wear", "polished", "cracked"]);
+
+// Par emplacement, la bille retirée par usure AVANT que sa phase ne vienne (sa phase
+// est alors sautée), ou null.
+function clearedBeforePhase(events) {
+  const cleared = Object.fromEntries(SLOTS.map((slot) => [slot, null]));
+  const phased = new Set();
+  for (const event of events) {
+    if (event.type === "phase" || event.type === "phaseSkipped") phased.add(event.slot);
+    if (event.type === "removed" && event.cause === "wear" && !phased.has(event.slot)) cleared[event.slot] = event.marble;
+  }
+  return cleared;
 }
 
 // Ce que disent les journaux de l'action et de la résolution. Exportée pour
@@ -73,6 +93,9 @@ export function readForecast(actionEvents, resolutionEvents) {
     speed,
     mass,
     impact,
+    cleared: clearedBeforePhase(all),
+    wear: all.filter((event) => WEAR_EVENTS.has(event.type)).map(({ type, slot, marble, wear }) => ({ type, slot, marble, wear })),
+    retired: all.filter((event) => event.type === "removed" && event.cause === "wear").map(({ slot, marble }) => ({ slot, marble })),
     drawn: all.filter((event) => event.type === "draw").length,
     regenerates: all.some((event) => event.type === "bagRegenerated"),
   };

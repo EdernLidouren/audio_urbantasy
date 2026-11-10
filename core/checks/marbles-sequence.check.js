@@ -102,13 +102,15 @@ function playGame(seed, options, present, onTurn = () => {}) {
 }
 
 // La forme attendue d'une résolution : ouverture, trois phases (chacune suivie de
-// ses pioches éventuelles, Pioche oblige), les billes usées (chacune suivie de son
+// ses pioches, Polissages et Fêlures éventuels, et des retraits qu'une Fêlure
+// provoque avec leur Final), les billes usées (chacune suivie de son
 // Final et de ses pioches éventuelles), l'Impact, puis la
 // rotation et la pioche du tour suivant, ou la fin de
 // partie (dernier tour : sans rotation ni pioche ; sac et défausse vides : la
 // fin suit l'arrêt de la pioche).
 const SEQUENCE_SHAPE = new RegExp(
-  "^resolution\\.opening (outcome\\.(slot|empty) (event\\.bag_regenerated |event\\.draw |event\\.draw_skipped\\.(handFull|noMarbles) )*){3}" +
+  "^resolution\\.opening (outcome\\.(slot|empty) (event\\.bag_regenerated |event\\.draw |event\\.draw_skipped\\.(handFull|noMarbles) |" +
+    "event\\.polished |event\\.cracked |event\\.target_empty |event\\.discarded\\.wear |event\\.effect_final )*){3}" +
     "(event\\.discarded\\.wear (event\\.effect_final )?(event\\.bag_regenerated |event\\.draw |event\\.draw_skipped\\.(handFull|noMarbles) )*)*" +
     "event\\.impact " +
     "(event\\.rotation (event\\.bag_regenerated )?((event\\.draw|event\\.draw_skipped\\.(handFull|noMarbles)) )+event\\.turn_started" +
@@ -429,7 +431,50 @@ function checkTexts(run) {
       texts(finalState).slice(3, 6)
     );
 
+    // Polissage et Fêlure : chez la bille qui les produit ; les conséquences prévues.
+    const cracking = playState({ hand: ["sulphide"], bag: ["clay"], triangle: { leftBase: { marble: "sulphide", wear: 0 }, rightBase: null, apex: { marble: "porcelain", wear: 1 } } });
+    run(
+      "Fêlure, R : chez le sulfure ; la porcelaine retirée avant sa phase, son Final",
+      "Prévision : Vitesse 4, Masse 1, Impact 4. base gauche, sulfure : Fêlure 1 à la pointe. base droite, vide. pointe, porcelaine : retirée avant sa phase. Final : Vitesse +4.",
+      said(describeOverview(cracking, rules, t))
+    );
+    run.same(
+      "Fêlure, séquence : l'effet, la fêlure, le retrait, le Final, la phase sautée",
+      [
+        "Résolution du tour 2. base gauche, sulfure : Fêlure 1 à la pointe.",
+        "porcelaine se fêle : usure 2 sur 2.",
+        "porcelaine est usée et part à la défausse.",
+        "Final de porcelaine : Vitesse +4.",
+        "base droite, vide.",
+        "pointe, vide.",
+        "Impact 4. Score 4.",
+      ],
+      texts(cracking).slice(0, 7)
+    );
+    run.same(
+      "Fêlure, confirmation : dans les valeurs prévues de la bille posée",
+      ["Poser sulfure en base droite ?", "Fêlure 1 à la pointe"],
+      placementLines({ ...cracking, triangle: { ...cracking.triangle, leftBase: null } }, 0, "rightBase", rules, t).map(({ key, params }) => said(t(key, params)))
+    );
+    const saving = playState({ bag: ["clay"], triangle: { leftBase: { marble: "agate", wear: 2 }, rightBase: null, apex: { marble: "porcelain", wear: 1 } } });
+    run(
+      "Polissage, R : le Final de l'agate polit la pointe, la porcelaine n'est pas retirée",
+      "Prévision : Vitesse 5, Masse 2, Impact 10. base gauche, agate : Masse +1. Final : Polissage 1 à la pointe. base droite, vide. pointe, porcelaine : Vitesse +5.",
+      said(describeOverview(saving, rules, t))
+    );
+    run.same(
+      "Polissage, séquence : le retrait de l'agate, son Final, la porcelaine polie",
+      ["agate est usée et part à la défausse.", "Final d'agate : Polissage 1 à la pointe.", "porcelaine est polie : usure 1 sur 2.", "Impact 10. Score 10."],
+      texts(saving).slice(3, 7)
+    );
+
     setLocale("en");
+    run(
+      "anglais, Fêlure : R",
+      "Forecast: Speed 4, Mass 1, Impact 4. left base, sulphide: Crack 1 to the apex. right base, empty. apex, porcelain: removed before its phase. Final: Speed +4.",
+      describeOverview(cracking, rules, t)
+    );
+    run.same("anglais, Polissage : séquence", ["porcelain is polished: wear 1 of 2."], texts(saving).filter((text) => text.includes("polished")));
     run(
       "anglais, final : R",
       "Forecast: Speed 9, Mass 1, Impact 9. left base, empty. right base, empty. apex, porcelain: Speed +5. Final: Speed +4.",

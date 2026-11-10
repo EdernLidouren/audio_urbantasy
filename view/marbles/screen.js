@@ -23,7 +23,7 @@
 //
 // RÉSOLUTION (Maj+R) : la simulation résout tout d'un coup ; ce qui suit n'est
 // que la présentation, une file d'étapes (view/marbles/sequence.js) qui se dit
-// avec une pause après chacune, avancée par onFrame. Entrée la passe et amène au
+// avec une pause après chacune, avancée par le TEMPS RÉEL de l'écran (plus bas). Entrée la passe et amène au
 // tour suivant (ou à la fin de partie), sans rien changer à l'état. Tant qu'elle
 // dure, tout le reste est refusé d'un son de blocage, sans parole pour ne pas la
 // couper : l'état est déjà celui d'après la résolution, et le dévoilerait.
@@ -37,9 +37,18 @@
 // FICHES : le curseur principal annonce court, Ctrl+haut et Ctrl+bas parcourent le
 // détail de la bille sous lui (view/marbles/card.js, lib/detail-card.js). Maj+S et
 // Maj+D ouvrent les menus du sac et de la défausse (view/marbles/pile-screen.js).
+//
+// TEMPS RÉEL : la séquence, la file de sons et les roulements avancent par un même
+// battement (lib/real-time.js), appelé à chaque image (onFrame) ET par une
+// minuterie : les images s'arrêtent quand la fenêtre passe en arrière-plan, la
+// minuterie continue (ralentie), et la séquence avec elle. Le temps n'est compté
+// qu'une fois, et la séquence ne dit qu'une étape par battement : au retour au
+// premier plan, ni étape sautée ni annonces en rafale. Un menu ouvert par-dessus
+// (aide, abandon) fige tout, comme avant : seul l'écran du sommet reçoit le temps.
 
 import { announce } from "../../lib/announce.js";
-import { popScreen } from "../../lib/screens.js";
+import { activeScreen, popScreen } from "../../lib/screens.js";
+import { createRealTimeDriver } from "../../lib/real-time.js";
 import { resolveAction, defineBindings } from "../../lib/input.js";
 import { jumpMenuCursor, stepMenuCursor, announceMenuLine } from "../../lib/menu.js";
 import { detailAfterMainMove, detailLine, mainWithDetail, stepDetail } from "../../lib/detail-card.js";
@@ -115,6 +124,11 @@ const MARBLES_BINDINGS = defineBindings("marbles", {
 
 // Les actions sans effet hors mode debug, absentes alors de l'aide.
 const DEBUG_ACTIONS = new Set(["placesDemo"]);
+
+// La minuterie du temps réel (voir l'en-tête), en millisecondes : assez fine pour
+// que les sons tombent juste quand les images manquent, le navigateur la ralentit
+// de lui-même en arrière-plan. Un invariant technique, pas un réglage de jeu.
+const REAL_TIME_PULSE_MS = 50;
 
 // `rules` : les règles du jeu, liées à la table des billes une fois pour toutes
 // par main.js (core/marbles-rules.js) ; l'écran les passe à ce qui en a besoin.
@@ -559,27 +573,44 @@ export function makeMarblesScreen(getGame, setGame, rules) {
     speak(withOverHint(`${t("marbles.intro")} ${stepsText(recorded(buildSteps(events, t)))} ${isOver() ? "" : focusLine()}`));
   }
 
-  return {
+  // Le temps réel reçu : la séquence (une étape au plus), puis les billes déjà en
+  // route avant que d'autres ne partent (un roulement qui part à ce battement
+  // commence au début de son trajet), puis les sons dus.
+  function advanceRealTime(deltaMs) {
+    if (isNarrating()) follow(advanceSequence(sequence, deltaMs));
+    advanceRolls(deltaMs);
+    flushSounds(deltaMs);
+  }
+
+  // `screen` : cet écran, pour savoir s'il est au sommet de la pile.
+  let screen = null;
+  const realTime = createRealTimeDriver({ advance: advanceRealTime, isActive: () => activeScreen() === screen });
+  let pulseTimer = null;
+
+  screen = {
     helpSections: () => [{ id: "marbles", include: (action) => !DEBUG_ACTIONS.has(action) || isDebugEnabled() }],
     onEnter() {
-      if (started) reannounce();
-      else start();
+      if (started) {
+        reannounce();
+        return;
+      }
+      start();
+      pulseTimer = setInterval(() => realTime.pulse(), REAL_TIME_PULSE_MS);
     },
     onExit() {
+      clearInterval(pulseTimer);
+      pulseTimer = null;
       silenceSounds();
       stopFocusBeacon();
       closeTableReverb();
       stopMarblesMusic();
       setGame(null);
     },
-    // Le temps réel de la séquence et de la file de sons : seul l'écran du sommet
-    // le reçoit, un menu ouvert par-dessus (aide, abandon) les fige donc.
-    onFrame(deltaMs) {
-      if (isNarrating()) follow(advanceSequence(sequence, deltaMs));
-      // Les billes déjà en route avancent avant que d'autres ne partent : un
-      // roulement qui part à cette frame commence au début de son trajet.
-      advanceRolls(deltaMs);
-      flushSounds(deltaMs);
+    // Une image : un battement du temps réel, qui mesure lui-même le temps écoulé
+    // (le delta de la boucle n'y sert pas : la minuterie en a peut-être déjà compté
+    // une part).
+    onFrame() {
+      realTime.pulse();
     },
     onKeyDown(event) {
       const action = resolveAction(MARBLES_BINDINGS, event.key, event.mods);
@@ -589,4 +620,5 @@ export function makeMarblesScreen(getGame, setGame, rules) {
       handler();
     },
   };
+  return screen;
 }

@@ -9,6 +9,21 @@
 // ou CONDITION_TEXTS). Une cible est un emplacement, ou rien pour la bille
 // elle-même.
 //
+// DEUX SORTES D'ACTIONS (`kind`) : les VALEURS (Vitesse, Masse, Pioche), qui
+// s'additionnent en un effet, et les actions SUR UNE BILLE (Polissage, Fêlure), qui
+// changent l'usure de la bille elle-même ou de celle d'un emplacement, une
+// application par clause, dans l'ordre des clauses.
+//
+// RÈGLE DES CIBLES : une cible n'a de sens que si l'effet ciblé peut encore se
+// produire. Une VALEUR (Vitesse, Masse) donnée à un emplacement modifie l'effet de
+// PHASE de sa bille : elle ne vaut que si cette phase peut encore avoir lieu ce
+// tour. La validation refuse les cas toujours impossibles (targetProblem) ; les cas
+// qui dépendent de la position se tranchent à l'exécution (core/marbles.js/
+// fireEffect : le bonus est perdu, l'évènement `effect` le note dans `lost`). Une
+// action sur une bille peut viser un emplacement depuis n'importe quel moment, la
+// bille visée restant sur le triangle ; mais pas la bille elle-même une fois
+// retirée (le Final).
+//
 // VALEURS : ce qu'un effet produit, une valeur par action, sous le nom de
 // l'action (`{ speed, mass, draw }`). Le core les applique (core/marbles.js/fireEffect),
 // la vue les dit, la prévision les rend.
@@ -59,28 +74,84 @@ function addAmount(values, clause) {
 }
 
 // Chaque action, sur le modèle des conditions :
+//   kind      "value" : elle produit une VALEUR de l'effet (`apply`), qui va aux
+//             compteurs du tour, ou en bonus à la phase d'un autre emplacement si
+//             elle a une cible ;
 //   fields    les champs qu'elle accepte ;
 //   validate  la validation de ses valeurs ;
-//   apply     ce qu'elle ajoute aux valeurs d'un effet, (values, clause) -> values.
-// Ses textes : view/marbles/narration.js/ACTION_TEXTS.
+//   apply     (valeur) ce qu'elle ajoute aux valeurs d'un effet, (values, clause) -> values ;
+//   wear      (sur une bille) l'usure d'après, (wear, amount, maxWear) -> wear ;
+//   event     (sur une bille) l'évènement de chaque application ;
+//   retires   (sur une bille) une bille amenée à son maximum est retirée aussitôt.
+// Le `kind` "marble" : une action sur une bille. Ses textes :
+// view/marbles/narration.js/ACTION_TEXTS.
 export const CLAUSE_ACTIONS = {
   // Ajoute `amount` (négatif permis) à la Vitesse.
-  speed: { fields: TARGETED_FIELDS, validate: validateInteger, apply: addAmount },
+  speed: { kind: "value", fields: TARGETED_FIELDS, validate: validateInteger, apply: addAmount },
   // Ajoute `amount` (négatif permis) à la Masse.
-  mass: { fields: TARGETED_FIELDS, validate: validateInteger, apply: addAmount },
+  mass: { kind: "value", fields: TARGETED_FIELDS, validate: validateInteger, apply: addAmount },
   // Pioche : `amount` billes (au moins 1), piochées par la bille elle-même au
   // déclenchement (core/marbles.js/drawMarbles), à tout moment du tour. Sans
   // cible : piocher pour une autre bille n'a pas de sens.
-  draw: { fields: SELF_FIELDS, validate: validatePositive, apply: addAmount },
+  draw: { kind: "value", fields: SELF_FIELDS, validate: validatePositive, apply: addAmount },
+  // Polissage : retire `amount` d'usure (au moins 1), jamais sous 0. Une bille
+  // arrivée à son maximum et polie avant l'étape des retraits n'est plus retirée.
+  polish: {
+    kind: "marble",
+    fields: TARGETED_FIELDS,
+    validate: validatePositive,
+    wear: (wear, amount) => Math.max(0, wear - amount),
+    event: "polished",
+    retires: false,
+  },
+  // Fêlure : ajoute `amount` d'usure (au moins 1), jamais au-delà du maximum ; à son
+  // maximum, la bille est retirée aussitôt, comme par usure (core/marbles.js/
+  // retireMarble).
+  crack: {
+    kind: "marble",
+    fields: TARGETED_FIELDS,
+    validate: validatePositive,
+    wear: (wear, amount, maxWear) => Math.min(maxWear, wear + amount),
+    event: "cracked",
+    retires: true,
+  },
 };
 
+const actionsOfKind = (kind) => Object.keys(CLAUSE_ACTIONS).filter((action) => CLAUSE_ACTIONS[action].kind === kind);
+
 // Les valeurs à zéro : toutes celles d'un effet, et celles qu'un effet peut
-// DONNER à un autre emplacement (les actions qui acceptent une cible).
+// DONNER à un autre emplacement (les valeurs qui acceptent une cible).
 function zeroValues(actions) {
   return Object.freeze(Object.fromEntries(actions.map((action) => [action, 0])));
 }
-const ZERO = zeroValues(Object.keys(CLAUSE_ACTIONS));
-const GIFT_ZERO = zeroValues(Object.keys(CLAUSE_ACTIONS).filter((action) => CLAUSE_ACTIONS[action].fields.includes("target")));
+const VALUE_ACTIONS = actionsOfKind("value");
+const ZERO = zeroValues(VALUE_ACTIONS);
+const GIFT_ZERO = zeroValues(VALUE_ACTIONS.filter((action) => CLAUSE_ACTIONS[action].fields.includes("target")));
+
+// Le moment où joue un champ d'effet, pour la règle des cibles (core/marbles.js le
+// construit) :
+//   { phaseSlots }  une phase, jouée à l'un de ces emplacements (base : les deux
+//                   bases ; une variante : la sienne ; pointe : la pointe) ;
+//   { moment }      un déclencheur : "play" (pendant la phase de jeu, avant toute
+//                   phase) ou "afterPhases" (après toutes les phases : le Final) ;
+//                   `removed` vrai si sa bille a déjà quitté le triangle.
+// Un emplacement vient-il APRÈS un autre dans l'ordre des phases ?
+const phaseIndex = (slot) => SLOTS.indexOf(slot);
+
+// Ce qui rend une clause toujours impossible à ce moment, ou null.
+function targetProblem(clause, context) {
+  const action = CLAUSE_ACTIONS[clause.action];
+  if (action.kind === "marble" && clause.target === undefined && context.removed) {
+    return "une action sur la bille elle-même n'a plus de bille : elle a quitté le triangle";
+  }
+  if (action.kind === "value" && clause.target !== undefined) {
+    if (context.moment === "afterPhases") return "une Vitesse ou une Masse ciblée n'a plus de phase à modifier : elle va aux compteurs, sans cible";
+    if (context.phaseSlots && !context.phaseSlots.some((from) => phaseIndex(clause.target) > phaseIndex(from))) {
+      return `la phase de ${clause.target} est toujours passée quand cet effet joue`;
+    }
+  }
+  return null;
+}
 
 // La somme de deux jeux de valeurs ; une valeur absente de l'un compte zéro.
 export function addValues(a, b) {
@@ -109,8 +180,9 @@ export const CONDITIONS = {
 };
 
 // Échoue au chargement sur un effet mal formé. Un effet absent se vérifie en
-// amont : ici, il existe.
-export function validateEffect(effect, describe, fail) {
+// amont : ici, il existe. `context` : le moment où il joue (voir targetProblem),
+// {} pour ne pas vérifier les cibles.
+export function validateEffect(effect, describe, fail, context = {}) {
   if (!Array.isArray(effect)) fail(`${describe} : un effet est une liste de clauses.`);
   for (const clause of effect) {
     const action = CLAUSE_ACTIONS[clause.action];
@@ -118,6 +190,8 @@ export function validateEffect(effect, describe, fail) {
     rejectUnknownFields(clause, action.fields, describe, fail);
     action.validate(clause, describe, fail);
     if (clause.target !== undefined && !SLOTS.includes(clause.target)) fail(`${describe} : cible inconnue "${clause.target}".`);
+    const problem = targetProblem(clause, context);
+    if (problem !== null) fail(`${describe} : ${problem}.`);
     if (clause.when !== undefined) {
       const condition = CONDITIONS[clause.when.type];
       if (!condition) fail(`${describe} : condition inconnue "${clause.when.type}".`);
@@ -128,16 +202,20 @@ export function validateEffect(effect, describe, fail) {
 }
 
 // Évalue des clauses sur un triangle, au moment du déclenchement :
-//   self    les valeurs de la bille elle-même, toutes présentes ;
-//   gifts   ce qui va à d'autres emplacements, [{ slot, ...valeurs donnables }].
+//   self        les valeurs de la bille elle-même, toutes présentes ;
+//   gifts       ce qui va à d'autres emplacements, [{ slot, ...valeurs donnables }] ;
+//   operations  les actions sur une bille, dans l'ordre des clauses,
+//               [{ action, amount, target }] (`target` absent : la bille elle-même).
 export function evaluateEffect(clauses, triangle, types) {
   let self = ZERO;
   const gifts = [];
+  const operations = [];
   for (const clause of clauses) {
     if (clause.when !== undefined && !CONDITIONS[clause.when.type].test(clause.when, triangle, types)) continue;
-    const { apply } = CLAUSE_ACTIONS[clause.action];
-    if (clause.target === undefined) self = apply(self, clause);
+    const { kind, apply } = CLAUSE_ACTIONS[clause.action];
+    if (kind === "marble") operations.push({ action: clause.action, amount: clause.amount, ...(clause.target === undefined ? {} : { target: clause.target }) });
+    else if (clause.target === undefined) self = apply(self, clause);
     else gifts.push({ slot: clause.target, ...apply(GIFT_ZERO, clause) });
   }
-  return { self, gifts };
+  return { self, gifts, operations };
 }

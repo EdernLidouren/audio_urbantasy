@@ -11,3 +11,9 @@ export const mass = (amount) => ({ action: "mass", amount });
 
 // Pioche `amount` billes.
 export const draw = (amount) => ({ action: "draw", amount });
+
+// Polissage : retire `amount` d'usure, à la bille elle-même ou à celle de `target`.
+export const polish = (amount, target) => ({ action: "polish", amount, ...(target === undefined ? {} : { target }) });
+
+// Fêlure : ajoute `amount` d'usure, à la bille elle-même ou à celle de `target`.
+export const crack = (amount, target) => ({ action: "crack", amount, ...(target === undefined ? {} : { target }) });
