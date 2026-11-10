@@ -68,10 +68,11 @@ function slotLine(state, slot, name) {
   return `${line}.`;
 }
 
-// Les valeurs de partie (core/marbles-tally.js), sous leur identifiant :
-// « flicksThisTurn 2, windfallsThisGame 1 ».
+// Les valeurs de partie (core/marbles-tally.js) qui ne sont pas à zéro, sous leur
+// identifiant, ce tour puis cette partie : « flick 2/5, shuffles 0/1 ».
 export function tallyList(tally) {
-  return Object.entries(tally).map(([id, value]) => `${id} ${value}`).join(", ");
+  const counted = Object.entries(tally).filter(([, values]) => values.turn !== 0 || values.game !== 0);
+  return counted.length === 0 ? "aucune" : counted.map(([id, values]) => `${id} ${values.turn}/${values.game}`).join(", ");
 }
 
 // L'état entier, une ligne par élément. Le sac se lit du haut (prochaine pioche)
@@ -87,7 +88,7 @@ export function formatState(state, name) {
     `Sac, ${state.bag.length}, du haut vers le bas : ${listOf(state.bag, name)}.`,
     `Défausse, ${state.discard.length} : ${listOf(state.discard, name)}.`,
     `Pioche : ${state.firstTurnDraw} au premier tour, ${state.drawPerTurn} ensuite.`,
-    `Valeurs de partie : ${tallyList(state.tally)}.`,
+    `Valeurs de partie (ce tour/cette partie) : ${tallyList(state.tally)}.`,
   ];
   return lines;
 }

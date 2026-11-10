@@ -13,7 +13,7 @@
 //     "hand": ["agate", "gorilla:2"],     "id:tours en main"
 //     "bag": ["mica"],                du haut (prochaine pioche) vers le bas
 //     "discard": [],
-//     "tally": { "flicksThisTurn": 1 },   valeurs de partie, les autres à 0
+//     "tally": { "flick": { "turn": 1, "game": 3 } },   valeurs de partie, le reste à 0
 //     "settings": { "maxHandSize": 5, "throwsPerTurn": 5, "firstTurnDraw": 5, "drawPerTurn": 1, "turnCount": 9 }
 //   }
 // Une bille du triangle : "id" (usure 0), "id:usure", ou { marble, wear, bonus? }.
@@ -68,11 +68,17 @@ function slotContent(value, slot) {
   return placed.bonus ? { marble: placed.marble, wear, bonus: { speed: 0, mass: 0, ...placed.bonus } } : { marble: placed.marble, wear };
 }
 
-// Les valeurs de partie : celles décrites, les autres à zéro (celles d'une partie
-// neuve, `base`). Un compteur inconnu ou une valeur négative lève une erreur.
+// Les valeurs de partie : celles décrites, par compteur et par portée ("turn",
+// "game"), le reste à zéro (celles d'une partie neuve, `base`). Un compteur ou une
+// portée inconnus, ou une valeur négative, lèvent une erreur.
 function tallyContent(values = {}, base) {
   rejectUnknownFields(values, Object.keys(base), "tally", fail);
-  return { ...base, ...Object.fromEntries(Object.entries(values).map(([id, value]) => [id, checkInteger(value, `valeur de partie ${id}`, 0)])) };
+  const described = Object.entries(values).map(([id, scopes]) => {
+    rejectUnknownFields(scopes, ["turn", "game"], `tally.${id}`, fail);
+    const checked = Object.fromEntries(Object.entries(scopes).map(([scope, value]) => [scope, checkInteger(value, `valeur de partie ${id} (${scope})`, 0)]));
+    return [id, { ...base[id], ...checked }];
+  });
+  return { ...base, ...Object.fromEntries(described) };
 }
 
 function marbleList(list = [], where) {

@@ -7,8 +7,8 @@
 // AJOUTER une action ou une condition : une entrée dans CLAUSE_ACTIONS ou
 // CONDITIONS, et ses textes dans la vue (view/marbles/narration.js, ACTION_TEXTS ou
 // CONDITION_TEXTS). AJOUTER une source de montant : une entrée dans AMOUNT_SOURCES,
-// textes compris, rien d'autre ; chaque valeur de partie en est une d'office
-// (config/marbles-values.js/MARBLE_TALLIES). Une cible est un emplacement, ou rien pour la bille
+// textes compris, rien d'autre ; chaque valeur de partie en est une d'office, par la
+// source `tally` (core/marbles-counters.js). Une cible est un emplacement, ou rien pour la bille
 // elle-même.
 //
 // LA SITUATION d'un effet, ce que ses conditions et ses montants calculés lisent au
@@ -23,6 +23,10 @@
 //                { placed, ejected } (deux ids de bille) ; null sinon ;
 //   tally        les valeurs de partie à cet instant (core/marbles-tally.js), lues
 //                par tallyValue seulement.
+//
+// La VALIDATION reçoit un contexte (validateEffect) : le moment où l'effet joue
+// (règle des cibles, conditions) et `tallies`, les identifiants des valeurs de
+// partie (core/marbles.js les fournit), que vérifie la source `tally`.
 //
 // MONTANT CALCULÉ : `amount` est un entier, ou { base, step, source, max? } :
 // base + step × la valeur de `source` (AMOUNT_SOURCES), plafonné à `max` s'il est
@@ -51,9 +55,9 @@
 // l'action (`{ speed, mass, draw }`). Le core les applique (core/marbles.js/fireEffect),
 // la vue les dit, la prévision les rend.
 
-import { MARBLE_SIZES, MARBLE_TALLIES } from "../config/marbles-values.js";
+import { MARBLE_SIZES } from "../config/marbles-values.js";
 import { rejectUnknownFields } from "../lib/validate.js";
-import { tallyValue } from "./marbles-tally.js";
+import { TALLY_SCOPES, tallyValue } from "./marbles-tally.js";
 
 // Un calibre connu (config/marbles-values.js/MARBLE_SIZES) ?
 export function isMarbleSize(size) {
@@ -92,7 +96,7 @@ const SELF_FIELDS = ["action", "amount", "when"];
 // Le montant d'une clause : un entier (au moins `minimum`, s'il y en a un), ou un
 // montant calculé (en-tête). Calculé, sa base peut valoir `minimum - 1` : un montant
 // évalué à 0 ne produit rien.
-function validateAmount(clause, describe, fail, minimum) {
+function validateAmount(clause, describe, fail, context, minimum) {
   const { amount } = clause;
   if (Number.isInteger(amount)) {
     if (minimum !== undefined && amount < minimum) fail(`${describe} : amount doit être un entier >= ${minimum}.`);
@@ -105,15 +109,26 @@ function validateAmount(clause, describe, fail, minimum) {
   if (minimum !== undefined && amount.base < minimum - 1) fail(`${where} : base doit être un entier >= ${minimum - 1}.`);
   if (!Number.isInteger(amount.step) || amount.step < 1) fail(`${where} : step doit être un entier >= 1.`);
   if (amount.max !== undefined && (!Number.isInteger(amount.max) || amount.max <= amount.base)) fail(`${where} : max doit être un entier plus grand que base.`);
-  validateRule(amount.source, AMOUNT_SOURCES, "source", where, fail, {});
+  validateRule(amount.source, AMOUNT_SOURCES, "source", where, fail, context);
 }
 
-function validateInteger(clause, describe, fail) {
-  validateAmount(clause, describe, fail);
+function validateInteger(clause, describe, fail, context) {
+  validateAmount(clause, describe, fail, context);
 }
 
-function validatePositive(clause, describe, fail) {
-  validateAmount(clause, describe, fail, 1);
+function validatePositive(clause, describe, fail, context) {
+  validateAmount(clause, describe, fail, context, 1);
+}
+
+// Une action SUR UNE BILLE mot-clé (Polissage, Fêlure) : un déclenchement par
+// application, sur une bille (son évènement) ou sur un emplacement vide
+// (`targetEmpty`) ; sa quantité réelle, l'usure réellement changée (`applied` de son
+// évènement, après plancher ou plafond).
+function marbleActionKeyword(action, eventType) {
+  return {
+    triggers: (event) => (event.type === eventType || (event.type === "targetEmpty" && event.action === action) ? 1 : 0),
+    quantity: (event) => (event.type === eventType ? event.applied : 0),
+  };
 }
 
 // Ajoute le montant de la clause à la valeur de son action.
@@ -130,7 +145,12 @@ function addAmount(values, clause) {
 //   apply     (valeur) ce qu'elle ajoute aux valeurs d'un effet, (values, clause) -> values ;
 //   wear      (sur une bille) l'usure d'après, (wear, amount, maxWear) -> wear ;
 //   event     (sur une bille) l'évènement de chaque application ;
-//   retires   (sur une bille) une bille amenée à son maximum est retirée aussitôt.
+//   retires   (sur une bille) une bille amenée à son maximum est retirée aussitôt ;
+//   keyword   (facultatif) l'action est un MOT-CLÉ, avec ses valeurs de partie
+//             (core/marbles-counters.js) : `triggers(event)`, ce qu'un évènement du
+//             journal ajoute à ses déclenchements ; `quantity(event)` (facultatif),
+//             à sa quantité réelle. Une action de valeur sans mot-clé (Vitesse,
+//             Masse) a ses gains et ses pertes.
 // Le `kind` "marble" : une action sur une bille. Ses textes :
 // view/marbles/narration.js/ACTION_TEXTS.
 export const CLAUSE_ACTIONS = {
@@ -141,7 +161,19 @@ export const CLAUSE_ACTIONS = {
   // Pioche : `amount` billes (au moins 1), piochées par la bille elle-même au
   // déclenchement (core/marbles.js/drawMarbles), à tout moment du tour. Sans
   // cible : piocher pour une autre bille n'a pas de sens.
-  draw: { kind: "value", fields: SELF_FIELDS, validate: validatePositive, apply: addAmount },
+  // Mot-clé : un déclenchement par effet joué qui pioche ; sa quantité réelle, les
+  // billes réellement piochées par un effet (« Pioche 2 » avec une seule bille
+  // disponible : 1 déclenchement, 1 bille).
+  draw: {
+    kind: "value",
+    fields: SELF_FIELDS,
+    validate: validatePositive,
+    apply: addAmount,
+    keyword: {
+      triggers: (event) => (event.type === "effect" && event.draw > 0 ? 1 : 0),
+      quantity: (event) => (event.type === "draw" && event.cause === "effect" ? 1 : 0),
+    },
+  },
   // Polissage : retire `amount` d'usure (au moins 1), jamais sous 0. Une bille
   // arrivée à son maximum et polie avant l'étape des retraits n'est plus retirée.
   polish: {
@@ -151,6 +183,7 @@ export const CLAUSE_ACTIONS = {
     wear: (wear, amount) => Math.max(0, wear - amount),
     event: "polished",
     retires: false,
+    keyword: marbleActionKeyword("polish", "polished"),
   },
   // Fêlure : ajoute `amount` d'usure (au moins 1), jamais au-delà du maximum ; à son
   // maximum, la bille est retirée aussitôt, comme par usure (core/marbles.js/
@@ -162,6 +195,7 @@ export const CLAUSE_ACTIONS = {
     wear: (wear, amount, maxWear) => Math.min(maxWear, wear + amount),
     event: "cracked",
     retires: true,
+    keyword: marbleActionKeyword("crack", "cracked"),
   },
 };
 
@@ -297,7 +331,7 @@ export const CONDITIONS = {
 //             +2 ») ; faux si elle dépend du moment (le triangle au déclenchement).
 // Une future valeur de partie s'y branche par une entrée ici, son gabarit dans
 // chaque langue, rien d'autre.
-const BUILT_IN_SOURCES = {
+export const AMOUNT_SOURCES = {
   // Les tours passés en main par la bille elle-même (core/marbles.js, en-tête) :
   // 0 hors de la main ; pendant son lancer, ceux qu'elle avait en la quittant.
   turnsInHand: {
@@ -327,29 +361,24 @@ const BUILT_IN_SOURCES = {
     names: (source) => ({ size: `marbles.size.${MARBLE_SIZES[source.size]}.name` }),
     current: false,
   },
+  // Une VALEUR DE PARTIE (core/marbles-counters.js) dans une portée : « par
+  // chiquenaude ce tour », { type: "tally", tally: "flick", scope: "turn" }. Sa
+  // valeur se lit dans le registre de l'état, hors de tout déclenchement aussi
+  // (`current`). L'identifiant se vérifie contre `context.tallies`.
+  tally: {
+    fields: ["type", "tally", "scope"],
+    validate(source, describe, fail, context) {
+      if (!TALLY_SCOPES.includes(source.scope)) fail(`${describe} : portée inconnue "${source.scope}".`);
+      if (!(context?.tallies instanceof Set)) fail(`${describe} : valeurs de partie absentes du contexte de validation.`);
+      if (!context.tallies.has(source.tally)) fail(`${describe} : valeur de partie inconnue "${source.tally}".`);
+    },
+    value: (source, { tally }) => tallyValue(tally, source.tally, source.scope),
+    text: "marbles.effect.per_tally",
+    names: (source) => ({ unit: `marbles.tally.${source.tally}.unit`, scope: `marbles.tally.scope.${source.scope}` }),
+    current: true,
+  },
 };
 
-// Chaque VALEUR DE PARTIE (config/marbles-values.js/MARBLE_TALLIES) est une source,
-// sous son identifiant : « par chiquenaude ce tour », { type: "flicksThisTurn" }. Sa
-// valeur se lit dans le registre de l'état, hors de tout déclenchement aussi
-// (`current`). Un identifiant déjà pris par une autre source échoue au chargement.
-function tallySources(tallies) {
-  return Object.fromEntries(
-    tallies.map((tally) => {
-      if (Object.hasOwn(BUILT_IN_SOURCES, tally.id)) throw new Error(`marbles : la valeur de partie "${tally.id}" porte le nom d'une autre source de montant.`);
-      const source = {
-        fields: ["type"],
-        validate() {},
-        value: (rule, { tally: values }) => tallyValue(values, tally.id),
-        text: tally.texts.source,
-        current: true,
-      };
-      return [tally.id, source];
-    })
-  );
-}
-
-export const AMOUNT_SOURCES = { ...BUILT_IN_SOURCES, ...tallySources(MARBLE_TALLIES) };
 
 // Un montant (entier, ou calculé : en-tête) évalué dans une situation. La fiche s'en
 // sert aussi, pour dire la valeur actuelle d'un montant calculé dont la source est
@@ -370,14 +399,15 @@ function validateRule(rule, table, label, describe, fail, context) {
 
 // Échoue au chargement sur un effet mal formé. Un effet absent se vérifie en
 // amont : ici, il existe. `context` : le moment où il joue (voir targetProblem),
-// {} pour ne pas vérifier les cibles.
+// {} pour ne pas vérifier les cibles ; `tallies`, les identifiants des valeurs de
+// partie (la source `tally`).
 export function validateEffect(effect, describe, fail, context = {}) {
   if (!Array.isArray(effect)) fail(`${describe} : un effet est une liste de clauses.`);
   for (const clause of effect) {
     const action = CLAUSE_ACTIONS[clause.action];
     if (!Object.hasOwn(CLAUSE_ACTIONS, clause.action)) fail(`${describe} : action inconnue "${clause.action}".`);
     rejectUnknownFields(clause, action.fields, describe, fail);
-    action.validate(clause, describe, fail);
+    action.validate(clause, describe, fail, context);
     if (clause.target !== undefined && !SLOTS.includes(clause.target)) fail(`${describe} : cible inconnue "${clause.target}".`);
     const problem = targetProblem(clause, context);
     if (problem !== null) fail(`${describe} : ${problem}.`);

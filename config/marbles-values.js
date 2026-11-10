@@ -307,40 +307,42 @@ export const MARBLE_TRIGGERS = [
 ];
 
 // Les VALEURS DE PARTIE (Tally) : des compteurs tenus par la simulation, dans l'état
-// (`tally`, sérialisé avec lui), alimentés par le journal (core/marbles-tally.js, le
-// seul à les écrire). Chacun :
+// (`tally`, sérialisé avec lui), chacun en deux portées, « ce tour » et « cette
+// partie ». La plupart sont GÉNÉRÉS (core/marbles-counters.js) : un par mot-clé de
+// déclenchement (MARBLE_TRIGGERS et les phases), deux par action mot-clé (Pioche,
+// Polissage, Fêlure : core/marbles-effects.js/CLAUSE_ACTIONS), quatre par compteur
+// du tour (Vitesse, Masse). Ici, les seuls déclarés à la main : les ÉVÈNEMENTS RÉELS,
+// ce qui arrive aux billes, quel que soit le mot-clé qui y réagit. Chacun :
 //   id      son identifiant, aussi celui de sa source de montant calculé
-//           (core/marbles-effects.js/AMOUNT_SOURCES) : « par chiquenaude ce tour » ;
-//   scope   sa portée : "turn", remis à zéro au début de chaque tour, avant sa
-//           pioche (à l'émission de `turnStarted`) ; "game", à zéro en début de
-//           partie seulement ;
+//           (`tally(id, portée)`, marbles/effects.js) ; ses textes en découlent :
+//           `marbles.tally.<id>.name` (menu de debug) et `.unit` (« par bille
+//           éjectée ») ;
 //   events  les types d'évènements du journal qui l'augmentent de 1
 //           (core/marbles.js/JOURNAL_EVENTS) ;
-//   filter  (facultatif) ce que l'évènement doit vérifier pour compter :
-//           { type: "size", size }, la bille qu'il nomme est de ce calibre (un
-//           évènement qui nomme toujours une bille connue, jamais la pioche, dont la
-//           bille est cachée dans la prévision) ;
-//   texts   ses gabarits i18n : `name`, son nom (menu de debug, Maj+L) ; `source`,
-//           le texte de sa source de montant, qui reçoit {effect} (le pas déjà dit).
-// Il compte À L'ÉMISSION de l'évènement, avant que les billes n'y réagissent : une
-// Chiquenaude qui lit « par chiquenaude ce tour » se compte elle-même.
-// AJOUTER un compteur : une entrée ici et ses deux textes dans chaque langue, rien
-// d'autre.
+//   match   (facultatif) des champs de l'évènement et leur valeur exigée :
+//           { cause: "wear" } ;
+//   filter  (facultatif) { type: "size", size } : la bille que nomme l'évènement
+//           est de ce calibre (un évènement qui nomme toujours une bille connue,
+//           jamais la pioche, dont la bille est cachée dans la prévision).
+// Tous comptent À L'ÉMISSION de leur évènement, avant que les billes n'y réagissent.
+// AJOUTER un compteur d'évènement : une entrée ici et ses deux textes dans chaque
+// langue, rien d'autre ; ses deux portées, sa source et sa ligne du menu suivent.
 export const MARBLE_TALLIES = [
-  {
-    id: "flicksThisTurn",
-    scope: "turn",
-    events: ["flick"],
-    texts: { name: "marbles.tally.flicks_this_turn", source: "marbles.effect.per_flick_this_turn" },
-  },
-  // Une trouvaille, c'est une régénération du sac depuis la défausse, qu'une bille
-  // active ait un effet de Trouvaille ou non.
-  {
-    id: "windfallsThisGame",
-    scope: "game",
-    events: ["bagRegenerated"],
-    texts: { name: "marbles.tally.windfalls_this_game", source: "marbles.effect.per_windfall_this_game" },
-  },
+  // Chaque pose depuis la main, que la bille ait une Chiquenaude ou non.
+  { id: "thrownMarbles", events: ["flick"] },
+  // Chaque bille posée sur un emplacement occupé (après sa Chiquenaude : si elle a
+  // vidé l'emplacement, la pose est simple).
+  { id: "hitMarbles", events: ["hit"] },
+  // Chaque bille retirée du triangle par un remplacement.
+  { id: "ejectedMarbles", events: ["removed"], match: { cause: "replacement" } },
+  // Chaque régénération du sac depuis la défausse.
+  { id: "shuffles", events: ["bagRegenerated"] },
+  // Chaque bille piochée, pioche du tour comme effets.
+  { id: "drawnMarbles", events: ["draw"] },
+  // Chaque retrait par usure, usure de phase ou Fêlure.
+  { id: "wornMarbles", events: ["removed"], match: { cause: "wear" } },
+  // Toute sortie du triangle, quelle qu'en soit la cause.
+  { id: "triangleExits", events: ["removed"] },
 ];
 
 // La fiche d'une bille (lib/detail-card.js, view/marbles/card.js) : l'ordre de ses

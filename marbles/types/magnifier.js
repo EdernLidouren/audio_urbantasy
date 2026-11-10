@@ -5,7 +5,7 @@ import { SMALL } from "../../config/marbles-values.js";
 
 export default {
   // Sa Chiquenaude se compte elle-même : la première du tour lit 1.
-  flick: [speed({ base: 0, step: 2, source: tally("flicksThisTurn"), max: 6 })],
+  flick: [speed({ base: 0, step: 2, source: tally("flick", "turn"), max: 6 })],
   base: [speed(1)],
   // En base gauche, renforce la pointe si elle donne de la Vitesse.
   baseVariant: {

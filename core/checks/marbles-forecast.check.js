@@ -6,7 +6,8 @@
 // (`node tools/run-checks.js marbles-forecast`).
 
 import { nextRandom } from "../rng.js";
-import { SLOTS, createMarblesGame, marblesReduce } from "../marbles.js";
+import { SLOTS, TALLY_COUNTERS, createMarblesGame, marblesReduce } from "../marbles.js";
+import { emptyTally } from "../marbles-tally.js";
 import { forecast, readForecast } from "../marbles-forecast.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
 import { emptyBagMarblesGame, inHand, withSizes } from "./helpers.js";
@@ -187,32 +188,38 @@ function checkTallyForecast(run) {
     const { uncertain, ...predicted } = rules.forecast(state, action);
     return JSON.stringify(predicted) === JSON.stringify(readForecast(real.events, resolved.events, resolved.state));
   };
-  const tally = (values) => ({ flicksThisTurn: 0, windfallsThisGame: 0, ...values });
+  // Un registre décrit en partie, { id: { turn, game } }, le reste à zéro.
+  const tally = (values) => ({ ...emptyTally(TALLY_COUNTERS), ...values });
 
   // La loupe : sa Chiquenaude lit le registre de la copie, elle-même comprise.
   const first = playState({ hand: inHand(["magnifier"]) });
   run("valeurs prévues : première chiquenaude du tour de la loupe, Vitesse +2", 2, rules.forecast(first, toApex).flick.speed);
   run("valeurs prévues : égales au réel", true, matches(first, toApex));
-  const second = playState({ hand: inHand(["magnifier"]), tally: tally({ flicksThisTurn: 1 }) });
+  const second = playState({ hand: inHand(["magnifier"]), tally: tally({ flick: { turn: 1, game: 1 } }) });
   run("valeurs prévues : deuxième chiquenaude, Vitesse +4", 4, rules.forecast(second, toApex).flick.speed);
   run("valeurs prévues : deuxième, égale au réel", true, matches(second, toApex));
-  const capped = playState({ hand: inHand(["magnifier"]), tally: tally({ flicksThisTurn: 7 }) });
+  const capped = playState({ hand: inHand(["magnifier"]), tally: tally({ flick: { turn: 7, game: 7 } }) });
   run("valeurs prévues : plafond de la loupe, Vitesse +6", 6, rules.forecast(capped, toApex).flick.speed);
 
-  // Le verre à la pointe : une régénération en chemin compte avant sa phase.
+  // Un mélange en chemin (le Tic de l'œil-de-chat qui pioche) : la Trouvaille de la
+  // tigrée et le mélange comptent dans le registre de la copie.
   const regenerating = playState({
     hand: inHand(["cats_eye"]),
     bag: [],
     discard: ["clay"],
-    triangle: { leftBase: null, rightBase: placed("glass"), apex: placed("tiger") },
-    tally: tally({ windfallsThisGame: 2 }),
+    triangle: { leftBase: placed("tiger"), rightBase: null, apex: placed("glass") },
+    tally: tally({ windfall: { turn: 0, game: 2 } }),
   });
   const predicted = rules.forecast(regenerating, toApex);
-  run("valeurs prévues : la régénération du Tic comptée dans le registre de la copie", 3, predicted.tally.windfallsThisGame);
+  run.same(
+    "valeurs prévues : la Trouvaille et le mélange comptés dans le registre de la copie",
+    { windfall: 3, shuffles: 1 },
+    { windfall: predicted.tally.windfall.game, shuffles: predicted.tally.shuffles.game }
+  );
   run("valeurs prévues : égales au réel, régénération comprise", true, matches(regenerating, toApex));
   const frozen = deepFreeze(structuredClone(regenerating));
   run("valeurs prévues : l'état reçu n'est pas modifié", true, rules.forecast(frozen, toApex).ok);
-  run.same("valeurs prévues : le registre réel non plus", tally({ windfallsThisGame: 2 }), frozen.tally);
+  run.same("valeurs prévues : le registre réel non plus", tally({ windfall: { turn: 0, game: 2 } }), frozen.tally);
 }
 
 // Polissage et Fêlure : la prévision montre leurs conséquences, comme le réel.

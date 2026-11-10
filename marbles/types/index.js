@@ -41,7 +41,7 @@
 //   amount  la valeur : un entier, ou un MONTANT CALCULÉ { base, step, source,
 //           max? }, base + step × la valeur de la source, plafonné à max, évalué
 //           au déclenchement (sources : turnsInHand(), activeSize(calibre),
-//           tally(valeur de partie), marbles/effects.js) ;
+//           tally(valeur, portée), marbles/effects.js) ;
 //   target  (facultatif) pour une Vitesse ou une Masse, l'emplacement dont elle
 //           modifie l'effet de phase, au lieu d'agir sur le compteur du tour (jamais
 //           une phase toujours passée, ni dans un Final) ; pour un Polissage ou une

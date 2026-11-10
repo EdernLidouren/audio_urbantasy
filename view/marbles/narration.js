@@ -5,7 +5,7 @@
 
 import { nameRef } from "../../data/i18n/index.js";
 import { MARBLE_SIZES, MARBLE_TRIGGERS } from "../../config/marbles-values.js";
-import { SLOTS, throwsLeft } from "../../core/marbles.js";
+import { SLOTS, TALLY_COUNTERS, throwsLeft } from "../../core/marbles.js";
 import { emptyTally } from "../../core/marbles-tally.js";
 import { AMOUNT_SOURCES, CLAUSE_ACTIONS, CONDITIONS, amountOf } from "../../core/marbles-effects.js";
 import { forecast } from "../../core/marbles-forecast.js";
@@ -153,7 +153,7 @@ function computedText(action, amount, situation, t) {
 // de ses montants calculés : la bille elle-même, avec son compteur de tours en main
 // (0 hors de la main), et les valeurs de partie du moment (`tally`, celles de l'état
 // de la partie ; à zéro, celles d'une partie neuve, hors de toute partie).
-export function cardSituation(marble, turnsInHand = 0, tally = emptyTally()) {
+export function cardSituation(marble, turnsInHand = 0, tally = emptyTally(TALLY_COUNTERS)) {
   return { triangle: null, holder: { marble, zone: null, turnsInHand }, replacement: null, tally };
 }
 

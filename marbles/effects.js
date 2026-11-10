@@ -29,6 +29,7 @@ export const turnsInHand = () => ({ type: "turnsInHand" });
 export const activeSize = (size) => ({ type: "activeSize", size });
 
 // Source d'un montant calculé : une VALEUR DE PARTIE, par son identifiant
-// (config/marbles-values.js/MARBLE_TALLIES). « Vitesse +2 par chiquenaude ce tour » :
-// speed({ base: 0, step: 2, source: tally("flicksThisTurn"), max: 6 }).
-export const tally = (id) => ({ type: id });
+// (core/marbles-counters.js), dans une portée, "turn" (ce tour) ou "game" (cette
+// partie). « Vitesse +2 par chiquenaude ce tour » :
+// speed({ base: 0, step: 2, source: tally("flick", "turn"), max: 6 }).
+export const tally = (id, scope) => ({ type: "tally", tally: id, scope });

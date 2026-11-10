@@ -8,13 +8,14 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
 | Fichier | Rôle |
 |---|---|
 | `marbles/types/` | Les billes, une par fichier, et leur registre `index.js` (donnée pure) |
-| `marbles/effects.js` | Les formes courtes des clauses, `speed(n)`, `mass(n)`, `draw(n)`, `polish(n, cible?)` et `crack(n, cible?)`, et les sources `turnsInHand()`, `activeSize(calibre)` et `tally(valeur de partie)` des montants calculés |
+| `marbles/effects.js` | Les formes courtes des clauses, `speed(n)`, `mass(n)`, `draw(n)`, `polish(n, cible?)` et `crack(n, cible?)`, et les sources `turnsInHand()`, `activeSize(calibre)` et `tally(valeur, portée)` des montants calculés |
 | `config/marbles-values.js` | Réglages, déclencheurs, valeurs de partie, modèle de fiche, sac de test, sons (donnée pure) |
 | `core/marbles-rules.js` | Les règles liées à une table de billes : le point d'entrée de la simulation hors du core |
 | `core/marbles.js` | La simulation : état, réducteur, écouteurs, journal, codes de refus |
 | `core/marbles-effects.js` | Le modèle d'effet : clauses, actions, conditions, effet imprimé |
 | `core/marbles-bus.js` | Le bus d'évènements interne à la simulation |
 | `core/marbles-tally.js` | Le registre des valeurs de partie : le seul à les écrire, et leur lecture publique |
+| `core/marbles-counters.js` | Les compteurs des valeurs de partie : générés (mots-clés, actions, Vitesse et Masse) et déclarés (évènements réels) |
 | `core/marbles-forecast.js` | La prévision : le vrai moteur sur une copie de l'état |
 | `view/marbles/screen.js` | L'écran de jeu et sa table de touches |
 | `view/marbles/pile-screen.js` | Le menu d'une pile de billes, sac ou défausse |
@@ -238,14 +239,14 @@ active ») en est un, base 0, pas 1. L'argile et le grès :
 ```js
 flick: [speed({ base: 0, step: 1, source: turnsInHand(), max: 5 })],
 base: [speed({ base: 0, step: 1, source: activeSize(SMALL) })],
-apex: [speed({ base: 0, step: 1, source: tally("windfallsThisGame"), max: 10 })], // le verre
+apex: [speed({ base: 0, step: 1, source: tally("windfall", "game"), max: 10 })], // le verre
 ```
 
 | Source (`source`) | Vaut | Fiche |
 |---|---|---|
 | `{ type: "turnsInHand" }` | le compteur de tours en main de la bille elle-même : 0 hors de la main ; pendant sa Chiquenaude, celui qu'elle avait en quittant la main | « Chiquenaude : Vitesse +1 par tour en main, maximum +5, actuellement +2. » |
 | `{ type: "activeSize", size }` | les billes actives (sur le triangle) de calibre `size`, la bille elle-même comprise si elle en est (déjà retirée, dans un Final, elle s'ajoute ; en cours de lancer, dans une Chiquenaude, non) | « Base : Vitesse +1 par minibille active. » (grès) |
-| `{ type: "flicksThisTurn" }`, `{ type: "windfallsThisGame" }` (`tally(id)`) | la valeur de partie de ce nom, lue dans le registre au déclenchement (voir « Valeurs de partie ») | « Chiquenaude : Vitesse +2 par chiquenaude ce tour, maximum +6, actuellement +4. » (loupe) |
+| `{ type: "tally", tally, scope }` (`tally(id, portée)`) | la valeur de partie `tally` dans la portée `scope` (`"turn"`, ce tour ; `"game"`, cette partie), lue dans le registre au déclenchement (voir « Valeurs de partie ») | « Chiquenaude : Vitesse +2 par chiquenaude ce tour, maximum +6, actuellement +4. » (loupe) |
 
 Chaque source est déclarée UNE fois, dans `core/marbles-effects.js`/`AMOUNT_SOURCES` :
 ses champs et leur validation, sa valeur dans la situation (`value`), son gabarit (`text`,
@@ -260,8 +261,11 @@ partie) ; une source qui dépend du moment (`activeSize`) n'en dit pas. R, la
 confirmation et la séquence ne disent que la valeur finale, celle de la prévision, qui
 fait évoluer le registre sur sa copie (une Chiquenaude de loupe s'y compte elle-même).
 **Ajouter une source** : son entrée dans `AMOUNT_SOURCES` et son gabarit dans chaque
-langue (vérifié par le domaine `marbles-view`), rien d'autre ; une valeur de partie y
-entre d'office, sous son identifiant (un identifiant déjà pris échoue au chargement).
+langue (vérifié par le domaine `marbles-view`), rien d'autre ; une valeur de partie est
+déjà une source, par `tally`, dont la validation vérifie l'identifiant (le contexte de
+validation porte la liste des compteurs, `tallies`) et dont le texte se compose :
+« {effect} par {unit} {scope} », l'unité de la valeur (`marbles.tally.<id>.unit`) et sa
+portée (`marbles.tally.scope.<portée>`).
 
 ### Conditions
 
@@ -405,47 +409,61 @@ que par les montants calculés (source `turnsInHand`).
 
 ### Valeurs de partie (Tally)
 
-Des compteurs tenus par la simulation, dans l'état (`tally`, `{ <id>: nombre }`, sérialisé
-avec lui), que lisent les montants calculés, la prévision, le menu de debug (Maj+L) et, plus
-tard, les succès. Chacun est déclaré UNE fois, dans
-`config/marbles-values.js`/`MARBLE_TALLIES` :
+Des compteurs tenus par la simulation, dans l'état (`tally`, `{ <id>: { turn, game } }`,
+sérialisé avec lui), que lisent les montants calculés, la prévision, le menu de debug
+(Maj+L) et, plus tard, les succès. Le mécanisme, `core/marbles-tally.js`, ne sait rien du
+jeu ; les compteurs viennent de `core/marbles-counters.js`, en une liste
+(`core/marbles.js`/`TALLY_COUNTERS`), chacun `{ id, category, count(event, context) }`.
+
+**Deux portées pour chaque compteur** : « ce tour » (`turn`) revient à zéro au début de
+chaque tour, avant sa pioche (à l'émission de `turnStarted`, le premier évènement de la
+pioche du tour) ; « cette partie » (`game`) n'est à zéro qu'en début de partie
+(`createGame`). Entre la fin de la résolution et la pioche suivante, « ce tour » garde la
+valeur du tour fini.
+
+**Moment** : un compteur de déclenchement ou d'évènement augmente À L'ÉMISSION de son
+évènement, avant que le bus ne le traite, donc avant que les billes qui y réagissent ne
+soient évaluées : une Chiquenaude qui compte « par chiquenaude ce tour » se compte
+elle-même (la première du tour lit 1). Un compteur de quantité réelle augmente à
+l'émission de l'évènement qui dit ce qui s'est appliqué, après plancher ou plafond.
+
+**Un mot-clé et l'évènement auquel il réagit sont deux compteurs**, avec deux noms : une
+pose sur une bille sans Éjection donne +1 bille éjectée, +0 éjection ; un mélange donne
++1 mélange, et une Trouvaille par bille active qui en a une.
+
+| Catégorie | Compteurs (id) | Source | Compte |
+|---|---|---|---|
+| Déclenchements | `flick`, `hit`, `windfall`, `knockout`, `final`, `apex`, `base`, `leftBase`, `rightBase` | générés : un par déclencheur de `MARBLE_TRIGGERS`, un par mot-clé de phase (`core/marbles.js`/`PHASE_KEYWORDS`) | +1, par bille, quand le mot-clé se déclenche chez une bille qui a un effet pour ce moment : son champ n'est pas vide (pour une base : l'effet de base, ou sa variante de l'emplacement), ou elle a reçu un effet extérieur pour ce moment (un bonus ciblé sur sa phase). Un effet à condition fausse compte ; une phase sautée (emplacement vide, bille retirée avant) ne compte pas. `base` = `leftBase` + `rightBase` |
+| Actions | `draw`, `drawQuantity`, `polish`, `polishQuantity`, `crack`, `crackQuantity` | générés depuis les actions de `CLAUSE_ACTIONS` qui déclarent `keyword` | les déclencheurs : un par application (une Pioche par effet joué qui pioche ; un Polissage ou une Fêlure par application, sur un emplacement vide compris) ; la quantité réelle : billes réellement piochées par une Pioche (`draw` de cause `"effect"`), usure réellement rendue ou ajoutée (`applied` de `polished`, `cracked`) |
+| Vitesse et Masse | `speedGains`, `speedGained`, `speedLosses`, `speedLost`, et les mêmes pour `mass` | générés depuis les actions de valeur sans `keyword` | dans chaque effet joué (`effect`), la valeur réellement appliquée aux compteurs du tour (bonus reçu compris ; un bonus perdu n'est jamais appliqué), avant les planchers de l'Impact : une occurrence de gain ou de perte par effet, et le total en valeur absolue |
+| Évènements | `thrownMarbles`, `hitMarbles`, `ejectedMarbles`, `shuffles`, `drawnMarbles`, `wornMarbles`, `triangleExits` | déclarés : `config/marbles-values.js`/`MARBLE_TALLIES` | billes lancées (`flick`), tiquées (`hit` : posées sur un emplacement occupé), éjectées (`removed`, cause `"replacement"`), mélanges (`bagRegenerated`), billes piochées (`draw`, toutes causes), usées (`removed`, cause `"wear"`), sorties du triangle (`removed`, toutes causes : aujourd'hui, usées + éjectées) |
+
+Un évènement réel se déclare ainsi :
 
 ```js
-{
-  id: "flicksThisTurn",          // aussi l'identifiant de sa source de montant
-  scope: "turn",                 // "turn" ou "game"
-  events: ["flick"],             // les évènements du journal qui l'augmentent de 1
-  // filter: { type: "size", size: MEDIUM },  facultatif : la bille de l'évènement
-  texts: { name: "marbles.tally.flicks_this_turn", source: "marbles.effect.per_flick_this_turn" },
-}
+{ id: "wornMarbles", events: ["removed"], match: { cause: "wear" } },
+// filter: { type: "size", size: MEDIUM }  facultatif : la bille de l'évènement
 ```
 
-| Valeur | Portée | Compte | Texte de source |
-|---|---|---|---|
-| `flicksThisTurn` | ce tour | chaque Chiquenaude (`flick`), qu'elle ait un effet ou non | « Vitesse +2 par chiquenaude ce tour » |
-| `windfallsThisGame` | cette partie | chaque régénération du sac depuis la défausse (`bagRegenerated`), qu'une bille active ait une Trouvaille ou non | « Vitesse +1 par trouvaille cette partie » |
+`match` : des champs de l'évènement et leur valeur. `filter` : la bille que nomme
+l'évènement est de ce calibre, seulement sur des évènements qui nomment une bille toujours
+connue (`core/marbles.js`/`JOURNAL_EVENTS`), jamais la pioche, dont la bille est cachée
+dans la prévision.
 
-- **Portée** : `"turn"` revient à zéro au début de chaque tour, avant sa pioche (à
-  l'émission de `turnStarted`, le premier évènement de la pioche du tour) ; `"game"`
-  n'est à zéro qu'en début de partie (`createGame`).
-- **Moment** : un compteur augmente À L'ÉMISSION de l'évènement, avant que le bus ne le
-  traite, donc avant que les billes qui y réagissent ne soient évaluées. Conséquence
-  voulue : une Chiquenaude qui compte « par chiquenaude ce tour » se compte elle-même (la
-  première du tour lit 1), une Trouvaille sa propre régénération.
-- **Filtre** (facultatif) : `{ type: "size", size }`, la bille que nomme l'évènement est de
-  ce calibre. Seulement sur des évènements qui nomment une bille toujours connue
-  (`core/marbles.js`/`JOURNAL_EVENTS`) : jamais la pioche, dont la bille est cachée dans la
-  prévision.
+- **Textes** : par convention, `marbles.tally.<id>.name` (le menu, au pluriel :
+  « chiquenaudes ») et `marbles.tally.<id>.unit` (la source, au singulier : « par
+  chiquenaude »), vérifiés dans chaque langue par le domaine `marbles-view`.
 - **Un seul écrivain** : `core/marbles-tally.js` (`recordTally`, appelé par `transact` à
-  chaque émission, et `emptyTally`). Tout le reste lit par `tallyValue(tally, id)`, qui lève
-  sur un identifiant inconnu.
-- **Validation au chargement** : portée, évènements (dans `JOURNAL_EVENTS`, dont la
-  vérification `marbles-tally` contrôle qu'il suit le moteur), filtre, textes ; les textes
-  dans chaque langue, par le domaine `marbles-view`.
+  chaque émission, et `emptyTally`). Tout le reste lit par `tallyValue(tally, id, portée)`,
+  qui lève sur un identifiant ou une portée inconnus.
+- **Validation au chargement** : identifiants uniques ; pour les évènements déclarés,
+  évènements connus (dans `JOURNAL_EVENTS`, dont la vérification `marbles-tally` contrôle
+  qu'il suit le moteur), `match` et filtre.
 
-**Ajouter une valeur de partie** : une entrée dans `MARBLE_TALLIES` et ses deux textes
-(`name`, `source`) dans chaque langue, rien d'autre : elle devient une source de montant
-et une ligne du menu de debug d'office.
+**Ajouter** : un déclencheur ou une action mot-clé ont leurs compteurs d'office ; un
+évènement réel, une entrée dans `MARBLE_TALLIES`. Dans tous les cas, leurs deux textes
+dans chaque langue, rien d'autre : chaque compteur devient une source de montant dans ses
+deux portées et une ligne du menu de debug.
 
 ### Le bus d'évènements
 
@@ -879,10 +897,11 @@ de l'écran, comme la séquence : la partie de billes n'a pas de sauvegarde.
 
 En mode debug seulement (le mode du projet, `config/debug.js` : Ctrl+D, ou
 `toggleDebug()` dans la console), **Maj+L** ouvre un menu vertical
-(`view/marbles/tally-screen.js`, un menu de `lib/menu.js`) : une ligne par valeur de partie
-déclarée, dans l'ordre de `MARBLE_TALLIES`, avec sa valeur (« Chiquenaudes ce tour : 2 »,
-« Trouvailles cette partie : 1 »), puis « Fermer » ; Échap ferme aussi. Les lignes se
-lisent, Entrée n'y fait rien. Hors mode debug, la touche ne fait rien et n'est pas dans
+(`view/marbles/tally-screen.js`, un menu de `lib/menu.js`), regroupé par catégorie :
+le titre de chacune (« Déclenchements », « Actions », « Vitesse et Masse »,
+« Évènements »), puis une ligne par compteur avec ses deux portées (« Chiquenaudes : 2 ce
+tour, 5 cette partie. ») ; enfin « Fermer ». Échap ferme aussi. Les lignes se lisent,
+Entrée n'y fait rien. Hors mode debug, la touche ne fait rien et n'est pas dans
 l'aide. Refusée pendant la séquence, dont l'état est déjà celui d'après la résolution. Pas
 de conflit : dans l'écran des billes, L seule ouvre l'historique, et le Maj+L de l'écran
 de ville (journal d'avertissements) n'est jamais actif en même temps (seul le sommet de la

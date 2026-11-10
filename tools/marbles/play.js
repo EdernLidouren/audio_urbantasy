@@ -128,7 +128,7 @@ function printState() {
   game.hand.forEach(({ marble, turnsInHand }, index) => printMarble(marble, describeHandFocus(game, index, GAME_RULES, t), turnsInHand));
   console.log(`  [sac, du haut vers le bas : ${game.bag.join(", ") || "-"}]`);
   console.log(`  [défausse : ${game.discard.join(", ") || "-"}]`);
-  console.log(`  [valeurs de partie : ${tallyList(game.tally)}]`);
+  console.log(`  [valeurs de partie, ce tour/cette partie : ${tallyList(game.tally)}]`);
 }
 
 // La prévision, dite avec les mêmes phrases que l'écran. `action` : null pour la

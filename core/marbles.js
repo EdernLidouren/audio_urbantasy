@@ -6,8 +6,9 @@
 //   { rngState, maxHandSize, throwsPerTurn, firstTurnDraw, drawPerTurn, turnCount,
 //     turn, score, speed, mass, stage, endReason, bag, hand, discard, triangle,
 //     swapUsed, throwsUsed, tally }
-// `tally` : les VALEURS DE PARTIE, { <id>: nombre } (core/marbles-tally.js, le seul à
-// les écrire), tenues à l'émission de chaque évènement du journal (transact).
+// `tally` : les VALEURS DE PARTIE, { <id>: { turn, game } } (core/marbles-tally.js, le
+// seul à les écrire ; les compteurs : core/marbles-counters.js, TALLY_COUNTERS), tenues
+// à l'émission de chaque évènement du journal (transact).
 // `throwsUsed` : les LANCERS joués ce tour (une pose depuis la main en est un,
 // l'échange non), jamais plus que `throwsPerTurn`.
 // bag et discard sont des listes d'ids de billes (doublons permis). Une bille
@@ -51,7 +52,7 @@
 //
 // JOURNAL — `events`, dans l'ordre où ça se passe. Interface et son s'appuient
 // sur lui seul (view/marbles/narration.js, view/marbles/sounds.js) :
-//   turnStarted { turn, turnCount }, draw { marble }, drawSkipped { reason },
+//   turnStarted { turn, turnCount }, draw { marble, cause }, drawSkipped { reason },
 //   bagRegenerated { size }, swapped { a, b },
 //   flick { slot, marble, turnsInHand }, windfall { slot, marble },
 //   knockout { slot, marble, replacement }, removed { slot, marble, cause },
@@ -59,7 +60,8 @@
 //   hit { slot, marble, replacement }, final { slot, marble },
 //   phase { slot, marble }, phaseSkipped { slot },
 //   effect { trigger, slot, marble, speedDelta, massDelta, draw, operations, given, lost, speed, mass },
-//   polished { slot, marble, amount, wear, maxWear }, cracked { slot, marble, amount, wear, maxWear },
+//   polished { slot, marble, amount, applied, wear, maxWear },
+//   cracked { slot, marble, amount, applied, wear, maxWear },
 //   targetEmpty { action, slot },
 //   wear { slot, marble, wear, maxWear },
 //   impact { speed, mass, impact, score },
@@ -74,6 +76,9 @@
 // (config/marbles-values.js/MARBLE_TRIGGERS : "flick", "hit", "windfall", "knockout",
 // "final").
 // `final` : une bille usée vient de rejoindre la défausse depuis `slot`.
+// draw `cause` : "turn" (la pioche du début de tour) ou "effect" (une Pioche).
+// polished, cracked `applied` : l'usure réellement rendue ou ajoutée, après plancher
+// ou plafond (`amount` : celle demandée).
 // drawSkipped `reason` : "handFull" (la bille reste au sac) ou "noMarbles" (sac
 // et défausse vides). Une pioche, une régénération ou un arrêt de pioche peuvent
 // avoir lieu à tout moment : début de tour, pose (un Tic qui pioche), résolution.
@@ -98,7 +103,8 @@ import { createSeed, nextRandom } from "./rng.js";
 import { rejectUnknownFields } from "../lib/validate.js";
 import { MarbleEventLimitError, createEventBus } from "./marbles-bus.js";
 import { CLAUSE_ACTIONS, SLOTS, addValues, effectAt, evaluateEffect, isMarbleSize, validateEffect } from "./marbles-effects.js";
-import { emptyTally, recordTally, validateTallies } from "./marbles-tally.js";
+import { emptyTally, recordTally } from "./marbles-tally.js";
+import { buildTallyCounters } from "./marbles-counters.js";
 
 export { SLOTS, effectAt };
 
@@ -122,8 +128,8 @@ export const MARBLE_ERRORS = [
 // Les types d'évènements du journal (voir l'en-tête), chacun avec vrai s'il nomme
 // toujours une bille CONNUE, même dans la prévision : faux pour la pioche, dont la
 // bille y est cachée, et pour ceux qui ne nomment aucune bille. Lu par la validation
-// des valeurs de partie (un compteur ne peut compter qu'un évènement qui existe ;
-// un filtre sur la bille, qu'un évènement qui la connaît).
+// des valeurs de partie déclarées (un compteur ne peut compter qu'un évènement qui
+// existe ; un filtre sur la bille, qu'un évènement qui la connaît).
 export const JOURNAL_EVENTS = Object.freeze({
   turnStarted: false,
   draw: false,
@@ -150,8 +156,6 @@ export const JOURNAL_EVENTS = Object.freeze({
   turnEnded: false,
   gameOver: false,
 });
-
-validateTallies(MARBLE_TALLIES, JOURNAL_EVENTS);
 
 // --- Déclencheurs ---
 
@@ -203,6 +207,29 @@ validateMarbleTriggers(MARBLE_TRIGGERS);
 // Les champs d'effet d'une bille : ceux de la phase, puis un par déclencheur.
 const EFFECT_FIELDS = [...PHASE_FIELDS, ...MARBLE_TRIGGERS.map((trigger) => trigger.field)];
 
+// Les mots-clés de phase, pour les valeurs de partie : pointe, base (les deux
+// bases), puis chaque base (son emplacement seul).
+const PHASE_KEYWORDS = [
+  { id: "apex", slots: ["apex"] },
+  { id: "base", slots: ["leftBase", "rightBase"] },
+  { id: "leftBase", slots: ["leftBase"] },
+  { id: "rightBase", slots: ["rightBase"] },
+];
+
+// TOUS les compteurs des valeurs de partie (core/marbles-counters.js) : générés depuis
+// les déclencheurs, les phases et les actions de clause, plus les évènements réels
+// déclarés. Construits et validés au chargement de ce module.
+export const TALLY_COUNTERS = buildTallyCounters({
+  triggers: MARBLE_TRIGGERS,
+  phases: PHASE_KEYWORDS,
+  actions: CLAUSE_ACTIONS,
+  events: MARBLE_TALLIES,
+  journalEvents: JOURNAL_EVENTS,
+});
+
+// Leurs identifiants, que la validation d'une source de montant `tally` vérifie.
+const TALLY_IDS = new Set(TALLY_COUNTERS.map((counter) => counter.id));
+
 // Le moment où joue chaque champ d'effet, pour la règle des cibles et les
 // conditions qui n'ont de sens qu'à certains moments (core/marbles-effects.js/
 // validateEffect) ; une variante de base joue sur sa base. `marble` : la bille
@@ -231,12 +258,12 @@ export function validateMarbleTypes(types) {
     // Le calibre, obligatoire : lu par les conditions de calibre et par le son.
     if (!isMarbleSize(type.size)) fail(`bille "${id}" : calibre (size) absent ou inconnu "${type.size}".`);
     for (const field of EFFECT_FIELDS) {
-      if (type[field] !== undefined) validateEffect(type[field], `bille "${id}", ${field}`, fail, FIELD_CONTEXTS[field]);
+      if (type[field] !== undefined) validateEffect(type[field], `bille "${id}", ${field}`, fail, { ...FIELD_CONTEXTS[field], tallies: TALLY_IDS });
     }
     if (type.baseVariant !== undefined) {
       rejectUnknownFields(type.baseVariant, ["leftBase", "rightBase"], `bille "${id}", baseVariant`, fail);
       for (const [slot, effect] of Object.entries(type.baseVariant)) {
-        validateEffect(effect, `bille "${id}", baseVariant.${slot}`, fail, { phaseSlots: [slot] });
+        validateEffect(effect, `bille "${id}", baseVariant.${slot}`, fail, { phaseSlots: [slot], tallies: TALLY_IDS });
       }
     }
     if (type.maxWear !== undefined && (!Number.isInteger(type.maxWear) || type.maxWear < 1)) {
@@ -332,8 +359,9 @@ export function createMarblesGame(seed, options = {}, types) {
     triangle: { leftBase: null, rightBase: null, apex: null },
     swapUsed: false,
     throwsUsed: 0,
-    // Les valeurs de partie, à zéro : la portée "game" ne revient à zéro qu'ici.
-    tally: emptyTally(),
+    // Les valeurs de partie, à zéro : la portée « cette partie » ne revient à zéro
+    // qu'ici.
+    tally: emptyTally(TALLY_COUNTERS),
   };
 }
 
@@ -559,7 +587,7 @@ function fireEffect(run, trigger, listener, clauses, event) {
   // tout moment du tour.
   const { draw } = self;
   run.emit({ type: "effect", trigger, slot, marble, speedDelta, massDelta, draw, operations, given, lost, speed, mass });
-  if (draw > 0) drawMarbles(run, draw);
+  if (draw > 0) drawMarbles(run, draw, "effect");
   // Les actions sur une bille, après la pioche, dans l'ordre des clauses : sur la
   // bille elle-même (son emplacement) ou sur celle de l'emplacement visé.
   for (const operation of operations) applyMarbleAction(run, operation.action, operation.amount, operation.target ?? slot);
@@ -580,7 +608,7 @@ function applyMarbleAction(run, action, amount, slot) {
   const maxWear = maxWearOf(placed.marble, run.types);
   const wear = rule.wear(placed.wear, amount, maxWear);
   update(run, { triangle: { ...run.state.triangle, [slot]: { ...placed, wear } } });
-  run.emit({ type: rule.event, slot, marble: placed.marble, amount, wear, maxWear });
+  run.emit({ type: rule.event, slot, marble: placed.marble, amount, applied: Math.abs(wear - placed.wear), wear, maxWear });
   if (rule.retires && wear >= maxWear) retireMarble(run, slot);
 }
 
@@ -617,7 +645,7 @@ function transact(state, types, { eventLimit, blind = false } = {}, body) {
   // Les valeurs de partie aussi : un évènement compte dès qu'il est émis, avant que
   // les billes n'y réagissent (core/marbles-tally.js).
   const record = (event) => {
-    update(run, { tally: recordTally(run.state.tally, event, types) });
+    update(run, { tally: recordTally(run.state.tally, event, { state: run.state, types }, TALLY_COUNTERS) });
     run.journal.push(event);
   };
   run.emit = (event) => {
@@ -682,26 +710,27 @@ function regenerateBag(run) {
 // pioche : "handFull", "noMarbles". La fin de partie n'est pas son affaire.
 // Après une régénération, la pioche reprend en relisant ses conditions : les
 // Trouvailles ont pu remplir la main, vider le sac ou remplir la défausse.
-function drawOne(run) {
+// `cause` : ce qui fait piocher, "turn" ou "effect", porté par l'évènement `draw`.
+function drawOne(run, cause) {
   if (run.state.hand.length >= run.state.maxHandSize) return "handFull";
   if (run.state.bag.length === 0) {
     if (run.state.discard.length === 0) return "noMarbles";
     regenerateBag(run);
-    return drawOne(run);
+    return drawOne(run, cause);
   }
   const [top, ...bag] = run.state.bag;
   const marble = run.blind ? UNKNOWN_MARBLE : top;
   update(run, { bag, hand: [...run.state.hand, { marble, turnsInHand: 0 }] });
-  run.emit({ type: "draw", marble });
+  run.emit({ type: "draw", marble, cause });
   return "drawn";
 }
 
 // Pioche `count` billes une par une, jusqu'au premier arrêt, qui se dit
 // (drawSkipped) : les billes restantes ne sont pas piochées. -> { drawn, stopped },
 // `stopped` null si tout a été pioché.
-function drawMarbles(run, count) {
+function drawMarbles(run, count, cause) {
   for (let drawn = 0; drawn < count; drawn++) {
-    const outcome = drawOne(run);
+    const outcome = drawOne(run, cause);
     if (outcome !== "drawn") {
       run.emit({ type: "drawSkipped", reason: outcome });
       return { drawn, stopped: outcome };
@@ -717,7 +746,7 @@ function drawTurn(run) {
   const { state } = run;
   run.emit({ type: "turnStarted", turn: state.turn, turnCount: state.turnCount });
   update(run, { hand: run.state.hand.map((held) => ({ ...held, turnsInHand: held.turnsInHand + 1 })) });
-  const result = drawMarbles(run, state.turn === 1 ? state.firstTurnDraw : state.drawPerTurn);
+  const result = drawMarbles(run, state.turn === 1 ? state.firstTurnDraw : state.drawPerTurn, "turn");
   const reason = endReasonAt("turnDraw", run.state, result);
   if (reason !== null) {
     endGame(run, reason);
