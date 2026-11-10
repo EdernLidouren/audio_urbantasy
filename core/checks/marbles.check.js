@@ -20,11 +20,13 @@ import {
   placeRefusal,
   throwRefusal,
   throwsLeft,
+  buildMarbleKeywords,
+  validateMarblePhases,
   validateMarbleTriggers,
   validateMarbleTypes,
 } from "../marbles.js";
-import { MARBLE_TRIGGERS } from "../../config/marbles-values.js";
-import { amountOf, printedStat } from "../marbles-effects.js";
+import { MARBLE_PHASES, MARBLE_TRIGGERS } from "../../config/marbles-values.js";
+import { CLAUSE_ACTIONS, amountOf, printedStat } from "../marbles-effects.js";
 import { LARGE, MARBLE_SIZES, MEDIUM, SMALL, STARTING_BAG, MARBLES_SETTINGS } from "../../config/marbles-values.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
 import { emptyBagMarblesGame, handIds, inHand, withSizes } from "./helpers.js";
@@ -105,6 +107,8 @@ export default function checkMarbles(run) {
   checkTurnsInHand(run);
   checkComputedAmounts(run);
   checkWindfall(run);
+  checkAwaken(run);
+  checkKeywordDeclarations(run);
   checkBonus(run);
   checkResolution(run);
   checkEndOfGame(run);
@@ -223,14 +227,15 @@ function checkDraw(run) {
   run("pioche : 5 billes au premier tour", 5, first.state.hand.length);
   run("pioche : prend le haut du sac, dans l'ordre", game.bag.slice(0, 5).join(), handIds(first.state).join());
   run("pioche : sac diminué", 8, first.state.bag.length);
-  run.same("pioche : journal", ["turnStarted", "draw", "draw", "draw", "draw", "draw"], eventTypes(first.events));
+  run.same("pioche : journal", ["turnStarted", "draw", "draw", "draw", "draw", "draw"], eventTypes(first.events).filter((type) => type === "turnStarted" || type === "draw"));
+  run("pioche : chaque bille piochée suivie de son éveil", true, first.events.every((event, index) => event.type !== "draw" || first.events[index + 1]?.type === "awaken"));
   run("pioche : refusée une seconde fois", "alreadyDrawn", rules.reduce(first.state, { type: "draw" }).error);
 
   // Tours suivants : une seule bille, ajoutée à ce qui reste en main.
-  const later = apply({ ...playState({ hand: inHand(["clay", "glass", "agate"]), bag: ["mica", "tiger", "giant"] }), stage: "draw" }, { type: "draw" });
-  run("pioche : 1 bille aux tours suivants", "clay,glass,agate,mica", handIds(later.state).join());
-  run("pioche : le reste au sac", "tiger,giant", later.state.bag.join());
-  run.same("pioche : journal du tour suivant", ["turnStarted", "draw"], eventTypes(later.events));
+  const later = apply({ ...playState({ hand: inHand(["clay", "glass", "agate"]), bag: ["porcelain", "gorilla", "stoneware"] }), stage: "draw" }, { type: "draw" });
+  run("pioche : 1 bille aux tours suivants", "clay,glass,agate,porcelain", handIds(later.state).join());
+  run("pioche : le reste au sac", "gorilla,stoneware", later.state.bag.join());
+  run.same("pioche : journal du tour suivant", ["turnStarted", "draw", "awaken"], eventTypes(later.events));
 
   // Main pleine : la pioche est sautée, la bille reste au sac.
   const fullHand = inHand(["clay", "glass", "agate", "mica", "tiger"]);
@@ -247,34 +252,144 @@ function checkDraw(run) {
   run("main à 4 billes : la pioche passe", 5, almostFull.state.hand.length);
 
   // Une pioche de plusieurs billes s'arrête quand la main est pleine.
-  const large = apply({ ...playState({ hand: fullHand.slice(0, 4), bag: ["giant", "gorilla", "mica"], drawPerTurn: 3 }), stage: "draw" }, { type: "draw" });
-  run.same("pioche de 3 : s'arrête à la main pleine", ["turnStarted", "draw", "drawSkipped"], eventTypes(large.events));
-  run("pioche de 3 : le reste au sac", "gorilla,mica", large.state.bag.join());
+  const large = apply({ ...playState({ hand: fullHand.slice(0, 4), bag: ["gorilla", "stoneware", "porcelain"], drawPerTurn: 3 }), stage: "draw" }, { type: "draw" });
+  run.same("pioche de 3 : s'arrête à la main pleine", ["turnStarted", "draw", "awaken", "drawSkipped"], eventTypes(large.events));
+  run("pioche de 3 : le reste au sac", "stoneware,porcelain", large.state.bag.join());
 
   // Régénération pendant la pioche : le mélange, puis la bille.
-  const regen = apply({ ...playState({ hand: inHand(["clay"]), bag: [], discard: ["agate", "mica", "tiger", "giant"] }), stage: "draw" }, { type: "draw" });
-  run.same("régénération : journal dans l'ordre", ["turnStarted", "bagRegenerated", "draw"], eventTypes(regen.events));
+  const regen = apply({ ...playState({ hand: inHand(["clay"]), bag: [], discard: ["agate", "porcelain", "gorilla", "stoneware"] }), stage: "draw" }, { type: "draw" });
+  run.same("régénération : journal dans l'ordre", ["turnStarted", "bagRegenerated", "draw", "awaken"], eventTypes(regen.events));
   run("régénération : taille annoncée", 4, regen.events[1].size);
   run("régénération : défausse vidée", 0, regen.state.discard.length);
   run("régénération : une bille piochée", 2, regen.state.hand.length);
   run("régénération : le reste au sac", 3, regen.state.bag.length);
-  run("régénération : mêmes billes après coup", "agate,clay,giant,mica,tiger", [...handIds(regen.state), ...regen.state.bag].sort().join());
+  run("régénération : mêmes billes après coup", "agate,clay,gorilla,porcelain,stoneware", [...handIds(regen.state), ...regen.state.bag].sort().join());
 
   const midDraw = apply(
-    { ...playState({ hand: inHand([]), bag: ["glass"], discard: ["agate", "mica", "tiger"], turn: 1 }), stage: "draw" },
+    { ...playState({ hand: inHand([]), bag: ["glass"], discard: ["agate", "porcelain", "gorilla"], turn: 1 }), stage: "draw" },
     { type: "draw" }
   );
   run.same(
     "régénération en cours de pioche : ce qui restait d'abord",
-    ["turnStarted", "draw", "bagRegenerated", "draw", "draw", "draw"],
-    eventTypes(midDraw.events).slice(0, 6)
+    ["turnStarted", "draw", "awaken", "bagRegenerated", "draw", "awaken", "draw", "awaken", "draw", "awaken"],
+    eventTypes(midDraw.events).slice(0, 10)
   );
   run("régénération en cours de pioche : la bille du sac en premier", "glass", midDraw.state.hand[0].marble);
 
   // Un sac qui se vide sans que la pioche demande une bille de plus ne régénère pas.
-  const exact = apply({ ...playState({ hand: inHand(["clay"]), bag: ["mica"], discard: ["giant"] }), stage: "draw" }, { type: "draw" });
+  const exact = apply({ ...playState({ hand: inHand(["clay"]), bag: ["porcelain"], discard: ["giant"] }), stage: "draw" }, { type: "draw" });
   run("pas de régénération sans bille demandée", false, eventTypes(exact.events).includes("bagRegenerated"));
   run("pas de régénération : sac vide", 0, exact.state.bag.length);
+}
+
+// Les mots-clés : sans nom ni description, le chargement échoue.
+function checkKeywordDeclarations(run) {
+  const texts = { name: "a.name", description: "a.description" };
+  const build = (over) => () => buildMarbleKeywords({ phases: MARBLE_PHASES, triggers: MARBLE_TRIGGERS, actions: CLAUSE_ACTIONS, ...over });
+  run("mots-clés : les vraies listes passent", false, throws(build({})));
+  run("mots-clés : une action sans description refusée", true, throws(build({ actions: { ...CLAUSE_ACTIONS, spin: { kind: "marble", keyword: { texts: { name: "x" } } } } })));
+  run("mots-clés : une phase sans description refusée", true, throws(build({ phases: [{ ...MARBLE_PHASES[0], texts: { name: "x" } }] })));
+  run("mots-clés : une action fictive a son mot-clé", true, buildMarbleKeywords({ phases: MARBLE_PHASES, triggers: MARBLE_TRIGGERS, actions: { ...CLAUSE_ACTIONS, spin: { kind: "marble", keyword: { texts } } } }).some((keyword) => keyword.id === "spin"));
+  const [awaken] = MARBLE_TRIGGERS;
+  run("mots-clés : un déclencheur sans description refusé", true, throws(() => validateMarbleTriggers([{ ...awaken, texts: { card: "c", effect: "e", name: "n" } }])));
+  run("mots-clés : une liste de phases sans description refusée", true, throws(() => validateMarblePhases([{ ...MARBLE_PHASES[0], texts: { name: "x" } }, MARBLE_PHASES[1]])));
+  run("phases : chaque emplacement dans une phase", true, throws(() => validateMarblePhases([MARBLE_PHASES[0]])));
+}
+
+// L'Éveil : à chaque bille réellement piochée, quelle qu'en soit la cause, juste
+// après sa pioche et avant la suivante ; la bille en main, à 0 tour en main.
+function checkAwaken(run) {
+  // Le journal, chaque évènement avec sa bille (la pioche aussi) ; l'effet, son
+  // déclencheur.
+  const journal = (events) =>
+    events.map((event) => {
+      if (event.type === "effect") return `effect:${event.trigger}:${event.marble}`;
+      return event.marble === undefined ? event.type : `${event.type}:${event.marble}`;
+    });
+
+  // Pioche du début de tour : les compteurs du NOUVEAU tour (remis à zéro par la
+  // résolution).
+  const ended = apply(playState({ hand: inHand([]), bag: ["tiger", "clay"], triangle: triangleOf(placed("clay"), null, null) }), { type: "resolve" });
+  const turnStart = apply(ended.state, { type: "draw" });
+  run.same("éveil, début de tour : pioche, éveil, effet", ["turnStarted", "draw:tiger", "awaken:tiger", "effect:awaken:tiger"], journal(turnStart.events));
+  run("éveil, début de tour : la Vitesse au compteur du nouveau tour", 2, turnStart.state.speed);
+  run("éveil, début de tour : la bille en main", "tiger", handIds(turnStart.state).join());
+
+  // Pioche d'un effet (le Tic de l'œil-de-chat) : l'éveil aussi.
+  const tic = apply(playState({ hand: inHand(["cats_eye"]), bag: ["tiger"], triangle: triangleOf(null, null, placed("glass")) }), { type: "place", handIndex: 0, slot: "apex" });
+  run.same("éveil, pioche d'un effet : après la pioche", ["draw:tiger", "awaken:tiger", "effect:awaken:tiger"], journal(tic.events).slice(-3));
+  run("éveil, pioche d'un effet : la Vitesse au compteur du tour en cours", 2, tic.state.speed);
+
+  // Main pleine : la bille reste au sac, pas d'éveil.
+  const full = apply({ ...playState({ hand: inHand(["clay", "glass", "agate", "porcelain", "gorilla"]), bag: ["tiger"] }), stage: "draw" }, { type: "draw" });
+  run.same("éveil, main pleine : pas de pioche, pas d'éveil", ["turnStarted", "drawSkipped"], journal(full.events));
+
+  // Ordre : régénération, trouvailles, pioche, éveil, pioche suivante.
+  const ordered = apply(
+    { ...playState({ hand: inHand([]), bag: [], discard: ["tiger"], drawPerTurn: 2, triangle: triangleOf(placed("agate", 1), null, null) }), stage: "draw" },
+    { type: "draw" }
+  );
+  run.same(
+    "éveil, ordre : régénération, trouvaille, pioche, éveil, puis l'arrêt de la pioche",
+    ["turnStarted", "bagRegenerated", "windfall:agate", "effect:windfall:agate", "polished:agate", "draw:tiger", "awaken:tiger", "effect:awaken:tiger", "drawSkipped"],
+    journal(ordered.events)
+  );
+
+  // L'enchaînement du mica : chaque mica piochée pioche la suivante, avant que la
+  // pioche du tour ne reprenne.
+  const chain = apply({ ...playState({ hand: inHand([]), bag: ["mica", "mica", "clay", "glass"] }), stage: "draw" }, { type: "draw" });
+  run.same(
+    "éveil, enchaînement du mica",
+    ["turnStarted", "draw:mica", "awaken:mica", "effect:awaken:mica", "draw:mica", "awaken:mica", "effect:awaken:mica", "draw:clay", "awaken:clay"],
+    journal(chain.events)
+  );
+  run("éveil, enchaînement : trois billes en main", "mica,mica,clay", handIds(chain.state).join());
+  run.same("éveil, enchaînement : compteurs d'éveils et de billes piochées", { awaken: 2, drawnMarbles: 3, draw: 2, drawQuantity: 2 }, {
+    awaken: chain.state.tally.awaken.game,
+    drawnMarbles: chain.state.tally.drawnMarbles.game,
+    draw: chain.state.tally.draw.game,
+    drawQuantity: chain.state.tally.drawQuantity.game,
+  });
+  // Avec une régénération au milieu, puis plus rien : l'enchaînement s'arrête.
+  const regenerated = apply({ ...playState({ hand: inHand([]), bag: ["mica"], discard: ["mica"] }), stage: "draw" }, { type: "draw" });
+  run.same(
+    "éveil, enchaînement avec régénération",
+    ["turnStarted", "draw:mica", "awaken:mica", "effect:awaken:mica", "bagRegenerated", "draw:mica", "awaken:mica", "effect:awaken:mica", "drawSkipped"],
+    journal(regenerated.events)
+  );
+  run("éveil, enchaînement avec régénération : la partie continue", "play", regenerated.state.stage);
+  // Borné par la main pleine.
+  const bounded = apply({ ...playState({ hand: inHand(["clay", "glass", "agate", "porcelain"]), bag: ["mica", "mica", "mica"] }), stage: "draw" }, { type: "draw" });
+  run.same("éveil, enchaînement borné par la main pleine", ["draw:mica", "awaken:mica", "effect:awaken:mica", "drawSkipped"], journal(bounded.events).slice(1));
+
+  // Règle des cibles : le Polissage ciblé de la géante sur la pointe ; un emplacement
+  // vide, noté.
+  const giant = (apex) => apply({ ...playState({ hand: inHand([]), bag: ["giant"], triangle: triangleOf(null, null, apex) }), stage: "draw" }, { type: "draw" });
+  run("éveil, cible : la géante polit la pointe", 0, giant(placed("tiger", 2)).state.triangle.apex.wear - 1);
+  run.same("éveil, cible : pointe vide, notée", { type: "targetEmpty", action: "polish", slot: "apex" }, giant(null).events.at(-1));
+  // Un bonus de Vitesse ciblé : donné avant la phase, perdu après.
+  const gifts = { waker: { awaken: [{ action: "speed", amount: 2, target: "apex" }] }, finisher: { maxWear: 1, final: [{ action: "draw", amount: 1 }] }, plain: {} };
+  const before = apply(playState({ hand: inHand(["plain"]), bag: ["waker"], triangle: triangleOf(null, null, placed("plain")) }), { type: "place", handIndex: 0, slot: "leftBase" }, gifts);
+  run("éveil : une pose sans pioche n'éveille rien", undefined, before.events.find((event) => event.trigger === "awaken"));
+  const dropper = { ...gifts, dropper: { flick: [{ action: "draw", amount: 1 }] } };
+  const given = apply(playState({ hand: inHand(["dropper"]), bag: ["waker"], triangle: triangleOf(null, null, placed("plain")) }), { type: "place", handIndex: 0, slot: "leftBase" }, dropper);
+  run("éveil, cible : en phase de jeu, le bonus donné à la pointe", 2, given.state.triangle.apex.bonus?.speed);
+  const late = apply(playState({ bag: ["waker"], triangle: triangleOf(placed("finisher"), null, placed("plain")) }), { type: "resolve" }, gifts);
+  run.same(
+    "éveil, cible : après les phases, le bonus perdu, noté",
+    [{ slot: "apex", reason: "phasePassed", speed: 2, mass: 0 }],
+    late.events.find((event) => event.trigger === "awaken").lost
+  );
+
+  // Validation : une action sur la bille elle-même est refusée (elle est en main).
+  run("éveil, validation : Polissage sur soi refusé", true, throws(() => validateTable({ a: { awaken: [{ action: "polish", amount: 1 }] } })));
+  run("éveil, validation : Fêlure ciblée permise", false, throws(() => validateTable({ a: { awaken: [{ action: "crack", amount: 1, target: "apex" }] } })));
+  run("éveil, validation : Pioche permise", false, throws(() => validateTable({ a: { awaken: [{ action: "draw", amount: 1 }] } })));
+  run("éveil, validation : Vitesse ciblée permise", false, throws(() => validateTable({ a: { awaken: [{ action: "speed", amount: 1, target: "leftBase" }] } })));
+
+  // Une bille fabriquée qui n'a pas d'Éveil : l'évènement passe, sans effet.
+  const quiet = apply({ ...playState({ hand: inHand([]), bag: ["clay"] }), stage: "draw" }, { type: "draw" });
+  run.same("éveil : sans le champ, l'évènement seul", ["turnStarted", "draw:clay", "awaken:clay"], journal(quiet.events));
 }
 
 function checkSwap(run) {
@@ -375,7 +490,7 @@ function checkDrawEffects(run) {
     playState({ hand: inHand(["cats_eye"]), bag: ["sulphide", "agate"], triangle: triangleOf(null, null, placed("glass")) }),
     { type: "place", handIndex: 0, slot: "apex" }
   );
-  run.same("tic qui pioche : journal", ["flick", "knockout", "removed", "discarded", "placed", "hit", "effect", "draw"], eventTypes(hit.events));
+  run.same("tic qui pioche : journal", ["flick", "knockout", "removed", "discarded", "placed", "hit", "effect", "draw", "awaken"], eventTypes(hit.events));
   run("tic qui pioche : l'effet dit sa Pioche", 1, hit.events[6].draw);
   run("tic qui pioche : le haut du sac", "sulphide", hit.events[7].marble);
   run("tic qui pioche : en main", "sulphide", handIds(hit.state).join());
@@ -390,14 +505,14 @@ function checkDrawEffects(run) {
   // L'argile a une Chiquenaude (à 0 tour en main, elle ne produit rien) : son effet passe.
   run.same(
     "éjection qui pioche : journal",
-    ["flick", "effect", "knockout", "effect", "draw", "removed", "discarded", "placed", "hit", "effect"],
+    ["flick", "effect", "knockout", "effect", "draw", "awaken", "removed", "discarded", "placed", "hit", "effect"],
     eventTypes(knockout.events)
   );
   run("éjection qui pioche : en main", "agate", handIds(knockout.state).join());
 
   // Phase qui pioche : la bille attend le tour suivant (elle est en main à sa pioche).
   const phase = apply(playState({ hand: inHand([]), bag: ["agate", "tiger"], triangle: triangleOf(placed("mica"), null, null) }), { type: "resolve" });
-  run.same("phase qui pioche : l'effet puis la bille", ["phase", "effect", "draw", "wear"], eventTypes(phase.events).slice(0, 4));
+  run.same("phase qui pioche : l'effet puis la bille", ["phase", "effect", "draw", "awaken", "wear"], eventTypes(phase.events).slice(0, 5));
   run("phase qui pioche : la Pioche ne touche ni Vitesse ni Masse", 0, phase.events[1].speedDelta + phase.events[1].massDelta);
   run("phase qui pioche : en main après la résolution", "agate", handIds(phase.state).join());
   run("phase qui pioche : le tour suivant reste à piocher", "draw", phase.state.stage);
@@ -407,24 +522,24 @@ function checkDrawEffects(run) {
 
   // Régénération pendant la phase de jeu (un Tic) et pendant la résolution.
   const regenPlay = apply(
-    playState({ hand: inHand(["cats_eye"]), bag: [], discard: ["agate", "tiger"], triangle: triangleOf(null, null, placed("glass")) }),
+    playState({ hand: inHand(["cats_eye"]), bag: [], discard: ["agate", "porcelain"], triangle: triangleOf(null, null, placed("glass")) }),
     { type: "place", handIndex: 0, slot: "apex" }
   );
   // La régénération, puis la Trouvaille de chaque bille active (ici l'œil-de-chat, sans
   // ce champ : l'évènement passe, sans effet), puis la pioche reprend.
-  run.same("régénération en jeu : dans le journal de la pose", ["hit", "effect", "bagRegenerated", "windfall", "draw"], eventTypes(regenPlay.events).slice(-5));
+  run.same("régénération en jeu : dans le journal de la pose", ["hit", "effect", "bagRegenerated", "windfall", "draw", "awaken"], eventTypes(regenPlay.events).slice(-6));
   run("régénération en jeu : la défausse entière, bille remplacée comprise", 3, regenPlay.events.find((event) => event.type === "bagRegenerated").size);
   run("régénération en jeu : la partie continue", "play", regenPlay.state.stage);
   const regenResolve = apply(playState({ hand: inHand([]), bag: [], discard: ["agate"], triangle: triangleOf(placed("mica"), null, null) }), { type: "resolve" });
-  run.same("régénération en résolution : dans le journal", ["phase", "effect", "bagRegenerated", "windfall", "draw"], eventTypes(regenResolve.events).slice(0, 5));
+  run.same("régénération en résolution : dans le journal", ["phase", "effect", "bagRegenerated", "windfall", "draw", "awaken"], eventTypes(regenResolve.events).slice(0, 6));
   run("régénération en résolution : la bille en main", "agate", handIds(regenResolve.state).join());
 
   // Arrêts : main pleine (pas de régénération), plus de billes (pas de fin de partie).
   const full = apply(
-    playState({ hand: inHand(["cats_eye", "clay", "glass", "agate", "tiger"]), bag: [], discard: ["giant"], triangle: triangleOf(null, null, placed("sulphide")) }),
+    playState({ hand: inHand(["cats_eye", "clay", "glass", "agate", "tiger"]), bag: [], discard: ["gorilla"], triangle: triangleOf(null, null, placed("sulphide")) }),
     { type: "place", handIndex: 0, slot: "apex" }
   );
-  run("tic qui pioche, main pleine après la pose : la pioche passe", "draw", eventTypes(full.events).at(-1));
+  run.same("tic qui pioche, main pleine après la pose : la pioche passe", ["draw", "awaken"], eventTypes(full.events).slice(-2));
   const fuller = { ...playState({ hand: inHand(["cats_eye", "clay", "glass", "agate", "tiger"]), maxHandSize: 4 }) };
   const stopped = apply({ ...fuller, bag: [], discard: ["giant"], triangle: triangleOf(null, null, placed("sulphide")) }, { type: "place", handIndex: 0, slot: "apex" });
   run.same("tic qui pioche, main pleine : arrêt sans régénération", ["effect", "drawSkipped"], eventTypes(stopped.events).slice(-2));
@@ -462,7 +577,11 @@ function checkDrawEffects(run) {
 
 // La liste des déclencheurs, déclarée une fois (config/marbles-values.js).
 function checkTriggers(run) {
-  run.same("déclencheurs : chiquenaude, tic, trouvaille, éjection, final, dans l'ordre de la fiche", ["flick", "hit", "windfall", "knockout", "final"], MARBLE_TRIGGERS.map((trigger) => trigger.id));
+  run.same(
+    "déclencheurs : éveil, chiquenaude, tic, trouvaille, éjection, final, dans l'ordre de la fiche",
+    ["awaken", "flick", "hit", "windfall", "knockout", "final"],
+    MARBLE_TRIGGERS.map((trigger) => trigger.id)
+  );
   run("déclencheurs : la vraie liste acceptée", false, throws(() => validateMarbleTriggers(MARBLE_TRIGGERS)));
   const [hit] = MARBLE_TRIGGERS;
   const refused = (name, list) => run(`déclencheurs refusés : ${name}`, true, throws(() => validateMarbleTriggers(list)));
@@ -1395,7 +1514,7 @@ function checkWindfall(run) {
   const started = apply(ended.state, { type: "draw" });
   run.same(
     "trouvaille, début de tour : régénération, trouvaille, pioche",
-    ["turnStarted", "bagRegenerated", "windfall:tiger", "effect:tiger", "draw"],
+    ["turnStarted", "bagRegenerated", "windfall:tiger", "effect:tiger", "draw", "awaken:clay"],
     typesAndMarbles(started.events)
   );
   run("trouvaille, début de tour : la Vitesse au compteur du nouveau tour", 3, started.state.speed);
@@ -1463,7 +1582,7 @@ function checkWindfall(run) {
   );
   run.same(
     "trouvaille, Pioche : la bille prise par la Trouvaille, la pioche reprise s'arrête",
-    ["bagRegenerated", "windfall:taker", "effect:taker", "draw", "drawSkipped"],
+    ["bagRegenerated", "windfall:taker", "effect:taker", "draw", "awaken:plain", "drawSkipped"],
     between(taken.events, "bagRegenerated", "drawSkipped")
   );
   // Une boucle de Trouvailles (chaque Pioche régénère, chaque Fêlure remplit la
@@ -1509,11 +1628,11 @@ function checkEndOfGame(run) {
 
   // Plus de règle « sac régénéré de moins de 3 billes » : un sac de 2 se joue.
   const small = apply(
-    { ...playState({ score: 12, hand: inHand(["clay"]), bag: [], discard: ["agate", "mica"] }), stage: "draw" },
+    { ...playState({ score: 12, hand: inHand(["clay"]), bag: [], discard: ["agate", "porcelain"] }), stage: "draw" },
     { type: "draw" }
   );
   run("sac régénéré de 2 billes : la partie continue", "play", small.state.stage);
-  run.same("sac régénéré de 2 billes : journal", ["turnStarted", "bagRegenerated", "draw"], eventTypes(small.events));
+  run.same("sac régénéré de 2 billes : journal", ["turnStarted", "bagRegenerated", "draw", "awaken"], eventTypes(small.events));
 
   // Pioche impossible, faute de billes : la partie finit.
   const empty = apply({ ...playState({ score: 12, hand: inHand(["clay"]), bag: [], discard: [] }), stage: "draw" }, { type: "draw" });
@@ -1527,7 +1646,7 @@ function checkEndOfGame(run) {
   // Une seule bille piochée sur trois : la partie continue.
   const partial = apply({ ...playState({ hand: inHand([]), bag: ["glass"], discard: [], drawPerTurn: 3 }), stage: "draw" }, { type: "draw" });
   run("pioche partielle : la partie continue", "play", partial.state.stage);
-  run.same("pioche partielle : journal", ["turnStarted", "draw", "drawSkipped"], eventTypes(partial.events));
+  run.same("pioche partielle : journal", ["turnStarted", "draw", "awaken", "drawSkipped"], eventTypes(partial.events));
 
   // Main pleine, sac et défausse vides : jamais une fin de partie.
   const full = apply({ ...playState({ hand: inHand(["clay", "glass", "agate", "mica", "tiger"]), bag: [], discard: [] }), stage: "draw" }, { type: "draw" });
@@ -1701,7 +1820,7 @@ function checkSmoke(run) {
   run.same("fumée : invariants tenus", [], faults.slice(0, 5));
   run(
     "fumée : tous les évènements rencontrés",
-    "bagRegenerated,cracked,discarded,draw,drawSkipped,effect,final,flick,gameOver,hit,impact,knockout,phase,phaseSkipped,placed,polished,removed,rotation,swapped,targetEmpty,turnEnded,turnStarted,wear,windfall",
+    "awaken,bagRegenerated,cracked,discarded,draw,drawSkipped,effect,final,flick,gameOver,hit,impact,knockout,phase,phaseSkipped,placed,polished,removed,rotation,swapped,targetEmpty,turnEnded,turnStarted,wear,windfall",
     [...seen].sort().join()
   );
 }

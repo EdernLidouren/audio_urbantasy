@@ -206,18 +206,46 @@ export const MARBLES_AUDIO = {
   shuffle: "assets/sounds/marbles/marbles_shuffling",
 };
 
+// Les PHASES, déclarées UNE fois : l'effet de base ou de pointe d'une bille, joué
+// pendant la résolution. Chacune :
+//   id      son identifiant, celui de son mot-clé et de sa valeur de partie ;
+//   field   le champ d'effet de la bille (marbles/types/index.js) ; la base a aussi
+//           ses variantes par emplacement (`baseVariant`) ;
+//   slots   les emplacements où elle joue, dans l'ordre de la résolution ;
+//   texts   `name`, le nom du mot-clé (« Pointe ») ; `description`, ce qu'il fait
+//           (aide des mots-clés, touches E et Maj+E). Une phase sans eux échoue au
+//           chargement (core/marbles.js).
+// L'ordre de la liste est celui des mots-clés (pointe, puis base).
+export const MARBLE_PHASES = [
+  {
+    id: "apex",
+    field: "apex",
+    slots: ["apex"],
+    texts: { name: "marbles.keyword.apex.name", description: "marbles.keyword.apex.description" },
+  },
+  {
+    id: "base",
+    field: "base",
+    slots: ["leftBase", "rightBase"],
+    texts: { name: "marbles.keyword.base.name", description: "marbles.keyword.base.description" },
+  },
+];
+
 // Les DÉCLENCHEURS propres d'une bille, déclarés UNE fois : la validation de la
 // table, les écouteurs du core (core/marbles.js), la prévision, la narration, la
 // fiche et les outils lisent cette liste, jamais une copie. La phase, l'effet de
 // base ou de pointe, est à part : elle a ses propres champs et se dit par son
-// emplacement. L'ordre de la liste est celui de la fiche.
+// emplacement. L'ordre de la liste est celui de la fiche et des mots-clés : la vie
+// d'une bille, de sa pioche à son départ.
 //   id        son identifiant : la valeur `trigger` de l'évènement `effect` ;
 //   field     le champ d'effet de la bille (marbles/types/index.js) ;
 //   event     l'évènement du journal qui le déclenche ;
 //   marble    la bille concernée : "onSlot", celle qui est sur l'emplacement de
 //             l'évènement ; "removed", celle que l'évènement nomme, déjà retirée du
 //             triangle ; "thrown", celle que l'évènement nomme, EN COURS DE LANCER :
-//             sortie de la main, pas encore sur le triangle ;
+//             sortie de la main, pas encore sur le triangle ; "drawn", celle que
+//             l'évènement nomme, qui vient d'être piochée : en main, à 0 tour en
+//             main (une action sur la bille elle-même y est refusée) ;
 //   moment    quand il joue : "play", pendant la phase de jeu (toutes les phases
 //             restent à venir) ; "afterPhases", après toutes les phases (une Vitesse
 //             ou une Masse ciblée n'y a plus de sens : core/marbles-effects.js) ;
@@ -236,7 +264,11 @@ export const MARBLES_AUDIO = {
 //               de phase (R, valeurs de la confirmation) ;
 //               { line: "regeneration" } : juste après l'annonce de la régénération
 //               du sac (R, confirmation), une phrase par effet, qui nomme sa bille ;
-//   texts     ses gabarits i18n : `card`, son champ de fiche ({effect}) ; `effect`,
+//               { line: "none" } : jamais prévu, la bille concernée étant inconnue
+//               de la prévision (l'Éveil : core/marbles-forecast.js, « incertain ») ;
+//   texts     ses gabarits i18n : `name`, le nom du mot-clé (« Chiquenaude ») ;
+//             `description`, ce qu'il fait (aide des mots-clés, touches E et
+//             Maj+E) ; `card`, son champ de fiche ({effect}) ; `effect`,
 //             son effet joué dans le journal ({marble}, {effect}, {speed}, {mass}) ;
 //             `placement` (ligne "placement"), `slot` (ligne "slot") ou
 //             `regeneration` (ligne "regeneration"), sa prévision ({marble},
@@ -245,6 +277,24 @@ export const MARBLES_AUDIO = {
 // AJOUTER un déclencheur : une entrée ici, son champ dans les billes, ses textes, et
 // l'émission de son évènement dans core/marbles.js au bon moment du tour.
 export const MARBLE_TRIGGERS = [
+  // L'Éveil : à chaque bille piochée (du sac à la main), pioche du tour ou effet,
+  // juste après sa pioche et avant la suivante ; jamais pour une bille restée au sac
+  // faute de place en main.
+  {
+    id: "awaken",
+    field: "awaken",
+    event: "awaken",
+    marble: "drawn",
+    moment: "anytime",
+    forecast: { line: "none" },
+    texts: {
+      name: "marbles.keyword.awaken.name",
+      description: "marbles.keyword.awaken.description",
+      card: "marbles.card.awaken",
+      effect: "marbles.event.effect_awaken",
+    },
+    card: "below",
+  },
   // La Chiquenaude : à chaque pose depuis la main, sur un emplacement vide ou occupé,
   // avant tout le reste, la bille en cours de lancer (ni en main ni sur le triangle).
   {
@@ -254,7 +304,13 @@ export const MARBLE_TRIGGERS = [
     marble: "thrown",
     moment: "play",
     forecast: { line: "placement", marble: "placed", order: 0 },
-    texts: { card: "marbles.card.flick", effect: "marbles.event.effect_flick", placement: "marbles.place.flick" },
+    texts: {
+      name: "marbles.keyword.flick.name",
+      description: "marbles.keyword.flick.description",
+      card: "marbles.card.flick",
+      effect: "marbles.event.effect_flick",
+      placement: "marbles.place.flick",
+    },
     card: "below",
   },
   {
@@ -265,7 +321,13 @@ export const MARBLE_TRIGGERS = [
     moment: "play",
     replacement: true,
     forecast: { line: "placement", marble: "placed", order: 2 },
-    texts: { card: "marbles.card.hit", effect: "marbles.event.effect_hit", placement: "marbles.place.hit" },
+    texts: {
+      name: "marbles.keyword.hit.name",
+      description: "marbles.keyword.hit.description",
+      card: "marbles.card.hit",
+      effect: "marbles.event.effect_hit",
+      placement: "marbles.place.hit",
+    },
     card: "below",
   },
   // La Trouvaille : à chaque régénération du sac depuis la défausse, à tout moment du
@@ -278,7 +340,13 @@ export const MARBLE_TRIGGERS = [
     marble: "onSlot",
     moment: "anytime",
     forecast: { line: "regeneration" },
-    texts: { card: "marbles.card.windfall", effect: "marbles.event.effect_windfall", regeneration: "marbles.forecast.windfall" },
+    texts: {
+      name: "marbles.keyword.windfall.name",
+      description: "marbles.keyword.windfall.description",
+      card: "marbles.card.windfall",
+      effect: "marbles.event.effect_windfall",
+      regeneration: "marbles.forecast.windfall",
+    },
     card: "below",
   },
   {
@@ -289,7 +357,13 @@ export const MARBLE_TRIGGERS = [
     moment: "play",
     replacement: true,
     forecast: { line: "placement", marble: "occupant", order: 1 },
-    texts: { card: "marbles.card.knockout", effect: "marbles.event.effect_knockout", placement: "marbles.place.knockout" },
+    texts: {
+      name: "marbles.keyword.knockout.name",
+      description: "marbles.keyword.knockout.description",
+      card: "marbles.card.knockout",
+      effect: "marbles.event.effect_knockout",
+      placement: "marbles.place.knockout",
+    },
     card: "below",
   },
   // Le Final : au retrait par USURE seulement, la bille déjà à la défausse. Ses
@@ -301,7 +375,13 @@ export const MARBLE_TRIGGERS = [
     marble: "removed",
     moment: "afterPhases",
     forecast: { line: "slot" },
-    texts: { card: "marbles.card.final", effect: "marbles.event.effect_final", slot: "marbles.outcome.final" },
+    texts: {
+      name: "marbles.keyword.final.name",
+      description: "marbles.keyword.final.description",
+      card: "marbles.card.final",
+      effect: "marbles.event.effect_final",
+      slot: "marbles.outcome.final",
+    },
     card: "below",
   },
 ];

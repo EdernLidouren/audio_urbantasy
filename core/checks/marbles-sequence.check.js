@@ -113,12 +113,17 @@ function playGame(seed, options, present, onTurn = () => {}) {
 const REGENERATION =
   "(event\\.bag_regenerated (event\\.effect_windfall |event\\.polished |event\\.cracked |event\\.target_empty |event\\.discarded\\.wear |event\\.effect_final )*)";
 
+// Une pioche, suivie de l'Éveil de sa bille et de ce qu'il déclenche (une Pioche qui
+// pioche à son tour, un Polissage ou une Fêlure, une régénération).
+const DRAWING =
+  "(" + REGENERATION + "|event\\.draw |event\\.draw_skipped\\.(handFull|noMarbles) |event\\.effect_awaken |" +
+  "event\\.polished |event\\.cracked |event\\.target_empty |event\\.discarded\\.wear |event\\.effect_final )";
+
 const SEQUENCE_SHAPE = new RegExp(
-  "^resolution\\.opening (outcome\\.(slot|empty) (" + REGENERATION + "|event\\.draw |event\\.draw_skipped\\.(handFull|noMarbles) |" +
-    "event\\.polished |event\\.cracked |event\\.target_empty |event\\.discarded\\.wear |event\\.effect_final )*){3}" +
-    "(event\\.discarded\\.wear (event\\.effect_final )?(" + REGENERATION + "|event\\.draw |event\\.draw_skipped\\.(handFull|noMarbles) )*)*" +
+  "^resolution\\.opening (outcome\\.(slot|empty) " + DRAWING + "*){3}" +
+    "(event\\.discarded\\.wear (event\\.effect_final )?" + DRAWING + "*)*" +
     "event\\.impact " +
-    "(event\\.rotation " + REGENERATION + "?((event\\.draw|event\\.draw_skipped\\.(handFull|noMarbles)) )+event\\.turn_started" +
+    "(event\\.rotation " + DRAWING + "+event\\.turn_started" +
     "|event\\.rotation event\\.draw_skipped\\.noMarbles event\\.game_over\\.outOfMarbles" +
     "|event\\.game_over\\.turnsCompleted)$"
 );
@@ -134,6 +139,7 @@ function checkRealGames(run) {
   const lostEvents = [];
   const emptySteps = [];
   const impactMismatches = [];
+  let awakenedBeforeImpact = 0;
   const badHistories = [];
   const seen = new Set();
 
@@ -168,8 +174,15 @@ function checkRealGames(run) {
         if (steps.some((step) => step.text === "")) emptySteps.push(`${seed}/${before.turn}`);
 
         // R au début de la phase de jeu, sans action ensuite : l'Impact prévu est
-        // celui que la résolution annonce.
+        // celui que la résolution annonce, sauf si un Éveil a joué avant l'Impact (il
+        // ne se prévoit pas) : R a dit alors « Éveils possibles. ».
         const { impact } = events.find((event) => event.type === "impact");
+        const impactIndex = events.findIndex((event) => event.type === "impact");
+        if (events.slice(0, impactIndex).some((event) => event.type === "effect" && event.trigger === "awaken")) {
+          awakenedBeforeImpact += 1;
+          if (!plain(overviewFr).endsWith("Éveils possibles.")) impactMismatches.push(`${seed}/${before.turn} : Éveil sans « Éveils possibles. »`);
+          return;
+        }
         const impactStep = steps.find((step) => step.events.some((event) => event.type === "impact"));
         const agrees = forecastImpact === impact && plain(overviewFr).includes(`Impact ${impact}.`) && plain(impactStep.text).startsWith(`Impact ${impact}.`);
         if (!agrees) impactMismatches.push(`${seed}/${before.turn} : prévu ${forecastImpact}, annoncé ${impact}`);
@@ -188,6 +201,7 @@ function checkRealGames(run) {
   run.same("séquence : chaque évènement dans une étape et une seule, dans l'ordre", [], lostEvents.slice(0, 3));
   run.same("séquence : aucune étape muette", [], emptySteps.slice(0, 3));
   run.same("R : l'Impact prévu est l'Impact annoncé à la résolution", [], impactMismatches.slice(0, 3));
+  run("R : des Éveils avant l'Impact rencontrés, R les disait possibles", true, awakenedBeforeImpact > 0);
   run.same("historique : le tour précédent, de son début au début du suivant, sur de vraies parties", [], badHistories.slice(0, 3));
 
   // Passer la séquence ne change rien : même graine et mêmes actions, même journal
@@ -287,8 +301,20 @@ function checkTexts(run) {
     );
     run.same(
       "séquence : sac régénéré",
-      ["Le sac est vide : la défausse est mélangée et forme un nouveau sac.", "Vous piochez tigrée.", "Début du tour 3, jouez vos billes."],
-      texts({ ...lensed, bag: [], discard: ["tiger", "tiger", "tiger"] }).slice(-3)
+      ["Le sac est vide : la défausse est mélangée et forme un nouveau sac.", "Vous piochez argile.", "Début du tour 3, jouez vos billes."],
+      texts({ ...lensed, bag: [], discard: ["clay", "clay", "clay"] }).slice(-3)
+    );
+    // L'Éveil : juste après la bille piochée, aux compteurs du nouveau tour.
+    run.same(
+      "séquence : éveil après la pioche",
+      ["Vous piochez tigrée.", "Éveil de tigrée : Vitesse +2. Vitesse 2, Masse 1.", "Début du tour 3, jouez vos billes."],
+      texts({ ...lensed, bag: ["tiger", "clay"] }).slice(-3)
+    );
+    // L'enchaînement du mica : chaque Éveil coupe la liste des pioches.
+    run.same(
+      "séquence : enchaînement d'éveils",
+      ["Vous piochez mica.", "Éveil de mica : Pioche 1. Vitesse 0, Masse 1.", "Vous piochez argile et verre.", "Début du tour 3, jouez vos billes."],
+      texts({ ...lensed, hand: inHand([]), bag: ["mica", "clay", "glass"], drawPerTurn: 2 }).slice(-4)
     );
     run.same(
       "séquence : sac et défausse vides, la fin remplace la suite",
@@ -385,7 +411,23 @@ function checkTexts(run) {
     run(
       "pioche, R : la régénération annoncée, sans rien révéler",
       "Prévision : Vitesse 0, Masse 1, Impact 0. base gauche, mica : Pioche 1. base droite, vide. pointe, grès : aucun effet. Le sac sera régénéré.",
-      said(describeOverview({ ...drawing, bag: [], discard: ["tiger"] }, rules, t))
+      said(describeOverview({ ...drawing, bag: [], discard: ["clay"] }, rules, t))
+    );
+    // Une bille qui pourrait être piochée a un Éveil : la fin de R le dit.
+    run(
+      "pioche, R : éveils possibles en fin d'annonce",
+      true,
+      said(describeOverview({ ...drawing, bag: [], discard: ["tiger"] }, rules, t)).endsWith("Le sac sera régénéré. Éveils possibles.")
+    );
+    run(
+      "pioche, R : pas d'éveil possible sans pioche",
+      false,
+      said(describeOverview({ ...drawing, triangle: { ...drawing.triangle, leftBase: null }, bag: ["tiger"] }, rules, t)).includes("Éveils")
+    );
+    run(
+      "pioche, confirmation : éveils possibles en dernière ligne",
+      "Éveils possibles.",
+      said(t(...(({ key, params }) => [key, params])(placementLines({ ...drawing, bag: ["tiger"] }, 0, "apex", rules, t).at(-1))))
     );
     run.same(
       "pioche, confirmation : Éjection et Tic qui piochent, puis la régénération",
@@ -545,7 +587,7 @@ function checkTexts(run) {
       "trouvaille, R : chaque régénération avec ses trouvailles",
       true,
       said(describeOverview(twice, rules, t)).endsWith(
-        "Le sac sera régénéré. Trouvaille de tigrée : Vitesse +3. Le sac sera de nouveau régénéré. Trouvaille de tigrée : Vitesse +3."
+        "Le sac sera régénéré. Trouvaille de tigrée : Vitesse +3. Le sac sera de nouveau régénéré. Trouvaille de tigrée : Vitesse +3. Éveils possibles."
       )
     );
     run.same(
@@ -603,7 +645,7 @@ function checkTexts(run) {
     run(
       "anglais, pioche : la régénération annoncée",
       true,
-      describeOverview({ ...drawing, bag: [], discard: ["tiger"] }, rules, t).endsWith("The bag will be regenerated.")
+      describeOverview({ ...drawing, bag: [], discard: ["tiger"] }, rules, t).endsWith("The bag will be regenerated. Possible awakenings.")
     );
     run.same("anglais, pioche : séquence", ["Resolving turn 2. left base, mica: Draw 1.", "You draw agate."], texts(drawing).slice(0, 2));
     run(

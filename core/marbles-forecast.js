@@ -13,6 +13,14 @@
 // - l'état reçu n'est jamais modifié, ses valeurs de partie comprises : la copie
 //   porte le registre (core/marbles-tally.js), qui y évolue comme dans la partie.
 //
+// L'EXCEPTION DE L'ÉVEIL : un déclencheur dont la bille concernée est la bille
+// piochée (MARBLE_TRIGGERS, `marble: "drawn"`) ne se prévoit jamais, puisque la
+// bille piochée est inconnue. Ses effets ne sont jamais dans les valeurs prévues ;
+// la prévision se dit « incertaine » (`uncertain`) dès qu'elle pioche au moins une
+// bille et qu'une bille qu'elle pourrait piocher a un tel effet. La propriété
+// « prévision = résultat réel » vaut pour tout ce qui ne dépend pas d'un Éveil :
+// pour tout résultat réel où aucun Éveil n'a joué.
+//
 // Résultat : { ok: false, error } si l'action serait refusée (mêmes codes que le
 // réducteur), sinon { ok: true, error: null, flick, knockout, hit, phases, speed,
 // mass, impact, drawn, regenerations, tally, uncertain }, où :
@@ -40,11 +48,15 @@
 //   tally          les valeurs de partie à la fin de la résolution ;
 //   uncertain      vrai si une bille piochée aurait pu réagir selon son identité,
 //                  que la prévision ignore : ses chiffres ne sont alors pas sûrs.
+//                  Aujourd'hui, l'Éveil : une bille est piochée, et une bille qui
+//                  pourrait l'être en a un (le sac ; avec une régénération en
+//                  chemin, aussi la défausse et ce qui y part pendant l'action et la
+//                  résolution).
 // Un effet : { marble, speed, mass, draw, operations, given }, le total effectif de
 // la bille, bonus reçu compris, et ses actions sur une bille (Polissage, Fêlure).
 
 import { MARBLE_TRIGGERS } from "../config/marbles-values.js";
-import { SLOTS, blindCopy, marblesReduce, runResolution, stageRefusal } from "./marbles.js";
+import { SLOTS, UNKNOWN_MARBLE, blindCopy, marblesReduce, runResolution, stageRefusal } from "./marbles.js";
 
 // Les déclencheurs prévus pendant une pose (config/marbles-values.js) : chacun a sa
 // clé dans le résultat, son effet ou null.
@@ -56,6 +68,27 @@ const SLOT_TRIGGERS = triggerIds("slot");
 const REGENERATION_TRIGGERS = triggerIds("regeneration");
 
 const FORECASTABLE_ACTIONS = ["place", "swap"];
+
+// Les déclencheurs de la bille piochée (l'Éveil), qui ne se prévoient jamais.
+const DRAWN_TRIGGERS = MARBLE_TRIGGERS.filter((trigger) => trigger.marble === "drawn");
+
+// Un Éveil est-il possible ? Une bille piochée, et, parmi celles qui pouvaient
+// l'être, une qui a un effet d'un déclencheur de la bille piochée. Les billes qui
+// pouvaient l'être : le sac ; s'il est régénéré en chemin, toutes celles qui ont pu
+// passer par la défausse (la défausse d'avant, et chaque bille défaussée pendant
+// l'action et la résolution, que le journal nomme). Rien n'est révélé : la
+// composition du sac et de la défausse est déjà connue du joueur, pas leur ordre.
+function awakenPossible(state, events, types) {
+  if (!events.some((event) => event.type === "draw")) return false;
+  const pool = [...state.bag];
+  if (events.some((event) => event.type === "bagRegenerated")) {
+    pool.push(...state.discard, ...events.filter((event) => event.type === "discarded").map((event) => event.marble));
+  }
+  // Une bille déjà inconnue (une vue où le sac est caché, celle des joueurs
+  // automatiques) pourrait en avoir un.
+  const mayAwaken = (marble) => marble === UNKNOWN_MARBLE || DRAWN_TRIGGERS.some((trigger) => (types[marble][trigger.field]?.length ?? 0) > 0);
+  return pool.some(mayAwaken);
+}
 
 function outcomeOf(event) {
   if (event === undefined) return null;
@@ -140,5 +173,6 @@ export function forecast(state, action, types) {
   if (!applied.ok) return failed(applied.error);
   const resolved = runResolution(applied.state, types, { blind: true });
   if (!resolved.ok) return failed(resolved.error);
-  return { ...readForecast(applied.events, resolved.events, resolved.state), uncertain: applied.uncertain || resolved.uncertain };
+  const uncertain = applied.uncertain || resolved.uncertain || awakenPossible(state, [...applied.events, ...resolved.events], types);
+  return { ...readForecast(applied.events, resolved.events, resolved.state), uncertain };
 }

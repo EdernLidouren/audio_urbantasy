@@ -4,6 +4,8 @@ import { speed, draw, polish } from "../effects.js";
 import { SMALL } from "../../config/marbles-values.js";
 
 export default {
+  // Éveil : Pioche 1, qui peut éveiller la bille suivante.
+  awaken: [draw(1)],
   base: [draw(1)],
   apex: [speed(2), polish(1)],
   // Éjection : Pioche 1 si la bille posée est plus grosse.

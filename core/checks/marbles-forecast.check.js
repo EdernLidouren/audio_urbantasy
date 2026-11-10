@@ -41,6 +41,7 @@ export default function checkMarblesForecast(run) {
   checkFlickForecast(run);
   checkWindfallForecast(run);
   checkTallyForecast(run);
+  checkAwakenForecast(run);
   checkGuards(run);
   checkMatchesReality(run);
 }
@@ -166,7 +167,9 @@ function checkWindfallForecast(run) {
     [["tiger"], ["tiger"]],
     rules.forecast(resolving).regenerations.map(({ effects }) => effects.map((effect) => effect.marble))
   );
-  run("trouvaille prévue, résolution : égale au réel", true, matches(resolving, null));
+  // La géante repioche sa propre bille après son Final, qui s'éveille (Polissage à la
+  // pointe) : un Éveil réel, que la prévision ne dit pas, mais annonce incertaine.
+  run("trouvaille prévue, résolution : la géante repiochée peut s'éveiller, prévision incertaine", true, rules.forecast(resolving).uncertain);
   const cracking = playState({
     hand: inHand(["cats_eye"]),
     bag: [],
@@ -398,7 +401,14 @@ function compareState(state, marbles, faults, tally) {
     tally.actions += 1;
     const actual = readForecast(real.events, resolved.events, resolved.state);
     const { uncertain, ...certain } = predicted;
-    if (uncertain) faults.push(`prévision incertaine sans bille qui écoute la main : ${JSON.stringify(action)}`);
+    // L'exception de l'Éveil (core/marbles-forecast.js) : un Éveil réel ne se
+    // prévoit pas ; la prévision doit alors s'être dite incertaine, et seul ce qui
+    // ne dépend d'aucun Éveil se compare.
+    if (awakened(real.events, resolved.events)) {
+      tally.awakened += 1;
+      if (!uncertain) faults.push(`éveil réel sans prévision incertaine : ${JSON.stringify(action)}`);
+      continue;
+    }
     if (JSON.stringify(certain) !== JSON.stringify(actual)) {
       faults.push(`écart sur ${JSON.stringify(action)} : ${JSON.stringify(predicted)} au lieu de ${JSON.stringify(actual)}`);
     }
@@ -417,6 +427,11 @@ function compareState(state, marbles, faults, tally) {
     const speed = parts.reduce((total, part) => total + part.speed, state.speed);
     if (speed !== predicted.speed) faults.push(`Vitesse prévue ${predicted.speed}, somme des effets ${speed}`);
   }
+}
+
+// Un Éveil a-t-il joué (un effet) dans ces journaux ?
+function awakened(...journals) {
+  return journals.flat().some((event) => event.type === "effect" && event.trigger === "awaken");
 }
 
 // Joue une partie au hasard, à graine (un PRNG de test, jamais celui de la
@@ -446,7 +461,7 @@ function walkGame(seed, options, marbles, faults, tally) {
 
 function checkMatchesReality(run) {
   const faults = [];
-  const tally = { states: 0, actions: 0 };
+  const tally = { states: 0, actions: 0, awakened: 0 };
   const mixedBag = ["plain", "plain", "heavy", "giver", "giver", "lens", "lens", "thief", "thief", "plain"];
   for (let seed = 1; seed <= 60; seed++) {
     walkGame(seed, {}, rules, faults, tally);
@@ -455,4 +470,30 @@ function checkMatchesReality(run) {
   run.same("propriété : la prévision correspond au résultat réel", [], faults.slice(0, 3));
   run("propriété : plusieurs centaines d'états", true, tally.states >= 300);
   run("propriété : des milliers d'actions comparées", true, tally.actions >= 2000);
+  run("propriété : des Éveils réels rencontrés, chacun annoncé incertain", true, tally.awakened > 0);
+}
+
+// L'Éveil dans la prévision : jamais compté, annoncé possible (« incertain ») quand
+// une bille est piochée et qu'une bille qui pouvait l'être en a un.
+function checkAwakenForecast(run) {
+  const toApex = { type: "place", handIndex: 0, slot: "apex" };
+  const occupied = { leftBase: null, rightBase: null, apex: placed("glass") };
+  const tic = (bag, discard = []) => playState({ hand: inHand(["cats_eye"]), bag, discard, triangle: occupied });
+  run("éveil prévu : une pioche, la tigrée au sac, incertaine", true, rules.forecast(tic(["tiger"]), toApex).uncertain);
+  run("éveil prévu : une pioche, aucune bille du sac n'a d'Éveil, certaine", false, rules.forecast(tic(["sulphide", "clay"]), toApex).uncertain);
+  run("éveil prévu : la tigrée en défausse, sans régénération, certaine", false, rules.forecast(tic(["clay"], ["tiger"]), toApex).uncertain);
+  run("éveil prévu : la tigrée en défausse, avec régénération, incertaine", true, rules.forecast(tic([], ["tiger"]), toApex).uncertain);
+  run(
+    "éveil prévu : aucune pioche, la tigrée au sac, certaine",
+    false,
+    rules.forecast(playState({ hand: inHand(["clay"]), bag: ["tiger"], triangle: occupied }), toApex).uncertain
+  );
+  // Jamais compté : la tigrée piochée par le Tic s'éveille (Vitesse +2) en vrai.
+  const state = tic(["tiger"]);
+  const predicted = rules.forecast(state, toApex);
+  const real = rules.reduce(state, toApex);
+  run("éveil prévu : l'effet réel a lieu", 2, real.events.find((event) => event.trigger === "awaken")?.speedDelta);
+  const resolved = rules.reduce(real.state, { type: "resolve" });
+  run("éveil prévu : jamais dans les valeurs prévues (Vitesse prévue = réelle − 2)", resolved.events.find((event) => event.type === "impact").speed - 2, predicted.speed);
+  run.same("éveil prévu : ni dans le registre de la copie", { turn: 0, game: 0 }, predicted.tally.awaken);
 }

@@ -22,6 +22,20 @@ export function frNumber(value, { signed = false } = {}) {
   return signed && value > 0 ? `+${text}` : text;
 }
 
+// Ce que la bille a produit, par déclencheur, valeurs non nulles seulement (une
+// ligne courte, lisible d'une traite) : « Produit en phase Vitesse 8,89, en tic
+// Vitesse 0,93 et Masse 0,46. ».
+function producedLine(marble) {
+  const parts = TRIGGER_IDS.flatMap((id) => {
+    const values = [
+      marble[`${id}Speed`] !== 0 ? `Vitesse ${frNumber(marble[`${id}Speed`])}` : null,
+      marble[`${id}Mass`] !== 0 ? `Masse ${frNumber(marble[`${id}Mass`])}` : null,
+    ].filter((value) => value !== null);
+    return values.length === 0 ? [] : [`${TRIGGER_WORDS[id].produced} ${values.join(" et ")}`];
+  });
+  return parts.length === 0 ? "  Ne produit ni Vitesse ni Masse." : `  Produit ${parts.join(", ")}.`;
+}
+
 const SETTING_LABELS = {
   maxHandSize: "main de",
   throwsPerTurn: "lancers par tour",
@@ -54,7 +68,7 @@ function marbleLines(marble, name, randomBags) {
     // Seulement pour une bille qui pioche : les autres gardent leurs deux lignes.
     ...(marble.drawn > 0 ? [`  Fait piocher ${n(marble.drawn)} bille(s) par ses effets.`] : []),
     `  Posée ${n(marble.placed)} fois, dont ${n(marble.placedReplacing)} en remplacement. Éjectée ${n(marble.knockedOut)} fois, retirée par usure ${n(marble.worn)} fois.`,
-    `  Produit ${TRIGGER_IDS.map((id) => `${TRIGGER_WORDS[id].produced} Vitesse ${n(marble[`${id}Speed`])} et Masse ${n(marble[`${id}Mass`])}`).join(", ")}.`,
+    producedLine(marble),
   ];
   if (randomBags) {
     lines.push(

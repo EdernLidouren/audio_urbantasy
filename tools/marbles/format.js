@@ -20,6 +20,7 @@ const CAUSES = { replacement: "remplacement", wear: "usure" };
 // (config/marbles-values.js) : un déclencheur sans ses mots lève au chargement.
 export const TRIGGER_WORDS = {
   phase: { name: "Phase", effect: "Effet de phase", produced: "en phase" },
+  awaken: { name: "Éveil", effect: "Effet d'éveil", produced: "en éveil" },
   flick: { name: "Chiquenaude", effect: "Effet de chiquenaude", produced: "en chiquenaude", brought: "les chiquenaudes" },
   hit: { name: "Tic", effect: "Effet de tic", produced: "en tic", brought: "les tics" },
   windfall: { name: "Trouvaille", effect: "Effet de trouvaille", produced: "en trouvaille" },
@@ -94,7 +95,9 @@ export function formatState(state, name) {
 }
 
 function effectLine(event, name) {
-  let line = `${TRIGGER_WORDS[event.trigger]?.effect ?? `Effet ${event.trigger}`}, ${marbleLabel(event.marble, name)} en ${slotLabel(event.slot)} : Vitesse ${signed(event.speedDelta)}, Masse ${signed(event.massDelta)}`;
+  // Une bille sans emplacement (l'Éveil) est en main.
+  const where = event.slot === null || event.slot === undefined ? "en main" : `en ${slotLabel(event.slot)}`;
+  let line = `${TRIGGER_WORDS[event.trigger]?.effect ?? `Effet ${event.trigger}`}, ${marbleLabel(event.marble, name)} ${where} : Vitesse ${signed(event.speedDelta)}, Masse ${signed(event.massDelta)}`;
   for (const gift of event.given ?? []) {
     line += `, donne Vitesse ${signed(gift.speed)} et Masse ${signed(gift.mass)} à ${slotLabel(gift.slot)}`;
   }
@@ -103,7 +106,8 @@ function effectLine(event, name) {
 
 const EVENT_LINES = {
   turnStarted: (event) => `Début du tour ${event.turn} sur ${event.turnCount}.`,
-  draw: (event, name) => `Pioche : ${marbleLabel(event.marble, name)}.`,
+  draw: (event, name) => `Pioche : ${marbleLabel(event.marble, name)}${event.cause === "effect" ? ", par un effet" : ""}.`,
+  awaken: (event, name) => `Éveil : ${marbleLabel(event.marble, name)}, en main.`,
   drawSkipped: (event) => `Pioche sautée (${event.reason}).`,
   bagRegenerated: (event) => `Sac régénéré depuis la défausse : ${event.size} billes.`,
   swapped: (event) => `Échange : ${slotLabel(event.a)} et ${slotLabel(event.b)}.`,

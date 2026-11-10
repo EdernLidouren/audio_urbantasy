@@ -3,7 +3,8 @@
 // non lib/menu.js, dont les menus se parcourent de haut en bas et réservent
 // Ctrl+flèche : ici, Ctrl+haut et Ctrl+bas parcourent la fiche de la bille
 // (view/marbles/card.js). Bornes, cyclage et étoile restent ceux des menus, par
-// leurs briques (stepMenuCursor, jumpMenuCursor, announceMenuLine).
+// leurs briques (stepMenuCursor, jumpMenuCursor, announceMenuLine). E et Maj+E disent
+// les mots-clés de la bille sous le curseur (view/marbles/keywords.js).
 //
 // Rien de la partie n'est lu ni modifié ici : la liste est reçue à l'ouverture,
 // dans l'ordre où elle doit se dire. C'est l'appelant qui décide de cet ordre.
@@ -22,6 +23,7 @@ import { playMenuSound } from "../menu-sounds.js";
 import { marbleCard } from "./card.js";
 import { describeMarbleInList } from "./narration.js";
 import { playFocusBeacon } from "./sounds.js";
+import { keywordsText, openKeywordsMenu } from "./keywords.js";
 
 const PILE_BINDINGS = defineBindings("marblesPile", {
   left: { keys: ["ArrowLeft"], mods: [] },
@@ -33,6 +35,9 @@ const PILE_BINDINGS = defineBindings("marblesPile", {
   activate: { keys: ["Enter", " "], mods: [] },
   reannounce: { keys: ["Backspace"], mods: [] },
   back: { keys: ["Escape"], mods: [] },
+  // Les mots-clés de la bille sous le curseur (view/marbles/keywords.js).
+  keywords: { keys: ["e"], mods: [] },
+  keywordsMenu: { keys: ["e"], mods: ["shift"] },
 });
 
 function makePileScreen(titleKey, marbles, rules, tally) {
@@ -104,6 +109,9 @@ function makePileScreen(titleKey, marbles, rules, tally) {
 
   const announceOpening = () => announce(`${t(titleKey)}. ${currentLine()}`, { assertive: true });
 
+  // La bille sous le curseur, ou undefined sur « Retour ».
+  const marbleUnderCursor = () => (isOnBack() ? undefined : marbles[index]);
+
   const keyHandlers = {
     left: () => goTo(stepMenuCursor(index, -1, total)),
     right: () => goTo(stepMenuCursor(index, 1, total)),
@@ -114,6 +122,11 @@ function makePileScreen(titleKey, marbles, rules, tally) {
     activate,
     reannounce: announceOpening,
     back,
+    keywords: () => announce(keywordsText(marbleUnderCursor(), rules, t), { assertive: true }),
+    keywordsMenu: () => {
+      playMenuSound("select");
+      openKeywordsMenu(marbleUnderCursor(), rules);
+    },
   };
 
   return {

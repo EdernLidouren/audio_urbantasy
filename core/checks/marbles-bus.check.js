@@ -94,7 +94,7 @@ export default function checkMarblesBus(run) {
   run("réducteur : code du refus", "eventLimit", refused.error);
   run("réducteur : état inchangé", game, refused.state);
   run.same("réducteur : journal vide", [], refused.events);
-  run("réducteur : sous la limite, l'action passe", true, rules.reduce(game, { type: "draw" }, { eventLimit: 6 }).ok);
+  run("réducteur : sous la limite, l'action passe", true, rules.reduce(game, { type: "draw" }, { eventLimit: 40 }).ok);
 
   // L'ordre fixe des écouteurs : base gauche, base droite, pointe, puis la main.
   const listening = {

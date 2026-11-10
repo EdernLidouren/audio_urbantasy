@@ -126,6 +126,7 @@ function validatePositive(clause, describe, fail, context) {
 // évènement, après plancher ou plafond).
 function marbleActionKeyword(action, eventType) {
   return {
+    texts: { name: `marbles.keyword.${action}.name`, description: `marbles.keyword.${action}.description` },
     triggers: (event) => (event.type === eventType || (event.type === "targetEmpty" && event.action === action) ? 1 : 0),
     quantity: (event) => (event.type === eventType ? event.applied : 0),
   };
@@ -146,7 +147,9 @@ function addAmount(values, clause) {
 //   wear      (sur une bille) l'usure d'après, (wear, amount, maxWear) -> wear ;
 //   event     (sur une bille) l'évènement de chaque application ;
 //   retires   (sur une bille) une bille amenée à son maximum est retirée aussitôt ;
-//   keyword   (facultatif) l'action est un MOT-CLÉ, avec ses valeurs de partie
+//   keyword   (facultatif) l'action est un MOT-CLÉ : `texts`, son nom et sa
+//             description (aide des mots-clés, touches E et Maj+E ; sans eux, le
+//             chargement échoue, core/marbles.js) ; ses valeurs de partie
 //             (core/marbles-counters.js) : `triggers(event)`, ce qu'un évènement du
 //             journal ajoute à ses déclenchements ; `quantity(event)` (facultatif),
 //             à sa quantité réelle. Une action de valeur sans mot-clé (Vitesse,
@@ -170,6 +173,7 @@ export const CLAUSE_ACTIONS = {
     validate: validatePositive,
     apply: addAmount,
     keyword: {
+      texts: { name: "marbles.keyword.draw.name", description: "marbles.keyword.draw.description" },
       triggers: (event) => (event.type === "effect" && event.draw > 0 ? 1 : 0),
       quantity: (event) => (event.type === "draw" && event.cause === "effect" ? 1 : 0),
     },
@@ -230,6 +234,7 @@ function targetProblem(clause, context) {
   if (action.kind === "marble" && clause.target === undefined) {
     if (context.marble === "removed") return "une action sur la bille elle-même n'a plus de bille : elle a quitté le triangle";
     if (context.marble === "thrown") return "une action sur la bille elle-même n'a pas encore de bille : elle est en cours de lancer";
+    if (context.marble === "drawn") return "une action sur la bille elle-même n'a pas de bille sur le triangle : elle vient d'être piochée, en main";
   }
   if (action.kind === "value" && clause.target !== undefined) {
     if (context.moment === "afterPhases") return "une Vitesse ou une Masse ciblée n'a plus de phase à modifier : elle va aux compteurs, sans cible";

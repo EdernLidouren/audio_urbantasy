@@ -54,7 +54,7 @@
 // sur lui seul (view/marbles/narration.js, view/marbles/sounds.js) :
 //   turnStarted { turn, turnCount }, draw { marble, cause }, drawSkipped { reason },
 //   bagRegenerated { size }, swapped { a, b },
-//   flick { slot, marble, turnsInHand }, windfall { slot, marble },
+//   awaken { marble }, flick { slot, marble, turnsInHand }, windfall { slot, marble },
 //   knockout { slot, marble, replacement }, removed { slot, marble, cause },
 //   discarded { slot, marble, cause }, placed { slot, marble },
 //   hit { slot, marble, replacement }, final { slot, marble },
@@ -66,6 +66,10 @@
 //   wear { slot, marble, wear, maxWear },
 //   impact { speed, mass, impact, score },
 //   rotation { triangle }, turnEnded { turn }, gameOver { reason, score }.
+// `awaken` : juste après chaque `draw` d'une bille réellement piochée, la bille
+// désormais en main (à 0 tour en main) ; son Éveil et tout ce qui en découle se
+// règlent avant la bille suivante (une interruption, comme la Trouvaille). À
+// l'aveugle, sa bille est UNKNOWN_MARBLE : aucun Éveil ne se prévoit.
 // `flick` : la bille vient de quitter la main pour être posée en `slot` ;
 // `turnsInHand`, le compteur qu'elle avait en main, que lit sa Chiquenaude.
 // `windfall` : après un `bagRegenerated`, une par bille active, dans l'ordre des
@@ -98,7 +102,7 @@
 // passent. Les vérifications y passent aussi des tables fabriquées, qui testent
 // ce qu'aucune bille actuelle ne produit (une Masse négative).
 
-import { MARBLE_TALLIES, MARBLE_TRIGGERS, MARBLES_SETTINGS, STARTING_BAG } from "../config/marbles-values.js";
+import { MARBLE_PHASES, MARBLE_TALLIES, MARBLE_TRIGGERS, MARBLES_SETTINGS, STARTING_BAG } from "../config/marbles-values.js";
 import { createSeed, nextRandom } from "./rng.js";
 import { rejectUnknownFields } from "../lib/validate.js";
 import { MarbleEventLimitError, createEventBus } from "./marbles-bus.js";
@@ -133,6 +137,7 @@ export const MARBLE_ERRORS = [
 export const JOURNAL_EVENTS = Object.freeze({
   turnStarted: false,
   draw: false,
+  awaken: false,
   drawSkipped: false,
   bagRegenerated: false,
   swapped: false,
@@ -160,8 +165,8 @@ export const JOURNAL_EVENTS = Object.freeze({
 // --- Déclencheurs ---
 
 // Les champs d'effet de PHASE d'une bille, à part des déclencheurs.
-const PHASE_FIELDS = ["base", "apex"];
-const TRIGGER_MARBLES = ["onSlot", "removed", "thrown"];
+const PHASE_FIELDS = MARBLE_PHASES.map((phase) => phase.field);
+const TRIGGER_MARBLES = ["onSlot", "removed", "thrown", "drawn"];
 const TRIGGER_MOMENTS = ["play", "afterPhases", "anytime"];
 const PLACEMENT_MARBLES = ["occupant", "placed"];
 
@@ -186,6 +191,7 @@ export function validateMarbleTriggers(triggers) {
     if (!TRIGGER_MARBLES.includes(trigger.marble)) fail(`${describe} : marble inconnu "${trigger.marble}".`);
     if (!TRIGGER_MOMENTS.includes(trigger.moment)) fail(`${describe} : moment inconnu "${trigger.moment}".`);
     const { forecast, texts } = trigger;
+    validateKeywordTexts(texts, describe, fail);
     if (typeof texts?.card !== "string" || typeof texts?.effect !== "string") fail(`${describe} : textes card et effect obligatoires.`);
     if (forecast?.line === "placement") {
       rejectUnknownFields(forecast, ["line", "marble", "order"], describe, fail);
@@ -195,8 +201,10 @@ export function validateMarbleTriggers(triggers) {
     } else if (forecast?.line === "slot" || forecast?.line === "regeneration") {
       rejectUnknownFields(forecast, ["line"], describe, fail);
       if (typeof texts[forecast.line] !== "string") fail(`${describe} : texte ${forecast.line} obligatoire.`);
+    } else if (forecast?.line === "none") {
+      rejectUnknownFields(forecast, ["line"], describe, fail);
     } else {
-      fail(`${describe} : forecast.line doit valoir "placement", "slot" ou "regeneration".`);
+      fail(`${describe} : forecast.line doit valoir "placement", "slot", "regeneration" ou "none".`);
     }
     if (trigger.card !== undefined && trigger.card !== "below") fail(`${describe} : card doit valoir "below".`);
   }
@@ -204,16 +212,44 @@ export function validateMarbleTriggers(triggers) {
 
 validateMarbleTriggers(MARBLE_TRIGGERS);
 
+// Les textes d'un MOT-CLÉ (phase, déclencheur, action) : son nom et sa description,
+// que l'aide des mots-clés dit (touches E et Maj+E). Obligatoires : un mot-clé sans
+// eux échoue au chargement. Leur présence dans chaque langue : domaine marbles-view.
+function validateKeywordTexts(texts, describe, fail) {
+  if (typeof texts?.name !== "string" || typeof texts?.description !== "string") fail(`${describe} : textes name et description obligatoires (mot-clé).`);
+}
+
+// Échoue sur une liste de phases mal formée (config/marbles-values.js/MARBLE_PHASES,
+// décrite là) : la vraie est validée au chargement de ce module.
+export function validateMarblePhases(phases) {
+  const fail = (message) => {
+    throw new Error(`marbles, phases : ${message}`);
+  };
+  const seen = new Set();
+  for (const phase of phases) {
+    const describe = `phase "${phase?.id}"`;
+    rejectUnknownFields(phase, ["id", "field", "slots", "texts"], describe, fail);
+    if (typeof phase.id !== "string" || seen.has(phase.id)) fail(`${describe} : id absent ou en double.`);
+    seen.add(phase.id);
+    if (typeof phase.field !== "string") fail(`${describe} : field doit être un texte.`);
+    if (!Array.isArray(phase.slots) || phase.slots.length === 0 || !phase.slots.every((slot) => SLOTS.includes(slot))) fail(`${describe} : slots doit lister des emplacements.`);
+    validateKeywordTexts(phase.texts, describe, fail);
+  }
+  const covered = phases.flatMap((phase) => phase.slots);
+  if (covered.length !== SLOTS.length || !SLOTS.every((slot) => covered.includes(slot))) fail("chaque emplacement doit appartenir à une phase, une seule.");
+}
+
+validateMarblePhases(MARBLE_PHASES);
+
 // Les champs d'effet d'une bille : ceux de la phase, puis un par déclencheur.
 const EFFECT_FIELDS = [...PHASE_FIELDS, ...MARBLE_TRIGGERS.map((trigger) => trigger.field)];
 
-// Les mots-clés de phase, pour les valeurs de partie : pointe, base (les deux
-// bases), puis chaque base (son emplacement seul).
+// Les mots-clés de phase, pour les valeurs de partie : chaque phase (MARBLE_PHASES :
+// pointe, base, celle-ci sur ses deux emplacements), puis chaque emplacement d'une
+// phase qui en a plusieurs (base gauche, base droite).
 const PHASE_KEYWORDS = [
-  { id: "apex", slots: ["apex"] },
-  { id: "base", slots: ["leftBase", "rightBase"] },
-  { id: "leftBase", slots: ["leftBase"] },
-  { id: "rightBase", slots: ["rightBase"] },
+  ...MARBLE_PHASES.map(({ id, slots }) => ({ id, slots })),
+  ...MARBLE_PHASES.filter((phase) => phase.slots.length > 1).flatMap((phase) => phase.slots.map((slot) => ({ id: slot, slots: [slot] }))),
 ];
 
 // TOUS les compteurs des valeurs de partie (core/marbles-counters.js) : générés depuis
@@ -236,12 +272,65 @@ const TALLY_IDS = new Set(TALLY_COUNTERS.map((counter) => counter.id));
 // concernée par le déclencheur ; `replacement` : un remplacement est en cours (Tic,
 // Éjection).
 const FIELD_CONTEXTS = {
-  base: { phaseSlots: ["leftBase", "rightBase"] },
-  apex: { phaseSlots: ["apex"] },
+  ...Object.fromEntries(MARBLE_PHASES.map((phase) => [phase.field, { phaseSlots: phase.slots }])),
   ...Object.fromEntries(
     MARBLE_TRIGGERS.map((trigger) => [trigger.field, { moment: trigger.moment, marble: trigger.marble, replacement: trigger.replacement === true }])
   ),
 };
+
+// --- Mots-clés ---
+
+// Toutes les clauses d'une bille, tous champs d'effet confondus (variantes de base
+// comprises).
+function clausesOf(type) {
+  return [...EFFECT_FIELDS.flatMap((field) => type[field] ?? []), ...Object.values(type.baseVariant ?? {}).flat()];
+}
+
+// Les MOTS-CLÉS, dans l'ordre de l'aide : les phases (MARBLE_PHASES), les
+// déclencheurs (MARBLE_TRIGGERS), puis les actions mots-clés (CLAUSE_ACTIONS qui
+// déclarent `keyword`). Chacun { id, kind, texts: { name, description },
+// present(marble, types) } : présent sur une bille si son champ n'est pas vide
+// (pour une phase, l'effet d'un de ses emplacements, variante comprise), ou, pour
+// une action, si une clause de la bille l'utilise. Un mot-clé ajouté à sa liste
+// est ici d'office ; un mot-clé sans nom ni description échoue au chargement.
+// Exportée pour vérifier ce refus sur des listes fabriquées.
+export function buildMarbleKeywords({ phases, triggers, actions }) {
+  const fail = (message) => {
+    throw new Error(`marbles, mots-clés : ${message}`);
+  };
+  const keywords = [
+    ...phases.map((phase) => ({
+      id: phase.id,
+      kind: "phase",
+      texts: phase.texts,
+      present: (marble, types) => phase.slots.some((slot) => effectAt(marble, slot, types).length > 0),
+    })),
+    ...triggers.map((trigger) => ({
+      id: trigger.id,
+      kind: "trigger",
+      texts: { name: trigger.texts?.name, description: trigger.texts?.description },
+      present: (marble, types) => (types[marble][trigger.field]?.length ?? 0) > 0,
+    })),
+    ...Object.entries(actions)
+      .filter(([, action]) => action.keyword !== undefined)
+      .map(([id, action]) => ({
+        id,
+        kind: "action",
+        texts: action.keyword.texts,
+        present: (marble, types) => clausesOf(types[marble]).some((clause) => clause.action === id),
+      })),
+  ];
+  for (const keyword of keywords) validateKeywordTexts(keyword.texts, `${keyword.kind} "${keyword.id}"`, fail);
+  return keywords;
+}
+
+export const MARBLE_KEYWORDS = buildMarbleKeywords({ phases: MARBLE_PHASES, triggers: MARBLE_TRIGGERS, actions: CLAUSE_ACTIONS });
+
+// Les mots-clés présents sur une bille, dans l'ordre de l'aide, chacun une fois :
+// [{ id, kind, texts }].
+export function keywordsOf(marble, types) {
+  return MARBLE_KEYWORDS.filter((keyword) => keyword.present(marble, types)).map(({ id, kind, texts }) => ({ id, kind, texts }));
+}
 
 // --- Table des billes ---
 
@@ -512,6 +601,8 @@ const ON_SLOT = ["triangle"];
 // La bille que nomme l'évènement, hors du triangle : sa zone ("removed",
 // "thrown") est la valeur `marble` du déclencheur.
 const NAMED_MARBLE = {
+  // En main, sans emplacement : une action sur elle-même est refusée à la validation.
+  drawn: (event) => ({ zone: "hand", slot: null, marble: event.marble, turnsInHand: 0 }),
   removed: (event) => ({ zone: "removed", slot: event.slot, marble: event.marble }),
   thrown: (event) => ({ zone: "thrown", slot: event.slot, marble: event.marble, turnsInHand: event.turnsInHand }),
 };
@@ -722,6 +813,10 @@ function drawOne(run, cause) {
   const marble = run.blind ? UNKNOWN_MARBLE : top;
   update(run, { bag, hand: [...run.state.hand, { marble, turnsInHand: 0 }] });
   run.emit({ type: "draw", marble, cause });
+  // L'ÉVEIL de la bille piochée : une interruption (run.settle), réglée jusqu'au bout,
+  // ce qu'il déclenche compris (une Pioche qui pioche à son tour), avant que la pioche
+  // ne passe à la bille suivante.
+  run.settle({ type: "awaken", marble });
   return "drawn";
 }
 

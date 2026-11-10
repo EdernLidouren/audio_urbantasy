@@ -18,7 +18,7 @@
 // core ; hors du core, on passe par ces règles. Ce qui ne lit aucune bille
 // (legalActions, les refus, impactOf, SLOTS...) s'importe directement.
 
-import { createMarblesGame, marblesReduce, maxWearOf, validateMarbleTypes } from "./marbles.js";
+import { createMarblesGame, keywordsOf, marblesReduce, maxWearOf, validateMarbleTypes } from "./marbles.js";
 import { effectAt } from "./marbles-effects.js";
 import { forecast } from "./marbles-forecast.js";
 
@@ -36,6 +36,8 @@ export function createMarblesRules(types) {
     // La prévision du tour, `action` envisagée ou non.
     forecast: (state, action = null) => forecast(state, action, types),
     maxWearOf: (marble) => maxWearOf(marble, types),
+    // Les mots-clés présents sur une bille, dans l'ordre de l'aide (touches E, Maj+E).
+    keywordsOf: (marble) => keywordsOf(marble, types),
     // L'effet de phase imprimé d'une bille à un emplacement, variante comprise.
     effectAt: (marble, slot) => effectAt(marble, slot, types),
   });

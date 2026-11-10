@@ -249,8 +249,9 @@ const PLACEMENT_LINES = MARBLE_TRIGGERS.filter((trigger) => trigger.forecast.lin
 // puis, sur un emplacement occupé, Éjection et Tic (ceux-là disent « aucun effet »
 // si la Chiquenaude vide l'emplacement) ; le menu garde la même structure. Enfin, si
 // la pose et la résolution régénéreraient le sac, une ligne par régénération, chacune
-// suivie d'une ligne par Trouvaille qu'elle déclencherait (regenerationLines). La
-// pose doit être permise (placeRefusal).
+// suivie d'une ligne par Trouvaille qu'elle déclencherait (regenerationLines) ; et
+// « Éveils possibles. » si la prévision est incertaine (uncertainLines). La pose doit
+// être permise (placeRefusal).
 export function placementLines(game, handIndex, slot, rules, t) {
   const { marble } = game.hand[handIndex];
   const predicted = rules.forecast(game, { type: "place", handIndex, slot });
@@ -268,7 +269,7 @@ export function placementLines(game, handIndex, slot, rules, t) {
       params: { marble: nameRef(`marble.${concerned[trigger.forecast.marble]}.name`), effect: describeOutcome(predicted[trigger.id], t) },
     });
   }
-  return [...lines, ...regenerationLines(predicted, t)];
+  return [...lines, ...regenerationLines(predicted, t), ...uncertainLines(predicted)];
 }
 
 // Le sac : combien il en reste, et combien on en pioche à chaque tour.
@@ -365,8 +366,15 @@ function regenerationLines(predicted, t) {
   ]);
 }
 
+// Ce que la prévision ignore, à la fin de ce qu'elle dit : « Éveils possibles. »
+// quand elle est incertaine (core/marbles-forecast.js : une bille piochée, et une
+// bille qui pouvait l'être a un Éveil). Rien sinon.
+function uncertainLines(predicted) {
+  return predicted.uncertain ? [{ key: "marbles.forecast.awakenings" }] : [];
+}
+
 function forecastNotes(predicted, t) {
-  return regenerationLines(predicted, t).map(({ key, params }) => t(key, params));
+  return [...regenerationLines(predicted, t), ...uncertainLines(predicted)].map(({ key, params }) => t(key, params));
 }
 
 // La vue d'ensemble du tour (touche R), d'un bloc : la prévision d'abord, Vitesse et
@@ -416,8 +424,14 @@ function effectText(event, t) {
 // le Tic et l'Éjection, par leur effet s'ils en ont un.
 const SILENT = () => null;
 // Ce qui ne se dit pas et prolonge l'étape PRÉCÉDENTE : l'usure suit l'effet de sa
-// phase, la fin de tour suit la rotation.
-const TRAILING = new Set(["wear", "turnEnded"]);
+// phase, la fin de tour suit la rotation, l'évènement d'un déclencheur de la bille
+// piochée (l'Éveil) suit sa pioche, sans couper la liste des pioches consécutives
+// (son effet, s'il en a un, ouvre sa propre étape et la coupe).
+const TRAILING = new Set([
+  "wear",
+  "turnEnded",
+  ...MARBLE_TRIGGERS.filter((trigger) => trigger.marble === "drawn").map((trigger) => trigger.event),
+]);
 
 // Le texte de chaque type d'évènement, ou null s'il ne se dit pas. `context` :
 // { gameEndsBeforeNextTurn(index) }, pour la rotation.

@@ -26,7 +26,7 @@ import {
 import { detailLine, stepDetail } from "../../lib/detail-card.js";
 import { createMarblesGame, marblesReduce, END_REASONS, MARBLE_ERRORS, SLOTS } from "../marbles.js";
 import { emptyTally } from "../marbles-tally.js";
-import { TALLY_COUNTERS } from "../marbles.js";
+import { MARBLE_KEYWORDS, TALLY_COUNTERS } from "../marbles.js";
 import { TALLY_CATEGORIES } from "../marbles-counters.js";
 import {
   bagDisplayOrder,
@@ -47,6 +47,7 @@ import {
 } from "../../view/marbles/narration.js";
 import { marbleCard } from "../../view/marbles/card.js";
 import { tallyMenu } from "../../view/marbles/tally-screen.js";
+import { keywordLines, keywordsMenu, keywordsText } from "../../view/marbles/keywords.js";
 import { confirmationEntries } from "../../view/menus/confirmation.js";
 import { INITIAL_CURSOR, placementStart, stepCursor, zoneOf } from "../../view/marbles/navigation.js";
 import {
@@ -188,7 +189,7 @@ function checkCards(run) {
     );
     run.same(
       "fiche : la Pioche en base, un Polissage sur soi, une Éjection conditionnée au calibre",
-      { above: ["Pointe : Vitesse +2 et Polissage 1.", "Base : Pioche 1."], below: ["Éjection : Pioche 1 si la bille posée est plus grosse."] },
+      { above: ["Pointe : Vitesse +2 et Polissage 1.", "Base : Pioche 1."], below: ["Éveil : Pioche 1.", "Éjection : Pioche 1 si la bille posée est plus grosse."] },
       fields("mica")
     );
     // Les conditions de calibre, lisibles à l'oreille.
@@ -257,7 +258,7 @@ function checkCards(run) {
       computedCard({ base: -2, step: 1, source, max: 1 }, "mass", 0)
     );
     run("fiche : montant calculé d'une Pioche", "Chiquenaude : Pioche 1 par tour en main, maximum 3, actuellement 3.", computedCard({ base: 0, step: 1, source, max: 3 }, "draw", 4));
-    run.same("fiche : le Final de la géante", ["Final : Pioche 1."], fields("giant").below);
+    run.same("fiche : l'Éveil en premier, puis le Final de la géante", ["Éveil : Polissage 1 à la pointe.", "Final : Pioche 1."], fields("giant").below);
     run.same(
       "fiche : tic, éjection, final, dans cet ordre",
       ["Tic : Vitesse +1.", "Éjection : Masse +2.", "Final : Pioche 1."],
@@ -272,7 +273,7 @@ function checkCards(run) {
     run.same("fiche, anglais : la Pioche et le Polissage", ["Apex: Speed +2 and Polish 1.", "Base: Draw 1."], fields("mica").above);
     run.same("fiche, anglais : la Fêlure ciblée", ["Apex: Mass +3.", "Base: Crack 1 to the apex."], fields("sulphide").above);
     run.same("fiche, anglais : comparaison de calibre au Tic", ["Hit: Speed +4 if the knocked-out marble is smaller.", "Knockout: Speed +3."], fields("gorilla").below);
-    run.same("fiche, anglais : comparaison de calibre à l'Éjection", ["Knockout: Draw 1 if the placed marble is larger."], fields("mica").below);
+    run.same("fiche, anglais : comparaison de calibre à l'Éjection", ["Awaken: Draw 1.", "Knockout: Draw 1 if the placed marble is larger."], fields("mica").below);
     run("fiche, anglais : comptage par calibre", "Base: Speed +1 per active peewee.", fields("stoneware").above[1]);
     run("fiche, anglais : calibre d'un emplacement", "Apex: Mass +1 and Mass +2 if the left base is a boulder.", fields("agate").above[0]);
     run("anglais : bille en liste, calibre après le nom", "gorilla, boulder, wear 3. 1 of 2", describeMarbleInList("gorilla", 0, 2, rules, t));
@@ -356,7 +357,7 @@ function checkTallyMenu(run) {
   run("menu des valeurs : titre", "Valeurs de partie", t(menu.title));
   run.same(
     "menu des valeurs : le début, la catégorie puis ses compteurs",
-    ["Déclenchements", "chiquenaudes : 2 ce tour, 5 cette partie.", "tics : 0 ce tour, 0 cette partie."],
+    ["Déclenchements", "éveils : 0 ce tour, 0 cette partie.", "chiquenaudes : 2 ce tour, 5 cette partie."],
     said.slice(0, 3)
   );
   run.same(
@@ -371,8 +372,66 @@ function checkTallyMenu(run) {
   run.same("menu des valeurs : seule Fermer agit", [menu.entries.length - 1], menu.entries.flatMap((entry, index) => (typeof entry.onActivate === "function" ? [index] : [])));
   run("menu des valeurs : un compteur absent du registre lève", true, throws(() => tallyMenu({})));
   setLocale("en");
-  run.same("menu des valeurs, anglais", ["Triggers", "flicks: 2 this turn, 5 this game."], lines(menu).slice(0, 2));
+  run.same("menu des valeurs, anglais", ["Triggers", "awakenings: 0 this turn, 0 this game.", "flicks: 2 this turn, 5 this game."], lines(menu).slice(0, 3));
   setLocale(locale);
+}
+
+// L'aide des mots-clés (touches E et Maj+E) : seulement ceux présents sur la bille,
+// dans l'ordre (pointe, base, déclencheurs, actions), chacun une fois ; les cas vides.
+function checkKeywords(run) {
+  const locale = getLocale();
+  const ids = (marble, marbles = rules) => marbles.keywordsOf(marble).map((keyword) => keyword.id);
+  run.same("mots-clés : la géante, déclencheurs puis actions", ["apex", "base", "awaken", "final", "draw", "polish"], ids("giant"));
+  run.same("mots-clés : le mica, la Pioche une seule fois (base, éveil, éjection)", ["apex", "base", "awaken", "knockout", "draw", "polish"], ids("mica"));
+  run.same("mots-clés : le sulfure, Fêlure", ["apex", "base", "windfall", "crack"], ids("sulphide"));
+  run.same("mots-clés : ni Vitesse ni Masse, ni calibre", ["apex", "base", "flick", "hit"], ids("clay"));
+  const made = fabricatedRules({ sided: { baseVariant: { leftBase: [{ action: "mass", amount: 1 }] } }, bare: {} });
+  run.same("mots-clés : une variante de base seule compte comme base", ["base"], ids("sided", made));
+  run.same("mots-clés : une bille sans effet n'en a aucun", [], ids("bare", made));
+  run.same(
+    "mots-clés : l'ordre de la liste, phases, déclencheurs, actions",
+    ["apex", "base", "awaken", "flick", "hit", "windfall", "knockout", "final", "draw", "polish", "crack"],
+    MARBLE_KEYWORDS.map((keyword) => keyword.id)
+  );
+
+  setLocale("fr");
+  run(
+    "touche E : la tigrée, d'une seule annonce",
+    "Pointe : effet joué pendant la phase de pointe, quand la bille est posée en pointe. " +
+      "Base : effet joué pendant la phase de base, quand la bille est posée en base gauche ou en base droite. Il peut différer selon le côté. " +
+      "Éveil : se déclenche quand la bille est piochée. " +
+      "Trouvaille : se déclenche quand le sac est reconstitué à partir de la défausse, si la bille est sur le triangle. " +
+      "Final : se déclenche quand la bille est usée et quitte le triangle.",
+    plain(keywordsText("tiger", rules, t))
+  );
+  run("touche E : aucune bille", "Aucune bille.", keywordsText(undefined, rules, t));
+  run("touche E : aucun mot-clé", "Aucun mot-clé.", keywordsText("bare", made, t));
+  const menu = keywordsMenu("giant", rules);
+  const lines = (built) => built.entries.map((entry) => plain(t(entry.label, entry.labelParams)));
+  run("Maj+E : titre", "Mots-clés de géante", plain(t(menu.title, menu.titleParams)));
+  run.same(
+    "Maj+E : une entrée par mot-clé, puis Fermer",
+    ["Pointe", "Base", "Éveil", "Final", "Pioche", "Polissage", "Fermer"],
+    lines(menu).map((line) => line.split(" : ")[0])
+  );
+  run("Maj+E : la description de la Pioche", "Pioche : pioche des billes du sac. Si le sac est vide, la défausse est mélangée pour le reconstituer.", lines(menu)[4]);
+  run("Maj+E : Échap ferme", true, menu.closable);
+  run.same("Maj+E : seule Fermer agit", [menu.entries.length - 1], menu.entries.flatMap((entry, index) => (typeof entry.onActivate === "function" ? [index] : [])));
+  run.same("Maj+E : aucun mot-clé", ["Aucun mot-clé.", "Fermer"], lines(keywordsMenu("bare", made)));
+  run.same("Maj+E : aucune bille", ["Aucune bille.", "Fermer"], lines(keywordsMenu(undefined, rules)));
+  run("Maj+E : aucune bille, titre", "Mots-clés", t(keywordsMenu(undefined, rules).title));
+  setLocale("en");
+  run("touche E, anglais : la première ligne", "Apex: effect played during the apex phase, when the marble sits at the apex.", plain(t(keywordLines("tiger", rules)[0].key, keywordLines("tiger", rules)[0].params)));
+  run("touche E, anglais : aucune bille", "No marble.", keywordsText(undefined, rules, t));
+  run("Maj+E, anglais : titre", "Keywords of giant", plain(t(menu.title, menu.titleParams)));
+  run.same("Maj+E, anglais : aucun mot-clé", ["No keyword.", "Close"], lines(keywordsMenu("bare", made)));
+  setLocale(locale);
+
+  // Chaque mot-clé a son nom et sa description dans chaque langue.
+  for (const [lang, table] of Object.entries(LOCALE_TABLES)) {
+    const missing = MARBLE_KEYWORDS.flatMap((keyword) => [keyword.texts.name, keyword.texts.description]).filter((key) => !Object.hasOwn(table, key));
+    run.same(`${lang} : chaque mot-clé a son nom et sa description`, [], missing);
+  }
 }
 
 function checkBagOrder(run) {
@@ -756,11 +815,13 @@ export default function checkMarblesView(run) {
   checkCards(run);
   checkBagOrder(run);
   checkTallyMenu(run);
+  checkKeywords(run);
   run("narration : évènement inconnu refusé", true, throws(() => buildSteps([{ type: "nope" }], (key) => key)));
 
   // Le découpage en étapes : tous les évènements, chacun une fois, dans l'ordre.
   run.same("étapes : aucun évènement perdu", events, buildSteps(events, (key) => key).flatMap((step) => step.events));
-  const turn = rules.createGame(4);
+  // Un sac sans Éveil : les pioches se disent en une liste, et seulement elles.
+  const turn = rules.createGame(4, { bag: ["clay", "glass", "agate", "porcelain", "gorilla", "stoneware"] });
   const drawn = rules.reduce(turn, { type: "draw" });
   run.same(
     "étapes : la pioche, puis le début de tour",

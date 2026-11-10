@@ -37,7 +37,9 @@
 // FICHES : le curseur principal annonce court, Ctrl+haut et Ctrl+bas parcourent le
 // détail de la bille sous lui (view/marbles/card.js, lib/detail-card.js). Maj+S et
 // Maj+D ouvrent les menus du sac et de la défausse (view/marbles/pile-screen.js).
-// En mode debug, Maj+L ouvre celui des valeurs de partie (view/marbles/tally-screen.js).
+// E dit les mots-clés de la bille sous le curseur, Maj+E les ouvre en menu
+// (view/marbles/keywords.js). En mode debug, Maj+L ouvre le menu des valeurs de partie
+// (view/marbles/tally-screen.js).
 //
 // TEMPS RÉEL : la séquence, la file de sons et les roulements avancent par un même
 // battement (lib/real-time.js), appelé à chaque image (onFrame) ET par une
@@ -99,6 +101,7 @@ import { advanceSequence, restartPause, skipSequence, startSequence } from "./se
 import { EMPTY_HISTORY, recordSteps } from "./history.js";
 import { openHistoryMenu } from "./history-screen.js";
 import { openTallyMenu } from "./tally-screen.js";
+import { keywordsText, openKeywordsMenu } from "./keywords.js";
 
 const MARBLES_BINDINGS = defineBindings("marbles", {
   up: { keys: ["ArrowUp"], mods: [] },
@@ -120,6 +123,8 @@ const MARBLES_BINDINGS = defineBindings("marbles", {
   overview: { keys: ["r"], mods: [] },
   resolve: { keys: ["r"], mods: ["shift"] },
   history: { keys: ["l"], mods: [] },
+  keywords: { keys: ["e"], mods: [] },
+  keywordsMenu: { keys: ["e"], mods: ["shift"] },
   // Mode debug seulement (voir DEBUG_ACTIONS).
   placesDemo: { keys: ["p"], mods: ["shift"] },
   tally: { keys: ["l"], mods: ["shift"] },
@@ -540,6 +545,19 @@ export function makeMarblesScreen(getGame, setGame, rules) {
     announce(t("marbles.debug.places_demo"), { assertive: true });
   }
 
+  // E : les mots-clés de la bille sous le curseur, d'une annonce ; Maj+E : en menu.
+  // Pas pendant la séquence, comme les autres annonces de consultation.
+  function announceKeywords() {
+    if (blockedDuringSequence()) return;
+    announce(keywordsText(marbleUnderCursor(), rules, t), { assertive: true });
+  }
+
+  function openKeywords() {
+    if (blockedDuringSequence()) return;
+    playMenuSound("select");
+    openKeywordsMenu(marbleUnderCursor(), rules);
+  }
+
   // Maj+L, mode debug : les valeurs de partie. Pas pendant la séquence, dont l'état
   // est déjà celui d'après la résolution : ce serait la dévoiler.
   function openTally() {
@@ -574,6 +592,8 @@ export function makeMarblesScreen(getGame, setGame, rules) {
     overview: announceOverview,
     resolve: resolveKey,
     history: openHistory,
+    keywords: announceKeywords,
+    keywordsMenu: openKeywords,
     placesDemo: playPlacesDemo,
     tally: openTally,
   };

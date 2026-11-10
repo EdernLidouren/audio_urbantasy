@@ -9,7 +9,7 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
 |---|---|
 | `marbles/types/` | Les billes, une par fichier, et leur registre `index.js` (donnée pure) |
 | `marbles/effects.js` | Les formes courtes des clauses, `speed(n)`, `mass(n)`, `draw(n)`, `polish(n, cible?)` et `crack(n, cible?)`, et les sources `turnsInHand()`, `activeSize(calibre)` et `tally(valeur, portée)` des montants calculés |
-| `config/marbles-values.js` | Réglages, déclencheurs, valeurs de partie, modèle de fiche, sac de test, sons (donnée pure) |
+| `config/marbles-values.js` | Réglages, phases, déclencheurs, valeurs de partie, modèle de fiche, sac de test, sons (donnée pure) |
 | `core/marbles-rules.js` | Les règles liées à une table de billes : le point d'entrée de la simulation hors du core |
 | `core/marbles.js` | La simulation : état, réducteur, écouteurs, journal, codes de refus |
 | `core/marbles-effects.js` | Le modèle d'effet : clauses, actions, conditions, effet imprimé |
@@ -26,6 +26,7 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
 | `view/marbles/sequence.js` | La file d'étapes de la séquence de résolution et ses pauses (pur) |
 | `view/marbles/history.js` | L'historique : les messages de jeu du tour précédent (pur) |
 | `view/marbles/history-screen.js` | Le menu de l'historique |
+| `view/marbles/keywords.js` | L'aide des mots-clés de la bille sous le curseur (E, Maj+E) |
 | `view/marbles/tally-screen.js` | Le menu de debug des valeurs de partie (Maj+L) |
 | `view/marbles/navigation.js` | Le curseur dans le triangle, les zones, l'ouverture de la sélection d'emplacement (pur) |
 | `view/marbles/sounds.js` | Les sons de l'écran : repères des évènements, roulements, balise au survol, musique |
@@ -72,7 +73,9 @@ Toute pioche, celle du début de tour comme celle d'un effet (Pioche), suit la m
 bille par bille (`core/marbles.js`/`drawOne`) :
 
 1. main pleine : la bille reste au sac, sans régénération ;
-2. sinon, le sac a une bille : on la pioche ;
+2. sinon, le sac a une bille : on la pioche (`draw`), puis son **Éveil** (`awaken`, voir
+   « Les déclencheurs »), réglé jusqu'au bout, ce qu'il déclenche compris (une Pioche qui
+   pioche à son tour), avant la bille suivante ;
 3. sinon, la défausse n'est pas vide : mélangée par le hasard de la partie, elle devient le
    sac (`bagRegenerated`) ; puis la **Trouvaille** de chaque bille active, dans l'ordre des
    phases (voir « Les déclencheurs ») ; puis la pioche reprend, en relisant ces conditions
@@ -85,7 +88,13 @@ Le premier arrêt interrompt la pioche et se dit (`drawSkipped`, motif `handFull
 Une régénération peut donc avoir lieu à tout moment : en début de tour, pendant la phase de
 jeu (un Tic qui pioche) ou pendant la résolution. Ses Trouvailles vont aux compteurs du tour
 en cours : en début de tour, celui qui commence, la résolution précédente ayant remis
-Vitesse et Masse à 0 et 1.
+Vitesse et Masse à 0 et 1. De même pour un Éveil : une bille piochée en début de tour
+s'éveille au compte du tour qui commence.
+
+L'ordre complet d'une bille piochée : (régénération éventuelle, puis Trouvailles), pioche de
+la bille, son Éveil et ce qu'il déclenche, puis la bille suivante s'il y en a. L'Éveil du
+mica (Pioche 1) peut ainsi en enchaîner d'autres, bornés par le sac, la défausse, la main
+pleine et la limite du bus.
 
 ### Fin de partie
 
@@ -351,7 +360,12 @@ calot ») et `noun` (« bille normale »).
 
 ### Les déclencheurs
 
-Hors la phase (base, pointe), une bille réagit par ses **déclencheurs** : la
+Hors la phase (base, pointe), une bille réagit par ses **déclencheurs** : l'**Éveil**
+(`awaken`, à chaque bille réellement piochée, du sac à la main, pioche du tour ou effet,
+juste après sa pioche et avant la suivante, la bille en main à 0 tour en main ; jamais pour
+une bille restée au sac faute de place ; ses valeurs vont aux compteurs du tour en cours ;
+une interruption du bus, comme la Trouvaille ; une action sur la bille elle-même y est
+refusée, ciblée elle est permise ; jamais prévu, voir « La prévision »), la
 **Chiquenaude** (`flick`, à chaque pose depuis la main, vide ou occupé, avant tout le reste,
 la bille en cours de lancer), le **Tic** (`hit`,
 posée sur un emplacement occupé, après l'éjection de l'occupante), la **Trouvaille**
@@ -370,13 +384,21 @@ défausse ; jamais à une éjection, un échange ou une pose). Ils sont déclar�
   field: "final",           // le champ d'effet de la bille
   event: "final",           // l'évènement du journal qui le déclenche
   marble: "removed",        // la bille concernée : "onSlot" (sur l'emplacement de
-                            // l'évènement), "removed" (déjà retirée, que l'évènement nomme)
-                            // ou "thrown" (en cours de lancer, que l'évènement nomme)
+                            // l'évènement), "removed" (déjà retirée, que l'évènement nomme),
+                            // "thrown" (en cours de lancer, que l'évènement nomme) ou
+                            // "drawn" (tout juste piochée, en main)
   forecast: { line: "slot" }, // sa prévision : avec l'emplacement de la bille ;
                             // { line: "placement", marble, order }, une ligne de confirmation
-                            // (sur un emplacement occupé seulement si `replacement`) ; ou
-                            // { line: "regeneration" }, après « Le sac sera régénéré. »
-  texts: { card: "marbles.card.final", effect: "marbles.event.effect_final", slot: "marbles.outcome.final" },
+                            // (sur un emplacement occupé seulement si `replacement`) ;
+                            // { line: "regeneration" }, après « Le sac sera régénéré. » ; ou
+                            // { line: "none" }, jamais prévu (l'Éveil)
+  texts: {
+    name: "marbles.keyword.final.name",               // le nom du mot-clé
+    description: "marbles.keyword.final.description", // ce qu'il fait (touches E, Maj+E)
+    card: "marbles.card.final",
+    effect: "marbles.event.effect_final",
+    slot: "marbles.outcome.final",
+  },
   card: "below",            // sa place dans la fiche, au-dessous de l'annonce principale
 }
 ```
@@ -385,13 +407,21 @@ Tout ce qui les connaît lit cette liste, jamais une copie : la validation de la
 champs permis), les écouteurs du core (`EVENT_TRIGGERS`, construit depuis elle, la phase
 seule y étant écrite à la main), la prévision, la narration (gabarits, lignes de
 confirmation, évènements muets), le modèle de fiche (`MARBLE_CARD_MODEL.below` en est
-dérivé, dans l'ordre de la liste, celui de la vie d'une bille : chiquenaude, tic,
-trouvaille, éjection, final) et les outils (chiffres par
+dérivé, dans l'ordre de la liste, celui de la vie d'une bille : éveil, chiquenaude, tic,
+trouvaille, éjection, final), l'aide des mots-clés et les outils (chiffres par
 déclencheur ; leurs mots, `tools/marbles/format.js`/`TRIGGER_WORDS`, échouent au
 chargement s'il en manque un). La liste est validée au chargement du core
-(`validateMarbleTriggers`) ; ses textes, par le domaine `marbles-view`. **Ajouter un
-déclencheur** : son entrée, ses textes FR et EN, ses mots dans les outils, et l'émission de
-son évènement dans `core/marbles.js` au bon moment du tour.
+(`validateMarbleTriggers`) : un déclencheur sans nom ni description de mot-clé échoue ; ses
+textes, par le domaine `marbles-view`. **Ajouter un déclencheur** : son entrée, ses textes
+FR et EN (dont son nom et sa description de mot-clé), ses mots dans les outils, et
+l'émission de son évènement dans `core/marbles.js` au bon moment du tour ; ses valeurs de
+partie et sa place dans l'aide des mots-clés suivent d'office.
+
+Les **phases** sont déclarées de même, dans `config/marbles-values.js`/`MARBLE_PHASES` :
+`{ id, field, slots, texts: { name, description } }` (pointe, puis base, sur ses deux
+emplacements), validées au chargement (`validateMarblePhases` : chaque emplacement dans une
+phase, une seule ; nom et description obligatoires). Le core en tire les champs de phase,
+le moment de chacun (règle des cibles) et les mots-clés de phase des valeurs de partie.
 
 ## Simulation
 
@@ -433,7 +463,7 @@ pose sur une bille sans Éjection donne +1 bille éjectée, +0 éjection ; un m�
 
 | Catégorie | Compteurs (id) | Source | Compte |
 |---|---|---|---|
-| Déclenchements | `flick`, `hit`, `windfall`, `knockout`, `final`, `apex`, `base`, `leftBase`, `rightBase` | générés : un par déclencheur de `MARBLE_TRIGGERS`, un par mot-clé de phase (`core/marbles.js`/`PHASE_KEYWORDS`) | +1, par bille, quand le mot-clé se déclenche chez une bille qui a un effet pour ce moment : son champ n'est pas vide (pour une base : l'effet de base, ou sa variante de l'emplacement), ou elle a reçu un effet extérieur pour ce moment (un bonus ciblé sur sa phase). Un effet à condition fausse compte ; une phase sautée (emplacement vide, bille retirée avant) ne compte pas. `base` = `leftBase` + `rightBase` |
+| Déclenchements | `awaken`, `flick`, `hit`, `windfall`, `knockout`, `final`, `apex`, `base`, `leftBase`, `rightBase` | générés : un par déclencheur de `MARBLE_TRIGGERS`, un par mot-clé de phase (`core/marbles.js`/`PHASE_KEYWORDS`, tirés de `MARBLE_PHASES`) | +1, par bille, quand le mot-clé se déclenche chez une bille qui a un effet pour ce moment : son champ n'est pas vide (pour une base : l'effet de base, ou sa variante de l'emplacement), ou elle a reçu un effet extérieur pour ce moment (un bonus ciblé sur sa phase). Un effet à condition fausse compte ; une phase sautée (emplacement vide, bille retirée avant) ne compte pas. `base` = `leftBase` + `rightBase` |
 | Actions | `draw`, `drawQuantity`, `polish`, `polishQuantity`, `crack`, `crackQuantity` | générés depuis les actions de `CLAUSE_ACTIONS` qui déclarent `keyword` | les déclencheurs : un par application (une Pioche par effet joué qui pioche ; un Polissage ou une Fêlure par application, sur un emplacement vide compris) ; la quantité réelle : billes réellement piochées par une Pioche (`draw` de cause `"effect"`), usure réellement rendue ou ajoutée (`applied` de `polished`, `cracked`) |
 | Vitesse et Masse | `speedGains`, `speedGained`, `speedLosses`, `speedLost`, et les mêmes pour `mass` | générés depuis les actions de valeur sans `keyword` | dans chaque effet joué (`effect`), la valeur réellement appliquée aux compteurs du tour (bonus reçu compris ; un bonus perdu n'est jamais appliqué), avant les planchers de l'Impact : une occurrence de gain ou de perte par effet, et le total en valeur absolue |
 | Évènements | `thrownMarbles`, `hitMarbles`, `ejectedMarbles`, `shuffles`, `drawnMarbles`, `wornMarbles`, `triangleExits` | déclarés : `config/marbles-values.js`/`MARBLE_TALLIES` | billes lancées (`flick`), tiquées (`hit` : posées sur un emplacement occupé), éjectées (`removed`, cause `"replacement"`), mélanges (`bagRegenerated`), billes piochées (`draw`, toutes causes), usées (`removed`, cause `"wear"`), sorties du triangle (`removed`, toutes causes : aujourd'hui, usées + éjectées) |
@@ -478,9 +508,10 @@ dans le réducteur, et rien d'extérieur ne s'y abonne.
 - **Pas de récursion** : un évènement émis pendant le traitement d'un autre attend dans une
   file, premier entré, premier sorti.
 - **Une exception, l'interruption** (`settle`) : son évènement et tout ce qui en découle se
-  règlent jusqu'au bout tout de suite, dans une file à part, avant ce qui attendait. Seule
-  la Trouvaille en est une : elle se joue entre la régénération et la reprise de la pioche,
-  même quand cette pioche vient d'un effet en plein traitement (un Tic qui pioche).
+  règlent jusqu'au bout tout de suite, dans une file à part, avant ce qui attendait. Deux
+  en sont : la Trouvaille, qui se joue entre la régénération et la reprise de la pioche, et
+  l'Éveil, entre la pioche d'une bille et celle de la suivante, même quand cette pioche
+  vient d'un effet en plein traitement (un Tic qui pioche).
 - **Le journal s'écrit à l'émission**, dans l'ordre où l'état change : la file étant premier
   entré, premier sorti, c'est l'ordre de traitement, sauf pour une interruption, réglée
   avant ce qui attendait mais émise après. Les valeurs de partie aussi (voir plus haut).
@@ -489,7 +520,7 @@ dans le réducteur, et rien d'extérieur ne s'y abonne.
   n'ayant jamais été touché.
 
 `EVENT_TRIGGERS` dit quels évènements déclenchent un effet : les phases, et les
-déclencheurs de `MARBLE_TRIGGERS` (Chiquenaude, Tic, Trouvaille, Éjection, Final). Les autres passent au journal,
+déclencheurs de `MARBLE_TRIGGERS` (Éveil, Chiquenaude, Tic, Trouvaille, Éjection, Final). Les autres passent au journal,
 prêts à servir.
 
 ### La prévision
@@ -515,10 +546,18 @@ retraits, dans l'ordre ; `drawn`, les billes que l'action et la
 résolution piocheraient ; `tally`, les valeurs de partie à la fin de la résolution (la
 copie porte le registre, qui y évolue comme dans la partie ; le registre réel n'est jamais
 touché) ; `uncertain`, vrai si une bille inconnue aurait pu réagir selon son
-identité (un déclencheur qui écoute la main : aucun aujourd'hui ; la Chiquenaude ne concerne
-que la bille lancée, toujours connue), ses chiffres n'étant alors
-pas sûrs. La vérification `marbles-forecast` contrôle que Vitesse, Masse, Impact, billes
-piochées et régénération prévues sont celles du réel.
+identité, ses chiffres n'étant alors pas sûrs : aujourd'hui, un Éveil possible.
+
+**L'exception de l'Éveil** : la bille piochée étant inconnue, son Éveil ne se prévoit
+jamais. Ses effets ne sont jamais dans les valeurs prévues, ni dans le registre de la copie.
+La prévision est `uncertain` dès qu'elle pioche au moins une bille et qu'une bille qui
+pouvait l'être a un Éveil : une bille du sac ; si le sac est régénéré en chemin, aussi la
+défausse et chaque bille qui y part pendant l'action et la résolution. Rien n'est révélé :
+la composition du sac et de la défausse est déjà consultable, pas leur ordre. R et la
+confirmation finissent alors par « Éveils possibles. ». La propriété « prévision = résultat
+réel » vaut pour tout ce qui ne dépend pas d'un Éveil : la vérification `marbles-forecast`
+la contrôle sur tout résultat réel où aucun Éveil n'a joué, et vérifie qu'un Éveil réel a
+toujours été annoncé possible.
 
 ## Écran de jeu
 
@@ -576,6 +615,7 @@ lisent et ne s'activent pas (Entrée n'y fait rien) :
 6. pour chaque régénération du sac que la pose et la résolution provoqueraient, « Le sac
    sera régénéré. » (« Le sac sera de nouveau régénéré. » pour les suivantes), puis une
    ligne par Trouvaille qu'elle déclencherait (« Trouvaille de tigrée : Vitesse +3. ») ;
+   enfin, si un Éveil est possible, « Éveils possibles. » ;
 7. Annuler (Échap aussi : la sélection d'emplacement reprend) ;
 8. Confirmer.
 
@@ -600,7 +640,7 @@ Tic : Vitesse +2.           <- Ctrl+bas
 ```
 
 Au-dessous, les champs des déclencheurs, facultatifs, dans l'ordre de la vie d'une bille :
-chiquenaude, tic, trouvaille, éjection, final (« Final : Masse +1. ») ; ils viennent de
+éveil, chiquenaude, tic, trouvaille, éjection, final (« Final : Masse +1. ») ; ils viennent de
 `MARBLE_TRIGGERS`. Un montant calculé s'y dit avec sa valeur actuelle (voir « Montants
 calculés »).
 
@@ -655,7 +695,8 @@ régénéré. » termine l'annonce, suivi d'une phrase par Trouvaille qu'elle d�
 nomme sa bille (« Trouvaille de tigrée : Vitesse +3. »). Chaque régénération se dit ainsi
 avec ses propres Trouvailles, comme dans la séquence, la deuxième « de nouveau » : « Le sac
 sera régénéré. Trouvaille de tigrée : Vitesse +3. Le sac sera de nouveau régénéré.
-Trouvaille de tigrée : Vitesse +3. ». Même gabarit que les
+Trouvaille de tigrée : Vitesse +3. ». Si un Éveil est possible, « Éveils possibles. »
+termine l'annonce. Même gabarit que les
 phases de la séquence (`outcomeLine`) : la prévision et la résolution se disent pareil.
 
 ### Séquence de résolution (Maj+R)
@@ -695,9 +736,11 @@ après l'effet qui la provoque.
 **Construite du journal** (`buildSteps`, la même pour une pose, un échange et la pioche
 du tour 1) : chaque évènement qui se dit devient une étape, à sa place chronologique ;
 un évènement muet (`phase`, `knockout`, `hit`, `removed`) rejoint l'étape suivante,
-l'usure et la fin de tour la précédente, pour que leurs sons partent avec elle. Deux
-règles d'ordre seulement : les pioches consécutives se disent en une liste, et le début
-de tour vient après sa pioche. Un effet d'un nouveau déclencheur s'insère donc comme une
+l'usure, la fin de tour et l'évènement `awaken` la précédente, pour que leurs sons
+partent avec elle. Deux règles d'ordre seulement : les pioches consécutives se disent en
+une liste, et le début de tour vient après sa pioche. Un Éveil qui a un effet se dit juste
+après sa bille piochée (« Vous piochez tigrée. », « Éveil de tigrée : Vitesse +2. Vitesse
+2, Masse 1. ») et coupe la liste ; un Éveil sans effet ne la coupe pas. Un effet d'un nouveau déclencheur s'insère donc comme une
 étape de plus, sans retoucher la séquence ; il lui faut son gabarit (`EFFECT_TEMPLATES`),
 sans quoi `buildSteps` lève.
 
@@ -868,6 +911,32 @@ centre, secs.
 positionnées ; brassage, chutes, collisions et roulements au volume de l'interface. Tous les sons des billes sont
 permanents et préchargés à l'ouverture de l'écran. Les gestes de l'écran gardent les sons de
 menu (`select`, `cancel`, `block`, `refusal`).
+
+### Mots-clés (E, Maj+E)
+
+Sur la bille sous le curseur, partout où une bille peut l'être (triangle, main, menus du
+sac et de la défausse : `view/marbles/keywords.js`) :
+
+- **E** : une seule annonce, « Pointe : effet joué pendant la phase de pointe, quand la
+  bille est posée en pointe. Base : … » ;
+- **Maj+E** : un menu vertical (`lib/menu.js`), titré « Mots-clés de géante », une entrée par
+  mot-clé (« Pioche : pioche des billes du sac. … »), puis « Fermer » ; Échap ferme aussi.
+  Les entrées se lisent, Entrée n'y fait rien.
+
+Seulement les mots-clés présents sur la bille (`core/marbles.js`/`keywordsOf`) : ses champs
+non vides (pointe, base, variante comprise, déclencheurs) et les actions mots-clés de ses
+clauses (Pioche, Polissage, Fêlure), chacun une fois, dans l'ordre : pointe, base, éveil,
+chiquenaude, tic, trouvaille, éjection, final, pioche, polissage, fêlure. Ni Vitesse ni
+Masse (ce ne sont pas des mots-clés), ni calibre. Sans bille (emplacement vide, main vide,
+« Retour » d'un menu de pile) : « Aucune bille. » ; une bille sans mot-clé : « Aucun
+mot-clé. » (dans le menu, cette entrée seule, puis « Fermer »). Refusées pendant la
+séquence, comme les autres annonces de consultation.
+
+Les noms et descriptions sont déclarés à côté des mots-clés (`MARBLE_PHASES`,
+`MARBLE_TRIGGERS`, `CLAUSE_ACTIONS` : `keyword.texts`), lus par
+`core/marbles.js`/`buildMarbleKeywords` : un mot-clé sans eux échoue au chargement. Pas de
+conflit de touches : E n'était lié à rien dans ces écrans (l'émote de l'écran de ville n'y
+est jamais active).
 
 ### Historique (L)
 

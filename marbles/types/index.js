@@ -14,6 +14,11 @@
 //   baseVariant effet propre à UNE base, { leftBase?, rightBase? }, qui
 //               remplace `base` sur cette base seulement ;
 //   apex        effet joué sur la pointe ;
+//   awaken      l'Éveil : effet joué quand la bille est piochée (du sac à la main),
+//               pioche du tour ou effet, juste après sa pioche et avant la suivante ;
+//               la bille est alors en main, à 0 tour en main (pas de Polissage ni de
+//               Fêlure sur elle-même) ; jamais prévu (la prévision ignore les billes
+//               piochées) ;
 //   flick       la Chiquenaude : effet joué à chaque pose de la bille depuis la
 //               main, sur un emplacement vide ou occupé, avant tout le reste ; la
 //               bille, en cours de lancer, n'est ni en main ni sur le triangle (pas
