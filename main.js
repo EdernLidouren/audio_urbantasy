@@ -256,7 +256,10 @@ function startMarblesGame(seed = createGameSeed()) {
       (next) => {
         marblesGame = next;
       },
-      marblesRules
+      marblesRules,
+      // La rubrique « Les touches » de l'aide H : l'aide générée de l'écran des
+      // billes, avec les touches globales, comme F1.
+      { openKeyHelp: (screen) => openHelp(t, { globalSections: GLOBAL_HELP_SECTIONS, covered: screen }) }
     )
   );
 }

@@ -112,7 +112,7 @@ export const MARBLES_PITCH_VARIATION = {
   roll: 0.02,
 };
 
-// OÙ S'ENTEND chaque place de la table (view/marbles/sounds.js/renderAt) :
+// OÙ S'ENTEND chaque place de la table (view/marbles/sounds/space.js/renderAt) :
 //   x  de gauche (-1) à droite (+1), le panoramique. Les billes de la main se
 //      répartissent de fromX à toX selon leur rang, la première tout à gauche ; une
 //      bille seule s'entend au milieu. Jamais aux extrêmes : un son tout d'un côté

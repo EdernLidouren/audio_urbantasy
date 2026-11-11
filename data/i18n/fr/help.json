@@ -58,6 +58,7 @@
   "help.marbles.down": "Descendre, de la pointe vers les bases et des bases vers la main",
   "help.marbles.end": "Aller à la dernière bille de la main",
   "help.marbles.finish": "Terminer un choix « jusqu'à N » sans faire tous les choix (sur le triangle comme dans la main)",
+  "help.marbles.help": "Ouvrir l'aide du jeu des billes : règles en bref, puis les touches",
   "help.marbles.history": "Ouvrir l'historique du tour précédent",
   "help.marbles.home": "Aller à la première bille de la main",
   "help.marbles.keywords": "Dire les mots-clés de la bille sous le curseur",

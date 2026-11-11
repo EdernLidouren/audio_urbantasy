@@ -34,6 +34,10 @@
 // attendre le joueur, avancée par onFrame comme la séquence ; la balise d'une
 // bille quand le curseur arrive sur elle, dans la main ou sur le triangle.
 //
+// AIDE (H) : un menu de rubriques courtes sur les règles, puis l'aide des touches de
+// l'écran (view/marbles/help-screen.js). F1 et Maj+H, touches globales, ouvrent
+// directement l'aide des touches.
+//
 // FICHES : le curseur principal annonce court, Ctrl+haut et Ctrl+bas parcourent le
 // détail de la bille sous lui (view/marbles/card.js, lib/detail-card.js). Maj+S,
 // Maj+D et Maj+P ouvrent les menus du sac, de la défausse et du pot
@@ -116,6 +120,7 @@ import { EMPTY_HISTORY, recordSteps } from "./history.js";
 import { openHistoryMenu } from "./history-screen.js";
 import { openTallyMenu } from "./tally-screen.js";
 import { keywordsText, openKeywordsMenu } from "./keywords.js";
+import { openMarblesHelp } from "./help-screen.js";
 
 const MARBLES_BINDINGS = defineBindings("marbles", {
   up: { keys: ["ArrowUp"], mods: [] },
@@ -144,6 +149,9 @@ const MARBLES_BINDINGS = defineBindings("marbles", {
   // Terminer un choix « jusqu'à N » (sur le triangle surtout : la main a son entrée
   // « Terminer »). Libre dans cet écran.
   finish: { keys: ["t"], mods: [] },
+  // L'aide du jeu des billes. Libre dans cet écran : F1 et Maj+H sont des touches
+  // globales (l'aide des touches), H seul n'est lié à rien.
+  help: { keys: ["h"], mods: [] },
   // Mode debug seulement (voir DEBUG_ACTIONS). La démonstration des places est sur
   // Maj+B (« balises ») : Maj+P ouvre le menu du pot.
   placesDemo: { keys: ["b"], mods: ["shift"] },
@@ -161,7 +169,9 @@ const REAL_TIME_PULSE_MS = 50;
 
 // `rules` : les règles du jeu, liées à la table des billes une fois pour toutes
 // par main.js (core/marbles-rules.js) ; l'écran les passe à ce qui en a besoin.
-export function makeMarblesScreen(getGame, setGame, rules) {
+// `openKeyHelp(screen)` : ouvre l'aide des touches de cet écran (main.js, qui connaît
+// les sections globales de l'aide), pour la rubrique « Les touches » de l'aide H.
+export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () => {} } = {}) {
   let cursor = INITIAL_CURSOR;
   // Le curseur secondaire, dans la fiche de ce qui est sous le curseur principal.
   let detail = 0;
@@ -691,6 +701,13 @@ export function makeMarblesScreen(getGame, setGame, rules) {
     announce(t("marbles.debug.places_demo"), { assertive: true });
   }
 
+  // H : l'aide du jeu des billes, à tout moment (elle ne dévoile rien de la partie ; un
+  // menu ouvert par-dessus fige la séquence, comme les autres).
+  function openHelpMenu() {
+    playMenuSound("select");
+    openMarblesHelp(() => openKeyHelp(screen));
+  }
+
   // E : les mots-clés de la bille sous le curseur, d'une annonce ; Maj+E : en menu.
   // Pas pendant la séquence, comme les autres annonces de consultation.
   function announceKeywords() {
@@ -746,6 +763,7 @@ export function makeMarblesScreen(getGame, setGame, rules) {
     keywords: announceKeywords,
     keywordsMenu: openKeywords,
     finish: finishChoice,
+    help: openHelpMenu,
     placesDemo: playPlacesDemo,
     tally: openTally,
   };

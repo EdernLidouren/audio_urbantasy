@@ -13,6 +13,7 @@ et des lignes simples, jamais de tableau. Les règles elles-mêmes : `doc/marble
 | `tools/marbles/play.js` | Jouer une partie au terminal, à graine imposée, au clavier ou par un fichier de commandes |
 | `tools/marbles/case.js` | Construire un état précis à la main, lui appliquer des actions, lire le journal |
 | `tools/marbles/simulate.js` | Le simulateur : des milliers de parties jouées par un joueur automatique, et un rapport |
+| `tools/marbles/rules-doc.js` | Le document de règles (`doc/marbles-rules.md`) : génère son annexe des billes depuis la table (`--write`), et vérifie qu'elle est à jour et que chaque mot-clé y figure avec sa description exacte (lancé par `tools/verify.js`) |
 
 Les modules qu'ils partagent, purs (sans Node, donc vérifiables) :
 

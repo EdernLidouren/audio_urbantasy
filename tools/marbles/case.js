@@ -47,6 +47,18 @@ const record = [];
 console.log("État de départ :");
 formatState(state, name).forEach((line) => console.log(`  ${line}`));
 
+// Ce qu'un effet prévu a produit en plus de ses valeurs : billes chassées (et leur
+// Éjection), mises en poche ou perdues, cibles vides, choix indécis.
+function results(outcome) {
+  const parts = [
+    ...(outcome.ejected ?? []).map(({ marble, knockout }) => `chasse ${marbleLabel(marble, name)}${knockout ? ` (Éjection : Vitesse ${counter(knockout.speed)}, Masse ${counter(knockout.mass)})` : ""}`),
+    ...(outcome.pockets ?? []).map(({ marble, lost }) => `${marble === null ? "une bille piochée" : marbleLabel(marble, name)} ${lost ? "perdue, pot plein" : "en poche"}`),
+    ...(outcome.empty ?? []).map(({ action, target, slot }) => `${action} sans cible (${target ?? slotLabel(slot)})`),
+    ...(outcome.undecided ?? []).map(({ action }) => `${action} selon le choix`),
+  ];
+  return parts.length === 0 ? "" : ` ; ${parts.join(", ")}`;
+}
+
 // La prévision d'une pose envisagée (ou du triangle actuel), en chiffres bruts.
 function printForecast(action) {
   const predicted = GAME_RULES.forecast(state, action);
@@ -56,17 +68,21 @@ function printForecast(action) {
   }
   for (const trigger of PLACEMENT_TRIGGERS) {
     const outcome = predicted[trigger.id];
-    if (outcome) console.log(`  ${triggerLabel(trigger.id)} : Vitesse ${counter(outcome.speed)}, Masse ${counter(outcome.mass)}.`);
+    if (outcome) console.log(`  ${triggerLabel(trigger.id)} : Vitesse ${counter(outcome.speed)}, Masse ${counter(outcome.mass)}${results(outcome)}.`);
   }
   for (const slot of SLOTS) {
     const phase = predicted.phases[slot];
-    console.log(`  ${slotLabel(slot)} : ${phase === null ? "vide" : `${marbleLabel(phase.marble, name)}, Vitesse ${counter(phase.speed)}, Masse ${counter(phase.mass)}`}.`);
+    const cleared = predicted.cleared[slot] === null ? "vide" : `${marbleLabel(predicted.cleared[slot], name)} retirée avant sa phase`;
+    console.log(`  ${slotLabel(slot)} : ${phase === null ? cleared : `${marbleLabel(phase.marble, name)}, Vitesse ${counter(phase.speed)}, Masse ${counter(phase.mass)}${results(phase)}`}.`);
     for (const effect of predicted.slotEffects[slot]) {
-      console.log(`    ${triggerLabel(effect.trigger)} : Vitesse ${counter(effect.speed)}, Masse ${counter(effect.mass)}, Pioche ${effect.draw}.`);
+      console.log(`    ${triggerLabel(effect.trigger)} : Vitesse ${counter(effect.speed)}, Masse ${counter(effect.mass)}, Pioche ${effect.draw}${results(effect)}.`);
     }
   }
+  for (const effect of predicted.potReactions) {
+    console.log(`  Pot, pendant la pose, ${marbleLabel(effect.marble, name)} : Vitesse ${counter(effect.speed)}, Masse ${counter(effect.mass)}${results(effect)}.`);
+  }
   for (const effect of predicted.potEffects) {
-    console.log(`  Pot, ${marbleLabel(effect.marble, name)} : Vitesse ${counter(effect.speed)}, Masse ${counter(effect.mass)}.`);
+    console.log(`  Pot, ${marbleLabel(effect.marble, name)} : Vitesse ${counter(effect.speed)}, Masse ${counter(effect.mass)}${results(effect)}.`);
   }
   for (const { effects } of predicted.regenerations) {
     console.log("  Régénération du sac prévue.");
@@ -74,7 +90,8 @@ function printForecast(action) {
       console.log(`    ${triggerLabel(effect.trigger)}, ${marbleLabel(effect.marble, name)} en ${slotLabel(effect.slot)} : Vitesse ${counter(effect.speed)}, Masse ${counter(effect.mass)}, Pioche ${effect.draw}.`);
     }
   }
-  console.log(`  Prévu : Vitesse ${counter(predicted.speed)}, Masse ${counter(predicted.mass)}, Impact ${predicted.impact}.`);
+  const notes = [predicted.choiceDependent && "selon le choix", predicted.awakenPossible && "éveils possibles", predicted.interrupted && "enchaînement interrompu"].filter(Boolean);
+  console.log(`  Prévu : Vitesse ${counter(predicted.speed)}, Masse ${counter(predicted.mass)}, Impact ${predicted.impact}${notes.length === 0 ? "" : ` (${notes.join(", ")})`}.`);
 }
 
 for (const entry of spec.actions ?? []) {

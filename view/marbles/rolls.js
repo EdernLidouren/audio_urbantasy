@@ -1,9 +1,10 @@
 // Jeu des billes : le MOUVEMENT d'une bille qui roule de place en place, pour le
 // son seulement. Pur : aucun son ni minuteur, que des positions { x, y } de la
-// table (view/marbles/sounds.js/positionOf) et des durées. view/marbles/sounds.js
-// s'en sert deux fois : pour placer l'arrivée sur la ligne de temps d'un geste
-// (rollDurationMs), puis, frame après frame, pour déplacer la boucle de roulement
-// (rollAt).
+// table (view/marbles/sounds/space.js/positionOf) et des durées. Les sons de l'écran
+// (view/marbles/sounds.js) s'en servent deux fois : pour placer l'arrivée sur la ligne
+// de temps d'un geste (rollDurationMs, view/marbles/sounds/timeline.js), puis, frame
+// après frame, pour déplacer la boucle de roulement (rollAt,
+// view/marbles/sounds/space.js).
 //
 // Un trajet est un CHEMIN : la suite des positions par où passe la bille, deux au
 // moins (départ et arrivée). Elle passe par les étapes sans s'arrêter, comme le

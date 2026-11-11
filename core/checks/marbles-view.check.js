@@ -78,6 +78,7 @@ import { throws } from "../../lib/check.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
 import { answerChoices, earlierTestTypes, emptyBagMarblesGame, inHand, withSizes } from "./helpers.js";
 import { choiceAnswer, choiceFocusLine, choiceHandOptions, choiceMarbleAt, choiceStartCursor, stepChoiceCursor } from "../../view/marbles/choice.js";
+import { MARBLES_HELP_TOPICS, helpTopicText, marblesHelpMenu } from "../../view/marbles/help-screen.js";
 import { createMarblesRules } from "../marbles-rules.js";
 import { AMOUNT_SOURCES, effectAt } from "../marbles-effects.js";
 
@@ -524,6 +525,60 @@ function checkKeywords(run) {
     const missing = MARBLE_KEYWORDS.flatMap((keyword) => [keyword.texts.name, keyword.texts.description]).filter((key) => !Object.hasOwn(table, key));
     run.same(`${lang} : chaque mot-clé a son nom et sa description`, [], missing);
   }
+}
+
+// L'aide du jeu des billes (touche H) : les rubriques dans l'ordre, puis « Les
+// touches » et « Fermer » ; Échap ferme ; chaque rubrique a son texte court, dans
+// chaque langue, avec les valeurs des réglages.
+function checkHelpMenu(run) {
+  const locale = getLocale();
+  let keyHelpOpened = 0;
+  const menu = marblesHelpMenu(() => (keyHelpOpened += 1));
+  const labels = menu.entries.map((entry) => entry.label);
+  setLocale("fr");
+  run.same(
+    "aide H : les rubriques dans l'ordre, puis les touches et Fermer",
+    [
+      "But du jeu",
+      "Score : Vitesse, Masse et Impact",
+      "Le triangle et la rotation",
+      "L'usure",
+      "Main, lancers et pioche",
+      "Les zones : sac, défausse, pot, billes perdues",
+      "Les mots-clés",
+      "Les touches",
+      "Fermer",
+    ],
+    labels.map((label) => plain(t(label)))
+  );
+  run("aide H : son titre", "Aide du jeu des billes", t(menu.title));
+  run("aide H : Échap ferme", true, menu.closable);
+  run("aide H : chaque entrée agit", true, menu.entries.every((entry) => typeof entry.onActivate === "function"));
+  menu.entries.at(-2).onActivate();
+  run("aide H : « Les touches » ouvre l'aide des touches", 1, keyHelpOpened);
+  run.same("aide H : une rubrique par texte, dans l'ordre", ["goal", "score", "triangle", "wear", "hand", "zones", "keywords"], MARBLES_HELP_TOPICS);
+  run(
+    "aide H : le but du jeu",
+    "Posez des billes sur le triangle pour marquer le plus de points en 9 tours. Chaque tour se termine par une résolution, qui produit un Impact. L'Impact s'ajoute à votre score.",
+    plain(helpTopicText("goal", t))
+  );
+  run("aide H : la main cite les réglages", true, plain(helpTopicText("hand", t)).includes("5 billes au premier tour, puis 1 bille à chaque tour") && plain(helpTopicText("hand", t)).includes("5 lancers par tour"));
+  run("aide H : le pot cite sa capacité", true, plain(helpTopicText("zones", t)).includes("jusqu'à 3 billes"));
+  run("aide H : les mots-clés renvoient à E et Maj+E", true, plain(helpTopicText("keywords", t)).includes("touche E") && plain(helpTopicText("keywords", t)).includes("Maj+E"));
+  for (const lang of ["fr", "en"]) {
+    setLocale(lang);
+    const short = MARBLES_HELP_TOPICS.filter((id) => {
+      const text = helpTopicText(id, t);
+      const sentences = text.split(/[.!?]\s/).length;
+      return text.length === 0 || sentences > 4;
+    });
+    run.same(`aide H, ${lang} : chaque texte court, de quelques phrases`, [], short);
+  }
+  setLocale("en");
+  run("aide H, anglais : la première rubrique", "Goal of the game", t(menu.entries[0].label));
+  run("aide H, anglais : Fermer", "Close", t(menu.entries.at(-1).label));
+  run("aide H, anglais : l'usure", true, helpTopicText("wear", t).startsWith("A marble on the triangle takes 1 wear at each phase."));
+  setLocale(locale);
 }
 
 // L'INTERFACE DE CHOIX (view/marbles/choice.js) et ses textes : la main limitée aux
@@ -1015,6 +1070,7 @@ export default function checkMarblesView(run) {
   checkKeywords(run);
   checkPotStatus(run);
   checkChoiceInterface(run);
+  checkHelpMenu(run);
   run("narration : évènement inconnu refusé", true, throws(() => buildSteps([{ type: "nope" }], (key) => key)));
 
   // Le découpage en étapes : tous les évènements, chacun une fois, dans l'ordre.

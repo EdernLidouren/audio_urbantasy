@@ -58,7 +58,9 @@ function modelFor(marble, model, rules) {
 // le compteur de la bille si elle est en main (0 sinon) ; `tally`, les valeurs de
 // partie de la partie en cours (à zéro sinon) ; `model`, un autre modèle, pour les
 // vérifications.
-export function marbleCard(marble, main, rules, t, { turnsInHand = 0, tally, model = MARBLE_CARD_MODEL } = {}) {
-  const situation = cardSituation(marble, turnsInHand, tally);
+// `timeless` : la fiche hors de toute partie, sans valeur actuelle des montants
+// calculés (l'annexe des règles, tools/marbles/rules-doc.js).
+export function marbleCard(marble, main, rules, t, { turnsInHand = 0, tally, model = MARBLE_CARD_MODEL, timeless = false } = {}) {
+  const situation = timeless ? null : cardSituation(marble, turnsInHand, tally);
   return assembleCard(modelFor(marble, model, rules), { main, readField: (entry) => readField(marble, entry, situation, rules, t), t });
 }

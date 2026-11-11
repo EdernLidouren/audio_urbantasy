@@ -262,7 +262,9 @@ function computedText(action, amount, situation, t) {
   let text = sourceText(amount.source, step, t);
   if (amount.base !== 0) text = t("marbles.effect.computed_base", { base: combined(valueParts({ [action]: amount.base }, t), t), effect: text });
   if (amount.max !== undefined) text = t("marbles.effect.computed_max", { effect: text, max: amountNumber(action, amount.max) });
-  if (!AMOUNT_SOURCES[amount.source.type].current) return text;
+  // Sans situation (une fiche hors de toute partie : l'annexe des règles), jamais de
+  // valeur actuelle.
+  if (!AMOUNT_SOURCES[amount.source.type].current || situation === null) return text;
   return t("marbles.effect.computed_current", { effect: text, current: amountNumber(action, amountOf(amount, situation)) });
 }
 

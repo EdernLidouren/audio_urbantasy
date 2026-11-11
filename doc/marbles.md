@@ -8,7 +8,7 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
 | Fichier | Rôle |
 |---|---|
 | `marbles/types/` | Les billes, une par fichier, et leur registre `index.js` (donnée pure) |
-| `marbles/effects.js` | Les formes courtes des clauses, `speed(n)`, `mass(n)`, `draw(n)`, `polish(n, cible?)`, `crack(n, cible?)` et `pocket(cible?)` (avec `FIRST_IN_HAND`), et les sources `turnsInHand()`, `activeSize(calibre)` et `tally(valeur, portée)` des montants calculés |
+| `marbles/effects.js` | Les formes courtes des clauses, `speed(n)`, `mass(n)`, `draw(n)`, `polish(n, cible?)`, `crack(n, cible?)`, `pocket(cible?)` (avec `FIRST_IN_HAND`) et `eject(cible?)`, les cibles `choice({ zones, count, upTo })` et `allActive(...filtres)` (avec `sizeIs(calibre)`), et les sources `turnsInHand()`, `activeSize(calibre)` et `tally(valeur, portée)` des montants calculés |
 | `config/marbles-values.js` | Réglages, phases, déclencheurs, mot-clé En poche, valeurs de partie, modèle de fiche, sac de test, sons (donnée pure) |
 | `core/marbles-rules.js` | Les règles liées à une table de billes : le point d'entrée de la simulation hors du core |
 | `core/marbles.js` | La simulation : état, réducteur, écouteurs, journal, codes de refus |
@@ -29,10 +29,13 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
 | `view/marbles/keywords.js` | L'aide des mots-clés de la bille sous le curseur (E, Maj+E) |
 | `view/marbles/tally-screen.js` | Le menu de debug des valeurs de partie (Maj+L) |
 | `view/marbles/navigation.js` | Le curseur dans le triangle, les zones, l'ouverture de la sélection d'emplacement (pur) |
-| `view/marbles/sounds.js` | Les sons de l'écran : repères des évènements, roulements, balise au survol, musique |
+| `view/marbles/sounds.js` | Les sons de l'écran, point d'entrée de ses modules (`view/marbles/sounds/`) : `validation.js` (réglages sonores, au chargement), `space.js` (places, positions, rendu), `timeline.js` (repères des évènements, ligne de temps), `playback.js` (lecture, roulements, balise au survol, musique) |
+| `view/marbles/help-screen.js` | L'aide du jeu des billes (touche H) : rubriques courtes, puis l'aide des touches |
 | `view/marbles/sound-queue.js` | La file de sons, qui étale ceux d'un même geste (pur) |
 | `view/marbles/rolls.js` | Le mouvement d'une bille qui roule : durée, position, vitesse (pur) |
-| `tools/marbles/` | La boîte à outils : partie au terminal, cas construits, simulateur (`doc/marbles-tools.md`) |
+| `tools/marbles/` | La boîte à outils : partie au terminal, cas construits, simulateur, annexe du document de règles (`doc/marbles-tools.md`) |
+| `doc/marbles-rules.md` | Les règles pour un joueur et pour le concepteur, sans code ; son annexe des billes est générée |
+| `doc/marbles-backlog.md` | Les points en suspens, une ligne chacun, avec leur origine |
 | `core/checks/marbles.check.js`, `marbles-bus.check.js`, `marbles-tally.check.js`, `marbles-forecast.check.js`, `marbles-view.check.js`, `marbles-sequence.check.js` | Vérifications |
 
 ## Déroulement d'un tour
@@ -59,8 +62,8 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
    Elles partent des compteurs du tour : Vitesse (0 en début de tour) et Masse (1), que
    Chiquenaude, Tic et Éjection ont déjà pu modifier. Chaque bille applique son effet (un Polissage ou
    une Fêlure sur elle-même compris) puis prend 1 d'usure, même si cela l'amène à son
-   maximum. Une bille qu'une Fêlure a retirée, ou qu'Empocher a envoyée au pot, avant sa
-   phase la saute.
+   maximum. Une bille qu'une Fêlure a retirée, qu'Empocher a envoyée au pot ou
+   qu'Éjecter a chassée, avant sa phase, la saute.
 5. **Pot** : chaque bille du pot, dans l'ordre d'arrivée, joue son effet **En poche, à
    chaque résolution** (voir « Le pot »). Une bille sans cet effet passe sans rien dire.
 6. **Retraits par usure**, dans l'ordre des phases : chaque bille à son usure maximale
@@ -234,10 +237,12 @@ cet ordre, visible au journal :
 `knockout` et `hit` portent le remplacement en cours, `replacement: { placed, ejected }`
 (les ids de A et de B), que lit la condition de calibre relatif (voir « Conditions »).
 
-**Une Chiquenaude qui vide l'emplacement visé** (une Fêlure qui amène B à son usure
-maximale, comme celle de la plombée) : B suit le retrait par usure habituel (`removed` et
-`discarded`, `cause: "wear"`, puis son Final), et la pose se poursuit comme sur un
-emplacement vide, sans Éjection ni Tic. La pose reste un lancer dans tous les cas.
+**Une Chiquenaude qui vide l'emplacement visé** : une Fêlure qui amène B à son usure
+maximale (B suit le retrait par usure habituel, `removed` et `discarded`, `cause:
+"wear"`, puis son Final), Éjecter (comme la plombée, qui éjecte la pointe : B joue son
+Éjection et part, `cause: "eject"`), ou Empocher. La pose se poursuit alors comme sur un
+emplacement vide, sans Éjection par la pose ni Tic. La pose reste un lancer dans tous les
+cas.
 
 ## Une bille
 
@@ -287,8 +292,8 @@ Le registre et le sac de test sont validés ensemble au démarrage
 contenu). L'ordre du registre compte : les sacs aléatoires du simulateur y tirent leurs
 billes.
 
-Les champs d'effet (`base`, `baseVariant`, `apex`, et un par déclencheur : `flick`, `hit`,
-`knockout`, `final`) sont tous facultatifs :
+Les champs d'effet (`base`, `baseVariant`, `apex`, un par déclencheur : `awaken`, `flick`,
+`hit`, `windfall`, `knockout`, `final`, et `pocketed`, En poche) sont tous facultatifs :
 absent, aucun effet. `maxWear` vaut 3 par défaut. Un champ obligatoire, validé au
 chargement par la simulation (`validateMarbleTypes`) :
 
@@ -611,7 +616,7 @@ chaque bille ACTIVE, dans l'ordre des phases, avant que la pioche ne reprenne : 
 interruption du bus, voir « Le bus d'évènements » ; ses valeurs vont aux compteurs du tour
 en cours ; une bille en main, au sac, en défausse ou en cours de lancer n'en a pas ; une
 bille retirée par une Trouvaille précédente non plus), l'**Éjection**
-(`knockout`, remplacée) et le **Final** (`final`, retirée par usure, une fois à la
+(`knockout`, remplacée par une pose, ou chassée par Éjecter) et le **Final** (`final`, retirée par usure, une fois à la
 défausse ; jamais à une éjection, un échange ou une pose). Ils sont déclarés UNE fois, dans
 `config/marbles-values.js`/`MARBLE_TRIGGERS`, une entrée chacun :
 
@@ -701,7 +706,7 @@ pose sur une bille sans Éjection donne +1 bille éjectée, +0 éjection ; un m�
 | Catégorie | Compteurs (id) | Source | Compte |
 |---|---|---|---|
 | Déclenchements | `awaken`, `flick`, `hit`, `windfall`, `knockout`, `final`, `apex`, `base`, `leftBase`, `rightBase`, `pocketEntry`, `pocketResolution`, `pocketReaction` | générés : un par déclencheur de `MARBLE_TRIGGERS`, un par mot-clé de phase (`core/marbles.js`/`PHASE_KEYWORDS`, tirés de `MARBLE_PHASES`), un par moment En poche (`MARBLE_POCKET`) | +1, par bille, quand le mot-clé se déclenche chez une bille qui a un effet pour ce moment : son champ n'est pas vide (pour une base : l'effet de base, ou sa variante de l'emplacement), ou elle a reçu un effet extérieur pour ce moment (un bonus ciblé sur sa phase). Un effet à condition fausse compte ; une phase sautée (emplacement vide, bille retirée avant) ne compte pas. `base` = `leftBase` + `rightBase` |
-| Actions | `draw`, `drawQuantity`, `polish`, `polishQuantity`, `crack`, `crackQuantity`, `pocket`, `pocketQuantity`, `eject`, `ejectQuantity` | générés depuis les actions de `CLAUSE_ACTIONS` qui déclarent `keyword` | les déclencheurs : un par application (une Pioche par effet joué qui pioche ; un Polissage, une Fêlure ou un Empocher par application, cible vide comprise) ; la quantité réelle : billes réellement piochées par une Pioche (`draw` de cause `"effect"`), usure réellement rendue ou ajoutée (`applied` de `polished`, `cracked`), billes réellement déplacées par Empocher (`pocketed` ou `lost`) |
+| Actions | `draw`, `drawQuantity`, `polish`, `polishQuantity`, `crack`, `crackQuantity`, `pocket`, `pocketQuantity`, `eject`, `ejectQuantity` | générés depuis les actions de `CLAUSE_ACTIONS` qui déclarent `keyword` | les déclencheurs : un par application (une Pioche par effet joué qui pioche ; un Polissage, une Fêlure, un Empocher ou un Éjecter par application, cible vide comprise) ; la quantité réelle : billes réellement piochées par une Pioche (`draw` de cause `"effect"`), usure réellement rendue ou ajoutée (`applied` de `polished`, `cracked`), billes réellement déplacées par Empocher (`pocketed` ou `lost`), billes réellement chassées par Éjecter (`removed`, cause `"eject"`) |
 | Vitesse et Masse | `speedGains`, `speedGained`, `speedLosses`, `speedLost`, et les mêmes pour `mass` | générés depuis les actions de valeur sans `keyword` | dans chaque effet joué (`effect`), la valeur réellement appliquée aux compteurs du tour (bonus reçu compris ; un bonus perdu n'est jamais appliqué), avant les planchers de l'Impact : une occurrence de gain ou de perte par effet, et le total en valeur absolue |
 | Évènements | `thrownMarbles`, `hitMarbles`, `ejectedMarbles`, `shuffles`, `drawnMarbles`, `wornMarbles`, `triangleExits`, `pocketedMarbles`, `lostMarbles` | déclarés : `config/marbles-values.js`/`MARBLE_TALLIES` | billes lancées (`flick`), tiquées (`hit` : posées sur un emplacement occupé), éjectées (`removed`, cause `"replacement"` ou `"eject"`), mélanges (`bagRegenerated`), billes piochées (`draw`, toutes causes), usées (`removed`, cause `"wear"`), sorties du triangle (`removed`, toutes causes : aujourd'hui, usées + éjectées + mises en poche depuis le triangle ; les éjectées comptent celles d'Éjecter), mises en poche (`pocketed`), perdues (`lost`) |
 
@@ -753,10 +758,11 @@ dans le réducteur, et rien d'extérieur ne s'y abonne.
 - **Pas de récursion** : un évènement émis pendant le traitement d'un autre attend dans une
   file, premier entré, premier sorti.
 - **Une exception, l'interruption** (`settle`) : son évènement et tout ce qui en découle se
-  règlent jusqu'au bout tout de suite, dans une file à part, avant ce qui attendait. Deux
-  en sont : la Trouvaille, qui se joue entre la régénération et la reprise de la pioche, et
+  règlent jusqu'au bout tout de suite, dans une file à part, avant ce qui attendait. Trois
+  en sont : la Trouvaille, qui se joue entre la régénération et la reprise de la pioche ;
   l'Éveil, entre la pioche d'une bille et celle de la suivante, même quand cette pioche
-  vient d'un effet en plein traitement (un Tic qui pioche).
+  vient d'un effet en plein traitement (un Tic qui pioche) ; et l'Éjection d'une bille
+  chassée par Éjecter, avant qu'elle ne quitte son emplacement.
 - **Le journal s'écrit à l'émission**, dans l'ordre où l'état change : la file étant premier
   entré, premier sorti, c'est l'ordre de traitement, sauf pour une interruption, réglée
   avant ce qui attendait mais émise après. Les valeurs de partie aussi (voir plus haut).
@@ -793,7 +799,7 @@ atteindra son usure maximale ce tour, rien sinon) ; `regenerations`, chaque rég
 du sac en chemin, dans l'ordre, `{ effects }` : les effets prévus avec elle (les
 Trouvailles des billes actives, connues : seule l'identité des billes piochées reste
 cachée), `[]` sans régénération ; `cleared`, par emplacement, la bille
-retirée avant sa phase par une Fêlure ; `wear` et `retired`, les changements d'usure et les
+retirée avant sa phase (une Fêlure, Empocher ou Éjecter) ; `wear` et `retired`, les changements d'usure et les
 retraits, dans l'ordre ; `drawn`, les billes que l'action et la
 résolution piocheraient ; `tally`, les valeurs de partie à la fin de la résolution (la
 copie porte le registre, qui y évolue comme dans la partie ; le registre réel n'est jamais
@@ -819,9 +825,9 @@ avant sa phase.
 une bille (Polissage, Fêlure, Empocher) n'a rien trouvé, `empty` (les évènements
 `targetEmpty`, rattachés par leur `by`) : emplacement vide, main vide, bille déjà partie.
 Le moteur le sait aussi sûrement qu'il joue le coup. R et la confirmation le disent chez
-l'effet, avant ce qu'il a empoché : « Tic de gorille : Vitesse +4 et Empocher la première
-bille de la main, main vide », « Final : Polissage 1 à la pointe et Empocher cette bille,
-pointe vide, puis agate en poche ». La séquence, elle, le dit à part, comme avant
+l'effet, avant ce qu'il a empoché : « Tic de gorille : Vitesse +4 et Empocher une bille de
+votre main au choix, aucune cible au choix », « Final : Polissage 1 à la pointe et Empocher
+cette bille, pointe vide, puis agate en poche ». La séquence, elle, le dit à part, comme avant
 (« Main vide : rien à empocher. »).
 
 **L'exception de l'Éveil** : la bille piochée étant inconnue, son Éveil ne se prévoit
@@ -1129,7 +1135,7 @@ ne change pas : il était déjà complet avant la première étape.
 
 Les sons du minijeu sont rangés à part, dans `assets/sounds/marbles/` et
 `assets/musics/marbles_classic`. Les clés vivent dans `config/marbles-values.js`, vérifiées
-par l'audit du contenu ; la lecture, dans `view/marbles/sounds.js`.
+par l'audit du contenu ; la lecture, dans `view/marbles/sounds/playback.js`.
 
 **Profils** : le son d'une bille dépend de son **calibre** (couplage voulu, une seule
 source de vérité) : un profil sonore par calibre (`MARBLE_SOUND_PROFILES`, indexé par
@@ -1300,6 +1306,18 @@ Les noms et descriptions sont déclarés à côté des mots-clés (`MARBLE_PHASE
 `core/marbles.js`/`buildMarbleKeywords` : un mot-clé sans eux échoue au chargement. Pas de
 conflit de touches : E n'était lié à rien dans ces écrans (l'émote de l'écran de ville n'y
 est jamais active).
+
+### Aide (H)
+
+**H** ouvre un menu vertical (`view/marbles/help-screen.js`, un menu de `lib/menu.js`), à
+tout moment : une entrée par rubrique, dans cet ordre, « But du jeu », « Score : Vitesse,
+Masse et Impact », « Le triangle et la rotation », « L'usure », « Main, lancers et
+pioche », « Les zones : sac, défausse, pot, billes perdues », « Les mots-clés » ; Entrée y
+dit un texte de quelques phrases, tiré de `doc/marbles-rules.md`, ses valeurs lues dans les
+réglages. Puis « Les touches », qui ouvre l'aide des touches de l'écran des billes, la même
+que F1 (générée, `lib/help.js`, l'écran décrit passé par `covered`), et « Fermer » ; Échap
+ferme aussi. H était libre dans cet écran : F1 et Maj+H sont des touches globales, qui
+ouvrent directement l'aide des touches.
 
 ### Historique (L)
 

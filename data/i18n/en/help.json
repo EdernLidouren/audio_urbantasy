@@ -58,6 +58,7 @@
   "help.marbles.down": "Go down, from the apex to the bases and from the bases to the hand",
   "help.marbles.end": "Go to the last marble in hand",
   "help.marbles.finish": "Finish an “up to N” choice without making every choice (on the triangle as in the hand)",
+  "help.marbles.help": "Open the marbles help: the rules in brief, then the keys",
   "help.marbles.history": "Open the history of the previous turn",
   "help.marbles.home": "Go to the first marble in hand",
   "help.marbles.keywords": "Say the keywords of the marble under the cursor",
