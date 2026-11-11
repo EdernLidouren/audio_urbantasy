@@ -400,41 +400,42 @@ function checkTallyMenu(run) {
 }
 
 // L'aide des mots-clés (touches E et Maj+E) : seulement ceux présents sur la bille,
-// dans l'ordre (pointe, base, déclencheurs, actions), chacun une fois ; les cas vides.
+// dans l'ordre (déclencheurs, En poche, actions, puis pointe et base), chacun une
+// fois ; les cas vides.
 function checkKeywords(run) {
   const locale = getLocale();
   const ids = (marble, marbles = rules) => marbles.keywordsOf(marble).map((keyword) => keyword.id);
-  run.same("mots-clés : la géante, déclencheurs puis actions", ["apex", "base", "awaken", "final", "draw", "polish"], ids("giant"));
-  run.same("mots-clés : le mica, la Pioche une seule fois (base, éveil, éjection)", ["apex", "base", "awaken", "knockout", "draw", "polish"], ids("mica"));
-  run.same("mots-clés : le sulfure, En poche avant les actions, Fêlure puis Empocher", ["apex", "base", "windfall", "pocketed", "crack", "pocket"], ids("sulphide"));
-  run.same("mots-clés : la porcelaine, En poche par son seul effet d'entrée", ["apex", "base", "flick", "final", "pocketed"], ids("porcelain"));
-  run.same("mots-clés : ni Vitesse ni Masse, ni calibre", ["apex", "base", "flick", "hit"], ids("clay"));
+  run.same("mots-clés : la géante, déclencheurs, actions, puis pointe et base", ["awaken", "final", "draw", "polish", "apex", "base"], ids("giant"));
+  run.same("mots-clés : le mica, la Pioche une seule fois (base, éveil, éjection)", ["awaken", "knockout", "draw", "polish", "apex", "base"], ids("mica"));
+  run.same("mots-clés : le sulfure, En poche avant les actions, Fêlure puis Empocher", ["windfall", "pocketed", "crack", "pocket", "apex", "base"], ids("sulphide"));
+  run.same("mots-clés : la porcelaine, En poche par son seul effet d'entrée", ["flick", "final", "pocketed", "apex", "base"], ids("porcelain"));
+  run.same("mots-clés : ni Vitesse ni Masse, ni calibre", ["flick", "hit", "apex", "base"], ids("clay"));
   const made = fabricatedRules({ sided: { baseVariant: { leftBase: [{ action: "mass", amount: 1 }] } }, bare: {} });
   run.same("mots-clés : une variante de base seule compte comme base", ["base"], ids("sided", made));
   run.same("mots-clés : une bille sans effet n'en a aucun", [], ids("bare", made));
   run.same(
-    "mots-clés : l'ordre de la liste, phases, déclencheurs, actions",
-    ["apex", "base", "awaken", "flick", "hit", "windfall", "knockout", "final", "pocketed", "draw", "polish", "crack", "pocket"],
+    "mots-clés : l'ordre de la liste, déclencheurs, En poche, actions, puis phases",
+    ["awaken", "flick", "hit", "windfall", "knockout", "final", "pocketed", "draw", "polish", "crack", "pocket", "apex", "base"],
     MARBLE_KEYWORDS.map((keyword) => keyword.id)
   );
 
   setLocale("fr");
   run(
-    "touche E : la tigrée, d'une seule annonce",
-    "Pointe : effet joué pendant la phase de pointe, quand la bille est posée en pointe. " +
-      "Base : effet joué pendant la phase de base, quand la bille est posée en base gauche ou en base droite. Il peut différer selon le côté. " +
-      "Éveil : se déclenche quand la bille est piochée. " +
+    "touche E : la tigrée, d'une seule annonce, pointe et base en dernier",
+    "Éveil : se déclenche quand la bille est piochée. " +
       "Trouvaille : se déclenche quand le sac est reconstitué à partir de la défausse, si la bille est sur le triangle. " +
-      "Final : se déclenche quand la bille est usée et quitte le triangle.",
+      "Final : se déclenche quand la bille est usée et quitte le triangle. Elle est alors déjà dans la défausse : si son Final l'empoche, elle passe de la défausse au pot. " +
+      "Pointe : effet joué pendant la phase de pointe, quand la bille est posée en pointe. " +
+      "Base : effet joué pendant la phase de base, quand la bille est posée en base gauche ou en base droite. Il peut différer selon le côté.",
     plain(keywordsText("tiger", rules, t))
   );
   run("touche E : aucune bille", "Aucune bille.", keywordsText(undefined, rules, t));
   run(
     "touche E : En poche et Empocher, tels que déclarés",
     true,
-    plain(keywordsText("agate", rules, t)).endsWith(
+    plain(keywordsText("agate", rules, t)).includes(
       "En poche : effets actifs uniquement lorsque la bille est dans le pot. Polissage : retire de l'usure à une bille, qui reste ainsi plus longtemps sur le triangle. " +
-        "Empocher : envoie une bille au pot. Si le pot est plein, la bille est perdue pour la partie."
+        "Empocher : envoie une bille au pot, où qu'elle soit : sur le triangle, en main ou dans la défausse. Si le pot est plein, la bille est perdue pour la partie. Pointe : "
     )
   );
   run("touche E : aucun mot-clé", "Aucun mot-clé.", keywordsText("bare", made, t));
@@ -443,24 +444,29 @@ function checkKeywords(run) {
   run("Maj+E : titre", "Mots-clés de géante", plain(t(menu.title, menu.titleParams)));
   run.same(
     "Maj+E : une entrée par mot-clé, puis Fermer",
-    ["Pointe", "Base", "Éveil", "Final", "Pioche", "Polissage", "Fermer"],
+    ["Éveil", "Final", "Pioche", "Polissage", "Pointe", "Base", "Fermer"],
     lines(menu).map((line) => line.split(" : ")[0])
   );
-  run("Maj+E : la description de la Pioche", "Pioche : pioche des billes du sac. Si le sac est vide, la défausse est mélangée pour le reconstituer.", lines(menu)[4]);
+  run("Maj+E : la description de la Pioche", "Pioche : pioche des billes du sac. Si le sac est vide, la défausse est mélangée pour le reconstituer.", lines(menu)[2]);
   run("Maj+E : Échap ferme", true, menu.closable);
   run.same("Maj+E : seule Fermer agit", [menu.entries.length - 1], menu.entries.flatMap((entry, index) => (typeof entry.onActivate === "function" ? [index] : [])));
   run.same("Maj+E : aucun mot-clé", ["Aucun mot-clé.", "Fermer"], lines(keywordsMenu("bare", made)));
   run.same("Maj+E : aucune bille", ["Aucune bille.", "Fermer"], lines(keywordsMenu(undefined, rules)));
   run("Maj+E : aucune bille, titre", "Mots-clés", t(keywordsMenu(undefined, rules).title));
   setLocale("en");
-  run("touche E, anglais : la première ligne", "Apex: effect played during the apex phase, when the marble sits at the apex.", plain(t(keywordLines("tiger", rules)[0].key, keywordLines("tiger", rules)[0].params)));
+  run("touche E, anglais : la première ligne", "Awaken: triggers when the marble is drawn.", plain(t(keywordLines("tiger", rules)[0].key, keywordLines("tiger", rules)[0].params)));
+  run(
+    "touche E, anglais : pointe en avant-dernier",
+    "Apex: effect played during the apex phase, when the marble sits at the apex.",
+    plain(t(keywordLines("tiger", rules).at(-2).key, keywordLines("tiger", rules).at(-2).params))
+  );
   run("touche E, anglais : aucune bille", "No marble.", keywordsText(undefined, rules, t));
   run(
     "touche E, anglais : En poche et Empocher",
     true,
-    plain(keywordsText("sulphide", rules, t)).endsWith(
+    plain(keywordsText("sulphide", rules, t)).includes(
       "Pocketed: effects active only while the marble is in the pot. Crack: adds wear to a marble. If it reaches its maximum, the marble is worn out and leaves the triangle at once. " +
-        "Pocket: sends a marble to the pot. If the pot is full, the marble is lost for the rest of the game."
+        "Pocket: sends a marble to the pot, wherever it is: on the triangle, in hand or in the discard. If the pot is full, the marble is lost for the rest of the game. Apex: "
     )
   );
   run("Maj+E, anglais : titre", "Keywords of giant", plain(t(menu.title, menu.titleParams)));

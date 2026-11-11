@@ -348,10 +348,11 @@ function clausesOf(type) {
   ];
 }
 
-// Les MOTS-CLÉS, dans l'ordre de l'aide : les phases (MARBLE_PHASES), les
-// déclencheurs (MARBLE_TRIGGERS), En poche (MARBLE_POCKET, présent si l'un de ses
-// moments a un effet), puis les actions mots-clés (CLAUSE_ACTIONS qui déclarent
-// `keyword`). Chacun { id, kind, texts: { name, description },
+// Les MOTS-CLÉS, dans l'ordre de l'aide : les déclencheurs (MARBLE_TRIGGERS), En
+// poche (MARBLE_POCKET, présent si l'un de ses moments a un effet), les actions
+// mots-clés (CLAUSE_ACTIONS qui déclarent `keyword`), puis les phases
+// (MARBLE_PHASES) en dernier : pointe et base, présentes sur presque toutes les
+// billes, ne masquent pas ce qui distingue la bille en tête d'annonce. Chacun { id, kind, texts: { name, description },
 // present(marble, types) } : présent sur une bille si son champ n'est pas vide
 // (pour une phase, l'effet d'un de ses emplacements, variante comprise), ou, pour
 // une action, si une clause de la bille l'utilise. Un mot-clé ajouté à sa liste
@@ -362,12 +363,6 @@ export function buildMarbleKeywords({ phases, triggers, pocket, actions }) {
     throw new Error(`marbles, mots-clés : ${message}`);
   };
   const keywords = [
-    ...phases.map((phase) => ({
-      id: phase.id,
-      kind: "phase",
-      texts: phase.texts,
-      present: (marble, types) => phase.slots.some((slot) => effectAt(marble, slot, types).length > 0),
-    })),
     ...triggers.map((trigger) => ({
       id: trigger.id,
       kind: "trigger",
@@ -388,6 +383,12 @@ export function buildMarbleKeywords({ phases, triggers, pocket, actions }) {
         texts: action.keyword.texts,
         present: (marble, types) => clausesOf(types[marble]).some((clause) => clause.action === id),
       })),
+    ...phases.map((phase) => ({
+      id: phase.id,
+      kind: "phase",
+      texts: phase.texts,
+      present: (marble, types) => phase.slots.some((slot) => effectAt(marble, slot, types).length > 0),
+    })),
   ];
   for (const keyword of keywords) validateKeywordTexts(keyword.texts, `${keyword.kind} "${keyword.id}"`, fail);
   return keywords;

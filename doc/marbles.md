@@ -1008,23 +1008,24 @@ menu (`select`, `cancel`, `block`, `refusal`).
 Sur la bille sous le curseur, partout où une bille peut l'être (triangle, main, menus du
 sac et de la défausse : `view/marbles/keywords.js`) :
 
-- **E** : une seule annonce, « Pointe : effet joué pendant la phase de pointe, quand la
-  bille est posée en pointe. Base : … » ;
+- **E** : une seule annonce, « Éveil : se déclenche quand la bille est piochée. Final : … » ;
 - **Maj+E** : un menu vertical (`lib/menu.js`), titré « Mots-clés de géante », une entrée par
   mot-clé (« Pioche : pioche des billes du sac. … »), puis « Fermer » ; Échap ferme aussi.
   Les entrées se lisent, Entrée n'y fait rien.
 
 Seulement les mots-clés présents sur la bille (`core/marbles.js`/`keywordsOf`) : ses champs
-non vides (pointe, base, variante comprise, déclencheurs) et les actions mots-clés de ses
-clauses (Pioche, Polissage, Fêlure), chacun une fois, dans l'ordre : pointe, base, éveil,
-chiquenaude, tic, trouvaille, éjection, final, pioche, polissage, fêlure. Ni Vitesse ni
+non vides (déclencheurs, En poche, pointe, base, variante comprise) et les actions
+mots-clés de ses clauses (Pioche, Polissage, Fêlure, Empocher), chacun une fois, dans
+l'ordre : éveil, chiquenaude, tic, trouvaille, éjection, final, en poche, pioche,
+polissage, fêlure, empocher, puis **pointe et base en dernier** : présentes sur presque
+toutes les billes, elles ne passent pas devant ce qui distingue la bille. Ni Vitesse ni
 Masse (ce ne sont pas des mots-clés), ni calibre. Sans bille (emplacement vide, main vide,
 « Retour » d'un menu de pile) : « Aucune bille. » ; une bille sans mot-clé : « Aucun
 mot-clé. » (dans le menu, cette entrée seule, puis « Fermer »). Refusées pendant la
 séquence, comme les autres annonces de consultation.
 
 Les noms et descriptions sont déclarés à côté des mots-clés (`MARBLE_PHASES`,
-`MARBLE_TRIGGERS`, `CLAUSE_ACTIONS` : `keyword.texts`), lus par
+`MARBLE_TRIGGERS`, `MARBLE_POCKET`, `CLAUSE_ACTIONS` : `keyword.texts`), lus par
 `core/marbles.js`/`buildMarbleKeywords` : un mot-clé sans eux échoue au chargement. Pas de
 conflit de touches : E n'était lié à rien dans ces écrans (l'émote de l'écran de ville n'y
 est jamais active).
