@@ -30,7 +30,3 @@ Les points repoussés « à plus tard », une ligne par point, avec son origine 
 - Autres conditions de fin de partie (un Impact minimal à atteindre). (`doc/marbles.md`, « Fin de partie ».)
 - Les succès, qui liront les valeurs de partie. (`doc/marbles.md`, « Valeurs de partie ».)
 - Une étape de séquence qui attendrait la fin d'un son au lieu d'une durée. (`doc/marbles.md`, « Séquence de résolution ».)
-
-## Outils
-
-- Rapports de référence commités dans `tools/marbles/reports/` : périmés depuis l'itération 6. Proposition faite à l'itération 19 : les remplacer par un rapport unique à jour, ou les supprimer.
