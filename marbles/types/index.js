@@ -31,6 +31,10 @@
 //   knockout    l'Éjection : effet joué quand la bille est remplacée ;
 //   final       le Final : effet joué quand la bille est retirée par usure, une fois
 //               à la défausse, avant l'Impact du tour ;
+//   pocketed    En poche : des effets qui ne jouent que lorsque la bille est dans le
+//               POT, un objet { <moment>: effet } (config/marbles-values.js/
+//               MARBLE_POCKET) : `entry`, à son entrée au pot ; `resolution`, à chaque
+//               résolution, après les phases. Rien sur la bille elle-même ;
 //   maxWear     usure maximale, sinon MARBLES_SETTINGS.defaultMaxWear ;
 //   size        son CALIBRE, obligatoire : SMALL, MEDIUM ou LARGE, toujours par ces
 //               constantes (config/marbles-values.js), validé au chargement. Statique.
@@ -43,6 +47,8 @@
 //           pioche `amount` billes (au moins 1, jamais de cible) ; "polish", le
 //           Polissage, et "crack", la Fêlure, qui retirent ou ajoutent `amount`
 //           d'usure (au moins 1) à la bille elle-même ou à celle de `target` ;
+//           "pocket", Empocher, sans montant, qui envoie au pot la bille elle-même,
+//           celle de `target` ou la première de la main (`target` FIRST_IN_HAND) ;
 //   amount  la valeur : un entier, ou un MONTANT CALCULÉ { base, step, source,
 //           max? }, base + step × la valeur de la source, plafonné à max, évalué
 //           au déclenchement (sources : turnsInHand(), activeSize(calibre),

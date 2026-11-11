@@ -42,6 +42,11 @@ function playState(over = {}, marbles = rules) {
   return { ...emptyBagMarblesGame(marbles, 1), turn: 2, stage: "play", ...over, tally: tallyOf(over.tally) };
 }
 
+// Seulement ces compteurs-là d'un relevé.
+function pick(values, ids) {
+  return Object.fromEntries(Object.entries(values).filter(([id]) => ids.includes(id)));
+}
+
 // Ce qu'une action a ajouté au registre, portée « cette partie », compteurs non nuls.
 function added(before, after) {
   return Object.fromEntries(
@@ -95,7 +100,7 @@ function checkGeneration(run) {
   run("génération : les phases", true, ["apex", "base", "leftBase", "rightBase"].every((id) => ids.includes(id)));
   run.same(
     "génération : les actions mots-clés, déclenchements et quantité réelle",
-    ["draw", "drawQuantity", "polish", "polishQuantity", "crack", "crackQuantity"],
+    ["draw", "drawQuantity", "polish", "polishQuantity", "crack", "crackQuantity", "pocket", "pocketQuantity"],
     TALLY_COUNTERS.filter((counter) => counter.category === "action").map((counter) => counter.id)
   );
   run.same(
@@ -168,13 +173,14 @@ function checkKeywords(run) {
   run.same("mots-clés : la tigrée, sans Chiquenaude, ne compte que comme bille lancée", { thrownMarbles: 1 }, added(tiger, thrown.state));
 
   // Un effet à condition fausse compte : le Tic du gorille sur une géante (pas plus
-  // petite) ne produit rien, mais le champ existe.
+  // petite) ne produit rien, mais le champ existe. Son Empocher trouve la main vide :
+  // un déclenchement, aucune bille déplacée.
   const gorilla = playState({ hand: inHand(["gorilla"]), triangle: { leftBase: null, rightBase: null, apex: placed("giant") } });
   const hit = rules.reduce(gorilla, { type: "place", handIndex: 0, slot: "apex" });
   run.same("mots-clés : le Tic à condition fausse ne produit rien", [{ marble: "gorilla", speedDelta: 0 }], effectsOf(hit.events, "hit"));
   run.same(
     "mots-clés : mais compte, comme ses évènements ; la géante sans Éjection : +1 bille éjectée, +0 éjection",
-    { hit: 1, thrownMarbles: 1, hitMarbles: 1, ejectedMarbles: 1, triangleExits: 1 },
+    { hit: 1, thrownMarbles: 1, hitMarbles: 1, ejectedMarbles: 1, triangleExits: 1, pocket: 1 },
     added(gorilla, hit.state)
   );
   // Une occupante qui a une Éjection : +1 éjection, aussi.
@@ -236,9 +242,11 @@ function checkActions(run) {
     { flick: 1, crack: 1, crackQuantity: 1, final: 1, thrownMarbles: 1, wornMarbles: 1, triangleExits: 1, speedGains: 1, speedGained: 4 },
     added(cracking, rules.reduce(cracking, { type: "place", handIndex: 0, slot: "apex" }).state)
   );
-  // Sur un emplacement vide : un déclenchement, aucune usure.
-  const empty = playState({ triangle: { leftBase: placed("sulphide"), rightBase: null, apex: null } });
-  const missed = added(empty, rules.reduce(empty, { type: "resolve" }).state);
+  // Sur un emplacement vide : un déclenchement, aucune usure (une Fêlure de base
+  // fabriquée).
+  const cracker = fabricated({ cracker: { base: [{ action: "crack", amount: 1, target: "apex" }] } });
+  const empty = playState({ triangle: { leftBase: placed("cracker"), rightBase: null, apex: null } }, cracker);
+  const missed = added(empty, cracker.reduce(empty, { type: "resolve" }).state);
   run.same("actions : Fêlure sur un emplacement vide, 1 déclenchement, 0 point", { crack: 1, crackQuantity: undefined }, { crack: missed.crack, crackQuantity: missed.crackQuantity });
 }
 
@@ -261,25 +269,57 @@ function checkStats(run) {
   run("Vitesse et Masse : un bonus perdu (pointe vide) ne compte pas", undefined, lostAdded.speedGained);
 }
 
-// Les évènements réels, et l'égalité des sorties du triangle avec les billes usées et
-// éjectées, sur des parties entières.
+// Les évènements réels, et l'égalité des sorties du triangle avec les billes usées,
+// éjectées et mises en poche depuis le triangle, sur des parties entières.
 function checkEvents(run) {
   const shuffle = playState({ stage: "draw", bag: [], discard: ["clay"] });
   run.same("évènements : un mélange sans bille active, une bille piochée", { shuffles: 1, drawnMarbles: 1 }, added(shuffle, rules.reduce(shuffle, { type: "draw" }).state));
   let random = 3;
   const mismatches = [];
+  let pocketedFromTriangle = 0;
   for (let seed = 1; seed <= 30; seed++) {
     let state = rules.createGame(seed);
+    // Les mises en poche depuis le triangle, comptées dans le journal (aucune valeur
+    // de partie ne les isole).
+    let fromTriangle = 0;
     while (state.stage !== "over") {
       const actions = legalActions(state);
       const draw = nextRandom(random);
       random = draw.state;
-      state = rules.reduce(state, actions[Math.floor(draw.value * actions.length)]).state;
+      const result = rules.reduce(state, actions[Math.floor(draw.value * actions.length)]);
+      fromTriangle += result.events.filter((event) => event.type === "removed" && event.cause === "pocket").length;
+      state = result.state;
       const { triangleExits, wornMarbles, ejectedMarbles } = state.tally;
-      if (triangleExits.game !== wornMarbles.game + ejectedMarbles.game || triangleExits.turn !== wornMarbles.turn + ejectedMarbles.turn) mismatches.push(seed);
+      if (triangleExits.game !== wornMarbles.game + ejectedMarbles.game + fromTriangle) mismatches.push(seed);
     }
+    pocketedFromTriangle += fromTriangle;
   }
-  run.same("évènements : billes sorties du triangle = billes usées + billes éjectées", [], mismatches);
+  run.same("évènements : billes sorties du triangle = billes usées + éjectées + mises en poche depuis le triangle", [], mismatches);
+  run("évènements : des mises en poche depuis le triangle rencontrées", true, pocketedFromTriangle > 0);
+
+  // Le pot : mises en poche, pertes, et Empocher, déclenchements et billes déplacées.
+  const gorilla = playState({ hand: inHand(["gorilla", "porcelain"]), triangle: { leftBase: null, rightBase: null, apex: placed("clay") } });
+  run.same(
+    "pot : une mise en poche, son entrée, Empocher et sa bille déplacée",
+    { pocketedMarbles: 1, pocketEntry: 1, pocket: 1, pocketQuantity: 1 },
+    pick(added(gorilla, rules.reduce(gorilla, { type: "place", handIndex: 0, slot: "apex" }).state), ["pocketedMarbles", "pocketEntry", "pocket", "pocketQuantity", "lostMarbles"])
+  );
+  const full = { ...gorilla, pot: ["clay", "glass", "mica"] };
+  run.same(
+    "pot plein : une bille perdue, pas d'entrée, une bille déplacée quand même",
+    { lostMarbles: 1, pocket: 1, pocketQuantity: 1 },
+    pick(added(full, rules.reduce(full, { type: "place", handIndex: 0, slot: "apex" }).state), ["pocketedMarbles", "pocketEntry", "pocket", "pocketQuantity", "lostMarbles"])
+  );
+  // Sans effet d'entrée (l'argile) : la mise en poche compte, pas l'entrée.
+  const plainEntry = playState({ hand: inHand(["gorilla", "clay"]), triangle: { leftBase: null, rightBase: null, apex: placed("clay") } });
+  run.same(
+    "pot : une bille sans effet d'entrée, pas d'entrée comptée",
+    { pocketedMarbles: 1, pocket: 1, pocketQuantity: 1 },
+    pick(added(plainEntry, rules.reduce(plainEntry, { type: "place", handIndex: 0, slot: "apex" }).state), ["pocketedMarbles", "pocketEntry", "pocket", "pocketQuantity"])
+  );
+  // À chaque résolution : seulement les billes du pot qui ont cet effet.
+  const resolving = playState({ triangle: { leftBase: placed("clay"), rightBase: null, apex: null }, pot: ["agate", "glass", "sulphide"] });
+  run("pot : à chaque résolution, l'agate et le sulfure, pas le verre", 2, added(resolving, rules.reduce(resolving, { type: "resolve" }).state).pocketResolution);
 }
 
 // Les portées : remise à zéro au début du tour, avant la pioche ; un refus ne compte

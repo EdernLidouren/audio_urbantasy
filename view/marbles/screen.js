@@ -35,8 +35,9 @@
 // bille quand le curseur arrive sur elle, dans la main ou sur le triangle.
 //
 // FICHES : le curseur principal annonce court, Ctrl+haut et Ctrl+bas parcourent le
-// détail de la bille sous lui (view/marbles/card.js, lib/detail-card.js). Maj+S et
-// Maj+D ouvrent les menus du sac et de la défausse (view/marbles/pile-screen.js).
+// détail de la bille sous lui (view/marbles/card.js, lib/detail-card.js). Maj+S,
+// Maj+D et Maj+P ouvrent les menus du sac, de la défausse et du pot
+// (view/marbles/pile-screen.js) ; P dit le pot et les billes perdues.
 // E dit les mots-clés de la bille sous le curseur, Maj+E les ouvre en menu
 // (view/marbles/keywords.js). En mode debug, Maj+L ouvre le menu des valeurs de partie
 // (view/marbles/tally-screen.js).
@@ -72,6 +73,7 @@ import {
   describeBag,
   describeOverview,
   describeDiscard,
+  describePot,
   describeHandFocus,
   describeSlotFocus,
   describeSlotForPlacement,
@@ -120,13 +122,16 @@ const MARBLES_BINDINGS = defineBindings("marbles", {
   discard: { keys: ["d"], mods: [] },
   bagMenu: { keys: ["s"], mods: ["shift"] },
   discardMenu: { keys: ["d"], mods: ["shift"] },
+  pot: { keys: ["p"], mods: [] },
+  potMenu: { keys: ["p"], mods: ["shift"] },
   overview: { keys: ["r"], mods: [] },
   resolve: { keys: ["r"], mods: ["shift"] },
   history: { keys: ["l"], mods: [] },
   keywords: { keys: ["e"], mods: [] },
   keywordsMenu: { keys: ["e"], mods: ["shift"] },
-  // Mode debug seulement (voir DEBUG_ACTIONS).
-  placesDemo: { keys: ["p"], mods: ["shift"] },
+  // Mode debug seulement (voir DEBUG_ACTIONS). La démonstration des places est sur
+  // Maj+B (« balises ») : Maj+P ouvre le menu du pot.
+  placesDemo: { keys: ["b"], mods: ["shift"] },
   tally: { keys: ["l"], mods: ["shift"] },
 });
 
@@ -528,6 +533,19 @@ export function makeMarblesScreen(getGame, setGame, rules) {
     openPileMenu("marbles.pile.discard", getGame().discard, rules, getGame().tally);
   }
 
+  // P : le pot et les billes perdues, d'une annonce ; Maj+P : le menu du pot, dans
+  // l'ordre d'arrivée, fiches et mots-clés compris (view/marbles/pile-screen.js).
+  function announcePot() {
+    if (blockedDuringSequence()) return;
+    announce(describePot(getGame(), t), { assertive: true });
+  }
+
+  function openPotMenu() {
+    if (blockedDuringSequence()) return;
+    playMenuSound("select");
+    openPileMenu("marbles.pile.pot", getGame().pot, rules, getGame().tally);
+  }
+
   // L : l'historique du tour précédent. Aussi en fin de partie : celui du dernier
   // tour. Pas pendant la séquence, qui le remplit.
   function openHistory() {
@@ -536,7 +554,7 @@ export function makeMarblesScreen(getGame, setGame, rules) {
     openHistoryMenu(history.previous);
   }
 
-  // Maj+P, mode debug : une balise à chaque place, pour régler l'espace à l'oreille.
+  // Maj+B, mode debug : une balise à chaque place, pour régler l'espace à l'oreille.
   // Celle de la bille sous le curseur, sinon de l'argile.
   function playPlacesDemo() {
     if (blockedDuringSequence()) return;
@@ -589,6 +607,8 @@ export function makeMarblesScreen(getGame, setGame, rules) {
     discard: announceDiscard,
     bagMenu: openBagMenu,
     discardMenu: openDiscardMenu,
+    pot: announcePot,
+    potMenu: openPotMenu,
     overview: announceOverview,
     resolve: resolveKey,
     history: openHistory,

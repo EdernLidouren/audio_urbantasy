@@ -87,6 +87,10 @@ export function printedStat(clauses, stat) {
   return clauses.filter(printed).reduce((total, clause) => total + clause.amount, 0);
 }
 
+// La cible « la première bille de la main », dans l'ordre affiché de la main (celle
+// d'Empocher).
+export const FIRST_IN_HAND = "firstInHand";
+
 // Les champs d'une clause. `target` n'appartient qu'aux actions qui ont un sens
 // pour un autre emplacement : une action qui ne le déclare pas refuse toute cible
 // à la validation. `when` : sa condition (CONDITIONS).
@@ -147,6 +151,13 @@ function addAmount(values, clause) {
 //   wear      (sur une bille) l'usure d'après, (wear, amount, maxWear) -> wear ;
 //   event     (sur une bille) l'évènement de chaque application ;
 //   retires   (sur une bille) une bille amenée à son maximum est retirée aussitôt ;
+//   moves     (sur une bille) au lieu de changer son usure, elle la DÉPLACE : "pot",
+//             Empocher (core/marbles.js/pocketOperation) ;
+//   amountless (facultatif) l'action n'a pas de montant (Empocher) ;
+//   targets   (facultatif) ses cibles permises, les emplacements sinon ;
+//   selfOutside (sur une bille) les moments où elle ne peut viser la bille
+//             elle-même, la bille concernée n'étant pas sur le triangle : la valeur
+//             `marble` du déclencheur, et pourquoi (targetProblem) ;
 //   keyword   (facultatif) l'action est un MOT-CLÉ : `texts`, son nom et sa
 //             description (aide des mots-clés, touches E et Maj+E ; sans eux, le
 //             chargement échoue, core/marbles.js) ; ses valeurs de partie
@@ -156,6 +167,16 @@ function addAmount(values, clause) {
 //             Masse) a ses gains et ses pertes.
 // Le `kind` "marble" : une action sur une bille. Ses textes :
 // view/marbles/narration.js/ACTION_TEXTS.
+
+// Où une action sur l'usure ne peut viser la bille elle-même : partout où elle n'est
+// pas sur le triangle.
+const WEAR_SELF_OUTSIDE = {
+  removed: "une action sur la bille elle-même n'a plus de bille : elle a quitté le triangle",
+  thrown: "une action sur la bille elle-même n'a pas encore de bille : elle est en cours de lancer",
+  drawn: "une action sur la bille elle-même n'a pas de bille sur le triangle : elle vient d'être piochée, en main",
+  pot: "une action sur la bille elle-même n'a pas de bille sur le triangle : elle est dans le pot",
+};
+
 export const CLAUSE_ACTIONS = {
   // Ajoute `amount` (négatif permis) à la Vitesse.
   speed: { kind: "value", fields: TARGETED_FIELDS, validate: validateInteger, apply: addAmount },
@@ -187,6 +208,7 @@ export const CLAUSE_ACTIONS = {
     wear: (wear, amount) => Math.max(0, wear - amount),
     event: "polished",
     retires: false,
+    selfOutside: WEAR_SELF_OUTSIDE,
     keyword: marbleActionKeyword("polish", "polished"),
   },
   // Fêlure : ajoute `amount` d'usure (au moins 1), jamais au-delà du maximum ; à son
@@ -199,7 +221,31 @@ export const CLAUSE_ACTIONS = {
     wear: (wear, amount, maxWear) => Math.min(maxWear, wear + amount),
     event: "cracked",
     retires: true,
+    selfOutside: WEAR_SELF_OUTSIDE,
     keyword: marbleActionKeyword("crack", "cracked"),
+  },
+  // Empocher : envoie une bille au POT, sans montant. Cible : la bille elle-même, où
+  // qu'elle soit (sur le triangle, en main à son Éveil, déjà à la défausse à son
+  // Final) ; un emplacement ; la première bille de la main (FIRST_IN_HAND). Pot
+  // plein : la bille est perdue. Cible vide : sans effet, noté au journal.
+  // Mot-clé : un déclenchement par application, cible vide comprise ; sa quantité
+  // réelle, les billes réellement déplacées (au pot ou perdues).
+  pocket: {
+    kind: "marble",
+    fields: ["action", "target", "when"],
+    validate() {},
+    amountless: true,
+    targets: [...SLOTS, FIRST_IN_HAND],
+    moves: "pot",
+    selfOutside: {
+      thrown: "une bille ne peut s'empocher elle-même dans sa Chiquenaude : elle est en cours de lancer",
+      pot: "une bille déjà dans le pot ne peut s'empocher elle-même",
+    },
+    keyword: {
+      texts: { name: "marbles.keyword.pocket.name", description: "marbles.keyword.pocket.description" },
+      triggers: (event) => (event.type === "pocketed" || event.type === "lost" || (event.type === "targetEmpty" && event.action === "pocket") ? 1 : 0),
+      quantity: (event) => (event.type === "pocketed" || event.type === "lost" ? 1 : 0),
+    },
   },
 };
 
@@ -232,9 +278,8 @@ const phaseIndex = (slot) => SLOTS.indexOf(slot);
 function targetProblem(clause, context) {
   const action = CLAUSE_ACTIONS[clause.action];
   if (action.kind === "marble" && clause.target === undefined) {
-    if (context.marble === "removed") return "une action sur la bille elle-même n'a plus de bille : elle a quitté le triangle";
-    if (context.marble === "thrown") return "une action sur la bille elle-même n'a pas encore de bille : elle est en cours de lancer";
-    if (context.marble === "drawn") return "une action sur la bille elle-même n'a pas de bille sur le triangle : elle vient d'être piochée, en main";
+    const problem = action.selfOutside?.[context.marble];
+    if (problem !== undefined) return problem;
   }
   if (action.kind === "value" && clause.target !== undefined) {
     if (context.moment === "afterPhases") return "une Vitesse ou une Masse ciblée n'a plus de phase à modifier : elle va aux compteurs, sans cible";
@@ -413,7 +458,7 @@ export function validateEffect(effect, describe, fail, context = {}) {
     if (!Object.hasOwn(CLAUSE_ACTIONS, clause.action)) fail(`${describe} : action inconnue "${clause.action}".`);
     rejectUnknownFields(clause, action.fields, describe, fail);
     action.validate(clause, describe, fail, context);
-    if (clause.target !== undefined && !SLOTS.includes(clause.target)) fail(`${describe} : cible inconnue "${clause.target}".`);
+    if (clause.target !== undefined && !(action.targets ?? SLOTS).includes(clause.target)) fail(`${describe} : cible inconnue "${clause.target}".`);
     const problem = targetProblem(clause, context);
     if (problem !== null) fail(`${describe} : ${problem}.`);
     if (clause.when !== undefined) validateRule(clause.when, CONDITIONS, "condition", describe, fail, context);
@@ -433,11 +478,13 @@ export function evaluateEffect(clauses, situation, types) {
   const operations = [];
   for (const printed of clauses) {
     if (printed.when !== undefined && !CONDITIONS[printed.when.type].test(printed.when, situation, types)) continue;
-    const amount = amountOf(printed.amount, situation, types);
+    const { kind, apply, amountless } = CLAUSE_ACTIONS[printed.action];
+    // Une action sans montant (Empocher) s'applique telle quelle.
+    const amount = amountless ? undefined : amountOf(printed.amount, situation, types);
     if (amount === 0) continue;
     const clause = { ...printed, amount };
-    const { kind, apply } = CLAUSE_ACTIONS[clause.action];
-    if (kind === "marble") operations.push({ action: clause.action, amount: clause.amount, ...(clause.target === undefined ? {} : { target: clause.target }) });
+    const target = clause.target === undefined ? {} : { target: clause.target };
+    if (kind === "marble") operations.push({ action: clause.action, ...(amountless ? {} : { amount: clause.amount }), ...target });
     else if (clause.target === undefined) self = apply(self, clause);
     else gifts.push({ slot: clause.target, ...apply(GIFT_ZERO, clause) });
   }

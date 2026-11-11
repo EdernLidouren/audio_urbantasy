@@ -42,6 +42,7 @@ export default function checkMarblesForecast(run) {
   checkWindfallForecast(run);
   checkTallyForecast(run);
   checkAwakenForecast(run);
+  checkPocketForecast(run);
   checkGuards(run);
   checkMatchesReality(run);
 }
@@ -109,7 +110,7 @@ function checkFlickForecast(run) {
   const matches = (state, action) => {
     const real = rules.reduce(state, action);
     const resolved = rules.reduce(real.state, { type: "resolve" });
-    const { uncertain, ...predicted } = rules.forecast(state, action);
+    const { uncertain, awakenPossible, ...predicted } = rules.forecast(state, action);
     return JSON.stringify(predicted) === JSON.stringify(readForecast(real.events, resolved.events, resolved.state));
   };
 
@@ -136,7 +137,7 @@ function checkWindfallForecast(run) {
   const matches = (state, action) => {
     const real = action === null ? { state, events: [] } : rules.reduce(state, action);
     const resolved = rules.reduce(real.state, { type: "resolve" });
-    const { uncertain, ...predicted } = rules.forecast(state, action);
+    const { uncertain, awakenPossible, ...predicted } = rules.forecast(state, action);
     return JSON.stringify(predicted) === JSON.stringify(readForecast(real.events, resolved.events, resolved.state));
   };
   const toApex = { type: "place", handIndex: 0, slot: "apex" };
@@ -188,7 +189,7 @@ function checkTallyForecast(run) {
   const matches = (state, action) => {
     const real = rules.reduce(state, action);
     const resolved = rules.reduce(real.state, { type: "resolve" });
-    const { uncertain, ...predicted } = rules.forecast(state, action);
+    const { uncertain, awakenPossible, ...predicted } = rules.forecast(state, action);
     return JSON.stringify(predicted) === JSON.stringify(readForecast(real.events, resolved.events, resolved.state));
   };
   // Un registre décrit en partie, { id: { turn, game } }, le reste à zéro.
@@ -225,23 +226,85 @@ function checkTallyForecast(run) {
   run.same("valeurs prévues : le registre réel non plus", tally({ windfall: { turn: 0, game: 2 } }), frozen.tally);
 }
 
+// Le pot dans la prévision : les effets En poche sont déterministes et inclus, chez la
+// bille qui empoche ; égale au réel.
+function checkPocketForecast(run) {
+  const matches = (state, action) => {
+    const real = action === null ? { state, events: [] } : rules.reduce(state, action);
+    const resolved = rules.reduce(real.state, { type: "resolve" });
+    const { uncertain, awakenPossible, ...predicted } = rules.forecast(state, action);
+    return JSON.stringify(predicted) === JSON.stringify(readForecast(real.events, resolved.events, resolved.state));
+  };
+  const toApex = { type: "place", handIndex: 0, slot: "apex" };
+
+  // Le Tic du gorille empoche la porcelaine, qui entre avec Vitesse +10.
+  const gorilla = playState({ hand: inHand(["gorilla", "porcelain"]), triangle: { leftBase: null, rightBase: null, apex: placed("clay") } });
+  const predicted = rules.forecast(gorilla, toApex);
+  run.same(
+    "pot prévu : chez le Tic du gorille, la porcelaine et son entrée",
+    [{ marble: "porcelain", lost: false, entry: { marble: "porcelain", speed: 10, mass: 0, draw: 0, operations: [], given: [] } }],
+    predicted.hit.pockets
+  );
+  run("pot prévu : l'entrée dans la Vitesse prévue (Tic 4, entrée 10, pointe du gorille 6)", 20, predicted.speed);
+  run("pot prévu : égal au réel", true, matches(gorilla, toApex));
+  const full = { ...gorilla, pot: ["clay", "glass", "mica"] };
+  run.same("pot prévu, plein : la porcelaine perdue, sans entrée", [{ marble: "porcelain", lost: true, entry: null }], rules.forecast(full, toApex).hit.pockets);
+  run("pot prévu, plein : égal au réel", true, matches(full, toApex));
+
+  // Le sulfure empoche la pointe pendant la résolution : phase sautée, entrée comptée.
+  const sulphide = playState({ triangle: { leftBase: placed("sulphide"), rightBase: null, apex: placed("porcelain", 1) } });
+  const resolving = rules.forecast(sulphide);
+  run("pot prévu, résolution : la pointe retirée avant sa phase", "porcelain", resolving.cleared.apex);
+  run("pot prévu, résolution : l'entrée chez le sulfure", 10, resolving.phases.leftBase.pockets[0].entry.speed);
+  run("pot prévu, résolution : Impact 10", 10, resolving.impact);
+  run("pot prévu, résolution : égal au réel", true, matches(sulphide, null));
+
+  // Les billes du pot, à chaque résolution.
+  const pot = playState({ triangle: { leftBase: placed("magnifier"), rightBase: null, apex: placed("porcelain") }, pot: ["agate", "glass", "sulphide"] });
+  run.same(
+    "pot prévu : les effets de chaque résolution, dans l'ordre d'arrivée, sans le verre",
+    [
+      { marble: "agate", speed: 0, mass: 1 },
+      { marble: "sulphide", speed: 4, mass: 0 },
+    ],
+    rules.forecast(pot).potEffects.map(({ marble, speed, mass }) => ({ marble, speed, mass }))
+  );
+  run("pot prévu : égal au réel", true, matches(pot, null));
+  // Le Final de l'agate l'empoche depuis la défausse ; elle joue au pot ce tour.
+  const agate = playState({ triangle: { leftBase: null, rightBase: null, apex: placed("agate", 2) } });
+  run("pot prévu : l'agate empochée par son Final", "agate", rules.forecast(agate).slotEffects.apex[0].pockets[0].marble);
+  run("pot prévu : Final de l'agate, égal au réel", true, matches(agate, null));
+
+  // Une bille piochée à l'aveugle puis empochée : inconnue, prévision incertaine,
+  // sans Éveil possible pour autant.
+  const blind = playState({ hand: inHand(["gorilla"]), bag: ["clay"], triangle: { leftBase: null, rightBase: null, apex: placed("stoneware") } });
+  const unknown = rules.forecast(blind, toApex);
+  run.same("pot prévu, bille inconnue : empochée sans être nommée", [{ marble: null, lost: false, entry: null }], unknown.hit.pockets);
+  run("pot prévu, bille inconnue : incertaine", true, unknown.uncertain);
+  run("pot prévu, bille inconnue : aucun Éveil possible", false, unknown.awakenPossible);
+  const frozen = deepFreeze(structuredClone(gorilla));
+  run("pot prévu : l'état reçu n'est pas modifié", true, rules.forecast(frozen, toApex).ok);
+  run.same("pot prévu : ni son pot", [], frozen.pot);
+}
+
 // Polissage et Fêlure : la prévision montre leurs conséquences, comme le réel.
 function checkWearForecast(run) {
-  const cracking = playState({ hand: inHand([]), bag: ["clay"], triangle: { leftBase: placed("sulphide"), rightBase: null, apex: placed("porcelain", 1) } });
-  const predicted = rules.forecast(cracking);
+  const crackerRules = fabricatedRules({ cracker: { base: [{ action: "crack", amount: 1, target: "apex" }] }, porcelain: MARBLE_TYPES.porcelain, clay: MARBLE_TYPES.clay });
+  const cracking = playState({ hand: inHand([]), bag: ["clay"], triangle: { leftBase: placed("cracker"), rightBase: null, apex: placed("porcelain", 1) } });
+  const predicted = crackerRules.forecast(cracking);
   run.same("Fêlure prévue : chez la bille qui la produit", [{ action: "crack", amount: 1, target: "apex" }], predicted.phases.leftBase.operations);
   run("Fêlure prévue : la pointe n'a pas de phase", null, predicted.phases.apex);
   run("Fêlure prévue : la porcelaine retirée avant sa phase", "porcelain", predicted.cleared.apex);
   run("Fêlure prévue : son Final", 4, predicted.slotEffects.apex[0].speed);
   run.same("Fêlure prévue : les retraits", [{ slot: "apex", marble: "porcelain" }], predicted.retired);
-  const real = rules.reduce(cracking, { type: "resolve" });
-  run.same("Fêlure prévue : comme le réel, usure comprise", JSON.stringify((({ uncertain, ...rest }) => rest)(predicted)), JSON.stringify(readForecast([], real.events, real.state)));
+  const real = crackerRules.reduce(cracking, { type: "resolve" });
+  run.same("Fêlure prévue : comme le réel, usure comprise", JSON.stringify((({ uncertain, awakenPossible, ...rest }) => rest)(predicted)), JSON.stringify(readForecast([], real.events, real.state)));
 
   const saving = playState({ hand: inHand([]), bag: ["clay"], triangle: { leftBase: placed("agate", 2), rightBase: null, apex: placed("porcelain", 1) } });
   const saved = rules.forecast(saving);
   run.same("Polissage prévu : la porcelaine sauvée n'est pas retirée", [{ slot: "leftBase", marble: "agate" }], saved.retired);
   run.same("Polissage prévu : pas de Final pour elle", [], saved.slotEffects.apex);
-  run.same("Polissage prévu : le Final de l'agate le dit", [{ action: "polish", amount: 1, target: "apex" }], saved.slotEffects.leftBase[0].operations);
+  run.same("Polissage prévu : le Final de l'agate le dit, puis elle s'empoche", [{ action: "polish", amount: 1, target: "apex" }, { action: "pocket" }], saved.slotEffects.leftBase[0].operations);
 
   // Un bonus perdu (phase passée) n'apparaît nulle part dans la prévision.
   const lostRules = fabricatedRules({ late: { base: [{ action: "speed", amount: 3, target: "rightBase" }] }, plain: { base: [{ action: "speed", amount: 1 }] } });
@@ -400,10 +463,16 @@ function compareState(state, marbles, faults, tally) {
     }
     tally.actions += 1;
     const actual = readForecast(real.events, resolved.events, resolved.state);
-    const { uncertain, ...certain } = predicted;
+    const { uncertain, awakenPossible, ...certain } = predicted;
     // L'exception de l'Éveil (core/marbles-forecast.js) : un Éveil réel ne se
     // prévoit pas ; la prévision doit alors s'être dite incertaine, et seul ce qui
-    // ne dépend d'aucun Éveil se compare.
+    // ne dépend d'aucun Éveil se compare. De même pour une bille piochée à l'aveugle
+    // puis empochée : son identité, donc son entrée au pot, est inconnue.
+    if (unknownPocket(predicted)) {
+      tally.unknownPockets += 1;
+      if (!uncertain) faults.push(`mise en poche inconnue sans prévision incertaine : ${JSON.stringify(action)}`);
+      continue;
+    }
     if (awakened(real.events, resolved.events)) {
       tally.awakened += 1;
       if (!uncertain) faults.push(`éveil réel sans prévision incertaine : ${JSON.stringify(action)}`);
@@ -423,10 +492,38 @@ function compareState(state, marbles, faults, tally) {
       ...SLOTS.map((slot) => predicted.phases[slot]),
       ...SLOTS.flatMap((slot) => predicted.slotEffects[slot]),
       ...predicted.regenerations.flatMap(({ effects }) => effects),
-    ].filter((part) => part !== null);
+      ...predicted.potEffects,
+    ]
+      .filter((part) => part !== null)
+      .flatMap(withEntries);
     const speed = parts.reduce((total, part) => total + part.speed, state.speed);
     if (speed !== predicted.speed) faults.push(`Vitesse prévue ${predicted.speed}, somme des effets ${speed}`);
   }
+}
+
+// Un effet prévu et les effets d'entrée au pot de ce qu'il a empoché, à plat.
+function withEntries(outcome) {
+  return [outcome, ...(outcome.pockets ?? []).flatMap((moved) => (moved.entry === null ? [] : withEntries(moved.entry)))];
+}
+
+// Tous les effets d'une prévision, à plat.
+function allOutcomes(predicted) {
+  return [
+    predicted.flick,
+    predicted.knockout,
+    predicted.hit,
+    ...SLOTS.map((slot) => predicted.phases[slot]),
+    ...SLOTS.flatMap((slot) => predicted.slotEffects[slot]),
+    ...predicted.regenerations.flatMap(({ effects }) => effects),
+    ...predicted.potEffects,
+  ]
+    .filter((part) => part !== null && part !== undefined)
+    .flatMap(withEntries);
+}
+
+// La prévision a-t-elle empoché une bille inconnue (piochée à l'aveugle) ?
+function unknownPocket(predicted) {
+  return allOutcomes(predicted).some((outcome) => (outcome.pockets ?? []).some((moved) => moved.marble === null));
 }
 
 // Un Éveil a-t-il joué (un effet) dans ces journaux ?
@@ -461,7 +558,7 @@ function walkGame(seed, options, marbles, faults, tally) {
 
 function checkMatchesReality(run) {
   const faults = [];
-  const tally = { states: 0, actions: 0, awakened: 0 };
+  const tally = { states: 0, actions: 0, awakened: 0, unknownPockets: 0 };
   const mixedBag = ["plain", "plain", "heavy", "giver", "giver", "lens", "lens", "thief", "thief", "plain"];
   for (let seed = 1; seed <= 60; seed++) {
     walkGame(seed, {}, rules, faults, tally);

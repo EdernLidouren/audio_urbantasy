@@ -8,6 +8,7 @@ export default {
   apex: [speed(5)],
   flick: [mass(1)],
   final: [speed(4)],
+  pocketed: { entry: [speed(10)] },
   maxWear: 2,
   size: SMALL,
 };

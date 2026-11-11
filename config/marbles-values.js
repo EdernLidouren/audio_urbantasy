@@ -11,6 +11,9 @@ export const MARBLES_SETTINGS = {
   // vide ou occupé (l'échange n'en est pas un). Borne ce qu'un joueur peut
   // enchaîner dans un tour, une pose qui pioche à chaque fois comprise.
   throwsPerTurn: 5,
+  // Capacité du POT : une bille envoyée au pot plein n'y entre pas, elle est perdue
+  // pour la partie.
+  potCapacity: 3,
   turnCount: 9,
   defaultMaxWear: 3,
   // Fiches : le curseur secondaire revient à l'annonce principale dès que le
@@ -119,13 +122,15 @@ export const MARBLES_PITCH_VARIATION = {
 //   y  la profondeur, de la main (0, au plus près) à la pointe (1, au plus loin),
 //      rendue par MARBLES_SOUND_DEPTH.
 // La défausse, où roulent les billes éjectées ou usées : à droite, derrière les
-// bases, pour que le joueur apprenne où elles « tombent ».
+// bases, pour que le joueur apprenne où elles « tombent ». Le pot, où roulent les
+// billes mises en poche, en face : à gauche, à la même profondeur.
 export const MARBLES_SOUND_PLACES = {
   hand: { fromX: -0.6, toX: 0.6, y: 0 },
   leftBase: { x: -0.4, y: 0.5 },
   rightBase: { x: 0.4, y: 0.5 },
   apex: { x: 0, y: 1 },
   discard: { x: 0.8, y: 0.7 },
+  pot: { x: -0.8, y: 0.7 },
 };
 
 // La PROFONDEUR, interpolée de la main (y = 0) à la pointe (y = 1). Trois indices,
@@ -161,7 +166,7 @@ export const MARBLES_SOUND_DEPTH = {
 //   knocked  la bille délogée, de son emplacement à la défausse. Sa vitesse de
 //            départ est multipliée par la force du choc (MARBLES_COLLISION) ;
 //   out      la bille usée, de son emplacement à la défausse. Plus lente, et qui
-//            s'essouffle ;
+//            s'essouffle ; aussi la bille mise en poche, de là où elle était au pot ;
 //   rotation  le triangle qui tourne : chaque bille roule vers l'emplacement
 //          suivant, toutes ensemble. Un seul élan pour plusieurs crans, qui passe
 //          par les emplacements sans s'y arrêter.
@@ -421,15 +426,65 @@ export const MARBLE_TALLIES = [
   { id: "drawnMarbles", events: ["draw"] },
   // Chaque retrait par usure, usure de phase ou Fêlure.
   { id: "wornMarbles", events: ["removed"], match: { cause: "wear" } },
-  // Toute sortie du triangle, quelle qu'en soit la cause.
+  // Toute sortie du triangle, quelle qu'en soit la cause (usure, éjection, mise en
+  // poche).
   { id: "triangleExits", events: ["removed"] },
+  // Chaque bille entrée au pot.
+  { id: "pocketedMarbles", events: ["pocketed"] },
+  // Chaque bille perdue, envoyée au pot plein.
+  { id: "lostMarbles", events: ["lost"] },
 ];
+
+// Le mot-clé EN POCHE (Pocketed) : des effets qui ne s'appliquent que lorsque la
+// bille est dans le POT, chacun attaché à un MOMENT. Le champ de bille `field` est un
+// objet { <moment>: effet } (marbles/types/index.js). Déclaré UNE fois :
+//   field    le champ de la bille ;
+//   texts    `name` et `description`, le mot-clé (aide des mots-clés, E et Maj+E) ;
+//   moments  la liste des moments, dans l'ordre de la fiche. Chacun :
+//     id       sa clé dans le champ ;
+//     trigger  l'identifiant de son effet (`trigger` de l'évènement `effect`), aussi
+//              celui de sa valeur de partie ;
+//     event    l'évènement du journal qui le déclenche, qui nomme la bille du pot ;
+//     moment   quand il joue, comme un déclencheur (MARBLE_TRIGGERS) : la règle des
+//              cibles en dépend ;
+//     texts    `card`, son champ de fiche ({effect}) ; `effect`, son effet joué dans
+//              le journal ({marble}, {effect}, {speed}, {mass}) ; `forecast`
+//              (facultatif), sa ligne dans R ({marble}, {effect}).
+// Une action sur la bille elle-même y est refusée : dans le pot, elle n'a ni usure
+// ni place à quitter. AJOUTER un moment (une réaction à un évènement global) : une
+// entrée ici, ses textes, et l'émission de son évènement dans core/marbles.js.
+export const MARBLE_POCKET = {
+  field: "pocketed",
+  texts: { name: "marbles.keyword.pocketed.name", description: "marbles.keyword.pocketed.description" },
+  moments: [
+    // À l'entrée au pot : quand la bille y entre effectivement (jamais si elle est
+    // perdue faute de place), juste après son arrivée.
+    {
+      id: "entry",
+      trigger: "pocketEntry",
+      event: "pocketed",
+      moment: "anytime",
+      texts: { card: "marbles.card.pocketed_entry", effect: "marbles.event.effect_pocket_entry" },
+    },
+    // À chaque résolution : une fois par tour, après les trois phases et avant les
+    // retraits par usure, chaque bille du pot dans l'ordre d'arrivée.
+    {
+      id: "resolution",
+      trigger: "pocketResolution",
+      event: "potResolution",
+      moment: "afterPhases",
+      texts: { card: "marbles.card.pocketed_resolution", effect: "marbles.outcome.pot", forecast: "marbles.outcome.pot" },
+    },
+  ],
+};
 
 // La fiche d'une bille (lib/detail-card.js, view/marbles/card.js) : l'ordre de ses
 // champs autour de l'annonce principale, du plus proche au plus éloigné. Les champs
 // des déclencheurs viennent de MARBLE_TRIGGERS (`card`), dans son ordre ; un autre
 // type d'effet : sa ligne ici et son gabarit, rien d'autre.
 //   field            le champ de la bille dans MARBLE_TYPES ;
+//   part             (facultatif) la clé dans ce champ, quand il est un objet de
+//                    moments (En poche) ;
 //   labelKey         son gabarit, qui reçoit {effect} ;
 //   variantLabelKey  (facultatif) son gabarit quand l'effet diffère selon la base ;
 //   required         champ toujours présent, « aucun effet » s'il est vide ; sinon,
@@ -440,7 +495,11 @@ export const MARBLE_CARD_MODEL = {
     { field: "apex", labelKey: "marbles.card.apex", required: true },
     { field: "base", labelKey: "marbles.card.base", variantLabelKey: "marbles.card.base_variant", required: true },
   ],
-  below: MARBLE_TRIGGERS.filter((trigger) => trigger.card === "below").map((trigger) => ({ field: trigger.field, labelKey: trigger.texts.card })),
+  below: [
+    ...MARBLE_TRIGGERS.filter((trigger) => trigger.card === "below").map((trigger) => ({ field: trigger.field, labelKey: trigger.texts.card })),
+    // En poche, en dernier : un champ par moment.
+    ...MARBLE_POCKET.moments.map((moment) => ({ field: MARBLE_POCKET.field, part: moment.id, labelKey: moment.texts.card })),
+  ],
   emptyBelowKey: "marbles.card.no_special_effect",
 };
 

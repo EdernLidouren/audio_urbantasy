@@ -1,6 +1,6 @@
 // Bille « agate » (agate). Donnée pure : les champs sont décrits dans
 // marbles/types/index.js.
-import { mass, polish } from "../effects.js";
+import { mass, polish, pocket } from "../effects.js";
 import { LARGE, MEDIUM } from "../../config/marbles-values.js";
 
 export default {
@@ -9,6 +9,8 @@ export default {
   apex: [mass(1), { ...mass(2), when: { type: "sizeAt", slot: "leftBase", size: LARGE } }],
   hit: [mass(1)],
   windfall: [polish(1)],
-  final: [polish(1, "apex")],
+  // Final : Polissage 1 à la pointe, puis elle s'empoche, depuis la défausse.
+  final: [polish(1, "apex"), pocket()],
+  pocketed: { resolution: [mass(1)] },
   size: MEDIUM,
 };

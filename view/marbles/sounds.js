@@ -120,7 +120,7 @@ export function validateSoundPlaces(places) {
   checkNumber(places.hand?.fromX, "hand.fromX", -1, 1);
   checkNumber(places.hand?.toX, "hand.toX", -1, 1);
   checkNumber(places.hand?.y, "hand.y", 0, 1);
-  for (const place of [...SLOTS, "discard"]) {
+  for (const place of [...SLOTS, "discard", "pot"]) {
     checkNumber(places[place]?.x, `${place}.x`, -1, 1);
     checkNumber(places[place]?.y, `${place}.y`, 0, 1);
   }
@@ -190,6 +190,7 @@ export function collisionStrength(striker, struck, { types = MARBLE_TYPES, colli
 export function positionOf(place, places = MARBLES_SOUND_PLACES) {
   if (place.kind === "slot") return places[place.slot];
   if (place.kind === "discard") return places.discard;
+  if (place.kind === "pot") return places.pot;
   const { fromX, toX, y } = places.hand;
   if (place.size <= 1) return { x: (fromX + toX) / 2, y };
   return { x: fromX + ((toX - fromX) * place.index) / (place.size - 1), y };
@@ -219,6 +220,7 @@ export function renderPosition({ x, y }, depth = MARBLES_SOUND_DEPTH) {
 export const slotPlace = (slot) => ({ kind: "slot", slot });
 export const handPlace = (index, size) => ({ kind: "hand", index, size });
 export const discardPlace = () => ({ kind: "discard" });
+export const potPlace = () => ({ kind: "pot" });
 
 // Le rendu d'une bille qui roule, `elapsedMs` après son départ, au volume `volume`
 // de sa catégorie -> { pan, volume, rate, lowpassHz, reverbSend }. `roll` : `path`
@@ -314,7 +316,22 @@ function createTimeline(settings, { rolls, places }) {
       this.out(nextWornAt, marble, slot);
       nextWornAt += rolls.outStaggerMs;
     },
+    // Une bille mise en poche roule de `from` (une place) au pot, et y tombe : le
+    // même roulement qu'une bille usée, à la suite des autres départs.
+    pocket(marble, from) {
+      const arrival = this.roll(nextWornAt, marble, [from, potPlace()], "out");
+      cues.push(cue(arrival, "drop", marble, potPlace()));
+      nextWornAt += rolls.outStaggerMs;
+    },
   };
+}
+
+// D'où part une bille mise en poche : son emplacement, sa place dans la main (la main
+// d'après le geste, plus elle), ou la défausse.
+function pocketOrigin(event, context) {
+  if (event.from === "triangle") return slotPlace(event.slot);
+  if (event.from === "hand") return handPlace(event.index, (context.handSize ?? 0) + 1);
+  return discardPlace();
 }
 
 // Les emplacements par où passe la bille de `origin` quand le triangle tourne de
@@ -363,6 +380,12 @@ export const MARBLE_EVENT_CUES = {
     context.struck = event.marble;
   },
   removed: null,
+  // La mise en poche : la bille roule de là où elle était au pot (de l'emplacement, de
+  // la main, de la défausse). La perte et l'étape du pot : des points d'accroche,
+  // muets aujourd'hui, la perte sans place imposée.
+  pocketed: (event, timeline, context) => timeline.pocket(event.marble, pocketOrigin(event, context)),
+  lost: null,
+  potResolution: null,
   // L'usée roule à la défausse ; la délogée part avec le choc (placed).
   discarded: (event, timeline) => {
     if (event.cause === "wear") timeline.worn(event.marble, event.slot);
@@ -431,6 +454,7 @@ export function eventCues(
   let drawn = 0;
   const context = {
     triangleAfter,
+    handSize: handAfter?.length,
     placeFrom,
     struck: null,
     nextDrawPlace: () => (handAfter === null ? undefined : handPlace(handAfter.length - drawCount + drawn++, handAfter.length)),
@@ -584,7 +608,7 @@ export function stopRolls() {
   for (const rolling of rollingVoices) endRoll(rolling);
 }
 
-// DÉMONSTRATION des places (mode debug, Maj+P) : la même balise à chaque place,
+// DÉMONSTRATION des places (mode debug, Maj+B) : la même balise à chaque place,
 // de la plus proche à la plus lointaine, pour régler l'espace à l'oreille
 // (MARBLES_SOUND_PLACES, MARBLES_SOUND_DEPTH). Une main de 5 : à gauche, au
 // centre, à droite ; puis les deux bases et la pointe.

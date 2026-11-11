@@ -33,3 +33,11 @@ export const activeSize = (size) => ({ type: "activeSize", size });
 // partie). « Vitesse +2 par chiquenaude ce tour » :
 // speed({ base: 0, step: 2, source: tally("flick", "turn"), max: 6 }).
 export const tally = (id, scope) => ({ type: "tally", tally: id, scope });
+
+// La première bille de la main, cible d'Empocher (core/marbles-effects.js/
+// FIRST_IN_HAND).
+export const FIRST_IN_HAND = "firstInHand";
+
+// Empocher : envoie au pot la bille elle-même (sans cible), celle d'un emplacement,
+// ou la première de la main (FIRST_IN_HAND). Sans montant.
+export const pocket = (target) => ({ action: "pocket", ...(target === undefined ? {} : { target }) });

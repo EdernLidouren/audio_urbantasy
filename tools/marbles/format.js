@@ -7,13 +7,15 @@
 // `name(id)` : le nom d'une bille ; par défaut son id. Les lanceurs passent le nom
 // français (data/i18n), les vérifications l'id.
 
-import { MARBLE_TRIGGERS } from "../../config/marbles-values.js";
+import { MARBLE_POCKET, MARBLE_TRIGGERS } from "../../config/marbles-values.js";
 import { SLOTS } from "../../core/marbles.js";
 import { formatCounter } from "../../view/marbles/narration.js";
 import { GAME_RULES } from "./game-rules.js";
 
 const SLOT_NAMES = { leftBase: "base gauche", rightBase: "base droite", apex: "pointe" };
-const CAUSES = { replacement: "remplacement", wear: "usure" };
+const CAUSES = { replacement: "remplacement", wear: "usure", pocket: "mise en poche" };
+// D'où vient une bille mise en poche ou perdue.
+const POCKET_ORIGINS = { triangle: "le triangle", hand: "la main", discard: "la défausse" };
 // Les mots du terminal pour chaque déclencheur, la phase comprise : son nom, son
 // effet, ce qu'il produit (rapport) et, pour un déclencheur de pose, ce qu'il apporte
 // (rapport, section des remplacements). Un par entrée de MARBLE_TRIGGERS
@@ -26,13 +28,19 @@ export const TRIGGER_WORDS = {
   windfall: { name: "Trouvaille", effect: "Effet de trouvaille", produced: "en trouvaille" },
   knockout: { name: "Éjection", effect: "Effet d'éjection", produced: "en éjection", brought: "les éjections" },
   final: { name: "Final", effect: "Effet final", produced: "en final" },
+  // Les moments En poche (config/marbles-values.js/MARBLE_POCKET).
+  pocketEntry: { name: "En poche, à l'entrée", effect: "Effet d'entrée au pot", produced: "à l'entrée au pot" },
+  pocketResolution: { name: "En poche, à chaque résolution", effect: "Effet du pot", produced: "au pot" },
 };
 for (const trigger of MARBLE_TRIGGERS) {
   if (!Object.hasOwn(TRIGGER_WORDS, trigger.id)) throw new Error(`outils des billes : le déclencheur "${trigger.id}" n'a pas ses mots (TRIGGER_WORDS).`);
 }
 
 // Les déclencheurs, la phase en tête : l'ordre des chiffres dans les outils.
-export const TRIGGER_IDS = ["phase", ...MARBLE_TRIGGERS.map((trigger) => trigger.id)];
+export const TRIGGER_IDS = ["phase", ...MARBLE_TRIGGERS.map((trigger) => trigger.id), ...MARBLE_POCKET.moments.map((moment) => moment.trigger)];
+for (const moment of MARBLE_POCKET.moments) {
+  if (!Object.hasOwn(TRIGGER_WORDS, moment.trigger)) throw new Error(`outils des billes : le moment En poche "${moment.trigger}" n'a pas ses mots (TRIGGER_WORDS).`);
+}
 // Les déclencheurs d'une pose, avec leur effet dans la prévision.
 export const PLACEMENT_TRIGGERS = MARBLE_TRIGGERS.filter((trigger) => trigger.forecast.line === "placement");
 export const triggerLabel = (id) => TRIGGER_WORDS[id].name;
@@ -88,6 +96,7 @@ export function formatState(state, name) {
     `Main, ${state.hand.length} sur ${state.maxHandSize} : ${handList(state.hand, name)}.`,
     `Sac, ${state.bag.length}, du haut vers le bas : ${listOf(state.bag, name)}.`,
     `Défausse, ${state.discard.length} : ${listOf(state.discard, name)}.`,
+    `Pot, ${state.pot.length} sur ${state.potCapacity}, dans l'ordre d'arrivée : ${listOf(state.pot, name)}. Perdues, ${state.lost.length} : ${listOf(state.lost, name)}.`,
     `Pioche : ${state.firstTurnDraw} au premier tour, ${state.drawPerTurn} ensuite.`,
     `Valeurs de partie (ce tour/cette partie) : ${tallyList(state.tally)}.`,
   ];
@@ -120,7 +129,15 @@ const EVENT_LINES = {
   hit: (event, name) => `Tic : ${marbleLabel(event.marble, name)} en ${slotLabel(event.slot)}.`,
   polished: (event, name) => `Polissage : ${marbleLabel(event.marble, name)} en ${slotLabel(event.slot)}, usure ${event.wear} sur ${event.maxWear}.`,
   cracked: (event, name) => `Fêlure : ${marbleLabel(event.marble, name)} en ${slotLabel(event.slot)}, usure ${event.wear} sur ${event.maxWear}.`,
-  targetEmpty: (event) => `${event.action === "crack" ? "Fêlure" : "Polissage"} sans effet : ${slotLabel(event.slot)} vide.`,
+  targetEmpty: (event, name) => {
+    const action = { crack: "Fêlure", polish: "Polissage", pocket: "Empocher" }[event.action] ?? event.action;
+    if (event.target === "firstInHand") return `${action} sans effet : main vide.`;
+    if (event.target === "self") return `${action} sans effet : ${marbleLabel(event.marble, name)} n'est plus là.`;
+    return `${action} sans effet : ${slotLabel(event.slot)} vide.`;
+  },
+  pocketed: (event, name) => `Mise en poche : ${marbleLabel(event.marble, name)}, depuis ${POCKET_ORIGINS[event.from]}${event.slot ? ` (${slotLabel(event.slot)})` : ""}.`,
+  lost: (event, name) => `Perdue, pot plein : ${marbleLabel(event.marble, name)}, depuis ${POCKET_ORIGINS[event.from]}${event.slot ? ` (${slotLabel(event.slot)})` : ""}.`,
+  potResolution: (event, name) => `Pot : ${marbleLabel(event.marble, name)}, ${event.index + 1}e arrivée.`,
   final: (event, name) => `Final : ${marbleLabel(event.marble, name)}, usée, partie de ${slotLabel(event.slot)}.`,
   phase: (event, name) => `Phase de ${slotLabel(event.slot)} : ${marbleLabel(event.marble, name)}.`,
   phaseSkipped: (event) => `Phase de ${slotLabel(event.slot)} : vide.`,

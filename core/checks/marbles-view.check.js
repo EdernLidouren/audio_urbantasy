@@ -34,6 +34,7 @@ import {
   stepsText,
   describeBag,
   describeDiscard,
+  describePot,
   describeEffect,
   describeHandFocus,
   describeMarbleInList,
@@ -57,6 +58,7 @@ import {
   handPlace,
   placesDemoCues,
   positionOf,
+  potPlace,
   renderAt,
   rollRendering,
   rotationPath,
@@ -123,8 +125,14 @@ function sampleEvents() {
   // sulfure qui fêle une porcelaine.
   const polishedNothing = rules.reduce({ ...emptyBagMarblesGame(rules, 6), turn: 2, stage: "play", hand: inHand(["glass"]), triangle: { leftBase: { marble: "clay", wear: 0 }, rightBase: null, apex: null } }, { type: "place", handIndex: 0, slot: "leftBase" });
   events.push(...polishedNothing.events);
-  const cracked = rules.reduce({ ...emptyBagMarblesGame(rules, 7), turn: 2, stage: "play", bag: ["clay"], triangle: { leftBase: { marble: "sulphide", wear: 0 }, rightBase: null, apex: { marble: "porcelain", wear: 0 } } }, { type: "resolve" });
+  const pocketedApex = rules.reduce({ ...emptyBagMarblesGame(rules, 7), turn: 2, stage: "play", bag: ["clay"], triangle: { leftBase: { marble: "sulphide", wear: 0 }, rightBase: null, apex: { marble: "porcelain", wear: 0 } } }, { type: "resolve" });
+  events.push(...pocketedApex.events);
+  // La plombée fêle la porcelaine de la pointe ; le gorille, pot plein, perd la
+  // première bille de la main ; puis, main vide, n'a rien à empocher.
+  const cracked = rules.reduce({ ...emptyBagMarblesGame(rules, 7), turn: 2, stage: "play", hand: inHand(["leaded"]), triangle: { leftBase: null, rightBase: null, apex: { marble: "porcelain", wear: 0 } } }, { type: "place", handIndex: 0, slot: "apex" });
   events.push(...cracked.events);
+  const lost = rules.reduce({ ...emptyBagMarblesGame(rules, 7), turn: 2, stage: "play", hand: inHand(["gorilla", "clay"]), pot: ["glass", "glass", "glass"], triangle: { leftBase: null, rightBase: null, apex: { marble: "clay", wear: 0 } } }, { type: "place", handIndex: 0, slot: "apex" });
+  events.push(...lost.events);
   const polished = rules.reduce({ ...emptyBagMarblesGame(rules, 8), turn: 2, stage: "play", bag: ["clay"], triangle: { leftBase: null, rightBase: null, apex: { marble: "mica", wear: 1 } } }, { type: "resolve" });
   events.push(...polished.events);
   // Sac vide, défausse pleine : la défausse devient le sac.
@@ -164,12 +172,18 @@ function checkCards(run) {
     );
     run.same(
       "fiche : éjection au-dessous, base sans effet",
-      { above: ["Pointe : Vitesse +6.", "Base : aucun effet."], below: ["Tic : Vitesse +4 si la bille éjectée est plus petite.", "Éjection : Vitesse +3."] },
+      {
+        above: ["Pointe : Vitesse +6.", "Base : aucun effet."],
+        below: ["Tic : Vitesse +4 si la bille éjectée est plus petite et Empocher la première bille de la main.", "Éjection : Vitesse +3."],
+      },
       fields("gorilla")
     );
     run.same(
-      "fiche : sans champ facultatif, le repli ; une Fêlure ciblée",
-      { above: ["Pointe : Masse +3.", "Base : Fêlure 1 à la pointe."], below: ["Trouvaille : Fêlure 1 à la base droite."] },
+      "fiche : Empocher en base, une Fêlure ciblée, En poche en dernier",
+      {
+        above: ["Pointe : Masse +3.", "Base : Empocher la bille en pointe."],
+        below: ["Trouvaille : Fêlure 1 à la base droite.", "En poche, à chaque résolution : Vitesse +2 par minibille active."],
+      },
       fields("sulphide")
     );
     run.same(
@@ -198,12 +212,16 @@ function checkCards(run) {
     run.same("fiche : un Polissage ciblé au Tic", ["Tic : Polissage 1 à la pointe."], fields("glass").below);
     run.same(
       "fiche : un Polissage ciblé au Final, une Trouvaille entre Tic et Final",
-      ["Tic : Masse +1.", "Trouvaille : Polissage 1.", "Final : Polissage 1 à la pointe."],
+      ["Tic : Masse +1.", "Trouvaille : Polissage 1.", "Final : Polissage 1 à la pointe et Empocher cette bille.", "En poche, à chaque résolution : Masse +1."],
       fields("agate").below
     );
     run.same("fiche : la Pioche au tic", ["Tic : Pioche 1."], fields("cats_eye").below);
     run.same("fiche : la Pioche à l'éjection", ["Éjection : Pioche 1."], fields("stoneware").below);
-    run.same("fiche : la Chiquenaude puis le Final de la porcelaine", ["Chiquenaude : Masse +1.", "Final : Vitesse +4."], fields("porcelain").below);
+    run.same(
+      "fiche : la Chiquenaude, le Final, puis En poche à l'entrée de la porcelaine",
+      ["Chiquenaude : Masse +1.", "Final : Vitesse +4.", "En poche, à l'entrée : Vitesse +10."],
+      fields("porcelain").below
+    );
     // Un montant calculé, avec sa valeur actuelle : en main, celle de son compteur.
     const flickLine = (turnsInHand) => plain(marbleCard("clay", "principal", rules, t, { turnsInHand }).below[0]);
     run("fiche : montant calculé en main, valeur actuelle", "Chiquenaude : Vitesse +1 par tour en main, maximum +5, actuellement +2.", flickLine(2));
@@ -271,8 +289,13 @@ function checkCards(run) {
     );
     setLocale("en");
     run.same("fiche, anglais : la Pioche et le Polissage", ["Apex: Speed +2 and Polish 1.", "Base: Draw 1."], fields("mica").above);
-    run.same("fiche, anglais : la Fêlure ciblée", ["Apex: Mass +3.", "Base: Crack 1 to the apex."], fields("sulphide").above);
-    run.same("fiche, anglais : comparaison de calibre au Tic", ["Hit: Speed +4 if the knocked-out marble is smaller.", "Knockout: Speed +3."], fields("gorilla").below);
+    run.same("fiche, anglais : Empocher en base", ["Apex: Mass +3.", "Base: Pocket the marble at the apex."], fields("sulphide").above);
+    run.same(
+      "fiche, anglais : comparaison de calibre au Tic, Empocher la première de la main",
+      ["Hit: Speed +4 if the knocked-out marble is smaller and Pocket the first marble in hand.", "Knockout: Speed +3."],
+      fields("gorilla").below
+    );
+    run.same("fiche, anglais : En poche", ["Final: Polish 1 to the apex and Pocket this marble.", "Pocketed, each resolution: Mass +1."], fields("agate").below.slice(-2));
     run.same("fiche, anglais : comparaison de calibre à l'Éjection", ["Awaken: Draw 1.", "Knockout: Draw 1 if the placed marble is larger."], fields("mica").below);
     run("fiche, anglais : comptage par calibre", "Base: Speed +1 per active peewee.", fields("stoneware").above[1]);
     run("fiche, anglais : calibre d'un emplacement", "Apex: Mass +1 and Mass +2 if the left base is a boulder.", fields("agate").above[0]);
@@ -383,14 +406,15 @@ function checkKeywords(run) {
   const ids = (marble, marbles = rules) => marbles.keywordsOf(marble).map((keyword) => keyword.id);
   run.same("mots-clés : la géante, déclencheurs puis actions", ["apex", "base", "awaken", "final", "draw", "polish"], ids("giant"));
   run.same("mots-clés : le mica, la Pioche une seule fois (base, éveil, éjection)", ["apex", "base", "awaken", "knockout", "draw", "polish"], ids("mica"));
-  run.same("mots-clés : le sulfure, Fêlure", ["apex", "base", "windfall", "crack"], ids("sulphide"));
+  run.same("mots-clés : le sulfure, En poche avant les actions, Fêlure puis Empocher", ["apex", "base", "windfall", "pocketed", "crack", "pocket"], ids("sulphide"));
+  run.same("mots-clés : la porcelaine, En poche par son seul effet d'entrée", ["apex", "base", "flick", "final", "pocketed"], ids("porcelain"));
   run.same("mots-clés : ni Vitesse ni Masse, ni calibre", ["apex", "base", "flick", "hit"], ids("clay"));
   const made = fabricatedRules({ sided: { baseVariant: { leftBase: [{ action: "mass", amount: 1 }] } }, bare: {} });
   run.same("mots-clés : une variante de base seule compte comme base", ["base"], ids("sided", made));
   run.same("mots-clés : une bille sans effet n'en a aucun", [], ids("bare", made));
   run.same(
     "mots-clés : l'ordre de la liste, phases, déclencheurs, actions",
-    ["apex", "base", "awaken", "flick", "hit", "windfall", "knockout", "final", "draw", "polish", "crack"],
+    ["apex", "base", "awaken", "flick", "hit", "windfall", "knockout", "final", "pocketed", "draw", "polish", "crack", "pocket"],
     MARBLE_KEYWORDS.map((keyword) => keyword.id)
   );
 
@@ -405,6 +429,14 @@ function checkKeywords(run) {
     plain(keywordsText("tiger", rules, t))
   );
   run("touche E : aucune bille", "Aucune bille.", keywordsText(undefined, rules, t));
+  run(
+    "touche E : En poche et Empocher, tels que déclarés",
+    true,
+    plain(keywordsText("agate", rules, t)).endsWith(
+      "En poche : effets actifs uniquement lorsque la bille est dans le pot. Polissage : retire de l'usure à une bille, qui reste ainsi plus longtemps sur le triangle. " +
+        "Empocher : envoie une bille au pot. Si le pot est plein, la bille est perdue pour la partie."
+    )
+  );
   run("touche E : aucun mot-clé", "Aucun mot-clé.", keywordsText("bare", made, t));
   const menu = keywordsMenu("giant", rules);
   const lines = (built) => built.entries.map((entry) => plain(t(entry.label, entry.labelParams)));
@@ -423,6 +455,14 @@ function checkKeywords(run) {
   setLocale("en");
   run("touche E, anglais : la première ligne", "Apex: effect played during the apex phase, when the marble sits at the apex.", plain(t(keywordLines("tiger", rules)[0].key, keywordLines("tiger", rules)[0].params)));
   run("touche E, anglais : aucune bille", "No marble.", keywordsText(undefined, rules, t));
+  run(
+    "touche E, anglais : En poche et Empocher",
+    true,
+    plain(keywordsText("sulphide", rules, t)).endsWith(
+      "Pocketed: effects active only while the marble is in the pot. Crack: adds wear to a marble. If it reaches its maximum, the marble is worn out and leaves the triangle at once. " +
+        "Pocket: sends a marble to the pot. If the pot is full, the marble is lost for the rest of the game."
+    )
+  );
   run("Maj+E, anglais : titre", "Keywords of giant", plain(t(menu.title, menu.titleParams)));
   run.same("Maj+E, anglais : aucun mot-clé", ["No keyword.", "Close"], lines(keywordsMenu("bare", made)));
   setLocale(locale);
@@ -432,6 +472,20 @@ function checkKeywords(run) {
     const missing = MARBLE_KEYWORDS.flatMap((keyword) => [keyword.texts.name, keyword.texts.description]).filter((key) => !Object.hasOwn(table, key));
     run.same(`${lang} : chaque mot-clé a son nom et sa description`, [], missing);
   }
+}
+
+// La touche P : le pot et les billes perdues, accords compris.
+function checkPotStatus(run) {
+  const locale = getLocale();
+  const game = (pot, lost) => ({ ...rules.createGame(1), pot, lost });
+  setLocale("fr");
+  run("touche P : vide", "0 bille sur 3 dans le pot, 0 bille perdue.", plain(describePot(game([], []), t)));
+  run("touche P : une de chaque", "1 bille sur 3 dans le pot, 1 bille perdue.", plain(describePot(game(["clay"], ["glass"]), t)));
+  run("touche P : pluriels", "3 billes sur 3 dans le pot, 2 billes perdues.", plain(describePot(game(["clay", "glass", "agate"], ["mica", "tiger"]), t)));
+  run("Maj+P : le titre du menu", "Pot", t("marbles.pile.pot"));
+  setLocale("en");
+  run("touche P, anglais", "2 marbles of 3 in the pot, 1 lost marble.", plain(describePot(game(["clay", "glass"], ["mica"]), t)));
+  setLocale(locale);
 }
 
 function checkBagOrder(run) {
@@ -557,6 +611,7 @@ function checkSounds(run) {
     rightBase: { x: 0.4, y: 0.5 },
     apex: { x: 0, y: 1 },
     discard: { x: 0.8, y: 1 },
+    pot: { x: -0.8, y: 1 },
   };
   const rolls = {
     place: { speed: 1, endRatio: 1 },
@@ -761,6 +816,8 @@ function checkSounds(run) {
   run("stéréo : place manquante refusée", true, throws(() => validateSoundPlaces({ hand: places.hand, leftBase: places.leftBase })));
   run("stéréo : défausse manquante refusée", true, throws(() => validateSoundPlaces({ ...places, discard: undefined })));
   run("stéréo : places complètes acceptées", false, throws(() => validateSoundPlaces(places)));
+  run("stéréo : pot manquant refusé", true, throws(() => validateSoundPlaces({ ...places, pot: undefined })));
+  run("stéréo : le pot, en face de la défausse", -places.discard.x, positionOf(potPlace(), places).x);
   run.same("stéréo : la défausse a sa place", { x: 0.8, y: 1 }, positionOf(discardPlace(), places));
   run("profondeur : profondeur hors bornes refusée", true, throws(() => validateSoundPlaces({ ...places, apex: { x: 0, y: 2 } })));
 
@@ -816,6 +873,7 @@ export default function checkMarblesView(run) {
   checkBagOrder(run);
   checkTallyMenu(run);
   checkKeywords(run);
+  checkPotStatus(run);
   run("narration : évènement inconnu refusé", true, throws(() => buildSteps([{ type: "nope" }], (key) => key)));
 
   // Le découpage en étapes : tous les évènements, chacun une fois, dans l'ordre.

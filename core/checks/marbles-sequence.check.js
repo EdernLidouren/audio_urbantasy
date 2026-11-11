@@ -115,12 +115,17 @@ const REGENERATION =
 
 // Une pioche, suivie de l'Éveil de sa bille et de ce qu'il déclenche (une Pioche qui
 // pioche à son tour, un Polissage ou une Fêlure, une régénération).
+// Une mise en poche (avec son entrée au pot) ou une perte, et une cible vide
+// d'Empocher.
+const POCKETING = "event\\.pocketed (event\\.effect_pocket_entry )?|event\\.lost |event\\.target_empty_(hand|self) |";
 const DRAWING =
-  "(" + REGENERATION + "|event\\.draw |event\\.draw_skipped\\.(handFull|noMarbles) |event\\.effect_awaken |" +
+  "(" + REGENERATION + "|event\\.draw |event\\.draw_skipped\\.(handFull|noMarbles) |event\\.effect_awaken |" + POCKETING +
   "event\\.polished |event\\.cracked |event\\.target_empty |event\\.discarded\\.wear |event\\.effect_final )";
 
 const SEQUENCE_SHAPE = new RegExp(
   "^resolution\\.opening (outcome\\.(slot|empty) " + DRAWING + "*){3}" +
+    // L'étape du pot : une par bille qui a un effet de résolution.
+    "(outcome\\.pot " + DRAWING + "*)*" +
     "(event\\.discarded\\.wear (event\\.effect_final )?" + DRAWING + "*)*" +
     "event\\.impact " +
     "(event\\.rotation " + DRAWING + "+event\\.turn_started" +
@@ -160,7 +165,7 @@ function checkRealGames(run) {
           said.filter((text) => text.startsWith("Début du tour")).length === (closing.startsWith("Début du tour") ? 2 : 1) &&
           (closing === `Début du tour ${before.turn + 1}, jouez vos billes.` || closing.includes("Score final")) &&
           said.includes(`Résolution du tour ${before.turn}.`) &&
-          !said.some((text) => text.includes("Entrée"));
+          !said.some((text) => text.includes("Entrée pour passer"));
         if (!historyOk) badHistories.push(`${seed}/${before.turn} : ${said.join(" | ")}`);
 
         const shape = resolutionSteps(before.turn, events, keyOnly)
@@ -478,41 +483,74 @@ function checkTexts(run) {
       texts(finalState).slice(3, 6)
     );
 
-    // Polissage et Fêlure : chez la bille qui les produit ; les conséquences prévues.
-    const cracking = playState({ hand: inHand(["sulphide"]), bag: ["clay"], triangle: { leftBase: { marble: "sulphide", wear: 0 }, rightBase: null, apex: { marble: "porcelain", wear: 1 } } });
+    // Empocher : chez la bille qui le produit, avec ce qu'il déplace et son entrée au
+    // pot ; la phase de la bille empochée, sautée.
+    const pocketing = playState({ hand: inHand(["sulphide"]), bag: ["clay"], triangle: { leftBase: { marble: "sulphide", wear: 0 }, rightBase: null, apex: { marble: "porcelain", wear: 1 } } });
     run(
-      "Fêlure, R : chez le sulfure ; la porcelaine retirée avant sa phase, son Final",
-      "Prévision : Vitesse 4, Masse 1, Impact 4. base gauche, sulfure : Fêlure 1 à la pointe. base droite, vide. pointe, porcelaine : retirée avant sa phase. Final : Vitesse +4.",
-      said(describeOverview(cracking, rules, t))
+      "Empocher, R : chez le sulfure, la porcelaine et son entrée ; la pointe retirée avant sa phase",
+      "Prévision : Vitesse 10, Masse 1, Impact 10. base gauche, sulfure : Empocher la bille en pointe, puis porcelaine en poche, à l'entrée : Vitesse +10. base droite, vide. pointe, porcelaine : retirée avant sa phase.",
+      said(describeOverview(pocketing, rules, t))
     );
     run.same(
-      "Fêlure, séquence : l'effet, la fêlure, le retrait, le Final, la phase sautée",
+      "Empocher, séquence : l'effet, la mise en poche, l'entrée, la phase sautée",
       [
-        "Résolution du tour 2. base gauche, sulfure : Fêlure 1 à la pointe.",
-        "porcelaine se fêle : usure 2 sur 2.",
-        "porcelaine est usée et part à la défausse.",
-        "Final de porcelaine : Vitesse +4.",
+        "Résolution du tour 2. base gauche, sulfure : Empocher la bille en pointe.",
+        "porcelaine est mise en poche.",
+        "Entrée au pot de porcelaine : Vitesse +10. Vitesse 10, Masse 1.",
         "base droite, vide.",
         "pointe, vide.",
-        "Impact 4. Score 4.",
+        "Impact 10. Score 10.",
       ],
-      texts(cracking).slice(0, 7)
+      texts(pocketing).slice(0, 6)
     );
     run.same(
-      "Fêlure, confirmation : dans les valeurs prévues de la bille posée",
-      ["Poser sulfure en base droite ?", "Fêlure 1 à la pointe", "Chiquenaude de sulfure : aucun effet"],
-      placementLines({ ...cracking, triangle: { ...cracking.triangle, leftBase: null } }, 0, "rightBase", rules, t).map(({ key, params }) => said(t(key, params)))
+      "Empocher, confirmation : dans les valeurs prévues de la bille posée",
+      ["Poser sulfure en base droite ?", "Empocher la bille en pointe, puis porcelaine en poche, à l'entrée : Vitesse +10", "Chiquenaude de sulfure : aucun effet"],
+      placementLines({ ...pocketing, triangle: { ...pocketing.triangle, leftBase: null } }, 0, "rightBase", rules, t).map(({ key, params }) => said(t(key, params)))
     );
+    // Le pot plein : la perte se dit, sans entrée.
+    const lostState = { ...pocketing, pot: ["clay", "glass", "mica"] };
+    run.same(
+      "Empocher, pot plein : la perte",
+      ["Résolution du tour 2. base gauche, sulfure : Empocher la bille en pointe.", "Le pot est plein : porcelaine est perdue."],
+      texts(lostState).slice(0, 2)
+    );
+    run(
+      "Empocher, pot plein, R : la perte chez le sulfure",
+      true,
+      said(describeOverview(lostState, rules, t)).includes("base gauche, sulfure : Empocher la bille en pointe, puis pot plein : porcelaine perdue.")
+    );
+    // Les billes du pot à chaque résolution : après les trois emplacements, une ligne
+    // ou une étape par bille qui a cet effet (pas le verre), avant les retraits.
+    const potState = playState({ triangle: { leftBase: { marble: "magnifier", wear: 0 }, rightBase: null, apex: { marble: "porcelain", wear: 0 } }, pot: ["agate", "glass", "sulphide"] });
+    run(
+      "pot, R : une ligne par bille du pot qui a un effet de résolution, comptée dans le total",
+      "Prévision : Vitesse 13, Masse 2, Impact 26. base gauche, loupe : aucun effet. base droite, vide. pointe, porcelaine : Vitesse +9. Pot, agate : Masse +1. Pot, sulfure : Vitesse +4.",
+      said(describeOverview(potState, rules, t))
+    );
+    run.same(
+      "pot, séquence : après la pointe, une étape par bille qui a un effet, puis l'Impact",
+      ["pointe, porcelaine : Vitesse +9.", "Pot, agate : Masse +1.", "Pot, sulfure : Vitesse +4.", "Impact 26. Score 26."],
+      texts(potState).slice(2, 6)
+    );
+    const quietPot = { ...potState, pot: ["glass"] };
+    run("pot : une bille sans effet de résolution ne se dit jamais", false, texts(quietPot).some((text) => text.startsWith("Pot")) || said(describeOverview(quietPot, rules, t)).includes("Pot"));
     const saving = playState({ bag: ["clay"], triangle: { leftBase: { marble: "agate", wear: 2 }, rightBase: null, apex: { marble: "porcelain", wear: 1 } } });
     run(
-      "Polissage, R : le Final de l'agate polit la pointe, la porcelaine n'est pas retirée",
-      "Prévision : Vitesse 5, Masse 2, Impact 10. base gauche, agate : Masse +1. Final : Polissage 1 à la pointe. base droite, vide. pointe, porcelaine : Vitesse +5.",
+      "Polissage, R : le Final de l'agate polit la pointe et l'empoche, la porcelaine n'est pas retirée",
+      "Prévision : Vitesse 5, Masse 2, Impact 10. base gauche, agate : Masse +1. Final : Polissage 1 à la pointe et Empocher cette bille, puis agate en poche. base droite, vide. pointe, porcelaine : Vitesse +5.",
       said(describeOverview(saving, rules, t))
     );
     run.same(
-      "Polissage, séquence : le retrait de l'agate, son Final, la porcelaine polie",
-      ["agate est usée et part à la défausse.", "Final d'agate : Polissage 1 à la pointe.", "porcelaine est polie : usure 1 sur 2.", "Impact 10. Score 10."],
-      texts(saving).slice(3, 7)
+      "Polissage, séquence : le retrait de l'agate, son Final, la porcelaine polie, l'agate en poche",
+      [
+        "agate est usée et part à la défausse.",
+        "Final d'agate : Polissage 1 à la pointe et Empocher cette bille.",
+        "porcelaine est polie : usure 1 sur 2.",
+        "agate est mise en poche.",
+        "Impact 10. Score 10.",
+      ],
+      texts(saving).slice(3, 8)
     );
 
     // La Chiquenaude : sa ligne de confirmation, toujours là, avec la valeur calculée ;
@@ -609,8 +647,13 @@ function checkTexts(run) {
     );
     run.same(
       "calibre, confirmation : le Tic du gorille, sa valeur finale",
-      ["Chiquenaude de gorille : aucun effet", "Éjection de porcelaine : aucun effet", "Tic de gorille : Vitesse +4"],
+      ["Chiquenaude de gorille : aucun effet", "Éjection de porcelaine : aucun effet", "Tic de gorille : Vitesse +4 et Empocher la première bille de la main"],
       placementLines(sized, 0, "rightBase", rules, t).map(({ key, params }) => said(t(key, params))).slice(2)
+    );
+    run(
+      "Empocher, confirmation : l'entrée au pot prévue, chez le Tic qui empoche",
+      "Tic de gorille : Vitesse +4 et Empocher la première bille de la main, puis porcelaine en poche, à l'entrée : Vitesse +10",
+      said(t(...(({ key, params }) => [key, params])(placementLines({ ...sized, hand: inHand(["gorilla", "porcelain"]) }, 0, "rightBase", rules, t).at(-1))))
     );
     const boulderLeft = { ...sized, triangle: { ...sized.triangle, leftBase: { marble: "giant", wear: 0 } } };
     run(
@@ -626,10 +669,16 @@ function checkTexts(run) {
       describeOverview(sized, rules, t)
     );
     run(
-      "anglais, Fêlure : R",
-      "Forecast: Speed 4, Mass 1, Impact 4. left base, sulphide: Crack 1 to the apex. right base, empty. apex, porcelain: removed before its phase. Final: Speed +4.",
-      describeOverview(cracking, rules, t)
+      "anglais, Empocher : R",
+      "Forecast: Speed 10, Mass 1, Impact 10. left base, sulphide: Pocket the marble at the apex, then porcelain pocketed, on entry: Speed +10. right base, empty. apex, porcelain: removed before its phase.",
+      describeOverview(pocketing, rules, t)
     );
+    run(
+      "anglais, pot : R",
+      true,
+      describeOverview(potState, rules, t).endsWith("Pot, agate: Mass +1. Pot, sulphide: Speed +4.")
+    );
+    run.same("anglais, Empocher : séquence", ["porcelain is pocketed.", "Pot entry of porcelain: Speed +10. Speed 10, Mass 1."], texts(pocketing).slice(1, 3));
     run.same("anglais, Polissage : séquence", ["porcelain is polished: wear 1 of 2."], texts(saving).filter((text) => text.includes("polished")));
     run(
       "anglais, final : R",

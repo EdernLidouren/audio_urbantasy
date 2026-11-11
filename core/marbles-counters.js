@@ -9,7 +9,9 @@
 // QUATRE CATÉGORIES, dans l'ordre du menu de debug :
 //   "trigger"  les MOTS-CLÉS DE DÉCLENCHEMENT, générés : un par déclencheur
 //              (config/marbles-values.js/MARBLE_TRIGGERS) et par phase (pointe,
-//              base, base gauche, base droite), sous l'id du mot-clé. +1, par bille,
+//              base, base gauche, base droite), et par moment du mot-clé En poche
+//              (MARBLE_POCKET : pocketEntry, pocketResolution), sous l'id du mot-clé
+//              ou de l'effet du moment. +1, par bille,
 //              quand le mot-clé se déclenche chez une bille qui a un effet pour ce
 //              moment : son champ n'est pas vide (pour une base, l'effet de base ou
 //              sa variante de l'emplacement), ou elle a reçu un effet extérieur pour
@@ -68,6 +70,16 @@ function phaseCounter({ id, slots }) {
       const received = state.triangle[event.slot]?.bonus !== undefined;
       return ownEffect || received ? 1 : 0;
     },
+  };
+}
+
+// Un moment du mot-clé En poche (à l'entrée, à chaque résolution) : la bille du pot
+// que nomme son évènement, si elle a un effet pour ce moment.
+function pocketMomentCounter({ id, event: eventType, clauses }) {
+  return {
+    id,
+    category: "trigger",
+    count: (event, { types }) => (event.type === eventType && event.marble !== null && (clauses(event.marble, types)?.length ?? 0) > 0 ? 1 : 0),
   };
 }
 
@@ -156,18 +168,21 @@ export function validateEventTallies(tallies, journalEvents) {
 // TOUS les compteurs, dans l'ordre du menu (catégories, puis l'ordre de leur source) :
 //   triggers  les déclencheurs (MARBLE_TRIGGERS) ;
 //   phases    les mots-clés de phase, [{ id, slots }] ;
+//   pocketMoments  les moments du mot-clé En poche, [{ id, event, clauses(marble,
+//             types) }] ;
 //   actions   les actions de clause (CLAUSE_ACTIONS) ;
 //   events    les évènements réels déclarés (MARBLE_TALLIES) ;
 //   journalEvents  pour valider ces derniers.
 // Un déclencheur ou une action ajoutés à leur liste ont leurs compteurs ici, sans
 // autre modification. Échoue sur un identifiant en double.
-export function buildTallyCounters({ triggers, phases, actions, events, journalEvents }) {
+export function buildTallyCounters({ triggers, phases, pocketMoments = [], actions, events, journalEvents }) {
   validateEventTallies(events, journalEvents);
   const keywordActions = Object.entries(actions).filter(([, action]) => action.keyword !== undefined);
   const statActions = Object.entries(actions).filter(([, action]) => action.keyword === undefined && action.kind === "value");
   const counters = [
     ...triggers.map(triggerCounter),
     ...phases.map(phaseCounter),
+    ...pocketMoments.map(pocketMomentCounter),
     ...keywordActions.flatMap(([id, action]) => actionCounters(id, action)),
     ...statActions.flatMap(([id]) => statCounters(id)),
     ...events.map(eventCounter),

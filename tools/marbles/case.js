@@ -63,6 +63,9 @@ function printForecast(action) {
       console.log(`    ${triggerLabel(effect.trigger)} : Vitesse ${counter(effect.speed)}, Masse ${counter(effect.mass)}, Pioche ${effect.draw}.`);
     }
   }
+  for (const effect of predicted.potEffects) {
+    console.log(`  Pot, ${marbleLabel(effect.marble, name)} : Vitesse ${counter(effect.speed)}, Masse ${counter(effect.mass)}.`);
+  }
   for (const { effects } of predicted.regenerations) {
     console.log("  Régénération du sac prévue.");
     for (const effect of effects) {

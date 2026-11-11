@@ -13,8 +13,9 @@
 //     "hand": ["agate", "gorilla:2"],     "id:tours en main"
 //     "bag": ["mica"],                du haut (prochaine pioche) vers le bas
 //     "discard": [],
+//     "pot": ["agate"], "lost": [],  le pot dans l'ordre d'arrivée, les billes perdues
 //     "tally": { "flick": { "turn": 1, "game": 3 } },   valeurs de partie, le reste à 0
-//     "settings": { "maxHandSize": 5, "throwsPerTurn": 5, "firstTurnDraw": 5, "drawPerTurn": 1, "turnCount": 9 }
+//     "settings": { "maxHandSize": 5, "throwsPerTurn": 5, "potCapacity": 3, "firstTurnDraw": 5, "drawPerTurn": 1, "turnCount": 9 }
 //   }
 // Une bille du triangle : "id" (usure 0), "id:usure", ou { marble, wear, bonus? }.
 // Une bille de la main : "id" (0 tour en main), "id:tours", ou { marble, turnsInHand }.
@@ -29,8 +30,8 @@ import { rejectUnknownFields } from "../../lib/validate.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
 import { GAME_RULES } from "./game-rules.js";
 
-const FIELDS = ["seed", "turn", "stage", "score", "speed", "mass", "swapUsed", "throwsUsed", "triangle", "hand", "bag", "discard", "tally", "settings"];
-const SETTINGS = ["maxHandSize", "throwsPerTurn", "firstTurnDraw", "drawPerTurn", "turnCount"];
+const FIELDS = ["seed", "turn", "stage", "score", "speed", "mass", "swapUsed", "throwsUsed", "triangle", "hand", "bag", "discard", "pot", "lost", "tally", "settings"];
+const SETTINGS = ["maxHandSize", "throwsPerTurn", "potCapacity", "firstTurnDraw", "drawPerTurn", "turnCount"];
 const STAGES = ["draw", "play", "over"];
 
 function fail(message) {
@@ -81,6 +82,13 @@ function tallyContent(values = {}, base) {
   return { ...base, ...Object.fromEntries(described) };
 }
 
+// Le pot : dans l'ordre d'arrivée, jamais plus que sa capacité.
+function potContent(list, capacity) {
+  const pot = marbleList(list, "pot");
+  if (pot.length > capacity) fail(`pot de ${pot.length} billes, plus que potCapacity (${capacity}).`);
+  return pot;
+}
+
 function marbleList(list = [], where) {
   if (!Array.isArray(list)) fail(`${where} doit être une liste d'ids.`);
   return list.map((id) => checkMarble(id, where));
@@ -122,6 +130,8 @@ export function buildState(description = {}) {
     hand,
     bag: marbleList(description.bag, "bag"),
     discard: marbleList(description.discard, "discard"),
+    pot: potContent(description.pot, base.potCapacity),
+    lost: marbleList(description.lost, "lost"),
     tally: tallyContent(description.tally, base.tally),
   };
 }

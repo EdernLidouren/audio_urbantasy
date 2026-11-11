@@ -48,7 +48,8 @@ node tools/marbles/case.js tools/marbles/examples/replacement.json
 Un fichier JSON : `state`, la description de l'état (format en tête de
 `tools/marbles/state-builder.js` : tour, triangle avec usure, main avec tours en main
 (`"clay:2"`), sac du haut vers le
-bas, défausse, compteurs, valeurs de partie (`"tally": { "flick": { "turn": 1, "game": 3 } }`, le
+bas, défausse, pot et billes perdues (`"pot": ["agate"]`, dans l'ordre d'arrivée, jamais
+plus que `potCapacity`), compteurs, valeurs de partie (`"tally": { "flick": { "turn": 1, "game": 3 } }`, le
 reste à zéro), réglages), et `actions`, des commandes texte (`poser 1
 pointe`, `echanger gauche pointe`, `resoudre`, `piocher`, `prevoir`) ou des actions
 brutes du réducteur. L'outil affiche l'état de départ, le journal ou le refus de chaque

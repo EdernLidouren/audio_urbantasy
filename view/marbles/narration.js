@@ -4,10 +4,10 @@
 // terminal (tools/marbles/play.js) disent exactement les mêmes phrases.
 
 import { nameRef } from "../../data/i18n/index.js";
-import { MARBLE_SIZES, MARBLE_TRIGGERS } from "../../config/marbles-values.js";
+import { MARBLE_POCKET, MARBLE_SIZES, MARBLE_TRIGGERS } from "../../config/marbles-values.js";
 import { SLOTS, TALLY_COUNTERS, throwsLeft } from "../../core/marbles.js";
 import { emptyTally } from "../../core/marbles-tally.js";
-import { AMOUNT_SOURCES, CLAUSE_ACTIONS, CONDITIONS, amountOf } from "../../core/marbles-effects.js";
+import { AMOUNT_SOURCES, CLAUSE_ACTIONS, CONDITIONS, FIRST_IN_HAND, amountOf } from "../../core/marbles-effects.js";
 import { forecast } from "../../core/marbles-forecast.js";
 import { formatMenuPosition } from "../../lib/menu.js";
 
@@ -47,6 +47,9 @@ const ACTION_TEXTS = {
   draw: { up: "marbles.effect.draw" },
   polish: { up: "marbles.effect.polish" },
   crack: { up: "marbles.effect.crack" },
+  // Sans montant ; son texte dépend de sa cible (actionText) : la bille elle-même
+  // (`up`), un emplacement (`slot`, qui reçoit {slot}), la première de la main.
+  pocket: { up: "marbles.effect.pocket_self", targets: { slot: "marbles.effect.pocket_slot", [FIRST_IN_HAND]: "marbles.effect.pocket_hand" } },
 };
 
 // Une action sans texte, ou un texte sans action, échoue au chargement.
@@ -68,14 +71,25 @@ function valueParts(values, t) {
   return parts;
 }
 
-// Les actions sur une bille d'un effet ([{ action, amount, target? }]) -> leurs
-// morceaux : « Polissage 1 », « Fêlure 1 à la pointe ». Elles se disent chez la bille
-// qui les produit, jamais chez celle qui les reçoit.
+// Le texte d'une action sur une bille, sa cible comprise : « Polissage 1 », « Fêlure
+// 1 à la pointe ». Une action qui a ses propres textes par cible (Empocher) les dit
+// elle-même : « Empocher cette bille », « Empocher la bille en pointe », « Empocher la
+// première bille de la main ».
+function actionText(action, amount, target, t) {
+  const { up, targets } = ACTION_TEXTS[action];
+  if (targets !== undefined) {
+    if (target === undefined) return t(up);
+    return target === FIRST_IN_HAND ? t(targets[FIRST_IN_HAND]) : t(targets.slot, { slot: slotName(target, t) });
+  }
+  const text = t(up, { amount });
+  return target === undefined ? text : t("marbles.effect.given", { effect: text, slot: slotName(target, t) });
+}
+
+// Les actions sur une bille d'un effet ([{ action, amount?, target? }]) -> leurs
+// morceaux. Elles se disent chez la bille qui les produit, jamais chez celle qui les
+// reçoit.
 function operationParts(operations = [], t) {
-  return operations.map(({ action, amount, target }) => {
-    const text = t(ACTION_TEXTS[action].up, { amount });
-    return target === undefined ? text : t("marbles.effect.given", { effect: text, slot: slotName(target, t) });
-  });
+  return operations.map(({ action, amount, target }) => actionText(action, amount, target, t));
 }
 
 // Tout ce qu'un effet joué ou prévu produit chez sa bille : ses valeurs, puis ses
@@ -88,6 +102,27 @@ function combined(parts, t) {
   return parts.length === 0 ? t("marbles.effect.none") : t("marbles.effect.combined", { parts });
 }
 
+// Ce qu'un Empocher PRÉVU a déplacé (core/marbles-forecast.js, `pockets`), dit chez la
+// bille qui l'a produit : « porcelaine en poche, à l'entrée : Vitesse +10 », « argile
+// en poche », « pot plein : argile perdue » ; une bille piochée à l'aveugle reste
+// inconnue.
+function pocketPart({ marble, lost, entry }, t) {
+  if (marble === null) return t(lost ? "marbles.pocket.lost_unknown" : "marbles.pocket.entered_unknown");
+  const ref = nameRef(`marble.${marble}.name`);
+  if (lost) return t("marbles.pocket.lost", { marble: ref });
+  if (entry === null) return t("marbles.pocket.entered", { marble: ref });
+  return t("marbles.pocket.entered_effect", { marble: ref, effect: effectSummary(entry, t) });
+}
+
+// Un effet prévu, d'une phrase : ses valeurs et ses actions, puis ce que ses Empocher
+// ont déplacé (« Empocher la bille en pointe, puis porcelaine en poche, à l'entrée :
+// Vitesse +10 »).
+function effectSummary(effect, t) {
+  const text = combined(effectParts(effect, t), t);
+  if (!effect.pockets?.length) return text;
+  return t("marbles.pocket.then", { effect: text, pockets: t("marbles.effect.combined", { parts: effect.pockets.map((moved) => pocketPart(moved, t)) }) });
+}
+
 // Un effet JOUÉ ou PRÉVU : { speed, mass, draw, given } -> « Vitesse +1 et Masse
 // +2 », « Pioche 1 », « Vitesse +4 à la pointe », « aucun effet ».
 export function describeEffect(effect, t) {
@@ -95,7 +130,9 @@ export function describeEffect(effect, t) {
   for (const gift of effect.given ?? []) {
     parts.push(t("marbles.effect.given", { effect: combined(valueParts(gift, t), t), slot: slotName(gift.slot, t) }));
   }
-  return combined(parts, t);
+  const text = combined(parts, t);
+  if (!effect.pockets?.length) return text;
+  return t("marbles.pocket.then", { effect: text, pockets: t("marbles.effect.combined", { parts: effect.pockets.map((moved) => pocketPart(moved, t)) }) });
 }
 
 // Prévu, s'il y en a un (null : rien à prévoir), sinon « aucun effet ».
@@ -161,6 +198,11 @@ export function cardSituation(marble, turnsInHand = 0, tally = emptyTally(TALLY_
 // actuelle dans `situation`), sa cible et sa condition comprises. Son action dit sa
 // valeur par ses propres textes.
 function describeClause(clause, situation, t) {
+  // Une action sans montant (Empocher) dit sa cible elle-même.
+  if (CLAUSE_ACTIONS[clause.action].amountless) {
+    const text = actionText(clause.action, undefined, clause.target, t);
+    return clause.when === undefined ? text : t("marbles.effect.conditional", { effect: text, condition: CONDITION_TEXTS[clause.when.type](clause.when, t) });
+  }
   let text = Number.isInteger(clause.amount)
     ? combined(valueParts({ [clause.action]: clause.amount }, t), t)
     : computedText(clause.action, clause.amount, situation, t);
@@ -231,7 +273,7 @@ export function describeSlotForPlacement(game, slot, rules, t) {
 function placedValues(predicted, slot, t) {
   // Retirée avant sa phase (une Fêlure de son Tic) : elle n'a pas de valeurs.
   if (predicted.phases[slot] === null) return forecastSlotLine(predicted, slot, t);
-  const values = combined(effectParts(predicted.phases[slot], t), t);
+  const values = effectSummary(predicted.phases[slot], t);
   const notes = slotNotes(predicted, slot, t);
   return notes.length === 0 ? values : [`${values}.`, ...notes].join(" ");
 }
@@ -277,6 +319,11 @@ export function describeBag(game, t) {
   return t("marbles.status.bag", { count: game.bag.length, draw: game.drawPerTurn });
 }
 
+// Le pot (touche P) : « 2 billes sur 3 dans le pot, 1 bille perdue. ».
+export function describePot(game, t) {
+  return t("marbles.status.pot", { count: game.pot.length, capacity: game.potCapacity, lost: game.lost.length });
+}
+
 export function describeDiscard(game, t) {
   return t("marbles.status.discard", { count: game.discard.length });
 }
@@ -313,7 +360,7 @@ function outcomeLine(slot, outcome, t, notes = []) {
   const line = t("marbles.outcome.slot", {
     slot: slotName(slot, t),
     marble: marbleName(outcome.marble, t),
-    effect: combined(effectParts(outcome, t), t),
+    effect: effectSummary(outcome, t),
   });
   return [line, ...notes].join(" ");
 }
@@ -340,7 +387,7 @@ function forecastSlotLine(predicted, slot, t) {
 // « Final : Vitesse +4. » si elle atteint son usure maximale ce tour. Les valeurs
 // produites seulement, comme une phase.
 function slotNotes(predicted, slot, t) {
-  return predicted.slotEffects[slot].map((effect) => t(SLOT_TEMPLATES[effect.trigger], { effect: combined(effectParts(effect, t), t) }));
+  return predicted.slotEffects[slot].map((effect) => t(SLOT_TEMPLATES[effect.trigger], { effect: effectSummary(effect, t) }));
 }
 
 // Les gabarits des déclencheurs prévus avec une régénération (MARBLE_TRIGGERS,
@@ -361,16 +408,25 @@ function regenerationLines(predicted, t) {
     { key: index === 0 ? "marbles.forecast.regenerates" : "marbles.forecast.regenerates_again" },
     ...effects.map((effect) => ({
       key: REGENERATION_TEMPLATES[effect.trigger],
-      params: { marble: nameRef(`marble.${effect.marble}.name`), effect: combined(effectParts(effect, t), t) },
+      params: { marble: nameRef(`marble.${effect.marble}.name`), effect: effectSummary(effect, t) },
     })),
   ]);
 }
 
 // Ce que la prévision ignore, à la fin de ce qu'elle dit : « Éveils possibles. »
-// quand elle est incertaine (core/marbles-forecast.js : une bille piochée, et une
-// bille qui pouvait l'être a un Éveil). Rien sinon.
+// quand un Éveil est possible (core/marbles-forecast.js, `awakenPossible` : une bille
+// piochée, et une bille qui pouvait l'être a un Éveil). Rien sinon.
 function uncertainLines(predicted) {
-  return predicted.uncertain ? [{ key: "marbles.forecast.awakenings" }] : [];
+  return predicted.awakenPossible ? [{ key: "marbles.forecast.awakenings" }] : [];
+}
+
+// Les billes du pot qui ont un effet à chaque résolution, après les trois
+// emplacements, dans l'ordre d'arrivée : « Pot, agate : Masse +1. ». Aucune ligne pour
+// les autres.
+const POT_FORECAST_TEMPLATE = MARBLE_POCKET.moments.find((moment) => moment.texts.forecast !== undefined)?.texts.forecast;
+
+function potLines(predicted, t) {
+  return predicted.potEffects.map((effect) => t(POT_FORECAST_TEMPLATE, { marble: nameRef(`marble.${effect.marble}.name`), effect: effectSummary(effect, t) }));
 }
 
 function forecastNotes(predicted, t) {
@@ -392,7 +448,7 @@ export function describeOverview(game, rules, t) {
     impact: predicted.impact,
   });
   const slots = SLOTS.map((slot) => forecastSlotLine(predicted, slot, t));
-  return [summary, ...slots, ...forecastNotes(predicted, t)].join(" ");
+  return [summary, ...slots, ...potLines(predicted, t), ...forecastNotes(predicted, t)].join(" ");
 }
 
 // La rotation du moteur (core/marbles.js/rotated) : un cran, dans le sens horaire
@@ -403,7 +459,12 @@ const ROTATION = { steps: 1, direction: "clockwise" };
 // Le gabarit d'un effet déclenché par un évènement, celui de son déclencheur
 // (MARBLE_TRIGGERS, `texts.effect`) ; celui d'une phase se dit comme le résultat de
 // son emplacement (outcomeLine).
-const EFFECT_TEMPLATES = Object.fromEntries(MARBLE_TRIGGERS.map((trigger) => [trigger.id, trigger.texts.effect]));
+const EFFECT_TEMPLATES = Object.fromEntries([
+  ...MARBLE_TRIGGERS.map((trigger) => [trigger.id, trigger.texts.effect]),
+  // Les moments En poche : « Entrée au pot de porcelaine : Vitesse +10. … », « Pot,
+  // agate : Masse +1. ».
+  ...MARBLE_POCKET.moments.map((moment) => [moment.trigger, moment.texts.effect]),
+]);
 
 function effectText(event, t) {
   if (event.trigger === "phase") {
@@ -451,7 +512,19 @@ const EVENT_TEXTS = {
   // Polissage, Fêlure : la bille qui les reçoit, et son usure d'après.
   polished: (event, t) => t("marbles.event.polished", { marble: nameRef(`marble.${event.marble}.name`), wear: event.wear, maxWear: event.maxWear }),
   cracked: (event, t) => t("marbles.event.cracked", { marble: nameRef(`marble.${event.marble}.name`), wear: event.wear, maxWear: event.maxWear }),
-  targetEmpty: (event, t) => t("marbles.event.target_empty", { slot: slotName(event.slot, t) }),
+  // Une cible vide : un emplacement, la main (Empocher la première bille de la
+  // main), ou la bille elle-même qui n'est plus là.
+  targetEmpty: (event, t) => {
+    if (event.target === FIRST_IN_HAND) return t("marbles.event.target_empty_hand");
+    if (event.target === "self") return t("marbles.event.target_empty_self", { marble: nameRef(`marble.${event.marble}.name`) });
+    return t("marbles.event.target_empty", { slot: slotName(event.slot, t) });
+  },
+  // La mise en poche et la perte, dites avec la bille ; une bille piochée à
+  // l'aveugle n'apparaît que dans la prévision, qui ne passe jamais par ici.
+  pocketed: (event, t) => t("marbles.event.pocketed", { marble: nameRef(`marble.${event.marble}.name`) }),
+  lost: (event, t) => t("marbles.event.lost", { marble: nameRef(`marble.${event.marble}.name`) }),
+  // L'étape du pot se dit par l'effet de la bille, si elle en a un.
+  potResolution: SILENT,
   discarded: (event, t) => t(`marbles.event.discarded.${event.cause}`, { marble: nameRef(`marble.${event.marble}.name`) }),
   placed: (event, t) => t("marbles.event.placed", { marble: marbleName(event.marble, t), slot: slotName(event.slot, t) }),
   phaseSkipped: (event, t) => outcomeLine(event.slot, null, t),

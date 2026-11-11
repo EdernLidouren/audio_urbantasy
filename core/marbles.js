@@ -3,9 +3,12 @@
 //
 // ÉTAT sérialisable, à part entière (jamais lié à la session du jeu principal,
 // aucune persistance aujourd'hui) :
-//   { rngState, maxHandSize, throwsPerTurn, firstTurnDraw, drawPerTurn, turnCount,
-//     turn, score, speed, mass, stage, endReason, bag, hand, discard, triangle,
-//     swapUsed, throwsUsed, tally }
+//   { rngState, maxHandSize, throwsPerTurn, potCapacity, firstTurnDraw, drawPerTurn,
+//     turnCount, turn, score, speed, mass, stage, endReason, bag, hand, discard,
+//     triangle, pot, lost, swapUsed, throwsUsed, tally }
+// `pot` : les billes EN POCHE, des ids dans l'ordre d'arrivée, au plus
+// `potCapacity` ; `lost` : les billes PERDUES, envoyées au pot plein. Ni l'une ni
+// l'autre ne revient jamais dans le sac, ni ne quitte sa zone.
 // `tally` : les VALEURS DE PARTIE, { <id>: { turn, game } } (core/marbles-tally.js, le
 // seul à les écrire ; les compteurs : core/marbles-counters.js, TALLY_COUNTERS), tenues
 // à l'émission de chaque évènement du journal (transact).
@@ -62,7 +65,9 @@
 //   effect { trigger, slot, marble, speedDelta, massDelta, draw, operations, given, lost, speed, mass },
 //   polished { slot, marble, amount, applied, wear, maxWear },
 //   cracked { slot, marble, amount, applied, wear, maxWear },
-//   targetEmpty { action, slot },
+//   targetEmpty { action, slot, target?, marble? },
+//   pocketed { marble, from, slot?, index?, by }, lost { marble, from, slot?, index?, by },
+//   potResolution { index, marble },
 //   wear { slot, marble, wear, maxWear },
 //   impact { speed, mass, impact, score },
 //   rotation { triangle }, turnEnded { turn }, gameOver { reason, score }.
@@ -76,10 +81,21 @@
 // phases ; sa Trouvaille et tout ce qui en découle se règlent avant la suite.
 // `replacement` (Tic, Éjection) : le remplacement en cours, { placed, ejected }, lu
 // par les conditions de calibre relatif (core/marbles-effects.js/relativeSize).
-// `cause` : "replacement" ou "wear". `trigger` : "phase" ou l'id d'un déclencheur
+// `cause` : "replacement", "wear" ou "pocket". `trigger` : "phase" ou l'id d'un déclencheur
 // (config/marbles-values.js/MARBLE_TRIGGERS : "flick", "hit", "windfall", "knockout",
 // "final").
 // `final` : une bille usée vient de rejoindre la défausse depuis `slot`.
+// `pocketed` : une bille entre au pot (Empocher) depuis `from` ("triangle", et son
+// `slot` ; "hand", et son `index` ; "discard"), produite par l'effet `by`
+// ({ trigger, slot, marble }) ; ses effets d'entrée (En poche) se règlent aussitôt,
+// une interruption. `lost` : la même, le pot étant plein : perdue, sans effet
+// d'entrée. Depuis le triangle, un `removed` de cause "pocket" les précède : ce
+// n'est ni une usure ni une éjection, ni Final ni Éjection.
+// `potResolution` : une fois par tour, après les phases et avant les retraits,
+// chaque bille du pot dans l'ordre d'arrivée (`index`), pour son effet En poche à
+// chaque résolution.
+// `targetEmpty` d'Empocher sans bille à prendre : `slot` vide ; ou `slot` null et
+// `target` "firstInHand" (main vide) ou "self" (la bille, `marble`, n'est plus là).
 // draw `cause` : "turn" (la pioche du début de tour) ou "effect" (une Pioche).
 // polished, cracked `applied` : l'usure réellement rendue ou ajoutée, après plancher
 // ou plafond (`amount` : celle demandée).
@@ -102,11 +118,11 @@
 // passent. Les vérifications y passent aussi des tables fabriquées, qui testent
 // ce qu'aucune bille actuelle ne produit (une Masse négative).
 
-import { MARBLE_PHASES, MARBLE_TALLIES, MARBLE_TRIGGERS, MARBLES_SETTINGS, STARTING_BAG } from "../config/marbles-values.js";
+import { MARBLE_PHASES, MARBLE_POCKET, MARBLE_TALLIES, MARBLE_TRIGGERS, MARBLES_SETTINGS, STARTING_BAG } from "../config/marbles-values.js";
 import { createSeed, nextRandom } from "./rng.js";
 import { rejectUnknownFields } from "../lib/validate.js";
 import { MarbleEventLimitError, createEventBus } from "./marbles-bus.js";
-import { CLAUSE_ACTIONS, SLOTS, addValues, effectAt, evaluateEffect, isMarbleSize, validateEffect } from "./marbles-effects.js";
+import { CLAUSE_ACTIONS, FIRST_IN_HAND, SLOTS, addValues, effectAt, evaluateEffect, isMarbleSize, validateEffect } from "./marbles-effects.js";
 import { emptyTally, recordTally } from "./marbles-tally.js";
 import { buildTallyCounters } from "./marbles-counters.js";
 
@@ -155,6 +171,11 @@ export const JOURNAL_EVENTS = Object.freeze({
   polished: true,
   cracked: true,
   targetEmpty: false,
+  // La bille mise en poche ou perdue peut être une bille piochée à l'aveugle (la
+  // première de la main) ; celles du pot aussi, du coup.
+  pocketed: false,
+  lost: false,
+  potResolution: false,
   wear: true,
   impact: false,
   rotation: false,
@@ -244,6 +265,37 @@ validateMarblePhases(MARBLE_PHASES);
 // Les champs d'effet d'une bille : ceux de la phase, puis un par déclencheur.
 const EFFECT_FIELDS = [...PHASE_FIELDS, ...MARBLE_TRIGGERS.map((trigger) => trigger.field)];
 
+// Les MOMENTS du mot-clé En poche (config/marbles-values.js/MARBLE_POCKET), validés
+// au chargement : chacun son id, son effet (`trigger`), son évènement et son moment.
+export function validatePocketMoments(pocket) {
+  const fail = (message) => {
+    throw new Error(`marbles, En poche : ${message}`);
+  };
+  rejectUnknownFields(pocket, ["field", "texts", "moments"], "MARBLE_POCKET", fail);
+  if (typeof pocket.field !== "string" || [...PHASE_FIELDS, ...MARBLE_TRIGGERS.map((trigger) => trigger.field)].includes(pocket.field)) fail("field doit être un champ à part.");
+  validateKeywordTexts(pocket.texts, "MARBLE_POCKET", fail);
+  if (!Array.isArray(pocket.moments) || pocket.moments.length === 0) fail("moments doit être une liste non vide.");
+  const seen = new Set();
+  for (const moment of pocket.moments) {
+    const describe = `moment "${moment?.id}"`;
+    rejectUnknownFields(moment, ["id", "trigger", "event", "moment", "texts"], describe, fail);
+    for (const key of ["id", "trigger", "event"]) {
+      if (typeof moment[key] !== "string" || moment[key] === "" || seen.has(`${key}:${moment[key]}`)) fail(`${describe} : ${key} absent ou en double.`);
+      seen.add(`${key}:${moment[key]}`);
+    }
+    if (MARBLE_TRIGGERS.some((trigger) => trigger.id === moment.trigger || trigger.event === moment.event)) fail(`${describe} : trigger ou event déjà pris par un déclencheur.`);
+    if (!TRIGGER_MOMENTS.includes(moment.moment)) fail(`${describe} : moment inconnu "${moment.moment}".`);
+    if (typeof moment.texts?.card !== "string" || typeof moment.texts?.effect !== "string") fail(`${describe} : textes card et effect obligatoires.`);
+  }
+}
+
+validatePocketMoments(MARBLE_POCKET);
+
+// Les clauses d'une bille pour un moment En poche, ou null.
+function pocketClauses(type, moment) {
+  return type[MARBLE_POCKET.field]?.[moment.id] ?? null;
+}
+
 // Les mots-clés de phase, pour les valeurs de partie : chaque phase (MARBLE_PHASES :
 // pointe, base, celle-ci sur ses deux emplacements), puis chaque emplacement d'une
 // phase qui en a plusieurs (base gauche, base droite).
@@ -258,6 +310,12 @@ const PHASE_KEYWORDS = [
 export const TALLY_COUNTERS = buildTallyCounters({
   triggers: MARBLE_TRIGGERS,
   phases: PHASE_KEYWORDS,
+  // Un compteur par moment En poche, sous l'identifiant de son effet.
+  pocketMoments: MARBLE_POCKET.moments.map((moment) => ({
+    id: moment.trigger,
+    event: moment.event,
+    clauses: (marble, types) => pocketClauses(types[marble], moment),
+  })),
   actions: CLAUSE_ACTIONS,
   events: MARBLE_TALLIES,
   journalEvents: JOURNAL_EVENTS,
@@ -283,18 +341,23 @@ const FIELD_CONTEXTS = {
 // Toutes les clauses d'une bille, tous champs d'effet confondus (variantes de base
 // comprises).
 function clausesOf(type) {
-  return [...EFFECT_FIELDS.flatMap((field) => type[field] ?? []), ...Object.values(type.baseVariant ?? {}).flat()];
+  return [
+    ...EFFECT_FIELDS.flatMap((field) => type[field] ?? []),
+    ...Object.values(type.baseVariant ?? {}).flat(),
+    ...Object.values(type[MARBLE_POCKET.field] ?? {}).flat(),
+  ];
 }
 
 // Les MOTS-CLÉS, dans l'ordre de l'aide : les phases (MARBLE_PHASES), les
-// déclencheurs (MARBLE_TRIGGERS), puis les actions mots-clés (CLAUSE_ACTIONS qui
-// déclarent `keyword`). Chacun { id, kind, texts: { name, description },
+// déclencheurs (MARBLE_TRIGGERS), En poche (MARBLE_POCKET, présent si l'un de ses
+// moments a un effet), puis les actions mots-clés (CLAUSE_ACTIONS qui déclarent
+// `keyword`). Chacun { id, kind, texts: { name, description },
 // present(marble, types) } : présent sur une bille si son champ n'est pas vide
 // (pour une phase, l'effet d'un de ses emplacements, variante comprise), ou, pour
 // une action, si une clause de la bille l'utilise. Un mot-clé ajouté à sa liste
 // est ici d'office ; un mot-clé sans nom ni description échoue au chargement.
 // Exportée pour vérifier ce refus sur des listes fabriquées.
-export function buildMarbleKeywords({ phases, triggers, actions }) {
+export function buildMarbleKeywords({ phases, triggers, pocket, actions }) {
   const fail = (message) => {
     throw new Error(`marbles, mots-clés : ${message}`);
   };
@@ -311,6 +374,12 @@ export function buildMarbleKeywords({ phases, triggers, actions }) {
       texts: { name: trigger.texts?.name, description: trigger.texts?.description },
       present: (marble, types) => (types[marble][trigger.field]?.length ?? 0) > 0,
     })),
+    {
+      id: pocket.field,
+      kind: "pocket",
+      texts: pocket.texts,
+      present: (marble, types) => pocket.moments.some((moment) => (types[marble][pocket.field]?.[moment.id]?.length ?? 0) > 0),
+    },
     ...Object.entries(actions)
       .filter(([, action]) => action.keyword !== undefined)
       .map(([id, action]) => ({
@@ -324,7 +393,7 @@ export function buildMarbleKeywords({ phases, triggers, actions }) {
   return keywords;
 }
 
-export const MARBLE_KEYWORDS = buildMarbleKeywords({ phases: MARBLE_PHASES, triggers: MARBLE_TRIGGERS, actions: CLAUSE_ACTIONS });
+export const MARBLE_KEYWORDS = buildMarbleKeywords({ phases: MARBLE_PHASES, triggers: MARBLE_TRIGGERS, pocket: MARBLE_POCKET, actions: CLAUSE_ACTIONS });
 
 // Les mots-clés présents sur une bille, dans l'ordre de l'aide, chacun une fois :
 // [{ id, kind, texts }].
@@ -343,11 +412,23 @@ export function validateMarbleTypes(types) {
   };
   if (Object.keys(types).length === 0) fail("table des billes vide.");
   for (const [id, type] of Object.entries(types)) {
-    rejectUnknownFields(type, [...EFFECT_FIELDS, "baseVariant", "maxWear", "size"], `bille "${id}"`, fail);
+    rejectUnknownFields(type, [...EFFECT_FIELDS, "baseVariant", MARBLE_POCKET.field, "maxWear", "size"], `bille "${id}"`, fail);
     // Le calibre, obligatoire : lu par les conditions de calibre et par le son.
     if (!isMarbleSize(type.size)) fail(`bille "${id}" : calibre (size) absent ou inconnu "${type.size}".`);
     for (const field of EFFECT_FIELDS) {
       if (type[field] !== undefined) validateEffect(type[field], `bille "${id}", ${field}`, fail, { ...FIELD_CONTEXTS[field], tallies: TALLY_IDS });
+    }
+    // En poche : un objet { <moment>: effet }, chaque effet joué par une bille dans
+    // le pot (règle des cibles selon son moment ; rien sur la bille elle-même).
+    const pocketed = type[MARBLE_POCKET.field];
+    if (pocketed !== undefined) {
+      const describe = `bille "${id}", ${MARBLE_POCKET.field}`;
+      if (pocketed === null || typeof pocketed !== "object" || Array.isArray(pocketed)) fail(`${describe} : un objet de moments.`);
+      rejectUnknownFields(pocketed, MARBLE_POCKET.moments.map((moment) => moment.id), describe, fail);
+      for (const moment of MARBLE_POCKET.moments) {
+        const effect = pocketClauses(type, moment);
+        if (effect !== null) validateEffect(effect, `${describe}.${moment.id}`, fail, { moment: moment.moment, marble: "pot", tallies: TALLY_IDS });
+      }
     }
     if (type.baseVariant !== undefined) {
       rejectUnknownFields(type.baseVariant, ["leftBase", "rightBase"], `bille "${id}", baseVariant`, fail);
@@ -365,11 +446,13 @@ export function validateMarbleTypes(types) {
 // triangle : le joueur est seul responsable de ses poses, et la résolution se lance
 // quel que soit l'état du triangle, au premier tour comme ensuite. Un sac vide fait
 // une partie qui s'arrête à la première pioche, faute de billes.
-function validateGameSettings({ maxHandSize, throwsPerTurn, firstTurnDraw, drawPerTurn, turnCount, bag }, types) {
+function validateGameSettings({ maxHandSize, throwsPerTurn, potCapacity, firstTurnDraw, drawPerTurn, turnCount, bag }, types) {
   const positive = { maxHandSize, throwsPerTurn, firstTurnDraw, drawPerTurn, turnCount };
   for (const [name, value] of Object.entries(positive)) {
     if (!Number.isInteger(value) || value < 1) throw new Error(`marbles : ${name} doit être un entier >= 1.`);
   }
+  // Un pot de capacité 0 se conçoit : toute bille empochée y serait perdue.
+  if (!Number.isInteger(potCapacity) || potCapacity < 0) throw new Error("marbles : potCapacity doit être un entier >= 0.");
   if (maxHandSize < firstTurnDraw) throw new Error("marbles : maxHandSize doit valoir au moins firstTurnDraw.");
   for (const id of bag) {
     if (!Object.hasOwn(types, id)) throw new Error(`marbles : bille inconnue "${id}" dans le sac.`);
@@ -423,16 +506,18 @@ export function createMarblesGame(seed, options = {}, types) {
     bag = STARTING_BAG,
     maxHandSize = MARBLES_SETTINGS.maxHandSize,
     throwsPerTurn = MARBLES_SETTINGS.throwsPerTurn,
+    potCapacity = MARBLES_SETTINGS.potCapacity,
     firstTurnDraw = MARBLES_SETTINGS.firstTurnDraw,
     drawPerTurn = MARBLES_SETTINGS.drawPerTurn,
     turnCount = MARBLES_SETTINGS.turnCount,
   } = options;
-  validateGameSettings({ maxHandSize, throwsPerTurn, firstTurnDraw, drawPerTurn, turnCount, bag }, types);
+  validateGameSettings({ maxHandSize, throwsPerTurn, potCapacity, firstTurnDraw, drawPerTurn, turnCount, bag }, types);
   const shuffle = shuffled(bag, createSeed(seed));
   return {
     rngState: shuffle.rngState,
     maxHandSize,
     throwsPerTurn,
+    potCapacity,
     firstTurnDraw,
     drawPerTurn,
     turnCount,
@@ -446,6 +531,8 @@ export function createMarblesGame(seed, options = {}, types) {
     hand: [],
     discard: [],
     triangle: { leftBase: null, rightBase: null, apex: null },
+    pot: [],
+    lost: [],
     swapUsed: false,
     throwsUsed: 0,
     // Les valeurs de partie, à zéro : la portée « cette partie » ne revient à zéro
@@ -631,6 +718,19 @@ const EVENT_TRIGGERS = {
     clauses: (event, listener, types) => (isOnEventSlot(event, listener) ? effectAt(listener.marble, listener.slot, types) : null),
   },
   ...Object.fromEntries(MARBLE_TRIGGERS.map((trigger) => [trigger.event, eventTrigger(trigger)])),
+  // Les moments En poche : la bille du pot que nomme l'évènement. Une bille du pot
+  // inconnue (empochée à l'aveugle) rend la prévision incertaine.
+  ...Object.fromEntries(
+    MARBLE_POCKET.moments.map((moment) => [
+      moment.event,
+      {
+        id: moment.trigger,
+        zones: ["pot"],
+        listeners: (event) => [{ zone: "pot", slot: null, marble: event.marble }],
+        clauses: (event, listener, types) => pocketClauses(types[listener.marble], moment),
+      },
+    ])
+  ),
 };
 
 // --- Le déroulé d'une action ---
@@ -680,8 +780,77 @@ function fireEffect(run, trigger, listener, clauses, event) {
   run.emit({ type: "effect", trigger, slot, marble, speedDelta, massDelta, draw, operations, given, lost, speed, mass });
   if (draw > 0) drawMarbles(run, draw, "effect");
   // Les actions sur une bille, après la pioche, dans l'ordre des clauses : sur la
-  // bille elle-même (son emplacement) ou sur celle de l'emplacement visé.
-  for (const operation of operations) applyMarbleAction(run, operation.action, operation.amount, operation.target ?? slot);
+  // bille elle-même (son emplacement) ou sur celle de l'emplacement visé. Empocher
+  // la déplace au pot, depuis là où elle est.
+  const by = { trigger, slot: slot ?? null, marble };
+  for (const operation of operations) {
+    if (CLAUSE_ACTIONS[operation.action].moves === "pot") pocketOperation(run, operation.target, listener, by);
+    else applyMarbleAction(run, operation.action, operation.amount, operation.target ?? slot);
+  }
+}
+
+// EMPOCHER, appliqué : la cible, puis son passage au pot (sendToPot).
+//   un emplacement : sa bille, s'il en a une ;
+//   FIRST_IN_HAND : la première bille de la main, s'il y en a une ;
+//   aucune : la bille elle-même, là où elle est (`holder`) : sur son emplacement
+//   (phase, Tic, Trouvaille, Éjection), en main (Éveil : une entrée à 0 tour en
+//   main, toutes identiques), à la défausse (Final : elle y est déjà, la dernière
+//   arrivée de ce nom). Ni en cours de lancer ni dans le pot (refusé à la
+//   validation).
+// Sans bille à prendre : sans effet, noté au journal (targetEmpty). `by` : l'effet
+// qui empoche, que portent pocketed et lost.
+function pocketOperation(run, target, holder, by) {
+  const empty = (details) => run.emit({ type: "targetEmpty", action: "pocket", ...details });
+  if (target === FIRST_IN_HAND) {
+    if (run.state.hand.length === 0) return empty({ slot: null, target });
+    const [{ marble }, ...hand] = run.state.hand;
+    update(run, { hand });
+    return sendToPot(run, marble, { from: "hand", index: 0 }, by);
+  }
+  if (target !== undefined) return pocketFromSlot(run, target, by);
+  if (holder.zone === "triangle" && run.state.triangle[holder.slot]?.marble === holder.marble) return pocketFromSlot(run, holder.slot, by);
+  if (holder.zone === "hand") {
+    const index = run.state.hand.findLastIndex((held) => held.marble === holder.marble && held.turnsInHand === 0);
+    if (index >= 0) {
+      update(run, { hand: run.state.hand.filter((_, other) => other !== index) });
+      return sendToPot(run, holder.marble, { from: "hand", index }, by);
+    }
+  }
+  if (holder.zone === "removed") {
+    const index = run.state.discard.lastIndexOf(holder.marble);
+    if (index >= 0) {
+      update(run, { discard: run.state.discard.filter((_, other) => other !== index) });
+      return sendToPot(run, holder.marble, { from: "discard" }, by);
+    }
+  }
+  return empty({ slot: null, target: "self", marble: holder.marble });
+}
+
+// La bille d'un emplacement quitte le triangle pour le pot : ni usure ni éjection,
+// donc ni Final ni Éjection ; une phase qui n'avait pas eu lieu est sautée (la
+// résolution relit l'emplacement). Son bonus part avec elle.
+function pocketFromSlot(run, slot, by) {
+  const placed = run.state.triangle[slot];
+  if (placed === null) {
+    run.emit({ type: "targetEmpty", action: "pocket", slot });
+    return;
+  }
+  update(run, { triangle: { ...run.state.triangle, [slot]: null } });
+  run.emit({ type: "removed", slot, marble: placed.marble, cause: "pocket" });
+  sendToPot(run, placed.marble, { from: "triangle", slot }, by);
+}
+
+// Une bille, sortie de sa zone, va au pot ; plein, elle est perdue. Elle n'y passe
+// qu'une fois : sa zone d'origine l'a déjà rendue. Au pot, ses effets d'entrée se
+// règlent aussitôt (une interruption : run.settle), avant la suite.
+function sendToPot(run, marble, origin, by) {
+  if (run.state.pot.length < run.state.potCapacity) {
+    update(run, { pot: [...run.state.pot, marble] });
+    run.settle({ type: "pocketed", marble, ...origin, by });
+    return;
+  }
+  update(run, { lost: [...run.state.lost, marble] });
+  run.emit({ type: "lost", marble, ...origin, by });
 }
 
 // Une action sur une bille (Polissage, Fêlure : CLAUSE_ACTIONS), appliquée à la
@@ -939,6 +1108,14 @@ function resolvePhases(run) {
   }
 }
 
+// L'étape du POT, une fois par tour : après les trois phases, avant les retraits par
+// usure, chaque bille du pot dans l'ordre d'arrivée, pour son effet En poche à
+// chaque résolution. Une bille entrée au pot pendant cette étape a aussi la sienne,
+// après les autres ; le pot étant borné, l'étape l'est aussi.
+function resolvePot(run) {
+  for (let index = 0; index < run.state.pot.length; index++) run.emit({ type: "potResolution", index, marble: run.state.pot[index] });
+}
+
 // Les retraits par usure, dans l'ordre des phases. Pour chaque bille usée : elle
 // quitte son emplacement, rejoint la défausse, puis son Final se déclenche (le seul
 // retrait qui en ait un : ni l'éjection ni l'échange). Ses valeurs comptent pour le
@@ -964,7 +1141,7 @@ function retireMarble(run, slot) {
   run.emit({ type: "final", slot, marble });
 }
 
-// La résolution, sans les refus, dans cet ordre : phases, retraits par usure (et
+// La résolution, sans les refus, dans cet ordre : phases, pot, retraits par usure (et
 // ce qu'ils déclenchent), Impact, rotation, fin de tour. Les retraits passent
 // AVANT l'Impact : ce qu'ils déclenchent compte pour le tour en cours. La vraie,
 // celle de l'action "resolve" comme celle de la prévision
@@ -973,6 +1150,7 @@ function retireMarble(run, slot) {
 export function runResolution(state, types, options = {}) {
   return transact(state, types, options, (run) => {
     resolvePhases(run);
+    resolvePot(run);
     retireWornMarbles(run);
 
     const { speed, mass } = run.state;

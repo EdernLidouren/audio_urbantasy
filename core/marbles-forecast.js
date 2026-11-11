@@ -23,7 +23,7 @@
 //
 // Résultat : { ok: false, error } si l'action serait refusée (mêmes codes que le
 // réducteur), sinon { ok: true, error: null, flick, knockout, hit, phases, speed,
-// mass, impact, drawn, regenerations, tally, uncertain }, où :
+// mass, impact, drawn, regenerations, potEffects, tally, uncertain, awakenPossible }, où :
 //   flick, knockout, hit  l'effet de l'action envisagée (null : pas de tel effet),
 //                  une clé par déclencheur prévu pendant une pose (forecast.line
 //                  "placement" de MARBLE_TRIGGERS). Une Chiquenaude qui vide
@@ -31,7 +31,7 @@
 //   phases         par emplacement, l'effet de phase de sa bille (null : pas de
 //                  phase, emplacement vide ou bille retirée avant) ;
 //   cleared        par emplacement, la bille retirée AVANT sa phase (une Fêlure qui
-//                  l'amène à son maximum), ou null : sa phase est sautée ;
+//                  l'amène à son maximum, ou Empocher), ou null : sa phase est sautée ;
 //   wear           les changements d'usure, dans l'ordre : [{ type, slot, marble,
 //                  wear }] (usure de phase, Polissage, Fêlure) ;
 //   retired        les billes retirées par usure, [{ slot, marble }], dans l'ordre ;
@@ -52,10 +52,19 @@
 //                  pourrait l'être en a un (le sac ; avec une régénération en
 //                  chemin, aussi la défausse et ce qui y part pendant l'action et la
 //                  résolution).
-// Un effet : { marble, speed, mass, draw, operations, given }, le total effectif de
-// la bille, bonus reçu compris, et ses actions sur une bille (Polissage, Fêlure).
+//   potEffects     les effets En poche à chaque résolution des billes du pot, dans
+//                  l'ordre d'arrivée (celles empochées pendant la résolution
+//                  comprises), chacun un effet ; [] sinon ;
+//   awakenPossible vrai si un Éveil est possible (voir plus haut) ; une des
+//                  raisons d'`uncertain`.
+// Un effet : { marble, speed, mass, draw, operations, given, pockets? }, le total
+// effectif de la bille, bonus reçu compris, et ses actions sur une bille (Polissage,
+// Fêlure, Empocher). `pockets` (seulement s'il y en a) : ce que ses Empocher ont
+// déplacé, dans l'ordre, chacun { marble, lost, entry } : la bille (null si c'est
+// une bille piochée, inconnue), perdue faute de place ou non, et l'effet de son
+// entrée au pot (En poche, à l'entrée), ou null.
 
-import { MARBLE_TRIGGERS } from "../config/marbles-values.js";
+import { MARBLE_POCKET, MARBLE_TRIGGERS } from "../config/marbles-values.js";
 import { SLOTS, UNKNOWN_MARBLE, blindCopy, marblesReduce, runResolution, stageRefusal } from "./marbles.js";
 
 // Les déclencheurs prévus pendant une pose (config/marbles-values.js) : chacun a sa
@@ -68,6 +77,11 @@ const SLOT_TRIGGERS = triggerIds("slot");
 const REGENERATION_TRIGGERS = triggerIds("regeneration");
 
 const FORECASTABLE_ACTIONS = ["place", "swap"];
+
+// Les effets En poche joués à l'entrée au pot (leur évènement est la mise en poche)
+// et ceux joués à chaque résolution (l'étape du pot).
+const ENTRY_TRIGGERS = new Set(MARBLE_POCKET.moments.filter((moment) => moment.event === "pocketed").map((moment) => moment.trigger));
+const POT_TRIGGERS = new Set(MARBLE_POCKET.moments.filter((moment) => moment.event === "potResolution").map((moment) => moment.trigger));
 
 // Les déclencheurs de la bille piochée (l'Éveil), qui ne se prévoient jamais.
 const DRAWN_TRIGGERS = MARBLE_TRIGGERS.filter((trigger) => trigger.marble === "drawn");
@@ -90,15 +104,44 @@ function awakenPossible(state, events, types) {
   return pool.some(mayAwaken);
 }
 
-function outcomeOf(event) {
-  if (event === undefined) return null;
-  return { marble: event.marble, speed: event.speedDelta, mass: event.massDelta, draw: event.draw, operations: event.operations, given: event.given };
+// Ce que les Empocher d'un journal ont déplacé, rattaché à l'effet qui les produit :
+// l'effet `by` de la mise en poche (ou de la perte), le plus récent qui lui
+// correspond (le même déclencheur, la même bille, le même emplacement), et l'effet
+// d'entrée qui la suit aussitôt (une interruption : il vient juste après).
+// -> Map effet -> [{ marble, lost, entry }], `entry` un évènement ou null.
+function pocketsByEffect(events) {
+  const pockets = new Map();
+  events.forEach((event, index) => {
+    if (event.type !== "pocketed" && event.type !== "lost") return;
+    const { by } = event;
+    const source = events
+      .slice(0, index)
+      .findLast((other) => other.type === "effect" && other.trigger === by.trigger && other.marble === by.marble && (other.slot ?? null) === by.slot);
+    if (source === undefined) return;
+    const next = events[index + 1];
+    const entry = event.type === "pocketed" && next?.type === "effect" && ENTRY_TRIGGERS.has(next.trigger) && next.marble === event.marble ? next : null;
+    pockets.set(source, [...(pockets.get(source) ?? []), { marble: event.marble, lost: event.type === "lost", entry }]);
+  });
+  return pockets;
+}
+
+// La lecture d'un effet du journal `events`, ses mises en poche comprises.
+function outcomeReader(events) {
+  const pockets = pocketsByEffect(events);
+  const outcomeOf = (event) => {
+    if (event === undefined) return null;
+    const outcome = { marble: event.marble, speed: event.speedDelta, mass: event.massDelta, draw: event.draw, operations: event.operations, given: event.given };
+    const moved = pockets.get(event);
+    if (moved === undefined) return outcome;
+    return { ...outcome, pockets: moved.map(({ marble, lost, entry }) => ({ marble, lost, entry: entry === null ? null : outcomeOf(entry) })) };
+  };
+  return outcomeOf;
 }
 
 // Les régénérations d'un journal, chacune avec les effets prévus qu'elle déclenche :
 // une Trouvaille se règle juste après sa régénération (core/marbles.js/
 // regenerateBag), avant toute autre : elle appartient à la dernière émise.
-function regenerationsOf(events) {
+function regenerationsOf(events, outcomeOf) {
   const regenerations = [];
   for (const event of events) {
     if (event.type === "bagRegenerated") regenerations.push({ effects: [] });
@@ -122,7 +165,8 @@ function clearedBeforePhase(events) {
   const phased = new Set();
   for (const event of events) {
     if (event.type === "phase" || event.type === "phaseSkipped") phased.add(event.slot);
-    if (event.type === "removed" && event.cause === "wear" && !phased.has(event.slot)) cleared[event.slot] = event.marble;
+    // Une usure (une Fêlure) ou une mise en poche (Empocher) avant la phase.
+    if (event.type === "removed" && (event.cause === "wear" || event.cause === "pocket") && !phased.has(event.slot)) cleared[event.slot] = event.marble;
   }
   return cleared;
 }
@@ -133,6 +177,7 @@ function clearedBeforePhase(events) {
 // l'aveugle).
 export function readForecast(actionEvents, resolutionEvents, finalState) {
   const all = [...actionEvents, ...resolutionEvents];
+  const outcomeOf = outcomeReader(all);
   const fromAction = (trigger) => actionEvents.find((event) => event.type === "effect" && event.trigger === trigger);
   const phaseOf = (slot) => resolutionEvents.find((event) => event.type === "effect" && event.trigger === "phase" && event.slot === slot);
   const { speed, mass, impact } = resolutionEvents.find((event) => event.type === "impact");
@@ -149,7 +194,8 @@ export function readForecast(actionEvents, resolutionEvents, finalState) {
           .map((event) => ({ trigger: event.trigger, ...outcomeOf(event) })),
       ])
     ),
-    regenerations: regenerationsOf(all),
+    regenerations: regenerationsOf(all, outcomeOf),
+    potEffects: resolutionEvents.filter((event) => event.type === "effect" && POT_TRIGGERS.has(event.trigger)).map(outcomeOf),
     speed,
     mass,
     impact,
@@ -173,6 +219,9 @@ export function forecast(state, action, types) {
   if (!applied.ok) return failed(applied.error);
   const resolved = runResolution(applied.state, types, { blind: true });
   if (!resolved.ok) return failed(resolved.error);
-  const uncertain = applied.uncertain || resolved.uncertain || awakenPossible(state, [...applied.events, ...resolved.events], types);
-  return { ...readForecast(applied.events, resolved.events, resolved.state), uncertain };
+  const awakening = awakenPossible(state, [...applied.events, ...resolved.events], types);
+  // Incertaine : un Éveil possible, ou une bille inconnue qui aurait pu réagir (une
+  // bille piochée à l'aveugle puis empochée : son entrée au pot, ses effets du pot).
+  const uncertain = applied.uncertain || resolved.uncertain || awakening;
+  return { ...readForecast(applied.events, resolved.events, resolved.state), uncertain, awakenPossible: awakening };
 }

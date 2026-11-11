@@ -8,8 +8,8 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
 | Fichier | Rôle |
 |---|---|
 | `marbles/types/` | Les billes, une par fichier, et leur registre `index.js` (donnée pure) |
-| `marbles/effects.js` | Les formes courtes des clauses, `speed(n)`, `mass(n)`, `draw(n)`, `polish(n, cible?)` et `crack(n, cible?)`, et les sources `turnsInHand()`, `activeSize(calibre)` et `tally(valeur, portée)` des montants calculés |
-| `config/marbles-values.js` | Réglages, phases, déclencheurs, valeurs de partie, modèle de fiche, sac de test, sons (donnée pure) |
+| `marbles/effects.js` | Les formes courtes des clauses, `speed(n)`, `mass(n)`, `draw(n)`, `polish(n, cible?)`, `crack(n, cible?)` et `pocket(cible?)` (avec `FIRST_IN_HAND`), et les sources `turnsInHand()`, `activeSize(calibre)` et `tally(valeur, portée)` des montants calculés |
+| `config/marbles-values.js` | Réglages, phases, déclencheurs, mot-clé En poche, valeurs de partie, modèle de fiche, sac de test, sons (donnée pure) |
 | `core/marbles-rules.js` | Les règles liées à une table de billes : le point d'entrée de la simulation hors du core |
 | `core/marbles.js` | La simulation : état, réducteur, écouteurs, journal, codes de refus |
 | `core/marbles-effects.js` | Le modèle d'effet : clauses, actions, conditions, effet imprimé |
@@ -59,13 +59,16 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
    Elles partent des compteurs du tour : Vitesse (0 en début de tour) et Masse (1), que
    Chiquenaude, Tic et Éjection ont déjà pu modifier. Chaque bille applique son effet (un Polissage ou
    une Fêlure sur elle-même compris) puis prend 1 d'usure, même si cela l'amène à son
-   maximum. Une bille qu'une Fêlure a retirée avant sa phase la saute.
-5. **Retraits par usure**, dans l'ordre des phases : chaque bille à son usure maximale
+   maximum. Une bille qu'une Fêlure a retirée, ou qu'Empocher a envoyée au pot, avant sa
+   phase la saute.
+5. **Pot** : chaque bille du pot, dans l'ordre d'arrivée, joue son effet **En poche, à
+   chaque résolution** (voir « Le pot »). Une bille sans cet effet passe sans rien dire.
+6. **Retraits par usure**, dans l'ordre des phases : chaque bille à son usure maximale
    quitte son emplacement, rejoint la défausse, puis son **Final** se déclenche (voir
    « Les déclencheurs »). Pas d'Éjection.
-6. **Impact** = max(0, Vitesse) × max(1, Masse), ces planchers ne valant que pour ce
-   calcul final, Final compris : les retraits passent avant lui. Il s'ajoute au Score.
-7. **Rotation** : base gauche → pointe, pointe → base droite, base droite → base gauche.
+7. **Impact** = max(0, Vitesse) × max(1, Masse), ces planchers ne valant que pour ce
+   calcul final, pot et Final compris : ils passent avant lui. Il s'ajoute au Score.
+8. **Rotation** : base gauche → pointe, pointe → base droite, base droite → base gauche.
 
 ### La pioche unifiée
 
@@ -109,6 +112,63 @@ ou en fin de résolution). Aujourd'hui :
 Un futur mode (un Impact minimal à atteindre…) y branche les siennes ; chaque raison a son
 texte, `marbles.event.game_over.<raison>`. Un sac de départ peut compter moins de billes
 que le triangle ; vide, la partie s'arrête à la première pioche (`outOfMarbles`).
+
+### Le pot
+
+Le **pot** garde des billes **en poche** toute la partie : leurs effets **En poche** y
+jouent, comme des effets permanents construits pendant la partie. Une bille n'y entre
+jamais par un geste du joueur, seulement par l'action **Empocher** d'une bille. Deux zones
+de l'état, sérialisées (`core/marbles.js`, en-tête) :
+
+- `pot` : les billes en poche, dans l'ordre d'arrivée, au plus `potCapacity` (3 par défaut,
+  `MARBLES_SETTINGS.potCapacity`, à côté de `maxHandSize` et `throwsPerTurn` : trois
+  capacités du joueur) ;
+- `lost` : les **billes perdues**, envoyées au pot plein. Elles n'y entrent pas, et n'en
+  ont donc pas les effets.
+
+Ni l'une ni l'autre ne revient jamais dans le sac à un mélange, ni ne quitte sa zone : une
+bille n'en sort pas aujourd'hui.
+
+**Empocher** (`pocket`, sans montant) déplace une bille vers le pot, depuis là où elle est.
+Sa cible :
+
+- aucune : **la bille elle-même**, où qu'elle soit au déclenchement : sur son emplacement
+  (phase, Tic, Trouvaille, Éjection), en main (à son Éveil), déjà à la défausse (à son
+  Final). Refusée à la validation dans une Chiquenaude (en cours de lancer) et dans le pot ;
+- un emplacement : la bille qui y est ;
+- `FIRST_IN_HAND` (`"firstInHand"`) : la première bille de la main, dans l'ordre affiché.
+
+Une cible vide (emplacement vide, main vide, bille qui n'est plus là) : sans effet, noté au
+journal (`targetEmpty`, « Main vide : rien à empocher. »). Une bille empochée **depuis le
+triangle** quitte son emplacement (`removed`, cause `"pocket"`) : ce n'est ni une usure ni
+une éjection, donc ni Final ni Éjection ; elle compte dans « billes sorties du triangle » ;
+sa phase, si elle n'avait pas eu lieu, est sautée. Une bille ne passe qu'**une fois** d'une
+zone à l'autre : empochée pendant sa propre Éjection, elle va au pot, jamais à la défausse ;
+pendant son propre Final, déjà défaussée, elle quitte la défausse pour le pot (elle n'est
+jamais aux deux). Puis, au pot (`pocketed`, « porcelaine est mise en poche. ») ses effets
+d'entrée se règlent aussitôt ; pot plein (`lost`, « Le pot est plein : porcelaine est
+perdue. »), rien d'autre.
+
+**En poche** (`pocketed`) est un champ de bille, un objet de **moments**, déclarés une fois
+dans `config/marbles-values.js`/`MARBLE_POCKET` :
+
+```js
+pocketed: { entry: [speed(10)] },          // la porcelaine
+pocketed: { resolution: [mass(1)] },       // l'agate
+```
+
+| Moment | Effet (`trigger`) | Évènement | Joue |
+|---|---|---|---|
+| `entry`, à l'entrée | `pocketEntry` | `pocketed` | quand la bille entre effectivement au pot, juste après son arrivée (jamais si elle est perdue) |
+| `resolution`, à chaque résolution | `pocketResolution` | `potResolution` | une fois par tour, après les trois phases et avant les retraits, chaque bille du pot dans l'ordre d'arrivée (une bille empochée plus tôt dans la résolution comprise) |
+
+Chaque moment déclare son id, son effet, son évènement, son moment pour la règle des cibles
+(`anytime` à l'entrée, `afterPhases` à chaque résolution : une Vitesse ou une Masse ciblée y
+est refusée, les phases étant passées ; Polissage, Fêlure, Empocher et Pioche ciblés passent)
+et ses textes (fiche, journal, R). Aucune action sur la bille elle-même dans le pot. Vitesse
+et Masse vont aux compteurs du tour. **Ajouter un moment** (une réaction à un évènement
+global) : une entrée dans `moments`, ses textes, et l'émission de son évènement dans
+`core/marbles.js` ; ses valeurs de partie, sa ligne de fiche et ses écouteurs suivent.
 
 ### Déroulé d'une pose
 
@@ -226,6 +286,8 @@ Un effet est une liste de clauses (`core/marbles-effects.js`) :
     résolution, sa phase est sautée si elle n'avait pas eu lieu ; en phase de jeu,
     l'emplacement peut recevoir une pose, sans Tic. L'usure de phase (+1) continue de
     retirer les billes à l'étape des retraits ;
+  - `pocket`, **Empocher**, sans montant : envoie au pot la bille elle-même, celle d'un
+    emplacement ou la première de la main (voir « Le pot ») ;
 - **cible** (`target`, facultative, pour les actions qui l'acceptent) : un emplacement.
   Pour une Vitesse ou une Masse, sans cible, la clause agit sur le compteur du tour ou
   s'ajoute à l'effet de la bille ; avec une cible, elle donne un **bonus** à la bille de
@@ -463,10 +525,10 @@ pose sur une bille sans Éjection donne +1 bille éjectée, +0 éjection ; un m�
 
 | Catégorie | Compteurs (id) | Source | Compte |
 |---|---|---|---|
-| Déclenchements | `awaken`, `flick`, `hit`, `windfall`, `knockout`, `final`, `apex`, `base`, `leftBase`, `rightBase` | générés : un par déclencheur de `MARBLE_TRIGGERS`, un par mot-clé de phase (`core/marbles.js`/`PHASE_KEYWORDS`, tirés de `MARBLE_PHASES`) | +1, par bille, quand le mot-clé se déclenche chez une bille qui a un effet pour ce moment : son champ n'est pas vide (pour une base : l'effet de base, ou sa variante de l'emplacement), ou elle a reçu un effet extérieur pour ce moment (un bonus ciblé sur sa phase). Un effet à condition fausse compte ; une phase sautée (emplacement vide, bille retirée avant) ne compte pas. `base` = `leftBase` + `rightBase` |
-| Actions | `draw`, `drawQuantity`, `polish`, `polishQuantity`, `crack`, `crackQuantity` | générés depuis les actions de `CLAUSE_ACTIONS` qui déclarent `keyword` | les déclencheurs : un par application (une Pioche par effet joué qui pioche ; un Polissage ou une Fêlure par application, sur un emplacement vide compris) ; la quantité réelle : billes réellement piochées par une Pioche (`draw` de cause `"effect"`), usure réellement rendue ou ajoutée (`applied` de `polished`, `cracked`) |
+| Déclenchements | `awaken`, `flick`, `hit`, `windfall`, `knockout`, `final`, `apex`, `base`, `leftBase`, `rightBase`, `pocketEntry`, `pocketResolution` | générés : un par déclencheur de `MARBLE_TRIGGERS`, un par mot-clé de phase (`core/marbles.js`/`PHASE_KEYWORDS`, tirés de `MARBLE_PHASES`), un par moment En poche (`MARBLE_POCKET`) | +1, par bille, quand le mot-clé se déclenche chez une bille qui a un effet pour ce moment : son champ n'est pas vide (pour une base : l'effet de base, ou sa variante de l'emplacement), ou elle a reçu un effet extérieur pour ce moment (un bonus ciblé sur sa phase). Un effet à condition fausse compte ; une phase sautée (emplacement vide, bille retirée avant) ne compte pas. `base` = `leftBase` + `rightBase` |
+| Actions | `draw`, `drawQuantity`, `polish`, `polishQuantity`, `crack`, `crackQuantity`, `pocket`, `pocketQuantity` | générés depuis les actions de `CLAUSE_ACTIONS` qui déclarent `keyword` | les déclencheurs : un par application (une Pioche par effet joué qui pioche ; un Polissage, une Fêlure ou un Empocher par application, cible vide comprise) ; la quantité réelle : billes réellement piochées par une Pioche (`draw` de cause `"effect"`), usure réellement rendue ou ajoutée (`applied` de `polished`, `cracked`), billes réellement déplacées par Empocher (`pocketed` ou `lost`) |
 | Vitesse et Masse | `speedGains`, `speedGained`, `speedLosses`, `speedLost`, et les mêmes pour `mass` | générés depuis les actions de valeur sans `keyword` | dans chaque effet joué (`effect`), la valeur réellement appliquée aux compteurs du tour (bonus reçu compris ; un bonus perdu n'est jamais appliqué), avant les planchers de l'Impact : une occurrence de gain ou de perte par effet, et le total en valeur absolue |
-| Évènements | `thrownMarbles`, `hitMarbles`, `ejectedMarbles`, `shuffles`, `drawnMarbles`, `wornMarbles`, `triangleExits` | déclarés : `config/marbles-values.js`/`MARBLE_TALLIES` | billes lancées (`flick`), tiquées (`hit` : posées sur un emplacement occupé), éjectées (`removed`, cause `"replacement"`), mélanges (`bagRegenerated`), billes piochées (`draw`, toutes causes), usées (`removed`, cause `"wear"`), sorties du triangle (`removed`, toutes causes : aujourd'hui, usées + éjectées) |
+| Évènements | `thrownMarbles`, `hitMarbles`, `ejectedMarbles`, `shuffles`, `drawnMarbles`, `wornMarbles`, `triangleExits`, `pocketedMarbles`, `lostMarbles` | déclarés : `config/marbles-values.js`/`MARBLE_TALLIES` | billes lancées (`flick`), tiquées (`hit` : posées sur un emplacement occupé), éjectées (`removed`, cause `"replacement"`), mélanges (`bagRegenerated`), billes piochées (`draw`, toutes causes), usées (`removed`, cause `"wear"`), sorties du triangle (`removed`, toutes causes : aujourd'hui, usées + éjectées + mises en poche depuis le triangle), mises en poche (`pocketed`), perdues (`lost`) |
 
 Un évènement réel se déclare ainsi :
 
@@ -548,15 +610,23 @@ copie porte le registre, qui y évolue comme dans la partie ; le registre réel 
 touché) ; `uncertain`, vrai si une bille inconnue aurait pu réagir selon son
 identité, ses chiffres n'étant alors pas sûrs : aujourd'hui, un Éveil possible.
 
+**Le pot** est déterministe et inclus : `potEffects`, les effets de chaque résolution des
+billes du pot, dans l'ordre d'arrivée ; chaque effet prévu porte, s'il a empoché, `pockets`
+(`{ marble, lost, entry }`, la bille déplacée, perdue ou non, et l'effet de son entrée),
+rattaché à l'effet qui l'a produite (le `by` de `pocketed` et `lost`). `cleared` compte
+aussi une bille empochée avant sa phase.
+
 **L'exception de l'Éveil** : la bille piochée étant inconnue, son Éveil ne se prévoit
 jamais. Ses effets ne sont jamais dans les valeurs prévues, ni dans le registre de la copie.
 La prévision est `uncertain` dès qu'elle pioche au moins une bille et qu'une bille qui
 pouvait l'être a un Éveil : une bille du sac ; si le sac est régénéré en chemin, aussi la
 défausse et chaque bille qui y part pendant l'action et la résolution. Rien n'est révélé :
 la composition du sac et de la défausse est déjà consultable, pas leur ordre. R et la
-confirmation finissent alors par « Éveils possibles. ». La propriété « prévision = résultat
-réel » vaut pour tout ce qui ne dépend pas d'un Éveil : la vérification `marbles-forecast`
-la contrôle sur tout résultat réel où aucun Éveil n'a joué, et vérifie qu'un Éveil réel a
+confirmation finissent alors par « Éveils possibles. » (`awakenPossible`). De même, une
+bille piochée à l'aveugle puis empochée reste inconnue (`marble` null dans `pockets`, « une
+bille piochée en poche ») ; la prévision est alors incertaine, sans Éveil pour autant. La propriété « prévision = résultat
+réel » vaut pour tout ce qui ne dépend pas d'un Éveil ni d'une bille piochée empochée : la
+vérification `marbles-forecast` la contrôle sur tout résultat réel où aucun des deux n'a joué, et vérifie qu'un Éveil réel a
 toujours été annoncé possible.
 
 ## Écran de jeu
@@ -611,7 +681,11 @@ lisent et ne s'activent pas (Entrée n'y fait rien) :
    atteint son usure maximale ce tour (« Vitesse +6. Final : Pioche 1. ») ;
 3. toujours, « Chiquenaude d'argile : Vitesse +2 », ou « … : aucun effet » ;
 4. sur un emplacement occupé, « Éjection de gorille : Vitesse +3 », ou « … : aucun effet » ;
-5. sur un emplacement occupé, « Tic d'argile : Vitesse +2 », ou « … : aucun effet » ;
+5. sur un emplacement occupé, « Tic d'argile : Vitesse +2 », ou « … : aucun effet ». Un
+   Empocher prévu s'y dit chez la bille qui le produit, avec ce qu'il déplace et l'entrée
+   au pot : « Tic de gorille : Vitesse +4 et Empocher la première bille de la main, puis
+   porcelaine en poche, à l'entrée : Vitesse +10 » (pot plein : « …, puis pot plein :
+   porcelaine perdue ») ; de même dans les valeurs prévues de la bille posée ;
 6. pour chaque régénération du sac que la pose et la résolution provoqueraient, « Le sac
    sera régénéré. » (« Le sac sera de nouveau régénéré. » pour les suivantes), puis une
    ligne par Trouvaille qu'elle déclencherait (« Trouvaille de tigrée : Vitesse +3. ») ;
@@ -641,7 +715,9 @@ Tic : Vitesse +2.           <- Ctrl+bas
 
 Au-dessous, les champs des déclencheurs, facultatifs, dans l'ordre de la vie d'une bille :
 éveil, chiquenaude, tic, trouvaille, éjection, final (« Final : Masse +1. ») ; ils viennent de
-`MARBLE_TRIGGERS`. Un montant calculé s'y dit avec sa valeur actuelle (voir « Montants
+`MARBLE_TRIGGERS`. En dernier, En poche, un champ par moment (`MARBLE_POCKET` ; dans le
+modèle de fiche, `part` désigne le moment) : « En poche, à l'entrée : Vitesse +10. », « En
+poche, à chaque résolution : Masse +1. ». Un montant calculé s'y dit avec sa valeur actuelle (voir « Montants
 calculés »).
 
 Les champs disent les effets IMPRIMÉS. En butée, le champ se réannonce, sans son ni
@@ -657,10 +733,13 @@ principale reste alors la prévision) et dans les menus du sac et de la défauss
 gabarit, sans toucher à la navigation. Le mécanisme (`lib/detail-card.js`) ne sait rien des
 billes : une fiche est une annonce principale et une liste de champs.
 
-### Sac et défausse
+### Sac, défausse et pot
 
-**Maj+S** et **Maj+D** ouvrent un menu horizontal : une entrée par bille, puis « Retour » ;
-Échap ferme aussi. Bornes, cyclage et étoile sont ceux des menus.
+**Maj+S**, **Maj+D** et **Maj+P** ouvrent un menu horizontal : une entrée par bille, puis
+« Retour » ; Échap ferme aussi. Bornes, cyclage et étoile sont ceux des menus ; fiches
+(Ctrl+haut, Ctrl+bas) et mots-clés (E, Maj+E) y marchent sur chaque bille. **P** dit le
+pot : « 2 billes sur 3 dans le pot, 1 bille perdue. » (`describePot`, accords compris). Le
+menu du pot suit l'ordre d'arrivée ; les billes perdues n'ont pas de menu.
 
 Le menu du sac se dit par ordre alphabétique (`bagDisplayOrder`) : l'ordre ne dépend que
 du contenu du sac, et ne révèle donc jamais l'ordre de la pioche. Aucun hasard n'y entre,
@@ -695,7 +774,9 @@ régénéré. » termine l'annonce, suivi d'une phrase par Trouvaille qu'elle d�
 nomme sa bille (« Trouvaille de tigrée : Vitesse +3. »). Chaque régénération se dit ainsi
 avec ses propres Trouvailles, comme dans la séquence, la deuxième « de nouveau » : « Le sac
 sera régénéré. Trouvaille de tigrée : Vitesse +3. Le sac sera de nouveau régénéré.
-Trouvaille de tigrée : Vitesse +3. ». Si un Éveil est possible, « Éveils possibles. »
+Trouvaille de tigrée : Vitesse +3. ». Après les trois emplacements, une ligne par bille du
+pot qui a un effet à chaque résolution, dans l'ordre d'arrivée (« Pot, agate : Masse +1. ») ;
+aucune pour les autres. Le résumé les compte. Si un Éveil est possible, « Éveils possibles. »
 termine l'annonce. Même gabarit que les
 phases de la séquence (`outcomeLine`) : la prévision et la résolution se disent pareil.
 
@@ -712,7 +793,11 @@ chacune :
    étape (`resolutionSteps`), une pause nulle entre deux étapes ferait couper la première
    annonce par la seconde ;
 2. à 4. chaque phase, dans l'ordre : « Base gauche, argile : Vitesse +1. », « Base
-   droite, vide. », avec les règles de la vue d'ensemble ; une phase qui pioche est suivie
+   droite, vide. », avec les règles de la vue d'ensemble, puis une étape par bille du pot
+   qui a un effet à chaque résolution (« Pot, agate : Masse +1. »), avec la pause habituelle,
+   avant les retraits ; une mise en poche se dit après l'effet qui la produit (« porcelaine
+   est mise en poche. », « Entrée au pot de porcelaine : Vitesse +10. Vitesse 10, Masse 1. »,
+   ou « Le pot est plein : porcelaine est perdue. ») ; une phase qui pioche est suivie
    de sa pioche (« Base gauche, mica : Pioche 1. », « Vous piochez agate. ») ; un
    Polissage ou une Fêlure, de son application (« Porcelaine se fêle : usure 2 sur 2. »,
    « Porcelaine est polie : usure 1 sur 2. », « Pointe vide : sans effet. ») et des retraits
@@ -809,7 +894,12 @@ et quand, sur la ligne de temps du geste (`eventCues`) :
   `swapSoundDelayMs` (150 ms) plus tard ; chacune tombe à son arrivée. Vers un emplacement
   vide, une seule bille roule ;
 - retrait par usure : la bille usée roule de son emplacement à la défausse et y tombe ;
-  plusieurs, l'une après l'autre (`outStaggerMs`). Son
+  plusieurs, l'une après l'autre (`outStaggerMs`) ;
+- mise en poche : la bille roule de là où elle était (son emplacement, sa place dans la
+  main, la défausse) au **pot**, en haut à gauche, en face de la défausse
+  (`MARBLES_SOUND_PLACES.pot`), et y tombe, du même roulement qu'une bille usée (`out`), à la
+  suite des autres départs. La perte (`lost`) et l'étape du pot (`potResolution`) sont des
+  points d'accroche muets, la perte sans place imposée. Son
   Final n'a pas encore de son propre : l'évènement `final` est un point d'accroche muet
   (`MARBLE_EVENT_CUES`), comme `polished`, `cracked` et `targetEmpty` ; une bille retirée
   par une Fêlure part comme une bille usée ;
@@ -902,7 +992,8 @@ centre, secs.
   (de 0,05 à 0,35), l'indice qui convainc le plus. La table a sa propre réverbération, créée à
   l'ouverture de l'écran et défaite à sa sortie. Pas de passe-haut : il amincit le son au lieu
   de l'éloigner.
-- **Régler à l'oreille** : en mode debug, **Maj+P** fait entendre la balise de la bille sous
+- **Régler à l'oreille** : en mode debug, **Maj+B** (« balises » ; Maj+P ouvre le menu du
+  pot) fait entendre la balise de la bille sous
   le curseur (de l'argile sinon) à chaque place, de la plus proche à la plus lointaine : la
   main à gauche, au centre, à droite, les deux bases, la pointe. Hors mode debug, la touche
   ne fait rien et n'est pas dans l'aide.
