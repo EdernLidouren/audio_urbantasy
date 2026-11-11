@@ -133,9 +133,9 @@
 // `pocketReaction` : une bille du pot (`index`, sa place d'arrivée) réagit à un
 // incrément du compteur écoutable `counter` (En poche, à chaque (occurrence)), une
 // fois par incrément ; voir pocketReactionsOf.
-// `chainInterrupted` : la limite de sécurité du bus a arrêté la chaîne
-// (core/marbles-bus.js) ; plus rien de l'action n'est traité après lui. Une anomalie
-// dans les vérifications et le simulateur.
+// `chainInterrupted` : la limite de sécurité du bus a coupé une chaîne
+// (core/marbles-bus.js) ; ce qui en restait n'est pas traité, l'action reprend
+// ensuite. Une anomalie dans les vérifications et le simulateur.
 // Un `effect` d'une bille du pot à une place connue (étape du pot, réaction) porte
 // aussi `potIndex`, cette place.
 // `choice` : un choix commence (au moins une cible éligible), le point d'accroche de
@@ -434,7 +434,7 @@ const COUNTER_CATEGORIES = Object.fromEntries(TALLY_COUNTERS.map((counter) => [c
 const FIELD_CONTEXTS = {
   ...Object.fromEntries(MARBLE_PHASES.map((phase) => [phase.field, { phaseSlots: phase.slots }])),
   ...Object.fromEntries(
-    MARBLE_TRIGGERS.map((trigger) => [trigger.field, { moment: trigger.moment, marble: trigger.marble, replacement: trigger.replacement === true }])
+    MARBLE_TRIGGERS.map((trigger) => [trigger.field, { moment: trigger.moment, marble: trigger.marble, replacement: trigger.replacement === true, trigger: trigger.id }])
   ),
 };
 
@@ -1261,10 +1261,20 @@ function handleEvent(run, event) {
   for (const reaction of reactions) run.emit({ type: REACTIVE_MOMENT.event, ...reaction });
 }
 
+// Les réactions du pot relevées pour `event`, réglées tout de suite, chacune jusqu'au
+// bout (des interruptions) : celles d'un évènement qui ne passe pas par la file (le
+// mélange, regenerateBag).
+function settleReactions(run, event) {
+  const reactions = run.reactions.get(event);
+  if (reactions === undefined) return;
+  run.reactions.delete(event);
+  for (const reaction of reactions) run.settle({ type: REACTIVE_MOMENT.event, ...reaction });
+}
+
 // Déroule une action sur un état de travail, avec son bus et son journal. Une
-// boucle d'évènements est arrêtée par la limite du bus : la chaîne s'arrête, le
-// journal le note (chainInterrupted), plus aucun effet ne joue, et l'action va à son
-// terme (la résolution finit son tour). `options` : { eventLimit, blind, answers,
+// boucle d'évènements est arrêtée par la limite du bus : cette chaîne-là est coupée,
+// le journal le note (chainInterrupted), et l'action reprend normalement ensuite
+// (la résolution joue ses phases suivantes, ses retraits, son Impact). `options` : { eventLimit, blind, answers,
 // seen } (voir marblesReduce) ; `answers` : les réponses aux choix à rejouer ;
 // `seen` : les évènements déjà rendus (un rejeu ne rend que les suivants). `action` :
 // l'action déroulée, gardée pour la reprise. Un choix sans réponse SUSPEND l'action :
@@ -1313,6 +1323,9 @@ function transact(state, types, { eventLimit, blind = false, answers = [], seen 
     record(event);
     bus.settle(event);
   };
+  // Au journal et aux valeurs de partie, sans passer par la file : un évènement dont
+  // les suites se règlent à la main (le mélange, regenerateBag).
+  run.record = record;
   try {
     body(run);
   } catch (error) {
@@ -1343,6 +1356,11 @@ export function blindCopy(state) {
 // suivante et avant que la pioche interrompue ne reprenne. L'emplacement se relit
 // à chaque bille : une bille retirée par une Trouvaille précédente n'a pas la
 // sienne. Une bille en main, au sac, en défausse ou en cours de lancer n'en a pas.
+// Puis, comme elles, les RÉACTIONS DU POT au mélange (En poche, à chaque mélange),
+// des interruptions aussi, juste après les Trouvailles : la bille concernée joue
+// d'abord son effet (les billes actives, leur Trouvaille), puis le pot réagit, avant
+// que la pioche ne reprenne. Le mélange entre donc au journal sans passer par la file
+// (run.record) : rien n'y réagit d'autre, et ses réactions se règlent ici.
 function regenerateBag(run) {
   const { discard } = run.state;
   if (run.blind) {
@@ -1351,11 +1369,13 @@ function regenerateBag(run) {
     const shuffle = shuffled(discard, run.state.rngState);
     update(run, { rngState: shuffle.rngState, bag: shuffle.list, discard: [] });
   }
-  run.emit({ type: "bagRegenerated", size: run.state.bag.length });
+  const regenerated = { type: "bagRegenerated", size: run.state.bag.length };
+  run.record(regenerated);
   for (const slot of SLOTS) {
     const placed = run.state.triangle[slot];
     if (placed !== null) run.settle({ type: "windfall", slot, marble: placed.marble });
   }
+  settleReactions(run, regenerated);
 }
 
 // LA pioche d'une bille, la seule : celle du début de tour comme celle d'un effet,
@@ -1593,8 +1613,8 @@ export function replayAction(state, action, types, options = {}) {
 
 // Le réducteur : pur, ne modifie jamais `state`. Même état + même action =
 // même résultat. `options` (facultatif) :
-//   eventLimit  la limite du bus pour cette action, abaissée par les vérifications
-//               (au-delà, la chaîne s'arrête : chainInterrupted) ;
+//   eventLimit  la limite du bus pour chaque chaîne, abaissée par les vérifications
+//               (au-delà, la chaîne est coupée : chainInterrupted) ;
 //   blind       le déroulé À L'AVEUGLE, celui de la prévision : aucune pioche n'y lit
 //               l'identité d'une bille ni le hasard de la partie (drawOne).
 export function marblesReduce(state, action, types, options = {}) {

@@ -80,7 +80,7 @@ import { answerChoices, earlierTestTypes, emptyBagMarblesGame, inHand, withSizes
 import { choiceAnswer, choiceFocusLine, choiceHandOptions, choiceMarbleAt, choiceStartCursor, stepChoiceCursor } from "../../view/marbles/choice.js";
 import { MARBLES_HELP_TOPICS, helpTopicText, marblesHelpMenu } from "../../view/marbles/help-screen.js";
 import { createMarblesRules } from "../marbles-rules.js";
-import { AMOUNT_SOURCES, effectAt } from "../marbles-effects.js";
+import { AMOUNT_SOURCES, CLAUSE_ACTIONS, effectAt } from "../marbles-effects.js";
 
 // Tables fabriquées : complétées d'un calibre (core/checks/helpers.js/withSizes).
 const fabricatedRules = (table) => createMarblesRules(withSizes(table));
@@ -163,8 +163,8 @@ function sampleEvents() {
   // Un choix indécis : à l'aveugle seulement (la prévision), le Tic du verre.
   const undecided = rules.reduce({ ...emptyBagMarblesGame(rules, 3), turn: 2, stage: "play", hand: inHand(["glass"]), triangle: { leftBase: null, rightBase: null, apex: { marble: "clay", wear: 0 } } }, { type: "place", handIndex: 0, slot: "apex" }, { blind: true });
   events.push(...undecided.events);
-  // La limite de sécurité, abaissée : la chaîne s'arrête, l'action aboutit.
-  const interrupted = rules.reduce(rules.createGame(3), { type: "draw" }, { eventLimit: 3 });
+  // La limite de sécurité, nulle : chaque chaîne est coupée, l'action aboutit.
+  const interrupted = rules.reduce(rules.createGame(3), { type: "draw" }, { eventLimit: 0 });
   events.push(...interrupted.events);
   return { events, state: { ...state, stage: "play" } };
 }
@@ -470,7 +470,7 @@ function checkKeywords(run) {
     "Éveil : se déclenche quand la bille est piochée. " +
       "Trouvaille : se déclenche quand le sac est reconstitué à partir de la défausse, si la bille est sur le triangle. " +
       "Final : se déclenche quand la bille est usée et quitte le triangle. Elle est alors déjà dans la défausse : si son Final l'empoche, elle passe de la défausse au pot. " +
-      "En poche : effets actifs uniquement lorsque la bille est dans le pot. " +
+      "En poche : effets actifs uniquement lorsque la bille est dans le pot : à son entrée, à chaque résolution, ou en réaction à ce qui se passe pendant la partie. " +
       "Éjecter : chasse une bille du triangle. Elle part à la défausse, et son effet d'éjection se déclenche. " +
       "Pointe : effet joué pendant la phase de pointe, quand la bille est posée en pointe. " +
       "Base : effet joué pendant la phase de base, quand la bille est posée en base gauche ou en base droite. Il peut différer selon le côté.",
@@ -481,7 +481,7 @@ function checkKeywords(run) {
     "touche E : En poche et Empocher, tels que déclarés",
     true,
     plain(keywordsText("agate", rules, t)).includes(
-      "En poche : effets actifs uniquement lorsque la bille est dans le pot. Polissage : retire de l'usure à une bille, qui reste ainsi plus longtemps sur le triangle. " +
+      "En poche : effets actifs uniquement lorsque la bille est dans le pot : à son entrée, à chaque résolution, ou en réaction à ce qui se passe pendant la partie. Polissage : retire de l'usure à une bille, qui reste ainsi plus longtemps sur le triangle. " +
         "Empocher : envoie une bille au pot, où qu'elle soit : sur le triangle, en main ou dans la défausse. Si le pot est plein, la bille est perdue pour la partie. Pointe : "
     )
   );
@@ -512,7 +512,7 @@ function checkKeywords(run) {
     "touche E, anglais : En poche et Empocher",
     true,
     plain(keywordsText("sulphide", rules, t)).includes(
-      "Pocketed: effects active only while the marble is in the pot. Crack: adds wear to a marble. If it reaches its maximum, the marble is worn out and leaves the triangle at once. " +
+      "Pocketed: effects active only while the marble is in the pot: on entering it, at each resolution, or in reaction to what happens during the game. Crack: adds wear to a marble. If it reaches its maximum, the marble is worn out and leaves the triangle at once. " +
         "Pocket: sends a marble to the pot, wherever it is: on the triangle, in hand or in the discard. If the pot is full, the marble is lost for the rest of the game. Apex: "
     )
   );
@@ -603,7 +603,9 @@ function checkChoiceInterface(run) {
   // Le gorille : la main seule, ses billes éligibles.
   const gorilla = rules.reduce({ ...emptyBagMarblesGame(rules, 2), turn: 2, stage: "play", hand: inHand(["gorilla", "clay", "agate"]), triangle: { leftBase: null, rightBase: null, apex: { marble: "clay", wear: 0 } } }, { type: "place", handIndex: 0, slot: "apex" }).state;
   const handOnly = gorilla.pendingChoice;
-  run("choix, question : la main", "Choisissez une bille de votre main à empocher.", plain(describeChoicePrompt(handOnly, t)));
+  // La question des billes fabriquées, sans nom : ce qui suit le moment.
+  const question = (pending, separator = " : ") => plain(describeChoicePrompt(pending, t)).split(separator).slice(1).join(separator);
+  run("choix, question : la bille et le moment, puis la main", "Tic de gorille : choisissez une bille de votre main à empocher.", plain(describeChoicePrompt(handOnly, t)));
   run.same("choix, main : les billes éligibles seulement", ["clay", "agate"], choiceHandOptions(handOnly).map((option) => option.marble));
   run.same("choix, main : le curseur s'y ouvre", { place: "hand", handIndex: 0 }, (({ place, handIndex }) => ({ place, handIndex }))(choiceStartCursor(handOnly, cursor("apex"))));
   run("choix, main : la position dans le menu du choix", "agate, normale, usure 3. 2 sur 2", plain(choiceFocusLine(gorilla, cursor("hand", 1), rules, t)));
@@ -614,7 +616,7 @@ function checkChoiceInterface(run) {
   // Le triangle seul, « jusqu'à 2 » : la question, Terminer, les non éligibles.
   const upTo = pending("upToPolish", { leftBase: { marble: "plain", wear: 1 }, rightBase: null, apex: { marble: "plain", wear: 0 } });
   const upToChoice = upTo.pendingChoice;
-  run("choix, question : jusqu'à 2, Terminer annoncé", "Choisissez jusqu'à 2 billes actives à polir. T pour terminer.", plain(describeChoicePrompt(upToChoice, t)));
+  run("choix, question : jusqu'à 2, Terminer annoncé", "choisissez jusqu'à 2 billes actives à polir. T pour terminer.", question(upToChoice));
   run.same("choix, triangle seul : le curseur sur le premier éligible", "leftBase", choiceStartCursor(upToChoice, cursor("hand")).place);
   run("choix, triangle seul : pas de main", null, stepChoiceCursor(upToChoice, cursor("leftBase"), "down"));
   run("choix, triangle : la navigation habituelle", "apex", stepChoiceCursor(upToChoice, cursor("leftBase"), "up").place);
@@ -629,17 +631,24 @@ function checkChoiceInterface(run) {
 
   // Obligatoire, 2 : la question, puis ce qui reste.
   const two = pending("twoCrack", { leftBase: { marble: "plain", wear: 0 }, rightBase: { marble: "plain", wear: 0 }, apex: { marble: "plain", wear: 0 } });
-  run("choix, question : 2 billes actives", "Choisissez 2 billes actives à fêler.", plain(describeChoicePrompt(two.pendingChoice, t)));
+  run("choix, question : 2 billes actives", "choisissez 2 billes actives à fêler.", question(two.pendingChoice));
   const oneDone = made.reduce(two, { type: "choose", target: { zone: "triangle", slot: "rightBase" } }).state.pendingChoice;
   run("choix, après un : ce qui reste", "Choisissez encore une bille active.", plain(describeChoicePrompt(oneDone, t)));
 
   // Un bonus au choix : sa valeur dans la question.
   const boost = pending("booster", { leftBase: { marble: "plain", wear: 0 }, rightBase: null, apex: { marble: "plain", wear: 0 } });
-  run("choix, question : un bonus", "Choisissez une bille active pour Vitesse +2.", plain(describeChoicePrompt(boost.pendingChoice, t)));
+  run("choix, question : un bonus", "choisissez une bille active pour Vitesse +2.", question(boost.pendingChoice));
 
   // Les deux zones : la main (avec Terminer s'il y a lieu), puis le triangle.
   const both = pending("anyPocket", { leftBase: null, rightBase: null, apex: { marble: "plain", wear: 0 } }, ["plain"]);
-  run("choix, question : main ou active", "Choisissez une bille de votre main ou active à empocher.", plain(describeChoicePrompt(both.pendingChoice, t)));
+  run("choix, question : main ou active", "choisissez une bille de votre main ou active à empocher.", question(both.pendingChoice));
+  // Chaque moment : une phase, un Final, une réaction du pot.
+  const tigerBase = rules.reduce({ ...emptyBagMarblesGame(rules, 2), turn: 2, stage: "play", triangle: { leftBase: { marble: "tiger", wear: 0 }, rightBase: null, apex: { marble: "clay", wear: 0 } } }, { type: "resolve" }).state;
+  run("choix, question : en phase, l'emplacement et la bille", "base gauche, tigrée : choisissez une bille active à éjecter.", plain(describeChoicePrompt(tigerBase.pendingChoice, t)));
+  const porcelainFinal = rules.reduce({ ...emptyBagMarblesGame(rules, 2), turn: 2, stage: "play", bag: ["clay"], triangle: { leftBase: { marble: "clay", wear: 0 }, rightBase: null, apex: { marble: "porcelain", wear: 1 } } }, { type: "resolve" }).state;
+  run("choix, question : au Final", "Final de porcelaine : choisissez jusqu'à 2 billes actives à polir. T pour terminer.", plain(describeChoicePrompt(porcelainFinal.pendingChoice, t)));
+  run("choix, question : en réaction du pot", "Pot, mica : choisissez une bille active à polir.", plain(describeChoicePrompt({ ...two.pendingChoice, action: "polish", count: 1, by: { trigger: "pocketReaction", slot: null, marble: "mica" } }, t)));
+  run("choix, question : à l'entrée au pot", true, plain(describeChoicePrompt({ ...two.pendingChoice, by: { trigger: "pocketEntry", slot: null, marble: "porcelain" } }, t)).startsWith("Entrée au pot de porcelaine : choisissez"));
   run("choix, deux zones : de la main vers le triangle", "leftBase", stepChoiceCursor(both.pendingChoice, cursor("hand"), "up").place);
   run("choix, deux zones : du triangle vers la main", "hand", stepChoiceCursor(both.pendingChoice, cursor("leftBase"), "down").place);
 
@@ -662,8 +671,9 @@ function checkChoiceInterface(run) {
   run("choix, dit : Terminer", "Choix terminé.", plain(stepsText(buildSteps(made.reduce(upTo, { type: "choose", done: true }).events, t))));
 
   setLocale("en");
-  run("choix, anglais : la main", "Choose a marble from your hand to pocket.", describeChoicePrompt(handOnly, t));
-  run("choix, anglais : jusqu'à 2", "Choose up to 2 active marbles to polish. T to finish.", describeChoicePrompt(upToChoice, t));
+  run("choix, anglais : la main", "Hit of gorilla: choose a marble from your hand to pocket.", describeChoicePrompt(handOnly, t));
+  run("choix, anglais : jusqu'à 2", "choose up to 2 active marbles to polish. T to finish.", question(upToChoice, ": "));
+  run("choix, anglais : en phase", "left base, tiger: choose an active marble to eject.", describeChoicePrompt(tigerBase.pendingChoice, t));
   run("choix, anglais : ce qui reste", "Still to choose: an active marble.", describeChoicePrompt(oneDone, t));
   run("choix, anglais : non éligible", "right base: empty. Not eligible.", choiceFocusLine(upTo, cursor("rightBase"), made, t));
   setLocale(locale);
@@ -1110,6 +1120,11 @@ export default function checkMarblesView(run) {
       ];
       const missingTallyTexts = tallyKeys.filter((key) => !Object.hasOwn(LOCALE_TABLES[locale], key));
       run.same(`${locale} : chaque valeur de partie a ses textes`, [], missingTallyTexts);
+      const missingVerbs = Object.entries(CLAUSE_ACTIONS)
+        .filter(([, action]) => action.choice !== undefined)
+        .map(([id]) => `marbles.choice.verb.${id}`)
+        .filter((key) => !Object.hasOwn(LOCALE_TABLES[locale], key));
+      run.same(`${locale} : chaque action au choix a le verbe de sa question`, [], missingVerbs);
       const missingEach = REACTION_KEYS.map((id) => `marbles.tally.${id}.each`).filter((key) => !Object.hasOwn(LOCALE_TABLES[locale], key));
       run.same(`${locale} : chaque occurrence écoutable a son « à chaque »`, [], missingEach);
 

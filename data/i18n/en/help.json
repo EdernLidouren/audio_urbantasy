@@ -48,7 +48,7 @@
   "help.inventoryTabs.nextTab": "Next tab",
   "help.inventoryTabs.prevTab": "Previous tab",
   "help.marbles.activate": "Take a marble then open its placement confirmation, or swap two slots; during resolution, skip it",
-  "help.marbles.back": "Cancel the selection, otherwise quit the game",
+  "help.marbles.back": "Cancel the selection, otherwise quit the game; during a choice, finish an “up to N” choice, or repeat the question of a required choice",
   "help.marbles.bag": "Announce the number of marbles in the bag and the draw per turn",
   "help.marbles.bagMenu": "Open the bag menu",
   "help.marbles.detailDown": "Marble card, downward: awaken, flick, hit, windfall, knockout, then final effects",

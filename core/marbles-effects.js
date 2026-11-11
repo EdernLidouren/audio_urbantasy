@@ -228,6 +228,8 @@ function addAmount(values, clause) {
 //   selfOutside (sur une bille) les moments où elle ne peut viser la bille
 //             elle-même, la bille concernée n'étant pas sur le triangle : la valeur
 //             `marble` du déclencheur, et pourquoi (targetProblem) ;
+//   selfRefusedIn (facultatif) les déclencheurs (leur id) où elle ne peut viser la
+//             bille elle-même, et pourquoi (Éjecter dans sa propre Éjection) ;
 //   keyword   (facultatif) l'action est un MOT-CLÉ : `texts`, son nom et sa
 //             description (aide des mots-clés, touches E et Maj+E ; sans eux, le
 //             chargement échoue, core/marbles.js) ; ses valeurs de partie
@@ -352,6 +354,8 @@ export const CLAUSE_ACTIONS = {
     choice: { zones: ["triangle"], picks: ["marble"] },
     all: true,
     selfOutside: EJECT_SELF_OUTSIDE,
+    // Dans sa propre Éjection, la bille est déjà en train d'être chassée.
+    selfRefusedIn: { knockout: "une bille ne peut s'éjecter elle-même dans sa propre Éjection : elle est déjà en train d'être chassée" },
     keyword: {
       texts: { name: "marbles.keyword.eject.name", description: "marbles.keyword.eject.description" },
       triggers: (event) => (event.type === "eject" || (event.type === "targetEmpty" && event.action === "eject") ? 1 : 0),
@@ -381,7 +385,7 @@ const GIFT_ZERO = zeroValues(VALUE_ACTIONS.filter((action) => CLAUSE_ACTIONS[act
 //                   l'exécution) ;
 //                   `marble`, sa bille (config/marbles-values.js/MARBLE_TRIGGERS) :
 //                   "removed" (déjà retirée) et "thrown" (en cours de lancer) ne
-//                   sont pas sur le triangle.
+//                   sont pas sur le triangle ; `trigger`, son id.
 // Un emplacement vient-il APRÈS un autre dans l'ordre des phases ?
 const phaseIndex = (slot) => SLOTS.indexOf(slot);
 
@@ -389,7 +393,7 @@ const phaseIndex = (slot) => SLOTS.indexOf(slot);
 function targetProblem(clause, context) {
   const action = CLAUSE_ACTIONS[clause.action];
   if (action.kind === "marble" && clause.target === undefined) {
-    const problem = action.selfOutside?.[context.marble];
+    const problem = action.selfOutside?.[context.marble] ?? action.selfRefusedIn?.[context.trigger];
     if (problem !== undefined) return problem;
   }
   // Un bonus au choix : il faut qu'au moins une phase puisse encore le recevoir.

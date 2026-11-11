@@ -48,7 +48,7 @@
   "help.inventoryTabs.nextTab": "Onglet suivant",
   "help.inventoryTabs.prevTab": "Onglet précédent",
   "help.marbles.activate": "Prendre une bille puis ouvrir la confirmation de sa pose, ou échanger deux emplacements ; pendant la résolution, la passer",
-  "help.marbles.back": "Annuler la sélection, sinon quitter la partie",
+  "help.marbles.back": "Annuler la sélection, sinon quitter la partie ; pendant un choix, terminer un choix « jusqu'à N », ou redire la question d'un choix obligatoire",
   "help.marbles.bag": "Annoncer le nombre de billes dans le sac et la pioche par tour",
   "help.marbles.bagMenu": "Ouvrir le menu du sac",
   "help.marbles.detailDown": "Fiche de la bille, vers le bas : effets d'éveil, de chiquenaude, de tic, de trouvaille, d'éjection, puis final",

@@ -659,8 +659,24 @@ const EVENT_TEXTS = {
   gameOver: (event, t) => t(`marbles.event.game_over.${event.reason}`, { score: event.score }),
 };
 
+// Le moment d'un choix, devant sa question : la bille qui le pose et son moment
+// (`by`, core/marbles.js), comme ses effets se disent : « Tic de gorille : », « base
+// gauche, tigrée : », « Entrée au pot de porcelaine : », « Pot, mica : ».
+const POCKET_ENTRY_TRIGGERS = new Set(MARBLE_POCKET.moments.filter((moment) => moment.event === "pocketed").map((moment) => moment.trigger));
+const POCKET_TRIGGERS = new Set(MARBLE_POCKET.moments.map((moment) => moment.trigger));
+const TRIGGER_NAMES = Object.fromEntries(MARBLE_TRIGGERS.map((trigger) => [trigger.id, trigger.texts.name]));
+
+function choiceByPrefix({ trigger, slot, marble }, question, t) {
+  const ref = nameRef(`marble.${marble}.name`);
+  if (trigger === "phase") return t("marbles.choice.by_phase", { slot: slotName(slot, t), marble: ref, question });
+  if (POCKET_ENTRY_TRIGGERS.has(trigger)) return t("marbles.choice.by_pot_entry", { marble: ref, question });
+  if (POCKET_TRIGGERS.has(trigger)) return t("marbles.choice.by_pot", { marble: ref, question });
+  return t("marbles.choice.by_trigger", { moment: t(TRIGGER_NAMES[trigger]), marble: ref, question });
+}
+
 // La question d'un CHOIX EN ATTENTE (core/marbles.js, `pendingChoice`), à
-// l'ouverture : « Choisissez une bille de votre main à empocher. », « Choisissez
+// l'ouverture, avec la bille et le moment qui la posent : « Tic de gorille :
+// choisissez une bille de votre main à empocher. », « Final de porcelaine : choisissez
 // jusqu'à 2 billes actives à polir. T pour terminer. » ; après un premier choix, ce
 // qui reste : « Choisissez encore une bille active. ».
 export function describeChoicePrompt(pending, t) {
@@ -669,7 +685,7 @@ export function describeChoicePrompt(pending, t) {
     return t(pending.upTo ? "marbles.choice.more_up_to" : "marbles.choice.more", { target });
   }
   const effect = pending.amount === undefined ? undefined : combined(valueParts({ [pending.action]: pending.amount }, t), t);
-  const question = t("marbles.choice.question", { target: choiceTarget(pending, t), verb: t(`marbles.choice.verb.${pending.action}`, { effect }) });
+  const question = choiceByPrefix(pending.by, t("marbles.choice.question", { target: choiceTarget(pending, t), verb: t(`marbles.choice.verb.${pending.action}`, { effect }) }), t);
   return pending.upTo ? `${question} ${t("marbles.choice.finish_hint")}` : question;
 }
 

@@ -618,13 +618,13 @@ function checkTexts(run) {
       said(describeOverview(shuffling, rules, t))
     );
     run.same(
-      "réaction, séquence : à sa place, une étape, après la pioche qui a mélangé",
+      "réaction, séquence : à sa place, juste après le mélange, avant la pioche qui reprend",
       [
         "Résolution du tour 2. base gauche, mica : Pioche 1.",
         "Le sac est vide : la défausse est mélangée et forme un nouveau sac.",
-        "Vous piochez argile.",
         "Pot, mica : Polissage 1 à la pointe.",
         "porcelaine est polie : usure 0 sur 2.",
+        "Vous piochez argile.",
         "base droite, vide.",
       ],
       texts(shuffling).slice(0, 6)

@@ -84,9 +84,10 @@ bille par bille (`core/marbles.js`/`drawOne`) :
    pioche à son tour), avant la bille suivante ;
 3. sinon, la défausse n'est pas vide : mélangée par le hasard de la partie, elle devient le
    sac (`bagRegenerated`) ; puis la **Trouvaille** de chaque bille active, dans l'ordre des
-   phases (voir « Les déclencheurs ») ; puis la pioche reprend, en relisant ces conditions
-   depuis le début (une Trouvaille a pu remplir la main, prendre la bille ou remplir la
-   défausse) ;
+   phases (voir « Les déclencheurs ») ; puis les réactions du pot au mélange (voir « Le
+   pot »), réglées comme les Trouvailles ; puis la pioche reprend, en relisant ces
+   conditions depuis le début (une Trouvaille a pu remplir la main, prendre la bille ou
+   remplir la défausse) ;
 4. sinon (sac et défausse vides) : rien à piocher.
 
 Le premier arrêt interrompt la pioche et se dit (`drawSkipped`, motif `handFull` ou
@@ -205,15 +206,18 @@ bille qui en a une ; « à chaque bille lancée » est `thrownMarbles`.
   réactions passent par la file du bus, sans récursion : relevées à l'émission
   (`pocketReactionsOf`), émises après le traitement de l'évènement (`handleEvent`). Le
   pot lu est celui de l'émission : une bille entrée plus tard ne réagit pas à ce qui l'a
-  précédée.
+  précédée. **Le mélange fait exception** : il entre au journal sans passer par la file
+  (`run.record`), et ses réactions se règlent aussitôt, des interruptions, juste après
+  les Trouvailles (les billes concernées) et avant que la pioche ne reprenne
+  (`regenerateBag`, `settleReactions`).
 - **La bille qui entre au pot ne réagit pas à sa propre mise en poche** (elle a pour cela
   son moment « à l'entrée ») ; elle réagit aux occurrences suivantes.
 - **Boucles** : réagir au déclenchement d'une action qu'on produit soi-même (« à chaque
   polissage : Polissage 1 ») est refusé au chargement. Une boucle indirecte (deux billes du
-  pot, l'une qui fêle à chaque polissage, l'autre qui polit à chaque fêlure) s'arrête à la
-  limite de sécurité du bus (voir « Le bus d'évènements ») : la chaîne s'arrête proprement,
-  le journal le note (`chainInterrupted`), « Enchaînement interrompu. » se dit. Dans les
-  vérifications et le simulateur, c'est une anomalie.
+  pot, l'une qui fêle à chaque polissage, l'autre qui polit à chaque fêlure) est coupée
+  par la limite de sécurité du bus (voir « Le bus d'évènements ») : seule cette chaîne
+  s'arrête, le journal le note (`chainInterrupted`), « Enchaînement interrompu. » se dit,
+  et l'action reprend. Dans les vérifications et le simulateur, c'est une anomalie.
 
 ### Déroulé d'une pose
 
@@ -483,7 +487,8 @@ minibilles actives » ; une forme déclarée dans `data/i18n/grammar.json`).
 une ou plusieurs billes actives du triangle par un effet, sans pose. Sa cible :
 
 - aucune : **la bille elle-même**, seulement si elle est sur le triangle (refusé à la
-  validation dans une Chiquenaude, un Final, un Éveil et en poche ; à l'exécution, une
+  validation dans une Chiquenaude, un Final, un Éveil, en poche, et dans sa propre
+  Éjection, `selfRefusedIn` : elle y est déjà en train d'être chassée ; à l'exécution, une
   bille déjà partie : sans effet, noté) ;
 - un **emplacement** : sa bille ;
 - des billes actives **au choix** (`choice({ zones: ["triangle"], count })`, voir
@@ -514,8 +519,10 @@ existera, sa phrase combinée s'écrira avec lui.
 Ni Tic (rien n'arrive), ni Final (ce n'est pas une usure). Pendant la résolution, une bille
 chassée avant sa phase la saute. Son Éjection a pu la retirer déjà (une Fêlure sur
 elle-même) : elle ne part pas une seconde fois. Une bille dont l'Éjection est en cours
-(une pose, ou Éjecter) n'est pas chassée une seconde fois par cette Éjection
-(`run.knockingOut`) : sans effet, noté, plutôt qu'une boucle. Cible vide ou aucune bille
+(une pose, ou Éjecter) n'est pas chassée une seconde fois par cette Éjection, quand elle
+vise son propre emplacement (`run.knockingOut`) : sans effet, noté, plutôt qu'une boucle.
+« Toutes les billes actives » et les choix comprennent la bille qui éjecte (une règle
+voulue ; un filtre « les autres » est en suspens). Cible vide ou aucune bille
 visée : sans effet, noté (`targetEmpty`, « Aucune bille visée : sans effet. »).
 
 **Compteurs** : billes éjectées (`ejectedMarbles`, causes `"replacement"` et `"eject"`) et
@@ -758,19 +765,23 @@ dans le réducteur, et rien d'extérieur ne s'y abonne.
 - **Pas de récursion** : un évènement émis pendant le traitement d'un autre attend dans une
   file, premier entré, premier sorti.
 - **Une exception, l'interruption** (`settle`) : son évènement et tout ce qui en découle se
-  règlent jusqu'au bout tout de suite, dans une file à part, avant ce qui attendait. Trois
-  en sont : la Trouvaille, qui se joue entre la régénération et la reprise de la pioche ;
+  règlent jusqu'au bout tout de suite, dans une file à part, avant ce qui attendait. En
+  sont : la Trouvaille, puis les réactions du pot au mélange, qui se jouent entre la
+  régénération et la reprise de la pioche ;
   l'Éveil, entre la pioche d'une bille et celle de la suivante, même quand cette pioche
   vient d'un effet en plein traitement (un Tic qui pioche) ; et l'Éjection d'une bille
   chassée par Éjecter, avant qu'elle ne quitte son emplacement.
 - **Le journal s'écrit à l'émission**, dans l'ordre où l'état change : la file étant premier
   entré, premier sorti, c'est l'ordre de traitement, sauf pour une interruption, réglée
   avant ce qui attendait mais émise après. Les valeurs de partie aussi (voir plus haut).
-- **Limite de sécurité** : `MAX_EVENTS_PER_ACTION`. Atteinte, la chaîne s'arrête
-  proprement : les files en attente sont vidées, le journal le note (`chainInterrupted`)
-  et plus rien n'est traité jusqu'à la fin de l'action, qui va pourtant à son terme (une
-  pose se pose, une résolution finit son tour et tourne). Rien n'est levé, aucune action
-  n'est refusée. « Enchaînement interrompu. » se dit à sa place, et dans R et la
+- **Une chaîne** : ce qu'un évènement émis hors de tout traitement déclenche, de proche en
+  proche, interruptions comprises. Le corps d'une action en ouvre plusieurs (une par
+  phase de la résolution, par exemple).
+- **Limite de sécurité** : `MAX_EVENTS_PER_CHAIN` évènements par chaîne. Atteinte, SEULE
+  CETTE CHAÎNE est coupée : ce qui en restait est abandonné, le journal le note
+  (`chainInterrupted`), et l'action reprend normalement à la chaîne suivante, qui repart
+  de zéro (une pose se pose, une résolution joue ses phases suivantes, ses retraits, son
+  Impact). Rien n'est levé, aucune action n'est refusée. « Enchaînement interrompu. » se dit à sa place, et dans R et la
   confirmation si la prévision l'atteint (`interrupted`). Une anomalie : la fumée
   (`marbles`), les vérifications et le simulateur la guettent.
 
@@ -940,9 +951,11 @@ une bille du sac.
 
 Quand un effet laisse choisir, l'écran passe en **mode choix** tant que le choix attend
 (`view/marbles/choice.js`, pur ; branché dans `view/marbles/screen.js`). La question se dit
-après ce que l'action a déjà fait : « Choisissez une bille de votre main à empocher. »,
-« Choisissez 2 billes actives à polir. », « Choisissez jusqu'à 2 billes actives à polir. T
-pour terminer. » ; après chaque choix, « agate choisie. Choisissez encore une bille
+après ce que l'action a déjà fait, avec la bille et le moment qui la posent (`by`), comme
+ses effets se disent : « Tic de gorille : choisissez une bille de votre main à
+empocher. », « base gauche, tigrée : choisissez une bille active à éjecter. », « Final de
+porcelaine : choisissez jusqu'à 2 billes actives à polir. T pour terminer. », « Pot, mica :
+… », « Entrée au pot de porcelaine : … » ; après chaque choix, « agate choisie. Choisissez encore une bille
 active. » (« Vous pouvez choisir encore une bille active, ou terminer avec T. » en mode
 « jusqu'à N »).
 
@@ -954,8 +967,9 @@ active. » (« Vous pouvez choisir encore une bille active, ou terminer avec T. 
 - **Les deux zones** : on passe de l'une à l'autre comme d'habitude, le nom de la zone
   annoncé ; une seule zone : l'autre n'existe pas pour le curseur.
 - **Entrée** choisit ; **T** termine un choix « jusqu'à N » (partout, sur le triangle
-  surtout ; refusé, « Ce choix est obligatoire. », sinon) ; **Échap** redit la question, un
-  choix ne se fermant pas (le jeu ne peut continuer sans lui).
+  surtout ; refusé, « Ce choix est obligatoire. », sinon) ; **Échap** fait comme T dans un
+  choix « jusqu'à N » (il valide la sélection en cours), et redit la question dans un
+  choix obligatoire, qui ne se ferme pas (le jeu ne peut continuer sans lui).
 - Fiches (Ctrl+haut, Ctrl+bas) et mots-clés (E, Maj+E) marchent sur chaque option ; R est
   refusé pendant le choix.
 

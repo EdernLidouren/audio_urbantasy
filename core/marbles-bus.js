@@ -13,37 +13,43 @@
 // en attente reprend ensuite. Sert à la régénération du sac : ses Trouvailles se
 // jouent avant que la pioche interrompue ne reprenne (core/marbles.js/regenerateBag).
 //
-// La LIMITE borne le nombre d'évènements traités d'une action, interruptions
-// comprises : une boucle (deux billes du pot qui se répondent) ne gèle jamais le jeu.
-// Atteinte, la CHAÎNE S'ARRÊTE proprement : les files en attente sont vidées,
-// `onLimit` est appelé une fois, et plus rien n'est traité jusqu'à la fin de
-// l'action ; ce qui est émis ensuite n'est plus traité. Rien n'est levé : celui qui
-// appelle finit son action. Dans les vérifications et le simulateur, l'atteindre est
-// une anomalie (un enchaînement de billes sans fin).
+// Une CHAÎNE : ce qu'un évènement émis hors de tout traitement déclenche, de proche
+// en proche, interruptions comprises, jusqu'à ce que tout soit réglé.
+//
+// La LIMITE borne le nombre d'évènements traités d'une chaîne : une boucle (deux
+// billes du pot qui se répondent) ne gèle jamais le jeu. Atteinte, la chaîne est
+// COUPÉE : ce qui en restait à traiter est abandonné, `onLimit` est appelé une fois,
+// et ce que la chaîne émet encore n'est plus traité. La chaîne suivante repart de
+// zéro : celui qui appelle reprend normalement (une résolution joue ses phases
+// suivantes). Rien n'est levé. Dans les vérifications et le simulateur, l'atteindre
+// est une anomalie (un enchaînement de billes sans fin).
 
-export const MAX_EVENTS_PER_ACTION = 200;
+export const MAX_EVENTS_PER_CHAIN = 200;
 
 // `handle(event)` : le traitement d'un évènement, qui peut rappeler `emit` ou
-// `settle`. `onLimit()` (facultatif) : appelé une fois, quand la limite arrête la
-// chaîne. `stopped()` dit si elle l'a fait.
-export function createEventBus(handle, limit = MAX_EVENTS_PER_ACTION, onLimit = () => {}) {
+// `settle`. `onLimit()` (facultatif) : appelé une fois par chaîne coupée.
+// `interruptions()` : le nombre de chaînes coupées.
+export function createEventBus(handle, limit = MAX_EVENTS_PER_CHAIN, onLimit = () => {}) {
   // Les files en cours, la plus récente en dernier : ce qu'un traitement émet va
   // dans la file de l'interruption en cours, ou dans la file principale.
   const queues = [];
+  // La chaîne en cours : ses évènements traités, et si elle a été coupée.
   let processed = 0;
-  let halted = false;
+  let cut = false;
+  let interruptions = 0;
 
-  function halt() {
-    halted = true;
+  function cutChain() {
+    cut = true;
+    interruptions += 1;
     for (const queue of queues) queue.length = 0;
     onLimit();
   }
 
   function drain(queue) {
-    while (!halted && queue.length > 0) {
+    while (!cut && queue.length > 0) {
       processed += 1;
       if (processed > limit) {
-        halt();
+        cutChain();
         return;
       }
       handle(queue.shift());
@@ -51,25 +57,31 @@ export function createEventBus(handle, limit = MAX_EVENTS_PER_ACTION, onLimit = 
   }
 
   // Traite `event` et tout ce qui en découle, dans une file à part, avant de rendre
-  // la main.
+  // la main. Hors de tout traitement, il ouvre une nouvelle chaîne.
   function settle(event) {
-    if (halted) return;
+    const opensChain = queues.length === 0;
+    if (opensChain) {
+      processed = 0;
+      cut = false;
+    }
+    if (cut) return;
     const queue = [event];
     queues.push(queue);
     try {
       drain(queue);
     } finally {
       queues.pop();
+      // La chaîne finie, coupée ou non : la suivante repart de zéro.
+      if (opensChain) cut = false;
     }
   }
 
   // Hors de tout traitement, `emit` règle l'évènement tout de suite ; pendant un
-  // traitement, il attend dans la file en cours.
+  // traitement, il attend dans la file en cours (sauf dans une chaîne coupée).
   function emit(event) {
-    if (halted) return;
     if (queues.length === 0) settle(event);
-    else queues[queues.length - 1].push(event);
+    else if (!cut) queues[queues.length - 1].push(event);
   }
 
-  return { emit, settle, stopped: () => halted };
+  return { emit, settle, interruptions: () => interruptions };
 }

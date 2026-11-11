@@ -645,6 +645,22 @@ function checkPocketReactions(run) {
     ordered.events.find((event) => event.type === "pocketReaction" && event.marble === "onFlick")
   );
 
+  // Un mélange en pleine pioche : les Trouvailles, puis la réaction du pot, juste
+  // après lui, avant que la pioche ne reprenne.
+  const shuffleTable = fabricatedRules({ ...table, finder: { windfall: [{ action: "speed", amount: 1 }] }, onShuffle: { pocketed: { shuffles: [{ action: "mass", amount: 1 }] } } });
+  const shuffled = apply(
+    { ...playState({ bag: [], discard: ["plain"], pot: ["onShuffle"], triangle: triangleOf(placed("finder"), null, null) }), stage: "draw" },
+    { type: "draw" },
+    shuffleTable
+  );
+  run.same(
+    "réaction au mélange : après les Trouvailles, avant la reprise de la pioche",
+    ["bagRegenerated", "windfall", "effect:windfall", "pocketReaction", "effect:pocketReaction", "draw"],
+    shuffled.events
+      .filter((event) => ["bagRegenerated", "windfall", "effect", "pocketReaction", "draw"].includes(event.type))
+      .map((event) => (event.type === "effect" ? `effect:${event.trigger}` : event.type))
+  );
+
   // La bille qui entre ne réagit pas à sa propre mise en poche ; elle réagit aux
   // suivantes.
   const entering = place(playState({ hand: inHand(["pocketer", "onPocketed"]), pot: ["onPocketed"] }));
@@ -684,13 +700,16 @@ function checkPocketReactions(run) {
   run("validation : réagir à une autre action que la sienne, accepté", true, valid({ polish: [{ action: "crack", amount: 1, target: "apex" }] }));
 
   // Boucle indirecte : deux billes du pot qui se répondent (Fêlure, Polissage), sur
-  // une bille qui ne s'use jamais assez. La limite du bus arrête la chaîne, l'action
-  // aboutit, le journal le note : une anomalie, que la fumée guette.
+  // une bille qui ne s'use jamais assez. La limite du bus coupe cette chaîne seule,
+  // l'action reprend ensuite normalement, le journal le note : une anomalie, que la
+  // fumée guette.
   const looping = fabricatedRules({
     ...table,
     sturdy: { maxWear: 100 },
     cracker: { pocketed: { polish: [{ action: "crack", amount: 1, target: "apex" }] } },
     healer: { pocketed: { crack: [{ action: "polish", amount: 1, target: "apex" }] } },
+    basePolisher: { base: [{ action: "polish", amount: 1, target: "apex" }] },
+    baseOne: { base: [{ action: "speed", amount: 1 }] },
   });
   const loop = looping.reduce(playState({ hand: inHand(["polisher", "plain"]), pot: ["cracker", "healer"], triangle: triangleOf(null, null, placed("sturdy", 50)) }), {
     type: "place",
@@ -700,9 +719,24 @@ function checkPocketReactions(run) {
   run("boucle indirecte : l'action aboutit", true, loop.ok);
   run("boucle indirecte : la chaîne interrompue, notée une fois", 1, loop.events.filter((event) => event.type === "chainInterrupted").length);
   run("boucle indirecte : la pose va à son terme", "polisher", loop.state.triangle.leftBase?.marble);
-  run("boucle indirecte : plus rien n'est joué après l'arrêt", false, loop.events.slice(loop.events.findIndex((event) => event.type === "chainInterrupted")).some((event) => event.type === "effect"));
+  run("boucle indirecte : la pose reprend après la chaîne coupée", true, loop.events.findIndex((event) => event.type === "placed") > loop.events.findIndex((event) => event.type === "chainInterrupted"));
   const resolved = looping.reduce(loop.state, { type: "resolve" });
   run("boucle indirecte : la partie continue", true, resolved.ok);
+  // Pendant la résolution : la boucle de la base gauche coupée, la base droite et la
+  // pointe jouent, les retraits et l'Impact suivent.
+  const midResolution = looping.reduce(
+    playState({ bag: ["plain"], pot: ["cracker", "healer"], triangle: triangleOf(placed("basePolisher"), placed("baseOne"), placed("sturdy", 50)) }),
+    { type: "resolve" }
+  );
+  const cutAt = midResolution.events.findIndex((event) => event.type === "chainInterrupted");
+  run("chaîne coupée en résolution : une seule fois", 1, midResolution.events.filter((event) => event.type === "chainInterrupted").length);
+  run(
+    "chaîne coupée en résolution : la base droite joue ensuite son effet",
+    true,
+    midResolution.events.slice(cutAt).some((event) => event.type === "effect" && event.trigger === "phase" && event.slot === "rightBase" && event.speedDelta === 1)
+  );
+  run("chaîne coupée en résolution : la pointe joue ensuite sa phase", true, midResolution.events.slice(cutAt).some((event) => event.type === "phase" && event.slot === "apex"));
+  run("chaîne coupée en résolution : l'Impact compte la base droite", 1, midResolution.events.find((event) => event.type === "impact").speed);
 }
 
 function caughtMessage(fn) {
@@ -906,7 +940,8 @@ function checkEject(run) {
     earlyEjector: { base: [{ action: "eject", target: "apex" }] },
     wornOut: { maxWear: 1, apex: [{ action: "speed", amount: 1 }], final: [{ action: "speed", amount: 9 }] },
     // Son Éjection l'éjecterait à nouveau : sans effet, pas de boucle.
-    loopKnock: { knockout: [{ action: "eject" }] },
+    // Son Éjection vise son propre emplacement : à l'exécution, sans effet.
+    loopKnock: { knockout: [{ action: "eject", target: "apex" }] },
     onEjected: { pocketed: { ejectedMarbles: [{ action: "mass", amount: 1 }] } },
   };
   const made = fabricatedRules(table);
@@ -937,6 +972,9 @@ function checkEject(run) {
   run("validation, éjecter soi-même : à l'Éveil refusé", true, refused("awaken"));
   run("validation, éjecter soi-même : en poche refusé", true, throws(() => validateTable({ x: { pocketed: { entry: [{ action: "eject" }] } } })));
   run("validation, éjecter soi-même : au Tic permis", false, refused("hit"));
+  run("validation, éjecter soi-même : dans sa propre Éjection refusé", true, refused("knockout"));
+  run("validation, éjecter soi-même : le message dit pourquoi", true, /propre Éjection/.test(caughtMessage(() => validateTable({ x: { knockout: [{ action: "eject" }] } }))));
+  run("validation, éjecter un emplacement dans son Éjection permis", false, refused("knockout", { action: "eject", target: "apex" }));
   run("validation, éjecter : un montant refusé", true, refused("hit", { action: "eject", amount: 1, target: "apex" }));
   run("validation, éjecter : au choix dans la main refusé", true, refused("hit", { action: "eject", target: { type: "choice", zones: ["hand"], pick: "marble", count: 1 } }));
   run("validation, « toutes » : un filtre inconnu refusé", true, refused("hit", { action: "eject", target: { type: "all", filters: [{ type: "matter", matter: "glass" }] } }));
@@ -983,7 +1021,7 @@ function checkEject(run) {
   const bySmall = apply(playState({ hand: inHand(["smallEjectorFixed"]), triangle: triangleOf(placed("sizeKnock"), null, placed("plain")) }), toApex, sizeTable);
   run("calibre : éjectée par une minibille, elle ne vaut pas", 0, bySmall.events.find((event) => event.trigger === "knockout").speedDelta);
 
-  // Une Éjection qui éjecterait sa propre bille : sans effet, pas de boucle.
+  // Une Éjection qui viserait son propre emplacement : sans effet, pas de boucle.
   const loop = go(playState({ hand: inHand(["apexEjector"]), triangle: triangleOf(placed("plain"), null, placed("loopKnock")) }), toLeft);
   run("éjecter : une Éjection qui s'éjecte elle-même, sans boucle", false, loop.events.some((event) => event.type === "chainInterrupted"));
   run("éjecter : elle part une seule fois", 1, loop.events.filter((event) => event.type === "removed" && event.marble === "loopKnock").length);

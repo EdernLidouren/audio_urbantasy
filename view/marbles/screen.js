@@ -51,8 +51,8 @@
 // le choix attend (view/marbles/choice.js) : la question se dit (après les étapes
 // déjà jouées), la main ne propose que les billes éligibles (et « Terminer » en mode
 // « jusqu'à N »), le triangle garde sa forme, ses emplacements non éligibles se
-// disent et bloquent. Entrée choisit, T termine un choix « jusqu'à N », Échap redit
-// la question (un choix ne se ferme pas). Fiches et mots-clés y marchent. Pendant
+// disent et bloquent. Entrée choisit, T termine un choix « jusqu'à N », Échap aussi ;
+// dans un choix obligatoire, Échap redit la question (il ne se ferme pas). Fiches et mots-clés y marchent. Pendant
 // une résolution, la séquence s'arrête sur la question (la passer aussi), le choix
 // se fait, puis la suite de la résolution reprend en séquence.
 //
@@ -729,11 +729,14 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
     openTallyMenu(getGame().tally);
   }
 
-  // Échap : pendant un choix, redit la question (un choix ne se ferme pas, le jeu ne
-  // peut continuer sans lui) ; sinon annule la sélection, ou propose de quitter.
+  // Échap : pendant un choix « jusqu'à N », valide la sélection en cours, comme
+  // Terminer ; pendant un choix obligatoire, redit la question (il ne se ferme pas, le
+  // jeu ne peut continuer sans lui) ; sinon annule la sélection, ou propose de quitter.
   function back() {
+    const pending = pendingChoice();
     if (isOver()) popScreen();
-    else if (pendingChoice()) speak(describeChoicePrompt(getGame().pendingChoice, t));
+    else if (pending?.upTo) answerChoice({ type: "choose", done: true });
+    else if (pending) speak(describeChoicePrompt(pending, t));
     else if (held) releaseSelection();
     else openConfirmation("marbles.quit.confirm", () => popScreen());
   }

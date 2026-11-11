@@ -121,18 +121,18 @@ Toute pioche, celle du début de tour comme celle d'un effet, se fait bille par 
 
 1. si la main est pleine, la pioche s'arrête et la bille reste au sac, sans régénération ;
 2. sinon, si le sac a une bille, on la pioche, puis son Éveil joue, avec tout ce qu'il déclenche, avant la bille suivante ;
-3. sinon, si la défausse n'est pas vide, elle est mélangée et devient le sac (la régénération), puis la Trouvaille de chaque bille active joue, et la pioche reprend du début ;
+3. sinon, si la défausse n'est pas vide, elle est mélangée et devient le sac (la régénération), puis la Trouvaille de chaque bille active joue, puis les billes du pot qui réagissent au mélange, et la pioche reprend du début ;
 4. sinon, le sac et la défausse sont vides : il n'y a plus rien à piocher.
 
 Le premier arrêt interrompt la pioche : les billes restantes ne sont pas piochées.
 
 ### La régénération du sac
 
-Une régénération peut avoir lieu à tout moment : en début de tour, pendant la phase de jeu ou pendant la résolution. Les billes du pot et les billes perdues n'y reviennent jamais. Ses Trouvailles comptent pour le tour en cours.
+Une régénération peut avoir lieu à tout moment : en début de tour, pendant la phase de jeu ou pendant la résolution. Les billes du pot et les billes perdues n'y reviennent jamais. Ses Trouvailles et les réactions du pot au mélange comptent pour le tour en cours ; elles jouent toutes juste après le mélange, avant que la pioche ne reprenne.
 
 ### La fin de partie par pioche impossible
 
-Au début d'un tour, si la pioche du tour n'a pu donner aucune bille parce que le sac et la défausse sont vides, la partie se termine, même si la main contient encore des billes.
+Au début d'un tour, si la pioche du tour n'a pu donner aucune bille parce que le sac et la défausse sont vides, la partie se termine, même si la main contient encore des billes : elles ne seront pas jouées.
 
 ## 7. L'usure, le polissage, la fêlure et les retraits
 
@@ -175,11 +175,11 @@ Les mots-clés se consultent en jeu, sur la bille sous le curseur, avec la touch
   - Moment : à la fin d'une pose sur un emplacement occupé, après l'Éjection de l'occupante et son départ.
 - Trouvaille : se déclenche quand le sac est reconstitué à partir de la défausse, si la bille est sur le triangle.
   - Moment : juste après chaque régénération du sac, chez chaque bille active, dans l'ordre des phases, avant que la pioche ne reprenne. Une bille en main, au sac, à la défausse ou en cours de lancer n'en a pas.
-- Éjection : se déclenche quand la bille est chassée du triangle par une autre bille.
-  - Moment : quand une pose la remplace, ou quand un effet Éjecter la chasse, avant qu'elle ne quitte son emplacement.
+- Éjection : se déclenche quand la bille est chassée du triangle.
+  - Moment : quand une pose la remplace, ou quand un effet Éjecter la chasse, avant qu'elle ne quitte son emplacement. Une bille qui s'éjecte elle-même déclenche aussi son Éjection.
 - Final : se déclenche quand la bille est usée et quitte le triangle. Elle est alors déjà dans la défausse : si son Final l'empoche, elle passe de la défausse au pot.
   - Moment : à son retrait par usure, à l'étape des retraits ou aussitôt après une Fêlure. Jamais à un remplacement, à un échange, à une éjection ni à une mise en poche.
-- En poche : effets actifs uniquement lorsque la bille est dans le pot.
+- En poche : effets actifs uniquement lorsque la bille est dans le pot : à son entrée, à chaque résolution, ou en réaction à ce qui se passe pendant la partie.
   - Trois moments : à l'entrée au pot, juste après l'arrivée de la bille (jamais si elle est perdue) ; à chaque résolution, à l'étape du pot ; à chaque occurrence d'un évènement de la partie, une réaction (section 9).
 
 ### Les mots-clés d'action
@@ -193,7 +193,8 @@ Les mots-clés se consultent en jeu, sur la bille sous le curseur, avec la touch
 - Empocher : envoie une bille au pot, où qu'elle soit : sur le triangle, en main ou dans la défausse. Si le pot est plein, la bille est perdue pour la partie.
   - Cible : la bille elle-même, où qu'elle soit (sauf en cours de lancer et dans le pot) ; un emplacement ; la première bille de la main ; ou une bille au choix, de la main ou du triangle.
 - Éjecter : chasse une bille du triangle. Elle part à la défausse, et son effet d'éjection se déclenche.
-  - Cible : la bille elle-même, seulement si elle est sur le triangle ; un emplacement ; des billes actives au choix ; ou toutes les billes actives, éventuellement d'un seul calibre (« toutes les minibilles actives »).
+  - Cible : la bille elle-même, seulement si elle est sur le triangle, jamais dans sa propre Éjection ; un emplacement ; des billes actives au choix ; ou toutes les billes actives, éventuellement d'un seul calibre (« toutes les minibilles actives »).
+  - « Toutes les billes actives » comprend la bille qui éjecte, si elle est sur le triangle et passe le filtre. De même, un choix parmi les billes actives peut porter sur la bille qui le pose.
 
 ### Les valeurs
 
@@ -217,9 +218,13 @@ Vitesse et Masse ne sont pas des mots-clés : un effet les augmente ou les dimin
 4. L'Impact.
 5. La rotation, puis la fin du tour.
 
+### L'ordre des clauses d'un effet
+
+Un effet peut faire plusieurs choses : « Pioche 1 et Éjecter toutes les minibilles actives ». Ses clauses s'appliquent dans l'ordre où elles sont écrites : ici, la Pioche, puis l'éjection. Seules deux précisions : les valeurs (Vitesse, Masse, Pioche) d'un même effet s'additionnent et se disent ensemble, avant les actions sur une bille ; et un bonus au choix se choisit avant que l'effet ne se dise.
+
 ### Ce qui se déclenche en chaîne
 
-Un effet peut en déclencher d'autres. Ils se jouent dans l'ordre où ils surviennent, l'un après l'autre. Deux exceptions se règlent jusqu'au bout tout de suite, avant la suite : l'Éveil d'une bille piochée, avant la bille suivante ; et les Trouvailles d'une régénération, avant que la pioche ne reprenne. L'Éjection d'une bille chassée par un effet se règle de même, avant qu'elle ne quitte son emplacement.
+Un effet peut en déclencher d'autres. Ils se jouent dans l'ordre où ils surviennent, l'un après l'autre. Quelques exceptions se règlent jusqu'au bout tout de suite, avant la suite : l'Éveil d'une bille piochée, avant la bille suivante ; les Trouvailles d'une régénération, puis les réactions du pot à ce mélange, avant que la pioche ne reprenne ; et l'Éjection d'une bille chassée par un effet, avant qu'elle ne quitte son emplacement.
 
 Quand plusieurs billes réagissent au même évènement, l'ordre est fixe : base gauche, base droite, pointe, puis la main de la première à la dernière.
 
@@ -262,7 +267,9 @@ Certains effets laissent le joueur choisir leur cible : une bille de sa main, un
 - Seules les cibles valides au moment du choix sont proposées : pour un bonus, seules les billes dont la phase n'a pas eu lieu.
 - La sélection s'arrête quand le nombre est atteint, quand le joueur termine, ou quand plus rien n'est proposé.
 - L'effet s'applique ensuite à chaque cible, dans l'ordre des choix.
+- La question nomme la bille et le moment qui la posent : « Tic de gorille : choisissez une bille de votre main à empocher. », « Final de porcelaine : choisissez jusqu'à 2 billes actives à polir. ».
 - Le jeu attend le choix : rien d'autre ne peut se faire tant qu'il n'est pas fait. Pendant la résolution, elle s'arrête sur la question et reprend après le choix.
+- Dans un choix « jusqu'à N », Échap valide la sélection en cours, comme Terminer. Dans un choix obligatoire, Échap redit la question.
 
 ### Les cibles vides
 
@@ -285,15 +292,15 @@ Une bille du pot peut réagir à ce qui se passe pendant la partie : « En poche
 - Elle peut écouter un évènement de la partie (bille lancée, tiquée, éjectée, piochée, usée, sortie du triangle, mise en poche, perdue, mélange du sac), le déclenchement d'un mot-clé chez une bille qui en a l'effet, ou le déclenchement d'une action.
 - Elle n'écoute jamais une quantité (comme les points d'usure rendus), ni les gains et pertes de Vitesse et de Masse, ni les réactions elles-mêmes.
 - Elle réagit une fois par occurrence : trois billes piochées, trois réactions. Un évènement qui compte pour deux occurrences écoutées donne deux réactions.
-- L'ordre : l'évènement se produit, les valeurs de partie sont comptées, la bille concernée joue son propre effet, puis les billes du pot qui écoutent réagissent, dans l'ordre d'arrivée.
+- L'ordre : l'évènement se produit, les valeurs de partie sont comptées, la bille concernée joue son propre effet, puis les billes du pot qui écoutent réagissent, dans l'ordre d'arrivée. Pour un mélange du sac, les billes concernées sont les billes actives (leur Trouvaille), et les réactions jouent avant que la pioche ne reprenne.
 - Une bille qui entre au pot ne réagit pas à sa propre mise en poche ; elle réagit aux occurrences suivantes. Une bille entrée plus tard ne réagit pas à ce qui l'a précédée.
 - Un bonus de réaction dont la phase est passée est perdu.
 
 ### Les garde-fous contre les boucles
 
 - Une bille ne peut pas réagir au déclenchement d'une action qu'elle produit elle-même (« à chaque polissage : Polissage 1 ») : une telle bille ne peut pas exister.
-- Une bille déjà en train d'être chassée n'est pas chassée une seconde fois par son propre effet d'Éjection : cela ne fait rien.
-- Une chaîne d'effets qui ne s'arrêterait pas, comme deux billes du pot qui se répondent, est interrompue par une limite de sécurité. Le jeu annonce « Enchaînement interrompu. », plus aucun effet ne joue jusqu'à la fin du geste en cours, et le geste va quand même à son terme. C'est une anomalie, que les outils de test signalent.
+- Une bille ne peut pas s'éjecter elle-même dans sa propre Éjection : une telle bille ne peut pas exister. Une Éjection qui viserait l'emplacement de sa propre bille ne fait rien : elle est déjà en train d'être chassée.
+- Une chaîne d'effets qui ne s'arrêterait pas, comme deux billes du pot qui se répondent, est coupée par une limite de sécurité. Le jeu annonce « Enchaînement interrompu. » ; seule cette chaîne est coupée, et le geste ou la résolution reprend ensuite normalement (phases suivantes, retraits, Impact). C'est une anomalie, que les outils de test signalent.
 - La limite de lancers par tour empêche les boucles pilotées par le joueur.
 
 ## 10. Les valeurs de partie

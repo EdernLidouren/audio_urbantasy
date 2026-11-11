@@ -4,7 +4,7 @@
 // écouteurs et l'arrêt propre d'une action du réducteur. Lancées par core/checks/index.js/runChecks
 // (`node tools/run-checks.js marbles-bus`).
 
-import { MAX_EVENTS_PER_ACTION, createEventBus } from "../marbles-bus.js";
+import { MAX_EVENTS_PER_CHAIN, createEventBus } from "../marbles-bus.js";
 import { createMarblesGame, marbleListeners, marblesReduce } from "../marbles.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
 import { createMarblesRules } from "../marbles-rules.js";
@@ -69,12 +69,17 @@ export default function checkMarblesBus(run) {
   run("interruption : une boucle d'interruptions s'arrête aussi, sans lever", 1, settleStops);
   run("interruption : arrêtée à la limite", 10, settled);
 
-  // Limite de sécurité : une boucle s'arrête proprement, sans lever ; `onLimit` une
-  // seule fois ; plus rien n'est traité ensuite.
+  // Limite de sécurité : une boucle coupe SA chaîne, sans lever ; `onLimit` une fois
+  // pour elle ; la chaîne suivante repart de zéro et se traite normalement.
   let stops = 0;
   let turns = 0;
+  const after = [];
   const looping = createEventBus(
     (event) => {
+      if (event === "après") {
+        after.push(event);
+        return;
+      }
       turns += 1;
       looping.emit(event);
       looping.emit("autre");
@@ -85,35 +90,38 @@ export default function checkMarblesBus(run) {
   looping.emit("tour");
   run("limite : une boucle s'arrête à la limite", 10, turns);
   run("limite : signalée une fois", 1, stops);
-  run("limite : le bus le dit", true, looping.stopped());
+  run("limite : le bus compte la chaîne coupée", 1, looping.interruptions());
   looping.emit("après");
   looping.settle("après");
-  run("limite : plus rien n'est traité ensuite", 10, turns);
-  run("limite : jamais signalée deux fois", 1, stops);
+  run.same("limite : la chaîne suivante se traite normalement", ["après", "après"], after);
+  run("limite : la boucle ne reprend pas", 10, turns);
+  run("limite : une seule chaîne coupée", 1, stops);
 
+  // La limite vaut par chaîne : trois chaînes de deux évènements passent sous une
+  // limite de trois.
   let handled = 0;
-  const exact = createEventBus(() => {
+  const perChain = createEventBus((event) => {
     handled += 1;
+    if (event !== "suite") perChain.emit("suite");
   }, 3);
-  exact.emit("un");
-  exact.emit("deux");
-  exact.emit("trois");
-  run("limite : atteinte sans être dépassée, tout passe", 3, handled);
-  run("limite : pas d'arrêt", false, exact.stopped());
-  exact.emit("quatre");
-  run("limite : le suivant arrête la chaîne", 3, handled);
-  run("limite : largement au-dessus d'une action réelle", true, MAX_EVENTS_PER_ACTION >= 100);
+  perChain.emit("un");
+  perChain.emit("deux");
+  perChain.emit("trois");
+  run("limite : par chaîne, jamais cumulée sur l'action", 6, handled);
+  run("limite : aucune chaîne coupée", 0, perChain.interruptions());
+  run("limite : largement au-dessus d'une chaîne réelle", true, MAX_EVENTS_PER_CHAIN >= 100);
 
-  // Le réducteur finit son action : la chaîne arrêtée se note au journal, l'action
-  // aboutit, l'état reçu reste intact.
+  // Le réducteur finit son action : chaque chaîne coupée se note au journal, l'action
+  // aboutit, l'état reçu reste intact. Une limite nulle coupe chaque chaîne d'emblée.
   const game = rules.createGame(3);
   const frozen = structuredClone(game);
-  const halted = rules.reduce(game, { type: "draw" }, { eventLimit: 3 });
+  const halted = rules.reduce(game, { type: "draw" }, { eventLimit: 0 });
   run("réducteur : au-delà de la limite, l'action aboutit", true, halted.ok);
-  run("réducteur : la chaîne arrêtée est notée", 1, halted.events.filter((event) => event.type === "chainInterrupted").length);
+  run("réducteur : les chaînes coupées sont notées", true, halted.events.some((event) => event.type === "chainInterrupted"));
   run.same("réducteur : l'état reçu n'est pas touché", frozen, game);
   run("réducteur : la pioche du tour se finit (le corps de l'action continue)", "play", halted.state.stage);
-  run("réducteur : sous la limite, rien de noté", false, rules.reduce(game, { type: "draw" }, { eventLimit: 40 }).events.some((event) => event.type === "chainInterrupted"));
+  run("réducteur : toutes les billes piochées quand même", 5, halted.state.hand.length);
+  run("réducteur : sous la limite, rien de noté", false, rules.reduce(game, { type: "draw" }).events.some((event) => event.type === "chainInterrupted"));
 
   // L'ordre fixe des écouteurs : base gauche, base droite, pointe, puis la main.
   const listening = {
