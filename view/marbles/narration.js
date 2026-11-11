@@ -304,9 +304,10 @@ const PLACEMENT_LINES = MARBLE_TRIGGERS.filter((trigger) => trigger.forecast.lin
 // puis, sur un emplacement occupé, Éjection et Tic (ceux-là disent « aucun effet »
 // si la Chiquenaude vide l'emplacement) ; le menu garde la même structure. Enfin, si
 // la pose et la résolution régénéreraient le sac, une ligne par régénération, chacune
-// suivie d'une ligne par Trouvaille qu'elle déclencherait (regenerationLines) ; et
-// « Éveils possibles. » si la prévision est incertaine (uncertainLines). La pose doit
-// être permise (placeRefusal).
+// suivie d'une ligne par Trouvaille qu'elle déclencherait (regenerationLines) ;
+// « Éveils possibles. » si la prévision est incertaine (uncertainLines) ; enfin, juste
+// avant « Annuler », toujours, les réactions du pot que la pose provoquerait
+// (potReactionLine). La pose doit être permise (placeRefusal).
 export function placementLines(game, handIndex, slot, rules, t) {
   const { marble } = game.hand[handIndex];
   const predicted = rules.forecast(game, { type: "place", handIndex, slot });
@@ -324,7 +325,7 @@ export function placementLines(game, handIndex, slot, rules, t) {
       params: { marble: nameRef(`marble.${concerned[trigger.forecast.marble]}.name`), effect: describeOutcome(predicted[trigger.id], t) },
     });
   }
-  return [...lines, ...regenerationLines(predicted, t), ...uncertainLines(predicted)];
+  return [...lines, ...regenerationLines(predicted, t), ...uncertainLines(predicted), potReactionLine(predicted, t)];
 }
 
 // Le sac : combien il en reste, et combien on en pioche à chaque tour.
@@ -426,16 +427,32 @@ function regenerationLines(predicted, t) {
   ]);
 }
 
-// Ce que la prévision ignore, à la fin de ce qu'elle dit : « Éveils possibles. »
-// quand un Éveil est possible (core/marbles-forecast.js, `awakenPossible` : une bille
-// piochée, et une bille qui pouvait l'être a un Éveil). Rien sinon.
+// Ce que la prévision ignore ou ne mène pas à terme, à la fin de ce qu'elle dit :
+// « Éveils possibles. » quand un Éveil est possible (core/marbles-forecast.js,
+// `awakenPossible` : une bille piochée, et une bille qui pouvait l'être a un Éveil) ;
+// « Enchaînement interrompu. » si la limite de sécurité arrêterait la chaîne
+// (`interrupted`, une anomalie). Rien sinon.
 function uncertainLines(predicted) {
-  return predicted.awakenPossible ? [{ key: "marbles.forecast.awakenings" }] : [];
+  return [
+    ...(predicted.awakenPossible ? [{ key: "marbles.forecast.awakenings" }] : []),
+    ...(predicted.interrupted ? [{ key: "marbles.forecast.interrupted" }] : []),
+  ];
 }
 
-// Les billes du pot qui ont un effet à chaque résolution, après les trois
-// emplacements, dans l'ordre d'arrivée : « Pot, agate : Masse +1. ». Aucune ligne pour
-// les autres.
+// La ligne du pot d'une confirmation : les réactions des billes du pot que la pose
+// provoquerait (core/marbles-forecast.js, `potReactions`), par bille dans l'ordre
+// d'arrivée, « Pot : tigrée, Vitesse +2 ; grès, Masse +1 », ou « Pot : aucun
+// effet ». Toujours présente, le menu garde sa structure.
+function potReactionLine(predicted, t) {
+  const parts = predicted.potReactions.map((effect) => t("marbles.place.pot_marble", { marble: nameRef(`marble.${effect.marble}.name`), effect: effectSummary(effect, t) }));
+  const reactions = parts.length === 0 ? t("marbles.effect.none") : parts.reduce((first, rest) => t("marbles.place.pot_more", { first, rest }));
+  return { key: "marbles.place.pot", params: { reactions } };
+}
+
+// Les billes du pot qui joueraient quelque chose pendant la résolution (leur effet à
+// chaque résolution et leurs réactions, regroupés : `potEffects`), après les trois
+// emplacements, dans l'ordre d'arrivée : « Pot, agate : Masse +1. ». Aucune ligne
+// pour les autres.
 const POT_FORECAST_TEMPLATE = MARBLE_POCKET.moments.find((moment) => moment.texts.forecast !== undefined)?.texts.forecast;
 
 function potLines(predicted, t) {
@@ -536,8 +553,12 @@ const EVENT_TEXTS = {
   // l'aveugle n'apparaît que dans la prévision, qui ne passe jamais par ici.
   pocketed: (event, t) => t("marbles.event.pocketed", { marble: nameRef(`marble.${event.marble}.name`) }),
   lost: (event, t) => t("marbles.event.lost", { marble: nameRef(`marble.${event.marble}.name`) }),
-  // L'étape du pot se dit par l'effet de la bille, si elle en a un.
+  // L'étape du pot et une réaction se disent par l'effet de la bille, si elle en a
+  // un (« Pot, tigrée : Vitesse +2. »).
   potResolution: SILENT,
+  pocketReaction: SILENT,
+  // La limite de sécurité a arrêté la chaîne : une anomalie, qui se dit.
+  chainInterrupted: (event, t) => t("marbles.event.chain_interrupted"),
   discarded: (event, t) => t(`marbles.event.discarded.${event.cause}`, { marble: nameRef(`marble.${event.marble}.name`) }),
   placed: (event, t) => t("marbles.event.placed", { marble: marbleName(event.marble, t), slot: slotName(event.slot, t) }),
   phaseSkipped: (event, t) => outcomeLine(event.slot, null, t),

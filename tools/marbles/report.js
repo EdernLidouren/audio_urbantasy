@@ -109,6 +109,7 @@ export function observations(summary, name) {
     found.push(`Plus faibles : ${withGap.slice(-3).reverse().map((marble) => `${marbleLabel(marble.id, name)} ${n(marble.gap, { signed: true })}`).join(", ")}.`);
   }
   if (summary.refusals > 0) found.push(`Le joueur a tenté ${summary.refusals} action(s) refusée(s) : une faute du joueur automatique.`);
+  if (summary.interruptions > 0) found.push(`ANOMALIE : ${summary.interruptions} enchaînement(s) interrompu(s) par la limite de sécurité du bus, une boucle de billes.`);
   return found;
 }
 
@@ -155,5 +156,6 @@ export function buildReport({ params, summary, name }) {
     ...observations(summary, name).map((text) => `- ${text}`),
     "",
     `Actions refusées : ${summary.refusals}.`,
+    `Enchaînements interrompus : ${summary.interruptions}.`,
   ];
 }

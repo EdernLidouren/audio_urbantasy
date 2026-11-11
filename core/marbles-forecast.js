@@ -23,7 +23,8 @@
 //
 // Résultat : { ok: false, error } si l'action serait refusée (mêmes codes que le
 // réducteur), sinon { ok: true, error: null, flick, knockout, hit, phases, speed,
-// mass, impact, drawn, regenerations, potEffects, tally, uncertain, awakenPossible }, où :
+// mass, impact, drawn, regenerations, potEffects, potReactions, interrupted, tally,
+// uncertain, awakenPossible }, où :
 //   flick, knockout, hit  l'effet de l'action envisagée (null : pas de tel effet),
 //                  une clé par déclencheur prévu pendant une pose (forecast.line
 //                  "placement" de MARBLE_TRIGGERS). Une Chiquenaude qui vide
@@ -52,9 +53,15 @@
 //                  pourrait l'être en a un (le sac ; avec une régénération en
 //                  chemin, aussi la défausse et ce qui y part pendant l'action et la
 //                  résolution).
-//   potEffects     les effets En poche à chaque résolution des billes du pot, dans
-//                  l'ordre d'arrivée (celles empochées pendant la résolution
-//                  comprises), chacun un effet ; [] sinon ;
+//   potEffects     ce que chaque bille du pot produirait PENDANT LA RÉSOLUTION, son
+//                  effet à chaque résolution et ses réactions (En poche, à chaque
+//                  (occurrence)) regroupés en un effet (valeurs additionnées, actions
+//                  et résultats à la suite), dans l'ordre d'arrivée (celles empochées
+//                  pendant la résolution comprises) ; une bille qui ne joue rien n'y
+//                  est pas ; [] sinon ;
+//   potReactions   de même, les réactions du pot PENDANT L'ACTION envisagée (la pose) ;
+//   interrupted    vrai si la limite de sécurité du bus arrêterait la chaîne
+//                  (chainInterrupted) : une anomalie, que R et la confirmation disent ;
 //   awakenPossible vrai si un Éveil est possible (voir plus haut) ; une des
 //                  raisons d'`uncertain`.
 // Un effet : { marble, speed, mass, draw, operations, given, pockets?, empty? }, le
@@ -82,10 +89,11 @@ const REGENERATION_TRIGGERS = triggerIds("regeneration");
 
 const FORECASTABLE_ACTIONS = ["place", "swap"];
 
-// Les effets En poche joués à l'entrée au pot (leur évènement est la mise en poche)
-// et ceux joués à chaque résolution (l'étape du pot).
+// Les effets En poche joués à l'entrée au pot (leur évènement est la mise en poche),
+// dits chez l'effet qui empoche ; les autres (à chaque résolution, les réactions)
+// se regroupent par bille du pot (`potIndex` de l'effet).
 const ENTRY_TRIGGERS = new Set(MARBLE_POCKET.moments.filter((moment) => moment.event === "pocketed").map((moment) => moment.trigger));
-const POT_TRIGGERS = new Set(MARBLE_POCKET.moments.filter((moment) => moment.event === "potResolution").map((moment) => moment.trigger));
+const POT_TRIGGERS = new Set(MARBLE_POCKET.moments.filter((moment) => moment.event !== "pocketed").map((moment) => moment.trigger));
 
 // Les déclencheurs de la bille piochée (l'Éveil), qui ne se prévoient jamais.
 const DRAWN_TRIGGERS = MARBLE_TRIGGERS.filter((trigger) => trigger.marble === "drawn");
@@ -157,6 +165,28 @@ function outcomeReader(events) {
   return outcomeOf;
 }
 
+// Plusieurs effets prévus d'une même bille en un : valeurs additionnées, actions,
+// dons et résultats (mises en poche, cibles vides) à la suite, dans l'ordre.
+function combinedOutcome(outcomes) {
+  const all = (key) => outcomes.flatMap((outcome) => outcome[key] ?? []);
+  const sum = (key) => outcomes.reduce((total, outcome) => total + outcome[key], 0);
+  const combined = { marble: outcomes[0].marble, speed: sum("speed"), mass: sum("mass"), draw: sum("draw"), operations: all("operations"), given: all("given") };
+  if (all("pockets").length > 0) combined.pockets = all("pockets");
+  if (all("empty").length > 0) combined.empty = all("empty");
+  return combined;
+}
+
+// Ce que chaque bille du pot joue dans ces évènements (sauf ses entrées), regroupé
+// par place d'arrivée, dans cet ordre.
+function potOutcomes(events, outcomeOf) {
+  const byPlace = new Map();
+  for (const event of events) {
+    if (event.type !== "effect" || !POT_TRIGGERS.has(event.trigger)) continue;
+    byPlace.set(event.potIndex, [...(byPlace.get(event.potIndex) ?? []), outcomeOf(event)]);
+  }
+  return [...byPlace.entries()].sort(([a], [b]) => a - b).map(([, outcomes]) => combinedOutcome(outcomes));
+}
+
 // Les régénérations d'un journal, chacune avec les effets prévus qu'elle déclenche :
 // une Trouvaille se règle juste après sa régénération (core/marbles.js/
 // regenerateBag), avant toute autre : elle appartient à la dernière émise.
@@ -214,7 +244,9 @@ export function readForecast(actionEvents, resolutionEvents, finalState) {
       ])
     ),
     regenerations: regenerationsOf(all, outcomeOf),
-    potEffects: resolutionEvents.filter((event) => event.type === "effect" && POT_TRIGGERS.has(event.trigger)).map(outcomeOf),
+    potEffects: potOutcomes(resolutionEvents, outcomeOf),
+    potReactions: potOutcomes(actionEvents, outcomeOf),
+    interrupted: all.some((event) => event.type === "chainInterrupted"),
     speed,
     mass,
     impact,

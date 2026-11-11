@@ -113,6 +113,7 @@ export default function checkMarbles(run) {
   checkAwaken(run);
   checkKeywordDeclarations(run);
   checkPocket(run);
+  checkPocketReactions(run);
   checkBonus(run);
   checkResolution(run);
   checkEndOfGame(run);
@@ -563,6 +564,143 @@ function checkPocket(run) {
   run("validation : En poche n'est pas une liste", true, refused({ a: { pocketed: [{ action: "speed", amount: 1 }] } }));
   run("validation : les moments déclarés sont valides", false, throws(() => validatePocketMoments(MARBLE_POCKET)));
   run("validation : un moment sans texte de fiche refusé", true, throws(() => validatePocketMoments({ ...MARBLE_POCKET, moments: [{ ...MARBLE_POCKET.moments[0], texts: { effect: "x" } }] })));
+}
+
+// EN POCHE, À CHAQUE (OCCURRENCE) : les réactions du pot aux valeurs de partie
+// écoutables. Tables fabriquées, pour isoler chaque règle.
+function checkPocketReactions(run) {
+  const reactions = (events) =>
+    events.filter((event) => event.type === "effect" && event.trigger === "pocketReaction").map((event) => `${event.potIndex}:${event.marble}`);
+  const effects = (events) => events.filter((event) => event.type === "effect").map((event) => `${event.trigger}:${event.marble}`);
+  const table = {
+    plain: { apex: [{ action: "speed", amount: 1 }] },
+    flicker: { flick: [{ action: "speed", amount: 1 }] },
+    polisher: { flick: [{ action: "polish", amount: 1, target: "apex" }] },
+    drawer: { flick: [{ action: "draw", amount: 3 }] },
+    pocketer: { flick: [{ action: "pocket", target: "firstInHand" }] },
+    onThrown: { pocketed: { thrownMarbles: [{ action: "speed", amount: 1 }] } },
+    onFlick: { pocketed: { flick: [{ action: "speed", amount: 2 }] } },
+    onFlickToo: { pocketed: { flick: [{ action: "mass", amount: 1 }] } },
+    onPolish: { pocketed: { polish: [{ action: "mass", amount: 1 }] } },
+    onDrawn: { pocketed: { drawnMarbles: [{ action: "speed", amount: 1 }] } },
+    onExit: { pocketed: { ejectedMarbles: [{ action: "speed", amount: 1 }], triangleExits: [{ action: "mass", amount: 1 }] } },
+    onPocketed: { pocketed: { pocketedMarbles: [{ action: "speed", amount: 5 }] } },
+    onApex: { pocketed: { apex: [{ action: "speed", amount: 2, target: "leftBase" }] } },
+  };
+  const made = fabricatedRules(table);
+  const place = (state, slot = "apex") => apply(state, { type: "place", handIndex: 0, slot }, made);
+
+  // Les trois catégories : un évènement réel (toute bille lancée), un mot-clé (une
+  // Chiquenaude, chez une bille qui en a une), une action (un Polissage).
+  run.same("réaction, évènement réel : toute bille lancée", ["0:onThrown"], reactions(place(playState({ hand: inHand(["plain"]), pot: ["onThrown"] })).events));
+  run.same("réaction, mot-clé : une Chiquenaude", ["0:onFlick"], reactions(place(playState({ hand: inHand(["flicker"]), pot: ["onFlick"] })).events));
+  run.same("réaction, mot-clé : une bille sans Chiquenaude n'en déclenche pas", [], reactions(place(playState({ hand: inHand(["plain"]), pot: ["onFlick"] })).events));
+  run.same(
+    "réaction, action : un Polissage",
+    ["0:onPolish"],
+    reactions(place(playState({ hand: inHand(["polisher"]), pot: ["onPolish"], triangle: triangleOf(placed("plain"), null, placed("plain", 1)) }), "leftBase").events)
+  );
+  const flicked = place(playState({ hand: inHand(["flicker"]), pot: ["onFlick"] }));
+  run("réaction : Vitesse aux compteurs du tour (1 + 2)", 3, flicked.state.speed);
+  run("réaction : le pot inchangé", "onFlick", flicked.state.pot.join());
+
+  // Une réaction par incrément : trois billes piochées, trois réactions ; un
+  // évènement qui augmente deux compteurs écoutés (une éjection est aussi une
+  // sortie du triangle) : deux.
+  const drawing = place(playState({ hand: inHand(["drawer"]), bag: ["plain", "plain", "plain"], pot: ["onDrawn"] }));
+  run.same("réaction : une par incrément (trois billes piochées)", ["0:onDrawn", "0:onDrawn", "0:onDrawn"], reactions(drawing.events));
+  const ejecting = place(playState({ hand: inHand(["plain"]), pot: ["onExit"], triangle: triangleOf(null, null, placed("plain")) }));
+  run.same("réaction : un évènement, deux compteurs écoutés, deux réactions", ["0:onExit", "0:onExit"], reactions(ejecting.events));
+  run("réaction : Vitesse +1 et Masse +1", "1/2", `${ejecting.state.speed}/${ejecting.state.mass}`);
+
+  // L'ordre : l'effet de la bille concernée, puis les billes du pot dans l'ordre
+  // d'arrivée ; par la file, avant la suite de l'action (la pose).
+  const ordered = place(playState({ hand: inHand(["flicker"]), pot: ["onFlickToo", "onThrown", "onFlick"] }));
+  run.same(
+    "réaction, ordre : l'effet de la bille, puis le pot dans l'ordre d'arrivée",
+    ["flick:flicker", "pocketReaction:onFlickToo", "pocketReaction:onThrown", "pocketReaction:onFlick"],
+    effects(ordered.events)
+  );
+  // Les trois réactions entrent dans la file d'un bloc, après l'effet de la bille ;
+  // leurs effets suivent, dans le même ordre, tous avant la pose.
+  run.same(
+    "réaction, ordre : la réaction suit son évènement, avant la pose",
+    ["flick", "effect", "pocketReaction", "pocketReaction", "pocketReaction", "effect", "effect", "effect", "placed"],
+    eventTypes(ordered.events)
+  );
+  run.same(
+    "réaction : l'évènement nomme la bille, sa place et le compteur",
+    { type: "pocketReaction", index: 2, marble: "onFlick", counter: "flick" },
+    ordered.events.find((event) => event.type === "pocketReaction" && event.marble === "onFlick")
+  );
+
+  // La bille qui entre ne réagit pas à sa propre mise en poche ; elle réagit aux
+  // suivantes.
+  const entering = place(playState({ hand: inHand(["pocketer", "onPocketed"]), pot: ["onPocketed"] }));
+  run.same("réaction : la bille entrante ne réagit pas à sa propre mise en poche", ["0:onPocketed"], reactions(entering.events));
+  const next = place({ ...entering.state, hand: inHand(["pocketer", "plain"]), throwsUsed: 0 });
+  run.same("réaction : elle réagit à la suivante", ["0:onPocketed", "1:onPocketed"], reactions(next.events));
+
+  // Règle des cibles : un bonus ciblé sur une phase passée est perdu, noté.
+  const late = apply(playState({ pot: ["onApex"], triangle: triangleOf(placed("plain"), null, placed("plain")) }), { type: "resolve" }, made);
+  const lateEffect = late.events.find((event) => event.type === "effect" && event.trigger === "pocketReaction");
+  run.same("réaction, cible : le bonus d'une phase passée, perdu et noté", [{ slot: "leftBase", reason: "phasePassed", speed: 2, mass: 0 }], lateEffect.lost);
+
+  // Les réactions comptent aux valeurs de partie, sans être écoutables.
+  run("réaction : comptée (pocketReaction)", 3, drawing.state.tally.pocketReaction.turn);
+
+  // Validation : une clé écoutable passe ; une quantité réelle, Vitesse et Masse,
+  // les réactions elles-mêmes et l'inconnu sont refusés.
+  const valid = (pocketed) => !throws(() => validateTable({ x: { pocketed } }));
+  const speed1 = [{ action: "speed", amount: 1 }];
+  run("validation, réaction : évènement réel accepté", true, valid({ shuffles: speed1 }));
+  run("validation, réaction : mot-clé accepté", true, valid({ final: speed1 }));
+  run("validation, réaction : moment fixe d'En poche accepté", true, valid({ pocketEntry: speed1 }));
+  run("validation, réaction : action acceptée", true, valid({ crack: speed1 }));
+  run("validation, réaction : quantité réelle refusée", false, valid({ polishQuantity: speed1 }));
+  run("validation, réaction : gains de Vitesse refusés", false, valid({ speedGains: speed1 }));
+  run("validation, réaction : total de Masse refusé", false, valid({ massGained: speed1 }));
+  run("validation, réaction : réagir aux réactions refusé", false, valid({ pocketReaction: speed1 }));
+  run("validation, réaction : clé inconnue refusée", false, valid({ nope: speed1 }));
+  run("validation, réaction : sur elle-même refusé", false, valid({ flick: [{ action: "polish", amount: 1 }] }));
+  run("validation, réaction : une action ciblée acceptée", true, valid({ flick: [{ action: "polish", amount: 1, target: "apex" }] }));
+  run("validation, réaction : le message dit pourquoi", true, /ne s'écoute pas/.test(caughtMessage(() => validateTable({ x: { pocketed: { drawQuantity: speed1 } } }))));
+
+  // Boucle directe : réagir au déclenchement d'une action qu'on produit, refusé.
+  run("validation, boucle directe : à chaque polissage, Polissage 1, refusé", false, valid({ polish: [{ action: "polish", amount: 1, target: "apex" }] }));
+  run("validation, boucle directe : à chaque pioche, Pioche 1, refusé", false, valid({ draw: [{ action: "draw", amount: 1 }] }));
+  run("validation, boucle directe : le message dit la boucle", true, /boucle/.test(caughtMessage(() => validateTable({ x: { pocketed: { crack: [{ action: "crack", amount: 1, target: "apex" }] } } }))));
+  run("validation : réagir à une autre action que la sienne, accepté", true, valid({ polish: [{ action: "crack", amount: 1, target: "apex" }] }));
+
+  // Boucle indirecte : deux billes du pot qui se répondent (Fêlure, Polissage), sur
+  // une bille qui ne s'use jamais assez. La limite du bus arrête la chaîne, l'action
+  // aboutit, le journal le note : une anomalie, que la fumée guette.
+  const looping = fabricatedRules({
+    ...table,
+    sturdy: { maxWear: 100 },
+    cracker: { pocketed: { polish: [{ action: "crack", amount: 1, target: "apex" }] } },
+    healer: { pocketed: { crack: [{ action: "polish", amount: 1, target: "apex" }] } },
+  });
+  const loop = looping.reduce(playState({ hand: inHand(["polisher", "plain"]), pot: ["cracker", "healer"], triangle: triangleOf(null, null, placed("sturdy", 50)) }), {
+    type: "place",
+    handIndex: 0,
+    slot: "leftBase",
+  });
+  run("boucle indirecte : l'action aboutit", true, loop.ok);
+  run("boucle indirecte : la chaîne interrompue, notée une fois", 1, loop.events.filter((event) => event.type === "chainInterrupted").length);
+  run("boucle indirecte : la pose va à son terme", "polisher", loop.state.triangle.leftBase?.marble);
+  run("boucle indirecte : plus rien n'est joué après l'arrêt", false, loop.events.slice(loop.events.findIndex((event) => event.type === "chainInterrupted")).some((event) => event.type === "effect"));
+  const resolved = looping.reduce(loop.state, { type: "resolve" });
+  run("boucle indirecte : la partie continue", true, resolved.ok);
+}
+
+function caughtMessage(fn) {
+  try {
+    fn();
+  } catch (error) {
+    return error.message;
+  }
+  return "";
 }
 
 function checkSwap(run) {
@@ -1769,7 +1907,7 @@ function checkWindfall(run) {
     playState({ hand: inHand(["dropper"]), bag: [], discard: ["looper"], triangle: triangleOf(placed("looper"), placed("looper"), placed("looper")) }),
     { type: "place", handIndex: 0, slot: "apex" }
   );
-  run("trouvaille, boucle : l'action aboutit ou est refusée, jamais de gel", true, bounded.ok || bounded.error === "eventLimit");
+  run("trouvaille, boucle : l'action aboutit, jamais de gel ni de refus", true, bounded.ok);
 
   // Validation : une Vitesse ciblée et une action sur elle-même sont permises ; pas
   // de comparaison de calibre (aucun remplacement en cours).
@@ -1994,9 +2132,11 @@ function checkSmoke(run) {
   run.same("fumée : invariants tenus", [], faults.slice(0, 5));
   run(
     "fumée : tous les évènements rencontrés",
-    "awaken,bagRegenerated,cracked,discarded,draw,drawSkipped,effect,final,flick,gameOver,hit,impact,knockout,lost,phase,phaseSkipped,placed,pocketed,polished,potResolution,removed,rotation,swapped,targetEmpty,turnEnded,turnStarted,wear,windfall",
+    "awaken,bagRegenerated,cracked,discarded,draw,drawSkipped,effect,final,flick,gameOver,hit,impact,knockout,lost,phase,phaseSkipped,placed,pocketReaction,pocketed,polished,potResolution,removed,rotation,swapped,targetEmpty,turnEnded,turnStarted,wear,windfall",
     [...seen].sort().join()
   );
+  // La limite de sécurité atteinte dans une vraie partie : une anomalie.
+  run("fumée : aucun enchaînement interrompu (anomalie)", false, seen.has("chainInterrupted"));
 }
 
 // legalActions : une lecture pure, qui dit exactement ce que le réducteur

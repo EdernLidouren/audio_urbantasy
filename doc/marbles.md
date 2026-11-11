@@ -155,20 +155,62 @@ dans `config/marbles-values.js`/`MARBLE_POCKET` :
 ```js
 pocketed: { entry: [speed(10)] },          // la porcelaine
 pocketed: { resolution: [mass(1)] },       // l'agate
+pocketed: { flick: [speed(2)] },           // la tigrée, à chaque chiquenaude
+pocketed: { shuffles: [polish(1, "apex")] }, // le mica, à chaque mélange
 ```
 
 | Moment | Effet (`trigger`) | Évènement | Joue |
 |---|---|---|---|
 | `entry`, à l'entrée | `pocketEntry` | `pocketed` | quand la bille entre effectivement au pot, juste après son arrivée (jamais si elle est perdue) |
 | `resolution`, à chaque résolution | `pocketResolution` | `potResolution` | une fois par tour, après les trois phases et avant les retraits, chaque bille du pot dans l'ordre d'arrivée (une bille empochée plus tôt dans la résolution comprise) |
+| à chaque (occurrence), le moment réactif (`reactive: true`) | `pocketReaction` | `pocketReaction` `{ index, marble, counter }` | une fois par incrément du compteur écouté, à tout moment (voir plus bas) |
 
 Chaque moment déclare son id, son effet, son évènement, son moment pour la règle des cibles
-(`anytime` à l'entrée, `afterPhases` à chaque résolution : une Vitesse ou une Masse ciblée y
-est refusée, les phases étant passées ; Polissage, Fêlure, Empocher et Pioche ciblés passent)
-et ses textes (fiche, journal, R). Aucune action sur la bille elle-même dans le pot. Vitesse
-et Masse vont aux compteurs du tour. **Ajouter un moment** (une réaction à un évènement
-global) : une entrée dans `moments`, ses textes, et l'émission de son évènement dans
-`core/marbles.js` ; ses valeurs de partie, sa ligne de fiche et ses écouteurs suivent.
+(`anytime` à l'entrée et en réaction, `afterPhases` à chaque résolution : une Vitesse ou une
+Masse ciblée y est refusée, les phases étant passées ; Polissage, Fêlure, Empocher et Pioche
+ciblés passent ; en réaction, un bonus ciblé dont la phase est passée est perdu, noté au
+journal) et ses textes (fiche, journal, R). Aucune action sur la bille elle-même dans le
+pot. Vitesse et Masse vont aux compteurs du tour en cours. **Ajouter un moment fixe** : une
+entrée dans `moments`, ses textes, et l'émission de son évènement dans `core/marbles.js` ;
+ses valeurs de partie, sa ligne de fiche et ses écouteurs suivent.
+
+**Les réactions (En poche, à chaque (occurrence))**, à la manière des reliques d'autres
+jeux. Les clés du moment réactif dans le champ ne sont pas un id fixe mais les
+**occurrences écoutables** : les valeurs de partie écoutables (voir « Valeurs de partie »),
+sans autre liste à tenir (`core/marbles.js`/`REACTION_KEYS`) :
+
+- les évènements réels : `thrownMarbles`, `hitMarbles`, `ejectedMarbles`, `shuffles`,
+  `drawnMarbles`, `wornMarbles`, `triangleExits`, `pocketedMarbles`, `lostMarbles` ;
+- les déclenchements de mots-clés : `apex`, `base`, `leftBase`, `rightBase`, `awaken`,
+  `flick`, `hit`, `windfall`, `knockout`, `final`, et les moments fixes d'En poche
+  `pocketEntry`, `pocketResolution` ;
+- les déclenchements d'actions : `draw`, `polish`, `crack`, `pocket`.
+
+Ne s'écoutent pas, refusés au chargement avec leur raison : les quantités réelles
+(`<action>Quantity`), Vitesse et Masse (`speedGains`…), qui comptent des points plutôt
+que des occurrences, et les réactions elles-mêmes (`pocketReaction`), qui se répondraient
+sans fin. Un compteur ajouté d'une catégorie écoutable devient écoutable par construction.
+Attention aux deux sens d'un même mot : `flick`, la Chiquenaude, ne compte que chez une
+bille qui en a une ; « à chaque bille lancée » est `thrownMarbles`.
+
+- **Une réaction par incrément** du compteur écouté : trois billes piochées, trois
+  réactions ; un évènement qui augmente deux compteurs écoutés (une éjection est aussi une
+  sortie du triangle), une réaction pour chacun.
+- **Ordre** : l'évènement est émis, les compteurs augmentent (`record`, à l'émission), la
+  bille concernée joue son propre effet, puis les billes du pot qui écoutent réagissent,
+  dans l'ordre d'arrivée (pour une même bille, dans l'ordre des valeurs de partie). Les
+  réactions passent par la file du bus, sans récursion : relevées à l'émission
+  (`pocketReactionsOf`), émises après le traitement de l'évènement (`handleEvent`). Le
+  pot lu est celui de l'émission : une bille entrée plus tard ne réagit pas à ce qui l'a
+  précédée.
+- **La bille qui entre au pot ne réagit pas à sa propre mise en poche** (elle a pour cela
+  son moment « à l'entrée ») ; elle réagit aux occurrences suivantes.
+- **Boucles** : réagir au déclenchement d'une action qu'on produit soi-même (« à chaque
+  polissage : Polissage 1 ») est refusé au chargement. Une boucle indirecte (deux billes du
+  pot, l'une qui fêle à chaque polissage, l'autre qui polit à chaque fêlure) s'arrête à la
+  limite de sécurité du bus (voir « Le bus d'évènements ») : la chaîne s'arrête proprement,
+  le journal le note (`chainInterrupted`), « Enchaînement interrompu. » se dit. Dans les
+  vérifications et le simulateur, c'est une anomalie.
 
 ### Déroulé d'une pose
 
@@ -525,10 +567,18 @@ pose sur une bille sans Éjection donne +1 bille éjectée, +0 éjection ; un m�
 
 | Catégorie | Compteurs (id) | Source | Compte |
 |---|---|---|---|
-| Déclenchements | `awaken`, `flick`, `hit`, `windfall`, `knockout`, `final`, `apex`, `base`, `leftBase`, `rightBase`, `pocketEntry`, `pocketResolution` | générés : un par déclencheur de `MARBLE_TRIGGERS`, un par mot-clé de phase (`core/marbles.js`/`PHASE_KEYWORDS`, tirés de `MARBLE_PHASES`), un par moment En poche (`MARBLE_POCKET`) | +1, par bille, quand le mot-clé se déclenche chez une bille qui a un effet pour ce moment : son champ n'est pas vide (pour une base : l'effet de base, ou sa variante de l'emplacement), ou elle a reçu un effet extérieur pour ce moment (un bonus ciblé sur sa phase). Un effet à condition fausse compte ; une phase sautée (emplacement vide, bille retirée avant) ne compte pas. `base` = `leftBase` + `rightBase` |
+| Déclenchements | `awaken`, `flick`, `hit`, `windfall`, `knockout`, `final`, `apex`, `base`, `leftBase`, `rightBase`, `pocketEntry`, `pocketResolution`, `pocketReaction` | générés : un par déclencheur de `MARBLE_TRIGGERS`, un par mot-clé de phase (`core/marbles.js`/`PHASE_KEYWORDS`, tirés de `MARBLE_PHASES`), un par moment En poche (`MARBLE_POCKET`) | +1, par bille, quand le mot-clé se déclenche chez une bille qui a un effet pour ce moment : son champ n'est pas vide (pour une base : l'effet de base, ou sa variante de l'emplacement), ou elle a reçu un effet extérieur pour ce moment (un bonus ciblé sur sa phase). Un effet à condition fausse compte ; une phase sautée (emplacement vide, bille retirée avant) ne compte pas. `base` = `leftBase` + `rightBase` |
 | Actions | `draw`, `drawQuantity`, `polish`, `polishQuantity`, `crack`, `crackQuantity`, `pocket`, `pocketQuantity` | générés depuis les actions de `CLAUSE_ACTIONS` qui déclarent `keyword` | les déclencheurs : un par application (une Pioche par effet joué qui pioche ; un Polissage, une Fêlure ou un Empocher par application, cible vide comprise) ; la quantité réelle : billes réellement piochées par une Pioche (`draw` de cause `"effect"`), usure réellement rendue ou ajoutée (`applied` de `polished`, `cracked`), billes réellement déplacées par Empocher (`pocketed` ou `lost`) |
 | Vitesse et Masse | `speedGains`, `speedGained`, `speedLosses`, `speedLost`, et les mêmes pour `mass` | générés depuis les actions de valeur sans `keyword` | dans chaque effet joué (`effect`), la valeur réellement appliquée aux compteurs du tour (bonus reçu compris ; un bonus perdu n'est jamais appliqué), avant les planchers de l'Impact : une occurrence de gain ou de perte par effet, et le total en valeur absolue |
 | Évènements | `thrownMarbles`, `hitMarbles`, `ejectedMarbles`, `shuffles`, `drawnMarbles`, `wornMarbles`, `triangleExits`, `pocketedMarbles`, `lostMarbles` | déclarés : `config/marbles-values.js`/`MARBLE_TALLIES` | billes lancées (`flick`), tiquées (`hit` : posées sur un emplacement occupé), éjectées (`removed`, cause `"replacement"`), mélanges (`bagRegenerated`), billes piochées (`draw`, toutes causes), usées (`removed`, cause `"wear"`), sorties du triangle (`removed`, toutes causes : aujourd'hui, usées + éjectées + mises en poche depuis le triangle), mises en poche (`pocketed`), perdues (`lost`) |
+
+**Écoutables** (`listenable`) : les compteurs auxquels une bille du pot peut réagir (voir
+« Le pot ») : tous les évènements réels, tous les déclenchements de mots-clés et d'actions,
+sauf `pocketReaction`. **Les réactions comptent ensemble** : un seul compteur,
+`pocketReaction`, +1 par réaction jouée, quelle que soit l'occurrence écoutée. Un compteur
+par occurrence doublerait la liste (vingt-cinq de plus) pour une question que les
+compteurs écoutés disent déjà ; les réactions d'une bille se lisent dans le simulateur
+(« en réaction au pot »). Il n'est pas écoutable.
 
 Un évènement réel se déclare ainsi :
 
@@ -577,9 +627,13 @@ dans le réducteur, et rien d'extérieur ne s'y abonne.
 - **Le journal s'écrit à l'émission**, dans l'ordre où l'état change : la file étant premier
   entré, premier sorti, c'est l'ordre de traitement, sauf pour une interruption, réglée
   avant ce qui attendait mais émise après. Les valeurs de partie aussi (voir plus haut).
-- **Limite de sécurité** : `MAX_EVENTS_PER_ACTION`. Au-delà, le bus lève
-  `MarbleEventLimitError` et le réducteur refuse l'action (`eventLimit`), l'état reçu
-  n'ayant jamais été touché.
+- **Limite de sécurité** : `MAX_EVENTS_PER_ACTION`. Atteinte, la chaîne s'arrête
+  proprement : les files en attente sont vidées, le journal le note (`chainInterrupted`)
+  et plus rien n'est traité jusqu'à la fin de l'action, qui va pourtant à son terme (une
+  pose se pose, une résolution finit son tour et tourne). Rien n'est levé, aucune action
+  n'est refusée. « Enchaînement interrompu. » se dit à sa place, et dans R et la
+  confirmation si la prévision l'atteint (`interrupted`). Une anomalie : la fumée
+  (`marbles`), les vérifications et le simulateur la guettent.
 
 `EVENT_TRIGGERS` dit quels évènements déclenchent un effet : les phases, et les
 déclencheurs de `MARBLE_TRIGGERS` (Éveil, Chiquenaude, Tic, Trouvaille, Éjection, Final). Les autres passent au journal,
@@ -610,8 +664,11 @@ copie porte le registre, qui y évolue comme dans la partie ; le registre réel 
 touché) ; `uncertain`, vrai si une bille inconnue aurait pu réagir selon son
 identité, ses chiffres n'étant alors pas sûrs : aujourd'hui, un Éveil possible.
 
-**Le pot** est déterministe et inclus : `potEffects`, les effets de chaque résolution des
-billes du pot, dans l'ordre d'arrivée ; chaque effet prévu porte, s'il a empoché, `pockets`
+**Le pot** est déterministe et inclus : `potEffects`, ce que chaque bille du pot jouerait
+pendant la résolution, son effet à chaque résolution et ses réactions regroupés en un effet
+(valeurs additionnées, actions et résultats à la suite, par `potIndex`), dans l'ordre
+d'arrivée, une bille qui ne joue rien absente ; `potReactions`, de même pour les réactions
+pendant l'action envisagée (la pose) ; chaque effet prévu porte, s'il a empoché, `pockets`
 (`{ marble, lost, entry }`, la bille déplacée, perdue ou non, et l'effet de son entrée),
 rattaché à l'effet qui l'a produite (le `by` de `pocketed` et `lost`). `cleared` compte
 aussi une bille empochée avant sa phase.
@@ -699,9 +756,13 @@ lisent et ne s'activent pas (Entrée n'y fait rien) :
 6. pour chaque régénération du sac que la pose et la résolution provoqueraient, « Le sac
    sera régénéré. » (« Le sac sera de nouveau régénéré. » pour les suivantes), puis une
    ligne par Trouvaille qu'elle déclencherait (« Trouvaille de tigrée : Vitesse +3. ») ;
-   enfin, si un Éveil est possible, « Éveils possibles. » ;
-7. Annuler (Échap aussi : la sélection d'emplacement reprend) ;
-8. Confirmer.
+   enfin, si un Éveil est possible, « Éveils possibles. », et si la limite de sécurité
+   arrêterait la chaîne, « Enchaînement interrompu. » ;
+7. toujours, les réactions du pot que la pose provoquerait (`potReactions`), par bille
+   dans l'ordre d'arrivée : « Pot : grès, Masse +1 ; tigrée, Vitesse +2 », ou « Pot :
+   aucun effet » ;
+8. Annuler (Échap aussi : la sélection d'emplacement reprend) ;
+9. Confirmer.
 
 Une Chiquenaude qui viderait l'emplacement visé (la plombée sur une argile en pointe) laisse
 les lignes d'Éjection et de Tic à « aucun effet » : elles n'auront pas lieu, et le menu
@@ -725,9 +786,13 @@ Tic : Vitesse +2.           <- Ctrl+bas
 
 Au-dessous, les champs des déclencheurs, facultatifs, dans l'ordre de la vie d'une bille :
 éveil, chiquenaude, tic, trouvaille, éjection, final (« Final : Masse +1. ») ; ils viennent de
-`MARBLE_TRIGGERS`. En dernier, En poche, un champ par moment (`MARBLE_POCKET` ; dans le
-modèle de fiche, `part` désigne le moment) : « En poche, à l'entrée : Vitesse +10. », « En
-poche, à chaque résolution : Masse +1. ». Un montant calculé s'y dit avec sa valeur actuelle (voir « Montants
+`MARBLE_TRIGGERS`. En dernier, En poche, un champ par moment fixe (`MARBLE_POCKET` ; dans
+le modèle de fiche, `part` désigne le moment) : « En poche, à l'entrée : Vitesse +10. »,
+« En poche, à chaque résolution : Masse +1. », puis une ligne par occurrence écoutée, dans
+l'ordre des valeurs de partie (`reactive` dans le modèle, déplié par
+`view/marbles/card.js`) : « En poche, à chaque chiquenaude : Vitesse +2. ». Chaque
+occurrence écoutable a son texte, `marbles.tally.<id>.each` (« à chaque chiquenaude », « à
+chaque bille éjectée », « à chaque phase de pointe »), vérifié dans chaque langue. Un montant calculé s'y dit avec sa valeur actuelle (voir « Montants
 calculés »).
 
 Les champs disent les effets IMPRIMÉS. En butée, le champ se réannonce, sans son ni
@@ -785,9 +850,11 @@ nomme sa bille (« Trouvaille de tigrée : Vitesse +3. »). Chaque régénérati
 avec ses propres Trouvailles, comme dans la séquence, la deuxième « de nouveau » : « Le sac
 sera régénéré. Trouvaille de tigrée : Vitesse +3. Le sac sera de nouveau régénéré.
 Trouvaille de tigrée : Vitesse +3. ». Après les trois emplacements, une ligne par bille du
-pot qui a un effet à chaque résolution, dans l'ordre d'arrivée (« Pot, agate : Masse +1. ») ;
-aucune pour les autres. Le résumé les compte. Si un Éveil est possible, « Éveils possibles. »
-termine l'annonce. Même gabarit que les
+pot qui jouerait quelque chose pendant la résolution, dans l'ordre d'arrivée : son effet à
+chaque résolution et ses réactions, regroupés (« Pot, agate : Masse +1. », « Pot, mica :
+Polissage 1 à la pointe. ») ; aucune pour les autres. Le résumé les compte. Si un Éveil est
+possible, « Éveils possibles. » termine l'annonce ; si la limite de sécurité arrêterait la
+chaîne, « Enchaînement interrompu. ». Même gabarit que les
 phases de la séquence (`outcomeLine`) : la prévision et la résolution se disent pareil.
 
 ### Séquence de résolution (Maj+R)
@@ -805,7 +872,11 @@ chacune :
 2. à 4. chaque phase, dans l'ordre : « Base gauche, argile : Vitesse +1. », « Base
    droite, vide. », avec les règles de la vue d'ensemble, puis une étape par bille du pot
    qui a un effet à chaque résolution (« Pot, agate : Masse +1. »), avec la pause habituelle,
-   avant les retraits ; une mise en poche se dit après l'effet qui la produit (« porcelaine
+   avant les retraits ; une réaction du pot se dit à sa place chronologique, sa propre
+   étape avec la pause habituelle, après l'effet de la bille concernée (« Pot, mica :
+   Polissage 1 à la pointe. », après le mélange et la pioche qui l'ont provoqué), pendant
+   la résolution comme pendant une pose (« Chiquenaude d'argile : … », puis « Pot, tigrée :
+   Vitesse +2. »), et entre dans l'historique ; une mise en poche se dit après l'effet qui la produit (« porcelaine
    est mise en poche. », « Entrée au pot de porcelaine : Vitesse +10. Vitesse 10, Masse 1. »,
    ou « Le pot est plein : porcelaine est perdue. ») ; une phase qui pioche est suivie
    de sa pioche (« Base gauche, mica : Pioche 1. », « Vous piochez agate. ») ; un

@@ -9,6 +9,8 @@ export default {
   awaken: [speed(2)],
   windfall: [speed(3)],
   final: [mass(1)],
+  // En poche, à chaque chiquenaude (le mot-clé, chez une bille qui en a une).
+  pocketed: { flick: [speed(2)] },
   maxWear: 4,
   size: MEDIUM,
 };

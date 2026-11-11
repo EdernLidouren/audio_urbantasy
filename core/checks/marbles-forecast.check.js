@@ -43,6 +43,7 @@ export default function checkMarblesForecast(run) {
   checkTallyForecast(run);
   checkAwakenForecast(run);
   checkPocketForecast(run);
+  checkReactionForecast(run);
   checkGuards(run);
   checkMatchesReality(run);
 }
@@ -295,6 +296,66 @@ function checkPocketForecast(run) {
   run.same("pot prévu : ni son pot", [], frozen.pot);
 }
 
+// Les réactions du pot dans la prévision : déterministes et incluses, celles de la
+// pose à part (`potReactions`), celles de la résolution regroupées par bille avec
+// son effet de résolution (`potEffects`) ; égales au réel.
+function checkReactionForecast(run) {
+  const matches = (marbles, state, action) => {
+    const real = action === null ? { state, events: [] } : marbles.reduce(state, action);
+    const resolved = marbles.reduce(real.state, { type: "resolve" });
+    const { uncertain, awakenPossible, ...predicted } = marbles.forecast(state, action);
+    return JSON.stringify(predicted) === JSON.stringify(readForecast(real.events, resolved.events, resolved.state));
+  };
+  const toApex = { type: "place", handIndex: 0, slot: "apex" };
+  const values = (outcomes) => outcomes.map(({ marble, speed, mass }) => ({ marble, speed, mass }));
+
+  // Pendant la pose : la tigrée à la Chiquenaude, le grès à l'éjection.
+  const placing = playState({ hand: inHand(["clay"]), pot: ["stoneware", "tiger"], triangle: { leftBase: null, rightBase: null, apex: placed("glass") } });
+  const predicted = rules.forecast(placing, toApex);
+  run.same(
+    "réactions prévues, pose : par bille, dans l'ordre d'arrivée",
+    [
+      { marble: "stoneware", speed: 0, mass: 1 },
+      { marble: "tiger", speed: 2, mass: 0 },
+    ],
+    values(predicted.potReactions)
+  );
+  run("réactions prévues, pose : rien pendant la résolution", 0, predicted.potEffects.length);
+  run("réactions prévues : dans la Vitesse prévue (Tic 2 + tigrée 2 + phase 4)", 8, predicted.speed);
+  run("réactions prévues, pose : égal au réel", true, matches(rules, placing, toApex));
+
+  // Pendant la résolution : le mica au mélange.
+  const shuffling = playState({ bag: [], discard: ["clay", "glass"], hand: inHand([]), pot: ["mica"], triangle: { leftBase: placed("mica"), rightBase: null, apex: placed("porcelain", 1) } });
+  const resolving = rules.forecast(shuffling);
+  run.same("réactions prévues, résolution : le Polissage du mica", [{ action: "polish", amount: 1, target: "apex" }], resolving.potEffects[0].operations);
+  run("réactions prévues, résolution : égal au réel", true, matches(rules, shuffling, null));
+
+  // Regroupées : l'effet de résolution et les réactions d'une même bille en un.
+  const made = fabricatedRules({
+    plain: { apex: [{ action: "speed", amount: 1 }] },
+    both: { pocketed: { resolution: [{ action: "mass", amount: 1 }], apex: [{ action: "speed", amount: 2 }] } },
+    quiet: { pocketed: { shuffles: [{ action: "speed", amount: 1 }] } },
+  });
+  const grouped = playState({ pot: ["both", "quiet"], triangle: { leftBase: null, rightBase: null, apex: placed("plain") } });
+  run.same(
+    "réactions prévues : regroupées par bille, la bille qui ne joue rien absente",
+    [{ marble: "both", speed: 2, mass: 1 }],
+    values(made.forecast(grouped).potEffects)
+  );
+  run("réactions prévues, regroupées : égal au réel", true, matches(made, grouped, null));
+
+  // Une boucle indirecte : la prévision le sait aussi.
+  const looping = fabricatedRules({
+    sturdy: { maxWear: 100 },
+    polisher: { flick: [{ action: "polish", amount: 1, target: "apex" }] },
+    cracker: { pocketed: { polish: [{ action: "crack", amount: 1, target: "apex" }] } },
+    healer: { pocketed: { crack: [{ action: "polish", amount: 1, target: "apex" }] } },
+  });
+  const loop = playState({ hand: inHand(["polisher"]), pot: ["cracker", "healer"], triangle: { leftBase: null, rightBase: null, apex: placed("sturdy", 50) } });
+  run("prévision, boucle : interrompue, dit", true, looping.forecast(loop, { type: "place", handIndex: 0, slot: "leftBase" }).interrupted);
+  run("prévision, sans boucle : rien d'interrompu", false, predicted.interrupted);
+}
+
 // Polissage et Fêlure : la prévision montre leurs conséquences, comme le réel.
 function checkWearForecast(run) {
   const crackerRules = fabricatedRules({ cracker: { base: [{ action: "crack", amount: 1, target: "apex" }] }, porcelain: MARBLE_TYPES.porcelain, clay: MARBLE_TYPES.clay });
@@ -501,6 +562,7 @@ function compareState(state, marbles, faults, tally) {
       ...SLOTS.flatMap((slot) => predicted.slotEffects[slot]),
       ...predicted.regenerations.flatMap(({ effects }) => effects),
       ...predicted.potEffects,
+      ...predicted.potReactions,
     ]
       .filter((part) => part !== null)
       .flatMap(withEntries);
@@ -524,6 +586,7 @@ function allOutcomes(predicted) {
     ...SLOTS.flatMap((slot) => predicted.slotEffects[slot]),
     ...predicted.regenerations.flatMap(({ effects }) => effects),
     ...predicted.potEffects,
+    ...predicted.potReactions,
   ]
     .filter((part) => part !== null && part !== undefined)
     .flatMap(withEntries);

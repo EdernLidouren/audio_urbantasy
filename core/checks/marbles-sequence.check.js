@@ -117,7 +117,8 @@ const REGENERATION =
 // pioche à son tour, un Polissage ou une Fêlure, une régénération).
 // Une mise en poche (avec son entrée au pot) ou une perte, et une cible vide
 // d'Empocher.
-const POCKETING = "event\\.pocketed (event\\.effect_pocket_entry )?|event\\.lost |event\\.target_empty_(hand|self) |";
+// Une réaction d'une bille du pot (En poche, à chaque (occurrence)), à tout moment.
+const POCKETING = "event\\.pocketed (event\\.effect_pocket_entry )?|event\\.lost |event\\.target_empty_(hand|self) |outcome\.pot |";
 const DRAWING =
   "(" + REGENERATION + "|event\\.draw |event\\.draw_skipped\\.(handFull|noMarbles) |event\\.effect_awaken |" + POCKETING +
   "event\\.polished |event\\.cracked |event\\.target_empty |event\\.discarded\\.wear |event\\.effect_final )";
@@ -430,13 +431,13 @@ function checkTexts(run) {
       said(describeOverview({ ...drawing, triangle: { ...drawing.triangle, leftBase: null }, bag: ["tiger"] }, rules, t)).includes("Éveils")
     );
     run(
-      "pioche, confirmation : éveils possibles en dernière ligne",
+      "pioche, confirmation : éveils possibles, juste avant la ligne du pot",
       "Éveils possibles.",
-      said(t(...(({ key, params }) => [key, params])(placementLines({ ...drawing, bag: ["tiger"] }, 0, "apex", rules, t).at(-1))))
+      said(t(...(({ key, params }) => [key, params])(placementLines({ ...drawing, bag: ["tiger"] }, 0, "apex", rules, t).at(-2))))
     );
     run.same(
       "pioche, confirmation : Éjection et Tic qui piochent, puis la régénération",
-      ["Poser œil-de-chat en pointe ?", "Vitesse +3", "Chiquenaude d'œil-de-chat : aucun effet", "Éjection de grès : Pioche 1", "Tic d'œil-de-chat : Pioche 1", "Le sac sera régénéré."],
+      ["Poser œil-de-chat en pointe ?", "Vitesse +3", "Chiquenaude d'œil-de-chat : aucun effet", "Éjection de grès : Pioche 1", "Tic d'œil-de-chat : Pioche 1", "Le sac sera régénéré.", "Pot : aucun effet"],
       placementLines(drawing, 0, "apex", rules, t).map(({ key, params }) => said(t(key, params)))
     );
     run.same(
@@ -474,7 +475,7 @@ function checkTexts(run) {
     );
     run.same(
       "final, confirmation : avec les valeurs prévues de la bille posée",
-      ["Poser géante en base gauche ?", "Vitesse +6. Final : Pioche 1.", "Chiquenaude de géante : aucun effet"],
+      ["Poser géante en base gauche ?", "Vitesse +6. Final : Pioche 1.", "Chiquenaude de géante : aucun effet", "Pot : aucun effet"],
       placementLines(finalState, 0, "leftBase", rules, t).map(({ key, params }) => said(t(key, params)))
     );
     run.same(
@@ -505,9 +506,71 @@ function checkTexts(run) {
     );
     run.same(
       "Empocher, confirmation : dans les valeurs prévues de la bille posée",
-      ["Poser sulfure en base droite ?", "Empocher la bille en pointe, puis porcelaine en poche, à l'entrée : Vitesse +10", "Chiquenaude de sulfure : aucun effet"],
+      ["Poser sulfure en base droite ?", "Empocher la bille en pointe, puis porcelaine en poche, à l'entrée : Vitesse +10", "Chiquenaude de sulfure : aucun effet", "Pot : aucun effet"],
       placementLines({ ...pocketing, triangle: { ...pocketing.triangle, leftBase: null } }, 0, "rightBase", rules, t).map(({ key, params }) => said(t(key, params)))
     );
+    // Les réactions du pot (En poche, à chaque (occurrence)). Pendant la pose : à leur
+    // place chronologique, après l'effet de la bille concernée ; la confirmation les
+    // dit dans sa ligne du pot, par bille dans l'ordre d'arrivée.
+    const reacting = playState({ hand: inHand(["clay"]), pot: ["stoneware", "tiger"], triangle: { ...EMPTY_TRIANGLE, apex: { marble: "glass", wear: 0 } } });
+    const reactingPlace = rules.reduce(reacting, { type: "place", handIndex: 0, slot: "apex" });
+    run.same(
+      "réaction, pose dite : la Chiquenaude puis la tigrée, l'éjection puis le grès",
+      ["Chiquenaude d'argile : aucun effet. Vitesse 0, Masse 1.", "Pot, tigrée : Vitesse +2.", "Pot, grès : Masse +1.", "Défausse : verre.", "Pose : argile en pointe."],
+      buildSteps(reactingPlace.events, t).map((step) => said(step.text)).slice(0, 5)
+    );
+    run(
+      "réaction, confirmation : la ligne du pot, par bille, avant Annuler",
+      "Pot : grès, Masse +1 ; tigrée, Vitesse +2",
+      said(t(...(({ key, params }) => [key, params])(placementLines(reacting, 0, "apex", rules, t).at(-1))))
+    );
+    run(
+      "réaction, confirmation : sur un emplacement vide, la tigrée seule",
+      "Pot : tigrée, Vitesse +2",
+      said(t(...(({ key, params }) => [key, params])(placementLines(reacting, 0, "leftBase", rules, t).at(-1))))
+    );
+    // Pendant la résolution : le mica du pot polit la pointe au mélange que provoque
+    // la Pioche de la base gauche ; R le compte dans sa ligne du pot.
+    const shuffling = playState({
+      bag: [],
+      discard: ["clay", "glass"],
+      hand: inHand([]),
+      pot: ["mica"],
+      triangle: { leftBase: { marble: "mica", wear: 0 }, rightBase: null, apex: { marble: "porcelain", wear: 1 } },
+    });
+    run(
+      "réaction, R : dans la ligne de la bille du pot",
+      "Prévision : Vitesse 5, Masse 1, Impact 5. base gauche, mica : Pioche 1. base droite, vide. pointe, porcelaine : Vitesse +5. Pot, mica : Polissage 1 à la pointe. Le sac sera régénéré.",
+      said(describeOverview(shuffling, rules, t))
+    );
+    run.same(
+      "réaction, séquence : à sa place, une étape, après la pioche qui a mélangé",
+      [
+        "Résolution du tour 2. base gauche, mica : Pioche 1.",
+        "Le sac est vide : la défausse est mélangée et forme un nouveau sac.",
+        "Vous piochez argile.",
+        "Pot, mica : Polissage 1 à la pointe.",
+        "porcelaine est polie : usure 0 sur 2.",
+        "base droite, vide.",
+      ],
+      texts(shuffling).slice(0, 6)
+    );
+    // Une bille du pot qui joue plusieurs fois dans la résolution : une seule ligne
+    // dans R, ses valeurs regroupées ; une bille qui ne joue rien, aucune.
+    const potPlayers = playState({ pot: ["agate", "glass"], triangle: { leftBase: { marble: "clay", wear: 0 }, rightBase: null, apex: { marble: "clay", wear: 0 } } });
+    run(
+      "R : une ligne par bille du pot qui joue, rien pour le verre",
+      true,
+      said(describeOverview(potPlayers, rules, t)).endsWith("Pot, agate : Masse +1.")
+    );
+    // L'historique garde les réactions de la pose.
+    const placeSteps = buildSteps(reactingPlace.events, t);
+    run(
+      "réaction, historique : la réaction de la pose y figure",
+      true,
+      recordSteps({ ...EMPTY_HISTORY, current: [], currentTurn: 2 }, placeSteps).current.map(said).includes("Pot, tigrée : Vitesse +2.")
+    );
+
     // Le pot plein : la perte se dit, sans entrée.
     const lostState = { ...pocketing, pot: ["clay", "glass", "mica"] };
     run.same(
@@ -571,13 +634,13 @@ function checkTexts(run) {
     const flicking = playState({ hand: inHand(["clay"], 2), triangle: { ...EMPTY_TRIANGLE, apex: { marble: "tiger", wear: 0 } } });
     run.same(
       "chiquenaude, confirmation : la valeur calculée, dans l'ordre réel",
-      ["Chiquenaude d'argile : Vitesse +2", "Éjection de tigrée : aucun effet", "Tic d'argile : Vitesse +2"],
+      ["Chiquenaude d'argile : Vitesse +2", "Éjection de tigrée : aucun effet", "Tic d'argile : Vitesse +2", "Pot : aucun effet"],
       placementLines(flicking, 0, "apex", rules, t).map(({ key, params }) => said(t(key, params))).slice(2)
     );
     const clearing = playState({ hand: inHand(["leaded"]), triangle: { ...EMPTY_TRIANGLE, apex: { marble: "clay", wear: 0 } } });
     run.same(
       "chiquenaude, confirmation : l'emplacement vidé, Éjection et Tic sans effet",
-      ["Poser plombée en pointe ?", "Vitesse −3", "Chiquenaude de plombée : Fêlure 3 à la pointe", "Éjection d'argile : aucun effet", "Tic de plombée : aucun effet"],
+      ["Poser plombée en pointe ?", "Vitesse −3", "Chiquenaude de plombée : Fêlure 3 à la pointe", "Éjection d'argile : aucun effet", "Tic de plombée : aucun effet", "Pot : aucun effet"],
       placementLines(clearing, 0, "apex", rules, t).map(({ key, params }) => said(t(key, params)))
     );
     run.same(
@@ -602,7 +665,7 @@ function checkTexts(run) {
     run.same(
       "trouvaille, confirmation : après la régénération, une ligne par bille",
       ["Le sac sera régénéré.", "Trouvaille de tigrée : Vitesse +3.", "Trouvaille d'agate : Polissage 1."],
-      placementLines(windfalls, 0, "apex", rules, t).map(({ key, params }) => said(t(key, params))).slice(-3)
+      placementLines(windfalls, 0, "apex", rules, t).map(({ key, params }) => said(t(key, params))).slice(-4, -1)
     );
     run.same(
       "trouvaille, pose dite : la régénération, puis les trouvailles, puis la pioche",
@@ -660,13 +723,13 @@ function checkTexts(run) {
     );
     run.same(
       "calibre, confirmation : le Tic du gorille, sa valeur finale",
-      ["Chiquenaude de gorille : aucun effet", "Éjection de porcelaine : aucun effet", "Tic de gorille : Vitesse +4 et Empocher la première bille de la main, main vide"],
+      ["Chiquenaude de gorille : aucun effet", "Éjection de porcelaine : aucun effet", "Tic de gorille : Vitesse +4 et Empocher la première bille de la main, main vide", "Pot : aucun effet"],
       placementLines(sized, 0, "rightBase", rules, t).map(({ key, params }) => said(t(key, params))).slice(2)
     );
     run(
       "Empocher, confirmation : l'entrée au pot prévue, chez le Tic qui empoche",
       "Tic de gorille : Vitesse +4 et Empocher la première bille de la main, puis porcelaine en poche, à l'entrée : Vitesse +10",
-      said(t(...(({ key, params }) => [key, params])(placementLines({ ...sized, hand: inHand(["gorilla", "porcelain"]) }, 0, "rightBase", rules, t).at(-1))))
+      said(t(...(({ key, params }) => [key, params])(placementLines({ ...sized, hand: inHand(["gorilla", "porcelain"]) }, 0, "rightBase", rules, t).at(-2))))
     );
     const boulderLeft = { ...sized, triangle: { ...sized.triangle, leftBase: { marble: "giant", wear: 0 } } };
     run(
@@ -696,6 +759,12 @@ function checkTexts(run) {
       true,
       describeOverview(lonelyAgate, rules, t).includes("Final: Polish 1 to the apex and Pocket this marble, apex empty, then agate pocketed.")
     );
+    run(
+      "anglais, réaction : confirmation",
+      "Pot: stoneware, Mass +1; tiger, Speed +2",
+      t(...(({ key, params }) => [key, params])(placementLines(reacting, 0, "apex", rules, t).at(-1)))
+    );
+    run.same("anglais, réaction : dite", ["Pot, tiger: Speed +2.", "Pot, stoneware: Mass +1."], buildSteps(reactingPlace.events, t).map((step) => step.text).slice(1, 3));
     run.same("anglais, Empocher : séquence", ["porcelain is pocketed.", "Pot entry of porcelain: Speed +10. Speed 10, Mass 1."], texts(pocketing).slice(1, 3));
     run.same("anglais, Polissage : séquence", ["porcelain is polished: wear 1 of 2."], texts(saving).filter((text) => text.includes("polished")));
     run(

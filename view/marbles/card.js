@@ -5,13 +5,17 @@
 //
 // Un champ du modèle : `field`, le champ de la bille dans la table, et `labelKey`,
 // son gabarit, qui reçoit {effect}. `variantLabelKey` (facultatif) : l'effet peut
-// différer selon la base, et ce gabarit reçoit alors {left} et {right}.
+// différer selon la base, et ce gabarit reçoit alors {left} et {right}. `reactive`
+// (facultatif, En poche) : une ligne par occurrence que la bille écoute, dans l'ordre
+// des valeurs de partie (core/marbles.js/REACTION_KEYS), son gabarit recevant aussi
+// {occurrence} (`marbles.tally.<id>.each`, « à chaque chiquenaude »).
 //
 // Un montant calculé se dit avec sa valeur ACTUELLE, là où se trouve la bille : son
 // compteur de tours en main dans la main, 0 ailleurs, et les valeurs de partie de la
 // partie en cours (narration.js/cardSituation).
 
 import { MARBLE_CARD_MODEL } from "../../config/marbles-values.js";
+import { REACTION_KEYS } from "../../core/marbles.js";
 import { assembleCard, validateCardModel } from "../../lib/detail-card.js";
 import { cardSituation, describePrinted } from "./narration.js";
 
@@ -28,7 +32,24 @@ function readField(marble, entry, situation, rules, t) {
   const field = rules.types[marble][entry.field];
   const clauses = entry.part === undefined ? field : field?.[entry.part];
   if (clauses === undefined && !entry.required) return null;
-  return t(entry.labelKey, { effect: describePrinted(clauses ?? [], situation, t) });
+  return t(entry.labelKey, { effect: describePrinted(clauses ?? [], situation, t), ...(entry.occurrence && { occurrence: t(entry.occurrence) }) });
+}
+
+// Le modèle tel qu'il se lit pour une bille : le moment réactif devient une entrée
+// par occurrence que la bille écoute (aucune si elle n'en écoute pas).
+function modelFor(marble, model, rules) {
+  const expand = (entries) =>
+    entries.flatMap((entry) => {
+      if (!entry.reactive) return [entry];
+      const field = rules.types[marble][entry.field] ?? {};
+      return REACTION_KEYS.filter((key) => Object.hasOwn(field, key)).map((key) => ({
+        field: entry.field,
+        part: key,
+        labelKey: entry.labelKey,
+        occurrence: `marbles.tally.${key}.each`,
+      }));
+    });
+  return { ...model, above: expand(model.above), below: expand(model.below) };
 }
 
 // La fiche d'une bille. `main` : son annonce principale, qui dépend de l'endroit
@@ -39,5 +60,5 @@ function readField(marble, entry, situation, rules, t) {
 // vérifications.
 export function marbleCard(marble, main, rules, t, { turnsInHand = 0, tally, model = MARBLE_CARD_MODEL } = {}) {
   const situation = cardSituation(marble, turnsInHand, tally);
-  return assembleCard(model, { main, readField: (entry) => readField(marble, entry, situation, rules, t), t });
+  return assembleCard(modelFor(marble, model, rules), { main, readField: (entry) => readField(marble, entry, situation, rules, t), t });
 }

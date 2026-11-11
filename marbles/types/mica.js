@@ -10,6 +10,8 @@ export default {
   apex: [speed(2), polish(1)],
   // Éjection : Pioche 1 si la bille posée est plus grosse.
   knockout: [{ ...draw(1), when: { type: "relativeSize", marble: "placed", is: "larger" } }],
+  // En poche, à chaque mélange du sac : Polissage 1 à la pointe.
+  pocketed: { shuffles: [polish(1, "apex")] },
   maxWear: 3,
   size: SMALL,
 };

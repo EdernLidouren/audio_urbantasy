@@ -34,7 +34,10 @@
 //   pocketed    En poche : des effets qui ne jouent que lorsque la bille est dans le
 //               POT, un objet { <moment>: effet } (config/marbles-values.js/
 //               MARBLE_POCKET) : `entry`, à son entrée au pot ; `resolution`, à chaque
-//               résolution, après les phases. Rien sur la bille elle-même ;
+//               résolution, après les phases ; ou l'identifiant d'une valeur de
+//               partie écoutable, à chaque incrément (`flick`, `shuffles`,
+//               `ejectedMarbles`… : core/marbles.js/REACTION_KEYS). Rien sur la
+//               bille elle-même ;
 //   maxWear     usure maximale, sinon MARBLES_SETTINGS.defaultMaxWear ;
 //   size        son CALIBRE, obligatoire : SMALL, MEDIUM ou LARGE, toujours par ces
 //               constantes (config/marbles-values.js), validé au chargement. Statique.

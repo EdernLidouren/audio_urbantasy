@@ -170,6 +170,9 @@ function recordEvents(record, events, actionType) {
       case "impact":
         record.impacts.push(event.impact);
         break;
+      case "chainInterrupted":
+        record.interruptions += 1;
+        break;
       case "gameOver":
         record.endReason = event.reason;
         break;
@@ -181,7 +184,9 @@ function recordEvents(record, events, actionType) {
 // Une partie jouée de bout en bout. -> son relevé :
 //   { index, seed, bag, score, endReason, turns, impacts, replacements,
 //     <déclencheur>: { speed, mass } (hit, knockout…), effectDraws, regenerations,
-//     midTurnRegenerations, throws, refusals, marbles: { id: stats } }
+//     midTurnRegenerations, throws, refusals, interruptions, marbles: { id: stats } }
+// `interruptions` : les enchaînements arrêtés par la limite de sécurité du bus
+// (chainInterrupted), une anomalie.
 // `effectDraws` : les billes piochées par des effets ; `throws` : les lancers joués.
 // `turns` : les tours résolus ; `impacts[k]` : l'Impact du tour k + 1.
 export function playGame({ index, seed, player, playerOptions = {}, bagMode, settings = {} }) {
@@ -204,6 +209,7 @@ export function playGame({ index, seed, player, playerOptions = {}, bagMode, set
     midTurnRegenerations: 0,
     throws: 0,
     refusals: [],
+    interruptions: 0,
     marbles: {},
   };
 

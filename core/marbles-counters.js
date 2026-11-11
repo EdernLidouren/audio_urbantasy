@@ -1,6 +1,6 @@
 // Jeu des billes : les COMPTEURS des valeurs de partie, générés ou déclarés, en une
 // seule liste (le registre qui les tient : core/marbles-tally.js). Chacun :
-//   { id, category, count(event, context) }
+//   { id, category, listenable, count(event, context) }
 // `count` dit ce qu'un évènement du journal lui apporte (0 s'il ne le concerne pas),
 // lu à l'émission ; `context` : { state, types }, l'état à l'émission et la table des
 // billes. Ses textes découlent de son id : `marbles.tally.<id>.name` (le menu de
@@ -35,6 +35,15 @@
 // Un mot-clé et l'évènement auquel il réagit sont deux compteurs : une pose sur un
 // emplacement occupé dont l'occupante n'a pas d'Éjection donne +1 bille éjectée
 // (ejectedMarbles), +0 éjection (knockout).
+//
+// ÉCOUTABLE (`listenable`) : une bille du pot peut réagir à chacun de ses incréments
+// (En poche, à chaque (occurrence) : config/marbles-values.js/MARBLE_POCKET). Le
+// sont les évènements réels, les déclenchements de mots-clés (déclencheurs, phases,
+// moments fixes d'En poche) et ceux des actions. Ne le sont pas : les quantités
+// réelles et Vitesse et Masse (« stat »), qui comptent des points plutôt que des
+// occurrences, ni les réactions elles-mêmes (un moment déclaré non écoutable), qui
+// se répondraient sans fin. Un compteur ajouté d'une catégorie écoutable l'est par
+// construction.
 
 import { MARBLE_SIZES } from "../config/marbles-values.js";
 import { effectAt } from "./marbles-effects.js";
@@ -54,6 +63,7 @@ function triggerCounter(trigger) {
   return {
     id: trigger.id,
     category: "trigger",
+    listenable: true,
     count: (event, { types }) => (event.type === trigger.event && hasField(types, event.marble, trigger.field) ? 1 : 0),
   };
 }
@@ -64,6 +74,7 @@ function phaseCounter({ id, slots }) {
   return {
     id,
     category: "trigger",
+    listenable: true,
     count(event, { state, types }) {
       if (event.type !== "phase" || !slots.includes(event.slot)) return 0;
       const ownEffect = effectAt(event.marble, event.slot, types).length > 0;
@@ -73,21 +84,24 @@ function phaseCounter({ id, slots }) {
   };
 }
 
-// Un moment du mot-clé En poche (à l'entrée, à chaque résolution) : la bille du pot
-// que nomme son évènement, si elle a un effet pour ce moment.
-function pocketMomentCounter({ id, event: eventType, clauses }) {
+// Un moment du mot-clé En poche (à l'entrée, à chaque résolution, à chaque
+// occurrence) : la bille du pot que nomme son évènement, si elle a un effet pour ce
+// moment (`clauses(event, types)`, celles de cet évènement). `listenable` : vrai sauf
+// pour les réactions.
+function pocketMomentCounter({ id, event: eventType, clauses, listenable }) {
   return {
     id,
     category: "trigger",
-    count: (event, { types }) => (event.type === eventType && event.marble !== null && (clauses(event.marble, types)?.length ?? 0) > 0 ? 1 : 0),
+    listenable,
+    count: (event, { types }) => (event.type === eventType && event.marble !== null && (clauses(event, types)?.length ?? 0) > 0 ? 1 : 0),
   };
 }
 
 // Une action mot-clé : `keyword.triggers`, ses déclenchements ; `keyword.quantity`
 // (facultatif), sa quantité réelle.
 function actionCounters(id, { keyword }) {
-  const counters = [{ id, category: "action", count: keyword.triggers }];
-  if (keyword.quantity) counters.push({ id: `${id}Quantity`, category: "action", count: keyword.quantity });
+  const counters = [{ id, category: "action", listenable: true, count: keyword.triggers }];
+  if (keyword.quantity) counters.push({ id: `${id}Quantity`, category: "action", listenable: false, count: keyword.quantity });
   return counters;
 }
 
@@ -96,10 +110,10 @@ function actionCounters(id, { keyword }) {
 function statCounters(id) {
   const delta = (event) => (event.type === "effect" ? event[`${id}Delta`] : 0);
   return [
-    { id: `${id}Gains`, category: "stat", count: (event) => (delta(event) > 0 ? 1 : 0) },
-    { id: `${id}Gained`, category: "stat", count: (event) => Math.max(0, delta(event)) },
-    { id: `${id}Losses`, category: "stat", count: (event) => (delta(event) < 0 ? 1 : 0) },
-    { id: `${id}Lost`, category: "stat", count: (event) => Math.max(0, -delta(event)) },
+    { id: `${id}Gains`, category: "stat", listenable: false, count: (event) => (delta(event) > 0 ? 1 : 0) },
+    { id: `${id}Gained`, category: "stat", listenable: false, count: (event) => Math.max(0, delta(event)) },
+    { id: `${id}Losses`, category: "stat", listenable: false, count: (event) => (delta(event) < 0 ? 1 : 0) },
+    { id: `${id}Lost`, category: "stat", listenable: false, count: (event) => Math.max(0, -delta(event)) },
   ];
 }
 
@@ -122,6 +136,7 @@ function eventCounter({ id, events, match = {}, filter }) {
   return {
     id,
     category: "event",
+    listenable: true,
     count(event, { types }) {
       if (!events.includes(event.type)) return 0;
       if (!Object.entries(match).every(([field, value]) => event[field] === value)) return 0;
@@ -168,8 +183,8 @@ export function validateEventTallies(tallies, journalEvents) {
 // TOUS les compteurs, dans l'ordre du menu (catégories, puis l'ordre de leur source) :
 //   triggers  les déclencheurs (MARBLE_TRIGGERS) ;
 //   phases    les mots-clés de phase, [{ id, slots }] ;
-//   pocketMoments  les moments du mot-clé En poche, [{ id, event, clauses(marble,
-//             types) }] ;
+//   pocketMoments  les moments du mot-clé En poche, [{ id, event, clauses(event,
+//             types), listenable }] ;
 //   actions   les actions de clause (CLAUSE_ACTIONS) ;
 //   events    les évènements réels déclarés (MARBLE_TALLIES) ;
 //   journalEvents  pour valider ces derniers.

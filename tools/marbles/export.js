@@ -32,6 +32,7 @@ const GAME_COLUMNS = [
   ["midTurnRegenerations", (game) => game.midTurnRegenerations],
   ["throws", (game) => game.throws],
   ["refusals", (game) => game.refusals.length],
+  ["interruptions", (game) => game.interruptions],
   ["impacts", (game) => game.impacts.join(" ")],
   ["bag", (game) => game.bag.join(" ")],
 ];

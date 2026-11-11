@@ -386,6 +386,10 @@ export const MARBLE_EVENT_CUES = {
   pocketed: (event, timeline, context) => timeline.pocket(event.marble, pocketOrigin(event, context)),
   lost: null,
   potResolution: null,
+  // Une réaction du pot : un point d'accroche, sans son à elle aujourd'hui ; l'arrêt
+  // d'un enchaînement, muet aussi (son annonce suffit).
+  pocketReaction: null,
+  chainInterrupted: null,
   // L'usée roule à la défausse ; la délogée part avec le choc (placed).
   discarded: (event, timeline) => {
     if (event.cause === "wear") timeline.worn(event.marble, event.slot);

@@ -11,7 +11,9 @@
 // l'autre ne revient jamais dans le sac, ni ne quitte sa zone.
 // `tally` : les VALEURS DE PARTIE, { <id>: { turn, game } } (core/marbles-tally.js, le
 // seul à les écrire ; les compteurs : core/marbles-counters.js, TALLY_COUNTERS), tenues
-// à l'émission de chaque évènement du journal (transact).
+// à l'émission de chaque évènement du journal (transact). Une bille du pot peut réagir
+// à chaque incrément d'un compteur ÉCOUTABLE (En poche, à chaque (occurrence) :
+// pocketReactionsOf).
 // `throwsUsed` : les LANCERS joués ce tour (une pose depuis la main en est un,
 // l'échange non), jamais plus que `throwsPerTurn`.
 // bag et discard sont des listes d'ids de billes (doublons permis). Une bille
@@ -67,7 +69,8 @@
 //   cracked { slot, marble, amount, applied, wear, maxWear },
 //   targetEmpty { action, slot, target?, marble?, by },
 //   pocketed { marble, from, slot?, index?, by }, lost { marble, from, slot?, index?, by },
-//   potResolution { index, marble },
+//   potResolution { index, marble }, pocketReaction { index, marble, counter },
+//   chainInterrupted {},
 //   wear { slot, marble, wear, maxWear },
 //   impact { speed, mass, impact, score },
 //   rotation { triangle }, turnEnded { turn }, gameOver { reason, score }.
@@ -94,6 +97,14 @@
 // `potResolution` : une fois par tour, après les phases et avant les retraits,
 // chaque bille du pot dans l'ordre d'arrivée (`index`), pour son effet En poche à
 // chaque résolution.
+// `pocketReaction` : une bille du pot (`index`, sa place d'arrivée) réagit à un
+// incrément du compteur écoutable `counter` (En poche, à chaque (occurrence)), une
+// fois par incrément ; voir pocketReactionsOf.
+// `chainInterrupted` : la limite de sécurité du bus a arrêté la chaîne
+// (core/marbles-bus.js) ; plus rien de l'action n'est traité après lui. Une anomalie
+// dans les vérifications et le simulateur.
+// Un `effect` d'une bille du pot à une place connue (étape du pot, réaction) porte
+// aussi `potIndex`, cette place.
 // `targetEmpty` : une action sur une bille sans bille à prendre, produite par
 // l'effet `by` ({ trigger, slot, marble }, comme pocketed et lost) : `slot` vide ;
 // ou, pour Empocher, `slot` null et `target` "firstInHand" (main vide) ou "self" (la
@@ -123,7 +134,7 @@
 import { MARBLE_PHASES, MARBLE_POCKET, MARBLE_TALLIES, MARBLE_TRIGGERS, MARBLES_SETTINGS, STARTING_BAG } from "../config/marbles-values.js";
 import { createSeed, nextRandom } from "./rng.js";
 import { rejectUnknownFields } from "../lib/validate.js";
-import { MarbleEventLimitError, createEventBus } from "./marbles-bus.js";
+import { createEventBus } from "./marbles-bus.js";
 import { CLAUSE_ACTIONS, FIRST_IN_HAND, SLOTS, addValues, effectAt, evaluateEffect, isMarbleSize, validateEffect } from "./marbles-effects.js";
 import { emptyTally, recordTally } from "./marbles-tally.js";
 import { buildTallyCounters } from "./marbles-counters.js";
@@ -144,7 +155,6 @@ export const MARBLE_ERRORS = [
   "swapSameSlot",
   "swapBothEmpty",
   "noThrowsLeft",
-  "eventLimit",
 ];
 
 // Les types d'évènements du journal (voir l'en-tête), chacun avec vrai s'il nomme
@@ -178,6 +188,8 @@ export const JOURNAL_EVENTS = Object.freeze({
   pocketed: false,
   lost: false,
   potResolution: false,
+  pocketReaction: false,
+  chainInterrupted: false,
   wear: true,
   impact: false,
   rotation: false,
@@ -274,13 +286,15 @@ export function validatePocketMoments(pocket) {
     throw new Error(`marbles, En poche : ${message}`);
   };
   rejectUnknownFields(pocket, ["field", "texts", "moments"], "MARBLE_POCKET", fail);
+  if (Array.isArray(pocket.moments) && pocket.moments.filter((moment) => moment?.reactive === true).length > 1) fail("un seul moment réactif.");
   if (typeof pocket.field !== "string" || [...PHASE_FIELDS, ...MARBLE_TRIGGERS.map((trigger) => trigger.field)].includes(pocket.field)) fail("field doit être un champ à part.");
   validateKeywordTexts(pocket.texts, "MARBLE_POCKET", fail);
   if (!Array.isArray(pocket.moments) || pocket.moments.length === 0) fail("moments doit être une liste non vide.");
   const seen = new Set();
   for (const moment of pocket.moments) {
     const describe = `moment "${moment?.id}"`;
-    rejectUnknownFields(moment, ["id", "trigger", "event", "moment", "texts"], describe, fail);
+    rejectUnknownFields(moment, ["id", "trigger", "event", "moment", "texts", "reactive"], describe, fail);
+    if (moment.reactive !== undefined && moment.reactive !== true) fail(`${describe} : reactive vaut true ou est absent.`);
     for (const key of ["id", "trigger", "event"]) {
       if (typeof moment[key] !== "string" || moment[key] === "" || seen.has(`${key}:${moment[key]}`)) fail(`${describe} : ${key} absent ou en double.`);
       seen.add(`${key}:${moment[key]}`);
@@ -293,9 +307,20 @@ export function validatePocketMoments(pocket) {
 
 validatePocketMoments(MARBLE_POCKET);
 
-// Les clauses d'une bille pour un moment En poche, ou null.
+// Les moments FIXES d'En poche (à l'entrée, à chaque résolution), chacun sous sa
+// clé `id`, et le moment RÉACTIF, s'il est déclaré, dont les clés sont les compteurs
+// écoutables (REACTION_KEYS).
+const FIXED_MOMENTS = MARBLE_POCKET.moments.filter((moment) => moment.reactive !== true);
+const REACTIVE_MOMENT = MARBLE_POCKET.moments.find((moment) => moment.reactive === true) ?? null;
+
+// Les clauses d'une bille pour un moment fixe En poche, ou null.
 function pocketClauses(type, moment) {
   return type[MARBLE_POCKET.field]?.[moment.id] ?? null;
+}
+
+// Les clauses d'une bille du pot en réaction au compteur `counter`, ou null.
+function reactionClauses(type, counter) {
+  return type[MARBLE_POCKET.field]?.[counter] ?? null;
 }
 
 // Les mots-clés de phase, pour les valeurs de partie : chaque phase (MARBLE_PHASES :
@@ -312,11 +337,13 @@ const PHASE_KEYWORDS = [
 export const TALLY_COUNTERS = buildTallyCounters({
   triggers: MARBLE_TRIGGERS,
   phases: PHASE_KEYWORDS,
-  // Un compteur par moment En poche, sous l'identifiant de son effet.
+  // Un compteur par moment En poche, sous l'identifiant de son effet ; celui des
+  // réactions n'est pas écoutable (les réactions se répondraient sans fin).
   pocketMoments: MARBLE_POCKET.moments.map((moment) => ({
     id: moment.trigger,
     event: moment.event,
-    clauses: (marble, types) => pocketClauses(types[marble], moment),
+    listenable: moment.reactive !== true,
+    clauses: (event, types) => (moment.reactive ? reactionClauses(types[event.marble], event.counter) : pocketClauses(types[event.marble], moment)),
   })),
   actions: CLAUSE_ACTIONS,
   events: MARBLE_TALLIES,
@@ -325,6 +352,16 @@ export const TALLY_COUNTERS = buildTallyCounters({
 
 // Leurs identifiants, que la validation d'une source de montant `tally` vérifie.
 const TALLY_IDS = new Set(TALLY_COUNTERS.map((counter) => counter.id));
+
+// Les OCCURRENCES ÉCOUTABLES par une bille du pot (En poche, à chaque (occurrence)) :
+// les compteurs écoutables (core/marbles-counters.js), dans leur ordre, celui des
+// fiches. Aucune sans moment réactif déclaré. Une clé de moment fixe qui serait aussi
+// un compteur rendrait le champ ambigu : refusé au chargement.
+export const REACTION_KEYS = REACTIVE_MOMENT === null ? [] : TALLY_COUNTERS.filter((counter) => counter.listenable).map((counter) => counter.id);
+for (const moment of FIXED_MOMENTS) {
+  if (TALLY_IDS.has(moment.id)) throw new Error(`marbles, En poche : la clé du moment "${moment.id}" est aussi une valeur de partie.`);
+}
+const COUNTER_CATEGORIES = Object.fromEntries(TALLY_COUNTERS.map((counter) => [counter.id, counter.category]));
 
 // Le moment où joue chaque champ d'effet, pour la règle des cibles et les
 // conditions qui n'ont de sens qu'à certains moments (core/marbles-effects.js/
@@ -375,7 +412,8 @@ export function buildMarbleKeywords({ phases, triggers, pocket, actions }) {
       id: pocket.field,
       kind: "pocket",
       texts: pocket.texts,
-      present: (marble, types) => pocket.moments.some((moment) => (types[marble][pocket.field]?.[moment.id]?.length ?? 0) > 0),
+      // Un moment fixe ou une occurrence écoutée, s'il a un effet.
+      present: (marble, types) => Object.values(types[marble][pocket.field] ?? {}).some((clauses) => clauses.length > 0),
     },
     ...Object.entries(actions)
       .filter(([, action]) => action.keyword !== undefined)
@@ -422,15 +460,30 @@ export function validateMarbleTypes(types) {
       if (type[field] !== undefined) validateEffect(type[field], `bille "${id}", ${field}`, fail, { ...FIELD_CONTEXTS[field], tallies: TALLY_IDS });
     }
     // En poche : un objet { <moment>: effet }, chaque effet joué par une bille dans
-    // le pot (règle des cibles selon son moment ; rien sur la bille elle-même).
+    // le pot (règle des cibles selon son moment ; rien sur la bille elle-même) : un
+    // moment fixe, ou une occurrence écoutable (REACTION_KEYS).
     const pocketed = type[MARBLE_POCKET.field];
     if (pocketed !== undefined) {
       const describe = `bille "${id}", ${MARBLE_POCKET.field}`;
       if (pocketed === null || typeof pocketed !== "object" || Array.isArray(pocketed)) fail(`${describe} : un objet de moments.`);
-      rejectUnknownFields(pocketed, MARBLE_POCKET.moments.map((moment) => moment.id), describe, fail);
-      for (const moment of MARBLE_POCKET.moments) {
+      for (const key of Object.keys(pocketed)) {
+        // Une valeur de partie qui n'est pas écoutable : le dire plutôt qu'« inconnu ».
+        if (TALLY_IDS.has(key) && !REACTION_KEYS.includes(key)) fail(`${describe} : « ${key} » ne s'écoute pas (quantité réelle, Vitesse ou Masse, ou réaction).`);
+      }
+      rejectUnknownFields(pocketed, [...FIXED_MOMENTS.map((moment) => moment.id), ...REACTION_KEYS], describe, fail);
+      for (const moment of FIXED_MOMENTS) {
         const effect = pocketClauses(type, moment);
         if (effect !== null) validateEffect(effect, `${describe}.${moment.id}`, fail, { moment: moment.moment, marble: "pot", tallies: TALLY_IDS });
+      }
+      for (const key of REACTION_KEYS) {
+        const effect = reactionClauses(type, key);
+        if (effect === null) continue;
+        validateEffect(effect, `${describe}.${key}`, fail, { moment: REACTIVE_MOMENT.moment, marble: "pot", tallies: TALLY_IDS });
+        // La boucle directe : réagir au déclenchement d'une action qu'on produit
+        // soi-même (« à chaque polissage : Polissage 1 ») se relancerait sans fin.
+        if (COUNTER_CATEGORIES[key] === "action" && effect.some((clause) => clause.action === key)) {
+          fail(`${describe}.${key} : réagit à « ${key} » en le produisant, une boucle sans fin.`);
+        }
       }
     }
     if (type.baseVariant !== undefined) {
@@ -721,20 +774,55 @@ const EVENT_TRIGGERS = {
     clauses: (event, listener, types) => (isOnEventSlot(event, listener) ? effectAt(listener.marble, listener.slot, types) : null),
   },
   ...Object.fromEntries(MARBLE_TRIGGERS.map((trigger) => [trigger.event, eventTrigger(trigger)])),
-  // Les moments En poche : la bille du pot que nomme l'évènement. Une bille du pot
-  // inconnue (empochée à l'aveugle) rend la prévision incertaine.
+  // Les moments En poche : la bille du pot que nomme l'évènement, à sa place
+  // d'arrivée (`index`) quand l'évènement la porte. Une bille du pot inconnue
+  // (empochée à l'aveugle) rend la prévision incertaine.
   ...Object.fromEntries(
     MARBLE_POCKET.moments.map((moment) => [
       moment.event,
       {
         id: moment.trigger,
         zones: ["pot"],
-        listeners: (event) => [{ zone: "pot", slot: null, marble: event.marble }],
-        clauses: (event, listener, types) => pocketClauses(types[listener.marble], moment),
+        listeners: (event) => [{ zone: "pot", slot: null, index: event.index, marble: event.marble }],
+        clauses: (event, listener, types) =>
+          moment.reactive ? reactionClauses(types[listener.marble], event.counter) : pocketClauses(types[listener.marble], moment),
       },
     ])
   ),
 };
+
+// LES RÉACTIONS d'un évènement qui vient d'être compté (En poche, à chaque
+// (occurrence)) : pour chaque compteur écoutable qu'il a augmenté, chaque bille du
+// pot qui l'écoute, dans l'ordre d'arrivée, une fois par incrément. `before` : le
+// registre d'avant l'évènement (la portée « cette partie », qui ne revient jamais à
+// zéro, donne l'incrément). Lu à l'émission, sur le pot de ce moment : une bille
+// entrée plus tard ne réagit pas à ce qui l'a précédée, et celle qui entre au pot par
+// cet évènement (`pocketed`, la dernière arrivée) ne réagit pas à sa propre mise en
+// poche (elle a pour cela son moment « à l'entrée »). Les réactions sont émises après
+// le traitement de l'évènement (handleEvent) : la bille concernée joue d'abord son
+// propre effet. -> [{ index, marble, counter }].
+function pocketReactionsOf(run, event, before) {
+  if (REACTION_KEYS.length === 0 || run.state.pot.length === 0) return [];
+  const after = run.state.tally;
+  const heard = REACTION_KEYS.map((id) => [id, after[id].game - before[id].game]).filter(([, count]) => count > 0);
+  if (heard.length === 0) return [];
+  const entering = event.type === "pocketed" ? run.state.pot.length - 1 : -1;
+  const reactions = [];
+  run.state.pot.forEach((marble, index) => {
+    if (index === entering) return;
+    // Une bille du pot inconnue (piochée à l'aveugle, puis empochée) aurait pu
+    // écouter : la prévision ne peut pas le dire.
+    if (marble === UNKNOWN_MARBLE) {
+      run.uncertain = true;
+      return;
+    }
+    for (const [counter, count] of heard) {
+      if ((reactionClauses(run.types[marble], counter)?.length ?? 0) === 0) continue;
+      for (let time = 0; time < count; time++) reactions.push({ index, marble, counter });
+    }
+  });
+  return reactions;
+}
 
 // --- Le déroulé d'une action ---
 
@@ -778,9 +866,10 @@ function fireEffect(run, trigger, listener, clauses, event) {
   const mass = run.state.mass + massDelta;
   update(run, { triangle, speed, mass });
   // La Pioche : l'effet s'annonce, puis ses billes se piochent (drawMarbles), à
-  // tout moment du tour.
+  // tout moment du tour. Une bille du pot à une place connue la porte (`potIndex`).
   const { draw } = self;
-  run.emit({ type: "effect", trigger, slot, marble, speedDelta, massDelta, draw, operations, given, lost, speed, mass });
+  const place = listener.zone === "pot" && listener.index !== undefined ? { potIndex: listener.index } : {};
+  run.emit({ type: "effect", trigger, slot, marble, speedDelta, massDelta, draw, operations, given, lost, speed, mass, ...place });
   if (draw > 0) drawMarbles(run, draw, "effect");
   // Les actions sur une bille, après la pioche, dans l'ordre des clauses : sur la
   // bille elle-même (son emplacement) ou sur celle de l'emplacement visé. Empocher
@@ -877,10 +966,12 @@ function applyMarbleAction(run, action, amount, slot, by) {
 }
 
 // Le traitement d'un évènement par le bus : ses écouteurs (il est déjà au journal).
+// Le traitement d'un évènement par le bus : les effets des billes concernées, puis
+// les réactions des billes du pot (pocketReactionsOf, relevées à son émission),
+// émises dans la file : pas de récursion.
 function handleEvent(run, event) {
   const trigger = EVENT_TRIGGERS[event.type];
-  if (!trigger) return;
-  const listeners = trigger.listeners ? trigger.listeners(event) : marbleListeners(run.state);
+  const listeners = !trigger ? [] : trigger.listeners ? trigger.listeners(event) : marbleListeners(run.state);
   for (const listener of listeners) {
     // Une bille inconnue (piochée à l'aveugle) que ce déclencheur pourrait
     // concerner : sa réaction dépend de son identité, la prévision ne peut pas la
@@ -892,26 +983,37 @@ function handleEvent(run, event) {
     const clauses = trigger.clauses(event, listener, run.types);
     if (clauses !== null) fireEffect(run, trigger.id, listener, clauses, event);
   }
+  const reactions = run.reactions.get(event);
+  if (reactions === undefined) return;
+  run.reactions.delete(event);
+  for (const reaction of reactions) run.emit({ type: REACTIVE_MOMENT.event, ...reaction });
 }
 
 // Déroule une action sur un état de travail, avec son bus et son journal. Une
-// boucle d'évènements l'annule tout entière : l'état reçu n'a jamais été touché.
-// `options` : { eventLimit, blind } (voir marblesReduce). À l'aveugle, le résultat
-// porte aussi `uncertain` : une bille inconnue aurait pu réagir (handleEvent).
+// boucle d'évènements est arrêtée par la limite du bus : la chaîne s'arrête, le
+// journal le note (chainInterrupted), plus aucun effet ne joue, et l'action va à son
+// terme (la résolution finit son tour). `options` : { eventLimit, blind } (voir
+// marblesReduce). À l'aveugle, le résultat porte aussi `uncertain` : une bille
+// inconnue aurait pu réagir (handleEvent, pocketReactionsOf).
 function transact(state, types, { eventLimit, blind = false } = {}, body) {
   // `phasesStarted` : les emplacements dont la phase a commencé (ou a été sautée)
-  // pendant cette action ; un bonus qui les vise est perdu (fireEffect).
-  const run = { state, types, blind, uncertain: false, phasesStarted: new Set(), journal: [] };
-  const bus = createEventBus((event) => handleEvent(run, event), eventLimit);
+  // pendant cette action ; un bonus qui les vise est perdu (fireEffect). `reactions` :
+  // par évènement émis, les réactions du pot à émettre après son traitement.
+  const run = { state, types, blind, uncertain: false, phasesStarted: new Set(), journal: [], reactions: new Map() };
+  const bus = createEventBus((event) => handleEvent(run, event), eventLimit, () => record({ type: "chainInterrupted" }));
   // Le journal s'écrit À L'ÉMISSION, dans l'ordre où l'état change : la file du bus
   // étant premier entré, premier sorti, c'est aussi l'ordre de traitement, sauf
   // pour une interruption (settle), réglée avant ce qui attendait, mais émise après.
   // Les valeurs de partie aussi : un évènement compte dès qu'il est émis, avant que
   // les billes n'y réagissent (core/marbles-tally.js).
-  const record = (event) => {
-    update(run, { tally: recordTally(run.state.tally, event, { state: run.state, types }, TALLY_COUNTERS) });
+  // Les réactions du pot s'y relèvent aussi, sur l'incrément des compteurs.
+  function record(event) {
+    const before = run.state.tally;
+    update(run, { tally: recordTally(before, event, { state: run.state, types }, TALLY_COUNTERS) });
     run.journal.push(event);
-  };
+    const reactions = pocketReactionsOf(run, event, before);
+    if (reactions.length > 0) run.reactions.set(event, reactions);
+  }
   run.emit = (event) => {
     record(event);
     bus.emit(event);
@@ -920,12 +1022,7 @@ function transact(state, types, { eventLimit, blind = false } = {}, body) {
     record(event);
     bus.settle(event);
   };
-  try {
-    body(run);
-  } catch (error) {
-    if (error instanceof MarbleEventLimitError) return refused(state, "eventLimit");
-    throw error;
-  }
+  body(run);
   const result = { ok: true, state: run.state, events: run.journal, error: null };
   return blind ? { ...result, uncertain: run.uncertain } : result;
 }
@@ -1177,7 +1274,8 @@ export function runResolution(state, types, options = {}) {
 
 // Le réducteur : pur, ne modifie jamais `state`. Même état + même action =
 // même résultat. `options` (facultatif) :
-//   eventLimit  la limite du bus pour cette action, abaissée par les vérifications ;
+//   eventLimit  la limite du bus pour cette action, abaissée par les vérifications
+//               (au-delà, la chaîne s'arrête : chainInterrupted) ;
 //   blind       le déroulé À L'AVEUGLE, celui de la prévision : aucune pioche n'y lit
 //               l'identité d'une bille ni le hasard de la partie (drawOne).
 export function marblesReduce(state, action, types, options = {}) {

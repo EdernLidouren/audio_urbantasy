@@ -13,30 +13,39 @@
 // en attente reprend ensuite. Sert à la régénération du sac : ses Trouvailles se
 // jouent avant que la pioche interrompue ne reprenne (core/marbles.js/regenerateBag).
 //
-// La limite borne le nombre d'évènements traités d'une action, interruptions
-// comprises : une boucle lève une erreur explicite au lieu de geler le jeu.
+// La LIMITE borne le nombre d'évènements traités d'une action, interruptions
+// comprises : une boucle (deux billes du pot qui se répondent) ne gèle jamais le jeu.
+// Atteinte, la CHAÎNE S'ARRÊTE proprement : les files en attente sont vidées,
+// `onLimit` est appelé une fois, et plus rien n'est traité jusqu'à la fin de
+// l'action ; ce qui est émis ensuite n'est plus traité. Rien n'est levé : celui qui
+// appelle finit son action. Dans les vérifications et le simulateur, l'atteindre est
+// une anomalie (un enchaînement de billes sans fin).
 
 export const MAX_EVENTS_PER_ACTION = 200;
 
-export class MarbleEventLimitError extends Error {
-  constructor(limit) {
-    super(`marbles : plus de ${limit} évènements pour une seule action, boucle d'évènements probable.`);
-    this.name = "MarbleEventLimitError";
-  }
-}
-
 // `handle(event)` : le traitement d'un évènement, qui peut rappeler `emit` ou
-// `settle`.
-export function createEventBus(handle, limit = MAX_EVENTS_PER_ACTION) {
+// `settle`. `onLimit()` (facultatif) : appelé une fois, quand la limite arrête la
+// chaîne. `stopped()` dit si elle l'a fait.
+export function createEventBus(handle, limit = MAX_EVENTS_PER_ACTION, onLimit = () => {}) {
   // Les files en cours, la plus récente en dernier : ce qu'un traitement émet va
   // dans la file de l'interruption en cours, ou dans la file principale.
   const queues = [];
   let processed = 0;
+  let halted = false;
+
+  function halt() {
+    halted = true;
+    for (const queue of queues) queue.length = 0;
+    onLimit();
+  }
 
   function drain(queue) {
-    while (queue.length > 0) {
+    while (!halted && queue.length > 0) {
       processed += 1;
-      if (processed > limit) throw new MarbleEventLimitError(limit);
+      if (processed > limit) {
+        halt();
+        return;
+      }
       handle(queue.shift());
     }
   }
@@ -44,6 +53,7 @@ export function createEventBus(handle, limit = MAX_EVENTS_PER_ACTION) {
   // Traite `event` et tout ce qui en découle, dans une file à part, avant de rendre
   // la main.
   function settle(event) {
+    if (halted) return;
     const queue = [event];
     queues.push(queue);
     try {
@@ -56,9 +66,10 @@ export function createEventBus(handle, limit = MAX_EVENTS_PER_ACTION) {
   // Hors de tout traitement, `emit` règle l'évènement tout de suite ; pendant un
   // traitement, il attend dans la file en cours.
   function emit(event) {
+    if (halted) return;
     if (queues.length === 0) settle(event);
     else queues[queues.length - 1].push(event);
   }
 
-  return { emit, settle };
+  return { emit, settle, stopped: () => halted };
 }

@@ -107,8 +107,11 @@ en final, et, avec des sacs
 aléatoires, le score moyen avec et sans elle). Les moyennes d'une bille sont prises sur
 les parties où elle est dans le sac ; un bonus reçu se compte chez la bille qui le
 reçoit, comme dans la vue d'ensemble. Il finit par des observations, sans jamais
-proposer de valeur, et par le nombre d'actions refusées au joueur (toujours 0 : sinon,
-c'est une faute du joueur).
+proposer de valeur, par le nombre d'actions refusées au joueur (toujours 0 : sinon,
+c'est une faute du joueur), et par le nombre d'enchaînements interrompus par la limite de
+sécurité du bus (toujours 0 : sinon, une boucle de billes, signalée « ANOMALIE » dans les
+observations ; colonne `interruptions` de l'export). Les réactions du pot se lisent par
+bille, « en réaction au pot ».
 
 **L'export** : `.json`, un fichier (paramètres, résumé, une entrée par partie) ; `.csv`,
 deux fichiers, `<nom>-games.csv` (une ligne par partie) et `<nom>-marbles.csv` (une

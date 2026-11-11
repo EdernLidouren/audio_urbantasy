@@ -449,10 +449,19 @@ export const MARBLE_TALLIES = [
 //              cibles en dépend ;
 //     texts    `card`, son champ de fiche ({effect}) ; `effect`, son effet joué dans
 //              le journal ({marble}, {effect}, {speed}, {mass}) ; `forecast`
-//              (facultatif), sa ligne dans R ({marble}, {effect}).
+//              (facultatif), sa ligne dans R ({marble}, {effect}) ;
+//     reactive (facultatif, un seul moment) vrai pour le moment RÉACTIF, « à chaque
+//              (occurrence) » : ses clés dans le champ ne sont pas `id` mais les
+//              identifiants des valeurs de partie ÉCOUTABLES (core/marbles-counters.js :
+//              évènements réels, déclenchements de mots-clés et d'actions ; jamais
+//              une quantité réelle, ni Vitesse et Masse), `pocketed: { flick: [...] }`.
+//              Une réaction par incrément du compteur écouté ; son évènement nomme la
+//              bille du pot et le compteur ({ index, marble, counter }). Sa ligne de
+//              fiche reçoit aussi {occurrence} (`marbles.tally.<id>.each`).
 // Une action sur la bille elle-même y est refusée : dans le pot, elle n'a ni usure
-// ni place à quitter. AJOUTER un moment (une réaction à un évènement global) : une
-// entrée ici, ses textes, et l'émission de son évènement dans core/marbles.js.
+// ni place à quitter. AJOUTER un moment fixe : une entrée ici, ses textes, et
+// l'émission de son évènement dans core/marbles.js. Une occurrence écoutable de plus
+// n'a rien à déclarer ici : tout compteur écoutable ajouté l'est par construction.
 export const MARBLE_POCKET = {
   field: "pocketed",
   texts: { name: "marbles.keyword.pocketed.name", description: "marbles.keyword.pocketed.description" },
@@ -475,6 +484,17 @@ export const MARBLE_POCKET = {
       moment: "afterPhases",
       texts: { card: "marbles.card.pocketed_resolution", effect: "marbles.outcome.pot", forecast: "marbles.outcome.pot" },
     },
+    // À chaque (occurrence) : une réaction à ce qui se passe pendant la partie, une
+    // par incrément du compteur écouté, après l'effet de la bille concernée, chaque
+    // bille du pot dans l'ordre d'arrivée. Jamais à sa propre mise en poche.
+    {
+      id: "each",
+      reactive: true,
+      trigger: "pocketReaction",
+      event: "pocketReaction",
+      moment: "anytime",
+      texts: { card: "marbles.card.pocketed_reaction", effect: "marbles.outcome.pot" },
+    },
   ],
 };
 
@@ -485,6 +505,9 @@ export const MARBLE_POCKET = {
 //   field            le champ de la bille dans MARBLE_TYPES ;
 //   part             (facultatif) la clé dans ce champ, quand il est un objet de
 //                    moments (En poche) ;
+//   reactive         (facultatif) le moment réactif d'En poche : une ligne par
+//                    occurrence écoutée par la bille, dans l'ordre des valeurs de
+//                    partie (view/marbles/card.js) ;
 //   labelKey         son gabarit, qui reçoit {effect} ;
 //   variantLabelKey  (facultatif) son gabarit quand l'effet diffère selon la base ;
 //   required         champ toujours présent, « aucun effet » s'il est vide ; sinon,
@@ -497,8 +520,11 @@ export const MARBLE_CARD_MODEL = {
   ],
   below: [
     ...MARBLE_TRIGGERS.filter((trigger) => trigger.card === "below").map((trigger) => ({ field: trigger.field, labelKey: trigger.texts.card })),
-    // En poche, en dernier : un champ par moment.
-    ...MARBLE_POCKET.moments.map((moment) => ({ field: MARBLE_POCKET.field, part: moment.id, labelKey: moment.texts.card })),
+    // En poche, en dernier : un champ par moment fixe, puis une ligne par occurrence
+    // écoutée.
+    ...MARBLE_POCKET.moments.map((moment) =>
+      moment.reactive ? { field: MARBLE_POCKET.field, reactive: true, labelKey: moment.texts.card } : { field: MARBLE_POCKET.field, part: moment.id, labelKey: moment.texts.card }
+    ),
   ],
   emptyBelowKey: "marbles.card.no_special_effect",
 };

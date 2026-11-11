@@ -26,7 +26,7 @@ import {
 import { detailLine, stepDetail } from "../../lib/detail-card.js";
 import { createMarblesGame, marblesReduce, END_REASONS, MARBLE_ERRORS, SLOTS } from "../marbles.js";
 import { emptyTally } from "../marbles-tally.js";
-import { MARBLE_KEYWORDS, TALLY_COUNTERS } from "../marbles.js";
+import { MARBLE_KEYWORDS, REACTION_KEYS, TALLY_COUNTERS } from "../marbles.js";
 import { TALLY_CATEGORIES } from "../marbles-counters.js";
 import {
   bagDisplayOrder,
@@ -144,6 +144,12 @@ function sampleEvents() {
   // Un tour avec des emplacements vides, pour les phases sautées.
   const skipped = rules.reduce({ ...emptyBagMarblesGame(rules, 3), turn: 2, stage: "play" }, { type: "resolve" });
   events.push(...skipped.events);
+  // La tigrée du pot réagit à la Chiquenaude de l'argile.
+  const reacting = rules.reduce({ ...emptyBagMarblesGame(rules, 3), turn: 2, stage: "play", hand: inHand(["clay"]), pot: ["tiger"] }, { type: "place", handIndex: 0, slot: "apex" });
+  events.push(...reacting.events);
+  // La limite de sécurité, abaissée : la chaîne s'arrête, l'action aboutit.
+  const interrupted = rules.reduce(rules.createGame(3), { type: "draw" }, { eventLimit: 3 });
+  events.push(...interrupted.events);
   return { events, state: { ...state, stage: "play" } };
 }
 
@@ -203,7 +209,10 @@ function checkCards(run) {
     );
     run.same(
       "fiche : la Pioche en base, un Polissage sur soi, une Éjection conditionnée au calibre",
-      { above: ["Pointe : Vitesse +2 et Polissage 1.", "Base : Pioche 1."], below: ["Éveil : Pioche 1.", "Éjection : Pioche 1 si la bille posée est plus grosse."] },
+      {
+        above: ["Pointe : Vitesse +2 et Polissage 1.", "Base : Pioche 1."],
+        below: ["Éveil : Pioche 1.", "Éjection : Pioche 1 si la bille posée est plus grosse.", "En poche, à chaque mélange : Polissage 1 à la pointe."],
+      },
       fields("mica")
     );
     // Les conditions de calibre, lisibles à l'oreille.
@@ -216,7 +225,18 @@ function checkCards(run) {
       fields("agate").below
     );
     run.same("fiche : la Pioche au tic", ["Tic : Pioche 1."], fields("cats_eye").below);
-    run.same("fiche : la Pioche à l'éjection", ["Éjection : Pioche 1."], fields("stoneware").below);
+    run.same("fiche : la Pioche à l'éjection, puis sa réaction en poche", ["Éjection : Pioche 1.", "En poche, à chaque bille éjectée : Masse +1."], fields("stoneware").below);
+    run("fiche : la réaction de la tigrée, en dernier", "En poche, à chaque chiquenaude : Vitesse +2.", fields("tiger").below.at(-1));
+    // Plusieurs occurrences écoutées : une ligne chacune, dans l'ordre des valeurs de
+    // partie, après les moments fixes.
+    const listening = fabricatedRules({
+      many: { pocketed: { shuffles: [{ action: "mass", amount: 1 }], resolution: [{ action: "speed", amount: 1 }], flick: [{ action: "speed", amount: 2 }] } },
+    });
+    run.same(
+      "fiche : moments fixes, puis une ligne par occurrence, dans l'ordre des valeurs de partie",
+      ["En poche, à chaque résolution : Vitesse +1.", "En poche, à chaque chiquenaude : Vitesse +2.", "En poche, à chaque mélange : Masse +1."],
+      marbleCard("many", "x", listening, t).below.map(plain)
+    );
     run.same(
       "fiche : la Chiquenaude, le Final, puis En poche à l'entrée de la porcelaine",
       ["Chiquenaude : Masse +1.", "Final : Vitesse +4.", "En poche, à l'entrée : Vitesse +10."],
@@ -296,7 +316,12 @@ function checkCards(run) {
       fields("gorilla").below
     );
     run.same("fiche, anglais : En poche", ["Final: Polish 1 to the apex and Pocket this marble.", "Pocketed, each resolution: Mass +1."], fields("agate").below.slice(-2));
-    run.same("fiche, anglais : comparaison de calibre à l'Éjection", ["Awaken: Draw 1.", "Knockout: Draw 1 if the placed marble is larger."], fields("mica").below);
+    run.same(
+      "fiche, anglais : comparaison de calibre à l'Éjection, réaction en poche",
+      ["Awaken: Draw 1.", "Knockout: Draw 1 if the placed marble is larger.", "Pocketed, each shuffle: Polish 1 to the apex."],
+      fields("mica").below
+    );
+    run("fiche, anglais : la réaction de la tigrée", "Pocketed, each flick: Speed +2.", fields("tiger").below.at(-1));
     run("fiche, anglais : comptage par calibre", "Base: Speed +1 per active peewee.", fields("stoneware").above[1]);
     run("fiche, anglais : calibre d'un emplacement", "Apex: Mass +1 and Mass +2 if the left base is a boulder.", fields("agate").above[0]);
     run("anglais : bille en liste, calibre après le nom", "gorilla, boulder, wear 3. 1 of 2", describeMarbleInList("gorilla", 0, 2, rules, t));
@@ -406,7 +431,7 @@ function checkKeywords(run) {
   const locale = getLocale();
   const ids = (marble, marbles = rules) => marbles.keywordsOf(marble).map((keyword) => keyword.id);
   run.same("mots-clés : la géante, déclencheurs, actions, puis pointe et base", ["awaken", "final", "draw", "polish", "apex", "base"], ids("giant"));
-  run.same("mots-clés : le mica, la Pioche une seule fois (base, éveil, éjection)", ["awaken", "knockout", "draw", "polish", "apex", "base"], ids("mica"));
+  run.same("mots-clés : le mica, la Pioche une seule fois (base, éveil, éjection) ; En poche par sa réaction", ["awaken", "knockout", "pocketed", "draw", "polish", "apex", "base"], ids("mica"));
   run.same("mots-clés : le sulfure, En poche avant les actions, Fêlure puis Empocher", ["windfall", "pocketed", "crack", "pocket", "apex", "base"], ids("sulphide"));
   run.same("mots-clés : la porcelaine, En poche par son seul effet d'entrée", ["flick", "final", "pocketed", "apex", "base"], ids("porcelain"));
   run.same("mots-clés : ni Vitesse ni Masse, ni calibre", ["flick", "hit", "apex", "base"], ids("clay"));
@@ -425,6 +450,7 @@ function checkKeywords(run) {
     "Éveil : se déclenche quand la bille est piochée. " +
       "Trouvaille : se déclenche quand le sac est reconstitué à partir de la défausse, si la bille est sur le triangle. " +
       "Final : se déclenche quand la bille est usée et quitte le triangle. Elle est alors déjà dans la défausse : si son Final l'empoche, elle passe de la défausse au pot. " +
+      "En poche : effets actifs uniquement lorsque la bille est dans le pot. " +
       "Pointe : effet joué pendant la phase de pointe, quand la bille est posée en pointe. " +
       "Base : effet joué pendant la phase de base, quand la bille est posée en base gauche ou en base droite. Il peut différer selon le côté.",
     plain(keywordsText("tiger", rules, t))
@@ -919,6 +945,8 @@ export default function checkMarblesView(run) {
       ];
       const missingTallyTexts = tallyKeys.filter((key) => !Object.hasOwn(LOCALE_TABLES[locale], key));
       run.same(`${locale} : chaque valeur de partie a ses textes`, [], missingTallyTexts);
+      const missingEach = REACTION_KEYS.map((id) => `marbles.tally.${id}.each`).filter((key) => !Object.hasOwn(LOCALE_TABLES[locale], key));
+      run.same(`${locale} : chaque occurrence écoutable a son « à chaque »`, [], missingEach);
 
       const dirtySteps = buildSteps(events, t).map((step) => step.text).filter((text) => !isClean(text));
       run.same(`${locale} : chaque étape du journal se dit`, [], dirtySteps.slice(0, 3));
@@ -1025,17 +1053,17 @@ export default function checkMarblesView(run) {
     const menuLines = (handIndex, slot) => placementLines(lensed, handIndex, slot, rules, t).map(({ key, params }) => said(t(key, params)));
     run.same(
       "confirmation sur vide : la question, les valeurs prévues, puis la Chiquenaude",
-      ["Poser argile en base droite ?", "Vitesse +1", "Chiquenaude d'argile : aucun effet"],
+      ["Poser argile en base droite ?", "Vitesse +1", "Chiquenaude d'argile : aucun effet", "Pot : aucun effet"],
       menuLines(0, "rightBase")
     );
     run.same(
       "confirmation sur occupé : dans l'ordre réel, élision comprise, bonus reçu compté",
-      ["Poser argile en pointe ?", "Vitesse +8", "Chiquenaude d'argile : aucun effet", "Éjection de gorille : Vitesse +3", "Tic d'argile : Vitesse +2"],
+      ["Poser argile en pointe ?", "Vitesse +8", "Chiquenaude d'argile : aucun effet", "Éjection de gorille : Vitesse +3", "Tic d'argile : Vitesse +2", "Pot : aucun effet"],
       menuLines(0, "apex")
     );
     run.same(
       "confirmation : aucun effet dit, même structure ; un Polissage ciblé chez qui le produit",
-      ["Poser verre en base gauche ?", "Masse +1", "Chiquenaude de verre : aucun effet", "Éjection de loupe : aucun effet", "Tic de verre : Polissage 1 à la pointe"],
+      ["Poser verre en base gauche ?", "Masse +1", "Chiquenaude de verre : aucun effet", "Éjection de loupe : aucun effet", "Tic de verre : Polissage 1 à la pointe", "Pot : aucun effet"],
       menuLines(2, "leftBase")
     );
     // Les valeurs prévues au format de R : ce que la loupe donne s'entend chez le
@@ -1044,25 +1072,25 @@ export default function checkMarblesView(run) {
     const lensToPlace = { ...lensed, hand: inHand(["magnifier"]), triangle: { ...lensed.triangle, leftBase: null }, tally: emptyTally(TALLY_COUNTERS) };
     run.same(
       "confirmation : valeurs produites seulement, sans bonus donné",
-      ["Poser loupe en base gauche ?", "aucun effet", "Chiquenaude de loupe : Vitesse +2"],
+      ["Poser loupe en base gauche ?", "aucun effet", "Chiquenaude de loupe : Vitesse +2", "Pot : aucun effet"],
       placementLines(lensToPlace, 0, "leftBase", rules, t).map(({ key, params }) => said(t(key, params)))
     );
-    // Le menu entier : question, valeurs, Chiquenaude, Éjection, Tic, puis Annuler
-    // avant Confirmer ; seules ces deux-là agissent.
+    // Le menu entier : question, valeurs, Chiquenaude, Éjection, Tic, le pot, puis
+    // Annuler avant Confirmer ; seules ces deux-là agissent.
     const entries = confirmationEntries(() => {}, placementLines(lensed, 0, "apex", rules, t));
     run.same(
       "confirmation : ordre complet du menu sur occupé",
-      ["marbles.place.question", "marbles.place.values", "marbles.place.flick", "marbles.place.knockout", "marbles.place.hit", "menu.confirm.cancel", "menu.confirm.confirm"],
+      ["marbles.place.question", "marbles.place.values", "marbles.place.flick", "marbles.place.knockout", "marbles.place.hit", "marbles.place.pot", "menu.confirm.cancel", "menu.confirm.confirm"],
       entries.map((entry) => entry.label)
     );
     run.same(
       "confirmation : les entrées d'information sans action",
-      [false, false, false, false, false, true, true],
+      [false, false, false, false, false, false, true, true],
       entries.map((entry) => typeof entry.onActivate === "function")
     );
     run.same(
       "confirmation : ordre complet du menu sur vide",
-      ["marbles.place.question", "marbles.place.values", "marbles.place.flick", "menu.confirm.cancel", "menu.confirm.confirm"],
+      ["marbles.place.question", "marbles.place.values", "marbles.place.flick", "marbles.place.pot", "menu.confirm.cancel", "menu.confirm.confirm"],
       confirmationEntries(() => {}, placementLines(lensed, 0, "rightBase", rules, t)).map((entry) => entry.label)
     );
 
@@ -1087,7 +1115,7 @@ export default function checkMarblesView(run) {
     setLocale("en");
     run.same(
       "anglais : confirmation sur occupé",
-      ["Place clay on the apex?", "Speed +8", "Flick of clay: no effect", "Knockout of gorilla: Speed +3", "Hit from clay: Speed +2"],
+      ["Place clay on the apex?", "Speed +8", "Flick of clay: no effect", "Knockout of gorilla: Speed +3", "Hit from clay: Speed +2", "Pot: no effect"],
       placementLines(lensed, 0, "apex", rules, t).map(({ key, params }) => t(key, params))
     );
     run("anglais : bille en main", "clay, standard, wear 3. 1 of 3", describeHandFocus(holding, 0, rules, t));

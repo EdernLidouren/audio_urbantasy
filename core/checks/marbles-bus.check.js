@@ -1,11 +1,10 @@
 // Vérifications du core — domaine « marbles-bus ». Le bus d'évènements du jeu
 // des billes (core/marbles-bus.js) : file premier entré, premier sorti, aucune
-// récursion, limite de sécurité ; l'ordre fixe des écouteurs et le refus propre
-// du réducteur. Lancées par core/checks/index.js/runChecks
+// récursion, limite de sécurité qui arrête la chaîne proprement ; l'ordre fixe des
+// écouteurs et l'arrêt propre d'une action du réducteur. Lancées par core/checks/index.js/runChecks
 // (`node tools/run-checks.js marbles-bus`).
 
-import { throws } from "../../lib/check.js";
-import { MAX_EVENTS_PER_ACTION, MarbleEventLimitError, createEventBus } from "../marbles-bus.js";
+import { MAX_EVENTS_PER_ACTION, createEventBus } from "../marbles-bus.js";
 import { createMarblesGame, marbleListeners, marblesReduce } from "../marbles.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
 import { createMarblesRules } from "../marbles-rules.js";
@@ -56,25 +55,41 @@ export default function checkMarblesBus(run) {
   const alone = createEventBus((event) => outside.push(event));
   alone.settle("seul");
   run.same("interruption : hors de tout traitement, comme emit", ["seul"], outside);
-  let interruptionCaught = null;
-  const loopingSettle = createEventBus((event) => loopingSettle.settle(event), 10);
-  try {
-    loopingSettle.settle("tour");
-  } catch (error) {
-    interruptionCaught = error;
-  }
-  run("interruption : une boucle d'interruptions lève aussi", true, interruptionCaught instanceof MarbleEventLimitError);
+  let settleStops = 0;
+  let settled = 0;
+  const loopingSettle = createEventBus(
+    (event) => {
+      settled += 1;
+      loopingSettle.settle(event);
+    },
+    10,
+    () => (settleStops += 1)
+  );
+  loopingSettle.settle("tour");
+  run("interruption : une boucle d'interruptions s'arrête aussi, sans lever", 1, settleStops);
+  run("interruption : arrêtée à la limite", 10, settled);
 
-  // Limite de sécurité : une boucle lève, avec une erreur qui se comprend.
-  let caught = null;
-  const looping = createEventBus((event) => looping.emit(event), 10);
-  try {
-    looping.emit("tour");
-  } catch (error) {
-    caught = error;
-  }
-  run("limite : une boucle lève", true, caught instanceof MarbleEventLimitError);
-  run("limite : le message dit la limite et la boucle", true, /10 évènements.*boucle/.test(caught?.message ?? ""));
+  // Limite de sécurité : une boucle s'arrête proprement, sans lever ; `onLimit` une
+  // seule fois ; plus rien n'est traité ensuite.
+  let stops = 0;
+  let turns = 0;
+  const looping = createEventBus(
+    (event) => {
+      turns += 1;
+      looping.emit(event);
+      looping.emit("autre");
+    },
+    10,
+    () => (stops += 1)
+  );
+  looping.emit("tour");
+  run("limite : une boucle s'arrête à la limite", 10, turns);
+  run("limite : signalée une fois", 1, stops);
+  run("limite : le bus le dit", true, looping.stopped());
+  looping.emit("après");
+  looping.settle("après");
+  run("limite : plus rien n'est traité ensuite", 10, turns);
+  run("limite : jamais signalée deux fois", 1, stops);
 
   let handled = 0;
   const exact = createEventBus(() => {
@@ -84,17 +99,21 @@ export default function checkMarblesBus(run) {
   exact.emit("deux");
   exact.emit("trois");
   run("limite : atteinte sans être dépassée, tout passe", 3, handled);
-  run("limite : le suivant est refusé", true, throws(() => exact.emit("quatre")));
+  run("limite : pas d'arrêt", false, exact.stopped());
+  exact.emit("quatre");
+  run("limite : le suivant arrête la chaîne", 3, handled);
   run("limite : largement au-dessus d'une action réelle", true, MAX_EVENTS_PER_ACTION >= 100);
 
-  // Le réducteur refuse proprement : un code, l'état d'avant, un journal vide.
+  // Le réducteur finit son action : la chaîne arrêtée se note au journal, l'action
+  // aboutit, l'état reçu reste intact.
   const game = rules.createGame(3);
-  const refused = rules.reduce(game, { type: "draw" }, { eventLimit: 3 });
-  run("réducteur : au-delà de la limite, refus", false, refused.ok);
-  run("réducteur : code du refus", "eventLimit", refused.error);
-  run("réducteur : état inchangé", game, refused.state);
-  run.same("réducteur : journal vide", [], refused.events);
-  run("réducteur : sous la limite, l'action passe", true, rules.reduce(game, { type: "draw" }, { eventLimit: 40 }).ok);
+  const frozen = structuredClone(game);
+  const halted = rules.reduce(game, { type: "draw" }, { eventLimit: 3 });
+  run("réducteur : au-delà de la limite, l'action aboutit", true, halted.ok);
+  run("réducteur : la chaîne arrêtée est notée", 1, halted.events.filter((event) => event.type === "chainInterrupted").length);
+  run.same("réducteur : l'état reçu n'est pas touché", frozen, game);
+  run("réducteur : la pioche du tour se finit (le corps de l'action continue)", "play", halted.state.stage);
+  run("réducteur : sous la limite, rien de noté", false, rules.reduce(game, { type: "draw" }, { eventLimit: 40 }).events.some((event) => event.type === "chainInterrupted"));
 
   // L'ordre fixe des écouteurs : base gauche, base droite, pointe, puis la main.
   const listening = {

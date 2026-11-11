@@ -31,6 +31,7 @@ export const TRIGGER_WORDS = {
   // Les moments En poche (config/marbles-values.js/MARBLE_POCKET).
   pocketEntry: { name: "En poche, à l'entrée", effect: "Effet d'entrée au pot", produced: "à l'entrée au pot" },
   pocketResolution: { name: "En poche, à chaque résolution", effect: "Effet du pot", produced: "au pot" },
+  pocketReaction: { name: "En poche, à chaque occurrence", effect: "Réaction du pot", produced: "en réaction au pot" },
 };
 for (const trigger of MARBLE_TRIGGERS) {
   if (!Object.hasOwn(TRIGGER_WORDS, trigger.id)) throw new Error(`outils des billes : le déclencheur "${trigger.id}" n'a pas ses mots (TRIGGER_WORDS).`);
@@ -103,9 +104,12 @@ export function formatState(state, name) {
   return lines;
 }
 
+// Les effets d'une bille du pot (les moments En poche).
+const POT_TRIGGERS = new Set(MARBLE_POCKET.moments.map((moment) => moment.trigger));
+
 function effectLine(event, name) {
-  // Une bille sans emplacement (l'Éveil) est en main.
-  const where = event.slot === null || event.slot === undefined ? "en main" : `en ${slotLabel(event.slot)}`;
+  // Une bille sans emplacement est au pot (En poche) ou en main (l'Éveil).
+  const where = POT_TRIGGERS.has(event.trigger) ? "au pot" : event.slot === null || event.slot === undefined ? "en main" : `en ${slotLabel(event.slot)}`;
   let line = `${TRIGGER_WORDS[event.trigger]?.effect ?? `Effet ${event.trigger}`}, ${marbleLabel(event.marble, name)} ${where} : Vitesse ${signed(event.speedDelta)}, Masse ${signed(event.massDelta)}`;
   for (const gift of event.given ?? []) {
     line += `, donne Vitesse ${signed(gift.speed)} et Masse ${signed(gift.mass)} à ${slotLabel(gift.slot)}`;
@@ -138,6 +142,8 @@ const EVENT_LINES = {
   pocketed: (event, name) => `Mise en poche : ${marbleLabel(event.marble, name)}, depuis ${POCKET_ORIGINS[event.from]}${event.slot ? ` (${slotLabel(event.slot)})` : ""}.`,
   lost: (event, name) => `Perdue, pot plein : ${marbleLabel(event.marble, name)}, depuis ${POCKET_ORIGINS[event.from]}${event.slot ? ` (${slotLabel(event.slot)})` : ""}.`,
   potResolution: (event, name) => `Pot : ${marbleLabel(event.marble, name)}, ${event.index + 1}e arrivée.`,
+  pocketReaction: (event, name) => `Réaction du pot : ${marbleLabel(event.marble, name)}, ${event.index + 1}e arrivée, à ${event.counter}.`,
+  chainInterrupted: () => "Enchaînement interrompu : limite de sécurité du bus atteinte (anomalie).",
   final: (event, name) => `Final : ${marbleLabel(event.marble, name)}, usée, partie de ${slotLabel(event.slot)}.`,
   phase: (event, name) => `Phase de ${slotLabel(event.slot)} : ${marbleLabel(event.marble, name)}.`,
   phaseSkipped: (event) => `Phase de ${slotLabel(event.slot)} : vide.`,

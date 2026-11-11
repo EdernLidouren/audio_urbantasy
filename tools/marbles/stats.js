@@ -49,7 +49,7 @@ function marbleSummary(id, games, randomBags) {
 //       hit, knockout ; la Chiquenaude, à chaque pose, s'y range avec eux),
 //     draws: { byEffect, regenerations, midTurnRegenerations } (par partie),
 //     throwsPerTurn (lancers par tour joué),
-//     refusals, marbles: [par bille, dans l'ordre de la table] }
+//     refusals, interruptions, marbles: [par bille, dans l'ordre de la table] }
 export function summarize({ params, games }) {
   const scores = games.map((game) => game.score).sort((a, b) => a - b);
   const turnCount = Math.max(0, ...games.map((game) => game.impacts.length));
@@ -91,6 +91,7 @@ export function summarize({ params, games }) {
     },
     throwsPerTurn: round(sum(games.map((game) => game.throws)) / Math.max(1, sum(games.map((game) => game.turns)))),
     refusals: sum(games.map((game) => game.refusals.length)),
+    interruptions: sum(games.map((game) => game.interruptions)),
     marbles: MARBLE_IDS.map((id) => marbleSummary(id, games, randomBags)),
   };
 }
