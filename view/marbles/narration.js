@@ -7,7 +7,7 @@ import { nameRef } from "../../data/i18n/index.js";
 import { MARBLE_POCKET, MARBLE_SIZES, MARBLE_TRIGGERS } from "../../config/marbles-values.js";
 import { SLOTS, TALLY_COUNTERS, throwsLeft } from "../../core/marbles.js";
 import { emptyTally } from "../../core/marbles-tally.js";
-import { AMOUNT_SOURCES, CLAUSE_ACTIONS, CONDITIONS, FIRST_IN_HAND, amountOf } from "../../core/marbles-effects.js";
+import { AMOUNT_SOURCES, CHOICE_ZONES, CLAUSE_ACTIONS, CONDITIONS, FIRST_IN_HAND, amountOf, isChoice } from "../../core/marbles-effects.js";
 import { forecast } from "../../core/marbles-forecast.js";
 import { formatMenuPosition } from "../../lib/menu.js";
 
@@ -48,9 +48,26 @@ const ACTION_TEXTS = {
   polish: { up: "marbles.effect.polish" },
   crack: { up: "marbles.effect.crack" },
   // Sans montant ; son texte dépend de sa cible (actionText) : la bille elle-même
-  // (`up`), un emplacement (`slot`, qui reçoit {slot}), la première de la main.
-  pocket: { up: "marbles.effect.pocket_self", targets: { slot: "marbles.effect.pocket_slot", [FIRST_IN_HAND]: "marbles.effect.pocket_hand" } },
+  // (`up`), un emplacement (`slot`, qui reçoit {slot}), la première de la main, une
+  // bille au choix (`choice`, qui reçoit {target}).
+  pocket: {
+    up: "marbles.effect.pocket_self",
+    targets: { slot: "marbles.effect.pocket_slot", [FIRST_IN_HAND]: "marbles.effect.pocket_hand", choice: "marbles.effect.pocket_choice" },
+  },
 };
+
+// Ce que dit une CIBLE AU CHOIX (core/marbles-effects.js, en-tête) : « une bille
+// active », « 2 billes de votre main », « jusqu'à 2 billes actives ». `count` : le
+// nombre à dire, celui de la cible par défaut (ce qui reste à choisir, sinon). Les
+// zones se disent dans l'ordre de leur déclaration (CHOICE_ZONES) : une clé par
+// combinaison de zones et par ce qui se vise, `marbles.choice.noun.<zones>_<pick>`.
+const ZONE_ORDER = Object.keys(CHOICE_ZONES);
+
+function choiceTarget(choice, t, count = choice.count, upTo = choice.upTo === true) {
+  const zones = ZONE_ORDER.filter((zone) => choice.zones.includes(zone)).join("_");
+  const noun = t(`marbles.choice.noun.${zones}_${choice.pick}`, { count });
+  return upTo ? t("marbles.choice.up_to", { target: noun }) : noun;
+}
 
 // Une action sans texte, ou un texte sans action, échoue au chargement.
 for (const action of new Set([...Object.keys(CLAUSE_ACTIONS), ...Object.keys(ACTION_TEXTS)])) {
@@ -79,10 +96,18 @@ function actionText(action, amount, target, t) {
   const { up, targets } = ACTION_TEXTS[action];
   if (targets !== undefined) {
     if (target === undefined) return t(up);
+    if (isChoice(target)) return t(targets.choice, { target: choiceTarget(target, t) });
     return target === FIRST_IN_HAND ? t(targets[FIRST_IN_HAND]) : t(targets.slot, { slot: slotName(target, t) });
   }
   const text = t(up, { amount });
-  return target === undefined ? text : t("marbles.effect.given", { effect: text, slot: slotName(target, t) });
+  return target === undefined ? text : targetedText(text, target, t);
+}
+
+// Un effet dit avec sa cible : un emplacement (« Polissage 1 à la pointe ») ou un
+// choix (« Polissage 1 à une bille active au choix »).
+function targetedText(text, target, t) {
+  if (isChoice(target)) return t("marbles.effect.given_choice", { effect: text, target: choiceTarget(target, t) });
+  return t("marbles.effect.given", { effect: text, slot: slotName(target, t) });
 }
 
 // Les actions sur une bille d'un effet ([{ action, amount?, target? }]) -> leurs
@@ -115,20 +140,24 @@ function pocketPart({ marble, lost, entry }, t) {
 }
 
 // Une cible vide PRÉVUE (core/marbles-forecast.js, `empty`) : « pointe vide »,
-// « main vide », « agate déjà partie ».
+// « main vide », « agate déjà partie », « aucune cible au choix ».
 function emptyPart({ slot, target, marble }, t) {
   if (target === FIRST_IN_HAND) return t("marbles.forecast_empty.hand");
+  if (target === "choice") return t("marbles.forecast_empty.choice");
   if (target === "self") return t("marbles.forecast_empty.self", { marble: nameRef(`marble.${marble}.name`) });
   return t("marbles.forecast_empty.slot", { slot: slotName(slot, t) });
 }
 
-// Le texte d'un effet prévu suivi de ses résultats : ses cibles vides, puis ce que
-// ses Empocher ont déplacé (« Polissage 1 à la pointe, pointe vide » ; « Empocher la
-// bille en pointe, puis porcelaine en poche, à l'entrée : Vitesse +10 »). Un effet
+// Le texte d'un effet prévu suivi de ses résultats : ses cibles vides, ses choix
+// indécis, puis ce que ses Empocher ont déplacé (« Polissage 1 à la pointe, pointe
+// vide » ; « Polissage 1 à une bille active au choix, selon votre choix » ; « Empocher
+// la bille en pointe, puis porcelaine en poche, à l'entrée : Vitesse +10 »). Un effet
 // joué n'en a pas : la séquence les dit à part.
 function withResults(text, effect, t) {
   const empty = effect.empty ?? [];
-  const withEmpty = empty.length === 0 ? text : t("marbles.forecast_empty.after", { effect: text, empty: t("marbles.effect.combined", { parts: empty.map((target) => emptyPart(target, t)) }) });
+  const withEmptyOnly = empty.length === 0 ? text : t("marbles.forecast_empty.after", { effect: text, empty: t("marbles.effect.combined", { parts: empty.map((target) => emptyPart(target, t)) }) });
+  // La prévision ne devine pas le choix du joueur : elle le dit, une fois par effet.
+  const withEmpty = (effect.undecided?.length ?? 0) === 0 ? withEmptyOnly : t("marbles.forecast_choice.after", { effect: withEmptyOnly });
   if (!effect.pockets?.length) return withEmpty;
   return t("marbles.pocket.then", { effect: withEmpty, pockets: t("marbles.effect.combined", { parts: effect.pockets.map((moved) => pocketPart(moved, t)) }) });
 }
@@ -219,7 +248,7 @@ function describeClause(clause, situation, t) {
   let text = Number.isInteger(clause.amount)
     ? combined(valueParts({ [clause.action]: clause.amount }, t), t)
     : computedText(clause.action, clause.amount, situation, t);
-  if (clause.target !== undefined) text = t("marbles.effect.given", { effect: text, slot: slotName(clause.target, t) });
+  if (clause.target !== undefined) text = targetedText(text, clause.target, t);
   if (clause.when !== undefined) text = t("marbles.effect.conditional", { effect: text, condition: CONDITION_TEXTS[clause.when.type](clause.when, t) });
   return text;
 }
@@ -546,6 +575,7 @@ const EVENT_TEXTS = {
   // main), ou la bille elle-même qui n'est plus là.
   targetEmpty: (event, t) => {
     if (event.target === FIRST_IN_HAND) return t("marbles.event.target_empty_hand");
+    if (event.target === "choice") return t("marbles.event.target_empty_choice");
     if (event.target === "self") return t("marbles.event.target_empty_self", { marble: nameRef(`marble.${event.marble}.name`) });
     return t("marbles.event.target_empty", { slot: slotName(event.slot, t) });
   },
@@ -559,6 +589,16 @@ const EVENT_TEXTS = {
   pocketReaction: SILENT,
   // La limite de sécurité a arrêté la chaîne : une anomalie, qui se dit.
   chainInterrupted: (event, t) => t("marbles.event.chain_interrupted"),
+  // Un choix : l'écran en dit la question (describeChoicePrompt) ; chaque cible
+  // choisie se dit (« agate choisie. »), la fin aussi quand elle n'est pas d'avoir
+  // fait les N choix. Un choix indécis n'existe qu'à l'aveugle, jamais dit ici.
+  choice: SILENT,
+  chosen: (event, t) =>
+    event.zone === "triangle" && event.marble === null
+      ? t("marbles.choice.chosen_slot", { slot: slotName(event.slot, t) })
+      : t("marbles.choice.chosen", { marble: nameRef(`marble.${event.marble}.name`) }),
+  choiceEnded: (event, t) => (event.reason === "count" ? null : t(`marbles.choice.ended.${event.reason}`)),
+  choiceUndecided: SILENT,
   discarded: (event, t) => t(`marbles.event.discarded.${event.cause}`, { marble: nameRef(`marble.${event.marble}.name`) }),
   placed: (event, t) => t("marbles.event.placed", { marble: marbleName(event.marble, t), slot: slotName(event.slot, t) }),
   phaseSkipped: (event, t) => outcomeLine(event.slot, null, t),
@@ -569,6 +609,20 @@ const EVENT_TEXTS = {
   rotation: (event, t, context) => (context.endsBeforeNextTurn ? null : t("marbles.event.rotation", ROTATION)),
   gameOver: (event, t) => t(`marbles.event.game_over.${event.reason}`, { score: event.score }),
 };
+
+// La question d'un CHOIX EN ATTENTE (core/marbles.js, `pendingChoice`), à
+// l'ouverture : « Choisissez une bille de votre main à empocher. », « Choisissez
+// jusqu'à 2 billes actives à polir. T pour terminer. » ; après un premier choix, ce
+// qui reste : « Choisissez encore une bille active. ».
+export function describeChoicePrompt(pending, t) {
+  if (pending.chosen.length > 0) {
+    const target = choiceTarget(pending, t, pending.remaining, false);
+    return t(pending.upTo ? "marbles.choice.more_up_to" : "marbles.choice.more", { target });
+  }
+  const effect = pending.amount === undefined ? undefined : combined(valueParts({ [pending.action]: pending.amount }, t), t);
+  const question = t("marbles.choice.question", { target: choiceTarget(pending, t), verb: t(`marbles.choice.verb.${pending.action}`, { effect }) });
+  return pending.upTo ? `${question} ${t("marbles.choice.finish_hint")}` : question;
+}
 
 // La partie finit-elle après `index`, avant tout nouveau tour ?
 function endsBeforeNextTurn(events, index) {

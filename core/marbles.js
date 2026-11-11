@@ -5,7 +5,7 @@
 // aucune persistance aujourd'hui) :
 //   { rngState, maxHandSize, throwsPerTurn, potCapacity, firstTurnDraw, drawPerTurn,
 //     turnCount, turn, score, speed, mass, stage, endReason, bag, hand, discard,
-//     triangle, pot, lost, swapUsed, throwsUsed, tally }
+//     triangle, pot, lost, swapUsed, throwsUsed, tally, pendingChoice }
 // `pot` : les billes EN POCHE, des ids dans l'ordre d'arrivée, au plus
 // `potCapacity` ; `lost` : les billes PERDUES, envoyées au pot plein. Ni l'une ni
 // l'autre ne revient jamais dans le sac, ni ne quitte sa zone.
@@ -16,6 +16,25 @@
 // pocketReactionsOf).
 // `throwsUsed` : les LANCERS joués ce tour (une pose depuis la main en est un,
 // l'échange non), jamais plus que `throwsPerTurn`.
+// `pendingChoice` : null, ou le CHOIX EN ATTENTE d'une cible au choix
+// (core/marbles-effects.js, en-tête), qui a SUSPENDU l'action en cours :
+//   { action, amount?, zones, pick, count, upTo, by, eligible, chosen, remaining,
+//     resume: { from, action, answers, seen, eventLimit? } }
+// `action`, `amount` : l'action à appliquer aux cibles ; `by` : l'effet qui la
+// produit ({ trigger, slot, marble }) ; `eligible` : les cibles valides maintenant,
+// déjà choisies exclues ; `chosen` : celles déjà choisies, dans l'ordre ; une cible
+// est { zone: "hand", index, marble } ou { zone: "triangle", slot, marble }.
+// REPRISE PAR REJEU : `resume.from` est l'état d'AVANT l'action suspendue,
+// `resume.action` cette action (pioche, pose, résolution), `resume.answers` les
+// réponses déjà données, dans l'ordre, `resume.seen` le nombre d'évènements du
+// journal déjà rendus. L'action « choisir » rejoue l'action depuis `from` avec une
+// réponse de plus : la simulation étant déterministe (hasard dans l'état), le rejeu
+// refait exactement le même chemin, file du bus comprise, jusqu'au choix, consomme
+// les réponses et continue ; seuls les évènements d'après `seen` sont rendus. Une
+// pile d'appels ne se sérialise pas : l'état d'avant et les réponses, si. L'état
+// suspendu (`state` rendu avec le choix) est celui du déroulé à l'instant du choix :
+// il se lit, il ne se rejoue jamais. Tant qu'un choix attend, toute autre action est
+// refusée (`choicePending`).
 // bag et discard sont des listes d'ids de billes (doublons permis). Une bille
 // n'a d'usure que SUR le triangle, { marble, wear, bonus? } : une bille qui en
 // sort perd donc son usure et son bonus par construction. `bonus`
@@ -43,6 +62,10 @@
 //   { type: "swap", a, b }                      échange deux emplacements
 //   { type: "place", handIndex, slot }          pose une bille de la main
 //   { type: "resolve" }                         résout le tour, retrait, rotation
+//   { type: "choose", target }                  répond au choix en attente : une
+//                                               cible, { zone: "hand", index } ou
+//                                               { zone: "triangle", slot }
+//   { type: "choose", done: true }              termine un choix « jusqu'à N »
 // Résultat, toujours la même forme : { ok, state, events, error }. Refus :
 // ok false, `state` inchangé, `events` vide, `error` un code de MARBLE_ERRORS
 // (son texte : `marbles.error.<code>`). Rien n'est jamais levé pour une
@@ -71,6 +94,9 @@
 //   pocketed { marble, from, slot?, index?, by }, lost { marble, from, slot?, index?, by },
 //   potResolution { index, marble }, pocketReaction { index, marble, counter },
 //   chainInterrupted {},
+//   choice { action, amount?, zones, pick, count, upTo, by },
+//   chosen { zone, index?, slot?, marble, by },
+//   choiceEnded { reason, chosen, by }, choiceUndecided { action, by },
 //   wear { slot, marble, wear, maxWear },
 //   impact { speed, mass, impact, score },
 //   rotation { triangle }, turnEnded { turn }, gameOver { reason, score }.
@@ -105,6 +131,13 @@
 // dans les vérifications et le simulateur.
 // Un `effect` d'une bille du pot à une place connue (étape du pot, réaction) porte
 // aussi `potIndex`, cette place.
+// `choice` : un choix commence (au moins une cible éligible), le point d'accroche de
+// son ouverture ; `chosen` : une cible choisie, celui de sa validation ;
+// `choiceEnded` : la sélection est finie, `reason` "count" (N choix faits), "done"
+// (Terminer, en mode « jusqu'à N ») ou "exhausted" (plus aucune cible éligible).
+// Aucune cible éligible dès le départ : `targetEmpty` de `target` "choice", et rien
+// ne s'ouvre. `choiceUndecided` : à l'aveugle seulement (la prévision), un choix
+// que personne n'a tranché : son action n'est pas appliquée.
 // `targetEmpty` : une action sur une bille sans bille à prendre, produite par
 // l'effet `by` ({ trigger, slot, marble }, comme pocketed et lost) : `slot` vide ;
 // ou, pour Empocher, `slot` null et `target` "firstInHand" (main vide) ou "self" (la
@@ -135,7 +168,7 @@ import { MARBLE_PHASES, MARBLE_POCKET, MARBLE_TALLIES, MARBLE_TRIGGERS, MARBLES_
 import { createSeed, nextRandom } from "./rng.js";
 import { rejectUnknownFields } from "../lib/validate.js";
 import { createEventBus } from "./marbles-bus.js";
-import { CLAUSE_ACTIONS, FIRST_IN_HAND, SLOTS, addValues, effectAt, evaluateEffect, isMarbleSize, validateEffect } from "./marbles-effects.js";
+import { CHOICE_ZONES, CLAUSE_ACTIONS, FIRST_IN_HAND, SLOTS, addValues, effectAt, evaluateEffect, isChoice, isMarbleSize, validateEffect } from "./marbles-effects.js";
 import { emptyTally, recordTally } from "./marbles-tally.js";
 import { buildTallyCounters } from "./marbles-counters.js";
 
@@ -155,6 +188,10 @@ export const MARBLE_ERRORS = [
   "swapSameSlot",
   "swapBothEmpty",
   "noThrowsLeft",
+  "choicePending",
+  "noChoicePending",
+  "invalidChoice",
+  "choiceRequired",
 ];
 
 // Les types d'évènements du journal (voir l'en-tête), chacun avec vrai s'il nomme
@@ -190,6 +227,11 @@ export const JOURNAL_EVENTS = Object.freeze({
   potResolution: false,
   pocketReaction: false,
   chainInterrupted: false,
+  choice: false,
+  // La bille choisie peut être une bille piochée à l'aveugle (la prévision).
+  chosen: false,
+  choiceEnded: false,
+  choiceUndecided: false,
   wear: true,
   impact: false,
   rotation: false,
@@ -594,13 +636,17 @@ export function createMarblesGame(seed, options = {}, types) {
     // Les valeurs de partie, à zéro : la portée « cette partie » ne revient à zéro
     // qu'ici.
     tally: emptyTally(TALLY_COUNTERS),
+    // Aucun choix en attente.
+    pendingChoice: null,
   };
 }
 
 // --- Refus ---
 
-// Exportée pour la prévision, qui suit la même règle.
+// Exportée pour la prévision, qui suit la même règle. Un choix en attente bloque
+// tout le reste : il faut d'abord y répondre.
 export function stageRefusal(state, expected) {
+  if (state.pendingChoice) return "choicePending";
   if (state.stage === "over") return "gameOver";
   if (state.stage === expected) return null;
   return expected === "draw" ? "alreadyDrawn" : "mustDraw";
@@ -662,6 +708,11 @@ function resolveRefusal(state) {
 // résolution). Elle passe par les mêmes refus que le réducteur, sans en recopier
 // aucun. Sert aux joueurs automatiques des outils (tools/marbles/players.js).
 export function legalActions(state) {
+  // Un choix en attente : ses cibles, puis Terminer s'il est permis.
+  if (state.pendingChoice) {
+    const { eligible, upTo } = state.pendingChoice;
+    return [...eligible.map((target) => ({ type: "choose", target: targetRef(target) })), ...(upTo ? [{ type: "choose", done: true }] : [])];
+  }
   if (stageRefusal(state, "draw") === null) return [{ type: "draw" }];
   const actions = [];
   SLOTS.forEach((a, index) => {
@@ -824,6 +875,133 @@ function pocketReactionsOf(run, event, before) {
   return reactions;
 }
 
+// --- Les cibles au choix ---
+
+// Les cibles d'une zone de choix disponible (core/marbles-effects.js/CHOICE_ZONES),
+// valides à cet instant : (run, pick, bonus) -> [cible]. `bonus` : l'action est un
+// bonus de Vitesse ou de Masse, qui ne vaut que pour une phase encore à venir (règle
+// des cibles) : un emplacement dont la phase a commencé n'est pas éligible.
+const CHOICE_TARGETS = {
+  hand: (run) => run.state.hand.map(({ marble }, index) => ({ zone: "hand", index, marble })),
+  triangle: (run, pick, bonus) =>
+    SLOTS.filter((slot) => (pick === "slot" || run.state.triangle[slot] !== null) && !(bonus && run.phasesStarted.has(slot))).map((slot) => ({
+      zone: "triangle",
+      slot,
+      marble: run.state.triangle[slot]?.marble ?? null,
+    })),
+};
+for (const [zone, { available }] of Object.entries(CHOICE_ZONES)) {
+  if (available && !Object.hasOwn(CHOICE_TARGETS, zone)) throw new Error(`marbles : la zone de choix "${zone}" n'a pas ses cibles (CHOICE_TARGETS).`);
+}
+
+// Deux cibles désignent-elles la même chose ?
+function sameTarget(a, b) {
+  return a.zone === b.zone && (a.zone === "hand" ? a.index === b.index : a.slot === b.slot);
+}
+
+// La forme publique d'une cible, celle de l'action « choisir ».
+function targetRef(target) {
+  return target.zone === "hand" ? { zone: "hand", index: target.index } : { zone: "triangle", slot: target.slot };
+}
+
+// La réponse que porte une action « choisir », telle que le rejeu la consomme.
+export function answerOf(action) {
+  return action.done === true ? { done: true } : { target: targetRef(action.target) };
+}
+
+// Cette réponse au choix en attente est-elle permise ? Le code du refus, ou null.
+// Exportée pour l'interface et la prévision, qui suivent la même règle.
+export function chooseRefusal(state, action) {
+  const pending = state.pendingChoice;
+  if (!pending) return "noChoicePending";
+  if (action.done === true) return pending.upTo ? null : "choiceRequired";
+  const target = action.target;
+  if (target === null || typeof target !== "object" || !pending.eligible.some((eligible) => sameTarget(eligible, target))) return "invalidChoice";
+  return null;
+}
+
+// Un choix que le joueur doit trancher : le déroulé s'arrête là (transact).
+class ChoiceSuspension {
+  constructor(request) {
+    this.request = request;
+  }
+}
+
+// Fait choisir les cibles d'une clause au choix (core/marbles-effects.js, en-tête),
+// une par une : une cible déjà choisie n'est plus éligible ; la sélection s'arrête à
+// N choix, quand plus rien n'est éligible, ou sur Terminer (« jusqu'à N »). Aucune
+// cible éligible dès le départ : rien ne s'ouvre, `targetEmpty` le note. Les réponses
+// viennent du rejeu (run.answers) ; quand il n'y en a plus, le déroulé se SUSPEND
+// (ChoiceSuspension), sauf à l'aveugle, où le choix reste indécis
+// (`choiceUndecided`) et rien n'est choisi. -> les cibles, dans l'ordre des choix.
+function chooseTargets(run, clause, by) {
+  const { zones, pick, count, upTo = false } = clause.target;
+  const bonus = CLAUSE_ACTIONS[clause.action].kind === "value";
+  const chosen = [];
+  const eligibleNow = () =>
+    zones.flatMap((zone) => CHOICE_TARGETS[zone](run, pick, bonus)).filter((target) => !chosen.some((done) => sameTarget(done, target)));
+  if (eligibleNow().length === 0) {
+    run.emit({ type: "targetEmpty", action: clause.action, slot: null, target: "choice", by });
+    return [];
+  }
+  const request = { action: clause.action, ...(clause.amount === undefined ? {} : { amount: clause.amount }), zones, pick, count, upTo, by };
+  run.emit({ type: "choice", ...request });
+  while (chosen.length < count) {
+    const eligible = eligibleNow();
+    if (eligible.length === 0) {
+      run.emit({ type: "choiceEnded", reason: "exhausted", chosen: chosen.length, by });
+      return chosen;
+    }
+    const answer = run.answers[run.answerIndex];
+    if (answer === undefined) {
+      if (!run.blind) throw new ChoiceSuspension({ ...request, eligible, chosen: [...chosen], remaining: count - chosen.length });
+      run.choiceDependent = true;
+      run.emit({ type: "choiceUndecided", action: clause.action, by });
+      return chosen;
+    }
+    run.answerIndex += 1;
+    if (answer.done) {
+      run.emit({ type: "choiceEnded", reason: "done", chosen: chosen.length, by });
+      return chosen;
+    }
+    const target = eligible.find((candidate) => sameTarget(candidate, answer.target));
+    if (target === undefined) {
+      // Un rejeu réel refait le même chemin : une réponse qui ne colle pas est une
+      // faute de programmation. À l'aveugle (la prévision d'un choix), le chemin peut
+      // diverger (billes piochées inconnues) : le choix reste indécis.
+      if (!run.blind) throw new Error(`marbles : réponse rejouée hors des cibles éligibles, ${JSON.stringify(answer)}.`);
+      run.choiceDependent = true;
+      run.emit({ type: "choiceUndecided", action: clause.action, by });
+      return chosen;
+    }
+    chosen.push(target);
+    run.emit({ type: "chosen", ...target, by });
+  }
+  run.emit({ type: "choiceEnded", reason: "count", chosen: chosen.length, by });
+  return chosen;
+}
+
+// Applique une action sur une bille à chacune des cibles choisies, dans l'ordre des
+// choix. Une bille de la main se suit par son entrée (la main change quand l'une
+// d'elles part au pot) ; une cible partie entre-temps : sans effet, noté.
+function applyToChosen(run, operation, targets, by) {
+  const held = targets.map((target) => (target.zone === "hand" ? run.state.hand[target.index] : null));
+  targets.forEach((target, order) => {
+    if (target.zone === "triangle") {
+      if (CLAUSE_ACTIONS[operation.action].moves === "pot") pocketFromSlot(run, target.slot, by);
+      else applyMarbleAction(run, operation.action, operation.amount, target.slot, by);
+      return;
+    }
+    const index = run.state.hand.indexOf(held[order]);
+    if (index < 0) {
+      run.emit({ type: "targetEmpty", action: operation.action, slot: null, target: "choice", by });
+      return;
+    }
+    update(run, { hand: run.state.hand.filter((_, other) => other !== index) });
+    sendToPot(run, held[order].marble, { from: "hand", index }, by);
+  });
+}
+
 // --- Le déroulé d'une action ---
 
 function update(run, changes) {
@@ -842,7 +1020,12 @@ function fireEffect(run, trigger, listener, clauses, event) {
     replacement: event.replacement ?? null,
     tally: run.state.tally,
   };
-  const { self, gifts, operations } = evaluateEffect(clauses, situation, run.types);
+  const { self, gifts: printedGifts, operations } = evaluateEffect(clauses, situation, run.types);
+  const by = { trigger, slot: slot ?? null, marble };
+  // Un bonus au choix : le joueur choisit d'abord ses billes, puis chacune le reçoit.
+  const gifts = printedGifts.flatMap(({ choice, action, amount, ...gift }) =>
+    choice === undefined ? [gift] : chooseTargets(run, { action, amount, target: choice }, by).map((target) => ({ ...gift, slot: target.slot }))
+  );
   const bonus = trigger === "phase" ? run.state.triangle[slot].bonus : undefined;
   const { speed: speedDelta, mass: massDelta } = bonus ? addValues(self, bonus) : self;
 
@@ -872,11 +1055,12 @@ function fireEffect(run, trigger, listener, clauses, event) {
   run.emit({ type: "effect", trigger, slot, marble, speedDelta, massDelta, draw, operations, given, lost, speed, mass, ...place });
   if (draw > 0) drawMarbles(run, draw, "effect");
   // Les actions sur une bille, après la pioche, dans l'ordre des clauses : sur la
-  // bille elle-même (son emplacement) ou sur celle de l'emplacement visé. Empocher
-  // la déplace au pot, depuis là où elle est.
-  const by = { trigger, slot: slot ?? null, marble };
+  // bille elle-même (son emplacement), sur celle de l'emplacement visé, ou sur les
+  // billes choisies, choisies d'abord. Empocher la déplace au pot, depuis là où elle
+  // est.
   for (const operation of operations) {
-    if (CLAUSE_ACTIONS[operation.action].moves === "pot") pocketOperation(run, operation.target, listener, by);
+    if (isChoice(operation.target)) applyToChosen(run, operation, chooseTargets(run, operation, by), by);
+    else if (CLAUSE_ACTIONS[operation.action].moves === "pot") pocketOperation(run, operation.target, listener, by);
     else applyMarbleAction(run, operation.action, operation.amount, operation.target ?? slot, by);
   }
 }
@@ -992,14 +1176,19 @@ function handleEvent(run, event) {
 // Déroule une action sur un état de travail, avec son bus et son journal. Une
 // boucle d'évènements est arrêtée par la limite du bus : la chaîne s'arrête, le
 // journal le note (chainInterrupted), plus aucun effet ne joue, et l'action va à son
-// terme (la résolution finit son tour). `options` : { eventLimit, blind } (voir
-// marblesReduce). À l'aveugle, le résultat porte aussi `uncertain` : une bille
-// inconnue aurait pu réagir (handleEvent, pocketReactionsOf).
-function transact(state, types, { eventLimit, blind = false } = {}, body) {
+// terme (la résolution finit son tour). `options` : { eventLimit, blind, answers,
+// seen } (voir marblesReduce) ; `answers` : les réponses aux choix à rejouer ;
+// `seen` : les évènements déjà rendus (un rejeu ne rend que les suivants). `action` :
+// l'action déroulée, gardée pour la reprise. Un choix sans réponse SUSPEND l'action :
+// le résultat porte l'état du déroulé à cet instant, avec son `pendingChoice` (en-tête),
+// et les évènements jusque-là. À l'aveugle, le résultat porte aussi `uncertain` (une
+// bille inconnue aurait pu réagir : handleEvent, pocketReactionsOf) et
+// `choiceDependent` (un choix est resté indécis).
+function transact(state, types, { eventLimit, blind = false, answers = [], seen = 0 } = {}, body, action) {
   // `phasesStarted` : les emplacements dont la phase a commencé (ou a été sautée)
   // pendant cette action ; un bonus qui les vise est perdu (fireEffect). `reactions` :
   // par évènement émis, les réactions du pot à émettre après son traitement.
-  const run = { state, types, blind, uncertain: false, phasesStarted: new Set(), journal: [], reactions: new Map() };
+  const run = { state, types, blind, uncertain: false, choiceDependent: false, phasesStarted: new Set(), journal: [], reactions: new Map(), answers, answerIndex: 0 };
   const bus = createEventBus((event) => handleEvent(run, event), eventLimit, () => record({ type: "chainInterrupted" }));
   // Le journal s'écrit À L'ÉMISSION, dans l'ordre où l'état change : la file du bus
   // étant premier entré, premier sorti, c'est aussi l'ordre de traitement, sauf
@@ -1022,9 +1211,15 @@ function transact(state, types, { eventLimit, blind = false } = {}, body) {
     record(event);
     bus.settle(event);
   };
-  body(run);
-  const result = { ok: true, state: run.state, events: run.journal, error: null };
-  return blind ? { ...result, uncertain: run.uncertain } : result;
+  try {
+    body(run);
+  } catch (error) {
+    if (!(error instanceof ChoiceSuspension)) throw error;
+    const resume = { from: state, action, answers, seen: run.journal.length, ...(eventLimit === undefined ? {} : { eventLimit }) };
+    return { ok: true, state: { ...run.state, pendingChoice: { ...error.request, resume } }, events: run.journal.slice(seen), error: null };
+  }
+  const result = { ok: true, state: run.state, events: run.journal.slice(seen), error: null };
+  return blind ? { ...result, uncertain: run.uncertain, choiceDependent: run.choiceDependent } : result;
 }
 
 // Une copie À L'AVEUGLE d'un état, celle de la prévision : le sac et la défausse
@@ -1249,27 +1444,46 @@ function retireMarble(run, slot) {
 // (core/marbles-forecast.js). Jamais la pioche du tour : seuls des effets y
 // piochent.
 export function runResolution(state, types, options = {}) {
-  return transact(state, types, options, (run) => {
-    resolvePhases(run);
-    resolvePot(run);
-    retireWornMarbles(run);
+  return transact(state, types, options, resolveTurn, RESOLVE);
+}
 
-    const { speed, mass } = run.state;
-    const impact = impactOf(speed, mass);
-    const score = run.state.score + impact;
-    update(run, { score });
-    run.emit({ type: "impact", speed, mass, impact, score });
+const RESOLVE = Object.freeze({ type: "resolve" });
 
-    const { leftBase, rightBase, apex } = run.state.triangle;
-    const triangle = rotated({ leftBase: withoutBonus(leftBase), rightBase: withoutBonus(rightBase), apex: withoutBonus(apex) });
-    update(run, { triangle, speed: 0, mass: 1 });
-    run.emit({ type: "rotation", triangle });
-    run.emit({ type: "turnEnded", turn: run.state.turn });
+function resolveTurn(run) {
+  resolvePhases(run);
+  resolvePot(run);
+  retireWornMarbles(run);
 
-    const reason = endReasonAt("turnEnd", run.state);
-    if (reason !== null) endGame(run, reason);
-    else update(run, { turn: run.state.turn + 1, stage: "draw" });
-  });
+  const { speed, mass } = run.state;
+  const impact = impactOf(speed, mass);
+  const score = run.state.score + impact;
+  update(run, { score });
+  run.emit({ type: "impact", speed, mass, impact, score });
+
+  const { leftBase, rightBase, apex } = run.state.triangle;
+  const triangle = rotated({ leftBase: withoutBonus(leftBase), rightBase: withoutBonus(rightBase), apex: withoutBonus(apex) });
+  update(run, { triangle, speed: 0, mass: 1 });
+  run.emit({ type: "rotation", triangle });
+  run.emit({ type: "turnEnded", turn: run.state.turn });
+
+  const reason = endReasonAt("turnEnd", run.state);
+  if (reason !== null) endGame(run, reason);
+  else update(run, { turn: run.state.turn + 1, stage: "draw" });
+}
+
+// Le déroulé de chaque action qui joue des effets, celui que la reprise rejoue.
+const BODIES = {
+  draw: drawTurn,
+  swap: swapSlots,
+  place: placeMarble,
+  resolve: resolveTurn,
+};
+
+// Rejoue `action` depuis `state` (l'état d'avant elle, ses refus déjà passés), avec
+// ces réponses aux choix : la reprise d'une action suspendue. Exportée pour la
+// prévision, qui rejoue à l'aveugle pour évaluer une réponse.
+export function replayAction(state, action, types, options = {}) {
+  return transact(state, types, options, (run) => BODIES[action.type](run, action), action);
 }
 
 // Le réducteur : pur, ne modifie jamais `state`. Même état + même action =
@@ -1283,16 +1497,25 @@ export function marblesReduce(state, action, types, options = {}) {
   switch (action?.type) {
     case "draw":
       refusal = stageRefusal(state, "draw");
-      return refusal ? refused(state, refusal) : transact(state, types, options, drawTurn);
+      return refusal ? refused(state, refusal) : replayAction(state, { type: "draw" }, types, options);
     case "swap":
       refusal = swapRefused(state, action);
-      return refusal ? refused(state, refusal) : transact(state, types, options, (run) => swapSlots(run, action));
+      return refusal ? refused(state, refusal) : replayAction(state, action, types, options);
     case "place":
       refusal = placeRefusal(state, action.handIndex, action.slot);
-      return refusal ? refused(state, refusal) : transact(state, types, options, (run) => placeMarble(run, action));
+      return refusal ? refused(state, refusal) : replayAction(state, action, types, options);
     case "resolve":
       refusal = resolveRefusal(state);
       return refusal ? refused(state, refusal) : runResolution(state, types, options);
+    case "choose": {
+      // La réponse au choix en attente : l'action suspendue est rejouée depuis son
+      // état de départ, avec une réponse de plus (voir l'en-tête, « reprise par
+      // rejeu ») ; seuls les évènements d'après la suspension sont rendus.
+      refusal = chooseRefusal(state, action);
+      if (refusal) return refused(state, refusal);
+      const { from, action: suspended, answers, seen, eventLimit } = state.pendingChoice.resume;
+      return replayAction(from, suspended, types, { ...options, eventLimit: options.eventLimit ?? eventLimit, answers: [...answers, answerOf(action)], seen });
+    }
     default:
       return refused(state, "unknownAction");
   }

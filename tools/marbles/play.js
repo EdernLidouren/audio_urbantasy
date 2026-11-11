@@ -55,11 +55,11 @@ installFileFetch();
 const { t, setLocale } = await import("../../data/i18n/index.js");
 const { createMarblesGame, marblesReduce, swapRefusal, SLOTS } = await import("../../core/marbles.js");
 const { forecast } = await import("../../core/marbles-forecast.js");
-const { buildSteps, resolutionSteps, describeBag, describeDiscard, describeHandFocus, describeOverview, describeSlotFocus, describeTurn, placementLines } = await import(
+const { buildSteps, resolutionSteps, describeBag, describeChoicePrompt, describeDiscard, describeHandFocus, describeOverview, describeSlotFocus, describeTurn, placementLines } = await import(
   "../../view/marbles/narration.js"
 );
 const { marbleCard } = await import("../../view/marbles/card.js");
-const { formatEvent, formatState, tallyList } = await import("./format.js");
+const { choiceLine, formatEvent, formatState, tallyList } = await import("./format.js");
 setLocale(lang);
 const name = (id) => t(`marble.${id}.name`);
 
@@ -71,6 +71,8 @@ const HELP = [
   "prevoir | forecast | r           la vue d'ensemble du tour (touche R)",
   "prevoir | forecast <n> <empl.>   prévoir la pose de la bille n (rien ne bouge)",
   "fin | end                        résoudre et finir le tour (Maj+R)",
+  "choisir | choose <n> | <empl.>   répondre au choix en attente : la bille n de la main, ou un emplacement",
+  "terminer | done                  terminer un choix « jusqu'à N »",
   "journal                          le journal, une ligne par évènement",
   "journal json                     le journal brut, en JSON",
   "aide | help                      cette liste",
@@ -94,19 +96,53 @@ function apply(action) {
   return result.events;
 }
 
-// Applique une action et affiche ce qu'elle a produit.
+// Le choix en attente, s'il y en a un : sa question, comme l'écran, puis ses cibles,
+// à désigner par « choisir ».
+function printChoice() {
+  if (game.pendingChoice === null) return;
+  console.log(describeChoicePrompt(game.pendingChoice, t));
+  console.log(`  ${choiceLine(game.pendingChoice, name)}`);
+}
+
+// Applique une action et affiche ce qu'elle a produit, puis le choix qu'elle attend.
 function act(action) {
   const events = apply(action);
   if (events) for (const step of buildSteps(events, t)) console.log(step.text);
+  printChoice();
 }
 
-// La résolution et la pioche du tour suivant, dites comme la séquence de l'écran.
+// La résolution en cours, tant qu'un choix peut l'interrompre : { turn, first }.
+let resolving = null;
+
+// La résolution et la pioche du tour suivant, dites comme la séquence de l'écran ;
+// un choix l'interrompt, sa suite se dit après la réponse (continueTurn).
 function resolveTurn() {
   const { turn } = game;
   const resolved = apply({ type: "resolve" });
   if (!resolved) return;
-  const drawn = game.stage === "draw" ? apply({ type: "draw" }) : [];
-  for (const step of resolutionSteps(turn, [...resolved, ...drawn], t)) console.log(step.text);
+  resolving = { turn, first: true };
+  continueTurn(resolved);
+}
+
+function continueTurn(events) {
+  let all = events;
+  if (game.pendingChoice === null && game.stage === "draw") all = [...all, ...(apply({ type: "draw" }) ?? [])];
+  const steps = resolving.first ? resolutionSteps(resolving.turn, all, t) : buildSteps(all, t);
+  resolving.first = false;
+  for (const step of steps) console.log(step.text);
+  if (game.pendingChoice === null) resolving = null;
+  printChoice();
+}
+
+// Une réponse au choix : pendant une résolution, sa suite.
+function answer(action) {
+  const events = apply(action);
+  if (!events) return;
+  if (resolving !== null) continueTurn(events);
+  else {
+    for (const step of buildSteps(events, t)) console.log(step.text);
+    printChoice();
+  }
 }
 
 // Une bille et sa fiche, à plat : ce que l'écran donne champ par champ.
@@ -160,6 +196,7 @@ function runCommand(line) {
     // dans la foulée comme l'écran.
     if (command.action.type === "resolve") resolveTurn();
     else if (command.action.type === "draw") console.log("La pioche est automatique ici.");
+    else if (command.action.type === "choose") answer(command.action);
     else act(command.action);
     return true;
   }

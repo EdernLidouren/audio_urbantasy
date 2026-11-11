@@ -100,8 +100,23 @@ export function formatState(state, name) {
     `Pot, ${state.pot.length} sur ${state.potCapacity}, dans l'ordre d'arrivée : ${listOf(state.pot, name)}. Perdues, ${state.lost.length} : ${listOf(state.lost, name)}.`,
     `Pioche : ${state.firstTurnDraw} au premier tour, ${state.drawPerTurn} ensuite.`,
     `Valeurs de partie (ce tour/cette partie) : ${tallyList(state.tally)}.`,
+    ...(state.pendingChoice ? [choiceLine(state.pendingChoice, name)] : []),
   ];
   return lines;
+}
+
+// Une cible de choix : « main 2 : agate (agate) », « pointe : argile (clay) ».
+export function targetLabel(target, name) {
+  const marble = target.marble === null || target.marble === undefined ? "vide" : marbleLabel(target.marble, name);
+  return target.zone === "hand" ? `main ${target.index + 1} : ${marble}` : `${slotLabel(target.slot)} : ${marble}`;
+}
+
+// Le choix en attente, d'une ligne : l'action, le mode, ce qui est fait, les cibles.
+export function choiceLine(pending, name) {
+  const mode = pending.upTo ? `jusqu'à ${pending.count}` : `${pending.count} obligatoire${pending.count > 1 ? "s" : ""}`;
+  const chosen = pending.chosen.length === 0 ? "" : ` Déjà choisies : ${pending.chosen.map((target) => targetLabel(target, name)).join(", ")}.`;
+  const finish = pending.upTo ? ", ou terminer" : "";
+  return `Choix en attente : ${pending.action}, ${mode}, encore ${pending.remaining}, par ${marbleLabel(pending.by.marble, name)} (${pending.by.trigger}).${chosen} Cibles : ${pending.eligible.map((target) => targetLabel(target, name)).join(", ")}${finish}.`;
 }
 
 // Les effets d'une bille du pot (les moments En poche).
@@ -136,6 +151,7 @@ const EVENT_LINES = {
   targetEmpty: (event, name) => {
     const action = { crack: "Fêlure", polish: "Polissage", pocket: "Empocher" }[event.action] ?? event.action;
     if (event.target === "firstInHand") return `${action} sans effet : main vide.`;
+    if (event.target === "choice") return `${action} sans effet : aucune cible à choisir.`;
     if (event.target === "self") return `${action} sans effet : ${marbleLabel(event.marble, name)} n'est plus là.`;
     return `${action} sans effet : ${slotLabel(event.slot)} vide.`;
   },
@@ -143,6 +159,10 @@ const EVENT_LINES = {
   lost: (event, name) => `Perdue, pot plein : ${marbleLabel(event.marble, name)}, depuis ${POCKET_ORIGINS[event.from]}${event.slot ? ` (${slotLabel(event.slot)})` : ""}.`,
   potResolution: (event, name) => `Pot : ${marbleLabel(event.marble, name)}, ${event.index + 1}e arrivée.`,
   pocketReaction: (event, name) => `Réaction du pot : ${marbleLabel(event.marble, name)}, ${event.index + 1}e arrivée, à ${event.counter}.`,
+  choice: (event, name) => `Choix : ${event.action}, ${event.upTo ? "jusqu'à " : ""}${event.count}, zones ${event.zones.join(" et ")}, par ${marbleLabel(event.by.marble, name)}.`,
+  chosen: (event, name) => `Choisie : ${targetLabel(event, name)}.`,
+  choiceEnded: (event) => `Choix fini (${{ count: "nombre atteint", done: "terminé", exhausted: "plus de cible" }[event.reason]}), ${event.chosen} choisie(s).`,
+  choiceUndecided: (event) => `Choix indécis (prévision) : ${event.action}.`,
   chainInterrupted: () => "Enchaînement interrompu : limite de sécurité du bus atteinte (anomalie).",
   final: (event, name) => `Final : ${marbleLabel(event.marble, name)}, usée, partie de ${slotLabel(event.slot)}.`,
   phase: (event, name) => `Phase de ${slotLabel(event.slot)} : ${marbleLabel(event.marble, name)}.`,

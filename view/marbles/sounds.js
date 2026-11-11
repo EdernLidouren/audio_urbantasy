@@ -390,6 +390,13 @@ export const MARBLE_EVENT_CUES = {
   // d'un enchaînement, muet aussi (son annonce suffit).
   pocketReaction: null,
   chainInterrupted: null,
+  // Un choix : son ouverture (`choice`) et chaque validation (`chosen`) sont des
+  // points d'accroche, sans son à eux aujourd'hui ; sa fin et un choix indécis (la
+  // prévision) aussi.
+  choice: null,
+  chosen: null,
+  choiceEnded: null,
+  choiceUndecided: null,
   // L'usée roule à la défausse ; la délogée part avec le choc (placed).
   discarded: (event, timeline) => {
     if (event.cause === "wear") timeline.worn(event.marble, event.slot);

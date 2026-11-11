@@ -130,9 +130,11 @@ function recordEvents(record, events, actionType) {
   for (const event of events) {
     switch (event.type) {
       case "draw":
-        if (byEffect) {
+        // La cause dit d'où vient la pioche, même quand une réponse à un choix
+        // reprend la pioche du tour.
+        if (event.cause === "effect") {
           record.effectDraws += 1;
-          stats(lastEffect).drawn += 1;
+          if (lastEffect !== null) stats(lastEffect).drawn += 1;
         }
         break;
       case "bagRegenerated":
@@ -215,7 +217,8 @@ export function playGame({ index, seed, player, playerOptions = {}, bagMode, set
 
   for (let count = 0; state.stage !== "over"; count++) {
     if (count >= MAX_ACTIONS_PER_GAME) throw new Error(`simulation : partie ${index} sans fin (joueur ${player}).`);
-    let action = state.stage === "draw" ? { type: "draw" } : session.next(publicView(state));
+    // Un choix en attente revient au joueur, même au milieu de la pioche du tour.
+    let action = state.pendingChoice === null && state.stage === "draw" ? { type: "draw" } : session.next(publicView(state));
     let result = GAME_RULES.reduce(state, action);
     if (!result.ok) {
       record.refusals.push({ turn: state.turn, action, error: result.error });

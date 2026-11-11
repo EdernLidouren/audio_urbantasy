@@ -24,11 +24,14 @@ import { EMPTY_HISTORY, recordSteps } from "../../view/marbles/history.js";
 import { historyMenu } from "../../view/marbles/history-screen.js";
 import { throws } from "../../lib/check.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
-import { emptyBagMarblesGame, inHand } from "./helpers.js";
+import { answerChoices, emptyBagMarblesGame, fixedTargetTypes, inHand } from "./helpers.js";
 import { createMarblesRules } from "../marbles-rules.js";
 
 // Les règles du jeu, liées à la vraie table (core/marbles-rules.js).
 const rules = createMarblesRules(MARBLE_TYPES);
+// Gorille, verre et porcelaine d'avant les cibles au choix, pour les cas qui portent
+// sur Empocher depuis la main (core/checks/helpers.js/fixedTargetTypes).
+const fixedRules = createMarblesRules(fixedTargetTypes(MARBLE_TYPES));
 
 // Traduction de test : la clé seule, sans son préfixe, pour lire la FORME d'une
 // séquence sans dépendre des textes.
@@ -68,8 +71,9 @@ function playGame(seed, options, present, onTurn = () => {}) {
   let state = rules.createGame(seed, options);
   const journal = [];
   let history = EMPTY_HISTORY;
+  // Un choix en attente se tranche aussitôt (la première cible) : la partie va au bout.
   const apply = (action) => {
-    const result = rules.reduce(state, action);
+    const result = answerChoices(rules, rules.reduce(state, action));
     if (!result.ok) return null;
     state = result.state;
     journal.push(...result.events);
@@ -117,10 +121,13 @@ const REGENERATION =
 // pioche à son tour, un Polissage ou une Fêlure, une régénération).
 // Une mise en poche (avec son entrée au pot) ou une perte, et une cible vide
 // d'Empocher.
+// Une réaction d'une bille du pot (En poche, à chaque (occurrence)), à tout moment ;
+// les étapes d'un choix (une cible choisie, la fin d'une sélection, aucune cible).
+const CHOOSING = "choice\\.chosen |choice\\.ended\\.(done|exhausted) |event\\.target_empty_choice |";
 // Une réaction d'une bille du pot (En poche, à chaque (occurrence)), à tout moment.
 const POCKETING = "event\\.pocketed (event\\.effect_pocket_entry )?|event\\.lost |event\\.target_empty_(hand|self) |outcome\.pot |";
 const DRAWING =
-  "(" + REGENERATION + "|event\\.draw |event\\.draw_skipped\\.(handFull|noMarbles) |event\\.effect_awaken |" + POCKETING +
+  "(" + REGENERATION + "|event\\.draw |event\\.draw_skipped\\.(handFull|noMarbles) |event\\.effect_awaken |" + POCKETING + CHOOSING +
   "event\\.polished |event\\.cracked |event\\.target_empty |event\\.discarded\\.wear |event\\.effect_final )";
 
 const SEQUENCE_SHAPE = new RegExp(
@@ -262,8 +269,8 @@ function checkTexts(run) {
 
     // La séquence, texte exact.
     const texts = (state) => {
-      const resolved = rules.reduce(state, { type: "resolve" });
-      const drawn = resolved.state.stage === "draw" ? rules.reduce(resolved.state, { type: "draw" }).events : [];
+      const resolved = answerChoices(rules, rules.reduce(state, { type: "resolve" }));
+      const drawn = resolved.state.stage === "draw" ? answerChoices(rules, rules.reduce(resolved.state, { type: "draw" })).events : [];
       return resolutionSteps(state.turn, [...resolved.events, ...drawn], t).map((step) => said(step.text));
     };
     run.same(
@@ -464,8 +471,8 @@ function checkTexts(run) {
     // dans la séquence, avant l'Impact.
     const finalState = playState({ hand: inHand(["giant"]), bag: ["agate"], triangle: { leftBase: null, rightBase: null, apex: { marble: "porcelain", wear: 1 } } });
     run(
-      "final, R : après la phase, compté dans la prévision",
-      "Prévision : Vitesse 9, Masse 1, Impact 9. base gauche, vide. base droite, vide. pointe, porcelaine : Vitesse +5. Final : Vitesse +4.",
+      "final, R : après la phase, compté dans la prévision ; son Polissage au choix sans cible, prévu",
+      "Prévision : Vitesse 9, Masse 1, Impact 9. base gauche, vide. base droite, vide. pointe, porcelaine : Vitesse +5. Final : Vitesse +4 et Polissage 1 à jusqu'à 2 billes actives au choix, aucune cible au choix.",
       said(describeOverview(finalState, rules, t))
     );
     run(
@@ -479,9 +486,9 @@ function checkTexts(run) {
       placementLines(finalState, 0, "leftBase", rules, t).map(({ key, params }) => said(t(key, params)))
     );
     run.same(
-      "final, séquence : le retrait, son Final, puis l'Impact",
-      ["porcelaine est usée et part à la défausse.", "Final de porcelaine : Vitesse +4.", "Impact 9. Score 9."],
-      texts(finalState).slice(3, 6)
+      "final, séquence : le retrait, son Final, rien à choisir (aucune interface), puis l'Impact",
+      ["porcelaine est usée et part à la défausse.", "Final de porcelaine : Vitesse +4 et Polissage 1 à jusqu'à 2 billes actives au choix.", "Aucune cible à choisir : sans effet.", "Impact 9. Score 9."],
+      texts(finalState).slice(3, 7)
     );
 
     // Empocher : chez la bille qui le produit, avec ce qu'il déplace et son entrée au
@@ -509,6 +516,27 @@ function checkTexts(run) {
       ["Poser sulfure en base droite ?", "Empocher la bille en pointe, puis porcelaine en poche, à l'entrée : Vitesse +10", "Chiquenaude de sulfure : aucun effet", "Pot : aucun effet"],
       placementLines({ ...pocketing, triangle: { ...pocketing.triangle, leftBase: null } }, 0, "rightBase", rules, t).map(({ key, params }) => said(t(key, params)))
     );
+    // Un choix pendant la résolution : la séquence s'arrête au Final de la
+    // porcelaine (ses étapes jusque-là, l'Impact pas encore dit), le choix se fait,
+    // puis la suite reprend : les billes choisies, leur Polissage, l'Impact.
+    const choosing = playState({ bag: ["clay"], hand: inHand([]), triangle: { leftBase: { marble: "clay", wear: 0 }, rightBase: { marble: "agate", wear: 1 }, apex: { marble: "porcelain", wear: 1 } } });
+    const suspended = rules.reduce(choosing, { type: "resolve" });
+    const before = resolutionSteps(2, suspended.events, t).map((step) => said(step.text));
+    run("choix en résolution : la séquence s'arrête au Final qui fait choisir", "Final de porcelaine : Vitesse +4 et Polissage 1 à jusqu'à 2 billes actives au choix.", before.at(-1));
+    run("choix en résolution : l'Impact pas encore dit", false, before.some((text) => text.startsWith("Impact")));
+    run(
+      "choix en résolution : R refusé pendant le choix (prévision refusée)",
+      "choicePending",
+      rules.forecast(suspended.state).error
+    );
+    const picked = rules.reduce(suspended.state, { type: "choose", target: { zone: "triangle", slot: "rightBase" } });
+    const finished = rules.reduce(picked.state, { type: "choose", done: true });
+    run.same(
+      "choix en résolution : la suite reprend après les réponses",
+      ["agate choisie.", "Choix terminé.", "agate est polie : usure 1 sur 3.", "Impact 20. Score 20."],
+      [...buildSteps(picked.events, t), ...buildSteps(finished.events, t)].map((step) => said(step.text)).slice(0, 4)
+    );
+
     // Les réactions du pot (En poche, à chaque (occurrence)). Pendant la pose : à leur
     // place chronologique, après l'effet de la bille concernée ; la confirmation les
     // dit dans sa ligne du pot, par bille dans l'ordre d'arrivée.
@@ -723,13 +751,13 @@ function checkTexts(run) {
     );
     run.same(
       "calibre, confirmation : le Tic du gorille, sa valeur finale",
-      ["Chiquenaude de gorille : aucun effet", "Éjection de porcelaine : aucun effet", "Tic de gorille : Vitesse +4 et Empocher la première bille de la main, main vide", "Pot : aucun effet"],
+      ["Chiquenaude de gorille : aucun effet", "Éjection de porcelaine : aucun effet", "Tic de gorille : Vitesse +4 et Empocher une bille de votre main au choix, aucune cible au choix", "Pot : aucun effet"],
       placementLines(sized, 0, "rightBase", rules, t).map(({ key, params }) => said(t(key, params))).slice(2)
     );
     run(
       "Empocher, confirmation : l'entrée au pot prévue, chez le Tic qui empoche",
       "Tic de gorille : Vitesse +4 et Empocher la première bille de la main, puis porcelaine en poche, à l'entrée : Vitesse +10",
-      said(t(...(({ key, params }) => [key, params])(placementLines({ ...sized, hand: inHand(["gorilla", "porcelain"]) }, 0, "rightBase", rules, t).at(-2))))
+      said(t(...(({ key, params }) => [key, params])(placementLines({ ...sized, hand: inHand(["gorilla", "porcelain"]) }, 0, "rightBase", fixedRules, t).at(-2))))
     );
     const boulderLeft = { ...sized, triangle: { ...sized.triangle, leftBase: { marble: "giant", wear: 0 } } };
     run(
@@ -769,10 +797,14 @@ function checkTexts(run) {
     run.same("anglais, Polissage : séquence", ["porcelain is polished: wear 1 of 2."], texts(saving).filter((text) => text.includes("polished")));
     run(
       "anglais, final : R",
-      "Forecast: Speed 9, Mass 1, Impact 9. left base, empty. right base, empty. apex, porcelain: Speed +5. Final: Speed +4.",
+      "Forecast: Speed 9, Mass 1, Impact 9. left base, empty. right base, empty. apex, porcelain: Speed +5. Final: Speed +4 and Polish 1 to up to 2 active marbles of your choice, nothing to choose.",
       describeOverview(finalState, rules, t)
     );
-    run.same("anglais, final : séquence", ["porcelain is worn out and goes to the discard.", "Final of porcelain: Speed +4.", "Impact 9. Score 9."], texts(finalState).slice(3, 6));
+    run.same(
+      "anglais, final : séquence",
+      ["porcelain is worn out and goes to the discard.", "Final of porcelain: Speed +4 and Polish 1 to up to 2 active marbles of your choice.", "Nothing to choose: no effect.", "Impact 9. Score 9."],
+      texts(finalState).slice(3, 7)
+    );
     run(
       "anglais, pioche : R",
       "Forecast: Speed 0, Mass 1, Impact 0. left base, mica: Draw 1. right base, empty. apex, stoneware: no effect.",

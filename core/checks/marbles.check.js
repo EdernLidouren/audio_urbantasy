@@ -30,7 +30,7 @@ import { MARBLE_PHASES, MARBLE_POCKET, MARBLE_TRIGGERS } from "../../config/marb
 import { CLAUSE_ACTIONS, amountOf, printedStat } from "../marbles-effects.js";
 import { LARGE, MARBLE_SIZES, MEDIUM, SMALL, STARTING_BAG, MARBLES_SETTINGS } from "../../config/marbles-values.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
-import { emptyBagMarblesGame, handIds, inHand, withSizes } from "./helpers.js";
+import { answerChoices, emptyBagMarblesGame, fixedTargetTypes, handIds, inHand, withSizes } from "./helpers.js";
 import { createMarblesRules } from "../marbles-rules.js";
 
 // Tables fabriquées : complétées d'un calibre (core/checks/helpers.js/withSizes).
@@ -39,6 +39,9 @@ const validateTable = (table) => validateMarbleTypes(withSizes(table));
 
 // Les règles du jeu, liées à la vraie table (core/marbles-rules.js).
 const rules = createMarblesRules(MARBLE_TYPES);
+// Les mêmes, gorille, verre et porcelaine d'avant les cibles au choix
+// (core/checks/helpers.js/fixedTargetTypes).
+const fixedRules = createMarblesRules(fixedTargetTypes(MARBLE_TYPES));
 
 // Partie en cours de tour : le tour 2 par défaut, sac vide. `over` remplace ce que
 // le test veut fixer.
@@ -62,6 +65,10 @@ function triangleOf(leftBase, rightBase, apex) {
 // `marbles` : les règles à appliquer, celles du jeu par défaut ; ou une table
 // fabriquée, dont on fait les règles.
 function apply(state, action, marbles = rules) {
+  return applyWith(state, action, marbles);
+}
+
+function applyWith(state, action, marbles) {
   const bound = typeof marbles.reduce === "function" ? marbles : fabricatedRules(marbles);
   const result = bound.reduce(state, action);
   if (!result.ok) throw new Error(`action refusée (${result.error}) : ${JSON.stringify(action)}`);
@@ -114,6 +121,7 @@ export default function checkMarbles(run) {
   checkKeywordDeclarations(run);
   checkPocket(run);
   checkPocketReactions(run);
+  checkChoices(run);
   checkBonus(run);
   checkResolution(run);
   checkEndOfGame(run);
@@ -412,6 +420,8 @@ function checkAwaken(run) {
 // règle « une seule fois d'une zone à l'autre », et le mot-clé En poche (entrée,
 // résolution).
 function checkPocket(run) {
+  // Les mécanismes du pot, sur le gorille d'avant les choix (la première de la main).
+  const apply = (state, action, marbles = fixedRules) => applyWith(state, action, marbles);
   const journal = (events) =>
     events.map((event) => {
       if (event.type === "effect") return `effect:${event.trigger}:${event.marble}`;
@@ -703,6 +713,169 @@ function caughtMessage(fn) {
   return "";
 }
 
+// CIBLES AU CHOIX : choix simple et multiple, modes, éligibilité, suspension et
+// reprise par rejeu, refus pendant l'attente, sérialisation, validation. Billes
+// fabriquées pour isoler chaque règle, puis les billes de test.
+function checkChoices(run) {
+  const choose = (zones, extra = {}) => ({ type: "choice", zones, pick: "marble", count: 1, ...extra });
+  const table = {
+    plain: { apex: [{ action: "speed", amount: 1 }] },
+    sturdy: { maxWear: 9 },
+    // Tic : Polissage 1 à 2 billes actives au choix, obligatoire.
+    twoPolish: { hit: [{ action: "polish", amount: 1, target: choose(["triangle"], { count: 2 }) }] },
+    // Tic : Polissage 1 à 3 billes actives au choix (jamais assez de cibles ici).
+    threePolish: { hit: [{ action: "polish", amount: 1, target: choose(["triangle"], { count: 3 }) }] },
+    // Tic : Polissage 1 à jusqu'à 2 billes actives au choix.
+    upToPolish: { hit: [{ action: "polish", amount: 1, target: choose(["triangle"], { count: 2, upTo: true }) }] },
+    // Tic : Empocher une bille, de la main ou active, au choix.
+    anyPocket: { hit: [{ action: "pocket", target: choose(["hand", "triangle"]) }] },
+    // Base : Vitesse +2 à une bille active au choix (un bonus de phase).
+    booster: { base: [{ action: "speed", amount: 2, target: choose(["triangle"]) }] },
+    // Final : Polissage 1 à une bille active au choix, et la même, cible fixe.
+    finalChooser: { maxWear: 1, final: [{ action: "polish", amount: 1, target: choose(["triangle"]) }] },
+    finalFixed: { maxWear: 1, final: [{ action: "polish", amount: 1, target: "rightBase" }] },
+    // En poche, à chaque chiquenaude : Fêlure 1 au choix, et la même, cible fixe.
+    potChooser: { pocketed: { flick: [{ action: "crack", amount: 1, target: choose(["triangle"]) }] } },
+    potFixed: { pocketed: { flick: [{ action: "crack", amount: 1, target: "leftBase" }] } },
+    flicker: { flick: [{ action: "speed", amount: 1 }] },
+  };
+  const made = fabricatedRules(table);
+  const reduce = (state, action) => made.reduce(state, action);
+  const answer = (state, slot) => reduce(state, { type: "choose", target: { zone: "triangle", slot } });
+  const slots = (pending) => pending.eligible.map((target) => target.slot ?? `main${target.index}`);
+  const types = (events) => events.map((event) => event.type);
+
+  // Choix multiple obligatoire : une cible choisie n'est plus éligible ; l'action
+  // s'applique ensuite, dans l'ordre des choix ; arrêt à N.
+  const triple = playState({ hand: inHand(["twoPolish"]), triangle: triangleOf(placed("sturdy", 3), placed("sturdy", 3), placed("plain")) });
+  const opened = reduce(triple, { type: "place", handIndex: 0, slot: "apex" });
+  run("choix : la pose s'arrête sur le choix", true, opened.ok && opened.state.pendingChoice !== null);
+  run.same("choix : les billes actives, la posée comprise", ["leftBase", "rightBase", "apex"], slots(opened.state.pendingChoice));
+  run.same(
+    "choix : la question en attente",
+    { action: "polish", amount: 1, zones: ["triangle"], pick: "marble", count: 2, upTo: false, remaining: 2, chosen: [] },
+    (({ action, amount, zones, pick, count, upTo, remaining, chosen }) => ({ action, amount, zones, pick, count, upTo, remaining, chosen }))(opened.state.pendingChoice)
+  );
+  run("choix : le journal s'arrête au choix ouvert", "choice", opened.events.at(-1).type);
+  const first = answer(opened.state, "rightBase");
+  run.same("choix : la cible choisie n'est plus éligible", ["leftBase", "apex"], slots(first.state.pendingChoice));
+  run("choix : encore une", 1, first.state.pendingChoice.remaining);
+  run.same("choix : chaque réponse rend la suite du journal seulement", ["chosen"], types(first.events));
+  const second = answer(first.state, "leftBase");
+  run("choix : fini à N choix, plus rien n'attend", null, second.state.pendingChoice);
+  run.same(
+    "choix : appliqué dans l'ordre des choix",
+    ["rightBase", "leftBase"],
+    second.events.filter((event) => event.type === "polished").map((event) => event.slot)
+  );
+  run.same("choix : la fin de la sélection notée", { reason: "count", chosen: 2 }, (({ reason, chosen }) => ({ reason, chosen }))(second.events.find((event) => event.type === "choiceEnded")));
+  run("choix : les lancers comptés une seule fois", 1, second.state.throwsUsed);
+
+  // Pas assez de cibles : arrêt quand plus rien n'est éligible.
+  const few = reduce(playState({ hand: inHand(["threePolish"]), triangle: triangleOf(placed("sturdy", 3), null, placed("plain")) }), { type: "place", handIndex: 0, slot: "apex" });
+  const fewDone = answer(answer(few.state, "leftBase").state, "apex");
+  run("choix, pas assez de cibles : arrêt quand plus rien n'est éligible", null, fewDone.state.pendingChoice);
+  run("choix, pas assez de cibles : noté", "exhausted", fewDone.events.find((event) => event.type === "choiceEnded").reason);
+
+  // Aucune cible dès le départ : rien ne s'ouvre, le journal le note.
+  const none = reduce(playState({ hand: inHand(["anyPocket"]), triangle: triangleOf(null, null, placed("plain")) }), { type: "place", handIndex: 0, slot: "apex" });
+  run("choix, aucune cible… : la posée elle-même est éligible", true, none.state.pendingChoice !== null);
+  const empty = reduce(playState({ hand: inHand(["finalChooser"]), bag: ["plain"], triangle: triangleOf(null, null, placed("finalChooser")) }), { type: "resolve" });
+  run("choix, aucune cible : aucune attente", null, empty.state.pendingChoice);
+  run("choix, aucune cible : noté au journal", true, empty.events.some((event) => event.type === "targetEmpty" && event.target === "choice"));
+  run("choix, aucune cible : aucun choix ouvert", false, empty.events.some((event) => event.type === "choice"));
+
+  // « Jusqu'à N » : Terminer, à zéro choix ou après un ; refusé en mode obligatoire.
+  const upTo = reduce(playState({ hand: inHand(["upToPolish"]), triangle: triangleOf(placed("sturdy", 3), null, placed("plain")) }), { type: "place", handIndex: 0, slot: "apex" });
+  const zero = reduce(upTo.state, { type: "choose", done: true });
+  run("jusqu'à N : Terminer à zéro choix", null, zero.state.pendingChoice);
+  run("jusqu'à N : rien poli", false, zero.events.some((event) => event.type === "polished"));
+  run("jusqu'à N : terminé, noté", "done", zero.events.find((event) => event.type === "choiceEnded").reason);
+  const one = reduce(answer(upTo.state, "leftBase").state, { type: "choose", done: true });
+  run.same("jusqu'à N : Terminer après un choix", ["leftBase"], one.events.filter((event) => event.type === "polished").map((event) => event.slot));
+  run("obligatoire : Terminer refusé", "choiceRequired", reduce(opened.state, { type: "choose", done: true }).error);
+  run.same("jusqu'à N : Terminer parmi les actions légales", { type: "choose", done: true }, legalActions(upTo.state).at(-1));
+  run.same("obligatoire : seulement les cibles", ["choose", "choose", "choose"], legalActions(opened.state).map((action) => action.type));
+
+  // Pendant l'attente : toute autre action refusée ; une cible non éligible refusée ;
+  // « choisir » sans choix en attente refusé.
+  for (const action of [{ type: "resolve" }, { type: "draw" }, { type: "place", handIndex: 0, slot: "leftBase" }, { type: "swap", a: "leftBase", b: "apex" }]) {
+    run(`attente : ${action.type} refusé`, "choicePending", reduce(first.state, action).error);
+  }
+  run("attente : une cible déjà choisie refusée", "invalidChoice", answer(first.state, "rightBase").error);
+  run("attente : une zone hors du choix refusée", "invalidChoice", reduce(first.state, { type: "choose", target: { zone: "hand", index: 0 } }).error);
+  run("hors attente : choisir refusé", "noChoicePending", reduce(triple, { type: "choose", done: true }).error);
+
+  // La main et le triangle : la bille de la main, par sa place.
+  const both = reduce(playState({ hand: inHand(["anyPocket", "plain", "sturdy"]), triangle: triangleOf(null, null, placed("plain")) }), { type: "place", handIndex: 0, slot: "apex" });
+  run.same("main et triangle : les billes de la main puis les actives", ["main0", "main1", "apex"], slots(both.state.pendingChoice));
+  const fromHand = reduce(both.state, { type: "choose", target: { zone: "hand", index: 1 } });
+  run.same("main : la bille choisie au pot, l'autre reste", { pot: ["sturdy"], hand: ["plain"] }, { pot: fromHand.state.pot, hand: handIds(fromHand.state) });
+
+  // Règle des cibles : un bonus ne va qu'à une phase à venir. En base gauche, pendant
+  // la résolution : la base gauche (en cours) n'est pas éligible.
+  const boosting = reduce(playState({ triangle: triangleOf(placed("booster"), placed("plain"), placed("plain")) }), { type: "resolve" });
+  run.same("éligibilité : un bonus, seulement les phases à venir", ["rightBase", "apex"], slots(boosting.state.pendingChoice));
+  const boosted = answer(boosting.state, "apex");
+  // La pointe ordinaire : Vitesse +1, plus le bonus de 2 ; la base droite ne produit rien.
+  run("éligibilité : le bonus compté à la phase choisie", 1 + 2, boosted.events.find((event) => event.type === "impact").speed);
+
+  // Reprise exacte : un choix équivaut à la même cible fixe. Au milieu d'une
+  // résolution (un Final), puis dans une réaction du pot (pendant la pose).
+  // Les évènements du choix à part, et la clause imprimée (au choix ou fixe) mise de
+  // côté : tout le reste doit être identique.
+  const withoutChoice = (events) =>
+    events.filter((event) => !["choice", "chosen", "choiceEnded"].includes(event.type)).map(({ operations, ...event }) => event);
+  const strip = (events) => JSON.stringify(withoutChoice(events)).replaceAll("finalChooser", "X").replaceAll("finalFixed", "X").replaceAll("potChooser", "X").replaceAll("potFixed", "X");
+  const resolving = (marble) => playState({ bag: ["plain"], triangle: triangleOf(placed("plain"), placed("sturdy", 3), placed(marble)) });
+  const suspended = reduce(resolving("finalChooser"), { type: "resolve" });
+  run("reprise, résolution : suspendue au Final", "final", suspended.state.pendingChoice.by.trigger);
+  run("reprise, résolution : l'Impact n'a pas encore eu lieu", false, suspended.events.some((event) => event.type === "impact"));
+  const resumed = answer(suspended.state, "rightBase");
+  const fixed = reduce(resolving("finalFixed"), { type: "resolve" });
+  run("reprise, résolution : même journal qu'une cible fixe", strip(fixed.events), strip([...suspended.events, ...resumed.events]));
+  run("reprise, résolution : même état qu'une cible fixe", JSON.stringify(fixed.state).replaceAll("finalFixed", "X"), JSON.stringify(resumed.state).replaceAll("finalChooser", "X"));
+  const reacting = (marble) => playState({ hand: inHand(["flicker"]), pot: [marble], triangle: triangleOf(placed("sturdy"), null, null) });
+  const inPot = reduce(reacting("potChooser"), { type: "place", handIndex: 0, slot: "apex" });
+  run("reprise, réaction du pot : suspendue à la réaction", "pocketReaction", inPot.state.pendingChoice.by.trigger);
+  run("reprise, réaction du pot : la bille lancée pas encore posée", false, inPot.events.some((event) => event.type === "placed"));
+  const potResumed = answer(inPot.state, "leftBase");
+  const potFixed = reduce(reacting("potFixed"), { type: "place", handIndex: 0, slot: "apex" });
+  run("reprise, réaction du pot : même journal qu'une cible fixe", strip(potFixed.events), strip([...inPot.events, ...potResumed.events]));
+
+  // Sérialisable : un aller-retour JSON de l'état en attente ne change rien.
+  const roundTrip = JSON.parse(JSON.stringify(first.state));
+  run.same("sérialisation : l'état en attente fait l'aller-retour", first.state, roundTrip);
+  run.same("sérialisation : la reprise depuis la copie est la même", answer(first.state, "leftBase"), answer(roundTrip, "leftBase"));
+  const frozen = deepFreeze(structuredClone(first.state));
+  run("pureté : l'état en attente reçu n'est pas modifié", true, answer(frozen, "leftBase").ok);
+
+  // Les billes de test : le gorille (main), le verre (triangle), la porcelaine
+  // (jusqu'à 2, pendant la résolution).
+  const gorilla = rules.reduce(playState({ hand: inHand(["gorilla", "clay", "agate"]), triangle: triangleOf(null, null, placed("clay")) }), { type: "place", handIndex: 0, slot: "apex" });
+  run.same("gorille : les billes de la main", ["clay", "agate"], gorilla.state.pendingChoice.eligible.map((target) => target.marble));
+  const pocketedAgate = rules.reduce(gorilla.state, { type: "choose", target: { zone: "hand", index: 1 } });
+  run.same("gorille : l'agate choisie au pot", ["agate"], pocketedAgate.state.pot);
+  const porcelain = rules.reduce(playState({ bag: ["clay"], triangle: triangleOf(placed("clay"), placed("agate", 1), placed("porcelain", 1)) }), { type: "resolve" });
+  run.same("porcelaine : son Final, jusqu'à 2 billes actives", { upTo: true, count: 2, trigger: "final" }, { upTo: porcelain.state.pendingChoice.upTo, count: porcelain.state.pendingChoice.count, trigger: porcelain.state.pendingChoice.by.trigger });
+
+  // Validation : les combinaisons impossibles refusées au chargement.
+  const valid = (clause, field = "hit") => !throws(() => validateTable({ x: { [field]: [clause] } }));
+  run("validation, choix : Polissage au choix sur le triangle permis", true, valid({ action: "polish", amount: 1, target: choose(["triangle"]) }));
+  run("validation, choix : Empocher dans la main permis", true, valid({ action: "pocket", target: choose(["hand"]) }));
+  run("validation, choix : Polissage dans la main refusé", false, valid({ action: "polish", amount: 1, target: choose(["hand"]) }));
+  run("validation, choix : le pot pas encore disponible", false, valid({ action: "pocket", target: choose(["pot"]) }));
+  run("validation, choix : zone inconnue refusée", false, valid({ action: "pocket", target: choose(["nowhere"]) }));
+  run("validation, choix : un emplacement vide n'a rien à polir", false, valid({ action: "polish", amount: 1, target: choose(["triangle"], { pick: "slot" }) }));
+  run("validation, choix : nombre nul refusé", false, valid({ action: "polish", amount: 1, target: choose(["triangle"], { count: 0 }) }));
+  run("validation, choix : champ inconnu refusé", false, valid({ action: "polish", amount: 1, target: choose(["triangle"], { extra: 1 }) }));
+  run("validation, choix : la Pioche ne se choisit pas", false, valid({ action: "draw", amount: 1, target: choose(["triangle"]) }));
+  run("validation, choix : bonus au choix pendant la pose permis", true, valid({ action: "speed", amount: 1, target: choose(["triangle"]) }));
+  run("validation, choix : bonus au choix au Final refusé (plus aucune phase)", false, valid({ action: "speed", amount: 1, target: choose(["triangle"]) }, "final"));
+  run("validation, choix : bonus au choix en pointe refusé (plus aucune phase après)", false, valid({ action: "speed", amount: 1, target: choose(["triangle"]) }, "apex"));
+  run("validation, choix : bonus au choix en base permis (la pointe vient après)", true, valid({ action: "speed", amount: 1, target: choose(["triangle"]) }, "base"));
+}
+
 function checkSwap(run) {
   const clay = placed("clay", 1);
   const glass = placed("glass", 2);
@@ -775,7 +948,8 @@ function checkThrows(run) {
   // en remplacements, quitte à laisser des emplacements vides.
   const firstTurn = playState({ turn: 1, hand: inHand(["clay", "glass", "agate", "mica"]), throwsUsed: 3, triangle: triangleOf(placed("tiger"), null, null) });
   run("premier tour : 2 lancers pour 2 vides, remplacer reste permis", null, placeRefusal(firstTurn, 0, "leftBase"));
-  const lastThrow = apply(apply(firstTurn, { type: "place", handIndex: 0, slot: "leftBase" }).state, { type: "place", handIndex: 0, slot: "leftBase" }).state;
+  // Le Tic du verre fait choisir sa cible : la première répond.
+  const lastThrow = answerChoices(rules, apply(apply(firstTurn, { type: "place", handIndex: 0, slot: "leftBase" }).state, { type: "place", handIndex: 0, slot: "leftBase" })).state;
   run("premier tour : lancers épuisés, deux emplacements vides", 0, throwsLeft(lastThrow));
   run("premier tour : la résolution se lance quand même", true, rules.reduce(lastThrow, { type: "resolve" }).ok);
 }
@@ -916,8 +1090,8 @@ function checkFinal(run) {
   // Porcelaine (usure 2) en pointe, déjà usée une fois : elle s'use, part, son Final joue.
   const worn = apply(playState({ hand: inHand([]), bag: ["clay"], triangle: triangleOf(null, null, placed("porcelain", 1)) }), { type: "resolve" });
   run.same(
-    "final : retrait, défausse, Final, puis l'Impact",
-    ["phase", "effect", "wear", "removed", "discarded", "final", "effect", "impact"],
+    "final : retrait, défausse, Final (son Polissage au choix sans aucune cible), puis l'Impact",
+    ["phase", "effect", "wear", "removed", "discarded", "final", "effect", "targetEmpty", "impact"],
     eventTypes(worn.events).slice(eventTypes(worn.events).indexOf("phase"), eventTypes(worn.events).indexOf("impact") + 1)
   );
   const final = worn.events.filter((event) => event.type === "effect").at(-1);
@@ -1015,10 +1189,11 @@ function checkPlace(run) {
 
   // Tour 1 : le joueur est seul responsable de ses poses, plus rien ne protège le
   // triangle. Quatre remplacements de suite sur la pointe passent.
+  // Le Tic du verre fait choisir sa cible : la première répond.
   let firstTurn = playState({ turn: 1, hand: inHand(["clay", "glass", "agate", "mica", "tiger"]) });
-  firstTurn = apply(firstTurn, { type: "place", handIndex: 0, slot: "apex" }).state;
-  firstTurn = apply(firstTurn, { type: "place", handIndex: 0, slot: "apex" }).state;
-  firstTurn = apply(firstTurn, { type: "place", handIndex: 0, slot: "apex" }).state;
+  firstTurn = answerChoices(rules, apply(firstTurn, { type: "place", handIndex: 0, slot: "apex" })).state;
+  firstTurn = answerChoices(rules, apply(firstTurn, { type: "place", handIndex: 0, slot: "apex" })).state;
+  firstTurn = answerChoices(rules, apply(firstTurn, { type: "place", handIndex: 0, slot: "apex" })).state;
   run("tour 1 : remplacer encore reste permis", true, rules.reduce(firstTurn, { type: "place", handIndex: 0, slot: "apex" }).ok);
   run("placeRefusal : même réponse que l'action", null, placeRefusal(firstTurn, 0, "apex"));
   run("tour 1 : remplir un vide reste permis", null, placeRefusal(firstTurn, 0, "leftBase"));
@@ -1235,13 +1410,21 @@ function checkWearActions(run) {
 // retrait immédiat, sur soi, depuis un Final.
 function checkWearMarbles(run) {
   const find = (result, type) => result.events.find((event) => event.type === type);
-  // Verre : son Tic polit la pointe.
-  const glass = apply(playState({ hand: inHand(["glass"]), triangle: triangleOf(placed("clay"), null, placed("porcelain", 1)) }), { type: "place", handIndex: 0, slot: "leftBase" });
-  run.same("verre : le Tic polit la pointe", { slot: "apex", marble: "porcelain", wear: 0 }, (({ slot, marble, wear }) => ({ slot, marble, wear }))(find(glass, "polished")));
+  // Verre : son Tic polit une bille active au choix, ici la pointe.
+  const glassPlaced = apply(playState({ hand: inHand(["glass"]), triangle: triangleOf(placed("clay"), null, placed("porcelain", 1)) }), { type: "place", handIndex: 0, slot: "leftBase" });
+  run.same(
+    "verre : le Tic propose les billes actives, lui compris",
+    ["leftBase", "apex"],
+    glassPlaced.state.pendingChoice.eligible.map((target) => target.slot)
+  );
+  const glass = apply(glassPlaced.state, { type: "choose", target: { zone: "triangle", slot: "apex" } });
+  run.same("verre : le Tic polit la bille choisie", { slot: "apex", marble: "porcelain", wear: 0 }, (({ slot, marble, wear }) => ({ slot, marble, wear }))(find(glass, "polished")));
 
   // Une Fêlure de base sur la pointe (une bille fabriquée) : la porcelaine (usure 1 sur
   // 2) part aussitôt, son Final joue, sa phase est sautée.
-  const crackerTable = { cracker: { base: [{ action: "crack", amount: 1, target: "apex" }] }, porcelain: MARBLE_TYPES.porcelain, clay: MARBLE_TYPES.clay };
+  // La porcelaine sans le Polissage au choix de son Final : ce cas porte sur la Fêlure.
+  const plainPorcelain = { ...MARBLE_TYPES.porcelain, final: [{ action: "speed", amount: 4 }] };
+  const crackerTable = { cracker: { base: [{ action: "crack", amount: 1, target: "apex" }] }, porcelain: plainPorcelain, clay: MARBLE_TYPES.clay };
   const cracked = apply(playState({ bag: ["clay"], triangle: triangleOf(placed("cracker"), null, placed("porcelain", 1)) }), { type: "resolve" }, crackerTable);
   run.same(
     "Fêlure en phase : retrait, Final de la porcelaine, puis la suite",
@@ -1675,7 +1858,8 @@ function checkFlick(run) {
     { apex: cleared.state.triangle.apex, discard: cleared.state.discard }
   );
   // Final compris : la porcelaine (usure maximale 2) joue le sien, compté au tour.
-  const withFinal = apply(playState({ hand: inHand(["leaded"]), triangle: triangleOf(null, null, placed("porcelain")) }), toApex);
+  // La porcelaine d'avant les choix : ce cas porte sur l'ordre du Final.
+  const withFinal = apply(playState({ hand: inHand(["leaded"]), triangle: triangleOf(null, null, placed("porcelain")) }), toApex, fixedRules);
   run.same(
     "chiquenaude qui vide l'emplacement : le Final de l'occupante, puis la pose",
     ["flick", "effect", "cracked", "removed", "discarded", "final", "effect", "placed"],
@@ -1854,7 +2038,8 @@ function checkWindfall(run) {
   // Final compris, avant la reprise de la pioche.
   const cracked = apply(
     { ...playState({ bag: [], discard: ["clay"], triangle: triangleOf(placed("sulphide"), placed("porcelain", 1), null) }), stage: "draw" },
-    { type: "draw" }
+    { type: "draw" },
+    fixedRules
   );
   run.same(
     "trouvaille, Fêlure : retrait, défausse, Final, puis la pioche",
@@ -1978,7 +2163,7 @@ function scriptedGame(seed) {
   let state = rules.createGame(seed);
   const journal = [];
   const step = (action) => {
-    const result = apply(state, action);
+    const result = answerChoices(rules, apply(state, action));
     state = result.state;
     journal.push(...result.events);
   };
@@ -2019,11 +2204,19 @@ function checkSerialization(run) {
   let state = rules.createGame(99);
   const journal = [];
   let findings = [];
+  // Chaque réponse à un choix passe aussi par l'aller-retour : un choix en attente
+  // se sérialise.
   const step = (action) => {
-    const result = apply(JSON.parse(JSON.stringify(state)), action);
+    let result = apply(JSON.parse(JSON.stringify(state)), action);
     auditNonSerializable(result.state, "state", new Set(), findings);
+    const events = [...result.events];
+    while (result.state.pendingChoice) {
+      result = apply(JSON.parse(JSON.stringify(result.state)), legalActions(result.state)[0]);
+      auditNonSerializable(result.state, "state", new Set(), findings);
+      events.push(...result.events);
+    }
     state = result.state;
-    journal.push(...result.events);
+    journal.push(...events);
   };
   while (state.stage !== "over") {
     step({ type: "draw" });
@@ -2063,7 +2256,10 @@ function playRandomGame(seed, options, seenTypes) {
     state = result.state;
     actions += 1;
     for (const event of result.events) seenTypes.add(event.type);
-    if (marbleCount(state) !== total) faults.push(`billes : ${marbleCount(state)} au lieu de ${total}`);
+    // Un état suspendu sur un choix est un instantané en pleine action : une bille
+    // peut y être en cours de lancer, ni en main ni sur le triangle. Le compte se
+    // vérifie hors choix.
+    if (!state.pendingChoice && marbleCount(state) !== total) faults.push(`billes : ${marbleCount(state)} au lieu de ${total}`);
     if (state.score < 0) faults.push(`score négatif : ${state.score}`);
     if (state.score < score) faults.push(`score en baisse : ${score} -> ${state.score}`);
     score = state.score;
@@ -2081,6 +2277,17 @@ function playRandomGame(seed, options, seenTypes) {
 
   // Borne large : une partie sans issue la dépasserait, et serait signalée.
   while (state.stage !== "over" && actions < 2000) {
+    // Un choix en attente : une réponse légale au hasard (Terminer compris), mais
+    // aussi, une fois sur quatre, une autre action, qui doit être refusée.
+    if (state.pendingChoice) {
+      if (pick(4) === 0) {
+        const refusedResult = rules.reduce(state, { type: "resolve" });
+        if (refusedResult.ok || refusedResult.error !== "choicePending") faults.push(`action acceptée pendant un choix : ${refusedResult.error}`);
+      }
+      const answers = legalActions(state);
+      verify(rules.reduce(state, answers[pick(answers.length)]));
+      continue;
+    }
     if (state.stage === "draw") {
       verify(rules.reduce(state, { type: "draw" }));
       continue;
@@ -2132,7 +2339,7 @@ function checkSmoke(run) {
   run.same("fumée : invariants tenus", [], faults.slice(0, 5));
   run(
     "fumée : tous les évènements rencontrés",
-    "awaken,bagRegenerated,cracked,discarded,draw,drawSkipped,effect,final,flick,gameOver,hit,impact,knockout,lost,phase,phaseSkipped,placed,pocketReaction,pocketed,polished,potResolution,removed,rotation,swapped,targetEmpty,turnEnded,turnStarted,wear,windfall",
+    "awaken,bagRegenerated,choice,choiceEnded,chosen,cracked,discarded,draw,drawSkipped,effect,final,flick,gameOver,hit,impact,knockout,lost,phase,phaseSkipped,placed,pocketReaction,pocketed,polished,potResolution,removed,rotation,swapped,targetEmpty,turnEnded,turnStarted,wear,windfall",
     [...seen].sort().join()
   );
   // La limite de sécurité atteinte dans une vraie partie : une anomalie.

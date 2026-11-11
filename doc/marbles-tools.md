@@ -38,6 +38,9 @@ node tools/marbles/play.js --seed 42 --json < commandes.txt
 
 Le mode d'emploi est en tête du fichier : `etat`, `brut` (l'état complet, sac
 compris), `poser`, `echanger`, `prevoir`, `fin`, `journal` (lisible) ou `journal json`.
+Un choix en attente se dit avec sa question et ses cibles ; on y répond par `choisir 2`
+(la bille 2 de la main), `choisir pointe`, ou `terminer` (« jusqu'à N ») ; pendant une
+résolution, la suite se dit après la réponse.
 
 ## Construire un cas
 
@@ -51,8 +54,9 @@ Un fichier JSON : `state`, la description de l'état (format en tête de
 bas, défausse, pot et billes perdues (`"pot": ["agate"]`, dans l'ordre d'arrivée, jamais
 plus que `potCapacity`), compteurs, valeurs de partie (`"tally": { "flick": { "turn": 1, "game": 3 } }`, le
 reste à zéro), réglages), et `actions`, des commandes texte (`poser 1
-pointe`, `echanger gauche pointe`, `resoudre`, `piocher`, `prevoir`) ou des actions
-brutes du réducteur. L'outil affiche l'état de départ, le journal ou le refus de chaque
+pointe`, `echanger gauche pointe`, `resoudre`, `piocher`, `prevoir`, `choisir 2`,
+`choisir pointe`, `terminer`) ou des actions brutes du réducteur ; une action suspendue
+sur un choix affiche le choix en attente et ses cibles, la suivante y répond. L'outil affiche l'état de départ, le journal ou le refus de chaque
 action, puis l'état final ; `--json` ajoute tout cela brut. Une description fausse
 (bille, champ ou emplacement inconnu, usure impossible) lève une erreur claire.
 
@@ -80,7 +84,12 @@ reçoivent une vue publique de l'état, billes du sac inconnues (seul leur nombr
 hasard de la partie retiré, et n'agissent que par les actions du réducteur, validées
 comme celles d'un humain, lancers compris. Pour planifier, le glouton passe par le
 réducteur à l'aveugle : une Pioche y donne une bille inconnue, qu'il ne planifie pas. Leurs
-choix aléatoires passent par leur propre générateur.
+choix aléatoires passent par leur propre générateur. Un **choix en attente** revient au
+joueur, même au milieu de la pioche du tour : sa vue publique voile aussi l'état de départ
+que le choix garde. L'aléatoire répond au hasard parmi les cibles éligibles, Terminer
+compris, par un générateur à part ; le glouton prend la réponse au meilleur Impact prévu
+du tour (« prévoir une réponse », `doc/marbles.md`), un choix après l'autre, et saute
+dans son plan une bille qu'un choix aurait empochée entre-temps.
 
 | Joueur | Ce qu'il fait |
 |---|---|

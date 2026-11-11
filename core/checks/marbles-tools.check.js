@@ -12,7 +12,7 @@ import { throws } from "../../lib/check.js";
 import { parseCommand } from "../../tools/marbles/commands.js";
 import { formatEvent, formatState } from "../../tools/marbles/format.js";
 import { applyActions, buildState } from "../../tools/marbles/state-builder.js";
-import { PLAYERS, bestPlan, publicView } from "../../tools/marbles/players.js";
+import { PLAYERS, bestChoice, bestPlan, publicView } from "../../tools/marbles/players.js";
 import { MARBLES_DRAWN_VALUE } from "../../tools/marbles/drawn-value.js";
 import { MARBLE_IDS, deriveSeed, parseBagText, playGame, simulate } from "../../tools/marbles/simulation.js";
 import { percentile, summarize } from "../../tools/marbles/stats.js";
@@ -34,6 +34,7 @@ export default function checkMarblesTools(run) {
   checkCommandsAndFormat(run);
   checkPublicView(run);
   checkGreedy(run);
+  checkPlayerChoices(run);
   checkDrawnValue(run);
   checkSimulation(run);
   checkReportAndExport(run);
@@ -98,7 +99,11 @@ function checkCommandsAndFormat(run) {
     const state = rules.createGame(games[index].seed, { bag: games[index].bag, turnCount: 20 });
     let current = state;
     while (current.stage !== "over") {
-      const action = current.stage === "draw" ? { type: "draw" } : legalActions(current).find((legal) => legal.type === "place") ?? { type: "resolve" };
+      const action = current.pendingChoice
+        ? legalActions(current)[0]
+        : current.stage === "draw"
+          ? { type: "draw" }
+          : (legalActions(current).find((legal) => legal.type === "place") ?? { type: "resolve" });
       const result = rules.reduce(current, action);
       for (const event of result.events) {
         types.add(event.type);
@@ -151,16 +156,40 @@ function checkPublicView(run) {
   run("graines : celle du joueur n'est pas celle de la partie", false, deriveSeed(1, 0, "player") === deriveSeed(1, 0, "game"));
 }
 
-// Impact prévu d'une suite d'actions sur `state`, par le moteur de prévision.
+// Impact prévu d'une suite d'actions sur `state`, par le moteur de prévision. À
+// l'aveugle, comme le glouton planifie : un choix y reste indécis, rien ne s'y
+// suspend.
 function predictedAfter(state, actions) {
   let current = state;
   for (const action of actions) {
-    const result = rules.reduce(current, action);
+    const result = rules.reduce(current, action, { blind: true });
     if (!result.ok) return null;
     current = result.state;
   }
   const predicted = rules.forecast(current);
   return predicted.ok ? predicted.impact : null;
+}
+
+// Les joueurs devant un choix : le glouton prend la réponse au meilleur Impact prévu,
+// l'aléatoire une réponse légale, Terminer compris ; la vue publique voile aussi
+// l'état de départ que garde le choix.
+function checkPlayerChoices(run) {
+  const state = buildState({ triangle: { leftBase: "porcelain:1", rightBase: null, apex: "clay" }, hand: ["glass"], bag: ["agate", "mica"] });
+  const pending = rules.reduce(state, { type: "place", handIndex: 0, slot: "apex" }).state;
+  const view = publicView(pending);
+  run("vue publique : le sac de l'état de départ du choix voilé", true, view.pendingChoice.resume.from.bag.every((marble) => marble === null));
+  const values = legalActions(view).map((action) => rules.forecast(view, action).impact);
+  const best = bestChoice(view);
+  run("glouton : la réponse au meilleur Impact prévu", Math.max(...values), rules.forecast(view, best).impact);
+  run("glouton : une réponse légale", true, rules.reduce(pending, best).ok);
+  const randomAnswer = PLAYERS.random.startGame({ seed: 3 }).next(view);
+  run("aléatoire : une réponse légale au choix", true, randomAnswer.type === "choose" && rules.reduce(pending, randomAnswer).ok);
+  // Mode « jusqu'à N » : Terminer est parmi les réponses tirées.
+  const upTo = { ...view, pendingChoice: { ...view.pendingChoice, upTo: true } };
+  const answers = new Set();
+  const session = PLAYERS.random.startGame({ seed: 5 });
+  for (let draw = 0; draw < 40; draw++) answers.add(JSON.stringify(session.next(upTo)));
+  run("aléatoire : Terminer tiré aussi", true, answers.has(JSON.stringify({ type: "choose", done: true })));
 }
 
 function checkGreedy(run) {
@@ -192,7 +221,7 @@ function checkGreedy(run) {
   let current = view;
   for (const choice of plan.choices) {
     const action = choice.type === "place" ? { type: "place", handIndex: handIds(current).indexOf(choice.marble), slot: choice.slot } : choice;
-    current = rules.reduce(current, action).state;
+    current = rules.reduce(current, action, { blind: true }).state;
   }
   run("glouton : son plan rejoué donne l'Impact annoncé", plan.impact, rules.forecast(current).impact);
   run("glouton : une pose au plus après le premier tour", true, plan.choices.filter((choice) => choice.type === "place").length <= 1);

@@ -51,7 +51,8 @@
 //           Polissage, et "crack", la Fêlure, qui retirent ou ajoutent `amount`
 //           d'usure (au moins 1) à la bille elle-même ou à celle de `target` ;
 //           "pocket", Empocher, sans montant, qui envoie au pot la bille elle-même,
-//           celle de `target` ou la première de la main (`target` FIRST_IN_HAND) ;
+//           celle de `target`, la première de la main (`target` FIRST_IN_HAND) ou
+//           une bille au choix (`target` choice(...)) ;
 //   amount  la valeur : un entier, ou un MONTANT CALCULÉ { base, step, source,
 //           max? }, base + step × la valeur de la source, plafonné à max, évalué
 //           au déclenchement (sources : turnsInHand(), activeSize(calibre),
@@ -59,7 +60,10 @@
 //   target  (facultatif) pour une Vitesse ou une Masse, l'emplacement dont elle
 //           modifie l'effet de phase, au lieu d'agir sur le compteur du tour (jamais
 //           une phase toujours passée, ni dans un Final) ; pour un Polissage ou une
-//           Fêlure, l'emplacement dont la bille la reçoit ;
+//           Fêlure, l'emplacement dont la bille la reçoit ; ou un CHOIX du joueur,
+//           choice({ zones, count, upTo }) (marbles/effects.js ; doc/marbles.md,
+//           « Cibles au choix ») : « Polissage 1 à une bille active au choix »,
+//           polish(1, choice({ zones: ["triangle"] })) ;
 //   when    (facultatif) sa condition, évaluée au déclenchement. Une condition
 //           lit toujours l'effet IMPRIMÉ d'une bille, jamais un effet déjà
 //           modifié : aucune dépendance circulaire n'est possible.

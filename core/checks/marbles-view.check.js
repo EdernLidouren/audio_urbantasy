@@ -9,7 +9,7 @@
 // dans le jeu. Lancées par core/checks/index.js/runChecks
 // (`node tools/run-checks.js marbles-view`).
 
-import { LOCALE_TABLES, t, setLocale, getLocale } from "../../data/i18n/index.js";
+import { LOCALE_TABLES, nameRef, t, setLocale, getLocale } from "../../data/i18n/index.js";
 import {
   LARGE,
   MARBLE_CARD_MODEL,
@@ -33,6 +33,7 @@ import {
   buildSteps,
   stepsText,
   describeBag,
+  describeChoicePrompt,
   describeDiscard,
   describePot,
   describeEffect,
@@ -75,7 +76,8 @@ import { pathLength, rollAt, rollDurationMs, rollEnvelope } from "../../view/mar
 import { EMPTY_SOUND_QUEUE, advanceSoundQueue, enqueueCues } from "../../view/marbles/sound-queue.js";
 import { throws } from "../../lib/check.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
-import { emptyBagMarblesGame, inHand, withSizes } from "./helpers.js";
+import { answerChoices, emptyBagMarblesGame, inHand, withSizes } from "./helpers.js";
+import { choiceAnswer, choiceFocusLine, choiceHandOptions, choiceMarbleAt, choiceStartCursor, stepChoiceCursor } from "../../view/marbles/choice.js";
 import { createMarblesRules } from "../marbles-rules.js";
 import { AMOUNT_SOURCES, effectAt } from "../marbles-effects.js";
 
@@ -102,7 +104,7 @@ function sampleEvents() {
   const events = [];
   let state = rules.createGame(11);
   const step = (action) => {
-    const result = rules.reduce(state, action);
+    const result = answerChoices(rules, rules.reduce(state, action));
     if (result.ok) {
       state = result.state;
       events.push(...result.events);
@@ -128,10 +130,11 @@ function sampleEvents() {
   const pocketedApex = rules.reduce({ ...emptyBagMarblesGame(rules, 7), turn: 2, stage: "play", bag: ["clay"], triangle: { leftBase: { marble: "sulphide", wear: 0 }, rightBase: null, apex: { marble: "porcelain", wear: 0 } } }, { type: "resolve" });
   events.push(...pocketedApex.events);
   // La plombée fêle la porcelaine de la pointe ; le gorille, pot plein, perd la
-  // première bille de la main ; puis, main vide, n'a rien à empocher.
+  // bille de la main choisie.
   const cracked = rules.reduce({ ...emptyBagMarblesGame(rules, 7), turn: 2, stage: "play", hand: inHand(["leaded"]), triangle: { leftBase: null, rightBase: null, apex: { marble: "porcelain", wear: 0 } } }, { type: "place", handIndex: 0, slot: "apex" });
   events.push(...cracked.events);
-  const lost = rules.reduce({ ...emptyBagMarblesGame(rules, 7), turn: 2, stage: "play", hand: inHand(["gorilla", "clay"]), pot: ["glass", "glass", "glass"], triangle: { leftBase: null, rightBase: null, apex: { marble: "clay", wear: 0 } } }, { type: "place", handIndex: 0, slot: "apex" });
+  // Le Tic du gorille fait choisir la bille de la main : l'argile, perdue.
+  const lost = answerChoices(rules, rules.reduce({ ...emptyBagMarblesGame(rules, 7), turn: 2, stage: "play", hand: inHand(["gorilla", "clay"]), pot: ["glass", "glass", "glass"], triangle: { leftBase: null, rightBase: null, apex: { marble: "clay", wear: 0 } } }, { type: "place", handIndex: 0, slot: "apex" }));
   events.push(...lost.events);
   const polished = rules.reduce({ ...emptyBagMarblesGame(rules, 8), turn: 2, stage: "play", bag: ["clay"], triangle: { leftBase: null, rightBase: null, apex: { marble: "mica", wear: 1 } } }, { type: "resolve" });
   events.push(...polished.events);
@@ -147,6 +150,9 @@ function sampleEvents() {
   // La tigrée du pot réagit à la Chiquenaude de l'argile.
   const reacting = rules.reduce({ ...emptyBagMarblesGame(rules, 3), turn: 2, stage: "play", hand: inHand(["clay"]), pot: ["tiger"] }, { type: "place", handIndex: 0, slot: "apex" });
   events.push(...reacting.events);
+  // Un choix indécis : à l'aveugle seulement (la prévision), le Tic du verre.
+  const undecided = rules.reduce({ ...emptyBagMarblesGame(rules, 3), turn: 2, stage: "play", hand: inHand(["glass"]), triangle: { leftBase: null, rightBase: null, apex: { marble: "clay", wear: 0 } } }, { type: "place", handIndex: 0, slot: "apex" }, { blind: true });
+  events.push(...undecided.events);
   // La limite de sécurité, abaissée : la chaîne s'arrête, l'action aboutit.
   const interrupted = rules.reduce(rules.createGame(3), { type: "draw" }, { eventLimit: 3 });
   events.push(...interrupted.events);
@@ -180,7 +186,7 @@ function checkCards(run) {
       "fiche : éjection au-dessous, base sans effet",
       {
         above: ["Pointe : Vitesse +6.", "Base : aucun effet."],
-        below: ["Tic : Vitesse +4 si la bille éjectée est plus petite et Empocher la première bille de la main.", "Éjection : Vitesse +3."],
+        below: ["Tic : Vitesse +4 si la bille éjectée est plus petite et Empocher une bille de votre main au choix.", "Éjection : Vitesse +3."],
       },
       fields("gorilla")
     );
@@ -218,7 +224,7 @@ function checkCards(run) {
     // Les conditions de calibre, lisibles à l'oreille.
     run("fiche : comptage par calibre", "Base : Vitesse +1 par minibille active.", fields("stoneware").above[1]);
     run("fiche : calibre d'un emplacement", "Pointe : Masse +1 et Masse +2 si la base gauche est un calot.", fields("agate").above[0]);
-    run.same("fiche : un Polissage ciblé au Tic", ["Tic : Polissage 1 à la pointe."], fields("glass").below);
+    run.same("fiche : un Polissage au choix au Tic", ["Tic : Polissage 1 à une bille active au choix."], fields("glass").below);
     run.same(
       "fiche : un Polissage ciblé au Final, une Trouvaille entre Tic et Final",
       ["Tic : Masse +1.", "Trouvaille : Polissage 1.", "Final : Polissage 1 à la pointe et Empocher cette bille.", "En poche, à chaque résolution : Masse +1."],
@@ -239,7 +245,7 @@ function checkCards(run) {
     );
     run.same(
       "fiche : la Chiquenaude, le Final, puis En poche à l'entrée de la porcelaine",
-      ["Chiquenaude : Masse +1.", "Final : Vitesse +4.", "En poche, à l'entrée : Vitesse +10."],
+      ["Chiquenaude : Masse +1.", "Final : Vitesse +4 et Polissage 1 à jusqu'à 2 billes actives au choix.", "En poche, à l'entrée : Vitesse +10."],
       fields("porcelain").below
     );
     // Un montant calculé, avec sa valeur actuelle : en main, celle de son compteur.
@@ -311,8 +317,8 @@ function checkCards(run) {
     run.same("fiche, anglais : la Pioche et le Polissage", ["Apex: Speed +2 and Polish 1.", "Base: Draw 1."], fields("mica").above);
     run.same("fiche, anglais : Empocher en base", ["Apex: Mass +3.", "Base: Pocket the marble at the apex."], fields("sulphide").above);
     run.same(
-      "fiche, anglais : comparaison de calibre au Tic, Empocher la première de la main",
-      ["Hit: Speed +4 if the knocked-out marble is smaller and Pocket the first marble in hand.", "Knockout: Speed +3."],
+      "fiche, anglais : comparaison de calibre au Tic, Empocher une bille de la main au choix",
+      ["Hit: Speed +4 if the knocked-out marble is smaller and Pocket a marble from your hand of your choice.", "Knockout: Speed +3."],
       fields("gorilla").below
     );
     run.same("fiche, anglais : En poche", ["Final: Polish 1 to the apex and Pocket this marble.", "Pocketed, each resolution: Mass +1."], fields("agate").below.slice(-2));
@@ -378,7 +384,7 @@ function playWithLookups(seed, lookup) {
   const journal = [];
   const step = (action) => {
     lookup(state);
-    const result = rules.reduce(state, action);
+    const result = answerChoices(rules, rules.reduce(state, action));
     if (result.ok) {
       state = result.state;
       journal.push(...result.events);
@@ -433,7 +439,7 @@ function checkKeywords(run) {
   run.same("mots-clés : la géante, déclencheurs, actions, puis pointe et base", ["awaken", "final", "draw", "polish", "apex", "base"], ids("giant"));
   run.same("mots-clés : le mica, la Pioche une seule fois (base, éveil, éjection) ; En poche par sa réaction", ["awaken", "knockout", "pocketed", "draw", "polish", "apex", "base"], ids("mica"));
   run.same("mots-clés : le sulfure, En poche avant les actions, Fêlure puis Empocher", ["windfall", "pocketed", "crack", "pocket", "apex", "base"], ids("sulphide"));
-  run.same("mots-clés : la porcelaine, En poche par son seul effet d'entrée", ["flick", "final", "pocketed", "apex", "base"], ids("porcelain"));
+  run.same("mots-clés : la porcelaine, En poche par son seul effet d'entrée, Polissage par son Final", ["flick", "final", "pocketed", "polish", "apex", "base"], ids("porcelain"));
   run.same("mots-clés : ni Vitesse ni Masse, ni calibre", ["flick", "hit", "apex", "base"], ids("clay"));
   const made = fabricatedRules({ sided: { baseVariant: { leftBase: [{ action: "mass", amount: 1 }] } }, bare: {} });
   run.same("mots-clés : une variante de base seule compte comme base", ["base"], ids("sided", made));
@@ -506,6 +512,94 @@ function checkKeywords(run) {
   }
 }
 
+// L'INTERFACE DE CHOIX (view/marbles/choice.js) et ses textes : la main limitée aux
+// billes éligibles (Terminer en dernier en mode « jusqu'à N »), le triangle entier
+// avec ses emplacements non éligibles dits et bloqués, la navigation entre zones,
+// la question, ce qui reste, les cibles choisies.
+function checkChoiceInterface(run) {
+  const locale = getLocale();
+  const choose = (zones, extra = {}) => ({ type: "choice", zones, pick: "marble", count: 1, ...extra });
+  const made = fabricatedRules({
+    plain: { apex: [{ action: "speed", amount: 1 }] },
+    anyPocket: { hit: [{ action: "pocket", target: choose(["hand", "triangle"]) }] },
+    upToPolish: { hit: [{ action: "polish", amount: 1, target: choose(["triangle"], { count: 2, upTo: true }) }] },
+    twoCrack: { hit: [{ action: "crack", amount: 1, target: choose(["triangle"], { count: 2 }) }] },
+    booster: { hit: [{ action: "speed", amount: 2, target: choose(["triangle"]) }] },
+  });
+  const pending = (marble, triangle, hand = []) =>
+    made.reduce({ ...emptyBagMarblesGame(made, 2), turn: 2, stage: "play", hand: inHand([marble, ...hand]), triangle }, { type: "place", handIndex: 0, slot: "apex" }).state;
+  const cursor = (place, handIndex = 0) => ({ place, handIndex, lastBase: "leftBase" });
+  setLocale("fr");
+
+  // Le gorille : la main seule, ses billes éligibles.
+  const gorilla = rules.reduce({ ...emptyBagMarblesGame(rules, 2), turn: 2, stage: "play", hand: inHand(["gorilla", "clay", "agate"]), triangle: { leftBase: null, rightBase: null, apex: { marble: "clay", wear: 0 } } }, { type: "place", handIndex: 0, slot: "apex" }).state;
+  const handOnly = gorilla.pendingChoice;
+  run("choix, question : la main", "Choisissez une bille de votre main à empocher.", plain(describeChoicePrompt(handOnly, t)));
+  run.same("choix, main : les billes éligibles seulement", ["clay", "agate"], choiceHandOptions(handOnly).map((option) => option.marble));
+  run.same("choix, main : le curseur s'y ouvre", { place: "hand", handIndex: 0 }, (({ place, handIndex }) => ({ place, handIndex }))(choiceStartCursor(handOnly, cursor("apex"))));
+  run("choix, main : la position dans le menu du choix", "agate, normale, usure 3. 2 sur 2", plain(choiceFocusLine(gorilla, cursor("hand", 1), rules, t)));
+  run("choix, main seule : pas de triangle", null, stepChoiceCursor(handOnly, cursor("hand"), "up"));
+  run.same("choix, main : Entrée répond par la place dans la main", { type: "choose", target: { zone: "hand", index: 1 } }, choiceAnswer(handOnly, cursor("hand", 1)).action);
+  run.same("choix, main : la fiche de la bille sous le curseur", "agate", choiceMarbleAt(gorilla, cursor("hand", 1)).marble);
+
+  // Le triangle seul, « jusqu'à 2 » : la question, Terminer, les non éligibles.
+  const upTo = pending("upToPolish", { leftBase: { marble: "plain", wear: 1 }, rightBase: null, apex: { marble: "plain", wear: 0 } });
+  const upToChoice = upTo.pendingChoice;
+  run("choix, question : jusqu'à 2, Terminer annoncé", "Choisissez jusqu'à 2 billes actives à polir. T pour terminer.", plain(describeChoicePrompt(upToChoice, t)));
+  run.same("choix, triangle seul : le curseur sur le premier éligible", "leftBase", choiceStartCursor(upToChoice, cursor("hand")).place);
+  run("choix, triangle seul : pas de main", null, stepChoiceCursor(upToChoice, cursor("leftBase"), "down"));
+  run("choix, triangle : la navigation habituelle", "apex", stepChoiceCursor(upToChoice, cursor("leftBase"), "up").place);
+  run("choix, triangle : un emplacement vide reste accessible", "rightBase", stepChoiceCursor(upToChoice, cursor("leftBase"), "right").place);
+  run("choix, triangle : non éligible, dit", "base droite : vide. Non éligible.", plain(choiceFocusLine(upTo, cursor("rightBase"), made, t)));
+  run.same("choix, triangle : non éligible, bloqué", { refusal: "notEligible" }, choiceAnswer(upToChoice, cursor("rightBase")));
+  run.same("choix, triangle : éligible, Entrée répond", { type: "choose", target: { zone: "triangle", slot: "leftBase" } }, choiceAnswer(upToChoice, cursor("leftBase")).action);
+  run.same("choix, triangle seul : pas de menu de main", [], choiceHandOptions(upToChoice));
+  const afterOne = made.reduce(upTo, { type: "choose", target: { zone: "triangle", slot: "leftBase" } }).state.pendingChoice;
+  run("choix, après un : ce qui reste, en mode jusqu'à N", "Vous pouvez choisir encore une bille active, ou terminer avec T.", plain(describeChoicePrompt(afterOne, t)));
+  run("choix, après un : la cible choisie n'est plus éligible", true, plain(choiceFocusLine({ ...upTo, pendingChoice: afterOne }, cursor("leftBase"), made, t)).endsWith("usure 1 sur 3. Non éligible."));
+
+  // Obligatoire, 2 : la question, puis ce qui reste.
+  const two = pending("twoCrack", { leftBase: { marble: "plain", wear: 0 }, rightBase: { marble: "plain", wear: 0 }, apex: { marble: "plain", wear: 0 } });
+  run("choix, question : 2 billes actives", "Choisissez 2 billes actives à fêler.", plain(describeChoicePrompt(two.pendingChoice, t)));
+  const oneDone = made.reduce(two, { type: "choose", target: { zone: "triangle", slot: "rightBase" } }).state.pendingChoice;
+  run("choix, après un : ce qui reste", "Choisissez encore une bille active.", plain(describeChoicePrompt(oneDone, t)));
+
+  // Un bonus au choix : sa valeur dans la question.
+  const boost = pending("booster", { leftBase: { marble: "plain", wear: 0 }, rightBase: null, apex: { marble: "plain", wear: 0 } });
+  run("choix, question : un bonus", "Choisissez une bille active pour Vitesse +2.", plain(describeChoicePrompt(boost.pendingChoice, t)));
+
+  // Les deux zones : la main (avec Terminer s'il y a lieu), puis le triangle.
+  const both = pending("anyPocket", { leftBase: null, rightBase: null, apex: { marble: "plain", wear: 0 } }, ["plain"]);
+  run("choix, question : main ou active", "Choisissez une bille de votre main ou active à empocher.", plain(describeChoicePrompt(both.pendingChoice, t)));
+  run("choix, deux zones : de la main vers le triangle", "leftBase", stepChoiceCursor(both.pendingChoice, cursor("hand"), "up").place);
+  run("choix, deux zones : du triangle vers la main", "hand", stepChoiceCursor(both.pendingChoice, cursor("leftBase"), "down").place);
+
+  // « Terminer » en fin de menu de la main, en mode « jusqu'à N ».
+  const upToHand = { ...handOnly, upTo: true };
+  run.same("choix, main, jusqu'à N : Terminer en dernier", ["marble", "marble", "finish"], choiceHandOptions(upToHand).map((option) => option.kind));
+  run("choix, main, jusqu'à N : Terminer dit", "Terminer. 3 sur 3", plain(choiceFocusLine({ ...gorilla, pendingChoice: upToHand }, cursor("hand", 2), rules, t)));
+  run.same("choix, main, jusqu'à N : Terminer répond", { type: "choose", done: true }, choiceAnswer(upToHand, cursor("hand", 2)).action);
+  run("choix, Terminer : aucune fiche", null, choiceMarbleAt({ ...gorilla, pendingChoice: upToHand }, cursor("hand", 2)));
+
+  // Les cibles choisies se disent, accord compris ; la fin, quand elle n'est pas d'avoir
+  // fait les N choix ; rien à choisir.
+  run("choix, dit : une bille choisie", "agate choisie.", plain(t("marbles.choice.chosen", { marble: nameRef("marble.agate.name") })));
+  run("choix, dit : un gorille choisi", "gorille choisi.", plain(t("marbles.choice.chosen", { marble: nameRef("marble.gorilla.name") })));
+  run(
+    "choix, dit : la réponse du gorille",
+    "agate choisie. agate est mise en poche.",
+    plain(stepsText(buildSteps(rules.reduce(gorilla, { type: "choose", target: { zone: "hand", index: 1 } }).events, t)))
+  );
+  run("choix, dit : Terminer", "Choix terminé.", plain(stepsText(buildSteps(made.reduce(upTo, { type: "choose", done: true }).events, t))));
+
+  setLocale("en");
+  run("choix, anglais : la main", "Choose a marble from your hand to pocket.", describeChoicePrompt(handOnly, t));
+  run("choix, anglais : jusqu'à 2", "Choose up to 2 active marbles to polish. T to finish.", describeChoicePrompt(upToChoice, t));
+  run("choix, anglais : ce qui reste", "Still to choose: an active marble.", describeChoicePrompt(oneDone, t));
+  run("choix, anglais : non éligible", "right base: empty. Not eligible.", choiceFocusLine(upTo, cursor("rightBase"), made, t));
+  setLocale(locale);
+}
+
 // La touche P : le pot et les billes perdues, accords compris.
 function checkPotStatus(run) {
   const locale = getLocale();
@@ -560,7 +654,7 @@ function checkBagOrder(run) {
   // La défausse : l'ordre d'arrivée, celui que tient l'état.
   let state = { ...emptyBagMarblesGame(rules, 1), turn: 2, stage: "play", hand: inHand(["clay", "glass", "agate"]) };
   state = { ...state, triangle: { leftBase: { marble: "porcelain", wear: 0 }, rightBase: { marble: "tiger", wear: 0 }, apex: { marble: "giant", wear: 0 } } };
-  for (const slot of ["apex", "leftBase", "rightBase"]) state = rules.reduce(state, { type: "place", handIndex: 0, slot }).state;
+  for (const slot of ["apex", "leftBase", "rightBase"]) state = answerChoices(rules, rules.reduce(state, { type: "place", handIndex: 0, slot })).state;
   run.same("défausse : de la plus ancienne à la plus récente", ["giant", "porcelain", "tiger"], state.discard);
 }
 
@@ -906,6 +1000,7 @@ export default function checkMarblesView(run) {
   checkTallyMenu(run);
   checkKeywords(run);
   checkPotStatus(run);
+  checkChoiceInterface(run);
   run("narration : évènement inconnu refusé", true, throws(() => buildSteps([{ type: "nope" }], (key) => key)));
 
   // Le découpage en étapes : tous les évènements, chacun une fois, dans l'ordre.
@@ -1062,8 +1157,8 @@ export default function checkMarblesView(run) {
       menuLines(0, "apex")
     );
     run.same(
-      "confirmation : aucun effet dit, même structure ; un Polissage ciblé chez qui le produit",
-      ["Poser verre en base gauche ?", "Masse +1", "Chiquenaude de verre : aucun effet", "Éjection de loupe : aucun effet", "Tic de verre : Polissage 1 à la pointe", "Pot : aucun effet"],
+      "confirmation : aucun effet dit, même structure ; un Polissage au choix chez qui le produit, selon votre choix",
+      ["Poser verre en base gauche ?", "Masse +1", "Chiquenaude de verre : aucun effet", "Éjection de loupe : aucun effet", "Tic de verre : Polissage 1 à une bille active au choix, selon votre choix", "Pot : aucun effet"],
       menuLines(2, "leftBase")
     );
     // Les valeurs prévues au format de R : ce que la loupe donne s'entend chez le

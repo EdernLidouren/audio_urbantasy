@@ -11,8 +11,10 @@
 //     "actions": ["prevoir", "poser 1 pointe", "resoudre", { "type": "swap", "a": "apex", "b": "leftBase" }]
 //   }
 // Une action est une commande texte (tools/marbles/commands.js : poser, echanger,
-// piocher, resoudre, prevoir) ou une action brute du réducteur. Ici « resoudre » ne
-// pioche pas : chaque action est exactement celle du réducteur.
+// piocher, resoudre, prevoir, choisir, terminer) ou une action brute du réducteur.
+// Ici « resoudre » ne pioche pas : chaque action est exactement celle du réducteur.
+// Une action suspendue sur un choix affiche le choix en attente et ses cibles ; la
+// suivante y répond (« choisir 2 », « choisir pointe », « terminer »).
 //
 // Sortie : l'état de départ, puis pour chaque action son journal (une ligne par
 // évènement) ou son refus, et l'état final. --json : une dernière ligne JSON
@@ -35,7 +37,7 @@ const { t } = await import("../../data/i18n/index.js");
 const { forecast } = await import("../../core/marbles-forecast.js");
 const { SLOTS } = await import("../../core/marbles.js");
 const { buildState, applyActions } = await import("./state-builder.js");
-const { PLACEMENT_TRIGGERS, counter, formatEvent, formatState, marbleLabel, slotLabel, triggerLabel } = await import("./format.js");
+const { PLACEMENT_TRIGGERS, choiceLine, counter, formatEvent, formatState, marbleLabel, slotLabel, triggerLabel } = await import("./format.js");
 const name = (id) => t(`marble.${id}.name`);
 
 const spec = JSON.parse(await readFile(file, "utf-8"));
@@ -93,6 +95,8 @@ for (const entry of spec.actions ?? []) {
   if (!step.ok) console.log(`  Refusé : ${step.error}.`);
   else step.events.forEach((event) => console.log(`  ${formatEvent(event, name)}`));
   state = next;
+  // Une action suspendue sur un choix : ses cibles, à désigner par « choisir ».
+  if (state.pendingChoice) console.log(`  ${choiceLine(state.pendingChoice, name)}`);
 }
 
 console.log("État final :");

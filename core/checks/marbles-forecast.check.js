@@ -6,18 +6,23 @@
 // (`node tools/run-checks.js marbles-forecast`).
 
 import { nextRandom } from "../rng.js";
-import { SLOTS, TALLY_COUNTERS, createMarblesGame, marblesReduce } from "../marbles.js";
+import { SLOTS, TALLY_COUNTERS, createMarblesGame, legalActions, marblesReduce } from "../marbles.js";
 import { emptyTally } from "../marbles-tally.js";
 import { forecast, readForecast } from "../marbles-forecast.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
-import { emptyBagMarblesGame, inHand, withSizes } from "./helpers.js";
+import { emptyBagMarblesGame, fixedTargetTypes, inHand, withSizes } from "./helpers.js";
 import { createMarblesRules } from "../marbles-rules.js";
 
 // Tables fabriquées : complétées d'un calibre (core/checks/helpers.js/withSizes).
 const fabricatedRules = (table) => createMarblesRules(withSizes(table));
 
 // Les règles du jeu, liées à la vraie table (core/marbles-rules.js).
-const rules = createMarblesRules(MARBLE_TYPES);
+const realRules = createMarblesRules(MARBLE_TYPES);
+// Gorille, verre et porcelaine d'avant les cibles au choix (core/checks/helpers.js/
+// fixedTargetTypes) : les cas qui portent sur d'autres mécanismes les gardent, sans
+// choix à trancher. La propriété « prévision = réel » et les cas du choix jouent la
+// vraie table (realRules).
+const rules = createMarblesRules(fixedTargetTypes(MARBLE_TYPES));
 
 const placed = (marble, wear = 0) => ({ marble, wear });
 
@@ -44,6 +49,7 @@ export default function checkMarblesForecast(run) {
   checkAwakenForecast(run);
   checkPocketForecast(run);
   checkReactionForecast(run);
+  checkChoiceForecast(run);
   checkGuards(run);
   checkMatchesReality(run);
 }
@@ -356,9 +362,39 @@ function checkReactionForecast(run) {
   run("prévision, sans boucle : rien d'interrompu", false, predicted.interrupted);
 }
 
+// Le CHOIX dans la prévision : elle ne le devine pas (« selon votre choix »), sauf
+// quand il n'y a rien à choisir ; la prévision d'une réponse rejoue l'action à
+// l'aveugle avec elle, et égale le réel (le joueur glouton s'en sert : domaine
+// marbles-tools).
+function checkChoiceForecast(run) {
+  const toApex = { type: "place", handIndex: 0, slot: "apex" };
+  const glass = playState({ hand: inHand(["glass"]), triangle: { leftBase: placed("porcelain", 1), rightBase: null, apex: placed("clay") } });
+  const predicted = realRules.forecast(glass, toApex);
+  run.same("choix prévu : indécis, chez le Tic du verre", [{ action: "polish" }], predicted.hit.undecided);
+  run("choix prévu : la prévision le dit", true, predicted.choiceDependent);
+  run("choix prévu : rien n'est appliqué (la porcelaine s'use)", "porcelain", predicted.retired.find((retired) => retired.slot === "leftBase")?.marble);
+
+  // Une réponse prévue : le Polissage de la porcelaine (usure 1 sur 2) la sauve.
+  const real = realRules.reduce(glass, toApex);
+  const answer = { type: "choose", target: { zone: "triangle", slot: "leftBase" } };
+  const answered = realRules.forecast(real.state, answer);
+  run("réponse prévue : la porcelaine sauvée", false, answered.retired.some((retired) => retired.marble === "porcelain"));
+  run("réponse prévue : plus rien d'indécis", false, answered.choiceDependent);
+  const chosen = realRules.reduce(real.state, answer);
+  const resolved = realRules.reduce(chosen.state, { type: "resolve" });
+  run("réponse prévue : l'Impact réel", resolved.state.score - real.state.score, answered.impact);
+  run("réponse prévue : une réponse refusée, refusée", "invalidChoice", realRules.forecast(real.state, { type: "choose", target: { zone: "triangle", slot: "rightBase" } }).error);
+  run("réponse prévue : l'état reçu n'est pas modifié", true, (() => {
+    const frozen = deepFreeze(structuredClone(real.state));
+    return realRules.forecast(frozen, answer).ok;
+  })());
+}
+
 // Polissage et Fêlure : la prévision montre leurs conséquences, comme le réel.
 function checkWearForecast(run) {
-  const crackerRules = fabricatedRules({ cracker: { base: [{ action: "crack", amount: 1, target: "apex" }] }, porcelain: MARBLE_TYPES.porcelain, clay: MARBLE_TYPES.clay });
+  // La porcelaine sans le Polissage au choix de son Final : ce cas porte sur la Fêlure.
+  const plainPorcelain = { ...MARBLE_TYPES.porcelain, final: [{ action: "speed", amount: 4 }] };
+  const crackerRules = fabricatedRules({ cracker: { base: [{ action: "crack", amount: 1, target: "apex" }] }, porcelain: plainPorcelain, clay: MARBLE_TYPES.clay });
   const cracking = playState({ hand: inHand([]), bag: ["clay"], triangle: { leftBase: placed("cracker"), rightBase: null, apex: placed("porcelain", 1) } });
   const predicted = crackerRules.forecast(cracking);
   run.same("Fêlure prévue : chez la bille qui la produit", [{ action: "crack", amount: 1, target: "apex" }], predicted.phases.leftBase.operations);
@@ -525,7 +561,18 @@ function compareState(state, marbles, faults, tally) {
       if (predicted.error !== real.error) faults.push(`refus différent : ${predicted.error} au lieu de ${real.error}`);
       continue;
     }
+    // L'exception du choix (core/marbles-forecast.js) : un choix réel attend le
+    // joueur, la prévision ne le devine pas ; elle doit l'avoir dit
+    // (`choiceDependent`), et rien ne se compare.
+    const choiceWaits = (result) => {
+      if (!result.ok || !result.state.pendingChoice) return false;
+      tally.choices += 1;
+      if (!predicted.choiceDependent) faults.push(`choix réel sans prévision qui le dise : ${JSON.stringify(action)}`);
+      return true;
+    };
+    if (choiceWaits(real)) continue;
     const resolved = marbles.reduce(real.state, { type: "resolve" });
+    if (choiceWaits(resolved)) continue;
     if (!resolved.ok) {
       if (!predicted.ok) faults.push(`prévision refusée sur un tour 1 : ${predicted.error}`);
       continue;
@@ -615,6 +662,11 @@ function walkGame(seed, options, marbles, faults, tally) {
   let guard = 0;
   while (state.stage !== "over" && guard < 400) {
     guard += 1;
+    if (state.pendingChoice) {
+      const answers = legalActions(state);
+      state = marbles.reduce(state, answers[pick(answers.length)]).state;
+      continue;
+    }
     if (state.stage === "draw") {
       state = marbles.reduce(state, { type: "draw" }).state;
       continue;
@@ -629,15 +681,16 @@ function walkGame(seed, options, marbles, faults, tally) {
 
 function checkMatchesReality(run) {
   const faults = [];
-  const tally = { states: 0, actions: 0, awakened: 0, unknownPockets: 0 };
+  const tally = { states: 0, actions: 0, awakened: 0, unknownPockets: 0, choices: 0 };
   const mixedBag = ["plain", "plain", "heavy", "giver", "giver", "lens", "lens", "thief", "thief", "plain"];
   for (let seed = 1; seed <= 60; seed++) {
-    walkGame(seed, {}, rules, faults, tally);
+    walkGame(seed, {}, realRules, faults, tally);
     walkGame(seed + 1000, { bag: mixedBag }, mixedRules, faults, tally);
   }
   run.same("propriété : la prévision correspond au résultat réel", [], faults.slice(0, 3));
   run("propriété : plusieurs centaines d'états", true, tally.states >= 300);
   run("propriété : des milliers d'actions comparées", true, tally.actions >= 2000);
+  run("propriété : des choix réels rencontrés, chacun annoncé par la prévision", true, tally.choices > 0);
   run("propriété : des Éveils réels rencontrés, chacun annoncé incertain", true, tally.awakened > 0);
 }
 

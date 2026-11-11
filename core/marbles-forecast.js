@@ -21,6 +21,22 @@
 // « prévision = résultat réel » vaut pour tout ce qui ne dépend pas d'un Éveil :
 // pour tout résultat réel où aucun Éveil n'a joué.
 //
+// L'EXCEPTION DU CHOIX : la prévision ne devine jamais le choix du joueur. Une cible
+// au choix (core/marbles-effects.js, en-tête) y reste INDÉCISE : son action n'est pas
+// appliquée, l'effet qui la porte le dit (`undecided`, « selon votre choix »), et
+// `choiceDependent` est vrai : ce qui en dépend n'est pas calculé. Une cible au
+// choix sans aucune cible éligible, elle, se prévoit (`empty`). La propriété
+// « prévision = résultat réel » vaut donc pour tout ce qui ne dépend ni d'un Éveil ni
+// d'un choix.
+//
+// PRÉVOIR UNE RÉPONSE : avec un choix en attente, `forecast(state, { type: "choose",
+// ... })` rejoue l'action suspendue À L'AVEUGLE depuis son état de départ
+// (core/marbles.js/replayAction), les réponses déjà données plus celle-ci, puis la
+// résolution si l'action n'en était pas une : l'Impact prévu du tour avec ce choix,
+// les choix suivants restant indécis. Ce que le joueur a vu piocher depuis le début
+// de l'action y redevient inconnu : un rejeu qui en dépendrait diverge, et le choix
+// concerné reste indécis.
+//
 // Résultat : { ok: false, error } si l'action serait refusée (mêmes codes que le
 // réducteur), sinon { ok: true, error: null, flick, knockout, hit, phases, speed,
 // mass, impact, drawn, regenerations, potEffects, potReactions, interrupted, tally,
@@ -62,6 +78,7 @@
 //   potReactions   de même, les réactions du pot PENDANT L'ACTION envisagée (la pose) ;
 //   interrupted    vrai si la limite de sécurité du bus arrêterait la chaîne
 //                  (chainInterrupted) : une anomalie, que R et la confirmation disent ;
+//   choiceDependent vrai si un choix du joueur est resté indécis (plus haut) ;
 //   awakenPossible vrai si un Éveil est possible (voir plus haut) ; une des
 //                  raisons d'`uncertain`.
 // Un effet : { marble, speed, mass, draw, operations, given, pockets?, empty? }, le
@@ -72,11 +89,12 @@
 // son entrée au pot (En poche, à l'entrée), ou null. `empty` (seulement s'il y en
 // a) : ses actions qui n'ont rien trouvé à leur cible, dans l'ordre, chacune
 // { action, slot, target?, marble? } (l'évènement targetEmpty) : emplacement vide,
-// main vide, bille déjà partie. Le moteur le sait aussi sûrement qu'il joue le
+// main vide, bille déjà partie, aucune cible à choisir. `undecided` (seulement s'il y
+// en a) : ses actions au choix restées indécises, chacune { action }. Le moteur le sait aussi sûrement qu'il joue le
 // coup ; une cible vidée par une pioche à l'aveugle reste vide pour de bon.
 
 import { MARBLE_POCKET, MARBLE_TRIGGERS } from "../config/marbles-values.js";
-import { SLOTS, UNKNOWN_MARBLE, blindCopy, marblesReduce, runResolution, stageRefusal } from "./marbles.js";
+import { SLOTS, UNKNOWN_MARBLE, answerOf, blindCopy, chooseRefusal, marblesReduce, replayAction, runResolution, stageRefusal } from "./marbles.js";
 
 // Les déclencheurs prévus pendant une pose (config/marbles-values.js) : chacun a sa
 // clé dans le résultat, son effet ou null.
@@ -122,19 +140,26 @@ function awakenPossible(state, events, types) {
 //   pockets : ce que ses Empocher ont déplacé (pocketed, lost), avec l'effet
 //             d'entrée qui suit aussitôt une mise en poche (une interruption : il
 //             vient juste après), un évènement ou null ;
-//   empty   : ses cibles vides (targetEmpty).
-// -> Map effet -> { pockets: [{ marble, lost, entry }], empty: [{ action, slot, ... }] }.
+//   empty   : ses cibles vides (targetEmpty) ;
+//   undecided : ses choix indécis (choiceUndecided).
+// -> Map effet -> { pockets: [{ marble, lost, entry }], empty: [{ action, slot, ... }], undecided: [{ action }] }.
+const RESULT_EVENTS = new Set(["pocketed", "lost", "targetEmpty", "choiceUndecided"]);
+
 function resultsByEffect(events) {
   const results = new Map();
   events.forEach((event, index) => {
-    if (event.type !== "pocketed" && event.type !== "lost" && event.type !== "targetEmpty") return;
+    if (!RESULT_EVENTS.has(event.type)) return;
     const { by } = event;
     const source = events
       .slice(0, index)
       .findLast((other) => other.type === "effect" && other.trigger === by.trigger && other.marble === by.marble && (other.slot ?? null) === by.slot);
     if (source === undefined) return;
-    const found = results.get(source) ?? { pockets: [], empty: [] };
+    const found = results.get(source) ?? { pockets: [], empty: [], undecided: [] };
     results.set(source, found);
+    if (event.type === "choiceUndecided") {
+      found.undecided.push({ action: event.action });
+      return;
+    }
     if (event.type === "targetEmpty") {
       const { type, by: _by, ...target } = event;
       found.empty.push(target);
@@ -160,6 +185,7 @@ function outcomeReader(events) {
       ...outcome,
       ...(found.pockets.length > 0 && { pockets: found.pockets.map(({ marble, lost, entry }) => ({ marble, lost, entry: entry === null ? null : outcomeOf(entry) })) }),
       ...(found.empty.length > 0 && { empty: found.empty }),
+      ...(found.undecided.length > 0 && { undecided: found.undecided }),
     };
   };
   return outcomeOf;
@@ -173,6 +199,7 @@ function combinedOutcome(outcomes) {
   const combined = { marble: outcomes[0].marble, speed: sum("speed"), mass: sum("mass"), draw: sum("draw"), operations: all("operations"), given: all("given") };
   if (all("pockets").length > 0) combined.pockets = all("pockets");
   if (all("empty").length > 0) combined.empty = all("empty");
+  if (all("undecided").length > 0) combined.undecided = all("undecided");
   return combined;
 }
 
@@ -247,6 +274,7 @@ export function readForecast(actionEvents, resolutionEvents, finalState) {
     potEffects: potOutcomes(resolutionEvents, outcomeOf),
     potReactions: potOutcomes(actionEvents, outcomeOf),
     interrupted: all.some((event) => event.type === "chainInterrupted"),
+    choiceDependent: all.some((event) => event.type === "choiceUndecided"),
     speed,
     mass,
     impact,
@@ -259,8 +287,10 @@ export function readForecast(actionEvents, resolutionEvents, finalState) {
 }
 
 // `action` : la pose ou l'échange envisagé, ou null pour prévoir le triangle
-// actuel. `types` : la table des billes (core/marbles.js, en-tête).
+// actuel, ou, un choix en attente, une réponse (`choose`). `types` : la table des
+// billes (core/marbles.js, en-tête).
 export function forecast(state, action, types) {
+  if (action?.type === "choose") return forecastAnswer(state, action, types);
   const refusal = stageRefusal(state, "play");
   if (refusal) return failed(refusal);
   if (action !== null && !FORECASTABLE_ACTIONS.includes(action?.type)) return failed("unknownAction");
@@ -273,6 +303,24 @@ export function forecast(state, action, types) {
   const awakening = awakenPossible(state, [...applied.events, ...resolved.events], types);
   // Incertaine : un Éveil possible, ou une bille inconnue qui aurait pu réagir (une
   // bille piochée à l'aveugle puis empochée : son entrée au pot, ses effets du pot).
+  const uncertain = applied.uncertain || resolved.uncertain || awakening;
+  return { ...readForecast(applied.events, resolved.events, resolved.state), uncertain, awakenPossible: awakening };
+}
+
+// Une réponse au choix en attente, prévue (en-tête, « prévoir une réponse ») :
+// l'action suspendue rejouée à l'aveugle avec cette réponse, puis la résolution si
+// elle n'en était pas une. Ses journaux sont entiers, depuis le début de l'action.
+function forecastAnswer(state, action, types) {
+  const refusal = chooseRefusal(state, action);
+  if (refusal) return failed(refusal);
+  const { from, action: suspended, answers } = state.pendingChoice.resume;
+  const options = { blind: true, answers: [...answers, answerOf(action)] };
+  const copy = blindCopy(from);
+  const isResolution = suspended.type === "resolve";
+  const applied = isResolution ? { ok: true, state: copy, events: [], uncertain: false } : replayAction(copy, suspended, types, options);
+  if (!isResolution && applied.state.stage !== "play") return failed(stageRefusal(applied.state, "play") ?? "mustDraw");
+  const resolved = isResolution ? replayAction(copy, suspended, types, options) : runResolution(applied.state, types, { blind: true });
+  const awakening = awakenPossible(from, [...applied.events, ...resolved.events], types);
   const uncertain = applied.uncertain || resolved.uncertain || awakening;
   return { ...readForecast(applied.events, resolved.events, resolved.state), uncertain, awakenPossible: awakening };
 }

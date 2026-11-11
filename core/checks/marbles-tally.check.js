@@ -15,11 +15,14 @@ import { emptyTally, recordTally, tallyValue } from "../marbles-tally.js";
 import { nextRandom } from "../rng.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
 import { createMarblesRules } from "../marbles-rules.js";
-import { emptyBagMarblesGame, inHand, withSizes } from "./helpers.js";
+import { emptyBagMarblesGame, fixedTargetTypes, inHand, withSizes } from "./helpers.js";
 
 // Les règles du jeu, liées à la vraie table (core/marbles-rules.js), et des règles
 // fabriquées, la vraie table complétée de billes de test.
 const rules = createMarblesRules(MARBLE_TYPES);
+// Gorille et porcelaine d'avant les cibles au choix : ces cas portent sur Empocher
+// depuis la main et sur la Fêlure (core/checks/helpers.js/fixedTargetTypes).
+const fixedRules = createMarblesRules(fixedTargetTypes(MARBLE_TYPES));
 const fabricated = (table) => createMarblesRules({ ...MARBLE_TYPES, ...withSizes(table) });
 
 const placed = (marble, wear = 0) => ({ marble, wear });
@@ -240,7 +243,7 @@ function checkActions(run) {
   run.same(
     "actions : Fêlure 3 sur une usure de 1 sur 2, 1 point ajouté ; usée, sans Tic ni éjection",
     { flick: 1, crack: 1, crackQuantity: 1, final: 1, thrownMarbles: 1, wornMarbles: 1, triangleExits: 1, speedGains: 1, speedGained: 4 },
-    added(cracking, rules.reduce(cracking, { type: "place", handIndex: 0, slot: "apex" }).state)
+    added(cracking, fixedRules.reduce(cracking, { type: "place", handIndex: 0, slot: "apex" }).state)
   );
   // Sur un emplacement vide : un déclenchement, aucune usure (une Fêlure de base
   // fabriquée).
@@ -302,20 +305,20 @@ function checkEvents(run) {
   run.same(
     "pot : une mise en poche, son entrée, Empocher et sa bille déplacée",
     { pocketedMarbles: 1, pocketEntry: 1, pocket: 1, pocketQuantity: 1 },
-    pick(added(gorilla, rules.reduce(gorilla, { type: "place", handIndex: 0, slot: "apex" }).state), ["pocketedMarbles", "pocketEntry", "pocket", "pocketQuantity", "lostMarbles"])
+    pick(added(gorilla, fixedRules.reduce(gorilla, { type: "place", handIndex: 0, slot: "apex" }).state), ["pocketedMarbles", "pocketEntry", "pocket", "pocketQuantity", "lostMarbles"])
   );
   const full = { ...gorilla, pot: ["clay", "glass", "mica"] };
   run.same(
     "pot plein : une bille perdue, pas d'entrée, une bille déplacée quand même",
     { lostMarbles: 1, pocket: 1, pocketQuantity: 1 },
-    pick(added(full, rules.reduce(full, { type: "place", handIndex: 0, slot: "apex" }).state), ["pocketedMarbles", "pocketEntry", "pocket", "pocketQuantity", "lostMarbles"])
+    pick(added(full, fixedRules.reduce(full, { type: "place", handIndex: 0, slot: "apex" }).state), ["pocketedMarbles", "pocketEntry", "pocket", "pocketQuantity", "lostMarbles"])
   );
   // Sans effet d'entrée (l'argile) : la mise en poche compte, pas l'entrée.
   const plainEntry = playState({ hand: inHand(["gorilla", "clay"]), triangle: { leftBase: null, rightBase: null, apex: placed("clay") } });
   run.same(
     "pot : une bille sans effet d'entrée, pas d'entrée comptée",
     { pocketedMarbles: 1, pocket: 1, pocketQuantity: 1 },
-    pick(added(plainEntry, rules.reduce(plainEntry, { type: "place", handIndex: 0, slot: "apex" }).state), ["pocketedMarbles", "pocketEntry", "pocket", "pocketQuantity"])
+    pick(added(plainEntry, fixedRules.reduce(plainEntry, { type: "place", handIndex: 0, slot: "apex" }).state), ["pocketedMarbles", "pocketEntry", "pocket", "pocketQuantity"])
   );
   // À chaque résolution : seulement les billes du pot qui ont cet effet.
   const resolving = playState({ triangle: { leftBase: placed("clay"), rightBase: null, apex: null }, pot: ["agate", "glass", "sulphide"] });

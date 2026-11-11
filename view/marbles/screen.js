@@ -42,6 +42,16 @@
 // (view/marbles/keywords.js). En mode debug, Maj+L ouvre le menu des valeurs de partie
 // (view/marbles/tally-screen.js).
 //
+// CHOIX : quand un effet laisse le joueur choisir sa cible, la simulation suspend
+// l'action (core/marbles.js, `pendingChoice`) ; l'écran passe en MODE CHOIX tant que
+// le choix attend (view/marbles/choice.js) : la question se dit (après les étapes
+// déjà jouées), la main ne propose que les billes éligibles (et « Terminer » en mode
+// « jusqu'à N »), le triangle garde sa forme, ses emplacements non éligibles se
+// disent et bloquent. Entrée choisit, T termine un choix « jusqu'à N », Échap redit
+// la question (un choix ne se ferme pas). Fiches et mots-clés y marchent. Pendant
+// une résolution, la séquence s'arrête sur la question (la passer aussi), le choix
+// se fait, puis la suite de la résolution reprend en séquence.
+//
 // TEMPS RÉEL : la séquence, la file de sons et les roulements avancent par un même
 // battement (lib/real-time.js), appelé à chaque image (onFrame) ET par une
 // minuterie : les images s'arrêtent quand la fenêtre passe en arrière-plan, la
@@ -63,11 +73,13 @@ import { SLOTS, swapRefusal, placeRefusal, throwRefusal } from "../../core/marbl
 import { playMenuSound } from "../menu-sounds.js";
 import { openConfirmation } from "../menus/confirmation.js";
 import { INITIAL_CURSOR, cursorOn, placementStart, stepCursor, zoneOf } from "./navigation.js";
+import { choiceAnswer, choiceFocusLine, choiceHandOptions, choiceMarbleAt, choiceStartCursor, stepChoiceCursor } from "./choice.js";
 import { marbleCard } from "./card.js";
 import { openPileMenu } from "./pile-screen.js";
 import {
   bagDisplayOrder,
   buildSteps,
+  describeChoicePrompt,
   resolutionSteps,
   stepsText,
   describeBag,
@@ -129,6 +141,9 @@ const MARBLES_BINDINGS = defineBindings("marbles", {
   history: { keys: ["l"], mods: [] },
   keywords: { keys: ["e"], mods: [] },
   keywordsMenu: { keys: ["e"], mods: ["shift"] },
+  // Terminer un choix « jusqu'à N » (sur le triangle surtout : la main a son entrée
+  // « Terminer »). Libre dans cet écran.
+  finish: { keys: ["t"], mods: [] },
   // Mode debug seulement (voir DEBUG_ACTIONS). La démonstration des places est sur
   // Maj+B (« balises ») : Maj+P ouvre le menu du pot.
   placesDemo: { keys: ["b"], mods: ["shift"] },
@@ -161,8 +176,14 @@ export function makeMarblesScreen(getGame, setGame, rules) {
   let history = EMPTY_HISTORY;
   // Les sons encore à venir d'un geste (view/marbles/sound-queue.js).
   let soundQueue = EMPTY_SOUND_QUEUE;
+  // La résolution en cours de présentation, tant qu'un choix peut l'interrompre :
+  // { turn }, ou null. Sa suite, après chaque choix, se dit aussi en séquence.
+  let resolving = null;
 
   const isNarrating = () => sequence !== null;
+  // Le choix en attente, s'il y en a un et que la séquence a fini de dire ce qui le
+  // précède : l'écran est alors en mode choix.
+  const pendingChoice = () => (isNarrating() ? null : getGame().pendingChoice);
   const isOver = () => getGame().stage === "over" && !isNarrating();
 
   function speak(text) {
@@ -221,22 +242,44 @@ export function makeMarblesScreen(getGame, setGame, rules) {
     return result.events;
   }
 
+  // Le nombre de places de la main pour le curseur : ses billes, ou, pendant un
+  // choix, les options de son menu.
+  function handCount() {
+    const pending = getGame().pendingChoice;
+    return pending ? choiceHandOptions(pending).length : getGame().hand.length;
+  }
+
   function clampedHandIndex() {
-    return Math.max(0, Math.min(cursor.handIndex, getGame().hand.length - 1));
+    return Math.max(0, Math.min(cursor.handIndex, handCount() - 1));
   }
 
   function focusLine() {
     const game = getGame();
+    if (game.pendingChoice) return choiceFocusLine(game, { ...cursor, handIndex: clampedHandIndex() }, rules, t);
     if (cursor.place === "hand") return describeHandFocus(game, clampedHandIndex(), rules, t);
     if (held?.kind === "hand") return describeSlotForPlacement(game, cursor.place, rules, t);
     const line = describeSlotFocus(game, cursor.place, rules, t);
     return held?.kind === "slot" && held.slot === cursor.place ? `${line} ${t("marbles.slot_line.held")}` : line;
   }
 
-  // La bille sous le curseur, ou undefined (emplacement vide, main vide).
+  // L'entrée de la main sous le curseur ({ marble, turnsInHand }, et sa place dans
+  // la main), ou null : pendant un choix, l'option du menu du choix.
+  function handEntryUnderCursor() {
+    const game = getGame();
+    if (cursor.place !== "hand") return null;
+    if (game.pendingChoice) {
+      const option = choiceHandOptions(game.pendingChoice)[clampedHandIndex()];
+      return option?.kind === "marble" ? { ...game.hand[option.index], index: option.index } : null;
+    }
+    const index = clampedHandIndex();
+    return game.hand[index] === undefined ? null : { ...game.hand[index], index };
+  }
+
+  // La bille sous le curseur, ou undefined (emplacement vide, main vide, Terminer).
   function marbleUnderCursor() {
     const game = getGame();
-    return cursor.place === "hand" ? game.hand[clampedHandIndex()]?.marble : game.triangle[cursor.place]?.marble;
+    if (game.pendingChoice) return choiceMarbleAt(game, { ...cursor, handIndex: clampedHandIndex() })?.marble;
+    return cursor.place === "hand" ? handEntryUnderCursor()?.marble : game.triangle[cursor.place]?.marble;
   }
 
   // Le curseur vient d'arriver quelque part : la voix de la bille qui s'y trouve,
@@ -244,7 +287,7 @@ export function makeMarblesScreen(getGame, setGame, rules) {
   function beaconUnderCursor() {
     const marble = marbleUnderCursor();
     if (marble === undefined) return;
-    const place = cursor.place === "hand" ? handPlace(clampedHandIndex(), getGame().hand.length) : slotPlace(cursor.place);
+    const place = cursor.place === "hand" ? handPlace(handEntryUnderCursor().index, getGame().hand.length) : slotPlace(cursor.place);
     playFocusBeacon(marble, place);
   }
 
@@ -256,7 +299,7 @@ export function makeMarblesScreen(getGame, setGame, rules) {
     const marble = marbleUnderCursor();
     if (marble === undefined) return null;
     const game = getGame();
-    const turnsInHand = cursor.place === "hand" ? game.hand[clampedHandIndex()].turnsInHand : 0;
+    const turnsInHand = cursor.place === "hand" ? handEntryUnderCursor().turnsInHand : 0;
     return marbleCard(marble, focusLine(), rules, t, { turnsInHand, tally: game.tally });
   }
 
@@ -306,7 +349,7 @@ export function makeMarblesScreen(getGame, setGame, rules) {
     if (blockedByNarration()) return;
     resetDetailAfterMove();
     if (cursor.place === "hand" && (direction === "left" || direction === "right")) {
-      const total = getGame().hand.length;
+      const total = handCount();
       if (total === 0) {
         playMenuSound("block");
         announceFocus(true);
@@ -320,7 +363,8 @@ export function makeMarblesScreen(getGame, setGame, rules) {
       if (index !== before) beaconUnderCursor();
       return;
     }
-    const next = stepCursor(cursor, direction, held?.kind === "hand");
+    const pending = getGame().pendingChoice;
+    const next = pending ? stepChoiceCursor(pending, cursor, direction) : stepCursor(cursor, direction, held?.kind === "hand");
     if (next === null) {
       playMenuSound("block");
       announceFocus(true);
@@ -337,7 +381,7 @@ export function makeMarblesScreen(getGame, setGame, rules) {
   // Origine et Fin : première et dernière bille, comme dans un menu. Là où elles
   // n'ont pas d'effet, elles sont silencieuses, sans son de blocage.
   function jump(target) {
-    const total = getGame().hand.length;
+    const total = handCount();
     if (isNarrating() || isOver() || cursor.place !== "hand" || total === 0) return;
     const { index, boundary } = jumpMenuCursor(clampedHandIndex(), target === "first" ? 0 : total - 1);
     cursor = { ...cursor, handIndex: index };
@@ -375,6 +419,22 @@ export function makeMarblesScreen(getGame, setGame, rules) {
     beaconUnderCursor();
   }
 
+  // Ce qu'un geste a fait se dit, suivi, si l'action attend un choix, de sa
+  // question ; le curseur s'y ouvre (sur une nouvelle question) ou y reste (un choix
+  // multiple qui continue).
+  function speakWithChoice(events) {
+    const text = stepsText(recorded(buildSteps(events, t)));
+    const pending = getGame().pendingChoice;
+    if (pending === null) {
+      speak(text);
+      return;
+    }
+    if (pending.chosen.length === 0) cursor = choiceStartCursor(pending, cursor);
+    else cursor = { ...cursor, handIndex: clampedHandIndex() };
+    detail = 0;
+    speak(text === "" ? describeChoicePrompt(pending, t) : `${text} ${describeChoicePrompt(pending, t)}`);
+  }
+
   // Le son d'une pose est celui de la confirmation qui vient de la lancer. La
   // sélection d'emplacement finie, le curseur revient dans la main.
   function performPlace(handIndex, slot) {
@@ -386,7 +446,51 @@ export function makeMarblesScreen(getGame, setGame, rules) {
     cursor = { ...cursor, place: "hand", handIndex: Math.min(handIndex, Math.max(0, getGame().hand.length - 1)) };
     resetDetailAfterMove();
     playEventSounds(events, { placeFrom });
-    speak(stepsText(recorded(buildSteps(events, t))));
+    speakWithChoice(events);
+  }
+
+  // Entrée pendant un choix : la cible sous le curseur, ou Terminer ; un emplacement
+  // non éligible bloque, et le dit.
+  function activateChoice() {
+    const pending = getGame().pendingChoice;
+    const answer = choiceAnswer(pending, { ...cursor, handIndex: clampedHandIndex() });
+    if (answer.refusal) {
+      playMenuSound("block");
+      announce(t("marbles.choice.not_eligible"), { assertive: true });
+      return;
+    }
+    answerChoice(answer.action);
+  }
+
+  // T : terminer un choix « jusqu'à N » ; un choix obligatoire le refuse.
+  function finishChoice() {
+    if (blockedByNarration()) return;
+    const pending = getGame().pendingChoice;
+    if (pending === null) {
+      playMenuSound("block");
+      return;
+    }
+    if (!pending.upTo) {
+      refuse("choiceRequired");
+      return;
+    }
+    answerChoice({ type: "choose", done: true });
+  }
+
+  // La réponse part au réducteur, qui reprend l'action suspendue. Pendant une
+  // résolution, la suite se dit en séquence ; ailleurs, d'un bloc. Le choix fini, le
+  // curseur revient dans la main.
+  function answerChoice(action) {
+    const events = dispatch(action);
+    if (!events) return;
+    playMenuSound("select");
+    playEventSounds(events);
+    if (resolving !== null) {
+      presentResolution(events, false);
+      return;
+    }
+    if (getGame().pendingChoice === null) cursor = { ...cursor, place: "hand", handIndex: 0 };
+    speakWithChoice(events);
   }
 
   function performSwap(a, b) {
@@ -396,7 +500,7 @@ export function makeMarblesScreen(getGame, setGame, rules) {
     resetDetailAfterMove();
     playMenuSound("select");
     playEventSounds(events);
-    speak(stepsText(recorded(buildSteps(events, t))));
+    speakWithChoice(events);
   }
 
   function activateHand() {
@@ -473,23 +577,42 @@ export function makeMarblesScreen(getGame, setGame, rules) {
       silenceSounds();
       follow(skipSequence(sequence));
     } else if (isOver()) popScreen();
+    else if (pendingChoice()) activateChoice();
     else if (cursor.place === "hand") activateHand();
     else activateSlot();
   }
 
   // Résolution du tour, et pioche du suivant dans la foulée : l'état est complet
-  // avant la première étape, la séquence ne fait plus que le dire. Le curseur
-  // revient sur la main.
+  // avant la première étape (ou jusqu'au premier choix), la séquence ne fait plus
+  // que le dire. Le curseur revient sur la main.
   function startResolution() {
     const { turn } = getGame();
     const resolved = dispatch({ type: "resolve" });
     if (!resolved) return;
-    const drawn = getGame().stage === "draw" ? dispatch({ type: "draw" }) : [];
     held = null;
     cursor = { ...cursor, place: "hand", handIndex: 0 };
     detail = 0;
+    resolving = { turn };
+    presentResolution(resolved, true);
+  }
+
+  // Une part de la résolution (`first` : son début, avec l'ouverture) : si elle est
+  // finie, la pioche du tour suivant s'y ajoute ; si un choix l'a suspendue, sa
+  // question devient la dernière étape de la séquence, où s'arrête aussi le geste qui
+  // la passe ; le choix fait, la suite reprend ici. La pioche elle-même peut attendre
+  // un choix (un Éveil) : même chemin.
+  function presentResolution(events, first) {
+    let all = events;
+    if (getGame().pendingChoice === null && getGame().stage === "draw") all = [...all, ...(dispatch({ type: "draw" }) ?? [])];
+    const { turn } = resolving;
     // La première fois, comment la passer.
-    const steps = recorded(resolutionSteps(turn, [...resolved, ...drawn], t, { hint: turn === 1 }));
+    const steps = recorded(first ? resolutionSteps(turn, all, t, { hint: turn === 1 }) : buildSteps(all, t));
+    const pending = getGame().pendingChoice;
+    if (pending === null) resolving = null;
+    else {
+      cursor = pending.chosen.length === 0 ? choiceStartCursor(pending, cursor) : { ...cursor, handIndex: clampedHandIndex() };
+      steps.push({ text: describeChoicePrompt(pending, t), events: [], messages: [] });
+    }
     follow(startSequence(steps));
   }
 
@@ -498,9 +621,14 @@ export function makeMarblesScreen(getGame, setGame, rules) {
     startResolution();
   }
 
-  // R : la vue d'ensemble, d'un bloc et sans pause.
+  // R : la vue d'ensemble, d'un bloc et sans pause. Pas pendant un choix : rien ne se
+  // prévoit au milieu d'une action.
   function announceOverview() {
     if (blockedByNarration()) return;
+    if (getGame().pendingChoice) {
+      refuse("choicePending");
+      return;
+    }
     announce(describeOverview(getGame(), rules, t), { assertive: true });
   }
 
@@ -584,8 +712,11 @@ export function makeMarblesScreen(getGame, setGame, rules) {
     openTallyMenu(getGame().tally);
   }
 
+  // Échap : pendant un choix, redit la question (un choix ne se ferme pas, le jeu ne
+  // peut continuer sans lui) ; sinon annule la sélection, ou propose de quitter.
   function back() {
     if (isOver()) popScreen();
+    else if (pendingChoice()) speak(describeChoicePrompt(getGame().pendingChoice, t));
     else if (held) releaseSelection();
     else openConfirmation("marbles.quit.confirm", () => popScreen());
   }
@@ -614,6 +745,7 @@ export function makeMarblesScreen(getGame, setGame, rules) {
     history: openHistory,
     keywords: announceKeywords,
     keywordsMenu: openKeywords,
+    finish: finishChoice,
     placesDemo: playPlacesDemo,
     tally: openTally,
   };
@@ -628,7 +760,10 @@ export function makeMarblesScreen(getGame, setGame, rules) {
     startMarblesMusic();
     const events = dispatch({ type: "draw" });
     playEventSounds(events, { shuffleFirst: true });
-    speak(withOverHint(`${t("marbles.intro")} ${stepsText(recorded(buildSteps(events, t)))} ${isOver() ? "" : focusLine()}`));
+    const pending = getGame().pendingChoice;
+    if (pending !== null) cursor = choiceStartCursor(pending, cursor);
+    const next = pending !== null ? describeChoicePrompt(pending, t) : isOver() ? "" : focusLine();
+    speak(withOverHint(`${t("marbles.intro")} ${stepsText(recorded(buildSteps(events, t)))} ${next}`));
   }
 
   // Le temps réel reçu : la séquence (une étape au plus), puis les billes déjà en

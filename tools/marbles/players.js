@@ -15,7 +15,9 @@
 // UN JOUEUR : une entrée de PLAYERS, { label, describe(options), startGame({ seed,
 // options }) }. startGame rend la session d'une partie, { next(view) }, qui donne
 // l'action suivante pour la vue reçue (jamais une pioche : le simulateur s'en
-// charge). Ajouter un joueur : une entrée de plus ici, sans toucher au simulateur.
+// charge). Avec un CHOIX EN ATTENTE (core/marbles.js, `pendingChoice`), la vue n'admet
+// qu'une réponse (`choose`) : chaque joueur a la sienne. Ajouter un joueur : une
+// entrée de plus ici, sans toucher au simulateur.
 
 import { MARBLES_DRAWN_VALUE } from "./drawn-value.js";
 import { SLOTS, UNKNOWN_MARBLE, legalActions } from "../../core/marbles.js";
@@ -24,20 +26,34 @@ import { createSeed, nextRandom } from "../../core/rng.js";
 import { GAME_RULES } from "./game-rules.js";
 
 // La vue publique d'un état : une copie, billes du sac inconnues (leur nombre reste)
-// et hasard retiré. La défausse, que le joueur entend, reste lisible.
+// et hasard retiré. La défausse, que le joueur entend, reste lisible. Un choix en
+// attente garde l'état de départ de son action (sa reprise) : il est voilé de même.
 export function publicView(state) {
-  return structuredClone({ ...state, bag: state.bag.map(() => UNKNOWN_MARBLE), rngState: null });
+  const hidden = { ...state, bag: state.bag.map(() => UNKNOWN_MARBLE), rngState: null };
+  if (state.pendingChoice) {
+    const { resume } = state.pendingChoice;
+    hidden.pendingChoice = { ...state.pendingChoice, resume: { ...resume, from: publicView(resume.from) } };
+  }
+  return structuredClone(hidden);
 }
 
 // --- Aléatoire ---
 
 // Uniforme parmi les actions légales (résolution comprise, dès qu'elle l'est) :
-// la référence basse.
+// la référence basse. Un choix : uniforme parmi ses cibles éligibles, Terminer
+// compris en mode « jusqu'à N », par un générateur À PART (graine dérivée), pour que
+// les choix ne décalent pas le reste de ses tirages.
 function startRandom({ seed }) {
   let rngState = createSeed(seed);
+  let choiceRng = createSeed(`${seed}/choices`);
   return {
     next(view) {
       const actions = legalActions(view).filter((action) => action.type !== "draw");
+      if (view.pendingChoice) {
+        const draw = nextRandom(choiceRng);
+        choiceRng = draw.state;
+        return actions[Math.floor(draw.value * actions.length)];
+      }
       const draw = nextRandom(rngState);
       rngState = draw.state;
       return actions[Math.floor(draw.value * actions.length)];
@@ -132,6 +148,20 @@ export function bestPlan(view, { maxPlacements = 1, allowReplacement = true, dra
   return { ...(best ?? { choices: [], impact: null, drawn: 0, value: null }), evaluated };
 }
 
+// La meilleure réponse au choix en attente : celle qui maximise l'Impact prévu du
+// tour (core/marbles-forecast.js, « prévoir une réponse » : les choix suivants y
+// restent indécis ; ils seront tranchés de même, un par un). À égalité, la première
+// dans l'ordre des réponses légales (cibles, puis Terminer).
+export function bestChoice(view) {
+  let best = null;
+  for (const action of legalActions(view)) {
+    const predicted = GAME_RULES.forecast(view, action);
+    const value = predicted.ok ? predicted.impact : -Infinity;
+    if (best === null || value > best.value) best = { action, value };
+  }
+  return best.action;
+}
+
 function checkMaxPlacements(value) {
   if (!Number.isInteger(value) || value < 0) throw new Error("joueur glouton : maxPlacements doit être un entier >= 0.");
   return value;
@@ -152,11 +182,16 @@ function startGreedy(allowReplacement) {
     let plannedTurn = null;
     return {
       next(view) {
+        if (view.pendingChoice) return bestChoice(view);
         if (plannedTurn !== view.turn) {
           plan = [...bestPlan(view, { maxPlacements, allowReplacement, drawnValue }).choices, { type: "resolve" }];
           plannedTurn = view.turn;
         }
-        return toAction(plan.shift() ?? { type: "resolve" }, view);
+        // Une bille du plan qui n'est plus en main (empochée par un choix entre-temps)
+        // ne se pose plus : la suite du plan continue.
+        let choice = plan.shift() ?? { type: "resolve" };
+        while (choice.type === "place" && handIndexIn(view.hand, choice.marble) < 0) choice = plan.shift() ?? { type: "resolve" };
+        return toAction(choice, view);
       },
     };
   };

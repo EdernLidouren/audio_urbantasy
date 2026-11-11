@@ -335,7 +335,8 @@ Un effet est une liste de clauses (`core/marbles-effects.js`) :
   s'ajoute à l'effet de la bille ; avec une cible, elle donne un **bonus** à la bille de
   cet emplacement. Pour un Polissage ou une Fêlure, sans cible, la bille elle-même ; avec
   une cible, la bille de cet emplacement (un emplacement vide : sans effet, noté au
-  journal, `targetEmpty`) ;
+  journal, `targetEmpty`). La cible peut aussi être un **choix du joueur** (voir « Cibles
+  au choix ») : `choice({ zones: ["triangle"], count: 2, upTo: true })` ;
 - **condition** (`when`, facultative) : évaluée au déclenchement ; fausse, la clause ne
   produit rien.
 
@@ -442,6 +443,11 @@ Une cible n'a de sens que si l'effet ciblé peut encore se produire.
   n'y est pas encore (refusé à la validation).
 - Une **Chiquenaude** joue pendant la phase de jeu : une Vitesse ou une Masse ciblée y est
   valide, toutes les phases restant à venir.
+- Une **cible au choix** suit la même règle, à l'ÉLIGIBILITÉ : seules les cibles valides
+  au moment du choix se proposent. Un bonus de Vitesse ou de Masse au choix ne propose
+  que les billes actives dont la phase n'a pas commencé ; la validation refuse un bonus au
+  choix là où aucune phase ne peut plus le recevoir (un Final, à chaque résolution du pot,
+  une pointe).
 
 Le moment de chaque champ vient de la phase (ses emplacements) ou du déclencheur
 (`moment` de `MARBLE_TRIGGERS` : `play`, `afterPhases` ou `anytime`, la Trouvaille, que la
@@ -461,6 +467,72 @@ après l'annonce de l'effet. Une condition : une entrée dans `CONDITIONS` et so
 montant : voir « Montants calculés ». Un nom de calibre glissé
 dans un texte passe par `nameRef`, avec ses formes françaises et anglaises `indef` (« un
 calot ») et `noun` (« bille normale »).
+
+### Cibles au choix
+
+Un effet peut laisser le joueur **choisir sa cible** : « une bille de votre main au choix »,
+« jusqu'à 2 billes actives au choix ». Le mécanisme est construit une fois, dans la
+simulation et dans l'écran, pour tous les effets.
+
+**Déclaration** (`core/marbles-effects.js`, en-tête ; forme courte `choice`,
+`marbles/effects.js`) : `target: { type: "choice", zones, pick, count, upTo? }`.
+
+- `zones` : où le joueur choisit, parmi `CHOICE_ZONES` : aujourd'hui `hand` et
+  `triangle` ; `pot`, `discard` et `bag` y sont déclarés, pas encore disponibles (refusés
+  au chargement). Ajouter une zone : `available` à vrai, ses cibles
+  (`core/marbles.js`/`CHOICE_TARGETS`), ses textes (`marbles.choice.noun.*`).
+- `pick` : sur le triangle, `marble` (une bille active) ou `slot` (un emplacement, vide
+  compris) ; aucune action actuelle n'a de sens sur un emplacement vide, `slot` est donc
+  refusé pour toutes aujourd'hui.
+- `count` : le nombre N de choix ; `upTo` : « jusqu'à N », moins permis, zéro compris ;
+  sinon obligatoire, exactement N (moins s'il n'y a pas assez de cibles).
+- Les actions qui l'acceptent le déclarent (`CLAUSE_ACTIONS`, `choice`) : Polissage et
+  Fêlure (triangle), Empocher (main et triangle), Vitesse et Masse en bonus (triangle).
+  Une combinaison impossible est refusée au chargement (une zone sans sens pour l'action,
+  un bonus sans phase à venir).
+
+**Déroulé** (`core/marbles.js`/`chooseTargets`) : les N choix se font un par un ; une cible
+déjà choisie n'est plus éligible ; la sélection s'arrête à N choix, dès qu'il ne reste
+aucune cible éligible, ou sur Terminer (« jusqu'à N »). Aucune cible éligible dès le
+départ : l'effet ne fait rien, le journal le note (`targetEmpty`, cible `"choice"`, « Aucune
+cible à choisir : sans effet. ») et rien ne s'ouvre. La sélection finie, l'action
+s'applique à chaque cible, dans l'ordre des choix ; une bille de la main se suit par son
+entrée (la main change quand une autre part au pot). Un bonus au choix se choisit avant
+l'annonce de l'effet ; une action sur une bille, après sa Pioche, à sa place dans les
+clauses. Journal : `choice` (ouverture), `chosen` (chaque validation, « agate choisie. »),
+`choiceEnded` (`reason` : `count`, `done` « Choix terminé. », `exhausted` « Plus rien à
+choisir. ») ; points d'accroche sonores, sans son aujourd'hui.
+
+**Suspension et reprise par rejeu.** Un choix INTERROMPT l'action en cours (pioche, pose,
+résolution, réaction du pot…) : le réducteur rend l'état du déroulé à cet instant, avec
+`pendingChoice`, et les évènements jusque-là.
+
+```js
+pendingChoice: {
+  action, amount?, zones, pick, count, upTo, by,   // la question, l'effet qui la pose
+  eligible, chosen, remaining,                     // cibles valides, déjà choisies, reste
+  resume: { from, action, answers, seen, eventLimit? },
+}
+```
+
+Une cible : `{ zone: "hand", index, marble }` ou `{ zone: "triangle", slot, marble }`.
+`resume.from` est l'état d'AVANT l'action suspendue, `resume.action` cette action,
+`resume.answers` les réponses déjà données, `resume.seen` le nombre d'évènements déjà
+rendus. L'action publique **`{ type: "choose", target }`** (ou `{ type: "choose", done:
+true }`, Terminer) rejoue l'action depuis `from` avec une réponse de plus
+(`replayAction`) : la simulation étant déterministe (le hasard est dans l'état), le rejeu
+refait exactement le même chemin, file du bus comprise, consomme les réponses au même
+point, et continue jusqu'à la fin ou au choix suivant ; seuls les évènements d'après `seen`
+sont rendus. Pourquoi un rejeu : une pile d'appels JavaScript ne se fige ni ne se
+sérialise ; l'état de départ et les réponses, si. Tout reste pur et synchrone, et l'état en
+attente se sérialise (vérifié par un aller-retour JSON). L'état suspendu se lit (l'écran
+y montre le triangle du moment), il ne se rejoue jamais : c'est un instantané en pleine
+action, où une bille peut être en cours de lancer.
+
+**Refus** : tant qu'un choix attend, toute autre action est refusée (`choicePending`) ;
+`choose` sans choix en attente : `noChoicePending` ; une cible non éligible :
+`invalidChoice` ; Terminer d'un choix obligatoire : `choiceRequired`. `legalActions` rend
+alors les réponses (les cibles, puis Terminer s'il est permis).
 
 ### Les déclencheurs
 
@@ -635,6 +707,9 @@ dans le réducteur, et rien d'extérieur ne s'y abonne.
   confirmation si la prévision l'atteint (`interrupted`). Une anomalie : la fumée
   (`marbles`), les vérifications et le simulateur la guettent.
 
+- **Un choix suspend l'action** (voir « Cibles au choix ») : le déroulé s'arrête au
+  milieu, file comprise, et reprend par rejeu ; le bus n'a rien à garder.
+
 `EVENT_TRIGGERS` dit quels évènements déclenchent un effet : les phases, et les
 déclencheurs de `MARBLE_TRIGGERS` (Éveil, Chiquenaude, Tic, Trouvaille, Éjection, Final). Les autres passent au journal,
 prêts à servir.
@@ -694,6 +769,23 @@ bille piochée en poche ») ; la prévision est alors incertaine, sans Éveil po
 réel » vaut pour tout ce qui ne dépend pas d'un Éveil ni d'une bille piochée empochée : la
 vérification `marbles-forecast` la contrôle sur tout résultat réel où aucun des deux n'a joué, et vérifie qu'un Éveil réel a
 toujours été annoncé possible.
+
+**L'exception du choix** : la prévision ne devine jamais le choix du joueur. Une cible au
+choix y reste indécise (`choiceUndecided`) : son action n'est pas appliquée, l'effet le
+porte (`undecided`) et R comme la confirmation le disent chez lui, « Tic de verre :
+Polissage 1 à une bille active au choix, selon votre choix » ; `choiceDependent` est vrai.
+Une cible au choix sans aucune cible éligible se prévoit, elle (« aucune cible au
+choix »). La propriété « prévision = résultat réel » vaut donc pour tout ce qui ne dépend
+ni d'un Éveil ni d'un choix : la vérification saute un résultat réel où un choix attend,
+et contrôle que la prévision l'avait dit.
+
+**Prévoir une réponse** : un choix en attente, `forecast(state, { type: "choose", … })`
+rejoue l'action suspendue à l'aveugle depuis son état de départ, avec les réponses déjà
+données plus celle-ci, puis la résolution si l'action n'en était pas une : l'Impact prévu
+du tour avec ce choix, les choix suivants restant indécis. Ce que le joueur a vu piocher
+depuis le début de l'action y redevient inconnu ; un rejeu qui en dépendrait diverge, et
+le choix concerné reste indécis. Le joueur glouton s'en sert. Pendant un choix, R est
+refusé : rien ne se prévoit au milieu d'une action.
 
 ## Écran de jeu
 
@@ -770,6 +862,32 @@ garde sa structure.
 
 Une Pioche s'y dit comme une valeur (« Tic d'œil-de-chat : Pioche 1 »), sans jamais nommer
 une bille du sac.
+
+### Choisir une cible
+
+Quand un effet laisse choisir, l'écran passe en **mode choix** tant que le choix attend
+(`view/marbles/choice.js`, pur ; branché dans `view/marbles/screen.js`). La question se dit
+après ce que l'action a déjà fait : « Choisissez une bille de votre main à empocher. »,
+« Choisissez 2 billes actives à polir. », « Choisissez jusqu'à 2 billes actives à polir. T
+pour terminer. » ; après chaque choix, « agate choisie. Choisissez encore une bille
+active. » (« Vous pouvez choisir encore une bille active, ou terminer avec T. » en mode
+« jusqu'à N »).
+
+- **Main** : un menu horizontal des SEULES billes éligibles, dans l'ordre de la main, puis
+  « Terminer » en mode « jusqu'à N » ; positions comptées dans ce menu.
+- **Triangle** : la même forme et la même navigation que l'écran habituel (pointe en haut,
+  bases en dessous). Les emplacements non éligibles restent accessibles, pour garder le
+  repère, mais se disent « Non éligible. » et Entrée y bloque (son de blocage).
+- **Les deux zones** : on passe de l'une à l'autre comme d'habitude, le nom de la zone
+  annoncé ; une seule zone : l'autre n'existe pas pour le curseur.
+- **Entrée** choisit ; **T** termine un choix « jusqu'à N » (partout, sur le triangle
+  surtout ; refusé, « Ce choix est obligatoire. », sinon) ; **Échap** redit la question, un
+  choix ne se fermant pas (le jeu ne peut continuer sans lui).
+- Fiches (Ctrl+haut, Ctrl+bas) et mots-clés (E, Maj+E) marchent sur chaque option ; R est
+  refusé pendant le choix.
+
+T était libre dans l'écran des billes ; elle porte l'aide « Terminer un choix « jusqu'à
+N » ».
 
 ### Fiches de détail
 
@@ -864,6 +982,11 @@ triangle, le modificateur évitant une fausse manipulation. La
 simulation résout le tour et pioche le suivant tout de suite ; ce qui suit n'est que de la
 présentation, une file d'étapes (`view/marbles/sequence.js`) dite avec une pause après
 chacune :
+
+**Un choix pendant la résolution** (le Final de la porcelaine) : la séquence dit les étapes
+jusqu'à lui, puis sa question en dernière étape, et s'arrête là ; le geste qui passe la
+séquence s'arrête aussi à la question. Le choix fait, la suite de la résolution (et la
+pioche qui la suit) reprend en séquence, avec ses pauses.
 
 1. « Résolution du tour 3. » (au tour 1, suivi de « Entrée pour passer la résolution. »),
    enchaînée SANS PAUSE sur la phase de base gauche : les deux partagent la première

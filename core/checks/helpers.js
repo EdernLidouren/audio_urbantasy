@@ -13,6 +13,7 @@ import { addItem } from "../bag.js";
 import { parseNewGame } from "../new-game.js";
 import { throws } from "../../lib/check.js";
 import { MEDIUM } from "../../config/marbles-values.js";
+import { legalActions } from "../marbles.js";
 
 // Départ d'OBJETS des vérifications d'inventaire et de collections : le kit
 // de test de config/new-game.js (rangers et escarpins dans le sac, baskets
@@ -28,6 +29,35 @@ export const ITEM_START = parseNewGame(
 // bille qui n'en déclare pas : MEDIUM, quand la vérification ne porte pas sur lui.
 export function withSizes(table) {
   return Object.fromEntries(Object.entries(table).map(([id, type]) => [id, { size: MEDIUM, ...type }]));
+}
+
+// Répond aux choix en attente d'un résultat du réducteur des billes, toujours par
+// la première réponse légale (la première cible éligible) : les parties jouées par
+// les vérifications vont au bout. -> le résultat final, son journal complété de ceux
+// des réponses. `rules` : core/marbles-rules.js.
+export function answerChoices(rules, result) {
+  let current = result;
+  const events = [...result.events];
+  while (current.ok && current.state.pendingChoice) {
+    current = rules.reduce(current.state, legalActions(current.state)[0]);
+    events.push(...current.events);
+  }
+  return { ...current, events };
+}
+
+// La table des billes avec le gorille, le verre et la porcelaine tels qu'avant les
+// cibles au choix : le Tic du gorille empoche la première bille de la main, celui du
+// verre polit la pointe, le Final de la porcelaine n'a que sa Vitesse. Les
+// vérifications des mécanismes qu'ils portaient (Empocher depuis la main, Polissage
+// ciblé, Final) les gardent ainsi, sans choix à trancher ; les cibles au choix ont
+// leurs propres cas.
+export function fixedTargetTypes(types) {
+  return {
+    ...types,
+    gorilla: { ...types.gorilla, hit: [types.gorilla.hit[0], { action: "pocket", target: "firstInHand" }] },
+    glass: { ...types.glass, hit: [{ action: "polish", amount: 1, target: "apex" }] },
+    porcelain: { ...types.porcelain, final: [types.porcelain.final[0]] },
+  };
 }
 
 // Une partie des billes au sac VIDE, base des états fabriqués par les domaines

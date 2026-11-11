@@ -8,8 +8,23 @@
 // CONDITIONS, et ses textes dans la vue (view/marbles/narration.js, ACTION_TEXTS ou
 // CONDITION_TEXTS). AJOUTER une source de montant : une entrée dans AMOUNT_SOURCES,
 // textes compris, rien d'autre ; chaque valeur de partie en est une d'office, par la
-// source `tally` (core/marbles-counters.js). Une cible est un emplacement, ou rien pour la bille
-// elle-même.
+// source `tally` (core/marbles-counters.js). Une cible est un emplacement, rien pour la bille
+// elle-même, ou un CHOIX du joueur (plus bas).
+//
+// CIBLE AU CHOIX : `target` vaut { type: "choice", zones, pick, count, upTo? } :
+//   zones  où le joueur choisit, des zones de CHOICE_ZONES (aujourd'hui "hand" et
+//          "triangle" ; le pot, la défausse et le sac sont déclarés, pas encore
+//          disponibles) ;
+//   pick   ce qui se choisit sur le triangle : "marble", une bille active
+//          (emplacement occupé), ou "slot", un emplacement, vide compris, pour une
+//          action qui y a un sens (aucune aujourd'hui) ;
+//   count  le nombre N de choix, au moins 1 ;
+//   upTo   vrai : « jusqu'à N », le joueur peut valider moins, voire aucun ; faux ou
+//          absent : obligatoire, exactement N (moins s'il n'y a pas assez de cibles).
+// Seules les actions qui déclarent `choice` (leurs zones et ce qu'elles visent)
+// l'acceptent. Les choix se font un par un, au déclenchement, sur les cibles valides
+// à cet instant (core/marbles.js/chooseTargets) ; l'action s'applique ensuite à
+// chacune, dans l'ordre des choix.
 //
 // LA SITUATION d'un effet, ce que ses conditions et ses montants calculés lisent au
 // déclenchement : { triangle, holder, replacement, tally } ;
@@ -136,6 +151,24 @@ function marbleActionKeyword(action, eventType) {
   };
 }
 
+// Les ZONES où un joueur peut choisir une cible, déclarées ici et nulle part
+// ailleurs : `available`, le choix y est possible aujourd'hui (les cibles de chaque
+// zone disponible : core/marbles.js/CHOICE_TARGETS) ; `picks`, ce qui s'y choisit.
+// Ajouter le pot, la défausse ou le sac : `available` à vrai, ses cibles dans le core,
+// ses textes dans la vue.
+export const CHOICE_ZONES = {
+  hand: { available: true, picks: ["marble"] },
+  triangle: { available: true, picks: ["marble", "slot"] },
+  pot: { available: false, picks: ["marble"] },
+  discard: { available: false, picks: ["marble"] },
+  bag: { available: false, picks: ["marble"] },
+};
+
+// Une cible est-elle un choix du joueur ?
+export function isChoice(target) {
+  return target !== null && typeof target === "object" && target.type === "choice";
+}
+
 // Ajoute le montant de la clause à la valeur de son action.
 function addAmount(values, clause) {
   return { ...values, [clause.action]: values[clause.action] + clause.amount };
@@ -155,6 +188,9 @@ function addAmount(values, clause) {
 //             Empocher (core/marbles.js/pocketOperation) ;
 //   amountless (facultatif) l'action n'a pas de montant (Empocher) ;
 //   targets   (facultatif) ses cibles permises, les emplacements sinon ;
+//   choice    (facultatif) la cible peut être un CHOIX du joueur (en-tête) : `zones`,
+//             celles où il a un sens ; `picks`, ce qui s'y vise ("marble" : une
+//             bille active ; "slot" : un emplacement, vide compris) ;
 //   selfOutside (sur une bille) les moments où elle ne peut viser la bille
 //             elle-même, la bille concernée n'étant pas sur le triangle : la valeur
 //             `marble` du déclencheur, et pourquoi (targetProblem) ;
@@ -178,10 +214,12 @@ const WEAR_SELF_OUTSIDE = {
 };
 
 export const CLAUSE_ACTIONS = {
-  // Ajoute `amount` (négatif permis) à la Vitesse.
-  speed: { kind: "value", fields: TARGETED_FIELDS, validate: validateInteger, apply: addAmount },
-  // Ajoute `amount` (négatif permis) à la Masse.
-  mass: { kind: "value", fields: TARGETED_FIELDS, validate: validateInteger, apply: addAmount },
+  // Ajoute `amount` (négatif permis) à la Vitesse. Au choix : un bonus à la phase d'une
+  // bille active dont la phase peut encore avoir lieu ; un emplacement vide le
+  // perdrait, la main n'a pas de phase.
+  speed: { kind: "value", fields: TARGETED_FIELDS, validate: validateInteger, apply: addAmount, choice: { zones: ["triangle"], picks: ["marble"] } },
+  // Ajoute `amount` (négatif permis) à la Masse. Au choix : comme la Vitesse.
+  mass: { kind: "value", fields: TARGETED_FIELDS, validate: validateInteger, apply: addAmount, choice: { zones: ["triangle"], picks: ["marble"] } },
   // Pioche : `amount` billes (au moins 1), piochées par la bille elle-même au
   // déclenchement (core/marbles.js/drawMarbles), à tout moment du tour. Sans
   // cible : piocher pour une autre bille n'a pas de sens.
@@ -209,6 +247,8 @@ export const CLAUSE_ACTIONS = {
     event: "polished",
     retires: false,
     selfOutside: WEAR_SELF_OUTSIDE,
+    // L'usure n'existe que sur le triangle.
+    choice: { zones: ["triangle"], picks: ["marble"] },
     keyword: marbleActionKeyword("polish", "polished"),
   },
   // Fêlure : ajoute `amount` d'usure (au moins 1), jamais au-delà du maximum ; à son
@@ -222,6 +262,7 @@ export const CLAUSE_ACTIONS = {
     event: "cracked",
     retires: true,
     selfOutside: WEAR_SELF_OUTSIDE,
+    choice: { zones: ["triangle"], picks: ["marble"] },
     keyword: marbleActionKeyword("crack", "cracked"),
   },
   // Empocher : envoie une bille au POT, sans montant. Cible : la bille elle-même, où
@@ -237,6 +278,9 @@ export const CLAUSE_ACTIONS = {
     amountless: true,
     targets: [...SLOTS, FIRST_IN_HAND],
     moves: "pot",
+    // Une bille de la main ou une bille active ; un emplacement vide n'a rien à
+    // empocher.
+    choice: { zones: ["hand", "triangle"], picks: ["marble"] },
     selfOutside: {
       thrown: "une bille ne peut s'empocher elle-même dans sa Chiquenaude : elle est en cours de lancer",
       pot: "une bille déjà dans le pot ne peut s'empocher elle-même",
@@ -280,6 +324,14 @@ function targetProblem(clause, context) {
   if (action.kind === "marble" && clause.target === undefined) {
     const problem = action.selfOutside?.[context.marble];
     if (problem !== undefined) return problem;
+  }
+  // Un bonus au choix : il faut qu'au moins une phase puisse encore le recevoir.
+  if (action.kind === "value" && isChoice(clause.target)) {
+    if (context.moment === "afterPhases") return "un bonus au choix n'a plus aucune phase à modifier : rien ne peut être choisi";
+    if (context.phaseSlots && !SLOTS.some((slot) => context.phaseSlots.some((from) => phaseIndex(slot) > phaseIndex(from)))) {
+      return "un bonus au choix n'a plus aucune phase à venir quand cet effet joue : rien ne peut être choisi";
+    }
+    return null;
   }
   if (action.kind === "value" && clause.target !== undefined) {
     if (context.moment === "afterPhases") return "une Vitesse ou une Masse ciblée n'a plus de phase à modifier : elle va aux compteurs, sans cible";
@@ -447,6 +499,25 @@ function validateRule(rule, table, label, describe, fail, context) {
   entry.validate(rule, describe, fail, context);
 }
 
+// Une cible au choix (en-tête) : ses champs, ses zones disponibles et sensées pour
+// l'action, ce qu'elle vise, son nombre.
+function validateChoice(clause, action, describe, fail) {
+  const choice = clause.target;
+  const where = `${describe}, cible au choix`;
+  rejectUnknownFields(choice, ["type", "zones", "pick", "count", "upTo"], where, fail);
+  if (action.choice === undefined) fail(`${where} : ${clause.action} ne se choisit pas.`);
+  if (!Array.isArray(choice.zones) || choice.zones.length === 0 || new Set(choice.zones).size !== choice.zones.length) fail(`${where} : zones doit lister des zones distinctes.`);
+  for (const zone of choice.zones) {
+    if (!Object.hasOwn(CHOICE_ZONES, zone)) fail(`${where} : zone inconnue "${zone}".`);
+    if (!CHOICE_ZONES[zone].available) fail(`${where} : pas encore de choix dans la zone "${zone}".`);
+    if (!action.choice.zones.includes(zone)) fail(`${where} : ${clause.action} n'a pas de sens dans la zone "${zone}".`);
+    if (!CHOICE_ZONES[zone].picks.includes(choice.pick)) fail(`${where} : la zone "${zone}" ne propose pas "${choice.pick}".`);
+  }
+  if (!action.choice.picks.includes(choice.pick)) fail(`${where} : ${clause.action} n'a pas de sens sur "${choice.pick}" (un emplacement vide n'a rien à recevoir).`);
+  if (!Number.isInteger(choice.count) || choice.count < 1) fail(`${where} : count doit être un entier >= 1.`);
+  if (choice.upTo !== undefined && typeof choice.upTo !== "boolean") fail(`${where} : upTo vaut true, false ou est absent.`);
+}
+
 // Échoue au chargement sur un effet mal formé. Un effet absent se vérifie en
 // amont : ici, il existe. `context` : le moment où il joue (voir targetProblem),
 // {} pour ne pas vérifier les cibles ; `tallies`, les identifiants des valeurs de
@@ -458,7 +529,8 @@ export function validateEffect(effect, describe, fail, context = {}) {
     if (!Object.hasOwn(CLAUSE_ACTIONS, clause.action)) fail(`${describe} : action inconnue "${clause.action}".`);
     rejectUnknownFields(clause, action.fields, describe, fail);
     action.validate(clause, describe, fail, context);
-    if (clause.target !== undefined && !(action.targets ?? SLOTS).includes(clause.target)) fail(`${describe} : cible inconnue "${clause.target}".`);
+    if (isChoice(clause.target)) validateChoice(clause, action, describe, fail);
+    else if (clause.target !== undefined && !(action.targets ?? SLOTS).includes(clause.target)) fail(`${describe} : cible inconnue "${clause.target}".`);
     const problem = targetProblem(clause, context);
     if (problem !== null) fail(`${describe} : ${problem}.`);
     if (clause.when !== undefined) validateRule(clause.when, CONDITIONS, "condition", describe, fail, context);
@@ -468,8 +540,11 @@ export function validateEffect(effect, describe, fail, context = {}) {
 // Évalue des clauses dans une SITUATION (en-tête), au moment du déclenchement :
 //   self        les valeurs de la bille elle-même, toutes présentes ;
 //   gifts       ce qui va à d'autres emplacements, [{ slot, ...valeurs donnables }] ;
+//               un bonus au choix porte `choice` (sa cible), `action` et `amount` au
+//               lieu de `slot` : le core demande le choix (core/marbles.js/fireEffect) ;
 //   operations  les actions sur une bille, dans l'ordre des clauses,
-//               [{ action, amount, target }] (`target` absent : la bille elle-même).
+//               [{ action, amount, target }] (`target` absent : la bille elle-même ;
+//               un choix : la cible au choix, que le core fait trancher).
 // Une clause dont la condition échoue, ou dont le montant (calculé s'il l'est) vaut
 // zéro, ne produit rien. Seules les valeurs finales en sortent.
 export function evaluateEffect(clauses, situation, types) {
@@ -486,6 +561,7 @@ export function evaluateEffect(clauses, situation, types) {
     const target = clause.target === undefined ? {} : { target: clause.target };
     if (kind === "marble") operations.push({ action: clause.action, ...(amountless ? {} : { amount: clause.amount }), ...target });
     else if (clause.target === undefined) self = apply(self, clause);
+    else if (isChoice(clause.target)) gifts.push({ choice: clause.target, action: clause.action, amount: clause.amount, ...apply(GIFT_ZERO, clause) });
     else gifts.push({ slot: clause.target, ...apply(GIFT_ZERO, clause) });
   }
   return { self, gifts, operations };

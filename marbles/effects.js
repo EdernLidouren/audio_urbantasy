@@ -38,6 +38,14 @@ export const tally = (id, scope) => ({ type: "tally", tally: id, scope });
 // FIRST_IN_HAND).
 export const FIRST_IN_HAND = "firstInHand";
 
+// Une CIBLE AU CHOIX du joueur (core/marbles-effects.js, en-tête) : `zones`, où il
+// choisit ("hand", "triangle") ; `count`, combien (1 par défaut) ; `upTo`, « jusqu'à
+// N », moins permis ; `pick`, ce qui se vise sur le triangle ("marble", une bille
+// active, par défaut). « Polissage 1 à une bille active au choix » :
+// polish(1, choice({ zones: ["triangle"] })).
+export const choice = ({ zones, count = 1, upTo = false, pick = "marble" }) => ({ type: "choice", zones, pick, count, ...(upTo ? { upTo: true } : {}) });
+
 // Empocher : envoie au pot la bille elle-même (sans cible), celle d'un emplacement,
-// ou la première de la main (FIRST_IN_HAND). Sans montant.
+// la première de la main (FIRST_IN_HAND), ou une bille au choix (choice). Sans
+// montant.
 export const pocket = (target) => ({ action: "pocket", ...(target === undefined ? {} : { target }) });

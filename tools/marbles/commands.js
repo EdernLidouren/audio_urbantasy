@@ -7,6 +7,9 @@
 //   piocher | draw                   pioche du tour
 //   resoudre | resolve               résolution seule, sans la pioche qui suit
 //   prevoir | forecast | r [<n> <empl.>]  prévision, rien ne bouge
+//   choisir | choose <n> | <empl.>   répond au choix en attente : la bille n de la
+//                                    main (à partir de 1), ou un emplacement
+//   terminer | done                  termine un choix « jusqu'à N »
 // Emplacements : gauche (g, left), droite (d, right), pointe (p, apex).
 
 export const SLOT_ALIASES = {
@@ -54,6 +57,17 @@ export function parseCommand(line) {
     case "resoudre":
     case "resolve":
       return { kind: "action", action: { type: "resolve" } };
+    case "choisir":
+    case "choose": {
+      const handIndex = handIndexOf(params[0]);
+      const slot = slotOf(params[0]);
+      if (handIndex !== undefined) return { kind: "action", action: { type: "choose", target: { zone: "hand", index: handIndex } } };
+      if (slot) return { kind: "action", action: { type: "choose", target: { zone: "triangle", slot } } };
+      return { kind: "error", error: "Usage : choisir <n de la main | gauche|droite|pointe>" };
+    }
+    case "terminer":
+    case "done":
+      return { kind: "action", action: { type: "choose", done: true } };
     case "prevoir":
     case "forecast":
     case "r": {
