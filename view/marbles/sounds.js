@@ -398,9 +398,12 @@ export const MARBLE_EVENT_CUES = {
   choiceEnded: null,
   choiceUndecided: null,
   // L'usée roule à la défausse ; la délogée part avec le choc (placed).
+  // Chassée par Éjecter : le même roulement vers la défausse qu'une bille usée.
   discarded: (event, timeline) => {
-    if (event.cause === "wear") timeline.worn(event.marble, event.slot);
+    if (event.cause === "wear" || event.cause === "eject") timeline.worn(event.marble, event.slot);
   },
+  // Éjecter : un point d'accroche, sans son à lui aujourd'hui.
+  eject: null,
   // La bille roule de la main à l'emplacement. Vide : elle s'y pose et y tombe.
   // Occupé : elle est tirée (strike), puis la collision, à la force du choc ; la
   // délogée part à la défausse, lancée d'autant.

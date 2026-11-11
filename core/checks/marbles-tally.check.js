@@ -15,14 +15,14 @@ import { emptyTally, recordTally, tallyValue } from "../marbles-tally.js";
 import { nextRandom } from "../rng.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
 import { createMarblesRules } from "../marbles-rules.js";
-import { emptyBagMarblesGame, fixedTargetTypes, inHand, withSizes } from "./helpers.js";
+import { emptyBagMarblesGame, earlierTestTypes, inHand, withSizes } from "./helpers.js";
 
 // Les règles du jeu, liées à la vraie table (core/marbles-rules.js), et des règles
 // fabriquées, la vraie table complétée de billes de test.
 const rules = createMarblesRules(MARBLE_TYPES);
 // Gorille et porcelaine d'avant les cibles au choix : ces cas portent sur Empocher
-// depuis la main et sur la Fêlure (core/checks/helpers.js/fixedTargetTypes).
-const fixedRules = createMarblesRules(fixedTargetTypes(MARBLE_TYPES));
+// depuis la main et sur la Fêlure (core/checks/helpers.js/earlierTestTypes).
+const fixedRules = createMarblesRules(earlierTestTypes(MARBLE_TYPES));
 const fabricated = (table) => createMarblesRules({ ...MARBLE_TYPES, ...withSizes(table) });
 
 const placed = (marble, wear = 0) => ({ marble, wear });
@@ -103,7 +103,7 @@ function checkGeneration(run) {
   run("génération : les phases", true, ["apex", "base", "leftBase", "rightBase"].every((id) => ids.includes(id)));
   run.same(
     "génération : les actions mots-clés, déclenchements et quantité réelle",
-    ["draw", "drawQuantity", "polish", "polishQuantity", "crack", "crackQuantity", "pocket", "pocketQuantity"],
+    ["draw", "drawQuantity", "polish", "polishQuantity", "crack", "crackQuantity", "pocket", "pocketQuantity", "eject", "ejectQuantity"],
     TALLY_COUNTERS.filter((counter) => counter.category === "action").map((counter) => counter.id)
   );
   run.same(
@@ -199,7 +199,8 @@ function checkKeywords(run) {
     added(phases, rules.reduce(phases, { type: "resolve" }).state)
   );
   const both = playState({ triangle: { leftBase: placed("clay"), rightBase: placed("tiger"), apex: placed("giant") } });
-  const bothAdded = added(both, rules.reduce(both, { type: "resolve" }).state);
+  // La tigrée d'avant Éjecter : sa base donne Vitesse +3, sans choix à trancher.
+  const bothAdded = added(both, fixedRules.reduce(both, { type: "resolve" }).state);
   run.same("mots-clés : bases = bases gauches + bases droites", { apex: 1, base: 2, leftBase: 1, rightBase: 1 }, { apex: bothAdded.apex, base: bothAdded.base, leftBase: bothAdded.leftBase, rightBase: bothAdded.rightBase });
   // Une variante de base est l'effet de base de son emplacement.
   const variant = playState({ triangle: { leftBase: null, rightBase: placed("cats_eye"), apex: null } });
@@ -370,8 +371,9 @@ function checkTestMarbles(run) {
   run.same("verre : plafonné à +10", [{ marble: "glass", speedDelta: 10 }], glass({ tally: { windfall: 15 } }));
   // Un mélange pendant la résolution, avant la pointe : la Pioche du mica en base
   // gauche, la tigrée en base droite trouve, le verre la compte.
+  // La tigrée d'avant Éjecter (sa base ne fait pas choisir).
   const midResolution = (rightBase) =>
-    effectsOf(rules.reduce(playState({ bag: [], discard: ["clay"], triangle: { leftBase: placed("mica"), rightBase, apex: placed("glass") } }), { type: "resolve" }).events, "phase").at(-1);
+    effectsOf(fixedRules.reduce(playState({ bag: [], discard: ["clay"], triangle: { leftBase: placed("mica"), rightBase, apex: placed("glass") } }), { type: "resolve" }).events, "phase").at(-1);
   run.same("verre : une Trouvaille pendant la résolution, avant sa phase", { marble: "glass", speedDelta: 1 }, midResolution(placed("tiger")));
   run.same("verre : un mélange sans Trouvaille, rien", { marble: "glass", speedDelta: 0 }, midResolution(placed("clay")));
   run("vérification du calibre des billes du test", true, MARBLE_TYPES.magnifier.size === SMALL && MARBLE_TYPES.glass.size === MEDIUM && MARBLE_TYPES.gorilla.size === LARGE);

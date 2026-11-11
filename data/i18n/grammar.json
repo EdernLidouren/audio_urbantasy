@@ -3,7 +3,8 @@
     "forms": [
       "def",
       "indef",
-      "noun"
+      "noun",
+      "plural"
     ],
     "attributes": {}
   },
@@ -12,7 +13,8 @@
       "def",
       "de",
       "indef",
-      "noun"
+      "noun",
+      "plural"
     ],
     "attributes": {
       "gender": [

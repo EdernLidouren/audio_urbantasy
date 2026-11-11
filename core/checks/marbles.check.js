@@ -30,7 +30,7 @@ import { MARBLE_PHASES, MARBLE_POCKET, MARBLE_TRIGGERS } from "../../config/marb
 import { CLAUSE_ACTIONS, amountOf, printedStat } from "../marbles-effects.js";
 import { LARGE, MARBLE_SIZES, MEDIUM, SMALL, STARTING_BAG, MARBLES_SETTINGS } from "../../config/marbles-values.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
-import { answerChoices, emptyBagMarblesGame, fixedTargetTypes, handIds, inHand, withSizes } from "./helpers.js";
+import { answerChoices, emptyBagMarblesGame, earlierTestTypes, handIds, inHand, withSizes } from "./helpers.js";
 import { createMarblesRules } from "../marbles-rules.js";
 
 // Tables fabriquées : complétées d'un calibre (core/checks/helpers.js/withSizes).
@@ -40,8 +40,8 @@ const validateTable = (table) => validateMarbleTypes(withSizes(table));
 // Les règles du jeu, liées à la vraie table (core/marbles-rules.js).
 const rules = createMarblesRules(MARBLE_TYPES);
 // Les mêmes, gorille, verre et porcelaine d'avant les cibles au choix
-// (core/checks/helpers.js/fixedTargetTypes).
-const fixedRules = createMarblesRules(fixedTargetTypes(MARBLE_TYPES));
+// (core/checks/helpers.js/earlierTestTypes).
+const fixedRules = createMarblesRules(earlierTestTypes(MARBLE_TYPES));
 
 // Partie en cours de tour : le tour 2 par défaut, sac vide. `over` remplace ce que
 // le test veut fixer.
@@ -122,6 +122,7 @@ export default function checkMarbles(run) {
   checkPocket(run);
   checkPocketReactions(run);
   checkChoices(run);
+  checkEject(run);
   checkBonus(run);
   checkResolution(run);
   checkEndOfGame(run);
@@ -876,6 +877,149 @@ function checkChoices(run) {
   run("validation, choix : bonus au choix en base permis (la pointe vient après)", true, valid({ action: "speed", amount: 1, target: choose(["triangle"]) }, "base"));
 }
 
+// ÉJECTER : chaque forme de cible, l'ordre (Éjection, retrait, défausse), ni Tic ni
+// Final, la phase sautée, la référence des conditions de calibre, les compteurs et
+// les réactions du pot, la plombée qui vide l'emplacement visé.
+function checkEject(run) {
+  const journal = (events) =>
+    events.map((event) => {
+      if (event.type === "effect") return `effect:${event.trigger}:${event.marble}`;
+      if (event.type === "removed" || event.type === "discarded") return `${event.type}:${event.marble}:${event.cause}`;
+      if (event.type === "targetEmpty") return `targetEmpty:${event.action}:${event.target ?? event.slot}`;
+      return event.marble === undefined ? event.type : `${event.type}:${event.marble}`;
+    });
+  const table = {
+    plain: { apex: [{ action: "speed", amount: 1 }], base: [{ action: "speed", amount: 1 }] },
+    small: { size: SMALL, apex: [{ action: "speed", amount: 1 }] },
+    smallKnock: { size: SMALL, knockout: [{ action: "speed", amount: 2 }] },
+    large: { size: LARGE },
+    // Éjection : Vitesse +5 si la bille « posée » (ici, celle qui éjecte) est plus grosse.
+    sizeKnock: { size: MEDIUM, knockout: [{ action: "speed", amount: 5, when: { type: "relativeSize", marble: "placed", is: "larger" } }] },
+    // Base : s'éjecter elle-même.
+    selfEjector: { base: [{ action: "eject" }] },
+    // Tic : Éjecter la pointe ; et toutes les minibilles actives ; et toutes.
+    apexEjector: { hit: [{ action: "eject", target: "apex" }] },
+    smallEjector: { size: LARGE, hit: [{ action: "eject", target: { type: "all", filters: [{ type: "size", size: SMALL }] } }] },
+    allEjector: { base: [{ action: "eject", target: { type: "all" } }] },
+    chooserEjector: { hit: [{ action: "eject", target: { type: "choice", zones: ["triangle"], pick: "marble", count: 2 } }] },
+    // Base gauche : Éjecter la pointe, avant sa phase.
+    earlyEjector: { base: [{ action: "eject", target: "apex" }] },
+    wornOut: { maxWear: 1, apex: [{ action: "speed", amount: 1 }], final: [{ action: "speed", amount: 9 }] },
+    // Son Éjection l'éjecterait à nouveau : sans effet, pas de boucle.
+    loopKnock: { knockout: [{ action: "eject" }] },
+    onEjected: { pocketed: { ejectedMarbles: [{ action: "mass", amount: 1 }] } },
+  };
+  const made = fabricatedRules(table);
+  const go = (state, action) => apply(state, action, made);
+  const toApex = { type: "place", handIndex: 0, slot: "apex" };
+  const toLeft = { type: "place", handIndex: 0, slot: "leftBase" };
+
+  // Un emplacement : l'Éjection de la visée, son retrait, sa défausse ; ni Tic ni Final.
+  const fixed = go(playState({ hand: inHand(["apexEjector"]), triangle: triangleOf(placed("plain"), null, placed("smallKnock")) }), toLeft);
+  run.same(
+    "éjecter, emplacement : Éjection, retrait, défausse",
+    ["eject:smallKnock", "knockout:smallKnock", "effect:knockout:smallKnock", "removed:smallKnock:eject", "discarded:smallKnock:eject"],
+    journal(fixed.events).slice(journal(fixed.events).indexOf("eject:smallKnock"))
+  );
+  run("éjecter : la pointe vidée", null, fixed.state.triangle.apex);
+  run("éjecter : la bille à la défausse", "plain,smallKnock", fixed.state.discard.join());
+  run("éjecter : ni Final ni Tic de plus", 1, fixed.events.filter((event) => event.type === "hit").length);
+  run("éjecter : pas de Final", false, fixed.events.some((event) => event.type === "final"));
+  run("éjecter : son Éjection compte au tour (Vitesse +2)", 2, fixed.state.speed);
+  run.same("éjecter : l'Éjection provoquée porte l'éjection", { trigger: "hit", slot: "leftBase", marble: "apexEjector" }, fixed.events.find((event) => event.trigger === "knockout").ejectedBy);
+
+  // La bille elle-même, sur le triangle ; refusée hors du triangle.
+  const self = go(playState({ bag: ["plain"], triangle: triangleOf(placed("selfEjector"), null, placed("plain")) }), { type: "resolve" });
+  run("éjecter soi-même : quitte le triangle pendant sa phase", true, self.events.some((event) => event.type === "removed" && event.marble === "selfEjector" && event.cause === "eject"));
+  const refused = (field, clause = { action: "eject" }) => throws(() => validateTable({ x: { [field]: [clause] } }));
+  run("validation, éjecter soi-même : dans une Chiquenaude refusé", true, refused("flick"));
+  run("validation, éjecter soi-même : dans un Final refusé", true, refused("final"));
+  run("validation, éjecter soi-même : à l'Éveil refusé", true, refused("awaken"));
+  run("validation, éjecter soi-même : en poche refusé", true, throws(() => validateTable({ x: { pocketed: { entry: [{ action: "eject" }] } } })));
+  run("validation, éjecter soi-même : au Tic permis", false, refused("hit"));
+  run("validation, éjecter : un montant refusé", true, refused("hit", { action: "eject", amount: 1, target: "apex" }));
+  run("validation, éjecter : au choix dans la main refusé", true, refused("hit", { action: "eject", target: { type: "choice", zones: ["hand"], pick: "marble", count: 1 } }));
+  run("validation, « toutes » : un filtre inconnu refusé", true, refused("hit", { action: "eject", target: { type: "all", filters: [{ type: "matter", matter: "glass" }] } }));
+  run("validation, « toutes » : un calibre inconnu refusé", true, refused("hit", { action: "eject", target: { type: "all", filters: [{ type: "size", size: 9 }] } }));
+  run("validation, « toutes » : deux filtres de calibre refusés", true, refused("hit", { action: "eject", target: { type: "all", filters: [{ type: "size", size: SMALL }, { type: "size", size: LARGE }] } }));
+  run("validation, « toutes » : pour une autre action refusé", true, refused("hit", { action: "polish", amount: 1, target: { type: "all" } }));
+  run("validation, « toutes » : sans filtre permis", false, refused("hit", { action: "eject", target: { type: "all" } }));
+
+  // Toutes les minibilles actives : dans l'ordre des phases, seulement elles.
+  const smalls = go(
+    playState({ hand: inHand(["smallEjector"]), triangle: triangleOf(placed("small"), placed("plain"), placed("smallKnock")) }),
+    { type: "place", handIndex: 0, slot: "rightBase" }
+  );
+  run.same("éjecter toutes les minibilles : dans l'ordre des phases", ["small", "smallKnock"], smalls.events.filter((event) => event.type === "eject").map((event) => event.marble));
+  run.same("éjecter toutes les minibilles : la bille normale reste", "smallEjector", smalls.state.triangle.rightBase.marble);
+  // Toutes : la bille elle-même comprise, sur le triangle.
+  const everyone = go(playState({ bag: ["plain"], triangle: triangleOf(placed("allEjector"), placed("plain"), placed("plain")) }), { type: "resolve" });
+  run.same("éjecter toutes : chaque bille active, elle comprise, dans l'ordre des phases", ["leftBase", "rightBase", "apex"], everyone.events.filter((event) => event.type === "eject").map((event) => event.slot));
+  // Aucune bille visée : sans effet, noté.
+  const noneSmall = go(playState({ hand: inHand(["smallEjector"]), triangle: triangleOf(placed("plain"), null, placed("plain")) }), toApex);
+  run("éjecter toutes les minibilles : aucune, noté", true, journal(noneSmall.events).includes("targetEmpty:eject:all"));
+
+  // Au choix : dans l'ordre de sélection.
+  const choosing = go(playState({ hand: inHand(["chooserEjector"]), triangle: triangleOf(placed("plain"), placed("small"), placed("plain")) }), toApex);
+  const first = made.reduce(choosing.state, { type: "choose", target: { zone: "triangle", slot: "rightBase" } });
+  const second = made.reduce(first.state, { type: "choose", target: { zone: "triangle", slot: "leftBase" } });
+  run.same("éjecter au choix : dans l'ordre de sélection", ["rightBase", "leftBase"], second.events.filter((event) => event.type === "eject").map((event) => event.slot));
+
+  // Cible vide.
+  const empty = go(playState({ hand: inHand(["apexEjector"]), triangle: triangleOf(placed("plain"), null, null) }), toLeft);
+  run("éjecter, emplacement vide : noté", true, journal(empty.events).includes("targetEmpty:eject:apex"));
+
+  // Avant sa phase : la phase sautée, la bille dite retirée avant.
+  const early = go(playState({ bag: ["plain"], triangle: triangleOf(placed("earlyEjector"), null, placed("wornOut")) }), { type: "resolve" });
+  run.same("éjecter avant la phase : phase sautée", { type: "phaseSkipped", slot: "apex" }, early.events.find((event) => event.type === "phaseSkipped" && event.slot === "apex"));
+  run("éjecter : pas de Final, même à l'usure maximale", false, early.events.some((event) => event.type === "final"));
+
+  // La comparaison de calibre : la bille qui éjecte est la référence (« posée »).
+  const bigger = go(playState({ hand: inHand(["smallEjector"]), triangle: triangleOf(placed("sizeKnock"), null, null) }), toApex);
+  run("calibre : plus petite que la grosse qui l'éjecte… (pas de minibille visée)", 0, bigger.state.speed);
+  const sizeTable = fabricatedRules({ ...table, bigEjector: { size: LARGE, hit: [{ action: "eject", target: "leftBase" }] }, smallEjectorFixed: { size: SMALL, hit: [{ action: "eject", target: "leftBase" }] } });
+  const byBig = apply(playState({ hand: inHand(["bigEjector"]), triangle: triangleOf(placed("sizeKnock"), null, placed("plain")) }), toApex, sizeTable);
+  run("calibre : éjectée par un calot, la condition « plus grosse » vaut", 5, byBig.events.find((event) => event.trigger === "knockout").speedDelta);
+  const bySmall = apply(playState({ hand: inHand(["smallEjectorFixed"]), triangle: triangleOf(placed("sizeKnock"), null, placed("plain")) }), toApex, sizeTable);
+  run("calibre : éjectée par une minibille, elle ne vaut pas", 0, bySmall.events.find((event) => event.trigger === "knockout").speedDelta);
+
+  // Une Éjection qui éjecterait sa propre bille : sans effet, pas de boucle.
+  const loop = go(playState({ hand: inHand(["apexEjector"]), triangle: triangleOf(placed("plain"), null, placed("loopKnock")) }), toLeft);
+  run("éjecter : une Éjection qui s'éjecte elle-même, sans boucle", false, loop.events.some((event) => event.type === "chainInterrupted"));
+  run("éjecter : elle part une seule fois", 1, loop.events.filter((event) => event.type === "removed" && event.marble === "loopKnock").length);
+
+  // Compteurs : billes éjectées, sorties du triangle, Éjection seulement avec l'effet,
+  // Éjecter et sa quantité réelle ; la réaction du pot « à chaque bille éjectée ».
+  const counted = go(
+    playState({ hand: inHand(["smallEjector"]), pot: ["onEjected"], triangle: triangleOf(placed("small"), placed("large"), placed("smallKnock")) }),
+    { type: "place", handIndex: 0, slot: "rightBase" }
+  );
+  const tally = (id) => counted.state.tally[id].turn;
+  // La pose chasse le calot de la base droite (1), Éjecter les deux minibilles (2).
+  run.same(
+    "compteurs : éjectées (pose et Éjecter), sorties, Éjection (une seule a l'effet), Éjecter, quantité",
+    { ejectedMarbles: 3, triangleExits: 3, knockout: 1, eject: 2, ejectQuantity: 2 },
+    { ejectedMarbles: tally("ejectedMarbles"), triangleExits: tally("triangleExits"), knockout: tally("knockout"), eject: tally("eject"), ejectQuantity: tally("ejectQuantity") }
+  );
+  run("compteurs : la réaction du pot à chaque bille éjectée, pose comprise", 3, counted.events.filter((event) => event.type === "pocketReaction").length);
+  run("compteurs : cible vide, un déclenchement, aucune bille", "1/0", `${noneSmall.state.tally.eject.turn}/${noneSmall.state.tally.ejectQuantity.turn}`);
+
+  // La plombée : posée en pointe sur une bille, sa Chiquenaude l'éjecte ; la pose se
+  // poursuit comme sur un emplacement vide, ni Éjection par la pose ni Tic.
+  const leaded = apply(playState({ hand: inHand(["leaded"]), triangle: triangleOf(null, null, placed("magnifier")) }), toApex);
+  run.same(
+    "plombée : sa Chiquenaude éjecte la pointe, puis la pose sur l'emplacement vidé",
+    ["flick:leaded", "effect:flick:leaded", "eject:magnifier", "knockout:magnifier", "effect:knockout:magnifier", "removed:magnifier:eject", "discarded:magnifier:eject", "placed:leaded"],
+    journal(leaded.events)
+  );
+  run("plombée : ni Tic", false, leaded.events.some((event) => event.type === "hit"));
+  run("plombée : l'Éjection de la loupe compte (Vitesse +3)", 3, leaded.state.speed);
+  // La géante : son Final éjecte toutes les minibilles actives, la loupe y joue son Éjection.
+  const giant = apply(playState({ bag: ["clay"], triangle: triangleOf(placed("magnifier"), placed("clay"), placed("giant")) }), { type: "resolve" });
+  run.same("géante : son Final éjecte la loupe, seule minibille", ["magnifier"], giant.events.filter((event) => event.type === "eject").map((event) => event.marble));
+  run("géante : la loupe joue son Éjection", true, giant.events.some((event) => event.trigger === "knockout" && event.marble === "magnifier" && event.speedDelta === 3));
+}
+
 function checkSwap(run) {
   const clay = placed("clay", 1);
   const glass = placed("glass", 2);
@@ -1107,7 +1251,8 @@ function checkFinal(run) {
   run("final : sa Vitesse compte pour l'Impact du tour (5 de phase + 4)", 9, worn.events.find((event) => event.type === "impact").impact);
 
   // Tigrée : la Masse du Final compte aussi.
-  const tiger = apply(playState({ hand: inHand([]), bag: ["clay"], triangle: triangleOf(placed("tiger", 3), null, null) }), { type: "resolve" });
+  // La tigrée d'avant Éjecter : sa base donne Vitesse +3, sans choix.
+  const tiger = apply(playState({ hand: inHand([]), bag: ["clay"], triangle: triangleOf(placed("tiger", 3), null, null) }), { type: "resolve" }, fixedRules);
   run.same("final : la Masse compte (Vitesse 3, Masse 1 + 1)", { speed: 3, mass: 2, impact: 6 }, (({ speed, mass, impact }) => ({ speed, mass, impact }))(tiger.events.find((event) => event.type === "impact")));
 
   // Pas usée : pas de Final.
@@ -1123,7 +1268,7 @@ function checkFinal(run) {
   run("final : jamais à une pose, même d'une bille d'usure 1", false, eventTypes(placedGiant.events).includes("final"));
 
   // Plusieurs retraits : dans l'ordre des phases, chacun avec son Final.
-  const both = apply(playState({ hand: inHand([]), bag: ["clay"], triangle: triangleOf(placed("tiger", 3), null, placed("porcelain", 1)) }), { type: "resolve" });
+  const both = apply(playState({ hand: inHand([]), bag: ["clay"], triangle: triangleOf(placed("tiger", 3), null, placed("porcelain", 1)) }), { type: "resolve" }, fixedRules);
   run.same(
     "final : dans l'ordre des phases",
     ["tiger", "porcelain"],
@@ -1843,9 +1988,10 @@ function checkFlick(run) {
   const among = apply(playState({ hand: inHand(["counter"]), triangle: triangleOf(placed("plain"), null, placed("plain")) }), toApex, ghost);
   run("chiquenaude : l'occupante, encore là, se compte", 2, effectOf(among, "flick").speedDelta);
 
-  // La Chiquenaude qui vide l'emplacement visé : la plombée (Fêlure 3 à la pointe) sur
-  // une argile (usure maximale 3).
-  const cleared = apply(playState({ hand: inHand(["leaded"]), triangle: triangleOf(null, null, placed("clay")) }), toApex);
+  // La Chiquenaude qui vide l'emplacement visé par une Fêlure : la plombée d'avant
+  // Éjecter (Fêlure 3 à la pointe) sur une argile (usure maximale 3). Celle d'aujourd'hui
+  // l'éjecte : checkEject.
+  const cleared = apply(playState({ hand: inHand(["leaded"]), triangle: triangleOf(null, null, placed("clay")) }), toApex, fixedRules);
   run.same(
     "chiquenaude qui vide l'emplacement : retrait par usure, puis la pose, ni Éjection ni Tic",
     ["flick", "effect", "cracked", "removed", "discarded", "final", "placed"],
@@ -1867,14 +2013,14 @@ function checkFlick(run) {
   );
   run("chiquenaude qui vide l'emplacement : le Final compte pour le tour", 4, withFinal.state.speed);
   // La Fêlure ne suffit pas (la tigrée, usure maximale 4) : un remplacement ordinaire.
-  const notCleared = apply(playState({ hand: inHand(["leaded"]), triangle: triangleOf(null, null, placed("tiger")) }), toApex);
+  const notCleared = apply(playState({ hand: inHand(["leaded"]), triangle: triangleOf(null, null, placed("tiger")) }), toApex, fixedRules);
   run.same(
     "chiquenaude : l'emplacement encore occupé, Éjection et Tic comme d'habitude",
     ["flick", "effect", "cracked", "knockout", "removed", "discarded", "placed", "hit"],
     eventTypes(notCleared.events)
   );
   // Posée ailleurs, la plombée fêle quand même la pointe.
-  const elsewhere = apply(playState({ hand: inHand(["leaded"]), triangle: triangleOf(null, null, placed("tiger")) }), { type: "place", handIndex: 0, slot: "leftBase" });
+  const elsewhere = apply(playState({ hand: inHand(["leaded"]), triangle: triangleOf(null, null, placed("tiger")) }), { type: "place", handIndex: 0, slot: "leftBase" }, fixedRules);
   run.same("chiquenaude : la Fêlure ciblée, posée ailleurs", { marble: "tiger", wear: 3 }, elsewhere.state.triangle.apex);
 
   // Validation : la règle des cibles et les conditions.
@@ -1961,6 +2107,9 @@ function checkComputedAmounts(run) {
 // sac, chez les billes actives, dans l'ordre des phases, avant que la pioche ne
 // reprenne ; aux trois moments où une régénération arrive.
 function checkWindfall(run) {
+  // La tigrée d'avant Éjecter (sa base donne Vitesse +3, sans choix) : ces cas portent
+  // sur la Trouvaille.
+  const apply = (state, action, marbles = fixedRules) => applyWith(state, action, marbles);
   // Chaque évènement, avec sa bille ; une pioche sans la sienne, que le mélange choisit.
   const typesAndMarbles = (events) => events.map((event) => (event.marble === undefined || event.type === "draw" ? event.type : `${event.type}:${event.marble}`));
   // De `first` à la première entrée `last` qui le suit.
@@ -2339,7 +2488,7 @@ function checkSmoke(run) {
   run.same("fumée : invariants tenus", [], faults.slice(0, 5));
   run(
     "fumée : tous les évènements rencontrés",
-    "awaken,bagRegenerated,choice,choiceEnded,chosen,cracked,discarded,draw,drawSkipped,effect,final,flick,gameOver,hit,impact,knockout,lost,phase,phaseSkipped,placed,pocketReaction,pocketed,polished,potResolution,removed,rotation,swapped,targetEmpty,turnEnded,turnStarted,wear,windfall",
+    "awaken,bagRegenerated,choice,choiceEnded,chosen,cracked,discarded,draw,drawSkipped,effect,eject,final,flick,gameOver,hit,impact,knockout,lost,phase,phaseSkipped,placed,pocketReaction,pocketed,polished,potResolution,removed,rotation,swapped,targetEmpty,turnEnded,turnStarted,wear,windfall",
     [...seen].sort().join()
   );
   // La limite de sécurité atteinte dans une vraie partie : une anomalie.

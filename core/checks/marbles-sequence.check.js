@@ -24,14 +24,14 @@ import { EMPTY_HISTORY, recordSteps } from "../../view/marbles/history.js";
 import { historyMenu } from "../../view/marbles/history-screen.js";
 import { throws } from "../../lib/check.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
-import { answerChoices, emptyBagMarblesGame, fixedTargetTypes, inHand } from "./helpers.js";
+import { answerChoices, emptyBagMarblesGame, earlierTestTypes, inHand } from "./helpers.js";
 import { createMarblesRules } from "../marbles-rules.js";
 
 // Les règles du jeu, liées à la vraie table (core/marbles-rules.js).
 const rules = createMarblesRules(MARBLE_TYPES);
 // Gorille, verre et porcelaine d'avant les cibles au choix, pour les cas qui portent
-// sur Empocher depuis la main (core/checks/helpers.js/fixedTargetTypes).
-const fixedRules = createMarblesRules(fixedTargetTypes(MARBLE_TYPES));
+// sur Empocher depuis la main (core/checks/helpers.js/earlierTestTypes).
+const fixedRules = createMarblesRules(earlierTestTypes(MARBLE_TYPES));
 
 // Traduction de test : la clé seule, sans son préfixe, pour lire la FORME d'une
 // séquence sans dépendre des textes.
@@ -94,13 +94,13 @@ function playGame(seed, options, present, onTurn = () => {}) {
 
     const before = state;
     const overviewFr = describeOverview(state, rules, t);
-    const forecastImpact = rules.forecast(state).impact;
+    const { impact: forecastImpact, choiceDependent } = rules.forecast(state);
     const resolved = apply({ type: "resolve" });
     const drawn = state.stage === "draw" ? apply({ type: "draw" }) : [];
     const events = [...resolved, ...drawn];
     const steps = record(resolutionSteps(before.turn, events, t, { hint: before.turn === 1 }));
     present(steps);
-    onTurn({ before, overviewFr, forecastImpact, events, steps, history });
+    onTurn({ before, overviewFr, forecastImpact, choiceDependent, events, steps, history });
   }
   return { state, journal, history };
 }
@@ -124,10 +124,12 @@ const REGENERATION =
 // Une réaction d'une bille du pot (En poche, à chaque (occurrence)), à tout moment ;
 // les étapes d'un choix (une cible choisie, la fin d'une sélection, aucune cible).
 const CHOOSING = "choice\\.chosen |choice\\.ended\\.(done|exhausted) |event\\.target_empty_choice |";
+// Une éjection par l'action Éjecter (son Éjection éventuelle), ou rien à éjecter.
+const EJECTING = "event\\.eject (event\\.effect_knockout )?|event\\.target_empty_all |event\\.target_empty_self_eject |";
 // Une réaction d'une bille du pot (En poche, à chaque (occurrence)), à tout moment.
 const POCKETING = "event\\.pocketed (event\\.effect_pocket_entry )?|event\\.lost |event\\.target_empty_(hand|self) |outcome\.pot |";
 const DRAWING =
-  "(" + REGENERATION + "|event\\.draw |event\\.draw_skipped\\.(handFull|noMarbles) |event\\.effect_awaken |" + POCKETING + CHOOSING +
+  "(" + REGENERATION + "|event\\.draw |event\\.draw_skipped\\.(handFull|noMarbles) |event\\.effect_awaken |" + POCKETING + CHOOSING + EJECTING +
   "event\\.polished |event\\.cracked |event\\.target_empty |event\\.discarded\\.wear |event\\.effect_final )";
 
 const SEQUENCE_SHAPE = new RegExp(
@@ -153,6 +155,7 @@ function checkRealGames(run) {
   const emptySteps = [];
   const impactMismatches = [];
   let awakenedBeforeImpact = 0;
+  let choiceDependentTurns = 0;
   const badHistories = [];
   const seen = new Set();
 
@@ -160,7 +163,7 @@ function checkRealGames(run) {
   try {
     setLocale("fr");
     for (const { seed, options } of GAMES) {
-      playGame(seed, options, playOut, ({ before, overviewFr, forecastImpact, events, steps, history }) => {
+      playGame(seed, options, playOut, ({ before, overviewFr, forecastImpact, choiceDependent, events, steps, history }) => {
         // L'historique après la résolution : le tour qui vient de se jouer, de son
         // début au début du suivant (ou à la fin de partie), sans indication de touche.
         const { previous } = history;
@@ -196,6 +199,13 @@ function checkRealGames(run) {
           if (!plain(overviewFr).endsWith("Éveils possibles.")) impactMismatches.push(`${seed}/${before.turn} : Éveil sans « Éveils possibles. »`);
           return;
         }
+        // Un choix pendant la résolution (la base de la tigrée) ne se prévoit pas : R
+        // l'a dit, « selon votre choix », et l'Impact ne se compare pas.
+        if (choiceDependent) {
+          choiceDependentTurns += 1;
+          if (!plain(overviewFr).includes("selon votre choix")) impactMismatches.push(`${seed}/${before.turn} : choix sans « selon votre choix »`);
+          return;
+        }
         const impactStep = steps.find((step) => step.events.some((event) => event.type === "impact"));
         const agrees = forecastImpact === impact && plain(overviewFr).includes(`Impact ${impact}.`) && plain(impactStep.text).startsWith(`Impact ${impact}.`);
         if (!agrees) impactMismatches.push(`${seed}/${before.turn} : prévu ${forecastImpact}, annoncé ${impact}`);
@@ -215,6 +225,7 @@ function checkRealGames(run) {
   run.same("séquence : aucune étape muette", [], emptySteps.slice(0, 3));
   run.same("R : l'Impact prévu est l'Impact annoncé à la résolution", [], impactMismatches.slice(0, 3));
   run("R : des Éveils avant l'Impact rencontrés, R les disait possibles", true, awakenedBeforeImpact > 0);
+  run("R : des choix pendant la résolution rencontrés, R les disait", true, choiceDependentTurns > 0);
   run.same("historique : le tour précédent, de son début au début du suivant, sur de vraies parties", [], badHistories.slice(0, 3));
 
   // Passer la séquence ne change rien : même graine et mêmes actions, même journal
@@ -299,8 +310,9 @@ function checkTexts(run) {
       "séquence : dernier tour, ni rotation ni pioche",
       [
         "géante est usée et part à la défausse.",
-        "Final de géante : Pioche 1.",
+        "Final de géante : Pioche 1 et Éjecter toutes les minibilles actives.",
         "Vous piochez agate.",
+        "Aucune bille visée : sans effet.",
         "gorille est usé et part à la défausse.",
         "Impact 13. Score 13.",
         "Partie terminée. Score final : 13.",
@@ -482,7 +494,7 @@ function checkTexts(run) {
     );
     run.same(
       "final, confirmation : avec les valeurs prévues de la bille posée",
-      ["Poser géante en base gauche ?", "Vitesse +6. Final : Pioche 1.", "Chiquenaude de géante : aucun effet", "Pot : aucun effet"],
+      ["Poser géante en base gauche ?", "Vitesse +6. Final : Pioche 1 et Éjecter toutes les minibilles actives, puis porcelaine éjectée.", "Chiquenaude de géante : aucun effet", "Pot : aucun effet"],
       placementLines(finalState, 0, "leftBase", rules, t).map(({ key, params }) => said(t(key, params)))
     );
     run.same(
@@ -536,6 +548,40 @@ function checkTexts(run) {
       ["agate choisie.", "Choix terminé.", "agate est polie : usure 1 sur 3.", "Impact 20. Score 20."],
       [...buildSteps(picked.events, t), ...buildSteps(finished.events, t)].map((step) => said(step.text)).slice(0, 4)
     );
+
+    // Éjecter : chez la bille qui éjecte, avec ce qu'elle chasse et l'Éjection
+    // provoquée ; dans la séquence, l'éjection puis l'Éjection, à leur place.
+    const ejecting = playState({ hand: inHand(["leaded"]), triangle: { ...EMPTY_TRIANGLE, apex: { marble: "magnifier", wear: 0 } } });
+    run(
+      "Éjecter, confirmation : la Chiquenaude de la plombée, la loupe chassée et son Éjection",
+      "Chiquenaude de plombée : Éjecter la bille en pointe, puis loupe éjectée, Éjection : Vitesse +3",
+      said(t(...(({ key, params }) => [key, params])(placementLines(ejecting, 0, "apex", rules, t)[2])))
+    );
+    run(
+      "Éjecter, confirmation : ni Éjection par la pose, ni Tic",
+      "Éjection de loupe : aucun effet ; Tic de plombée : aucun effet",
+      placementLines(ejecting, 0, "apex", rules, t).slice(3, 5).map(({ key, params }) => said(t(key, params))).join(" ; ")
+    );
+    run.same(
+      "Éjecter, pose dite : l'éjection, l'Éjection de la loupe, la pose",
+      ["Chiquenaude de plombée : Éjecter la bille en pointe. Vitesse 0, Masse 1.", "plombée éjecte loupe.", "Éjection de loupe : Vitesse +3. Vitesse 3, Masse 1.", "Pose : plombée en pointe."],
+      buildSteps(rules.reduce(ejecting, { type: "place", handIndex: 0, slot: "apex" }).events, t).map((step) => said(step.text))
+    );
+    // Le Final de la géante pendant la résolution : R le dit chez elle, la séquence à sa place.
+    const giantFinal = playState({ bag: ["clay"], triangle: { leftBase: { marble: "magnifier", wear: 0 }, rightBase: { marble: "clay", wear: 0 }, apex: { marble: "giant", wear: 0 } } });
+    run(
+      "Éjecter, R : le Final de la géante, la loupe chassée et son Éjection",
+      true,
+      said(describeOverview(giantFinal, rules, t)).includes("Final : Pioche 1 et Éjecter toutes les minibilles actives, puis loupe éjectée, Éjection : Vitesse +3.")
+    );
+    run.same(
+      "Éjecter, séquence : après le Final, l'éjection et l'Éjection, avant l'Impact",
+      ["Final de géante : Pioche 1 et Éjecter toutes les minibilles actives.", "Vous piochez argile.", "géante éjecte loupe.", "Éjection de loupe : Vitesse +3. Vitesse 14, Masse 1."],
+      texts(giantFinal).slice(4, 8)
+    );
+    // La base de la tigrée : un choix pendant la résolution, « selon votre choix ».
+    const tigerBase = playState({ triangle: { leftBase: { marble: "tiger", wear: 0 }, rightBase: null, apex: { marble: "clay", wear: 0 } } });
+    run("Éjecter au choix, R : selon votre choix", true, said(describeOverview(tigerBase, rules, t)).includes("base gauche, tigrée : Éjecter une bille active au choix, selon votre choix."));
 
     // Les réactions du pot (En poche, à chaque (occurrence)). Pendant la pose : à leur
     // place chronologique, après l'effet de la bille concernée ; la confirmation les
@@ -667,18 +713,13 @@ function checkTexts(run) {
     );
     const clearing = playState({ hand: inHand(["leaded"]), triangle: { ...EMPTY_TRIANGLE, apex: { marble: "clay", wear: 0 } } });
     run.same(
-      "chiquenaude, confirmation : l'emplacement vidé, Éjection et Tic sans effet",
-      ["Poser plombée en pointe ?", "Vitesse −3", "Chiquenaude de plombée : Fêlure 3 à la pointe", "Éjection d'argile : aucun effet", "Tic de plombée : aucun effet", "Pot : aucun effet"],
+      "chiquenaude, confirmation : l'emplacement vidé par Éjecter, ni Éjection par la pose ni Tic",
+      ["Poser plombée en pointe ?", "Vitesse −3", "Chiquenaude de plombée : Éjecter la bille en pointe, puis argile éjectée", "Éjection d'argile : aucun effet", "Tic de plombée : aucun effet", "Pot : aucun effet"],
       placementLines(clearing, 0, "apex", rules, t).map(({ key, params }) => said(t(key, params)))
     );
     run.same(
-      "chiquenaude, journal dit : la Fêlure, le retrait par usure, la pose",
-      [
-        "Chiquenaude de plombée : Fêlure 3 à la pointe. Vitesse 0, Masse 1.",
-        "argile se fêle : usure 3 sur 3.",
-        "argile est usée et part à la défausse.",
-        "Pose : plombée en pointe.",
-      ],
+      "chiquenaude, journal dit : l'éjection, puis la pose",
+      ["Chiquenaude de plombée : Éjecter la bille en pointe. Vitesse 0, Masse 1.", "plombée éjecte argile.", "Pose : plombée en pointe."],
       buildSteps(rules.reduce(clearing, { type: "place", handIndex: 0, slot: "apex" }).events, t).map((step) => said(step.text))
     );
 
@@ -793,6 +834,16 @@ function checkTexts(run) {
       t(...(({ key, params }) => [key, params])(placementLines(reacting, 0, "apex", rules, t).at(-1)))
     );
     run.same("anglais, réaction : dite", ["Pot, tiger: Speed +2.", "Pot, stoneware: Mass +1."], buildSteps(reactingPlace.events, t).map((step) => step.text).slice(1, 3));
+    run(
+      "anglais, Éjecter : confirmation",
+      "Flick of leaded: Eject the marble at the apex, then magnifier ejected, knockout: Speed +3",
+      t(...(({ key, params }) => [key, params])(placementLines(ejecting, 0, "apex", rules, t)[2]))
+    );
+    run.same(
+      "anglais, Éjecter : dit",
+      ["leaded ejects magnifier.", "Knockout of magnifier: Speed +3. Speed 3, Mass 1."],
+      buildSteps(rules.reduce(ejecting, { type: "place", handIndex: 0, slot: "apex" }).events, t).map((step) => step.text).slice(1, 3)
+    );
     run.same("anglais, Empocher : séquence", ["porcelain is pocketed.", "Pot entry of porcelain: Speed +10. Speed 10, Mass 1."], texts(pocketing).slice(1, 3));
     run.same("anglais, Polissage : séquence", ["porcelain is polished: wear 1 of 2."], texts(saving).filter((text) => text.includes("polished")));
     run(
@@ -825,8 +876,9 @@ function checkTexts(run) {
       "anglais : séquence",
       [
         "giant is worn out and goes to the discard.",
-        "Final of giant: Draw 1.",
+        "Final of giant: Draw 1 and Eject all active peewees.",
         "You draw agate.",
+        "No marble targeted: no effect.",
         "gorilla is worn out and goes to the discard.",
         "Impact 13. Score 13.",
         "Game over. Final score: 13.",

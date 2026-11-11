@@ -56,6 +56,10 @@
   "marbles.effect.conditional": "{effect} if {condition}",
   "marbles.effect.crack": "Crack {amount}",
   "marbles.effect.draw": "Draw {amount}",
+  "marbles.effect.eject_all": "Eject {target}",
+  "marbles.effect.eject_choice": "Eject {target} of your choice",
+  "marbles.effect.eject_self": "Eject this marble",
+  "marbles.effect.eject_slot": "Eject the marble at the {slot}",
   "marbles.effect.given": "{effect} to the {slot}",
   "marbles.effect.given_choice": "{effect} to {target} of your choice",
   "marbles.effect.mass_down": "Mass −{amount}",
@@ -71,6 +75,8 @@
   "marbles.effect.polish": "Polish {amount}",
   "marbles.effect.speed_down": "Speed −{amount}",
   "marbles.effect.speed_up": "Speed +{amount}",
+  "marbles.eject.ejected": "{marble} ejected",
+  "marbles.eject.ejected_effect": "{marble} ejected, knockout: {effect}",
   "marbles.error.alreadyDrawn": "This turn's draw is already done.",
   "marbles.error.choicePending": "A choice is waiting: make it first.",
   "marbles.error.choiceRequired": "This choice is required.",
@@ -101,6 +107,7 @@
   "marbles.event.effect_knockout": "Knockout of {marble}: {effect}. Speed {speed}, Mass {mass}.",
   "marbles.event.effect_pocket_entry": "Pot entry of {marble}: {effect}. Speed {speed}, Mass {mass}.",
   "marbles.event.effect_windfall": "Windfall of {marble}: {effect}. Speed {speed}, Mass {mass}.",
+  "marbles.event.eject": "{source} ejects {marble}.",
   "marbles.event.game_over.outOfMarbles": "Game over: out of marbles. Final score: {score}.",
   "marbles.event.game_over.turnsCompleted": "Game over. Final score: {score}.",
   "marbles.event.impact": "Impact {impact}. Score {score}.",
@@ -111,9 +118,11 @@
   "marbles.event.rotation": "The triangle turns {steps, plural, one {one notch} other {# notches}} {direction, select, clockwise {clockwise} other {counterclockwise}}.",
   "marbles.event.swapped": "Swap: {a} and {b}.",
   "marbles.event.target_empty": "{slot} empty: no effect.",
+  "marbles.event.target_empty_all": "No marble targeted: no effect.",
   "marbles.event.target_empty_choice": "Nothing to choose: no effect.",
   "marbles.event.target_empty_hand": "Hand empty: nothing to pocket.",
   "marbles.event.target_empty_self": "{marble} is gone: nothing to pocket.",
+  "marbles.event.target_empty_self_eject": "{marble} is no longer on the triangle: nothing to eject.",
   "marbles.event.turn_started": "Turn {turn} begins, play your marbles.",
   "marbles.forecast.awakenings": "Possible awakenings.",
   "marbles.forecast.interrupted": "Chain interrupted.",
@@ -122,6 +131,7 @@
   "marbles.forecast.windfall": "Windfall of {marble}: {effect}.",
   "marbles.forecast_choice.after": "{effect}, depending on your choice",
   "marbles.forecast_empty.after": "{effect}, {empty}",
+  "marbles.forecast_empty.all": "no marble targeted",
   "marbles.forecast_empty.choice": "nothing to choose",
   "marbles.forecast_empty.hand": "empty hand",
   "marbles.forecast_empty.self": "{marble} already gone",
@@ -144,6 +154,8 @@
   "marbles.keyword.crack.name": "Crack",
   "marbles.keyword.draw.description": "draws marbles from the bag. If the bag is empty, the discard pile is shuffled to rebuild it.",
   "marbles.keyword.draw.name": "Draw",
+  "marbles.keyword.eject.description": "knocks a marble off the triangle. It goes to the discard pile, and its knockout effect triggers.",
+  "marbles.keyword.eject.name": "Eject",
   "marbles.keyword.final.description": "triggers when the marble is worn out and leaves the triangle. It is already in the discard by then: if its Final pockets it, it moves from the discard to the pot.",
   "marbles.keyword.final.name": "Final",
   "marbles.keyword.flick.description": "triggers when the marble is thrown from the hand, before it reaches the triangle.",
@@ -198,17 +210,20 @@
   "marbles.size.large.name": {
     "base": "boulder",
     "indef": "a boulder",
-    "noun": "boulder"
+    "noun": "boulder",
+    "plural": "boulders"
   },
   "marbles.size.medium.name": {
     "base": "standard",
     "indef": "a standard marble",
-    "noun": "standard marble"
+    "noun": "standard marble",
+    "plural": "standard marbles"
   },
   "marbles.size.small.name": {
     "base": "peewee",
     "indef": "a peewee",
-    "noun": "peewee"
+    "noun": "peewee",
+    "plural": "peewees"
   },
   "marbles.slot.apex": "apex",
   "marbles.slot.empty": "empty",
@@ -256,6 +271,11 @@
   "marbles.tally.drawnMarbles.each": "each marble drawn",
   "marbles.tally.drawnMarbles.name": "marbles drawn",
   "marbles.tally.drawnMarbles.unit": "marble drawn",
+  "marbles.tally.eject.each": "each effect ejection",
+  "marbles.tally.eject.name": "effect ejections",
+  "marbles.tally.eject.unit": "effect ejection",
+  "marbles.tally.ejectQuantity.name": "marbles ejected by effects",
+  "marbles.tally.ejectQuantity.unit": "marble ejected by an effect",
   "marbles.tally.ejectedMarbles.each": "each marble knocked out",
   "marbles.tally.ejectedMarbles.name": "marbles knocked out",
   "marbles.tally.ejectedMarbles.unit": "marble knocked out",
@@ -339,6 +359,8 @@
   "marbles.tally.wornMarbles.each": "each marble worn out",
   "marbles.tally.wornMarbles.name": "marbles worn out",
   "marbles.tally.wornMarbles.unit": "marble worn out",
+  "marbles.target.all": "all active marbles",
+  "marbles.target.all_size": "all active {size:plural}",
   "marbles.zone.hand": "Hand.",
   "marbles.zone.triangle": "Triangle."
 }

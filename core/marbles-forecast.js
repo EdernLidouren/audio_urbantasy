@@ -44,11 +44,14 @@
 //   flick, knockout, hit  l'effet de l'action envisagée (null : pas de tel effet),
 //                  une clé par déclencheur prévu pendant une pose (forecast.line
 //                  "placement" de MARBLE_TRIGGERS). Une Chiquenaude qui vide
-//                  l'emplacement visé n'a ni Éjection ni Tic après elle : null ;
+//                  l'emplacement visé n'a ni Éjection ni Tic après elle : null.
+//                  Une Éjection provoquée par l'action Éjecter n'est pas celle de la
+//                  pose : elle se lit chez l'effet qui éjecte (`ejected`) ;
 //   phases         par emplacement, l'effet de phase de sa bille (null : pas de
 //                  phase, emplacement vide ou bille retirée avant) ;
 //   cleared        par emplacement, la bille retirée AVANT sa phase (une Fêlure qui
-//                  l'amène à son maximum, ou Empocher), ou null : sa phase est sautée ;
+//                  l'amène à son maximum, Empocher ou Éjecter), ou null : sa phase est
+//                  sautée ;
 //   wear           les changements d'usure, dans l'ordre : [{ type, slot, marble,
 //                  wear }] (usure de phase, Polissage, Fêlure) ;
 //   retired        les billes retirées par usure, [{ slot, marble }], dans l'ordre ;
@@ -90,7 +93,10 @@
 // a) : ses actions qui n'ont rien trouvé à leur cible, dans l'ordre, chacune
 // { action, slot, target?, marble? } (l'évènement targetEmpty) : emplacement vide,
 // main vide, bille déjà partie, aucune cible à choisir. `undecided` (seulement s'il y
-// en a) : ses actions au choix restées indécises, chacune { action }. Le moteur le sait aussi sûrement qu'il joue le
+// en a) : ses actions au choix restées indécises, chacune { action }. `ejected`
+// (seulement s'il y en a) : les billes que ses Éjecter ont chassées, dans l'ordre,
+// chacune { marble, slot, knockout } : la bille, son emplacement, et l'effet de son
+// Éjection ainsi provoquée, ou null. Le moteur le sait aussi sûrement qu'il joue le
 // coup ; une cible vidée par une pioche à l'aveugle reste vide pour de bon.
 
 import { MARBLE_POCKET, MARBLE_TRIGGERS } from "../config/marbles-values.js";
@@ -141,9 +147,24 @@ function awakenPossible(state, events, types) {
 //             d'entrée qui suit aussitôt une mise en poche (une interruption : il
 //             vient juste après), un évènement ou null ;
 //   empty   : ses cibles vides (targetEmpty) ;
-//   undecided : ses choix indécis (choiceUndecided).
-// -> Map effet -> { pockets: [{ marble, lost, entry }], empty: [{ action, slot, ... }], undecided: [{ action }] }.
-const RESULT_EVENTS = new Set(["pocketed", "lost", "targetEmpty", "choiceUndecided"]);
+//   undecided : ses choix indécis (choiceUndecided) ;
+//   ejected : les billes que ses Éjecter ont chassées (eject), avec l'effet de leur
+//             Éjection, l'effet `knockout` qui porte `ejectedBy` sur leur emplacement
+//             avant leur départ (une interruption : il vient juste après), ou null.
+// -> Map effet -> { pockets: [{ marble, lost, entry }], empty: [{ action, slot, ... }],
+//    undecided: [{ action }], ejected: [{ marble, slot, knockout }] }.
+const RESULT_EVENTS = new Set(["pocketed", "lost", "targetEmpty", "choiceUndecided", "eject"]);
+
+// L'effet de l'Éjection provoquée par l'évènement `eject` à `index`, ou null : le
+// premier `effect` d'Éjection provoquée sur son emplacement, avant qu'elle ne parte.
+function provokedKnockout(events, index) {
+  const { slot, marble } = events[index];
+  for (const event of events.slice(index + 1)) {
+    if (event.type === "removed" && event.slot === slot) return null;
+    if (event.type === "effect" && event.trigger === "knockout" && event.ejectedBy !== undefined && event.slot === slot && event.marble === marble) return event;
+  }
+  return null;
+}
 
 function resultsByEffect(events) {
   const results = new Map();
@@ -154,8 +175,12 @@ function resultsByEffect(events) {
       .slice(0, index)
       .findLast((other) => other.type === "effect" && other.trigger === by.trigger && other.marble === by.marble && (other.slot ?? null) === by.slot);
     if (source === undefined) return;
-    const found = results.get(source) ?? { pockets: [], empty: [], undecided: [] };
+    const found = results.get(source) ?? { pockets: [], empty: [], undecided: [], ejected: [] };
     results.set(source, found);
+    if (event.type === "eject") {
+      found.ejected.push({ marble: event.marble, slot: event.slot, knockout: provokedKnockout(events, index) });
+      return;
+    }
     if (event.type === "choiceUndecided") {
       found.undecided.push({ action: event.action });
       return;
@@ -186,6 +211,9 @@ function outcomeReader(events) {
       ...(found.pockets.length > 0 && { pockets: found.pockets.map(({ marble, lost, entry }) => ({ marble, lost, entry: entry === null ? null : outcomeOf(entry) })) }),
       ...(found.empty.length > 0 && { empty: found.empty }),
       ...(found.undecided.length > 0 && { undecided: found.undecided }),
+      ...(found.ejected.length > 0 && {
+        ejected: found.ejected.map(({ marble, slot, knockout }) => ({ marble, slot, knockout: knockout === null ? null : outcomeOf(knockout) })),
+      }),
     };
   };
   return outcomeOf;
@@ -200,6 +228,7 @@ function combinedOutcome(outcomes) {
   if (all("pockets").length > 0) combined.pockets = all("pockets");
   if (all("empty").length > 0) combined.empty = all("empty");
   if (all("undecided").length > 0) combined.undecided = all("undecided");
+  if (all("ejected").length > 0) combined.ejected = all("ejected");
   return combined;
 }
 
@@ -234,15 +263,18 @@ function failed(error) {
 
 const WEAR_EVENTS = new Set(["wear", "polished", "cracked"]);
 
-// Par emplacement, la bille retirée par usure AVANT que sa phase ne vienne (sa phase
+const BEFORE_PHASE_CAUSES = new Set(["wear", "pocket", "eject"]);
+
+// Par emplacement, la bille retirée AVANT que sa phase ne vienne (sa phase
 // est alors sautée), ou null.
 function clearedBeforePhase(events) {
   const cleared = Object.fromEntries(SLOTS.map((slot) => [slot, null]));
   const phased = new Set();
   for (const event of events) {
     if (event.type === "phase" || event.type === "phaseSkipped") phased.add(event.slot);
-    // Une usure (une Fêlure) ou une mise en poche (Empocher) avant la phase.
-    if (event.type === "removed" && (event.cause === "wear" || event.cause === "pocket") && !phased.has(event.slot)) cleared[event.slot] = event.marble;
+    // Une usure (une Fêlure), une mise en poche (Empocher) ou une éjection
+    // (Éjecter) avant la phase.
+    if (event.type === "removed" && BEFORE_PHASE_CAUSES.has(event.cause) && !phased.has(event.slot)) cleared[event.slot] = event.marble;
   }
   return cleared;
 }
@@ -254,7 +286,8 @@ function clearedBeforePhase(events) {
 export function readForecast(actionEvents, resolutionEvents, finalState) {
   const all = [...actionEvents, ...resolutionEvents];
   const outcomeOf = outcomeReader(all);
-  const fromAction = (trigger) => actionEvents.find((event) => event.type === "effect" && event.trigger === trigger);
+  // L'effet d'un déclencheur de la pose ; une Éjection provoquée par Éjecter n'en est pas.
+  const fromAction = (trigger) => actionEvents.find((event) => event.type === "effect" && event.trigger === trigger && event.ejectedBy === undefined);
   const phaseOf = (slot) => resolutionEvents.find((event) => event.type === "effect" && event.trigger === "phase" && event.slot === slot);
   const { speed, mass, impact } = resolutionEvents.find((event) => event.type === "impact");
   return {

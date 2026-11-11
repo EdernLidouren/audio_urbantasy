@@ -139,7 +139,7 @@ function eventCounter({ id, events, match = {}, filter }) {
     listenable: true,
     count(event, { types }) {
       if (!events.includes(event.type)) return 0;
-      if (!Object.entries(match).every(([field, value]) => event[field] === value)) return 0;
+      if (!Object.entries(match).every(([field, value]) => (Array.isArray(value) ? value.includes(event[field]) : event[field] === value))) return 0;
       if (filter !== undefined && !EVENT_FILTERS[filter.type].test(filter, event, types)) return 0;
       return 1;
     },
@@ -165,7 +165,11 @@ export function validateEventTallies(tallies, journalEvents) {
     }
     if (tally.match !== undefined) {
       if (tally.match === null || typeof tally.match !== "object" || Array.isArray(tally.match)) fail(`${describe} : match doit être un objet.`);
-      if (Object.values(tally.match).some((value) => value !== null && typeof value === "object")) fail(`${describe} : match n'attend que des valeurs simples.`);
+      // Une valeur simple, ou la liste des valeurs simples admises.
+      const simple = (value) => value === null || typeof value !== "object";
+      if (Object.values(tally.match).some((value) => (Array.isArray(value) ? value.length === 0 || !value.every(simple) : !simple(value)))) {
+        fail(`${describe} : match n'attend que des valeurs simples, ou des listes non vides de valeurs simples.`);
+      }
     }
     if (tally.filter !== undefined) {
       const filter = EVENT_FILTERS[tally.filter?.type];

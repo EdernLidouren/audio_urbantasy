@@ -13,7 +13,7 @@ import { formatCounter } from "../../view/marbles/narration.js";
 import { GAME_RULES } from "./game-rules.js";
 
 const SLOT_NAMES = { leftBase: "base gauche", rightBase: "base droite", apex: "pointe" };
-const CAUSES = { replacement: "remplacement", wear: "usure", pocket: "mise en poche" };
+const CAUSES = { replacement: "remplacement", wear: "usure", pocket: "mise en poche", eject: "éjectée par un effet" };
 // D'où vient une bille mise en poche ou perdue.
 const POCKET_ORIGINS = { triangle: "le triangle", hand: "la main", discard: "la défausse" };
 // Les mots du terminal pour chaque déclencheur, la phase comprise : son nom, son
@@ -149,9 +149,10 @@ const EVENT_LINES = {
   polished: (event, name) => `Polissage : ${marbleLabel(event.marble, name)} en ${slotLabel(event.slot)}, usure ${event.wear} sur ${event.maxWear}.`,
   cracked: (event, name) => `Fêlure : ${marbleLabel(event.marble, name)} en ${slotLabel(event.slot)}, usure ${event.wear} sur ${event.maxWear}.`,
   targetEmpty: (event, name) => {
-    const action = { crack: "Fêlure", polish: "Polissage", pocket: "Empocher" }[event.action] ?? event.action;
+    const action = { crack: "Fêlure", polish: "Polissage", pocket: "Empocher", eject: "Éjecter" }[event.action] ?? event.action;
     if (event.target === "firstInHand") return `${action} sans effet : main vide.`;
     if (event.target === "choice") return `${action} sans effet : aucune cible à choisir.`;
+    if (event.target === "all") return `${action} sans effet : aucune bille visée.`;
     if (event.target === "self") return `${action} sans effet : ${marbleLabel(event.marble, name)} n'est plus là.`;
     return `${action} sans effet : ${slotLabel(event.slot)} vide.`;
   },
@@ -163,6 +164,7 @@ const EVENT_LINES = {
   chosen: (event, name) => `Choisie : ${targetLabel(event, name)}.`,
   choiceEnded: (event) => `Choix fini (${{ count: "nombre atteint", done: "terminé", exhausted: "plus de cible" }[event.reason]}), ${event.chosen} choisie(s).`,
   choiceUndecided: (event) => `Choix indécis (prévision) : ${event.action}.`,
+  eject: (event, name) => `Éjecter : ${marbleLabel(event.by.marble, name)} chasse ${marbleLabel(event.marble, name)} de ${slotLabel(event.slot)}.`,
   chainInterrupted: () => "Enchaînement interrompu : limite de sécurité du bus atteinte (anomalie).",
   final: (event, name) => `Final : ${marbleLabel(event.marble, name)}, usée, partie de ${slotLabel(event.slot)}.`,
   phase: (event, name) => `Phase de ${slotLabel(event.slot)} : ${marbleLabel(event.marble, name)}.`,

@@ -76,7 +76,7 @@ import { pathLength, rollAt, rollDurationMs, rollEnvelope } from "../../view/mar
 import { EMPTY_SOUND_QUEUE, advanceSoundQueue, enqueueCues } from "../../view/marbles/sound-queue.js";
 import { throws } from "../../lib/check.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
-import { answerChoices, emptyBagMarblesGame, inHand, withSizes } from "./helpers.js";
+import { answerChoices, earlierTestTypes, emptyBagMarblesGame, inHand, withSizes } from "./helpers.js";
 import { choiceAnswer, choiceFocusLine, choiceHandOptions, choiceMarbleAt, choiceStartCursor, stepChoiceCursor } from "../../view/marbles/choice.js";
 import { createMarblesRules } from "../marbles-rules.js";
 import { AMOUNT_SOURCES, effectAt } from "../marbles-effects.js";
@@ -86,6 +86,8 @@ const fabricatedRules = (table) => createMarblesRules(withSizes(table));
 
 // Les règles du jeu, liées à la vraie table (core/marbles-rules.js).
 const rules = createMarblesRules(MARBLE_TYPES);
+// Les billes de test d'avant les cibles au choix et Éjecter (core/checks/helpers.js).
+const earlierRules = createMarblesRules(earlierTestTypes(MARBLE_TYPES));
 
 // Un gabarit resté brut (accolade, clé non traduite), ou un nombre négatif écrit
 // avec un trait d'union, qu'un lecteur d'écran peut taire.
@@ -133,13 +135,20 @@ function sampleEvents() {
   // bille de la main choisie.
   const cracked = rules.reduce({ ...emptyBagMarblesGame(rules, 7), turn: 2, stage: "play", hand: inHand(["leaded"]), triangle: { leftBase: null, rightBase: null, apex: { marble: "porcelain", wear: 0 } } }, { type: "place", handIndex: 0, slot: "apex" });
   events.push(...cracked.events);
+  // Une Fêlure : la plombée d'avant Éjecter (core/checks/helpers.js/earlierTestTypes).
+  const crackedBefore = earlierRules.reduce({ ...emptyBagMarblesGame(rules, 7), turn: 2, stage: "play", hand: inHand(["leaded"]), triangle: { leftBase: null, rightBase: null, apex: { marble: "porcelain", wear: 0 } } }, { type: "place", handIndex: 0, slot: "apex" });
+  events.push(...crackedBefore.events);
   // Le Tic du gorille fait choisir la bille de la main : l'argile, perdue.
   const lost = answerChoices(rules, rules.reduce({ ...emptyBagMarblesGame(rules, 7), turn: 2, stage: "play", hand: inHand(["gorilla", "clay"]), pot: ["glass", "glass", "glass"], triangle: { leftBase: null, rightBase: null, apex: { marble: "clay", wear: 0 } } }, { type: "place", handIndex: 0, slot: "apex" }));
   events.push(...lost.events);
   const polished = rules.reduce({ ...emptyBagMarblesGame(rules, 8), turn: 2, stage: "play", bag: ["clay"], triangle: { leftBase: null, rightBase: null, apex: { marble: "mica", wear: 1 } } }, { type: "resolve" });
   events.push(...polished.events);
   // Sac vide, défausse pleine : la défausse devient le sac.
-  const regenerated = rules.reduce({ ...emptyBagMarblesGame(rules, 5), turn: 2, stage: "draw", hand: inHand([]), discard: ["clay", "glass"] }, { type: "draw" });
+  // La tigrée active y trouve (Trouvaille).
+  const regenerated = rules.reduce(
+    { ...emptyBagMarblesGame(rules, 5), turn: 2, stage: "draw", hand: inHand([]), discard: ["clay", "glass"], triangle: { leftBase: null, rightBase: null, apex: { marble: "tiger", wear: 0 } } },
+    { type: "draw" }
+  );
   events.push(...regenerated.events);
   // Sac et défausse vides : la pioche s'arrête, la partie finit.
   const end = rules.reduce({ ...emptyBagMarblesGame(rules, 2), turn: 2, stage: "draw", hand: inHand(["clay"]) }, { type: "draw" });
@@ -252,7 +261,9 @@ function checkCards(run) {
     const flickLine = (turnsInHand) => plain(marbleCard("clay", "principal", rules, t, { turnsInHand }).below[0]);
     run("fiche : montant calculé en main, valeur actuelle", "Chiquenaude : Vitesse +1 par tour en main, maximum +5, actuellement +2.", flickLine(2));
     run("fiche : montant calculé en main, plafonné", "Chiquenaude : Vitesse +1 par tour en main, maximum +5, actuellement +5.", flickLine(8));
-    run("fiche : la Fêlure ciblée de la plombée", "Chiquenaude : Fêlure 3 à la pointe.", fields("leaded").below[0]);
+    run("fiche : Éjecter la bille en pointe, la plombée", "Chiquenaude : Éjecter la bille en pointe.", fields("leaded").below[0]);
+    run("fiche : Éjecter toutes les minibilles actives, la géante", "Final : Pioche 1 et Éjecter toutes les minibilles actives.", fields("giant").below.at(-1));
+    run("fiche : Éjecter une bille active au choix, la tigrée", "Base : Éjecter une bille active au choix.", fields("tiger").above[1]);
     // Une valeur de partie : la valeur actuelle se lit dans le registre de la partie,
     // où que soit la bille ; hors de toute partie, à zéro.
     const withTally = (marble, values) => marbleCard(marble, "principal", rules, t, { tally: { ...emptyTally(TALLY_COUNTERS), ...values } });
@@ -302,7 +313,7 @@ function checkCards(run) {
       computedCard({ base: -2, step: 1, source, max: 1 }, "mass", 0)
     );
     run("fiche : montant calculé d'une Pioche", "Chiquenaude : Pioche 1 par tour en main, maximum 3, actuellement 3.", computedCard({ base: 0, step: 1, source, max: 3 }, "draw", 4));
-    run.same("fiche : l'Éveil en premier, puis le Final de la géante", ["Éveil : Polissage 1 à la pointe.", "Final : Pioche 1."], fields("giant").below);
+    run.same("fiche : l'Éveil en premier, puis le Final de la géante", ["Éveil : Polissage 1 à la pointe.", "Final : Pioche 1 et Éjecter toutes les minibilles actives."], fields("giant").below);
     run.same(
       "fiche : tic, éjection, final, dans cet ordre",
       ["Tic : Vitesse +1.", "Éjection : Masse +2.", "Final : Pioche 1."],
@@ -328,6 +339,8 @@ function checkCards(run) {
       fields("mica").below
     );
     run("fiche, anglais : la réaction de la tigrée", "Pocketed, each flick: Speed +2.", fields("tiger").below.at(-1));
+    run("fiche, anglais : Éjecter toutes les minibilles actives", "Final: Draw 1 and Eject all active peewees.", fields("giant").below.at(-1));
+    run("fiche, anglais : Éjecter la bille en pointe", "Flick: Eject the marble at the apex.", fields("leaded").below[0]);
     run("fiche, anglais : comptage par calibre", "Base: Speed +1 per active peewee.", fields("stoneware").above[1]);
     run("fiche, anglais : calibre d'un emplacement", "Apex: Mass +1 and Mass +2 if the left base is a boulder.", fields("agate").above[0]);
     run("anglais : bille en liste, calibre après le nom", "gorilla, boulder, wear 3. 1 of 2", describeMarbleInList("gorilla", 0, 2, rules, t));
@@ -436,7 +449,7 @@ function checkTallyMenu(run) {
 function checkKeywords(run) {
   const locale = getLocale();
   const ids = (marble, marbles = rules) => marbles.keywordsOf(marble).map((keyword) => keyword.id);
-  run.same("mots-clés : la géante, déclencheurs, actions, puis pointe et base", ["awaken", "final", "draw", "polish", "apex", "base"], ids("giant"));
+  run.same("mots-clés : la géante, déclencheurs, actions, puis pointe et base", ["awaken", "final", "draw", "polish", "eject", "apex", "base"], ids("giant"));
   run.same("mots-clés : le mica, la Pioche une seule fois (base, éveil, éjection) ; En poche par sa réaction", ["awaken", "knockout", "pocketed", "draw", "polish", "apex", "base"], ids("mica"));
   run.same("mots-clés : le sulfure, En poche avant les actions, Fêlure puis Empocher", ["windfall", "pocketed", "crack", "pocket", "apex", "base"], ids("sulphide"));
   run.same("mots-clés : la porcelaine, En poche par son seul effet d'entrée, Polissage par son Final", ["flick", "final", "pocketed", "polish", "apex", "base"], ids("porcelain"));
@@ -446,7 +459,7 @@ function checkKeywords(run) {
   run.same("mots-clés : une bille sans effet n'en a aucun", [], ids("bare", made));
   run.same(
     "mots-clés : l'ordre de la liste, déclencheurs, En poche, actions, puis phases",
-    ["awaken", "flick", "hit", "windfall", "knockout", "final", "pocketed", "draw", "polish", "crack", "pocket", "apex", "base"],
+    ["awaken", "flick", "hit", "windfall", "knockout", "final", "pocketed", "draw", "polish", "crack", "pocket", "eject", "apex", "base"],
     MARBLE_KEYWORDS.map((keyword) => keyword.id)
   );
 
@@ -457,6 +470,7 @@ function checkKeywords(run) {
       "Trouvaille : se déclenche quand le sac est reconstitué à partir de la défausse, si la bille est sur le triangle. " +
       "Final : se déclenche quand la bille est usée et quitte le triangle. Elle est alors déjà dans la défausse : si son Final l'empoche, elle passe de la défausse au pot. " +
       "En poche : effets actifs uniquement lorsque la bille est dans le pot. " +
+      "Éjecter : chasse une bille du triangle. Elle part à la défausse, et son effet d'éjection se déclenche. " +
       "Pointe : effet joué pendant la phase de pointe, quand la bille est posée en pointe. " +
       "Base : effet joué pendant la phase de base, quand la bille est posée en base gauche ou en base droite. Il peut différer selon le côté.",
     plain(keywordsText("tiger", rules, t))
@@ -476,7 +490,7 @@ function checkKeywords(run) {
   run("Maj+E : titre", "Mots-clés de géante", plain(t(menu.title, menu.titleParams)));
   run.same(
     "Maj+E : une entrée par mot-clé, puis Fermer",
-    ["Éveil", "Final", "Pioche", "Polissage", "Pointe", "Base", "Fermer"],
+    ["Éveil", "Final", "Pioche", "Polissage", "Éjecter", "Pointe", "Base", "Fermer"],
     lines(menu).map((line) => line.split(" : ")[0])
   );
   run("Maj+E : la description de la Pioche", "Pioche : pioche des billes du sac. Si le sac est vide, la défausse est mélangée pour le reconstituer.", lines(menu)[2]);
@@ -1158,7 +1172,7 @@ export default function checkMarblesView(run) {
     );
     run.same(
       "confirmation : aucun effet dit, même structure ; un Polissage au choix chez qui le produit, selon votre choix",
-      ["Poser verre en base gauche ?", "Masse +1", "Chiquenaude de verre : aucun effet", "Éjection de loupe : aucun effet", "Tic de verre : Polissage 1 à une bille active au choix, selon votre choix", "Pot : aucun effet"],
+      ["Poser verre en base gauche ?", "Masse +1", "Chiquenaude de verre : aucun effet", "Éjection de loupe : Vitesse +3", "Tic de verre : Polissage 1 à une bille active au choix, selon votre choix", "Pot : aucun effet"],
       menuLines(2, "leftBase")
     );
     // Les valeurs prévues au format de R : ce que la loupe donne s'entend chez le

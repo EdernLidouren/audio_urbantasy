@@ -119,8 +119,22 @@ const NAME_SLOTS = [
     param: "marble",
     names: () => Object.keys(MARBLE_TYPES).map((id) => `marble.${id}.name`),
   })),
-  // view/marbles/narration.js : le calibre d'une condition ou d'une source de montant.
-  ...["marbles.condition.sizeAt", "marbles.effect.per_active_size"].map((template) => ({
+  // view/marbles/narration.js : la bille qui éjecte et celle qu'elle chasse (Éjecter),
+  // la bille chassée prévue, la bille choisie.
+  ...[
+    ["marbles.event.eject", "source"],
+    ["marbles.event.eject", "marble"],
+    ["marbles.eject.ejected", "marble"],
+    ["marbles.eject.ejected_effect", "marble"],
+    ["marbles.choice.chosen", "marble"],
+  ].map(([template, param]) => ({
+    template,
+    param,
+    names: () => Object.keys(MARBLE_TYPES).map((id) => `marble.${id}.name`),
+  })),
+  // view/marbles/narration.js : le calibre d'une condition, d'une source de montant ou
+  // d'un filtre de cible.
+  ...["marbles.condition.sizeAt", "marbles.effect.per_active_size", "marbles.target.all_size"].map((template) => ({
     template,
     param: "size",
     names: () => Object.values(MARBLE_SIZES).map((id) => `marbles.size.${id}.name`),

@@ -7,7 +7,7 @@ import { nameRef } from "../../data/i18n/index.js";
 import { MARBLE_POCKET, MARBLE_SIZES, MARBLE_TRIGGERS } from "../../config/marbles-values.js";
 import { SLOTS, TALLY_COUNTERS, throwsLeft } from "../../core/marbles.js";
 import { emptyTally } from "../../core/marbles-tally.js";
-import { AMOUNT_SOURCES, CHOICE_ZONES, CLAUSE_ACTIONS, CONDITIONS, FIRST_IN_HAND, amountOf, isChoice } from "../../core/marbles-effects.js";
+import { AMOUNT_SOURCES, CHOICE_ZONES, CLAUSE_ACTIONS, CONDITIONS, FIRST_IN_HAND, TARGET_FILTERS, amountOf, isAll, isChoice } from "../../core/marbles-effects.js";
 import { forecast } from "../../core/marbles-forecast.js";
 import { formatMenuPosition } from "../../lib/menu.js";
 
@@ -54,7 +54,32 @@ const ACTION_TEXTS = {
     up: "marbles.effect.pocket_self",
     targets: { slot: "marbles.effect.pocket_slot", [FIRST_IN_HAND]: "marbles.effect.pocket_hand", choice: "marbles.effect.pocket_choice" },
   },
+  // Sans montant, comme Empocher ; « toutes » (`all`) reçoit {target}.
+  eject: {
+    up: "marbles.effect.eject_self",
+    targets: { slot: "marbles.effect.eject_slot", choice: "marbles.effect.eject_choice", all: "marbles.effect.eject_all" },
+  },
 };
+
+// Le texte de chaque filtre d'une cible « toutes » (core/marbles-effects.js/
+// TARGET_FILTERS) : la cible entière qu'il qualifie, { key, params }. « toutes les
+// minibilles actives ». Un filtre sans texte échoue au chargement.
+const FILTER_TEXTS = {
+  size: (filter) => ({ key: "marbles.target.all_size", params: { size: sizeRef(filter.size) } }),
+};
+for (const type of Object.keys(TARGET_FILTERS)) {
+  if (!Object.hasOwn(FILTER_TEXTS, type)) throw new Error(`marbles : le filtre de cible "${type}" doit avoir son texte (FILTER_TEXTS).`);
+}
+
+// Ce que dit une cible « toutes » : « toutes les billes actives », ou, filtrée, le
+// texte de son filtre (un seul type de filtre existe aujourd'hui : deux filtres
+// demanderont une phrase qui les combine).
+function allTarget(target, t) {
+  const [filter] = target.filters ?? [];
+  if (filter === undefined) return t("marbles.target.all");
+  const { key, params } = FILTER_TEXTS[filter.type](filter);
+  return t(key, params);
+}
 
 // Ce que dit une CIBLE AU CHOIX (core/marbles-effects.js, en-tête) : « une bille
 // active », « 2 billes de votre main », « jusqu'à 2 billes actives ». `count` : le
@@ -97,6 +122,7 @@ function actionText(action, amount, target, t) {
   if (targets !== undefined) {
     if (target === undefined) return t(up);
     if (isChoice(target)) return t(targets.choice, { target: choiceTarget(target, t) });
+    if (isAll(target)) return t(targets.all, { target: allTarget(target, t) });
     return target === FIRST_IN_HAND ? t(targets[FIRST_IN_HAND]) : t(targets.slot, { slot: slotName(target, t) });
   }
   const text = t(up, { amount });
@@ -144,6 +170,7 @@ function pocketPart({ marble, lost, entry }, t) {
 function emptyPart({ slot, target, marble }, t) {
   if (target === FIRST_IN_HAND) return t("marbles.forecast_empty.hand");
   if (target === "choice") return t("marbles.forecast_empty.choice");
+  if (target === "all") return t("marbles.forecast_empty.all");
   if (target === "self") return t("marbles.forecast_empty.self", { marble: nameRef(`marble.${marble}.name`) });
   return t("marbles.forecast_empty.slot", { slot: slotName(slot, t) });
 }
@@ -158,8 +185,19 @@ function withResults(text, effect, t) {
   const withEmptyOnly = empty.length === 0 ? text : t("marbles.forecast_empty.after", { effect: text, empty: t("marbles.effect.combined", { parts: empty.map((target) => emptyPart(target, t)) }) });
   // La prévision ne devine pas le choix du joueur : elle le dit, une fois par effet.
   const withEmpty = (effect.undecided?.length ?? 0) === 0 ? withEmptyOnly : t("marbles.forecast_choice.after", { effect: withEmptyOnly });
-  if (!effect.pockets?.length) return withEmpty;
-  return t("marbles.pocket.then", { effect: withEmpty, pockets: t("marbles.effect.combined", { parts: effect.pockets.map((moved) => pocketPart(moved, t)) }) });
+  // Ce que l'effet a chassé (Éjecter), puis ce qu'il a empoché.
+  const parts = [...(effect.ejected ?? []).map((ejected) => ejectedPart(ejected, t)), ...(effect.pockets ?? []).map((moved) => pocketPart(moved, t))];
+  if (parts.length === 0) return withEmpty;
+  return t("marbles.pocket.then", { effect: withEmpty, pockets: t("marbles.effect.combined", { parts }) });
+}
+
+// Une bille qu'un Éjecter PRÉVU a chassée (core/marbles-forecast.js, `ejected`), dite
+// chez la bille qui l'a produit, avec l'effet de son Éjection : « argile éjectée »,
+// « loupe éjectée, Éjection : Vitesse +3 ».
+function ejectedPart({ marble, knockout }, t) {
+  const ref = nameRef(`marble.${marble}.name`);
+  if (knockout === null) return t("marbles.eject.ejected", { marble: ref });
+  return t("marbles.eject.ejected_effect", { marble: ref, effect: effectSummary(knockout, t) });
 }
 
 // Un effet prévu, d'une phrase : ses valeurs et ses actions, puis ses résultats.
@@ -547,11 +585,14 @@ const SILENT = () => null;
 // phase, la fin de tour suit la rotation, l'évènement d'un déclencheur de la bille
 // piochée (l'Éveil) suit sa pioche, sans couper la liste des pioches consécutives
 // (son effet, s'il en a un, ouvre sa propre étape et la coupe).
+// Une bille chassée par Éjecter : son retrait et son départ à la défausse suivent
+// l'annonce de son Éjection (ou de l'éjection), sans se dire.
 const TRAILING = new Set([
   "wear",
   "turnEnded",
   ...MARBLE_TRIGGERS.filter((trigger) => trigger.marble === "drawn").map((trigger) => trigger.event),
 ]);
+const isTrailing = (event) => TRAILING.has(event.type) || ((event.type === "removed" || event.type === "discarded") && event.cause === "eject");
 
 // Le texte de chaque type d'évènement, ou null s'il ne se dit pas. `context` :
 // { gameEndsBeforeNextTurn(index) }, pour la rotation.
@@ -576,6 +617,8 @@ const EVENT_TEXTS = {
   targetEmpty: (event, t) => {
     if (event.target === FIRST_IN_HAND) return t("marbles.event.target_empty_hand");
     if (event.target === "choice") return t("marbles.event.target_empty_choice");
+    if (event.target === "all") return t("marbles.event.target_empty_all");
+    if (event.target === "self" && event.action === "eject") return t("marbles.event.target_empty_self_eject", { marble: nameRef(`marble.${event.marble}.name`) });
     if (event.target === "self") return t("marbles.event.target_empty_self", { marble: nameRef(`marble.${event.marble}.name`) });
     return t("marbles.event.target_empty", { slot: slotName(event.slot, t) });
   },
@@ -599,7 +642,11 @@ const EVENT_TEXTS = {
       : t("marbles.choice.chosen", { marble: nameRef(`marble.${event.marble}.name`) }),
   choiceEnded: (event, t) => (event.reason === "count" ? null : t(`marbles.choice.ended.${event.reason}`)),
   choiceUndecided: SILENT,
-  discarded: (event, t) => t(`marbles.event.discarded.${event.cause}`, { marble: nameRef(`marble.${event.marble}.name`) }),
+  // Une bille chassée par Éjecter : déjà dite par l'éjection (isTrailing).
+  discarded: (event, t) => (event.cause === "eject" ? null : t(`marbles.event.discarded.${event.cause}`, { marble: nameRef(`marble.${event.marble}.name`) })),
+  // Éjecter : la bille qui éjecte, et celle qu'elle chasse ; son Éjection se dit
+  // ensuite par son effet.
+  eject: (event, t) => t("marbles.event.eject", { source: nameRef(`marble.${event.by.marble}.name`), marble: nameRef(`marble.${event.marble}.name`) }),
   placed: (event, t) => t("marbles.event.placed", { marble: marbleName(event.marble, t), slot: slotName(event.slot, t) }),
   phaseSkipped: (event, t) => outcomeLine(event.slot, null, t),
   effect: effectText,
@@ -680,7 +727,7 @@ export function buildSteps(events, t) {
       }
       return;
     }
-    if (TRAILING.has(event.type) && last !== undefined && waiting.length === 0) {
+    if (isTrailing(event) && last !== undefined && waiting.length === 0) {
       last.events.push(event);
       return;
     }

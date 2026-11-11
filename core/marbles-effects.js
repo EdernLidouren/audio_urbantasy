@@ -26,6 +26,11 @@
 // à cet instant (core/marbles.js/chooseTargets) ; l'action s'applique ensuite à
 // chacune, dans l'ordre des choix.
 //
+// CIBLE « TOUTES » : `target` vaut { type: "all", filters? } : toutes les billes
+// actives, au déclenchement, dans l'ordre des phases, qui passent TOUS les filtres
+// (TARGET_FILTERS : aujourd'hui le calibre, { type: "size", size }). Seules les
+// actions qui déclarent `all` l'acceptent (Éjecter).
+//
 // LA SITUATION d'un effet, ce que ses conditions et ses montants calculés lisent au
 // déclenchement : { triangle, holder, replacement, tally } ;
 //   triangle     le triangle à cet instant ;
@@ -169,6 +174,31 @@ export function isChoice(target) {
   return target !== null && typeof target === "object" && target.type === "choice";
 }
 
+// Une cible est-elle « toutes les billes actives » ?
+export function isAll(target) {
+  return target !== null && typeof target === "object" && target.type === "all";
+}
+
+// Les FILTRES d'une cible « toutes » (en-tête), déclarés ici et nulle part ailleurs,
+// sur le modèle des conditions : `fields`, `validate`, et `test(filter, marble,
+// types)`, la bille passe-t-elle le filtre. Ajouter un filtre (la matière…) : une
+// entrée ici et son texte dans la vue (view/marbles/narration.js/FILTER_TEXTS).
+export const TARGET_FILTERS = {
+  // La bille est de calibre `size` (config/marbles-values.js : SMALL, MEDIUM, LARGE).
+  size: {
+    fields: ["type", "size"],
+    validate(filter, describe, fail) {
+      validateSize(filter.size, describe, fail);
+    },
+    test: (filter, marble, types) => types[marble].size === filter.size,
+  },
+};
+
+// Une bille passe-t-elle tous ces filtres (aucun : oui) ?
+export function passesFilters(marble, filters = [], types) {
+  return filters.every((filter) => TARGET_FILTERS[filter.type].test(filter, marble, types));
+}
+
 // Ajoute le montant de la clause à la valeur de son action.
 function addAmount(values, clause) {
   return { ...values, [clause.action]: values[clause.action] + clause.amount };
@@ -191,6 +221,10 @@ function addAmount(values, clause) {
 //   choice    (facultatif) la cible peut être un CHOIX du joueur (en-tête) : `zones`,
 //             celles où il a un sens ; `picks`, ce qui s'y vise ("marble" : une
 //             bille active ; "slot" : un emplacement, vide compris) ;
+//   all       (facultatif) la cible peut être « toutes les billes actives »,
+//             filtrées (en-tête) ;
+//   ejects    (sur une bille) au lieu de changer son usure, elle la CHASSE du
+//             triangle : Éjecter (core/marbles.js/ejectFromSlot) ;
 //   selfOutside (sur une bille) les moments où elle ne peut viser la bille
 //             elle-même, la bille concernée n'étant pas sur le triangle : la valeur
 //             `marble` du déclencheur, et pourquoi (targetProblem) ;
@@ -206,6 +240,15 @@ function addAmount(values, clause) {
 
 // Où une action sur l'usure ne peut viser la bille elle-même : partout où elle n'est
 // pas sur le triangle.
+// Où Éjecter ne peut viser la bille elle-même : partout où elle n'est pas sur le
+// triangle.
+const EJECT_SELF_OUTSIDE = {
+  removed: "une bille ne peut s'éjecter elle-même dans son Final : elle a déjà quitté le triangle",
+  thrown: "une bille ne peut s'éjecter elle-même dans sa Chiquenaude : elle est en cours de lancer",
+  drawn: "une bille ne peut s'éjecter elle-même à son Éveil : elle est en main",
+  pot: "une bille du pot ne peut s'éjecter elle-même : elle n'est pas sur le triangle",
+};
+
 const WEAR_SELF_OUTSIDE = {
   removed: "une action sur la bille elle-même n'a plus de bille : elle a quitté le triangle",
   thrown: "une action sur la bille elle-même n'a pas encore de bille : elle est en cours de lancer",
@@ -289,6 +332,30 @@ export const CLAUSE_ACTIONS = {
       texts: { name: "marbles.keyword.pocket.name", description: "marbles.keyword.pocket.description" },
       triggers: (event) => (event.type === "pocketed" || event.type === "lost" || (event.type === "targetEmpty" && event.action === "pocket") ? 1 : 0),
       quantity: (event) => (event.type === "pocketed" || event.type === "lost" ? 1 : 0),
+    },
+  },
+  // Éjecter : CHASSE une bille active du triangle par un effet, sans pose, sans
+  // montant. Cible : la bille elle-même (sur le triangle seulement) ; un
+  // emplacement ; des billes actives au choix ; toutes les billes actives, filtrées.
+  // Pour chaque bille : son Éjection (la référence de ses conditions de calibre : la
+  // bille qui éjecte), puis elle quitte son emplacement et rejoint la défausse. Ni
+  // Tic (rien n'arrive), ni Final (ce n'est pas une usure). Cible vide : sans
+  // effet, noté. Mot-clé : un déclenchement par bille visée, cible vide comprise ; sa
+  // quantité réelle, les billes réellement chassées (`removed`, cause "eject").
+  eject: {
+    kind: "marble",
+    fields: ["action", "target", "when"],
+    validate() {},
+    amountless: true,
+    targets: SLOTS,
+    ejects: true,
+    choice: { zones: ["triangle"], picks: ["marble"] },
+    all: true,
+    selfOutside: EJECT_SELF_OUTSIDE,
+    keyword: {
+      texts: { name: "marbles.keyword.eject.name", description: "marbles.keyword.eject.description" },
+      triggers: (event) => (event.type === "eject" || (event.type === "targetEmpty" && event.action === "eject") ? 1 : 0),
+      quantity: (event) => (event.type === "removed" && event.cause === "eject" ? 1 : 0),
     },
   },
 };
@@ -518,6 +585,23 @@ function validateChoice(clause, action, describe, fail) {
   if (choice.upTo !== undefined && typeof choice.upTo !== "boolean") fail(`${where} : upTo vaut true, false ou est absent.`);
 }
 
+// Une cible « toutes » (en-tête) : ses champs, ses filtres, chacun valide et d'un type
+// au plus (deux calibres à la fois ne viseraient rien).
+function validateAll(clause, action, describe, fail) {
+  const all = clause.target;
+  const where = `${describe}, cible « toutes »`;
+  rejectUnknownFields(all, ["type", "filters"], where, fail);
+  if (action.all !== true) fail(`${where} : ${clause.action} ne vise pas toutes les billes.`);
+  if (all.filters === undefined) return;
+  if (!Array.isArray(all.filters)) fail(`${where} : filters doit être une liste.`);
+  const seen = new Set();
+  for (const filter of all.filters) {
+    validateRule(filter, TARGET_FILTERS, "filtre", where, fail);
+    if (seen.has(filter.type)) fail(`${where} : filtre "${filter.type}" en double.`);
+    seen.add(filter.type);
+  }
+}
+
 // Échoue au chargement sur un effet mal formé. Un effet absent se vérifie en
 // amont : ici, il existe. `context` : le moment où il joue (voir targetProblem),
 // {} pour ne pas vérifier les cibles ; `tallies`, les identifiants des valeurs de
@@ -530,6 +614,7 @@ export function validateEffect(effect, describe, fail, context = {}) {
     rejectUnknownFields(clause, action.fields, describe, fail);
     action.validate(clause, describe, fail, context);
     if (isChoice(clause.target)) validateChoice(clause, action, describe, fail);
+    else if (isAll(clause.target)) validateAll(clause, action, describe, fail);
     else if (clause.target !== undefined && !(action.targets ?? SLOTS).includes(clause.target)) fail(`${describe} : cible inconnue "${clause.target}".`);
     const problem = targetProblem(clause, context);
     if (problem !== null) fail(`${describe} : ${problem}.`);

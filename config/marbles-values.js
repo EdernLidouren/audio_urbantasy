@@ -404,8 +404,8 @@ export const MARBLE_TRIGGERS = [
 //           éjectée ») ;
 //   events  les types d'évènements du journal qui l'augmentent de 1
 //           (core/marbles.js/JOURNAL_EVENTS) ;
-//   match   (facultatif) des champs de l'évènement et leur valeur exigée :
-//           { cause: "wear" } ;
+//   match   (facultatif) des champs de l'évènement et leur valeur exigée, ou la
+//           liste des valeurs admises : { cause: "wear" }, { cause: ["a", "b"] } ;
 //   filter  (facultatif) { type: "size", size } : la bille que nomme l'évènement
 //           est de ce calibre (un évènement qui nomme toujours une bille connue,
 //           jamais la pioche, dont la bille est cachée dans la prévision).
@@ -418,8 +418,9 @@ export const MARBLE_TALLIES = [
   // Chaque bille posée sur un emplacement occupé (après sa Chiquenaude : si elle a
   // vidé l'emplacement, la pose est simple).
   { id: "hitMarbles", events: ["hit"] },
-  // Chaque bille retirée du triangle par un remplacement.
-  { id: "ejectedMarbles", events: ["removed"], match: { cause: "replacement" } },
+  // Chaque bille chassée du triangle : par un remplacement (une pose), ou par
+  // l'action Éjecter.
+  { id: "ejectedMarbles", events: ["removed"], match: { cause: ["replacement", "eject"] } },
   // Chaque régénération du sac depuis la défausse.
   { id: "shuffles", events: ["bagRegenerated"] },
   // Chaque bille piochée, pioche du tour comme effets.

@@ -330,13 +330,16 @@ Un effet est une liste de clauses (`core/marbles-effects.js`) :
     retirer les billes à l'étape des retraits ;
   - `pocket`, **Empocher**, sans montant : envoie au pot la bille elle-même, celle d'un
     emplacement ou la première de la main (voir « Le pot ») ;
+  - `eject`, **Éjecter**, sans montant : chasse une ou plusieurs billes actives du
+    triangle, sans pose (voir « Éjecter ») ;
 - **cible** (`target`, facultative, pour les actions qui l'acceptent) : un emplacement.
   Pour une Vitesse ou une Masse, sans cible, la clause agit sur le compteur du tour ou
   s'ajoute à l'effet de la bille ; avec une cible, elle donne un **bonus** à la bille de
   cet emplacement. Pour un Polissage ou une Fêlure, sans cible, la bille elle-même ; avec
   une cible, la bille de cet emplacement (un emplacement vide : sans effet, noté au
   journal, `targetEmpty`). La cible peut aussi être un **choix du joueur** (voir « Cibles
-  au choix ») : `choice({ zones: ["triangle"], count: 2, upTo: true })` ;
+  au choix ») : `choice({ zones: ["triangle"], count: 2, upTo: true })` ; ou, pour
+  Éjecter, **toutes les billes actives**, filtrées : `allActive(sizeIs(SMALL))` ;
 - **condition** (`when`, facultative) : évaluée au déclenchement ; fausse, la clause ne
   produit rien.
 
@@ -466,7 +469,65 @@ après l'annonce de l'effet. Une condition : une entrée dans `CONDITIONS` et so
 `CONDITION_TEXTS` ; une condition sans texte fait échouer le chargement. Une source de
 montant : voir « Montants calculés ». Un nom de calibre glissé
 dans un texte passe par `nameRef`, avec ses formes françaises et anglaises `indef` (« un
-calot ») et `noun` (« bille normale »).
+calot »), `noun` (« bille normale ») et `plural` (« minibilles », pour « toutes les
+minibilles actives » ; une forme déclarée dans `data/i18n/grammar.json`).
+
+### Éjecter
+
+**Éjecter** (`eject`, mot-clé d'action, `core/marbles-effects.js`/`CLAUSE_ACTIONS`) chasse
+une ou plusieurs billes actives du triangle par un effet, sans pose. Sa cible :
+
+- aucune : **la bille elle-même**, seulement si elle est sur le triangle (refusé à la
+  validation dans une Chiquenaude, un Final, un Éveil et en poche ; à l'exécution, une
+  bille déjà partie : sans effet, noté) ;
+- un **emplacement** : sa bille ;
+- des billes actives **au choix** (`choice({ zones: ["triangle"], count })`, voir
+  « Cibles au choix ») : dans l'ordre de sélection ;
+- **toutes les billes actives** (`allActive(...filtres)`), la bille elle-même comprise si
+  elle y est : relevées au déclenchement, chassées dans l'ordre des phases ; une bille
+  déjà partie entre-temps n'est plus visée.
+
+**Les filtres de cible**, déclarés une fois (`TARGET_FILTERS`, sur le modèle des
+conditions : champs, validation, test) : une cible « toutes » porte `filters`, une liste ;
+une bille doit les passer TOUS ; un même type de filtre une seule fois. Aujourd'hui, le
+calibre seul : `{ type: "size", size }` (forme courte `sizeIs(SMALL)`). Ajouter un filtre
+(la matière…) : une entrée dans `TARGET_FILTERS` et son texte dans
+`view/marbles/narration.js`/`FILTER_TEXTS` (un filtre sans texte fait échouer le
+chargement). Les textes ne combinent pas encore deux filtres : le jour où un second type
+existera, sa phrase combinée s'écrira avec lui.
+
+**Déroulé**, pour chaque bille chassée (`core/marbles.js`/`ejectFromSlot`) :
+
+1. `eject` (« plombée éjecte loupe. ») ;
+2. son **Éjection** (`knockout`), une interruption réglée jusqu'au bout avant la suite
+   (« Éjection de loupe : Vitesse +3. … ») ; ses conditions de calibre relatif ont pour
+   référence la bille qui éjecte (`replacement.placed`), où qu'elle soit ;
+3. elle quitte son emplacement (`removed`) et rejoint la défausse (`discarded`), cause
+   `"eject"` ; ces deux-là ne se disent pas, ils suivent l'annonce précédente, avec le
+   roulement vers la défausse d'une bille usée.
+
+Ni Tic (rien n'arrive), ni Final (ce n'est pas une usure). Pendant la résolution, une bille
+chassée avant sa phase la saute. Son Éjection a pu la retirer déjà (une Fêlure sur
+elle-même) : elle ne part pas une seconde fois. Une bille dont l'Éjection est en cours
+(une pose, ou Éjecter) n'est pas chassée une seconde fois par cette Éjection
+(`run.knockingOut`) : sans effet, noté, plutôt qu'une boucle. Cible vide ou aucune bille
+visée : sans effet, noté (`targetEmpty`, « Aucune bille visée : sans effet. »).
+
+**Compteurs** : billes éjectées (`ejectedMarbles`, causes `"replacement"` et `"eject"`) et
+sorties du triangle ; Éjection (`knockout`) seulement si la bille chassée a un effet
+d'Éjection ; Éjecter (`eject`, un par bille visée, cible vide comprise) et sa quantité
+réelle (`ejectQuantity`, les billes réellement chassées). Les réactions du pot « à chaque
+bille éjectée » suivent.
+
+**Affichage** : la fiche dit « Éjecter la bille en pointe », « Éjecter une bille active au
+choix », « Éjecter toutes les minibilles actives » (la forme `plural` des calibres,
+`data/i18n/grammar.json`). R et la confirmation le disent chez la bille qui éjecte, avec ce
+qu'elle chasse et l'Éjection provoquée : « Chiquenaude de plombée : Éjecter la bille en
+pointe, puis loupe éjectée, Éjection : Vitesse +3 » ; une bille chassée avant sa phase se
+dit comme retirée avant (« pointe, argile : retirée avant sa phase. »). La plombée posée
+en pointe sur une bille l'éjecte par sa Chiquenaude : la pose se poursuit comme sur un
+emplacement vide, sans Éjection par la pose ni Tic (« Éjection de … : aucun effet » et
+« Tic de plombée : aucun effet » dans la confirmation).
 
 ### Cibles au choix
 
@@ -640,9 +701,9 @@ pose sur une bille sans Éjection donne +1 bille éjectée, +0 éjection ; un m�
 | Catégorie | Compteurs (id) | Source | Compte |
 |---|---|---|---|
 | Déclenchements | `awaken`, `flick`, `hit`, `windfall`, `knockout`, `final`, `apex`, `base`, `leftBase`, `rightBase`, `pocketEntry`, `pocketResolution`, `pocketReaction` | générés : un par déclencheur de `MARBLE_TRIGGERS`, un par mot-clé de phase (`core/marbles.js`/`PHASE_KEYWORDS`, tirés de `MARBLE_PHASES`), un par moment En poche (`MARBLE_POCKET`) | +1, par bille, quand le mot-clé se déclenche chez une bille qui a un effet pour ce moment : son champ n'est pas vide (pour une base : l'effet de base, ou sa variante de l'emplacement), ou elle a reçu un effet extérieur pour ce moment (un bonus ciblé sur sa phase). Un effet à condition fausse compte ; une phase sautée (emplacement vide, bille retirée avant) ne compte pas. `base` = `leftBase` + `rightBase` |
-| Actions | `draw`, `drawQuantity`, `polish`, `polishQuantity`, `crack`, `crackQuantity`, `pocket`, `pocketQuantity` | générés depuis les actions de `CLAUSE_ACTIONS` qui déclarent `keyword` | les déclencheurs : un par application (une Pioche par effet joué qui pioche ; un Polissage, une Fêlure ou un Empocher par application, cible vide comprise) ; la quantité réelle : billes réellement piochées par une Pioche (`draw` de cause `"effect"`), usure réellement rendue ou ajoutée (`applied` de `polished`, `cracked`), billes réellement déplacées par Empocher (`pocketed` ou `lost`) |
+| Actions | `draw`, `drawQuantity`, `polish`, `polishQuantity`, `crack`, `crackQuantity`, `pocket`, `pocketQuantity`, `eject`, `ejectQuantity` | générés depuis les actions de `CLAUSE_ACTIONS` qui déclarent `keyword` | les déclencheurs : un par application (une Pioche par effet joué qui pioche ; un Polissage, une Fêlure ou un Empocher par application, cible vide comprise) ; la quantité réelle : billes réellement piochées par une Pioche (`draw` de cause `"effect"`), usure réellement rendue ou ajoutée (`applied` de `polished`, `cracked`), billes réellement déplacées par Empocher (`pocketed` ou `lost`) |
 | Vitesse et Masse | `speedGains`, `speedGained`, `speedLosses`, `speedLost`, et les mêmes pour `mass` | générés depuis les actions de valeur sans `keyword` | dans chaque effet joué (`effect`), la valeur réellement appliquée aux compteurs du tour (bonus reçu compris ; un bonus perdu n'est jamais appliqué), avant les planchers de l'Impact : une occurrence de gain ou de perte par effet, et le total en valeur absolue |
-| Évènements | `thrownMarbles`, `hitMarbles`, `ejectedMarbles`, `shuffles`, `drawnMarbles`, `wornMarbles`, `triangleExits`, `pocketedMarbles`, `lostMarbles` | déclarés : `config/marbles-values.js`/`MARBLE_TALLIES` | billes lancées (`flick`), tiquées (`hit` : posées sur un emplacement occupé), éjectées (`removed`, cause `"replacement"`), mélanges (`bagRegenerated`), billes piochées (`draw`, toutes causes), usées (`removed`, cause `"wear"`), sorties du triangle (`removed`, toutes causes : aujourd'hui, usées + éjectées + mises en poche depuis le triangle), mises en poche (`pocketed`), perdues (`lost`) |
+| Évènements | `thrownMarbles`, `hitMarbles`, `ejectedMarbles`, `shuffles`, `drawnMarbles`, `wornMarbles`, `triangleExits`, `pocketedMarbles`, `lostMarbles` | déclarés : `config/marbles-values.js`/`MARBLE_TALLIES` | billes lancées (`flick`), tiquées (`hit` : posées sur un emplacement occupé), éjectées (`removed`, cause `"replacement"` ou `"eject"`), mélanges (`bagRegenerated`), billes piochées (`draw`, toutes causes), usées (`removed`, cause `"wear"`), sorties du triangle (`removed`, toutes causes : aujourd'hui, usées + éjectées + mises en poche depuis le triangle ; les éjectées comptent celles d'Éjecter), mises en poche (`pocketed`), perdues (`lost`) |
 
 **Écoutables** (`listenable`) : les compteurs auxquels une bille du pot peut réagir (voir
 « Le pot ») : tous les évènements réels, tous les déclenchements de mots-clés et d'actions,
@@ -747,6 +808,12 @@ pendant l'action envisagée (la pose) ; chaque effet prévu porte, s'il a empoch
 (`{ marble, lost, entry }`, la bille déplacée, perdue ou non, et l'effet de son entrée),
 rattaché à l'effet qui l'a produite (le `by` de `pocketed` et `lost`). `cleared` compte
 aussi une bille empochée avant sa phase.
+
+**Les éjections** se prévoient de même : un effet prévu porte, s'il a chassé des billes,
+`ejected` (`{ marble, slot, knockout }`, la bille, son emplacement et l'effet de son
+Éjection provoquée), rattaché par le `by` de `eject`. L'Éjection provoquée n'est jamais
+celle de la pose (son `effect` porte `ejectedBy`) ; `cleared` compte une bille chassée
+avant sa phase.
 
 **Les cibles vides** se prévoient de même : un effet prévu porte, si une de ses actions sur
 une bille (Polissage, Fêlure, Empocher) n'a rien trouvé, `empty` (les évènements

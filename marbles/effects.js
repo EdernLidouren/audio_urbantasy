@@ -45,6 +45,18 @@ export const FIRST_IN_HAND = "firstInHand";
 // polish(1, choice({ zones: ["triangle"] })).
 export const choice = ({ zones, count = 1, upTo = false, pick = "marble" }) => ({ type: "choice", zones, pick, count, ...(upTo ? { upTo: true } : {}) });
 
+// Une cible « TOUTES LES BILLES ACTIVES » (core/marbles-effects.js, en-tête), qui
+// passent tous les filtres donnés : allActive(), allActive(sizeIs(SMALL)).
+export const allActive = (...filters) => ({ type: "all", ...(filters.length === 0 ? {} : { filters }) });
+
+// Filtre de cible : le calibre (SMALL, MEDIUM, LARGE, config/marbles-values.js).
+export const sizeIs = (size) => ({ type: "size", size });
+
+// Éjecter : chasse du triangle la bille elle-même (sans cible, sur le triangle
+// seulement), celle d'un emplacement, des billes au choix (choice) ou toutes les
+// billes actives filtrées (allActive). Sans montant.
+export const eject = (target) => ({ action: "eject", ...(target === undefined ? {} : { target }) });
+
 // Empocher : envoie au pot la bille elle-même (sans cible), celle d'un emplacement,
 // la première de la main (FIRST_IN_HAND), ou une bille au choix (choice). Sans
 // montant.

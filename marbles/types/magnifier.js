@@ -12,5 +12,7 @@ export default {
     leftBase: [{ ...speed(4), target: "apex", when: { type: "printedStat", slot: "apex", stat: "speed", atLeast: 1 } }],
   },
   apex: [speed(2)],
+  // Éjection : Vitesse +3 (le Final de la géante la déclenche).
+  knockout: [speed(3)],
   size: SMALL,
 };

@@ -45,18 +45,25 @@ export function answerChoices(rules, result) {
   return { ...current, events };
 }
 
-// La table des billes avec le gorille, le verre et la porcelaine tels qu'avant les
-// cibles au choix : le Tic du gorille empoche la première bille de la main, celui du
-// verre polit la pointe, le Final de la porcelaine n'a que sa Vitesse. Les
-// vérifications des mécanismes qu'ils portaient (Empocher depuis la main, Polissage
-// ciblé, Final) les gardent ainsi, sans choix à trancher ; les cibles au choix ont
-// leurs propres cas.
-export function fixedTargetTypes(types) {
+// La table des billes avec les billes de test telles qu'avant les cibles au choix
+// et l'action Éjecter : le Tic du gorille empoche la première bille de la main, celui
+// du verre polit la pointe, le Final de la porcelaine n'a que sa Vitesse ; la
+// Chiquenaude de la plombée fêle la pointe de 3, le Final de la géante n'a que sa
+// Pioche, la loupe n'a pas d'Éjection, la base de la tigrée donne Vitesse +3. Les
+// vérifications des mécanismes qu'elles portaient (Empocher depuis la main,
+// Polissage et Fêlure ciblés, Final, Trouvaille…) les gardent ainsi ; les cibles au
+// choix et Éjecter ont leurs propres cas.
+export function earlierTestTypes(types) {
+  const { knockout, ...magnifier } = types.magnifier;
   return {
     ...types,
     gorilla: { ...types.gorilla, hit: [types.gorilla.hit[0], { action: "pocket", target: "firstInHand" }] },
     glass: { ...types.glass, hit: [{ action: "polish", amount: 1, target: "apex" }] },
     porcelain: { ...types.porcelain, final: [types.porcelain.final[0]] },
+    leaded: { ...types.leaded, flick: [{ action: "crack", amount: 3, target: "apex" }] },
+    giant: { ...types.giant, final: [types.giant.final[0]] },
+    magnifier,
+    tiger: { ...types.tiger, base: [{ action: "speed", amount: 3 }] },
   };
 }
 

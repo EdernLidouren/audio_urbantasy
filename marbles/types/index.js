@@ -53,6 +53,9 @@
 //           "pocket", Empocher, sans montant, qui envoie au pot la bille elle-même,
 //           celle de `target`, la première de la main (`target` FIRST_IN_HAND) ou
 //           une bille au choix (`target` choice(...)) ;
+//           "eject", Éjecter, sans montant, qui chasse du triangle la bille
+//           elle-même (si elle y est), celle de `target`, des billes au choix, ou
+//           toutes les billes actives filtrées (`target` allActive(sizeIs(SMALL))) ;
 //   amount  la valeur : un entier, ou un MONTANT CALCULÉ { base, step, source,
 //           max? }, base + step × la valeur de la source, plafonné à max, évalué
 //           au déclenchement (sources : turnsInHand(), activeSize(calibre),

@@ -97,6 +97,7 @@
 //   choice { action, amount?, zones, pick, count, upTo, by },
 //   chosen { zone, index?, slot?, marble, by },
 //   choiceEnded { reason, chosen, by }, choiceUndecided { action, by },
+//   eject { slot, marble, by },
 //   wear { slot, marble, wear, maxWear },
 //   impact { speed, mass, impact, score },
 //   rotation { triangle }, turnEnded { turn }, gameOver { reason, score }.
@@ -110,7 +111,13 @@
 // phases ; sa Trouvaille et tout ce qui en découle se règlent avant la suite.
 // `replacement` (Tic, Éjection) : le remplacement en cours, { placed, ejected }, lu
 // par les conditions de calibre relatif (core/marbles-effects.js/relativeSize).
-// `cause` : "replacement", "wear" ou "pocket". `trigger` : "phase" ou l'id d'un déclencheur
+// `eject` : l'action Éjecter (core/marbles-effects.js) chasse la bille de `slot`,
+// produite par l'effet `by` ; suivent son Éjection (`knockout`, avec `by` et le
+// remplacement { placed: la bille qui éjecte, ejected }, réglée aussitôt, une
+// interruption), puis `removed` et `discarded` de cause "eject". Un `effect` d'une
+// Éjection ainsi provoquée porte `ejectedBy` (le `by` de l'éjection) : ce n'est pas
+// celle d'une pose.
+// `cause` : "replacement", "wear", "pocket" ou "eject". `trigger` : "phase" ou l'id d'un déclencheur
 // (config/marbles-values.js/MARBLE_TRIGGERS : "flick", "hit", "windfall", "knockout",
 // "final").
 // `final` : une bille usée vient de rejoindre la défausse depuis `slot`.
@@ -168,7 +175,20 @@ import { MARBLE_PHASES, MARBLE_POCKET, MARBLE_TALLIES, MARBLE_TRIGGERS, MARBLES_
 import { createSeed, nextRandom } from "./rng.js";
 import { rejectUnknownFields } from "../lib/validate.js";
 import { createEventBus } from "./marbles-bus.js";
-import { CHOICE_ZONES, CLAUSE_ACTIONS, FIRST_IN_HAND, SLOTS, addValues, effectAt, evaluateEffect, isChoice, isMarbleSize, validateEffect } from "./marbles-effects.js";
+import {
+  CHOICE_ZONES,
+  CLAUSE_ACTIONS,
+  FIRST_IN_HAND,
+  SLOTS,
+  addValues,
+  effectAt,
+  evaluateEffect,
+  isAll,
+  isChoice,
+  isMarbleSize,
+  passesFilters,
+  validateEffect,
+} from "./marbles-effects.js";
 import { emptyTally, recordTally } from "./marbles-tally.js";
 import { buildTallyCounters } from "./marbles-counters.js";
 
@@ -232,6 +252,7 @@ export const JOURNAL_EVENTS = Object.freeze({
   chosen: false,
   choiceEnded: false,
   choiceUndecided: false,
+  eject: true,
   wear: true,
   impact: false,
   rotation: false,
@@ -989,6 +1010,7 @@ function applyToChosen(run, operation, targets, by) {
   targets.forEach((target, order) => {
     if (target.zone === "triangle") {
       if (CLAUSE_ACTIONS[operation.action].moves === "pot") pocketFromSlot(run, target.slot, by);
+      else if (CLAUSE_ACTIONS[operation.action].ejects) ejectFromSlot(run, target.slot, by);
       else applyMarbleAction(run, operation.action, operation.amount, target.slot, by);
       return;
     }
@@ -1052,7 +1074,9 @@ function fireEffect(run, trigger, listener, clauses, event) {
   // tout moment du tour. Une bille du pot à une place connue la porte (`potIndex`).
   const { draw } = self;
   const place = listener.zone === "pot" && listener.index !== undefined ? { potIndex: listener.index } : {};
-  run.emit({ type: "effect", trigger, slot, marble, speedDelta, massDelta, draw, operations, given, lost, speed, mass, ...place });
+  // L'Éjection provoquée par l'action Éjecter, et non par une pose : elle le porte.
+  const provoked = event.type === "knockout" && event.by !== undefined ? { ejectedBy: event.by } : {};
+  run.emit({ type: "effect", trigger, slot, marble, speedDelta, massDelta, draw, operations, given, lost, speed, mass, ...place, ...provoked });
   if (draw > 0) drawMarbles(run, draw, "effect");
   // Les actions sur une bille, après la pioche, dans l'ordre des clauses : sur la
   // bille elle-même (son emplacement), sur celle de l'emplacement visé, ou sur les
@@ -1061,6 +1085,7 @@ function fireEffect(run, trigger, listener, clauses, event) {
   for (const operation of operations) {
     if (isChoice(operation.target)) applyToChosen(run, operation, chooseTargets(run, operation, by), by);
     else if (CLAUSE_ACTIONS[operation.action].moves === "pot") pocketOperation(run, operation.target, listener, by);
+    else if (CLAUSE_ACTIONS[operation.action].ejects) ejectOperation(run, operation.target, listener, by);
     else applyMarbleAction(run, operation.action, operation.amount, operation.target ?? slot, by);
   }
 }
@@ -1129,6 +1154,69 @@ function sendToPot(run, marble, origin, by) {
   run.emit({ type: "lost", marble, ...origin, by });
 }
 
+// ÉJECTER, appliqué (core/marbles-effects.js/CLAUSE_ACTIONS.eject) : la cible, puis
+// chaque bille chassée (ejectFromSlot).
+//   aucune : la bille elle-même, si elle est encore sur son emplacement (`holder`) ;
+//   un emplacement : sa bille ;
+//   « toutes » : les billes actives qui passent les filtres, relevées au
+//   déclenchement, dans l'ordre des phases ; une bille partie entre-temps (chassée
+//   par l'Éjection d'une précédente) n'est plus visée.
+// Rien à chasser : sans effet, noté au journal (targetEmpty).
+function ejectOperation(run, target, holder, by) {
+  if (target === undefined) {
+    if (holder.zone === "triangle" && run.state.triangle[holder.slot]?.marble === holder.marble) ejectFromSlot(run, holder.slot, by);
+    else run.emit({ type: "targetEmpty", action: "eject", slot: null, target: "self", marble: holder.marble, by });
+    return;
+  }
+  if (isAll(target)) {
+    const aimed = SLOTS.filter((slot) => run.state.triangle[slot] !== null && passesFilters(run.state.triangle[slot].marble, target.filters, run.types)).map((slot) => ({
+      slot,
+      marble: run.state.triangle[slot].marble,
+    }));
+    if (aimed.length === 0) {
+      run.emit({ type: "targetEmpty", action: "eject", slot: null, target: "all", by });
+      return;
+    }
+    for (const { slot, marble } of aimed) {
+      if (run.state.triangle[slot]?.marble === marble) ejectFromSlot(run, slot, by);
+    }
+    return;
+  }
+  ejectFromSlot(run, target, by);
+}
+
+// La bille de `slot` est CHASSÉE par l'effet `by`, dans cet ordre : `eject` ; son
+// Éjection, une interruption (run.settle) réglée jusqu'au bout avant la suite, dont
+// les conditions de calibre comparent la bille chassée à celle qui éjecte (le
+// remplacement { placed, ejected }) ; puis elle quitte son emplacement et rejoint la
+// défausse (cause "eject"). Ni Tic ni Final. Pendant la résolution, sa phase, si
+// elle n'avait pas eu lieu, est sautée (la résolution relit l'emplacement). Son
+// Éjection a pu la retirer déjà (une Fêlure sur elle-même) : elle ne part pas une
+// seconde fois. Une bille déjà en train d'être chassée (`run.knockingOut` : son
+// Éjection est en cours, et vise à son tour son emplacement) ne l'est pas deux fois :
+// sans effet, noté, plutôt qu'une boucle.
+function ejectFromSlot(run, slot, by) {
+  const placed = run.state.triangle[slot];
+  if (placed === null || run.knockingOut.has(slot)) {
+    run.emit({ type: "targetEmpty", action: "eject", slot, by });
+    return;
+  }
+  const { marble } = placed;
+  run.emit({ type: "eject", slot, marble, by });
+  run.knockingOut.add(slot);
+  try {
+    run.settle({ type: "knockout", slot, marble, replacement: { placed: by.marble, ejected: marble }, by });
+  } finally {
+    run.knockingOut.delete(slot);
+  }
+  if (run.state.triangle[slot] === null) return;
+  const ejected = { slot, marble, cause: "eject" };
+  update(run, { triangle: { ...run.state.triangle, [slot]: null } });
+  run.emit({ type: "removed", ...ejected });
+  update(run, { discard: [...run.state.discard, marble] });
+  run.emit({ type: "discarded", ...ejected });
+}
+
 // Une action sur une bille (Polissage, Fêlure : CLAUSE_ACTIONS), appliquée à la
 // bille de `slot`. Emplacement vide : sans effet, noté au journal (avec `by`, l'effet
 // qui la produit). Une Fêlure qui
@@ -1188,7 +1276,21 @@ function transact(state, types, { eventLimit, blind = false, answers = [], seen 
   // `phasesStarted` : les emplacements dont la phase a commencé (ou a été sautée)
   // pendant cette action ; un bonus qui les vise est perdu (fireEffect). `reactions` :
   // par évènement émis, les réactions du pot à émettre après son traitement.
-  const run = { state, types, blind, uncertain: false, choiceDependent: false, phasesStarted: new Set(), journal: [], reactions: new Map(), answers, answerIndex: 0 };
+  // `knockingOut` : les emplacements dont l'Éjection est en cours (une pose, Éjecter) :
+  // Éjecter ne les vise pas une seconde fois (ejectFromSlot).
+  const run = {
+    state,
+    types,
+    blind,
+    uncertain: false,
+    choiceDependent: false,
+    phasesStarted: new Set(),
+    knockingOut: new Set(),
+    journal: [],
+    reactions: new Map(),
+    answers,
+    answerIndex: 0,
+  };
   const bus = createEventBus((event) => handleEvent(run, event), eventLimit, () => record({ type: "chainInterrupted" }));
   // Le journal s'écrit À L'ÉMISSION, dans l'ordre où l'état change : la file du bus
   // étant premier entré, premier sorti, c'est aussi l'ordre de traitement, sauf
@@ -1351,7 +1453,10 @@ function placeMarble(run, { handIndex, slot }) {
   const replacement = previous === null ? null : { placed: marble, ejected: previous.marble };
   if (previous !== null) {
     const ejected = { slot, marble: previous.marble };
+    // Pendant son Éjection, Éjecter ne la vise pas une seconde fois.
+    run.knockingOut.add(slot);
     run.emit({ type: "knockout", ...ejected, replacement });
+    run.knockingOut.delete(slot);
     // Son Éjection a pu la retirer déjà (une Fêlure sur elle-même) : elle est alors
     // partie, usée, et ne part pas une seconde fois.
     if (run.state.triangle[slot] !== null) {

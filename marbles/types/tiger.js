@@ -1,10 +1,11 @@
 // Bille « tigrée » (tiger). Donnée pure : les champs sont décrits dans
 // marbles/types/index.js.
-import { speed, mass } from "../effects.js";
+import { speed, mass, eject, choice } from "../effects.js";
 import { MEDIUM } from "../../config/marbles-values.js";
 
 export default {
-  base: [speed(3)],
+  // Base : Éjecter une bille active au choix, pendant la résolution.
+  base: [eject(choice({ zones: ["triangle"] }))],
   apex: [speed(-1)],
   awaken: [speed(2)],
   windfall: [speed(3)],

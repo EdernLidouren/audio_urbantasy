@@ -151,7 +151,8 @@ function recordEvents(record, events, actionType) {
         record.replacements += 1;
         break;
       case "removed":
-        if (event.cause === "replacement") stats(event.marble).knockedOut += 1;
+        // Chassée par une pose ou par l'action Éjecter.
+        if (event.cause === "replacement" || event.cause === "eject") stats(event.marble).knockedOut += 1;
         break;
       case "discarded":
         if (event.cause === "wear") stats(event.marble).worn += 1;

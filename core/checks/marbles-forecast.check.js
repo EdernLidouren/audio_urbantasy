@@ -10,7 +10,7 @@ import { SLOTS, TALLY_COUNTERS, createMarblesGame, legalActions, marblesReduce }
 import { emptyTally } from "../marbles-tally.js";
 import { forecast, readForecast } from "../marbles-forecast.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
-import { emptyBagMarblesGame, fixedTargetTypes, inHand, withSizes } from "./helpers.js";
+import { emptyBagMarblesGame, earlierTestTypes, inHand, withSizes } from "./helpers.js";
 import { createMarblesRules } from "../marbles-rules.js";
 
 // Tables fabriquées : complétées d'un calibre (core/checks/helpers.js/withSizes).
@@ -19,10 +19,10 @@ const fabricatedRules = (table) => createMarblesRules(withSizes(table));
 // Les règles du jeu, liées à la vraie table (core/marbles-rules.js).
 const realRules = createMarblesRules(MARBLE_TYPES);
 // Gorille, verre et porcelaine d'avant les cibles au choix (core/checks/helpers.js/
-// fixedTargetTypes) : les cas qui portent sur d'autres mécanismes les gardent, sans
+// earlierTestTypes) : les cas qui portent sur d'autres mécanismes les gardent, sans
 // choix à trancher. La propriété « prévision = réel » et les cas du choix jouent la
 // vraie table (realRules).
-const rules = createMarblesRules(fixedTargetTypes(MARBLE_TYPES));
+const rules = createMarblesRules(earlierTestTypes(MARBLE_TYPES));
 
 const placed = (marble, wear = 0) => ({ marble, wear });
 
@@ -50,6 +50,7 @@ export default function checkMarblesForecast(run) {
   checkPocketForecast(run);
   checkReactionForecast(run);
   checkChoiceForecast(run);
+  checkEjectForecast(run);
   checkGuards(run);
   checkMatchesReality(run);
 }
@@ -390,6 +391,46 @@ function checkChoiceForecast(run) {
   })());
 }
 
+// ÉJECTER dans la prévision : déterministe ; les billes chassées chez l'effet qui
+// éjecte, avec leur Éjection provoquée ; la pose sans Éjection ni Tic quand la
+// Chiquenaude vide l'emplacement ; une bille chassée avant sa phase, retirée avant.
+// Égale au réel.
+function checkEjectForecast(run) {
+  const matches = (marbles, state, action) => {
+    const real = action === null ? { state, events: [] } : marbles.reduce(state, action);
+    const resolved = marbles.reduce(real.state, { type: "resolve" });
+    const { uncertain, awakenPossible, ...predicted } = marbles.forecast(state, action);
+    return JSON.stringify(predicted) === JSON.stringify(readForecast(real.events, resolved.events, resolved.state));
+  };
+  const toApex = { type: "place", handIndex: 0, slot: "apex" };
+  const leaded = playState({ hand: inHand(["leaded"]), triangle: { leftBase: null, rightBase: null, apex: placed("magnifier") } });
+  const predicted = realRules.forecast(leaded, toApex);
+  run.same(
+    "Éjecter prévu : chez la Chiquenaude, la loupe et son Éjection",
+    [{ marble: "magnifier", slot: "apex", knockout: { marble: "magnifier", speed: 3, mass: 0, draw: 0, operations: [], given: [] } }],
+    predicted.flick.ejected
+  );
+  run("Éjecter prévu : pas d'Éjection de la pose", null, predicted.knockout);
+  run("Éjecter prévu : pas de Tic", null, predicted.hit);
+  run("Éjecter prévu : égal au réel", true, matches(realRules, leaded, toApex));
+
+  const giant = playState({ bag: ["clay"], triangle: { leftBase: placed("magnifier"), rightBase: placed("clay"), apex: placed("giant") } });
+  run.same("Éjecter prévu, Final : la loupe chassée", ["magnifier"], realRules.forecast(giant).slotEffects.apex[0].ejected.map((ejected) => ejected.marble));
+  run("Éjecter prévu, Final : égal au réel", true, matches(realRules, giant, null));
+
+  // Avant sa phase : la bille chassée se dit retirée avant.
+  const made = fabricatedRules({ early: { base: [{ action: "eject", target: "apex" }] }, plain: { apex: [{ action: "speed", amount: 2 }] } });
+  const early = playState({ triangle: { leftBase: placed("early"), rightBase: null, apex: placed("plain") } });
+  const earlyForecast = made.forecast(early);
+  run("Éjecter prévu, avant la phase : la pointe retirée avant", "plain", earlyForecast.cleared.apex);
+  run("Éjecter prévu, avant la phase : pas de phase", null, earlyForecast.phases.apex);
+  run("Éjecter prévu, avant la phase : égal au réel", true, matches(made, early, null));
+
+  // Au choix : selon votre choix.
+  const tiger = playState({ triangle: { leftBase: placed("tiger"), rightBase: null, apex: placed("clay") } });
+  run.same("Éjecter au choix prévu : indécis", [{ action: "eject" }], realRules.forecast(tiger).phases.leftBase.undecided);
+}
+
 // Polissage et Fêlure : la prévision montre leurs conséquences, comme le réel.
 function checkWearForecast(run) {
   // La porcelaine sans le Polissage au choix de son Final : ce cas porte sur la Fêlure.
@@ -619,8 +660,13 @@ function compareState(state, marbles, faults, tally) {
 }
 
 // Un effet prévu et les effets d'entrée au pot de ce qu'il a empoché, à plat.
+// Les Éjections provoquées par ses Éjecter aussi.
 function withEntries(outcome) {
-  return [outcome, ...(outcome.pockets ?? []).flatMap((moved) => (moved.entry === null ? [] : withEntries(moved.entry)))];
+  return [
+    outcome,
+    ...(outcome.pockets ?? []).flatMap((moved) => (moved.entry === null ? [] : withEntries(moved.entry))),
+    ...(outcome.ejected ?? []).flatMap((ejected) => (ejected.knockout === null ? [] : withEntries(ejected.knockout))),
+  ];
 }
 
 // Tous les effets d'une prévision, à plat.
