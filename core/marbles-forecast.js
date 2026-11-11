@@ -57,12 +57,16 @@
 //                  comprises), chacun un effet ; [] sinon ;
 //   awakenPossible vrai si un Éveil est possible (voir plus haut) ; une des
 //                  raisons d'`uncertain`.
-// Un effet : { marble, speed, mass, draw, operations, given, pockets? }, le total
-// effectif de la bille, bonus reçu compris, et ses actions sur une bille (Polissage,
-// Fêlure, Empocher). `pockets` (seulement s'il y en a) : ce que ses Empocher ont
-// déplacé, dans l'ordre, chacun { marble, lost, entry } : la bille (null si c'est
-// une bille piochée, inconnue), perdue faute de place ou non, et l'effet de son
-// entrée au pot (En poche, à l'entrée), ou null.
+// Un effet : { marble, speed, mass, draw, operations, given, pockets?, empty? }, le
+// total effectif de la bille, bonus reçu compris, et ses actions sur une bille
+// (Polissage, Fêlure, Empocher). `pockets` (seulement s'il y en a) : ce que ses
+// Empocher ont déplacé, dans l'ordre, chacun { marble, lost, entry } : la bille (null
+// si c'est une bille piochée, inconnue), perdue faute de place ou non, et l'effet de
+// son entrée au pot (En poche, à l'entrée), ou null. `empty` (seulement s'il y en
+// a) : ses actions qui n'ont rien trouvé à leur cible, dans l'ordre, chacune
+// { action, slot, target?, marble? } (l'évènement targetEmpty) : emplacement vide,
+// main vide, bille déjà partie. Le moteur le sait aussi sûrement qu'il joue le
+// coup ; une cible vidée par une pioche à l'aveugle reste vide pour de bon.
 
 import { MARBLE_POCKET, MARBLE_TRIGGERS } from "../config/marbles-values.js";
 import { SLOTS, UNKNOWN_MARBLE, blindCopy, marblesReduce, runResolution, stageRefusal } from "./marbles.js";
@@ -104,36 +108,51 @@ function awakenPossible(state, events, types) {
   return pool.some(mayAwaken);
 }
 
-// Ce que les Empocher d'un journal ont déplacé, rattaché à l'effet qui les produit :
-// l'effet `by` de la mise en poche (ou de la perte), le plus récent qui lui
-// correspond (le même déclencheur, la même bille, le même emplacement), et l'effet
-// d'entrée qui la suit aussitôt (une interruption : il vient juste après).
-// -> Map effet -> [{ marble, lost, entry }], `entry` un évènement ou null.
-function pocketsByEffect(events) {
-  const pockets = new Map();
+// Les résultats des actions sur une bille d'un journal, rattachés à l'effet qui les
+// produit : l'effet `by` de l'évènement, le plus récent qui lui correspond (le même
+// déclencheur, la même bille, le même emplacement).
+//   pockets : ce que ses Empocher ont déplacé (pocketed, lost), avec l'effet
+//             d'entrée qui suit aussitôt une mise en poche (une interruption : il
+//             vient juste après), un évènement ou null ;
+//   empty   : ses cibles vides (targetEmpty).
+// -> Map effet -> { pockets: [{ marble, lost, entry }], empty: [{ action, slot, ... }] }.
+function resultsByEffect(events) {
+  const results = new Map();
   events.forEach((event, index) => {
-    if (event.type !== "pocketed" && event.type !== "lost") return;
+    if (event.type !== "pocketed" && event.type !== "lost" && event.type !== "targetEmpty") return;
     const { by } = event;
     const source = events
       .slice(0, index)
       .findLast((other) => other.type === "effect" && other.trigger === by.trigger && other.marble === by.marble && (other.slot ?? null) === by.slot);
     if (source === undefined) return;
+    const found = results.get(source) ?? { pockets: [], empty: [] };
+    results.set(source, found);
+    if (event.type === "targetEmpty") {
+      const { type, by: _by, ...target } = event;
+      found.empty.push(target);
+      return;
+    }
     const next = events[index + 1];
     const entry = event.type === "pocketed" && next?.type === "effect" && ENTRY_TRIGGERS.has(next.trigger) && next.marble === event.marble ? next : null;
-    pockets.set(source, [...(pockets.get(source) ?? []), { marble: event.marble, lost: event.type === "lost", entry }]);
+    found.pockets.push({ marble: event.marble, lost: event.type === "lost", entry });
   });
-  return pockets;
+  return results;
 }
 
-// La lecture d'un effet du journal `events`, ses mises en poche comprises.
+// La lecture d'un effet du journal `events`, ses mises en poche et ses cibles vides
+// comprises (chacune seulement s'il y en a).
 function outcomeReader(events) {
-  const pockets = pocketsByEffect(events);
+  const results = resultsByEffect(events);
   const outcomeOf = (event) => {
     if (event === undefined) return null;
     const outcome = { marble: event.marble, speed: event.speedDelta, mass: event.massDelta, draw: event.draw, operations: event.operations, given: event.given };
-    const moved = pockets.get(event);
-    if (moved === undefined) return outcome;
-    return { ...outcome, pockets: moved.map(({ marble, lost, entry }) => ({ marble, lost, entry: entry === null ? null : outcomeOf(entry) })) };
+    const found = results.get(event);
+    if (found === undefined) return outcome;
+    return {
+      ...outcome,
+      ...(found.pockets.length > 0 && { pockets: found.pockets.map(({ marble, lost, entry }) => ({ marble, lost, entry: entry === null ? null : outcomeOf(entry) })) }),
+      ...(found.empty.length > 0 && { empty: found.empty }),
+    };
   };
   return outcomeOf;
 }

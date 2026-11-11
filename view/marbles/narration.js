@@ -114,13 +114,28 @@ function pocketPart({ marble, lost, entry }, t) {
   return t("marbles.pocket.entered_effect", { marble: ref, effect: effectSummary(entry, t) });
 }
 
-// Un effet prévu, d'une phrase : ses valeurs et ses actions, puis ce que ses Empocher
-// ont déplacé (« Empocher la bille en pointe, puis porcelaine en poche, à l'entrée :
-// Vitesse +10 »).
+// Une cible vide PRÉVUE (core/marbles-forecast.js, `empty`) : « pointe vide »,
+// « main vide », « agate déjà partie ».
+function emptyPart({ slot, target, marble }, t) {
+  if (target === FIRST_IN_HAND) return t("marbles.forecast_empty.hand");
+  if (target === "self") return t("marbles.forecast_empty.self", { marble: nameRef(`marble.${marble}.name`) });
+  return t("marbles.forecast_empty.slot", { slot: slotName(slot, t) });
+}
+
+// Le texte d'un effet prévu suivi de ses résultats : ses cibles vides, puis ce que
+// ses Empocher ont déplacé (« Polissage 1 à la pointe, pointe vide » ; « Empocher la
+// bille en pointe, puis porcelaine en poche, à l'entrée : Vitesse +10 »). Un effet
+// joué n'en a pas : la séquence les dit à part.
+function withResults(text, effect, t) {
+  const empty = effect.empty ?? [];
+  const withEmpty = empty.length === 0 ? text : t("marbles.forecast_empty.after", { effect: text, empty: t("marbles.effect.combined", { parts: empty.map((target) => emptyPart(target, t)) }) });
+  if (!effect.pockets?.length) return withEmpty;
+  return t("marbles.pocket.then", { effect: withEmpty, pockets: t("marbles.effect.combined", { parts: effect.pockets.map((moved) => pocketPart(moved, t)) }) });
+}
+
+// Un effet prévu, d'une phrase : ses valeurs et ses actions, puis ses résultats.
 function effectSummary(effect, t) {
-  const text = combined(effectParts(effect, t), t);
-  if (!effect.pockets?.length) return text;
-  return t("marbles.pocket.then", { effect: text, pockets: t("marbles.effect.combined", { parts: effect.pockets.map((moved) => pocketPart(moved, t)) }) });
+  return withResults(combined(effectParts(effect, t), t), effect, t);
 }
 
 // Un effet JOUÉ ou PRÉVU : { speed, mass, draw, given } -> « Vitesse +1 et Masse
@@ -130,9 +145,7 @@ export function describeEffect(effect, t) {
   for (const gift of effect.given ?? []) {
     parts.push(t("marbles.effect.given", { effect: combined(valueParts(gift, t), t), slot: slotName(gift.slot, t) }));
   }
-  const text = combined(parts, t);
-  if (!effect.pockets?.length) return text;
-  return t("marbles.pocket.then", { effect: text, pockets: t("marbles.effect.combined", { parts: effect.pockets.map((moved) => pocketPart(moved, t)) }) });
+  return withResults(combined(parts, t), effect, t);
 }
 
 // Prévu, s'il y en a un (null : rien à prévoir), sinon « aucun effet ».

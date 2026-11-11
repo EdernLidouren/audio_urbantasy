@@ -520,6 +520,19 @@ function checkTexts(run) {
       true,
       said(describeOverview(lostState, rules, t)).includes("base gauche, sulfure : Empocher la bille en pointe, puis pot plein : porcelaine perdue.")
     );
+    // Une cible vide se prévoit, chez l'effet qui la vise, avant ce qu'il empoche :
+    // le Final de l'agate seule en pointe polit sa propre place, déjà vide.
+    const lonelyAgate = playState({ bag: ["clay"], triangle: { leftBase: null, rightBase: null, apex: { marble: "agate", wear: 2 } } });
+    run(
+      "cible vide, R : chez le Final de l'agate, avant sa mise en poche",
+      true,
+      said(describeOverview(lonelyAgate, rules, t)).includes("Final : Polissage 1 à la pointe et Empocher cette bille, pointe vide, puis agate en poche.")
+    );
+    run.same(
+      "cible vide, séquence : dite à part, comme avant",
+      ["pointe vide : sans effet."],
+      texts(lonelyAgate).filter((text) => text.includes("vide :"))
+    );
     // Les billes du pot à chaque résolution : après les trois emplacements, une ligne
     // ou une étape par bille qui a cet effet (pas le verre), avant les retraits.
     const potState = playState({ triangle: { leftBase: { marble: "magnifier", wear: 0 }, rightBase: null, apex: { marble: "porcelain", wear: 0 } }, pot: ["agate", "glass", "sulphide"] });
@@ -647,7 +660,7 @@ function checkTexts(run) {
     );
     run.same(
       "calibre, confirmation : le Tic du gorille, sa valeur finale",
-      ["Chiquenaude de gorille : aucun effet", "Éjection de porcelaine : aucun effet", "Tic de gorille : Vitesse +4 et Empocher la première bille de la main"],
+      ["Chiquenaude de gorille : aucun effet", "Éjection de porcelaine : aucun effet", "Tic de gorille : Vitesse +4 et Empocher la première bille de la main, main vide"],
       placementLines(sized, 0, "rightBase", rules, t).map(({ key, params }) => said(t(key, params))).slice(2)
     );
     run(
@@ -677,6 +690,11 @@ function checkTexts(run) {
       "anglais, pot : R",
       true,
       describeOverview(potState, rules, t).endsWith("Pot, agate: Mass +1. Pot, sulphide: Speed +4.")
+    );
+    run(
+      "anglais, cible vide : R",
+      true,
+      describeOverview(lonelyAgate, rules, t).includes("Final: Polish 1 to the apex and Pocket this marble, apex empty, then agate pocketed.")
     );
     run.same("anglais, Empocher : séquence", ["porcelain is pocketed.", "Pot entry of porcelain: Speed +10. Speed 10, Mass 1."], texts(pocketing).slice(1, 3));
     run.same("anglais, Polissage : séquence", ["porcelain is polished: wear 1 of 2."], texts(saving).filter((text) => text.includes("polished")));

@@ -616,6 +616,15 @@ billes du pot, dans l'ordre d'arrivée ; chaque effet prévu porte, s'il a empoc
 rattaché à l'effet qui l'a produite (le `by` de `pocketed` et `lost`). `cleared` compte
 aussi une bille empochée avant sa phase.
 
+**Les cibles vides** se prévoient de même : un effet prévu porte, si une de ses actions sur
+une bille (Polissage, Fêlure, Empocher) n'a rien trouvé, `empty` (les évènements
+`targetEmpty`, rattachés par leur `by`) : emplacement vide, main vide, bille déjà partie.
+Le moteur le sait aussi sûrement qu'il joue le coup. R et la confirmation le disent chez
+l'effet, avant ce qu'il a empoché : « Tic de gorille : Vitesse +4 et Empocher la première
+bille de la main, main vide », « Final : Polissage 1 à la pointe et Empocher cette bille,
+pointe vide, puis agate en poche ». La séquence, elle, le dit à part, comme avant
+(« Main vide : rien à empocher. »).
+
 **L'exception de l'Éveil** : la bille piochée étant inconnue, son Éveil ne se prévoit
 jamais. Ses effets ne sont jamais dans les valeurs prévues, ni dans le registre de la copie.
 La prévision est `uncertain` dès qu'elle pioche au moins une bille et qu'une bille qui
@@ -685,7 +694,8 @@ lisent et ne s'activent pas (Entrée n'y fait rien) :
    Empocher prévu s'y dit chez la bille qui le produit, avec ce qu'il déplace et l'entrée
    au pot : « Tic de gorille : Vitesse +4 et Empocher la première bille de la main, puis
    porcelaine en poche, à l'entrée : Vitesse +10 » (pot plein : « …, puis pot plein :
-   porcelaine perdue ») ; de même dans les valeurs prévues de la bille posée ;
+   porcelaine perdue ») ; une cible vide, de même, avant (« …, main vide ») ; de même
+   dans les valeurs prévues de la bille posée ;
 6. pour chaque régénération du sac que la pose et la résolution provoqueraient, « Le sac
    sera régénéré. » (« Le sac sera de nouveau régénéré. » pour les suivantes), puis une
    ligne par Trouvaille qu'elle déclencherait (« Trouvaille de tigrée : Vitesse +3. ») ;

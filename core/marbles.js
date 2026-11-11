@@ -65,7 +65,7 @@
 //   effect { trigger, slot, marble, speedDelta, massDelta, draw, operations, given, lost, speed, mass },
 //   polished { slot, marble, amount, applied, wear, maxWear },
 //   cracked { slot, marble, amount, applied, wear, maxWear },
-//   targetEmpty { action, slot, target?, marble? },
+//   targetEmpty { action, slot, target?, marble?, by },
 //   pocketed { marble, from, slot?, index?, by }, lost { marble, from, slot?, index?, by },
 //   potResolution { index, marble },
 //   wear { slot, marble, wear, maxWear },
@@ -94,8 +94,10 @@
 // `potResolution` : une fois par tour, après les phases et avant les retraits,
 // chaque bille du pot dans l'ordre d'arrivée (`index`), pour son effet En poche à
 // chaque résolution.
-// `targetEmpty` d'Empocher sans bille à prendre : `slot` vide ; ou `slot` null et
-// `target` "firstInHand" (main vide) ou "self" (la bille, `marble`, n'est plus là).
+// `targetEmpty` : une action sur une bille sans bille à prendre, produite par
+// l'effet `by` ({ trigger, slot, marble }, comme pocketed et lost) : `slot` vide ;
+// ou, pour Empocher, `slot` null et `target` "firstInHand" (main vide) ou "self" (la
+// bille, `marble`, n'est plus là).
 // draw `cause` : "turn" (la pioche du début de tour) ou "effect" (une Pioche).
 // polished, cracked `applied` : l'usure réellement rendue ou ajoutée, après plancher
 // ou plafond (`amount` : celle demandée).
@@ -786,7 +788,7 @@ function fireEffect(run, trigger, listener, clauses, event) {
   const by = { trigger, slot: slot ?? null, marble };
   for (const operation of operations) {
     if (CLAUSE_ACTIONS[operation.action].moves === "pot") pocketOperation(run, operation.target, listener, by);
-    else applyMarbleAction(run, operation.action, operation.amount, operation.target ?? slot);
+    else applyMarbleAction(run, operation.action, operation.amount, operation.target ?? slot, by);
   }
 }
 
@@ -799,9 +801,9 @@ function fireEffect(run, trigger, listener, clauses, event) {
 //   arrivée de ce nom). Ni en cours de lancer ni dans le pot (refusé à la
 //   validation).
 // Sans bille à prendre : sans effet, noté au journal (targetEmpty). `by` : l'effet
-// qui empoche, que portent pocketed et lost.
+// qui empoche, que portent pocketed, lost et targetEmpty.
 function pocketOperation(run, target, holder, by) {
-  const empty = (details) => run.emit({ type: "targetEmpty", action: "pocket", ...details });
+  const empty = (details) => run.emit({ type: "targetEmpty", action: "pocket", ...details, by });
   if (target === FIRST_IN_HAND) {
     if (run.state.hand.length === 0) return empty({ slot: null, target });
     const [{ marble }, ...hand] = run.state.hand;
@@ -833,7 +835,7 @@ function pocketOperation(run, target, holder, by) {
 function pocketFromSlot(run, slot, by) {
   const placed = run.state.triangle[slot];
   if (placed === null) {
-    run.emit({ type: "targetEmpty", action: "pocket", slot });
+    run.emit({ type: "targetEmpty", action: "pocket", slot, by });
     return;
   }
   update(run, { triangle: { ...run.state.triangle, [slot]: null } });
@@ -855,14 +857,15 @@ function sendToPot(run, marble, origin, by) {
 }
 
 // Une action sur une bille (Polissage, Fêlure : CLAUSE_ACTIONS), appliquée à la
-// bille de `slot`. Emplacement vide : sans effet, noté au journal. Une Fêlure qui
+// bille de `slot`. Emplacement vide : sans effet, noté au journal (avec `by`, l'effet
+// qui la produit). Une Fêlure qui
 // amène la bille à son maximum la retire aussitôt (retireMarble) : en résolution,
 // une phase qui n'avait pas eu lieu est alors sautée ; en phase de jeu,
 // l'emplacement vide peut recevoir une pose, sans Tic.
-function applyMarbleAction(run, action, amount, slot) {
+function applyMarbleAction(run, action, amount, slot, by) {
   const placed = run.state.triangle[slot];
   if (placed === null) {
-    run.emit({ type: "targetEmpty", action, slot });
+    run.emit({ type: "targetEmpty", action, slot, by });
     return;
   }
   const rule = CLAUSE_ACTIONS[action];

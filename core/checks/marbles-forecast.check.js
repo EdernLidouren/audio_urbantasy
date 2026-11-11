@@ -274,6 +274,14 @@ function checkPocketForecast(run) {
   const agate = playState({ triangle: { leftBase: null, rightBase: null, apex: placed("agate", 2) } });
   run("pot prévu : l'agate empochée par son Final", "agate", rules.forecast(agate).slotEffects.apex[0].pockets[0].marble);
   run("pot prévu : Final de l'agate, égal au réel", true, matches(agate, null));
+  // Ses cibles vides : la pointe qu'elle polit est déjà la sienne, vidée.
+  run.same("cible vide prévue : chez le Final de l'agate", [{ action: "polish", slot: "apex" }], rules.forecast(agate).slotEffects.apex[0].empty);
+  // La main vide du gorille : Empocher n'y trouve rien, et la prévision le sait.
+  const alone = playState({ hand: inHand(["gorilla"]), triangle: { leftBase: null, rightBase: null, apex: placed("clay") } });
+  const aloneForecast = rules.forecast(alone, toApex);
+  run.same("cible vide prévue : main vide au Tic du gorille", [{ action: "pocket", slot: null, target: "firstInHand" }], aloneForecast.hit.empty);
+  run("cible vide prévue : rien d'empoché", undefined, aloneForecast.hit.pockets);
+  run("cible vide prévue : égal au réel", true, matches(alone, toApex));
 
   // Une bille piochée à l'aveugle puis empochée : inconnue, prévision incertaine,
   // sans Éveil possible pour autant.

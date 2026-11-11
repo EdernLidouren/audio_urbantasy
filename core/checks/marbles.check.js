@@ -377,7 +377,11 @@ function checkAwaken(run) {
   // vide, noté.
   const giant = (apex) => apply({ ...playState({ hand: inHand([]), bag: ["giant"], triangle: triangleOf(null, null, apex) }), stage: "draw" }, { type: "draw" });
   run("éveil, cible : la géante polit la pointe", 0, giant(placed("tiger", 2)).state.triangle.apex.wear - 1);
-  run.same("éveil, cible : pointe vide, notée", { type: "targetEmpty", action: "polish", slot: "apex" }, giant(null).events.at(-1));
+  run.same(
+    "éveil, cible : pointe vide, notée avec son effet",
+    { type: "targetEmpty", action: "polish", slot: "apex", by: { trigger: "awaken", slot: null, marble: "giant" } },
+    giant(null).events.at(-1)
+  );
   // Un bonus de Vitesse ciblé : donné avant la phase, perdu après.
   const gifts = { waker: { awaken: [{ action: "speed", amount: 2, target: "apex" }] }, finisher: { maxWear: 1, final: [{ action: "draw", amount: 1 }] }, plain: {} };
   const before = apply(playState({ hand: inHand(["plain"]), bag: ["waker"], triangle: triangleOf(null, null, placed("plain")) }), { type: "place", handIndex: 0, slot: "leftBase" }, gifts);
@@ -1080,7 +1084,7 @@ function checkWearActions(run) {
 
   // Cible vide : sans effet, noté au journal.
   const empty = act(playState({ hand: inHand(["emptyHitter"]), triangle: triangleOf(placed("plain"), null, null) }), { type: "place", handIndex: 0, slot: "leftBase" });
-  run.same("cible vide : notée au journal", { type: "targetEmpty", action: "polish", slot: "rightBase" }, find(empty, "targetEmpty"));
+  run.same("cible vide : notée au journal", { type: "targetEmpty", action: "polish", slot: "rightBase", by: { trigger: "hit", slot: "leftBase", marble: "emptyHitter" } }, find(empty, "targetEmpty"));
 
   // Une bille fêlée jusqu'au retrait par sa propre Éjection ne part qu'une fois.
   const self = act(playState({ hand: inHand(["plain"]), triangle: triangleOf(null, null, placed("selfBreaker")) }), { type: "place", handIndex: 0, slot: "apex" });
