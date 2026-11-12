@@ -1,6 +1,6 @@
 // Jeu des billes : le BUS D'ÉVÈNEMENTS interne à la simulation. Aucun lien avec
 // le DOM ni avec la vue : un bus vit le temps d'UNE action du réducteur
-// (core/marbles.js), et le journal qu'il alimente reste la seule interface vers
+// (core/marbles.js, déroulée par core/marbles-run.js/transact), et le journal qu'il alimente reste la seule interface vers
 // l'écran et le son.
 //
 // Synchrone : `emit` traite l'évènement et tout ce qui en découle avant de rendre
@@ -11,7 +11,7 @@
 // suite, même au milieu d'un traitement. Son évènement et tout ce qui en découle
 // passent dans une file à part, vidée avant que `settle` ne rende la main ; la file
 // en attente reprend ensuite. Sert à ce qui doit se régler avant la suite
-// (core/marbles.js) : les Trouvailles puis les réactions du pot au mélange, avant
+// (core/marbles-run.js) : les Trouvailles puis les réactions du pot au mélange, avant
 // que la pioche interrompue ne reprenne (regenerateBag) ; l'Éveil d'une bille
 // piochée, avant la suivante ; l'entrée au pot ; l'Éjection d'une bille chassée par
 // l'action Éjecter, avant qu'elle ne quitte son emplacement.

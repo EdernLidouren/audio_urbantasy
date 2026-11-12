@@ -5,7 +5,7 @@
 // l'affaire de core/marbles-counters.js, qui les génère et les déclare ; ce module
 // les reçoit en paramètre et n'importe rien du jeu.
 //
-// core/marbles.js passe chaque évènement du journal à recordTally À SON ÉMISSION,
+// core/marbles-run.js passe chaque évènement du journal à recordTally À SON ÉMISSION,
 // avant que le bus ne le traite, donc avant que les billes n'y réagissent : une
 // Chiquenaude qui compte « par chiquenaude ce tour » se compte elle-même. Un
 // compteur de quantité réelle (l'usure rendue par un Polissage…) compte l'évènement

@@ -13,12 +13,13 @@
 // table fabriquée se teste de la même façon, sans risque de retomber en silence
 // sur celle du jeu : createMarblesRules(maTable).
 //
-// Les fonctions de core/marbles.js, core/marbles-effects.js et
-// core/marbles-forecast.js qui prennent `types` restent la plomberie interne du
+// Les fonctions de core/marbles.js, core/marbles-content.js, core/marbles-run.js,
+// core/marbles-effects.js et core/marbles-forecast.js qui prennent `types` restent la plomberie interne du
 // core ; hors du core, on passe par ces règles. Ce qui ne lit aucune bille
 // (legalActions, les refus, impactOf, SLOTS...) s'importe directement.
 
-import { createMarblesGame, keywordsOf, marblesReduce, maxWearOf, validateMarbleTypes } from "./marbles.js";
+import { createMarblesGame, marblesReduce } from "./marbles.js";
+import { keywordsOf, maxWearOf, validateMarbleTypes } from "./marbles-content.js";
 import { effectAt } from "./marbles-effects.js";
 import { forecast } from "./marbles-forecast.js";
 

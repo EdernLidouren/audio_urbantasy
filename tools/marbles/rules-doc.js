@@ -4,7 +4,7 @@
 //     la table des billes (marbles/types/), avec les fiches du jeu en français
 //     (view/marbles/card.js), entre ses deux marqueurs ; elle ne s'écrit jamais à la
 //     main ;
-//   - chaque MOT-CLÉ déclaré (core/marbles.js/MARBLE_KEYWORDS) doit y figurer, sous la
+//   - chaque MOT-CLÉ déclaré (core/marbles-content.js/MARBLE_KEYWORDS) doit y figurer, sous la
 //     forme « Nom : description. », sa description étant celle du jeu (les touches E et
 //     Maj+E) mot pour mot.
 //
@@ -27,7 +27,7 @@ const END = "<!-- annexe des billes : fin -->";
 
 const { t, setLocale } = await import("../../data/i18n/index.js");
 const { marbleCard } = await import("../../view/marbles/card.js");
-const { MARBLE_KEYWORDS } = await import("../../core/marbles.js");
+const { MARBLE_KEYWORDS } = await import("../../core/marbles-content.js");
 const { GAME_RULES } = await import("./game-rules.js");
 const { MARBLE_SIZES } = await import("../../config/marbles-values.js");
 

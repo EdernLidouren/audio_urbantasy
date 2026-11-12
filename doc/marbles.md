@@ -11,7 +11,9 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
 | `marbles/effects.js` | Les formes courtes des clauses, `speed(n)`, `mass(n)`, `draw(n)`, `polish(n, cible?)`, `crack(n, cible?)`, `pocket(cible?)` (avec `FIRST_IN_HAND`) et `eject(cible?)`, les cibles `choice({ zones, count, upTo })` et `allActive(...filtres)` (avec `sizeIs(calibre)`), et les sources `turnsInHand()`, `activeSize(calibre)` et `tally(valeur, portée)` des montants calculés |
 | `config/marbles-values.js` | Réglages, phases, déclencheurs, mot-clé En poche, valeurs de partie, modèle de fiche, sac de test, sons (donnée pure) |
 | `core/marbles-rules.js` | Les règles liées à une table de billes : le point d'entrée de la simulation hors du core |
-| `core/marbles.js` | La simulation : état, réducteur, écouteurs, journal, codes de refus |
+| `core/marbles.js` | Le réducteur : état, mise en place, refus et codes de refus, actions (pioche du tour, échange, pose, résolution, choix) |
+| `core/marbles-content.js` | Le contenu : validation des déclencheurs, des phases, des moments En poche et d'une table de billes, valeurs de partie, mots-clés, types d'évènements du journal (décrits dans son en-tête) |
+| `core/marbles-run.js` | Le déroulé d'une action : bus et écouteurs, effets des billes, choix, actions sur une bille, pioche, retraits, journal |
 | `core/marbles-effects.js` | Le modèle d'effet : clauses, actions, conditions, effet imprimé |
 | `core/marbles-bus.js` | Le bus d'évènements interne à la simulation |
 | `core/marbles-tally.js` | Le registre des valeurs de partie : le seul à les écrire, et leur lecture publique |
@@ -76,7 +78,7 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
 ### La pioche unifiée
 
 Toute pioche, celle du début de tour comme celle d'un effet (Pioche), suit la même mécanique,
-bille par bille (`core/marbles.js`/`drawOne`) :
+bille par bille (`core/marbles-run.js`/`drawOne`) :
 
 1. main pleine : la bille reste au sac, sans régénération ;
 2. sinon, le sac a une bille : on la pioche (`draw`), puis son **Éveil** (`awaken`, voir
@@ -171,13 +173,13 @@ Masse ciblée y est refusée, les phases étant passées ; Polissage, Fêlure, E
 ciblés passent ; en réaction, un bonus ciblé dont la phase est passée est perdu, noté au
 journal) et ses textes (fiche, journal, R). Aucune action sur la bille elle-même dans le
 pot. Vitesse et Masse vont aux compteurs du tour en cours. **Ajouter un moment fixe** : une
-entrée dans `moments`, ses textes, et l'émission de son évènement dans `core/marbles.js` ;
+entrée dans `moments`, ses textes, et l'émission de son évènement dans `core/marbles-run.js` ;
 ses valeurs de partie, sa ligne de fiche et ses écouteurs suivent.
 
 **Les réactions (En poche, à chaque (occurrence))**, à la manière des reliques d'autres
 jeux. Les clés du moment réactif dans le champ ne sont pas un id fixe mais les
 **occurrences écoutables** : les valeurs de partie écoutables (voir « Valeurs de partie »),
-sans autre liste à tenir (`core/marbles.js`/`REACTION_KEYS`) :
+sans autre liste à tenir (`core/marbles-content.js`/`REACTION_KEYS`) :
 
 - les évènements réels : `thrownMarbles`, `hitMarbles`, `ejectedMarbles`, `shuffles`,
   `drawnMarbles`, `wornMarbles`, `triangleExits`, `pocketedMarbles`, `lostMarbles` ;
@@ -289,7 +291,7 @@ plomberie interne.
   sonore et la force de ses chocs en viennent.
 
 Le registre et le sac de test sont validés ensemble au démarrage
-(`core/marbles.js`/`validateMarblesContent`, appelé par `main.js` et par l'audit du
+(`core/marbles-content.js`/`validateMarblesContent`, appelé par `main.js` et par l'audit du
 contenu). L'ordre du registre compte : les sacs aléatoires du simulateur y tirent leurs
 billes.
 
@@ -471,7 +473,7 @@ toute cible à la validation), sa validation (`validate`) et ce qu'elle ajoute a
 (`apply`) ; puis ses textes dans `view/marbles/narration.js`/`ACTION_TEXTS` (`up` pour une
 valeur positive, `down` pour une négative), lus par les fiches, R, la confirmation et la
 séquence. Une action sans textes fait échouer le chargement. Si son application touche à
-l'état autrement qu'un compteur, comme la Pioche, `fireEffect` (`core/marbles.js`) l'exécute
+l'état autrement qu'un compteur, comme la Pioche, `fireEffect` (`core/marbles-run.js`) l'exécute
 après l'annonce de l'effet. Une condition : une entrée dans `CONDITIONS` et son texte dans
 `CONDITION_TEXTS` ; une condition sans texte fait échouer le chargement. Une source de
 montant : voir « Montants calculés ». Un nom de calibre glissé
@@ -504,7 +506,7 @@ calibre seul : `{ type: "size", size }` (forme courte `sizeIs(SMALL)`). Ajouter 
 chargement). Les textes ne combinent pas encore deux filtres : le jour où un second type
 existera, sa phrase combinée s'écrira avec lui.
 
-**Déroulé**, pour chaque bille chassée (`core/marbles.js`/`ejectFromSlot`) :
+**Déroulé**, pour chaque bille chassée (`core/marbles-run.js`/`ejectFromSlot`) :
 
 1. `eject` (« plombée éjecte loupe. ») ;
 2. son **Éjection** (`knockout`), une interruption réglée jusqu'au bout avant la suite
@@ -551,7 +553,7 @@ simulation et dans l'écran, pour tous les effets.
 - `zones` : où le joueur choisit, parmi `CHOICE_ZONES` : aujourd'hui `hand` et
   `triangle` ; `pot`, `discard` et `bag` y sont déclarés, pas encore disponibles (refusés
   au chargement). Ajouter une zone : `available` à vrai, ses cibles
-  (`core/marbles.js`/`CHOICE_TARGETS`), ses textes (`marbles.choice.noun.*`).
+  (`core/marbles-run.js`/`CHOICE_TARGETS`), ses textes (`marbles.choice.noun.*`).
 - `pick` : sur le triangle, `marble` (une bille active) ou `slot` (un emplacement, vide
   compris) ; aucune action actuelle n'a de sens sur un emplacement vide, `slot` est donc
   refusé pour toutes aujourd'hui.
@@ -562,7 +564,7 @@ simulation et dans l'écran, pour tous les effets.
   Une combinaison impossible est refusée au chargement (une zone sans sens pour l'action,
   un bonus sans phase à venir).
 
-**Déroulé** (`core/marbles.js`/`chooseTargets`) : les N choix se font un par un ; une cible
+**Déroulé** (`core/marbles-run.js`/`chooseTargets`) : les N choix se font un par un ; une cible
 déjà choisie n'est plus éligible ; la sélection s'arrête à N choix, dès qu'il ne reste
 aucune cible éligible, ou sur Terminer (« jusqu'à N »). Aucune cible éligible dès le
 départ : l'effet ne fait rien, le journal le note (`targetEmpty`, cible `"choice"`, « Aucune
@@ -661,7 +663,7 @@ chargement s'il en manque un). La liste est validée au chargement du core
 (`validateMarbleTriggers`) : un déclencheur sans nom ni description de mot-clé échoue ; ses
 textes, par le domaine `marbles-view`. **Ajouter un déclencheur** : son entrée, ses textes
 FR et EN (dont son nom et sa description de mot-clé), ses mots dans les outils, et
-l'émission de son évènement dans `core/marbles.js` au bon moment du tour ; ses valeurs de
+l'émission de son évènement dans `core/marbles.js` ou `core/marbles-run.js` au bon moment du tour ; ses valeurs de
 partie et sa place dans l'aide des mots-clés suivent d'office.
 
 Les **phases** sont déclarées de même, dans `config/marbles-values.js`/`MARBLE_PHASES` :
@@ -673,7 +675,8 @@ le moment de chacun (règle des cibles) et les mots-clés de phase des valeurs d
 ## Simulation
 
 Le réducteur, `reduce(state, action)` des règles (`core/marbles.js`/`marblesReduce` derrière), est pur et rend toujours `{ ok, state, events, error }`.
-L'en-tête de `core/marbles.js` décrit l'état, les actions et chaque évènement du journal.
+L'en-tête de `core/marbles.js` décrit l'état et les actions ; celui de
+`core/marbles-content.js`, chaque évènement du journal.
 Une action interdite ne lève jamais : `ok` est faux, l'état inchangé, et `error` est un
 code de `MARBLE_ERRORS`, dont le texte est `marbles.error.<code>`.
 
@@ -690,7 +693,7 @@ Des compteurs tenus par la simulation, dans l'état (`tally`, `{ <id>: { turn, g
 sérialisé avec lui), que lisent les montants calculés, la prévision, le menu de debug
 (Maj+L) et, plus tard, les succès. Le mécanisme, `core/marbles-tally.js`, ne sait rien du
 jeu ; les compteurs viennent de `core/marbles-counters.js`, en une liste
-(`core/marbles.js`/`TALLY_COUNTERS`), chacun `{ id, category, count(event, context) }`.
+(`core/marbles-content.js`/`TALLY_COUNTERS`), chacun `{ id, category, count(event, context) }`.
 
 **Deux portées pour chaque compteur** : « ce tour » (`turn`) revient à zéro au début de
 chaque tour, avant sa pioche (à l'émission de `turnStarted`, le premier évènement de la
@@ -710,7 +713,7 @@ pose sur une bille sans Éjection donne +1 bille éjectée, +0 éjection ; un m�
 
 | Catégorie | Compteurs (id) | Source | Compte |
 |---|---|---|---|
-| Déclenchements | `awaken`, `flick`, `hit`, `windfall`, `knockout`, `final`, `apex`, `base`, `leftBase`, `rightBase`, `pocketEntry`, `pocketResolution`, `pocketReaction` | générés : un par déclencheur de `MARBLE_TRIGGERS`, un par mot-clé de phase (`core/marbles.js`/`PHASE_KEYWORDS`, tirés de `MARBLE_PHASES`), un par moment En poche (`MARBLE_POCKET`) | +1, par bille, quand le mot-clé se déclenche chez une bille qui a un effet pour ce moment : son champ n'est pas vide (pour une base : l'effet de base, ou sa variante de l'emplacement), ou elle a reçu un effet extérieur pour ce moment (un bonus ciblé sur sa phase). Un effet à condition fausse compte ; une phase sautée (emplacement vide, bille retirée avant) ne compte pas. `base` = `leftBase` + `rightBase` |
+| Déclenchements | `awaken`, `flick`, `hit`, `windfall`, `knockout`, `final`, `apex`, `base`, `leftBase`, `rightBase`, `pocketEntry`, `pocketResolution`, `pocketReaction` | générés : un par déclencheur de `MARBLE_TRIGGERS`, un par mot-clé de phase (`core/marbles-content.js`/`PHASE_KEYWORDS`, tirés de `MARBLE_PHASES`), un par moment En poche (`MARBLE_POCKET`) | +1, par bille, quand le mot-clé se déclenche chez une bille qui a un effet pour ce moment : son champ n'est pas vide (pour une base : l'effet de base, ou sa variante de l'emplacement), ou elle a reçu un effet extérieur pour ce moment (un bonus ciblé sur sa phase). Un effet à condition fausse compte ; une phase sautée (emplacement vide, bille retirée avant) ne compte pas. `base` = `leftBase` + `rightBase` |
 | Actions | `draw`, `drawQuantity`, `polish`, `polishQuantity`, `crack`, `crackQuantity`, `pocket`, `pocketQuantity`, `eject`, `ejectQuantity` | générés depuis les actions de `CLAUSE_ACTIONS` qui déclarent `keyword` | les déclencheurs : un par application (une Pioche par effet joué qui pioche ; un Polissage, une Fêlure, un Empocher ou un Éjecter par application, cible vide comprise) ; la quantité réelle : billes réellement piochées par une Pioche (`draw` de cause `"effect"`), usure réellement rendue ou ajoutée (`applied` de `polished`, `cracked`), billes réellement déplacées par Empocher (`pocketed` ou `lost`), billes réellement chassées par Éjecter (`removed`, cause `"eject"`) |
 | Vitesse et Masse | `speedGains`, `speedGained`, `speedLosses`, `speedLost`, et les mêmes pour `mass` | générés depuis les actions de valeur sans `keyword` | dans chaque effet joué (`effect`), la valeur réellement appliquée aux compteurs du tour (bonus reçu compris ; un bonus perdu n'est jamais appliqué), avant les planchers de l'Impact : une occurrence de gain ou de perte par effet, et le total en valeur absolue |
 | Évènements | `thrownMarbles`, `hitMarbles`, `ejectedMarbles`, `shuffles`, `drawnMarbles`, `wornMarbles`, `triangleExits`, `pocketedMarbles`, `lostMarbles` | déclarés : `config/marbles-values.js`/`MARBLE_TALLIES` | billes lancées (`flick`), tiquées (`hit` : posées sur un emplacement occupé), éjectées (`removed`, cause `"replacement"` ou `"eject"`), mélanges (`bagRegenerated`), billes piochées (`draw`, toutes causes), usées (`removed`, cause `"wear"`), sorties du triangle (`removed`, toutes causes : aujourd'hui, usées + éjectées + mises en poche depuis le triangle ; les éjectées comptent celles d'Éjecter), mises en poche (`pocketed`), perdues (`lost`) |
@@ -732,7 +735,7 @@ Un évènement réel se déclare ainsi :
 
 `match` : des champs de l'évènement et leur valeur. `filter` : la bille que nomme
 l'évènement est de ce calibre, seulement sur des évènements qui nomment une bille toujours
-connue (`core/marbles.js`/`JOURNAL_EVENTS`), jamais la pioche, dont la bille est cachée
+connue (`core/marbles-content.js`/`JOURNAL_EVENTS`), jamais la pioche, dont la bille est cachée
 dans la prévision.
 
 - **Textes** : par convention, `marbles.tally.<id>.name` (le menu, au pluriel :
@@ -1316,7 +1319,7 @@ sac et de la défausse : `view/marbles/keywords.js`) :
   mot-clé (« Pioche : pioche des billes du sac. … »), puis « Fermer » ; Échap ferme aussi.
   Les entrées se lisent, Entrée n'y fait rien.
 
-Seulement les mots-clés présents sur la bille (`core/marbles.js`/`keywordsOf`) : ses champs
+Seulement les mots-clés présents sur la bille (`core/marbles-content.js`/`keywordsOf`) : ses champs
 non vides (déclencheurs, En poche, pointe, base, variante comprise) et les actions
 mots-clés de ses clauses (Pioche, Polissage, Fêlure, Empocher), chacun une fois, dans
 l'ordre : éveil, chiquenaude, tic, trouvaille, éjection, final, en poche, pioche,
@@ -1329,7 +1332,7 @@ séquence, comme les autres annonces de consultation.
 
 Les noms et descriptions sont déclarés à côté des mots-clés (`MARBLE_PHASES`,
 `MARBLE_TRIGGERS`, `MARBLE_POCKET`, `CLAUSE_ACTIONS` : `keyword.texts`), lus par
-`core/marbles.js`/`buildMarbleKeywords` : un mot-clé sans eux échoue au chargement. Pas de
+`core/marbles-content.js`/`buildMarbleKeywords` : un mot-clé sans eux échoue au chargement. Pas de
 conflit de touches : E n'était lié à rien dans ces écrans (l'émote de l'écran de ville n'y
 est jamais active).
 

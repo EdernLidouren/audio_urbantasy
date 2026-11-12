@@ -13,7 +13,7 @@
 import { pushScreen, popScreen } from "../../lib/screens.js";
 import { makeMenuScreen } from "../../lib/menu.js";
 import { nameRef, t } from "../../data/i18n/index.js";
-import { TALLY_COUNTERS } from "../../core/marbles.js";
+import { TALLY_COUNTERS } from "../../core/marbles-content.js";
 import { TALLY_CATEGORIES } from "../../core/marbles-counters.js";
 import { tallyValue } from "../../core/marbles-tally.js";
 

@@ -3,7 +3,7 @@
 //
 // CE QU'UN JOUEUR SAIT : ce qu'un joueur humain sait, rien de plus. Il ne reçoit
 // jamais l'état de la partie, seulement sa VUE PUBLIQUE (publicView) : les billes du
-// sac y sont inconnues (core/marbles.js/UNKNOWN_MARBLE : seul leur nombre reste,
+// sac y sont inconnues (core/marbles-run.js/UNKNOWN_MARBLE : seul leur nombre reste,
 // comme la touche S), et l'état du hasard de la partie en est retiré. Il n'agit que
 // par les actions publiques du réducteur (core/marbles.js), que le simulateur valide
 // comme celles d'un humain (lancers compris), et ne prévoit que par le moteur de
@@ -20,7 +20,8 @@
 // entrée de plus ici, sans toucher au simulateur.
 
 import { MARBLES_DRAWN_VALUE } from "./drawn-value.js";
-import { SLOTS, UNKNOWN_MARBLE, legalActions } from "../../core/marbles.js";
+import { SLOTS, legalActions } from "../../core/marbles.js";
+import { UNKNOWN_MARBLE } from "../../core/marbles-run.js";
 import { createSeed, nextRandom } from "../../core/rng.js";
 import { GAME_RULES } from "./game-rules.js";
 

@@ -29,9 +29,10 @@ import {
   MARBLE_TRIGGERS,
 } from "../../config/marbles-values.js";
 import { detailLine, stepDetail } from "../../lib/detail-card.js";
-import { JOURNAL_EVENTS, MARBLE_ERRORS, SLOTS } from "../marbles.js";
+import { MARBLE_ERRORS, SLOTS } from "../marbles.js";
+import { JOURNAL_EVENTS } from "../marbles-content.js";
 import { emptyTally } from "../marbles-tally.js";
-import { MARBLE_KEYWORDS, REACTION_KEYS, TALLY_COUNTERS } from "../marbles.js";
+import { MARBLE_KEYWORDS, REACTION_KEYS, TALLY_COUNTERS } from "../marbles-content.js";
 import { TALLY_CATEGORIES } from "../marbles-counters.js";
 import {
   bagDisplayOrder,
@@ -816,6 +817,9 @@ function checkSounds(run) {
   run("profils : délai négatif refusé", true, throws(() => validateMarbleSounds({}, {}, { ...MARBLES_SETTINGS, drawSoundIntervalMs: -1 })));
 
   const settings = { shuffleToDrawMs: 900, drawSoundIntervalMs: 350, swapSoundDelayMs: 150 };
+  // La table des billes des repères : celle des vérifications, injectée comme les
+  // règles de l'écran injectent la leur.
+  const FIXTURE_TABLE = { types: FIXTURE_TYPES };
   const draws = ["aging_flick", "hit_polish", "one_shot"].map((marble) => ({ type: "draw", marble }));
   run.same(
     "repères : ouverture, le brassage puis une balise après l'autre",
@@ -825,17 +829,17 @@ function checkSounds(run) {
       { atMs: 1250, sound: "beacon", marble: "hit_polish" },
       { atMs: 1600, sound: "beacon", marble: "one_shot" },
     ],
-    eventCues([{ type: "turnStarted", turn: 1, turnCount: 9 }, ...draws], { shuffleFirst: true }, settings)
+    eventCues([{ type: "turnStarted", turn: 1, turnCount: 9 }, ...draws], { shuffleFirst: true }, settings, FIXTURE_TABLE)
   );
   run.same(
     "repères : une pioche sans brassage part aussitôt",
     [0, 350],
-    eventCues(draws.slice(0, 2), {}, settings).map((cue) => cue.atMs)
+    eventCues(draws.slice(0, 2), {}, settings, FIXTURE_TABLE).map((cue) => cue.atMs)
   );
   run.same(
     "repères : sac régénéré, le brassage avant la pioche",
     ["shuffle@0", "beacon@900"],
-    eventCues([{ type: "bagRegenerated", size: 4 }, draws[0]], {}, settings).map((cue) => `${cue.sound}@${cue.atMs}`)
+    eventCues([{ type: "bagRegenerated", size: 4 }, draws[0]], {}, settings, FIXTURE_TABLE).map((cue) => `${cue.sound}@${cue.atMs}`)
   );
   // Roulements, sur une table aux distances rondes : de la main au milieu à la
   // pointe, 1 ; d'une base à l'autre, 0,8 ; de la pointe à la défausse, 0,8.
@@ -859,7 +863,7 @@ function checkSounds(run) {
     impactToOutMs: 30,
     outStaggerMs: 200,
   };
-  const motion = { rolls, places };
+  const motion = { rolls, places, types: FIXTURE_TYPES };
   const placeName = (place) => place.slot ?? place.kind;
   const rolled = (cues) =>
     cues.map((cue) =>
@@ -957,7 +961,7 @@ function checkSounds(run) {
   );
   // Rotation : chaque bille roule vers l'emplacement suivant, toutes ensemble ; un
   // emplacement vide reste muet. Les chutes, plus discrètes, à l'arrivée.
-  const rotation = (triangle) => ({ type: "rotation", triangle });
+  const rotation = (triangle, notches = 1) => ({ type: "rotation", triangle, notches });
   run.same(
     "repères : une rotation, les billes tournent ensemble, puis se calent",
     [
@@ -981,6 +985,11 @@ function checkSounds(run) {
     "repères : une rotation avec un seul emplacement occupé, une seule bille tourne",
     ["roll one_shot rightBase>leftBase @0+700", "drop one_shot leftBase @700 x0.5"],
     rolled(eventCues([rotation({ apex: null, rightBase: null, leftBase: { marble: "one_shot", wear: 0 } })], {}, settings, motion))
+  );
+  run.same(
+    "repères : une rotation de deux crans, la bille passe par l'emplacement du milieu",
+    ["roll one_shot leftBase>apex>rightBase @0+1400", "drop one_shot rightBase @1400 x0.5"],
+    rolled(eventCues([rotation({ apex: null, rightBase: { marble: "one_shot", wear: 0 }, leftBase: null }, 2)], {}, settings, motion))
   );
   run.same("rotation : un cran, l'emplacement suivant", ["leftBase", "apex"], rotationPath("leftBase", 1));
   run.same("rotation : trois crans, le tour complet", ["apex", "rightBase", "leftBase", "apex"], rotationPath("apex", 3));
@@ -1027,7 +1036,7 @@ function checkSounds(run) {
   run.same(
     "repères : une phase, la balise de la bille active, à son emplacement",
     [{ atMs: 0, sound: "beacon", marble: "aging_flick", place: slotPlace("apex") }],
-    eventCues([{ type: "phase", slot: "apex", marble: "aging_flick" }], {}, settings)
+    eventCues([{ type: "phase", slot: "apex", marble: "aging_flick" }], {}, settings, FIXTURE_TABLE)
   );
 
   // Stéréo : chaque bille piochée s'entend à sa place dans la main, de gauche à
@@ -1035,9 +1044,9 @@ function checkSounds(run) {
   run.same(
     "repères : les billes piochées, les dernières de la main, dans l'ordre",
     [handPlace(3, 5), handPlace(4, 5)],
-    eventCues(draws.slice(0, 2), { handAfter: ["final_pocket", "awaken_draw", "all_rounder", "aging_flick", "hit_polish"] }, settings).map((cue) => cue.place)
+    eventCues(draws.slice(0, 2), { handAfter: ["final_pocket", "awaken_draw", "all_rounder", "aging_flick", "hit_polish"] }, settings, FIXTURE_TABLE).map((cue) => cue.place)
   );
-  run("repères : sans main connue, la pioche au centre", undefined, eventCues(draws.slice(0, 1), {}, settings)[0].place);
+  run("repères : sans main connue, la pioche au centre", undefined, eventCues(draws.slice(0, 1), {}, settings, FIXTURE_TABLE)[0].place);
   const round = (value) => Math.round(value * 100) / 100;
   run.same(
     "stéréo : la main de gauche à droite",
@@ -1081,10 +1090,10 @@ function checkSounds(run) {
     ["hand@0", "hand@700", "hand@1400", "leftBase@2100", "rightBase@2800", "apex@3500"],
     placesDemoCues("aging_flick").map((cue) => `${cue.place.slot ?? cue.place.kind}@${cue.atMs}`)
   );
-  run.same("repères : une phase sur un emplacement vide reste muette", [], eventCues([{ type: "phaseSkipped", slot: "apex" }], {}, settings));
+  run.same("repères : une phase sur un emplacement vide reste muette", [], eventCues([{ type: "phaseSkipped", slot: "apex" }], {}, settings, FIXTURE_TABLE));
 
   // La file : les immédiats aussitôt, les autres à leur échéance, dans l'ordre.
-  let queue = enqueueCues(EMPTY_SOUND_QUEUE, eventCues(draws, { shuffleFirst: true }, settings));
+  let queue = enqueueCues(EMPTY_SOUND_QUEUE, eventCues(draws, { shuffleFirst: true }, settings, FIXTURE_TABLE));
   const step = (deltaMs) => {
     const result = advanceSoundQueue(queue, deltaMs);
     queue = result.queue;
@@ -1110,7 +1119,7 @@ function checkSounds(run) {
   );
   // Une pioche dite à une étape où la main compte 2 billes, même si la main finale en
   // compte 4 : sa balise est à la dernière place d'une main de 2.
-  const midDraw = eventCues([{ type: "draw", marble: "aging_flick", cause: "effect" }], { handAfter: [{}, {}, {}, {}], handSize: 2 });
+  const midDraw = eventCues([{ type: "draw", marble: "aging_flick", cause: "effect" }], { handAfter: [{}, {}, {}, {}], handSize: 2 }, undefined, FIXTURE_TABLE);
   run.same("pioche d'une étape : placée dans la main de ce moment", handPlace(1, 2), midDraw.find((cue) => cue.sound === "beacon").place);
 }
 

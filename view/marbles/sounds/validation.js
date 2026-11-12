@@ -21,7 +21,7 @@ const TIMING_SETTINGS = ["shuffleToDrawMs", "drawSoundIntervalMs", "swapSoundDel
 
 // Échoue au chargement : un calibre sans profil, ou un profil incomplet, se
 // découvrirait sinon en pleine partie, en silence. Le calibre de chaque bille, lui,
-// est validé par la simulation (core/marbles.js/validateMarbleTypes).
+// est validé par la simulation (core/marbles-content.js/validateMarbleTypes).
 export function validateMarbleSounds(sizes, profiles, settings) {
   for (const [size, id] of Object.entries(sizes)) {
     const profile = profiles[size];

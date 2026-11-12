@@ -9,7 +9,7 @@
 
 import { throws } from "../../lib/check.js";
 import { MARBLE_TALLIES, MARBLE_TRIGGERS, SMALL } from "../../config/marbles-values.js";
-import { JOURNAL_EVENTS, TALLY_COUNTERS } from "../marbles.js";
+import { JOURNAL_EVENTS, TALLY_COUNTERS } from "../marbles-content.js";
 import { CLAUSE_ACTIONS } from "../marbles-effects.js";
 import { TALLY_CATEGORIES, buildTallyCounters, validateEventTallies } from "../marbles-counters.js";
 import { emptyTally, recordTally, tallyValue } from "../marbles-tally.js";

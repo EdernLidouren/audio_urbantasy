@@ -6,7 +6,8 @@
 // Lancées par core/checks/index.js/runChecks (`node tools/run-checks.js marbles-pocket`).
 
 import { throws } from "../../lib/check.js";
-import { createMarblesGame, impactOf, validatePocketMoments } from "../marbles.js";
+import { createMarblesGame, impactOf } from "../marbles.js";
+import { validatePocketMoments } from "../marbles-content.js";
 import { MARBLE_POCKET, MARBLES_SETTINGS } from "../../config/marbles-values.js";
 import { CHOICELESS_TYPES, FIXTURE_BAG, FIXTURE_TYPES, fixtureRules } from "./fixtures/marbles.js";
 import { caughtMessage, eventTypes, fabricatedRules, handIds, inHand, marbleCount, marblesPlayState, mustReduce, placed, triangleOf, validateTable } from "./helpers.js";
@@ -67,6 +68,21 @@ function checkPocket(run) {
   );
   run.same("Empocher, depuis la main : le pot, la main", { pot: ["fragile"], hand: ["aging_flick"] }, { pot: hitPocket.state.pot, hand: handIds(hitPocket.state) });
   run("Empocher, depuis la main : l'entrée aux compteurs du tour (4 + 10)", 14, hitPocket.state.speed);
+  // La place d'arrivée au pot, et non la place d'origine dans la main : la fragile
+  // quitte la main en 0 et arrive au pot en 1, derrière la bille déjà là.
+  const behind = apply(
+    playState({ hand: inHand(["hit_pocket", "fragile", "aging_flick"]), triangle: triangleOf(null, null, placed("aging_flick")), pot: ["hit_polish"] }),
+    { type: "place", handIndex: 0, slot: "apex" }
+  );
+  run.same(
+    "Empocher, depuis la main : la mise en poche et son entrée portent la place d'arrivée au pot",
+    { index: 0, potIndex: 1, entry: 1 },
+    {
+      index: behind.events.find((event) => event.type === "pocketed").index,
+      potIndex: behind.events.find((event) => event.type === "pocketed").potIndex,
+      entry: behind.events.find((event) => event.type === "effect" && event.trigger === "pocketEntry").potIndex,
+    }
+  );
   // Main vide : sans effet, noté.
   const emptyHand = apply(playState({ hand: inHand(["hit_pocket"]), triangle: triangleOf(null, null, placed("aging_flick")) }), { type: "place", handIndex: 0, slot: "apex" });
   run("Empocher, main vide : noté", "targetEmpty:pocket:firstInHand", journal(emptyHand.events).at(-1));

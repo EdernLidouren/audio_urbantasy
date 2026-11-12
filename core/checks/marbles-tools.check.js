@@ -9,7 +9,8 @@
 // (`node tools/run-checks.js marbles-tools`).
 
 import { MARBLES_SETTINGS, STARTING_BAG } from "../../config/marbles-values.js";
-import { JOURNAL_EVENTS, SLOTS, legalActions } from "../marbles.js";
+import { SLOTS, legalActions } from "../marbles.js";
+import { JOURNAL_EVENTS } from "../marbles-content.js";
 import { throws } from "../../lib/check.js";
 import { parseCommand } from "../../tools/marbles/commands.js";
 import { formatEvent, formatState } from "../../tools/marbles/format.js";

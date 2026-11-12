@@ -1,11 +1,12 @@
 // Jeu des billes : tout ce qui se DIT, à partir de l'état, du journal
-// (core/marbles.js) et de la prévision (core/marbles-forecast.js). Pur : rend du
+// (core/marbles-content.js, en-tête) et de la prévision (core/marbles-forecast.js). Pur : rend du
 // texte, n'annonce rien. `t` est reçu en paramètre, pour que l'écran et le kit
 // terminal (tools/marbles/play.js) disent exactement les mêmes phrases.
 
 import { nameRef } from "../../data/i18n/index.js";
 import { MARBLE_POCKET, MARBLE_SIZES, MARBLE_TRIGGERS } from "../../config/marbles-values.js";
-import { SLOTS, TALLY_COUNTERS, throwsLeft } from "../../core/marbles.js";
+import { SLOTS, throwsLeft } from "../../core/marbles.js";
+import { TALLY_COUNTERS } from "../../core/marbles-content.js";
 import { emptyTally } from "../../core/marbles-tally.js";
 import { AMOUNT_SOURCES, CHOICE_ZONES, CLAUSE_ACTIONS, CONDITIONS, FIRST_IN_HAND, TARGET_FILTERS, amountOf, isAll, isChoice } from "../../core/marbles-effects.js";
 import { forecast } from "../../core/marbles-forecast.js";
@@ -550,10 +551,9 @@ export function describeOverview(game, rules, t) {
   return [summary, ...slots, ...potLines(predicted, t), ...forecastNotes(predicted, t)].join(" ");
 }
 
-// La rotation du moteur (core/marbles.js/rotated) : un cran, dans le sens horaire
-// (base gauche -> pointe -> base droite). Paramètres du texte, pour le jour où elle
-// variera ; son évènement les portera alors.
-const ROTATION = { steps: 1, direction: "clockwise" };
+// Le sens de la rotation du moteur (core/marbles.js/ROTATION_NEXT) : horaire (base
+// gauche -> pointe -> base droite). Ses crans, eux, viennent de l'évènement.
+const ROTATION_DIRECTION = "clockwise";
 
 // Le gabarit d'un effet déclenché par un évènement, celui de son déclencheur
 // (MARBLE_TRIGGERS, `texts.effect`) ; celui d'une phase se dit comme le résultat de
@@ -655,12 +655,12 @@ const EVENT_TEXTS = {
   impact: (event, t) => t("marbles.event.impact", { impact: event.impact, score: event.score }),
   // Au dernier tour, la partie finit avant que le triangle ne serve : la rotation
   // ne se dit pas.
-  rotation: (event, t, context) => (context.endsBeforeNextTurn ? null : t("marbles.event.rotation", ROTATION)),
+  rotation: (event, t, context) => (context.endsBeforeNextTurn ? null : t("marbles.event.rotation", { steps: event.notches, direction: ROTATION_DIRECTION })),
   gameOver: (event, t) => t("marbles.event.game_over", { score: event.score }),
 };
 
 // Le moment d'un choix, devant sa question : la bille qui le pose et son moment
-// (`by`, core/marbles.js), comme ses effets se disent : « Tic de gorille : », « base
+// (`by`, core/marbles-content.js, en-tête), comme ses effets se disent : « Tic de gorille : », « base
 // gauche, tigrée : », « Entrée au pot de porcelaine : », « Pot, mica : ». Le Tic a
 // sa propre clé : son effet anglais se dit « Hit from gorilla », pas « of ».
 const POCKET_ENTRY_TRIGGERS = new Set(MARBLE_POCKET.moments.filter((moment) => moment.event === "pocketed").map((moment) => moment.trigger));

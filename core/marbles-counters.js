@@ -148,7 +148,7 @@ function eventCounter({ id, events, match = {}, filter }) {
 
 // Échoue sur une liste de compteurs d'évènements mal formée (config/marbles-values.js/
 // MARBLE_TALLIES, décrite là). `journalEvents` : les types d'évènements du journal,
-// chacun avec vrai s'il nomme toujours une bille connue (core/marbles.js/
+// chacun avec vrai s'il nomme toujours une bille connue (core/marbles-content.js/
 // JOURNAL_EVENTS).
 export function validateEventTallies(tallies, journalEvents) {
   const fail = (message) => {

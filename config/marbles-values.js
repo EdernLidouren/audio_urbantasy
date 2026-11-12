@@ -225,7 +225,7 @@ export const MARBLES_AUDIO = {
 //   slots   les emplacements où elle joue, dans l'ordre de la résolution ;
 //   texts   `name`, le nom du mot-clé (« Pointe ») ; `description`, ce qu'il fait
 //           (aide des mots-clés, touches E et Maj+E). Une phase sans eux échoue au
-//           chargement (core/marbles.js).
+//           chargement (core/marbles-content.js).
 // L'ordre de la liste est celui des mots-clés (pointe, puis base).
 export const MARBLE_PHASES = [
   {
@@ -243,7 +243,7 @@ export const MARBLE_PHASES = [
 ];
 
 // Les DÉCLENCHEURS propres d'une bille, déclarés UNE fois : la validation de la
-// table, les écouteurs du core (core/marbles.js), la prévision, la narration, la
+// table, les écouteurs du core (core/marbles-run.js), la prévision, la narration, la
 // fiche et les outils lisent cette liste, jamais une copie. La phase, l'effet de
 // base ou de pointe, est à part : elle a ses propres champs et se dit par son
 // emplacement. L'ordre de la liste est celui de la fiche et des mots-clés : la vie
@@ -286,7 +286,8 @@ export const MARBLE_PHASES = [
 //             {effect} ; {effect} seul pour "slot") ;
 //   card      sa place dans la fiche : "below", au-dessous de l'annonce principale.
 // AJOUTER un déclencheur : une entrée ici, son champ dans les billes, ses textes, et
-// l'émission de son évènement dans core/marbles.js au bon moment du tour.
+// l'émission de son évènement dans core/marbles.js ou core/marbles-run.js au bon
+// moment du tour.
 export const MARBLE_TRIGGERS = [
   // L'Éveil : à chaque bille piochée (du sac à la main), pioche du tour ou effet,
   // juste après sa pioche et avant la suivante ; jamais pour une bille restée au sac
@@ -411,7 +412,7 @@ export const MARBLE_TRIGGERS = [
 //           `marbles.tally.<id>.name` (menu de debug) et `.unit` (« par bille
 //           éjectée ») ;
 //   events  les types d'évènements du journal qui l'augmentent de 1
-//           (core/marbles.js/JOURNAL_EVENTS) ;
+//           (core/marbles-content.js/JOURNAL_EVENTS) ;
 //   match   (facultatif) des champs de l'évènement et leur valeur exigée, ou la
 //           liste des valeurs admises : { cause: "wear" }, { cause: ["a", "b"] } ;
 //   filter  (facultatif) { type: "size", size } : la bille que nomme l'évènement
@@ -469,7 +470,7 @@ export const MARBLE_TALLIES = [
 //              fiche reçoit aussi {occurrence} (`marbles.tally.<id>.each`).
 // Une action sur la bille elle-même y est refusée : dans le pot, elle n'a ni usure
 // ni place à quitter. AJOUTER un moment fixe : une entrée ici, ses textes, et
-// l'émission de son évènement dans core/marbles.js. Une occurrence écoutable de plus
+// l'émission de son évènement dans core/marbles-run.js. Une occurrence écoutable de plus
 // n'a rien à déclarer ici : tout compteur écoutable ajouté l'est par construction.
 export const MARBLE_POCKET = {
   field: "pocketed",
@@ -540,7 +541,7 @@ export const MARBLE_CARD_MODEL = {
 
 // Sac de test : un exemplaire de chaque bille. Une liste d'ids, pas un
 // dérivé du registre (marbles/types/) : un sac peut porter plusieurs exemplaires
-// d'une bille. Validé au démarrage (core/marbles.js/validateMarblesContent).
+// d'une bille. Validé au démarrage (core/marbles-content.js/validateMarblesContent).
 export const STARTING_BAG = [
   "clay",
   "glass",

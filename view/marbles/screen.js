@@ -269,7 +269,7 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
   function flushSounds(deltaMs) {
     const { queue, due } = advanceSoundQueue(soundQueue, deltaMs);
     soundQueue = queue;
-    due.forEach(playCue);
+    due.forEach((cue) => playCue(cue, rules.types));
   }
 
   // Les sons d'un geste, d'après son journal : en file, les immédiats aussitôt.
@@ -359,7 +359,7 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
     const marble = marbleUnderCursor();
     if (marble === undefined) return;
     const place = cursor.place === "hand" ? handPlace(handEntryUnderCursor().index, getGame().hand.length) : slotPlace(cursor.place);
-    playFocusBeacon(marble, place);
+    playFocusBeacon(marble, place, rules.types);
   }
 
   // La fiche de la bille sous le curseur, avec ce qu'on entendrait à sa position

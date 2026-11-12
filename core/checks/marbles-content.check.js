@@ -17,7 +17,8 @@
 
 import { LOCALE_TABLES, t, getLocale, setLocale } from "../../data/i18n/index.js";
 import { MARBLE_SOUND_PROFILES, STARTING_BAG } from "../../config/marbles-values.js";
-import { SLOTS, validateMarblesContent } from "../marbles.js";
+import { SLOTS } from "../marbles.js";
+import { validateMarblesContent } from "../marbles-content.js";
 import { createMarblesRules } from "../marbles-rules.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
 import { marbleCard } from "../../view/marbles/card.js";

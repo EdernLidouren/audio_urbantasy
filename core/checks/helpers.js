@@ -14,7 +14,8 @@ import { parseNewGame } from "../new-game.js";
 import { throws } from "../../lib/check.js";
 import { NameRef } from "../../lib/i18n.js";
 import { MEDIUM } from "../../config/marbles-values.js";
-import { SLOTS, legalActions, validateMarbleTypes } from "../marbles.js";
+import { SLOTS, legalActions } from "../marbles.js";
+import { validateMarbleTypes } from "../marbles-content.js";
 import { nextRandom } from "../rng.js";
 import { fixtureRules } from "./fixtures/marbles.js";
 
@@ -74,7 +75,7 @@ export function fabricatedRules(table) {
 }
 
 // Valide une table de billes FABRIQUÉE, complétée d'un calibre (withSizes) : lève si
-// la table est refusée (core/marbles.js/validateMarbleTypes).
+// la table est refusée (core/marbles-content.js/validateMarbleTypes).
 export function validateTable(table) {
   validateMarbleTypes(withSizes(table));
 }

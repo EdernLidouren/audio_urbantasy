@@ -4,7 +4,7 @@
 // pas diverger du moteur.
 //
 // Garde-fous :
-// - À L'AVEUGLE : la copie (core/marbles.js/blindCopy) ne connaît du sac et de la
+// - À L'AVEUGLE : la copie (core/marbles-run.js/blindCopy) ne connaît du sac et de la
 //   défausse que leur nombre de billes, et n'a pas le hasard de la partie ; le
 //   déroulé est aveugle (options.blind). Une pioche y a lieu, avec ses arrêts
 //   (main pleine, plus de billes), mais sa bille est inconnue ; une régénération
@@ -35,7 +35,10 @@
 // résolution si l'action n'en était pas une : l'Impact prévu du tour avec ce choix,
 // les choix suivants restant indécis. Ce que le joueur a vu piocher depuis le début
 // de l'action y redevient inconnu : un rejeu qui en dépendrait diverge, et le choix
-// concerné reste indécis.
+// concerné reste indécis. Une réponse s'y repère par sa cible ET sa bille
+// (core/marbles-run.js/answerOf) : si le rejeu a mis une autre bille connue à cette place
+// (un Éveil inconnu n'y a pas empoché la première de la main, par exemple), le
+// choix reste indécis plutôt que de prévoir une autre bille.
 //
 // Résultat : { ok: false, error } si l'action serait refusée (mêmes codes que le
 // réducteur), sinon { ok: true, error: null, flick, knockout, hit, phases, speed,
@@ -100,7 +103,8 @@
 // coup ; une cible vidée par une pioche à l'aveugle reste vide pour de bon.
 
 import { MARBLE_POCKET, MARBLE_TRIGGERS } from "../config/marbles-values.js";
-import { SLOTS, UNKNOWN_MARBLE, answerOf, blindCopy, chooseRefusal, marblesReduce, replayAction, runResolution, stageRefusal } from "./marbles.js";
+import { SLOTS, marblesReduce, replayAction, runResolution, stageRefusal } from "./marbles.js";
+import { UNKNOWN_MARBLE, answerOf, blindCopy, chooseRefusal } from "./marbles-run.js";
 
 // Les déclencheurs prévus pendant une pose (config/marbles-values.js) : chacun a sa
 // clé dans le résultat, son effet ou null.
@@ -244,7 +248,7 @@ function potOutcomes(events, outcomeOf) {
 }
 
 // Les régénérations d'un journal, chacune avec les effets prévus qu'elle déclenche :
-// une Trouvaille se règle juste après sa régénération (core/marbles.js/
+// une Trouvaille se règle juste après sa régénération (core/marbles-run.js/
 // regenerateBag), avant toute autre : elle appartient à la dernière émise.
 function regenerationsOf(events, outcomeOf) {
   const regenerations = [];
@@ -347,7 +351,7 @@ function forecastAnswer(state, action, types) {
   const refusal = chooseRefusal(state, action);
   if (refusal) return failed(refusal);
   const { from, action: suspended, answers } = state.pendingChoice.resume;
-  const options = { blind: true, answers: [...answers, answerOf(action)] };
+  const options = { blind: true, answers: [...answers, answerOf(state.pendingChoice, action)] };
   const copy = blindCopy(from);
   const isResolution = suspended.type === "resolve";
   const applied = isResolution ? { ok: true, state: copy, events: [], uncertain: false } : replayAction(copy, suspended, types, options);

@@ -26,17 +26,18 @@ import {
 import { assetKeyMembers, resolveAsset } from "../../../lib/assets.js";
 import { beaconVolumeFactor, interfaceVolumeFactor, musicVolumeFactor } from "../../audio/volume-factors.js";
 import { positionOf, renderAt, renderPosition, rollRendering } from "./space.js";
-import MARBLE_TYPES from "../../../marbles/types/index.js";
 
-// Le profil sonore d'une bille : celui de son calibre.
-const profileOf = (marble) => MARBLE_SOUND_PROFILES[MARBLE_TYPES[marble].size];
+// Le profil sonore d'une bille : celui de son calibre. `types` : la table des billes,
+// toujours injectée (les règles de l'écran, rules.types), jamais la vraie importée
+// ici.
+const profileOf = (marble, types) => MARBLE_SOUND_PROFILES[types[marble].size];
 
 // Le chemin et le volume d'un repère ponctuel.
-function cueSound(cue) {
+function cueSound(cue, types) {
   const gain = cue.gain ?? 1;
   if (cue.sound === "shuffle") return { key: MARBLES_AUDIO.shuffle, volume: gain * interfaceVolumeFactor() };
-  if (cue.sound === "drop") return { key: profileOf(cue.marble).drop, volume: gain * interfaceVolumeFactor() };
-  return { key: profileOf(cue.marble).beacon, volume: gain * beaconVolumeFactor() };
+  if (cue.sound === "drop") return { key: profileOf(cue.marble, types).drop, volume: gain * interfaceVolumeFactor() };
+  return { key: profileOf(cue.marble, types).beacon, volume: gain * beaconVolumeFactor() };
 }
 
 // La vitesse de lecture d'un son : tirée autour de 1 pour les familles qui varient
@@ -67,16 +68,17 @@ function placedOptions(place, volume, rate = 1) {
   return options;
 }
 
-export function playCue(cue) {
+// Joue un repère (./timeline.js) ; `types` : la table des billes.
+export function playCue(cue, types) {
   if (cue.sound === "roll") {
-    startRoll(cue);
+    startRoll(cue, types);
     return;
   }
   if (cue.sound === "collision") {
-    playCollision(cue);
+    playCollision(cue, types);
     return;
   }
-  const { key, volume } = cueSound(cue);
+  const { key, volume } = cueSound(cue, types);
   playAt(key, cue.place, volume, pitchOf(cue.sound), cue.sound);
 }
 
@@ -90,9 +92,9 @@ function playAt(key, place, volume, rate, label, delayMs = 0) {
 
 // La frappeuse tout de suite, la frappée `flamMs` plus tard, retardée par la chaîne
 // audio (voir l'en-tête) ; chacune avec sa propre variation de ton.
-function playCollision(cue) {
+function playCollision(cue, types) {
   const volume = (cue.gain ?? 1) * interfaceVolumeFactor();
-  const impact = (marble, delayMs) => playAt(profileOf(marble).impact, cue.place, volume, pitchOf("impact"), "impact", delayMs);
+  const impact = (marble, delayMs) => playAt(profileOf(marble, types).impact, cue.place, volume, pitchOf("impact"), "impact", delayMs);
   impact(cue.marble, 0);
   impact(cue.struck, MARBLES_COLLISION.flamMs);
 }
@@ -108,8 +110,8 @@ const rollingVoices = new Set();
 // pour ne jamais couper un trajet qui reçoit ses frames.
 const ROLL_DEADLINE_MARGIN_MS = 250;
 
-function startRoll(cue) {
-  const key = profileOf(cue.marble).roll;
+function startRoll(cue, types) {
+  const key = profileOf(cue.marble, types).roll;
   const style = MARBLES_ROLLS[cue.style];
   const roll = {
     path: cue.path.map((place) => positionOf(place)),
@@ -171,10 +173,10 @@ export function stopRolls() {
 let focusBeacon = null;
 
 // `place` : où est le curseur (voir l'en-tête) ; sans place, au centre (menus du
-// sac et de la défausse).
-export function playFocusBeacon(marble, place) {
+// sac et de la défausse). `types` : la table des billes.
+export function playFocusBeacon(marble, place, types) {
   stopFocusBeacon();
-  const key = profileOf(marble).beacon;
+  const key = profileOf(marble, types).beacon;
   try {
     focusBeacon = playTrackedOneShot(resolveAsset(key), placedOptions(place, beaconVolumeFactor()));
   } catch (error) {

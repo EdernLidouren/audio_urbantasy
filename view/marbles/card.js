@@ -7,7 +7,7 @@
 // son gabarit, qui reçoit {effect}. `variantLabelKey` (facultatif) : l'effet peut
 // différer selon la base, et ce gabarit reçoit alors {left} et {right}. `reactive`
 // (facultatif, En poche) : une ligne par occurrence que la bille écoute, dans l'ordre
-// des valeurs de partie (core/marbles.js/REACTION_KEYS), son gabarit recevant aussi
+// des valeurs de partie (core/marbles-content.js/REACTION_KEYS), son gabarit recevant aussi
 // {occurrence} (`marbles.tally.<id>.each`, « à chaque chiquenaude »).
 //
 // Un montant calculé se dit avec sa valeur ACTUELLE, là où se trouve la bille : son
@@ -15,7 +15,7 @@
 // partie en cours (narration.js/cardSituation).
 
 import { MARBLE_CARD_MODEL } from "../../config/marbles-values.js";
-import { REACTION_KEYS } from "../../core/marbles.js";
+import { REACTION_KEYS } from "../../core/marbles-content.js";
 import { assembleCard, validateCardModel } from "../../lib/detail-card.js";
 import { cardSituation, describePrinted } from "./narration.js";
 

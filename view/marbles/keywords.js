@@ -7,7 +7,7 @@
 // mot-clé. » (dans le menu, cette entrée seule, puis « Fermer »).
 //
 // Les mots-clés d'une bille et leur ordre viennent du core
-// (core/marbles.js/keywordsOf, par les règles) : seulement ceux présents sur la
+// (core/marbles-content.js/keywordsOf, par les règles) : seulement ceux présents sur la
 // bille, chacun une fois, déclencheurs, En poche, actions mots-clés, puis pointe et
 // base ; leurs noms et descriptions sont déclarés à côté d'eux (MARBLE_TRIGGERS,
 // MARBLE_POCKET, CLAUSE_ACTIONS, MARBLE_PHASES). Pur, sauf l'ouverture du menu.

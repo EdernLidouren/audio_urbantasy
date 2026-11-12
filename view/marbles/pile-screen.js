@@ -67,7 +67,7 @@ function makePileScreen(titleKey, marbles, rules, tally) {
 
   // La balise de l'entrée courante, si c'est une bille.
   function beacon() {
-    if (!isOnBack()) playFocusBeacon(marbles[index]);
+    if (!isOnBack()) playFocusBeacon(marbles[index], undefined, rules.types);
   }
 
   function goTo({ index: next, boundary }) {

@@ -2,7 +2,7 @@
 // donnée (format : en-tête de config/marbles-values.js). Ce module sait la
 // valider, lire ce qu'une bille a d'imprimé et l'évaluer sur un triangle ; pur,
 // il ne touche à aucun état : appliquer le résultat est l'affaire de
-// core/marbles.js.
+// core/marbles-run.js.
 //
 // AJOUTER une action ou une condition : une entrée dans CLAUSE_ACTIONS ou
 // CONDITIONS, et ses textes dans la vue (view/marbles/narration.js, ACTION_TEXTS ou
@@ -23,7 +23,7 @@
 //          absent : obligatoire, exactement N (moins s'il n'y a pas assez de cibles).
 // Seules les actions qui déclarent `choice` (leurs zones et ce qu'elles visent)
 // l'acceptent. Les choix se font un par un, au déclenchement, sur les cibles valides
-// à cet instant (core/marbles.js/chooseTargets) ; l'action s'applique ensuite à
+// à cet instant (core/marbles-run.js/chooseTargets) ; l'action s'applique ensuite à
 // chacune, dans l'ordre des choix.
 //
 // CIBLE « TOUTES » : `target` vaut { type: "all", filters? } : toutes les billes
@@ -35,10 +35,11 @@
 // déclenchement : { triangle, holder, replacement, tally } ;
 //   triangle     le triangle à cet instant ;
 //   holder       la bille qui joue l'effet, { marble, zone, turnsInHand } : `zone`
-//                dit où elle est ("triangle" ; "removed", déjà retirée du triangle,
-//                le Final ; "thrown", en cours de lancer, la Chiquenaude ;
-//                "hand") ; `turnsInHand`, son compteur de tours en main (0 hors de
-//                la main ; pendant son lancer, celui qu'elle avait en la quittant) ;
+//                dit où elle est (HOLDER_ZONES : "triangle" ; "removed", déjà
+//                retirée du triangle, le Final ; "thrown", en cours de lancer, la
+//                Chiquenaude ; "hand", l'Éveil ; "pot") ; `turnsInHand`, son
+//                compteur de tours en main (0 hors de la main ; pendant son lancer,
+//                celui qu'elle avait en la quittant) ;
 //   replacement  pendant un Tic ou une Éjection, le remplacement en cours,
 //                { placed, ejected } (deux ids de bille) ; null sinon ;
 //   tally        les valeurs de partie à cet instant (core/marbles-tally.js), lues
@@ -46,7 +47,7 @@
 //
 // La VALIDATION reçoit un contexte (validateEffect) : le moment où l'effet joue
 // (règle des cibles, conditions) et `tallies`, les identifiants des valeurs de
-// partie (core/marbles.js les fournit), que vérifie la source `tally`.
+// partie (core/marbles-content.js les fournit), que vérifie la source `tally`.
 //
 // MONTANT CALCULÉ : `amount` est un entier, ou { base, step, source, max? } :
 // base + step × la valeur de `source` (AMOUNT_SOURCES), plafonné à `max` s'il est
@@ -66,15 +67,16 @@
 // produire. Une VALEUR (Vitesse, Masse) donnée à un emplacement modifie l'effet de
 // PHASE de sa bille : elle ne vaut que si cette phase peut encore avoir lieu ce
 // tour. La validation refuse les cas toujours impossibles (targetProblem) ; les cas
-// qui dépendent de la position se tranchent à l'exécution (core/marbles.js/
+// qui dépendent de la position se tranchent à l'exécution (core/marbles-run.js/
 // fireEffect : le bonus est perdu, l'évènement `effect` le note dans `lost`). Une
 // action sur une bille peut viser un emplacement depuis n'importe quel moment, la
 // bille visée restant sur le triangle. La bille elle-même, elle, n'est visable que
-// là où elle est : chaque action le déclare (`selfOutside`, `selfRefusedIn`) ;
+// là où elle est (HOLDER_ZONES) : chaque action déclare les zones où elle la prend
+// (`selfZones`) et les déclencheurs où elle ne le peut pas (`selfRefusedIn`) ;
 // Empocher la prend même dans son Final, à la défausse.
 //
 // VALEURS : ce qu'un effet produit, une valeur par action, sous le nom de
-// l'action (`{ speed, mass, draw }`). Le core les applique (core/marbles.js/fireEffect),
+// l'action (`{ speed, mass, draw }`). Le core les applique (core/marbles-run.js/fireEffect),
 // la vue les dit, la prévision les rend.
 
 import { MARBLE_SIZES } from "../config/marbles-values.js";
@@ -160,7 +162,7 @@ function marbleActionKeyword(action, eventType) {
 
 // Les ZONES où un joueur peut choisir une cible, déclarées ici et nulle part
 // ailleurs : `available`, le choix y est possible aujourd'hui (les cibles de chaque
-// zone disponible : core/marbles.js/CHOICE_TARGETS) ; `picks`, ce qui s'y choisit.
+// zone disponible : core/marbles-run.js/CHOICE_TARGETS) ; `picks`, ce qui s'y choisit.
 // Ajouter le pot, la défausse ou le sac : `available` à vrai, ses cibles dans le core,
 // ses textes dans la vue.
 export const CHOICE_ZONES = {
@@ -217,7 +219,7 @@ function addAmount(values, clause) {
 //   event     (sur une bille) l'évènement de chaque application ;
 //   retires   (sur une bille) une bille amenée à son maximum est retirée aussitôt ;
 //   moves     (sur une bille) au lieu de changer son usure, elle la DÉPLACE : "pot",
-//             Empocher (core/marbles.js/pocketOperation) ;
+//             Empocher (core/marbles-run.js/pocketFromSlot, sendToPot) ;
 //   amountless (facultatif) l'action n'a pas de montant (Empocher) ;
 //   targets   (facultatif) ses cibles permises, les emplacements sinon ;
 //   choice    (facultatif) la cible peut être un CHOIX du joueur (en-tête) : `zones`,
@@ -226,15 +228,15 @@ function addAmount(values, clause) {
 //   all       (facultatif) la cible peut être « toutes les billes actives »,
 //             filtrées (en-tête) ;
 //   ejects    (sur une bille) au lieu de changer son usure, elle la CHASSE du
-//             triangle : Éjecter (core/marbles.js/ejectFromSlot) ;
-//   selfOutside (sur une bille) les moments où elle ne peut viser la bille
-//             elle-même, la bille concernée n'étant pas sur le triangle : la valeur
-//             `marble` du déclencheur, et pourquoi (targetProblem) ;
+//             triangle : Éjecter (core/marbles-run.js/ejectFromSlot) ;
+//   selfZones (sur une bille) les zones (HOLDER_ZONES) où elle peut viser la bille
+//             elle-même, sans cible ; ailleurs, la validation refuse
+//             (targetProblem) ;
 //   selfRefusedIn (facultatif) les déclencheurs (leur id) où elle ne peut viser la
 //             bille elle-même, et pourquoi (Éjecter dans sa propre Éjection) ;
 //   keyword   (facultatif) l'action est un MOT-CLÉ : `texts`, son nom et sa
 //             description (aide des mots-clés, touches E et Maj+E ; sans eux, le
-//             chargement échoue, core/marbles.js) ; ses valeurs de partie
+//             chargement échoue, core/marbles-content.js) ; ses valeurs de partie
 //             (core/marbles-counters.js) : `triggers(event)`, ce qu'un évènement du
 //             journal ajoute à ses déclenchements ; `quantity(event)` (facultatif),
 //             à sa quantité réelle. Une action de valeur sans mot-clé (Vitesse,
@@ -242,23 +244,26 @@ function addAmount(values, clause) {
 // Le `kind` "marble" : une action sur une bille. Ses textes :
 // view/marbles/narration.js/ACTION_TEXTS.
 
-// Où Éjecter ne peut viser la bille elle-même : partout où elle n'est pas sur le
-// triangle.
-const EJECT_SELF_OUTSIDE = {
-  removed: "une bille ne peut s'éjecter elle-même dans son Final : elle a déjà quitté le triangle",
-  thrown: "une bille ne peut s'éjecter elle-même dans sa Chiquenaude : elle est en cours de lancer",
-  drawn: "une bille ne peut s'éjecter elle-même à son Éveil : elle est en main",
-  pot: "une bille du pot ne peut s'éjecter elle-même : elle n'est pas sur le triangle",
+// OÙ EST LA BILLE ELLE-MÊME quand son effet joue : sa ZONE, selon la valeur `marble`
+// de son déclencheur (config/marbles-values.js/MARBLE_TRIGGERS ; "pot" pour un moment
+// En poche ; une phase, qui n'en a pas, est sur le triangle comme "onSlot"). C'est la
+// `zone` de holder (la situation, en-tête) et des écouteurs (core/marbles-run.js) ;
+// `where` dit à la validation pourquoi une action ne l'y prend pas (targetProblem).
+// Chaque valeur `marble` d'un déclencheur y a son entrée (vérifié au chargement,
+// core/marbles-run.js).
+export const HOLDER_ZONES = {
+  onSlot: { zone: "triangle", where: "elle est sur le triangle" },
+  drawn: { zone: "hand", where: "elle vient d'être piochée, en main (son Éveil)" },
+  thrown: { zone: "thrown", where: "elle est en cours de lancer (sa Chiquenaude)" },
+  removed: { zone: "removed", where: "elle a déjà quitté le triangle (son Final)" },
+  pot: { zone: "pot", where: "elle est dans le pot" },
 };
 
-// Où une action sur l'usure ne peut viser la bille elle-même : partout où elle n'est
-// pas sur le triangle.
-const WEAR_SELF_OUTSIDE = {
-  removed: "une action sur la bille elle-même n'a plus de bille : elle a quitté le triangle",
-  thrown: "une action sur la bille elle-même n'a pas encore de bille : elle est en cours de lancer",
-  drawn: "une action sur la bille elle-même n'a pas de bille sur le triangle : elle vient d'être piochée, en main",
-  pot: "une action sur la bille elle-même n'a pas de bille sur le triangle : elle est dans le pot",
-};
+// La zone de la bille elle-même dans un contexte de validation (validateEffect).
+const holderZoneOf = (context) => HOLDER_ZONES[context.marble ?? "onSlot"];
+
+// L'usure et l'éjection n'existent que sur le triangle.
+const ON_TRIANGLE = ["triangle"];
 
 export const CLAUSE_ACTIONS = {
   // Ajoute `amount` (négatif permis) à la Vitesse. Au choix : un bonus à la phase d'une
@@ -268,7 +273,7 @@ export const CLAUSE_ACTIONS = {
   // Ajoute `amount` (négatif permis) à la Masse. Au choix : comme la Vitesse.
   mass: { kind: "value", fields: TARGETED_FIELDS, validate: validateInteger, apply: addAmount, choice: { zones: ["triangle"], picks: ["marble"] } },
   // Pioche : `amount` billes (au moins 1), piochées par la bille elle-même au
-  // déclenchement (core/marbles.js/drawMarbles), à tout moment du tour. Sans
+  // déclenchement (core/marbles-run.js/drawMarbles), à tout moment du tour. Sans
   // cible : piocher pour une autre bille n'a pas de sens.
   // Mot-clé : un déclenchement par effet joué qui pioche ; sa quantité réelle, les
   // billes réellement piochées par un effet (« Pioche 2 » avec une seule bille
@@ -293,13 +298,13 @@ export const CLAUSE_ACTIONS = {
     wear: (wear, amount) => Math.max(0, wear - amount),
     event: "polished",
     retires: false,
-    selfOutside: WEAR_SELF_OUTSIDE,
+    selfZones: ON_TRIANGLE,
     // L'usure n'existe que sur le triangle.
     choice: { zones: ["triangle"], picks: ["marble"] },
     keyword: marbleActionKeyword("polish", "polished"),
   },
   // Fêlure : ajoute `amount` d'usure (au moins 1), jamais au-delà du maximum ; à son
-  // maximum, la bille est retirée aussitôt, comme par usure (core/marbles.js/
+  // maximum, la bille est retirée aussitôt, comme par usure (core/marbles-run.js/
   // retireMarble).
   crack: {
     kind: "marble",
@@ -308,7 +313,7 @@ export const CLAUSE_ACTIONS = {
     wear: (wear, amount, maxWear) => Math.min(maxWear, wear + amount),
     event: "cracked",
     retires: true,
-    selfOutside: WEAR_SELF_OUTSIDE,
+    selfZones: ON_TRIANGLE,
     choice: { zones: ["triangle"], picks: ["marble"] },
     keyword: marbleActionKeyword("crack", "cracked"),
   },
@@ -328,10 +333,8 @@ export const CLAUSE_ACTIONS = {
     // Une bille de la main ou une bille active ; un emplacement vide n'a rien à
     // empocher.
     choice: { zones: ["hand", "triangle"], picks: ["marble"] },
-    selfOutside: {
-      thrown: "une bille ne peut s'empocher elle-même dans sa Chiquenaude : elle est en cours de lancer",
-      pot: "une bille déjà dans le pot ne peut s'empocher elle-même",
-    },
+    // Ni en cours de lancer, ni déjà dans le pot.
+    selfZones: ["triangle", "hand", "removed"],
     keyword: {
       texts: { name: "marbles.keyword.pocket.name", description: "marbles.keyword.pocket.description" },
       triggers: (event) => (event.type === "pocketed" || event.type === "lost" || (event.type === "targetEmpty" && event.action === "pocket") ? 1 : 0),
@@ -355,7 +358,7 @@ export const CLAUSE_ACTIONS = {
     ejects: true,
     choice: { zones: ["triangle"], picks: ["marble"] },
     all: true,
-    selfOutside: EJECT_SELF_OUTSIDE,
+    selfZones: ON_TRIANGLE,
     // Dans sa propre Éjection, la bille est déjà en train d'être chassée.
     selfRefusedIn: { knockout: "une bille ne peut s'éjecter elle-même dans sa propre Éjection : elle est déjà en train d'être chassée" },
     keyword: {
@@ -377,8 +380,8 @@ const VALUE_ACTIONS = actionsOfKind("value");
 const ZERO = zeroValues(VALUE_ACTIONS);
 const GIFT_ZERO = zeroValues(VALUE_ACTIONS.filter((action) => CLAUSE_ACTIONS[action].fields.includes("target")));
 
-// Le moment où joue un champ d'effet, pour la règle des cibles (core/marbles.js le
-// construit) :
+// Le moment où joue un champ d'effet, pour la règle des cibles
+// (core/marbles-content.js le construit) :
 //   { phaseSlots }  une phase, jouée à l'un de ces emplacements (base : les deux
 //                   bases ; une variante : la sienne ; pointe : la pointe) ;
 //   { moment }      un déclencheur : "play" (pendant la phase de jeu, avant toute
@@ -395,8 +398,10 @@ const phaseIndex = (slot) => SLOTS.indexOf(slot);
 function targetProblem(clause, context) {
   const action = CLAUSE_ACTIONS[clause.action];
   if (action.kind === "marble" && clause.target === undefined) {
-    const problem = action.selfOutside?.[context.marble] ?? action.selfRefusedIn?.[context.trigger];
-    if (problem !== undefined) return problem;
+    const { zone, where } = holderZoneOf(context);
+    if (!action.selfZones.includes(zone)) return `l'action "${clause.action}" ne peut pas viser la bille elle-même ici : ${where}`;
+    const refused = action.selfRefusedIn?.[context.trigger];
+    if (refused !== undefined) return refused;
   }
   // Un bonus au choix : il faut qu'au moins une phase puisse encore le recevoir.
   if (action.kind === "value" && isChoice(clause.target)) {
@@ -635,7 +640,7 @@ export function validateEffect(effect, describe, fail, context = {}) {
 //   self        les valeurs de la bille elle-même, toutes présentes ;
 //   gifts       ce qui va à d'autres emplacements, [{ slot, ...valeurs donnables }] ;
 //               un bonus au choix porte `choice` (sa cible), `action` et `amount` au
-//               lieu de `slot` : le core demande le choix (core/marbles.js/fireEffect) ;
+//               lieu de `slot` : le core demande le choix (core/marbles-run.js/fireEffect) ;
 //   operations  les actions sur une bille, dans l'ordre des clauses,
 //               [{ action, amount, target }] (`target` absent : la bille elle-même ;
 //               un choix : la cible au choix, que le core fait trancher).

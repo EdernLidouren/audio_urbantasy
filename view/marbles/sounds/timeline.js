@@ -8,13 +8,13 @@ import { MARBLES_COLLISION, MARBLES_ROLLS, MARBLES_SETTINGS, MARBLES_SOUND_PLACE
 import { ROTATION_NEXT, SLOTS } from "../../../core/marbles.js";
 import { rollDurationMs } from "../rolls.js";
 import { discardPlace, handPlace, positionOf, potPlace, slotPlace } from "./space.js";
-import MARBLE_TYPES from "../../../marbles/types/index.js";
 
 // La FORCE d'une collision : le rapport des poids des CALIBRES de la frappeuse (la
 // posée) et de la frappée (l'éjectée), élevé à `weightExponent`. 1 entre deux
 // billes de même calibre ; plus quand une grosse frappe une petite, moins dans
-// l'autre sens.
-export function collisionStrength(striker, struck, { types = MARBLE_TYPES, collision = MARBLES_COLLISION } = {}) {
+// l'autre sens. `types` : la table des billes, toujours injectée (les règles de
+// l'écran, rules.types), jamais la vraie importée ici.
+export function collisionStrength(striker, struck, { types, collision = MARBLES_COLLISION }) {
   const ratio = collision.weights[types[striker].size] / collision.weights[types[struck].size];
   return ratio ** collision.weightExponent;
 }
@@ -213,9 +213,8 @@ export const MARBLE_EVENT_CUES = {
   effect: null,
   wear: null,
   impact: null,
-  // Un cran par tour aujourd'hui ; le jour où un effet en ajoutera (jusqu'à 3, un
-  // tour complet), l'évènement dira combien, et rotation() suivra.
-  rotation: (event, timeline) => timeline.rotation(event.triangle, 1),
+  // Autant de crans que l'évènement en porte.
+  rotation: (event, timeline) => timeline.rotation(event.triangle, event.notches),
   turnEnded: null,
   gameOver: null,
 };
@@ -227,8 +226,9 @@ export const MARBLE_EVENT_CUES = {
 // donc les dernières, dans l'ordre. Sans elle, les balises de pioche s'entendent au
 // centre. `placeFrom` : d'où part la bille posée, sa place dans la main AVANT la
 // pose (le journal ne la dit pas) ; sans elle, du milieu de la main. `table` : ce
-// qui règle les trajets et les chocs, par défaut ceux du jeu : les roulements, les
-// places, la collision, les billes et leurs tailles.
+// qui règle les trajets et les chocs, par défaut ceux du jeu (les roulements, les
+// places, la collision), sauf `types`, la table des billes et de leurs tailles,
+// OBLIGATOIRE : les règles de l'écran (rules.types), jamais la vraie importée ici.
 // `handSize` : la taille de la main juste après ces évènements, quand `handAfter`
 // est déjà plus loin (une étape d'une séquence, l'état étant celui de sa fin) ; par
 // défaut, celle de `handAfter`.
@@ -236,13 +236,9 @@ export function eventCues(
   events,
   { triangleAfter = null, handAfter = null, handSize = handAfter?.length, shuffleFirst = false, placeFrom = handPlace(0, 1) } = {},
   settings = MARBLES_SETTINGS,
-  {
-    rolls = MARBLES_ROLLS,
-    places = MARBLES_SOUND_PLACES,
-    collision = MARBLES_COLLISION,
-    types = MARBLE_TYPES,
-  } = {}
+  { rolls = MARBLES_ROLLS, places = MARBLES_SOUND_PLACES, collision = MARBLES_COLLISION, types } = {}
 ) {
+  if (types === null || typeof types !== "object") throw new Error("sons des billes : eventCues demande la table des billes (`types`).");
   const table = { rolls, places, collision, types };
   const timeline = createTimeline(settings, table);
   const drawCount = events.filter((event) => event.type === "draw").length;

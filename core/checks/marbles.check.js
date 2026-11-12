@@ -6,26 +6,13 @@
 // (`node tools/run-checks.js marbles`).
 
 import { auditNonSerializable, throws } from "../../lib/check.js";
-import {
-  JOURNAL_EVENTS,
-  SLOTS,
-  createMarblesGame,
-  impactOf,
-  legalActions,
-  swapRefusal,
-  placeRefusal,
-  throwRefusal,
-  throwsLeft,
-  buildMarbleKeywords,
-  validateMarblePhases,
-  validateMarbleTriggers,
-  validateMarbleTypes,
-} from "../marbles.js";
+import { SLOTS, createMarblesGame, impactOf, legalActions, swapRefusal, placeRefusal, throwRefusal, throwsLeft } from "../marbles.js";
+import { JOURNAL_EVENTS, buildMarbleKeywords, validateMarblePhases, validateMarbleTriggers, validateMarbleTypes } from "../marbles-content.js";
 import { MARBLE_PHASES, MARBLE_POCKET, MARBLE_TRIGGERS } from "../../config/marbles-values.js";
 import { CLAUSE_ACTIONS, amountOf, printedStat } from "../marbles-effects.js";
 import { LARGE, MARBLE_SIZES, MARBLES_SETTINGS, MEDIUM, SMALL } from "../../config/marbles-values.js";
 import { CHOICELESS_TYPES, FIXTURE_BAG, FIXTURE_SETTINGS, FIXTURE_TYPES, fixtureRules } from "./fixtures/marbles.js";
-import { answerChoices, deepFreeze, eventTypes, fabricatedRules, handIds, inHand, marbleCount, marblesPlayState, mustReduce, placed, playRandomMarblesGame, triangleOf, validateTable, withSizes } from "./helpers.js";
+import { answerChoices, caughtMessage, deepFreeze, eventTypes, fabricatedRules, handIds, inHand, marbleCount, marblesPlayState, mustReduce, placed, playRandomMarblesGame, triangleOf, validateTable, withSizes } from "./helpers.js";
 
 // Les règles de la table des vérifications (core/checks/fixtures/marbles.js).
 const rules = fixtureRules();
@@ -1350,6 +1337,13 @@ function checkFlick(run) {
   run("chiquenaude : une Vitesse ciblée est permise", false, throws(() => validateTable({ a: { flick: [{ action: "speed", amount: 1, target: "apex" }] } })));
   run("chiquenaude : une Fêlure ciblée est permise", false, throws(() => validateTable({ a: { flick: [{ action: "crack", amount: 1, target: "apex" }] } })));
   run("chiquenaude : une action sur elle-même est refusée", true, throws(() => validateTable({ a: { flick: [{ action: "polish", amount: 1 }] } })));
+  // Où est la bille elle-même (core/marbles-effects.js/HOLDER_ZONES) : le refus le dit,
+  // pour chaque action qui ne l'y prend pas.
+  run("éveil : une Fêlure sur elle-même refusée, le message dit qu'elle est en main", true, /en main/.test(caughtMessage(() => validateTable({ a: { awaken: [{ action: "crack", amount: 1 }] } }))));
+  run("éveil : Empocher elle-même est permis, elle est en main", false, throws(() => validateTable({ a: { awaken: [{ action: "pocket" }] } })));
+  run("final : Éjecter elle-même refusé, le message dit qu'elle a quitté le triangle", true, /quitté le triangle/.test(caughtMessage(() => validateTable({ a: { final: [{ action: "eject" }] } }))));
+  run("final : Empocher elle-même est permis, elle est à la défausse", false, throws(() => validateTable({ a: { final: [{ action: "pocket" }] } })));
+  run("chiquenaude : Empocher elle-même refusé, en cours de lancer", true, /en cours de lancer/.test(caughtMessage(() => validateTable({ a: { flick: [{ action: "pocket" }] } }))));
   run(
     "chiquenaude : pas de calibre relatif, aucun remplacement en cours",
     true,

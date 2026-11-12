@@ -1,5 +1,5 @@
 // Jeu des billes : les SONS de l'écran. Aucune règle ici : ce qui se passe vient
-// du journal (core/marbles.js), ce que chaque bille fait entendre du profil sonore
+// du journal (core/marbles-content.js, en-tête), ce que chaque bille fait entendre du profil sonore
 // de son CALIBRE (champ `size` de chaque bille, marbles/types/, profils dans
 // MARBLE_SOUND_PROFILES).
 //

@@ -5,7 +5,7 @@
 //
 // Le core ne l'importe JAMAIS (CLAUDE.md) : la vue, les outils et les vérifications
 // le lui passent en paramètre (`types`). Validé au démarrage
-// (core/marbles.js/validateMarblesContent, appelé par main.js et par l'audit du
+// (core/marbles-content.js/validateMarblesContent, appelé par main.js et par l'audit du
 // contenu). L'ordre des clés est celui de la table : les outils de simulation en
 // tirent leurs sacs aléatoires, le changer change leurs résultats.
 //
@@ -36,7 +36,7 @@
 //               MARBLE_POCKET) : `entry`, à son entrée au pot ; `resolution`, à chaque
 //               résolution, après les phases ; ou l'identifiant d'une valeur de
 //               partie écoutable, à chaque incrément (`flick`, `shuffles`,
-//               `ejectedMarbles`… : core/marbles.js/REACTION_KEYS). Rien sur la
+//               `ejectedMarbles`… : core/marbles-content.js/REACTION_KEYS). Rien sur la
 //               bille elle-même ;
 //   maxWear     usure maximale, sinon MARBLES_SETTINGS.defaultMaxWear ;
 //   size        son CALIBRE, obligatoire : SMALL, MEDIUM ou LARGE, toujours par ces

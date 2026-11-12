@@ -7,7 +7,7 @@
 // la vraie table (domaine marbles-content). Lancées par core/checks/index.js/runChecks
 // (`node tools/run-checks.js marbles-forecast`).
 
-import { TALLY_COUNTERS } from "../marbles.js";
+import { TALLY_COUNTERS } from "../marbles-content.js";
 import { emptyTally } from "../marbles-tally.js";
 import { forecast, readForecast } from "../marbles-forecast.js";
 import { CHOICELESS_TYPES, FIXTURE_TYPES, fixtureRules } from "./fixtures/marbles.js";
@@ -376,6 +376,33 @@ function checkChoiceForecast(run) {
     const frozen = deepFreeze(structuredClone(real.state));
     return choiceRules.forecast(frozen, answer).ok;
   })());
+
+  // Un rejeu qui DIVERGE : la Chiquenaude de drawer pioche waker, dont l'Éveil empoche
+  // la première de la main (first) ; puis drawer fait empocher une bille de la main
+  // au choix. En vrai, la main est alors [second, waker] ; à l'aveugle, l'Éveil de la
+  // bille piochée (inconnue) ne joue pas, la main reste [first, second, ?]. La
+  // réponse « place 0 » désigne second en vrai, first à l'aveugle : la réponse se
+  // repère par sa bille, le choix reste indécis au lieu de prévoir first.
+  const choice = (zones) => ({ type: "choice", zones, pick: "marble", count: 1 });
+  const diverging = fabricatedRules({
+    first: {},
+    second: {},
+    waker: { awaken: [{ action: "pocket", target: "firstInHand" }] },
+    drawer: { flick: [{ action: "draw", amount: 1 }, { action: "pocket", target: choice(["hand"]) }] },
+  });
+  const drawing = diverging.reduce(playState({ hand: inHand(["drawer", "first", "second"]), bag: ["waker"] }), toApex);
+  run.same(
+    "réponse prévue, rejeu divergent : en vrai, le choix porte sur la main d'après l'Éveil",
+    ["second", "waker"],
+    drawing.state.pendingChoice.eligible.map((target) => target.marble)
+  );
+  const firstPlace = { type: "choose", target: { zone: "hand", index: 0 } };
+  run("réponse prévue, rejeu divergent : une autre bille à cette place, le choix reste indécis", true, diverging.forecast(drawing.state, firstPlace).choiceDependent);
+  run.same(
+    "réponse prévue, rejeu divergent : le réel empoche bien second",
+    ["first", "second"],
+    diverging.reduce(drawing.state, firstPlace).state.pot
+  );
 }
 
 // ÉJECTER dans la prévision : déterministe ; les billes chassées chez l'effet qui
