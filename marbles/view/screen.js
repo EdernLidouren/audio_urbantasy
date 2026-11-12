@@ -388,7 +388,7 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
     if (marble === undefined) return null;
     const game = getGame();
     const turnsInHand = cursor.place === "hand" ? handEntryUnderCursor().turnsInHand : 0;
-    return marbleCard(marble, focusLine(), rules, t, { turnsInHand, tally: game.tally });
+    return marbleCard(marble, focusLine(), rules, t, { turnsInHand, game });
   }
 
   // Ce qui se dit du curseur : l'annonce principale, et le champ où se trouve le
@@ -730,14 +730,14 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
   function openBagMenu() {
     if (blockedDuringSequence()) return;
     playMenuSound("select");
-    openPileMenu("marbles.pile.bag", bagDisplayOrder(getGame().bag, t), rules, getGame().tally);
+    openPileMenu("marbles.pile.bag", bagDisplayOrder(getGame().bag, t), rules, getGame());
   }
 
   // Dans l'ordre d'arrivée : de la plus ancienne à la plus récente.
   function openDiscardMenu() {
     if (blockedDuringSequence()) return;
     playMenuSound("select");
-    openPileMenu("marbles.pile.discard", getGame().discard, rules, getGame().tally);
+    openPileMenu("marbles.pile.discard", getGame().discard, rules, getGame());
   }
 
   // P : le pot et les billes perdues, d'une annonce ; Maj+P : le menu du pot, dans
@@ -750,7 +750,7 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
   function openPotMenu() {
     if (blockedDuringSequence()) return;
     playMenuSound("select");
-    openPileMenu("marbles.pile.pot", getGame().pot, rules, getGame().tally);
+    openPileMenu("marbles.pile.pot", getGame().pot, rules, getGame());
   }
 
   // L : l'historique du tour précédent. Aussi en fin de partie : celui du dernier

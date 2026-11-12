@@ -1,13 +1,14 @@
 // Bille « mica » (mica). Donnée pure : les champs sont décrits dans
 // marbles/content/types/index.js.
-import { speed, draw, polish, bounce } from "../effects.js";
+import { speed, draw, polish, bounce, NEXT_SLOT } from "../effects.js";
 import { SMALL } from "../../config/values.js";
 
 export default {
   // Éveil : Pioche 1, qui peut éveiller la bille suivante.
   awaken: [draw(1)],
   base: [draw(1)],
-  apex: [speed(2), polish(1)],
+  // Pointe : Vitesse +2 et Polissage 1 à la suivante, la base droite.
+  apex: [speed(2), polish(1, NEXT_SLOT)],
   // Éjection : Pioche 1 si la bille posée est plus grosse.
   knockout: [{ ...draw(1), when: { type: "relativeSize", marble: "placed", is: "larger" } }],
   // Final : Rebond sur elle-même, en partance : elle revient en main au lieu de la

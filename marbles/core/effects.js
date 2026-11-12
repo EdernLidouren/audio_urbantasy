@@ -35,8 +35,12 @@
 // actions qui déclarent `all` l'acceptent (Éjecter).
 //
 // LA SITUATION d'un effet, ce que ses conditions et ses montants calculés lisent au
-// déclenchement : { triangle, holder, replacement, tally } ;
+// déclenchement : { triangle, holder, replacement, tally, state } ;
 //   triangle     le triangle à cet instant ;
+//   state        l'état de la partie à cet instant, d'où se comptent les ZONES
+//                (GAME_ZONES : conditions d'état, nombre de billes par zone) ; une
+//                bille en transit n'y est dans aucune zone. Absent (null) d'une fiche
+//                hors de toute partie ;
 //   holder       la bille qui joue l'effet, { marble, zone, turnsInHand } : `zone`
 //                dit où elle est (HOLDER_ZONES : "triangle" ; "leaving", en
 //                partance, le Final et l'Éjection ; "discard", à la défausse, la
@@ -119,6 +123,39 @@ export function nextSlot(slot) {
 export function previousSlot(slot) {
   return SLOTS[(slotIndex(slot) + SLOTS.length - 1) % SLOTS.length];
 }
+
+// Les CIBLES RELATIVES : l'emplacement suivant ou précédent (nextSlot, previousSlot)
+// de l'emplacement d'où la bille agit, sa RÉFÉRENCE : son emplacement sur le
+// triangle ; pendant sa Chiquenaude, l'emplacement visé par la pose ; en partance
+// (son Final, son Éjection) ou à sa Chute depuis le triangle, l'emplacement qu'elle
+// quitte. Acceptées partout où une action accepte un emplacement, et par le champ
+// `slot` des conditions qui lisent un emplacement. Traduites en emplacement au
+// déclenchement (resolveRelative) ; sans référence (une Chute depuis la main), la
+// clause est sans cible : aucun effet, noté au journal. Refusées au chargement là où
+// la bille n'a jamais de référence (l'Éveil, en main ; en poche).
+export const NEXT_SLOT = "nextSlot";
+export const PREVIOUS_SLOT = "previousSlot";
+const RELATIVE_TARGETS = { [NEXT_SLOT]: { step: nextSlot, word: "next" }, [PREVIOUS_SLOT]: { step: previousSlot, word: "previous" } };
+
+// Une cible (ou un emplacement de condition) est-elle relative ?
+export function isRelative(target) {
+  return typeof target === "string" && Object.hasOwn(RELATIVE_TARGETS, target);
+}
+
+// Le mot d'une cible relative pour ses textes : "next", "previous".
+export function relativeWord(target) {
+  return RELATIVE_TARGETS[target].word;
+}
+
+// L'emplacement que désigne une cible relative depuis `reference` (un emplacement),
+// ou null sans référence.
+function resolveRelative(target, reference) {
+  return reference === null || reference === undefined ? null : RELATIVE_TARGETS[target].step(reference);
+}
+
+// Les zones de la bille qui joue un effet où elle n'a JAMAIS d'emplacement de
+// référence (HOLDER_ZONES) : en main (l'Éveil), dans le pot.
+const NO_REFERENCE_ZONES = ["hand", "pot"];
 
 // Le même « aucun effet » partout : comparer deux effets par identité dit si
 // une bille a une variante de base.
@@ -553,6 +590,9 @@ function targetProblem(clause, context) {
   }
   if (action.kind === "value" && clause.target !== undefined) {
     if (context.moment === "afterPhases") return "une Vitesse ou une Masse ciblée n'a plus de phase à modifier : elle va aux compteurs, sans cible";
+    // Relative : l'emplacement visé dépend de la référence ; un bonus dont la phase est
+    // passée se perd à l'exécution, noté au journal.
+    if (isRelative(clause.target)) return null;
     if (context.phaseSlots && !context.phaseSlots.some((from) => phaseIndex(clause.target) > phaseIndex(from))) {
       return `la phase de ${clause.target} est toujours passée quand cet effet joue`;
     }
@@ -583,19 +623,67 @@ function validateSlot(slot, describe, fail) {
   if (!SLOTS.includes(slot)) fail(`${describe} : emplacement inconnu "${slot}".`);
 }
 
+// L'emplacement lu par une condition : un emplacement, ou une cible relative là où
+// la bille a une référence (`context`, celui de la validation).
+function validateConditionSlot(slot, describe, fail, context) {
+  if (isRelative(slot)) {
+    if (context && NO_REFERENCE_ZONES.includes(holderZoneOf(context).zone)) fail(`${describe} : un emplacement relatif n'a pas de référence ici : ${holderZoneOf(context).where}.`);
+    return;
+  }
+  validateSlot(slot, describe, fail);
+}
+
 // Les billes d'un remplacement que relativeSize compare : celle qu'elle nomme,
 // comparée à l'autre.
 const REPLACEMENT_MARBLES = { ejected: "placed", placed: "ejected" };
 
 // Chaque condition : ses champs, leur validation (`context` : le moment du champ
 // d'effet, voir targetProblem), et son test sur la situation (en-tête).
+// LES ZONES DE LA PARTIE, déclarées ICI ET NULLE PART AILLEURS, pour les conditions
+// d'état (`zone`) et les sources de nombre de billes (`zoneCount`). Chacune :
+//   count     son nombre de billes dans un état, (state) -> entier ; une bille en
+//             transit (en cours de lancer, en partance) n'est dans aucune zone de
+//             l'état : elle ne compte nulle part ;
+//   capacity  (facultatif) sa capacité EN VIGUEUR, (state) -> entier : les
+//             caractéristiques de la partie (taille de la main, capacité du pot) ;
+//   states    les états qu'une condition peut lui demander (ZONE_STATES).
+// AJOUTER une zone ou un état : une entrée ici (et dans ZONE_STATES), ses textes
+// (`marbles.condition.zone.<zone>.<état>`, `marbles.effect.per_zone`), rien d'autre.
+export const GAME_ZONES = {
+  triangle: { count: (state) => SLOTS.filter((slot) => state.triangle[slot] !== null).length, capacity: () => SLOTS.length, states: ["full", "empty", "single"] },
+  hand: { count: (state) => state.hand.length, capacity: (state) => state.maxHandSize, states: ["empty", "full"] },
+  bag: { count: (state) => state.bag.length, states: ["empty"] },
+  discard: { count: (state) => state.discard.length, states: ["empty"] },
+  pot: { count: (state) => state.pot.length, capacity: (state) => state.potCapacity, states: ["full", "empty"] },
+  lost: { count: (state) => state.lost.length, states: [] },
+};
+
+// Les ÉTATS d'une zone qu'une condition peut lire : `test(count, capacity)` ;
+// `needsCapacity`, l'état n'a de sens que pour une zone qui a une capacité.
+const ZONE_STATES = {
+  empty: { test: (count) => count === 0 },
+  single: { test: (count) => count === 1 },
+  full: { needsCapacity: true, test: (count, capacity) => count >= capacity },
+};
+for (const [id, zone] of Object.entries(GAME_ZONES)) {
+  for (const state of zone.states) {
+    if (!Object.hasOwn(ZONE_STATES, state)) throw new Error(`marbles : la zone "${id}" demande un état inconnu "${state}".`);
+    if (ZONE_STATES[state].needsCapacity && zone.capacity === undefined) throw new Error(`marbles : l'état "${state}" demande une capacité, que la zone "${id}" n'a pas.`);
+  }
+}
+
+// La zone d'une condition ou d'une source : une zone déclarée.
+function validateZone(zone, describe, fail) {
+  if (!Object.hasOwn(GAME_ZONES, zone)) fail(`${describe} : zone inconnue "${zone}".`);
+}
+
 export const CONDITIONS = {
   // La bille à `slot` a-t-elle, IMPRIMÉ à cet emplacement, au moins `atLeast`
   // de `stat` ? Emplacement vide : non, il n'y a rien à lire.
   printedStat: {
     fields: ["type", "slot", "stat", "atLeast"],
-    validate(when, describe, fail) {
-      validateSlot(when.slot, describe, fail);
+    validate(when, describe, fail, context) {
+      validateConditionSlot(when.slot, describe, fail, context);
       if (!Object.hasOwn(CLAUSE_ACTIONS, when.stat)) fail(`${describe} : statistique inconnue "${when.stat}".`);
       // Seule une action à montant s'imprime : sur Empocher ou Éjecter, la condition
       // vaudrait toujours 0, jamais vraie dès « au moins 1 ».
@@ -603,7 +691,8 @@ export const CONDITIONS = {
       if (!Number.isInteger(when.atLeast)) fail(`${describe} : atLeast doit être un entier.`);
     },
     test(when, { triangle }, types) {
-      const placed = triangle[when.slot];
+      // Un emplacement relatif sans référence (resolveClauses) : rien à lire.
+      const placed = triangle[when.slot] ?? null;
       if (placed === null) return false;
       return printedStat(effectAt(placed.marble, when.slot, types), when.stat) >= when.atLeast;
     },
@@ -625,15 +714,29 @@ export const CONDITIONS = {
       return SIZE_COMPARISONS[when.is](types[subject].size, types[other].size);
     },
   },
+  // L'ÉTAT D'UNE ZONE de la partie au déclenchement (GAME_ZONES, ZONE_STATES) :
+  // « si le triangle est plein », « si la main est vide », « si le pot est plein ».
+  // Pleine se compare à la capacité en vigueur.
+  zone: {
+    fields: ["type", "zone", "state"],
+    validate(when, describe, fail) {
+      validateZone(when.zone, describe, fail);
+      if (!GAME_ZONES[when.zone].states.includes(when.state)) fail(`${describe} : la zone "${when.zone}" n'a pas d'état "${when.state}" (${GAME_ZONES[when.zone].states.join(", ") || "aucun"}).`);
+    },
+    test(when, { state }) {
+      const zone = GAME_ZONES[when.zone];
+      return ZONE_STATES[when.state].test(zone.count(state), zone.capacity?.(state));
+    },
+  },
   // La bille à `slot` est-elle de calibre `size` ? Emplacement vide : non.
   sizeAt: {
     fields: ["type", "slot", "size"],
-    validate(when, describe, fail) {
-      validateSlot(when.slot, describe, fail);
+    validate(when, describe, fail, context) {
+      validateConditionSlot(when.slot, describe, fail, context);
       validateSize(when.size, describe, fail);
     },
     test(when, { triangle }, types) {
-      const placed = triangle[when.slot];
+      const placed = triangle[when.slot] ?? null;
       return placed !== null && types[placed.marble].size === when.size;
     },
   },
@@ -651,7 +754,9 @@ export const CONDITIONS = {
 //             (nameRef), dont le gabarit choisit la forme ;
 //   current   vrai si sa valeur se connaît hors de tout déclenchement, à partir de
 //             la bille seule : la fiche dit alors la valeur actuelle (« actuellement
-//             +2 ») ; faux si elle dépend du moment (le triangle au déclenchement).
+//             +2 ») ; faux si elle dépend du moment (le triangle au déclenchement) ;
+//   needsState (facultatif) sa valeur actuelle se lit dans l'état de la partie en
+//             cours : une fiche hors de toute partie ne la dit pas.
 // Une future valeur de partie s'y branche par une entrée ici, son gabarit dans
 // chaque langue, rien d'autre.
 export const AMOUNT_SOURCES = {
@@ -680,6 +785,21 @@ export const AMOUNT_SOURCES = {
     text: "marbles.effect.per_active_size",
     names: (source) => ({ size: `marbles.size.${MARBLE_SIZES[source.size]}.name` }),
     current: false,
+  },
+  // Le NOMBRE DE BILLES d'une zone de la partie (GAME_ZONES) au déclenchement : « par
+  // bille en main », « par bille active ». Une bille en transit ne compte nulle part.
+  // Sa valeur se connaît hors de tout déclenchement, dans la partie en cours
+  // (`current`, `needsState` : la fiche la lit dans l'état).
+  zoneCount: {
+    fields: ["type", "zone"],
+    validate(source, describe, fail) {
+      validateZone(source.zone, describe, fail);
+    },
+    value: (source, { state }) => GAME_ZONES[source.zone].count(state),
+    text: "marbles.effect.per_zone",
+    params: (source) => ({ zone: source.zone }),
+    current: true,
+    needsState: true,
   },
   // Une VALEUR DE PARTIE (marbles/core/counters.js) dans une portée : « par
   // chiquenaude ce tour », { type: "tally", tally: "flick", scope: "turn" }. Sa
@@ -761,6 +881,17 @@ function validateAll(clause, action, describe, fail) {
   }
 }
 
+// Une cible relative : seulement pour une action qui accepte un emplacement, et là
+// où la bille a une référence (jamais à l'Éveil ni en poche).
+function validateRelative(clause, action, describe, fail, context) {
+  const where = `${describe}, cible relative`;
+  if (!(action.targets ?? SLOTS).some((target) => SLOTS.includes(target))) fail(`${where} : l'action "${clause.action}" ne vise pas un emplacement.`);
+  const { zone, where: holderWhere } = holderZoneOf(context);
+  if (context.trigger !== undefined || context.moment !== undefined || context.phaseSlots !== undefined) {
+    if (NO_REFERENCE_ZONES.includes(zone)) fail(`${where} : la bille n'a pas d'emplacement de référence ici : ${holderWhere}.`);
+  }
+}
+
 // Une cible « les N prochaines billes du sac » : seule une action qui la déclare
 // (`bag`) l'accepte ; N, un entier au moins 1.
 function validateBag(clause, action, describe, fail) {
@@ -784,11 +915,36 @@ export function validateEffect(effect, describe, fail, context = {}) {
     if (isChoice(clause.target)) validateChoice(clause, action, describe, fail);
     else if (isAll(clause.target)) validateAll(clause, action, describe, fail);
     else if (isBag(clause.target)) validateBag(clause, action, describe, fail);
+    else if (isRelative(clause.target)) validateRelative(clause, action, describe, fail, context);
     else if (clause.target !== undefined && !(action.targets ?? SLOTS).includes(clause.target)) fail(`${describe} : cible inconnue "${clause.target}".`);
     const problem = targetProblem(clause, context);
     if (problem !== null) fail(`${describe} : ${problem}.`);
     if (clause.when !== undefined) validateRule(clause.when, CONDITIONS, "condition", describe, fail, context);
   }
+}
+
+// Les clauses d'un effet, leurs CIBLES RELATIVES traduites depuis `reference`
+// (l'emplacement d'où la bille agit, ou null) : la cible et l'emplacement des
+// conditions. -> { clauses, unresolved } : `unresolved`, les clauses dont la cible
+// relative n'a pas de référence, retirées (sans cible : aucun effet, noté par le
+// déroulé) ; une condition sur un emplacement relatif sans référence est fausse.
+export function resolveClauses(clauses, reference) {
+  const resolved = [];
+  const unresolved = [];
+  for (const clause of clauses) {
+    let next = clause;
+    if (clause.when?.slot !== undefined && isRelative(clause.when.slot)) next = { ...next, when: { ...clause.when, slot: resolveRelative(clause.when.slot, reference) } };
+    if (isRelative(clause.target)) {
+      const target = resolveRelative(clause.target, reference);
+      if (target === null) {
+        unresolved.push(next);
+        continue;
+      }
+      next = { ...next, target };
+    }
+    resolved.push(next);
+  }
+  return { clauses: resolved, unresolved };
 }
 
 // Évalue des clauses dans une SITUATION (en-tête), au moment du déclenchement :

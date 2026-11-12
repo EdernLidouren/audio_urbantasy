@@ -91,6 +91,7 @@ const EVENT_TEXTS = {
     if (event.target === "bag") return t("marbles.event.target_empty_bag");
     if (event.target === "lastDiscarded") return t("marbles.event.target_empty_discard");
     if (event.target === "handFull") return t("marbles.event.target_empty_hand_full");
+    if (event.target === "noReference") return t("marbles.event.target_empty_no_reference");
     return t("marbles.event.target_empty", { slot: slotName(event.slot, t) });
   },
   // La mise en poche et la perte, dites avec la bille ; une bille piochée à

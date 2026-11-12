@@ -30,7 +30,7 @@ function phaseText(game, slot, rules, t) {
   const predicted = rules.forecast(game);
   if (predicted.ok) return describeEffect(predicted.phases[slot], t);
   const { marble } = game.triangle[slot];
-  return describePrinted(rules.effectAt(marble, slot), cardSituation(marble, 0, game.tally), t);
+  return describePrinted(rules.effectAt(marble, slot), cardSituation(marble, 0, game.tally, game), t);
 }
 
 // L'annonce principale d'un emplacement sous le curseur : la bille, son calibre

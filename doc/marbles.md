@@ -17,7 +17,7 @@ depuis le menu principal.
 | Fichier | Rôle |
 |---|---|
 | `marbles/content/types/` | Les billes, une par fichier, et leur registre `index.js` (donnée pure) |
-| `marbles/content/effects.js` | Les formes courtes des clauses, `speed(n)`, `mass(n)`, `draw(n)`, `polish(n, cible?)`, `crack(n, cible?)`, `pocket(cible?)` (avec `FIRST_IN_HAND`), `discard(cible?)` (avec `nextInBag(n)`), `bounce(cible?)`, `retrieve(cible)` (avec `LAST_DISCARDED`) et `eject(cible?)`, les cibles `choice({ zones, count, upTo })` et `allActive(...filtres)` (avec `sizeIs(calibre)`), et les sources `turnsInHand()`, `activeSize(calibre)` et `tally(valeur, portée)` des montants calculés |
+| `marbles/content/effects.js` | Les formes courtes des clauses, `speed(n)`, `mass(n)`, `draw(n)`, `polish(n, cible?)`, `crack(n, cible?)`, `pocket(cible?)` (avec `FIRST_IN_HAND`), `discard(cible?)` (avec `nextInBag(n)`), `bounce(cible?)`, `retrieve(cible)` (avec `LAST_DISCARDED`) et `eject(cible?)`, les cibles relatives `NEXT_SLOT` et `PREVIOUS_SLOT`, les cibles `choice({ zones, count, upTo })` et `allActive(...filtres)` (avec `sizeIs(calibre)`), les sources `turnsInHand()`, `activeSize(calibre)`, `tally(valeur, portée)` et `zoneCount(zone)` des montants calculés, et la condition `zoneIs(zone, état)` |
 | `marbles/config/values.js` | Réglages, phases, déclencheurs, mot-clé En poche, valeurs de partie, modèle de fiche, sac de test, sons (donnée pure) |
 | `marbles/core/rules.js` | Les règles liées à une table de billes : le point d'entrée de la simulation hors du core |
 | `marbles/core/marbles.js` | Le réducteur : état, mise en place, refus et codes de refus, actions (pioche du tour, échange, pose, résolution, choix) |
@@ -464,6 +464,7 @@ apex: [speed({ base: 0, step: 1, source: tally("windfall", "game"), max: 10 })],
 |---|---|---|
 | `{ type: "turnsInHand" }` | le compteur de tours en main de la bille elle-même : 0 hors de la main ; pendant sa Chiquenaude, celui qu'elle avait en quittant la main | « Chiquenaude : Vitesse +1 par tour en main, maximum +5, actuellement +2. » |
 | `{ type: "activeSize", size }` | les billes actives (sur le triangle) de calibre `size`, la bille elle-même comprise si elle en est (en transit, non : en partance, dans un Final ou une Éjection, ni en cours de lancer, dans une Chiquenaude) | « Base : Vitesse +1 par minibille active. » (grès) |
+| `{ type: "zoneCount", zone }` (`zoneCount(zone)`) | le nombre de billes de la zone de la partie `zone` (`GAME_ZONES` : `triangle`, les actives ; `hand`, `bag`, `discard`, `pot`, `lost`), au déclenchement ; une bille en transit ne compte nulle part ; la fiche dit la valeur actuelle dans la partie en cours (`needsState`) | « Base : Vitesse +1 par bille en main, maximum +5, actuellement +3. » (verre) |
 | `{ type: "tally", tally, scope }` (`tally(id, portée)`) | la valeur de partie `tally` dans la portée `scope` (`"turn"`, ce tour ; `"game"`, cette partie), lue dans le registre au déclenchement (voir « Valeurs de partie ») | « Chiquenaude : Vitesse +2 par chiquenaude ce tour, maximum +6, actuellement +4. » (loupe) |
 
 Chaque source est déclarée UNE fois, dans `marbles/core/effects.js`/`AMOUNT_SOURCES` :
@@ -497,6 +498,14 @@ Tic ou une Éjection, le remplacement en cours.
 | `{ type: "printedStat", slot, stat, atLeast }` | la bille de `slot` a, imprimé à cet emplacement, au moins `atLeast` de `stat` (une action à montant : Empocher et Éjecter refusés au chargement) ; emplacement vide : faux | « Vitesse +4 à la pointe si son effet de pointe donne au moins Vitesse +1 » (loupe) |
 | `{ type: "relativeSize", marble, is }` | pendant un remplacement, la bille `marble` (`ejected`, l'éjectée, ou `placed`, la posée) est `is` (`smaller` ou `larger`) que l'autre ; calibres égaux : ni l'un ni l'autre | « Tic : Vitesse +4 si la bille éjectée est plus petite. » (gorille), « Éjection : Pioche 1 si la bille posée est plus grosse. » (mica) |
 | `{ type: "sizeAt", slot, size }` | la bille de `slot` est de calibre `size` ; emplacement vide : faux | « Pointe : Masse +1 et Masse +2 si la base gauche est un calot. » (agate) |
+| `{ type: "zone", zone, state }` (`zoneIs(zone, état)`) | la zone de la partie `zone` est dans l'état `state` au déclenchement (`ZONE_STATES` : `empty`, aucune bille ; `single`, une seule ; `full`, autant que sa capacité en vigueur, taille de main ou capacité du pot) ; chaque zone déclare ses états (`GAME_ZONES`, `states`), un autre est refusé au chargement ; une bille en transit ne compte nulle part | « Pointe : Vitesse +6 si le triangle est plein. » (argile), « Tic : Pioche 1 si la main est vide. » (œil-de-chat), « En poche, à chaque résolution : Masse +2 si le pot est plein. » (agate) |
+
+Les ZONES DE LA PARTIE (`marbles/core/effects.js`/`GAME_ZONES`) se déclarent une fois, avec
+leur décompte, leur capacité éventuelle et leurs états ; ajouter une zone ou un état : une
+entrée et ses textes (`marbles.condition.zone.<zone>.<état>`, `marbles.effect.per_zone`).
+La situation d'un effet porte l'état de la partie (`state`), d'où elles se comptent. Le
+`slot` de `printedStat` et de `sizeAt` peut être une cible relative (voir « La règle des
+cibles ») ; sans référence, la condition est fausse.
 
 `relativeSize` n'existe que pendant un remplacement : la validation la refuse hors d'un champ
 de déclencheur marqué `replacement` dans `MARBLE_TRIGGERS` (le Tic, vu par la posée ;
@@ -547,6 +556,23 @@ Une cible n'a de sens que si l'effet ciblé peut encore se produire.
   Chiquenaude, où elle n'y est pas encore (refusé à la validation).
 - Une **Chiquenaude** joue pendant la phase de jeu : une Vitesse ou une Masse ciblée y est
   valide, toutes les phases restant à venir.
+- Une **cible relative** (`NEXT_SLOT`, `PREVIOUS_SLOT`, `marbles/core/effects.js`) vise
+  l'emplacement suivant ou précédent (`nextSlot`, `previousSlot`) de la RÉFÉRENCE de la
+  bille : son emplacement sur le triangle (phase, Tic, Trouvaille) ; l'emplacement visé,
+  pendant sa Chiquenaude ; l'emplacement quitté, en partance (Final, Éjection) ou à sa
+  Chute depuis le triangle. Elle est traduite au déclenchement
+  (`resolveClauses`, appelé par `marbles/core/run.js`/`fireEffect`), la cible et le
+  `slot` des conditions ; la suite est celle d'un emplacement fixe (bonus perdu si sa
+  phase est passée, noté dans `lost` ; Polissage, Fêlure, Empocher, Éjecter, Défausser,
+  Rebond valides ; emplacement vide, `targetEmpty`). Sans référence (une Chute depuis la
+  main) : la clause est retirée, sans effet, et notée (`targetEmpty`, cible
+  `"noReference"`, « Pas d'emplacement de référence : sans effet. ») si sa condition tient.
+  Acceptée partout où une action accepte un emplacement ; refusée au chargement là où la
+  bille n'a jamais de référence (l'Éveil, en poche), et, pour une Vitesse ou une Masse,
+  dans un Final. Jamais refusée pour une phase passée : la position décide, à
+  l'exécution, comme depuis la pointe vers la base droite. Une Éjection qui éjecte la
+  suivante fait ricocher l'éjection, chaque bille par le chemin des billes ; le ricochet
+  s'arrête sur un emplacement déjà vidé.
 - Une **cible au choix** suit la même règle, à l'ÉLIGIBILITÉ : seules les cibles valides
   au moment du choix se proposent. Un bonus de Vitesse ou de Masse au choix ne propose
   que les billes actives dont la phase n'a pas commencé ; la validation refuse un bonus au
@@ -1574,7 +1600,7 @@ pile reçoit le clavier).
 ## Tester
 
 ```
-node tools/run-checks.js marbles marbles-pocket marbles-path marbles-choice marbles-bus marbles-tally marbles-forecast marbles-view marbles-sequence marbles-tools marbles-content marbles-screen detail-card
+node tools/run-checks.js marbles marbles-pocket marbles-path marbles-zones marbles-relative marbles-choice marbles-bus marbles-tally marbles-forecast marbles-view marbles-sequence marbles-tools marbles-content marbles-screen detail-card
 node marbles/tools/play.js --seed 42
 ```
 

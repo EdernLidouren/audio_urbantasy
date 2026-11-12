@@ -25,6 +25,7 @@ import { createEventBus } from "./bus.js";
 import {
   CHOICE_ZONES,
   CLAUSE_ACTIONS,
+  CONDITIONS,
   FIRST_IN_HAND,
   HOLDER_ZONES,
   LAST_DISCARDED,
@@ -37,6 +38,7 @@ import {
   isChoice,
   isOptionalChoice,
   passesFilters,
+  resolveClauses,
 } from "./effects.js";
 import { recordTally } from "./tally.js";
 import { REACTION_KEYS, REACTIVE_MOMENT, TALLY_COUNTERS, maxWearOf, pocketClauses, reactionClauses } from "./content.js";
@@ -394,8 +396,11 @@ function fireEffect(run, trigger, listener, clauses, event) {
     holder: { marble, zone: listener.zone, turnsInHand: listener.turnsInHand ?? 0 },
     replacement: event.replacement ?? null,
     tally: run.state.tally,
+    state: run.state,
   };
-  const { self, gifts: printedGifts, operations } = evaluateEffect(clauses, situation, run.types);
+  // Les cibles relatives, depuis l'emplacement d'où la bille agit (resolveClauses).
+  const { clauses: resolved, unresolved } = resolveClauses(clauses, slot ?? null);
+  const { self, gifts: printedGifts, operations } = evaluateEffect(resolved, situation, run.types);
   const by = { trigger, slot: slot ?? null, marble };
   // Un bonus au choix : le joueur choisit d'abord ses billes, puis chacune le reçoit.
   const gifts = printedGifts.flatMap(({ choice, action, amount, ...gift }) =>
@@ -433,6 +438,12 @@ function fireEffect(run, trigger, listener, clauses, event) {
   if (draw > 0) drawMarbles(run, draw, "effect");
   // Les actions sur une bille, après la pioche, dans l'ordre des clauses.
   for (const operation of operations) applyOperation(run, operation, listener, by);
+  // Une cible relative sans emplacement de référence (une Chute depuis la main) : la
+  // clause est sans cible, aucun effet, noté au journal, si sa condition tient.
+  for (const clause of unresolved) {
+    if (clause.when !== undefined && !CONDITIONS[clause.when.type].test(clause.when, situation, run.types)) continue;
+    run.emit({ type: "targetEmpty", action: clause.action, slot: null, target: "noReference", by });
+  }
 }
 
 // --- Les actions sur une bille ---

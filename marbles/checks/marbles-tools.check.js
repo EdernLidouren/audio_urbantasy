@@ -310,8 +310,9 @@ function checkGreedy(run) {
 // pour le glouton ; avec elle, il la joue quand elle rapporte plus que l'Impact perdu.
 function checkDrawnValue(run) {
   run("bille gagnée : la valeur par défaut, dite dans la description du joueur", true, PLAYERS.greedy.describe({}).includes(frNumber(MARBLES_DRAWN_VALUE)));
-  // Le Tic de l'œil-de-chat pioche : une pose sur un emplacement occupé.
-  const view = publicView(buildState({ turn: 4, triangle: { leftBase: "clay", rightBase: "glass", apex: null }, hand: ["cats_eye", "agate"], bag: ["tiger", "giant"] }));
+  // Le Tic de l'œil-de-chat pioche si la main est vide : posé seul de sa main, sur un
+  // emplacement occupé.
+  const view = publicView(buildState({ turn: 4, triangle: { leftBase: "clay", rightBase: "glass", apex: null }, hand: ["cats_eye"], bag: ["tiger", "giant"] }));
   const greedy = bestPlan(view, { drawnValue: 100 });
   run("bille gagnée : très chère, le glouton pioche", true, greedy.drawn >= 1);
   run("bille gagnée : la valeur du plan", greedy.impact + 100 * greedy.drawn, greedy.value);

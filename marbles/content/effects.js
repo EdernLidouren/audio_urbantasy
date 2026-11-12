@@ -34,6 +34,14 @@ export const activeSize = (size) => ({ type: "activeSize", size });
 // speed({ base: 0, step: 2, source: tally("flick", "turn"), max: 6 }).
 export const tally = (id, scope) => ({ type: "tally", tally: id, scope });
 
+// Le nombre de billes d'une zone de la partie, source d'un montant calculé
+// (marbles/core/effects.js/GAME_ZONES) : zoneCount("hand"), « par bille en main ».
+export const zoneCount = (zone) => ({ type: "zoneCount", zone });
+
+// L'état d'une zone de la partie, une condition (`when`) : zoneIs("triangle",
+// "full"), « si le triangle est plein » ; états "empty", "full", "single".
+export const zoneIs = (zone, state) => ({ type: "zone", zone, state });
+
 // La première bille de la main, cible d'Empocher et de Défausser
 // (marbles/core/effects.js/FIRST_IN_HAND).
 export const FIRST_IN_HAND = "firstInHand";
@@ -41,6 +49,13 @@ export const FIRST_IN_HAND = "firstInHand";
 // La dernière bille arrivée à la défausse, cible de Ramasser
 // (marbles/core/effects.js/LAST_DISCARDED).
 export const LAST_DISCARDED = "lastDiscarded";
+
+// Les CIBLES RELATIVES (marbles/core/effects.js) : l'emplacement suivant, ou
+// précédent, de celui d'où la bille agit. Partout où une action accepte un
+// emplacement, et dans le `slot` des conditions qui lisent un emplacement :
+// speed(2, NEXT_SLOT)… { ...speed(2), target: NEXT_SLOT }.
+export const NEXT_SLOT = "nextSlot";
+export const PREVIOUS_SLOT = "previousSlot";
 
 // Les `count` prochaines billes du sac, cible de Défausser (marbles/core/effects.js/
 // isBag) : nextInBag(1), « la prochaine bille du sac ».

@@ -150,7 +150,7 @@ function answer(action) {
 // Une bille et sa fiche, à plat : ce que l'écran donne champ par champ.
 function printMarble(marble, main, turnsInHand = 0) {
   console.log(`  ${main}`);
-  const { above, below } = marbleCard(marble, main, GAME_RULES, t, { turnsInHand, tally: game.tally });
+  const { above, below } = marbleCard(marble, main, GAME_RULES, t, { turnsInHand, game });
   for (const field of [...above, ...below]) console.log(`      ${field}`);
 }
 

@@ -21,6 +21,8 @@ import {
   isAll,
   isBag,
   isChoice,
+  isRelative,
+  relativeWord,
   isOptionalChoice,
 } from "../../core/effects.js";
 
@@ -65,7 +67,7 @@ const ACTION_TEXTS = {
   // bille au choix (`choice`, qui reçoit {target}).
   pocket: {
     up: "marbles.effect.pocket_self",
-    targets: { slot: "marbles.effect.pocket_slot", [FIRST_IN_HAND]: "marbles.effect.pocket_hand", choice: "marbles.effect.pocket_choice" },
+    targets: { slot: "marbles.effect.pocket_slot", relative: "marbles.effect.pocket_relative", [FIRST_IN_HAND]: "marbles.effect.pocket_hand", choice: "marbles.effect.pocket_choice" },
   },
   // Sans montant, comme Empocher ; « toutes » (`all`) reçoit {target}, le sac
   // (`bag`) reçoit {count}.
@@ -73,6 +75,7 @@ const ACTION_TEXTS = {
     up: "marbles.effect.discard_self",
     targets: {
       slot: "marbles.effect.discard_slot",
+      relative: "marbles.effect.discard_relative",
       [FIRST_IN_HAND]: "marbles.effect.discard_hand",
       choice: "marbles.effect.discard_choice",
       all: "marbles.effect.discard_all",
@@ -82,7 +85,7 @@ const ACTION_TEXTS = {
   // Sans montant ; la bille elle-même, un emplacement, un choix, « toutes ».
   bounce: {
     up: "marbles.effect.bounce_self",
-    targets: { slot: "marbles.effect.bounce_slot", choice: "marbles.effect.bounce_choice", all: "marbles.effect.bounce_all" },
+    targets: { slot: "marbles.effect.bounce_slot", relative: "marbles.effect.bounce_relative", choice: "marbles.effect.bounce_choice", all: "marbles.effect.bounce_all" },
   },
   // Sans montant ; jamais la bille elle-même : la dernière arrivée à la défausse, ou
   // un choix.
@@ -93,7 +96,7 @@ const ACTION_TEXTS = {
   // Sans montant, comme Empocher ; « toutes » (`all`) reçoit {target}.
   eject: {
     up: "marbles.effect.eject_self",
-    targets: { slot: "marbles.effect.eject_slot", choice: "marbles.effect.eject_choice", all: "marbles.effect.eject_all" },
+    targets: { slot: "marbles.effect.eject_slot", relative: "marbles.effect.eject_relative", choice: "marbles.effect.eject_choice", all: "marbles.effect.eject_all" },
   },
 };
 
@@ -160,6 +163,8 @@ function actionText(action, amount, target, t) {
     if (isChoice(target)) return t(targets.choice, { target: choiceTarget(target, t) });
     if (isAll(target)) return t(targets.all, { target: allTarget(target, t) });
     if (isBag(target)) return t(targets.bag, { count: target.count });
+    // Relative : « Éjecter la bille de l'emplacement suivant ».
+    if (isRelative(target)) return t(targets.relative, { relative: relativeWord(target) });
     if (target === FIRST_IN_HAND || target === LAST_DISCARDED) return t(targets[target]);
     return t(targets.slot, { slot: slotName(target, t) });
   }
@@ -172,6 +177,8 @@ function actionText(action, amount, target, t) {
 // actives au choix » : un choix facultatif choisit la tournure, jamais « à
 // jusqu'à »).
 function targetedText(text, target, t) {
+  // Relative : « Vitesse +2 à la bille de l'emplacement suivant ».
+  if (isRelative(target)) return t("marbles.effect.given_relative", { effect: text, relative: relativeWord(target) });
   if (isChoice(target)) return t("marbles.effect.given_choice", { effect: text, target: choiceTarget(target, t), upTo: isOptionalChoice(target) ? "yes" : "no" });
   return t("marbles.effect.given", { effect: text, slot: slotName(target, t) });
 }
@@ -215,6 +222,7 @@ function emptyPart({ slot, target, marble }, t) {
   if (target === "bag") return t("marbles.forecast_empty.bag");
   if (target === LAST_DISCARDED) return t("marbles.forecast_empty.discard");
   if (target === "handFull") return t("marbles.forecast_empty.hand_full");
+  if (target === "noReference") return t("marbles.forecast_empty.no_reference");
   return t("marbles.forecast_empty.slot", { slot: slotName(slot, t) });
 }
 
@@ -279,13 +287,18 @@ export function describeOutcome(outcome, t) {
 // Le texte de chaque condition (marbles/core/effects.js/CONDITIONS), lu dans une
 // fiche après « si » : « si la bille éjectée est plus petite ».
 const CONDITION_TEXTS = {
-  printedStat: (when, t) =>
-    t("marbles.condition.printedStat", {
-      slot: slotName(when.slot, t),
-      effect: combined(valueParts({ [when.stat]: when.atLeast }, t), t),
-    }),
+  printedStat: (when, t) => {
+    const effect = combined(valueParts({ [when.stat]: when.atLeast }, t), t);
+    if (isRelative(when.slot)) return t("marbles.condition.printedStat_relative", { relative: relativeWord(when.slot), effect });
+    return t("marbles.condition.printedStat", { slot: slotName(when.slot, t), effect });
+  },
   relativeSize: (when, t) => t("marbles.condition.relativeSize", { marble: when.marble, is: when.is }),
-  sizeAt: (when, t) => t("marbles.condition.sizeAt", { slot: slotName(when.slot, t), size: sizeRef(when.size) }),
+  sizeAt: (when, t) =>
+    isRelative(when.slot)
+      ? t("marbles.condition.sizeAt_relative", { relative: relativeWord(when.slot), size: sizeRef(when.size) })
+      : t("marbles.condition.sizeAt", { slot: slotName(when.slot, t), size: sizeRef(when.size) }),
+  // L'état d'une zone : un texte par zone et par état déclaré.
+  zone: (when, t) => t(`marbles.condition.zone.${when.zone}.${when.state}`),
 };
 
 // Une condition sans texte, ou un texte sans condition, échoue au chargement.
@@ -320,16 +333,19 @@ function computedText(action, amount, situation, t) {
   if (amount.max !== undefined) text = t("marbles.effect.computed_max", { effect: text, max: amountNumber(action, amount.max) });
   // Sans situation (une fiche hors de toute partie : l'annexe des règles), jamais de
   // valeur actuelle.
-  if (!AMOUNT_SOURCES[amount.source.type].current || situation === null) return text;
+  const { current, needsState } = AMOUNT_SOURCES[amount.source.type];
+  if (!current || situation === null || (needsState && !situation.state)) return text;
   return t("marbles.effect.computed_current", { effect: text, current: amountNumber(action, amountOf(amount, situation)) });
 }
 
 // La situation d'une bille HORS de tout déclenchement, pour dire la valeur actuelle
 // de ses montants calculés : la bille elle-même, avec son compteur de tours en main
-// (0 hors de la main), et les valeurs de partie du moment (`tally`, celles de l'état
-// de la partie ; à zéro, celles d'une partie neuve, hors de toute partie).
-export function cardSituation(marble, turnsInHand = 0, tally = emptyTally(TALLY_COUNTERS)) {
-  return { triangle: null, holder: { marble, zone: null, turnsInHand }, replacement: null, tally };
+// (0 hors de la main), les valeurs de partie du moment (`tally`, celles de l'état
+// de la partie ; à zéro, celles d'une partie neuve, hors de toute partie), et l'état
+// de la partie en cours (`state`, d'où se comptent les zones ; null hors de toute
+// partie : le nombre de billes d'une zone n'a alors pas de valeur actuelle).
+export function cardSituation(marble, turnsInHand = 0, tally = emptyTally(TALLY_COUNTERS), state = null) {
+  return { triangle: state?.triangle ?? null, holder: { marble, zone: null, turnsInHand }, replacement: null, tally, state };
 }
 
 // Une clause IMPRIMÉE : ce que la bille promet, son montant calculé (avec sa valeur

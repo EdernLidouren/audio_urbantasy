@@ -263,16 +263,26 @@ Une cible n'a de sens que si l'effet visé peut encore se produire :
 
 - un bonus ne vaut que si la phase de la bille visée n'a pas encore eu lieu ce tour ; sinon, ou si l'emplacement est vide, il est perdu. Les phases suivant l'ordre horaire, une base droite peut donner un bonus à la base gauche, jamais l'inverse ;
 - une bille ne prévoit jamais de bonus que rien ne pourrait recevoir : pas de bonus dans un Final, ni à chaque résolution du pot, ni depuis la pointe, dont la phase est la dernière ;
-- un Polissage, une Fêlure, une Éjection ou une mise en poche peuvent viser un emplacement à tout moment ;
+- un Polissage, une Fêlure, une Éjection, une mise en poche, une Défausse ou un Rebond peuvent viser un emplacement à tout moment ;
 - une bille ne peut agir sur elle-même que là où elle est : pas d'usure sur elle-même hors du triangle, pas d'Éjecter sur elle-même hors du triangle, pas d'Empocher sur elle-même pendant son lancer ni depuis le pot.
+
+### Les cibles relatives
+
+Une action qui vise un emplacement peut viser, au lieu d'un emplacement fixe, l'**emplacement suivant** ou l'**emplacement précédent**, dans l'ordre horaire (suivant : base droite → base gauche → pointe → base droite ; précédent : le sens inverse). « Vitesse +2 à la bille de l'emplacement suivant », « Éjecter la bille de l'emplacement suivant ».
+
+- **La référence** est l'emplacement d'où la bille agit : sur le triangle, son emplacement ; pendant sa Chiquenaude, l'emplacement visé par la pose ; en partance, pendant son Final ou son Éjection, l'emplacement qu'elle quitte ; à sa Chute, l'emplacement qu'elle a quitté si elle vient du triangle.
+- **Sans référence** (une Chute d'une bille défaussée de la main, par exemple) : l'effet est sans cible, il ne fait rien, et le journal le note. Une bille n'a jamais de référence à son Éveil ni dans le pot : une cible relative y est refusée.
+- **La règle des cibles s'applique comme d'habitude** : un bonus de Vitesse ou de Masse dont la phase visée est passée est perdu, et le journal le note (depuis la pointe, l'emplacement suivant est la base droite, déjà résolue) ; un Polissage, une Fêlure, Empocher, Éjecter, Défausser et Rebond restent valides. Un emplacement visé vide : sans effet, noté.
+- **En chaîne** : une Éjection qui éjecte la bille de l'emplacement suivant fait ricocher l'éjection d'emplacement en emplacement ; chaque bille suit son chemin, et le ricochet s'arrête sur un emplacement déjà vidé.
 
 ### Les conditions
 
-Une clause peut porter une condition, évaluée au moment où l'effet joue ; fausse, la clause ne produit rien. Trois conditions existent :
+Une clause peut porter une condition, évaluée au moment où l'effet joue ; fausse, la clause ne produit rien. Quatre sortes de conditions existent :
 
 - **l'effet imprimé d'une autre bille** : la bille d'un emplacement donne au moins une certaine valeur, à cet emplacement. Seul compte ce qui est imprimé sur la bille, jamais un effet déjà modifié ;
 - **le calibre relatif**, pendant un remplacement seulement : la bille posée ou la bille chassée est plus petite, ou plus grosse, que l'autre. Quand c'est un effet Éjecter qui chasse, la bille qui éjecte tient le rôle de la bille posée, où qu'elle soit ;
-- **le calibre d'un emplacement** : la bille d'un emplacement est d'un calibre donné.
+- **le calibre d'un emplacement** : la bille d'un emplacement est d'un calibre donné. L'emplacement peut être relatif : « si la bille de l'emplacement suivant est un calot » ;
+- **l'état d'une zone de la partie** : le triangle est plein, vide, ou n'a qu'une bille ; la main est vide, ou pleine ; le sac est vide ; la défausse est vide ; le pot est plein, ou vide. « Pleine » et « plein » se comparent aux caractéristiques en vigueur : la taille de la main, la capacité du pot. Une bille en transit (en cours de lancer, en partance) n'est dans aucune zone et ne compte nulle part : pendant sa Chiquenaude, la bille lancée n'est plus en main ; pendant son Éjection, la bille chassée n'est plus sur le triangle. « Pointe : Vitesse +6 si le triangle est plein. », « Tic : Pioche 1 si la main est vide. », « En poche, à chaque résolution : Masse +2 si le pot est plein. ».
 
 ### Les montants calculés
 
@@ -280,7 +290,8 @@ Un montant peut dépendre du moment, par exemple « Vitesse +1 par minibille act
 
 - **les tours en main** de la bille elle-même ;
 - **les billes actives d'un calibre**, la bille elle-même comprise si elle est sur le triangle (en partance ou en cours de lancer, elle ne compte pas) ;
-- **une valeur de partie**, ce tour ou cette partie (section 10).
+- **une valeur de partie**, ce tour ou cette partie (section 10) ;
+- **le nombre de billes d'une zone** : actives, en main, dans le sac, à la défausse, dans le pot, perdues. Une bille en transit ne compte nulle part. La fiche dit la valeur actuelle : « Base : Vitesse +1 par bille en main, maximum +5, actuellement +3. ».
 
 Un montant qui vaut 0 ne produit rien.
 
@@ -381,8 +392,8 @@ Cette annexe est générée à partir de la table des billes ; elle ne se modifi
 
 argile, normale, usure 3.
 
-- Pointe : Vitesse +4.
-- Base : Vitesse +1.
+- Pointe : Vitesse +6 si si le triangle est plein.
+- Base : Vitesse +2 à la bille de l'emplacement suivant.
 - Chiquenaude : Vitesse +1 par tour en main, maximum +5.
 - Tic : Vitesse +2.
 
@@ -391,7 +402,7 @@ argile, normale, usure 3.
 verre, normale, usure 3.
 
 - Pointe : Vitesse +1 par trouvaille cette partie, maximum +10.
-- Base : Masse +1.
+- Base : Vitesse +1 par bille en main, maximum +5.
 - Tic : Polissage 1, jusqu'à une bille active au choix.
 
 ### gorille
@@ -401,7 +412,7 @@ gorille, calot, usure 3.
 - Pointe : Vitesse +6.
 - Base : aucun effet.
 - Tic : Vitesse +4 si la bille éjectée est plus petite et Empocher une bille de votre main au choix.
-- Éjection : Vitesse +3.
+- Éjection : Éjecter la bille de l'emplacement suivant.
 
 ### agate
 
@@ -412,7 +423,7 @@ agate, normale, usure 3.
 - Tic : Masse +1.
 - Trouvaille : Polissage 1.
 - Final : Polissage 1 à la pointe et Empocher cette bille.
-- En poche, à chaque résolution : Masse +1.
+- En poche, à chaque résolution : Masse +2 si si le pot est plein.
 
 ### œil-de-chat
 
@@ -420,18 +431,18 @@ agate, normale, usure 3.
 
 - Pointe : Vitesse +3.
 - Base droite : Masse +1. Base gauche : Vitesse +3.
-- Tic : Pioche 1.
+- Tic : Pioche 1 si si la main est vide.
 - Éjection : Ramasser jusqu'à une bille de la défausse au choix.
 
 ### porcelaine
 
 porcelaine, minibille, usure 2.
 
-- Pointe : Vitesse +5.
+- Pointe : Vitesse +5 et Vitesse +2 à la bille de l'emplacement suivant.
 - Base : Vitesse +2.
-- Chiquenaude : Masse +1.
+- Chiquenaude : Masse +1 à la bille de l'emplacement précédent.
 - Final : Vitesse +4 et Polissage 1, jusqu'à 2 billes actives au choix.
-- Chute : Vitesse +3.
+- Chute : Polissage 1 à la bille de l'emplacement suivant.
 - En poche, à l'entrée : Vitesse +10.
 
 ### plombée
@@ -447,7 +458,7 @@ plombée, calot, usure 3.
 
 mica, minibille, usure 3.
 
-- Pointe : Vitesse +2 et Polissage 1.
+- Pointe : Vitesse +2 et Polissage 1 à la bille de l'emplacement suivant.
 - Base : Pioche 1.
 - Éveil : Pioche 1.
 - Éjection : Pioche 1 si la bille posée est plus grosse.

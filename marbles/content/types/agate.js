@@ -1,6 +1,6 @@
 // Bille « agate » (agate). Donnée pure : les champs sont décrits dans
 // marbles/content/types/index.js.
-import { mass, polish, pocket } from "../effects.js";
+import { mass, polish, pocket, zoneIs } from "../effects.js";
 import { LARGE, MEDIUM } from "../../config/values.js";
 
 export default {
@@ -11,6 +11,7 @@ export default {
   windfall: [polish(1)],
   // Final : Polissage 1 à la pointe, puis elle s'empoche, depuis la défausse.
   final: [polish(1, "apex"), pocket()],
-  pocketed: { resolution: [mass(1)] },
+  // En poche, à chaque résolution : Masse +2 si le pot est plein.
+  pocketed: { resolution: [{ ...mass(2), when: zoneIs("pot", "full") }] },
   size: MEDIUM,
 };
