@@ -29,7 +29,7 @@ export function itemSounds(type) {
 }
 
 // Champs d'un objet (voir l'en-tête) ; tout autre champ est rejeté.
-const ITEM_FIELDS = ["stackable", "label", "descriptionKey", "value", "rarity", "tags", "sound", "equippable", "slot", "gait"];
+const ITEM_FIELDS = ["stackable", "nameKey", "descriptionKey", "value", "rarity", "tags", "sound", "equippable", "slot", "gait"];
 
 function failItems(message) {
   throw new Error(`core/items.js: ${message}`);

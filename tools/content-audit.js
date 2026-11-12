@@ -324,7 +324,10 @@ export async function auditContent() {
       continue;
     }
     try {
-      checkPlaySoundTargets(source, parseScene(raw, registry));
+      // Ce que parseScene signale sans refuser (core/scene.js, en-tête) : un
+      // problème de contenu comme un autre.
+      const warn = ({ type, ...details }) => report(source, url, `avertissement ${type}`, JSON.stringify(details));
+      checkPlaySoundTargets(source, parseScene(raw, registry, { warn }));
     } catch (error) {
       report(source, url, "scène invalide", error.message);
     }

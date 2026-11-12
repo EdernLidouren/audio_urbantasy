@@ -144,7 +144,7 @@ export default function checkEphemerals(run) {
   // spec : descripteur DÉJÀ RÉSOLU (voir core/spawn.js/
   // ephemeralArchetypeSpec) — spawnEphemeral ne l'interprète
   // jamais, il ne fait qu'y ajouter id/x/ephemeral.
-  const EPHEMERAL_SPEC = { type: "dog", labelKey: "entity.dog.name", interactable: true, action: { kind: "pickup", amount: 5 } };
+  const EPHEMERAL_SPEC = { type: "dog", nameKey: "entity.dog.name", interactable: true, action: { kind: "pickup", amount: 5 } };
 
   const ephemeralState = createInitialState(ephemeralWorldA);
   run("éphémère : monde neuf démarre à nextEphemeralId 0", 0, getActiveWorld(ephemeralState).nextEphemeralId);
@@ -153,7 +153,7 @@ export default function checkEphemerals(run) {
   const spawned1 = getActiveWorld(afterSpawn1).entities.find((e) => e.id === "ephemeral-0");
   run("éphémère : spawnEphemeral ajoute une entité marquée ephemeral:true", true, Boolean(spawned1 && spawned1.ephemeral));
   run("éphémère : spawnEphemeral pose x tel que demandé", 4, spawned1 && spawned1.x);
-  run("éphémère : spawnEphemeral reporte les champs de spec tels quels", "entity.dog.name", spawned1 && spawned1.labelKey);
+  run("éphémère : spawnEphemeral reporte les champs de spec tels quels", "entity.dog.name", spawned1 && spawned1.nameKey);
   run("éphémère : spawnEphemeral NE MUTE JAMAIS l'original", false, getActiveWorld(ephemeralState).entities.some((e) => e.ephemeral));
   run(
     "éphémère : une entité déclarée n'est jamais affectée par un spawn",
@@ -318,7 +318,7 @@ export default function checkEphemerals(run) {
   // + drawScatteredPosition, core/money.js/lootEntitySpawn) ---
   // Voir doc/entity-model.md/"Spawn déclenché par une action".
 
-  const SCATTER_SPEC = { type: "dog", labelKey: "entity.dog.name", interactable: true, action: { kind: "pickup", amount: 1 } };
+  const SCATTER_SPEC = { type: "dog", nameKey: "entity.dog.name", interactable: true, action: { kind: "pickup", amount: 1 } };
 
   // drawScatteredPosition en ISOLATION (exportée pour ça, voir son
   // commentaire) : bornes de carte ET obstacle, vérifiées directement,
@@ -506,7 +506,7 @@ function checkSpawnEffect(run) {
   const GHOST_SPAWN = { type: "spawn", spec: { type: "ghost", behavior: { kind: "wander" } } };
   const parsed = parseScene(withEffects([GHOST_SPAWN]), SPAWN_REGISTRY);
   const resolved = parsed.verso.entities[0].triggers[0].effects[0].spec;
-  run("spawn : spec résolu (nom de l'archétype)", "entity.ghost.name", resolved.labelKey);
+  run("spawn : spec résolu (nom de l'archétype)", "entity.ghost.name", resolved.nameKey);
   run("spawn : spec résolu (présence de l'archétype)", 1, resolved.presence.length);
   run("spawn : spec résolu (comportement de l'instance)", "wander", resolved.behavior.kind);
   run("spawn : spec sans id ni x", "false,false", ["id" in resolved, "x" in resolved].join(","));

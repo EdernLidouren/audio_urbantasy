@@ -24,7 +24,7 @@ import { resolveTuning } from "../config/tuning.js";
 import { createWorldView, stopPersistentAudioLayers } from "./world-view.js";
 import { clearInteractionCooldowns } from "./interaction.js";
 import { announceSceneName } from "./status-announcements.js";
-import { reportSceneLoadFailure, reportSceneReloadFailure } from "./debug-warnings.js";
+import { reportSceneLoadFailure, reportSceneReloadFailure, reportSceneWarning } from "./debug-warnings.js";
 import { muteNextDiscoveryCheck } from "./discoveries.js";
 import { saveGame } from "./save-storage.js";
 
@@ -116,7 +116,7 @@ export function createWorldTravel({ getSession, setSession }) {
     if (getSession().worlds[targetId]) return null;
     pushScreen({});
     try {
-      return await loadSceneById(targetId, registry);
+      return await loadSceneById(targetId, registry, { warn: reportSceneWarning });
     } catch (error) {
       reportSceneLoadFailure(targetId, error.message);
       announce(t("teleport.failed"), { assertive: true });
@@ -300,7 +300,7 @@ export function createWorldTravel({ getSession, setSession }) {
     let freshScene;
     pushScreen({});
     try {
-      freshScene = await loadSceneById(sceneId, registry);
+      freshScene = await loadSceneById(sceneId, registry, { warn: reportSceneWarning });
     } catch (error) {
       reportSceneReloadFailure(sceneId, error.message);
       announce(t("teleport.debug.reloadFailed"), { assertive: true });

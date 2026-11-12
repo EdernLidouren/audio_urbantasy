@@ -267,7 +267,7 @@ export default function checkMovement(run) {
   run("collision : entité non bloquante ne signale jamais de blocage", null, passState.player.blockedBy);
 
   // Surcharge d'instance blocksMovement (JSON de scène), lue AVANT le défaut du
-  // type — cascade identique à labelKey/descriptionKey.
+  // type — cascade identique à nameKey/descriptionKey.
   const overrideBlockScene = parseScene(
     { id: "movement-check-override-block", titleKey: "scene.demo.name", length: 10, playerStart: 4, entities: [{ id: "wall-2", type: "deco", x: 5, blocksMovement: true }] },
     NONBLOCKING_REGISTRY // type "deco" a blocksMovement absent (-> false par défaut)
@@ -372,13 +372,8 @@ export default function checkMovement(run) {
   run("chevauchement : cas normal, pas de signal pushedBy", null, noOverlapState.player.pushedBy);
 
   // Validation au chargement : NON bloquant (parseScene ne lève jamais pour
-  // un chevauchement), mais averti clairement (console.warn).
-  let overlapWarned = false;
-  const originalWarn = console.warn;
-  console.warn = (...args) => {
-    overlapWarned = true;
-    originalWarn(...args);
-  };
+  // un chevauchement), mais averti clairement (`warn`, core/scene.js, en-tête).
+  const overlapWarnings = [];
   const overlapLoadThrew = throws(() => {
     parseScene(
       {
@@ -391,12 +386,12 @@ export default function checkMovement(run) {
           { id: "wall-load-b", type: "wall", x: 5.05 },
         ],
       },
-      OVERLAP_REGISTRY
+      OVERLAP_REGISTRY,
+      { warn: (warning) => overlapWarnings.push(warning.type) }
     );
   });
-  console.warn = originalWarn;
   run("chevauchement : parseScene reste non bloquant au chargement", false, overlapLoadThrew);
-  run("chevauchement : parseScene avertit clairement au chargement", true, overlapWarned);
+  run("chevauchement : parseScene avertit clairement au chargement", true, overlapWarnings.includes("overlap"));
 
   // --- Pipeline core/physics/ : intentions (phase 1, comportement) +
   // physique (phase 2) combinées dans le même tick, sur une scène mêlant une

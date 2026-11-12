@@ -163,7 +163,7 @@ export default function checkInventory(run) {
   // quantité, jamais N éparpillées — voir core/bag.js/dropItem.
   const DROP_SPEC = {
     type: "item",
-    labelKey: "item.apple.name",
+    nameKey: "item.apple.name",
     descriptionKey: "item.apple.description",
     blocksMovement: false,
     observable: true,
@@ -247,7 +247,7 @@ export default function checkInventory(run) {
   // --- Tags d'objets (core/tags.js, config/items-values.js/ITEM_REGISTRY.tags,
   // core/equipment-slots.js/equippedTags, condition "hasEquipmentTag") ---
 
-  run("tags : registre — military a la bonne clé i18n", "tag.military", tagProps("military").labelKey);
+  run("tags : registre — military a la bonne clé i18n", "tag.military", tagProps("military").nameKey);
   run("tags : registre — clé inconnue -> undefined", undefined, tagProps("does-not-exist"));
   run("tags : registre — tagProps délègue à TAG_REGISTRY", TAG_REGISTRY.military, tagProps("military"));
   run("tags : ITEM_REGISTRY — les rangers portent le tag military", true, ITEM_REGISTRY.combat_boots.tags.includes("military"));
@@ -400,11 +400,11 @@ export default function checkInventory(run) {
     GENERIC_ITEM_REGISTRY
   );
   const genericById = Object.fromEntries(genericItemScene.entities.map((e) => [e.id, e]));
-  run("objet au sol : nom repris de l'objet", "item.resistor.name", genericById.res.labelKey);
+  run("objet au sol : nom repris de l'objet", "item.resistor.name", genericById.res.nameKey);
   run("objet au sol : description reprise de l'objet", "item.resistor.description", genericById.res.descriptionKey);
   run("objet au sol : beacon = son de l'objet, en boucle", `${ITEM_REGISTRY.resistor.sound}/true`, `${genericById.res.sounds.beacon.path}/${genericById.res.sounds.beacon.loop}`);
   run("objet au sol : ramassage = même son", ITEM_REGISTRY.resistor.sound, genericById.res.sounds.pickup.path);
-  run("objet au sol : nom de l'instance prioritaire", "custom.name", genericById["res-named"].labelKey);
+  run("objet au sol : nom de l'instance prioritaire", "custom.name", genericById["res-named"].nameKey);
   run("objet au sol : objet sans son -> sons de l'archétype", "generic", genericById.boots.sounds.beacon.path);
   run("objet au sol : itemSounds d'un objet sans son -> rien", undefined, itemSounds("apple"));
 

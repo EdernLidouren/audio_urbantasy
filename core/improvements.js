@@ -25,7 +25,7 @@ function failImprovements(message) {
 export function validateImprovementRegistry(registry) {
   const seen = new Map();
   for (const [id, props] of Object.entries(registry)) {
-    rejectUnknownFields(props, ["order", "labelKey", "descriptionKey"], `"${id}"`, failImprovements);
+    rejectUnknownFields(props, ["order", "nameKey", "descriptionKey"], `"${id}"`, failImprovements);
     if (!Number.isInteger(props.order) || props.order < 1) {
       failImprovements(`"${id}".order doit être un entier >= 1 (reçu : ${JSON.stringify(props.order)}).`);
     }

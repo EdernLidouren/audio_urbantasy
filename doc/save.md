@@ -180,8 +180,9 @@ existantes ; une table dédiée s'ajoutera le jour où le cas se présente.
 **Champ de contenu renommé ou dont l'unité change** (paramètre d'un
 comportement, d'une action...) : aucune table, la conversion s'écrit dans
 `core/save-migrate.js`, appelée par `migrateSave` après les renommages, idempotente,
-avec sa vérification. Précédent : `convertWanderTicks` (durées d'errance
-passées des ticks aux ms).
+avec sa vérification. Précédents : `convertWanderTicks` (durées d'errance
+passées des ticks aux ms), `renameNameFields` (le nom d'un contenu, `labelKey`
+devenu `nameKey` dans l'état).
 
 Vérifications : `core/checks/save.check.js` (`runChecks("save")`), sections
 « save renommages », « save errance », « save scène renommée », « save

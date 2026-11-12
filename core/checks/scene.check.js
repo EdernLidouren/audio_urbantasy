@@ -3,7 +3,7 @@
 // (voir ce fichier). Pur : aucun DOM, aucun fetch ; chaque scène est
 // construite en dur via un objet littéral passé à parseScene.
 
-import { parseScene, validateReverbPresets } from "../scene.js";
+import { parseScene, validateReverbPresets, SCENE_WARNING_TYPES } from "../scene.js";
 import { REVERB_PRESETS } from "../../config/reverb-values.js";
 import { createInitialState, getActiveWorld, MOVE_STEP } from "../state.js";
 import { tick } from "../actions.js";
@@ -25,6 +25,39 @@ export default function checkScene(run) {
     run("parseScene({}) : titleKey -> défaut générique", "scene.default.name", emptyScene.titleKey);
     run("parseScene({}) : length -> défaut minimal traversable (10)", 10, emptyScene.length);
     run("parseScene({}) : playerStart -> 0 (filet existant)", 0, emptyScene.playerStart);
+
+    // Les AVERTISSEMENTS (core/scene.js, en-tête) : jamais d'exception, chacun
+    // passé à `warn`, une donnée par avertissement ; sans `warn`, silence.
+    const warningsOf = (raw, registry = EMPTY_REGISTRY) => {
+      const warnings = [];
+      parseScene(raw, registry, { warn: (warning) => warnings.push(warning) });
+      return warnings;
+    };
+    run.same(
+      "avertissements : point d'arrivée hors bornes, repli dit",
+      [{ type: "playerStartFallback", sceneId: "far", playerStart: "50" }],
+      warningsOf({ id: "far", length: 10, playerStart: 50 })
+    );
+    const WALLS = { wall: { nameKey: "entity.wall.name", blocksMovement: true } };
+    run.same(
+      "avertissements : deux murs qui se chevauchent",
+      [{ type: "overlap", sceneId: "walls", a: "w1", ax: 2, b: "w2", bx: 2.1 }],
+      warningsOf({ id: "walls", length: 10, playerStart: 8, entities: [{ id: "w1", type: "wall", x: 2 }, { id: "w2", type: "wall", x: 2.1 }] }, WALLS)
+    );
+    run.same(
+      "avertissements : le point d'arrivée dans un mur",
+      ["playerStartInBody"],
+      warningsOf({ id: "inside", length: 10, playerStart: 5, entities: [{ id: "w1", type: "wall", x: 5 }] }, WALLS).map((warning) => warning.type)
+    );
+    run.same("avertissements : une scène saine n'en a aucun", [], warningsOf({ id: "fine", length: 10, playerStart: 1 }));
+    run(
+      "avertissements : chaque type émis est déclaré",
+      true,
+      warningsOf({ id: "all", length: 10, playerStart: 50, entities: [{ id: "w1", type: "wall", x: 0 }, { id: "w2", type: "wall", x: 0.1 }] }, WALLS).every((warning) =>
+        SCENE_WARNING_TYPES.includes(warning.type)
+      )
+    );
+    run("avertissements : sans warn, rien ne lève", false, throws(() => parseScene({ length: 10, playerStart: 50 }, EMPTY_REGISTRY)));
     run("parseScene({}) : entities -> [] (tableau vide)", 0, emptyScene.entities.length);
     run("parseScene({}) : defaultSurface -> DEFAULT_SURFACE", DEFAULT_SURFACE, emptyScene.defaultSurface);
     run("parseScene({}) : segments -> [] (tableau vide)", 0, emptyScene.segments.length);

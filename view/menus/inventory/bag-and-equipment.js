@@ -122,7 +122,7 @@ export function setCurrentTabsScreen(screen) {
 // qui strip le point pour laisser la place au suffixe de position ajouté
 // par lib/menu.js).
 function describeBagEntry(entry) {
-  const item = t(ITEM_REGISTRY[entry.type].label);
+  const item = t(ITEM_REGISTRY[entry.type].nameKey);
   const description = t(ITEM_REGISTRY[entry.type].descriptionKey);
   return entry.quantity !== undefined
     ? t("inventory.entry.stack", { item, quantity: entry.quantity, description })
@@ -130,9 +130,9 @@ function describeBagEntry(entry) {
 }
 
 function bagEntryLine(getWorldView, getSession, entry, index) {
-  const itemLabelKey = ITEM_REGISTRY[entry.type].label;
+  const itemNameKey = ITEM_REGISTRY[entry.type].nameKey;
   const description = stripTrailingPeriod(t(ITEM_REGISTRY[entry.type].descriptionKey));
-  const item = t(itemLabelKey);
+  const item = t(itemNameKey);
 
   const text =
     entry.quantity !== undefined
@@ -141,7 +141,7 @@ function bagEntryLine(getWorldView, getSession, entry, index) {
 
   return {
     ...text,
-    onActivate: () => openItemActionsMenu(getWorldView, getSession, entry, itemLabelKey, index),
+    onActivate: () => openItemActionsMenu(getWorldView, getSession, entry, itemNameKey, index),
   };
 }
 
@@ -215,12 +215,12 @@ function equipmentSlotEntry(getWorldView, getSession, slot) {
     };
   }
 
-  const itemLabelKey = ITEM_REGISTRY[occupant.type].label;
+  const itemNameKey = ITEM_REGISTRY[occupant.type].nameKey;
   const description = stripTrailingPeriod(t(ITEM_REGISTRY[occupant.type].descriptionKey));
   return {
     label: "inventory.equipment.slot.occupied",
-    labelParams: { slot: slotLabel, item: t(itemLabelKey), description },
-    onActivate: () => openEquipmentSlotActionsMenu(getWorldView, getSession, slot, itemLabelKey),
+    labelParams: { slot: slotLabel, item: t(itemNameKey), description },
+    onActivate: () => openEquipmentSlotActionsMenu(getWorldView, getSession, slot, itemNameKey),
   };
 }
 
@@ -240,15 +240,15 @@ export function buildEquipmentTabScreen(getWorldView, getSession) {
 // liste pour un objet donné (ex. un objet de quête vital) — non codé ici,
 // aucun objet de ce genre n'existe encore ; documenté pour ne pas condamner
 // ce slot par erreur plus tard.
-function buildItemActions(getSession, entry, itemLabelKey, index) {
+function buildItemActions(getSession, entry, itemNameKey, index) {
   const props = ITEM_REGISTRY[entry.type];
   const actions = [];
   if (props.equippable) {
-    actions.push({ label: "inventory.actions.equip", onActivate: () => confirmEquip(getSession, entry, itemLabelKey, index) });
+    actions.push({ label: "inventory.actions.equip", onActivate: () => confirmEquip(getSession, entry, itemNameKey, index) });
   }
   actions.push({
     label: "inventory.actions.drop",
-    onActivate: () => confirmDrop(getSession, entry, itemLabelKey, index),
+    onActivate: () => confirmDrop(getSession, entry, itemNameKey, index),
   });
   return actions;
 }
@@ -258,29 +258,29 @@ function buildItemActions(getSession, entry, itemLabelKey, index) {
 // menu" et "agit directement" selon le nombre d'actions disponibles) — SAUF
 // si zéro action n'est disponible, auquel cas silence total, aucun menu ne
 // s'ouvre (même politique que view/interaction.js : jamais un menu vide).
-// Titre : le LABEL DE L'OBJET LUI-MÊME (itemLabelKey, déjà une clé i18n,
+// Titre : le LABEL DE L'OBJET LUI-MÊME (itemNameKey, déjà une clé i18n,
 // voir bagEntryLine) réutilisé tel quel comme titre de menu ("Pomme. Poser.
 // 1 sur 2") — pas de nouvelle clé i18n dédiée, menu.title n'étant qu'une clé
 // passée telle quelle à t() par lib/menu.js.
-function openItemActionsMenu(getWorldView, getSession, entry, itemLabelKey, index) {
-  const actions = buildItemActions(getSession, entry, itemLabelKey, index);
+function openItemActionsMenu(getWorldView, getSession, entry, itemNameKey, index) {
+  const actions = buildItemActions(getSession, entry, itemNameKey, index);
 
   actions.push({ label: "inventory.actions.cancel", onActivate: () => popScreen() });
 
-  const menu = { title: itemLabelKey, closable: true, entries: actions };
+  const menu = { title: itemNameKey, closable: true, entries: actions };
   pushScreen(withPausedBeacons(makeMenuScreen(menu, t), getWorldView));
 }
 
 // Menu d'actions d'UN SLOT d'équipement occupé (onglet Équipement) —
 // Déséquiper + Annuler, même patron que openItemActionsMenu ci-dessus (un
 // menu d'actions par objet, quel que soit l'onglet où il se trouve).
-function openEquipmentSlotActionsMenu(getWorldView, getSession, slot, itemLabelKey) {
+function openEquipmentSlotActionsMenu(getWorldView, getSession, slot, itemNameKey) {
   const actions = [
-    { label: "inventory.actions.unequip", onActivate: () => confirmUnequip(slot, itemLabelKey) },
+    { label: "inventory.actions.unequip", onActivate: () => confirmUnequip(slot, itemNameKey) },
     { label: "inventory.actions.cancel", onActivate: () => popScreen() },
   ];
 
-  const menu = { title: itemLabelKey, closable: true, entries: actions };
+  const menu = { title: itemNameKey, closable: true, entries: actions };
   pushScreen(withPausedBeacons(makeMenuScreen(menu, t), getWorldView));
 }
 
@@ -292,28 +292,28 @@ function openEquipmentSlotActionsMenu(getWorldView, getSession, slot, itemLabelK
 // popCount d'executeAction. Réannonce + repositionnement du curseur après
 // coup (RÈGLE GÉNÉRALE, voir bagRemovalAnnouncement/executeAction) : `index`
 // = position de l'entrée équipée dans le sac AVANT l'effet.
-function confirmEquip(getSession, entry, itemLabelKey, index) {
+function confirmEquip(getSession, entry, itemNameKey, index) {
   executeAction(
     1,
     () => {
       if (!equipItemHandler) return false;
       equipItemHandler(entry.type);
     },
-    () => `${t("inventory.equipped", { item: t(itemLabelKey) })} ${bagRemovalAnnouncement(getSession, index)}`,
+    () => `${t("inventory.equipped", { item: t(itemNameKey) })} ${bagRemovalAnnouncement(getSession, index)}`,
     () => bagCursorAfterRemoval(getSession().bag, index)
   );
 }
 
 // "Déséquiper" choisi (onglet Équipement) : même patron, un seul niveau au-
 // dessus des onglets (son propre menu d'actions).
-function confirmUnequip(slot, itemLabelKey) {
+function confirmUnequip(slot, itemNameKey) {
   executeAction(
     1,
     () => {
       if (!unequipItemHandler) return false;
       unequipItemHandler(slot);
     },
-    () => t("inventory.unequipped", { item: t(itemLabelKey) })
+    () => t("inventory.unequipped", { item: t(itemNameKey) })
   );
 }
 
@@ -324,7 +324,7 @@ function confirmUnequip(slot, itemLabelKey) {
 // l'entrée selon la quantité choisie). `index` : position de l'entrée dans
 // le sac AVANT l'effet, transmise pour la réannonce/repositionnement (voir
 // bagRemovalAnnouncement/executeAction).
-function confirmDrop(getSession, entry, itemLabelKey, index) {
+function confirmDrop(getSession, entry, itemNameKey, index) {
   const available = entry.quantity ?? 1;
   if (available <= 1) {
     // Un seul niveau au-dessus des onglets à ce stade (le menu d'actions) —
@@ -335,12 +335,12 @@ function confirmDrop(getSession, entry, itemLabelKey, index) {
         if (!dropItemHandler) return false;
         dropItemHandler(entry.type, available);
       },
-      () => buildDropMessage(getSession, entry, itemLabelKey, available, index),
+      () => buildDropMessage(getSession, entry, itemNameKey, available, index),
       () => bagCursorAfterRemoval(getSession().bag, index)
     );
     return;
   }
-  openQuantitySelector(getSession, entry, itemLabelKey, available, index);
+  openQuantitySelector(getSession, entry, itemNameKey, available, index);
 }
 
 // Message de résultat du dépôt — appelé APRÈS l'effet (voir executeAction) :
@@ -349,8 +349,8 @@ function confirmDrop(getSession, entry, itemLabelKey, index) {
 // jamais muté) -> retrait complet de l'entrée -> réannonce (RÈGLE GÉNÉRALE,
 // voir bagRemovalAnnouncement) ; sinon (dépôt partiel d'un stack, l'entrée
 // SURVIT au même index) -> message seul, rien à réannoncer.
-function buildDropMessage(getSession, entry, itemLabelKey, quantity, index) {
-  const item = t(itemLabelKey);
+function buildDropMessage(getSession, entry, itemNameKey, quantity, index) {
+  const item = t(itemNameKey);
   const isStack = entry.quantity !== undefined;
   const dropMessage = isStack ? t("inventory.dropped.stack", { item, quantity }) : t("inventory.dropped", { item });
   const fullyRemoved = quantity >= (entry.quantity ?? 1);
@@ -379,7 +379,7 @@ function buildDropMessage(getSession, entry, itemLabelKey, quantity, index) {
 // jamais par ce mécanisme). Ne pause/reprend PAS les balises lui-même : le
 // menu d'actions juste en-dessous, encore sur la pile, l'a déjà fait à son
 // ouverture et ne s'en dépossède qu'à SA propre sortie.
-function openQuantitySelector(getSession, entry, itemLabelKey, max, index) {
+function openQuantitySelector(getSession, entry, itemNameKey, max, index) {
   let quantity = 1;
   const hold = createHoldRepeat();
 
@@ -424,7 +424,7 @@ function openQuantitySelector(getSession, entry, itemLabelKey, max, index) {
             if (!dropItemHandler) return false;
             dropItemHandler(entry.type, quantity);
           },
-          () => buildDropMessage(getSession, entry, itemLabelKey, quantity, index),
+          () => buildDropMessage(getSession, entry, itemNameKey, quantity, index),
           () => bagCursorAfterRemoval(getSession().bag, index)
         );
       } else if (action === "cancel") {
@@ -435,7 +435,7 @@ function openQuantitySelector(getSession, entry, itemLabelKey, max, index) {
   };
 
   screen.onEnter = () => {
-    announce(t("inventory.quantity.announce", { item: t(itemLabelKey), quantity, max }), { assertive: true });
+    announce(t("inventory.quantity.announce", { item: t(itemNameKey), quantity, max }), { assertive: true });
   };
 
   pushScreen(screen);

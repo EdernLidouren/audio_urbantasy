@@ -1010,6 +1010,12 @@
   "assets/sounds/items/small_pieces_1_beacon": [
     "assets/sounds/items/small_pieces_1_beacon_1.mp3"
   ],
+  "assets/sounds/marble_cracking": [
+    "assets/sounds/marble_cracking_1.mp3"
+  ],
+  "assets/sounds/marble_polishing": [
+    "assets/sounds/marble_polishing_1.mp3"
+  ],
   "assets/sounds/marbles/marble_large_1_beacon": [
     "assets/sounds/marbles/marble_large_1_beacon_1.mp3"
   ],

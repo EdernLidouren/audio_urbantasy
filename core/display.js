@@ -139,7 +139,7 @@ export function validateDisplayArticles(articles) {
 validateDisplayArticles(DISPLAY_ARTICLES);
 
 // Article RÉSOLU, tel que la vue l'annonce, le sonne et que l'achat
-// l'applique : { id, item | improvement, price, labelKey, descriptionKey,
+// l'applique : { id, item | improvement, price, nameKey, descriptionKey,
 // sound? }. `sound` : celui de l'article, sinon celui de l'objet visé,
 // absent sinon (la vue prend alors la balise de repli du présentoir). null
 // pour un id inconnu (jamais une exception : un présentoir sauvegardé peut
@@ -155,10 +155,10 @@ export function displayArticleInfo(id, articles = DISPLAY_ARTICLES) {
   };
   if (article.item !== undefined) {
     const props = ITEM_REGISTRY[article.item];
-    return withSound({ id, item: article.item, price, labelKey: props.label, descriptionKey: props.descriptionKey }, props.sound);
+    return withSound({ id, item: article.item, price, nameKey: props.nameKey, descriptionKey: props.descriptionKey }, props.sound);
   }
   const props = IMPROVEMENT_REGISTRY[article.improvement];
-  return withSound({ id, improvement: article.improvement, price, labelKey: props.labelKey, descriptionKey: props.descriptionKey });
+  return withSound({ id, improvement: article.improvement, price, nameKey: props.nameKey, descriptionKey: props.descriptionKey });
 }
 
 // Article exposé par un présentoir, résolu — null si le présentoir est vide
@@ -172,9 +172,9 @@ export function offeredArticle(entity) {
 // de choix) : l'article exposé pour un présentoir garni — on s'approche
 // d'une lampe-torche, pas d'un meuble —, son propre nom sinon (présentoir
 // vide compris).
-export function presentedLabelKey(entity) {
+export function presentedNameKey(entity) {
   const article = offeredArticle(entity);
-  return article ? article.labelKey : entity.labelKey;
+  return article ? article.nameKey : entity.nameKey;
 }
 
 // Articles INDISPONIBLES ce jour-là pour la partie : exclus de tout tirage.

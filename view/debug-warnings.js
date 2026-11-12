@@ -61,6 +61,21 @@ export function reportSceneReloadFailure(sceneId, message) {
   );
 }
 
+// Avertissement d'une scène au chargement (core/scene.js/parseScene, `warn`) :
+// un point d'arrivée hors bornes ou dans un corps, deux corps infranchissables
+// qui se chevauchent. Une scène se recharge à chaque visite d'un monde neuf et
+// à chaque rechargement de debug : un même avertissement n'est noté qu'une fois
+// tant qu'il est au journal, comme un texte de travers (reportI18nWarning).
+// Chaque type a son texte, debug.warnings.scene.<type>
+// (core/scene.js/SCENE_WARNING_TYPES, vérifié par le domaine i18n-content).
+export function reportSceneWarning(warning) {
+  const { type, ...params } = warning;
+  const key = `debug.warnings.scene.${type}`;
+  const alreadyLogged = warningLog.entries().some((entry) => entry.key === key && JSON.stringify(entry.params) === JSON.stringify(params));
+  if (alreadyLogged) return;
+  reportWarning(key, params, `Scène "${warning.sceneId}" : avertissement au chargement (${type}) :`, params);
+}
+
 // Texte de collection manquant (voir view/discoveries.js) : nom
 // d'une collection, ou nom/description d'une de ses entrées, absent de
 // data/i18n/<langue>/collections.json. Pas de repli sur les textes de

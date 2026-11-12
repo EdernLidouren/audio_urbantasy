@@ -38,7 +38,7 @@ validé au démarrage (voir "Registre de types"). Avant de jouer une scène neuv
 | `id`          | string   | optionnel, non vide si présent — **FILET si absent** : repli sur `"scene"` (`DEFAULT_SCENE_ID`) |
 | `titleKey`    | string   | optionnel, non vide si présent, clé i18n du titre de la scène — **FILET si absent** : repli sur `"scene.default.name"` (`DEFAULT_SCENE_TITLE_KEY`, "Scène sans nom"/"Unnamed scene") |
 | `length`      | number   | optionnel, `> 0` si présent — longueur en unités le long de l'axe x — **FILET si absent** : repli sur `10` (`DEFAULT_SCENE_LENGTH`, petite étendue traversable, jamais `0`) |
-| `playerStart` | number   | point d'arrivée PAR DÉFAUT de la scène. **FILET, jamais rejeté** : absent ou hors `[0, length]` -> repli sur `0` (avec un `console.warn`), jamais d'exception. Des points d'arrivée NOMMÉS (ex. par porte) pourront s'ajouter plus tard, sans toucher à ce filet. |
+| `playerStart` | number   | point d'arrivée PAR DÉFAUT de la scène. **FILET, jamais rejeté** : absent ou hors `[0, length]` -> repli sur `0`, signalé comme avertissement (`parseScene(raw, registry, { warn })` : au journal de debug, Maj+L, en jeu ; au rapport de l'audit du contenu), jamais d'exception. Des points d'arrivée NOMMÉS (ex. par porte) pourront s'ajouter plus tard, sans toucher à ce filet. |
 | `entities`    | Entity[] | optionnel — **FILET si absent** : repli sur `[]` (scène sans entité, toujours jouable). Voir ci-dessous pour la forme d'une entité. |
 | `music`       | string   | optionnel : musique de la scène — une clé de POOL (plusieurs fichiers, voir `assets/manifest.json`) ou un membre précis, résolue par `resolveAsset` comme tout autre pool. Canal global non spatialisé — voir `view/audio/layers.js`. Par défaut, lue en SÉQUENCE avec respiration (voir "Musique : séquence avec respiration" plus bas), jamais en boucle simple. |
 | `musicDay` / `musicNight` | string | optionnels : musique PAR PHASE jour/nuit (voir `core/time.js`/`phaseAt`, "Phase jour/nuit" plus bas), même forme que `music` (pool ou membre précis). Une scène qui n'en déclare aucune des deux retombe sur `music` pour les deux phases. Bascule en cours de jeu par FONDU UNIVERSEL puis respiration puis nouvelle séquence (`view/audio/layers.js`) ; à l'entrée dans une scène, la phase courante joue directement, sans fondu. |
@@ -320,13 +320,14 @@ Renommer un id d'instance ne demande aucune entrée dans
 zones inaccessibles d'une face (derrière un obstacle infranchissable) sont un
 choix de contenu, pour le relief d'une scène, jamais une erreur.
 
-`parseScene` normalise chaque entité en ajoutant `labelKey` et
-`descriptionKey` : `entity.nameKey` (du JSON) si présent sinon
-`registry[type].nameKey` pour le premier ; `entity.descriptionKey` (du JSON) si présent sinon
-`registry[type].descriptionKey` pour le second (peut rester `undefined`, ex.
-`decor`). Les champs bruts du JSON source une fois résolus (`nameKey`,
-`descriptionKey`) ne sont pas reportés tels quels dans l'entité normalisée —
-seuls `labelKey` et `descriptionKey` (résolus) sont exposés.
+`parseScene` résout le `nameKey` et le `descriptionKey` de chaque entité, en
+cascade : celui de l'instance (le JSON) si présent, sinon celui de l'objet porté
+(un objet au sol générique), sinon celui de l'archétype (`registry[type]`) ; la
+description peut rester `undefined` (ex. `decor`). L'entité normalisée porte ces
+deux champs RÉSOLUS, sous le même nom que dans le JSON : le nom d'un contenu est
+`nameKey` partout, scène, registres et état (une sauvegarde d'avant le
+2026-11-12, qui l'appelait `labelKey`, est remise à jour au chargement,
+`core/save-migrate.js`/`renameNameFields`).
 
 ## Présence conditionnelle et triggers de comportement
 

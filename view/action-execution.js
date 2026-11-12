@@ -44,7 +44,7 @@ function handleSwitchSide(entity, action) {
 // par la PRÉSENCE du champ (voir core/action-kinds.js) :
 //   - action.item : vers le SAC (voir core/bag.js/pickupItemEntity,
 //     doc/entity-model.md/"Sac d'objets") — le nom affiché ("Ramassé :
-//     <objet>") est entity.labelKey, déjà résolu par le core (un objet au
+//     <objet>") est entity.nameKey, déjà résolu par le core (un objet au
 //     sol reprend le nom de l'objet, voir core/entity-parse.js/
 //     genericItemDefaults) ;
 //   - action.amount : vers session.money.
@@ -55,7 +55,7 @@ function handlePickup(entity, action) {
     if (!itemPickupHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
     playEntityPickupSound(entity); // avant le retrait : l'entité a encore sa voix
     if (itemPickupHandler(entity, action.item, action.count ?? 1)) {
-      announce(t("interaction.pickupItem", { item: t(entity.labelKey) }), { assertive: true });
+      announce(t("interaction.pickupItem", { item: t(entity.nameKey) }), { assertive: true });
     }
     return;
   }

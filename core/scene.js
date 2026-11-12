@@ -1,5 +1,12 @@
 // Parsing et validation d'une scène. Fonction pure : aucun accès réseau ou
-// DOM, aucune chaîne affichable produite (labelKey reste une clé i18n).
+// DOM, aucune chaîne affichable produite (nameKey reste une clé i18n).
+//
+// AVERTISSEMENTS : ce qui est suspect sans être une erreur (un point d'arrivée
+// hors bornes, des corps impassables qui se chevauchent) ne lève pas, et n'écrit
+// rien : parseScene le passe à la fonction `warn` qu'on lui donne
+// (options.warn), une donnée { type, sceneId, ... } par avertissement, que
+// l'appelant présente à sa façon (le journal de debug du jeu, le rapport de
+// l'audit du contenu). Sans elle, silence.
 // Ce fichier porte la scène et ses faces ; une entité est parsée par
 // core/entity-parse.js, le format déclaratif par core/script-parse.js.
 //
@@ -37,30 +44,33 @@ const DEFAULT_SCENE_LENGTH = 10;
 // Détection de chevauchement au chargement (préventif, NON bloquant) : la
 // conception des scènes évite ce cas, mais une scène mal formée doit se
 // dénoncer au chargement plutôt qu'en cours de jeu — même principe de filet que
-// playerStart plus bas, un console.warn clair, jamais un fail(). Une
+// playerStart plus bas, un avertissement (`warn`, voir l'en-tête), jamais un
+// fail(). Une
 // entité passable n'a pas de zone d'exclusion propre (voir
 // core/physics/overlap.js/resolveOverlaps) : seules les paires impliquant au moins
 // une entité impassable sont vérifiées. Une paire dont un membre a des règles
 // de présence ne l'est pas : deux corps peuvent se partager un x en n'étant
 // jamais là ensemble, et lire ces règles ne se fait pas ici.
-function warnOnOverlaps(entities, playerStart) {
+//   { type: "playerStartInBody", sceneId, playerStart, entityId, x }
+//   { type: "overlap", sceneId, a, ax, b, bx }
+function warnOnOverlaps(entities, playerStart, sceneId, warn) {
   for (let i = 0; i < entities.length; i++) {
     const a = entities[i];
     if (a.blocksMovement && Math.abs(playerStart - a.x) < BODY_RADIUS) {
-      console.warn(
-        `parseScene: playerStart (${playerStart}) démarre dans le corps de l'entité impassable "${a.id}" (x=${a.x}).`
-      );
+      warn({ type: "playerStartInBody", sceneId, playerStart, entityId: a.id, x: a.x });
     }
     for (let j = i + 1; j < entities.length; j++) {
       const b = entities[j];
       if (a.blocksMovement && b.blocksMovement && !a.presence && !b.presence && Math.abs(a.x - b.x) < 2 * BODY_RADIUS) {
-        console.warn(
-          `parseScene: entités impassables "${a.id}" (x=${a.x}) et "${b.id}" (x=${b.x}) se chevauchent au chargement.`
-        );
+        warn({ type: "overlap", sceneId, a: a.id, ax: a.x, b: b.id, bx: b.x });
       }
     }
   }
 }
+
+// Les types d'avertissement d'une scène (voir l'en-tête), chacun avec un texte
+// chez qui les présente.
+export const SCENE_WARNING_TYPES = ["playerStartFallback", "playerStartInBody", "overlap"];
 
 // Bornes [from, to] d'une portion de scène (segment, plage de collecte) :
 // from < to, les deux dans [0, length].
@@ -426,7 +436,9 @@ function parseFace(raw, length, registry, describe, sceneVariables, seenIds = ne
   return face;
 }
 
-export function parseScene(raw, registry) {
+// `options.warn(warning)` : reçoit chaque avertissement (voir l'en-tête) ; par
+// défaut, aucun.
+export function parseScene(raw, registry, { warn = () => {} } = {}) {
   if (typeof raw !== "object" || raw === null) {
     fail("la scène n'est pas un objet.");
   }
@@ -459,10 +471,10 @@ export function parseScene(raw, registry) {
   // pourront s'ajouter plus tard, sans toucher à ce filet — pas codés ici.
   const resolvedPlayerStart =
     isFiniteNumber(playerStart) && playerStart >= 0 && playerStart <= resolvedLength ? playerStart : 0;
+  // Absent ou hors bornes : un avertissement, le repli dit.
+  //   { type: "playerStartFallback", sceneId, playerStart }
   if (resolvedPlayerStart !== playerStart) {
-    console.warn(
-      `parseScene: playerStart (${JSON.stringify(playerStart)}) absent ou hors bornes, repli sur 0.`
-    );
+    warn({ type: "playerStartFallback", sceneId: resolvedId, playerStart: JSON.stringify(playerStart) });
   }
 
   // variables : STOCKAGE de variables de portée "scene" (voir
@@ -525,8 +537,8 @@ export function parseScene(raw, registry) {
     const sceneIds = new Set();
     const parsedRecto = parseFace(recto, resolvedLength, registry, "recto", resolvedVariables, sceneIds);
     const parsedVerso = parseFace(verso, resolvedLength, registry, "verso", resolvedVariables, sceneIds);
-    warnOnOverlaps(parsedRecto.entities, resolvedPlayerStart);
-    warnOnOverlaps(parsedVerso.entities, resolvedPlayerStart);
+    warnOnOverlaps(parsedRecto.entities, resolvedPlayerStart, resolvedId, warn);
+    warnOnOverlaps(parsedVerso.entities, resolvedPlayerStart, resolvedId, warn);
     return {
       id: resolvedId,
       titleKey: resolvedTitleKey,
@@ -541,7 +553,7 @@ export function parseScene(raw, registry) {
 
   rejectUnknownFields(raw, [...SCENE_FIELDS, ...FACE_FIELDS], "scène");
   const face = parseFace(raw, resolvedLength, registry, null, resolvedVariables);
-  warnOnOverlaps(face.entities, resolvedPlayerStart);
+  warnOnOverlaps(face.entities, resolvedPlayerStart, resolvedId, warn);
 
   return {
     id: resolvedId,

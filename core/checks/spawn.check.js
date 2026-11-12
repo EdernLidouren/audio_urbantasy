@@ -459,7 +459,7 @@ export default function checkSpawn(run) {
   run("objet posé : archétype dédié -> son type, count remplacé", "apple/apple/3", `${droppedApple.type}/${droppedApple.action.item}/${droppedApple.action.count}`);
   const droppedResistor = ephemeralItemSpec(specSession, "resistor", 4, SPEC_REGISTRY);
   run("objet posé : sans archétype -> type générique item", "item", droppedResistor.type);
-  run("objet posé : générique -> nom et description de l'objet", `${ITEM_REGISTRY.resistor.label}|${ITEM_REGISTRY.resistor.descriptionKey}`, `${droppedResistor.labelKey}|${droppedResistor.descriptionKey}`);
+  run("objet posé : générique -> nom et description de l'objet", `${ITEM_REGISTRY.resistor.nameKey}|${ITEM_REGISTRY.resistor.descriptionKey}`, `${droppedResistor.nameKey}|${droppedResistor.descriptionKey}`);
   run("objet posé : générique -> son de l'objet en balise", ITEM_REGISTRY.resistor.sound, droppedResistor.sounds.beacon.path);
   run("objet posé : générique -> action pickup de l'objet avec la quantité", "pickup/resistor/4", (({ kind, item, count }) => `${kind}/${item}/${count}`)(droppedResistor.action));
 

@@ -55,7 +55,7 @@ function buildSaleLines(bag) {
   const types = [...new Set(bag.map((entry) => entry.type))].filter(isSellable);
   return types.map((type) => ({
     type,
-    labelKey: ITEM_REGISTRY[type].label,
+    nameKey: ITEM_REGISTRY[type].nameKey,
     descriptionKey: ITEM_REGISTRY[type].descriptionKey,
     max: ownedQuantity(bag, type),
     price: sellValueOf(type),
@@ -68,7 +68,7 @@ function buildSaleLines(bag) {
 function buildPurchaseLines(shopEntity) {
   return shopArticles(shopEntity).map((article) => ({
     type: article.type,
-    labelKey: ITEM_REGISTRY[article.type].label,
+    nameKey: ITEM_REGISTRY[article.type].nameKey,
     descriptionKey: ITEM_REGISTRY[article.type].descriptionKey,
     max: article.stock,
     price: article.price,
@@ -87,7 +87,7 @@ function selectedQuantities(lines) {
 function details(lines) {
   return lines
     .filter((line) => line.selected > 0)
-    .map((line) => t("shop.detail", { item: t(line.labelKey), quantity: line.selected }));
+    .map((line) => t("shop.detail", { item: t(line.nameKey), quantity: line.selected }));
 }
 
 // Confirmation de TRANSACTION (voir ./confirmation.js). Titre DYNAMIQUE :
@@ -178,14 +178,14 @@ function openBuyMenu(getSession, entityId) {
 
 // Activation du point de vente (action "shop", voir view/interaction.js) :
 // MENU D'ACTIONS ("Acheter" d'abord, "Vendre", "Annuler"), titre = le nom du
-// point de vente lui-même (entity.labelKey, déjà une clé i18n — même idiome
+// point de vente lui-même (entity.nameKey, déjà une clé i18n — même idiome
 // que inventory/bag-and-equipment.js/openItemActionsMenu). "Acheter" sans catalogue,
 // "Vendre" sans rien de vendable au sac -> son "refusal" + annonce seule,
 // aucune liste vide.
 // Balises en pause tant que ce menu (ou un écran au-dessus) est ouvert.
 export function openShopMenu(getWorldView, getSession, entity) {
   const menu = {
-    title: entity.labelKey,
+    title: entity.nameKey,
     closable: true,
     entries: [
       {

@@ -74,7 +74,7 @@ function openDiscardConfirmation() {
 
 // Ouvre la liste, paramétrée par `spec` :
 //   getSession       — lecture de la session (argent, Maj+G)
-//   lines            — lignes { type, labelKey, descriptionKey, max, price, selected }
+//   lines            — lignes { type, nameKey, descriptionKey, max, price, selected }
 //   entryKey         — gabarit de l'entrée complète ({item, selected, max, price, description})
 //   soldOutKey?      — gabarit d'une ligne à max 0 (achat : "épuisé")
 //   totalKey         — gabarit du titre/grand total ({count, total})
@@ -110,7 +110,7 @@ export function openQuantityList(spec) {
       const line = lines[index];
       const key = line.max === 0 && spec.soldOutKey ? spec.soldOutKey : spec.entryKey;
       text = t(key, {
-        item: t(line.labelKey),
+        item: t(line.nameKey),
         selected: line.selected,
         max: line.max,
         price: line.price,

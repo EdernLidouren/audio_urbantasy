@@ -42,7 +42,7 @@ export default function checkCompanions(run) {
   ).start;
   let companionState = createInitialState(companionScene, 1, COMPANION_START);
   run("compagnons : le compagnon du départ est présent", 1, companionState.companions.length);
-  run("compagnons : nom hérité de son archétype", "entity.dog.name", companionState.companions[0].labelKey);
+  run("compagnons : nom hérité de son archétype", "entity.dog.name", companionState.companions[0].nameKey);
   run("compagnons : positionné près du joueur à la création", companionScene.playerStart, companionState.companions[0].x);
 
   // Injection à la LECTURE (voir core/state.js/getActiveWorld) : présent
@@ -90,7 +90,7 @@ export default function checkCompanions(run) {
   const tooManyCompanions = Array.from({ length: MAX_COMPANIONS + 3 }, (_, i) => ({
     id: `extra-companion-${i}`,
     type: "dog",
-    labelKey: "entity.dog.name",
+    nameKey: "entity.dog.name",
     blocksMovement: false,
     x: 0,
     dir: 1,
@@ -153,9 +153,9 @@ export default function checkCompanions(run) {
   run("compagnons : toujours pas de résidu dans le monde B quitté", 0, companionPartie.worlds[companionWorldB.id].entities.length);
 
   // --- Compagnons : robustesse ---
-  // addCompanion (core/state.js) : SEUL point d'ajout. Refuse + signale à la
-  // limite, jamais d'éviction silencieuse — voir son commentaire pour la
-  // politique complète.
+  // addCompanion (core/state.js) : SEUL point d'ajout. Refuse à la limite
+  // (`added` faux, à l'appelant de le dire), jamais d'éviction silencieuse —
+  // voir son commentaire pour la politique complète.
   const fullCompanions = [
     { id: "c1", type: "dog", x: 0 },
     { id: "c2", type: "dog", x: 1 },

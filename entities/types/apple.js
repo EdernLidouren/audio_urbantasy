@@ -7,7 +7,7 @@
 // doc/entity-model.md, "Résolution en cascade").
 //
 // nameKey/descriptionKey/action réutilisent DIRECTEMENT les mêmes clés que
-// config/items-values.js/ITEM_REGISTRY.apple.label/descriptionKey : une instance de
+// config/items-values.js/ITEM_REGISTRY.apple.nameKey/descriptionKey : une instance de
 // scène minimale ({ type: "apple", x }) suffit donc, sans jamais répéter
 // nameKey/descriptionKey/action — le nom annoncé au ramassage correspond
 // déjà à celui du sac par construction, pas seulement par convention.

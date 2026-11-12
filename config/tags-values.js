@@ -10,7 +10,7 @@
 // ailleurs.
 //
 // Un tag est un IDENTIFIANT STABLE (la clé de ce registre, ex. "military"),
-// traduit SEULEMENT à l'affichage via labelKey (i18n) — toute vérification
+// traduit SEULEMENT à l'affichage via nameKey (i18n) — toute vérification
 // (core/items.js/ITEM_REGISTRY, condition "hasEquipmentTag" — voir
 // core/conditions.js et core/script-parse.js/validateCondition) porte sur la
 // CLÉ, jamais le texte traduit :
@@ -22,13 +22,13 @@
 // DOIT exister ici — une faute de frappe échoue clairement au chargement,
 // jamais un mismatch silencieux découvert en jeu.
 export const TAG_REGISTRY = {
-  military: { labelKey: "tag.military" },
-  chic: { labelKey: "tag.chic" },
-  metal: { labelKey: "tag.metal" },
+  military: { nameKey: "tag.military" },
+  chic: { nameKey: "tag.chic" },
+  metal: { nameKey: "tag.metal" },
   // Composants électroniques (collection "electronics") : sert aussi à la
   // table de garnissage déduite "electronics" (config/spawn-values.js).
-  electronic: { labelKey: "tag.electronic" },
+  electronic: { nameKey: "tag.electronic" },
   // Minéraux (collection "minerals") : table de garnissage déduite
   // "minerals" (config/spawn-values.js).
-  mineral: { labelKey: "tag.mineral" },
+  mineral: { nameKey: "tag.mineral" },
 };

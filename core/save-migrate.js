@@ -281,6 +281,22 @@ function applyContentRenames(data) {
   return renameValues(renameSceneIds(renameWorldIds(renameSpawnRangeTypes(mapEntityLists(data, renameEntityTypes)))));
 }
 
+// --- Le champ du nom : labelKey devenu nameKey (doc/save.md) ------------
+
+// Le NOM d'un contenu s'appelle `nameKey` partout (CLAUDE.md), dans l'état
+// compris, depuis le 2026-11-12. Une sauvegarde antérieure le porte encore sous
+// `labelKey` : sur ses entités (mondes, faces, compagnons) et sur les descripteurs
+// d'entité de ses effets (le `spec` d'un "spawn"). Renommé partout dans la donnée :
+// aucun autre objet de l'état n'a jamais porté ce champ. Idempotent : une partie à
+// jour n'a plus de `labelKey`, rien ne change (MÊME référence).
+function renameNameFields(data) {
+  return mapDeep(data, (value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value) || !Object.hasOwn(value, "labelKey")) return value;
+    const { labelKey, ...rest } = value;
+    return { ...rest, nameKey: labelKey };
+  });
+}
+
 // --- Durées d'errance en ticks (doc/save.md) ----------------------------
 
 // Les durées du comportement "wander" (core/behaviors/wander.js) se
@@ -744,8 +760,9 @@ export function migrateSave(raw) {
     if (anyChanged) data = { ...data, worlds: patchedWorlds };
   }
 
-  // Renommages de contenu (config/save-renames.js) : APRÈS les rebouchages,
-  // sur une partie dont la forme est déjà complète.
+  // Le champ du nom, puis les renommages de contenu (config/save-renames.js) :
+  // APRÈS les rebouchages, sur une partie dont la forme est déjà complète.
+  data = renameNameFields(data);
   data = applyContentRenames(data);
   data = convertWanderTicks(data);
 

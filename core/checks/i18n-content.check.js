@@ -18,6 +18,7 @@ import {
   nameRef as gameNameRef,
 } from "../../data/i18n/index.js";
 import { PREF_CONSTRAINTS } from "../../config/preferences.js";
+import { SCENE_WARNING_TYPES } from "../scene.js";
 
 // Espace fine insécable : le séparateur de milliers du français
 // (Intl.NumberFormat), et l'espace avant « ; ! ? » des textes français.
@@ -91,6 +92,17 @@ function game(locale, key, params) {
 }
 
 function checkGameTemplates(run) {
+  // Chaque avertissement d'une scène (core/scene.js/SCENE_WARNING_TYPES) a son
+  // texte au journal de debug (view/debug-warnings.js/reportSceneWarning), dans
+  // chaque langue, sans gabarit resté brut.
+  const sceneWarning = { sceneId: "s", playerStart: "50", entityId: "e", x: 1, a: "a", ax: 1, b: "b", bx: 1.2 };
+  for (const locale of Object.keys(LOCALE_TABLES)) {
+    for (const type of SCENE_WARNING_TYPES) {
+      const key = `debug.warnings.scene.${type}`;
+      const text = game(locale, key, sceneWarning);
+      run(`avertissements de scène (${locale}) : ${type} a son texte`, true, text !== key && !/[{}]/.test(text));
+    }
+  }
   const date = (locale, day) => game(locale, "time.announce", { hour: "08", minute: "05", day, month: "M", season: "S", year: 1 });
 
   run("jeu fr : 0 pièce", "0 pièce.", game("fr", "money.announce", { amount: 0 }));

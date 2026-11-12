@@ -828,7 +828,7 @@ export default function checkConditions(run) {
   );
   const perceptionWallState = toggleUnlockedPerception(createInitialState(perceptionWallScene, 5));
   run("placement : le mur est bien bloquant sous perception", true, isBlocking(getActiveWorld(perceptionWallState).entities[0], conditionContextOf(perceptionWallState)));
-  const SCATTER_DOG = { type: "dog", labelKey: "entity.dog.name", interactable: true, action: { kind: "pickup", amount: 1 } };
+  const SCATTER_DOG = { type: "dog", nameKey: "entity.dog.name", interactable: true, action: { kind: "pickup", amount: 1 } };
   const scattered = getActiveWorld(spawnScatteredEphemerals(perceptionWallState, SCATTER_DOG, 10, 12, 3))
     .entities.filter((e) => e.ephemeral)
     .map((e) => e.x);

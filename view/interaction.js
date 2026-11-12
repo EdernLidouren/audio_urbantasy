@@ -24,7 +24,7 @@ import { runEffects } from "./effect-runner.js";
 import { executeAction } from "./action-execution.js";
 import { openConfirmation } from "./menus/confirmation.js";
 import { getPref, PREF_CONSTRAINTS } from "../config/preferences.js";
-import { offeredArticle, presentedLabelKey } from "../core/display.js";
+import { offeredArticle, presentedNameKey } from "../core/display.js";
 
 // Description RICHE d'une entité (interaction "describe"), distincte du nom
 // annoncé à l'approche (occupation, voir view/occupancy.js).
@@ -243,7 +243,7 @@ function openDisambiguationMenu(candidates, kind, getWorldView) {
     closable: true, // Échap ferme sans rien faire
     entries: candidates.map((entity) => ({
       // Même nom que l'occupation (un présentoir garni : son article).
-      label: presentedLabelKey(entity),
+      label: presentedNameKey(entity),
       onActivate: () => {
         popScreen();
         interact(entity, kind, getWorldView);

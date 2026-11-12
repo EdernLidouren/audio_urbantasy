@@ -128,14 +128,10 @@ function repositionCompanions(companions, playerX, length) {
 // (liste renvoyée INCHANGÉE) et SIGNALE l'échec — jamais d'éviction
 // silencieuse d'un compagnon existant pour faire de la place. `added` dans
 // le retour permet à l'appelant (vue ou test) de distinguer un ajout réussi
-// d'un refus sans avoir à recomparer les longueurs lui-même. Pure hormis
-// l'avertissement diagnostique (même convention que core/scene.js, qui
-// avertit sur des cas similaires au chargement).
+// d'un refus sans avoir à recomparer les longueurs lui-même : c'est à lui de
+// le dire. Pure.
 export function addCompanion(companions, companion) {
-  if (companions.length >= MAX_COMPANIONS) {
-    console.warn(`addCompanion: limite de ${MAX_COMPANIONS} compagnon(s) déjà atteinte, ajout refusé.`);
-    return { companions, added: false };
-  }
+  if (companions.length >= MAX_COMPANIONS) return { companions, added: false };
   return { companions: [...companions, companion], added: true };
 }
 
@@ -562,7 +558,7 @@ export function applyCompanionActionEffects(session, companionId, effects, { app
 // un objet lâché par un compagnon... — tous passent par cette même
 // fonction, jamais une variante par appelant.
 //
-// `spec` est un descripteur d'entité DÉJÀ RÉSOLU (type, labelKey,
+// `spec` est un descripteur d'entité DÉJÀ RÉSOLU (type, nameKey,
 // blocksMovement, observable, interactable, action...) — EXACTEMENT la
 // forme qu'une entité obtient en sortie de core/entity-parse.js/parseEntity,
 // construit par L'APPELANT (par parseSpawnedEntity, comme le fait

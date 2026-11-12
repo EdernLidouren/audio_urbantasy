@@ -5,7 +5,8 @@
 import { parseScene } from "../core/scene.js";
 import scenePaths from "./index.js";
 
-export async function loadScene(url, registry) {
+// `options` : celles de parseScene (`warn`, qui reçoit ses avertissements).
+export async function loadScene(url, registry, options = {}) {
   let response;
   try {
     // "no-cache" : le navigateur redemande TOUJOURS au serveur si le fichier
@@ -29,16 +30,16 @@ export async function loadScene(url, registry) {
     throw new Error(`loadScene: JSON invalide dans "${url}" : ${error.message}`);
   }
 
-  return parseScene(raw, registry);
+  return parseScene(raw, registry, options);
 }
 
 // Charge une scène par SON ID (ex. target d'une porte, voir
 // doc/scene-format.md) plutôt que par chemin explicite — résout l'id via
 // scenes/index.js, puis délègue à loadScene.
-export async function loadSceneById(id, registry) {
+export async function loadSceneById(id, registry, options = {}) {
   const url = scenePaths[id];
   if (!url) {
     throw new Error(`loadSceneById: id de scène "${id}" absent du registre (scenes/index.js).`);
   }
-  return loadScene(url, registry);
+  return loadScene(url, registry, options);
 }

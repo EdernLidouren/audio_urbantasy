@@ -122,7 +122,7 @@ function validateSounds(sounds, describe, allowNull, failWith = fail) {
 
 // Fusion PROFONDE d'une surcharge sur une base — utilisée par `sounds`
 // (voir parseEntity plus bas), SEUL champ cascadé PAR FUSION plutôt que par
-// simple remplacement (labelKey, blocksMovement...) ou transport brut
+// simple remplacement (nameKey, blocksMovement...) ou transport brut
 // (tuning). Appliquée récursivement, TROIS cas :
 //   - override === undefined (clé absente) -> hérite `base` telle quelle.
 //   - override === null -> RETIRE ce palier (résultat undefined ici — le
@@ -165,7 +165,7 @@ function genericItemDefaults(type, action) {
   if (action.kind !== "pickup" || typeof action.item !== "string") return {};
   const props = ITEM_REGISTRY[action.item];
   if (!props) return {};
-  return { nameKey: props.label, descriptionKey: props.descriptionKey, sounds: itemSounds(action.item) };
+  return { nameKey: props.nameKey, descriptionKey: props.descriptionKey, sounds: itemSounds(action.item) };
 }
 
 // --- Champs d'une entité, un validateur par champ ou groupe de champs. ---
@@ -542,7 +542,7 @@ export function parseEntity(rawEntity, index, registry, length, seenIds, sceneVa
   // Textes : clés i18n, cascade instance -> objet porté -> archétype. La
   // description "consumed" (voir doc/entity-model.md/"Collectible
   // persistant") est simplement transportée : la vue choisit laquelle dire.
-  const labelKey = isNonEmptyString(nameKey) ? nameKey : carried.nameKey ?? archetype.nameKey;
+  const resolvedNameKey = isNonEmptyString(nameKey) ? nameKey : carried.nameKey ?? archetype.nameKey;
   const resolvedDescriptionKey = isNonEmptyString(descriptionKey) ? descriptionKey : carried.descriptionKey ?? archetype.descriptionKey;
   const resolvedConsumedDescriptionKey = isNonEmptyString(consumedDescriptionKey)
     ? consumedDescriptionKey
@@ -555,7 +555,7 @@ export function parseEntity(rawEntity, index, registry, length, seenIds, sceneVa
     id,
     type,
     x,
-    labelKey,
+    nameKey: resolvedNameKey,
     sounds: resolvedSounds,
     blocksMovement: parseBooleanCapability("blocksMovement", blocksMovement, archetype.blocksMovement, at),
     observable: parseBooleanCapability("observable", observable, archetype.observable, at),

@@ -2230,7 +2230,7 @@ améliorations existantes (valide `hasImprovement`/`giveImprovement`/
 global (voir plus bas). Ajouter une amélioration = une entrée ici :
 
 ```js
-flashlight: { order: 1, labelKey: "improvement.flashlight.name", descriptionKey: "improvement.flashlight.description" },
+flashlight: { order: 1, nameKey: "improvement.flashlight.name", descriptionKey: "improvement.flashlight.description" },
 ```
 
 `order` (entier >= 1, UNIQUE, validé à l'import par
@@ -2374,7 +2374,7 @@ n'en jouent pas (aucun état « avant »).
 Registre de mots-étiquettes (`config/tags-values.js`/`TAG_REGISTRY`) pour la classification
 HORIZONTALE d'un objet et de futures vérifications (PNJ, événements) — indépendant
 de `stackable`/`equippable`/`slot`. Un tag est un IDENTIFIANT STABLE (la clé du
-registre), traduit SEULEMENT à l'affichage via `labelKey` — jamais le texte traduit
+registre), traduit SEULEMENT à l'affichage via `nameKey` — jamais le texte traduit
 dans une vérification, qui cesserait de matcher au changement de langue.
 
 **⚠️ À jour avec `config/tags-values.js`/`TAG_REGISTRY`** pour la liste complète (ex. `chic`,
@@ -2404,7 +2404,7 @@ union des tags de chaque objet ÉQUIPÉ, DÉRIVÉE, jamais stockée — même pr
 
 ### Ajouter un tag
 
-Une entrée dans `TAG_REGISTRY` (`core/tags.js`), avec son `labelKey` (+ la
+Une entrée dans `TAG_REGISTRY` (`config/tags-values.js`), avec son `nameKey` (+ la
 traduction dans `data/i18n/fr/items.json`/`data/i18n/en/items.json`). Rien d'autre à
 toucher — un objet peut alors le référencer dans son `tags: [...]`.
 

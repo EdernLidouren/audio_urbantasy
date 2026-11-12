@@ -21,7 +21,7 @@ import {
   validateDisplayDistribution,
   displayArticleInfo,
   offeredArticle,
-  presentedLabelKey,
+  presentedNameKey,
   unavailableArticles,
   drawOffer,
 } from "../display.js";
@@ -49,10 +49,10 @@ export default function checkDisplay(run) {
 
   const flashlight = displayArticleInfo("flashlight");
   run("articles : amélioration résolue (nature, prix, nom du registre)", true,
-    flashlight.improvement === "flashlight" && flashlight.item === undefined && flashlight.price === DISPLAY_ARTICLES.flashlight.price && flashlight.labelKey === "improvement.flashlight.name");
+    flashlight.improvement === "flashlight" && flashlight.item === undefined && flashlight.price === DISPLAY_ARTICLES.flashlight.price && flashlight.nameKey === "improvement.flashlight.name");
   const sneakers = displayArticleInfo("sneakers");
   run("articles : objet résolu, prix par défaut = value de l'objet", true,
-    sneakers.item === "sneakers" && sneakers.improvement === undefined && sneakers.price === ITEM_REGISTRY.sneakers.value && sneakers.labelKey === ITEM_REGISTRY.sneakers.label);
+    sneakers.item === "sneakers" && sneakers.improvement === undefined && sneakers.price === ITEM_REGISTRY.sneakers.value && sneakers.nameKey === ITEM_REGISTRY.sneakers.nameKey);
   run("articles : id inconnu -> null, jamais une exception", null, displayArticleInfo("nope"));
   run("articles : son de l'article repris (amélioration)", DISPLAY_ARTICLES.flashlight.sound, flashlight.sound);
   // Registre fabriqué : aucun article réel ne vise encore un objet sonore.
@@ -160,9 +160,9 @@ export default function checkDisplay(run) {
   run("garnissage : jamais deux fois le même article", shoeOffers.length, new Set(shoeOffers).size);
   run("garnissage : table épuisée -> le présentoir suivant reste vide", null, offerOf(loaded, "shoes-5"));
   run("garnissage : une entité qui n'est pas un présentoir n'a pas d'offre", undefined, entity(loaded, "dog-1").offer);
-  run("nom présenté : présentoir garni -> nom de son article", "improvement.flashlight.name", presentedLabelKey(entity(loaded, "improvement-stand")));
-  run("nom présenté : présentoir vide -> son propre nom", "entity.dog.name", presentedLabelKey(entity(loaded, "shoes-5")));
-  run("nom présenté : autre entité -> son propre nom", "entity.dog.name", presentedLabelKey(entity(loaded, "dog-1")));
+  run("nom présenté : présentoir garni -> nom de son article", "improvement.flashlight.name", presentedNameKey(entity(loaded, "improvement-stand")));
+  run("nom présenté : présentoir vide -> son propre nom", "entity.dog.name", presentedNameKey(entity(loaded, "shoes-5")));
+  run("nom présenté : autre entité -> son propre nom", "entity.dog.name", presentedNameKey(entity(loaded, "dog-1")));
   run("garnissage : même seed -> mêmes articles", shoeIds.map((id) => offerOf(loaded, id)).join(","),
     shoeIds.map((id) => offerOf(refillDueSpawns(fresh, DISPLAY_REGISTRY), id)).join(","));
   run("garnissage : déjà fait ce cycle -> référence INCHANGÉE", loaded, refillDueSpawns(loaded, DISPLAY_REGISTRY));

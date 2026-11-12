@@ -185,7 +185,7 @@ export default function checkFaces(run) {
   // Éphémères : spawnEphemeral/removeEntity/markConsumed sont scopés à la
   // face COURANTE (session.player.side), jamais l'autre.
   let twoFaceEphemeralSession = createInitialState(twoFacedScene, 3);
-  const TWO_FACE_EPHEMERAL_SPEC = { type: "dog", labelKey: "entity.dog.name" };
+  const TWO_FACE_EPHEMERAL_SPEC = { type: "dog", nameKey: "entity.dog.name" };
   twoFaceEphemeralSession = spawnEphemeral(twoFaceEphemeralSession, TWO_FACE_EPHEMERAL_SPEC, 4);
   run(
     "deux faces : spawnEphemeral crée sur la face COURANTE (recto)",

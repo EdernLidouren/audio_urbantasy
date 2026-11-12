@@ -232,7 +232,8 @@ export default function checkSave(run) {
     "video_projector,video_projector,video_projector",
     migratedSpawner && [migratedSpawner.action.effects[0], migratedSpawner.triggers[0].effects[0], migratedSpawner.pendingEffects[0].effects[0]].map((e) => e.spec.type).join(",")
   );
-  run("save renommages : clé i18n du spec renommée aussi", "entity.video_projector.name", migratedSpawner && migratedSpawner.triggers[0].effects[0].spec.labelKey);
+  run("save renommages : clé i18n du spec renommée aussi", "entity.video_projector.name", migratedSpawner && migratedSpawner.triggers[0].effects[0].spec.nameKey);
+  run("save nom : le spec d'une ancienne sauvegarde passe de labelKey à nameKey", false, migratedSpawner && Object.hasOwn(migratedSpawner.triggers[0].effects[0].spec, "labelKey"));
   run.same(
     "save renommages : clés d'une plage de types renommées, poids gardés",
     { video_projector: 2, nothing: 1 },
@@ -324,7 +325,16 @@ export default function checkSave(run) {
   run(
     "save renommages : ancienne clé d'objet -> feuille .name, description intacte",
     "item.key_bronze.name|item.key_bronze.description",
-    migratedKey && `${migratedKey.labelKey}|${migratedKey.descriptionKey}`
+    migratedKey && `${migratedKey.nameKey}|${migratedKey.descriptionKey}`
+  );
+  run("save nom : une entité d'une ancienne sauvegarde n'a plus de labelKey", false, migratedKey && Object.hasOwn(migratedKey, "labelKey"));
+  // Un compagnon d'une sauvegarde d'avant nameKey : son nom repris, sous nameKey.
+  const legacyCompanions = auditSession.companions.map(({ nameKey, ...companion }) => ({ ...companion, labelKey: nameKey }));
+  const legacyCompanionResult = deserializeGame({ version: SAVE_VERSION, data: { ...auditSession, companions: legacyCompanions } });
+  run.same(
+    "save nom : les compagnons d'une ancienne sauvegarde retrouvent leur nameKey",
+    auditSession.companions.map((companion) => companion.nameKey),
+    legacyCompanionResult.session.companions.map((companion) => companion.nameKey)
   );
   run("save types inconnus : sans registre, rien n'est retiré", true, renameResult.session.worlds[renameWorldId].entities.some((e) => e.id === "vanished"));
   const knownTypes = { video_projector: {} };

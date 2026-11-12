@@ -43,7 +43,7 @@ function announceRefusal(status, article, session) {
   }
   playMenuSound("refusal");
   if (status === "alreadyOwned") {
-    announce(t("shop.display.alreadyOwned", { item: t(article.labelKey) }), { assertive: true });
+    announce(t("shop.display.alreadyOwned", { item: t(article.nameKey) }), { assertive: true });
   } else if (status === "insufficientFunds") {
     announce(t("shop.display.insufficientFunds", { price: article.price, money: session.money }), { assertive: true });
   }
@@ -59,7 +59,7 @@ export function openDisplayPurchase(getWorldView, getSession, entity) {
     announceRefusal(refusal, article, getSession());
     return;
   }
-  const item = t(article.labelKey);
+  const item = t(article.nameKey);
   openConfirmation(
     "shop.display.confirm",
     () => {

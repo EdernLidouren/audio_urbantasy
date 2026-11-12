@@ -32,7 +32,7 @@ function improvementEntry(id, owned) {
   }
   const labelParams = {
     order: props.order,
-    name: t(props.labelKey),
+    name: t(props.nameKey),
     description: stripTrailingPeriod(t(props.descriptionKey)),
   };
   return {

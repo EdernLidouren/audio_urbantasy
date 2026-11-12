@@ -32,7 +32,7 @@ import { getPref, setPref } from "./config/preferences.js";
 import { configureAssetManifest } from "./lib/assets.js";
 import { checkAutoSaveTimer } from "./view/autosave-timer.js";
 import { loadGame } from "./view/save-storage.js";
-import { reportSaveRepairs, reportI18nWarning } from "./view/debug-warnings.js";
+import { reportSaveRepairs, reportI18nWarning, reportSceneWarning } from "./view/debug-warnings.js";
 import { announceNewDiscoveries } from "./view/discoveries.js";
 import MARBLE_TYPES from "./marbles/content/types/index.js";
 import { installDebugConsole } from "./view/debug-console.js";
@@ -172,7 +172,7 @@ function enterCity() {
 async function loadStartScene(sceneId) {
   pushScreen({});
   try {
-    return await loadSceneById(sceneId, registry);
+    return await loadSceneById(sceneId, registry, { warn: reportSceneWarning });
   } catch (error) {
     console.error(error.message);
     announce(t("menu.main.start_failed"), { assertive: true });
@@ -323,7 +323,7 @@ startLoop(
   (deltaMs) => tickFrame(deltaMs)
 );
 
-loadSceneById(newGame.startSceneId, registry)
+loadSceneById(newGame.startSceneId, registry, { warn: reportSceneWarning })
   .then((loadedScene) => {
     scene = loadedScene;
   })

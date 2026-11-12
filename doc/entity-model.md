@@ -250,7 +250,7 @@ JSON de scène, une entité ÉPHÉMÈRE n'est par définition jamais DÉCLARÉE.
   observée (`enterSound`). Rien dans le mécanisme n'est spécifique à l'un
   d'eux : un objet lâché par un compagnon s'y greffe de la même façon. `spec` est un
   descripteur d'entité DÉJÀ RÉSOLU
-  (`type`, `labelKey`, `sounds`, `blocksMovement`, `observable`,
+  (`type`, `nameKey`, `sounds`, `blocksMovement`, `observable`,
   `interactable`, `action`...) — EXACTEMENT la forme qu'une entité obtient
   en sortie de `core/entity-parse.js`/`parseEntity`, construit par L'APPELANT
   (par `parseSpawnedEntity`, comme `core/spawn.js` ; même principe pour les
@@ -921,7 +921,7 @@ posé en x 20, provisoirement.
   d'eux-mêmes, dérivés du diff par la vue.
 - **Rendu** — vue pure, lue dans l'état :
   - **Nom** : un présentoir garni se présente sous le nom de son article
-    (`core/display.js`/`presentedLabelKey`), à l'occupation comme dans le
+    (`core/display.js`/`presentedNameKey`), à l'occupation comme dans le
     menu de choix — on s'approche d'une « lampe-torche » ; vide, il
     s'appelle « présentoir ».
   - **Balise** : garni, le son de l'article (`sound` de l'article, sinon de
@@ -1022,7 +1022,7 @@ redéfinir :
 { "id": "component_rattle_v", "type": "item", "x": 12, "action": { "kind": "pickup", "item": "resistor", "count": 1 } }
 ```
 
-- Nom et description : `label`/`descriptionKey` de l'objet (`ITEM_REGISTRY`).
+- Nom et description : `nameKey`/`descriptionKey` de l'objet (`ITEM_REGISTRY`).
 - Sons : si l'objet déclare un `sound` (un pool), il devient le beacon en
   boucle et le son de ramassage, joué une fois (`core/items.js`/`itemSounds`).
   Sans `sound`, les sons de l'archétype générique restent.
@@ -1124,7 +1124,7 @@ l'écriture du slot).
   `gait` : un mot-étiquette pour de futures vérifications de contenu (PNJ,
   événements), pas un mécanisme de gameplay en soi. Un tag est un
   IDENTIFIANT STABLE (la clé du registre), traduit SEULEMENT à l'affichage
-  via `labelKey` — jamais le texte traduit dans une vérification, qui
+  via `nameKey` — jamais le texte traduit dans une vérification, qui
   cesserait de matcher au changement de langue. `TAG_REGISTRY` est la SOURCE
   DE VÉRITÉ : un tag référencé par un objet absent de ce registre échoue au
   chargement (`core/items.js`/`validateItemRegistry`, appelée sur

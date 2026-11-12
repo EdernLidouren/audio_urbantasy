@@ -7,7 +7,7 @@
 // une instance qui l'oublie échoue au chargement (l'action "buy" l'exige).
 //
 // Garni, le présentoir se présente sous le NOM de son article
-// (core/display.js/presentedLabelKey) et sonne sa balise (le son de
+// (core/display.js/presentedNameKey) et sonne sa balise (le son de
 // l'article, voir config/shop-values.js/DISPLAY_ARTICLES). Vide, il ne sonne
 // RIEN — un magasin aux présentoirs vendus ne doit pas bourdonner de meubles —
 // et garde le nom et la description ci-dessous. La balise déclarée ici n'est

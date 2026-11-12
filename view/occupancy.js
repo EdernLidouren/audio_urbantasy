@@ -10,7 +10,7 @@ import { announce } from "../lib/announce.js";
 import { resolveTuning } from "../config/tuning.js";
 import { t } from "../data/i18n/index.js";
 import { getActiveWorld } from "../core/state.js";
-import { presentedLabelKey } from "../core/display.js";
+import { presentedNameKey } from "../core/display.js";
 import { entitiesInReach, interactionCandidates } from "../core/interaction.js";
 
 // La portée d'interaction d'une entité : le réglage interactRange, en cascade
@@ -43,7 +43,7 @@ export function createOccupancy(getSession) {
     if (!setsEqual(occupiedIdsNow, occupiedIds)) {
       if (occupiedIdsNow.size > 0) {
         // Un présentoir garni se présente sous le nom de son article.
-        announce(occupied.map((entity) => t(presentedLabelKey(entity))).join(", "));
+        announce(occupied.map((entity) => t(presentedNameKey(entity))).join(", "));
       }
       occupiedIds = occupiedIdsNow;
     }
