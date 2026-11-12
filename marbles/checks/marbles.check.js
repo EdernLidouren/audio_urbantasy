@@ -1754,7 +1754,7 @@ function checkSmoke(run) {
       size: MEDIUM,
       base: [{ action: "bounce", target: "apex" }],
       apex: [{ action: "speed", amount: 1 }, { action: "discard", target: { type: "bag", count: 1 } }],
-      hit: [{ action: "retrieve", target: { type: "choice", zones: ["discard"], pick: "marble", count: 1 } }],
+      hit: [{ action: "retrieve", target: { type: "choice", zones: ["discard"], pick: "marble", count: 1, mode: "required" } }],
       knockout: [{ action: "retrieve", target: "lastDiscarded" }],
       final: [{ action: "bounce" }],
       maxWear: 2,

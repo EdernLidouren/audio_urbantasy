@@ -639,11 +639,11 @@ function checkHelpMenu(run) {
 // avec ses emplacements non éligibles dits et bloqués, la navigation entre zones,
 // la question, ce qui reste, les cibles choisies.
 function checkChoiceInterface(run) {
-  const choose = (zones, extra = {}) => ({ type: "choice", zones, pick: "marble", count: 1, ...extra });
+  const choose = (zones, extra = {}) => ({ type: "choice", zones, pick: "marble", count: 1, mode: "required", ...extra });
   const made = fabricatedRules({
     plain: { apex: [{ action: "speed", amount: 1 }] },
     anyPocket: { hit: [{ action: "pocket", target: choose(["hand", "triangle"]) }] },
-    upToPolish: { hit: [{ action: "polish", amount: 1, target: choose(["triangle"], { count: 2, upTo: true }) }] },
+    upToPolish: { hit: [{ action: "polish", amount: 1, target: choose(["triangle"], { count: 2, mode: "optional" }) }] },
     twoCrack: { hit: [{ action: "crack", amount: 1, target: choose(["triangle"], { count: 2 }) }] },
     booster: { hit: [{ action: "speed", amount: 2, target: choose(["triangle"]) }] },
     // En poche, à chaque chiquenaude : Fêlure 1 au choix ; un choix ouvert pendant
@@ -664,7 +664,7 @@ function checkChoiceInterface(run) {
   const handOnly = hitPocket.pendingChoice;
   // La question d'un choix des billes fabriquées.
   const question = (pending) => describeChoicePrompt(pending, t);
-  run("choix, question : la bille et le moment, puis la main", "choice.by_hit{marble: <hit_pocket>, question: choice.question{target: choice.noun.hand_marble{count: 1}, verb: choice.verb.pocket{effect: undefined}}}", describeChoicePrompt(handOnly, t));
+  run("choix, question : la bille et le moment, puis la main", "choice.by_hit{marble: <hit_pocket>, question: choice.question.required{target: choice.noun.hand_marble{count: 1}, verb: choice.verb.pocket{effect: undefined}}}", describeChoicePrompt(handOnly, t));
   run.same("choix, main : les billes éligibles seulement", ["aging_flick", "final_pocket"], choiceHandOptions(handOnly).map((option) => option.marble));
   run.same("choix, main : le curseur s'y ouvre", { place: "hand", handIndex: 0 }, (({ place, handIndex }) => ({ place, handIndex }))(choiceStartCursor(handOnly, cursor("apex"))));
   run("choix, main : la position dans le menu du choix", "list.line{name: <final_pocket>, size: size.medium.name, maxWear: 3}. menu.position{index: 2, total: 2}", choiceFocusLine(hitPocket, cursor("hand", 1), rules, t));
@@ -675,7 +675,7 @@ function checkChoiceInterface(run) {
   // Le triangle seul, « jusqu'à 2 » : la question, Terminer, les non éligibles.
   const upTo = pending("upToPolish", { leftBase: { marble: "plain", wear: 1 }, rightBase: null, apex: { marble: "plain", wear: 0 } });
   const upToChoice = upTo.pendingChoice;
-  run("choix, question : jusqu'à 2, Terminer annoncé", "choice.by_hit{marble: <upToPolish>, question: choice.question{target: choice.up_to{target: choice.noun.triangle_marble{count: 2}}, verb: choice.verb.polish{effect: effect.combined{parts: [effect.polish{amount: 1}]}}}} choice.finish_hint", question(upToChoice));
+  run("choix, question : facultatif, jusqu'à 2, « ne rien choisir » annoncé", "choice.by_hit{marble: <upToPolish>, question: choice.question.optional{action: choice.may.polish{target: choice.up_to{target: choice.noun.triangle_marble{count: 2}}, limit: choice.at_most{target: choice.noun.triangle_marble{count: 2}}, effect: effect.combined{parts: [effect.polish{amount: 1}]}}}} choice.decline_hint", question(upToChoice));
   run.same("choix, triangle seul : le curseur sur le premier éligible", "leftBase", choiceStartCursor(upToChoice, cursor("hand")).place);
   run("choix, triangle seul : pas de main", null, stepChoiceCursor(upToChoice, cursor("leftBase"), "down"));
   run("choix, triangle : la navigation habituelle", "apex", stepChoiceCursor(upToChoice, cursor("leftBase"), "up").place);
@@ -685,7 +685,7 @@ function checkChoiceInterface(run) {
   run.same("choix, triangle : éligible, Entrée répond", { type: "choose", target: { zone: "triangle", slot: "leftBase" } }, choiceAnswer(upToChoice, cursor("leftBase")).action);
   run.same("choix, triangle seul : pas de menu de main", [], choiceHandOptions(upToChoice));
   const afterOne = made.reduce(upTo, { type: "choose", target: { zone: "triangle", slot: "leftBase" } }).state.pendingChoice;
-  run("choix, après un : ce qui reste, en mode jusqu'à N", "choice.more_up_to{target: choice.noun.triangle_marble{count: 1}}", describeChoicePrompt(afterOne, t));
+  run("choix, après un : ce qui reste, en mode facultatif", "choice.more.optional{action: choice.may.polish{target: choice.noun.triangle_marble{count: 1}, limit: choice.noun.triangle_marble{count: 1}, effect: effect.combined{parts: [effect.polish{amount: 1}]}}} choice.finish_hint", describeChoicePrompt(afterOne, t));
   run("choix, après un : la cible choisie n'est plus éligible", true, choiceFocusLine({ ...upTo, pendingChoice: afterOne }, cursor("leftBase"), made, t).endsWith("choice.not_eligible"));
 
   // Une bille EN TRANSIT (en cours de lancer) : l'emplacement qu'elle vise l'annonce
@@ -732,7 +732,7 @@ function checkChoiceInterface(run) {
   const fromDiscard = picking.pendingChoice;
   run(
     "défausse, question : choisir une bille de la défausse à ramasser",
-    "choice.by_hit{marble: <picker>, question: choice.question{target: choice.noun.discard_marble{count: 1}, verb: choice.verb.retrieve{effect: undefined}}}",
+    "choice.by_hit{marble: <picker>, question: choice.question.required{target: choice.noun.discard_marble{count: 1}, verb: choice.verb.retrieve{effect: undefined}}}",
     describeChoicePrompt(fromDiscard, t)
   );
   run.same("défausse : le menu, dans l'ordre d'arrivée, la remplacée en dernier", ["plain", "booster", "plain"], choiceHandOptions(fromDiscard).map((option) => option.marble));
@@ -744,23 +744,23 @@ function checkChoiceInterface(run) {
 
   // Obligatoire, 2 : la question, puis ce qui reste.
   const two = pending("twoCrack", { leftBase: { marble: "plain", wear: 0 }, rightBase: { marble: "plain", wear: 0 }, apex: { marble: "plain", wear: 0 } });
-  run("choix, question : 2 billes actives", "choice.by_hit{marble: <twoCrack>, question: choice.question{target: choice.noun.triangle_marble{count: 2}, verb: choice.verb.crack{effect: effect.combined{parts: [effect.crack{amount: 1}]}}}}", question(two.pendingChoice));
+  run("choix, question : 2 billes actives", "choice.by_hit{marble: <twoCrack>, question: choice.question.required{target: choice.noun.triangle_marble{count: 2}, verb: choice.verb.crack{effect: effect.combined{parts: [effect.crack{amount: 1}]}}}}", question(two.pendingChoice));
   const oneDone = made.reduce(two, { type: "choose", target: { zone: "triangle", slot: "rightBase" } }).state.pendingChoice;
-  run("choix, après un : ce qui reste", "choice.more{target: choice.noun.triangle_marble{count: 1}}", describeChoicePrompt(oneDone, t));
+  run("choix, après un : ce qui reste", "choice.more.required{target: choice.noun.triangle_marble{count: 1}}", describeChoicePrompt(oneDone, t));
 
   // Un bonus au choix : sa valeur dans la question.
   const boost = pending("booster", { leftBase: { marble: "plain", wear: 0 }, rightBase: null, apex: { marble: "plain", wear: 0 } });
-  run("choix, question : un bonus", "choice.by_hit{marble: <booster>, question: choice.question{target: choice.noun.triangle_marble{count: 1}, verb: choice.verb.speed{effect: effect.combined{parts: [effect.speed_up{amount: 2}]}}}}", question(boost.pendingChoice));
+  run("choix, question : un bonus", "choice.by_hit{marble: <booster>, question: choice.question.required{target: choice.noun.triangle_marble{count: 1}, verb: choice.verb.speed{effect: effect.combined{parts: [effect.speed_up{amount: 2}]}}}}", question(boost.pendingChoice));
 
   // Les deux zones : la main (avec Terminer s'il y a lieu), puis le triangle.
   const both = pending("anyPocket", { leftBase: null, rightBase: null, apex: { marble: "plain", wear: 0 } }, ["plain"]);
-  run("choix, question : main ou active", "choice.by_hit{marble: <anyPocket>, question: choice.question{target: choice.noun.hand_triangle_marble{count: 1}, verb: choice.verb.pocket{effect: undefined}}}", question(both.pendingChoice));
+  run("choix, question : main ou active", "choice.by_hit{marble: <anyPocket>, question: choice.question.required{target: choice.noun.hand_triangle_marble{count: 1}, verb: choice.verb.pocket{effect: undefined}}}", question(both.pendingChoice));
   // Chaque moment : une phase, un Final, une réaction du pot.
   const tigerBase = rules.reduce({ ...emptyBagMarblesGame(rules, 2), turn: 2, stage: "play", triangle: { leftBase: { marble: "all_rounder", wear: 0 }, rightBase: null, apex: { marble: "aging_flick", wear: 0 } } }, { type: "resolve" }).state;
-  run("choix, question : en phase, l'emplacement et la bille", "choice.by_phase{slot: slot.leftBase, marble: <all_rounder>, question: choice.question{target: choice.noun.triangle_marble{count: 1}, verb: choice.verb.eject{effect: undefined}}}", describeChoicePrompt(tigerBase.pendingChoice, t));
+  run("choix, question : en phase, l'emplacement et la bille", "choice.by_phase{slot: slot.leftBase, marble: <all_rounder>, question: choice.question.required{target: choice.noun.triangle_marble{count: 1}, verb: choice.verb.eject{effect: undefined}}}", describeChoicePrompt(tigerBase.pendingChoice, t));
   const porcelainFinal = rules.reduce({ ...emptyBagMarblesGame(rules, 2), turn: 2, stage: "play", bag: ["aging_flick"], triangle: { leftBase: { marble: "aging_flick", wear: 0 }, rightBase: null, apex: { marble: "fragile", wear: 1 } } }, { type: "resolve" }).state;
-  run("choix, question : au Final", "choice.by_trigger{moment: keyword.final.name, marble: <fragile>, question: choice.question{target: choice.up_to{target: choice.noun.triangle_marble{count: 2}}, verb: choice.verb.polish{effect: effect.combined{parts: [effect.polish{amount: 1}]}}}} choice.finish_hint", describeChoicePrompt(porcelainFinal.pendingChoice, t));
-  run("choix, question : en réaction du pot", "choice.by_pot{marble: <awaken_draw>, question: choice.question{target: choice.noun.triangle_marble{count: 1}, verb: choice.verb.polish{effect: effect.combined{parts: [effect.polish{amount: 1}]}}}}", describeChoicePrompt({ ...two.pendingChoice, action: "polish", count: 1, by: { trigger: "pocketReaction", slot: null, marble: "awaken_draw" } }, t));
+  run("choix, question : au Final", "choice.by_trigger{moment: keyword.final.name, marble: <fragile>, question: choice.question.optional{action: choice.may.polish{target: choice.up_to{target: choice.noun.triangle_marble{count: 2}}, limit: choice.at_most{target: choice.noun.triangle_marble{count: 2}}, effect: effect.combined{parts: [effect.polish{amount: 1}]}}}} choice.decline_hint", describeChoicePrompt(porcelainFinal.pendingChoice, t));
+  run("choix, question : en réaction du pot", "choice.by_pot{marble: <awaken_draw>, question: choice.question.required{target: choice.noun.triangle_marble{count: 1}, verb: choice.verb.polish{effect: effect.combined{parts: [effect.polish{amount: 1}]}}}}", describeChoicePrompt({ ...two.pendingChoice, action: "polish", count: 1, by: { trigger: "pocketReaction", slot: null, marble: "awaken_draw" } }, t));
   run("choix, question : à l'entrée au pot", true, describeChoicePrompt({ ...two.pendingChoice, by: { trigger: "pocketEntry", slot: null, marble: "fragile" } }, t).startsWith("choice.by_pot_entry{marble: <fragile>"));
   run("choix, deux zones : de la main vers le triangle", "leftBase", stepChoiceCursor(both.pendingChoice, cursor("hand"), "up").place);
   run("choix, deux zones : du triangle vers la main", "hand", stepChoiceCursor(both.pendingChoice, cursor("leftBase"), "down").place);
@@ -773,9 +773,12 @@ function checkChoiceInterface(run) {
   run("choix, deux zones, après une réponse : le curseur reste là où il a des options", "hand", choiceCursorAfterAnswer(both.pendingChoice, cursor("hand")).place);
 
   // « Terminer » en fin de menu de la main, en mode « jusqu'à N ».
-  const upToHand = { ...handOnly, upTo: true };
+  const upToHand = { ...handOnly, mode: "optional" };
   run.same("choix, main, jusqu'à N : Terminer en dernier", ["marble", "marble", "finish"], choiceHandOptions(upToHand).map((option) => option.kind));
-  run("choix, main, jusqu'à N : Terminer dit", "choice.finish. menu.position{index: 3, total: 3}", choiceFocusLine({ ...hitPocket, pendingChoice: upToHand }, cursor("hand", 2), rules, t));
+  run("choix, main, facultatif : rien de choisi, « Ne rien choisir »", "choice.decline. menu.position{index: 3, total: 3}", choiceFocusLine({ ...hitPocket, pendingChoice: upToHand }, cursor("hand", 2), rules, t));
+  const oneChosen = { ...upToHand, chosen: [upToHand.eligible[0]], eligible: upToHand.eligible.slice(1) };
+  run("choix, main, facultatif : une cible choisie, « Terminer »", "choice.finish. menu.position{index: 2, total: 2}", choiceFocusLine({ ...hitPocket, pendingChoice: oneChosen }, cursor("hand", 1), rules, t));
+  run.same("choix, main, obligatoire : ni « Ne rien choisir » ni « Terminer »", ["marble", "marble"], choiceHandOptions(handOnly).map((option) => option.kind));
   run.same("choix, main, jusqu'à N : Terminer répond", { type: "choose", done: true }, choiceAnswer(upToHand, cursor("hand", 2)).action);
   run("choix, Terminer : aucune fiche", null, choiceMarbleAt({ ...hitPocket, pendingChoice: upToHand }, cursor("hand", 2)));
 
@@ -788,7 +791,9 @@ function checkChoiceInterface(run) {
     "choice.chosen{marble: <final_pocket>} event.pocketed{marble: <final_pocket>}",
     stepsText(buildSteps(rules.reduce(hitPocket, { type: "choose", target: { zone: "hand", index: 1 } }).events, t))
   );
-  run("choix, dit : Terminer", "choice.ended.done", stepsText(buildSteps(made.reduce(upTo, { type: "choose", done: true }).events, t)));
+  run("choix, dit : rien de choisi, l'action ignorée", "choice.ended.declined", stepsText(buildSteps(made.reduce(upTo, { type: "choose", done: true }).events, t)));
+  const doneAfterOne = made.reduce(made.reduce(upTo, { type: "choose", target: { zone: "triangle", slot: "leftBase" } }).state, { type: "choose", done: true });
+  run("choix, dit : Terminer après une cible", true, stepsText(buildSteps(doneAfterOne.events, t)).includes("choice.ended.done"));
 
 }
 
@@ -893,7 +898,7 @@ function checkSounds(run) {
   run("profils : délai d'usure négatif refusé", true, throws(() => validateMarbleSounds({}, {}, { ...MARBLES_SETTINGS, crackToOutMs: -1 })));
   run("ton : variation de la fêlure manquante refusée", true, throws(() => validatePitchVariation({ ...MARBLES_PITCH_VARIATION, crack: undefined })));
 
-  const settings = { shuffleToDrawMs: 900, drawSoundIntervalMs: 350, swapSoundDelayMs: 150, wearSoundIntervalMs: 120, crackToOutMs: 150 };
+  const settings = { shuffleToDrawMs: 900, drawSoundIntervalMs: 350, swapSoundDelayMs: 150, wearSoundIntervalMs: 120, crackToOutMs: 150, awakenAfterDrawMs: 250, triggerSoundIntervalMs: 120 };
   // La table des billes des repères : celle des vérifications, injectée comme les
   // règles de l'écran injectent la leur.
   const FIXTURE_TABLE = { types: FIXTURE_TYPES };
@@ -1143,6 +1148,54 @@ function checkSounds(run) {
     FIXTURE_TABLE
   );
   run.same("usure : la bille retirée par la Fêlure part après sa fêlure", ["crack@0", "roll@150", "drop"], crackedOut.map((cue) => (cue.sound === "drop" ? cue.sound : `${cue.sound}@${cue.atMs}`)));
+  // Les sons de DÉCLENCHEUR, seulement chez une bille qui a l'effet du mot-clé :
+  // la Chiquenaude à la place de la bille dans la main, l'Éveil après la balise de
+  // sa pioche, à la même place, la balise suivante l'attend ; le Final à
+  // l'emplacement quitté, la Trouvaille à son emplacement, l'un après l'autre.
+  const fromHand = handPlace(1, 3);
+  run.same(
+    "Chiquenaude : son son à la place de la bille dans la main, avant son roulement",
+    ["flick@0", "roll@0"],
+    eventCues([{ type: "flick", slot: "apex", marble: "aging_flick", turnsInHand: 0 }, { type: "placed", slot: "apex", marble: "aging_flick" }], { placeFrom: fromHand }, settings, FIXTURE_TABLE).slice(0, 2).map((cue) => `${cue.sound}@${cue.atMs}`)
+  );
+  run.same("Chiquenaude : à la place de la bille dans la main", fromHand, eventCues([{ type: "flick", slot: "apex", marble: "aging_flick", turnsInHand: 0 }], { placeFrom: fromHand }, settings, FIXTURE_TABLE)[0].place);
+  run.same("Chiquenaude : muette chez une bille qui n'en a pas", [], eventCues([{ type: "flick", slot: "apex", marble: "hit_pocket", turnsInHand: 0 }], { placeFrom: fromHand }, settings, FIXTURE_TABLE));
+  const waking = eventCues(
+    [{ type: "draw", marble: "awaken_draw", cause: "turn" }, { type: "awaken", marble: "awaken_draw" }, { type: "draw", marble: "hit_pocket", cause: "turn" }, { type: "awaken", marble: "hit_pocket" }],
+    { handAfter: ["awaken_draw", "hit_pocket"] },
+    settings,
+    FIXTURE_TABLE
+  );
+  run.same(
+    "Éveil : après la balise de sa pioche, la pause réglée ; la balise suivante l'attend ; aucun chez une bille sans Éveil",
+    ["beacon@0", `awaken@${settings.awakenAfterDrawMs}`, `beacon@${settings.awakenAfterDrawMs + settings.drawSoundIntervalMs}`],
+    waking.map((cue) => `${cue.sound}@${cue.atMs}`)
+  );
+  run.same("Éveil : à la place de la bille dans la main", [handPlace(0, 2), handPlace(0, 2)], waking.slice(0, 2).map((cue) => cue.place));
+  run.same(
+    "Final et Trouvaille : à leur emplacement, l'un après l'autre",
+    [`final@0@apex`, `windfall@${settings.triggerSoundIntervalMs}@leftBase`],
+    eventCues([{ type: "final", slot: "apex", marble: "fragile" }, { type: "windfall", slot: "leftBase", marble: "all_rounder" }], {}, settings, FIXTURE_TABLE).map((cue) => `${cue.sound}@${cue.atMs}@${cue.place.slot}`)
+  );
+  run.same("Final : muet chez une bille qui n'en a pas", [], eventCues([{ type: "final", slot: "apex", marble: "aging_flick" }], {}, settings, FIXTURE_TABLE));
+  // Le début du tour du joueur : après les balises de pioche, au centre.
+  const turnCue = eventCues([{ type: "draw", marble: "aging_flick", cause: "turn" }], { handAfter: ["aging_flick"], playerTurn: true }, settings, FIXTURE_TABLE).at(-1);
+  run.same("player_turn : après la balise de pioche, au centre", { atMs: settings.drawSoundIntervalMs, sound: "playerTurn" }, turnCue);
+
+  // Une bille du pot qui agit (son effet à chaque résolution, une réaction) : sa
+  // balise, au pot ; son entrée au pot, non (son roulement la dit).
+  const potEffect = (trigger) => ({ type: "effect", trigger, slot: null, marble: "aging_flick", speedDelta: 1, massDelta: 0, draw: 0, operations: [], given: [], lost: [], speed: 1, mass: 1, potIndex: 0 });
+  run.same(
+    "pot : sa balise quand une bille du pot agit, à la résolution et en réaction",
+    [
+      [{ atMs: 0, sound: "beacon", marble: "aging_flick", place: potPlace() }],
+      [{ atMs: 0, sound: "beacon", marble: "aging_flick", place: potPlace() }],
+    ],
+    ["pocketResolution", "pocketReaction"].map((trigger) => eventCues([potEffect(trigger)], {}, settings, FIXTURE_TABLE))
+  );
+  run.same("pot : pas de balise à l'entrée au pot", [], eventCues([potEffect("pocketEntry")], {}, settings, FIXTURE_TABLE));
+  run.same("effet : un effet de phase n'ajoute rien (la phase a sa balise)", [], eventCues([{ ...potEffect("phase"), slot: "apex" }], {}, settings, FIXTURE_TABLE));
+
   // Les déplacements par effet : vers la main (Rebond, Ramasser), de la main à la
   // défausse (Défausser) ; du sac, muet.
   run.same(
@@ -1374,7 +1427,7 @@ function checkSaid(run, { events, state }) {
         "effect.combined{parts: [effect.discard_all{target: target.all}]}",
         "effect.combined{parts: [effect.discard_bag{count: 2}]}",
       ],
-      [undefined, "apex", "firstInHand", { type: "choice", zones: ["hand"], pick: "marble", count: 1 }, { type: "all" }, { type: "bag", count: 2 }].map(discardText)
+      [undefined, "apex", "firstInHand", { type: "choice", zones: ["hand"], pick: "marble", count: 1, mode: "required" }, { type: "all" }, { type: "bag", count: 2 }].map(discardText)
     );
     run(
       "texte : Défausser prévu, la bille défaussée et sa Chute, une bille du sac inconnue",
@@ -1584,7 +1637,7 @@ const WITNESS_RULES = fabricatedRules({
   clay: { base: [speed(1)], apex: [speed(4)], hit: [speed(2)], maxWear: 3, size: MEDIUM },
   gorilla: { apex: [speed(6)], knockout: [speed(3)], maxWear: 3, size: LARGE },
   leaded: { apex: [speed(-3)], maxWear: 3, size: LARGE },
-  glass: { hit: [polish(1, choice({ zones: ["triangle"] }))], maxWear: 3, size: MEDIUM },
+  glass: { hit: [polish(1, choice({ zones: ["triangle"], mode: "optional" }))], maxWear: 3, size: MEDIUM },
 });
 
 // Les phrases attendues des témoins, par langue.
@@ -1608,7 +1661,17 @@ const WITNESSES = {
       "Pointe : Vitesse +4.",
       "Base : Vitesse +1.",
     ],
-    question: "Tic de verre : choisissez une bille active à polir.",
+    question: "Tic de verre : vous pouvez polir une bille active. T pour ne rien choisir.",
+    questions: [
+      "Tic de verre : vous pouvez polir jusqu'à 2 billes actives. T pour ne rien choisir.",
+      "Tic de verre : vous devez choisir une bille active à polir.",
+      "Tic de verre : vous devez choisir 2 billes actives à polir.",
+      "Tic de verre : vous pouvez éjecter une bille active. T pour ne rien choisir.",
+      "Tic de verre : vous devez choisir une bille active à éjecter.",
+      "Tic de verre : vous pouvez donner Vitesse +2 à 2 billes actives au plus. T pour ne rien choisir.",
+      "Vous pouvez encore polir une bille active. T pour terminer.",
+      "Vous devez encore choisir une bille active.",
+    ],
     chosen: [
       "agate choisie.",
       "gorille choisi.",
@@ -1640,7 +1703,17 @@ const WITNESSES = {
       "Apex: Speed +4.",
       "Base: Speed +1.",
     ],
-    question: "Hit from glass: choose an active marble to polish.",
+    question: "Hit from glass: you may polish an active marble. T to choose nothing.",
+    questions: [
+      "Hit from glass: you may polish up to 2 active marbles. T to choose nothing.",
+      "Hit from glass: you must choose an active marble to polish.",
+      "Hit from glass: you must choose 2 active marbles to polish.",
+      "Hit from glass: you may eject an active marble. T to choose nothing.",
+      "Hit from glass: you must choose an active marble to eject.",
+      "Hit from glass: you may give Speed +2 to 2 active marbles at most. T to choose nothing.",
+      "You may still polish an active marble. T to finish.",
+      "You must still choose an active marble.",
+    ],
     chosen: [
       "agate chosen.",
       "gorilla chosen.",
@@ -1670,6 +1743,18 @@ function checkWitnesses(run) {
     { type: "place", handIndex: 0, slot: "leftBase" }
   ).state;
   const lines = (built) => built.map(({ key, params }) => plain(realT(key, params)));
+  // Les variantes d'une question : facultatif et obligatoire, singulier et pluriel,
+  // une autre action, un bonus, puis les relances après une première cible.
+  const questionVariants = (pending) => [
+    { ...pending, count: 2, remaining: 2 },
+    { ...pending, mode: "required" },
+    { ...pending, mode: "required", count: 2, remaining: 2 },
+    { ...pending, action: "eject", amount: undefined },
+    { ...pending, action: "eject", amount: undefined, mode: "required" },
+    { ...pending, action: "speed", amount: 2, count: 2, remaining: 2 },
+    { ...pending, count: 2, remaining: 1, chosen: [pending.eligible[0]] },
+    { ...pending, mode: "required", count: 2, remaining: 1, chosen: [pending.eligible[0]] },
+  ];
   const said = (locale) => {
     setLocale(locale);
     return {
@@ -1681,6 +1766,7 @@ function checkWitnesses(run) {
       overview: plain(describeOverview(game({ triangle: { leftBase: { marble: "clay", wear: 0 }, rightBase: null, apex: { marble: "leaded", wear: 0 } } }), WITNESS_RULES, realT)),
       card: marbleCard("clay", "x", WITNESS_RULES, realT).above.map(plain),
       question: plain(describeChoicePrompt(choosing.pendingChoice, realT)),
+      questions: questionVariants(choosing.pendingChoice).map((pending) => plain(describeChoicePrompt(pending, realT))),
       chosen: ["agate", "gorilla"].map((marble) => plain(realT("marbles.choice.chosen", { marble: nameRef(`marble.${marble}.name`) }))),
       turn: plain(describeTurn(game({ score: 5, speed: 5, mass: 2, throwsUsed: 1 }), true, realT)),
       bag: [8, 1].map((count) => plain(describeBag(game({ bag: Array(count).fill("clay"), drawPerTurn: 1 }), realT))),
@@ -1697,6 +1783,7 @@ function checkWitnesses(run) {
       run(`témoin ${locale} : la vue d'ensemble, une Vitesse négative`, WITNESSES[locale].overview, witness.overview);
       run.same(`témoin ${locale} : une fiche`, WITNESSES[locale].card, witness.card);
       run(`témoin ${locale} : la question d'un choix`, WITNESSES[locale].question, witness.question);
+      run.same(`témoin ${locale} : les questions selon le mode, au singulier et au pluriel, et les relances`, WITNESSES[locale].questions, witness.questions);
       run.same(`témoin ${locale} : une bille choisie, accordée`, WITNESSES[locale].chosen, witness.chosen);
       run(`témoin ${locale} : le tour`, WITNESSES[locale].turn, witness.turn);
       run.same(`témoin ${locale} : le sac, pluriel et singulier`, WITNESSES[locale].bag, witness.bag);

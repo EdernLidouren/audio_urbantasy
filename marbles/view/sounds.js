@@ -11,8 +11,10 @@
 //   emplacement, puis sa chute ; ou, tirée plus vite, sa collision avec
 //   l'occupante, qui roule à la défausse ; les deux billes d'un échange qui roulent l'une vers l'autre ; la
 //   balise de la bille active à la phase de son emplacement ; le Polissage et la
-//   Fêlure à l'emplacement de la bille touchée ; la bille usée qui roule à la
-//   défausse ; les billes du triangle qui tournent ensemble, chacune
+//   Fêlure à l'emplacement de la bille touchée ; les sons de déclencheur
+//   (Chiquenaude, Éveil, Final, Trouvaille) là où est la bille ; la balise d'une
+//   bille du pot qui agit, au pot ; le début du tour du joueur, au centre ; la bille
+//   usée qui roule à la défausse ; les billes du triangle qui tournent ensemble, chacune
 //   vers l'emplacement suivant. L'écran les met dans sa file de sons
 //   (marbles/view/sound-queue.js) et les joue à leur échéance : le son seul
 //   attend, jamais le joueur ;
@@ -47,13 +49,13 @@
 // (environ 17 ms), plus gros grain que l'écart lui-même, et un minuteur JS flotte
 // de plusieurs millisecondes.
 //
-// VARIATIONS DE TON : collisions, chutes, roulements, polissages et fêlures jouent
-// chacun à une vitesse tirée au hasard autour de 1 (MARBLES_PITCH_VARIATION) ;
+// VARIATIONS DE TON : collisions, chutes, roulements, polissages, fêlures et sons de
+// déclencheur jouent chacun à une vitesse tirée au hasard autour de 1 (MARBLES_PITCH_VARIATION) ;
 // jamais les balises. Un hasard de rendu seulement, que la simulation ne voit pas.
 //
 // VOLUMES : les balises (pioche, survol) suivent le volume des balises du jeu, elles
-// ont vocation à être positionnées ; brassage, chutes, chocs, roulements, polissages
-// et fêlures, celui de l'interface ; la musique, celui de la musique. Tous les sons des billes sont PERMANENTS (jamais
+// ont vocation à être positionnées ; brassage, chutes, chocs, roulements, polissages,
+// fêlures, sons de déclencheur et début de tour, celui de l'interface ; la musique, celui de la musique. Tous les sons des billes sont PERMANENTS (jamais
 // purgés, lib/audio/retention.js) et préchargés à l'ouverture
 // (preloadMarblesAudio) : la première balise ne part pas en retard sur la touche.
 // Un son manquant avertit en console, jamais de plantage.

@@ -437,7 +437,7 @@ Un effet est une liste de clauses (`marbles/core/effects.js`) :
   cet emplacement. Pour un Polissage ou une Fêlure, sans cible, la bille elle-même ; avec
   une cible, la bille de cet emplacement (un emplacement vide : sans effet, noté au
   journal, `targetEmpty`). La cible peut aussi être un **choix du joueur** (voir « Cibles
-  au choix ») : `choice({ zones: ["triangle"], count: 2, upTo: true })` ; ou, pour
+  au choix ») : `choice({ zones: ["triangle"], count: 2, mode: "optional" })` ; ou, pour
   Éjecter, Défausser et Rebond, **toutes les billes actives**, filtrées :
   `allActive(sizeIs(SMALL))` ; Défausser, Rebond et Ramasser passent par le chemin des
   billes (voir « Le chemin des billes ») ;
@@ -642,7 +642,7 @@ Un effet peut laisser le joueur **choisir sa cible** : « une bille de votre mai
 simulation et dans l'écran, pour tous les effets.
 
 **Déclaration** (`marbles/core/effects.js`, en-tête ; forme courte `choice`,
-`marbles/content/effects.js`) : `target: { type: "choice", zones, pick, count, upTo? }`.
+`marbles/content/effects.js`) : `target: { type: "choice", zones, pick, count, mode }`.
 
 - `zones` : où le joueur choisit, parmi `CHOICE_ZONES` : aujourd'hui `hand`, `triangle`
   et `discard` (la défausse, dans l'ordre d'arrivée, une cible `{ zone: "discard", index,
@@ -652,8 +652,12 @@ simulation et dans l'écran, pour tous les effets.
 - `pick` : sur le triangle, `marble` (une bille active) ou `slot` (un emplacement, vide
   compris) ; aucune action actuelle n'a de sens sur un emplacement vide, `slot` est donc
   refusé pour toutes aujourd'hui.
-- `count` : le nombre N de choix ; `upTo` : « jusqu'à N », moins permis, zéro compris ;
-  sinon obligatoire, exactement N (moins s'il n'y a pas assez de cibles).
+- `count` : le nombre N de choix ;
+- `mode`, le **mode**, explicite et toujours déclaré (`CHOICE_MODES`, une cible sans mode
+  est refusée au chargement) : `"optional"`, **facultatif**, N choix au plus, moins
+  permis, aucun compris (rien de choisi : l'action est ignorée, `choiceEnded` de raison
+  `declined`) ; `"required"`, **obligatoire**, exactement N (moins s'il n'y a pas assez
+  de cibles), Terminer refusé (`choiceRequired`).
 - Les actions qui l'acceptent le déclarent (`CLAUSE_ACTIONS`, `choice`) : Polissage,
   Fêlure et Rebond (triangle), Empocher et Défausser (main et triangle), Ramasser
   (défausse), Vitesse et Masse en bonus (triangle). Ramasser, vers la main
@@ -665,14 +669,15 @@ simulation et dans l'écran, pour tous les effets.
 
 **Déroulé** (`marbles/core/run.js`/`chooseTargets`) : les N choix se font un par un ; une cible
 déjà choisie n'est plus éligible ; la sélection s'arrête à N choix, dès qu'il ne reste
-aucune cible éligible, ou sur Terminer (« jusqu'à N »). Aucune cible éligible dès le
+aucune cible éligible, ou sur Terminer (facultatif seulement). Aucune cible éligible dès le
 départ : l'effet ne fait rien, le journal le note (`targetEmpty`, cible `"choice"`, « Aucune
 cible à choisir : sans effet. ») et rien ne s'ouvre. La sélection finie, l'action
 s'applique à chaque cible, dans l'ordre des choix ; une bille de la main se suit par son
 entrée (la main change quand une autre part au pot). Un bonus au choix se choisit avant
 l'annonce de l'effet ; une action sur une bille, après sa Pioche, à sa place dans les
 clauses. Journal : `choice` (ouverture), `chosen` (chaque validation, « agate choisie. »),
-`choiceEnded` (`reason` : `count`, `done` « Choix terminé. », `exhausted` « Plus rien à
+`choiceEnded` (`reason` : `count`, `declined` « Rien de choisi : l'action est ignorée. »
+(Terminer d'un choix facultatif sans aucune cible), `done` « Choix terminé. », `exhausted` « Plus rien à
 choisir. ») ; points d'accroche sonores, sans son aujourd'hui.
 
 **Suspension et reprise par rejeu.** Un choix INTERROMPT l'action en cours (pioche, pose,
@@ -681,7 +686,7 @@ résolution, réaction du pot…) : le réducteur rend l'état du déroulé à c
 
 ```js
 pendingChoice: {
-  action, amount?, zones, pick, count, upTo, by,   // la question, l'effet qui la pose
+  action, amount?, zones, pick, count, mode, by,   // la question, l'effet qui la pose
   eligible, chosen, remaining,                     // cibles valides, déjà choisies, reste
   inTransit,                                       // billes en transit, pour information
   resume: { from, action, answers, seen, eventLimit? },
@@ -1082,15 +1087,26 @@ une bille du sac.
 Quand un effet laisse choisir, l'écran passe en **mode choix** tant que le choix attend
 (`marbles/view/choice.js`, pur ; branché dans `marbles/view/screen.js`). La question se dit
 après ce que l'action a déjà fait, avec la bille et le moment qui la posent (`by`), comme
-ses effets se disent : « Tic de gorille : choisissez une bille de votre main à
-empocher. », « base gauche, tigrée : choisissez une bille active à éjecter. », « Final de
-porcelaine : choisissez jusqu'à 2 billes actives à polir. T pour terminer. », « Pot, mica :
-… », « Entrée au pot de porcelaine : … » ; après chaque choix, « agate choisie. Choisissez encore une bille
-active. » (« Vous pouvez choisir encore une bille active, ou terminer avec T. » en mode
-« jusqu'à N »).
+ses effets se disent, sa phrase selon le MODE (`marbles/view/narration/journal.js`/
+`describeChoicePrompt`, construite de l'action et de la zone) :
 
-- **Main** : un menu horizontal des SEULES billes éligibles, dans l'ordre de la main, puis
-  « Terminer » en mode « jusqu'à N » ; positions comptées dans ce menu.
+- **facultatif** : « Tic de verre : vous pouvez polir une bille active. T pour ne rien
+  choisir. », « Final de porcelaine : vous pouvez polir jusqu'à 2 billes actives. T pour ne
+  rien choisir. » ; un bonus évite « à jusqu'à » : « vous pouvez donner Vitesse +2 à 2
+  billes actives au plus » (`marbles.choice.may.<action>`, qui reçoit `target`, `limit` et
+  `effect`) ; après une cible, « Vous pouvez encore polir une bille active. T pour
+  terminer. » ;
+- **obligatoire** : « Tic de gorille : vous devez choisir une bille de votre main à
+  empocher. », « base gauche, tigrée : vous devez choisir une bille active à éjecter. »,
+  « vous devez choisir 2 billes actives à polir » ; après une cible, « Vous devez encore
+  choisir une bille active. ».
+
+Les préfixes : « Pot, mica : … », « Entrée au pot de porcelaine : … » ; chaque cible
+choisie se dit (« agate choisie. »).
+
+- **Main** : un menu horizontal des SEULES billes éligibles, dans l'ordre de la main, puis,
+  en mode facultatif, « Ne rien choisir » tant que rien n'est choisi, « Terminer » ensuite ;
+  positions comptées dans ce menu. En mode obligatoire, ni l'un ni l'autre.
 - **Défausse** (Ramasser) : le même menu horizontal, à la même place du curseur, des
   billes éligibles de la défausse dans l'ordre d'arrivée ; fiches et mots-clés (E, Maj+E)
   sur chaque option, la balise au survol à la défausse. Un choix n'a jamais à la fois la
@@ -1105,15 +1121,18 @@ active. » (« Vous pouvez choisir encore une bille active, ou terminer avec T. 
   rien de plus dans un choix de la main seule, où le triangle n'est pas parcouru.
 - **Les deux zones** : on passe de l'une à l'autre comme d'habitude, le nom de la zone
   annoncé ; une seule zone : l'autre n'existe pas pour le curseur.
-- **Entrée** choisit ; **T** termine un choix « jusqu'à N » (partout, sur le triangle
-  surtout ; refusé, « Ce choix est obligatoire. », sinon) ; **Échap** fait comme T dans un
-  choix « jusqu'à N » (il valide la sélection en cours), et redit la question dans un
-  choix obligatoire, qui ne se ferme pas (le jeu ne peut continuer sans lui).
+- **Entrée** choisit ; **T** fait comme « Ne rien choisir » ou « Terminer » dans un choix
+  facultatif (partout, sur le triangle surtout, qui n'a pas de menu ; refusé, « Ce choix est
+  obligatoire. », sinon) ; **Échap** fait comme T dans un choix facultatif (il valide la
+  sélection en cours ; rien de choisi : l'action est ignorée, et cela se dit), et redit la
+  question dans un choix obligatoire, qui ne se ferme pas (le jeu ne peut continuer sans
+  lui). Ne rien choisir n'est pas une erreur : les joueurs automatiques le peuvent aussi
+  (c'est une action légale).
 - Fiches (Ctrl+haut, Ctrl+bas) et mots-clés (E, Maj+E) marchent sur chaque option ; R est
   refusé pendant le choix.
 
-T était libre dans l'écran des billes ; elle porte l'aide « Terminer un choix « jusqu'à
-N » ».
+T était libre dans l'écran des billes ; elle porte l'aide « Ne rien choisir, ou terminer
+un choix facultatif ».
 
 ### Fiches de détail
 
@@ -1295,7 +1314,7 @@ choisirait la cible d'une question, ou quitterait la fin de partie, avant que le
 d'écran ne l'ait dite.
 
 **Retour arrière pendant un choix** redit la question, puis la ligne du curseur : dans un
-choix « jusqu'à N », Échap terminant le choix, c'est le moyen de la réentendre. La
+choix facultatif, Échap terminant le choix, c'est le moyen de la réentendre. La
 question entre aussi dans l'historique (L), comme les autres messages de jeu.
 
 ### Sons
@@ -1326,6 +1345,21 @@ et quand, sur la ligne de temps du geste (`eventCues`) :
   sac à sa création, sans évènement : l'écran le joue) et à chaque `bagRegenerated` ;
 - pioche : la balise de chaque bille piochée, l'une après l'autre ; la première attend
   `shuffleToDrawMs` (900 ms) après un brassage, les suivantes `drawSoundIntervalMs` (350 ms) ;
+- sons de DÉCLENCHEUR (`MARBLES_AUDIO` : `flick`, `awaken`, `final`, `windfall`), seulement
+  quand le mot-clé se déclenche chez une bille qui en a l'effet, au volume de l'interface,
+  avec une légère variation de ton : la **Chiquenaude** à la place qu'occupait la bille
+  dans la main (celle de sa balise quand on parcourt la main), au début de la pose, avec
+  le départ de son roulement ; l'**Éveil** à la place de la bille piochée dans la main,
+  `awakenAfterDrawMs` (250 ms) après sa balise de pioche, la balise suivante l'attendant ;
+  le **Final** à l'emplacement que la bille vient de quitter, la **Trouvaille** à
+  l'emplacement de la bille active, l'un après l'autre (`triggerSoundIntervalMs`, 120 ms) ;
+- **billes du pot qui agissent** (leur effet à chaque résolution, leurs réactions) : leur
+  balise, au pot, au moment de leur étape, pendant la résolution comme pendant la phase de
+  jeu ; leur entrée au pot, elle, se dit par son roulement et sa chute ;
+- **début du tour du joueur** (`MARBLES_AUDIO.playerTurn`, `player_turn`), au centre, quand
+  la main lui revient : à l'ouverture de la partie (le premier tour), et à l'étape de la
+  séquence qui dit le début du tour, qu'elle ait été écoutée ou passée (un saut joue la
+  dernière étape) ; après les balises de pioche du même geste ;
 - pose sur un emplacement vide : la bille roule de sa place dans la main à l'emplacement,
   puis y tombe ;
 - pose sur un emplacement occupé (remplacement) : la bille est **tirée** jusqu'à
@@ -1343,9 +1377,8 @@ et quand, sur la ligne de temps du geste (`eventCues`) :
   main, la défausse) au **pot**, en haut à gauche, en face de la défausse
   (`MARBLES_SOUND_PLACES.pot`), et y tombe, du même roulement qu'une bille usée (`out`), à la
   suite des autres départs. La perte (`lost`) et l'étape du pot (`potResolution`) sont des
-  points d'accroche muets, la perte sans place imposée. Son
-  Final n'a pas encore de son propre : l'évènement `final` est un point d'accroche muet
-  (`MARBLE_EVENT_CUES`), comme `targetEmpty` ;
+  points d'accroche muets, la perte sans place imposée ; une cible vide (`targetEmpty`)
+  aussi ;
 - Polissage et Fêlure (`polished`, `cracked`) : leur son (`MARBLES_AUDIO.polish`,
   `marble_polishing` ; `MARBLES_AUDIO.crack`, `marble_cracking`), le même pour tous les
   calibres, à l'emplacement de la bille touchée, au volume de l'interface. Seulement quand
@@ -1417,10 +1450,11 @@ frappeuse sur frappée, élevé à `weightExponent` (0,3). Un calot sur une mini
 1,39, une minibille sur un calot à 0,72, deux billes de même calibre à 1. La force règle le
 volume des deux sons et la vitesse de départ de la délogée (`collisionStrength`).
 
-**Variations de ton** : collisions, chutes, roulements, polissages et fêlures jouent chacun
-à une vitesse de lecture tirée au hasard autour de 1 (`MARBLES_PITCH_VARIATION` : ±4 %,
-±3 %, ±2 %, ±3 %, ±3 %, le roulement une fois par trajet), pour que deux sons de suite ne
-soient jamais identiques.
+**Variations de ton** : collisions, chutes, roulements, polissages, fêlures et sons de
+déclencheur (Chiquenaude, Éveil, Final, Trouvaille) jouent chacun à une vitesse de lecture
+tirée au hasard autour de 1 (`MARBLES_PITCH_VARIATION` : ±4 %, ±3 %, ±2 %, puis ±3 % pour
+les autres, le roulement une fois par trajet), pour que deux sons de suite ne soient
+jamais identiques. Le début du tour du joueur n'en a pas.
 Jamais les balises : la balise est l'identité de la bille. Un hasard de rendu, que la
 simulation ne voit pas.
 

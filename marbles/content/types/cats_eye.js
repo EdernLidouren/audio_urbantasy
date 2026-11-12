@@ -10,6 +10,6 @@ export default {
   hit: [draw(1)],
   // Éjection : Ramasser une bille de la défausse au choix. En partance, elle n'y est
   // pas encore : elle ne peut pas se choisir elle-même.
-  knockout: [retrieve(choice({ zones: ["discard"] }))],
+  knockout: [retrieve(choice({ zones: ["discard"], mode: "optional" }))],
   size: MEDIUM,
 };

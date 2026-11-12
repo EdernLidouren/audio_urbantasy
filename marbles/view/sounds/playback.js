@@ -32,12 +32,17 @@ import { positionOf, renderAt, renderPosition, rollRendering } from "./space.js"
 // ici.
 const profileOf = (marble, types) => MARBLE_SOUND_PROFILES[types[marble].size];
 
+// Les repères dont le son est le même pour toutes les billes (MARBLES_AUDIO), au
+// volume de l'interface.
+const SHARED_SOUNDS = ["polish", "crack", "flick", "awaken", "final", "windfall", "playerTurn"];
+
 // Le chemin et le volume d'un repère ponctuel.
 function cueSound(cue, types) {
   const gain = cue.gain ?? 1;
   if (cue.sound === "shuffle") return { key: MARBLES_AUDIO.shuffle, volume: gain * interfaceVolumeFactor() };
-  // Les sons d'usure : les mêmes pour tous les calibres.
-  if (cue.sound === "polish" || cue.sound === "crack") return { key: MARBLES_AUDIO[cue.sound], volume: gain * interfaceVolumeFactor() };
+  // Les sons d'usure, de déclencheur et du début de tour : les mêmes pour tous les
+  // calibres.
+  if (SHARED_SOUNDS.includes(cue.sound)) return { key: MARBLES_AUDIO[cue.sound], volume: gain * interfaceVolumeFactor() };
   if (cue.sound === "drop") return { key: profileOf(cue.marble, types).drop, volume: gain * interfaceVolumeFactor() };
   return { key: profileOf(cue.marble, types).beacon, volume: gain * beaconVolumeFactor() };
 }
@@ -193,7 +198,7 @@ export function stopFocusBeacon() {
 
 // Tous les sons de l'écran, décodés d'avance.
 export function preloadMarblesAudio() {
-  const keys = [MARBLES_AUDIO.shuffle, MARBLES_AUDIO.polish, MARBLES_AUDIO.crack, ...Object.values(MARBLE_SOUND_PROFILES).flatMap((profile) => Object.values(profile))];
+  const keys = [MARBLES_AUDIO.shuffle, ...SHARED_SOUNDS.map((sound) => MARBLES_AUDIO[sound]), ...Object.values(MARBLE_SOUND_PROFILES).flatMap((profile) => Object.values(profile))];
   for (const member of keys.flatMap(assetKeyMembers)) preloadOneShot(member);
   for (const member of assetKeyMembers(MARBLES_AUDIO.music)) preloadMusic(member);
 }

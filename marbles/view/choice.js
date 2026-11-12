@@ -19,6 +19,7 @@
 // `handIndex` est la place dans le menu du choix, pas dans la main.
 
 import { SLOTS } from "../core/marbles.js";
+import { isOptionalChoice } from "../core/effects.js";
 import { formatMenuPosition } from "../../lib/menu.js";
 import { cursorOn, stepCursor, zoneOf } from "./navigation.js";
 import { describeMarbleInList, describeSlotFocus, marbleName } from "./narration.js";
@@ -34,14 +35,16 @@ function hasZone(pending, zone) {
 }
 
 // Le menu du choix (main ou défausse) : les billes éligibles, chacune { kind:
-// "marble", zone, index (sa place dans sa zone), marble }, puis { kind: "finish" } en
-// mode « jusqu'à N ». Vide si ni la main ni la défausse ne sont une zone du choix.
+// "marble", zone, index (sa place dans sa zone), marble }, puis, en mode facultatif,
+// { kind: "finish" } : « Ne rien choisir » tant que rien n'est choisi, « Terminer »
+// ensuite (choiceFocusLine). Vide si ni la main ni la défausse ne sont une zone du
+// choix.
 export function choiceHandOptions(pending) {
   if (!hasZone(pending, "hand")) return [];
   const marbles = pending.eligible
     .filter((target) => LIST_ZONES.includes(target.zone))
     .map(({ zone, index, marble }) => ({ kind: "marble", zone, index, marble }));
-  return pending.upTo ? [...marbles, { kind: "finish" }] : marbles;
+  return isOptionalChoice(pending) ? [...marbles, { kind: "finish" }] : marbles;
 }
 
 // L'entrée sous une option du menu du choix : sa bille, avec son compteur de tours
@@ -122,8 +125,10 @@ export function choiceFocusLine(game, cursor, rules, t) {
     const options = choiceHandOptions(pending);
     const option = options[cursor.handIndex];
     if (option.kind === "finish") {
+      // Rien choisi encore : renoncer ; au moins une cible : arrêter là.
+      const label = t(pending.chosen.length === 0 ? "marbles.choice.decline" : "marbles.choice.finish");
       const position = formatMenuPosition(cursor.handIndex, options.length, t);
-      return position ? `${t("marbles.choice.finish")}. ${position}` : `${t("marbles.choice.finish")}.`;
+      return position ? `${label}. ${position}` : `${label}.`;
     }
     return describeMarbleInList(option.marble, cursor.handIndex, options.length, rules, t);
   }

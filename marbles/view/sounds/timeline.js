@@ -4,7 +4,7 @@
 // échéance. Rien ne s'y joue : la lecture est l'affaire de ./playback.js. Point
 // d'entrée et vue d'ensemble : marbles/view/sounds.js.
 
-import { MARBLES_COLLISION, MARBLES_ROLLS, MARBLES_SETTINGS, MARBLES_SOUND_PLACES } from "../../config/values.js";
+import { MARBLE_POCKET, MARBLE_TRIGGERS, MARBLES_COLLISION, MARBLES_ROLLS, MARBLES_SETTINGS, MARBLES_SOUND_PLACES } from "../../config/values.js";
 import { SLOTS, nextSlot } from "../../core/marbles.js";
 import { rollDurationMs } from "../rolls.js";
 import { discardPlace, handPlace, positionOf, potPlace, slotPlace } from "./space.js";
@@ -32,6 +32,9 @@ function createTimeline(settings, { rolls, places }) {
   let nextDrawAt = 0;
   let nextWornAt = 0;
   let nextWearAt = 0;
+  let nextTriggerAt = 0;
+  // La dernière balise de pioche : son échéance et sa place (l'Éveil la suit).
+  let lastDraw = null;
   const cue = (atMs, sound, marble, place, gain) => ({
     atMs,
     sound,
@@ -53,7 +56,25 @@ function createTimeline(settings, { rolls, places }) {
     },
     draw(marble, place) {
       cues.push(cue(nextDrawAt, "beacon", marble, place));
+      lastDraw = { atMs: nextDrawAt, place };
       nextDrawAt += settings.drawSoundIntervalMs;
+    },
+    // L'Éveil de la bille qui vient d'être piochée : à sa place dans la main,
+    // awakenAfterDrawMs après sa balise ; la balise suivante l'attend.
+    awaken(marble) {
+      const atMs = (lastDraw?.atMs ?? 0) + settings.awakenAfterDrawMs;
+      cues.push(cue(atMs, "awaken", marble, lastDraw?.place));
+      nextDrawAt = Math.max(nextDrawAt, atMs + settings.drawSoundIntervalMs);
+    },
+    // Un son de déclencheur (Final, Trouvaille) à `place` ; plusieurs, l'un après
+    // l'autre.
+    trigger(sound, marble, place) {
+      cues.push(cue(nextTriggerAt, sound, marble, place));
+      nextTriggerAt += settings.triggerSoundIntervalMs;
+    },
+    // Le début du tour du joueur, au centre : après les balises de pioche du geste.
+    playerTurn() {
+      cues.push(cue(nextDrawAt, "playerTurn"));
     },
     // Une bille roule le long de `path` (des places) à partir de `atMs` :
     // l'échéance de son arrivée. `speedFactor` multiplie la vitesse du style (la
@@ -164,11 +185,19 @@ export const MARBLE_EVENT_CUES = {
     }
   },
   // Le choc se joue avec la pose qui suit, à l'arrivée de la bille posée.
-  // L'Éveil, la Chiquenaude et la Trouvaille : des points d'accroche, muets
-  // aujourd'hui (aucun son dédié).
-  awaken: null,
-  flick: null,
-  windfall: null,
+  // L'Éveil, la Chiquenaude et la Trouvaille : leur son, quand la bille a l'effet
+  // de ce mot-clé (hasTriggerEffect). L'Éveil suit la balise de sa pioche, à la
+  // même place ; la Chiquenaude part de la place de la bille dans la main ; la
+  // Trouvaille, de son emplacement.
+  awaken: (event, timeline, context, settings, table) => {
+    if (hasTriggerEffect(table, event.marble, "awaken")) timeline.awaken(event.marble);
+  },
+  flick: (event, timeline, context, settings, table) => {
+    if (hasTriggerEffect(table, event.marble, "flick")) timeline.at(0, "flick", event.marble, context.placeFrom);
+  },
+  windfall: (event, timeline, context, settings, table) => {
+    if (hasTriggerEffect(table, event.marble, "windfall")) timeline.trigger("windfall", event.marble, slotPlace(event.slot));
+  },
   knockout: (event, timeline, context) => {
     context.struck = event.marble;
   },
@@ -226,9 +255,11 @@ export const MARBLE_EVENT_CUES = {
   // Le Polissage et la Fêlure : leur son à l'emplacement de la bille touchée,
   // seulement quand l'usure change (un Polissage d'une bille à 0 est muet), ou
   // quand la Fêlure retire la bille, qui part alors à la défausse comme une bille
-  // usée (`discarded`), crackToOutMs après sa fêlure. Le Final d'une bille usée et
-  // une cible vide : des points d'accroche, muets pour l'instant.
-  final: null,
+  // usée (`discarded`), crackToOutMs après sa fêlure.
+  // Le Final : son son à l'emplacement que la bille vient de quitter.
+  final: (event, timeline, context, settings, table) => {
+    if (hasTriggerEffect(table, event.marble, "final")) timeline.trigger("final", event.marble, slotPlace(event.slot));
+  },
   polished: (event, timeline) => {
     if (event.applied > 0) timeline.wear("polish", event.marble, event.slot);
   },
@@ -238,18 +269,40 @@ export const MARBLE_EVENT_CUES = {
     const atMs = timeline.wear("crack", event.marble, event.slot);
     if (retires) timeline.holdDepartures(atMs + settings.crackToOutMs);
   },
+  // Une cible vide : un point d'accroche, muet pour l'instant.
   targetEmpty: null,
   // La bille active fait entendre sa voix quand vient la phase de son emplacement,
   // avec l'étape de la séquence qui dit ce qu'elle produit.
   phase: (event, timeline) => timeline.now("beacon", event.marble, slotPlace(event.slot)),
   phaseSkipped: null,
-  effect: null,
+  // Un effet joué : son repère selon son déclencheur (EFFECT_CUES) ; les autres
+  // effets restent muets, leur évènement a déjà son repère (la phase, la pose…).
+  effect: (event, timeline, context, settings) => EFFECT_CUES[event.trigger]?.(event, timeline, context, settings),
   wear: null,
   impact: null,
   // Autant de crans que l'évènement en porte.
   rotation: (event, timeline) => timeline.rotation(event.triangle, event.notches),
   turnEnded: null,
   gameOver: null,
+};
+
+// La bille a-t-elle un effet pour ce déclencheur (MARBLE_TRIGGERS, son champ) ? Une
+// bille inconnue n'en a pas.
+const TRIGGER_FIELDS = Object.fromEntries(MARBLE_TRIGGERS.map((trigger) => [trigger.id, trigger.field]));
+function hasTriggerEffect(table, marble, trigger) {
+  return marble !== null && marble !== undefined && (table.types[marble]?.[TRIGGER_FIELDS[trigger]]?.length ?? 0) > 0;
+}
+
+// Les déclencheurs d'une bille du POT qui AGIT : son effet à chaque résolution et ses
+// réactions (MARBLE_POCKET), pas son entrée, que son roulement et sa chute disent
+// déjà (pocketed).
+const POT_ACTING_TRIGGERS = MARBLE_POCKET.moments.filter((moment) => moment.event !== "pocketed").map((moment) => moment.trigger);
+
+// Le repère d'un effet joué, par déclencheur (l'évènement `effect`) : seulement
+// quand la bille a un effet pour ce moment, puisque l'évènement n'existe qu'alors.
+//   une bille du pot qui agit : sa balise, au pot, au moment de son étape.
+const EFFECT_CUES = {
+  ...Object.fromEntries(POT_ACTING_TRIGGERS.map((trigger) => [trigger, (event, timeline) => timeline.now("beacon", event.marble, potPlace())])),
 };
 
 // Les repères des évènements d'un geste, dans l'ordre du journal. `shuffleFirst` :
@@ -264,10 +317,12 @@ export const MARBLE_EVENT_CUES = {
 // OBLIGATOIRE : les règles de l'écran (rules.types), jamais la vraie importée ici.
 // `handSize` : la taille de la main juste après ces évènements, quand `handAfter`
 // est déjà plus loin (une étape d'une séquence, l'état étant celui de sa fin) ; par
-// défaut, celle de `handAfter`.
+// défaut, celle de `handAfter`. `playerTurn` : la main revient au joueur au début de
+// son tour avec ces évènements (l'ouverture de la partie, l'étape qui dit le début
+// du tour) : son son, après les balises de pioche.
 export function eventCues(
   events,
-  { triangleAfter = null, handAfter = null, handSize = handAfter?.length, shuffleFirst = false, placeFrom = handPlace(0, 1) } = {},
+  { triangleAfter = null, handAfter = null, handSize = handAfter?.length, shuffleFirst = false, placeFrom = handPlace(0, 1), playerTurn = false } = {},
   settings = MARBLES_SETTINGS,
   { rolls = MARBLES_ROLLS, places = MARBLES_SOUND_PLACES, collision = MARBLES_COLLISION, types } = {}
 ) {
@@ -288,6 +343,7 @@ export function eventCues(
     const cue = MARBLE_EVENT_CUES[event.type];
     if (cue) cue(event, timeline, context, settings, table);
   }
+  if (playerTurn) timeline.playerTurn();
   return timeline.cues;
 }
 

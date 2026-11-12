@@ -42,7 +42,7 @@ export default function checkMarblesPath(run) {
 // ni Éjection, une phase sautée ; en partance, une redirection ; main pleine, la
 // défausse et sa Chute ; rejouable dans le tour.
 function checkBounce(run) {
-  const choose = { type: "choice", zones: ["triangle"], pick: "marble", count: 1 };
+  const choose = { type: "choice", zones: ["triangle"], pick: "marble", count: 1, mode: "required" };
   const table = {
     plain: { apex: [{ action: "speed", amount: 1 }] },
     // Éveil, Final, Éjection, Chute : aucun ne doit jouer sur un Rebond réussi.
@@ -110,7 +110,7 @@ function checkBounce(run) {
   for (const field of ["flick", "awaken", "drop"]) {
     run(`validation, Rebond soi : refusé (${field})`, true, throws(() => validateTable({ x: { [field]: [{ action: "bounce" }] } })));
   }
-  run("validation, Rebond : pas de choix dans la main", true, throws(() => validateTable({ x: { hit: [{ action: "bounce", target: { type: "choice", zones: ["hand"], pick: "marble", count: 1 } }] } })));
+  run("validation, Rebond : pas de choix dans la main", true, throws(() => validateTable({ x: { hit: [{ action: "bounce", target: { type: "choice", zones: ["hand"], pick: "marble", count: 1, mode: "required" } }] } })));
 
   // Prévision : égale au réel.
   run("prévision : égale au réel, Rebond d'un emplacement", true, forecastMatches(rules, state({ hand: inHand(["toApex"]), triangle: { rightBase: placed("plain"), leftBase: null, apex: placed("target") } }), { type: "place", handIndex: 0, slot: "rightBase" }));
@@ -123,7 +123,7 @@ function checkBounce(run) {
 // dans l'ordre d'arrivée ; main pleine, elle reste ; une bille en partance n'est pas
 // à la défausse.
 function checkRetrieve(run) {
-  const fromDiscard = (count = 1, upTo = false) => ({ type: "choice", zones: ["discard"], pick: "marble", count, ...(upTo ? { upTo: true } : {}) });
+  const fromDiscard = (count = 1, mode = "required") => ({ type: "choice", zones: ["discard"], pick: "marble", count, mode });
   const table = {
     plain: {},
     waker: { awaken: [{ action: "speed", amount: 50 }] },
@@ -191,7 +191,7 @@ function checkRetrieve(run) {
   // Validation : jamais sur soi, jamais le sac, jamais un choix dans la main.
   run("validation, Ramasser : sans cible refusé", true, throws(() => validateTable({ x: { hit: [{ action: "retrieve" }] } })));
   run("validation, Ramasser : le sac refusé", true, throws(() => validateTable({ x: { hit: [{ action: "retrieve", target: { type: "bag", count: 1 } }] } })));
-  run("validation, Ramasser : un choix dans la main refusé", true, throws(() => validateTable({ x: { hit: [{ action: "retrieve", target: { type: "choice", zones: ["hand"], pick: "marble", count: 1 } }] } })));
+  run("validation, Ramasser : un choix dans la main refusé", true, throws(() => validateTable({ x: { hit: [{ action: "retrieve", target: { type: "choice", zones: ["hand"], pick: "marble", count: 1, mode: "required" } }] } })));
   run("validation, Ramasser : la dernière arrivée, permis", false, throws(() => validateTable({ x: { hit: [{ action: "retrieve", target: "lastDiscarded" }] } })));
 
   // Prévision : égale au réel pour la dernière ; un choix, selon le joueur.
@@ -206,7 +206,7 @@ const discard = (target) => ({ action: "discard", ...(target === undefined ? {} 
 // ni Éjection, une sortie du triangle, une phase sautée ; la Chute à chaque arrivée ;
 // le sac sans régénération ; les compteurs ; la prévision.
 function checkDiscard(run) {
-  const choose = (zones) => ({ type: "choice", zones, pick: "marble", count: 1 });
+  const choose = (zones) => ({ type: "choice", zones, pick: "marble", count: 1, mode: "required" });
   const table = {
     plain: { apex: [{ action: "speed", amount: 1 }] },
     // Une Chute, un Final, une Éjection : seule la Chute doit jouer.

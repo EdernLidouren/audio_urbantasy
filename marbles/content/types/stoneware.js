@@ -8,7 +8,7 @@ export default {
   base: [speed({ base: 0, step: 1, source: activeSize(SMALL) })],
   knockout: [draw(1)],
   // Tic : Défausser une bille de la main au choix.
-  hit: [discard(choice({ zones: ["hand"] }))],
+  hit: [discard(choice({ zones: ["hand"], mode: "optional" }))],
   // En poche, à chaque bille éjectée du triangle.
   pocketed: { ejectedMarbles: [mass(1)] },
   size: MEDIUM,

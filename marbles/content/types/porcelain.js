@@ -8,7 +8,7 @@ export default {
   apex: [speed(5)],
   flick: [mass(1)],
   // Final : Vitesse +4, puis Polissage 1 à jusqu'à 2 billes actives au choix.
-  final: [speed(4), polish(1, choice({ zones: ["triangle"], count: 2, upTo: true }))],
+  final: [speed(4), polish(1, choice({ zones: ["triangle"], count: 2, mode: "optional" }))],
   // Chute : Vitesse +3, après son Final quand elle est usée.
   drop: [speed(3)],
   pocketed: { entry: [speed(10)] },

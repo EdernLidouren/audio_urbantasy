@@ -40,6 +40,7 @@ export default function checkMarblesScreen(run) {
   run.section("choix pendant une résolution", checkChoiceDuringResolution);
   run.section("choix pendant un lancer", checkChoiceDuringThrow);
   run.section("choix dans la défausse", checkDiscardChoice);
+  run.section("choix facultatif et obligatoire", checkChoiceModes);
   run.section("fin de partie", checkGameEnd);
 }
 
@@ -56,10 +57,15 @@ function checkOpening(run) {
     );
     run("ouverture : le brassage d'abord", "shuffle", bench.sounds.find((sound) => sound.name === "playCue").args[0].sound);
     run("ouverture : la minuterie du temps réel", 1, bench.timerCount());
+    bench.advance(LONG_MS);
+    run("ouverture : le premier tour, la main revient au joueur (player_turn)", 1, turnCues(bench));
   } finally {
     bench.close();
   }
 }
+
+// Combien de fois le son du début de tour du joueur a été joué.
+const turnCues = (bench) => bench.sounds.filter((sound) => sound.name === "playCue" && sound.args[0].sound === "playerTurn").length;
 
 // Entrée sur une bille de la main ouvre la sélection d'emplacement ; Entrée sur un
 // emplacement ouvre la confirmation ; Confirmer pose, et le curseur revient dans la
@@ -99,7 +105,7 @@ function checkPlace(run) {
       bench.said.at(-1)
     );
     bench.advance(LONG_MS);
-    run.same("confirmer : ses sons une seule fois, le roulement puis la chute", ["roll", "drop"], cuesOf(bench, "aging_flick"));
+    run.same("confirmer : ses sons une seule fois, sa Chiquenaude, le roulement puis la chute", ["flick", "roll", "drop"], cuesOf(bench, "aging_flick"));
     bench.key("Backspace");
     run("après la pose : le curseur dans la main, sur la bille restante", true, bench.said.at(-1).startsWith("list.line{name: <hit_polish>"));
   } finally {
@@ -172,6 +178,7 @@ function checkSequence(run) {
     bench.key("Enter");
     run("second Entrée trop proche : ignoré, sans parole", afterSkip, bench.said.length);
     bench.advance(MARBLES_SETTINGS.skipGuardMs);
+    run("Entrée : séquence passée, la main revient au joueur (player_turn), une fois", 1, turnCues(bench));
     bench.key("Enter");
     run("après la garde : Entrée reprend, une bille prise", true, bench.said.at(-1).startsWith("take.hand{name: <aging_flick>}"));
   } finally {
@@ -216,7 +223,7 @@ function checkChoiceDuringResolution(run) {
     run(
       "choix : la séquence s'arrête sur la question du Final",
       true,
-      bench.said.at(-1).startsWith("choice.by_trigger{moment: keyword.final.name, marble: <fragile>") && bench.said.at(-1).endsWith("choice.finish_hint")
+      bench.said.at(-1).startsWith("choice.by_trigger{moment: keyword.final.name, marble: <fragile>") && bench.said.at(-1).endsWith("choice.decline_hint")
     );
     run("choix : l'Impact pas encore dit", false, bench.said.some((text) => text.includes("event.impact")));
     run("choix : en attente dans la partie", "polish", bench.game().pendingChoice?.action);
@@ -224,13 +231,14 @@ function checkChoiceDuringResolution(run) {
     // Le curseur s'ouvre sur la première cible dans l'ordre horaire : la base droite.
     run("réponse : la cible choisie se dit", "choice.chosen{marble: <final_pocket>}", bench.said.at(-1));
     playOut();
-    run("réponse : la question suivante, en séquence", "choice.more_up_to{target: choice.noun.triangle_marble{count: 1}}", bench.said.at(-1));
+    run("réponse : la question suivante, en séquence", true, bench.said.at(-1).startsWith("choice.more.optional{") && bench.said.at(-1).endsWith("choice.finish_hint"));
     bench.key("t");
     playOut();
     run("Terminer : la résolution reprise jusqu'à l'Impact", true, bench.said.some((text) => text.includes("event.impact{")));
     run("Terminer : plus de choix en attente", null, bench.game().pendingChoice);
     run("Terminer : le tour suivant pioché", "3 play", `${bench.game().turn} ${bench.game().stage}`);
     run("Terminer : la séquence finit sur le début du tour suivant", "event.turn_started{turn: 3}", bench.said.at(-1));
+    run("séquence écoutée jusqu'au bout : la main revient au joueur (player_turn), une fois", 1, turnCues(bench));
   } finally {
     bench.close();
   }
@@ -241,7 +249,7 @@ function checkChoiceDuringResolution(run) {
 // après son contenu, et Entrée n'y choisit rien ; la réponse la fait arriver. Billes
 // fabriquées : aucune de la table des vérifications n'ouvre de choix à ce moment.
 function checkChoiceDuringThrow(run) {
-  const choose = { type: "choice", zones: ["triangle"], pick: "marble", count: 1 };
+  const choose = { type: "choice", zones: ["triangle"], pick: "marble", count: 1, mode: "required" };
   const made = fabricatedRules({
     plain: { apex: [speed(1)] },
     flicker: { flick: [speed(1)] },
@@ -282,7 +290,7 @@ function checkDiscardChoice(run) {
   const made = fabricatedRules({
     plain: {},
     flicker: { flick: [speed(1)] },
-    picker: { hit: [{ action: "retrieve", target: { type: "choice", zones: ["discard"], pick: "marble", count: 1 } }] },
+    picker: { hit: [{ action: "retrieve", target: { type: "choice", zones: ["discard"], pick: "marble", count: 1, mode: "required" } }] },
   });
   const state = marblesPlayState(made, { hand: inHand(["picker"]), discard: ["plain", "flicker"], triangle: { rightBase: null, leftBase: null, apex: placed("plain") } });
   const bench = openScreenBench(made, state);
@@ -305,6 +313,57 @@ function checkDiscardChoice(run) {
     run("défausse : plus de choix en attente", null, bench.game().pendingChoice);
   } finally {
     bench.close();
+  }
+}
+
+// Les deux MODES d'un choix. Facultatif : « Ne rien choisir » en fin de menu, Échap
+// valide la sélection en cours, rien de choisi, l'action est ignorée et cela se dit.
+// Obligatoire : ni « Ne rien choisir » ni « Terminer », Échap redit la question, T
+// est refusé.
+function checkChoiceModes(run) {
+  const choose = (zones, mode) => ({ type: "choice", zones, pick: "marble", count: 1, mode });
+  const made = fabricatedRules({
+    plain: {},
+    optPicker: { hit: [{ action: "retrieve", target: choose(["discard"], "optional") }] },
+    reqPolish: { hit: [{ action: "polish", amount: 1, target: choose(["triangle"], "required") }] },
+  });
+  const placeOnApex = (bench) => {
+    // Prise, le curseur sur la base droite (le premier vide), montée à la pointe.
+    bench.key("Enter");
+    bench.key("ArrowUp");
+    bench.key("Enter");
+    bench.key("End");
+    bench.key("Enter");
+    for (let pulse = 0; pulse < 5; pulse++) bench.advance(LONG_MS);
+  };
+
+  const optional = openScreenBench(made, marblesPlayState(made, { hand: inHand(["optPicker"]), discard: ["plain"], triangle: { rightBase: null, leftBase: null, apex: placed("plain") } }));
+  try {
+    placeOnApex(optional);
+    run("facultatif : la question dit ce qu'on peut faire, puis T pour ne rien choisir", true, optional.said.at(-1).includes("choice.question.optional{") && optional.said.at(-1).endsWith("choice.decline_hint"));
+    optional.key("End");
+    run("facultatif : « Ne rien choisir » en fin de menu", "choice.decline. menu.position{index: 3, total: 3}", optional.said.at(-1));
+    optional.key("Escape");
+    for (let pulse = 0; pulse < 5; pulse++) optional.advance(LONG_MS);
+    run("facultatif : Échap, plus de choix en attente", null, optional.game().pendingChoice);
+    run("facultatif : rien de choisi, l'action ignorée, dite", true, optional.said.some((text) => text.includes("choice.ended.declined")));
+    run("facultatif : rien n'a quitté la défausse", 0, optional.game().hand.length);
+  } finally {
+    optional.close();
+  }
+
+  const required = openScreenBench(made, marblesPlayState(made, { hand: inHand(["reqPolish"]), triangle: { rightBase: placed("plain", 1), leftBase: null, apex: placed("plain") } }));
+  try {
+    placeOnApex(required);
+    const question = required.said.at(-1);
+    run("obligatoire : la question dit ce qu'on doit choisir, sans indication de T", true, question.includes("choice.question.required{") && !question.includes("hint"));
+    required.key("Escape");
+    // La pose s'est dite avec la question à sa suite ; Échap ne redit que la question.
+    run("obligatoire : Échap redit la question", true, required.said.at(-1).startsWith("choice.by_hit{") && question.endsWith(required.said.at(-1)));
+    required.key("t");
+    run("obligatoire : T refusé, le choix attend toujours", true, required.game().pendingChoice !== null);
+  } finally {
+    required.close();
   }
 }
 

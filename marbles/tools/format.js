@@ -127,9 +127,9 @@ export function targetLabel(target, name) {
 // Le choix en attente, d'une ligne : l'action, le mode, ce qui est fait, les cibles,
 // puis les billes en transit (en cours de lancer), jamais des cibles.
 export function choiceLine(pending, name) {
-  const mode = pending.upTo ? `jusqu'à ${pending.count}` : `${pending.count} obligatoire${pending.count > 1 ? "s" : ""}`;
+  const mode = pending.mode === "optional" ? `facultatif, jusqu'à ${pending.count}` : `${pending.count} obligatoire${pending.count > 1 ? "s" : ""}`;
   const chosen = pending.chosen.length === 0 ? "" : ` Déjà choisies : ${pending.chosen.map((target) => targetLabel(target, name)).join(", ")}.`;
-  const finish = pending.upTo ? ", ou terminer" : "";
+  const finish = pending.mode === "optional" ? ", ou terminer (rien choisi : l'action est ignorée)" : "";
   const transit =
     pending.inTransit.length === 0 ? "" : ` En transit : ${pending.inTransit.map((moving) => `${marbleLabel(moving.marble, name)} vers ${slotLabel(moving.slot)}`).join(", ")}.`;
   return `Choix en attente : ${pending.action}, ${mode}, encore ${pending.remaining}, par ${marbleLabel(pending.by.marble, name)} (${pending.by.trigger}).${chosen} Cibles : ${pending.eligible.map((target) => targetLabel(target, name)).join(", ")}${finish}.${transit}`;
@@ -178,7 +178,7 @@ const EVENT_LINES = {
   lost: (event, name) => `Perdue, pot plein : ${marbleLabel(event.marble, name)}, depuis ${POCKET_ORIGINS[event.from]}${event.slot ? ` (${slotLabel(event.slot)})` : ""}.`,
   potResolution: (event, name) => `Pot : ${marbleLabel(event.marble, name)}, ${event.index + 1}e arrivée.`,
   pocketReaction: (event, name) => `Réaction du pot : ${marbleLabel(event.marble, name)}, ${event.index + 1}e arrivée, à ${event.counter}.`,
-  choice: (event, name) => `Choix : ${event.action}, ${event.upTo ? "jusqu'à " : ""}${event.count}, zones ${event.zones.join(" et ")}, par ${marbleLabel(event.by.marble, name)}.`,
+  choice: (event, name) => `Choix : ${event.action}, ${event.mode === "optional" ? "facultatif, jusqu'à " : ""}${event.count}, zones ${event.zones.join(" et ")}, par ${marbleLabel(event.by.marble, name)}.`,
   chosen: (event, name) => `Choisie : ${targetLabel(event, name)}.`,
   choiceEnded: (event) => `Choix fini (${{ count: "nombre atteint", done: "terminé", exhausted: "plus de cible" }[event.reason]}), ${event.chosen} choisie(s).`,
   choiceUndecided: (event) => `Choix indécis (prévision) : ${event.action}.`,

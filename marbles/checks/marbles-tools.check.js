@@ -109,7 +109,7 @@ function checkCommandsAndFormat(run) {
   const pending = {
     action: "crack",
     count: 1,
-    upTo: false,
+    mode: "required",
     remaining: 1,
     by: { trigger: "pocketReaction", slot: null, marble: "a" },
     chosen: [],
@@ -225,7 +225,7 @@ function checkPlayerChoices(run) {
   const randomAnswer = PLAYERS.random.startGame({ seed: 3 }).next(view);
   run("aléatoire : une réponse légale au choix", true, randomAnswer.type === "choose" && rules.reduce(pending, randomAnswer).ok);
   // Mode « jusqu'à N » : Terminer est parmi les réponses tirées.
-  const upTo = { ...view, pendingChoice: { ...view.pendingChoice, upTo: true } };
+  const upTo = { ...view, pendingChoice: { ...view.pendingChoice, mode: "optional" } };
   const answers = new Set();
   const session = PLAYERS.random.startGame({ seed: 5 });
   for (let draw = 0; draw < 40; draw++) answers.add(JSON.stringify(session.next(upTo)));

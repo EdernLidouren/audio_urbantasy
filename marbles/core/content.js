@@ -27,7 +27,7 @@
 //   pocketed { marble, from, slot?, index?, potIndex, by }, lost { marble, from, slot?, index?, by },
 //   potResolution { index, marble }, pocketReaction { index, marble, counter },
 //   chainInterrupted {},
-//   choice { action, amount?, zones, pick, count, upTo, by },
+//   choice { action, amount?, zones, pick, count, mode, by },
 //   chosen { zone, index?, slot?, marble, by },
 //   choiceEnded { reason, chosen, by }, choiceUndecided { action, by },
 //   eject { slot, marble, by },

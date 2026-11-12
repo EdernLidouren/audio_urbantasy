@@ -50,7 +50,7 @@ export const FIXTURE_TYPES = deepFreeze({
   hit_polish: {
     base: [mass(1)],
     apex: [speed({ base: 0, step: 1, source: tally("windfall", "game"), max: 10 })],
-    hit: [polish(1, choice({ zones: ["triangle"] }))],
+    hit: [polish(1, choice({ zones: ["triangle"], mode: "required" }))],
     maxWear: 3,
     size: MEDIUM,
   },
@@ -58,7 +58,7 @@ export const FIXTURE_TYPES = deepFreeze({
   // au choix ; Éjection : Vitesse. Un calot sans base.
   hit_pocket: {
     apex: [speed(6)],
-    hit: [{ ...speed(4), when: { type: "relativeSize", marble: "ejected", is: "smaller" } }, pocket(choice({ zones: ["hand"] }))],
+    hit: [{ ...speed(4), when: { type: "relativeSize", marble: "ejected", is: "smaller" } }, pocket(choice({ zones: ["hand"], mode: "required" }))],
     knockout: [speed(3)],
     maxWear: 3,
     size: LARGE,
@@ -91,7 +91,7 @@ export const FIXTURE_TYPES = deepFreeze({
     base: [speed(2)],
     apex: [speed(5)],
     flick: [mass(1)],
-    final: [speed(4), polish(1, choice({ zones: ["triangle"], count: 2, upTo: true }))],
+    final: [speed(4), polish(1, choice({ zones: ["triangle"], count: 2, mode: "optional" }))],
     pocketed: { entry: [speed(10)] },
     maxWear: 2,
     size: SMALL,
@@ -139,7 +139,7 @@ export const FIXTURE_TYPES = deepFreeze({
   // Beaucoup de déclencheurs : base qui Éjecte une bille active au choix, Éveil,
   // Trouvaille, Final, En poche à chaque Chiquenaude ; usure 4.
   all_rounder: {
-    base: [eject(choice({ zones: ["triangle"] }))],
+    base: [eject(choice({ zones: ["triangle"], mode: "required" }))],
     apex: [speed(-1)],
     awaken: [speed(2)],
     windfall: [speed(3)],

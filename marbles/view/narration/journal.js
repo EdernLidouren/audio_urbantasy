@@ -6,7 +6,7 @@
 
 import { nameRef } from "../../../data/i18n/index.js";
 import { MARBLE_POCKET, MARBLE_TRIGGERS } from "../../config/values.js";
-import { FIRST_IN_HAND } from "../../core/effects.js";
+import { FIRST_IN_HAND, isOptionalChoice } from "../../core/effects.js";
 import { choiceTarget, combined, describeEffect, formatCounter, marbleName, outcomeLine, slotName, valueParts } from "./effects.js";
 
 // Le sens de la rotation du moteur (marbles/core/effects.js/nextSlot) : horaire (base
@@ -111,6 +111,7 @@ const EVENT_TEXTS = {
     event.zone === "triangle" && event.marble === null
       ? t("marbles.choice.chosen_slot", { slot: slotName(event.slot, t) })
       : t("marbles.choice.chosen", { marble: nameRef(`marble.${event.marble}.name`) }),
+  // Rien de choisi dans un choix facultatif : l'action est ignorée, cela se dit.
   choiceEnded: (event, t) => (event.reason === "count" ? null : t(`marbles.choice.ended.${event.reason}`)),
   choiceUndecided: SILENT,
   // Une bille chassée par Éjecter, ou usée : déjà dite par l'éjection ou par son
@@ -159,13 +160,30 @@ function choiceByPrefix({ trigger, slot, marble }, question, t) {
 // jusqu'à 2 billes actives à polir. T pour terminer. » ; après un premier choix, ce
 // qui reste : « Choisissez encore une bille active. ».
 export function describeChoicePrompt(pending, t) {
-  if (pending.chosen.length > 0) {
-    const target = choiceTarget(pending, t, pending.remaining, false);
-    return t(pending.upTo ? "marbles.choice.more_up_to" : "marbles.choice.more", { target });
-  }
   const effect = pending.amount === undefined ? undefined : combined(valueParts({ [pending.action]: pending.amount }, t), t);
-  const question = choiceByPrefix(pending.by, t("marbles.choice.question", { target: choiceTarget(pending, t), verb: t(`marbles.choice.verb.${pending.action}`, { effect }) }), t);
-  return pending.upTo ? `${question} ${t("marbles.choice.finish_hint")}` : question;
+  const optional = isOptionalChoice(pending);
+  if (pending.chosen.length > 0) {
+    if (!optional) return t("marbles.choice.more.required", { target: choiceTarget(pending, t, pending.remaining, false) });
+    return `${t("marbles.choice.more.optional", { action: mayText(pending, pending.remaining, effect, t) })} ${t("marbles.choice.finish_hint")}`;
+  }
+  if (!optional) {
+    const verb = t(`marbles.choice.verb.${pending.action}`, { effect });
+    return choiceByPrefix(pending.by, t("marbles.choice.question.required", { target: choiceTarget(pending, t, pending.count, false), verb }), t);
+  }
+  const question = choiceByPrefix(pending.by, t("marbles.choice.question.optional", { action: mayText(pending, pending.count, effect, t) }), t);
+  return `${question} ${t("marbles.choice.decline_hint")}`;
+}
+
+// Ce qu'un choix FACULTATIF permet, l'action et sa cible : « éjecter une bille
+// active », « éjecter jusqu'à 2 billes actives », « donner Vitesse +2 à 2 billes
+// actives au plus » (jamais « à jusqu'à »). `count` : ce qui reste à choisir.
+// Chaque action a son gabarit, `marbles.choice.may.<action>`, qui reçoit `target`
+// (avec « jusqu'à » au pluriel), `limit` (avec « au plus » au pluriel) et `effect`.
+function mayText(pending, count, effect, t) {
+  const noun = choiceTarget(pending, t, count, false);
+  const target = count > 1 ? t("marbles.choice.up_to", { target: noun }) : noun;
+  const limit = count > 1 ? t("marbles.choice.at_most", { target: noun }) : noun;
+  return t(`marbles.choice.may.${pending.action}`, { target, limit, effect });
 }
 
 // La partie finit-elle après `index`, avant tout nouveau tour ?

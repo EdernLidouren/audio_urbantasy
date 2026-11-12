@@ -47,11 +47,12 @@ export const LAST_DISCARDED = "lastDiscarded";
 export const nextInBag = (count) => ({ type: "bag", count });
 
 // Une CIBLE AU CHOIX du joueur (marbles/core/effects.js, en-tête) : `zones`, où il
-// choisit ("hand", "triangle") ; `count`, combien (1 par défaut) ; `upTo`, « jusqu'à
-// N », moins permis ; `pick`, ce qui se vise sur le triangle ("marble", une bille
-// active, par défaut). « Polissage 1 à une bille active au choix » :
-// polish(1, choice({ zones: ["triangle"] })).
-export const choice = ({ zones, count = 1, upTo = false, pick = "marble" }) => ({ type: "choice", zones, pick, count, ...(upTo ? { upTo: true } : {}) });
+// choisit ("hand", "triangle", "discard") ; `count`, combien (1 par défaut) ; `mode`,
+// TOUJOURS donné, "optional" (facultatif : N au plus, aucun permis) ou "required"
+// (obligatoire : exactement N) ; `pick`, ce qui se vise sur le triangle ("marble", une
+// bille active, par défaut). « Vous pouvez polir une bille active » :
+// polish(1, choice({ zones: ["triangle"], mode: "optional" })).
+export const choice = ({ zones, count = 1, mode, pick = "marble" }) => ({ type: "choice", zones, pick, count, mode });
 
 // Une cible « TOUTES LES BILLES ACTIVES » (marbles/core/effects.js, en-tête), qui
 // passent tous les filtres donnés : allActive(), allActive(sizeIs(SMALL)).

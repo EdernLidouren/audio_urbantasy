@@ -35,6 +35,7 @@ import {
   evaluateEffect,
   isAll,
   isChoice,
+  isOptionalChoice,
   passesFilters,
 } from "./effects.js";
 import { recordTally } from "./tally.js";
@@ -261,7 +262,7 @@ function isOtherMarble(target, answered) {
 export function chooseRefusal(state, action) {
   const pending = state.pendingChoice;
   if (!pending) return "noChoicePending";
-  if (action.done === true) return pending.upTo ? null : "choiceRequired";
+  if (action.done === true) return isOptionalChoice(pending) ? null : "choiceRequired";
   const target = action.target;
   if (target === null || typeof target !== "object" || !pending.eligible.some((eligible) => sameTarget(eligible, target))) return "invalidChoice";
   return null;
@@ -282,7 +283,7 @@ class ChoiceSuspension {
 // (ChoiceSuspension), sauf à l'aveugle, où le choix reste indécis
 // (`choiceUndecided`) et rien n'est choisi. -> les cibles, dans l'ordre des choix.
 function chooseTargets(run, clause, by) {
-  const { zones, pick, upTo = false } = clause.target;
+  const { zones, pick, mode } = clause.target;
   const bonus = CLAUSE_ACTIONS[clause.action].kind === "value";
   const chosen = [];
   const eligibleNow = () =>
@@ -302,7 +303,7 @@ function chooseTargets(run, clause, by) {
     }
     count = Math.min(count, room);
   }
-  const request = { action: clause.action, ...(clause.amount === undefined ? {} : { amount: clause.amount }), zones, pick, count, upTo, by };
+  const request = { action: clause.action, ...(clause.amount === undefined ? {} : { amount: clause.amount }), zones, pick, count, mode, by };
   run.emit({ type: "choice", ...request });
   while (chosen.length < count) {
     const eligible = eligibleNow();
@@ -318,8 +319,11 @@ function chooseTargets(run, clause, by) {
       return chosen;
     }
     run.answerIndex += 1;
+    // Terminer (facultatif seulement) : sans aucune cible choisie, le joueur n'a
+    // rien choisi, l'action est ignorée (`declined`) ; après au moins une, la
+    // sélection s'arrête là (`done`).
     if (answer.done) {
-      run.emit({ type: "choiceEnded", reason: "done", chosen: chosen.length, by });
+      run.emit({ type: "choiceEnded", reason: chosen.length === 0 ? "declined" : "done", chosen: chosen.length, by });
       return chosen;
     }
     const target = eligible.find((candidate) => sameTarget(candidate, answer.target));

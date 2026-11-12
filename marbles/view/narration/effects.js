@@ -21,6 +21,7 @@ import {
   isAll,
   isBag,
   isChoice,
+  isOptionalChoice,
 } from "../../core/effects.js";
 
 export function marbleName(marble, t) {
@@ -123,7 +124,7 @@ function allTarget(target, t) {
 // combinaison de zones et par ce qui se vise, `marbles.choice.noun.<zones>_<pick>`.
 const ZONE_ORDER = Object.keys(CHOICE_ZONES);
 
-export function choiceTarget(choice, t, count = choice.count, upTo = choice.upTo === true) {
+export function choiceTarget(choice, t, count = choice.count, upTo = isOptionalChoice(choice)) {
   const zones = ZONE_ORDER.filter((zone) => choice.zones.includes(zone)).join("_");
   const noun = t(`marbles.choice.noun.${zones}_${choice.pick}`, { count });
   return upTo ? t("marbles.choice.up_to", { target: noun }) : noun;
@@ -168,9 +169,10 @@ function actionText(action, amount, target, t) {
 
 // Un effet dit avec sa cible : un emplacement (« Polissage 1 à la pointe ») ou un
 // choix (« Polissage 1 à une bille active au choix », « Polissage 1, jusqu'à 2 billes
-// actives au choix » : `upTo` choisit la tournure, jamais « à jusqu'à »).
+// actives au choix » : un choix facultatif choisit la tournure, jamais « à
+// jusqu'à »).
 function targetedText(text, target, t) {
-  if (isChoice(target)) return t("marbles.effect.given_choice", { effect: text, target: choiceTarget(target, t), upTo: target.upTo === true ? "yes" : "no" });
+  if (isChoice(target)) return t("marbles.effect.given_choice", { effect: text, target: choiceTarget(target, t), upTo: isOptionalChoice(target) ? "yes" : "no" });
   return t("marbles.effect.given", { effect: text, slot: slotName(target, t) });
 }
 

@@ -39,7 +39,7 @@ export default function checkMarblesChoice(run) {
 // reprise par rejeu, refus pendant l'attente, sérialisation, validation. Billes
 // fabriquées pour isoler chaque règle, puis les billes de test.
 function checkChoices(run) {
-  const choose = (zones, extra = {}) => ({ type: "choice", zones, pick: "marble", count: 1, ...extra });
+  const choose = (zones, extra = {}) => ({ type: "choice", zones, pick: "marble", count: 1, mode: "required", ...extra });
   const table = {
     plain: { apex: [{ action: "speed", amount: 1 }] },
     sturdy: { maxWear: 9 },
@@ -48,7 +48,7 @@ function checkChoices(run) {
     // Tic : Polissage 1 à 3 billes actives au choix (jamais assez de cibles ici).
     threePolish: { hit: [{ action: "polish", amount: 1, target: choose(["triangle"], { count: 3 }) }] },
     // Tic : Polissage 1, jusqu'à 2 billes actives au choix.
-    upToPolish: { hit: [{ action: "polish", amount: 1, target: choose(["triangle"], { count: 2, upTo: true }) }] },
+    upToPolish: { hit: [{ action: "polish", amount: 1, target: choose(["triangle"], { count: 2, mode: "optional" }) }] },
     // Tic : Empocher une bille, de la main ou active, au choix.
     anyPocket: { hit: [{ action: "pocket", target: choose(["hand", "triangle"]) }] },
     // Base : Vitesse +2 à une bille active au choix (un bonus de phase).
@@ -75,8 +75,8 @@ function checkChoices(run) {
   run.same("choix : les billes actives dans l'ordre horaire, la posée comprise", ["rightBase", "leftBase", "apex"], slots(opened.state.pendingChoice));
   run.same(
     "choix : la question en attente",
-    { action: "polish", amount: 1, zones: ["triangle"], pick: "marble", count: 2, upTo: false, remaining: 2, chosen: [] },
-    (({ action, amount, zones, pick, count, upTo, remaining, chosen }) => ({ action, amount, zones, pick, count, upTo, remaining, chosen }))(opened.state.pendingChoice)
+    { action: "polish", amount: 1, zones: ["triangle"], pick: "marble", count: 2, mode: "required", remaining: 2, chosen: [] },
+    (({ action, amount, zones, pick, count, mode, remaining, chosen }) => ({ action, amount, zones, pick, count, mode, remaining, chosen }))(opened.state.pendingChoice)
   );
   run("choix : le journal s'arrête au choix ouvert", "choice", opened.events.at(-1).type);
   const first = answer(opened.state, "rightBase");
@@ -112,9 +112,12 @@ function checkChoices(run) {
   const zero = reduce(upTo.state, { type: "choose", done: true });
   run("jusqu'à N : Terminer à zéro choix", null, zero.state.pendingChoice);
   run("jusqu'à N : rien poli", false, zero.events.some((event) => event.type === "polished"));
-  run("jusqu'à N : terminé, noté", "done", zero.events.find((event) => event.type === "choiceEnded").reason);
+  run("facultatif : rien de choisi, l'action ignorée, noté", "declined", zero.events.find((event) => event.type === "choiceEnded").reason);
   const one = reduce(answer(upTo.state, "leftBase").state, { type: "choose", done: true });
   run.same("jusqu'à N : Terminer après un choix", ["leftBase"], one.events.filter((event) => event.type === "polished").map((event) => event.slot));
+  run("facultatif : Terminer après un choix, noté comme terminé", "done", one.events.find((event) => event.type === "choiceEnded").reason);
+  run("validation, choix : sans mode refusé", true, throws(() => validateTable({ x: { hit: [{ action: "polish", amount: 1, target: { type: "choice", zones: ["triangle"], pick: "marble", count: 1 } }] } })));
+  run("validation, choix : mode inconnu refusé", true, throws(() => validateTable({ x: { hit: [{ action: "polish", amount: 1, target: { type: "choice", zones: ["triangle"], pick: "marble", count: 1, mode: "maybe" } }] } })));
   run("obligatoire : Terminer refusé", "choiceRequired", reduce(opened.state, { type: "choose", done: true }).error);
   run.same("jusqu'à N : Terminer parmi les actions légales", { type: "choose", done: true }, legalActions(upTo.state).at(-1));
   run.same("obligatoire : seulement les cibles", ["choose", "choose", "choose"], legalActions(opened.state).map((action) => action.type));
@@ -192,7 +195,7 @@ function checkChoices(run) {
   const pocketedFinalPocket = rules.reduce(hitPocket.state, { type: "choose", target: { zone: "hand", index: 1 } });
   run.same("hit_pocket : final_pocket choisie au pot", ["final_pocket"], pocketedFinalPocket.state.pot);
   const fragile = rules.reduce(playState({ bag: ["aging_flick"], triangle: triangleOf(placed("aging_flick"), placed("final_pocket", 1), placed("fragile", 1)) }), { type: "resolve" });
-  run.same("fragile : son Final, jusqu'à 2 billes actives", { upTo: true, count: 2, trigger: "final" }, { upTo: fragile.state.pendingChoice.upTo, count: fragile.state.pendingChoice.count, trigger: fragile.state.pendingChoice.by.trigger });
+  run.same("fragile : son Final, jusqu'à 2 billes actives", { mode: "optional", count: 2, trigger: "final" }, { mode: fragile.state.pendingChoice.mode, count: fragile.state.pendingChoice.count, trigger: fragile.state.pendingChoice.by.trigger });
 
   // Validation : les combinaisons impossibles refusées au chargement.
   const valid = (clause, field = "hit") => !throws(() => validateTable({ x: { [field]: [clause] } }));
@@ -235,7 +238,7 @@ function checkEject(run) {
     apexEjector: { hit: [{ action: "eject", target: "apex" }] },
     smallEjector: { size: LARGE, hit: [{ action: "eject", target: { type: "all", filters: [{ type: "size", size: SMALL }] } }] },
     allEjector: { base: [{ action: "eject", target: { type: "all" } }] },
-    chooserEjector: { hit: [{ action: "eject", target: { type: "choice", zones: ["triangle"], pick: "marble", count: 2 } }] },
+    chooserEjector: { hit: [{ action: "eject", target: { type: "choice", zones: ["triangle"], pick: "marble", count: 2, mode: "required" } }] },
     // Base gauche : Éjecter la pointe, avant sa phase.
     earlyEjector: { base: [{ action: "eject", target: "apex" }] },
     wornOut: { maxWear: 1, apex: [{ action: "speed", amount: 1 }], final: [{ action: "speed", amount: 9 }] },
@@ -277,7 +280,7 @@ function checkEject(run) {
   run("validation, éjecter soi-même : le message dit pourquoi, elle est en partance", true, /en partance/.test(caughtMessage(() => validateTable({ x: { knockout: [{ action: "eject" }] } }))));
   run("validation, éjecter un emplacement dans son Éjection permis", false, refused("knockout", { action: "eject", target: "apex" }));
   run("validation, éjecter : un montant refusé", true, refused("hit", { action: "eject", amount: 1, target: "apex" }));
-  run("validation, éjecter : au choix dans la main refusé", true, refused("hit", { action: "eject", target: { type: "choice", zones: ["hand"], pick: "marble", count: 1 } }));
+  run("validation, éjecter : au choix dans la main refusé", true, refused("hit", { action: "eject", target: { type: "choice", zones: ["hand"], pick: "marble", count: 1, mode: "required" } }));
   run("validation, « toutes » : un filtre inconnu refusé", true, refused("hit", { action: "eject", target: { type: "all", filters: [{ type: "matter", matter: "hit_polish" }] } }));
   run("validation, « toutes » : un calibre inconnu refusé", true, refused("hit", { action: "eject", target: { type: "all", filters: [{ type: "size", size: 9 }] } }));
   run("validation, « toutes » : deux filtres de calibre refusés", true, refused("hit", { action: "eject", target: { type: "all", filters: [{ type: "size", size: SMALL }, { type: "size", size: LARGE }] } }));
@@ -290,7 +293,7 @@ function checkEject(run) {
 
   // Un choix pendant une Éjection ne propose jamais l'emplacement de la bille qui part.
   const leaving = fabricatedRules({
-    k: { knockout: [{ action: "eject", target: { type: "choice", zones: ["triangle"], pick: "marble", count: 1 } }] },
+    k: { knockout: [{ action: "eject", target: { type: "choice", zones: ["triangle"], pick: "marble", count: 1, mode: "required" } }] },
     p: {},
   });
   const replacing = leaving.reduce(

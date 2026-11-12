@@ -43,7 +43,8 @@ Le mode d'emploi est en tête du fichier : `etat`, `brut` (l'état complet, sac
 compris), `poser`, `echanger`, `prevoir`, `fin`, `journal` (lisible) ou `journal json`.
 Un choix en attente se dit avec sa question et ses cibles ; on y répond par `choisir 2`
 (la bille 2 de la main), `choisir pointe`, `choisir defausse 3` (la bille 3 de la défausse,
-dans l'ordre d'arrivée), ou `terminer` (« jusqu'à N ») ; pendant une
+dans l'ordre d'arrivée), ou `terminer` (un choix facultatif : sans cible, l'action est
+ignorée) ; pendant une
 résolution, la suite se dit après la réponse.
 
 ## Construire un cas

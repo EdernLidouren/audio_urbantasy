@@ -85,6 +85,7 @@ import { t } from "../../data/i18n/index.js";
 import { MARBLES_SETTINGS } from "../config/values.js";
 import { isDebugEnabled } from "../../config/debug.js";
 import { SLOTS, swapRefusal, placeRefusal, throwRefusal } from "../core/marbles.js";
+import { isOptionalChoice } from "../core/effects.js";
 import { playMenuSound } from "../../view/menu-sounds.js";
 import { openConfirmation } from "../../view/menus/confirmation.js";
 import { INITIAL_CURSOR, cursorOn, placementStart, stepCursor, zoneOf } from "./navigation.js";
@@ -248,9 +249,11 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
     t,
     now,
     recorded: (steps) => recorded(steps),
-    // Une étape commence : ses sons, son texte.
+    // Une étape commence : ses sons, son texte. L'étape qui dit le début du tour
+    // rend la main au joueur : son son (player_turn), que la séquence ait été
+    // écoutée ou passée (un saut joue la dernière étape).
     onStep: (step) => {
-      playEventSounds(step.events, { handSize: step.handSize });
+      playEventSounds(step.events, { handSize: step.handSize, playerTurn: step.startsTurn !== undefined });
       speak(withOverHint(step.text));
     },
     onChoice: (pending) => placeCursorForChoice(pending),
@@ -291,10 +294,10 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
   // `placeFrom` : d'où part la bille posée, sa place dans la main avant la pose.
   // `handSize` : la taille de la main juste après ces évènements, quand l'état est
   // déjà plus loin (une étape de séquence) ; par défaut, la main actuelle.
-  function playEventSounds(events, { shuffleFirst = false, placeFrom, handSize } = {}) {
+  function playEventSounds(events, { shuffleFirst = false, placeFrom, handSize, playerTurn = false } = {}) {
     const { triangle, hand } = getGame();
     // Les tailles des billes, pour la force des chocs : celles de la table de l'écran.
-    const cues = eventCues(events, { triangleAfter: triangle, handAfter: hand, handSize, shuffleFirst, placeFrom }, MARBLES_SETTINGS, { types: rules.types });
+    const cues = eventCues(events, { triangleAfter: triangle, handAfter: hand, handSize, shuffleFirst, placeFrom, playerTurn }, MARBLES_SETTINGS, { types: rules.types });
     soundQueue = enqueueCues(soundQueue, cues);
     flushSounds(0);
   }
@@ -564,7 +567,7 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
       playMenuSound("block");
       return;
     }
-    if (!pending.upTo) {
+    if (!isOptionalChoice(pending)) {
       refuse("choiceRequired");
       return;
     }
@@ -795,13 +798,14 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
     openTallyMenu(getGame().tally);
   }
 
-  // Échap : pendant un choix « jusqu'à N », valide la sélection en cours, comme
-  // Terminer ; pendant un choix obligatoire, redit la question (il ne se ferme pas, le
-  // jeu ne peut continuer sans lui) ; sinon annule la sélection, ou propose de quitter.
+  // Échap : pendant un choix facultatif, valide la sélection en cours, comme
+  // Terminer (sans aucune cible : l'action est ignorée) ; pendant un choix
+  // obligatoire, redit la question (il ne se ferme pas, le jeu ne peut continuer sans
+  // lui) ; sinon annule la sélection, ou propose de quitter.
   function back() {
     const pending = pendingChoice();
     if (isOver()) popScreen();
-    else if (pending?.upTo) answerChoice({ type: "choose", done: true });
+    else if (pending && isOptionalChoice(pending)) answerChoice({ type: "choose", done: true });
     else if (pending) speak(describeChoicePrompt(pending, t));
     else if (held) releaseSelection();
     else openConfirmation("marbles.quit.confirm", () => popScreen());
@@ -850,7 +854,8 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
     startMarblesMusic();
     const drawing = getGame().stage === "draw" && getGame().pendingChoice === null;
     const events = drawing ? dispatch({ type: "draw" }) : [];
-    playEventSounds(events, { shuffleFirst: true });
+    // Le premier tour : la main revient au joueur après sa pioche.
+    playEventSounds(events, { shuffleFirst: true, playerTurn: events.some((event) => event.type === "turnStarted") });
     const pending = getGame().pendingChoice;
     if (pending !== null) cursor = choiceStartCursor(pending, cursor);
     // Un état construit ouvert sur un choix qui suspend une résolution : la suite se

@@ -5,7 +5,7 @@ import { MEDIUM } from "../../config/values.js";
 
 export default {
   // Base : Éjecter une bille active au choix, pendant la résolution.
-  base: [eject(choice({ zones: ["triangle"] }))],
+  base: [eject(choice({ zones: ["triangle"], mode: "required" }))],
   apex: [speed(-1)],
   awaken: [speed(2)],
   windfall: [speed(3)],

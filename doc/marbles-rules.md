@@ -288,16 +288,18 @@ Un montant qui vaut 0 ne produit rien.
 
 Certains effets laissent le joueur choisir leur cible : une bille de sa main, une ou plusieurs billes actives, une ou plusieurs billes de la défausse (dans l'ordre d'arrivée).
 
-- **Choix obligatoire** : le joueur choisit exactement le nombre demandé, ou moins s'il n'y a pas assez de cibles.
-- **Choix « jusqu'à N »** : le joueur peut s'arrêter avant, et même ne rien choisir, en terminant.
+Chaque choix a un mode, écrit sur la bille :
+
+- **Choix obligatoire** : le joueur choisit exactement le nombre demandé, ou moins s'il n'y a pas assez de cibles. « Vous devez choisir une bille active à éjecter. », « Vous devez choisir 2 billes actives à éjecter. ».
+- **Choix facultatif** : le joueur choisit au plus le nombre demandé ; il peut s'arrêter avant, et même ne rien choisir. Ne rien choisir n'est pas une erreur : l'action est ignorée, et le jeu le dit. « Vous pouvez éjecter une bille active. », « Vous pouvez éjecter jusqu'à 2 billes actives. ».
 - Les choix se font un par un. Une cible déjà choisie n'est plus proposée.
 - Seules les cibles valides au moment du choix sont proposées : pour un bonus, seules les billes dont la phase n'a pas eu lieu.
 - La sélection s'arrête quand le nombre est atteint, quand le joueur termine, ou quand plus rien n'est proposé.
 - L'effet s'applique ensuite à chaque cible, dans l'ordre des choix.
-- La question nomme la bille et le moment qui la posent : « Tic de gorille : choisissez une bille de votre main à empocher. », « Final de porcelaine : choisissez jusqu'à 2 billes actives à polir. ».
+- La question nomme la bille et le moment qui la posent : « Tic de gorille : vous devez choisir une bille de votre main à empocher. », « Final de porcelaine : vous pouvez polir jusqu'à 2 billes actives. ».
 - Le jeu attend le choix : rien d'autre ne peut se faire tant qu'il n'est pas fait. Pendant la résolution, elle s'arrête sur la question et reprend après le choix.
 - Une bille en transit n'est jamais proposée (section 2). Pendant un choix sur le triangle, l'emplacement vers lequel se dirige une bille en cours de lancer l'annonce après son contenu : « Agate, calot, pointe, usure 2 sur 3. En approche : loupe. ». Un emplacement vide l'annonce de même : « Pointe, vide. En approche : loupe. ».
-- Dans un choix « jusqu'à N », Échap valide la sélection en cours, comme Terminer. Dans un choix obligatoire, Échap redit la question.
+- Dans un choix facultatif, le menu propose « Ne rien choisir » tant que rien n'est choisi, puis « Terminer » ; sur le triangle, la touche T fait de même. Échap valide la sélection en cours ; sans aucune cible choisie, l'action est ignorée. Dans un choix obligatoire, ni « Ne rien choisir » ni « Terminer » : Échap redit la question.
 
 ### Les cibles vides
 
@@ -390,7 +392,7 @@ verre, normale, usure 3.
 
 - Pointe : Vitesse +1 par trouvaille cette partie, maximum +10.
 - Base : Masse +1.
-- Tic : Polissage 1 à une bille active au choix.
+- Tic : Polissage 1, jusqu'à une bille active au choix.
 
 ### gorille
 
@@ -419,7 +421,7 @@ agate, normale, usure 3.
 - Pointe : Vitesse +3.
 - Base droite : Masse +1. Base gauche : Vitesse +3.
 - Tic : Pioche 1.
-- Éjection : Ramasser une bille de la défausse au choix.
+- Éjection : Ramasser jusqu'à une bille de la défausse au choix.
 
 ### porcelaine
 
@@ -467,7 +469,7 @@ grès, normale, usure 3.
 
 - Pointe : aucun effet.
 - Base : Vitesse +1 par minibille active.
-- Tic : Défausser une bille de votre main au choix.
+- Tic : Défausser jusqu'à une bille de votre main au choix.
 - Éjection : Pioche 1.
 - En poche, à chaque bille éjectée : Masse +1.
 

@@ -11,16 +11,19 @@
 // source `tally` (marbles/core/counters.js). Une cible est un emplacement, rien pour la bille
 // elle-même, ou un CHOIX du joueur (plus bas).
 //
-// CIBLE AU CHOIX : `target` vaut { type: "choice", zones, pick, count, upTo? } :
-//   zones  où le joueur choisit, des zones de CHOICE_ZONES (aujourd'hui "hand" et
-//          "triangle" ; le pot, la défausse et le sac sont déclarés, pas encore
+// CIBLE AU CHOIX : `target` vaut { type: "choice", zones, pick, count, mode } :
+//   zones  où le joueur choisit, des zones de CHOICE_ZONES (aujourd'hui "hand",
+//          "triangle" et "discard" ; le pot et le sac sont déclarés, pas encore
 //          disponibles) ;
 //   pick   ce qui se choisit sur le triangle : "marble", une bille active
 //          (emplacement occupé), ou "slot", un emplacement, vide compris, pour une
 //          action qui y a un sens (aucune aujourd'hui) ;
 //   count  le nombre N de choix, au moins 1 ;
-//   upTo   vrai : « jusqu'à N », le joueur peut valider moins, voire aucun ; faux ou
-//          absent : obligatoire, exactement N (moins s'il n'y a pas assez de cibles).
+//   mode   le MODE du choix, explicite, toujours déclaré (CHOICE_MODES) :
+//          "optional", FACULTATIF, N choix au plus, moins permis, aucun compris (le
+//          joueur ne choisit rien : l'action est ignorée, le journal le note) ;
+//          "required", OBLIGATOIRE, exactement N (moins s'il n'y a pas assez de
+//          cibles).
 // Seules les actions qui déclarent `choice` (leurs zones et ce qu'elles visent)
 // l'acceptent. Les choix se font un par un, au déclenchement, sur les cibles valides
 // à cet instant (marbles/core/run.js/chooseTargets) ; l'action s'applique ensuite à
@@ -714,12 +717,20 @@ function validateRule(rule, table, label, describe, fail, context) {
   entry.validate(rule, describe, fail, context);
 }
 
+// Les modes d'un choix (en-tête) : facultatif, obligatoire.
+const CHOICE_MODES = Object.freeze(["optional", "required"]);
+
+// Un choix est-il facultatif (le joueur peut s'arrêter avant N, ou ne rien choisir) ?
+export function isOptionalChoice(choice) {
+  return choice.mode === "optional";
+}
+
 // Une cible au choix (en-tête) : ses champs, ses zones disponibles et sensées pour
-// l'action, ce qu'elle vise, son nombre.
+// l'action, ce qu'elle vise, son nombre, son mode.
 function validateChoice(clause, action, describe, fail) {
   const choice = clause.target;
   const where = `${describe}, cible au choix`;
-  rejectUnknownFields(choice, ["type", "zones", "pick", "count", "upTo"], where, fail);
+  rejectUnknownFields(choice, ["type", "zones", "pick", "count", "mode"], where, fail);
   if (action.choice === undefined) fail(`${where} : ${clause.action} ne se choisit pas.`);
   if (!Array.isArray(choice.zones) || choice.zones.length === 0 || new Set(choice.zones).size !== choice.zones.length) fail(`${where} : zones doit lister des zones distinctes.`);
   for (const zone of choice.zones) {
@@ -730,7 +741,7 @@ function validateChoice(clause, action, describe, fail) {
   }
   if (!action.choice.picks.includes(choice.pick)) fail(`${where} : ${clause.action} n'a pas de sens sur "${choice.pick}" (un emplacement vide n'a rien à recevoir).`);
   if (!Number.isInteger(choice.count) || choice.count < 1) fail(`${where} : count doit être un entier >= 1.`);
-  if (choice.upTo !== undefined && typeof choice.upTo !== "boolean") fail(`${where} : upTo vaut true, false ou est absent.`);
+  if (!CHOICE_MODES.includes(choice.mode)) fail(`${where} : mode doit valoir ${CHOICE_MODES.map((mode) => `"${mode}"`).join(" ou ")}.`);
 }
 
 // Une cible « toutes » (en-tête) : ses champs, ses filtres, chacun valide et d'un type

@@ -33,12 +33,17 @@ export const MARBLES_SETTINGS = {
   // l'autre swapSoundDelayMs plus tard. Les sons d'usure (Polissage, Fêlure)
   // d'un même geste se suivent à wearSoundIntervalMs ; une bille qu'une Fêlure
   // retire part à la défausse crackToOutMs après le son de sa fêlure, qu'on
-  // l'entende avant le roulement.
+  // l'entende avant le roulement. Le son d'Éveil d'une bille piochée part
+  // awakenAfterDrawMs après sa balise de pioche, et la balise suivante l'attend ;
+  // ceux du Final et de la Trouvaille d'un même geste se suivent à
+  // triggerSoundIntervalMs.
   shuffleToDrawMs: 900,
   drawSoundIntervalMs: 350,
   swapSoundDelayMs: 150,
   wearSoundIntervalMs: 120,
   crackToOutMs: 150,
+  awakenAfterDrawMs: 250,
+  triggerSoundIntervalMs: 120,
   // Après qu'Entrée a passé la séquence de résolution, un second Entrée est ignoré
   // pendant skipGuardMs : pressé avant que le lecteur d'écran ait dit la question
   // d'un choix ou la fin de partie, il choisirait ou quitterait sans qu'on l'ait
@@ -123,6 +128,10 @@ export const MARBLES_PITCH_VARIATION = {
   roll: 0.02,
   polish: 0.03,
   crack: 0.03,
+  flick: 0.03,
+  awaken: 0.03,
+  final: 0.03,
+  windfall: 0.03,
 };
 
 // OÙ S'ENTEND chaque place de la table (marbles/view/sounds/space.js/renderAt) :
@@ -218,14 +227,24 @@ export const MARBLES_ROLLS = {
 };
 
 // Les sons de l'écran des billes qui ne sont pas la voix d'un calibre : la musique
-// (en boucle s'il n'y a qu'un morceau, sinon enchaînée), le brassage du sac, et
-// les sons d'usure, les mêmes pour tous les calibres, joués à l'emplacement de la
-// bille touchée : le Polissage (polish) et la Fêlure (crack).
+// (en boucle s'il n'y a qu'un morceau, sinon enchaînée), le brassage du sac, les
+// sons d'usure, les mêmes pour tous les calibres, joués à l'emplacement de la bille
+// touchée : le Polissage (polish) et la Fêlure (crack) ; les sons de DÉCLENCHEUR,
+// joués quand le mot-clé se déclenche chez une bille qui en a l'effet, là où elle
+// est : la Chiquenaude (flick, à sa place dans la main), l'Éveil (awaken, à sa place
+// dans la main, après sa balise de pioche), le Final (final, à l'emplacement
+// quitté), la Trouvaille (windfall, à son emplacement) ; et le début du tour du
+// joueur (playerTurn, au centre), quand la main lui revient.
 export const MARBLES_AUDIO = {
   music: "assets/musics/marbles_classic",
   shuffle: "assets/sounds/marbles/marbles_shuffling",
   polish: "assets/sounds/marbles/marble_polishing",
   crack: "assets/sounds/marbles/marble_cracking",
+  flick: "assets/sounds/marbles/marble_flick",
+  awaken: "assets/sounds/marbles/marble_awaken",
+  final: "assets/sounds/marbles/marble_final",
+  windfall: "assets/sounds/marbles/marble_windfall",
+  playerTurn: "assets/sounds/marbles/player_turn",
 };
 
 // Les PHASES, déclarées UNE fois : l'effet de base ou de pointe d'une bille, joué

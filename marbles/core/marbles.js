@@ -26,7 +26,7 @@
 // l'échange non), jamais plus que `throwsPerTurn`.
 // `pendingChoice` : null, ou le CHOIX EN ATTENTE d'une cible au choix
 // (marbles/core/effects.js, en-tête), qui a SUSPENDU l'action en cours :
-//   { action, amount?, zones, pick, count, upTo, by, eligible, chosen, remaining,
+//   { action, amount?, zones, pick, count, mode, by, eligible, chosen, remaining,
 //     inTransit, resume: { from, action, answers, seen, eventLimit? } }
 // `action`, `amount` : l'action à appliquer aux cibles ; `by` : l'effet qui la
 // produit ({ trigger, slot, marble }) ; `eligible` : les cibles valides maintenant,
@@ -98,7 +98,7 @@
 
 import { MARBLES_SETTINGS, STARTING_BAG } from "../config/values.js";
 import { createSeed } from "../../lib/rng.js";
-import { SLOTS, effectAt, nextSlot, previousSlot } from "./effects.js";
+import { SLOTS, effectAt, isOptionalChoice, nextSlot, previousSlot } from "./effects.js";
 import { emptyTally } from "./tally.js";
 import { TALLY_COUNTERS, maxWearOf, validateGameSettings } from "./content.js";
 import { UNKNOWN_MARBLE, answerOf, chooseRefusal, drawMarbles, retireMarble, shuffled, targetRef, transact, travel, update } from "./run.js";
@@ -246,8 +246,9 @@ function resolveRefusal(state) {
 export function legalActions(state) {
   // Un choix en attente : ses cibles, puis Terminer s'il est permis.
   if (state.pendingChoice) {
-    const { eligible, upTo } = state.pendingChoice;
-    return [...eligible.map((target) => ({ type: "choose", target: targetRef(target) })), ...(upTo ? [{ type: "choose", done: true }] : [])];
+    const { eligible } = state.pendingChoice;
+    const finish = isOptionalChoice(state.pendingChoice) ? [{ type: "choose", done: true }] : [];
+    return [...eligible.map((target) => ({ type: "choose", target: targetRef(target) })), ...finish];
   }
   if (stageRefusal(state, "draw") === null) return [{ type: "draw" }];
   const actions = [];

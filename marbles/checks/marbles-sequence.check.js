@@ -1005,7 +1005,7 @@ function checkPresentation(run) {
     withHandSizes(steps, 5).map((step) => step.handSize)
   );
   run.same("présentation : les étapes gardent leur texte", ["a", "b", "c", "d"], withHandSizes(steps, 5).map((step) => step.text));
-  const pending = { action: "polish", amount: 1, zones: ["triangle"], pick: "marble", count: 1, upTo: false, by: { trigger: "hit", slot: "apex", marble: "hit_polish" }, eligible: [], chosen: [], remaining: 1 };
+  const pending = { action: "polish", amount: 1, zones: ["triangle"], pick: "marble", count: 1, mode: "required", by: { trigger: "hit", slot: "apex", marble: "hit_polish" }, eligible: [], chosen: [], remaining: 1 };
   const prompt = choicePromptStep(pending, keyText);
   run.same("présentation : la question d'un choix, une étape sans évènement, retenue comme message", { events: [], messages: [prompt.text] }, { events: prompt.events, messages: prompt.messages });
 }

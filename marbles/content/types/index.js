@@ -66,9 +66,9 @@
 //           modifie l'effet de phase, au lieu d'agir sur le compteur du tour (jamais
 //           une phase toujours passée, ni dans un Final) ; pour un Polissage ou une
 //           Fêlure, l'emplacement dont la bille la reçoit ; ou un CHOIX du joueur,
-//           choice({ zones, count, upTo }) (marbles/content/effects.js ; doc/marbles.md,
-//           « Cibles au choix ») : « Polissage 1 à une bille active au choix »,
-//           polish(1, choice({ zones: ["triangle"] })) ;
+//           choice({ zones, count, mode }) (marbles/content/effects.js ; doc/marbles.md,
+//           « Cibles au choix ») : « Polissage 1, jusqu'à une bille active au choix »,
+//           polish(1, choice({ zones: ["triangle"], mode: "optional" })) ;
 //   when    (facultatif) sa condition, évaluée au déclenchement. Une condition
 //           lit toujours l'effet IMPRIMÉ d'une bille, jamais un effet déjà
 //           modifié : aucune dépendance circulaire n'est possible.

@@ -394,7 +394,7 @@ function checkChoiceForecast(run) {
   // bille piochée (inconnue) ne joue pas, la main reste [first, second, ?]. La
   // réponse « place 0 » désigne second en vrai, first à l'aveugle : la réponse se
   // repère par sa bille, le choix reste indécis au lieu de prévoir first.
-  const choice = (zones) => ({ type: "choice", zones, pick: "marble", count: 1 });
+  const choice = (zones) => ({ type: "choice", zones, pick: "marble", count: 1, mode: "required" });
   const diverging = fabricatedRules({
     first: {},
     second: {},
