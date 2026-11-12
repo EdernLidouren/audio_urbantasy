@@ -19,6 +19,6 @@ Les points repoussés « à plus tard », une ligne par point, avec son origine 
 - Filtres de cible autres que le calibre, et la phrase qui en combine deux. (Itération 18.)
 - Un filtre de cible « les autres », pour que « toutes les billes actives » et les choix puissent exclure la bille qui les pose. (Décision après l'itération 19.)
 - Rotation de plus d'un cran par tour, que l'évènement de rotation dira. (`doc/marbles.md`, « Sons ».)
-- Autres conditions de fin de partie (un Impact minimal à atteindre). (`doc/marbles.md`, « Fin de partie ».)
+- Un système de fin de partie à concevoir à neuf : conditions multiples, modes de partie (un Impact minimal à atteindre…), exportables dans les règles de partie. Aujourd'hui, la partie finit au tour `turnCount`, et seulement là ; l'ancienne fin par pioche impossible a été retirée, devenue illogique avec les bonus de pioche. (`doc/marbles.md`, « Fin de partie ».)
 - Les succès, qui liront les valeurs de partie. (`doc/marbles.md`, « Valeurs de partie ».)
 - Une étape de séquence qui attendrait la fin d'un son au lieu d'une durée. (`doc/marbles.md`, « Séquence de résolution ».)

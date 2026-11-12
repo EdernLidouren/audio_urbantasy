@@ -100,16 +100,21 @@ export function dueTriggerEffects(entity, previousTime, nextTime, session) {
 // s'exécute maintenant — mises bout à bout, le `wait` de l'une retarderait
 // les effets de la suivante. `apply(session, effects, options)` :
 // l'application (entité d'une face ou compagnon). La PREMIÈRE séquence de
-// l'évènement remplace ce qui attendait sur l'entité (un nouveau sifflet
-// reprend la réaction au début), les suivantes s'y AJOUTENT (`append`) :
-// toutes vont à leur terme. Les effets de RENDU de la tête de chaque
-// séquence vont dans `fired`, regroupés par entité.
+// l'évènement qui a une suite (un `wait`) remplace ce qui attendait sur
+// l'entité (un nouveau sifflet reprend la réaction au début), les suivantes
+// s'y AJOUTENT (`append`) : toutes vont à leur terme. Un trigger sans suite
+// ne met rien en attente : il ne compte pas comme la première, sinon la
+// séquence suivante s'ajouterait à celle de l'évènement PRÉCÉDENT au lieu de
+// la remplacer. Les effets de RENDU de la tête de chaque séquence vont dans
+// `fired`, regroupés par entité.
 function applyTriggers(session, entity, triggers, apply, fired) {
   let next = session;
   const renderEffects = [];
-  for (const [index, trigger] of triggers.entries()) {
-    next = apply(next, trigger.effects, { append: index > 0 });
+  let scheduled = false;
+  for (const trigger of triggers) {
+    next = apply(next, trigger.effects, { append: scheduled });
     renderEffects.push(...sequenceHead(trigger.effects).filter(isRenderEffect));
+    if (sequenceHead(trigger.effects).length < trigger.effects.length) scheduled = true;
   }
   if (renderEffects.length > 0) fired.push({ entity, effects: renderEffects });
   return next;

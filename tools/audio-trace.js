@@ -43,8 +43,7 @@ import { loadSceneById } from "../scenes/load.js";
 import { createInitialState, togglePerception, switchSide, getActiveWorld } from "../core/state.js";
 import { parseNewGame } from "../core/new-game.js";
 import { NEW_GAME } from "../config/new-game.js";
-import { reduce } from "../core/reduce.js";
-import { tick } from "../core/actions.js";
+import { advanceTick } from "../core/advance.js";
 import { advanceTime } from "../core/time.js";
 import { setWeather } from "../core/weather.js";
 import { refillDueSpawns, searchContainer } from "../core/spawn.js";
@@ -414,10 +413,14 @@ export async function runAudioTrace({ seed = 20261021 } = {}) {
   const getSession = () => session;
   let scene = null;
 
-  // Un pas de simulation : réducteur, horloge, rendu, relevé des annonces.
+  // Un pas de simulation : un tick complet (core/advance.js, réducteur puis
+  // séquences d'effets en attente, comme le jeu), horloge, rendu, relevé des
+  // annonces. Les effets de RENDU dus (`fired`) ne sont pas rejoués : le
+  // parcours de la trace ne déclenche aucune séquence ; s'il en déclenchait,
+  // leurs sons manqueraient à la trace.
   const steps = (count, direction) => {
     for (let i = 0; i < count; i++) {
-      session = reduce(session, tick(direction));
+      session = advanceTick(session, direction).session;
       advance(TICK_MS);
       scene.update();
       snapshotAnnouncements();

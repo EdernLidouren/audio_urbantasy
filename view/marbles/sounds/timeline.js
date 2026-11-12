@@ -229,9 +229,12 @@ export const MARBLE_EVENT_CUES = {
 // pose (le journal ne la dit pas) ; sans elle, du milieu de la main. `table` : ce
 // qui règle les trajets et les chocs, par défaut ceux du jeu : les roulements, les
 // places, la collision, les billes et leurs tailles.
+// `handSize` : la taille de la main juste après ces évènements, quand `handAfter`
+// est déjà plus loin (une étape d'une séquence, l'état étant celui de sa fin) ; par
+// défaut, celle de `handAfter`.
 export function eventCues(
   events,
-  { triangleAfter = null, handAfter = null, shuffleFirst = false, placeFrom = handPlace(0, 1) } = {},
+  { triangleAfter = null, handAfter = null, handSize = handAfter?.length, shuffleFirst = false, placeFrom = handPlace(0, 1) } = {},
   settings = MARBLES_SETTINGS,
   {
     rolls = MARBLES_ROLLS,
@@ -246,10 +249,10 @@ export function eventCues(
   let drawn = 0;
   const context = {
     triangleAfter,
-    handSize: handAfter?.length,
+    handSize,
     placeFrom,
     struck: null,
-    nextDrawPlace: () => (handAfter === null ? undefined : handPlace(handAfter.length - drawCount + drawn++, handAfter.length)),
+    nextDrawPlace: () => (handSize === undefined ? undefined : handPlace(handSize - drawCount + drawn++, handSize)),
   };
   if (shuffleFirst) timeline.shuffle();
   for (const event of events) {
@@ -257,6 +260,19 @@ export function eventCues(
     if (cue) cue(event, timeline, context, settings, table);
   }
   return timeline.cues;
+}
+
+// De combien des évènements changent la taille de la main : une bille piochée y
+// entre ; une bille posée, empochée ou perdue depuis la main en sort. Pour retrouver
+// la main au moment d'une étape, en remontant depuis la main finale.
+export function handSizeChange(events) {
+  let change = 0;
+  for (const event of events) {
+    if (event.type === "draw") change += 1;
+    else if (event.type === "placed") change -= 1;
+    else if ((event.type === "pocketed" || event.type === "lost") && event.from === "hand") change -= 1;
+  }
+  return change;
 }
 
 // DÉMONSTRATION des places (mode debug, Maj+B) : la même balise à chaque place,

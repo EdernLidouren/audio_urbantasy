@@ -57,9 +57,10 @@
 // IMPRIMÉ) ; le calibre est statique : aucune dépendance circulaire.
 //
 // DEUX SORTES D'ACTIONS (`kind`) : les VALEURS (Vitesse, Masse, Pioche), qui
-// s'additionnent en un effet, et les actions SUR UNE BILLE (Polissage, Fêlure), qui
-// changent l'usure de la bille elle-même ou de celle d'un emplacement, une
-// application par clause, dans l'ordre des clauses.
+// s'additionnent en un effet, et les actions SUR UNE BILLE (Polissage, Fêlure,
+// Empocher, Éjecter), qui agissent sur la bille elle-même, sur celle d'un
+// emplacement ou sur des billes choisies, une application par clause, dans l'ordre
+// des clauses, après les valeurs.
 //
 // RÈGLE DES CIBLES : une cible n'a de sens que si l'effet ciblé peut encore se
 // produire. Une VALEUR (Vitesse, Masse) donnée à un emplacement modifie l'effet de
@@ -68,8 +69,9 @@
 // qui dépendent de la position se tranchent à l'exécution (core/marbles.js/
 // fireEffect : le bonus est perdu, l'évènement `effect` le note dans `lost`). Une
 // action sur une bille peut viser un emplacement depuis n'importe quel moment, la
-// bille visée restant sur le triangle ; mais pas la bille elle-même une fois
-// retirée (le Final).
+// bille visée restant sur le triangle. La bille elle-même, elle, n'est visable que
+// là où elle est : chaque action le déclare (`selfOutside`, `selfRefusedIn`) ;
+// Empocher la prend même dans son Final, à la défausse.
 //
 // VALEURS : ce qu'un effet produit, une valeur par action, sous le nom de
 // l'action (`{ speed, mass, draw }`). Le core les applique (core/marbles.js/fireEffect),
@@ -240,8 +242,6 @@ function addAmount(values, clause) {
 // Le `kind` "marble" : une action sur une bille. Ses textes :
 // view/marbles/narration.js/ACTION_TEXTS.
 
-// Où une action sur l'usure ne peut viser la bille elle-même : partout où elle n'est
-// pas sur le triangle.
 // Où Éjecter ne peut viser la bille elle-même : partout où elle n'est pas sur le
 // triangle.
 const EJECT_SELF_OUTSIDE = {
@@ -251,6 +251,8 @@ const EJECT_SELF_OUTSIDE = {
   pot: "une bille du pot ne peut s'éjecter elle-même : elle n'est pas sur le triangle",
 };
 
+// Où une action sur l'usure ne peut viser la bille elle-même : partout où elle n'est
+// pas sur le triangle.
 const WEAR_SELF_OUTSIDE = {
   removed: "une action sur la bille elle-même n'a plus de bille : elle a quitté le triangle",
   thrown: "une action sur la bille elle-même n'a pas encore de bille : elle est en cours de lancer",
@@ -450,6 +452,9 @@ export const CONDITIONS = {
     validate(when, describe, fail) {
       validateSlot(when.slot, describe, fail);
       if (!Object.hasOwn(CLAUSE_ACTIONS, when.stat)) fail(`${describe} : statistique inconnue "${when.stat}".`);
+      // Seule une action à montant s'imprime : sur Empocher ou Éjecter, la condition
+      // vaudrait toujours 0, jamais vraie dès « au moins 1 ».
+      if (!CLAUSE_ACTIONS[when.stat].fields.includes("amount")) fail(`${describe} : "${when.stat}" n'a pas de montant, il n'y a rien d'imprimé à lire.`);
       if (!Number.isInteger(when.atLeast)) fail(`${describe} : atLeast doit être un entier.`);
     },
     test(when, { triangle }, types) {

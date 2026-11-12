@@ -13,7 +13,7 @@ import { makeMenuScreen, createHoldRepeat, heldStep, shouldAnnounceAdjustment } 
 import { announce, stripTrailingPeriod } from "../../../lib/announce.js";
 import { playMenuSound } from "../../menu-sounds.js";
 import { ITEM_REGISTRY } from "../../../core/items.js";
-import { EQUIPMENT_SLOTS } from "../../../core/equipment.js";
+import { EQUIPMENT_SLOTS } from "../../../core/equipment-slots.js";
 import { resolveAction, defineBindings } from "../../../lib/input.js";
 import { TUNING_DEFAULTS } from "../../../config/tuning-values.js";
 
@@ -51,7 +51,7 @@ const QUANTITY_ADJUSTMENTS = {
   increaseBig: [1, "big"],
 };
 
-// Noms d'affichage des slots d'équipement (core/equipment.js/EQUIPMENT_SLOTS)
+// Noms d'affichage des slots d'équipement (core/equipment-slots.js/EQUIPMENT_SLOTS)
 // — DONNÉE DE VUE (clé i18n par slot), jamais dérivée du core : un nom de
 // slot est un choix de contenu/présentation, pas une propriété structurelle.
 // Ajouter un slot (torse, tête...) demande une entrée ici EN PLUS de

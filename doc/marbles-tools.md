@@ -133,7 +133,8 @@ deux fichiers, `<nom>-games.csv` (une ligne par partie) et `<nom>-marbles.csv` (
 ligne par bille). Les chiffres par bille sont ceux du rapport, arrondis au centième une
 seule fois (`tools/marbles/stats.js`).
 
-**Durée** : environ 3 secondes pour 1 000 parties gloutonnes.
+**Durée** : environ 30 secondes pour 1 000 parties gloutonnes (le glouton prévoit chaque
+combinaison du tour), quelques secondes pour l'aléatoire.
 
 ## Comparer avant et après
 

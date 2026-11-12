@@ -80,8 +80,8 @@ export function contextLabel({ heading, marble }) {
 //   { identical, changedLines, resultsChanged, groups: [{ context, before: [lignes],
 //     after: [lignes] }] }
 // `changedLines` : par groupe, le plus grand des deux côtés (une ligne modifiée
-// compte une fois). `resultsChanged` : un groupe touche le score final, l'Impact par
-// tour ou les fins de partie (REPORT_RESULT_HEADINGS), ou l'en-tête (les paramètres
+// compte une fois). `resultsChanged` : un groupe touche le score final ou l'Impact
+// par tour (REPORT_RESULT_HEADINGS), ou l'en-tête (les paramètres
 // diffèrent : la comparaison ne vaut alors rien).
 export function diffReports(beforeLines, afterLines) {
   const before = beforeLines.filter((line) => !isIgnored(line));

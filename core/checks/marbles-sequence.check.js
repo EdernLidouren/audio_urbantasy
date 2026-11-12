@@ -9,8 +9,7 @@
 
 import { t, setLocale, getLocale } from "../../data/i18n/index.js";
 import { MARBLES_SETTINGS, STARTING_BAG } from "../../config/marbles-values.js";
-import { createMarblesGame, marblesReduce, placeRefusal, SLOTS } from "../marbles.js";
-import { forecast } from "../marbles-forecast.js";
+import { placeRefusal, SLOTS } from "../marbles.js";
 import { buildSteps, describeOverview, placementLines, resolutionSteps } from "../../view/marbles/narration.js";
 import {
   advanceSequence,
@@ -139,8 +138,7 @@ const SEQUENCE_SHAPE = new RegExp(
     "(event\\.discarded\\.wear (event\\.effect_final )?" + DRAWING + "*)*" +
     "event\\.impact " +
     "(event\\.rotation " + DRAWING + "+event\\.turn_started" +
-    "|event\\.rotation event\\.draw_skipped\\.noMarbles event\\.game_over\\.outOfMarbles" +
-    "|event\\.game_over\\.turnsCompleted)$"
+    "|event\\.game_over)$"
 );
 
 const GAMES = [
@@ -183,7 +181,7 @@ function checkRealGames(run) {
           .map((step) => step.text)
           .join(" ");
         if (!SEQUENCE_SHAPE.test(shape)) badShapes.push(`${seed}/${before.turn} : ${shape}`);
-        for (const marker of ["event.bag_regenerated event.draw", "game_over.outOfMarbles", "game_over.turnsCompleted", "draw_skipped", "discarded.wear", "outcome.empty"]) {
+        for (const marker of ["event.bag_regenerated event.draw", "event.game_over", "draw_skipped.noMarbles", "discarded.wear", "outcome.empty"]) {
           if (shape.includes(marker)) seen.add(marker);
         }
         if (JSON.stringify(steps.flatMap((step) => step.events)) !== JSON.stringify(events)) lostEvents.push(`${seed}/${before.turn}`);
@@ -218,7 +216,7 @@ function checkRealGames(run) {
   run.same("séquence : ordre des étapes sur de vraies parties", [], badShapes.slice(0, 3));
   run.same(
     "séquence : chaque cas rencontré au moins une fois",
-    ["discarded.wear", "draw_skipped", "event.bag_regenerated event.draw", "game_over.outOfMarbles", "game_over.turnsCompleted", "outcome.empty"],
+    ["discarded.wear", "draw_skipped.noMarbles", "event.bag_regenerated event.draw", "event.game_over", "outcome.empty"],
     [...seen].sort()
   );
   run.same("séquence : chaque évènement dans une étape et une seule, dans l'ordre", [], lostEvents.slice(0, 3));
@@ -317,7 +315,7 @@ function checkTexts(run) {
         "Impact 13. Score 13.",
         "Partie terminée. Score final : 13.",
       ],
-      texts({ ...worn, turn: 9 }).slice(3)
+      texts({ ...worn, turn: 10 }).slice(3)
     );
     run.same(
       "séquence : main pleine",
@@ -342,8 +340,8 @@ function checkTexts(run) {
       texts({ ...lensed, hand: inHand([]), bag: ["mica", "clay", "glass"], drawPerTurn: 2 }).slice(-4)
     );
     run.same(
-      "séquence : sac et défausse vides, la fin remplace la suite",
-      ["Plus aucune bille à piocher.", "Partie terminée faute de billes. Score final : 10."],
+      "séquence : sac et défausse vides, le tour suivant commence quand même",
+      ["Plus aucune bille à piocher.", "Début du tour 3, jouez vos billes."],
       texts({ ...lensed, bag: [], discard: [] }).slice(-2)
     );
     run(
@@ -883,9 +881,9 @@ function checkTexts(run) {
         "Impact 13. Score 13.",
         "Game over. Final score: 13.",
       ],
-      texts({ ...worn, turn: 9 }).slice(3)
+      texts({ ...worn, turn: 10 }).slice(3)
     );
-    run("anglais : ouverture et base gauche", "Resolving turn 9. left base, giant: Speed +6.", texts({ ...worn, turn: 9 })[0]);
+    run("anglais : ouverture et base gauche", "Resolving turn 10. left base, giant: Speed +6.", texts({ ...worn, turn: 10 })[0]);
     run.same("anglais : historique, premier tour", ["No history yet.", "Close"], historyMenu(null).entries.map((entry) => t(entry.label, entry.labelParams)));
     run("anglais : rotation", "The triangle turns one notch clockwise.", t("marbles.event.rotation", { steps: 1, direction: "clockwise" }));
   } finally {

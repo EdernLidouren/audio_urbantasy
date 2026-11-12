@@ -8,10 +8,7 @@ Le jeu des billes est un jeu de stratégie en solitaire, sans adresse ni adversa
 
 Le but est de marquer le plus de points possible. Chaque tour se termine par une résolution, qui produit un Impact ; l'Impact s'ajoute au Score. Le Score final est celui de la fin de partie.
 
-La partie se termine de deux façons :
-
-- après la résolution du dernier tour, le neuvième aujourd'hui ;
-- au début d'un tour, si la pioche n'a pu donner aucune bille parce que le sac et la défausse sont vides. Une main pleine ne termine jamais la partie.
+La partie se termine après la résolution du dernier tour, le dixième aujourd'hui, et seulement là. Ni le sac vide ni la main vide ne la terminent : un tour sans bille à poser se résout à vide.
 
 ## 2. Le lexique
 
@@ -71,7 +68,7 @@ Les planchers ne valent qu'au calcul final. Pendant le tour, une Vitesse de moin
 - **Lancers par tour** : 5. Chaque pose depuis la main est un lancer ; l'échange n'en est pas un.
 - **Capacité du pot** : 3 billes.
 - **Pioche** : 5 billes au premier tour, 1 à chaque tour suivant.
-- **Nombre de tours** : 9.
+- **Nombre de tours** : 10.
 - **Usure maximale** d'une bille : 3, sauf si la bille en indique une autre.
 
 ## 5. Le déroulé d'un tour
@@ -80,7 +77,7 @@ Les planchers ne valent qu'au calcul final. Pendant le tour, une Vitesse de moin
 
 1. Chaque bille déjà en main gagne un tour à son compteur de tours en main.
 2. La pioche du tour : 5 billes au premier tour, 1 ensuite, une par une, selon la pioche unifiée (section 6).
-3. Si cette pioche n'a pu donner aucune bille faute de billes, la partie se termine.
+3. Si cette pioche n'a pu donner aucune bille faute de billes, le jeu le dit, et le tour se joue avec la main qu'on a.
 
 ### La phase de jeu
 
@@ -113,7 +110,7 @@ Si la Chiquenaude a vidé l'emplacement visé, la pose se poursuit comme sur un 
 
 Une bille piochée pendant la phase de jeu peut être lancée aussitôt, dans la limite des lancers. Une bille piochée pendant la résolution attend le tour suivant.
 
-## 6. La pioche, la régénération du sac et la fin de partie
+## 6. La pioche et la régénération du sac
 
 ### La pioche unifiée
 
@@ -129,10 +126,6 @@ Le premier arrêt interrompt la pioche : les billes restantes ne sont pas pioch�
 ### La régénération du sac
 
 Une régénération peut avoir lieu à tout moment : en début de tour, pendant la phase de jeu ou pendant la résolution. Les billes du pot et les billes perdues n'y reviennent jamais. Ses Trouvailles et les réactions du pot au mélange comptent pour le tour en cours ; elles jouent toutes juste après le mélange, avant que la pioche ne reprenne.
-
-### La fin de partie par pioche impossible
-
-Au début d'un tour, si la pioche du tour n'a pu donner aucune bille parce que le sac et la défausse sont vides, la partie se termine, même si la main contient encore des billes : elles ne seront pas jouées.
 
 ## 7. L'usure, le polissage, la fêlure et les retraits
 

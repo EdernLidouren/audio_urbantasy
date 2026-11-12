@@ -6,8 +6,7 @@
 // (`node tools/run-checks.js marbles-tools`).
 
 import { MARBLES_SETTINGS, STARTING_BAG } from "../../config/marbles-values.js";
-import { SLOTS, createMarblesGame, legalActions, marblesReduce } from "../marbles.js";
-import { forecast } from "../marbles-forecast.js";
+import { SLOTS, legalActions } from "../marbles.js";
 import { throws } from "../../lib/check.js";
 import { parseCommand } from "../../tools/marbles/commands.js";
 import { formatEvent, formatState } from "../../tools/marbles/format.js";

@@ -445,8 +445,9 @@ function parseActionEffect(rawEffect, describe, entityVariables, sceneVariables)
 }
 
 // Un TRIGGER (voir core/triggers.js, doc/scripting.md/"Triggers") :
-// { on: "hour", hour?: 0..23, effects } ou
-// { on: "emote", emote?, range?, effects }.
+// { on: "hour", hour?: 0..23, effects },
+// { on: "emote", emote?, range?, effects } ou
+// { on: "break", effects } (à la destruction d'une entité minable).
 // `effects` : MÊME vocabulaire et MÊME validation qu'une action
 // (parseActionEffect ci-dessus), SAUF les effets MIXTES (teleport) — un
 // déplacement du JOUEUR déclenché par l'horloge n'a pas de sens, refusé au

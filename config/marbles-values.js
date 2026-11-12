@@ -14,7 +14,8 @@ export const MARBLES_SETTINGS = {
   // Capacité du POT : une bille envoyée au pot plein n'y entre pas, elle est perdue
   // pour la partie.
   potCapacity: 3,
-  turnCount: 9,
+  // La partie se termine après la résolution de ce tour, et seulement là.
+  turnCount: 10,
   defaultMaxWear: 3,
   // Fiches : le curseur secondaire revient à l'annonce principale dès que le
   // curseur principal se déplace. Pourra devenir une option.
@@ -33,6 +34,11 @@ export const MARBLES_SETTINGS = {
   shuffleToDrawMs: 900,
   drawSoundIntervalMs: 350,
   swapSoundDelayMs: 150,
+  // Après qu'Entrée a passé la séquence de résolution, un second Entrée est ignoré
+  // pendant skipGuardMs : pressé avant que le lecteur d'écran ait dit la question
+  // d'un choix ou la fin de partie, il choisirait ou quitterait sans qu'on l'ait
+  // entendue.
+  skipGuardMs: 400,
 };
 
 // Les CALIBRES (Size) : ce qu'EST une bille par sa taille, champ `size` obligatoire
@@ -359,7 +365,9 @@ export const MARBLE_TRIGGERS = [
     field: "knockout",
     event: "knockout",
     marble: "onSlot",
-    moment: "play",
+    // À tout moment : une pose pendant la phase de jeu, mais aussi l'action Éjecter
+    // d'un effet de résolution (une phase, un Final).
+    moment: "anytime",
     replacement: true,
     forecast: { line: "placement", marble: "occupant", order: 1 },
     texts: {

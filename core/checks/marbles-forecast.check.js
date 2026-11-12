@@ -6,7 +6,7 @@
 // (`node tools/run-checks.js marbles-forecast`).
 
 import { nextRandom } from "../rng.js";
-import { SLOTS, TALLY_COUNTERS, createMarblesGame, legalActions, marblesReduce } from "../marbles.js";
+import { SLOTS, TALLY_COUNTERS, legalActions } from "../marbles.js";
 import { emptyTally } from "../marbles-tally.js";
 import { forecast, readForecast } from "../marbles-forecast.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";

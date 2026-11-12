@@ -34,7 +34,6 @@ if (!file) {
 
 installFileFetch();
 const { t } = await import("../../data/i18n/index.js");
-const { forecast } = await import("../../core/marbles-forecast.js");
 const { SLOTS } = await import("../../core/marbles.js");
 const { buildState, applyActions } = await import("./state-builder.js");
 const { PLACEMENT_TRIGGERS, choiceLine, counter, formatEvent, formatState, marbleLabel, slotLabel, triggerLabel } = await import("./format.js");

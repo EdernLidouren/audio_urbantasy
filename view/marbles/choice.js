@@ -38,17 +38,32 @@ function isSlotEligible(pending, slot) {
   return pending.eligible.some((target) => target.zone === "triangle" && target.slot === slot);
 }
 
+// La main a-t-elle des options dans ce choix ? Une zone du choix peut n'en avoir
+// aucune (aucune bille éligible en main, ou la dernière déjà choisie) : le curseur
+// n'y entre alors jamais.
+function handHasOptions(pending) {
+  return choiceHandOptions(pending).length > 0;
+}
+
 // Où s'ouvre le curseur d'un choix : sur la première option de la main si la main en
-// est une zone, sinon sur le premier emplacement éligible.
+// a, sinon sur le premier emplacement éligible.
 export function choiceStartCursor(pending, cursor) {
-  if (hasZone(pending, "hand")) return { ...cursor, place: "hand", handIndex: 0 };
+  if (handHasOptions(pending)) return { ...cursor, place: "hand", handIndex: 0 };
   return cursorOn(cursor, SLOTS.find((slot) => isSlotEligible(pending, slot)) ?? SLOTS[0]);
 }
 
+// Où reste le curseur après une réponse qui n'a pas fini le choix : sur sa place si
+// elle a encore des options (l'index borné par l'écran), sinon où le choix s'ouvre.
+export function choiceCursorAfterAnswer(pending, cursor) {
+  if (cursor.place === "hand" && !handHasOptions(pending)) return choiceStartCursor(pending, cursor);
+  return cursor;
+}
+
 // Un pas vertical (ou sur le triangle) du curseur pendant un choix, ou null : comme
-// l'écran, sans jamais entrer dans une zone qui n'est pas celle du choix.
+// l'écran, sans jamais entrer dans une zone qui n'est pas celle du choix, ni dans
+// une main sans option.
 export function stepChoiceCursor(pending, cursor, direction) {
-  const next = stepCursor(cursor, direction, !hasZone(pending, "hand"));
+  const next = stepCursor(cursor, direction, !handHasOptions(pending));
   if (next === null || !hasZone(pending, zoneOf(next.place))) return null;
   return next;
 }

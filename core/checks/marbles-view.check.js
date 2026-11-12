@@ -14,7 +14,6 @@ import {
   LARGE,
   MARBLE_CARD_MODEL,
   MARBLE_SIZES,
-  MARBLE_TALLIES,
   MEDIUM,
   SMALL,
   MARBLE_SOUND_PROFILES,
@@ -24,7 +23,7 @@ import {
   MARBLE_TRIGGERS,
 } from "../../config/marbles-values.js";
 import { detailLine, stepDetail } from "../../lib/detail-card.js";
-import { createMarblesGame, marblesReduce, END_REASONS, MARBLE_ERRORS, SLOTS } from "../marbles.js";
+import { createMarblesGame, MARBLE_ERRORS, SLOTS } from "../marbles.js";
 import { emptyTally } from "../marbles-tally.js";
 import { MARBLE_KEYWORDS, REACTION_KEYS, TALLY_COUNTERS } from "../marbles.js";
 import { TALLY_CATEGORIES } from "../marbles-counters.js";
@@ -57,6 +56,7 @@ import {
   discardPlace,
   eventCues,
   handPlace,
+  handSizeChange,
   placesDemoCues,
   positionOf,
   potPlace,
@@ -77,7 +77,7 @@ import { EMPTY_SOUND_QUEUE, advanceSoundQueue, enqueueCues } from "../../view/ma
 import { throws } from "../../lib/check.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
 import { answerChoices, earlierTestTypes, emptyBagMarblesGame, inHand, withSizes } from "./helpers.js";
-import { choiceAnswer, choiceFocusLine, choiceHandOptions, choiceMarbleAt, choiceStartCursor, stepChoiceCursor } from "../../view/marbles/choice.js";
+import { choiceAnswer, choiceCursorAfterAnswer, choiceFocusLine, choiceHandOptions, choiceMarbleAt, choiceStartCursor, stepChoiceCursor } from "../../view/marbles/choice.js";
 import { MARBLES_HELP_TOPICS, helpTopicText, marblesHelpMenu } from "../../view/marbles/help-screen.js";
 import { createMarblesRules } from "../marbles-rules.js";
 import { AMOUNT_SOURCES, CLAUSE_ACTIONS, effectAt } from "../marbles-effects.js";
@@ -559,7 +559,7 @@ function checkHelpMenu(run) {
   run.same("aide H : une rubrique par texte, dans l'ordre", ["goal", "score", "triangle", "wear", "hand", "zones", "keywords"], MARBLES_HELP_TOPICS);
   run(
     "aide H : le but du jeu",
-    "Posez des billes sur le triangle pour marquer le plus de points en 9 tours. Chaque tour se termine par une résolution, qui produit un Impact. L'Impact s'ajoute à votre score.",
+    "Posez des billes sur le triangle pour marquer le plus de points en 10 tours. Chaque tour se termine par une résolution, qui produit un Impact. L'Impact s'ajoute à votre score.",
     plain(helpTopicText("goal", t))
   );
   run("aide H : la main cite les réglages", true, plain(helpTopicText("hand", t)).includes("5 billes au premier tour, puis 1 bille à chaque tour") && plain(helpTopicText("hand", t)).includes("5 lancers par tour"));
@@ -651,6 +651,13 @@ function checkChoiceInterface(run) {
   run("choix, question : à l'entrée au pot", true, plain(describeChoicePrompt({ ...two.pendingChoice, by: { trigger: "pocketEntry", slot: null, marble: "porcelain" } }, t)).startsWith("Entrée au pot de porcelaine : choisissez"));
   run("choix, deux zones : de la main vers le triangle", "leftBase", stepChoiceCursor(both.pendingChoice, cursor("hand"), "up").place);
   run("choix, deux zones : du triangle vers la main", "hand", stepChoiceCursor(both.pendingChoice, cursor("leftBase"), "down").place);
+  // Deux zones, mais plus aucune bille éligible en main (aucune au départ, ou la
+  // dernière déjà choisie) : le curseur n'entre jamais dans une main sans option.
+  const triangleLeft = { ...both.pendingChoice, eligible: both.pendingChoice.eligible.filter((target) => target.zone === "triangle") };
+  run("choix, deux zones, main sans option : le curseur s'ouvre sur le triangle", "apex", choiceStartCursor(triangleLeft, cursor("hand")).place);
+  run("choix, deux zones, main sans option : on n'y descend pas", false, ["leftBase", "rightBase"].some((slot) => stepChoiceCursor(triangleLeft, cursor(slot), "down")?.place === "hand"));
+  run("choix, deux zones, main sans option : après une réponse, le curseur la quitte", "apex", choiceCursorAfterAnswer(triangleLeft, cursor("hand")).place);
+  run("choix, deux zones, après une réponse : le curseur reste là où il a des options", "hand", choiceCursorAfterAnswer(both.pendingChoice, cursor("hand")).place);
 
   // « Terminer » en fin de menu de la main, en mode « jusqu'à N ».
   const upToHand = { ...handOnly, upTo: true };
@@ -1066,6 +1073,23 @@ function checkSounds(run) {
   run.same("file : la première balise à son échéance", ["clay"], step(1));
   run.same("file : une longue absence rend tout ce qui est dû, dans l'ordre", ["glass", "giant"], step(5000));
   run("file : vide une fois tout joué", 0, queue.length);
+
+  // La main au moment d'une étape : ce que chaque évènement y fait entrer ou sortir.
+  run(
+    "main d'une étape : pioche +1, pose et mise en poche depuis la main −1, ailleurs rien",
+    0,
+    handSizeChange([
+      { type: "draw", marble: "clay", cause: "effect" },
+      { type: "draw", marble: "glass", cause: "effect" },
+      { type: "placed", slot: "apex", marble: "agate" },
+      { type: "pocketed", marble: "mica", from: "hand", index: 0 },
+      { type: "pocketed", marble: "clay", from: "triangle", slot: "apex" },
+    ])
+  );
+  // Une pioche dite à une étape où la main compte 2 billes, même si la main finale en
+  // compte 4 : sa balise est à la dernière place d'une main de 2.
+  const midDraw = eventCues([{ type: "draw", marble: "clay", cause: "effect" }], { handAfter: [{}, {}, {}, {}], handSize: 2 });
+  run.same("pioche d'une étape : placée dans la main de ce moment", handPlace(1, 2), midDraw.find((cue) => cue.sound === "beacon").place);
 }
 
 export default function checkMarblesView(run) {
@@ -1106,8 +1130,7 @@ export default function checkMarblesView(run) {
       run.same(`${locale} : aucun nom sans bille`, [], orphanNames);
       const missingErrors = MARBLE_ERRORS.filter((code) => !Object.hasOwn(LOCALE_TABLES[locale], `marbles.error.${code}`));
       run.same(`${locale} : chaque refus a son texte`, [], missingErrors);
-      const missingEnds = END_REASONS.filter((reason) => !Object.hasOwn(LOCALE_TABLES[locale], `marbles.event.game_over.${reason}`));
-      run.same(`${locale} : chaque fin de partie a son texte`, [], missingEnds);
+      run(`${locale} : la fin de partie a son texte`, true, Object.hasOwn(LOCALE_TABLES[locale], "marbles.event.game_over"));
       const missingTriggerTexts = MARBLE_TRIGGERS.flatMap((trigger) => Object.values(trigger.texts)).filter((key) => !Object.hasOwn(LOCALE_TABLES[locale], key));
       run.same(`${locale} : chaque déclencheur a ses textes`, [], missingTriggerTexts);
       const missingSourceTexts = Object.values(AMOUNT_SOURCES).map((source) => source.text).filter((key) => !Object.hasOwn(LOCALE_TABLES[locale], key));
@@ -1287,7 +1310,7 @@ export default function checkMarblesView(run) {
     run.same("étapes : aucune étape silencieuse", [], buildSteps(events, t).filter((step) => step.text === ""));
     run(
       "texte : le tour, compteurs compris",
-      "Tour 2 sur 9. Score 5. Vitesse 5, Masse 2. 4 lancers restants. Échange disponible.",
+      "Tour 2 sur 10. Score 5. Vitesse 5, Masse 2. 4 lancers restants. Échange disponible.",
       said(describeTurn({ ...lensed, score: 5, speed: 5, mass: 2 }, true, t))
     );
 

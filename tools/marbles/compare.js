@@ -24,7 +24,7 @@
 // La sortie : une ligne par simulation (identique, ou combien de lignes changent et
 // si les résultats en font partie), le détail des lignes changées sous leur
 // contexte (section, bille), puis un bilan : rapports identiques, résultats
-// (score final, Impact par tour, fins de partie), actions refusées et enchaînements
+// (score final, Impact par tour), actions refusées et enchaînements
 // interrompus. Code de sortie 1 si une simulation échoue, 0 sinon, même si des
 // lignes changent : c'est à la lecture de dire si un changement est voulu.
 
@@ -161,8 +161,8 @@ async function main() {
     const withResults = reports.filter(({ diff }) => diff.resultsChanged).map(({ entry }) => entry.label);
     console.log(
       withResults.length === 0
-        ? "Résultats (score final, Impact par tour, fins de partie) : identiques partout."
-        : `Résultats (score final, Impact par tour, fins de partie) : changent pour ${withResults.join(" ; ")}.`
+        ? "Résultats (score final, Impact par tour) : identiques partout."
+        : `Résultats (score final, Impact par tour) : changent pour ${withResults.join(" ; ")}.`
     );
     for (const [field, words] of [
       ["refusals", "Actions refusées"],

@@ -219,9 +219,14 @@ export default function checkMining(run) {
   run.same("minage : coups numérotés 1, 2, 3... jusqu'au dernier", numbers.map((_, i) => i + 1), numbers);
   run("minage : dernier coup -> broken", "broken", result.status);
   run("minage : entité détruite -> retirée du monde", undefined, entityOf(session, "boulder-1"));
-  const dropped = worldOf(session).entities.filter((e) => e.ephemeral);
+  const dropped = worldOf(session).entities.filter((e) => e.id.startsWith("boulder-1-drop-"));
   run("minage : objets tombés dans la fourchette count", true, result.items.length >= 1 && result.items.length <= 3);
-  run("minage : une entité ÉPHÉMÈRE par objet tombé", result.items.length, dropped.length);
+  run("minage : une entité par objet tombé", result.items.length, dropped.length);
+  // Persistantes, comme les objets d'une plage : une entité placée à la main ne
+  // revient jamais, son butin ne doit pas se perdre à la sauvegarde.
+  run("minage : objets tombés persistants (spawned), jamais éphémères", true, dropped.every((e) => e.spawned === true && !e.ephemeral));
+  const reloadedIds = worldOf(deserializeGame(serializeGame(session)).session).entities.map((e) => e.id).filter((id) => id.startsWith("boulder-1-drop-"));
+  run.same("minage : objets tombés gardés par la sauvegarde", dropped.map((e) => e.id), reloadedIds);
   run("minage : objets tombés ramassables (pickup vers le sac)", true, dropped.every((e) => e.action.kind === "pickup" && e.action.item === "granite"));
   run("minage : objets éparpillés autour de l'entité détruite", true, dropped.every((e) => Math.abs(e.x - 10) <= TUNING_DEFAULTS.mineScatterSpread));
   run("minage : rien au sac directement", 0, session.bag.length);

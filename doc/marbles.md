@@ -105,17 +105,13 @@ pleine et la limite du bus.
 
 ### Fin de partie
 
-Toutes les conditions de fin vivent à un seul endroit, `END_CONDITIONS` de
-`core/marbles.js`, chacune consultée à un moment du tour (après la pioche du début de tour,
-ou en fin de résolution). Aujourd'hui :
-
-- `outOfMarbles` : la pioche du début de tour n'a pu donner aucune bille, faute de billes
-  (sac et défausse vides dès la première). Une main pleine n'est jamais une fin de partie ;
-- `turnsCompleted` : le dernier tour est résolu.
-
-Un futur mode (un Impact minimal à atteindre…) y branche les siennes ; chaque raison a son
-texte, `marbles.event.game_over.<raison>`. Un sac de départ peut compter moins de billes
-que le triangle ; vide, la partie s'arrête à la première pioche (`outOfMarbles`).
+Une seule fin de partie : la résolution du dernier tour, `turnCount` (10, réglage de
+`MARBLES_SETTINGS`, `config/marbles-values.js`), juste après la rotation (`gameOver {
+score }`, « Partie terminée. Score final : … »). Ni le sac ni la main n'arrêtent la
+partie : une pioche impossible se dit (`drawSkipped`, `noMarbles`) et le tour se joue
+avec la main qu'on a, même vide ; un sac de départ vide, ou plus petit que le triangle,
+se joue ainsi jusqu'au bout. Des conditions de fin plus riches (modes de partie) seront
+conçues à neuf (`doc/marbles-backlog.md`).
 
 ### Le pot
 
@@ -402,7 +398,7 @@ Tic ou une Éjection, le remplacement en cours.
 
 | Condition (`when`) | Vraie si | Exemple (fiche) |
 |---|---|---|
-| `{ type: "printedStat", slot, stat, atLeast }` | la bille de `slot` a, imprimé à cet emplacement, au moins `atLeast` de `stat` ; emplacement vide : faux | « Vitesse +4 à la pointe si son effet de pointe donne au moins Vitesse +1 » (loupe) |
+| `{ type: "printedStat", slot, stat, atLeast }` | la bille de `slot` a, imprimé à cet emplacement, au moins `atLeast` de `stat` (une action à montant : Empocher et Éjecter refusés au chargement) ; emplacement vide : faux | « Vitesse +4 à la pointe si son effet de pointe donne au moins Vitesse +1 » (loupe) |
 | `{ type: "relativeSize", marble, is }` | pendant un remplacement, la bille `marble` (`ejected`, l'éjectée, ou `placed`, la posée) est `is` (`smaller` ou `larger`) que l'autre ; calibres égaux : ni l'un ni l'autre | « Tic : Vitesse +4 si la bille éjectée est plus petite. » (gorille), « Éjection : Pioche 1 si la bille posée est plus grosse. » (mica) |
 | `{ type: "sizeAt", slot, size }` | la bille de `slot` est de calibre `size` ; emplacement vide : faux | « Pointe : Masse +1 et Masse +2 si la base gauche est un calot. » (agate) |
 
@@ -459,7 +455,8 @@ Une cible n'a de sens que si l'effet ciblé peut encore se produire.
   au moment du choix se proposent. Un bonus de Vitesse ou de Masse au choix ne propose
   que les billes actives dont la phase n'a pas commencé ; la validation refuse un bonus au
   choix là où aucune phase ne peut plus le recevoir (un Final, à chaque résolution du pot,
-  une pointe).
+  une pointe). L'emplacement d'une bille dont l'Éjection est en cours n'est jamais
+  éligible (`run.knockingOut`) : elle part, une action sur elle ne ferait rien.
 
 Le moment de chaque champ vient de la phase (ses emplacements) ou du déclencheur
 (`moment` de `MARBLE_TRIGGERS` : `play`, `afterPhases` ou `anytime`, la Trouvaille, que la
@@ -890,15 +887,15 @@ Ce qui se dit, selon l'endroit :
 | Bille active, sans sélection | « gorille, calot, pointe, usure 1 sur 3. » |
 | Emplacement vide, sans sélection | « pointe : vide. » |
 | Emplacement occupé, bille sélectionnée | « pointe, gorille : Vitesse +10. » (la prévision) |
-
-Le calibre se dit juste après le nom, dans l'annonce principale seulement ; la fiche n'en dit
-rien de plus, ses conditions de calibre passant par les champs d'effet.
 | Emplacement vide, bille sélectionnée | « pointe » |
 | R | la vue d'ensemble du tour (voir plus bas) |
 | L | le menu de l'historique (voir plus bas) |
 | I | tour, score, Vitesse et Masse du tour, lancers restants, échange |
 | S | nombre de billes au sac, pioche par tour |
 | D | nombre de billes en défausse |
+
+Le calibre se dit juste après le nom, dans l'annonce principale seulement ; la fiche n'en dit
+rien de plus, ses conditions de calibre passant par les champs d'effet.
 
 Une valeur négative porte le vrai signe moins, collé au nombre (« Vitesse −3 », U+2212) :
 un lecteur d'écran le lit, là où il peut taire un trait d'union. Un gabarit d'effet
@@ -1070,11 +1067,6 @@ simulation résout le tour et pioche le suivant tout de suite ; ce qui suit n'es
 présentation, une file d'étapes (`view/marbles/sequence.js`) dite avec une pause après
 chacune :
 
-**Un choix pendant la résolution** (le Final de la porcelaine) : la séquence dit les étapes
-jusqu'à lui, puis sa question en dernière étape, et s'arrête là ; le geste qui passe la
-séquence s'arrête aussi à la question. Le choix fait, la suite de la résolution (et la
-pioche qui la suit) reprend en séquence, avec ses pauses.
-
 1. « Résolution du tour 3. » (au tour 1, suivi de « Entrée pour passer la résolution. »),
    enchaînée SANS PAUSE sur la phase de base gauche : les deux partagent la première
    étape (`resolutionSteps`), une pause nulle entre deux étapes ferait couper la première
@@ -1105,9 +1097,16 @@ pioche qui la suit) reprend en séquence, avec ses pauses.
 9. « Début du tour 4, jouez vos billes. »
 
 Au dernier tour, ni rotation ni pioche : les retraits et l'Impact mènent à la fin de
-partie. Si la pioche du tour suivant ne trouve plus aucune bille, la fin de partie suit
-son arrêt. Une pioche en cours de tour (Tic, Éjection) se dit de la même façon, juste
-après l'effet qui la provoque.
+partie. Si la pioche du tour suivant ne trouve plus aucune bille, « Plus aucune bille à
+piocher. » se dit, et le tour suivant commence quand même. Une pioche en cours de tour
+(Tic, Éjection) se dit de la même façon, juste après l'effet qui la provoque.
+
+**Un choix pendant la résolution** (le Final de la porcelaine) : la séquence dit les étapes
+jusqu'à lui, puis sa question en dernière étape, et s'arrête là ; le geste qui passe la
+séquence s'arrête aussi à la question. Le choix fait, la suite de la résolution (et la
+pioche qui la suit) reprend en séquence, avec ses pauses, chaque étape avec ses sons ; à
+la fin, le curseur revient dans la main. Une bille piochée en cours de séquence s'entend
+à sa place dans la main de ce moment, pas dans celle de la fin de la séquence.
 
 **Construite du journal** (`buildSteps`, la même pour une pose, un échange et la pioche
 du tour 1) : chaque évènement qui se dit devient une étape, à sa place chronologique ;
@@ -1139,11 +1138,20 @@ la fin d'un son au lieu d'une durée.
 **Pendant la séquence**, tout le reste est refusé d'un son de blocage, sans parole pour ne
 pas couper l'étape : pose, échange, Maj+R, R, déplacements, I, S, D, L et leurs menus. La
 séquence se termine quand sa dernière étape est dite : le joueur a la main pendant
-qu'elle se dit.
+qu'elle se dit. Restent permis : Retour arrière (redire l'étape), l'aide (F1, H) et
+**Échap**, qui propose de quitter la partie : voulu, pour pouvoir partir à tout moment ;
+la confirmation ouverte par-dessus fige la séquence, qui reprend si l'on reste.
 
 **Passer** : Entrée (ou Espace, la même action) amène directement au début du tour
 suivant, ou à la fin de partie, sans dire les étapes d'avant ni jouer leurs sons. L'état
-ne change pas : il était déjà complet avant la première étape.
+ne change pas : il était déjà complet avant la première étape. Un second Entrée pressé
+dans les `skipGuardMs` (400 ms, `MARBLES_SETTINGS`) qui suivent est ignoré : il
+choisirait la cible d'une question, ou quitterait la fin de partie, avant que le lecteur
+d'écran ne l'ait dite.
+
+**Retour arrière pendant un choix** redit la question, puis la ligne du curseur : dans un
+choix « jusqu'à N », Échap terminant le choix, c'est le moyen de la réentendre. La
+question entre aussi dans l'historique (L), comme les autres messages de jeu.
 
 ### Sons
 

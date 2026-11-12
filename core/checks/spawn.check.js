@@ -526,6 +526,9 @@ function checkEntityRanges(run) {
   run("plage de types : distribution ET entities -> rejetée", true, refused({ from: 2, to: 20, entities: BOTH, distribution: { items: { apple: 1 } } }));
   run("plage de types : type inconnu -> rejeté", true, refused({ from: 2, to: 20, entities: { nope: 1 } }));
   run("plage de types : type bloquant -> rejeté", true, refused({ from: 2, to: 20, entities: { wall: 1 } }));
+  // Un type qui ne se construit pas seul (un présentoir exige son article) : refusé
+  // au chargement de la scène, pas à l'arrivée dans le monde.
+  run("plage de types : type qui ne se construit pas seul -> rejeté", true, refused({ from: 2, to: 20, entities: { shop_display: 1 } }));
   run("plage de types : rien que nothing -> rejetée", true, refused({ from: 2, to: 20, entities: { nothing: 1 } }));
   run("plage de types : poids invalide -> rejeté", true, refused({ from: 2, to: 20, entities: { boulder: "mythic" } }));
   run("plage de types : nothing pondéré -> accepté", false, refused({ from: 2, to: 20, entities: { boulder: 1, nothing: 1 } }));

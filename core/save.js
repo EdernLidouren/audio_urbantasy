@@ -13,7 +13,7 @@
 
 import { DEFAULT_SURFACE } from "./surfaces.js";
 import { INITIAL_TIME } from "./time.js";
-import { createEmptyEquipment } from "./equipment.js";
+import { createEmptyEquipment } from "./equipment-slots.js";
 import { stripEphemeralsFromWorld, isTwoSided, deriveAcquiredItems, withActiveWorld } from "./state.js";
 import { createInitialWeather } from "./weather.js";
 import { ITEM_REGISTRY } from "./items.js";
@@ -145,6 +145,45 @@ function renameEntityTypes(entities) {
   return changed ? out : entities;
 }
 
+// Les clés d'une plage de types (`entities` d'un `spawnRanges`, figée avec la
+// face) sont des types d'entité : renommées aussi, sinon la plage perdrait le
+// type renommé sans rien dire. Deux anciennes clés qui mènent au même nom : la
+// première garde son poids (aucun poids n'est inventé).
+function renameSpawnRangeTypes(data) {
+  if (!data.worlds || typeof data.worlds !== "object") return data;
+  const renameFace = (face) => {
+    if (!face || !Array.isArray(face.spawnRanges)) return face;
+    let changed = false;
+    const spawnRanges = face.spawnRanges.map((range) => {
+      if (!range?.entities || typeof range.entities !== "object") return range;
+      if (!Object.keys(range.entities).some((type) => Object.hasOwn(ENTITY_TYPE_RENAMES, type))) return range;
+      changed = true;
+      const entities = {};
+      for (const [type, weight] of Object.entries(range.entities)) {
+        const renamed = Object.hasOwn(ENTITY_TYPE_RENAMES, type) ? ENTITY_TYPE_RENAMES[type] : type;
+        if (!Object.hasOwn(entities, renamed)) entities[renamed] = weight;
+      }
+      return { ...range, entities };
+    });
+    return changed ? { ...face, spawnRanges } : face;
+  };
+  const worlds = {};
+  let anyChanged = false;
+  for (const [id, world] of Object.entries(data.worlds)) {
+    let next = world;
+    if (world && world.recto !== undefined && world.verso !== undefined) {
+      const recto = renameFace(world.recto);
+      const verso = renameFace(world.verso);
+      if (recto !== world.recto || verso !== world.verso) next = { ...world, recto, verso };
+    } else {
+      next = renameFace(world);
+    }
+    worlds[id] = next;
+    if (next !== world) anyChanged = true;
+  }
+  return anyChanged ? { ...data, worlds } : data;
+}
+
 // Le `spec` d'un effet "spawn" (core/script-parse.js) porte lui aussi un
 // type d'entité, figé avec la scène dans les listes d'effets de l'entité.
 function renameSpawnSpecType(effect) {
@@ -240,12 +279,12 @@ function renameWorldIds(data) {
   return { ...data, worlds };
 }
 
-// Renommages de contenu d'une partie déjà rebouchée : types d'entité, ids
-// de scènes (clés des mondes, puis là où ils sont cités), puis clés i18n et
-// chemins de sons. Idempotent : une sauvegarde déjà à jour traverse sans
-// changement.
+// Renommages de contenu d'une partie déjà rebouchée : types d'entité (des
+// entités et des plages de types), ids de scènes (clés des mondes, puis là où
+// ils sont cités), puis clés i18n et chemins de sons. Idempotent : une
+// sauvegarde déjà à jour traverse sans changement.
 function applyContentRenames(data) {
-  return renameValues(renameSceneIds(renameWorldIds(mapEntityLists(data, renameEntityTypes))));
+  return renameValues(renameSceneIds(renameWorldIds(renameSpawnRangeTypes(mapEntityLists(data, renameEntityTypes)))));
 }
 
 // --- Durées d'errance en ticks (doc/save.md) ----------------------------

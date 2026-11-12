@@ -1,6 +1,8 @@
 // Point d'entrée des vérifications du core, sans DOM : au terminal avec Node
 // (`node tools/run-checks.js`, voir son en-tête), ou depuis la console du
-// navigateur. Exposé par main.js sur `window` :
+// navigateur. Exposé par main.js sur `window`, chargé seulement à l'appel (le
+// jeu ne charge jamais les vérifications au démarrage ; le résultat arrive par
+// une promesse) :
 //   runChecks()                    -> tous les domaines
 //   runChecks("spawn")             -> un seul domaine
 //   runChecks(["save", "faces"])   -> plusieurs domaines

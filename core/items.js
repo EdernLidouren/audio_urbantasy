@@ -23,7 +23,7 @@ import { rejectUnknownFields } from "../lib/validate.js";
 //
 // `equippable` (booléen) : peut être placé dans un slot d'équipement
 // (core/equipment.js/equipItem) plutôt que de rester simple contenu du sac.
-// `slot` : NOM du slot qu'il occupe (voir core/equipment.js/EQUIPMENT_SLOTS)
+// `slot` : NOM du slot qu'il occupe (voir core/equipment-slots.js/EQUIPMENT_SLOTS)
 // — aujourd'hui seulement "feet". `gait` : pool de son de pas (voir
 // doc/entity-model.md, "Surfaces de sol et son de pas") que cet objet impose
 // une fois équipé — lu par core/equipment.js/gaitOf, JAMAIS stocké ailleurs
@@ -36,7 +36,7 @@ import { rejectUnknownFields } from "../lib/validate.js";
 // `tags` (optionnel, tableau de clés — voir core/tags.js/TAG_REGISTRY) :
 // classification HORIZONTALE d'un objet (ex. "military"), indépendante de
 // stackable/equippable/slot — un objet équipé PORTE ses tags (voir
-// core/equipment.js/equippedTags), une future vérification de contenu (PNJ,
+// core/equipment-slots.js/equippedTags), une future vérification de contenu (PNJ,
 // événement) les lit via la condition "hasEquipmentTag" (core/presence.js).
 // Absent ou vide -> aucun tag.
 //

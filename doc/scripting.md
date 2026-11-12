@@ -210,7 +210,7 @@ filet "présente sinon" — sans elle, l'entité serait dormante en permanence, 
 ```
 
 Vraie si `context.playerEquipment` porte, sur un slot occupé, un objet marqué de
-`tag` (délègue à `core/equipment.js`/`equippedTags`, qui fait l'union des tags de
+`tag` (délègue à `core/equipment-slots.js`/`equippedTags`, qui fait l'union des tags de
 tout ce qui est équipé). Contexte sans `playerEquipment` → fausse, jamais une
 exception. `tag` est validé contre `core/tags.js`/`TAG_REGISTRY` au chargement (voir
 "Validation" plus haut) — voir "Tags" plus bas pour le registre.
@@ -1366,8 +1366,10 @@ jamais un exécuteur. Valable partout où vit une liste d'effets d'action :
   REMPLACE ses tranches en attente (siffler deux fois relance la réaction au
   début) ; une liste SANS `wait` n'y touche pas. Plusieurs triggers d'une
   entité qui répondent au MÊME évènement forment un seul fil : le premier
-  remplace ce qui attendait, les suivants s'y ajoutent, et toutes leurs
-  suites vont à leur terme, chacune à son heure.
+  qui a une suite (un `wait`) remplace ce qui attendait, les suivants s'y
+  ajoutent, et toutes leurs suites vont à leur terme, chacune à son heure.
+  Un trigger sans suite ne compte pas comme le premier : la suite d'un
+  trigger suivant remplace donc bien celle de l'évènement précédent.
 - **Temps** — ticks de simulation : gelé sous un menu, déterministe.
   Donnée pure, sauvegardée ; oubliée au chargement du monde
   (`forgetPendingEffects`, avec les comportements temporaires). Une entité
@@ -2392,7 +2394,7 @@ tag fautif et l'objet concerné. `validateItemRegistry` est exportée pour reste
 testable avec un registre de test (`core/checks/inventory.check.js`), sans avoir à
 corrompre le vrai registre.
 
-**Tags EFFECTIVEMENT portés** (`core/equipment.js`/`equippedTags(equipment)`) :
+**Tags EFFECTIVEMENT portés** (`core/equipment-slots.js`/`equippedTags(equipment)`) :
 union des tags de chaque objet ÉQUIPÉ, DÉRIVÉE, jamais stockée — même principe que
 `gaitOf`. UNIFIÉ joueur/compagnon/PNJ : la fonction ne connaît que la FORME
 `equipment` (`{ <slot>: <entrée>|null }`), jamais le type de porteur.

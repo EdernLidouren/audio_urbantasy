@@ -22,6 +22,9 @@
 //   prevoir | forecast <n> <empl.>   prévoir la pose de la bille n (rien ne bouge)
 //   fin | end                        résoudre et finir le tour (Maj+R) : une ligne
 //                                    par étape de la séquence, sans les pauses
+//   choisir | choose <n> | <empl.>   répondre au choix en attente : la bille n de la
+//                                    main, ou un emplacement
+//   terminer | done                  terminer un choix « jusqu'à N »
 //   journal                          le journal de la partie, une ligne par évènement
 //   journal json                     le même, brut, en JSON
 //   aide | help                      cette liste
@@ -53,8 +56,7 @@ const seed = seedOption === undefined ? Math.floor(Math.random() * 2 ** 32) : /^
 // Avant d'importer les textes, qui se chargent par fetch (voir tools/node-fetch.js).
 installFileFetch();
 const { t, setLocale } = await import("../../data/i18n/index.js");
-const { createMarblesGame, marblesReduce, swapRefusal, SLOTS } = await import("../../core/marbles.js");
-const { forecast } = await import("../../core/marbles-forecast.js");
+const { swapRefusal, SLOTS } = await import("../../core/marbles.js");
 const { buildSteps, resolutionSteps, describeBag, describeChoicePrompt, describeDiscard, describeHandFocus, describeOverview, describeSlotFocus, describeTurn, placementLines } = await import(
   "../../view/marbles/narration.js"
 );
@@ -188,7 +190,9 @@ function runCommand(line) {
     return true;
   }
   if (command.kind === "forecast") {
-    printForecast(command.action);
+    // Comme l'écran (touche R) : rien ne se prévoit au milieu d'une action.
+    if (game.pendingChoice !== null) console.log(`Refusé : ${t("marbles.error.choicePending")} (choicePending)`);
+    else printForecast(command.action);
     return true;
   }
   if (command.kind === "action") {

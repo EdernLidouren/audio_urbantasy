@@ -10,8 +10,11 @@
 // Une seule exception, `settle` : une INTERRUPTION, réglée jusqu'au bout tout de
 // suite, même au milieu d'un traitement. Son évènement et tout ce qui en découle
 // passent dans une file à part, vidée avant que `settle` ne rende la main ; la file
-// en attente reprend ensuite. Sert à la régénération du sac : ses Trouvailles se
-// jouent avant que la pioche interrompue ne reprenne (core/marbles.js/regenerateBag).
+// en attente reprend ensuite. Sert à ce qui doit se régler avant la suite
+// (core/marbles.js) : les Trouvailles puis les réactions du pot au mélange, avant
+// que la pioche interrompue ne reprenne (regenerateBag) ; l'Éveil d'une bille
+// piochée, avant la suivante ; l'entrée au pot ; l'Éjection d'une bille chassée par
+// l'action Éjecter, avant qu'elle ne quitte son emplacement.
 //
 // Une CHAÎNE : ce qu'un évènement émis hors de tout traitement déclenche, de proche
 // en proche, interruptions comprises, jusqu'à ce que tout soit réglé.

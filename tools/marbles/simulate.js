@@ -76,6 +76,11 @@ try {
   const seedOption = option("--seed") ?? "1";
   const seed = /^\d+$/.test(seedOption) ? Number(seedOption) : seedOption;
   let bagMode = { kind: "test" };
+  if (option("--max-copies") !== undefined && option("--random-bag") === undefined) throw new Error("--max-copies ne vaut qu'avec --random-bag.");
+  // L'extension de l'export, vérifiée avant de jouer : pas une simulation entière
+  // perdue pour une faute de frappe.
+  const exportOption = option("--export");
+  if (exportOption !== undefined && !exportOption.endsWith(".json") && !exportOption.endsWith(".csv")) throw new Error("--export attend un chemin en .json ou en .csv.");
   if (option("--random-bag") !== undefined) bagMode = { kind: "random", size: integerOption("--random-bag"), maxCopies: integerOption("--max-copies") ?? null };
   else if (option("--bag-file") !== undefined) {
     const source = option("--bag-file");

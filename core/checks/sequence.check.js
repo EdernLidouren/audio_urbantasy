@@ -239,6 +239,32 @@ export default function checkSequence(run) {
   run("deux triggers avec wait : la plus longue s'applique aussi", true, waitingDog(afterLong.session).startled === true);
   run("deux triggers avec wait : plus rien n'attend", undefined, waitingDog(afterLong.session).pendingEffects);
 
+  // Le premier trigger SANS suite, le second avec : au second évènement, la suite
+  // REMPLACE celle du premier évènement, elle ne s'y ajoute pas.
+  const firstPlain = parseScene(
+    {
+      ...sceneWith({}),
+      id: "sequence-check-first-plain",
+      entities: [
+        {
+          id: "d",
+          type: "dog",
+          x: 5,
+          triggers: [
+            { on: "emote", effects: [BELL] },
+            { on: "emote", effects: [BELL, { type: "wait", ms: 500 }, BELL] },
+          ],
+        },
+      ],
+    },
+    REGISTRY
+  );
+  const plainDog = (s) => s.worlds["sequence-check-first-plain"].entities.find((e) => e.id === "d");
+  const clappedOnce = applyEmoteTriggers(createInitialState(firstPlain, 1), "clap", 0).session;
+  const clappedTwice = applyEmoteTriggers(clappedOnce, "clap", 0).session;
+  run("premier trigger sans suite : une seule suite en attente", 1, plainDog(clappedOnce).pendingEffects.length);
+  run("premier trigger sans suite : le second évènement remplace la suite du premier", 1, plainDog(clappedTwice).pendingEffects.length);
+
   // Trigger horaire de l'AUTRE face : sa séquence va à son terme.
   const HOUR = TIME_CONFIG.minutesPerHour;
   const faces = parseScene(

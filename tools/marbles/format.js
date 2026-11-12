@@ -90,7 +90,7 @@ export function tallyList(tally) {
 export function formatState(state, name) {
   const yesNo = (value) => (value ? "oui" : "non");
   const lines = [
-    `Tour ${state.turn} sur ${state.turnCount}, étape ${state.stage}${state.endReason ? `, fin : ${state.endReason}` : ""}.`,
+    `Tour ${state.turn} sur ${state.turnCount}, étape ${state.stage}.`,
     `Score ${state.score}. Vitesse ${formatCounter(state.speed)}, Masse ${formatCounter(state.mass)}.`,
     `Échange utilisé : ${yesNo(state.swapUsed)}. Lancers : ${state.throwsUsed} sur ${state.throwsPerTurn}.`,
     ...SLOTS.map((slot) => slotLine(state, slot, name)),
@@ -175,7 +175,7 @@ const EVENT_LINES = {
   rotation: (event, name) =>
     `Rotation : ${SLOTS.map((slot) => `${slotLabel(slot)} ${event.triangle[slot] === null ? "vide" : marbleLabel(event.triangle[slot].marble, name)}`).join(", ")}.`,
   turnEnded: (event) => `Fin du tour ${event.turn}.`,
-  gameOver: (event) => `Fin de partie (${event.reason}), score ${event.score}.`,
+  gameOver: (event) => `Fin de partie, score ${event.score}.`,
 };
 
 // Un évènement du journal en une ligne. Un type inconnu (ajouté depuis) se lit

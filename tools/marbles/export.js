@@ -19,7 +19,6 @@ const GAME_COLUMNS = [
   ["index", (game) => game.index],
   ["seed", (game) => game.seed],
   ["score", (game) => game.score],
-  ["endReason", (game) => game.endReason],
   ["turns", (game) => game.turns],
   ["replacements", (game) => game.replacements],
   // Ce que chaque déclencheur (hors phase) a apporté : <déclencheur>Speed, …Mass.

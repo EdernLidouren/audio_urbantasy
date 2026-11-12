@@ -662,10 +662,15 @@ renfermait tombe au sol. Moteur : `core/mining.js`/`mineEntity`, pur.
 - **Butin** — à la destruction, `count` (fourchette, défaut 1) tirages dans
   `distribution` (même forme qu'une distribution de collecte, voir
   "Collecte" : `{ table }`, `{ items }`, `{ tables }`, issue `nothing`
-  permise). Chaque objet tombe en entité ÉPHÉMÈRE éparpillée autour de
-  l'entité détruite (`mineScatterSpread`), MÊME geste qu'une fouille, à
-  ramasser par `"pickup"`. Tous les tirages peuvent tomber sur `nothing` :
-  l'entité se brise alors sans rien livrer.
+  permise). Chaque objet tombe en entité au sol éparpillée autour de
+  l'entité détruite (`mineScatterSpread`), à ramasser par `"pickup"`.
+  Contrairement à une fouille, elle est PERSISTANTE (`spawned: true`, id
+  `<entité>-drop-<n>`, `core/mining.js`/`dropLoot`) : gardée par la
+  sauvegarde et quand on quitte la scène, elle ne s'efface qu'au prochain
+  garnissage de la face, comme les objets d'une plage. Une entité placée à
+  la main ne revenant jamais, son butin ne doit pas se perdre. Tous les
+  tirages peuvent tomber sur `nothing` : l'entité se brise alors sans rien
+  livrer.
 - **Destruction** — l'entité est RETIRÉE du monde (`core/state.js`/
   `removeEntity`) ; la sauvegarde fige ce retrait. Placée à la main, elle ne
   revient jamais ; posée par une plage, le garnissage quotidien la remplace.
@@ -1124,7 +1129,7 @@ l'écriture du slot).
   `ITEM_REGISTRY` lui-même), même principe que les surfaces contre
   `SURFACE_REGISTRY`.
 - **Tags EFFECTIVEMENT portés — DÉRIVÉ, jamais stocké**
-  (`core/equipment.js`/`equippedTags`) : union des tags de chaque objet
+  (`core/equipment-slots.js`/`equippedTags`) : union des tags de chaque objet
   ÉQUIPÉ, même principe que `gaitOf` juste en dessous. UNIFIÉ
   joueur/compagnon/PNJ — la fonction ne connaît que la FORME `equipment`
   (`{ <slot>: <entrée>|null }`), jamais le type de porteur ;
@@ -1166,7 +1171,7 @@ l'écriture du slot).
   d'annonce.
 - **Persistance** — `session.equipment` traverse la partie comme `bag`/
   `money` (jamais dans un monde). Une sauvegarde ANTÉRIEURE à l'équipement
-  est rebouchée VIDE (`core/equipment.js`/`createEmptyEquipment`), JAMAIS
+  est rebouchée VIDE (`core/equipment-slots.js`/`createEmptyEquipment`), JAMAIS
   avec les baskets de départ : ce rebouchage vaut pour une partie DÉJÀ EN
   COURS, pas pour une partie neuve (voir `core/save.js`).
 

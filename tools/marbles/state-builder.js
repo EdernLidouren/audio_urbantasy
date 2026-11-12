@@ -15,7 +15,7 @@
 //     "discard": [],
 //     "pot": ["agate"], "lost": [],  le pot dans l'ordre d'arrivée, les billes perdues
 //     "tally": { "flick": { "turn": 1, "game": 3 } },   valeurs de partie, le reste à 0
-//     "settings": { "maxHandSize": 5, "throwsPerTurn": 5, "potCapacity": 3, "firstTurnDraw": 5, "drawPerTurn": 1, "turnCount": 9 }
+//     "settings": { "maxHandSize": 5, "throwsPerTurn": 5, "potCapacity": 3, "firstTurnDraw": 5, "drawPerTurn": 1, "turnCount": 10 }
 //   }
 // Une bille du triangle : "id" (usure 0), "id:usure", ou { marble, wear, bonus? }.
 // Une bille de la main : "id" (0 tour en main), "id:tours", ou { marble, turnsInHand }.
@@ -120,7 +120,6 @@ export function buildState(description = {}) {
     ...base,
     turn,
     stage,
-    endReason: stage === "over" ? "turnsCompleted" : null,
     score: checkInteger(description.score ?? 0, "score", 0),
     speed: Number.isInteger(description.speed ?? 0) ? description.speed ?? 0 : fail("speed doit être un entier."),
     mass: Number.isInteger(description.mass ?? 1) ? description.mass ?? 1 : fail("mass doit être un entier."),

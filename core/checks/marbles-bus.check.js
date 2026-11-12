@@ -5,7 +5,7 @@
 // (`node tools/run-checks.js marbles-bus`).
 
 import { MAX_EVENTS_PER_CHAIN, createEventBus } from "../marbles-bus.js";
-import { createMarblesGame, marbleListeners, marblesReduce } from "../marbles.js";
+import { marbleListeners } from "../marbles.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
 import { createMarblesRules } from "../marbles-rules.js";
 import { inHand } from "./helpers.js";

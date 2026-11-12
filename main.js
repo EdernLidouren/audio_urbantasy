@@ -18,7 +18,6 @@ import { playMenuSound } from "./view/menu-sounds.js";
 import { makeCityScreen } from "./view/city-screen.js";
 import { makeMarblesScreen } from "./view/marbles/screen.js";
 import { t, setI18nWarningHandler } from "./data/i18n/index.js";
-import { runChecks } from "./core/checks/index.js";
 import { isDebugEnabled, setDebugEnabled } from "./config/debug.js";
 import { startLoop } from "./lib/loop.js";
 import { loadSceneById } from "./scenes/load.js";
@@ -63,12 +62,11 @@ validateMarblesContent(MARBLE_TYPES);
 const marblesRules = createMarblesRules(MARBLE_TYPES);
 const newGame = parseNewGame(NEW_GAME, registry);
 
-// Un import n'expose rien au scope global : on l'attache explicitement à
-// window pour pouvoir appeler runChecks() depuis la console (voir
-// core/checks/index.js : runChecks("spawn") pour un seul domaine). Un
-// script type="module" s'exécute après le parsing du DOM (comme s'il avait
-// "defer"), donc le DOM est déjà prêt ici.
-window.runChecks = runChecks;
+// runChecks() depuis la console (voir core/checks/index.js : runChecks("spawn")
+// pour un seul domaine). Les vérifications, et les outils qu'elles testent, ne
+// se chargent qu'à l'appel (import dynamique) : jamais au démarrage du jeu, dont
+// elles feraient plus du tiers du code chargé. Rend une promesse du résultat.
+window.runChecks = async (...args) => (await import("./core/checks/index.js")).runChecks(...args);
 console.log("Vérifs dispo : tape runChecks()");
 
 // Mode DEBUG (voir config/debug.js) : PAS de menu — bascule DEPUIS LA

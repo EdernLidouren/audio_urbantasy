@@ -19,7 +19,7 @@ import { SURFACE_REGISTRY, DEFAULT_SURFACE } from "./surfaces.js";
 import { parseVariables } from "./variables.js";
 import { SPAWN_RANGE_DEFAULT_COUNT } from "../config/spawn-values.js";
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";
-import { validateDistribution, validateEntityTable } from "./distribution.js";
+import { NOTHING, validateDistribution, validateEntityTable } from "./distribution.js";
 import { fail, isNonEmptyString, isFiniteNumber, rejectUnknownFields, parseIntRange } from "./parse-common.js";
 import { parseEntity } from "./entity-parse.js";
 
@@ -187,11 +187,14 @@ export function validateReverbPresets(presets) {
 validateReverbPresets(REVERB_PRESETS);
 
 // Une PLAGE de collecte (voir core/spawn.js, doc/entity-model.md/"Collecte")
-// : { from, to, count?, distribution } — bornes comme un segment (from < to,
-// dans [0, length]), count entier >= 1 optionnel (défaut :
-// config/spawn-values.js/SPAWN_RANGE_DEFAULT_COUNT, résolu par le moteur),
-// distribution validée comme celle d'un conteneur.
-function parseSpawnRange(rawRange, index, length, prefix, registry) {
+// : { from, to, count?, distribution | entities } — bornes comme un segment
+// (from < to, dans [0, length]), count entier ou fourchette, 0 permis
+// (défaut : config/spawn-values.js/SPAWN_RANGE_DEFAULT_COUNT, résolu par le
+// moteur), plafonné par la capacité de la plage ; distribution (des objets)
+// validée comme celle d'un conteneur, ou entities (des types d'entités),
+// chaque type essayé ici comme le garnissage le construira.
+// `sceneVariables` : celles de la scène, pour cet essai (parseFace).
+function parseSpawnRange(rawRange, index, length, prefix, registry, sceneVariables) {
   const describe = `${prefix}spawnRanges[${index}]`;
   if (typeof rawRange !== "object" || rawRange === null) {
     fail(`${describe} n'est pas un objet.`);
@@ -202,8 +205,20 @@ function parseSpawnRange(rawRange, index, length, prefix, registry) {
   if ((distribution === undefined) === (entities === undefined)) {
     fail(`${describe} : déclarer soit distribution (des objets), soit entities (des types d'entités), jamais les deux.`);
   }
-  if (entities !== undefined) validateEntityTable(entities, registry, `${describe}.entities`, fail);
-  else validateDistribution(distribution, `${describe}.distribution`, fail);
+  if (entities !== undefined) {
+    validateEntityTable(entities, registry, `${describe}.entities`, fail);
+    // Chaque type, construit seul comme le garnissage le fera (core/spawn.js,
+    // parseSpawnedEntity) : un type qui exige un champ d'instance (un présentoir et
+    // son article) échoue ICI, au chargement de la scène, et non à l'arrivée dans
+    // le monde, une fois la vue précédente détruite.
+    for (const type of Object.keys(entities).filter((key) => key !== NOTHING)) {
+      try {
+        parseEntity({ id: "spawn-check", x: from, type }, 0, registry, length, new Set(), sceneVariables);
+      } catch (error) {
+        fail(`${describe}.entities : le type "${type}" ne peut pas apparaître seul dans une zone (${error.message.replace(/^parseScene: /, "")}).`);
+      }
+    }
+  } else validateDistribution(distribution, `${describe}.distribution`, fail);
 
   // `count` : combien d'emplacements, entier fixe ou fourchette (0 permis :
   // une zone peut rester vide certains jours). Plafonné par ce que la zone
@@ -326,7 +341,7 @@ function parseFace(raw, length, registry, describe, sceneVariables, seenIds = ne
     fail(`${prefix}spawnRanges doit être un tableau si présent (reçu : ${JSON.stringify(spawnRanges)}).`);
   }
   const parsedSpawnRanges =
-    spawnRanges !== undefined ? spawnRanges.map((rawRange, index) => parseSpawnRange(rawRange, index, length, prefix, registry)) : undefined;
+    spawnRanges !== undefined ? spawnRanges.map((rawRange, index) => parseSpawnRange(rawRange, index, length, prefix, registry, sceneVariables)) : undefined;
   // music : optionnel, chemin vers la musique de la scène (voir
   // view/audio/layers.js). Simple passage : parseScene ne connaît ni
   // Howler ni la lecture audio, juste la présence d'une chaîne.

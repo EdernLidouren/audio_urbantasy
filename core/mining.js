@@ -5,9 +5,8 @@
 // core/entity-parse.js/parseMineable, cascade instance -> archétype). Chaque
 // coup (action "mine" côté vue, view/action-execution.js) lui retire un point
 // de résistance ; au dernier, elle est DÉTRUITE et ce
-// qu'elle renfermait TOMBE AU SOL — une entité éphémère par objet, éparpillée
-// autour d'elle, MÊME geste que la fouille d'un conteneur
-// (core/spawn.js/searchContainer).
+// qu'elle renfermait TOMBE AU SOL — une entité PERSISTANTE par objet
+// (`spawned`, comme celles d'une plage), éparpillée autour d'elle (dropLoot).
 //
 // La résistance n'est PAS tirée au chargement : elle l'est au PREMIER coup
 // (`hitsLeft`, champ runtime plat sérialisé avec la partie), dans la
@@ -31,7 +30,8 @@
 
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";
 import { drawIntInRange } from "./rng.js";
-import { resolveFace, updateActiveFace, removeEntity, spawnScatteredEphemerals } from "./state.js";
+import { resolveFace, updateActiveFace, removeEntity, drawScatteredPosition } from "./state.js";
+import { presenceContextOf } from "./presence.js";
 import { drawItems, buildCollectibleSpec } from "./spawn.js";
 import { applyBreakTriggers } from "./triggers.js";
 
@@ -44,6 +44,31 @@ function drawLoot(mineable, rngState) {
   }
   const count = drawIntInRange(mineable.count, rngState);
   return drawItems(mineable.distribution, count.value, count.rngState);
+}
+
+// Le butin TOMBE AU SOL en entités PERSISTANTES (`spawned: true`, comme celles
+// d'une plage) : sauvegardées avec la partie, elles restent quand on quitte la
+// scène, et ne s'effacent qu'au prochain garnissage de la face (core/spawn.js,
+// le lendemain, pour une face qui a des sources de collecte), comme les objets
+// d'une plage. Éphémères, elles se perdaient à la sauvegarde, alors qu'une entité
+// placée à la main, une fois détruite, ne revient jamais. Ids `<entité>-drop-<n>` :
+// uniques, l'entité détruite ne revenant pas (celle d'une plage a un id unique
+// dans son cycle, et ses objets partent avec elle au garnissage suivant).
+// Positions tirées comme une fouille (drawScatteredPosition, PRNG de la face).
+function dropLoot(session, items, entity, world, registry) {
+  const side = session.player.side;
+  const presenceContext = presenceContextOf(session);
+  let next = session;
+  let { rngState } = resolveFace(next.worlds[next.activeWorldId], side);
+  items.forEach((item, index) => {
+    const face = resolveFace(next.worlds[next.activeWorldId], side);
+    const obstacles = [...face.entities, ...next.companions];
+    const draw = drawScatteredPosition(entity.x, TUNING_DEFAULTS.mineScatterSpread, world.length, obstacles, presenceContext, rngState);
+    rngState = draw.rngState;
+    const dropped = buildCollectibleSpec(item, `${entity.id}-drop-${index}`, draw.x, registry, world.length, world.variables);
+    next = updateActiveFace(next, { entities: [...face.entities, { ...dropped, spawned: true }] }, side);
+  });
+  return updateActiveFace(next, { rngState }, side);
 }
 
 // Un coup sur l'entité minable `entityId` de la FACE ACTIVE. Rend
@@ -82,10 +107,6 @@ export function mineEntity(session, entityId, registry) {
 
   const drawn = drawLoot(entity.mineable, rngState);
   const triggered = applyBreakTriggers(updateActiveFace(session, { rngState: drawn.rngState }, side), entity, side);
-  let nextSession = removeEntity(triggered.session, entityId);
-  for (const item of drawn.items) {
-    const spec = buildCollectibleSpec(item, `${entityId}-drop`, entity.x, registry, world.length, world.variables);
-    nextSession = spawnScatteredEphemerals(nextSession, spec, entity.x, 1, TUNING_DEFAULTS.mineScatterSpread);
-  }
+  const nextSession = dropLoot(removeEntity(triggered.session, entityId), drawn.items, entity, world, registry);
   return { session: nextSession, status: "broken", strike, items: drawn.items, fired: triggered.fired };
 }

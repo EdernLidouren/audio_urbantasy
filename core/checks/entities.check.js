@@ -304,6 +304,11 @@ export default function checkEntities(run) {
   run("registre des types : messageRotation vide refusé", true, registryThrows({ sign: { messageRotation: "" } }).includes("messageRotation"));
   run("registre des types : période de rotation nulle refusée", true, registryThrows({ sign: { messageRotationMinutes: 0 } }).includes("messageRotationMinutes"));
   run("tuning : période de rotation négative refusée (instance)", true, entityMessage({ tuning: { messageRotationMinutes: -60 } }).includes("messageRotationMinutes"));
+  // La gamme du geste de minage : une liste non vide de nombres, sinon refusée.
+  run("registre des types : gamme de minage acceptée", "accepté", registryThrows({ rock: { nameKey: "entity.rock.name", mineStrikeScale: [0, 2, 4] } }));
+  for (const [label, scale] of [["vide", []], ["texte", "loud"], ["valeur non numérique", [0, "x"]]]) {
+    run(`registre des types : gamme de minage ${label} refusée`, true, registryThrows({ rock: { nameKey: "entity.rock.name", mineStrikeScale: scale } }).includes("mineStrikeScale"));
+  }
   run("registre des types : vitesse de fondu nulle refusée (descripteur)", true, registryThrows({ lamp: { nameKey: "entity.lamp.name", sounds: { beacon: { path: "assets/sounds/a", beaconFadeRate: 0 } } } }).includes("beaconFadeRate"));
 
   // --- Cadence conditionnelle du vocal (sounds.vocal.rules, voir

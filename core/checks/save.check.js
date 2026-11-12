@@ -206,7 +206,15 @@ export default function checkSave(run) {
     version: SAVE_VERSION,
     data: {
       ...auditSession,
-      worlds: { ...auditSession.worlds, [renameWorldId]: { ...renameWorld, entities: [...renameWorld.entities, legacyProjector, ghostEntity, legacySpawner] } },
+      worlds: {
+        ...auditSession.worlds,
+        [renameWorldId]: {
+          ...renameWorld,
+          entities: [...renameWorld.entities, legacyProjector, ghostEntity, legacySpawner],
+          // Une plage de types figée avec la face : ses clés sont des types.
+          spawnRanges: [{ from: 1, to: 5, entities: { film_projector: 2, nothing: 1 } }],
+        },
+      },
       companions: [...auditSession.companions, ghostCompanion],
     },
   };
@@ -224,6 +232,11 @@ export default function checkSave(run) {
     migratedSpawner && [migratedSpawner.action.effects[0], migratedSpawner.triggers[0].effects[0], migratedSpawner.pendingEffects[0].effects[0]].map((e) => e.spec.type).join(",")
   );
   run("save renommages : clé i18n du spec renommée aussi", "entity.video_projector.name", migratedSpawner && migratedSpawner.triggers[0].effects[0].spec.labelKey);
+  run.same(
+    "save renommages : clés d'une plage de types renommées, poids gardés",
+    { video_projector: 2, nothing: 1 },
+    renameResult.success ? renameResult.session.worlds[renameWorldId].spawnRanges[0].entities : null
+  );
   run.same(
     "save renommages : idempotent (une partie déjà migrée ne change plus)",
     renameResult.session,

@@ -17,7 +17,6 @@ export const REPORT_HEADINGS = {
   title: "Simulation du jeu des billes.",
   score: "Score final.",
   impact: "Impact par tour.",
-  end: "Fin de partie.",
   replacements: "Poses, moyennes par partie.",
   draws: "Pioche et lancers.",
   marbles: "Par bille, moyennes par partie où elle est dans le sac.",
@@ -26,7 +25,7 @@ export const REPORT_HEADINGS = {
   interruptions: "Enchaînements interrompus : ",
 };
 // Les sections des résultats d'une partie : ce qui change quand le jeu change.
-export const REPORT_RESULT_HEADINGS = [REPORT_HEADINGS.score, REPORT_HEADINGS.impact, REPORT_HEADINGS.end];
+export const REPORT_RESULT_HEADINGS = [REPORT_HEADINGS.score, REPORT_HEADINGS.impact];
 
 // Seuil des billes « presque jamais posées », en poses par partie.
 export const RARELY_PLACED = 0.25;
@@ -133,7 +132,7 @@ export function observations(summary, name) {
 // Le rapport, ligne par ligne. `name(id)` : le nom d'une bille (son id par défaut).
 export function buildReport({ params, summary, name }) {
   const n = frNumber;
-  const { score, impact, end, replacements, draws } = summary;
+  const { score, impact, replacements, draws } = summary;
   const randomBags = params.bagMode.kind === "random";
   const lastTurns = impact.perTurn.map(({ turn, mean, games }) =>
     games === summary.games ? `Tour ${turn} : ${n(mean)}.` : `Tour ${turn} : ${n(mean)}, sur ${games} parties.`
@@ -153,9 +152,6 @@ export function buildReport({ params, summary, name }) {
     `Moyenne ${n(impact.mean)} par tour joué.`,
     ...lastTurns,
     "",
-    REPORT_HEADINGS.end,
-    `Par le nombre de tours : ${n(end.turnsCompleted)} %. Par pioche impossible, faute de billes : ${n(end.outOfMarbles)} %.`,
-    "",
     REPORT_HEADINGS.replacements,
     `Poses sur un emplacement occupé : ${n(replacements.perGame)}.`,
     ...PLACEMENT_TRIGGERS.map(({ id }) => `Apporté par ${TRIGGER_WORDS[id].brought} : Vitesse ${n(replacements[`${id}Speed`])}, Masse ${n(replacements[`${id}Mass`])}.`),
@@ -164,7 +160,6 @@ export function buildReport({ params, summary, name }) {
     `Billes piochées par des effets : ${n(draws.byEffect)} par partie.`,
     `Régénérations du sac : ${n(draws.regenerations)} par partie, dont ${n(draws.midTurnRegenerations)} en cours de tour.`,
     `Lancers : ${n(summary.throwsPerTurn)} par tour joué.`,
-    `Fins de partie par pioche impossible : ${n(end.outOfMarbles)} %.`,
     "",
     REPORT_HEADINGS.marbles,
     ...summary.marbles.flatMap((marble) => marbleLines(marble, name, randomBags)),

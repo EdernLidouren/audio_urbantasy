@@ -21,7 +21,6 @@
 
 import { MARBLES_DRAWN_VALUE } from "./drawn-value.js";
 import { SLOTS, UNKNOWN_MARBLE, legalActions } from "../../core/marbles.js";
-import { forecast } from "../../core/marbles-forecast.js";
 import { createSeed, nextRandom } from "../../core/rng.js";
 import { GAME_RULES } from "./game-rules.js";
 

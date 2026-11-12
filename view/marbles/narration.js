@@ -656,7 +656,7 @@ const EVENT_TEXTS = {
   // Au dernier tour, la partie finit avant que le triangle ne serve : la rotation
   // ne se dit pas.
   rotation: (event, t, context) => (context.endsBeforeNextTurn ? null : t("marbles.event.rotation", ROTATION)),
-  gameOver: (event, t) => t(`marbles.event.game_over.${event.reason}`, { score: event.score }),
+  gameOver: (event, t) => t("marbles.event.game_over", { score: event.score }),
 };
 
 // Le moment d'un choix, devant sa question : la bille qui le pose et son moment

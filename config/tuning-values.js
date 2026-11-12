@@ -187,7 +187,7 @@ export const TUNING_DEFAULTS = {
   // Envoi de réverb des ÉMOTES (sifflement, claquement de mains... voir
   // core/emotes.js), jouées sur le joueur comme ses pas. Plus haut que le
   // pas : une émote est un son qu'on PROJETTE dans l'espace, sa queue de
-  // réverb dit la taille du lieu (une salle ne répond pas comme une place).
+  // réverb dit la taille de l'espace (une salle ne répond pas comme une place).
   emoteReverbSend: 0.45,
 
   // Variation de ton des émotes, même sens que pitchVariation : vitesse de

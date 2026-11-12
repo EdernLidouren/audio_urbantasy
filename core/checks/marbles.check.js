@@ -9,13 +9,8 @@ import { auditNonSerializable, throws } from "../../lib/check.js";
 import { nextRandom } from "../rng.js";
 import {
   SLOTS,
-  END_REASONS,
-  createMarblesGame,
-  marblesReduce,
-  effectAt,
   impactOf,
   legalActions,
-  maxWearOf,
   swapRefusal,
   placeRefusal,
   throwRefusal,
@@ -981,6 +976,22 @@ function checkEject(run) {
   run("validation, « toutes » : un calibre inconnu refusé", true, refused("hit", { action: "eject", target: { type: "all", filters: [{ type: "size", size: 9 }] } }));
   run("validation, « toutes » : deux filtres de calibre refusés", true, refused("hit", { action: "eject", target: { type: "all", filters: [{ type: "size", size: SMALL }, { type: "size", size: LARGE }] } }));
   run("validation, « toutes » : pour une autre action refusé", true, refused("hit", { action: "polish", amount: 1, target: { type: "all" } }));
+  // Une condition sur une action sans montant : elle vaudrait toujours 0.
+  const printedOn = (stat) => refused("hit", { action: "speed", amount: 1, when: { type: "printedStat", slot: "apex", stat, atLeast: 1 } });
+  run("validation, condition imprimée : sur Empocher refusée", true, printedOn("pocket"));
+  run("validation, condition imprimée : sur Éjecter refusée", true, printedOn("eject"));
+  run("validation, condition imprimée : sur la Fêlure permise", false, printedOn("crack"));
+
+  // Un choix pendant une Éjection ne propose jamais l'emplacement de la bille qui part.
+  const leaving = fabricatedRules({
+    k: { knockout: [{ action: "eject", target: { type: "choice", zones: ["triangle"], pick: "marble", count: 1 } }] },
+    p: {},
+  });
+  const replacing = leaving.reduce(
+    { ...leaving.createGame(1, { bag: ["p"] }), stage: "play", bag: [], hand: [{ marble: "p", turnsInHand: 0 }], triangle: { leftBase: { marble: "k", wear: 0 }, rightBase: { marble: "p", wear: 0 }, apex: null } },
+    { type: "place", handIndex: 0, slot: "leftBase" }
+  ).state;
+  run.same("choix pendant une Éjection : l'emplacement de la bille qui part n'est pas éligible", ["rightBase"], replacing.pendingChoice.eligible.map((target) => target.slot));
   run("validation, « toutes » : sans filtre permis", false, refused("hit", { action: "eject", target: { type: "all" } }));
 
   // Toutes les minibilles actives : dans l'ordre des phases, seulement elles.
@@ -2299,11 +2310,14 @@ function pickTotals(result) {
 
 function checkEndOfGame(run) {
   // Après le dernier tour.
-  const lastTurn = apply(playState({ turn: 9, score: 3, triangle: triangleOf(placed("clay"), null, null) }), { type: "resolve" });
-  run("fin : après le 9e tour", "over", lastTurn.state.stage);
-  run("fin : motif", "turnsCompleted", lastTurn.state.endReason);
-  run("fin : le tour reste à 9", 9, lastTurn.state.turn);
-  run.same("fin : dernier du journal", { type: "gameOver", reason: "turnsCompleted", score: 4 }, lastTurn.events.at(-1));
+  const lastTurn = apply(playState({ turn: 10, turnCount: 10, score: 3, triangle: triangleOf(placed("clay"), null, null) }), { type: "resolve" });
+  run("fin : après le dernier tour", "over", lastTurn.state.stage);
+  run("fin : le tour reste au dernier", 10, lastTurn.state.turn);
+  run.same("fin : dernier du journal", { type: "gameOver", score: 4 }, lastTurn.events.at(-1));
+  run("fin : le nombre de tours vient des réglages", 10, rules.createGame(1).turnCount);
+  const shortGame = apply(playState({ turn: 3, turnCount: 3, triangle: triangleOf(placed("clay"), null, null) }), { type: "resolve" });
+  run("fin : un nombre de tours réglé, la fin suit", "over", shortGame.state.stage);
+  run("fin : avant le dernier tour, la partie continue", "draw", apply(playState({ turn: 9, turnCount: 10 }), { type: "resolve" }).state.stage);
   run.same("fin : la rotation et la fin du tour ont lieu avant", ["rotation", "turnEnded"], eventTypes(lastTurn.events).slice(-3, -1));
   run("fin : plus aucune action", "gameOver", rules.reduce(lastTurn.state, { type: "draw" }).error);
   run("fin : plus de résolution", "gameOver", rules.reduce(lastTurn.state, { type: "resolve" }).error);
@@ -2318,14 +2332,16 @@ function checkEndOfGame(run) {
   run("sac régénéré de 2 billes : la partie continue", "play", small.state.stage);
   run.same("sac régénéré de 2 billes : journal", ["turnStarted", "bagRegenerated", "draw", "awaken"], eventTypes(small.events));
 
-  // Pioche impossible, faute de billes : la partie finit.
+  // Pioche impossible, faute de billes : dite, et la partie continue.
   const empty = apply({ ...playState({ score: 12, hand: inHand(["clay"]), bag: [], discard: [] }), stage: "draw" }, { type: "draw" });
-  run("sac et défausse vides : partie finie", "over", empty.state.stage);
-  run("sac et défausse vides : motif", "outOfMarbles", empty.state.endReason);
-  run.same("sac et défausse vides : journal", ["turnStarted", "drawSkipped", "gameOver"], eventTypes(empty.events));
+  run("sac et défausse vides : la partie continue", "play", empty.state.stage);
+  run.same("sac et défausse vides : journal", ["turnStarted", "drawSkipped"], eventTypes(empty.events));
   run("sac et défausse vides : arrêt annoncé", "noMarbles", empty.events[1].reason);
-  run.same("sac et défausse vides : score compté", { type: "gameOver", reason: "outOfMarbles", score: 12 }, empty.events[2]);
-  run("sac et défausse vides : plus de pose", "gameOver", placeRefusal(empty.state, 0, "apex"));
+  run("sac et défausse vides : la main se joue", null, placeRefusal(empty.state, 0, "apex"));
+  // Plus aucune bille nulle part : chaque tour se résout à vide jusqu'au dernier.
+  const nothing = apply({ ...playState({ turn: 10, turnCount: 10, hand: inHand([]), bag: [], discard: [] }), stage: "draw" }, { type: "draw" });
+  run("plus aucune bille : le tour se joue quand même", "play", nothing.state.stage);
+  run("plus aucune bille : la résolution du dernier tour finit la partie", "over", apply(nothing.state, { type: "resolve" }).state.stage);
 
   // Une seule bille piochée sur trois : la partie continue.
   const partial = apply({ ...playState({ hand: inHand([]), bag: ["glass"], discard: [], drawPerTurn: 3 }), stage: "draw" }, { type: "draw" });
@@ -2338,10 +2354,9 @@ function checkEndOfGame(run) {
   run("main pleine, rien à piocher : motif de l'arrêt", "handFull", full.events[1].reason);
 
   // Plus de sac minimal : un sac plus petit que le triangle se joue, un sac vide
-  // s'arrête à la première pioche, faute de billes.
+  // aussi, à vide.
   run("sac de 2 billes : la partie se joue", "play", apply(rules.createGame(1, { bag: ["clay", "glass"] }), { type: "draw" }).state.stage);
-  run("sac vide : partie finie à la première pioche", "outOfMarbles", apply(rules.createGame(1, { bag: [] }), { type: "draw" }).state.endReason);
-  run.same("fins de partie : les raisons, dans l'ordre", ["outOfMarbles", "turnsCompleted"], END_REASONS);
+  run("sac vide : la partie se joue, à vide", "play", apply(rules.createGame(1, { bag: [] }), { type: "draw" }).state.stage);
 }
 
 // Une partie complète, décisions fixes : toujours la première bille sur les
@@ -2371,8 +2386,8 @@ function checkDeterminism(run) {
   const b = scriptedGame(1234);
   run.same("déterminisme : même journal", a.journal, b.journal);
   run.same("déterminisme : même état final", a.state, b.state);
-  run("partie complète : 9 tours joués", 9, a.journal.filter((event) => event.type === "turnStarted").length);
-  run("partie complète : fin normale", "turnsCompleted", a.state.endReason);
+  run("partie complète : tous les tours joués", a.state.turnCount, a.journal.filter((event) => event.type === "turnStarted").length);
+  run("partie complète : finie", "over", a.state.stage);
   run("partie complète : billes conservées", STARTING_BAG.length, marbleCount(a.state));
   run("autre graine : autre partie", false, JSON.stringify(a.journal) === JSON.stringify(scriptedGame(1235).journal));
   run("graine en chaîne acceptée", true, scriptedGame("billes").state.stage === "over");
@@ -2555,7 +2570,7 @@ function checkLegalActions(run) {
     "tour 2, échange possible": playState({ hand: inHand(["clay", "glass"]), triangle: triangleOf(placed("agate"), null, placed("mica")) }),
     "tour 2, échange déjà fait": playState({ hand: inHand(["clay"]), swapUsed: true, triangle: triangleOf(placed("agate"), null, null) }),
     "tour 2, triangle vide, main vide": playState({ hand: inHand([]) }),
-    "partie finie": playState({ stage: "over", endReason: "turnsCompleted" }),
+    "partie finie": playState({ stage: "over" }),
   };
   for (const [label, state] of Object.entries(cases)) {
     run.same(`actions légales : ${label}, celles que le réducteur accepte`, accepted(state), listed(state));

@@ -4,7 +4,7 @@
 // ÉTAT sérialisable, à part entière (jamais lié à la session du jeu principal,
 // aucune persistance aujourd'hui) :
 //   { rngState, maxHandSize, throwsPerTurn, potCapacity, firstTurnDraw, drawPerTurn,
-//     turnCount, turn, score, speed, mass, stage, endReason, bag, hand, discard,
+//     turnCount, turn, score, speed, mass, stage, bag, hand, discard,
 //     triangle, pot, lost, swapUsed, throwsUsed, tally, pendingChoice }
 // `pot` : les billes EN POCHE, des ids dans l'ordre d'arrivée, au plus
 // `potCapacity` ; `lost` : les billes PERDUES, envoyées au pot plein. Ni l'une ni
@@ -52,10 +52,10 @@
 // de chaque résolution.
 //
 // `stage` découpe le tour : "draw" (la pioche reste à faire), "play" (échange
-// et pose, jusqu'à la résolution), "over" (partie finie, endReason dit
-// pourquoi : une raison de END_CONDITIONS). À la fin d'une résolution, `turn`
+// et pose, jusqu'à la résolution), "over" (partie finie, après la résolution du
+// tour `turnCount`, la seule fin de partie). À la fin d'une résolution, `turn`
 // passe au tour suivant, sauf si la partie s'arrête : il reste alors sur le
-// dernier tour joué, jamais « 10 sur 9 ».
+// dernier tour joué, jamais « 11 sur 10 ».
 //
 // ACTIONS — marblesReduce(state, action, types) :
 //   { type: "draw" }                            pioche du tour
@@ -83,7 +83,7 @@
 //   turnStarted { turn, turnCount }, draw { marble, cause }, drawSkipped { reason },
 //   bagRegenerated { size }, swapped { a, b },
 //   awaken { marble }, flick { slot, marble, turnsInHand }, windfall { slot, marble },
-//   knockout { slot, marble, replacement }, removed { slot, marble, cause },
+//   knockout { slot, marble, replacement, by? }, removed { slot, marble, cause },
 //   discarded { slot, marble, cause }, placed { slot, marble },
 //   hit { slot, marble, replacement }, final { slot, marble },
 //   phase { slot, marble }, phaseSkipped { slot },
@@ -100,7 +100,7 @@
 //   eject { slot, marble, by },
 //   wear { slot, marble, wear, maxWear },
 //   impact { speed, mass, impact, score },
-//   rotation { triangle }, turnEnded { turn }, gameOver { reason, score }.
+//   rotation { triangle }, turnEnded { turn }, gameOver { score }.
 // `awaken` : juste après chaque `draw` d'une bille réellement piochée, la bille
 // désormais en main (à 0 tour en main) ; son Éveil et tout ce qui en découle se
 // règlent avant la bille suivante (une interruption, comme la Trouvaille). À
@@ -117,9 +117,10 @@
 // interruption), puis `removed` et `discarded` de cause "eject". Un `effect` d'une
 // Éjection ainsi provoquée porte `ejectedBy` (le `by` de l'éjection) : ce n'est pas
 // celle d'une pose.
-// `cause` : "replacement", "wear", "pocket" ou "eject". `trigger` : "phase" ou l'id d'un déclencheur
-// (config/marbles-values.js/MARBLE_TRIGGERS : "flick", "hit", "windfall", "knockout",
-// "final").
+// `cause` : "replacement", "wear", "pocket" ou "eject". `trigger` : "phase", l'id d'un
+// déclencheur (config/marbles-values.js/MARBLE_TRIGGERS : "awaken", "flick", "hit",
+// "windfall", "knockout", "final") ou d'un moment En poche (MARBLE_POCKET :
+// "pocketEntry", "pocketResolution", "pocketReaction").
 // `final` : une bille usée vient de rejoindre la défausse depuis `slot`.
 // `pocketed` : une bille entre au pot (Empocher) depuis `from` ("triangle", et son
 // `slot` ; "hand", et son `index` ; "discard"), produite par l'effet `by`
@@ -645,7 +646,6 @@ export function createMarblesGame(seed, options = {}, types) {
     speed: 0,
     mass: 1,
     stage: "draw",
-    endReason: null,
     bag: shuffle.list,
     hand: [],
     discard: [],
@@ -752,30 +752,18 @@ function refused(state, error) {
 
 // --- Fin de partie ---
 
-// TOUTES les conditions de fin de partie, ici et nulle part ailleurs. Chacune est
-// consultée à un MOMENT du tour :
-//   "turnDraw"  après la pioche du début de tour ; `context` : { drawn, stopped },
-//               les billes piochées et ce qui a arrêté la pioche (drawMarbles) ;
-//   "turnEnd"   après la rotation, en fin de résolution.
-// La première qui répond l'emporte, sa `reason` devient endReason et a son texte,
-// `marbles.event.game_over.<reason>`. Un futur mode (un Impact minimal à
-// atteindre…) branche ici les siennes. Une main pleine n'arrête jamais la partie.
-const END_CONDITIONS = [
-  // La pioche du tour n'a pu donner aucune bille, faute de billes.
-  { reason: "outOfMarbles", moment: "turnDraw", test: (state, { drawn, stopped }) => drawn === 0 && stopped === "noMarbles" },
-  { reason: "turnsCompleted", moment: "turnEnd", test: (state) => state.turn >= state.turnCount },
-];
-
-export const END_REASONS = END_CONDITIONS.map((condition) => condition.reason);
-
-// La raison de finir à ce moment, ou null.
-function endReasonAt(moment, state, context = {}) {
-  return END_CONDITIONS.find((condition) => condition.moment === moment && condition.test(state, context))?.reason ?? null;
+// LA fin de partie, la seule : la résolution du dernier tour, `turnCount`
+// (config/marbles-values.js, MARBLES_SETTINGS). Ni le sac ni la main n'arrêtent la
+// partie : une pioche impossible se dit (drawSkipped) et le tour se joue avec ce
+// qu'on a, même rien. Des conditions de fin plus riches (modes de partie) seront
+// conçues à neuf (doc/marbles-backlog.md).
+function isLastTurn(state) {
+  return state.turn >= state.turnCount;
 }
 
-function endGame(run, reason) {
-  update(run, { stage: "over", endReason: reason });
-  run.emit({ type: "gameOver", reason, score: run.state.score });
+function endGame(run) {
+  update(run, { stage: "over" });
+  run.emit({ type: "gameOver", score: run.state.score });
 }
 
 // --- Écouteurs ---
@@ -901,11 +889,15 @@ function pocketReactionsOf(run, event, before) {
 // Les cibles d'une zone de choix disponible (core/marbles-effects.js/CHOICE_ZONES),
 // valides à cet instant : (run, pick, bonus) -> [cible]. `bonus` : l'action est un
 // bonus de Vitesse ou de Masse, qui ne vaut que pour une phase encore à venir (règle
-// des cibles) : un emplacement dont la phase a commencé n'est pas éligible.
+// des cibles) : un emplacement dont la phase a commencé n'est pas éligible. Un
+// emplacement dont l'Éjection est en cours (`run.knockingOut`) ne l'est jamais : sa
+// bille part, une action sur elle ne ferait rien et un bonus s'y perdrait.
 const CHOICE_TARGETS = {
   hand: (run) => run.state.hand.map(({ marble }, index) => ({ zone: "hand", index, marble })),
   triangle: (run, pick, bonus) =>
-    SLOTS.filter((slot) => (pick === "slot" || run.state.triangle[slot] !== null) && !(bonus && run.phasesStarted.has(slot))).map((slot) => ({
+    SLOTS.filter(
+      (slot) => (pick === "slot" || run.state.triangle[slot] !== null) && !(bonus && run.phasesStarted.has(slot)) && !run.knockingOut.has(slot)
+    ).map((slot) => ({
       zone: "triangle",
       slot,
       marble: run.state.triangle[slot]?.marble ?? null,
@@ -1237,8 +1229,8 @@ function applyMarbleAction(run, action, amount, slot, by) {
   if (rule.retires && wear >= maxWear) retireMarble(run, slot);
 }
 
-// Le traitement d'un évènement par le bus : ses écouteurs (il est déjà au journal).
-// Le traitement d'un évènement par le bus : les effets des billes concernées, puis
+// Le traitement d'un évènement par le bus (il est déjà au journal) : les effets des
+// billes concernées, puis
 // les réactions des billes du pot (pocketReactionsOf, relevées à son émission),
 // émises dans la file : pas de récursion.
 function handleEvent(run, event) {
@@ -1423,17 +1415,13 @@ function drawMarbles(run, count, cause) {
 
 // Début de tour : les billes déjà en main y passent un tour de plus, puis la pioche,
 // `firstTurnDraw` billes au premier tour, `drawPerTurn` ensuite ; une bille piochée
-// maintenant reste donc à 0. La pioche peut finir la partie (END_CONDITIONS).
+// maintenant reste donc à 0. Une pioche impossible ne finit jamais la partie : le
+// tour se joue avec la main qu'on a.
 function drawTurn(run) {
   const { state } = run;
   run.emit({ type: "turnStarted", turn: state.turn, turnCount: state.turnCount });
   update(run, { hand: run.state.hand.map((held) => ({ ...held, turnsInHand: held.turnsInHand + 1 })) });
-  const result = drawMarbles(run, state.turn === 1 ? state.firstTurnDraw : state.drawPerTurn, "turn");
-  const reason = endReasonAt("turnDraw", run.state, result);
-  if (reason !== null) {
-    endGame(run, reason);
-    return;
-  }
+  drawMarbles(run, state.turn === 1 ? state.firstTurnDraw : state.drawPerTurn, "turn");
   update(run, { stage: "play", swapUsed: false, throwsUsed: 0 });
 }
 
@@ -1591,8 +1579,7 @@ function resolveTurn(run) {
   run.emit({ type: "rotation", triangle });
   run.emit({ type: "turnEnded", turn: run.state.turn });
 
-  const reason = endReasonAt("turnEnd", run.state);
-  if (reason !== null) endGame(run, reason);
+  if (isLastTurn(run.state)) endGame(run);
   else update(run, { turn: run.state.turn + 1, stage: "draw" });
 }
 

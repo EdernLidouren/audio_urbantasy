@@ -9,7 +9,8 @@ import { createInitialState, getActiveWorld, switchSide, removeEntity } from "..
 import { addMoney, pickupEntity, lootUniqueEntity } from "../money.js";
 import { addItem, pickupItemEntity, removeItem, dropItem } from "../bag.js";
 import { ITEM_REGISTRY, itemProps, validateItemRegistry, itemSounds } from "../items.js";
-import { EQUIPMENT_SLOTS, createEmptyEquipment, gaitOf, equipItem, unequipItem, equippedTags } from "../equipment.js";
+import { gaitOf, equipItem, unequipItem } from "../equipment.js";
+import { EQUIPMENT_SLOTS, createEmptyEquipment, equippedTags } from "../equipment-slots.js";
 import { TAG_REGISTRY, tagProps } from "../tags.js";
 import { evaluateCondition } from "../presence.js";
 import { ownedQuantity } from "../trade.js";
@@ -242,7 +243,7 @@ export default function checkInventory(run) {
   );
 
   // --- Tags d'objets (core/tags.js, core/items.js/ITEM_REGISTRY.tags,
-  // core/equipment.js/equippedTags, condition "hasEquipmentTag") ---
+  // core/equipment-slots.js/equippedTags, condition "hasEquipmentTag") ---
 
   run("tags : registre — military a la bonne clé i18n", "tag.military", tagProps("military").labelKey);
   run("tags : registre — clé inconnue -> undefined", undefined, tagProps("does-not-exist"));

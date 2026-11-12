@@ -74,7 +74,7 @@ import { INITIAL_TIME } from "./time.js";
 import { createInitialWeather } from "./weather.js";
 import { parseVariables, applyActionEffects } from "./variables.js";
 import { sequenceHead, sequenceTail } from "./sequence.js";
-import { createEmptyEquipment } from "./equipment.js";
+import { createEmptyEquipment } from "./equipment-slots.js";
 
 function fail(message) {
   throw new Error(`createInitialState: ${message}`);

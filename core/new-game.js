@@ -14,7 +14,7 @@
 // (émotes connues, forme de session.emotes, voir core/emotes.js).
 
 import { ITEM_REGISTRY } from "./items.js";
-import { EQUIPMENT_SLOTS, createEmptyEquipment } from "./equipment.js";
+import { EQUIPMENT_SLOTS, createEmptyEquipment } from "./equipment-slots.js";
 import { addItem } from "./bag.js";
 import { parseEntity } from "./entity-parse.js";
 import { parseVariables } from "./variables.js";

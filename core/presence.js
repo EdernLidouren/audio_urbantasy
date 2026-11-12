@@ -54,7 +54,7 @@
 // l'entité (ex. "arrived"). Étendre le contexte ne change jamais la
 // signature de evaluateCondition, seulement ce que context transporte.
 
-import { equippedTags } from "./equipment.js";
+import { equippedTags } from "./equipment-slots.js";
 import { temporalThresholdOffset } from "./temporal-spread.js";
 import { TIME_CONFIG } from "../config/time-values.js";
 import { MINUTES_PER_DAY } from "./time.js";
@@ -162,7 +162,7 @@ function evaluateConsumed(cond, context) {
 
 // "hasEquipmentTag" : vraie si le JOUEUR (context.playerEquipment — PAS
 // context.entity, voir plus bas) porte, dans son PROPRE équipement, un
-// objet marqué de ce tag — voir core/equipment.js/equippedTags, qui fait
+// objet marqué de ce tag — voir core/equipment-slots.js/equippedTags, qui fait
 // déjà tout le travail d'union et ignore le type de porteur. Contexte sans
 // équipement joueur (ex. hors d'une interaction) -> false, jamais une
 // exception — même repli défensif que evaluateArrived/evaluateConsumed

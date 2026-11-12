@@ -187,16 +187,13 @@ export function recordEvents(record, events, actionType, drawers) {
       case "chainInterrupted":
         record.interruptions += 1;
         break;
-      case "gameOver":
-        record.endReason = event.reason;
-        break;
       default:
     }
   }
 }
 
 // Une partie jouée de bout en bout. -> son relevé :
-//   { index, seed, bag, score, endReason, turns, impacts, replacements,
+//   { index, seed, bag, score, turns, impacts, replacements,
 //     <déclencheur>: { speed, mass } (hit, knockout…), effectDraws, regenerations,
 //     midTurnRegenerations, throws, refusals, interruptions, marbles: { id: stats } }
 // `interruptions` : les enchaînements arrêtés par la limite de sécurité du bus
@@ -213,7 +210,6 @@ export function playGame({ index, seed, player, playerOptions = {}, bagMode, set
     seed: gameSeed,
     bag,
     score: 0,
-    endReason: null,
     turns: 0,
     impacts: [],
     replacements: 0,

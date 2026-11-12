@@ -44,7 +44,6 @@ function marbleSummary(id, games, randomBags) {
 // -> le résumé :
 //   { games, score: { mean, median, min, max, p10, p25, p75, p90 },
 //     impact: { mean, perTurn: [{ turn, mean, games }] },
-//     end: { turnsCompleted, outOfMarbles } (en % des parties),
 //     replacements: { perGame, <déclencheur de pose>Speed, …Mass } (par partie : flick,
 //       hit, knockout ; la Chiquenaude, à chaque pose, s'y range avec eux),
 //     draws: { byEffect, regenerations, midTurnRegenerations } (par partie),
@@ -58,7 +57,6 @@ export function summarize({ params, games }) {
     const impacts = games.filter((game) => game.impacts.length >= turn).map((game) => game.impacts[turn - 1]);
     perTurn.push({ turn, mean: round(mean(impacts)), games: impacts.length });
   }
-  const share = (reason) => round((100 * games.filter((game) => game.endReason === reason).length) / games.length);
   const perGame = (read) => round(mean(games.map(read)));
   const randomBags = params.bagMode.kind === "random";
   return {
@@ -74,7 +72,6 @@ export function summarize({ params, games }) {
       p90: round(percentile(scores, 90)),
     },
     impact: { mean: round(mean(games.flatMap((game) => game.impacts))), perTurn },
-    end: { turnsCompleted: share("turnsCompleted"), outOfMarbles: share("outOfMarbles") },
     replacements: {
       perGame: perGame((game) => game.replacements),
       ...Object.fromEntries(

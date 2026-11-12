@@ -80,7 +80,7 @@ function validateVocalRules(rules, describe, failWith) {
 // `tuning` d'instance, premier niveau d'archétype.
 const TRANSITION_SOUND_NATURES = ["diegetic", "meta"];
 function validateTuningValues(holder, describe, failWith = fail) {
-  const { beaconFadeMs, beaconFadeRate, transitionSoundNature, messageRotationMinutes } = holder;
+  const { beaconFadeMs, beaconFadeRate, transitionSoundNature, messageRotationMinutes, mineStrikeScale } = holder;
   if (beaconFadeMs !== undefined && !(Number.isFinite(beaconFadeMs) && beaconFadeMs >= 0)) {
     failWith(`${describe}.beaconFadeMs doit être un nombre de ms >= 0 (reçu : ${JSON.stringify(beaconFadeMs)}).`);
   }
@@ -92,6 +92,11 @@ function validateTuningValues(holder, describe, failWith = fail) {
   }
   if (messageRotationMinutes !== undefined && !(Number.isFinite(messageRotationMinutes) && messageRotationMinutes > 0)) {
     failWith(`${describe}.messageRotationMinutes doit être un nombre de minutes > 0 (reçu : ${JSON.stringify(messageRotationMinutes)}).`);
+  }
+  // La gamme du geste de minage, en demi-tons (view/action-execution.js) : une
+  // valeur fausse donnerait une vitesse de lecture invalide, sans erreur.
+  if (mineStrikeScale !== undefined && !(Array.isArray(mineStrikeScale) && mineStrikeScale.length > 0 && mineStrikeScale.every(Number.isFinite))) {
+    failWith(`${describe}.mineStrikeScale doit être une liste non vide de nombres (demi-tons) (reçu : ${JSON.stringify(mineStrikeScale)}).`);
   }
 }
 
