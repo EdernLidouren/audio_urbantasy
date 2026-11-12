@@ -167,11 +167,45 @@ node tools/run-checks.js marbles-tools
 ```
 
 Domaine `marbles-tools` (`core/checks/marbles-tools.check.js`) : état construit,
-journal lisible, vue publique des joueurs, choix du glouton contre une recherche
-exhaustive, aucune action refusée sur des centaines de parties, glouton meilleur que
-l'aléatoire, déterminisme du rapport, surcharges, sacs, égalité des chiffres entre
-rapport et exports, attribution des pioches à l'effet qui les demande, et différence de
-deux rapports (titres connus du comparateur, contexte, résultats, durée ignorée).
+journal lisible (chaque type de `JOURNAL_EVENTS`), vue publique des joueurs, choix du
+glouton contre une recherche exhaustive, aucune action refusée sur 50 parties par
+joueur, glouton meilleur que l'aléatoire, déterminisme du rapport, surcharges, sacs,
+égalité des chiffres entre rapport et exports, attribution des pioches à l'effet qui
+les demande, et différence de deux rapports (titres connus du comparateur, contexte,
+résultats, durée ignorée). Les outils étant liés à la vraie table
+(`tools/marbles/game-rules.js`), ces vérifications la jouent aussi, mais n'en attendent
+aucun chiffre : ce qu'elles comparent se déduit de la table et des réglages.
+
+## Les vérifications du jeu des billes
+
+Les billes du jeu (`marbles/types/`) changent à chaque itération de design. Les
+vérifications des MÉCANISMES ne passent donc jamais par elles :
+
+- **Une table figée** : `core/checks/fixtures/marbles.js`, une bille par mécanisme
+  (`aging_flick`, `hit_pocket`, `one_shot`…), écrites en entier, usure comprise, et
+  `CHOICELESS_TYPES`, la même sans cible au choix ni Éjecter. Ses parties prennent leurs
+  réglages dans `FIXTURE_SETTINGS`, jamais dans `MARBLES_SETTINGS` :
+  `fixtureRules()` en compose les règles. Pour vérifier un mécanisme nouveau, mieux
+  vaut y AJOUTER une bille que changer une bille existante.
+- **Les textes par leurs clés** : les vérifications de vue passent la traduction de test
+  `core/checks/helpers.js`/`keyText` là où la vue attend `t`. Elles lisent le gabarit et
+  ses valeurs (`event.draw{marbles: [<aging_flick>]}`), jamais la rédaction : réécrire un
+  texte ne les casse pas. Les phrases complètes ont une dizaine de TÉMOINS par langue
+  (domaine `marbles-view`, `checkWitnesses`), sur des billes fabriquées qui ne prennent
+  aux vraies que leur nom.
+- **Le contrat des vraies billes** : domaine `marbles-content`. La table et le sac de
+  départ se valident, chaque bille a son nom et ses textes sans gabarit brut, un profil
+  sonore complet, des parties au hasard gardent leurs invariants, et la prévision
+  correspond au réel. Aucune attente chiffrée sur une bille.
+- **Des sections** : chaque domaine découpe ses vérifications par `run.section`
+  (`lib/check.js`) ; une exception n'arrête que sa section, comptée comme un échec.
+- **Les fixtures partagées** sont dans `core/checks/helpers.js` (état de partie,
+  billes posées, parties au hasard, traduction de test…), la propriété « prévision =
+  réel » dans `core/checks/fixtures/forecast-property.js`.
+
+Les domaines : `marbles` (règles), `marbles-pocket` (le pot), `marbles-choice` (cibles au
+choix et Éjecter), `marbles-bus`, `marbles-tally`, `marbles-forecast`, `marbles-view`,
+`marbles-sequence`, `marbles-tools`, `marbles-content`.
 
 ## Tester l'écran dans le navigateur
 

@@ -6,12 +6,11 @@
 
 import { MAX_EVENTS_PER_CHAIN, createEventBus } from "../marbles-bus.js";
 import { marbleListeners } from "../marbles.js";
-import MARBLE_TYPES from "../../marbles/types/index.js";
-import { createMarblesRules } from "../marbles-rules.js";
+import { fixtureRules } from "./fixtures/marbles.js";
 import { inHand } from "./helpers.js";
 
-// Les règles du jeu, liées à la vraie table (core/marbles-rules.js).
-const rules = createMarblesRules(MARBLE_TYPES);
+// Les règles liées à la table de billes des vérifications (core/checks/fixtures/marbles.js).
+const rules = fixtureRules();
 
 export default function checkMarblesBus(run) {
   // File : un évènement émis pendant un traitement attend son tour.
@@ -126,14 +125,14 @@ export default function checkMarblesBus(run) {
   // L'ordre fixe des écouteurs : base gauche, base droite, pointe, puis la main.
   const listening = {
     ...game,
-    hand: inHand(["mica", "tiger"]),
-    triangle: { apex: { marble: "clay", wear: 0 }, rightBase: { marble: "glass", wear: 0 }, leftBase: { marble: "agate", wear: 0 } },
+    hand: inHand(["awaken_draw", "all_rounder"]),
+    triangle: { apex: { marble: "aging_flick", wear: 0 }, rightBase: { marble: "hit_polish", wear: 0 }, leftBase: { marble: "final_pocket", wear: 0 } },
   };
   run.same(
     "écouteurs : ordre fixe",
-    ["triangle:leftBase:agate", "triangle:rightBase:glass", "triangle:apex:clay", "hand:0:mica", "hand:1:tiger"],
+    ["triangle:leftBase:final_pocket", "triangle:rightBase:hit_polish", "triangle:apex:aging_flick", "hand:0:awaken_draw", "hand:1:all_rounder"],
     marbleListeners(listening).map((listener) => `${listener.zone}:${listener.slot ?? listener.index}:${listener.marble}`)
   );
-  const holes = { ...listening, hand: inHand([]), triangle: { leftBase: null, rightBase: { marble: "glass", wear: 0 }, apex: null } };
+  const holes = { ...listening, hand: inHand([]), triangle: { leftBase: null, rightBase: { marble: "hit_polish", wear: 0 }, apex: null } };
   run("écouteurs : un emplacement vide n'écoute pas", 1, marbleListeners(holes).length);
 }

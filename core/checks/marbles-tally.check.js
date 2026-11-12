@@ -3,29 +3,27 @@
 // des compteurs (core/marbles-counters.js), puis leur branchement dans le réducteur :
 // la règle des mots-clés (un champ, ou un effet reçu), les actions mots-clés et leurs
 // quantités réelles, Vitesse et Masse, les évènements réels, les deux portées, la
-// sérialisation, et les deux billes qui les lisent, la loupe et le verre. Lancées par
-// core/checks/index.js/runChecks (`node tools/run-checks.js marbles-tally`).
+// sérialisation, et les montants calculés qui les lisent (tally_flick et hit_polish).
+// Sur la table de billes des vérifications (core/checks/fixtures/marbles.js). Lancées
+// par core/checks/index.js/runChecks (`node tools/run-checks.js marbles-tally`).
 
 import { throws } from "../../lib/check.js";
-import { MARBLE_TALLIES, MARBLE_TRIGGERS, LARGE, MEDIUM, SMALL } from "../../config/marbles-values.js";
-import { JOURNAL_EVENTS, TALLY_COUNTERS, legalActions } from "../marbles.js";
+import { MARBLE_TALLIES, MARBLE_TRIGGERS, SMALL } from "../../config/marbles-values.js";
+import { JOURNAL_EVENTS, TALLY_COUNTERS } from "../marbles.js";
 import { CLAUSE_ACTIONS } from "../marbles-effects.js";
 import { TALLY_CATEGORIES, buildTallyCounters, validateEventTallies } from "../marbles-counters.js";
 import { emptyTally, recordTally, tallyValue } from "../marbles-tally.js";
-import { nextRandom } from "../rng.js";
-import MARBLE_TYPES from "../../marbles/types/index.js";
-import { createMarblesRules } from "../marbles-rules.js";
-import { emptyBagMarblesGame, earlierTestTypes, inHand, withSizes } from "./helpers.js";
+import { CHOICELESS_TYPES, FIXTURE_TYPES, fixtureRules } from "./fixtures/marbles.js";
+import { createPicker, inHand, marblesPlayState, placed, playLegalGame, withSizes } from "./helpers.js";
 
-// Les règles du jeu, liées à la vraie table (core/marbles-rules.js), et des règles
-// fabriquées, la vraie table complétée de billes de test.
-const rules = createMarblesRules(MARBLE_TYPES);
-// Gorille et porcelaine d'avant les cibles au choix : ces cas portent sur Empocher
-// depuis la main et sur la Fêlure (core/checks/helpers.js/earlierTestTypes).
-const fixedRules = createMarblesRules(earlierTestTypes(MARBLE_TYPES));
-const fabricated = (table) => createMarblesRules({ ...MARBLE_TYPES, ...withSizes(table) });
+// Les règles de la table des vérifications (core/checks/fixtures/marbles.js), et des
+// règles fabriquées : cette table complétée de billes propres à un cas.
+const rules = fixtureRules();
+// La même table sans cible au choix ni Éjecter : ces cas portent sur Empocher depuis
+// la main et sur la Fêlure.
+const fixedRules = fixtureRules(CHOICELESS_TYPES);
+const fabricated = (table) => fixtureRules({ ...FIXTURE_TYPES, ...withSizes(table) });
 
-const placed = (marble, wear = 0) => ({ marble, wear });
 const PHASES = [
   { id: "apex", slots: ["apex"] },
   { id: "base", slots: ["leftBase", "rightBase"] },
@@ -42,7 +40,7 @@ function tallyOf(values = {}) {
 }
 
 function playState(over = {}, marbles = rules) {
-  return { ...emptyBagMarblesGame(marbles, 1), turn: 2, stage: "play", ...over, tally: tallyOf(over.tally) };
+  return marblesPlayState(marbles, { ...over, tally: tallyOf(over.tally) });
 }
 
 // Seulement ces compteurs-là d'un relevé.
@@ -63,15 +61,15 @@ function added(before, after) {
 const effectsOf = (events, trigger) => events.filter((event) => event.type === "effect" && event.trigger === trigger).map(({ marble, speedDelta }) => ({ marble, speedDelta }));
 
 export default function checkMarblesTally(run) {
-  checkRegistry(run);
-  checkGeneration(run);
-  checkDeclarations(run);
-  checkKeywords(run);
-  checkActions(run);
-  checkStats(run);
-  checkEvents(run);
-  checkScopes(run);
-  checkTestMarbles(run);
+  run.section("registre", checkRegistry);
+  run.section("génération", checkGeneration);
+  run.section("déclarations", checkDeclarations);
+  run.section("mots-clés", checkKeywords);
+  run.section("actions", checkActions);
+  run.section("Vitesse et Masse", checkStats);
+  run.section("évènements", checkEvents);
+  run.section("portées", checkScopes);
+  run.section("montants qui lisent les valeurs", checkTallyAmounts);
 }
 
 // Le registre seul : deux portées, la remise à zéro du tour, la lecture publique.
@@ -153,17 +151,11 @@ function checkDeclarations(run) {
   // La liste des évènements suit le moteur : des parties jouées au hasard (un PRNG
   // de test, à graine) n'émettent rien qu'elle ignore.
   const emitted = new Set();
-  let random = 7;
+  const draws = createPicker(7);
   for (let seed = 1; seed <= 40; seed++) {
-    let state = rules.createGame(seed);
-    while (state.stage !== "over") {
-      const actions = legalActions(state);
-      const draw = nextRandom(random);
-      random = draw.state;
-      const result = rules.reduce(state, actions[Math.floor(draw.value * actions.length)]);
+    playLegalGame(rules, rules.createGame(seed), draws, (result) => {
       for (const event of result.events) emitted.add(event.type);
-      state = result.state;
-    }
+    });
   }
   run.same("déclaration : chaque évènement émis est dans JOURNAL_EVENTS", [], [...emitted].filter((type) => !Object.hasOwn(JOURNAL_EVENTS, type)));
 }
@@ -171,40 +163,40 @@ function checkDeclarations(run) {
 // La règle des mots-clés de déclenchement.
 function checkKeywords(run) {
   // Un champ vide sans effet extérieur ne compte pas ; l'évènement réel, si.
-  const tiger = playState({ hand: inHand(["tiger"]) });
-  const thrown = rules.reduce(tiger, { type: "place", handIndex: 0, slot: "apex" });
-  run.same("mots-clés : la tigrée, sans Chiquenaude, ne compte que comme bille lancée", { thrownMarbles: 1 }, added(tiger, thrown.state));
+  const allRounder = playState({ hand: inHand(["all_rounder"]) });
+  const thrown = rules.reduce(allRounder, { type: "place", handIndex: 0, slot: "apex" });
+  run.same("mots-clés : all_rounder, sans Chiquenaude, ne compte que comme bille lancée", { thrownMarbles: 1 }, added(allRounder, thrown.state));
 
-  // Un effet à condition fausse compte : le Tic du gorille sur une géante (pas plus
+  // Un effet à condition fausse compte : le Tic de hit_pocket sur une one_shot (pas plus
   // petite) ne produit rien, mais le champ existe. Son Empocher trouve la main vide :
   // un déclenchement, aucune bille déplacée.
-  const gorilla = playState({ hand: inHand(["gorilla"]), triangle: { leftBase: null, rightBase: null, apex: placed("giant") } });
-  const hit = rules.reduce(gorilla, { type: "place", handIndex: 0, slot: "apex" });
-  run.same("mots-clés : le Tic à condition fausse ne produit rien", [{ marble: "gorilla", speedDelta: 0 }], effectsOf(hit.events, "hit"));
+  const hitPocket = playState({ hand: inHand(["hit_pocket"]), triangle: { leftBase: null, rightBase: null, apex: placed("one_shot") } });
+  const hit = rules.reduce(hitPocket, { type: "place", handIndex: 0, slot: "apex" });
+  run.same("mots-clés : le Tic à condition fausse ne produit rien", [{ marble: "hit_pocket", speedDelta: 0 }], effectsOf(hit.events, "hit"));
   run.same(
-    "mots-clés : mais compte, comme ses évènements ; la géante sans Éjection : +1 bille éjectée, +0 éjection",
+    "mots-clés : mais compte, comme ses évènements ; one_shot sans Éjection : +1 bille éjectée, +0 éjection",
     { hit: 1, thrownMarbles: 1, hitMarbles: 1, ejectedMarbles: 1, triangleExits: 1, pocket: 1 },
-    added(gorilla, hit.state)
+    added(hitPocket, hit.state)
   );
   // Une occupante qui a une Éjection : +1 éjection, aussi.
-  const knocked = playState({ hand: inHand(["tiger"]), triangle: { leftBase: null, rightBase: null, apex: placed("gorilla") } });
-  run("mots-clés : l'Éjection du gorille compte", 1, added(knocked, rules.reduce(knocked, { type: "place", handIndex: 0, slot: "apex" }).state).knockout);
+  const knocked = playState({ hand: inHand(["all_rounder"]), triangle: { leftBase: null, rightBase: null, apex: placed("hit_pocket") } });
+  run("mots-clés : l'Éjection de hit_pocket compte", 1, added(knocked, rules.reduce(knocked, { type: "place", handIndex: 0, slot: "apex" }).state).knockout);
 
-  // Les phases : chaque base, les deux bases, la pointe. Le gorille n'a pas d'effet de
+  // Les phases : chaque base, les deux bases, la pointe. hit_pocket n'a pas d'effet de
   // base : sa phase ne compte pas ; un emplacement vide saute sa phase.
-  const phases = playState({ triangle: { leftBase: placed("clay"), rightBase: placed("gorilla"), apex: null } });
+  const phases = playState({ triangle: { leftBase: placed("aging_flick"), rightBase: placed("hit_pocket"), apex: null } });
   run.same(
     "mots-clés : base gauche comptée, base droite au champ vide non, pointe vide sautée",
     { base: 1, leftBase: 1, speedGains: 1, speedGained: 1 },
     added(phases, rules.reduce(phases, { type: "resolve" }).state)
   );
-  const both = playState({ triangle: { leftBase: placed("clay"), rightBase: placed("tiger"), apex: placed("giant") } });
-  // La tigrée d'avant Éjecter : sa base donne Vitesse +3, sans choix à trancher.
+  const both = playState({ triangle: { leftBase: placed("aging_flick"), rightBase: placed("all_rounder"), apex: placed("one_shot") } });
+  // all_rounder d'avant Éjecter : sa base donne Vitesse +3, sans choix à trancher.
   const bothAdded = added(both, fixedRules.reduce(both, { type: "resolve" }).state);
   run.same("mots-clés : bases = bases gauches + bases droites", { apex: 1, base: 2, leftBase: 1, rightBase: 1 }, { apex: bothAdded.apex, base: bothAdded.base, leftBase: bothAdded.leftBase, rightBase: bothAdded.rightBase });
   // Une variante de base est l'effet de base de son emplacement.
-  const variant = playState({ triangle: { leftBase: null, rightBase: placed("cats_eye"), apex: null } });
-  run("mots-clés : la variante de base droite de l'œil-de-chat compte", 1, added(variant, rules.reduce(variant, { type: "resolve" }).state).rightBase);
+  const variant = playState({ triangle: { leftBase: null, rightBase: placed("split_base"), apex: null } });
+  run("mots-clés : la variante de base droite de split_base compte", 1, added(variant, rules.reduce(variant, { type: "resolve" }).state).rightBase);
 
   // Un champ de pointe vide qui reçoit un bonus ciblé compte (un effet extérieur).
   const giving = fabricated({ blank: { apex: [] }, giver: { base: [{ action: "speed", amount: 2, target: "apex" }], apex: [] } });
@@ -215,8 +207,8 @@ function checkKeywords(run) {
   run("mots-clés : sans bonus, la même ne compte pas", undefined, added(alone, giving.reduce(alone, { type: "resolve" }).state).apex);
 
   // Plusieurs billes au même moment comptent chacune : un mélange, trois
-  // Trouvailles (la tigrée, l'agate, le sulfure), pas le verre qui n'en a pas.
-  const windfalls = playState({ stage: "draw", bag: [], discard: ["clay"], triangle: { leftBase: placed("tiger"), rightBase: placed("agate"), apex: placed("sulphide") } });
+  // Trouvailles (all_rounder, final_pocket, base_pocket), pas hit_polish qui n'en a pas.
+  const windfalls = playState({ stage: "draw", bag: [], discard: ["aging_flick"], triangle: { leftBase: placed("all_rounder"), rightBase: placed("final_pocket"), apex: placed("base_pocket") } });
   const regenerated = added(windfalls, rules.reduce(windfalls, { type: "draw" }).state);
   run.same("mots-clés : trois Trouvailles pour un mélange", { windfall: 3, shuffles: 1 }, { windfall: regenerated.windfall, shuffles: regenerated.shuffles });
 }
@@ -226,11 +218,11 @@ function checkKeywords(run) {
 function checkActions(run) {
   // « Pioche 2 » avec une seule bille disponible : 1 déclenchement, 1 bille.
   const drawing = fabricated({ digger: { apex: [{ action: "draw", amount: 2 }] } });
-  const dig = playState({ bag: ["clay"], triangle: { leftBase: null, rightBase: null, apex: placed("digger") } }, drawing);
+  const dig = playState({ bag: ["aging_flick"], triangle: { leftBase: null, rightBase: null, apex: placed("digger") } }, drawing);
   const dug = added(dig, drawing.reduce(dig, { type: "resolve" }).state);
   run.same("actions : Pioche 2, une seule bille, 1 déclenchement et 1 bille", { draw: 1, drawQuantity: 1, drawnMarbles: 1 }, { draw: dug.draw, drawQuantity: dug.drawQuantity, drawnMarbles: dug.drawnMarbles });
   // La pioche du tour n'est pas une Pioche : billes piochées, pas d'action.
-  const turnDraw = playState({ stage: "draw", bag: ["clay"] });
+  const turnDraw = playState({ stage: "draw", bag: ["aging_flick"] });
   run.same("actions : la pioche du tour, sans Pioche", { drawnMarbles: 1 }, added(turnDraw, rules.reduce(turnDraw, { type: "draw" }).state));
 
   // Polissage 2 sur une bille à 1 : 1 point rendu.
@@ -239,8 +231,8 @@ function checkActions(run) {
   const shone = added(shine, polishing.reduce(shine, { type: "resolve" }).state);
   run.same("actions : Polissage 2 sur une usure de 1, 1 point rendu", { polish: 1, polishQuantity: 1 }, { polish: shone.polish, polishQuantity: shone.polishQuantity });
 
-  // Fêlure 3 de la plombée sur une porcelaine à 1 sur 2 : 1 point ajouté, retirée.
-  const cracking = playState({ hand: inHand(["leaded"]), triangle: { leftBase: null, rightBase: null, apex: placed("porcelain", 1) } });
+  // Fêlure 3 de flick_strike sur une fragile à 1 sur 2 : 1 point ajouté, retirée.
+  const cracking = playState({ hand: inHand(["flick_strike"]), triangle: { leftBase: null, rightBase: null, apex: placed("fragile", 1) } });
   run.same(
     "actions : Fêlure 3 sur une usure de 1 sur 2, 1 point ajouté ; usée, sans Tic ni éjection",
     { flick: 1, crack: 1, crackQuantity: 1, final: 1, thrownMarbles: 1, wornMarbles: 1, triangleExits: 1, speedGains: 1, speedGained: 4 },
@@ -257,18 +249,18 @@ function checkActions(run) {
 // Vitesse et Masse : gains et pertes séparés, occurrences et totaux ; un bonus reçu
 // compte chez qui le reçoit, un bonus perdu jamais.
 function checkStats(run) {
-  const tiger = playState({ triangle: { leftBase: placed("clay"), rightBase: placed("agate"), apex: placed("tiger") } });
-  const stats = added(tiger, rules.reduce(tiger, { type: "resolve" }).state);
+  const allRounder = playState({ triangle: { leftBase: placed("aging_flick"), rightBase: placed("final_pocket"), apex: placed("all_rounder") } });
+  const stats = added(allRounder, rules.reduce(allRounder, { type: "resolve" }).state);
   run.same(
-    "Vitesse et Masse : l'argile +1, l'agate Masse +1, la tigrée −1",
+    "Vitesse et Masse : aging_flick +1, final_pocket Masse +1, all_rounder −1",
     { speedGains: 1, speedGained: 1, speedLosses: 1, speedLost: 1, massGains: 1, massGained: 1 },
     Object.fromEntries(Object.entries(stats).filter(([id]) => /^(speed|mass)/.test(id)))
   );
   const giving = fabricated({ giver: { base: [{ action: "speed", amount: 4, target: "apex" }], apex: [] }, lost: { hit: [{ action: "speed", amount: 4, target: "apex" }], apex: [] } });
-  const received = playState({ triangle: { leftBase: placed("giver"), rightBase: null, apex: placed("clay") } }, giving);
+  const received = playState({ triangle: { leftBase: placed("giver"), rightBase: null, apex: placed("aging_flick") } }, giving);
   const receivedAdded = added(received, giving.reduce(received, { type: "resolve" }).state);
   run.same("Vitesse et Masse : le bonus reçu compte chez qui le reçoit (4 + 4)", { speedGains: 1, speedGained: 8 }, { speedGains: receivedAdded.speedGains, speedGained: receivedAdded.speedGained });
-  const losing = playState({ hand: inHand(["lost"]), triangle: { leftBase: placed("clay"), rightBase: null, apex: null } }, giving);
+  const losing = playState({ hand: inHand(["lost"]), triangle: { leftBase: placed("aging_flick"), rightBase: null, apex: null } }, giving);
   const lostAdded = added(losing, giving.reduce(losing, { type: "place", handIndex: 0, slot: "leftBase" }).state);
   run("Vitesse et Masse : un bonus perdu (pointe vide) ne compte pas", undefined, lostAdded.speedGained);
 }
@@ -276,105 +268,99 @@ function checkStats(run) {
 // Les évènements réels, et l'égalité des sorties du triangle avec les billes usées,
 // éjectées et mises en poche depuis le triangle, sur des parties entières.
 function checkEvents(run) {
-  const shuffle = playState({ stage: "draw", bag: [], discard: ["clay"] });
+  const shuffle = playState({ stage: "draw", bag: [], discard: ["aging_flick"] });
   run.same("évènements : un mélange sans bille active, une bille piochée", { shuffles: 1, drawnMarbles: 1 }, added(shuffle, rules.reduce(shuffle, { type: "draw" }).state));
-  let random = 3;
+  const draws = createPicker(3);
   const mismatches = [];
   let pocketedFromTriangle = 0;
   for (let seed = 1; seed <= 30; seed++) {
-    let state = rules.createGame(seed);
     // Les mises en poche depuis le triangle, comptées dans le journal (aucune valeur
     // de partie ne les isole).
     let fromTriangle = 0;
-    while (state.stage !== "over") {
-      const actions = legalActions(state);
-      const draw = nextRandom(random);
-      random = draw.state;
-      const result = rules.reduce(state, actions[Math.floor(draw.value * actions.length)]);
+    playLegalGame(rules, rules.createGame(seed), draws, (result) => {
       fromTriangle += result.events.filter((event) => event.type === "removed" && event.cause === "pocket").length;
-      state = result.state;
-      const { triangleExits, wornMarbles, ejectedMarbles } = state.tally;
+      const { triangleExits, wornMarbles, ejectedMarbles } = result.state.tally;
       if (triangleExits.game !== wornMarbles.game + ejectedMarbles.game + fromTriangle) mismatches.push(seed);
-    }
+    });
     pocketedFromTriangle += fromTriangle;
   }
   run.same("évènements : billes sorties du triangle = billes usées + éjectées + mises en poche depuis le triangle", [], mismatches);
   run("évènements : des mises en poche depuis le triangle rencontrées", true, pocketedFromTriangle > 0);
 
   // Le pot : mises en poche, pertes, et Empocher, déclenchements et billes déplacées.
-  const gorilla = playState({ hand: inHand(["gorilla", "porcelain"]), triangle: { leftBase: null, rightBase: null, apex: placed("clay") } });
+  const hitPocket = playState({ hand: inHand(["hit_pocket", "fragile"]), triangle: { leftBase: null, rightBase: null, apex: placed("aging_flick") } });
   run.same(
     "pot : une mise en poche, son entrée, Empocher et sa bille déplacée",
     { pocketedMarbles: 1, pocketEntry: 1, pocket: 1, pocketQuantity: 1 },
-    pick(added(gorilla, fixedRules.reduce(gorilla, { type: "place", handIndex: 0, slot: "apex" }).state), ["pocketedMarbles", "pocketEntry", "pocket", "pocketQuantity", "lostMarbles"])
+    pick(added(hitPocket, fixedRules.reduce(hitPocket, { type: "place", handIndex: 0, slot: "apex" }).state), ["pocketedMarbles", "pocketEntry", "pocket", "pocketQuantity", "lostMarbles"])
   );
-  const full = { ...gorilla, pot: ["clay", "glass", "mica"] };
+  const full = { ...hitPocket, pot: ["aging_flick", "hit_polish", "awaken_draw"] };
   run.same(
     "pot plein : une bille perdue, pas d'entrée, une bille déplacée quand même",
     { lostMarbles: 1, pocket: 1, pocketQuantity: 1 },
     pick(added(full, fixedRules.reduce(full, { type: "place", handIndex: 0, slot: "apex" }).state), ["pocketedMarbles", "pocketEntry", "pocket", "pocketQuantity", "lostMarbles"])
   );
-  // Sans effet d'entrée (l'argile) : la mise en poche compte, pas l'entrée.
-  const plainEntry = playState({ hand: inHand(["gorilla", "clay"]), triangle: { leftBase: null, rightBase: null, apex: placed("clay") } });
+  // Sans effet d'entrée (aging_flick) : la mise en poche compte, pas l'entrée.
+  const plainEntry = playState({ hand: inHand(["hit_pocket", "aging_flick"]), triangle: { leftBase: null, rightBase: null, apex: placed("aging_flick") } });
   run.same(
     "pot : une bille sans effet d'entrée, pas d'entrée comptée",
     { pocketedMarbles: 1, pocket: 1, pocketQuantity: 1 },
     pick(added(plainEntry, fixedRules.reduce(plainEntry, { type: "place", handIndex: 0, slot: "apex" }).state), ["pocketedMarbles", "pocketEntry", "pocket", "pocketQuantity"])
   );
   // À chaque résolution : seulement les billes du pot qui ont cet effet.
-  const resolving = playState({ triangle: { leftBase: placed("clay"), rightBase: null, apex: null }, pot: ["agate", "glass", "sulphide"] });
-  run("pot : à chaque résolution, l'agate et le sulfure, pas le verre", 2, added(resolving, rules.reduce(resolving, { type: "resolve" }).state).pocketResolution);
+  const resolving = playState({ triangle: { leftBase: placed("aging_flick"), rightBase: null, apex: null }, pot: ["final_pocket", "hit_polish", "base_pocket"] });
+  run("pot : à chaque résolution, final_pocket et base_pocket, pas hit_polish", 2, added(resolving, rules.reduce(resolving, { type: "resolve" }).state).pocketResolution);
 }
 
 // Les portées : remise à zéro au début du tour, avant la pioche ; un refus ne compte
 // rien ; le registre traverse une sérialisation.
 function checkScopes(run) {
-  const state = playState({ hand: inHand(["clay", "clay"]), tally: { flick: { turn: 1, game: 4 } } });
-  const placedClay = rules.reduce(state, { type: "place", handIndex: 0, slot: "apex" });
-  run.same("portées : la Chiquenaude de l'argile, dans les deux portées", { turn: 2, game: 5 }, placedClay.state.tally.flick);
-  const refused = rules.reduce({ ...placedClay.state, throwsUsed: placedClay.state.throwsPerTurn }, { type: "place", handIndex: 0, slot: "leftBase" });
-  run("portées : un lancer refusé ne compte pas", placedClay.state.tally, refused.state.tally);
-  const drawing = rules.reduce({ ...placedClay.state, stage: "draw", bag: ["agate"] }, { type: "draw" });
+  const state = playState({ hand: inHand(["aging_flick", "aging_flick"]), tally: { flick: { turn: 1, game: 4 } } });
+  const placedAgingFlick = rules.reduce(state, { type: "place", handIndex: 0, slot: "apex" });
+  run.same("portées : la Chiquenaude de aging_flick, dans les deux portées", { turn: 2, game: 5 }, placedAgingFlick.state.tally.flick);
+  const refused = rules.reduce({ ...placedAgingFlick.state, throwsUsed: placedAgingFlick.state.throwsPerTurn }, { type: "place", handIndex: 0, slot: "leftBase" });
+  run("portées : un lancer refusé ne compte pas", placedAgingFlick.state.tally, refused.state.tally);
+  const drawing = rules.reduce({ ...placedAgingFlick.state, stage: "draw", bag: ["final_pocket"] }, { type: "draw" });
   run("portées : la remise à zéro ouvre la pioche du tour", "turnStarted", drawing.events[0].type);
   run.same("portées : au tour suivant, « ce tour » à zéro, « cette partie » gardée", { turn: 0, game: 5 }, drawing.state.tally.flick);
   run.same("portées : la pioche du tour compte dans le nouveau tour", { turn: 1, game: 1 }, drawing.state.tally.drawnMarbles);
 
-  const restored = JSON.parse(JSON.stringify(placedClay.state));
-  run.same("sérialisation : le registre fait l'aller-retour", placedClay.state.tally, restored.tally);
+  const restored = JSON.parse(JSON.stringify(placedAgingFlick.state));
+  run.same("sérialisation : le registre fait l'aller-retour", placedAgingFlick.state.tally, restored.tally);
   run(
     "sérialisation : la partie reprend à l'identique",
-    JSON.stringify(rules.reduce(placedClay.state, { type: "resolve" })),
+    JSON.stringify(rules.reduce(placedAgingFlick.state, { type: "resolve" })),
     JSON.stringify(rules.reduce(restored, { type: "resolve" }))
   );
   run.same("sérialisation : une partie neuve porte le registre à zéro", emptyTally(TALLY_COUNTERS), rules.createGame(1).tally);
 }
 
-// La loupe et le verre, avec la nouvelle règle.
-function checkTestMarbles(run) {
-  // La loupe : sa Chiquenaude se compte elle-même ; celle de la tigrée (sans
-  // Chiquenaude) ne compte pas, celle de l'argile si.
-  const state = playState({ hand: inHand(["magnifier", "tiger", "magnifier", "clay", "magnifier"]) });
+// Les montants calculés qui lisent une valeur de partie : la Chiquenaude de
+// tally_flick (ce tour), la pointe de hit_polish (cette partie).
+function checkTallyAmounts(run) {
+  // tally_flick : sa Chiquenaude se compte elle-même ; celle de all_rounder (sans
+  // Chiquenaude) ne compte pas, celle de aging_flick si.
+  const state = playState({ hand: inHand(["tally_flick", "all_rounder", "tally_flick", "aging_flick", "tally_flick"]) });
   const first = rules.reduce(state, { type: "place", handIndex: 0, slot: "leftBase" });
-  run.same("loupe : la première chiquenaude du tour lit 1, Vitesse +2", [{ marble: "magnifier", speedDelta: 2 }], effectsOf(first.events, "flick"));
-  const tiger = rules.reduce(first.state, { type: "place", handIndex: 0, slot: "rightBase" });
-  run("loupe : la tigrée lancée ne compte pas comme chiquenaude", 1, tiger.state.tally.flick.turn);
-  const second = rules.reduce(tiger.state, { type: "place", handIndex: 0, slot: "apex" });
-  run.same("loupe : la deuxième lit 2, Vitesse +4", [{ marble: "magnifier", speedDelta: 4 }], effectsOf(second.events, "flick"));
-  const clay = rules.reduce(second.state, { type: "place", handIndex: 0, slot: "apex" });
-  const fourth = rules.reduce(clay.state, { type: "place", handIndex: 0, slot: "leftBase" });
-  run.same("loupe : la quatrième lirait 4, plafonnée à +6", [{ marble: "magnifier", speedDelta: 6 }], effectsOf(fourth.events, "flick"));
+  run.same("tally_flick : la première chiquenaude du tour lit 1, Vitesse +2", [{ marble: "tally_flick", speedDelta: 2 }], effectsOf(first.events, "flick"));
+  const allRounder = rules.reduce(first.state, { type: "place", handIndex: 0, slot: "rightBase" });
+  run("tally_flick : all_rounder lancée ne compte pas comme chiquenaude", 1, allRounder.state.tally.flick.turn);
+  const second = rules.reduce(allRounder.state, { type: "place", handIndex: 0, slot: "apex" });
+  run.same("tally_flick : la deuxième lit 2, Vitesse +4", [{ marble: "tally_flick", speedDelta: 4 }], effectsOf(second.events, "flick"));
+  const agingFlick = rules.reduce(second.state, { type: "place", handIndex: 0, slot: "apex" });
+  const fourth = rules.reduce(agingFlick.state, { type: "place", handIndex: 0, slot: "leftBase" });
+  run.same("tally_flick : la quatrième lirait 4, plafonnée à +6", [{ marble: "tally_flick", speedDelta: 6 }], effectsOf(fourth.events, "flick"));
 
-  // Le verre : les Trouvailles déclenchées, pas les mélanges.
-  const glass = (over) => effectsOf(rules.reduce(playState({ triangle: { leftBase: null, rightBase: null, apex: placed("glass") }, ...over }), { type: "resolve" }).events, "phase");
-  run.same("verre : 2 trouvailles, Vitesse +2", [{ marble: "glass", speedDelta: 2 }], glass({ tally: { windfall: 2 } }));
-  run.same("verre : des mélanges seuls n'y font rien", [{ marble: "glass", speedDelta: 0 }], glass({ tally: { shuffles: 5 } }));
-  run.same("verre : plafonné à +10", [{ marble: "glass", speedDelta: 10 }], glass({ tally: { windfall: 15 } }));
-  // Un mélange pendant la résolution, avant la pointe : la Pioche du mica en base
-  // gauche, la tigrée en base droite trouve, le verre la compte.
-  // La tigrée d'avant Éjecter (sa base ne fait pas choisir).
+  // hit_polish : les Trouvailles déclenchées, pas les mélanges.
+  const hitPolish = (over) => effectsOf(rules.reduce(playState({ triangle: { leftBase: null, rightBase: null, apex: placed("hit_polish") }, ...over }), { type: "resolve" }).events, "phase");
+  run.same("hit_polish : 2 trouvailles, Vitesse +2", [{ marble: "hit_polish", speedDelta: 2 }], hitPolish({ tally: { windfall: 2 } }));
+  run.same("hit_polish : des mélanges seuls n'y font rien", [{ marble: "hit_polish", speedDelta: 0 }], hitPolish({ tally: { shuffles: 5 } }));
+  run.same("hit_polish : plafonné à +10", [{ marble: "hit_polish", speedDelta: 10 }], hitPolish({ tally: { windfall: 15 } }));
+  // Un mélange pendant la résolution, avant la pointe : la Pioche de awaken_draw en base
+  // gauche, all_rounder en base droite trouve, hit_polish la compte.
+  // all_rounder d'avant Éjecter (sa base ne fait pas choisir).
   const midResolution = (rightBase) =>
-    effectsOf(fixedRules.reduce(playState({ bag: [], discard: ["clay"], triangle: { leftBase: placed("mica"), rightBase, apex: placed("glass") } }), { type: "resolve" }).events, "phase").at(-1);
-  run.same("verre : une Trouvaille pendant la résolution, avant sa phase", { marble: "glass", speedDelta: 1 }, midResolution(placed("tiger")));
-  run.same("verre : un mélange sans Trouvaille, rien", { marble: "glass", speedDelta: 0 }, midResolution(placed("clay")));
-  run("vérification du calibre des billes du test", true, MARBLE_TYPES.magnifier.size === SMALL && MARBLE_TYPES.glass.size === MEDIUM && MARBLE_TYPES.gorilla.size === LARGE);
+    effectsOf(fixedRules.reduce(playState({ bag: [], discard: ["aging_flick"], triangle: { leftBase: placed("awaken_draw"), rightBase, apex: placed("hit_polish") } }), { type: "resolve" }).events, "phase").at(-1);
+  run.same("hit_polish : une Trouvaille pendant la résolution, avant sa phase", { marble: "hit_polish", speedDelta: 1 }, midResolution(placed("all_rounder")));
+  run.same("hit_polish : un mélange sans Trouvaille, rien", { marble: "hit_polish", speedDelta: 0 }, midResolution(placed("aging_flick")));
 }

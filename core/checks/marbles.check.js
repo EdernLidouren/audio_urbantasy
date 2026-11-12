@@ -6,9 +6,10 @@
 // (`node tools/run-checks.js marbles`).
 
 import { auditNonSerializable, throws } from "../../lib/check.js";
-import { nextRandom } from "../rng.js";
 import {
+  JOURNAL_EVENTS,
   SLOTS,
+  createMarblesGame,
   impactOf,
   legalActions,
   swapRefusal,
@@ -18,141 +19,83 @@ import {
   buildMarbleKeywords,
   validateMarblePhases,
   validateMarbleTriggers,
-  validatePocketMoments,
   validateMarbleTypes,
 } from "../marbles.js";
 import { MARBLE_PHASES, MARBLE_POCKET, MARBLE_TRIGGERS } from "../../config/marbles-values.js";
 import { CLAUSE_ACTIONS, amountOf, printedStat } from "../marbles-effects.js";
-import { LARGE, MARBLE_SIZES, MEDIUM, SMALL, STARTING_BAG, MARBLES_SETTINGS } from "../../config/marbles-values.js";
-import MARBLE_TYPES from "../../marbles/types/index.js";
-import { answerChoices, emptyBagMarblesGame, earlierTestTypes, handIds, inHand, withSizes } from "./helpers.js";
-import { createMarblesRules } from "../marbles-rules.js";
+import { LARGE, MARBLE_SIZES, MARBLES_SETTINGS, MEDIUM, SMALL } from "../../config/marbles-values.js";
+import { CHOICELESS_TYPES, FIXTURE_BAG, FIXTURE_SETTINGS, FIXTURE_TYPES, fixtureRules } from "./fixtures/marbles.js";
+import { answerChoices, deepFreeze, eventTypes, fabricatedRules, handIds, inHand, marbleCount, marblesPlayState, mustReduce, placed, playRandomMarblesGame, triangleOf, validateTable, withSizes } from "./helpers.js";
 
-// Tables fabriquées : complétées d'un calibre (core/checks/helpers.js/withSizes).
-const fabricatedRules = (table) => createMarblesRules(withSizes(table));
-const validateTable = (table) => validateMarbleTypes(withSizes(table));
-
-// Les règles du jeu, liées à la vraie table (core/marbles-rules.js).
-const rules = createMarblesRules(MARBLE_TYPES);
-// Les mêmes, gorille, verre et porcelaine d'avant les cibles au choix
-// (core/checks/helpers.js/earlierTestTypes).
-const fixedRules = createMarblesRules(earlierTestTypes(MARBLE_TYPES));
+// Les règles de la table des vérifications (core/checks/fixtures/marbles.js).
+const rules = fixtureRules();
+// La même table sans cible au choix ni Éjecter.
+const fixedRules = fixtureRules(CHOICELESS_TYPES);
 
 // Partie en cours de tour : le tour 2 par défaut, sac vide. `over` remplace ce que
 // le test veut fixer.
 function playState(over = {}) {
-  return {
-    ...emptyBagMarblesGame(rules, 1),
-    turn: 2,
-    stage: "play",
-    ...over,
-  };
+  return marblesPlayState(rules, over);
 }
 
-const placed = (marble, wear = 0) => ({ marble, wear });
-
-function triangleOf(leftBase, rightBase, apex) {
-  return { leftBase, rightBase, apex };
-}
-
-// Applique une action qui doit passer ; une action refusée est une faute du
-// test, nommée telle quelle plutôt qu'un échec plus loin.
-// `marbles` : les règles à appliquer, celles du jeu par défaut ; ou une table
+// Applique une action qui doit passer (helpers.js/mustReduce). `marbles` : les
+// règles à appliquer, celles de la table des vérifications par défaut ; ou une table
 // fabriquée, dont on fait les règles.
 function apply(state, action, marbles = rules) {
-  return applyWith(state, action, marbles);
-}
-
-function applyWith(state, action, marbles) {
-  const bound = typeof marbles.reduce === "function" ? marbles : fabricatedRules(marbles);
-  const result = bound.reduce(state, action);
-  if (!result.ok) throw new Error(`action refusée (${result.error}) : ${JSON.stringify(action)}`);
-  return result;
-}
-
-function eventTypes(events) {
-  return events.map((event) => event.type);
-}
-
-// Toutes les billes de la partie, où qu'elles soient : sac, main, défausse,
-// triangle, pot et billes perdues. Aucune ne se crée ni ne disparaît.
-function marbleCount(state) {
-  const onTriangle = SLOTS.filter((slot) => state.triangle[slot] !== null).length;
-  return state.bag.length + state.hand.length + state.discard.length + onTriangle + state.pot.length + state.lost.length;
-}
-
-// Fige récursivement : une écriture dans un état reçu lèverait (modules ES,
-// donc mode strict), et prouverait que le réducteur n'est pas pur.
-function deepFreeze(value) {
-  if (value && typeof value === "object") {
-    Object.values(value).forEach(deepFreeze);
-    Object.freeze(value);
-  }
-  return value;
+  return mustReduce(typeof marbles.reduce === "function" ? marbles : fabricatedRules(marbles), state, action);
 }
 
 export default function checkMarbles(run) {
-  checkTable(run);
-  checkSetup(run);
-  checkDraw(run);
-  checkSwap(run);
-  checkPlace(run);
-  checkThrows(run);
-  checkDrawEffects(run);
-  checkTriggers(run);
-  checkFinal(run);
-  checkHitAndKnockout(run);
-  checkMagnifier(run);
-  checkTargetRule(run);
-  checkWearActions(run);
-  checkWearMarbles(run);
-  checkSizeConditions(run);
-  checkSizeMarbles(run);
-  checkFlick(run);
-  checkTurnsInHand(run);
-  checkComputedAmounts(run);
-  checkWindfall(run);
-  checkAwaken(run);
-  checkKeywordDeclarations(run);
-  checkPocket(run);
-  checkPocketReactions(run);
-  checkChoices(run);
-  checkEject(run);
-  checkBonus(run);
-  checkResolution(run);
-  checkEndOfGame(run);
-  checkDeterminism(run);
-  checkSerialization(run);
-  checkSmoke(run);
-  checkLegalActions(run);
+  run.section("table", checkTable);
+  run.section("mise en place", checkSetup);
+  run.section("pioche", checkDraw);
+  run.section("échange", checkSwap);
+  run.section("pose", checkPlace);
+  run.section("lancers", checkThrows);
+  run.section("Pioche des effets", checkDrawEffects);
+  run.section("déclencheurs", checkTriggers);
+  run.section("Final", checkFinal);
+  run.section("Tic et Éjection", checkHitAndKnockout);
+  run.section("Chiquenaude qui lit une valeur", checkTallyFlick);
+  run.section("règle des cibles", checkTargetRule);
+  run.section("Polissage et Fêlure", checkWearActions);
+  run.section("billes d'usure", checkWearMarbles);
+  run.section("conditions de calibre", checkSizeConditions);
+  run.section("billes de calibre", checkSizeMarbles);
+  run.section("Chiquenaude", checkFlick);
+  run.section("tours en main", checkTurnsInHand);
+  run.section("montants calculés", checkComputedAmounts);
+  run.section("Trouvaille", checkWindfall);
+  run.section("Éveil", checkAwaken);
+  run.section("déclarations des mots-clés", checkKeywordDeclarations);
+  run.section("bonus", checkBonus);
+  run.section("résolution", checkResolution);
+  run.section("fin de partie", checkEndOfGame);
+  run.section("déterminisme", checkDeterminism);
+  run.section("sérialisation", checkSerialization);
+  run.section("fumée", checkSmoke);
+  run.section("actions légales", checkLegalActions);
 }
 
 function checkTable(run) {
-  run("table : 13 billes", 13, Object.keys(MARBLE_TYPES).length);
-  run.same("sac de test : un exemplaire de chaque", Object.keys(MARBLE_TYPES).sort(), [...STARTING_BAG].sort());
-  run("usure par défaut", 3, rules.maxWearOf("clay"));
-  run("usure propre", 4, rules.maxWearOf("tiger"));
-  run("usure 1 de la géante", 1, rules.maxWearOf("giant"));
-  run("usure de la loupe", 3, rules.maxWearOf("magnifier"));
+  run("usure par défaut", 3, rules.maxWearOf("aging_flick"));
+  run("usure propre", 4, rules.maxWearOf("all_rounder"));
+  run("usure 1 de one_shot", 1, rules.maxWearOf("one_shot"));
+  run("usure de tally_flick", 3, rules.maxWearOf("tally_flick"));
 
   const amount = (clauses) => clauses[0].amount;
-  run("variante : œil-de-chat, base gauche", 3, amount(rules.effectAt("cats_eye", "leftBase")));
-  run("variante : œil-de-chat, base droite", "mass", rules.effectAt("cats_eye", "rightBase")[0].action);
-  run("variante : la base droite n'a pas la Vitesse de base", 0, printedStat(rules.effectAt("cats_eye", "rightBase"), "speed"));
-  run("sans variante : même effet sur les deux bases", rules.effectAt("clay", "leftBase"), rules.effectAt("clay", "rightBase"));
-  run("pointe", 4, amount(rules.effectAt("clay", "apex")));
-  run("effet absent : aucun effet", 0, rules.effectAt("gorilla", "leftBase").length);
-  run("effet absent : la même valeur partout", rules.effectAt("gorilla", "leftBase"), rules.effectAt("stoneware", "apex"));
+  run("variante : split_base, base gauche", 3, amount(rules.effectAt("split_base", "leftBase")));
+  run("variante : split_base, base droite", "mass", rules.effectAt("split_base", "rightBase")[0].action);
+  run("variante : la base droite n'a pas la Vitesse de base", 0, printedStat(rules.effectAt("split_base", "rightBase"), "speed"));
+  run("sans variante : même effet sur les deux bases", rules.effectAt("aging_flick", "leftBase"), rules.effectAt("aging_flick", "rightBase"));
+  run("pointe", 4, amount(rules.effectAt("aging_flick", "apex")));
+  run("effet absent : aucun effet", 0, rules.effectAt("hit_pocket", "leftBase").length);
+  run("effet absent : la même valeur partout", rules.effectAt("hit_pocket", "leftBase"), rules.effectAt("size_count", "apex"));
 
-  run.same("Tic de l'argile", [{ action: "speed", amount: 2 }], MARBLE_TYPES.clay.hit);
-  run.same("Tic de l'agate", [{ action: "mass", amount: 1 }], MARBLE_TYPES.agate.hit);
-  run.same("Éjection du gorille", [{ action: "speed", amount: 3 }], MARBLE_TYPES.gorilla.knockout);
-  run.same("Éjection de la plombée", [{ action: "mass", amount: 1 }], MARBLE_TYPES.leaded.knockout);
-
-  run("imprimé : ce que la clause donne", 6, printedStat(rules.effectAt("gorilla", "apex"), "speed"));
-  run("imprimé : une autre statistique ne compte pas", 0, printedStat(rules.effectAt("agate", "apex"), "speed"));
-  run("imprimé : négatif", -3, printedStat(rules.effectAt("leaded", "apex"), "speed"));
-  run("imprimé : une clause conditionnelle ne compte pas", 0, printedStat(rules.effectAt("magnifier", "leftBase"), "speed"));
+  run("imprimé : ce que la clause donne", 6, printedStat(rules.effectAt("hit_pocket", "apex"), "speed"));
+  run("imprimé : une autre statistique ne compte pas", 0, printedStat(rules.effectAt("final_pocket", "apex"), "speed"));
+  run("imprimé : négatif", -3, printedStat(rules.effectAt("flick_strike", "apex"), "speed"));
+  run("imprimé : une clause conditionnelle ne compte pas", 0, printedStat(rules.effectAt("tally_flick", "leftBase"), "speed"));
 
   const refused = (name, table) => run(`table refusée : ${name}`, true, throws(() => validateTable(table)));
   const clause = { action: "speed", amount: 1 };
@@ -184,42 +127,38 @@ function checkTable(run) {
   for (const size of [SMALL, MEDIUM, LARGE]) {
     run(`calibre, table acceptée : ${MARBLE_SIZES[size]}`, false, throws(() => validateMarbleTypes({ a: { size } })));
   }
-  run("calibre : chaque bille du jeu en a un valide", true, Object.values(MARBLE_TYPES).every((type) => Object.hasOwn(MARBLE_SIZES, type.size)));
   run("calibre : trois, dans l'ordre", true, SMALL < MEDIUM && MEDIUM < LARGE);
 
   // Les règles (core/marbles-rules.js) : liées à UNE table, validée à la composition.
   run("règles : une table mal formée refusée à la composition", true, throws(() => fabricatedRules({ a: { maxWear: 0 } })));
-  run("règles : la table du jeu acceptée", false, throws(() => createMarblesRules(MARBLE_TYPES)));
-  const custom = fabricatedRules({ clay: { apex: [{ action: "speed", amount: 9 }], maxWear: 5 } });
-  run("règles : chaque jeu de règles lit SA table", "3 5", `${rules.maxWearOf("clay")} ${custom.maxWearOf("clay")}`);
-  run.same("règles : l'effet imprimé vient de sa table", [{ action: "speed", amount: 9 }], custom.effectAt("clay", "apex"));
-  run("règles : une partie neuve avec le sac de test", 13, rules.createGame(1).bag.length + rules.createGame(1).hand.length);
+  run("règles : la table des vérifications acceptée", false, throws(() => fixtureRules()));
+  const custom = fabricatedRules({ aging_flick: { apex: [{ action: "speed", amount: 9 }], maxWear: 5 } });
+  run("règles : chaque jeu de règles lit SA table", "3 5", `${rules.maxWearOf("aging_flick")} ${custom.maxWearOf("aging_flick")}`);
+  run.same("règles : l'effet imprimé vient de sa table", [{ action: "speed", amount: 9 }], custom.effectAt("aging_flick", "apex"));
+  run("règles : une partie neuve avec le sac de test", FIXTURE_BAG.length, rules.createGame(1).bag.length + rules.createGame(1).hand.length);
   run("règles : figées", true, Object.isFrozen(rules));
 }
 
 function checkSetup(run) {
   const game = rules.createGame(42);
-  run("mise en place : sac complet", STARTING_BAG.length, game.bag.length);
-  run.same("mise en place : sac mélangé, mêmes billes", [...STARTING_BAG].sort(), [...game.bag].sort());
-  run("mise en place : sac réellement mélangé", false, game.bag.join() === STARTING_BAG.join());
+  run("mise en place : sac complet", FIXTURE_BAG.length, game.bag.length);
+  run.same("mise en place : sac mélangé, mêmes billes", [...FIXTURE_BAG].sort(), [...game.bag].sort());
+  run("mise en place : sac réellement mélangé", false, game.bag.join() === FIXTURE_BAG.join());
   run.same("mise en place : main vide", [], game.hand);
   run.same("mise en place : défausse vide", [], game.discard);
   run.same("mise en place : triangle vide", triangleOf(null, null, null), game.triangle);
   run("mise en place : score 0", 0, game.score);
   run("mise en place : compteurs du tour", "0,1", `${game.speed},${game.mass}`);
-  run("réglages : main maximale", 5, MARBLES_SETTINGS.maxHandSize);
-  run("réglages : pioche du premier tour", 5, MARBLES_SETTINGS.firstTurnDraw);
-  run("réglages : pioche par tour", 1, MARBLES_SETTINGS.drawPerTurn);
-  run("réglages : main maximale dans l'état", MARBLES_SETTINGS.maxHandSize, game.maxHandSize);
-  run("réglages : nombre de tours", MARBLES_SETTINGS.turnCount, game.turnCount);
+  run("réglages : main maximale dans l'état", FIXTURE_SETTINGS.maxHandSize, game.maxHandSize);
+  run("réglages : nombre de tours dans l'état", FIXTURE_SETTINGS.turnCount, game.turnCount);
 
-  run("sac : bille inconnue refusée", true, throws(() => rules.createGame(1, { bag: ["clay", "nope"] })));
+  run("sac : bille inconnue refusée", true, throws(() => rules.createGame(1, { bag: ["aging_flick", "nope"] })));
   run("réglages : première pioche plus petite que le triangle permise", 2, rules.createGame(1, { firstTurnDraw: 2 }).firstTurnDraw);
   run("réglages : première pioche nulle refusée", true, throws(() => rules.createGame(1, { firstTurnDraw: 0 })));
   run("réglages : main plus petite que la première pioche refusée", true, throws(() => rules.createGame(1, { maxHandSize: 4 })));
   run("réglages : pioche par tour nulle refusée", true, throws(() => rules.createGame(1, { drawPerTurn: 0 })));
-  const doubles = rules.createGame(1, { bag: ["clay", "clay", "clay", "glass", "glass", "agate"] });
-  run("sac : doublons acceptés", 3, doubles.bag.filter((id) => id === "clay").length);
+  const doubles = rules.createGame(1, { bag: ["aging_flick", "aging_flick", "aging_flick", "hit_polish", "hit_polish", "final_pocket"] });
+  run("sac : doublons acceptés", 3, doubles.bag.filter((id) => id === "aging_flick").length);
 
   const fresh = rules.createGame(42);
   run("action inconnue refusée", "unknownAction", rules.reduce(fresh, { type: "cheat" }).error);
@@ -241,41 +180,41 @@ function checkDraw(run) {
   run("pioche : refusée une seconde fois", "alreadyDrawn", rules.reduce(first.state, { type: "draw" }).error);
 
   // Tours suivants : une seule bille, ajoutée à ce qui reste en main.
-  const later = apply({ ...playState({ hand: inHand(["clay", "glass", "agate"]), bag: ["porcelain", "gorilla", "stoneware"] }), stage: "draw" }, { type: "draw" });
-  run("pioche : 1 bille aux tours suivants", "clay,glass,agate,porcelain", handIds(later.state).join());
-  run("pioche : le reste au sac", "gorilla,stoneware", later.state.bag.join());
+  const later = apply({ ...playState({ hand: inHand(["aging_flick", "hit_polish", "final_pocket"]), bag: ["fragile", "hit_pocket", "size_count"] }), stage: "draw" }, { type: "draw" });
+  run("pioche : 1 bille aux tours suivants", "aging_flick,hit_polish,final_pocket,fragile", handIds(later.state).join());
+  run("pioche : le reste au sac", "hit_pocket,size_count", later.state.bag.join());
   run.same("pioche : journal du tour suivant", ["turnStarted", "draw", "awaken"], eventTypes(later.events));
 
   // Main pleine : la pioche est sautée, la bille reste au sac.
-  const fullHand = inHand(["clay", "glass", "agate", "mica", "tiger"]);
-  const skipped = apply({ ...playState({ hand: fullHand, bag: ["giant", "gorilla"] }), stage: "draw" }, { type: "draw" });
+  const fullHand = inHand(["aging_flick", "hit_polish", "final_pocket", "awaken_draw", "all_rounder"]);
+  const skipped = apply({ ...playState({ hand: fullHand, bag: ["one_shot", "hit_pocket"] }), stage: "draw" }, { type: "draw" });
   run.same("main pleine : journal", ["turnStarted", "drawSkipped"], eventTypes(skipped.events));
   run("main pleine : motif", "handFull", skipped.events[1].reason);
   run("main pleine : main inchangée", fullHand.map((held) => held.marble).join(), handIds(skipped.state).join());
-  run("main pleine : la bille reste au sac", "giant,gorilla", skipped.state.bag.join());
+  run("main pleine : la bille reste au sac", "one_shot,hit_pocket", skipped.state.bag.join());
   run("main pleine : le tour se joue", "play", skipped.state.stage);
-  const fullNoBag = apply({ ...playState({ hand: fullHand, bag: [], discard: ["giant"] }), stage: "draw" }, { type: "draw" });
+  const fullNoBag = apply({ ...playState({ hand: fullHand, bag: [], discard: ["one_shot"] }), stage: "draw" }, { type: "draw" });
   run("main pleine : pas de régénération, même sac vide", false, eventTypes(fullNoBag.events).includes("bagRegenerated"));
   run("main pleine : la partie continue, même défausse courte", "play", fullNoBag.state.stage);
-  const almostFull = apply({ ...playState({ hand: fullHand.slice(0, 4), bag: ["giant", "gorilla"] }), stage: "draw" }, { type: "draw" });
+  const almostFull = apply({ ...playState({ hand: fullHand.slice(0, 4), bag: ["one_shot", "hit_pocket"] }), stage: "draw" }, { type: "draw" });
   run("main à 4 billes : la pioche passe", 5, almostFull.state.hand.length);
 
   // Une pioche de plusieurs billes s'arrête quand la main est pleine.
-  const large = apply({ ...playState({ hand: fullHand.slice(0, 4), bag: ["gorilla", "stoneware", "porcelain"], drawPerTurn: 3 }), stage: "draw" }, { type: "draw" });
+  const large = apply({ ...playState({ hand: fullHand.slice(0, 4), bag: ["hit_pocket", "size_count", "fragile"], drawPerTurn: 3 }), stage: "draw" }, { type: "draw" });
   run.same("pioche de 3 : s'arrête à la main pleine", ["turnStarted", "draw", "awaken", "drawSkipped"], eventTypes(large.events));
-  run("pioche de 3 : le reste au sac", "stoneware,porcelain", large.state.bag.join());
+  run("pioche de 3 : le reste au sac", "size_count,fragile", large.state.bag.join());
 
   // Régénération pendant la pioche : le mélange, puis la bille.
-  const regen = apply({ ...playState({ hand: inHand(["clay"]), bag: [], discard: ["agate", "porcelain", "gorilla", "stoneware"] }), stage: "draw" }, { type: "draw" });
+  const regen = apply({ ...playState({ hand: inHand(["aging_flick"]), bag: [], discard: ["final_pocket", "fragile", "hit_pocket", "size_count"] }), stage: "draw" }, { type: "draw" });
   run.same("régénération : journal dans l'ordre", ["turnStarted", "bagRegenerated", "draw", "awaken"], eventTypes(regen.events));
   run("régénération : taille annoncée", 4, regen.events[1].size);
   run("régénération : défausse vidée", 0, regen.state.discard.length);
   run("régénération : une bille piochée", 2, regen.state.hand.length);
   run("régénération : le reste au sac", 3, regen.state.bag.length);
-  run("régénération : mêmes billes après coup", "agate,clay,gorilla,porcelain,stoneware", [...handIds(regen.state), ...regen.state.bag].sort().join());
+  run("régénération : mêmes billes après coup", "aging_flick,final_pocket,fragile,hit_pocket,size_count", [...handIds(regen.state), ...regen.state.bag].sort().join());
 
   const midDraw = apply(
-    { ...playState({ hand: inHand([]), bag: ["glass"], discard: ["agate", "porcelain", "gorilla"], turn: 1 }), stage: "draw" },
+    { ...playState({ hand: inHand([]), bag: ["hit_polish"], discard: ["final_pocket", "fragile", "hit_pocket"], turn: 1 }), stage: "draw" },
     { type: "draw" }
   );
   run.same(
@@ -283,10 +222,10 @@ function checkDraw(run) {
     ["turnStarted", "draw", "awaken", "bagRegenerated", "draw", "awaken", "draw", "awaken", "draw", "awaken"],
     eventTypes(midDraw.events).slice(0, 10)
   );
-  run("régénération en cours de pioche : la bille du sac en premier", "glass", midDraw.state.hand[0].marble);
+  run("régénération en cours de pioche : la bille du sac en premier", "hit_polish", midDraw.state.hand[0].marble);
 
   // Un sac qui se vide sans que la pioche demande une bille de plus ne régénère pas.
-  const exact = apply({ ...playState({ hand: inHand(["clay"]), bag: ["porcelain"], discard: ["giant"] }), stage: "draw" }, { type: "draw" });
+  const exact = apply({ ...playState({ hand: inHand(["aging_flick"]), bag: ["fragile"], discard: ["one_shot"] }), stage: "draw" }, { type: "draw" });
   run("pas de régénération sans bille demandée", false, eventTypes(exact.events).includes("bagRegenerated"));
   run("pas de régénération : sac vide", 0, exact.state.bag.length);
 }
@@ -325,41 +264,41 @@ function checkAwaken(run) {
 
   // Pioche du début de tour : les compteurs du NOUVEAU tour (remis à zéro par la
   // résolution).
-  const ended = apply(playState({ hand: inHand([]), bag: ["tiger", "clay"], triangle: triangleOf(placed("clay"), null, null) }), { type: "resolve" });
+  const ended = apply(playState({ hand: inHand([]), bag: ["all_rounder", "aging_flick"], triangle: triangleOf(placed("aging_flick"), null, null) }), { type: "resolve" });
   const turnStart = apply(ended.state, { type: "draw" });
-  run.same("éveil, début de tour : pioche, éveil, effet", ["turnStarted", "draw:tiger", "awaken:tiger", "effect:awaken:tiger"], journal(turnStart.events));
+  run.same("éveil, début de tour : pioche, éveil, effet", ["turnStarted", "draw:all_rounder", "awaken:all_rounder", "effect:awaken:all_rounder"], journal(turnStart.events));
   run("éveil, début de tour : la Vitesse au compteur du nouveau tour", 2, turnStart.state.speed);
-  run("éveil, début de tour : la bille en main", "tiger", handIds(turnStart.state).join());
+  run("éveil, début de tour : la bille en main", "all_rounder", handIds(turnStart.state).join());
 
-  // Pioche d'un effet (le Tic de l'œil-de-chat) : l'éveil aussi.
-  const tic = apply(playState({ hand: inHand(["cats_eye"]), bag: ["tiger"], triangle: triangleOf(null, null, placed("glass")) }), { type: "place", handIndex: 0, slot: "apex" });
-  run.same("éveil, pioche d'un effet : après la pioche", ["draw:tiger", "awaken:tiger", "effect:awaken:tiger"], journal(tic.events).slice(-3));
+  // Pioche d'un effet (le Tic de split_base) : l'éveil aussi.
+  const tic = apply(playState({ hand: inHand(["split_base"]), bag: ["all_rounder"], triangle: triangleOf(null, null, placed("hit_polish")) }), { type: "place", handIndex: 0, slot: "apex" });
+  run.same("éveil, pioche d'un effet : après la pioche", ["draw:all_rounder", "awaken:all_rounder", "effect:awaken:all_rounder"], journal(tic.events).slice(-3));
   run("éveil, pioche d'un effet : la Vitesse au compteur du tour en cours", 2, tic.state.speed);
 
   // Main pleine : la bille reste au sac, pas d'éveil.
-  const full = apply({ ...playState({ hand: inHand(["clay", "glass", "agate", "porcelain", "gorilla"]), bag: ["tiger"] }), stage: "draw" }, { type: "draw" });
+  const full = apply({ ...playState({ hand: inHand(["aging_flick", "hit_polish", "final_pocket", "fragile", "hit_pocket"]), bag: ["all_rounder"] }), stage: "draw" }, { type: "draw" });
   run.same("éveil, main pleine : pas de pioche, pas d'éveil", ["turnStarted", "drawSkipped"], journal(full.events));
 
   // Ordre : régénération, trouvailles, pioche, éveil, pioche suivante.
   const ordered = apply(
-    { ...playState({ hand: inHand([]), bag: [], discard: ["tiger"], drawPerTurn: 2, triangle: triangleOf(placed("agate", 1), null, null) }), stage: "draw" },
+    { ...playState({ hand: inHand([]), bag: [], discard: ["all_rounder"], drawPerTurn: 2, triangle: triangleOf(placed("final_pocket", 1), null, null) }), stage: "draw" },
     { type: "draw" }
   );
   run.same(
     "éveil, ordre : régénération, trouvaille, pioche, éveil, puis l'arrêt de la pioche",
-    ["turnStarted", "bagRegenerated", "windfall:agate", "effect:windfall:agate", "polished:agate", "draw:tiger", "awaken:tiger", "effect:awaken:tiger", "drawSkipped"],
+    ["turnStarted", "bagRegenerated", "windfall:final_pocket", "effect:windfall:final_pocket", "polished:final_pocket", "draw:all_rounder", "awaken:all_rounder", "effect:awaken:all_rounder", "drawSkipped"],
     journal(ordered.events)
   );
 
-  // L'enchaînement du mica : chaque mica piochée pioche la suivante, avant que la
+  // L'enchaînement de awaken_draw : chaque awaken_draw piochée pioche la suivante, avant que la
   // pioche du tour ne reprenne.
-  const chain = apply({ ...playState({ hand: inHand([]), bag: ["mica", "mica", "clay", "glass"] }), stage: "draw" }, { type: "draw" });
+  const chain = apply({ ...playState({ hand: inHand([]), bag: ["awaken_draw", "awaken_draw", "aging_flick", "hit_polish"] }), stage: "draw" }, { type: "draw" });
   run.same(
-    "éveil, enchaînement du mica",
-    ["turnStarted", "draw:mica", "awaken:mica", "effect:awaken:mica", "draw:mica", "awaken:mica", "effect:awaken:mica", "draw:clay", "awaken:clay"],
+    "éveil, enchaînement de awaken_draw",
+    ["turnStarted", "draw:awaken_draw", "awaken:awaken_draw", "effect:awaken:awaken_draw", "draw:awaken_draw", "awaken:awaken_draw", "effect:awaken:awaken_draw", "draw:aging_flick", "awaken:aging_flick"],
     journal(chain.events)
   );
-  run("éveil, enchaînement : trois billes en main", "mica,mica,clay", handIds(chain.state).join());
+  run("éveil, enchaînement : trois billes en main", "awaken_draw,awaken_draw,aging_flick", handIds(chain.state).join());
   run.same("éveil, enchaînement : compteurs d'éveils et de billes piochées", { awaken: 2, drawnMarbles: 3, draw: 2, drawQuantity: 2 }, {
     awaken: chain.state.tally.awaken.game,
     drawnMarbles: chain.state.tally.drawnMarbles.game,
@@ -367,25 +306,25 @@ function checkAwaken(run) {
     drawQuantity: chain.state.tally.drawQuantity.game,
   });
   // Avec une régénération au milieu, puis plus rien : l'enchaînement s'arrête.
-  const regenerated = apply({ ...playState({ hand: inHand([]), bag: ["mica"], discard: ["mica"] }), stage: "draw" }, { type: "draw" });
+  const regenerated = apply({ ...playState({ hand: inHand([]), bag: ["awaken_draw"], discard: ["awaken_draw"] }), stage: "draw" }, { type: "draw" });
   run.same(
     "éveil, enchaînement avec régénération",
-    ["turnStarted", "draw:mica", "awaken:mica", "effect:awaken:mica", "bagRegenerated", "draw:mica", "awaken:mica", "effect:awaken:mica", "drawSkipped"],
+    ["turnStarted", "draw:awaken_draw", "awaken:awaken_draw", "effect:awaken:awaken_draw", "bagRegenerated", "draw:awaken_draw", "awaken:awaken_draw", "effect:awaken:awaken_draw", "drawSkipped"],
     journal(regenerated.events)
   );
   run("éveil, enchaînement avec régénération : la partie continue", "play", regenerated.state.stage);
   // Borné par la main pleine.
-  const bounded = apply({ ...playState({ hand: inHand(["clay", "glass", "agate", "porcelain"]), bag: ["mica", "mica", "mica"] }), stage: "draw" }, { type: "draw" });
-  run.same("éveil, enchaînement borné par la main pleine", ["draw:mica", "awaken:mica", "effect:awaken:mica", "drawSkipped"], journal(bounded.events).slice(1));
+  const bounded = apply({ ...playState({ hand: inHand(["aging_flick", "hit_polish", "final_pocket", "fragile"]), bag: ["awaken_draw", "awaken_draw", "awaken_draw"] }), stage: "draw" }, { type: "draw" });
+  run.same("éveil, enchaînement borné par la main pleine", ["draw:awaken_draw", "awaken:awaken_draw", "effect:awaken:awaken_draw", "drawSkipped"], journal(bounded.events).slice(1));
 
-  // Règle des cibles : le Polissage ciblé de la géante sur la pointe ; un emplacement
+  // Règle des cibles : le Polissage ciblé de one_shot sur la pointe ; un emplacement
   // vide, noté.
-  const giant = (apex) => apply({ ...playState({ hand: inHand([]), bag: ["giant"], triangle: triangleOf(null, null, apex) }), stage: "draw" }, { type: "draw" });
-  run("éveil, cible : la géante polit la pointe", 0, giant(placed("tiger", 2)).state.triangle.apex.wear - 1);
+  const oneShot = (apex) => apply({ ...playState({ hand: inHand([]), bag: ["one_shot"], triangle: triangleOf(null, null, apex) }), stage: "draw" }, { type: "draw" });
+  run("éveil, cible : one_shot polit la pointe", 0, oneShot(placed("all_rounder", 2)).state.triangle.apex.wear - 1);
   run.same(
     "éveil, cible : pointe vide, notée avec son effet",
-    { type: "targetEmpty", action: "polish", slot: "apex", by: { trigger: "awaken", slot: null, marble: "giant" } },
-    giant(null).events.at(-1)
+    { type: "targetEmpty", action: "polish", slot: "apex", by: { trigger: "awaken", slot: null, marble: "one_shot" } },
+    oneShot(null).events.at(-1)
   );
   // Un bonus de Vitesse ciblé : donné avant la phase, perdu après.
   const gifts = { waker: { awaken: [{ action: "speed", amount: 2, target: "apex" }] }, finisher: { maxWear: 1, final: [{ action: "draw", amount: 1 }] }, plain: {} };
@@ -408,716 +347,59 @@ function checkAwaken(run) {
   run("éveil, validation : Vitesse ciblée permise", false, throws(() => validateTable({ a: { awaken: [{ action: "speed", amount: 1, target: "leftBase" }] } })));
 
   // Une bille fabriquée qui n'a pas d'Éveil : l'évènement passe, sans effet.
-  const quiet = apply({ ...playState({ hand: inHand([]), bag: ["clay"] }), stage: "draw" }, { type: "draw" });
-  run.same("éveil : sans le champ, l'évènement seul", ["turnStarted", "draw:clay", "awaken:clay"], journal(quiet.events));
-}
-
-// Le POT : capacité, Empocher depuis chaque origine, cibles vides, validation, la
-// règle « une seule fois d'une zone à l'autre », et le mot-clé En poche (entrée,
-// résolution).
-function checkPocket(run) {
-  // Les mécanismes du pot, sur le gorille d'avant les choix (la première de la main).
-  const apply = (state, action, marbles = fixedRules) => applyWith(state, action, marbles);
-  const journal = (events) =>
-    events.map((event) => {
-      if (event.type === "effect") return `effect:${event.trigger}:${event.marble}`;
-      if (event.type === "removed") return `removed:${event.marble}:${event.cause}`;
-      if (event.type === "pocketed" || event.type === "lost") return `${event.type}:${event.marble}:${event.from}`;
-      if (event.type === "targetEmpty") return `targetEmpty:${event.action}:${event.target ?? event.slot}`;
-      return event.marble === undefined ? event.type : `${event.type}:${event.marble}`;
-    });
-  // Toutes les billes de la partie, pot et billes perdues comprises.
-  const everywhere = (state) => marbleCount(state);
-
-  run("pot : capacité par défaut", MARBLES_SETTINGS.potCapacity, rules.createGame(1).potCapacity);
-  run.same("pot : vide en début de partie, aucune bille perdue", { pot: [], lost: [] }, (({ pot, lost }) => ({ pot, lost }))(rules.createGame(1)));
-  run("pot : capacité négative refusée", true, throws(() => rules.createGame(1, { potCapacity: -1 })));
-  run("pot : capacité nulle permise", 0, rules.createGame(1, { potCapacity: 0 }).potCapacity);
-
-  // Depuis la main : le Tic du gorille empoche la première bille de la main ; la
-  // porcelaine entre, puis son effet d'entrée.
-  const gorilla = apply(playState({ hand: inHand(["gorilla", "porcelain", "clay"]), triangle: triangleOf(null, null, placed("clay")) }), { type: "place", handIndex: 0, slot: "apex" });
-  run.same(
-    "Empocher, depuis la main : la mise en poche, puis l'entrée",
-    ["effect:hit:gorilla", "pocketed:porcelain:hand", "effect:pocketEntry:porcelain"],
-    journal(gorilla.events).slice(-3)
-  );
-  run.same("Empocher, depuis la main : le pot, la main", { pot: ["porcelain"], hand: ["clay"] }, { pot: gorilla.state.pot, hand: handIds(gorilla.state) });
-  run("Empocher, depuis la main : l'entrée aux compteurs du tour (4 + 10)", 14, gorilla.state.speed);
-  // Main vide : sans effet, noté.
-  const emptyHand = apply(playState({ hand: inHand(["gorilla"]), triangle: triangleOf(null, null, placed("clay")) }), { type: "place", handIndex: 0, slot: "apex" });
-  run("Empocher, main vide : noté", "targetEmpty:pocket:firstInHand", journal(emptyHand.events).at(-1));
-
-  // Pot plein : la bille est perdue, sans effet d'entrée.
-  const full = apply(
-    playState({ hand: inHand(["gorilla", "porcelain"]), triangle: triangleOf(null, null, placed("clay")), pot: ["clay", "glass", "mica"] }),
-    { type: "place", handIndex: 0, slot: "apex" }
-  );
-  run.same("pot plein : la bille perdue, sans effet d'entrée", ["effect:hit:gorilla", "lost:porcelain:hand"], journal(full.events).slice(-2));
-  run.same("pot plein : pot inchangé, la bille chez les perdues", { pot: ["clay", "glass", "mica"], lost: ["porcelain"] }, { pot: full.state.pot, lost: full.state.lost });
-  run("pot plein : ni entrée ni Vitesse +10", 4, full.state.speed);
-  const zero = apply(
-    { ...playState({ hand: inHand(["gorilla", "porcelain"]), triangle: triangleOf(null, null, placed("clay")) }), potCapacity: 0 },
-    { type: "place", handIndex: 0, slot: "apex" }
-  );
-  run.same("pot de capacité nulle : toute bille empochée est perdue", [], zero.state.pot);
-
-  // Depuis un emplacement, pendant la résolution : le sulfure en base empoche la
-  // pointe ; ni usure ni éjection (pas de Final) ; la phase de pointe est sautée.
-  const sulphide = apply(playState({ bag: ["clay"], triangle: triangleOf(placed("sulphide"), null, placed("porcelain", 1)) }), { type: "resolve" });
-  run.same(
-    "Empocher, depuis un emplacement : retrait, mise en poche, entrée, puis la suite",
-    ["phase:sulphide", "effect:phase:sulphide", "removed:porcelain:pocket", "pocketed:porcelain:triangle", "effect:pocketEntry:porcelain", "wear:sulphide", "phaseSkipped", "phaseSkipped"],
-    journal(sulphide.events).slice(0, 8)
-  );
-  run("Empocher, depuis un emplacement : pas de Final", false, sulphide.events.some((event) => event.type === "final"));
-  run("Empocher, depuis un emplacement : dans l'Impact, l'entrée et pas la phase de la porcelaine", 10, sulphide.events.find((event) => event.type === "impact").impact);
-  run("Empocher, depuis un emplacement : rien à la défausse", 0, sulphide.state.discard.length);
-  const emptyApex = apply(playState({ triangle: triangleOf(placed("sulphide"), null, null) }), { type: "resolve" });
-  run("Empocher, emplacement vide : noté", true, journal(emptyApex.events).includes("targetEmpty:pocket:apex"));
-
-  // Depuis la défausse : le Final de l'agate (usure 2 sur 3) l'empoche, déjà
-  // défaussée ; elle n'est qu'à un endroit, le pot.
-  const agate = apply(playState({ triangle: triangleOf(null, null, placed("agate", 2)) }), { type: "resolve" });
-  run.same(
-    "Empocher, Final : retrait, défausse, Final, puis la mise en poche depuis la défausse",
-    ["removed:agate:wear", "discarded:agate", "final:agate", "effect:final:agate", "targetEmpty:polish:apex", "pocketed:agate:discard"],
-    journal(agate.events).filter((entry) => !["impact", "rotation", "turnEnded"].includes(entry)).slice(-6)
-  );
-  run.same("Empocher, Final : au pot, pas à la défausse", { pot: ["agate"], discard: [] }, { pot: agate.state.pot, discard: agate.state.discard });
-  run("Empocher, Final : aucune bille perdue ni dupliquée", 1, everywhere(agate.state));
-
-  // Pendant sa propre Éjection : elle ne passe qu'une fois, au pot.
-  const shy = { shy: { knockout: [{ action: "pocket" }] }, plain: {} };
-  const ejected = apply(playState({ hand: inHand(["plain"]), triangle: triangleOf(null, null, placed("shy")) }), { type: "place", handIndex: 0, slot: "apex" }, shy);
-  run.same(
-    "Empocher, sa propre Éjection : au pot, jamais à la défausse",
-    ["flick:plain", "knockout:shy", "effect:knockout:shy", "removed:shy:pocket", "pocketed:shy:triangle", "placed:plain", "hit:plain"],
-    journal(ejected.events)
-  );
-  run.same("Empocher, sa propre Éjection : le pot, une défausse vide", { pot: ["shy"], discard: [] }, { pot: ejected.state.pot, discard: ejected.state.discard });
-  run("Empocher, sa propre Éjection : aucune bille dupliquée", 2, everywhere(ejected.state));
-
-  // Pendant son Éveil : depuis la main ; une seconde fois, elle n'est plus là.
-  const waking = { waker: { awaken: [{ action: "pocket" }, { action: "pocket" }] }, plain: {} };
-  const awoken = apply({ ...playState({ hand: inHand([]), bag: ["waker"] }), stage: "draw" }, { type: "draw" }, waking);
-  run.same(
-    "Empocher, Éveil : depuis la main, puis la bille n'est plus là",
-    ["draw:waker", "awaken:waker", "effect:awaken:waker", "pocketed:waker:hand", "targetEmpty:pocket:self"],
-    journal(awoken.events).slice(1)
-  );
-  run.same("Empocher, Éveil : la main vide, la bille au pot", { pot: ["waker"], hand: [] }, { pot: awoken.state.pot, hand: handIds(awoken.state) });
-
-  // Jamais remélangées : pot et billes perdues restent où elles sont à la régénération.
-  const regenerated = apply({ ...playState({ hand: inHand([]), bag: [], discard: ["glass"], pot: ["agate"], lost: ["clay"] }), stage: "draw" }, { type: "draw" });
-  run.same("pot et billes perdues : jamais remélangées", { pot: ["agate"], lost: ["clay"], hand: ["glass"] }, { pot: regenerated.state.pot, lost: regenerated.state.lost, hand: handIds(regenerated.state) });
-
-  // L'étape du pot : après les trois phases, avant les retraits, dans l'ordre
-  // d'arrivée ; une bille sans effet de résolution passe sans effet.
-  const pot = apply(
-    playState({ triangle: triangleOf(placed("magnifier"), null, placed("porcelain", 1)), pot: ["agate", "glass", "sulphide"] }),
-    { type: "resolve" }
-  );
-  const steps = journal(pot.events);
-  run.same(
-    "pot, résolution : chaque bille dans l'ordre d'arrivée, après les phases, avant les retraits",
-    ["potResolution:agate", "effect:pocketResolution:agate", "potResolution:glass", "potResolution:sulphide", "effect:pocketResolution:sulphide", "removed:porcelain:wear"],
-    steps.slice(steps.indexOf("potResolution:agate"), steps.indexOf("removed:porcelain:wear") + 1)
-  );
-  run("pot, résolution : après la phase de pointe", true, steps.indexOf("wear:porcelain") < steps.indexOf("potResolution:agate"));
-  run.same(
-    "pot, résolution : l'agate Masse +1, le sulfure Vitesse +2 par minibille active (loupe, porcelaine)",
-    [{ marble: "agate", massDelta: 1 }, { marble: "sulphide", speedDelta: 4 }],
-    pot.events.filter((event) => event.trigger === "pocketResolution").map(({ marble, speedDelta, massDelta }) => (marble === "agate" ? { marble, massDelta } : { marble, speedDelta }))
-  );
-  const impact = pot.events.find((event) => event.type === "impact");
-  run("pot, résolution : compté dans l'Impact", impactOf(impact.speed, impact.mass), impact.impact);
-  run("pot, résolution : la Masse de l'agate dans l'Impact", 2, impact.mass);
-  // Une bille empochée pendant la résolution, avant l'étape du pot, y passe ce tour.
-  const late = apply(playState({ triangle: triangleOf(placed("sulphide"), null, placed("agate")) }), { type: "resolve" });
-  run("pot, résolution : la bille empochée pendant les phases y passe", true, journal(late.events).includes("effect:pocketResolution:agate"));
-
-  // Validation : jamais sur soi dans une Chiquenaude ni dans le pot ; une Vitesse
-  // ciblée à chaque résolution n'a plus de phase ; les autres actions ciblées passent.
-  const refused = (table) => throws(() => validateTable(table));
-  run("validation : Empocher soi-même dans sa Chiquenaude refusé", true, refused({ a: { flick: [{ action: "pocket" }] } }));
-  run("validation : Empocher une cible dans sa Chiquenaude permis", false, refused({ a: { flick: [{ action: "pocket", target: "apex" }] } }));
-  run("validation : Empocher soi-même au Final permis", false, refused({ a: { final: [{ action: "pocket" }] } }));
-  run("validation : Empocher soi-même à l'Éveil permis", false, refused({ a: { awaken: [{ action: "pocket" }] } }));
-  run("validation : Empocher avec un montant refusé", true, refused({ a: { base: [{ action: "pocket", amount: 1 }] } }));
-  run("validation : Empocher la première de la main permis", false, refused({ a: { hit: [{ action: "pocket", target: "firstInHand" }] } }));
-  run("validation : Polissage de la première de la main refusé", true, refused({ a: { hit: [{ action: "polish", amount: 1, target: "firstInHand" }] } }));
-  run("validation : En poche, un moment inconnu refusé", true, refused({ a: { pocketed: { exit: [{ action: "speed", amount: 1 }] } } }));
-  run("validation : En poche, Empocher soi-même refusé", true, refused({ a: { pocketed: { entry: [{ action: "pocket" }] } } }));
-  run("validation : En poche, Polissage sur soi refusé", true, refused({ a: { pocketed: { resolution: [{ action: "polish", amount: 1 }] } } }));
-  run("validation : En poche à chaque résolution, Vitesse ciblée refusée", true, refused({ a: { pocketed: { resolution: [{ action: "speed", amount: 1, target: "apex" }] } } }));
-  run(
-    "validation : En poche à chaque résolution, Polissage, Fêlure, Empocher et Pioche ciblés permis",
-    false,
-    refused({
-      a: {
-        pocketed: {
-          resolution: [
-            { action: "polish", amount: 1, target: "apex" },
-            { action: "crack", amount: 1, target: "apex" },
-            { action: "pocket", target: "firstInHand" },
-            { action: "draw", amount: 1 },
-          ],
-        },
-      },
-    })
-  );
-  run("validation : En poche n'est pas une liste", true, refused({ a: { pocketed: [{ action: "speed", amount: 1 }] } }));
-  run("validation : les moments déclarés sont valides", false, throws(() => validatePocketMoments(MARBLE_POCKET)));
-  run("validation : un moment sans texte de fiche refusé", true, throws(() => validatePocketMoments({ ...MARBLE_POCKET, moments: [{ ...MARBLE_POCKET.moments[0], texts: { effect: "x" } }] })));
-}
-
-// EN POCHE, À CHAQUE (OCCURRENCE) : les réactions du pot aux valeurs de partie
-// écoutables. Tables fabriquées, pour isoler chaque règle.
-function checkPocketReactions(run) {
-  const reactions = (events) =>
-    events.filter((event) => event.type === "effect" && event.trigger === "pocketReaction").map((event) => `${event.potIndex}:${event.marble}`);
-  const effects = (events) => events.filter((event) => event.type === "effect").map((event) => `${event.trigger}:${event.marble}`);
-  const table = {
-    plain: { apex: [{ action: "speed", amount: 1 }] },
-    flicker: { flick: [{ action: "speed", amount: 1 }] },
-    polisher: { flick: [{ action: "polish", amount: 1, target: "apex" }] },
-    drawer: { flick: [{ action: "draw", amount: 3 }] },
-    pocketer: { flick: [{ action: "pocket", target: "firstInHand" }] },
-    onThrown: { pocketed: { thrownMarbles: [{ action: "speed", amount: 1 }] } },
-    onFlick: { pocketed: { flick: [{ action: "speed", amount: 2 }] } },
-    onFlickToo: { pocketed: { flick: [{ action: "mass", amount: 1 }] } },
-    onPolish: { pocketed: { polish: [{ action: "mass", amount: 1 }] } },
-    onDrawn: { pocketed: { drawnMarbles: [{ action: "speed", amount: 1 }] } },
-    onExit: { pocketed: { ejectedMarbles: [{ action: "speed", amount: 1 }], triangleExits: [{ action: "mass", amount: 1 }] } },
-    onPocketed: { pocketed: { pocketedMarbles: [{ action: "speed", amount: 5 }] } },
-    onApex: { pocketed: { apex: [{ action: "speed", amount: 2, target: "leftBase" }] } },
-  };
-  const made = fabricatedRules(table);
-  const place = (state, slot = "apex") => apply(state, { type: "place", handIndex: 0, slot }, made);
-
-  // Les trois catégories : un évènement réel (toute bille lancée), un mot-clé (une
-  // Chiquenaude, chez une bille qui en a une), une action (un Polissage).
-  run.same("réaction, évènement réel : toute bille lancée", ["0:onThrown"], reactions(place(playState({ hand: inHand(["plain"]), pot: ["onThrown"] })).events));
-  run.same("réaction, mot-clé : une Chiquenaude", ["0:onFlick"], reactions(place(playState({ hand: inHand(["flicker"]), pot: ["onFlick"] })).events));
-  run.same("réaction, mot-clé : une bille sans Chiquenaude n'en déclenche pas", [], reactions(place(playState({ hand: inHand(["plain"]), pot: ["onFlick"] })).events));
-  run.same(
-    "réaction, action : un Polissage",
-    ["0:onPolish"],
-    reactions(place(playState({ hand: inHand(["polisher"]), pot: ["onPolish"], triangle: triangleOf(placed("plain"), null, placed("plain", 1)) }), "leftBase").events)
-  );
-  const flicked = place(playState({ hand: inHand(["flicker"]), pot: ["onFlick"] }));
-  run("réaction : Vitesse aux compteurs du tour (1 + 2)", 3, flicked.state.speed);
-  run("réaction : le pot inchangé", "onFlick", flicked.state.pot.join());
-
-  // Une réaction par incrément : trois billes piochées, trois réactions ; un
-  // évènement qui augmente deux compteurs écoutés (une éjection est aussi une
-  // sortie du triangle) : deux.
-  const drawing = place(playState({ hand: inHand(["drawer"]), bag: ["plain", "plain", "plain"], pot: ["onDrawn"] }));
-  run.same("réaction : une par incrément (trois billes piochées)", ["0:onDrawn", "0:onDrawn", "0:onDrawn"], reactions(drawing.events));
-  const ejecting = place(playState({ hand: inHand(["plain"]), pot: ["onExit"], triangle: triangleOf(null, null, placed("plain")) }));
-  run.same("réaction : un évènement, deux compteurs écoutés, deux réactions", ["0:onExit", "0:onExit"], reactions(ejecting.events));
-  run("réaction : Vitesse +1 et Masse +1", "1/2", `${ejecting.state.speed}/${ejecting.state.mass}`);
-
-  // L'ordre : l'effet de la bille concernée, puis les billes du pot dans l'ordre
-  // d'arrivée ; par la file, avant la suite de l'action (la pose).
-  const ordered = place(playState({ hand: inHand(["flicker"]), pot: ["onFlickToo", "onThrown", "onFlick"] }));
-  run.same(
-    "réaction, ordre : l'effet de la bille, puis le pot dans l'ordre d'arrivée",
-    ["flick:flicker", "pocketReaction:onFlickToo", "pocketReaction:onThrown", "pocketReaction:onFlick"],
-    effects(ordered.events)
-  );
-  // Les trois réactions entrent dans la file d'un bloc, après l'effet de la bille ;
-  // leurs effets suivent, dans le même ordre, tous avant la pose.
-  run.same(
-    "réaction, ordre : la réaction suit son évènement, avant la pose",
-    ["flick", "effect", "pocketReaction", "pocketReaction", "pocketReaction", "effect", "effect", "effect", "placed"],
-    eventTypes(ordered.events)
-  );
-  run.same(
-    "réaction : l'évènement nomme la bille, sa place et le compteur",
-    { type: "pocketReaction", index: 2, marble: "onFlick", counter: "flick" },
-    ordered.events.find((event) => event.type === "pocketReaction" && event.marble === "onFlick")
-  );
-
-  // Un mélange en pleine pioche : les Trouvailles, puis la réaction du pot, juste
-  // après lui, avant que la pioche ne reprenne.
-  const shuffleTable = fabricatedRules({ ...table, finder: { windfall: [{ action: "speed", amount: 1 }] }, onShuffle: { pocketed: { shuffles: [{ action: "mass", amount: 1 }] } } });
-  const shuffled = apply(
-    { ...playState({ bag: [], discard: ["plain"], pot: ["onShuffle"], triangle: triangleOf(placed("finder"), null, null) }), stage: "draw" },
-    { type: "draw" },
-    shuffleTable
-  );
-  run.same(
-    "réaction au mélange : après les Trouvailles, avant la reprise de la pioche",
-    ["bagRegenerated", "windfall", "effect:windfall", "pocketReaction", "effect:pocketReaction", "draw"],
-    shuffled.events
-      .filter((event) => ["bagRegenerated", "windfall", "effect", "pocketReaction", "draw"].includes(event.type))
-      .map((event) => (event.type === "effect" ? `effect:${event.trigger}` : event.type))
-  );
-
-  // La bille qui entre ne réagit pas à sa propre mise en poche ; elle réagit aux
-  // suivantes.
-  const entering = place(playState({ hand: inHand(["pocketer", "onPocketed"]), pot: ["onPocketed"] }));
-  run.same("réaction : la bille entrante ne réagit pas à sa propre mise en poche", ["0:onPocketed"], reactions(entering.events));
-  const next = place({ ...entering.state, hand: inHand(["pocketer", "plain"]), throwsUsed: 0 });
-  run.same("réaction : elle réagit à la suivante", ["0:onPocketed", "1:onPocketed"], reactions(next.events));
-
-  // Règle des cibles : un bonus ciblé sur une phase passée est perdu, noté.
-  const late = apply(playState({ pot: ["onApex"], triangle: triangleOf(placed("plain"), null, placed("plain")) }), { type: "resolve" }, made);
-  const lateEffect = late.events.find((event) => event.type === "effect" && event.trigger === "pocketReaction");
-  run.same("réaction, cible : le bonus d'une phase passée, perdu et noté", [{ slot: "leftBase", reason: "phasePassed", speed: 2, mass: 0 }], lateEffect.lost);
-
-  // Les réactions comptent aux valeurs de partie, sans être écoutables.
-  run("réaction : comptée (pocketReaction)", 3, drawing.state.tally.pocketReaction.turn);
-
-  // Validation : une clé écoutable passe ; une quantité réelle, Vitesse et Masse,
-  // les réactions elles-mêmes et l'inconnu sont refusés.
-  const valid = (pocketed) => !throws(() => validateTable({ x: { pocketed } }));
-  const speed1 = [{ action: "speed", amount: 1 }];
-  run("validation, réaction : évènement réel accepté", true, valid({ shuffles: speed1 }));
-  run("validation, réaction : mot-clé accepté", true, valid({ final: speed1 }));
-  run("validation, réaction : moment fixe d'En poche accepté", true, valid({ pocketEntry: speed1 }));
-  run("validation, réaction : action acceptée", true, valid({ crack: speed1 }));
-  run("validation, réaction : quantité réelle refusée", false, valid({ polishQuantity: speed1 }));
-  run("validation, réaction : gains de Vitesse refusés", false, valid({ speedGains: speed1 }));
-  run("validation, réaction : total de Masse refusé", false, valid({ massGained: speed1 }));
-  run("validation, réaction : réagir aux réactions refusé", false, valid({ pocketReaction: speed1 }));
-  run("validation, réaction : clé inconnue refusée", false, valid({ nope: speed1 }));
-  run("validation, réaction : sur elle-même refusé", false, valid({ flick: [{ action: "polish", amount: 1 }] }));
-  run("validation, réaction : une action ciblée acceptée", true, valid({ flick: [{ action: "polish", amount: 1, target: "apex" }] }));
-  run("validation, réaction : le message dit pourquoi", true, /ne s'écoute pas/.test(caughtMessage(() => validateTable({ x: { pocketed: { drawQuantity: speed1 } } }))));
-
-  // Boucle directe : réagir au déclenchement d'une action qu'on produit, refusé.
-  run("validation, boucle directe : à chaque polissage, Polissage 1, refusé", false, valid({ polish: [{ action: "polish", amount: 1, target: "apex" }] }));
-  run("validation, boucle directe : à chaque pioche, Pioche 1, refusé", false, valid({ draw: [{ action: "draw", amount: 1 }] }));
-  run("validation, boucle directe : le message dit la boucle", true, /boucle/.test(caughtMessage(() => validateTable({ x: { pocketed: { crack: [{ action: "crack", amount: 1, target: "apex" }] } } }))));
-  run("validation : réagir à une autre action que la sienne, accepté", true, valid({ polish: [{ action: "crack", amount: 1, target: "apex" }] }));
-
-  // Boucle indirecte : deux billes du pot qui se répondent (Fêlure, Polissage), sur
-  // une bille qui ne s'use jamais assez. La limite du bus coupe cette chaîne seule,
-  // l'action reprend ensuite normalement, le journal le note : une anomalie, que la
-  // fumée guette.
-  const looping = fabricatedRules({
-    ...table,
-    sturdy: { maxWear: 100 },
-    cracker: { pocketed: { polish: [{ action: "crack", amount: 1, target: "apex" }] } },
-    healer: { pocketed: { crack: [{ action: "polish", amount: 1, target: "apex" }] } },
-    basePolisher: { base: [{ action: "polish", amount: 1, target: "apex" }] },
-    baseOne: { base: [{ action: "speed", amount: 1 }] },
-  });
-  const loop = looping.reduce(playState({ hand: inHand(["polisher", "plain"]), pot: ["cracker", "healer"], triangle: triangleOf(null, null, placed("sturdy", 50)) }), {
-    type: "place",
-    handIndex: 0,
-    slot: "leftBase",
-  });
-  run("boucle indirecte : l'action aboutit", true, loop.ok);
-  run("boucle indirecte : la chaîne interrompue, notée une fois", 1, loop.events.filter((event) => event.type === "chainInterrupted").length);
-  run("boucle indirecte : la pose va à son terme", "polisher", loop.state.triangle.leftBase?.marble);
-  run("boucle indirecte : la pose reprend après la chaîne coupée", true, loop.events.findIndex((event) => event.type === "placed") > loop.events.findIndex((event) => event.type === "chainInterrupted"));
-  const resolved = looping.reduce(loop.state, { type: "resolve" });
-  run("boucle indirecte : la partie continue", true, resolved.ok);
-  // Pendant la résolution : la boucle de la base gauche coupée, la base droite et la
-  // pointe jouent, les retraits et l'Impact suivent.
-  const midResolution = looping.reduce(
-    playState({ bag: ["plain"], pot: ["cracker", "healer"], triangle: triangleOf(placed("basePolisher"), placed("baseOne"), placed("sturdy", 50)) }),
-    { type: "resolve" }
-  );
-  const cutAt = midResolution.events.findIndex((event) => event.type === "chainInterrupted");
-  run("chaîne coupée en résolution : une seule fois", 1, midResolution.events.filter((event) => event.type === "chainInterrupted").length);
-  run(
-    "chaîne coupée en résolution : la base droite joue ensuite son effet",
-    true,
-    midResolution.events.slice(cutAt).some((event) => event.type === "effect" && event.trigger === "phase" && event.slot === "rightBase" && event.speedDelta === 1)
-  );
-  run("chaîne coupée en résolution : la pointe joue ensuite sa phase", true, midResolution.events.slice(cutAt).some((event) => event.type === "phase" && event.slot === "apex"));
-  run("chaîne coupée en résolution : l'Impact compte la base droite", 1, midResolution.events.find((event) => event.type === "impact").speed);
-}
-
-function caughtMessage(fn) {
-  try {
-    fn();
-  } catch (error) {
-    return error.message;
-  }
-  return "";
-}
-
-// CIBLES AU CHOIX : choix simple et multiple, modes, éligibilité, suspension et
-// reprise par rejeu, refus pendant l'attente, sérialisation, validation. Billes
-// fabriquées pour isoler chaque règle, puis les billes de test.
-function checkChoices(run) {
-  const choose = (zones, extra = {}) => ({ type: "choice", zones, pick: "marble", count: 1, ...extra });
-  const table = {
-    plain: { apex: [{ action: "speed", amount: 1 }] },
-    sturdy: { maxWear: 9 },
-    // Tic : Polissage 1 à 2 billes actives au choix, obligatoire.
-    twoPolish: { hit: [{ action: "polish", amount: 1, target: choose(["triangle"], { count: 2 }) }] },
-    // Tic : Polissage 1 à 3 billes actives au choix (jamais assez de cibles ici).
-    threePolish: { hit: [{ action: "polish", amount: 1, target: choose(["triangle"], { count: 3 }) }] },
-    // Tic : Polissage 1, jusqu'à 2 billes actives au choix.
-    upToPolish: { hit: [{ action: "polish", amount: 1, target: choose(["triangle"], { count: 2, upTo: true }) }] },
-    // Tic : Empocher une bille, de la main ou active, au choix.
-    anyPocket: { hit: [{ action: "pocket", target: choose(["hand", "triangle"]) }] },
-    // Base : Vitesse +2 à une bille active au choix (un bonus de phase).
-    booster: { base: [{ action: "speed", amount: 2, target: choose(["triangle"]) }] },
-    // Final : Polissage 1 à une bille active au choix, et la même, cible fixe.
-    finalChooser: { maxWear: 1, final: [{ action: "polish", amount: 1, target: choose(["triangle"]) }] },
-    finalFixed: { maxWear: 1, final: [{ action: "polish", amount: 1, target: "rightBase" }] },
-    // En poche, à chaque chiquenaude : Fêlure 1 au choix, et la même, cible fixe.
-    potChooser: { pocketed: { flick: [{ action: "crack", amount: 1, target: choose(["triangle"]) }] } },
-    potFixed: { pocketed: { flick: [{ action: "crack", amount: 1, target: "leftBase" }] } },
-    flicker: { flick: [{ action: "speed", amount: 1 }] },
-  };
-  const made = fabricatedRules(table);
-  const reduce = (state, action) => made.reduce(state, action);
-  const answer = (state, slot) => reduce(state, { type: "choose", target: { zone: "triangle", slot } });
-  const slots = (pending) => pending.eligible.map((target) => target.slot ?? `main${target.index}`);
-  const types = (events) => events.map((event) => event.type);
-
-  // Choix multiple obligatoire : une cible choisie n'est plus éligible ; l'action
-  // s'applique ensuite, dans l'ordre des choix ; arrêt à N.
-  const triple = playState({ hand: inHand(["twoPolish"]), triangle: triangleOf(placed("sturdy", 3), placed("sturdy", 3), placed("plain")) });
-  const opened = reduce(triple, { type: "place", handIndex: 0, slot: "apex" });
-  run("choix : la pose s'arrête sur le choix", true, opened.ok && opened.state.pendingChoice !== null);
-  run.same("choix : les billes actives, la posée comprise", ["leftBase", "rightBase", "apex"], slots(opened.state.pendingChoice));
-  run.same(
-    "choix : la question en attente",
-    { action: "polish", amount: 1, zones: ["triangle"], pick: "marble", count: 2, upTo: false, remaining: 2, chosen: [] },
-    (({ action, amount, zones, pick, count, upTo, remaining, chosen }) => ({ action, amount, zones, pick, count, upTo, remaining, chosen }))(opened.state.pendingChoice)
-  );
-  run("choix : le journal s'arrête au choix ouvert", "choice", opened.events.at(-1).type);
-  const first = answer(opened.state, "rightBase");
-  run.same("choix : la cible choisie n'est plus éligible", ["leftBase", "apex"], slots(first.state.pendingChoice));
-  run("choix : encore une", 1, first.state.pendingChoice.remaining);
-  run.same("choix : chaque réponse rend la suite du journal seulement", ["chosen"], types(first.events));
-  const second = answer(first.state, "leftBase");
-  run("choix : fini à N choix, plus rien n'attend", null, second.state.pendingChoice);
-  run.same(
-    "choix : appliqué dans l'ordre des choix",
-    ["rightBase", "leftBase"],
-    second.events.filter((event) => event.type === "polished").map((event) => event.slot)
-  );
-  run.same("choix : la fin de la sélection notée", { reason: "count", chosen: 2 }, (({ reason, chosen }) => ({ reason, chosen }))(second.events.find((event) => event.type === "choiceEnded")));
-  run("choix : les lancers comptés une seule fois", 1, second.state.throwsUsed);
-
-  // Pas assez de cibles : arrêt quand plus rien n'est éligible.
-  const few = reduce(playState({ hand: inHand(["threePolish"]), triangle: triangleOf(placed("sturdy", 3), null, placed("plain")) }), { type: "place", handIndex: 0, slot: "apex" });
-  const fewDone = answer(answer(few.state, "leftBase").state, "apex");
-  run("choix, pas assez de cibles : arrêt quand plus rien n'est éligible", null, fewDone.state.pendingChoice);
-  run("choix, pas assez de cibles : noté", "exhausted", fewDone.events.find((event) => event.type === "choiceEnded").reason);
-
-  // Aucune cible dès le départ : rien ne s'ouvre, le journal le note.
-  const none = reduce(playState({ hand: inHand(["anyPocket"]), triangle: triangleOf(null, null, placed("plain")) }), { type: "place", handIndex: 0, slot: "apex" });
-  run("choix, aucune cible… : la posée elle-même est éligible", true, none.state.pendingChoice !== null);
-  const empty = reduce(playState({ hand: inHand(["finalChooser"]), bag: ["plain"], triangle: triangleOf(null, null, placed("finalChooser")) }), { type: "resolve" });
-  run("choix, aucune cible : aucune attente", null, empty.state.pendingChoice);
-  run("choix, aucune cible : noté au journal", true, empty.events.some((event) => event.type === "targetEmpty" && event.target === "choice"));
-  run("choix, aucune cible : aucun choix ouvert", false, empty.events.some((event) => event.type === "choice"));
-
-  // « Jusqu'à N » : Terminer, à zéro choix ou après un ; refusé en mode obligatoire.
-  const upTo = reduce(playState({ hand: inHand(["upToPolish"]), triangle: triangleOf(placed("sturdy", 3), null, placed("plain")) }), { type: "place", handIndex: 0, slot: "apex" });
-  const zero = reduce(upTo.state, { type: "choose", done: true });
-  run("jusqu'à N : Terminer à zéro choix", null, zero.state.pendingChoice);
-  run("jusqu'à N : rien poli", false, zero.events.some((event) => event.type === "polished"));
-  run("jusqu'à N : terminé, noté", "done", zero.events.find((event) => event.type === "choiceEnded").reason);
-  const one = reduce(answer(upTo.state, "leftBase").state, { type: "choose", done: true });
-  run.same("jusqu'à N : Terminer après un choix", ["leftBase"], one.events.filter((event) => event.type === "polished").map((event) => event.slot));
-  run("obligatoire : Terminer refusé", "choiceRequired", reduce(opened.state, { type: "choose", done: true }).error);
-  run.same("jusqu'à N : Terminer parmi les actions légales", { type: "choose", done: true }, legalActions(upTo.state).at(-1));
-  run.same("obligatoire : seulement les cibles", ["choose", "choose", "choose"], legalActions(opened.state).map((action) => action.type));
-
-  // Pendant l'attente : toute autre action refusée ; une cible non éligible refusée ;
-  // « choisir » sans choix en attente refusé.
-  for (const action of [{ type: "resolve" }, { type: "draw" }, { type: "place", handIndex: 0, slot: "leftBase" }, { type: "swap", a: "leftBase", b: "apex" }]) {
-    run(`attente : ${action.type} refusé`, "choicePending", reduce(first.state, action).error);
-  }
-  run("attente : une cible déjà choisie refusée", "invalidChoice", answer(first.state, "rightBase").error);
-  run("attente : une zone hors du choix refusée", "invalidChoice", reduce(first.state, { type: "choose", target: { zone: "hand", index: 0 } }).error);
-  run("hors attente : choisir refusé", "noChoicePending", reduce(triple, { type: "choose", done: true }).error);
-
-  // La main et le triangle : la bille de la main, par sa place.
-  const both = reduce(playState({ hand: inHand(["anyPocket", "plain", "sturdy"]), triangle: triangleOf(null, null, placed("plain")) }), { type: "place", handIndex: 0, slot: "apex" });
-  run.same("main et triangle : les billes de la main puis les actives", ["main0", "main1", "apex"], slots(both.state.pendingChoice));
-  const fromHand = reduce(both.state, { type: "choose", target: { zone: "hand", index: 1 } });
-  run.same("main : la bille choisie au pot, l'autre reste", { pot: ["sturdy"], hand: ["plain"] }, { pot: fromHand.state.pot, hand: handIds(fromHand.state) });
-
-  // Règle des cibles : un bonus ne va qu'à une phase à venir. En base gauche, pendant
-  // la résolution : la base gauche (en cours) n'est pas éligible.
-  const boosting = reduce(playState({ triangle: triangleOf(placed("booster"), placed("plain"), placed("plain")) }), { type: "resolve" });
-  run.same("éligibilité : un bonus, seulement les phases à venir", ["rightBase", "apex"], slots(boosting.state.pendingChoice));
-  const boosted = answer(boosting.state, "apex");
-  // La pointe ordinaire : Vitesse +1, plus le bonus de 2 ; la base droite ne produit rien.
-  run("éligibilité : le bonus compté à la phase choisie", 1 + 2, boosted.events.find((event) => event.type === "impact").speed);
-
-  // Reprise exacte : un choix équivaut à la même cible fixe. Au milieu d'une
-  // résolution (un Final), puis dans une réaction du pot (pendant la pose).
-  // Les évènements du choix à part, et la clause imprimée (au choix ou fixe) mise de
-  // côté : tout le reste doit être identique.
-  const withoutChoice = (events) =>
-    events.filter((event) => !["choice", "chosen", "choiceEnded"].includes(event.type)).map(({ operations, ...event }) => event);
-  const strip = (events) => JSON.stringify(withoutChoice(events)).replaceAll("finalChooser", "X").replaceAll("finalFixed", "X").replaceAll("potChooser", "X").replaceAll("potFixed", "X");
-  const resolving = (marble) => playState({ bag: ["plain"], triangle: triangleOf(placed("plain"), placed("sturdy", 3), placed(marble)) });
-  const suspended = reduce(resolving("finalChooser"), { type: "resolve" });
-  run("reprise, résolution : suspendue au Final", "final", suspended.state.pendingChoice.by.trigger);
-  run("reprise, résolution : l'Impact n'a pas encore eu lieu", false, suspended.events.some((event) => event.type === "impact"));
-  const resumed = answer(suspended.state, "rightBase");
-  const fixed = reduce(resolving("finalFixed"), { type: "resolve" });
-  run("reprise, résolution : même journal qu'une cible fixe", strip(fixed.events), strip([...suspended.events, ...resumed.events]));
-  run("reprise, résolution : même état qu'une cible fixe", JSON.stringify(fixed.state).replaceAll("finalFixed", "X"), JSON.stringify(resumed.state).replaceAll("finalChooser", "X"));
-  const reacting = (marble) => playState({ hand: inHand(["flicker"]), pot: [marble], triangle: triangleOf(placed("sturdy"), null, null) });
-  const inPot = reduce(reacting("potChooser"), { type: "place", handIndex: 0, slot: "apex" });
-  run("reprise, réaction du pot : suspendue à la réaction", "pocketReaction", inPot.state.pendingChoice.by.trigger);
-  run("reprise, réaction du pot : la bille lancée pas encore posée", false, inPot.events.some((event) => event.type === "placed"));
-  const potResumed = answer(inPot.state, "leftBase");
-  const potFixed = reduce(reacting("potFixed"), { type: "place", handIndex: 0, slot: "apex" });
-  run("reprise, réaction du pot : même journal qu'une cible fixe", strip(potFixed.events), strip([...inPot.events, ...potResumed.events]));
-
-  // Sérialisable : un aller-retour JSON de l'état en attente ne change rien.
-  const roundTrip = JSON.parse(JSON.stringify(first.state));
-  run.same("sérialisation : l'état en attente fait l'aller-retour", first.state, roundTrip);
-  run.same("sérialisation : la reprise depuis la copie est la même", answer(first.state, "leftBase"), answer(roundTrip, "leftBase"));
-  const frozen = deepFreeze(structuredClone(first.state));
-  run("pureté : l'état en attente reçu n'est pas modifié", true, answer(frozen, "leftBase").ok);
-
-  // Les billes de test : le gorille (main), le verre (triangle), la porcelaine
-  // (jusqu'à 2, pendant la résolution).
-  const gorilla = rules.reduce(playState({ hand: inHand(["gorilla", "clay", "agate"]), triangle: triangleOf(null, null, placed("clay")) }), { type: "place", handIndex: 0, slot: "apex" });
-  run.same("gorille : les billes de la main", ["clay", "agate"], gorilla.state.pendingChoice.eligible.map((target) => target.marble));
-  const pocketedAgate = rules.reduce(gorilla.state, { type: "choose", target: { zone: "hand", index: 1 } });
-  run.same("gorille : l'agate choisie au pot", ["agate"], pocketedAgate.state.pot);
-  const porcelain = rules.reduce(playState({ bag: ["clay"], triangle: triangleOf(placed("clay"), placed("agate", 1), placed("porcelain", 1)) }), { type: "resolve" });
-  run.same("porcelaine : son Final, jusqu'à 2 billes actives", { upTo: true, count: 2, trigger: "final" }, { upTo: porcelain.state.pendingChoice.upTo, count: porcelain.state.pendingChoice.count, trigger: porcelain.state.pendingChoice.by.trigger });
-
-  // Validation : les combinaisons impossibles refusées au chargement.
-  const valid = (clause, field = "hit") => !throws(() => validateTable({ x: { [field]: [clause] } }));
-  run("validation, choix : Polissage au choix sur le triangle permis", true, valid({ action: "polish", amount: 1, target: choose(["triangle"]) }));
-  run("validation, choix : Empocher dans la main permis", true, valid({ action: "pocket", target: choose(["hand"]) }));
-  run("validation, choix : Polissage dans la main refusé", false, valid({ action: "polish", amount: 1, target: choose(["hand"]) }));
-  run("validation, choix : le pot pas encore disponible", false, valid({ action: "pocket", target: choose(["pot"]) }));
-  run("validation, choix : zone inconnue refusée", false, valid({ action: "pocket", target: choose(["nowhere"]) }));
-  run("validation, choix : un emplacement vide n'a rien à polir", false, valid({ action: "polish", amount: 1, target: choose(["triangle"], { pick: "slot" }) }));
-  run("validation, choix : nombre nul refusé", false, valid({ action: "polish", amount: 1, target: choose(["triangle"], { count: 0 }) }));
-  run("validation, choix : champ inconnu refusé", false, valid({ action: "polish", amount: 1, target: choose(["triangle"], { extra: 1 }) }));
-  run("validation, choix : la Pioche ne se choisit pas", false, valid({ action: "draw", amount: 1, target: choose(["triangle"]) }));
-  run("validation, choix : bonus au choix pendant la pose permis", true, valid({ action: "speed", amount: 1, target: choose(["triangle"]) }));
-  run("validation, choix : bonus au choix au Final refusé (plus aucune phase)", false, valid({ action: "speed", amount: 1, target: choose(["triangle"]) }, "final"));
-  run("validation, choix : bonus au choix en pointe refusé (plus aucune phase après)", false, valid({ action: "speed", amount: 1, target: choose(["triangle"]) }, "apex"));
-  run("validation, choix : bonus au choix en base permis (la pointe vient après)", true, valid({ action: "speed", amount: 1, target: choose(["triangle"]) }, "base"));
-}
-
-// ÉJECTER : chaque forme de cible, l'ordre (Éjection, retrait, défausse), ni Tic ni
-// Final, la phase sautée, la référence des conditions de calibre, les compteurs et
-// les réactions du pot, la plombée qui vide l'emplacement visé.
-function checkEject(run) {
-  const journal = (events) =>
-    events.map((event) => {
-      if (event.type === "effect") return `effect:${event.trigger}:${event.marble}`;
-      if (event.type === "removed" || event.type === "discarded") return `${event.type}:${event.marble}:${event.cause}`;
-      if (event.type === "targetEmpty") return `targetEmpty:${event.action}:${event.target ?? event.slot}`;
-      return event.marble === undefined ? event.type : `${event.type}:${event.marble}`;
-    });
-  const table = {
-    plain: { apex: [{ action: "speed", amount: 1 }], base: [{ action: "speed", amount: 1 }] },
-    small: { size: SMALL, apex: [{ action: "speed", amount: 1 }] },
-    smallKnock: { size: SMALL, knockout: [{ action: "speed", amount: 2 }] },
-    large: { size: LARGE },
-    // Éjection : Vitesse +5 si la bille « posée » (ici, celle qui éjecte) est plus grosse.
-    sizeKnock: { size: MEDIUM, knockout: [{ action: "speed", amount: 5, when: { type: "relativeSize", marble: "placed", is: "larger" } }] },
-    // Base : s'éjecter elle-même.
-    selfEjector: { base: [{ action: "eject" }] },
-    // Tic : Éjecter la pointe ; et toutes les minibilles actives ; et toutes.
-    apexEjector: { hit: [{ action: "eject", target: "apex" }] },
-    smallEjector: { size: LARGE, hit: [{ action: "eject", target: { type: "all", filters: [{ type: "size", size: SMALL }] } }] },
-    allEjector: { base: [{ action: "eject", target: { type: "all" } }] },
-    chooserEjector: { hit: [{ action: "eject", target: { type: "choice", zones: ["triangle"], pick: "marble", count: 2 } }] },
-    // Base gauche : Éjecter la pointe, avant sa phase.
-    earlyEjector: { base: [{ action: "eject", target: "apex" }] },
-    wornOut: { maxWear: 1, apex: [{ action: "speed", amount: 1 }], final: [{ action: "speed", amount: 9 }] },
-    // Son Éjection l'éjecterait à nouveau : sans effet, pas de boucle.
-    // Son Éjection vise son propre emplacement : à l'exécution, sans effet.
-    loopKnock: { knockout: [{ action: "eject", target: "apex" }] },
-    onEjected: { pocketed: { ejectedMarbles: [{ action: "mass", amount: 1 }] } },
-  };
-  const made = fabricatedRules(table);
-  const go = (state, action) => apply(state, action, made);
-  const toApex = { type: "place", handIndex: 0, slot: "apex" };
-  const toLeft = { type: "place", handIndex: 0, slot: "leftBase" };
-
-  // Un emplacement : l'Éjection de la visée, son retrait, sa défausse ; ni Tic ni Final.
-  const fixed = go(playState({ hand: inHand(["apexEjector"]), triangle: triangleOf(placed("plain"), null, placed("smallKnock")) }), toLeft);
-  run.same(
-    "éjecter, emplacement : Éjection, retrait, défausse",
-    ["eject:smallKnock", "knockout:smallKnock", "effect:knockout:smallKnock", "removed:smallKnock:eject", "discarded:smallKnock:eject"],
-    journal(fixed.events).slice(journal(fixed.events).indexOf("eject:smallKnock"))
-  );
-  run("éjecter : la pointe vidée", null, fixed.state.triangle.apex);
-  run("éjecter : la bille à la défausse", "plain,smallKnock", fixed.state.discard.join());
-  run("éjecter : ni Final ni Tic de plus", 1, fixed.events.filter((event) => event.type === "hit").length);
-  run("éjecter : pas de Final", false, fixed.events.some((event) => event.type === "final"));
-  run("éjecter : son Éjection compte au tour (Vitesse +2)", 2, fixed.state.speed);
-  run.same("éjecter : l'Éjection provoquée porte l'éjection", { trigger: "hit", slot: "leftBase", marble: "apexEjector" }, fixed.events.find((event) => event.trigger === "knockout").ejectedBy);
-
-  // La bille elle-même, sur le triangle ; refusée hors du triangle.
-  const self = go(playState({ bag: ["plain"], triangle: triangleOf(placed("selfEjector"), null, placed("plain")) }), { type: "resolve" });
-  run("éjecter soi-même : quitte le triangle pendant sa phase", true, self.events.some((event) => event.type === "removed" && event.marble === "selfEjector" && event.cause === "eject"));
-  const refused = (field, clause = { action: "eject" }) => throws(() => validateTable({ x: { [field]: [clause] } }));
-  run("validation, éjecter soi-même : dans une Chiquenaude refusé", true, refused("flick"));
-  run("validation, éjecter soi-même : dans un Final refusé", true, refused("final"));
-  run("validation, éjecter soi-même : à l'Éveil refusé", true, refused("awaken"));
-  run("validation, éjecter soi-même : en poche refusé", true, throws(() => validateTable({ x: { pocketed: { entry: [{ action: "eject" }] } } })));
-  run("validation, éjecter soi-même : au Tic permis", false, refused("hit"));
-  run("validation, éjecter soi-même : dans sa propre Éjection refusé", true, refused("knockout"));
-  run("validation, éjecter soi-même : le message dit pourquoi", true, /propre Éjection/.test(caughtMessage(() => validateTable({ x: { knockout: [{ action: "eject" }] } }))));
-  run("validation, éjecter un emplacement dans son Éjection permis", false, refused("knockout", { action: "eject", target: "apex" }));
-  run("validation, éjecter : un montant refusé", true, refused("hit", { action: "eject", amount: 1, target: "apex" }));
-  run("validation, éjecter : au choix dans la main refusé", true, refused("hit", { action: "eject", target: { type: "choice", zones: ["hand"], pick: "marble", count: 1 } }));
-  run("validation, « toutes » : un filtre inconnu refusé", true, refused("hit", { action: "eject", target: { type: "all", filters: [{ type: "matter", matter: "glass" }] } }));
-  run("validation, « toutes » : un calibre inconnu refusé", true, refused("hit", { action: "eject", target: { type: "all", filters: [{ type: "size", size: 9 }] } }));
-  run("validation, « toutes » : deux filtres de calibre refusés", true, refused("hit", { action: "eject", target: { type: "all", filters: [{ type: "size", size: SMALL }, { type: "size", size: LARGE }] } }));
-  run("validation, « toutes » : pour une autre action refusé", true, refused("hit", { action: "polish", amount: 1, target: { type: "all" } }));
-  // Une condition sur une action sans montant : elle vaudrait toujours 0.
-  const printedOn = (stat) => refused("hit", { action: "speed", amount: 1, when: { type: "printedStat", slot: "apex", stat, atLeast: 1 } });
-  run("validation, condition imprimée : sur Empocher refusée", true, printedOn("pocket"));
-  run("validation, condition imprimée : sur Éjecter refusée", true, printedOn("eject"));
-  run("validation, condition imprimée : sur la Fêlure permise", false, printedOn("crack"));
-
-  // Un choix pendant une Éjection ne propose jamais l'emplacement de la bille qui part.
-  const leaving = fabricatedRules({
-    k: { knockout: [{ action: "eject", target: { type: "choice", zones: ["triangle"], pick: "marble", count: 1 } }] },
-    p: {},
-  });
-  const replacing = leaving.reduce(
-    { ...leaving.createGame(1, { bag: ["p"] }), stage: "play", bag: [], hand: [{ marble: "p", turnsInHand: 0 }], triangle: { leftBase: { marble: "k", wear: 0 }, rightBase: { marble: "p", wear: 0 }, apex: null } },
-    { type: "place", handIndex: 0, slot: "leftBase" }
-  ).state;
-  run.same("choix pendant une Éjection : l'emplacement de la bille qui part n'est pas éligible", ["rightBase"], replacing.pendingChoice.eligible.map((target) => target.slot));
-  run("validation, « toutes » : sans filtre permis", false, refused("hit", { action: "eject", target: { type: "all" } }));
-
-  // Toutes les minibilles actives : dans l'ordre des phases, seulement elles.
-  const smalls = go(
-    playState({ hand: inHand(["smallEjector"]), triangle: triangleOf(placed("small"), placed("plain"), placed("smallKnock")) }),
-    { type: "place", handIndex: 0, slot: "rightBase" }
-  );
-  run.same("éjecter toutes les minibilles : dans l'ordre des phases", ["small", "smallKnock"], smalls.events.filter((event) => event.type === "eject").map((event) => event.marble));
-  run.same("éjecter toutes les minibilles : la bille normale reste", "smallEjector", smalls.state.triangle.rightBase.marble);
-  // Toutes : la bille elle-même comprise, sur le triangle.
-  const everyone = go(playState({ bag: ["plain"], triangle: triangleOf(placed("allEjector"), placed("plain"), placed("plain")) }), { type: "resolve" });
-  run.same("éjecter toutes : chaque bille active, elle comprise, dans l'ordre des phases", ["leftBase", "rightBase", "apex"], everyone.events.filter((event) => event.type === "eject").map((event) => event.slot));
-  // Aucune bille visée : sans effet, noté.
-  const noneSmall = go(playState({ hand: inHand(["smallEjector"]), triangle: triangleOf(placed("plain"), null, placed("plain")) }), toApex);
-  run("éjecter toutes les minibilles : aucune, noté", true, journal(noneSmall.events).includes("targetEmpty:eject:all"));
-
-  // Au choix : dans l'ordre de sélection.
-  const choosing = go(playState({ hand: inHand(["chooserEjector"]), triangle: triangleOf(placed("plain"), placed("small"), placed("plain")) }), toApex);
-  const first = made.reduce(choosing.state, { type: "choose", target: { zone: "triangle", slot: "rightBase" } });
-  const second = made.reduce(first.state, { type: "choose", target: { zone: "triangle", slot: "leftBase" } });
-  run.same("éjecter au choix : dans l'ordre de sélection", ["rightBase", "leftBase"], second.events.filter((event) => event.type === "eject").map((event) => event.slot));
-
-  // Cible vide.
-  const empty = go(playState({ hand: inHand(["apexEjector"]), triangle: triangleOf(placed("plain"), null, null) }), toLeft);
-  run("éjecter, emplacement vide : noté", true, journal(empty.events).includes("targetEmpty:eject:apex"));
-
-  // Avant sa phase : la phase sautée, la bille dite retirée avant.
-  const early = go(playState({ bag: ["plain"], triangle: triangleOf(placed("earlyEjector"), null, placed("wornOut")) }), { type: "resolve" });
-  run.same("éjecter avant la phase : phase sautée", { type: "phaseSkipped", slot: "apex" }, early.events.find((event) => event.type === "phaseSkipped" && event.slot === "apex"));
-  run("éjecter : pas de Final, même à l'usure maximale", false, early.events.some((event) => event.type === "final"));
-
-  // La comparaison de calibre : la bille qui éjecte est la référence (« posée »).
-  const bigger = go(playState({ hand: inHand(["smallEjector"]), triangle: triangleOf(placed("sizeKnock"), null, null) }), toApex);
-  run("calibre : plus petite que la grosse qui l'éjecte… (pas de minibille visée)", 0, bigger.state.speed);
-  const sizeTable = fabricatedRules({ ...table, bigEjector: { size: LARGE, hit: [{ action: "eject", target: "leftBase" }] }, smallEjectorFixed: { size: SMALL, hit: [{ action: "eject", target: "leftBase" }] } });
-  const byBig = apply(playState({ hand: inHand(["bigEjector"]), triangle: triangleOf(placed("sizeKnock"), null, placed("plain")) }), toApex, sizeTable);
-  run("calibre : éjectée par un calot, la condition « plus grosse » vaut", 5, byBig.events.find((event) => event.trigger === "knockout").speedDelta);
-  const bySmall = apply(playState({ hand: inHand(["smallEjectorFixed"]), triangle: triangleOf(placed("sizeKnock"), null, placed("plain")) }), toApex, sizeTable);
-  run("calibre : éjectée par une minibille, elle ne vaut pas", 0, bySmall.events.find((event) => event.trigger === "knockout").speedDelta);
-
-  // Une Éjection qui viserait son propre emplacement : sans effet, pas de boucle.
-  const loop = go(playState({ hand: inHand(["apexEjector"]), triangle: triangleOf(placed("plain"), null, placed("loopKnock")) }), toLeft);
-  run("éjecter : une Éjection qui s'éjecte elle-même, sans boucle", false, loop.events.some((event) => event.type === "chainInterrupted"));
-  run("éjecter : elle part une seule fois", 1, loop.events.filter((event) => event.type === "removed" && event.marble === "loopKnock").length);
-
-  // Compteurs : billes éjectées, sorties du triangle, Éjection seulement avec l'effet,
-  // Éjecter et sa quantité réelle ; la réaction du pot « à chaque bille éjectée ».
-  const counted = go(
-    playState({ hand: inHand(["smallEjector"]), pot: ["onEjected"], triangle: triangleOf(placed("small"), placed("large"), placed("smallKnock")) }),
-    { type: "place", handIndex: 0, slot: "rightBase" }
-  );
-  const tally = (id) => counted.state.tally[id].turn;
-  // La pose chasse le calot de la base droite (1), Éjecter les deux minibilles (2).
-  run.same(
-    "compteurs : éjectées (pose et Éjecter), sorties, Éjection (une seule a l'effet), Éjecter, quantité",
-    { ejectedMarbles: 3, triangleExits: 3, knockout: 1, eject: 2, ejectQuantity: 2 },
-    { ejectedMarbles: tally("ejectedMarbles"), triangleExits: tally("triangleExits"), knockout: tally("knockout"), eject: tally("eject"), ejectQuantity: tally("ejectQuantity") }
-  );
-  run("compteurs : la réaction du pot à chaque bille éjectée, pose comprise", 3, counted.events.filter((event) => event.type === "pocketReaction").length);
-  run("compteurs : cible vide, un déclenchement, aucune bille", "1/0", `${noneSmall.state.tally.eject.turn}/${noneSmall.state.tally.ejectQuantity.turn}`);
-
-  // La plombée : posée en pointe sur une bille, sa Chiquenaude l'éjecte ; la pose se
-  // poursuit comme sur un emplacement vide, ni Éjection par la pose ni Tic.
-  const leaded = apply(playState({ hand: inHand(["leaded"]), triangle: triangleOf(null, null, placed("magnifier")) }), toApex);
-  run.same(
-    "plombée : sa Chiquenaude éjecte la pointe, puis la pose sur l'emplacement vidé",
-    ["flick:leaded", "effect:flick:leaded", "eject:magnifier", "knockout:magnifier", "effect:knockout:magnifier", "removed:magnifier:eject", "discarded:magnifier:eject", "placed:leaded"],
-    journal(leaded.events)
-  );
-  run("plombée : ni Tic", false, leaded.events.some((event) => event.type === "hit"));
-  run("plombée : l'Éjection de la loupe compte (Vitesse +3)", 3, leaded.state.speed);
-  // La géante : son Final éjecte toutes les minibilles actives, la loupe y joue son Éjection.
-  const giant = apply(playState({ bag: ["clay"], triangle: triangleOf(placed("magnifier"), placed("clay"), placed("giant")) }), { type: "resolve" });
-  run.same("géante : son Final éjecte la loupe, seule minibille", ["magnifier"], giant.events.filter((event) => event.type === "eject").map((event) => event.marble));
-  run("géante : la loupe joue son Éjection", true, giant.events.some((event) => event.trigger === "knockout" && event.marble === "magnifier" && event.speedDelta === 3));
+  const quiet = apply({ ...playState({ hand: inHand([]), bag: ["aging_flick"] }), stage: "draw" }, { type: "draw" });
+  run.same("éveil : sans le champ, l'évènement seul", ["turnStarted", "draw:aging_flick", "awaken:aging_flick"], journal(quiet.events));
 }
 
 function checkSwap(run) {
-  const clay = placed("clay", 1);
-  const glass = placed("glass", 2);
+  const agingFlick = placed("aging_flick", 1);
+  const hitPolish = placed("hit_polish", 2);
 
-  const both = apply(playState({ triangle: triangleOf(clay, glass, null) }), { type: "swap", a: "leftBase", b: "rightBase" });
-  run.same("échange : contenu interverti, usure gardée", triangleOf(glass, clay, null), both.state.triangle);
+  const both = apply(playState({ triangle: triangleOf(agingFlick, hitPolish, null) }), { type: "swap", a: "leftBase", b: "rightBase" });
+  run.same("échange : contenu interverti, usure gardée", triangleOf(hitPolish, agingFlick, null), both.state.triangle);
   run.same("échange : ni Tic ni Éjection", ["swapped"], eventTypes(both.events));
 
-  const move = apply(playState({ triangle: triangleOf(clay, null, null) }), { type: "swap", a: "leftBase", b: "apex" });
-  run.same("échange avec un vide : déplacement, usure gardée", triangleOf(null, null, clay), move.state.triangle);
+  const move = apply(playState({ triangle: triangleOf(agingFlick, null, null) }), { type: "swap", a: "leftBase", b: "apex" });
+  run.same("échange avec un vide : déplacement, usure gardée", triangleOf(null, null, agingFlick), move.state.triangle);
 
-  const moveBack = apply(playState({ triangle: triangleOf(null, null, clay) }), { type: "swap", a: "leftBase", b: "apex" });
-  run.same("échange depuis un vide : même déplacement", triangleOf(clay, null, null), moveBack.state.triangle);
+  const moveBack = apply(playState({ triangle: triangleOf(null, null, agingFlick) }), { type: "swap", a: "leftBase", b: "apex" });
+  run.same("échange depuis un vide : même déplacement", triangleOf(agingFlick, null, null), moveBack.state.triangle);
 
   run("échange : une seule fois par tour", "swapAlreadyUsed", rules.reduce(both.state, { type: "swap", a: "leftBase", b: "apex" }).error);
-  run("échange : deux vides refusés", "swapBothEmpty", rules.reduce(playState({ triangle: triangleOf(clay, null, null) }), { type: "swap", a: "rightBase", b: "apex" }).error);
-  run("échange : même emplacement refusé", "swapSameSlot", rules.reduce(playState({ triangle: triangleOf(clay, null, null) }), { type: "swap", a: "leftBase", b: "leftBase" }).error);
+  run("échange : deux vides refusés", "swapBothEmpty", rules.reduce(playState({ triangle: triangleOf(agingFlick, null, null) }), { type: "swap", a: "rightBase", b: "apex" }).error);
+  run("échange : même emplacement refusé", "swapSameSlot", rules.reduce(playState({ triangle: triangleOf(agingFlick, null, null) }), { type: "swap", a: "leftBase", b: "leftBase" }).error);
   run("échange : emplacement inconnu refusé", "invalidSlot", rules.reduce(playState(), { type: "swap", a: "leftBase", b: "top" }).error);
 
   // Un refus ne consomme rien : l'état rendu est l'état reçu.
-  const state = playState({ triangle: triangleOf(clay, null, null) });
+  const state = playState({ triangle: triangleOf(agingFlick, null, null) });
   run("refus : état inchangé", state, rules.reduce(state, { type: "swap", a: "rightBase", b: "apex" }).state);
   run.same("refus : journal vide", [], rules.reduce(state, { type: "swap", a: "rightBase", b: "apex" }).events);
 
   // L'ordre du tour : l'échange vient avant la pose.
-  const afterPlace = apply(playState({ hand: inHand(["agate"]), triangle: triangleOf(clay, null, null) }), { type: "place", handIndex: 0, slot: "apex" });
+  const afterPlace = apply(playState({ hand: inHand(["final_pocket"]), triangle: triangleOf(agingFlick, null, null) }), { type: "place", handIndex: 0, slot: "apex" });
   run("échange : refusé après une pose", "swapAfterPlacement", rules.reduce(afterPlace.state, { type: "swap", a: "leftBase", b: "apex" }).error);
   run("swapRefusal : disponible", null, swapRefusal(playState()));
   run("swapRefusal : même code que l'action", "swapAfterPlacement", swapRefusal(afterPlace.state));
 
   // L'échange revient au tour suivant.
-  const nextTurn = apply({ ...both.state, stage: "draw", hand: inHand([]), bag: ["agate", "mica", "tiger", "sulphide", "stoneware"] }, { type: "draw" });
+  const nextTurn = apply({ ...both.state, stage: "draw", hand: inHand([]), bag: ["final_pocket", "awaken_draw", "all_rounder", "base_pocket", "size_count"] }, { type: "draw" });
   run("échange : rendu par la pioche du tour suivant", null, swapRefusal(nextTurn.state));
-  const placeThenDraw = apply({ ...afterPlace.state, stage: "draw", hand: inHand([]), bag: ["mica", "tiger", "sulphide", "stoneware", "gorilla"] }, { type: "draw" });
+  const placeThenDraw = apply({ ...afterPlace.state, stage: "draw", hand: inHand([]), bag: ["awaken_draw", "all_rounder", "base_pocket", "size_count", "hit_pocket"] }, { type: "draw" });
   run("pose : l'échange revient au tour suivant", null, swapRefusal(placeThenDraw.state));
 }
 
 // Les LANCERS : une pose depuis la main en est un, l'échange non ; la limite du
 // tour borne ce que le joueur peut enchaîner.
 function checkThrows(run) {
-  run("lancers : 5 par tour, réglage du jeu", 5, MARBLES_SETTINGS.throwsPerTurn);
+  run("lancers : sans réglage donné, la limite des réglages du jeu", MARBLES_SETTINGS.throwsPerTurn, createMarblesGame(1, { bag: FIXTURE_BAG }, FIXTURE_TYPES).throwsPerTurn);
   run("lancers : une partie neuve n'en a joué aucun", 0, rules.createGame(1).throwsUsed);
   run("lancers : la limite vient du réglage", 5, rules.createGame(1).throwsPerTurn);
   run("lancers : un seul permis (plus de poses obligatoires au premier tour)", 1, rules.createGame(1, { throwsPerTurn: 1 }).throwsPerTurn);
   run("lancers : zéro refusé", true, throws(() => rules.createGame(1, { throwsPerTurn: 0 })));
 
   // Cinq poses, puis plus rien. Le sac de la main : six billes pour en avoir une de trop.
-  let state = playState({ hand: inHand(["clay", "glass", "agate", "mica", "tiger"]), maxHandSize: 6, throwsPerTurn: 5 });
-  state = { ...state, hand: [...state.hand, ...inHand(["giant"])] };
+  let state = playState({ hand: inHand(["aging_flick", "hit_polish", "final_pocket", "awaken_draw", "all_rounder"]), maxHandSize: 6, throwsPerTurn: 5 });
+  state = { ...state, hand: [...state.hand, ...inHand(["one_shot"])] };
   for (let count = 0; count < 5; count++) state = apply(state, { type: "place", handIndex: 0, slot: SLOTS[count % 3] }).state;
   run("lancers : cinq poses jouées", 5, state.throwsUsed);
   run("lancers : plus aucun", 0, throwsLeft(state));
@@ -1130,18 +412,18 @@ function checkThrows(run) {
   run("lancers : plus de pose dans les actions légales", false, legalActions(state).some((action) => action.type === "place"));
 
   // L'échange n'est pas un lancer.
-  const swapped = apply(playState({ hand: inHand(["clay"]), triangle: triangleOf(placed("glass"), null, null) }), { type: "swap", a: "leftBase", b: "apex" });
+  const swapped = apply(playState({ hand: inHand(["aging_flick"]), triangle: triangleOf(placed("hit_polish"), null, null) }), { type: "swap", a: "leftBase", b: "apex" });
   run("lancers : l'échange n'en compte pas", 0, swapped.state.throwsUsed);
 
   // Remis à zéro à la pioche du tour.
-  const next = apply({ ...state, stage: "draw", bag: ["clay"] }, { type: "draw" });
+  const next = apply({ ...state, stage: "draw", bag: ["aging_flick"] }, { type: "draw" });
   run("lancers : remis à zéro à la pioche", 0, next.state.throwsUsed);
 
   // Au premier tour, plus aucune protection : le joueur peut dépenser ses lancers
   // en remplacements, quitte à laisser des emplacements vides.
-  const firstTurn = playState({ turn: 1, hand: inHand(["clay", "glass", "agate", "mica"]), throwsUsed: 3, triangle: triangleOf(placed("tiger"), null, null) });
+  const firstTurn = playState({ turn: 1, hand: inHand(["aging_flick", "hit_polish", "final_pocket", "awaken_draw"]), throwsUsed: 3, triangle: triangleOf(placed("all_rounder"), null, null) });
   run("premier tour : 2 lancers pour 2 vides, remplacer reste permis", null, placeRefusal(firstTurn, 0, "leftBase"));
-  // Le Tic du verre fait choisir sa cible : la première répond.
+  // Le Tic de hit_polish fait choisir sa cible : la première répond.
   const lastThrow = answerChoices(rules, apply(apply(firstTurn, { type: "place", handIndex: 0, slot: "leftBase" }).state, { type: "place", handIndex: 0, slot: "leftBase" })).state;
   run("premier tour : lancers épuisés, deux emplacements vides", 0, throwsLeft(lastThrow));
   run("premier tour : la résolution se lance quand même", true, rules.reduce(lastThrow, { type: "resolve" }).ok);
@@ -1161,38 +443,38 @@ function checkDrawEffects(run) {
     throws(() => validateTable({ a: { base: [draw1], baseVariant: { leftBase: [draw1] }, apex: [draw1], hit: [draw1], knockout: [draw1] } }))
   );
   run("pioche : avec une condition", false, throws(() => validateTable({ a: { apex: [{ ...draw1, when: { type: "printedStat", slot: "apex", stat: "speed", atLeast: 1 } }] } })));
-  run.same("imprimé : la Pioche se lit comme une autre valeur", 1, printedStat(rules.effectAt("mica", "leftBase"), "draw"));
+  run.same("imprimé : la Pioche se lit comme une autre valeur", 1, printedStat(rules.effectAt("awaken_draw", "leftBase"), "draw"));
 
   // Tic qui pioche : l'effet, puis la bille. Elle se joue dans le même tour.
   const hit = apply(
-    playState({ hand: inHand(["cats_eye"]), bag: ["sulphide", "agate"], triangle: triangleOf(null, null, placed("glass")) }),
+    playState({ hand: inHand(["split_base"]), bag: ["base_pocket", "final_pocket"], triangle: triangleOf(null, null, placed("hit_polish")) }),
     { type: "place", handIndex: 0, slot: "apex" }
   );
   run.same("tic qui pioche : journal", ["flick", "knockout", "removed", "discarded", "placed", "hit", "effect", "draw", "awaken"], eventTypes(hit.events));
   run("tic qui pioche : l'effet dit sa Pioche", 1, hit.events[6].draw);
-  run("tic qui pioche : le haut du sac", "sulphide", hit.events[7].marble);
-  run("tic qui pioche : en main", "sulphide", handIds(hit.state).join());
+  run("tic qui pioche : le haut du sac", "base_pocket", hit.events[7].marble);
+  run("tic qui pioche : en main", "base_pocket", handIds(hit.state).join());
   const replay = rules.reduce(hit.state, { type: "place", handIndex: 0, slot: "leftBase" });
   run("tic qui pioche : la bille piochée se joue dans le même tour", true, replay.ok);
 
   // Éjection qui pioche.
   const knockout = apply(
-    playState({ hand: inHand(["clay"]), bag: ["agate"], triangle: triangleOf(null, null, placed("stoneware")) }),
+    playState({ hand: inHand(["aging_flick"]), bag: ["final_pocket"], triangle: triangleOf(null, null, placed("size_count")) }),
     { type: "place", handIndex: 0, slot: "apex" }
   );
-  // L'argile a une Chiquenaude (à 0 tour en main, elle ne produit rien) : son effet passe.
+  // aging_flick a une Chiquenaude (à 0 tour en main, elle ne produit rien) : son effet passe.
   run.same(
     "éjection qui pioche : journal",
     ["flick", "effect", "knockout", "effect", "draw", "awaken", "removed", "discarded", "placed", "hit", "effect"],
     eventTypes(knockout.events)
   );
-  run("éjection qui pioche : en main", "agate", handIds(knockout.state).join());
+  run("éjection qui pioche : en main", "final_pocket", handIds(knockout.state).join());
 
   // Phase qui pioche : la bille attend le tour suivant (elle est en main à sa pioche).
-  const phase = apply(playState({ hand: inHand([]), bag: ["agate", "tiger"], triangle: triangleOf(placed("mica"), null, null) }), { type: "resolve" });
+  const phase = apply(playState({ hand: inHand([]), bag: ["final_pocket", "all_rounder"], triangle: triangleOf(placed("awaken_draw"), null, null) }), { type: "resolve" });
   run.same("phase qui pioche : l'effet puis la bille", ["phase", "effect", "draw", "awaken", "wear"], eventTypes(phase.events).slice(0, 5));
   run("phase qui pioche : la Pioche ne touche ni Vitesse ni Masse", 0, phase.events[1].speedDelta + phase.events[1].massDelta);
-  run("phase qui pioche : en main après la résolution", "agate", handIds(phase.state).join());
+  run("phase qui pioche : en main après la résolution", "final_pocket", handIds(phase.state).join());
   run("phase qui pioche : le tour suivant reste à piocher", "draw", phase.state.stage);
   run("phase qui pioche : pas jouable avant la pioche du tour", "mustDraw", placeRefusal(phase.state, 0, "apex"));
   const nextTurn = apply(phase.state, { type: "draw" });
@@ -1200,42 +482,42 @@ function checkDrawEffects(run) {
 
   // Régénération pendant la phase de jeu (un Tic) et pendant la résolution.
   const regenPlay = apply(
-    playState({ hand: inHand(["cats_eye"]), bag: [], discard: ["agate", "porcelain"], triangle: triangleOf(null, null, placed("glass")) }),
+    playState({ hand: inHand(["split_base"]), bag: [], discard: ["final_pocket", "fragile"], triangle: triangleOf(null, null, placed("hit_polish")) }),
     { type: "place", handIndex: 0, slot: "apex" }
   );
-  // La régénération, puis la Trouvaille de chaque bille active (ici l'œil-de-chat, sans
+  // La régénération, puis la Trouvaille de chaque bille active (ici split_base, sans
   // ce champ : l'évènement passe, sans effet), puis la pioche reprend.
   run.same("régénération en jeu : dans le journal de la pose", ["hit", "effect", "bagRegenerated", "windfall", "draw", "awaken"], eventTypes(regenPlay.events).slice(-6));
   run("régénération en jeu : la défausse entière, bille remplacée comprise", 3, regenPlay.events.find((event) => event.type === "bagRegenerated").size);
   run("régénération en jeu : la partie continue", "play", regenPlay.state.stage);
-  const regenResolve = apply(playState({ hand: inHand([]), bag: [], discard: ["agate"], triangle: triangleOf(placed("mica"), null, null) }), { type: "resolve" });
+  const regenResolve = apply(playState({ hand: inHand([]), bag: [], discard: ["final_pocket"], triangle: triangleOf(placed("awaken_draw"), null, null) }), { type: "resolve" });
   run.same("régénération en résolution : dans le journal", ["phase", "effect", "bagRegenerated", "windfall", "draw", "awaken"], eventTypes(regenResolve.events).slice(0, 6));
-  run("régénération en résolution : la bille en main", "agate", handIds(regenResolve.state).join());
+  run("régénération en résolution : la bille en main", "final_pocket", handIds(regenResolve.state).join());
 
   // Arrêts : main pleine (pas de régénération), plus de billes (pas de fin de partie).
   const full = apply(
-    playState({ hand: inHand(["cats_eye", "clay", "glass", "agate", "tiger"]), bag: [], discard: ["gorilla"], triangle: triangleOf(null, null, placed("sulphide")) }),
+    playState({ hand: inHand(["split_base", "aging_flick", "hit_polish", "final_pocket", "all_rounder"]), bag: [], discard: ["hit_pocket"], triangle: triangleOf(null, null, placed("base_pocket")) }),
     { type: "place", handIndex: 0, slot: "apex" }
   );
   run.same("tic qui pioche, main pleine après la pose : la pioche passe", ["draw", "awaken"], eventTypes(full.events).slice(-2));
-  const fuller = { ...playState({ hand: inHand(["cats_eye", "clay", "glass", "agate", "tiger"]), maxHandSize: 4 }) };
-  const stopped = apply({ ...fuller, bag: [], discard: ["giant"], triangle: triangleOf(null, null, placed("sulphide")) }, { type: "place", handIndex: 0, slot: "apex" });
+  const fuller = { ...playState({ hand: inHand(["split_base", "aging_flick", "hit_polish", "final_pocket", "all_rounder"]), maxHandSize: 4 }) };
+  const stopped = apply({ ...fuller, bag: [], discard: ["one_shot"], triangle: triangleOf(null, null, placed("base_pocket")) }, { type: "place", handIndex: 0, slot: "apex" });
   run.same("tic qui pioche, main pleine : arrêt sans régénération", ["effect", "drawSkipped"], eventTypes(stopped.events).slice(-2));
   run("tic qui pioche, main pleine : motif", "handFull", stopped.events.at(-1).reason);
-  const none = apply(playState({ hand: inHand(["cats_eye"]), bag: [], discard: [], triangle: triangleOf(null, null, placed("glass")) }), { type: "place", handIndex: 0, slot: "apex" });
+  const none = apply(playState({ hand: inHand(["split_base"]), bag: [], discard: [], triangle: triangleOf(null, null, placed("hit_polish")) }), { type: "place", handIndex: 0, slot: "apex" });
   // La bille remplacée vient d'arriver en défausse : elle est repiochée.
-  run("tic qui pioche, sac vide : la remplacée revient", "glass", handIds(none.state).join());
-  const nothing = apply(playState({ hand: inHand([]), bag: [], discard: [], triangle: triangleOf(placed("mica"), null, null) }), { type: "resolve" });
+  run("tic qui pioche, sac vide : la remplacée revient", "hit_polish", handIds(none.state).join());
+  const nothing = apply(playState({ hand: inHand([]), bag: [], discard: [], triangle: triangleOf(placed("awaken_draw"), null, null) }), { type: "resolve" });
   run("phase qui pioche, rien à piocher : arrêt annoncé", "noMarbles", nothing.events.find((event) => event.type === "drawSkipped").reason);
   run("phase qui pioche, rien à piocher : jamais une fin de partie en cours de tour", "draw", nothing.state.stage);
 
   // ANTI-BOUCLE : un Tic qui pioche à chaque pose, avec régénération possible ;
   // les lancers arrêtent le joueur à 5 poses.
   let loop = playState({
-    hand: inHand(["cats_eye"]),
+    hand: inHand(["split_base"]),
     bag: [],
     discard: [],
-    triangle: triangleOf(placed("cats_eye"), placed("cats_eye"), placed("cats_eye")),
+    triangle: triangleOf(placed("split_base"), placed("split_base"), placed("split_base")),
   });
   let accepted = 0;
   let lastError = null;
@@ -1280,15 +562,15 @@ function checkTriggers(run) {
 // Le FINAL : au retrait par usure seulement, la bille déjà à la défausse, avant
 // l'Impact, ses valeurs comptant pour le tour.
 function checkFinal(run) {
-  // Porcelaine (usure 2) en pointe, déjà usée une fois : elle s'use, part, son Final joue.
-  const worn = apply(playState({ hand: inHand([]), bag: ["clay"], triangle: triangleOf(null, null, placed("porcelain", 1)) }), { type: "resolve" });
+  // fragile (usure 2) en pointe, déjà usée une fois : elle s'use, part, son Final joue.
+  const worn = apply(playState({ hand: inHand([]), bag: ["aging_flick"], triangle: triangleOf(null, null, placed("fragile", 1)) }), { type: "resolve" });
   run.same(
     "final : retrait, défausse, Final (son Polissage au choix sans aucune cible), puis l'Impact",
     ["phase", "effect", "wear", "removed", "discarded", "final", "effect", "targetEmpty", "impact"],
     eventTypes(worn.events).slice(eventTypes(worn.events).indexOf("phase"), eventTypes(worn.events).indexOf("impact") + 1)
   );
   const final = worn.events.filter((event) => event.type === "effect").at(-1);
-  run.same("final : son effet", { trigger: "final", slot: "apex", marble: "porcelain", speedDelta: 4, massDelta: 0, draw: 0 }, {
+  run.same("final : son effet", { trigger: "final", slot: "apex", marble: "fragile", speedDelta: 4, massDelta: 0, draw: 0 }, {
     trigger: final.trigger,
     slot: final.slot,
     marble: final.marble,
@@ -1296,103 +578,103 @@ function checkFinal(run) {
     massDelta: final.massDelta,
     draw: final.draw,
   });
-  run("final : la bille est déjà à la défausse", "porcelain", worn.state.discard.join());
+  run("final : la bille est déjà à la défausse", "fragile", worn.state.discard.join());
   run("final : sa Vitesse compte pour l'Impact du tour (5 de phase + 4)", 9, worn.events.find((event) => event.type === "impact").impact);
 
-  // Tigrée : la Masse du Final compte aussi.
-  // La tigrée d'avant Éjecter : sa base donne Vitesse +3, sans choix.
-  const tiger = apply(playState({ hand: inHand([]), bag: ["clay"], triangle: triangleOf(placed("tiger", 3), null, null) }), { type: "resolve" }, fixedRules);
-  run.same("final : la Masse compte (Vitesse 3, Masse 1 + 1)", { speed: 3, mass: 2, impact: 6 }, (({ speed, mass, impact }) => ({ speed, mass, impact }))(tiger.events.find((event) => event.type === "impact")));
+  // all_rounder : la Masse du Final compte aussi.
+  // all_rounder d'avant Éjecter : sa base donne Vitesse +3, sans choix.
+  const allRounder = apply(playState({ hand: inHand([]), bag: ["aging_flick"], triangle: triangleOf(placed("all_rounder", 3), null, null) }), { type: "resolve" }, fixedRules);
+  run.same("final : la Masse compte (Vitesse 3, Masse 1 + 1)", { speed: 3, mass: 2, impact: 6 }, (({ speed, mass, impact }) => ({ speed, mass, impact }))(allRounder.events.find((event) => event.type === "impact")));
 
   // Pas usée : pas de Final.
-  const fresh = apply(playState({ hand: inHand([]), bag: ["clay"], triangle: triangleOf(null, null, placed("porcelain", 0)) }), { type: "resolve" });
+  const fresh = apply(playState({ hand: inHand([]), bag: ["aging_flick"], triangle: triangleOf(null, null, placed("fragile", 0)) }), { type: "resolve" });
   run("final : pas d'usure maximale, pas de Final", false, eventTypes(fresh.events).includes("final"));
 
   // Jamais à une éjection, un échange, une pose.
-  const knocked = apply(playState({ hand: inHand(["clay"]), bag: ["glass"], triangle: triangleOf(null, null, placed("porcelain", 1)) }), { type: "place", handIndex: 0, slot: "apex" });
+  const knocked = apply(playState({ hand: inHand(["aging_flick"]), bag: ["hit_polish"], triangle: triangleOf(null, null, placed("fragile", 1)) }), { type: "place", handIndex: 0, slot: "apex" });
   run("final : jamais à une éjection", false, eventTypes(knocked.events).includes("final"));
-  const swapped = apply(playState({ hand: inHand([]), triangle: triangleOf(placed("porcelain", 1), null, placed("tiger", 3)) }), { type: "swap", a: "leftBase", b: "apex" });
+  const swapped = apply(playState({ hand: inHand([]), triangle: triangleOf(placed("fragile", 1), null, placed("all_rounder", 3)) }), { type: "swap", a: "leftBase", b: "apex" });
   run("final : jamais à un échange", false, eventTypes(swapped.events).includes("final"));
-  const placedGiant = apply(playState({ hand: inHand(["giant"]), bag: ["glass"] }), { type: "place", handIndex: 0, slot: "apex" });
-  run("final : jamais à une pose, même d'une bille d'usure 1", false, eventTypes(placedGiant.events).includes("final"));
+  const placedOneShot = apply(playState({ hand: inHand(["one_shot"]), bag: ["hit_polish"] }), { type: "place", handIndex: 0, slot: "apex" });
+  run("final : jamais à une pose, même d'une bille d'usure 1", false, eventTypes(placedOneShot.events).includes("final"));
 
   // Plusieurs retraits : dans l'ordre des phases, chacun avec son Final.
-  const both = apply(playState({ hand: inHand([]), bag: ["clay"], triangle: triangleOf(placed("tiger", 3), null, placed("porcelain", 1)) }), { type: "resolve" }, fixedRules);
+  const both = apply(playState({ hand: inHand([]), bag: ["aging_flick"], triangle: triangleOf(placed("all_rounder", 3), null, placed("fragile", 1)) }), { type: "resolve" }, fixedRules);
   run.same(
     "final : dans l'ordre des phases",
-    ["tiger", "porcelain"],
+    ["all_rounder", "fragile"],
     both.events.filter((event) => event.type === "effect" && event.trigger === "final").map((event) => event.marble)
   );
 
-  // Géante : son Final pioche par la pioche unifiée ; la bille attend le tour suivant.
-  const giant = apply(playState({ hand: inHand([]), bag: ["agate"], triangle: triangleOf(null, null, placed("giant")) }), { type: "resolve" });
-  run.same("final, pioche : l'effet, puis la bille, avant l'Impact", ["final", "effect", "draw", "impact"], eventTypes(giant.events).filter((type) => ["final", "effect", "draw", "impact"].includes(type)).slice(-4));
-  run("final, pioche : en main", "agate", handIds(giant.state).join());
-  run("final, pioche : pas jouable avant la pioche du tour", "mustDraw", placeRefusal(giant.state, 0, "apex"));
-  run("final, pioche : jouable au tour suivant", null, placeRefusal(apply(giant.state, { type: "draw" }).state, 0, "apex"));
+  // one_shot : son Final pioche par la pioche unifiée ; la bille attend le tour suivant.
+  const oneShot = apply(playState({ hand: inHand([]), bag: ["final_pocket"], triangle: triangleOf(null, null, placed("one_shot")) }), { type: "resolve" });
+  run.same("final, pioche : l'effet, puis la bille, avant l'Impact", ["final", "effect", "draw", "impact"], eventTypes(oneShot.events).filter((type) => ["final", "effect", "draw", "impact"].includes(type)).slice(-4));
+  run("final, pioche : en main", "final_pocket", handIds(oneShot.state).join());
+  run("final, pioche : pas jouable avant la pioche du tour", "mustDraw", placeRefusal(oneShot.state, 0, "apex"));
+  run("final, pioche : jouable au tour suivant", null, placeRefusal(apply(oneShot.state, { type: "draw" }).state, 0, "apex"));
 
-  // Sac vide : la défausse, géante comprise (elle vient d'y arriver), devient le sac.
-  const regen = apply(playState({ hand: inHand([]), bag: [], discard: ["clay"], triangle: triangleOf(null, null, placed("giant")) }), { type: "resolve" });
+  // Sac vide : la défausse, one_shot comprise (elle vient d'y arriver), devient le sac.
+  const regen = apply(playState({ hand: inHand([]), bag: [], discard: ["aging_flick"], triangle: triangleOf(null, null, placed("one_shot")) }), { type: "resolve" });
   run.same("final, pioche : régénération au cours de la résolution", ["final", "effect", "bagRegenerated", "draw"], eventTypes(regen.events).filter((type) => ["final", "effect", "bagRegenerated", "draw"].includes(type)).slice(-4));
-  run("final, pioche : la défausse entière, géante comprise", 2, regen.events.find((event) => event.type === "bagRegenerated").size);
+  run("final, pioche : la défausse entière, one_shot comprise", 2, regen.events.find((event) => event.type === "bagRegenerated").size);
   run("final, pioche : aucune bille perdue", 2, marbleCount(regen.state));
 }
 
 function checkPlace(run) {
-  const onEmpty = apply(playState({ hand: inHand(["clay", "glass"]), triangle: triangleOf(null, null, null) }), { type: "place", handIndex: 1, slot: "apex" });
-  run.same("pose : la bille va sur l'emplacement, usure 0", placed("glass"), onEmpty.state.triangle.apex);
-  run("pose : quitte la main", "clay", handIds(onEmpty.state).join());
+  const onEmpty = apply(playState({ hand: inHand(["aging_flick", "hit_polish"]), triangle: triangleOf(null, null, null) }), { type: "place", handIndex: 1, slot: "apex" });
+  run.same("pose : la bille va sur l'emplacement, usure 0", placed("hit_polish"), onEmpty.state.triangle.apex);
+  run("pose : quitte la main", "aging_flick", handIds(onEmpty.state).join());
   run.same("pose : journal", ["flick", "placed"], eventTypes(onEmpty.events));
 
   const replacing = apply(
-    playState({ hand: inHand(["clay"]), triangle: triangleOf(null, null, placed("giant", 0)), discard: ["mica"] }),
+    playState({ hand: inHand(["aging_flick"]), triangle: triangleOf(null, null, placed("one_shot", 0)), discard: ["awaken_draw"] }),
     { type: "place", handIndex: 0, slot: "apex" }
   );
-  run.same("remplacement : nouvelle bille à usure 0", placed("clay"), replacing.state.triangle.apex);
-  run("remplacement : ancienne bille à la défausse", "mica,giant", replacing.state.discard.join());
-  run("remplacement : journal nomme l'ancienne", "giant", replacing.events.find((event) => event.type === "knockout").marble);
+  run.same("remplacement : nouvelle bille à usure 0", placed("aging_flick"), replacing.state.triangle.apex);
+  run("remplacement : ancienne bille à la défausse", "awaken_draw,one_shot", replacing.state.discard.join());
+  run("remplacement : journal nomme l'ancienne", "one_shot", replacing.events.find((event) => event.type === "knockout").marble);
   run.same(
     "remplacement : cause de la défausse",
-    { type: "discarded", slot: "apex", marble: "giant", cause: "replacement" },
+    { type: "discarded", slot: "apex", marble: "one_shot", cause: "replacement" },
     replacing.events.find((event) => event.type === "discarded")
   );
 
   // Une bille usée qui revient repart à zéro : hors du triangle, elle n'est
   // plus qu'un id.
-  const worn = apply(playState({ hand: inHand(["agate"]), triangle: triangleOf(placed("clay", 2), null, null) }), { type: "place", handIndex: 0, slot: "leftBase" });
-  run("remplacement : aucune usure en défausse", "clay", worn.state.discard[0]);
-  const back = apply(playState({ hand: inHand(["clay"]), triangle: triangleOf(null, null, null) }), { type: "place", handIndex: 0, slot: "leftBase" });
+  const worn = apply(playState({ hand: inHand(["final_pocket"]), triangle: triangleOf(placed("aging_flick", 2), null, null) }), { type: "place", handIndex: 0, slot: "leftBase" });
+  run("remplacement : aucune usure en défausse", "aging_flick", worn.state.discard[0]);
+  const back = apply(playState({ hand: inHand(["aging_flick"]), triangle: triangleOf(null, null, null) }), { type: "place", handIndex: 0, slot: "leftBase" });
   run("une bille qui revient repart à usure 0", 0, back.state.triangle.leftBase.wear);
 
-  run("pose : index hors main refusé", "invalidHandIndex", rules.reduce(playState({ hand: inHand(["clay"]) }), { type: "place", handIndex: 3, slot: "apex" }).error);
-  run("pose : index non entier refusé", "invalidHandIndex", rules.reduce(playState({ hand: inHand(["clay"]) }), { type: "place", handIndex: "0", slot: "apex" }).error);
-  run("pose : emplacement inconnu refusé", "invalidSlot", rules.reduce(playState({ hand: inHand(["clay"]) }), { type: "place", handIndex: 0, slot: "top" }).error);
+  run("pose : index hors main refusé", "invalidHandIndex", rules.reduce(playState({ hand: inHand(["aging_flick"]) }), { type: "place", handIndex: 3, slot: "apex" }).error);
+  run("pose : index non entier refusé", "invalidHandIndex", rules.reduce(playState({ hand: inHand(["aging_flick"]) }), { type: "place", handIndex: "0", slot: "apex" }).error);
+  run("pose : emplacement inconnu refusé", "invalidSlot", rules.reduce(playState({ hand: inHand(["aging_flick"]) }), { type: "place", handIndex: 0, slot: "top" }).error);
 
   // Plusieurs poses dans le même tour.
-  let many = playState({ hand: inHand(["clay", "glass", "agate"]) });
+  let many = playState({ hand: inHand(["aging_flick", "hit_polish", "final_pocket"]) });
   many = apply(many, { type: "place", handIndex: 0, slot: "leftBase" }).state;
   many = apply(many, { type: "place", handIndex: 0, slot: "rightBase" }).state;
   many = apply(many, { type: "place", handIndex: 0, slot: "apex" }).state;
   run("pose : autant de billes que voulu", 0, many.hand.length);
 
   // Doublons : deux exemplaires, deux emplacements indépendants.
-  let doubles = playState({ hand: inHand(["clay", "clay"]) });
+  let doubles = playState({ hand: inHand(["aging_flick", "aging_flick"]) });
   doubles = apply(doubles, { type: "place", handIndex: 0, slot: "leftBase" }).state;
   doubles = apply(doubles, { type: "place", handIndex: 0, slot: "apex" }).state;
-  run("doublons : deux exemplaires posés", "clay,clay", [doubles.triangle.leftBase.marble, doubles.triangle.apex.marble].join());
+  run("doublons : deux exemplaires posés", "aging_flick,aging_flick", [doubles.triangle.leftBase.marble, doubles.triangle.apex.marble].join());
 
   // Tour 1 : le joueur est seul responsable de ses poses, plus rien ne protège le
   // triangle. Quatre remplacements de suite sur la pointe passent.
-  // Le Tic du verre fait choisir sa cible : la première répond.
-  let firstTurn = playState({ turn: 1, hand: inHand(["clay", "glass", "agate", "mica", "tiger"]) });
+  // Le Tic de hit_polish fait choisir sa cible : la première répond.
+  let firstTurn = playState({ turn: 1, hand: inHand(["aging_flick", "hit_polish", "final_pocket", "awaken_draw", "all_rounder"]) });
   firstTurn = answerChoices(rules, apply(firstTurn, { type: "place", handIndex: 0, slot: "apex" })).state;
   firstTurn = answerChoices(rules, apply(firstTurn, { type: "place", handIndex: 0, slot: "apex" })).state;
   firstTurn = answerChoices(rules, apply(firstTurn, { type: "place", handIndex: 0, slot: "apex" })).state;
   run("tour 1 : remplacer encore reste permis", true, rules.reduce(firstTurn, { type: "place", handIndex: 0, slot: "apex" }).ok);
   run("placeRefusal : même réponse que l'action", null, placeRefusal(firstTurn, 0, "apex"));
   run("tour 1 : remplir un vide reste permis", null, placeRefusal(firstTurn, 0, "leftBase"));
-  run("placeRefusal : pose permise", null, placeRefusal(playState({ hand: inHand(["clay"]) }), 0, "apex"));
-  const later = playState({ turn: 2, hand: inHand(["clay"]), triangle: triangleOf(null, null, placed("mica")) });
+  run("placeRefusal : pose permise", null, placeRefusal(playState({ hand: inHand(["aging_flick"]) }), 0, "apex"));
+  const later = playState({ turn: 2, hand: inHand(["aging_flick"]), triangle: triangleOf(null, null, placed("awaken_draw")) });
   run("tour 2 : le remplacement n'a plus de limite", null, placeRefusal(later, 0, "apex"));
 }
 
@@ -1400,7 +682,7 @@ function checkPlace(run) {
 function checkHitAndKnockout(run) {
   // Ordre sur un emplacement occupé : Chiquenaude de A, Éjection de B, retrait,
   // défausse, pose de A, Tic de A.
-  const state = playState({ hand: inHand(["clay"]), triangle: triangleOf(null, null, placed("gorilla", 1)) });
+  const state = playState({ hand: inHand(["aging_flick"]), triangle: triangleOf(null, null, placed("hit_pocket", 1)) });
   const both = apply(state, { type: "place", handIndex: 0, slot: "apex" });
   run.same(
     "pose sur occupé : ordre du journal",
@@ -1409,17 +691,17 @@ function checkHitAndKnockout(run) {
   );
   run.same(
     "pose sur occupé : qui joue quoi",
-    ["flick:clay", "effect:clay", "knockout:gorilla", "effect:gorilla", "removed:gorilla", "discarded:gorilla", "placed:clay", "hit:clay", "effect:clay"],
+    ["flick:aging_flick", "effect:aging_flick", "knockout:hit_pocket", "effect:hit_pocket", "removed:hit_pocket", "discarded:hit_pocket", "placed:aging_flick", "hit:aging_flick", "effect:aging_flick"],
     both.events.map((event) => `${event.type}:${event.marble}`)
   );
   run.same(
     "Éjection : son effet et le cumul",
-    { type: "effect", trigger: "knockout", slot: "apex", marble: "gorilla", speedDelta: 3, massDelta: 0, draw: 0, operations: [], given: [], lost: [], speed: 3, mass: 1 },
+    { type: "effect", trigger: "knockout", slot: "apex", marble: "hit_pocket", speedDelta: 3, massDelta: 0, draw: 0, operations: [], given: [], lost: [], speed: 3, mass: 1 },
     both.events[3]
   );
   run.same(
     "Tic : son effet et le cumul",
-    { type: "effect", trigger: "hit", slot: "apex", marble: "clay", speedDelta: 2, massDelta: 0, draw: 0, operations: [], given: [], lost: [], speed: 5, mass: 1 },
+    { type: "effect", trigger: "hit", slot: "apex", marble: "aging_flick", speedDelta: 2, massDelta: 0, draw: 0, operations: [], given: [], lost: [], speed: 5, mass: 1 },
     both.events[8]
   );
 
@@ -1436,35 +718,35 @@ function checkHitAndKnockout(run) {
   run("compteurs : Vitesse du tour modifiée", 5, both.state.speed);
   run("compteurs : Masse du tour inchangée", 1, both.state.mass);
   const resolved = apply(both.state, { type: "resolve" });
-  // 3 (Éjection du gorille) + 2 (Tic de l'argile) + 4 (argile en pointe).
+  // 3 (Éjection de hit_pocket) + 2 (Tic de aging_flick) + 4 (aging_flick en pointe).
   run("compteurs : la résolution en part", 9, resolved.events.find((event) => event.type === "impact").impact);
   run("compteurs : remis à zéro après la résolution", "0,1", `${resolved.state.speed},${resolved.state.mass}`);
 
-  // Masse : Éjection de la plombée +1, Tic de l'agate +1, agate en pointe +1 (la base
-  // gauche, une argile, n'est pas un calot), argile en base +1 de Vitesse.
-  const massive = apply(playState({ hand: inHand(["agate"]), triangle: triangleOf(placed("clay"), null, placed("leaded")) }), { type: "place", handIndex: 0, slot: "apex" });
+  // Masse : Éjection de flick_strike +1, Tic de final_pocket +1, final_pocket en pointe +1 (la base
+  // gauche, une aging_flick, n'est pas un calot), aging_flick en base +1 de Vitesse.
+  const massive = apply(playState({ hand: inHand(["final_pocket"]), triangle: triangleOf(placed("aging_flick"), null, placed("flick_strike")) }), { type: "place", handIndex: 0, slot: "apex" });
   run("Masse : Éjection et Tic", 3, massive.state.mass);
   const massImpact = apply(massive.state, { type: "resolve" }).events.find((event) => event.type === "impact");
   run.same("Masse : l'Impact en tient compte", { speed: 1, mass: 4, impact: 4 }, { speed: massImpact.speed, mass: massImpact.mass, impact: massImpact.impact });
 
   // Plusieurs poses : les compteurs s'accumulent.
-  const twice = apply(apply(playState({ hand: inHand(["clay", "agate"]), triangle: triangleOf(placed("gorilla"), placed("leaded"), null) }), { type: "place", handIndex: 0, slot: "leftBase" }).state, { type: "place", handIndex: 0, slot: "rightBase" });
+  const twice = apply(apply(playState({ hand: inHand(["aging_flick", "final_pocket"]), triangle: triangleOf(placed("hit_pocket"), placed("flick_strike"), null) }), { type: "place", handIndex: 0, slot: "leftBase" }).state, { type: "place", handIndex: 0, slot: "rightBase" });
   run("compteurs : deux poses, Vitesse", 5, twice.state.speed);
   run("compteurs : deux poses, Masse", 3, twice.state.mass);
 
   // Une bille sans Tic ni Éjection : les évènements passent, aucun effet.
-  const plain = apply(playState({ hand: inHand(["tiger"]), triangle: triangleOf(null, null, placed("porcelain")) }), { type: "place", handIndex: 0, slot: "apex" });
+  const plain = apply(playState({ hand: inHand(["all_rounder"]), triangle: triangleOf(null, null, placed("fragile")) }), { type: "place", handIndex: 0, slot: "apex" });
   run.same("sans Tic ni Éjection : aucun effet", ["flick", "knockout", "removed", "discarded", "placed", "hit"], eventTypes(plain.events));
   run("sans Tic ni Éjection : compteurs intacts", "0,1", `${plain.state.speed},${plain.state.mass}`);
 
   // Ni Tic ni Éjection ailleurs.
   const noReaction = (result) =>
     result.events.filter((event) => ["hit", "knockout"].includes(event.type) || ["hit", "knockout"].includes(event.trigger)).map((event) => event.type);
-  const onEmpty = apply(playState({ hand: inHand(["clay"]) }), { type: "place", handIndex: 0, slot: "apex" });
+  const onEmpty = apply(playState({ hand: inHand(["aging_flick"]) }), { type: "place", handIndex: 0, slot: "apex" });
   run.same("pose sur vide : ni Tic ni Éjection", [], noReaction(onEmpty));
-  const swapped = apply(playState({ triangle: triangleOf(placed("gorilla"), placed("clay"), null) }), { type: "swap", a: "leftBase", b: "rightBase" });
+  const swapped = apply(playState({ triangle: triangleOf(placed("hit_pocket"), placed("aging_flick"), null) }), { type: "swap", a: "leftBase", b: "rightBase" });
   run.same("échange : ni Tic ni Éjection, même sur des billes qui en ont", [], noReaction(swapped));
-  const worn = apply(playState({ triangle: triangleOf(null, null, placed("gorilla", 2)) }), { type: "resolve" });
+  const worn = apply(playState({ triangle: triangleOf(null, null, placed("hit_pocket", 2)) }), { type: "resolve" });
   run("retrait par usure : pas d'Éjection", false, eventTypes(worn.events).includes("knockout"));
   run("retrait par usure : Impact de la phase seule", 6, worn.state.score);
   run("retrait par usure : cause", "wear", worn.events.find((event) => event.type === "discarded").cause);
@@ -1481,43 +763,43 @@ function checkHitAndKnockout(run) {
   run("négatif : Impact au plancher", 0, drainedImpact.impact);
 }
 
-// La Loupe : en base gauche, +4 à une pointe qui imprime de la Vitesse.
-function checkMagnifier(run) {
+// tally_flick : en base gauche, +4 à une pointe qui imprime de la Vitesse.
+function checkTallyFlick(run) {
   const withApex = (marble, apexOver = {}) =>
-    apply(playState({ triangle: triangleOf(placed("magnifier"), null, marble === null ? null : { ...placed(marble), ...apexOver }) }), { type: "resolve" });
+    apply(playState({ triangle: triangleOf(placed("tally_flick"), null, marble === null ? null : { ...placed(marble), ...apexOver }) }), { type: "resolve" });
   const apexEffect = (result) => result.events.find((event) => event.type === "effect" && event.slot === "apex");
 
-  const gorilla = withApex("gorilla");
-  run("loupe : gorille en pointe, Vitesse +10", 10, apexEffect(gorilla).speedDelta);
-  run("loupe : Impact 10", 10, gorilla.state.score);
+  const hitPocket = withApex("hit_pocket");
+  run("tally_flick : hit_pocket en pointe, Vitesse +10", 10, apexEffect(hitPocket).speedDelta);
+  run("tally_flick : Impact 10", 10, hitPocket.state.score);
   run.same(
-    "loupe : ce qu'elle donne, dans son effet",
-    [{ slot: "apex", marble: "gorilla", speed: 4, mass: 0 }],
-    gorilla.events.find((event) => event.slot === "leftBase" && event.type === "effect").given
+    "tally_flick : ce qu'elle donne, dans son effet",
+    [{ slot: "apex", marble: "hit_pocket", speed: 4, mass: 0 }],
+    hitPocket.events.find((event) => event.slot === "leftBase" && event.type === "effect").given
   );
-  run("loupe : rien pour elle-même", 0, gorilla.events.find((event) => event.slot === "leftBase" && event.type === "effect").speedDelta);
+  run("tally_flick : rien pour elle-même", 0, hitPocket.events.find((event) => event.slot === "leftBase" && event.type === "effect").speedDelta);
 
-  run("loupe : argile, 4 + 4", 8, apexEffect(withApex("clay")).speedDelta);
-  run("loupe : une autre loupe en pointe, 2 + 4", 6, apexEffect(withApex("magnifier")).speedDelta);
-  run("loupe : agate, aucun bonus", 0, apexEffect(withApex("agate")).speedDelta);
-  run("loupe : agate garde sa Masse", 1, apexEffect(withApex("agate")).massDelta);
-  run("loupe : sulfure, aucun bonus", 0, apexEffect(withApex("sulphide")).speedDelta);
-  run("loupe : grès, sans effet de pointe, aucun bonus", 0, apexEffect(withApex("stoneware")).speedDelta);
-  run("loupe : plombée, imprime du négatif, aucun bonus", -3, apexEffect(withApex("leaded")).speedDelta);
-  run.same("loupe : pointe sans Vitesse, rien de donné", [], withApex("agate").events.find((event) => event.slot === "leftBase" && event.type === "effect").given);
-  run.same("loupe : pointe vide, rien de donné", [], withApex(null).events.find((event) => event.slot === "leftBase" && event.type === "effect").given);
+  run("tally_flick : aging_flick, 4 + 4", 8, apexEffect(withApex("aging_flick")).speedDelta);
+  run("tally_flick : une autre tally_flick en pointe, 2 + 4", 6, apexEffect(withApex("tally_flick")).speedDelta);
+  run("tally_flick : final_pocket, aucun bonus", 0, apexEffect(withApex("final_pocket")).speedDelta);
+  run("tally_flick : final_pocket garde sa Masse", 1, apexEffect(withApex("final_pocket")).massDelta);
+  run("tally_flick : base_pocket, aucun bonus", 0, apexEffect(withApex("base_pocket")).speedDelta);
+  run("tally_flick : size_count, sans effet de pointe, aucun bonus", 0, apexEffect(withApex("size_count")).speedDelta);
+  run("tally_flick : flick_strike, imprime du négatif, aucun bonus", -3, apexEffect(withApex("flick_strike")).speedDelta);
+  run.same("tally_flick : pointe sans Vitesse, rien de donné", [], withApex("final_pocket").events.find((event) => event.slot === "leftBase" && event.type === "effect").given);
+  run.same("tally_flick : pointe vide, rien de donné", [], withApex(null).events.find((event) => event.slot === "leftBase" && event.type === "effect").given);
 
   // La condition lit l'imprimé, jamais l'effet déjà modifié : un bonus reçu ne
   // fait pas passer une pointe négative pour une pointe à Vitesse.
-  const boosted = withApex("leaded", { bonus: { speed: 10, mass: 0 } });
+  const boosted = withApex("flick_strike", { bonus: { speed: 10, mass: 0 } });
   run.same("anti-boucle : un bonus reçu n'ouvre pas la condition", [], boosted.events.find((event) => event.slot === "leftBase" && event.type === "effect").given);
   run("anti-boucle : la pointe garde son bonus", 7, apexEffect(boosted).speedDelta);
 
   // Sur l'autre base et en pointe, ses autres effets.
-  const right = apply(playState({ triangle: triangleOf(null, placed("magnifier"), placed("gorilla")) }), { type: "resolve" });
-  run("loupe en base droite : Vitesse +1, pas de bonus", 7, right.state.score);
-  const onApex = apply(playState({ triangle: triangleOf(null, null, placed("magnifier")) }), { type: "resolve" });
-  run("loupe en pointe : Vitesse +2", 2, onApex.state.score);
+  const right = apply(playState({ triangle: triangleOf(null, placed("tally_flick"), placed("hit_pocket")) }), { type: "resolve" });
+  run("tally_flick en base droite : Vitesse +1, pas de bonus", 7, right.state.score);
+  const onApex = apply(playState({ triangle: triangleOf(null, null, placed("tally_flick")) }), { type: "resolve" });
+  run("tally_flick en pointe : Vitesse +2", 2, onApex.state.score);
 }
 
 // POLISSAGE et FÊLURE, sur des billes fictives.
@@ -1604,41 +886,40 @@ function checkWearActions(run) {
 // retrait immédiat, sur soi, depuis un Final.
 function checkWearMarbles(run) {
   const find = (result, type) => result.events.find((event) => event.type === type);
-  // Verre : son Tic polit une bille active au choix, ici la pointe.
-  const glassPlaced = apply(playState({ hand: inHand(["glass"]), triangle: triangleOf(placed("clay"), null, placed("porcelain", 1)) }), { type: "place", handIndex: 0, slot: "leftBase" });
+  // hit_polish : son Tic polit une bille active au choix, ici la pointe.
+  const glassPlaced = apply(playState({ hand: inHand(["hit_polish"]), triangle: triangleOf(placed("aging_flick"), null, placed("fragile", 1)) }), { type: "place", handIndex: 0, slot: "leftBase" });
   run.same(
-    "verre : le Tic propose les billes actives, lui compris",
+    "hit_polish : le Tic propose les billes actives, lui compris",
     ["leftBase", "apex"],
     glassPlaced.state.pendingChoice.eligible.map((target) => target.slot)
   );
-  const glass = apply(glassPlaced.state, { type: "choose", target: { zone: "triangle", slot: "apex" } });
-  run.same("verre : le Tic polit la bille choisie", { slot: "apex", marble: "porcelain", wear: 0 }, (({ slot, marble, wear }) => ({ slot, marble, wear }))(find(glass, "polished")));
+  const hitPolish = apply(glassPlaced.state, { type: "choose", target: { zone: "triangle", slot: "apex" } });
+  run.same("hit_polish : le Tic polit la bille choisie", { slot: "apex", marble: "fragile", wear: 0 }, (({ slot, marble, wear }) => ({ slot, marble, wear }))(find(hitPolish, "polished")));
 
-  // Une Fêlure de base sur la pointe (une bille fabriquée) : la porcelaine (usure 1 sur
+  // Une Fêlure de base sur la pointe (une bille fabriquée) : fragile (usure 1 sur
   // 2) part aussitôt, son Final joue, sa phase est sautée.
-  // La porcelaine sans le Polissage au choix de son Final : ce cas porte sur la Fêlure.
-  const plainPorcelain = { ...MARBLE_TYPES.porcelain, final: [{ action: "speed", amount: 4 }] };
-  const crackerTable = { cracker: { base: [{ action: "crack", amount: 1, target: "apex" }] }, porcelain: plainPorcelain, clay: MARBLE_TYPES.clay };
-  const cracked = apply(playState({ bag: ["clay"], triangle: triangleOf(placed("cracker"), null, placed("porcelain", 1)) }), { type: "resolve" }, crackerTable);
+  // fragile sans le Polissage au choix de son Final : ce cas porte sur la Fêlure.
+  const crackerTable = { cracker: { base: [{ action: "crack", amount: 1, target: "apex" }] }, fragile: CHOICELESS_TYPES.fragile, aging_flick: FIXTURE_TYPES.aging_flick };
+  const cracked = apply(playState({ bag: ["aging_flick"], triangle: triangleOf(placed("cracker"), null, placed("fragile", 1)) }), { type: "resolve" }, crackerTable);
   run.same(
-    "Fêlure en phase : retrait, Final de la porcelaine, puis la suite",
+    "Fêlure en phase : retrait, Final de fragile, puis la suite",
     ["phase", "effect", "cracked", "removed", "discarded", "final", "effect", "wear", "phaseSkipped", "phaseSkipped"],
     eventTypes(cracked.events).slice(0, 10)
   );
-  run("Fêlure en phase : la Vitesse du Final compte, la phase de la porcelaine non", 4, find(cracked, "impact").impact);
+  run("Fêlure en phase : la Vitesse du Final compte, la phase de fragile non", 4, find(cracked, "impact").impact);
 
-  // Mica en pointe : Vitesse +2 et Polissage sur lui-même, puis son +1 d'usure.
-  const mica = apply(playState({ bag: ["clay"], triangle: triangleOf(null, null, placed("mica", 2)) }), { type: "resolve" });
-  run.same("mica : l'effet, le Polissage, puis l'usure", ["effect", "polished", "wear"], eventTypes(mica.events).filter((type) => ["effect", "polished", "wear"].includes(type)));
-  run.same("mica : usure 2, polie à 1, puis 2 : il reste", [1, 2, false], [find(mica, "polished").wear, find(mica, "wear").wear, mica.events.some((event) => event.type === "removed")]);
+  // awaken_draw en pointe : Vitesse +2 et Polissage sur lui-même, puis son +1 d'usure.
+  const awakenDraw = apply(playState({ bag: ["aging_flick"], triangle: triangleOf(null, null, placed("awaken_draw", 2)) }), { type: "resolve" });
+  run.same("awaken_draw : l'effet, le Polissage, puis l'usure", ["effect", "polished", "wear"], eventTypes(awakenDraw.events).filter((type) => ["effect", "polished", "wear"].includes(type)));
+  run.same("awaken_draw : usure 2, polie à 1, puis 2 : il reste", [1, 2, false], [find(awakenDraw, "polished").wear, find(awakenDraw, "wear").wear, awakenDraw.events.some((event) => event.type === "removed")]);
 
-  // Agate : son Final polit la pointe, qui n'est alors plus retirée.
-  const agate = apply(
-    playState({ bag: ["clay"], triangle: triangleOf({ ...placed("agate", 2) }, null, placed("porcelain", 1)) }),
+  // final_pocket : son Final polit la pointe, qui n'est alors plus retirée.
+  const finalPocket = apply(
+    playState({ bag: ["aging_flick"], triangle: triangleOf({ ...placed("final_pocket", 2) }, null, placed("fragile", 1)) }),
     { type: "resolve" }
   );
-  run.same("agate : Final ciblé, la porcelaine usée est sauvée", ["agate"], agate.events.filter((event) => event.type === "removed").map((event) => event.marble));
-  run("agate : la porcelaine polie de 2 à 1", 1, find(agate, "polished").wear);
+  run.same("final_pocket : Final ciblé, fragile usée est sauvée", ["final_pocket"], finalPocket.events.filter((event) => event.type === "removed").map((event) => event.marble));
+  run("final_pocket : fragile polie de 2 à 1", 1, find(finalPocket, "polished").wear);
 }
 
 // Le bonus, sur des billes fictives : ce que la table du jeu ne fait pas encore.
@@ -1734,7 +1015,7 @@ function checkBonus(run) {
 
 function checkResolution(run) {
   // Ordre : base gauche, base droite, pointe, puis Impact, retrait, rotation.
-  const full = playState({ triangle: triangleOf(placed("clay"), placed("glass"), placed("agate")) });
+  const full = playState({ triangle: triangleOf(placed("aging_flick"), placed("hit_polish"), placed("final_pocket")) });
   const result = apply(full, { type: "resolve" });
   run.same(
     "résolution : ordre du journal",
@@ -1746,35 +1027,35 @@ function checkResolution(run) {
     ["leftBase", "rightBase", "apex"],
     result.events.filter((event) => event.type === "phase").map((event) => event.slot)
   );
-  // Argile en base (Vitesse +1), Verre en base (Masse +1), Agate en pointe (Masse +1 :
-  // la base gauche, une argile, n'est pas un calot).
+  // aging_flick en base (Vitesse +1), hit_polish en base (Masse +1), final_pocket en pointe (Masse +1 :
+  // la base gauche, une aging_flick, n'est pas un calot).
   const impact = result.events.find((event) => event.type === "impact");
   run.same("résolution : Vitesse 1, Masse 3, Impact 3", { type: "impact", speed: 1, mass: 3, impact: 3, score: 3 }, impact);
   run("résolution : le Score cumule", 3, result.state.score);
   run("résolution : le tour avance", 3, result.state.turn);
   run("résolution : la pioche suivante reste à faire", "draw", result.state.stage);
 
-  const second = apply(playState({ score: 10, triangle: triangleOf(placed("clay"), placed("glass"), placed("agate")) }), { type: "resolve" });
+  const second = apply(playState({ score: 10, triangle: triangleOf(placed("aging_flick"), placed("hit_polish"), placed("final_pocket")) }), { type: "resolve" });
   run("Impact ajouté au Score", 13, second.state.score);
 
   const effect = result.events.find((event) => event.type === "effect" && event.slot === "rightBase");
   run.same(
     "effet : deltas et cumul",
-    { type: "effect", trigger: "phase", slot: "rightBase", marble: "glass", speedDelta: 0, massDelta: 1, draw: 0, operations: [], given: [], lost: [], speed: 1, mass: 2 },
+    { type: "effect", trigger: "phase", slot: "rightBase", marble: "hit_polish", speedDelta: 0, massDelta: 1, draw: 0, operations: [], given: [], lost: [], speed: 1, mass: 2 },
     effect
   );
 
   // Usure qui se remplit, sans retrait avant le maximum.
-  const worn = apply(playState({ triangle: triangleOf(placed("clay", 1), null, null) }), { type: "resolve" });
+  const worn = apply(playState({ triangle: triangleOf(placed("aging_flick", 1), null, null) }), { type: "resolve" });
   const wearEvent = worn.events.find((event) => event.type === "wear");
-  run.same("usure : +1 et maximum dans le journal", { type: "wear", slot: "leftBase", marble: "clay", wear: 2, maxWear: 3 }, wearEvent);
+  run.same("usure : +1 et maximum dans le journal", { type: "wear", slot: "leftBase", marble: "aging_flick", wear: 2, maxWear: 3 }, wearEvent);
   run("usure : pas de retrait avant le maximum", false, eventTypes(worn.events).includes("retired"));
   run("usure : gardée après rotation (base gauche -> pointe)", 2, worn.state.triangle.apex.wear);
 
   // Retrait : la bille joue son effet, puis part à la défausse.
-  const last = apply(playState({ triangle: triangleOf(placed("clay", 2), null, null) }), { type: "resolve" });
+  const last = apply(playState({ triangle: triangleOf(placed("aging_flick", 2), null, null) }), { type: "resolve" });
   run("retrait : effet joué malgré le maximum atteint", 1, last.events.find((event) => event.type === "impact").impact);
-  run("retrait : part à la défausse", "clay", last.state.discard.join());
+  run("retrait : part à la défausse", "aging_flick", last.state.discard.join());
   run.same("retrait : emplacement vidé", triangleOf(null, null, null), last.state.triangle);
   run.same(
     "retrait : après les phases, avant l'Impact et la rotation",
@@ -1782,42 +1063,42 @@ function checkResolution(run) {
     eventTypes(last.events).slice(-6)
   );
 
-  const giant = apply(playState({ bag: ["agate"], triangle: triangleOf(null, null, placed("giant")) }), { type: "resolve" });
-  run("géante : joue puis part dès le premier tour", 6, giant.state.score);
-  run("géante : retirée", "giant", giant.state.discard.join());
+  const oneShot = apply(playState({ bag: ["final_pocket"], triangle: triangleOf(null, null, placed("one_shot")) }), { type: "resolve" });
+  run("one_shot : joue puis part dès le premier tour", 6, oneShot.state.score);
+  run("one_shot : retirée", "one_shot", oneShot.state.discard.join());
 
-  const porcelain = apply(playState({ triangle: triangleOf(null, null, placed("porcelain", 1)) }), { type: "resolve" });
-  run("porcelaine : retirée à usure 2", "porcelain", porcelain.state.discard.join());
-  const tiger = apply(playState({ triangle: triangleOf(null, null, placed("tiger", 2)) }), { type: "resolve" });
-  run("tigrée : pas retirée à usure 3 sur 4", 0, tiger.state.discard.length);
+  const fragile = apply(playState({ triangle: triangleOf(null, null, placed("fragile", 1)) }), { type: "resolve" });
+  run("fragile : retirée à usure 2", "fragile", fragile.state.discard.join());
+  const allRounder = apply(playState({ triangle: triangleOf(null, null, placed("all_rounder", 2)) }), { type: "resolve" });
+  run("all_rounder : pas retirée à usure 3 sur 4", 0, allRounder.state.discard.length);
 
-  const twoRetired = apply(playState({ bag: ["agate"], triangle: triangleOf(placed("giant"), placed("clay", 2), placed("glass")) }), { type: "resolve" });
-  run("retrait : dans l'ordre des emplacements", "giant,clay", twoRetired.state.discard.join());
+  const twoRetired = apply(playState({ bag: ["final_pocket"], triangle: triangleOf(placed("one_shot"), placed("aging_flick", 2), placed("hit_polish")) }), { type: "resolve" });
+  run("retrait : dans l'ordre des emplacements", "one_shot,aging_flick", twoRetired.state.discard.join());
 
   // Rotation : base gauche -> pointe, pointe -> base droite, base droite -> base gauche.
   run.same(
     "rotation : billes",
-    triangleOf(placed("glass", 1), placed("agate", 1), placed("clay", 1)),
+    triangleOf(placed("hit_polish", 1), placed("final_pocket", 1), placed("aging_flick", 1)),
     result.state.triangle
   );
   run.same("rotation : journal porte le triangle d'après", result.state.triangle, result.events.find((event) => event.type === "rotation").triangle);
-  const withHole = apply(playState({ triangle: triangleOf(placed("clay"), null, null) }), { type: "resolve" });
-  run.same("rotation : les vides tournent aussi", triangleOf(null, null, placed("clay", 1)), withHole.state.triangle);
+  const withHole = apply(playState({ triangle: triangleOf(placed("aging_flick"), null, null) }), { type: "resolve" });
+  run.same("rotation : les vides tournent aussi", triangleOf(null, null, placed("aging_flick", 1)), withHole.state.triangle);
 
   // Emplacement vide : phase sautée.
-  const skipped = apply(playState({ triangle: triangleOf(null, placed("clay"), null) }), { type: "resolve" });
+  const skipped = apply(playState({ triangle: triangleOf(null, placed("aging_flick"), null) }), { type: "resolve" });
   run.same("phase vide : sautée, dans l'ordre", ["phaseSkipped", "phase", "effect", "wear", "phaseSkipped", "impact", "rotation", "turnEnded"], eventTypes(skipped.events));
 
-  // Œil-de-chat : la variante suit la base où il se trouve.
-  const leftEye = apply(playState({ triangle: triangleOf(placed("cats_eye"), null, null) }), { type: "resolve" });
-  run.same("œil-de-chat en base gauche : Vitesse +3", { speed: 3, mass: 1 }, pickTotals(leftEye));
-  const rightEye = apply(playState({ triangle: triangleOf(null, placed("cats_eye"), null) }), { type: "resolve" });
-  run.same("œil-de-chat en base droite : Masse +1", { speed: 0, mass: 2 }, pickTotals(rightEye));
-  const apexEye = apply(playState({ triangle: triangleOf(null, null, placed("cats_eye")) }), { type: "resolve" });
-  run.same("œil-de-chat en pointe : Vitesse +3", { speed: 3, mass: 1 }, pickTotals(apexEye));
+  // split_base : la variante suit la base où il se trouve.
+  const leftEye = apply(playState({ triangle: triangleOf(placed("split_base"), null, null) }), { type: "resolve" });
+  run.same("split_base en base gauche : Vitesse +3", { speed: 3, mass: 1 }, pickTotals(leftEye));
+  const rightEye = apply(playState({ triangle: triangleOf(null, placed("split_base"), null) }), { type: "resolve" });
+  run.same("split_base en base droite : Masse +1", { speed: 0, mass: 2 }, pickTotals(rightEye));
+  const apexEye = apply(playState({ triangle: triangleOf(null, null, placed("split_base")) }), { type: "resolve" });
+  run.same("split_base en pointe : Vitesse +3", { speed: 3, mass: 1 }, pickTotals(apexEye));
 
   // Planchers : à l'Impact seulement.
-  const negative = apply(playState({ score: 5, triangle: triangleOf(null, null, placed("leaded")) }), { type: "resolve" });
+  const negative = apply(playState({ score: 5, triangle: triangleOf(null, null, placed("flick_strike")) }), { type: "resolve" });
   const negativeImpact = negative.events.find((event) => event.type === "impact");
   run("plancher Vitesse : Vitesse brute dans le journal", -3, negativeImpact.speed);
   run("plancher Vitesse : Impact 0", 0, negativeImpact.impact);
@@ -1958,48 +1239,41 @@ function checkSizeConditions(run) {
   }
 }
 
-// Les billes de test des conditions de calibre, sur la vraie table : le gorille
-// (comparaison au Tic), le mica (comparaison à l'Éjection), le grès (comptage),
-// l'agate (calibre d'un emplacement, vide compris).
+// Les billes de test des conditions de calibre, sur la vraie table : hit_pocket
+// (comparaison au Tic), awaken_draw (comparaison à l'Éjection), size_count (comptage),
+// final_pocket (calibre d'un emplacement, vide compris).
 function checkSizeMarbles(run) {
-  run.same(
-    "calibres des billes de test",
-    "porcelain:small mica:small magnifier:small clay:medium glass:medium agate:medium cats_eye:medium stoneware:medium tiger:medium gorilla:large leaded:large sulphide:large giant:large",
-    ["porcelain", "mica", "magnifier", "clay", "glass", "agate", "cats_eye", "stoneware", "tiger", "gorilla", "leaded", "sulphide", "giant"]
-      .map((id) => `${id}:${MARBLE_SIZES[MARBLE_TYPES[id].size]}`)
-      .join(" ")
-  );
   const effectOf = (events, trigger) => events.find((event) => event.type === "effect" && event.trigger === trigger);
 
-  // Gorille, Tic : Vitesse +4 si l'éjectée est plus petite.
+  // hit_pocket, Tic : Vitesse +4 si l'éjectée est plus petite.
   const gorillaOn = (occupant) =>
-    effectOf(apply(playState({ hand: inHand(["gorilla"]), triangle: triangleOf(null, null, placed(occupant)) }), { type: "place", handIndex: 0, slot: "apex" }).events, "hit").speedDelta;
-  run("gorille : éjecte une minibille, Vitesse +4", 4, gorillaOn("porcelain"));
-  run("gorille : éjecte une normale, Vitesse +4", 4, gorillaOn("clay"));
-  run("gorille : éjecte un calot, rien", 0, gorillaOn("giant"));
+    effectOf(apply(playState({ hand: inHand(["hit_pocket"]), triangle: triangleOf(null, null, placed(occupant)) }), { type: "place", handIndex: 0, slot: "apex" }).events, "hit").speedDelta;
+  run("hit_pocket : éjecte une minibille, Vitesse +4", 4, gorillaOn("fragile"));
+  run("hit_pocket : éjecte une normale, Vitesse +4", 4, gorillaOn("aging_flick"));
+  run("hit_pocket : éjecte un calot, rien", 0, gorillaOn("one_shot"));
 
-  // Mica, Éjection : Pioche 1 si la posée est plus grosse.
+  // awaken_draw, Éjection : Pioche 1 si la posée est plus grosse.
   const micaKnocked = (incoming) => {
-    const result = apply(playState({ hand: inHand([incoming]), bag: ["tiger"], triangle: triangleOf(placed("mica"), null, null) }), { type: "place", handIndex: 0, slot: "leftBase" });
+    const result = apply(playState({ hand: inHand([incoming]), bag: ["all_rounder"], triangle: triangleOf(placed("awaken_draw"), null, null) }), { type: "place", handIndex: 0, slot: "leftBase" });
     return { draw: effectOf(result.events, "knockout").draw, hand: handIds(result.state) };
   };
-  run.same("mica : délogé par une normale, Pioche 1", { draw: 1, hand: ["tiger"] }, micaKnocked("clay"));
-  run.same("mica : délogé par un calot, Pioche 1", { draw: 1, hand: ["tiger"] }, micaKnocked("giant"));
-  run.same("mica : délogé par une minibille, rien", { draw: 0, hand: [] }, micaKnocked("porcelain"));
+  run.same("awaken_draw : délogé par une normale, Pioche 1", { draw: 1, hand: ["all_rounder"] }, micaKnocked("aging_flick"));
+  run.same("awaken_draw : délogé par un calot, Pioche 1", { draw: 1, hand: ["all_rounder"] }, micaKnocked("one_shot"));
+  run.same("awaken_draw : délogé par une minibille, rien", { draw: 0, hand: [] }, micaKnocked("fragile"));
 
-  // Grès, base : Vitesse +1 par minibille active.
+  // size_count, base : Vitesse +1 par minibille active.
   const stonewareSpeed = (rightBase, apex) =>
-    apply(playState({ triangle: triangleOf(placed("stoneware"), rightBase, apex) }), { type: "resolve" }).events.find((event) => event.trigger === "phase" && event.slot === "leftBase").speedDelta;
-  run("grès : deux minibilles actives, Vitesse +2", 2, stonewareSpeed(placed("porcelain"), placed("magnifier")));
-  run("grès : une seule, Vitesse +1", 1, stonewareSpeed(placed("clay"), placed("mica")));
-  run("grès : aucune, rien", 0, stonewareSpeed(placed("clay"), null));
+    apply(playState({ triangle: triangleOf(placed("size_count"), rightBase, apex) }), { type: "resolve" }).events.find((event) => event.trigger === "phase" && event.slot === "leftBase").speedDelta;
+  run("size_count : deux minibilles actives, Vitesse +2", 2, stonewareSpeed(placed("fragile"), placed("tally_flick")));
+  run("size_count : une seule, Vitesse +1", 1, stonewareSpeed(placed("aging_flick"), placed("awaken_draw")));
+  run("size_count : aucune, rien", 0, stonewareSpeed(placed("aging_flick"), null));
 
-  // Agate, pointe : Masse +1, et Masse +2 si la base gauche est un calot.
+  // final_pocket, pointe : Masse +1, et Masse +2 si la base gauche est un calot.
   const agateMass = (leftBase) =>
-    apply(playState({ triangle: triangleOf(leftBase, null, placed("agate")) }), { type: "resolve" }).events.find((event) => event.trigger === "phase" && event.slot === "apex").massDelta;
-  run("agate : base gauche un calot, Masse +3", 3, agateMass(placed("leaded")));
-  run("agate : base gauche une normale, Masse +1", 1, agateMass(placed("clay")));
-  run("agate : base gauche vide, Masse +1", 1, agateMass(null));
+    apply(playState({ triangle: triangleOf(leftBase, null, placed("final_pocket")) }), { type: "resolve" }).events.find((event) => event.trigger === "phase" && event.slot === "apex").massDelta;
+  run("final_pocket : base gauche un calot, Masse +3", 3, agateMass(placed("flick_strike")));
+  run("final_pocket : base gauche une normale, Masse +1", 1, agateMass(placed("aging_flick")));
+  run("final_pocket : base gauche vide, Masse +1", 1, agateMass(null));
 }
 
 // La Chiquenaude (doc/marbles.md, « Déroulé d'une pose ») : à chaque pose, avant tout
@@ -2008,19 +1282,19 @@ function checkFlick(run) {
   const toApex = { type: "place", handIndex: 0, slot: "apex" };
   const effectOf = (result, trigger) => result.events.find((event) => event.type === "effect" && event.trigger === trigger);
 
-  // L'ordre du journal, sur un vide puis sur un occupé (la porcelaine : Masse +1).
-  const onEmpty = apply(playState({ hand: inHand(["porcelain"]) }), toApex);
+  // L'ordre du journal, sur un vide puis sur un occupé (fragile : Masse +1).
+  const onEmpty = apply(playState({ hand: inHand(["fragile"]) }), toApex);
   run.same("chiquenaude, vide : la Chiquenaude, son effet, la pose", ["flick", "effect", "placed"], eventTypes(onEmpty.events));
   const { trigger, slot, marble, massDelta, mass } = onEmpty.events[1];
-  run.same("chiquenaude : son effet, à l'emplacement visé, compté au tour", { trigger: "flick", slot: "apex", marble: "porcelain", massDelta: 1, mass: 2 }, { trigger, slot, marble, massDelta, mass });
-  const onOccupied = apply(playState({ hand: inHand(["porcelain"]), triangle: triangleOf(null, null, placed("gorilla")) }), toApex);
+  run.same("chiquenaude : son effet, à l'emplacement visé, compté au tour", { trigger: "flick", slot: "apex", marble: "fragile", massDelta: 1, mass: 2 }, { trigger, slot, marble, massDelta, mass });
+  const onOccupied = apply(playState({ hand: inHand(["fragile"]), triangle: triangleOf(null, null, placed("hit_pocket")) }), toApex);
   run.same(
     "chiquenaude, occupé : Chiquenaude, Éjection, retrait, défausse, pose, Tic",
     ["flick", "effect", "knockout", "effect", "removed", "discarded", "placed", "hit"],
     eventTypes(onOccupied.events)
   );
-  const counted = apply(playState({ hand: inHand(["tiger"], 3) }), toApex);
-  run.same("chiquenaude : l'évènement porte le compteur de la bille lancée", { type: "flick", slot: "apex", marble: "tiger", turnsInHand: 3 }, counted.events[0]);
+  const counted = apply(playState({ hand: inHand(["all_rounder"], 3) }), toApex);
+  run.same("chiquenaude : l'évènement porte le compteur de la bille lancée", { type: "flick", slot: "apex", marble: "all_rounder", turnsInHand: 3 }, counted.events[0]);
   run("chiquenaude : la pose reste un lancer", 1, counted.state.throwsUsed);
   run("chiquenaude : sans le champ, pas d'effet", false, counted.events.some((event) => event.type === "effect"));
 
@@ -2037,10 +1311,10 @@ function checkFlick(run) {
   const among = apply(playState({ hand: inHand(["counter"]), triangle: triangleOf(placed("plain"), null, placed("plain")) }), toApex, ghost);
   run("chiquenaude : l'occupante, encore là, se compte", 2, effectOf(among, "flick").speedDelta);
 
-  // La Chiquenaude qui vide l'emplacement visé par une Fêlure : la plombée d'avant
-  // Éjecter (Fêlure 3 à la pointe) sur une argile (usure maximale 3). Celle d'aujourd'hui
+  // La Chiquenaude qui vide l'emplacement visé par une Fêlure : flick_strike d'avant
+  // Éjecter (Fêlure 3 à la pointe) sur une aging_flick (usure maximale 3). Celle d'aujourd'hui
   // l'éjecte : checkEject.
-  const cleared = apply(playState({ hand: inHand(["leaded"]), triangle: triangleOf(null, null, placed("clay")) }), toApex, fixedRules);
+  const cleared = apply(playState({ hand: inHand(["flick_strike"]), triangle: triangleOf(null, null, placed("aging_flick")) }), toApex, fixedRules);
   run.same(
     "chiquenaude qui vide l'emplacement : retrait par usure, puis la pose, ni Éjection ni Tic",
     ["flick", "effect", "cracked", "removed", "discarded", "final", "placed"],
@@ -2048,29 +1322,29 @@ function checkFlick(run) {
   );
   run("chiquenaude qui vide l'emplacement : l'occupante part par usure", "wear", cleared.events.find((event) => event.type === "discarded").cause);
   run.same(
-    "chiquenaude qui vide l'emplacement : la plombée en pointe, l'argile à la défausse",
-    { apex: placed("leaded"), discard: ["clay"] },
+    "chiquenaude qui vide l'emplacement : flick_strike en pointe, aging_flick à la défausse",
+    { apex: placed("flick_strike"), discard: ["aging_flick"] },
     { apex: cleared.state.triangle.apex, discard: cleared.state.discard }
   );
-  // Final compris : la porcelaine (usure maximale 2) joue le sien, compté au tour.
-  // La porcelaine d'avant les choix : ce cas porte sur l'ordre du Final.
-  const withFinal = apply(playState({ hand: inHand(["leaded"]), triangle: triangleOf(null, null, placed("porcelain")) }), toApex, fixedRules);
+  // Final compris : fragile (usure maximale 2) joue le sien, compté au tour.
+  // fragile d'avant les choix : ce cas porte sur l'ordre du Final.
+  const withFinal = apply(playState({ hand: inHand(["flick_strike"]), triangle: triangleOf(null, null, placed("fragile")) }), toApex, fixedRules);
   run.same(
     "chiquenaude qui vide l'emplacement : le Final de l'occupante, puis la pose",
     ["flick", "effect", "cracked", "removed", "discarded", "final", "effect", "placed"],
     eventTypes(withFinal.events)
   );
   run("chiquenaude qui vide l'emplacement : le Final compte pour le tour", 4, withFinal.state.speed);
-  // La Fêlure ne suffit pas (la tigrée, usure maximale 4) : un remplacement ordinaire.
-  const notCleared = apply(playState({ hand: inHand(["leaded"]), triangle: triangleOf(null, null, placed("tiger")) }), toApex, fixedRules);
+  // La Fêlure ne suffit pas (all_rounder, usure maximale 4) : un remplacement ordinaire.
+  const notCleared = apply(playState({ hand: inHand(["flick_strike"]), triangle: triangleOf(null, null, placed("all_rounder")) }), toApex, fixedRules);
   run.same(
     "chiquenaude : l'emplacement encore occupé, Éjection et Tic comme d'habitude",
     ["flick", "effect", "cracked", "knockout", "removed", "discarded", "placed", "hit"],
     eventTypes(notCleared.events)
   );
-  // Posée ailleurs, la plombée fêle quand même la pointe.
-  const elsewhere = apply(playState({ hand: inHand(["leaded"]), triangle: triangleOf(null, null, placed("tiger")) }), { type: "place", handIndex: 0, slot: "leftBase" }, fixedRules);
-  run.same("chiquenaude : la Fêlure ciblée, posée ailleurs", { marble: "tiger", wear: 3 }, elsewhere.state.triangle.apex);
+  // Posée ailleurs, flick_strike fêle quand même la pointe.
+  const elsewhere = apply(playState({ hand: inHand(["flick_strike"]), triangle: triangleOf(null, null, placed("all_rounder")) }), { type: "place", handIndex: 0, slot: "leftBase" }, fixedRules);
+  run.same("chiquenaude : la Fêlure ciblée, posée ailleurs", { marble: "all_rounder", wear: 3 }, elsewhere.state.triangle.apex);
 
   // Validation : la règle des cibles et les conditions.
   run("chiquenaude : une Vitesse ciblée est permise", false, throws(() => validateTable({ a: { flick: [{ action: "speed", amount: 1, target: "apex" }] } })));
@@ -2086,15 +1360,15 @@ function checkFlick(run) {
 // Le compteur de tours en main (core/marbles.js, en-tête).
 function checkTurnsInHand(run) {
   const start = apply(
-    { ...playState({ hand: [{ marble: "clay", turnsInHand: 0 }, { marble: "tiger", turnsInHand: 2 }], bag: ["glass"] }), stage: "draw" },
+    { ...playState({ hand: [{ marble: "aging_flick", turnsInHand: 0 }, { marble: "all_rounder", turnsInHand: 2 }], bag: ["hit_polish"] }), stage: "draw" },
     { type: "draw" }
   );
   run.same(
     "compteur : +1 en début de tour pour les billes déjà en main, 0 pour la bille piochée",
     [
-      { marble: "clay", turnsInHand: 1 },
-      { marble: "tiger", turnsInHand: 3 },
-      { marble: "glass", turnsInHand: 0 },
+      { marble: "aging_flick", turnsInHand: 1 },
+      { marble: "all_rounder", turnsInHand: 3 },
+      { marble: "hit_polish", turnsInHand: 0 },
     ],
     start.state.hand
   );
@@ -2117,8 +1391,8 @@ function checkTurnsInHand(run) {
 // plafonnés, évalués au déclenchement.
 function checkComputedAmounts(run) {
   const clayFlick = (turnsInHand) =>
-    apply(playState({ hand: inHand(["clay"], turnsInHand) }), { type: "place", handIndex: 0, slot: "apex" }).events.find((event) => event.trigger === "flick").speedDelta;
-  run("montant calculé : l'argile à 0 tour en main, Vitesse +0", 0, clayFlick(0));
+    apply(playState({ hand: inHand(["aging_flick"], turnsInHand) }), { type: "place", handIndex: 0, slot: "apex" }).events.find((event) => event.trigger === "flick").speedDelta;
+  run("montant calculé : aging_flick à 0 tour en main, Vitesse +0", 0, clayFlick(0));
   run("montant calculé : 2 tours, Vitesse +2", 2, clayFlick(2));
   run("montant calculé : 5 tours, au plafond", 5, clayFlick(5));
   run("montant calculé : 9 tours, plafonné à +5", 5, clayFlick(9));
@@ -2129,7 +1403,7 @@ function checkComputedAmounts(run) {
   run("montant calculé : plafonné", 6, amountOf({ base: 2, step: 3, source, max: 6 }, inHandFor(2)));
   run("montant calculé : base négative permise pour une Vitesse", -1, amountOf({ base: -3, step: 1, source }, inHandFor(2)));
   run("montant calculé : un entier reste lui-même", 4, amountOf(4, inHandFor(2)));
-  run("montant calculé : jamais dans l'imprimé", 0, printedStat(MARBLE_TYPES.clay.flick, "speed"));
+  run("montant calculé : jamais dans l'imprimé", 0, printedStat(FIXTURE_TYPES.aging_flick.flick, "speed"));
 
   // Une Pioche calculée à 0 ne pioche rien ; à 1, une bille.
   const drawer = { drawer: { flick: [{ action: "draw", amount: { base: 0, step: 1, source } }] }, plain: {} };
@@ -2156,9 +1430,9 @@ function checkComputedAmounts(run) {
 // sac, chez les billes actives, dans l'ordre des phases, avant que la pioche ne
 // reprenne ; aux trois moments où une régénération arrive.
 function checkWindfall(run) {
-  // La tigrée d'avant Éjecter (sa base donne Vitesse +3, sans choix) : ces cas portent
+  // all_rounder d'avant Éjecter (sa base donne Vitesse +3, sans choix) : ces cas portent
   // sur la Trouvaille.
-  const apply = (state, action, marbles = fixedRules) => applyWith(state, action, marbles);
+  const apply = (state, action, marbles = fixedRules) => mustReduce(typeof marbles.reduce === "function" ? marbles : fabricatedRules(marbles), state, action);
   // Chaque évènement, avec sa bille ; une pioche sans la sienne, que le mélange choisit.
   const typesAndMarbles = (events) => events.map((event) => (event.marble === undefined || event.type === "draw" ? event.type : `${event.type}:${event.marble}`));
   // De `first` à la première entrée `last` qui le suit.
@@ -2168,21 +1442,21 @@ function checkWindfall(run) {
     return types.slice(from, types.indexOf(last, from) + 1);
   };
 
-  // Phase de jeu : le Tic de l'œil-de-chat pioche, la défausse devient le sac.
+  // Phase de jeu : le Tic de split_base pioche, la défausse devient le sac.
   const play = apply(
-    playState({ hand: inHand(["cats_eye"]), bag: [], discard: ["clay"], triangle: triangleOf(placed("tiger"), placed("agate", 1), placed("glass")) }),
+    playState({ hand: inHand(["split_base"]), bag: [], discard: ["aging_flick"], triangle: triangleOf(placed("all_rounder"), placed("final_pocket", 1), placed("hit_polish")) }),
     { type: "place", handIndex: 0, slot: "apex" }
   );
   run.same(
     "trouvaille, phase de jeu : régénération, trouvailles dans l'ordre des phases, puis la pioche",
     [
       "bagRegenerated",
-      "windfall:tiger",
-      "effect:tiger",
-      "windfall:agate",
-      "effect:agate",
-      "polished:agate",
-      "windfall:cats_eye",
+      "windfall:all_rounder",
+      "effect:all_rounder",
+      "windfall:final_pocket",
+      "effect:final_pocket",
+      "polished:final_pocket",
+      "windfall:split_base",
       "draw",
     ],
     between(play.events, "bagRegenerated", "draw")
@@ -2190,38 +1464,38 @@ function checkWindfall(run) {
   run("trouvaille, phase de jeu : la Vitesse au compteur du tour", 3, play.state.speed);
   run("trouvaille, phase de jeu : le Polissage sur elle-même", 0, play.state.triangle.rightBase.wear);
 
-  // Résolution : la Pioche du mica en phase, puis celle du Final de la géante.
-  const resolved = apply(playState({ bag: [], discard: ["clay"], triangle: triangleOf(placed("mica"), placed("giant"), placed("tiger")) }), { type: "resolve" });
+  // Résolution : la Pioche de awaken_draw en phase, puis celle du Final de one_shot.
+  const resolved = apply(playState({ bag: [], discard: ["aging_flick"], triangle: triangleOf(placed("awaken_draw"), placed("one_shot"), placed("all_rounder")) }), { type: "resolve" });
   const regenerations = resolved.events.filter((event) => event.type === "bagRegenerated").length;
   run("trouvaille, résolution : deux régénérations, en phase et au Final", 2, regenerations);
   run.same(
-    "trouvaille, résolution : chez les billes encore actives, la géante retirée n'en a plus",
-    ["windfall:mica", "windfall:giant", "windfall:tiger", "windfall:mica", "windfall:tiger"],
+    "trouvaille, résolution : chez les billes encore actives, one_shot retirée n'en a plus",
+    ["windfall:awaken_draw", "windfall:one_shot", "windfall:all_rounder", "windfall:awaken_draw", "windfall:all_rounder"],
     typesAndMarbles(resolved.events).filter((entry) => entry.startsWith("windfall"))
   );
   run("trouvaille, résolution : comptée dans l'Impact (6 − 1 + 3 + 3)", 11, resolved.events.find((event) => event.type === "impact").impact);
 
   // Début de tour : les compteurs, remis à zéro par la résolution, reçoivent la
   // Trouvaille du nouveau tour.
-  const ended = apply(playState({ hand: inHand(["glass"]), bag: [], discard: ["clay"], triangle: triangleOf(placed("tiger"), null, null) }), { type: "resolve" });
+  const ended = apply(playState({ hand: inHand(["hit_polish"]), bag: [], discard: ["aging_flick"], triangle: triangleOf(placed("all_rounder"), null, null) }), { type: "resolve" });
   run("trouvaille, début de tour : compteurs remis à zéro après la résolution", "0,1", `${ended.state.speed},${ended.state.mass}`);
   const started = apply(ended.state, { type: "draw" });
   run.same(
     "trouvaille, début de tour : régénération, trouvaille, pioche",
-    ["turnStarted", "bagRegenerated", "windfall:tiger", "effect:tiger", "draw", "awaken:clay"],
+    ["turnStarted", "bagRegenerated", "windfall:all_rounder", "effect:all_rounder", "draw", "awaken:aging_flick"],
     typesAndMarbles(started.events)
   );
   run("trouvaille, début de tour : la Vitesse au compteur du nouveau tour", 3, started.state.speed);
 
   // Seulement les billes actives : en main, au sac, en défausse, rien.
-  const idle = apply(playState({ hand: inHand(["tiger", "cats_eye"]), bag: [], discard: ["tiger", "agate"], triangle: triangleOf(null, null, placed("glass")) }), {
+  const idle = apply(playState({ hand: inHand(["all_rounder", "split_base"]), bag: [], discard: ["all_rounder", "final_pocket"], triangle: triangleOf(null, null, placed("hit_polish")) }), {
     type: "place",
     handIndex: 1,
     slot: "apex",
   });
   run.same(
     "trouvaille : seulement chez les billes actives",
-    ["windfall:cats_eye"],
+    ["windfall:split_base"],
     typesAndMarbles(idle.events).filter((entry) => entry.startsWith("windfall"))
   );
   run("trouvaille : aucun effet sans bille active qui en a une", 0, idle.state.speed);
@@ -2231,20 +1505,20 @@ function checkWindfall(run) {
   const thrown = apply(playState({ hand: inHand(["thrower"]), bag: [], discard: ["plain"] }), { type: "place", handIndex: 0, slot: "apex" }, thrownTable);
   run.same("trouvaille : pas chez la bille en cours de lancer", [], typesAndMarbles(thrown.events).filter((entry) => entry.startsWith("windfall")));
 
-  // Retrait immédiat par Fêlure après une régénération : le sulfure fêle la
-  // porcelaine (usure maximale 2), qui rejoint la défausse tout juste vidée, son
+  // Retrait immédiat par Fêlure après une régénération : base_pocket fêle la
+  // fragile (usure maximale 2), qui rejoint la défausse tout juste vidée, son
   // Final compris, avant la reprise de la pioche.
   const cracked = apply(
-    { ...playState({ bag: [], discard: ["clay"], triangle: triangleOf(placed("sulphide"), placed("porcelain", 1), null) }), stage: "draw" },
+    { ...playState({ bag: [], discard: ["aging_flick"], triangle: triangleOf(placed("base_pocket"), placed("fragile", 1), null) }), stage: "draw" },
     { type: "draw" },
     fixedRules
   );
   run.same(
     "trouvaille, Fêlure : retrait, défausse, Final, puis la pioche",
-    ["windfall:sulphide", "effect:sulphide", "cracked:porcelain", "removed:porcelain", "discarded:porcelain", "final:porcelain", "effect:porcelain", "draw"],
-    between(cracked.events, "windfall:sulphide", "draw")
+    ["windfall:base_pocket", "effect:base_pocket", "cracked:fragile", "removed:fragile", "discarded:fragile", "final:fragile", "effect:fragile", "draw"],
+    between(cracked.events, "windfall:base_pocket", "draw")
   );
-  run.same("trouvaille, Fêlure : la porcelaine seule dans la défausse vidée", ["porcelain"], cracked.state.discard);
+  run.same("trouvaille, Fêlure : fragile seule dans la défausse vidée", ["fragile"], cracked.state.discard);
   run("trouvaille, Fêlure : aucune bille perdue", 3, marbleCount(cracked.state));
   run("trouvaille, Fêlure : le Final compte au tour", 4, cracked.state.speed);
 
@@ -2310,12 +1584,12 @@ function pickTotals(result) {
 
 function checkEndOfGame(run) {
   // Après le dernier tour.
-  const lastTurn = apply(playState({ turn: 10, turnCount: 10, score: 3, triangle: triangleOf(placed("clay"), null, null) }), { type: "resolve" });
+  const lastTurn = apply(playState({ turn: 10, turnCount: 10, score: 3, triangle: triangleOf(placed("aging_flick"), null, null) }), { type: "resolve" });
   run("fin : après le dernier tour", "over", lastTurn.state.stage);
   run("fin : le tour reste au dernier", 10, lastTurn.state.turn);
   run.same("fin : dernier du journal", { type: "gameOver", score: 4 }, lastTurn.events.at(-1));
   run("fin : le nombre de tours vient des réglages", 10, rules.createGame(1).turnCount);
-  const shortGame = apply(playState({ turn: 3, turnCount: 3, triangle: triangleOf(placed("clay"), null, null) }), { type: "resolve" });
+  const shortGame = apply(playState({ turn: 3, turnCount: 3, triangle: triangleOf(placed("aging_flick"), null, null) }), { type: "resolve" });
   run("fin : un nombre de tours réglé, la fin suit", "over", shortGame.state.stage);
   run("fin : avant le dernier tour, la partie continue", "draw", apply(playState({ turn: 9, turnCount: 10 }), { type: "resolve" }).state.stage);
   run.same("fin : la rotation et la fin du tour ont lieu avant", ["rotation", "turnEnded"], eventTypes(lastTurn.events).slice(-3, -1));
@@ -2326,14 +1600,14 @@ function checkEndOfGame(run) {
 
   // Plus de règle « sac régénéré de moins de 3 billes » : un sac de 2 se joue.
   const small = apply(
-    { ...playState({ score: 12, hand: inHand(["clay"]), bag: [], discard: ["agate", "porcelain"] }), stage: "draw" },
+    { ...playState({ score: 12, hand: inHand(["aging_flick"]), bag: [], discard: ["final_pocket", "fragile"] }), stage: "draw" },
     { type: "draw" }
   );
   run("sac régénéré de 2 billes : la partie continue", "play", small.state.stage);
   run.same("sac régénéré de 2 billes : journal", ["turnStarted", "bagRegenerated", "draw", "awaken"], eventTypes(small.events));
 
   // Pioche impossible, faute de billes : dite, et la partie continue.
-  const empty = apply({ ...playState({ score: 12, hand: inHand(["clay"]), bag: [], discard: [] }), stage: "draw" }, { type: "draw" });
+  const empty = apply({ ...playState({ score: 12, hand: inHand(["aging_flick"]), bag: [], discard: [] }), stage: "draw" }, { type: "draw" });
   run("sac et défausse vides : la partie continue", "play", empty.state.stage);
   run.same("sac et défausse vides : journal", ["turnStarted", "drawSkipped"], eventTypes(empty.events));
   run("sac et défausse vides : arrêt annoncé", "noMarbles", empty.events[1].reason);
@@ -2344,18 +1618,18 @@ function checkEndOfGame(run) {
   run("plus aucune bille : la résolution du dernier tour finit la partie", "over", apply(nothing.state, { type: "resolve" }).state.stage);
 
   // Une seule bille piochée sur trois : la partie continue.
-  const partial = apply({ ...playState({ hand: inHand([]), bag: ["glass"], discard: [], drawPerTurn: 3 }), stage: "draw" }, { type: "draw" });
+  const partial = apply({ ...playState({ hand: inHand([]), bag: ["hit_polish"], discard: [], drawPerTurn: 3 }), stage: "draw" }, { type: "draw" });
   run("pioche partielle : la partie continue", "play", partial.state.stage);
   run.same("pioche partielle : journal", ["turnStarted", "draw", "awaken", "drawSkipped"], eventTypes(partial.events));
 
   // Main pleine, sac et défausse vides : jamais une fin de partie.
-  const full = apply({ ...playState({ hand: inHand(["clay", "glass", "agate", "mica", "tiger"]), bag: [], discard: [] }), stage: "draw" }, { type: "draw" });
+  const full = apply({ ...playState({ hand: inHand(["aging_flick", "hit_polish", "final_pocket", "awaken_draw", "all_rounder"]), bag: [], discard: [] }), stage: "draw" }, { type: "draw" });
   run("main pleine, rien à piocher : la partie continue", "play", full.state.stage);
   run("main pleine, rien à piocher : motif de l'arrêt", "handFull", full.events[1].reason);
 
   // Plus de sac minimal : un sac plus petit que le triangle se joue, un sac vide
   // aussi, à vide.
-  run("sac de 2 billes : la partie se joue", "play", apply(rules.createGame(1, { bag: ["clay", "glass"] }), { type: "draw" }).state.stage);
+  run("sac de 2 billes : la partie se joue", "play", apply(rules.createGame(1, { bag: ["aging_flick", "hit_polish"] }), { type: "draw" }).state.stage);
   run("sac vide : la partie se joue, à vide", "play", apply(rules.createGame(1, { bag: [] }), { type: "draw" }).state.stage);
 }
 
@@ -2388,15 +1662,15 @@ function checkDeterminism(run) {
   run.same("déterminisme : même état final", a.state, b.state);
   run("partie complète : tous les tours joués", a.state.turnCount, a.journal.filter((event) => event.type === "turnStarted").length);
   run("partie complète : finie", "over", a.state.stage);
-  run("partie complète : billes conservées", STARTING_BAG.length, marbleCount(a.state));
+  run("partie complète : billes conservées", FIXTURE_BAG.length, marbleCount(a.state));
   run("autre graine : autre partie", false, JSON.stringify(a.journal) === JSON.stringify(scriptedGame(1235).journal));
   run("graine en chaîne acceptée", true, scriptedGame("billes").state.stage === "over");
 
   // Le réducteur ne touche jamais à l'état reçu.
   const frozen = deepFreeze(apply(rules.createGame(5), { type: "draw" }).state);
   run("pureté : pose sur un état figé", false, throws(() => apply(frozen, { type: "place", handIndex: 0, slot: "apex" })));
-  run("pureté : résolution sur un état figé", false, throws(() => rules.reduce(deepFreeze(playState({ triangle: triangleOf(placed("clay"), null, placed("giant")) })), { type: "resolve" })));
-  run("pureté : pioche sur un état figé", false, throws(() => apply(deepFreeze({ ...playState({ hand: inHand([]), bag: [], discard: ["clay", "glass", "agate", "mica", "tiger"] }), stage: "draw" }), { type: "draw" })));
+  run("pureté : résolution sur un état figé", false, throws(() => rules.reduce(deepFreeze(playState({ triangle: triangleOf(placed("aging_flick"), null, placed("one_shot")) })), { type: "resolve" })));
+  run("pureté : pioche sur un état figé", false, throws(() => apply(deepFreeze({ ...playState({ hand: inHand([]), bag: [], discard: ["aging_flick", "hit_polish", "final_pocket", "awaken_draw", "all_rounder"] }), stage: "draw" }), { type: "draw" })));
 }
 
 function checkSerialization(run) {
@@ -2434,115 +1708,41 @@ function checkSerialization(run) {
   run.same("sérialisation : même journal", original.journal, journal);
 }
 
-// Choix au hasard, à graine : le PRNG du test, jamais celui de la partie.
-function createPicker(seed) {
-  let rngState = seed >>> 0;
-  return (count) => {
-    const { value, state } = nextRandom(rngState);
-    rngState = state;
-    return Math.floor(value * count);
-  };
-}
-
-// Joue une partie par choix aléatoires, actions refusées comprises. Rend les
-// fautes d'invariants trouvées et les types d'évènements vus.
-function playRandomGame(seed, options, seenTypes) {
-  const pick = createPicker(seed);
-  let state = rules.createGame(seed, options);
-  const total = marbleCount(state);
-  const faults = [];
-  let score = 0;
-  let actions = 0;
-
-  const verify = (result) => {
-    state = result.state;
-    actions += 1;
-    for (const event of result.events) seenTypes.add(event.type);
-    // Un état suspendu sur un choix est un instantané en pleine action : une bille
-    // peut y être en cours de lancer, ni en main ni sur le triangle. Le compte se
-    // vérifie hors choix.
-    if (!state.pendingChoice && marbleCount(state) !== total) faults.push(`billes : ${marbleCount(state)} au lieu de ${total}`);
-    if (state.score < 0) faults.push(`score négatif : ${state.score}`);
-    if (state.score < score) faults.push(`score en baisse : ${score} -> ${state.score}`);
-    score = state.score;
-    if (state.hand.length > state.maxHandSize) faults.push(`main trop grande : ${state.hand.length}`);
-    if (state.stage !== "play" && (state.speed !== 0 || state.mass !== 1)) faults.push(`compteurs non remis à zéro : ${state.speed}, ${state.mass}`);
-    if (state.turn > state.turnCount) faults.push(`tour hors bornes : ${state.turn}`);
-    for (const slot of SLOTS) {
-      const placedHere = state.triangle[slot];
-      if (placedHere !== null && placedHere.wear >= rules.maxWearOf(placedHere.marble) && state.stage === "draw") {
-        faults.push(`bille à usure maximale restée sur le triangle : ${placedHere.marble}`);
-      }
-      if (placedHere?.bonus !== undefined && state.stage !== "play") faults.push(`bonus resté après la résolution : ${placedHere.marble}`);
-    }
-  };
-
-  // Borne large : une partie sans issue la dépasserait, et serait signalée.
-  while (state.stage !== "over" && actions < 2000) {
-    // Un choix en attente : une réponse légale au hasard (Terminer compris), mais
-    // aussi, une fois sur quatre, une autre action, qui doit être refusée.
-    if (state.pendingChoice) {
-      if (pick(4) === 0) {
-        const refusedResult = rules.reduce(state, { type: "resolve" });
-        if (refusedResult.ok || refusedResult.error !== "choicePending") faults.push(`action acceptée pendant un choix : ${refusedResult.error}`);
-      }
-      const answers = legalActions(state);
-      verify(rules.reduce(state, answers[pick(answers.length)]));
-      continue;
-    }
-    if (state.stage === "draw") {
-      verify(rules.reduce(state, { type: "draw" }));
-      continue;
-    }
-    switch (pick(6)) {
-      case 0:
-        verify(rules.reduce(state, { type: "swap", a: SLOTS[pick(3)], b: SLOTS[pick(3)] }));
-        break;
-      case 1:
-      case 2:
-      case 3:
-        verify(rules.reduce(state, { type: "place", handIndex: pick(state.maxHandSize), slot: SLOTS[pick(3)] }));
-        break;
-      default:
-        verify(rules.reduce(state, { type: "resolve" }));
-    }
-  }
-  if (state.stage !== "over") faults.push("partie sans issue");
-  return faults;
-}
-
 function checkSmoke(run) {
   const seen = new Set();
   const bags = [
     undefined, // le sac de test, le cas principal
-    { bag: ["clay", "clay", "clay", "giant", "giant", "giant", "porcelain", "porcelain"] },
-    { bag: ["giant", "giant", "giant", "giant", "giant", "giant"] },
-    { bag: ["clay", "glass", "agate", "mica", "tiger"] },
-    { bag: ["clay", "glass", "agate"] },
-    { bag: ["mica", "mica", "mica"] }, // le plus petit sac permis : la pioche finit par manquer de billes
+    { bag: ["aging_flick", "aging_flick", "aging_flick", "one_shot", "one_shot", "one_shot", "fragile", "fragile"] },
+    { bag: ["one_shot", "one_shot", "one_shot", "one_shot", "one_shot", "one_shot"] },
+    { bag: ["aging_flick", "hit_polish", "final_pocket", "awaken_draw", "all_rounder"] },
+    { bag: ["aging_flick", "hit_polish", "final_pocket"] },
+    { bag: ["awaken_draw", "awaken_draw", "awaken_draw"] }, // le plus petit sac permis : la pioche finit par manquer de billes
   ];
   const faults = [];
-  let games = 0;
   let exceptions = 0;
   for (let seed = 1; seed <= 300; seed++) {
     // Une graine sur deux pour le sac de test, les autres se partagent les
     // petits sacs.
     const options = bags[seed % 2 === 0 ? 0 : 1 + ((seed - 1) / 2) % (bags.length - 1)];
-    games += 1;
     try {
-      faults.push(...playRandomGame(seed, options, seen).map((fault) => `graine ${seed} : ${fault}`));
+      faults.push(...playRandomMarblesGame(rules, seed, options, seen).map((fault) => `graine ${seed} : ${fault}`));
     } catch (error) {
       exceptions += 1;
       faults.push(`graine ${seed} : exception ${error.message}`);
     }
   }
-  run("fumée : 300 parties jouées", 300, games);
   run("fumée : aucune exception", 0, exceptions);
   run.same("fumée : invariants tenus", [], faults.slice(0, 5));
-  run(
-    "fumée : tous les évènements rencontrés",
-    "awaken,bagRegenerated,choice,choiceEnded,chosen,cracked,discarded,draw,drawSkipped,effect,eject,final,flick,gameOver,hit,impact,knockout,lost,phase,phaseSkipped,placed,pocketReaction,pocketed,polished,potResolution,removed,rotation,swapped,targetEmpty,turnEnded,turnStarted,wear,windfall",
-    [...seen].sort().join()
+  // Chaque type d'évènement déclaré (JOURNAL_EVENTS) est réellement émis : la liste
+  // n'a aucune entrée morte, et les parties de fumée passent partout. Sauf ceux
+  // qu'une partie jouée n'émet jamais : la limite de sécurité (une anomalie,
+  // vérifiée par le domaine marbles-bus) et le choix indécis, propre à la
+  // prévision (domaine marbles-forecast).
+  const neverPlayed = ["chainInterrupted", "choiceUndecided"];
+  run.same(
+    "fumée : chaque évènement du journal rencontré",
+    Object.keys(JOURNAL_EVENTS).filter((type) => !neverPlayed.includes(type)).sort(),
+    [...seen].sort()
   );
   // La limite de sécurité atteinte dans une vraie partie : une anomalie.
   run("fumée : aucun enchaînement interrompu (anomalie)", false, seen.has("chainInterrupted"));
@@ -2567,8 +1767,8 @@ function checkLegalActions(run) {
   const cases = {
     "pioche à faire": rules.createGame(1),
     "premier tour, triangle vide": apply(rules.createGame(1), { type: "draw" }).state,
-    "tour 2, échange possible": playState({ hand: inHand(["clay", "glass"]), triangle: triangleOf(placed("agate"), null, placed("mica")) }),
-    "tour 2, échange déjà fait": playState({ hand: inHand(["clay"]), swapUsed: true, triangle: triangleOf(placed("agate"), null, null) }),
+    "tour 2, échange possible": playState({ hand: inHand(["aging_flick", "hit_polish"]), triangle: triangleOf(placed("final_pocket"), null, placed("awaken_draw")) }),
+    "tour 2, échange déjà fait": playState({ hand: inHand(["aging_flick"]), swapUsed: true, triangle: triangleOf(placed("final_pocket"), null, null) }),
     "tour 2, triangle vide, main vide": playState({ hand: inHand([]) }),
     "partie finie": playState({ stage: "over" }),
   };

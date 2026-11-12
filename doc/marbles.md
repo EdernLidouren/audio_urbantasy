@@ -36,7 +36,7 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
 | `tools/marbles/` | La boîte à outils : partie au terminal, cas construits, simulateur, annexe du document de règles (`doc/marbles-tools.md`) |
 | `doc/marbles-rules.md` | Les règles pour un joueur et pour le concepteur, sans code ; son annexe des billes est générée |
 | `doc/marbles-backlog.md` | Les points en suspens, une ligne chacun, avec leur origine |
-| `core/checks/marbles.check.js`, `marbles-bus.check.js`, `marbles-tally.check.js`, `marbles-forecast.check.js`, `marbles-view.check.js`, `marbles-sequence.check.js` | Vérifications |
+| `core/checks/marbles.check.js`, `marbles-pocket.check.js`, `marbles-choice.check.js`, `marbles-bus.check.js`, `marbles-tally.check.js`, `marbles-forecast.check.js`, `marbles-view.check.js`, `marbles-sequence.check.js`, `marbles-tools.check.js`, `marbles-content.check.js` ; leur table de billes, `core/checks/fixtures/marbles.js` | Vérifications (organisation : `doc/marbles-tools.md`, « Les vérifications du jeu des billes ») |
 
 ## Déroulement d'un tour
 
@@ -282,8 +282,9 @@ plomberie interne.
 - **Le jeu** compose ses règles dans `main.js`, qui les passe à l'écran des billes ; l'écran
   les passe à la narration, aux fiches et aux menus des piles, comme il leur passe `t`.
 - **La boîte à outils** a son point de composition, `tools/marbles/game-rules.js`.
-- **Les vérifications** créent les leurs, avec la vraie table ou une table fabriquée ; une
-  table fabriquée ne retombe jamais en silence sur celle du jeu.
+- **Les vérifications** créent les leurs, avec leur propre table, figée
+  (`core/checks/fixtures/marbles.js`), ou une table fabriquée ; aucune ne retombe en
+  silence sur celle du jeu, qui n'a que son contrat (domaine `marbles-content`).
 - **Les sons** lisent le calibre d'une bille directement dans le registre : son profil
   sonore et la force de ses chocs en viennent.
 
@@ -307,7 +308,7 @@ chargement par la simulation (`validateMarbleTypes`) :
 
 **Ajouter une bille** : son fichier dans `marbles/types/` avec son calibre, sa ligne dans
 `marbles/types/index.js`, son nom dans chaque langue (vérifié par le domaine
-`marbles-view`), et sa place dans `STARTING_BAG` pour la mettre en jeu. En français, le nom
+`marbles-content`), et sa place dans `STARTING_BAG` pour la mettre en jeu. En français, le nom
 porte sa forme `de` (« d'argile », « de gorille ») : `{ "base": "argile", "de": "d'argile" }`,
 pour « Tic d'argile ». Un sac est une liste d'ids : les doublons y sont permis.
 
@@ -1385,11 +1386,13 @@ pile reçoit le clavier).
 ## Tester
 
 ```
-node tools/run-checks.js marbles marbles-bus marbles-tally marbles-forecast marbles-view marbles-sequence marbles-tools detail-card
+node tools/run-checks.js marbles marbles-pocket marbles-choice marbles-bus marbles-tally marbles-forecast marbles-view marbles-sequence marbles-tools marbles-content detail-card
 node tools/marbles/play.js --seed 42
 ```
 
-Les autres outils (cas construit à la main, simulateur) : `doc/marbles-tools.md`.
+Les autres outils (cas construit à la main, simulateur), et comment les vérifications
+sont organisées (table figée, textes par leurs clés, contrat des vraies billes) :
+`doc/marbles-tools.md`.
 
 Le mode d'emploi du kit terminal est en tête de `tools/marbles/play.js` : une partie se
 joue au clavier ou par un fichier de commandes, `prevoir` dit la prévision sans rien

@@ -2,11 +2,14 @@
 // (tools/marbles/, doc/marbles-tools.md) : état construit à la main, affichage du
 // journal, commandes, joueurs automatiques, simulateur, rapport et exports. Les
 // outils ne changent aucune règle : on vérifie qu'ils mesurent juste. Rien n'est
-// annoncé ni joué ici. Lancées par core/checks/index.js/runChecks
+// annoncé ni joué ici. Les outils sont liés à la VRAIE table
+// (tools/marbles/game-rules.js) : ces vérifications la jouent aussi, mais n'en
+// attendent aucun chiffre (nombre de billes, effet d'une bille) ; ce qu'elles
+// comparent se déduit de la table. Lancées par core/checks/index.js/runChecks
 // (`node tools/run-checks.js marbles-tools`).
 
 import { MARBLES_SETTINGS, STARTING_BAG } from "../../config/marbles-values.js";
-import { SLOTS, legalActions } from "../marbles.js";
+import { JOURNAL_EVENTS, SLOTS, legalActions } from "../marbles.js";
 import { throws } from "../../lib/check.js";
 import { parseCommand } from "../../tools/marbles/commands.js";
 import { formatEvent, formatState } from "../../tools/marbles/format.js";
@@ -25,21 +28,27 @@ import { handIds } from "./helpers.js";
 // Les règles du jeu, liées à la vraie table (core/marbles-rules.js).
 const rules = createMarblesRules(MARBLE_TYPES);
 
-// Les parties de contrôle : assez pour que les moyennes parlent, assez peu pour
-// que la vérification reste rapide (elle tourne aussi dans le jeu).
-const GAMES = 300;
+// Les parties de contrôle par joueur : assez pour que les moyennes se départagent
+// nettement (le glouton bat l'aléatoire de loin), assez peu pour que la
+// vérification reste rapide (elle tourne aussi dans le jeu).
+const GAMES = 50;
 
 export default function checkMarblesTools(run) {
-  checkStateBuilder(run);
-  checkCommandsAndFormat(run);
-  checkPublicView(run);
-  checkGreedy(run);
-  checkPlayerChoices(run);
-  checkDrawnValue(run);
-  checkSimulation(run);
-  checkReportAndExport(run);
-  checkDrawAttribution(run);
-  checkReportDiff(run);
+  run.section("état construit", checkStateBuilder);
+  run.section("commandes et journal lisible", checkCommandsAndFormat);
+  run.section("vue publique", checkPublicView);
+  run.section("glouton", checkGreedy);
+  run.section("choix des joueurs", checkPlayerChoices);
+  run.section("bille gagnée", checkDrawnValue);
+  run.section("simulation", checkSimulation);
+  run.section("rapport et exports", checkReportAndExport);
+  run.section("attribution des pioches", checkDrawAttribution);
+  run.section("différence de rapports", checkReportDiff);
+}
+
+// Une clause qui pioche, quelque part dans les effets d'une bille.
+function drawsSomewhere(type) {
+  return JSON.stringify(type).includes('"action":"draw"');
 }
 
 function checkStateBuilder(run) {
@@ -60,8 +69,9 @@ function checkStateBuilder(run) {
   run("état construit : bille inconnue refusée", true, throws(() => buildState({ hand: ["nope"] })));
   run("état construit : champ inconnu refusé", true, throws(() => buildState({ tour: 2 })));
   run("état construit : emplacement inconnu refusé", true, throws(() => buildState({ triangle: { middle: "clay" } })));
-  run("état construit : usure au maximum refusée", true, throws(() => buildState({ triangle: { apex: "giant:1" } })));
-  run("état construit : main trop grande refusée", true, throws(() => buildState({ hand: Array(6).fill("clay") })));
+  run("état construit : usure au maximum refusée", true, throws(() => buildState({ triangle: { apex: `clay:${rules.maxWearOf("clay")}` } })));
+  run("état construit : juste sous le maximum, acceptée", false, throws(() => buildState({ triangle: { apex: `clay:${rules.maxWearOf("clay") - 1}` } })));
+  run("état construit : main trop grande refusée", true, throws(() => buildState({ hand: Array(MARBLES_SETTINGS.maxHandSize + 1).fill("clay") })));
   run.same(
     "état construit : la main avec ses compteurs de tours en main",
     [{ marble: "clay", turnsInHand: 0 }, { marble: "leaded", turnsInHand: 2 }],
@@ -71,7 +81,7 @@ function checkStateBuilder(run) {
   run("état construit : compteur négatif refusé", true, throws(() => buildState({ hand: ["clay:-1"] })));
   run(
     "état lisible : la main dit les tours en main",
-    "Main, 2 sur 5 : clay, 0 tour en main ; leaded, 2 tours en main.",
+    `Main, 2 sur ${MARBLES_SETTINGS.maxHandSize} : clay, 0 tour en main ; leaded, 2 tours en main.`,
     formatState(state).find((line) => line.startsWith("Main"))
   );
 
@@ -115,7 +125,16 @@ function checkCommandsAndFormat(run) {
     }
   }
   run("journal lisible : aucun évènement en JSON brut", 0, raw);
-  run("journal lisible : assez de types couverts", true, types.size >= 15);
+  // Chaque type du journal (JOURNAL_EVENTS) a sa ligne, pas seulement ceux qu'une
+  // partie a rencontrés : un évènement minimal de chaque type, ses champs de
+  // structure seulement quand la ligne les lit.
+  const minimal = {
+    choice: { zones: ["hand"], count: 1, by: { trigger: "hit", slot: "apex", marble: "clay" } },
+    eject: { slot: "apex", marble: "clay", by: { trigger: "hit", slot: "apex", marble: "clay" } },
+    rotation: { triangle: { leftBase: null, rightBase: null, apex: null } },
+  };
+  const unreadable = Object.keys(JOURNAL_EVENTS).filter((type) => formatEvent({ type, ...minimal[type] }).startsWith(`${type} : {`));
+  run.same("journal lisible : chaque type du journal (JOURNAL_EVENTS) a sa ligne", [], unreadable);
   run("journal lisible : un type inconnu se lit quand même", true, formatEvent({ type: "nouveau", x: 1 }).startsWith("nouveau : "));
   run("état lisible : une ligne par élément, sans tableau", true, formatState(buildState({ hand: ["clay"] })).every((line) => !line.includes("|") && line.length < 200));
 }
@@ -126,7 +145,7 @@ function checkPublicView(run) {
   run.same("vue publique : billes du sac inconnues", [null, null, null], view.bag);
   run("vue publique : le nombre de billes du sac reste", 3, view.bag.length);
   run("vue publique : sans hasard de la partie", null, view.rngState);
-  run("vue publique : une copie, l'état n'est pas touché", 3, state.bag.length);
+  run.same("vue publique : une copie, l'état n'est pas touché", ["agate", "mica", "giant"], state.bag);
 
   // Un joueur espion, ajouté le temps du test : ce que chaque joueur reçoit, c'est
   // une vue, jamais l'état.
@@ -263,7 +282,6 @@ function checkGreedy(run) {
   }
   const firstPlan = bestPlan(publicView(first), impactOnly);
   run("glouton, premier tour : le meilleur remplissage, partiel compris", firstBest, firstPlan.impact);
-  run.same("glouton, premier tour : ici, les trois emplacements", [...SLOTS].sort(), firstPlan.choices.map((choice) => choice.slot).sort());
   // Un triangle partiel s'envisage : une main d'une bille au premier tour donne un plan d'une pose.
   const single = { ...first, hand: first.hand.slice(0, 1) };
   run("glouton, premier tour : une seule bille, une seule pose", 1, bestPlan(publicView(single), impactOnly).choices.length);
@@ -272,8 +290,7 @@ function checkGreedy(run) {
 // La valeur d'une bille gagnée en main : sans elle, une bille qui pioche ne vaut rien
 // pour le glouton ; avec elle, il la joue quand elle rapporte plus que l'Impact perdu.
 function checkDrawnValue(run) {
-  run("bille gagnée : la valeur par défaut, mesurée sur la référence", 12.68, MARBLES_DRAWN_VALUE);
-  run("bille gagnée : dite dans la description du joueur", true, PLAYERS.greedy.describe({}).includes("12,68"));
+  run("bille gagnée : la valeur par défaut, dite dans la description du joueur", true, PLAYERS.greedy.describe({}).includes(frNumber(MARBLES_DRAWN_VALUE)));
   // Le Tic de l'œil-de-chat pioche : une pose sur un emplacement occupé.
   const view = publicView(buildState({ turn: 4, triangle: { leftBase: "clay", rightBase: "glass", apex: null }, hand: ["cats_eye", "agate"], bag: ["tiger", "giant"] }));
   const greedy = bestPlan(view, { drawnValue: 100 });
@@ -284,12 +301,16 @@ function checkDrawnValue(run) {
   run("bille gagnée : valeur négative refusée", true, throws(() => PLAYERS.greedy.startGame({ seed: 1, options: { drawnValue: -1 } })));
 
   // La simulation compte les pioches d'effets, les régénérations et les lancers.
-  const summary = summarize(simulate({ games: 60, seed: 5, player: "greedy" }));
+  const summary = summarize(simulate({ games: 30, seed: 5, player: "greedy" }));
   run("simulation : des billes piochées par des effets", true, summary.draws.byEffect > 0);
   run("simulation : régénérations en cours de tour, comprises dans le total", true, summary.draws.midTurnRegenerations <= summary.draws.regenerations);
   run("simulation : jamais plus de lancers que la limite", true, summary.throwsPerTurn > 0 && summary.throwsPerTurn <= MARBLES_SETTINGS.throwsPerTurn);
-  run("simulation : le mica fait piocher", true, summary.marbles.find((marble) => marble.id === "mica").drawn > 0);
-  run("simulation : l'argile ne fait jamais piocher", 0, summary.marbles.find((marble) => marble.id === "clay").drawn);
+  // Les pioches d'effets reviennent aux billes qui ont une Pioche, jamais aux autres.
+  run.same(
+    "simulation : seules les billes qui ont une Pioche font piocher",
+    [],
+    summary.marbles.filter((marble) => marble.drawn > 0 && !drawsSomewhere(MARBLE_TYPES[marble.id])).map((marble) => marble.id)
+  );
 }
 
 function checkSimulation(run) {
@@ -305,14 +326,14 @@ function checkSimulation(run) {
 
   // Déterminisme : mêmes paramètres, même rapport ; une autre graine, un autre.
   const report = (seed) => {
-    const result = simulate({ games: 30, seed, player: "greedy", bagMode: { kind: "random", size: 10, maxCopies: 2 } });
+    const result = simulate({ games: 10, seed, player: "greedy", bagMode: { kind: "random", size: 10, maxCopies: 2 } });
     return buildReport({ params: result.params, summary: summarize(result) });
   };
   run.same("déterminisme : même rapport, au caractère près", report(5), report(5));
   run("déterminisme : une autre graine change le rapport", false, JSON.stringify(report(5)) === JSON.stringify(report(6)));
 
   // Surcharges : prises en compte, le module de réglages intact.
-  const short = simulate({ games: 20, seed: 2, player: "greedy", settings: { turnCount: 4, drawPerTurn: 2, maxHandSize: 6, firstTurnDraw: 6 } });
+  const short = simulate({ games: 10, seed: 2, player: "greedy", settings: { turnCount: 4, drawPerTurn: 2, maxHandSize: 6, firstTurnDraw: 6 } });
   run("surcharge : 4 tours", true, short.games.every((game) => game.turns === 4));
   run.same("surcharge : réglages par défaut intacts", settingsBefore, MARBLES_SETTINGS);
   run("surcharge : réglage inconnu refusé", true, throws(() => simulate({ games: 1, settings: { tours: 3 } })));
@@ -333,7 +354,7 @@ function checkSimulation(run) {
   // Une partie se rejoue à l'identique, seule, depuis son index.
   run.same("partie : rejouée seule, même relevé", results.greedy.games[17], playGame({ ...results.greedy.params, index: 17 }));
   run("centiles : interpolation", 2.5, percentile([1, 2, 3, 4], 50));
-  run("ids des billes : la table", 13, MARBLE_IDS.length);
+  run.same("ids des billes : ceux de la table, dans son ordre", Object.keys(MARBLE_TYPES), MARBLE_IDS);
 }
 
 function checkReportAndExport(run) {
