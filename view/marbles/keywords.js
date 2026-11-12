@@ -20,7 +20,7 @@ import { nameRef, t } from "../../data/i18n/index.js";
 // ou undefined s'il n'y a pas de bille sous le curseur. Noms et descriptions passent
 // en références, jamais en textes déjà traduits : la ligne se rend dans la langue du
 // moment où elle se dit.
-export function keywordLines(marble, rules) {
+function keywordLines(marble, rules) {
   if (marble === undefined || marble === null) return [{ key: "marbles.keyword.no_marble" }];
   const keywords = rules.keywordsOf(marble);
   if (keywords.length === 0) return [{ key: "marbles.keyword.none" }];

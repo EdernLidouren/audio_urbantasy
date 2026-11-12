@@ -205,12 +205,41 @@ vérifications des MÉCANISMES ne passent donc jamais par elles :
 
 Les domaines : `marbles` (règles), `marbles-pocket` (le pot), `marbles-choice` (cibles au
 choix et Éjecter), `marbles-bus`, `marbles-tally`, `marbles-forecast`, `marbles-view`,
-`marbles-sequence`, `marbles-tools`, `marbles-content`.
+`marbles-sequence`, `marbles-tools`, `marbles-content`, `marbles-screen` (l'écran, ci-dessous).
+
+## Vérifier l'écran au terminal
+
+```
+node tools/run-checks.js marbles-screen
+```
+
+Domaine `marbles-screen` (`core/checks/marbles-screen.check.js`) : l'écran des billes
+joué au clavier sous Node, par son banc d'essai (`core/checks/fixtures/screen-bench.js`).
+Le banc ouvre l'écran sur la vraie pile d'écrans, sur un état de la table des
+vérifications, et lui passe son monde extérieur (`io`, en-tête de
+`view/marbles/screen.js`) : les annonces relevées, les textes par leurs clés, les sons
+relevés sans rien jouer, une horloge FACTICE avancée à la main, une minuterie qui ne part
+jamais. Les menus que l'écran ouvre gardent leurs vrais modules ; un faux `document`
+relève ce qu'ils annoncent.
+
+```
+const bench = openScreenBench(rules, state);   // l'écran ouvert sur `state`
+bench.key("Enter"); bench.key("r", ["shift"]); // des touches, au sommet de la pile
+bench.advance(500);                            // 500 ms d'horloge, un battement
+bench.said; bench.sounds; bench.game(); bench.top(); bench.close();
+```
+
+Il vérifie : l'ouverture, prendre et poser (sélection, confirmation, Échap), l'échange et
+son refus, la séquence de résolution (une étape par battement, Retour arrière,
+blocage, passage et sa garde contre un second Entrée), un menu qui fige la séquence, un
+choix au milieu d'une résolution, la fin de partie. Domaine `nodeOnly`
+(`core/checks/index.js`) : dans la console du jeu, `runChecks()` le saute et le dit,
+pour ne jamais écrire dans les vraies régions d'annonce.
 
 ## Tester l'écran dans le navigateur
 
-Les outils ci-dessus passent par le réducteur et les phrases de l'écran, pas par l'écran
-lui-même (touches, curseur, séquence en temps réel). Pour lui : le kit de test en jeu
+Le banc d'essai (domaine `marbles-screen`) joue les touches de l'écran, mais sans le
+lecteur d'écran, le son ni le vrai temps réel. Pour eux : le kit de test en jeu
 (`tools/test-kit.js`, mode d'emploi en tête), `startMarbles`, qui ouvre l'écran des
 billes sur une partie neuve à graine imposée, ou sur un état construit (le format de
 `tools/marbles/state-builder.js`) après des actions déjà jouées : par exemple, une

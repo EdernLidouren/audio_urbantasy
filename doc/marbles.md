@@ -36,7 +36,7 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
 | `tools/marbles/` | La boîte à outils : partie au terminal, cas construits, simulateur, annexe du document de règles (`doc/marbles-tools.md`) |
 | `doc/marbles-rules.md` | Les règles pour un joueur et pour le concepteur, sans code ; son annexe des billes est générée |
 | `doc/marbles-backlog.md` | Les points en suspens, une ligne chacun, avec leur origine |
-| `core/checks/marbles.check.js`, `marbles-pocket.check.js`, `marbles-choice.check.js`, `marbles-bus.check.js`, `marbles-tally.check.js`, `marbles-forecast.check.js`, `marbles-view.check.js`, `marbles-sequence.check.js`, `marbles-tools.check.js`, `marbles-content.check.js` ; leur table de billes, `core/checks/fixtures/marbles.js` | Vérifications (organisation : `doc/marbles-tools.md`, « Les vérifications du jeu des billes ») |
+| `core/checks/marbles.check.js`, `marbles-pocket.check.js`, `marbles-choice.check.js`, `marbles-bus.check.js`, `marbles-tally.check.js`, `marbles-forecast.check.js`, `marbles-view.check.js`, `marbles-sequence.check.js`, `marbles-tools.check.js`, `marbles-content.check.js`, `marbles-screen.check.js` ; leur table de billes, `core/checks/fixtures/marbles.js`, et le banc d'essai de l'écran, `core/checks/fixtures/screen-bench.js` | Vérifications (organisation : `doc/marbles-tools.md`, « Les vérifications du jeu des billes ») |
 
 ## Déroulement d'un tour
 
@@ -1386,7 +1386,7 @@ pile reçoit le clavier).
 ## Tester
 
 ```
-node tools/run-checks.js marbles marbles-pocket marbles-choice marbles-bus marbles-tally marbles-forecast marbles-view marbles-sequence marbles-tools marbles-content detail-card
+node tools/run-checks.js marbles marbles-pocket marbles-choice marbles-bus marbles-tally marbles-forecast marbles-view marbles-sequence marbles-tools marbles-content marbles-screen detail-card
 node tools/marbles/play.js --seed 42
 ```
 

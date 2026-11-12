@@ -66,6 +66,12 @@
 // qu'une fois, et la séquence ne dit qu'une étape par battement : au retour au
 // premier plan, ni étape sautée ni annonces en rafale. Un menu ouvert par-dessus
 // (aide, abandon) fige tout, comme avant : seul l'écran du sommet reçoit le temps.
+//
+// LE MONDE EXTÉRIEUR (`io`, facultatif) : ce que l'écran annonce, ses textes, ses
+// sons, son horloge et sa minuterie. Par défaut les vrais (le jeu, main.js, n'en
+// passe aucun) ; le banc d'essai des vérifications (core/checks/fixtures/
+// screen-bench.js) les remplace pour jouer l'écran sous Node, sans DOM ni audio. Les
+// menus ouverts par l'écran (confirmation, aide, piles) gardent leurs vrais modules.
 
 import { announce } from "../../lib/announce.js";
 import { activeScreen, popScreen } from "../../lib/screens.js";
@@ -171,11 +177,55 @@ const DEBUG_ACTIONS = new Set(["placesDemo", "tally"]);
 // de lui-même en arrière-plan. Un invariant technique, pas un réglage de jeu.
 const REAL_TIME_PULSE_MS = 50;
 
+// Les sons de l'écran, tels qu'il les appelle : ce qu'un `io.sounds` peut remplacer.
+const SCREEN_SOUNDS = {
+  advanceRolls,
+  closeTableReverb,
+  openTableReverb,
+  playCue,
+  playFocusBeacon,
+  playMenuSound,
+  preloadMarblesAudio,
+  startMarblesMusic,
+  stopFocusBeacon,
+  stopMarblesMusic,
+  stopRolls,
+};
+
+// Le monde extérieur par défaut, le vrai (voir l'en-tête).
+const REAL_IO = {
+  announce,
+  announceMenuLine,
+  t,
+  now: () => performance.now(),
+  setInterval: (fn, ms) => setInterval(fn, ms),
+  clearInterval: (id) => clearInterval(id),
+};
+
 // `rules` : les règles du jeu, liées à la table des billes une fois pour toutes
 // par main.js (core/marbles-rules.js) ; l'écran les passe à ce qui en a besoin.
 // `openKeyHelp(screen)` : ouvre l'aide des touches de cet écran (main.js, qui connaît
 // les sections globales de l'aide), pour la rubrique « Les touches » de l'aide H.
-export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () => {} } = {}) {
+// `io` : le monde extérieur (voir l'en-tête), { announce, announceMenuLine, t, now,
+// setInterval, clearInterval, sounds }, chacun facultatif ; `sounds` remplace tout ou partie de
+// SCREEN_SOUNDS.
+export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () => {}, io = {} } = {}) {
+  // Ces noms masquent les imports du même nom : le corps de l'écran les appelle tels
+  // quels, vrais ou remplacés.
+  const { announce, announceMenuLine, t, now, setInterval, clearInterval } = { ...REAL_IO, ...io };
+  const {
+    advanceRolls,
+    closeTableReverb,
+    openTableReverb,
+    playCue,
+    playFocusBeacon,
+    playMenuSound,
+    preloadMarblesAudio,
+    startMarblesMusic,
+    stopFocusBeacon,
+    stopMarblesMusic,
+    stopRolls,
+  } = { ...SCREEN_SOUNDS, ...io.sounds };
   let cursor = INITIAL_CURSOR;
   // Le curseur secondaire, dans la fiche de ce qui est sous le curseur principal.
   let detail = 0;
@@ -186,7 +236,7 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
   let sequence = null;
   let spoken = "";
   // Jusqu'à quand un Entrée qui suit un saut de la séquence est ignoré
-  // (performance.now, MARBLES_SETTINGS.skipGuardMs).
+  // (`now`, MARBLES_SETTINGS.skipGuardMs).
   let skipGuardUntil = -Infinity;
   let started = false;
   // Les messages de jeu du tour en cours et du précédent (view/marbles/history.js).
@@ -229,7 +279,8 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
   // déjà plus loin (une étape de séquence) ; par défaut, la main actuelle.
   function playEventSounds(events, { shuffleFirst = false, placeFrom, handSize } = {}) {
     const { triangle, hand } = getGame();
-    const cues = eventCues(events, { triangleAfter: triangle, handAfter: hand, handSize, shuffleFirst, placeFrom });
+    // Les tailles des billes, pour la force des chocs : celles de la table de l'écran.
+    const cues = eventCues(events, { triangleAfter: triangle, handAfter: hand, handSize, shuffleFirst, placeFrom }, MARBLES_SETTINGS, { types: rules.types });
     soundQueue = enqueueCues(soundQueue, cues);
     flushSounds(0);
   }
@@ -623,8 +674,8 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
       // Passer coupe aussi les sons encore à venir des étapes passées.
       silenceSounds();
       follow(skipSequence(sequence));
-      skipGuardUntil = performance.now() + MARBLES_SETTINGS.skipGuardMs;
-    } else if (performance.now() < skipGuardUntil) {
+      skipGuardUntil = now() + MARBLES_SETTINGS.skipGuardMs;
+    } else if (now() < skipGuardUntil) {
       // Un second Entrée trop proche du saut : la dernière étape n'a pas pu être
       // entendue (une question, la fin de partie). Ignoré, sans son.
     } else if (isOver()) popScreen();
@@ -863,7 +914,7 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
 
   // `screen` : cet écran, pour savoir s'il est au sommet de la pile.
   let screen = null;
-  const realTime = createRealTimeDriver({ advance: advanceRealTime, isActive: () => activeScreen() === screen });
+  const realTime = createRealTimeDriver({ advance: advanceRealTime, isActive: () => activeScreen() === screen, now });
   let pulseTimer = null;
 
   screen = {

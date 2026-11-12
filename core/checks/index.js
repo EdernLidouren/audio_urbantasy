@@ -18,11 +18,16 @@
 // la sienne.
 // Les domaines des billes (marbles*) jouent la table figée de ./fixtures/, jamais
 // les vraies billes ; celles-ci n'ont que leur contrat, domaine marbles-content
-// (doc/marbles-tools.md, « Les vérifications du jeu des billes »).
+// (doc/marbles-tools.md, « Les vérifications du jeu des billes »). L'écran des
+// billes se joue au clavier par son banc d'essai, ./fixtures/screen-bench.js
+// (domaine marbles-screen, `nodeOnly`).
 //
 // Ajouter un domaine : un fichier ./<domaine>.check.js qui exporte par
 // défaut `function check<Domaine>(run)`, et sa ligne dans SUITES (l'ordre
-// de SUITES est l'ordre d'exécution et d'affichage). Un mécanisme PORTABLE
+// de SUITES est l'ordre d'exécution et d'affichage). Un domaine marqué
+// `nodeOnly` ne tourne qu'au terminal : dans la console du jeu, il est sauté, et
+// une ligne le dit (le banc d'essai de l'écran des billes, marbles-screen,
+// écrirait sinon dans les vraies régions d'annonce, que NVDA lirait). Un mécanisme PORTABLE
 // de lib/ range ses vérifications dans lib/checks/<domaine>.check.js, même
 // forme, et passe par ce même point d'entrée (domaines "i18n", "check"...).
 
@@ -70,6 +75,7 @@ import checkMarblesView from "./marbles-view.check.js";
 import checkMarblesSequence from "./marbles-sequence.check.js";
 import checkMarblesTools from "./marbles-tools.check.js";
 import checkMarblesContent from "./marbles-content.check.js";
+import checkMarblesScreen from "./marbles-screen.check.js";
 // Domaines de lib/ (mécanismes portables), lancés par le même point
 // d'entrée : une seule commande, un seul récapitulatif.
 import checkI18n from "../../lib/checks/i18n.check.js";
@@ -126,6 +132,7 @@ const SUITES = [
   { name: "marbles-sequence", check: checkMarblesSequence },
   { name: "marbles-tools", check: checkMarblesTools },
   { name: "marbles-content", check: checkMarblesContent },
+  { name: "marbles-screen", check: checkMarblesScreen, nodeOnly: true },
   { name: "i18n", check: checkI18n },
   { name: "i18n-content", check: checkI18nContent },
   { name: "input", check: checkInput },
@@ -140,8 +147,19 @@ const SUITES = [
 // Noms des domaines, dans l'ordre d'exécution.
 export const CHECK_DOMAINS = SUITES.map((suite) => suite.name);
 
+// Vrai sous Node (le terminal), faux dans le navigateur.
+const IN_NODE = typeof process !== "undefined" && process.versions?.node !== undefined;
+
 // Lance les vérifications (toutes, ou les domaines nommés par `only`) ;
-// rend `{ passed, total, domains }` (voir lib/check.js/runCheckSuites).
+// rend `{ passed, total, domains }` (voir lib/check.js/runCheckSuites). Hors de
+// Node, les domaines `nodeOnly` sont sautés, et une ligne le dit.
 export function runChecks(only, options = {}) {
-  return runCheckSuites(SUITES, { only, ...options });
+  const log = options.log ?? console.log;
+  const skipped = IN_NODE ? [] : SUITES.filter((suite) => suite.nodeOnly).map((suite) => suite.name);
+  const wanted = only === undefined ? undefined : (Array.isArray(only) ? only : [only]).filter((name) => !skipped.includes(name));
+  if (skipped.length > 0) log(`Vérifs : sauté(s) hors du terminal (node tools/run-checks.js) : ${skipped.join(", ")}.`);
+  return runCheckSuites(
+    SUITES.filter((suite) => !skipped.includes(suite.name)),
+    { ...options, only: wanted }
+  );
 }
