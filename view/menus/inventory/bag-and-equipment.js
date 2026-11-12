@@ -12,7 +12,7 @@ import { withPausedBeacons } from "../../paused-beacons.js";
 import { makeMenuScreen, createHoldRepeat, heldStep, shouldAnnounceAdjustment } from "../../../lib/menu.js";
 import { announce, stripTrailingPeriod } from "../../../lib/announce.js";
 import { playMenuSound } from "../../menu-sounds.js";
-import { ITEM_REGISTRY } from "../../../core/items.js";
+import { ITEM_REGISTRY } from "../../../config/items-values.js";
 import { EQUIPMENT_SLOTS } from "../../../core/equipment-slots.js";
 import { resolveAction, defineBindings } from "../../../lib/input.js";
 import { TUNING_DEFAULTS } from "../../../config/tuning-values.js";
@@ -234,7 +234,7 @@ export function buildEquipmentTabScreen(getWorldView, getSession) {
 }
 
 // Actions disponibles pour UNE entrée de sac — "Équiper" seulement si
-// equippable (core/items.js/ITEM_REGISTRY), TOUJOURS "Poser". Extensibilité
+// equippable (config/items-values.js/ITEM_REGISTRY), TOUJOURS "Poser". Extensibilité
 // anti-drop RÉSERVÉE, PAS construite : un futur flag `droppable` sur
 // ITEM_REGISTRY (défaut true) pourrait un jour retirer "Poser" de cette
 // liste pour un objet donné (ex. un objet de quête vital) — non codé ici,

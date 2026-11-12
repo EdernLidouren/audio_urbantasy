@@ -1,6 +1,6 @@
 // Moteur MÉTÉO — machine à états GLOBALE (une seule météo pour toute la
 // ville/partie), pilotée par le TEMPS DE JEU (voir
-// core/time.js). PRNG seedé (core/rng.js) -> déterministe : même seed +
+// core/time.js). PRNG seedé (lib/rng.js) -> déterministe : même seed +
 // même succession d'avancées de temps -> même succession météo, toujours.
 //
 // session.weather = { state, nextTransitionAt, rngState } : l'état
@@ -22,7 +22,7 @@
 // Pas encore de contenu qui apparaisse selon la météo.
 
 import { WEATHER_STATES, DEFAULT_WEATHER_STATE } from "../config/weather-values.js";
-import { createSeed, nextRandom, pickWeighted } from "./rng.js";
+import { createSeed, nextRandom, pickWeighted } from "../lib/rng.js";
 import { INITIAL_TIME } from "./time.js";
 
 // Valide la table météo — ÉTAT PAR ÉTAT (durée cohérente, au moins une

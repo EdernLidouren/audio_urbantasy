@@ -10,7 +10,7 @@
 // PUR : reçoit une clé + un contexte déjà construit par l'appelant (voir
 // view/interaction.js/actionContext) — ne lit jamais l'horloge réelle ni
 // aucun état global lui-même. MÊME FORME que le contexte d'évaluation de
-// condition (core/presence.js/evaluateCondition) — point d'extension
+// condition (core/conditions.js/evaluateCondition) — point d'extension
 // délibéré : le niveau RICHE (fragments choisis par condition, voir
 // doc/entity-model.md) réutilisera CE MÊME contexte pour filtrer ses
 // fragments, jamais une seconde forme à maintenir en parallèle.

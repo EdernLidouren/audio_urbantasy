@@ -22,7 +22,7 @@ import { advanceTick } from "../advance.js";
 const stepOnce = (session) => advanceTick(session, 0).session;
 import { SAVE_VERSION, serializeGame, deserializeGame } from "../save.js";
 import { pickupEntity, lootEntity, lootUniqueEntity, lootEntitySpawn } from "../money.js";
-import { createSeed } from "../rng.js";
+import { createSeed } from "../../lib/rng.js";
 import { MAX_EPHEMERALS } from "../../config/ephemerals.js";
 import { TUNING_DEFAULTS } from "../../config/tuning-values.js";
 
@@ -245,7 +245,7 @@ export default function checkEphemerals(run) {
     );
   }
 
-  // Rebouchage nextEphemeralId (core/save.js/backfillWorld) : une sauvegarde
+  // Rebouchage nextEphemeralId (core/save-migrate.js/backfillWorld) : une sauvegarde
   // antérieure aux entités éphémères n'a jamais eu cette clé — sans
   // rebouchage, spawnEphemeral calculerait undefined + 1 = NaN, et TOUT
   // éphémère suivant recevrait le même id ("ephemeral-NaN"), collision
@@ -346,7 +346,7 @@ export default function checkEphemerals(run) {
   }
   // Une entité DORMANTE (règle de présence non couvrante à cet instant) ne
   // compte JAMAIS comme obstacle, même blocksMovement:true — cohérent avec
-  // isBlocking partout ailleurs (core/presence.js). spread:0 isole la
+  // isBlocking partout ailleurs (core/conditions.js). spread:0 isole la
   // vérification de tout aléa : le seul candidat possible est sourceX lui-même.
   {
     const dormantObstacle = [

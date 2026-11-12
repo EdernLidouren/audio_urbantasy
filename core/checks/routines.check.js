@@ -10,7 +10,7 @@ import { tick } from "../actions.js";
 import { reduce } from "../reduce.js";
 import { advanceTime, minuteOfHour, hourOfDay } from "../time.js";
 import { TIME_CONFIG } from "../../config/time-values.js";
-import { isPresent, resolveEntityRules } from "../presence.js";
+import { isPresent, resolveEntityRules } from "../conditions.js";
 import { throws } from "../../lib/check.js";
 import { TICK_MS } from "../../lib/loop.js";
 
@@ -167,7 +167,7 @@ export default function checkRoutines(run) {
   // présence, voir resolveEntityRules) et corrige `.behavior`, mais la
   // PRÉSENCE de CE MÊME tick a déjà été calculée contre l'ancien
   // `.behavior` (encore "goto") -> encore dormante PENDANT UN TICK, puis
-  // spontanément corrigée au suivant (voir core/presence.js/
+  // spontanément corrigée au suivant (voir core/conditions.js/
   // evaluateArrived). Documenté ici plutôt que masqué par une boucle large.
   // Détour par la nuit profonde (1h) AVEC un tick réel avant de sauter à
   // 8h : nécessaire pour que `ruleActive` enregistre RÉELLEMENT la fenêtre
@@ -382,7 +382,7 @@ export default function checkRoutines(run) {
 
   // --- "Le bar" : trois PNJ, MÊME règle de départ "vers 6h" à spread,
   // partent de façon ÉCHELONNÉE (voir core/temporal-spread.js,
-  // core/presence.js/evaluateTimeRange) — test D'INTÉGRATION (via
+  // core/conditions.js/evaluateTimeRange) — test D'INTÉGRATION (via
   // reduce()/resolveEntityRules(), pas l'évaluateur isolé comme plus haut)
   // qui prouve que le mécanisme fonctionne de bout en bout sur une scène
   // réelle à plusieurs entités partageant un contenu identique.

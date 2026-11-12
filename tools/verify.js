@@ -13,7 +13,7 @@
 //   4. parité i18n fr/en (tools/check_i18n_parity.py, avec Python) ;
 //   5. audit de la doc (tools/doc-audit.js) : fichiers, identifiants et
 //      sections cités par la doc et les commentaires ;
-//   6. document de règles des billes (tools/marbles/rules-doc.js) : son annexe
+//   6. document de règles des billes (marbles/tools/rules-doc.js) : son annexe
 //      générée à jour, chaque mot-clé déclaré présent avec sa description ;
 //   7. exports sans usage (tools/dead-exports.js) : un RAPPORT, jamais un
 //      échec — ses comptes sur une ligne, le détail en lançant l'outil.
@@ -109,7 +109,7 @@ const STEPS = [
     run: () => runStep("python", ["tools/check_i18n_parity.py"], { env: { PYTHONUTF8: "1" }, summary: /synchrone|divergence/ }),
   },
   { name: "audit de la doc", run: () => runStep(process.execPath, ["tools/doc-audit.js"], { summary: /^Audit de la doc/ }) },
-  { name: "règles des billes", run: () => runStep(process.execPath, ["tools/marbles/rules-doc.js"], { summary: /^Document de règles/ }) },
+  { name: "règles des billes", run: () => runStep(process.execPath, ["marbles/tools/rules-doc.js"], { summary: /^Document de règles/ }) },
   { name: "exports sans usage", run: () => runStep(process.execPath, ["tools/dead-exports.js"], { summary: /^Exports sans usage/ }) },
 ];
 

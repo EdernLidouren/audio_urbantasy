@@ -1,5 +1,5 @@
 // Vérifications du core — domaine « dormancy ». Dormance FORCÉE par l'effet
-// "dormantUntil" (core/variables.js, core/presence.js/isForcedDormant) :
+// "dormantUntil" (core/variables.js, core/conditions.js/isForcedDormant) :
 // échéance au prochain début d'heure (core/time.js/nextHourStart),
 // validation, dormance observée au tick, réveil à l'échéance, entité sans
 // règle de présence, survie au rechargement et au retour dans le monde.
@@ -13,7 +13,7 @@ import { createInitialState, getActiveWorld, applyEntityActionEffects } from "..
 import { tick } from "../actions.js";
 import { reduce } from "../reduce.js";
 import { nextHourStart, MINUTES_PER_DAY } from "../time.js";
-import { isForcedDormant, tracksPresence } from "../presence.js";
+import { isForcedDormant, tracksPresence } from "../conditions.js";
 import { serializeGame, deserializeGame, resetVisitVariables } from "../save.js";
 import { returnStartledEntities } from "../startle.js";
 import { auditNonSerializable, throws } from "../../lib/check.js";

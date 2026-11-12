@@ -18,7 +18,7 @@
 // Montants d'argent : entiers STRICTEMENT positifs. Une action ne retire
 // jamais d'argent ; ce serait un effet dédié, le jour où il en faut un.
 
-import { ITEM_REGISTRY } from "./items.js";
+import { ITEM_REGISTRY } from "../config/items-values.js";
 
 // Champs permis sur TOUTE action, quel que soit son kind (voir
 // doc/scripting.md/"Conditions d'action", "Effets d'action", "Confirmation

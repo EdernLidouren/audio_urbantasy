@@ -13,8 +13,10 @@ import { makeMenuScreen } from "../../../lib/menu.js";
 import { announce, stripTrailingPeriod } from "../../../lib/announce.js";
 import { randomRate } from "../../../lib/audio.js";
 import { TUNING_DEFAULTS } from "../../../config/tuning.js";
-import { IMPROVEMENT_REGISTRY, orderedImprovementIds } from "../../../core/improvements.js";
-import { EMOTE_REGISTRY, orderedEmoteIds } from "../../../core/emotes.js";
+import { orderedImprovementIds } from "../../../core/improvements.js";
+import { IMPROVEMENT_REGISTRY } from "../../../config/improvements-values.js";
+import { orderedEmoteIds } from "../../../core/emotes.js";
+import { EMOTE_REGISTRY } from "../../../config/emotes-values.js";
 import { createSoundPreview } from "./sound-preview.js";
 
 // Ligne d'UNE amélioration. Débloquée : "{order} - {nom} : {description}",
@@ -48,7 +50,7 @@ function countKnown(ids, known) {
 // Menu des améliorations : toutes celles du registre, dans leur `order`
 // déclaré. "Débloquée" se lit dans l'ÉTAT RÉEL (session.improvements),
 // JAMAIS via la condition hasImprovement : en mode debug, celle-ci répond
-// toujours vrai (court-circuit, voir core/presence.js), alors que ce menu
+// toujours vrai (court-circuit, voir core/conditions.js), alors que ce menu
 // doit montrer ce que le joueur possède vraiment — sinon impossible de
 // vérifier son état en debug.
 function buildImprovementsMenuScreen(getSession) {

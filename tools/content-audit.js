@@ -63,9 +63,9 @@ import collections from "../collections/index.js";
 import rotations from "../rotations/index.js";
 import { parseScene } from "../core/scene.js";
 import { validateEntityRegistry, entityEffectLists } from "../core/entity-parse.js";
-import { ITEM_REGISTRY } from "../core/items.js";
-import { IMPROVEMENT_REGISTRY } from "../core/improvements.js";
-import { EMOTE_REGISTRY } from "../core/emotes.js";
+import { ITEM_REGISTRY } from "../config/items-values.js";
+import { IMPROVEMENT_REGISTRY } from "../config/improvements-values.js";
+import { EMOTE_REGISTRY } from "../config/emotes-values.js";
 import { collectionNameKey, entryTextKeys } from "../core/collections.js";
 import { validateRotation, rotationTextKey } from "../core/rotation.js";
 import { CITY_MAP_GRID } from "../map/city-map.js";
@@ -73,8 +73,8 @@ import { NEW_GAME } from "../config/new-game.js";
 import { WEATHER_STATES } from "../config/weather-values.js";
 import { PERCEPTION_MUSIC_POOL, PERCEPTION_AMBIENCE_POOL } from "../config/perception.js";
 import { SHOP_CATALOGS, DISPLAY_ARTICLES } from "../config/shop-values.js";
-import { MARBLE_SIZES, MARBLE_SOUND_PROFILES, MARBLES_AUDIO } from "../config/marbles-values.js";
-import { validateMarblesContent } from "../core/marbles-content.js";
+import { MARBLE_SIZES, MARBLE_SOUND_PROFILES, MARBLES_AUDIO } from "../marbles/config/values.js";
+import { validateMarblesContent } from "../marbles/core/content.js";
 import { LOCALE_TABLES } from "../data/i18n/index.js";
 import { configureAssetManifest, hasAsset } from "../lib/assets.js";
 import { bindingTableIds, bindingTable, needsKeyName, keyNameKey } from "../lib/input.js";
@@ -88,9 +88,9 @@ import "../view/menus/city-map-menu.js";
 import "../view/menus/inventory-menu.js";
 import "../view/menus/inventory/bag-and-equipment.js";
 import "../view/menus/shop-quantity-list.js";
-import "../view/marbles/screen.js";
-import "../view/marbles/pile-screen.js";
-import MARBLE_TYPES from "../marbles/types/index.js";
+import "../marbles/view/screen.js";
+import "../marbles/view/pile-screen.js";
+import MARBLE_TYPES from "../marbles/content/types/index.js";
 
 const KEY_PATTERN = /^[a-z][a-zA-Z0-9_]*(\.[a-zA-Z0-9_]+)+$/;
 
@@ -105,7 +105,7 @@ const NAME_SLOTS = [
   { template: "interaction.travelConfirm", param: "scene", names: () => MAIN_SCENE_IDS.map((id) => `scene.${id}.name`) },
   // view/emotes.js/chooseShortcut : l'émote placée en raccourci.
   { template: "emote.shortcutSet", param: "emote", names: () => Object.values(EMOTE_REGISTRY).map((emote) => emote.nameKey) },
-  // view/marbles/narration.js : la bille qui joue son Tic ou son Éjection, et
+  // marbles/view/narration.js : la bille qui joue son Tic ou son Éjection, et
   // celle qui part à la défausse.
   ...[
     "marbles.place.hit",
@@ -119,7 +119,7 @@ const NAME_SLOTS = [
     param: "marble",
     names: () => Object.keys(MARBLE_TYPES).map((id) => `marble.${id}.name`),
   })),
-  // view/marbles/narration.js : la bille qui éjecte et celle qu'elle chasse (Éjecter),
+  // marbles/view/narration.js : la bille qui éjecte et celle qu'elle chasse (Éjecter),
   // la bille chassée prévue, la bille choisie.
   ...[
     ["marbles.event.eject", "source"],
@@ -132,7 +132,7 @@ const NAME_SLOTS = [
     param,
     names: () => Object.keys(MARBLE_TYPES).map((id) => `marble.${id}.name`),
   })),
-  // view/marbles/narration.js : le calibre d'une condition, d'une source de montant ou
+  // marbles/view/narration.js : le calibre d'une condition, d'une source de montant ou
   // d'un filtre de cible.
   ...["marbles.condition.sizeAt", "marbles.effect.per_active_size", "marbles.target.all_size"].map((template) => ({
     template,
@@ -364,14 +364,14 @@ export async function auditContent() {
 
   // Jeu des billes : chaque son cité (profils des billes, musique, brassage)
   // existe dans le manifeste. Le profil de chaque bille est validé au chargement
-  // de view/marbles/sounds.js.
+  // de marbles/view/sounds.js.
   checkStrings("billes, sons", { profiles: MARBLE_SOUND_PROFILES, audio: MARBLES_AUDIO });
-  // Les billes elles-mêmes (marbles/types/) et le sac de test, comme au démarrage
+  // Les billes elles-mêmes (marbles/content/types/) et le sac de test, comme au démarrage
   // du jeu.
   try {
     validateMarblesContent(MARBLE_TYPES);
   } catch (error) {
-    report("billes", "marbles/types", "table invalide", error.message);
+    report("billes", "marbles/content/types", "table invalide", error.message);
   }
 
   // Collections : leurs clés sont DÉDUITES des ids (voir core/collections.js),

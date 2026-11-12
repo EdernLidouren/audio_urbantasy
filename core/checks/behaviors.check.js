@@ -8,7 +8,7 @@ import { parseScene } from "../scene.js";
 import { createInitialState, getActiveWorld, BODY_RADIUS } from "../state.js";
 import { tick } from "../actions.js";
 import { reduce } from "../reduce.js";
-import { evaluateCondition, isPresent, resolveEntityRules } from "../presence.js";
+import { evaluateCondition, isPresent, resolveEntityRules } from "../conditions.js";
 import { DEFAULTS as WANDER_DEFAULTS } from "../behaviors/wander.js";
 import { throws } from "../../lib/check.js";
 import { TICK_MS } from "../../lib/loop.js";
@@ -520,7 +520,7 @@ export default function checkBehaviors(run) {
   });
   run("goto : arriveDistance invalide (<=0) rejeté au chargement", true, invalidArriveDistanceRejected);
 
-  // --- Triggers de comportement (voir core/presence.js) ---
+  // --- Triggers de comportement (voir core/conditions.js) ---
   // L'évaluateur de conditions ÉLARGI : une règle porte { when, effects }.
   // "arrived" (nouvelle condition, événementielle) et l'effet "behavior"
   // (nouveau, pose un comportement sur la BASCULE de sa condition, jamais
@@ -583,7 +583,7 @@ export default function checkBehaviors(run) {
     evaluateCondition({ type: "arrived" }, { entity: { behavior: { kind: "goto" }, gotoArrived: true } })
   );
   // Non-régression du filet anti-péremption (voir header de evaluateArrived
-  // dans core/presence.js) : gotoArrived reste posé pour toujours par
+  // dans core/conditions.js) : gotoArrived reste posé pour toujours par
   // goto.js, mais une fois le comportement REMPLACÉ par autre chose que
   // "goto", "arrived" redevient FAUSSE — sans ce garde-fou, une entité
   // resterait bloquée dormante pour toujours après sa toute première

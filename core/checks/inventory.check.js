@@ -8,11 +8,13 @@ import { parseScene } from "../scene.js";
 import { createInitialState, getActiveWorld, switchSide, removeEntity } from "../state.js";
 import { addMoney, pickupEntity, lootUniqueEntity } from "../money.js";
 import { addItem, pickupItemEntity, removeItem, dropItem } from "../bag.js";
-import { ITEM_REGISTRY, itemProps, validateItemRegistry, itemSounds } from "../items.js";
+import { itemProps, validateItemRegistry, itemSounds } from "../items.js";
+import { ITEM_REGISTRY } from "../../config/items-values.js";
 import { gaitOf, equipItem, unequipItem } from "../equipment.js";
 import { EQUIPMENT_SLOTS, createEmptyEquipment, equippedTags } from "../equipment-slots.js";
-import { TAG_REGISTRY, tagProps } from "../tags.js";
-import { evaluateCondition } from "../presence.js";
+import { tagProps } from "../tags.js";
+import { TAG_REGISTRY } from "../../config/tags-values.js";
+import { evaluateCondition } from "../conditions.js";
 import { ownedQuantity } from "../trade.js";
 import { throws } from "../../lib/check.js";
 import { ITEM_START, RAW_SCENE, EMPTY_REGISTRY, buildMoneyScene } from "./helpers.js";
@@ -49,7 +51,7 @@ export default function checkInventory(run) {
   run("argent : pickupEntity sur une entité déjà retirée -> aucun second gain", 7, pickupEntity(afterPickup, "coin-1", 7).money);
   run("argent : pickupEntity sur une entité déjà retirée -> référence INCHANGÉE", afterPickup, pickupEntity(afterPickup, "coin-1", 7));
 
-  // --- Sac d'objets (core/bag.js/addItem + pickupItemEntity, core/items.js/ITEM_REGISTRY) ---
+  // --- Sac d'objets (core/bag.js/addItem + pickupItemEntity, config/items-values.js/ITEM_REGISTRY) ---
   // Deuxième tiers de l'inventaire, même statut que l'argent ci-dessus.
 
   run("sac : ITEM_REGISTRY.apple est empilable", true, itemProps("apple").stackable);
@@ -242,7 +244,7 @@ export default function checkInventory(run) {
     afterEquipBoots.bag.some((entry) => entry.type === afterEquipBoots.equipment.feet.type)
   );
 
-  // --- Tags d'objets (core/tags.js, core/items.js/ITEM_REGISTRY.tags,
+  // --- Tags d'objets (core/tags.js, config/items-values.js/ITEM_REGISTRY.tags,
   // core/equipment-slots.js/equippedTags, condition "hasEquipmentTag") ---
 
   run("tags : registre — military a la bonne clé i18n", "tag.military", tagProps("military").labelKey);
@@ -302,7 +304,7 @@ export default function checkInventory(run) {
 
   // Condition "hasEquipmentTag" — branchée dans l'aiguillage existant
   // (evaluateCondition), lit context.playerEquipment via equippedTags —
-  // PAS context.entity (voir core/presence.js/evaluateHasEquipmentTag,
+  // PAS context.entity (voir core/conditions.js/evaluateHasEquipmentTag,
   // "CLÉ DE CONTEXTE DÉDIÉE, PAS context.entity" : context.entity désigne
   // TOUJOURS l'entité qui PORTE la condition, jamais le joueur — voir
   // variables.check.js).

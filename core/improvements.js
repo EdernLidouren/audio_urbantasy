@@ -1,10 +1,11 @@
-// Registre des AMÉLIORATIONS (improvements) — capacités que le joueur
-// possède ou non, données pures, structuré comme core/tags.js/TAG_REGISTRY :
-// SOURCE DE VÉRITÉ des improvements existantes, valide give/remove/has à
-// l'instar de hasEquipmentTag/tag (voir core/script-parse.js/validateCondition,
-// parseActionEffect). Ajouter une improvement = une entrée ici, jamais une
-// chaîne en dur ailleurs — affichée dans le menu des améliorations, onglet
-// Capacités du menu global (view/menus/inventory-menu.js).
+// AMÉLIORATIONS (improvements) — capacités que le joueur possède ou non. Le
+// registre (config/improvements-values.js/IMPROVEMENT_REGISTRY, la donnée) est la
+// SOURCE DE VÉRITÉ des improvements existantes, validé ici au chargement ; il
+// valide give/remove/has à l'instar de hasEquipmentTag/tag (voir
+// core/script-parse.js/validateCondition, parseActionEffect). Ajouter une
+// improvement = une entrée dans le registre, jamais une chaîne en dur ailleurs —
+// affichée dans le menu des améliorations, onglet Capacités du menu global
+// (view/menus/inventory-menu.js).
 //
 // FLAG SIMPLE pour l'instant (possédée ou non) : un état interne riche (une
 // improvement qui porterait ses propres variables) viendrait s'ajouter SI un
@@ -12,29 +13,7 @@
 // d'abstraction prématurée).
 
 import { rejectUnknownFields } from "../lib/validate.js";
-// `order` (entier >= 1, UNIQUE) : position d'affichage dans l'onglet
-// Améliorations (view/menus/inventory-menu.js) et numéro annoncé au joueur.
-// Déclaré, jamais dérivé de l'ordre d'insertion de cet objet : réarranger
-// le registre ne doit pas renuméroter les pouvoirs. Validé à l'import
-// (validateImprovementRegistry plus bas).
-export const IMPROVEMENT_REGISTRY = {
-  flashlight: { order: 1, labelKey: "improvement.flashlight.name", descriptionKey: "improvement.flashlight.description" },
-  // Sans effet direct pour l'instant : les veines et filons deviendront
-  // exploitables avec lui. En vente au bazar après la lampe-torche
-  // (config/shop-values.js).
-  mining_kit: { order: 2, labelKey: "improvement.mining_kit.name", descriptionKey: "improvement.mining_kit.description" },
-  supernatural_perception: {
-    order: 3,
-    labelKey: "improvement.supernatural_perception.name",
-    descriptionKey: "improvement.supernatural_perception.description",
-  },
-  mirror_pass: { order: 4, labelKey: "improvement.mirror_pass.name", descriptionKey: "improvement.mirror_pass.description" },
-  master_key: { order: 5, labelKey: "improvement.master_key.name", descriptionKey: "improvement.master_key.description" },
-  skeleton_key: { order: 6, labelKey: "improvement.skeleton_key.name", descriptionKey: "improvement.skeleton_key.description" },
-  // Révèle les cases "hors plan" de la carte de la ville (voir
-  // map/city-map.js/onMapWhen). Obtenue en ramassant le vieux cadastre.
-  old_plans: { order: 7, labelKey: "improvement.old_plans.name", descriptionKey: "improvement.old_plans.description" },
-};
+import { IMPROVEMENT_REGISTRY } from "../config/improvements-values.js";
 
 function failImprovements(message) {
   throw new Error(`IMPROVEMENT_REGISTRY : ${message}`);
@@ -69,7 +48,7 @@ export function improvementProps(id) {
 
 // STOCKAGE — session.improvements : { [id]: true }, SPARSE (une improvement
 // NON possédée n'a PAS de clé, jamais `false`) — cercle PARTIE, PERSISTANT
-// (voir core/state.js/createInitialState, core/save.js/migrateSave).
+// (voir core/state.js/createInitialState, core/save-migrate.js/migrateSave).
 //
 // Trois primitives PURES, même patron que core/equipment.js/equipItem (mais
 // plus simples : pas de second sac à synchroniser) — opèrent sur le SAC

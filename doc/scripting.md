@@ -30,7 +30,7 @@ de document).
 ## Vue d'ensemble : une seule couche de conditions, sept consommateurs
 
 Le même objet condition (`{ type, ...champs }`) et le même évaluateur
-(`core/presence.js`/`evaluateCondition`) servent à SEPT usages, sans
+(`core/conditions.js`/`evaluateCondition`) servent à SEPT usages, sans
 jamais sept mécanismes séparés :
 
 1. **Présence conditionnelle** — `entity.presence` décide si une entité est
@@ -71,14 +71,14 @@ conditions parallèle.
 ## Conditions
 
 **Forme** : `{ type: "<clé>", ...champs propres au type }`. `type` est un aiguillage
-tenu par un REGISTRE — `CONDITION_EVALUATORS` dans `core/presence.js` — chaque
+tenu par un REGISTRE — `CONDITION_EVALUATORS` dans `core/conditions.js` — chaque
 entrée réduite à la même signature `(cond, context) -> boolean`. `evaluateCondition`
 délègue au bon évaluateur ; un `type` inconnu à l'ÉVALUATION (hors du chemin validé
 au chargement, ex. un appel direct depuis `core/checks/conditions.check.js`) renvoie `false`,
 jamais une exception.
 
 `context` transporte ce dont un évaluateur peut avoir besoin — l'état de partie
-dérivé par `core/presence.js`/`presenceContextOf` (`time` en minutes de jeu, voir
+dérivé par `core/conditions.js`/`conditionContextOf` (`time` en minutes de jeu, voir
 `doc/time.md`, `weather`, `perceptionActive`, `world`, `session`) et `entity`
 (l'entité dont on évalue une propriété PROPRE, ajoutée AVANT l'appel par
 l'appelant — voir la nuance `hasEquipmentTag` plus bas, où "l'entité" concernée
@@ -94,7 +94,7 @@ silencieuse à l'évaluation) — SAUF `hasEquipmentTag.tag`, qui référence un
 de contenu externe (`core/tags.js`) et est donc validé explicitement, comme une
 surface de segment.
 
-**⚠️ À jour avec `core/presence.js`/`CONDITION_EVALUATORS`** — types existants :
+**⚠️ À jour avec `core/conditions.js`/`CONDITION_EVALUATORS`** — types existants :
 
 ### `timeRange` — heure du jour
 
@@ -103,7 +103,7 @@ surface de segment.
 ```
 
 Vraie si l'heure courante (dérivée de `context.time`, en HEURE FRACTIONNAIRE —
-`core/presence.js`/`hourOfDayFraction`, pas l'entier de `core/time.js`/`hourOfDay` :
+`core/conditions.js`/`hourOfDayFraction`, pas l'entier de `core/time.js`/`hourOfDay` :
 nécessaire pour que `spread` ci-dessous ait un effet observable à la minute) tombe
 dans `[from, to[`, en gérant le passage par minuit (`from > to`, comme ci-dessus).
 
@@ -150,7 +150,7 @@ le même décalage). Le passage par minuit du DÉCALAGE lui-même (un seuil proc
 passage par minuit de la FENÊTRE `from`/`to` — les deux cohabitent sans conflit.
 
 Sans `spread` déclaré (ou évalué hors d'une entité de monde, ex.
-`action.condition`, voir `view/interaction.js`/`actionConditionMet`) : décalage
+`action.condition`, voir `core/interaction.js`/`activationOf`) : décalage
 nul — seuil pile sur `from`/`to`.
 
 Exemple — trois habitués d'un bar, même règle de départ partagée, décalés de
@@ -212,13 +212,13 @@ filet "présente sinon" — sans elle, l'entité serait dormante en permanence, 
 Vraie si `context.playerEquipment` porte, sur un slot occupé, un objet marqué de
 `tag` (délègue à `core/equipment-slots.js`/`equippedTags`, qui fait l'union des tags de
 tout ce qui est équipé). Contexte sans `playerEquipment` → fausse, jamais une
-exception. `tag` est validé contre `core/tags.js`/`TAG_REGISTRY` au chargement (voir
+exception. `tag` est validé contre `config/tags-values.js`/`TAG_REGISTRY` au chargement (voir
 "Validation" plus haut) — voir "Tags" plus bas pour le registre.
 
 **Clé de contexte DÉDIÉE, PAS `context.entity`** — TOUJOURS le JOUEUR, quel que soit
 le CONSOMMATEUR : `context.entity`, lui, désigne systématiquement l'entité qui PORTE
 la condition évaluée (l'entité elle-même pour `presence[].when` — voir
-`core/presence.js`/`resolveEntityRules`, qui construit `{ ...context, entity }` —
+`core/conditions.js`/`resolveEntityRules`, qui construit `{ ...context, entity }` —
 l'entité qui déclare l'action pour `action.condition`, voir "Conditions d'action"
 plus bas) — jamais le joueur qui déclenche une action sur une AUTRE entité (une
 porte n'a pas d'équipement). Les deux rôles ont chacun leur clé PRÉCISÉMENT parce
@@ -239,7 +239,7 @@ Vraie si le joueur possède l'amélioration `id` (voir "Améliorations
 une improvement est cercle PARTIE comme une variable de partie, jamais un
 second mécanisme de contexte. Contexte sans `session` → fausse, même repli
 défensif que les autres évaluateurs. `id` validé contre
-`core/improvements.js`/`IMPROVEMENT_REGISTRY` au chargement (voir
+`config/improvements-values.js`/`IMPROVEMENT_REGISTRY` au chargement (voir
 "Validation" plus haut) — même sévérité que `hasEquipmentTag`/`tag`.
 
 **COURT-CIRCUIT DEBUG** (`config/debug.js`/`isDebugEnabled`) : en mode debug,
@@ -255,9 +255,11 @@ bas pour le principe complet (lecture ment, écriture jamais touchée).
 
 Vraie si le joueur connaît l'émote `id` (voir "Émotes" plus bas). Même
 lecture que `hasImprovement` (`context.session.emotes`, repli à faux sans
-`session`), `id` validé contre `core/emotes.js`/`EMOTE_REGISTRY` au
+`session`), `id` validé contre `config/emotes-values.js`/`EMOTE_REGISTRY` au
 chargement, et MÊME court-circuit debug : en mode debug, toujours vraie.
-Lue aussi par la vue pour lister les émotes du menu (`view/emotes.js`).
+Lue aussi pour lister les émotes connues (`core/triggers.js`/`knownEmoteIds`, le
+menu de `view/emotes.js`), et pour refuser une émote inconnue
+(`core/triggers.js`/`performEmote`).
 
 ### `hasObserved` — le joueur a observé un TYPE d'entité
 
@@ -282,11 +284,11 @@ n'a pas été observé.
 
 Sans champ propre. Vraie si `context.perceptionActive` est vrai — posé par
 `core/reduce.js`/TICK dans `presenceContext` (construit par
-`core/presence.js`/`presenceContextOf`, voir `variable` plus bas), PARTAGÉ
+`core/conditions.js`/`conditionContextOf`, voir `variable` plus bas), PARTAGÉ
 par tout le tick, exactement comme `time`), lui-même dérivé de
 `session.perceptionActive` (`core/state.js`/`togglePerception`, bascule via une
-touche dédiée — GATÉE par l'improvement `supernatural_perception`, voir
-`view/perception-toggle.js`/`toggle` et "Améliorations
+touche dédiée — GATÉE par l'improvement `supernatural_perception` dans le core,
+`core/state.js`/`perceptionAvailable`, voir "Améliorations
 (improvements)" plus bas — jamais cette condition elle-même, qui reste un
 simple miroir de `session.perceptionActive`). Contexte SANS `perceptionActive`
 (ex. `action.condition`, voir "Conditions d'action" plus bas) →
@@ -328,7 +330,7 @@ Exemple réel complet : voir "Conditions d'action" (la porte à dresscode).
 ```
 
 Vraie si l'état météo courant (`context.weather`, posé par `core/reduce.js`/TICK dans
-`presenceContext`, construit par `presenceContextOf`, PARTAGÉ par tout le tick —
+`presenceContext`, construit par `conditionContextOf`, PARTAGÉ par tout le tick —
 même patron que `perceptionActive` ci-dessus, dérivé de `session.weather.state`, voir
 `core/weather.js`) est EXACTEMENT `state`. `state` est validé au chargement contre
 `config/weather-values.js`/`WEATHER_STATES` (comme `hasEquipmentTag.tag` contre
@@ -518,7 +520,7 @@ section couvre seulement la LECTURE. `scope` ∈ `"entity" | "scene" | "party"` 
 - `"party"` : global (`context.session`).
 
 **Contexte d'évaluation.** Pour les règles de présence, il vient TOUJOURS de
-`core/presence.js`/`presenceContextOf(session)` : `{ time, perceptionActive,
+`core/conditions.js`/`conditionContextOf(session)` : `{ time, perceptionActive,
 weather, world, session }`, `world` étant le monde RACINE (variables de scène
 partagées entre recto et verso). C'est la SOURCE UNIQUE, utilisée par le TICK
 et par la vue quand elle doit connaître une présence hors tick (montage de la
@@ -575,7 +577,7 @@ filtrées par condition" plus bas).
 
 ### Ajouter un type de condition
 
-1. Une entrée dans `CONDITION_EVALUATORS` (`core/presence.js`) :
+1. Une entrée dans `CONDITION_EVALUATORS` (`core/conditions.js`) :
    `{ evaluate, fields }` — `evaluate(cond, context) -> boolean`, jamais un
    throw (dégrade sur `false`) ; `fields`, les champs qu'il lit en plus de
    `type` (tout autre champ est rejeté au chargement).
@@ -594,11 +596,11 @@ filtrées par condition" plus bas).
 
 Un effet porté par une règle : `{ type: "<clé>", ...champs }`. Contrairement aux
 conditions, PAS un registre uniforme — aiguillage EXPLICITE (`core/script-parse.js`/
-`parseEffect` pour la validation, `core/presence.js`/`resolveEntityRules` pour
+`parseEffect` pour la validation, `core/conditions.js`/`resolveEntityRules` pour
 l'application) car chaque effet a une validation ET une application propres à son
 type, qu'un registre de noms ne suffirait pas à couvrir.
 
-**⚠️ À jour avec `core/script-parse.js`/`parseEffect` ET `core/presence.js`/
+**⚠️ À jour avec `core/script-parse.js`/`parseEffect` ET `core/conditions.js`/
 `resolveEntityRules`** — types existants :
 
 ### `"presence"` — décide si l'entité est affichée/simulée
@@ -692,7 +694,7 @@ le module de chaque kind.
 
 1. Un cas dans `core/script-parse.js`/`parseEffect` : valide la FORME propre à ce type,
    renvoie `{ type, ...champs validés }`.
-2. Un cas dans `core/presence.js`/`resolveEntityRules` : décrit ce que l'effet
+2. Un cas dans `core/conditions.js`/`resolveEntityRules` : décrit ce que l'effet
    PRODUIT (une valeur résolue comme `"presence"`, ou un objet pour l'appelant comme
    `"behavior"` → `behaviorEffect`).
 3. TOUJOURS ces DEUX endroits (contrairement à une condition, qui n'en a qu'un) —
@@ -711,7 +713,7 @@ sans AUCUN effet (ni `effects` ni `present`) échoue au chargement — une règl
 muette qu'on croirait active serait pire qu'une erreur claire.
 
 `entity.presence` est un TABLEAU de règles, évaluées DANS L'ORDRE à chaque tick
-(voir `core/presence.js`/`resolveEntityRules`) :
+(voir `core/conditions.js`/`resolveEntityRules`) :
 - la présence résolue = celle du PREMIER effet `"presence"` dont la règle est
   active (recherche continue si une règle active n'en porte pas) ;
 - chaque effet `"behavior"` s'applique sur SA PROPRE bascule, indépendamment du
@@ -878,10 +880,11 @@ triggers: [{ on: "emote", emote: "clap", range: 8, effects: [{ type: "startle" }
 
 Les effets s'exécutent quand le joueur fait une émote (voir "Émotes" plus
 bas) à portée de l'entité. Résolus par `core/triggers.js`/
-`applyEmoteTriggers`, appelé par `view/emotes.js` APRÈS le son de l'émote
-(et seulement si le délai entre deux émotes laisse l'émote se faire).
+`applyEmoteTriggers`, par `core/triggers.js`/`performEmote` (qui refuse une émote
+inconnue), appelé par `view/emotes.js`, qui joue le son de l'émote avant les
+réactions (et seulement si le délai entre deux émotes laisse l'émote se faire).
 
-- `emote` (id de `core/emotes.js`/`EMOTE_REGISTRY`, validé au chargement) :
+- `emote` (id de `config/emotes-values.js`/`EMOTE_REGISTRY`, validé au chargement) :
   l'émote qui déclenche. ABSENT -> TOUTES les émotes (une bête que tout
   bruit fait fuir), comme un trigger horaire sans `hour` tire à chaque
   heure.
@@ -1041,7 +1044,7 @@ Vers le sac (`session.bag`, voir `core/bag.js`/`pickupItemEntity`) :
 action: { kind: "pickup", item: "apple", count: 1 },
 ```
 
-EXACTEMENT une des deux : `item` (clé de `core/items.js`/`ITEM_REGISTRY`, `count`
+EXACTEMENT une des deux : `item` (clé de `config/items-values.js`/`ITEM_REGISTRY`, `count`
 entier > 0 facultatif, défaut 1) ou `amount` (entier > 0, sans `count`).
 
 **Son de ramassage** : rôle `sounds.pickup` de l'ARCHÉTYPE de l'objet
@@ -1101,8 +1104,8 @@ presence: [{ when: { type: "not", condition: { type: "consumed" } }, present: tr
 ```
 
 Pour les trois formes, un collectible déjà `consumed` ne fait plus RIEN à
-l'activation : ni effets, ni son (`view/interaction.js`, verrou avant
-l'exécution des effets).
+l'activation : ni effets, ni son (`core/interaction.js`/`activationOf` ne rend
+aucune action, avant l'exécution des effets).
 
 ### `"search"` — FOUILLE d'un conteneur de collecte
 
@@ -1149,7 +1152,7 @@ ou plusieurs objets, pluriel accordé par le gabarit) ou `interaction.searchNoth
 
 **Candidature liée à l'état** (`core/spawn.js`/`containerStatus`) : un
 conteneur VIDÉ n'est candidat à Entrée que s'il n'y a RIEN d'autre à
-activer à portée (`view/occupancy.js`/`getInteractionCandidates`) —
+activer à portée (`core/interaction.js`/`interactionCandidates`) —
 jamais de menu de désambiguïsation avec les objets tombés autour. Seul, il
 annonce son état : `interaction.searchAlreadyToday` (régénérant, fouillable
 de nouveau dès qu'un cycle est passé) ou `interaction.searchDepleted` (non
@@ -1198,7 +1201,7 @@ point de vente (`view/menus/shop-menu.js`/`openShopMenu` — "Vendre",
 en pause) ; seules les TRANSACTIONS sont des effets d'état du core
 (`core/trade.js`/`sellItems` : retrait du sac + crédit de `session.money` ;
 `buyItems` : débit + ajout au sac + décrément du stock — atomiques). Vente :
-prix = `value` de l'objet (`core/items.js`/`ITEM_REGISTRY`), sans `value` ->
+prix = `value` de l'objet (`config/items-values.js`/`ITEM_REGISTRY`), sans `value` ->
 non vendable. Achat : catalogue déclaré par l'entité (`shop: { catalog }`,
 voir `doc/scene-format.md`/"Entité" — `{ table: "<nom de SHOP_CATALOGS>" }`
 ou `{ items: { <objet>: { stock, price? } } }`, `config/shop-values.js`),
@@ -1299,7 +1302,7 @@ Un effet déclenché à l'ACTIVATION d'une action (`action.effects` — conditio
 RÉUSSIT — ou `action.refusalEffects` — condition ÉCHOUE, voir "Conditions
 d'action" plus bas) : `{ type: "<clé>", ...champs }`. AIGUILLAGE DISTINCT de
 "Effets" plus haut (`"presence"`/`"behavior"`, appliqués au TICK par
-`core/presence.js`/`resolveEntityRules`) : ceux-ci n'ont de sens qu'au moment
+`core/conditions.js`/`resolveEntityRules`) : ceux-ci n'ont de sens qu'au moment
 d'une interaction PONCTUELLE, jamais réévalués en continu, jamais mélangés
 dans le même registre (`core/script-parse.js`/`parseActionEffect`, PAS `parseEffect`).
 
@@ -1417,7 +1420,7 @@ lecture-avant-écriture pour toggle/add, splice dans la session).
 
 `{ id }` — ajoute/retire l'amélioration `id` de `session.improvements` (voir
 "Améliorations (improvements)" plus bas pour le registre/le stockage
-complets). `id` validé contre `core/improvements.js`/`IMPROVEMENT_REGISTRY`
+complets). `id` validé contre `config/improvements-values.js`/`IMPROVEMENT_REGISTRY`
 au chargement, même sévérité que `setVariable`/`hasEquipmentTag`. TOUJOURS
 portée PARTIE (pas de champ `scope` : une improvement n'a qu'UN porteur
 possible, le joueur) — appliqués par `applyActionEffects`
@@ -1435,7 +1438,7 @@ laisse `session.improvements` à une RÉFÉRENCE INCHANGÉE).
 
 `{ id }` — le joueur apprend/oublie l'émote `id` (`session.emotes`, voir
 "Émotes" plus bas). Exactement le patron de `giveImprovement`/
-`removeImprovement` : `id` validé contre `core/emotes.js`/`EMOTE_REGISTRY`
+`removeImprovement` : `id` validé contre `config/emotes-values.js`/`EMOTE_REGISTRY`
 au chargement, portée PARTIE sans champ `scope`, appliqués par
 `applyActionEffects` dans le même passage que les autres effets d'état,
 idempotents.
@@ -1485,7 +1488,7 @@ le 22 h du lendemain ; à 3 h, celui du soir même
 (`core/time.js`/`nextHourStart`). L'échéance est un instant ABSOLU posé
 sur l'entité (`dormantUntil`, champ runtime, sauvegardé) et comparé à
 l'horloge à chaque résolution de présence
-(`core/presence.js`/`isForcedDormant`) : elle tient que le joueur reste,
+(`core/conditions.js`/`isForcedDormant`) : elle tient que le joueur reste,
 quitte la scène (le monde gelé la relit à son retour) ou recharge sa
 partie, ce qu'un trigger horaire ne ferait pas (une entité dormante ne
 tire pas, un monde quitté ne tique pas). Elle prime sur les règles de
@@ -1981,8 +1984,8 @@ dans "Conditions"/`hasEquipmentTag` plus haut. Une condition `"variable"` scope
 `"entity"` (voir "Variables" plus bas) se résout donc contre les variables de
 L'ENTITÉ-CIBLE elle-même (ex. `isOpen` d'une fenêtre), jamais contre le joueur. Le
 reste du contexte (heure, météo, perception, monde, session) est EXACTEMENT celui de
-la présence : `core/presence.js`/`actionContextOf` le construit à partir de
-`presenceContextOf`, pour une condition d'action (`view/interaction.js`/
+la présence : `core/conditions.js`/`actionContextOf` le construit à partir de
+`conditionContextOf`, pour une condition d'action (`view/interaction.js`/
 `actionContext`) comme pour un beacon conditionnel. `timeRange`, `weather`,
 `perceptionActive`, `hasImprovement` et les variables scope `"scene"`/`"party"` se
 comportent donc IDENTIQUEMENT sur `action.condition` et sur `presence[].when`.
@@ -2044,7 +2047,7 @@ Mise en œuvre : `core/script-parse.js`/`parseSingleAction` (forme),
 "Effets d'action" plus haut), validée EXACTEMENT comme une action unique
 (`core/script-parse.js`/`parseSingleAction`, réutilisée à l'identique par les deux formes).
 
-**Sélection SILENCIEUSE, pas un menu** (`core/presence.js`/`selectMatchingAction`) :
+**Sélection SILENCIEUSE, pas un menu** (`core/conditions.js`/`selectMatchingAction`) :
 à l'ACTIVATION, la PREMIÈRE candidate (ordre de déclaration) dont la `condition` est
 vraie est choisie et exécutée — entièrement dictée par l'état du jeu, aucun choix
 JOUEUR. Très proche de la désambiguïsation d'ENTITÉS
@@ -2220,8 +2223,8 @@ portées dans la MÊME activation), point d'entrée de
 
 ## Améliorations (improvements)
 
-**Registre** (`core/improvements.js`/`IMPROVEMENT_REGISTRY`) — données pures,
-structuré comme `core/tags.js`/`TAG_REGISTRY` : SOURCE DE VÉRITÉ des
+**Registre** (`config/improvements-values.js`/`IMPROVEMENT_REGISTRY`) — données pures,
+structuré comme `config/tags-values.js`/`TAG_REGISTRY` : SOURCE DE VÉRITÉ des
 améliorations existantes (valide `hasImprovement`/`giveImprovement`/
 `removeImprovement`), affichées dans le menu des améliorations, onglet Capacités du menu
 global (voir plus bas). Ajouter une amélioration = une entrée ici :
@@ -2235,7 +2238,7 @@ flashlight: { order: 1, labelKey: "improvement.flashlight.name", descriptionKey:
 Toujours DÉCLARÉ, jamais dérivé de l'ordre d'insertion du registre —
 réarranger le registre ne doit jamais renuméroter les pouvoirs.
 
-**⚠️ À jour avec `core/improvements.js`/`IMPROVEMENT_REGISTRY`.**
+**⚠️ À jour avec `config/improvements-values.js`/`IMPROVEMENT_REGISTRY`.**
 
 **FLAG SIMPLE pour l'instant** (possédée ou non) : un état interne riche (une
 amélioration qui porterait ses propres variables) viendrait s'ajouter SI un
@@ -2246,7 +2249,7 @@ amélioration NON possédée n'a PAS de clé), cercle PARTIE comme `equipment`/
 `variables`, PERSISTANT (une amélioration débloquée le reste, JAMAIS
 réinitialisée comme une variable volatile). Vide à la création d'une partie
 neuve ; rebouché vide pour une sauvegarde antérieure à ce mécanisme (voir
-`core/save.js`/`migrateSave`).
+`core/save-migrate.js`/`migrateSave`).
 
 **Menu des améliorations** (`view/menus/inventory/capacities-tab.js`) : ouvert
 depuis l'onglet **Capacités** (touche "m", troisième onglet du menu global
@@ -2288,7 +2291,7 @@ prochain appel — aucune trace, aucun nettoyage à faire.
 **Cas de test réel — la perception débloquable** (`view/perception-toggle.js`/
 `toggle`) : la touche "p" est gatée par
 `{ type: "hasImprovement", id: "supernatural_perception" }`, évaluée via
-`core/presence.js`/`evaluateCondition` (RÉUTILISÉ tel quel, jamais une
+`core/conditions.js`/`evaluateCondition` (RÉUTILISÉ tel quel, jamais une
 vérification maison) AVANT toute bascule — sans l'amélioration, la touche
 est SILENCIEUSE (comme une touche non attribuée, aucun son ni annonce) ; en
 mode debug, elle fonctionne TOUJOURS.
@@ -2333,7 +2336,7 @@ de scène : sifflement 25, claquement de mains 12). Le monde y réagit par
 les triggers `on: "emote"` de ses entités, dans cette portée (voir
 "Triggers d'émote" plus haut).
 
-**Registre** (`core/emotes.js`/`EMOTE_REGISTRY`) — même patron que les
+**Registre** (`config/emotes-values.js`/`EMOTE_REGISTRY`) — même patron que les
 améliorations : SOURCE DE VÉRITÉ des émotes (valide `knowsEmote`/
 `learnEmote`/`forgetEmote`), une entrée par émote :
 
@@ -2354,7 +2357,7 @@ comme les textes. Validé à l'import (`validateEmoteRegistry`).
 **Stockage** — `session.emotes` : `{ [id]: true }`, SPARSE, cercle PARTIE,
 PERSISTANT, comme `session.improvements`. À la création d'une partie neuve :
 celles du départ (`config/new-game.js`/`emotes`, voir `doc/new-game.md`) ;
-rebouché vide pour une sauvegarde antérieure (`core/save.js`/`migrateSave`),
+rebouché vide pour une sauvegarde antérieure (`core/save-migrate.js`/`migrateSave`),
 de même que le raccourci (`null`).
 
 **Lecture** : condition `knowsEmote` ; **écriture** : effets `learnEmote`/
@@ -2368,16 +2371,16 @@ n'en jouent pas (aucun état « avant »).
 
 ## Tags
 
-Registre de mots-étiquettes (`core/tags.js`/`TAG_REGISTRY`) pour la classification
+Registre de mots-étiquettes (`config/tags-values.js`/`TAG_REGISTRY`) pour la classification
 HORIZONTALE d'un objet et de futures vérifications (PNJ, événements) — indépendant
 de `stackable`/`equippable`/`slot`. Un tag est un IDENTIFIANT STABLE (la clé du
 registre), traduit SEULEMENT à l'affichage via `labelKey` — jamais le texte traduit
 dans une vérification, qui cesserait de matcher au changement de langue.
 
-**⚠️ À jour avec `core/tags.js`/`TAG_REGISTRY`** pour la liste complète (ex. `chic`,
+**⚠️ À jour avec `config/tags-values.js`/`TAG_REGISTRY`** pour la liste complète (ex. `chic`,
 lu par la porte à dresscode).
 
-Un objet porte ses tags dans `core/items.js`/`ITEM_REGISTRY[type].tags`, un tableau
+Un objet porte ses tags dans `config/items-values.js`/`ITEM_REGISTRY[type].tags`, un tableau
 optionnel :
 
 ```js
@@ -2445,7 +2448,7 @@ condition (`entity`, `time`, `perceptionActive`, `weather`, `world`,
 résolveur (PUR : aucun accès à l'horloge réelle ni à un état global).
 
 **Axe d'évolution — niveau RICHE** : choisir le texte selon des CONDITIONS,
-en réutilisant `evaluateCondition` (`core/presence.js`) contre ce MÊME
+en réutilisant `evaluateCondition` (`core/conditions.js`) contre ce MÊME
 contexte — jamais une seconde forme de contexte à maintenir. Un premier
 palier est construit : le choix de la DESCRIPTION ENTIÈRE par condition
 (voir "Descriptions conditionnelles" ci-dessous). Reste à construire, si un
@@ -2459,7 +2462,7 @@ la météo). Le riche est une EXTENSION du simple, jamais un remplacement.
 BLOC, comme `presence`) : un tableau de règles `{ when, descriptionKey }`.
 À chaque observation (Espace), la PREMIÈRE règle dont la condition est vraie
 donne la clé de description ; aucune règle vraie -> la description
-habituelle. Choix fait par le core (`core/presence.js`/
+habituelle. Choix fait par le core (`core/conditions.js`/
 `selectDescriptionKey`), contre le contexte d'une action
 (`actionContextOf` : heure, météo, perception, variables, `consumed`...),
 le MÊME que celui qui remplit ensuite le gabarit (voir "Descriptions
@@ -2494,8 +2497,8 @@ accès protégé par un lourd rideau de fer. »
 
 | Vocabulaire | Registre / aiguillage | Fichier |
 |---|---|---|
-| Types de condition et leurs champs | `CONDITION_EVALUATORS` (`fields`) | `core/presence.js` |
-| Types d'effet (presence/behavior, TICK) | `parseEffect` + `resolveEntityRules` | `core/script-parse.js`, `core/presence.js` |
+| Types de condition et leurs champs | `CONDITION_EVALUATORS` (`fields`) | `core/conditions.js` |
+| Types d'effet (presence/behavior, TICK) | `parseEffect` + `resolveEntityRules` | `core/script-parse.js`, `core/conditions.js` |
 | Types d'effet d'action (ACTIVATION, état + rendu + mixte) | `ACTION_EFFECT_FIELDS` (champs) + `parseActionEffect` (forme) + `STATE_EFFECT_TYPES`/`RENDER_EFFECT_TYPES`/`MIXED_EFFECT_TYPES` (nature/routage) + `applyActionEffects` (état) + `runEffects` (rendu + mixte) | `core/script-parse.js`, `core/effects.js`, `core/variables.js`, `view/effect-runner.js` |
 | Exécution de l'effet "teleport" (rechargement/repositionnement) | `executeTeleport`/`performTransition` + `placePlayer`/`travelToWorld` | `view/world-travel.js`, `core/state.js` |
 | Kinds de trigger (transition d'horloge) | `TRIGGER_KINDS` + `parseTrigger` (forme) + `applyDueTriggers` (détection, état) + `runRenderEffects` (rendu) | `core/triggers.js`, `core/script-parse.js`, `view/effect-runner.js` |

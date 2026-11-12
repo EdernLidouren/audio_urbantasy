@@ -3,7 +3,7 @@
 // L'ordre des entrées est l'ordre d'affichage, fixe (celui de la liste de
 // l'auteur : passifs, semi-conducteurs, puces, électromécaniques, capteurs,
 // énergie, rétro). Chaque entrée référence un objet du sac
-// (core/items.js/ITEM_REGISTRY) ; ses textes de collection vivent sous
+// (config/items-values.js/ITEM_REGISTRY) ; ses textes de collection vivent sous
 // collection.electronics.entry.<objet>.* (collections.json).
 export default {
   // Son d'interface joué à chaque nouvelle découverte de cette collection.

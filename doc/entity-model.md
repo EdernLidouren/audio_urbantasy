@@ -72,7 +72,8 @@ une balise `interactable:false` jamais candidate à Entrée, même à portée.
 Deux niveaux de PERCEPTION, à ne pas confondre :
 
 - **Occupation** (couche légère) : le NOM de l'entité, annoncé à
-  l'approche (`view/occupancy.js`/`occupiedEntities`) sur le canal
+  l'approche (`view/occupancy.js`, d'après la règle du core
+  `core/interaction.js`/`entitiesInReach`) sur le canal
   POLITE (information de contexte, jamais une urgence : ne coupe pas une
   lecture en cours). Toute entité à portée y figure, SAUF celles qui n'ont
   AUCUNE des deux capacités (`observable:false` ET `interactable:false`,
@@ -92,7 +93,8 @@ Deux niveaux de PERCEPTION, à ne pas confondre :
   `doc/scripting.md`/"Descriptions conditionnelles").
 
 Résolution de candidats PAR VERBE
-(`view/occupancy.js`/`getInteractionCandidates(kind)`) : filtre
+(`core/interaction.js`/`interactionCandidates`, lue par
+`view/occupancy.js`/`getInteractionCandidates(kind)`) : filtre
 l'ensemble d'occupation courant par la capacité du verbe pressé
 (`observable` pour Espace, `interactable` pour Entrée) — MÊME portée
 (`interactRange`) que l'occupation, pas de zone séparée. La désambiguïsation
@@ -195,10 +197,10 @@ d'ÉTAT. Le mécanisme, en trois couches strictement séparées :
     RESTE observable/interactable après cet effet seul — c'est ce qui le
     distingue du suivant.
   - **Devenir dormant** — PAS un champ propre à ce système : se déclare avec
-    le mécanisme de présence EXISTANT (`core/presence.js`), à l'INSTANCE (pas
+    le mécanisme de présence EXISTANT (`core/conditions.js`), à l'INSTANCE (pas
     à l'archétype, voir `entities/types/crate.js` qui n'en déclare aucune par
     défaut) — voir `scenes/demo2.json`, `crate_warehouse`. Une entité
-    `consumed` alimente le registre de conditions (`core/presence.js`/
+    `consumed` alimente le registre de conditions (`core/conditions.js`/
     `CONDITION_EVALUATORS.consumed`) exactement comme `"timeRange"`/
     `"arrived"`, sans aucun cas spécial dans `isPresent`/`resolveEntityRules`/
     `core/reduce.js`. PERMANENT par
@@ -367,7 +369,7 @@ l'activation — ex. `crate_stash` (`scenes/demo2.json`), une caisse dont le
 ### Mode debug
 
 `config/debug.js` : un drapeau global minimal, désactivé par défaut,
-activable depuis la console (`window.toggleDebug()`, voir `main.js`, même
+activable depuis la console (`window.toggleDebug()`, voir `view/debug-console.js`, même
 patron que `window.runChecks`) OU par la combinaison **Ctrl+D** en
 jeu (même fonction, deux chemins d'accès — voir `lib/input.js`/
 `onGlobalPress`, binding GLOBAL résolu indépendamment de la pile d'écrans,
@@ -393,13 +395,13 @@ Consommateurs, tous derrière ce MÊME drapeau (jamais un drapeau par outil) :
   annoncée (`view/world-travel.js`/`debugSwitchSide`). Scène à une face :
   annoncé, rien ne bouge ;
 - la condition `hasImprovement`, qui répond toujours vrai en mode debug
-  (`core/presence.js`/`evaluateHasImprovement`, voir
+  (`core/conditions.js`/`evaluateHasImprovement`, voir
   `doc/scripting.md`/"Améliorations") ;
 - la condition `knowsEmote`, de même (toutes les émotes se jouent, voir
   `doc/scripting.md`/"Émotes") ;
 - l'annonce de position (touche "x", `view/status-announcements.js`/
   `announcePlayerX`), plus précise en mode debug ;
-- `window.debugSession()` dans la console (`main.js`) : une COPIE de la
+- `window.debugSession()` dans la console (`view/debug-console.js`) : une COPIE de la
   partie en cours, pour inspecter l'état pendant un test (positions,
   présence, variables) sans passer par une sauvegarde. Hors mode debug, ou
   hors partie, elle ne rend rien.
@@ -527,7 +529,7 @@ persiste avec le monde.
   tirage sur la table équivalente (`resolveDistribution`), mêmes
   probabilités. Exemple réel : `entities/types/office_supply_box.js`
   (`electronics` poids 1 + `{ items: { nothing: 1 } }` poids 1).
-  Poids RELATIFS, tirage via `core/rng.js`/`pickWeighted`, le même que la
+  Poids RELATIFS, tirage via `lib/rng.js`/`pickWeighted`, le même que la
   météo — une seule logique de tirage pondéré. Résolue à CHAQUE tirage, jamais
   figée dans l'état : un monde sauvegardé tire toujours dans la table
   COURANTE. Validée au chargement par `core/distribution.js`/
@@ -603,8 +605,8 @@ persiste avec le monde.
   paresseux dû), `"searchedToday"` (fouillé, se regarnira au prochain cycle)
   ou `"depleted"` (fouillé, non régénérant : plus jamais rien).
   `isSearchable` = `"searchable"`.
-- **Candidature à Entrée** — filtrée par `view/occupancy.js`/
-  `getInteractionCandidates` (`"activate"` seulement) : un conteneur VIDÉ
+- **Candidature à Entrée** — filtrée par `core/interaction.js`/
+  `interactionCandidates` (`"activate"` seulement) : un conteneur VIDÉ
   n'est candidat que s'il n'y a RIEN d'autre à activer à portée. Ramasser
   les objets tombés autour ne propose donc jamais le conteneur ni un menu de
   désambiguïsation ; seul, il répond à Entrée en annonçant son état —
@@ -757,7 +759,7 @@ le menu est VUE (`view/menus/shop-menu.js`, pile d'écrans, jeu en pause,
 balises en pause) ; les TRANSACTIONS sont des effets d'état CORE
 (`core/trade.js`/`sellItems`, `buyItems`, injectés depuis
 `view/action-handlers.js`, même patron que "Poser"). Prix de vente : `value` sur
-l'objet (`core/items.js`/`ITEM_REGISTRY`), pleine valeur ; sans `value` (ou
+l'objet (`config/items-values.js`/`ITEM_REGISTRY`), pleine valeur ; sans `value` (ou
 0) -> NON vendable, jamais listé (filtrage par catégories/tags de boutique :
 prévu, pas construit). Prix d'achat : `price` de l'article, sinon `value`
 (pleine valeur, marge marchand plus tard).
@@ -940,7 +942,7 @@ posé en x 20, provisoirement.
     conteneur déjà fouillé), amélioration déjà possédée ou fonds
     insuffisants (son « refusal », avec le prix et l'argent possédé). Un
     présentoir vide n'est candidat à Entrée que s'il est seul à portée,
-    comme un conteneur vidé (`view/occupancy.js`).
+    comme un conteneur vidé (`core/interaction.js`/`interactionCandidates`).
 - **Sauvegarde** — `offer` est un champ plat sérialisé. Une table de
   présentoir disparue est neutralisée (`distribution: null`, plus rien
   d'exposé), un article exposé disparu vide le présentoir jusqu'au
@@ -1091,7 +1093,7 @@ notés à la main.
   objet posé puis abandonné est une utilité en soi (se délester quelque
   part, pas juste réorganiser le sac).
 - **Extensibilité anti-drop, RÉSERVÉE, PAS construite** : un futur flag
-  `droppable` sur `core/items.js`/`ITEM_REGISTRY` (défaut `true`) pourrait un
+  `droppable` sur `config/items-values.js`/`ITEM_REGISTRY` (défaut `true`) pourrait un
   jour exclure "Poser" du menu d'actions pour un objet donné (ex. un objet
   de quête vital) — non codé ici, aucun objet de ce genre n'existe encore ;
   documenté pour ne pas condamner ce slot par erreur plus tard.
@@ -1105,7 +1107,7 @@ donné est SOIT dans le sac SOIT équipé, JAMAIS les deux (les deux fonctions
 composent `removeItem`/`addItem`, `core/bag.js`, ATOMIQUEMENT avec
 l'écriture du slot).
 
-- **Objets équipables** (`core/items.js`/`ITEM_REGISTRY`) — `equippable:true`,
+- **Objets équipables** (`config/items-values.js`/`ITEM_REGISTRY`) — `equippable:true`,
   `slot` (le nom du slot occupé), `gait` (voir plus bas). Quatre exemples au
   slot "feet" : `sneakers` (gait `"shoes"`, équipées de départ — voir plus
   bas), `leather_boots` et `combat_boots` (toutes deux gait `"boots"` — MÊME
@@ -1116,7 +1118,7 @@ l'écriture du slot).
   `createInitialState`), pas équipés — de quoi tester l'échange ET le tag
   "chic" (porte à dresscode, voir "Actions conditionnelles" plus bas) sans
   avoir à en ramasser en jeu.
-- **Tags d'objets** (`core/tags.js`/`TAG_REGISTRY`, `core/items.js`/
+- **Tags d'objets** (`config/tags-values.js`/`TAG_REGISTRY`, `core/items.js`/
   `ITEM_REGISTRY[type].tags`) — classification HORIZONTALE d'un objet (ex.
   `combat_boots` porte `["military"]`), indépendante de `equippable`/`slot`/
   `gait` : un mot-étiquette pour de futures vérifications de contenu (PNJ,
@@ -1173,11 +1175,11 @@ l'écriture du slot).
   `money` (jamais dans un monde). Une sauvegarde ANTÉRIEURE à l'équipement
   est rebouchée VIDE (`core/equipment-slots.js`/`createEmptyEquipment`), JAMAIS
   avec les baskets de départ : ce rebouchage vaut pour une partie DÉJÀ EN
-  COURS, pas pour une partie neuve (voir `core/save.js`).
+  COURS, pas pour une partie neuve (voir `core/save-migrate.js`/`migrateSave`).
 
 ## Présence conditionnelle et triggers de comportement
 
-`presence` (optionnel, `core/presence.js`) : une liste de RÈGLES
+`presence` (optionnel, `core/conditions.js`) : une liste de RÈGLES
 `{ when: <condition>, effects: [<effet>...] }`, évaluées DANS L'ORDRE
 chaque tick. Sans ce champ, une entité reste TOUJOURS présente. RACCOURCI :
 `{ when, present:
@@ -1207,8 +1209,8 @@ absente" mais réversible :
   proprement à la TRANSITION (jamais en continu), redémarrée si l'entité
   redevient présente — voir aussi "Sons de transition" plus bas ;
 - **Interaction** — exclue de l'occupation et de la résolution de cible
-  (`view/interaction.js` via `view/occupancy.js`/`occupiedEntities`), et ne
-  bloque jamais le déplacement (`core/presence.js`/`isBlocking`, lu par
+  (`core/interaction.js`/`entitiesInReach`, lue par `view/occupancy.js`), et ne
+  bloque jamais le déplacement (`core/conditions.js`/`isBlocking`, lu par
   `core/physics/collision.js` et `core/physics/overlap.js` à la place d'un
   simple `blocksMovement`).
 
@@ -1242,7 +1244,7 @@ même tick ; l'effet lui-même ne déplace jamais l'entité.
 à `"presence"` (un booléen trivialement idempotent, réévalué frais à chaque
 tick sans mémoire), poser un comportement à CHAQUE tick tant que sa
 condition reste vraie serait au mieux inutile, au pire cassant pour un futur
-comportement à état propre — voir `core/presence.js`/`resolveEntityRules`
+comportement à état propre — voir `core/conditions.js`/`resolveEntityRules`
 pour le mécanisme de mémoire (`entity.ruleActive`, un booléen par règle,
 indexé par position — les règles d'une entité sont figées au chargement,
 jamais réordonnées en cours de partie). **Nuance sur le TOUT PREMIER
@@ -1285,7 +1287,7 @@ autre chose. Événementielle par nature (contrairement à `"timeRange"`,
 purement temporelle) — les deux cohabitent dans le même registre sans
 qu'aucun code appelant n'ait à distinguer leur nature.
 
-**Limite connue** (voir le commentaire dédié dans `core/presence.js`) : la
+**Limite connue** (voir le commentaire dédié dans `core/conditions.js`) : la
 garde ci-dessus se corrige d'elle-même dès le tick SUIVANT une vraie
 observation de la bascule, mais si aucun tick n'a lieu pendant tout un
 créneau où une règle de comportement serait repassée à faux (onglet mis en
@@ -1377,7 +1379,7 @@ minutes de jeu, jamais écrit dans le JSON de scène, sauvegardé) :
 
 - **Priorité** — tant que l'horloge n'a pas atteint l'échéance, l'entité est
   dormante quoi que disent ses règles de présence, avec ses trois plans
-  coupés (`core/presence.js`/`isForcedDormant`, lu par
+  coupés (`core/conditions.js`/`isForcedDormant`, lu par
   `resolveEntityRules`). Une entité sans règle de présence porte sa
   présence dès qu'elle est endormie (`tracksPresence`).
 - **Échéance** — comparée à l'horloge à chaque tick, jamais décomptée : elle
@@ -1934,7 +1936,7 @@ démarreraient sinon toutes dans la même fenêtre :
 
 `beaconIntervalVariation`, `vocalIntervalVariation`, `pitchVariation` et le
 délai de désempilement d'attaques ci-dessus utilisent `Math.random()`,
-jamais le PRNG seedé du core (`core/rng.js`) — même politique pour les
+jamais le PRNG seedé du core (`lib/rng.js`) — même politique pour les
 quatre, aucune raison de les traiter différemment. C'est un aléa de RENDU pur,
 sans aucun effet sur l'état de partie (position, comportement, save...).
 Coupler ce genre de détail cosmétique au PRNG du core reviendrait à faire
@@ -2192,7 +2194,8 @@ espace fermé pour tout ce qui est spatial/logique :
 - **Interaction et occupation** : scopées à la face COURANTE (celle du
   joueur) — les entités de l'autre face n'apparaissent JAMAIS dans
   `getInteractionCandidates`/l'annonce d'occupation (voir
-  `view/occupancy.js`), même à portée sur l'axe x.
+  `view/occupancy.js`, qui ne passe à `core/interaction.js` que les entités de
+  la face courante), même à portée sur l'axe x.
 - **PRNG** : chaque face garde son propre `rngState` (voir
   `createFaceState`) — déterminisme préservé, aucune
   interférence entre les deux flux.

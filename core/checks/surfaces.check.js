@@ -4,7 +4,8 @@
 // via un objet littéral passé à parseScene.
 
 import { parseScene } from "../scene.js";
-import { SURFACE_REGISTRY, DEFAULT_SURFACE, surfaceAt, surfaceProps, surfacePropsAt } from "../surfaces.js";
+import { surfaceAt, surfaceProps, surfacePropsAt } from "../surfaces.js";
+import { SURFACE_REGISTRY, DEFAULT_SURFACE } from "../../config/surfaces-values.js";
 import { throws } from "../../lib/check.js";
 import { EMPTY_REGISTRY } from "./helpers.js";
 

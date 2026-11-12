@@ -39,9 +39,8 @@
 // (vidé, se regarnira au prochain cycle) ou "depleted" (vidé pour de bon :
 // `container.regenerates: false`, stock tiré UNE SEULE fois, jamais
 // regarni). Vidé, il reste présent, audible, observable (l'arbre reste un
-// arbre) ; la vue ne le propose plus à Entrée que s'il est le SEUL candidat,
-// pour annoncer son état (voir view/occupancy.js/
-// getInteractionCandidates).
+// arbre) ; il n'est plus candidat à Entrée que s'il est le SEUL, pour annoncer
+// son état (voir core/interaction.js/interactionCandidates).
 // Un tirage peut ne RIEN donner (clé `nothing` d'une table, voir
 // core/distribution.js) : un stock peut donc être vide, une plage poser
 // moins de `count` objets.
@@ -57,7 +56,7 @@ import { SPAWN_CYCLE_HOUR, SPAWN_RANGE_DEFAULT_COUNT, SPAWN_CONTAINER_DEFAULT_CO
 import { TIME_CONFIG } from "../config/time-values.js";
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";
 import { drawItem, drawEntityType } from "./distribution.js";
-import { drawIntInRange } from "./rng.js";
+import { drawIntInRange } from "../lib/rng.js";
 import { restockShopEntity } from "./catalog.js";
 import { drawOffer, unavailableArticles } from "./display.js";
 import {
@@ -71,7 +70,7 @@ import {
 } from "./state.js";
 import { parseSpawnedEntity, GENERIC_ITEM_TYPE } from "./entity-parse.js";
 import { MINUTES_PER_DAY } from "./time.js";
-import { presenceContextOf } from "./presence.js";
+import { conditionContextOf } from "./conditions.js";
 
 // Tentatives pour trouver une position respectant l'espacement minimal
 // (voir drawRangePosition) — plafond, jamais une boucle sans fin.
@@ -100,9 +99,8 @@ function isRestockDue(entity, cycle) {
 //     searchContainer) ;
 //   - "searchedToday" : vidé, se regarnira au prochain cycle ;
 //   - "depleted" : vidé, ne se regarnira jamais (regenerates: false).
-// Lu par la vue : candidats à "activate" (view/occupancy.js/
-// getInteractionCandidates) et annonce de la fouille (view/action-execution.js/
-// handleSearch).
+// Lu par les candidats à "activate" (core/interaction.js/interactionCandidates)
+// et par l'annonce de la fouille (view/action-execution.js/handleSearch).
 export function containerStatus(entity, time) {
   if (!entity.container) return null;
   if (isRestockDue(entity, spawnCycleAt(time))) return "searchable";
@@ -130,7 +128,7 @@ function faceHasSources(face) {
 // tirages "rien" (item null) sont écartés : `items` peut compter moins de
 // `count` objets, voire aucun — `count` tirages sont consommés quoi qu'il
 // arrive. Distribution `null` (neutralisée à la relecture d'une
-// sauvegarde, voir core/save.js/repairContentReferences) : rien. Partagée
+// sauvegarde, voir core/save-migrate.js/repairContentReferences) : rien. Partagée
 // avec le minage (core/mining.js).
 export function drawItems(distribution, count, rngState) {
   if (distribution === null) return { items: [], rngState };
@@ -330,7 +328,7 @@ export function refillDueSpawns(session, registry) {
   const faces = isTwoSided(world) ? ["recto", "verso"] : [null];
   if (!faces.some((side) => faceHasSources(resolveFace(world, side)))) return session;
 
-  const presenceContext = presenceContextOf(session);
+  const presenceContext = conditionContextOf(session);
   const offered = unavailableArticles(session);
   let nextWorld = world;
   for (const side of faces) {

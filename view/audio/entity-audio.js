@@ -4,15 +4,15 @@
 // faces d'une scène à deux faces passent par les MÊMES fonctions, l'autre
 // face avec un étouffement complet (`forcedMuffle` 1).
 //
-// Présence conditionnelle (voir core/presence.js) : une entité dormante est
+// Présence conditionnelle (voir core/conditions.js) : une entité dormante est
 // "comme si absente" — ni balise, ni déclenchement, ni pas. Ses bascules
 // (live.presenceChanged, posé par le core) jouent enterSound/exitSound —
 // sauf une sortie due à une dormance FORCÉE (effet "dormantUntil", voir
-// core/presence.js/isForcedDormant), muette : la séquence qui l'a posée
+// core/conditions.js/isForcedDormant), muette : la séquence qui l'a posée
 // joue son propre son (le néon qui éclate ne grésille pas en plus).
 
 import { getInactiveFace } from "../../core/state.js";
-import { evaluateCondition, actionContextOf, isForcedDormant } from "../../core/presence.js";
+import { evaluateCondition, actionContextOf, isForcedDormant } from "../../core/conditions.js";
 import { spatialRendering } from "./spatial.js";
 import { beaconVolumeFactor, footstepVolumeFactor } from "./volume-factors.js";
 import { resolveFootstepPath, stepWalker } from "./footsteps.js";
@@ -208,7 +208,7 @@ export function createEntityAudio({ getSession, entities, effectiveMuffle, fullF
   // Son de TRANSITION d'une entité dont la présence vient de basculer
   // (exitSound au départ, enterSound à l'arrivée), sous l'étouffement
   // `muffle` de sa face. Pas d'exitSound pour une dormance FORCÉE
-  // (core/presence.js/isForcedDormant) : la séquence qui la pose joue son
+  // (core/conditions.js/isForcedDormant) : la séquence qui la pose joue son
   // propre son, comme l'éclatement du néon défectueux.
   function playPresenceTransition(entry, live, relX, muffle) {
     if (live.presenceChanged === "exited" && entry.exitSound && !isForcedDormant(live, getSession().time)) {

@@ -9,9 +9,9 @@ import { pushScreen, popScreen } from "../lib/screens.js";
 import { makeMenuScreen } from "../lib/menu.js";
 import { announce } from "../lib/announce.js";
 import { t, nameRef } from "../data/i18n/index.js";
-import { EMOTE_REGISTRY, orderedEmoteIds, setEmoteShortcut } from "../core/emotes.js";
-import { evaluateCondition, presenceContextOf } from "../core/presence.js";
-import { applyEmoteTriggers } from "../core/triggers.js";
+import { setEmoteShortcut } from "../core/emotes.js";
+import { EMOTE_REGISTRY } from "../config/emotes-values.js";
+import { knownEmoteIds as knownEmotesOf, performEmote } from "../core/triggers.js";
 import { withPausedBeacons } from "./paused-beacons.js";
 import { runRenderEffects } from "./effect-runner.js";
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";
@@ -23,11 +23,10 @@ export function createEmotes({ getSession, setSession, getWorldView }) {
   // comme la perception (view/perception-toggle.js).
   let cooldownUntil = 0;
 
-  // Émotes connues, dans l'ordre du registre — lues par la condition
-  // knowsEmote, la MÊME qu'un script déclarerait : en mode debug, toutes.
+  // Émotes connues, dans l'ordre du registre : la règle du core
+  // (core/triggers.js/knownEmoteIds).
   function knownEmoteIds() {
-    const context = presenceContextOf(getSession());
-    return orderedEmoteIds().filter((id) => evaluateCondition({ type: "knowsEmote", id }, context));
+    return knownEmotesOf(getSession());
   }
 
   // Le raccourci, s'il vise une émote connue ; sinon null (aucun, ou une
@@ -43,17 +42,18 @@ export function createEmotes({ getSession, setSession, getWorldView }) {
     return knownEmoteIds().length > 0;
   }
 
-  // Pendant le délai : rien du tout, comme une touche non attribuée — ni
-  // son, ni réaction. Le son d'abord, puis les réactions du monde (comme
-  // view/game-clock.js/advance pour les triggers horaires) : un oiseau
-  // effrayé s'envole au tick suivant, après le claquement.
+  // Pendant le délai, ou une émote inconnue (le core la refuse) : rien du tout,
+  // comme une touche non attribuée — ni son, ni réaction. Le son d'abord, puis
+  // les réactions du monde (comme view/game-clock.js/advance pour les triggers
+  // horaires) : un oiseau effrayé s'envole au tick suivant, après le claquement.
   function perform(id) {
     const now = performance.now();
     if (now < cooldownUntil) return;
+    const before = getSession();
+    const { session, fired, performed } = performEmote(before, id, before.player.x);
+    if (!performed) return;
     cooldownUntil = now + TUNING_DEFAULTS.emoteCooldownMs;
     getWorldView()?.playEmoteSound(EMOTE_REGISTRY[id].soundPath);
-    const before = getSession();
-    const { session, fired } = applyEmoteTriggers(before, id, before.player.x);
     setSession(session);
     for (const { entity, effects } of fired) runRenderEffects(entity, effects);
   }

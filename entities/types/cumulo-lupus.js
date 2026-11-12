@@ -3,7 +3,7 @@
 // Aucun `behavior` par défaut ici, volontairement (voir dog.js) : se
 // déclare à l'INSTANCE (scenes/*.json). Donnée pure : aucun import.
 //
-// Présence conditionnée par l'ET de DEUX conditions (core/presence.js/
+// Présence conditionnée par l'ET de DEUX conditions (core/conditions.js/
 // "allOf") : perception surnaturelle ACTIVE ET météo BRUMEUSE — un loup
 // surnaturel, visible SEULEMENT si les deux tiennent à la fois (perception
 // seule ou brume seule ne suffisent pas). Entité SURNATURELLE comme

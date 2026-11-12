@@ -3,7 +3,7 @@
 // pas de maintien, donc aucun souci d'auto-interruption NVDA ici. Aucune
 // RÈGLE de jeu propre ici (le core reste la seule source de vérité) :
 // description, choix de la candidate et condition (lectures pures du core,
-// core/presence.js), cooldown d'entrée, menu de choix entre entités. Le
+// core/conditions.js), cooldown d'entrée, menu de choix entre entités. Le
 // reste est délégué :
 //   - ./effect-runner.js : effets d'une action (état délégué, rendu joué) ;
 //   - ./action-execution.js : exécution par kind (son, annonce, état) ;
@@ -15,7 +15,8 @@ import { t, nameRef } from "../data/i18n/index.js";
 import { pushScreen, popScreen } from "../lib/screens.js";
 import { withPausedBeacons } from "./paused-beacons.js";
 import { makeMenuScreen } from "../lib/menu.js";
-import { evaluateCondition, selectMatchingAction, selectDescriptionKey, actionContextOf } from "../core/presence.js";
+import { selectDescriptionKey, actionContextOf } from "../core/conditions.js";
+import { activationOf } from "../core/interaction.js";
 import { resolveDescriptionText } from "./description-resolver.js";
 import { resolveTuning } from "../config/tuning.js";
 import { sessionProvider, observationHandler } from "./interaction-handlers.js";
@@ -73,32 +74,28 @@ function resolveDescription(entity) {
 // parle qu'à condition réutilisent tous cette MÊME vérification, jamais un
 // second mécanisme.
 // Réutilise TEL QUEL l'évaluateur de conditions du core
-// (core/presence.js/evaluateCondition) — même objet déclaratif que
+// (core/conditions.js/evaluateCondition) — même objet déclaratif que
 // presence[].when, déjà validé au chargement (core/script-parse.js/
 // validateCondition).
 //
 // context.entity PORTE ICI L'ENTITÉ-CIBLE (celle qui déclare l'action —
 // une variable de portée "entity" référencée par la condition, voir
-// core/presence.js/evaluateVariable, se résout donc contre SES PROPRES
+// core/conditions.js/evaluateVariable, se résout donc contre SES PROPRES
 // variables), JAMAIS le joueur — voir context.playerEquipment ci-dessous
 // pour la distinction. L'équipement du JOUEUR vit dans sa PROPRE clé,
-// `playerEquipment` (voir core/presence.js/evaluateHasEquipmentTag, qui la
+// `playerEquipment` (voir core/conditions.js/evaluateHasEquipmentTag, qui la
 // lit spécifiquement) — les deux rôles ne peuvent PAS partager `context.entity` sans se marcher dessus dès qu'une
 // condition "variable" et une condition "hasEquipmentTag" coexistent (ex.
 // dans un allOf) sur la MÊME action.
 //
 // Le reste du contexte (heure, météo, perception, monde, session) est
-// celui de la présence (core/presence.js/actionContextOf) : une condition
+// celui de la présence (core/conditions.js/actionContextOf) : une condition
 // se comporte donc IDENTIQUEMENT sur action.condition et sur
 // presence[].when (voir doc/scripting.md/"Conditions d'action"). Sans
 // fournisseur de session (cas limite, jamais en jeu réel) : seule l'entité,
 // chaque évaluateur se replie sur faux.
 function actionContext(entity) {
   return sessionProvider ? actionContextOf(sessionProvider(), entity) : { entity };
-}
-
-function actionConditionMet(condition, entity) {
-  return evaluateCondition(condition, actionContext(entity));
 }
 
 // kind ∈ { "describe", "activate" }. entity est déjà un candidat FILTRÉ par
@@ -188,34 +185,20 @@ export function interact(entity, kind, getWorldView) {
     // Cooldown (voir lastActivationAt plus haut) : ignoré en silence.
     if (isInCooldown(entity)) return;
 
-    // ACTIONS MULTIPLES CANDIDATES (voir core/entity-parse.js/parseEntity,
-    // core/presence.js/selectMatchingAction, doc/scripting.md/"Actions
-    // multiples filtrées par condition") : entity.action est soit un OBJET
-    // UNIQUE (resolvedAction EST cet objet), soit un
-    // TABLEAU de candidates — la PREMIÈRE dont la condition est vraie est
-    // choisie SILENCIEUSEMENT (pas de menu, contrairement à
-    // chooseInteractionTarget plus bas, qui désambiguïse entre ENTITÉS via
-    // un choix JOUEUR — ici, la sélection est entièrement dictée par
-    // l'état du jeu). AUCUNE candidate ne matche -> rien, exactement comme
-    // une action à condition non remplie ci-dessous.
-    const resolvedAction = Array.isArray(entity.action)
-      ? selectMatchingAction(entity.action, actionContext(entity))
-      : entity.action;
-    if (!resolvedAction) return;
-
-    // Collectible persistant déjà consommé : plus rien à faire, ni effet ni
-    // son. Sans ce verrou, ses effets (exécutés AVANT le handler du kind,
-    // voir plus bas) se rejoueraient à chaque Entrée.
-    if (resolvedAction.kind === "loot" && entity.consumed) return;
+    // CE QUE FAIT L'ACTIVATION, règle du core (core/interaction.js/
+    // activationOf) : rien (aucune candidate ne tient, collectible déjà
+    // consommé), un REFUS, ou l'action. Une liste de candidates se tranche
+    // SILENCIEUSEMENT par l'état du jeu (pas de menu, contrairement à
+    // chooseInteractionTarget plus bas, qui désambiguïse entre ENTITÉS par un
+    // choix du joueur).
+    const activation = activationOf(entity, actionContext(entity));
+    if (activation === null) return;
+    const resolvedAction = activation.action;
 
     // Condition fausse -> REFUS informatif (refusalEffects, voir
-    // view/effect-runner.js/runEffects), AUCUN effet de succès, AUCUNE transition : l'action est
-    // simplement bloquée, proprement. Action sans condition -> ce bloc est
-    // sauté entièrement. Pour une action choisie DANS un tableau, cette
-    // condition est déjà connue vraie (voir selectMatchingAction) — la
-    // revérifier ici reste correct (fonction pure, même contexte) et évite
-    // un second chemin de code.
-    if (resolvedAction.condition && !actionConditionMet(resolvedAction.condition, entity)) {
+    // view/effect-runner.js/runEffects), AUCUN effet de succès, AUCUNE
+    // transition : l'action est simplement bloquée, proprement.
+    if (activation.refused) {
       lastActivationAt.set(entity.id, performance.now());
       runEffects(entity, resolvedAction.refusalEffects);
       return;

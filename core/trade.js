@@ -1,6 +1,6 @@
 // VENTE et ACHAT (transactions du point de vente, voir view/menus/
 // shop-menu.js pour les menus) — pur, headless. Vente : le prix vient de
-// `value` sur l'objet (core/items.js/ITEM_REGISTRY), pleine valeur, aucune
+// `value` sur l'objet (config/items-values.js/ITEM_REGISTRY), pleine valeur, aucune
 // marge ; un objet sans `value` (ou 0) n'est pas vendable. Achat : catalogue
 // du point de vente (core/catalog.js — articles, prix, stock FINI rechargé
 // au cycle de collecte), fonds vérifiés, stock clampé. Achat à un
@@ -9,7 +9,8 @@
 // (core/improvements.js) et addMoney (core/money.js) : aucune seconde
 // logique de sac, d'amélioration ni d'argent.
 
-import { ITEM_REGISTRY, itemValue } from "./items.js";
+import { itemValue } from "./items.js";
+import { ITEM_REGISTRY } from "../config/items-values.js";
 import { addItem, removeItem } from "./bag.js";
 import { addMoney } from "./money.js";
 import { hasImprovement, giveImprovement } from "./improvements.js";

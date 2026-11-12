@@ -17,7 +17,7 @@
 // GAIT : jamais stocké ici, ni nulle part sur le joueur — DÉRIVÉ de
 // l'équipement à CHAQUE pas (voir core/equipment.js/gaitOf,
 // view/audio/footsteps.js/playFootstep) : le slot "feet" (session.equipment)
-// porte-t-il un objet avec un gait (core/items.js/ITEM_REGISTRY) ? oui -> ce
+// porte-t-il un objet avec un gait (config/items-values.js/ITEM_REGISTRY) ? oui -> ce
 // gait ; slot vide -> "barefoot" (pieds nus, défaut). Équiper/déséquiper
 // change donc le pas SUIVANT automatiquement, sans notification ni code de
 // synchro — c'est tout l'intérêt de dériver plutôt que de stocker. Sur sol

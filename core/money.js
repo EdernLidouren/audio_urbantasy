@@ -36,7 +36,7 @@ export function pickupEntity(session, entityId, amount) {
 // ACTIVATION (description alternative, dormance) ne sont PAS déclenchés
 // ici : ce sont des propriétés DÉCLARATIVES de l'entité (consumedDescriptionKey,
 // une règle de présence sur la condition "consumed"), lues ailleurs
-// (view/interaction.js, core/presence.js) — ce module ne fait que poser
+// (view/interaction.js, core/conditions.js) — ce module ne fait que poser
 // l'état dont elles dépendent, jamais leur logique de rendu.
 export function lootEntity(session, entityId, amount) {
   const entity = activeFaceEntities(session).find((e) => e.id === entityId);

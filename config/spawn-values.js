@@ -3,7 +3,7 @@
 // même patron que config/weather-values.js : le moteur ne fait que LIRE.
 //
 // Une table, DEUX formes :
-//   - { <objet du sac (core/items.js/ITEM_REGISTRY)>: <poids> } — le poids
+//   - { <objet du sac (config/items-values.js/ITEM_REGISTRY)>: <poids> } — le poids
 //     est un NOMBRE, ou le NOM d'un niveau de rareté ("rare"), qui vaut le
 //     poids de ce niveau (RARITY_LEVELS ci-dessous) ;
 //   - { fromTag: <étiquette> } — table DÉDUITE : tous les objets portant
@@ -12,7 +12,7 @@
 //     change met la table à jour tout seul.
 // Dans une table { objet: poids }, la clé RÉSERVÉE `nothing` est une issue
 // "rien" pondérée comme les autres (voir core/distribution.js/NOTHING).
-// Poids RELATIFS normalisés au tirage (voir core/rng.js/pickWeighted,
+// Poids RELATIFS normalisés au tirage (voir lib/rng.js/pickWeighted,
 // réutilisé tel quel), jamais des pourcentages. Une source (conteneur,
 // plage) RÉFÉRENCE une table par son nom ({ table: "default" }), déclare
 // la sienne inline ({ items: { ... } }) ou en combine plusieurs

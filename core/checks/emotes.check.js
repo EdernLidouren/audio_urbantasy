@@ -6,9 +6,8 @@
 import { parseScene } from "../scene.js";
 import { createInitialState, applyEntityActionEffects } from "../state.js";
 import { SAVE_VERSION, serializeGame, deserializeGame } from "../save.js";
-import { evaluateCondition } from "../presence.js";
+import { evaluateCondition } from "../conditions.js";
 import {
-  EMOTE_REGISTRY,
   emoteProps,
   knowsEmote,
   learnEmote,
@@ -17,7 +16,8 @@ import {
   validateEmoteRegistry,
   orderedEmoteIds,
 } from "../emotes.js";
-import { applyEmoteTriggers, emoteTriggerRange } from "../triggers.js";
+import { EMOTE_REGISTRY } from "../../config/emotes-values.js";
+import { applyEmoteTriggers, emoteTriggerRange, knownEmoteIds, performEmote } from "../triggers.js";
 import { isDebugEnabled, setDebugEnabled } from "../../config/debug.js";
 import { throws } from "../../lib/check.js";
 
@@ -158,6 +158,25 @@ function checkEmotesBody(run) {
   run("applyEmoteTriggers : claquement depuis x 4 -> pigeon et chat", "pigeon,cat", firedIds(applyEmoteTriggers(emoteBase, "clap", 4)));
   run("applyEmoteTriggers : sifflement -> l'écho (20 <= 25), pas les triggers du claquement", "echo", firedIds(applyEmoteTriggers(emoteBase, "whistle", 0)));
   run("applyEmoteTriggers : claquement depuis x 7 -> l'écho à 13 n'entend pas (portée 12)", "pigeon,cat", firedIds(applyEmoteTriggers(emoteBase, "clap", 7)));
+
+  // Faire une émote (performEmote) : la règle du core, une émote connue seulement.
+  // Hors mode debug ici (checkEmotes), la session de départ n'en connaît aucune.
+  run.same("émotes connues : aucune au départ", [], knownEmoteIds(emoteBase));
+  const unknownClap = performEmote(emoteBase, "clap", 0);
+  run("performEmote : émote inconnue refusée", false, unknownClap.performed);
+  run("performEmote : refusée, la session ne change pas (même référence)", true, unknownClap.session === emoteBase);
+  run("performEmote : refusée, aucun trigger", 0, unknownClap.fired.length);
+  const clapper = { ...emoteBase, emotes: learnEmote(emoteBase.emotes, "clap") };
+  run.same("émotes connues : celle qu'on a apprise", ["clap"], knownEmoteIds(clapper));
+  const knownClap = performEmote(clapper, "clap", 0);
+  run("performEmote : émote connue, faite", true, knownClap.performed);
+  run("performEmote : ses triggers, comme applyEmoteTriggers", "pigeon", firedIds(knownClap));
+  setDebugEnabled(true);
+  try {
+    run("performEmote : en mode debug, toute émote se fait", true, performEmote(emoteBase, "whistle", 0).performed);
+  } finally {
+    setDebugEnabled(false);
+  }
   run("applyEmoteTriggers : déjà enfui -> ne réagit plus", "", firedIds(applyEmoteTriggers(clapped.session, "clap", 0)));
   const nothing = applyEmoteTriggers(emoteBase, "clap", 30);
   run("applyEmoteTriggers : rien à portée -> MÊME référence de session", true, Object.is(nothing.session, emoteBase));

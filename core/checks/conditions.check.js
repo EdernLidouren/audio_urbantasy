@@ -8,7 +8,6 @@ import { parseScene } from "../scene.js";
 import {
   createInitialState,
   getActiveWorld,
-  togglePerception,
   applyEntityActionEffects,
   spawnScatteredEphemerals,
   BODY_RADIUS,
@@ -17,17 +16,17 @@ import { tick } from "../actions.js";
 import { reduce } from "../reduce.js";
 import { advanceTime } from "../time.js";
 import { TIME_CONFIG } from "../../config/time-values.js";
-import { evaluateCondition, isPresent, isBlocking, presenceContextOf, selectDescriptionKey } from "../presence.js";
+import { evaluateCondition, isPresent, isBlocking, conditionContextOf, selectDescriptionKey } from "../conditions.js";
 import { setWeather } from "../weather.js";
 import { auditNonSerializable } from "../../lib/check.js";
 import { TICK_MS } from "../../lib/loop.js";
-import { WANDER_REGISTRY, UNKNOWN_FIELD, makeWanderScene, expectSceneParseThrows, sceneParseMessage } from "./helpers.js";
+import { WANDER_REGISTRY, UNKNOWN_FIELD, makeWanderScene, expectSceneParseThrows, sceneParseMessage, toggleUnlockedPerception } from "./helpers.js";
 
 export default function checkConditions(run) {
   // Fixtures partagées avec d'autres domaines (voir ./helpers.js).
   const wanderScene = parseScene(makeWanderScene(), WANDER_REGISTRY);
 
-  // --- Présence conditionnelle (core/presence.js) ---
+  // --- Présence conditionnelle (core/conditions.js) ---
   // Évaluateur générique (un seul type aujourd'hui : "timeRange"), résolution
   // de présence, et intégration dans reduce() — voir entities/types/neon.js
   // pour le cas d'usage réel (présent la nuit).
@@ -460,7 +459,7 @@ export default function checkConditions(run) {
   auditNonSerializable(dormantWanderState, "presenceSession", new Set(), presenceLeaks);
   run("presence : aucune fuite de non-sérialisable avec des règles de présence actives", 0, presenceLeaks.length);
 
-  // --- Condition "weather" (core/presence.js/evaluateWeather) : réutilise l'évaluateur de conditions
+  // --- Condition "weather" (core/conditions.js/evaluateWeather) : réutilise l'évaluateur de conditions
   // existant, un cas de plus à côté de timeRange/perceptionActive.
   run("weather (condition) : evaluateCondition — état courant == état demandé -> vraie", true, evaluateCondition({ type: "weather", state: "fog" }, { weather: "fog" }));
   run("weather (condition) : evaluateCondition — état courant != état demandé -> fausse", false, evaluateCondition({ type: "weather", state: "fog" }, { weather: "clear" }));
@@ -523,7 +522,7 @@ export default function checkConditions(run) {
   notFoggyAgainState = reduce(notFoggyAgainState, tick(0));
   run("weather (condition) : redevient dormante quand la météo change à nouveau", false, wolf(notFoggyAgainState).present);
 
-  // --- Condition "allOf" (core/presence.js/evaluateAllOf) : composite, ET
+  // --- Condition "allOf" (core/conditions.js/evaluateAllOf) : composite, ET
   // logique entre plusieurs conditions — délègue à evaluateCondition pour
   // chaque sous-condition, jamais un second mécanisme.
   run(
@@ -640,7 +639,7 @@ export default function checkConditions(run) {
   neitherState = reduce(neitherState, tick(0));
   run("allOf (intégration) : ni perception ni brume -> dormante", false, allOfWolf(neitherState).present);
 
-  let perceptionOnlyState = togglePerception(neitherState);
+  let perceptionOnlyState = toggleUnlockedPerception(neitherState);
   perceptionOnlyState = reduce(perceptionOnlyState, tick(0));
   run("allOf (intégration) : perception SEULE (pas de brume) -> dormante", false, allOfWolf(perceptionOnlyState).present);
 
@@ -648,15 +647,15 @@ export default function checkConditions(run) {
   fogOnlyState = reduce(fogOnlyState, tick(0));
   run("allOf (intégration) : brume SEULE (perception inactive) -> dormante", false, allOfWolf(fogOnlyState).present);
 
-  let bothState = togglePerception(fogOnlyState);
+  let bothState = toggleUnlockedPerception(fogOnlyState);
   bothState = reduce(bothState, tick(0));
   run("allOf (intégration) : perception ACTIVE ET brume -> présente", true, allOfWolf(bothState).present);
 
-  let bothThenOffState = togglePerception(bothState);
+  let bothThenOffState = toggleUnlockedPerception(bothState);
   bothThenOffState = reduce(bothThenOffState, tick(0));
   run("allOf (intégration) : perception redevient inactive -> redevient dormante", false, allOfWolf(bothThenOffState).present);
 
-  // --- Condition "anyOf" (core/presence.js/evaluateAnyOf) : composite, OU
+  // --- Condition "anyOf" (core/conditions.js/evaluateAnyOf) : composite, OU
   // logique — cas réel : la bouche d'égout qui ne coule que par temps
   // pluvieux (pluie OU orage, entities/types/storm_drain.js).
   const RAINY = { type: "anyOf", conditions: [{ type: "weather", state: "rain" }, { type: "weather", state: "stormy" }] };
@@ -696,7 +695,7 @@ export default function checkConditions(run) {
     )
   );
 
-  // --- Condition "not" (core/presence.js/evaluateNot) : négation, composable ---
+  // --- Condition "not" (core/conditions.js/evaluateNot) : négation, composable ---
   const NOT_PERCEPTION = { type: "not", condition: { type: "perceptionActive" } };
   run("not : perception inactive -> vraie", true, evaluateCondition(NOT_PERCEPTION, { perceptionActive: false }));
   run("not : perception active -> fausse", false, evaluateCondition(NOT_PERCEPTION, { perceptionActive: true }));
@@ -731,14 +730,14 @@ export default function checkConditions(run) {
   const swapPresence = (state) => getActiveWorld(state).entities.map((e) => `${e.id}:${e.present}`).join(",");
   let swapState = reduce(createInitialState(swapScene, "not-swap"), tick(0));
   run("not (intégration) : perception inactive -> ordinaire seul", "plain:true,magic:false", swapPresence(swapState));
-  swapState = reduce(togglePerception(swapState), tick(0));
+  swapState = reduce(toggleUnlockedPerception(swapState), tick(0));
   run("not (intégration) : perception active -> magique seul", "plain:false,magic:true", swapPresence(swapState));
-  swapState = reduce(togglePerception(swapState), tick(0));
+  swapState = reduce(toggleUnlockedPerception(swapState), tick(0));
   run("not (intégration) : perception redevient inactive -> ordinaire seul", "plain:true,magic:false", swapPresence(swapState));
 
-  // --- Présence pilotée par une variable de SCÈNE (presenceContextOf) :
+  // --- Présence pilotée par une variable de SCÈNE (conditionContextOf) :
   // le cas "projection / porte cachée" — deux entités en alternance sur une
-  // variable que le projecteur écrit. presenceContextOf est le contexte
+  // variable que le projecteur écrit. conditionContextOf est le contexte
   // partagé par le TICK et la vue (montage de la scène audio) : sans le
   // monde, la condition vaudrait toujours faux et la vue couperait à tort
   // le beacon d'une entité présente. ---
@@ -765,7 +764,7 @@ export default function checkConditions(run) {
   );
   let scenePresenceState = createInitialState(scenePresenceScene, "scene-presence");
   const presentAtMount = (state) =>
-    getActiveWorld(state).entities.filter((e) => e.presence).map((e) => `${e.id}:${isPresent(e, presenceContextOf(state))}`).join(",");
+    getActiveWorld(state).entities.filter((e) => e.presence).map((e) => `${e.id}:${isPresent(e, conditionContextOf(state))}`).join(",");
   run("variable de scène : présence au montage (contexte partagé)", "projection:true,hidden-door:false", presentAtMount(scenePresenceState));
   run(
     "variable de scène : sans le monde, la condition vaudrait faux (le bug évité)",
@@ -806,7 +805,7 @@ export default function checkConditions(run) {
   );
 
   // --- Placement au sol : la présence d'un obstacle est évaluée dans le
-  // contexte COMPLET de la partie (core/presence.js/presenceContextOf) ---
+  // contexte COMPLET de la partie (core/conditions.js/conditionContextOf) ---
   // Un mur présent seulement sous perception : perception active, il
   // bloque, et l'éparpillement l'évite.
   const perceptionWallScene = parseScene(
@@ -827,8 +826,8 @@ export default function checkConditions(run) {
     },
     TIME_RANGE_REGISTRY
   );
-  const perceptionWallState = togglePerception(createInitialState(perceptionWallScene, 5));
-  run("placement : le mur est bien bloquant sous perception", true, isBlocking(getActiveWorld(perceptionWallState).entities[0], presenceContextOf(perceptionWallState)));
+  const perceptionWallState = toggleUnlockedPerception(createInitialState(perceptionWallScene, 5));
+  run("placement : le mur est bien bloquant sous perception", true, isBlocking(getActiveWorld(perceptionWallState).entities[0], conditionContextOf(perceptionWallState)));
   const SCATTER_DOG = { type: "dog", labelKey: "entity.dog.name", interactable: true, action: { kind: "pickup", amount: 1 } };
   const scattered = getActiveWorld(spawnScatteredEphemerals(perceptionWallState, SCATTER_DOG, 10, 12, 3))
     .entities.filter((e) => e.ephemeral)
@@ -871,7 +870,7 @@ export default function checkConditions(run) {
   );
 
   // --- Descriptions conditionnelles (core/entity-parse.js/descriptionRules,
-  // core/presence.js/selectDescriptionKey) : la première règle vraie, sinon
+  // core/conditions.js/selectDescriptionKey) : la première règle vraie, sinon
   // la description consommée, sinon la description habituelle. ---
   const SHUTTER_RULES = [{ when: { type: "timeRange", from: 20, to: 8 }, descriptionKey: "door.closed" }];
   const DESC_REGISTRY = {

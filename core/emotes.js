@@ -1,9 +1,10 @@
-// Registre des ÉMOTES — gestes SONORES du joueur (siffler, claquer des
-// mains...), joués sur sa position (touche "e", voir view/emotes.js).
-// Structuré comme core/improvements.js/IMPROVEMENT_REGISTRY : SOURCE DE
-// VÉRITÉ des émotes existantes, valide la condition knowsEmote et les effets
-// learnEmote/forgetEmote (voir core/script-parse.js). Ajouter une émote =
-// une entrée ici, jamais une chaîne en dur ailleurs.
+// ÉMOTES — gestes SONORES du joueur (siffler, claquer des mains...), joués sur
+// sa position (touche "e", voir view/emotes.js). Le registre
+// (config/emotes-values.js/EMOTE_REGISTRY, la donnée) est la SOURCE DE VÉRITÉ
+// des émotes existantes, validé ici au chargement ; il valide la condition
+// knowsEmote et les effets learnEmote/forgetEmote (voir core/script-parse.js).
+// Ajouter une émote = une entrée dans le registre, jamais une chaîne en dur
+// ailleurs.
 //
 // Une émote se CONNAÎT ou non, comme une amélioration se possède : le joueur
 // les apprend au fil de la partie (effet learnEmote, ou départ d'une partie
@@ -16,30 +17,7 @@
 // setEmoteShortcut plus bas.
 
 import { rejectUnknownFields, isNonEmptyString, isFiniteNumber } from "../lib/validate.js";
-
-// `order` (entier >= 1, UNIQUE) : position dans le menu des émotes, déclarée
-// comme pour les améliorations (réarranger le registre ne renumérote rien).
-// `soundPath` : la clé d'asset jouée sur le joueur (un pool, voir
-// lib/assets.js), vérifiée par l'audit du contenu comme tout son cité.
-// `range` (nombre > 0, unités de scène) : jusqu'où l'émote PORTE — au-delà,
-// aucune entité ne l'entend, aucun trigger n'est même examiné. Un trigger
-// peut la raccourcir (sa propre sensibilité), jamais l'allonger.
-export const EMOTE_REGISTRY = {
-  whistle: {
-    order: 1,
-    nameKey: "emote.whistle.name",
-    descriptionKey: "emote.whistle.description",
-    soundPath: "assets/sounds/emotes/calling_whistle",
-    range: 25,
-  },
-  clap: {
-    order: 2,
-    nameKey: "emote.clap.name",
-    descriptionKey: "emote.clap.description",
-    soundPath: "assets/sounds/emotes/hand_clap",
-    range: 12,
-  },
-};
+import { EMOTE_REGISTRY } from "../config/emotes-values.js";
 
 function failEmotes(message) {
   throw new Error(`EMOTE_REGISTRY : ${message}`);
@@ -79,7 +57,7 @@ export function emoteProps(id) {
 // STOCKAGE — session.emotes : { [id]: true }, SPARSE (une émote inconnue n'a
 // PAS de clé), cercle PARTIE et PERSISTANT, exactement comme
 // session.improvements (voir core/state.js/createInitialState,
-// core/save.js/migrateSave). Trois primitives PURES sur ce sac, même patron
+// core/save-migrate.js/migrateSave). Trois primitives PURES sur ce sac, même patron
 // que core/improvements.js : un id inconnu du registre n'est jamais vérifié
 // ICI, la validation vit au CHARGEMENT (core/script-parse.js,
 // core/new-game.js).

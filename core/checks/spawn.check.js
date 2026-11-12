@@ -8,8 +8,8 @@ import { parseScene } from "../scene.js";
 import { createInitialState, travelToWorld, BODY_RADIUS } from "../state.js";
 import { serializeGame, deserializeGame } from "../save.js";
 import { pickupItemEntity } from "../bag.js";
-import { ITEM_REGISTRY } from "../items.js";
-import { createSeed } from "../rng.js";
+import { ITEM_REGISTRY } from "../../config/items-values.js";
+import { createSeed } from "../../lib/rng.js";
 import { TUNING_DEFAULTS } from "../../config/tuning-values.js";
 import { INITIAL_TIME, advanceTime } from "../time.js";
 import { TIME_CONFIG } from "../../config/time-values.js";
@@ -72,7 +72,7 @@ export default function checkSpawn(run) {
   run("rareté : objets de l'étiquette sans rareté -> table rejetée", true, throws(() => validateSpawnTables({ t: { fromTag: "chic" } })));
   run("rareté : fromTag mêlé à des entrées -> table rejetée", true, throws(() => validateSpawnTables({ t: { fromTag: "electronic", apple: 1 } })));
 
-  // Tirage pondéré : core/rng.js/pickWeighted (le même que la météo) — équité vérifiée sur
+  // Tirage pondéré : lib/rng.js/pickWeighted (le même que la météo) — équité vérifiée sur
   // une table inline à deux objets 3:1.
   {
     const counts = { apple: 0, key_bronze: 0 };

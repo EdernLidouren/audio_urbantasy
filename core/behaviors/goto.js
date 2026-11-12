@@ -5,7 +5,7 @@
 // Variante de follow.js (voir son header) SANS zone morte élastique (une
 // seule distance d'arrivée, pas un couple minDistance/maxDistance) et AVEC
 // un état d'arrivée exposé (`entity.gotoArrived`) — lu par la condition
-// "arrived" (core/presence.js/evaluateArrived), qui permet à une règle
+// "arrived" (core/conditions.js/evaluateArrived), qui permet à une règle
 // d'enchaîner un effet (ex. "devient dormante une fois à la porte"). Ce
 // module se limite à SIGNALER l'arrivée, jamais à en tirer une conséquence.
 //
@@ -68,7 +68,7 @@ export function parseParams(raw, fail) {
 // de crash — même dégradation que follow.js. gotoArrived n'est PAS posé
 // dans ce cas : une impossibilité de progresser n'est pas une arrivée : la
 // dégradation en présence pour ce cas précis reste à la charge des règles
-// de l'entité (core/presence.js), pas de ce module.
+// de l'entité (core/conditions.js), pas de ce module.
 //
 // Arrivée (distance <= arriveDistance) : intent retombe à 0 (s'arrête) ET
 // `gotoArrived: true` est posé sur l'entité — persistant, jamais remis à

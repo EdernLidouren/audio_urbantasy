@@ -2,36 +2,20 @@
 // courante. Une seule source pour deux usages qui doivent voir le même
 // ensemble, dans le même ordre : l'annonce d'occupation (à l'approche) et
 // les candidats d'interaction (Espace, Entrée — voir
-// view/interaction.js/chooseInteractionTarget).
+// view/interaction.js/chooseInteractionTarget). Les règles (la portée, les
+// candidats d'un verbe) sont celles du core (core/interaction.js) ; ici,
+// seulement l'annonce et la portée de chaque entité, résolue en cascade.
 
 import { announce } from "../lib/announce.js";
 import { resolveTuning } from "../config/tuning.js";
 import { t } from "../data/i18n/index.js";
 import { getActiveWorld } from "../core/state.js";
-import { isSearchable } from "../core/spawn.js";
-import { offeredArticle, presentedLabelKey } from "../core/display.js";
+import { presentedLabelKey } from "../core/display.js";
+import { entitiesInReach, interactionCandidates } from "../core/interaction.js";
 
-// Entité qui n'a PLUS rien à offrir à Entrée, sans pour autant disparaître :
-// conteneur vidé, présentoir vide.
-function isSpentForActivation(entity, time) {
-  if (entity.container) return !isSearchable(entity, time);
-  if (entity.display) return offeredArticle(entity) === null;
-  return false;
-}
-
-// Entités dont la zone d'interaction (interactRange de chaque entité, en
-// cascade) englobe le joueur, triées de gauche à droite. Exclues : les
-// entités dormantes (voir core/presence.js) et celles qui n'offrent rien à
-// Espace ni à Entrée (décor, émetteur de son).
-function occupiedEntities(entities, x) {
-  return entities
-    .filter((entity) => {
-      if (entity.present === false) return false;
-      if (!entity.observable && !entity.interactable) return false;
-      return Math.abs(entity.x - x) <= resolveTuning("interactRange", entity);
-    })
-    .sort((a, b) => a.x - b.x);
-}
+// La portée d'interaction d'une entité : le réglage interactRange, en cascade
+// (config/tuning.js), injecté dans la règle du core.
+const interactRangeOf = (entity) => resolveTuning("interactRange", entity);
 
 function setsEqual(a, b) {
   if (a.size !== b.size) return false;
@@ -53,7 +37,7 @@ export function createOccupancy(getSession) {
   // l'ensemble change. L'ensemble vide ne dit rien.
   function update() {
     const session = getSession();
-    const occupied = occupiedEntities(getActiveWorld(session).entities, session.player.x);
+    const occupied = entitiesInReach(getActiveWorld(session).entities, session.player.x, interactRangeOf);
     currentOccupied = occupied;
     const occupiedIdsNow = new Set(occupied.map((entity) => entity.id));
     if (!setsEqual(occupiedIdsNow, occupiedIds)) {
@@ -66,17 +50,10 @@ export function createOccupancy(getSession) {
   }
 
   // Candidats pour un verbe ("describe" -> Espace, "activate" -> Entrée) :
-  // l'occupation courante filtrée par la capacité du verbe. Un conteneur
-  // VIDÉ ou un présentoir VIDE ne reste candidat à Entrée que s'il n'y a
-  // rien d'autre à activer : ramasser les objets tombés autour ne propose
-  // jamais de menu de désambiguïsation avec lui, et seul il annonce son état
-  // (voir view/action-execution.js/handleSearch, handleBuy).
+  // l'occupation courante filtrée par la règle du core
+  // (core/interaction.js/interactionCandidates).
   function getInteractionCandidates(kind) {
-    if (kind === "describe") return currentOccupied.filter((entity) => entity.observable);
-    const time = getSession().time;
-    const interactable = currentOccupied.filter((entity) => entity.interactable);
-    const live = interactable.filter((entity) => !isSpentForActivation(entity, time));
-    return live.length > 0 ? live : interactable;
+    return interactionCandidates(currentOccupied, kind, getSession().time);
   }
 
   return { update, getInteractionCandidates };

@@ -12,7 +12,7 @@
 // exécuteur, qui ne reçoit que des tranches.
 
 import { TICK_MS } from "../lib/loop.js";
-import { nextRandom } from "./rng.js";
+import { nextRandom } from "../lib/rng.js";
 
 function isWait(effect) {
   return effect.type === "wait";

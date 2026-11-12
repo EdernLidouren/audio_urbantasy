@@ -6,7 +6,7 @@
 
 import { parseScene } from "../scene.js";
 import { createInitialState, getActiveWorld, applyEntityActionEffects } from "../state.js";
-import { evaluateCondition } from "../presence.js";
+import { evaluateCondition } from "../conditions.js";
 import { validateEntityRegistry } from "../entity-parse.js";
 import { throws } from "../../lib/check.js";
 import { UNKNOWN_FIELD, expectSceneParseThrows, sceneParseMessage } from "./helpers.js";
@@ -14,11 +14,10 @@ import { UNKNOWN_FIELD, expectSceneParseThrows, sceneParseMessage } from "./help
 export default function checkEntities(run) {
   // --- Interaction niveau 0 : capacités observable/interactable ---
   // Cascade IDENTIQUE à blocksMovement (instance -> type -> défaut false),
-  // voir core/entity-parse.js/parseEntity. Le filtrage par verbe et la
-  // désambiguïsation restent côté vue (view/occupancy.js,
-  // view/interaction.js), hors de portée
-  // d'un check terminal — seule la RÉSOLUTION de ces deux champs est
-  // vérifiable ici.
+  // voir core/entity-parse.js/parseEntity. Le filtrage par verbe est une
+  // règle du core (domaine interaction) ; la désambiguïsation reste côté vue
+  // (view/interaction.js), hors de portée d'un check terminal — ici, seule la
+  // RÉSOLUTION de ces deux champs.
 
   const INTERACTION_REGISTRY = {
     describable: { nameKey: "entity.dog.name", observable: true, interactable: false },

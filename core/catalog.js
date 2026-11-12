@@ -11,7 +11,8 @@
 // l'importent sans tirer la transaction — jamais d'import circulaire.
 
 import { SHOP_CATALOGS } from "../config/shop-values.js";
-import { ITEM_REGISTRY, itemValue } from "./items.js";
+import { itemValue } from "./items.js";
+import { ITEM_REGISTRY } from "../config/items-values.js";
 
 // Prix d'achat unitaire d'un article : `price` déclaré, sinon `value` de
 // l'objet (pleine valeur). 0 si aucun des deux n'est un entier positif.
@@ -81,7 +82,7 @@ export function validateCatalog(catalog, describe, fail) {
 }
 
 // Articles d'un catalogue. `null` (neutralisé à la relecture d'une
-// sauvegarde, voir core/save.js/repairContentReferences) : aucun article.
+// sauvegarde, voir core/save-migrate.js/repairContentReferences) : aucun article.
 export function resolveCatalog(catalog) {
   if (catalog === null) return {};
   return catalog.table !== undefined ? SHOP_CATALOGS[catalog.table] : catalog.items;

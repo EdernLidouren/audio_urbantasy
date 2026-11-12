@@ -1,27 +1,18 @@
-// Préférences utilisateur : store clé -> valeur. Les défauts sont ceux de
-// PREF_CONSTRAINTS ci-dessous (champ `default`), seule source des bornes et
-// défauts de chaque préférence — sans lien avec config/tuning-values.js,
-// qui porte les réglages de feeling, pas les choix du joueur. TOUT le stockage vit ici :
-// localStorage automatique + export/import fichier manuel. Aucun autre
-// module n'importe localStorage ni ne connaît le format de persistance — les
-// appelants ne voient que getPref/setPref/export/import/reset.
+// Préférences utilisateur de Templeton : leurs CONTRAINTES (PREF_CONSTRAINTS,
+// défaut et bornes de chaque préférence) et le magasin qui les garde. Le
+// mécanisme (stockage local automatique, export et import d'un fichier,
+// validation de ce qui est lu) est générique : lib/preferences.js. Sans lien
+// avec config/tuning-values.js, qui porte les réglages de feeling, pas les choix
+// du joueur. Les appelants ne voient que getPref/setPref/export/import/reset.
 
-import { saveTextFile } from "../lib/download.js";
-
-const STORAGE_KEY = "templeton-preferences";
-
-// Format stocké : { version, prefs }. Les montées de version futures
-// s'ajoutent à migratePrefs ci-dessous (v1 -> v2 -> ... -> courante, jamais
-// en sautant une étape) ; pour l'instant, seule v1 existe.
-const PREFS_VERSION = 1;
+import { createPreferenceStore } from "../lib/preferences.js";
 
 // Contraintes par prefKey — SOURCE UNIQUE partagée entre la validation de
-// persistance (ci-dessous) et les sliders/toggles qui les consomment (voir
+// persistance (lib/preferences.js) et les sliders/toggles qui les consomment (voir
 // view/menus/*.js, qui lisent min/max/default d'ici plutôt que de les
 // redéfinir) : jamais deux définitions divergentes des bornes d'une même
 // préférence. type ∈ "number" (borné [min,max]) | "boolean" (bornes non
-// pertinentes, ignorées par isValidPrefValue) | "string" (une valeur parmi
-// `values`).
+// pertinentes) | "string" (une valeur parmi `values`).
 export const PREF_CONSTRAINTS = {
   // Langue des textes et des annonces (voir view/locale.js). "auto" suit la
   // langue du navigateur ; sinon une langue fournie par data/i18n/ — liste
@@ -88,158 +79,12 @@ export const PREF_CONSTRAINTS = {
   saveSoundEnabled: { type: "boolean", default: true },
 };
 
-const store = new Map();
-
-function isValidKey(key) {
-  return typeof key === "string" && key !== "";
-}
-
-// Valide UNE valeur pour une clé CONNUE : type + bornes de
-// PREF_CONSTRAINTS. Clé absente du registre -> invalide par construction
-// (jamais persistée ni acceptée à l'import, quelle que soit sa valeur).
-function isValidPrefValue(key, value) {
-  const constraint = PREF_CONSTRAINTS[key];
-  if (!constraint) return false;
-  if (typeof value !== constraint.type) return false;
-  if (constraint.type === "number" && (value < constraint.min || value > constraint.max)) return false;
-  // Une préférence texte n'existe qu'avec la liste de ses valeurs : sans
-  // elle, aucune valeur n'est valide (jamais une exception sur `values`).
-  if (constraint.type === "string" && !(constraint.values ?? []).includes(value)) return false;
-  return true;
-}
-
-// raw = objet JSON déjà parsé (localStorage ou fichier importé), donnée
-// SUSPECTE par définition (corrompue, périmée, trafiquée). Convertit vers
-// le format courant selon raw.version ; absent/inconnu -> aucun chemin de
-// montée connu, on repart des défauts (objet de préférences vide).
-function migratePrefs(raw) {
-  if (!raw || typeof raw !== "object") return {};
-  if (raw.version === PREFS_VERSION) {
-    return raw.prefs && typeof raw.prefs === "object" ? raw.prefs : {};
-  }
-  return {};
-}
-
-// Valide chaque entrée d'un objet de préférences déjà migré : clé connue +
-// valeur conforme à PREF_CONSTRAINTS, sinon ignorée silencieusement.
-// Chemin PARTAGÉ par localStorage et l'import fichier — mêmes garanties.
-function validatePrefs(rawPrefs) {
-  const valid = {};
-  for (const [key, value] of Object.entries(rawPrefs)) {
-    if (isValidPrefValue(key, value)) valid[key] = value;
-  }
-  return valid;
-}
-
-// Chargement au tout premier import de ce module. Toute défaillance
-// (localStorage indisponible — mode privé, quota, désactivé — ou JSON
-// illisible) -> store vide (défauts), jamais d'exception : le jeu démarre
-// toujours.
-function loadFromStorage() {
-  // Aucun stockage du tout (outils lancés avec Node, qui importent des modules de
-  // la vue) : les défauts, sans avertir, ce n'est pas une défaillance.
-  if (typeof localStorage === "undefined") return;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-
-    const prefs = validatePrefs(migratePrefs(JSON.parse(raw)));
-    for (const [key, value] of Object.entries(prefs)) {
-      store.set(key, value);
-    }
-  } catch (error) {
-    console.warn("preferences: lecture localStorage impossible, repli sur les défauts.", error);
-  }
-}
-loadFromStorage();
-
-function serializeStore() {
-  return JSON.stringify({ version: PREFS_VERSION, prefs: Object.fromEntries(store) });
-}
-
-// Best-effort : une écriture qui échoue (quota, mode privé, désactivé)
-// n'interrompt jamais l'appelant, juste un avertissement discret.
-function persist() {
-  try {
-    localStorage.setItem(STORAGE_KEY, serializeStore());
-  } catch (error) {
-    console.warn("preferences: écriture localStorage impossible, non persisté.", error);
-  }
-}
-
-export function getPref(key, fallback) {
-  if (!isValidKey(key)) {
-    console.warn("preferences: clé de préférence invalide, repli sur le défaut fourni.");
-    return fallback;
-  }
-  return store.has(key) ? store.get(key) : fallback;
-}
-
-export function setPref(key, value) {
-  if (!isValidKey(key)) {
-    console.warn("preferences: clé de préférence invalide, écriture ignorée.");
-    return;
-  }
-  store.set(key, value);
-  persist();
-}
-
-// Réinitialise TOUTES les préférences connues à leur valeur par défaut
-// (PREF_CONSTRAINTS), via setPref — jamais d'accès direct au store : même
-// chemin, mêmes garanties que toute autre écriture. Utilisé par
-// "Réinitialiser tous les réglages" (menu Options) — robuste par
-// construction à l'ajout futur d'une préférence : il suffit de la déclarer
-// dans PREF_CONSTRAINTS, ce reset la couvre automatiquement.
-export function resetAllPrefs() {
-  for (const [key, constraint] of Object.entries(PREF_CONSTRAINTS)) {
-    setPref(key, constraint.default);
-  }
-}
-
-// Déclenche le téléchargement d'un fichier JSON contenant les préférences
-// courantes, au même format que le stockage local — donc ré-importable tel
-// quel. Rend la promesse de lib/download.js/saveTextFile ("saved" |
-// "cancelled" | "downloaded"), que l'appelant annonce.
-export function exportPreferences() {
-  const text = JSON.stringify({ version: PREFS_VERSION, prefs: Object.fromEntries(store) }, null, 2);
-  return saveTextFile("templeton-preferences.json", text, { description: "Préférences Templeton" });
-}
-
-// Lit, migre, valide et applique un fichier de préférences (typiquement
-// exporté par exportPreferences, mais toute donnée suspecte passe par le
-// même chemin de validation que localStorage). Ne lève jamais : résultat
-// { success, reason? } pour que l'appelant décide quoi annoncer.
-// reason ∈ "read" (FileReader), "parse" (JSON invalide), "empty" (aucune
-// préférence valide reconnue une fois migrée/validée).
-export function importPreferences(file) {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-
-    reader.onerror = () => resolve({ success: false, reason: "read" });
-
-    reader.onload = () => {
-      let parsed;
-      try {
-        parsed = JSON.parse(reader.result);
-      } catch (error) {
-        resolve({ success: false, reason: "parse" });
-        return;
-      }
-
-      const prefs = validatePrefs(migratePrefs(parsed));
-      if (Object.keys(prefs).length === 0) {
-        resolve({ success: false, reason: "empty" });
-        return;
-      }
-
-      // setPref persiste aussi (une écriture par clé : store minuscule, pas
-      // besoin d'optimiser en une seule écriture groupée).
-      for (const [key, value] of Object.entries(prefs)) {
-        setPref(key, value);
-      }
-      resolve({ success: true });
-    };
-
-    reader.readAsText(file);
-  });
-}
+// Le magasin, chargé dès le premier import de ce module. Format stocké :
+// { version, prefs } ; pour l'instant, seule la version 1 existe.
+export const { getPref, setPref, resetAllPrefs, exportPreferences, importPreferences } = createPreferenceStore({
+  storageKey: "templeton-preferences",
+  version: 1,
+  constraints: PREF_CONSTRAINTS,
+  fileName: "templeton-preferences.json",
+  fileDescription: "Préférences Templeton",
+});

@@ -12,7 +12,7 @@
 import { playOneShot, preloadOneShot, preloadMusic } from "../../lib/audio.js";
 import { resolveAsset, assetKeyMembers } from "../../lib/assets.js";
 import { gaitOf } from "../../core/equipment.js";
-import { EMOTE_REGISTRY } from "../../core/emotes.js";
+import { EMOTE_REGISTRY } from "../../config/emotes-values.js";
 import player from "../../entities/player.js";
 import {
   PLAYER_GAIT_POOL,

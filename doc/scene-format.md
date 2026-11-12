@@ -150,7 +150,7 @@ s'inversent — c'est ce croisement qui l'anime, plutôt qu'un échange
 instantané.
 
 **Persistance** : une scène à deux faces sauvegarde SES DEUX FACES
-(entités, rngState, compteur d'éphémères) — `core/save.js` traite un monde à
+(entités, rngState, compteur d'éphémères) — `core/save.js` et `core/save-migrate.js` traitent un monde à
 deux faces comme deux faces indépendantes (purge d'éphémères,
 rebouchage `defaultSurface`/`segments`/`nextEphemeralId`). Une sauvegarde
 antérieure à ce modèle n'a jamais de `recto`/`verso` (scènes simples

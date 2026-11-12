@@ -5,19 +5,20 @@
 // construite en dur via un objet littéral passé à parseScene.
 
 import { parseScene } from "../scene.js";
-import { createInitialState, togglePerception, applyEntityActionEffects, BODY_RADIUS } from "../state.js";
+import { createInitialState, applyEntityActionEffects, BODY_RADIUS } from "../state.js";
 import { reduce } from "../reduce.js";
 import { addItem, dropItem, pickupItemEntity } from "../bag.js";
 import { ephemeralItemSpec } from "../spawn.js";
 import { serializeGame, deserializeGame } from "../save.js";
 import { mineEntity } from "../mining.js";
-import { isPresent, presenceContextOf } from "../presence.js";
+import { isPresent, conditionContextOf } from "../conditions.js";
 import { resolveDistribution } from "../distribution.js";
 import { ACTION_KINDS } from "../action-kinds.js";
 import { TUNING_DEFAULTS } from "../../config/tuning-values.js";
 import { SPAWN_TABLES } from "../../config/spawn-values.js";
-import { ITEM_REGISTRY } from "../items.js";
+import { ITEM_REGISTRY } from "../../config/items-values.js";
 import { auditNonSerializable, throws } from "../../lib/check.js";
+import { toggleUnlockedPerception } from "./helpers.js";
 
 export default function checkMining(run) {
   const MINING_REGISTRY = {
@@ -149,11 +150,11 @@ export default function checkMining(run) {
     walk(1);
     const stop = 15 - BODY_RADIUS;
     run("énigme : le champ arrête le joueur", stop, game.player.x);
-    game = togglePerception(game);
+    game = toggleUnlockedPerception(game);
     walk(1);
     run("énigme : perception coupée, la doublure l'arrête au même endroit", stop, game.player.x);
     run("énigme : c'est bien la doublure qui bloque", "field-unseen", game.player.blockedBy);
-    game = togglePerception(game);
+    game = toggleUnlockedPerception(game);
     walk(1);
     run("énigme : perception rallumée, toujours arrêté", stop, game.player.x);
 
@@ -279,7 +280,7 @@ export default function checkMining(run) {
   const breakScene = parseScene(breakRaw, MINING_REGISTRY);
   const breakWorld = (s) => s.worlds[breakScene.id];
   const breakEntity = (s, id) => breakWorld(s).entities.find((e) => e.id === id);
-  const revealedHere = (s) => isPresent(breakEntity(s, "revealed-1"), presenceContextOf(s));
+  const revealedHere = (s) => isPresent(breakEntity(s, "revealed-1"), conditionContextOf(s));
   const breakFresh = createInitialState(breakScene);
   run("minage, destruction : avant -> l'entité révélée dort", false, revealedHere(breakFresh));
   const breakHit = mineEntity(breakFresh, "vein-1", MINING_REGISTRY);

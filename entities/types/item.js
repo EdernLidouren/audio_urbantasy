@@ -1,7 +1,7 @@
 // Archétype "item" — un objet du monde RAMASSABLE VERS LE SAC (voir
 // doc/entity-model.md/"Sac d'objets"), par opposition à "money" (vers
 // session.money) : action { kind: "pickup", item: <type>, count: <n> },
-// <type> référence une entrée de core/items.js/ITEM_REGISTRY.
+// <type> référence une entrée de config/items-values.js/ITEM_REGISTRY.
 //
 // Preset GÉNÉRIQUE, PAS un objet précis — contrairement à "money" (un seul
 // type d'argent, un seul nameKey pertinent), CE type recouvre N objets

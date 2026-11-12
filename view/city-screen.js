@@ -101,7 +101,7 @@ export function makeCityScreen(getSession, setSession) {
   };
 
   // Accès CONSOLE réservé aux tests en jeu (tools/test-kit.js), relayé par
-  // main.js en MODE DEBUG seulement : les fonctions que les touches et les
+  // view/debug-console.js en MODE DEBUG seulement : les fonctions que les touches et les
   // menus de debug appellent déjà, sans menu à parcourir. Aucune logique
   // propre ici.
   const debugActions = {

@@ -3,7 +3,7 @@
 // L'ordre des entrées est l'ordre d'affichage, fixe (celui de la liste de
 // l'auteur : roches, minerais, métaux natifs, minéraux et cristaux, pierres
 // fines, pierres précieuses, fossiles et curiosités). Chaque entrée
-// référence un objet du sac (core/items.js/ITEM_REGISTRY) ; ses textes de
+// référence un objet du sac (config/items-values.js/ITEM_REGISTRY) ; ses textes de
 // collection vivent sous collection.minerals.entry.<objet>.*
 // (collections.json).
 export default {

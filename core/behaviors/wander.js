@@ -1,7 +1,7 @@
 // Comportement "wander" : errance en DEUX ÉTATS — MARCHE (avance dans une
 // direction) / PAUSE (immobile) — au lieu d'un mouvement continu haché par
 // un flip de direction à chaque tick. Déterministe (PRNG seedé, voir
-// core/rng.js) : les durées de chaque état ET les directions sont TIRÉES,
+// lib/rng.js) : les durées de chaque état ET les directions sont TIRÉES,
 // jamais Math.random().
 //
 // Respecte la frontière comportement/physique (voir core/reduce.js) : ce
@@ -27,7 +27,7 @@
 // entité (lazy init dans step(), pas de seed dédiée dans core/state.js :
 // ce module gère seul tout son état, y compris son tirage initial).
 
-import { nextRandom } from "../rng.js";
+import { nextRandom } from "../../lib/rng.js";
 import { TICK_MS } from "../../lib/loop.js";
 import { TUNING_DEFAULTS } from "../../config/tuning-values.js";
 import { isFiniteNumber } from "../../lib/validate.js";

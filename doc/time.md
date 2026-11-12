@@ -110,7 +110,7 @@ non testable en terminal) :
 `session.time` est un nombre plat : couvert par construction par l'audit de
 sérialisabilité (`core/checks/save.check.js`), étendu explicitement à ce champ. Une
 sauvegarde sans cette clé est rebouchée à `INITIAL_TIME` par
-`core/save.js`/`migrateSave`, même principe que le rebouchage de
+`core/save-migrate.js`/`migrateSave`, même principe que le rebouchage de
 `defaultSurface`/`segments`.
 
 ## Lien réservé avec `lastVisited`, pas exploité
@@ -164,7 +164,7 @@ annonce « La nuit tombe. » / « Le jour se lève. » : `view/ambient-announcem
 
 ## Présence conditionnelle d'entité — deuxième consommateur
 
-`core/presence.js`/`isPresent` dérive la présence d'une entité de `session.time`
+`core/conditions.js`/`isPresent` dérive la présence d'une entité de `session.time`
 via ses règles déclaratives (`presence: [{ when, present }]`) — condition
 `"timeRange"` aujourd'hui, même dérivation d'heure que `phaseAt` mais totalement
 DÉCOUPLÉE de la phase jour/nuit (une entité déclare son propre horaire, ex.

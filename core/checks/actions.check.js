@@ -9,10 +9,11 @@ import { throws } from "../../lib/check.js";
 
 export default function checkActions(run) {
   // --- Actions CONDITIONNELLES (core/script-parse.js/parseSingleAction, action.condition/
-  // refusalEffects ; voir view/interaction.js) — GÉNÉRIQUE à TOUT kind,
-  // testé ICI en FORME/VALIDATION seulement (au chargement) ; le blocage +
-  // l'exécution des effets de refus à l'interaction sont côté vue, hors de
-  // portée d'un test terminal — ce volet se vérifie à l'oreille, en jeu.
+  // refusalEffects) — GÉNÉRIQUE à TOUT kind, testé ICI en FORME/VALIDATION
+  // seulement (au chargement) ; le choix de l'action et le refus à l'activation
+  // sont la règle du core (core/interaction.js/activationOf, domaine
+  // interaction) ; l'exécution des effets de refus est côté vue, hors de portée
+  // d'un test terminal — ce volet se vérifie à l'oreille, en jeu.
 
   const ACTION_CONDITION_REGISTRY = { dog: { nameKey: "entity.dog.name" } };
 

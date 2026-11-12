@@ -10,7 +10,7 @@ import { serializeGame, deserializeGame } from "../save.js";
 import { addMoney } from "../money.js";
 import { advanceTime } from "../time.js";
 import { giveImprovement } from "../improvements.js";
-import { ITEM_REGISTRY } from "../items.js";
+import { ITEM_REGISTRY } from "../../config/items-values.js";
 import { TIME_CONFIG } from "../../config/time-values.js";
 import { DISPLAY_ARTICLES, DISPLAY_TABLES } from "../../config/shop-values.js";
 import { refillDueSpawns } from "../spawn.js";

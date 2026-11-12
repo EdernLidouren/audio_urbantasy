@@ -1,5 +1,5 @@
 // Décalage de SEUIL TEMPOREL par entité — dérivation PURE et DÉTERMINISTE
-// (voir core/rng.js), utilisée par core/presence.js/evaluateTimeRange pour
+// (voir lib/rng.js), utilisée par core/conditions.js/evaluateTimeRange pour
 // désynchroniser des entités qui partagent la même règle temporelle (ex.
 // trois PNJ "partent vers 6h" -> chacun à SA propre minute, pas tous pile à
 // l'heure). Voir doc/scripting.md/"spread" pour la doc côté contenu — le
@@ -18,14 +18,14 @@
 // porte PLUSIEURS règles temporelles à spread obtient un décalage
 // INDÉPENDANT pour chacune, plutôt qu'un même tirage brut simplement remis
 // à l'échelle par des spreads différents.
-import { createSeed, nextRandom } from "./rng.js";
+import { createSeed, nextRandom } from "../lib/rng.js";
 import { TIME_CONFIG } from "../config/time-values.js";
 
 const NAMESPACE = "temporalSpread";
 
 // Décalage en HEURES (fractionnaires), dans [-spread, +spread] — spread
 // donné en MINUTES (voir doc/scripting.md) — prêt à s'ajouter directement
-// à un seuil `from`/`to` de core/presence.js/evaluateTimeRange. spread
+// à un seuil `from`/`to` de core/conditions.js/evaluateTimeRange. spread
 // absent, non fini ou <= 0 -> 0 (pas de spread déclaré, pas de décalage :
 // seuil pile à l'heure déclarée).
 export function temporalThresholdOffset(entityId, from, to, spreadMinutes) {

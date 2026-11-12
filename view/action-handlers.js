@@ -54,22 +54,25 @@ export function registerActionHandlers({ getSession, setSession, travel }) {
   const bindings = [
     // Effet "teleport" (portes et tout autre effet).
     [setTeleportHandler, travel.executeTeleport],
+    // Ramasser et fouiller un collectible : chaque gestionnaire rend vrai si la
+    // transaction a eu lieu (applyTransaction), et la vue n'annonce qu'alors
+    // (view/action-execution.js/handlePickup, handleLoot).
     // Ramassage d'argent (`amount` déjà extrait de l'action résolue par
     // view/action-execution.js/handlePickup).
-    [setPickupHandler, (entity, amount) => setSession(pickupEntity(getSession(), entity.id, amount))],
+    [setPickupHandler, (entity, amount) => applyTransaction(pickupEntity(getSession(), entity.id, amount))],
     // Ramassage vers le sac.
-    [setItemPickupHandler, (entity, item, count) => setSession(pickupItemEntity(getSession(), entity.id, item, count))],
+    [setItemPickupHandler, (entity, item, count) => applyTransaction(pickupItemEntity(getSession(), entity.id, item, count))],
     // Loot d'argent : l'entité passe consommée, jamais retirée.
-    [setLootHandler, (entity, amount) => setSession(lootEntity(getSession(), entity.id, amount))],
+    [setLootHandler, (entity, amount) => applyTransaction(lootEntity(getSession(), entity.id, amount))],
     // Loot d'un objet unique : l'entité passe consommée, rien d'autre.
-    [setLootUniqueHandler, (entity) => setSession(lootUniqueEntity(getSession(), entity.id))],
+    [setLootUniqueHandler, (entity) => applyTransaction(lootUniqueEntity(getSession(), entity.id))],
     // Loot éparpillé : le descripteur minimal (ex. { type: "money", amount:
     // 20 }) est résolu par le core, avec le registre injecté.
     [
       setLootSpawnHandler,
       (entity, spawn) => {
         const spec = ephemeralArchetypeSpec(getSession(), spawn.spec.type, registry, spawn.spec);
-        setSession(lootEntitySpawn(getSession(), entity.id, spec, spawn.count, spawn.spread));
+        return applyTransaction(lootEntitySpawn(getSession(), entity.id, spec, spawn.count, spawn.spread));
       },
     ],
     // Bascule de face par un passage.

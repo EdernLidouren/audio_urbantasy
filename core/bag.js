@@ -1,6 +1,6 @@
 // Le SAC (session.bag) — deuxième tiers de l'inventaire après l'argent
 // (voir core/money.js) : une liste d'ENTRÉES, { type, quantity } pour un
-// objet EMPILABLE (voir core/items.js/ITEM_REGISTRY) — une SEULE entrée
+// objet EMPILABLE (voir config/items-values.js/ITEM_REGISTRY) — une SEULE entrée
 // par type, quantity incrémentée à chaque ajout — ou { type } SEUL pour un
 // objet NON empilable — une entrée PAR EXEMPLAIRE, jamais de quantity
 // (toujours 1 par construction : deux clés = deux entrées distinctes).
@@ -22,11 +22,11 @@
 // action du sac au-delà de la consultation.
 
 import { removeEntity, spawnEphemeral, activeFaceEntities } from "./state.js";
-import { ITEM_REGISTRY } from "./items.js";
+import { ITEM_REGISTRY } from "../config/items-values.js";
 
 // type ABSENT du registre -> traité comme NON empilable (repli sûr, jamais
 // un throw pour un typo de contenu — même politique de dégradation que le
-// reste du projet, ex. core/presence.js sur une condition inconnue) : crée
+// reste du projet, ex. core/conditions.js sur une condition inconnue) : crée
 // une entrée de plus, silencieusement dégradée, jamais un crash en jeu
 // réel.
 export function addItem(session, type, count = 1) {

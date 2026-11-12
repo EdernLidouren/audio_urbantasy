@@ -25,7 +25,7 @@ import { createPositionedSound, randomRate } from "../../lib/audio.js";
 import { resolveAsset } from "../../lib/assets.js";
 import registry from "../../entities/types/index.js";
 import { TUNING_DEFAULTS, resolveTuning } from "../../config/tuning.js";
-import { isPresent, presenceContextOf } from "../../core/presence.js";
+import { isPresent, conditionContextOf } from "../../core/conditions.js";
 import { offeredArticle } from "../../core/display.js";
 import { STEP_DISTANCE, createWalkerState } from "./footsteps.js";
 
@@ -302,12 +302,12 @@ export function buildEntitySoundEntry(entity, session, { otherFace = false, disa
     intermittentSources.push({ ...source, gain: source.gain * faceGain(vocalCrossFaceGain), role: "vocal", cadenceRules });
   }
 
-  // Présence de départ, avec le MÊME contexte que le tick (presenceContextOf)
+  // Présence de départ, avec le MÊME contexte que le tick (conditionContextOf)
   // : sans le monde ni la partie, une condition sur une variable de scène
   // couperait à tort la balise. Une balise continue créée dormante est
   // arrêtée aussitôt (son Howl reste prêt). Aucun son de transition : l'état
   // de départ n'est pas une bascule.
-  if (sound && !isPresent(entity, presenceContextOf(session))) sound.stop();
+  if (sound && !isPresent(entity, conditionContextOf(session))) sound.stop();
 
   return {
     entity,

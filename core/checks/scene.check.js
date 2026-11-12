@@ -9,7 +9,8 @@ import { createInitialState, getActiveWorld, MOVE_STEP } from "../state.js";
 import { tick } from "../actions.js";
 import { reduce } from "../reduce.js";
 import { serializeGame, deserializeGame } from "../save.js";
-import { DEFAULT_SURFACE, surfaceAt } from "../surfaces.js";
+import { surfaceAt } from "../surfaces.js";
+import { DEFAULT_SURFACE } from "../../config/surfaces-values.js";
 import { throws } from "../../lib/check.js";
 import { EMPTY_REGISTRY, WORLD_A_REGISTRY, TWO_FACED_RAW_SCENE, UNKNOWN_FIELD, expectSceneParseThrows, sceneParseMessage } from "./helpers.js";
 

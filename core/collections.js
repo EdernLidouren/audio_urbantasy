@@ -5,7 +5,7 @@
 //
 // Une collection = { discoverySound?, entries: [...] } : une liste ORDONNÉE
 // d'entrées, de DEUX genres :
-//   - `{ item }` : un objet du sac (core/items.js/ITEM_REGISTRY), DÉCOUVERT
+//   - `{ item }` : un objet du sac (config/items-values.js/ITEM_REGISTRY), DÉCOUVERT
 //     dès qu'il a été acquis une fois (session.acquiredItems, posé par
 //     core/bag.js/addItem) ;
 //   - `{ entity }` : un type d'entité (entities/types/), DÉCOUVERT dès que

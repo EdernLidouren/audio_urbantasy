@@ -7,7 +7,7 @@
 
 import { parseScene } from "../scene.js";
 import { createInitialState, applyEntityActionEffects } from "../state.js";
-import { evaluateCondition, selectMatchingAction } from "../presence.js";
+import { evaluateCondition, selectMatchingAction } from "../conditions.js";
 import { serializeGame, deserializeGame, resetVisitVariables } from "../save.js";
 import { applyActionEffects, parseVariables, getVariable, setVariable } from "../variables.js";
 import { throws, auditNonSerializable, fail } from "../../lib/check.js";
@@ -265,10 +265,10 @@ export default function checkVariables(run) {
 
   // --- VARIABLES BRANCHÉES (voir doc/scripting.md/"Variables"
   // et "Actions multiples filtrées par condition") : condition "variable"
-  // (LECTURE, core/presence.js/evaluateVariable), effets setVariable/
+  // (LECTURE, core/conditions.js/evaluateVariable), effets setVariable/
   // toggleVariable/addVariable (ÉCRITURE, core/script-parse.js/parseActionEffect,
   // core/variables.js/applyActionEffects), sélection d'action multiple par
-  // condition (core/presence.js/selectMatchingAction). Cas de référence :
+  // condition (core/conditions.js/selectMatchingAction). Cas de référence :
   // la FENÊTRE (deux candidates aux conditions opposées).
   {
     // 1) Condition "variable" — direct via evaluateCondition, contexte
@@ -354,7 +354,7 @@ export default function checkVariables(run) {
     );
 
     // 2) selectMatchingAction — sélection SILENCIEUSE (pas de menu, voir
-    // core/presence.js) parmi des candidates, PREMIÈRE dont la condition
+    // core/conditions.js) parmi des candidates, PREMIÈRE dont la condition
     // est vraie.
     const candidateOpen = { kind: "applyEffects", condition: { type: "variable", scope: "entity", name: "isOpen", equals: false } };
     const candidateClose = { kind: "applyEffects", condition: { type: "variable", scope: "entity", name: "isOpen", equals: true } };

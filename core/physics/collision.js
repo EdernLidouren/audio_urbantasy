@@ -22,12 +22,12 @@
 
 import { MOVE_STEP, BODY_RADIUS } from "../state.js";
 import { moveWithinBounds } from "./movement.js";
-import { isBlocking } from "../presence.js";
+import { isBlocking } from "../conditions.js";
 
 // Cœur commun : pas fixe (MOVE_STEP × speed, voir plus bas) + bornes de la
 // scène (moveWithinBounds), PUIS le corps de la première entité BLOQUANTE
 // rencontrée dans le sens du déplacement (isBlocking : blocksMovement ET
-// présente, voir core/presence.js — une entité DORMANTE ne bloque jamais,
+// présente, voir core/conditions.js — une entité DORMANTE ne bloque jamais,
 // "comme si absente"), à `clearance` du centre de son corps (si son bord
 // serait franchi). blockedBy est l'id de cette entité, ou null si rien
 // n'arrête le mouvement. dir === 0 : jamais bloqué (rien n'est tenté). Pure,
@@ -64,7 +64,7 @@ function resolveBlockedMove(moverX, dir, entities, sceneLength, clearance, prese
 // Résout le déplacement VOULU du joueur pour ce tick : le joueur est un
 // POINT (dégagement d'un seul BODY_RADIUS face à un corps bloquant), voir
 // header et overlap.js §1 pour la convention miroir. presenceContext : voir
-// core/presence.js/isBlocking — requis dès qu'une entité de `entities` peut
+// core/conditions.js/isBlocking — requis dès qu'une entité de `entities` peut
 // porter une règle de présence (toujours fourni par core/reduce.js). `speed`
 // n'est JAMAIS fourni par le joueur (voir core/reduce.js) : reste à son
 // défaut 1, le joueur avance toujours au pas fixe MOVE_STEP.

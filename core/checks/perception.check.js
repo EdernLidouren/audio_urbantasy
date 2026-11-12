@@ -4,11 +4,12 @@
 // via un objet littéral passé à parseScene.
 
 import { parseScene } from "../scene.js";
-import { createInitialState, getActiveWorld, togglePerception } from "../state.js";
+import { createInitialState, getActiveWorld, perceptionAvailable, togglePerception } from "../state.js";
 import { tick } from "../actions.js";
 import { reduce } from "../reduce.js";
 import { SAVE_VERSION, serializeGame, deserializeGame } from "../save.js";
-import { evaluateCondition } from "../presence.js";
+import { evaluateCondition } from "../conditions.js";
+import { setDebugEnabled } from "../../config/debug.js";
 import { TICK_MS } from "../../lib/loop.js";
 import { RAW_SCENE, EMPTY_REGISTRY, createAuditFixture } from "./helpers.js";
 
@@ -18,7 +19,7 @@ export default function checkPerception(run) {
   const { auditSession } = createAuditFixture();
 
   // --- Perception surnaturelle (core/state.js/togglePerception,
-  // core/presence.js/"perceptionActive") : état + condition, CORE pur.
+  // core/conditions.js/"perceptionActive") : état + condition, CORE pur.
   // La bascule sonore (crossfade musique/ambiance, filtre d'étouffement des
   // entités mondaines) reste ENTIÈREMENT côté vue (view/perception-toggle.js,
   // view/audio/layers.js, view/audio/muffle.js) — hors de portée d'un check
@@ -26,7 +27,19 @@ export default function checkPerception(run) {
 
   run("perception : createInitialState — perceptionActive false par défaut", false, createInitialState(scene).perceptionActive);
 
-  const perceptionSession = createInitialState(scene);
+  // Sa RÈGLE D'ACCÈS, dans le core : l'amélioration "supernatural_perception"
+  // (lue par la condition hasImprovement, court-circuit debug compris).
+  const lockedSession = createInitialState(scene);
+  run("perception : sans l'amélioration, indisponible", false, perceptionAvailable(lockedSession));
+  run("perception : sans l'amélioration, la bascule est refusée (même référence)", true, togglePerception(lockedSession) === lockedSession);
+  setDebugEnabled(true);
+  try {
+    run("perception : en mode debug, disponible sans l'amélioration", true, togglePerception(lockedSession).perceptionActive);
+  } finally {
+    setDebugEnabled(false);
+  }
+  const perceptionSession = { ...lockedSession, improvements: { ...lockedSession.improvements, supernatural_perception: true } };
+  run("perception : avec l'amélioration, disponible", true, perceptionAvailable(perceptionSession));
   const perceptionToggled = togglePerception(perceptionSession);
   run("perception : togglePerception active (false -> true)", true, perceptionToggled.perceptionActive);
   run("perception : togglePerception NE MUTE JAMAIS l'original", false, perceptionSession.perceptionActive);
@@ -100,7 +113,7 @@ export default function checkPerception(run) {
   }
 
   // Sauvegarde ANTÉRIEURE à ce mécanisme : jamais eu de clé
-  // `perceptionActive` — sans rebouchage (core/save.js/migrateSave), une
+  // `perceptionActive` — sans rebouchage (core/save-migrate.js/migrateSave), une
   // partie ainsi rechargée porterait `undefined` au lieu d'un booléen.
   const { perceptionActive: _droppedPerception, ...auditSessionWithoutPerception } = auditSession;
   const oldPerceptionSave = { version: SAVE_VERSION, data: auditSessionWithoutPerception };

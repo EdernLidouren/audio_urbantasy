@@ -18,7 +18,7 @@ import { makeMenuScreen } from "../../lib/menu.js";
 import { openQuantityList, selectedCount, selectedTotal } from "./shop-quantity-list.js";
 import { announce } from "../../lib/announce.js";
 import { playMenuSound } from "../menu-sounds.js";
-import { ITEM_REGISTRY } from "../../core/items.js";
+import { ITEM_REGISTRY } from "../../config/items-values.js";
 import { getActiveWorld } from "../../core/state.js";
 import { isSellable, sellValueOf, ownedQuantity, shopArticles } from "../../core/trade.js";
 

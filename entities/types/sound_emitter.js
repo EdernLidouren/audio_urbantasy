@@ -1,6 +1,6 @@
 // Archétype "sound_emitter" — ÉMETTEUR INVISIBLE : une position et un
 // script, rien d'autre. Ni observable ni interactable (donc jamais annoncé
-// à l'approche, voir view/occupancy.js/occupiedEntities), aucun rôle
+// à l'approche, voir core/interaction.js/entitiesInReach), aucun rôle
 // de son propre : ses sons se déclarent PAR INSTANCE, jamais ici — comme
 // un comportement. Deux usages :
 //   - des `triggers` (voir doc/scripting.md/"Triggers") : un playSound

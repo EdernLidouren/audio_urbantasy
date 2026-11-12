@@ -1,12 +1,12 @@
 // Archétype "neon" — enseigne lumineuse PRÉSENTE UNIQUEMENT LA NUIT, de 22 h
 // à 6 h (voir
-// core/presence.js) : cas de test du système de présence conditionnelle. Le
+// core/conditions.js) : cas de test du système de présence conditionnelle. Le
 // jour, aucune règle ne correspond -> DORMANTE (silencieuse, non
-// examinable, jamais bloquante — voir core/presence.js/isPresent). La nuit,
+// examinable, jamais bloquante — voir core/conditions.js/isPresent). La nuit,
 // PRÉSENTE : bourdonnement continu (beacon "neon_beacon", pool via
 // resolveAsset). Donnée pure : aucun import.
 //
-// enterSound/exitSound (voir core/presence.js, view/audio/oneshots.js) :
+// enterSound/exitSound (voir core/conditions.js, view/audio/oneshots.js) :
 // rôles PONCTUELS et POSITIONNÉS, distincts du beacon — joués UNE FOIS sur
 // une bascule de présence OBSERVÉE (jamais à l'entrée en scène si le néon
 // est déjà présent/dormant, voir core/reduce.js/stepEntities). Même pool
@@ -29,9 +29,9 @@ export default {
   blocksMovement: false,
   observable: true,
   interactable: false,
-  // 22h..6h : passage par minuit géré par core/presence.js/evaluateCondition
+  // 22h..6h : passage par minuit géré par core/conditions.js/evaluateCondition
   // (timeRange). Une seule règle suffit — le jour n'est simplement couvert
-  // par aucune, donc dormant par défaut (voir core/presence.js/isPresent).
+  // par aucune, donc dormant par défaut (voir core/conditions.js/isPresent).
   // Dormant, il ne bourdonne pas et ne s'observe pas : la ville en compte
   // plusieurs, ils n'encombrent pas l'exploration de jour.
   // Cascade jusqu'à l'instance (core/entity-parse.js) : une scène pourrait donner

@@ -16,7 +16,7 @@
 // Résolue à CHAQUE tirage (jamais figée dans l'état) : un monde sauvegardé
 // garde la référence, et tire toujours dans la table COURANTE.
 //
-// Tirage pondéré : core/rng.js/pickWeighted, le même que la météo — une
+// Tirage pondéré : lib/rng.js/pickWeighted, le même que la météo — une
 // table d'objets a la forme { objet: poids }, aucune seconde logique de
 // tirage. Le choix "table
 // puis objet" des tables multiples est réalisé en UN SEUL tirage, sur la
@@ -29,9 +29,9 @@
 // voir parseSpawnedEntity) : jamais d'import circulaire.
 
 import { SPAWN_TABLES, RARITY_LEVELS } from "../config/spawn-values.js";
-import { ITEM_REGISTRY } from "./items.js";
-import { TAG_REGISTRY } from "./tags.js";
-import { pickWeighted } from "./rng.js";
+import { ITEM_REGISTRY } from "../config/items-values.js";
+import { TAG_REGISTRY } from "../config/tags-values.js";
+import { pickWeighted } from "../lib/rng.js";
 
 // Clé RÉSERVÉE d'une table : l'issue "rien". Jamais un objet du sac — un
 // registre qui en déclarerait un sous ce nom échoue au chargement.
@@ -71,7 +71,7 @@ function expandTagTable(tag) {
 }
 
 // Table effective, en poids NUMÉRIQUES, quelle que soit sa forme : c'est ce
-// que reçoit le tirage (core/rng.js/pickWeighted).
+// que reçoit le tirage (lib/rng.js/pickWeighted).
 function toWeights(table) {
   if (table.fromTag !== undefined) return expandTagTable(table.fromTag);
   return Object.fromEntries(Object.entries(table).map(([item, value]) => [item, entryWeight(value)]));

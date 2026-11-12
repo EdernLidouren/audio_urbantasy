@@ -29,9 +29,9 @@
 // `registry` est INJECTÉ (comme pour core/spawn.js), jamais importé.
 
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";
-import { drawIntInRange } from "./rng.js";
+import { drawIntInRange } from "../lib/rng.js";
 import { resolveFace, updateActiveFace, removeEntity, drawScatteredPosition } from "./state.js";
-import { presenceContextOf } from "./presence.js";
+import { conditionContextOf } from "./conditions.js";
 import { drawItems, buildCollectibleSpec } from "./spawn.js";
 import { applyBreakTriggers } from "./triggers.js";
 
@@ -57,7 +57,7 @@ function drawLoot(mineable, rngState) {
 // Positions tirées comme une fouille (drawScatteredPosition, PRNG de la face).
 function dropLoot(session, items, entity, world, registry) {
   const side = session.player.side;
-  const presenceContext = presenceContextOf(session);
+  const presenceContext = conditionContextOf(session);
   let next = session;
   let { rngState } = resolveFace(next.worlds[next.activeWorldId], side);
   items.forEach((item, index) => {

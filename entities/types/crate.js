@@ -18,7 +18,7 @@
 //     consumed passe à true. Un son DIFFÉRENT (un autre fichier) n'est PAS
 //     supporté — seule son ABSENCE l'est.
 // "Devenir dormant" n'est PAS un champ de cet archétype : ça se déclare
-// avec le système de présence EXISTANT (core/presence.js), en ajoutant une
+// avec le système de présence EXISTANT (core/conditions.js), en ajoutant une
 // règle { when: { type: "consumed" }, present: false } à l'INSTANCE qui
 // veut cet effet (voir scenes/demo2.json, "crate_warehouse") — cet
 // archétype n'en déclare AUCUNE par défaut : silence perceptible SEUL par

@@ -22,7 +22,7 @@
 //     au chargement suivant : il suit le joueur, aucun monde ne le
 //     ramènerait sinon.
 //
-// DORMANCE : une entité marquée est dormante (core/presence.js/
+// DORMANCE : une entité marquée est dormante (core/conditions.js/
 // resolveEntityRules), avec ses trois plans coupés (comportement, son,
 // interaction). Le marquage se fait en FIN de tick, la dormance prend donc
 // effet au tick SUIVANT : la présence de ce tick-ci est déjà connue, et la
@@ -58,7 +58,7 @@ export function startleNearby(entities, playerX) {
 // Une entité ramenée à sa place : sans marque, et sans présence mémorisée —
 // pour le tick suivant, elle n'a encore jamais tiqué (aucune bascule
 // "entered" fantôme au retour, aucun "exited" resté collé d'un départ en
-// plein envol, voir core/presence.js/resolveEntityRules).
+// plein envol, voir core/conditions.js/resolveEntityRules).
 function settle(entity) {
   const { startled, present, presenceChanged, ...rest } = entity;
   return rest;

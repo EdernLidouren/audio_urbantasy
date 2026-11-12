@@ -1,5 +1,5 @@
 // Archétype "apple" — l'objet "pomme" du sac (voir doc/entity-model.md/"Sac
-// d'objets", core/items.js/ITEM_REGISTRY.apple) : un PRESET DÉDIÉ (comme
+// d'objets", config/items-values.js/ITEM_REGISTRY.apple) : un PRESET DÉDIÉ (comme
 // money.js/crate.js), pas le générique entities/types/item.js — une pomme a
 // SON PROPRE son (fruit_beacon), ce que le type générique ne permet pas de
 // surcharger par instance (sounds n'a pas de cascade d'instance,
@@ -7,7 +7,7 @@
 // doc/entity-model.md, "Résolution en cascade").
 //
 // nameKey/descriptionKey/action réutilisent DIRECTEMENT les mêmes clés que
-// core/items.js/ITEM_REGISTRY.apple.label/descriptionKey : une instance de
+// config/items-values.js/ITEM_REGISTRY.apple.label/descriptionKey : une instance de
 // scène minimale ({ type: "apple", x }) suffit donc, sans jamais répéter
 // nameKey/descriptionKey/action — le nom annoncé au ramassage correspond
 // déjà à celui du sac par construction, pas seulement par convention.

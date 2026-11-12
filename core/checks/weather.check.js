@@ -6,7 +6,7 @@
 import { parseScene } from "../scene.js";
 import { createInitialState, getActiveWorld } from "../state.js";
 import { SAVE_VERSION, serializeGame, deserializeGame } from "../save.js";
-import { createSeed, pickWeighted } from "../rng.js";
+import { createSeed, pickWeighted } from "../../lib/rng.js";
 import { INITIAL_TIME } from "../time.js";
 import {
   validateWeatherStates,
@@ -74,7 +74,7 @@ export default function checkWeather(run) {
   );
   run("weather : la VRAIE table (config/weather-values.js) est valide", false, expectWeatherValidationThrows(WEATHER_STATES));
 
-  // Tirage pondéré (core/rng.js/pickWeighted) — ÉQUITÉ : sur un grand nombre de
+  // Tirage pondéré (lib/rng.js/pickWeighted) — ÉQUITÉ : sur un grand nombre de
   // tirages avec des poids CONNUS (40/40/10/10, indépendants de la vraie
   // table), les fréquences observées doivent rester dans une tolérance
   // large mais significative des proportions attendues (40%/40%/10%/10%
@@ -201,7 +201,7 @@ export default function checkWeather(run) {
   }
 
   // Sauvegarde ANTÉRIEURE à ce mécanisme : jamais eu de clé `weather` —
-  // sans rebouchage (core/save.js/migrateSave), une partie ainsi rechargée
+  // sans rebouchage (core/save-migrate.js/migrateSave), une partie ainsi rechargée
   // porterait `undefined`. Reboutchée depuis la minute de jeu COURANTE de
   // CETTE sauvegarde (auditSession.time), jamais depuis zéro.
   const { weather: _droppedWeather, ...auditSessionWithoutWeather } = auditSession;

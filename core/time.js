@@ -14,7 +14,7 @@
 // lib/loop.js, view/game-clock.js) — même delta injecté -> même compteur
 // résultant, le déterminisme du core s'étend donc au temps. Consommateurs
 // du compteur : la phase jour/nuit (phaseAt ci-dessous), la condition
-// "timeRange" (core/presence.js), le cycle de collecte (core/spawn.js), la
+// "timeRange" (core/conditions.js), le cycle de collecte (core/spawn.js), la
 // météo (core/weather.js) et les triggers horaires (core/triggers.js) —
 // voir doc/time.md pour la portée exacte et les chantiers réservés.
 

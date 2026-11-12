@@ -1,10 +1,10 @@
 // Archétype "ghost" — entité SURNATURELLE, cas de test de la PERCEPTION
-// SURNATURELLE (voir core/presence.js/"perceptionActive",
+// SURNATURELLE (voir core/conditions.js/"perceptionActive",
 // view/audio/muffle.js) : même rôle que neon.js pour la présence
 // conditionnelle "timeRange" — rien de plus qu'une entité normale dont la
 // présence est conditionnée par cette condition. Perception INACTIVE :
 // aucune règle ne correspond -> DORMANTE (silencieuse, non examinable,
-// jamais bloquante — voir core/presence.js/isPresent). Perception ACTIVE :
+// jamais bloquante — voir core/conditions.js/isPresent). Perception ACTIVE :
 // PRÉSENTE, pleine et claire (JAMAIS soumise au filtre d'étouffement des
 // entités mondaines, voir view/audio/entity-sound-entry.js/isPerceptionGated) —
 // murmure continu (beacon "neon_beacon", pool via resolveAsset, réutilisé

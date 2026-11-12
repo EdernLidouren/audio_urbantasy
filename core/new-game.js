@@ -13,7 +13,7 @@
 // résolues par createInitialState comme pour tout appelant) et emotes
 // (émotes connues, forme de session.emotes, voir core/emotes.js).
 
-import { ITEM_REGISTRY } from "./items.js";
+import { ITEM_REGISTRY } from "../config/items-values.js";
 import { EQUIPMENT_SLOTS, createEmptyEquipment } from "./equipment-slots.js";
 import { addItem } from "./bag.js";
 import { parseEntity } from "./entity-parse.js";
@@ -21,7 +21,8 @@ import { parseVariables } from "./variables.js";
 import { isNonEmptyString } from "./parse-common.js";
 import { rejectUnknownFields as rejectUnknown } from "../lib/validate.js";
 import { MAX_COMPANIONS } from "../config/companions.js";
-import { EMOTE_REGISTRY, learnEmote } from "./emotes.js";
+import { learnEmote } from "./emotes.js";
+import { EMOTE_REGISTRY } from "../config/emotes-values.js";
 
 const FIELDS = ["startSceneId", "money", "bag", "equipment", "companions", "partyVariables", "emotes"];
 const BAG_ENTRY_FIELDS = ["type", "count"];

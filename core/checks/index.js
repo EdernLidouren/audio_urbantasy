@@ -10,17 +10,12 @@
 // Chaque domaine (./<domaine>.check.js) est AUTONOME : il construit ses
 // propres scènes, ne lit aucune variable d'un autre domaine, et peut être
 // lancé seul. Les fixtures communes à plusieurs domaines vivent dans
-// ./helpers.js, ou dans ./fixtures/ quand elles forment un tout (la table de
-// billes des vérifications, ./fixtures/marbles.js ; la propriété « prévision =
-// réel », ./fixtures/forecast-property.js) ; le moteur générique (compteurs,
-// sections, récapitulatif, audit de sérialisabilité) dans lib/check.js. Un
-// domaine se découpe en sections (`run.section`) : une exception n'arrête que
-// la sienne.
-// Les domaines des billes (marbles*) jouent la table figée de ./fixtures/, jamais
-// les vraies billes ; celles-ci n'ont que leur contrat, domaine marbles-content
-// (doc/marbles-tools.md, « Les vérifications du jeu des billes »). L'écran des
-// billes se joue au clavier par son banc d'essai, ./fixtures/screen-bench.js
-// (domaine marbles-screen, `nodeOnly`).
+// ./helpers.js ; le moteur générique (compteurs, sections, récapitulatif, audit
+// de sérialisabilité) dans lib/check.js. Un domaine se découpe en sections
+// (`run.section`) : une exception n'arrête que la sienne.
+// Les domaines des billes (marbles*) vivent avec le jeu des billes, dans
+// marbles/checks/ (leur liste : marbles/checks/index.js/MARBLES_SUITES) ; ils
+// passent par ce même point d'entrée.
 //
 // Ajouter un domaine : un fichier ./<domaine>.check.js qui exporte par
 // défaut `function check<Domaine>(run)`, et sa ligne dans SUITES (l'ordre
@@ -32,6 +27,7 @@
 // forme, et passe par ce même point d'entrée (domaines "i18n", "check"...).
 
 import { runCheckSuites } from "../../lib/check.js";
+import { MARBLES_SUITES } from "../../marbles/checks/index.js";
 import checkMovement from "./movement.check.js";
 import checkBehaviors from "./behaviors.check.js";
 import checkEntities from "./entities.check.js";
@@ -47,6 +43,7 @@ import checkInventory from "./inventory.check.js";
 import checkImprovements from "./improvements.check.js";
 import checkEmotes from "./emotes.check.js";
 import checkActions from "./actions.check.js";
+import checkInteraction from "./interaction.check.js";
 import checkPerception from "./perception.check.js";
 import checkWeather from "./weather.check.js";
 import checkEphemerals from "./ephemerals.check.js";
@@ -65,17 +62,6 @@ import checkDormancy from "./dormancy.check.js";
 import checkTemporaryBehavior from "./temporary-behavior.check.js";
 import checkSequence from "./sequence.check.js";
 import checkRotation from "./rotation.check.js";
-import checkMarbles from "./marbles.check.js";
-import checkMarblesPocket from "./marbles-pocket.check.js";
-import checkMarblesChoice from "./marbles-choice.check.js";
-import checkMarblesBus from "./marbles-bus.check.js";
-import checkMarblesTally from "./marbles-tally.check.js";
-import checkMarblesForecast from "./marbles-forecast.check.js";
-import checkMarblesView from "./marbles-view.check.js";
-import checkMarblesSequence from "./marbles-sequence.check.js";
-import checkMarblesTools from "./marbles-tools.check.js";
-import checkMarblesContent from "./marbles-content.check.js";
-import checkMarblesScreen from "./marbles-screen.check.js";
 // Domaines de lib/ (mécanismes portables), lancés par le même point
 // d'entrée : une seule commande, un seul récapitulatif.
 import checkI18n from "../../lib/checks/i18n.check.js";
@@ -87,6 +73,7 @@ import checkHelp from "../../lib/checks/help.check.js";
 import checkAudioRetention from "../../lib/checks/audio-retention.check.js";
 import checkRealTime from "../../lib/checks/real-time.check.js";
 import checkCheck from "../../lib/checks/check.check.js";
+import checkPreferences from "../../lib/checks/preferences.check.js";
 
 const SUITES = [
   { name: "movement", check: checkMovement },
@@ -104,6 +91,7 @@ const SUITES = [
   { name: "improvements", check: checkImprovements },
   { name: "emotes", check: checkEmotes },
   { name: "actions", check: checkActions },
+  { name: "interaction", check: checkInteraction },
   { name: "perception", check: checkPerception },
   { name: "weather", check: checkWeather },
   { name: "ephemerals", check: checkEphemerals },
@@ -122,17 +110,7 @@ const SUITES = [
   { name: "temporary-behavior", check: checkTemporaryBehavior },
   { name: "sequence", check: checkSequence },
   { name: "rotation", check: checkRotation },
-  { name: "marbles", check: checkMarbles },
-  { name: "marbles-pocket", check: checkMarblesPocket },
-  { name: "marbles-choice", check: checkMarblesChoice },
-  { name: "marbles-bus", check: checkMarblesBus },
-  { name: "marbles-tally", check: checkMarblesTally },
-  { name: "marbles-forecast", check: checkMarblesForecast },
-  { name: "marbles-view", check: checkMarblesView },
-  { name: "marbles-sequence", check: checkMarblesSequence },
-  { name: "marbles-tools", check: checkMarblesTools },
-  { name: "marbles-content", check: checkMarblesContent },
-  { name: "marbles-screen", check: checkMarblesScreen, nodeOnly: true },
+  ...MARBLES_SUITES,
   { name: "i18n", check: checkI18n },
   { name: "i18n-content", check: checkI18nContent },
   { name: "input", check: checkInput },
@@ -142,6 +120,7 @@ const SUITES = [
   { name: "audio-retention", check: checkAudioRetention },
   { name: "real-time", check: checkRealTime },
   { name: "check", check: checkCheck },
+  { name: "preferences", check: checkPreferences },
 ];
 
 // Noms des domaines, dans l'ordre d'exécution.

@@ -19,7 +19,7 @@
 // mélangé ; le cycle suivant remélange. Jamais deux fois le même message de
 // suite, jonction de deux cycles comprise.
 
-import { createSeed, nextRandom } from "./rng.js";
+import { createSeed, nextRandom } from "../lib/rng.js";
 
 const ENTRY_ID_PATTERN = /^[a-z0-9_]+$/;
 

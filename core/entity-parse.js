@@ -5,7 +5,8 @@
 // pose en jeu (parseSpawnedEntity). Pur.
 
 import { parseVariables } from "./variables.js";
-import { ITEM_REGISTRY, itemSounds } from "./items.js";
+import { itemSounds } from "./items.js";
+import { ITEM_REGISTRY } from "../config/items-values.js";
 import { validateDistribution } from "./distribution.js";
 import { validateCatalog } from "./catalog.js";
 import { validateDisplayDistribution } from "./display.js";
@@ -663,7 +664,7 @@ export function parseEntity(rawEntity, index, registry, length, seenIds, sceneVa
     entity.descriptionRules = parseDescriptionRules(resolvedDescriptionRules, at, entity.variables, sceneVariables);
   }
 
-  // Présence conditionnelle (voir core/presence.js) : sans règle, l'entité
+  // Présence conditionnelle (voir core/conditions.js) : sans règle, l'entité
   // est toujours présente.
   const resolvedPresence = presence !== undefined ? presence : archetype.presence;
   if (resolvedPresence !== undefined) {

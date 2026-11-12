@@ -26,7 +26,7 @@ Tables actuelles : `move`, `city`, `global` (`view/input.js`), `menu` (`lib/menu
 `cityMap` (`view/menus/city-map-menu.js`), `inventoryTabs`
 (`view/menus/inventory-menu.js`), `dropQuantity`
 (`view/menus/inventory/bag-and-equipment.js`), `shopList`
-(`view/menus/shop-quantity-list.js`), `marbles` (`view/marbles/screen.js`), `marblesPile` (`view/marbles/pile-screen.js`). Une table déclarée dans un nouveau module
+(`view/menus/shop-quantity-list.js`), `marbles` (`marbles/view/screen.js`), `marblesPile` (`marbles/view/pile-screen.js`). Une table déclarée dans un nouveau module
 ajoute l'import de ce module en tête de `tools/content-audit.js`, pour que l'audit la
 voie.
 

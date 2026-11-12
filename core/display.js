@@ -25,7 +25,7 @@
 // table COURANTE.
 //
 // CONDITION D'APPARITION (`when`, facultative) : une condition du script
-// (core/presence.js, MÊME format que partout — jamais un système parallèle),
+// (core/conditions.js, MÊME format que partout — jamais un système parallèle),
 // lue sur la PARTIE au garnissage : l'article n'est tiré que si elle est
 // vraie ce jour-là (ex. le matériel de minage, une fois la lampe-torche
 // acquise). Seules les conditions qui ont un sens hors de toute entité y
@@ -40,7 +40,7 @@
 // RÉEL de la partie, jamais via le court-circuit debug de hasImprovement
 // (il exclurait toutes les améliorations, et ouvrirait toutes les
 // conditions) : le magasin montre en debug ce qu'il montrerait en jeu.
-// Les poids restants se renormalisent d'eux-mêmes (core/rng.js/
+// Les poids restants se renormalisent d'eux-mêmes (lib/rng.js/
 // pickWeighted). Plus aucun article possible : présentoir vide, sans tirage.
 //
 // Module SÉPARÉ de core/trade.js (comme core/catalog.js) pour que
@@ -48,11 +48,13 @@
 // la transaction.
 
 import { DISPLAY_ARTICLES, DISPLAY_TABLES } from "../config/shop-values.js";
-import { ITEM_REGISTRY, itemValue } from "./items.js";
-import { IMPROVEMENT_REGISTRY, hasImprovement } from "./improvements.js";
+import { itemValue } from "./items.js";
+import { ITEM_REGISTRY } from "../config/items-values.js";
+import { hasImprovement } from "./improvements.js";
+import { IMPROVEMENT_REGISTRY } from "../config/improvements-values.js";
 import { NOTHING, entryWeight } from "./distribution.js";
-import { pickWeighted } from "./rng.js";
-import { evaluateCondition, actionContextOf } from "./presence.js";
+import { pickWeighted } from "../lib/rng.js";
+import { evaluateCondition, actionContextOf } from "./conditions.js";
 import { validateCondition } from "./script-parse.js";
 import { rejectUnknownFields } from "../lib/validate.js";
 
@@ -141,7 +143,7 @@ validateDisplayArticles(DISPLAY_ARTICLES);
 // sound? }. `sound` : celui de l'article, sinon celui de l'objet visé,
 // absent sinon (la vue prend alors la balise de repli du présentoir). null
 // pour un id inconnu (jamais une exception : un présentoir sauvegardé peut
-// citer un article retiré depuis, voir core/save.js/repairEntityReferences).
+// citer un article retiré depuis, voir core/save-migrate.js/repairEntityReferences).
 // `articles` : paramètre pour les vérifications (registre fabriqué).
 export function displayArticleInfo(id, articles = DISPLAY_ARTICLES) {
   if (typeof id !== "string" || !Object.hasOwn(articles, id)) return null;

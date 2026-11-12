@@ -1,5 +1,5 @@
 // Renommages de contenu à appliquer aux SAUVEGARDES existantes (voir
-// core/save.js/migrateSave, doc/save.md). Une sauvegarde garde le monde tel
+// core/save-migrate.js/migrateSave, doc/save.md). Une sauvegarde garde le monde tel
 // qu'il était à la première visite : nom de type, clés i18n, chemins de
 // sons et ids de scènes y sont figés. Renommer l'un d'eux dans le contenu sans l'ajouter ici
 // laisse les anciennes parties pointer vers quelque chose qui n'existe plus.

@@ -22,7 +22,7 @@
 
 import collections from "../collections/index.js";
 import entityRegistry from "../entities/types/index.js";
-import { ITEM_REGISTRY } from "../core/items.js";
+import { ITEM_REGISTRY } from "../config/items-values.js";
 import {
   validateCollection,
   collectionNameKey,

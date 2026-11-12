@@ -1,7 +1,9 @@
 # Sauvegarde
 
 Format d'une partie sauvegardée, sa relecture, et ce qu'il faut faire quand on
-renomme ou supprime du contenu. Code : `core/save.js` (forme, migration, pur),
+renomme ou supprime du contenu. Code : `core/save.js` (forme, sérialisation et
+désenveloppement, pur), `core/save-migrate.js` (montée d'une sauvegarde lue et
+réparation de ses références, pur),
 `view/save-storage.js` (disque, obscurcissement, import/export de fichier),
 `config/save-renames.js` (table des renommages).
 
@@ -89,7 +91,7 @@ la partie (voir `doc/entity-model.md`/"Mode debug").
    mode debug (voir `doc/entity-model.md`/"Mode debug").
 
 **Références de contenu cassées** (toujours, ces tables étant du code ou de
-la donnée du core — `core/save.js`/`repairContentReferences`) : une partie
+la donnée du core — `core/save-migrate.js`/`repairContentReferences`) : une partie
 garde aussi, telles qu'à la première visite, les distributions de collecte
 (conteneurs, plages, entités minables), les butins fixes, les stocks déjà tirés, les catalogues des points de
 vente, les tables et articles des présentoirs, et l'état météo. Elles sont revalidées avec les MÊMES validateurs que
@@ -114,7 +116,7 @@ source, problem }`, `worldId` null pour la météo) et signalée au même moment
 que les entités retirées.
 
 **Objets inconnus** (toujours, le registre d'objets étant du code du core) :
-un objet du sac ou de l'équipement absent de `core/items.js`/`ITEM_REGISTRY`
+un objet du sac ou de l'équipement absent de `config/items-values.js`/`ITEM_REGISTRY`
 (supprimé, ou renommé : les ids d'objets n'ont pas de table de renommage)
 est retiré, et listé dans `droppedItems` (`{ where, type }`, `where` =
 `"bag"` ou le nom du slot). Signalé au même moment que les entités
@@ -142,7 +144,7 @@ export const RENAMED_SCENE_IDS = { clock_tower_weight_shaft_mirror_space: "clock
   qu'elles portent (action et refus, triggers, séquence en attente) : il
   est résolu au chargement de la scène et figé avec elle. Et dans les clés
   d'une plage de types (`entities` d'un `spawnRanges`), poids gardés
-  (`core/save.js`/`renameSpawnRangeTypes`) ; un type RETIRÉ, lui, y est
+  (`core/save-migrate.js`/`renameSpawnRangeTypes`) ; un type RETIRÉ, lui, y est
   simplement ignoré au garnissage, la plage continue avec ses autres types.
 - Clés i18n et chemins de sons sont remplacés partout où ils apparaissent
   comme **valeur exacte** (nom, description, titre de scène, clé d'annonce
@@ -177,7 +179,7 @@ existantes ; une table dédiée s'ajoutera le jour où le cas se présente.
 
 **Champ de contenu renommé ou dont l'unité change** (paramètre d'un
 comportement, d'une action...) : aucune table, la conversion s'écrit dans
-`core/save.js`, appelée par `migrateSave` après les renommages, idempotente,
+`core/save-migrate.js`, appelée par `migrateSave` après les renommages, idempotente,
 avec sa vérification. Précédent : `convertWanderTicks` (durées d'errance
 passées des ticks aux ms).
 

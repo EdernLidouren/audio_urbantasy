@@ -155,7 +155,7 @@ export function setDisplayHandler(handler) {
 // () => session — fournit LA SESSION pour l'évaluation d'une condition
 // d'action (voir view/interaction.js/actionContext), même principe d'injection que les
 // gestionnaires ci-dessus. L'évaluateur reste un PUR consommateur de
-// données (core/presence.js/evaluateCondition) : la vue lit `session`
+// données (core/conditions.js/evaluateCondition) : la vue lit `session`
 // pour construire un contexte, elle ne l'écrit jamais (toute écriture reste
 // déléguée aux gestionnaires enregistrés, qui seuls détiennent setSession).
 export let sessionProvider = null;

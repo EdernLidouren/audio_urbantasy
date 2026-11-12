@@ -10,7 +10,7 @@ Les points repoussés « à plus tard », une ligne par point, avec son origine 
 
 - Avec une réaction du pot provoquée par une phase, le son d'usure de cette phase part avec l'étape de la réaction. (Itération 15.)
 - Le Final, Éjecter, les choix et les réactions du pot n'ont pas de son à eux : ce sont des points d'accroche muets. (Itérations 14 à 18, `doc/marbles.md`, « Sons ».)
-- Un profil sonore n'a qu'une voix par rôle ; plusieurs voix par calibre sont prévues. (`config/marbles-values.js`.)
+- Un profil sonore n'a qu'une voix par rôle ; plusieurs voix par calibre sont prévues. (`marbles/config/values.js`.)
 
 ## Extensions prévues par la structure
 

@@ -9,7 +9,7 @@ import { TUNING_DEFAULTS, resolveTuning } from "../../config/tuning.js";
 import { MOVE_STEP, getActiveWorld } from "../../core/state.js";
 import { surfaceAt, surfaceProps } from "../../core/surfaces.js";
 import { gaitOf } from "../../core/equipment.js";
-import { ITEM_REGISTRY } from "../../core/items.js";
+import { ITEM_REGISTRY } from "../../config/items-values.js";
 import player from "../../entities/player.js";
 import { footstepVolumeFactor } from "./volume-factors.js";
 

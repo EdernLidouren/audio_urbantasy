@@ -14,7 +14,8 @@
 //   - "seulement dans son fichier" : utilisé en interne, l'`export` est de
 //     trop ;
 //   - "seulement par les vérifications ou les outils" (core/checks/,
-//     lib/checks/, tools/) : à garder si la vérification le justifie.
+//     lib/checks/, marbles/checks/, tools/, marbles/tools/) : à garder si la
+//     vérification le justifie.
 //
 // Déclarations lues : `export function|const|let|var|class <nom>` et les
 // listes `export { a, b as c }` (réexports compris : un fichier comme
@@ -24,9 +25,9 @@
 // ou dans index.html. Limite assumée : un homonyme (un autre `parse` dans
 // un autre fichier) passe pour un usage.
 //
-// Sources des exports : tous les .js du projet sauf tools/ (ses exports
-// sont l'API de console des outils) et l'outillage des vérifications (voir
-// isCheckInfrastructure) ; sources des usages : tous les .js, tools/ et
+// Sources des exports : tous les .js du projet sauf les outils (isTool : leurs
+// exports sont l'API de console des outils) et l'outillage des vérifications
+// (voir isCheckInfrastructure) ; sources des usages : tous les .js, outils et
 // vérifications compris.
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
@@ -77,10 +78,14 @@ function exportedNames(code) {
 }
 
 // Fichiers faits pour les seules vérifications : leurs fixtures
-// (core/checks/, lib/checks/) et leur moteur (lib/check.js). Leurs exports
-// ne servent qu'aux vérifications, par construction : jamais rapportés.
+// (core/checks/, lib/checks/, marbles/checks/) et leur moteur (lib/check.js).
+// Leurs exports ne servent qu'aux vérifications, par construction : jamais
+// rapportés.
 const isCheckInfrastructure = (file) =>
-  /[\\/](?:core|lib)[\\/]checks[\\/]/.test(file) || file === join(ROOT, "lib", "check.js");
+  /[\\/](?:core|lib|marbles)[\\/]checks[\\/]/.test(file) || file === join(ROOT, "lib", "check.js");
+
+// Les outils : tools/, et la boîte à outils des billes, marbles/tools/.
+const isTool = (file) => file.startsWith(join(ROOT, "tools") + sep) || file.startsWith(join(ROOT, "marbles", "tools") + sep);
 
 // Exports GARDÉS EXPRÈS, avec leur raison : jamais rapportés. Un ajout ici
 // est une décision, pas une façon de faire taire le rapport.
@@ -91,7 +96,7 @@ const KEPT_ON_PURPOSE = {
   "lib/coordinate-label.js:formatCoordinateY": "API documentée de la brique portable (doc/city-map.md)",
 };
 
-const isCheckOrTool = (file) => /[\\/](?:core|lib)[\\/]checks[\\/]/.test(file) || file.startsWith(join(ROOT, "tools") + sep);
+const isCheckOrTool = (file) => isCheckInfrastructure(file) || isTool(file);
 
 export function findDeadExports() {
   const files = listJsFiles(ROOT);
@@ -101,7 +106,7 @@ export function findDeadExports() {
 
   const report = { unused: [], internalOnly: [], checksOnly: [] };
   for (const file of files) {
-    if (file.startsWith(join(ROOT, "tools") + sep) || isCheckInfrastructure(file)) continue;
+    if (isTool(file) || isCheckInfrastructure(file)) continue;
     for (const name of exportedNames(code.get(file))) {
       if (Object.hasOwn(KEPT_ON_PURPOSE, `${relative(ROOT, file).split(sep).join("/")}:${name}`)) continue;
       const pattern = word(name);

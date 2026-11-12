@@ -16,15 +16,15 @@ import { setGameStartHandler } from "./view/menus/save-menu.js";
 import { makeMenuScreen, configureMenuPreferences, configureMenuSounds } from "./lib/menu.js";
 import { playMenuSound } from "./view/menu-sounds.js";
 import { makeCityScreen } from "./view/city-screen.js";
-import { makeMarblesScreen } from "./view/marbles/screen.js";
+import { makeMarblesScreen } from "./marbles/view/screen.js";
 import { t, setI18nWarningHandler } from "./data/i18n/index.js";
 import { isDebugEnabled, setDebugEnabled } from "./config/debug.js";
 import { startLoop } from "./lib/loop.js";
 import { loadSceneById } from "./scenes/load.js";
 import registry from "./entities/types/index.js";
 import { createInitialState } from "./core/state.js";
-import { validateMarblesContent } from "./core/marbles-content.js";
-import { createMarblesRules } from "./core/marbles-rules.js";
+import { validateMarblesContent } from "./marbles/core/content.js";
+import { createMarblesRules } from "./marbles/core/rules.js";
 import { parseNewGame } from "./core/new-game.js";
 import { validateEntityRegistry } from "./core/entity-parse.js";
 import { NEW_GAME } from "./config/new-game.js";
@@ -34,7 +34,8 @@ import { checkAutoSaveTimer } from "./view/autosave-timer.js";
 import { loadGame } from "./view/save-storage.js";
 import { reportSaveRepairs, reportI18nWarning } from "./view/debug-warnings.js";
 import { announceNewDiscoveries } from "./view/discoveries.js";
-import MARBLE_TYPES from "./marbles/types/index.js";
+import MARBLE_TYPES from "./marbles/content/types/index.js";
+import { installDebugConsole } from "./view/debug-console.js";
 
 // Préférences de menu (sliders/toggles + cyclage/étoile/suffixe, voir
 // lib/menu.js) injectées UNE FOIS ici, point de composition unique — tout
@@ -56,21 +57,14 @@ setI18nWarningHandler(reportI18nWarning);
 // "Nouvelle partie" ou à la première scène qui utilise le type fautif.
 validateEntityRegistry(registry);
 // Les billes : un registre de contenu, que le core reçoit et n'importe jamais. Les
-// règles du jeu y sont liées ici, une fois pour toutes (core/marbles-rules.js), puis
+// règles du jeu y sont liées ici, une fois pour toutes (marbles/core/rules.js), puis
 // passées à l'écran des billes.
 validateMarblesContent(MARBLE_TYPES);
 const marblesRules = createMarblesRules(MARBLE_TYPES);
 const newGame = parseNewGame(NEW_GAME, registry);
 
-// runChecks() depuis la console (voir core/checks/index.js : runChecks("spawn")
-// pour un seul domaine). Les vérifications, et les outils qu'elles testent, ne
-// se chargent qu'à l'appel (import dynamique) : jamais au démarrage du jeu, dont
-// elles feraient plus du tiers du code chargé. Rend une promesse du résultat.
-window.runChecks = async (...args) => (await import("./core/checks/index.js")).runChecks(...args);
-console.log("Vérifs dispo : tape runChecks()");
-
 // Mode DEBUG (voir config/debug.js) : PAS de menu — bascule DEPUIS LA
-// CONSOLE (window.toggleDebug, comme runChecks ci-dessus) OU par la
+// CONSOLE (window.toggleDebug, view/debug-console.js) OU par la
 // combinaison Ctrl+D EN JEU (voir onGlobalPress plus bas, lib/input.js) —
 // deux chemins, UNE seule fonction, jamais deux logiques à maintenir.
 // Une fois activé, il ouvre aussi les touches de debug en ville (ex.
@@ -79,8 +73,6 @@ function toggleDebug() {
   setDebugEnabled(!isDebugEnabled());
   console.log(`Mode debug : ${isDebugEnabled() ? "activé" : "désactivé"}`);
 }
-window.toggleDebug = toggleDebug;
-console.log("Mode debug : tape toggleDebug() ou Ctrl+D en jeu");
 
 const gameZone = document.getElementById("game");
 
@@ -241,10 +233,11 @@ function continueGame() {
   enterCity();
 }
 
-// Partie de billes en cours (voir core/marbles.js), null hors partie : comme
+// Partie de billes en cours (voir marbles/core/marbles.js), null hors partie : comme
 // la session, c'est ici qu'elle vit, l'écran n'en détient pas de copie.
 // Indépendante de la session, jamais sauvegardée. `seed` : imposée par la
-// console de test (window.debugStartMarbles plus bas), sinon tirée au hasard ;
+// console de test (window.debugStartMarbles, view/debug-console.js), sinon
+// tirée au hasard ;
 // `initialState` : un état construit par la console de test, au lieu d'une
 // partie neuve (null en jeu).
 let marblesGame = null;
@@ -295,63 +288,16 @@ function startImportedGame(importedSession) {
 }
 setGameStartHandler(startImportedGame);
 
-// Vérif console : logge player.x pendant qu'on tient une touche de
-// déplacement. Rendu audio/annonce non requis à ce stade.
-window.debugPlayerX = () => {
-  if (!session) {
-    console.log("debugPlayerX: aucune session en cours (hors ville).");
-    return;
-  }
-  console.log(session.player.x);
-};
-
-// Accès CONSOLE des tests en jeu (tools/test-kit.js), MODE DEBUG seulement :
-// les actions de debug de l'écran de ville en cours (view/city-screen.js/
-// debugActions), ou null hors partie. Une fonction, relue à chaque appel :
-// une nouvelle partie remplace l'écran.
-window.debugActions = () => {
-  if (!isDebugEnabled()) {
-    console.log("debugActions: mode debug désactivé (toggleDebug() ou Ctrl+D).");
-    return null;
-  }
-  return session && cityScreen ? cityScreen.debugActions : null;
-};
-
-// Vérif console, MODE DEBUG seulement : rend une COPIE de la partie en
-// cours (positions, présence, variables...), pour inspecter l'état pendant
-// un test sans passer par une sauvegarde. Une copie, jamais la session
-// elle-même : la modifier depuis la console ne touche pas au jeu. L'état
-// est sérialisable par contrat, structuredClone suffit.
-window.debugSession = () => {
-  if (!isDebugEnabled()) {
-    console.log("debugSession: mode debug désactivé (toggleDebug() ou Ctrl+D).");
-    return undefined;
-  }
-  if (!session) {
-    console.log("debugSession: aucune session en cours (hors ville).");
-    return undefined;
-  }
-  return structuredClone(session);
-};
-
-// Vérif console, MODE DEBUG seulement : lance une partie de billes à graine
-// imposée, ou sur un état construit (`state`, un état de core/marbles.js : voir
-// tools/test-kit.js/startMarbles), et rend une COPIE de la partie en cours
-// (comme debugSession).
-window.debugStartMarbles = (seed, state = null) => {
-  if (!isDebugEnabled()) {
-    console.log("debugStartMarbles: mode debug désactivé (toggleDebug() ou Ctrl+D).");
-    return;
-  }
-  startMarblesGame(seed, state === null ? null : structuredClone(state));
-};
-window.debugMarbles = () => {
-  if (!isDebugEnabled()) {
-    console.log("debugMarbles: mode debug désactivé (toggleDebug() ou Ctrl+D).");
-    return undefined;
-  }
-  return structuredClone(marblesGame);
-};
+// La console de debug (view/debug-console.js) : vérifications, bascule du mode
+// debug, et accès des tests en jeu (tools/test-kit.js) à la partie, l'écran de
+// ville et la partie de billes, par les accesseurs de ce point de composition.
+installDebugConsole({
+  getSession,
+  getCityScreen: () => cityScreen,
+  toggleDebug,
+  startMarblesGame,
+  getMarblesGame: () => marblesGame,
+});
 
 // Le jeu démarre TOUJOURS sur le menu principal, jamais en partie : la
 // session naît d'un choix ("Continuer"/"Nouvelle partie" ci-dessus), jamais

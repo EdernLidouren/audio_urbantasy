@@ -7,10 +7,9 @@
 import { parseScene } from "../scene.js";
 import { createInitialState, applyEntityActionEffects } from "../state.js";
 import { SAVE_VERSION, serializeGame, deserializeGame } from "../save.js";
-import { evaluateCondition } from "../presence.js";
+import { evaluateCondition } from "../conditions.js";
 import { applyActionEffects } from "../variables.js";
 import {
-  IMPROVEMENT_REGISTRY,
   improvementProps,
   hasImprovement,
   giveImprovement,
@@ -18,6 +17,7 @@ import {
   validateImprovementRegistry,
   orderedImprovementIds,
 } from "../improvements.js";
+import { IMPROVEMENT_REGISTRY } from "../../config/improvements-values.js";
 import { isDebugEnabled, setDebugEnabled } from "../../config/debug.js";
 import { throws } from "../../lib/check.js";
 
@@ -109,7 +109,7 @@ function checkImprovementsBody(run) {
       throws(() => parseScene(sceneWithImprovementEffect({ type: "removeImprovement", id: "does-not-exist" }), IMPROVEMENT_TEST_REGISTRY))
     );
 
-    // Évaluation RUNTIME — condition "hasImprovement" (core/presence.js).
+    // Évaluation RUNTIME — condition "hasImprovement" (core/conditions.js).
     run(
       "evaluateCondition hasImprovement : possédée -> vrai",
       true,
@@ -252,7 +252,7 @@ function checkImprovementsBody(run) {
       setDebugEnabled(false);
     }
 
-    // Rebouchage d'une VIEILLE sauvegarde (voir core/save.js/migrateSave) —
+    // Rebouchage d'une VIEILLE sauvegarde (voir core/save-migrate.js/migrateSave) —
     // antérieure au mécanisme d'improvements, `improvements` absent du
     // blob brut.
     const oldSaveWithoutImprovements = { version: SAVE_VERSION, data: { ...improvementSession } };

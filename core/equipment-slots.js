@@ -1,7 +1,7 @@
 // La FORME de l'équipement (session.equipment), sans écriture : ses slots,
 // l'équipement vide et les tags qu'il fait porter. À part de core/equipment.js,
 // dont les écritures (equipItem/unequipItem) composent avec le sac
-// (core/bag.js) : l'état (core/state.js) et les conditions (core/presence.js)
+// (core/bag.js) : l'état (core/state.js) et les conditions (core/conditions.js)
 // lisent la forme sans dépendre du sac, ce qui évite un cycle d'imports
 // (sac -> état -> équipement -> sac). Détail de l'équipement : en-tête de
 // core/equipment.js, doc/entity-model.md/"Équipement".
@@ -18,7 +18,7 @@ export function createEmptyEquipment() {
   return Object.fromEntries(EQUIPMENT_SLOTS.map((slot) => [slot, null]));
 }
 
-// Tags EFFECTIVEMENT portés — union des tags (core/items.js/ITEM_REGISTRY)
+// Tags EFFECTIVEMENT portés — union des tags (config/items-values.js/ITEM_REGISTRY)
 // de CHAQUE objet équipé, DÉRIVÉE, jamais stockée (même principe que
 // core/equipment.js/gaitOf). UNIFIÉ joueur/compagnon/PNJ : cette fonction
 // ignore tout du TYPE de porteur, elle ne connaît que la FORME `equipment`

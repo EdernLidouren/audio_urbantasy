@@ -4,10 +4,10 @@
 // donnée malformée échoue ici, jamais en jeu ; le SENS reste au moteur (core)
 // ou à la vue selon la nature de l'effet (voir core/effects.js). Pur.
 
-import { CONDITION_TYPES, conditionFields } from "./presence.js";
-import { TAG_REGISTRY } from "./tags.js";
-import { IMPROVEMENT_REGISTRY } from "./improvements.js";
-import { EMOTE_REGISTRY } from "./emotes.js";
+import { CONDITION_TYPES, conditionFields } from "./conditions.js";
+import { TAG_REGISTRY } from "../config/tags-values.js";
+import { IMPROVEMENT_REGISTRY } from "../config/improvements-values.js";
+import { EMOTE_REGISTRY } from "../config/emotes-values.js";
 import { WEATHER_STATES } from "../config/weather-values.js";
 import { VARIABLE_SCOPES, VARIABLE_TYPES, isValidValueForType } from "./variables.js";
 import { ACTION_EFFECT_TYPES, MIXED_EFFECT_TYPES } from "./effects.js";
@@ -20,7 +20,7 @@ import { fail, isNonEmptyString, isFiniteNumber, parseBehavior, parseBehaviorAt,
 // boolean } ou { type: "behavior", behavior: <objet behavior, même forme
 // que entities[].behavior — voir parseBehavior plus bas, réutilisé TEL
 // QUEL, aucune duplication>. Aiguillage EXPLICITE par type, PAS un registre
-// comme CONDITION_TYPES (voir core/presence.js, header) : un effet a une
+// comme CONDITION_TYPES (voir core/conditions.js, header) : un effet a une
 // validation propre à son type — une simple chaîne booléenne pour
 // "presence", une sous-validation complète de comportement pour
 // "behavior" — qu'un registre de noms ne suffirait pas à couvrir. `describe`
@@ -49,7 +49,7 @@ function parseEffect(rawEffect, describe, index, id) {
     // doc/scripting.md, "Effets"/"behavior") : l'entité redevient immobile,
     // comme si elle n'en avait jamais eu — SEULE valeur acceptée en dehors
     // d'un objet behavior valide (jamais `undefined`, qui signifierait
-    // "aucun effet à ce champ", pas "retire-le" ; core/presence.js/
+    // "aucun effet à ce champ", pas "retire-le" ; core/conditions.js/
     // resolveEntityRules distingue les deux). Nécessaire pour qu'un cycle de
     // routine "goto" reste réenclenchable : sans repasser par un `kind`
     // différent de "goto" (ou par ce retrait), `entity.gotoArrived` — jamais
@@ -92,7 +92,7 @@ function resolveKnownVariableType(scope, name, entityVariables, sceneVariables) 
 //     doc/scripting.md/"Variables") plutôt que silencieusement ignorée :
 //     une variable de partie mal orthographiée dans une condition/un effet
 //     ne sera détectée qu'à l'ÉVALUATION (repli sur false/no-op, voir
-//     core/presence.js et core/variables.js), jamais au chargement de la scène.
+//     core/conditions.js et core/variables.js), jamais au chargement de la scène.
 function validateVariableReference(scope, name, entityVariables, sceneVariables, describe) {
   if (!VARIABLE_SCOPES.includes(scope)) {
     fail(`${describe}.scope "${scope}" inconnu (attendu : ${VARIABLE_SCOPES.join(" | ")}).`);
@@ -308,7 +308,7 @@ function parseActionEffect(rawEffect, describe, entityVariables, sceneVariables)
   }
   // "dormantUntil" { hour } — ÉTAT : l'entité qui porte l'effet devient
   // DORMANTE jusqu'au prochain début de l'heure `hour` (voir
-  // core/variables.js/applyActionEffects, core/presence.js/
+  // core/variables.js/applyActionEffects, core/conditions.js/
   // isForcedDormant), même si le joueur n'est plus là pour le voir.
   if (type === "dormantUntil") {
     if (!Number.isInteger(rawEffect.hour) || rawEffect.hour < 0 || rawEffect.hour >= TIME_CONFIG.hoursPerDay) {
@@ -574,26 +574,26 @@ export function validateCondition(cond, describe, entityVariables, sceneVariable
   }
   rejectUnknownFields(cond, ["type", ...conditionFields(cond.type)], describe);
   // "hasEquipmentTag" : EN PLUS de son type (déjà validé ci-dessus), son
-  // champ `tag` référence un tag de contenu (core/tags.js/TAG_REGISTRY) —
+  // champ `tag` référence un tag de contenu (config/tags-values.js/TAG_REGISTRY) —
   // même traitement qu'une surface de segment (voir parseSegment plus bas) :
   // une faute de frappe ici échouerait SILENCIEUSEMENT à l'évaluation
-  // (core/presence.js/evaluateHasEquipmentTag replie sur false pour un tag
+  // (core/conditions.js/evaluateHasEquipmentTag replie sur false pour un tag
   // absent), donc elle est refusée ICI, au chargement, plutôt que de laisser
   // une règle de contenu ne jamais se déclencher sans qu'on sache pourquoi.
   if (cond.type === "hasEquipmentTag" && (!isNonEmptyString(cond.tag) || !TAG_REGISTRY[cond.tag])) {
     fail(`${describe}.tag "${cond.tag}" absent du registre de tags.`);
   }
   // "hasImprovement" : EN PLUS de son type, son champ `id` référence une
-  // amélioration du registre (core/improvements.js/IMPROVEMENT_REGISTRY) —
+  // amélioration du registre (config/improvements-values.js/IMPROVEMENT_REGISTRY) —
   // même traitement que hasEquipmentTag.tag ci-dessus : une faute de frappe
-  // échouerait SILENCIEUSEMENT à l'évaluation (core/presence.js/
+  // échouerait SILENCIEUSEMENT à l'évaluation (core/conditions.js/
   // evaluateHasImprovement replie sur false pour un id absent, HORS mode
   // debug — voir son commentaire), donc refusée ICI, au chargement.
   if (cond.type === "hasImprovement" && (!isNonEmptyString(cond.id) || !IMPROVEMENT_REGISTRY[cond.id])) {
     fail(`${describe}.id "${cond.id}" absent du registre d'improvements.`);
   }
   // "knowsEmote" : même traitement, contre le registre des émotes
-  // (core/emotes.js/EMOTE_REGISTRY).
+  // (config/emotes-values.js/EMOTE_REGISTRY).
   if (cond.type === "knowsEmote" && (!isNonEmptyString(cond.id) || !EMOTE_REGISTRY[cond.id])) {
     fail(`${describe}.id "${cond.id}" absent du registre d'émotes.`);
   }
@@ -607,7 +607,7 @@ export function validateCondition(cond, describe, entityVariables, sceneVariable
   // "weather" : EN PLUS de son type, son champ `state` référence un état de
   // la table météo (config/weather-values.js/WEATHER_STATES) — même
   // traitement que hasEquipmentTag.tag ci-dessus : une faute de frappe
-  // échouerait SILENCIEUSEMENT à l'évaluation (core/presence.js/
+  // échouerait SILENCIEUSEMENT à l'évaluation (core/conditions.js/
   // evaluateWeather replie sur false pour un état qui ne matche jamais),
   // donc refusée ICI, au chargement.
   if (cond.type === "weather" && (!isNonEmptyString(cond.state) || !WEATHER_STATES[cond.state])) {
@@ -617,7 +617,7 @@ export function validateCondition(cond, describe, entityVariables, sceneVariable
   // la borne haute est permise (0..24 couvre toute la journée) ; from ===
   // to serait une fenêtre vide, jamais vraie. `spread` (minutes) optionnel,
   // >= 0. Une faute (ex. "20" en chaîne) rendrait sinon la règle toujours
-  // fausse sans que rien ne le signale (core/presence.js/evaluateTimeRange).
+  // fausse sans que rien ne le signale (core/conditions.js/evaluateTimeRange).
   if (cond.type === "timeRange") {
     for (const bound of ["from", "to"]) {
       const hour = cond[bound];
@@ -654,7 +654,7 @@ export function validateCondition(cond, describe, entityVariables, sceneVariable
     }
     validateCondition(cond.condition, `${describe}.condition`, entityVariables, sceneVariables);
   }
-  // "variable" : LECTURE d'une variable (voir core/presence.js/
+  // "variable" : LECTURE d'une variable (voir core/conditions.js/
   // evaluateVariable, core/variables.js) — scope/name validés contre les
   // sacs déjà résolus du porteur (voir validateVariableReference, y
   // compris sa limite documentée sur la portée "party"), EXACTEMENT UN
@@ -684,7 +684,7 @@ export function validateCondition(cond, describe, entityVariables, sceneVariable
 
 // Une règle de presence[] : { when: { type, ... }, effects: [<effet>...] }.
 // `when` est reporté TEL QUEL (transport générique, comme `tuning` plus
-// bas) — son évaluateur (core/presence.js) gère seul ses propres champs, y
+// bas) — son évaluateur (core/conditions.js) gère seul ses propres champs, y
 // compris leur absence/malformation (repli défensif -> false). RACCOURCI
 // pour la présence seule : `{ when, present: boolean }` sans `effects`, normalisé ICI en forme
 // canonique `{ when, effects: [{ type: "presence", present }] }` — tout

@@ -70,7 +70,7 @@ export function reportCollectionTextMissing(key) {
 }
 
 // Objets retirés du sac ou de l'équipement d'une sauvegarde adoptée, type
-// absent du registre d'objets (voir core/save.js/dropUnknownItems). Même
+// absent du registre d'objets (voir core/save-migrate.js/dropUnknownItems). Même
 // moment de signalement que reportDroppedEntities.
 function reportDroppedItems(droppedItems) {
   for (const { where, type } of droppedItems) {
@@ -81,7 +81,7 @@ function reportDroppedItems(droppedItems) {
 
 // Références de contenu neutralisées dans une sauvegarde adoptée
 // (distribution, stock, catalogue, état météo — voir
-// core/save.js/repairContentReferences). Même moment de signalement que
+// core/save-migrate.js/repairContentReferences). Même moment de signalement que
 // reportDroppedEntities.
 function reportBrokenReferences(brokenReferences) {
   for (const { worldId, source, problem } of brokenReferences) {

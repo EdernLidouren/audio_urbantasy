@@ -57,7 +57,7 @@ export default {
   déclaration, fixe — une entrée ne change pas de place en étant découverte.
 - Une entrée est `{ item }` OU `{ entity }`, jamais les deux (une même
   collection peut mêler les deux genres) :
-  - `item` : un objet du sac (`core/items.js`/`ITEM_REGISTRY`) ;
+  - `item` : un objet du sac (`config/items-values.js`/`ITEM_REGISTRY`) ;
   - `entity` : un type d'entité (`entities/types/index.js`, la clé du
     registre, ex. `cumuloLupus`).
   L'objet ou le type sert aussi d'identifiant de l'entrée (unique dans sa
@@ -175,7 +175,7 @@ Maj+Tab), ouvrable directement avec **C** en ville
 
 `acquiredItems` et `observedEntityTypes` font partie de l'état, donc de la
 sauvegarde. Une sauvegarde antérieure reconstitue le premier à partir du sac
-et de l'équipement actuels (`core/save.js`/`migrateSave`) — approximatif : un
+et de l'équipement actuels (`core/save-migrate.js`/`migrateSave`) — approximatif : un
 objet déjà revendu n'y figure plus ; le second repart vide (rien ne permet de
 le reconstituer, une entité se redécouvre à la prochaine observation). Un id inconnu (objet retiré depuis) est simplement ignoré : les
 collections LISENT ce fait, elles ne le parcourent jamais.

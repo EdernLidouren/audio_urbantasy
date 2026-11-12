@@ -2,7 +2,7 @@
 // view/menus/shop-menu.js). Donnée pure, ZÉRO import, même patron que
 // config/spawn-values.js : le moteur ne fait que LIRE.
 //
-// Un catalogue = { <objet du sac (core/items.js/ITEM_REGISTRY)>: { stock,
+// Un catalogue = { <objet du sac (config/items-values.js/ITEM_REGISTRY)>: { stock,
 // price? } } — `stock` : quantité en rayon PAR CYCLE quotidien (rechargée à
 // cette valeur au cycle de collecte, voir core/spawn.js) ; `price` optionnel :
 // prix d'achat unitaire, défaut = `value` de l'objet (pleine valeur, aucune

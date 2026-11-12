@@ -7,9 +7,9 @@ import { parseScene } from "../scene.js";
 import { createInitialState, applyEntityActionEffects } from "../state.js";
 import { SAVE_VERSION, serializeGame, deserializeGame } from "../save.js";
 import { addItem, removeItem } from "../bag.js";
-import { ITEM_REGISTRY } from "../items.js";
+import { ITEM_REGISTRY } from "../../config/items-values.js";
 import { markObserved } from "../observations.js";
-import { evaluateCondition } from "../presence.js";
+import { evaluateCondition } from "../conditions.js";
 import { validateCondition } from "../script-parse.js";
 import { applyActionEffects } from "../variables.js";
 import {

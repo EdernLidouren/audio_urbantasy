@@ -23,7 +23,7 @@
 // sans écriture : core/equipment-slots.js.
 
 import { addItem, removeItem } from "./bag.js";
-import { ITEM_REGISTRY } from "./items.js";
+import { ITEM_REGISTRY } from "../config/items-values.js";
 
 // Gait EFFECTIF du joueur — dérivation PURE, JAMAIS stockée (voir
 // entities/player.js, qui ne porte plus aucun gait en dur) : l'objet équipé

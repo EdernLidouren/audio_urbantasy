@@ -48,19 +48,21 @@ function handleSwitchSide(entity, action) {
 //     sol reprend le nom de l'objet, voir core/entity-parse.js/
 //     genericItemDefaults) ;
 //   - action.amount : vers session.money.
+// Le gestionnaire rend vrai si la transaction a eu lieu : une entité déjà
+// ramassée (id périmé) laisse la session inchangée, et rien ne s'annonce.
 function handlePickup(entity, action) {
   if (action.item !== undefined) {
     if (!itemPickupHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
     playEntityPickupSound(entity); // avant le retrait : l'entité a encore sa voix
-    itemPickupHandler(entity, action.item, action.count ?? 1);
-    announce(t("interaction.pickupItem", { item: t(entity.labelKey) }), { assertive: true });
+    if (itemPickupHandler(entity, action.item, action.count ?? 1)) {
+      announce(t("interaction.pickupItem", { item: t(entity.labelKey) }), { assertive: true });
+    }
     return;
   }
 
   if (!pickupHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
   playEntityPickupSound(entity);
-  pickupHandler(entity, action.amount);
-  announce(t("interaction.pickup", { amount: action.amount }), { assertive: true });
+  if (pickupHandler(entity, action.amount)) announce(t("interaction.pickup", { amount: action.amount }), { assertive: true });
 }
 
 // "loot" : COLLECTIBLE PERSISTANT (voir core/money.js/lootEntity,
@@ -69,12 +71,13 @@ function handlePickup(entity, action) {
 // l'entité N'EST JAMAIS retirée : elle change d'état (consumed:true), avec
 // ses effets post-activation DÉCLARATIFS (description alternative —
 // view/interaction.js/resolveDescription ; devenir dormant — une règle de présence
-// sur la condition "consumed", voir core/presence.js) résolus ailleurs,
-// jamais ici. IDEMPOTENCE côté retour SENSORIEL, pas seulement en core :
-// sans cette garde, réactiver une entité déjà consumed rejouerait le son +
-// l'annonce "trouvé N pièces" alors qu'aucun argent n'est réellement ajouté
-// (lootEntity, lui, se dégrade déjà silencieusement — voir son commentaire)
-// — le piège exact que ce système doit éviter.
+// sur la condition "consumed", voir core/conditions.js) résolus ailleurs,
+// jamais ici. IDEMPOTENCE : l'activation d'un collectible déjà consommé est
+// refusée par le core (core/interaction.js/activationOf), et chaque transaction
+// le refuse aussi (core/money.js/lootEntity) ; le gestionnaire rend vrai si elle
+// a eu lieu, et le son comme l'annonce n'en partent qu'alors : jamais « trouvé N
+// pièces » sans pièces. L'entité restant au monde, le son peut suivre la
+// transaction.
 //
 // DEUX formes possibles pour action.kind:"loot", jamais mélangées sur une
 // même entité — voir doc/entity-model.md/"Entités éphémères" :
@@ -88,13 +91,11 @@ function handlePickup(entity, action) {
 //     (voir core/spawn.js/ephemeralArchetypeSpec) — ce fichier n'en
 //     connaît que la forme brute, jamais le registre.
 function handleLoot(entity, action) {
-  if (entity.consumed) return;
-
   const spawn = action.spawn;
   if (spawn) {
     if (!lootSpawnHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
+    if (!lootSpawnHandler(entity, spawn)) return;
     playEntityPickupSound(entity);
-    lootSpawnHandler(entity, spawn);
     // Pas de MONTANT ici (contrairement au cas action.amount ci-dessous) :
     // rien n'est encore GAGNÉ, seulement RÉPANDU autour de la source — le
     // joueur ramassera chaque pièce individuellement, chacune annonçant
@@ -110,13 +111,12 @@ function handleLoot(entity, action) {
   // annonce propre ici : c'est au contenu de dire ce qu'on a pris.
   if (amount === undefined) {
     if (!lootUniqueHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
-    playEntityPickupSound(entity);
-    lootUniqueHandler(entity);
+    if (lootUniqueHandler(entity)) playEntityPickupSound(entity);
     return;
   }
   if (!lootHandler) return; // aucun gestionnaire enregistré (cas limite, jamais en jeu réel)
+  if (!lootHandler(entity, amount)) return;
   playEntityPickupSound(entity);
-  lootHandler(entity, amount);
   announce(t("interaction.loot", { amount }), { assertive: true });
 }
 

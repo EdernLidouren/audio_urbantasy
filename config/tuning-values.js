@@ -16,7 +16,7 @@
 // quand même, à `undefined` (voir la fin de l'objet).
 
 // Durée (ms) du fondu de la PERCEPTION SURNATURELLE (voir
-// core/presence.js/"perceptionActive", view/audio/layers.js,
+// core/conditions.js/"perceptionActive", view/audio/layers.js,
 // view/audio/muffle.js) —
 // crossfade musique/ambiance vers les pools surnaturels ET rampe du filtre
 // d'étouffement des entités mondaines, LA MÊME durée pour les deux (une
@@ -318,7 +318,7 @@ export const TUNING_DEFAULTS = {
   // beaconGain/movementGain, pour le rôle "vocal".
   vocalGain: 1,
 
-  // Facteurs propres des sons de TRANSITION (voir core/presence.js,
+  // Facteurs propres des sons de TRANSITION (voir core/conditions.js,
   // doc/entity-model.md) — même principe que beaconGain/vocalGain/
   // movementGain, un par rôle : enterSound (bascule dormant->présent),
   // exitSound (présent->dormant).

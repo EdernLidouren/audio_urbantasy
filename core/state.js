@@ -67,9 +67,9 @@
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";
 import { MAX_COMPANIONS } from "../config/companions.js";
 import { MAX_EPHEMERALS } from "../config/ephemerals.js";
-import { createSeed, nextRandom } from "./rng.js";
+import { createSeed, nextRandom } from "../lib/rng.js";
 import { clamp } from "../lib/math.js";
-import { isBlocking, presenceContextOf, tracksPresence } from "./presence.js";
+import { evaluateCondition, isBlocking, conditionContextOf, tracksPresence } from "./conditions.js";
 import { INITIAL_TIME } from "./time.js";
 import { createInitialWeather } from "./weather.js";
 import { parseVariables, applyActionEffects } from "./variables.js";
@@ -317,14 +317,14 @@ export function createInitialState(
     companions: repositionCompanions(companions.slice(0, MAX_COMPANIONS), scene.playerStart, scene.length),
     // Flux PRNG dédié aux compagnons (voir header) : dérivé du même seed,
     // mais hashé sous une clé distincte — jamais la même suite que le
-    // premier monde (createSeed accepte une chaîne, voir core/rng.js).
+    // premier monde (createSeed accepte une chaîne, voir lib/rng.js).
     companionsRngState: createSeed(`companions:${seed}`),
     // Météo (voir core/weather.js) : machine à états GLOBALE, cercle
     // PARTIE comme time/money — jamais par monde. État initial +
     // rendez-vous de transition dérivés du seed de partie, comme
     // companionsRngState juste au-dessus.
     weather: createInitialWeather(seed),
-    // Perception surnaturelle (voir core/presence.js/"perceptionActive",
+    // Perception surnaturelle (voir core/conditions.js/"perceptionActive",
     // view/perception-toggle.js) : booléen simple, cercle PARTIE comme side/
     // time/money — jamais par monde. false par défaut : une partie neuve
     // démarre en perception normale.
@@ -339,14 +339,14 @@ export function createInitialState(
     // TOUJOURS résolu (jamais undefined), même politique EAGER que
     // money/bag/equipment ci-dessus.
     variables: parseVariables(partyVariables, "variables de partie", fail),
-    // improvements (voir core/improvements.js/IMPROVEMENT_REGISTRY) :
+    // improvements (voir config/improvements-values.js/IMPROVEMENT_REGISTRY) :
     // capacités POSSÉDÉES par le joueur, cercle PARTIE comme
     // equipment/variables — jamais par monde. Sac VIDE au départ (aucune
     // improvement débloquée à la création d'une partie neuve), PERSISTANT
     // (une improvement débloquée le reste, jamais réinitialisée comme une
     // variable volatile — voir core/save.js).
     improvements: {},
-    // émotes CONNUES (voir core/emotes.js/EMOTE_REGISTRY) : même stockage
+    // émotes CONNUES (voir config/emotes-values.js/EMOTE_REGISTRY) : même stockage
     // que improvements, SPARSE et PERSISTANT. Celles du départ d'une partie
     // neuve (config/new-game.js), aucune par défaut.
     emotes,
@@ -356,15 +356,29 @@ export function createInitialState(
   };
 }
 
+// La perception surnaturelle est débloquée par l'amélioration
+// "supernatural_perception", vérifiée par l'évaluateur de conditions — la MÊME
+// condition qu'une action déclarerait. Le court-circuit debug de hasImprovement
+// s'applique.
+const SUPERNATURAL_PERCEPTION_IMPROVEMENT = { type: "hasImprovement", id: "supernatural_perception" };
+
+// La perception surnaturelle peut-elle basculer ? Lu aussi par la vue, pour la
+// touche et l'aide des touches (view/perception-toggle.js) : une seule règle.
+export function perceptionAvailable(session) {
+  return evaluateCondition(SUPERNATURAL_PERCEPTION_IMPROVEMENT, conditionContextOf(session));
+}
+
 // Bascule la perception surnaturelle (touche dédiée, voir
 // view/perception-toggle.js — le COOLDOWN anti-spam reste entièrement côté vue,
-// rien à en savoir ici). Pur : un simple flip, aucun état d'attente ni
+// sur l'horloge murale, rien à en savoir ici). Sans l'amélioration : refusée,
+// RÉFÉRENCE INCHANGÉE. Pur : un simple flip, aucun état d'attente ni
 // compte-à-rebours — la bascule est INSTANTANÉE, c'est le SEUIL de
 // perception lui-même qui change, jamais un délai. Toute entité dont la
-// présence dépend de "perceptionActive" (voir core/presence.js) réagit dès
+// présence dépend de "perceptionActive" (voir core/conditions.js) réagit dès
 // le PROCHAIN tick, via le même mécanisme de présence conditionnelle que
 // le reste (ex. neon.js) — rien de plus à faire ici.
 export function togglePerception(session) {
+  if (!perceptionAvailable(session)) return session;
   return { ...session, perceptionActive: !session.perceptionActive };
 }
 
@@ -486,7 +500,7 @@ export function applyEntityActionEffects(session, entityId, effects, side = sess
 // Naissances notées par l'effet "spawn" (voir core/variables.js/
 // applyActionEffects), réalisées dans l'ordre sur la face `side` par
 // spawnEphemeral. Une entité qui porte sa présence (règles, voir
-// core/presence.js/tracksPresence) naît ABSENTE (`present: false`) : le
+// core/conditions.js/tracksPresence) naît ABSENTE (`present: false`) : le
 // tick suivant observe son ENTRÉE et la vue joue son enterSound (le
 // ghosten qui apparaît) — ou plus tard, quand ses règles l'admettent (la
 // perception activée). Sans règle, elle est simplement là.
@@ -605,7 +619,7 @@ const SCATTER_MAX_ATTEMPTS = 5;
 
 // Une position est BLOQUÉE si elle tombe dans le corps (BODY_RADIUS) d'une
 // entité qui bloque RÉELLEMENT le mouvement (isBlocking : blocksMovement ET
-// présente, voir core/presence.js — une entité dormante ne compte jamais).
+// présente, voir core/conditions.js — une entité dormante ne compte jamais).
 // `entities` : le monde actif ET les compagnons (voir spawnScatteredEphemerals)
 // — un compagnon pourrait bloquer demain, autant rester correct dès
 // aujourd'hui plutôt que de le découvrir en contenu.
@@ -627,7 +641,7 @@ function isPositionBlocked(x, entities, presenceContext) {
 // Exportée : réutilisée par core/spawn.js (placement des plages), et
 // vérifiée directement par core/checks/ephemerals.check.js, sans dépendre
 // du hasard d'un tirage complet. `presenceContext` : voir
-// core/presence.js/presenceContextOf.
+// core/conditions.js/conditionContextOf.
 export function drawScatteredPosition(sourceX, spread, length, entities, presenceContext, rngState) {
   let state = rngState;
   for (let attempt = 0; attempt < SCATTER_MAX_ATTEMPTS; attempt++) {
@@ -664,7 +678,7 @@ export function drawScatteredPosition(sourceX, spread, length, entities, presenc
 // déterministe (même seed + même SUITE d'actions, ticks ET interactions
 // confondus, -> même état, toujours).
 export function spawnScatteredEphemerals(session, spec, sourceX, count, spread = TUNING_DEFAULTS.ephemeralScatterSpread) {
-  const presenceContext = presenceContextOf(session);
+  const presenceContext = conditionContextOf(session);
   const side = session.player.side;
   let rngState = resolveFace(session.worlds[session.activeWorldId], side).rngState;
   let nextSession = session;

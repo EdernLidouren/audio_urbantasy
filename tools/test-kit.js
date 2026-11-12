@@ -20,8 +20,8 @@
 //      k.entity("defective_neon_1_v");        // l'entité, avec sa face
 //   Jeu des billes (sans partie de ville) : l'écran des billes, ouvert sur une
 //   partie neuve à graine imposée, ou sur un état construit à la main (format en
-//   tête de tools/marbles/state-builder.js) et des actions déjà jouées (commandes
-//   texte de tools/marbles/commands.js), pour arriver droit sur un choix :
+//   tête de marbles/tools/state-builder.js) et des actions déjà jouées (commandes
+//   texte de marbles/tools/commands.js), pour arriver droit sur un choix :
 //      await k.startMarbles({ seed: 42 });
 //      await k.startMarbles({ state: { triangle: { leftBase: "tiger", apex: "clay" } },
 //                             actions: ["resoudre"] });   // la question de la tigrée
@@ -172,7 +172,7 @@ export async function start() {
 // L'écran des billes au sommet, après prepare(), sans partie de ville. Sans
 // `state` ni `actions` : une partie neuve à la graine `seed`, piochée à
 // l'ouverture comme en jeu. Sinon : l'état construit `state` (description de
-// tools/marbles/state-builder.js, graine `seed` par défaut), auquel `actions`
+// marbles/tools/state-builder.js, graine `seed` par défaut), auquel `actions`
 // (commandes texte comme dans un cas, « poser 1 pointe », « resoudre »,
 // « choisir 2 », ou actions brutes du réducteur) sont appliquées AVANT
 // l'ouverture : l'écran s'ouvre sur l'état obtenu, sans pioche s'il est déjà en
@@ -182,8 +182,8 @@ export async function startMarbles({ seed = 1, state, actions = [] } = {}) {
   await prepare();
   let initial = null;
   if (state !== undefined || actions.length > 0) {
-    const { buildState, applyActions } = await import("./marbles/state-builder.js");
-    const { parseCommand } = await import("./marbles/commands.js");
+    const { buildState, applyActions } = await import("../marbles/tools/state-builder.js");
+    const { parseCommand } = await import("../marbles/tools/commands.js");
     const raw = actions.map((entry) => {
       if (typeof entry !== "string") return entry;
       const command = parseCommand(entry);

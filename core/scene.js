@@ -15,7 +15,7 @@
 import { AMBIENCE_CHANNEL_LIMIT } from "../config/audio-channels.js";
 import { REVERB_PRESETS } from "../config/reverb-values.js";
 import { BODY_RADIUS } from "./state.js";
-import { SURFACE_REGISTRY, DEFAULT_SURFACE } from "./surfaces.js";
+import { SURFACE_REGISTRY, DEFAULT_SURFACE } from "../config/surfaces-values.js";
 import { parseVariables } from "./variables.js";
 import { SPAWN_RANGE_DEFAULT_COUNT } from "../config/spawn-values.js";
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";

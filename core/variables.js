@@ -13,7 +13,7 @@
 // persistent, value } }.
 //
 // BRANCHÉ sur les conditions (LECTURE, condition "variable" — voir
-// core/presence.js/evaluateVariable) et les actions (ÉCRITURE, effets
+// core/conditions.js/evaluateVariable) et les actions (ÉCRITURE, effets
 // setVariable/toggleVariable/addVariable — voir core/script-parse.js/
 // parseActionEffect, applyActionEffects ci-dessous). getVariable/setVariable
 // restent le SEUL point d'accès bas niveau ; applyActionEffects les enchaîne
@@ -130,7 +130,7 @@ const SCOPE_CONTEXT_KEYS = { entity: "entity", scene: "world", party: "session" 
 // { entity?, world?, session? } — le consommateur (condition/action)
 // construit ce contexte comme il l'entend. Portée inconnue -> undefined,
 // jamais une exception (même repli défensif que evaluateCondition sur un
-// type de condition inconnu, core/presence.js).
+// type de condition inconnu, core/conditions.js).
 function carrierForScope(context, scope) {
   return context?.[SCOPE_CONTEXT_KEYS[scope]];
 }
@@ -250,7 +250,7 @@ export function applyActionEffects(effects, context) {
     }
     // dormantUntil : l'entité dort jusqu'au prochain début de l'heure
     // `hour` — un instant ABSOLU (core/time.js/nextHourStart), comparé à
-    // l'horloge à chaque résolution de présence (core/presence.js/
+    // l'horloge à chaque résolution de présence (core/conditions.js/
     // isForcedDormant) : il tient que le joueur reste, parte (monde gelé,
     // relu à son retour) ou recharge sa partie. Un nouvel effet remplace
     // l'échéance. Contexte sans entité ou sans partie (pas d'horloge) ->

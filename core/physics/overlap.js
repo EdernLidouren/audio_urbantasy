@@ -5,7 +5,7 @@
 
 import { BODY_RADIUS } from "../state.js";
 import { clamp } from "../../lib/math.js";
-import { isBlocking, isPresent } from "../presence.js";
+import { isBlocking, isPresent } from "../conditions.js";
 
 // Sépare deux positions sur l'axe pour atteindre un écart minGap, borné à
 // [0, length]. weightA/weightB pondèrent qui bouge en priorité (0 = ne bouge
@@ -82,7 +82,7 @@ export function resolveEntityOverlaps(entities, length, presenceContext) {
 // Résolution de chevauchement des corps (curatif) : le game design évite ce
 // cas, mais le code ne doit pas en dépendre. Appelée APRÈS le mouvement de
 // tous les mobiles au tick. Une entité NON BLOQUANTE (isBlocking : passable,
-// OU impassable mais DORMANTE — voir core/presence.js) n'a pas de zone
+// OU impassable mais DORMANTE — voir core/conditions.js) n'a pas de zone
 // d'exclusion propre : seule une paire impliquant AU MOINS UNE entité
 // bloquante, et sans entité dormante, est résolue ; l'entité passable s'y
 // écarte seule. Une seule passe déterministe (ordre = celui de

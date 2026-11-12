@@ -45,7 +45,7 @@
 import BEHAVIORS from "./behaviors/index.js";
 import { resolvePlayerMove, resolveBodyMove } from "./physics/collision.js";
 import { resolveOverlaps, resolveEntityOverlaps } from "./physics/overlap.js";
-import { resolveEntityRules, presenceContextOf, tracksPresence } from "./presence.js";
+import { resolveEntityRules, conditionContextOf, tracksPresence } from "./conditions.js";
 import { resolveFace, withFace, withActiveWorld, isTwoSided } from "./state.js";
 import { startleNearby } from "./startle.js";
 import { activeBehaviorOf, countDownTemporaryBehavior, withBaseBehavior } from "./temporary-behavior.js";
@@ -83,7 +83,7 @@ function resolveTargetPosition(state, face, targetId) {
 // goto.js) ET l'état du flux après tous les tirages, pour que l'appelant
 // le reporte au tick suivant.
 //
-// Règles déclaratives (voir core/presence.js/resolveEntityRules) résolues
+// Règles déclaratives (voir core/conditions.js/resolveEntityRules) résolues
 // ICI, avant tout comportement — présence : premier des trois plans coupés
 // par le drapeau DORMANT (voir doc/entity-model.md/doc/time.md pour les
 // deux autres, côté vue : rendu audio, occupation/interaction ; le
@@ -94,7 +94,7 @@ function resolveTargetPosition(state, face, targetId) {
 // RESTÉES actives, quel que soit l'état de présence des autres. Les
 // champs `present`/`presenceChanged` ne sont ajoutés à l'entité QUE si
 // elle porte une règle `presence` ou peut s'envoler (voir
-// core/presence.js/tracksPresence), `ruleActive` seulement avec des
+// core/conditions.js/tracksPresence), `ruleActive` seulement avec des
 // règles (jamais sur une autre entité : sa forme sérialisée reste celle de
 // sa scène, voir core/checks/save.check.js, audit de sérialisabilité).
 //
@@ -210,7 +210,7 @@ export function reduce(state, action) {
       const getTargetPosition = (targetId) => resolveTargetPosition(state, face, targetId);
       // Présence : dérivée de state.time, state.perceptionActive ET
       // state.weather.state (tous constants pour tout ce tick, voir
-      // core/presence.js) — un seul objet construit ici, partagé par la
+      // core/conditions.js) — un seul objet construit ici, partagé par la
       // phase 1 (stepEntities) ET la phase 2 (isBlocking, via
       // resolvePlayerMove/resolveBodyMove/resolveOverlaps ci-dessous),
       // jamais recréé par appel. `world`/`session` : PORTEURS des variables
@@ -223,8 +223,8 @@ export function reduce(state, action) {
       // copie — resolveEntityRules n'en fait rien d'autre qu'une LECTURE
       // (aucun effet d'écriture ne passe par presence[].effects, voir
       // doc/scripting.md/"Effets d'action"). Construit par
-      // presenceContextOf, la même fonction que la vue utilise au montage.
-      const presenceContext = presenceContextOf(state);
+      // conditionContextOf, la même fonction que la vue utilise au montage.
+      const presenceContext = conditionContextOf(state);
       const worldStep = stepEntities(face.entities, {
         length: world.length,
         rngState: face.rngState,
@@ -246,7 +246,7 @@ export function reduce(state, action) {
       // après. Le joueur se résout contre les corps "avant" (entities du
       // monde ET compagnons, PRE-comportement) : il réagit, comme les
       // cibles de la phase 1, à l'état de DÉBUT de tick. Une entité DORMANTE ne bloque
-      // jamais (voir core/presence.js/isBlocking, lu par
+      // jamais (voir core/conditions.js/isBlocking, lu par
       // resolvePlayerMove/resolveBodyMove/resolveOverlaps à la place d'un
       // simple entity.blocksMovement) — présence recalculée fraîche depuis
       // ces entités PRÉ-tick plutôt que relue sur un éventuel `.present`

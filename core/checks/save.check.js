@@ -6,7 +6,7 @@
 // passé à parseScene.
 
 import { parseScene } from "../scene.js";
-import { createInitialState, getActiveWorld, travelToWorld, togglePerception, switchSide } from "../state.js";
+import { createInitialState, getActiveWorld, travelToWorld, switchSide } from "../state.js";
 import { tick } from "../actions.js";
 import { reduce } from "../reduce.js";
 import { SAVE_VERSION, serializeGame, deserializeGame } from "../save.js";
@@ -16,13 +16,14 @@ import { setWeather } from "../weather.js";
 import { addMoney } from "../money.js";
 import { applyActionEffects, setVariable } from "../variables.js";
 import { hasImprovement } from "../improvements.js";
-import { DEFAULT_SURFACE, surfaceAt } from "../surfaces.js";
+import { surfaceAt } from "../surfaces.js";
+import { DEFAULT_SURFACE } from "../../config/surfaces-values.js";
 import { refillDueSpawns } from "../spawn.js";
 import { shopArticles } from "../trade.js";
 import { DEFAULT_WEATHER_STATE } from "../../config/weather-values.js";
 import { throws, auditNonSerializable, diffStructure } from "../../lib/check.js";
 import { TICK_MS } from "../../lib/loop.js";
-import { WORLD_A_REGISTRY, TWO_FACED_RAW_SCENE, createAuditFixture } from "./helpers.js";
+import { WORLD_A_REGISTRY, TWO_FACED_RAW_SCENE, createAuditFixture, toggleUnlockedPerception } from "./helpers.js";
 
 export default function checkSave(run) {
   // Fixtures partagées avec d'autres domaines (voir ./helpers.js).
@@ -263,7 +264,7 @@ export default function checkSave(run) {
   const migratedKey = legacyKeyResult.success
     ? legacyKeyResult.session.worlds[renameWorldId].entities.find((e) => e.id === "legacy-key")
     : undefined;
-  // --- Références de contenu figées (core/save.js/repairContentReferences) ---
+  // --- Références de contenu figées (core/save-migrate.js/repairContentReferences) ---
   // Une table, un catalogue, un objet ou un état météo disparus depuis la
   // première visite : neutralisés et listés, jamais un plantage.
   const brokenSave = {
@@ -342,7 +343,7 @@ export default function checkSave(run) {
   );
   run("save types inconnus : partie saine -> rien de retiré", 0, deserializeGame(saveEnvelope, { registry: knownTypes }).droppedEntities.length);
 
-  // --- Durées d'errance en ticks (voir core/save.js/convertWanderTicks) ---
+  // --- Durées d'errance en ticks (voir core/save-migrate.js/convertWanderTicks) ---
   // Une partie ancienne a figé ses errances en ticks, dans le champ
   // `behavior` comme dans un effet "behavior" de règle : elles ressortent
   // en ms, aux valeurs qui redonnent exactement les mêmes ticks au tirage.
@@ -443,7 +444,7 @@ export default function checkSave(run) {
   // Sauvegarde ANTÉRIEURE à defaultSurface/segments (voir
   // core/scene.js/parseScene) : ses mondes n'ont jamais eu ces clés, et une
   // relecture de sauvegarde ne repasse jamais par parseScene — sans
-  // rebouchage (core/save.js/backfillWorld), surfaceAt(world, x) plante sur
+  // rebouchage (core/save-migrate.js/backfillWorld), surfaceAt(world, x) plante sur
   // world.segments.find(...) dès qu'un tel monde redevient actif (bug réel,
   // trouvé en jeu).
   const oldWorlds = {};
@@ -464,7 +465,7 @@ export default function checkSave(run) {
 
   // Sauvegarde ANTÉRIEURE à `indoor` (voir core/scene.js/parseFace, "nature
   // de scène") : ses mondes n'ont jamais eu cette clé — sans rebouchage
-  // (core/save.js/backfillFace), le rendu d'ambiance météo lirait
+  // (core/save-migrate.js/backfillFace), le rendu d'ambiance météo lirait
   // `undefined` (ni indoor ni outdoor) au lieu d'un booléen.
   const oldIndoorWorlds = {};
   for (const [id, world] of Object.entries(auditSession.worlds)) {
@@ -496,7 +497,7 @@ export default function checkSave(run) {
   }
 
   // Sauvegarde ANTÉRIEURE à l'horloge de partie (voir core/time.js) : jamais
-  // eu de clé .time — sans rebouchage (core/save.js/migrateSave), toute
+  // eu de clé .time — sans rebouchage (core/save-migrate.js/migrateSave), toute
   // dérivation (minuteOfHour, etc.) recevrait undefined au lieu d'un nombre.
   const { time: _droppedTime, ...auditSessionWithoutTime } = auditSession;
   const oldTimeSave = { version: SAVE_VERSION, data: auditSessionWithoutTime };
@@ -550,7 +551,7 @@ export default function checkSave(run) {
 
   // Sauvegarde ANTÉRIEURE au modèle recto/verso (voir
   // doc/entity-model.md/"Recto/verso") : jamais eu de clé `player.side` — sans rebouchage
-  // (core/save.js/migrateSave), une scène à deux faces qu'on visiterait
+  // (core/save-migrate.js/migrateSave), une scène à deux faces qu'on visiterait
   // plus tard n'aurait aucune face "courante" définie.
   const { side: _droppedSide, ...auditPlayerWithoutSide } = auditSession.player;
   const oldSideSave = {
@@ -565,8 +566,8 @@ export default function checkSave(run) {
 
   // Sauvegarde d'une scène à DEUX FACES, ANTÉRIEURE à defaultSurface/
   // segments/nextEphemeralId/indoor — même précédent que le monde simple
-  // ci-dessus (core/save.js/backfillFace), mais chaque face doit être
-  // rebouchée INDÉPENDAMMENT (voir core/save.js/backfillWorld).
+  // ci-dessus (core/save-migrate.js/backfillFace), mais chaque face doit être
+  // rebouchée INDÉPENDAMMENT (voir core/save-migrate.js/backfillWorld).
   const freshTwoFaceSession = createInitialState(twoFacedScene, 42);
   const freshTwoFaceWorld = freshTwoFaceSession.worlds[twoFaceWorldId];
   const {
@@ -673,7 +674,7 @@ export default function checkSave(run) {
     panierSession = addMoney(panierSession, 25);
     panierSession = addItem(panierSession, "apple", 2);
     panierSession = setWeather(panierSession, "rain");
-    panierSession = togglePerception(panierSession);
+    panierSession = toggleUnlockedPerception(panierSession);
     panierSession = switchSide(panierSession, 4);
     panierSession = applyActionEffects([{ type: "giveImprovement", id: "supernatural_perception" }], { session: panierSession }).session;
     panierSession = applyActionEffects(

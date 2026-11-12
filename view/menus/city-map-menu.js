@@ -40,8 +40,8 @@ import {
   isCityMapUnderConstruction,
   findCityMapCoordinates,
 } from "../../map/city-map.js";
-import { evaluateCondition, presenceContextOf, CONDITION_TYPES } from "../../core/presence.js";
-import { IMPROVEMENT_REGISTRY } from "../../core/improvements.js";
+import { evaluateCondition, conditionContextOf, CONDITION_TYPES } from "../../core/conditions.js";
+import { IMPROVEMENT_REGISTRY } from "../../config/improvements-values.js";
 import { MAIN_SCENE_OF } from "../../scenes/index.js";
 
 // La grille est déclarée à la main (map/city-map.js) : une condition
@@ -68,7 +68,7 @@ for (const row of CITY_MAP_GRID) {
 // joueur la voit, comme le menu des améliorations.
 function isZoneOnMap(cell, session) {
   if (!cell.onMapWhen) return true;
-  return evaluateCondition(cell.onMapWhen, { ...presenceContextOf(session), debugShortCircuit: false });
+  return evaluateCondition(cell.onMapWhen, { ...conditionContextOf(session), debugShortCircuit: false });
 }
 
 const CITY_MAP_BINDINGS = defineBindings("cityMap", {

@@ -1,17 +1,13 @@
-// BASCULE DE LA PERCEPTION SURNATURELLE (touche "p") : l'état (core), puis le
-// retour sensoriel (son, annonce).
+// BASCULE DE LA PERCEPTION SURNATURELLE (touche "p") : l'état et sa règle (core,
+// core/state.js/togglePerception : il faut l'amélioration), puis le retour
+// sensoriel (son, annonce). Ici, seulement le délai entre deux bascules, sur
+// l'horloge murale.
 
 import { announce } from "../lib/announce.js";
 import { t } from "../data/i18n/index.js";
-import { togglePerception } from "../core/state.js";
-import { evaluateCondition, presenceContextOf } from "../core/presence.js";
+import { perceptionAvailable, togglePerception } from "../core/state.js";
 import { playInterfaceSound } from "./menu-sounds.js";
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";
-
-// Débloquée par l'amélioration "supernatural_perception", vérifiée avec
-// l'évaluateur de conditions du core — la MÊME condition qu'une action
-// déclarerait. Le court-circuit debug de hasImprovement s'applique.
-const SUPERNATURAL_PERCEPTION_IMPROVEMENT = { type: "hasImprovement", id: "supernatural_perception" };
 
 // Deux sons distincts : activation et désactivation se reconnaissent à
 // l'oreille avant l'annonce. Non positionnés, volume de l'interface.
@@ -30,22 +26,24 @@ export function createPerceptionToggle({ getSession, setSession }) {
   let cooldownUntil = 0;
 
   // La touche a-t-elle un effet ? Lu aussi par l'aide des touches
-  // (view/city-screen.js), qui ne la montre que débloquée : une seule règle
-  // pour la touche et pour l'aide.
+  // (view/city-screen.js), qui ne la montre que débloquée : la règle du core,
+  // une seule pour la touche et pour l'aide.
   function isAvailable() {
-    return evaluateCondition(SUPERNATURAL_PERCEPTION_IMPROVEMENT, presenceContextOf(getSession()));
+    return perceptionAvailable(getSession());
   }
 
-  // Sans l'amélioration ou pendant le délai : rien du tout (ni son ni
-  // annonce), comme une touche non attribuée.
+  // Sans l'amélioration (le core refuse, la session ne change pas) ou pendant le
+  // délai : rien du tout (ni son ni annonce), comme une touche non attribuée.
   function toggle() {
     if (!isAvailable()) return;
 
     const now = performance.now();
     if (now < cooldownUntil) return;
-    cooldownUntil = now + TUNING_DEFAULTS.perceptionCooldownMs;
 
-    setSession(togglePerception(getSession()));
+    const next = togglePerception(getSession());
+    if (next === getSession()) return;
+    cooldownUntil = now + TUNING_DEFAULTS.perceptionCooldownMs;
+    setSession(next);
     const active = getSession().perceptionActive;
     playPerceptionToggleSound(active);
     announce(t(active ? "perception.activated" : "perception.deactivated"), { assertive: true });

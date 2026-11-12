@@ -8,7 +8,7 @@ import { createInitialState } from "../state.js";
 import { serializeGame, deserializeGame } from "../save.js";
 import { addMoney } from "../money.js";
 import { addItem } from "../bag.js";
-import { ITEM_REGISTRY } from "../items.js";
+import { ITEM_REGISTRY } from "../../config/items-values.js";
 import { advanceTime } from "../time.js";
 import { TIME_CONFIG } from "../../config/time-values.js";
 import { refillDueSpawns } from "../spawn.js";

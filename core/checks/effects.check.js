@@ -6,13 +6,13 @@
 // passé à parseScene.
 
 import { parseScene } from "../scene.js";
-import { createInitialState, togglePerception } from "../state.js";
-import { evaluateCondition, selectMatchingAction } from "../presence.js";
+import { createInitialState } from "../state.js";
+import { evaluateCondition, selectMatchingAction } from "../conditions.js";
 import { setWeather } from "../weather.js";
 import { applyActionEffects, setVariable } from "../variables.js";
 import { isRenderEffect } from "../effects.js";
 import { throws } from "../../lib/check.js";
-import { VAR_ACTION_REGISTRY, UNKNOWN_FIELD, sceneWithActionEffect, sceneParseMessage } from "./helpers.js";
+import { VAR_ACTION_REGISTRY, UNKNOWN_FIELD, sceneWithActionEffect, sceneParseMessage, toggleUnlockedPerception } from "./helpers.js";
 
 export default function checkEffects(run) {
   // --- Effets d'action : RENDU (playSound/announce) et forme de l'effet
@@ -260,7 +260,7 @@ export default function checkEffects(run) {
   {
     // a) Actions multiples filtrées par condition, teleport vers des
     // cibles DIFFÉRENTES — tombe GRATUITEMENT du mécanisme existant
-    // (core/presence.js/selectMatchingAction), aucun code dédié. Condition
+    // (core/conditions.js/selectMatchingAction), aucun code dédié. Condition
     // "variable" scope "entity" (même patron que la fenêtre, actions.check.js) :
     // une porte VIP dont la destination dépend d'un flag PROPRE à cette
     // porte (ex. posé par un effet ailleurs dans la partie).
@@ -333,7 +333,7 @@ export default function checkEffects(run) {
   // cascade) pour appeler le VRAI actionContext — il reconstruit ici, à la
   // main, EXACTEMENT la forme que actionContext produit (même dérivation,
   // reprise au mot près : perceptionActive/weather/world lus depuis la
-  // session, comme core/presence.js/presenceContextOf), et vérifie que
+  // session, comme core/conditions.js/conditionContextOf), et vérifie que
   // evaluateCondition (le SEUL évaluateur, partagé avec presence[].when) s'y
   // comporte comme sur presence[].when — DANS LES DEUX SENS (fausse PUIS
   // vraie), pour ne pas juste remplacer un "toujours faux" par un "toujours
@@ -397,7 +397,7 @@ export default function checkEffects(run) {
       evaluateCondition({ type: "weather", state: "rain" }, buildActionContextLike(rainySession, doorEntity))
     );
 
-    const perceivingSession = togglePerception(angleMortSession);
+    const perceivingSession = toggleUnlockedPerception(angleMortSession);
     run(
       "action.condition (contexte réel) : perceptionActive fausse par défaut",
       false,

@@ -44,14 +44,15 @@
 // passer une variable de 1 à 2 réveillerait aussitôt, dans la même passe,
 // celui qui attend 2 (un seul sifflement ferait éclater le néon défectueux
 // au lieu de le dérégler). `context` : celui d'une condition d'action
-// (core/presence.js/actionContextOf), construit sur la session d'avant.
+// (core/conditions.js/actionContextOf), construit sur la session d'avant.
 
 import { TIME_CONFIG } from "../config/time-values.js";
 import { hourOfDay } from "./time.js";
 import { isTwoSided, resolveFace, applyEntityActionEffects, applyCompanionActionEffects } from "./state.js";
-import { evaluateCondition, actionContextOf } from "./presence.js";
+import { evaluateCondition, actionContextOf, conditionContextOf } from "./conditions.js";
 import { isRenderEffect } from "./effects.js";
-import { EMOTE_REGISTRY } from "./emotes.js";
+import { orderedEmoteIds } from "./emotes.js";
+import { EMOTE_REGISTRY } from "../config/emotes-values.js";
 import { sequenceHead } from "./sequence.js";
 
 // Kinds de trigger reconnus (`on`) — SEULE liste, lue par
@@ -207,6 +208,23 @@ export function applyEmoteTriggers(session, emoteId, sourceX) {
   }
 
   return { session: next, fired };
+}
+
+// Les émotes que le joueur CONNAÎT, dans l'ordre du registre : lues par la
+// condition knowsEmote, la MÊME qu'un script déclarerait (en mode debug, toutes).
+// La liste du menu des émotes et du raccourci (view/emotes.js).
+export function knownEmoteIds(session) {
+  const context = conditionContextOf(session);
+  return orderedEmoteIds().filter((id) => evaluateCondition({ type: "knowsEmote", id }, context));
+}
+
+// Le joueur FAIT l'émote `emoteId` depuis `sourceX` : la transaction de la touche
+// E et du menu des émotes. Une émote qu'il ne connaît pas est refusée : rien ne
+// change, `performed` est faux, et la vue ne joue rien. Sinon, ses triggers
+// (applyEmoteTriggers) : { session, fired, performed: true }.
+export function performEmote(session, emoteId, sourceX) {
+  if (!knownEmoteIds(session).includes(emoteId)) return { session, fired: [], performed: false };
+  return { ...applyEmoteTriggers(session, emoteId, sourceX), performed: true };
 }
 
 // L'entité minable `entity` de la face `side` cède : applique ses triggers de
