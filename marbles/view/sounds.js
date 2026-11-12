@@ -31,7 +31,7 @@
 // de réverbération), d'après marbles/config/values.js/MARBLES_SOUND_PLACES et
 // MARBLES_SOUND_DEPTH. Stéréo et volume, jamais de HRTF (CLAUDE.md). La table a sa
 // propre réverbération, créée à l'ouverture de l'écran et défaite à sa sortie. Sans
-// place (brassage, menus du sac et de la défausse) : au centre, sec, plein volume.
+// place (brassage, menus des piles) : au centre, sec, plein volume.
 //
 // ROULEMENTS : un repère "roll" suit un chemin de places. Sa boucle de roulement
 // (le `roll` du profil) joue en continu, et chaque frame (advanceRolls, appelée par

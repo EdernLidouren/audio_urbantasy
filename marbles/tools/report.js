@@ -28,7 +28,7 @@ export const REPORT_HEADINGS = {
 export const REPORT_RESULT_HEADINGS = [REPORT_HEADINGS.score, REPORT_HEADINGS.impact];
 
 // Seuil des billes « presque jamais posées », en poses par partie.
-export const RARELY_PLACED = 0.25;
+const RARELY_PLACED = 0.25;
 
 // Un nombre à la française : virgule décimale, zéros inutiles retirés, vrai signe
 // moins. `signed` : « +4,2 » pour un écart.
@@ -55,6 +55,7 @@ function producedLine(marble) {
 const SETTING_LABELS = {
   maxHandSize: "main de",
   throwsPerTurn: "lancers par tour",
+  potCapacity: "pot de",
   firstTurnDraw: "pioche du premier tour",
   drawPerTurn: "pioche par tour",
   turnCount: "tours",

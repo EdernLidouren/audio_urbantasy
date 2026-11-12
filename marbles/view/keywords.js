@@ -1,5 +1,5 @@
 // Jeu des billes : l'AIDE DES MOTS-CLÉS de la bille sous le curseur, partout où une
-// bille peut l'être (triangle, main, menus du sac et de la défausse).
+// bille peut l'être (triangle, main, menus du sac, de la défausse et du pot).
 //   E      une seule annonce : « Pointe : description. Base : description. » ;
 //   Maj+E  un menu vertical de lib/menu.js, une entrée par mot-clé (« Pointe :
 //          description. »), puis « Fermer » ; Échap ferme aussi.
@@ -17,7 +17,7 @@
 import { pushScreen, popScreen } from "../../lib/screens.js";
 import { makeMenuScreen } from "../../lib/menu.js";
 import { nameRef, t } from "../../data/i18n/index.js";
-import { statusHelpLine } from "./narration.js";
+import { marbleRef, statusHelpLine } from "./narration.js";
 
 // Les lignes des mots-clés d'une bille, chacune { key, params }. `marble` : son id,
 // ou undefined s'il n'y a pas de bille sous le curseur. Noms et descriptions passent
@@ -46,7 +46,7 @@ export function keywordsMenu(marble, rules) {
   const known = marble !== undefined && marble !== null;
   return {
     title: known ? "marbles.keyword.title" : "marbles.keyword.title_none",
-    titleParams: known ? { marble: nameRef(`marble.${marble}.name`) } : undefined,
+    titleParams: known ? { marble: marbleRef(marble) } : undefined,
     closable: true,
     entries: [
       ...keywordLines(marble, rules).map(({ key, params }) => ({ label: key, labelParams: params })),

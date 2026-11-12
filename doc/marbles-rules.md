@@ -126,11 +126,13 @@ Une bille piochée pendant la phase de jeu peut être lancée aussitôt, dans la
 Toute pioche, celle du début de tour comme celle d'un effet, se fait bille par bille, ainsi :
 
 1. si la main est pleine, la pioche s'arrête et la bille reste au sac, sans régénération ;
-2. sinon, si le sac a une bille, on la pioche, puis son Éveil joue, avec tout ce qu'il déclenche, avant la bille suivante ;
-3. sinon, si la défausse n'est pas vide, elle est mélangée et devient le sac (la régénération), puis la Trouvaille de chaque bille active joue, puis les billes du pot qui réagissent au mélange, et la pioche reprend du début ;
+2. sinon, si le sac a une bille, on la pioche, puis son Éveil joue, avec tout ce qu'il déclenche, puis les billes du pot et les statuts qui réagissent à la pioche, avant la bille suivante ;
+3. sinon, si la défausse n'est pas vide, elle est mélangée et devient le sac (la régénération), puis la Trouvaille de chaque bille active joue, puis les billes du pot et les statuts qui réagissent au mélange, et la pioche reprend du début ;
 4. sinon, le sac et la défausse sont vides : il n'y a plus rien à piocher.
 
 Le premier arrêt interrompt la pioche : les billes restantes ne sont pas piochées.
+
+La pioche du début de tour et la Pioche d'un effet suivent exactement le même ordre. Ce que joue la pioche du début de tour (Éveils, Trouvailles, réactions) compte pour le tour qui commence.
 
 ### La régénération du sac
 
@@ -257,7 +259,7 @@ Un effet peut faire plusieurs choses : « Pioche 1 et Éjecter toutes les minibi
 
 ### Ce qui se déclenche en chaîne
 
-Un effet peut en déclencher d'autres. Ils se jouent dans l'ordre où ils surviennent, l'un après l'autre. Quelques exceptions se règlent jusqu'au bout tout de suite, avant la suite : l'Éveil d'une bille piochée, avant la bille suivante ; les Trouvailles d'une régénération, puis les réactions du pot à ce mélange, avant que la pioche ne reprenne ; l'Éjection et le Final d'une bille en partance, avant son arrivée ; et l'arrivée d'une bille à la défausse ou au pot.
+Un effet peut en déclencher d'autres. Ils se jouent dans l'ordre où ils surviennent, l'un après l'autre. Quelques exceptions se règlent jusqu'au bout tout de suite, avant la suite : l'Éveil d'une bille piochée, puis les réactions à la pioche, avant la bille suivante ; les Trouvailles d'une régénération, puis les réactions à ce mélange, avant que la pioche ne reprenne ; l'Éjection et le Final d'une bille en partance, puis les réactions à son départ, avant son arrivée ; et l'arrivée d'une bille à la défausse ou au pot.
 
 Quand plusieurs billes réagissent au même évènement, l'ordre est fixe : l'ordre horaire (base droite, base gauche, pointe), puis la main de la première à la dernière.
 
@@ -325,7 +327,7 @@ Une action dont la cible est vide ne fait rien, et le journal le dit : un emplac
 ### Le pot
 
 - Une bille n'entre au pot que par un effet Empocher, jamais par un geste du joueur.
-- Le pot garde ses billes dans l'ordre d'arrivée, au plus 3.
+- Le pot garde ses billes dans l'ordre d'arrivée, au plus sa capacité en vigueur : 3 au départ, qu'un statut peut changer (section 12).
 - **Pot plein** : la bille envoyée est perdue pour la partie. Elle n'a pas d'effet d'entrée, ni aucun autre.
 - Une bille au pot n'en sort jamais, et ne revient jamais au sac.
 - Ses effets En poche jouent : à son entrée, à chaque résolution, et en réaction.
@@ -336,10 +338,10 @@ Une action dont la cible est vide ne fait rien, et le journal le dit : un emplac
 
 Une bille du pot peut réagir à ce qui se passe pendant la partie : « En poche, à chaque chiquenaude : Vitesse +2 ».
 
-- Elle peut écouter un évènement de la partie (bille lancée, tiquée, éjectée, piochée, usée, sortie du triangle, mise en poche, perdue, mélange du sac), le déclenchement d'un mot-clé chez une bille qui en a l'effet, ou le déclenchement d'une action.
+- Elle peut écouter un évènement de la partie, le déclenchement d'un mot-clé chez une bille qui en a l'effet, ou le déclenchement d'une action : les valeurs de partie de ces trois catégories (section 10, « Les catégories »).
 - Elle n'écoute jamais une quantité (comme les points d'usure rendus), ni les gains et pertes de Vitesse et de Masse, ni les réactions elles-mêmes.
 - Elle réagit une fois par occurrence : trois billes piochées, trois réactions. Un évènement qui compte pour deux occurrences écoutées donne deux réactions.
-- L'ordre : l'évènement se produit, les valeurs de partie sont comptées, la bille concernée joue son propre effet, puis les billes du pot qui écoutent réagissent, dans l'ordre d'arrivée. Pour un mélange du sac, les billes concernées sont les billes actives (leur Trouvaille), et les réactions jouent avant que la pioche ne reprenne.
+- **L'ordre, une seule règle** : l'évènement se produit et les valeurs de partie sont comptées ; la bille concernée joue d'abord son propre effet (l'Éveil après sa pioche, le Final ou l'Éjection après son départ du triangle, les Trouvailles des billes actives après un mélange) ; puis les billes du pot réagissent, dans l'ordre d'arrivée ; puis les statuts, dans l'ordre où ils ont été reçus (section 12). Le même ordre partout : pour la pioche du début de tour comme pour une Pioche d'effet, pour un retrait à l'étape des retraits comme pour un retrait par une Fêlure. Une bille perdue au pot plein suit cet ordre comme toute arrivée. Après un mélange, les réactions jouent avant que la pioche ne reprenne.
 - Une bille qui entre au pot ne réagit pas à sa propre mise en poche ; elle réagit aux occurrences suivantes. Une bille entrée plus tard ne réagit pas à ce qui l'a précédée.
 - Un bonus de réaction dont la phase est passée est perdu.
 
@@ -410,6 +412,7 @@ Un **statut** est un effet durable que reçoit la partie, donné par une bille (
   - Une quantité ramenée à 0 ne fait rien : l'action ne se joue pas, ne se dit pas, et ne compte pas comme un déclenchement de son mot-clé. Une usure de phase ramenée à 0 : la bille joue sa phase sans s'user.
   - Une usure de phase augmentée peut amener la bille à son maximum (jamais au-delà) : elle part à l'étape des retraits. Une Fêlure augmentée qui l'y amène la retire aussitôt.
   - L'effet se dit avec ses quantités finales : « Polissage 2 à la pointe » pour un Polissage 1, sous un statut qui ajoute 1 aux Polissages. La fiche d'une bille garde son effet imprimé.
+- **Réagir à ce qui se passe**, comme une bille du pot (section 9) : « Ferveur : à chaque chiquenaude, Vitesse +2 ». La réaction se dit avec le nom du statut : « Ferveur : Vitesse +2. ». Elle ne vise jamais « cette bille » ni un emplacement relatif : un statut n'a pas de bille.
 
 ### Les points d'interception
 
@@ -429,7 +432,8 @@ Tous les endroits où un statut peut modifier une valeur, dans l'ordre où ils s
 | usure de phase | l'usure prise par une bille à sa phase | après son effet de phase, avant le plafond |
 
 Tous ont un plancher de 0. Empocher, Éjecter, Défausser, Rebond et Ramasser n'en ont pas.
-- **Réagir à ce qui se passe**, comme une bille du pot (section 9) : « Ferveur : à chaque chiquenaude, Vitesse +2 ». La réaction se dit avec le nom du statut : « Ferveur : Vitesse +2. ». Elle ne vise jamais « cette bille » ni un emplacement relatif : un statut n'a pas de bille.
+
+Un statut ne compte, pour une charge comme pour ce qui se dit, que s'il change vraiment la valeur, plancher compris : un doublement d'une perte déjà ramenée à 0 ne change rien, et ne consomme aucune charge.
 
 ### L'intensité et le cumul
 
@@ -452,31 +456,38 @@ Tous ont un plancher de 0. Empocher, Éjecter, Défausser, Rebond et Ramasser n'
 
 ### Les réactions des statuts
 
-- L'ordre : l'évènement se produit, il est compté, la bille concernée joue son propre effet, puis les billes du pot réagissent, dans l'ordre d'arrivée, puis les statuts, dans l'ordre où ils ont été reçus.
+- L'ordre est la règle unique des réactions (section 9, « Les réactions en poche ») : l'évènement se produit, il est compté, la bille concernée joue son propre effet (l'Éveil après sa pioche, le Final ou l'Éjection après son départ), puis les billes du pot réagissent, dans l'ordre d'arrivée, puis les statuts, dans l'ordre où ils ont été reçus.
 - Un statut ne réagit jamais à sa propre réception ni à son renforcement ; il réagit aux occurrences suivantes, tant qu'il est en vigueur.
 
 ### Les consulter
 
 - **A** : « 2 statuts : amorti, intensité 2, 3 tours. Lancer supplémentaire, à partir du prochain tour. », ou « Aucun statut. ».
-- **Maj+A** : le menu des statuts, de gauche à droite, puis « Retour » ; Échap ferme. Chaque entrée dit le nom, l'intensité s'il le faut et ce qui reste ; Ctrl+bas parcourt sa fiche : son effet, ce qui lui reste, son origine (« Obtenu par : Tic d'argile. ») ; E dit sa description.
+- **Maj+A** : le menu des statuts, de gauche à droite, puis « Retour » (sans statut, « Aucun statut. » avant « Retour ») ; Échap ferme. Chaque entrée dit le nom, l'intensité s'il le faut et ce qui reste ; Ctrl+bas parcourt sa fiche : son effet, ce qui lui reste, son origine (« Obtenu par : Tic d'argile. ») ; E dit sa description.
 - Sur une bille, sa fiche dit le statut qu'elle donne et sa durée ; E décrit, après ses mots-clés, chaque statut qu'elle peut donner.
-- La prévision (R, la confirmation d'une pose) compte les statuts et leurs charges, sur une copie : rien n'est consommé avant le vrai coup. La confirmation a une ligne des statuts dès que la partie en a.
+- La prévision (R, la confirmation d'une pose) compte les statuts et leurs charges, sur une copie : rien n'est consommé avant le vrai coup. R dit les réactions des statuts pendant la résolution ; la confirmation a une ligne des statuts dès que la partie en a.
+- **S** dit la pioche du prochain début de tour, statuts compris, sans rien consommer.
 
 ### Les statuts de test
 
-- **Lancer supplémentaire** : lancers +1 par intensité, le prochain tour ; en intensité.
-- **Poche profonde** : capacité du pot +1 par intensité, toute la partie ; en intensité.
-- **Coup de fouet** : le prochain gain de Vitesse doublé ; une charge, en durée.
-- **Amorti** : pertes de Vitesse −1 par intensité, 3 tours ; en intensité.
-- **Ferveur** : à chaque chiquenaude, Vitesse +2, 2 tours ; unique.
-- **Coup double** : l'Impact du tour doublé, ce tour ; unique.
-- **Fatigue** : lancers −1 par intensité, le prochain tour ; en intensité. Un statut négatif.
-- **Main vive** : pioche du début de tour +1 par intensité, 2 tours ; en intensité.
-- **Inspiration** : la prochaine Pioche d'un effet pioche une bille de plus ; une charge, en durée.
-- **Lustre** : Polissages +1 par intensité, toute la partie ; en intensité.
-- **Fragilité** : Fêlures +1 par intensité, 3 tours ; en intensité. Un statut négatif.
-- **Répit** : les billes ne s'usent pas à leur phase, ce tour ; unique.
-- **Usure accélérée** : usure de phase +1 par intensité, le prochain tour ; en intensité. Un statut négatif.
+Cette liste est générée à partir de la table des statuts ; elle ne se modifie pas à la main.
+
+<!-- statuts de test : début -->
+
+- **Lancer supplémentaire** : lancers +1 par intensité, le prochain tour. Se cumule en intensité.
+- **Poche profonde** : capacité du pot +1 par intensité, toute la partie. Se cumule en intensité.
+- **Coup de fouet** : le prochain gain de Vitesse est doublé. Une charge ; chaque nouvelle application en ajoute une.
+- **Amorti** : les pertes de Vitesse sont réduites de 1 par intensité, sans jamais devenir un gain. 3 tours ; se cumule en intensité.
+- **Ferveur** : à chaque chiquenaude : Vitesse +2. 2 tours ; unique.
+- **Coup double** : l'Impact du tour est doublé. Ce tour ; unique.
+- **Fatigue** : lancers −1 par intensité, le prochain tour. Se cumule en intensité.
+- **Main vive** : pioche du début de tour +1 par intensité. 2 tours ; se cumule en intensité.
+- **Inspiration** : la prochaine Pioche d'un effet pioche une bille de plus. Une charge ; chaque nouvelle application en ajoute une.
+- **Lustre** : Polissages +1 par intensité, toute la partie. Se cumule en intensité.
+- **Fragilité** : Fêlures +1 par intensité. 3 tours ; se cumule en intensité.
+- **Répit** : les billes jouent leur phase sans s'user. Ce tour ; unique.
+- **Usure accélérée** : usure de phase +1 par intensité, le prochain tour. Se cumule en intensité.
+
+<!-- statuts de test : fin -->
 
 ## Annexe : les billes de test
 

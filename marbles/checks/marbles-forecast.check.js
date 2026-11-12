@@ -12,7 +12,7 @@ import { emptyTally } from "../core/tally.js";
 import { forecast, readForecast } from "../core/forecast.js";
 import { CHOICELESS_TYPES, FIXTURE_TYPES, fixtureRules } from "./fixtures/marbles.js";
 import { emptyForecastTally, walkForecastGame } from "./fixtures/forecast-property.js";
-import { deepFreeze, fabricatedRules, inHand, marblesPlayState, placed } from "./helpers.js";
+import { deepFreeze, fabricatedRules, forecastMatches, inHand, marblesPlayState, placed } from "./helpers.js";
 
 // Les règles de la table des vérifications (marbles/checks/fixtures/marbles.js) : la
 // propriété « prévision = réel » et les cas du choix et d'Éjecter.
@@ -102,12 +102,7 @@ function checkFinalForecast(run) {
 // elle vide l'emplacement visé (ni Éjection ni Tic) ; toujours égale au réel.
 function checkFlickForecast(run) {
   const toApex = { type: "place", handIndex: 0, slot: "apex" };
-  const matches = (state, action) => {
-    const real = rules.reduce(state, action);
-    const resolved = rules.reduce(real.state, { type: "resolve" });
-    const { uncertain, awakenPossible, ...predicted } = rules.forecast(state, action);
-    return JSON.stringify(predicted) === JSON.stringify(readForecast(real.events, resolved.events, resolved.state));
-  };
+  const matches = (state, action) => forecastMatches(rules, state, action);
 
   const agingFlick = playState({ hand: inHand(["aging_flick"], 3), triangle: { leftBase: null, rightBase: null, apex: placed("all_rounder") } });
   const predicted = rules.forecast(agingFlick, toApex);
@@ -129,12 +124,7 @@ function checkFlickForecast(run) {
 // Les Trouvailles dans la prévision : prévues chez les billes actives, connues ;
 // seules les billes piochées restent cachées. Toujours égales au réel.
 function checkWindfallForecast(run) {
-  const matches = (state, action) => {
-    const real = action === null ? { state, events: [] } : rules.reduce(state, action);
-    const resolved = rules.reduce(real.state, { type: "resolve" });
-    const { uncertain, awakenPossible, ...predicted } = rules.forecast(state, action);
-    return JSON.stringify(predicted) === JSON.stringify(readForecast(real.events, resolved.events, resolved.state));
-  };
+  const matches = (state, action) => forecastMatches(rules, state, action);
   const toApex = { type: "place", handIndex: 0, slot: "apex" };
   const play = playState({
     hand: inHand(["split_base"]),
@@ -192,12 +182,7 @@ function checkWindfallForecast(run) {
 // une trouvaille) ; le registre réel n'est jamais touché.
 function checkTallyForecast(run) {
   const toApex = { type: "place", handIndex: 0, slot: "apex" };
-  const matches = (state, action) => {
-    const real = rules.reduce(state, action);
-    const resolved = rules.reduce(real.state, { type: "resolve" });
-    const { uncertain, awakenPossible, ...predicted } = rules.forecast(state, action);
-    return JSON.stringify(predicted) === JSON.stringify(readForecast(real.events, resolved.events, resolved.state));
-  };
+  const matches = (state, action) => forecastMatches(rules, state, action);
   // Un registre décrit en partie, { id: { turn, game } }, le reste à zéro.
   const tally = (values) => ({ ...emptyTally(TALLY_COUNTERS), ...values });
 
@@ -235,12 +220,7 @@ function checkTallyForecast(run) {
 // Le pot dans la prévision : les effets En poche sont déterministes et inclus, chez la
 // bille qui empoche ; égale au réel.
 function checkPocketForecast(run) {
-  const matches = (state, action) => {
-    const real = action === null ? { state, events: [] } : rules.reduce(state, action);
-    const resolved = rules.reduce(real.state, { type: "resolve" });
-    const { uncertain, awakenPossible, ...predicted } = rules.forecast(state, action);
-    return JSON.stringify(predicted) === JSON.stringify(readForecast(real.events, resolved.events, resolved.state));
-  };
+  const matches = (state, action) => forecastMatches(rules, state, action);
   const toApex = { type: "place", handIndex: 0, slot: "apex" };
 
   // Le Tic de hit_pocket empoche fragile, qui entre avec Vitesse +10.
@@ -305,12 +285,7 @@ function checkPocketForecast(run) {
 // pose à part (`potReactions`), celles de la résolution regroupées par bille avec
 // son effet de résolution (`potEffects`) ; égales au réel.
 function checkReactionForecast(run) {
-  const matches = (marbles, state, action) => {
-    const real = action === null ? { state, events: [] } : marbles.reduce(state, action);
-    const resolved = marbles.reduce(real.state, { type: "resolve" });
-    const { uncertain, awakenPossible, ...predicted } = marbles.forecast(state, action);
-    return JSON.stringify(predicted) === JSON.stringify(readForecast(real.events, resolved.events, resolved.state));
-  };
+  const matches = forecastMatches;
   const toApex = { type: "place", handIndex: 0, slot: "apex" };
   const values = (outcomes) => outcomes.map(({ marble, speed, mass }) => ({ marble, speed, mass }));
 
@@ -421,12 +396,7 @@ function checkChoiceForecast(run) {
 // Chiquenaude vide l'emplacement ; une bille chassée avant sa phase, retirée avant.
 // Égale au réel.
 function checkEjectForecast(run) {
-  const matches = (marbles, state, action) => {
-    const real = action === null ? { state, events: [] } : marbles.reduce(state, action);
-    const resolved = marbles.reduce(real.state, { type: "resolve" });
-    const { uncertain, awakenPossible, ...predicted } = marbles.forecast(state, action);
-    return JSON.stringify(predicted) === JSON.stringify(readForecast(real.events, resolved.events, resolved.state));
-  };
+  const matches = forecastMatches;
   const toApex = { type: "place", handIndex: 0, slot: "apex" };
   const flickStrike = playState({ hand: inHand(["flick_strike"]), triangle: { leftBase: null, rightBase: null, apex: placed("tally_flick") } });
   const predicted = choiceRules.forecast(flickStrike, toApex);

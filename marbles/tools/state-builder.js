@@ -15,10 +15,15 @@
 //     "discard": [],
 //     "pot": ["agate"], "lost": [],  le pot dans l'ordre d'arrivée, les billes perdues
 //     "tally": { "flick": { "turn": 1, "game": 3 } },   valeurs de partie, le reste à 0
+//     "statuses": ["cushion:2", { "status": "extraThrow", "pending": true }],
 //     "settings": { "maxHandSize": 5, "throwsPerTurn": 5, "potCapacity": 3, "firstTurnDraw": 5, "drawPerTurn": 1, "turnCount": 10 }
 //   }
 // Une bille du triangle : "id" (usure 0), "id:usure", ou { marble, wear, bonus? }.
 // Une bille de la main : "id" (0 tour en main), "id:tours", ou { marble, turnsInHand }.
+// Un statut, dans l'ordre d'acquisition : "id" (intensité 1), "id:intensité", ou
+// { status, intensity?, remaining?, pending? } ; ce qui n'est pas dit vient de sa
+// définition, comme s'il venait d'être reçu. Les bornes (main, lancers, pot) se
+// lisent aux caractéristiques en vigueur, statuts compris.
 // Défauts : tour 2 en phase de jeu, triangle, main, sac et défausse vides,
 // compteurs de début de tour. Une description fausse (champ, bille ou
 // emplacement inconnu, usure hors bornes) lève une erreur claire : jamais d'état
@@ -26,11 +31,11 @@
 
 import { createSeed } from "../../lib/rng.js";
 import { SLOTS } from "../core/marbles.js";
+import { applyStatus } from "../core/statuses.js";
 import { rejectUnknownFields } from "../../lib/validate.js";
-import MARBLE_TYPES from "../content/types/index.js";
 import { GAME_RULES } from "./game-rules.js";
 
-const FIELDS = ["seed", "turn", "stage", "score", "speed", "mass", "swapUsed", "throwsUsed", "triangle", "hand", "bag", "discard", "pot", "lost", "tally", "settings"];
+const FIELDS = ["seed", "turn", "stage", "score", "speed", "mass", "swapUsed", "throwsUsed", "triangle", "hand", "bag", "discard", "pot", "lost", "tally", "statuses", "settings"];
 const SETTINGS = ["maxHandSize", "throwsPerTurn", "potCapacity", "firstTurnDraw", "drawPerTurn", "turnCount"];
 const STAGES = ["draw", "play", "over"];
 
@@ -39,7 +44,7 @@ function fail(message) {
 }
 
 function checkMarble(id, where) {
-  if (!Object.hasOwn(MARBLE_TYPES, id)) fail(`bille inconnue "${id}" (${where}).`);
+  if (!Object.hasOwn(GAME_RULES.types, id)) fail(`bille inconnue "${id}" (${where}).`);
   return id;
 }
 
@@ -82,11 +87,29 @@ function tallyContent(values = {}, base) {
   return { ...base, ...Object.fromEntries(described) };
 }
 
-// Le pot : dans l'ordre d'arrivée, jamais plus que sa capacité.
+// Le pot : dans l'ordre d'arrivée, jamais plus que sa capacité en vigueur.
 function potContent(list, capacity) {
   const pot = marbleList(list, "pot");
-  if (pot.length > capacity) fail(`pot de ${pot.length} billes, plus que potCapacity (${capacity}).`);
+  if (pot.length > capacity) fail(`pot de ${pot.length} billes, plus que sa capacité en vigueur (${capacity}).`);
   return pot;
+}
+
+// Les statuts, dans l'ordre d'acquisition : chacun reçu comme d'un effet (sa
+// définition, marbles/core/statuses.js/applyStatus), puis ce que la description fixe.
+function statusContent(list = []) {
+  if (!Array.isArray(list)) fail("statuses doit être une liste.");
+  let instances = [];
+  for (const value of list) {
+    const described = typeof value === "string" ? { status: value.split(":")[0], intensity: Number(value.split(":")[1] ?? 1) } : value;
+    rejectUnknownFields(described, ["status", "intensity", "remaining", "pending"], "statut", fail);
+    if (!Object.hasOwn(GAME_RULES.statuses, described.status)) fail(`statut inconnu "${described.status}".`);
+    if (instances.some((instance) => instance.status === described.status)) fail(`statut "${described.status}" donné deux fois.`);
+    const intensity = checkInteger(described.intensity ?? 1, `intensité de ${described.status}`, 1);
+    const { instance } = applyStatus(instances, GAME_RULES.statuses, described.status, { intensity }, null);
+    const remaining = described.remaining === undefined ? instance.remaining : checkInteger(described.remaining, `reste de ${described.status}`, 1);
+    instances = [...instances, { ...instance, remaining, pending: described.pending ?? instance.pending }];
+  }
+  return instances;
 }
 
 function marbleList(list = [], where) {
@@ -114,7 +137,10 @@ export function buildState(description = {}) {
   if (turn > base.turnCount) fail(`tour ${turn} au-delà des ${base.turnCount} tours de la partie.`);
   if (description.hand !== undefined && !Array.isArray(description.hand)) fail("hand doit être une liste.");
   const hand = (description.hand ?? []).map(handContent);
-  if (hand.length > base.maxHandSize) fail(`main de ${hand.length} billes, plus que maxHandSize (${base.maxHandSize}).`);
+  // Les caractéristiques en vigueur, statuts compris, bornent la main, les lancers, le pot.
+  const statuses = statusContent(description.statuses);
+  const value = (key) => GAME_RULES.characteristic({ ...base, statuses }, key);
+  if (hand.length > value("handSize")) fail(`main de ${hand.length} billes, plus que sa taille en vigueur (${value("handSize")}).`);
 
   return {
     ...base,
@@ -124,14 +150,15 @@ export function buildState(description = {}) {
     speed: Number.isInteger(description.speed ?? 0) ? description.speed ?? 0 : fail("speed doit être un entier."),
     mass: Number.isInteger(description.mass ?? 1) ? description.mass ?? 1 : fail("mass doit être un entier."),
     swapUsed: description.swapUsed ?? false,
-    throwsUsed: checkThrowsUsed(description.throwsUsed ?? 0, base.throwsPerTurn),
+    throwsUsed: checkThrowsUsed(description.throwsUsed ?? 0, value("throws")),
     triangle: Object.fromEntries(SLOTS.map((slot) => [slot, slotContent(triangle[slot], slot)])),
     hand,
     bag: marbleList(description.bag, "bag"),
     discard: marbleList(description.discard, "discard"),
-    pot: potContent(description.pot, base.potCapacity),
+    pot: potContent(description.pot, value("potCapacity")),
     lost: marbleList(description.lost, "lost"),
     tally: tallyContent(description.tally, base.tally),
+    statuses,
   };
 }
 

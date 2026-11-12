@@ -5,7 +5,7 @@
 // billes des vérifications et sur des billes fabriquées, marbles-content sur la
 // vraie table (son contrat).
 
-import { SLOTS, legalActions } from "../../core/marbles.js";
+import { SLOTS } from "../../core/marbles.js";
 import { readForecast } from "../../core/forecast.js";
 import { createPicker } from "../helpers.js";
 
@@ -88,18 +88,7 @@ function compareState(state, marbles, faults, tally) {
       faults.push(`Impact prévu ${predicted.impact}, réel ${resolved.state.score - state.score}`);
     }
     // Les comptes tombent juste, lus indépendamment du journal d'Impact.
-    const parts = [
-      predicted.flick,
-      predicted.knockout,
-      predicted.hit,
-      ...SLOTS.map((slot) => predicted.phases[slot]),
-      ...SLOTS.flatMap((slot) => predicted.slotEffects[slot]),
-      ...predicted.regenerations.flatMap(({ effects }) => effects),
-      ...predicted.potEffects,
-      ...predicted.potReactions,
-    ]
-      .filter((part) => part !== null)
-      .flatMap(withEntries);
+    const parts = allOutcomes(predicted);
     const speed = parts.reduce((total, part) => total + part.speed, state.speed);
     if (speed !== predicted.speed) faults.push(`Vitesse prévue ${predicted.speed}, somme des effets ${speed}`);
   }
@@ -117,7 +106,9 @@ function withEntries(outcome) {
   ];
 }
 
-// Tous les effets d'une prévision, à plat.
+// Tous les effets d'une prévision, à plat : la pose, les phases, ce qui se prévoit avec
+// un emplacement ou une régénération, le pot, et les réactions des statuts, pendant la
+// pose comme pendant la résolution.
 function allOutcomes(predicted) {
   return [
     predicted.flick,
@@ -128,6 +119,8 @@ function allOutcomes(predicted) {
     ...predicted.regenerations.flatMap(({ effects }) => effects),
     ...predicted.potEffects,
     ...predicted.potReactions,
+    ...predicted.statusEffects,
+    ...predicted.statusReactions,
   ]
     .filter((part) => part !== null && part !== undefined)
     .flatMap(withEntries);
@@ -158,7 +151,7 @@ export function walkForecastGame(marbles, seed, options, faults, tally) {
   while (state.stage !== "over" && guard < 400) {
     guard += 1;
     if (state.pendingChoice) {
-      const answers = legalActions(state);
+      const answers = marbles.legalActions(state);
       state = marbles.reduce(state, answers[pick(answers.length)]).state;
       continue;
     }
@@ -169,7 +162,8 @@ export function walkForecastGame(marbles, seed, options, faults, tally) {
     compareState(state, marbles, faults, tally);
     const roll = pick(5);
     if (roll === 0) state = marbles.reduce(state, { type: "swap", a: SLOTS[pick(3)], b: SLOTS[pick(3)] }).state;
-    else if (roll <= 2) state = marbles.reduce(state, { type: "place", handIndex: pick(state.maxHandSize), slot: SLOTS[pick(3)] }).state;
+    // Une place de la main tirée parfois au-delà de la main : une pose refusée.
+    else if (roll <= 2) state = marbles.reduce(state, { type: "place", handIndex: pick(state.hand.length + 1), slot: SLOTS[pick(3)] }).state;
     else state = marbles.reduce(state, { type: "resolve" }).state;
   }
 }

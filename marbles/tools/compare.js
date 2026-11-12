@@ -35,6 +35,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { installFileFetch } from "../../tools/node-fetch.js";
+import { parseArgs } from "./args.js";
 
 // Avant d'importer le rapport, dont les modules chargent les textes par fetch (voir
 // tools/node-fetch.js).
@@ -55,13 +56,8 @@ const RUNS = [
   { id: "rb-greedy-no-replacement", label: "glouton sans remplacement, sacs aléatoires", args: ["--player", "greedy-no-replacement", ...RANDOM_BAG] },
 ];
 
-const args = process.argv.slice(2);
+// Les options, toutes à valeur ; la ligne de commande se lit strictement (args.js).
 const KNOWN_OPTIONS = ["--ref", "--games", "--seed", "--save"];
-
-function option(name) {
-  const index = args.indexOf(name);
-  return index >= 0 ? args[index + 1] : undefined;
-}
 
 // Un programme, sa sortie standard en texte ; une erreur claire s'il échoue.
 // `stdin` : un flux à brancher sur son entrée.
@@ -116,7 +112,7 @@ async function simulate(root, entry, games, seed) {
 const plural = (count, one, many) => (count === 1 ? one : many);
 
 async function main() {
-  for (const arg of args) if (arg.startsWith("--") && !KNOWN_OPTIONS.includes(arg)) throw new Error(`option inconnue ${arg}.`);
+  const { option } = parseArgs(process.argv.slice(2), { values: KNOWN_OPTIONS });
   const ref = option("--ref") ?? "HEAD";
   const gamesOption = option("--games") ?? "1000";
   if (!/^\d+$/.test(gamesOption) || Number(gamesOption) < 1) throw new Error(`--games attend un entier >= 1, pas "${gamesOption}".`);

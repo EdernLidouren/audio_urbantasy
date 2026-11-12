@@ -16,6 +16,10 @@ const IGNORED = [/^Durée : /];
 
 const isIgnored = (line) => IGNORED.some((pattern) => pattern.test(line));
 
+// Les lignes qui sont leur propre titre : les dernières du rapport, sans paragraphe à
+// elles (« Actions refusées : 0. »), chacune rangée sous son préfixe.
+const SELF_HEADED = [REPORT_HEADINGS.refusals, REPORT_HEADINGS.interruptions];
+
 // Le contexte de chaque ligne : { heading, marble } (marble : null hors des billes).
 function contexts(lines) {
   let heading = null;
@@ -25,6 +29,11 @@ function contexts(lines) {
       heading = null;
       marble = null;
       return { heading: null, marble: null };
+    }
+    const prefix = SELF_HEADED.find((start) => line.startsWith(start));
+    if (prefix !== undefined) {
+      heading = null;
+      return { heading: prefix, marble: null };
     }
     if (heading === null) {
       heading = line;

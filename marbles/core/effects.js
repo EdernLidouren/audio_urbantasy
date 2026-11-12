@@ -1,5 +1,5 @@
 // Jeu des billes : le MODÈLE D'EFFET. Un effet est une liste de clauses, de la
-// donnée (format : en-tête de marbles/config/values.js). Ce module sait la
+// donnée (format : en-tête de marbles/content/types/index.js). Ce module sait la
 // valider, lire ce qu'une bille a d'imprimé et l'évaluer sur un triangle ; pur,
 // il ne touche à aucun état : appliquer le résultat est l'affaire de
 // marbles/core/run.js.
@@ -26,13 +26,13 @@
 //          cibles).
 // Seules les actions qui déclarent `choice` (leurs zones et ce qu'elles visent)
 // l'acceptent. Les choix se font un par un, au déclenchement, sur les cibles valides
-// à cet instant (marbles/core/run.js/chooseTargets) ; l'action s'applique ensuite à
+// à cet instant (marbles/core/choices.js/chooseTargets) ; l'action s'applique ensuite à
 // chacune, dans l'ordre des choix.
 //
 // CIBLE « TOUTES » : `target` vaut { type: "all", filters? } : toutes les billes
 // actives, au déclenchement, dans l'ordre horaire (SLOTS), qui passent TOUS les filtres
 // (TARGET_FILTERS : aujourd'hui le calibre, { type: "size", size }). Seules les
-// actions qui déclarent `all` l'acceptent (Éjecter).
+// actions qui déclarent `all` l'acceptent (Éjecter, Défausser, Rebond).
 //
 // LA SITUATION d'un effet, ce que ses conditions et ses montants calculés lisent au
 // déclenchement : { triangle, holder, replacement, tally, state, statuses } ;
@@ -84,8 +84,9 @@
 // action sur une bille peut viser un emplacement depuis n'importe quel moment, la
 // bille visée restant sur le triangle. La bille elle-même, elle, n'est visable que
 // là où elle est (HOLDER_ZONES) : chaque action déclare les zones où elle la prend
-// (`selfZones`) ; en partance (son Final, son Éjection), Empocher la redirige
-// vers le pot, Polissage, Fêlure et Éjecter ne la prennent pas.
+// (`selfZones`) ; en partance (son Final, son Éjection), Empocher et Rebond la
+// redirigent (vers le pot, vers la main), Polissage, Fêlure et Éjecter ne la prennent
+// pas.
 //
 // VALEURS : ce qu'un effet produit, une valeur par action, sous le nom de
 // l'action (`{ speed, mass, draw }`). Le core les applique (marbles/core/run.js/fireEffect),
@@ -94,40 +95,18 @@
 import { MARBLE_SIZES } from "../config/values.js";
 import { rejectUnknownFields } from "../../lib/validate.js";
 import { TALLY_SCOPES, tallyValue } from "./tally.js";
-import { NO_STATUSES, STATUS_DURATIONS, characteristic, definitionOf, statusApplication } from "./statuses.js";
+import { NO_STATUSES, STATUS_DURATIONS, definitionOf, statusApplication } from "./statuses.js";
+import { CHOICE_ZONES, GAME_ZONES, HOLDER_ZONES, NO_REFERENCE_ZONES, SLOTS, ZONE_STATES, nextSlot, previousSlot } from "./zones.js";
 
 // Un calibre connu (marbles/config/values.js/MARBLE_SIZES) ?
 export function isMarbleSize(size) {
   return Number.isInteger(size) && Object.hasOwn(MARBLE_SIZES, size);
 }
 
-// LES EMPLACEMENTS, dans l'ORDRE HORAIRE, le seul ordre du triangle, déclaré ici
-// seulement : base droite, base gauche, pointe, puis de nouveau base droite. Il est
-// celui de la résolution (les phases, la pointe en dernier), des retraits par usure,
-// des billes actives visées ensemble, des écouteurs du bus, de la prévision et de
-// tout ce que l'écran énumère ; la disposition spatiale de l'écran, elle, n'en
-// dépend pas. Il définit l'emplacement SUIVANT (nextSlot) et le PRÉCÉDENT
-// (previousSlot) : la rotation de fin de tour fait avancer chaque bille vers son
-// suivant.
-export const SLOTS = Object.freeze(["rightBase", "leftBase", "apex"]);
+// Une bille dont l'identité est cachée : au sac ou en défausse dans la copie de la
+// prévision, ou piochée à l'aveugle (drawOne). Jamais dans une vraie partie.
+export const UNKNOWN_MARBLE = null;
 
-function slotIndex(slot) {
-  const index = SLOTS.indexOf(slot);
-  if (index < 0) throw new Error(`marbles : emplacement inconnu "${slot}".`);
-  return index;
-}
-
-// L'emplacement suivant dans le sens horaire : base droite -> base gauche, base
-// gauche -> pointe, pointe -> base droite.
-export function nextSlot(slot) {
-  return SLOTS[(slotIndex(slot) + 1) % SLOTS.length];
-}
-
-// L'emplacement précédent, le sens inverse : base gauche -> base droite, pointe ->
-// base gauche, base droite -> pointe.
-export function previousSlot(slot) {
-  return SLOTS[(slotIndex(slot) + SLOTS.length - 1) % SLOTS.length];
-}
 
 // Les CIBLES RELATIVES : l'emplacement suivant ou précédent (nextSlot, previousSlot)
 // de l'emplacement d'où la bille agit, sa RÉFÉRENCE : son emplacement sur le
@@ -158,9 +137,6 @@ function resolveRelative(target, reference) {
   return reference === null || reference === undefined ? null : RELATIVE_TARGETS[target].step(reference);
 }
 
-// Les zones de la bille qui joue un effet où elle n'a JAMAIS d'emplacement de
-// référence (HOLDER_ZONES) : en main (l'Éveil), dans le pot, et un statut.
-const NO_REFERENCE_ZONES = ["hand", "pot", "status"];
 
 // Le même « aucun effet » partout : comparer deux effets par identité dit si
 // une bille a une variante de base.
@@ -229,7 +205,7 @@ function validatePositive(clause, describe, fail, context) {
 }
 
 // Une ARRIVÉE (en main, ou à la défausse) d'une bille que l'action `action` a
-// déplacée, directement ou par une redirection (`movedBy`, marbles/core/run.js/
+// déplacée, directement ou par une redirection (`movedBy`, marbles/core/path.js/
 // arrive).
 function movedArrival(event, action) {
   return (event.type === "returned" || event.type === "discarded") && event.movedBy === action;
@@ -247,19 +223,6 @@ function marbleActionKeyword(action, eventType) {
   };
 }
 
-// Les ZONES où un joueur peut choisir une cible, déclarées ici et nulle part
-// ailleurs : `available`, le choix y est possible aujourd'hui (les cibles de chaque
-// zone disponible : marbles/core/run.js/CHOICE_TARGETS) ; `picks`, ce qui s'y choisit.
-// Ajouter le pot ou le sac : `available` à vrai, ses cibles dans le core, ses textes
-// dans la vue.
-export const CHOICE_ZONES = {
-  hand: { available: true, picks: ["marble"] },
-  triangle: { available: true, picks: ["marble", "slot"] },
-  pot: { available: false, picks: ["marble"] },
-  // La défausse, dans l'ordre d'arrivée (Ramasser).
-  discard: { available: true, picks: ["marble"] },
-  bag: { available: false, picks: ["marble"] },
-};
 
 // Une cible est-elle un choix du joueur ?
 export function isChoice(target) {
@@ -307,7 +270,7 @@ function addAmount(values, clause) {
 //   event     (sur une bille) l'évènement de chaque application ;
 //   retires   (sur une bille) une bille amenée à son maximum est retirée aussitôt ;
 //   moves     (sur une bille) au lieu de changer son usure, elle la DÉPLACE vers
-//             cette destination, par le chemin des billes (marbles/core/run.js/
+//             cette destination, par le chemin des billes (marbles/core/path.js/
 //             travel) : "pot", Empocher ; "discard", Défausser ; "hand",
 //             Rebond et Ramasser ;
 //   handLimited (facultatif) vers la main, la bille n'y va que s'il y a de la
@@ -323,7 +286,7 @@ function addAmount(values, clause) {
 //   all       (facultatif) la cible peut être « toutes les billes actives »,
 //             filtrées (en-tête) ;
 //   ejects    (sur une bille) au lieu de changer son usure, elle la CHASSE du
-//             triangle : Éjecter (marbles/core/run.js/ejectFromSlot) ;
+//             triangle : Éjecter (marbles/core/path.js/ejectFromSlot) ;
 //   selfZones (sur une bille) les zones (HOLDER_ZONES) où elle peut viser la bille
 //             elle-même, sans cible ; ailleurs, la validation refuse
 //             (targetProblem) ;
@@ -337,23 +300,6 @@ function addAmount(values, clause) {
 // Le `kind` "marble" : une action sur une bille. Ses textes :
 // marbles/view/narration/effects.js/ACTION_TEXTS.
 
-// OÙ EST LA BILLE ELLE-MÊME quand son effet joue : sa ZONE, selon la valeur `marble`
-// de son déclencheur (marbles/config/values.js/MARBLE_TRIGGERS ; "pot" pour un moment
-// En poche ; une phase, qui n'en a pas, est sur le triangle comme "onSlot"). C'est la
-// `zone` de holder (la situation, en-tête) et des écouteurs (marbles/core/run.js) ;
-// `where` dit à la validation pourquoi une action ne l'y prend pas (targetProblem).
-// Chaque valeur `marble` d'un déclencheur y a son entrée (vérifié au chargement,
-// marbles/core/run.js).
-export const HOLDER_ZONES = {
-  onSlot: { zone: "triangle", where: "elle est sur le triangle" },
-  drawn: { zone: "hand", where: "elle vient d'être piochée, en main (son Éveil)" },
-  thrown: { zone: "thrown", where: "elle est en cours de lancer (sa Chiquenaude)" },
-  leaving: { zone: "leaving", where: "elle est en partance (son Final, son Éjection)" },
-  dropped: { zone: "discard", where: "elle vient d'arriver à la défausse (sa Chute)" },
-  pot: { zone: "pot", where: "elle est dans le pot" },
-  // Un STATUT qui réagit (marbles/core/statuses.js) : aucune bille ne joue l'effet.
-  status: { zone: "status", where: "c'est un statut, sans bille" },
-};
 
 // La zone de la bille elle-même dans un contexte de validation (validateEffect).
 const holderZoneOf = (context) => HOLDER_ZONES[context.marble ?? "onSlot"];
@@ -419,7 +365,7 @@ export const CLAUSE_ACTIONS = {
     keyword: marbleActionKeyword("polish", "polished"),
   },
   // Fêlure : ajoute `amount` d'usure (au moins 1), jamais au-delà du maximum ; à son
-  // maximum, la bille est retirée aussitôt, comme par usure (marbles/core/run.js/
+  // maximum, la bille est retirée aussitôt, comme par usure (marbles/core/path.js/
   // retireMarble).
   crack: {
     kind: "marble",
@@ -452,7 +398,7 @@ export const CLAUSE_ACTIONS = {
     // empocher.
     choice: { zones: ["hand", "triangle"], picks: ["marble"] },
     // Ni en cours de lancer, ni déjà dans le pot. En partance, la redirige vers le
-    // pot (marbles/core/run.js/travel) ; à la défausse (sa Chute), l'en fait partir.
+    // pot (marbles/core/path.js/travel) ; à la défausse (sa Chute), l'en fait partir.
     selfZones: ["triangle", "hand", "leaving", "discard"],
     keyword: {
       texts: { name: "marbles.keyword.pocket.name", description: "marbles.keyword.pocket.description" },
@@ -490,7 +436,7 @@ export const CLAUSE_ACTIONS = {
     },
   },
   // Défausser : envoie une bille à la DÉFAUSSE (sa Chute s'y déclenche), sans
-  // montant, par le chemin des billes (marbles/core/run.js/travel). Cible : la bille
+  // montant, par le chemin des billes (marbles/core/path.js/travel). Cible : la bille
   // elle-même (sur le triangle, en main à son Éveil) ; un emplacement ; la première
   // bille de la main (FIRST_IN_HAND) ; des billes de la main ou actives au choix ;
   // toutes les billes actives, filtrées ; les N prochaines billes du sac (isBag).
@@ -674,48 +620,14 @@ function validateConditionSlot(slot, describe, fail, context) {
 // comparée à l'autre.
 const REPLACEMENT_MARBLES = { ejected: "placed", placed: "ejected" };
 
-// Chaque condition : ses champs, leur validation (`context` : le moment du champ
-// d'effet, voir targetProblem), et son test sur la situation (en-tête).
-// LES ZONES DE LA PARTIE, déclarées ICI ET NULLE PART AILLEURS, pour les conditions
-// d'état (`zone`) et les sources de nombre de billes (`zoneCount`). Chacune :
-//   count     son nombre de billes dans un état, (state) -> entier ; une bille en
-//             transit (en cours de lancer, en partance) n'est dans aucune zone de
-//             l'état : elle ne compte nulle part ;
-//   capacity  (facultatif) sa capacité EN VIGUEUR, (state, statuses) -> entier : les
-//             caractéristiques de la partie (taille de la main, capacité du pot),
-//             statuts compris (marbles/core/statuses.js/characteristic) ; une zone
-//             au-delà de sa capacité compte pleine ;
-//   states    les états qu'une condition peut lui demander (ZONE_STATES).
-// AJOUTER une zone ou un état : une entrée ici (et dans ZONE_STATES), ses textes
-// (`marbles.condition.zone.<zone>.<état>`, `marbles.effect.per_zone`), rien d'autre.
-export const GAME_ZONES = {
-  triangle: { count: (state) => SLOTS.filter((slot) => state.triangle[slot] !== null).length, capacity: () => SLOTS.length, states: ["full", "empty", "single"] },
-  hand: { count: (state) => state.hand.length, capacity: (state, statuses) => characteristic(state, "handSize", statuses), states: ["empty", "full"] },
-  bag: { count: (state) => state.bag.length, states: ["empty"] },
-  discard: { count: (state) => state.discard.length, states: ["empty"] },
-  pot: { count: (state) => state.pot.length, capacity: (state, statuses) => characteristic(state, "potCapacity", statuses), states: ["full", "empty"] },
-  lost: { count: (state) => state.lost.length, states: [] },
-};
-
-// Les ÉTATS d'une zone qu'une condition peut lire : `test(count, capacity)` ;
-// `needsCapacity`, l'état n'a de sens que pour une zone qui a une capacité.
-const ZONE_STATES = {
-  empty: { test: (count) => count === 0 },
-  single: { test: (count) => count === 1 },
-  full: { needsCapacity: true, test: (count, capacity) => count >= capacity },
-};
-for (const [id, zone] of Object.entries(GAME_ZONES)) {
-  for (const state of zone.states) {
-    if (!Object.hasOwn(ZONE_STATES, state)) throw new Error(`marbles : la zone "${id}" demande un état inconnu "${state}".`);
-    if (ZONE_STATES[state].needsCapacity && zone.capacity === undefined) throw new Error(`marbles : l'état "${state}" demande une capacité, que la zone "${id}" n'a pas.`);
-  }
-}
 
 // La zone d'une condition ou d'une source : une zone déclarée.
 function validateZone(zone, describe, fail) {
   if (!Object.hasOwn(GAME_ZONES, zone)) fail(`${describe} : zone inconnue "${zone}".`);
 }
 
+// Chaque condition : ses champs, leur validation (`context` : le moment du champ
+// d'effet, voir targetProblem), et son test sur la situation (en-tête).
 export const CONDITIONS = {
   // La bille à `slot` a-t-elle, IMPRIMÉ à cet emplacement, au moins `atLeast`
   // de `stat` ? Emplacement vide : non, il n'y a rien à lire.
@@ -750,6 +662,9 @@ export const CONDITIONS = {
     test(when, { replacement }, types) {
       const subject = replacement[when.marble];
       const other = replacement[REPLACEMENT_MARBLES[when.marble]];
+      // Un statut qui éjecte n'est pas une bille : sans les deux calibres, rien à
+      // comparer, la condition est fausse.
+      if (subject === null || other === null) return false;
       return SIZE_COMPARISONS[when.is](types[subject].size, types[other].size);
     },
   },
@@ -962,28 +877,22 @@ export function validateEffect(effect, describe, fail, context = {}) {
   }
 }
 
+// La cible d'une clause relative SANS RÉFÉRENCE (resolveClauses) : elle reste à sa
+// place, évaluée comme les autres (condition, montant), puis ne fait rien, notée au
+// journal (marbles/core/run.js/applyOperation).
+export const NO_REFERENCE = "noReference";
+
 // Les clauses d'un effet, leurs CIBLES RELATIVES traduites depuis `reference`
 // (l'emplacement d'où la bille agit, ou null) : la cible et l'emplacement des
-// conditions. -> { clauses, unresolved } : `unresolved`, les clauses dont la cible
-// relative n'a pas de référence, retirées (sans cible : aucun effet, noté par le
-// déroulé) ; une condition sur un emplacement relatif sans référence est fausse.
+// conditions. Une cible relative sans référence devient NO_REFERENCE ; une condition
+// sur un emplacement relatif sans référence est fausse.
 export function resolveClauses(clauses, reference) {
-  const resolved = [];
-  const unresolved = [];
-  for (const clause of clauses) {
+  return clauses.map((clause) => {
     let next = clause;
     if (clause.when?.slot !== undefined && isRelative(clause.when.slot)) next = { ...next, when: { ...clause.when, slot: resolveRelative(clause.when.slot, reference) } };
-    if (isRelative(clause.target)) {
-      const target = resolveRelative(clause.target, reference);
-      if (target === null) {
-        unresolved.push(next);
-        continue;
-      }
-      next = { ...next, target };
-    }
-    resolved.push(next);
-  }
-  return { clauses: resolved, unresolved };
+    if (isRelative(clause.target)) next = { ...next, target: resolveRelative(clause.target, reference) ?? NO_REFERENCE };
+    return next;
+  });
 }
 
 // Évalue des clauses dans une SITUATION (en-tête), au moment du déclenchement :
@@ -993,7 +902,8 @@ export function resolveClauses(clauses, reference) {
 //               lieu de `slot` : le core demande le choix (marbles/core/run.js/fireEffect) ;
 //   operations  les actions sur une bille et de statut, dans l'ordre des clauses,
 //               [{ action, amount, target }] (`target` absent : la bille elle-même ;
-//               un choix : la cible au choix, que le core fait trancher) ; un statut :
+//               un choix : la cible au choix, que le core fait trancher ; NO_REFERENCE :
+//               une cible relative sans référence, sans effet) ; un statut :
 //               [{ action, status, amount, duration, stacking }]
 //               (marbles/core/statuses.js/statusApplication).
 // Une clause dont la condition échoue, ou dont le montant (calculé s'il l'est) vaut
@@ -1010,7 +920,10 @@ export function evaluateEffect(clauses, situation, types) {
     if (amount === 0) continue;
     const clause = { ...printed, amount };
     const target = clause.target === undefined ? {} : { target: clause.target };
-    if (kind === "marble") operations.push({ action: clause.action, ...(amountless ? {} : { amount: clause.amount }), ...target });
+    // Sans référence (resolveClauses) : une action à sa place, sans effet, quelle que
+    // soit sa sorte (une valeur pour un autre emplacement comprise).
+    if (clause.target === NO_REFERENCE) operations.push({ action: clause.action, ...(amountless ? {} : { amount: clause.amount }), target: NO_REFERENCE });
+    else if (kind === "marble") operations.push({ action: clause.action, ...(amountless ? {} : { amount: clause.amount }), ...target });
     // Un statut : son application résolue d'après sa définition (la table de la
     // situation), son intensité et sa durée comprises.
     else if (kind === "status") operations.push({ action: clause.action, ...statusApplication(clause, definitionOf(situation.statuses ?? NO_STATUSES, clause.status)) });

@@ -21,7 +21,7 @@
 
 import { MARBLES_DRAWN_VALUE } from "./drawn-value.js";
 import { SLOTS } from "../core/marbles.js";
-import { UNKNOWN_MARBLE } from "../core/run.js";
+import { UNKNOWN_MARBLE } from "../core/effects.js";
 import { createSeed, nextRandom } from "../../lib/rng.js";
 import { GAME_RULES } from "./game-rules.js";
 
@@ -41,7 +41,7 @@ export function publicView(state) {
 
 // Uniforme parmi les actions légales (résolution comprise, dès qu'elle l'est) :
 // la référence basse. Un choix : uniforme parmi ses cibles éligibles, Terminer
-// compris en mode « jusqu'à N », par un générateur À PART (graine dérivée), pour que
+// compris dans un choix facultatif, par un générateur À PART (graine dérivée), pour que
 // les choix ne décalent pas le reste de ses tirages.
 function startRandom({ seed }) {
   let rngState = createSeed(seed);

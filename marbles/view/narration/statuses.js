@@ -7,9 +7,9 @@
 
 import { nameRef } from "../../../data/i18n/index.js";
 import { assembleCard, validateCardModel } from "../../../lib/detail-card.js";
-import { MARBLE_POCKET, MARBLE_TRIGGERS, STATUS_CARD_MODEL } from "../../config/values.js";
+import { STATUS_CARD_MODEL } from "../../config/values.js";
 import { MODIFIER_POINTS, definitionOf } from "../../core/statuses.js";
-import { combined, describePrinted, formatCounter, slotName, statusName } from "./effects.js";
+import { combined, describePrinted, effectMoment, formatCounter, statusName } from "./effects.js";
 
 validateCardModel(STATUS_CARD_MODEL);
 
@@ -81,21 +81,22 @@ function behaviorsText(definition, intensity, t, statuses) {
 }
 
 // L'ORIGINE d'une instance, l'effet qui l'a donnée (`origin`, son `by`), dite comme le
-// moment d'un effet : « Tic d'argile », « base gauche, tigrée », « Final de tigrée »,
-// « Entrée au pot d'agate », « Pot, mica », ou le statut qui l'a donnée par sa réaction.
-const POCKET_ENTRY_TRIGGERS = new Set(MARBLE_POCKET.moments.filter((moment) => moment.event === "pocketed").map((moment) => moment.trigger));
-const POCKET_TRIGGERS = new Set(MARBLE_POCKET.moments.map((moment) => moment.trigger));
-const TRIGGER_NAMES = Object.fromEntries(MARBLE_TRIGGERS.map((trigger) => [trigger.id, trigger.texts.name]));
+// moment d'un effet (effectMoment) : « Tic d'argile », « base gauche, tigrée », « Final
+// de tigrée », « Entrée au pot d'agate », « Pot, mica », ou le statut qui l'a donnée par
+// sa réaction.
+const ORIGIN_KEYS = {
+  status: "marbles.statuses.origin.status",
+  phase: "marbles.statuses.origin.phase",
+  potEntry: "marbles.statuses.origin.pot_entry",
+  pot: "marbles.statuses.origin.pot",
+  hit: "marbles.statuses.origin.hit",
+  trigger: "marbles.statuses.origin.trigger",
+};
 
 export function originText(origin, t) {
   if (origin === null) return t("marbles.statuses.origin.none");
-  if (origin.status !== undefined) return t("marbles.statuses.origin.status", { status: statusName(origin.status, t) });
-  const marble = nameRef(`marble.${origin.marble}.name`);
-  if (origin.trigger === "phase") return t("marbles.statuses.origin.phase", { slot: slotName(origin.slot, t), marble });
-  if (POCKET_ENTRY_TRIGGERS.has(origin.trigger)) return t("marbles.statuses.origin.pot_entry", { marble });
-  if (POCKET_TRIGGERS.has(origin.trigger)) return t("marbles.statuses.origin.pot", { marble });
-  if (origin.trigger === "hit") return t("marbles.statuses.origin.hit", { marble });
-  return t("marbles.statuses.origin.trigger", { moment: t(TRIGGER_NAMES[origin.trigger]), marble });
+  const { kind, params } = effectMoment(origin, t);
+  return t(ORIGIN_KEYS[kind], params);
 }
 
 // LA FICHE d'une instance (STATUS_CARD_MODEL) : `main`, son annonce principale ; ses

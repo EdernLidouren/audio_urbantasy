@@ -1,5 +1,5 @@
 // Vérifications du core — domaine « marbles-path ». Le CHEMIN DES BILLES du jeu des
-// billes (marbles/core/run.js/travel, doc/marbles.md, « Le chemin des billes ») et
+// billes (marbles/core/path.js/travel, doc/marbles.md, « Le chemin des billes ») et
 // ce qui s'y branche : la Chute, déclencheur d'arrivée à la défausse, et les
 // actions qui déplacent une bille (Défausser, Rebond, Ramasser). Sur des billes
 // fabriquées, pour isoler chaque règle. Lancées par
@@ -7,18 +7,7 @@
 
 import { throws } from "../../lib/check.js";
 import { LARGE, SMALL } from "../config/values.js";
-import { readForecast } from "../core/forecast.js";
-import { fabricatedRules, inHand, marbleCount, marblesPlayState, mustReduce, placed, validateTable } from "./helpers.js";
-import { placeRefusal } from "../core/marbles.js";
-
-// La prévision (sans ce qui n'existe qu'à l'aveugle) égale-t-elle le réel, lu de la
-// même façon ? `action` : null pour le triangle actuel.
-function forecastMatches(rules, state, action) {
-  const real = action === null ? { state, events: [] } : mustReduce(rules, state, action);
-  const resolved = mustReduce(rules, real.state, { type: "resolve" });
-  const { uncertain, awakenPossible, ...predicted } = rules.forecast(state, action);
-  return JSON.stringify(predicted) === JSON.stringify(readForecast(real.events, resolved.events, resolved.state));
-}
+import { fabricatedRules, forecastMatches, inHand, marbleCount, marblesPlayState, mustReduce, placed, validateTable } from "./helpers.js";
 
 // Le journal, une entrée par évènement : son type et sa bille, et ce qui distingue
 // un départ (sa cause), une arrivée (d'où) ou un effet (son déclencheur).
@@ -69,7 +58,7 @@ function checkBounce(run) {
     { triangleExits: bounced.state.tally.triangleExits.game - 1, bounce: bounced.state.tally.bounce.game, bounceQuantity: bounced.state.tally.bounceQuantity.game }
   );
   // Rejouable dans le tour, à usure 0 sur le triangle.
-  run("Rebond : rejouable dans le tour", null, placeRefusal(bounced.state, 0, "apex"));
+  run("Rebond : rejouable dans le tour", null, rules.placeRefusal(bounced.state, 0, "apex"));
   const replayed = mustReduce(rules, bounced.state, { type: "place", handIndex: 0, slot: "apex" });
   run.same("Rebond : reposée à usure 0", { marble: "target", wear: 0 }, replayed.state.triangle.apex);
 
@@ -147,6 +136,7 @@ function checkRetrieve(run) {
   run.same("Ramasser la dernière : la remplacée, en main, à 0 tour en main", [{ marble: "waker", turnsInHand: 0 }], last.state.hand);
   run("Ramasser la dernière : pas d'Éveil", false, last.events.some((event) => event.type === "awaken" || (event.type === "effect" && event.trigger === "awaken")));
   run.same("Ramasser la dernière : la défausse, sans elle", ["plain"], last.state.discard);
+  run.same("Ramasser la dernière : l'arrivée dit sa place d'origine dans la défausse", { from: "discard", index: 1 }, (({ from, index }) => ({ from, index }))(last.events.find((event) => event.type === "returned")));
   run.same("Ramasser : un ramassage, une bille", "1 1", `${last.state.tally.retrieve.game} ${last.state.tally.retrieveQuantity.game}`);
   const resolve = (over) => mustReduce(rules, state(over), { type: "resolve" });
   const none = resolve({ discard: [], triangle: { rightBase: placed("baseLast"), leftBase: null, apex: null } });
@@ -368,6 +358,8 @@ function checkDrop(run) {
     journal(bounced.events).filter((entry) => /^(discarded|effect:drop|pocketed)/.test(entry))
   );
   run.same("Chute, Empocher sur soi : au pot, la défausse vide", { pot: ["bouncer"], discard: [] }, { pot: bounced.state.pot, discard: bounced.state.discard });
+  const fromDrop = bounced.events.find((event) => event.type === "pocketed");
+  run.same("Chute, Empocher sur soi : une arrivée comme les autres, sa cause, son action, sa place", { cause: undefined, movedBy: "pocket", index: 0 }, { cause: fromDrop.cause, movedBy: fromDrop.movedBy, index: fromDrop.index });
   run("Chute, Empocher sur soi : aucune bille perdue ni dupliquée", marbleCount(state({ triangle: { rightBase: null, leftBase: null, apex: placed("bouncer") } })), marbleCount(bounced.state));
 
   // Règle des cibles : un bonus de Chute dont la phase est passée est perdu.

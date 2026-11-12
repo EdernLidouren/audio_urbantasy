@@ -5,7 +5,7 @@
 //
 // Le core ne l'importe JAMAIS (CLAUDE.md) : la vue, les outils et les vérifications
 // le lui passent en paramètre (`types`). Validé au démarrage
-// (marbles/core/content.js/validateMarblesContent, appelé par main.js et par l'audit du
+// (marbles/core/validation.js/validateMarblesContent, appelé par main.js et par l'audit du
 // contenu). L'ordre des clés est celui de la table : les outils de simulation en
 // tirent leurs sacs aléatoires, le changer change leurs résultats.
 //
@@ -28,7 +28,8 @@
 //   windfall    la Trouvaille : effet joué à chaque régénération du sac depuis la
 //               défausse, à tout moment du tour, si la bille est active (sur le
 //               triangle), dans l'ordre horaire, avant que la pioche ne reprenne ;
-//   knockout    l'Éjection : effet joué quand la bille est remplacée ;
+//   knockout    l'Éjection : effet joué quand la bille est chassée du triangle, par
+//               une pose (remplacée) ou par l'action Éjecter ;
 //   final       le Final : effet joué quand la bille est retirée par usure, en
 //               partance (pas encore à la défausse), avant l'Impact du tour ;
 //   drop        la Chute : effet joué quand la bille arrive à la défausse, d'où
@@ -46,32 +47,27 @@
 //               Lu par les conditions de calibre, et par le son : le profil sonore
 //               et la force des chocs de la bille viennent de lui.
 //
-// Un effet est une LISTE DE CLAUSES ; une clause (marbles/core/effects.js) :
-//   action  ce qu'elle fait : "speed" ou "mass", qui ajoutent `amount` (entier,
-//           négatif permis) à la Vitesse ou à la Masse ; "draw", la Pioche, qui
-//           pioche `amount` billes (au moins 1, jamais de cible) ; "polish", le
-//           Polissage, et "crack", la Fêlure, qui retirent ou ajoutent `amount`
-//           d'usure (au moins 1) à la bille elle-même ou à celle de `target` ;
-//           "pocket", Empocher, sans montant, qui envoie au pot la bille elle-même,
-//           celle de `target`, la première de la main (`target` FIRST_IN_HAND) ou
-//           une bille au choix (`target` choice(...)) ;
-//           "eject", Éjecter, sans montant, qui chasse du triangle la bille
-//           elle-même (si elle y est), celle de `target`, des billes au choix, ou
-//           toutes les billes actives filtrées (`target` allActive(sizeIs(SMALL))) ;
+// Un effet est une LISTE DE CLAUSES ; une clause (marbles/core/effects.js, CLAUSE_ACTIONS
+// pour la liste des actions et ce que chacune accepte ; les formes courtes, une par
+// action : marbles/content/effects.js) :
+//   action  ce qu'elle fait : une VALEUR (Vitesse, Masse, Pioche), une action SUR
+//           UNE BILLE (Polissage, Fêlure, Empocher, Éjecter, Défausser, Rebond,
+//           Ramasser), ou Appliquer un statut (marbles/content/statuses/) ;
 //   amount  la valeur : un entier, ou un MONTANT CALCULÉ { base, step, source,
 //           max? }, base + step × la valeur de la source, plafonné à max, évalué
 //           au déclenchement (sources : turnsInHand(), activeSize(calibre),
-//           tally(valeur, portée), marbles/content/effects.js) ;
-//   target  (facultatif) pour une Vitesse ou une Masse, l'emplacement dont elle
-//           modifie l'effet de phase, au lieu d'agir sur le compteur du tour (jamais
-//           une phase toujours passée, ni dans un Final) ; pour un Polissage ou une
-//           Fêlure, l'emplacement dont la bille la reçoit ; ou un CHOIX du joueur,
-//           choice({ zones, count, mode }) (marbles/content/effects.js ; doc/marbles.md,
-//           « Cibles au choix ») : « Polissage 1, jusqu'à une bille active au choix »,
-//           polish(1, choice({ zones: ["triangle"], mode: "optional" })) ;
-//   when    (facultatif) sa condition, évaluée au déclenchement. Une condition
-//           lit toujours l'effet IMPRIMÉ d'une bille, jamais un effet déjà
-//           modifié : aucune dépendance circulaire n'est possible.
+//           tally(valeur, portée), zoneCount(zone)) ;
+//   target  (facultatif) un emplacement ; une cible relative (NEXT_SLOT,
+//           PREVIOUS_SLOT) ; un CHOIX du joueur, choice({ zones, count, mode }) ;
+//           « toutes les billes actives », allActive(...filtres) ; et ce que
+//           l'action déclare de plus (la première de la main, la dernière arrivée à
+//           la défausse, les prochaines du sac). Pour une Vitesse ou une Masse, un
+//           emplacement donne un bonus à sa phase (jamais une phase toujours passée,
+//           ni dans un Final) ;
+//   when    (facultatif) sa condition, évaluée au déclenchement (calibre d'un
+//           emplacement, calibre relatif d'un remplacement, état d'une zone, effet
+//           imprimé). Une condition lit toujours l'effet IMPRIMÉ d'une bille, jamais
+//           un effet déjà modifié : aucune dépendance circulaire n'est possible.
 //
 // Le nom d'une bille se déduit de son id : `marble.<id>.name`
 // (data/i18n/<langue>/marbles.json), vérifié par les vérifications

@@ -180,7 +180,7 @@ export function stopRolls() {
 let focusBeacon = null;
 
 // `place` : où est le curseur (voir l'en-tête) ; sans place, au centre (menus du
-// sac et de la défausse). `types` : la table des billes.
+// sac, de la défausse et du pot). `types` : la table des billes.
 export function playFocusBeacon(marble, place, types) {
   stopFocusBeacon();
   const key = profileOf(marble, types).beacon;

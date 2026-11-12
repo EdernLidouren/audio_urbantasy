@@ -7,22 +7,13 @@
 // core/checks/index.js/runChecks (`node tools/run-checks.js marbles-zones`).
 
 import { throws } from "../../lib/check.js";
+import { zoneCount, zoneIs } from "../content/effects.js";
 import { LOCALE_TABLES } from "../../data/i18n/index.js";
-import { CONDITIONS, GAME_ZONES, amountOf } from "../core/effects.js";
-import { readForecast } from "../core/forecast.js";
+import { CONDITIONS, amountOf } from "../core/effects.js";
+import { GAME_ZONES } from "../core/zones.js";
 import { marbleCard } from "../view/card.js";
-import { fabricatedRules, inHand, keyText as t, marblesPlayState, mustReduce, placed, validateTable } from "./helpers.js";
+import { fabricatedRules, forecastMatches, inHand, keyText as t, marblesPlayState, mustReduce, placed, validateTable } from "./helpers.js";
 
-const zoneIs = (zone, state) => ({ type: "zone", zone, state });
-const zoneCount = (zone) => ({ type: "zoneCount", zone });
-
-// La prévision égale-t-elle le réel, lu de la même façon ?
-function forecastMatches(rules, state, action) {
-  const real = action === null ? { state, events: [] } : mustReduce(rules, state, action);
-  const resolved = mustReduce(rules, real.state, { type: "resolve" });
-  const { uncertain, awakenPossible, ...predicted } = rules.forecast(state, action);
-  return JSON.stringify(predicted) === JSON.stringify(readForecast(real.events, resolved.events, resolved.state));
-}
 
 export default function checkMarblesZones(run) {
   run.section("conditions d'état", checkZoneConditions);

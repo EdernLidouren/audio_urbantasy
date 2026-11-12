@@ -13,11 +13,12 @@
 // `node tools/run-checks.js marbles-screen`.
 
 import { MARBLES_SETTINGS } from "../config/values.js";
+import { t as realT } from "../../data/i18n/index.js";
 import { speed } from "../content/effects.js";
 import { pauseAfter } from "../view/sequence.js";
 import { fixtureRules } from "./fixtures/marbles.js";
 import { openScreenBench } from "./fixtures/screen-bench.js";
-import { fabricatedRules, inHand, marblesPlayState, placed } from "./helpers.js";
+import { fabricatedRules, inHand, marblesPlayState, placed, statusInstance } from "./helpers.js";
 
 // Les règles de la table des vérifications.
 const rules = fixtureRules();
@@ -43,7 +44,33 @@ export default function checkMarblesScreen(run) {
   run.section("choix dans la défausse", checkDiscardChoice);
   run.section("choix facultatif et obligatoire", checkChoiceModes);
   run.section("statuts", checkStatuses);
+  run.section("choix pendant la pioche du tour", checkChoiceDuringTurnDraw);
   run.section("fin de partie", checkGameEnd);
+}
+
+// Un Éveil à choix pendant la pioche du premier tour : la question d'abord, sans le
+// début du tour ni le son de la main rendue ; la réponse faite, la pioche finit, puis
+// « Début du tour 1 », avec son son.
+function checkChoiceDuringTurnDraw(run) {
+  const made = fabricatedRules({
+    plain: { apex: [speed(1)] },
+    chooser: { awaken: [{ action: "polish", amount: 1, target: { type: "choice", zones: ["triangle"], pick: "marble", count: 1, mode: "required" } }] },
+  });
+  const state = { ...made.createGame(4, { bag: ["chooser", "plain"], firstTurnDraw: 2 }), triangle: { leftBase: null, rightBase: null, apex: placed("plain", 1) } };
+  const bench = openScreenBench(made, state);
+  try {
+    bench.advance(LONG_MS);
+    run("ouverture : le choix attend, la pioche suspendue", "draw", bench.game().pendingChoice?.resume.action.type);
+    run("ouverture : pas encore de début de tour", false, bench.said[0].includes("event.turn_started"));
+    run("ouverture : pas encore le son de la main rendue", false, bench.sounds.some((sound) => sound.name === "playCue" && sound.args[0].sound === "playerTurn"));
+    bench.key("Enter");
+    bench.advance(LONG_MS);
+    run("réponse : la pioche finie, le joueur a sa main", "play", bench.game().stage);
+    run("réponse : le début du tour à la fin", true, bench.said.at(-1).endsWith("event.turn_started{turn: 1}"));
+    run("réponse : le son de la main rendue", true, bench.sounds.some((sound) => sound.name === "playCue" && sound.args[0].sound === "playerTurn"));
+  } finally {
+    bench.close();
+  }
 }
 
 // Les STATUTS : A dit leur résumé, dans l'ordre d'acquisition, ou qu'il n'y en a
@@ -52,8 +79,8 @@ export default function checkMarblesScreen(run) {
 // de résolution, ni l'un ni l'autre.
 function checkStatuses(run) {
   const statuses = [
-    { status: "loss_cushion", holder: "game", intensity: 2, remaining: 3, pending: false, origin: { trigger: "flick", slot: "apex", marble: "aging_flick" } },
-    { status: "throws_next", holder: "game", intensity: 1, remaining: 1, pending: true, origin: null },
+    statusInstance("loss_cushion", { intensity: 2, remaining: 3, origin: { trigger: "flick", slot: "apex", marble: "aging_flick" } }),
+    statusInstance("throws_next", { pending: true }),
   ];
   const bench = openScreenBench(rules, { ...playState({ hand: inHand(["aging_flick"]) }), statuses });
   try {
@@ -75,6 +102,12 @@ function checkStatuses(run) {
   try {
     empty.key("a");
     run("A : aucun statut", "statuses.none", empty.said.at(-1));
+    // Le menu d'une liste vide le dit, avant « Retour » (marbles/view/card-menu.js).
+    empty.key("a", ["shift"]);
+    run("Maj+A sans statut : le menu dit qu'il n'y en a aucun", true, empty.menuSaid().at(-1).includes(realT("marbles.statuses.none")));
+    empty.key("ArrowRight");
+    run("Maj+A sans statut : puis Retour", true, empty.menuSaid().at(-1).startsWith(realT("marbles.pile.back")));
+    empty.key("Escape");
   } finally {
     empty.close();
   }

@@ -11,10 +11,11 @@
 // suite, même au milieu d'un traitement. Son évènement et tout ce qui en découle
 // passent dans une file à part, vidée avant que `settle` ne rende la main ; la file
 // en attente reprend ensuite. Sert à ce qui doit se régler avant la suite
-// (marbles/core/run.js) : les Trouvailles puis les réactions du pot au mélange, avant
-// que la pioche interrompue ne reprenne (regenerateBag) ; l'Éveil d'une bille
-// piochée, avant la suivante ; l'entrée au pot ; l'Éjection d'une bille chassée par
-// l'action Éjecter, avant qu'elle ne quitte son emplacement.
+// (marbles/core/run.js, path.js) : les Trouvailles puis les réactions au mélange,
+// avant que la pioche interrompue ne reprenne (regenerateBag) ; l'Éveil d'une bille
+// piochée, puis les réactions à sa pioche, avant la suivante ; le déclencheur de
+// sortie d'une bille en partance (son Final, son Éjection), puis les réactions à son
+// départ ; chaque arrivée (défausse, pot, perte, main) et ce qui y réagit.
 //
 // Une CHAÎNE : ce qu'un évènement émis hors de tout traitement déclenche, de proche
 // en proche, interruptions comprises, jusqu'à ce que tout soit réglé.

@@ -7,9 +7,12 @@
 import { NameRef } from "../../lib/i18n.js";
 import { MEDIUM } from "../config/values.js";
 import { SLOTS } from "../core/marbles.js";
-import { validateMarbleTypes } from "../core/content.js";
+import { validateMarbleTypes } from "../core/validation.js";
 import { nextRandom } from "../../lib/rng.js";
-import { FIXTURE_STATUSES, fixtureRules } from "./fixtures/marbles.js";
+import { FIXTURE_STATUSES, deepFreeze, fixtureRules } from "./fixtures/marbles.js";
+import { readForecast } from "../core/forecast.js";
+
+export { deepFreeze };
 
 // Une table de billes FABRIQUÉE, complétée d'un calibre (obligatoire) pour chaque
 // bille qui n'en déclare pas : MEDIUM, quand la vérification ne porte pas sur lui.
@@ -58,7 +61,7 @@ export function fabricatedRules(table) {
 
 // Valide une table de billes FABRIQUÉE, complétée d'un calibre (withSizes), avec la
 // table des statuts de test : lève si la table est refusée
-// (marbles/core/content.js/validateMarbleTypes).
+// (marbles/core/validation.js/validateMarbleTypes).
 export function validateTable(table) {
   validateMarbleTypes(withSizes(table), FIXTURE_STATUSES);
 }
@@ -103,21 +106,29 @@ export function marblesPlayState(rules, over = {}) {
   return { ...emptyBagMarblesGame(rules, 1), turn: 2, stage: "play", ...over };
 }
 
+// LA PROPRIÉTÉ « PRÉVISION = RÉEL » sur un cas : la prévision de `action` (null : le
+// triangle actuel) est-elle, lue de la même façon (marbles/core/forecast.js/
+// readForecast), égale à ce que l'action puis la résolution font vraiment ? Sans
+// `uncertain` ni `awakenPossible`, qui n'existent qu'à l'aveugle.
+export function forecastMatches(rules, state, action) {
+  const real = action === null ? { state, events: [] } : mustReduce(rules, state, action);
+  const resolved = mustReduce(rules, real.state, { type: "resolve" });
+  const { uncertain, awakenPossible, ...predicted } = rules.forecast(state, action);
+  return JSON.stringify(predicted) === JSON.stringify(readForecast(real.events, resolved.events, resolved.state));
+}
+
+// Une INSTANCE DE STATUT posée à la main dans un état fabriqué
+// (marbles/core/statuses.js, en-tête) : en vigueur, intensité 1, un tour ; `over`
+// remplace ce que le test veut fixer.
+export function statusInstance(status, over = {}) {
+  return { status, holder: "game", intensity: 1, remaining: 1, pending: false, origin: null, ...over };
+}
+
 // Toutes les billes d'une partie, où qu'elles soient : sac, main, défausse,
 // triangle, pot et billes perdues. Aucune ne se crée ni ne disparaît.
 export function marbleCount(state) {
   const onTriangle = SLOTS.filter((slot) => state.triangle[slot] !== null).length;
   return state.bag.length + state.hand.length + state.discard.length + onTriangle + state.pot.length + state.lost.length;
-}
-
-// Fige récursivement : une écriture dans un état reçu lèverait (modules ES, donc
-// mode strict), et prouverait que le réducteur ou la prévision n'est pas pur.
-export function deepFreeze(value) {
-  if (value && typeof value === "object") {
-    Object.values(value).forEach(deepFreeze);
-    Object.freeze(value);
-  }
-  return value;
 }
 
 // Un tirage d'entiers à graine, pour les parties jouées au hasard des
@@ -146,6 +157,7 @@ export function playRandomMarblesGame(rules, seed, options, seenTypes) {
   const faults = [];
   let score = 0;
   let actions = 0;
+  let handBefore = state.hand.length;
 
   const verify = (result) => {
     state = result.state;
@@ -160,7 +172,8 @@ export function playRandomMarblesGame(rules, seed, options, seenTypes) {
     score = state.score;
     // Une main au-delà de sa taille en vigueur n'apparaît que si un statut l'a
     // réduite ; elle n'y grossit jamais.
-    if (state.hand.length > Math.max(state.maxHandSize, rules.characteristic(state, "handSize"))) faults.push(`main trop grande : ${state.hand.length}`);
+    if (state.hand.length > rules.characteristic(state, "handSize") && state.hand.length > handBefore) faults.push(`main trop grande : ${state.hand.length}`);
+    handBefore = state.hand.length;
     if (state.stage !== "play" && (state.speed !== 0 || state.mass !== 1)) faults.push(`compteurs non remis à zéro : ${state.speed}, ${state.mass}`);
     if (state.turn > state.turnCount) faults.push(`tour hors bornes : ${state.turn}`);
     for (const slot of SLOTS) {
@@ -196,7 +209,8 @@ export function playRandomMarblesGame(rules, seed, options, seenTypes) {
       case 1:
       case 2:
       case 3:
-        verify(rules.reduce(state, { type: "place", handIndex: pick(state.maxHandSize), slot: SLOTS[pick(3)] }));
+        // Une place tirée parfois au-delà de la main : une pose refusée.
+        verify(rules.reduce(state, { type: "place", handIndex: pick(state.hand.length + 1), slot: SLOTS[pick(3)] }));
         break;
       default:
         verify(rules.reduce(state, { type: "resolve" }));
@@ -204,21 +218,6 @@ export function playRandomMarblesGame(rules, seed, options, seenTypes) {
   }
   if (state.stage !== "over") faults.push("partie sans issue");
   return faults;
-}
-
-// Joue une partie de billes jusqu'au bout, chaque action tirée par `pick`
-// (createPicker) parmi les actions légales (marbles/core/marbles.js/legalActions), réponses
-// aux choix comprises. `onResult(result, before)` reçoit chaque résultat et l'état
-// d'avant. -> l'état final.
-export function playLegalGame(rules, state, pick, onResult = () => {}) {
-  let current = state;
-  while (current.stage !== "over") {
-    const actions = rules.legalActions(current);
-    const result = rules.reduce(current, actions[pick(actions.length)]);
-    onResult(result, current);
-    current = result.state;
-  }
-  return current;
 }
 
 // --- Textes : la traduction de test des vérifications de vue ---

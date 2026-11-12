@@ -23,7 +23,7 @@ import { startLoop } from "./lib/loop.js";
 import { loadSceneById } from "./scenes/load.js";
 import registry from "./entities/types/index.js";
 import { createInitialState } from "./core/state.js";
-import { validateMarblesContent } from "./marbles/core/content.js";
+import { validateMarblesContent } from "./marbles/core/validation.js";
 import { createMarblesRules } from "./marbles/core/rules.js";
 import { parseNewGame } from "./core/new-game.js";
 import { validateEntityRegistry } from "./core/entity-parse.js";

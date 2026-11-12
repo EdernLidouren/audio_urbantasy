@@ -21,7 +21,7 @@
 //   --bag-file <chemin>    le sac d'un fichier (ids séparés par espaces, virgules ou
 //                          lignes, # commente ; ou liste JSON). Sans --random-bag ni
 //                          --bag-file : le sac de test.
-//   --hand-size <n>, --throws <n>, --first-draw <n>, --draw <n>, --turns <n>
+//   --hand-size <n>, --throws <n>, --pot <n>, --first-draw <n>, --draw <n>, --turns <n>
 //                          surcharges des réglages, pour cette simulation seulement
 //   --export <chemin>      résultats bruts : .json (un fichier) ou .csv (deux
 //                          fichiers, <nom>-games.csv et <nom>-marbles.csv)
@@ -30,21 +30,16 @@
 
 import { readFile, writeFile } from "node:fs/promises";
 import { installFileFetch } from "../../tools/node-fetch.js";
+import { parseArgs } from "./args.js";
 
-const args = process.argv.slice(2);
-
-function option(name) {
-  const index = args.indexOf(name);
-  return index >= 0 ? args[index + 1] : undefined;
-}
-
-function integerOption(name) {
+function integerOption(option, name) {
   const value = option(name);
   if (value === undefined) return undefined;
   if (!/^\d+$/.test(value)) throw new Error(`${name} attend un entier, pas "${value}".`);
   return Number(value);
 }
 
+// Les options, toutes à valeur ; la ligne de commande se lit strictement (args.js).
 const KNOWN_OPTIONS = [
   "--games",
   "--seed",
@@ -56,6 +51,7 @@ const KNOWN_OPTIONS = [
   "--bag-file",
   "--hand-size",
   "--throws",
+  "--pot",
   "--first-draw",
   "--draw",
   "--turns",
@@ -71,7 +67,7 @@ const { toCsv, toJson } = await import("./export.js");
 const name = (id) => t(`marble.${id}.name`);
 
 try {
-  for (const arg of args) if (arg.startsWith("--") && !KNOWN_OPTIONS.includes(arg)) throw new Error(`option inconnue ${arg}.`);
+  const { option } = parseArgs(process.argv.slice(2), { values: KNOWN_OPTIONS });
 
   const seedOption = option("--seed") ?? "1";
   const seed = /^\d+$/.test(seedOption) ? Number(seedOption) : seedOption;
@@ -81,17 +77,17 @@ try {
   // perdue pour une faute de frappe.
   const exportOption = option("--export");
   if (exportOption !== undefined && !exportOption.endsWith(".json") && !exportOption.endsWith(".csv")) throw new Error("--export attend un chemin en .json ou en .csv.");
-  if (option("--random-bag") !== undefined) bagMode = { kind: "random", size: integerOption("--random-bag"), maxCopies: integerOption("--max-copies") ?? null };
+  if (option("--random-bag") !== undefined) bagMode = { kind: "random", size: integerOption(option, "--random-bag"), maxCopies: integerOption(option, "--max-copies") ?? null };
   else if (option("--bag-file") !== undefined) {
     const source = option("--bag-file");
     bagMode = { kind: "list", source, marbles: parseBagText(await readFile(source, "utf-8")) };
   }
   const settings = {};
-  for (const [flag, setting] of [["--hand-size", "maxHandSize"], ["--throws", "throwsPerTurn"], ["--first-draw", "firstTurnDraw"], ["--draw", "drawPerTurn"], ["--turns", "turnCount"]]) {
-    const value = integerOption(flag);
+  for (const [flag, setting] of [["--hand-size", "maxHandSize"], ["--throws", "throwsPerTurn"], ["--pot", "potCapacity"], ["--first-draw", "firstTurnDraw"], ["--draw", "drawPerTurn"], ["--turns", "turnCount"]]) {
+    const value = integerOption(option, flag);
     if (value !== undefined) settings[setting] = value;
   }
-  const maxPlacements = integerOption("--max-placements");
+  const maxPlacements = integerOption(option, "--max-placements");
   const drawnValueOption = option("--drawn-value");
   if (drawnValueOption !== undefined && !/^\d+([.,]\d+)?$/.test(drawnValueOption)) throw new Error(`--drawn-value attend un nombre, pas "${drawnValueOption}".`);
   const playerOptions = {};
@@ -100,7 +96,7 @@ try {
 
   const started = performance.now();
   const result = simulate({
-    games: integerOption("--games") ?? 1000,
+    games: integerOption(option, "--games") ?? 1000,
     seed,
     player: option("--player") ?? "greedy",
     playerOptions,
@@ -117,14 +113,13 @@ try {
     if (exportPath.endsWith(".json")) {
       await writeFile(exportPath, toJson({ ...result, summary }), "utf-8");
       console.log(`Export : ${exportPath}.`);
-    } else if (exportPath.endsWith(".csv")) {
+    } else {
+      // Un .csv : l'extension est vérifiée à la lecture des options.
       const base = exportPath.slice(0, -".csv".length);
       const csv = toCsv({ ...result, summary });
       await writeFile(`${base}-games.csv`, csv.games, "utf-8");
       await writeFile(`${base}-marbles.csv`, csv.marbles, "utf-8");
       console.log(`Export : ${base}-games.csv et ${base}-marbles.csv.`);
-    } else {
-      throw new Error("--export attend un chemin en .json ou en .csv.");
     }
   }
   console.log(`Durée : ${seconds.toFixed(1).replace(".", ",")} s.`);

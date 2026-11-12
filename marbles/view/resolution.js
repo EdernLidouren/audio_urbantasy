@@ -66,12 +66,13 @@ export function createResolutionPresenter({ getGame, draw, t, now, recorded, onS
   // question devient la dernière étape de la séquence, où s'arrête aussi le geste qui
   // la passe ; le choix fait, la suite reprend ici (resume). La pioche elle-même peut
   // attendre un choix (un Éveil) : même chemin.
-  function present(events, first) {
+  // `carriedTurn` : le tour dont la pioche reprend après un choix (buildSteps).
+  function present(events, first, carriedTurn) {
     let all = events;
     if (getGame().pendingChoice === null && getGame().stage === "draw") all = [...all, ...draw()];
     const { turn } = resolving;
     // La première fois, comment la passer.
-    const steps = recorded(first ? resolutionSteps(turn, all, t, { hint: turn === 1 }) : buildSteps(all, t));
+    const steps = recorded(first ? resolutionSteps(turn, all, t, { hint: turn === 1 }) : buildSteps(all, t, { carriedTurn }));
     const pending = getGame().pendingChoice;
     if (pending === null) {
       resolving = null;
@@ -93,9 +94,10 @@ export function createResolutionPresenter({ getGame, draw, t, now, recorded, onS
       resolving = { turn };
       present(events, true);
     },
-    // Un choix qui la suspendait vient d'être fait (les évènements de la reprise).
-    resume(events) {
-      present(events, false);
+    // Un choix qui la suspendait vient d'être fait (les évènements de la reprise) ;
+    // `carriedTurn`, si c'est la pioche du tour qui reprend.
+    resume(events, carriedTurn) {
+      present(events, false, carriedTurn);
     },
     // Un état construit, ouvert sur un choix qui suspend la résolution du tour `turn` :
     // la suite se dira en séquence, puis le tour suivant se piochera, comme si

@@ -198,8 +198,11 @@ export const MARBLE_EVENT_CUES = {
   windfall: (event, timeline, context, settings, table) => {
     if (hasTriggerEffect(table, event.marble, "windfall")) timeline.trigger("windfall", event.marble, slotPlace(event.slot));
   },
+  // L'Éjection d'un REMPLACEMENT (une pose sur un emplacement occupé) : la bille
+  // délogée part avec le choc de la pose qui suit. Une Éjection provoquée par l'action
+  // Éjecter (`by`) n'a pas de pose : sa bille roule à la défausse à son arrivée.
   knockout: (event, timeline, context) => {
-    context.struck = event.marble;
+    if (event.by === undefined) context.struck = event.marble;
   },
   removed: null,
   // Une redirection : un point d'accroche muet, l'arrivée a son son.
@@ -273,7 +276,8 @@ export const MARBLE_EVENT_CUES = {
     if (event.applied > 0) timeline.wear("polish", event.marble, event.slot);
   },
   cracked: (event, timeline, context, settings) => {
-    const retires = event.wear >= event.maxWear;
+    // Le retrait se lit dans l'évènement (le core l'a décidé), jamais recalculé ici.
+    const { retires } = event;
     if (event.applied === 0 && !retires) return;
     const atMs = timeline.wear("crack", event.marble, event.slot);
     if (retires) timeline.holdDepartures(atMs + settings.crackToOutMs);
@@ -371,11 +375,11 @@ export function handSizeChange(events) {
 
 // DÉMONSTRATION des places (mode debug, Maj+B) : la même balise à chaque place,
 // de la plus proche à la plus lointaine, pour régler l'espace à l'oreille
-// (MARBLES_SOUND_PLACES, MARBLES_SOUND_DEPTH). Une main de 5 : à gauche, au
-// centre, à droite ; puis les deux bases et la pointe.
-const DEMO_INTERVAL_MS = 700;
-
-export function placesDemoCues(marble) {
-  const places = [handPlace(0, 5), handPlace(2, 5), handPlace(4, 5), slotPlace("leftBase"), slotPlace("rightBase"), slotPlace("apex")];
-  return places.map((place, index) => ({ atMs: index * DEMO_INTERVAL_MS, sound: "beacon", marble, place }));
+// (MARBLES_SOUND_PLACES, MARBLES_SOUND_DEPTH). Une main pleine (la taille des
+// réglages) : à gauche, au centre, à droite ; puis les deux bases et la pointe.
+export function placesDemoCues(marble, settings = MARBLES_SETTINGS) {
+  const size = settings.maxHandSize;
+  const hand = [0, Math.floor((size - 1) / 2), size - 1].map((index) => handPlace(index, size));
+  const places = [...hand, slotPlace("leftBase"), slotPlace("rightBase"), slotPlace("apex")];
+  return places.map((place, index) => ({ atMs: index * settings.placesDemoIntervalMs, sound: "beacon", marble, place }));
 }

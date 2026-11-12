@@ -24,9 +24,17 @@ import { readFile } from "node:fs/promises";
 import { installFileFetch } from "../../tools/node-fetch.js";
 import { parseCommand } from "./commands.js";
 import { GAME_RULES } from "./game-rules.js";
+import { parseArgs } from "./args.js";
 
-const args = process.argv.slice(2);
-const file = args.find((arg) => !arg.startsWith("--"));
+// La ligne de commande, lue strictement (args.js) : le fichier du cas, et --json.
+let args;
+try {
+  args = parseArgs(process.argv.slice(2), { flags: ["--json"], positionals: 1 });
+} catch (error) {
+  console.error(error.message);
+  process.exit(1);
+}
+const [file] = args.positionals;
 if (!file) {
   console.log("Usage : node marbles/tools/case.js <cas.json> [--json]");
   process.exit(1);
@@ -44,7 +52,7 @@ let state = buildState(spec.state ?? {});
 const record = [];
 
 console.log("État de départ :");
-formatState(state, name, GAME_RULES.statuses).forEach((line) => console.log(`  ${line}`));
+formatState(state, name).forEach((line) => console.log(`  ${line}`));
 
 // Ce qu'un effet prévu a produit en plus de ses valeurs : billes chassées (et leur
 // Éjection), mises en poche ou perdues, cibles vides, choix indécis.
@@ -54,6 +62,7 @@ function results(outcome) {
     ...(outcome.pockets ?? []).map(({ marble, lost }) => `${marble === null ? "une bille piochée" : marbleLabel(marble, name)} ${lost ? "perdue, pot plein" : "en poche"}`),
     ...(outcome.empty ?? []).map(({ action, target, slot }) => `${action} sans cible (${target ?? slotLabel(slot)})`),
     ...(outcome.undecided ?? []).map(({ action }) => `${action} selon le choix`),
+    ...(outcome.discards ?? []).map(({ marble }) => `${marble === null ? "une bille du sac" : marbleLabel(marble, name)} défaussée`),
   ];
   return parts.length === 0 ? "" : ` ; ${parts.join(", ")}`;
 }
@@ -82,6 +91,17 @@ function printForecast(action) {
   }
   for (const effect of predicted.potEffects) {
     console.log(`  Pot, ${marbleLabel(effect.marble, name)} : Vitesse ${counter(effect.speed)}, Masse ${counter(effect.mass)}${results(effect)}.`);
+  }
+  // Les réactions des statuts, pendant la pose puis pendant la résolution.
+  for (const effect of predicted.statusReactions) {
+    console.log(`  Statut ${effect.status}, pendant la pose : Vitesse ${counter(effect.speed)}, Masse ${counter(effect.mass)}${results(effect)}.`);
+  }
+  for (const effect of predicted.statusEffects) {
+    console.log(`  Statut ${effect.status} : Vitesse ${counter(effect.speed)}, Masse ${counter(effect.mass)}${results(effect)}.`);
+  }
+  // L'usure prévue, statuts compris.
+  if (predicted.wear.length > 0) {
+    console.log(`  Usure : ${predicted.wear.map(({ type, slot, marble, wear }) => `${marbleLabel(marble, name)} en ${slotLabel(slot)} à ${wear} (${type})`).join(", ")}.`);
   }
   for (const { effects } of predicted.regenerations) {
     console.log("  Régénération du sac prévue.");
@@ -116,5 +136,5 @@ for (const entry of spec.actions ?? []) {
 }
 
 console.log("État final :");
-formatState(state, name, GAME_RULES.statuses).forEach((line) => console.log(`  ${line}`));
-if (args.includes("--json")) console.log(JSON.stringify({ state, steps: record }));
+formatState(state, name).forEach((line) => console.log(`  ${line}`));
+if (args.flag("--json")) console.log(JSON.stringify({ state, steps: record }));

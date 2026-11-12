@@ -6,7 +6,8 @@
 //
 // Ils jouent la table de billes figée des vérifications (./fixtures/marbles.js),
 // jamais les vraies billes ; celles-ci n'ont que leur contrat, domaine
-// marbles-content. Les fixtures communes à plusieurs domaines des billes vivent
+// marbles-content. Seuls les outils (domaine marbles-tools), qui servent les vraies
+// billes, les jouent aussi, sans attente sur l'effet d'une bille. Les fixtures communes à plusieurs domaines des billes vivent
 // dans ./helpers.js, ou dans ./fixtures/ quand elles forment un tout (la propriété
 // « prévision = réel », ./fixtures/forecast-property.js). L'écran des billes se
 // joue au clavier par son banc d'essai, ./fixtures/screen-bench.js (domaine

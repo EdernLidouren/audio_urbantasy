@@ -19,7 +19,7 @@
 //   bench.said; bench.sounds; bench.game(); bench.top(); bench.close();
 
 import { activeScreen, handleKeyDown, popScreen, pushScreen, tickFrame } from "../../../lib/screens.js";
-import { makeMarblesScreen } from "../../view/screen.js";
+import { SCREEN_SOUND_NAMES, makeMarblesScreen } from "../../view/screen.js";
 import { keyText } from "../helpers.js";
 
 // Les régions d'annonce du faux document : ce que les menus y écrivent, dans
@@ -45,21 +45,10 @@ function installFakeDocument() {
   globalThis.document = { getElementById: (id) => regions[id] ?? null };
 }
 
-// Les sons de l'écran (marbles/view/screen.js/SCREEN_SOUNDS), relevés : `name` et
-// ses arguments, dans l'ordre des appels.
-const SOUND_NAMES = [
-  "advanceRolls",
-  "closeTableReverb",
-  "openTableReverb",
-  "playCue",
-  "playFocusBeacon",
-  "playMenuSound",
-  "preloadMarblesAudio",
-  "startMarblesMusic",
-  "stopFocusBeacon",
-  "stopMarblesMusic",
-  "stopRolls",
-];
+// Les sons de l'écran (marbles/view/screen.js/SCREEN_SOUND_NAMES), tous relevés :
+// `name` et ses arguments, dans l'ordre des appels. Un son ajouté à l'écran l'est ici
+// d'office, jamais joué pour de vrai sous Node.
+const SOUND_NAMES = SCREEN_SOUND_NAMES;
 
 // Ouvre l'écran des billes sur la partie `state` (une partie neuve, ou un état
 // fabriqué : en phase de jeu, l'écran s'ouvre sans pioche), avec les règles `rules`.

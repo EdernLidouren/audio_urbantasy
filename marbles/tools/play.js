@@ -22,9 +22,9 @@
 //   prevoir | forecast <n> <empl.>   prévoir la pose de la bille n (rien ne bouge)
 //   fin | end                        résoudre et finir le tour (Maj+R) : une ligne
 //                                    par étape de la séquence, sans les pauses
-//   choisir | choose <n> | <empl.>   répondre au choix en attente : la bille n de la
+//   choisir | choose <n> | <empl.> | defausse <n>   répondre au choix en attente : la bille n de la
 //                                    main, ou un emplacement
-//   terminer | done                  terminer un choix « jusqu'à N »
+//   terminer | done                  terminer un choix facultatif
 //   journal                          le journal de la partie, une ligne par évènement
 //   journal json                     le même, brut, en JSON
 //   aide | help                      cette liste
@@ -40,16 +40,19 @@ import { createInterface } from "node:readline";
 import { installFileFetch } from "../../tools/node-fetch.js";
 import { parseCommand } from "./commands.js";
 import { GAME_RULES } from "./game-rules.js";
+import { parseArgs } from "./args.js";
 
-function optionValue(args, name) {
-  const index = args.indexOf(name);
-  return index >= 0 ? args[index + 1] : undefined;
+// La ligne de commande, lue strictement (args.js) : une erreur, et l'outil s'arrête.
+let args;
+try {
+  args = parseArgs(process.argv.slice(2), { values: ["--lang", "--seed"], flags: ["--json"] });
+} catch (error) {
+  console.error(error.message);
+  process.exit(1);
 }
-
-const args = process.argv.slice(2);
-const lang = optionValue(args, "--lang") ?? "fr";
-const jsonOutput = args.includes("--json");
-const seedOption = optionValue(args, "--seed");
+const lang = args.option("--lang") ?? "fr";
+const jsonOutput = args.flag("--json");
+const seedOption = args.option("--seed");
 // Une graine en chiffres reste un nombre : la même que celle du jeu.
 const seed = seedOption === undefined ? Math.floor(Math.random() * 2 ** 32) : /^\d+$/.test(seedOption) ? Number(seedOption) : seedOption;
 
@@ -74,7 +77,8 @@ const HELP = [
   "prevoir | forecast <n> <empl.>   prévoir la pose de la bille n (rien ne bouge)",
   "fin | end                        résoudre et finir le tour (Maj+R)",
   "choisir | choose <n> | <empl.>   répondre au choix en attente : la bille n de la main, ou un emplacement",
-  "terminer | done                  terminer un choix « jusqu'à N »",
+  "choisir defausse <n>             répondre par la bille n de la défausse",
+  "terminer | done                  terminer un choix facultatif (rien choisi : l'action est ignorée)",
   "journal                          le journal, une ligne par évènement",
   "journal json                     le journal brut, en JSON",
   "aide | help                      cette liste",
@@ -155,8 +159,8 @@ function printMarble(marble, main, turnsInHand = 0) {
 }
 
 function printState() {
-  console.log(`${describeBag(game, t)} ${describeDiscard(game, t)}`);
-  console.log(describeTurn(game, swapRefusal(game) === null, t, GAME_RULES));
+  console.log(`${describeBag(game, GAME_RULES, t)} ${describeDiscard(game, t)}`);
+  console.log(describeTurn(game, swapRefusal(game) === null, GAME_RULES, t));
   for (const slot of SLOTS) {
     const placed = game.triangle[slot];
     if (placed === null) console.log(`  ${describeSlotFocus(game, slot, GAME_RULES, t)}`);
@@ -211,7 +215,7 @@ function runCommand(line) {
       break;
     case "brut":
     case "raw":
-      formatState(game, name, GAME_RULES.statuses).forEach((text) => console.log(text));
+      formatState(game, name).forEach((text) => console.log(text));
       break;
     case "fin":
     case "end":

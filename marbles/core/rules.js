@@ -22,8 +22,9 @@
 // caractéristiques (lancers restants, refus de lancer et de pose, actions légales)
 // passe par les règles, qui y lient les statuts.
 
-import { createMarblesGame, legalActions, marblesReduce, placeRefusal, throwRefusal, throwsLeft } from "./marbles.js";
-import { appliedStatusesOf, keywordsOf, maxWearOf, validateMarbleStatuses, validateMarbleTypes } from "./content.js";
+import { createMarblesGame, legalActions, marblesReduce, nextTurnDraw, placeRefusal, throwRefusal, throwsLeft } from "./marbles.js";
+import { appliedStatusesOf, keywordsOf, maxWearOf } from "./content.js";
+import { validateMarbleStatuses, validateMarbleTypes } from "./validation.js";
 import { NO_STATUSES, characteristic } from "./statuses.js";
 import { effectAt } from "./effects.js";
 import { forecast } from "./forecast.js";
@@ -52,6 +53,8 @@ export function createMarblesRules(types, statuses = NO_STATUSES) {
     throwRefusal: (state) => throwRefusal(state, statuses),
     placeRefusal: (state, handIndex, slot) => placeRefusal(state, handIndex, slot, statuses),
     legalActions: (state) => legalActions(state, statuses),
+    // La pioche du prochain début de tour, statuts compris, sans rien consommer.
+    nextTurnDraw: (state) => nextTurnDraw(state, statuses),
     maxWearOf: (marble) => maxWearOf(marble, types),
     // Les mots-clés présents sur une bille, dans l'ordre de l'aide (touches E, Maj+E).
     keywordsOf: (marble) => keywordsOf(marble, types),

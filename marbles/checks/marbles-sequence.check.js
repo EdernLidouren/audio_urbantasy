@@ -11,7 +11,7 @@
 // core/checks/index.js/runChecks (`node tools/run-checks.js marbles-sequence`).
 
 import { MARBLES_SETTINGS } from "../config/values.js";
-import { placeRefusal, SLOTS } from "../core/marbles.js";
+import { SLOTS } from "../core/marbles.js";
 import { buildSteps, describeOverview, placementLines, resolutionSteps } from "../view/narration.js";
 import {
   advanceSequence,
@@ -88,7 +88,7 @@ function playGame(seed, options, present, onTurn = () => {}) {
     // tous les trois tours, la main se remplit et des emplacements se vident.
     const generous = seed % 2 === 1;
     const slots = state.turn === 1 || generous ? SLOTS : state.turn % 3 === 0 ? [SLOTS[state.turn % 2]] : [];
-    for (const slot of slots) if (placeRefusal(state, 0, slot) === null) record(buildSteps(apply({ type: "place", handIndex: 0, slot }), t));
+    for (const slot of slots) if (rules.placeRefusal(state, 0, slot) === null) record(buildSteps(apply({ type: "place", handIndex: 0, slot }), t));
 
     const before = state;
     const overview = describeOverview(state, rules, t);
@@ -671,7 +671,7 @@ function checkTexts(run) {
     );
     run(
       "réaction, confirmation : la ligne du pot, par bille, avant Annuler",
-      "place.pot{reactions: place.pot_more{first: place.pot_marble{marble: <size_count>, effect: effect.combined{parts: [effect.mass_up{amount: 1}]}}, rest: place.pot_marble{marble: <all_rounder>, effect: effect.combined{parts: [effect.speed_up{amount: 2}]}}}}",
+      "place.pot{reactions: place.more{first: place.pot_marble{marble: <size_count>, effect: effect.combined{parts: [effect.mass_up{amount: 1}]}}, rest: place.pot_marble{marble: <all_rounder>, effect: effect.combined{parts: [effect.speed_up{amount: 2}]}}}}",
       t(...(({ key, params }) => [key, params])(placementLines(reacting, 0, "apex", rules, t).at(-1)))
     );
     run(

@@ -14,7 +14,7 @@ import { CLAUSE_ACTIONS } from "../core/effects.js";
 import { TALLY_CATEGORIES, buildTallyCounters, validateEventTallies } from "../core/counters.js";
 import { emptyTally, recordTally, tallyValue } from "../core/tally.js";
 import { CHOICELESS_TYPES, FIXTURE_TYPES, fixtureRules } from "./fixtures/marbles.js";
-import { createPicker, inHand, marblesPlayState, placed, playLegalGame, withSizes } from "./helpers.js";
+import { createPicker, inHand, marblesPlayState, placed, withSizes } from "./helpers.js";
 
 // Les règles de la table des vérifications (marbles/checks/fixtures/marbles.js), et des
 // règles fabriquées : cette table complétée de billes propres à un cas.
@@ -59,6 +59,21 @@ function added(before, after) {
 
 // Les effets d'un déclencheur dans un journal, réduits à leur bille et leur Vitesse.
 const effectsOf = (events, trigger) => events.filter((event) => event.type === "effect" && event.trigger === trigger).map(({ marble, speedDelta }) => ({ marble, speedDelta }));
+
+// Joue une partie de billes jusqu'au bout, chaque action tirée par `pick`
+// (createPicker) parmi les actions légales (marbles/core/marbles.js/legalActions), réponses
+// aux choix comprises. `onResult(result, before)` reçoit chaque résultat et l'état
+// d'avant. -> l'état final.
+function playLegalGame(rules, state, pick, onResult = () => {}) {
+  let current = state;
+  while (current.stage !== "over") {
+    const actions = rules.legalActions(current);
+    const result = rules.reduce(current, actions[pick(actions.length)]);
+    onResult(result, current);
+    current = result.state;
+  }
+  return current;
+}
 
 export default function checkMarblesTally(run) {
   run.section("registre", checkRegistry);
@@ -318,7 +333,7 @@ function checkScopes(run) {
   const state = playState({ hand: inHand(["aging_flick", "aging_flick"]), tally: { flick: { turn: 1, game: 4 } } });
   const placedAgingFlick = rules.reduce(state, { type: "place", handIndex: 0, slot: "apex" });
   run.same("portées : la Chiquenaude de aging_flick, dans les deux portées", { turn: 2, game: 5 }, placedAgingFlick.state.tally.flick);
-  const refused = rules.reduce({ ...placedAgingFlick.state, throwsUsed: placedAgingFlick.state.throwsPerTurn }, { type: "place", handIndex: 0, slot: "leftBase" });
+  const refused = rules.reduce({ ...placedAgingFlick.state, throwsUsed: fixedRules.characteristic(placedAgingFlick.state, "throws") }, { type: "place", handIndex: 0, slot: "leftBase" });
   run("portées : un lancer refusé ne compte pas", placedAgingFlick.state.tally, refused.state.tally);
   const drawing = rules.reduce({ ...placedAgingFlick.state, stage: "draw", bag: ["final_pocket"] }, { type: "draw" });
   run("portées : la remise à zéro ouvre la pioche du tour", "turnStarted", drawing.events[0].type);

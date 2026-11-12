@@ -8,19 +8,11 @@
 
 import { throws } from "../../lib/check.js";
 import { LARGE } from "../config/values.js";
-import { readForecast } from "../core/forecast.js";
 import { marbleCard } from "../view/card.js";
-import { fabricatedRules, inHand, keyText as t, marbleCount, marblesPlayState, mustReduce, placed, validateTable } from "./helpers.js";
+import { fabricatedRules, forecastMatches, inHand, keyText as t, marbleCount, marblesPlayState, mustReduce, placed, validateTable } from "./helpers.js";
 
 const NEXT = "nextSlot";
 const PREVIOUS = "previousSlot";
-
-function forecastMatches(rules, state, action) {
-  const real = action === null ? { state, events: [] } : mustReduce(rules, state, action);
-  const resolved = mustReduce(rules, real.state, { type: "resolve" });
-  const { uncertain, awakenPossible, ...predicted } = rules.forecast(state, action);
-  return JSON.stringify(predicted) === JSON.stringify(readForecast(real.events, resolved.events, resolved.state));
-}
 
 export default function checkMarblesRelative(run) {
   run.section("références et règle des cibles", checkReferences);
@@ -43,6 +35,15 @@ const TABLE = {
   finalPolisher: { maxWear: 1, final: [{ action: "polish", amount: 1, target: NEXT }] },
   // Chute : Polissage 1 à la suivante, sans référence depuis la main.
   dropper: { drop: [{ action: "polish", amount: 1, target: NEXT }] },
+  // Chute : Fêlure à la suivante (sans référence depuis la main) d'un montant calculé
+  // à 0 (aucune bille en main), puis Fêlure 1 à la suivante, puis Masse +1.
+  orderDropper: {
+    drop: [
+      { action: "crack", amount: { base: 0, step: 1, source: { type: "zoneCount", zone: "hand" } }, target: NEXT },
+      { action: "crack", amount: 1, target: NEXT },
+      { action: "mass", amount: 1, target: "apex" },
+    ],
+  },
   // Tic : Défausser la première bille de la main.
   handDiscarder: { hit: [{ action: "discard", target: "firstInHand" }] },
   // Base : Vitesse +3 si la bille de l'emplacement suivant est un calot.
@@ -91,6 +92,17 @@ function checkReferences(run) {
     fromHand.events.filter((event) => event.type === "targetEmpty")
   );
   run("Chute depuis la main : rien de poli", false, fromHand.events.some((event) => event.type === "polished"));
+  // Sans référence, la clause s'évalue comme les autres (un montant calculé à 0 ne
+  // produit rien) et se note à sa place, dans l'ordre des clauses.
+  const ordered = mustReduce(rules, state({ hand: inHand(["handDiscarder", "orderDropper"]), triangle: { rightBase: placed("plain"), leftBase: null, apex: null } }), { type: "place", handIndex: 0, slot: "rightBase" });
+  run.same(
+    "Chute sans référence : un montant à 0 ne se note pas, la Fêlure se note, son effet ne la dit pas",
+    { empties: ["crack"], said: [] },
+    {
+      empties: ordered.events.filter((event) => event.type === "targetEmpty" && event.target === "noReference").map((event) => event.action),
+      said: ordered.events.find((event) => event.type === "effect" && event.trigger === "drop").operations,
+    }
+  );
 
   // Une condition sur un emplacement relatif.
   const watching = (size) => resolve({ triangle: { rightBase: placed("sizeWatcher"), leftBase: placed(size), apex: null } });

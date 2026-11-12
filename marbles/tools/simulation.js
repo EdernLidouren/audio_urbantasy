@@ -18,15 +18,13 @@
 // les options de createMarblesGame, celles d'une partie.
 
 import { STARTING_BAG } from "../config/values.js";
-import { createMarblesGame } from "../core/marbles.js";
 import { createSeed, nextRandom } from "../../lib/rng.js";
 import { PLAYERS, publicView } from "./players.js";
-import MARBLE_TYPES from "../content/types/index.js";
 import { GAME_RULES } from "./game-rules.js";
 import { TRIGGER_IDS } from "./format.js";
 
-export const MARBLE_IDS = Object.keys(MARBLE_TYPES);
-export const SETTING_NAMES = ["maxHandSize", "throwsPerTurn", "firstTurnDraw", "drawPerTurn", "turnCount"];
+export const MARBLE_IDS = Object.keys(GAME_RULES.types);
+export const SETTING_NAMES = ["maxHandSize", "throwsPerTurn", "potCapacity", "firstTurnDraw", "drawPerTurn", "turnCount"];
 
 // Au-delà, une partie ne finit pas : une faute de programmation, pas une partie.
 const MAX_ACTIONS_PER_GAME = 10_000;
@@ -41,7 +39,7 @@ export function deriveSeed(seed, index, label) {
 // (tiré dans la table des billes, doublons permis jusqu'à maxCopies exemplaires,
 // null : sans limite).
 
-export function validateBagMode(mode) {
+function validateBagMode(mode) {
   if (mode.kind === "test") return;
   if (mode.kind === "list") {
     for (const id of mode.marbles) if (!MARBLE_IDS.includes(id)) throw new Error(`sac : bille inconnue "${id}".`);
@@ -250,7 +248,7 @@ export function playGame({ index, seed, player, playerOptions = {}, bagMode, set
 // --- Une série ---
 
 // Les paramètres complétés et validés : une erreur claire avant la première partie.
-export function normalizeParams(params) {
+function normalizeParams(params) {
   const normalized = {
     games: params.games ?? 1000,
     seed: params.seed ?? 1,

@@ -1,13 +1,20 @@
 // JEU DES BILLES — le RÉDUCTEUR : l'état, la mise en place, les refus et les
 // actions (marblesReduce). Simulation pure : aucun DOM, aucun son, aucun aléa non
 // seedé. Règles, format des billes et interface : doc/marbles.md.
-// TROIS MODULES, du plus fondamental au réducteur :
-//   marbles/core/content.js  le contenu : validation des déclarations et d'une table
-//                            de billes, valeurs de partie, mots-clés, et le JOURNAL
-//                            (ses évènements, décrits dans son en-tête) ;
-//   marbles/core/run.js      le déroulé d'une action : bus et écouteurs, effets,
-//                            choix, actions sur une bille, pioche, retraits ;
-//   marbles/core/marbles.js          ce fichier : l'état, les refus, les actions.
+// LES MODULES DU CORE, du plus fondamental au réducteur (doc/marbles.md, la carte) :
+//   zones.js       les zones : le triangle et son ordre horaire, les zones de la
+//                  partie, celles d'un choix, celles de la bille qui joue un effet ;
+//   statuses.js    les statuts : caractéristiques, modificateurs, cumuls, durées ;
+//   effects.js     le modèle d'effet : clauses, actions, conditions, montants ;
+//   counters.js, tally.js  les valeurs de partie : leurs compteurs, leur registre ;
+//   content.js     le catalogue : le journal, les valeurs de partie, les mots-clés ;
+//   validation.js  la validation des tables injectées (billes, statuts, réglages) ;
+//   bus.js         le bus d'évènements d'une action ;
+//   path.js, choices.js  le chemin des billes, les cibles au choix ;
+//   run.js         le déroulé d'une action : écouteurs, effets, réactions, pioche ;
+//   marbles.js     ce fichier : l'état, les refus, les actions ;
+//   forecast.js    la prévision, le vrai moteur sur une copie à l'aveugle ;
+//   rules.js       les règles liées aux tables, le point d'entrée hors du core.
 //
 // ÉTAT sérialisable, à part entière (jamais lié à la session du jeu principal,
 // aucune persistance aujourd'hui) :
@@ -19,14 +26,14 @@
 // l'accès unique (marbles/core/statuses.js/characteristic) y ajoute les statuts.
 // `statuses` : les INSTANCES DE STATUT de la partie, dans l'ordre d'acquisition
 // (marbles/core/statuses.js, en-tête), [] au départ.
-// `pot` : les billes EN POCHE, des ids dans l'ordre d'arrivée, au plus
-// `potCapacity` ; `lost` : les billes PERDUES, envoyées au pot plein. Ni l'une ni
+// `pot` : les billes EN POCHE, des ids dans l'ordre d'arrivée, au plus sa capacité en
+// vigueur à l'arrivée (une capacité réduite ensuite n'en fait sortir aucune) ; `lost` : les billes PERDUES, envoyées au pot plein. Ni l'une ni
 // l'autre ne revient jamais dans le sac, ni ne quitte sa zone.
 // `tally` : les VALEURS DE PARTIE, { <id>: { turn, game } } (marbles/core/tally.js, le
 // seul à les écrire ; les compteurs : marbles/core/counters.js, TALLY_COUNTERS), tenues
 // à l'émission de chaque évènement du journal (marbles/core/run.js/transact). Une
 // bille du pot peut réagir à chaque incrément d'un compteur ÉCOUTABLE (En poche, à
-// chaque (occurrence) : marbles/core/run.js/pocketReactionsOf).
+// chaque (occurrence) : marbles/core/run.js/reactionsOf).
 // `throwsUsed` : les LANCERS joués ce tour (une pose depuis la main en est un,
 // l'échange non) ; la caractéristique « lancers » (statuts compris) les borne.
 // `pendingChoice` : null, ou le CHOIX EN ATTENTE d'une cible au choix
@@ -68,8 +75,9 @@
 // calculés (marbles/core/effects.js/AMOUNT_SOURCES).
 // Le sommet du sac est bag[0].
 //
-// `speed` et `mass` sont les compteurs du tour : Tic et Éjection les modifient
-// avant la résolution, qui part de ces valeurs. Ils reviennent à 0 et 1 à la fin
+// `speed` et `mass` sont les compteurs du tour : les effets joués pendant la phase de
+// jeu (Chiquenaude, Tic, Éjection, réactions…) les modifient avant la résolution, qui
+// part de ces valeurs. Ils reviennent à 0 et 1 à la fin
 // de chaque résolution.
 //
 // `stage` découpe le tour : "draw" (la pioche reste à faire), "play" (échange
@@ -86,7 +94,8 @@
 //   { type: "choose", target }                  répond au choix en attente : une
 //                                               cible, { zone: "hand", index } ou
 //                                               { zone: "triangle", slot }
-//   { type: "choose", done: true }              termine un choix « jusqu'à N »
+//   { type: "choose", done: true }              termine un choix facultatif (rien
+//                                               choisi : l'action est ignorée)
 // Résultat, toujours la même forme : { ok, state, events, error }. Refus :
 // ok false, `state` inchangé, `events` vide, `error` un code de MARBLE_ERRORS
 // (son texte : `marbles.error.<code>`). Rien n'est jamais levé pour une
@@ -107,13 +116,17 @@
 
 import { MARBLES_SETTINGS, STARTING_BAG } from "../config/values.js";
 import { createSeed } from "../../lib/rng.js";
-import { SLOTS, effectAt, isOptionalChoice, nextSlot, previousSlot } from "./effects.js";
+import { UNKNOWN_MARBLE, isOptionalChoice } from "./effects.js";
+import { SLOTS, nextSlot, previousSlot } from "./zones.js";
 import { emptyTally } from "./tally.js";
-import { TALLY_COUNTERS, maxWearOf, validateGameSettings } from "./content.js";
-import { UNKNOWN_MARBLE, answerOf, chooseRefusal, consumeCharges, drawMarbles, noteModification, retireMarble, shuffled, targetRef, transact, travel, update } from "./run.js";
+import { TALLY_COUNTERS, maxWearOf } from "./content.js";
+import { validateGameSettings } from "./validation.js";
+import { drawMarbles, intercept, noteModification, shuffled, transact } from "./run.js";
+import { answerOf, chooseRefusal, targetRef } from "./choices.js";
+import { retireMarble, travel } from "./path.js";
 import { NO_STATUSES, activatePending, characteristic, endTurn, modifyQuantity } from "./statuses.js";
 
-export { SLOTS, effectAt, nextSlot, previousSlot };
+export { SLOTS, nextSlot, previousSlot };
 
 // Codes de refus (voir l'en-tête). Une liste pour que chaque code ait son
 // texte, vérifié par les vérifications (domaine marbles-view).
@@ -222,6 +235,16 @@ export function throwsLeft(state, statuses = NO_STATUSES) {
   return Math.max(0, characteristic(state, "throws", statuses) - state.throwsUsed);
 }
 
+// La PIOCHE DU PROCHAIN DÉBUT DE TOUR, telle qu'elle se ferait, sans rien consommer
+// (une charge reste) : avant la pioche du tour, celle de ce tour ; sinon celle du
+// tour suivant, les statuts comme ils seront alors (la fin de ce tour, puis
+// l'activation de ceux en attente). Lue par l'annonce du sac (touche S).
+export function nextTurnDraw(state, statuses = NO_STATUSES) {
+  if (state.stage === "draw") return modifyQuantity(state.statuses, statuses, "turnDraw", state.turn === 1 ? state.firstTurnDraw : state.drawPerTurn).value;
+  const ended = isLastTurn(state) ? state.statuses : endTurn(state.statuses, statuses).instances;
+  return modifyQuantity(activatePending(ended).instances, statuses, "turnDraw", state.drawPerTurn).value;
+}
+
 // Peut-on encore lancer une bille ce tour-ci, avant même de la choisir ? Le code
 // du refus, ou null. Exportée pour que l'interface refuse dès la prise.
 export function throwRefusal(state, statuses = NO_STATUSES) {
@@ -292,7 +315,7 @@ function isLastTurn(state) {
 }
 
 function endGame(run) {
-  update(run, { stage: "over" });
+  run.update({ stage: "over" });
   run.emit({ type: "gameOver", score: run.state.score });
 }
 
@@ -301,22 +324,22 @@ function endGame(run) {
 // maintenant reste donc à 0. Une pioche impossible ne finit jamais la partie : le
 // tour se joue avec la main qu'on a.
 function drawTurn(run) {
-  const { state } = run;
-  run.emit({ type: "turnStarted", turn: state.turn, turnCount: state.turnCount });
+  run.emit({ type: "turnStarted", turn: run.state.turn, turnCount: run.state.turnCount });
   // Les statuts « le prochain tour » s'activent, en silence, avant la pioche : une
   // main agrandie compte dès elle.
   const { instances, activated } = activatePending(run.state.statuses);
   if (activated.length > 0) {
-    update(run, { statuses: instances });
+    run.update({ statuses: instances });
     for (const status of activated) run.emit({ type: "statusActivated", status });
   }
-  update(run, { hand: run.state.hand.map((held) => ({ ...held, turnsInHand: held.turnsInHand + 1 })) });
+  run.update({ hand: run.state.hand.map((held) => ({ ...held, turnsInHand: held.turnsInHand + 1 })) });
   // Le nombre à piocher passe par ses modificateurs (turnDraw) ; la pioche s'arrête
   // ensuite à ses limites habituelles (main pleine, plus de billes).
-  const count = consumeCharges(run, modifyQuantity(run.state.statuses, run.statuses, "turnDraw", state.turn === 1 ? state.firstTurnDraw : state.drawPerTurn));
-  noteModification(run, count, null);
-  drawMarbles(run, count.value, "turn");
-  update(run, { stage: "play", swapUsed: false, throwsUsed: 0 });
+  const { turn, firstTurnDraw, drawPerTurn } = run.state;
+  const drawChange = intercept(run, modifyQuantity, "turnDraw", turn === 1 ? firstTurnDraw : drawPerTurn);
+  noteModification(run, drawChange, null);
+  drawMarbles(run, drawChange.value, "turn");
+  run.update({ stage: "play", swapUsed: false, throwsUsed: 0 });
 }
 
 // Échange : le contenu de deux emplacements, usure comprise. Un emplacement
@@ -333,14 +356,14 @@ function swapRefused(state, { a, b }) {
 
 function swapSlots(run, { a, b }) {
   const { triangle } = run.state;
-  update(run, { triangle: { ...triangle, [a]: triangle[b], [b]: triangle[a] }, swapUsed: true });
+  run.update({ triangle: { ...triangle, [a]: triangle[b], [b]: triangle[a] }, swapUsed: true });
   run.emit({ type: "swapped", a, b });
 }
 
 // Pose, un LANCER (la confirmation est l'affaire de l'interface). D'abord, toujours,
 // la bille quitte la main (son compteur avec elle) et sa Chiquenaude joue : en cours
 // de lancer, elle n'est ni en main ni sur le triangle. Puis, sur un emplacement
-// occupé, le trajet de l'occupante (marbles/core/run.js/travel, cause
+// occupé, le trajet de l'occupante (marbles/core/path.js/travel, cause
 // "replacement") : son départ, son Éjection pendant qu'elle est en partance, son
 // arrivée (la défausse sauf redirection) ; puis la nouvelle bille rejoint
 // l'emplacement, et son Tic. Sur un emplacement vide, la bille le rejoint
@@ -349,7 +372,7 @@ function swapSlots(run, { a, b }) {
 // vide, sans Éjection ni Tic.
 function placeMarble(run, { handIndex, slot }) {
   const { marble, turnsInHand } = run.state.hand[handIndex];
-  update(run, { hand: run.state.hand.filter((_, index) => index !== handIndex), throwsUsed: run.state.throwsUsed + 1 });
+  run.update({ hand: run.state.hand.filter((_, index) => index !== handIndex), throwsUsed: run.state.throwsUsed + 1 });
   // En transit de sa sortie de la main à son arrivée sur l'emplacement : dans aucune
   // zone, mais un choix ouvert entre-temps la connaît (transact, inTransit). Une
   // action ne pose qu'une bille : la liste n'en a jamais qu'une.
@@ -364,7 +387,7 @@ function placeMarble(run, { handIndex, slot }) {
     const exit = { type: "knockout", slot, marble: previous.marble, replacement };
     travel(run, { marble: previous.marble, from: { zone: "triangle", slot }, cause: "replacement", exit });
   }
-  update(run, { triangle: { ...run.state.triangle, [slot]: { marble, wear: 0 } } });
+  run.update({ triangle: { ...run.state.triangle, [slot]: { marble, wear: 0 } } });
   run.inTransit = run.inTransit.filter((other) => other !== thrown);
   run.emit({ type: "placed", slot, marble });
   if (previous !== null) run.emit({ type: "hit", slot, marble, replacement });
@@ -406,9 +429,9 @@ function resolvePhases(run) {
     // maximum : ramené à 0, la bille ne s'use pas (l'évènement le dit, usure
     // inchangée) ; augmenté jusqu'au maximum, elle part à l'étape des retraits.
     const maxWear = maxWearOf(marble, run.types);
-    const added = consumeCharges(run, modifyQuantity(run.state.statuses, run.statuses, "phaseWear", 1));
+    const added = intercept(run, modifyQuantity, "phaseWear", 1);
     const wear = Math.min(maxWear, after.wear + added.value);
-    update(run, { triangle: { ...run.state.triangle, [slot]: { marble, wear } } });
+    run.update({ triangle: { ...run.state.triangle, [slot]: { marble, wear } } });
     run.emit({ type: "wear", slot, marble, wear, maxWear });
     noteModification(run, added, { trigger: "phase", slot, marble });
   }
@@ -434,6 +457,8 @@ function retireWornMarbles(run) {
   }
 }
 
+const RESOLVE = Object.freeze({ type: "resolve" });
+
 // La résolution, sans les refus, dans cet ordre : phases, pot, retraits par usure (et
 // ce qu'ils déclenchent), Impact (passé par les modificateurs des statuts), rotation,
 // fin des statuts qui s'arrêtent à ce tour, fin de tour. Les retraits passent
@@ -442,10 +467,8 @@ function retireWornMarbles(run) {
 // (marbles/core/forecast.js). Jamais la pioche du tour : seuls des effets y
 // piochent.
 export function runResolution(state, types, options = {}) {
-  return transact(state, types, options, resolveTurn, RESOLVE);
+  return replayAction(state, RESOLVE, types, options);
 }
-
-const RESOLVE = Object.freeze({ type: "resolve" });
 
 function resolveTurn(run) {
   resolvePhases(run);
@@ -455,17 +478,17 @@ function resolveTurn(run) {
   const { speed, mass } = run.state;
   // L'Impact habituel, puis ses modificateurs (Coup double), plancher 0 ; l'évènement
   // porte la valeur finale, ce qu'ont fait les statuts se dit après lui.
-  const change = consumeCharges(run, modifyQuantity(run.state.statuses, run.statuses, "impact", impactOf(speed, mass)));
+  const change = intercept(run, modifyQuantity, "impact", impactOf(speed, mass));
   const impact = change.value;
   const score = run.state.score + impact;
-  update(run, { score });
+  run.update({ score });
   run.emit({ type: "impact", speed, mass, impact, score });
   noteModification(run, change, null);
 
   const { leftBase, rightBase, apex } = run.state.triangle;
   let triangle = { leftBase: withoutBonus(leftBase), rightBase: withoutBonus(rightBase), apex: withoutBonus(apex) };
   for (let notch = 0; notch < ROTATION_NOTCHES; notch++) triangle = rotated(triangle);
-  update(run, { triangle, speed: 0, mass: 1 });
+  run.update({ triangle, speed: 0, mass: 1 });
   run.emit({ type: "rotation", triangle, notches: ROTATION_NOTCHES });
   // Les statuts comptés en tours en voient un de moins ; à zéro, ils prennent fin,
   // dans l'ordre d'acquisition. Pas au dernier tour : la partie s'arrête là.
@@ -473,13 +496,13 @@ function resolveTurn(run) {
   run.emit({ type: "turnEnded", turn: run.state.turn });
 
   if (isLastTurn(run.state)) endGame(run);
-  else update(run, { turn: run.state.turn + 1, stage: "draw" });
+  else run.update({ turn: run.state.turn + 1, stage: "draw" });
 }
 
 // La fin de tour des statuts (marbles/core/statuses.js/endTurn), chaque fin dite.
 function expireStatuses(run) {
   const { instances, expired } = endTurn(run.state.statuses, run.statuses);
-  update(run, { statuses: instances });
+  run.update({ statuses: instances });
   for (const status of expired) run.emit({ type: "statusExpired", status });
 }
 
@@ -519,7 +542,7 @@ export function marblesReduce(state, action, types, options = {}) {
       return refusal ? refused(state, refusal) : replayAction(state, action, types, options);
     case "resolve":
       refusal = resolveRefusal(state);
-      return refusal ? refused(state, refusal) : runResolution(state, types, options);
+      return refusal ? refused(state, refusal) : replayAction(state, RESOLVE, types, options);
     case "choose": {
       // La réponse au choix en attente : l'action suspendue est rejouée depuis son
       // état de départ, avec une réponse de plus (voir l'en-tête, « reprise par

@@ -4,10 +4,9 @@
 // rules.forecast) : emplacements, régénérations et leurs Trouvailles, pot,
 // incertitudes. Pur. Point d'entrée et vue d'ensemble : marbles/view/narration.js.
 
-import { nameRef } from "../../../data/i18n/index.js";
 import { MARBLE_POCKET, MARBLE_TRIGGERS } from "../../config/values.js";
 import { SLOTS } from "../../core/marbles.js";
-import { describeEffect, describeOutcome, formatCounter, marbleName, outcomeLine, slotName, statusName } from "./effects.js";
+import { describeEffect, describeOutcome, formatCounter, marbleName, outcomeLine, slotName, statusName, marbleRef } from "./effects.js";
 
 // La ligne des valeurs prévues d'une pose : celles de la phase de la bille posée,
 // puis ce qui s'y ajoute avec son emplacement (son Final, si elle s'use ce tour) :
@@ -34,9 +33,10 @@ const PLACEMENT_LINES = MARBLE_TRIGGERS.filter((trigger) => trigger.forecast.lin
 // si la Chiquenaude vide l'emplacement) ; le menu garde la même structure. Enfin, si
 // la pose et la résolution régénéreraient le sac, une ligne par régénération, chacune
 // suivie d'une ligne par Trouvaille qu'elle déclencherait (regenerationLines) ;
-// « Éveils possibles. » si la prévision est incertaine (uncertainLines) ; enfin, juste
-// avant « Annuler », toujours, les réactions du pot que la pose provoquerait
-// (potReactionLine). La pose doit être permise (placeRefusal).
+// « Éveils possibles. » si la prévision est incertaine (uncertainLines) ; puis,
+// toujours, les réactions du pot que la pose provoquerait (potReactionLine) ; enfin,
+// juste avant « Annuler », dès que la partie a des statuts, leurs réactions
+// (statusReactionLines). La pose doit être permise (rules.placeRefusal).
 export function placementLines(game, handIndex, slot, rules, t) {
   const { marble } = game.hand[handIndex];
   const predicted = rules.forecast(game, { type: "place", handIndex, slot });
@@ -51,7 +51,7 @@ export function placementLines(game, handIndex, slot, rules, t) {
     if (trigger.replacement === true && occupant === null) continue;
     lines.push({
       key: trigger.texts.placement,
-      params: { marble: nameRef(`marble.${concerned[trigger.forecast.marble]}.name`), effect: describeOutcome(predicted[trigger.id], t) },
+      params: { marble: marbleRef(concerned[trigger.forecast.marble]), effect: describeOutcome(predicted[trigger.id], t) },
     });
   }
   return [...lines, ...regenerationLines(predicted, t), ...uncertainLines(predicted), potReactionLine(predicted, t), ...statusReactionLines(game, predicted, t)];
@@ -63,9 +63,7 @@ export function placementLines(game, handIndex, slot, rules, t) {
 // la partie a des statuts, pour que le menu garde sa structure pendant qu'ils durent.
 function statusReactionLines(game, predicted, t) {
   if (game.statuses.length === 0) return [];
-  const parts = predicted.statusReactions.map((effect) => t("marbles.place.status_effect", { status: statusName(effect.status, t), effect: describeEffect(effect, t) }));
-  const reactions = parts.length === 0 ? t("marbles.effect.none") : parts.reduce((first, rest) => t("marbles.place.pot_more", { first, rest }));
-  return [{ key: "marbles.place.statuses", params: { reactions } }];
+  return [reactionsLine("marbles.place.statuses", predicted.statusReactions.map((effect) => t("marbles.place.status_effect", { status: statusName(effect.status, t), effect: describeEffect(effect, t) })), t)];
 }
 
 // Les gabarits des déclencheurs prévus avec un emplacement (MARBLE_TRIGGERS,
@@ -81,7 +79,7 @@ function forecastSlotLine(predicted, slot, t) {
   const notes = slotNotes(predicted, slot, t);
   const cleared = predicted.cleared[slot];
   if (predicted.phases[slot] === null && cleared !== null) {
-    return [t("marbles.outcome.removed", { slot: slotName(slot, t), marble: nameRef(`marble.${cleared}.name`) }), ...notes].join(" ");
+    return [t("marbles.outcome.removed", { slot: slotName(slot, t), marble: marbleRef(cleared) }), ...notes].join(" ");
   }
   return outcomeLine(slot, predicted.phases[slot], t, notes);
 }
@@ -111,7 +109,7 @@ function regenerationLines(predicted, t) {
     { key: index === 0 ? "marbles.forecast.regenerates" : "marbles.forecast.regenerates_again" },
     ...effects.map((effect) => ({
       key: REGENERATION_TEMPLATES[effect.trigger],
-      params: { marble: nameRef(`marble.${effect.marble}.name`), effect: describeEffect(effect, t) },
+      params: { marble: marbleRef(effect.marble), effect: describeEffect(effect, t) },
     })),
   ]);
 }
@@ -133,9 +131,14 @@ function uncertainLines(predicted) {
 // d'arrivée, « Pot : tigrée, Vitesse +2 ; grès, Masse +1 », ou « Pot : aucun
 // effet ». Toujours présente, le menu garde sa structure.
 function potReactionLine(predicted, t) {
-  const parts = predicted.potReactions.map((effect) => t("marbles.place.pot_marble", { marble: nameRef(`marble.${effect.marble}.name`), effect: describeEffect(effect, t) }));
-  const reactions = parts.length === 0 ? t("marbles.effect.none") : parts.reduce((first, rest) => t("marbles.place.pot_more", { first, rest }));
-  return { key: "marbles.place.pot", params: { reactions } };
+  return reactionsLine("marbles.place.pot", predicted.potReactions.map((effect) => t("marbles.place.pot_marble", { marble: marbleRef(effect.marble), effect: describeEffect(effect, t) })), t);
+}
+
+// Une ligne de réactions d'une confirmation (le pot, les statuts) : ses morceaux à la
+// suite (« tigrée, Vitesse +2 ; grès, Masse +1 »), ou « aucun effet ».
+function reactionsLine(key, parts, t) {
+  const reactions = parts.length === 0 ? t("marbles.effect.none") : parts.reduce((first, rest) => t("marbles.place.more", { first, rest }));
+  return { key, params: { reactions } };
 }
 
 // Les billes du pot qui joueraient quelque chose pendant la résolution (leur effet à
@@ -145,7 +148,7 @@ function potReactionLine(predicted, t) {
 const POT_FORECAST_TEMPLATE = MARBLE_POCKET.moments.find((moment) => moment.texts.forecast !== undefined)?.texts.forecast;
 
 function potLines(predicted, t) {
-  return predicted.potEffects.map((effect) => t(POT_FORECAST_TEMPLATE, { marble: nameRef(`marble.${effect.marble}.name`), effect: describeEffect(effect, t) }));
+  return predicted.potEffects.map((effect) => t(POT_FORECAST_TEMPLATE, { marble: marbleRef(effect.marble), effect: describeEffect(effect, t) }));
 }
 
 // Les statuts qui joueraient quelque chose pendant la résolution (leurs réactions,
@@ -161,8 +164,9 @@ function forecastNotes(predicted, t) {
 // La vue d'ensemble du tour (touche R), d'un bloc : la prévision d'abord, Vitesse et
 // Masse comprenant ce que le tour a déjà gagné (Tic, Éjection), l'Impact avec ses
 // planchers ; puis chaque emplacement dans l'ordre horaire (une Pioche y est une
-// valeur comme une autre, « Pioche 1 ») ; enfin la régénération du sac, si la
-// résolution la provoquerait. Le triangle actuel, sans action envisagée. null hors
+// valeur comme une autre, « Pioche 1 ») ; puis ce que joueraient le pot et les statuts
+// pendant la résolution ; enfin la régénération du sac, si la résolution la
+// provoquerait. Le triangle actuel, sans action envisagée. null hors
 // de la phase de jeu, où rien ne se prévoit.
 export function describeOverview(game, rules, t) {
   const predicted = rules.forecast(game);

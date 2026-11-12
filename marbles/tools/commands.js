@@ -8,11 +8,13 @@
 //   resoudre | resolve               résolution seule, sans la pioche qui suit
 //   prevoir | forecast | r [<n> <empl.>]  prévision, rien ne bouge
 //   choisir | choose <n> | <empl.>   répond au choix en attente : la bille n de la
-//                                    main (à partir de 1), ou un emplacement
-//   terminer | done                  termine un choix « jusqu'à N »
+//     | defausse <n>                 main (à partir de 1), un emplacement, ou la
+//                                    bille n de la défausse
+//   terminer | done                  termine un choix facultatif (rien choisi :
+//                                    l'action est ignorée)
 // Emplacements : gauche (g, left), droite (d, right), pointe (p, apex).
 
-export const SLOT_ALIASES = {
+const SLOT_ALIASES = {
   gauche: "leftBase",
   g: "leftBase",
   left: "leftBase",
@@ -29,13 +31,14 @@ export const SLOT_ALIASES = {
 const slotOf = (word) => SLOT_ALIASES[word?.toLowerCase()];
 const handIndexOf = (word) => (/^\d+$/.test(word ?? "") ? Number(word) - 1 : undefined);
 
+// Les mots qui désignent la défausse dans `choisir defausse <n>`, en minuscules.
+const DISCARD_WORDS = ["defausse", "défausse", "discard"];
+
 // Une ligne -> { kind, action?, error? } :
 //   kind "action"   : `action` à passer au réducteur ;
 //   kind "forecast" : `action` la pose envisagée, ou null pour le triangle actuel ;
 //   kind "other"    : une commande propre à l'outil (le premier mot, `word`) ;
 //   kind "error"    : `error`, l'usage attendu.
-// Les mots qui désignent la défausse dans `choisir defausse <n>`.
-const DISCARD_WORDS = ["defausse", "défausse", "discard"];
 
 export function parseCommand(line) {
   const [word = "", ...params] = line.trim().split(/\s+/);
@@ -64,7 +67,7 @@ export function parseCommand(line) {
     case "choose": {
       // Une bille de la défausse : `choisir defausse 2`, sa place dans l'ordre
       // d'arrivée.
-      if (DISCARD_WORDS.includes(params[0])) {
+      if (DISCARD_WORDS.includes(params[0]?.toLowerCase())) {
         const index = handIndexOf(params[1]);
         if (index !== undefined) return { kind: "action", action: { type: "choose", target: { zone: "discard", index } } };
         return { kind: "error", error: "Usage : choisir defausse <n>" };

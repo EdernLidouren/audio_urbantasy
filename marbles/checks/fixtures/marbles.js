@@ -1,5 +1,5 @@
 // Jeu des billes : la TABLE DE BILLES DES VÉRIFICATIONS, et les réglages de leurs
-// parties. Les vérifications des MÉCANISMES (core/checks/marbles*.check.js) jouent
+// parties. Les vérifications des MÉCANISMES (marbles/checks/marbles*.check.js) jouent
 // ces billes-ci, jamais celles du jeu (marbles/content/types/) : les billes du jeu sont en
 // phase de design et changent à chaque itération ; une vérification qui passait par
 // elles cassait (ou disparaissait du total) dès qu'une valeur bougeait, sans
@@ -23,9 +23,10 @@ import { activeSize, allActive, choice, crack, draw, eject, mass, pocket, polish
 import { LARGE, MEDIUM, SMALL } from "../../config/values.js";
 import { createMarblesRules } from "../../core/rules.js";
 
-// Gèle une table et chacune de ses billes en profondeur : une vérification qui
-// modifierait une bille par mégarde lèverait au lieu de fausser les suivantes.
-function deepFreeze(value) {
+// Gèle en profondeur (une table de billes, un état reçu) : une écriture par mégarde
+// lèverait (modules ES, donc mode strict) au lieu de fausser les vérifications
+// suivantes, et prouverait qu'un réducteur ou la prévision n'est pas pur.
+export function deepFreeze(value) {
   if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
     Object.freeze(value);
     for (const inner of Object.values(value)) deepFreeze(inner);
@@ -318,6 +319,15 @@ export const FIXTURE_STATUSES = deepFreeze({
   // À chaque statut reçu : Vitesse +1 ; toute la partie, unique (jamais à sa propre
   // réception).
   received_react: { stacking: "unique", duration: { kind: "game" }, behaviors: [{ type: "reaction", on: "statusesReceived", effect: [speed(1)] }] },
+  // Impact ×2, une charge, en durée : une charge qui ne change rien ne se consomme pas.
+  impact_charge: { stacking: "duration", duration: { kind: "charges", count: 1 }, behaviors: [{ type: "modifier", point: "impact", operation: "multiply", value: 2 }] },
+  // À chaque bille piochée, usée, perdue : Vitesse +1 ; toute la partie, unique. Pour
+  // l'ordre des réactions.
+  draw_react: { stacking: "unique", duration: { kind: "game" }, behaviors: [{ type: "reaction", on: "drawnMarbles", effect: [speed(1)] }] },
+  worn_react: { stacking: "unique", duration: { kind: "game" }, behaviors: [{ type: "reaction", on: "wornMarbles", effect: [speed(1)] }] },
+  lost_react: { stacking: "unique", duration: { kind: "game" }, behaviors: [{ type: "reaction", on: "lostMarbles", effect: [speed(1)] }] },
+  // Éjecte la pointe à chaque bille lancée ; toute la partie, unique.
+  throw_eject: { stacking: "unique", duration: { kind: "game" }, behaviors: [{ type: "reaction", on: "thrownMarbles", effect: [{ action: "eject", target: "apex" }] }] },
   // À chaque bille lancée : Masse +1 ; toute la partie, unique.
   throw_react: { stacking: "unique", duration: { kind: "game" }, behaviors: [{ type: "reaction", on: "thrownMarbles", effect: [mass(1)] }] },
 });

@@ -45,8 +45,7 @@
 // se répondraient sans fin. Un compteur ajouté d'une catégorie écoutable l'est par
 // construction.
 
-import { MARBLE_SIZES } from "../config/values.js";
-import { effectAt } from "./effects.js";
+import { effectAt, isMarbleSize } from "./effects.js";
 import { rejectUnknownFields } from "../../lib/validate.js";
 
 export const TALLY_CATEGORIES = ["trigger", "action", "stat", "event"];
@@ -125,7 +124,7 @@ const EVENT_FILTERS = {
   size: {
     fields: ["type", "size"],
     validate(filter, describe, fail) {
-      if (!Number.isInteger(filter.size) || !Object.hasOwn(MARBLE_SIZES, filter.size)) fail(`${describe} : calibre inconnu "${filter.size}".`);
+      if (!isMarbleSize(filter.size)) fail(`${describe} : calibre inconnu "${filter.size}".`);
     },
     test: (filter, event, types) => types[event.marble].size === filter.size,
   },

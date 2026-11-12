@@ -7,7 +7,8 @@
 
 import { auditNonSerializable, throws } from "../../lib/check.js";
 import { SLOTS, createMarblesGame, impactOf, legalActions, nextSlot, previousSlot, swapRefusal, placeRefusal, throwRefusal, throwsLeft } from "../core/marbles.js";
-import { JOURNAL_EVENTS, buildMarbleKeywords, validateMarblePhases, validateMarbleTriggers, validateMarbleTypes } from "../core/content.js";
+import { JOURNAL_EVENTS, buildMarbleKeywords, validateMarblePhases, validateMarbleTriggers } from "../core/content.js";
+import { validateMarbleTypes } from "../core/validation.js";
 import { MARBLE_PHASES, MARBLE_POCKET, MARBLE_TRIGGERS } from "../config/values.js";
 import { CLAUSE_ACTIONS, amountOf, printedStat } from "../core/effects.js";
 import { LARGE, MARBLE_SIZES, MARBLES_SETTINGS, MEDIUM, SMALL } from "../config/values.js";
@@ -827,7 +828,7 @@ function checkWearActions(run) {
 
   // Polissage : jamais sous 0.
   const floor = resolveOf(playState({ bag: ["plain"], triangle: triangleOf(placed("polisher"), null, placed("plain", 1)) }));
-  run.same("Polissage : jamais sous 0, 1 point réellement rendu", { slot: "apex", marble: "plain", amount: 2, applied: 1, wear: 0, maxWear: 3 }, (({ type, ...rest }) => rest)(find(floor, "polished")));
+  run.same("Polissage : jamais sous 0, 1 point réellement rendu", { slot: "apex", marble: "plain", amount: 2, applied: 1, wear: 0, maxWear: 3, retires: false }, (({ type, ...rest }) => rest)(find(floor, "polished")));
 
   // Une bille à son maximum, polie avant l'étape des retraits, n'est plus retirée.
   const saved = resolveOf(playState({ bag: ["plain"], triangle: triangleOf(placed("plain", 2), null, placed("savior")) }));

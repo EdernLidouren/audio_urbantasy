@@ -4,10 +4,9 @@
 // en attente (describeChoicePrompt). Pur. Point d'entrée et vue d'ensemble :
 // marbles/view/narration.js.
 
-import { nameRef } from "../../../data/i18n/index.js";
 import { MARBLE_POCKET, MARBLE_TRIGGERS } from "../../config/values.js";
 import { FIRST_IN_HAND, isOptionalChoice } from "../../core/effects.js";
-import { choiceTarget, combined, describeEffect, formatCounter, marbleName, outcomeLine, slotName, statusName, valueParts } from "./effects.js";
+import { choiceTarget, combined, describeEffect, effectMoment, formatCounter, marbleName, marbleRef, outcomeLine, slotName, statusName, valueParts } from "./effects.js";
 import { statusLabel } from "./statuses.js";
 
 // Le sens de la rotation du moteur (marbles/core/effects.js/nextSlot) : horaire (base
@@ -24,19 +23,24 @@ const EFFECT_TEMPLATES = Object.fromEntries([
   ...MARBLE_POCKET.moments.map((moment) => [moment.trigger, moment.texts.effect]),
 ]);
 
+// L'effet JOUÉ que porte un évènement `effect`, tel que describeEffect le dit.
+function playedEffect(event) {
+  return { speed: event.speedDelta, mass: event.massDelta, draw: event.draw, operations: event.operations, given: event.given };
+}
+
 function effectText(event, t) {
   // La réaction d'un statut, dite avec son nom : « Ferveur : Vitesse +2. ».
   if (event.trigger === "statusReaction") {
-    return t("marbles.event.effect_status", { status: statusName(event.status, t), effect: describeEffect({ speed: event.speedDelta, mass: event.massDelta, draw: event.draw, operations: event.operations, given: event.given }, t) });
+    return t("marbles.event.effect_status", { status: statusName(event.status, t), effect: describeEffect(playedEffect(event), t) });
   }
   if (event.trigger === "phase") {
-    return outcomeLine(event.slot, { marble: event.marble, speed: event.speedDelta, mass: event.massDelta, draw: event.draw, operations: event.operations, given: event.given }, t);
+    return outcomeLine(event.slot, { marble: event.marble, ...playedEffect(event) }, t);
   }
   const template = EFFECT_TEMPLATES[event.trigger];
   if (!template) throw new Error(`marbles : effet sans gabarit pour le déclencheur "${event.trigger}".`);
   return t(template, {
-    marble: nameRef(`marble.${event.marble}.name`),
-    effect: describeEffect({ speed: event.speedDelta, mass: event.massDelta, draw: event.draw, operations: event.operations, given: event.given }, t),
+    marble: marbleRef(event.marble),
+    effect: describeEffect(playedEffect(event), t),
     speed: formatCounter(event.speed),
     mass: formatCounter(event.mass),
   });
@@ -82,22 +86,22 @@ const EVENT_TEXTS = {
   // L'évènement d'un déclencheur se dit par son effet, s'il en a un.
   ...Object.fromEntries(MARBLE_TRIGGERS.map((trigger) => [trigger.event, SILENT])),
   // Le départ d'une bille usée se dit ; les autres départs, par leur arrivée.
-  removed: (event, t) => (event.cause === "wear" ? t("marbles.event.removed.wear", { marble: nameRef(`marble.${event.marble}.name`) }) : null),
+  removed: (event, t) => (event.cause === "wear" ? t("marbles.event.removed.wear", { marble: marbleRef(event.marble) }) : null),
   redirected: SILENT,
   phase: SILENT,
   wear: SILENT,
   turnEnded: SILENT,
   // Polissage, Fêlure : la bille qui les reçoit, et son usure d'après.
-  polished: (event, t) => t("marbles.event.polished", { marble: nameRef(`marble.${event.marble}.name`), wear: event.wear, maxWear: event.maxWear }),
-  cracked: (event, t) => t("marbles.event.cracked", { marble: nameRef(`marble.${event.marble}.name`), wear: event.wear, maxWear: event.maxWear }),
+  polished: (event, t) => t("marbles.event.polished", { marble: marbleRef(event.marble), wear: event.wear, maxWear: event.maxWear }),
+  cracked: (event, t) => t("marbles.event.cracked", { marble: marbleRef(event.marble), wear: event.wear, maxWear: event.maxWear }),
   // Une cible vide : un emplacement, la main (la première bille de la main), le sac
   // (ses prochaines billes), ou la bille elle-même qui n'est plus là.
   targetEmpty: (event, t) => {
     if (event.target === FIRST_IN_HAND) return t("marbles.event.target_empty_hand");
     if (event.target === "choice") return t("marbles.event.target_empty_choice");
     if (event.target === "all") return t("marbles.event.target_empty_all");
-    if (event.target === "self" && event.action === "eject") return t("marbles.event.target_empty_self_eject", { marble: nameRef(`marble.${event.marble}.name`) });
-    if (event.target === "self") return t("marbles.event.target_empty_self", { marble: nameRef(`marble.${event.marble}.name`) });
+    if (event.target === "self" && event.action === "eject") return t("marbles.event.target_empty_self_eject", { marble: marbleRef(event.marble) });
+    if (event.target === "self") return t("marbles.event.target_empty_self", { marble: marbleRef(event.marble) });
     if (event.target === "bag") return t("marbles.event.target_empty_bag");
     if (event.target === "lastDiscarded") return t("marbles.event.target_empty_discard");
     if (event.target === "handFull") return t("marbles.event.target_empty_hand_full");
@@ -106,8 +110,8 @@ const EVENT_TEXTS = {
   },
   // La mise en poche et la perte, dites avec la bille ; une bille piochée à
   // l'aveugle n'apparaît que dans la prévision, qui ne passe jamais par ici.
-  pocketed: (event, t) => t("marbles.event.pocketed", { marble: nameRef(`marble.${event.marble}.name`) }),
-  lost: (event, t) => t("marbles.event.lost", { marble: nameRef(`marble.${event.marble}.name`) }),
+  pocketed: (event, t) => t("marbles.event.pocketed", { marble: marbleRef(event.marble) }),
+  lost: (event, t) => t("marbles.event.lost", { marble: marbleRef(event.marble) }),
   // L'étape du pot et une réaction se disent par l'effet de la bille, si elle en a
   // un (« Pot, tigrée : Vitesse +2. »).
   potResolution: SILENT,
@@ -121,7 +125,7 @@ const EVENT_TEXTS = {
   chosen: (event, t) =>
     event.zone === "triangle" && event.marble === null
       ? t("marbles.choice.chosen_slot", { slot: slotName(event.slot, t) })
-      : t("marbles.choice.chosen", { marble: nameRef(`marble.${event.marble}.name`) }),
+      : t("marbles.choice.chosen", { marble: marbleRef(event.marble) }),
   // Rien de choisi dans un choix facultatif : l'action est ignorée, cela se dit.
   choiceEnded: (event, t) => (event.reason === "count" ? null : t(`marbles.choice.ended.${event.reason}`)),
   choiceUndecided: SILENT,
@@ -129,15 +133,15 @@ const EVENT_TEXTS = {
   // départ (isTrailing).
   // Une bille renvoyée vers une main pleine : dite, quelle que soit sa cause.
   discarded: (event, t) => {
-    const marble = nameRef(`marble.${event.marble}.name`);
+    const marble = marbleRef(event.marble);
     if (event.handFull === true) return t("marbles.event.discarded.hand_full", { marble });
     return event.cause === "eject" || event.cause === "wear" ? null : t(`marbles.event.discarded.${event.cause}`, { marble });
   },
   // Une bille arrivée en main : selon l'action qui l'y a envoyée.
-  returned: (event, t) => t(`marbles.event.returned.${event.movedBy}`, { marble: nameRef(`marble.${event.marble}.name`) }),
+  returned: (event, t) => t(`marbles.event.returned.${event.movedBy}`, { marble: marbleRef(event.marble) }),
   // Éjecter : la bille qui éjecte, et celle qu'elle chasse ; son Éjection se dit
   // ensuite par son effet.
-  eject: (event, t) => t("marbles.event.eject", { source: nameRef(`marble.${event.by.marble}.name`), marble: nameRef(`marble.${event.marble}.name`) }),
+  eject: (event, t) => t("marbles.event.eject", { source: marbleRef(event.by.marble), marble: marbleRef(event.marble) }),
   placed: (event, t) => t("marbles.event.placed", { marble: marbleName(event.marble, t), slot: slotName(event.slot, t) }),
   phaseSkipped: (event, t) => outcomeLine(event.slot, null, t),
   effect: effectText,
@@ -164,19 +168,18 @@ const EVENT_TEXTS = {
 // (`by`, marbles/core/content.js, en-tête), comme ses effets se disent : « Tic de gorille : », « base
 // gauche, tigrée : », « Entrée au pot de porcelaine : », « Pot, mica : ». Le Tic a
 // sa propre clé : son effet anglais se dit « Hit from gorilla », pas « of ».
-const POCKET_ENTRY_TRIGGERS = new Set(MARBLE_POCKET.moments.filter((moment) => moment.event === "pocketed").map((moment) => moment.trigger));
-const POCKET_TRIGGERS = new Set(MARBLE_POCKET.moments.map((moment) => moment.trigger));
-const TRIGGER_NAMES = Object.fromEntries(MARBLE_TRIGGERS.map((trigger) => [trigger.id, trigger.texts.name]));
+const CHOICE_BY = {
+  status: "marbles.choice.by_status",
+  phase: "marbles.choice.by_phase",
+  potEntry: "marbles.choice.by_pot_entry",
+  pot: "marbles.choice.by_pot",
+  hit: "marbles.choice.by_hit",
+  trigger: "marbles.choice.by_trigger",
+};
 
-function choiceByPrefix({ trigger, slot, marble, status }, question, t) {
-  // Un choix ouvert par la réaction d'un statut : « Ferveur : … ».
-  if (status !== undefined) return t("marbles.choice.by_status", { status: statusName(status, t), question });
-  const ref = nameRef(`marble.${marble}.name`);
-  if (trigger === "phase") return t("marbles.choice.by_phase", { slot: slotName(slot, t), marble: ref, question });
-  if (POCKET_ENTRY_TRIGGERS.has(trigger)) return t("marbles.choice.by_pot_entry", { marble: ref, question });
-  if (POCKET_TRIGGERS.has(trigger)) return t("marbles.choice.by_pot", { marble: ref, question });
-  if (trigger === "hit") return t("marbles.choice.by_hit", { marble: ref, question });
-  return t("marbles.choice.by_trigger", { moment: t(TRIGGER_NAMES[trigger]), marble: ref, question });
+function choiceByPrefix(by, question, t) {
+  const { kind, params } = effectMoment(by, t);
+  return t(CHOICE_BY[kind], { ...params, question });
 }
 
 // La question d'un CHOIX EN ATTENTE (marbles/core/marbles.js, `pendingChoice`), à
@@ -228,13 +231,16 @@ function endsBeforeNextTurn(events, index) {
 // - le début de tour se dit APRÈS sa pioche, à la fin du journal reçu : « Début du
 //   tour 3, jouez vos billes. » vient quand le joueur a sa main. Une fin de partie
 //   avant lui le remplace.
+// - une pioche du tour qu'un choix suspend (un Éveil à choix : le journal finit sur
+//   `choice`) ne dit pas encore le début du tour : il se dit à la fin de sa reprise,
+//   `carriedTurn` (le tour), quand le joueur a vraiment sa main.
 // Un nouvel évènement qui se dit (un effet d'un nouveau déclencheur) devient ainsi une
 // étape à sa place, sans autre changement. Un type inconnu lève : c'est une faute de
 // programmation, qu'une partie de fumée (domaine marbles-view) trouve avant le joueur.
-export function buildSteps(events, t) {
+export function buildSteps(events, t, { carriedTurn } = {}) {
   const steps = [];
   let waiting = [];
-  let turnStart = null;
+  let turnStart = carriedTurn === undefined ? null : { text: t("marbles.event.turn_started", { turn: carriedTurn }), turn: carriedTurn };
 
   const open = (text, event) => {
     const step = { text, events: [...waiting, event] };
@@ -276,7 +282,9 @@ export function buildSteps(events, t) {
     else open(spoken, event);
   });
 
-  if (turnStart !== null) steps.push({ text: turnStart.text, events: waiting, startsTurn: turnStart.turn });
+  // Suspendu sur un choix : le début du tour attend la reprise.
+  const suspended = events.at(-1)?.type === "choice";
+  if (turnStart !== null && !suspended) steps.push({ text: turnStart.text, events: waiting, startsTurn: turnStart.turn });
   else if (waiting.length > 0 && steps.length > 0) steps[steps.length - 1].events.push(...waiting);
   else if (waiting.length > 0) steps.push({ text: "", events: waiting });
 

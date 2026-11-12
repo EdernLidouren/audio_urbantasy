@@ -4,8 +4,9 @@
 // pas diverger du moteur.
 //
 // Garde-fous :
-// - À L'AVEUGLE : la copie (marbles/core/run.js/blindCopy) ne connaît du sac et de la
-//   défausse que leur nombre de billes, et n'a pas le hasard de la partie ; le
+// - À L'AVEUGLE : la copie (blindCopy, plus bas) ne connaît du sac que son nombre de
+//   billes (la défausse, que le joueur connaît, reste telle quelle ; un mélange à
+//   l'aveugle la cache), et n'a pas le hasard de la partie ; le
 //   déroulé est aveugle (options.blind). Une pioche y a lieu, avec ses arrêts
 //   (main pleine, plus de billes), mais sa bille est inconnue ; une régénération
 //   s'annonce sans mélange. Rien n'est révélé, rien n'avance le hasard réel ;
@@ -36,7 +37,7 @@
 // les choix suivants restant indécis. Ce que le joueur a vu piocher depuis le début
 // de l'action y redevient inconnu : un rejeu qui en dépendrait diverge, et le choix
 // concerné reste indécis. Une réponse s'y repère par sa cible ET sa bille
-// (marbles/core/run.js/answerOf) : si le rejeu a mis une autre bille connue à cette place
+// (marbles/core/choices.js/answerOf) : si le rejeu a mis une autre bille connue à cette place
 // (un Éveil inconnu n'y a pas empoché la première de la main, par exemple), le
 // choix reste indécis plutôt que de prévoir une autre bille.
 //
@@ -91,7 +92,8 @@
 //   choiceDependent vrai si un choix du joueur est resté indécis (plus haut) ;
 //   awakenPossible vrai si un Éveil est possible (voir plus haut) ; une des
 //                  raisons d'`uncertain`.
-// Un effet : { marble, speed, mass, draw, operations, given, pockets?, empty? }, le
+// Un effet : { marble, status?, speed, mass, draw, operations, given, pockets?, empty?,
+// undecided?, ejected?, discards? } (`status` : la réaction d'un statut, sans bille), le
 // total effectif de la bille, bonus reçu compris, et ses actions sur une bille
 // (Polissage, Fêlure, Empocher). `pockets` (seulement s'il y en a) : ce que ses
 // Empocher ont déplacé, dans l'ordre, chacun { marble, lost, entry } : la bille (null
@@ -108,7 +110,19 @@
 
 import { MARBLE_POCKET, MARBLE_TRIGGERS } from "../config/values.js";
 import { SLOTS, marblesReduce, replayAction, runResolution, stageRefusal } from "./marbles.js";
-import { UNKNOWN_MARBLE, answerOf, blindCopy, chooseRefusal } from "./run.js";
+import { UNKNOWN_MARBLE } from "./effects.js";
+import { answerOf, chooseRefusal } from "./choices.js";
+
+// Une copie À L'AVEUGLE d'un état, celle de la prévision : le sac n'y garde que son
+// nombre de billes, jamais leur identité ni leur ordre, et le hasard de la partie
+// en est retiré (null : un tirage y échouerait). La défausse, que le joueur connaît
+// dans l'ordre d'arrivée, reste telle quelle (Ramasser la lit) ; un mélange à
+// l'aveugle la cache (regenerateBag). Un déroulé à
+// l'aveugle (options.blind) n'en a jamais besoin.
+function blindCopy(state) {
+  const hidden = (list) => list.map(() => UNKNOWN_MARBLE);
+  return { ...structuredClone(state), bag: hidden(state.bag), rngState: null };
+}
 
 // Les déclencheurs prévus pendant une pose (marbles/config/values.js) : chacun a sa
 // clé dans le résultat, son effet ou null.
@@ -170,7 +184,7 @@ function awakenPossible(state, events, types) {
 //             depuis le triangle se dit sur son emplacement (retirée, puis sa Chute).
 const RESULT_EVENTS = new Set(["pocketed", "lost", "targetEmpty", "choiceUndecided", "eject", "discarded"]);
 
-// Les arrivées d'une bille au bout de son trajet (marbles/core/run.js/travel).
+// Les arrivées d'une bille au bout de son trajet (marbles/core/path.js/travel).
 const ARRIVALS = new Set(["discarded", "pocketed", "lost"]);
 
 // L'effet de l'Éjection provoquée par l'évènement `eject` à `index`, ou null : le
@@ -400,7 +414,6 @@ function forecastAnswer(state, action, types, statuses) {
   const copy = blindCopy(from);
   const isResolution = suspended.type === "resolve";
   const applied = isResolution ? { ok: true, state: copy, events: [], uncertain: false } : replayAction(copy, suspended, types, options);
-  if (!isResolution && applied.state.stage !== "play") return failed(stageRefusal(applied.state, "play") ?? "mustDraw");
   const resolved = isResolution ? replayAction(copy, suspended, types, options) : runResolution(applied.state, types, { blind: true, statuses });
   const awakening = awakenPossible(from, [...applied.events, ...resolved.events], types);
   const uncertain = applied.uncertain || resolved.uncertain || awakening;

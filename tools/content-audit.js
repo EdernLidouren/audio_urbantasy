@@ -74,7 +74,7 @@ import { WEATHER_STATES } from "../config/weather-values.js";
 import { PERCEPTION_MUSIC_POOL, PERCEPTION_AMBIENCE_POOL } from "../config/perception.js";
 import { SHOP_CATALOGS, DISPLAY_ARTICLES } from "../config/shop-values.js";
 import { MARBLE_SIZES, MARBLE_SOUND_PROFILES, MARBLES_AUDIO } from "../marbles/config/values.js";
-import { validateMarblesContent } from "../marbles/core/content.js";
+import { validateMarblesContent } from "../marbles/core/validation.js";
 import { LOCALE_TABLES } from "../data/i18n/index.js";
 import { configureAssetManifest, hasAsset } from "../lib/assets.js";
 import { bindingTableIds, bindingTable, needsKeyName, keyNameKey } from "../lib/input.js";

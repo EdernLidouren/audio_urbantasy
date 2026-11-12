@@ -5,7 +5,7 @@
 //
 // Le core ne l'importe JAMAIS (CLAUDE.md) : les règles le reçoivent avec la table des
 // billes (marbles/core/rules.js/createMarblesRules). Validé au démarrage
-// (marbles/core/content.js/validateMarblesContent, appelé par main.js et par l'audit
+// (marbles/core/validation.js/validateMarblesContent, appelé par main.js et par l'audit
 // du contenu).
 //
 // Un statut (le modèle complet : en-tête de marbles/core/statuses.js) :

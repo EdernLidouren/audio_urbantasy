@@ -89,8 +89,8 @@ import { EMPTY_SOUND_QUEUE, advanceSoundQueue, enqueueCues } from "../view/sound
 import { throws } from "../../lib/check.js";
 import { CHOICELESS_TYPES, FIXTURE_STATUSES, FIXTURE_TYPES, fixtureRules } from "./fixtures/marbles.js";
 import { choice, draw, polish, speed } from "../content/effects.js";
-import { answerChoices, emptyBagMarblesGame, fabricatedRules, inHand, isCleanText, keyText, marblesPlayState, mustReduce } from "./helpers.js";
-import { choiceAnswer, choiceCursorAfterAnswer, choiceFocusLine, choiceHandOptions, choiceMarbleAt, choiceStartCursor, stepChoiceCursor } from "../view/choice.js";
+import { answerChoices, emptyBagMarblesGame, fabricatedRules, inHand, isCleanText, keyText, marblesPlayState, mustReduce, statusInstance } from "./helpers.js";
+import { choiceAnswer, choiceCursorAfterAnswer, choiceFocusLine, choiceHandOptions, choiceListEntry, choiceStartCursor, stepChoiceCursor } from "../view/choice.js";
 import { MARBLES_HELP_TOPICS, helpTopicText, marblesHelpMenu } from "../view/help-screen.js";
 import { AMOUNT_SOURCES, CLAUSE_ACTIONS, effectAt } from "../core/effects.js";
 
@@ -209,8 +209,7 @@ function sampleEvents() {
       apex: [{ action: "speed", amount: 3 }],
     },
   });
-  const pending = (status, remaining, waiting) => ({ status, holder: "game", intensity: 1, remaining, pending: waiting, origin: null });
-  let statusState = { ...emptyBagMarblesGame(statusRules, 9), turn: 2, stage: "play", hand: inHand(["aging_flick", "aging_flick"]), statuses: [pending("flick_react", 1, false), pending("throws_next", 1, true)] };
+  let statusState = { ...emptyBagMarblesGame(statusRules, 9), turn: 2, stage: "play", hand: inHand(["aging_flick", "aging_flick"]), statuses: [statusInstance("flick_react"), statusInstance("throws_next", { pending: true })] };
   for (const action of [{ type: "place", handIndex: 0, slot: "rightBase" }, { type: "place", handIndex: 0, slot: "leftBase" }, { type: "resolve" }, { type: "draw" }]) {
     const result = statusRules.reduce(statusState, action);
     statusState = result.state;
@@ -663,7 +662,8 @@ function checkHelpMenu(run) {
 }
 
 // L'INTERFACE DE CHOIX (marbles/view/choice.js) et ses textes : la main limitée aux
-// billes éligibles (Terminer en dernier en mode « jusqu'à N »), le triangle entier
+// billes éligibles (« Ne rien choisir », puis « Terminer », en dernier dans un choix
+// facultatif), le triangle entier
 // avec ses emplacements non éligibles dits et bloqués, la navigation entre zones,
 // la question, ce qui reste, les cibles choisies.
 function checkChoiceInterface(run) {
@@ -698,7 +698,7 @@ function checkChoiceInterface(run) {
   run("choix, main : la position dans le menu du choix", "list.line{name: <final_pocket>, size: size.medium.name, maxWear: 3}. menu.position{index: 2, total: 2}", choiceFocusLine(hitPocket, cursor("hand", 1), rules, t));
   run("choix, main seule : pas de triangle", null, stepChoiceCursor(handOnly, cursor("hand"), "up"));
   run.same("choix, main : Entrée répond par la place dans la main", { type: "choose", target: { zone: "hand", index: 1 } }, choiceAnswer(handOnly, cursor("hand", 1)).action);
-  run.same("choix, main : la fiche de la bille sous le curseur", "final_pocket", choiceMarbleAt(hitPocket, cursor("hand", 1)).marble);
+  run.same("choix, main : la fiche de la bille sous le curseur", "final_pocket", choiceListEntry(hitPocket, choiceHandOptions(hitPocket.pendingChoice)[1]).marble);
 
   // Le triangle seul, « jusqu'à 2 » : la question, Terminer, les non éligibles.
   const upTo = pending("upToPolish", { leftBase: { marble: "plain", wear: 1 }, rightBase: null, apex: { marble: "plain", wear: 0 } });
@@ -767,7 +767,7 @@ function checkChoiceInterface(run) {
   run.same("défausse : le curseur s'y ouvre", { place: "hand", handIndex: 0 }, (({ place, handIndex }) => ({ place, handIndex }))(choiceStartCursor(fromDiscard, cursor("apex"))));
   run("défausse : la position dans le menu", "list.line{name: <booster>, size: size.medium.name, maxWear: 3}. menu.position{index: 2, total: 3}", choiceFocusLine(picking, cursor("hand", 1), made, t));
   run.same("défausse : Entrée répond par la place dans la défausse", { type: "choose", target: { zone: "discard", index: 1 } }, choiceAnswer(fromDiscard, cursor("hand", 1)).action);
-  run.same("défausse : la fiche de la bille sous le curseur", { marble: "booster", turnsInHand: 0 }, choiceMarbleAt(picking, cursor("hand", 1)));
+  run.same("défausse : la fiche de la bille sous le curseur", { marble: "booster", turnsInHand: 0 }, (({ marble, turnsInHand }) => ({ marble, turnsInHand }))(choiceListEntry(picking, choiceHandOptions(picking.pendingChoice)[1])));
   run("défausse seule : pas de triangle", null, stepChoiceCursor(fromDiscard, cursor("hand"), "up"));
 
   // Obligatoire, 2 : la question, puis ce qui reste.
@@ -800,15 +800,15 @@ function checkChoiceInterface(run) {
   run("choix, deux zones, main sans option : après une réponse, le curseur la quitte", "apex", choiceCursorAfterAnswer(triangleLeft, cursor("hand")).place);
   run("choix, deux zones, après une réponse : le curseur reste là où il a des options", "hand", choiceCursorAfterAnswer(both.pendingChoice, cursor("hand")).place);
 
-  // « Terminer » en fin de menu de la main, en mode « jusqu'à N ».
+  // « Ne rien choisir » en fin de menu de la main, dans un choix facultatif.
   const upToHand = { ...handOnly, mode: "optional" };
-  run.same("choix, main, jusqu'à N : Terminer en dernier", ["marble", "marble", "finish"], choiceHandOptions(upToHand).map((option) => option.kind));
+  run.same("choix, main, facultatif : Ne rien choisir en dernier", ["marble", "marble", "finish"], choiceHandOptions(upToHand).map((option) => option.kind));
   run("choix, main, facultatif : rien de choisi, « Ne rien choisir »", "choice.decline. menu.position{index: 3, total: 3}", choiceFocusLine({ ...hitPocket, pendingChoice: upToHand }, cursor("hand", 2), rules, t));
   const oneChosen = { ...upToHand, chosen: [upToHand.eligible[0]], eligible: upToHand.eligible.slice(1) };
   run("choix, main, facultatif : une cible choisie, « Terminer »", "choice.finish. menu.position{index: 2, total: 2}", choiceFocusLine({ ...hitPocket, pendingChoice: oneChosen }, cursor("hand", 1), rules, t));
   run.same("choix, main, obligatoire : ni « Ne rien choisir » ni « Terminer »", ["marble", "marble"], choiceHandOptions(handOnly).map((option) => option.kind));
-  run.same("choix, main, jusqu'à N : Terminer répond", { type: "choose", done: true }, choiceAnswer(upToHand, cursor("hand", 2)).action);
-  run("choix, Terminer : aucune fiche", null, choiceMarbleAt({ ...hitPocket, pendingChoice: upToHand }, cursor("hand", 2)));
+  run.same("choix, main, facultatif : Ne rien choisir répond", { type: "choose", done: true }, choiceAnswer(upToHand, cursor("hand", 2)).action);
+  run("choix, Terminer : aucune fiche", null, choiceListEntry({ ...hitPocket, pendingChoice: upToHand }, choiceHandOptions(upToHand)[2]));
 
   // Les cibles choisies se disent, accord compris ; la fin, quand elle n'est pas d'avoir
   // fait les N choix ; rien à choisir.
@@ -828,9 +828,9 @@ function checkChoiceInterface(run) {
 // La touche P : le pot et les billes perdues, accords compris.
 function checkPotStatus(run) {
   const game = (pot, lost) => ({ ...rules.createGame(1), pot, lost });
-  run("touche P : vide", "status.pot{count: 0, capacity: 3, lost: 0}", describePot(game([], []), t, rules));
-  run("touche P : une de chaque", "status.pot{count: 1, capacity: 3, lost: 1}", describePot(game(["aging_flick"], ["hit_polish"]), t, rules));
-  run("touche P : pluriels", "status.pot{count: 3, capacity: 3, lost: 2}", describePot(game(["aging_flick", "hit_polish", "final_pocket"], ["awaken_draw", "all_rounder"]), t, rules));
+  run("touche P : vide", "state.pot{count: 0, capacity: 3, lost: 0}", describePot(game([], []), rules, t));
+  run("touche P : une de chaque", "state.pot{count: 1, capacity: 3, lost: 1}", describePot(game(["aging_flick"], ["hit_polish"]), rules, t));
+  run("touche P : pluriels", "state.pot{count: 3, capacity: 3, lost: 2}", describePot(game(["aging_flick", "hit_polish", "final_pocket"], ["awaken_draw", "all_rounder"]), rules, t));
   run("Maj+P : le titre du menu", "pile.pot", t("marbles.pile.pot"));
 }
 
@@ -865,7 +865,7 @@ function checkBagOrder(run) {
     Object.freeze(state.bag);
     Object.freeze(state.discard);
     bagDisplayOrder(state.bag, t);
-    describeBag(state, t);
+    describeBag(state, rules, t);
     describeDiscard(state, t);
     for (const marble of [...state.bag, ...state.discard]) marbleCard(marble, "x", rules, t);
   });
@@ -981,6 +981,26 @@ function checkSounds(run) {
         ? `roll ${cue.marble} ${cue.path.map(placeName).join(">")} @${cue.atMs}+${Math.round(cue.durationMs)}`
         : `${cue.sound} ${cue.marble}${cue.struck ? `>${cue.struck}` : ""} ${placeName(cue.place)} @${Math.round(cue.atMs)}${cue.gain === undefined ? "" : ` x${cue.gain}`}`
     );
+  // Une Éjecter à la Chiquenaude, posée sur un emplacement vide : la chassée roule à la
+  // défausse, une seule fois ; la posée se pose, sans choc.
+  const ejectingFlick = [
+    { type: "flick", slot: "leftBase", marble: "flick_strike", turnsInHand: 0 },
+    { type: "eject", slot: "apex", marble: "aging_flick", by: { trigger: "flick", slot: "leftBase", marble: "flick_strike" } },
+    { type: "removed", slot: "apex", marble: "aging_flick", cause: "eject" },
+    { type: "knockout", slot: "apex", marble: "aging_flick", replacement: { placed: "flick_strike", ejected: "aging_flick" }, by: { trigger: "flick", slot: "leftBase", marble: "flick_strike" } },
+    { type: "discarded", marble: "aging_flick", from: "triangle", slot: "apex", cause: "eject" },
+    { type: "placed", slot: "leftBase", marble: "flick_strike" },
+  ];
+  const ejectCues = eventCues(ejectingFlick, { placeFrom: handPlace(0, 1) }, settings, motion);
+  run.same(
+    "repères : Éjecter hors d'une pose, une seule sortie de la chassée, une pose sans choc",
+    { outs: 1, collisions: 0, placedDrop: true },
+    {
+      outs: ejectCues.filter((cue) => cue.sound === "roll" && cue.marble === "aging_flick").length,
+      collisions: ejectCues.filter((cue) => cue.sound === "collision").length,
+      placedDrop: ejectCues.some((cue) => cue.sound === "drop" && cue.marble === "flick_strike"),
+    }
+  );
   run.same(
     "repères : une pose, la bille roule de la main à l'emplacement, puis y tombe",
     ["roll final_pocket hand>apex @0+1000", "drop final_pocket apex @1000"],
@@ -1152,7 +1172,9 @@ function checkSounds(run) {
   // Les sons d'usure : à l'emplacement de la bille touchée, seulement quand l'usure
   // change ou que la Fêlure retire la bille ; plusieurs, l'un après l'autre ; la
   // bille retirée par une Fêlure part après le son de sa fêlure.
-  const wearEvent = (type, slot, marble, applied, wear, maxWear = 3) => ({ type, slot, marble, amount: 1, applied, wear, maxWear });
+  // Un évènement d'usure tel que le core l'émet : une Fêlure qui amène la bille à son
+  // maximum la retire (`retires`).
+  const wearEvent = (type, slot, marble, applied, wear, maxWear = 3) => ({ type, slot, marble, amount: 1, applied, wear, maxWear, retires: type === "cracked" && wear >= maxWear });
   run.same(
     "usure : le Polissage, à l'emplacement de la bille polie",
     [{ atMs: 0, sound: "polish", marble: "aging_flick", place: slotPlace("leftBase") }],
@@ -1356,7 +1378,7 @@ export default function checkMarblesView(run) {
 // clause qui les donne, le journal (renforcé, déjà là, une charge, la fin, une
 // réaction), la question d'un choix ouvert par un statut, la confirmation et R.
 function checkStatusNarration(run) {
-  const instance = (status, over = {}) => ({ status, holder: "game", intensity: 1, remaining: 1, pending: false, origin: null, ...over });
+  const instance = statusInstance;
   // Ce qui reste, selon la sorte de durée.
   run.same(
     "reste : ce tour, 3 tours, en attente, en attente sur 2 tours, toute la partie, 1 charge",
@@ -1474,7 +1496,11 @@ function checkStatusNarration(run) {
     true,
     texts.includes("event.status_strengthened{status: statuses.label_intensity{status: status.loss_cushion.name, duration: statuses.duration.turns{count: 3}, intensity: 3}}")
   );
-  run("journal : un statut reçu ne se dit pas à part, l'effet le dit", false, texts.some((text) => text.includes("status_gained")));
+  run.same(
+    "journal : un statut reçu ne se dit pas à part, l'effet le dit",
+    [],
+    buildSteps([{ type: "statusGained", status: "loss_cushion", intensity: 1, remaining: 3, pending: false, kind: "turns", stacking: "intensity", by: { trigger: "flick", slot: "apex", marble: "giver" } }], t).flatMap((step) => step.messages)
+  );
   run.same(
     "journal : déjà là, une charge, la fin",
     ["event.status_unchanged{status: status.flick_react.name}", "event.status_charge{status: status.gain_charge.name}", "event.status_expired{status: status.gain_charge.name}"],
@@ -1581,11 +1607,11 @@ function checkLocales(run, { events, state }) {
 
       const emptyTriangle = { leftBase: null, rightBase: null, apex: null };
       const lines = [
-        describeTurn(state, true, realT, rules),
-        describeTurn(state, false, realT, rules),
-        describeBag(state, realT),
+        describeTurn(state, true, rules, realT),
+        describeTurn(state, false, rules, realT),
+        describeBag(state, rules, realT),
         describeDiscard(state, realT),
-        describeTurn({ ...state, speed: -3, mass: -1 }, true, realT, rules),
+        describeTurn({ ...state, speed: -3, mass: -1 }, true, rules, realT),
         stepsText(buildSteps([{ type: "impact", speed: -3, mass: -1, impact: 0, score: 0 }], realT)),
         describeHandFocus({ ...state, hand: inHand([]) }, 0, rules, realT),
         ...SLOTS.map((slot) => describeSlotFocus({ ...state, triangle: emptyTriangle }, slot, rules, realT)),
@@ -1677,16 +1703,20 @@ function checkSaid(run, { events, state }) {
     // Pendant une pose, la prévision reste.
     run("texte : pose, emplacement occupé", "slot_line.placing_occupied{slot: slot.apex, name: <hit_pocket>, effect: effect.combined{parts: [effect.speed_up{amount: 10}]}}", describeSlotForPlacement(lensed, "apex", rules, t));
     run("texte : pose, emplacement vide", "slot_line.placing_empty{slot: slot.rightBase}", describeSlotForPlacement(lensed, "rightBase", rules, t));
+    // Une bille que la prévision retire avant sa phase (base_pocket empoche la pointe) :
+    // dite retirée, sans planter.
+    const emptied = { ...state, triangle: { leftBase: { marble: "base_pocket", wear: 0 }, rightBase: null, apex: { marble: "aging_flick", wear: 0 } } };
+    run("texte : pose, bille retirée avant sa phase", "outcome.removed{slot: slot.apex, marble: <aging_flick>}", describeSlotForPlacement(emptied, "apex", rules, t));
 
     // S et D : les nombres et leurs accords.
     const counts = (bag, discard, drawPerTurn = 1) => ({ ...state, bag: Array(bag).fill("aging_flick"), discard: Array(discard).fill("aging_flick"), drawPerTurn });
-    run("texte : sac, pluriel", "status.bag{count: 8, draw: 1}", describeBag(counts(8, 0), t));
-    run("texte : sac, une bille", "status.bag{count: 1, draw: 1}", describeBag(counts(1, 0), t));
-    run("texte : sac vide", "status.bag{count: 0, draw: 1}", describeBag(counts(0, 0), t));
-    run("texte : sac, pioche en vigueur", "status.bag{count: 8, draw: 2}", describeBag(counts(8, 0, 2), t));
-    run("texte : défausse, pluriel", "status.discard{count: 3}", describeDiscard(counts(0, 3), t));
-    run("texte : défausse, une bille", "status.discard{count: 1}", describeDiscard(counts(0, 1), t));
-    run("texte : défausse vide", "status.discard{count: 0}", describeDiscard(counts(0, 0), t));
+    run("texte : sac, pluriel", "state.bag{count: 8, draw: 1}", describeBag(counts(8, 0), rules, t));
+    run("texte : sac, une bille", "state.bag{count: 1, draw: 1}", describeBag(counts(1, 0), rules, t));
+    run("texte : sac vide", "state.bag{count: 0, draw: 1}", describeBag(counts(0, 0), rules, t));
+    run("texte : sac, pioche en vigueur", "state.bag{count: 8, draw: 2}", describeBag(counts(8, 0, 2), rules, t));
+    run("texte : défausse, pluriel", "state.discard{count: 3}", describeDiscard(counts(0, 3), t));
+    run("texte : défausse, une bille", "state.discard{count: 1}", describeDiscard(counts(0, 1), t));
+    run("texte : défausse vide", "state.discard{count: 0}", describeDiscard(counts(0, 0), t));
 
     // Confirmation d'une pose : structure et texte exacts.
     const menuLines = (handIndex, slot) => placementLines(lensed, handIndex, slot, rules, t).map(({ key, params }) => t(key, params));
@@ -1771,8 +1801,8 @@ function checkSaid(run, { events, state }) {
     run.same("étapes : aucune étape silencieuse", [], buildSteps(events, t).filter((step) => step.text === ""));
     run(
       "texte : le tour, compteurs compris",
-      "status.turn{turn: 2, turnCount: 10, score: 5, speed: 5, mass: 2} status.throws{count: 4} status.swap_available",
-      describeTurn({ ...lensed, score: 5, speed: 5, mass: 2 }, true, t, rules)
+      "state.turn{turn: 2, turnCount: 10, score: 5, speed: 5, mass: 2} state.throws{count: 4} state.swap_available",
+      describeTurn({ ...lensed, score: 5, speed: 5, mass: 2 }, true, rules, t)
     );
 
   }
@@ -1966,9 +1996,9 @@ function checkWitnesses(run) {
       question: plain(describeChoicePrompt(choosing.pendingChoice, realT)),
       questions: questionVariants(choosing.pendingChoice).map((pending) => plain(describeChoicePrompt(pending, realT))),
       chosen: ["agate", "gorilla"].map((marble) => plain(realT("marbles.choice.chosen", { marble: nameRef(`marble.${marble}.name`) }))),
-      turn: plain(describeTurn(game({ score: 5, speed: 5, mass: 2, throwsUsed: 1 }), true, realT, rules)),
-      bag: [8, 1].map((count) => plain(describeBag(game({ bag: Array(count).fill("clay"), drawPerTurn: 1 }), realT))),
-      pot: plain(describePot(game({ pot: ["clay"], lost: ["gorilla", "glass"] }), realT, rules)),
+      turn: plain(describeTurn(game({ score: 5, speed: 5, mass: 2, throwsUsed: 1 }), true, rules, realT)),
+      bag: [8, 1].map((count) => plain(describeBag(game({ bag: Array(count).fill("clay"), drawPerTurn: 1 }), rules, realT))),
+      pot: plain(describePot(game({ pot: ["clay"], lost: ["gorilla", "glass"] }), rules, realT)),
       impact: plain(stepsText(buildSteps([{ type: "impact", speed: -3, mass: 2, impact: 0, score: 14 }], realT))),
     };
   };

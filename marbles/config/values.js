@@ -5,7 +5,8 @@
 export const MARBLES_SETTINGS = {
   firstTurnDraw: 5, // billes piochées au premier tour
   drawPerTurn: 1, // billes piochées à chaque tour suivant
-  // Capacités du joueur, qui pourront devenir ses caractéristiques :
+  // Les valeurs de départ des CARACTÉRISTIQUES de la partie, que des statuts changent
+  // (marbles/core/statuses.js/characteristic) :
   maxHandSize: 5, // main pleine : la pioche est sautée, la bille reste au sac
   // Lancers par tour : un lancer est une pose depuis la main, sur un emplacement
   // vide ou occupé (l'échange n'en est pas un). Borne ce qu'un joueur peut
@@ -49,6 +50,9 @@ export const MARBLES_SETTINGS = {
   // d'un choix ou la fin de partie, il choisirait ou quitterait sans qu'on l'ait
   // entendue.
   skipGuardMs: 400,
+  // Mode debug : la démonstration des places (Maj+B) fait entendre une balise à chaque
+  // place, une toutes les placesDemoIntervalMs.
+  placesDemoIntervalMs: 700,
 };
 
 // Les CALIBRES (Size) : ce qu'EST une bille par sa taille, champ `size` obligatoire
@@ -284,12 +288,12 @@ export const MARBLE_PHASES = [
 //   event     l'évènement du journal qui le déclenche ;
 //   marble    la bille concernée : "onSlot", celle qui est sur l'emplacement de
 //             l'évènement ; "leaving", celle que l'évènement nomme, EN PARTANCE :
-//             sortie de sa zone, pas encore arrivée (marbles/core/run.js/travel) ;
+//             sortie de sa zone, pas encore arrivée (marbles/core/path.js/travel) ;
 //             "dropped", celle que l'évènement nomme, qui vient d'arriver à la
 //             DÉFAUSSE ; "thrown", celle que l'évènement nomme, EN COURS DE LANCER :
 //             sortie de la main, pas encore sur le triangle ; "drawn", celle que
 //             l'évènement nomme, qui vient d'être piochée : en main, à 0 tour en
-//             main (une action sur la bille elle-même y est refusée) ;
+//             main (seules Empocher et Défausser y prennent la bille elle-même) ;
 //   moment    quand il joue : "play", pendant la phase de jeu (toutes les phases
 //             restent à venir) ; "afterPhases", après toutes les phases (une Vitesse
 //             ou une Masse ciblée n'y a plus de sens : marbles/core/effects.js) ;
@@ -435,7 +439,7 @@ export const MARBLE_TRIGGERS = [
     card: "below",
   },
   // La Chute : à chaque arrivée de la bille à la défausse, d'où qu'elle vienne
-  // (triangle, main, sac), au bout de son trajet (marbles/core/run.js/travel), jamais
+  // (triangle, main, sac), au bout de son trajet (marbles/core/path.js/travel), jamais
   // si une redirection l'envoie ailleurs. Elle est alors à la défausse. Sa prévision :
   // avec l'emplacement qu'elle a quitté, après son Final ; une bille arrivée d'une
   // autre zone n'en a pas.
@@ -460,9 +464,9 @@ export const MARBLE_TRIGGERS = [
 // Les VALEURS DE PARTIE (Tally) : des compteurs tenus par la simulation, dans l'état
 // (`tally`, sérialisé avec lui), chacun en deux portées, « ce tour » et « cette
 // partie ». La plupart sont GÉNÉRÉS (marbles/core/counters.js) : un par mot-clé de
-// déclenchement (MARBLE_TRIGGERS et les phases), deux par action mot-clé (Pioche,
-// Polissage, Fêlure : marbles/core/effects.js/CLAUSE_ACTIONS), quatre par compteur
-// du tour (Vitesse, Masse). Ici, les seuls déclarés à la main : les ÉVÈNEMENTS RÉELS,
+// déclenchement (MARBLE_TRIGGERS et les phases), un ou deux par action mot-clé (ses
+// déclenchements, et sa quantité réelle si elle en a une : marbles/core/effects.js/
+// CLAUSE_ACTIONS), quatre par compteur du tour (Vitesse, Masse). Ici, les seuls déclarés à la main : les ÉVÈNEMENTS RÉELS,
 // ce qui arrive aux billes, quel que soit le mot-clé qui y réagit. Chacun :
 //   id      son identifiant, aussi celui de sa source de montant calculé
 //           (`tally(id, portée)`, marbles/content/effects.js) ; ses textes en découlent :
@@ -494,7 +498,7 @@ export const MARBLE_TALLIES = [
   // Chaque retrait par usure, usure de phase ou Fêlure.
   { id: "wornMarbles", events: ["removed"], match: { cause: "wear" } },
   // Toute sortie du triangle, quelle qu'en soit la cause (usure, éjection, mise en
-  // poche).
+  // poche, défausse, rebond).
   { id: "triangleExits", events: ["removed"] },
   // Chaque bille entrée au pot.
   { id: "pocketedMarbles", events: ["pocketed"] },
@@ -620,7 +624,7 @@ export const STATUS_CARD_MODEL = {
 
 // Sac de test : un exemplaire de chaque bille. Une liste d'ids, pas un
 // dérivé du registre (marbles/content/types/) : un sac peut porter plusieurs exemplaires
-// d'une bille. Validé au démarrage (marbles/core/content.js/validateMarblesContent).
+// d'une bille. Validé au démarrage (marbles/core/validation.js/validateMarblesContent).
 export const STARTING_BAG = [
   "clay",
   "glass",

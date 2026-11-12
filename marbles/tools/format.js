@@ -9,7 +9,6 @@
 
 import { MARBLE_POCKET, MARBLE_TRIGGERS } from "../config/values.js";
 import { SLOTS } from "../core/marbles.js";
-import { NO_STATUSES, characteristic } from "../core/statuses.js";
 import { formatCounter } from "../view/narration.js";
 import { GAME_RULES } from "./game-rules.js";
 
@@ -82,10 +81,10 @@ function handList(hand, name) {
 const turnsLabel = (turns) => `${turns} tour${turns > 1 ? "s" : ""} en main`;
 
 // Un emplacement : « base gauche : argile (clay), usure 1 sur 3, bonus Vitesse +4. »
-function slotLine(state, slot, name) {
+function slotLine(state, slot, name, rules) {
   const placed = state.triangle[slot];
   if (placed === null) return `${slotLabel(slot)} : vide.`;
-  let line = `${slotLabel(slot)} : ${marbleLabel(placed.marble, name)}, usure ${placed.wear} sur ${GAME_RULES.maxWearOf(placed.marble)}`;
+  let line = `${slotLabel(slot)} : ${marbleLabel(placed.marble, name)}, usure ${placed.wear} sur ${rules.maxWearOf(placed.marble)}`;
   if (placed.bonus) line += `, bonus Vitesse ${signed(placed.bonus.speed)} et Masse ${signed(placed.bonus.mass)}`;
   return `${line}.`;
 }
@@ -108,16 +107,16 @@ function statusList(instances) {
 
 // L'état entier, une ligne par élément. Le sac se lit du haut (prochaine pioche)
 // vers le bas : c'est un outil de test, il voit ce que le joueur ne voit pas.
-// `statuses` : la table des statuts, pour les caractéristiques en vigueur (lancers,
-// main, pot) ; aucune par défaut.
-export function formatState(state, name, statuses = NO_STATUSES) {
-  const value = (key) => characteristic(state, key, statuses);
+// `rules` : les règles (celles du jeu par défaut), pour l'usure maximale des billes
+// et les caractéristiques en vigueur, statuts compris (lancers, main, pot).
+export function formatState(state, name, rules = GAME_RULES) {
+  const value = (key) => rules.characteristic(state, key);
   const yesNo = (value) => (value ? "oui" : "non");
   const lines = [
     `Tour ${state.turn} sur ${state.turnCount}, étape ${state.stage}.`,
     `Score ${state.score}. Vitesse ${formatCounter(state.speed)}, Masse ${formatCounter(state.mass)}.`,
     `Échange utilisé : ${yesNo(state.swapUsed)}. Lancers : ${state.throwsUsed} sur ${value("throws")}.`,
-    ...SLOTS.map((slot) => slotLine(state, slot, name)),
+    ...SLOTS.map((slot) => slotLine(state, slot, name, rules)),
     `Main, ${state.hand.length} sur ${value("handSize")} : ${handList(state.hand, name)}.`,
     `Sac, ${state.bag.length}, du haut vers le bas : ${listOf(state.bag, name)}.`,
     `Défausse, ${state.discard.length} : ${listOf(state.discard, name)}.`,
@@ -131,7 +130,7 @@ export function formatState(state, name, statuses = NO_STATUSES) {
 }
 
 // Une cible de choix : « main 2 : agate (agate) », « pointe : argile (clay) ».
-export function targetLabel(target, name) {
+function targetLabel(target, name) {
   const marble = target.marble === null || target.marble === undefined ? "vide" : marbleLabel(target.marble, name);
   if (target.zone === "hand") return `main ${target.index + 1} : ${marble}`;
   if (target.zone === "discard") return `défausse ${target.index + 1} : ${marble}`;
@@ -163,6 +162,34 @@ function effectLine(event, name) {
   return `${line} ; compteurs Vitesse ${formatCounter(event.speed)}, Masse ${formatCounter(event.mass)}.`;
 }
 
+// Les actions de clause, nommées dans les lignes du journal.
+const ACTION_NAMES = {
+  crack: "Fêlure",
+  polish: "Polissage",
+  pocket: "Empocher",
+  eject: "Éjecter",
+  discard: "Défausser",
+  bounce: "Rebond",
+  retrieve: "Ramasser",
+  speed: "Vitesse",
+  mass: "Masse",
+};
+
+// Les cibles vides d'une action (`targetEmpty`, `target`), sauf la bille elle-même et
+// un emplacement, dites à part.
+const EMPTY_TARGETS = {
+  firstInHand: "main vide",
+  choice: "aucune cible à choisir",
+  all: "aucune bille visée",
+  bag: "sac vide",
+  lastDiscarded: "défausse vide",
+  handFull: "main pleine",
+  noReference: "pas d'emplacement de référence",
+};
+
+// Les raisons de la fin d'un choix (`choiceEnded`).
+const CHOICE_ENDS = { count: "nombre atteint", done: "terminé", exhausted: "plus de cible", declined: "rien choisi, action ignorée" };
+
 const EVENT_LINES = {
   turnStarted: (event) => `Début du tour ${event.turn} sur ${event.turnCount}.`,
   draw: (event, name) => `Pioche : ${marbleLabel(event.marble, name)}${event.cause === "effect" ? ", par un effet" : ""}.`,
@@ -180,11 +207,9 @@ const EVENT_LINES = {
   polished: (event, name) => `Polissage : ${marbleLabel(event.marble, name)} en ${slotLabel(event.slot)}, usure ${event.wear} sur ${event.maxWear}.`,
   cracked: (event, name) => `Fêlure : ${marbleLabel(event.marble, name)} en ${slotLabel(event.slot)}, usure ${event.wear} sur ${event.maxWear}.`,
   targetEmpty: (event, name) => {
-    const action = { crack: "Fêlure", polish: "Polissage", pocket: "Empocher", eject: "Éjecter" }[event.action] ?? event.action;
-    if (event.target === "firstInHand") return `${action} sans effet : main vide.`;
-    if (event.target === "choice") return `${action} sans effet : aucune cible à choisir.`;
-    if (event.target === "all") return `${action} sans effet : aucune bille visée.`;
+    const action = ACTION_NAMES[event.action] ?? event.action;
     if (event.target === "self") return `${action} sans effet : ${marbleLabel(event.marble, name)} n'est plus là.`;
+    if (Object.hasOwn(EMPTY_TARGETS, event.target)) return `${action} sans effet : ${EMPTY_TARGETS[event.target]}.`;
     return `${action} sans effet : ${slotLabel(event.slot)} vide.`;
   },
   pocketed: (event, name) => `Mise en poche : ${marbleLabel(event.marble, name)}, depuis ${POCKET_ORIGINS[event.from]}${event.slot ? ` (${slotLabel(event.slot)})` : ""}.`,
@@ -195,7 +220,7 @@ const EVENT_LINES = {
   pocketReaction: (event, name) => `Réaction du pot : ${marbleLabel(event.marble, name)}, ${event.index + 1}e arrivée, à ${event.counter}.`,
   choice: (event, name) => `Choix : ${event.action}, ${event.mode === "optional" ? "facultatif, jusqu'à " : ""}${event.count}, zones ${event.zones.join(" et ")}, par ${marbleLabel(event.by.marble, name)}.`,
   chosen: (event, name) => `Choisie : ${targetLabel(event, name)}.`,
-  choiceEnded: (event) => `Choix fini (${{ count: "nombre atteint", done: "terminé", exhausted: "plus de cible" }[event.reason]}), ${event.chosen} choisie(s).`,
+  choiceEnded: (event) => `Choix fini (${CHOICE_ENDS[event.reason] ?? event.reason}), ${event.chosen} choisie(s).`,
   choiceUndecided: (event) => `Choix indécis (prévision) : ${event.action}.`,
   eject: (event, name) => `Éjecter : ${marbleLabel(event.by.marble, name)} chasse ${marbleLabel(event.marble, name)} de ${slotLabel(event.slot)}.`,
   chainInterrupted: () => "Enchaînement interrompu : limite de sécurité du bus atteinte (anomalie).",

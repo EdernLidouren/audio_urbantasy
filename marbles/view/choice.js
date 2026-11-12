@@ -4,15 +4,17 @@
 // réponse qu'Entrée envoie ; c'est la même navigation que l'écran habituel.
 //
 // - MAIN, ou DÉFAUSSE : un menu horizontal des SEULES billes éligibles, dans l'ordre
-//   de la main, ou dans l'ordre d'arrivée à la défausse, suivies de « Terminer » en
-//   mode « jusqu'à N ». Un choix n'a jamais les deux : leur menu prend la place du
+//   de la main, ou dans l'ordre d'arrivée à la défausse, suivies, dans un choix
+//   facultatif, de « Ne rien choisir » (puis « Terminer » après un premier choix). Un
+//   choix n'a jamais les deux : leur menu prend la place du
 //   curseur dans la main (`place: "hand"`).
 // - TRIANGLE : la même géométrie que l'écran (pointe en haut, les deux bases en
 //   dessous) et la même navigation (marbles/view/navigation.js). Les emplacements
 //   non éligibles restent accessibles, pour garder le repère, mais se disent « Non
-//   éligible. » et ne se valident pas. L'emplacement que vise une bille EN TRANSIT
-//   (en cours de lancer, pendingChoice.inTransit) l'annonce après son contenu,
-//   « En approche : loupe. », pour information : elle n'est jamais une cible.
+//   éligible. » et ne se valident pas. Une bille EN TRANSIT (pendingChoice.inTransit)
+//   se dit après le contenu de son emplacement, pour information, jamais une cible :
+//   en cours de lancer, sur l'emplacement visé (« En approche : loupe. ») ; en
+//   partance, pendant son Final ou son Éjection, sur l'emplacement qu'elle quitte.
 // - Les deux zones : on passe de l'une à l'autre comme d'habitude, le nom de la zone
 //   annoncé ; une seule : l'autre n'existe pas pour le curseur.
 // Le curseur est celui de l'écran ({ place, handIndex, lastBase }) ; dans la main,
@@ -93,18 +95,6 @@ export function stepChoiceCursor(pending, cursor, direction) {
 // L'option de la main sous le curseur, ou null.
 function handOption(pending, cursor) {
   return cursor.place === "hand" ? (choiceHandOptions(pending)[cursor.handIndex] ?? null) : null;
-}
-
-// La bille sous le curseur pendant un choix ({ marble, turnsInHand }), pour sa fiche
-// et ses mots-clés, ou null (Terminer, emplacement vide).
-export function choiceMarbleAt(game, cursor) {
-  const pending = game.pendingChoice;
-  if (cursor.place === "hand") {
-    const entry = choiceListEntry(game, handOption(pending, cursor));
-    return entry === null ? null : { marble: entry.marble, turnsInHand: entry.turnsInHand };
-  }
-  const placed = game.triangle[cursor.place];
-  return placed === null ? null : { marble: placed.marble, turnsInHand: 0 };
 }
 
 // Les billes en transit qui visent `slot`, dites après son contenu : « En approche :

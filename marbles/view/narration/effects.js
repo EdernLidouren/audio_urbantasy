@@ -6,13 +6,13 @@
 // marbles/view/narration.js.
 
 import { nameRef } from "../../../data/i18n/index.js";
-import { MARBLE_SIZES } from "../../config/values.js";
+import { MARBLE_POCKET, MARBLE_SIZES, MARBLE_TRIGGERS } from "../../config/values.js";
 import { TALLY_COUNTERS } from "../../core/content.js";
 import { emptyTally } from "../../core/tally.js";
 import { NO_STATUSES, definitionOf, statusApplication } from "../../core/statuses.js";
+import { CHOICE_ZONES } from "../../core/zones.js";
 import {
   AMOUNT_SOURCES,
-  CHOICE_ZONES,
   CLAUSE_ACTIONS,
   CONDITIONS,
   FIRST_IN_HAND,
@@ -29,6 +29,32 @@ import {
 
 export function marbleName(marble, t) {
   return t(`marble.${marble}.name`);
+}
+
+// La RÉFÉRENCE au nom d'une bille, pour un gabarit qui en choisit la forme
+// (« d'argile », « l'agate », son genre) : jamais un texte déjà traduit.
+export function marbleRef(marble) {
+  return nameRef(`marble.${marble}.name`);
+}
+
+// LE MOMENT D'UN EFFET, celui qui pose un choix ou donne un statut (`by` des
+// évènements : { trigger, slot, marble, status? }), pour le dire : { kind, params }.
+// `kind` : "status" (la réaction d'un statut, { status }) ; "phase" ({ slot,
+// marble }) ; "potEntry" et "pot" (une bille du pot, { marble }) ; "hit" (le Tic, à
+// part : en anglais « Hit from gorilla », pas « of ») ; "trigger" (un autre
+// déclencheur, { moment, marble }). Chaque usage a ses gabarits par sorte.
+const POCKET_ENTRY_TRIGGERS = new Set(MARBLE_POCKET.moments.filter((moment) => moment.event === "pocketed").map((moment) => moment.trigger));
+const POCKET_TRIGGERS = new Set(MARBLE_POCKET.moments.map((moment) => moment.trigger));
+const TRIGGER_NAMES = Object.fromEntries(MARBLE_TRIGGERS.map((trigger) => [trigger.id, trigger.texts.name]));
+
+export function effectMoment({ trigger, slot, marble, status }, t) {
+  if (status !== undefined) return { kind: "status", params: { status: statusName(status, t) } };
+  const ref = marbleRef(marble);
+  if (trigger === "phase") return { kind: "phase", params: { slot: slotName(slot, t), marble: ref } };
+  if (POCKET_ENTRY_TRIGGERS.has(trigger)) return { kind: "potEntry", params: { marble: ref } };
+  if (POCKET_TRIGGERS.has(trigger)) return { kind: "pot", params: { marble: ref } };
+  if (trigger === "hit") return { kind: "hit", params: { marble: ref } };
+  return { kind: "trigger", params: { moment: t(TRIGGER_NAMES[trigger]), marble: ref } };
 }
 
 export function slotName(slot, t) {
@@ -231,7 +257,7 @@ export function combined(parts, t) {
 // inconnue.
 function pocketPart({ marble, lost, entry }, t) {
   if (marble === null) return t(lost ? "marbles.pocket.lost_unknown" : "marbles.pocket.entered_unknown");
-  const ref = nameRef(`marble.${marble}.name`);
+  const ref = marbleRef(marble);
   if (lost) return t("marbles.pocket.lost", { marble: ref });
   if (entry === null) return t("marbles.pocket.entered", { marble: ref });
   return t("marbles.pocket.entered_effect", { marble: ref, effect: describeEffect(entry, t) });
@@ -243,7 +269,7 @@ function emptyPart({ slot, target, marble }, t) {
   if (target === FIRST_IN_HAND) return t("marbles.forecast_empty.hand");
   if (target === "choice") return t("marbles.forecast_empty.choice");
   if (target === "all") return t("marbles.forecast_empty.all");
-  if (target === "self") return t("marbles.forecast_empty.self", { marble: nameRef(`marble.${marble}.name`) });
+  if (target === "self") return t("marbles.forecast_empty.self", { marble: marbleRef(marble) });
   if (target === "bag") return t("marbles.forecast_empty.bag");
   if (target === LAST_DISCARDED) return t("marbles.forecast_empty.discard");
   if (target === "handFull") return t("marbles.forecast_empty.hand_full");
@@ -277,7 +303,7 @@ function withResults(text, effect, t) {
 // Vitesse +3 » ; une bille du sac, à l'aveugle, reste inconnue.
 function discardPart({ marble, drop }, t) {
   if (marble === null) return t("marbles.discard.discarded_unknown");
-  const ref = nameRef(`marble.${marble}.name`);
+  const ref = marbleRef(marble);
   if (drop === null) return t("marbles.discard.discarded", { marble: ref });
   return t("marbles.discard.discarded_effect", { marble: ref, effect: describeEffect(drop, t) });
 }
@@ -286,7 +312,7 @@ function discardPart({ marble, drop }, t) {
 // chez la bille qui l'a produit, avec l'effet de son Éjection : « argile éjectée »,
 // « loupe éjectée, Éjection : Vitesse +3 ».
 function ejectedPart({ marble, knockout }, t) {
-  const ref = nameRef(`marble.${marble}.name`);
+  const ref = marbleRef(marble);
   if (knockout === null) return t("marbles.eject.ejected", { marble: ref });
   return t("marbles.eject.ejected_effect", { marble: ref, effect: describeEffect(knockout, t) });
 }

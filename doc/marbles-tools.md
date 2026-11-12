@@ -4,7 +4,8 @@ Les outils de développement du jeu des billes, réunis dans `marbles/tools/`. I
 sont jamais chargés par le jeu, passent par le vrai réducteur (`marbles/core/marbles.js`) et
 la vraie prévision (`marbles/core/forecast.js`), et ne changent ni règle ni valeur :
 ils jouent, montrent et mesurent. Leur sortie se lit au lecteur d'écran : des phrases
-et des lignes simples, jamais de tableau. Les règles elles-mêmes : `doc/marbles.md`.
+et des lignes simples, jamais de tableau. Les règles elles-mêmes : `doc/marbles-rules.md` ;
+leur mécanisme : `doc/marbles.md`.
 
 ## Les outils
 
@@ -20,9 +21,10 @@ Les modules qu'ils partagent, purs (sans Node, donc vérifiables) :
 
 | Module | Rôle |
 |---|---|
-| `marbles/tools/game-rules.js` | Les règles du jeu, liées une fois à la table des billes : le point de composition des outils |
+| `marbles/tools/game-rules.js` | Les règles du jeu, liées une fois aux tables des billes et des statuts : le point de composition des outils |
+| `marbles/tools/args.js` | La lecture stricte de la ligne de commande, commune aux outils : une option inconnue, une option à valeur sans sa valeur, une option donnée deux fois ou un argument en trop sont une erreur claire, jamais un silence |
 | `marbles/tools/commands.js` | Les commandes texte (« poser 1 pointe ») communes à `play.js` et `case.js` |
-| `marbles/tools/format.js` | L'état et le journal en lignes lisibles |
+| `marbles/tools/format.js` | L'état et le journal en lignes lisibles : chaque type d'évènement, chaque cible vide (main pleine, pas d'emplacement de référence…) et chaque fin de choix (dont `declined`, rien choisi) |
 | `marbles/tools/state-builder.js` | L'état construit à la main (`buildState`) et l'application d'actions (`applyActions`) |
 | `marbles/tools/players.js` | Les joueurs automatiques et la vue publique qu'ils reçoivent |
 | `marbles/tools/drawn-value.js` | La valeur d'une bille gagnée en main pour le glouton, et comment elle a été mesurée |
@@ -57,12 +59,17 @@ Un fichier JSON : `state`, la description de l'état (format en tête de
 `marbles/tools/state-builder.js` : tour, triangle avec usure, main avec tours en main
 (`"clay:2"`), sac du haut vers le
 bas, défausse, pot et billes perdues (`"pot": ["agate"]`, dans l'ordre d'arrivée, jamais
-plus que `potCapacity`), compteurs, valeurs de partie (`"tally": { "flick": { "turn": 1, "game": 3 } }`, le
-reste à zéro), réglages), et `actions`, des commandes texte (`poser 1
+plus que la capacité du pot en vigueur), compteurs, valeurs de partie (`"tally": { "flick": { "turn": 1, "game": 3 } }`, le
+reste à zéro), statuts (`"statuses": ["cushion:2", { "status": "extraThrow", "pending": true }]`,
+dans l'ordre d'acquisition, ce qui n'est pas dit venant de la définition ; les bornes
+de la main, des lancers et du pot se lisent aux caractéristiques en vigueur, statuts
+compris), réglages), et `actions`, des commandes texte (`poser 1
 pointe`, `echanger gauche pointe`, `resoudre`, `piocher`, `prevoir`, `choisir 2`,
 `choisir pointe`, `terminer`) ou des actions brutes du réducteur ; une action suspendue
 sur un choix affiche le choix en attente et ses cibles, la suivante y répond. L'outil affiche l'état de départ, le journal ou le refus de chaque
-action, puis l'état final ; `--json` ajoute tout cela brut. Une description fausse
+action, puis l'état final ; `prevoir` y dit aussi les réactions des statuts et l'usure
+prévue ; `--json` ajoute tout cela brut. La ligne de commande se lit strictement
+(`marbles/tools/args.js`) : le fichier du cas, et `--json`. Une description fausse
 (bille, champ ou emplacement inconnu, usure impossible) lève une erreur claire.
 
 ## Le simulateur
@@ -77,8 +84,10 @@ node marbles/tools/simulate.js --games 200 --export resultats.csv
 Toutes les options sont en tête de `marbles/tools/simulate.js` : nombre de parties,
 graine de départ, joueur, poses envisagées par le glouton, valeur d'une bille gagnée en
 main (`--drawn-value`), sac (de test, aléatoire avec une limite d'exemplaires, ou d'un
-fichier), surcharges des réglages (taille de main, lancers, pioches, nombre de tours, pour
-cette simulation seulement) et export.
+fichier), surcharges des réglages (taille de main, lancers, capacité du pot `--pot`,
+pioches, nombre de tours, pour cette simulation seulement) et export. Comme tous les
+outils, il lit sa ligne de commande strictement (`marbles/tools/args.js`) : une option
+inconnue, une valeur manquante ou un argument en trop l'arrête sur une erreur.
 
 **Déterminisme** : chaque partie reçoit ses graines dérivées de la graine de départ
 (partie, joueur, sac). Mêmes options, même rapport au caractère près, sauf la dernière
@@ -98,7 +107,7 @@ dans son plan une bille qu'un choix aurait empochée entre-temps.
 
 | Joueur | Ce qu'il fait |
 |---|---|
-| `random` | Uniforme parmi les actions légales (`marbles/core/marbles.js/legalActions`), résolution comprise : la référence basse |
+| `random` | Uniforme parmi les actions légales (`legalActions` des règles, statuts compris), résolution comprise : la référence basse |
 | `greedy` | Évalue par la prévision chaque combinaison du tour (pas d'échange ou chaque échange, puis jusqu'à `--max-placements` poses, 1 par défaut ; au premier tour, chaque remplissage de tout ou partie du triangle, aucune règle ne l'exigeant) et joue celle de la plus haute valeur : l'Impact prévu, plus `--drawn-value` par bille que le plan piocherait ; à égalité, la plus simple |
 | `greedy-no-replacement` | Le même, sans jamais poser sur un emplacement occupé : l'écart avec `greedy` mesure ce que rapportent le tic et l'éjection |
 
@@ -110,10 +119,12 @@ le glouton ne voit que l'Impact du tour, et jugerait nulles les billes qui pioch
 mesurée sur le rapport glouton de référence, d'avant la Pioche : score moyen 164,825 pour 13
 billes piochées par partie. `--drawn-value 0` rend le glouton d'avant.
 
-**Le rapport** : score final (moyenne, médiane, extrêmes, centiles 10, 25, 75 et 90,
-par interpolation linéaire), Impact moyen par tour et par numéro de tour, fins de partie,
-remplacements, pioche et lancers (billes piochées par des effets, régénérations du sac dont
-celles en cours de tour, lancers par tour joué, fins par pioche impossible), puis chaque
+**Le rapport** (ses sections : `marbles/tools/report.js`/`REPORT_HEADINGS`) : score final
+(moyenne, médiane, extrêmes, centiles 10, 25, 75 et 90, par interpolation linéaire),
+Impact moyen par tour et par numéro de tour, poses (poses sur un emplacement occupé, et
+ce qu'apportent la Chiquenaude, l'Éjection et le Tic), pioche et lancers (billes piochées
+par des effets, régénérations du sac dont celles en cours de tour, lancers par tour
+joué), puis chaque
 bille (billes que ses effets ont fait piocher, s'il y en a : chacune revient à l'effet à
 Pioche qui l'a demandée, même quand une réaction au mélange ou l'Éveil d'une autre bille
 se glisse entre la Pioche et ses billes, `marbles/tools/simulation.js/recordEvents` ;
@@ -154,8 +165,8 @@ touchés. Le côté « avant » joue avec le simulateur du commit : un changemen
 simulateur lui-même se voit aussi.
 
 La sortie, d'abord une ligne par simulation : « identique », ou combien de lignes
-changent et si les résultats (score final, Impact par tour, fins de partie) en font
-partie. Puis chaque ligne changée, « avant : » et « après : », sous son contexte : le titre
+changent et si les résultats (score final, Impact par tour :
+`REPORT_RESULT_HEADINGS`) en font partie. Puis chaque ligne changée, « avant : » et « après : », sous son contexte : le titre
 de sa section, ou sa bille dans la section des billes. Enfin un bilan : rapports
 identiques, résultats, actions refusées et enchaînements interrompus après le changement
 (toujours 0 : sinon, « ANOMALIE »). La durée n'est jamais comparée. `--save <dossier>`
@@ -202,18 +213,25 @@ vérifications des MÉCANISMES ne passent donc jamais par elles :
 - **Des sections** : chaque domaine découpe ses vérifications par `run.section`
   (`lib/check.js`) ; une exception n'arrête que sa section, comptée comme un échec.
 - **Les fixtures partagées** sont dans `marbles/checks/helpers.js` (état de partie,
-  billes posées, parties au hasard, traduction de test…), la propriété « prévision =
-  réel » dans `marbles/checks/fixtures/forecast-property.js`.
+  billes posées, parties au hasard, traduction de test, une instance de statut posée à
+  la main, `statusInstance`, et la propriété « prévision = réel » sur un cas,
+  `forecastMatches(rules, state, action)`), la propriété « prévision = réel » sur des
+  états aléatoires dans `marbles/checks/fixtures/forecast-property.js`.
 
-Les domaines, listés dans `marbles/checks/index.js` (`MARBLES_SUITES`) et lancés par le
-point d'entrée unique des vérifications (`node tools/run-checks.js`) : `marbles` (règles), `marbles-pocket` (le pot), `marbles-path` (le chemin des billes :
-la Chute, Défausser, Rebond, Ramasser), `marbles-zones` (conditions d'état et nombre de
-billes par zone), `marbles-relative` (les cibles relatives), `marbles-statuses` (les
-statuts : définitions, cumuls, caractéristiques, modificateurs, réactions, durées,
-quantités, sur
-la table des statuts de test `FIXTURE_STATUSES`), `marbles-choice` (cibles au
-choix et Éjecter), `marbles-bus`, `marbles-tally`, `marbles-forecast`, `marbles-view`,
-`marbles-sequence`, `marbles-tools`, `marbles-content`, `marbles-screen` (l'écran, ci-dessous).
+**Les domaines** : la liste qui fait foi, dans leur ordre d'exécution, est
+`marbles/checks/index.js`/`MARBLES_SUITES` ; ils sont lancés par le point d'entrée unique
+des vérifications (`node tools/run-checks.js` pour tous, `node tools/run-checks.js
+<domaine>` pour un seul). Ce que vérifie chacun, aujourd'hui : `marbles` (les règles du
+réducteur), `marbles-pocket` (le pot), `marbles-path` (le chemin des billes : la Chute,
+Défausser, Rebond, Ramasser), `marbles-zones` (conditions d'état et nombre de billes par
+zone), `marbles-relative` (les cibles relatives), `marbles-statuses` (les statuts :
+définitions, cumuls, caractéristiques, modificateurs, réactions, durées, quantités, sur
+la table des statuts de test `FIXTURE_STATUSES`), `marbles-choice` (cibles au choix et
+Éjecter), `marbles-bus` (le bus d'évènements), `marbles-tally` (les valeurs de partie),
+`marbles-forecast` (la prévision), `marbles-view` (la narration et ses textes),
+`marbles-sequence` (la séquence de résolution), `marbles-tools` (les outils, ci-dessus),
+`marbles-content` (le contrat des vraies billes), `marbles-screen` (l'écran,
+ci-dessous). Un domaine ajouté à `MARBLES_SUITES` doit l'être aussi ici.
 
 ## Vérifier l'écran au terminal
 

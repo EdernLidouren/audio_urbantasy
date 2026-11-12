@@ -21,7 +21,7 @@ const TIMING_SETTINGS = ["shuffleToDrawMs", "drawSoundIntervalMs", "swapSoundDel
 
 // Échoue au chargement : un calibre sans profil, ou un profil incomplet, se
 // découvrirait sinon en pleine partie, en silence. Le calibre de chaque bille, lui,
-// est validé par la simulation (marbles/core/content.js/validateMarbleTypes).
+// est validé par la simulation (marbles/core/validation.js/validateMarbleTypes).
 export function validateMarbleSounds(sizes, profiles, settings) {
   for (const [size, id] of Object.entries(sizes)) {
     const profile = profiles[size];
@@ -93,7 +93,9 @@ export function validateCollision(collision, sizes = MARBLE_SIZES) {
   for (const [size, id] of Object.entries(sizes)) checkNumber(collision.weights?.[size], `weights.${id}`, 0.01, 100);
 }
 
-// Une variation au-delà de la moitié ferait d'un son un autre son.
+// Une variation au-delà de la moitié ferait d'un son un autre son. La liste est un
+// CONTRAT, pas une copie : chaque famille de sons qui doit varier (tout sauf les
+// balises) a la sienne, une absente est refusée.
 export function validatePitchVariation(variation) {
   for (const sound of ["impact", "drop", "roll", "polish", "crack", "flick", "awaken", "final", "windfall"]) checkNumber(variation[sound], `pitchVariation.${sound}`, 0, 0.5);
 }

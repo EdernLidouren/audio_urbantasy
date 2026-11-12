@@ -11,17 +11,14 @@
 
 import { throws } from "../../lib/check.js";
 import { applyStatus as gain, crack, draw, mass, polish, speed } from "../content/effects.js";
-import { validateMarbleStatuses } from "../core/content.js";
+import { validateMarbleStatuses } from "../core/validation.js";
 import { CONDITIONS } from "../core/effects.js";
-import { readForecast } from "../core/forecast.js";
 import { applyStatus, characteristic } from "../core/statuses.js";
 import { FIXTURE_STATUSES } from "./fixtures/marbles.js";
-import { caughtMessage, eventTypes, fabricatedRules, inHand, marblesPlayState, mustReduce, placed, triangleOf, validateTable } from "./helpers.js";
+import { caughtMessage, eventTypes, fabricatedRules, forecastMatches, inHand, marblesPlayState, mustReduce, placed, statusInstance, triangleOf, validateTable } from "./helpers.js";
 
-// Une instance de statut posée à la main dans un état fabriqué.
-function instance(status, { intensity = 1, remaining = 1, pending = false } = {}) {
-  return { status, holder: "game", intensity, remaining, pending, origin: null };
-}
+// Une instance de statut posée à la main (helpers.js).
+const instance = statusInstance;
 
 // Les billes fabriquées des vérifications de ce domaine.
 const TABLE = {
@@ -48,19 +45,22 @@ const TABLE = {
   drawer: { flick: [draw(1)] },
   // Une bille à usure maximale 3, Vitesse +1 en phase.
   worn: { base: [speed(1)], apex: [speed(1)], maxWear: 3 },
+  // Un Éveil ; un Final d'une bille usée en une phase ; une Éjection sous condition de
+  // calibre relatif ; deux Empocher de la main.
+  waker: { awaken: [speed(1)] },
+  finisher: { final: [speed(1)], maxWear: 1 },
+  sizeKnock: { knockout: [{ action: "speed", amount: 1, when: { type: "relativeSize", marble: "placed", is: "larger" } }] },
+  twoPockets: { flick: [{ action: "pocket", target: "firstInHand" }, { action: "pocket", target: "firstInHand" }] },
+  // Chiquenaude : Vitesse +1 si la main est pleine.
+  fullWatcher: { flick: [{ action: "speed", amount: 1, when: { type: "zone", zone: "hand", state: "full" } }] },
 };
 
 const rules = fabricatedRules(TABLE);
 const game = (over) => marblesPlayState(rules, over);
 const toApex = { type: "place", handIndex: 0, slot: "apex" };
 
-// La prévision égale-t-elle le réel, lu de la même façon ?
-function forecastMatches(state, action) {
-  const real = action === null ? { state, events: [] } : mustReduce(rules, state, action);
-  const resolved = mustReduce(rules, real.state, { type: "resolve" });
-  const { uncertain, awakenPossible, ...predicted } = rules.forecast(state, action);
-  return JSON.stringify(predicted) === JSON.stringify(readForecast(real.events, resolved.events, resolved.state));
-}
+// « Prévision = réel » sur les règles de ce domaine (helpers.js).
+const matches = (state, action) => forecastMatches(rules, state, action);
 
 export default function checkMarblesStatuses(run) {
   run.section("définitions", checkDefinitions);
@@ -70,6 +70,37 @@ export default function checkMarblesStatuses(run) {
   run.section("réactions", checkReactions);
   run.section("durées", checkDurations);
   run.section("quantités", checkQuantities);
+  run.section("ordre des réactions", checkReactionOrder);
+}
+
+// UNE SEULE RÈGLE D'ORDRE : la bille concernée joue d'abord son propre effet, puis
+// les réactions (le pot, les statuts) ; la pioche du tour comme celle d'un effet, un
+// retrait à l'étape des retraits comme par une Fêlure, une perte comme une entrée.
+function checkReactionOrder(run) {
+  const order = (events) => events.filter((event) => ["draw", "awaken", "removed", "final", "lost", "statusReaction"].includes(event.type) || (event.type === "effect" && event.trigger !== "flick")).map((event) => (event.type === "effect" ? `effect:${event.trigger}` : event.type));
+  const drawReact = [instance("draw_react", { remaining: null })];
+  const turnDraw = mustReduce(rules, { ...game({ stage: "draw", bag: ["waker"] }), statuses: drawReact }, { type: "draw" });
+  run.same("pioche du tour : la pioche, l'Éveil, puis la réaction", ["draw", "awaken", "effect:awaken", "statusReaction", "effect:statusReaction"], order(turnDraw.events));
+  const effectDraw = mustReduce(rules, { ...game({ hand: inHand(["drawer"]), bag: ["waker"] }), statuses: drawReact }, toApex);
+  run.same("Pioche d'un effet : le même ordre", ["draw", "awaken", "effect:awaken", "statusReaction", "effect:statusReaction"], order(effectDraw.events));
+
+  const wornReact = [instance("worn_react", { remaining: null })];
+  const retired = mustReduce(rules, { ...game({ triangle: triangleOf(null, placed("finisher"), null) }), statuses: wornReact }, { type: "resolve" });
+  const tail = (events) => order(events).filter((entry) => entry !== "effect:phase");
+  run.same("retrait par usure : le départ, le Final, puis la réaction", ["removed", "final", "effect:final", "statusReaction", "effect:statusReaction"], tail(retired.events));
+  const crackedOut = mustReduce(rules, { ...game({ hand: inHand(["cracker"]), triangle: triangleOf(null, null, placed("finisher")) }), statuses: wornReact }, toApex);
+  run.same("retrait par une Fêlure : le même ordre", ["removed", "final", "effect:final", "statusReaction", "effect:statusReaction"], tail(crackedOut.events));
+
+  const lostReact = [instance("lost_react", { remaining: null })];
+  const lost = mustReduce(rules, { ...game({ hand: inHand(["twoPockets", "plain", "plain"]), pot: ["plain", "plain", "plain"] }), statuses: lostReact }, toApex);
+  run.same("perte au pot plein : chaque perte, puis sa réaction, avant la suivante", ["lost", "statusReaction", "effect:statusReaction", "lost", "statusReaction", "effect:statusReaction"], order(lost.events));
+
+  // Un statut qui éjecte n'est pas une bille : la condition de calibre relatif de
+  // l'éjectée est fausse, rien ne plante, au réel comme en prévision.
+  const ejecting = { ...game({ hand: inHand(["plain"]), triangle: triangleOf(null, null, placed("sizeKnock")) }), statuses: [instance("throw_eject", { remaining: null })] };
+  const knocked = mustReduce(rules, ejecting, { type: "place", handIndex: 0, slot: "leftBase" });
+  run("statut qui éjecte : l'Éjection joue, sa condition de calibre fausse", 0, knocked.events.find((event) => event.type === "effect" && event.trigger === "knockout")?.speedDelta ?? 0);
+  run("statut qui éjecte : la prévision aussi", true, rules.forecast(ejecting, { type: "place", handIndex: 0, slot: "leftBase" }).ok);
 }
 
 // LES QUANTITÉS : chaque point modifie sa quantité, plancher 0, avant les limites
@@ -80,6 +111,19 @@ function checkQuantities(run) {
 
   // La pioche du début de tour, à part de la pioche par effet.
   const turnState = (statuses, hand = []) => ({ ...game({ stage: "draw", hand: inHand(hand), bag: Array(6).fill("plain") }), statuses });
+  // La pioche du prochain début de tour, telle que la touche S la dit : les statuts
+  // comme ils seront alors, rien de consommé.
+  const next = (statuses, over = {}) => rules.nextTurnDraw({ ...game(over), statuses });
+  run.same(
+    "prochain début de tour : avec le statut, qui expire, qui s'active, avant la pioche du tour",
+    [2, 1, 2, 3],
+    [
+      next([instance("turn_draw_more", { remaining: 2 })]),
+      next([instance("turn_draw_more", { remaining: 1 })]),
+      next([instance("turn_draw_more", { remaining: 1, pending: true })]),
+      next([instance("turn_draw_more", { intensity: 2, remaining: 1 })], { stage: "draw" }),
+    ]
+  );
   run("pioche du tour : 1 + 2 (intensité 2)", 3, drawnOf(mustReduce(rules, turnState([instance("turn_draw_more", { intensity: 2, remaining: 2 })]), { type: "draw" })));
   const limited = mustReduce(rules, turnState([instance("turn_draw_more", { intensity: 2, remaining: 2 })], ["plain", "plain", "plain"]), { type: "draw" });
   run.same("pioche du tour : la main pleine arrête ensuite, comptée juste", [2, 2, "handFull"], [drawnOf(limited), limited.state.tally.drawnMarbles.turn, limited.events.find((event) => event.type === "drawSkipped")?.reason]);
@@ -124,9 +168,9 @@ function checkQuantities(run) {
   run("usure de phase : une charge de Pioche n'y est pas consommée", 1, resolved(0, [instance("effect_draw_charge")]).state.statuses[0].remaining);
 
   // La prévision égale le réel, usure et quantités comprises.
-  run("prévision = réel : usure de phase +1 et retrait", true, forecastMatches({ ...game({ triangle: triangleOf(placed("worn", 1), placed("worn", 0), null) }), statuses: [instance("wear_more")] }, null));
-  run("prévision = réel : Polissage augmenté à la pose", true, forecastMatches({ ...game({ hand: inHand(["polisher"]), triangle: triangleOf(placed("worn", 1), null, placed("worn", 2)) }), statuses: [instance("polish_more", { remaining: null })] }, toApex));
-  run("prévision = réel : Fêlure augmentée à la pose", true, forecastMatches({ ...game({ hand: inHand(["cracker"]), triangle: triangleOf(null, null, placed("worn", 1)) }), statuses: [instance("crack_more", { remaining: 3 })] }, toApex));
+  run("prévision = réel : usure de phase +1 et retrait", true, matches({ ...game({ triangle: triangleOf(placed("worn", 1), placed("worn", 0), null) }), statuses: [instance("wear_more")] }, null));
+  run("prévision = réel : Polissage augmenté à la pose", true, matches({ ...game({ hand: inHand(["polisher"]), triangle: triangleOf(placed("worn", 1), null, placed("worn", 2)) }), statuses: [instance("polish_more", { remaining: null })] }, toApex));
+  run("prévision = réel : Fêlure augmentée à la pose", true, matches({ ...game({ hand: inHand(["cracker"]), triangle: triangleOf(null, null, placed("worn", 1)) }), statuses: [instance("crack_more", { remaining: 3 })] }, toApex));
   run("prévision : l'usure prévue est celle d'après les statuts", 0, rules.forecast({ ...game({ triangle: triangleOf(null, placed("worn", 0), null) }), statuses: [instance("wear_none")] }).wear[0].wear);
 }
 
@@ -252,6 +296,9 @@ function checkCharacteristics(run) {
   run.same("pot au-delà : la bille empochée est perdue, aucune n'en sort", [4, 1], [over.state.pot.length, over.state.lost.length]);
   const roomy = mustReduce(pocketer, { ...game({ hand: inHand(["pocketer", "plain"]), pot: ["plain", "plain", "plain"] }), statuses: [instance("pot_game", { remaining: null })] }, toApex);
   run("pot agrandi : la bille entre", 4, roomy.state.pot.length);
+  // La main pleine se lit à la taille en vigueur : 3 sur 5, réduite à 3, pleine.
+  const watched = (statuses) => mustReduce(rules, { ...game({ hand: inHand(["fullWatcher", "plain", "plain", "plain"]) }), statuses }, toApex).events.find((event) => event.type === "effect").speedDelta;
+  run.same("main pleine : à la taille en vigueur, réduite par un statut", [0, 1], [watched([]), watched([instance("hand_shrink")])]);
   // La main réduite : la pioche s'arrête plus tôt.
   const drawer = fabricatedRules({ ...TABLE, drawer: { flick: [{ action: "draw", amount: 2 }] } });
   const shrunk = mustReduce(drawer, { ...game({ hand: inHand(["drawer", "plain", "plain", "plain"]), bag: ["plain", "plain"] }), statuses: [instance("hand_shrink")] }, toApex);
@@ -294,22 +341,24 @@ function checkModifiers(run) {
   run.same("Impact : 3, doublé 6, taxé 0 (plancher)", [3, 6, 0], [impact([]), impact([instance("impact_double")]), impact([instance("impact_tax", { remaining: null })])]);
   const taxed = resolved(triangleOf(null, placed("gainer"), null), [instance("impact_tax", { remaining: null }), instance("impact_double")]);
   run.same(
-    "Impact : additions puis multiplications, plancher à la fin, l'évènement modifié après l'Impact",
-    { impact: 0, next: "valueModified", contributions: [{ status: "impact_tax", before: 3, after: -2 }, { status: "impact_double", before: -2, after: -4 }] },
+    "Impact : additions puis multiplications, plancher à la fin ; un pas qui ne change rien, plancher compris, ne se dit pas",
+    { impact: 0, next: "valueModified", contributions: [{ status: "impact_tax", before: 3, after: 0 }] },
     (() => {
       const index = taxed.events.findIndex((event) => event.type === "impact");
       return { impact: taxed.events[index].impact, next: taxed.events[index + 1].type, contributions: taxed.events[index + 1].contributions };
     })()
   );
+  const charged0 = resolved(triangleOf(null, placed("gainer"), null), [instance("impact_tax", { remaining: null }), instance("impact_charge")]);
+  run("charge : ×2 sur un Impact déjà ramené à 0 ne change rien, la charge reste", 1, charged0.state.statuses.find((one) => one.status === "impact_charge").remaining);
   run("Impact : Coup double reçu en résolution compte ce tour", 4, impact([], triangleOf(null, placed("doubler"), null)));
 
   // La prévision : les statuts agissent sur la copie, jamais sur l'état.
   const state = { ...game({ triangle: triangleOf(placed("gainer"), placed("gainer"), null) }), statuses: [instance("gain_charge")] };
   run("prévision : la charge comptée", 9, rules.forecast(state).speed);
   run("prévision : la charge reste dans l'état", 1, state.statuses[0].remaining);
-  run("prévision = réel : une charge", true, forecastMatches(state, null));
-  run("prévision = réel : un statut reçu à la pose, puis la résolution", true, forecastMatches(game({ hand: inHand(["chargeGiver"]), triangle: triangleOf(placed("gainer"), null, null) }), toApex));
-  run("prévision = réel : Coup double reçu en résolution", true, forecastMatches(game({ triangle: triangleOf(null, placed("doubler"), placed("gainer")) }), null));
+  run("prévision = réel : une charge", true, matches(state, null));
+  run("prévision = réel : un statut reçu à la pose, puis la résolution", true, matches(game({ hand: inHand(["chargeGiver"]), triangle: triangleOf(placed("gainer"), null, null) }), toApex));
+  run("prévision = réel : Coup double reçu en résolution", true, matches(game({ triangle: triangleOf(null, placed("doubler"), placed("gainer")) }), null));
 }
 
 function checkReactions(run) {

@@ -21,6 +21,7 @@ import { MARBLE_IDS, deriveSeed, parseBagText, playGame, recordEvents, simulate 
 import { percentile, summarize } from "../tools/stats.js";
 import { REPORT_HEADINGS, REPORT_RESULT_HEADINGS, buildReport, frNumber } from "../tools/report.js";
 import { contextLabel, diffReports, reportAnomalies } from "../tools/report-diff.js";
+import { parseArgs } from "../tools/args.js";
 import { MARBLE_COLUMNS, toCsv, toJson } from "../tools/export.js";
 import MARBLE_TYPES from "../content/types/index.js";
 import { GAME_RULES } from "../tools/game-rules.js";
@@ -45,6 +46,7 @@ export default function checkMarblesTools(run) {
   run.section("rapport et exports", checkReportAndExport);
   run.section("attribution des pioches", checkDrawAttribution);
   run.section("différence de rapports", checkReportDiff);
+  run.section("ligne de commande", checkArgs);
 }
 
 // Une clause qui pioche, quelque part dans les effets d'une bille.
@@ -73,6 +75,17 @@ function checkStateBuilder(run) {
   run("état construit : usure au maximum refusée", true, throws(() => buildState({ triangle: { apex: `clay:${rules.maxWearOf("clay")}` } })));
   run("état construit : juste sous le maximum, acceptée", false, throws(() => buildState({ triangle: { apex: `clay:${rules.maxWearOf("clay") - 1}` } })));
   run("état construit : main trop grande refusée", true, throws(() => buildState({ hand: Array(MARBLES_SETTINGS.maxHandSize + 1).fill("clay") })));
+  // Les statuts : reçus comme d'un effet, puis ce que la description fixe ; les bornes
+  // aux caractéristiques en vigueur.
+  const withStatuses = buildState({ statuses: ["cushion:2", { status: "extraThrow", pending: true }] });
+  run.same(
+    "état construit : statuts, l'intensité dite, le reste de la définition",
+    [{ status: "cushion", intensity: 2, remaining: 3, pending: false }, { status: "extraThrow", intensity: 1, remaining: 1, pending: true }],
+    withStatuses.statuses.map(({ status, intensity, remaining, pending }) => ({ status, intensity, remaining, pending }))
+  );
+  run("état construit : statut inconnu refusé", true, throws(() => buildState({ statuses: ["nope"] })));
+  run("état construit : pot au-delà de sa capacité refusé", true, throws(() => buildState({ pot: ["clay", "clay", "clay", "clay"] })));
+  run("état construit : pot agrandi par un statut, permis", 4, buildState({ pot: ["clay", "clay", "clay", "clay"], statuses: ["deepPocket"] }).pot.length);
   run.same(
     "état construit : la main avec ses compteurs de tours en main",
     [{ marble: "clay", turnsInHand: 0 }, { marble: "leaded", turnsInHand: 2 }],
@@ -123,7 +136,8 @@ function checkCommandsAndFormat(run) {
 
   // Chaque type d'évènement d'une vraie partie a sa ligne lisible, jamais le repli
   // JSON.
-  const { games } = simulate({ games: 20, seed: "format", player: "greedy", bagMode: { kind: "random", size: 7, maxCopies: null }, settings: { turnCount: 20 } });
+  // Trois parties suffisent : seuls leurs graines et leurs sacs servent.
+  const { games } = simulate({ games: 3, seed: "format", player: "random", bagMode: { kind: "random", size: 7, maxCopies: null }, settings: { turnCount: 20 } });
   const types = new Set();
   let raw = 0;
   for (const index of [0, 1, 2]) {
@@ -154,6 +168,10 @@ function checkCommandsAndFormat(run) {
   };
   const unreadable = Object.keys(JOURNAL_EVENTS).filter((type) => formatEvent({ type, ...minimal[type] }).startsWith(`${type} : {`));
   run.same("journal lisible : chaque type du journal (JOURNAL_EVENTS) a sa ligne", [], unreadable);
+  // Chaque cible vide et chaque fin de choix se disent, sans « null » ni « undefined ».
+  const empties = ["firstInHand", "choice", "all", "bag", "lastDiscarded", "handFull", "noReference"].map((target) => formatEvent({ type: "targetEmpty", action: "discard", slot: null, target }));
+  const ends = ["count", "done", "exhausted", "declined"].map((reason) => formatEvent({ type: "choiceEnded", reason, chosen: 0 }));
+  run.same("journal lisible : chaque cible vide, chaque fin de choix", [], [...empties, ...ends].filter((line) => /null|undefined/.test(line)));
   run("journal lisible : un type inconnu se lit quand même", true, formatEvent({ type: "nouveau", x: 1 }).startsWith("nouveau : "));
   run("état lisible : une ligne par élément, sans tableau", true, formatState(buildState({ hand: ["clay"] })).every((line) => !line.includes("|") && line.length < 200));
 }
@@ -214,7 +232,10 @@ function predictedAfter(state, actions) {
 // l'aléatoire une réponse légale, Terminer compris ; la vue publique voile aussi
 // l'état de départ que garde le choix.
 function checkPlayerChoices(run) {
-  const state = buildState({ triangle: { leftBase: "porcelain:1", rightBase: null, apex: "clay" }, hand: ["glass"], bag: ["agate", "mica"] });
+  // Une vraie bille dont le Tic ouvre un choix, trouvée par ce qu'elle fait.
+  const chooser = Object.keys(MARBLE_TYPES).find((id) => (MARBLE_TYPES[id].hit ?? []).some((clause) => clause.target?.type === "choice" && clause.when === undefined));
+  if (chooser === undefined) throw new Error("aucune vraie bille n'a de Tic à choix : ce test n'a rien à jouer.");
+  const state = buildState({ triangle: { leftBase: "porcelain:1", rightBase: null, apex: "clay" }, hand: [chooser], bag: ["agate", "mica"] });
   const pending = rules.reduce(state, { type: "place", handIndex: 0, slot: "apex" }).state;
   const view = publicView(pending);
   run("vue publique : le sac de l'état de départ du choix voilé", true, view.pendingChoice.resume.from.bag.every((marble) => marble === null));
@@ -224,7 +245,7 @@ function checkPlayerChoices(run) {
   run("glouton : une réponse légale", true, rules.reduce(pending, best).ok);
   const randomAnswer = PLAYERS.random.startGame({ seed: 3 }).next(view);
   run("aléatoire : une réponse légale au choix", true, randomAnswer.type === "choose" && rules.reduce(pending, randomAnswer).ok);
-  // Mode « jusqu'à N » : Terminer est parmi les réponses tirées.
+  // Un choix facultatif : Terminer est parmi les réponses tirées.
   const upTo = { ...view, pendingChoice: { ...view.pendingChoice, mode: "optional" } };
   const answers = new Set();
   const session = PLAYERS.random.startGame({ seed: 5 });
@@ -233,8 +254,8 @@ function checkPlayerChoices(run) {
 }
 
 function checkGreedy(run) {
-  // Un cas construit où le meilleur coup est un remplacement : la plombée éjecte le
-  // gorille de la pointe... ou l'inverse. Le glouton doit trouver le maximum que donne
+  // Un cas construit, triangle plein et trois billes en main : le glouton doit trouver
+  // le maximum que donne
   // une recherche exhaustive indépendante (pas d'échange ou chaque échange, puis
   // aucune pose ou chaque pose). Une bille gagnée en main n'y vaut rien
   // (drawnValue 0) : le glouton ne compare alors que l'Impact.
@@ -310,9 +331,13 @@ function checkGreedy(run) {
 // pour le glouton ; avec elle, il la joue quand elle rapporte plus que l'Impact perdu.
 function checkDrawnValue(run) {
   run("bille gagnée : la valeur par défaut, dite dans la description du joueur", true, PLAYERS.greedy.describe({}).includes(frNumber(MARBLES_DRAWN_VALUE)));
-  // Le Tic de l'œil-de-chat pioche si la main est vide : posé seul de sa main, sur un
-  // emplacement occupé.
-  const view = publicView(buildState({ turn: 4, triangle: { leftBase: "clay", rightBase: "glass", apex: null }, hand: ["cats_eye"], bag: ["tiger", "giant"] }));
+  // Une vraie bille dont le Tic pioche (sous condition au plus de main vide) : posée
+  // seule de sa main, sur un emplacement occupé, elle pioche.
+  const drawer = Object.keys(MARBLE_TYPES).find((id) =>
+    (MARBLE_TYPES[id].hit ?? []).some((clause) => clause.action === "draw" && (clause.when === undefined || (clause.when.type === "zone" && clause.when.zone === "hand" && clause.when.state === "empty")))
+  );
+  if (drawer === undefined) throw new Error("aucune vraie bille ne pioche à son Tic : ce test n'a rien à jouer.");
+  const view = publicView(buildState({ turn: 4, triangle: { leftBase: "clay", rightBase: "glass", apex: null }, hand: [drawer], bag: ["tiger", "giant"] }));
   const greedy = bestPlan(view, { drawnValue: 100 });
   run("bille gagnée : très chère, le glouton pioche", true, greedy.drawn >= 1);
   run("bille gagnée : la valeur du plan", greedy.impact + 100 * greedy.drawn, greedy.value);
@@ -324,7 +349,8 @@ function checkDrawnValue(run) {
   const summary = summarize(simulate({ games: 30, seed: 5, player: "greedy" }));
   run("simulation : des billes piochées par des effets", true, summary.draws.byEffect > 0);
   run("simulation : régénérations en cours de tour, comprises dans le total", true, summary.draws.midTurnRegenerations <= summary.draws.regenerations);
-  run("simulation : jamais plus de lancers que la limite", true, summary.throwsPerTurn > 0 && summary.throwsPerTurn <= MARBLES_SETTINGS.throwsPerTurn);
+  // La limite elle-même, statuts compris, est une règle du réducteur (domaine marbles).
+  run("simulation : des lancers joués à chaque tour, en moyenne", true, summary.throwsPerTurn > 0);
   // Les pioches d'effets reviennent aux billes qui ont une Pioche, jamais aux autres.
   run.same(
     "simulation : seules les billes qui ont une Pioche font piocher",
@@ -431,6 +457,8 @@ function checkDrawAttribution(run) {
     { giant: 2, cats_eye: 1 },
     drawnBy([effect("giant", "phase", 2), drawn, effect("cats_eye", "awaken", 1), drawn, drawn])
   );
+  // La Pioche d'une réaction de statut : aucune bille ne la fait, aucune ne la compte.
+  run.same("attribution des pioches : la Pioche d'un statut, chez aucune bille", {}, drawnBy([effect(null, "statusReaction", 1), drawn]));
   // Une Pioche suspendue par un choix finit dans l'action suivante : la pile la garde.
   const drawers = [];
   drawnBy([effect("giant", "phase", 2), drawn], drawers);
@@ -444,6 +472,18 @@ function checkDrawAttribution(run) {
 }
 
 // La différence de deux rapports (marbles/tools/report-diff.js), celle du comparateur.
+// La ligne de commande des outils, lue strictement (marbles/tools/args.js).
+function checkArgs(run) {
+  const spec = { values: ["--seed", "--games"], flags: ["--json"], positionals: 1 };
+  const read = parseArgs(["cas.json", "--seed", "42", "--json"], spec);
+  run.same("arguments : valeur, drapeau, argument", ["42", true, false, ["cas.json"]], [read.option("--seed"), read.flag("--json"), read.flag("--games"), read.positionals]);
+  run("arguments : une option inconnue refusée", true, throws(() => parseArgs(["--nope"], spec)));
+  run("arguments : une valeur manquante en dernier refusée", true, throws(() => parseArgs(["--seed"], spec)));
+  run("arguments : une valeur prise par l'option suivante refusée", true, throws(() => parseArgs(["--seed", "--json"], spec)));
+  run("arguments : une option donnée deux fois refusée", true, throws(() => parseArgs(["--seed", "1", "--seed", "2"], spec)));
+  run("arguments : un argument en trop refusé", true, throws(() => parseArgs(["a.json", "b.json"], spec)));
+}
+
 function checkReportDiff(run) {
   const result = simulate({ games: 20, seed: 4, player: "random" });
   const report = [...buildReport({ params: result.params, summary: summarize(result), name: (id) => id }), "Durée : 1,2 s."];
@@ -466,6 +506,15 @@ function checkReportDiff(run) {
     before: byMarble.groups[0].before.map((line) => line.trim()),
     after: byMarble.groups[0].after.map((line) => line.trim()),
   });
+
+  // Les dernières lignes, sans paragraphe à elles : chacune sous son propre titre.
+  const interruptionLine = report.findIndex((line) => line.startsWith(REPORT_HEADINGS.interruptions));
+  const interrupted = diffReports(report, report.map((line, index) => (index === interruptionLine ? `${REPORT_HEADINGS.interruptions}2.` : line)));
+  run.same(
+    "différence : une interruption changée, une ligne, sous son titre",
+    { changed: 1, context: REPORT_HEADINGS.interruptions },
+    { changed: interrupted.changedLines, context: interrupted.groups[0].context.heading }
+  );
 
   // Le score final changé : un résultat.
   const scoreLine = report.indexOf(REPORT_HEADINGS.score) + 1;

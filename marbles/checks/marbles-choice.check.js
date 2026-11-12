@@ -6,7 +6,6 @@
 // core/checks/index.js/runChecks (`node tools/run-checks.js marbles-choice`).
 
 import { throws } from "../../lib/check.js";
-import { legalActions } from "../core/marbles.js";
 import { LARGE, MEDIUM, SMALL } from "../config/values.js";
 import { printedStat } from "../core/effects.js";
 import { CHOICELESS_TYPES, fixtureRules } from "./fixtures/marbles.js";
@@ -110,17 +109,17 @@ function checkChoices(run) {
   // « Jusqu'à N » : Terminer, à zéro choix ou après un ; refusé en mode obligatoire.
   const upTo = reduce(playState({ hand: inHand(["upToPolish"]), triangle: triangleOf(placed("sturdy", 3), null, placed("plain")) }), { type: "place", handIndex: 0, slot: "apex" });
   const zero = reduce(upTo.state, { type: "choose", done: true });
-  run("jusqu'à N : Terminer à zéro choix", null, zero.state.pendingChoice);
-  run("jusqu'à N : rien poli", false, zero.events.some((event) => event.type === "polished"));
+  run("facultatif : Ne rien choisir, à zéro choix", null, zero.state.pendingChoice);
+  run("facultatif : rien poli", false, zero.events.some((event) => event.type === "polished"));
   run("facultatif : rien de choisi, l'action ignorée, noté", "declined", zero.events.find((event) => event.type === "choiceEnded").reason);
   const one = reduce(answer(upTo.state, "leftBase").state, { type: "choose", done: true });
-  run.same("jusqu'à N : Terminer après un choix", ["leftBase"], one.events.filter((event) => event.type === "polished").map((event) => event.slot));
+  run.same("facultatif : Terminer après un choix", ["leftBase"], one.events.filter((event) => event.type === "polished").map((event) => event.slot));
   run("facultatif : Terminer après un choix, noté comme terminé", "done", one.events.find((event) => event.type === "choiceEnded").reason);
   run("validation, choix : sans mode refusé", true, throws(() => validateTable({ x: { hit: [{ action: "polish", amount: 1, target: { type: "choice", zones: ["triangle"], pick: "marble", count: 1 } }] } })));
   run("validation, choix : mode inconnu refusé", true, throws(() => validateTable({ x: { hit: [{ action: "polish", amount: 1, target: { type: "choice", zones: ["triangle"], pick: "marble", count: 1, mode: "maybe" } }] } })));
   run("obligatoire : Terminer refusé", "choiceRequired", reduce(opened.state, { type: "choose", done: true }).error);
-  run.same("jusqu'à N : Terminer parmi les actions légales", { type: "choose", done: true }, legalActions(upTo.state).at(-1));
-  run.same("obligatoire : seulement les cibles", ["choose", "choose", "choose"], legalActions(opened.state).map((action) => action.type));
+  run.same("facultatif : Terminer parmi les actions légales", { type: "choose", done: true }, rules.legalActions(upTo.state).at(-1));
+  run.same("obligatoire : seulement les cibles", ["choose", "choose", "choose"], rules.legalActions(opened.state).map((action) => action.type));
 
   // Pendant l'attente : toute autre action refusée ; une cible non éligible refusée ;
   // « choisir » sans choix en attente refusé.

@@ -11,7 +11,7 @@
 // un état qui porte une instance d'un statut absent de la table échoue alors,
 // clairement (definitionOf), jamais en silence.
 //
-// UNE DÉFINITION (sa validation : marbles/core/content.js/validateMarbleStatuses) :
+// UNE DÉFINITION (sa validation : marbles/core/validation.js/validateMarbleStatuses) :
 //   stacking   le CUMUL quand le statut est appliqué alors qu'il est déjà là
 //              (STATUS_STACKINGS) : "intensity", l'intensité s'ajoute ; "duration",
 //              la durée s'ajoute ; "unique", une seconde application est sans effet ;
@@ -182,7 +182,8 @@ export function characteristic(state, key, statuses = NO_STATUSES) {
 // Une valeur passée par les modificateurs d'un point d'interception (MODIFIER_POINTS),
 // sans rien changer à l'état : additions puis multiplications, chacune dans l'ordre
 // d'acquisition, puis le plancher 0. -> { value, contributions, changed } :
-//   contributions  chaque pas qui a changé la valeur, [{ status, before, after }] ;
+//   contributions  chaque pas qui a changé la valeur, plancher compris,
+//                  [{ status, before, after }] ;
 //   changed        les statuts dont un pas a VRAIMENT changé la valeur, chacun une
 //                  fois, dans l'ordre : leurs charges se consomment (useCharges).
 function intercept(instances, statuses, point, value) {
@@ -195,10 +196,14 @@ function intercept(instances, statuses, point, value) {
   const changed = [];
   for (const { instance, behavior } of modifiers) {
     const after = MODIFIER_OPERATIONS[behavior.operation].step(current, behavior, instance.intensity);
-    if (after === current) continue;
-    contributions.push({ status: instance.status, before: current, after });
-    if (!changed.includes(instance.status)) changed.push(instance.status);
+    // Le calcul garde la valeur brute (les planchers à la fin) ; un pas ne CHANGE la
+    // valeur que si son résultat, plancher compris, change : -4 puis ×2 reste 0,
+    // aucune charge consommée, rien à dire.
+    const [floorBefore, floorAfter] = [Math.max(0, current), Math.max(0, after)];
     current = after;
+    if (floorAfter === floorBefore) continue;
+    contributions.push({ status: instance.status, before: floorBefore, after: floorAfter });
+    if (!changed.includes(instance.status)) changed.push(instance.status);
   }
   return { value: Math.max(0, current), contributions, changed };
 }
