@@ -1010,17 +1010,14 @@
   "assets/sounds/items/small_pieces_1_beacon": [
     "assets/sounds/items/small_pieces_1_beacon_1.mp3"
   ],
-  "assets/sounds/marbles/marble_awakening": [
-    "assets/sounds/marbles/marble_awakening_1.mp3"
+  "assets/sounds/marbles/marble_awaken": [
+    "assets/sounds/marbles/marble_awaken_1.mp3"
   ],
   "assets/sounds/marbles/marble_cracking": [
     "assets/sounds/marbles/marble_cracking_1.mp3"
   ],
   "assets/sounds/marbles/marble_final": [
     "assets/sounds/marbles/marble_final_1.mp3"
-  ],
-  "assets/sounds/marbles/marble_finding": [
-    "assets/sounds/marbles/marble_finding_1.mp3"
   ],
   "assets/sounds/marbles/marble_flick": [
     "assets/sounds/marbles/marble_flick_1.mp3"
@@ -1063,6 +1060,9 @@
   ],
   "assets/sounds/marbles/marble_small_rolling": [
     "assets/sounds/marbles/marble_small_rolling_1.mp3"
+  ],
+  "assets/sounds/marbles/marble_windfall": [
+    "assets/sounds/marbles/marble_windfall_1.mp3"
   ],
   "assets/sounds/marbles/marbles_shuffling": [
     "assets/sounds/marbles/marbles_shuffling_1.mp3",
