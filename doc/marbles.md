@@ -918,7 +918,7 @@ billes ; le déroulé les reçoit par `options.statuses` (`run.statuses`). Une d
 | Comportement | Forme | Effet |
 |---|---|---|
 | caractéristique | `{ type: "stat", stat, amount }` | `throws`, `handSize` ou `potCapacity` augmentée de `amount` × l'intensité |
-| modificateur | `{ type: "modifier", point, operation, value }` | à un point d'interception (`MODIFIER_POINTS` : `speedGain`, `speedLoss`, `massGain`, `massLoss`, `impact`), `add` (`value` × l'intensité) ou `multiply` (`value` à la puissance de l'intensité) |
+| modificateur | `{ type: "modifier", point, operation, value }` | à un point d'interception (`MODIFIER_POINTS` : `speedGain`, `speedLoss`, `massGain`, `massLoss`, `impact`, `turnDraw`, `effectDraw`, `polish`, `crack`, `phaseWear`), `add` (`value` × l'intensité) ou `multiply` (`value` à la puissance de l'intensité) |
 | réaction | `{ type: "reaction", on, effect }` | un effet de billes joué à chaque incrément du compteur écoutable `on`, comme une bille du pot ; l'intensité ne la module pas |
 
 Les INSTANCES sont dans l'état, sérialisées avec lui (`state.statuses`, l'ordre de la
@@ -933,10 +933,19 @@ statut : une nouvelle application se fusionne (`applyStatus`, selon le cumul).
   (`rules.characteristic`, `rules.throwsLeft`, `rules.throwRefusal`,
   `rules.placeRefusal`, `rules.legalActions`) ; hors du core, la vue et les outils
   passent par elles.
-- **Modificateurs** : `modifyStat` sur la Vitesse et la Masse qu'un effet applique
+- **Modificateurs** : chaque point déclare sa nature (`MODIFIER_POINTS`, `nature`).
+  Valeurs signées : `modifyStat` sur la Vitesse et la Masse qu'un effet applique
   (`marbles/core/run.js`/`fireEffect`, bonus reçu compris, par le signe d'avant la
-  modification, sur la grandeur, signe remis), `modifyImpact` sur l'Impact
-  (`marbles/core/marbles.js`/`resolveTurn`) ; additions puis multiplications, ordre
+  modification, sur la grandeur, signe remis). Quantités, plancher 0 :
+  `modifyQuantity` sur l'Impact (`marbles/core/marbles.js`/`resolveTurn`), la pioche
+  du début de tour (`drawTurn`) et l'usure de phase (`resolvePhases`, plafonnée
+  ensuite au maximum) ; `modifyActionAmount` sur le montant d'une action de clause qui
+  déclare son point (`action` : `effectDraw` pour le total des Pioches d'un effet,
+  `polish`, `crack` par clause), dans `fireEffect`, avant que l'effet ne s'émette : ses
+  `operations` et son `draw` portent les quantités finales, une quantité ramenée à 0
+  retire l'action ; un montant nul n'est intercepté par rien. Ajouter Empocher ou une
+  autre action : une entrée de `MODIFIER_POINTS` avec son `action`, et ses textes
+  (`marbles.statuses.point.<id>`). Additions puis multiplications, ordre
   d'acquisition, plancher 0. L'évènement `effect` ou `impact` porte la valeur finale ;
   `valueModified` (muet) dit les pas, puis `statusCharge` et `statusExpired` à leur
   place. Une charge ne se consomme qu'à un vrai changement (`useCharges`).

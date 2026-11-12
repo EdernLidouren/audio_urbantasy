@@ -7,7 +7,8 @@ export default {
   // Base : Éjecter une bille active au choix, pendant la résolution.
   base: [eject(choice({ zones: ["triangle"], mode: "required" }))],
   apex: [speed(-1)],
-  awaken: [speed(2)],
+  // Éveil : statut répit (ce tour, les billes ne s'usent pas à leur phase).
+  awaken: [applyStatus("respite")],
   windfall: [speed(3)],
   // Final : statut amorti, 3 tours (les pertes de Vitesse réduites de 1).
   final: [applyStatus("cushion")],

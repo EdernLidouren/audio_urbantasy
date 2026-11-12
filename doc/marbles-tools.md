@@ -209,7 +209,8 @@ Les domaines, listés dans `marbles/checks/index.js` (`MARBLES_SUITES`) et lanc�
 point d'entrée unique des vérifications (`node tools/run-checks.js`) : `marbles` (règles), `marbles-pocket` (le pot), `marbles-path` (le chemin des billes :
 la Chute, Défausser, Rebond, Ramasser), `marbles-zones` (conditions d'état et nombre de
 billes par zone), `marbles-relative` (les cibles relatives), `marbles-statuses` (les
-statuts : définitions, cumuls, caractéristiques, modificateurs, réactions, durées, sur
+statuts : définitions, cumuls, caractéristiques, modificateurs, réactions, durées,
+quantités, sur
 la table des statuts de test `FIXTURE_STATUSES`), `marbles-choice` (cibles au
 choix et Éjecter), `marbles-bus`, `marbles-tally`, `marbles-forecast`, `marbles-view`,
 `marbles-sequence`, `marbles-tools`, `marbles-content`, `marbles-screen` (l'écran, ci-dessous).

@@ -111,7 +111,7 @@ import { SLOTS, effectAt, isOptionalChoice, nextSlot, previousSlot } from "./eff
 import { emptyTally } from "./tally.js";
 import { TALLY_COUNTERS, maxWearOf, validateGameSettings } from "./content.js";
 import { UNKNOWN_MARBLE, answerOf, chooseRefusal, consumeCharges, drawMarbles, noteModification, retireMarble, shuffled, targetRef, transact, travel, update } from "./run.js";
-import { NO_STATUSES, activatePending, characteristic, endTurn, modifyImpact } from "./statuses.js";
+import { NO_STATUSES, activatePending, characteristic, endTurn, modifyQuantity } from "./statuses.js";
 
 export { SLOTS, effectAt, nextSlot, previousSlot };
 
@@ -311,7 +311,11 @@ function drawTurn(run) {
     for (const status of activated) run.emit({ type: "statusActivated", status });
   }
   update(run, { hand: run.state.hand.map((held) => ({ ...held, turnsInHand: held.turnsInHand + 1 })) });
-  drawMarbles(run, state.turn === 1 ? state.firstTurnDraw : state.drawPerTurn, "turn");
+  // Le nombre à piocher passe par ses modificateurs (turnDraw) ; la pioche s'arrête
+  // ensuite à ses limites habituelles (main pleine, plus de billes).
+  const count = consumeCharges(run, modifyQuantity(run.state.statuses, run.statuses, "turnDraw", state.turn === 1 ? state.firstTurnDraw : state.drawPerTurn));
+  noteModification(run, count, null);
+  drawMarbles(run, count.value, "turn");
   update(run, { stage: "play", swapUsed: false, throwsUsed: 0 });
 }
 
@@ -398,9 +402,15 @@ function resolvePhases(run) {
     // maximum.
     const after = run.state.triangle[slot];
     if (after === null) continue;
-    const wear = after.wear + 1;
+    // Le +1 passe par ses modificateurs (phaseWear), puis l'usure se plafonne à son
+    // maximum : ramené à 0, la bille ne s'use pas (l'évènement le dit, usure
+    // inchangée) ; augmenté jusqu'au maximum, elle part à l'étape des retraits.
+    const maxWear = maxWearOf(marble, run.types);
+    const added = consumeCharges(run, modifyQuantity(run.state.statuses, run.statuses, "phaseWear", 1));
+    const wear = Math.min(maxWear, after.wear + added.value);
     update(run, { triangle: { ...run.state.triangle, [slot]: { marble, wear } } });
-    run.emit({ type: "wear", slot, marble, wear, maxWear: maxWearOf(marble, run.types) });
+    run.emit({ type: "wear", slot, marble, wear, maxWear });
+    noteModification(run, added, { trigger: "phase", slot, marble });
   }
 }
 
@@ -445,7 +455,7 @@ function resolveTurn(run) {
   const { speed, mass } = run.state;
   // L'Impact habituel, puis ses modificateurs (Coup double), plancher 0 ; l'évènement
   // porte la valeur finale, ce qu'ont fait les statuts se dit après lui.
-  const change = consumeCharges(run, modifyImpact(run.state.statuses, run.statuses, impactOf(speed, mass)));
+  const change = consumeCharges(run, modifyQuantity(run.state.statuses, run.statuses, "impact", impactOf(speed, mass)));
   const impact = change.value;
   const score = run.state.score + impact;
   update(run, { score });

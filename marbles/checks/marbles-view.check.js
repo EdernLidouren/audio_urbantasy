@@ -88,7 +88,7 @@ import { pathLength, rollAt, rollDurationMs, rollEnvelope } from "../view/rolls.
 import { EMPTY_SOUND_QUEUE, advanceSoundQueue, enqueueCues } from "../view/sound-queue.js";
 import { throws } from "../../lib/check.js";
 import { CHOICELESS_TYPES, FIXTURE_STATUSES, FIXTURE_TYPES, fixtureRules } from "./fixtures/marbles.js";
-import { choice, polish, speed } from "../content/effects.js";
+import { choice, draw, polish, speed } from "../content/effects.js";
 import { answerChoices, emptyBagMarblesGame, fabricatedRules, inHand, isCleanText, keyText, marblesPlayState, mustReduce } from "./helpers.js";
 import { choiceAnswer, choiceCursorAfterAnswer, choiceFocusLine, choiceHandOptions, choiceMarbleAt, choiceStartCursor, stepChoiceCursor } from "../view/choice.js";
 import { MARBLES_HELP_TOPICS, helpTopicText, marblesHelpMenu } from "../view/help-screen.js";
@@ -1429,6 +1429,33 @@ function checkStatusNarration(run) {
       originText(null, t),
     ]
   );
+
+  // Les quantités : sans virgule, à l'intensité ; un multiplicateur nul.
+  run.same(
+    "fiche : les quantités, pioche du tour, pioche par effet, Polissage, Fêlure, usure de phase",
+    [
+      "statuses.card.effect{effect: effect.combined{parts: [statuses.behavior.add_quantity{point: statuses.point.turnDraw, value: +2}]}}",
+      "statuses.card.effect{effect: effect.combined{parts: [statuses.behavior.add_quantity{point: statuses.point.effectDraw, value: +1}]}}",
+      "statuses.card.effect{effect: effect.combined{parts: [statuses.behavior.add_quantity{point: statuses.point.polish, value: −1}]}}",
+      "statuses.card.effect{effect: effect.combined{parts: [statuses.behavior.add_quantity{point: statuses.point.crack, value: +1}]}}",
+      "statuses.card.effect{effect: effect.combined{parts: [statuses.behavior.multiply{point: statuses.point.phaseWear, value: 0}]}}",
+    ],
+    [
+      instance("turn_draw_more", { intensity: 2 }),
+      instance("effect_draw_charge"),
+      instance("polish_less", { remaining: null }),
+      instance("crack_more", { remaining: 3 }),
+      instance("wear_none"),
+    ].map((one) => statusCard(one, "main", rules, t).below[0])
+  );
+  // La confirmation et R : les quantités finales, sans rien de plus.
+  const polishing = fabricatedRules({ polisher: { flick: [polish(1, "apex")] }, target: { base: [speed(1)], apex: [speed(1)] } });
+  const polishState = { ...marblesPlayState(polishing, { hand: inHand(["polisher"]), triangle: { leftBase: null, rightBase: null, apex: { marble: "target", wear: 2 } } }), statuses: [instance("polish_more", { remaining: null })] };
+  const flickLine = placementLines(polishState, 0, "leftBase", polishing, t).find(({ key }) => key === "marbles.place.flick");
+  run("confirmation : la Chiquenaude dit Polissage 2", true, flickLine.params.effect.includes("effect.polish{amount: 2}"));
+  const drawing = fabricatedRules({ drawer: { base: [draw(1)], apex: [draw(1)] } });
+  const overviewDraw = describeOverview({ ...marblesPlayState(drawing, { bag: ["drawer", "drawer"], triangle: { leftBase: null, rightBase: { marble: "drawer", wear: 0 }, apex: null } }), statuses: [instance("effect_draw_charge")] }, drawing, t);
+  run("R : la phase dit Pioche 2", true, overviewDraw.includes("effect.draw{amount: 2}"));
 
   // La clause sur une fiche : le nom, l'intensité s'il le faut, la durée de la clause.
   const giving = fabricatedRules({ giver: { flick: [{ action: "applyStatus", status: "loss_cushion", amount: 2, duration: 1 }, { action: "applyStatus", status: "throws_next", amount: 1 }] } });

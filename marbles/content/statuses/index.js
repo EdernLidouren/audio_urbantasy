@@ -21,8 +21,9 @@
 //                capacité du pot) augmentée de `amount` par intensité (négatif
 //                permis) ;
 //              { type: "modifier", point, operation, value } : un modificateur de
-//                valeur ("speedGain", "speedLoss", "massGain", "massLoss",
-//                "impact" ; "add" ou "multiply") ;
+//                valeur ("speedGain", "speedLoss", "massGain", "massLoss", "impact",
+//                "turnDraw", "effectDraw", "polish", "crack", "phaseWear" : la liste
+//                de marbles/core/statuses.js/MODIFIER_POINTS ; "add" ou "multiply") ;
 //              { type: "reaction", on, effect } : un effet (une liste de clauses)
 //                joué à chaque incrément de la valeur de partie écoutable `on`.
 //
@@ -37,6 +38,12 @@ import cushion from "./cushion.js";
 import fervor from "./fervor.js";
 import doubleStrike from "./doubleStrike.js";
 import fatigue from "./fatigue.js";
+import quickHand from "./quickHand.js";
+import inspiration from "./inspiration.js";
+import luster from "./luster.js";
+import brittleness from "./brittleness.js";
+import respite from "./respite.js";
+import acceleratedWear from "./acceleratedWear.js";
 
 export default {
   extraThrow,
@@ -46,4 +53,10 @@ export default {
   fervor,
   doubleStrike,
   fatigue,
+  quickHand,
+  inspiration,
+  luster,
+  brittleness,
+  respite,
+  acceleratedWear,
 };

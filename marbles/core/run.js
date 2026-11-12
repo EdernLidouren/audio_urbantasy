@@ -42,7 +42,7 @@ import {
 } from "./effects.js";
 import { recordTally } from "./tally.js";
 import { LISTENABLE_KEYS, REACTION_KEYS, REACTIVE_MOMENT, TALLY_COUNTERS, maxWearOf, pocketClauses, reactionClauses } from "./content.js";
-import { NO_STATUSES, applyStatus, characteristic, definitionOf, modifyStat, statusReactionClauses, statusReactionsOf, useCharges } from "./statuses.js";
+import { NO_STATUSES, applyStatus, characteristic, definitionOf, modifyActionAmount, modifyStat, statusReactionClauses, statusReactionsOf, useCharges } from "./statuses.js";
 
 // Une bille dont l'identité est cachée : au sac ou en défausse dans la copie de la
 // prévision, ou piochée à l'aveugle (drawOne). Jamais dans une vraie partie.
@@ -424,7 +424,7 @@ function fireEffect(run, trigger, listener, clauses, event) {
   };
   // Les cibles relatives, depuis l'emplacement d'où la bille agit (resolveClauses).
   const { clauses: resolved, unresolved } = resolveClauses(clauses, slot ?? null);
-  const { self, gifts: printedGifts, operations } = evaluateEffect(resolved, situation, run.types);
+  const { self, gifts: printedGifts, operations: printedOperations } = evaluateEffect(resolved, situation, run.types);
   // L'effet, tel que le portent ses suites ; celui d'un statut le nomme.
   const by = { trigger, slot: slot ?? null, marble, ...(listener.status === undefined ? {} : { status: listener.status }) };
   // Un bonus au choix : le joueur choisit d'abord ses billes, puis chacune le reçoit.
@@ -441,6 +441,22 @@ function fireEffect(run, trigger, listener, clauses, event) {
   const massChange = consumeCharges(run, modifyStat(run.state.statuses, run.statuses, "mass", applied.mass));
   const speedDelta = speedChange.value;
   const massDelta = massChange.value;
+  // Puis les QUANTITÉS de l'effet, dans l'ordre des clauses : le total de ses Pioches
+  // (effectDraw), puis le montant de chaque action sur une bille qui a son point
+  // (Polissage, Fêlure), une fois par clause, pour toutes ses cibles. Une quantité
+  // ramenée à 0 : l'action ne se joue pas. L'effet porte les quantités finales.
+  const drawChange = consumeCharges(run, modifyActionAmount(run.state.statuses, run.statuses, "draw", self.draw));
+  const amountChanges = [];
+  const operations = [];
+  for (const operation of printedOperations) {
+    if (operation.amount === undefined || CLAUSE_ACTIONS[operation.action].kind !== "marble") {
+      operations.push(operation);
+      continue;
+    }
+    const change = consumeCharges(run, modifyActionAmount(run.state.statuses, run.statuses, operation.action, operation.amount));
+    amountChanges.push(change);
+    if (change.value > 0) operations.push({ ...operation, amount: change.value });
+  }
 
   // Un bonus ne vaut que si la phase de sa cible peut encore avoir lieu ce tour :
   // sinon (emplacement vide, phase déjà passée ou en cours), il est perdu, et
@@ -463,14 +479,13 @@ function fireEffect(run, trigger, listener, clauses, event) {
   update(run, { triangle, speed, mass });
   // La Pioche : l'effet s'annonce, puis ses billes se piochent (drawMarbles), à
   // tout moment du tour. Une bille du pot porte sa place d'arrivée (`potIndex`).
-  const { draw } = self;
+  const draw = drawChange.value;
   const place = listener.zone === "pot" ? { potIndex: listener.index } : {};
   // L'Éjection provoquée par l'action Éjecter, et non par une pose : elle le porte.
   const provoked = event.type === "knockout" && event.by !== undefined ? { ejectedBy: event.by } : {};
   const ofStatus = listener.status === undefined ? {} : { status: listener.status };
   run.emit({ type: "effect", trigger, slot, marble, speedDelta, massDelta, draw, operations, given, lost, speed, mass, ...place, ...provoked, ...ofStatus });
-  noteModification(run, speedChange, by);
-  noteModification(run, massChange, by);
+  for (const change of [speedChange, massChange, drawChange, ...amountChanges]) noteModification(run, change, by);
   if (draw > 0) drawMarbles(run, draw, "effect");
   // Les actions sur une bille, après la pioche, dans l'ordre des clauses.
   for (const operation of operations) applyOperation(run, operation, listener, by);
@@ -499,8 +514,8 @@ function gainStatus(run, { status, amount, duration, stacking }, by) {
   run.emit({ type: outcome === "gained" ? "statusGained" : "statusStrengthened", status, intensity, remaining, pending, kind: duration.kind, stacking, by });
 }
 
-// Une valeur passée par les modificateurs des statuts (`change` : modifyStat ou
-// modifyImpact, marbles/core/statuses.js) : les charges des statuts qui l'ont
+// Une valeur passée par les modificateurs des statuts (`change` : modifyStat,
+// modifyQuantity ou modifyActionAmount, marbles/core/statuses.js) : les charges des statuts qui l'ont
 // VRAIMENT changée se consomment aussitôt dans l'état (une charge ne sert qu'une
 // fois, même à la Masse du même effet). -> le changement, avec `used` et `expired`,
 // que noteModification dira.

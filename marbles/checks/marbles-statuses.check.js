@@ -4,12 +4,13 @@
 // sauvegarde JSON, compteurs), les caractéristiques en vigueur et leurs planchers, les
 // modificateurs de valeur (ordre, signe, charges, Impact, prévision), les réactions
 // des statuts après celles du pot, et les durées (activation, expiration, dernier
-// tour). Sur la table des statuts de test (marbles/checks/fixtures/marbles.js/
+// tour), et les modificateurs de quantité (pioche du début de tour, pioche par effet,
+// Polissage, Fêlure, usure de phase). Sur la table des statuts de test (marbles/checks/fixtures/marbles.js/
 // FIXTURE_STATUSES) et des billes fabriquées. Lancées par
 // core/checks/index.js/runChecks (`node tools/run-checks.js marbles-statuses`).
 
 import { throws } from "../../lib/check.js";
-import { applyStatus as gain, mass, speed } from "../content/effects.js";
+import { applyStatus as gain, crack, draw, mass, polish, speed } from "../content/effects.js";
 import { validateMarbleStatuses } from "../core/content.js";
 import { CONDITIONS } from "../core/effects.js";
 import { readForecast } from "../core/forecast.js";
@@ -41,6 +42,12 @@ const TABLE = {
   flicker: { flick: [mass(1)] },
   // Donne Coup double à sa phase, et Vitesse +2.
   doubler: { base: [speed(2), gain("impact_double")], apex: [speed(2), gain("impact_double")] },
+  // Les quantités, à leur Chiquenaude : Polissage 1, Fêlure 1 à la pointe, Pioche 1.
+  polisher: { flick: [polish(1, "apex")] },
+  cracker: { flick: [crack(1, "apex")] },
+  drawer: { flick: [draw(1)] },
+  // Une bille à usure maximale 3, Vitesse +1 en phase.
+  worn: { base: [speed(1)], apex: [speed(1)], maxWear: 3 },
 };
 
 const rules = fabricatedRules(TABLE);
@@ -62,6 +69,65 @@ export default function checkMarblesStatuses(run) {
   run.section("modificateurs", checkModifiers);
   run.section("réactions", checkReactions);
   run.section("durées", checkDurations);
+  run.section("quantités", checkQuantities);
+}
+
+// LES QUANTITÉS : chaque point modifie sa quantité, plancher 0, avant les limites
+// habituelles ; les compteurs de quantité réelle disent ce qui s'est passé.
+function checkQuantities(run) {
+  const drawnOf = (result) => result.events.filter((event) => event.type === "draw").length;
+  const effectOf = (result, trigger) => result.events.find((event) => event.type === "effect" && event.trigger === trigger);
+
+  // La pioche du début de tour, à part de la pioche par effet.
+  const turnState = (statuses, hand = []) => ({ ...game({ stage: "draw", hand: inHand(hand), bag: Array(6).fill("plain") }), statuses });
+  run("pioche du tour : 1 + 2 (intensité 2)", 3, drawnOf(mustReduce(rules, turnState([instance("turn_draw_more", { intensity: 2, remaining: 2 })]), { type: "draw" })));
+  const limited = mustReduce(rules, turnState([instance("turn_draw_more", { intensity: 2, remaining: 2 })], ["plain", "plain", "plain"]), { type: "draw" });
+  run.same("pioche du tour : la main pleine arrête ensuite, comptée juste", [2, 2, "handFull"], [drawnOf(limited), limited.state.tally.drawnMarbles.turn, limited.events.find((event) => event.type === "drawSkipped")?.reason]);
+  const notByEffect = mustReduce(rules, turnState([instance("effect_draw_charge")]), { type: "draw" });
+  run.same("pioche du tour : une pioche par effet n'y touche pas, sa charge reste", [1, 1], [drawnOf(notByEffect), notByEffect.state.statuses[0].remaining]);
+  const effectBag = (statuses) => ({ ...game({ hand: inHand(["drawer"]), bag: Array(6).fill("plain") }), statuses });
+  const byEffect = mustReduce(rules, effectBag([instance("effect_draw_charge")]), toApex);
+  run.same("pioche par effet : 1 + 1, l'effet dit 2, la charge consommée", [2, 2, 0], [drawnOf(byEffect), effectOf(byEffect, "flick").draw, byEffect.state.statuses.length]);
+  run("pioche par effet : la pioche du tour n'y touche pas", 1, drawnOf(mustReduce(rules, effectBag([instance("turn_draw_more", { remaining: 2 })]), toApex)));
+  run("pioche par effet : sans Pioche, la charge reste", 1, mustReduce(rules, { ...game({ hand: inHand(["plain"]) }), statuses: [instance("effect_draw_charge")] }, toApex).state.statuses[0].remaining);
+
+  // Le Polissage : la quantité modifiée, puis le plancher d'usure.
+  const polished = (wear, statuses) => mustReduce(rules, { ...game({ hand: inHand(["polisher"]), triangle: triangleOf(null, null, placed("worn", wear)) }), statuses }, toApex);
+  const more = polished(2, [instance("polish_more", { remaining: null })]);
+  run.same("Polissage : 1 + 1, l'effet dit 2, usure 2 → 0", [2, 0], [effectOf(more, "flick").operations[0].amount, more.events.find((event) => event.type === "polished").wear]);
+  const floored = polished(1, [instance("polish_more", { remaining: null })]);
+  run.same("Polissage : le plancher d'usure ensuite, la quantité réelle 1", [0, 2, 1], [floored.events.find((event) => event.type === "polished").wear, floored.events.find((event) => event.type === "polished").amount, floored.state.tally.polishQuantity.turn]);
+  const none = polished(2, [instance("polish_less", { remaining: null })]);
+  run.same(
+    "Polissage ramené à 0 : rien ne se joue, ni évènement, ni déclenchement, l'effet ne le dit plus",
+    [false, 0, []],
+    [none.events.some((event) => event.type === "polished"), none.state.tally.polish.turn, effectOf(none, "flick").operations]
+  );
+  run("Polissage −2 : plancher 0, jamais une Fêlure", false, polished(2, [instance("polish_less", { intensity: 2, remaining: null })]).events.some((event) => event.type === "cracked"));
+
+  // La Fêlure : augmentée jusqu'au maximum, la bille part aussitôt.
+  const cracked = mustReduce(rules, { ...game({ hand: inHand(["cracker"]), triangle: triangleOf(null, null, placed("worn", 1)) }), statuses: [instance("crack_more", { remaining: 3 })] }, toApex);
+  const crackIndex = cracked.events.findIndex((event) => event.type === "cracked");
+  run.same("Fêlure : 1 + 1, usure 1 → 3, retirée aussitôt", [3, "removed", "wear"], [cracked.events[crackIndex].wear, cracked.events[crackIndex + 1].type, cracked.events[crackIndex + 1].cause]);
+  run("Fêlure : sa quantité réelle, 2", 2, cracked.state.tally.crackQuantity.turn);
+
+  // L'usure de phase : ×0, la phase jouée sans usure ; +1, retrait à l'étape des
+  // retraits ; plafonnée au maximum.
+  const resolved = (wear, statuses) => mustReduce(rules, { ...game({ triangle: triangleOf(null, placed("worn", wear), null) }), statuses }, { type: "resolve" });
+  const rested = resolved(0, [instance("wear_none")]);
+  run.same("usure de phase ×0 : la phase jouée, l'usure inchangée", [1, 0], [effectOf(rested, "phase").speedDelta, rested.events.find((event) => event.type === "wear").wear]);
+  const worn = resolved(1, [instance("wear_more")]);
+  const wearIndex = worn.events.findIndex((event) => event.type === "wear");
+  const removedIndex = worn.events.findIndex((event) => event.type === "removed");
+  run.same("usure de phase +1 : 1 → 3, retirée à l'étape des retraits, après les phases", [3, true], [worn.events[wearIndex].wear, removedIndex > worn.events.findIndex((event) => event.type === "phaseSkipped" && event.slot === "apex")]);
+  run("usure de phase +2 : plafonnée au maximum", 3, resolved(2, [instance("wear_more", { intensity: 2 })]).events.find((event) => event.type === "wear").wear);
+  run("usure de phase : une charge de Pioche n'y est pas consommée", 1, resolved(0, [instance("effect_draw_charge")]).state.statuses[0].remaining);
+
+  // La prévision égale le réel, usure et quantités comprises.
+  run("prévision = réel : usure de phase +1 et retrait", true, forecastMatches({ ...game({ triangle: triangleOf(placed("worn", 1), placed("worn", 0), null) }), statuses: [instance("wear_more")] }, null));
+  run("prévision = réel : Polissage augmenté à la pose", true, forecastMatches({ ...game({ hand: inHand(["polisher"]), triangle: triangleOf(placed("worn", 1), null, placed("worn", 2)) }), statuses: [instance("polish_more", { remaining: null })] }, toApex));
+  run("prévision = réel : Fêlure augmentée à la pose", true, forecastMatches({ ...game({ hand: inHand(["cracker"]), triangle: triangleOf(null, null, placed("worn", 1)) }), statuses: [instance("crack_more", { remaining: 3 })] }, toApex));
+  run("prévision : l'usure prévue est celle d'après les statuts", 0, rules.forecast({ ...game({ triangle: triangleOf(null, placed("worn", 0), null) }), statuses: [instance("wear_none")] }).wear[0].wear);
 }
 
 function checkDefinitions(run) {

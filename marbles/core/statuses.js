@@ -86,15 +86,45 @@ export const CHARACTERISTICS = Object.freeze({
 //                         inversé, une grandeur jamais sous 0 ;
 //   massGain, massLoss    la même chose pour la Masse ;
 //   impact                l'Impact du tour, après son calcul habituel (Vitesse ×
-//                         Masse et leurs planchers), puis plancher 0.
-// `stat` : la valeur interceptée ; `sign` : le signe des valeurs qu'il prend.
+//                         Masse et leurs planchers), puis plancher 0 ;
+//   turnDraw              le nombre de billes de la pioche du DÉBUT DE TOUR (celle
+//                         du premier tour comme des suivants), avant de piocher ;
+//   effectDraw            le N des Pioches d'un effet (leur total, une fois par
+//                         effet), avant de piocher ;
+//   polish, crack         le N d'une clause Polissage, d'une clause Fêlure, une fois
+//                         par clause quand l'effet joue, avant le plancher et le
+//                         plafond d'usure ; la quantité finale vaut pour chaque cible ;
+//   phaseWear             le +1 d'usure qu'une bille prend à sa phase, plafonné
+//                         ensuite à son usure maximale.
+// Chacun déclare sa NATURE :
+//   "signed"    une valeur signée (Vitesse, Masse) : `stat`, la valeur interceptée,
+//               et `sign`, le signe des valeurs qu'il prend (modifyStat) ;
+//   "quantity"  une quantité, jamais négative : modifiée telle quelle, plancher 0
+//               (modifyQuantity) ; les limites habituelles (main pleine, sac vide,
+//               usure entre 0 et son maximum) s'appliquent APRÈS. `action`
+//               (facultatif) : l'action de clause dont elle intercepte le montant
+//               (pointOfAction) ; une autre action (Empocher, Éjecter…) s'y ajoute
+//               par une entrée ici, rien d'autre côté statuts.
+// Une quantité ramenée à 0 ne fait rien : l'action ne se joue pas (l'usure de phase,
+// elle, se dit inchangée).
 export const MODIFIER_POINTS = Object.freeze({
-  speedGain: { stat: "speed", sign: 1 },
-  speedLoss: { stat: "speed", sign: -1 },
-  massGain: { stat: "mass", sign: 1 },
-  massLoss: { stat: "mass", sign: -1 },
-  impact: { stat: "impact", sign: 1 },
+  speedGain: { nature: "signed", stat: "speed", sign: 1 },
+  speedLoss: { nature: "signed", stat: "speed", sign: -1 },
+  massGain: { nature: "signed", stat: "mass", sign: 1 },
+  massLoss: { nature: "signed", stat: "mass", sign: -1 },
+  impact: { nature: "quantity" },
+  turnDraw: { nature: "quantity" },
+  effectDraw: { nature: "quantity", action: "draw" },
+  polish: { nature: "quantity", action: "polish" },
+  crack: { nature: "quantity", action: "crack" },
+  phaseWear: { nature: "quantity" },
 });
+
+// Le point d'interception du montant d'une action de clause (MODIFIER_POINTS,
+// `action`), ou null : son montant n'est intercepté par rien.
+function pointOfAction(action) {
+  return Object.keys(MODIFIER_POINTS).find((id) => MODIFIER_POINTS[id].action === action) ?? null;
+}
 
 // Les opérations d'un modificateur : d'abord TOUTES les additions, puis toutes les
 // multiplications, chacune dans l'ordre d'acquisition ; les planchers à la fin.
@@ -180,7 +210,7 @@ function intercept(instances, statuses, point, value) {
 export function modifyStat(instances, statuses, stat, value) {
   if (value === 0) return { point: null, before: 0, value: 0, contributions: [], changed: [] };
   const sign = Math.sign(value);
-  const point = Object.keys(MODIFIER_POINTS).find((id) => MODIFIER_POINTS[id].stat === stat && MODIFIER_POINTS[id].sign === sign);
+  const point = Object.keys(MODIFIER_POINTS).find((id) => MODIFIER_POINTS[id].nature === "signed" && MODIFIER_POINTS[id].stat === stat && MODIFIER_POINTS[id].sign === sign);
   const result = intercept(instances, statuses, point, Math.abs(value));
   // Une grandeur ramenée à 0 vaut 0, jamais −0 (qu'une comparaison ou un texte
   // distinguerait).
@@ -188,10 +218,22 @@ export function modifyStat(instances, statuses, stat, value) {
   return { point, before: value, value: signed, contributions: result.contributions, changed: result.changed };
 }
 
-// L'Impact du tour, après son calcul habituel, passé par ses modificateurs, plancher 0.
-export function modifyImpact(instances, statuses, impact) {
-  const result = intercept(instances, statuses, "impact", impact);
-  return { point: "impact", before: impact, ...result };
+// Une QUANTITÉ (un point de nature "quantity" : l'Impact, une pioche, un Polissage,
+// une Fêlure, l'usure de phase) passée par ses modificateurs, plancher 0.
+// -> { point, before, value, contributions, changed }.
+export function modifyQuantity(instances, statuses, point, value) {
+  if (MODIFIER_POINTS[point]?.nature !== "quantity") throw new Error(`marbles : "${point}" n'est pas un point d'interception de quantité.`);
+  const result = intercept(instances, statuses, point, value);
+  return { point, before: value, ...result };
+}
+
+// Le montant d'une action de clause passé par son point d'interception
+// (pointOfAction), ou tel quel si elle n'en a pas. Un montant nul (un effet sans
+// Pioche) n'est intercepté par rien : il n'y a rien à modifier.
+export function modifyActionAmount(instances, statuses, action, amount) {
+  const point = pointOfAction(action);
+  if (point === null || amount === 0) return { point: null, before: amount, value: amount, contributions: [], changed: [] };
+  return modifyQuantity(instances, statuses, point, amount);
 }
 
 // --- Les instances ---

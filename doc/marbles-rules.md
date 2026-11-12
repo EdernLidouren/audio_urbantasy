@@ -402,6 +402,33 @@ Un **statut** est un effet durable que reçoit la partie, donné par une bille (
   - L'Impact se modifie après son calcul habituel (Vitesse × Masse et leurs planchers), puis ne descend jamais sous 0.
   - Plusieurs statuts sur la même valeur : d'abord toutes les additions, puis toutes les multiplications, chacune dans l'ordre où les statuts ont été reçus ; le plancher à la fin.
   - L'effet et l'Impact se disent avec leur valeur finale, partout : la séquence, R, la confirmation.
+- **Modifier une quantité** : le nombre de billes de la pioche du début de tour, le N des Pioches d'un effet, le N d'un Polissage, le N d'une Fêlure, et l'usure qu'une bille prend à sa phase (1 d'habitude).
+  - Le même ordre que pour les valeurs : additions, puis multiplications, dans l'ordre où les statuts ont été reçus, plancher 0 à la fin. Une quantité ne devient jamais négative : un Polissage réduit ne devient jamais une Fêlure, ni l'inverse.
+  - La pioche du début de tour (celle du premier tour comme des suivants) et la Pioche d'un effet sont deux quantités séparées : un statut sur l'une ne touche pas l'autre. Les Pioches d'un effet se modifient ensemble, une fois par effet ; un effet sans Pioche n'a rien à modifier.
+  - Un Polissage ou une Fêlure se modifie une fois par clause, quand l'effet joue ; la quantité finale vaut pour chacune de ses cibles. Une charge sert donc à toute la clause, et se consomme même si la cible se révèle vide.
+  - Les limites habituelles viennent APRÈS : la main pleine et le sac vide arrêtent la pioche, l'usure ne descend pas sous 0 ni ne dépasse son maximum. Les quantités réelles des valeurs de partie comptent ce qui s'est vraiment passé.
+  - Une quantité ramenée à 0 ne fait rien : l'action ne se joue pas, ne se dit pas, et ne compte pas comme un déclenchement de son mot-clé. Une usure de phase ramenée à 0 : la bille joue sa phase sans s'user.
+  - Une usure de phase augmentée peut amener la bille à son maximum (jamais au-delà) : elle part à l'étape des retraits. Une Fêlure augmentée qui l'y amène la retire aussitôt.
+  - L'effet se dit avec ses quantités finales : « Polissage 2 à la pointe » pour un Polissage 1, sous un statut qui ajoute 1 aux Polissages. La fiche d'une bille garde son effet imprimé.
+
+### Les points d'interception
+
+Tous les endroits où un statut peut modifier une valeur, dans l'ordre où ils se déclarent :
+
+| Point | La valeur modifiée | Quand |
+|---|---|---|
+| gains de Vitesse | une Vitesse positive qu'un effet applique, sur sa grandeur | quand l'effet joue, bonus reçu compris |
+| pertes de Vitesse | une Vitesse négative qu'un effet applique, sur sa grandeur | quand l'effet joue, bonus reçu compris |
+| gains de Masse | une Masse positive qu'un effet applique | quand l'effet joue |
+| pertes de Masse | une Masse négative qu'un effet applique | quand l'effet joue |
+| Impact | l'Impact du tour | après son calcul habituel |
+| pioche du début de tour | le nombre de billes à piocher au début du tour | avant de piocher |
+| Pioches par effet | le total des Pioches d'un effet | quand l'effet joue, avant de piocher |
+| Polissages | le N d'une clause Polissage | quand l'effet joue, avant le plancher d'usure |
+| Fêlures | le N d'une clause Fêlure | quand l'effet joue, avant le plafond d'usure |
+| usure de phase | l'usure prise par une bille à sa phase | après son effet de phase, avant le plafond |
+
+Tous ont un plancher de 0. Empocher, Éjecter, Défausser, Rebond et Ramasser n'en ont pas.
 - **Réagir à ce qui se passe**, comme une bille du pot (section 9) : « Ferveur : à chaque chiquenaude, Vitesse +2 ». La réaction se dit avec le nom du statut : « Ferveur : Vitesse +2. ». Elle ne vise jamais « cette bille » ni un emplacement relatif : un statut n'a pas de bille.
 
 ### L'intensité et le cumul
@@ -444,6 +471,12 @@ Un **statut** est un effet durable que reçoit la partie, donné par une bille (
 - **Ferveur** : à chaque chiquenaude, Vitesse +2, 2 tours ; unique.
 - **Coup double** : l'Impact du tour doublé, ce tour ; unique.
 - **Fatigue** : lancers −1 par intensité, le prochain tour ; en intensité. Un statut négatif.
+- **Main vive** : pioche du début de tour +1 par intensité, 2 tours ; en intensité.
+- **Inspiration** : la prochaine Pioche d'un effet pioche une bille de plus ; une charge, en durée.
+- **Lustre** : Polissages +1 par intensité, toute la partie ; en intensité.
+- **Fragilité** : Fêlures +1 par intensité, 3 tours ; en intensité. Un statut négatif.
+- **Répit** : les billes ne s'usent pas à leur phase, ce tour ; unique.
+- **Usure accélérée** : usure de phase +1 par intensité, le prochain tour ; en intensité. Un statut négatif.
 
 ## Annexe : les billes de test
 
@@ -483,8 +516,8 @@ agate, normale, usure 3.
 
 - Pointe : Masse +1 et Masse +2 si la base gauche est un calot.
 - Base : Masse +1.
-- Tic : Masse +1.
-- Trouvaille : Polissage 1.
+- Tic : statut inspiration, 1 charge.
+- Trouvaille : statut lustre, toute la partie.
 - Final : statut poche profonde, toute la partie et Empocher cette bille.
 - En poche, à chaque résolution : Masse +2 si le pot est plein.
 
@@ -505,7 +538,7 @@ porcelaine, minibille, usure 2.
 - Base : Vitesse +2.
 - Chiquenaude : Masse +1 à la bille de l'emplacement précédent.
 - Final : Vitesse +4 et Polissage 1, jusqu'à 2 billes actives au choix.
-- Chute : Polissage 1 à la bille de l'emplacement suivant.
+- Chute : statut fragilité, 3 tours.
 - En poche, à l'entrée : Vitesse +10.
 
 ### plombée
@@ -513,7 +546,7 @@ porcelaine, minibille, usure 2.
 plombée, calot, usure 3.
 
 - Pointe : Vitesse −3.
-- Base : Masse +2.
+- Base : statut usure accélérée, le prochain tour.
 - Chiquenaude : Éjecter la bille en pointe.
 - Éjection : statut coup de fouet, 1 charge.
 
@@ -544,7 +577,7 @@ grès, normale, usure 3.
 - Pointe : aucun effet.
 - Base : Vitesse +1 par minibille active.
 - Tic : Défausser jusqu'à une bille de votre main au choix.
-- Éjection : Pioche 1.
+- Éjection : statut main vive, 2 tours.
 - En poche, à chaque bille éjectée : Masse +1.
 
 ### tigrée
@@ -553,7 +586,7 @@ tigrée, normale, usure 4.
 
 - Pointe : Vitesse −1.
 - Base : Éjecter une bille active au choix.
-- Éveil : Vitesse +2.
+- Éveil : statut répit, ce tour.
 - Trouvaille : Vitesse +3.
 - Final : statut amorti, 3 tours.
 - En poche, à chaque chiquenaude : Vitesse +2.

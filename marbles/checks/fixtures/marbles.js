@@ -298,6 +298,21 @@ export const FIXTURE_STATUSES = deepFreeze({
   impact_double: { stacking: "unique", duration: { kind: "turn" }, behaviors: [{ type: "modifier", point: "impact", operation: "multiply", value: 2 }] },
   // Impact −5, toute la partie, en intensité : vers le plancher 0.
   impact_tax: { stacking: "intensity", duration: { kind: "game" }, behaviors: [{ type: "modifier", point: "impact", operation: "add", value: -5 }] },
+  // LES QUANTITÉS (pioches, Polissage, Fêlure, usure de phase).
+  // Pioche du début de tour +1, deux tours, en intensité.
+  turn_draw_more: { stacking: "intensity", duration: { kind: "turns", count: 2 }, behaviors: [{ type: "modifier", point: "turnDraw", operation: "add", value: 1 }] },
+  // Pioches par effet +1, une charge, en durée.
+  effect_draw_charge: { stacking: "duration", duration: { kind: "charges", count: 1 }, behaviors: [{ type: "modifier", point: "effectDraw", operation: "add", value: 1 }] },
+  // Polissages +1, toute la partie, en intensité.
+  polish_more: { stacking: "intensity", duration: { kind: "game" }, behaviors: [{ type: "modifier", point: "polish", operation: "add", value: 1 }] },
+  // Polissages −1, toute la partie, en intensité : vers le plancher 0.
+  polish_less: { stacking: "intensity", duration: { kind: "game" }, behaviors: [{ type: "modifier", point: "polish", operation: "add", value: -1 }] },
+  // Fêlures +1, trois tours, en intensité.
+  crack_more: { stacking: "intensity", duration: { kind: "turns", count: 3 }, behaviors: [{ type: "modifier", point: "crack", operation: "add", value: 1 }] },
+  // Usure de phase ×0, ce tour, unique.
+  wear_none: { stacking: "unique", duration: { kind: "turn" }, behaviors: [{ type: "modifier", point: "phaseWear", operation: "multiply", value: 0 }] },
+  // Usure de phase +1, le prochain tour, en intensité.
+  wear_more: { stacking: "intensity", duration: { kind: "nextTurn" }, behaviors: [{ type: "modifier", point: "phaseWear", operation: "add", value: 1 }] },
   // À chaque chiquenaude (le mot-clé) : Vitesse +2 ; deux tours, unique.
   flick_react: { stacking: "unique", duration: { kind: "turns", count: 2 }, behaviors: [{ type: "reaction", on: "flick", effect: [speed(2)] }] },
   // À chaque statut reçu : Vitesse +1 ; toute la partie, unique (jamais à sa propre

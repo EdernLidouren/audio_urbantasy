@@ -8,7 +8,7 @@
 import { nameRef } from "../../../data/i18n/index.js";
 import { assembleCard, validateCardModel } from "../../../lib/detail-card.js";
 import { MARBLE_POCKET, MARBLE_TRIGGERS, STATUS_CARD_MODEL } from "../../config/values.js";
-import { definitionOf } from "../../core/statuses.js";
+import { MODIFIER_POINTS, definitionOf } from "../../core/statuses.js";
 import { combined, describePrinted, formatCounter, slotName, statusName } from "./effects.js";
 
 validateCardModel(STATUS_CARD_MODEL);
@@ -53,13 +53,19 @@ export function describeStatuses(game, rules, t) {
   return [t("marbles.statuses.summary", { count: labels.length, first }), ...rest.map((label) => t("marbles.statuses.item", { status: label }))].join(" ");
 }
 
-// Les COMPORTEMENTS d'une définition, à l'intensité donnée : « Lancers +2 », « pertes de
-// Vitesse, −1 », « gains de Vitesse ×2 », « à chaque chiquenaude : Vitesse +2 ».
+// Les COMPORTEMENTS d'une définition, à l'intensité donnée : « lancers +2 », « pertes de
+// Vitesse, −1 », « gains de Vitesse ×2 », « Polissages +1 », « usure de phase ×0 »,
+// « à chaque chiquenaude : Vitesse +2 ».
 const BEHAVIOR_TEXTS = {
   stat: (behavior, intensity, t) => t(`marbles.statuses.behavior.stat.${behavior.stat}`, { amount: signed(behavior.amount * intensity) }),
+  // Une addition sur un gain ou une perte garde sa virgule (« pertes de Vitesse,
+  // −1 » : la perte n'est pas négative) ; sur une quantité, aucune (« Polissages +1 »).
   modifier: (behavior, intensity, t) => {
     const point = t(`marbles.statuses.point.${behavior.point}`);
-    if (behavior.operation === "add") return t("marbles.statuses.behavior.add", { point, value: signed(behavior.value * intensity) });
+    if (behavior.operation === "add") {
+      const key = MODIFIER_POINTS[behavior.point].nature === "signed" ? "marbles.statuses.behavior.add" : "marbles.statuses.behavior.add_quantity";
+      return t(key, { point, value: signed(behavior.value * intensity) });
+    }
     return t("marbles.statuses.behavior.multiply", { point, value: behavior.value ** intensity });
   },
   // Une réaction, que l'intensité ne module pas.

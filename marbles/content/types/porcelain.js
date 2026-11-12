@@ -1,6 +1,6 @@
 // Bille « porcelaine » (porcelain). Donnée pure : les champs sont décrits dans
 // marbles/content/types/index.js.
-import { mass, speed, polish, choice, NEXT_SLOT, PREVIOUS_SLOT } from "../effects.js";
+import { mass, speed, polish, choice, applyStatus, NEXT_SLOT, PREVIOUS_SLOT } from "../effects.js";
 import { SMALL } from "../../config/values.js";
 
 export default {
@@ -12,9 +12,8 @@ export default {
   flick: [{ ...mass(1), target: PREVIOUS_SLOT }],
   // Final : Vitesse +4, puis Polissage 1 à jusqu'à 2 billes actives au choix.
   final: [speed(4), polish(1, choice({ zones: ["triangle"], count: 2, mode: "optional" }))],
-  // Chute : Polissage 1 à la suivante de l'emplacement quitté, après son Final quand
-  // elle est usée ; défaussée de la main (le Tic du grès), sans référence : sans effet.
-  drop: [polish(1, NEXT_SLOT)],
+  // Chute : statut fragilité (les Fêlures +1, 3 tours), à chaque arrivée à la défausse.
+  drop: [applyStatus("brittleness")],
   pocketed: { entry: [speed(10)] },
   maxWear: 2,
   size: SMALL,
