@@ -255,7 +255,7 @@ function checkCards(run) {
     );
     run.same(
       "fiche : la Chiquenaude, le Final, puis En poche à l'entrée de la porcelaine",
-      ["Chiquenaude : Masse +1.", "Final : Vitesse +4 et Polissage 1 à jusqu'à 2 billes actives au choix.", "En poche, à l'entrée : Vitesse +10."],
+      ["Chiquenaude : Masse +1.", "Final : Vitesse +4 et Polissage 1, jusqu'à 2 billes actives au choix.", "En poche, à l'entrée : Vitesse +10."],
       fields("porcelain").below
     );
     // Un montant calculé, avec sa valeur actuelle : en main, celle de son compteur.
@@ -330,7 +330,7 @@ function checkCards(run) {
     run.same("fiche, anglais : Empocher en base", ["Apex: Mass +3.", "Base: Pocket the marble at the apex."], fields("sulphide").above);
     run.same(
       "fiche, anglais : comparaison de calibre au Tic, Empocher une bille de la main au choix",
-      ["Hit: Speed +4 if the knocked-out marble is smaller and Pocket a marble from your hand of your choice.", "Knockout: Speed +3."],
+      ["Hit: Speed +4 if the knocked-out marble is smaller and Pocket a marble from your hand, your choice.", "Knockout: Speed +3."],
       fields("gorilla").below
     );
     run.same("fiche, anglais : En poche", ["Final: Polish 1 to the apex and Pocket this marble.", "Pocketed, each resolution: Mass +1."], fields("agate").below.slice(-2));
@@ -621,7 +621,7 @@ function checkChoiceInterface(run) {
   run("choix, triangle seul : pas de main", null, stepChoiceCursor(upToChoice, cursor("leftBase"), "down"));
   run("choix, triangle : la navigation habituelle", "apex", stepChoiceCursor(upToChoice, cursor("leftBase"), "up").place);
   run("choix, triangle : un emplacement vide reste accessible", "rightBase", stepChoiceCursor(upToChoice, cursor("leftBase"), "right").place);
-  run("choix, triangle : non éligible, dit", "base droite : vide. Non éligible.", plain(choiceFocusLine(upTo, cursor("rightBase"), made, t)));
+  run("choix, triangle : non éligible, dit", "base droite, vide. Non éligible.", plain(choiceFocusLine(upTo, cursor("rightBase"), made, t)));
   run.same("choix, triangle : non éligible, bloqué", { refusal: "notEligible" }, choiceAnswer(upToChoice, cursor("rightBase")));
   run.same("choix, triangle : éligible, Entrée répond", { type: "choose", target: { zone: "triangle", slot: "leftBase" } }, choiceAnswer(upToChoice, cursor("leftBase")).action);
   run.same("choix, triangle seul : pas de menu de main", [], choiceHandOptions(upToChoice));
@@ -678,11 +678,12 @@ function checkChoiceInterface(run) {
   run("choix, dit : Terminer", "Choix terminé.", plain(stepsText(buildSteps(made.reduce(upTo, { type: "choose", done: true }).events, t))));
 
   setLocale("en");
-  run("choix, anglais : la main", "Hit of gorilla: choose a marble from your hand to pocket.", describeChoicePrompt(handOnly, t));
+  run("choix, anglais : la main", "Hit from gorilla: choose a marble from your hand to pocket.", describeChoicePrompt(handOnly, t));
   run("choix, anglais : jusqu'à 2", "choose up to 2 active marbles to polish. T to finish.", question(upToChoice, ": "));
   run("choix, anglais : en phase", "left base, tiger: choose an active marble to eject.", describeChoicePrompt(tigerBase.pendingChoice, t));
   run("choix, anglais : ce qui reste", "Still to choose: an active marble.", describeChoicePrompt(oneDone, t));
-  run("choix, anglais : non éligible", "right base: empty. Not eligible.", choiceFocusLine(upTo, cursor("rightBase"), made, t));
+  run("choix, anglais : non éligible", "right base, empty. Not eligible.", choiceFocusLine(upTo, cursor("rightBase"), made, t));
+  run("pose, anglais : l'article devant l'emplacement", "Placement: agate on the apex.", buildSteps([{ type: "placed", slot: "apex", marble: "agate" }], t)[0].text);
   setLocale(locale);
 }
 
@@ -1237,7 +1238,7 @@ export default function checkMarblesView(run) {
       triangle: { leftBase: { marble: "magnifier", wear: 0 }, rightBase: null, apex: { marble: "gorilla", wear: 1 } },
     };
     run("texte : bille active", "gorille, calot, pointe, usure 1 sur 3.", said(describeSlotFocus(lensed, "apex", rules, t)));
-    run("texte : emplacement vide", "base droite : vide.", said(describeSlotFocus(lensed, "rightBase", rules, t)));
+    run("texte : emplacement vide", "base droite, vide.", said(describeSlotFocus(lensed, "rightBase", rules, t)));
     // Pendant une pose, la prévision reste.
     run("texte : pose, emplacement occupé", "pointe, gorille : Vitesse +10.", said(describeSlotForPlacement(lensed, "apex", rules, t)));
     run("texte : pose, emplacement vide", "base droite", said(describeSlotForPlacement(lensed, "rightBase", rules, t)));
@@ -1274,8 +1275,8 @@ export default function checkMarblesView(run) {
     // Aucune chiquenaude encore ce tour : celle de la loupe se compte elle-même.
     const lensToPlace = { ...lensed, hand: inHand(["magnifier"]), triangle: { ...lensed.triangle, leftBase: null }, tally: emptyTally(TALLY_COUNTERS) };
     run.same(
-      "confirmation : valeurs produites seulement, sans bonus donné",
-      ["Poser loupe en base gauche ?", "aucun effet", "Chiquenaude de loupe : Vitesse +2", "Pot : aucun effet"],
+      "confirmation : le don dit chez la bille qui le fait",
+      ["Poser loupe en base gauche ?", "Vitesse +4 à la pointe", "Chiquenaude de loupe : Vitesse +2", "Pot : aucun effet"],
       placementLines(lensToPlace, 0, "leftBase", rules, t).map(({ key, params }) => said(t(key, params)))
     );
     // Le menu entier : question, valeurs, Chiquenaude, Éjection, Tic, le pot, puis
@@ -1305,7 +1306,7 @@ export default function checkMarblesView(run) {
       said(stepsText(buildSteps(placing.events, t)))
     );
     const lensedSteps = buildSteps(rules.reduce(lensed, { type: "resolve" }).events, t).map((step) => said(step.text));
-    run("texte : la loupe ne produit rien elle-même", "base gauche, loupe : aucun effet.", lensedSteps[0]);
+    run("texte : la loupe dit son don à la pointe", "base gauche, loupe : Vitesse +4 à la pointe.", lensedSteps[0]);
     run("texte : le bonus s'entend chez qui le reçoit", "pointe, gorille : Vitesse +10.", lensedSteps[2]);
     run.same("étapes : aucune étape silencieuse", [], buildSteps(events, t).filter((step) => step.text === ""));
     run(

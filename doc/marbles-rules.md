@@ -223,7 +223,7 @@ Quand plusieurs billes réagissent au même évènement, l'ordre est fixe : base
 
 ### Les bonus et la règle des cibles
 
-Une valeur avec une cible donne un bonus à la phase de la bille visée. Le bonus s'ajoute à l'effet de phase de cette bille et se dit chez elle. Il suit la bille dans un échange, se perd si elle est remplacée, et disparaît à la fin de la résolution.
+Une valeur avec une cible donne un bonus à la phase de la bille visée. Le jeu dit le don chez la bille qui le fait (« Vitesse +4 à la pointe »), et le bonus s'ajoute à l'effet de phase de la bille visée, qui le compte dans ses valeurs. Il suit la bille dans un échange, se perd si elle est remplacée, et disparaît à la fin de la résolution.
 
 Une cible n'a de sens que si l'effet visé peut encore se produire :
 
@@ -392,7 +392,7 @@ porcelaine, minibille, usure 2.
 - Pointe : Vitesse +5.
 - Base : Vitesse +2.
 - Chiquenaude : Masse +1.
-- Final : Vitesse +4 et Polissage 1 à jusqu'à 2 billes actives au choix.
+- Final : Vitesse +4 et Polissage 1, jusqu'à 2 billes actives au choix.
 - En poche, à l'entrée : Vitesse +10.
 
 ### plombée

@@ -130,9 +130,10 @@ function actionText(action, amount, target, t) {
 }
 
 // Un effet dit avec sa cible : un emplacement (« Polissage 1 à la pointe ») ou un
-// choix (« Polissage 1 à une bille active au choix »).
+// choix (« Polissage 1 à une bille active au choix », « Polissage 1, jusqu'à 2 billes
+// actives au choix » : `upTo` choisit la tournure, jamais « à jusqu'à »).
 function targetedText(text, target, t) {
-  if (isChoice(target)) return t("marbles.effect.given_choice", { effect: text, target: choiceTarget(target, t) });
+  if (isChoice(target)) return t("marbles.effect.given_choice", { effect: text, target: choiceTarget(target, t), upTo: target.upTo === true ? "yes" : "no" });
   return t("marbles.effect.given", { effect: text, slot: slotName(target, t) });
 }
 
@@ -162,7 +163,7 @@ function pocketPart({ marble, lost, entry }, t) {
   const ref = nameRef(`marble.${marble}.name`);
   if (lost) return t("marbles.pocket.lost", { marble: ref });
   if (entry === null) return t("marbles.pocket.entered", { marble: ref });
-  return t("marbles.pocket.entered_effect", { marble: ref, effect: effectSummary(entry, t) });
+  return t("marbles.pocket.entered_effect", { marble: ref, effect: describeEffect(entry, t) });
 }
 
 // Une cible vide PRÉVUE (core/marbles-forecast.js, `empty`) : « pointe vide »,
@@ -197,16 +198,14 @@ function withResults(text, effect, t) {
 function ejectedPart({ marble, knockout }, t) {
   const ref = nameRef(`marble.${marble}.name`);
   if (knockout === null) return t("marbles.eject.ejected", { marble: ref });
-  return t("marbles.eject.ejected_effect", { marble: ref, effect: effectSummary(knockout, t) });
+  return t("marbles.eject.ejected_effect", { marble: ref, effect: describeEffect(knockout, t) });
 }
 
-// Un effet prévu, d'une phrase : ses valeurs et ses actions, puis ses résultats.
-function effectSummary(effect, t) {
-  return withResults(combined(effectParts(effect, t), t), effect, t);
-}
-
-// Un effet JOUÉ ou PRÉVU : { speed, mass, draw, given } -> « Vitesse +1 et Masse
-// +2 », « Pioche 1 », « Vitesse +4 à la pointe », « aucun effet ».
+// Un effet JOUÉ ou PRÉVU, d'une phrase : { speed, mass, draw, operations, given } ->
+// « Vitesse +1 et Masse +2 », « Pioche 1 », « Vitesse +4 à la pointe », « aucun
+// effet », puis ses résultats. LA façon de dire un effet, partout (pose, R,
+// séquence, fiches) : un don (`given`) se dit chez la bille qui le fait, et la
+// bille qui le reçoit le compte dans ses valeurs (sa phase porte le bonus).
 export function describeEffect(effect, t) {
   const parts = effectParts(effect, t);
   for (const gift of effect.given ?? []) {
@@ -355,7 +354,7 @@ export function describeSlotForPlacement(game, slot, rules, t) {
 function placedValues(predicted, slot, t) {
   // Retirée avant sa phase (une Fêlure de son Tic) : elle n'a pas de valeurs.
   if (predicted.phases[slot] === null) return forecastSlotLine(predicted, slot, t);
-  const values = effectSummary(predicted.phases[slot], t);
+  const values = describeEffect(predicted.phases[slot], t);
   const notes = slotNotes(predicted, slot, t);
   return notes.length === 0 ? values : [`${values}.`, ...notes].join(" ");
 }
@@ -434,16 +433,17 @@ export function bagDisplayOrder(bag, t) {
 
 // Ce qu'une bille produit À SON EMPLACEMENT, sur le triangle prévu ou pendant la
 // résolution : « base gauche, argile : Vitesse +1. », « base droite, vide. ».
-// `outcome` : { marble, speed, mass }, ou null pour un emplacement vide. Seules les
-// valeurs effectivement produites se disent, bonus reçu compris, sans texte d'effet
-// ni de condition : ce que la bille donne à une autre s'entend chez celle-ci.
+// `outcome` : { marble, speed, mass, given? }, ou null pour un emplacement vide.
+// Seules les valeurs effectivement produites se disent, bonus reçu compris, sans
+// texte de condition ; ce que la bille donne à une autre se dit aussi chez elle
+// (« base gauche, loupe : Vitesse +4 à la pointe. »), comme pendant une pose.
 // `notes` : ce qui se prévoit en plus avec cet emplacement (slotNotes), à la suite.
 function outcomeLine(slot, outcome, t, notes = []) {
   if (outcome === null) return t("marbles.outcome.empty", { slot: slotName(slot, t) });
   const line = t("marbles.outcome.slot", {
     slot: slotName(slot, t),
     marble: marbleName(outcome.marble, t),
-    effect: effectSummary(outcome, t),
+    effect: describeEffect(outcome, t),
   });
   return [line, ...notes].join(" ");
 }
@@ -470,7 +470,7 @@ function forecastSlotLine(predicted, slot, t) {
 // « Final : Vitesse +4. » si elle atteint son usure maximale ce tour. Les valeurs
 // produites seulement, comme une phase.
 function slotNotes(predicted, slot, t) {
-  return predicted.slotEffects[slot].map((effect) => t(SLOT_TEMPLATES[effect.trigger], { effect: effectSummary(effect, t) }));
+  return predicted.slotEffects[slot].map((effect) => t(SLOT_TEMPLATES[effect.trigger], { effect: describeEffect(effect, t) }));
 }
 
 // Les gabarits des déclencheurs prévus avec une régénération (MARBLE_TRIGGERS,
@@ -491,7 +491,7 @@ function regenerationLines(predicted, t) {
     { key: index === 0 ? "marbles.forecast.regenerates" : "marbles.forecast.regenerates_again" },
     ...effects.map((effect) => ({
       key: REGENERATION_TEMPLATES[effect.trigger],
-      params: { marble: nameRef(`marble.${effect.marble}.name`), effect: effectSummary(effect, t) },
+      params: { marble: nameRef(`marble.${effect.marble}.name`), effect: describeEffect(effect, t) },
     })),
   ]);
 }
@@ -513,7 +513,7 @@ function uncertainLines(predicted) {
 // d'arrivée, « Pot : tigrée, Vitesse +2 ; grès, Masse +1 », ou « Pot : aucun
 // effet ». Toujours présente, le menu garde sa structure.
 function potReactionLine(predicted, t) {
-  const parts = predicted.potReactions.map((effect) => t("marbles.place.pot_marble", { marble: nameRef(`marble.${effect.marble}.name`), effect: effectSummary(effect, t) }));
+  const parts = predicted.potReactions.map((effect) => t("marbles.place.pot_marble", { marble: nameRef(`marble.${effect.marble}.name`), effect: describeEffect(effect, t) }));
   const reactions = parts.length === 0 ? t("marbles.effect.none") : parts.reduce((first, rest) => t("marbles.place.pot_more", { first, rest }));
   return { key: "marbles.place.pot", params: { reactions } };
 }
@@ -525,7 +525,7 @@ function potReactionLine(predicted, t) {
 const POT_FORECAST_TEMPLATE = MARBLE_POCKET.moments.find((moment) => moment.texts.forecast !== undefined)?.texts.forecast;
 
 function potLines(predicted, t) {
-  return predicted.potEffects.map((effect) => t(POT_FORECAST_TEMPLATE, { marble: nameRef(`marble.${effect.marble}.name`), effect: effectSummary(effect, t) }));
+  return predicted.potEffects.map((effect) => t(POT_FORECAST_TEMPLATE, { marble: nameRef(`marble.${effect.marble}.name`), effect: describeEffect(effect, t) }));
 }
 
 function forecastNotes(predicted, t) {
@@ -567,7 +567,7 @@ const EFFECT_TEMPLATES = Object.fromEntries([
 
 function effectText(event, t) {
   if (event.trigger === "phase") {
-    return outcomeLine(event.slot, { marble: event.marble, speed: event.speedDelta, mass: event.massDelta, draw: event.draw, operations: event.operations }, t);
+    return outcomeLine(event.slot, { marble: event.marble, speed: event.speedDelta, mass: event.massDelta, draw: event.draw, operations: event.operations, given: event.given }, t);
   }
   const template = EFFECT_TEMPLATES[event.trigger];
   if (!template) throw new Error(`marbles : effet sans gabarit pour le déclencheur "${event.trigger}".`);
@@ -661,7 +661,8 @@ const EVENT_TEXTS = {
 
 // Le moment d'un choix, devant sa question : la bille qui le pose et son moment
 // (`by`, core/marbles.js), comme ses effets se disent : « Tic de gorille : », « base
-// gauche, tigrée : », « Entrée au pot de porcelaine : », « Pot, mica : ».
+// gauche, tigrée : », « Entrée au pot de porcelaine : », « Pot, mica : ». Le Tic a
+// sa propre clé : son effet anglais se dit « Hit from gorilla », pas « of ».
 const POCKET_ENTRY_TRIGGERS = new Set(MARBLE_POCKET.moments.filter((moment) => moment.event === "pocketed").map((moment) => moment.trigger));
 const POCKET_TRIGGERS = new Set(MARBLE_POCKET.moments.map((moment) => moment.trigger));
 const TRIGGER_NAMES = Object.fromEntries(MARBLE_TRIGGERS.map((trigger) => [trigger.id, trigger.texts.name]));
@@ -671,6 +672,7 @@ function choiceByPrefix({ trigger, slot, marble }, question, t) {
   if (trigger === "phase") return t("marbles.choice.by_phase", { slot: slotName(slot, t), marble: ref, question });
   if (POCKET_ENTRY_TRIGGERS.has(trigger)) return t("marbles.choice.by_pot_entry", { marble: ref, question });
   if (POCKET_TRIGGERS.has(trigger)) return t("marbles.choice.by_pot", { marble: ref, question });
+  if (trigger === "hit") return t("marbles.choice.by_hit", { marble: ref, question });
   return t("marbles.choice.by_trigger", { moment: t(TRIGGER_NAMES[trigger]), marble: ref, question });
 }
 

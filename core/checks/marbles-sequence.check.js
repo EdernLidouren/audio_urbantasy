@@ -255,13 +255,13 @@ function checkTexts(run) {
 
     // R : la prévision d'abord, puis chaque emplacement dans l'ordre des phases.
     run(
-      "R : vide, aucun effet, bonus chez qui le reçoit",
-      "Prévision : Vitesse 10, Masse 1, Impact 10. base gauche, loupe : aucun effet. base droite, vide. pointe, gorille : Vitesse +10.",
+      "R : vide, le don dit chez qui le fait, le bonus compté chez qui le reçoit",
+      "Prévision : Vitesse 10, Masse 1, Impact 10. base gauche, loupe : Vitesse +4 à la pointe. base droite, vide. pointe, gorille : Vitesse +10.",
       said(describeOverview(lensed, rules, t))
     );
     run(
       "R : les gains du tour déjà comptés",
-      "Prévision : Vitesse 13, Masse 2, Impact 26. base gauche, loupe : aucun effet. base droite, vide. pointe, gorille : Vitesse +10.",
+      "Prévision : Vitesse 13, Masse 2, Impact 26. base gauche, loupe : Vitesse +4 à la pointe. base droite, vide. pointe, gorille : Vitesse +10.",
       said(describeOverview({ ...lensed, speed: 3, mass: 2 }, rules, t))
     );
     run(
@@ -285,7 +285,7 @@ function checkTexts(run) {
     run.same(
       "séquence : un tour complet, sans pause entre l'ouverture et la base gauche",
       [
-        "Résolution du tour 2. base gauche, loupe : aucun effet.",
+        "Résolution du tour 2. base gauche, loupe : Vitesse +4 à la pointe.",
         "base droite, vide.",
         "pointe, gorille : Vitesse +10.",
         "Impact 10. Score 10.",
@@ -370,9 +370,9 @@ function checkTexts(run) {
       const resolved = rules.reduce(lensed, { type: "resolve" });
       return resolutionSteps(1, resolved.events, t, { hint })[0];
     };
-    run("ouverture : avec la base gauche, d'un seul tenant", "Résolution du tour 1. base gauche, loupe : aucun effet.", said(opening(false).text));
-    run("ouverture : l'indication après l'ouverture", "Résolution du tour 1. Entrée pour passer la résolution. base gauche, loupe : aucun effet.", said(opening(true).text));
-    run.same("ouverture : deux messages, sans l'indication", ["Résolution du tour 1.", "base gauche, loupe : aucun effet."], opening(true).messages.map(said));
+    run("ouverture : avec la base gauche, d'un seul tenant", "Résolution du tour 1. base gauche, loupe : Vitesse +4 à la pointe.", said(opening(false).text));
+    run("ouverture : l'indication après l'ouverture", "Résolution du tour 1. Entrée pour passer la résolution. base gauche, loupe : Vitesse +4 à la pointe.", said(opening(true).text));
+    run.same("ouverture : deux messages, sans l'indication", ["Résolution du tour 1.", "base gauche, loupe : Vitesse +4 à la pointe."], opening(true).messages.map(said));
 
     // L'historique, texte exact : le début de partie n'en a pas ; après la première
     // résolution, le tour 1 entier, poses comprises, sans la pioche qui précède son
@@ -482,7 +482,7 @@ function checkTexts(run) {
     const finalState = playState({ hand: inHand(["giant"]), bag: ["agate"], triangle: { leftBase: null, rightBase: null, apex: { marble: "porcelain", wear: 1 } } });
     run(
       "final, R : après la phase, compté dans la prévision ; son Polissage au choix sans cible, prévu",
-      "Prévision : Vitesse 9, Masse 1, Impact 9. base gauche, vide. base droite, vide. pointe, porcelaine : Vitesse +5. Final : Vitesse +4 et Polissage 1 à jusqu'à 2 billes actives au choix, aucune cible au choix.",
+      "Prévision : Vitesse 9, Masse 1, Impact 9. base gauche, vide. base droite, vide. pointe, porcelaine : Vitesse +5. Final : Vitesse +4 et Polissage 1, jusqu'à 2 billes actives au choix, aucune cible au choix.",
       said(describeOverview(finalState, rules, t))
     );
     run(
@@ -497,7 +497,7 @@ function checkTexts(run) {
     );
     run.same(
       "final, séquence : le retrait, son Final, rien à choisir (aucune interface), puis l'Impact",
-      ["porcelaine est usée et part à la défausse.", "Final de porcelaine : Vitesse +4 et Polissage 1 à jusqu'à 2 billes actives au choix.", "Aucune cible à choisir : sans effet.", "Impact 9. Score 9."],
+      ["porcelaine est usée et part à la défausse.", "Final de porcelaine : Vitesse +4 et Polissage 1, jusqu'à 2 billes actives au choix.", "Aucune cible à choisir : sans effet.", "Impact 9. Score 9."],
       texts(finalState).slice(3, 7)
     );
 
@@ -532,7 +532,7 @@ function checkTexts(run) {
     const choosing = playState({ bag: ["clay"], hand: inHand([]), triangle: { leftBase: { marble: "clay", wear: 0 }, rightBase: { marble: "agate", wear: 1 }, apex: { marble: "porcelain", wear: 1 } } });
     const suspended = rules.reduce(choosing, { type: "resolve" });
     const before = resolutionSteps(2, suspended.events, t).map((step) => said(step.text));
-    run("choix en résolution : la séquence s'arrête au Final qui fait choisir", "Final de porcelaine : Vitesse +4 et Polissage 1 à jusqu'à 2 billes actives au choix.", before.at(-1));
+    run("choix en résolution : la séquence s'arrête au Final qui fait choisir", "Final de porcelaine : Vitesse +4 et Polissage 1, jusqu'à 2 billes actives au choix.", before.at(-1));
     run("choix en résolution : l'Impact pas encore dit", false, before.some((text) => text.startsWith("Impact")));
     run(
       "choix en résolution : R refusé pendant le choix (prévision refusée)",
@@ -665,7 +665,7 @@ function checkTexts(run) {
     );
     run.same(
       "cible vide, séquence : dite à part, comme avant",
-      ["pointe vide : sans effet."],
+      ["pointe, vide : sans effet."],
       texts(lonelyAgate).filter((text) => text.includes("vide :"))
     );
     // Les billes du pot à chaque résolution : après les trois emplacements, une ligne
@@ -673,7 +673,7 @@ function checkTexts(run) {
     const potState = playState({ triangle: { leftBase: { marble: "magnifier", wear: 0 }, rightBase: null, apex: { marble: "porcelain", wear: 0 } }, pot: ["agate", "glass", "sulphide"] });
     run(
       "pot, R : une ligne par bille du pot qui a un effet de résolution, comptée dans le total",
-      "Prévision : Vitesse 13, Masse 2, Impact 26. base gauche, loupe : aucun effet. base droite, vide. pointe, porcelaine : Vitesse +9. Pot, agate : Masse +1. Pot, sulfure : Vitesse +4.",
+      "Prévision : Vitesse 13, Masse 2, Impact 26. base gauche, loupe : Vitesse +4 à la pointe. base droite, vide. pointe, porcelaine : Vitesse +9. Pot, agate : Masse +1. Pot, sulfure : Vitesse +4.",
       said(describeOverview(potState, rules, t))
     );
     run.same(
@@ -846,12 +846,12 @@ function checkTexts(run) {
     run.same("anglais, Polissage : séquence", ["porcelain is polished: wear 1 of 2."], texts(saving).filter((text) => text.includes("polished")));
     run(
       "anglais, final : R",
-      "Forecast: Speed 9, Mass 1, Impact 9. left base, empty. right base, empty. apex, porcelain: Speed +5. Final: Speed +4 and Polish 1 to up to 2 active marbles of your choice, nothing to choose.",
+      "Forecast: Speed 9, Mass 1, Impact 9. left base, empty. right base, empty. apex, porcelain: Speed +5. Final: Speed +4 and Polish 1, up to 2 active marbles, your choice, nothing to choose.",
       describeOverview(finalState, rules, t)
     );
     run.same(
       "anglais, final : séquence",
-      ["porcelain is worn out and goes to the discard.", "Final of porcelain: Speed +4 and Polish 1 to up to 2 active marbles of your choice.", "Nothing to choose: no effect.", "Impact 9. Score 9."],
+      ["porcelain is worn out and goes to the discard.", "Final of porcelain: Speed +4 and Polish 1, up to 2 active marbles, your choice.", "Nothing to choose: no effect.", "Impact 9. Score 9."],
       texts(finalState).slice(3, 7)
     );
     run(
@@ -867,7 +867,7 @@ function checkTexts(run) {
     run.same("anglais, pioche : séquence", ["Resolving turn 2. left base, mica: Draw 1.", "You draw agate."], texts(drawing).slice(0, 2));
     run(
       "anglais : R",
-      "Forecast: Speed 10, Mass 1, Impact 10. left base, magnifier: no effect. right base, empty. apex, gorilla: Speed +10.",
+      "Forecast: Speed 10, Mass 1, Impact 10. left base, magnifier: Speed +4 to the apex. right base, empty. apex, gorilla: Speed +10.",
       describeOverview(lensed, rules, t)
     );
     run.same(

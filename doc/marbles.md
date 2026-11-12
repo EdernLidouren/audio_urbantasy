@@ -885,7 +885,7 @@ Ce qui se dit, selon l'endroit :
 |---|---|
 | Bille en main, au sac, en défausse | « argile, normale, usure 3. 1 sur 5 » |
 | Bille active, sans sélection | « gorille, calot, pointe, usure 1 sur 3. » |
-| Emplacement vide, sans sélection | « pointe : vide. » |
+| Emplacement vide, sans sélection | « pointe, vide. » |
 | Emplacement occupé, bille sélectionnée | « pointe, gorille : Vitesse +10. » (la prévision) |
 | Emplacement vide, bille sélectionnée | « pointe » |
 | R | la vue d'ensemble du tour (voir plus bas) |
@@ -915,8 +915,9 @@ lisent et ne s'activent pas (Entrée n'y fait rien) :
 
 1. « Poser argile en pointe ? » ;
 2. les valeurs prévues, sur leur propre ligne, au format de la vue d'ensemble (R) :
-   « Vitesse +6 », valeurs produites seulement, non nulles, bonus reçu compris, sans
-   texte d'effet ; « aucun effet » si rien ; suivies du Final de la bille posée si elle
+   « Vitesse +6 », valeurs produites, non nulles, bonus reçu compris, et ce que la bille
+   donne à une autre (« Vitesse +4 à la pointe ») ; « aucun effet » si rien ; suivies du
+   Final de la bille posée si elle
    atteint son usure maximale ce tour (« Vitesse +6. Final : Pioche 1. ») ;
 3. toujours, « Chiquenaude d'argile : Vitesse +2 », ou « … : aucun effet » ;
 4. sur un emplacement occupé, « Éjection de gorille : Vitesse +3 », ou « … : aucun effet » ;
@@ -1043,10 +1044,12 @@ retirée avant sa phase. Final : Vitesse +4. ».
 
 Vitesse et Masse comprennent ce que le tour a déjà gagné (Tic, Éjection) ; l'Impact
 applique les planchers. Un emplacement dit les valeurs que sa bille PRODUIT, après
-conditions et bonus reçus, jamais un texte d'effet : valeurs nulles omises, « aucun
-effet » si rien ; une Pioche est une valeur comme une autre (« Pioche 1 »). Un bonus se
-compte chez la bille qui le reçoit : la loupe en base gauche dit « aucun effet », le gorille
-qu'elle renforce « Vitesse +10 ». Si la résolution régénérerait le sac, « Le sac sera
+conditions et bonus reçus, jamais un texte de condition : valeurs nulles omises, « aucun
+effet » si rien ; une Pioche est une valeur comme une autre (« Pioche 1 »). Un DON se dit
+chez la bille qui le fait, et se compte chez celle qui le reçoit : la loupe en base gauche
+dit « Vitesse +4 à la pointe », le gorille qu'elle renforce « Vitesse +10 ». C'est la même
+façon de dire un effet partout, pose, R, séquence et fiches
+(`view/marbles/narration.js`/`describeEffect`). Si la résolution régénérerait le sac, « Le sac sera
 régénéré. » termine l'annonce, suivi d'une phrase par Trouvaille qu'elle déclencherait, qui
 nomme sa bille (« Trouvaille de tigrée : Vitesse +3. »). Chaque régénération se dit ainsi
 avec ses propres Trouvailles, comme dans la séquence, la deuxième « de nouveau » : « Le sac
@@ -1083,7 +1086,7 @@ chacune :
    ou « Le pot est plein : porcelaine est perdue. ») ; une phase qui pioche est suivie
    de sa pioche (« Base gauche, mica : Pioche 1. », « Vous piochez agate. ») ; un
    Polissage ou une Fêlure, de son application (« Porcelaine se fêle : usure 2 sur 2. »,
-   « Porcelaine est polie : usure 1 sur 2. », « Pointe vide : sans effet. ») et des retraits
+   « Porcelaine est polie : usure 1 sur 2. », « Pointe, vide : sans effet. ») et des retraits
    qu'une Fêlure provoque, avec leur Final ;
 5. une étape par bille usée : « Gorille est usé et part à la défausse. » (l'adjectif
    s'accorde au genre du nom, attribut `gender` des noms français), suivie de son Final

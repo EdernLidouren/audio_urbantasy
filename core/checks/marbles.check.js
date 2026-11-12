@@ -755,7 +755,7 @@ function checkChoices(run) {
     twoPolish: { hit: [{ action: "polish", amount: 1, target: choose(["triangle"], { count: 2 }) }] },
     // Tic : Polissage 1 à 3 billes actives au choix (jamais assez de cibles ici).
     threePolish: { hit: [{ action: "polish", amount: 1, target: choose(["triangle"], { count: 3 }) }] },
-    // Tic : Polissage 1 à jusqu'à 2 billes actives au choix.
+    // Tic : Polissage 1, jusqu'à 2 billes actives au choix.
     upToPolish: { hit: [{ action: "polish", amount: 1, target: choose(["triangle"], { count: 2, upTo: true }) }] },
     // Tic : Empocher une bille, de la main ou active, au choix.
     anyPocket: { hit: [{ action: "pocket", target: choose(["hand", "triangle"]) }] },
