@@ -22,7 +22,3 @@ Les points repoussés « à plus tard », une ligne par point, avec son origine 
 - Autres conditions de fin de partie (un Impact minimal à atteindre). (`doc/marbles.md`, « Fin de partie ».)
 - Les succès, qui liront les valeurs de partie. (`doc/marbles.md`, « Valeurs de partie ».)
 - Une étape de séquence qui attendrait la fin d'un son au lieu d'une durée. (`doc/marbles.md`, « Séquence de résolution ».)
-
-## Outils
-
-- Simulateur : une bille piochée par un effet est attribuée au dernier effet joué avant elle, pas à celui qui a demandé la pioche ; depuis que les réactions au mélange jouent avant la reprise de la pioche, le mica en reçoit quelques-unes (« fait piocher », au centième près). À attribuer à l'effet qui pioche. (Décisions après l'itération 19.)

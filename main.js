@@ -246,10 +246,12 @@ function continueGame() {
 // Partie de billes en cours (voir core/marbles.js), null hors partie : comme
 // la session, c'est ici qu'elle vit, l'écran n'en détient pas de copie.
 // Indépendante de la session, jamais sauvegardée. `seed` : imposée par la
-// console de test (window.debugStartMarbles plus bas), sinon tirée au hasard.
+// console de test (window.debugStartMarbles plus bas), sinon tirée au hasard ;
+// `initialState` : un état construit par la console de test, au lieu d'une
+// partie neuve (null en jeu).
 let marblesGame = null;
-function startMarblesGame(seed = createGameSeed()) {
-  marblesGame = marblesRules.createGame(seed);
+function startMarblesGame(seed = createGameSeed(), initialState = null) {
+  marblesGame = initialState ?? marblesRules.createGame(seed);
   pushScreen(
     makeMarblesScreen(
       () => marblesGame,
@@ -335,13 +337,15 @@ window.debugSession = () => {
 };
 
 // Vérif console, MODE DEBUG seulement : lance une partie de billes à graine
-// imposée, et rend une COPIE de la partie en cours (comme debugSession).
-window.debugStartMarbles = (seed) => {
+// imposée, ou sur un état construit (`state`, un état de core/marbles.js : voir
+// tools/test-kit.js/startMarbles), et rend une COPIE de la partie en cours
+// (comme debugSession).
+window.debugStartMarbles = (seed, state = null) => {
   if (!isDebugEnabled()) {
     console.log("debugStartMarbles: mode debug désactivé (toggleDebug() ou Ctrl+D).");
     return;
   }
-  startMarblesGame(seed);
+  startMarblesGame(seed, state === null ? null : structuredClone(state));
 };
 window.debugMarbles = () => {
   if (!isDebugEnabled()) {

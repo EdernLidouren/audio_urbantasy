@@ -120,13 +120,19 @@ function emptyTriggerTotals() {
 }
 
 // Ce que le journal d'une action ajoute au relevé de la partie. `actionType` : la
-// pioche du tour ("draw") pioche pour elle-même ; ailleurs, une pioche vient d'un
-// effet, celui de la bille du dernier évènement `effect`, et une régénération a lieu
+// pioche du tour ("draw") pioche pour elle-même ; ailleurs, une régénération a lieu
 // en cours de tour.
-function recordEvents(record, events, actionType) {
+// Une pioche d'effet revient à l'effet qui l'a demandée, et non au dernier effet
+// dit : une réaction au mélange peut se glisser entre une Pioche et ses billes.
+// `drawers` : la pile des effets à Pioche (`draw > 0`) qui attendent encore des
+// billes, gardée d'une action à l'autre (un choix peut suspendre une pioche). Une
+// pioche revient au plus récent d'entre eux : un Éveil qui pioche pendant la pioche
+// d'une autre bille prend ses billes, puis la pioche de l'autre reprend à son compte.
+// Une pioche arrêtée (main pleine) laisse son entrée dans la pile : elle n'y sert
+// plus, chaque Pioche à venir s'empilant au-dessus avant ses billes.
+export function recordEvents(record, events, actionType, drawers) {
   const stats = (id) => (record.marbles[id] ??= emptyMarbleStats());
   const byEffect = actionType !== "draw";
-  let lastEffect = null;
   for (const event of events) {
     switch (event.type) {
       case "draw":
@@ -134,7 +140,12 @@ function recordEvents(record, events, actionType) {
         // reprend la pioche du tour.
         if (event.cause === "effect") {
           record.effectDraws += 1;
-          if (lastEffect !== null) stats(lastEffect).drawn += 1;
+          const drawer = drawers.findLast((entry) => entry.remaining > 0);
+          if (drawer !== undefined) {
+            drawer.remaining -= 1;
+            stats(drawer.marble).drawn += 1;
+          }
+          while (drawers.length > 0 && drawers.at(-1).remaining === 0) drawers.pop();
         }
         break;
       case "bagRegenerated":
@@ -160,7 +171,7 @@ function recordEvents(record, events, actionType) {
       case "effect": {
         // speedDelta et massDelta comptent le bonus reçu : un bonus se compte chez
         // la bille qui le reçoit, comme dans la vue d'ensemble (touche R).
-        lastEffect = event.marble;
+        if (event.draw > 0) drawers.push({ marble: event.marble, remaining: event.draw });
         const marble = stats(event.marble);
         marble[`${event.trigger}Speed`] += event.speedDelta;
         marble[`${event.trigger}Mass`] += event.massDelta;
@@ -215,6 +226,8 @@ export function playGame({ index, seed, player, playerOptions = {}, bagMode, set
     interruptions: 0,
     marbles: {},
   };
+  // Les effets à Pioche en attente de leurs billes (recordEvents), hors du relevé.
+  const drawers = [];
 
   for (let count = 0; state.stage !== "over"; count++) {
     if (count >= MAX_ACTIONS_PER_GAME) throw new Error(`simulation : partie ${index} sans fin (joueur ${player}).`);
@@ -226,7 +239,7 @@ export function playGame({ index, seed, player, playerOptions = {}, bagMode, set
       action = legalActions(state).find((legal) => legal.type !== "draw") ?? legalActions(state)[0];
       result = GAME_RULES.reduce(state, action);
     }
-    recordEvents(record, result.events, action.type);
+    recordEvents(record, result.events, action.type, drawers);
     state = result.state;
   }
 

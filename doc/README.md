@@ -88,7 +88,8 @@ chaque son cité existe dans le manifeste audio, et que chaque scène citée
 `tools/content-audit.js`. Il AVERTIT aussi, sans échouer, de chaque id
 d'entité hors de la convention de nommage (voir `doc/scene-format.md`/"Nommer
 les ids d'entités"). Complète `node tools/run-checks.js` (le core) et
-`python tools/check_i18n_parity.py` (la parité fr/en).
+`python tools/check_i18n_parity.py` (la parité fr/en ; pour écrire des textes
+dans les deux langues d'un coup, `python tools/i18n_set.py`, voir `doc/i18n.md`).
 
 **La doc elle-même** : `node tools/doc-audit.js` vérifie que chaque fichier
 cité par la doc et par les commentaires existe encore, que chaque

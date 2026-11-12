@@ -772,17 +772,25 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
   };
 
   // Première ouverture : la musique, le sac qu'on brasse et la pioche du tour 1.
-  // Ensuite (retour d'une confirmation, de l'aide), l'écran redit où l'on en est.
+  // Une partie déjà piochée (un état construit par la console de test,
+  // window.debugStartMarbles) s'ouvre sans pioche, sur sa phase de jeu ou son choix
+  // en attente. Ensuite (retour d'une confirmation, de l'aide), l'écran redit où
+  // l'on en est.
   function start() {
     started = true;
     preloadMarblesAudio();
     // Après le préchargement : la réverbération a besoin du contexte audio.
     openTableReverb();
     startMarblesMusic();
-    const events = dispatch({ type: "draw" });
+    const drawing = getGame().stage === "draw" && getGame().pendingChoice === null;
+    const events = drawing ? dispatch({ type: "draw" }) : [];
     playEventSounds(events, { shuffleFirst: true });
     const pending = getGame().pendingChoice;
     if (pending !== null) cursor = choiceStartCursor(pending, cursor);
+    // Un état construit ouvert sur un choix qui suspend une résolution : la suite se
+    // dira en séquence, puis le tour suivant se piochera, comme si l'écran l'avait
+    // lancée (presentResolution).
+    if (pending?.resume.action.type === "resolve") resolving = { turn: getGame().turn };
     const next = pending !== null ? describeChoicePrompt(pending, t) : isOver() ? "" : focusLine();
     speak(withOverHint(`${t("marbles.intro")} ${stepsText(recorded(buildSteps(events, t)))} ${next}`));
   }

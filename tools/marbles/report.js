@@ -11,6 +11,23 @@ import { PLAYERS } from "./players.js";
 import { SETTING_NAMES } from "./simulation.js";
 import { PLACEMENT_TRIGGERS, TRIGGER_IDS, TRIGGER_WORDS, marbleLabel } from "./format.js";
 
+// Les titres du rapport, et le début de ses lignes d'anomalies : le comparateur
+// (tools/marbles/report-diff.js) range les lignes changées sous eux.
+export const REPORT_HEADINGS = {
+  title: "Simulation du jeu des billes.",
+  score: "Score final.",
+  impact: "Impact par tour.",
+  end: "Fin de partie.",
+  replacements: "Poses, moyennes par partie.",
+  draws: "Pioche et lancers.",
+  marbles: "Par bille, moyennes par partie où elle est dans le sac.",
+  observations: "Observations.",
+  refusals: "Actions refusées : ",
+  interruptions: "Enchaînements interrompus : ",
+};
+// Les sections des résultats d'une partie : ce qui change quand le jeu change.
+export const REPORT_RESULT_HEADINGS = [REPORT_HEADINGS.score, REPORT_HEADINGS.impact, REPORT_HEADINGS.end];
+
 // Seuil des billes « presque jamais posées », en poses par partie.
 export const RARELY_PLACED = 0.25;
 
@@ -122,40 +139,40 @@ export function buildReport({ params, summary, name }) {
     games === summary.games ? `Tour ${turn} : ${n(mean)}.` : `Tour ${turn} : ${n(mean)}, sur ${games} parties.`
   );
   return [
-    "Simulation du jeu des billes.",
+    REPORT_HEADINGS.title,
     `Joueur : ${PLAYERS[params.player].describe(params.playerOptions)}.`,
     `Parties : ${summary.games}, graine de départ ${params.seed}.`,
     bagLine(params.bagMode),
     settingsLine(params.settings),
     "",
-    "Score final.",
+    REPORT_HEADINGS.score,
     `Moyenne ${n(score.mean)}. Médiane ${n(score.median)}. Minimum ${n(score.min)}, maximum ${n(score.max)}.`,
     `Centiles : 10e ${n(score.p10)}, 25e ${n(score.p25)}, 75e ${n(score.p75)}, 90e ${n(score.p90)}.`,
     "",
-    "Impact par tour.",
+    REPORT_HEADINGS.impact,
     `Moyenne ${n(impact.mean)} par tour joué.`,
     ...lastTurns,
     "",
-    "Fin de partie.",
+    REPORT_HEADINGS.end,
     `Par le nombre de tours : ${n(end.turnsCompleted)} %. Par pioche impossible, faute de billes : ${n(end.outOfMarbles)} %.`,
     "",
-    "Poses, moyennes par partie.",
+    REPORT_HEADINGS.replacements,
     `Poses sur un emplacement occupé : ${n(replacements.perGame)}.`,
     ...PLACEMENT_TRIGGERS.map(({ id }) => `Apporté par ${TRIGGER_WORDS[id].brought} : Vitesse ${n(replacements[`${id}Speed`])}, Masse ${n(replacements[`${id}Mass`])}.`),
     "",
-    "Pioche et lancers.",
+    REPORT_HEADINGS.draws,
     `Billes piochées par des effets : ${n(draws.byEffect)} par partie.`,
     `Régénérations du sac : ${n(draws.regenerations)} par partie, dont ${n(draws.midTurnRegenerations)} en cours de tour.`,
     `Lancers : ${n(summary.throwsPerTurn)} par tour joué.`,
     `Fins de partie par pioche impossible : ${n(end.outOfMarbles)} %.`,
     "",
-    "Par bille, moyennes par partie où elle est dans le sac.",
+    REPORT_HEADINGS.marbles,
     ...summary.marbles.flatMap((marble) => marbleLines(marble, name, randomBags)),
     "",
-    "Observations.",
+    REPORT_HEADINGS.observations,
     ...observations(summary, name).map((text) => `- ${text}`),
     "",
-    `Actions refusées : ${summary.refusals}.`,
-    `Enchaînements interrompus : ${summary.interruptions}.`,
+    `${REPORT_HEADINGS.refusals}${summary.refusals}.`,
+    `${REPORT_HEADINGS.interruptions}${summary.interruptions}.`,
   ];
 }

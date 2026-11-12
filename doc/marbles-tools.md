@@ -13,6 +13,7 @@ et des lignes simples, jamais de tableau. Les règles elles-mêmes : `doc/marble
 | `tools/marbles/play.js` | Jouer une partie au terminal, à graine imposée, au clavier ou par un fichier de commandes |
 | `tools/marbles/case.js` | Construire un état précis à la main, lui appliquer des actions, lire le journal |
 | `tools/marbles/simulate.js` | Le simulateur : des milliers de parties jouées par un joueur automatique, et un rapport |
+| `tools/marbles/compare.js` | Le comparateur : les six simulations de référence sur un commit et sur le code en cours, et ce qui change entre leurs rapports |
 | `tools/marbles/rules-doc.js` | Le document de règles (`doc/marbles-rules.md`) : génère son annexe des billes depuis la table (`--write`), et vérifie qu'elle est à jour et que chaque mot-clé y figure avec sa description exacte (lancé par `tools/verify.js`) |
 
 Les modules qu'ils partagent, purs (sans Node, donc vérifiables) :
@@ -28,6 +29,7 @@ Les modules qu'ils partagent, purs (sans Node, donc vérifiables) :
 | `tools/marbles/simulation.js` | Les parties du simulateur, les graines dérivées, les sacs |
 | `tools/marbles/stats.js` | Le résumé chiffré d'une simulation |
 | `tools/marbles/report.js` | Le rapport en phrases, et ses observations |
+| `tools/marbles/report-diff.js` | La différence de deux rapports, ligne à ligne, rangée sous sa section et sa bille |
 | `tools/marbles/export.js` | L'export JSON ou CSV |
 
 ## Jouer une partie
@@ -110,7 +112,10 @@ billes piochées par partie. `--drawn-value 0` rend le glouton d'avant.
 par interpolation linéaire), Impact moyen par tour et par numéro de tour, fins de partie,
 remplacements, pioche et lancers (billes piochées par des effets, régénérations du sac dont
 celles en cours de tour, lancers par tour joué, fins par pioche impossible), puis chaque
-bille (billes que ses effets ont fait piocher, s'il y en a, poses et remplacements,
+bille (billes que ses effets ont fait piocher, s'il y en a : chacune revient à l'effet à
+Pioche qui l'a demandée, même quand une réaction au mélange ou l'Éveil d'une autre bille
+se glisse entre la Pioche et ses billes, `tools/marbles/simulation.js/recordEvents` ;
+poses et remplacements,
 éjections, retraits par usure,
 Vitesse et Masse produites en phase et par chaque déclencheur, en tic, en éjection et
 en final, et, avec des sacs
@@ -130,6 +135,30 @@ seule fois (`tools/marbles/stats.js`).
 
 **Durée** : environ 3 secondes pour 1 000 parties gloutonnes.
 
+## Comparer avant et après
+
+```
+node tools/marbles/compare.js
+node tools/marbles/compare.js --games 300
+node tools/marbles/compare.js --ref main --save comparaison
+```
+
+Les six simulations de référence (les trois joueurs, sur le sac de test et sur des sacs
+aléatoires de 13 billes à 2 exemplaires au plus), jouées sur un commit (`--ref`, le
+dernier par défaut) et sur le code en cours, à mêmes graines. Le commit est extrait dans
+un dossier temporaire (`git archive`), effacé à la fin : ni le dépôt ni l'index ne sont
+touchés. Le côté « avant » joue avec le simulateur du commit : un changement du
+simulateur lui-même se voit aussi.
+
+La sortie, d'abord une ligne par simulation : « identique », ou combien de lignes
+changent et si les résultats (score final, Impact par tour, fins de partie) en font
+partie. Puis chaque ligne changée, « avant : » et « après : », sous son contexte : le titre
+de sa section, ou sa bille dans la section des billes. Enfin un bilan : rapports
+identiques, résultats, actions refusées et enchaînements interrompus après le changement
+(toujours 0 : sinon, « ANOMALIE »). La durée n'est jamais comparée. `--save <dossier>`
+garde les rapports (`avant/` et `apres/`). Environ 7 secondes à 200 parties et 40 à 1 000, toutes les
+simulations tournant en parallèle.
+
 ## Vérifier les outils
 
 ```
@@ -139,5 +168,17 @@ node tools/run-checks.js marbles-tools
 Domaine `marbles-tools` (`core/checks/marbles-tools.check.js`) : état construit,
 journal lisible, vue publique des joueurs, choix du glouton contre une recherche
 exhaustive, aucune action refusée sur des centaines de parties, glouton meilleur que
-l'aléatoire, déterminisme du rapport, surcharges, sacs, et égalité des chiffres entre
-rapport et exports.
+l'aléatoire, déterminisme du rapport, surcharges, sacs, égalité des chiffres entre
+rapport et exports, attribution des pioches à l'effet qui les demande, et différence de
+deux rapports (titres connus du comparateur, contexte, résultats, durée ignorée).
+
+## Tester l'écran dans le navigateur
+
+Les outils ci-dessus passent par le réducteur et les phrases de l'écran, pas par l'écran
+lui-même (touches, curseur, séquence en temps réel). Pour lui : le kit de test en jeu
+(`tools/test-kit.js`, mode d'emploi en tête), `startMarbles`, qui ouvre l'écran des
+billes sur une partie neuve à graine imposée, ou sur un état construit (le format de
+`tools/marbles/state-builder.js`) après des actions déjà jouées : par exemple, une
+résolution suspendue sur un choix, pour en essayer les touches. L'écran s'ouvre alors
+sans pioche, sur la question, et reprend la résolution après la réponse comme s'il
+l'avait lancée.

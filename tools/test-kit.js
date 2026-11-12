@@ -18,6 +18,16 @@
 //      k.mark(); await k.emote("whistle"); await k.wait(1500);
 //      k.sounds({ match: /neon|whistle/ });   // sons depuis mark(), dt en ms
 //      k.entity("defective_neon_1_v");        // l'entité, avec sa face
+//   Jeu des billes (sans partie de ville) : l'écran des billes, ouvert sur une
+//   partie neuve à graine imposée, ou sur un état construit à la main (format en
+//   tête de tools/marbles/state-builder.js) et des actions déjà jouées (commandes
+//   texte de tools/marbles/commands.js), pour arriver droit sur un choix :
+//      await k.startMarbles({ seed: 42 });
+//      await k.startMarbles({ state: { triangle: { leftBase: "tiger", apex: "clay" } },
+//                             actions: ["resoudre"] });   // la question de la tigrée
+//      k.mark(); k.press("Escape"); await k.wait(500);
+//      k.announcements(); k.marbles().pendingChoice;      // ce qui s'est dit, l'état
+//   La résolution se dit en temps réel (étapes et pauses) : `wait`, pas `tick`.
 //   3. TOUJOURS finir par : await k.cleanup();  // audio, espions, stockage
 //      puis fermer l'onglet et arrêter le serveur (tabs_close, preview_stop).
 //      Après cleanup(), la page n'a plus d'audio : la recharger avant tout
@@ -54,6 +64,7 @@ import { isDebugEnabled } from "../config/debug.js";
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";
 import { TIME_CONFIG } from "../config/time-values.js";
 import { WEATHER_STATES } from "../config/weather-values.js";
+import { isAssetManifestLoaded } from "../lib/assets.js";
 
 const STORAGE_KEYS = ["templeton-save", "templeton-preferences"];
 // Sauvegarde du stockage du panneau AVANT les tests, en sessionStorage pour
@@ -124,20 +135,29 @@ export async function refresh(paths) {
 
 // --- Mise en place ----------------------------------------------------------
 
-// Partie "Ville test" (scène demo) si aucune n'est en cours, mode debug
-// actif, stockage sauvegardé, espions sons et annonces posés. Rend l'état
-// de départ résumé.
-export async function start() {
+// Ce que tout test demande : main.js chargé, mode debug actif, stockage
+// sauvegardé, espions sons et annonces posés.
+async function prepare() {
   if (kit.cleanedUp) throw new Error("test-kit : cleanup() a déchargé l'audio de cette page, la recharger avant un nouveau start().");
   // Juste après un rechargement, main.js peut ne pas avoir fini de se
   // charger : ses accès console n'existent pas encore.
   for (let i = 0; i < 100 && typeof window.toggleDebug !== "function"; i++) await sleep(50);
   if (typeof window.toggleDebug !== "function") throw new Error("test-kit : main.js n'est pas chargé.");
+  // Le manifeste des sons se charge après main.js : un écran ouvert avant lui
+  // (startMarbles, juste après un rechargement) échouerait sur sa musique.
+  for (let i = 0; i < 100 && !isAssetManifestLoaded(); i++) await sleep(50);
+  if (!isAssetManifestLoaded()) throw new Error("test-kit : le manifeste des sons n'est pas chargé.");
   if (!isDebugEnabled()) window.toggleDebug();
   startHeartbeat();
   backupStorage();
   installSoundSpy();
   installAnnouncementObserver();
+}
+
+// Partie "Ville test" (scène demo) si aucune n'est en cours, après
+// prepare(). Rend l'état de départ résumé.
+export async function start() {
+  await prepare();
   if (!window.debugSession()) {
     // Menu principal : "Ville test" est la première entrée, curseur remis
     // en tête à chaque affichage.
@@ -147,6 +167,37 @@ export async function start() {
     tick(5);
   }
   return where();
+}
+
+// L'écran des billes au sommet, après prepare(), sans partie de ville. Sans
+// `state` ni `actions` : une partie neuve à la graine `seed`, piochée à
+// l'ouverture comme en jeu. Sinon : l'état construit `state` (description de
+// tools/marbles/state-builder.js, graine `seed` par défaut), auquel `actions`
+// (commandes texte comme dans un cas, « poser 1 pointe », « resoudre »,
+// « choisir 2 », ou actions brutes du réducteur) sont appliquées AVANT
+// l'ouverture : l'écran s'ouvre sur l'état obtenu, sans pioche s'il est déjà en
+// phase de jeu, sur la question d'un choix en attente. Une action refusée ou une
+// commande fausse lève. Rend le résumé de la partie (marblesSummary).
+export async function startMarbles({ seed = 1, state, actions = [] } = {}) {
+  await prepare();
+  let initial = null;
+  if (state !== undefined || actions.length > 0) {
+    const { buildState, applyActions } = await import("./marbles/state-builder.js");
+    const { parseCommand } = await import("./marbles/commands.js");
+    const raw = actions.map((entry) => {
+      if (typeof entry !== "string") return entry;
+      const command = parseCommand(entry);
+      if (command.kind !== "action") throw new Error(`test-kit : "${entry}" n'est pas une action (${command.error ?? command.kind}).`);
+      return command.action;
+    });
+    const result = applyActions(buildState({ seed, ...state }), raw);
+    const refused = result.steps.find((step) => !step.ok);
+    if (refused) throw new Error(`test-kit : action refusée avant l'ouverture, ${JSON.stringify(refused.action)} : ${refused.error}.`);
+    initial = result.state;
+  }
+  window.debugStartMarbles(seed, initial);
+  if (!window.debugMarbles()) throw new Error("test-kit : la partie de billes n'a pas démarré.");
+  return marblesSummary();
 }
 
 // Téléportation directe, sans sas ni menu. `side`/`x` facultatifs (défaut :
@@ -320,6 +371,19 @@ export function clock() {
 // Copie de la partie (window.debugSession).
 export function state() {
   return window.debugSession();
+}
+
+// Copie de la partie de billes en cours (window.debugMarbles), null hors partie.
+export function marbles() {
+  return window.debugMarbles() ?? null;
+}
+
+// Résumé de la partie de billes : tour, étape, triangle, main, choix en attente.
+export function marblesSummary() {
+  const game = marbles();
+  if (game === null) return null;
+  const triangle = Object.fromEntries(Object.entries(game.triangle).map(([slot, placed]) => [slot, placed === null ? null : `${placed.marble}:${placed.wear}`]));
+  return { turn: game.turn, stage: game.stage, score: game.score, triangle, hand: game.hand.map(({ marble }) => marble), pendingChoice: game.pendingChoice };
 }
 
 // Une entité du monde actif (ses deux faces) ou un compagnon, par id, avec

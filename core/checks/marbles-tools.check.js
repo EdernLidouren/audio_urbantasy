@@ -14,9 +14,10 @@ import { formatEvent, formatState } from "../../tools/marbles/format.js";
 import { applyActions, buildState } from "../../tools/marbles/state-builder.js";
 import { PLAYERS, bestChoice, bestPlan, publicView } from "../../tools/marbles/players.js";
 import { MARBLES_DRAWN_VALUE } from "../../tools/marbles/drawn-value.js";
-import { MARBLE_IDS, deriveSeed, parseBagText, playGame, simulate } from "../../tools/marbles/simulation.js";
+import { MARBLE_IDS, deriveSeed, parseBagText, playGame, recordEvents, simulate } from "../../tools/marbles/simulation.js";
 import { percentile, summarize } from "../../tools/marbles/stats.js";
-import { buildReport, frNumber } from "../../tools/marbles/report.js";
+import { REPORT_HEADINGS, REPORT_RESULT_HEADINGS, buildReport, frNumber } from "../../tools/marbles/report.js";
+import { contextLabel, diffReports, reportAnomalies } from "../../tools/marbles/report-diff.js";
 import { MARBLE_COLUMNS, toCsv, toJson } from "../../tools/marbles/export.js";
 import MARBLE_TYPES from "../../marbles/types/index.js";
 import { createMarblesRules } from "../marbles-rules.js";
@@ -38,6 +39,8 @@ export default function checkMarblesTools(run) {
   checkDrawnValue(run);
   checkSimulation(run);
   checkReportAndExport(run);
+  checkDrawAttribution(run);
+  checkReportDiff(run);
 }
 
 function checkStateBuilder(run) {
@@ -363,4 +366,74 @@ function checkReportAndExport(run) {
   const firstGame = csv.games.split("\n")[1].split(",");
   run("export CSV : le score de la partie", String(result.games[0].score), firstGame[2]);
   run("nombre français : virgule et signe", "+4,5 / −2", `${frNumber(4.5, { signed: true })} / ${frNumber(-2)}`);
+}
+
+// Une pioche d'effet revient à l'effet qui l'a demandée (recordEvents), journaux
+// écrits à la main : seuls comptent les évènements `effect` et `draw`.
+function checkDrawAttribution(run) {
+  const effect = (marble, trigger, draw) => ({ type: "effect", trigger, marble, speedDelta: 0, massDelta: 0, draw });
+  const drawn = { type: "draw", marble: "clay", cause: "effect" };
+  const drawnBy = (events, drawers = []) => {
+    const record = { effectDraws: 0, regenerations: 0, midTurnRegenerations: 0, marbles: {}, awaken: { speed: 0, mass: 0 }, pocketReaction: { speed: 0, mass: 0 } };
+    recordEvents(record, events, "resolve", drawers);
+    return Object.fromEntries(Object.entries(record.marbles).filter(([, stats]) => stats.drawn > 0).map(([id, stats]) => [id, stats.drawn]));
+  };
+  // Le mélange au milieu de la Pioche de la géante : la réaction du mica se dit entre
+  // la Pioche et ses billes, sans rien piocher elle-même.
+  run.same(
+    "attribution des pioches : une réaction glissée avant les billes n'en prend aucune",
+    { giant: 2 },
+    drawnBy([effect("giant", "phase", 2), drawn, { type: "bagRegenerated" }, effect("mica", "pocketReaction", 0), drawn])
+  );
+  // L'Éveil de la bille piochée pioche à son tour, puis la pioche de la géante reprend.
+  run.same(
+    "attribution des pioches : un Éveil qui pioche pendant une Pioche prend ses billes, la Pioche reprend",
+    { giant: 2, cats_eye: 1 },
+    drawnBy([effect("giant", "phase", 2), drawn, effect("cats_eye", "awaken", 1), drawn, drawn])
+  );
+  // Une Pioche suspendue par un choix finit dans l'action suivante : la pile la garde.
+  const drawers = [];
+  drawnBy([effect("giant", "phase", 2), drawn], drawers);
+  run.same("attribution des pioches : la pile passe d'une action à l'autre", { giant: 1 }, drawnBy([drawn], drawers));
+  // Une Pioche arrêtée (main pleine) ne prend rien à la suivante.
+  run.same(
+    "attribution des pioches : une Pioche arrêtée ne prend pas les billes d'une autre",
+    { mica: 1 },
+    drawnBy([effect("giant", "phase", 2), effect("mica", "phase", 1), drawn])
+  );
+}
+
+// La différence de deux rapports (tools/marbles/report-diff.js), celle du comparateur.
+function checkReportDiff(run) {
+  const result = simulate({ games: 20, seed: 4, player: "random" });
+  const report = [...buildReport({ params: result.params, summary: summarize(result), name: (id) => id }), "Durée : 1,2 s."];
+  const headings = Object.values(REPORT_HEADINGS);
+  run("rapport : chaque titre du comparateur y est", true, headings.every((heading) => report.some((line) => line.startsWith(heading))));
+  run("rapport : les titres des résultats en font partie", true, REPORT_RESULT_HEADINGS.every((heading) => headings.includes(heading)));
+
+  const same = diffReports(report, report.map((line) => (line.startsWith("Durée") ? "Durée : 9,9 s." : line)));
+  run("différence : la durée seule ne compte pas", true, same.identical);
+  run.same("différence : les anomalies lues", { refusals: 0, interruptions: 0 }, reportAnomalies(report));
+
+  // Une ligne d'une bille changée : rangée sous sa bille, hors des résultats.
+  const marbleLine = report.findIndex((line) => line.startsWith("  Posée"));
+  const marbleChanged = report.map((line, index) => (index === marbleLine ? "  Posée 99 fois." : line));
+  const byMarble = diffReports(report, marbleChanged);
+  run("différence : une ligne de bille, une ligne changée", 1, byMarble.changedLines);
+  run("différence : une ligne de bille, hors des résultats", false, byMarble.resultsChanged);
+  run("différence : une ligne de bille, sous sa bille", report[marbleLine - 1].replace(/\.$/, ""), contextLabel(byMarble.groups[0].context));
+  run.same("différence : avant et après", { before: [report[marbleLine].trim()], after: ["Posée 99 fois."] }, {
+    before: byMarble.groups[0].before.map((line) => line.trim()),
+    after: byMarble.groups[0].after.map((line) => line.trim()),
+  });
+
+  // Le score final changé : un résultat.
+  const scoreLine = report.indexOf(REPORT_HEADINGS.score) + 1;
+  const scoreChanged = diffReports(report, report.map((line, index) => (index === scoreLine ? "Moyenne 1." : line)));
+  run("différence : le score final est un résultat", true, scoreChanged.resultsChanged);
+  run("différence : sous son titre", "Score final", contextLabel(scoreChanged.groups[0].context));
+  // Une ligne en plus, puis une en moins : chacune d'un seul côté.
+  const added = diffReports(report, [...report.slice(0, scoreLine), "Ligne nouvelle.", ...report.slice(scoreLine)]);
+  run.same("différence : une ligne ajoutée", { before: [], after: ["Ligne nouvelle."] }, { before: added.groups[0].before, after: added.groups[0].after });
+  run("différence : une interruption lue", 3, reportAnomalies(report.map((line) => (line.startsWith(REPORT_HEADINGS.interruptions) ? `${REPORT_HEADINGS.interruptions}3.` : line))).interruptions);
 }
