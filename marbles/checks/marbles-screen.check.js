@@ -5,7 +5,8 @@
 // et la partie qu'il laisse, touche après touche, l'horloge avancée à la main.
 // Prendre et poser, l'échange, la séquence de résolution (une étape par battement,
 // Retour arrière, blocage, passage et sa garde), un menu qui fige tout, un choix au
-// milieu d'une résolution, un choix pendant un lancer, la fin de partie. Sur la table de billes des
+// milieu d'une résolution, un choix pendant un lancer, les statuts (A et Maj+A), la
+// fin de partie. Sur la table de billes des
 // vérifications (marbles/checks/fixtures/marbles.js).
 // Domaine `nodeOnly` (core/checks/index.js) : sauté dans la console du jeu, où il
 // écrirait dans les vraies régions d'annonce. Lancées par
@@ -41,7 +42,42 @@ export default function checkMarblesScreen(run) {
   run.section("choix pendant un lancer", checkChoiceDuringThrow);
   run.section("choix dans la défausse", checkDiscardChoice);
   run.section("choix facultatif et obligatoire", checkChoiceModes);
+  run.section("statuts", checkStatuses);
   run.section("fin de partie", checkGameEnd);
+}
+
+// Les STATUTS : A dit leur résumé, dans l'ordre d'acquisition, ou qu'il n'y en a
+// aucun ; Maj+A ouvre leur menu par-dessus l'écran (marbles/view/status-screen.js, ses
+// textes vérifiés par le domaine marbles-view), Échap le referme. Pendant la séquence
+// de résolution, ni l'un ni l'autre.
+function checkStatuses(run) {
+  const statuses = [
+    { status: "loss_cushion", holder: "game", intensity: 2, remaining: 3, pending: false, origin: { trigger: "flick", slot: "apex", marble: "aging_flick" } },
+    { status: "throws_next", holder: "game", intensity: 1, remaining: 1, pending: true, origin: null },
+  ];
+  const bench = openScreenBench(rules, { ...playState({ hand: inHand(["aging_flick"]) }), statuses });
+  try {
+    bench.key("a");
+    run(
+      "A : le résumé, dans l'ordre d'acquisition, l'intensité et l'attente dites",
+      "statuses.summary{count: 2, first: statuses.label_intensity{status: status.loss_cushion.name, duration: statuses.duration.turns{count: 3}, intensity: 2}} statuses.item{status: statuses.label{status: status.throws_next.name, duration: statuses.remaining.pending}}",
+      bench.said.at(-1)
+    );
+    bench.key("a", ["shift"]);
+    run("Maj+A : le menu des statuts par-dessus l'écran", true, bench.top() !== bench.screen);
+    bench.key("Escape");
+    run("Maj+A, Échap : de retour sur l'écran", true, bench.top() === bench.screen);
+    run("A et Maj+A ne touchent pas à la partie", JSON.stringify(statuses), JSON.stringify(bench.game().statuses));
+  } finally {
+    bench.close();
+  }
+  const empty = openScreenBench(rules, playState({ hand: inHand(["aging_flick"]) }));
+  try {
+    empty.key("a");
+    run("A : aucun statut", "statuses.none", empty.said.at(-1));
+  } finally {
+    empty.close();
+  }
 }
 
 // Une partie neuve : la musique, le sac brassé, la pioche du tour 1, d'une annonce.

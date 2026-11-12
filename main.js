@@ -35,6 +35,7 @@ import { loadGame } from "./view/save-storage.js";
 import { reportSaveRepairs, reportI18nWarning, reportSceneWarning } from "./view/debug-warnings.js";
 import { announceNewDiscoveries } from "./view/discoveries.js";
 import MARBLE_TYPES from "./marbles/content/types/index.js";
+import MARBLE_STATUSES from "./marbles/content/statuses/index.js";
 import { installDebugConsole } from "./view/debug-console.js";
 
 // Préférences de menu (sliders/toggles + cyclage/étoile/suffixe, voir
@@ -59,8 +60,8 @@ validateEntityRegistry(registry);
 // Les billes : un registre de contenu, que le core reçoit et n'importe jamais. Les
 // règles du jeu y sont liées ici, une fois pour toutes (marbles/core/rules.js), puis
 // passées à l'écran des billes.
-validateMarblesContent(MARBLE_TYPES);
-const marblesRules = createMarblesRules(MARBLE_TYPES);
+validateMarblesContent(MARBLE_TYPES, MARBLE_STATUSES);
+const marblesRules = createMarblesRules(MARBLE_TYPES, MARBLE_STATUSES);
 const newGame = parseNewGame(NEW_GAME, registry);
 
 // Mode DEBUG (voir config/debug.js) : PAS de menu — bascule DEPUIS LA

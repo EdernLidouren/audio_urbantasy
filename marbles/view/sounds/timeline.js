@@ -217,6 +217,15 @@ export const MARBLE_EVENT_CUES = {
   // Une réaction du pot : un point d'accroche, sans son à elle aujourd'hui ; l'arrêt
   // d'un enchaînement, muet aussi (son annonce suffit).
   pocketReaction: null,
+  // Les statuts : des points d'accroche, sans son à eux aujourd'hui.
+  statusGained: null,
+  statusStrengthened: null,
+  statusUnchanged: null,
+  statusActivated: null,
+  statusCharge: null,
+  statusExpired: null,
+  statusReaction: null,
+  valueModified: null,
   chainInterrupted: null,
   // Un choix : son ouverture (`choice`) et chaque validation (`chosen`) sont des
   // points d'accroche, sans son à eux aujourd'hui ; sa fin et un choix indécis (la

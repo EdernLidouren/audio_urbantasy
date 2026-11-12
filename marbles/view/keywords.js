@@ -10,11 +10,14 @@
 // (marbles/core/content.js/keywordsOf, par les règles) : seulement ceux présents sur la
 // bille, chacun une fois, déclencheurs, En poche, actions mots-clés, puis pointe et
 // base ; leurs noms et descriptions sont déclarés à côté d'eux (MARBLE_TRIGGERS,
-// MARBLE_POCKET, CLAUSE_ACTIONS, MARBLE_PHASES). Pur, sauf l'ouverture du menu.
+// MARBLE_POCKET, CLAUSE_ACTIONS, MARBLE_PHASES). Puis, une ligne chacun, les STATUTS
+// que la bille peut appliquer (rules.appliedStatusesOf), avec leur description.
+// Pur, sauf l'ouverture du menu.
 
 import { pushScreen, popScreen } from "../../lib/screens.js";
 import { makeMenuScreen } from "../../lib/menu.js";
 import { nameRef, t } from "../../data/i18n/index.js";
+import { statusHelpLine } from "./narration.js";
 
 // Les lignes des mots-clés d'une bille, chacune { key, params }. `marble` : son id,
 // ou undefined s'il n'y a pas de bille sous le curseur. Noms et descriptions passent
@@ -24,7 +27,11 @@ function keywordLines(marble, rules) {
   if (marble === undefined || marble === null) return [{ key: "marbles.keyword.no_marble" }];
   const keywords = rules.keywordsOf(marble);
   if (keywords.length === 0) return [{ key: "marbles.keyword.none" }];
-  return keywords.map(({ texts }) => ({ key: "marbles.keyword.line", params: { name: nameRef(texts.name), description: nameRef(texts.description) } }));
+  // Puis chaque statut que la bille peut appliquer, décrit (« Statut amorti : … »).
+  return [
+    ...keywords.map(({ texts }) => ({ key: "marbles.keyword.line", params: { name: nameRef(texts.name), description: nameRef(texts.description) } })),
+    ...rules.appliedStatusesOf(marble).map(statusHelpLine),
+  ];
 }
 
 // La touche E : toutes les lignes, d'une seule annonce.

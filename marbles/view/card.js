@@ -25,14 +25,14 @@ function readField(marble, entry, situation, rules, t) {
   if (entry.variantLabelKey !== undefined) {
     const left = rules.effectAt(marble, "leftBase");
     const right = rules.effectAt(marble, "rightBase");
-    if (left !== right) return t(entry.variantLabelKey, { left: describePrinted(left, situation, t), right: describePrinted(right, situation, t) });
-    return t(entry.labelKey, { effect: describePrinted(left, situation, t) });
+    if (left !== right) return t(entry.variantLabelKey, { left: describePrinted(left, situation, t, rules.statuses), right: describePrinted(right, situation, t, rules.statuses) });
+    return t(entry.labelKey, { effect: describePrinted(left, situation, t, rules.statuses) });
   }
   // Un champ d'objet de moments (En poche) : la clé `part`.
   const field = rules.types[marble][entry.field];
   const clauses = entry.part === undefined ? field : field?.[entry.part];
   if (clauses === undefined && !entry.required) return null;
-  return t(entry.labelKey, { effect: describePrinted(clauses ?? [], situation, t), ...(entry.occurrence && { occurrence: t(entry.occurrence) }) });
+  return t(entry.labelKey, { effect: describePrinted(clauses ?? [], situation, t, rules.statuses), ...(entry.occurrence && { occurrence: t(entry.occurrence) }) });
 }
 
 // Le modèle tel qu'il se lit pour une bille : le moment réactif devient une entrée

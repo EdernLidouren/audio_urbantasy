@@ -263,11 +263,56 @@ export const FIXTURE_SETTINGS = Object.freeze({
   turnCount: 10,
 });
 
+// La TABLE DES STATUTS DES VÉRIFICATIONS (marbles/core/statuses.js), figée comme les
+// billes : chaque statut nommé d'après ce qu'il a de particulier, une sorte de durée,
+// un cumul et un comportement chacun, ceux de la vraie table et quelques autres.
+// Aucun n'a de texte (leurs noms n'existent pas) : les vérifications de vue lisent
+// les CLÉS.
+export const FIXTURE_STATUSES = deepFreeze({
+  // Lancers +1, le prochain tour, en intensité.
+  throws_next: { stacking: "intensity", duration: { kind: "nextTurn" }, behaviors: [{ type: "stat", stat: "throws", amount: 1 }] },
+  // Lancers +1, ce tour, en intensité : reçu pendant le tour, il s'ajoute aussitôt.
+  throws_now: { stacking: "intensity", duration: { kind: "turn" }, behaviors: [{ type: "stat", stat: "throws", amount: 1 }] },
+  // Lancers −1, le prochain tour, en intensité : un statut négatif.
+  throws_minus: { stacking: "intensity", duration: { kind: "nextTurn" }, behaviors: [{ type: "stat", stat: "throws", amount: -1 }] },
+  // Capacité du pot +1, toute la partie, en intensité.
+  pot_game: { stacking: "intensity", duration: { kind: "game" }, behaviors: [{ type: "stat", stat: "potCapacity", amount: 1 }] },
+  // Taille de main −2, ce tour, en intensité : vers le plancher.
+  hand_shrink: { stacking: "intensity", duration: { kind: "turn" }, behaviors: [{ type: "stat", stat: "handSize", amount: -2 }] },
+  // Gains de Vitesse ×2, une charge, en durée.
+  gain_charge: { stacking: "duration", duration: { kind: "charges", count: 1 }, behaviors: [{ type: "modifier", point: "speedGain", operation: "multiply", value: 2 }] },
+  // Gains de Vitesse +1, deux tours, en durée.
+  gain_add: { stacking: "duration", duration: { kind: "turns", count: 2 }, behaviors: [{ type: "modifier", point: "speedGain", operation: "add", value: 1 }] },
+  // Pertes de Vitesse −1, trois tours, en intensité.
+  loss_cushion: { stacking: "intensity", duration: { kind: "turns", count: 3 }, behaviors: [{ type: "modifier", point: "speedLoss", operation: "add", value: -1 }] },
+  // Gains et pertes de Masse ×2, deux charges, en durée : une charge par vrai changement.
+  mass_double: {
+    stacking: "duration",
+    duration: { kind: "charges", count: 2 },
+    behaviors: [
+      { type: "modifier", point: "massGain", operation: "multiply", value: 2 },
+      { type: "modifier", point: "massLoss", operation: "multiply", value: 2 },
+    ],
+  },
+  // Impact ×2, ce tour, unique.
+  impact_double: { stacking: "unique", duration: { kind: "turn" }, behaviors: [{ type: "modifier", point: "impact", operation: "multiply", value: 2 }] },
+  // Impact −5, toute la partie, en intensité : vers le plancher 0.
+  impact_tax: { stacking: "intensity", duration: { kind: "game" }, behaviors: [{ type: "modifier", point: "impact", operation: "add", value: -5 }] },
+  // À chaque chiquenaude (le mot-clé) : Vitesse +2 ; deux tours, unique.
+  flick_react: { stacking: "unique", duration: { kind: "turns", count: 2 }, behaviors: [{ type: "reaction", on: "flick", effect: [speed(2)] }] },
+  // À chaque statut reçu : Vitesse +1 ; toute la partie, unique (jamais à sa propre
+  // réception).
+  received_react: { stacking: "unique", duration: { kind: "game" }, behaviors: [{ type: "reaction", on: "statusesReceived", effect: [speed(1)] }] },
+  // À chaque bille lancée : Masse +1 ; toute la partie, unique.
+  throw_react: { stacking: "unique", duration: { kind: "game" }, behaviors: [{ type: "reaction", on: "thrownMarbles", effect: [mass(1)] }] },
+});
+
 // Les règles d'une table de test (FIXTURE_TYPES par défaut, ou une table fabriquée),
-// dont chaque partie neuve part du sac de test et des réglages de test ; `options`
-// de createGame les remplace au cas par cas (un sac vide, une autre capacité…).
-export function fixtureRules(types = FIXTURE_TYPES) {
-  const rules = createMarblesRules(types);
+// et de la table des statuts de test (FIXTURE_STATUSES par défaut), dont chaque
+// partie neuve part du sac de test et des réglages de test ; `options` de createGame
+// les remplace au cas par cas (un sac vide, une autre capacité…).
+export function fixtureRules(types = FIXTURE_TYPES, statuses = FIXTURE_STATUSES) {
+  const rules = createMarblesRules(types, statuses);
   return Object.freeze({
     ...rules,
     createGame: (seed, options = {}) => rules.createGame(seed, { bag: FIXTURE_BAG, ...FIXTURE_SETTINGS, ...options }),

@@ -102,3 +102,10 @@ export const bounce = (target) => ({ action: "bounce", ...(target === undefined 
 // (LAST_DISCARDED) ou des billes de la défausse au choix (choice). Toujours une
 // cible. Sans montant.
 export const retrieve = (target) => ({ action: "retrieve", target });
+
+// APPLIQUER UN STATUT (marbles/content/statuses/) à la partie : `id`, le statut ;
+// `intensity`, son intensité (1 par défaut) ; `duration` (facultatif), le nombre de
+// tours ou de charges, pour un statut dont la durée se compte seulement (la sorte de
+// durée est celle du statut). applyStatus("whiplash"), applyStatus("cushion",
+// { intensity: 2 }), applyStatus("cushion", { duration: 1 }).
+export const applyStatus = (id, { intensity = 1, duration } = {}) => ({ action: "applyStatus", status: id, amount: intensity, ...(duration === undefined ? {} : { duration }) });

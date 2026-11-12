@@ -84,7 +84,7 @@ import { detailAfterMainMove, detailLine, mainWithDetail, stepDetail } from "../
 import { t } from "../../data/i18n/index.js";
 import { MARBLES_SETTINGS } from "../config/values.js";
 import { isDebugEnabled } from "../../config/debug.js";
-import { SLOTS, swapRefusal, placeRefusal, throwRefusal } from "../core/marbles.js";
+import { SLOTS, swapRefusal } from "../core/marbles.js";
 import { isOptionalChoice } from "../core/effects.js";
 import { playMenuSound } from "../../view/menu-sounds.js";
 import { openConfirmation } from "../../view/menus/confirmation.js";
@@ -92,6 +92,7 @@ import { INITIAL_CURSOR, cursorOn, placementStart, stepCursor, zoneOf } from "./
 import { choiceAnswer, choiceCursorAfterAnswer, choiceFocusLine, choiceHandOptions, choiceListEntry, choiceMarbleAt, choiceStartCursor, stepChoiceCursor } from "./choice.js";
 import { marbleCard } from "./card.js";
 import { openPileMenu } from "./pile-screen.js";
+import { openStatusMenu } from "./status-screen.js";
 import {
   bagDisplayOrder,
   buildSteps,
@@ -101,6 +102,7 @@ import {
   describeOverview,
   describeDiscard,
   describePot,
+  describeStatuses,
   describeHandFocus,
   describeSlotFocus,
   describeSlotForPlacement,
@@ -153,6 +155,9 @@ const MARBLES_BINDINGS = defineBindings("marbles", {
   discardMenu: { keys: ["d"], mods: ["shift"] },
   pot: { keys: ["p"], mods: [] },
   potMenu: { keys: ["p"], mods: ["shift"] },
+  // Les statuts de la partie : leur résumé, puis leur menu (marbles/view/status-screen.js).
+  statuses: { keys: ["a"], mods: [] },
+  statusesMenu: { keys: ["a"], mods: ["shift"] },
   overview: { keys: ["r"], mods: [] },
   resolve: { keys: ["r"], mods: ["shift"] },
   history: { keys: ["l"], mods: [] },
@@ -619,7 +624,7 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
       return;
     }
     // Plus de lancer : refusé dès la prise, comme l'échange.
-    const refusal = throwRefusal(game);
+    const refusal = rules.throwRefusal(game);
     if (refusal) {
       refuse(refusal);
       return;
@@ -637,7 +642,7 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
   function placeHeldOn(slot) {
     const game = getGame();
     const handIndex = held.index;
-    const refusal = placeRefusal(game, handIndex, slot);
+    const refusal = rules.placeRefusal(game, handIndex, slot);
     if (refusal) {
       refuse(refusal);
       return;
@@ -714,7 +719,7 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
   function announceTurn() {
     if (blockedDuringSequence()) return;
     const game = getGame();
-    announce(describeTurn(game, swapRefusal(game) === null, t), { assertive: true });
+    announce(describeTurn(game, swapRefusal(game) === null, t, rules), { assertive: true });
   }
 
   function announceBag() {
@@ -744,13 +749,26 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
   // l'ordre d'arrivée, fiches et mots-clés compris (marbles/view/pile-screen.js).
   function announcePot() {
     if (blockedDuringSequence()) return;
-    announce(describePot(getGame(), t), { assertive: true });
+    announce(describePot(getGame(), t, rules), { assertive: true });
   }
 
   function openPotMenu() {
     if (blockedDuringSequence()) return;
     playMenuSound("select");
     openPileMenu("marbles.pile.pot", getGame().pot, rules, getGame());
+  }
+
+  // A : les statuts de la partie, d'une annonce ; Maj+A : leur menu, fiches et
+  // descriptions comprises (marbles/view/status-screen.js).
+  function announceStatuses() {
+    if (blockedDuringSequence()) return;
+    announce(describeStatuses(getGame(), rules, t), { assertive: true });
+  }
+
+  function openStatuses() {
+    if (blockedDuringSequence()) return;
+    playMenuSound("select");
+    openStatusMenu(getGame().statuses, rules);
   }
 
   // L : l'historique du tour précédent. Aussi en fin de partie : celui du dernier
@@ -830,6 +848,8 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
     discardMenu: openDiscardMenu,
     pot: announcePot,
     potMenu: openPotMenu,
+    statuses: announceStatuses,
+    statusesMenu: openStatuses,
     overview: announceOverview,
     resolve: resolveKey,
     history: openHistory,

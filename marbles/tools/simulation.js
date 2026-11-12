@@ -18,7 +18,7 @@
 // les options de createMarblesGame, celles d'une partie.
 
 import { STARTING_BAG } from "../config/values.js";
-import { createMarblesGame, legalActions } from "../core/marbles.js";
+import { createMarblesGame } from "../core/marbles.js";
 import { createSeed, nextRandom } from "../../lib/rng.js";
 import { PLAYERS, publicView } from "./players.js";
 import MARBLE_TYPES from "../content/types/index.js";
@@ -143,7 +143,8 @@ export function recordEvents(record, events, actionType, drawers) {
           const drawer = drawers.findLast((entry) => entry.remaining > 0);
           if (drawer !== undefined) {
             drawer.remaining -= 1;
-            stats(drawer.marble).drawn += 1;
+            // Une pioche d'un statut (aucune bille) ne compte chez aucune bille.
+            if (drawer.marble !== null) stats(drawer.marble).drawn += 1;
           }
           while (drawers.length > 0 && drawers.at(-1).remaining === 0) drawers.pop();
         }
@@ -171,6 +172,9 @@ export function recordEvents(record, events, actionType, drawers) {
         // speedDelta et massDelta comptent le bonus reçu : un bonus se compte chez
         // la bille qui le reçoit, comme dans la vue d'ensemble (touche R).
         if (event.draw > 0) drawers.push({ marble: event.marble, remaining: event.draw });
+        // La réaction d'un statut n'est l'effet d'aucune bille : ses valeurs comptent
+        // dans l'Impact, dans aucune colonne de bille (ses pioches, chez aucune).
+        if (event.trigger === "statusReaction") break;
         const marble = stats(event.marble);
         marble[`${event.trigger}Speed`] += event.speedDelta;
         marble[`${event.trigger}Mass`] += event.massDelta;
@@ -231,7 +235,7 @@ export function playGame({ index, seed, player, playerOptions = {}, bagMode, set
     let result = GAME_RULES.reduce(state, action);
     if (!result.ok) {
       record.refusals.push({ turn: state.turn, action, error: result.error });
-      action = legalActions(state).find((legal) => legal.type !== "draw") ?? legalActions(state)[0];
+      action = GAME_RULES.legalActions(state).find((legal) => legal.type !== "draw") ?? GAME_RULES.legalActions(state)[0];
       result = GAME_RULES.reduce(state, action);
     }
     recordEvents(record, result.events, action.type, drawers);

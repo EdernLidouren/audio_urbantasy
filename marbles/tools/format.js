@@ -9,6 +9,7 @@
 
 import { MARBLE_POCKET, MARBLE_TRIGGERS } from "../config/values.js";
 import { SLOTS } from "../core/marbles.js";
+import { NO_STATUSES, characteristic } from "../core/statuses.js";
 import { formatCounter } from "../view/narration.js";
 import { GAME_RULES } from "./game-rules.js";
 
@@ -96,19 +97,32 @@ export function tallyList(tally) {
   return counted.length === 0 ? "aucune" : counted.map(([id, values]) => `${id} ${values.turn}/${values.game}`).join(", ");
 }
 
+// Les statuts de la partie, dans l'ordre d'acquisition : « cushion intensité 2,
+// reste 3 (tours) ; extraThrow intensité 1, reste 1 (tours), en attente ».
+function statusList(instances) {
+  if (instances.length === 0) return "aucun";
+  return instances
+    .map(({ status, intensity, remaining, pending }) => `${status} intensité ${intensity}, reste ${remaining ?? "toute la partie"}${pending ? ", en attente" : ""}`)
+    .join(" ; ");
+}
+
 // L'état entier, une ligne par élément. Le sac se lit du haut (prochaine pioche)
 // vers le bas : c'est un outil de test, il voit ce que le joueur ne voit pas.
-export function formatState(state, name) {
+// `statuses` : la table des statuts, pour les caractéristiques en vigueur (lancers,
+// main, pot) ; aucune par défaut.
+export function formatState(state, name, statuses = NO_STATUSES) {
+  const value = (key) => characteristic(state, key, statuses);
   const yesNo = (value) => (value ? "oui" : "non");
   const lines = [
     `Tour ${state.turn} sur ${state.turnCount}, étape ${state.stage}.`,
     `Score ${state.score}. Vitesse ${formatCounter(state.speed)}, Masse ${formatCounter(state.mass)}.`,
-    `Échange utilisé : ${yesNo(state.swapUsed)}. Lancers : ${state.throwsUsed} sur ${state.throwsPerTurn}.`,
+    `Échange utilisé : ${yesNo(state.swapUsed)}. Lancers : ${state.throwsUsed} sur ${value("throws")}.`,
     ...SLOTS.map((slot) => slotLine(state, slot, name)),
-    `Main, ${state.hand.length} sur ${state.maxHandSize} : ${handList(state.hand, name)}.`,
+    `Main, ${state.hand.length} sur ${value("handSize")} : ${handList(state.hand, name)}.`,
     `Sac, ${state.bag.length}, du haut vers le bas : ${listOf(state.bag, name)}.`,
     `Défausse, ${state.discard.length} : ${listOf(state.discard, name)}.`,
-    `Pot, ${state.pot.length} sur ${state.potCapacity}, dans l'ordre d'arrivée : ${listOf(state.pot, name)}. Perdues, ${state.lost.length} : ${listOf(state.lost, name)}.`,
+    `Pot, ${state.pot.length} sur ${value("potCapacity")}, dans l'ordre d'arrivée : ${listOf(state.pot, name)}. Perdues, ${state.lost.length} : ${listOf(state.lost, name)}.`,
+    `Statuts : ${statusList(state.statuses)}.`,
     `Pioche : ${state.firstTurnDraw} au premier tour, ${state.drawPerTurn} ensuite.`,
     `Valeurs de partie (ce tour/cette partie) : ${tallyList(state.tally)}.`,
     ...(state.pendingChoice ? [choiceLine(state.pendingChoice, name)] : []),
@@ -139,6 +153,7 @@ export function choiceLine(pending, name) {
 const POT_TRIGGERS = new Set(MARBLE_POCKET.moments.map((moment) => moment.trigger));
 
 function effectLine(event, name) {
+  if (event.trigger === "statusReaction") return `Effet du statut ${event.status} : Vitesse ${signed(event.speedDelta)}, Masse ${signed(event.massDelta)} ; compteurs Vitesse ${formatCounter(event.speed)}, Masse ${formatCounter(event.mass)}.`;
   // Une bille sans emplacement est au pot (En poche) ou en main (l'Éveil).
   const where = POT_TRIGGERS.has(event.trigger) ? "au pot" : event.slot === null || event.slot === undefined ? "en main" : `en ${slotLabel(event.slot)}`;
   let line = `${TRIGGER_WORDS[event.trigger]?.effect ?? `Effet ${event.trigger}`}, ${marbleLabel(event.marble, name)} ${where} : Vitesse ${signed(event.speedDelta)}, Masse ${signed(event.massDelta)}`;
@@ -194,6 +209,14 @@ const EVENT_LINES = {
     `Rotation : ${SLOTS.map((slot) => `${slotLabel(slot)} ${event.triangle[slot] === null ? "vide" : marbleLabel(event.triangle[slot].marble, name)}`).join(", ")}.`,
   turnEnded: (event) => `Fin du tour ${event.turn}.`,
   gameOver: (event) => `Fin de partie, score ${event.score}.`,
+  statusGained: (event) => `Statut reçu : ${event.status}, intensité ${event.intensity}, reste ${event.remaining ?? "toute la partie"}${event.pending ? ", en attente" : ""}.`,
+  statusStrengthened: (event) => `Statut renforcé : ${event.status}, intensité ${event.intensity}, reste ${event.remaining ?? "toute la partie"}${event.pending ? ", en attente" : ""}.`,
+  statusUnchanged: (event) => `Statut déjà là, sans effet : ${event.status}.`,
+  statusActivated: (event) => `Statut activé : ${event.status}.`,
+  statusCharge: (event) => `Charge utilisée : ${event.status}, reste ${event.remaining}.`,
+  statusExpired: (event) => `Fin du statut : ${event.status}.`,
+  statusReaction: (event) => `Réaction du statut ${event.status}, à ${event.counter}.`,
+  valueModified: (event) => `Valeur modifiée (${event.point}) : ${event.before} -> ${event.after}, par ${(event.contributions ?? []).map((step) => `${step.status} (${step.before} -> ${step.after})`).join(", ")}.`,
 };
 
 // Un évènement du journal en une ligne. Un type inconnu (ajouté depuis) se lit

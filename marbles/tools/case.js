@@ -44,7 +44,7 @@ let state = buildState(spec.state ?? {});
 const record = [];
 
 console.log("État de départ :");
-formatState(state, name).forEach((line) => console.log(`  ${line}`));
+formatState(state, name, GAME_RULES.statuses).forEach((line) => console.log(`  ${line}`));
 
 // Ce qu'un effet prévu a produit en plus de ses valeurs : billes chassées (et leur
 // Éjection), mises en poche ou perdues, cibles vides, choix indécis.
@@ -116,5 +116,5 @@ for (const entry of spec.actions ?? []) {
 }
 
 console.log("État final :");
-formatState(state, name).forEach((line) => console.log(`  ${line}`));
+formatState(state, name, GAME_RULES.statuses).forEach((line) => console.log(`  ${line}`));
 if (args.includes("--json")) console.log(JSON.stringify({ state, steps: record }));

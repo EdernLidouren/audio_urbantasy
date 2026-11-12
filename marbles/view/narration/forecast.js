@@ -7,7 +7,7 @@
 import { nameRef } from "../../../data/i18n/index.js";
 import { MARBLE_POCKET, MARBLE_TRIGGERS } from "../../config/values.js";
 import { SLOTS } from "../../core/marbles.js";
-import { describeEffect, describeOutcome, formatCounter, marbleName, outcomeLine, slotName } from "./effects.js";
+import { describeEffect, describeOutcome, formatCounter, marbleName, outcomeLine, slotName, statusName } from "./effects.js";
 
 // La ligne des valeurs prévues d'une pose : celles de la phase de la bille posée,
 // puis ce qui s'y ajoute avec son emplacement (son Final, si elle s'use ce tour) :
@@ -54,7 +54,18 @@ export function placementLines(game, handIndex, slot, rules, t) {
       params: { marble: nameRef(`marble.${concerned[trigger.forecast.marble]}.name`), effect: describeOutcome(predicted[trigger.id], t) },
     });
   }
-  return [...lines, ...regenerationLines(predicted, t), ...uncertainLines(predicted), potReactionLine(predicted, t)];
+  return [...lines, ...regenerationLines(predicted, t), ...uncertainLines(predicted), potReactionLine(predicted, t), ...statusReactionLines(game, predicted, t)];
+}
+
+// La ligne des statuts d'une confirmation, après celle du pot : les réactions des
+// statuts que la pose provoquerait (marbles/core/forecast.js, `statusReactions`),
+// « Statuts : ferveur, Vitesse +2 », ou « Statuts : aucun effet ». Présente dès que
+// la partie a des statuts, pour que le menu garde sa structure pendant qu'ils durent.
+function statusReactionLines(game, predicted, t) {
+  if (game.statuses.length === 0) return [];
+  const parts = predicted.statusReactions.map((effect) => t("marbles.place.status_effect", { status: statusName(effect.status, t), effect: describeEffect(effect, t) }));
+  const reactions = parts.length === 0 ? t("marbles.effect.none") : parts.reduce((first, rest) => t("marbles.place.pot_more", { first, rest }));
+  return [{ key: "marbles.place.statuses", params: { reactions } }];
 }
 
 // Les gabarits des déclencheurs prévus avec un emplacement (MARBLE_TRIGGERS,
@@ -137,6 +148,12 @@ function potLines(predicted, t) {
   return predicted.potEffects.map((effect) => t(POT_FORECAST_TEMPLATE, { marble: nameRef(`marble.${effect.marble}.name`), effect: describeEffect(effect, t) }));
 }
 
+// Les statuts qui joueraient quelque chose pendant la résolution (leurs réactions,
+// regroupées : `statusEffects`), après le pot : « Ferveur : Vitesse +2. ».
+function statusLines(predicted, t) {
+  return predicted.statusEffects.map((effect) => t("marbles.event.effect_status", { status: statusName(effect.status, t), effect: describeEffect(effect, t) }));
+}
+
 function forecastNotes(predicted, t) {
   return [...regenerationLines(predicted, t), ...uncertainLines(predicted)].map(({ key, params }) => t(key, params));
 }
@@ -156,5 +173,5 @@ export function describeOverview(game, rules, t) {
     impact: predicted.impact,
   });
   const slots = SLOTS.map((slot) => forecastSlotLine(predicted, slot, t));
-  return [summary, ...slots, ...potLines(predicted, t), ...forecastNotes(predicted, t)].join(" ");
+  return [summary, ...slots, ...potLines(predicted, t), ...statusLines(predicted, t), ...forecastNotes(predicted, t)].join(" ");
 }

@@ -35,17 +35,20 @@
 // actions qui déclarent `all` l'acceptent (Éjecter).
 //
 // LA SITUATION d'un effet, ce que ses conditions et ses montants calculés lisent au
-// déclenchement : { triangle, holder, replacement, tally, state } ;
+// déclenchement : { triangle, holder, replacement, tally, state, statuses } ;
 //   triangle     le triangle à cet instant ;
 //   state        l'état de la partie à cet instant, d'où se comptent les ZONES
 //                (GAME_ZONES : conditions d'état, nombre de billes par zone) ; une
 //                bille en transit n'y est dans aucune zone. Absent (null) d'une fiche
 //                hors de toute partie ;
+//   statuses     la table des statuts (marbles/core/statuses.js), que lit la capacité
+//                en vigueur d'une zone (ses caractéristiques) ; absente : aucune ;
 //   holder       la bille qui joue l'effet, { marble, zone, turnsInHand } : `zone`
 //                dit où elle est (HOLDER_ZONES : "triangle" ; "leaving", en
 //                partance, le Final et l'Éjection ; "discard", à la défausse, la
 //                Chute ; "thrown", en cours de lancer, la
-//                Chiquenaude ; "hand", l'Éveil ; "pot") ; `turnsInHand`, son
+//                Chiquenaude ; "hand", l'Éveil ; "pot" ; "status", un statut qui
+//                réagit, sans bille) ; `turnsInHand`, son
 //                compteur de tours en main (0 hors de la main ; pendant son lancer,
 //                celui qu'elle avait en la quittant) ;
 //   replacement  pendant un Tic ou une Éjection, le remplacement en cours,
@@ -65,11 +68,12 @@
 // Une condition ne lit jamais un effet déjà modifié (printedStat lit l'effet
 // IMPRIMÉ) ; le calibre est statique : aucune dépendance circulaire.
 //
-// DEUX SORTES D'ACTIONS (`kind`) : les VALEURS (Vitesse, Masse, Pioche), qui
-// s'additionnent en un effet, et les actions SUR UNE BILLE (Polissage, Fêlure,
-// Empocher, Éjecter), qui agissent sur la bille elle-même, sur celle d'un
-// emplacement ou sur des billes choisies, une application par clause, dans l'ordre
-// des clauses, après les valeurs.
+// TROIS SORTES D'ACTIONS (`kind`) : les VALEURS (Vitesse, Masse, Pioche), qui
+// s'additionnent en un effet ; les actions SUR UNE BILLE (Polissage, Fêlure,
+// Empocher, Éjecter…), qui agissent sur la bille elle-même, sur celle d'un
+// emplacement ou sur des billes choisies ; les actions de STATUT (Appliquer un
+// statut), qui donnent un statut à la partie. Les deux dernières : une application
+// par clause, dans l'ordre des clauses, après les valeurs.
 //
 // RÈGLE DES CIBLES : une cible n'a de sens que si l'effet ciblé peut encore se
 // produire. Une VALEUR (Vitesse, Masse) donnée à un emplacement modifie l'effet de
@@ -90,6 +94,7 @@
 import { MARBLE_SIZES } from "../config/values.js";
 import { rejectUnknownFields } from "../../lib/validate.js";
 import { TALLY_SCOPES, tallyValue } from "./tally.js";
+import { NO_STATUSES, STATUS_DURATIONS, characteristic, definitionOf, statusApplication } from "./statuses.js";
 
 // Un calibre connu (marbles/config/values.js/MARBLE_SIZES) ?
 export function isMarbleSize(size) {
@@ -154,8 +159,8 @@ function resolveRelative(target, reference) {
 }
 
 // Les zones de la bille qui joue un effet où elle n'a JAMAIS d'emplacement de
-// référence (HOLDER_ZONES) : en main (l'Éveil), dans le pot.
-const NO_REFERENCE_ZONES = ["hand", "pot"];
+// référence (HOLDER_ZONES) : en main (l'Éveil), dans le pot, et un statut.
+const NO_REFERENCE_ZONES = ["hand", "pot", "status"];
 
 // Le même « aucun effet » partout : comparer deux effets par identité dit si
 // une bille a une variante de base.
@@ -346,6 +351,8 @@ export const HOLDER_ZONES = {
   leaving: { zone: "leaving", where: "elle est en partance (son Final, son Éjection)" },
   dropped: { zone: "discard", where: "elle vient d'arriver à la défausse (sa Chute)" },
   pot: { zone: "pot", where: "elle est dans le pot" },
+  // Un STATUT qui réagit (marbles/core/statuses.js) : aucune bille ne joue l'effet.
+  status: { zone: "status", where: "c'est un statut, sans bille" },
 };
 
 // La zone de la bille elle-même dans un contexte de validation (validateEffect).
@@ -353,6 +360,25 @@ const holderZoneOf = (context) => HOLDER_ZONES[context.marble ?? "onSlot"];
 
 // L'usure et l'éjection n'existent que sur le triangle.
 const ON_TRIANGLE = ["triangle"];
+
+// Les évènements d'une APPLICATION de statut (marbles/core/run.js/gainStatus) :
+// reçu, renforcé, ou sans effet (unique, déjà là).
+const STATUS_APPLICATIONS = new Set(["statusGained", "statusStrengthened", "statusUnchanged"]);
+
+// Appliquer un statut : la clause { action: "applyStatus", status, amount, duration? }.
+// `status`, l'id d'un statut de la table (context.statuses, celle des règles) ;
+// `amount`, son INTENSITÉ (au moins 1 ; un montant calculé permis) ; `duration`
+// (facultatif) le nombre de tours ou de charges, pour une durée comptée seulement :
+// la sorte de durée est celle de la définition. Sans cible : le porteur est la partie.
+function validateStatusClause(clause, describe, fail, context) {
+  validatePositive(clause, describe, fail, context);
+  if (context?.statuses === undefined) fail(`${describe} : table des statuts absente du contexte de validation.`);
+  if (!Object.hasOwn(context.statuses, clause.status)) fail(`${describe} : statut inconnu "${clause.status}".`);
+  if (clause.duration === undefined) return;
+  const { kind } = context.statuses[clause.status].duration;
+  if (!STATUS_DURATIONS[kind]?.counted) fail(`${describe} : la durée du statut "${clause.status}" (${kind}) ne se compte pas, une clause ne la change pas.`);
+  if (!Number.isInteger(clause.duration) || clause.duration < 1) fail(`${describe} : duration doit être un entier >= 1.`);
+}
 
 export const CLAUSE_ACTIONS = {
   // Ajoute `amount` (négatif permis) à la Vitesse. Au choix : un bonus à la phase d'une
@@ -545,6 +571,17 @@ export const CLAUSE_ACTIONS = {
       quantity: (event) => (movedArrival(event, "retrieve") ? 1 : 0),
     },
   },
+  applyStatus: {
+    kind: "status",
+    fields: ["action", "status", "amount", "duration", "when"],
+    validate: validateStatusClause,
+    // Mot-clé : un déclenchement par application, renforcement ou application sans
+    // effet comprise.
+    keyword: {
+      texts: { name: "marbles.keyword.applyStatus.name", description: "marbles.keyword.applyStatus.description" },
+      triggers: (event) => (STATUS_APPLICATIONS.has(event.type) ? 1 : 0),
+    },
+  },
 };
 
 const actionsOfKind = (kind) => Object.keys(CLAUSE_ACTIONS).filter((action) => CLAUSE_ACTIONS[action].kind === kind);
@@ -644,17 +681,19 @@ const REPLACEMENT_MARBLES = { ejected: "placed", placed: "ejected" };
 //   count     son nombre de billes dans un état, (state) -> entier ; une bille en
 //             transit (en cours de lancer, en partance) n'est dans aucune zone de
 //             l'état : elle ne compte nulle part ;
-//   capacity  (facultatif) sa capacité EN VIGUEUR, (state) -> entier : les
-//             caractéristiques de la partie (taille de la main, capacité du pot) ;
+//   capacity  (facultatif) sa capacité EN VIGUEUR, (state, statuses) -> entier : les
+//             caractéristiques de la partie (taille de la main, capacité du pot),
+//             statuts compris (marbles/core/statuses.js/characteristic) ; une zone
+//             au-delà de sa capacité compte pleine ;
 //   states    les états qu'une condition peut lui demander (ZONE_STATES).
 // AJOUTER une zone ou un état : une entrée ici (et dans ZONE_STATES), ses textes
 // (`marbles.condition.zone.<zone>.<état>`, `marbles.effect.per_zone`), rien d'autre.
 export const GAME_ZONES = {
   triangle: { count: (state) => SLOTS.filter((slot) => state.triangle[slot] !== null).length, capacity: () => SLOTS.length, states: ["full", "empty", "single"] },
-  hand: { count: (state) => state.hand.length, capacity: (state) => state.maxHandSize, states: ["empty", "full"] },
+  hand: { count: (state) => state.hand.length, capacity: (state, statuses) => characteristic(state, "handSize", statuses), states: ["empty", "full"] },
   bag: { count: (state) => state.bag.length, states: ["empty"] },
   discard: { count: (state) => state.discard.length, states: ["empty"] },
-  pot: { count: (state) => state.pot.length, capacity: (state) => state.potCapacity, states: ["full", "empty"] },
+  pot: { count: (state) => state.pot.length, capacity: (state, statuses) => characteristic(state, "potCapacity", statuses), states: ["full", "empty"] },
   lost: { count: (state) => state.lost.length, states: [] },
 };
 
@@ -723,9 +762,9 @@ export const CONDITIONS = {
       validateZone(when.zone, describe, fail);
       if (!GAME_ZONES[when.zone].states.includes(when.state)) fail(`${describe} : la zone "${when.zone}" n'a pas d'état "${when.state}" (${GAME_ZONES[when.zone].states.join(", ") || "aucun"}).`);
     },
-    test(when, { state }) {
+    test(when, { state, statuses }) {
       const zone = GAME_ZONES[when.zone];
-      return ZONE_STATES[when.state].test(zone.count(state), zone.capacity?.(state));
+      return ZONE_STATES[when.state].test(zone.count(state), zone.capacity?.(state, statuses));
     },
   },
   // La bille à `slot` est-elle de calibre `size` ? Emplacement vide : non.
@@ -952,9 +991,11 @@ export function resolveClauses(clauses, reference) {
 //   gifts       ce qui va à d'autres emplacements, [{ slot, ...valeurs donnables }] ;
 //               un bonus au choix porte `choice` (sa cible), `action` et `amount` au
 //               lieu de `slot` : le core demande le choix (marbles/core/run.js/fireEffect) ;
-//   operations  les actions sur une bille, dans l'ordre des clauses,
+//   operations  les actions sur une bille et de statut, dans l'ordre des clauses,
 //               [{ action, amount, target }] (`target` absent : la bille elle-même ;
-//               un choix : la cible au choix, que le core fait trancher).
+//               un choix : la cible au choix, que le core fait trancher) ; un statut :
+//               [{ action, status, amount, duration, stacking }]
+//               (marbles/core/statuses.js/statusApplication).
 // Une clause dont la condition échoue, ou dont le montant (calculé s'il l'est) vaut
 // zéro, ne produit rien. Seules les valeurs finales en sortent.
 export function evaluateEffect(clauses, situation, types) {
@@ -970,6 +1011,9 @@ export function evaluateEffect(clauses, situation, types) {
     const clause = { ...printed, amount };
     const target = clause.target === undefined ? {} : { target: clause.target };
     if (kind === "marble") operations.push({ action: clause.action, ...(amountless ? {} : { amount: clause.amount }), ...target });
+    // Un statut : son application résolue d'après sa définition (la table de la
+    // situation), son intensité et sa durée comprises.
+    else if (kind === "status") operations.push({ action: clause.action, ...statusApplication(clause, definitionOf(situation.statuses ?? NO_STATUSES, clause.status)) });
     else if (clause.target === undefined) self = apply(self, clause);
     else if (isChoice(clause.target)) gifts.push({ choice: clause.target, action: clause.action, amount: clause.amount, ...apply(GIFT_ZERO, clause) });
     else gifts.push({ slot: clause.target, ...apply(GIFT_ZERO, clause) });

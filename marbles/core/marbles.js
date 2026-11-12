@@ -13,7 +13,12 @@
 // aucune persistance aujourd'hui) :
 //   { rngState, maxHandSize, throwsPerTurn, potCapacity, firstTurnDraw, drawPerTurn,
 //     turnCount, turn, score, speed, mass, stage, bag, hand, discard,
-//     triangle, pot, lost, swapUsed, throwsUsed, tally, pendingChoice }
+//     triangle, pot, lost, swapUsed, throwsUsed, tally, statuses, pendingChoice }
+// `maxHandSize`, `throwsPerTurn`, `potCapacity` : les RÉGLAGES de la partie, la
+// valeur de départ de ses CARACTÉRISTIQUES, jamais lus directement par une règle :
+// l'accès unique (marbles/core/statuses.js/characteristic) y ajoute les statuts.
+// `statuses` : les INSTANCES DE STATUT de la partie, dans l'ordre d'acquisition
+// (marbles/core/statuses.js, en-tête), [] au départ.
 // `pot` : les billes EN POCHE, des ids dans l'ordre d'arrivée, au plus
 // `potCapacity` ; `lost` : les billes PERDUES, envoyées au pot plein. Ni l'une ni
 // l'autre ne revient jamais dans le sac, ni ne quitte sa zone.
@@ -23,7 +28,7 @@
 // bille du pot peut réagir à chaque incrément d'un compteur ÉCOUTABLE (En poche, à
 // chaque (occurrence) : marbles/core/run.js/pocketReactionsOf).
 // `throwsUsed` : les LANCERS joués ce tour (une pose depuis la main en est un,
-// l'échange non), jamais plus que `throwsPerTurn`.
+// l'échange non) ; la caractéristique « lancers » (statuts compris) les borne.
 // `pendingChoice` : null, ou le CHOIX EN ATTENTE d'une cible au choix
 // (marbles/core/effects.js, en-tête), qui a SUSPENDU l'action en cours :
 //   { action, amount?, zones, pick, count, mode, by, eligible, chosen, remaining,
@@ -95,13 +100,18 @@
 // n'importe jamais (CLAUDE.md) : la vue, les outils et les vérifications le lui
 // passent. Les vérifications y passent aussi des tables fabriquées, qui testent
 // ce qu'aucune bille actuelle ne produit (une Masse négative).
+// `statuses` (dernier paramètre des lectures qui dépendent des caractéristiques, et
+// `options.statuses` du réducteur) : la table des statuts, de même un registre de
+// contenu (marbles/content/statuses/index.js) ; absente, aucune (NO_STATUSES).
+// Les règles (marbles/core/rules.js) lient les deux tables une fois pour toutes.
 
 import { MARBLES_SETTINGS, STARTING_BAG } from "../config/values.js";
 import { createSeed } from "../../lib/rng.js";
 import { SLOTS, effectAt, isOptionalChoice, nextSlot, previousSlot } from "./effects.js";
 import { emptyTally } from "./tally.js";
 import { TALLY_COUNTERS, maxWearOf, validateGameSettings } from "./content.js";
-import { UNKNOWN_MARBLE, answerOf, chooseRefusal, drawMarbles, retireMarble, shuffled, targetRef, transact, travel, update } from "./run.js";
+import { UNKNOWN_MARBLE, answerOf, chooseRefusal, consumeCharges, drawMarbles, noteModification, retireMarble, shuffled, targetRef, transact, travel, update } from "./run.js";
+import { NO_STATUSES, activatePending, characteristic, endTurn, modifyImpact } from "./statuses.js";
 
 export { SLOTS, effectAt, nextSlot, previousSlot };
 
@@ -172,6 +182,8 @@ export function createMarblesGame(seed, options = {}, types) {
     // Les valeurs de partie, à zéro : la portée « cette partie » ne revient à zéro
     // qu'ici.
     tally: emptyTally(TALLY_COUNTERS),
+    // Aucun statut.
+    statuses: [],
     // Aucun choix en attente.
     pendingChoice: null,
   };
@@ -203,17 +215,19 @@ export function swapRefusal(state) {
   return null;
 }
 
-// Les lancers qui restent ce tour.
-export function throwsLeft(state) {
-  return state.throwsPerTurn - state.throwsUsed;
+// Les lancers qui restent ce tour : la caractéristique « lancers » en vigueur
+// (statuts compris : un lancer de plus reçu pendant le tour s'ajoute aussitôt), moins
+// ceux déjà joués ; jamais moins de zéro.
+export function throwsLeft(state, statuses = NO_STATUSES) {
+  return Math.max(0, characteristic(state, "throws", statuses) - state.throwsUsed);
 }
 
 // Peut-on encore lancer une bille ce tour-ci, avant même de la choisir ? Le code
 // du refus, ou null. Exportée pour que l'interface refuse dès la prise.
-export function throwRefusal(state) {
+export function throwRefusal(state, statuses = NO_STATUSES) {
   const refusal = stageRefusal(state, "play");
   if (refusal) return refusal;
-  if (throwsLeft(state) <= 0) return "noThrowsLeft";
+  if (throwsLeft(state, statuses) <= 0) return "noThrowsLeft";
   return null;
 }
 
@@ -221,8 +235,8 @@ export function throwRefusal(state) {
 // l'interface ne demande pas de confirmer une pose qui serait refusée. Le joueur
 // est seul responsable de ses poses : rien ne le protège d'un triangle qu'il ne
 // pourrait plus remplir, au premier tour comme ensuite.
-export function placeRefusal(state, handIndex, slot) {
-  const refusal = throwRefusal(state);
+export function placeRefusal(state, handIndex, slot, statuses = NO_STATUSES) {
+  const refusal = throwRefusal(state, statuses);
   if (refusal) return refusal;
   if (!isSlot(slot)) return "invalidSlot";
   if (!Number.isInteger(handIndex) || handIndex < 0 || handIndex >= state.hand.length) return "invalidHandIndex";
@@ -243,7 +257,7 @@ function resolveRefusal(state) {
 // fois, dans l'ordre des emplacements ; poses, bille de la main puis emplacement ;
 // résolution). Elle passe par les mêmes refus que le réducteur, sans en recopier
 // aucun. Sert aux joueurs automatiques des outils (marbles/tools/players.js).
-export function legalActions(state) {
+export function legalActions(state, statuses = NO_STATUSES) {
   // Un choix en attente : ses cibles, puis Terminer s'il est permis.
   if (state.pendingChoice) {
     const { eligible } = state.pendingChoice;
@@ -256,7 +270,7 @@ export function legalActions(state) {
     for (const b of SLOTS.slice(index + 1)) if (swapRefused(state, { a, b }) === null) actions.push({ type: "swap", a, b });
   });
   state.hand.forEach((_, handIndex) => {
-    for (const slot of SLOTS) if (placeRefusal(state, handIndex, slot) === null) actions.push({ type: "place", handIndex, slot });
+    for (const slot of SLOTS) if (placeRefusal(state, handIndex, slot, statuses) === null) actions.push({ type: "place", handIndex, slot });
   });
   if (resolveRefusal(state) === null) actions.push({ type: "resolve" });
   return actions;
@@ -289,6 +303,13 @@ function endGame(run) {
 function drawTurn(run) {
   const { state } = run;
   run.emit({ type: "turnStarted", turn: state.turn, turnCount: state.turnCount });
+  // Les statuts « le prochain tour » s'activent, en silence, avant la pioche : une
+  // main agrandie compte dès elle.
+  const { instances, activated } = activatePending(run.state.statuses);
+  if (activated.length > 0) {
+    update(run, { statuses: instances });
+    for (const status of activated) run.emit({ type: "statusActivated", status });
+  }
   update(run, { hand: run.state.hand.map((held) => ({ ...held, turnsInHand: held.turnsInHand + 1 })) });
   drawMarbles(run, state.turn === 1 ? state.firstTurnDraw : state.drawPerTurn, "turn");
   update(run, { stage: "play", swapUsed: false, throwsUsed: 0 });
@@ -404,7 +425,8 @@ function retireWornMarbles(run) {
 }
 
 // La résolution, sans les refus, dans cet ordre : phases, pot, retraits par usure (et
-// ce qu'ils déclenchent), Impact, rotation, fin de tour. Les retraits passent
+// ce qu'ils déclenchent), Impact (passé par les modificateurs des statuts), rotation,
+// fin des statuts qui s'arrêtent à ce tour, fin de tour. Les retraits passent
 // AVANT l'Impact : ce qu'ils déclenchent compte pour le tour en cours. La vraie,
 // celle de l'action "resolve" comme celle de la prévision
 // (marbles/core/forecast.js). Jamais la pioche du tour : seuls des effets y
@@ -421,20 +443,34 @@ function resolveTurn(run) {
   retireWornMarbles(run);
 
   const { speed, mass } = run.state;
-  const impact = impactOf(speed, mass);
+  // L'Impact habituel, puis ses modificateurs (Coup double), plancher 0 ; l'évènement
+  // porte la valeur finale, ce qu'ont fait les statuts se dit après lui.
+  const change = consumeCharges(run, modifyImpact(run.state.statuses, run.statuses, impactOf(speed, mass)));
+  const impact = change.value;
   const score = run.state.score + impact;
   update(run, { score });
   run.emit({ type: "impact", speed, mass, impact, score });
+  noteModification(run, change, null);
 
   const { leftBase, rightBase, apex } = run.state.triangle;
   let triangle = { leftBase: withoutBonus(leftBase), rightBase: withoutBonus(rightBase), apex: withoutBonus(apex) };
   for (let notch = 0; notch < ROTATION_NOTCHES; notch++) triangle = rotated(triangle);
   update(run, { triangle, speed: 0, mass: 1 });
   run.emit({ type: "rotation", triangle, notches: ROTATION_NOTCHES });
+  // Les statuts comptés en tours en voient un de moins ; à zéro, ils prennent fin,
+  // dans l'ordre d'acquisition. Pas au dernier tour : la partie s'arrête là.
+  if (!isLastTurn(run.state)) expireStatuses(run);
   run.emit({ type: "turnEnded", turn: run.state.turn });
 
   if (isLastTurn(run.state)) endGame(run);
   else update(run, { turn: run.state.turn + 1, stage: "draw" });
+}
+
+// La fin de tour des statuts (marbles/core/statuses.js/endTurn), chaque fin dite.
+function expireStatuses(run) {
+  const { instances, expired } = endTurn(run.state.statuses, run.statuses);
+  update(run, { statuses: instances });
+  for (const status of expired) run.emit({ type: "statusExpired", status });
 }
 
 // Le déroulé de chaque action qui joue des effets, celui que la reprise rejoue.
@@ -457,7 +493,8 @@ export function replayAction(state, action, types, options = {}) {
 //   eventLimit  la limite du bus pour chaque chaîne, abaissée par les vérifications
 //               (au-delà, la chaîne est coupée : chainInterrupted) ;
 //   blind       le déroulé À L'AVEUGLE, celui de la prévision : aucune pioche n'y lit
-//               l'identité d'une bille ni le hasard de la partie (drawOne).
+//               l'identité d'une bille ni le hasard de la partie (drawOne) ;
+//   statuses    la table des statuts (en-tête), NO_STATUSES par défaut.
 export function marblesReduce(state, action, types, options = {}) {
   let refusal;
   switch (action?.type) {
@@ -468,7 +505,7 @@ export function marblesReduce(state, action, types, options = {}) {
       refusal = swapRefused(state, action);
       return refusal ? refused(state, refusal) : replayAction(state, action, types, options);
     case "place":
-      refusal = placeRefusal(state, action.handIndex, action.slot);
+      refusal = placeRefusal(state, action.handIndex, action.slot, options.statuses);
       return refusal ? refused(state, refusal) : replayAction(state, action, types, options);
     case "resolve":
       refusal = resolveRefusal(state);

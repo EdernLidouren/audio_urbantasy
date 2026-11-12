@@ -1,6 +1,6 @@
 // Bille « mica » (mica). Donnée pure : les champs sont décrits dans
 // marbles/content/types/index.js.
-import { speed, draw, polish, bounce, NEXT_SLOT } from "../effects.js";
+import { speed, draw, polish, bounce, applyStatus, NEXT_SLOT } from "../effects.js";
 import { SMALL } from "../../config/values.js";
 
 export default {
@@ -14,8 +14,9 @@ export default {
   // Final : Rebond sur elle-même, en partance : elle revient en main au lieu de la
   // défausse (main pleine : la défausse, et sa Chute, qu'elle n'a pas).
   final: [bounce()],
-  // En poche, à chaque mélange du sac : Polissage 1 à la pointe.
-  pocketed: { shuffles: [polish(1, "apex")] },
+  // En poche, à chaque mélange du sac : statut ferveur (à chaque chiquenaude, Vitesse
+  // +2, 2 tours).
+  pocketed: { shuffles: [applyStatus("fervor")] },
   maxWear: 3,
   size: SMALL,
 };

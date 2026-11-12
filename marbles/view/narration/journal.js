@@ -7,7 +7,8 @@
 import { nameRef } from "../../../data/i18n/index.js";
 import { MARBLE_POCKET, MARBLE_TRIGGERS } from "../../config/values.js";
 import { FIRST_IN_HAND, isOptionalChoice } from "../../core/effects.js";
-import { choiceTarget, combined, describeEffect, formatCounter, marbleName, outcomeLine, slotName, valueParts } from "./effects.js";
+import { choiceTarget, combined, describeEffect, formatCounter, marbleName, outcomeLine, slotName, statusName, valueParts } from "./effects.js";
+import { statusLabel } from "./statuses.js";
 
 // Le sens de la rotation du moteur (marbles/core/effects.js/nextSlot) : horaire (base
 // droite -> base gauche -> pointe). Ses crans, eux, viennent de l'évènement.
@@ -24,6 +25,10 @@ const EFFECT_TEMPLATES = Object.fromEntries([
 ]);
 
 function effectText(event, t) {
+  // La réaction d'un statut, dite avec son nom : « Ferveur : Vitesse +2. ».
+  if (event.trigger === "statusReaction") {
+    return t("marbles.event.effect_status", { status: statusName(event.status, t), effect: describeEffect({ speed: event.speedDelta, mass: event.massDelta, draw: event.draw, operations: event.operations, given: event.given }, t) });
+  }
   if (event.trigger === "phase") {
     return outcomeLine(event.slot, { marble: event.marble, speed: event.speedDelta, mass: event.massDelta, draw: event.draw, operations: event.operations, given: event.given }, t);
   }
@@ -50,9 +55,14 @@ const SILENT = () => null;
 // l'annonce de l'éjection (puis de son Éjection), sans se dire. Une bille usée :
 // son départ se dit (« usée, quitte le triangle »), son arrivée à la défausse, la
 // destination par défaut, suit ce qui l'a précédée (son Final) sans se dire.
+// Un statut reçu suit l'effet qui le donne, qui le dit (« Tic d'argile : statut
+// lancer supplémentaire, le prochain tour. ») ; ce que les statuts ont changé à une
+// valeur suit l'effet ou l'Impact qui porte la valeur finale.
 const TRAILING = new Set([
   "wear",
   "turnEnded",
+  "statusGained",
+  "valueModified",
   ...MARBLE_TRIGGERS.filter((trigger) => trigger.marble === "drawn").map((trigger) => trigger.event),
 ]);
 const isTrailing = (event) =>
@@ -136,6 +146,18 @@ const EVENT_TEXTS = {
   // ne se dit pas.
   rotation: (event, t, context) => (context.endsBeforeNextTurn ? null : t("marbles.event.rotation", { steps: event.notches, direction: ROTATION_DIRECTION })),
   gameOver: (event, t) => t("marbles.event.game_over", { score: event.score }),
+  // LES STATUTS. Reçu : dit par l'effet qui le donne, et une modification de valeur
+  // par l'effet ou l'Impact qui la porte (TRAILING) ; activé au début du tour : en
+  // silence ; une réaction : par son effet. Renforcé, déjà là, une charge utilisée,
+  // sa fin : chacun se dit.
+  statusGained: SILENT,
+  valueModified: SILENT,
+  statusActivated: SILENT,
+  statusReaction: SILENT,
+  statusStrengthened: (event, t) => t("marbles.event.status_strengthened", { status: statusLabel(event, event, t) }),
+  statusUnchanged: (event, t) => t("marbles.event.status_unchanged", { status: statusName(event.status, t) }),
+  statusCharge: (event, t) => t("marbles.event.status_charge", { status: statusName(event.status, t) }),
+  statusExpired: (event, t) => t("marbles.event.status_expired", { status: statusName(event.status, t) }),
 };
 
 // Le moment d'un choix, devant sa question : la bille qui le pose et son moment
@@ -146,7 +168,9 @@ const POCKET_ENTRY_TRIGGERS = new Set(MARBLE_POCKET.moments.filter((moment) => m
 const POCKET_TRIGGERS = new Set(MARBLE_POCKET.moments.map((moment) => moment.trigger));
 const TRIGGER_NAMES = Object.fromEntries(MARBLE_TRIGGERS.map((trigger) => [trigger.id, trigger.texts.name]));
 
-function choiceByPrefix({ trigger, slot, marble }, question, t) {
+function choiceByPrefix({ trigger, slot, marble, status }, question, t) {
+  // Un choix ouvert par la réaction d'un statut : « Ferveur : … ».
+  if (status !== undefined) return t("marbles.choice.by_status", { status: statusName(status, t), question });
   const ref = nameRef(`marble.${marble}.name`);
   if (trigger === "phase") return t("marbles.choice.by_phase", { slot: slotName(slot, t), marble: ref, question });
   if (POCKET_ENTRY_TRIGGERS.has(trigger)) return t("marbles.choice.by_pot_entry", { marble: ref, question });

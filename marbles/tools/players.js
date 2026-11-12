@@ -20,7 +20,7 @@
 // entrée de plus ici, sans toucher au simulateur.
 
 import { MARBLES_DRAWN_VALUE } from "./drawn-value.js";
-import { SLOTS, legalActions } from "../core/marbles.js";
+import { SLOTS } from "../core/marbles.js";
 import { UNKNOWN_MARBLE } from "../core/run.js";
 import { createSeed, nextRandom } from "../../lib/rng.js";
 import { GAME_RULES } from "./game-rules.js";
@@ -48,7 +48,7 @@ function startRandom({ seed }) {
   let choiceRng = createSeed(`${seed}/choices`);
   return {
     next(view) {
-      const actions = legalActions(view).filter((action) => action.type !== "draw");
+      const actions = GAME_RULES.legalActions(view).filter((action) => action.type !== "draw");
       if (view.pendingChoice) {
         const draw = nextRandom(choiceRng);
         choiceRng = draw.state;
@@ -127,7 +127,7 @@ function placementSequences(state, { maxPlacements, allowReplacement }, drawnBef
 // simple : sans échange, avec le moins de poses).
 // -> { choices, impact, drawn, value, evaluated }
 export function bestPlan(view, { maxPlacements = 1, allowReplacement = true, drawnValue = MARBLES_DRAWN_VALUE } = {}) {
-  const swaps = [null, ...legalActions(view).filter((action) => action.type === "swap")];
+  const swaps = [null, ...GAME_RULES.legalActions(view).filter((action) => action.type === "swap")];
   let best = null;
   let evaluated = 0;
   for (const swap of swaps) {
@@ -154,7 +154,7 @@ export function bestPlan(view, { maxPlacements = 1, allowReplacement = true, dra
 // dans l'ordre des réponses légales (cibles, puis Terminer).
 export function bestChoice(view) {
   let best = null;
-  for (const action of legalActions(view)) {
+  for (const action of GAME_RULES.legalActions(view)) {
     const predicted = GAME_RULES.forecast(view, action);
     const value = predicted.ok ? predicted.impact : -Infinity;
     if (best === null || value > best.value) best = { action, value };

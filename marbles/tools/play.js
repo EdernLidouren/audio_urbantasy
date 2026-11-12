@@ -156,7 +156,7 @@ function printMarble(marble, main, turnsInHand = 0) {
 
 function printState() {
   console.log(`${describeBag(game, t)} ${describeDiscard(game, t)}`);
-  console.log(describeTurn(game, swapRefusal(game) === null, t));
+  console.log(describeTurn(game, swapRefusal(game) === null, t, GAME_RULES));
   for (const slot of SLOTS) {
     const placed = game.triangle[slot];
     if (placed === null) console.log(`  ${describeSlotFocus(game, slot, GAME_RULES, t)}`);
@@ -211,7 +211,7 @@ function runCommand(line) {
       break;
     case "brut":
     case "raw":
-      formatState(game, name).forEach((text) => console.log(text));
+      formatState(game, name, GAME_RULES.statuses).forEach((text) => console.log(text));
       break;
     case "fin":
     case "end":

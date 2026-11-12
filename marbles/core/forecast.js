@@ -82,6 +82,10 @@
 //                  pendant la résolution comprises) ; une bille qui ne joue rien n'y
 //                  est pas ; [] sinon ;
 //   potReactions   de même, les réactions du pot PENDANT L'ACTION envisagée (la pose) ;
+//   statusEffects  ce que chaque statut produirait par ses réactions PENDANT LA
+//                  RÉSOLUTION, regroupé en un effet par statut (`status`), dans l'ordre
+//                  de leur première réaction ; [] sinon ;
+//   statusReactions de même, PENDANT L'ACTION envisagée ;
 //   interrupted    vrai si la limite de sécurité du bus arrêterait la chaîne
 //                  (chainInterrupted) : une anomalie, que R et la confirmation disent ;
 //   choiceDependent vrai si un choix du joueur est resté indécis (plus haut) ;
@@ -191,7 +195,9 @@ function resultsByEffect(events) {
     if (by === undefined || (event.type === "discarded" && event.from === "triangle")) return;
     const source = events
       .slice(0, index)
-      .findLast((other) => other.type === "effect" && other.trigger === by.trigger && other.marble === by.marble && (other.slot ?? null) === by.slot);
+      .findLast(
+        (other) => other.type === "effect" && other.trigger === by.trigger && other.marble === by.marble && (other.slot ?? null) === by.slot && other.status === by.status
+      );
     if (source === undefined) return;
     const found = results.get(source) ?? { pockets: [], empty: [], undecided: [], ejected: [], discards: [] };
     results.set(source, found);
@@ -227,6 +233,8 @@ function outcomeReader(events) {
   const outcomeOf = (event) => {
     if (event === undefined) return null;
     const outcome = { marble: event.marble, speed: event.speedDelta, mass: event.massDelta, draw: event.draw, operations: event.operations, given: event.given };
+    // Celui d'un statut le nomme.
+    if (event.status !== undefined) outcome.status = event.status;
     const found = results.get(event);
     if (found === undefined) return outcome;
     return {
@@ -249,6 +257,7 @@ function combinedOutcome(outcomes) {
   const all = (key) => outcomes.flatMap((outcome) => outcome[key] ?? []);
   const sum = (key) => outcomes.reduce((total, outcome) => total + outcome[key], 0);
   const combined = { marble: outcomes[0].marble, speed: sum("speed"), mass: sum("mass"), draw: sum("draw"), operations: all("operations"), given: all("given") };
+  if (outcomes[0].status !== undefined) combined.status = outcomes[0].status;
   if (all("pockets").length > 0) combined.pockets = all("pockets");
   if (all("empty").length > 0) combined.empty = all("empty");
   if (all("undecided").length > 0) combined.undecided = all("undecided");
@@ -266,6 +275,17 @@ function potOutcomes(events, outcomeOf) {
     byPlace.set(event.potIndex, [...(byPlace.get(event.potIndex) ?? []), outcomeOf(event)]);
   }
   return [...byPlace.entries()].sort(([a], [b]) => a - b).map(([, outcomes]) => combinedOutcome(outcomes));
+}
+
+// Ce que chaque statut joue par ses réactions dans ces évènements, regroupé par
+// statut, dans l'ordre de sa première réaction.
+function statusOutcomes(events, outcomeOf) {
+  const byStatus = new Map();
+  for (const event of events) {
+    if (event.type !== "effect" || event.trigger !== "statusReaction") continue;
+    byStatus.set(event.status, [...(byStatus.get(event.status) ?? []), outcomeOf(event)]);
+  }
+  return [...byStatus.values()].map(combinedOutcome);
 }
 
 // Les régénérations d'un journal, chacune avec les effets prévus qu'elle déclenche :
@@ -331,6 +351,8 @@ export function readForecast(actionEvents, resolutionEvents, finalState) {
     regenerations: regenerationsOf(all, outcomeOf),
     potEffects: potOutcomes(resolutionEvents, outcomeOf),
     potReactions: potOutcomes(actionEvents, outcomeOf),
+    statusEffects: statusOutcomes(resolutionEvents, outcomeOf),
+    statusReactions: statusOutcomes(actionEvents, outcomeOf),
     interrupted: all.some((event) => event.type === "chainInterrupted"),
     choiceDependent: all.some((event) => event.type === "choiceUndecided"),
     speed,
@@ -345,18 +367,20 @@ export function readForecast(actionEvents, resolutionEvents, finalState) {
 }
 
 // `action` : la pose ou l'échange envisagé, ou null pour prévoir le triangle
-// actuel, ou, un choix en attente, une réponse (`choose`). `types` : la table des
-// billes (marbles/core/marbles.js, en-tête).
-export function forecast(state, action, types) {
-  if (action?.type === "choose") return forecastAnswer(state, action, types);
+// actuel, ou, un choix en attente, une réponse (`choose`). `types`, `statuses` : la
+// table des billes et celle des statuts (marbles/core/marbles.js, en-tête). Les
+// STATUTS sont dans l'état, donc dans la copie : ils y agissent, s'y renforcent et
+// y consomment leurs charges, sur la copie seulement.
+export function forecast(state, action, types, statuses) {
+  if (action?.type === "choose") return forecastAnswer(state, action, types, statuses);
   const refusal = stageRefusal(state, "play");
   if (refusal) return failed(refusal);
   if (action !== null && !FORECASTABLE_ACTIONS.includes(action?.type)) return failed("unknownAction");
 
   const copy = blindCopy(state);
-  const applied = action === null ? { ok: true, state: copy, events: [], uncertain: false } : marblesReduce(copy, action, types, { blind: true });
+  const applied = action === null ? { ok: true, state: copy, events: [], uncertain: false } : marblesReduce(copy, action, types, { blind: true, statuses });
   if (!applied.ok) return failed(applied.error);
-  const resolved = runResolution(applied.state, types, { blind: true });
+  const resolved = runResolution(applied.state, types, { blind: true, statuses });
   if (!resolved.ok) return failed(resolved.error);
   const awakening = awakenPossible(state, [...applied.events, ...resolved.events], types);
   // Incertaine : un Éveil possible, ou une bille inconnue qui aurait pu réagir (une
@@ -368,16 +392,16 @@ export function forecast(state, action, types) {
 // Une réponse au choix en attente, prévue (en-tête, « prévoir une réponse ») :
 // l'action suspendue rejouée à l'aveugle avec cette réponse, puis la résolution si
 // elle n'en était pas une. Ses journaux sont entiers, depuis le début de l'action.
-function forecastAnswer(state, action, types) {
+function forecastAnswer(state, action, types, statuses) {
   const refusal = chooseRefusal(state, action);
   if (refusal) return failed(refusal);
   const { from, action: suspended, answers } = state.pendingChoice.resume;
-  const options = { blind: true, answers: [...answers, answerOf(state.pendingChoice, action)] };
+  const options = { blind: true, statuses, answers: [...answers, answerOf(state.pendingChoice, action)] };
   const copy = blindCopy(from);
   const isResolution = suspended.type === "resolve";
   const applied = isResolution ? { ok: true, state: copy, events: [], uncertain: false } : replayAction(copy, suspended, types, options);
   if (!isResolution && applied.state.stage !== "play") return failed(stageRefusal(applied.state, "play") ?? "mustDraw");
-  const resolved = isResolution ? replayAction(copy, suspended, types, options) : runResolution(applied.state, types, { blind: true });
+  const resolved = isResolution ? replayAction(copy, suspended, types, options) : runResolution(applied.state, types, { blind: true, statuses });
   const awakening = awakenPossible(from, [...applied.events, ...resolved.events], types);
   const uncertain = applied.uncertain || resolved.uncertain || awakening;
   return { ...readForecast(applied.events, resolved.events, resolved.state), uncertain, awakenPossible: awakening };

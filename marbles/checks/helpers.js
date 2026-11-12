@@ -6,10 +6,10 @@
 
 import { NameRef } from "../../lib/i18n.js";
 import { MEDIUM } from "../config/values.js";
-import { SLOTS, legalActions } from "../core/marbles.js";
+import { SLOTS } from "../core/marbles.js";
 import { validateMarbleTypes } from "../core/content.js";
 import { nextRandom } from "../../lib/rng.js";
-import { fixtureRules } from "./fixtures/marbles.js";
+import { FIXTURE_STATUSES, fixtureRules } from "./fixtures/marbles.js";
 
 // Une table de billes FABRIQUÉE, complétée d'un calibre (obligatoire) pour chaque
 // bille qui n'en déclare pas : MEDIUM, quand la vérification ne porte pas sur lui.
@@ -25,7 +25,7 @@ export function answerChoices(rules, result) {
   let current = result;
   const events = [...result.events];
   while (current.ok && current.state.pendingChoice) {
-    current = rules.reduce(current.state, legalActions(current.state)[0]);
+    current = rules.reduce(current.state, rules.legalActions(current.state)[0]);
     events.push(...current.events);
   }
   return { ...current, events };
@@ -56,10 +56,11 @@ export function fabricatedRules(table) {
   return fixtureRules(withSizes(table));
 }
 
-// Valide une table de billes FABRIQUÉE, complétée d'un calibre (withSizes) : lève si
-// la table est refusée (marbles/core/content.js/validateMarbleTypes).
+// Valide une table de billes FABRIQUÉE, complétée d'un calibre (withSizes), avec la
+// table des statuts de test : lève si la table est refusée
+// (marbles/core/content.js/validateMarbleTypes).
 export function validateTable(table) {
-  validateMarbleTypes(withSizes(table));
+  validateMarbleTypes(withSizes(table), FIXTURE_STATUSES);
 }
 
 // Le message de l'exception que lève `fn`, ou "" : pour vérifier qu'un refus vient
@@ -157,7 +158,9 @@ export function playRandomMarblesGame(rules, seed, options, seenTypes) {
     if (state.score < 0) faults.push(`score négatif : ${state.score}`);
     if (state.score < score) faults.push(`score en baisse : ${score} -> ${state.score}`);
     score = state.score;
-    if (state.hand.length > state.maxHandSize) faults.push(`main trop grande : ${state.hand.length}`);
+    // Une main au-delà de sa taille en vigueur n'apparaît que si un statut l'a
+    // réduite ; elle n'y grossit jamais.
+    if (state.hand.length > Math.max(state.maxHandSize, rules.characteristic(state, "handSize"))) faults.push(`main trop grande : ${state.hand.length}`);
     if (state.stage !== "play" && (state.speed !== 0 || state.mass !== 1)) faults.push(`compteurs non remis à zéro : ${state.speed}, ${state.mass}`);
     if (state.turn > state.turnCount) faults.push(`tour hors bornes : ${state.turn}`);
     for (const slot of SLOTS) {
@@ -178,7 +181,7 @@ export function playRandomMarblesGame(rules, seed, options, seenTypes) {
         const refusedResult = rules.reduce(state, { type: "resolve" });
         if (refusedResult.ok || refusedResult.error !== "choicePending") faults.push(`action acceptée pendant un choix : ${refusedResult.error}`);
       }
-      const answers = legalActions(state);
+      const answers = rules.legalActions(state);
       verify(rules.reduce(state, answers[pick(answers.length)]));
       continue;
     }
@@ -210,7 +213,7 @@ export function playRandomMarblesGame(rules, seed, options, seenTypes) {
 export function playLegalGame(rules, state, pick, onResult = () => {}) {
   let current = state;
   while (current.stage !== "over") {
-    const actions = legalActions(current);
+    const actions = rules.legalActions(current);
     const result = rules.reduce(current, actions[pick(actions.length)]);
     onResult(result, current);
     current = result.state;

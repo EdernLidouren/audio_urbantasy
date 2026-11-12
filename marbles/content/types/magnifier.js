@@ -1,6 +1,6 @@
 // Bille « loupe » (magnifier). Donnée pure : les champs sont décrits dans
 // marbles/content/types/index.js.
-import { speed, tally, discard, nextInBag } from "../effects.js";
+import { speed, tally, discard, nextInBag, applyStatus } from "../effects.js";
 import { SMALL } from "../../config/values.js";
 
 export default {
@@ -13,7 +13,8 @@ export default {
   },
   // Pointe : Vitesse +2, puis Défausser la prochaine bille du sac.
   apex: [speed(2), discard(nextInBag(1))],
-  // Éjection : Vitesse +3 (le Final de la géante la déclenche).
-  knockout: [speed(3)],
+  // Éjection : statut fatigue, un lancer de moins le prochain tour (le Final de la
+  // géante ne la déclenche plus : il ne l'éjecte plus).
+  knockout: [applyStatus("fatigue")],
   size: SMALL,
 };

@@ -19,6 +19,7 @@ import checkMarblesPocket from "./marbles-pocket.check.js";
 import checkMarblesPath from "./marbles-path.check.js";
 import checkMarblesZones from "./marbles-zones.check.js";
 import checkMarblesRelative from "./marbles-relative.check.js";
+import checkMarblesStatuses from "./marbles-statuses.check.js";
 import checkMarblesChoice from "./marbles-choice.check.js";
 import checkMarblesBus from "./marbles-bus.check.js";
 import checkMarblesTally from "./marbles-tally.check.js";
@@ -35,6 +36,7 @@ export const MARBLES_SUITES = [
   { name: "marbles-path", check: checkMarblesPath },
   { name: "marbles-zones", check: checkMarblesZones },
   { name: "marbles-relative", check: checkMarblesRelative },
+  { name: "marbles-statuses", check: checkMarblesStatuses },
   { name: "marbles-choice", check: checkMarblesChoice },
   { name: "marbles-bus", check: checkMarblesBus },
   { name: "marbles-tally", check: checkMarblesTally },

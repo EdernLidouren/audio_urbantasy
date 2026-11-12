@@ -1759,9 +1759,20 @@ function checkSmoke(run) {
       final: [{ action: "bounce" }],
       maxWear: 2,
     },
+    // Une bille qui donne des STATUTS (FIXTURE_STATUSES) à chaque moment : reçus,
+    // renforcés, inchangés, activés, chargés, terminés, et leurs réactions.
+    statuser: {
+      size: SMALL,
+      flick: [{ action: "applyStatus", status: "gain_charge", amount: 1 }],
+      base: [{ action: "speed", amount: 2 }, { action: "applyStatus", status: "flick_react", amount: 1 }],
+      apex: [{ action: "speed", amount: -2 }, { action: "applyStatus", status: "loss_cushion", amount: 1 }],
+      hit: [{ action: "applyStatus", status: "throws_next", amount: 1 }],
+      final: [{ action: "applyStatus", status: "impact_double", amount: 1 }],
+      maxWear: 2,
+    },
   });
   for (let seed = 1; seed <= 60; seed++) {
-    const options = { bag: ["mover", "mover", "aging_flick", "hit_polish", "one_shot", "fragile", "final_pocket", "awaken_draw"] };
+    const options = { bag: ["mover", "mover", "statuser", "statuser", "aging_flick", "hit_polish", "one_shot", "fragile", "final_pocket", "awaken_draw"] };
     try {
       faults.push(...playRandomMarblesGame(moverRules, seed, options, seen).map((fault) => `table étendue, graine ${seed} : ${fault}`));
     } catch (error) {

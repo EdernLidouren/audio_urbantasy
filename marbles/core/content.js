@@ -33,7 +33,27 @@
 //   eject { slot, marble, by },
 //   wear { slot, marble, wear, maxWear },
 //   impact { speed, mass, impact, score },
-//   rotation { triangle, notches }, turnEnded { turn }, gameOver { score }.
+//   rotation { triangle, notches }, turnEnded { turn }, gameOver { score },
+//   statusGained { status, intensity, remaining, pending, kind, stacking, by },
+//   statusStrengthened { status, intensity, remaining, pending, kind, stacking, by },
+//   statusUnchanged { status, by }, statusActivated { status },
+//   statusCharge { status, remaining }, statusExpired { status },
+//   statusReaction { status, counter },
+//   valueModified { point, before, after, contributions, by? }.
+// LES STATUTS (marbles/core/statuses.js) : `statusGained`, une instance neuve, donnée
+// par l'effet `by` (Appliquer un statut) ; `statusStrengthened`, le statut déjà là
+// fusionné, son intensité et ce qui lui reste d'après (`kind`, la sorte de sa durée,
+// et `stacking`, son cumul, pour le dire) ; `statusUnchanged`, un statut
+// unique déjà là, sans effet ; `statusActivated`, un statut « le prochain tour »
+// qui s'active au début du tour ; `statusCharge`, une charge consommée (`remaining`,
+// celles qui restent) ; `statusExpired`, sa fin (fin de tour, après la rotation, ou
+// dernière charge) ; `statusReaction`, un statut réagit à un incrément du compteur
+// `counter`, comme une bille du pot. `valueModified` : des statuts ont changé une
+// valeur à un point d'interception (`point`, MODIFIER_POINTS), de `before` à
+// `after`, pas par pas (`contributions`, [{ status, before, after }]) ; l'effet ou
+// l'Impact porte déjà la valeur finale, cet évènement les explique (l'historique,
+// les charges). Un `effect` d'une réaction de statut a `trigger` "statusReaction",
+// `status`, et ni bille ni emplacement (null).
 // `awaken` : juste après chaque `draw` d'une bille réellement piochée, la bille
 // désormais en main (à 0 tour en main) ; son Éveil et tout ce qui en découle se
 // règlent avant la bille suivante (une interruption, comme la Trouvaille). À
@@ -124,10 +144,12 @@ import { MARBLES_SETTINGS, MARBLE_PHASES, MARBLE_POCKET, MARBLE_TALLIES, MARBLE_
 import { rejectUnknownFields } from "../../lib/validate.js";
 import { CLAUSE_ACTIONS, SLOTS, effectAt, isMarbleSize, validateEffect } from "./effects.js";
 import { buildTallyCounters } from "./counters.js";
+import { CHARACTERISTICS, MODIFIER_OPERATIONS, MODIFIER_POINTS, NO_STATUSES, STATUS_BEHAVIORS, STATUS_DURATIONS, STATUS_STACKINGS } from "./statuses.js";
 
 // Les types d'évènements du journal (voir l'en-tête), chacun avec vrai s'il nomme
 // toujours une bille CONNUE, même dans la prévision : faux pour la pioche, dont la
-// bille y est cachée, et pour ceux qui ne nomment aucune bille. Lu par la validation
+// bille y est cachée, et pour ceux qui ne nomment aucune bille (un `effect` d'une
+// réaction de statut n'en a pas). Lu par la validation
 // des valeurs de partie déclarées (un compteur ne peut compter qu'un évènement qui
 // existe ; un filtre sur la bille, qu'un évènement qui la connaît).
 export const JOURNAL_EVENTS = Object.freeze({
@@ -151,7 +173,8 @@ export const JOURNAL_EVENTS = Object.freeze({
   final: true,
   phase: true,
   phaseSkipped: false,
-  effect: true,
+  // Celui d'une réaction de statut ne nomme aucune bille.
+  effect: false,
   polished: true,
   cracked: true,
   targetEmpty: false,
@@ -173,6 +196,14 @@ export const JOURNAL_EVENTS = Object.freeze({
   rotation: false,
   turnEnded: false,
   gameOver: false,
+  statusGained: false,
+  statusStrengthened: false,
+  statusUnchanged: false,
+  statusActivated: false,
+  statusCharge: false,
+  statusExpired: false,
+  statusReaction: false,
+  valueModified: false,
 });
 
 // --- Déclencheurs ---
@@ -331,11 +362,14 @@ export const TALLY_COUNTERS = buildTallyCounters({
 // Leurs identifiants, que la validation d'une source de montant `tally` vérifie.
 const TALLY_IDS = new Set(TALLY_COUNTERS.map((counter) => counter.id));
 
+// Les compteurs ÉCOUTABLES (marbles/core/counters.js), dans leur ordre, celui des
+// fiches : ce qu'écoutent les réactions des statuts (marbles/core/statuses.js).
+export const LISTENABLE_KEYS = TALLY_COUNTERS.filter((counter) => counter.listenable).map((counter) => counter.id);
+
 // Les OCCURRENCES ÉCOUTABLES par une bille du pot (En poche, à chaque (occurrence)) :
-// les compteurs écoutables (marbles/core/counters.js), dans leur ordre, celui des
-// fiches. Aucune sans moment réactif déclaré. Une clé de moment fixe qui serait aussi
-// un compteur rendrait le champ ambigu : refusé au chargement.
-export const REACTION_KEYS = REACTIVE_MOMENT === null ? [] : TALLY_COUNTERS.filter((counter) => counter.listenable).map((counter) => counter.id);
+// les compteurs écoutables. Aucune sans moment réactif déclaré. Une clé de moment fixe
+// qui serait aussi un compteur rendrait le champ ambigu : refusé au chargement.
+export const REACTION_KEYS = REACTIVE_MOMENT === null ? [] : LISTENABLE_KEYS;
 for (const moment of FIXED_MOMENTS) {
   if (TALLY_IDS.has(moment.id)) throw new Error(`marbles, En poche : la clé du moment "${moment.id}" est aussi une valeur de partie.`);
 }
@@ -414,6 +448,13 @@ export function buildMarbleKeywords({ phases, triggers, pocket, actions }) {
 
 export const MARBLE_KEYWORDS = buildMarbleKeywords({ phases: MARBLE_PHASES, triggers: MARBLE_TRIGGERS, pocket: MARBLE_POCKET, actions: CLAUSE_ACTIONS });
 
+// Les STATUTS qu'une bille peut appliquer (Appliquer un statut), dans l'ordre de ses
+// clauses, chacun une fois : l'aide E les décrit après ses mots-clés.
+export function appliedStatusesOf(marble, types) {
+  const ids = clausesOf(types[marble]).filter((clause) => clause.action === "applyStatus").map((clause) => clause.status);
+  return [...new Set(ids)];
+}
+
 // Les mots-clés présents sur une bille, dans l'ordre de l'aide, chacun une fois :
 // [{ id, kind, texts }].
 export function keywordsOf(marble, types) {
@@ -424,18 +465,22 @@ export function keywordsOf(marble, types) {
 
 // Échoue sur une table mal formée. La vraie est validée au démarrage
 // (validateMarblesContent) ; exportée aussi pour vérifier le rejet sur des tables
-// fabriquées.
-export function validateMarbleTypes(types) {
+// fabriquées. `statuses` : la table des statuts, que vérifie l'action Appliquer un
+// statut (aucune par défaut : un statut cité est alors inconnu).
+export function validateMarbleTypes(types, statuses = NO_STATUSES) {
   const fail = (message) => {
     throw new Error(`marbles : ${message}`);
   };
+  // Le contexte de validation d'un effet : son moment, les valeurs de partie et les
+  // statuts que ses clauses peuvent citer.
+  const contextOf = (moment) => ({ ...moment, tallies: TALLY_IDS, statuses });
   if (Object.keys(types).length === 0) fail("table des billes vide.");
   for (const [id, type] of Object.entries(types)) {
     rejectUnknownFields(type, [...EFFECT_FIELDS, "baseVariant", MARBLE_POCKET.field, "maxWear", "size"], `bille "${id}"`, fail);
     // Le calibre, obligatoire : lu par les conditions de calibre et par le son.
     if (!isMarbleSize(type.size)) fail(`bille "${id}" : calibre (size) absent ou inconnu "${type.size}".`);
     for (const field of EFFECT_FIELDS) {
-      if (type[field] !== undefined) validateEffect(type[field], `bille "${id}", ${field}`, fail, { ...FIELD_CONTEXTS[field], tallies: TALLY_IDS });
+      if (type[field] !== undefined) validateEffect(type[field], `bille "${id}", ${field}`, fail, contextOf(FIELD_CONTEXTS[field]));
     }
     // En poche : un objet { <moment>: effet }, chaque effet joué par une bille dans
     // le pot (règle des cibles selon son moment ; rien sur la bille elle-même) : un
@@ -451,28 +496,88 @@ export function validateMarbleTypes(types) {
       rejectUnknownFields(pocketed, [...FIXED_MOMENTS.map((moment) => moment.id), ...REACTION_KEYS], describe, fail);
       for (const moment of FIXED_MOMENTS) {
         const effect = pocketClauses(type, moment);
-        if (effect !== null) validateEffect(effect, `${describe}.${moment.id}`, fail, { moment: moment.moment, marble: "pot", tallies: TALLY_IDS });
+        if (effect !== null) validateEffect(effect, `${describe}.${moment.id}`, fail, contextOf({ moment: moment.moment, marble: "pot" }));
       }
       for (const key of REACTION_KEYS) {
         const effect = reactionClauses(type, key);
         if (effect === null) continue;
-        validateEffect(effect, `${describe}.${key}`, fail, { moment: REACTIVE_MOMENT.moment, marble: "pot", tallies: TALLY_IDS });
-        // La boucle directe : réagir au déclenchement d'une action qu'on produit
-        // soi-même (« à chaque polissage : Polissage 1 ») se relancerait sans fin.
-        if (COUNTER_CATEGORIES[key] === "action" && effect.some((clause) => clause.action === key)) {
-          fail(`${describe}.${key} : réagit à « ${key} » en le produisant, une boucle sans fin.`);
-        }
+        validateEffect(effect, `${describe}.${key}`, fail, contextOf({ moment: REACTIVE_MOMENT.moment, marble: "pot" }));
+        rejectDirectLoop(effect, key, `${describe}.${key}`, fail);
       }
     }
     if (type.baseVariant !== undefined) {
       rejectUnknownFields(type.baseVariant, ["leftBase", "rightBase"], `bille "${id}", baseVariant`, fail);
       for (const [slot, effect] of Object.entries(type.baseVariant)) {
-        validateEffect(effect, `bille "${id}", baseVariant.${slot}`, fail, { phaseSlots: [slot], tallies: TALLY_IDS });
+        validateEffect(effect, `bille "${id}", baseVariant.${slot}`, fail, contextOf({ phaseSlots: [slot] }));
       }
     }
     if (type.maxWear !== undefined && (!Number.isInteger(type.maxWear) || type.maxWear < 1)) {
       fail(`bille "${id}" : maxWear doit être un entier >= 1.`);
     }
+  }
+}
+
+// La boucle directe : réagir au déclenchement d'une action qu'on produit soi-même
+// (« à chaque polissage : Polissage 1 ») se relancerait sans fin. Une bille du pot
+// comme un statut.
+function rejectDirectLoop(effect, key, describe, fail) {
+  if (COUNTER_CATEGORIES[key] === "action" && effect.some((clause) => clause.action === key)) {
+    fail(`${describe} : réagit à « ${key} » en le produisant, une boucle sans fin.`);
+  }
+}
+
+// --- Table des statuts ---
+
+// Échoue sur une table des statuts mal formée (format : en-tête de
+// marbles/core/statuses.js). La vraie est validée au démarrage
+// (validateMarblesContent) et par les règles (marbles/core/rules.js) ; exportée pour
+// vérifier le rejet sur des tables fabriquées. Une réaction est un effet de billes,
+// joué sans bille : toute clause, sauf sur la bille elle-même et vers un
+// emplacement relatif (comme dans le pot).
+export function validateMarbleStatuses(statuses) {
+  const fail = (message) => {
+    throw new Error(`marbles, statuts : ${message}`);
+  };
+  if (statuses === null || typeof statuses !== "object" || Array.isArray(statuses)) fail("la table des statuts est un objet { id: définition }.");
+  for (const [id, definition] of Object.entries(statuses)) {
+    const describe = `statut "${id}"`;
+    rejectUnknownFields(definition, ["stacking", "duration", "behaviors"], describe, fail);
+    if (!STATUS_STACKINGS.includes(definition.stacking)) fail(`${describe} : cumul (stacking) inconnu "${definition.stacking}" (${STATUS_STACKINGS.join(", ")}).`);
+    const { duration } = definition;
+    if (duration === null || typeof duration !== "object") fail(`${describe} : duration doit être { kind, count? }.`);
+    rejectUnknownFields(duration, ["kind", "count"], `${describe}, durée`, fail);
+    const kind = STATUS_DURATIONS[duration.kind];
+    if (kind === undefined) fail(`${describe} : durée inconnue "${duration.kind}" (${Object.keys(STATUS_DURATIONS).join(", ")}).`);
+    if (kind.counted && (!Number.isInteger(duration.count) || duration.count < 1)) fail(`${describe} : la durée "${duration.kind}" demande un count entier >= 1.`);
+    if (!kind.counted && duration.count !== undefined) fail(`${describe} : la durée "${duration.kind}" n'a pas de count.`);
+    if (definition.stacking === "duration" && !kind.stackable) fail(`${describe} : un cumul en durée n'a pas de sens pour la durée "${duration.kind}".`);
+    if (!Array.isArray(definition.behaviors) || definition.behaviors.length === 0) fail(`${describe} : behaviors doit être une liste non vide.`);
+    for (const behavior of definition.behaviors) validateStatusBehavior(behavior, statuses, describe, fail);
+    // Une charge ne se consomme qu'à un vrai changement d'une valeur interceptée.
+    if (kind.charges && !definition.behaviors.some((behavior) => behavior.type === "modifier")) fail(`${describe} : une durée en charges demande un modificateur, seul à consommer une charge.`);
+  }
+}
+
+// Un comportement d'un statut (en-tête de marbles/core/statuses.js).
+function validateStatusBehavior(behavior, statuses, describe, fail) {
+  if (!STATUS_BEHAVIORS.includes(behavior?.type)) fail(`${describe} : comportement inconnu "${behavior?.type}" (${STATUS_BEHAVIORS.join(", ")}).`);
+  const where = `${describe}, ${behavior.type}`;
+  if (behavior.type === "stat") {
+    rejectUnknownFields(behavior, ["type", "stat", "amount"], where, fail);
+    if (!Object.hasOwn(CHARACTERISTICS, behavior.stat)) fail(`${where} : caractéristique inconnue "${behavior.stat}" (${Object.keys(CHARACTERISTICS).join(", ")}).`);
+    if (!Number.isInteger(behavior.amount) || behavior.amount === 0) fail(`${where} : amount doit être un entier non nul.`);
+  } else if (behavior.type === "modifier") {
+    rejectUnknownFields(behavior, ["type", "point", "operation", "value"], where, fail);
+    if (!Object.hasOwn(MODIFIER_POINTS, behavior.point)) fail(`${where} : point d'interception inconnu "${behavior.point}" (${Object.keys(MODIFIER_POINTS).join(", ")}).`);
+    if (!Object.hasOwn(MODIFIER_OPERATIONS, behavior.operation)) fail(`${where} : opération inconnue "${behavior.operation}" (${Object.keys(MODIFIER_OPERATIONS).join(", ")}).`);
+    if (!Number.isInteger(behavior.value)) fail(`${where} : value doit être un entier.`);
+    if (behavior.operation === "add" && behavior.value === 0) fail(`${where} : ajouter 0 ne change rien.`);
+    if (behavior.operation === "multiply" && (behavior.value < 0 || behavior.value === 1)) fail(`${where} : un multiplicateur est un entier >= 0, autre que 1 (le signe ne s'inverse jamais).`);
+  } else {
+    rejectUnknownFields(behavior, ["type", "on", "effect"], where, fail);
+    if (!LISTENABLE_KEYS.includes(behavior.on)) fail(`${where} : « ${behavior.on} » n'est pas une valeur de partie écoutable.`);
+    validateEffect(behavior.effect, `${where} ${behavior.on}`, fail, { moment: "anytime", marble: "status", tallies: TALLY_IDS, statuses });
+    rejectDirectLoop(behavior.effect, behavior.on, `${where} ${behavior.on}`, fail);
   }
 }
 
@@ -494,10 +599,11 @@ export function validateGameSettings({ maxHandSize, throwsPerTurn, potCapacity, 
 }
 
 // Le contenu du jeu des billes, au démarrage (main.js, l'audit du contenu) : la
-// table, et les réglages avec le sac de test, qui ne doit citer que des billes
-// connues. Une erreur ici échouerait sinon en pleine partie.
-export function validateMarblesContent(types) {
-  validateMarbleTypes(types);
+// table des statuts, celle des billes, et les réglages avec le sac de test, qui ne
+// doit citer que des billes connues. Une erreur ici échouerait sinon en pleine partie.
+export function validateMarblesContent(types, statuses) {
+  validateMarbleStatuses(statuses);
+  validateMarbleTypes(types, statuses);
   validateGameSettings({ ...MARBLES_SETTINGS, bag: STARTING_BAG }, types);
 }
 

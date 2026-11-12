@@ -502,6 +502,12 @@ export const MARBLE_TALLIES = [
   { id: "lostMarbles", events: ["lost"] },
   // Chaque bille arrivée à la défausse, d'où qu'elle vienne (triangle, main, sac).
   { id: "discardedMarbles", events: ["discarded"] },
+  // LES STATUTS (marbles/core/statuses.js) : chaque statut reçu (une instance neuve),
+  // renforcé (fusionné avec celui qui est là), chaque charge consommée, chaque fin.
+  { id: "statusesReceived", events: ["statusGained"] },
+  { id: "statusesStrengthened", events: ["statusStrengthened"] },
+  { id: "statusChargesUsed", events: ["statusCharge"] },
+  { id: "statusesExpired", events: ["statusExpired"] },
 ];
 
 // Le mot-clé EN POCHE (Pocketed) : des effets qui ne s'appliquent que lorsque la
@@ -596,6 +602,20 @@ export const MARBLE_CARD_MODEL = {
     ),
   ],
   emptyBelowKey: "marbles.card.no_special_effect",
+};
+
+// La fiche d'un STATUT (lib/detail-card.js, marbles/view/narration/statuses.js), dans
+// le menu des statuts (Maj+A) : au-dessous de l'annonce principale (son nom, son
+// intensité, ce qui lui reste), son effet, ce qui lui reste, son origine.
+//   field  le champ du statut (STATUS_FIELDS de la narration) ;
+//   required  toujours présent.
+export const STATUS_CARD_MODEL = {
+  above: [],
+  below: [
+    { field: "effect", required: true },
+    { field: "remaining", required: true },
+    { field: "origin", required: true },
+  ],
 };
 
 // Sac de test : un exemplaire de chaque bille. Une liste d'ids, pas un

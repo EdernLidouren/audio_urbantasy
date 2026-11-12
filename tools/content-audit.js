@@ -91,6 +91,7 @@ import "../view/menus/shop-quantity-list.js";
 import "../marbles/view/screen.js";
 import "../marbles/view/pile-screen.js";
 import MARBLE_TYPES from "../marbles/content/types/index.js";
+import MARBLE_STATUSES from "../marbles/content/statuses/index.js";
 
 const KEY_PATTERN = /^[a-z][a-zA-Z0-9_]*(\.[a-zA-Z0-9_]+)+$/;
 
@@ -372,7 +373,7 @@ export async function auditContent() {
   // Les billes elles-mêmes (marbles/content/types/) et le sac de test, comme au démarrage
   // du jeu.
   try {
-    validateMarblesContent(MARBLE_TYPES);
+    validateMarblesContent(MARBLE_TYPES, MARBLE_STATUSES);
   } catch (error) {
     report("billes", "marbles/content/types", "table invalide", error.message);
   }

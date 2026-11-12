@@ -21,6 +21,7 @@ import { SLOTS } from "../core/marbles.js";
 import { validateMarblesContent } from "../core/content.js";
 import { createMarblesRules } from "../core/rules.js";
 import MARBLE_TYPES from "../content/types/index.js";
+import MARBLE_STATUSES from "../content/statuses/index.js";
 import { marbleCard } from "../view/card.js";
 import { describeHandFocus, describeSlotFocus, describeSlotForPlacement, placementLines } from "../view/narration.js";
 import { throws } from "../../lib/check.js";
@@ -28,7 +29,7 @@ import { emptyForecastTally, walkForecastGame } from "./fixtures/forecast-proper
 import { inHand, isCleanText, marblesPlayState, playRandomMarblesGame } from "./helpers.js";
 
 // Les règles du jeu, liées à la vraie table.
-const rules = createMarblesRules(MARBLE_TYPES);
+const rules = createMarblesRules(MARBLE_TYPES, MARBLE_STATUSES);
 const ids = Object.keys(MARBLE_TYPES);
 
 export default function checkMarblesContent(run) {
@@ -40,8 +41,8 @@ export default function checkMarblesContent(run) {
 }
 
 function checkValidation(run) {
-  run("la table et le sac de départ se valident", false, throws(() => validateMarblesContent(MARBLE_TYPES)));
-  run("les règles se composent sur la table", false, throws(() => createMarblesRules(MARBLE_TYPES)));
+  run("la table, celle des statuts et le sac de départ se valident", false, throws(() => validateMarblesContent(MARBLE_TYPES, MARBLE_STATUSES)));
+  run("les règles se composent sur les tables", false, throws(() => createMarblesRules(MARBLE_TYPES, MARBLE_STATUSES)));
   run.same("le sac de départ ne cite que des billes de la table", [], STARTING_BAG.filter((id) => !Object.hasOwn(MARBLE_TYPES, id)));
   run("une partie neuve se pioche", true, rules.reduce(rules.createGame(1), { type: "draw" }).ok);
 }
@@ -59,6 +60,22 @@ function checkTexts(run) {
         Object.keys(LOCALE_TABLES[locale])
           .filter((key) => key.startsWith("marble."))
           .filter((key) => !Object.hasOwn(MARBLE_TYPES, key.split(".")[1]))
+      );
+      // Chaque statut a son nom et sa description, obligatoires ; aucun texte de
+      // statut sans statut.
+      run.same(
+        `${locale} : chaque statut a son nom et sa description`,
+        [],
+        Object.keys(MARBLE_STATUSES)
+          .flatMap((id) => [`marbles.status.${id}.name`, `marbles.status.${id}.description`])
+          .filter((key) => !Object.hasOwn(LOCALE_TABLES[locale], key))
+      );
+      run.same(
+        `${locale} : aucun texte de statut sans statut`,
+        [],
+        Object.keys(LOCALE_TABLES[locale])
+          .filter((key) => /^marbles\.status\.[^.]+\.(name|description)$/.test(key))
+          .filter((key) => !Object.hasOwn(MARBLE_STATUSES, key.split(".")[2]))
       );
 
       const state = marblesPlayState(rules, { hand: inHand([]) });

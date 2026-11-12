@@ -41,7 +41,8 @@ import {
   resolveClauses,
 } from "./effects.js";
 import { recordTally } from "./tally.js";
-import { REACTION_KEYS, REACTIVE_MOMENT, TALLY_COUNTERS, maxWearOf, pocketClauses, reactionClauses } from "./content.js";
+import { LISTENABLE_KEYS, REACTION_KEYS, REACTIVE_MOMENT, TALLY_COUNTERS, maxWearOf, pocketClauses, reactionClauses } from "./content.js";
+import { NO_STATUSES, applyStatus, characteristic, definitionOf, modifyStat, statusReactionClauses, statusReactionsOf, useCharges } from "./statuses.js";
 
 // Une bille dont l'identité est cachée : au sac ou en défausse dans la copie de la
 // prévision, ou piochée à l'aveugle (drawOne). Jamais dans une vraie partie.
@@ -93,7 +94,7 @@ function isOnEventSlot(event, listener) {
 //   listeners  (facultatif) les billes concernées, quand ce ne sont pas les
 //              écouteurs (marbleListeners) : une bille déjà retirée, ou en cours de
 //              lancer, toujours connue ;
-//   clauses(event, listener, types).
+//   clauses(event, listener, types, statuses) (`statuses` : la table des statuts).
 // La phase est écrite ici ; les autres viennent de MARBLE_TRIGGERS.
 const ON_SLOT = ["triangle"];
 
@@ -167,22 +168,44 @@ const EVENT_TRIGGERS = {
       },
     ])
   ),
+  // La RÉACTION D'UN STATUT (marbles/core/statuses.js) : aucune bille ne la joue, le
+  // statut que nomme l'évènement (zone "status") ; ses clauses, celles de sa
+  // définition pour ce compteur.
+  statusReaction: {
+    id: "statusReaction",
+    zones: [],
+    listeners: (event) => [{ zone: HOLDER_ZONES.status.zone, slot: null, marble: null, status: event.status }],
+    clauses: (event, listener, types, statuses) => statusReactionClauses(definitionOf(statuses, event.status), event.counter),
+  },
 };
 
-// LES RÉACTIONS d'un évènement qui vient d'être compté (En poche, à chaque
-// (occurrence)) : pour chaque compteur écoutable qu'il a augmenté, chaque bille du
-// pot qui l'écoute, dans l'ordre d'arrivée, une fois par incrément. `before` : le
-// registre d'avant l'évènement (la portée « cette partie », qui ne revient jamais à
-// zéro, donne l'incrément). Lu à l'émission, sur le pot de ce moment : une bille
-// entrée plus tard ne réagit pas à ce qui l'a précédée, et celle qui entre au pot par
-// cet évènement (`pocketed`, la dernière arrivée) ne réagit pas à sa propre mise en
-// poche (elle a pour cela son moment « à l'entrée »). Les réactions sont émises après
-// le traitement de l'évènement (handleEvent) : la bille concernée joue d'abord son
-// propre effet. -> [{ index, marble, counter }].
-function pocketReactionsOf(run, event, before) {
-  if (REACTION_KEYS.length === 0 || run.state.pot.length === 0) return [];
+// LES RÉACTIONS d'un évènement qui vient d'être compté, ses SOURCES RÉACTIVES dans cet
+// ordre : les billes du pot (En poche, à chaque (occurrence)), dans l'ordre
+// d'arrivée, puis les statuts qui agissent (marbles/core/statuses.js), dans l'ordre
+// d'acquisition ; chacune une fois par incrément de chaque compteur écoutable qu'elle
+// écoute. `before` : le registre d'avant l'évènement (la portée « cette partie », qui
+// ne revient jamais à zéro, donne l'incrément). Lues à l'émission, sur le pot et les
+// statuts de ce moment : une source arrivée plus tard ne réagit pas à ce qui l'a
+// précédée, ni à sa propre arrivée (une bille à sa mise en poche, qui a son moment
+// « à l'entrée » ; un statut à sa réception ou à son renforcement). Elles sont
+// émises après le traitement de l'évènement (handleEvent) : la bille concernée joue
+// d'abord son propre effet. -> les évènements des réactions, dans l'ordre.
+function reactionsOf(run, event, before) {
+  const potListens = REACTION_KEYS.length > 0 && run.state.pot.length > 0;
+  const statusesListen = run.state.statuses.length > 0;
+  if (!potListens && !statusesListen) return [];
   const after = run.state.tally;
-  const heard = REACTION_KEYS.map((id) => [id, after[id].game - before[id].game]).filter(([, count]) => count > 0);
+  const heard = LISTENABLE_KEYS.map((id) => [id, after[id].game - before[id].game]).filter(([, count]) => count > 0);
+  if (heard.length === 0) return [];
+  const pot = potListens ? pocketReactionsOf(run, event, heard.filter(([id]) => REACTION_KEYS.includes(id))) : [];
+  const statuses = statusesListen ? statusReactionsOf(run.state.statuses, run.statuses, heard, event).map((reaction) => ({ type: "statusReaction", ...reaction })) : [];
+  return [...pot, ...statuses];
+}
+
+// Les réactions des billes du pot (reactionsOf), `heard` les compteurs qu'elles
+// peuvent écouter et leur incrément. -> leurs évènements, { type, index, marble,
+// counter }.
+function pocketReactionsOf(run, event, heard) {
   if (heard.length === 0) return [];
   const entering = event.type === "pocketed" ? event.potIndex : -1;
   const reactions = [];
@@ -196,7 +219,7 @@ function pocketReactionsOf(run, event, before) {
     }
     for (const [counter, count] of heard) {
       if ((reactionClauses(run.types[marble], counter)?.length ?? 0) === 0) continue;
-      for (let time = 0; time < count; time++) reactions.push({ index, marble, counter });
+      for (let time = 0; time < count; time++) reactions.push({ type: REACTIVE_MOMENT.event, index, marble, counter });
     }
   });
   return reactions;
@@ -298,7 +321,7 @@ function chooseTargets(run, clause, by) {
   // place, aucun choix (la cible vide le note).
   let { count } = clause.target;
   if (CLAUSE_ACTIONS[clause.action].handLimited) {
-    const room = run.state.maxHandSize - run.state.hand.length;
+    const room = characteristic(run.state, "handSize", run.statuses) - run.state.hand.length;
     if (room <= 0) {
       run.emit({ type: "targetEmpty", action: clause.action, slot: null, target: "handFull", by });
       return [];
@@ -397,17 +420,27 @@ function fireEffect(run, trigger, listener, clauses, event) {
     replacement: event.replacement ?? null,
     tally: run.state.tally,
     state: run.state,
+    statuses: run.statuses,
   };
   // Les cibles relatives, depuis l'emplacement d'où la bille agit (resolveClauses).
   const { clauses: resolved, unresolved } = resolveClauses(clauses, slot ?? null);
   const { self, gifts: printedGifts, operations } = evaluateEffect(resolved, situation, run.types);
-  const by = { trigger, slot: slot ?? null, marble };
+  // L'effet, tel que le portent ses suites ; celui d'un statut le nomme.
+  const by = { trigger, slot: slot ?? null, marble, ...(listener.status === undefined ? {} : { status: listener.status }) };
   // Un bonus au choix : le joueur choisit d'abord ses billes, puis chacune le reçoit.
   const gifts = printedGifts.flatMap(({ choice, action, amount, ...gift }) =>
     choice === undefined ? [gift] : chooseTargets(run, { action, amount, target: choice }, by).map((target) => ({ ...gift, slot: target.slot }))
   );
   const bonus = trigger === "phase" ? run.state.triangle[slot].bonus : undefined;
-  const { speed: speedDelta, mass: massDelta } = bonus ? addValues(self, bonus) : self;
+  const applied = bonus ? addValues(self, bonus) : self;
+  // LES STATUTS : la Vitesse puis la Masse que l'effet applique (bonus reçu compris)
+  // passent par leurs modificateurs (marbles/core/statuses.js/modifyStat), les
+  // charges se consommant à mesure ; l'effet porte les valeurs finales, ce qu'ont
+  // fait les statuts se dit après lui (noteModification).
+  const speedChange = consumeCharges(run, modifyStat(run.state.statuses, run.statuses, "speed", applied.speed));
+  const massChange = consumeCharges(run, modifyStat(run.state.statuses, run.statuses, "mass", applied.mass));
+  const speedDelta = speedChange.value;
+  const massDelta = massChange.value;
 
   // Un bonus ne vaut que si la phase de sa cible peut encore avoir lieu ce tour :
   // sinon (emplacement vide, phase déjà passée ou en cours), il est perdu, et
@@ -434,7 +467,10 @@ function fireEffect(run, trigger, listener, clauses, event) {
   const place = listener.zone === "pot" ? { potIndex: listener.index } : {};
   // L'Éjection provoquée par l'action Éjecter, et non par une pose : elle le porte.
   const provoked = event.type === "knockout" && event.by !== undefined ? { ejectedBy: event.by } : {};
-  run.emit({ type: "effect", trigger, slot, marble, speedDelta, massDelta, draw, operations, given, lost, speed, mass, ...place, ...provoked });
+  const ofStatus = listener.status === undefined ? {} : { status: listener.status };
+  run.emit({ type: "effect", trigger, slot, marble, speedDelta, massDelta, draw, operations, given, lost, speed, mass, ...place, ...provoked, ...ofStatus });
+  noteModification(run, speedChange, by);
+  noteModification(run, massChange, by);
   if (draw > 0) drawMarbles(run, draw, "effect");
   // Les actions sur une bille, après la pioche, dans l'ordre des clauses.
   for (const operation of operations) applyOperation(run, operation, listener, by);
@@ -444,6 +480,46 @@ function fireEffect(run, trigger, listener, clauses, event) {
     if (clause.when !== undefined && !CONDITIONS[clause.when.type].test(clause.when, situation, run.types)) continue;
     run.emit({ type: "targetEmpty", action: clause.action, slot: null, target: "noReference", by });
   }
+}
+
+// --- Les statuts ---
+
+// APPLIQUER UN STATUT (marbles/core/statuses.js/applyStatus) à la partie : une
+// instance neuve, ou la fusion avec celle qui est là, dite par son évènement, avec
+// l'effet qui la donne (son origine).
+function gainStatus(run, { status, amount, duration, stacking }, by) {
+  const { instances, outcome, instance } = applyStatus(run.state.statuses, run.statuses, status, { intensity: amount, count: duration.count }, by);
+  update(run, { statuses: instances });
+  if (outcome === "unchanged") {
+    run.emit({ type: "statusUnchanged", status, by });
+    return;
+  }
+  // La sorte de durée et le cumul (l'application, statusApplication), pour dire ce qui reste.
+  const { intensity, remaining, pending } = instance;
+  run.emit({ type: outcome === "gained" ? "statusGained" : "statusStrengthened", status, intensity, remaining, pending, kind: duration.kind, stacking, by });
+}
+
+// Une valeur passée par les modificateurs des statuts (`change` : modifyStat ou
+// modifyImpact, marbles/core/statuses.js) : les charges des statuts qui l'ont
+// VRAIMENT changée se consomment aussitôt dans l'état (une charge ne sert qu'une
+// fois, même à la Masse du même effet). -> le changement, avec `used` et `expired`,
+// que noteModification dira.
+export function consumeCharges(run, change) {
+  if (change.changed.length === 0) return { ...change, used: [], expired: [] };
+  const { instances, used, expired } = useCharges(run.state.statuses, run.statuses, change.changed);
+  update(run, { statuses: instances });
+  return { ...change, used, expired };
+}
+
+// Ce que les statuts ont changé à une valeur (consumeCharges), dit APRÈS l'évènement
+// qui porte la valeur finale (l'effet, l'Impact) : la modification, pas à pas
+// (silencieuse, pour l'historique), puis chaque charge consommée et chaque fin, à
+// leur place chronologique. `by` : l'effet, ou null pour l'Impact.
+export function noteModification(run, change, by) {
+  if (change.contributions.length === 0) return;
+  run.emit({ type: "valueModified", point: change.point, before: change.before, after: change.value, contributions: change.contributions, ...(by === null ? {} : { by }) });
+  for (const { status, remaining } of change.used) run.emit({ type: "statusCharge", status, remaining });
+  for (const status of change.expired) run.emit({ type: "statusExpired", status });
 }
 
 // --- Les actions sur une bille ---
@@ -464,7 +540,8 @@ function fireEffect(run, trigger, listener, clauses, event) {
 // Sans bille à prendre : sans effet, noté au journal (targetEmpty).
 function applyOperation(run, operation, holder, by) {
   const { action, amount, target } = operation;
-  if (isChoice(target)) applyToChosen(run, operation, chooseTargets(run, operation, by), by);
+  if (CLAUSE_ACTIONS[action].kind === "status") gainStatus(run, operation, by);
+  else if (isChoice(target)) applyToChosen(run, operation, chooseTargets(run, operation, by), by);
   else if (target === undefined) actOnSelf(run, action, amount, holder, by);
   else if (target === FIRST_IN_HAND) {
     if (run.state.hand.length === 0) run.emit({ type: "targetEmpty", action, slot: null, target, by });
@@ -634,7 +711,7 @@ function arrive(run, moving, from, cause) {
   }
   // En main (Rebond, Ramasser), à 0 tour en main, sans Éveil : ce n'est pas une
   // pioche. `handIndex` : sa place d'arrivée, la dernière.
-  const roomInHand = run.state.hand.length < run.state.maxHandSize;
+  const roomInHand = run.state.hand.length < characteristic(run.state, "handSize", run.statuses);
   if (moving.destination === "hand" && roomInHand) {
     update(run, { hand: [...run.state.hand, { marble: moving.marble, turnsInHand: 0 }] });
     run.settle({ type: "returned", marble: moving.marble, ...origin, handIndex: run.state.hand.length - 1, cause, ...marks, ...(moving.by === null ? {} : { by: moving.by }) });
@@ -658,7 +735,7 @@ function moveBy(run, marble, from, action, by) {
 // La bille de la défausse à `index` la quitte (Ramasser). Vers la main, s'il n'y a
 // plus de place (`handLimited`), elle reste où elle est : sans effet, noté.
 function moveFromDiscard(run, index, action, by) {
-  if (CLAUSE_ACTIONS[action].handLimited && run.state.hand.length >= run.state.maxHandSize) {
+  if (CLAUSE_ACTIONS[action].handLimited && run.state.hand.length >= characteristic(run.state, "handSize", run.statuses)) {
     run.emit({ type: "targetEmpty", action, slot: null, target: "handFull", by });
     return;
   }
@@ -700,7 +777,7 @@ function moveFromBag(run, count, action, by) {
 // `redirected` quand une redirection l'y a envoyée (son déclenchement d'Empocher
 // est déjà compté par `redirected`).
 function sendToPot(run, marble, origin, by, extra = {}) {
-  if (run.state.pot.length < run.state.potCapacity) {
+  if (run.state.pot.length < characteristic(run.state, "potCapacity", run.statuses)) {
     update(run, { pot: [...run.state.pot, marble] });
     run.settle({ type: "pocketed", marble, ...origin, potIndex: run.state.pot.length - 1, by, ...extra });
     return;
@@ -749,7 +826,7 @@ function wearOnSlot(run, action, amount, slot, by) {
 
 // Le traitement d'un évènement par le bus (il est déjà au journal) : les effets des
 // billes concernées, puis
-// les réactions des billes du pot (pocketReactionsOf, relevées à son émission),
+// les réactions du pot et des statuts (reactionsOf, relevées à son émission),
 // émises dans la file : pas de récursion.
 function handleEvent(run, event) {
   const trigger = EVENT_TRIGGERS[event.type];
@@ -758,48 +835,50 @@ function handleEvent(run, event) {
     // Une bille inconnue (piochée à l'aveugle) que ce déclencheur pourrait
     // concerner : sa réaction dépend de son identité, la prévision ne peut pas la
     // dire et se déclare incertaine. Elle ne réagit pas.
-    if (listener.marble === UNKNOWN_MARBLE) {
+    if (listener.zone !== HOLDER_ZONES.status.zone && listener.marble === UNKNOWN_MARBLE) {
       if (trigger.zones.includes(listener.zone)) run.uncertain = true;
       continue;
     }
-    const clauses = trigger.clauses(event, listener, run.types);
+    const clauses = trigger.clauses(event, listener, run.types, run.statuses);
     if (clauses !== null) fireEffect(run, trigger.id, listener, clauses, event);
   }
   const reactions = run.reactions.get(event);
   if (reactions === undefined) return;
   run.reactions.delete(event);
-  for (const reaction of reactions) run.emit({ type: REACTIVE_MOMENT.event, ...reaction });
+  for (const reaction of reactions) run.emit(reaction);
 }
 
-// Les réactions du pot relevées pour `event`, réglées tout de suite, chacune jusqu'au
+// Les réactions relevées pour `event`, réglées tout de suite, chacune jusqu'au
 // bout (des interruptions) : celles d'un évènement qui ne passe pas par la file (le
 // mélange, regenerateBag).
 function settleReactions(run, event) {
   const reactions = run.reactions.get(event);
   if (reactions === undefined) return;
   run.reactions.delete(event);
-  for (const reaction of reactions) run.settle({ type: REACTIVE_MOMENT.event, ...reaction });
+  for (const reaction of reactions) run.settle(reaction);
 }
 
 // Déroule une action sur un état de travail, avec son bus et son journal. Une
 // boucle d'évènements est arrêtée par la limite du bus : cette chaîne-là est coupée,
 // le journal le note (chainInterrupted), et l'action reprend normalement ensuite
 // (la résolution joue ses phases suivantes, ses retraits, son Impact). `options` : { eventLimit, blind, answers,
-// seen } (voir marblesReduce) ; `answers` : les réponses aux choix à rejouer ;
+// seen, statuses } (voir marblesReduce) ; `answers` : les réponses aux choix à rejouer ;
 // `seen` : les évènements déjà rendus (un rejeu ne rend que les suivants). `action` :
 // l'action déroulée, gardée pour la reprise. Un choix sans réponse SUSPEND l'action :
 // le résultat porte l'état du déroulé à cet instant, avec son `pendingChoice` (en-tête
 // de marbles/core/marbles.js),
 // et les évènements jusque-là. À l'aveugle, le résultat porte aussi `uncertain` (une
-// bille inconnue aurait pu réagir : handleEvent, pocketReactionsOf) et
+// bille inconnue aurait pu réagir : handleEvent, reactionsOf) et
 // `choiceDependent` (un choix est resté indécis).
-export function transact(state, types, { eventLimit, blind = false, answers = [], seen = 0 } = {}, body, action) {
+export function transact(state, types, { eventLimit, blind = false, answers = [], seen = 0, statuses = NO_STATUSES } = {}, body, action) {
   // `phasesStarted` : les emplacements dont la phase a commencé (ou a été sautée)
   // pendant cette action ; un bonus qui les vise est perdu (fireEffect). `reactions` :
   // par évènement émis, les réactions du pot à émettre après son traitement.
   const run = {
     state,
     types,
+    // La table des statuts (marbles/core/statuses.js), celle des règles.
+    statuses,
     blind,
     uncertain: false,
     choiceDependent: false,
@@ -827,7 +906,7 @@ export function transact(state, types, { eventLimit, blind = false, answers = []
     const before = run.state.tally;
     update(run, { tally: recordTally(before, event, { state: run.state, types }, TALLY_COUNTERS) });
     run.journal.push(event);
-    const reactions = pocketReactionsOf(run, event, before);
+    const reactions = reactionsOf(run, event, before);
     if (reactions.length > 0) run.reactions.set(event, reactions);
   }
   run.emit = (event) => {
@@ -909,7 +988,7 @@ function regenerateBag(run) {
 // Trouvailles ont pu remplir la main, vider le sac ou remplir la défausse.
 // `cause` : ce qui fait piocher, "turn" ou "effect", porté par l'évènement `draw`.
 function drawOne(run, cause) {
-  if (run.state.hand.length >= run.state.maxHandSize) return "handFull";
+  if (run.state.hand.length >= characteristic(run.state, "handSize", run.statuses)) return "handFull";
   if (run.state.bag.length === 0) {
     if (run.state.discard.length === 0) return "noMarbles";
     regenerateBag(run);

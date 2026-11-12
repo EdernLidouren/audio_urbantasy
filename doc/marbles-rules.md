@@ -77,6 +77,8 @@ Les planchers ne valent qu'au calcul final. Pendant le tour, une Vitesse de moin
 - **Nombre de tours** : 10.
 - **Usure maximale** d'une bille : 3, sauf si la bille en indique une autre.
 
+Les lancers par tour, la taille de la main et la capacité du pot sont des valeurs de départ : des statuts peuvent les changer pendant la partie (section 12). Toute règle lit la valeur en vigueur, statuts compris.
+
 ## 5. Le déroulé d'un tour
 
 ### Début de tour et pioche
@@ -223,6 +225,10 @@ Les mots-clés se consultent en jeu, sur la bille sous le curseur, avec la touch
   - La bille arrive en main à 0 tour en main. Ce n'est pas une pioche : pas d'Éveil.
   - Main pleine : la bille reste à la défausse, sans effet pour elle. Un choix ne propose jamais plus de billes qu'il n'y a de places en main ; sans place, il ne s'ouvre pas.
 
+- Appliquer un statut : donne à la partie un statut, un effet durable qui change une caractéristique, modifie une valeur ou réagit à ce qui arrive, pour ce tour, plusieurs tours, le prochain tour, toute la partie ou un nombre de charges.
+  - Les statuts en détail : section 12. Jamais de cible : c'est la partie qui porte le statut. Une intensité (1 par défaut), et une durée, celle du statut ; une bille peut en changer le nombre de tours ou de charges, jamais la sorte.
+  - Se dit avec l'effet qui le donne : « Tic d'argile : statut lancer supplémentaire, le prochain tour. ».
+
 ### Les valeurs
 
 Vitesse et Masse ne sont pas des mots-clés : un effet les augmente ou les diminue (« Vitesse +2 », « Masse −1 »). Sans cible, la valeur va aux compteurs du tour. Avec une cible, elle devient un bonus pour la bille d'un autre emplacement (section 9).
@@ -339,7 +345,8 @@ Une bille du pot peut réagir à ce qui se passe pendant la partie : « En poche
 
 ### Les garde-fous contre les boucles
 
-- Une bille ne peut pas réagir au déclenchement d'une action qu'elle produit elle-même (« à chaque polissage : Polissage 1 ») : une telle bille ne peut pas exister.
+- Une bille ne peut pas réagir au déclenchement d'une action qu'elle produit elle-même (« à chaque polissage : Polissage 1 ») : une telle bille ne peut pas exister. Un statut non plus.
+- Un statut ne réagit jamais à sa propre réception ni à son propre renforcement.
 - Une bille ne peut pas s'éjecter elle-même dans sa propre Éjection : une telle bille ne peut pas exister. Une Éjection qui viserait l'emplacement de sa propre bille ne fait rien : elle est déjà en train d'être chassée.
 - Une chaîne d'effets qui ne s'arrêterait pas, comme deux billes du pot qui se répondent, est coupée par une limite de sécurité. Le jeu annonce « Enchaînement interrompu. » ; seule cette chaîne est coupée, et le geste ou la résolution reprend ensuite normalement (phases suivantes, retraits, Impact). C'est une anomalie, que les outils de test signalent.
 - La limite de lancers par tour empêche les boucles pilotées par le joueur.
@@ -356,7 +363,7 @@ Les valeurs de partie sont des compteurs tenus pendant la partie. Les montants c
 - **Les déclenchements de mots-clés** : Éveil, Chiquenaude, Tic, Trouvaille, Éjection, Final, Chute, pointe, base, base droite, base gauche, et les effets En poche (entrée, résolution, réactions).
 - **Les actions** : pour chaque mot-clé d'action, ses déclenchements, et sa quantité réelle (billes piochées, usure rendue ou ajoutée, billes déplacées au pot, billes chassées, billes défaussées, renvoyées en main, ramassées).
 - **Vitesse et Masse** : les gains et les pertes, en nombre et en total.
-- **Les évènements** : billes lancées, tiquées, éjectées, mélanges, billes piochées, usées, sorties du triangle, mises en poche, perdues, défaussées (toute arrivée à la défausse, d'où qu'elle vienne).
+- **Les évènements** : billes lancées, tiquées, éjectées, mélanges, billes piochées, usées, sorties du triangle, mises en poche, perdues, défaussées (toute arrivée à la défausse, d'où qu'elle vienne) ; statuts reçus, renforcés, charges de statut utilisées, statuts terminés.
 
 ### Les règles de comptage
 
@@ -382,6 +389,62 @@ Elle a deux exceptions :
 
 De même, une bille piochée puis aussitôt empochée reste inconnue dans la prévision. En dehors de ces cas, la prévision donne exactement le résultat réel.
 
+## 12. Les statuts
+
+Un **statut** est un effet durable que reçoit la partie, donné par une bille (le mot-clé d'action Appliquer un statut). La partie le porte : il reste quand la bille qui l'a donné quitte le triangle.
+
+### Ce qu'un statut peut faire
+
+- **Changer une caractéristique** (section 4) : les lancers par tour, la taille de la main, la capacité du pot, d'un nombre par intensité. Planchers : une main d'au moins une bille, des lancers et un pot jamais négatifs. Un lancer de plus reçu pendant la phase de jeu s'ajoute aussitôt aux lancers restants. Une zone au-delà de sa capacité (le pot, quand le statut qui l'agrandissait prend fin) garde ses billes : elle compte comme pleine, et rien n'en sort.
+- **Modifier une valeur** : les gains de Vitesse, les pertes de Vitesse, les gains de Masse, les pertes de Masse, et l'Impact du tour.
+  - Un gain ou une perte se reconnaît au signe de la Vitesse ou de la Masse qu'un effet applique, bonus reçu compris, avant toute modification.
+  - Le statut agit sur la grandeur (une perte de 3 est une grandeur 3), qui ne descend jamais sous 0 : une perte réduite reste une perte, ou devient nulle, jamais un gain. « Amorti : pertes de Vitesse, −1 » fait d'une Vitesse −3 une Vitesse −2.
+  - L'Impact se modifie après son calcul habituel (Vitesse × Masse et leurs planchers), puis ne descend jamais sous 0.
+  - Plusieurs statuts sur la même valeur : d'abord toutes les additions, puis toutes les multiplications, chacune dans l'ordre où les statuts ont été reçus ; le plancher à la fin.
+  - L'effet et l'Impact se disent avec leur valeur finale, partout : la séquence, R, la confirmation.
+- **Réagir à ce qui se passe**, comme une bille du pot (section 9) : « Ferveur : à chaque chiquenaude, Vitesse +2 ». La réaction se dit avec le nom du statut : « Ferveur : Vitesse +2. ». Elle ne vise jamais « cette bille » ni un emplacement relatif : un statut n'a pas de bille.
+
+### L'intensité et le cumul
+
+- **L'intensité** multiplie ce qu'un statut ajoute (une caractéristique, une addition) : un amorti d'intensité 2 réduit les pertes de 2. Une multiplication s'applique autant de fois que l'intensité : ×2 à l'intensité 2 fait ×4. Une réaction n'est pas modulée.
+- **Le même statut appliqué de nouveau** ne fait jamais deux exemplaires. Selon son cumul :
+  - **en intensité** : l'intensité s'ajoute, et la durée la plus longue des deux reste ;
+  - **en durée** : la durée s'ajoute (tours ou charges), l'intensité la plus forte reste ;
+  - **unique** : sans effet, « Statut déjà actif, sans effet : ferveur. ».
+- Un renforcement se dit : « Statut renforcé : amorti, intensité 2, 3 tours. ». L'intensité ne se dit que pour un statut qui se cumule en intensité, et seulement au-delà de 1.
+- Un statut « le prochain tour » reçu de nouveau : encore en attente, il se renforce et attend toujours ; déjà en vigueur, il se renforce aussitôt et dure aussi le prochain tour.
+
+### La durée
+
+- **Ce tour** : il prend fin à la fin du tour.
+- **N tours** : le tour en cours compte pour un ; reçu pendant la résolution aussi.
+- **Le prochain tour** : en attente jusqu'au début du tour suivant, où il s'active, en silence, avant la pioche. En attente, il n'agit pas et ne réagit pas.
+- **Toute la partie** : il ne prend jamais fin.
+- **N charges** : une charge se consomme chaque fois qu'un de ses modificateurs change vraiment une valeur ; à sa dernière charge, il prend fin aussitôt : « Coup de fouet : une charge utilisée. Fin du statut : coup de fouet. ».
+- Les fins de tour se disent après la rotation, dans l'ordre où les statuts ont été reçus : « Fin du statut : amorti. ». Jamais au dernier tour : la partie s'arrête là.
+
+### Les réactions des statuts
+
+- L'ordre : l'évènement se produit, il est compté, la bille concernée joue son propre effet, puis les billes du pot réagissent, dans l'ordre d'arrivée, puis les statuts, dans l'ordre où ils ont été reçus.
+- Un statut ne réagit jamais à sa propre réception ni à son renforcement ; il réagit aux occurrences suivantes, tant qu'il est en vigueur.
+
+### Les consulter
+
+- **A** : « 2 statuts : amorti, intensité 2, 3 tours. Lancer supplémentaire, à partir du prochain tour. », ou « Aucun statut. ».
+- **Maj+A** : le menu des statuts, de gauche à droite, puis « Retour » ; Échap ferme. Chaque entrée dit le nom, l'intensité s'il le faut et ce qui reste ; Ctrl+bas parcourt sa fiche : son effet, ce qui lui reste, son origine (« Obtenu par : Tic d'argile. ») ; E dit sa description.
+- Sur une bille, sa fiche dit le statut qu'elle donne et sa durée ; E décrit, après ses mots-clés, chaque statut qu'elle peut donner.
+- La prévision (R, la confirmation d'une pose) compte les statuts et leurs charges, sur une copie : rien n'est consommé avant le vrai coup. La confirmation a une ligne des statuts dès que la partie en a.
+
+### Les statuts de test
+
+- **Lancer supplémentaire** : lancers +1 par intensité, le prochain tour ; en intensité.
+- **Poche profonde** : capacité du pot +1 par intensité, toute la partie ; en intensité.
+- **Coup de fouet** : le prochain gain de Vitesse doublé ; une charge, en durée.
+- **Amorti** : pertes de Vitesse −1 par intensité, 3 tours ; en intensité.
+- **Ferveur** : à chaque chiquenaude, Vitesse +2, 2 tours ; unique.
+- **Coup double** : l'Impact du tour doublé, ce tour ; unique.
+- **Fatigue** : lancers −1 par intensité, le prochain tour ; en intensité. Un statut négatif.
+
 ## Annexe : les billes de test
 
 Cette annexe est générée à partir de la table des billes ; elle ne se modifie pas à la main.
@@ -392,10 +455,10 @@ Cette annexe est générée à partir de la table des billes ; elle ne se modifi
 
 argile, normale, usure 3.
 
-- Pointe : Vitesse +6 si si le triangle est plein.
+- Pointe : Vitesse +6 si le triangle est plein.
 - Base : Vitesse +2 à la bille de l'emplacement suivant.
 - Chiquenaude : Vitesse +1 par tour en main, maximum +5.
-- Tic : Vitesse +2.
+- Tic : statut lancer supplémentaire, le prochain tour.
 
 ### verre
 
@@ -422,8 +485,8 @@ agate, normale, usure 3.
 - Base : Masse +1.
 - Tic : Masse +1.
 - Trouvaille : Polissage 1.
-- Final : Polissage 1 à la pointe et Empocher cette bille.
-- En poche, à chaque résolution : Masse +2 si si le pot est plein.
+- Final : statut poche profonde, toute la partie et Empocher cette bille.
+- En poche, à chaque résolution : Masse +2 si le pot est plein.
 
 ### œil-de-chat
 
@@ -431,7 +494,7 @@ agate, normale, usure 3.
 
 - Pointe : Vitesse +3.
 - Base droite : Masse +1. Base gauche : Vitesse +3.
-- Tic : Pioche 1 si si la main est vide.
+- Tic : Pioche 1 si la main est vide.
 - Éjection : Ramasser jusqu'à une bille de la défausse au choix.
 
 ### porcelaine
@@ -452,7 +515,7 @@ plombée, calot, usure 3.
 - Pointe : Vitesse −3.
 - Base : Masse +2.
 - Chiquenaude : Éjecter la bille en pointe.
-- Éjection : Masse +1.
+- Éjection : statut coup de fouet, 1 charge.
 
 ### mica
 
@@ -463,7 +526,7 @@ mica, minibille, usure 3.
 - Éveil : Pioche 1.
 - Éjection : Pioche 1 si la bille posée est plus grosse.
 - Final : Rebond de cette bille.
-- En poche, à chaque mélange : Polissage 1 à la pointe.
+- En poche, à chaque mélange : statut ferveur, 2 tours.
 
 ### sulfure
 
@@ -492,7 +555,7 @@ tigrée, normale, usure 4.
 - Base : Éjecter une bille active au choix.
 - Éveil : Vitesse +2.
 - Trouvaille : Vitesse +3.
-- Final : Masse +1.
+- Final : statut amorti, 3 tours.
 - En poche, à chaque chiquenaude : Vitesse +2.
 
 ### géante
@@ -502,7 +565,7 @@ géante, calot, usure 1.
 - Pointe : Vitesse +6.
 - Base : Vitesse +6.
 - Éveil : Polissage 1 à la pointe.
-- Final : Pioche 1 et Éjecter toutes les minibilles actives.
+- Final : Pioche 1 et statut coup double, ce tour.
 
 ### loupe
 
@@ -511,6 +574,6 @@ loupe, minibille, usure 3.
 - Pointe : Vitesse +2 et Défausser la prochaine bille du sac.
 - Base droite : Vitesse +1. Base gauche : Vitesse +4 à la pointe si son effet de pointe donne au moins Vitesse +1.
 - Chiquenaude : Vitesse +2 par chiquenaude ce tour, maximum +6.
-- Éjection : Vitesse +3.
+- Éjection : statut fatigue, le prochain tour.
 
 <!-- annexe des billes : fin -->

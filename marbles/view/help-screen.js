@@ -1,6 +1,6 @@
 // Jeu des billes : l'AIDE GÉNÉRALE (touche H), un menu vertical de lib/menu.js. Une
 // entrée par rubrique, dans cet ordre : but du jeu, score, triangle et rotation,
-// usure, main, lancers et pioche, zones, mots-clés ; Entrée sur une rubrique en dit
+// usure, main, lancers et pioche, zones, mots-clés, statuts ; Entrée sur une rubrique en dit
 // le texte, de quelques phrases, tiré du document de règles (doc/marbles-rules.md).
 // Puis « Les touches », qui ouvre l'aide des touches de l'écran des billes, la même
 // que F1 (lib/help.js, générée) ; enfin « Fermer ». Échap ferme aussi.
@@ -15,7 +15,7 @@ import { t } from "../../data/i18n/index.js";
 import { MARBLES_SETTINGS } from "../config/values.js";
 
 // Les rubriques, dans l'ordre du menu : `marbles.help.<id>.title` et `.text`.
-export const MARBLES_HELP_TOPICS = ["goal", "score", "triangle", "wear", "hand", "zones", "keywords"];
+export const MARBLES_HELP_TOPICS = ["goal", "score", "triangle", "wear", "hand", "zones", "keywords", "statuses"];
 
 // Les valeurs que les textes citent.
 function helpParams() {

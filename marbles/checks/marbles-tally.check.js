@@ -101,7 +101,7 @@ function checkGeneration(run) {
   run("génération : les phases", true, ["apex", "base", "leftBase", "rightBase"].every((id) => ids.includes(id)));
   run.same(
     "génération : les actions mots-clés, déclenchements et quantité réelle",
-    ["draw", "drawQuantity", "polish", "polishQuantity", "crack", "crackQuantity", "pocket", "pocketQuantity", "eject", "ejectQuantity", "discard", "discardQuantity", "bounce", "bounceQuantity", "retrieve", "retrieveQuantity"],
+    ["draw", "drawQuantity", "polish", "polishQuantity", "crack", "crackQuantity", "pocket", "pocketQuantity", "eject", "ejectQuantity", "discard", "discardQuantity", "bounce", "bounceQuantity", "retrieve", "retrieveQuantity", "applyStatus"],
     TALLY_COUNTERS.filter((counter) => counter.category === "action").map((counter) => counter.id)
   );
   run.same(

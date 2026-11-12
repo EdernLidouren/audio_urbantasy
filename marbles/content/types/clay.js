@@ -1,6 +1,6 @@
 // Bille « argile » (clay). Donnée pure : les champs sont décrits dans
 // marbles/content/types/index.js.
-import { speed, turnsInHand, zoneIs, NEXT_SLOT } from "../effects.js";
+import { speed, turnsInHand, zoneIs, applyStatus, NEXT_SLOT } from "../effects.js";
 import { MEDIUM } from "../../config/values.js";
 
 export default {
@@ -11,6 +11,7 @@ export default {
   apex: [{ ...speed(6), when: zoneIs("triangle", "full") }],
   // Vitesse +0, +1 par tour en main, maximum +5.
   flick: [speed({ base: 0, step: 1, source: turnsInHand(), max: 5 })],
-  hit: [speed(2)],
+  // Tic : statut lancer supplémentaire, le prochain tour.
+  hit: [applyStatus("extraThrow")],
   size: MEDIUM,
 };

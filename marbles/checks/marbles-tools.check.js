@@ -9,7 +9,7 @@
 // (`node tools/run-checks.js marbles-tools`).
 
 import { MARBLES_SETTINGS, STARTING_BAG } from "../config/values.js";
-import { SLOTS, legalActions } from "../core/marbles.js";
+import { SLOTS } from "../core/marbles.js";
 import { JOURNAL_EVENTS } from "../core/content.js";
 import { throws } from "../../lib/check.js";
 import { parseCommand } from "../tools/commands.js";
@@ -23,11 +23,11 @@ import { REPORT_HEADINGS, REPORT_RESULT_HEADINGS, buildReport, frNumber } from "
 import { contextLabel, diffReports, reportAnomalies } from "../tools/report-diff.js";
 import { MARBLE_COLUMNS, toCsv, toJson } from "../tools/export.js";
 import MARBLE_TYPES from "../content/types/index.js";
-import { createMarblesRules } from "../core/rules.js";
+import { GAME_RULES } from "../tools/game-rules.js";
 import { handIds } from "./helpers.js";
 
-// Les règles du jeu, liées à la vraie table (marbles/core/rules.js).
-const rules = createMarblesRules(MARBLE_TYPES);
+// Les règles du jeu, liées aux vraies tables (marbles/tools/game-rules.js).
+const rules = GAME_RULES;
 
 // Les parties de contrôle par joueur : assez pour que les moyennes se départagent
 // nettement (le glouton bat l'aléatoire de loin), assez peu pour que la
@@ -131,10 +131,10 @@ function checkCommandsAndFormat(run) {
     let current = state;
     while (current.stage !== "over") {
       const action = current.pendingChoice
-        ? legalActions(current)[0]
+        ? rules.legalActions(current)[0]
         : current.stage === "draw"
           ? { type: "draw" }
-          : (legalActions(current).find((legal) => legal.type === "place") ?? { type: "resolve" });
+          : (rules.legalActions(current).find((legal) => legal.type === "place") ?? { type: "resolve" });
       const result = rules.reduce(current, action);
       for (const event of result.events) {
         types.add(event.type);
@@ -218,7 +218,7 @@ function checkPlayerChoices(run) {
   const pending = rules.reduce(state, { type: "place", handIndex: 0, slot: "apex" }).state;
   const view = publicView(pending);
   run("vue publique : le sac de l'état de départ du choix voilé", true, view.pendingChoice.resume.from.bag.every((marble) => marble === null));
-  const values = legalActions(view).map((action) => rules.forecast(view, action).impact);
+  const values = rules.legalActions(view).map((action) => rules.forecast(view, action).impact);
   const best = bestChoice(view);
   run("glouton : la réponse au meilleur Impact prévu", Math.max(...values), rules.forecast(view, best).impact);
   run("glouton : une réponse légale", true, rules.reduce(pending, best).ok);
@@ -244,12 +244,12 @@ function checkGreedy(run) {
     hand: ["clay", "gorilla", "agate"],
   });
   const view = publicView(state);
-  const swaps = [[], ...legalActions(view).filter((action) => action.type === "swap").map((swap) => [swap])];
+  const swaps = [[], ...rules.legalActions(view).filter((action) => action.type === "swap").map((swap) => [swap])];
   let best = -Infinity;
   for (const swap of swaps) {
     const afterSwap = swap.length === 0 ? view : rules.reduce(view, swap[0]).state;
     best = Math.max(best, predictedAfter(view, swap));
-    for (const place of legalActions(afterSwap).filter((action) => action.type === "place")) {
+    for (const place of rules.legalActions(afterSwap).filter((action) => action.type === "place")) {
       best = Math.max(best, predictedAfter(view, [...swap, place]));
     }
   }

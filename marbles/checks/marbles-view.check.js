@@ -52,7 +52,11 @@ import {
   describeSlotForPlacement,
   describeTurn,
   formatCounter,
+  instanceLabel,
+  originText,
   placementLines,
+  remainingText,
+  statusCard,
 } from "../view/narration.js";
 import { marbleCard } from "../view/card.js";
 import { tallyMenu } from "../view/tally-screen.js";
@@ -83,9 +87,9 @@ import {
 import { pathLength, rollAt, rollDurationMs, rollEnvelope } from "../view/rolls.js";
 import { EMPTY_SOUND_QUEUE, advanceSoundQueue, enqueueCues } from "../view/sound-queue.js";
 import { throws } from "../../lib/check.js";
-import { CHOICELESS_TYPES, FIXTURE_TYPES, fixtureRules } from "./fixtures/marbles.js";
+import { CHOICELESS_TYPES, FIXTURE_STATUSES, FIXTURE_TYPES, fixtureRules } from "./fixtures/marbles.js";
 import { choice, polish, speed } from "../content/effects.js";
-import { answerChoices, emptyBagMarblesGame, fabricatedRules, inHand, isCleanText, keyText, marblesPlayState } from "./helpers.js";
+import { answerChoices, emptyBagMarblesGame, fabricatedRules, inHand, isCleanText, keyText, marblesPlayState, mustReduce } from "./helpers.js";
 import { choiceAnswer, choiceCursorAfterAnswer, choiceFocusLine, choiceHandOptions, choiceMarbleAt, choiceStartCursor, stepChoiceCursor } from "../view/choice.js";
 import { MARBLES_HELP_TOPICS, helpTopicText, marblesHelpMenu } from "../view/help-screen.js";
 import { AMOUNT_SOURCES, CLAUSE_ACTIONS, effectAt } from "../core/effects.js";
@@ -109,7 +113,8 @@ function plain(text) {
 // Les billes de la table des vérifications n'ont pas de nom : pour faire dire leurs
 // évènements dans une vraie langue, chacune y prend celui d'une vraie bille.
 function withRealNames(value) {
-  if (typeof value === "string") return Object.hasOwn(FIXTURE_TYPES, value) ? "clay" : value;
+  // Une bille de test devient l'argile ; un statut de test, le coup de fouet.
+  if (typeof value === "string") return Object.hasOwn(FIXTURE_TYPES, value) ? "clay" : Object.hasOwn(FIXTURE_STATUSES, value) ? "whiplash" : value;
   if (Array.isArray(value)) return value.map(withRealNames);
   if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, withRealNames(inner)]));
   return value;
@@ -189,6 +194,28 @@ function sampleEvents() {
   // Un choix indécis : à l'aveugle seulement (la prévision), le Tic de hit_polish.
   const undecided = rules.reduce({ ...emptyBagMarblesGame(rules, 3), turn: 2, stage: "play", hand: inHand(["hit_polish"]), triangle: { leftBase: null, rightBase: null, apex: { marble: "aging_flick", wear: 0 } } }, { type: "place", handIndex: 0, slot: "apex" }, { blind: true });
   events.push(...undecided.events);
+  // Les STATUTS (FIXTURE_STATUSES) : des reçus, un déjà là et une réaction à la
+  // première pose (aging_flick, sa Chiquenaude), qui consomme la charge reçue et la
+  // finit ; un renforcé à la seconde ; à la résolution, la fin d'un statut compté en
+  // tours ; au tour suivant, l'activation d'un statut en attente.
+  const statusRules = fabricatedRules({
+    aging_flick: {
+      flick: [
+        { action: "applyStatus", status: "gain_charge", amount: 1 },
+        { action: "applyStatus", status: "loss_cushion", amount: 1 },
+        { action: "applyStatus", status: "flick_react", amount: 1 },
+      ],
+      base: [{ action: "speed", amount: 3 }],
+      apex: [{ action: "speed", amount: 3 }],
+    },
+  });
+  const pending = (status, remaining, waiting) => ({ status, holder: "game", intensity: 1, remaining, pending: waiting, origin: null });
+  let statusState = { ...emptyBagMarblesGame(statusRules, 9), turn: 2, stage: "play", hand: inHand(["aging_flick", "aging_flick"]), statuses: [pending("flick_react", 1, false), pending("throws_next", 1, true)] };
+  for (const action of [{ type: "place", handIndex: 0, slot: "rightBase" }, { type: "place", handIndex: 0, slot: "leftBase" }, { type: "resolve" }, { type: "draw" }]) {
+    const result = statusRules.reduce(statusState, action);
+    statusState = result.state;
+    events.push(...result.events);
+  }
   // La limite de sécurité, nulle : chaque chaîne est coupée, l'action aboutit.
   const interrupted = rules.reduce(rules.createGame(3), { type: "draw" }, { eventLimit: 0 });
   events.push(...interrupted.events);
@@ -527,7 +554,7 @@ function checkKeywords(run) {
   run.same("mots-clés : une bille sans effet n'en a aucun", [], ids("bare", made));
   run.same(
     "mots-clés : l'ordre de la liste, déclencheurs, En poche, actions, puis phases",
-    ["awaken", "flick", "hit", "windfall", "knockout", "final", "drop", "pocketed", "draw", "polish", "crack", "pocket", "eject", "discard", "bounce", "retrieve", "apex", "base"],
+    ["awaken", "flick", "hit", "windfall", "knockout", "final", "drop", "pocketed", "draw", "polish", "crack", "pocket", "eject", "discard", "bounce", "retrieve", "applyStatus", "apex", "base"],
     MARBLE_KEYWORDS.map((keyword) => keyword.id)
   );
 
@@ -600,6 +627,7 @@ function checkHelpMenu(run) {
       "help.hand.title",
       "help.zones.title",
       "help.keywords.title",
+      "help.statuses.title",
       "help.keys.title",
       "help.close",
     ],
@@ -610,7 +638,7 @@ function checkHelpMenu(run) {
   run("aide H : chaque entrée agit", true, menu.entries.every((entry) => typeof entry.onActivate === "function"));
   menu.entries.at(-2).onActivate();
   run("aide H : « Les touches » ouvre l'aide des touches", 1, keyHelpOpened);
-  run.same("aide H : une rubrique par texte, dans l'ordre", ["goal", "score", "triangle", "wear", "hand", "zones", "keywords"], MARBLES_HELP_TOPICS);
+  run.same("aide H : une rubrique par texte, dans l'ordre", ["goal", "score", "triangle", "wear", "hand", "zones", "keywords", "statuses"], MARBLES_HELP_TOPICS);
   // Les textes de l'aide citent les réglages du jeu, lus dans MARBLES_SETTINGS.
   const { turnCount, maxHandSize, throwsPerTurn, firstTurnDraw, drawPerTurn, potCapacity } = MARBLES_SETTINGS;
   run(
@@ -800,9 +828,9 @@ function checkChoiceInterface(run) {
 // La touche P : le pot et les billes perdues, accords compris.
 function checkPotStatus(run) {
   const game = (pot, lost) => ({ ...rules.createGame(1), pot, lost });
-  run("touche P : vide", "status.pot{count: 0, capacity: 3, lost: 0}", describePot(game([], []), t));
-  run("touche P : une de chaque", "status.pot{count: 1, capacity: 3, lost: 1}", describePot(game(["aging_flick"], ["hit_polish"]), t));
-  run("touche P : pluriels", "status.pot{count: 3, capacity: 3, lost: 2}", describePot(game(["aging_flick", "hit_polish", "final_pocket"], ["awaken_draw", "all_rounder"]), t));
+  run("touche P : vide", "status.pot{count: 0, capacity: 3, lost: 0}", describePot(game([], []), t, rules));
+  run("touche P : une de chaque", "status.pot{count: 1, capacity: 3, lost: 1}", describePot(game(["aging_flick"], ["hit_polish"]), t, rules));
+  run("touche P : pluriels", "status.pot{count: 3, capacity: 3, lost: 2}", describePot(game(["aging_flick", "hit_polish", "final_pocket"], ["awaken_draw", "all_rounder"]), t, rules));
   run("Maj+P : le titre du menu", "pile.pot", t("marbles.pile.pot"));
 }
 
@@ -1320,6 +1348,149 @@ export default function checkMarblesView(run) {
   run.section("ce qui se dit", (r) => checkSaid(r, sample));
   run.section("confirmation et curseur", checkConfirmationAndCursor);
   run.section("témoins", checkWitnesses);
+  run.section("statuts", checkStatusNarration);
+}
+
+// LES STATUTS en mots (marbles/view/narration/statuses.js, journal.js, forecast.js),
+// par les clés : leur étiquette, ce qui leur reste, leur fiche et leur origine, la
+// clause qui les donne, le journal (renforcé, déjà là, une charge, la fin, une
+// réaction), la question d'un choix ouvert par un statut, la confirmation et R.
+function checkStatusNarration(run) {
+  const instance = (status, over = {}) => ({ status, holder: "game", intensity: 1, remaining: 1, pending: false, origin: null, ...over });
+  // Ce qui reste, selon la sorte de durée.
+  run.same(
+    "reste : ce tour, 3 tours, en attente, en attente sur 2 tours, toute la partie, 1 charge",
+    [
+      "statuses.duration.turn",
+      "statuses.duration.turns{count: 3}",
+      "statuses.remaining.pending",
+      "statuses.remaining.pending_turns{count: 2}",
+      "statuses.duration.game",
+      "statuses.duration.charges{count: 1}",
+    ],
+    [
+      remainingText(instance("x"), "turns", t),
+      remainingText(instance("x", { remaining: 3 }), "turns", t),
+      remainingText(instance("x", { pending: true }), "nextTurn", t),
+      remainingText(instance("x", { pending: true, remaining: 2 }), "nextTurn", t),
+      remainingText(instance("x", { remaining: null }), "game", t),
+      remainingText(instance("x", { remaining: 1 }), "charges", t),
+    ]
+  );
+  // L'intensité : seulement en cumul d'intensité, au-delà de 1.
+  run.same(
+    "étiquette : l'intensité dite en cumul d'intensité au-delà de 1, jamais sinon",
+    [
+      "statuses.label_intensity{status: status.loss_cushion.name, duration: statuses.duration.turns{count: 3}, intensity: 2}",
+      "statuses.label{status: status.loss_cushion.name, duration: statuses.duration.turns{count: 3}}",
+      "statuses.label{status: status.gain_charge.name, duration: statuses.duration.charges{count: 1}}",
+    ],
+    [
+      instanceLabel(instance("loss_cushion", { intensity: 2, remaining: 3 }), rules, t),
+      instanceLabel(instance("loss_cushion", { remaining: 3 }), rules, t),
+      instanceLabel(instance("gain_charge", { intensity: 2 }), rules, t),
+    ]
+  );
+  // La fiche : l'effet à son intensité, ce qui reste, l'origine.
+  const card = statusCard(instance("loss_cushion", { intensity: 2, remaining: 3, origin: { trigger: "hit", slot: "apex", marble: "aging_flick" } }), "main", rules, t);
+  run.same(
+    "fiche : effet, reste, origine, au-dessous",
+    [
+      "statuses.card.effect{effect: effect.combined{parts: [statuses.behavior.add{point: statuses.point.speedLoss, value: −2}]}}",
+      "statuses.card.remaining{duration: statuses.duration.turns{count: 3}}",
+      "statuses.card.origin{origin: statuses.origin.hit{marble: <aging_flick>}}",
+    ],
+    card.below
+  );
+  run(
+    "fiche : un multiplicateur à l'intensité 2, au carré",
+    "statuses.card.effect{effect: effect.combined{parts: [statuses.behavior.multiply{point: statuses.point.speedGain, value: 4}]}}",
+    statusCard(instance("gain_charge", { intensity: 2 }), "main", rules, t).below[0]
+  );
+  run(
+    "fiche : une réaction, que l'intensité ne module pas",
+    "statuses.card.effect{effect: effect.combined{parts: [statuses.behavior.reaction{occurrence: tally.flick.each, effect: effect.combined{parts: [effect.combined{parts: [effect.speed_up{amount: 2}]}]}}]}}",
+    statusCard(instance("flick_react", { intensity: 3 }), "main", rules, t).below[0]
+  );
+  run.same(
+    "origine : une phase, une entrée au pot, une réaction du pot, un statut, aucune",
+    [
+      "statuses.origin.phase{slot: slot.leftBase, marble: <aging_flick>}",
+      "statuses.origin.pot_entry{marble: <fragile>}",
+      "statuses.origin.pot{marble: <all_rounder>}",
+      "statuses.origin.status{status: status.flick_react.name}",
+      "statuses.origin.none",
+    ],
+    [
+      originText({ trigger: "phase", slot: "leftBase", marble: "aging_flick" }, t),
+      originText({ trigger: "pocketEntry", slot: null, marble: "fragile" }, t),
+      originText({ trigger: "pocketReaction", slot: null, marble: "all_rounder" }, t),
+      originText({ trigger: "statusReaction", slot: null, marble: null, status: "flick_react" }, t),
+      originText(null, t),
+    ]
+  );
+
+  // La clause sur une fiche : le nom, l'intensité s'il le faut, la durée de la clause.
+  const giving = fabricatedRules({ giver: { flick: [{ action: "applyStatus", status: "loss_cushion", amount: 2, duration: 1 }, { action: "applyStatus", status: "throws_next", amount: 1 }] } });
+  run(
+    "fiche d'une bille : la clause dit le statut, son intensité et sa durée",
+    "effect.combined{parts: [effect.apply_status_intensity{status: status.loss_cushion.name, duration: statuses.duration.turns{count: 1}, intensity: 2} | effect.apply_status{status: status.throws_next.name, duration: statuses.duration.nextTurn}]}",
+    describePrinted(giving.types.giver.flick, null, t, giving.statuses)
+  );
+
+  // Le journal : reçu muet (l'effet le dit), renforcé, déjà là, une charge, la fin,
+  // une réaction dite par son nom.
+  const played = giving.reduce({ ...marblesPlayState(giving, { hand: inHand(["giver"]) }), statuses: [instance("loss_cushion", { remaining: 3 })] }, { type: "place", handIndex: 0, slot: "apex" });
+  const texts = buildSteps(played.events, t).map((step) => step.text);
+  run(
+    "journal : renforcé, avec son étiquette",
+    true,
+    texts.includes("event.status_strengthened{status: statuses.label_intensity{status: status.loss_cushion.name, duration: statuses.duration.turns{count: 3}, intensity: 3}}")
+  );
+  run("journal : un statut reçu ne se dit pas à part, l'effet le dit", false, texts.some((text) => text.includes("status_gained")));
+  run.same(
+    "journal : déjà là, une charge, la fin",
+    ["event.status_unchanged{status: status.flick_react.name}", "event.status_charge{status: status.gain_charge.name}", "event.status_expired{status: status.gain_charge.name}"],
+    buildSteps(
+      [
+        { type: "statusUnchanged", status: "flick_react", by: { trigger: "flick", slot: "apex", marble: "aging_flick" } },
+        { type: "statusCharge", status: "gain_charge", remaining: 0 },
+        { type: "statusExpired", status: "gain_charge" },
+      ],
+      t
+    ).map((step) => step.text)
+  );
+  const reacting = mustReduce(rules, { ...marblesPlayState(rules, { hand: inHand(["aging_flick"]) }), statuses: [instance("flick_react", { remaining: 2 })] }, { type: "place", handIndex: 0, slot: "apex" });
+  run(
+    "journal : une réaction, dite avec le nom du statut",
+    true,
+    buildSteps(reacting.events, t).some((step) => step.text.startsWith("event.effect_status{status: status.flick_react.name, effect: effect.combined{parts: [effect.speed_up{amount: 2}]}}"))
+  );
+  // La question d'un choix ouvert par la réaction d'un statut.
+  const question = describeChoicePrompt(
+    { action: "polish", amount: 1, zones: ["triangle"], pick: "marble", count: 1, mode: "required", chosen: [], remaining: 1, by: { trigger: "statusReaction", slot: null, marble: null, status: "flick_react" } },
+    t
+  );
+  run("choix : ouvert par un statut, son nom en tête", true, question.startsWith("choice.by_status{status: status.flick_react.name, question:"));
+
+  // La confirmation : la ligne des statuts dès que la partie en a, après celle du pot.
+  const keys = (state) => placementLines(state, 0, "apex", rules, t).map(({ key }) => key);
+  run("confirmation : sans statut, pas de ligne des statuts", false, keys(marblesPlayState(rules, { hand: inHand(["aging_flick"]) })).includes("marbles.place.statuses"));
+  const lines = placementLines({ ...marblesPlayState(rules, { hand: inHand(["aging_flick"]) }), statuses: [instance("flick_react", { remaining: 2 })] }, 0, "apex", rules, t);
+  run.same(
+    "confirmation : avec un statut, sa réaction prévue, après le pot",
+    ["marbles.place.pot", "marbles.place.statuses"],
+    lines.slice(-2).map(({ key }) => key)
+  );
+  run("confirmation : la réaction de Ferveur prévue", "place.status_effect{status: status.flick_react.name, effect: effect.combined{parts: [effect.speed_up{amount: 2}]}}", lines.at(-1).params.reactions);
+  // R : une réaction pendant la résolution, après le pot.
+  const reactingRules = fabricatedRules({ phaseFlicker: { base: [{ action: "speed", amount: 1 }] } });
+  const overview = describeOverview(
+    { ...marblesPlayState(reactingRules, { triangle: { leftBase: null, rightBase: { marble: "phaseFlicker", wear: 0 }, apex: null } }), statuses: [instance("throw_react", { remaining: null })] },
+    reactingRules,
+    t
+  );
+  run("R : sans réaction pendant la résolution, aucune ligne de statut", false, overview.includes("effect_status"));
 }
 
 // La couverture : chaque évènement du journal (JOURNAL_EVENTS) a son point
@@ -1383,11 +1554,11 @@ function checkLocales(run, { events, state }) {
 
       const emptyTriangle = { leftBase: null, rightBase: null, apex: null };
       const lines = [
-        describeTurn(state, true, realT),
-        describeTurn(state, false, realT),
+        describeTurn(state, true, realT, rules),
+        describeTurn(state, false, realT, rules),
         describeBag(state, realT),
         describeDiscard(state, realT),
-        describeTurn({ ...state, speed: -3, mass: -1 }, true, realT),
+        describeTurn({ ...state, speed: -3, mass: -1 }, true, realT, rules),
         stepsText(buildSteps([{ type: "impact", speed: -3, mass: -1, impact: 0, score: 0 }], realT)),
         describeHandFocus({ ...state, hand: inHand([]) }, 0, rules, realT),
         ...SLOTS.map((slot) => describeSlotFocus({ ...state, triangle: emptyTriangle }, slot, rules, realT)),
@@ -1574,7 +1745,7 @@ function checkSaid(run, { events, state }) {
     run(
       "texte : le tour, compteurs compris",
       "status.turn{turn: 2, turnCount: 10, score: 5, speed: 5, mass: 2} status.throws{count: 4} status.swap_available",
-      describeTurn({ ...lensed, score: 5, speed: 5, mass: 2 }, true, t)
+      describeTurn({ ...lensed, score: 5, speed: 5, mass: 2 }, true, t, rules)
     );
 
   }
@@ -1768,9 +1939,9 @@ function checkWitnesses(run) {
       question: plain(describeChoicePrompt(choosing.pendingChoice, realT)),
       questions: questionVariants(choosing.pendingChoice).map((pending) => plain(describeChoicePrompt(pending, realT))),
       chosen: ["agate", "gorilla"].map((marble) => plain(realT("marbles.choice.chosen", { marble: nameRef(`marble.${marble}.name`) }))),
-      turn: plain(describeTurn(game({ score: 5, speed: 5, mass: 2, throwsUsed: 1 }), true, realT)),
+      turn: plain(describeTurn(game({ score: 5, speed: 5, mass: 2, throwsUsed: 1 }), true, realT, rules)),
       bag: [8, 1].map((count) => plain(describeBag(game({ bag: Array(count).fill("clay"), drawPerTurn: 1 }), realT))),
-      pot: plain(describePot(game({ pot: ["clay"], lost: ["gorilla", "glass"] }), realT)),
+      pot: plain(describePot(game({ pot: ["clay"], lost: ["gorilla", "glass"] }), realT, rules)),
       impact: plain(stepsText(buildSteps([{ type: "impact", speed: -3, mass: 2, impact: 0, score: 14 }], realT))),
     };
   };

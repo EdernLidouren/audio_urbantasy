@@ -9,6 +9,7 @@ import { nameRef } from "../../../data/i18n/index.js";
 import { MARBLE_SIZES } from "../../config/values.js";
 import { TALLY_COUNTERS } from "../../core/content.js";
 import { emptyTally } from "../../core/tally.js";
+import { NO_STATUSES, definitionOf, statusApplication } from "../../core/statuses.js";
 import {
   AMOUNT_SOURCES,
   CHOICE_ZONES,
@@ -98,7 +99,29 @@ const ACTION_TEXTS = {
     up: "marbles.effect.eject_self",
     targets: { slot: "marbles.effect.eject_slot", relative: "marbles.effect.eject_relative", choice: "marbles.effect.eject_choice", all: "marbles.effect.eject_all" },
   },
+  // Un statut : son nom, son intensité s'il le faut, sa durée (statusText).
+  applyStatus: { up: "marbles.effect.apply_status", intensity: "marbles.effect.apply_status_intensity" },
 };
+
+// Le nom d'un statut (marbles/core/statuses.js), en minuscules : « coup de fouet ».
+export function statusName(status, t) {
+  return t(`marbles.status.${status}.name`);
+}
+
+// Une DURÉE de statut, { kind, count? } : « ce tour », « 3 tours », « le prochain
+// tour », « toute la partie », « 1 charge ».
+function durationText(duration, t) {
+  return t(`marbles.statuses.duration.${duration.kind}`, duration.count === undefined ? {} : { count: duration.count });
+}
+
+// L'application d'un statut (marbles/core/statuses.js/statusApplication) : « statut
+// lancer supplémentaire, le prochain tour », « statut amorti, intensité 2, 3 tours ».
+// L'intensité ne se dit que pour un statut qui se cumule en intensité, au-delà de 1.
+function statusText({ status, amount, duration, stacking }, t) {
+  const params = { status: statusName(status, t), duration: durationText(duration, t) };
+  if (stacking === "intensity" && Number.isInteger(amount) && amount > 1) return t(ACTION_TEXTS.applyStatus.intensity, { ...params, intensity: amount });
+  return t(ACTION_TEXTS.applyStatus.up, params);
+}
 
 // Le texte de chaque filtre d'une cible « toutes » (marbles/core/effects.js/
 // TARGET_FILTERS) : la cible entière qu'il qualifie, { key, params }. « toutes les
@@ -187,7 +210,9 @@ function targetedText(text, target, t) {
 // morceaux. Elles se disent chez la bille qui les produit, jamais chez celle qui les
 // reçoit.
 function operationParts(operations = [], t) {
-  return operations.map(({ action, amount, target }) => actionText(action, amount, target, t));
+  return operations.map((operation) =>
+    CLAUSE_ACTIONS[operation.action].kind === "status" ? statusText(operation, t) : actionText(operation.action, operation.amount, operation.target, t)
+  );
 }
 
 // Tout ce qu'un effet joué ou prévu produit chez sa bille : ses valeurs, puis ses
@@ -351,10 +376,12 @@ export function cardSituation(marble, turnsInHand = 0, tally = emptyTally(TALLY_
 // Une clause IMPRIMÉE : ce que la bille promet, son montant calculé (avec sa valeur
 // actuelle dans `situation`), sa cible et sa condition comprises. Son action dit sa
 // valeur par ses propres textes.
-function describeClause(clause, situation, t) {
-  // Une action sans montant (Empocher) dit sa cible elle-même.
-  if (CLAUSE_ACTIONS[clause.action].amountless) {
-    const text = actionText(clause.action, undefined, clause.target, t);
+function describeClause(clause, situation, t, statuses) {
+  // Un statut se dit d'après sa définition (la table des statuts) ; une action sans
+  // montant (Empocher) dit sa cible elle-même.
+  const status = CLAUSE_ACTIONS[clause.action].kind === "status";
+  if (status || CLAUSE_ACTIONS[clause.action].amountless) {
+    const text = status ? statusText(statusApplication(clause, definitionOf(statuses, clause.status)), t) : actionText(clause.action, undefined, clause.target, t);
     return clause.when === undefined ? text : t("marbles.effect.conditional", { effect: text, condition: CONDITION_TEXTS[clause.when.type](clause.when, t) });
   }
   let text = Number.isInteger(clause.amount)
@@ -366,9 +393,10 @@ function describeClause(clause, situation, t) {
 }
 
 // Un effet imprimé : une liste de clauses. `situation` (cardSituation) : où en est la
-// bille, pour la valeur actuelle de ses montants calculés.
-export function describePrinted(clauses, situation, t) {
-  return combined(clauses.map((clause) => describeClause(clause, situation, t)), t);
+// bille, pour la valeur actuelle de ses montants calculés ; `statuses`, la table des
+// statuts (celle des règles), que lit une clause Appliquer un statut.
+export function describePrinted(clauses, situation, t, statuses = NO_STATUSES) {
+  return combined(clauses.map((clause) => describeClause(clause, situation, t, statuses)), t);
 }
 
 // Ce qu'une bille produit À SON EMPLACEMENT, sur le triangle prévu ou pendant la
