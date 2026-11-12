@@ -634,6 +634,10 @@ function checkChoiceInterface(run) {
     upToPolish: { hit: [{ action: "polish", amount: 1, target: choose(["triangle"], { count: 2, upTo: true }) }] },
     twoCrack: { hit: [{ action: "crack", amount: 1, target: choose(["triangle"], { count: 2 }) }] },
     booster: { hit: [{ action: "speed", amount: 2, target: choose(["triangle"]) }] },
+    // En poche, à chaque chiquenaude : Fêlure 1 au choix ; un choix ouvert pendant
+    // le lancer de `flicker`, alors en transit.
+    potCrack: { pocketed: { flick: [{ action: "crack", amount: 1, target: choose(["triangle"]) }] } },
+    flicker: { flick: [{ action: "speed", amount: 1 }] },
   });
   const pending = (marble, triangle, hand = []) =>
     made.reduce({ ...emptyBagMarblesGame(made, 2), turn: 2, stage: "play", hand: inHand([marble, ...hand]), triangle }, { type: "place", handIndex: 0, slot: "apex" }).state;
@@ -667,6 +671,29 @@ function checkChoiceInterface(run) {
   const afterOne = made.reduce(upTo, { type: "choose", target: { zone: "triangle", slot: "leftBase" } }).state.pendingChoice;
   run("choix, après un : ce qui reste, en mode jusqu'à N", "choice.more_up_to{target: choice.noun.triangle_marble{count: 1}}", describeChoicePrompt(afterOne, t));
   run("choix, après un : la cible choisie n'est plus éligible", true, choiceFocusLine({ ...upTo, pendingChoice: afterOne }, cursor("leftBase"), made, t).endsWith("choice.not_eligible"));
+
+  // Une bille EN TRANSIT (en cours de lancer) : l'emplacement qu'elle vise l'annonce
+  // après son contenu, avant « Non éligible. » ; jamais une cible ; les autres
+  // emplacements n'en disent rien.
+  const throwing = (slot) =>
+    made.reduce(
+      { ...emptyBagMarblesGame(made, 2), turn: 2, stage: "play", hand: inHand(["flicker"]), pot: ["potCrack"], triangle: { leftBase: { marble: "plain", wear: 1 }, rightBase: null, apex: { marble: "plain", wear: 0 } } },
+      { type: "place", handIndex: 0, slot }
+    ).state;
+  const toApex = throwing("apex");
+  run(
+    "transit : l'emplacement visé, occupé, l'annonce après son contenu",
+    "slot_line.occupied{slot: slot.apex, name: <plain>, size: size.medium.name, wear: 0, maxWear: 3} choice.in_transit.thrown{name: <flicker>}",
+    choiceFocusLine(toApex, cursor("apex"), made, t)
+  );
+  run("transit : un autre emplacement n'en dit rien", "slot_line.occupied{slot: slot.leftBase, name: <plain>, size: size.medium.name, wear: 1, maxWear: 3}", choiceFocusLine(toApex, cursor("leftBase"), made, t));
+  const toEmpty = throwing("rightBase");
+  run(
+    "transit : l'emplacement visé, vide et non éligible, l'annonce avant « Non éligible »",
+    "slot_line.empty{slot: slot.rightBase} choice.in_transit.thrown{name: <flicker>} choice.not_eligible",
+    choiceFocusLine(toEmpty, cursor("rightBase"), made, t)
+  );
+  run.same("transit : jamais une cible, Entrée bloque sur l'emplacement vide qu'elle vise", { refusal: "notEligible" }, choiceAnswer(toEmpty.pendingChoice, cursor("rightBase")));
 
   // Obligatoire, 2 : la question, puis ce qui reste.
   const two = pending("twoCrack", { leftBase: { marble: "plain", wear: 0 }, rightBase: { marble: "plain", wear: 0 }, apex: { marble: "plain", wear: 0 } });
@@ -816,7 +843,10 @@ function checkSounds(run) {
   );
   run("profils : délai négatif refusé", true, throws(() => validateMarbleSounds({}, {}, { ...MARBLES_SETTINGS, drawSoundIntervalMs: -1 })));
 
-  const settings = { shuffleToDrawMs: 900, drawSoundIntervalMs: 350, swapSoundDelayMs: 150 };
+  run("profils : délai d'usure négatif refusé", true, throws(() => validateMarbleSounds({}, {}, { ...MARBLES_SETTINGS, crackToOutMs: -1 })));
+  run("ton : variation de la fêlure manquante refusée", true, throws(() => validatePitchVariation({ ...MARBLES_PITCH_VARIATION, crack: undefined })));
+
+  const settings = { shuffleToDrawMs: 900, drawSoundIntervalMs: 350, swapSoundDelayMs: 150, wearSoundIntervalMs: 120, crackToOutMs: 150 };
   // La table des billes des repères : celle des vérifications, injectée comme les
   // règles de l'écran injectent la leur.
   const FIXTURE_TABLE = { types: FIXTURE_TYPES };
@@ -1037,6 +1067,39 @@ function checkSounds(run) {
     "repères : une phase, la balise de la bille active, à son emplacement",
     [{ atMs: 0, sound: "beacon", marble: "aging_flick", place: slotPlace("apex") }],
     eventCues([{ type: "phase", slot: "apex", marble: "aging_flick" }], {}, settings, FIXTURE_TABLE)
+  );
+
+  // Les sons d'usure : à l'emplacement de la bille touchée, seulement quand l'usure
+  // change ou que la Fêlure retire la bille ; plusieurs, l'un après l'autre ; la
+  // bille retirée par une Fêlure part après le son de sa fêlure.
+  const wearEvent = (type, slot, marble, applied, wear, maxWear = 3) => ({ type, slot, marble, amount: 1, applied, wear, maxWear });
+  run.same(
+    "usure : le Polissage, à l'emplacement de la bille polie",
+    [{ atMs: 0, sound: "polish", marble: "aging_flick", place: slotPlace("leftBase") }],
+    eventCues([wearEvent("polished", "leftBase", "aging_flick", 1, 0)], {}, settings, FIXTURE_TABLE)
+  );
+  run.same("usure : un Polissage sans effet reste muet", [], eventCues([wearEvent("polished", "leftBase", "aging_flick", 0, 0)], {}, settings, FIXTURE_TABLE));
+  run.same(
+    "usure : la Fêlure, à l'emplacement de la bille fêlée",
+    [{ atMs: 0, sound: "crack", marble: "one_shot", place: slotPlace("apex") }],
+    eventCues([wearEvent("cracked", "apex", "one_shot", 1, 1)], {}, settings, FIXTURE_TABLE)
+  );
+  run.same(
+    "usure : plusieurs sons d'un geste, l'un après l'autre",
+    ["polish@0", "crack@120"],
+    eventCues([wearEvent("polished", "leftBase", "aging_flick", 1, 0), wearEvent("cracked", "apex", "one_shot", 1, 1)], {}, settings, FIXTURE_TABLE).map((cue) => `${cue.sound}@${cue.atMs}`)
+  );
+  const crackedOut = eventCues(
+    [wearEvent("cracked", "apex", "one_shot", 1, 3), { type: "removed", slot: "apex", marble: "one_shot", cause: "wear" }, { type: "discarded", slot: "apex", marble: "one_shot", cause: "wear" }],
+    {},
+    settings,
+    FIXTURE_TABLE
+  );
+  run.same("usure : la bille retirée par la Fêlure part après sa fêlure", ["crack@0", "roll@150", "drop"], crackedOut.map((cue) => (cue.sound === "drop" ? cue.sound : `${cue.sound}@${cue.atMs}`)));
+  run.same(
+    "usure : une Fêlure qui retire une bille déjà au maximum se fait entendre",
+    ["crack"],
+    eventCues([wearEvent("cracked", "apex", "one_shot", 0, 3)], {}, settings, FIXTURE_TABLE).map((cue) => cue.sound)
   );
 
   // Stéréo : chaque bille piochée s'entend à sa place dans la main, de gauche à

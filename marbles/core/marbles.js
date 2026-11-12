@@ -27,11 +27,17 @@
 // `pendingChoice` : null, ou le CHOIX EN ATTENTE d'une cible au choix
 // (marbles/core/effects.js, en-tête), qui a SUSPENDU l'action en cours :
 //   { action, amount?, zones, pick, count, upTo, by, eligible, chosen, remaining,
-//     resume: { from, action, answers, seen, eventLimit? } }
+//     inTransit, resume: { from, action, answers, seen, eventLimit? } }
 // `action`, `amount` : l'action à appliquer aux cibles ; `by` : l'effet qui la
 // produit ({ trigger, slot, marble }) ; `eligible` : les cibles valides maintenant,
 // déjà choisies exclues ; `chosen` : celles déjà choisies, dans l'ordre ; une cible
 // est { zone: "hand", index, marble } ou { zone: "triangle", slot, marble }.
+// `inTransit` : les billes EN TRANSIT à l'instant du choix, sorties d'une zone et
+// pas encore arrivées ({ kind, marble, slot }, aujourd'hui la seule nature
+// "thrown", en cours de lancer, vers l'emplacement `slot`) ; souvent vide. Une
+// information pour l'interface, jamais une cible : elles n'appartiennent à aucune
+// zone. Elles n'existent que dans un choix en attente, l'état n'en a pas d'autre
+// trace.
 // REPRISE PAR REJEU : `resume.from` est l'état d'AVANT l'action suspendue,
 // `resume.action` cette action (pioche, pose, résolution), `resume.answers` les
 // réponses déjà données, dans l'ordre (answerOf : une cible avec sa bille, ou
@@ -315,6 +321,10 @@ function swapSlots(run, { a, b }) {
 function placeMarble(run, { handIndex, slot }) {
   const { marble, turnsInHand } = run.state.hand[handIndex];
   update(run, { hand: run.state.hand.filter((_, index) => index !== handIndex), throwsUsed: run.state.throwsUsed + 1 });
+  // En transit de sa sortie de la main à son arrivée sur l'emplacement : dans aucune
+  // zone, mais un choix ouvert entre-temps la connaît (transact, inTransit). Une
+  // action ne pose qu'une bille : la liste n'en a jamais qu'une.
+  run.inTransit = [{ kind: "thrown", marble, slot }];
   run.emit({ type: "flick", slot, marble, turnsInHand });
 
   const previous = run.state.triangle[slot];
@@ -331,6 +341,7 @@ function placeMarble(run, { handIndex, slot }) {
     if (run.state.triangle[slot] !== null) discardFromSlot(run, slot, previous.marble, "replacement");
   }
   update(run, { triangle: { ...run.state.triangle, [slot]: { marble, wear: 0 } } });
+  run.inTransit = [];
   run.emit({ type: "placed", slot, marble });
   if (previous !== null) run.emit({ type: "hit", slot, marble, replacement });
 }

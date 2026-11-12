@@ -632,6 +632,12 @@ export function transact(state, types, { eventLimit, blind = false, answers = []
     reactions: new Map(),
     answers,
     answerIndex: 0,
+    // Les billes EN TRANSIT : sorties d'une zone, pas encore arrivées dans la
+    // suivante ({ kind, marble, slot }). Dans aucune zone, donc jamais une cible ni
+    // un écouteur ; un choix qui s'ouvre pendant leur trajet les emporte, pour
+    // information (pendingChoice.inTransit). Seule nature aujourd'hui : "thrown",
+    // en cours de lancer (marbles/core/marbles.js/placeMarble).
+    inTransit: [],
   };
   const bus = createEventBus((event) => handleEvent(run, event), eventLimit, () => record({ type: "chainInterrupted" }));
   // Le journal s'écrit À L'ÉMISSION, dans l'ordre où l'état change : la file du bus
@@ -663,7 +669,8 @@ export function transact(state, types, { eventLimit, blind = false, answers = []
   } catch (error) {
     if (!(error instanceof ChoiceSuspension)) throw error;
     const resume = { from: state, action, answers, seen: run.journal.length, ...(eventLimit === undefined ? {} : { eventLimit }) };
-    return { ok: true, state: { ...run.state, pendingChoice: { ...error.request, resume } }, events: run.journal.slice(seen), error: null };
+    const pendingChoice = { ...error.request, inTransit: run.inTransit, resume };
+    return { ok: true, state: { ...run.state, pendingChoice }, events: run.journal.slice(seen), error: null };
   }
   const result = { ok: true, state: run.state, events: run.journal.slice(seen), error: null };
   return blind ? { ...result, uncertain: run.uncertain, choiceDependent: run.choiceDependent } : result;

@@ -88,6 +88,7 @@
   "marbles.choice.ended.exhausted": "Plus rien à choisir.",
   "marbles.choice.finish": "Terminer",
   "marbles.choice.finish_hint": "T pour terminer.",
+  "marbles.choice.in_transit.thrown": "En approche : {name}.",
   "marbles.choice.more": "Choisissez encore {target}.",
   "marbles.choice.more_up_to": "Vous pouvez choisir encore {target}, ou terminer avec T.",
   "marbles.choice.not_eligible": "Non éligible.",

@@ -21,8 +21,8 @@ export function collisionStrength(striker, struck, { types, collision = MARBLES_
 
 
 // La ligne de temps d'un geste : les repères déjà posés, l'échéance de la
-// prochaine balise de pioche (la suivante attend la précédente) et celle du
-// prochain départ d'une bille usée. Un repère : { atMs, sound, marble?, place?,
+// prochaine balise de pioche (la suivante attend la précédente), celle du
+// prochain départ d'une bille usée et celle du prochain son d'usure. Un repère : { atMs, sound, marble?, place?,
 // gain? } (`gain` multiplie le volume de sa catégorie) ; un roulement : { atMs,
 // sound: "roll", marble, path, style, durationMs }, `path` étant la suite des places
 // par où passe la bille ; une collision : { atMs, sound: "collision", marble (la
@@ -31,6 +31,7 @@ function createTimeline(settings, { rolls, places }) {
   const cues = [];
   let nextDrawAt = 0;
   let nextWornAt = 0;
+  let nextWearAt = 0;
   const cue = (atMs, sound, marble, place, gain) => ({
     atMs,
     sound,
@@ -88,6 +89,19 @@ function createTimeline(settings, { rolls, places }) {
         const arrival = this.roll(0, placed.marble, slots.map(slotPlace), "rotation");
         cues.push(cue(arrival, "drop", placed.marble, slotPlace(destination), rolls.rotation.dropGain));
       }
+    },
+    // Un son d'usure (`polish`, `crack`) à l'emplacement de la bille touchée ;
+    // plusieurs, l'un après l'autre. -> son échéance.
+    wear(sound, marble, slot) {
+      const atMs = nextWearAt;
+      cues.push(cue(atMs, sound, marble, slotPlace(slot)));
+      nextWearAt += settings.wearSoundIntervalMs;
+      return atMs;
+    },
+    // Les départs vers la défausse attendent `atMs` au moins : une bille retirée
+    // par une Fêlure part après le son de sa fêlure.
+    holdDepartures(atMs) {
+      nextWornAt = Math.max(nextWornAt, atMs);
     },
     // Une bille usée part à la défausse ; plusieurs, l'une après l'autre.
     worn(marble, slot) {
@@ -199,12 +213,21 @@ export const MARBLE_EVENT_CUES = {
     context.struck = null;
   },
   hit: null,
-  // Le Final d'une bille usée, le Polissage, la Fêlure, une cible vide : des points
-  // d'accroche, muets pour l'instant. Une bille retirée par une Fêlure part comme
-  // une bille usée (`discarded`).
+  // Le Polissage et la Fêlure : leur son à l'emplacement de la bille touchée,
+  // seulement quand l'usure change (un Polissage d'une bille à 0 est muet), ou
+  // quand la Fêlure retire la bille, qui part alors à la défausse comme une bille
+  // usée (`discarded`), crackToOutMs après sa fêlure. Le Final d'une bille usée et
+  // une cible vide : des points d'accroche, muets pour l'instant.
   final: null,
-  polished: null,
-  cracked: null,
+  polished: (event, timeline) => {
+    if (event.applied > 0) timeline.wear("polish", event.marble, event.slot);
+  },
+  cracked: (event, timeline, context, settings) => {
+    const retires = event.wear >= event.maxWear;
+    if (event.applied === 0 && !retires) return;
+    const atMs = timeline.wear("crack", event.marble, event.slot);
+    if (retires) timeline.holdDepartures(atMs + settings.crackToOutMs);
+  },
   targetEmpty: null,
   // La bille active fait entendre sa voix quand vient la phase de son emplacement,
   // avec l'étape de la séquence qui dit ce qu'elle produit.

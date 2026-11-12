@@ -111,12 +111,15 @@ export function targetLabel(target, name) {
   return target.zone === "hand" ? `main ${target.index + 1} : ${marble}` : `${slotLabel(target.slot)} : ${marble}`;
 }
 
-// Le choix en attente, d'une ligne : l'action, le mode, ce qui est fait, les cibles.
+// Le choix en attente, d'une ligne : l'action, le mode, ce qui est fait, les cibles,
+// puis les billes en transit (en cours de lancer), jamais des cibles.
 export function choiceLine(pending, name) {
   const mode = pending.upTo ? `jusqu'à ${pending.count}` : `${pending.count} obligatoire${pending.count > 1 ? "s" : ""}`;
   const chosen = pending.chosen.length === 0 ? "" : ` Déjà choisies : ${pending.chosen.map((target) => targetLabel(target, name)).join(", ")}.`;
   const finish = pending.upTo ? ", ou terminer" : "";
-  return `Choix en attente : ${pending.action}, ${mode}, encore ${pending.remaining}, par ${marbleLabel(pending.by.marble, name)} (${pending.by.trigger}).${chosen} Cibles : ${pending.eligible.map((target) => targetLabel(target, name)).join(", ")}${finish}.`;
+  const transit =
+    pending.inTransit.length === 0 ? "" : ` En transit : ${pending.inTransit.map((moving) => `${marbleLabel(moving.marble, name)} vers ${slotLabel(moving.slot)}`).join(", ")}.`;
+  return `Choix en attente : ${pending.action}, ${mode}, encore ${pending.remaining}, par ${marbleLabel(pending.by.marble, name)} (${pending.by.trigger}).${chosen} Cibles : ${pending.eligible.map((target) => targetLabel(target, name)).join(", ")}${finish}.${transit}`;
 }
 
 // Les effets d'une bille du pot (les moments En poche).

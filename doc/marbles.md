@@ -234,7 +234,9 @@ Toute pose d'une bille A commence par sa **Chiquenaude** : A quitte la main (son
 tours en main avec elle) et, **en cours de lancer**, n'est ni en main ni sur le triangle ;
 elle ne compte ni dans la main (une Pioche y trouve sa place libre) ni parmi les billes
 actives (la source `activeSize`) ; une régénération pendant son lancer ne lui donne pas de
-Trouvaille. L'emplacement visé se lit ensuite : sur un emplacement
+Trouvaille. Elle est **en transit** (voir « Cibles au choix », `inTransit`) : dans aucune
+zone, jamais une cible, mais un choix ouvert pendant son lancer la connaît, avec
+l'emplacement qu'elle vise. L'emplacement visé se lit ensuite : sur un emplacement
 vide, A le rejoint, sans Éjection ni Tic. Sur un emplacement occupé par une bille B, dans
 cet ordre, visible au journal :
 
@@ -595,9 +597,21 @@ résolution, réaction du pot…) : le réducteur rend l'état du déroulé à c
 pendingChoice: {
   action, amount?, zones, pick, count, upTo, by,   // la question, l'effet qui la pose
   eligible, chosen, remaining,                     // cibles valides, déjà choisies, reste
+  inTransit,                                       // billes en transit, pour information
   resume: { from, action, answers, seen, eventLimit? },
 }
 ```
+
+**Billes en transit** (`inTransit`) : les billes sorties d'une zone et pas encore arrivées
+dans la suivante à l'instant du choix, `[{ kind, marble, slot }]`, souvent vide. Elles
+n'appartiennent à aucune zone : jamais une cible ni un écouteur, l'interface les annonce
+seulement. Une seule nature aujourd'hui, `"thrown"`, la bille en cours de lancer (de sa
+sortie de la main à son arrivée, `placeMarble`), vers l'emplacement `slot`. « En partance »
+(une bille qui aurait quitté une zone sans être arrivée dans la suivante) est couverte
+par la règle sans cas aujourd'hui : un départ du triangle arrive aussitôt à la défausse
+ou au pot. Le déroulé les tient (`run.inTransit`, `marbles/core/run.js`/`transact`) et les
+copie dans le choix qui suspend l'action : l'état n'en a pas d'autre trace, elles ne
+peuvent donc exister hors d'un choix en attente.
 
 Une cible : `{ zone: "hand", index, marble }` ou `{ zone: "triangle", slot, marble }`.
 `resume.from` est l'état d'AVANT l'action suspendue, `resume.action` cette action,
@@ -977,6 +991,11 @@ active. » (« Vous pouvez choisir encore une bille active, ou terminer avec T. 
 - **Triangle** : la même forme et la même navigation que l'écran habituel (pointe en haut,
   bases en dessous). Les emplacements non éligibles restent accessibles, pour garder le
   repère, mais se disent « Non éligible. » et Entrée y bloque (son de blocage).
+- **Bille en transit** (`pendingChoice.inTransit`) : l'emplacement que vise une bille en
+  cours de lancer l'annonce après son contenu, avant « Non éligible. » s'il y a lieu :
+  « Agate, calot, pointe, usure 2 sur 3. En approche : loupe. », « Base droite, vide. En
+  approche : loupe. Non éligible. » (`marbles.choice.in_transit.<kind>`). Jamais une cible ;
+  rien de plus dans un choix de la main seule, où le triangle n'est pas parcouru.
 - **Les deux zones** : on passe de l'une à l'autre comme d'habitude, le nom de la zone
   annoncé ; une seule zone : l'autre n'existe pas pour le curseur.
 - **Entrée** choisit ; **T** termine un choix « jusqu'à N » (partout, sur le triangle
@@ -1219,8 +1238,15 @@ et quand, sur la ligne de temps du geste (`eventCues`) :
   suite des autres départs. La perte (`lost`) et l'étape du pot (`potResolution`) sont des
   points d'accroche muets, la perte sans place imposée. Son
   Final n'a pas encore de son propre : l'évènement `final` est un point d'accroche muet
-  (`MARBLE_EVENT_CUES`), comme `polished`, `cracked` et `targetEmpty` ; une bille retirée
-  par une Fêlure part comme une bille usée ;
+  (`MARBLE_EVENT_CUES`), comme `targetEmpty` ;
+- Polissage et Fêlure (`polished`, `cracked`) : leur son (`MARBLES_AUDIO.polish`,
+  `marble_polishing` ; `MARBLES_AUDIO.crack`, `marble_cracking`), le même pour tous les
+  calibres, à l'emplacement de la bille touchée, au volume de l'interface. Seulement quand
+  l'usure change (`applied`) : un Polissage d'une bille déjà à 0 reste muet ; une Fêlure
+  qui retire une bille déjà à son maximum se fait entendre. Plusieurs dans un même geste
+  (un choix de 2 billes) se suivent à `wearSoundIntervalMs` (120 ms). Une bille qu'une
+  Fêlure retire part comme une bille usée, `crackToOutMs` (150 ms) après le son de sa
+  fêlure, pour qu'on l'entende avant le roulement ;
 - rotation : les billes du triangle roulent ensemble, chacune vers l'emplacement suivant
   (l'ordre du cœur, `ROTATION_NEXT`), puis s'y calent avec une chute discrète ; un
   emplacement vide reste muet. Pas de son de rotation à part : les billes suffisent.
@@ -1279,9 +1305,10 @@ frappeuse sur frappée, élevé à `weightExponent` (0,3). Un calot sur une mini
 1,39, une minibille sur un calot à 0,72, deux billes de même calibre à 1. La force règle le
 volume des deux sons et la vitesse de départ de la délogée (`collisionStrength`).
 
-**Variations de ton** : collisions, chutes et roulements jouent chacun à une vitesse de
-lecture tirée au hasard autour de 1 (`MARBLES_PITCH_VARIATION` : ±4 %, ±3 %, ±2 %, le
-roulement une fois par trajet), pour que deux sons de suite ne soient jamais identiques.
+**Variations de ton** : collisions, chutes, roulements, polissages et fêlures jouent chacun
+à une vitesse de lecture tirée au hasard autour de 1 (`MARBLES_PITCH_VARIATION` : ±4 %,
+±3 %, ±2 %, ±3 %, ±3 %, le roulement une fois par trajet), pour que deux sons de suite ne
+soient jamais identiques.
 Jamais les balises : la balise est l'identité de la bille. Un hasard de rendu, que la
 simulation ne voit pas.
 
@@ -1292,8 +1319,8 @@ suivante coupe la précédente. Une butée, qui laisse le curseur en place, n'en
 
 **Espace** : un son de bille s'entend à sa place sur la table (`MARBLES_SOUND_PLACES`,
 `renderAt`), en stéréo et en volume, jamais en HRTF. La balise d'une bille piochée s'entend à
-sa place dans la main, la cascade de pioche va donc de gauche à droite ; la chute d'une pose
-et la balise de phase à l'emplacement ; la balise au survol là où est le curseur ; un
+sa place dans la main, la cascade de pioche va donc de gauche à droite ; la chute d'une pose,
+la balise de phase, le Polissage et la Fêlure à l'emplacement ; la balise au survol là où est le curseur ; un
 roulement d'une place à l'autre. Le brassage et les menus du sac et de la défausse restent au
 centre, secs.
 

@@ -32,7 +32,12 @@ La partie se termine après la résolution du dernier tour, le dixième aujourd'
 
 Une bille ne garde rien en changeant de zone : en quittant le triangle, elle perd son usure et son bonus ; en quittant la main, elle perd son compteur de tours en main.
 
-Une bille en cours de lancer, entre la main et le triangle, n'est ni en main ni active.
+### Les billes en transit
+
+Une bille **en transit** a quitté une zone sans être encore arrivée dans la suivante. Elle n'appartient à aucune zone : elle n'est ni en main ni active, et elle n'est jamais proposée comme cible. Le jeu l'annonce seulement, pour information (section 9, « Le choix du joueur »).
+
+- **En cours de lancer** : la bille lancée, entre la main et le triangle, pendant sa Chiquenaude et jusqu'à son arrivée sur l'emplacement.
+- **En partance** : une bille qui aurait quitté une zone pour une autre sans y être encore. La règle la couvre, mais aucun cas n'existe aujourd'hui : une bille qui quitte le triangle arrive aussitôt à la défausse ou au pot.
 
 ### Les calibres
 
@@ -262,6 +267,7 @@ Certains effets laissent le joueur choisir leur cible : une bille de sa main, un
 - L'effet s'applique ensuite à chaque cible, dans l'ordre des choix.
 - La question nomme la bille et le moment qui la posent : « Tic de gorille : choisissez une bille de votre main à empocher. », « Final de porcelaine : choisissez jusqu'à 2 billes actives à polir. ».
 - Le jeu attend le choix : rien d'autre ne peut se faire tant qu'il n'est pas fait. Pendant la résolution, elle s'arrête sur la question et reprend après le choix.
+- Une bille en transit n'est jamais proposée (section 2). Pendant un choix sur le triangle, l'emplacement vers lequel se dirige une bille en cours de lancer l'annonce après son contenu : « Agate, calot, pointe, usure 2 sur 3. En approche : loupe. ». Un emplacement vide l'annonce de même : « Pointe, vide. En approche : loupe. ».
 - Dans un choix « jusqu'à N », Échap valide la sélection en cours, comme Terminer. Dans un choix obligatoire, Échap redit la question.
 
 ### Les cibles vides

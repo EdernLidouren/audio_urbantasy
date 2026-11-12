@@ -161,6 +161,17 @@ function checkChoices(run) {
   const inPot = reduce(reacting("potChooser"), { type: "place", handIndex: 0, slot: "apex" });
   run("reprise, réaction du pot : suspendue à la réaction", "pocketReaction", inPot.state.pendingChoice.by.trigger);
   run("reprise, réaction du pot : la bille lancée pas encore posée", false, inPot.events.some((event) => event.type === "placed"));
+
+  // EN TRANSIT : la bille en cours de lancer, dans aucune zone, jamais une cible,
+  // mais connue du choix ouvert pendant son trajet, avec l'emplacement qu'elle vise.
+  run.same("transit : la bille en cours de lancer, vers son emplacement", [{ kind: "thrown", marble: "flicker", slot: "apex" }], inPot.state.pendingChoice.inTransit);
+  run("transit : ni en main ni sur le triangle", false, inPot.state.hand.some((held) => held.marble === "flicker") || Object.values(inPot.state.triangle).some((slot) => slot?.marble === "flicker"));
+  run("transit : jamais une cible", false, inPot.state.pendingChoice.eligible.some((target) => target.marble === "flicker"));
+  run.same("transit : un aller-retour JSON ne change rien", inPot.state, JSON.parse(JSON.stringify(inPot.state)));
+  run.same("transit : aucune au Tic, la bille déjà posée", [], opened.state.pendingChoice.inTransit);
+  run.same("transit : aucune pendant une résolution", [], suspended.state.pendingChoice.inTransit);
+  const reachedChoice = (state) => state.pendingChoice?.inTransit ?? null;
+  run("transit : arrivée, plus rien n'attend", null, reachedChoice(answer(inPot.state, "leftBase").state));
   const potResumed = answer(inPot.state, "leftBase");
   const potFixed = reduce(reacting("potFixed"), { type: "place", handIndex: 0, slot: "apex" });
   run("reprise, réaction du pot : même journal qu'une cible fixe", strip(potFixed.events), strip([...inPot.events, ...potResumed.events]));

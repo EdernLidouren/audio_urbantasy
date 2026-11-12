@@ -13,7 +13,7 @@ import { SLOTS, legalActions } from "../core/marbles.js";
 import { JOURNAL_EVENTS } from "../core/content.js";
 import { throws } from "../../lib/check.js";
 import { parseCommand } from "../tools/commands.js";
-import { formatEvent, formatState } from "../tools/format.js";
+import { choiceLine, formatEvent, formatState } from "../tools/format.js";
 import { applyActions, buildState } from "../tools/state-builder.js";
 import { PLAYERS, bestChoice, bestPlan, publicView } from "../tools/players.js";
 import { MARBLES_DRAWN_VALUE } from "../tools/drawn-value.js";
@@ -102,6 +102,21 @@ function checkCommandsAndFormat(run) {
   run.same("commande : prévision du triangle", { kind: "forecast", action: null }, parseCommand("r"));
   run("commande : usage faux", "error", parseCommand("poser x pointe").kind);
   run("commande : propre à l'outil", "journal", parseCommand("journal json").word);
+
+  // Le choix en attente : les billes en transit à la fin, jamais parmi les cibles.
+  const pending = {
+    action: "crack",
+    count: 1,
+    upTo: false,
+    remaining: 1,
+    by: { trigger: "pocketReaction", slot: null, marble: "a" },
+    chosen: [],
+    eligible: [{ zone: "triangle", slot: "apex", marble: "b" }],
+    inTransit: [{ kind: "thrown", marble: "c", slot: "rightBase" }],
+  };
+  const line = choiceLine(pending, (id) => id);
+  run("ligne de choix : la bille en transit et l'emplacement qu'elle vise", true, line.endsWith(". En transit : c vers base droite."));
+  run("ligne de choix : sans transit, rien de plus", false, choiceLine({ ...pending, inTransit: [] }, (id) => id).includes("transit"));
 
   // Chaque type d'évènement d'une vraie partie a sa ligne lisible, jamais le repli
   // JSON.

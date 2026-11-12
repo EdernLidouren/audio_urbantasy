@@ -17,7 +17,7 @@ import { SLOTS } from "../../core/marbles.js";
 
 // --- Validation au chargement ---
 
-const TIMING_SETTINGS = ["shuffleToDrawMs", "drawSoundIntervalMs", "swapSoundDelayMs"];
+const TIMING_SETTINGS = ["shuffleToDrawMs", "drawSoundIntervalMs", "swapSoundDelayMs", "wearSoundIntervalMs", "crackToOutMs"];
 
 // Échoue au chargement : un calibre sans profil, ou un profil incomplet, se
 // découvrirait sinon en pleine partie, en silence. Le calibre de chaque bille, lui,
@@ -95,7 +95,7 @@ export function validateCollision(collision, sizes = MARBLE_SIZES) {
 
 // Une variation au-delà de la moitié ferait d'un son un autre son.
 export function validatePitchVariation(variation) {
-  for (const sound of ["impact", "drop", "roll"]) checkNumber(variation[sound], `pitchVariation.${sound}`, 0, 0.5);
+  for (const sound of ["impact", "drop", "roll", "polish", "crack"]) checkNumber(variation[sound], `pitchVariation.${sound}`, 0, 0.5);
 }
 
 validateSoundPlaces(MARBLES_SOUND_PLACES);

@@ -36,6 +36,7 @@
   "marbles.choice.ended.exhausted": "Nothing left to choose.",
   "marbles.choice.finish": "Finish",
   "marbles.choice.finish_hint": "T to finish.",
+  "marbles.choice.in_transit.thrown": "Incoming: {name}.",
   "marbles.choice.more": "Still to choose: {target}.",
   "marbles.choice.more_up_to": "You may still choose {target}, or finish with T.",
   "marbles.choice.not_eligible": "Not eligible.",

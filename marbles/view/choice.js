@@ -8,7 +8,9 @@
 // - TRIANGLE : la même géométrie que l'écran (pointe en haut, les deux bases en
 //   dessous) et la même navigation (marbles/view/navigation.js). Les emplacements
 //   non éligibles restent accessibles, pour garder le repère, mais se disent « Non
-//   éligible. » et ne se valident pas.
+//   éligible. » et ne se valident pas. L'emplacement que vise une bille EN TRANSIT
+//   (en cours de lancer, pendingChoice.inTransit) l'annonce après son contenu,
+//   « En approche : loupe. », pour information : elle n'est jamais une cible.
 // - Les deux zones : on passe de l'une à l'autre comme d'habitude, le nom de la zone
 //   annoncé ; une seule : l'autre n'existe pas pour le curseur.
 // Le curseur est celui de l'écran ({ place, handIndex, lastBase }) ; dans la main,
@@ -17,7 +19,7 @@
 import { SLOTS } from "../core/marbles.js";
 import { formatMenuPosition } from "../../lib/menu.js";
 import { cursorOn, stepCursor, zoneOf } from "./navigation.js";
-import { describeMarbleInList, describeSlotFocus } from "./narration.js";
+import { describeMarbleInList, describeSlotFocus, marbleName } from "./narration.js";
 
 // Les zones du choix en attente.
 function hasZone(pending, zone) {
@@ -85,9 +87,18 @@ export function choiceMarbleAt(game, cursor) {
   return placed === null ? null : { marble: placed.marble, turnsInHand: 0 };
 }
 
+// Les billes en transit qui visent `slot`, dites après son contenu : « En approche :
+// loupe. ». Rien si aucune ne le vise. La règle (qui est en transit, et vers où) est
+// celle du core ; la vue ne fait que la dire.
+function approachLines(pending, slot, t) {
+  return pending.inTransit
+    .filter((transit) => transit.slot === slot)
+    .map((transit) => t(`marbles.choice.in_transit.${transit.kind}`, { name: marbleName(transit.marble, t) }));
+}
+
 // Ce que dit le curseur pendant un choix : une bille éligible de la main (sa
-// position comptée dans le menu du choix), « Terminer », ou un emplacement, suivi de
-// « Non éligible. » s'il ne se valide pas.
+// position comptée dans le menu du choix), « Terminer », ou un emplacement, suivi
+// des billes en approche, puis de « Non éligible. » s'il ne se valide pas.
 export function choiceFocusLine(game, cursor, rules, t) {
   const pending = game.pendingChoice;
   if (cursor.place === "hand") {
@@ -99,8 +110,9 @@ export function choiceFocusLine(game, cursor, rules, t) {
     }
     return describeMarbleInList(option.marble, cursor.handIndex, options.length, rules, t);
   }
-  const line = describeSlotFocus(game, cursor.place, rules, t);
-  return isSlotEligible(pending, cursor.place) ? line : `${line} ${t("marbles.choice.not_eligible")}`;
+  const parts = [describeSlotFocus(game, cursor.place, rules, t), ...approachLines(pending, cursor.place, t)];
+  if (!isSlotEligible(pending, cursor.place)) parts.push(t("marbles.choice.not_eligible"));
+  return parts.join(" ");
 }
 
 // La réponse qu'Entrée envoie sous ce curseur : { action } (l'action « choisir » du

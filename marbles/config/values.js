@@ -30,10 +30,15 @@ export const MARBLES_SETTINGS = {
   // joueur n'attend jamais. Après un brassage du sac, la première balise de
   // pioche part au bout de shuffleToDrawMs, puis une balise toutes les
   // drawSoundIntervalMs ; un échange fait rouler la bille choisie, puis
-  // l'autre swapSoundDelayMs plus tard.
+  // l'autre swapSoundDelayMs plus tard. Les sons d'usure (Polissage, Fêlure)
+  // d'un même geste se suivent à wearSoundIntervalMs ; une bille qu'une Fêlure
+  // retire part à la défausse crackToOutMs après le son de sa fêlure, qu'on
+  // l'entende avant le roulement.
   shuffleToDrawMs: 900,
   drawSoundIntervalMs: 350,
   swapSoundDelayMs: 150,
+  wearSoundIntervalMs: 120,
+  crackToOutMs: 150,
   // Après qu'Entrée a passé la séquence de résolution, un second Entrée est ignoré
   // pendant skipGuardMs : pressé avant que le lecteur d'écran ait dit la question
   // d'un choix ou la fin de partie, il choisirait ou quitterait sans qu'on l'ait
@@ -116,6 +121,8 @@ export const MARBLES_PITCH_VARIATION = {
   impact: 0.04,
   drop: 0.03,
   roll: 0.02,
+  polish: 0.03,
+  crack: 0.03,
 };
 
 // OÙ S'ENTEND chaque place de la table (marbles/view/sounds/space.js/renderAt) :
@@ -210,11 +217,15 @@ export const MARBLES_ROLLS = {
   outStaggerMs: 200,
 };
 
-// Les sons de l'écran des billes qui ne sont pas ceux d'une bille : la musique
-// (en boucle s'il n'y a qu'un morceau, sinon enchaînée) et le brassage du sac.
+// Les sons de l'écran des billes qui ne sont pas la voix d'un calibre : la musique
+// (en boucle s'il n'y a qu'un morceau, sinon enchaînée), le brassage du sac, et
+// les sons d'usure, les mêmes pour tous les calibres, joués à l'emplacement de la
+// bille touchée : le Polissage (polish) et la Fêlure (crack).
 export const MARBLES_AUDIO = {
   music: "assets/musics/marbles_classic",
   shuffle: "assets/sounds/marbles/marbles_shuffling",
+  polish: "assets/sounds/marbles/marble_polishing",
+  crack: "assets/sounds/marbles/marble_cracking",
 };
 
 // Les PHASES, déclarées UNE fois : l'effet de base ou de pointe d'une bille, joué

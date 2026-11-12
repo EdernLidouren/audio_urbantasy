@@ -5,17 +5,18 @@
 // et la partie qu'il laisse, touche après touche, l'horloge avancée à la main.
 // Prendre et poser, l'échange, la séquence de résolution (une étape par battement,
 // Retour arrière, blocage, passage et sa garde), un menu qui fige tout, un choix au
-// milieu d'une résolution, la fin de partie. Sur la table de billes des
+// milieu d'une résolution, un choix pendant un lancer, la fin de partie. Sur la table de billes des
 // vérifications (marbles/checks/fixtures/marbles.js).
 // Domaine `nodeOnly` (core/checks/index.js) : sauté dans la console du jeu, où il
 // écrirait dans les vraies régions d'annonce. Lancées par
 // `node tools/run-checks.js marbles-screen`.
 
 import { MARBLES_SETTINGS } from "../config/values.js";
+import { speed } from "../content/effects.js";
 import { pauseAfter } from "../view/sequence.js";
 import { fixtureRules } from "./fixtures/marbles.js";
 import { openScreenBench } from "./fixtures/screen-bench.js";
-import { inHand, marblesPlayState, placed } from "./helpers.js";
+import { fabricatedRules, inHand, marblesPlayState, placed } from "./helpers.js";
 
 // Les règles de la table des vérifications.
 const rules = fixtureRules();
@@ -37,6 +38,7 @@ export default function checkMarblesScreen(run) {
   run.section("séquence de résolution", checkSequence);
   run.section("menu par-dessus", checkMenuFreezes);
   run.section("choix pendant une résolution", checkChoiceDuringResolution);
+  run.section("choix pendant un lancer", checkChoiceDuringThrow);
   run.section("fin de partie", checkGameEnd);
 }
 
@@ -227,6 +229,45 @@ function checkChoiceDuringResolution(run) {
     run("Terminer : plus de choix en attente", null, bench.game().pendingChoice);
     run("Terminer : le tour suivant pioché", "3 play", `${bench.game().turn} ${bench.game().stage}`);
     run("Terminer : la séquence finit sur le début du tour suivant", "event.turn_started{turn: 3}", bench.said.at(-1));
+  } finally {
+    bench.close();
+  }
+}
+
+// Un choix ouvert pendant un lancer (une bille du pot qui réagit à la Chiquenaude) :
+// la bille en cours de lancer est en transit. L'emplacement qu'elle vise l'annonce
+// après son contenu, et Entrée n'y choisit rien ; la réponse la fait arriver. Billes
+// fabriquées : aucune de la table des vérifications n'ouvre de choix à ce moment.
+function checkChoiceDuringThrow(run) {
+  const choose = { type: "choice", zones: ["triangle"], pick: "marble", count: 1 };
+  const made = fabricatedRules({
+    plain: { apex: [speed(1)] },
+    flicker: { flick: [speed(1)] },
+    potCrack: { pocketed: { flick: [{ action: "crack", amount: 1, target: choose }] } },
+  });
+  const state = marblesPlayState(made, { hand: inHand(["flicker"]), pot: ["potCrack"], triangle: { leftBase: placed("plain"), rightBase: null, apex: placed("plain") } });
+  const bench = openScreenBench(made, state);
+  try {
+    // Prise, le curseur sur le premier emplacement vide (base droite), confirmée.
+    bench.key("Enter");
+    bench.key("Enter");
+    bench.key("End");
+    bench.key("Enter");
+    for (let pulse = 0; pulse < 5; pulse++) bench.advance(LONG_MS);
+    run.same("lancer : le choix attend, la bille en transit", [{ kind: "thrown", marble: "flicker", slot: "rightBase" }], bench.game().pendingChoice?.inTransit);
+    bench.key("ArrowRight");
+    run(
+      "lancer : l'emplacement visé dit la bille en approche, puis Non éligible",
+      "slot_line.empty{slot: slot.rightBase} choice.in_transit.thrown{name: <flicker>} choice.not_eligible",
+      bench.said.at(-1)
+    );
+    bench.key("Enter");
+    run("lancer : Entrée n'y choisit rien", true, bench.game().pendingChoice !== null);
+    bench.key("ArrowLeft");
+    bench.key("Enter");
+    for (let pulse = 0; pulse < 5; pulse++) bench.advance(LONG_MS);
+    run("réponse : plus de choix en attente", null, bench.game().pendingChoice);
+    run.same("réponse : la bille lancée arrivée", placed("flicker"), bench.game().triangle.rightBase);
   } finally {
     bench.close();
   }
