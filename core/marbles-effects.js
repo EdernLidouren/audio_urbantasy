@@ -5,8 +5,8 @@
 // core/marbles-run.js.
 //
 // AJOUTER une action ou une condition : une entrée dans CLAUSE_ACTIONS ou
-// CONDITIONS, et ses textes dans la vue (view/marbles/narration.js, ACTION_TEXTS ou
-// CONDITION_TEXTS). AJOUTER une source de montant : une entrée dans AMOUNT_SOURCES,
+// CONDITIONS, et ses textes dans la vue (view/marbles/narration/effects.js,
+// ACTION_TEXTS ou CONDITION_TEXTS). AJOUTER une source de montant : une entrée dans AMOUNT_SOURCES,
 // textes compris, rien d'autre ; chaque valeur de partie en est une d'office, par la
 // source `tally` (core/marbles-counters.js). Une cible est un emplacement, rien pour la bille
 // elle-même, ou un CHOIX du joueur (plus bas).
@@ -186,7 +186,7 @@ export function isAll(target) {
 // Les FILTRES d'une cible « toutes » (en-tête), déclarés ici et nulle part ailleurs,
 // sur le modèle des conditions : `fields`, `validate`, et `test(filter, marble,
 // types)`, la bille passe-t-elle le filtre. Ajouter un filtre (la matière…) : une
-// entrée ici et son texte dans la vue (view/marbles/narration.js/FILTER_TEXTS).
+// entrée ici et son texte dans la vue (view/marbles/narration/effects.js/FILTER_TEXTS).
 export const TARGET_FILTERS = {
   // La bille est de calibre `size` (config/marbles-values.js : SMALL, MEDIUM, LARGE).
   size: {
@@ -242,7 +242,7 @@ function addAmount(values, clause) {
 //             à sa quantité réelle. Une action de valeur sans mot-clé (Vitesse,
 //             Masse) a ses gains et ses pertes.
 // Le `kind` "marble" : une action sur une bille. Ses textes :
-// view/marbles/narration.js/ACTION_TEXTS.
+// view/marbles/narration/effects.js/ACTION_TEXTS.
 
 // OÙ EST LA BILLE ELLE-MÊME quand son effet joue : sa ZONE, selon la valeur `marble`
 // de son déclencheur (config/marbles-values.js/MARBLE_TRIGGERS ; "pot" pour un moment

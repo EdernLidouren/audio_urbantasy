@@ -1,6 +1,6 @@
 // Jeu des billes : l'HISTORIQUE, les messages de jeu du tour précédent (touche L).
 // Pur : aucune annonce ni écran ; l'écran (view/marbles/screen.js) lui passe les
-// étapes qu'il fait dire (view/marbles/narration.js/buildSteps, resolutionSteps)
+// étapes qu'il fait dire (view/marbles/narration/journal.js/buildSteps, resolutionSteps)
 // et ouvre le menu de ce qu'il rend.
 //
 // Ne sont retenus que les MESSAGES DE JEU, ceux des étapes : pose, échange, effets,

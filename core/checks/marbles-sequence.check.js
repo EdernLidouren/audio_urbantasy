@@ -3,7 +3,7 @@
 // ses étapes sur des parties jouées, ce qu'elles disent (gabarits et valeurs),
 // l'égalité entre l'Impact prévu et l'Impact annoncé, la file d'étapes
 // (view/marbles/sequence.js) : pauses, avance, passage, sans effet sur la partie ;
-// et l'historique qui en retient les messages (view/marbles/history.js, touche L).
+// la taille de la main à chaque étape (view/marbles/resolution.js) ; et l'historique qui en retient les messages (view/marbles/history.js, touche L).
 // Sur la table de billes des vérifications (core/checks/fixtures/marbles.js), avec
 // la traduction de test (helpers.js/keyText) : les CLÉS et leurs paramètres, jamais
 // la rédaction des textes ; les phrases complètes ont leurs témoins (domaine
@@ -22,6 +22,7 @@ import {
   validatePauseSettings,
 } from "../../view/marbles/sequence.js";
 import { EMPTY_HISTORY, recordSteps } from "../../view/marbles/history.js";
+import { choicePromptStep, withHandSizes } from "../../view/marbles/resolution.js";
 import { historyMenu } from "../../view/marbles/history-screen.js";
 import { throws } from "../../lib/check.js";
 import { CHOICELESS_TYPES, FIXTURE_BAG, fixtureRules } from "./fixtures/marbles.js";
@@ -955,8 +956,32 @@ function checkQueue(run) {
   run.same("file : dite jusqu'au bout, toutes les étapes dans l'ordre", ["un", "deux", "trois"], playOut(steps).map((step) => step.text));
 }
 
+// La présentation de la résolution (view/marbles/resolution.js), sa part pure : la
+// main de chaque étape, remontée depuis la main finale, et la question d'un choix
+// en étape. Son déroulé, lui, se joue par le banc d'essai de l'écran (domaine
+// marbles-screen).
+function checkPresentation(run) {
+  const draw = { type: "draw", marble: "aging_flick", cause: "effect" };
+  const steps = [
+    { text: "a", events: [draw] },
+    { text: "b", events: [{ type: "placed", slot: "apex", marble: "one_shot" }] },
+    { text: "c", events: [] },
+    { text: "d", events: [draw, draw] },
+  ];
+  run.same(
+    "présentation : la main de chaque étape, remontée depuis la main finale (5)",
+    [4, 3, 3, 5],
+    withHandSizes(steps, 5).map((step) => step.handSize)
+  );
+  run.same("présentation : les étapes gardent leur texte", ["a", "b", "c", "d"], withHandSizes(steps, 5).map((step) => step.text));
+  const pending = { action: "polish", amount: 1, zones: ["triangle"], pick: "marble", count: 1, upTo: false, by: { trigger: "hit", slot: "apex", marble: "hit_polish" }, eligible: [], chosen: [], remaining: 1 };
+  const prompt = choicePromptStep(pending, keyText);
+  run.same("présentation : la question d'un choix, une étape sans évènement, retenue comme message", { events: [], messages: [prompt.text] }, { events: prompt.events, messages: prompt.messages });
+}
+
 export default function checkMarblesSequence(run) {
   run.section("file d'étapes", checkQueue);
+  run.section("présentation de la résolution", checkPresentation);
   run.section("textes", checkTexts);
   run.section("parties jouées", checkRealGames);
 }

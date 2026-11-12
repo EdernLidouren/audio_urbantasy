@@ -12,7 +12,7 @@
 //
 // Un montant calculé se dit avec sa valeur ACTUELLE, là où se trouve la bille : son
 // compteur de tours en main dans la main, 0 ailleurs, et les valeurs de partie de la
-// partie en cours (narration.js/cardSituation).
+// partie en cours (view/marbles/narration/effects.js/cardSituation).
 
 import { MARBLE_CARD_MODEL } from "../../config/marbles-values.js";
 import { REACTION_KEYS } from "../../core/marbles-content.js";

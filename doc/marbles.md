@@ -24,7 +24,8 @@ sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui
 | `view/marbles/card.js` | La fiche d'une bille, lue dans le modèle `MARBLE_CARD_MODEL` |
 | `lib/detail-card.js` | Le mécanisme générique des fiches : assemblage et curseur secondaire |
 | `lib/real-time.js` | L'horloge temps réel à deux moteurs (images et minuterie) de l'écran |
-| `view/marbles/narration.js` | Ce qui se dit, à partir de l'état, du journal et de la prévision (pur) |
+| `view/marbles/narration.js` | Ce qui se dit, à partir de l'état, du journal et de la prévision (pur), point d'entrée de ses modules (`view/marbles/narration/`) : `effects.js` (vocabulaire, effets joués, prévus et imprimés), `focus.js` (lignes de curseur et d'état), `forecast.js` (confirmation d'une pose, vue d'ensemble R), `journal.js` (étapes du journal, question d'un choix) |
+| `view/marbles/resolution.js` | La présentation de la résolution : sa séquence, la résolution qu'un choix interrompt, la garde après un saut |
 | `view/marbles/sequence.js` | La file d'étapes de la séquence de résolution et ses pauses (pur) |
 | `view/marbles/history.js` | L'historique : les messages de jeu du tour précédent (pur) |
 | `view/marbles/history-screen.js` | Le menu de l'historique |
@@ -470,7 +471,7 @@ triangle).
 **Ajouter** une action : une entrée dans `CLAUSE_ACTIONS` (`core/marbles-effects.js`), sur
 le modèle des conditions, qui déclare ses champs (`fields` : une action sans `target` refuse
 toute cible à la validation), sa validation (`validate`) et ce qu'elle ajoute aux valeurs
-(`apply`) ; puis ses textes dans `view/marbles/narration.js`/`ACTION_TEXTS` (`up` pour une
+(`apply`) ; puis ses textes dans `view/marbles/narration/effects.js`/`ACTION_TEXTS` (`up` pour une
 valeur positive, `down` pour une négative), lus par les fiches, R, la confirmation et la
 séquence. Une action sans textes fait échouer le chargement. Si son application touche à
 l'état autrement qu'un compteur, comme la Pioche, `fireEffect` (`core/marbles-run.js`) l'exécute
@@ -502,7 +503,7 @@ conditions : champs, validation, test) : une cible « toutes » porte `filters`,
 une bille doit les passer TOUS ; un même type de filtre une seule fois. Aujourd'hui, le
 calibre seul : `{ type: "size", size }` (forme courte `sizeIs(SMALL)`). Ajouter un filtre
 (la matière…) : une entrée dans `TARGET_FILTERS` et son texte dans
-`view/marbles/narration.js`/`FILTER_TEXTS` (un filtre sans texte fait échouer le
+`view/marbles/narration/effects.js`/`FILTER_TEXTS` (un filtre sans texte fait échouer le
 chargement). Les textes ne combinent pas encore deux filtres : le jour où un second type
 existera, sa phrase combinée s'écrira avec lui.
 
@@ -903,7 +904,7 @@ rien de plus, ses conditions de calibre passant par les champs d'effet.
 
 Une valeur négative porte le vrai signe moins, collé au nombre (« Vitesse −3 », U+2212) :
 un lecteur d'écran le lit, là où il peut taire un trait d'union. Un gabarit d'effet
-l'écrit lui-même ; un compteur passe par `view/marbles/narration.js`/`formatCounter`.
+l'écrit lui-même ; un compteur passe par `view/marbles/narration/effects.js`/`formatCounter`.
 
 **Poser** : Entrée sur une bille la sélectionne et ouvre la **sélection d'emplacement**.
 Le curseur passe sur le premier emplacement vide dans l'ordre des phases (base gauche,
@@ -1053,7 +1054,7 @@ effet » si rien ; une Pioche est une valeur comme une autre (« Pioche 1 »). U
 chez la bille qui le fait, et se compte chez celle qui le reçoit : la loupe en base gauche
 dit « Vitesse +4 à la pointe », le gorille qu'elle renforce « Vitesse +10 ». C'est la même
 façon de dire un effet partout, pose, R, séquence et fiches
-(`view/marbles/narration.js`/`describeEffect`). Si la résolution régénérerait le sac, « Le sac sera
+(`view/marbles/narration/effects.js`/`describeEffect`). Si la résolution régénérerait le sac, « Le sac sera
 régénéré. » termine l'annonce, suivi d'une phrase par Trouvaille qu'elle déclencherait, qui
 nomme sa bille (« Trouvaille de tigrée : Vitesse +3. »). Chaque régénération se dit ainsi
 avec ses propres Trouvailles, comme dans la séquence, la deuxième « de nouveau » : « Le sac
@@ -1097,7 +1098,8 @@ chacune :
    s'il en a un (« Final de porcelaine : Vitesse +4. ») et de ses pioches ;
 6. « Impact 18. Score 42. » ;
 7. « Le triangle tourne d'un cran dans le sens horaire. » (le nombre de crans et le sens
-   sont des paramètres du texte, constante `ROTATION` de `narration.js`) ;
+   sont des paramètres du texte : les crans viennent de l'évènement `rotation`, le sens
+   de la constante `ROTATION_DIRECTION` de `view/marbles/narration/journal.js`) ;
 8. la pioche : « Vous piochez agate. », « Main pleine, pas de pioche. » ou « Plus aucune
    bille à piocher. », précédée s'il y a lieu de « Le sac est vide : la défausse est
    mélangée et forme un nouveau sac. » ;
