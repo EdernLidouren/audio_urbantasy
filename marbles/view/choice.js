@@ -3,8 +3,10 @@
 // (marbles/view/screen.js) y lit ce que le curseur propose, ce qu'il dit et la
 // réponse qu'Entrée envoie ; c'est la même navigation que l'écran habituel.
 //
-// - MAIN : un menu horizontal des SEULES billes éligibles, dans l'ordre de la main,
-//   suivies de « Terminer » en mode « jusqu'à N ».
+// - MAIN, ou DÉFAUSSE : un menu horizontal des SEULES billes éligibles, dans l'ordre
+//   de la main, ou dans l'ordre d'arrivée à la défausse, suivies de « Terminer » en
+//   mode « jusqu'à N ». Un choix n'a jamais les deux : leur menu prend la place du
+//   curseur dans la main (`place: "hand"`).
 // - TRIANGLE : la même géométrie que l'écran (pointe en haut, les deux bases en
 //   dessous) et la même navigation (marbles/view/navigation.js). Les emplacements
 //   non éligibles restent accessibles, pour garder le repère, mais se disent « Non
@@ -21,18 +23,33 @@ import { formatMenuPosition } from "../../lib/menu.js";
 import { cursorOn, stepCursor, zoneOf } from "./navigation.js";
 import { describeMarbleInList, describeSlotFocus, marbleName } from "./narration.js";
 
-// Les zones du choix en attente.
+// Les zones dont le choix se fait dans un MENU HORIZONTAL, à la place du curseur dans
+// la main : la main, la défausse.
+const LIST_ZONES = ["hand", "discard"];
+
+// Les zones du choix en attente ; la place "hand" du curseur est celle du menu.
 function hasZone(pending, zone) {
+  if (zone === "hand") return pending.zones.some((listed) => LIST_ZONES.includes(listed));
   return pending.zones.includes(zone);
 }
 
-// Le menu de la main pendant un choix : les billes éligibles, chacune { kind:
-// "marble", index (sa place dans la main), marble }, puis { kind: "finish" } en mode
-// « jusqu'à N ». Vide si la main n'est pas une zone du choix.
+// Le menu du choix (main ou défausse) : les billes éligibles, chacune { kind:
+// "marble", zone, index (sa place dans sa zone), marble }, puis { kind: "finish" } en
+// mode « jusqu'à N ». Vide si ni la main ni la défausse ne sont une zone du choix.
 export function choiceHandOptions(pending) {
   if (!hasZone(pending, "hand")) return [];
-  const marbles = pending.eligible.filter((target) => target.zone === "hand").map(({ index, marble }) => ({ kind: "marble", index, marble }));
+  const marbles = pending.eligible
+    .filter((target) => LIST_ZONES.includes(target.zone))
+    .map(({ zone, index, marble }) => ({ kind: "marble", zone, index, marble }));
   return pending.upTo ? [...marbles, { kind: "finish" }] : marbles;
+}
+
+// L'entrée sous une option du menu du choix : sa bille, avec son compteur de tours
+// en main (0 à la défausse), et sa place dans sa zone ; null pour Terminer.
+export function choiceListEntry(game, option) {
+  if (option?.kind !== "marble") return null;
+  if (option.zone === "discard") return { marble: game.discard[option.index], turnsInHand: 0, zone: "discard", index: option.index };
+  return { ...game.hand[option.index], zone: "hand", index: option.index };
 }
 
 // Un emplacement est-il éligible ?
@@ -80,8 +97,8 @@ function handOption(pending, cursor) {
 export function choiceMarbleAt(game, cursor) {
   const pending = game.pendingChoice;
   if (cursor.place === "hand") {
-    const option = handOption(pending, cursor);
-    return option?.kind === "marble" ? game.hand[option.index] : null;
+    const entry = choiceListEntry(game, handOption(pending, cursor));
+    return entry === null ? null : { marble: entry.marble, turnsInHand: entry.turnsInHand };
   }
   const placed = game.triangle[cursor.place];
   return placed === null ? null : { marble: placed.marble, turnsInHand: 0 };
@@ -121,7 +138,7 @@ export function choiceAnswer(pending, cursor) {
   if (cursor.place === "hand") {
     const option = handOption(pending, cursor);
     if (option === null) return { refusal: "notEligible" };
-    return option.kind === "finish" ? { action: { type: "choose", done: true } } : { action: { type: "choose", target: { zone: "hand", index: option.index } } };
+    return option.kind === "finish" ? { action: { type: "choose", done: true } } : { action: { type: "choose", target: { zone: option.zone, index: option.index } } };
   }
   if (!isSlotEligible(pending, cursor.place)) return { refusal: "notEligible" };
   return { action: { type: "choose", target: { zone: "triangle", slot: cursor.place } } };

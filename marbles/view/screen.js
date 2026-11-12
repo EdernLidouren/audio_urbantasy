@@ -7,7 +7,7 @@
 //
 // PRENDRE ET POSER, un seul geste (Entrée) : sur une bille de la main, la
 // sélectionne et ouvre la SÉLECTION D'EMPLACEMENT : le curseur passe sur le premier
-// emplacement vide (dans l'ordre des phases, base gauche sinon) et ne quitte plus le
+// emplacement vide (dans l'ordre horaire, base droite sinon) et ne quitte plus le
 // triangle, la main n'existe plus pour lui. Entrée sur un emplacement ouvre la
 // confirmation de la pose, qui dit ce qu'elle produirait (prévision,
 // marbles/core/forecast.js) ; Échap annule et ramène sur la bille dans la main, où
@@ -88,7 +88,7 @@ import { SLOTS, swapRefusal, placeRefusal, throwRefusal } from "../core/marbles.
 import { playMenuSound } from "../../view/menu-sounds.js";
 import { openConfirmation } from "../../view/menus/confirmation.js";
 import { INITIAL_CURSOR, cursorOn, placementStart, stepCursor, zoneOf } from "./navigation.js";
-import { choiceAnswer, choiceCursorAfterAnswer, choiceFocusLine, choiceHandOptions, choiceMarbleAt, choiceStartCursor, stepChoiceCursor } from "./choice.js";
+import { choiceAnswer, choiceCursorAfterAnswer, choiceFocusLine, choiceHandOptions, choiceListEntry, choiceMarbleAt, choiceStartCursor, stepChoiceCursor } from "./choice.js";
 import { marbleCard } from "./card.js";
 import { openPileMenu } from "./pile-screen.js";
 import {
@@ -111,6 +111,7 @@ import {
 import {
   advanceRolls,
   closeTableReverb,
+  discardPlace,
   eventCues,
   handPlace,
   openTableReverb,
@@ -346,17 +347,15 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
     return held?.kind === "slot" && held.slot === cursor.place ? `${line} ${t("marbles.slot_line.held")}` : line;
   }
 
-  // L'entrée de la main sous le curseur ({ marble, turnsInHand }, et sa place dans
-  // la main), ou null : pendant un choix, l'option du menu du choix.
+  // L'entrée de la main sous le curseur ({ marble, turnsInHand, zone }, et sa place
+  // dans sa zone), ou null : pendant un choix, l'option du menu du choix, de la main
+  // ou de la défausse.
   function handEntryUnderCursor() {
     const game = getGame();
     if (cursor.place !== "hand") return null;
-    if (game.pendingChoice) {
-      const option = choiceHandOptions(game.pendingChoice)[clampedHandIndex()];
-      return option?.kind === "marble" ? { ...game.hand[option.index], index: option.index } : null;
-    }
+    if (game.pendingChoice) return choiceListEntry(game, choiceHandOptions(game.pendingChoice)[clampedHandIndex()]);
     const index = clampedHandIndex();
-    return game.hand[index] === undefined ? null : { ...game.hand[index], index };
+    return game.hand[index] === undefined ? null : { ...game.hand[index], zone: "hand", index };
   }
 
   // La bille sous le curseur, ou undefined (emplacement vide, main vide, Terminer).
@@ -371,7 +370,9 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
   function beaconUnderCursor() {
     const marble = marbleUnderCursor();
     if (marble === undefined) return;
-    const place = cursor.place === "hand" ? handPlace(handEntryUnderCursor().index, getGame().hand.length) : slotPlace(cursor.place);
+    // Une bille de la défausse (le menu d'un choix) s'entend à la défausse.
+    const entry = cursor.place === "hand" ? handEntryUnderCursor() : null;
+    const place = entry === null ? slotPlace(cursor.place) : entry.zone === "discard" ? discardPlace() : handPlace(entry.index, getGame().hand.length);
     playFocusBeacon(marble, place, rules.types);
   }
 

@@ -144,10 +144,10 @@ function checkWindfallForecast(run) {
   });
   const predicted = rules.forecast(play, toApex);
   run.same(
-    "trouvaille prévue, pose : chez les billes actives, dans l'ordre",
+    "trouvaille prévue, pose : chez les billes actives, dans l'ordre horaire",
     [
-      { trigger: "windfall", slot: "leftBase", marble: "all_rounder", speed: 3 },
       { trigger: "windfall", slot: "rightBase", marble: "final_pocket", speed: 0 },
+      { trigger: "windfall", slot: "leftBase", marble: "all_rounder", speed: 3 },
     ],
     predicted.regenerations[0].effects.map(({ trigger, slot, marble, speed }) => ({ trigger, slot, marble, speed }))
   );
@@ -156,16 +156,27 @@ function checkWindfallForecast(run) {
   run("trouvaille prévue, pose : égale au réel", true, matches(play, toApex));
 
   const resolving = playState({ bag: [], discard: ["aging_flick"], triangle: { leftBase: placed("awaken_draw"), rightBase: placed("one_shot"), apex: placed("all_rounder") } });
-  // Deux régénérations : la Pioche de awaken_draw, puis celle du Final de one_shot ; la
-  // all_rounder trouve à chacune, et chaque Trouvaille reste avec la sienne.
+  // Le Final de one_shot pioche, mais one_shot, en partance, n'est pas encore à la
+  // défausse : elle ne peut pas être repiochée, aucun Éveil n'est possible.
+  run.same("trouvaille prévue, résolution : une régénération, en phase", [["all_rounder"]], rules.forecast(resolving).regenerations.map(({ effects }) => effects.map((effect) => effect.marble)));
+  run("trouvaille prévue, résolution : one_shot en partance pendant son Final, jamais repiochée, prévision certaine", false, rules.forecast(resolving).uncertain);
+  run("trouvaille prévue, résolution : égale au réel", true, matches(resolving, null));
+  // Deux régénérations : la Pioche de drawer en phase, puis celle de son Final, après
+  // l'arrivée de worn à la défausse (retirée avant elle, dans l'ordre horaire) ; finder
+  // trouve à chacune, et chaque Trouvaille reste avec la sienne.
+  const regenTwice = fabricatedRules({
+    finder: { windfall: [{ action: "speed", amount: 3 }] },
+    worn: { maxWear: 1 },
+    drawer: { base: [{ action: "draw", amount: 1 }], final: [{ action: "draw", amount: 1 }], maxWear: 1 },
+    spare: {},
+  });
+  const twice = playState({ hand: inHand([]), bag: [], discard: ["spare"], triangle: { rightBase: placed("worn"), leftBase: placed("drawer"), apex: placed("finder") } });
   run.same(
-    "trouvaille prévue, résolution : deux régénérations, all_rounder à chacune",
-    [["all_rounder"], ["all_rounder"]],
-    rules.forecast(resolving).regenerations.map(({ effects }) => effects.map((effect) => effect.marble))
+    "trouvaille prévue, résolution : deux régénérations, finder à chacune",
+    [["finder"], ["finder"]],
+    regenTwice.forecast(twice).regenerations.map(({ effects }) => effects.map((effect) => effect.marble))
   );
-  // one_shot repioche sa propre bille après son Final, qui s'éveille (Polissage à la
-  // pointe) : un Éveil réel, que la prévision ne dit pas, mais annonce incertaine.
-  run("trouvaille prévue, résolution : one_shot repiochée peut s'éveiller, prévision incertaine", true, rules.forecast(resolving).uncertain);
+  run("trouvaille prévue, résolution : deux régénérations, certaine", false, regenTwice.forecast(twice).uncertain);
   const cracking = playState({
     hand: inHand(["split_base"]),
     bag: [],
@@ -471,10 +482,10 @@ function checkWearForecast(run) {
   run.same("Polissage prévu : le Final de final_pocket le dit, puis elle s'empoche", [{ action: "polish", amount: 1, target: "apex" }, { action: "pocket" }], saved.slotEffects.leftBase[0].operations);
 
   // Un bonus perdu (phase passée) n'apparaît nulle part dans la prévision.
-  const lostRules = fabricatedRules({ late: { base: [{ action: "speed", amount: 3, target: "rightBase" }] }, plain: { base: [{ action: "speed", amount: 1 }] } });
-  const lost = lostRules.forecast(playState({ hand: inHand([]), triangle: { leftBase: placed("plain"), rightBase: placed("late"), apex: null } }));
+  const lostRules = fabricatedRules({ late: { base: [{ action: "speed", amount: 3, target: "leftBase" }] }, plain: { base: [{ action: "speed", amount: 1 }] } });
+  const lost = lostRules.forecast(playState({ hand: inHand([]), triangle: { leftBase: placed("late"), rightBase: placed("plain"), apex: null } }));
   run("bonus perdu : absent de la prévision", 1, lost.speed);
-  run.same("bonus perdu : rien de donné", [], lost.phases.rightBase.given);
+  run.same("bonus perdu : rien de donné", [], lost.phases.leftBase.given);
 }
 
 function checkCases(run) {
@@ -584,7 +595,7 @@ const MIXED_TYPES = {
   plain: { base: [{ action: "speed", amount: 1 }], apex: [{ action: "speed", amount: 3 }] },
   heavy: { base: [{ action: "mass", amount: 2 }], apex: [{ action: "mass", amount: -1 }], maxWear: 2 },
   giver: {
-    base: [{ action: "speed", amount: 2, target: "apex" }, { action: "mass", amount: 1, target: "rightBase" }],
+    base: [{ action: "speed", amount: 2, target: "apex" }, { action: "mass", amount: 1, target: "leftBase" }],
     hit: [{ action: "speed", amount: 2, target: "apex" }, { action: "speed", amount: 1 }],
     knockout: [{ action: "speed", amount: 3, target: "leftBase" }],
   },

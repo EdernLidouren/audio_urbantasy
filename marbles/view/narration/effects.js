@@ -15,9 +15,11 @@ import {
   CLAUSE_ACTIONS,
   CONDITIONS,
   FIRST_IN_HAND,
+  LAST_DISCARDED,
   TARGET_FILTERS,
   amountOf,
   isAll,
+  isBag,
   isChoice,
 } from "../../core/effects.js";
 
@@ -63,6 +65,29 @@ const ACTION_TEXTS = {
   pocket: {
     up: "marbles.effect.pocket_self",
     targets: { slot: "marbles.effect.pocket_slot", [FIRST_IN_HAND]: "marbles.effect.pocket_hand", choice: "marbles.effect.pocket_choice" },
+  },
+  // Sans montant, comme Empocher ; « toutes » (`all`) reçoit {target}, le sac
+  // (`bag`) reçoit {count}.
+  discard: {
+    up: "marbles.effect.discard_self",
+    targets: {
+      slot: "marbles.effect.discard_slot",
+      [FIRST_IN_HAND]: "marbles.effect.discard_hand",
+      choice: "marbles.effect.discard_choice",
+      all: "marbles.effect.discard_all",
+      bag: "marbles.effect.discard_bag",
+    },
+  },
+  // Sans montant ; la bille elle-même, un emplacement, un choix, « toutes ».
+  bounce: {
+    up: "marbles.effect.bounce_self",
+    targets: { slot: "marbles.effect.bounce_slot", choice: "marbles.effect.bounce_choice", all: "marbles.effect.bounce_all" },
+  },
+  // Sans montant ; jamais la bille elle-même : la dernière arrivée à la défausse, ou
+  // un choix.
+  retrieve: {
+    up: "marbles.effect.retrieve_last",
+    targets: { [LAST_DISCARDED]: "marbles.effect.retrieve_last", choice: "marbles.effect.retrieve_choice" },
   },
   // Sans montant, comme Empocher ; « toutes » (`all`) reçoit {target}.
   eject: {
@@ -133,7 +158,9 @@ function actionText(action, amount, target, t) {
     if (target === undefined) return t(up);
     if (isChoice(target)) return t(targets.choice, { target: choiceTarget(target, t) });
     if (isAll(target)) return t(targets.all, { target: allTarget(target, t) });
-    return target === FIRST_IN_HAND ? t(targets[FIRST_IN_HAND]) : t(targets.slot, { slot: slotName(target, t) });
+    if (isBag(target)) return t(targets.bag, { count: target.count });
+    if (target === FIRST_IN_HAND || target === LAST_DISCARDED) return t(targets[target]);
+    return t(targets.slot, { slot: slotName(target, t) });
   }
   const text = t(up, { amount });
   return target === undefined ? text : targetedText(text, target, t);
@@ -183,6 +210,9 @@ function emptyPart({ slot, target, marble }, t) {
   if (target === "choice") return t("marbles.forecast_empty.choice");
   if (target === "all") return t("marbles.forecast_empty.all");
   if (target === "self") return t("marbles.forecast_empty.self", { marble: nameRef(`marble.${marble}.name`) });
+  if (target === "bag") return t("marbles.forecast_empty.bag");
+  if (target === LAST_DISCARDED) return t("marbles.forecast_empty.discard");
+  if (target === "handFull") return t("marbles.forecast_empty.hand_full");
   return t("marbles.forecast_empty.slot", { slot: slotName(slot, t) });
 }
 
@@ -196,10 +226,25 @@ function withResults(text, effect, t) {
   const withEmptyOnly = empty.length === 0 ? text : t("marbles.forecast_empty.after", { effect: text, empty: t("marbles.effect.combined", { parts: empty.map((target) => emptyPart(target, t)) }) });
   // La prévision ne devine pas le choix du joueur : elle le dit, une fois par effet.
   const withEmpty = (effect.undecided?.length ?? 0) === 0 ? withEmptyOnly : t("marbles.forecast_choice.after", { effect: withEmptyOnly });
-  // Ce que l'effet a chassé (Éjecter), puis ce qu'il a empoché.
-  const parts = [...(effect.ejected ?? []).map((ejected) => ejectedPart(ejected, t)), ...(effect.pockets ?? []).map((moved) => pocketPart(moved, t))];
+  // Ce que l'effet a chassé (Éjecter), puis ce qu'il a empoché, puis défaussé.
+  const parts = [
+    ...(effect.ejected ?? []).map((ejected) => ejectedPart(ejected, t)),
+    ...(effect.pockets ?? []).map((moved) => pocketPart(moved, t)),
+    ...(effect.discards ?? []).map((moved) => discardPart(moved, t)),
+  ];
   if (parts.length === 0) return withEmpty;
   return t("marbles.pocket.then", { effect: withEmpty, pockets: t("marbles.effect.combined", { parts }) });
+}
+
+// Une bille qu'un Défausser PRÉVU a envoyée à la défausse depuis la main ou le sac
+// (marbles/core/forecast.js, `discards`), dite chez la bille qui l'a produit, avec
+// l'effet de sa Chute : « argile défaussée », « porcelaine défaussée, Chute :
+// Vitesse +3 » ; une bille du sac, à l'aveugle, reste inconnue.
+function discardPart({ marble, drop }, t) {
+  if (marble === null) return t("marbles.discard.discarded_unknown");
+  const ref = nameRef(`marble.${marble}.name`);
+  if (drop === null) return t("marbles.discard.discarded", { marble: ref });
+  return t("marbles.discard.discarded_effect", { marble: ref, effect: describeEffect(drop, t) });
 }
 
 // Une bille qu'un Éjecter PRÉVU a chassée (marbles/core/forecast.js, `ejected`), dite

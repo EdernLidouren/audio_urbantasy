@@ -27,7 +27,7 @@
 // chacune, dans l'ordre des choix.
 //
 // CIBLE « TOUTES » : `target` vaut { type: "all", filters? } : toutes les billes
-// actives, au déclenchement, dans l'ordre des phases, qui passent TOUS les filtres
+// actives, au déclenchement, dans l'ordre horaire (SLOTS), qui passent TOUS les filtres
 // (TARGET_FILTERS : aujourd'hui le calibre, { type: "size", size }). Seules les
 // actions qui déclarent `all` l'acceptent (Éjecter).
 //
@@ -35,8 +35,9 @@
 // déclenchement : { triangle, holder, replacement, tally } ;
 //   triangle     le triangle à cet instant ;
 //   holder       la bille qui joue l'effet, { marble, zone, turnsInHand } : `zone`
-//                dit où elle est (HOLDER_ZONES : "triangle" ; "removed", déjà
-//                retirée du triangle, le Final ; "thrown", en cours de lancer, la
+//                dit où elle est (HOLDER_ZONES : "triangle" ; "leaving", en
+//                partance, le Final et l'Éjection ; "discard", à la défausse, la
+//                Chute ; "thrown", en cours de lancer, la
 //                Chiquenaude ; "hand", l'Éveil ; "pot") ; `turnsInHand`, son
 //                compteur de tours en main (0 hors de la main ; pendant son lancer,
 //                celui qu'elle avait en la quittant) ;
@@ -72,8 +73,8 @@
 // action sur une bille peut viser un emplacement depuis n'importe quel moment, la
 // bille visée restant sur le triangle. La bille elle-même, elle, n'est visable que
 // là où elle est (HOLDER_ZONES) : chaque action déclare les zones où elle la prend
-// (`selfZones`) et les déclencheurs où elle ne le peut pas (`selfRefusedIn`) ;
-// Empocher la prend même dans son Final, à la défausse.
+// (`selfZones`) ; en partance (son Final, son Éjection), Empocher la redirige
+// vers le pot, Polissage, Fêlure et Éjecter ne la prennent pas.
 //
 // VALEURS : ce qu'un effet produit, une valeur par action, sous le nom de
 // l'action (`{ speed, mass, draw }`). Le core les applique (marbles/core/run.js/fireEffect),
@@ -88,9 +89,33 @@ export function isMarbleSize(size) {
   return Number.isInteger(size) && Object.hasOwn(MARBLE_SIZES, size);
 }
 
-// Emplacements, dans l'ordre de RÉSOLUTION (phases de base gauche, de base
-// droite, de pointe).
-export const SLOTS = ["leftBase", "rightBase", "apex"];
+// LES EMPLACEMENTS, dans l'ORDRE HORAIRE, le seul ordre du triangle, déclaré ici
+// seulement : base droite, base gauche, pointe, puis de nouveau base droite. Il est
+// celui de la résolution (les phases, la pointe en dernier), des retraits par usure,
+// des billes actives visées ensemble, des écouteurs du bus, de la prévision et de
+// tout ce que l'écran énumère ; la disposition spatiale de l'écran, elle, n'en
+// dépend pas. Il définit l'emplacement SUIVANT (nextSlot) et le PRÉCÉDENT
+// (previousSlot) : la rotation de fin de tour fait avancer chaque bille vers son
+// suivant.
+export const SLOTS = Object.freeze(["rightBase", "leftBase", "apex"]);
+
+function slotIndex(slot) {
+  const index = SLOTS.indexOf(slot);
+  if (index < 0) throw new Error(`marbles : emplacement inconnu "${slot}".`);
+  return index;
+}
+
+// L'emplacement suivant dans le sens horaire : base droite -> base gauche, base
+// gauche -> pointe, pointe -> base droite.
+export function nextSlot(slot) {
+  return SLOTS[(slotIndex(slot) + 1) % SLOTS.length];
+}
+
+// L'emplacement précédent, le sens inverse : base gauche -> base droite, pointe ->
+// base gauche, base droite -> pointe.
+export function previousSlot(slot) {
+  return SLOTS[(slotIndex(slot) + SLOTS.length - 1) % SLOTS.length];
+}
 
 // Le même « aucun effet » partout : comparer deux effets par identité dit si
 // une bille a une variante de base.
@@ -111,9 +136,19 @@ export function printedStat(clauses, stat) {
   return clauses.filter(printed).reduce((total, clause) => total + clause.amount, 0);
 }
 
-// La cible « la première bille de la main », dans l'ordre affiché de la main (celle
-// d'Empocher).
+// La cible « la première bille de la main », dans l'ordre affiché de la main
+// (Empocher, Défausser).
 export const FIRST_IN_HAND = "firstInHand";
+
+// La cible « la dernière bille arrivée à la défausse » (Ramasser).
+export const LAST_DISCARDED = "lastDiscarded";
+
+// Une cible est-elle « les N prochaines billes du sac », { type: "bag", count }
+// (Défausser) ? Elles partent du haut du sac, une par une, sans être révélées
+// avant ; un sac qui en a moins donne ce qu'il a, sans régénération.
+export function isBag(target) {
+  return target !== null && typeof target === "object" && target.type === "bag";
+}
 
 // Les champs d'une clause. `target` n'appartient qu'aux actions qui ont un sens
 // pour un autre emplacement : une action qui ne le déclare pas refuse toute cible
@@ -148,6 +183,13 @@ function validatePositive(clause, describe, fail, context) {
   validateAmount(clause, describe, fail, context, 1);
 }
 
+// Une ARRIVÉE (en main, ou à la défausse) d'une bille que l'action `action` a
+// déplacée, directement ou par une redirection (`movedBy`, marbles/core/run.js/
+// arrive).
+function movedArrival(event, action) {
+  return (event.type === "returned" || event.type === "discarded") && event.movedBy === action;
+}
+
 // Une action SUR UNE BILLE mot-clé (Polissage, Fêlure) : un déclenchement par
 // application, sur une bille (son évènement) ou sur un emplacement vide
 // (`targetEmpty`) ; sa quantité réelle, l'usure réellement changée (`applied` de son
@@ -163,13 +205,14 @@ function marbleActionKeyword(action, eventType) {
 // Les ZONES où un joueur peut choisir une cible, déclarées ici et nulle part
 // ailleurs : `available`, le choix y est possible aujourd'hui (les cibles de chaque
 // zone disponible : marbles/core/run.js/CHOICE_TARGETS) ; `picks`, ce qui s'y choisit.
-// Ajouter le pot, la défausse ou le sac : `available` à vrai, ses cibles dans le core,
-// ses textes dans la vue.
+// Ajouter le pot ou le sac : `available` à vrai, ses cibles dans le core, ses textes
+// dans la vue.
 export const CHOICE_ZONES = {
   hand: { available: true, picks: ["marble"] },
   triangle: { available: true, picks: ["marble", "slot"] },
   pot: { available: false, picks: ["marble"] },
-  discard: { available: false, picks: ["marble"] },
+  // La défausse, dans l'ordre d'arrivée (Ramasser).
+  discard: { available: true, picks: ["marble"] },
   bag: { available: false, picks: ["marble"] },
 };
 
@@ -218,8 +261,15 @@ function addAmount(values, clause) {
 //   wear      (sur une bille) l'usure d'après, (wear, amount, maxWear) -> wear ;
 //   event     (sur une bille) l'évènement de chaque application ;
 //   retires   (sur une bille) une bille amenée à son maximum est retirée aussitôt ;
-//   moves     (sur une bille) au lieu de changer son usure, elle la DÉPLACE : "pot",
-//             Empocher (marbles/core/run.js/pocketFromSlot, sendToPot) ;
+//   moves     (sur une bille) au lieu de changer son usure, elle la DÉPLACE vers
+//             cette destination, par le chemin des billes (marbles/core/run.js/
+//             travel) : "pot", Empocher ; "discard", Défausser ; "hand",
+//             Rebond et Ramasser ;
+//   handLimited (facultatif) vers la main, la bille n'y va que s'il y a de la
+//             place, sinon elle reste où elle est (Ramasser ; Rebond, lui, l'envoie
+//             à la défausse à l'arrivée) ;
+//   bag       (facultatif) la cible peut être les N prochaines billes du sac
+//             (isBag : Défausser) ;
 //   amountless (facultatif) l'action n'a pas de montant (Empocher) ;
 //   targets   (facultatif) ses cibles permises, les emplacements sinon ;
 //   choice    (facultatif) la cible peut être un CHOIX du joueur (en-tête) : `zones`,
@@ -232,8 +282,6 @@ function addAmount(values, clause) {
 //   selfZones (sur une bille) les zones (HOLDER_ZONES) où elle peut viser la bille
 //             elle-même, sans cible ; ailleurs, la validation refuse
 //             (targetProblem) ;
-//   selfRefusedIn (facultatif) les déclencheurs (leur id) où elle ne peut viser la
-//             bille elle-même, et pourquoi (Éjecter dans sa propre Éjection) ;
 //   keyword   (facultatif) l'action est un MOT-CLÉ : `texts`, son nom et sa
 //             description (aide des mots-clés, touches E et Maj+E ; sans eux, le
 //             chargement échoue, marbles/core/content.js) ; ses valeurs de partie
@@ -255,7 +303,8 @@ export const HOLDER_ZONES = {
   onSlot: { zone: "triangle", where: "elle est sur le triangle" },
   drawn: { zone: "hand", where: "elle vient d'être piochée, en main (son Éveil)" },
   thrown: { zone: "thrown", where: "elle est en cours de lancer (sa Chiquenaude)" },
-  removed: { zone: "removed", where: "elle a déjà quitté le triangle (son Final)" },
+  leaving: { zone: "leaving", where: "elle est en partance (son Final, son Éjection)" },
+  dropped: { zone: "discard", where: "elle vient d'arriver à la défausse (sa Chute)" },
   pot: { zone: "pot", where: "elle est dans le pot" },
 };
 
@@ -318,11 +367,14 @@ export const CLAUSE_ACTIONS = {
     keyword: marbleActionKeyword("crack", "cracked"),
   },
   // Empocher : envoie une bille au POT, sans montant. Cible : la bille elle-même, où
-  // qu'elle soit (sur le triangle, en main à son Éveil, déjà à la défausse à son
-  // Final) ; un emplacement ; la première bille de la main (FIRST_IN_HAND). Pot
-  // plein : la bille est perdue. Cible vide : sans effet, noté au journal.
-  // Mot-clé : un déclenchement par application, cible vide comprise ; sa quantité
-  // réelle, les billes réellement déplacées (au pot ou perdues).
+  // qu'elle soit (sur le triangle, en main à son Éveil, en partance pendant son
+  // Final ou son Éjection, ce qui REDIRIGE sa destination, à la défausse pendant sa
+  // Chute) ; un emplacement ; la
+  // première bille de la main (FIRST_IN_HAND). Pot plein : la bille est perdue. Cible
+  // vide : sans effet, noté au journal.
+  // Mot-clé : un déclenchement par application, cible vide comprise (une
+  // redirection, `redirected`, en est une, et l'arrivée qui la suit ne se recompte
+  // pas) ; sa quantité réelle, les billes réellement arrivées au pot ou perdues.
   pocket: {
     kind: "marble",
     fields: ["action", "target", "when"],
@@ -333,11 +385,17 @@ export const CLAUSE_ACTIONS = {
     // Une bille de la main ou une bille active ; un emplacement vide n'a rien à
     // empocher.
     choice: { zones: ["hand", "triangle"], picks: ["marble"] },
-    // Ni en cours de lancer, ni déjà dans le pot.
-    selfZones: ["triangle", "hand", "removed"],
+    // Ni en cours de lancer, ni déjà dans le pot. En partance, la redirige vers le
+    // pot (marbles/core/run.js/travel) ; à la défausse (sa Chute), l'en fait partir.
+    selfZones: ["triangle", "hand", "leaving", "discard"],
     keyword: {
       texts: { name: "marbles.keyword.pocket.name", description: "marbles.keyword.pocket.description" },
-      triggers: (event) => (event.type === "pocketed" || event.type === "lost" || (event.type === "targetEmpty" && event.action === "pocket") ? 1 : 0),
+      triggers: (event) =>
+        ((event.type === "pocketed" || event.type === "lost") && event.redirected !== true) ||
+        (event.type === "redirected" && event.action === "pocket") ||
+        (event.type === "targetEmpty" && event.action === "pocket")
+          ? 1
+          : 0,
       quantity: (event) => (event.type === "pocketed" || event.type === "lost" ? 1 : 0),
     },
   },
@@ -359,12 +417,92 @@ export const CLAUSE_ACTIONS = {
     choice: { zones: ["triangle"], picks: ["marble"] },
     all: true,
     selfZones: ON_TRIANGLE,
-    // Dans sa propre Éjection, la bille est déjà en train d'être chassée.
-    selfRefusedIn: { knockout: "une bille ne peut s'éjecter elle-même dans sa propre Éjection : elle est déjà en train d'être chassée" },
     keyword: {
       texts: { name: "marbles.keyword.eject.name", description: "marbles.keyword.eject.description" },
       triggers: (event) => (event.type === "eject" || (event.type === "targetEmpty" && event.action === "eject") ? 1 : 0),
       quantity: (event) => (event.type === "removed" && event.cause === "eject" ? 1 : 0),
+    },
+  },
+  // Défausser : envoie une bille à la DÉFAUSSE (sa Chute s'y déclenche), sans
+  // montant, par le chemin des billes (marbles/core/run.js/travel). Cible : la bille
+  // elle-même (sur le triangle, en main à son Éveil) ; un emplacement ; la première
+  // bille de la main (FIRST_IN_HAND) ; des billes de la main ou actives au choix ;
+  // toutes les billes actives, filtrées ; les N prochaines billes du sac (isBag).
+  // Depuis le triangle, ni usure ni éjection : ni Final ni Éjection ; une phase qui
+  // n'avait pas eu lieu est sautée. Jamais depuis le pot. Cible vide : sans effet,
+  // noté au journal.
+  // Mot-clé : un déclenchement par bille visée, cible vide comprise ; sa quantité
+  // réelle, les billes réellement arrivées à la défausse par lui.
+  discard: {
+    kind: "marble",
+    fields: ["action", "target", "when"],
+    validate() {},
+    amountless: true,
+    targets: [...SLOTS, FIRST_IN_HAND],
+    moves: "discard",
+    choice: { zones: ["hand", "triangle"], picks: ["marble"] },
+    all: true,
+    bag: true,
+    // Ni en cours de lancer, ni en partance (elle a déjà sa destination), ni à la
+    // défausse, ni dans le pot.
+    selfZones: ["triangle", "hand"],
+    keyword: {
+      texts: { name: "marbles.keyword.discard.name", description: "marbles.keyword.discard.description" },
+      triggers: (event) => ((event.type === "discarded" && event.cause === "discard") || (event.type === "targetEmpty" && event.action === "discard") ? 1 : 0),
+      quantity: (event) => (event.type === "discarded" && event.cause === "discard" ? 1 : 0),
+    },
+  },
+  // Rebond : RENVOIE une bille active, ou la bille elle-même en partance, dans la
+  // MAIN, sans montant, par le chemin des billes (destination "hand"). Elle y
+  // arrive à 0 tour en main, sans Éveil (ce n'est pas une pioche), et repartira à
+  // usure 0 à sa prochaine pose. Main pleine à l'arrivée : elle va à la défausse à
+  // la place, et sa Chute joue. Cible : la bille elle-même (sur le triangle, ou en
+  // partance pendant son Final ou son Éjection, ce qui REDIRIGE sa destination) ;
+  // un emplacement ; des billes actives au choix ; toutes les billes actives,
+  // filtrées. Depuis le triangle, ni Final ni Éjection ; une phase qui n'avait pas
+  // eu lieu est sautée.
+  // Mot-clé : un déclenchement par bille visée, cible vide comprise (une
+  // redirection en est une) ; sa quantité réelle, les billes réellement déplacées
+  // par lui, en main ou, main pleine, à la défausse.
+  bounce: {
+    kind: "marble",
+    fields: ["action", "target", "when"],
+    validate() {},
+    amountless: true,
+    targets: SLOTS,
+    moves: "hand",
+    choice: { zones: ["triangle"], picks: ["marble"] },
+    all: true,
+    selfZones: ["triangle", "leaving"],
+    keyword: {
+      texts: { name: "marbles.keyword.bounce.name", description: "marbles.keyword.bounce.description" },
+      triggers: (event) => (movedArrival(event, "bounce") && event.redirected !== true) || (event.type === "redirected" && event.action === "bounce") || (event.type === "targetEmpty" && event.action === "bounce") ? 1 : 0,
+      quantity: (event) => (movedArrival(event, "bounce") ? 1 : 0),
+    },
+  },
+  // Ramasser : REPREND une bille de la DÉFAUSSE dans la main, sans montant, par le
+  // chemin des billes (destination "hand"), à 0 tour en main, sans Éveil. Main
+  // pleine : la bille reste à la défausse, sans effet pour elle ; un choix ne
+  // propose jamais plus de billes qu'il n'y a de places (`handLimited`). Cible : la
+  // dernière bille arrivée à la défausse (LAST_DISCARDED) ; des billes de la défausse
+  // au choix. Jamais la bille elle-même : une bille en partance n'est pas encore à la
+  // défausse.
+  // Mot-clé : un déclenchement par bille visée, cible vide comprise ; sa quantité
+  // réelle, les billes réellement ramassées.
+  retrieve: {
+    kind: "marble",
+    fields: ["action", "target", "when"],
+    validate() {},
+    amountless: true,
+    targets: [LAST_DISCARDED],
+    moves: "hand",
+    handLimited: true,
+    choice: { zones: ["discard"], picks: ["marble"] },
+    selfZones: [],
+    keyword: {
+      texts: { name: "marbles.keyword.retrieve.name", description: "marbles.keyword.retrieve.description" },
+      triggers: (event) => movedArrival(event, "retrieve") || (event.type === "targetEmpty" && event.action === "retrieve") ? 1 : 0,
+      quantity: (event) => (movedArrival(event, "retrieve") ? 1 : 0),
     },
   },
 };
@@ -389,9 +527,10 @@ const GIFT_ZERO = zeroValues(VALUE_ACTIONS.filter((action) => CLAUSE_ACTIONS[act
 //                   "anytime" (n'importe quand : la Trouvaille, tranchée à
 //                   l'exécution) ;
 //                   `marble`, sa bille (marbles/config/values.js/MARBLE_TRIGGERS) :
-//                   "removed" (déjà retirée) et "thrown" (en cours de lancer) ne
+//                   "leaving" (en partance) et "thrown" (en cours de lancer) ne
 //                   sont pas sur le triangle ; `trigger`, son id.
-// Un emplacement vient-il APRÈS un autre dans l'ordre des phases ?
+// Un emplacement vient-il APRÈS un autre dans l'ordre des phases, l'ordre horaire
+// (SLOTS) ?
 const phaseIndex = (slot) => SLOTS.indexOf(slot);
 
 // Ce qui rend une clause toujours impossible à ce moment, ou null.
@@ -400,8 +539,6 @@ function targetProblem(clause, context) {
   if (action.kind === "marble" && clause.target === undefined) {
     const { zone, where } = holderZoneOf(context);
     if (!action.selfZones.includes(zone)) return `l'action "${clause.action}" ne peut pas viser la bille elle-même ici : ${where}`;
-    const refused = action.selfRefusedIn?.[context.trigger];
-    if (refused !== undefined) return refused;
   }
   // Un bonus au choix : il faut qu'au moins une phase puisse encore le recevoir.
   if (action.kind === "value" && isChoice(clause.target)) {
@@ -527,18 +664,15 @@ export const AMOUNT_SOURCES = {
     current: true,
   },
   // Les billes ACTIVES (sur le triangle) de calibre `size`, la bille elle-même
-  // comprise si elle en est : sur le triangle, elle s'y compte ; déjà retirée (le
-  // Final), elle s'ajoute. En cours de lancer (la Chiquenaude), elle n'est pas
-  // active : elle ne compte pas.
+  // comprise si elle en est. En transit, elle n'est pas active et ne compte pas : en
+  // partance (son Final, son Éjection) comme en cours de lancer (sa Chiquenaude).
   activeSize: {
     fields: ["type", "size"],
     validate(source, describe, fail) {
       validateSize(source.size, describe, fail);
     },
-    value(source, { triangle, holder }, types) {
-      const onTriangle = SLOTS.filter((slot) => triangle[slot] !== null && types[triangle[slot].marble].size === source.size).length;
-      const self = holder.zone === "removed" && types[holder.marble].size === source.size ? 1 : 0;
-      return onTriangle + self;
+    value(source, { triangle }, types) {
+      return SLOTS.filter((slot) => triangle[slot] !== null && types[triangle[slot].marble].size === source.size).length;
     },
     text: "marbles.effect.per_active_size",
     names: (source) => ({ size: `marbles.size.${MARBLE_SIZES[source.size]}.name` }),
@@ -616,6 +750,15 @@ function validateAll(clause, action, describe, fail) {
   }
 }
 
+// Une cible « les N prochaines billes du sac » : seule une action qui la déclare
+// (`bag`) l'accepte ; N, un entier au moins 1.
+function validateBag(clause, action, describe, fail) {
+  const where = `${describe}, cible du sac`;
+  if (action.bag !== true) fail(`${where} : l'action "${clause.action}" ne vise pas le sac.`);
+  rejectUnknownFields(clause.target, ["type", "count"], where, fail);
+  if (!Number.isInteger(clause.target.count) || clause.target.count < 1) fail(`${where} : count doit être un entier >= 1.`);
+}
+
 // Échoue au chargement sur un effet mal formé. Un effet absent se vérifie en
 // amont : ici, il existe. `context` : le moment où il joue (voir targetProblem),
 // {} pour ne pas vérifier les cibles ; `tallies`, les identifiants des valeurs de
@@ -629,6 +772,7 @@ export function validateEffect(effect, describe, fail, context = {}) {
     action.validate(clause, describe, fail, context);
     if (isChoice(clause.target)) validateChoice(clause, action, describe, fail);
     else if (isAll(clause.target)) validateAll(clause, action, describe, fail);
+    else if (isBag(clause.target)) validateBag(clause, action, describe, fail);
     else if (clause.target !== undefined && !(action.targets ?? SLOTS).includes(clause.target)) fail(`${describe} : cible inconnue "${clause.target}".`);
     const problem = targetProblem(clause, context);
     if (problem !== null) fail(`${describe} : ${problem}.`);

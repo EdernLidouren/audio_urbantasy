@@ -8,7 +8,7 @@
 //
 // BUS ET ÉCOUTEURS — chaque action passe ses évènements par un bus
 // (marbles/core/bus.js) : chacun entre au journal, puis les billes l'écoutent,
-// toujours dans cet ordre : base gauche, base droite, pointe, puis la main de
+// toujours dans cet ordre : l'ordre horaire (base droite, base gauche, pointe), puis la main de
 // la première à la dernière (marbleListeners). EVENT_TRIGGERS dit quels
 // évènements déclenchent un effet de bille ; les autres passent au journal sans
 // effet associé, prêts à servir.
@@ -27,6 +27,8 @@ import {
   CLAUSE_ACTIONS,
   FIRST_IN_HAND,
   HOLDER_ZONES,
+  LAST_DISCARDED,
+  isBag,
   SLOTS,
   addValues,
   effectAt,
@@ -59,8 +61,8 @@ export function shuffled(list, rngState) {
 
 // --- Écouteurs ---
 
-// Les billes qui écoutent le bus, dans leur ordre fixe : base gauche, base
-// droite, pointe, puis la main de la première à la dernière. Une liste relue à
+// Les billes qui écoutent le bus, dans leur ordre fixe : l'ordre horaire (base
+// droite, base gauche, pointe), puis la main de la première à la dernière. Une liste relue à
 // chaque évènement : elle suit le triangle tel qu'il est à cet instant.
 export function marbleListeners(state) {
   const onTriangle = SLOTS.filter((slot) => state.triangle[slot] !== null).map((slot) => ({
@@ -97,7 +99,10 @@ const ON_SLOT = ["triangle"];
 const NAMED_MARBLE = {
   // En main, sans emplacement : seul Empocher l'y prend (HOLDER_ZONES, selfZones).
   drawn: (event) => ({ slot: null, marble: event.marble, turnsInHand: 0 }),
-  removed: (event) => ({ slot: event.slot, marble: event.marble }),
+  leaving: (event) => ({ slot: event.slot, marble: event.marble }),
+  // À la défausse : l'emplacement qu'elle a quitté, si elle vient du triangle (sa
+  // Chute se prévoit avec lui), sinon aucun.
+  dropped: (event) => ({ slot: event.from === "triangle" ? event.slot : null, marble: event.marble }),
   thrown: (event) => ({ slot: event.slot, marble: event.marble, turnsInHand: event.turnsInHand }),
 };
 // Chaque valeur `marble` d'un déclencheur a sa zone ; chaque bille nommée hors du
@@ -112,9 +117,13 @@ for (const trigger of MARBLE_TRIGGERS) {
 function eventTrigger(trigger) {
   const clausesOf = (listener, types) => types[listener.marble][trigger.field] ?? null;
   if (Object.hasOwn(NAMED_MARBLE, trigger.marble)) {
+    // Une bille nommée inconnue (défaussée du sac à l'aveugle) rend la prévision
+    // incertaine, sauf pour un déclencheur qui ne se prévoit jamais (l'Éveil, que
+    // la prévision traite à part : marbles/core/forecast.js).
+    const zone = HOLDER_ZONES[trigger.marble].zone;
     return {
       id: trigger.id,
-      zones: [],
+      zones: trigger.forecast.line === "none" ? [] : [zone],
       listeners: (event) => [{ zone: HOLDER_ZONES[trigger.marble].zone, ...NAMED_MARBLE[trigger.marble](event) }],
       clauses: (event, listener, types) => clausesOf(listener, types),
     };
@@ -195,14 +204,16 @@ function pocketReactionsOf(run, event, before) {
 // Les cibles d'une zone de choix disponible (marbles/core/effects.js/CHOICE_ZONES),
 // valides à cet instant : (run, pick, bonus) -> [cible]. `bonus` : l'action est un
 // bonus de Vitesse ou de Masse, qui ne vaut que pour une phase encore à venir (règle
-// des cibles) : un emplacement dont la phase a commencé n'est pas éligible. Un
-// emplacement dont l'Éjection est en cours (`run.knockingOut`) ne l'est jamais : sa
-// bille part, une action sur elle ne ferait rien et un bonus s'y perdrait.
+// des cibles) : un emplacement dont la phase a commencé n'est pas éligible. Une
+// bille en partance (son Final, son Éjection) n'est plus sur le triangle : jamais
+// proposée.
 const CHOICE_TARGETS = {
   hand: (run) => run.state.hand.map(({ marble }, index) => ({ zone: "hand", index, marble })),
+  // La défausse, dans l'ordre d'arrivée : une bille en partance n'y est pas encore.
+  discard: (run) => run.state.discard.map((marble, index) => ({ zone: "discard", index, marble })),
   triangle: (run, pick, bonus) =>
     SLOTS.filter(
-      (slot) => (pick === "slot" || run.state.triangle[slot] !== null) && !(bonus && run.phasesStarted.has(slot)) && !run.knockingOut.has(slot)
+      (slot) => (pick === "slot" || run.state.triangle[slot] !== null) && !(bonus && run.phasesStarted.has(slot))
     ).map((slot) => ({
       zone: "triangle",
       slot,
@@ -214,13 +225,17 @@ for (const [zone, { available }] of Object.entries(CHOICE_ZONES)) {
 }
 
 // Deux cibles désignent-elles la même chose ?
+// Les zones dont une cible se désigne par sa place (`index`), et non par un
+// emplacement : la main, la défausse.
+const INDEXED_ZONES = new Set(["hand", "discard"]);
+
 function sameTarget(a, b) {
-  return a.zone === b.zone && (a.zone === "hand" ? a.index === b.index : a.slot === b.slot);
+  return a.zone === b.zone && (INDEXED_ZONES.has(a.zone) ? a.index === b.index : a.slot === b.slot);
 }
 
 // La forme publique d'une cible, celle de l'action « choisir ».
 export function targetRef(target) {
-  return target.zone === "hand" ? { zone: "hand", index: target.index } : { zone: "triangle", slot: target.slot };
+  return INDEXED_ZONES.has(target.zone) ? { zone: target.zone, index: target.index } : { zone: "triangle", slot: target.slot };
 }
 
 // La réponse que porte une action « choisir » au choix en attente `pending` (déjà
@@ -267,7 +282,7 @@ class ChoiceSuspension {
 // (ChoiceSuspension), sauf à l'aveugle, où le choix reste indécis
 // (`choiceUndecided`) et rien n'est choisi. -> les cibles, dans l'ordre des choix.
 function chooseTargets(run, clause, by) {
-  const { zones, pick, count, upTo = false } = clause.target;
+  const { zones, pick, upTo = false } = clause.target;
   const bonus = CLAUSE_ACTIONS[clause.action].kind === "value";
   const chosen = [];
   const eligibleNow = () =>
@@ -275,6 +290,17 @@ function chooseTargets(run, clause, by) {
   if (eligibleNow().length === 0) {
     run.emit({ type: "targetEmpty", action: clause.action, slot: null, target: "choice", by });
     return [];
+  }
+  // Vers la main (Ramasser) : jamais plus de choix que de places libres ; aucune
+  // place, aucun choix (la cible vide le note).
+  let { count } = clause.target;
+  if (CLAUSE_ACTIONS[clause.action].handLimited) {
+    const room = run.state.maxHandSize - run.state.hand.length;
+    if (room <= 0) {
+      run.emit({ type: "targetEmpty", action: clause.action, slot: null, target: "handFull", by });
+      return [];
+    }
+    count = Math.min(count, room);
   }
   const request = { action: clause.action, ...(clause.amount === undefined ? {} : { amount: clause.amount }), zones, pick, count, upTo, by };
   run.emit({ type: "choice", ...request });
@@ -320,9 +346,22 @@ function chooseTargets(run, clause, by) {
 // quand l'une d'elles part au pot) ; une cible partie entre-temps : sans effet, noté.
 function applyToChosen(run, operation, targets, by) {
   const held = targets.map((target) => (target.zone === "hand" ? run.state.hand[target.index] : null));
+  // La défausse n'a que des ids : une bille choisie s'y suit par sa place, décalée
+  // des billes choisies avant elle et déjà parties, qui la précédaient.
+  const left = [];
   targets.forEach((target, order) => {
     if (target.zone === "triangle") {
       actOnSlot(run, operation.action, operation.amount, target.slot, by);
+      return;
+    }
+    if (target.zone === "discard") {
+      const index = target.index - left.filter((gone) => gone < target.index).length;
+      left.push(target.index);
+      if (run.state.discard[index] !== target.marble) {
+        run.emit({ type: "targetEmpty", action: operation.action, slot: null, target: "choice", by });
+        return;
+      }
+      moveFromDiscard(run, index, operation.action, by);
       return;
     }
     const index = run.state.hand.indexOf(held[order]);
@@ -330,7 +369,7 @@ function applyToChosen(run, operation, targets, by) {
       run.emit({ type: "targetEmpty", action: operation.action, slot: null, target: "choice", by });
       return;
     }
-    pocketFromHand(run, index, by);
+    moveFromHand(run, index, operation.action, by);
   });
 }
 
@@ -395,14 +434,17 @@ function fireEffect(run, trigger, listener, clauses, event) {
 // --- Les actions sur une bille ---
 
 // Une action sur une bille (CLAUSE_ACTIONS de kind "marble" : Polissage, Fêlure,
-// Empocher, Éjecter) appliquée à sa cible (marbles/core/effects.js, en-tête) : le
-// seul aiguillage par forme de cible. `holder` : la bille qui joue l'effet (un
-// écouteur, sa zone : marbles/core/effects.js/HOLDER_ZONES) ; `by` : l'effet, que
-// portent les évènements produits.
+// Empocher, Défausser, Rebond, Ramasser, Éjecter) appliquée à sa cible (marbles/core/effects.js,
+// en-tête) : le seul aiguillage par forme de cible. `holder` : la bille qui joue
+// l'effet (un écouteur, sa zone : marbles/core/effects.js/HOLDER_ZONES) ; `by` :
+// l'effet, que portent les évènements produits.
 //   au choix : les cibles choisies d'abord, puis chacune (applyToChosen) ;
 //   aucune : la bille elle-même, là où elle est (actOnSelf) ;
-//   FIRST_IN_HAND (Empocher) : la première bille de la main, s'il y en a une ;
-//   « toutes » (Éjecter) : les billes actives filtrées (actOnAll) ;
+//   FIRST_IN_HAND (Empocher, Défausser) : la première bille de la main, s'il y en a
+//   une ;
+//   « toutes » (Éjecter, Défausser) : les billes actives filtrées (actOnAll) ;
+//   le sac (Défausser) : les N prochaines billes du sac (moveFromBag) ;
+//   LAST_DISCARDED (Ramasser) : la dernière bille arrivée à la défausse ;
 //   un emplacement : sa bille (actOnSlot).
 // Sans bille à prendre : sans effet, noté au journal (targetEmpty).
 function applyOperation(run, operation, holder, by) {
@@ -411,17 +453,22 @@ function applyOperation(run, operation, holder, by) {
   else if (target === undefined) actOnSelf(run, action, amount, holder, by);
   else if (target === FIRST_IN_HAND) {
     if (run.state.hand.length === 0) run.emit({ type: "targetEmpty", action, slot: null, target, by });
-    else pocketFromHand(run, 0, by);
+    else moveFromHand(run, 0, action, by);
+  } else if (target === LAST_DISCARDED) {
+    if (run.state.discard.length === 0) run.emit({ type: "targetEmpty", action, slot: null, target, by });
+    else moveFromDiscard(run, run.state.discard.length - 1, action, by);
   } else if (isAll(target)) actOnAll(run, action, amount, target, by);
+  else if (isBag(target)) moveFromBag(run, target.count, action, by);
   else actOnSlot(run, action, amount, target, by);
 }
 
 // Une action sur la bille de `slot`, selon sa nature : le seul aiguillage par nature
-// d'action. Empocher la déplace au pot, Éjecter la chasse, Polissage et Fêlure
-// changent son usure. Emplacement vide : chacune le note.
+// d'action. Une action qui DÉPLACE (`moves` : Empocher vers le pot, Défausser vers la
+// défausse, Rebond vers la main) la fait voyager, Éjecter la chasse, Polissage et Fêlure changent son
+// usure. Emplacement vide : chacune le note.
 function actOnSlot(run, action, amount, slot, by) {
   const rule = CLAUSE_ACTIONS[action];
-  if (rule.moves === "pot") pocketFromSlot(run, slot, by);
+  if (rule.moves !== undefined) moveFromSlot(run, slot, action, by);
   else if (rule.ejects) ejectFromSlot(run, slot, by);
   else wearOnSlot(run, action, amount, slot, by);
 }
@@ -432,8 +479,9 @@ function actOnSlot(run, action, amount, slot, by) {
 //   qui est noté) ; Empocher et Éjecter, la bille, si elle y est encore ;
 //   en main (Empocher, à son Éveil) : une entrée à 0 tour en main, toutes
 //   identiques ;
-//   à la défausse (Empocher, à son Final) : elle y est déjà, la dernière arrivée de
-//   ce nom.
+//   EN PARTANCE (son Final, son Éjection) : son départ est acquis, l'action
+//   REDIRIGE sa destination (Empocher : le pot), voir travel ;
+//   à la défausse (Empocher, à sa Chute) : la dernière arrivée de ce nom, elle-même.
 // Sans bille à prendre : sans effet, noté (targetEmpty, `target` "self").
 function actOnSelf(run, action, amount, holder, by) {
   if (holder.zone === "triangle") {
@@ -444,14 +492,15 @@ function actOnSelf(run, action, amount, holder, by) {
   } else if (holder.zone === "hand") {
     const index = run.state.hand.findLastIndex((held) => held.marble === holder.marble && held.turnsInHand === 0);
     if (index >= 0) {
-      pocketFromHand(run, index, by);
+      moveFromHand(run, index, action, by);
       return;
     }
-  } else if (holder.zone === "removed") {
+  } else if (holder.zone === "leaving") {
+    if (redirect(run, holder.marble, CLAUSE_ACTIONS[action].moves, action, by)) return;
+  } else if (holder.zone === "discard") {
     const index = run.state.discard.lastIndexOf(holder.marble);
     if (index >= 0) {
-      update(run, { discard: run.state.discard.filter((_, other) => other !== index) });
-      sendToPot(run, holder.marble, { from: "discard" }, by);
+      travel(run, { marble: holder.marble, from: { zone: "discard", index }, cause: "pocket", destination: CLAUSE_ACTIONS[action].moves, by });
       return;
     }
   }
@@ -459,7 +508,7 @@ function actOnSelf(run, action, amount, holder, by) {
 }
 
 // « Toutes les billes actives » (Éjecter), filtrées : relevées au déclenchement, dans
-// l'ordre des phases ; une bille partie entre-temps (chassée par l'Éjection d'une
+// l'ordre horaire ; une bille partie entre-temps (chassée par l'Éjection d'une
 // précédente) n'est plus visée. Aucune : sans effet, noté.
 function actOnAll(run, action, amount, target, by) {
   const aimed = SLOTS.filter((slot) => run.state.triangle[slot] !== null && passesFilters(run.state.triangle[slot].marble, target.filters, run.types)).map((slot) => ({
@@ -475,78 +524,193 @@ function actOnAll(run, action, amount, target, by) {
   }
 }
 
-// La bille de la main à `index` quitte la main pour le pot (sendToPot).
-function pocketFromHand(run, index, by) {
-  const { marble } = run.state.hand[index];
-  update(run, { hand: run.state.hand.filter((_, other) => other !== index) });
-  sendToPot(run, marble, { from: "hand", index }, by);
+// --- LE CHEMIN DES BILLES ---
+//
+// Toute sortie d'une bille de sa zone passe par UN déroulé (travel), dans cet ordre :
+//   1. DÉPART : la bille quitte sa zone (ORIGINS) et devient EN PARTANCE. Elle
+//      n'appartient plus à aucune zone : ni active, ni en main, ni à la défausse,
+//      pour toutes les règles (conditions, montants, cibles, régénération du sac).
+//      Depuis le triangle, `removed` le dit, avec sa cause.
+//   2. DÉCLENCHEUR DE SORTIE, s'il y en a un : le Final (usure) ou l'Éjection
+//      (remplacement, Éjecter), une INTERRUPTION (run.settle) réglée jusqu'au bout.
+//      La bille y est "leaving" (marbles/core/effects.js/HOLDER_ZONES) : une action
+//      sur elle-même y REDIRIGE sa destination (Empocher vers le pot), le départ, lui,
+//      ne s'annule jamais.
+//   3. DESTINATION : la défausse par défaut, ou celle qu'une redirection a posée.
+//   4. ARRIVÉE (arrive) : dans la défausse (`discarded`, sa Chute), au pot
+//      (`pocketed`, son entrée ; plein, `lost`, sans effet d'entrée), en main
+//      (`returned`, aucun déclencheur ; pleine, la défausse à la place).
+// Le trajet en cours est dans `run.inTransit` le temps du déclencheur de sortie : un
+// choix qui s'ouvre alors l'emporte (pendingChoice.inTransit).
+
+// Ce qui fait quitter sa zone à une bille, par zone d'origine `from` : { zone, slot }
+// sur le triangle, { zone, index } dans la main ou la défausse, { zone } pour le haut
+// du sac.
+const ORIGINS = {
+  // Son emplacement se vide, son bonus part avec elle ; une phase qui n'avait pas eu
+  // lieu est sautée (la résolution relit l'emplacement).
+  triangle(run, from, marble, cause) {
+    update(run, { triangle: { ...run.state.triangle, [from.slot]: null } });
+    run.emit({ type: "removed", slot: from.slot, marble, cause });
+  },
+  hand(run, from) {
+    update(run, { hand: run.state.hand.filter((_, other) => other !== from.index) });
+  },
+  discard(run, from) {
+    update(run, { discard: run.state.discard.filter((_, other) => other !== from.index) });
+  },
+  // Le haut du sac (Défausser les prochaines billes du sac).
+  bag(run) {
+    update(run, { bag: run.state.bag.slice(1) });
+  },
+};
+
+// Les champs d'origine que portent les évènements d'arrivée : `from` (la zone) et
+// sa place, `slot` ou `index`.
+function originFields(from) {
+  if (from.zone === "triangle") return { from: "triangle", slot: from.slot };
+  if (from.zone === "hand") return { from: "hand", index: from.index };
+  return { from: from.zone };
 }
 
-// La bille d'un emplacement quitte le triangle pour le pot : ni usure ni éjection,
-// donc ni Final ni Éjection ; une phase qui n'avait pas eu lieu est sautée (la
-// résolution relit l'emplacement). Son bonus part avec elle.
-function pocketFromSlot(run, slot, by) {
-  const placed = run.state.triangle[slot];
-  if (placed === null) {
-    run.emit({ type: "targetEmpty", action: "pocket", slot, by });
+// LE trajet d'une bille, le seul (voir plus haut). `journey` :
+//   marble       la bille ;
+//   from         d'où elle part (ORIGINS) ;
+//   cause        pourquoi : "wear", "replacement", "eject", ou l'action qui la
+//                déplace ("pocket", "discard") ;
+//   exit         (facultatif) l'évènement de son déclencheur de sortie, `final` ou
+//                `knockout`, réglé pendant qu'elle est en partance ;
+//   destination  (facultatif) "discard" par défaut, ou "pot" (Empocher) ;
+//                une action qui déplace pose la sienne (CLAUSE_ACTIONS, `moves`) ;
+//   by           (facultatif) l'effet qui la déplace, que porte son arrivée ;
+//   movedBy      (facultatif) l'action qui la déplace (Empocher, Défausser,
+//                Rebond, Ramasser), que porte son arrivée : ses compteurs la lisent.
+export function travel(run, { marble, from, cause, exit = null, destination = "discard", by = null, movedBy = null }) {
+  ORIGINS[from.zone](run, from, marble, cause);
+  const moving = { kind: "leaving", marble, slot: from.slot ?? null, destination, by, movedBy, redirected: false };
+  run.inTransit = [...run.inTransit, moving];
+  if (exit !== null) run.settle(exit);
+  run.inTransit = run.inTransit.filter((other) => other !== moving);
+  arrive(run, moving, from, cause);
+}
+
+// Redirige la bille EN PARTANCE `marble` (la plus récente de ce nom) vers
+// `destination`, par l'effet `by` : `redirected` le note, un déclenchement de
+// l'action `action`. La dernière redirection l'emporte. -> vrai si une bille en
+// partance a été trouvée.
+function redirect(run, marble, destination, action, by) {
+  const moving = run.inTransit.findLast((other) => other.kind === "leaving" && other.marble === marble);
+  if (moving === undefined) return false;
+  Object.assign(moving, { destination, by, movedBy: action, redirected: true });
+  run.emit({ type: "redirected", marble, destination, action, by });
+  return true;
+}
+
+// L'ARRIVÉE d'une bille à sa destination, son trajet fini : au pot (sendToPot), ou
+// à la défausse (`discarded`, de sa cause), une interruption comme les autres
+// arrivées, réglée avant la suite : la CHUTE de la bille (MARBLE_TRIGGERS, `drop`)
+// y joue, elle à la défausse.
+function arrive(run, moving, from, cause) {
+  const origin = originFields(from);
+  const marks = { ...(moving.redirected ? { redirected: true } : {}), ...(moving.movedBy === null ? {} : { movedBy: moving.movedBy }) };
+  if (moving.destination === "pot") {
+    sendToPot(run, moving.marble, origin, moving.by, marks);
     return;
   }
-  update(run, { triangle: { ...run.state.triangle, [slot]: null } });
-  run.emit({ type: "removed", slot, marble: placed.marble, cause: "pocket" });
-  sendToPot(run, placed.marble, { from: "triangle", slot }, by);
+  // En main (Rebond, Ramasser), à 0 tour en main, sans Éveil : ce n'est pas une
+  // pioche. `handIndex` : sa place d'arrivée, la dernière.
+  const roomInHand = run.state.hand.length < run.state.maxHandSize;
+  if (moving.destination === "hand" && roomInHand) {
+    update(run, { hand: [...run.state.hand, { marble: moving.marble, turnsInHand: 0 }] });
+    run.settle({ type: "returned", marble: moving.marble, ...origin, handIndex: run.state.hand.length - 1, cause, ...marks, ...(moving.by === null ? {} : { by: moving.by }) });
+    return;
+  }
+  // La défausse, destination par défaut, ou celle d'une bille renvoyée vers une
+  // main pleine (`handFull`). L'effet qui l'a déplacée, s'il y en a un : la
+  // prévision rattache l'arrivée, et sa Chute, à cet effet.
+  update(run, { discard: [...run.state.discard, moving.marble] });
+  const handFull = moving.destination === "hand" ? { handFull: true } : {};
+  run.settle({ type: "discarded", marble: moving.marble, ...origin, cause, ...handFull, ...marks, ...(moving.by === null ? {} : { by: moving.by }) });
 }
 
-// Une bille, sortie de sa zone, va au pot ; plein, elle est perdue. Elle n'y passe
-// qu'une fois : sa zone d'origine l'a déjà rendue. Au pot, ses effets d'entrée se
-// règlent aussitôt (une interruption : run.settle), avant la suite.
-function sendToPot(run, marble, origin, by) {
+// LES DÉPLACEMENTS d'une action qui en fait (CLAUSE_ACTIONS, `moves` : Empocher,
+// Défausser) : un trajet (travel), sans déclencheur de sortie, de cause l'action,
+// vers sa destination.
+function moveBy(run, marble, from, action, by) {
+  travel(run, { marble, from, cause: action, destination: CLAUSE_ACTIONS[action].moves, by, movedBy: action });
+}
+
+// La bille de la défausse à `index` la quitte (Ramasser). Vers la main, s'il n'y a
+// plus de place (`handLimited`), elle reste où elle est : sans effet, noté.
+function moveFromDiscard(run, index, action, by) {
+  if (CLAUSE_ACTIONS[action].handLimited && run.state.hand.length >= run.state.maxHandSize) {
+    run.emit({ type: "targetEmpty", action, slot: null, target: "handFull", by });
+    return;
+  }
+  moveBy(run, run.state.discard[index], { zone: "discard", index }, action, by);
+}
+
+// La bille de la main à `index` quitte la main.
+function moveFromHand(run, index, action, by) {
+  moveBy(run, run.state.hand[index].marble, { zone: "hand", index }, action, by);
+}
+
+// La bille d'un emplacement quitte le triangle : ni usure ni éjection, donc ni Final
+// ni Éjection ; une phase qui n'avait pas eu lieu est sautée. Vide : noté.
+function moveFromSlot(run, slot, action, by) {
+  const placed = run.state.triangle[slot];
+  if (placed === null) {
+    run.emit({ type: "targetEmpty", action, slot, by });
+    return;
+  }
+  moveBy(run, placed.marble, { zone: "triangle", slot }, action, by);
+}
+
+// Les `count` prochaines billes du sac, une par une, du haut : chacune son trajet
+// (sa Chute, une Défausse). Un sac qui en a moins donne ce qu'il a, sans
+// régénération (mélanger la défausse pour la redéfausser n'aurait pas de sens) ; un
+// sac vide : sans effet, noté. À l'aveugle (la prévision), la bille est inconnue.
+function moveFromBag(run, count, action, by) {
+  if (run.state.bag.length === 0) {
+    run.emit({ type: "targetEmpty", action, slot: null, target: "bag", by });
+    return;
+  }
+  for (let moved = 0; moved < count && run.state.bag.length > 0; moved++) {
+    moveBy(run, run.state.bag[0], { zone: "bag" }, action, by);
+  }
+}
+
+// L'arrivée au pot ; plein, la bille est perdue. Au pot, ses effets d'entrée se
+// règlent aussitôt (une interruption : run.settle), avant la suite. `extra` :
+// `redirected` quand une redirection l'y a envoyée (son déclenchement d'Empocher
+// est déjà compté par `redirected`).
+function sendToPot(run, marble, origin, by, extra = {}) {
   if (run.state.pot.length < run.state.potCapacity) {
     update(run, { pot: [...run.state.pot, marble] });
-    run.settle({ type: "pocketed", marble, ...origin, potIndex: run.state.pot.length - 1, by });
+    run.settle({ type: "pocketed", marble, ...origin, potIndex: run.state.pot.length - 1, by, ...extra });
     return;
   }
   update(run, { lost: [...run.state.lost, marble] });
-  run.emit({ type: "lost", marble, ...origin, by });
+  run.emit({ type: "lost", marble, ...origin, by, ...extra });
 }
 
-// La bille de `slot` est CHASSÉE par l'effet `by`, dans cet ordre : `eject` ; son
-// Éjection, une interruption (run.settle) réglée jusqu'au bout avant la suite, dont
-// les conditions de calibre comparent la bille chassée à celle qui éjecte (le
-// remplacement { placed, ejected }) ; puis elle quitte son emplacement et rejoint la
-// défausse (cause "eject"). Ni Tic ni Final. Pendant la résolution, sa phase, si
-// elle n'avait pas eu lieu, est sautée (la résolution relit l'emplacement). Son
-// Éjection a pu la retirer déjà (une Fêlure sur elle-même) : elle ne part pas une
-// seconde fois. Une bille déjà en train d'être chassée (`run.knockingOut` : son
-// Éjection est en cours, et vise à son tour son emplacement) ne l'est pas deux fois :
-// sans effet, noté, plutôt qu'une boucle.
+// La bille de `slot` est CHASSÉE par l'effet `by` : `eject`, puis son trajet
+// (travel), cause "eject", son Éjection pour déclencheur de sortie, dont les
+// conditions de calibre comparent la bille chassée à celle qui éjecte (le
+// remplacement { placed, ejected }). Ni Tic ni Final. Pendant la résolution, sa
+// phase, si elle n'avait pas eu lieu, est sautée. Partie dès son départ, elle n'est
+// plus sur le triangle pendant son Éjection : rien ne peut la chasser une seconde
+// fois.
 function ejectFromSlot(run, slot, by) {
   const placed = run.state.triangle[slot];
-  if (placed === null || run.knockingOut.has(slot)) {
+  if (placed === null) {
     run.emit({ type: "targetEmpty", action: "eject", slot, by });
     return;
   }
   const { marble } = placed;
   run.emit({ type: "eject", slot, marble, by });
-  run.knockingOut.add(slot);
-  try {
-    run.settle({ type: "knockout", slot, marble, replacement: { placed: by.marble, ejected: marble }, by });
-  } finally {
-    run.knockingOut.delete(slot);
-  }
-  if (run.state.triangle[slot] === null) return;
-  discardFromSlot(run, slot, marble, "eject");
-}
-
-// LE départ d'une bille du triangle pour la défausse, le seul : elle quitte son
-// emplacement (`removed`), puis rejoint la défausse (`discarded`), de `cause`
-// "replacement" (délogée par une pose), "wear" (usée) ou "eject" (chassée par
-// Éjecter). Empocher, lui, l'envoie au pot (pocketFromSlot).
-export function discardFromSlot(run, slot, marble, cause) {
-  const leaving = { slot, marble, cause };
-  update(run, { triangle: { ...run.state.triangle, [slot]: null } });
-  run.emit({ type: "removed", ...leaving });
-  update(run, { discard: [...run.state.discard, marble] });
-  run.emit({ type: "discarded", ...leaving });
+  const exit = { type: "knockout", slot, marble, replacement: { placed: by.marble, ejected: marble }, by };
+  travel(run, { marble, from: { zone: "triangle", slot }, cause: "eject", exit });
 }
 
 // Une action sur l'usure (Polissage, Fêlure : CLAUSE_ACTIONS), appliquée à la bille
@@ -618,8 +782,6 @@ export function transact(state, types, { eventLimit, blind = false, answers = []
   // `phasesStarted` : les emplacements dont la phase a commencé (ou a été sautée)
   // pendant cette action ; un bonus qui les vise est perdu (fireEffect). `reactions` :
   // par évènement émis, les réactions du pot à émettre après son traitement.
-  // `knockingOut` : les emplacements dont l'Éjection est en cours (une pose, Éjecter) :
-  // Éjecter ne les vise pas une seconde fois (ejectFromSlot).
   const run = {
     state,
     types,
@@ -627,16 +789,16 @@ export function transact(state, types, { eventLimit, blind = false, answers = []
     uncertain: false,
     choiceDependent: false,
     phasesStarted: new Set(),
-    knockingOut: new Set(),
     journal: [],
     reactions: new Map(),
     answers,
     answerIndex: 0,
     // Les billes EN TRANSIT : sorties d'une zone, pas encore arrivées dans la
-    // suivante ({ kind, marble, slot }). Dans aucune zone, donc jamais une cible ni
-    // un écouteur ; un choix qui s'ouvre pendant leur trajet les emporte, pour
-    // information (pendingChoice.inTransit). Seule nature aujourd'hui : "thrown",
-    // en cours de lancer (marbles/core/marbles.js/placeMarble).
+    // suivante ({ kind, marble, slot, ... }). Dans aucune zone, donc jamais une
+    // cible ni un écouteur ; un choix qui s'ouvre pendant leur trajet les emporte,
+    // pour information (pendingChoice.inTransit). Deux natures : "thrown", en cours
+    // de lancer (marbles/core/marbles.js/placeMarble), vers l'emplacement `slot` ;
+    // "leaving", en partance (travel), depuis l'emplacement `slot` ou null.
     inTransit: [],
   };
   const bus = createEventBus((event) => handleEvent(run, event), eventLimit, () => record({ type: "chainInterrupted" }));
@@ -669,20 +831,23 @@ export function transact(state, types, { eventLimit, blind = false, answers = []
   } catch (error) {
     if (!(error instanceof ChoiceSuspension)) throw error;
     const resume = { from: state, action, answers, seen: run.journal.length, ...(eventLimit === undefined ? {} : { eventLimit }) };
-    const pendingChoice = { ...error.request, inTransit: run.inTransit, resume };
+    const inTransit = run.inTransit.map(({ kind, marble, slot }) => ({ kind, marble, slot }));
+    const pendingChoice = { ...error.request, inTransit, resume };
     return { ok: true, state: { ...run.state, pendingChoice }, events: run.journal.slice(seen), error: null };
   }
   const result = { ok: true, state: run.state, events: run.journal.slice(seen), error: null };
   return blind ? { ...result, uncertain: run.uncertain, choiceDependent: run.choiceDependent } : result;
 }
 
-// Une copie À L'AVEUGLE d'un état, celle de la prévision : le sac et la défausse
-// n'y gardent que leur nombre de billes, jamais leur identité ni leur ordre, et le
-// hasard de la partie en est retiré (null : un tirage y échouerait). Un déroulé à
+// Une copie À L'AVEUGLE d'un état, celle de la prévision : le sac n'y garde que son
+// nombre de billes, jamais leur identité ni leur ordre, et le hasard de la partie
+// en est retiré (null : un tirage y échouerait). La défausse, que le joueur connaît
+// dans l'ordre d'arrivée, reste telle quelle (Ramasser la lit) ; un mélange à
+// l'aveugle la cache (regenerateBag). Un déroulé à
 // l'aveugle (options.blind) n'en a jamais besoin.
 export function blindCopy(state) {
   const hidden = (list) => list.map(() => UNKNOWN_MARBLE);
-  return { ...structuredClone(state), bag: hidden(state.bag), discard: hidden(state.discard), rngState: null };
+  return { ...structuredClone(state), bag: hidden(state.bag), rngState: null };
 }
 
 // --- Actions ---
@@ -690,7 +855,7 @@ export function blindCopy(state) {
 // La défausse devient le sac : mélangée par le hasard de la partie, ou, à
 // l'aveugle, sans mélange ni hasard, ses billes devenant inconnues (la prévision
 // annonce la régénération sans rien en révéler). Puis la TROUVAILLE de chaque bille
-// active, dans l'ordre des phases : une INTERRUPTION (run.settle), réglée jusqu'au
+// active, dans l'ordre horaire : une INTERRUPTION (run.settle), réglée jusqu'au
 // bout, ce qu'elle déclenche compris (Pioche, Fêlure et Final), avant la bille
 // suivante et avant que la pioche interrompue ne reprenne. L'emplacement se relit
 // à chaque bille : une bille retirée par une Trouvaille précédente n'a pas la
@@ -761,10 +926,10 @@ export function drawMarbles(run, count, cause) {
 }
 
 // LE retrait par usure d'une bille, le seul : à l'étape des retraits, ou aussitôt
-// quand une Fêlure l'amène à son maximum. Elle quitte son emplacement, rejoint la
-// défausse, puis son Final se déclenche.
+// quand une Fêlure l'amène à son maximum. Son trajet (travel), cause "wear" : elle
+// quitte son emplacement, son Final joue pendant qu'elle est en partance, puis elle
+// arrive à sa destination, la défausse sauf redirection.
 export function retireMarble(run, slot) {
   const { marble } = run.state.triangle[slot];
-  discardFromSlot(run, slot, marble, "wear");
-  run.emit({ type: "final", slot, marble });
+  travel(run, { marble, from: { zone: "triangle", slot }, cause: "wear", exit: { type: "final", slot, marble } });
 }

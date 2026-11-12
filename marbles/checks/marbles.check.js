@@ -6,7 +6,7 @@
 // (`node tools/run-checks.js marbles`).
 
 import { auditNonSerializable, throws } from "../../lib/check.js";
-import { SLOTS, createMarblesGame, impactOf, legalActions, swapRefusal, placeRefusal, throwRefusal, throwsLeft } from "../core/marbles.js";
+import { SLOTS, createMarblesGame, impactOf, legalActions, nextSlot, previousSlot, swapRefusal, placeRefusal, throwRefusal, throwsLeft } from "../core/marbles.js";
 import { JOURNAL_EVENTS, buildMarbleKeywords, validateMarblePhases, validateMarbleTriggers, validateMarbleTypes } from "../core/content.js";
 import { MARBLE_PHASES, MARBLE_POCKET, MARBLE_TRIGGERS } from "../config/values.js";
 import { CLAUSE_ACTIONS, amountOf, printedStat } from "../core/effects.js";
@@ -437,7 +437,7 @@ function checkDrawEffects(run) {
     playState({ hand: inHand(["split_base"]), bag: ["base_pocket", "final_pocket"], triangle: triangleOf(null, null, placed("hit_polish")) }),
     { type: "place", handIndex: 0, slot: "apex" }
   );
-  run.same("tic qui pioche : journal", ["flick", "knockout", "removed", "discarded", "placed", "hit", "effect", "draw", "awaken"], eventTypes(hit.events));
+  run.same("tic qui pioche : journal", ["flick", "removed", "knockout", "discarded", "placed", "hit", "effect", "draw", "awaken"], eventTypes(hit.events));
   run("tic qui pioche : l'effet dit sa Pioche", 1, hit.events[6].draw);
   run("tic qui pioche : le haut du sac", "base_pocket", hit.events[7].marble);
   run("tic qui pioche : en main", "base_pocket", handIds(hit.state).join());
@@ -452,13 +452,13 @@ function checkDrawEffects(run) {
   // aging_flick a une Chiquenaude (à 0 tour en main, elle ne produit rien) : son effet passe.
   run.same(
     "éjection qui pioche : journal",
-    ["flick", "effect", "knockout", "effect", "draw", "awaken", "removed", "discarded", "placed", "hit", "effect"],
+    ["flick", "effect", "removed", "knockout", "effect", "draw", "awaken", "discarded", "placed", "hit", "effect"],
     eventTypes(knockout.events)
   );
   run("éjection qui pioche : en main", "final_pocket", handIds(knockout.state).join());
 
   // Phase qui pioche : la bille attend le tour suivant (elle est en main à sa pioche).
-  const phase = apply(playState({ hand: inHand([]), bag: ["final_pocket", "all_rounder"], triangle: triangleOf(placed("awaken_draw"), null, null) }), { type: "resolve" });
+  const phase = apply(playState({ hand: inHand([]), bag: ["final_pocket", "all_rounder"], triangle: triangleOf(null, placed("awaken_draw"), null) }), { type: "resolve" });
   run.same("phase qui pioche : l'effet puis la bille", ["phase", "effect", "draw", "awaken", "wear"], eventTypes(phase.events).slice(0, 5));
   run("phase qui pioche : la Pioche ne touche ni Vitesse ni Masse", 0, phase.events[1].speedDelta + phase.events[1].massDelta);
   run("phase qui pioche : en main après la résolution", "final_pocket", handIds(phase.state).join());
@@ -477,7 +477,7 @@ function checkDrawEffects(run) {
   run.same("régénération en jeu : dans le journal de la pose", ["hit", "effect", "bagRegenerated", "windfall", "draw", "awaken"], eventTypes(regenPlay.events).slice(-6));
   run("régénération en jeu : la défausse entière, bille remplacée comprise", 3, regenPlay.events.find((event) => event.type === "bagRegenerated").size);
   run("régénération en jeu : la partie continue", "play", regenPlay.state.stage);
-  const regenResolve = apply(playState({ hand: inHand([]), bag: [], discard: ["final_pocket"], triangle: triangleOf(placed("awaken_draw"), null, null) }), { type: "resolve" });
+  const regenResolve = apply(playState({ hand: inHand([]), bag: [], discard: ["final_pocket"], triangle: triangleOf(null, placed("awaken_draw"), null) }), { type: "resolve" });
   run.same("régénération en résolution : dans le journal", ["phase", "effect", "bagRegenerated", "windfall", "draw", "awaken"], eventTypes(regenResolve.events).slice(0, 6));
   run("régénération en résolution : la bille en main", "final_pocket", handIds(regenResolve.state).join());
 
@@ -494,7 +494,7 @@ function checkDrawEffects(run) {
   const none = apply(playState({ hand: inHand(["split_base"]), bag: [], discard: [], triangle: triangleOf(null, null, placed("hit_polish")) }), { type: "place", handIndex: 0, slot: "apex" });
   // La bille remplacée vient d'arriver en défausse : elle est repiochée.
   run("tic qui pioche, sac vide : la remplacée revient", "hit_polish", handIds(none.state).join());
-  const nothing = apply(playState({ hand: inHand([]), bag: [], discard: [], triangle: triangleOf(placed("awaken_draw"), null, null) }), { type: "resolve" });
+  const nothing = apply(playState({ hand: inHand([]), bag: [], discard: [], triangle: triangleOf(null, placed("awaken_draw"), null) }), { type: "resolve" });
   run("phase qui pioche, rien à piocher : arrêt annoncé", "noMarbles", nothing.events.find((event) => event.type === "drawSkipped").reason);
   run("phase qui pioche, rien à piocher : jamais une fin de partie en cours de tour", "draw", nothing.state.stage);
 
@@ -525,8 +525,8 @@ function checkDrawEffects(run) {
 // La liste des déclencheurs, déclarée une fois (marbles/config/values.js).
 function checkTriggers(run) {
   run.same(
-    "déclencheurs : éveil, chiquenaude, tic, trouvaille, éjection, final, dans l'ordre de la fiche",
-    ["awaken", "flick", "hit", "windfall", "knockout", "final"],
+    "déclencheurs : éveil, chiquenaude, tic, trouvaille, éjection, final, chute, dans l'ordre de la fiche",
+    ["awaken", "flick", "hit", "windfall", "knockout", "final", "drop"],
     MARBLE_TRIGGERS.map((trigger) => trigger.id)
   );
   run("déclencheurs : la vraie liste acceptée", false, throws(() => validateMarbleTriggers(MARBLE_TRIGGERS)));
@@ -546,14 +546,15 @@ function checkTriggers(run) {
   run("table : un champ de déclencheur inconnu refusé", true, throws(() => validateTable({ a: { finale: [] } })));
 }
 
-// Le FINAL : au retrait par usure seulement, la bille déjà à la défausse, avant
-// l'Impact, ses valeurs comptant pour le tour.
+// Le FINAL : au retrait par usure seulement, la bille EN PARTANCE (partie de son
+// emplacement, pas encore arrivée à la défausse), avant l'Impact, ses valeurs
+// comptant pour le tour.
 function checkFinal(run) {
   // fragile (usure 2) en pointe, déjà usée une fois : elle s'use, part, son Final joue.
   const worn = apply(playState({ hand: inHand([]), bag: ["aging_flick"], triangle: triangleOf(null, null, placed("fragile", 1)) }), { type: "resolve" });
   run.same(
-    "final : retrait, défausse, Final (son Polissage au choix sans aucune cible), puis l'Impact",
-    ["phase", "effect", "wear", "removed", "discarded", "final", "effect", "targetEmpty", "impact"],
+    "final : départ, Final en partance (son Polissage au choix sans aucune cible), arrivée à la défausse, puis l'Impact",
+    ["phase", "effect", "wear", "removed", "final", "effect", "targetEmpty", "discarded", "impact"],
     eventTypes(worn.events).slice(eventTypes(worn.events).indexOf("phase"), eventTypes(worn.events).indexOf("impact") + 1)
   );
   const final = worn.events.filter((event) => event.type === "effect").at(-1);
@@ -600,10 +601,12 @@ function checkFinal(run) {
   run("final, pioche : pas jouable avant la pioche du tour", "mustDraw", placeRefusal(oneShot.state, 0, "apex"));
   run("final, pioche : jouable au tour suivant", null, placeRefusal(apply(oneShot.state, { type: "draw" }).state, 0, "apex"));
 
-  // Sac vide : la défausse, one_shot comprise (elle vient d'y arriver), devient le sac.
+  // Sac vide : la défausse devient le sac, SANS one_shot, en partance pendant son
+  // Final (pas encore à la défausse) ; elle y arrive ensuite.
   const regen = apply(playState({ hand: inHand([]), bag: [], discard: ["aging_flick"], triangle: triangleOf(null, null, placed("one_shot")) }), { type: "resolve" });
   run.same("final, pioche : régénération au cours de la résolution", ["final", "effect", "bagRegenerated", "draw"], eventTypes(regen.events).filter((type) => ["final", "effect", "bagRegenerated", "draw"].includes(type)).slice(-4));
-  run("final, pioche : la défausse entière, one_shot comprise", 2, regen.events.find((event) => event.type === "bagRegenerated").size);
+  run("final, pioche : la défausse remélangée sans one_shot, en partance", 1, regen.events.find((event) => event.type === "bagRegenerated").size);
+  run.same("final, pioche : one_shot arrive à la défausse après son Final", ["one_shot"], regen.state.discard);
   run("final, pioche : aucune bille perdue", 2, marbleCount(regen.state));
 }
 
@@ -622,7 +625,7 @@ function checkPlace(run) {
   run("remplacement : journal nomme l'ancienne", "one_shot", replacing.events.find((event) => event.type === "knockout").marble);
   run.same(
     "remplacement : cause de la défausse",
-    { type: "discarded", slot: "apex", marble: "one_shot", cause: "replacement" },
+    { type: "discarded", marble: "one_shot", from: "triangle", slot: "apex", cause: "replacement" },
     replacing.events.find((event) => event.type === "discarded")
   );
 
@@ -667,24 +670,24 @@ function checkPlace(run) {
 
 // Le déroulé d'une pose, les compteurs du tour : Tic et Éjection.
 function checkHitAndKnockout(run) {
-  // Ordre sur un emplacement occupé : Chiquenaude de A, Éjection de B, retrait,
-  // défausse, pose de A, Tic de A.
+  // Ordre sur un emplacement occupé : Chiquenaude de A, départ de B, son Éjection
+  // en partance, son arrivée à la défausse, pose de A, Tic de A.
   const state = playState({ hand: inHand(["aging_flick"]), triangle: triangleOf(null, null, placed("hit_pocket", 1)) });
   const both = apply(state, { type: "place", handIndex: 0, slot: "apex" });
   run.same(
     "pose sur occupé : ordre du journal",
-    ["flick", "effect", "knockout", "effect", "removed", "discarded", "placed", "hit", "effect"],
+    ["flick", "effect", "removed", "knockout", "effect", "discarded", "placed", "hit", "effect"],
     eventTypes(both.events)
   );
   run.same(
     "pose sur occupé : qui joue quoi",
-    ["flick:aging_flick", "effect:aging_flick", "knockout:hit_pocket", "effect:hit_pocket", "removed:hit_pocket", "discarded:hit_pocket", "placed:aging_flick", "hit:aging_flick", "effect:aging_flick"],
+    ["flick:aging_flick", "effect:aging_flick", "removed:hit_pocket", "knockout:hit_pocket", "effect:hit_pocket", "discarded:hit_pocket", "placed:aging_flick", "hit:aging_flick", "effect:aging_flick"],
     both.events.map((event) => `${event.type}:${event.marble}`)
   );
   run.same(
     "Éjection : son effet et le cumul",
     { type: "effect", trigger: "knockout", slot: "apex", marble: "hit_pocket", speedDelta: 3, massDelta: 0, draw: 0, operations: [], given: [], lost: [], speed: 3, mass: 1 },
-    both.events[3]
+    both.events[4]
   );
   run.same(
     "Tic : son effet et le cumul",
@@ -692,13 +695,15 @@ function checkHitAndKnockout(run) {
     both.events[8]
   );
 
-  // Les bons moments : au Tic, la nouvelle bille est là ; à l'Éjection, encore en main.
+  // Les bons moments : au Tic, la nouvelle bille est là ; à l'Éjection, l'occupante
+  // est déjà partie (en partance) et la nouvelle encore en lancer : l'emplacement
+  // est vide pour les conditions.
   const seenByKnockout = {
     witness: { knockout: [{ action: "speed", amount: 1, when: { type: "printedStat", slot: "apex", stat: "speed", atLeast: 5 } }], apex: [{ action: "speed", amount: 5 }] },
     arrival: { hit: [{ action: "mass", amount: 1, when: { type: "printedStat", slot: "apex", stat: "mass", atLeast: 2 } }], apex: [{ action: "mass", amount: 2 }] },
   };
   const moments = apply(playState({ hand: inHand(["arrival"]), triangle: triangleOf(null, null, placed("witness")) }), { type: "place", handIndex: 0, slot: "apex" }, seenByKnockout);
-  run("Éjection : jouée avant le retrait de la bille", 1, moments.events.find((event) => event.trigger === "knockout").speedDelta);
+  run("Éjection : jouée en partance, la bille n'est plus sur son emplacement", 0, moments.events.find((event) => event.trigger === "knockout").speedDelta);
   run("Tic : joué après l'arrivée de la bille", 1, moments.events.find((event) => event.trigger === "hit").massDelta);
 
   // Compteurs du tour, modifiés avant la résolution, et l'Impact en tient compte.
@@ -723,7 +728,7 @@ function checkHitAndKnockout(run) {
 
   // Une bille sans Tic ni Éjection : les évènements passent, aucun effet.
   const plain = apply(playState({ hand: inHand(["all_rounder"]), triangle: triangleOf(null, null, placed("fragile")) }), { type: "place", handIndex: 0, slot: "apex" });
-  run.same("sans Tic ni Éjection : aucun effet", ["flick", "knockout", "removed", "discarded", "placed", "hit"], eventTypes(plain.events));
+  run.same("sans Tic ni Éjection : aucun effet", ["flick", "removed", "knockout", "discarded", "placed", "hit"], eventTypes(plain.events));
   run("sans Tic ni Éjection : compteurs intacts", "0,1", `${plain.state.speed},${plain.state.mass}`);
 
   // Ni Tic ni Éjection ailleurs.
@@ -812,7 +817,6 @@ function checkWearActions(run) {
     cracker: { base: [crack(1, "apex")], hit: [crack(1, "leftBase")] },
     breaker: { base: [crack(5, "apex")] },
     finalPolisher: { final: [polish(1, "apex")], maxWear: 1 },
-    selfBreaker: { knockout: [crack(5)] },
     emptyHitter: { hit: [polish(1, "rightBase")] },
   };
   const wearRules = fabricatedRules(table);
@@ -834,10 +838,10 @@ function checkWearActions(run) {
   run("Polissage depuis un Final : appliqué à la pointe", "apex", find(finalSave, "polished").slot);
 
   // Fêlure en phase : jusqu'au maximum, retrait aussitôt, Final, phase sautée.
-  const broken = resolveOf(playState({ bag: ["plain"], triangle: triangleOf(placed("cracker"), null, placed("fragile", 1)) }));
+  const broken = resolveOf(playState({ bag: ["plain"], triangle: triangleOf(null, placed("cracker"), placed("fragile", 1)) }));
   run.same(
     "Fêlure : l'effet, la fêlure, le retrait, le Final, avant la suite",
-    ["phase", "effect", "cracked", "removed", "discarded", "final", "effect", "wear", "phaseSkipped", "phaseSkipped"],
+    ["phase", "effect", "cracked", "removed", "final", "effect", "discarded", "wear", "phaseSkipped", "phaseSkipped"],
     types(broken).slice(0, 10)
   );
   run("Fêlure : la phase de la bille retirée est sautée", "apex", broken.events.filter((event) => event.type === "phaseSkipped").at(-1).slot);
@@ -862,11 +866,13 @@ function checkWearActions(run) {
   const empty = act(playState({ hand: inHand(["emptyHitter"]), triangle: triangleOf(placed("plain"), null, null) }), { type: "place", handIndex: 0, slot: "leftBase" });
   run.same("cible vide : notée au journal", { type: "targetEmpty", action: "polish", slot: "rightBase", by: { trigger: "hit", slot: "leftBase", marble: "emptyHitter" } }, find(empty, "targetEmpty"));
 
-  // Une bille fêlée jusqu'au retrait par sa propre Éjection ne part qu'une fois.
-  const self = act(playState({ hand: inHand(["plain"]), triangle: triangleOf(null, null, placed("selfBreaker")) }), { type: "place", handIndex: 0, slot: "apex" });
-  run("Éjection qui se fêle : une seule défausse", "selfBreaker", self.state.discard.join());
-  run("Éjection qui se fêle : la posée arrive", "plain", self.state.triangle.apex.marble);
-  run("Éjection qui se fêle : aucune bille perdue ni dupliquée", marbleCount(playState({ hand: inHand(["plain"]), triangle: triangleOf(null, null, placed("selfBreaker")) })), marbleCount(self.state));
+  // Polissage et Fêlure sur soi, refusés dans un Final et une Éjection : la bille y
+  // est en partance, son départ est acquis.
+  for (const field of ["knockout", "final"]) {
+    for (const action of ["crack", "polish"]) {
+      run(`${field} : ${action} sur elle-même refusé, en partance`, true, /en partance/.test(caughtMessage(() => validateTable({ a: { [field]: [{ action, amount: 1 }] } }))));
+    }
+  }
 }
 
 // Polissage et Fêlure sur les billes de test du jeu : par un Tic, en phase avec
@@ -887,10 +893,10 @@ function checkWearMarbles(run) {
   // 2) part aussitôt, son Final joue, sa phase est sautée.
   // fragile sans le Polissage au choix de son Final : ce cas porte sur la Fêlure.
   const crackerTable = { cracker: { base: [{ action: "crack", amount: 1, target: "apex" }] }, fragile: CHOICELESS_TYPES.fragile, aging_flick: FIXTURE_TYPES.aging_flick };
-  const cracked = apply(playState({ bag: ["aging_flick"], triangle: triangleOf(placed("cracker"), null, placed("fragile", 1)) }), { type: "resolve" }, crackerTable);
+  const cracked = apply(playState({ bag: ["aging_flick"], triangle: triangleOf(null, placed("cracker"), placed("fragile", 1)) }), { type: "resolve" }, crackerTable);
   run.same(
     "Fêlure en phase : retrait, Final de fragile, puis la suite",
-    ["phase", "effect", "cracked", "removed", "discarded", "final", "effect", "wear", "phaseSkipped", "phaseSkipped"],
+    ["phase", "effect", "cracked", "removed", "final", "effect", "discarded", "wear", "phaseSkipped", "phaseSkipped"],
     eventTypes(cracked.events).slice(0, 10)
   );
   run("Fêlure en phase : la Vitesse du Final compte, la phase de fragile non", 4, find(cracked, "impact").impact);
@@ -922,11 +928,12 @@ function checkTargetRule(run) {
   refused("pointe vers la base gauche", { apex: [speedTo("leftBase")] });
   refused("pointe vers la base droite", { apex: [massTo("rightBase")] });
   refused("pointe vers elle-même", { apex: [speedTo("apex")] });
-  refused("base vers la base gauche (toujours passée)", { base: [speedTo("leftBase")] });
-  refused("variante de base droite vers la base droite", { baseVariant: { rightBase: [speedTo("rightBase")] } });
-  accepted("base vers la base droite (depuis la base gauche)", { base: [speedTo("rightBase")] });
+  refused("base vers la base droite (toujours passée, la première phase)", { base: [speedTo("rightBase")] });
+  refused("variante de base gauche vers la base gauche", { baseVariant: { leftBase: [speedTo("leftBase")] } });
+  refused("variante de base gauche vers la base droite (passée)", { baseVariant: { leftBase: [speedTo("rightBase")] } });
+  accepted("base vers la base gauche (depuis la base droite)", { base: [speedTo("leftBase")] });
   accepted("base vers la pointe", { base: [speedTo("apex")] });
-  accepted("variante de base gauche vers la base droite", { baseVariant: { leftBase: [speedTo("rightBase")] } });
+  accepted("variante de base droite vers la base gauche", { baseVariant: { rightBase: [speedTo("leftBase")] } });
   accepted("tic vers n'importe quel emplacement", { hit: [speedTo("leftBase"), speedTo("apex")] });
   accepted("éjection vers la base gauche", { knockout: [massTo("leftBase")] });
   accepted("Final sans cible", { final: [{ action: "speed", amount: 2 }] });
@@ -937,9 +944,9 @@ function checkBonus(run) {
   const table = {
     plain: { apex: [{ action: "speed", amount: 1 }], base: [{ action: "speed", amount: 1 }] },
     giver: { hit: [toApex(2)], knockout: [toApex(3), toApex(1, "mass")] },
-    // Une base qui vise la base droite : possible depuis la base gauche, perdu depuis
-    // la base droite (sa propre phase a commencé).
-    late: { base: [{ action: "speed", amount: 1, target: "rightBase" }] },
+    // Une base qui vise la base gauche : possible depuis la base droite (la première
+    // phase), perdu depuis la base gauche (sa propre phase a commencé).
+    late: { base: [{ action: "speed", amount: 1, target: "leftBase" }] },
     both: { base: [{ action: "speed", amount: 5 }, toApex(2)] },
     conditional: { hit: [{ action: "speed", amount: 9, when: { type: "printedStat", slot: "apex", stat: "mass", atLeast: 1 } }] },
   };
@@ -975,17 +982,17 @@ function checkBonus(run) {
   const replaced = act(playState({ hand: inHand(["plain"]), triangle: triangleOf(null, null, { ...placed("plain"), bonus: { speed: 2, mass: 0 } }) }), { type: "place", handIndex: 0, slot: "apex" });
   run("bonus : perdu avec une bille remplacée", undefined, replaced.state.triangle.apex.bonus);
 
-  const tooLate = resolveOf(playState({ triangle: triangleOf(placed("plain"), placed("late"), null) }));
+  const tooLate = resolveOf(playState({ triangle: triangleOf(placed("late"), placed("plain"), null) }));
   run("bonus : phase de la cible commencée, sans effet sur l'Impact", 1, tooLate.state.score);
   run("bonus : phase de la cible commencée, ne survit pas au tour", undefined, tooLate.state.triangle.leftBase.bonus);
   run.same(
     "bonus : perdu, noté au journal",
-    [{ slot: "rightBase", reason: "phasePassed", speed: 1, mass: 0 }],
+    [{ slot: "leftBase", reason: "phasePassed", speed: 1, mass: 0 }],
     tooLate.events.find((event) => event.type === "effect" && event.marble === "late").lost
   );
   run.same("bonus : perdu, rien de donné", [], tooLate.events.find((event) => event.type === "effect" && event.marble === "late").given);
-  const inTime = resolveOf(playState({ triangle: triangleOf(placed("late"), placed("plain"), null) }));
-  run("bonus : depuis la base gauche, la base droite le reçoit (1 + 1)", 2, inTime.events.find((event) => event.type === "effect" && event.slot === "rightBase").speedDelta);
+  const inTime = resolveOf(playState({ triangle: triangleOf(placed("plain"), placed("late"), null) }));
+  run("bonus : depuis la base droite, la base gauche le reçoit (1 + 1)", 2, inTime.events.find((event) => event.type === "effect" && event.slot === "leftBase").speedDelta);
   run.same("bonus : emplacement vide, noté au journal", [{ slot: "apex", reason: "emptySlot", speed: 2, mass: 0 }], toEmpty.events.find((event) => event.trigger === "hit").lost);
 
   const mixed = resolveOf(playState({ triangle: triangleOf(placed("both"), null, placed("plain")) }));
@@ -1001,7 +1008,7 @@ function checkBonus(run) {
 }
 
 function checkResolution(run) {
-  // Ordre : base gauche, base droite, pointe, puis Impact, retrait, rotation.
+  // Ordre horaire : base droite, base gauche, pointe, puis Impact, retrait, rotation.
   const full = playState({ triangle: triangleOf(placed("aging_flick"), placed("hit_polish"), placed("final_pocket")) });
   const result = apply(full, { type: "resolve" });
   run.same(
@@ -1010,8 +1017,8 @@ function checkResolution(run) {
     eventTypes(result.events)
   );
   run.same(
-    "résolution : ordre des phases",
-    ["leftBase", "rightBase", "apex"],
+    "résolution : ordre des phases, l'ordre horaire",
+    ["rightBase", "leftBase", "apex"],
     result.events.filter((event) => event.type === "phase").map((event) => event.slot)
   );
   // aging_flick en base (Vitesse +1), hit_polish en base (Masse +1), final_pocket en pointe (Masse +1 :
@@ -1028,7 +1035,7 @@ function checkResolution(run) {
   const effect = result.events.find((event) => event.type === "effect" && event.slot === "rightBase");
   run.same(
     "effet : deltas et cumul",
-    { type: "effect", trigger: "phase", slot: "rightBase", marble: "hit_polish", speedDelta: 0, massDelta: 1, draw: 0, operations: [], given: [], lost: [], speed: 1, mass: 2 },
+    { type: "effect", trigger: "phase", slot: "rightBase", marble: "hit_polish", speedDelta: 0, massDelta: 1, draw: 0, operations: [], given: [], lost: [], speed: 0, mass: 2 },
     effect
   );
 
@@ -1046,7 +1053,7 @@ function checkResolution(run) {
   run.same("retrait : emplacement vidé", triangleOf(null, null, null), last.state.triangle);
   run.same(
     "retrait : après les phases, avant l'Impact et la rotation",
-    ["removed", "discarded", "final", "impact", "rotation", "turnEnded"],
+    ["removed", "final", "discarded", "impact", "rotation", "turnEnded"],
     eventTypes(last.events).slice(-6)
   );
 
@@ -1060,9 +1067,18 @@ function checkResolution(run) {
   run("all_rounder : pas retirée à usure 3 sur 4", 0, allRounder.state.discard.length);
 
   const twoRetired = apply(playState({ bag: ["final_pocket"], triangle: triangleOf(placed("one_shot"), placed("aging_flick", 2), placed("hit_polish")) }), { type: "resolve" });
-  run("retrait : dans l'ordre des emplacements", "one_shot,aging_flick", twoRetired.state.discard.join());
+  run("retrait : dans l'ordre horaire, la base droite d'abord", "aging_flick,one_shot", twoRetired.state.discard.join());
 
-  // Rotation : base gauche -> pointe, pointe -> base droite, base droite -> base gauche.
+  // L'ordre horaire, le seul : base droite, base gauche, pointe ; le suivant et le
+  // précédent, la pointe suivie de la base droite.
+  run.same("ordre horaire : base droite, base gauche, pointe", ["rightBase", "leftBase", "apex"], [...SLOTS]);
+  run.same("ordre horaire : les suivants", ["leftBase", "apex", "rightBase"], SLOTS.map(nextSlot));
+  run.same("ordre horaire : les précédents", ["apex", "rightBase", "leftBase"], SLOTS.map(previousSlot));
+  run.same("ordre horaire : précédent du suivant, l'emplacement lui-même", [...SLOTS], SLOTS.map((slot) => previousSlot(nextSlot(slot))));
+  run("ordre horaire : un emplacement inconnu refusé", true, throws(() => nextSlot("middle")));
+
+  // Rotation, inchangée dans les faits : chaque bille vers son suivant, base gauche
+  // -> pointe, pointe -> base droite, base droite -> base gauche.
   run.same(
     "rotation : billes",
     triangleOf(placed("hit_polish", 1), placed("final_pocket", 1), placed("aging_flick", 1)),
@@ -1074,7 +1090,7 @@ function checkResolution(run) {
 
   // Emplacement vide : phase sautée.
   const skipped = apply(playState({ triangle: triangleOf(null, placed("aging_flick"), null) }), { type: "resolve" });
-  run.same("phase vide : sautée, dans l'ordre", ["phaseSkipped", "phase", "effect", "wear", "phaseSkipped", "impact", "rotation", "turnEnded"], eventTypes(skipped.events));
+  run.same("phase vide : sautée, dans l'ordre", ["phase", "effect", "wear", "phaseSkipped", "phaseSkipped", "impact", "rotation", "turnEnded"], eventTypes(skipped.events));
 
   // split_base : la variante suit la base où il se trouve.
   const leftEye = apply(playState({ triangle: triangleOf(placed("split_base"), null, null) }), { type: "resolve" });
@@ -1207,7 +1223,7 @@ function checkSizeConditions(run) {
   run("calibre, comptage : la bille elle-même comprise", 2, phaseSpeed(triangleOf(placed("selfish"), placed("pebble"), null), "leftBase"));
   run("calibre, comptage : seule, elle se compte", 1, phaseSpeed(triangleOf(placed("selfish"), null, null), "leftBase"));
   const ghost = apply(playState({ triangle: triangleOf(placed("ghost"), placed("pebble"), null) }), { type: "resolve" }, sizeRules);
-  run("calibre, comptage dans un Final : retirée, elle se compte encore", 4, ghost.events.find((event) => event.trigger === "final").speedDelta);
+  run("calibre, comptage dans un Final : en partance, elle ne se compte plus", 2, ghost.events.find((event) => event.trigger === "final").speedDelta);
   const none = apply(playState({ triangle: triangleOf(placed("counter"), null, null) }), { type: "resolve" }, sizeRules);
   run("calibre, comptage à zéro : l'effet ne produit rien", "0 1", [none.events.find((event) => event.type === "effect").speedDelta, none.state.score === 0 ? 1 : 0].join(" "));
 
@@ -1276,8 +1292,8 @@ function checkFlick(run) {
   run.same("chiquenaude : son effet, à l'emplacement visé, compté au tour", { trigger: "flick", slot: "apex", marble: "fragile", massDelta: 1, mass: 2 }, { trigger, slot, marble, massDelta, mass });
   const onOccupied = apply(playState({ hand: inHand(["fragile"]), triangle: triangleOf(null, null, placed("hit_pocket")) }), toApex);
   run.same(
-    "chiquenaude, occupé : Chiquenaude, Éjection, retrait, défausse, pose, Tic",
-    ["flick", "effect", "knockout", "effect", "removed", "discarded", "placed", "hit"],
+    "chiquenaude, occupé : Chiquenaude, départ, Éjection, arrivée à la défausse, pose, Tic",
+    ["flick", "effect", "removed", "knockout", "effect", "discarded", "placed", "hit"],
     eventTypes(onOccupied.events)
   );
   const counted = apply(playState({ hand: inHand(["all_rounder"], 3) }), toApex);
@@ -1304,7 +1320,7 @@ function checkFlick(run) {
   const cleared = apply(playState({ hand: inHand(["flick_strike"]), triangle: triangleOf(null, null, placed("aging_flick")) }), toApex, fixedRules);
   run.same(
     "chiquenaude qui vide l'emplacement : retrait par usure, puis la pose, ni Éjection ni Tic",
-    ["flick", "effect", "cracked", "removed", "discarded", "final", "placed"],
+    ["flick", "effect", "cracked", "removed", "final", "discarded", "placed"],
     eventTypes(cleared.events)
   );
   run("chiquenaude qui vide l'emplacement : l'occupante part par usure", "wear", cleared.events.find((event) => event.type === "discarded").cause);
@@ -1318,7 +1334,7 @@ function checkFlick(run) {
   const withFinal = apply(playState({ hand: inHand(["flick_strike"]), triangle: triangleOf(null, null, placed("fragile")) }), toApex, fixedRules);
   run.same(
     "chiquenaude qui vide l'emplacement : le Final de l'occupante, puis la pose",
-    ["flick", "effect", "cracked", "removed", "discarded", "final", "effect", "placed"],
+    ["flick", "effect", "cracked", "removed", "final", "effect", "discarded", "placed"],
     eventTypes(withFinal.events)
   );
   run("chiquenaude qui vide l'emplacement : le Final compte pour le tour", 4, withFinal.state.speed);
@@ -1326,7 +1342,7 @@ function checkFlick(run) {
   const notCleared = apply(playState({ hand: inHand(["flick_strike"]), triangle: triangleOf(null, null, placed("all_rounder")) }), toApex, fixedRules);
   run.same(
     "chiquenaude : l'emplacement encore occupé, Éjection et Tic comme d'habitude",
-    ["flick", "effect", "cracked", "knockout", "removed", "discarded", "placed", "hit"],
+    ["flick", "effect", "cracked", "removed", "knockout", "discarded", "placed", "hit"],
     eventTypes(notCleared.events)
   );
   // Posée ailleurs, flick_strike fêle quand même la pointe.
@@ -1341,8 +1357,8 @@ function checkFlick(run) {
   // pour chaque action qui ne l'y prend pas.
   run("éveil : une Fêlure sur elle-même refusée, le message dit qu'elle est en main", true, /en main/.test(caughtMessage(() => validateTable({ a: { awaken: [{ action: "crack", amount: 1 }] } }))));
   run("éveil : Empocher elle-même est permis, elle est en main", false, throws(() => validateTable({ a: { awaken: [{ action: "pocket" }] } })));
-  run("final : Éjecter elle-même refusé, le message dit qu'elle a quitté le triangle", true, /quitté le triangle/.test(caughtMessage(() => validateTable({ a: { final: [{ action: "eject" }] } }))));
-  run("final : Empocher elle-même est permis, elle est à la défausse", false, throws(() => validateTable({ a: { final: [{ action: "pocket" }] } })));
+  run("final : Éjecter elle-même refusé, le message dit qu'elle est en partance", true, /en partance/.test(caughtMessage(() => validateTable({ a: { final: [{ action: "eject" }] } }))));
+  run("final : Empocher elle-même est permis, il la redirige", false, throws(() => validateTable({ a: { final: [{ action: "pocket" }] } })));
   run("chiquenaude : Empocher elle-même refusé, en cours de lancer", true, /en cours de lancer/.test(caughtMessage(() => validateTable({ a: { flick: [{ action: "pocket" }] } }))));
   run(
     "chiquenaude : pas de calibre relatif, aucun remplacement en cours",
@@ -1442,14 +1458,14 @@ function checkWindfall(run) {
     { type: "place", handIndex: 0, slot: "apex" }
   );
   run.same(
-    "trouvaille, phase de jeu : régénération, trouvailles dans l'ordre des phases, puis la pioche",
+    "trouvaille, phase de jeu : régénération, trouvailles dans l'ordre horaire, puis la pioche",
     [
       "bagRegenerated",
-      "windfall:all_rounder",
-      "effect:all_rounder",
       "windfall:final_pocket",
       "effect:final_pocket",
       "polished:final_pocket",
+      "windfall:all_rounder",
+      "effect:all_rounder",
       "windfall:split_base",
       "draw",
     ],
@@ -1458,16 +1474,20 @@ function checkWindfall(run) {
   run("trouvaille, phase de jeu : la Vitesse au compteur du tour", 3, play.state.speed);
   run("trouvaille, phase de jeu : le Polissage sur elle-même", 0, play.state.triangle.rightBase.wear);
 
-  // Résolution : la Pioche de awaken_draw en phase, puis celle du Final de one_shot.
+  // Résolution : la Pioche de awaken_draw en phase régénère le sac ; celle du Final
+  // de one_shot ne trouve plus rien : one_shot, en partance, n'est pas encore à la
+  // défausse, elle ne peut pas se remélanger.
   const resolved = apply(playState({ bag: [], discard: ["aging_flick"], triangle: triangleOf(placed("awaken_draw"), placed("one_shot"), placed("all_rounder")) }), { type: "resolve" });
   const regenerations = resolved.events.filter((event) => event.type === "bagRegenerated").length;
-  run("trouvaille, résolution : deux régénérations, en phase et au Final", 2, regenerations);
+  run("trouvaille, résolution : une régénération, en phase ; aucune au Final", 1, regenerations);
   run.same(
-    "trouvaille, résolution : chez les billes encore actives, one_shot retirée n'en a plus",
-    ["windfall:awaken_draw", "windfall:one_shot", "windfall:all_rounder", "windfall:awaken_draw", "windfall:all_rounder"],
+    "trouvaille, résolution : chez les billes actives",
+    ["windfall:one_shot", "windfall:awaken_draw", "windfall:all_rounder"],
     typesAndMarbles(resolved.events).filter((entry) => entry.startsWith("windfall"))
   );
-  run("trouvaille, résolution : comptée dans l'Impact (6 − 1 + 3 + 3)", 11, resolved.events.find((event) => event.type === "impact").impact);
+  run("trouvaille, résolution : au Final, plus rien à piocher", "noMarbles", resolved.events.findLast((event) => event.type === "drawSkipped")?.reason);
+  run.same("trouvaille, résolution : one_shot arrive à la défausse après son Final", ["one_shot"], resolved.state.discard);
+  run("trouvaille, résolution : comptée dans l'Impact (6 − 1 + 3)", 8, resolved.events.find((event) => event.type === "impact").impact);
 
   // Début de tour : les compteurs, remis à zéro par la résolution, reçoivent la
   // Trouvaille du nouveau tour.
@@ -1500,16 +1520,16 @@ function checkWindfall(run) {
   run.same("trouvaille : pas chez la bille en cours de lancer", [], typesAndMarbles(thrown.events).filter((entry) => entry.startsWith("windfall")));
 
   // Retrait immédiat par Fêlure après une régénération : base_pocket fêle la
-  // fragile (usure maximale 2), qui rejoint la défausse tout juste vidée, son
-  // Final compris, avant la reprise de la pioche.
+  // fragile (usure maximale 2), qui part, joue son Final en partance, puis rejoint
+  // la défausse tout juste vidée, avant la reprise de la pioche.
   const cracked = apply(
     { ...playState({ bag: [], discard: ["aging_flick"], triangle: triangleOf(placed("base_pocket"), placed("fragile", 1), null) }), stage: "draw" },
     { type: "draw" },
     fixedRules
   );
   run.same(
-    "trouvaille, Fêlure : retrait, défausse, Final, puis la pioche",
-    ["windfall:base_pocket", "effect:base_pocket", "cracked:fragile", "removed:fragile", "discarded:fragile", "final:fragile", "effect:fragile", "draw"],
+    "trouvaille, Fêlure : départ, Final, arrivée à la défausse, puis la pioche",
+    ["windfall:base_pocket", "effect:base_pocket", "cracked:fragile", "removed:fragile", "final:fragile", "effect:fragile", "discarded:fragile", "draw"],
     between(cracked.events, "windfall:base_pocket", "draw")
   );
   run.same("trouvaille, Fêlure : fragile seule dans la défausse vidée", ["fragile"], cracked.state.discard);
@@ -1723,6 +1743,30 @@ function checkSmoke(run) {
     } catch (error) {
       exceptions += 1;
       faults.push(`graine ${seed} : exception ${error.message}`);
+    }
+  }
+  // Une table étendue d'une bille qui déplace (Rebond, Ramasser, Défausser) : les
+  // mêmes invariants sur des parties qui passent par ces chemins. La table figée,
+  // elle, reste intacte : ses graines nourrissent d'autres vérifications.
+  const moverRules = fixtureRules({
+    ...FIXTURE_TYPES,
+    mover: {
+      size: MEDIUM,
+      base: [{ action: "bounce", target: "apex" }],
+      apex: [{ action: "speed", amount: 1 }, { action: "discard", target: { type: "bag", count: 1 } }],
+      hit: [{ action: "retrieve", target: { type: "choice", zones: ["discard"], pick: "marble", count: 1 } }],
+      knockout: [{ action: "retrieve", target: "lastDiscarded" }],
+      final: [{ action: "bounce" }],
+      maxWear: 2,
+    },
+  });
+  for (let seed = 1; seed <= 60; seed++) {
+    const options = { bag: ["mover", "mover", "aging_flick", "hit_polish", "one_shot", "fragile", "final_pocket", "awaken_draw"] };
+    try {
+      faults.push(...playRandomMarblesGame(moverRules, seed, options, seen).map((fault) => `table étendue, graine ${seed} : ${fault}`));
+    } catch (error) {
+      exceptions += 1;
+      faults.push(`table étendue, graine ${seed} : exception ${error.message}`);
     }
   }
   run("fumée : aucune exception", 0, exceptions);

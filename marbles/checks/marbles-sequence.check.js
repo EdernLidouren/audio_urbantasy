@@ -26,7 +26,7 @@ import { choicePromptStep, withHandSizes } from "../view/resolution.js";
 import { historyMenu } from "../view/history-screen.js";
 import { throws } from "../../lib/check.js";
 import { CHOICELESS_TYPES, FIXTURE_BAG, fixtureRules } from "./fixtures/marbles.js";
-import { answerChoices, inHand, keyText, marblesPlayState } from "./helpers.js";
+import { answerChoices, fabricatedRules, inHand, keyText, marblesPlayState } from "./helpers.js";
 
 // Les règles de la table des vérifications (marbles/checks/fixtures/marbles.js).
 const rules = fixtureRules();
@@ -113,7 +113,7 @@ function playGame(seed, options, present, onTurn = () => {}) {
 // Une régénération du sac, suivie des Trouvailles des billes actives et de ce
 // qu'elles déclenchent (actions sur une bille, retraits, Finals).
 const REGENERATION =
-  "(event\\.bag_regenerated (event\\.effect_windfall |event\\.polished |event\\.cracked |event\\.target_empty |event\\.discarded\\.wear |event\\.effect_final )*)";
+  "(event\\.bag_regenerated (event\\.effect_windfall |event\\.polished |event\\.cracked |event\\.target_empty |event\\.removed\\.wear |event\\.effect_final )*)";
 
 // Une pioche, suivie de l'Éveil de sa bille et de ce qu'il déclenche (une Pioche qui
 // pioche à son tour, un Polissage ou une Fêlure, une régénération).
@@ -128,13 +128,13 @@ const EJECTING = "event\\.eject (event\\.effect_knockout )?|event\\.target_empty
 const POCKETING = "event\\.pocketed (event\\.effect_pocket_entry )?|event\\.lost |event\\.target_empty_(hand|self) |outcome\.pot |";
 const DRAWING =
   "(" + REGENERATION + "|event\\.draw |event\\.draw_skipped\\.(handFull|noMarbles) |event\\.effect_awaken |" + POCKETING + CHOOSING + EJECTING +
-  "event\\.polished |event\\.cracked |event\\.target_empty |event\\.discarded\\.wear |event\\.effect_final )";
+  "event\\.polished |event\\.cracked |event\\.target_empty |event\\.removed\\.wear |event\\.effect_final )";
 
 const SEQUENCE_SHAPE = new RegExp(
   "^resolution\\.opening (outcome\\.(slot|empty) " + DRAWING + "*){3}" +
     // L'étape du pot : une par bille qui a un effet de résolution.
     "(outcome\\.pot " + DRAWING + "*)*" +
-    "(event\\.discarded\\.wear (event\\.effect_final )?" + DRAWING + "*)*" +
+    "(event\\.removed\\.wear (event\\.effect_final )?" + DRAWING + "*)*" +
     "event\\.impact " +
     "(event\\.rotation " + DRAWING + "+event\\.turn_started" +
     "|event\\.game_over)$"
@@ -179,7 +179,7 @@ function checkRealGames(run) {
           .map((step) => step.text)
           .join(" ");
         if (!SEQUENCE_SHAPE.test(shape)) badShapes.push(`${seed}/${before.turn} : ${shape}`);
-        for (const marker of ["event.bag_regenerated event.draw", "event.game_over", "draw_skipped.noMarbles", "discarded.wear", "outcome.empty"]) {
+        for (const marker of ["event.bag_regenerated event.draw", "event.game_over", "draw_skipped.noMarbles", "removed.wear", "outcome.empty"]) {
           if (shape.includes(marker)) seen.add(marker);
         }
         if (JSON.stringify(steps.flatMap((step) => step.events)) !== JSON.stringify(events)) lostEvents.push(`${seed}/${before.turn}`);
@@ -213,7 +213,7 @@ function checkRealGames(run) {
   run.same("séquence : ordre des étapes sur de vraies parties", [], badShapes.slice(0, 3));
   run.same(
     "séquence : chaque cas rencontré au moins une fois",
-    ["discarded.wear", "draw_skipped.noMarbles", "event.bag_regenerated event.draw", "event.game_over", "outcome.empty"],
+    ["draw_skipped.noMarbles", "event.bag_regenerated event.draw", "event.game_over", "outcome.empty", "removed.wear"],
     [...seen].sort()
   );
   run.same("séquence : chaque évènement dans une étape et une seule, dans l'ordre", [], lostEvents.slice(0, 3));
@@ -250,22 +250,22 @@ function checkTexts(run) {
     // R : la prévision d'abord, puis chaque emplacement dans l'ordre des phases.
     run(
       "R : vide, le don dit chez qui le fait, le bonus compté chez qui le reçoit",
-      "overview.summary{speed: 10, mass: 1, impact: 10} outcome.slot{slot: slot.leftBase, marble: <tally_flick>, effect: effect.combined{parts: [effect.given{effect: effect.combined{parts: [effect.speed_up{amount: 4}]}, slot: slot.apex}]}} outcome.empty{slot: slot.rightBase} outcome.slot{slot: slot.apex, marble: <hit_pocket>, effect: effect.combined{parts: [effect.speed_up{amount: 10}]}}",
+      "overview.summary{speed: 10, mass: 1, impact: 10} outcome.empty{slot: slot.rightBase} outcome.slot{slot: slot.leftBase, marble: <tally_flick>, effect: effect.combined{parts: [effect.given{effect: effect.combined{parts: [effect.speed_up{amount: 4}]}, slot: slot.apex}]}} outcome.slot{slot: slot.apex, marble: <hit_pocket>, effect: effect.combined{parts: [effect.speed_up{amount: 10}]}}",
       describeOverview(lensed, rules, t)
     );
     run(
       "R : les gains du tour déjà comptés",
-      "overview.summary{speed: 13, mass: 2, impact: 26} outcome.slot{slot: slot.leftBase, marble: <tally_flick>, effect: effect.combined{parts: [effect.given{effect: effect.combined{parts: [effect.speed_up{amount: 4}]}, slot: slot.apex}]}} outcome.empty{slot: slot.rightBase} outcome.slot{slot: slot.apex, marble: <hit_pocket>, effect: effect.combined{parts: [effect.speed_up{amount: 10}]}}",
+      "overview.summary{speed: 13, mass: 2, impact: 26} outcome.empty{slot: slot.rightBase} outcome.slot{slot: slot.leftBase, marble: <tally_flick>, effect: effect.combined{parts: [effect.given{effect: effect.combined{parts: [effect.speed_up{amount: 4}]}, slot: slot.apex}]}} outcome.slot{slot: slot.apex, marble: <hit_pocket>, effect: effect.combined{parts: [effect.speed_up{amount: 10}]}}",
       describeOverview({ ...lensed, speed: 3, mass: 2 }, rules, t)
     );
     run(
       "R : valeurs négatives, planchers de l'Impact",
-      "overview.summary{speed: −3, mass: 2, impact: 0} outcome.empty{slot: slot.leftBase} outcome.slot{slot: slot.rightBase, marble: <split_base>, effect: effect.combined{parts: [effect.mass_up{amount: 1}]}} outcome.slot{slot: slot.apex, marble: <flick_strike>, effect: effect.combined{parts: [effect.speed_down{amount: 3}]}}",
+      "overview.summary{speed: −3, mass: 2, impact: 0} outcome.slot{slot: slot.rightBase, marble: <split_base>, effect: effect.combined{parts: [effect.mass_up{amount: 1}]}} outcome.empty{slot: slot.leftBase} outcome.slot{slot: slot.apex, marble: <flick_strike>, effect: effect.combined{parts: [effect.speed_down{amount: 3}]}}",
       describeOverview(playState({ triangle: { ...EMPTY_TRIANGLE, rightBase: { marble: "split_base", wear: 0 }, apex: { marble: "flick_strike", wear: 0 } } }), rules, t)
     );
     run(
       "R : Vitesse et Masse de deux billes",
-      "overview.summary{speed: 3, mass: 2, impact: 6} outcome.slot{slot: slot.leftBase, marble: <split_base>, effect: effect.combined{parts: [effect.speed_up{amount: 3}]}} outcome.empty{slot: slot.rightBase} outcome.slot{slot: slot.apex, marble: <final_pocket>, effect: effect.combined{parts: [effect.mass_up{amount: 1}]}}",
+      "overview.summary{speed: 3, mass: 2, impact: 6} outcome.empty{slot: slot.rightBase} outcome.slot{slot: slot.leftBase, marble: <split_base>, effect: effect.combined{parts: [effect.speed_up{amount: 3}]}} outcome.slot{slot: slot.apex, marble: <final_pocket>, effect: effect.combined{parts: [effect.mass_up{amount: 1}]}}",
       describeOverview(playState({ triangle: { ...EMPTY_TRIANGLE, leftBase: { marble: "split_base", wear: 0 }, apex: { marble: "final_pocket", wear: 0 } } }), rules, t)
     );
     run("R : rien à prévoir, partie finie", null, describeOverview({ ...lensed, stage: "over" }, rules, t));
@@ -277,10 +277,10 @@ function checkTexts(run) {
       return resolutionSteps(state.turn, [...resolved.events, ...drawn], t).map((step) => step.text);
     };
     run.same(
-      "séquence : un tour complet, sans pause entre l'ouverture et la base gauche",
+      "séquence : un tour complet, sans pause entre l'ouverture et la première phase (base droite)",
       [
-        "resolution.opening{turn: 2} outcome.slot{slot: slot.leftBase, marble: <tally_flick>, effect: effect.combined{parts: [effect.given{effect: effect.combined{parts: [effect.speed_up{amount: 4}]}, slot: slot.apex}]}}",
-        "outcome.empty{slot: slot.rightBase}",
+        "resolution.opening{turn: 2} outcome.empty{slot: slot.rightBase}",
+        "outcome.slot{slot: slot.leftBase, marble: <tally_flick>, effect: effect.combined{parts: [effect.given{effect: effect.combined{parts: [effect.speed_up{amount: 4}]}, slot: slot.apex}]}}",
         "outcome.slot{slot: slot.apex, marble: <hit_pocket>, effect: effect.combined{parts: [effect.speed_up{amount: 10}]}}",
         "event.impact{impact: 10, score: 10}",
         "event.rotation{steps: 1, direction: clockwise}",
@@ -295,17 +295,17 @@ function checkTexts(run) {
     });
     run.same(
       "séquence : une étape par bille usée",
-      ["event.discarded.wear{marble: <one_shot>}", "event.discarded.wear{marble: <hit_pocket>}"],
-      texts(worn).filter((text) => text.startsWith("event.discarded.wear"))
+      ["event.removed.wear{marble: <one_shot>}", "event.removed.wear{marble: <hit_pocket>}"],
+      texts(worn).filter((text) => text.startsWith("event.removed.wear"))
     );
     run.same(
       "séquence : dernier tour, ni rotation ni pioche",
       [
-        "event.discarded.wear{marble: <one_shot>}",
+        "event.removed.wear{marble: <one_shot>}",
         "event.effect_final{marble: <one_shot>, effect: effect.combined{parts: [effect.draw{amount: 1} | effect.eject_all{target: target.all_size{size: <size.small.name>}}]}, speed: 13, mass: 1}",
         "event.draw{marbles: [<final_pocket>]}",
         "event.target_empty_all",
-        "event.discarded.wear{marble: <hit_pocket>}",
+        "event.removed.wear{marble: <hit_pocket>}",
         "event.impact{impact: 13, score: 13}",
         "event.game_over{score: 13}",
       ],
@@ -386,11 +386,11 @@ function checkTexts(run) {
       const resolved = rules.reduce(lensed, { type: "resolve" });
       return resolutionSteps(1, resolved.events, t, { hint })[0];
     };
-    run("ouverture : avec la base gauche, d'un seul tenant", "resolution.opening{turn: 1} outcome.slot{slot: slot.leftBase, marble: <tally_flick>, effect: effect.combined{parts: [effect.given{effect: effect.combined{parts: [effect.speed_up{amount: 4}]}, slot: slot.apex}]}}", (opening(false).text));
-    run("ouverture : l'indication après l'ouverture", "resolution.opening{turn: 1} resolution.hint outcome.slot{slot: slot.leftBase, marble: <tally_flick>, effect: effect.combined{parts: [effect.given{effect: effect.combined{parts: [effect.speed_up{amount: 4}]}, slot: slot.apex}]}}", (opening(true).text));
+    run("ouverture : avec la première phase (base droite), d'un seul tenant", "resolution.opening{turn: 1} outcome.empty{slot: slot.rightBase}", (opening(false).text));
+    run("ouverture : l'indication après l'ouverture", "resolution.opening{turn: 1} resolution.hint outcome.empty{slot: slot.rightBase}", (opening(true).text));
     run.same("ouverture : deux messages, sans l'indication", [
       "resolution.opening{turn: 1}",
-      "outcome.slot{slot: slot.leftBase, marble: <tally_flick>, effect: effect.combined{parts: [effect.given{effect: effect.combined{parts: [effect.speed_up{amount: 4}]}, slot: slot.apex}]}}",
+      "outcome.empty{slot: slot.rightBase}",
     ], opening(true).messages);
 
     // L'historique, texte exact : le début de partie n'en a pas ; après la première
@@ -454,12 +454,12 @@ function checkTexts(run) {
     });
     run(
       "pioche, R : une valeur finale",
-      "overview.summary{speed: 0, mass: 1, impact: 0} outcome.slot{slot: slot.leftBase, marble: <awaken_draw>, effect: effect.combined{parts: [effect.draw{amount: 1}]}} outcome.empty{slot: slot.rightBase} outcome.slot{slot: slot.apex, marble: <size_count>, effect: effect.none}",
+      "overview.summary{speed: 0, mass: 1, impact: 0} outcome.empty{slot: slot.rightBase} outcome.slot{slot: slot.leftBase, marble: <awaken_draw>, effect: effect.combined{parts: [effect.draw{amount: 1}]}} outcome.slot{slot: slot.apex, marble: <size_count>, effect: effect.none}",
       describeOverview(drawing, rules, t)
     );
     run(
       "pioche, R : la régénération annoncée, sans rien révéler",
-      "overview.summary{speed: 0, mass: 1, impact: 0} outcome.slot{slot: slot.leftBase, marble: <awaken_draw>, effect: effect.combined{parts: [effect.draw{amount: 1}]}} outcome.empty{slot: slot.rightBase} outcome.slot{slot: slot.apex, marble: <size_count>, effect: effect.none} forecast.regenerates",
+      "overview.summary{speed: 0, mass: 1, impact: 0} outcome.empty{slot: slot.rightBase} outcome.slot{slot: slot.leftBase, marble: <awaken_draw>, effect: effect.combined{parts: [effect.draw{amount: 1}]}} outcome.slot{slot: slot.apex, marble: <size_count>, effect: effect.none} forecast.regenerates",
       describeOverview({ ...drawing, bag: [], discard: ["aging_flick"] }, rules, t)
     );
     // Une bille qui pourrait être piochée a un Éveil : la fin de R le dit.
@@ -494,10 +494,11 @@ function checkTexts(run) {
     run.same(
       "pioche, séquence : la Pioche de la phase, puis la bille",
       [
-        "resolution.opening{turn: 2} outcome.slot{slot: slot.leftBase, marble: <awaken_draw>, effect: effect.combined{parts: [effect.draw{amount: 1}]}}",
+        "resolution.opening{turn: 2} outcome.empty{slot: slot.rightBase}",
+        "outcome.slot{slot: slot.leftBase, marble: <awaken_draw>, effect: effect.combined{parts: [effect.draw{amount: 1}]}}",
         "event.draw{marbles: [<final_pocket>]}",
       ],
-      texts(drawing).slice(0, 2)
+      texts(drawing).slice(0, 3)
     );
     const placedEvents = rules.reduce(drawing, { type: "place", handIndex: 0, slot: "apex" }).events;
     run.same(
@@ -519,12 +520,12 @@ function checkTexts(run) {
     const finalState = playState({ hand: inHand(["one_shot"]), bag: ["final_pocket"], triangle: { leftBase: null, rightBase: null, apex: { marble: "fragile", wear: 1 } } });
     run(
       "final, R : après la phase, compté dans la prévision ; son Polissage au choix sans cible, prévu",
-      "overview.summary{speed: 9, mass: 1, impact: 9} outcome.empty{slot: slot.leftBase} outcome.empty{slot: slot.rightBase} outcome.slot{slot: slot.apex, marble: <fragile>, effect: effect.combined{parts: [effect.speed_up{amount: 5}]}} outcome.final{effect: forecast_empty.after{effect: effect.combined{parts: [effect.speed_up{amount: 4} | effect.given_choice{effect: effect.polish{amount: 1}, target: choice.up_to{target: choice.noun.triangle_marble{count: 2}}, upTo: yes}]}, empty: effect.combined{parts: [forecast_empty.choice]}}}",
+      "overview.summary{speed: 9, mass: 1, impact: 9} outcome.empty{slot: slot.rightBase} outcome.empty{slot: slot.leftBase} outcome.slot{slot: slot.apex, marble: <fragile>, effect: effect.combined{parts: [effect.speed_up{amount: 5}]}} outcome.final{effect: forecast_empty.after{effect: effect.combined{parts: [effect.speed_up{amount: 4} | effect.given_choice{effect: effect.polish{amount: 1}, target: choice.up_to{target: choice.noun.triangle_marble{count: 2}}, upTo: yes}]}, empty: effect.combined{parts: [forecast_empty.choice]}}}",
       describeOverview(finalState, rules, t)
     );
     run(
       "final, R : absent si la bille ne s'use pas ce tour",
-      "overview.summary{speed: 5, mass: 1, impact: 5} outcome.empty{slot: slot.leftBase} outcome.empty{slot: slot.rightBase} outcome.slot{slot: slot.apex, marble: <fragile>, effect: effect.combined{parts: [effect.speed_up{amount: 5}]}}",
+      "overview.summary{speed: 5, mass: 1, impact: 5} outcome.empty{slot: slot.rightBase} outcome.empty{slot: slot.leftBase} outcome.slot{slot: slot.apex, marble: <fragile>, effect: effect.combined{parts: [effect.speed_up{amount: 5}]}}",
       describeOverview({ ...finalState, triangle: { ...finalState.triangle, apex: { marble: "fragile", wear: 0 } } }, rules, t)
     );
     run.same(
@@ -540,7 +541,7 @@ function checkTexts(run) {
     run.same(
       "final, séquence : le retrait, son Final, rien à choisir (aucune interface), puis l'Impact",
       [
-        "event.discarded.wear{marble: <fragile>}",
+        "event.removed.wear{marble: <fragile>}",
         "event.effect_final{marble: <fragile>, effect: effect.combined{parts: [effect.speed_up{amount: 4} | effect.given_choice{effect: effect.polish{amount: 1}, target: choice.up_to{target: choice.noun.triangle_marble{count: 2}}, upTo: yes}]}, speed: 9, mass: 1}",
         "event.target_empty_choice",
         "event.impact{impact: 9, score: 9}",
@@ -553,16 +554,16 @@ function checkTexts(run) {
     const pocketing = playState({ hand: inHand(["base_pocket"]), bag: ["aging_flick"], triangle: { leftBase: { marble: "base_pocket", wear: 0 }, rightBase: null, apex: { marble: "fragile", wear: 1 } } });
     run(
       "Empocher, R : chez base_pocket, fragile et son entrée ; la pointe retirée avant sa phase",
-      "overview.summary{speed: 10, mass: 1, impact: 10} outcome.slot{slot: slot.leftBase, marble: <base_pocket>, effect: pocket.then{effect: effect.combined{parts: [effect.pocket_slot{slot: slot.apex}]}, pockets: effect.combined{parts: [pocket.entered_effect{marble: <fragile>, effect: effect.combined{parts: [effect.speed_up{amount: 10}]}}]}}} outcome.empty{slot: slot.rightBase} outcome.removed{slot: slot.apex, marble: <fragile>}",
+      "overview.summary{speed: 10, mass: 1, impact: 10} outcome.empty{slot: slot.rightBase} outcome.slot{slot: slot.leftBase, marble: <base_pocket>, effect: pocket.then{effect: effect.combined{parts: [effect.pocket_slot{slot: slot.apex}]}, pockets: effect.combined{parts: [pocket.entered_effect{marble: <fragile>, effect: effect.combined{parts: [effect.speed_up{amount: 10}]}}]}}} outcome.removed{slot: slot.apex, marble: <fragile>}",
       describeOverview(pocketing, rules, t)
     );
     run.same(
       "Empocher, séquence : l'effet, la mise en poche, l'entrée, la phase sautée",
       [
-        "resolution.opening{turn: 2} outcome.slot{slot: slot.leftBase, marble: <base_pocket>, effect: effect.combined{parts: [effect.pocket_slot{slot: slot.apex}]}}",
+        "resolution.opening{turn: 2} outcome.empty{slot: slot.rightBase}",
+        "outcome.slot{slot: slot.leftBase, marble: <base_pocket>, effect: effect.combined{parts: [effect.pocket_slot{slot: slot.apex}]}}",
         "event.pocketed{marble: <fragile>}",
         "event.effect_pocket_entry{marble: <fragile>, effect: effect.combined{parts: [effect.speed_up{amount: 10}]}, speed: 10, mass: 1}",
-        "outcome.empty{slot: slot.rightBase}",
         "outcome.empty{slot: slot.apex}",
         "event.impact{impact: 10, score: 10}",
       ],
@@ -689,18 +690,18 @@ function checkTexts(run) {
     });
     run(
       "réaction, R : dans la ligne de la bille du pot",
-      "overview.summary{speed: 5, mass: 1, impact: 5} outcome.slot{slot: slot.leftBase, marble: <awaken_draw>, effect: effect.combined{parts: [effect.draw{amount: 1}]}} outcome.empty{slot: slot.rightBase} outcome.slot{slot: slot.apex, marble: <fragile>, effect: effect.combined{parts: [effect.speed_up{amount: 5}]}} outcome.pot{marble: <awaken_draw>, effect: effect.combined{parts: [effect.given{effect: effect.polish{amount: 1}, slot: slot.apex}]}} forecast.regenerates",
+      "overview.summary{speed: 5, mass: 1, impact: 5} outcome.empty{slot: slot.rightBase} outcome.slot{slot: slot.leftBase, marble: <awaken_draw>, effect: effect.combined{parts: [effect.draw{amount: 1}]}} outcome.slot{slot: slot.apex, marble: <fragile>, effect: effect.combined{parts: [effect.speed_up{amount: 5}]}} outcome.pot{marble: <awaken_draw>, effect: effect.combined{parts: [effect.given{effect: effect.polish{amount: 1}, slot: slot.apex}]}} forecast.regenerates",
       describeOverview(shuffling, rules, t)
     );
     run.same(
       "réaction, séquence : à sa place, juste après le mélange, avant la pioche qui reprend",
       [
-        "resolution.opening{turn: 2} outcome.slot{slot: slot.leftBase, marble: <awaken_draw>, effect: effect.combined{parts: [effect.draw{amount: 1}]}}",
+        "resolution.opening{turn: 2} outcome.empty{slot: slot.rightBase}",
+        "outcome.slot{slot: slot.leftBase, marble: <awaken_draw>, effect: effect.combined{parts: [effect.draw{amount: 1}]}}",
         "event.bag_regenerated{size: 2}",
         "outcome.pot{marble: <awaken_draw>, effect: effect.combined{parts: [effect.given{effect: effect.polish{amount: 1}, slot: slot.apex}]}, speed: 0, mass: 1}",
         "event.polished{marble: <fragile>, wear: 0, maxWear: 2}",
         "event.draw{marbles: [<aging_flick>]}",
-        "outcome.empty{slot: slot.rightBase}",
       ],
       texts(shuffling).slice(0, 6)
     );
@@ -725,10 +726,11 @@ function checkTexts(run) {
     run.same(
       "Empocher, pot plein : la perte",
       [
-        "resolution.opening{turn: 2} outcome.slot{slot: slot.leftBase, marble: <base_pocket>, effect: effect.combined{parts: [effect.pocket_slot{slot: slot.apex}]}}",
+        "resolution.opening{turn: 2} outcome.empty{slot: slot.rightBase}",
+        "outcome.slot{slot: slot.leftBase, marble: <base_pocket>, effect: effect.combined{parts: [effect.pocket_slot{slot: slot.apex}]}}",
         "event.lost{marble: <fragile>}",
       ],
-      texts(lostState).slice(0, 2)
+      texts(lostState).slice(0, 3)
     );
     run(
       "Empocher, pot plein, R : la perte chez base_pocket",
@@ -757,7 +759,7 @@ function checkTexts(run) {
     const potState = playState({ triangle: { leftBase: { marble: "tally_flick", wear: 0 }, rightBase: null, apex: { marble: "fragile", wear: 0 } }, pot: ["final_pocket", "hit_polish", "base_pocket"] });
     run(
       "pot, R : une ligne par bille du pot qui a un effet de résolution, comptée dans le total",
-      "overview.summary{speed: 13, mass: 2, impact: 26} outcome.slot{slot: slot.leftBase, marble: <tally_flick>, effect: effect.combined{parts: [effect.given{effect: effect.combined{parts: [effect.speed_up{amount: 4}]}, slot: slot.apex}]}} outcome.empty{slot: slot.rightBase} outcome.slot{slot: slot.apex, marble: <fragile>, effect: effect.combined{parts: [effect.speed_up{amount: 9}]}} outcome.pot{marble: <final_pocket>, effect: effect.combined{parts: [effect.mass_up{amount: 1}]}} outcome.pot{marble: <base_pocket>, effect: effect.combined{parts: [effect.speed_up{amount: 4}]}}",
+      "overview.summary{speed: 13, mass: 2, impact: 26} outcome.empty{slot: slot.rightBase} outcome.slot{slot: slot.leftBase, marble: <tally_flick>, effect: effect.combined{parts: [effect.given{effect: effect.combined{parts: [effect.speed_up{amount: 4}]}, slot: slot.apex}]}} outcome.slot{slot: slot.apex, marble: <fragile>, effect: effect.combined{parts: [effect.speed_up{amount: 9}]}} outcome.pot{marble: <final_pocket>, effect: effect.combined{parts: [effect.mass_up{amount: 1}]}} outcome.pot{marble: <base_pocket>, effect: effect.combined{parts: [effect.speed_up{amount: 4}]}}",
       describeOverview(potState, rules, t)
     );
     run.same(
@@ -775,13 +777,13 @@ function checkTexts(run) {
     const saving = playState({ bag: ["aging_flick"], triangle: { leftBase: { marble: "final_pocket", wear: 2 }, rightBase: null, apex: { marble: "fragile", wear: 1 } } });
     run(
       "Polissage, R : le Final de final_pocket polit la pointe et l'empoche, fragile n'est pas retirée",
-      "overview.summary{speed: 5, mass: 2, impact: 10} outcome.slot{slot: slot.leftBase, marble: <final_pocket>, effect: effect.combined{parts: [effect.mass_up{amount: 1}]}} outcome.final{effect: pocket.then{effect: effect.combined{parts: [effect.given{effect: effect.polish{amount: 1}, slot: slot.apex} | effect.pocket_self]}, pockets: effect.combined{parts: [pocket.entered{marble: <final_pocket>}]}}} outcome.empty{slot: slot.rightBase} outcome.slot{slot: slot.apex, marble: <fragile>, effect: effect.combined{parts: [effect.speed_up{amount: 5}]}}",
+      "overview.summary{speed: 5, mass: 2, impact: 10} outcome.empty{slot: slot.rightBase} outcome.slot{slot: slot.leftBase, marble: <final_pocket>, effect: effect.combined{parts: [effect.mass_up{amount: 1}]}} outcome.final{effect: pocket.then{effect: effect.combined{parts: [effect.given{effect: effect.polish{amount: 1}, slot: slot.apex} | effect.pocket_self]}, pockets: effect.combined{parts: [pocket.entered{marble: <final_pocket>}]}}} outcome.slot{slot: slot.apex, marble: <fragile>, effect: effect.combined{parts: [effect.speed_up{amount: 5}]}}",
       describeOverview(saving, rules, t)
     );
     run.same(
       "Polissage, séquence : le retrait de final_pocket, son Final, fragile polie, final_pocket en poche",
       [
-        "event.discarded.wear{marble: <final_pocket>}",
+        "event.removed.wear{marble: <final_pocket>}",
         "event.effect_final{marble: <final_pocket>, effect: effect.combined{parts: [effect.given{effect: effect.polish{amount: 1}, slot: slot.apex} | effect.pocket_self]}, speed: 5, mass: 2}",
         "event.polished{marble: <fragile>, wear: 1, maxWear: 2}",
         "event.pocketed{marble: <final_pocket>}",
@@ -838,8 +840,8 @@ function checkTexts(run) {
       "trouvaille, confirmation : après la régénération, une ligne par bille",
       [
         "forecast.regenerates",
-        "forecast.windfall{marble: <all_rounder>, effect: effect.combined{parts: [effect.speed_up{amount: 3}]}}",
         "forecast.windfall{marble: <final_pocket>, effect: effect.combined{parts: [effect.polish{amount: 1}]}}",
+        "forecast.windfall{marble: <all_rounder>, effect: effect.combined{parts: [effect.speed_up{amount: 3}]}}",
       ],
       placementLines(windfalls, 0, "apex", rules, t).map(({ key, params }) => t(key, params)).slice(-4, -1)
     );
@@ -847,9 +849,9 @@ function checkTexts(run) {
       "trouvaille, pose dite : la régénération, puis les trouvailles, puis la pioche",
       [
         "event.bag_regenerated{size: 2}",
-        "event.effect_windfall{marble: <all_rounder>, effect: effect.combined{parts: [effect.speed_up{amount: 3}]}, speed: 3, mass: 1}",
-        "event.effect_windfall{marble: <final_pocket>, effect: effect.combined{parts: [effect.polish{amount: 1}]}, speed: 3, mass: 1}",
+        "event.effect_windfall{marble: <final_pocket>, effect: effect.combined{parts: [effect.polish{amount: 1}]}, speed: 0, mass: 1}",
         "event.polished{marble: <final_pocket>, wear: 0, maxWear: 3}",
+        "event.effect_windfall{marble: <all_rounder>, effect: effect.combined{parts: [effect.speed_up{amount: 3}]}, speed: 3, mass: 1}",
         "event.draw{marbles: [<aging_flick>]}",
       ],
       buildSteps(rules.reduce(windfalls, { type: "place", handIndex: 0, slot: "apex" }).events, t).map((step) => step.text).slice(-5)
@@ -862,22 +864,51 @@ function checkTexts(run) {
     });
     run(
       "trouvaille, R : après la régénération, chez la bille qui la produit",
-      "overview.summary{speed: 2, mass: 1, impact: 2} outcome.slot{slot: slot.leftBase, marble: <awaken_draw>, effect: effect.combined{parts: [effect.draw{amount: 1}]}} outcome.empty{slot: slot.rightBase} outcome.slot{slot: slot.apex, marble: <all_rounder>, effect: effect.combined{parts: [effect.speed_down{amount: 1}]}} forecast.regenerates forecast.windfall{marble: <all_rounder>, effect: effect.combined{parts: [effect.speed_up{amount: 3}]}}",
+      "overview.summary{speed: 2, mass: 1, impact: 2} outcome.empty{slot: slot.rightBase} outcome.slot{slot: slot.leftBase, marble: <awaken_draw>, effect: effect.combined{parts: [effect.draw{amount: 1}]}} outcome.slot{slot: slot.apex, marble: <all_rounder>, effect: effect.combined{parts: [effect.speed_down{amount: 1}]}} forecast.regenerates forecast.windfall{marble: <all_rounder>, effect: effect.combined{parts: [effect.speed_up{amount: 3}]}}",
       describeOverview(resolvingWindfall, rules, t)
     );
+    // La Chute : dans R, sur la ligne de l'emplacement quitté, après le Final ; dans la
+    // séquence, après le Final, « Chute de … ».
+    const dropping = fabricatedRules({ faller: { maxWear: 1, final: [{ action: "mass", amount: 1 }], drop: [{ action: "speed", amount: 3 }] }, plain: {} });
+    const falling = marblesPlayState(dropping, { score: 0, hand: inHand([]), bag: ["plain"], triangle: { rightBase: null, leftBase: null, apex: { marble: "faller", wear: 0 } } });
+    run(
+      "chute, R : après le Final, sur l'emplacement quitté",
+      true,
+      describeOverview(falling, dropping, t).includes(
+        "outcome.final{effect: effect.combined{parts: [effect.mass_up{amount: 1}]}} outcome.drop{effect: effect.combined{parts: [effect.speed_up{amount: 3}]}}"
+      )
+    );
+    const fallingSteps = resolutionSteps(2, dropping.reduce(falling, { type: "resolve" }).events, t).map((step) => step.text);
+    run.same(
+      "chute, séquence : le départ, le Final, puis la Chute",
+      [
+        "event.removed.wear{marble: <faller>}",
+        "event.effect_final{marble: <faller>, effect: effect.combined{parts: [effect.mass_up{amount: 1}]}, speed: 0, mass: 2}",
+        "event.effect_drop{marble: <faller>, effect: effect.combined{parts: [effect.speed_up{amount: 3}]}, speed: 3, mass: 2}",
+      ],
+      fallingSteps.filter((text) => /faller/.test(text) && !text.startsWith("outcome"))
+    );
+
     // Deux régénérations : chacune se dit avec ses propres Trouvailles, la seconde
-    // « de nouveau » (la Pioche de awaken_draw, puis celle du Final de one_shot).
+    // « de nouveau » (la Pioche de drawer en phase, puis celle de son Final, après
+    // l'arrivée de worn à la défausse).
+    const regenTwice = fabricatedRules({
+      finder: { windfall: [{ action: "speed", amount: 3 }] },
+      worn: { maxWear: 1 },
+      drawer: { base: [{ action: "draw", amount: 1 }], final: [{ action: "draw", amount: 1 }], maxWear: 1 },
+      spare: {},
+    });
     const twice = playState({
       hand: inHand([]),
       bag: [],
-      discard: ["aging_flick"],
-      triangle: { leftBase: { marble: "awaken_draw", wear: 0 }, rightBase: { marble: "one_shot", wear: 0 }, apex: { marble: "all_rounder", wear: 0 } },
+      discard: ["spare"],
+      triangle: { rightBase: { marble: "worn", wear: 0 }, leftBase: { marble: "drawer", wear: 0 }, apex: { marble: "finder", wear: 0 } },
     });
     run(
       "trouvaille, R : chaque régénération avec ses trouvailles",
       true,
-      describeOverview(twice, rules, t).endsWith(
-        "forecast.regenerates forecast.windfall{marble: <all_rounder>, effect: effect.combined{parts: [effect.speed_up{amount: 3}]}} forecast.regenerates_again forecast.windfall{marble: <all_rounder>, effect: effect.combined{parts: [effect.speed_up{amount: 3}]}} forecast.awakenings"
+      describeOverview(twice, regenTwice, t).endsWith(
+        "forecast.regenerates forecast.windfall{marble: <finder>, effect: effect.combined{parts: [effect.speed_up{amount: 3}]}} forecast.regenerates_again forecast.windfall{marble: <finder>, effect: effect.combined{parts: [effect.speed_up{amount: 3}]}}"
       )
     );
     run.same(
@@ -887,7 +918,7 @@ function checkTexts(run) {
         "event.effect_windfall{marble: <all_rounder>, effect: effect.combined{parts: [effect.speed_up{amount: 3}]}, speed: 3, mass: 1}",
         "event.draw{marbles: [<aging_flick>]}",
       ],
-      texts(resolvingWindfall).slice(1, 4)
+      texts(resolvingWindfall).slice(2, 5)
     );
 
     // Conditions de calibre : R, la confirmation et la séquence ne disent que les
@@ -898,7 +929,7 @@ function checkTexts(run) {
     });
     run(
       "calibre, R : size_count compte une minibille, final_pocket sans calot en base gauche",
-      "overview.summary{speed: 3, mass: 2, impact: 6} outcome.slot{slot: slot.leftBase, marble: <size_count>, effect: effect.combined{parts: [effect.speed_up{amount: 1}]}} outcome.slot{slot: slot.rightBase, marble: <fragile>, effect: effect.combined{parts: [effect.speed_up{amount: 2}]}} outcome.slot{slot: slot.apex, marble: <final_pocket>, effect: effect.combined{parts: [effect.mass_up{amount: 1}]}}",
+      "overview.summary{speed: 3, mass: 2, impact: 6} outcome.slot{slot: slot.rightBase, marble: <fragile>, effect: effect.combined{parts: [effect.speed_up{amount: 2}]}} outcome.slot{slot: slot.leftBase, marble: <size_count>, effect: effect.combined{parts: [effect.speed_up{amount: 1}]}} outcome.slot{slot: slot.apex, marble: <final_pocket>, effect: effect.combined{parts: [effect.mass_up{amount: 1}]}}",
       describeOverview(sized, rules, t)
     );
     run.same(

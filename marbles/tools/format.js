@@ -13,9 +13,19 @@ import { formatCounter } from "../view/narration.js";
 import { GAME_RULES } from "./game-rules.js";
 
 const SLOT_NAMES = { leftBase: "base gauche", rightBase: "base droite", apex: "pointe" };
-const CAUSES = { replacement: "remplacement", wear: "usure", pocket: "mise en poche", eject: "éjectée par un effet" };
+const CAUSES = {
+  replacement: "remplacement",
+  wear: "usure",
+  pocket: "mise en poche",
+  eject: "éjectée par un effet",
+  discard: "défaussée par un effet",
+  bounce: "renvoyée en main",
+  retrieve: "ramassée",
+};
+// Où va une bille redirigée pendant son déclencheur de sortie.
+const DESTINATIONS = { pot: "le pot", hand: "la main", discard: "la défausse" };
 // D'où vient une bille mise en poche ou perdue.
-const POCKET_ORIGINS = { triangle: "le triangle", hand: "la main", discard: "la défausse" };
+const POCKET_ORIGINS = { triangle: "le triangle", hand: "la main", discard: "la défausse", bag: "le sac" };
 // Les mots du terminal pour chaque déclencheur, la phase comprise : son nom, son
 // effet, ce qu'il produit (rapport) et, pour un déclencheur de pose, ce qu'il apporte
 // (rapport, section des remplacements). Un par entrée de MARBLE_TRIGGERS
@@ -28,6 +38,7 @@ export const TRIGGER_WORDS = {
   windfall: { name: "Trouvaille", effect: "Effet de trouvaille", produced: "en trouvaille" },
   knockout: { name: "Éjection", effect: "Effet d'éjection", produced: "en éjection", brought: "les éjections" },
   final: { name: "Final", effect: "Effet final", produced: "en final" },
+  drop: { name: "Chute", effect: "Effet de chute", produced: "en chute" },
   // Les moments En poche (marbles/config/values.js/MARBLE_POCKET).
   pocketEntry: { name: "En poche, à l'entrée", effect: "Effet d'entrée au pot", produced: "à l'entrée au pot" },
   pocketResolution: { name: "En poche, à chaque résolution", effect: "Effet du pot", produced: "au pot" },
@@ -108,7 +119,9 @@ export function formatState(state, name) {
 // Une cible de choix : « main 2 : agate (agate) », « pointe : argile (clay) ».
 export function targetLabel(target, name) {
   const marble = target.marble === null || target.marble === undefined ? "vide" : marbleLabel(target.marble, name);
-  return target.zone === "hand" ? `main ${target.index + 1} : ${marble}` : `${slotLabel(target.slot)} : ${marble}`;
+  if (target.zone === "hand") return `main ${target.index + 1} : ${marble}`;
+  if (target.zone === "discard") return `défausse ${target.index + 1} : ${marble}`;
+  return `${slotLabel(target.slot)} : ${marble}`;
 }
 
 // Le choix en attente, d'une ligne : l'action, le mode, ce qui est fait, les cibles,
@@ -160,6 +173,8 @@ const EVENT_LINES = {
     return `${action} sans effet : ${slotLabel(event.slot)} vide.`;
   },
   pocketed: (event, name) => `Mise en poche : ${marbleLabel(event.marble, name)}, depuis ${POCKET_ORIGINS[event.from]}${event.slot ? ` (${slotLabel(event.slot)})` : ""}.`,
+  returned: (event, name) => `En main : ${marbleLabel(event.marble, name)}, depuis ${POCKET_ORIGINS[event.from]}${event.slot ? ` (${slotLabel(event.slot)})` : ""} (${CAUSES[event.movedBy] ?? event.movedBy}).`,
+  redirected: (event, name) => `Redirigée : ${marbleLabel(event.marble, name)}, en partance, vers ${DESTINATIONS[event.destination] ?? event.destination}.`,
   lost: (event, name) => `Perdue, pot plein : ${marbleLabel(event.marble, name)}, depuis ${POCKET_ORIGINS[event.from]}${event.slot ? ` (${slotLabel(event.slot)})` : ""}.`,
   potResolution: (event, name) => `Pot : ${marbleLabel(event.marble, name)}, ${event.index + 1}e arrivée.`,
   pocketReaction: (event, name) => `Réaction du pot : ${marbleLabel(event.marble, name)}, ${event.index + 1}e arrivée, à ${event.counter}.`,

@@ -10,9 +10,10 @@ import { readForecast } from "../../core/forecast.js";
 import { createPicker } from "../helpers.js";
 
 // Les comptes d'une série de parties : états visités, actions comparées, et les
-// exceptions rencontrées (Éveils, billes inconnues mises en poche, choix réels).
+// exceptions rencontrées (Éveils, billes inconnues mises en poche ou défaussées du
+// sac, choix réels).
 export function emptyForecastTally() {
-  return { states: 0, actions: 0, awakened: 0, unknownPockets: 0, choices: 0 };
+  return { states: 0, actions: 0, awakened: 0, unknownPockets: 0, unknownDiscards: 0, choices: 0 };
 }
 
 // Les actions envisagées dans un état : aucune (la résolution seule), chaque pose,
@@ -68,6 +69,13 @@ function compareState(state, marbles, faults, tally) {
       if (!uncertain) faults.push(`mise en poche inconnue sans prévision incertaine : ${JSON.stringify(action)}`);
       continue;
     }
+    // L'exception de Défausser depuis le sac : la bille défaussée est cachée à la
+    // prévision, sa Chute aussi ; la prévision doit s'être dite incertaine.
+    if (unknownDiscard(predicted)) {
+      tally.unknownDiscards += 1;
+      if (!uncertain) faults.push(`défausse inconnue sans prévision incertaine : ${JSON.stringify(action)}`);
+      continue;
+    }
     if (awakened(real.events, resolved.events)) {
       tally.awakened += 1;
       if (!uncertain) faults.push(`éveil réel sans prévision incertaine : ${JSON.stringify(action)}`);
@@ -98,12 +106,14 @@ function compareState(state, marbles, faults, tally) {
 }
 
 // Un effet prévu et les effets d'entrée au pot de ce qu'il a empoché, à plat.
-// Les Éjections provoquées par ses Éjecter aussi.
+// Les Éjections provoquées par ses Éjecter aussi, et les Chutes de ce que ses
+// Défausser ont défaussé de la main ou du sac.
 function withEntries(outcome) {
   return [
     outcome,
     ...(outcome.pockets ?? []).flatMap((moved) => (moved.entry === null ? [] : withEntries(moved.entry))),
     ...(outcome.ejected ?? []).flatMap((ejected) => (ejected.knockout === null ? [] : withEntries(ejected.knockout))),
+    ...(outcome.discards ?? []).flatMap((moved) => (moved.drop === null ? [] : withEntries(moved.drop))),
   ];
 }
 
@@ -126,6 +136,11 @@ function allOutcomes(predicted) {
 // La prévision a-t-elle empoché une bille inconnue (piochée à l'aveugle) ?
 function unknownPocket(predicted) {
   return allOutcomes(predicted).some((outcome) => (outcome.pockets ?? []).some((moved) => moved.marble === null));
+}
+
+// La prévision a-t-elle défaussé une bille inconnue (du sac, à l'aveugle) ?
+function unknownDiscard(predicted) {
+  return allOutcomes(predicted).some((outcome) => (outcome.discards ?? []).some((moved) => moved.marble === null));
 }
 
 // Un Éveil a-t-il joué (un effet) dans ces journaux ?

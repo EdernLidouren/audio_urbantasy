@@ -5,7 +5,7 @@
 // d'entrée et vue d'ensemble : marbles/view/sounds.js.
 
 import { MARBLES_COLLISION, MARBLES_ROLLS, MARBLES_SETTINGS, MARBLES_SOUND_PLACES } from "../../config/values.js";
-import { ROTATION_NEXT, SLOTS } from "../../core/marbles.js";
+import { SLOTS, nextSlot } from "../../core/marbles.js";
 import { rollDurationMs } from "../rolls.js";
 import { discardPlace, handPlace, positionOf, potPlace, slotPlace } from "./space.js";
 
@@ -108,19 +108,20 @@ function createTimeline(settings, { rolls, places }) {
       this.out(nextWornAt, marble, slot);
       nextWornAt += rolls.outStaggerMs;
     },
-    // Une bille mise en poche roule de `from` (une place) au pot, et y tombe : le
-    // même roulement qu'une bille usée, à la suite des autres départs.
-    pocket(marble, from) {
-      const arrival = this.roll(nextWornAt, marble, [from, potPlace()], "out");
-      cues.push(cue(arrival, "drop", marble, potPlace()));
+    // Une bille déplacée par un effet roule de `from` (une place) à `to` (le pot, la
+    // défausse), et y tombe : le même roulement qu'une bille usée, à la suite des
+    // autres départs.
+    depart(marble, from, to) {
+      const arrival = this.roll(nextWornAt, marble, [from, to], "out");
+      cues.push(cue(arrival, "drop", marble, to));
       nextWornAt += rolls.outStaggerMs;
     },
   };
 }
 
-// D'où part une bille mise en poche : son emplacement, sa place dans la main (la main
-// d'après le geste, plus elle), ou la défausse.
-function pocketOrigin(event, context) {
+// D'où part une bille déplacée par un effet : son emplacement, sa place dans la main
+// (la main d'après le geste, plus elle), ou la défausse.
+function originPlace(event, context) {
   if (event.from === "triangle") return slotPlace(event.slot);
   if (event.from === "hand") return handPlace(event.index, (context.handSize ?? 0) + 1);
   return discardPlace();
@@ -128,11 +129,11 @@ function pocketOrigin(event, context) {
 
 // Les emplacements par où passe la bille de `origin` quand le triangle tourne de
 // `notches` crans, départ et arrivée compris : 1 cran, deux emplacements ; 3 crans,
-// le tour complet, elle revient à sa place. L'ordre est celui du cœur
-// (marbles/core/marbles.js/ROTATION_NEXT).
+// le tour complet, elle revient à sa place. L'ordre est celui du cœur, chaque
+// cran vers l'emplacement suivant (marbles/core/effects.js/nextSlot).
 export function rotationPath(origin, notches) {
   const slots = [origin];
-  for (let notch = 0; notch < notches; notch++) slots.push(ROTATION_NEXT[slots[slots.length - 1]]);
+  for (let notch = 0; notch < notches; notch++) slots.push(nextSlot(slots[slots.length - 1]));
   return slots;
 }
 
@@ -172,10 +173,16 @@ export const MARBLE_EVENT_CUES = {
     context.struck = event.marble;
   },
   removed: null,
+  // Une redirection : un point d'accroche muet, l'arrivée a son son.
+  redirected: null,
+  // Une bille arrivée en main (Rebond, Ramasser) roule de là où elle était (son
+  // emplacement, la défausse) à sa place dans la main, et y tombe.
+  returned: (event, timeline, context) =>
+    timeline.depart(event.marble, originPlace(event, context), handPlace(event.handIndex, Math.max(context.handSize ?? 0, event.handIndex + 1))),
   // La mise en poche : la bille roule de là où elle était au pot (de l'emplacement, de
   // la main, de la défausse). La perte et l'étape du pot : des points d'accroche,
   // muets aujourd'hui, la perte sans place imposée.
-  pocketed: (event, timeline, context) => timeline.pocket(event.marble, pocketOrigin(event, context)),
+  pocketed: (event, timeline, context) => timeline.depart(event.marble, originPlace(event, context), potPlace()),
   lost: null,
   potResolution: null,
   // Une réaction du pot : un point d'accroche, sans son à elle aujourd'hui ; l'arrêt
@@ -190,9 +197,12 @@ export const MARBLE_EVENT_CUES = {
   choiceEnded: null,
   choiceUndecided: null,
   // L'usée roule à la défausse ; la délogée part avec le choc (placed).
-  // Chassée par Éjecter : le même roulement vers la défausse qu'une bille usée.
-  discarded: (event, timeline) => {
-    if (event.cause === "wear" || event.cause === "eject") timeline.worn(event.marble, event.slot);
+  // Chassée par Éjecter, défaussée du triangle : le même roulement vers la défausse
+  // qu'une bille usée. Défaussée de la main : de sa place dans la main. Du sac : un
+  // point d'accroche muet.
+  discarded: (event, timeline, context) => {
+    if (event.from === "triangle" && event.cause !== "replacement") timeline.worn(event.marble, event.slot);
+    else if (event.from === "hand") timeline.depart(event.marble, originPlace(event, context), discardPlace());
   },
   // Éjecter : un point d'accroche, sans son à lui aujourd'hui.
   eject: null,
@@ -287,9 +297,9 @@ export function eventCues(
 export function handSizeChange(events) {
   let change = 0;
   for (const event of events) {
-    if (event.type === "draw") change += 1;
+    if (event.type === "draw" || event.type === "returned") change += 1;
     else if (event.type === "placed") change -= 1;
-    else if ((event.type === "pocketed" || event.type === "lost") && event.from === "hand") change -= 1;
+    else if (["pocketed", "lost", "discarded"].includes(event.type) && event.from === "hand") change -= 1;
   }
   return change;
 }

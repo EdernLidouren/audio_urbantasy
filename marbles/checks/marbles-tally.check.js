@@ -101,7 +101,7 @@ function checkGeneration(run) {
   run("génération : les phases", true, ["apex", "base", "leftBase", "rightBase"].every((id) => ids.includes(id)));
   run.same(
     "génération : les actions mots-clés, déclenchements et quantité réelle",
-    ["draw", "drawQuantity", "polish", "polishQuantity", "crack", "crackQuantity", "pocket", "pocketQuantity", "eject", "ejectQuantity"],
+    ["draw", "drawQuantity", "polish", "polishQuantity", "crack", "crackQuantity", "pocket", "pocketQuantity", "eject", "ejectQuantity", "discard", "discardQuantity", "bounce", "bounceQuantity", "retrieve", "retrieveQuantity"],
     TALLY_COUNTERS.filter((counter) => counter.category === "action").map((counter) => counter.id)
   );
   run.same(
@@ -175,7 +175,7 @@ function checkKeywords(run) {
   run.same("mots-clés : le Tic à condition fausse ne produit rien", [{ marble: "hit_pocket", speedDelta: 0 }], effectsOf(hit.events, "hit"));
   run.same(
     "mots-clés : mais compte, comme ses évènements ; one_shot sans Éjection : +1 bille éjectée, +0 éjection",
-    { hit: 1, thrownMarbles: 1, hitMarbles: 1, ejectedMarbles: 1, triangleExits: 1, pocket: 1 },
+    { hit: 1, thrownMarbles: 1, hitMarbles: 1, ejectedMarbles: 1, triangleExits: 1, discardedMarbles: 1, pocket: 1 },
     added(hitPocket, hit.state)
   );
   // Une occupante qui a une Éjection : +1 éjection, aussi.
@@ -235,7 +235,7 @@ function checkActions(run) {
   const cracking = playState({ hand: inHand(["flick_strike"]), triangle: { leftBase: null, rightBase: null, apex: placed("fragile", 1) } });
   run.same(
     "actions : Fêlure 3 sur une usure de 1 sur 2, 1 point ajouté ; usée, sans Tic ni éjection",
-    { flick: 1, crack: 1, crackQuantity: 1, final: 1, thrownMarbles: 1, wornMarbles: 1, triangleExits: 1, speedGains: 1, speedGained: 4 },
+    { flick: 1, crack: 1, crackQuantity: 1, final: 1, thrownMarbles: 1, wornMarbles: 1, triangleExits: 1, discardedMarbles: 1, speedGains: 1, speedGained: 4 },
     added(cracking, fixedRules.reduce(cracking, { type: "place", handIndex: 0, slot: "apex" }).state)
   );
   // Sur un emplacement vide : un déclenchement, aucune usure (une Fêlure de base

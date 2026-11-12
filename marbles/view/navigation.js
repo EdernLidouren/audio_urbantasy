@@ -30,8 +30,8 @@ export function stepCursor(cursor, direction, triangleOnly = false) {
 }
 
 // Où s'ouvre la sélection d'un emplacement pour poser : le premier emplacement
-// vide dans l'ordre des phases (`slots`, base gauche, base droite, pointe), sinon
-// le premier de tous. `triangle` : { slot: occupant ou null }.
+// vide dans l'ordre horaire (`slots`, base droite, base gauche, pointe), sinon le
+// premier de tous. `triangle` : { slot: occupant ou null }.
 export function placementStart(triangle, slots) {
   return slots.find((slot) => triangle[slot] === null) ?? slots[0];
 }

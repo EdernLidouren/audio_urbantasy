@@ -129,14 +129,17 @@ const DRAWN_TRIGGERS = MARBLE_TRIGGERS.filter((trigger) => trigger.marble === "d
 // Un Éveil est-il possible ? Une bille piochée, et, parmi celles qui pouvaient
 // l'être, une qui a un effet d'un déclencheur de la bille piochée. Les billes qui
 // pouvaient l'être : le sac ; s'il est régénéré en chemin, toutes celles qui ont pu
-// passer par la défausse (la défausse d'avant, et chaque bille défaussée pendant
-// l'action et la résolution, que le journal nomme). Rien n'est révélé : la
-// composition du sac et de la défausse est déjà connue du joueur, pas leur ordre.
+// passer par la défausse avant le dernier mélange (la défausse d'avant, et chaque
+// bille arrivée à la défausse pendant l'action et la résolution avant ce mélange,
+// que le journal nomme) : une bille arrivée après, en partance pendant son Final
+// par exemple, ne peut plus être piochée. Rien n'est révélé : la composition du sac
+// et de la défausse est déjà connue du joueur, pas leur ordre.
 function awakenPossible(state, events, types) {
   if (!events.some((event) => event.type === "draw")) return false;
   const pool = [...state.bag];
-  if (events.some((event) => event.type === "bagRegenerated")) {
-    pool.push(...state.discard, ...events.filter((event) => event.type === "discarded").map((event) => event.marble));
+  const lastShuffle = events.findLastIndex((event) => event.type === "bagRegenerated");
+  if (lastShuffle >= 0) {
+    pool.push(...state.discard, ...events.slice(0, lastShuffle).filter((event) => event.type === "discarded").map((event) => event.marble));
   }
   // Une bille déjà inconnue (une vue où le sac est caché, celle des joueurs
   // automatiques) pourrait en avoir un.
@@ -157,14 +160,22 @@ function awakenPossible(state, events, types) {
 //             avant leur départ (une interruption : il vient juste après), ou null.
 // -> Map effet -> { pockets: [{ marble, lost, entry }], empty: [{ action, slot, ... }],
 //    undecided: [{ action }], ejected: [{ marble, slot, knockout }] }.
-const RESULT_EVENTS = new Set(["pocketed", "lost", "targetEmpty", "choiceUndecided", "eject"]);
+//   discards : les billes que ses Défausser ont envoyées à la défausse depuis la
+//             main ou le sac (`discarded` qui porte `by`), avec l'effet de leur Chute,
+//             qui suit aussitôt (une interruption), ou null ; une bille défaussée
+//             depuis le triangle se dit sur son emplacement (retirée, puis sa Chute).
+const RESULT_EVENTS = new Set(["pocketed", "lost", "targetEmpty", "choiceUndecided", "eject", "discarded"]);
+
+// Les arrivées d'une bille au bout de son trajet (marbles/core/run.js/travel).
+const ARRIVALS = new Set(["discarded", "pocketed", "lost"]);
 
 // L'effet de l'Éjection provoquée par l'évènement `eject` à `index`, ou null : le
-// premier `effect` d'Éjection provoquée sur son emplacement, avant qu'elle ne parte.
+// premier `effect` d'Éjection provoquée sur son emplacement, pendant qu'elle est en
+// partance, avant son arrivée.
 function provokedKnockout(events, index) {
   const { slot, marble } = events[index];
   for (const event of events.slice(index + 1)) {
-    if (event.type === "removed" && event.slot === slot) return null;
+    if (ARRIVALS.has(event.type) && event.marble === marble) return null;
     if (event.type === "effect" && event.trigger === "knockout" && event.ejectedBy !== undefined && event.slot === slot && event.marble === marble) return event;
   }
   return null;
@@ -175,11 +186,14 @@ function resultsByEffect(events) {
   events.forEach((event, index) => {
     if (!RESULT_EVENTS.has(event.type)) return;
     const { by } = event;
+    // Une arrivée à la défausse sans effet qui l'y envoie (usure, éjection), ou
+    // depuis le triangle (dite sur son emplacement) : pas un résultat d'effet.
+    if (by === undefined || (event.type === "discarded" && event.from === "triangle")) return;
     const source = events
       .slice(0, index)
       .findLast((other) => other.type === "effect" && other.trigger === by.trigger && other.marble === by.marble && (other.slot ?? null) === by.slot);
     if (source === undefined) return;
-    const found = results.get(source) ?? { pockets: [], empty: [], undecided: [], ejected: [] };
+    const found = results.get(source) ?? { pockets: [], empty: [], undecided: [], ejected: [], discards: [] };
     results.set(source, found);
     if (event.type === "eject") {
       found.ejected.push({ marble: event.marble, slot: event.slot, knockout: provokedKnockout(events, index) });
@@ -195,6 +209,11 @@ function resultsByEffect(events) {
       return;
     }
     const next = events[index + 1];
+    if (event.type === "discarded") {
+      const drop = next?.type === "effect" && next.trigger === "drop" && next.marble === event.marble ? next : null;
+      found.discards.push({ marble: event.marble, drop });
+      return;
+    }
     const entry = event.type === "pocketed" && next?.type === "effect" && ENTRY_TRIGGERS.has(next.trigger) && next.marble === event.marble ? next : null;
     found.pockets.push({ marble: event.marble, lost: event.type === "lost", entry });
   });
@@ -218,6 +237,7 @@ function outcomeReader(events) {
       ...(found.ejected.length > 0 && {
         ejected: found.ejected.map(({ marble, slot, knockout }) => ({ marble, slot, knockout: knockout === null ? null : outcomeOf(knockout) })),
       }),
+      ...(found.discards.length > 0 && { discards: found.discards.map(({ marble, drop }) => ({ marble, drop: drop === null ? null : outcomeOf(drop) })) }),
     };
   };
   return outcomeOf;
@@ -233,6 +253,7 @@ function combinedOutcome(outcomes) {
   if (all("empty").length > 0) combined.empty = all("empty");
   if (all("undecided").length > 0) combined.undecided = all("undecided");
   if (all("ejected").length > 0) combined.ejected = all("ejected");
+  if (all("discards").length > 0) combined.discards = all("discards");
   return combined;
 }
 
@@ -267,7 +288,7 @@ function failed(error) {
 
 const WEAR_EVENTS = new Set(["wear", "polished", "cracked"]);
 
-const BEFORE_PHASE_CAUSES = new Set(["wear", "pocket", "eject"]);
+const BEFORE_PHASE_CAUSES = new Set(["wear", "pocket", "eject", "discard", "bounce"]);
 
 // Par emplacement, la bille retirée AVANT que sa phase ne vienne (sa phase
 // est alors sautée), ou null.
@@ -276,8 +297,8 @@ function clearedBeforePhase(events) {
   const phased = new Set();
   for (const event of events) {
     if (event.type === "phase" || event.type === "phaseSkipped") phased.add(event.slot);
-    // Une usure (une Fêlure), une mise en poche (Empocher) ou une éjection
-    // (Éjecter) avant la phase.
+    // Une usure (une Fêlure), une mise en poche (Empocher), une éjection (Éjecter),
+    // une défausse (Défausser) ou un rebond (Rebond) avant la phase.
     if (event.type === "removed" && BEFORE_PHASE_CAUSES.has(event.cause) && !phased.has(event.slot)) cleared[event.slot] = event.marble;
   }
   return cleared;

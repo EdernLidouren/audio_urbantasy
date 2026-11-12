@@ -143,7 +143,7 @@ function forecastNotes(predicted, t) {
 
 // La vue d'ensemble du tour (touche R), d'un bloc : la prévision d'abord, Vitesse et
 // Masse comprenant ce que le tour a déjà gagné (Tic, Éjection), l'Impact avec ses
-// planchers ; puis chaque emplacement dans l'ordre des phases (une Pioche y est une
+// planchers ; puis chaque emplacement dans l'ordre horaire (une Pioche y est une
 // valeur comme une autre, « Pioche 1 ») ; enfin la régénération du sac, si la
 // résolution la provoquerait. Le triangle actuel, sans action envisagée. null hors
 // de la phase de jeu, où rien ne se prévoit.

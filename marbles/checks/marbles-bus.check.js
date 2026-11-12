@@ -122,7 +122,8 @@ export default function checkMarblesBus(run) {
   run("réducteur : toutes les billes piochées quand même", 5, halted.state.hand.length);
   run("réducteur : sous la limite, rien de noté", false, rules.reduce(game, { type: "draw" }).events.some((event) => event.type === "chainInterrupted"));
 
-  // L'ordre fixe des écouteurs : base gauche, base droite, pointe, puis la main.
+  // L'ordre fixe des écouteurs : l'ordre horaire (base droite, base gauche, pointe),
+  // puis la main.
   const listening = {
     ...game,
     hand: inHand(["awaken_draw", "all_rounder"]),
@@ -130,7 +131,7 @@ export default function checkMarblesBus(run) {
   };
   run.same(
     "écouteurs : ordre fixe",
-    ["triangle:leftBase:final_pocket", "triangle:rightBase:hit_polish", "triangle:apex:aging_flick", "hand:0:awaken_draw", "hand:1:all_rounder"],
+    ["triangle:rightBase:hit_polish", "triangle:leftBase:final_pocket", "triangle:apex:aging_flick", "hand:0:awaken_draw", "hand:1:all_rounder"],
     marbleListeners(listening).map((listener) => `${listener.zone}:${listener.slot ?? listener.index}:${listener.marble}`)
   );
   const holes = { ...listening, hand: inHand([]), triangle: { leftBase: null, rightBase: { marble: "hit_polish", wear: 0 }, apex: null } };

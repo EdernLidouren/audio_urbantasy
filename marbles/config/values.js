@@ -248,7 +248,8 @@ export const MARBLE_PHASES = [
   {
     id: "base",
     field: "base",
-    slots: ["leftBase", "rightBase"],
+    // Dans l'ordre horaire (marbles/core/effects.js/SLOTS).
+    slots: ["rightBase", "leftBase"],
     texts: { name: "marbles.keyword.base.name", description: "marbles.keyword.base.description" },
   },
 ];
@@ -263,8 +264,10 @@ export const MARBLE_PHASES = [
 //   field     le champ d'effet de la bille (marbles/content/types/index.js) ;
 //   event     l'évènement du journal qui le déclenche ;
 //   marble    la bille concernée : "onSlot", celle qui est sur l'emplacement de
-//             l'évènement ; "removed", celle que l'évènement nomme, déjà retirée du
-//             triangle ; "thrown", celle que l'évènement nomme, EN COURS DE LANCER :
+//             l'évènement ; "leaving", celle que l'évènement nomme, EN PARTANCE :
+//             sortie de sa zone, pas encore arrivée (marbles/core/run.js/travel) ;
+//             "dropped", celle que l'évènement nomme, qui vient d'arriver à la
+//             DÉFAUSSE ; "thrown", celle que l'évènement nomme, EN COURS DE LANCER :
 //             sortie de la main, pas encore sur le triangle ; "drawn", celle que
 //             l'évènement nomme, qui vient d'être piochée : en main, à 0 tour en
 //             main (une action sur la bille elle-même y est refusée) ;
@@ -354,7 +357,7 @@ export const MARBLE_TRIGGERS = [
     card: "below",
   },
   // La Trouvaille : à chaque régénération du sac depuis la défausse, à tout moment du
-  // tour, chez chaque bille ACTIVE (sur le triangle), dans l'ordre des phases, avant
+  // tour, chez chaque bille ACTIVE (sur le triangle), dans l'ordre horaire, avant
   // que la pioche interrompue ne reprenne.
   {
     id: "windfall",
@@ -372,11 +375,13 @@ export const MARBLE_TRIGGERS = [
     },
     card: "below",
   },
+  // L'Éjection : la bille chassée du triangle (par une pose, par Éjecter), EN
+  // PARTANCE : partie de son emplacement, pas encore arrivée.
   {
     id: "knockout",
     field: "knockout",
     event: "knockout",
-    marble: "onSlot",
+    marble: "leaving",
     // À tout moment : une pose pendant la phase de jeu, mais aussi l'action Éjecter
     // d'un effet de résolution (une phase, un Final).
     moment: "anytime",
@@ -391,13 +396,14 @@ export const MARBLE_TRIGGERS = [
     },
     card: "below",
   },
-  // Le Final : au retrait par USURE seulement, la bille déjà à la défausse. Ses
-  // valeurs comptent pour le tour en cours (les retraits précèdent l'Impact).
+  // Le Final : au retrait par USURE seulement, la bille EN PARTANCE, avant son
+  // arrivée à la défausse. Ses valeurs comptent pour le tour en cours (les retraits
+  // précèdent l'Impact).
   {
     id: "final",
     field: "final",
     event: "final",
-    marble: "removed",
+    marble: "leaving",
     moment: "afterPhases",
     forecast: { line: "slot" },
     texts: {
@@ -406,6 +412,27 @@ export const MARBLE_TRIGGERS = [
       card: "marbles.card.final",
       effect: "marbles.event.effect_final",
       slot: "marbles.outcome.final",
+    },
+    card: "below",
+  },
+  // La Chute : à chaque arrivée de la bille à la défausse, d'où qu'elle vienne
+  // (triangle, main, sac), au bout de son trajet (marbles/core/run.js/travel), jamais
+  // si une redirection l'envoie ailleurs. Elle est alors à la défausse. Sa prévision :
+  // avec l'emplacement qu'elle a quitté, après son Final ; une bille arrivée d'une
+  // autre zone n'en a pas.
+  {
+    id: "drop",
+    field: "drop",
+    event: "discarded",
+    marble: "dropped",
+    moment: "anytime",
+    forecast: { line: "slot" },
+    texts: {
+      name: "marbles.keyword.drop.name",
+      description: "marbles.keyword.drop.description",
+      card: "marbles.card.drop",
+      effect: "marbles.event.effect_drop",
+      slot: "marbles.outcome.drop",
     },
     card: "below",
   },
@@ -454,6 +481,8 @@ export const MARBLE_TALLIES = [
   { id: "pocketedMarbles", events: ["pocketed"] },
   // Chaque bille perdue, envoyée au pot plein.
   { id: "lostMarbles", events: ["lost"] },
+  // Chaque bille arrivée à la défausse, d'où qu'elle vienne (triangle, main, sac).
+  { id: "discardedMarbles", events: ["discarded"] },
 ];
 
 // Le mot-clé EN POCHE (Pocketed) : des effets qui ne s'appliquent que lorsque la

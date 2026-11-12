@@ -34,6 +34,9 @@ const handIndexOf = (word) => (/^\d+$/.test(word ?? "") ? Number(word) - 1 : und
 //   kind "forecast" : `action` la pose envisagée, ou null pour le triangle actuel ;
 //   kind "other"    : une commande propre à l'outil (le premier mot, `word`) ;
 //   kind "error"    : `error`, l'usage attendu.
+// Les mots qui désignent la défausse dans `choisir defausse <n>`.
+const DISCARD_WORDS = ["defausse", "défausse", "discard"];
+
 export function parseCommand(line) {
   const [word = "", ...params] = line.trim().split(/\s+/);
   switch (word.toLowerCase()) {
@@ -59,11 +62,18 @@ export function parseCommand(line) {
       return { kind: "action", action: { type: "resolve" } };
     case "choisir":
     case "choose": {
+      // Une bille de la défausse : `choisir defausse 2`, sa place dans l'ordre
+      // d'arrivée.
+      if (DISCARD_WORDS.includes(params[0])) {
+        const index = handIndexOf(params[1]);
+        if (index !== undefined) return { kind: "action", action: { type: "choose", target: { zone: "discard", index } } };
+        return { kind: "error", error: "Usage : choisir defausse <n>" };
+      }
       const handIndex = handIndexOf(params[0]);
       const slot = slotOf(params[0]);
       if (handIndex !== undefined) return { kind: "action", action: { type: "choose", target: { zone: "hand", index: handIndex } } };
       if (slot) return { kind: "action", action: { type: "choose", target: { zone: "triangle", slot } } };
-      return { kind: "error", error: "Usage : choisir <n de la main | gauche|droite|pointe>" };
+      return { kind: "error", error: "Usage : choisir <n de la main | gauche|droite|pointe | defausse n>" };
     }
     case "terminer":
     case "done":

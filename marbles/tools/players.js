@@ -97,8 +97,8 @@ function placementSequences(state, { maxPlacements, allowReplacement }, drawnBef
   const walk = (current, choices, drawn) => {
     sequences.push({ choices, state: current, drawn });
     if (!firstTurn && choices.length >= maxPlacements) return;
-    // Au premier tour, les emplacements vides se remplissent dans l'ordre des
-    // phases, chacun après le dernier rempli : chaque sous-ensemble d'emplacements,
+    // Au premier tour, les emplacements vides se remplissent dans l'ordre horaire,
+    // chacun après le dernier rempli : chaque sous-ensemble d'emplacements,
     // chaque attribution, est couvert sans compter deux fois le même.
     const after = choices.length === 0 ? -1 : SLOTS.indexOf(choices.at(-1).slot);
     const slots = firstTurn

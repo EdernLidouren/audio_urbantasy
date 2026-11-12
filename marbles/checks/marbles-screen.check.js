@@ -39,6 +39,7 @@ export default function checkMarblesScreen(run) {
   run.section("menu par-dessus", checkMenuFreezes);
   run.section("choix pendant une résolution", checkChoiceDuringResolution);
   run.section("choix pendant un lancer", checkChoiceDuringThrow);
+  run.section("choix dans la défausse", checkDiscardChoice);
   run.section("fin de partie", checkGameEnd);
 }
 
@@ -82,19 +83,19 @@ function checkPlace(run) {
   const bench = openScreenBench(rules, state);
   try {
     bench.key("Enter");
-    run("prendre : la bille prise, le curseur sur le premier emplacement vide", "take.hand{name: <aging_flick>} slot_line.placing_empty{slot: slot.leftBase}", bench.said.at(-1));
+    run("prendre : la bille prise, le curseur sur le premier emplacement vide (ordre horaire)", "take.hand{name: <aging_flick>} slot_line.placing_empty{slot: slot.rightBase}", bench.said.at(-1));
     bench.key("Enter");
     run("emplacement : la confirmation s'ouvre par-dessus l'écran", true, bench.top() !== bench.screen);
-    run("emplacement : rien n'est encore posé", null, bench.game().triangle.leftBase);
+    run("emplacement : rien n'est encore posé", null, bench.game().triangle.rightBase);
     // Confirmer : la dernière entrée du menu.
     bench.key("End");
     bench.key("Enter");
     run("confirmer : de retour sur l'écran", true, bench.top() === bench.screen);
-    run.same("confirmer : la bille posée", placed("aging_flick"), bench.game().triangle.leftBase);
+    run.same("confirmer : la bille posée", placed("aging_flick"), bench.game().triangle.rightBase);
     run.same("confirmer : la main sans elle", inHand(["hit_polish"]), bench.game().hand);
     run(
       "confirmer : la pose dite",
-      "event.effect_flick{marble: <aging_flick>, effect: effect.none, speed: 0, mass: 1} event.placed{marble: <aging_flick>, slot: slot.leftBase}",
+      "event.effect_flick{marble: <aging_flick>, effect: effect.none, speed: 0, mass: 1} event.placed{marble: <aging_flick>, slot: slot.rightBase}",
       bench.said.at(-1)
     );
     bench.advance(LONG_MS);
@@ -138,13 +139,13 @@ function checkSequence(run) {
   try {
     const start = bench.said.length;
     bench.key("r", ["shift"]);
-    run("Maj+R : la première étape aussitôt, l'ouverture avec la base gauche", true, bench.said.length === start + 1 && bench.said.at(-1).startsWith("resolution.opening{turn: 2} outcome.slot{slot: slot.leftBase"));
+    run("Maj+R : la première étape aussitôt, l'ouverture avec la base droite", true, bench.said.length === start + 1 && bench.said.at(-1).startsWith("resolution.opening{turn: 2} outcome.slot{slot: slot.rightBase"));
     run("Maj+R : la partie déjà résolue, l'écran ne fait plus que la dire", 3, bench.game().turn);
     const firstPause = pauseAfter(bench.said.at(-1));
     bench.advance(firstPause - 1);
     run("séquence : rien avant la fin de la pause", start + 1, bench.said.length);
     bench.advance(1);
-    run("séquence : l'étape suivante à la fin de la pause", true, bench.said.at(-1).startsWith("outcome.slot{slot: slot.rightBase"));
+    run("séquence : l'étape suivante à la fin de la pause", true, bench.said.at(-1).startsWith("outcome.slot{slot: slot.leftBase"));
     bench.advance(LONG_MS);
     run("séquence : une étape au plus par battement, même après une longue absence", start + 3, bench.said.length);
 
@@ -194,7 +195,7 @@ function checkMenuFreezes(run) {
     bench.key("Escape");
     run("aide refermée : l'écran redit son étape", step, bench.said.at(-1));
     bench.advance(LONG_MS);
-    run("aide refermée : la séquence reprend", true, bench.said.at(-1).startsWith("outcome.slot{slot: slot.rightBase"));
+    run("aide refermée : la séquence reprend", true, bench.said.at(-1).startsWith("outcome.slot{slot: slot.leftBase"));
   } finally {
     bench.close();
   }
@@ -220,7 +221,8 @@ function checkChoiceDuringResolution(run) {
     run("choix : l'Impact pas encore dit", false, bench.said.some((text) => text.includes("event.impact")));
     run("choix : en attente dans la partie", "polish", bench.game().pendingChoice?.action);
     bench.key("Enter");
-    run("réponse : la cible choisie se dit", "choice.chosen{marble: <aging_flick>}", bench.said.at(-1));
+    // Le curseur s'ouvre sur la première cible dans l'ordre horaire : la base droite.
+    run("réponse : la cible choisie se dit", "choice.chosen{marble: <final_pocket>}", bench.said.at(-1));
     playOut();
     run("réponse : la question suivante, en séquence", "choice.more_up_to{target: choice.noun.triangle_marble{count: 1}}", bench.said.at(-1));
     bench.key("t");
@@ -268,6 +270,39 @@ function checkChoiceDuringThrow(run) {
     for (let pulse = 0; pulse < 5; pulse++) bench.advance(LONG_MS);
     run("réponse : plus de choix en attente", null, bench.game().pendingChoice);
     run.same("réponse : la bille lancée arrivée", placed("flicker"), bench.game().triangle.rightBase);
+  } finally {
+    bench.close();
+  }
+}
+
+// Un choix dans la DÉFAUSSE (Ramasser) : un menu horizontal dans l'ordre d'arrivée,
+// les flèches gauche et droite le parcourent, E dit les mots-clés de la bille sous
+// le curseur, Entrée la ramasse en main.
+function checkDiscardChoice(run) {
+  const made = fabricatedRules({
+    plain: {},
+    flicker: { flick: [speed(1)] },
+    picker: { hit: [{ action: "retrieve", target: { type: "choice", zones: ["discard"], pick: "marble", count: 1 } }] },
+  });
+  const state = marblesPlayState(made, { hand: inHand(["picker"]), discard: ["plain", "flicker"], triangle: { rightBase: null, leftBase: null, apex: placed("plain") } });
+  const bench = openScreenBench(made, state);
+  try {
+    // Prise, le curseur sur la base droite, monté à la pointe, la pose confirmée.
+    bench.key("Enter");
+    bench.key("ArrowUp");
+    bench.key("Enter");
+    bench.key("End");
+    bench.key("Enter");
+    for (let pulse = 0; pulse < 5; pulse++) bench.advance(LONG_MS);
+    run("défausse : le choix attend, dans la défausse", true, bench.game().pendingChoice?.zones.includes("discard"));
+    bench.key("ArrowRight");
+    run("défausse : la flèche droite, la bille suivante dans l'ordre d'arrivée", true, bench.said.at(-1).startsWith("list.line{name: <flicker>"));
+    bench.key("e");
+    run("défausse : E dit les mots-clés de la bille", true, bench.said.at(-1).includes("keyword.flick"));
+    bench.key("Enter");
+    for (let pulse = 0; pulse < 5; pulse++) bench.advance(LONG_MS);
+    run("défausse : la bille choisie, ramassée en main", true, bench.game().hand.some((held) => held.marble === "flicker"));
+    run("défausse : plus de choix en attente", null, bench.game().pendingChoice);
   } finally {
     bench.close();
   }

@@ -72,7 +72,7 @@ function checkChoices(run) {
   const triple = playState({ hand: inHand(["twoPolish"]), triangle: triangleOf(placed("sturdy", 3), placed("sturdy", 3), placed("plain")) });
   const opened = reduce(triple, { type: "place", handIndex: 0, slot: "apex" });
   run("choix : la pose s'arrête sur le choix", true, opened.ok && opened.state.pendingChoice !== null);
-  run.same("choix : les billes actives, la posée comprise", ["leftBase", "rightBase", "apex"], slots(opened.state.pendingChoice));
+  run.same("choix : les billes actives dans l'ordre horaire, la posée comprise", ["rightBase", "leftBase", "apex"], slots(opened.state.pendingChoice));
   run.same(
     "choix : la question en attente",
     { action: "polish", amount: 1, zones: ["triangle"], pick: "marble", count: 2, upTo: false, remaining: 2, chosen: [] },
@@ -134,12 +134,13 @@ function checkChoices(run) {
   const fromHand = reduce(both.state, { type: "choose", target: { zone: "hand", index: 1 } });
   run.same("main : la bille choisie au pot, l'autre reste", { pot: ["sturdy"], hand: ["plain"] }, { pot: fromHand.state.pot, hand: handIds(fromHand.state) });
 
-  // Règle des cibles : un bonus ne va qu'à une phase à venir. En base gauche, pendant
-  // la résolution : la base gauche (en cours) n'est pas éligible.
-  const boosting = reduce(playState({ triangle: triangleOf(placed("booster"), placed("plain"), placed("plain")) }), { type: "resolve" });
-  run.same("éligibilité : un bonus, seulement les phases à venir", ["rightBase", "apex"], slots(boosting.state.pendingChoice));
+  // Règle des cibles : un bonus ne va qu'à une phase à venir. En base droite, la
+  // première phase, pendant la résolution : la base droite (en cours) n'est pas
+  // éligible.
+  const boosting = reduce(playState({ triangle: triangleOf(placed("plain"), placed("booster"), placed("plain")) }), { type: "resolve" });
+  run.same("éligibilité : un bonus, seulement les phases à venir", ["leftBase", "apex"], slots(boosting.state.pendingChoice));
   const boosted = answer(boosting.state, "apex");
-  // La pointe ordinaire : Vitesse +1, plus le bonus de 2 ; la base droite ne produit rien.
+  // La pointe ordinaire : Vitesse +1, plus le bonus de 2 ; la base gauche ne produit rien.
   run("éligibilité : le bonus compté à la phase choisie", 1 + 2, boosted.events.find((event) => event.type === "impact").speed);
 
   // Reprise exacte : un choix équivaut à la même cible fixe. Au milieu d'une
@@ -169,7 +170,8 @@ function checkChoices(run) {
   run("transit : jamais une cible", false, inPot.state.pendingChoice.eligible.some((target) => target.marble === "flicker"));
   run.same("transit : un aller-retour JSON ne change rien", inPot.state, JSON.parse(JSON.stringify(inPot.state)));
   run.same("transit : aucune au Tic, la bille déjà posée", [], opened.state.pendingChoice.inTransit);
-  run.same("transit : aucune pendant une résolution", [], suspended.state.pendingChoice.inTransit);
+  run.same("transit : pendant un Final, la bille en partance, depuis son emplacement", [{ kind: "leaving", marble: "finalChooser", slot: "apex" }], suspended.state.pendingChoice.inTransit);
+  run("transit : en partance, jamais une cible", false, suspended.state.pendingChoice.eligible.some((target) => target.marble === "finalChooser"));
   const reachedChoice = (state) => state.pendingChoice?.inTransit ?? null;
   run("transit : arrivée, plus rien n'attend", null, reachedChoice(answer(inPot.state, "leftBase").state));
   const potResumed = answer(inPot.state, "leftBase");
@@ -247,11 +249,12 @@ function checkEject(run) {
   const toApex = { type: "place", handIndex: 0, slot: "apex" };
   const toLeft = { type: "place", handIndex: 0, slot: "leftBase" };
 
-  // Un emplacement : l'Éjection de la visée, son retrait, sa défausse ; ni Tic ni Final.
+  // Un emplacement : le départ de la visée, son Éjection en partance, son arrivée à
+  // la défausse ; ni Tic ni Final.
   const fixed = go(playState({ hand: inHand(["apexEjector"]), triangle: triangleOf(placed("plain"), null, placed("smallKnock")) }), toLeft);
   run.same(
-    "éjecter, emplacement : Éjection, retrait, défausse",
-    ["eject:smallKnock", "knockout:smallKnock", "effect:knockout:smallKnock", "removed:smallKnock:eject", "discarded:smallKnock:eject"],
+    "éjecter, emplacement : départ, Éjection, défausse",
+    ["eject:smallKnock", "removed:smallKnock:eject", "knockout:smallKnock", "effect:knockout:smallKnock", "discarded:smallKnock:eject"],
     journal(fixed.events).slice(journal(fixed.events).indexOf("eject:smallKnock"))
   );
   run("éjecter : la pointe vidée", null, fixed.state.triangle.apex);
@@ -271,7 +274,7 @@ function checkEject(run) {
   run("validation, éjecter soi-même : en poche refusé", true, throws(() => validateTable({ x: { pocketed: { entry: [{ action: "eject" }] } } })));
   run("validation, éjecter soi-même : au Tic permis", false, refused("hit"));
   run("validation, éjecter soi-même : dans sa propre Éjection refusé", true, refused("knockout"));
-  run("validation, éjecter soi-même : le message dit pourquoi", true, /propre Éjection/.test(caughtMessage(() => validateTable({ x: { knockout: [{ action: "eject" }] } }))));
+  run("validation, éjecter soi-même : le message dit pourquoi, elle est en partance", true, /en partance/.test(caughtMessage(() => validateTable({ x: { knockout: [{ action: "eject" }] } }))));
   run("validation, éjecter un emplacement dans son Éjection permis", false, refused("knockout", { action: "eject", target: "apex" }));
   run("validation, éjecter : un montant refusé", true, refused("hit", { action: "eject", amount: 1, target: "apex" }));
   run("validation, éjecter : au choix dans la main refusé", true, refused("hit", { action: "eject", target: { type: "choice", zones: ["hand"], pick: "marble", count: 1 } }));
@@ -297,16 +300,16 @@ function checkEject(run) {
   run.same("choix pendant une Éjection : l'emplacement de la bille qui part n'est pas éligible", ["rightBase"], replacing.pendingChoice.eligible.map((target) => target.slot));
   run("validation, « toutes » : sans filtre permis", false, refused("hit", { action: "eject", target: { type: "all" } }));
 
-  // Toutes les minibilles actives : dans l'ordre des phases, seulement elles.
+  // Toutes les minibilles actives : dans l'ordre horaire, seulement elles.
   const smalls = go(
     playState({ hand: inHand(["smallEjector"]), triangle: triangleOf(placed("small"), placed("plain"), placed("smallKnock")) }),
     { type: "place", handIndex: 0, slot: "rightBase" }
   );
-  run.same("éjecter toutes les minibilles : dans l'ordre des phases", ["small", "smallKnock"], smalls.events.filter((event) => event.type === "eject").map((event) => event.marble));
+  run.same("éjecter toutes les minibilles : dans l'ordre horaire", ["small", "smallKnock"], smalls.events.filter((event) => event.type === "eject").map((event) => event.marble));
   run.same("éjecter toutes les minibilles : la bille normale reste", "smallEjector", smalls.state.triangle.rightBase.marble);
   // Toutes : la bille elle-même comprise, sur le triangle.
   const everyone = go(playState({ bag: ["plain"], triangle: triangleOf(placed("allEjector"), placed("plain"), placed("plain")) }), { type: "resolve" });
-  run.same("éjecter toutes : chaque bille active, elle comprise, dans l'ordre des phases", ["leftBase", "rightBase", "apex"], everyone.events.filter((event) => event.type === "eject").map((event) => event.slot));
+  run.same("éjecter toutes : chaque bille active, elle comprise, dans l'ordre horaire", ["rightBase", "leftBase", "apex"], everyone.events.filter((event) => event.type === "eject").map((event) => event.slot));
   // Aucune bille visée : sans effet, noté.
   const noneSmall = go(playState({ hand: inHand(["smallEjector"]), triangle: triangleOf(placed("plain"), null, placed("plain")) }), toApex);
   run("éjecter toutes les minibilles : aucune, noté", true, journal(noneSmall.events).includes("targetEmpty:eject:all"));
@@ -361,7 +364,7 @@ function checkEject(run) {
   const flickStrike = apply(playState({ hand: inHand(["flick_strike"]), triangle: triangleOf(null, null, placed("tally_flick")) }), toApex);
   run.same(
     "flick_strike : sa Chiquenaude éjecte la pointe, puis la pose sur l'emplacement vidé",
-    ["flick:flick_strike", "effect:flick:flick_strike", "eject:tally_flick", "knockout:tally_flick", "effect:knockout:tally_flick", "removed:tally_flick:eject", "discarded:tally_flick:eject", "placed:flick_strike"],
+    ["flick:flick_strike", "effect:flick:flick_strike", "eject:tally_flick", "removed:tally_flick:eject", "knockout:tally_flick", "effect:knockout:tally_flick", "discarded:tally_flick:eject", "placed:flick_strike"],
     journal(flickStrike.events)
   );
   run("flick_strike : ni Tic", false, flickStrike.events.some((event) => event.type === "hit"));

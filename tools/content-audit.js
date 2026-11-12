@@ -105,15 +105,15 @@ const NAME_SLOTS = [
   { template: "interaction.travelConfirm", param: "scene", names: () => MAIN_SCENE_IDS.map((id) => `scene.${id}.name`) },
   // view/emotes.js/chooseShortcut : l'émote placée en raccourci.
   { template: "emote.shortcutSet", param: "emote", names: () => Object.values(EMOTE_REGISTRY).map((emote) => emote.nameKey) },
-  // marbles/view/narration.js : la bille qui joue son Tic ou son Éjection, et
-  // celle qui part à la défausse.
+  // marbles/view/narration.js : la bille qui joue son Tic ou son Éjection, celle
+  // qui part à la défausse, et celle qui quitte le triangle usée.
   ...[
     "marbles.place.hit",
     "marbles.place.knockout",
     "marbles.event.effect_hit",
     "marbles.event.effect_knockout",
     "marbles.event.discarded.replacement",
-    "marbles.event.discarded.wear",
+    "marbles.event.removed.wear",
   ].map((template) => ({
     template,
     param: "marble",

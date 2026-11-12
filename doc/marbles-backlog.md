@@ -10,7 +10,9 @@ Les points repoussés « à plus tard », une ligne par point, avec son origine 
 
 ## Extensions prévues par la structure
 
-- Choix dans le pot, la défausse ou le sac : zones déclarées, pas encore disponibles. (Itération 17.)
+- Choix dans le pot ou le sac : zones déclarées, pas encore disponibles. (Itération 17 ; la défausse l'est depuis l'itération 21, pour Ramasser.)
+- Défausser depuis le pot : la manipulation du pot sera réservée à des effets exceptionnels. (Itération 21.)
+- Un déclencheur d'arrivée en main (après un Rebond ou un Ramasser), sur le modèle de la Chute à la défausse. (Itération 21.)
 - Choix d'un emplacement vide : prévu, aucune action n'y a de sens aujourd'hui. (Itération 17.)
 - Filtres de cible autres que le calibre, et la phrase qui en combine deux. (Itération 18.)
 - Un filtre de cible « les autres », pour que « toutes les billes actives » et les choix puissent exclure la bille qui les pose. (Décision après l'itération 19.)

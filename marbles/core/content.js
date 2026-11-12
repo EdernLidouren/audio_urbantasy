@@ -14,7 +14,10 @@
 //   bagRegenerated { size }, swapped { a, b },
 //   awaken { marble }, flick { slot, marble, turnsInHand }, windfall { slot, marble },
 //   knockout { slot, marble, replacement, by? }, removed { slot, marble, cause },
-//   discarded { slot, marble, cause }, placed { slot, marble },
+//   discarded { marble, from, slot?, index?, cause, handFull?, movedBy?, redirected?, by? },
+//   redirected { marble, destination, action, by },
+//   returned { marble, from, slot?, index?, handIndex, cause, movedBy?, redirected?, by? },
+//   placed { slot, marble },
 //   hit { slot, marble, replacement }, final { slot, marble },
 //   phase { slot, marble }, phaseSkipped { slot },
 //   effect { trigger, slot, marble, speedDelta, massDelta, draw, operations, given, lost, speed, mass },
@@ -41,19 +44,32 @@
 // phases ; sa Trouvaille et tout ce qui en découle se règlent avant la suite.
 // `replacement` (Tic, Éjection) : le remplacement en cours, { placed, ejected }, lu
 // par les conditions de calibre relatif (marbles/core/effects.js/relativeSize).
+// LE CHEMIN D'UNE BILLE (marbles/core/run.js/travel) : `removed` (son départ du
+// triangle, avec sa cause), son déclencheur de sortie (`final`, `knockout`) réglé
+// pendant qu'elle est en partance, une `redirected` éventuelle, puis son arrivée,
+// `discarded` (la défausse, depuis `from` : "triangle" et son `slot`, "hand" et son
+// `index`), `pocketed` ou `lost`.
 // `eject` : l'action Éjecter (marbles/core/effects.js) chasse la bille de `slot`,
-// produite par l'effet `by` ; suivent son Éjection (`knockout`, avec `by` et le
-// remplacement { placed: la bille qui éjecte, ejected }, réglée aussitôt, une
-// interruption), puis `removed` et `discarded` de cause "eject". Un `effect` d'une
-// Éjection ainsi provoquée porte `ejectedBy` (le `by` de l'éjection) : ce n'est pas
-// celle d'une pose.
+// produite par l'effet `by` ; suivent `removed` de cause "eject", son Éjection
+// (`knockout`, avec `by` et le remplacement { placed: la bille qui éjecte, ejected },
+// une interruption), puis son arrivée. Un `effect` d'une Éjection ainsi provoquée
+// porte `ejectedBy` (le `by` de l'éjection) : ce n'est pas celle d'une pose.
+// `redirected` : pendant son déclencheur de sortie, une action sur elle-même
+// (Empocher, Rebond) a redirigé la bille en partance vers `destination` ("pot",
+// "hand"), par l'effet `by` ; son arrivée porte alors `redirected: true`.
+// `returned` : une bille arrive en MAIN (Rebond, Ramasser), à 0 tour en main, sans
+// Éveil, à la place `handIndex` ; depuis `from` ("triangle" et son `slot`,
+// "discard" et son `index`). Une bille renvoyée vers une main pleine arrive à la
+// défausse à la place : `discarded` porte `handFull`.
+// `movedBy` (arrivées) : l'action qui a déplacé la bille (Empocher, Défausser,
+// Rebond, Ramasser), directement ou par une redirection ; lu par leurs compteurs.
 // `cause` : "replacement", "wear", "pocket" ou "eject". `trigger` : "phase", l'id d'un
 // déclencheur (marbles/config/values.js/MARBLE_TRIGGERS : "awaken", "flick", "hit",
 // "windfall", "knockout", "final") ou d'un moment En poche (MARBLE_POCKET :
 // "pocketEntry", "pocketResolution", "pocketReaction").
-// `final` : une bille usée vient de rejoindre la défausse depuis `slot`.
+// `final` : une bille usée vient de quitter `slot` ; en partance, pas encore arrivée.
 // `pocketed` : une bille entre au pot (Empocher) depuis `from` ("triangle", et son
-// `slot` ; "hand", et son `index` ; "discard"), produite par l'effet `by`
+// `slot` ; "hand", et son `index`), produite par l'effet `by`
 // ({ trigger, slot, marble }) ; `potIndex`, sa place d'arrivée au pot (la dernière) ;
 // ses effets d'entrée (En poche) se règlent aussitôt, une interruption. `lost` : la même, le pot étant plein : perdue, sans effet
 // d'entrée. Depuis le triangle, un `removed` de cause "pocket" les précède : ce
@@ -69,7 +85,7 @@
 // ensuite. Une anomalie dans les vérifications et le simulateur.
 // Un `effect` d'une bille du pot (entrée, étape du pot, réaction) porte aussi
 // `potIndex`, sa place d'arrivée.
-// `rotation` : le triangle a tourné de `notches` crans (ROTATION_NEXT, un cran par
+// `rotation` : le triangle a tourné de `notches` crans (nextSlot, un cran par
 // tour aujourd'hui), `triangle` étant celui d'après.
 // `choice` : un choix commence (au moins une cible éligible), le point d'accroche de
 // son ouverture ; `chosen` : une cible choisie, celui de sa validation ;
@@ -125,7 +141,11 @@ export const JOURNAL_EVENTS = Object.freeze({
   windfall: true,
   knockout: true,
   removed: true,
-  discarded: true,
+  // La bille défaussée peut venir du sac, cachée dans la prévision.
+  discarded: false,
+  // La bille ramassée peut venir du sac, défaussée à l'aveugle.
+  returned: false,
+  redirected: true,
   placed: true,
   hit: true,
   final: true,
@@ -159,7 +179,7 @@ export const JOURNAL_EVENTS = Object.freeze({
 
 // Les champs d'effet de PHASE d'une bille, à part des déclencheurs.
 const PHASE_FIELDS = MARBLE_PHASES.map((phase) => phase.field);
-const TRIGGER_MARBLES = ["onSlot", "removed", "thrown", "drawn"];
+const TRIGGER_MARBLES = ["onSlot", "leaving", "dropped", "thrown", "drawn"];
 const TRIGGER_MOMENTS = ["play", "afterPhases", "anytime"];
 const PLACEMENT_MARBLES = ["occupant", "placed"];
 
@@ -283,7 +303,7 @@ export function reactionClauses(type, counter) {
 
 // Les mots-clés de phase, pour les valeurs de partie : chaque phase (MARBLE_PHASES :
 // pointe, base, celle-ci sur ses deux emplacements), puis chaque emplacement d'une
-// phase qui en a plusieurs (base gauche, base droite).
+// phase qui en a plusieurs (base droite, base gauche).
 const PHASE_KEYWORDS = [
   ...MARBLE_PHASES.map(({ id, slots }) => ({ id, slots })),
   ...MARBLE_PHASES.filter((phase) => phase.slots.length > 1).flatMap((phase) => phase.slots.map((slot) => ({ id: slot, slots: [slot] }))),

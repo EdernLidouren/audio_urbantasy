@@ -144,6 +144,10 @@ function sampleEvents() {
   // base_pocket qui fêle une fragile.
   const polishedNothing = rules.reduce({ ...emptyBagMarblesGame(rules, 6), turn: 2, stage: "play", hand: inHand(["hit_polish"]), triangle: { leftBase: { marble: "aging_flick", wear: 0 }, rightBase: null, apex: null } }, { type: "place", handIndex: 0, slot: "leftBase" });
   events.push(...polishedNothing.events);
+  // Une cible vide : le Tic de hit_polish sans choix (CHOICELESS_TYPES) polit la
+  // pointe, vide.
+  const polishedEmpty = earlierRules.reduce({ ...emptyBagMarblesGame(rules, 6), turn: 2, stage: "play", hand: inHand(["hit_polish"]), triangle: { leftBase: { marble: "aging_flick", wear: 0 }, rightBase: null, apex: null } }, { type: "place", handIndex: 0, slot: "leftBase" });
+  events.push(...polishedEmpty.events);
   const pocketedApex = rules.reduce({ ...emptyBagMarblesGame(rules, 7), turn: 2, stage: "play", bag: ["aging_flick"], triangle: { leftBase: { marble: "base_pocket", wear: 0 }, rightBase: null, apex: { marble: "fragile", wear: 0 } } }, { type: "resolve" });
   events.push(...pocketedApex.events);
   // flick_strike fêle fragile de la pointe ; hit_pocket, pot plein, perd la
@@ -158,6 +162,14 @@ function sampleEvents() {
   events.push(...lost.events);
   const polished = rules.reduce({ ...emptyBagMarblesGame(rules, 8), turn: 2, stage: "play", bag: ["aging_flick"], triangle: { leftBase: null, rightBase: null, apex: { marble: "awaken_draw", wear: 1 } } }, { type: "resolve" });
   events.push(...polished.events);
+  // Une arrivée en main : une bille qui se renvoie en main à son Final, fabriquée
+  // sous un id de la table des vérifications (ses textes : withRealNames).
+  const bouncing = fabricatedRules({ aging_flick: { maxWear: 1, final: [{ action: "bounce" }] }, hit_polish: {} });
+  const returned = bouncing.reduce({ ...emptyBagMarblesGame(bouncing, 8), turn: 2, stage: "play", bag: ["hit_polish"], triangle: { leftBase: null, rightBase: null, apex: { marble: "aging_flick", wear: 0 } } }, { type: "resolve" });
+  events.push(...returned.events);
+  // Une redirection : le Final de final_pocket l'empoche, en partance.
+  const redirected = rules.reduce({ ...emptyBagMarblesGame(rules, 8), turn: 2, stage: "play", bag: ["aging_flick"], triangle: { leftBase: null, rightBase: null, apex: { marble: "final_pocket", wear: 2 } } }, { type: "resolve" });
+  events.push(...redirected.events);
   // Sac vide, défausse pleine : la défausse devient le sac.
   // all_rounder active y trouve (Trouvaille).
   const regenerated = rules.reduce(
@@ -515,7 +527,7 @@ function checkKeywords(run) {
   run.same("mots-clés : une bille sans effet n'en a aucun", [], ids("bare", made));
   run.same(
     "mots-clés : l'ordre de la liste, déclencheurs, En poche, actions, puis phases",
-    ["awaken", "flick", "hit", "windfall", "knockout", "final", "pocketed", "draw", "polish", "crack", "pocket", "eject", "apex", "base"],
+    ["awaken", "flick", "hit", "windfall", "knockout", "final", "drop", "pocketed", "draw", "polish", "crack", "pocket", "eject", "discard", "bounce", "retrieve", "apex", "base"],
     MARBLE_KEYWORDS.map((keyword) => keyword.id)
   );
 
@@ -637,6 +649,10 @@ function checkChoiceInterface(run) {
     // En poche, à chaque chiquenaude : Fêlure 1 au choix ; un choix ouvert pendant
     // le lancer de `flicker`, alors en transit.
     potCrack: { pocketed: { flick: [{ action: "crack", amount: 1, target: choose(["triangle"]) }] } },
+    // Final : Polissage 1 au choix, pendant que la bille est en partance.
+    finalChooser: { maxWear: 1, final: [{ action: "polish", amount: 1, target: choose(["triangle"]) }] },
+    // Tic : Ramasser une bille de la défausse au choix.
+    picker: { hit: [{ action: "retrieve", target: choose(["discard"]) }] },
     flicker: { flick: [{ action: "speed", amount: 1 }] },
   });
   const pending = (marble, triangle, hand = []) =>
@@ -694,6 +710,37 @@ function checkChoiceInterface(run) {
     choiceFocusLine(toEmpty, cursor("rightBase"), made, t)
   );
   run.same("transit : jamais une cible, Entrée bloque sur l'emplacement vide qu'elle vise", { refusal: "notEligible" }, choiceAnswer(toEmpty.pendingChoice, cursor("rightBase")));
+  // EN PARTANCE : pendant son Final, l'emplacement que la bille quitte le dit.
+  const leaving = made.reduce(
+    { ...emptyBagMarblesGame(made, 2), turn: 2, stage: "play", bag: ["plain"], triangle: { leftBase: { marble: "plain", wear: 0 }, rightBase: null, apex: { marble: "finalChooser", wear: 0 } } },
+    { type: "resolve" }
+  ).state;
+  run(
+    "en partance : l'emplacement quitté l'annonce, avant « Non éligible »",
+    "slot_line.empty{slot: slot.apex} choice.in_transit.leaving{name: <finalChooser>} choice.not_eligible",
+    choiceFocusLine(leaving, cursor("apex"), made, t)
+  );
+  run("en partance : un autre emplacement n'en dit rien", false, choiceFocusLine(leaving, cursor("leftBase"), made, t).includes("in_transit"));
+
+  // LA DÉFAUSSE (Ramasser) : un menu horizontal, dans l'ordre d'arrivée, à la place
+  // de la main ; Entrée répond par la place dans la défausse ; la fiche est celle de
+  // la bille.
+  const picking = made.reduce(
+    { ...emptyBagMarblesGame(made, 2), turn: 2, stage: "play", hand: inHand(["picker"]), discard: ["plain", "booster"], triangle: { leftBase: null, rightBase: null, apex: { marble: "plain", wear: 0 } } },
+    { type: "place", handIndex: 0, slot: "apex" }
+  ).state;
+  const fromDiscard = picking.pendingChoice;
+  run(
+    "défausse, question : choisir une bille de la défausse à ramasser",
+    "choice.by_hit{marble: <picker>, question: choice.question{target: choice.noun.discard_marble{count: 1}, verb: choice.verb.retrieve{effect: undefined}}}",
+    describeChoicePrompt(fromDiscard, t)
+  );
+  run.same("défausse : le menu, dans l'ordre d'arrivée, la remplacée en dernier", ["plain", "booster", "plain"], choiceHandOptions(fromDiscard).map((option) => option.marble));
+  run.same("défausse : le curseur s'y ouvre", { place: "hand", handIndex: 0 }, (({ place, handIndex }) => ({ place, handIndex }))(choiceStartCursor(fromDiscard, cursor("apex"))));
+  run("défausse : la position dans le menu", "list.line{name: <booster>, size: size.medium.name, maxWear: 3}. menu.position{index: 2, total: 3}", choiceFocusLine(picking, cursor("hand", 1), made, t));
+  run.same("défausse : Entrée répond par la place dans la défausse", { type: "choose", target: { zone: "discard", index: 1 } }, choiceAnswer(fromDiscard, cursor("hand", 1)).action);
+  run.same("défausse : la fiche de la bille sous le curseur", { marble: "booster", turnsInHand: 0 }, choiceMarbleAt(picking, cursor("hand", 1)));
+  run("défausse seule : pas de triangle", null, stepChoiceCursor(fromDiscard, cursor("hand"), "up"));
 
   // Obligatoire, 2 : la question, puis ce qui reste.
   const two = pending("twoCrack", { leftBase: { marble: "plain", wear: 0 }, rightBase: { marble: "plain", wear: 0 }, apex: { marble: "plain", wear: 0 } });
@@ -957,7 +1004,7 @@ function checkSounds(run) {
     "knocked out",
     [
       eventCues(replacement, {}, settings, collisionMotion).find((cue) => cue.marble === "awaken_draw" && cue.sound === "roll").style,
-      eventCues([{ type: "discarded", slot: "apex", marble: "awaken_draw", cause: "wear" }], {}, settings, collisionMotion)[0].style,
+      eventCues([{ type: "discarded", marble: "awaken_draw", from: "triangle", slot: "apex", cause: "wear" }], {}, settings, collisionMotion)[0].style,
     ].join(" ")
   );
   // Échange : la bille choisie (en `a` avant l'échange, en `b` après), puis l'autre.
@@ -981,7 +1028,7 @@ function checkSounds(run) {
       eventCues(
         ["aging_flick", "all_rounder"].flatMap((marble) => [
           { type: "removed", slot: "apex", marble, cause: "wear" },
-          { type: "discarded", slot: "apex", marble, cause: "wear" },
+          { type: "discarded", marble, from: "triangle", slot: "apex", cause: "wear" },
         ]),
         {},
         settings,
@@ -995,10 +1042,10 @@ function checkSounds(run) {
   run.same(
     "repères : une rotation, les billes tournent ensemble, puis se calent",
     [
-      "roll aging_flick leftBase>apex @0+700",
-      "drop aging_flick apex @700 x0.5",
       "roll all_rounder rightBase>leftBase @0+700",
       "drop all_rounder leftBase @700 x0.5",
+      "roll aging_flick leftBase>apex @0+700",
+      "drop aging_flick apex @700 x0.5",
       "roll awaken_draw apex>rightBase @0+700",
       "drop awaken_draw rightBase @700 x0.5",
     ],
@@ -1090,12 +1137,30 @@ function checkSounds(run) {
     eventCues([wearEvent("polished", "leftBase", "aging_flick", 1, 0), wearEvent("cracked", "apex", "one_shot", 1, 1)], {}, settings, FIXTURE_TABLE).map((cue) => `${cue.sound}@${cue.atMs}`)
   );
   const crackedOut = eventCues(
-    [wearEvent("cracked", "apex", "one_shot", 1, 3), { type: "removed", slot: "apex", marble: "one_shot", cause: "wear" }, { type: "discarded", slot: "apex", marble: "one_shot", cause: "wear" }],
+    [wearEvent("cracked", "apex", "one_shot", 1, 3), { type: "removed", slot: "apex", marble: "one_shot", cause: "wear" }, { type: "discarded", from: "triangle", slot: "apex", marble: "one_shot", cause: "wear" }],
     {},
     settings,
     FIXTURE_TABLE
   );
   run.same("usure : la bille retirée par la Fêlure part après sa fêlure", ["crack@0", "roll@150", "drop"], crackedOut.map((cue) => (cue.sound === "drop" ? cue.sound : `${cue.sound}@${cue.atMs}`)));
+  // Les déplacements par effet : vers la main (Rebond, Ramasser), de la main à la
+  // défausse (Défausser) ; du sac, muet.
+  run.same(
+    "déplacement : une bille renvoyée en main roule de son emplacement à sa place dans la main",
+    ["roll", "drop"],
+    eventCues([{ type: "returned", marble: "aging_flick", from: "triangle", slot: "apex", handIndex: 1, cause: "bounce", movedBy: "bounce" }], { handSize: 2 }, settings, FIXTURE_TABLE).map((cue) => cue.sound)
+  );
+  run.same(
+    "déplacement : elle tombe à sa place dans la main",
+    handPlace(1, 2),
+    eventCues([{ type: "returned", marble: "aging_flick", from: "discard", index: 0, handIndex: 1, cause: "retrieve", movedBy: "retrieve" }], { handSize: 2 }, settings, FIXTURE_TABLE).at(-1).place
+  );
+  run.same(
+    "déplacement : défaussée de la main, elle roule à la défausse",
+    discardPlace(),
+    eventCues([{ type: "discarded", marble: "aging_flick", from: "hand", index: 0, cause: "discard", movedBy: "discard" }], { handSize: 1 }, settings, FIXTURE_TABLE).at(-1).place
+  );
+  run.same("déplacement : défaussée du sac, muette", [], eventCues([{ type: "discarded", marble: "aging_flick", from: "bag", cause: "discard", movedBy: "discard" }], {}, settings, FIXTURE_TABLE));
   run.same(
     "usure : une Fêlure qui retire une bille déjà au maximum se fait entendre",
     ["crack"],
@@ -1297,6 +1362,34 @@ function checkSaid(run, { events, state }) {
     run("texte : effet positif", "effect.combined{parts: [effect.speed_up{amount: 4}]}", describeEffect({ speed: 4 }, t));
     run("texte : effet négatif, vrai signe moins collé au nombre", "effect.combined{parts: [effect.speed_down{amount: 3}]}", describeEffect({ speed: -3 }, t));
     run("texte : Masse négative", "effect.combined{parts: [effect.mass_down{amount: 2}]}", describeEffect({ mass: -2 }, t));
+    // Défausser : chaque forme de cible, et la défausse prévue avec sa Chute.
+    const discardText = (target) => describeEffect({ operations: [{ action: "discard", ...(target === undefined ? {} : { target }) }] }, t);
+    run.same(
+      "texte : Défausser, chaque cible",
+      [
+        "effect.combined{parts: [effect.discard_self]}",
+        "effect.combined{parts: [effect.discard_slot{slot: slot.apex}]}",
+        "effect.combined{parts: [effect.discard_hand]}",
+        "effect.combined{parts: [effect.discard_choice{target: choice.noun.hand_marble{count: 1}}]}",
+        "effect.combined{parts: [effect.discard_all{target: target.all}]}",
+        "effect.combined{parts: [effect.discard_bag{count: 2}]}",
+      ],
+      [undefined, "apex", "firstInHand", { type: "choice", zones: ["hand"], pick: "marble", count: 1 }, { type: "all" }, { type: "bag", count: 2 }].map(discardText)
+    );
+    run(
+      "texte : Défausser prévu, la bille défaussée et sa Chute, une bille du sac inconnue",
+      "pocket.then{effect: effect.combined{parts: [effect.discard_bag{count: 2}]}, pockets: effect.combined{parts: [discard.discarded_effect{marble: <aging_flick>, effect: effect.combined{parts: [effect.speed_up{amount: 2}]}} | discard.discarded_unknown]}}",
+      describeEffect(
+        {
+          operations: [{ action: "discard", target: { type: "bag", count: 2 } }],
+          discards: [
+            { marble: "aging_flick", drop: { marble: "aging_flick", speed: 2, mass: 0, draw: 0, operations: [], given: [] } },
+            { marble: null, drop: null },
+          ],
+        },
+        t
+      )
+    );
     run("texte : compteur négatif", "−3", formatCounter(-3));
     run("texte : compteur positif", "3", formatCounter(3));
     run(
@@ -1421,7 +1514,8 @@ function checkSaid(run, { events, state }) {
       stepsText(buildSteps(placing.events, t))
     );
     const lensedSteps = buildSteps(rules.reduce(lensed, { type: "resolve" }).events, t).map((step) => step.text);
-    run("texte : tally_flick dit son don à la pointe", "outcome.slot{slot: slot.leftBase, marble: <tally_flick>, effect: effect.combined{parts: [effect.given{effect: effect.combined{parts: [effect.speed_up{amount: 4}]}, slot: slot.apex}]}}", lensedSteps[0]);
+    // La base droite, vide, ouvre la résolution (lensedSteps[0]).
+    run("texte : tally_flick dit son don à la pointe", "outcome.slot{slot: slot.leftBase, marble: <tally_flick>, effect: effect.combined{parts: [effect.given{effect: effect.combined{parts: [effect.speed_up{amount: 4}]}, slot: slot.apex}]}}", lensedSteps[1]);
     run("texte : le bonus s'entend chez qui le reçoit", "outcome.slot{slot: slot.apex, marble: <hit_pocket>, effect: effect.combined{parts: [effect.speed_up{amount: 10}]}}", lensedSteps[2]);
     run.same("étapes : aucune étape silencieuse", [], buildSteps(events, t).filter((step) => step.text === ""));
     run(
@@ -1476,11 +1570,11 @@ function checkConfirmationAndCursor(run) {
   run("sélection : vers la pointe", "apex", stepCursor(inTriangle("rightBase", "rightBase"), "up", true).place);
   const marble = { marble: "aging_flick", wear: 0 };
   const start = (leftBase, rightBase, apex) => placementStart({ leftBase, rightBase, apex }, SLOTS);
-  run("sélection : tout vide, base gauche", "leftBase", start(null, null, null));
-  run("sélection : premier vide, base droite", "rightBase", start(marble, null, null));
+  run("sélection : tout vide, base droite (la première dans l'ordre horaire)", "rightBase", start(null, null, null));
+  run("sélection : base gauche occupée, base droite", "rightBase", start(marble, null, null));
   run("sélection : seule la pointe est vide", "apex", start(marble, marble, null));
-  run("sélection : base gauche avant pointe", "leftBase", start(null, marble, null));
-  run("sélection : tout occupé, base gauche", "leftBase", start(marble, marble, marble));
+  run("sélection : base droite occupée, base gauche avant pointe", "leftBase", start(null, marble, null));
+  run("sélection : tout occupé, base droite", "rightBase", start(marble, marble, marble));
 }
 
 // Les billes TÉMOINS : de vraies billes par leur id, pour leur NOM dans chaque langue
@@ -1506,10 +1600,10 @@ const WITNESSES = {
     ],
     placing: "Éjection de gorille : Vitesse +3. Vitesse 3, Masse 1. Défausse : gorille. Pose : argile en pointe. Tic d'argile : Vitesse +2. Vitesse 5, Masse 1.",
     wornOut: [
-      "argile est usée et part à la défausse.",
-      "gorille est usé et part à la défausse.",
+      "argile est usée et quitte le triangle.",
+      "gorille est usé et quitte le triangle.",
     ],
-    overview: "Prévision : Vitesse −2, Masse 1, Impact 0. base gauche, argile : Vitesse +1. base droite, vide. pointe, plombée : Vitesse −3.",
+    overview: "Prévision : Vitesse −2, Masse 1, Impact 0. base droite, vide. base gauche, argile : Vitesse +1. pointe, plombée : Vitesse −3.",
     card: [
       "Pointe : Vitesse +4.",
       "Base : Vitesse +1.",
@@ -1538,10 +1632,10 @@ const WITNESSES = {
     ],
     placing: "Knockout of gorilla: Speed +3. Speed 3, Mass 1. Discard: gorilla. Placement: clay on the apex. Hit from clay: Speed +2. Speed 5, Mass 1.",
     wornOut: [
-      "clay is worn out and goes to the discard.",
-      "gorilla is worn out and goes to the discard.",
+      "clay is worn out and leaves the triangle.",
+      "gorilla is worn out and leaves the triangle.",
     ],
-    overview: "Forecast: Speed −2, Mass 1, Impact 0. left base, clay: Speed +1. right base, empty. apex, leaded: Speed −3.",
+    overview: "Forecast: Speed −2, Mass 1, Impact 0. right base, empty. left base, clay: Speed +1. apex, leaded: Speed −3.",
     card: [
       "Apex: Speed +4.",
       "Base: Speed +1.",
@@ -1582,7 +1676,7 @@ function checkWitnesses(run) {
       confirmation: lines(placementLines(occupied, 0, "apex", WITNESS_RULES, realT)),
       placing: plain(stepsText(buildSteps(WITNESS_RULES.reduce(occupied, { type: "place", handIndex: 0, slot: "apex" }).events, realT))),
       wornOut: WITNESS_RULES.reduce(worn, { type: "resolve" })
-        .events.filter((event) => event.type === "discarded")
+        .events.filter((event) => event.type === "removed" && event.cause === "wear")
         .map((event) => plain(stepsText(buildSteps([event], realT)))),
       overview: plain(describeOverview(game({ triangle: { leftBase: { marble: "clay", wear: 0 }, rightBase: null, apex: { marble: "leaded", wear: 0 } } }), WITNESS_RULES, realT)),
       card: marbleCard("clay", "x", WITNESS_RULES, realT).above.map(plain),

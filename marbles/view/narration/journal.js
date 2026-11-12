@@ -9,8 +9,8 @@ import { MARBLE_POCKET, MARBLE_TRIGGERS } from "../../config/values.js";
 import { FIRST_IN_HAND } from "../../core/effects.js";
 import { choiceTarget, combined, describeEffect, formatCounter, marbleName, outcomeLine, slotName, valueParts } from "./effects.js";
 
-// Le sens de la rotation du moteur (marbles/core/marbles.js/ROTATION_NEXT) : horaire (base
-// gauche -> pointe -> base droite). Ses crans, eux, viennent de l'évènement.
+// Le sens de la rotation du moteur (marbles/core/effects.js/nextSlot) : horaire (base
+// droite -> base gauche -> pointe). Ses crans, eux, viennent de l'évènement.
 const ROTATION_DIRECTION = "clockwise";
 
 // Le gabarit d'un effet déclenché par un évènement, celui de son déclencheur
@@ -38,21 +38,27 @@ function effectText(event, t) {
 }
 
 // Ce qui ne se dit pas : l'évènement rejoint l'étape SUIVANTE (son son avec elle).
-// La phase se dit par son effet, qui la suit toujours ; le retrait, par la défausse ;
-// le Tic et l'Éjection, par leur effet s'ils en ont un.
+// La phase se dit par son effet, qui la suit toujours ; le départ d'une bille
+// remplacée ou mise en poche, par son arrivée ; le Tic et l'Éjection, par leur effet
+// s'ils en ont un ; une redirection, par l'effet qui la fait et par l'arrivée.
 const SILENT = () => null;
 // Ce qui ne se dit pas et prolonge l'étape PRÉCÉDENTE : l'usure suit l'effet de sa
 // phase, la fin de tour suit la rotation, l'évènement d'un déclencheur de la bille
 // piochée (l'Éveil) suit sa pioche, sans couper la liste des pioches consécutives
 // (son effet, s'il en a un, ouvre sa propre étape et la coupe).
-// Une bille chassée par Éjecter : son retrait et son départ à la défausse suivent
-// l'annonce de son Éjection (ou de l'éjection), sans se dire.
+// Une bille chassée par Éjecter : son retrait et son arrivée à la défausse suivent
+// l'annonce de l'éjection (puis de son Éjection), sans se dire. Une bille usée :
+// son départ se dit (« usée, quitte le triangle »), son arrivée à la défausse, la
+// destination par défaut, suit ce qui l'a précédée (son Final) sans se dire.
 const TRAILING = new Set([
   "wear",
   "turnEnded",
   ...MARBLE_TRIGGERS.filter((trigger) => trigger.marble === "drawn").map((trigger) => trigger.event),
 ]);
-const isTrailing = (event) => TRAILING.has(event.type) || ((event.type === "removed" || event.type === "discarded") && event.cause === "eject");
+const isTrailing = (event) =>
+  TRAILING.has(event.type) ||
+  ((event.type === "removed" || event.type === "discarded") && event.cause === "eject" && event.handFull !== true) ||
+  (event.type === "discarded" && event.cause === "wear" && event.handFull !== true);
 
 // Le texte de chaque type d'évènement, ou null s'il ne se dit pas. `context` :
 // { gameEndsBeforeNextTurn(index) }, pour la rotation.
@@ -65,21 +71,26 @@ const EVENT_TEXTS = {
   swapped: (event, t) => t("marbles.event.swapped", { a: slotName(event.a, t), b: slotName(event.b, t) }),
   // L'évènement d'un déclencheur se dit par son effet, s'il en a un.
   ...Object.fromEntries(MARBLE_TRIGGERS.map((trigger) => [trigger.event, SILENT])),
-  removed: SILENT,
+  // Le départ d'une bille usée se dit ; les autres départs, par leur arrivée.
+  removed: (event, t) => (event.cause === "wear" ? t("marbles.event.removed.wear", { marble: nameRef(`marble.${event.marble}.name`) }) : null),
+  redirected: SILENT,
   phase: SILENT,
   wear: SILENT,
   turnEnded: SILENT,
   // Polissage, Fêlure : la bille qui les reçoit, et son usure d'après.
   polished: (event, t) => t("marbles.event.polished", { marble: nameRef(`marble.${event.marble}.name`), wear: event.wear, maxWear: event.maxWear }),
   cracked: (event, t) => t("marbles.event.cracked", { marble: nameRef(`marble.${event.marble}.name`), wear: event.wear, maxWear: event.maxWear }),
-  // Une cible vide : un emplacement, la main (Empocher la première bille de la
-  // main), ou la bille elle-même qui n'est plus là.
+  // Une cible vide : un emplacement, la main (la première bille de la main), le sac
+  // (ses prochaines billes), ou la bille elle-même qui n'est plus là.
   targetEmpty: (event, t) => {
     if (event.target === FIRST_IN_HAND) return t("marbles.event.target_empty_hand");
     if (event.target === "choice") return t("marbles.event.target_empty_choice");
     if (event.target === "all") return t("marbles.event.target_empty_all");
     if (event.target === "self" && event.action === "eject") return t("marbles.event.target_empty_self_eject", { marble: nameRef(`marble.${event.marble}.name`) });
     if (event.target === "self") return t("marbles.event.target_empty_self", { marble: nameRef(`marble.${event.marble}.name`) });
+    if (event.target === "bag") return t("marbles.event.target_empty_bag");
+    if (event.target === "lastDiscarded") return t("marbles.event.target_empty_discard");
+    if (event.target === "handFull") return t("marbles.event.target_empty_hand_full");
     return t("marbles.event.target_empty", { slot: slotName(event.slot, t) });
   },
   // La mise en poche et la perte, dites avec la bille ; une bille piochée à
@@ -102,8 +113,16 @@ const EVENT_TEXTS = {
       : t("marbles.choice.chosen", { marble: nameRef(`marble.${event.marble}.name`) }),
   choiceEnded: (event, t) => (event.reason === "count" ? null : t(`marbles.choice.ended.${event.reason}`)),
   choiceUndecided: SILENT,
-  // Une bille chassée par Éjecter : déjà dite par l'éjection (isTrailing).
-  discarded: (event, t) => (event.cause === "eject" ? null : t(`marbles.event.discarded.${event.cause}`, { marble: nameRef(`marble.${event.marble}.name`) })),
+  // Une bille chassée par Éjecter, ou usée : déjà dite par l'éjection ou par son
+  // départ (isTrailing).
+  // Une bille renvoyée vers une main pleine : dite, quelle que soit sa cause.
+  discarded: (event, t) => {
+    const marble = nameRef(`marble.${event.marble}.name`);
+    if (event.handFull === true) return t("marbles.event.discarded.hand_full", { marble });
+    return event.cause === "eject" || event.cause === "wear" ? null : t(`marbles.event.discarded.${event.cause}`, { marble });
+  },
+  // Une bille arrivée en main : selon l'action qui l'y a envoyée.
+  returned: (event, t) => t(`marbles.event.returned.${event.movedBy}`, { marble: nameRef(`marble.${event.marble}.name`) }),
   // Éjecter : la bille qui éjecte, et celle qu'elle chasse ; son Éjection se dit
   // ensuite par son effet.
   eject: (event, t) => t("marbles.event.eject", { source: nameRef(`marble.${event.by.marble}.name`), marble: nameRef(`marble.${event.marble}.name`) }),

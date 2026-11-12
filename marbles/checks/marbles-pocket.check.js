@@ -103,7 +103,7 @@ function checkPocket(run) {
 
   // Depuis un emplacement, pendant la résolution : base_pocket en base empoche la
   // pointe ; ni usure ni éjection (pas de Final) ; la phase de pointe est sautée.
-  const basePocket = apply(playState({ bag: ["aging_flick"], triangle: triangleOf(placed("base_pocket"), null, placed("fragile", 1)) }), { type: "resolve" });
+  const basePocket = apply(playState({ bag: ["aging_flick"], triangle: triangleOf(null, placed("base_pocket"), placed("fragile", 1)) }), { type: "resolve" });
   run.same(
     "Empocher, depuis un emplacement : retrait, mise en poche, entrée, puis la suite",
     ["phase:base_pocket", "effect:phase:base_pocket", "removed:fragile:pocket", "pocketed:fragile:triangle", "effect:pocketEntry:fragile", "wear:base_pocket", "phaseSkipped", "phaseSkipped"],
@@ -115,23 +115,36 @@ function checkPocket(run) {
   const emptyApex = apply(playState({ triangle: triangleOf(placed("base_pocket"), null, null) }), { type: "resolve" });
   run("Empocher, emplacement vide : noté", true, journal(emptyApex.events).includes("targetEmpty:pocket:apex"));
 
-  // Depuis la défausse : le Final de final_pocket (usure 2 sur 3) l'empoche, déjà
-  // défaussée ; elle n'est qu'à un endroit, le pot.
+  // Pendant son Final : final_pocket (usure 2 sur 3), en partance, s'empoche
+  // elle-même, ce qui REDIRIGE sa destination ; elle ne passe jamais par la
+  // défausse, et n'est qu'à un endroit, le pot.
   const finalPocket = apply(playState({ triangle: triangleOf(null, null, placed("final_pocket", 2)) }), { type: "resolve" });
   run.same(
-    "Empocher, Final : retrait, défausse, Final, puis la mise en poche depuis la défausse",
-    ["removed:final_pocket:wear", "discarded:final_pocket", "final:final_pocket", "effect:final:final_pocket", "targetEmpty:polish:apex", "pocketed:final_pocket:discard"],
+    "Empocher, Final : départ, Final, redirection, puis l'arrivée au pot depuis le triangle",
+    ["removed:final_pocket:wear", "final:final_pocket", "effect:final:final_pocket", "targetEmpty:polish:apex", "redirected:final_pocket", "pocketed:final_pocket:triangle"],
     journal(finalPocket.events).filter((entry) => !["impact", "rotation", "turnEnded"].includes(entry)).slice(-6)
   );
   run.same("Empocher, Final : au pot, pas à la défausse", { pot: ["final_pocket"], discard: [] }, { pot: finalPocket.state.pot, discard: finalPocket.state.discard });
   run("Empocher, Final : aucune bille perdue ni dupliquée", 1, everywhere(finalPocket.state));
+  run.same(
+    "Empocher, Final : la redirection, vers le pot, par le Final",
+    { destination: "pot", action: "pocket", by: { trigger: "final", slot: "apex", marble: "final_pocket" } },
+    (({ destination, action, by }) => ({ destination, action, by }))(finalPocket.events.find((event) => event.type === "redirected"))
+  );
+  run("Empocher, Final : l'arrivée marquée comme redirigée", true, finalPocket.events.find((event) => event.type === "pocketed").redirected);
+  run.same(
+    "Empocher, Final : un seul déclenchement d'Empocher, une bille déplacée",
+    { triggers: 1, quantity: 1 },
+    { triggers: finalPocket.state.tally.pocket.game, quantity: finalPocket.state.tally.pocketQuantity.game }
+  );
 
-  // Pendant sa propre Éjection : elle ne passe qu'une fois, au pot.
+  // Pendant sa propre Éjection : en partance, redirigée ; elle ne passe qu'une fois,
+  // au pot, jamais par la défausse.
   const shy = { shy: { knockout: [{ action: "pocket" }] }, plain: {} };
   const ejected = apply(playState({ hand: inHand(["plain"]), triangle: triangleOf(null, null, placed("shy")) }), { type: "place", handIndex: 0, slot: "apex" }, shy);
   run.same(
     "Empocher, sa propre Éjection : au pot, jamais à la défausse",
-    ["flick:plain", "knockout:shy", "effect:knockout:shy", "removed:shy:pocket", "pocketed:shy:triangle", "placed:plain", "hit:plain"],
+    ["flick:plain", "removed:shy:replacement", "knockout:shy", "effect:knockout:shy", "redirected:shy", "pocketed:shy:triangle", "placed:plain", "hit:plain"],
     journal(ejected.events)
   );
   run.same("Empocher, sa propre Éjection : le pot, une défausse vide", { pot: ["shy"], discard: [] }, { pot: ejected.state.pot, discard: ejected.state.discard });
@@ -356,18 +369,18 @@ function checkPocketReactions(run) {
   run("boucle indirecte : la pose reprend après la chaîne coupée", true, loop.events.findIndex((event) => event.type === "placed") > loop.events.findIndex((event) => event.type === "chainInterrupted"));
   const resolved = looping.reduce(loop.state, { type: "resolve" });
   run("boucle indirecte : la partie continue", true, resolved.ok);
-  // Pendant la résolution : la boucle de la base gauche coupée, la base droite et la
-  // pointe jouent, les retraits et l'Impact suivent.
+  // Pendant la résolution : la boucle de la base droite (la première phase) coupée,
+  // la base gauche et la pointe jouent, les retraits et l'Impact suivent.
   const midResolution = looping.reduce(
-    playState({ bag: ["plain"], pot: ["cracker", "healer"], triangle: triangleOf(placed("basePolisher"), placed("baseOne"), placed("sturdy", 50)) }),
+    playState({ bag: ["plain"], pot: ["cracker", "healer"], triangle: triangleOf(placed("baseOne"), placed("basePolisher"), placed("sturdy", 50)) }),
     { type: "resolve" }
   );
   const cutAt = midResolution.events.findIndex((event) => event.type === "chainInterrupted");
   run("chaîne coupée en résolution : une seule fois", 1, midResolution.events.filter((event) => event.type === "chainInterrupted").length);
   run(
-    "chaîne coupée en résolution : la base droite joue ensuite son effet",
+    "chaîne coupée en résolution : la base gauche joue ensuite son effet",
     true,
-    midResolution.events.slice(cutAt).some((event) => event.type === "effect" && event.trigger === "phase" && event.slot === "rightBase" && event.speedDelta === 1)
+    midResolution.events.slice(cutAt).some((event) => event.type === "effect" && event.trigger === "phase" && event.slot === "leftBase" && event.speedDelta === 1)
   );
   run("chaîne coupée en résolution : la pointe joue ensuite sa phase", true, midResolution.events.slice(cutAt).some((event) => event.type === "phase" && event.slot === "apex"));
   run("chaîne coupée en résolution : l'Impact compte la base droite", 1, midResolution.events.find((event) => event.type === "impact").speed);

@@ -34,9 +34,17 @@ export const activeSize = (size) => ({ type: "activeSize", size });
 // speed({ base: 0, step: 2, source: tally("flick", "turn"), max: 6 }).
 export const tally = (id, scope) => ({ type: "tally", tally: id, scope });
 
-// La première bille de la main, cible d'Empocher (marbles/core/effects.js/
-// FIRST_IN_HAND).
+// La première bille de la main, cible d'Empocher et de Défausser
+// (marbles/core/effects.js/FIRST_IN_HAND).
 export const FIRST_IN_HAND = "firstInHand";
+
+// La dernière bille arrivée à la défausse, cible de Ramasser
+// (marbles/core/effects.js/LAST_DISCARDED).
+export const LAST_DISCARDED = "lastDiscarded";
+
+// Les `count` prochaines billes du sac, cible de Défausser (marbles/core/effects.js/
+// isBag) : nextInBag(1), « la prochaine bille du sac ».
+export const nextInBag = (count) => ({ type: "bag", count });
 
 // Une CIBLE AU CHOIX du joueur (marbles/core/effects.js, en-tête) : `zones`, où il
 // choisit ("hand", "triangle") ; `count`, combien (1 par défaut) ; `upTo`, « jusqu'à
@@ -61,3 +69,20 @@ export const eject = (target) => ({ action: "eject", ...(target === undefined ? 
 // la première de la main (FIRST_IN_HAND), ou une bille au choix (choice). Sans
 // montant.
 export const pocket = (target) => ({ action: "pocket", ...(target === undefined ? {} : { target }) });
+
+// Défausser : envoie à la défausse la bille elle-même (sans cible), celle d'un
+// emplacement, la première de la main (FIRST_IN_HAND), des billes au choix
+// (choice), toutes les billes actives filtrées (allActive) ou les prochaines billes
+// du sac (nextInBag). Sans montant.
+export const discard = (target) => ({ action: "discard", ...(target === undefined ? {} : { target }) });
+
+// Rebond : renvoie en main la bille elle-même (sans cible : sur le triangle, ou en
+// partance pendant son Final ou son Éjection), celle d'un emplacement, des billes
+// actives au choix (choice) ou toutes les billes actives filtrées (allActive). Sans
+// montant.
+export const bounce = (target) => ({ action: "bounce", ...(target === undefined ? {} : { target }) });
+
+// Ramasser : reprend en main la dernière bille arrivée à la défausse
+// (LAST_DISCARDED) ou des billes de la défausse au choix (choice). Toujours une
+// cible. Sans montant.
+export const retrieve = (target) => ({ action: "retrieve", target });

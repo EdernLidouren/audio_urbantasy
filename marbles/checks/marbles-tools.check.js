@@ -102,6 +102,8 @@ function checkCommandsAndFormat(run) {
   run.same("commande : prévision du triangle", { kind: "forecast", action: null }, parseCommand("r"));
   run("commande : usage faux", "error", parseCommand("poser x pointe").kind);
   run("commande : propre à l'outil", "journal", parseCommand("journal json").word);
+  run.same("commande : choisir dans la défausse", { kind: "action", action: { type: "choose", target: { zone: "discard", index: 1 } } }, parseCommand("choisir defausse 2"));
+  run("commande : choisir dans la défausse, sans place", "error", parseCommand("choisir defausse").kind);
 
   // Le choix en attente : les billes en transit à la fin, jamais parmi les cibles.
   const pending = {
@@ -117,6 +119,7 @@ function checkCommandsAndFormat(run) {
   const line = choiceLine(pending, (id) => id);
   run("ligne de choix : la bille en transit et l'emplacement qu'elle vise", true, line.endsWith(". En transit : c vers base droite."));
   run("ligne de choix : sans transit, rien de plus", false, choiceLine({ ...pending, inTransit: [] }, (id) => id).includes("transit"));
+  run("ligne de choix : une cible de la défausse", true, choiceLine({ ...pending, eligible: [{ zone: "discard", index: 0, marble: "b" }], inTransit: [] }, (id) => id).includes("Cibles : défausse 1 : b."));
 
   // Chaque type d'évènement d'une vraie partie a sa ligne lisible, jamais le repli
   // JSON.

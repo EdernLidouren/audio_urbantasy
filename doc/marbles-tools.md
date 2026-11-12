@@ -42,7 +42,8 @@ node marbles/tools/play.js --seed 42 --json < commandes.txt
 Le mode d'emploi est en tête du fichier : `etat`, `brut` (l'état complet, sac
 compris), `poser`, `echanger`, `prevoir`, `fin`, `journal` (lisible) ou `journal json`.
 Un choix en attente se dit avec sa question et ses cibles ; on y répond par `choisir 2`
-(la bille 2 de la main), `choisir pointe`, ou `terminer` (« jusqu'à N ») ; pendant une
+(la bille 2 de la main), `choisir pointe`, `choisir defausse 3` (la bille 3 de la défausse,
+dans l'ordre d'arrivée), ou `terminer` (« jusqu'à N ») ; pendant une
 résolution, la suite se dit après la réponse.
 
 ## Construire un cas
@@ -204,7 +205,8 @@ vérifications des MÉCANISMES ne passent donc jamais par elles :
   réel » dans `marbles/checks/fixtures/forecast-property.js`.
 
 Les domaines, listés dans `marbles/checks/index.js` (`MARBLES_SUITES`) et lancés par le
-point d'entrée unique des vérifications (`node tools/run-checks.js`) : `marbles` (règles), `marbles-pocket` (le pot), `marbles-choice` (cibles au
+point d'entrée unique des vérifications (`node tools/run-checks.js`) : `marbles` (règles), `marbles-pocket` (le pot), `marbles-path` (le chemin des billes :
+la Chute, Défausser, Rebond, Ramasser), `marbles-choice` (cibles au
 choix et Éjecter), `marbles-bus`, `marbles-tally`, `marbles-forecast`, `marbles-view`,
 `marbles-sequence`, `marbles-tools`, `marbles-content`, `marbles-screen` (l'écran, ci-dessous).
 

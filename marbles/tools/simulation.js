@@ -162,10 +162,9 @@ export function recordEvents(record, events, actionType, drawers) {
         record.replacements += 1;
         break;
       case "removed":
-        // Chassée par une pose ou par l'action Éjecter.
+        // Chassée par une pose ou par l'action Éjecter ; usée, au départ, quelle que
+        // soit sa destination (une redirection l'envoie ailleurs qu'à la défausse).
         if (event.cause === "replacement" || event.cause === "eject") stats(event.marble).knockedOut += 1;
-        break;
-      case "discarded":
         if (event.cause === "wear") stats(event.marble).worn += 1;
         break;
       case "effect": {

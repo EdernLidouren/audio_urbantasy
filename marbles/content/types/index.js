@@ -27,10 +27,12 @@
 //               occupé, après l'éjection de l'occupante ;
 //   windfall    la Trouvaille : effet joué à chaque régénération du sac depuis la
 //               défausse, à tout moment du tour, si la bille est active (sur le
-//               triangle), dans l'ordre des phases, avant que la pioche ne reprenne ;
+//               triangle), dans l'ordre horaire, avant que la pioche ne reprenne ;
 //   knockout    l'Éjection : effet joué quand la bille est remplacée ;
-//   final       le Final : effet joué quand la bille est retirée par usure, une fois
-//               à la défausse, avant l'Impact du tour ;
+//   final       le Final : effet joué quand la bille est retirée par usure, en
+//               partance (pas encore à la défausse), avant l'Impact du tour ;
+//   drop        la Chute : effet joué quand la bille arrive à la défausse, d'où
+//               qu'elle vienne, jamais si une redirection l'envoie ailleurs ;
 //   pocketed    En poche : des effets qui ne jouent que lorsque la bille est dans le
 //               POT, un objet { <moment>: effet } (marbles/config/values.js/
 //               MARBLE_POCKET) : `entry`, à son entrée au pot ; `resolution`, à chaque

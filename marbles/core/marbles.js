@@ -33,8 +33,9 @@
 // déjà choisies exclues ; `chosen` : celles déjà choisies, dans l'ordre ; une cible
 // est { zone: "hand", index, marble } ou { zone: "triangle", slot, marble }.
 // `inTransit` : les billes EN TRANSIT à l'instant du choix, sorties d'une zone et
-// pas encore arrivées ({ kind, marble, slot }, aujourd'hui la seule nature
-// "thrown", en cours de lancer, vers l'emplacement `slot`) ; souvent vide. Une
+// pas encore arrivées ({ kind, marble, slot } : "thrown", en cours de lancer, vers
+// l'emplacement `slot` ; "leaving", en partance pendant son Final ou son Éjection,
+// depuis l'emplacement `slot`, ou null hors du triangle) ; souvent vide. Une
 // information pour l'interface, jamais une cible : elles n'appartiennent à aucune
 // zone. Elles n'existent que dans un choix en attente, l'état n'en a pas d'autre
 // trace.
@@ -97,12 +98,12 @@
 
 import { MARBLES_SETTINGS, STARTING_BAG } from "../config/values.js";
 import { createSeed } from "../../lib/rng.js";
-import { SLOTS, effectAt } from "./effects.js";
+import { SLOTS, effectAt, nextSlot, previousSlot } from "./effects.js";
 import { emptyTally } from "./tally.js";
 import { TALLY_COUNTERS, maxWearOf, validateGameSettings } from "./content.js";
-import { UNKNOWN_MARBLE, answerOf, chooseRefusal, discardFromSlot, drawMarbles, retireMarble, shuffled, targetRef, transact, update } from "./run.js";
+import { UNKNOWN_MARBLE, answerOf, chooseRefusal, drawMarbles, retireMarble, shuffled, targetRef, transact, travel, update } from "./run.js";
 
-export { SLOTS, effectAt };
+export { SLOTS, effectAt, nextSlot, previousSlot };
 
 // Codes de refus (voir l'en-tête). Une liste pour que chaque code ait son
 // texte, vérifié par les vérifications (domaine marbles-view).
@@ -313,52 +314,45 @@ function swapSlots(run, { a, b }) {
 // Pose, un LANCER (la confirmation est l'affaire de l'interface). D'abord, toujours,
 // la bille quitte la main (son compteur avec elle) et sa Chiquenaude joue : en cours
 // de lancer, elle n'est ni en main ni sur le triangle. Puis, sur un emplacement
-// occupé, dans cet ordre : Éjection de l'occupante, son retrait, son départ à la
-// défausse, la nouvelle bille rejoint l'emplacement, son Tic. Sur un emplacement
-// vide, la bille le rejoint seulement. L'emplacement se lit APRÈS la Chiquenaude :
-// si elle l'a vidé (une Fêlure qui retire l'occupante, Final compris), la pose se
-// poursuit comme sur un vide, sans Éjection ni Tic.
+// occupé, le trajet de l'occupante (marbles/core/run.js/travel, cause
+// "replacement") : son départ, son Éjection pendant qu'elle est en partance, son
+// arrivée (la défausse sauf redirection) ; puis la nouvelle bille rejoint
+// l'emplacement, et son Tic. Sur un emplacement vide, la bille le rejoint
+// seulement. L'emplacement se lit APRÈS la Chiquenaude : si elle l'a vidé (une
+// Fêlure qui retire l'occupante, Final compris), la pose se poursuit comme sur un
+// vide, sans Éjection ni Tic.
 function placeMarble(run, { handIndex, slot }) {
   const { marble, turnsInHand } = run.state.hand[handIndex];
   update(run, { hand: run.state.hand.filter((_, index) => index !== handIndex), throwsUsed: run.state.throwsUsed + 1 });
   // En transit de sa sortie de la main à son arrivée sur l'emplacement : dans aucune
   // zone, mais un choix ouvert entre-temps la connaît (transact, inTransit). Une
   // action ne pose qu'une bille : la liste n'en a jamais qu'une.
-  run.inTransit = [{ kind: "thrown", marble, slot }];
+  const thrown = { kind: "thrown", marble, slot };
+  run.inTransit = [...run.inTransit, thrown];
   run.emit({ type: "flick", slot, marble, turnsInHand });
 
   const previous = run.state.triangle[slot];
   // Le remplacement en cours, que Tic et Éjection portent (conditions de calibre).
   const replacement = previous === null ? null : { placed: marble, ejected: previous.marble };
   if (previous !== null) {
-    const ejected = { slot, marble: previous.marble };
-    // Pendant son Éjection, Éjecter ne la vise pas une seconde fois.
-    run.knockingOut.add(slot);
-    run.emit({ type: "knockout", ...ejected, replacement });
-    run.knockingOut.delete(slot);
-    // Son Éjection a pu la retirer déjà (une Fêlure sur elle-même) : elle est alors
-    // partie, usée, et ne part pas une seconde fois.
-    if (run.state.triangle[slot] !== null) discardFromSlot(run, slot, previous.marble, "replacement");
+    const exit = { type: "knockout", slot, marble: previous.marble, replacement };
+    travel(run, { marble: previous.marble, from: { zone: "triangle", slot }, cause: "replacement", exit });
   }
   update(run, { triangle: { ...run.state.triangle, [slot]: { marble, wear: 0 } } });
-  run.inTransit = [];
+  run.inTransit = run.inTransit.filter((other) => other !== thrown);
   run.emit({ type: "placed", slot, marble });
   if (previous !== null) run.emit({ type: "hit", slot, marble, replacement });
 }
-
-// Où va la bille de chaque emplacement à un cran de rotation : base gauche -> pointe,
-// pointe -> base droite, base droite -> base gauche. Exporté pour la vue, qui fait
-// rouler les billes de place en place (marbles/view/sounds.js) sans recopier la
-// règle.
-export const ROTATION_NEXT = Object.freeze({ leftBase: "apex", apex: "rightBase", rightBase: "leftBase" });
 
 // Les crans de la rotation de fin de tour, portés par l'évènement `rotation` : la vue
 // les lit là (narration, roulements), sans les supposer.
 const ROTATION_NOTCHES = 1;
 
-// Un cran de rotation. Les emplacements vides tournent aussi.
+// Un cran de rotation : chaque bille avance vers son emplacement SUIVANT, dans le
+// sens horaire (marbles/core/effects.js/nextSlot). Les emplacements vides tournent
+// aussi. La vue suit la même règle pour faire rouler les billes (nextSlot).
 function rotated(triangle) {
-  return Object.fromEntries(SLOTS.map((slot) => [ROTATION_NEXT[slot], triangle[slot]]));
+  return Object.fromEntries(SLOTS.map((slot) => [nextSlot(slot), triangle[slot]]));
 }
 
 // Plus de bonus une fois la résolution finie : il ne vaut que pour ce tour.
@@ -396,7 +390,7 @@ function resolvePot(run) {
   for (let index = 0; index < run.state.pot.length; index++) run.emit({ type: "potResolution", index, marble: run.state.pot[index] });
 }
 
-// Les retraits par usure, dans l'ordre des phases. Pour chaque bille usée : elle
+// Les retraits par usure, dans l'ordre horaire. Pour chaque bille usée : elle
 // quitte son emplacement, rejoint la défausse, puis son Final se déclenche (le seul
 // retrait qui en ait un : ni l'éjection ni l'échange). Ses valeurs comptent pour le
 // tour en cours ; une Pioche y passe par la pioche unifiée.
