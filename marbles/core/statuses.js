@@ -22,19 +22,26 @@
 //   behaviors  ses COMPORTEMENTS, une liste non vide, trois sortes :
 //              { type: "stat", stat, amount } une CARACTÉRISTIQUE (CHARACTERISTICS)
 //                 augmentée de `amount` × l'intensité ;
-//              { type: "modifier", point, operation, value } un MODIFICATEUR de
-//                 valeur à un point d'interception (MODIFIER_POINTS) : "add",
-//                 `value` × l'intensité ajouté ; "multiply", multiplié par `value`
-//                 autant de fois que l'intensité (×2 à l'intensité 2 : ×4) ;
+//              { type: "modifier", point, operation, value, filters? } un
+//                 MODIFICATEUR de valeur à un point d'interception (MODIFIER_POINTS) :
+//                 "add", `value` × l'intensité ajouté ; "multiply", multiplié par
+//                 `value` autant de fois que l'intensité (×2 à l'intensité 2 : ×4 ;
+//                 ×0,5 : ÷2) ; `filters`, des FILTRES SUR LA SOURCE (ceux des cibles,
+//                 marbles/core/effects.js/TARGET_FILTERS) : il ne modifie que les
+//                 valeurs PRODUITES par une bille qui les passe (« les gains de Vitesse
+//                 produits par un calot »), jamais une valeur sans bille source ;
 //              { type: "reaction", on, effect } une RÉACTION : un effet de billes
 //                 (une liste de clauses) joué à chaque incrément du compteur
 //                 écoutable `on` (marbles/core/counters.js), comme une bille du pot ;
-//                 l'intensité ne la module pas.
+//                 l'intensité ne la module pas ;
+//              { type: "lock", lock, ... } un VERROU (LOCKS) : une action du joueur
+//                 ou une sorte d'effet rendue indisponible ; l'intensité ne le module
+//                 pas.
 // Ses textes découlent de son id : `marbles.status.<id>.name` (en minuscules) et
 // `marbles.status.<id>.description`, obligatoires (domaine marbles-view).
 //
 // UNE INSTANCE (dans l'état, sérialisée avec lui) :
-//   { status, holder, intensity, remaining, pending, origin }
+//   { status, holder, intensity, remaining, pending, origin, locked? }
 //   status     l'id de sa définition ;
 //   holder     qui la porte : "game", la partie (aujourd'hui le seul ; la forme
 //              est prête pour une bille) ;
@@ -46,7 +53,14 @@
 //              n'agit pas, ne compte pas ses tours, et s'active au début du tour
 //              suivant, en silence ;
 //   origin     l'effet qui l'a donné, { trigger, slot, marble } (le `by` des
-//              évènements), ou null.
+//              évènements), RULE_ORIGIN pour une règle, ou null ;
+//   locked     (une RÈGLE seulement) vrai : aucun effet ne peut la retirer, la
+//              réduire, la renforcer ni consommer ses charges.
+// LES RÈGLES d'une partie (marbles/core/definitions.js, `rules`) sont des statuts de la
+// table, de durée « toute la partie », posés à la création de la partie, en silence
+// (ruleInstance), en tête de la liste, VERROUILLÉS et d'origine « règle ». Ils agissent
+// comme tout statut (caractéristiques, modificateurs, réactions, verrous) ; la vue les
+// tient à part (touche O, jamais A : ordinaryInstances).
 // L'ORDRE DE LA LISTE est l'ordre d'acquisition : une nouvelle instance s'ajoute à la
 // fin, un renforcement la laisse à sa place. Il ordonne les modificateurs, les
 // réactions et les expirations. Une seule instance par statut et par porteur : une
@@ -67,14 +81,15 @@ export const STATUS_DURATIONS = Object.freeze({
   charges: { counted: true, charges: true, stackable: true },
 });
 
-// Les CARACTÉRISTIQUES de la partie, celles que lit l'accès unique (characteristic) :
-// `setting`, la valeur de départ dans l'état (les réglages de la partie) ; `floor`,
-// le plancher, appliqué après les statuts. Une main d'au moins une bille, des lancers
-// et un pot jamais négatifs.
+// Les CARACTÉRISTIQUES de la partie, celles que lit l'accès unique (characteristic),
+// leur valeur de départ sous la même clé dans la définition de la partie
+// (`state.definition.start`, marbles/core/definitions.js) : `floor`, le plancher,
+// appliqué après les statuts. Une main d'au moins une bille, des lancers et un pot
+// jamais négatifs.
 export const CHARACTERISTICS = Object.freeze({
-  throws: { setting: "throwsPerTurn", floor: 0 },
-  handSize: { setting: "maxHandSize", floor: 1 },
-  potCapacity: { setting: "potCapacity", floor: 0 },
+  throws: { floor: 0 },
+  handSize: { floor: 1 },
+  potCapacity: { floor: 0 },
 });
 
 // Les POINTS D'INTERCEPTION des valeurs, déclarés ICI ET NULLE PART AILLEURS :
@@ -96,6 +111,16 @@ export const CHARACTERISTICS = Object.freeze({
 //                         plafond d'usure ; la quantité finale vaut pour chaque cible ;
 //   phaseWear             le +1 d'usure qu'une bille prend à sa phase, plafonné
 //                         ensuite à son usure maximale.
+// LA SOURCE d'une valeur, que lisent les filtres d'un modificateur : la bille qui la
+// PRODUIT, celle dont l'effet joue (une bille du pot comprise ; pour un bonus reçu,
+// la bille qui le reçoit et le joue à sa phase), ou, pour l'usure de phase, la bille
+// qui s'use. Sans bille (la réaction d'un statut), aucune source : aucun filtre ne
+// correspond. `sourced` : le point a une source ; l'Impact et la pioche du début de
+// tour n'en ont jamais, un filtre y est refusé au chargement.
+// ARRONDI : une valeur non entière après modification (×0,5) est arrondie VERS ZÉRO, à
+// la fin (3 × 0,5 donne 1 ; 1 × 0,5 donne 0) ; le calcul reste exact d'un pas à
+// l'autre, et chaque pas se juge sur sa valeur arrondie (une charge ne se consomme que
+// si la valeur arrondie change).
 // Chacun déclare sa NATURE :
 //   "signed"    une valeur signée (Vitesse, Masse) : `stat`, la valeur interceptée,
 //               et `sign`, le signe des valeurs qu'il prend (modifyStat) ;
@@ -108,17 +133,34 @@ export const CHARACTERISTICS = Object.freeze({
 // Une quantité ramenée à 0 ne fait rien : l'action ne se joue pas (l'usure de phase,
 // elle, se dit inchangée).
 export const MODIFIER_POINTS = Object.freeze({
-  speedGain: { nature: "signed", stat: "speed", sign: 1 },
-  speedLoss: { nature: "signed", stat: "speed", sign: -1 },
-  massGain: { nature: "signed", stat: "mass", sign: 1 },
-  massLoss: { nature: "signed", stat: "mass", sign: -1 },
-  impact: { nature: "quantity" },
-  turnDraw: { nature: "quantity" },
-  effectDraw: { nature: "quantity", action: "draw" },
-  polish: { nature: "quantity", action: "polish" },
-  crack: { nature: "quantity", action: "crack" },
-  phaseWear: { nature: "quantity" },
+  speedGain: { nature: "signed", stat: "speed", sign: 1, sourced: true },
+  speedLoss: { nature: "signed", stat: "speed", sign: -1, sourced: true },
+  massGain: { nature: "signed", stat: "mass", sign: 1, sourced: true },
+  massLoss: { nature: "signed", stat: "mass", sign: -1, sourced: true },
+  impact: { nature: "quantity", sourced: false },
+  turnDraw: { nature: "quantity", sourced: false },
+  effectDraw: { nature: "quantity", action: "draw", sourced: true },
+  polish: { nature: "quantity", action: "polish", sourced: true },
+  crack: { nature: "quantity", action: "crack", sourced: true },
+  phaseWear: { nature: "quantity", sourced: true },
 });
+
+// LA SOURCE d'une valeur interceptée (en-tête), telle que la reçoivent les
+// modifications : null (aucune bille), ou { marble, matches(filters) }, la bille et le
+// test de ses filtres (fourni par le déroulé, marbles/core/run.js/sourceOf, qui
+// connaît la table des billes).
+export const NO_SOURCE = null;
+
+// Le modificateur s'applique-t-il à une valeur de cette source ? Sans filtre, toujours ;
+// avec, seulement une valeur produite par une bille qui les passe.
+function appliesTo(behavior, source) {
+  return behavior.filters === undefined || (source !== NO_SOURCE && source.matches(behavior.filters));
+}
+
+// L'arrondi vers zéro d'une valeur modifiée (en-tête) ; jamais −0.
+function towardZero(value) {
+  return Math.trunc(value) + 0;
+}
 
 // Le point d'interception du montant d'une action de clause (MODIFIER_POINTS,
 // `action`), ou null : son montant n'est intercepté par rien.
@@ -135,10 +177,59 @@ export const MODIFIER_OPERATIONS = Object.freeze({
 });
 
 // Les comportements d'une définition (en-tête).
-export const STATUS_BEHAVIORS = Object.freeze(["stat", "modifier", "reaction"]);
+export const STATUS_BEHAVIORS = Object.freeze(["stat", "modifier", "reaction", "lock"]);
+
+// LES VERROUS, déclarés ICI ET NULLE PART AILLEURS : ce qu'un comportement `lock` rend
+// indisponible tant que son statut agit. Chacun :
+//   nature  "action", une ACTION DU JOUEUR, refusée par le réducteur (`refusal`, son
+//           code d'erreur, qui nomme le statut en cause : marbles/core/marbles.js) et
+//           jamais proposée aux joueurs automatiques ; "effect", une SORTE D'EFFET qui
+//           ne joue plus, ses compteurs immobiles (marbles/core/run.js,
+//           marbles/core/counters.js) ;
+//   fields  ses champs.
+// Les quatre :
+//   swap         l'échange ;
+//   replacement  la pose sur un emplacement occupé (le remplacement) ; la pose sur
+//                un vide reste permise ;
+//   trigger      { trigger } : ce mot-clé de déclenchement d'une bille
+//                (marbles/config/values.js/MARBLE_TRIGGERS) ne se déclenche plus ;
+//                l'évènement réel a lieu (une bille lancée l'est toujours), son effet
+//                ne joue pas et son compteur de déclenchements ne bouge pas ;
+//   pot          les billes du POT n'agissent plus : ni entrée, ni étape du pot, ni
+//                réactions (aucun évènement, aucun compteur) ; elles y entrent
+//                toujours, la capacité inchangée.
+// Le porteur est la partie ; un verrou porté par une BILLE (« cette bille ne peut pas
+// être éjectée ») est préparé par la forme des instances (`holder`), pas encore joué.
+// AJOUTER un verrou : une entrée ici, et sa lecture (isLocked) là où il agit.
+export const LOCKS = Object.freeze({
+  swap: { nature: "action", fields: ["type", "lock"], refusal: "swapLocked" },
+  replacement: { nature: "action", fields: ["type", "lock"], refusal: "replacementLocked" },
+  trigger: { nature: "effect", fields: ["type", "lock", "trigger"] },
+  pot: { nature: "effect", fields: ["type", "lock"] },
+});
 
 // La table vide : celle d'une partie sans statuts (en-tête).
 export const NO_STATUSES = Object.freeze({});
+
+// L'origine d'une règle (en-tête), de la forme d'un `by` sans bille.
+export const RULE_ORIGIN = Object.freeze({ trigger: "rule", slot: null, marble: null });
+
+// L'instance d'une RÈGLE, posée à la création de la partie (en-tête) : intensité 1,
+// toute la partie, verrouillée. Sa définition est validée avec celle de la partie
+// (marbles/core/validation.js : durée « toute la partie »).
+export function ruleInstance(status) {
+  return { status, holder: "game", intensity: 1, remaining: null, pending: false, origin: RULE_ORIGIN, locked: true };
+}
+
+// Les statuts ORDINAIRES (ceux des billes : touches A et Maj+A) et les RÈGLES (touche
+// O), chacun dans l'ordre d'acquisition.
+export function ordinaryInstances(instances) {
+  return instances.filter((instance) => instance.locked !== true);
+}
+
+export function ruleInstances(instances) {
+  return instances.filter((instance) => instance.locked === true);
+}
 
 // La définition d'un statut ; inconnu de la table : une erreur, jamais un silence.
 export function definitionOf(statuses, id) {
@@ -161,34 +252,50 @@ function actingBehaviors(instances, statuses, type) {
   );
 }
 
+// --- Les verrous ---
+
+// L'instance qui VERROUILLE `lock` (LOCKS) maintenant, la première dans l'ordre
+// d'acquisition (une règle d'abord), ou null. `trigger` : le mot-clé, pour un verrou
+// de déclencheur.
+export function lockingInstance(instances, statuses, lock, trigger = null) {
+  const found = actingBehaviors(instances, statuses, "lock").find(({ behavior }) => behavior.lock === lock && (lock !== "trigger" || behavior.trigger === trigger));
+  return found?.instance ?? null;
+}
+
+// `lock` est-il verrouillé maintenant ?
+export function isLocked(instances, statuses, lock, trigger = null) {
+  return lockingInstance(instances, statuses, lock, trigger) !== null;
+}
+
 // --- Les caractéristiques ---
 
-// L'ACCÈS UNIQUE à une caractéristique de la partie (CHARACTERISTICS) : la valeur
-// des réglages de la partie, plus les comportements `stat` des statuts qui agissent
-// (`amount` × l'intensité), puis le plancher. Lu partout où une règle en dépend :
-// lancers restants, pioche, choix vers la main, arrivées au pot, zones pleines.
-// Une zone au-delà de sa capacité (le pot, après la fin d'un statut qui l'agrandissait)
-// garde ses billes : elle compte pleine, rien n'en sort.
+// L'ACCÈS UNIQUE à une caractéristique de la partie (CHARACTERISTICS) : sa valeur de
+// départ dans la définition de la partie, plus les comportements `stat` des statuts
+// qui agissent (`amount` × l'intensité), puis le plancher. Lu partout où une règle en
+// dépend : lancers restants, pioche, choix vers la main, arrivées au pot, zones
+// pleines. Une zone au-delà de sa capacité (le pot, après la fin d'un statut qui
+// l'agrandissait) garde ses billes : elle compte pleine, rien n'en sort.
 export function characteristic(state, key, statuses = NO_STATUSES) {
-  const { setting, floor } = CHARACTERISTICS[key];
+  const { floor } = CHARACTERISTICS[key];
   const bonus = actingBehaviors(state.statuses, statuses, "stat")
     .filter(({ behavior }) => behavior.stat === key)
     .reduce((total, { instance, behavior }) => total + behavior.amount * instance.intensity, 0);
-  return Math.max(floor, state[setting] + bonus);
+  return Math.max(floor, state.definition.start[key] + bonus);
 }
 
 // --- Les modificateurs de valeur ---
 
 // Une valeur passée par les modificateurs d'un point d'interception (MODIFIER_POINTS),
-// sans rien changer à l'état : additions puis multiplications, chacune dans l'ordre
-// d'acquisition, puis le plancher 0. -> { value, contributions, changed } :
+// sans rien changer à l'état : ceux qui s'appliquent à sa source (appliesTo), additions
+// puis multiplications, chacune dans l'ordre d'acquisition, puis le plancher 0 et
+// l'arrondi vers zéro. -> { value, contributions, changed } :
 //   contributions  chaque pas qui a changé la valeur, plancher compris,
 //                  [{ status, before, after }] ;
 //   changed        les statuts dont un pas a VRAIMENT changé la valeur, chacun une
 //                  fois, dans l'ordre : leurs charges se consomment (useCharges).
-function intercept(instances, statuses, point, value) {
+function intercept(instances, statuses, point, value, source) {
   const modifiers = actingBehaviors(instances, statuses, "modifier")
-    .filter(({ behavior }) => behavior.point === point)
+    .filter(({ behavior }) => behavior.point === point && appliesTo(behavior, source))
     .map((entry, order) => ({ ...entry, order }))
     .sort((a, b) => MODIFIER_OPERATIONS[a.behavior.operation].rank - MODIFIER_OPERATIONS[b.behavior.operation].rank || a.order - b.order);
   let current = value;
@@ -196,27 +303,28 @@ function intercept(instances, statuses, point, value) {
   const changed = [];
   for (const { instance, behavior } of modifiers) {
     const after = MODIFIER_OPERATIONS[behavior.operation].step(current, behavior, instance.intensity);
-    // Le calcul garde la valeur brute (les planchers à la fin) ; un pas ne CHANGE la
-    // valeur que si son résultat, plancher compris, change : -4 puis ×2 reste 0,
-    // aucune charge consommée, rien à dire.
-    const [floorBefore, floorAfter] = [Math.max(0, current), Math.max(0, after)];
+    // Le calcul garde la valeur brute (plancher et arrondi à la fin) ; un pas ne CHANGE
+    // la valeur que si son résultat, plancher et arrondi compris, change : -4 puis ×2
+    // reste 0, aucune charge consommée, rien à dire.
+    const [floorBefore, floorAfter] = [towardZero(Math.max(0, current)), towardZero(Math.max(0, after))];
     current = after;
     if (floorAfter === floorBefore) continue;
     contributions.push({ status: instance.status, before: floorBefore, after: floorAfter });
     if (!changed.includes(instance.status)) changed.push(instance.status);
   }
-  return { value: Math.max(0, current), contributions, changed };
+  return { value: towardZero(Math.max(0, current)), contributions, changed };
 }
 
 // La Vitesse ou la Masse (`stat`) qu'un effet applique, passée par ses modificateurs :
 // un gain par `<stat>Gain`, une perte par `<stat>Loss`, sur sa GRANDEUR, le signe
 // remis ensuite (jamais inversé). Zéro n'est intercepté par rien.
+// `source` : la bille qui la produit (NO_SOURCE par défaut).
 // -> { point, before, value, contributions, changed } (point null pour zéro).
-export function modifyStat(instances, statuses, stat, value) {
+export function modifyStat(instances, statuses, stat, value, source = NO_SOURCE) {
   if (value === 0) return { point: null, before: 0, value: 0, contributions: [], changed: [] };
   const sign = Math.sign(value);
   const point = Object.keys(MODIFIER_POINTS).find((id) => MODIFIER_POINTS[id].nature === "signed" && MODIFIER_POINTS[id].stat === stat && MODIFIER_POINTS[id].sign === sign);
-  const result = intercept(instances, statuses, point, Math.abs(value));
+  const result = intercept(instances, statuses, point, Math.abs(value), source);
   // Une grandeur ramenée à 0 vaut 0, jamais −0 (qu'une comparaison ou un texte
   // distinguerait).
   const signed = result.value === 0 ? 0 : sign * result.value;
@@ -224,21 +332,22 @@ export function modifyStat(instances, statuses, stat, value) {
 }
 
 // Une QUANTITÉ (un point de nature "quantity" : l'Impact, une pioche, un Polissage,
-// une Fêlure, l'usure de phase) passée par ses modificateurs, plancher 0.
+// une Fêlure, l'usure de phase) passée par ses modificateurs, plancher 0. `source` :
+// la bille qui la produit (NO_SOURCE par défaut).
 // -> { point, before, value, contributions, changed }.
-export function modifyQuantity(instances, statuses, point, value) {
+export function modifyQuantity(instances, statuses, point, value, source = NO_SOURCE) {
   if (MODIFIER_POINTS[point]?.nature !== "quantity") throw new Error(`marbles : "${point}" n'est pas un point d'interception de quantité.`);
-  const result = intercept(instances, statuses, point, value);
+  const result = intercept(instances, statuses, point, value, source);
   return { point, before: value, ...result };
 }
 
 // Le montant d'une action de clause passé par son point d'interception
 // (pointOfAction), ou tel quel si elle n'en a pas. Un montant nul (un effet sans
 // Pioche) n'est intercepté par rien : il n'y a rien à modifier.
-export function modifyActionAmount(instances, statuses, action, amount) {
+export function modifyActionAmount(instances, statuses, action, amount, source = NO_SOURCE) {
   const point = pointOfAction(action);
   if (point === null || amount === 0) return { point: null, before: amount, value: amount, contributions: [], changed: [] };
-  return modifyQuantity(instances, statuses, point, amount);
+  return modifyQuantity(instances, statuses, point, amount, source);
 }
 
 // --- Les instances ---
@@ -283,14 +392,17 @@ function merged(existing, fresh, definition) {
 
 // Applique le statut `id` à la partie : { intensity, count } (`count`, la durée
 // comptée que donne la clause, sinon celle de la définition), `origin`, l'effet qui
-// le donne. Une instance neuve, ou la fusion avec celle qui est là (merged).
+// le donne. Une instance neuve, ou la fusion avec celle qui est là (merged) ; une
+// RÈGLE déjà là ne se renforce jamais (verrouillée).
 // -> { instances, outcome, instance } : `outcome` "gained" (neuve), "strengthened"
-// (fusionnée) ou "unchanged" (unique, déjà là) ; `instance`, celle d'après.
+// (fusionnée), "unchanged" (unique, déjà là) ou "locked" (une règle, sans effet) ;
+// `instance`, celle d'après.
 export function applyStatus(instances, statuses, id, application, origin = null) {
   const definition = definitionOf(statuses, id);
   const fresh = freshInstance(id, definition, application, origin);
   const index = instances.findIndex((instance) => instance.status === id && instance.holder === "game");
   if (index < 0) return { instances: [...instances, fresh], outcome: "gained", instance: fresh };
+  if (instances[index].locked === true) return { instances, outcome: "locked", instance: instances[index] };
   const next = merged(instances[index], fresh, definition);
   if (next === null) return { instances, outcome: "unchanged", instance: instances[index] };
   return { instances: instances.map((instance, other) => (other === index ? next : instance)), outcome: "strengthened", instance: next };
@@ -312,7 +424,7 @@ export function endTurn(instances, statuses) {
   const expired = [];
   const kept = [];
   for (const instance of instances) {
-    const counted = !instance.pending && STATUS_DURATIONS[definitionOf(statuses, instance.status).duration.kind].turns === true;
+    const counted = !instance.pending && instance.locked !== true && STATUS_DURATIONS[definitionOf(statuses, instance.status).duration.kind].turns === true;
     if (!counted) {
       kept.push(instance);
       continue;
@@ -333,7 +445,8 @@ export function useCharges(instances, statuses, ids) {
   const expired = [];
   for (const id of ids) {
     const index = next.findIndex((instance) => instance.status === id);
-    if (index < 0 || STATUS_DURATIONS[definitionOf(statuses, id).duration.kind].charges !== true) continue;
+    // Une règle ne consomme jamais ses charges (verrouillée).
+    if (index < 0 || next[index].locked === true || STATUS_DURATIONS[definitionOf(statuses, id).duration.kind].charges !== true) continue;
     const remaining = next[index].remaining - 1;
     used.push({ status: id, remaining: Math.max(0, remaining) });
     if (remaining <= 0) {

@@ -92,6 +92,7 @@ import "../marbles/view/screen.js";
 import "../marbles/view/pile-screen.js";
 import MARBLE_TYPES from "../marbles/content/types/index.js";
 import MARBLE_STATUSES from "../marbles/content/statuses/index.js";
+import { GAME_DEFINITIONS } from "../marbles/content/definitions/index.js";
 
 const KEY_PATTERN = /^[a-z][a-zA-Z0-9_]*(\.[a-zA-Z0-9_]+)+$/;
 
@@ -370,10 +371,10 @@ export async function auditContent() {
   // existe dans le manifeste. Le profil de chaque bille est validé au chargement
   // de marbles/view/sounds.js.
   checkStrings("billes, sons", { profiles: MARBLE_SOUND_PROFILES, audio: MARBLES_AUDIO });
-  // Les billes elles-mêmes (marbles/content/types/) et le sac de test, comme au démarrage
-  // du jeu.
+  // Les billes elles-mêmes (marbles/content/types/), les statuts et les définitions de
+  // partie, comme au démarrage du jeu.
   try {
-    validateMarblesContent(MARBLE_TYPES, MARBLE_STATUSES);
+    validateMarblesContent(MARBLE_TYPES, MARBLE_STATUSES, GAME_DEFINITIONS);
   } catch (error) {
     report("billes", "marbles/content/types", "table invalide", error.message);
   }

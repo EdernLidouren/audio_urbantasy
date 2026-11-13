@@ -16,6 +16,7 @@
 // doc/marbles-tools.md, « Les vérifications du jeu des billes ».
 
 import checkMarbles from "./marbles.check.js";
+import checkMarblesDefinitions from "./marbles-definitions.check.js";
 import checkMarblesPocket from "./marbles-pocket.check.js";
 import checkMarblesPath from "./marbles-path.check.js";
 import checkMarblesZones from "./marbles-zones.check.js";
@@ -33,6 +34,7 @@ import checkMarblesScreen from "./marbles-screen.check.js";
 
 export const MARBLES_SUITES = [
   { name: "marbles", check: checkMarbles },
+  { name: "marbles-definitions", check: checkMarblesDefinitions },
   { name: "marbles-pocket", check: checkMarblesPocket },
   { name: "marbles-path", check: checkMarblesPath },
   { name: "marbles-zones", check: checkMarblesZones },

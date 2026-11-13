@@ -13,12 +13,13 @@
 // `node tools/run-checks.js marbles-screen`.
 
 import { MARBLES_SETTINGS } from "../config/values.js";
+import { ruleInstance } from "../core/statuses.js";
 import { t as realT } from "../../data/i18n/index.js";
 import { speed } from "../content/effects.js";
 import { pauseAfter } from "../view/sequence.js";
 import { fixtureRules } from "./fixtures/marbles.js";
 import { openScreenBench } from "./fixtures/screen-bench.js";
-import { fabricatedRules, inHand, marblesPlayState, placed, statusInstance } from "./helpers.js";
+import { fabricatedRules, inHand, marblesPlayState, overState, placed, statusInstance } from "./helpers.js";
 
 // Les règles de la table des vérifications.
 const rules = fixtureRules();
@@ -33,6 +34,32 @@ const playState = (over) => marblesPlayState(rules, over);
 const cuesOf = (bench, marble) =>
   bench.sounds.filter((sound) => sound.name === "playCue" && sound.args[0].marble === marble).map((sound) => sound.args[0].sound);
 
+// L'OBJECTIF : O dit l'objectif, la progression et le nombre de règles ; Maj+O ouvre le
+// menu de l'objectif et des règles (marbles/view/goal-screen.js), ses entrées dans
+// l'ordre, E y dit la description ; une règle n'apparaît pas sous A. En FR et EN, les
+// textes eux-mêmes : domaine marbles-view.
+function checkGoal(run) {
+  const state = overState(playState({ hand: inHand(["aging_flick"]), turn: 5, score: 120, rules: ["pot_game"] }), { goal: { kind: "target", score: 200 }, turns: 8 });
+  const bench = openScreenBench(rules, { ...state, statuses: [ruleInstance("pot_game")] });
+  try {
+    bench.key("o");
+    run("O : l'objectif, la progression, les règles", "goal.target{score: 200, turns: 8} goal.progress.target{score: 120, target: 200, turn: 5, turns: 8} goal.rule_count{count: 1}", bench.said.at(-1));
+    bench.key("a");
+    run("A : une règle n'y est pas", "statuses.none", bench.said.at(-1));
+    bench.key("o", ["shift"]);
+    run("Maj+O : le menu par-dessus l'écran", true, bench.top() !== bench.screen);
+    run("Maj+O : l'objectif en premier", true, bench.menuSaid().at(-1).includes(realT("marbles.goal.target", { score: 200, turns: 8 })));
+    bench.key("ArrowRight");
+    run("Maj+O : puis chaque règle", true, !bench.menuSaid().at(-1).startsWith(realT("marbles.pile.back")));
+    bench.key("ArrowRight");
+    run("Maj+O : puis Retour", true, bench.menuSaid().at(-1).startsWith(realT("marbles.pile.back")));
+    bench.key("Escape");
+    run("Maj+O, Échap : de retour sur l'écran", true, bench.top() === bench.screen);
+  } finally {
+    bench.close();
+  }
+}
+
 export default function checkMarblesScreen(run) {
   run.section("ouverture", checkOpening);
   run.section("prendre et poser", checkPlace);
@@ -44,6 +71,7 @@ export default function checkMarblesScreen(run) {
   run.section("choix dans la défausse", checkDiscardChoice);
   run.section("choix facultatif et obligatoire", checkChoiceModes);
   run.section("statuts", checkStatuses);
+  run.section("objectif et règles", checkGoal);
   run.section("choix pendant la pioche du tour", checkChoiceDuringTurnDraw);
   run.section("fin de partie", checkGameEnd);
 }
@@ -117,7 +145,7 @@ function checkStatuses(run) {
 function checkOpening(run) {
   const bench = openScreenBench(rules, rules.createGame(3));
   try {
-    run("ouverture : une seule annonce, l'accueil puis la pioche", true, bench.said.length === 1 && bench.said[0].startsWith("intro event.draw{"));
+    run("ouverture : une seule annonce, l'accueil, l'objectif, puis la pioche", true, bench.said.length === 1 && bench.said[0].startsWith("intro goal.free{turns: 10} event.draw{"));
     run("ouverture : la partie piochée", "play", bench.game().stage);
     run.same(
       "ouverture : préchargement, réverbération, musique, puis les sons du geste",
@@ -444,7 +472,7 @@ function checkGameEnd(run) {
   try {
     bench.key("r", ["shift"]);
     bench.key("Enter");
-    run("fin de partie : le score final, puis comment sortir", "event.game_over{score: 3} over_hint", bench.said.at(-1));
+    run("fin de partie : le score final, puis comment sortir", "event.game_over{score: 3, result: result.no_tier} over_hint", bench.said.at(-1));
     bench.advance(MARBLES_SETTINGS.skipGuardMs);
     const sounds = bench.sounds.length;
     bench.key("Enter");

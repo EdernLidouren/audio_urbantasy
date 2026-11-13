@@ -6,9 +6,9 @@ Ce document décrit les règles du jeu des billes telles qu'elles s'appliquent a
 
 Le jeu des billes est un jeu de stratégie en solitaire, sans adresse ni adversaire. Le joueur pose des billes sur un triangle à trois emplacements, qui tourne d'un cran à chaque tour. Chaque bille a des effets, qui se déclenchent à des moments précis.
 
-Le but est de marquer le plus de points possible. Chaque tour se termine par une résolution, qui produit un Impact ; l'Impact s'ajoute au Score. Le Score final est celui de la fin de partie.
+Chaque tour se termine par une résolution, qui produit un Impact ; l'Impact s'ajoute au Score. Le Score final est celui de la fin de partie.
 
-La partie se termine après la résolution du dernier tour, le dixième aujourd'hui, et seulement là. Ni le sac vide ni la main vide ne la terminent : un tour sans bille à poser se résout à vide.
+Une partie se joue selon sa **définition** (section 13) : ses valeurs de départ, son sac, son objectif et ses règles. La partie habituelle est une partie libre : marquer le plus de points possible en dix tours, le résultat se jugeant au palier atteint. La partie s'arrête aussi quand il ne reste plus aucune bille à jouer. Un sac vide ou une main vide seuls ne l'arrêtent pas : un tour sans bille à poser se résout à vide, tant qu'une bille reste en jeu.
 
 ## 2. Le lexique
 
@@ -77,7 +77,7 @@ Les planchers ne valent qu'au calcul final. Pendant le tour, une Vitesse de moin
 - **Nombre de tours** : 10.
 - **Usure maximale** d'une bille : 3, sauf si la bille en indique une autre.
 
-Les lancers par tour, la taille de la main et la capacité du pot sont des valeurs de départ : des statuts peuvent les changer pendant la partie (section 12). Toute règle lit la valeur en vigueur, statuts compris.
+Ce sont les valeurs de la partie habituelle ; une autre définition de partie peut en donner d'autres (section 13). Les lancers par tour, la taille de la main et la capacité du pot sont des valeurs de départ : des statuts, et les règles d'une partie, peuvent les changer (section 12). Toute règle lit la valeur en vigueur, statuts compris.
 
 ## 5. Le déroulé d'un tour
 
@@ -85,7 +85,8 @@ Les lancers par tour, la taille de la main et la capacité du pot sont des valeu
 
 1. Chaque bille déjà en main gagne un tour à son compteur de tours en main.
 2. La pioche du tour : 5 billes au premier tour, 1 ensuite, une par une, selon la pioche unifiée (section 6).
-3. Si cette pioche n'a pu donner aucune bille faute de billes, le jeu le dit, et le tour se joue avec la main qu'on a.
+3. Si, après cette pioche, il ne reste plus aucune bille à jouer (ni en main, ni sur le triangle, ni au sac, ni à la défausse), la partie s'arrête : c'est la **pioche impossible** (section 13), et le tour n'est pas joué. Les billes du pot et les billes perdues ne comptent pas : elles ne se jouent plus.
+4. Sinon, si la pioche n'a pu donner aucune bille faute de billes, le jeu le dit, et le tour se joue avec ce qu'on a.
 
 ### La phase de jeu
 
@@ -113,9 +114,9 @@ Si la Chiquenaude a vidé l'emplacement visé, la pose se poursuit comme sur un 
 1. **Les phases**, dans l'ordre horaire : base droite, base gauche, pointe. Un emplacement vide saute sa phase. La bille de l'emplacement joue son effet de phase, puis prend 1 d'usure, même si cela l'amène à son maximum. Une bille qui a quitté le triangle avant sa phase la saute.
 2. **Le pot** : chaque bille du pot, dans l'ordre d'arrivée, joue son effet En poche à chaque résolution, si elle en a un.
 3. **Les retraits par usure**, dans l'ordre horaire : chaque bille à son usure maximale quitte son emplacement, son Final joue pendant qu'elle est en partance, puis elle arrive à la défausse (sauf si son Final l'envoie ailleurs), avant la bille suivante.
-4. **L'Impact** se calcule et s'ajoute au Score.
+4. **L'Impact** se calcule et s'ajoute au Score. En partie libre, un palier franchi se dit aussitôt. Puis les **conditions de fin** d'après l'Impact se vérifient (section 13) : cible atteinte, tour d'endurance raté, dernier tour.
 5. **La rotation** : chaque bille avance d'un cran vers son emplacement suivant, la base droite vers la base gauche, la base gauche vers la pointe, la pointe vers la base droite. Les emplacements vides tournent aussi. Les bonus disparaissent.
-6. Si c'était le dernier tour, la partie se termine ; sinon, le tour suivant commence.
+6. Si une condition de fin est atteinte, la partie se termine ; sinon, le tour suivant commence.
 
 Une bille piochée pendant la phase de jeu peut être lancée aussitôt, dans la limite des lancers. Une bille piochée pendant la résolution attend le tour suivant.
 
@@ -393,7 +394,7 @@ De même, une bille piochée puis aussitôt empochée reste inconnue dans la pr�
 
 ## 12. Les statuts
 
-Un **statut** est un effet durable que reçoit la partie, donné par une bille (le mot-clé d'action Appliquer un statut). La partie le porte : il reste quand la bille qui l'a donné quitte le triangle.
+Un **statut** est un effet durable que reçoit la partie, donné par une bille (le mot-clé d'action Appliquer un statut), ou posé dès le début comme **règle** de la partie (section 13). La partie le porte : il reste quand la bille qui l'a donné quitte le triangle.
 
 ### Ce qu'un statut peut faire
 
@@ -403,6 +404,8 @@ Un **statut** est un effet durable que reçoit la partie, donné par une bille (
   - Le statut agit sur la grandeur (une perte de 3 est une grandeur 3), qui ne descend jamais sous 0 : une perte réduite reste une perte, ou devient nulle, jamais un gain. « Amorti : pertes de Vitesse, −1 » fait d'une Vitesse −3 une Vitesse −2.
   - L'Impact se modifie après son calcul habituel (Vitesse × Masse et leurs planchers), puis ne descend jamais sous 0.
   - Plusieurs statuts sur la même valeur : d'abord toutes les additions, puis toutes les multiplications, chacune dans l'ordre où les statuts ont été reçus ; le plancher à la fin.
+  - Une multiplication peut être une fraction (÷2). Une valeur non entière après modification est **arrondie vers zéro**, à la fin : un gain de Vitesse 3 divisé par deux donne 1 ; un gain de 1, 0.
+  - Un modificateur peut ne viser que les valeurs **produites par une bille** d'un certain genre (aujourd'hui, un calibre) : « les gains de Vitesse des calots ÷2 ». La bille qui produit une valeur est celle dont l'effet joue (une bille du pot comprise ; pour un bonus reçu, la bille qui le reçoit et le joue à sa phase) ; pour l'usure de phase, la bille qui s'use. Une valeur produite sans bille (la réaction d'un statut) ne correspond à aucun de ces filtres. L'Impact et la pioche du début de tour n'ont jamais de bille : aucun filtre ne s'y pose.
   - L'effet et l'Impact se disent avec leur valeur finale, partout : la séquence, R, la confirmation.
 - **Modifier une quantité** : le nombre de billes de la pioche du début de tour, le N des Pioches d'un effet, le N d'un Polissage, le N d'une Fêlure, et l'usure qu'une bille prend à sa phase (1 d'habitude).
   - Le même ordre que pour les valeurs : additions, puis multiplications, dans l'ordre où les statuts ont été reçus, plancher 0 à la fin. Une quantité ne devient jamais négative : un Polissage réduit ne devient jamais une Fêlure, ni l'inverse.
@@ -413,6 +416,12 @@ Un **statut** est un effet durable que reçoit la partie, donné par une bille (
   - Une usure de phase augmentée peut amener la bille à son maximum (jamais au-delà) : elle part à l'étape des retraits. Une Fêlure augmentée qui l'y amène la retire aussitôt.
   - L'effet se dit avec ses quantités finales : « Polissage 2 à la pointe » pour un Polissage 1, sous un statut qui ajoute 1 aux Polissages. La fiche d'une bille garde son effet imprimé.
 - **Réagir à ce qui se passe**, comme une bille du pot (section 9) : « Ferveur : à chaque chiquenaude, Vitesse +2 ». La réaction se dit avec le nom du statut : « Ferveur : Vitesse +2. ». Elle ne vise jamais « cette bille » ni un emplacement relatif : un statut n'a pas de bille.
+- **Verrouiller** une action du joueur ou une sorte d'effet (un **verrou**) :
+  - **l'échange** : il est refusé, « Échange interdit par le statut : … » ;
+  - **le remplacement** : une pose sur un emplacement occupé est refusée ; une pose sur un emplacement vide reste permise ;
+  - **un mot-clé de déclenchement** (la Chiquenaude, par exemple) : il ne se déclenche plus. L'évènement a lieu (la bille est bien lancée, et compte parmi les billes lancées), mais son effet ne joue pas, et son compteur de déclenchements ne bouge pas : rien n'y réagit ;
+  - **le pot** : les billes du pot n'agissent plus, ni à leur entrée, ni à la résolution, ni en réaction. Elles y entrent toujours, et la capacité ne change pas.
+  Une action verrouillée n'est jamais proposée ; la prévision tient compte des verrous. Un verrou ne vise aujourd'hui que la partie ; un verrou sur une bille (« cette bille ne peut pas être éjectée ») est prévu, pas encore joué.
 
 ### Les points d'interception
 
@@ -431,7 +440,7 @@ Tous les endroits où un statut peut modifier une valeur, dans l'ordre où ils s
 | Fêlures | le N d'une clause Fêlure | quand l'effet joue, avant le plafond d'usure |
 | usure de phase | l'usure prise par une bille à sa phase | après son effet de phase, avant le plafond |
 
-Tous ont un plancher de 0. Empocher, Éjecter, Défausser, Rebond et Ramasser n'en ont pas.
+Tous ont un plancher de 0, puis l'arrondi vers zéro. Empocher, Éjecter, Défausser, Rebond et Ramasser n'en ont pas. Tous ont une bille qui produit la valeur, sauf l'Impact et la pioche du début de tour.
 
 Un statut ne compte, pour une charge comme pour ce qui se dit, que s'il change vraiment la valeur, plancher compris : un doublement d'une perte déjà ramenée à 0 ne change rien, et ne consomme aucune charge.
 
@@ -452,7 +461,7 @@ Un statut ne compte, pour une charge comme pour ce qui se dit, que s'il change v
 - **Le prochain tour** : en attente jusqu'au début du tour suivant, où il s'active, en silence, avant la pioche. En attente, il n'agit pas et ne réagit pas.
 - **Toute la partie** : il ne prend jamais fin.
 - **N charges** : une charge se consomme chaque fois qu'un de ses modificateurs change vraiment une valeur ; à sa dernière charge, il prend fin aussitôt : « Coup de fouet : une charge utilisée. Fin du statut : coup de fouet. ».
-- Les fins de tour se disent après la rotation, dans l'ordre où les statuts ont été reçus : « Fin du statut : amorti. ». Jamais au dernier tour : la partie s'arrête là.
+- Les fins de tour se disent après la rotation, dans l'ordre où les statuts ont été reçus : « Fin du statut : amorti. ». Jamais au tour où la partie s'arrête.
 
 ### Les réactions des statuts
 
@@ -461,7 +470,7 @@ Un statut ne compte, pour une charge comme pour ce qui se dit, que s'il change v
 
 ### Les consulter
 
-- **A** : « 2 statuts : amorti, intensité 2, 3 tours. Lancer supplémentaire, à partir du prochain tour. », ou « Aucun statut. ».
+- **A** : « 2 statuts : amorti, intensité 2, 3 tours. Lancer supplémentaire, à partir du prochain tour. », ou « Aucun statut. ». Les règles de la partie n'y sont pas : elles se consultent par O (section 13).
 - **Maj+A** : le menu des statuts, de gauche à droite, puis « Retour » (sans statut, « Aucun statut. » avant « Retour ») ; Échap ferme. Chaque entrée dit le nom, l'intensité s'il le faut et ce qui reste ; Ctrl+bas parcourt sa fiche : son effet, ce qui lui reste, son origine (« Obtenu par : Tic d'argile. ») ; E dit sa description.
 - Sur une bille, sa fiche dit le statut qu'elle donne et sa durée ; E décrit, après ses mots-clés, chaque statut qu'elle peut donner.
 - La prévision (R, la confirmation d'une pose) compte les statuts et leurs charges, sur une copie : rien n'est consommé avant le vrai coup. R dit les réactions des statuts pendant la résolution ; la confirmation a une ligne des statuts dès que la partie en a.
@@ -486,8 +495,66 @@ Cette liste est générée à partir de la table des statuts ; elle ne se modifi
 - **Fragilité** : Fêlures +1 par intensité. 3 tours ; se cumule en intensité.
 - **Répit** : les billes jouent leur phase sans s'user. Ce tour ; unique.
 - **Usure accélérée** : usure de phase +1 par intensité, le prochain tour. Se cumule en intensité.
+- **Gravier** : Les calots rapportent moitié moins de Vitesse et de Masse : leurs gains de Vitesse et de Masse sont divisés par deux, arrondis vers zéro.
+- **Un lancer de moins** : Un lancer de moins à chaque tour.
+- **Échange interdit** : Aucun échange n'est permis.
+- **Pot inerte** : Les billes du pot n'agissent pas : ni à leur entrée, ni à la résolution, ni en réaction.
+- **Silence** : Le mot-clé Chiquenaude ne se déclenche plus.
 
 <!-- statuts de test : fin -->
+
+## 13. Définitions de partie, objectifs, règles et verrous
+
+### La définition d'une partie
+
+Une partie est décrite entièrement par sa **définition** : ses valeurs de départ (taille de la main, lancers, capacité du pot, pioche du premier tour, pioche par tour), son sac de départ (une liste fixe, ou un sac tiré au hasard dans la table des billes), son nombre de tours, ses conditions de fin, son objectif, et ses règles, éventuellement aucune. La partie habituelle est la définition par défaut ; un défi n'est qu'une définition de plus. En jeu, c'est aujourd'hui toujours la partie habituelle.
+
+### Quand la partie s'arrête : les conditions de fin
+
+Elles se vérifient à deux moments fixes, et la première atteinte arrête la partie :
+
+- **Après le calcul de l'Impact** : la cible atteinte (objectif cible), un tour raté (objectif endurance), le dernier tour de la définition. La résolution se termine alors comme au dernier tour : la rotation, la fin du tour, sans fin des statuts.
+- **À la pioche du début de tour** : la **pioche impossible**, commune à tous les objectifs. Après la pioche, il ne reste plus aucune bille à jouer, ni en main, ni sur le triangle, ni au sac, ni à la défausse ; le tour n'est pas joué. C'est possible parce que des billes envoyées au pot plein sont perdues pour la partie.
+
+### Comment le résultat se juge : l'objectif
+
+- **Libre** : la partie va jusqu'à son dernier tour. Le résultat est le **palier** atteint par le score : aucun, bronze, argent ou or, selon les seuils de la définition. Chaque palier franchi se dit aussitôt après l'Impact. Une pioche impossible donne un résultat normal.
+- **Cible** : atteindre un score donné en un nombre de tours au plus. **Victoire** dès que le score l'atteint, après l'Impact : la partie s'arrête aussitôt, même au dernier tour. **Échec** si le dernier tour se termine sans l'avoir atteint, ou sur une pioche impossible.
+- **Endurance** : à chaque tour, l'Impact doit atteindre un minimum. La partie s'arrête à la fin du premier tour raté ; le résultat est le nombre de **tours tenus**, et le score. Un nombre de tours maximal, facultatif, termine la partie en **succès** ; sans lui, la partie ne s'arrête qu'au premier tour raté, ou sur une pioche impossible (un résultat normal : les tours tenus).
+
+### Les règles
+
+Une **règle** est un statut (section 12) posé au début de la partie, pour toute sa durée. Deux particularités :
+
+- elle est **verrouillée** : aucun effet ne peut la retirer, la réduire, la renforcer ni consommer ses charges. Une bille qui donne le même statut est sans effet : « Règle de la partie, sans effet : … » ;
+- son **origine** est « une règle de la partie », non une bille.
+
+Une règle peut faire tout ce que fait un statut : changer une caractéristique, modifier une valeur (avec ses filtres), réagir, verrouiller. Les règles ne figurent pas parmi les statuts (touche A), mais avec l'objectif (O, Maj+O). Un même statut peut servir de règle à plusieurs définitions.
+
+### Les verrous
+
+Un **verrou** est un comportement de statut (section 12, « Ce qu'un statut peut faire »), qu'il vienne d'une règle ou d'un statut ordinaire (« pas d'échange ce tour »). Une action verrouillée est refusée avec sa raison : « Échange interdit par la règle : terrain étroit. », « Remplacement interdit par le statut : … ».
+
+### Les consulter
+
+- **À l'ouverture**, une seule annonce, avant celle du premier tour : l'objectif, puis chaque règle. « Objectif : 165 points en 8 tours. Règle : gravier. Les calots rapportent moitié moins de Vitesse et de Masse… »
+- **O** : l'objectif, la progression, puis le nombre de règles. « Objectif : 165 points en 8 tours. 120 sur 165, tour 5 sur 8. 1 règle. » ; en partie libre : « Objectif : libre, 10 tours. Tour 5 sur 10. Score 120, aucun palier atteint. Prochain palier : bronze à 180. » ; en endurance : « Objectif : Impact de 12 minimum chaque tour, 20 tours au plus. 4 tours tenus sur 20. »
+- **Maj+O** : un menu, de gauche à droite : l'objectif, puis chaque règle, puis « Retour » ; Échap ferme. Ctrl+bas parcourt la fiche de l'objectif (sa progression, ce qui le juge, la pioche impossible) ou d'une règle (son effet) ; E dit la description de la partie ou de la règle.
+- **À la fin** : le résultat selon l'objectif, puis le score final. « Partie terminée. Palier argent atteint. Score final : 205. », « Partie terminée. Victoire : objectif atteint. Score final : 170. », « Partie terminée. Fin de l'endurance : 4 tours tenus. Score final : 80. » ; sur une pioche impossible, la raison d'abord : « Plus aucune bille à jouer. ».
+
+### Les définitions de test
+
+Des définitions provisoires, pour tester les mécaniques ; leurs valeurs sont des repères techniques tirés du simulateur (joueur glouton, sac de test), pas un équilibrage.
+
+| Définition | Objectif | Règles |
+|---|---|---|
+| partie libre (la partie habituelle) | libre, 10 tours ; paliers bronze 180, argent 200, or 245 | aucune |
+| défi cible | 165 points en 8 tours | aucune |
+| défi endurance | Impact de 12 minimum chaque tour, 20 tours au plus | aucune |
+| gravier | libre, 10 tours | gravier : les gains de Vitesse et de Masse produits par un calot sont divisés par deux |
+| terrain étroit | libre, 10 tours | un lancer de moins ; échange interdit |
+| sans pot | libre, 10 tours | pot inerte : les billes du pot n'agissent pas |
+| silence | libre, 10 tours | silence : le mot-clé Chiquenaude ne se déclenche plus |
 
 ## Annexe : les billes de test
 

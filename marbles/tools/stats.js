@@ -11,6 +11,7 @@
 
 import { MARBLE_IDS, MARBLE_STAT_FIELDS } from "./simulation.js";
 import { PLACEMENT_TRIGGERS } from "./format.js";
+import { TIERS } from "../core/definitions.js";
 
 export const round = (value) => Math.round(value * 100) / 100;
 const sum = (values) => values.reduce((total, value) => total + value, 0);
@@ -24,6 +25,32 @@ export function percentile(sorted, p) {
   return sorted[low] + (sorted[high] - sorted[low]) * (position - low);
 }
 
+
+// LE RÉSULTAT selon l'objectif de la définition jouée (`kind`), en pourcentages de
+// parties ou en moyennes, et les fins faute de billes (`noMarbles`, un nombre de
+// parties), pour tous :
+//   free       { tiers: { none, bronze, silver, gold } } (part des parties, en %) ;
+//   target     { victories (%), victoryTurn (tour moyen de la victoire, ou null) } ;
+//   endurance  { held: { mean, median, min, max }, successes (%) }.
+const percent = (count, total) => round((100 * count) / Math.max(1, total));
+const GOAL_SUMMARIES = {
+  free: (games) => ({ tiers: Object.fromEntries(["none", ...TIERS].map((tier) => [tier, percent(games.filter((game) => game.result.tier === tier).length, games.length)])) }),
+  target: (games) => {
+    const won = games.filter((game) => game.result.outcome === "victory");
+    return { victories: percent(won.length, games.length), victoryTurn: won.length === 0 ? null : round(mean(won.map((game) => game.turns))) };
+  },
+  endurance: (games) => {
+    const held = games.map((game) => game.result.held).sort((a, b) => a - b);
+    return {
+      held: { mean: round(mean(held)), median: round(percentile(held, 50)), min: held[0], max: held[held.length - 1] },
+      successes: percent(games.filter((game) => game.result.outcome === "success").length, games.length),
+    };
+  },
+};
+
+function goalSummary(kind, games) {
+  return { kind, ...GOAL_SUMMARIES[kind](games), noMarbles: games.filter((game) => game.result.end === "noMarbles").length };
+}
 
 function marbleSummary(id, games, randomBags) {
   const present = games.filter((game) => game.bag.includes(id));
@@ -48,6 +75,7 @@ function marbleSummary(id, games, randomBags) {
 //       hit, knockout ; la Chiquenaude, à chaque pose, s'y range avec eux),
 //     draws: { byEffect, regenerations, midTurnRegenerations } (par partie),
 //     throwsPerTurn (lancers par tour joué),
+//     goal (le résultat selon l'objectif : goalSummary),
 //     refusals, interruptions, marbles: [par bille, dans l'ordre de la table] }
 export function summarize({ params, games }) {
   const scores = games.map((game) => game.score).sort((a, b) => a - b);
@@ -87,6 +115,7 @@ export function summarize({ params, games }) {
       midTurnRegenerations: perGame((game) => game.midTurnRegenerations),
     },
     throwsPerTurn: round(sum(games.map((game) => game.throws)) / Math.max(1, sum(games.map((game) => game.turns)))),
+    goal: goalSummary(params.definition.goal.kind, games),
     refusals: sum(games.map((game) => game.refusals.length)),
     interruptions: sum(games.map((game) => game.interruptions)),
     marbles: MARBLE_IDS.map((id) => marbleSummary(id, games, randomBags)),

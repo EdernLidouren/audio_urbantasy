@@ -9,7 +9,8 @@ import { MEDIUM } from "../config/values.js";
 import { SLOTS } from "../core/marbles.js";
 import { validateMarbleTypes } from "../core/validation.js";
 import { nextRandom } from "../../lib/rng.js";
-import { FIXTURE_STATUSES, deepFreeze, fixtureRules } from "./fixtures/marbles.js";
+import { FIXTURE_STATUSES, deepFreeze, fixtureDefinition, fixtureRules } from "./fixtures/marbles.js";
+import { START_KEYS, turnLimit } from "../core/definitions.js";
 import { readForecast } from "../core/forecast.js";
 
 export { deepFreeze };
@@ -103,7 +104,21 @@ export function mustReduce(rules, state, action) {
 // Une partie de billes en cours de tour, base des états fabriqués : le tour 2, phase
 // de jeu, sac vide (emptyBagMarblesGame). `over` remplace ce que le test veut fixer.
 export function marblesPlayState(rules, over = {}) {
-  return { ...emptyBagMarblesGame(rules, 1), turn: 2, stage: "play", ...over };
+  return overState({ ...emptyBagMarblesGame(rules, 1), turn: 2, stage: "play" }, over);
+}
+
+// Les champs de la DÉFINITION qu'un état fabriqué peut remplacer, à plat (`turns`, une
+// valeur de départ par son nom) ; tout autre champ est un champ de l'état.
+const DEFINITION_OVERRIDES = [...START_KEYS, "turns", "goal", "rules"];
+
+// Un état dont des champs sont remplacés, À PLAT : ceux de l'état (`bag` compris, le
+// sac de la partie), et ceux de sa définition (DEFINITION_OVERRIDES), sur une copie.
+export function overState(state, over = {}) {
+  const ofState = {};
+  const ofDefinition = {};
+  for (const [key, value] of Object.entries(over)) (DEFINITION_OVERRIDES.includes(key) ? ofDefinition : ofState)[key] = value;
+  if (Object.keys(ofDefinition).length === 0) return { ...state, ...ofState };
+  return { ...state, ...ofState, definition: fixtureDefinition(ofDefinition, state.definition) };
 }
 
 // LA PROPRIÉTÉ « PRÉVISION = RÉEL » sur un cas : la prévision de `action` (null : le
@@ -146,7 +161,8 @@ export function createPicker(seed) {
 // jamais le hasard de la partie), actions refusées comprises, et en vérifie les
 // invariants à chaque action : aucune bille créée ni perdue, score jamais négatif
 // ni en baisse, main bornée, compteurs remis à zéro, tour dans les bornes, aucune
-// bille usée restée sur le triangle, aucun bonus resté. Partagée par la fumée de la
+// bille usée restée sur le triangle, aucun bonus resté, aucune action verrouillée
+// acceptée, un résultat selon l'objectif à la fin et seulement là. Partagée par la fumée de la
 // table des vérifications (domaine marbles) et celle de la vraie table (domaine
 // marbles-content). -> les fautes trouvées (des phrases) ; `seenTypes` (un Set)
 // reçoit les types d'évènements vus.
@@ -162,6 +178,7 @@ export function playRandomMarblesGame(rules, seed, options, seenTypes) {
   const verify = (result) => {
     state = result.state;
     actions += 1;
+    if ((state.stage === "over") !== (state.result !== null)) faults.push(`résultat ${state.result === null ? "absent à la fin" : "en cours de partie"}`);
     for (const event of result.events) seenTypes.add(event.type);
     // Un état suspendu sur un choix est un instantané en pleine action : une bille
     // peut y être en cours de lancer, ni en main ni sur le triangle. Le compte se
@@ -175,7 +192,7 @@ export function playRandomMarblesGame(rules, seed, options, seenTypes) {
     if (state.hand.length > rules.characteristic(state, "handSize") && state.hand.length > handBefore) faults.push(`main trop grande : ${state.hand.length}`);
     handBefore = state.hand.length;
     if (state.stage !== "play" && (state.speed !== 0 || state.mass !== 1)) faults.push(`compteurs non remis à zéro : ${state.speed}, ${state.mass}`);
-    if (state.turn > state.turnCount) faults.push(`tour hors bornes : ${state.turn}`);
+    if (state.turn > turnLimit(state)) faults.push(`tour hors bornes : ${state.turn}`);
     for (const slot of SLOTS) {
       const placedHere = state.triangle[slot];
       if (placedHere !== null && placedHere.wear >= rules.maxWearOf(placedHere.marble) && state.stage === "draw") {
@@ -202,21 +219,32 @@ export function playRandomMarblesGame(rules, seed, options, seenTypes) {
       verify(rules.reduce(state, { type: "draw" }));
       continue;
     }
+    // Une action qu'un verrou interdit n'est jamais acceptée.
+    const unlocked = (action, result) => {
+      if (result.ok && action.type === "swap" && rules.swapRefusal(state) === "swapLocked") faults.push("échange verrouillé accepté");
+      if (result.ok && action.type === "place" && rules.placeRefusal(state, action.handIndex, action.slot) === "replacementLocked") faults.push("remplacement verrouillé accepté");
+      return result;
+    };
     switch (pick(6)) {
-      case 0:
-        verify(rules.reduce(state, { type: "swap", a: SLOTS[pick(3)], b: SLOTS[pick(3)] }));
+      case 0: {
+        const swap = { type: "swap", a: SLOTS[pick(3)], b: SLOTS[pick(3)] };
+        verify(unlocked(swap, rules.reduce(state, swap)));
         break;
+      }
       case 1:
       case 2:
-      case 3:
+      case 3: {
         // Une place tirée parfois au-delà de la main : une pose refusée.
-        verify(rules.reduce(state, { type: "place", handIndex: pick(state.hand.length + 1), slot: SLOTS[pick(3)] }));
+        const place = { type: "place", handIndex: pick(state.hand.length + 1), slot: SLOTS[pick(3)] };
+        verify(unlocked(place, rules.reduce(state, place)));
         break;
+      }
       default:
         verify(rules.reduce(state, { type: "resolve" }));
     }
   }
   if (state.stage !== "over") faults.push("partie sans issue");
+  else if (state.result === null || state.result.goal !== state.definition.goal.kind || state.result.score !== state.score) faults.push(`résultat absent ou faux : ${JSON.stringify(state.result)}`);
   return faults;
 }
 

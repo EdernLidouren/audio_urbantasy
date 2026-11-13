@@ -4,11 +4,12 @@
 // LES MODULES DU CORE, du plus fondamental au réducteur (doc/marbles.md, la carte) :
 //   zones.js       les zones : le triangle et son ordre horaire, les zones de la
 //                  partie, celles d'un choix, celles de la bille qui joue un effet ;
+//   definitions.js les définitions de partie : départ, sac, tours, objectif, règles ;
 //   statuses.js    les statuts : caractéristiques, modificateurs, cumuls, durées ;
 //   effects.js     le modèle d'effet : clauses, actions, conditions, montants ;
 //   counters.js, tally.js  les valeurs de partie : leurs compteurs, leur registre ;
 //   content.js     le catalogue : le journal, les valeurs de partie, les mots-clés ;
-//   validation.js  la validation des tables injectées (billes, statuts, réglages) ;
+//   validation.js  la validation des tables injectées (billes, statuts, définitions) ;
 //   bus.js         le bus d'évènements d'une action ;
 //   path.js, choices.js  le chemin des billes, les cibles au choix ;
 //   run.js         le déroulé d'une action : écouteurs, effets, réactions, pioche ;
@@ -18,12 +19,14 @@
 //
 // ÉTAT sérialisable, à part entière (jamais lié à la session du jeu principal,
 // aucune persistance aujourd'hui) :
-//   { rngState, maxHandSize, throwsPerTurn, potCapacity, firstTurnDraw, drawPerTurn,
-//     turnCount, turn, score, speed, mass, stage, bag, hand, discard,
-//     triangle, pot, lost, swapUsed, throwsUsed, tally, statuses, pendingChoice }
-// `maxHandSize`, `throwsPerTurn`, `potCapacity` : les RÉGLAGES de la partie, la
-// valeur de départ de ses CARACTÉRISTIQUES, jamais lus directement par une règle :
-// l'accès unique (marbles/core/statuses.js/characteristic) y ajoute les statuts.
+//   { rngState, definition, turn, score, speed, mass, stage, bag, hand, discard,
+//     triangle, pot, lost, swapUsed, throwsUsed, tally, statuses, pendingChoice, result }
+// `definition` : la COPIE de la définition de la partie (marbles/core/definitions.js) :
+// ses valeurs de départ (pioches, et celles des CARACTÉRISTIQUES, jamais lues
+// directement par une règle : l'accès unique, marbles/core/statuses.js/characteristic,
+// y ajoute les statuts), son nombre de tours, son objectif, ses règles. Jamais
+// modifiée. `result` : null pendant la partie ; à sa fin, son RÉSULTAT selon son
+// objectif (marbles/core/definitions.js/gameResult), que porte aussi `gameOver`.
 // `statuses` : les INSTANCES DE STATUT de la partie, dans l'ordre d'acquisition
 // (marbles/core/statuses.js, en-tête), [] au départ.
 // `pot` : les billes EN POCHE, des ids dans l'ordre d'arrivée, au plus sa capacité en
@@ -81,8 +84,9 @@
 // de chaque résolution.
 //
 // `stage` découpe le tour : "draw" (la pioche reste à faire), "play" (échange
-// et pose, jusqu'à la résolution), "over" (partie finie, après la résolution du
-// tour `turnCount`, la seule fin de partie). À la fin d'une résolution, `turn`
+// et pose, jusqu'à la résolution), "over" (partie finie : une CONDITION DE FIN
+// atteinte, marbles/core/definitions.js/END_CONDITIONS, après l'Impact d'une
+// résolution ou à la pioche du début de tour). À la fin d'une résolution, `turn`
 // passe au tour suivant, sauf si la partie s'arrête : il reste alors sur le
 // dernier tour joué, jamais « 11 sur 10 ».
 //
@@ -98,8 +102,9 @@
 //                                               choisi : l'action est ignorée)
 // Résultat, toujours la même forme : { ok, state, events, error }. Refus :
 // ok false, `state` inchangé, `events` vide, `error` un code de MARBLE_ERRORS
-// (son texte : `marbles.error.<code>`). Rien n'est jamais levé pour une
-// action interdite.
+// (son texte : `marbles.error.<code>`), et, pour un VERROU, `lockedBy`, le statut en
+// cause ({ status, rule } : lockReason). Rien n'est jamais levé pour une action
+// interdite.
 //
 // JOURNAL — `events`, dans l'ordre où ça se passe : ses évènements sont décrits dans
 // l'en-tête de marbles/core/content.js (JOURNAL_EVENTS).
@@ -114,17 +119,17 @@
 // contenu (marbles/content/statuses/index.js) ; absente, aucune (NO_STATUSES).
 // Les règles (marbles/core/rules.js) lient les deux tables une fois pour toutes.
 
-import { MARBLES_SETTINGS, STARTING_BAG } from "../config/values.js";
 import { createSeed } from "../../lib/rng.js";
 import { UNKNOWN_MARBLE, isOptionalChoice } from "./effects.js";
 import { SLOTS, nextSlot, previousSlot } from "./zones.js";
 import { emptyTally } from "./tally.js";
 import { TALLY_COUNTERS, maxWearOf } from "./content.js";
-import { validateGameSettings } from "./validation.js";
-import { drawMarbles, intercept, noteModification, shuffled, transact } from "./run.js";
+import { validateGameDefinition } from "./validation.js";
+import { endReached, gameResult, startValue, startingBag, tierOf, turnLimit } from "./definitions.js";
+import { drawMarbles, intercept, noteModification, shuffled, sourceOf, transact } from "./run.js";
 import { answerOf, chooseRefusal, targetRef } from "./choices.js";
 import { retireMarble, travel } from "./path.js";
-import { NO_STATUSES, activatePending, characteristic, endTurn, modifyQuantity } from "./statuses.js";
+import { LOCKS, NO_STATUSES, activatePending, characteristic, endTurn, isLocked, lockingInstance, modifyQuantity, ruleInstance } from "./statuses.js";
 
 export { SLOTS, nextSlot, previousSlot };
 
@@ -146,6 +151,10 @@ export const MARBLE_ERRORS = [
   "noChoicePending",
   "invalidChoice",
   "choiceRequired",
+  // Les VERROUS d'action (marbles/core/statuses.js/LOCKS) : le refus porte le statut en
+  // cause (`lockedBy`).
+  "swapLocked",
+  "replacementLocked",
 ];
 
 // Vitesse × Masse d'un tour. Les planchers valent pour ce calcul final, jamais
@@ -157,28 +166,16 @@ export function impactOf(speed, mass) {
 
 // --- Mise en place ---
 
-// `seed` : nombre ou chaîne (lib/rng.js/createSeed). `options` ({} pour aucune) :
-// bag et les réglages de MARBLES_SETTINGS propres à une partie.
-export function createMarblesGame(seed, options = {}, types) {
-  const {
-    bag = STARTING_BAG,
-    maxHandSize = MARBLES_SETTINGS.maxHandSize,
-    throwsPerTurn = MARBLES_SETTINGS.throwsPerTurn,
-    potCapacity = MARBLES_SETTINGS.potCapacity,
-    firstTurnDraw = MARBLES_SETTINGS.firstTurnDraw,
-    drawPerTurn = MARBLES_SETTINGS.drawPerTurn,
-    turnCount = MARBLES_SETTINGS.turnCount,
-  } = options;
-  validateGameSettings({ maxHandSize, throwsPerTurn, potCapacity, firstTurnDraw, drawPerTurn, turnCount, bag }, types);
-  const shuffle = shuffled(bag, createSeed(seed));
+// `seed` : nombre ou chaîne (lib/rng.js/createSeed). `definition` : la définition de
+// la partie (marbles/core/definitions.js), validée ici, puis copiée dans l'état : son
+// sac de départ, mélangé par le hasard de la partie ; ses règles, des statuts
+// verrouillés posés dès le départ, en silence (marbles/core/statuses.js/ruleInstance).
+export function createMarblesGame(seed, definition, types, statuses = NO_STATUSES) {
+  validateGameDefinition(definition, types, statuses);
+  const shuffle = shuffled(startingBag(definition, seed, types), createSeed(seed));
   return {
     rngState: shuffle.rngState,
-    maxHandSize,
-    throwsPerTurn,
-    potCapacity,
-    firstTurnDraw,
-    drawPerTurn,
-    turnCount,
+    definition: structuredClone(definition),
     turn: 1,
     score: 0,
     speed: 0,
@@ -195,10 +192,12 @@ export function createMarblesGame(seed, options = {}, types) {
     // Les valeurs de partie, à zéro : la portée « cette partie » ne revient à zéro
     // qu'ici.
     tally: emptyTally(TALLY_COUNTERS),
-    // Aucun statut.
-    statuses: [],
+    // Les règles de la partie, en tête des statuts ; aucun autre.
+    statuses: definition.rules.map(ruleInstance),
     // Aucun choix en attente.
     pendingChoice: null,
+    // Pas encore de résultat.
+    result: null,
   };
 }
 
@@ -219,10 +218,12 @@ function isSlot(slot) {
 
 // Peut-on encore lancer un échange ce tour-ci, avant même de choisir les
 // emplacements ? Le code du refus, ou null. Exportée pour que l'interface
-// refuse dès la prise, avec la règle du core au lieu d'une copie.
-export function swapRefusal(state) {
+// refuse dès la prise, avec la règle du core au lieu d'une copie. Un échange
+// VERROUILLÉ (marbles/core/statuses.js/LOCKS) l'est avant tout le reste du tour.
+export function swapRefusal(state, statuses = NO_STATUSES) {
   const refusal = stageRefusal(state, "play");
   if (refusal) return refusal;
+  if (isLocked(state.statuses, statuses, "swap")) return LOCKS.swap.refusal;
   if (state.swapUsed) return "swapAlreadyUsed";
   if (state.throwsUsed > 0) return "swapAfterPlacement"; // l'échange précède la pose
   return null;
@@ -240,9 +241,9 @@ export function throwsLeft(state, statuses = NO_STATUSES) {
 // tour suivant, les statuts comme ils seront alors (la fin de ce tour, puis
 // l'activation de ceux en attente). Lue par l'annonce du sac (touche S).
 export function nextTurnDraw(state, statuses = NO_STATUSES) {
-  if (state.stage === "draw") return modifyQuantity(state.statuses, statuses, "turnDraw", state.turn === 1 ? state.firstTurnDraw : state.drawPerTurn).value;
+  if (state.stage === "draw") return modifyQuantity(state.statuses, statuses, "turnDraw", turnDrawOf(state)).value;
   const ended = isLastTurn(state) ? state.statuses : endTurn(state.statuses, statuses).instances;
-  return modifyQuantity(activatePending(ended).instances, statuses, "turnDraw", state.drawPerTurn).value;
+  return modifyQuantity(activatePending(ended).instances, statuses, "turnDraw", startValue(state, "drawPerTurn")).value;
 }
 
 // Peut-on encore lancer une bille ce tour-ci, avant même de la choisir ? Le code
@@ -265,7 +266,19 @@ export function placeRefusal(state, handIndex, slot, statuses = NO_STATUSES) {
   if (!Number.isInteger(handIndex) || handIndex < 0 || handIndex >= state.hand.length) return "invalidHandIndex";
   // Une bille piochée à l'aveugle n'a pas d'identité : rien à poser.
   if (state.hand[handIndex].marble === UNKNOWN_MARBLE) return "invalidHandIndex";
+  // Un remplacement verrouillé : la pose sur un emplacement occupé seulement.
+  if (state.triangle[slot] !== null && isLocked(state.statuses, statuses, "replacement")) return LOCKS.replacement.refusal;
   return null;
+}
+
+// LA RAISON d'un refus de VERROU (`code`, un code de LOCKS) : le statut qui verrouille,
+// { status, rule } (`rule`, vrai pour une règle de la partie), ou null pour un autre
+// refus. Portée par le résultat du réducteur (`lockedBy`) ; l'interface la dit.
+export function lockReason(state, code, statuses = NO_STATUSES) {
+  const lock = Object.keys(LOCKS).find((id) => LOCKS[id].refusal === code);
+  if (lock === undefined) return null;
+  const instance = lockingInstance(state.statuses, statuses, lock);
+  return instance === null ? null : { status: instance.status, rule: instance.locked === true };
 }
 
 // Peut-on résoudre le tour ? Le code du refus, ou null : à tout moment de la phase
@@ -290,7 +303,7 @@ export function legalActions(state, statuses = NO_STATUSES) {
   if (stageRefusal(state, "draw") === null) return [{ type: "draw" }];
   const actions = [];
   SLOTS.forEach((a, index) => {
-    for (const b of SLOTS.slice(index + 1)) if (swapRefused(state, { a, b }) === null) actions.push({ type: "swap", a, b });
+    for (const b of SLOTS.slice(index + 1)) if (swapRefused(state, { a, b }, statuses) === null) actions.push({ type: "swap", a, b });
   });
   state.hand.forEach((_, handIndex) => {
     for (const slot of SLOTS) if (placeRefusal(state, handIndex, slot, statuses) === null) actions.push({ type: "place", handIndex, slot });
@@ -299,32 +312,46 @@ export function legalActions(state, statuses = NO_STATUSES) {
   return actions;
 }
 
-function refused(state, error) {
-  return { ok: false, state, events: [], error };
+function refused(state, error, statuses = NO_STATUSES) {
+  const lockedBy = lockReason(state, error, statuses);
+  return { ok: false, state, events: [], error, ...(lockedBy === null ? {} : { lockedBy }) };
 }
 
 // --- Fin de partie ---
 
-// LA fin de partie, la seule : la résolution du dernier tour, `turnCount`
-// (marbles/config/values.js, MARBLES_SETTINGS). Ni le sac ni la main n'arrêtent la
-// partie : une pioche impossible se dit (drawSkipped) et le tour se joue avec ce
-// qu'on a, même rien. Des conditions de fin plus riches (modes de partie) seront
-// conçues à neuf (doc/marbles-backlog.md).
+// LA FIN DE PARTIE : une condition de fin atteinte (marbles/core/definitions.js/
+// END_CONDITIONS), vérifiée à ses moments fixes : après l'Impact d'une résolution
+// (cible atteinte, tour d'endurance raté, dernier tour), et à la pioche du début de
+// tour (plus aucune bille à jouer). Une pioche seulement partielle, ou vide alors qu'il
+// reste des billes en jeu, se dit (drawSkipped) et le tour se joue avec ce qu'on a.
+// Le dernier tour de la définition, s'il en a un : lu par la fin des statuts et la
+// pioche du prochain tour (nextTurnDraw).
 function isLastTurn(state) {
-  return state.turn >= state.turnCount;
+  const limit = turnLimit(state);
+  return limit !== null && state.turn >= limit;
 }
 
-function endGame(run) {
-  run.update({ stage: "over" });
-  run.emit({ type: "gameOver", score: run.state.score });
+// La pioche du début du tour en cours, avant ses modificateurs : celle du premier tour,
+// ou celle des suivants (les valeurs de départ de la définition).
+function turnDrawOf(state) {
+  return startValue(state, state.turn === 1 ? "firstTurnDraw" : "drawPerTurn");
+}
+
+// La partie s'arrête par la condition `end` : son résultat selon son objectif, dans
+// l'état et dans l'évènement.
+function endGame(run, end) {
+  const result = gameResult(run.state, end);
+  run.update({ stage: "over", result });
+  run.emit({ type: "gameOver", score: run.state.score, result });
 }
 
 // Début de tour : les billes déjà en main y passent un tour de plus, puis la pioche,
-// `firstTurnDraw` billes au premier tour, `drawPerTurn` ensuite ; une bille piochée
+// `firstTurnDraw` billes au premier tour, `drawPerTurn` ensuite (les valeurs de départ
+// de la définition) ; une bille piochée
 // maintenant reste donc à 0. Une pioche impossible ne finit jamais la partie : le
 // tour se joue avec la main qu'on a.
 function drawTurn(run) {
-  run.emit({ type: "turnStarted", turn: run.state.turn, turnCount: run.state.turnCount });
+  run.emit({ type: "turnStarted", turn: run.state.turn, turnCount: turnLimit(run.state) });
   // Les statuts « le prochain tour » s'activent, en silence, avant la pioche : une
   // main agrandie compte dès elle.
   const { instances, activated } = activatePending(run.state.statuses);
@@ -335,18 +362,20 @@ function drawTurn(run) {
   run.update({ hand: run.state.hand.map((held) => ({ ...held, turnsInHand: held.turnsInHand + 1 })) });
   // Le nombre à piocher passe par ses modificateurs (turnDraw) ; la pioche s'arrête
   // ensuite à ses limites habituelles (main pleine, plus de billes).
-  const { turn, firstTurnDraw, drawPerTurn } = run.state;
-  const drawChange = intercept(run, modifyQuantity, "turnDraw", turn === 1 ? firstTurnDraw : drawPerTurn);
+  const drawChange = intercept(run, modifyQuantity, "turnDraw", turnDrawOf(run.state));
   noteModification(run, drawChange, null);
   drawMarbles(run, drawChange.value, "turn");
   run.update({ stage: "play", swapUsed: false, throwsUsed: 0 });
+  // Les conditions de fin de la pioche : plus rien à jouer, le tour n'a pas lieu.
+  const end = endReached(run.state, "turnDraw");
+  if (end !== null) endGame(run, end);
 }
 
 // Échange : le contenu de deux emplacements, usure comprise. Un emplacement
 // vide fait de l'échange un simple déplacement ; deux vides n'échangeraient
 // rien et gâcheraient l'échange du tour, c'est refusé. Ni Tic ni Éjection.
-function swapRefused(state, { a, b }) {
-  const refusal = swapRefusal(state);
+function swapRefused(state, { a, b }, statuses = NO_STATUSES) {
+  const refusal = swapRefusal(state, statuses);
   if (refusal) return refusal;
   if (!isSlot(a) || !isSlot(b)) return "invalidSlot";
   if (a === b) return "swapSameSlot";
@@ -429,7 +458,7 @@ function resolvePhases(run) {
     // maximum : ramené à 0, la bille ne s'use pas (l'évènement le dit, usure
     // inchangée) ; augmenté jusqu'au maximum, elle part à l'étape des retraits.
     const maxWear = maxWearOf(marble, run.types);
-    const added = intercept(run, modifyQuantity, "phaseWear", 1);
+    const added = intercept(run, modifyQuantity, "phaseWear", 1, sourceOf(run, marble));
     const wear = Math.min(maxWear, after.wear + added.value);
     run.update({ triangle: { ...run.state.triangle, [slot]: { marble, wear } } });
     run.emit({ type: "wear", slot, marble, wear, maxWear });
@@ -441,7 +470,10 @@ function resolvePhases(run) {
 // usure, chaque bille du pot dans l'ordre d'arrivée, pour son effet En poche à
 // chaque résolution. Une bille entrée au pot pendant cette étape a aussi la sienne,
 // après les autres ; le pot étant borné, l'étape l'est aussi.
+// Un POT verrouillé (marbles/core/statuses.js/LOCKS) n'a pas d'étape : aucun
+// évènement.
 function resolvePot(run) {
+  if (isLocked(run.state.statuses, run.statuses, "pot")) return;
   for (let index = 0; index < run.state.pot.length; index++) run.emit({ type: "potResolution", index, marble: run.state.pot[index] });
 }
 
@@ -480,10 +512,15 @@ function resolveTurn(run) {
   // porte la valeur finale, ce qu'ont fait les statuts se dit après lui.
   const change = intercept(run, modifyQuantity, "impact", impactOf(speed, mass));
   const impact = change.value;
-  const score = run.state.score + impact;
+  const before = run.state.score;
+  const score = before + impact;
   run.update({ score });
   run.emit({ type: "impact", speed, mass, impact, score });
   noteModification(run, change, null);
+  noteTier(run, before);
+  // Les conditions de fin d'après l'Impact : la résolution se termine comme au
+  // dernier tour, puis la partie s'arrête.
+  const end = endReached(run.state, "afterImpact", { impact });
 
   const { leftBase, rightBase, apex } = run.state.triangle;
   let triangle = { leftBase: withoutBonus(leftBase), rightBase: withoutBonus(rightBase), apex: withoutBonus(apex) };
@@ -492,11 +529,20 @@ function resolveTurn(run) {
   run.emit({ type: "rotation", triangle, notches: ROTATION_NOTCHES });
   // Les statuts comptés en tours en voient un de moins ; à zéro, ils prennent fin,
   // dans l'ordre d'acquisition. Pas au dernier tour : la partie s'arrête là.
-  if (!isLastTurn(run.state)) expireStatuses(run);
+  if (end === null) expireStatuses(run);
   run.emit({ type: "turnEnded", turn: run.state.turn });
 
-  if (isLastTurn(run.state)) endGame(run);
+  if (end !== null) endGame(run, end);
   else run.update({ turn: run.state.turn + 1, stage: "draw" });
+}
+
+// PALIER ATTEINT (partie libre) : l'Impact a fait passer le score au palier supérieur
+// (le plus haut atteint, s'il en franchit plusieurs d'un coup), dit aussitôt.
+function noteTier(run, before) {
+  const { goal } = run.state.definition;
+  if (goal.kind !== "free") return;
+  const tier = tierOf(run.state.score, goal.tiers);
+  if (tier !== tierOf(before, goal.tiers)) run.emit({ type: "tierReached", tier, score: run.state.score });
 }
 
 // La fin de tour des statuts (marbles/core/statuses.js/endTurn), chaque fin dite.
@@ -535,11 +581,11 @@ export function marblesReduce(state, action, types, options = {}) {
       refusal = stageRefusal(state, "draw");
       return refusal ? refused(state, refusal) : replayAction(state, { type: "draw" }, types, options);
     case "swap":
-      refusal = swapRefused(state, action);
-      return refusal ? refused(state, refusal) : replayAction(state, action, types, options);
+      refusal = swapRefused(state, action, options.statuses);
+      return refusal ? refused(state, refusal, options.statuses) : replayAction(state, action, types, options);
     case "place":
       refusal = placeRefusal(state, action.handIndex, action.slot, options.statuses);
-      return refusal ? refused(state, refusal) : replayAction(state, action, types, options);
+      return refusal ? refused(state, refusal, options.statuses) : replayAction(state, action, types, options);
     case "resolve":
       refusal = resolveRefusal(state);
       return refusal ? refused(state, refusal) : replayAction(state, RESOLVE, types, options);

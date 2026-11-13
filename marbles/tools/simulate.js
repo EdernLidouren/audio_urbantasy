@@ -7,6 +7,7 @@
 //   node marbles/tools/simulate.js --player random --random-bag 13 --max-copies 2
 //   node marbles/tools/simulate.js --bag-file marbles/tools/examples/bag.txt --turns 12
 //   node marbles/tools/simulate.js --games 200 --export resultats.csv
+//   node marbles/tools/simulate.js --definition free
 //
 // Options :
 //   --games <n>            nombre de parties (1000)
@@ -20,9 +21,13 @@
 //                          (sans limite par défaut)
 //   --bag-file <chemin>    le sac d'un fichier (ids séparés par espaces, virgules ou
 //                          lignes, # commente ; ou liste JSON). Sans --random-bag ni
-//                          --bag-file : le sac de test.
+//                          --bag-file : le sac de la définition.
+//   --definition <id|fichier>  la définition de partie : l'id d'une définition du
+//                          registre, ou un fichier JSON de même forme
+//                          (marbles/tools/definition-option.js) ; celle du jeu par défaut
 //   --hand-size <n>, --throws <n>, --pot <n>, --first-draw <n>, --draw <n>, --turns <n>
-//                          surcharges des réglages, pour cette simulation seulement
+//                          surcharges des valeurs de la définition, pour cette
+//                          simulation seulement
 //   --export <chemin>      résultats bruts : .json (un fichier) ou .csv (deux
 //                          fichiers, <nom>-games.csv et <nom>-marbles.csv)
 //
@@ -49,6 +54,7 @@ const KNOWN_OPTIONS = [
   "--random-bag",
   "--max-copies",
   "--bag-file",
+  "--definition",
   "--hand-size",
   "--throws",
   "--pot",
@@ -64,6 +70,7 @@ const { simulate, parseBagText } = await import("./simulation.js");
 const { summarize } = await import("./stats.js");
 const { buildReport } = await import("./report.js");
 const { toCsv, toJson } = await import("./export.js");
+const { readDefinitionOption } = await import("./definition-option.js");
 const name = (id) => t(`marble.${id}.name`);
 
 try {
@@ -83,7 +90,7 @@ try {
     bagMode = { kind: "list", source, marbles: parseBagText(await readFile(source, "utf-8")) };
   }
   const settings = {};
-  for (const [flag, setting] of [["--hand-size", "maxHandSize"], ["--throws", "throwsPerTurn"], ["--pot", "potCapacity"], ["--first-draw", "firstTurnDraw"], ["--draw", "drawPerTurn"], ["--turns", "turnCount"]]) {
+  for (const [flag, setting] of [["--hand-size", "handSize"], ["--throws", "throws"], ["--pot", "potCapacity"], ["--first-draw", "firstTurnDraw"], ["--draw", "drawPerTurn"], ["--turns", "turns"]]) {
     const value = integerOption(option, flag);
     if (value !== undefined) settings[setting] = value;
   }
@@ -101,6 +108,7 @@ try {
     player: option("--player") ?? "greedy",
     playerOptions,
     bagMode,
+    definition: await readDefinitionOption(option("--definition")),
     settings,
   });
   const summary = summarize(result);

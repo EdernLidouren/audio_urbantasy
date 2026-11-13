@@ -2,21 +2,35 @@
 // fait entendre. Donnée pure, zéro import. Les billes elles-mêmes sont du contenu,
 // une par fichier : marbles/content/types/ (champs décrits dans marbles/content/types/index.js).
 
+// La PARTIE PAR DÉFAUT : les valeurs de sa définition (marbles/content/definitions/
+// free.js, format : marbles/core/definitions.js), celle que lance le jeu. Les autres
+// définitions les reprennent et changent ce qui diffère.
+export const DEFAULT_GAME = {
+  // Les valeurs de DÉPART (definition.start).
+  start: {
+    firstTurnDraw: 5, // billes piochées au premier tour
+    drawPerTurn: 1, // billes piochées à chaque tour suivant
+    // Les valeurs de départ des CARACTÉRISTIQUES de la partie, que des statuts changent
+    // (marbles/core/statuses.js/characteristic) :
+    handSize: 5, // main pleine : la pioche est sautée, la bille reste au sac
+    // Lancers par tour : un lancer est une pose depuis la main, sur un emplacement
+    // vide ou occupé (l'échange n'en est pas un). Borne ce qu'un joueur peut
+    // enchaîner dans un tour, une pose qui pioche à chaque fois comprise.
+    throws: 5,
+    // Capacité du POT : une bille envoyée au pot plein n'y entre pas, elle est perdue
+    // pour la partie.
+    potCapacity: 3,
+  },
+  // Le nombre de tours (definition.turns).
+  turns: 10,
+  // Les PALIERS de la partie libre (definition.goal.tiers) : des repères techniques
+  // PROVISOIRES, tirés du simulateur (joueur glouton, sac de test, 1000 parties) : les
+  // 25e, 50e et 90e centiles du score final.
+  tiers: { bronze: 180, silver: 200, gold: 245 },
+};
+
 export const MARBLES_SETTINGS = {
-  firstTurnDraw: 5, // billes piochées au premier tour
-  drawPerTurn: 1, // billes piochées à chaque tour suivant
-  // Les valeurs de départ des CARACTÉRISTIQUES de la partie, que des statuts changent
-  // (marbles/core/statuses.js/characteristic) :
-  maxHandSize: 5, // main pleine : la pioche est sautée, la bille reste au sac
-  // Lancers par tour : un lancer est une pose depuis la main, sur un emplacement
-  // vide ou occupé (l'échange n'en est pas un). Borne ce qu'un joueur peut
-  // enchaîner dans un tour, une pose qui pioche à chaque fois comprise.
-  throwsPerTurn: 5,
-  // Capacité du POT : une bille envoyée au pot plein n'y entre pas, elle est perdue
-  // pour la partie.
-  potCapacity: 3,
-  // La partie se termine après la résolution de ce tour, et seulement là.
-  turnCount: 10,
+  // L'usure maximale d'une bille qui n'en déclare pas (marbles/content/types/).
   defaultMaxWear: 3,
   // Fiches : le curseur secondaire revient à l'annonce principale dès que le
   // curseur principal se déplace. Pourra devenir une option.
@@ -238,7 +252,10 @@ export const MARBLES_ROLLS = {
 // est : la Chiquenaude (flick, à sa place dans la main), l'Éveil (awaken, à sa place
 // dans la main, après sa balise de pioche), le Final (final, à l'emplacement
 // quitté), la Trouvaille (windfall, à son emplacement) ; et le début du tour du
-// joueur (playerTurn, au centre), quand la main lui revient.
+// joueur (playerTurn, au centre), quand la main lui revient. Enfin, des POINTS
+// D'ACCROCHE sans fichier pour l'instant (null : rien ne se joue), au centre : la
+// victoire et l'échec (objectif cible), le palier atteint (partie libre, en cours de
+// partie et à la fin), la fin de l'endurance (marbles/core/definitions.js).
 export const MARBLES_AUDIO = {
   music: "assets/musics/marbles_classic",
   shuffle: "assets/sounds/marbles/marbles_shuffling",
@@ -249,6 +266,10 @@ export const MARBLES_AUDIO = {
   final: "assets/sounds/marbles/marble_final",
   windfall: "assets/sounds/marbles/marble_windfall",
   playerTurn: "assets/sounds/marbles/player_turn",
+  victory: null,
+  defeat: null,
+  tier: null,
+  enduranceEnd: null,
 };
 
 // Les PHASES, déclarées UNE fois : l'effet de base ou de pointe d'une bille, joué
@@ -622,9 +643,10 @@ export const STATUS_CARD_MODEL = {
   ],
 };
 
-// Sac de test : un exemplaire de chaque bille. Une liste d'ids, pas un
-// dérivé du registre (marbles/content/types/) : un sac peut porter plusieurs exemplaires
-// d'une bille. Validé au démarrage (marbles/core/validation.js/validateMarblesContent).
+// Sac de test : un exemplaire de chaque bille, le sac de la partie par défaut
+// (DEFAULT_GAME). Une liste d'ids, pas un dérivé du registre (marbles/content/types/) :
+// un sac peut porter plusieurs exemplaires d'une bille. Validé au démarrage avec les
+// définitions (marbles/core/validation.js/validateMarblesContent).
 export const STARTING_BAG = [
   "clay",
   "glass",

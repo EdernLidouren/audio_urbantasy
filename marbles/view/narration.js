@@ -11,7 +11,8 @@
 // - forecast.js : la prévision et la confirmation (placementLines, describeOverview) ;
 // - journal.js  : le journal en étapes (buildSteps, resolutionSteps) et la question
 //                 d'un choix (describeChoicePrompt) ;
-// - statuses.js : les statuts de la partie (touche A, menu Maj+A, fiches, aide E).
+// - statuses.js : les statuts de la partie (touche A, menu Maj+A, fiches, aide E) ;
+// - goal.js     : l'objectif et les règles (ouverture, touche O, menu Maj+O, résultat).
 // Les autres modules importent d'ici, jamais des modules eux-mêmes ; les modules de la
 // narration s'importent entre eux directement.
 
@@ -20,3 +21,4 @@ export * from "./narration/focus.js";
 export * from "./narration/forecast.js";
 export * from "./narration/journal.js";
 export * from "./narration/statuses.js";
+export * from "./narration/goal.js";

@@ -293,10 +293,23 @@ export const MARBLE_EVENT_CUES = {
   effect: (event, timeline, context, settings) => EFFECT_CUES[event.trigger]?.(event, timeline, context, settings),
   wear: null,
   impact: null,
+  // Les points d'accroche de l'objectif (MARBLES_AUDIO), au centre.
+  tierReached: (event, timeline) => timeline.now("tier", null, null),
   // Autant de crans que l'évènement en porte.
   rotation: (event, timeline) => timeline.rotation(event.triangle, event.notches),
   turnEnded: null,
-  gameOver: null,
+  gameOver: (event, timeline) => {
+    const sound = RESULT_SOUNDS[event.result.goal](event.result);
+    if (sound !== null) timeline.now(sound, null, null);
+  },
+};
+
+// Le point d'accroche d'un résultat (MARBLES_AUDIO) : la victoire ou l'échec d'une
+// cible, la fin d'une endurance, le palier d'une partie libre (aucun sans palier).
+const RESULT_SOUNDS = {
+  free: (result) => (result.tier === "none" ? null : "tier"),
+  target: (result) => result.outcome,
+  endurance: () => "enduranceEnd",
 };
 
 // La bille a-t-elle un effet pour ce déclencheur (MARBLE_TRIGGERS, son champ) ? Une
@@ -375,10 +388,9 @@ export function handSizeChange(events) {
 
 // DÉMONSTRATION des places (mode debug, Maj+B) : la même balise à chaque place,
 // de la plus proche à la plus lointaine, pour régler l'espace à l'oreille
-// (MARBLES_SOUND_PLACES, MARBLES_SOUND_DEPTH). Une main pleine (la taille des
-// réglages) : à gauche, au centre, à droite ; puis les deux bases et la pointe.
-export function placesDemoCues(marble, settings = MARBLES_SETTINGS) {
-  const size = settings.maxHandSize;
+// (MARBLES_SOUND_PLACES, MARBLES_SOUND_DEPTH). Une main pleine (`size`, la taille en
+// vigueur) : à gauche, au centre, à droite ; puis les deux bases et la pointe.
+export function placesDemoCues(marble, size, settings = MARBLES_SETTINGS) {
   const hand = [0, Math.floor((size - 1) / 2), size - 1].map((index) => handPlace(index, size));
   const places = [...hand, slotPlace("leftBase"), slotPlace("rightBase"), slotPlace("apex")];
   return places.map((place, index) => ({ atMs: index * settings.placesDemoIntervalMs, sound: "beacon", marble, place }));

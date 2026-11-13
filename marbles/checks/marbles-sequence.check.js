@@ -26,7 +26,7 @@ import { choicePromptStep, withHandSizes } from "../view/resolution.js";
 import { historyMenu } from "../view/history-screen.js";
 import { throws } from "../../lib/check.js";
 import { CHOICELESS_TYPES, FIXTURE_BAG, fixtureRules } from "./fixtures/marbles.js";
-import { answerChoices, fabricatedRules, inHand, keyText, marblesPlayState } from "./helpers.js";
+import { answerChoices, fabricatedRules, inHand, keyText, marblesPlayState, overState } from "./helpers.js";
 
 // Les règles de la table des vérifications (marbles/checks/fixtures/marbles.js).
 const rules = fixtureRules();
@@ -135,15 +135,17 @@ const SEQUENCE_SHAPE = new RegExp(
     // L'étape du pot : une par bille qui a un effet de résolution.
     "(outcome\\.pot " + DRAWING + "*)*" +
     "(event\\.removed\\.wear (event\\.effect_final )?" + DRAWING + "*)*" +
-    "event\\.impact " +
-    "(event\\.rotation " + DRAWING + "+event\\.turn_started" +
+    "event\\.impact (event\\.tier_reached )?" +
+    // Le tour suivant commence ; ou la partie s'arrête, après l'Impact (sans rotation
+    // dite), ou à la pioche, faute de billes.
+    "(event\\.rotation " + DRAWING + "+(event\\.turn_started|event\\.game_over)" +
     "|event\\.game_over)$"
 );
 
 const GAMES = [
   ...Array.from({ length: 30 }, (_, index) => ({ seed: index + 1, options: {} })),
   // Un petit sac et beaucoup de tours : régénérations, puis sac épuisé.
-  ...Array.from({ length: 30 }, (_, index) => ({ seed: index + 100, options: { bag: FIXTURE_BAG.slice(0, 6), turnCount: 30 } })),
+  ...Array.from({ length: 30 }, (_, index) => ({ seed: index + 100, options: { bag: FIXTURE_BAG.slice(0, 6), turns: 30 } })),
 ];
 
 function checkRealGames(run) {
@@ -307,7 +309,7 @@ function checkTexts(run) {
         "event.target_empty_all",
         "event.removed.wear{marble: <hit_pocket>}",
         "event.impact{impact: 13, score: 13}",
-        "event.game_over{score: 13}",
+        "event.game_over{score: 13, result: result.no_tier}",
       ],
       texts({ ...worn, turn: 10 }).slice(3)
     );
@@ -347,7 +349,7 @@ function checkTexts(run) {
         "event.draw{marbles: [<aging_flick> | <hit_polish>]}",
         "event.turn_started{turn: 3}",
       ],
-      texts({ ...lensed, hand: inHand([]), bag: ["awaken_draw", "aging_flick", "hit_polish"], drawPerTurn: 2 }).slice(-4)
+      texts(overState(lensed, { hand: inHand([]), bag: ["awaken_draw", "aging_flick", "hit_polish"], drawPerTurn: 2 })).slice(-4)
     );
     run.same(
       "séquence : sac et défausse vides, le tour suivant commence quand même",

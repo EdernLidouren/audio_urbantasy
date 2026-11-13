@@ -37,7 +37,7 @@ import { detailAfterMainMove, detailLine, mainWithDetail, stepDetail } from "../
 import { t } from "../../data/i18n/index.js";
 import { MARBLES_SETTINGS } from "../config/values.js";
 import { isDebugEnabled } from "../../config/debug.js";
-import { SLOTS, swapRefusal } from "../core/marbles.js";
+import { SLOTS } from "../core/marbles.js";
 import { isOptionalChoice } from "../core/effects.js";
 import { playMenuSound } from "../../view/menu-sounds.js";
 import { openConfirmation } from "../../view/menus/confirmation.js";
@@ -46,6 +46,8 @@ import { choiceAnswer, choiceCursorAfterAnswer, choiceFocusLine, choiceHandOptio
 import { marbleCard } from "./card.js";
 import { openPileMenu } from "./pile-screen.js";
 import { openStatusMenu } from "./status-screen.js";
+import { openGoalMenu } from "./goal-screen.js";
+import { ordinaryInstances } from "../core/statuses.js";
 import {
   bagDisplayOrder,
   buildSteps,
@@ -56,6 +58,9 @@ import {
   describeDiscard,
   describePot,
   describeStatuses,
+  describeGoal,
+  describeOpening,
+  refusalText,
   describeHandFocus,
   describeSlotFocus,
   describeSlotForPlacement,
@@ -111,6 +116,9 @@ const MARBLES_BINDINGS = defineBindings("marbles", {
   // Les statuts de la partie : leur résumé, puis leur menu (marbles/view/status-screen.js).
   statuses: { keys: ["a"], mods: [] },
   statusesMenu: { keys: ["a"], mods: ["shift"] },
+  // L'objectif et sa progression ; le menu de l'objectif et des règles.
+  goal: { keys: ["o"], mods: [] },
+  goalMenu: { keys: ["o"], mods: ["shift"] },
   overview: { keys: ["r"], mods: [] },
   resolve: { keys: ["r"], mods: ["shift"] },
   history: { keys: ["l"], mods: [] },
@@ -264,9 +272,10 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
     return isOver() ? `${text} ${t("marbles.over_hint")}` : text;
   }
 
+  // Un refus, dit avec sa raison (le statut ou la règle d'un verrou : refusalText).
   function refuse(code) {
     sound.playMenuSound("refusal");
-    announce(t(`marbles.error.${code}`), { assertive: true });
+    announce(refusalText(code, getGame(), rules, t), { assertive: true });
   }
 
   // Passe une action au réducteur : ses évènements, ou null si elle est
@@ -614,7 +623,7 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
       else performSwap(held.slot, slot);
       return;
     }
-    const refusal = swapRefusal(getGame());
+    const refusal = rules.swapRefusal(getGame());
     if (refusal) {
       refuse(refusal);
       return;
@@ -690,7 +699,7 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
   // Celle de la bille sous le curseur, sinon de la première de la table.
   function playPlacesDemo() {
     if (blockedDuringSequence()) return;
-    soundQueue = enqueueCues(soundQueue, placesDemoCues(marbleUnderCursor() ?? Object.keys(rules.types)[0]));
+    soundQueue = enqueueCues(soundQueue, placesDemoCues(marbleUnderCursor() ?? Object.keys(rules.types)[0], rules.characteristic(getGame(), "handSize")));
     flushSounds(0);
     announce(t("marbles.debug.places_demo"), { assertive: true });
   }
@@ -699,7 +708,7 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
   // menu ouvert par-dessus fige la séquence, comme les autres).
   function openHelpMenu() {
     sound.playMenuSound("select");
-    openMarblesHelp(() => openKeyHelp(screen));
+    openMarblesHelp(() => openKeyHelp(screen), getGame().definition);
   }
 
   // Échap : pendant un choix facultatif, valide la sélection en cours, comme
@@ -729,7 +738,7 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
     reannounce,
     // Les lancers restants et l'échange : rien d'autre ne permet de les savoir sans
     // essayer.
-    turnInfo: consult(() => describeTurn(getGame(), swapRefusal(getGame()) === null, rules, t)),
+    turnInfo: consult(() => describeTurn(getGame(), rules.swapRefusal(getGame()) === null, rules, t)),
     bag: consult(() => describeBag(getGame(), rules, t)),
     discard: consult(() => describeDiscard(getGame(), t)),
     // Le sac dans un ordre qui ne dévoile rien de la pioche ; la défausse et le pot
@@ -739,7 +748,9 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
     pot: consult(() => describePot(getGame(), rules, t)),
     potMenu: openMenu(() => openPileMenu("marbles.pile.pot", getGame().pot, rules, getGame())),
     statuses: consult(() => describeStatuses(getGame(), rules, t)),
-    statusesMenu: openMenu(() => openStatusMenu(getGame().statuses, rules)),
+    statusesMenu: openMenu(() => openStatusMenu(ordinaryInstances(getGame().statuses), rules)),
+    goal: consult(() => describeGoal(getGame(), t)),
+    goalMenu: openMenu(() => openGoalMenu(getGame(), rules)),
     overview: announceOverview,
     resolve: resolveKey,
     // L'historique du tour précédent, aussi en fin de partie (celui du dernier tour).
@@ -777,7 +788,8 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
     // lancée.
     if (pending?.resume.action.type === "resolve") resolution.adopt(getGame().turn);
     const next = pending !== null ? describeChoicePrompt(pending, t) : isOver() ? "" : focusLine();
-    speak(withOverHint(`${t("marbles.intro")} ${stepsText(recorded(buildSteps(events, t)))} ${next}`));
+    // L'objectif et les règles, une seule annonce, avant celle du premier tour.
+    speak(withOverHint(`${t("marbles.intro")} ${describeOpening(getGame(), t)} ${stepsText(recorded(buildSteps(events, t)))} ${next}`));
   }
 
   // Le temps réel reçu : la séquence (une étape au plus), puis les billes déjà en

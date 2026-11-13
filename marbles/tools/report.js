@@ -6,9 +6,8 @@
 // La durée d'exécution n'en fait pas partie (le lanceur l'ajoute) : mêmes
 // paramètres, même rapport, au caractère près.
 
-import { MARBLES_SETTINGS } from "../config/values.js";
 import { PLAYERS } from "./players.js";
-import { SETTING_NAMES } from "./simulation.js";
+import { SETTING_NAMES, settingOf } from "./game-rules.js";
 import { PLACEMENT_TRIGGERS, TRIGGER_IDS, TRIGGER_WORDS, marbleLabel } from "./format.js";
 
 // Les titres du rapport, et le début de ses lignes d'anomalies : le comparateur
@@ -19,13 +18,14 @@ export const REPORT_HEADINGS = {
   impact: "Impact par tour.",
   replacements: "Poses, moyennes par partie.",
   draws: "Pioche et lancers.",
+  goal: "Objectif.",
   marbles: "Par bille, moyennes par partie où elle est dans le sac.",
   observations: "Observations.",
   refusals: "Actions refusées : ",
   interruptions: "Enchaînements interrompus : ",
 };
 // Les sections des résultats d'une partie : ce qui change quand le jeu change.
-export const REPORT_RESULT_HEADINGS = [REPORT_HEADINGS.score, REPORT_HEADINGS.impact];
+export const REPORT_RESULT_HEADINGS = [REPORT_HEADINGS.score, REPORT_HEADINGS.impact, REPORT_HEADINGS.goal];
 
 // Seuil des billes « presque jamais posées », en poses par partie.
 const RARELY_PLACED = 0.25;
@@ -53,24 +53,58 @@ function producedLine(marble) {
 }
 
 const SETTING_LABELS = {
-  maxHandSize: "main de",
-  throwsPerTurn: "lancers par tour",
+  handSize: "main de",
+  throws: "lancers par tour",
   potCapacity: "pot de",
   firstTurnDraw: "pioche du premier tour",
   drawPerTurn: "pioche par tour",
-  turnCount: "tours",
+  turns: "tours",
 };
 
-function bagLine(mode) {
-  if (mode.kind === "test") return "Sac : le sac de test.";
+// Le sac : celui de la définition (mode "test"), d'un fichier, ou tiré par partie.
+function bagLine(mode, definition) {
+  if (mode.kind === "test") {
+    const { bag } = definition;
+    if (bag.kind === "list") return `Sac : celui de la définition, ${bag.marbles.length} billes.`;
+    return bagLine(bag).replace("Sac : aléatoire", "Sac : celui de la définition, aléatoire");
+  }
   if (mode.kind === "list") return `Sac : ${mode.source ?? "décrit"}, ${mode.marbles.length} billes.`;
   const limit = mode.maxCopies === null ? "sans limite d'exemplaires" : `${mode.maxCopies} exemplaire(s) au plus par bille`;
   return `Sac : aléatoire, ${mode.size} billes tirées dans la table, ${limit}, un sac par partie.`;
 }
 
-function settingsLine(settings) {
+// La définition jouée : son id, son objectif et ses règles (les ids des statuts).
+const GOAL_WORDS = {
+  free: (goal) => `libre, paliers ${goal.tiers.bronze}, ${goal.tiers.silver} et ${goal.tiers.gold}`,
+  target: (goal) => `cible, ${goal.score} points`,
+  endurance: (goal) => `endurance, Impact de ${goal.minimum} minimum par tour`,
+};
+
+function definitionLine(definition) {
+  const rules = definition.rules.length === 0 ? "aucune règle" : `règles ${definition.rules.join(", ")}`;
+  return `Définition : ${definition.id}, objectif ${GOAL_WORDS[definition.goal.kind](definition.goal)}, ${rules}.`;
+}
+
+// Le résultat selon l'objectif (marbles/tools/stats.js, goalSummary), puis les fins
+// faute de billes.
+const TIER_WORDS = { none: "aucun", bronze: "bronze", silver: "argent", gold: "or" };
+const GOAL_LINES = {
+  free: (goal, n) => [`Paliers : ${Object.entries(goal.tiers).map(([tier, share]) => `${TIER_WORDS[tier]} ${n(share)} %`).join(", ")}.`],
+  target: (goal, n) => [`Victoires : ${n(goal.victories)} %.`, goal.victoryTurn === null ? "Aucune victoire." : `Tour de la victoire, en moyenne : ${n(goal.victoryTurn)}.`],
+  endurance: (goal, n) => [
+    `Tours tenus : moyenne ${n(goal.held.mean)}, médiane ${n(goal.held.median)}, minimum ${n(goal.held.min)}, maximum ${n(goal.held.max)}.`,
+    `Succès (le nombre de tours atteint) : ${n(goal.successes)} %.`,
+  ],
+};
+
+function goalLines(goal, n) {
+  return [...GOAL_LINES[goal.kind](goal, n), `Fins faute de billes : ${goal.noMarbles}.`];
+}
+
+// Les valeurs de la définition jouée, surcharges comprises.
+function settingsLine(settings, definition) {
   const parts = SETTING_NAMES.map((setting) => {
-    const value = settings[setting] ?? MARBLES_SETTINGS[setting];
+    const value = settings[setting] ?? settingOf(definition, setting) ?? "sans limite";
     const overridden = settings[setting] !== undefined ? " (surchargé)" : "";
     return `${SETTING_LABELS[setting]} ${value}${overridden}`;
   });
@@ -142,8 +176,12 @@ export function buildReport({ params, summary, name }) {
     REPORT_HEADINGS.title,
     `Joueur : ${PLAYERS[params.player].describe(params.playerOptions)}.`,
     `Parties : ${summary.games}, graine de départ ${params.seed}.`,
-    bagLine(params.bagMode),
-    settingsLine(params.settings),
+    bagLine(params.bagMode, params.definition),
+    definitionLine(params.definition),
+    settingsLine(params.settings, params.definition),
+    "",
+    REPORT_HEADINGS.goal,
+    ...goalLines(summary.goal, n),
     "",
     REPORT_HEADINGS.score,
     `Moyenne ${n(score.mean)}. Médiane ${n(score.median)}. Minimum ${n(score.min)}, maximum ${n(score.max)}.`,

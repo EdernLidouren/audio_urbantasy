@@ -16,8 +16,10 @@
 //     "pot": ["agate"], "lost": [],  le pot dans l'ordre d'arrivée, les billes perdues
 //     "tally": { "flick": { "turn": 1, "game": 3 } },   valeurs de partie, le reste à 0
 //     "statuses": ["cushion:2", { "status": "extraThrow", "pending": true }],
-//     "settings": { "maxHandSize": 5, "throwsPerTurn": 5, "potCapacity": 3, "firstTurnDraw": 5, "drawPerTurn": 1, "turnCount": 10 }
-//   }
+//     "definition": "free",           l'id d'une définition du registre, ou une
+//                                     définition entière (celle du jeu par défaut)
+//     "settings": { "handSize": 5, "throws": 5, "potCapacity": 3, "firstTurnDraw": 5, "drawPerTurn": 1, "turns": 10 }
+//   }                                 surcharges des valeurs de la définition
 // Une bille du triangle : "id" (usure 0), "id:usure", ou { marble, wear, bonus? }.
 // Une bille de la main : "id" (0 tour en main), "id:tours", ou { marble, turnsInHand }.
 // Un statut, dans l'ordre d'acquisition : "id" (intensité 1), "id:intensité", ou
@@ -33,10 +35,10 @@ import { createSeed } from "../../lib/rng.js";
 import { SLOTS } from "../core/marbles.js";
 import { applyStatus } from "../core/statuses.js";
 import { rejectUnknownFields } from "../../lib/validate.js";
-import { GAME_RULES } from "./game-rules.js";
+import { turnLimit } from "../core/definitions.js";
+import { DEFAULT_GAME_DEFINITION, GAME_RULES, definitionById, withBag, withSettings } from "./game-rules.js";
 
-const FIELDS = ["seed", "turn", "stage", "score", "speed", "mass", "swapUsed", "throwsUsed", "triangle", "hand", "bag", "discard", "pot", "lost", "tally", "statuses", "settings"];
-const SETTINGS = ["maxHandSize", "throwsPerTurn", "potCapacity", "firstTurnDraw", "drawPerTurn", "turnCount"];
+const FIELDS = ["seed", "turn", "stage", "score", "speed", "mass", "swapUsed", "throwsUsed", "triangle", "hand", "bag", "discard", "pot", "lost", "tally", "statuses", "definition", "settings"];
 const STAGES = ["draw", "play", "over"];
 
 function fail(message) {
@@ -94,11 +96,12 @@ function potContent(list, capacity) {
   return pot;
 }
 
-// Les statuts, dans l'ordre d'acquisition : chacun reçu comme d'un effet (sa
-// définition, marbles/core/statuses.js/applyStatus), puis ce que la description fixe.
-function statusContent(list = []) {
+// Les statuts, dans l'ordre d'acquisition, après les règles de la partie (`rules`, ses
+// instances, toujours là) : chacun reçu comme d'un effet (sa définition,
+// marbles/core/statuses.js/applyStatus), puis ce que la description fixe.
+function statusContent(list = [], rules = []) {
   if (!Array.isArray(list)) fail("statuses doit être une liste.");
-  let instances = [];
+  let instances = [...rules];
   for (const value of list) {
     const described = typeof value === "string" ? { status: value.split(":")[0], intensity: Number(value.split(":")[1] ?? 1) } : value;
     rejectUnknownFields(described, ["status", "intensity", "remaining", "pending"], "statut", fail);
@@ -117,10 +120,25 @@ function marbleList(list = [], where) {
   return list.map((id) => checkMarble(id, where));
 }
 
+// La définition décrite : un id du registre, une définition entière, ou celle du jeu.
+function definitionOf(value) {
+  if (value === undefined) return DEFAULT_GAME_DEFINITION;
+  if (typeof value !== "string") return value;
+  try {
+    return definitionById(value);
+  } catch (error) {
+    return fail(error.message);
+  }
+}
+
 export function buildState(description = {}) {
   rejectUnknownFields(description, FIELDS, "description", fail);
-  const settings = description.settings ?? {};
-  rejectUnknownFields(settings, SETTINGS, "settings", fail);
+  let definition;
+  try {
+    definition = withSettings(definitionOf(description.definition), description.settings ?? {});
+  } catch (error) {
+    fail(`settings : ${error.message}`);
+  }
   const triangle = description.triangle ?? {};
   rejectUnknownFields(triangle, SLOTS, "triangle", fail);
 
@@ -130,15 +148,15 @@ export function buildState(description = {}) {
   // garde le hasard d'une partie sans mélange, celui de la graine.
   const seed = description.seed ?? 0;
   const [first] = Object.keys(GAME_RULES.types);
-  const base = { ...GAME_RULES.createGame(seed, { ...settings, bag: [first, first, first] }), rngState: createSeed(seed) };
+  const base = { ...GAME_RULES.createGame(seed, withBag(definition, [first, first, first])), rngState: createSeed(seed) };
   const stage = description.stage ?? "play";
   if (!STAGES.includes(stage)) fail(`étape inconnue "${stage}".`);
   const turn = checkInteger(description.turn ?? 2, "turn", 1);
-  if (turn > base.turnCount) fail(`tour ${turn} au-delà des ${base.turnCount} tours de la partie.`);
+  if (turn > turnLimit(base)) fail(`tour ${turn} au-delà des ${turnLimit(base)} tours de la partie.`);
   if (description.hand !== undefined && !Array.isArray(description.hand)) fail("hand doit être une liste.");
   const hand = (description.hand ?? []).map(handContent);
   // Les caractéristiques en vigueur, statuts compris, bornent la main, les lancers, le pot.
-  const statuses = statusContent(description.statuses);
+  const statuses = statusContent(description.statuses, base.statuses);
   const value = (key) => GAME_RULES.characteristic({ ...base, statuses }, key);
   if (hand.length > value("handSize")) fail(`main de ${hand.length} billes, plus que sa taille en vigueur (${value("handSize")}).`);
 
@@ -163,8 +181,8 @@ export function buildState(description = {}) {
 }
 
 // Les lancers déjà joués : entre 0 et la limite du tour.
-function checkThrowsUsed(value, throwsPerTurn) {
-  if (!Number.isInteger(value) || value < 0 || value > throwsPerTurn) fail(`throwsUsed doit être un entier entre 0 et ${throwsPerTurn}.`);
+function checkThrowsUsed(value, throws) {
+  if (!Number.isInteger(value) || value < 0 || value > throws) fail(`throwsUsed doit être un entier entre 0 et ${throws}.`);
   return value;
 }
 

@@ -33,10 +33,11 @@
 //   eject { slot, marble, by },
 //   wear { slot, marble, wear, maxWear },
 //   impact { speed, mass, impact, score },
-//   rotation { triangle, notches }, turnEnded { turn }, gameOver { score },
+//   tierReached { tier, score },
+//   rotation { triangle, notches }, turnEnded { turn }, gameOver { score, result },
 //   statusGained { status, intensity, remaining, pending, kind, stacking, by },
 //   statusStrengthened { status, intensity, remaining, pending, kind, stacking, by },
-//   statusUnchanged { status, by }, statusActivated { status },
+//   statusUnchanged { status, by, locked? }, statusActivated { status },
 //   statusCharge { status, remaining }, statusExpired { status },
 //   statusReaction { status, counter },
 //   valueModified { point, before, after, contributions, by? }.
@@ -44,7 +45,7 @@
 // par l'effet `by` (Appliquer un statut) ; `statusStrengthened`, le statut déjà là
 // fusionné, son intensité et ce qui lui reste d'après (`kind`, la sorte de sa durée,
 // et `stacking`, son cumul, pour le dire) ; `statusUnchanged`, un statut
-// unique déjà là, sans effet ; `statusActivated`, un statut « le prochain tour »
+// unique déjà là, ou une règle (`locked`, verrouillée), sans effet ; `statusActivated`, un statut « le prochain tour »
 // qui s'active au début du tour ; `statusCharge`, une charge consommée (`remaining`,
 // celles qui restent) ; `statusExpired`, sa fin (fin de tour, après la rotation, ou
 // dernière charge) ; `statusReaction`, un statut réagit à un incrément du compteur
@@ -54,6 +55,10 @@
 // l'Impact porte déjà la valeur finale, cet évènement les explique (l'historique,
 // les charges). Un `effect` d'une réaction de statut a `trigger` "statusReaction",
 // `status`, et ni bille ni emplacement (null).
+// LA FIN DE PARTIE (marbles/core/definitions.js) : `tierReached`, une partie libre
+// dont l'Impact vient de faire passer le score à un palier supérieur (`tier`, le plus
+// haut atteint) ; `gameOver`, la partie s'arrête, avec son résultat selon l'objectif
+// (`result`, gameResult : { goal, end, score, tier | outcome | held, outcome }).
 // `awaken` : juste après chaque `draw` d'une bille réellement piochée, la bille
 // désormais en main (à 0 tour en main) ; son Éveil et tout ce qui en découle se
 // règlent avant la bille suivante (une interruption, comme la Trouvaille). À
@@ -201,6 +206,7 @@ export const JOURNAL_EVENTS = Object.freeze({
   eject: true,
   wear: true,
   impact: false,
+  tierReached: false,
   rotation: false,
   turnEnded: false,
   gameOver: false,

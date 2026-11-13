@@ -6,6 +6,7 @@
 // marbles/view/narration.js.
 
 import { formatMenuPosition } from "../../../lib/menu.js";
+import { turnLimit } from "../../core/definitions.js";
 import { cardSituation, describeEffect, describePrinted, formatCounter, marbleName, sizeName, slotName, marbleRef } from "./effects.js";
 
 // L'annonce principale d'une bille hors du triangle (main, sac, défausse) : son
@@ -77,9 +78,10 @@ export function describeDiscard(game, t) {
 // Où en est le tour. Avec les lancers restants (statuts compris : rules.throwsLeft)
 // et la disponibilité de l'échange : rien d'autre ne permet de les savoir sans essayer.
 export function describeTurn(game, swapAvailable, rules, t) {
-  const line = t("marbles.state.turn", {
+  // Une partie sans limite de tours (une endurance) : « Tour 5. ».
+  const line = t(turnLimit(game) === null ? "marbles.state.turn_unlimited" : "marbles.state.turn", {
     turn: game.turn,
-    turnCount: game.turnCount,
+    turnCount: turnLimit(game),
     score: game.score,
     speed: formatCounter(game.speed),
     mass: formatCounter(game.mass),

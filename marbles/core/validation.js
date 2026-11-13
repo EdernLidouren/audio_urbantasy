@@ -1,16 +1,17 @@
 // JEU DES BILLES — LA VALIDATION des tables INJECTÉES : la table des billes, celle
-// des statuts, et les réglages d'une partie avec leur sac. Échouer au chargement,
+// des statuts, et les définitions de partie. Échouer au chargement,
 // jamais en pleine partie : les règles (marbles/core/rules.js) valident leurs tables à
 // la composition, main.js et l'audit du contenu le contenu du jeu au démarrage.
 // Ce qu'elle lit vient du catalogue (marbles/core/content.js : valeurs de partie,
 // champs d'effet, moments En poche), qui valide lui-même, à son chargement, les
 // déclarations dont il est fait (déclencheurs, phases, En poche). Pur.
 
-import { MARBLES_SETTINGS, MARBLE_PHASES, MARBLE_POCKET, MARBLE_TRIGGERS, STARTING_BAG } from "../config/values.js";
+import { MARBLE_PHASES, MARBLE_POCKET, MARBLE_TRIGGERS } from "../config/values.js";
 import { rejectUnknownFields } from "../../lib/validate.js";
-import { isMarbleSize, validateEffect } from "./effects.js";
+import { isMarbleSize, validateEffect, validateFilters } from "./effects.js";
 import { EFFECT_FIELDS, FIXED_MOMENTS, LISTENABLE_KEYS, REACTION_KEYS, REACTIVE_MOMENT, TALLY_COUNTERS, TALLY_IDS, pocketClauses, reactionClauses } from "./content.js";
-import { CHARACTERISTICS, MODIFIER_OPERATIONS, MODIFIER_POINTS, NO_STATUSES, STATUS_BEHAVIORS, STATUS_DURATIONS, STATUS_STACKINGS } from "./statuses.js";
+import { CHARACTERISTICS, LOCKS, MODIFIER_OPERATIONS, MODIFIER_POINTS, NO_STATUSES, STATUS_BEHAVIORS, STATUS_DURATIONS, STATUS_STACKINGS } from "./statuses.js";
+import { BAG_KINDS, GOALS, START_KEYS } from "./definitions.js";
 
 // La catégorie de chaque valeur de partie (marbles/core/counters.js), que lit le
 // garde-fou des boucles directes.
@@ -134,12 +135,26 @@ function validateStatusBehavior(behavior, statuses, describe, fail) {
     if (!Object.hasOwn(CHARACTERISTICS, behavior.stat)) fail(`${where} : caractéristique inconnue "${behavior.stat}" (${Object.keys(CHARACTERISTICS).join(", ")}).`);
     if (!Number.isInteger(behavior.amount) || behavior.amount === 0) fail(`${where} : amount doit être un entier non nul.`);
   } else if (behavior.type === "modifier") {
-    rejectUnknownFields(behavior, ["type", "point", "operation", "value"], where, fail);
+    rejectUnknownFields(behavior, ["type", "point", "operation", "value", "filters"], where, fail);
     if (!Object.hasOwn(MODIFIER_POINTS, behavior.point)) fail(`${where} : point d'interception inconnu "${behavior.point}" (${Object.keys(MODIFIER_POINTS).join(", ")}).`);
     if (!Object.hasOwn(MODIFIER_OPERATIONS, behavior.operation)) fail(`${where} : opération inconnue "${behavior.operation}" (${Object.keys(MODIFIER_OPERATIONS).join(", ")}).`);
-    if (!Number.isInteger(behavior.value)) fail(`${where} : value doit être un entier.`);
-    if (behavior.operation === "add" && behavior.value === 0) fail(`${where} : ajouter 0 ne change rien.`);
-    if (behavior.operation === "multiply" && (behavior.value < 0 || behavior.value === 1)) fail(`${where} : un multiplicateur est un entier >= 0, autre que 1 (le signe ne s'inverse jamais).`);
+    // Une addition entière ; une multiplication par un nombre positif (×0,5 permis :
+    // la valeur s'arrondit vers zéro), jamais négatif (le signe ne s'inverse jamais).
+    if (behavior.operation === "add" && (!Number.isInteger(behavior.value) || behavior.value === 0)) fail(`${where} : une addition est un entier non nul.`);
+    if (behavior.operation === "multiply" && (typeof behavior.value !== "number" || !Number.isFinite(behavior.value) || behavior.value < 0 || behavior.value === 1)) {
+      fail(`${where} : un multiplicateur est un nombre >= 0, autre que 1 (le signe ne s'inverse jamais).`);
+    }
+    // Un filtre sur la source : seulement là où une valeur a une bille source.
+    if (behavior.filters !== undefined) {
+      if (!MODIFIER_POINTS[behavior.point].sourced) fail(`${where} : « ${behavior.point} » n'a jamais de bille source, un filtre n'y correspondrait à rien.`);
+      validateFilters(behavior.filters, `${where}, filtres de source`, fail);
+    }
+  } else if (behavior.type === "lock") {
+    if (!Object.hasOwn(LOCKS, behavior.lock)) fail(`${where} : verrou inconnu "${behavior.lock}" (${Object.keys(LOCKS).join(", ")}).`);
+    rejectUnknownFields(behavior, LOCKS[behavior.lock].fields, `${where} ${behavior.lock}`, fail);
+    if (behavior.lock === "trigger" && !MARBLE_TRIGGERS.some((trigger) => trigger.id === behavior.trigger)) {
+      fail(`${where} : déclencheur inconnu "${behavior.trigger}" (${MARBLE_TRIGGERS.map((trigger) => trigger.id).join(", ")}).`);
+    }
   } else {
     rejectUnknownFields(behavior, ["type", "on", "effect"], where, fail);
     if (!LISTENABLE_KEYS.includes(behavior.on)) fail(`${where} : « ${behavior.on} » n'est pas une valeur de partie écoutable.`);
@@ -148,28 +163,95 @@ function validateStatusBehavior(behavior, statuses, describe, fail) {
   }
 }
 
-// La valeur fausse échouerait sinon en pleine partie. Aucun minimum lié au
-// triangle : le joueur est seul responsable de ses poses, et la résolution se lance
-// quel que soit l'état du triangle, au premier tour comme ensuite. Un sac vide fait
-// une partie qui s'arrête à la première pioche, faute de billes.
-export function validateGameSettings({ maxHandSize, throwsPerTurn, potCapacity, firstTurnDraw, drawPerTurn, turnCount, bag }, types) {
-  const positive = { maxHandSize, throwsPerTurn, firstTurnDraw, drawPerTurn, turnCount };
-  for (const [name, value] of Object.entries(positive)) {
-    if (!Number.isInteger(value) || value < 1) throw new Error(`marbles : ${name} doit être un entier >= 1.`);
+// --- Définitions de partie ---
+
+// Échoue sur une définition de partie mal formée (format : en-tête de
+// marbles/core/definitions.js), du registre ou lue d'un fichier : une valeur fausse
+// échouerait sinon en pleine partie. Aucun minimum lié au triangle : le joueur est seul
+// responsable de ses poses, et la résolution se lance quel que soit l'état du
+// triangle. Un sac vide se conçoit (une partie sans billes).
+export function validateGameDefinition(definition, types, statuses = NO_STATUSES) {
+  const fail = (message) => {
+    throw new Error(`marbles, définition "${definition?.id}" : ${message}`);
+  };
+  if (definition === null || typeof definition !== "object" || Array.isArray(definition)) fail("une définition est un objet.");
+  rejectUnknownFields(definition, ["id", "start", "bag", "turns", "goal", "rules"], "définition", fail);
+  if (typeof definition.id !== "string" || definition.id === "") fail("id doit être un texte non vide.");
+  validateStart(definition.start, fail);
+  validateStartingBag(definition.bag, types, fail);
+  const { goal } = definition;
+  if (goal === null || typeof goal !== "object" || !Object.hasOwn(GOALS, goal.kind)) fail(`objectif (goal) inconnu "${goal?.kind}" (${Object.keys(GOALS).join(", ")}).`);
+  rejectUnknownFields(goal, GOALS[goal.kind].fields, `objectif ${goal.kind}`, fail);
+  GOALS[goal.kind].validate(goal, (message) => fail(`objectif ${goal.kind} : ${message}`));
+  // Le nombre de tours : un entier, ou null pour un objectif qui le permet (sans
+  // limite) ; une partie sans limite finit alors par son objectif ou faute de billes.
+  const unlimited = definition.turns === null && GOALS[goal.kind].turns === "optional";
+  if (!unlimited && (!Number.isInteger(definition.turns) || definition.turns < 1)) {
+    fail(GOALS[goal.kind].turns === "optional" ? "turns doit être un entier >= 1, ou null (sans limite)." : "turns doit être un entier >= 1.");
   }
-  // Un pot de capacité 0 se conçoit : toute bille empochée y serait perdue.
-  if (!Number.isInteger(potCapacity) || potCapacity < 0) throw new Error("marbles : potCapacity doit être un entier >= 0.");
-  if (maxHandSize < firstTurnDraw) throw new Error("marbles : maxHandSize doit valoir au moins firstTurnDraw.");
-  for (const id of bag) {
-    if (!Object.hasOwn(types, id)) throw new Error(`marbles : bille inconnue "${id}" dans le sac.`);
+  validateRules(definition.rules, statuses, fail);
+}
+
+// Les RÈGLES d'une définition : des statuts de la table, chacun une fois, de durée
+// « toute la partie » (une règle vaut pour toute la partie : des tours ou des charges
+// n'y auraient pas de sens, et elle ne s'use jamais).
+function validateRules(rules, statuses, fail) {
+  if (!Array.isArray(rules)) fail("rules doit être une liste d'ids de statuts.");
+  const seen = new Set();
+  for (const id of rules) {
+    if (!Object.hasOwn(statuses, id)) fail(`règle : statut inconnu "${id}".`);
+    if (seen.has(id)) fail(`règle "${id}" en double.`);
+    seen.add(id);
+    if (statuses[id].duration.kind !== "game") fail(`règle "${id}" : un statut de durée « toute la partie » (game), pas "${statuses[id].duration.kind}".`);
+  }
+}
+
+// Les valeurs de départ : toutes entières ; les pioches, la main et les lancers d'au
+// moins 1, un pot de capacité 0 se conçoit (toute bille empochée y serait perdue) ;
+// une main qui tient la première pioche.
+function validateStart(start, fail) {
+  if (start === null || typeof start !== "object") fail("start doit être un objet de valeurs de départ.");
+  rejectUnknownFields(start, START_KEYS, "start", fail);
+  for (const key of START_KEYS) {
+    const min = key === "potCapacity" ? 0 : 1;
+    if (!Number.isInteger(start[key]) || start[key] < min) fail(`start.${key} doit être un entier >= ${min}.`);
+  }
+  if (start.handSize < start.firstTurnDraw) fail("start.handSize doit valoir au moins start.firstTurnDraw.");
+}
+
+// Le sac de départ (BAG_KINDS) : des billes connues ; un tirage possible.
+function validateStartingBag(bag, types, fail) {
+  if (bag === null || typeof bag !== "object" || !Object.hasOwn(BAG_KINDS, bag.kind)) fail(`sac (bag) de sorte inconnue "${bag?.kind}" (${Object.keys(BAG_KINDS).join(", ")}).`);
+  rejectUnknownFields(bag, BAG_KINDS[bag.kind].fields, `sac ${bag.kind}`, fail);
+  if (bag.kind === "list") {
+    if (!Array.isArray(bag.marbles)) fail("bag.marbles doit être une liste d'ids.");
+    for (const id of bag.marbles) {
+      if (!Object.hasOwn(types, id)) fail(`bille inconnue "${id}" dans le sac.`);
+    }
+    return;
+  }
+  if (!Number.isInteger(bag.size) || bag.size < 1) fail("bag.size doit être un entier >= 1.");
+  if (bag.maxCopies !== null && (!Number.isInteger(bag.maxCopies) || bag.maxCopies < 1)) fail("bag.maxCopies doit être un entier >= 1, ou null.");
+  const count = Object.keys(types).length;
+  if (bag.maxCopies !== null && bag.size > bag.maxCopies * count) fail(`${bag.size} billes impossibles avec ${bag.maxCopies} exemplaire(s) au plus de ${count} billes.`);
+}
+
+// Le registre des définitions : un objet { id: définition }, chaque définition
+// nommée par sa clé.
+export function validateGameDefinitions(definitions, types, statuses = NO_STATUSES) {
+  if (definitions === null || typeof definitions !== "object" || Array.isArray(definitions)) throw new Error("marbles : le registre des définitions est un objet { id: définition }.");
+  for (const [id, definition] of Object.entries(definitions)) {
+    if (definition?.id !== id) throw new Error(`marbles : la définition "${id}" doit porter son id ("${definition?.id}").`);
+    validateGameDefinition(definition, types, statuses);
   }
 }
 
 // Le contenu du jeu des billes, au démarrage (main.js, l'audit du contenu) : la
-// table des statuts, celle des billes, et les réglages avec le sac de test, qui ne
-// doit citer que des billes connues. Une erreur ici échouerait sinon en pleine partie.
-export function validateMarblesContent(types, statuses) {
+// table des statuts, celle des billes, et les définitions de partie, qui ne citent
+// que des billes et des statuts connus. Une erreur ici échouerait sinon en pleine
+// partie.
+export function validateMarblesContent(types, statuses, definitions) {
   validateMarbleStatuses(statuses);
   validateMarbleTypes(types, statuses);
-  validateGameSettings({ ...MARBLES_SETTINGS, bag: STARTING_BAG }, types);
+  validateGameDefinitions(definitions, types, statuses);
 }

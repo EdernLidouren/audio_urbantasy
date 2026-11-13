@@ -6,13 +6,14 @@
 // (`node tools/run-checks.js marbles`).
 
 import { auditNonSerializable, throws } from "../../lib/check.js";
-import { SLOTS, createMarblesGame, impactOf, legalActions, nextSlot, previousSlot, swapRefusal, placeRefusal, throwRefusal, throwsLeft } from "../core/marbles.js";
+import { SLOTS, impactOf, legalActions, nextSlot, previousSlot, swapRefusal, placeRefusal, throwRefusal, throwsLeft } from "../core/marbles.js";
 import { JOURNAL_EVENTS, buildMarbleKeywords, validateMarblePhases, validateMarbleTriggers } from "../core/content.js";
 import { validateMarbleTypes } from "../core/validation.js";
 import { MARBLE_PHASES, MARBLE_POCKET, MARBLE_TRIGGERS } from "../config/values.js";
 import { CLAUSE_ACTIONS, amountOf, printedStat } from "../core/effects.js";
-import { LARGE, MARBLE_SIZES, MARBLES_SETTINGS, MEDIUM, SMALL } from "../config/values.js";
-import { CHOICELESS_TYPES, FIXTURE_BAG, FIXTURE_SETTINGS, FIXTURE_TYPES, fixtureRules } from "./fixtures/marbles.js";
+import { LARGE, MARBLE_SIZES, MEDIUM, SMALL } from "../config/values.js";
+import { CHOICELESS_TYPES, FIXTURE_BAG, FIXTURE_DEFINITION, FIXTURE_TYPES, fixtureRules } from "./fixtures/marbles.js";
+import { turnLimit } from "../core/definitions.js";
 import { answerChoices, caughtMessage, deepFreeze, eventTypes, fabricatedRules, handIds, inHand, marbleCount, marblesPlayState, mustReduce, placed, playRandomMarblesGame, triangleOf, validateTable, withSizes } from "./helpers.js";
 
 // Les règles de la table des vérifications (marbles/checks/fixtures/marbles.js).
@@ -137,13 +138,16 @@ function checkSetup(run) {
   run.same("mise en place : triangle vide", triangleOf(null, null, null), game.triangle);
   run("mise en place : score 0", 0, game.score);
   run("mise en place : compteurs du tour", "0,1", `${game.speed},${game.mass}`);
-  run("réglages : main maximale dans l'état", FIXTURE_SETTINGS.maxHandSize, game.maxHandSize);
-  run("réglages : nombre de tours dans l'état", FIXTURE_SETTINGS.turnCount, game.turnCount);
+  run.same("définition : copiée dans l'état", FIXTURE_DEFINITION, game.definition);
+  run("définition : une copie, pas une référence", false, game.definition === FIXTURE_DEFINITION || game.definition.start === FIXTURE_DEFINITION.start);
+  run("définition : main de départ, caractéristique", FIXTURE_DEFINITION.start.handSize, rules.characteristic(game, "handSize"));
+  run("définition : nombre de tours", FIXTURE_DEFINITION.turns, turnLimit(game));
+  run("définition : l'état se sérialise", JSON.stringify(game), JSON.stringify(JSON.parse(JSON.stringify(game))));
 
   run("sac : bille inconnue refusée", true, throws(() => rules.createGame(1, { bag: ["aging_flick", "nope"] })));
-  run("réglages : première pioche plus petite que le triangle permise", 2, rules.createGame(1, { firstTurnDraw: 2 }).firstTurnDraw);
+  run("réglages : première pioche plus petite que le triangle permise", 2, rules.createGame(1, { firstTurnDraw: 2 }).definition.start.firstTurnDraw);
   run("réglages : première pioche nulle refusée", true, throws(() => rules.createGame(1, { firstTurnDraw: 0 })));
-  run("réglages : main plus petite que la première pioche refusée", true, throws(() => rules.createGame(1, { maxHandSize: 4 })));
+  run("réglages : main plus petite que la première pioche refusée", true, throws(() => rules.createGame(1, { handSize: 4 })));
   run("réglages : pioche par tour nulle refusée", true, throws(() => rules.createGame(1, { drawPerTurn: 0 })));
   const doubles = rules.createGame(1, { bag: ["aging_flick", "aging_flick", "aging_flick", "hit_polish", "hit_polish", "final_pocket"] });
   run("sac : doublons acceptés", 3, doubles.bag.filter((id) => id === "aging_flick").length);
@@ -379,14 +383,13 @@ function checkSwap(run) {
 // Les LANCERS : une pose depuis la main en est un, l'échange non ; la limite du
 // tour borne ce que le joueur peut enchaîner.
 function checkThrows(run) {
-  run("lancers : sans réglage donné, la limite des réglages du jeu", MARBLES_SETTINGS.throwsPerTurn, createMarblesGame(1, { bag: FIXTURE_BAG }, FIXTURE_TYPES).throwsPerTurn);
   run("lancers : une partie neuve n'en a joué aucun", 0, rules.createGame(1).throwsUsed);
-  run("lancers : la limite vient du réglage", 5, rules.createGame(1).throwsPerTurn);
-  run("lancers : un seul permis (plus de poses obligatoires au premier tour)", 1, rules.createGame(1, { throwsPerTurn: 1 }).throwsPerTurn);
-  run("lancers : zéro refusé", true, throws(() => rules.createGame(1, { throwsPerTurn: 0 })));
+  run("lancers : la limite vient de la définition", FIXTURE_DEFINITION.start.throws, rules.throwsLeft({ ...rules.createGame(1), stage: "play" }));
+  run("lancers : un seul permis (plus de poses obligatoires au premier tour)", 1, rules.characteristic(rules.createGame(1, { throws: 1 }), "throws"));
+  run("lancers : zéro refusé", true, throws(() => rules.createGame(1, { throws: 0 })));
 
   // Cinq poses, puis plus rien. Le sac de la main : six billes pour en avoir une de trop.
-  let state = playState({ hand: inHand(["aging_flick", "hit_polish", "final_pocket", "awaken_draw", "all_rounder"]), maxHandSize: 6, throwsPerTurn: 5 });
+  let state = playState({ hand: inHand(["aging_flick", "hit_polish", "final_pocket", "awaken_draw", "all_rounder"]), handSize: 6, throws: 5 });
   state = { ...state, hand: [...state.hand, ...inHand(["one_shot"])] };
   for (let count = 0; count < 5; count++) state = apply(state, { type: "place", handIndex: 0, slot: SLOTS[count % 3] }).state;
   run("lancers : cinq poses jouées", 5, state.throwsUsed);
@@ -488,7 +491,7 @@ function checkDrawEffects(run) {
     { type: "place", handIndex: 0, slot: "apex" }
   );
   run.same("tic qui pioche, main pleine après la pose : la pioche passe", ["draw", "awaken"], eventTypes(full.events).slice(-2));
-  const fuller = { ...playState({ hand: inHand(["split_base", "aging_flick", "hit_polish", "final_pocket", "all_rounder"]), maxHandSize: 4 }) };
+  const fuller = { ...playState({ hand: inHand(["split_base", "aging_flick", "hit_polish", "final_pocket", "all_rounder"]), handSize: 4 }) };
   const stopped = apply({ ...fuller, bag: [], discard: ["one_shot"], triangle: triangleOf(null, null, placed("base_pocket")) }, { type: "place", handIndex: 0, slot: "apex" });
   run.same("tic qui pioche, main pleine : arrêt sans régénération", ["effect", "drawSkipped"], eventTypes(stopped.events).slice(-2));
   run("tic qui pioche, main pleine : motif", "handFull", stopped.events.at(-1).reason);
@@ -1308,7 +1311,7 @@ function checkFlick(run) {
     counter: { flick: [{ action: "speed", amount: { base: 0, step: 1, source: { type: "activeSize", size: MEDIUM } } }] },
     plain: {},
   };
-  const drew = apply(playState({ maxHandSize: 1, hand: inHand(["drawer"]), bag: ["plain"] }), toApex, ghost);
+  const drew = apply(playState({ handSize: 1, hand: inHand(["drawer"]), bag: ["plain"] }), toApex, ghost);
   run.same("chiquenaude : hors de la main, sa Pioche passe dans une main d'une place", ["plain"], handIds(drew.state));
   const alone = apply(playState({ hand: inHand(["counter"]) }), toApex, ghost);
   run("chiquenaude : hors des billes actives, elle ne se compte pas", 0, effectOf(alone, "flick").speedDelta);
@@ -1599,14 +1602,16 @@ function pickTotals(result) {
 
 function checkEndOfGame(run) {
   // Après le dernier tour.
-  const lastTurn = apply(playState({ turn: 10, turnCount: 10, score: 3, triangle: triangleOf(placed("aging_flick"), null, null) }), { type: "resolve" });
+  const lastTurn = apply(playState({ turn: 10, turns: 10, score: 3, triangle: triangleOf(placed("aging_flick"), null, null) }), { type: "resolve" });
   run("fin : après le dernier tour", "over", lastTurn.state.stage);
   run("fin : le tour reste au dernier", 10, lastTurn.state.turn);
-  run.same("fin : dernier du journal", { type: "gameOver", score: 4 }, lastTurn.events.at(-1));
-  run("fin : le nombre de tours vient des réglages", 10, rules.createGame(1).turnCount);
-  const shortGame = apply(playState({ turn: 3, turnCount: 3, triangle: triangleOf(placed("aging_flick"), null, null) }), { type: "resolve" });
+  run.same("fin : dernier du journal", { type: "gameOver", score: 4, result: { goal: "free", end: "lastTurn", score: 4, tier: "none" } }, lastTurn.events.at(-1));
+  run.same("fin : le résultat dans l'état", lastTurn.events.at(-1).result, lastTurn.state.result);
+  run("fin : pas de résultat en cours de partie", null, rules.createGame(1).result);
+  run("fin : le nombre de tours vient de la définition", 10, turnLimit(rules.createGame(1)));
+  const shortGame = apply(playState({ turn: 3, turns: 3, triangle: triangleOf(placed("aging_flick"), null, null) }), { type: "resolve" });
   run("fin : un nombre de tours réglé, la fin suit", "over", shortGame.state.stage);
-  run("fin : avant le dernier tour, la partie continue", "draw", apply(playState({ turn: 9, turnCount: 10 }), { type: "resolve" }).state.stage);
+  run("fin : avant le dernier tour, la partie continue", "draw", apply(playState({ turn: 9, turns: 10 }), { type: "resolve" }).state.stage);
   run.same("fin : la rotation et la fin du tour ont lieu avant", ["rotation", "turnEnded"], eventTypes(lastTurn.events).slice(-3, -1));
   run("fin : plus aucune action", "gameOver", rules.reduce(lastTurn.state, { type: "draw" }).error);
   run("fin : plus de résolution", "gameOver", rules.reduce(lastTurn.state, { type: "resolve" }).error);
@@ -1627,10 +1632,19 @@ function checkEndOfGame(run) {
   run.same("sac et défausse vides : journal", ["turnStarted", "drawSkipped"], eventTypes(empty.events));
   run("sac et défausse vides : arrêt annoncé", "noMarbles", empty.events[1].reason);
   run("sac et défausse vides : la main se joue", null, placeRefusal(empty.state, 0, "apex"));
-  // Plus aucune bille nulle part : chaque tour se résout à vide jusqu'au dernier.
-  const nothing = apply({ ...playState({ turn: 10, turnCount: 10, hand: inHand([]), bag: [], discard: [] }), stage: "draw" }, { type: "draw" });
-  run("plus aucune bille : le tour se joue quand même", "play", nothing.state.stage);
-  run("plus aucune bille : la résolution du dernier tour finit la partie", "over", apply(nothing.state, { type: "resolve" }).state.stage);
+  // PIOCHE IMPOSSIBLE : plus aucune bille à jouer (main, triangle, sac, défausse vides)
+  // après la pioche du début de tour ; la partie s'arrête, le tour n'est pas joué. Le
+  // pot ne compte pas : ses billes ne se jouent plus.
+  const nothing = apply({ ...playState({ turn: 4, hand: inHand([]), bag: [], discard: [], pot: ["aging_flick"] }), stage: "draw" }, { type: "draw" });
+  run("pioche impossible : la partie s'arrête", "over", nothing.state.stage);
+  run.same("pioche impossible : journal", ["turnStarted", "drawSkipped", "gameOver"], eventTypes(nothing.events));
+  run("pioche impossible : la condition de fin", "noMarbles", nothing.state.result.end);
+  run("pioche impossible : le tour reste celui qui n'a pas été joué", 4, nothing.state.turn);
+  const lastOne = apply({ ...playState({ hand: inHand([]), bag: [], discard: [], triangle: triangleOf(placed("aging_flick"), null, null) }), stage: "draw" }, { type: "draw" });
+  run("une bille sur le triangle : le tour se joue", "play", lastOne.state.stage);
+  const inDiscard = apply({ ...playState({ hand: inHand([]), bag: [], discard: ["aging_flick"] }), stage: "draw" }, { type: "draw" });
+  run("une bille à la défausse : régénérée et piochée, le tour se joue", "play", inDiscard.state.stage);
+  // Une pioche ratée parce que la main est pleine n'arrête rien.
 
   // Une seule bille piochée sur trois : la partie continue.
   const partial = apply({ ...playState({ hand: inHand([]), bag: ["hit_polish"], discard: [], drawPerTurn: 3 }), stage: "draw" }, { type: "draw" });
@@ -1642,10 +1656,10 @@ function checkEndOfGame(run) {
   run("main pleine, rien à piocher : la partie continue", "play", full.state.stage);
   run("main pleine, rien à piocher : motif de l'arrêt", "handFull", full.events[1].reason);
 
-  // Plus de sac minimal : un sac plus petit que le triangle se joue, un sac vide
-  // aussi, à vide.
+  // Plus de sac minimal : un sac plus petit que le triangle se joue ; un sac vide finit
+  // la partie dès la première pioche, faute de billes.
   run("sac de 2 billes : la partie se joue", "play", apply(rules.createGame(1, { bag: ["aging_flick", "hit_polish"] }), { type: "draw" }).state.stage);
-  run("sac vide : la partie se joue, à vide", "play", apply(rules.createGame(1, { bag: [] }), { type: "draw" }).state.stage);
+  run("sac vide : la partie s'arrête à la première pioche", "noMarbles", apply(rules.createGame(1, { bag: [] }), { type: "draw" }).state.result?.end);
 }
 
 // Une partie complète, décisions fixes : toujours la première bille sur les
@@ -1675,7 +1689,7 @@ function checkDeterminism(run) {
   const b = scriptedGame(1234);
   run.same("déterminisme : même journal", a.journal, b.journal);
   run.same("déterminisme : même état final", a.state, b.state);
-  run("partie complète : tous les tours joués", a.state.turnCount, a.journal.filter((event) => event.type === "turnStarted").length);
+  run("partie complète : tous les tours joués", turnLimit(a.state), a.journal.filter((event) => event.type === "turnStarted").length);
   run("partie complète : finie", "over", a.state.stage);
   run("partie complète : billes conservées", FIXTURE_BAG.length, marbleCount(a.state));
   run("autre graine : autre partie", false, JSON.stringify(a.journal) === JSON.stringify(scriptedGame(1235).journal));

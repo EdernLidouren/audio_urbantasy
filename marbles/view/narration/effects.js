@@ -68,7 +68,7 @@ export function sizeName(size, t) {
 
 // La référence au nom d'un calibre, pour un gabarit qui en choisit la forme
 // (« un calot », « par minibille active »).
-function sizeRef(size) {
+export function sizeRef(size) {
   return nameRef(`marbles.size.${MARBLE_SIZES[size]}.name`);
 }
 

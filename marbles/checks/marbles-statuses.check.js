@@ -13,9 +13,11 @@ import { throws } from "../../lib/check.js";
 import { applyStatus as gain, crack, draw, mass, polish, speed } from "../content/effects.js";
 import { validateMarbleStatuses } from "../core/validation.js";
 import { CONDITIONS } from "../core/effects.js";
-import { applyStatus, characteristic } from "../core/statuses.js";
-import { FIXTURE_STATUSES } from "./fixtures/marbles.js";
-import { caughtMessage, eventTypes, fabricatedRules, forecastMatches, inHand, marblesPlayState, mustReduce, placed, statusInstance, triangleOf, validateTable } from "./helpers.js";
+import { applyStatus, characteristic, modifyQuantity, modifyStat, ruleInstance } from "../core/statuses.js";
+import { passesFilters } from "../core/effects.js";
+import { LARGE, SMALL } from "../config/values.js";
+import { FIXTURE_STATUSES, fixtureRules } from "./fixtures/marbles.js";
+import { caughtMessage, eventTypes, fabricatedRules, withSizes, forecastMatches, inHand, marblesPlayState, mustReduce, placed, statusInstance, triangleOf, validateTable } from "./helpers.js";
 
 // Une instance de statut posée à la main (helpers.js).
 const instance = statusInstance;
@@ -67,6 +69,8 @@ export default function checkMarblesStatuses(run) {
   run.section("instances et cumuls", checkInstances);
   run.section("caractéristiques", checkCharacteristics);
   run.section("modificateurs", checkModifiers);
+  run.section("filtres de source et arrondi", checkSourceFilters);
+  run.section("verrous", checkLocks);
   run.section("réactions", checkReactions);
   run.section("durées", checkDurations);
   run.section("quantités", checkQuantities);
@@ -191,7 +195,13 @@ function checkDefinitions(run) {
   run("refus : opération inconnue", true, modifier({ operation: "power" }).includes("opération"));
   run("refus : multiplier par 1", true, modifier({ operation: "multiply", value: 1 }).includes("multiplicateur"));
   run("refus : multiplier par un négatif", true, modifier({ operation: "multiply", value: -2 }).includes("multiplicateur"));
-  run("refus : ajouter 0", true, modifier({ value: 0 }).includes("ajouter 0"));
+  run("refus : ajouter 0", true, modifier({ value: 0 }).includes("entier non nul"));
+  run("refus : ajouter une fraction", true, modifier({ value: 0.5 }).includes("entier non nul"));
+  run("multiplier par 0,5 permis", "", modifier({ operation: "multiply", value: 0.5 }));
+  run("filtre de source permis sur un gain", "", modifier({ filters: [{ type: "size", size: LARGE }] }));
+  run("refus : filtre de source sur l'Impact (jamais de source)", true, modifier({ point: "impact", filters: [{ type: "size", size: LARGE }] }).includes("source"));
+  run("refus : filtre inconnu", true, modifier({ filters: [{ type: "matter" }] }).includes("filtre"));
+  run("refus : filtres vides", true, modifier({ filters: [] }).includes("filters"));
   const reaction = (behavior) => refused({ ...ok, behaviors: [{ type: "reaction", on: "flick", effect: [speed(1)], ...behavior }] });
   run("refus : réagir à une valeur qui ne s'écoute pas", true, reaction({ on: "speedGained" }).includes("écoutable"));
   run("refus : une réaction sur la bille elle-même", true, reaction({ effect: [{ action: "polish", amount: 1 }] }).includes("bille elle-même"));
@@ -303,6 +313,108 @@ function checkCharacteristics(run) {
   const drawer = fabricatedRules({ ...TABLE, drawer: { flick: [{ action: "draw", amount: 2 }] } });
   const shrunk = mustReduce(drawer, { ...game({ hand: inHand(["drawer", "plain", "plain", "plain"]), bag: ["plain", "plain"] }), statuses: [instance("hand_shrink")] }, toApex);
   run("main réduite à 3 : pleine à 3, la pioche est sautée", "handFull", shrunk.events.find((event) => event.type === "drawSkipped")?.reason);
+}
+
+// LES FILTRES SUR LA SOURCE : un modificateur filtré ne touche que les valeurs
+// produites par une bille qui passe ses filtres ; jamais une valeur sans source.
+// L'ARRONDI : vers zéro, à la fin.
+function checkSourceFilters(run) {
+  const statuses = {
+    gravel: {
+      stacking: "unique",
+      duration: { kind: "game" },
+      behaviors: [
+        { type: "modifier", point: "speedGain", operation: "multiply", value: 0.5, filters: [{ type: "size", size: LARGE }] },
+        { type: "modifier", point: "massGain", operation: "multiply", value: 0.5, filters: [{ type: "size", size: LARGE }] },
+      ],
+    },
+    halfDraw: { stacking: "unique", duration: { kind: "game" }, behaviors: [{ type: "modifier", point: "turnDraw", operation: "multiply", value: 0.5 }] },
+    halfCharge: { stacking: "duration", duration: { kind: "charges", count: 2 }, behaviors: [{ type: "modifier", point: "speedGain", operation: "multiply", value: 0.5 }] },
+    thrownBoost: { stacking: "unique", duration: { kind: "game" }, behaviors: [{ type: "reaction", on: "thrownMarbles", effect: [speed(3)] }] },
+  };
+  const types = withSizes({ big: { size: LARGE, base: [speed(3), mass(3)], apex: [speed(3), mass(3)] }, small: { size: SMALL, base: [speed(3), mass(3)], apex: [speed(3), mass(3)] }, plain: {} });
+  const source = (marble) => ({ marble, matches: (filters) => passesFilters(marble, filters, types) });
+  const gravel = [instance("gravel", { remaining: null })];
+  run("filtre : la bille filtrée, modifiée (3 × 0,5 arrondi vers zéro)", 1, modifyStat(gravel, statuses, "speed", 3, source("big")).value);
+  run("filtre : une autre bille, intacte", 3, modifyStat(gravel, statuses, "speed", 3, source("small")).value);
+  run("filtre : sans source, intacte", 3, modifyStat(gravel, statuses, "speed", 3).value);
+  run("filtre : une perte n'est pas un gain", -3, modifyStat(gravel, statuses, "speed", -3, source("big")).value);
+  run("arrondi : 1 × 0,5 donne 0", 0, modifyStat(gravel, statuses, "speed", 1, source("big")).value);
+  run("arrondi : 5 × 0,5 donne 2", 2, modifyStat(gravel, statuses, "mass", 5, source("big")).value);
+  run("arrondi : jamais −0", true, Object.is(modifyStat(gravel, statuses, "speed", 1, source("big")).value, 0));
+  run("arrondi : une quantité aussi, 5 × 0,5 donne 2", 2, modifyQuantity([instance("halfDraw", { remaining: null })], statuses, "turnDraw", 5).value);
+  // Une charge ne se consomme que si la valeur ARRONDIE change : 1 × 0,5 donne 0, elle
+  // change ; aucun changement, aucune charge.
+  run.same("arrondi : un pas qui change la valeur arrondie compte", ["halfCharge"], modifyStat([instance("halfCharge", { remaining: 2 })], statuses, "speed", 1).changed);
+  // En partie : la Vitesse et la Masse de la grosse bille divisées, pas celles de la petite.
+  const made = fixtureRules(types, statuses);
+  const resolved = (marble) =>
+    mustReduce(made, marblesPlayState(made, { triangle: triangleOf(placed(marble), null, null), statuses: gravel }), { type: "resolve" }).events.find((event) => event.type === "effect");
+  run.same("en partie : le calot filtré, Vitesse et Masse divisées", [1, 1], ((effect) => [effect.speedDelta, effect.massDelta])(resolved("big")));
+  run.same("en partie : l'autre bille, intacte", [3, 3], ((effect) => [effect.speedDelta, effect.massDelta])(resolved("small")));
+  // Une valeur produite par un statut (sa réaction) n'a pas de bille source.
+  const reacted = mustReduce(made, marblesPlayState(made, { hand: inHand(["big"]), statuses: [...gravel, instance("thrownBoost", { remaining: null })] }), toApex);
+  run("en partie : la réaction d'un statut, sans source, intacte", 3, reacted.events.find((event) => event.type === "effect" && event.trigger === "statusReaction").speedDelta);
+}
+
+// LES VERROUS : une action du joueur refusée, avec son statut ; un déclencheur ou le
+// pot réduits au silence, leurs compteurs immobiles ; jamais proposés aux joueurs
+// automatiques ; la prévision en tient compte.
+function checkLocks(run) {
+  const refusedBehavior = (behavior) => caughtMessage(() => validateMarbleStatuses({ x: { stacking: "unique", duration: { kind: "game" }, behaviors: [behavior] } }));
+  run("validation : verrou inconnu", true, refusedBehavior({ type: "lock", lock: "eject" }).includes("verrou inconnu"));
+  run("validation : déclencheur inconnu", true, refusedBehavior({ type: "lock", lock: "trigger", trigger: "nope" }).includes("déclencheur inconnu"));
+  run("validation : champ en trop", true, refusedBehavior({ type: "lock", lock: "swap", trigger: "flick" }) !== "");
+  run("validation : un verrou de déclencheur valide", "", refusedBehavior({ type: "lock", lock: "trigger", trigger: "final" }));
+
+  const made = fixtureRules();
+  const play = (over, statuses) => ({ ...marblesPlayState(made, over), statuses });
+  const lockedBy = (status) => [statusInstance(status, { remaining: status === "no_swap" ? 1 : null })];
+
+  // L'échange.
+  const swapState = play({ triangle: triangleOf(placed("aging_flick"), null, null) }, lockedBy("no_swap"));
+  run("échange : refusé par le verrou", "swapLocked", made.swapRefusal(swapState));
+  const swapped = made.reduce(swapState, { type: "swap", a: "leftBase", b: "apex" });
+  run.same("échange : le réducteur refuse et nomme le statut", { ok: false, error: "swapLocked", lockedBy: { status: "no_swap", rule: false } }, { ok: swapped.ok, error: swapped.error, lockedBy: swapped.lockedBy });
+  run("échange : jamais proposé", false, made.legalActions(swapState).some((action) => action.type === "swap"));
+  const asRule = { ...swapState, statuses: [ruleInstance("no_replacement"), statusInstance("no_swap", { remaining: 1 })] };
+  run("échange : un autre verrou ne l'interdit pas", "swapLocked", made.swapRefusal(asRule));
+  run("échange : sans verrou, permis", null, made.swapRefusal({ ...swapState, statuses: [] }));
+
+  // Le remplacement.
+  const placeState = play({ hand: inHand(["hit_polish"]), triangle: triangleOf(placed("aging_flick"), null, null) }, [ruleInstance("no_replacement")]);
+  run("remplacement : refusé sur un emplacement occupé", "replacementLocked", made.placeRefusal(placeState, 0, "leftBase"));
+  run("remplacement : une pose sur un vide permise", null, made.placeRefusal(placeState, 0, "apex"));
+  run.same("remplacement : le refus nomme la règle", { status: "no_replacement", rule: true }, made.reduce(placeState, { type: "place", handIndex: 0, slot: "leftBase" }).lockedBy);
+  run("remplacement : jamais proposé", false, made.legalActions(placeState).some((action) => action.type === "place" && action.slot === "leftBase"));
+  run("un autre refus ne nomme aucun statut", undefined, made.reduce(placeState, { type: "draw" }).lockedBy);
+
+  // Un déclencheur désactivé : l'évènement réel a lieu, l'effet ne joue pas, son
+  // compteur ne bouge pas, rien n'y réagit (la bille du pot qui écoute les chiquenaudes).
+  const flickState = play({ hand: inHand(["fragile"]), pot: ["all_rounder"] }, lockedBy("no_flick"));
+  const thrown = mustReduce(made, flickState, toApex);
+  run("déclencheur désactivé : la bille est lancée", true, thrown.events.some((event) => event.type === "flick"));
+  run("déclencheur désactivé : son effet ne joue pas", false, thrown.events.some((event) => event.type === "effect" && event.trigger === "flick"));
+  run("déclencheur désactivé : son compteur immobile", 0, thrown.state.tally.flick.game);
+  run("déclencheur désactivé : les billes lancées comptent", 1, thrown.state.tally.thrownMarbles.game);
+  run("déclencheur désactivé : rien n'y réagit", false, thrown.events.some((event) => event.type === "pocketReaction"));
+  const free = mustReduce(made, { ...flickState, statuses: [] }, toApex);
+  run("sans verrou : l'effet joue et le pot réagit", true, free.events.some((event) => event.type === "effect" && event.trigger === "flick") && free.events.some((event) => event.type === "pocketReaction"));
+  run("prévision : le déclencheur désactivé compris", true, forecastMatches(made, flickState, toApex));
+
+  // Le pot inactif : ni étape du pot, ni entrée, ni réaction ; les billes y entrent.
+  const potState = play({ triangle: triangleOf(placed("aging_flick"), null, null), pot: ["final_pocket", "base_pocket"] }, lockedBy("no_pot"));
+  const resolved = mustReduce(made, potState, { type: "resolve" });
+  run("pot inactif : aucune étape du pot", false, resolved.events.some((event) => event.type === "potResolution"));
+  run("pot inactif : aucun compteur", 0, resolved.state.tally.pocketResolution.game);
+  run("pot actif : son étape", true, mustReduce(made, { ...potState, statuses: [] }, { type: "resolve" }).events.some((event) => event.type === "potResolution"));
+  const pocketing = fixtureRules(withSizes({ pocketer: { flick: [{ action: "pocket", target: "firstInHand" }] }, entrant: { pocketed: { entry: [speed(5)] } } }));
+  const enteringState = { ...marblesPlayState(pocketing, { hand: inHand(["pocketer", "entrant"]) }), statuses: lockedBy("no_pot") };
+  const entering = mustReduce(pocketing, enteringState, toApex);
+  run("pot inactif : la bille y entre", true, entering.state.pot.includes("entrant"));
+  run("pot actif : son effet à l'entrée", true, mustReduce(pocketing, { ...enteringState, statuses: [] }, toApex).events.some((event) => event.type === "effect" && event.trigger === "pocketEntry"));
+  run("pot inactif : pas d'effet à l'entrée", false, entering.events.some((event) => event.type === "effect" && event.trigger === "pocketEntry"));
+  run("prévision : le pot inactif compris", true, forecastMatches(made, potState, null));
 }
 
 function checkModifiers(run) {

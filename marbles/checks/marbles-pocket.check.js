@@ -6,10 +6,10 @@
 // Lancées par core/checks/index.js/runChecks (`node tools/run-checks.js marbles-pocket`).
 
 import { throws } from "../../lib/check.js";
-import { createMarblesGame, impactOf } from "../core/marbles.js";
+import { impactOf } from "../core/marbles.js";
 import { validatePocketMoments } from "../core/content.js";
-import { MARBLE_POCKET, MARBLES_SETTINGS } from "../config/values.js";
-import { CHOICELESS_TYPES, FIXTURE_BAG, FIXTURE_TYPES, fixtureRules } from "./fixtures/marbles.js";
+import { MARBLE_POCKET } from "../config/values.js";
+import { CHOICELESS_TYPES, FIXTURE_BAG, FIXTURE_DEFINITION, FIXTURE_TYPES, fixtureRules } from "./fixtures/marbles.js";
 import { caughtMessage, eventTypes, fabricatedRules, handIds, inHand, marbleCount, marblesPlayState, mustReduce, placed, triangleOf, validateTable } from "./helpers.js";
 
 // Les règles de la table des vérifications (marbles/checks/fixtures/marbles.js).
@@ -53,10 +53,10 @@ function checkPocket(run) {
   const everywhere = (state) => marbleCount(state);
 
   // Sans réglage donné, la capacité est celle des réglages du jeu.
-  run("pot : capacité par défaut, celle des réglages", MARBLES_SETTINGS.potCapacity, createMarblesGame(1, { bag: FIXTURE_BAG }, FIXTURE_TYPES).potCapacity);
+  run("pot : capacité de départ, celle de la définition", FIXTURE_DEFINITION.start.potCapacity, rules.characteristic(rules.createGame(1), "potCapacity"));
   run.same("pot : vide en début de partie, aucune bille perdue", { pot: [], lost: [] }, (({ pot, lost }) => ({ pot, lost }))(rules.createGame(1)));
   run("pot : capacité négative refusée", true, throws(() => rules.createGame(1, { potCapacity: -1 })));
-  run("pot : capacité nulle permise", 0, rules.createGame(1, { potCapacity: 0 }).potCapacity);
+  run("pot : capacité nulle permise", 0, rules.characteristic(rules.createGame(1, { potCapacity: 0 }), "potCapacity"));
 
   // Depuis la main : le Tic de hit_pocket empoche la première bille de la main ; la
   // fragile entre, puis son effet d'entrée.
@@ -96,7 +96,7 @@ function checkPocket(run) {
   run.same("pot plein : pot inchangé, la bille chez les perdues", { pot: ["aging_flick", "hit_polish", "awaken_draw"], lost: ["fragile"] }, { pot: full.state.pot, lost: full.state.lost });
   run("pot plein : ni entrée ni Vitesse +10", 4, full.state.speed);
   const zero = apply(
-    { ...playState({ hand: inHand(["hit_pocket", "fragile"]), triangle: triangleOf(null, null, placed("aging_flick")) }), potCapacity: 0 },
+    playState({ hand: inHand(["hit_pocket", "fragile"]), triangle: triangleOf(null, null, placed("aging_flick")), potCapacity: 0 }),
     { type: "place", handIndex: 0, slot: "apex" }
   );
   run.same("pot de capacité nulle : toute bille empochée est perdue", [], zero.state.pot);
@@ -156,7 +156,7 @@ function checkPocket(run) {
   run.same(
     "Empocher, Éveil : depuis la main, puis la bille n'est plus là",
     ["draw:waker", "awaken:waker", "effect:awaken:waker", "pocketed:waker:hand", "targetEmpty:pocket:self"],
-    journal(awoken.events).slice(1)
+    journal(awoken.events).slice(1, 6)
   );
   run.same("Empocher, Éveil : la main vide, la bille au pot", { pot: ["waker"], hand: [] }, { pot: awoken.state.pot, hand: handIds(awoken.state) });
 

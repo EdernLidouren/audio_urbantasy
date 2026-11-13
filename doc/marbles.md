@@ -11,8 +11,9 @@ Le jeu des billes a son arbre à lui, `marbles/`, avec les mêmes règles que le
 vérifications) et `tools/` (sa boîte à outils). Il ne dépend du jeu principal que
 par `lib/` (dont le PRNG seedé, `lib/rng.js`), les textes (`data/i18n/*/marbles.json`),
 les sons (`assets/`), et quelques briques de la vue (sons de menu, confirmation,
-volumes). `main.js` le compose (les règles liées aux tables des billes et des statuts)
-et l'ouvre depuis le menu principal.
+volumes). `main.js` le compose (les règles liées aux tables des billes, des statuts et
+des définitions de partie) et l'ouvre depuis le menu principal, sur la définition par
+défaut.
 
 **Deux documents, deux rôles.** Les règles telles que le joueur les vit (le tour, la
 pioche, le pot, les choix, les statuts) sont dans `doc/marbles-rules.md`, et seulement
@@ -28,31 +29,34 @@ l'en-tête de `marbles/core/marbles.js`.
 | Fichier | Rôle |
 |---|---|
 | `marbles/content/types/` | Les billes, une par fichier, et leur registre `index.js` (donnée pure) |
-| `marbles/content/statuses/` | Les statuts, un par fichier, et leur registre `index.js` (donnée pure) |
+| `marbles/content/statuses/` | Les statuts, un par fichier, et leur registre `index.js` (donnée pure) ; les règles de partie en sont |
+| `marbles/content/definitions/` | Les définitions de partie, une par fichier, leur registre `index.js` et la définition que lance le jeu (`DEFAULT_DEFINITION`) (donnée pure) |
 | `marbles/content/effects.js` | Les formes courtes des clauses : une par action (`speed(n)`, `pocket(cible?)`, `applyStatus(id, { intensity, duration })`…), les cibles (`NEXT_SLOT`, `FIRST_IN_HAND`, `nextInBag(n)`, `choice({ zones, count, mode })`, `allActive(...filtres)`…), les sources des montants calculés et les conditions ; la liste est le fichier lui-même |
-| `marbles/config/values.js` | Réglages, phases, déclencheurs, mot-clé En poche, valeurs de partie, modèles de fiche (billes et statuts), sac de test, sons (donnée pure) |
+| `marbles/config/values.js` | Réglages, valeurs de la partie par défaut (`DEFAULT_GAME`), phases, déclencheurs, mot-clé En poche, valeurs de partie, modèles de fiche (billes et statuts), sac de test, sons (donnée pure) |
 | `marbles/core/zones.js` | Les zones : les emplacements et l'ordre horaire (`SLOTS`, `nextSlot`, `previousSlot`), les zones de la partie et leurs états (`GAME_ZONES`, `ZONE_STATES`), celles d'un choix (`CHOICE_ZONES`), celles de la bille qui joue un effet (`HOLDER_ZONES`, `NO_REFERENCE_ZONES`) |
-| `marbles/core/statuses.js` | Les statuts : leur modèle, les caractéristiques en vigueur (l'accès unique), les modificateurs de valeur, le cumul, les durées, les réactions |
+| `marbles/core/definitions.js` | Les définitions de partie : leur modèle, le sac de départ (liste ou tirage, `randomBag`), les objectifs (`GOALS`), les conditions de fin (`END_CONDITIONS`, `endReached`), le résultat (`gameResult`) |
+| `marbles/core/statuses.js` | Les statuts : leur modèle, les caractéristiques en vigueur (l'accès unique), les modificateurs de valeur (filtres de source, arrondi), les verrous (`LOCKS`), les règles (`ruleInstance`), le cumul, les durées, les réactions |
 | `marbles/core/effects.js` | Le modèle d'effet : clauses, actions (`CLAUSE_ACTIONS`), cibles, conditions, sources de montant, effet imprimé, la bille inconnue de la prévision (`UNKNOWN_MARBLE`) |
 | `marbles/core/counters.js` | Les compteurs des valeurs de partie : générés (mots-clés, actions, Vitesse et Masse) et déclarés (évènements réels) |
 | `marbles/core/tally.js` | Le registre des valeurs de partie : le seul à les écrire, et leur lecture publique |
 | `marbles/core/content.js` | Le catalogue : ce que la partie sait des déclarations avant de jouer (leur validation à son chargement : déclencheurs, phases, moments En poche), les valeurs de partie et les clés écoutables, les mots-clés, les statuts qu'une bille applique, l'usure maximale (`maxWearOf`), les types d'évènements du journal (décrits dans son en-tête) |
-| `marbles/core/validation.js` | La validation des tables injectées : billes (`validateMarbleTypes`), statuts (`validateMarbleStatuses`), réglages d'une partie (`validateGameSettings`), contenu du jeu au démarrage (`validateMarblesContent`) |
+| `marbles/core/validation.js` | La validation des tables injectées : billes (`validateMarbleTypes`), statuts (`validateMarbleStatuses`), définitions de partie (`validateGameDefinition`, `validateGameDefinitions`), contenu du jeu au démarrage (`validateMarblesContent`) |
 | `marbles/core/bus.js` | Le bus d'évènements interne à la simulation |
 | `marbles/core/path.js` | Le chemin des billes : tout départ, déclencheur de sortie, destination et arrivée (`travel`, `arrive`, `redirect`), les déplacements des actions, l'éjection (`ejectFromSlot`), le retrait par usure (`retireMarble`), la place libre en main (`handRoom`) |
 | `marbles/core/choices.js` | Les cibles au choix : les cibles valides par zone, le choix lui-même (`chooseTargets`, qui suspend l'action par `ChoiceSuspension`), la réponse rejouée (`answerOf`), le refus d'une réponse (`chooseRefusal`), la forme publique d'une cible (`targetRef`) |
 | `marbles/core/run.js` | Le déroulé d'une action : bus et écouteurs, effets des billes, réactions (le pot, les statuts), valeurs passées par les statuts (`intercept`, `noteModification`), actions sur une bille, pioche, journal |
 | `marbles/core/marbles.js` | Le réducteur : état, mise en place, refus et codes de refus, actions (pioche du tour, échange, pose, résolution, choix) ; son en-tête porte la carte des modules du core |
 | `marbles/core/forecast.js` | La prévision : le vrai moteur sur une copie à l'aveugle (`blindCopy`) |
-| `marbles/core/rules.js` | Les règles liées aux tables des billes et des statuts : le point d'entrée de la simulation hors du core |
+| `marbles/core/rules.js` | Les règles liées aux tables des billes, des statuts et des définitions : le point d'entrée de la simulation hors du core |
 | `marbles/view/screen.js` | L'écran de jeu et sa table de touches |
 | `marbles/view/card-menu.js` | Le menu horizontal à fiches, commun aux menus des piles et à celui des statuts |
 | `marbles/view/pile-screen.js` | Le menu d'une pile de billes : sac, défausse ou pot (Maj+S, Maj+D, Maj+P) |
 | `marbles/view/status-screen.js` | Le menu des statuts de la partie (Maj+A) |
+| `marbles/view/goal-screen.js` | Le menu de l'objectif et des règles (Maj+O) |
 | `marbles/view/card.js` | La fiche d'une bille, lue dans le modèle `MARBLE_CARD_MODEL` |
 | `lib/detail-card.js` | Le mécanisme générique des fiches : assemblage et curseur secondaire |
 | `lib/real-time.js` | L'horloge temps réel à deux moteurs (images et minuterie) de l'écran |
-| `marbles/view/narration.js` | Ce qui se dit, à partir de l'état, du journal et de la prévision (pur), point d'entrée de ses modules (`marbles/view/narration/`) : `effects.js` (vocabulaire, effets joués, prévus et imprimés), `focus.js` (lignes de curseur et d'état), `forecast.js` (confirmation d'une pose, vue d'ensemble R), `journal.js` (étapes du journal, question d'un choix), `statuses.js` (les statuts : étiquette, touche A, fiche, aide E) |
+| `marbles/view/narration.js` | Ce qui se dit, à partir de l'état, du journal et de la prévision (pur), point d'entrée de ses modules (`marbles/view/narration/`) : `effects.js` (vocabulaire, effets joués, prévus et imprimés), `focus.js` (lignes de curseur et d'état), `forecast.js` (confirmation d'une pose, vue d'ensemble R), `journal.js` (étapes du journal, question d'un choix), `statuses.js` (les statuts : étiquette, touche A, fiche, aide E, texte d'un refus de verrou), `goal.js` (l'objectif et les règles : ouverture, touche O, fiches du menu Maj+O, résultat) |
 | `marbles/view/resolution.js` | La présentation de la résolution : sa séquence, la résolution qu'un choix interrompt, la garde après un saut |
 | `marbles/view/sequence.js` | La file d'étapes de la séquence de résolution et ses pauses (pur) |
 | `marbles/view/history.js` | L'historique : les messages de jeu du tour précédent (pur) |
@@ -101,10 +105,10 @@ simulation (`marbles/core/marbles.js`) :
   `drawTurn` : `turnStarted`, l'activation des statuts en attente, un tour de plus au
   compteur des billes déjà en main, puis la pioche, `firstTurnDraw` billes au premier
   tour et `drawPerTurn` ensuite, passée par les statuts) ; `"play"`, l'échange (`swap`),
-  les poses (`place`) et la résolution (`resolve`) ; `"over"`, la partie finie. Les
-  réglages sont dans `MARBLES_SETTINGS` (`marbles/config/values.js`).
+  les poses (`place`) et la résolution (`resolve`) ; `"over"`, la partie finie. Ces
+  valeurs viennent de la définition de la partie (voir « Définitions de partie »).
 - **Les lancers** : `throwsUsed` compte les poses du tour, bornées par la
-  caractéristique « lancers » en vigueur (`throwsPerTurn`, plus les statuts). Lancers
+  caractéristique « lancers » en vigueur (`throws` de la définition, plus les statuts). Lancers
   épuisés : `noThrowsLeft`, que l'écran oppose dès la prise de la bille
   (`rules.throwRefusal`). Pourquoi une limite : une boucle pilotée par le joueur (un
   Tic qui pioche à chaque pose, par exemple) est faite d'actions du joueur, que la
@@ -115,9 +119,10 @@ simulation (`marbles/core/marbles.js`) :
   compris.
 - **La résolution** (`resolveTurn`) : les phases (`resolvePhases` : l'effet, puis
   l'usure de phase, passée par les statuts), l'étape du pot (`potResolution`), les
-  retraits par usure, l'Impact (`impactOf`, ses planchers, puis les statuts), la
-  rotation (`rotation`), la fin des statuts comptés en tours (sauf au dernier tour),
-  `turnEnded`, puis `gameOver` ou le tour suivant, à l'étape `"draw"`. Les retraits
+  retraits par usure, l'Impact (`impactOf`, ses planchers, puis les statuts), le palier
+  franchi (`tierReached`, partie libre), les conditions de fin d'après l'Impact, la
+  rotation (`rotation`), la fin des statuts comptés en tours (sauf si la partie
+  s'arrête), `turnEnded`, puis `gameOver` ou le tour suivant, à l'étape `"draw"`. Les retraits
   passent avant l'Impact : ce qu'ils déclenchent compte pour le tour. La résolution ne
   pioche jamais : l'écran envoie la pioche du tour suivant aussitôt après (voir
   « Séquence de résolution »).
@@ -146,12 +151,26 @@ main pleine et la limite du bus.
 
 ### Fin de partie
 
-Une seule : la résolution du tour `turnCount` (réglage de `MARBLES_SETTINGS`), après la
-rotation. `stage` passe à `"over"`, `turn` reste sur le dernier tour joué (jamais
-« 11 sur 10 »), et le journal finit par `gameOver { score }` (« Partie terminée. Score
-final : … »). Une pioche impossible n'arrête rien (`drawSkipped`, `noMarbles`) : un sac
-de départ vide, ou plus petit que le triangle, se joue jusqu'au bout. Des conditions de
-fin plus riches (modes de partie) seront conçues à neuf (`doc/marbles-backlog.md`).
+Quand la partie s'arrête et comment son résultat se juge : `doc/marbles-rules.md`,
+section 13, « Définitions de partie, objectifs, règles et verrous ». Côté simulation,
+deux notions séparées (`marbles/core/definitions.js`) :
+
+- **Les conditions de fin** (`END_CONDITIONS`), QUAND la partie s'arrête, vérifiées à
+  deux moments fixes par `endReached(state, moment)` : `"afterImpact"`, dans
+  `resolveTurn` juste après l'Impact (`targetReached`, `impactMissed`, `lastTurn`, dans
+  cet ordre : la première atteinte l'emporte), la résolution se terminant ensuite comme
+  au dernier tour (rotation, `turnEnded`, sans fin des statuts) ; `"turnDraw"`, dans
+  `drawTurn` après la pioche (`noMarbles` : main, triangle, sac et défausse vides),
+  le tour n'étant pas joué. Une pioche seulement partielle, ou vide quand il reste des
+  billes en jeu, n'arrête rien (`drawSkipped`).
+- **L'objectif** (`GOALS`), COMMENT le résultat se juge : `free`, `target`,
+  `endurance`, chacun ses champs, sa validation et son jugement (`judge`).
+
+À l'arrêt (`endGame`), `stage` passe à `"over"`, `turn` reste sur le dernier tour joué
+(jamais « 11 sur 10 »), l'état porte `result` (`gameResult` : `{ goal, end, score,
+tier }`, `{ …, outcome }` ou `{ …, held, outcome }`, null avant), et le journal finit
+par `gameOver { score, result }`. En partie libre, `tierReached { tier, score }` dit
+chaque palier franchi, après l'Impact.
 
 ### Le pot
 
@@ -159,7 +178,7 @@ Le pot tel que le joueur le vit : `doc/marbles-rules.md`, section 9, « Le pot �
 zones de l'état, sérialisées (`marbles/core/marbles.js`, en-tête) :
 
 - `pot` : les billes en poche, dans l'ordre d'arrivée, au plus la capacité en vigueur
-  à leur arrivée (`potCapacity`, réglage de `MARBLES_SETTINGS`, plus les statuts :
+  à leur arrivée (`potCapacity`, valeur de départ de la définition, plus les statuts :
   `marbles/core/statuses.js`/`characteristic`) ;
 - `lost` : les **billes perdues**, envoyées au pot plein.
 
@@ -953,19 +972,21 @@ n'importe jamais : `createMarblesRules(types, statuses)` les valide
 (`marbles/core/validation.js`/`validateMarbleStatuses`) et les lie, comme la table des
 billes ; le déroulé les reçoit par `options.statuses` (`run.statuses`). Une définition :
 `stacking` (`"intensity"`, `"duration"`, `"unique"`), `duration` (`{ kind, count? }` :
-`turn`, `turns`, `nextTurn`, `game`, `charges`), `behaviors`, trois sortes :
+`turn`, `turns`, `nextTurn`, `game`, `charges`), `behaviors`, quatre sortes :
 
 | Comportement | Forme | Effet |
 |---|---|---|
 | caractéristique | `{ type: "stat", stat, amount }` | `throws`, `handSize` ou `potCapacity` augmentée de `amount` × l'intensité |
-| modificateur | `{ type: "modifier", point, operation, value }` | à un point d'interception (`MODIFIER_POINTS`, la liste ; ce que chacun modifie et quand : `doc/marbles-rules.md`, section 12, « Les points d'interception »), `add` (`value` × l'intensité) ou `multiply` (`value` à la puissance de l'intensité) |
+| modificateur | `{ type: "modifier", point, operation, value, filters? }` | à un point d'interception (`MODIFIER_POINTS`, la liste ; ce que chacun modifie et quand : `doc/marbles-rules.md`, section 12, « Les points d'interception »), `add` (un entier, × l'intensité) ou `multiply` (un nombre positif, fraction permise, à la puissance de l'intensité) ; `filters`, des filtres sur la bille SOURCE de la valeur |
 | réaction | `{ type: "reaction", on, effect }` | un effet de billes joué à chaque incrément du compteur écoutable `on`, comme une bille du pot (voir « Les réactions ») ; l'intensité ne la module pas |
+| verrou | `{ type: "lock", lock, trigger? }` | une action du joueur ou une sorte d'effet rendue indisponible (`LOCKS` : `swap`, `replacement`, `trigger`, `pot`) ; l'intensité ne le module pas |
 
 Les INSTANCES sont dans l'état, sérialisées avec lui (`state.statuses`, l'ordre de la
 liste étant l'ordre d'acquisition) : `{ status, holder, intensity, remaining, pending,
-origin }`, `holder` valant `"game"` (la forme est prête pour une bille, un point en
+origin, locked? }`, `holder` valant `"game"` (la forme est prête pour une bille, un point en
 suspens : `doc/marbles-backlog.md`). Une seule par statut : une nouvelle application se
-fusionne (`applyStatus`, selon le cumul).
+fusionne (`applyStatus`, selon le cumul) ; sur une RÈGLE, elle est sans effet (`outcome`
+`"locked"`, `statusUnchanged { locked: true }`).
 
 - **Caractéristiques** : `characteristic(state, key, statuses)`, l'accès unique, lu
   partout où une règle en dépend (lancers restants, pioche, choix vers la main, arrivées
@@ -980,6 +1001,14 @@ fusionne (`applyStatus`, selon le cumul).
   modify, ...args)` : la modification (`modify`, l'une des trois ci-dessous), puis les
   charges des statuts qui l'ont vraiment changée, consommées aussitôt ; puis, APRÈS
   l'évènement qui porte la valeur finale, `noteModification` dit les pas et les charges.
+  Chaque modification reçoit la SOURCE de la valeur (`run.js`/`sourceOf` : la bille dont
+  l'effet joue, la bille qui s'use ; `NO_SOURCE` pour l'Impact, la pioche du tour et la
+  réaction d'un statut) : un modificateur filtré (`filters`, ceux des cibles,
+  `marbles/core/effects.js`/`TARGET_FILTERS`, validés par `validateFilters`) ne
+  s'applique qu'à une source qui les passe, et un filtre sur un point sans source
+  (`sourced` faux : l'Impact, la pioche du tour) est refusé au chargement. ARRONDI : la
+  valeur finale est arrondie vers zéro (`towardZero`), chaque pas jugé sur sa valeur
+  arrondie.
   Valeurs signées : `modifyStat` sur la Vitesse et la Masse qu'un effet applique
   (`marbles/core/run.js`/`fireEffect`, bonus reçu compris, par le signe d'avant la
   modification, sur la grandeur, signe remis). Quantités, plancher 0 :
@@ -1003,7 +1032,22 @@ fusionne (`applyStatus`, selon le cumul).
   renforcement. L'effet d'une réaction a `trigger` `"statusReaction"`, `status`, ni bille
   ni emplacement : une cible relative y est refusée au chargement.
 - **Durées** : `activatePending` au début du tour, après `turnStarted` (`statusActivated`,
-  muet) ; `endTurn` après la rotation, jamais au dernier tour (`statusExpired`).
+  muet) ; `endTurn` après la rotation, jamais quand la partie s'arrête (`statusExpired`).
+- **Verrous** (`LOCKS`, chacun sa nature) : `lockingInstance` et `isLocked` disent ce qui
+  verrouille. D'ACTION : `swapRefusal` (`swapLocked`) et `placeRefusal`
+  (`replacementLocked`, sur un emplacement occupé) refusent, le résultat du réducteur
+  portant `lockedBy` (`lockReason` : `{ status, rule }`), et `legalActions` ne les
+  propose jamais (les joueurs automatiques non plus) ; la vue dit la raison
+  (`refusalText`). D'EFFET : un déclencheur verrouillé n'a plus d'écouteurs
+  (`EVENT_TRIGGERS`, `lock`, dans `handleEvent`) et son compteur ne bouge pas
+  (`marbles/core/counters.js`, le contexte porte la table des statuts) ; un pot
+  verrouillé n'a ni étape (`resolvePot`), ni entrée, ni réactions (`reactionsOf`). La
+  prévision, le vrai moteur, en tient compte.
+- **Règles** : les statuts d'une définition (`rules`), de durée « toute la partie »,
+  posés à la création de la partie (`ruleInstance` : intensité 1, `origin`
+  `RULE_ORIGIN`, `locked`), en tête de la liste, en silence ; ni renforcées, ni usées, ni
+  comptées en tours (`applyStatus`, `useCharges`, `endTurn`). `ordinaryInstances` (A,
+  Maj+A) les écarte, `ruleInstances` (O, Maj+O) les retient.
 - **Action** `applyStatus` (`CLAUSE_ACTIONS`, `kind` `"status"`, mot-clé Appliquer un
   statut) : `{ action, status, amount, duration? }`, l'intensité en `amount` ; ses
   `operations` portent l'application résolue (`statusApplication` : durée, cumul).
@@ -1012,8 +1056,44 @@ fusionne (`applyStatus`, selon le cumul).
 
 Ajouter un statut : son fichier et sa ligne dans `marbles/content/statuses/index.js`,
 `marbles.status.<id>.name` et `.description` dans chaque langue. Une sorte de
-comportement, de durée ou un point d'interception : sa déclaration dans
+comportement, de durée, un point d'interception ou un verrou : sa déclaration dans
 `marbles/core/statuses.js`, sa validation, ses textes.
+
+### Définitions de partie
+
+Une partie est décrite entièrement en données par sa DÉFINITION
+(`marbles/core/definitions.js`, son en-tête porte le modèle complet) ; la partie du jeu
+est la définition par défaut, un défi n'en sera qu'une de plus. Les définitions sont
+un contenu, `marbles/content/definitions/` (une par fichier, registre `index.js`, la
+définition que lance le jeu : `DEFAULT_DEFINITION`), que le core n'importe jamais :
+`createMarblesRules(types, statuses, definitions)` les valide
+(`validateGameDefinitions`) ; `rules.createGame(seed, definition)` crée une partie
+d'après l'une d'elles, ou d'après une définition venue d'ailleurs (un fichier des
+outils), validée de même (`validateGameDefinition`). Une définition :
+
+| Champ | Forme |
+|---|---|
+| `id` | son identifiant, celui de sa clé au registre ; textes `marbles.definition.<id>.name` et `.description` |
+| `start` | les valeurs de départ (`START_KEYS`) : `firstTurnDraw`, `drawPerTurn`, et celles des caractéristiques, `handSize`, `throws`, `potCapacity` |
+| `bag` | le sac de départ (`BAG_KINDS`) : `{ kind: "list", marbles }`, ou `{ kind: "random", size, maxCopies }`, tiré par sa propre graine dérivée de celle de la partie (`randomBag`, le même tirage que le simulateur) |
+| `turns` | le nombre de tours ; null, sans limite, pour un objectif qui le permet |
+| `goal` | l'objectif (`GOALS`) : `{ kind: "free", tiers }`, `{ kind: "target", score }`, `{ kind: "endurance", minimum }` |
+| `rules` | les règles, des ids de statuts de durée `game` (vide : aucune) |
+
+**Sérialisation : par COPIE.** `createMarblesGame` copie la définition dans l'état
+(`state.definition`), jamais une référence au registre : une définition lue d'un
+fichier n'est dans aucun registre, et un état construit, une prévision ou la reprise
+d'un choix restent autonomes. Aucune valeur de départ n'est plus recopiée en haut de
+l'état : `characteristic` lit `state.definition.start`, `startValue` les pioches,
+`turnLimit` le nombre de tours. Les valeurs de la définition par défaut viennent de
+`marbles/config/values.js` (`DEFAULT_GAME`, `STARTING_BAG`) ; les définitions de test
+les reprennent.
+
+Ajouter une définition : son fichier et sa ligne dans
+`marbles/content/definitions/index.js`, `marbles.definition.<id>.name` et
+`.description` dans chaque langue. Un objectif ou une condition de fin : sa
+déclaration dans `marbles/core/definitions.js` (`GOALS`, `END_CONDITIONS`), ses textes
+(`marbles/view/narration/goal.js`), son résumé au simulateur (`marbles/tools/stats.js`).
 
 ### Le bus d'évènements
 
@@ -1699,7 +1779,7 @@ est jamais active).
 
 - **A** : `marbles/view/narration/statuses.js`/`describeStatuses`, « 2 statuts : amorti,
   intensité 2, 3 tours. Lancer supplémentaire, à partir du prochain tour. », ou « Aucun
-  statut. ».
+  statut. ». Jamais les règles de la partie (touche O).
 - **Maj+A** : `marbles/view/status-screen.js`, sur le menu horizontal à fiches commun
   aux piles (`marbles/view/card-menu.js`) : une entrée par statut (ordre d'acquisition,
   en attente compris), puis « Retour » ; sans statut, « Aucun statut. » avant
@@ -1716,14 +1796,36 @@ est jamais active).
 - E sur une bille ajoute, après ses mots-clés, une ligne par statut qu'elle peut donner
   (`rules.appliedStatusesOf`).
 
+### Objectif et règles (O, Maj+O)
+
+- **Ouverture** : une seule annonce, avant celle du premier tour,
+  `marbles/view/narration/goal.js`/`describeOpening` : l'objectif, puis chaque règle
+  (« Règle : gravier. » et sa description).
+- **O** : `describeGoal`, l'objectif, la progression selon lui (tour et palier atteint
+  avec le suivant, score sur la cible, tours tenus), puis le nombre de règles.
+- **Maj+O** : `marbles/view/goal-screen.js`, sur le menu horizontal à fiches commun
+  (`marbles/view/card-menu.js`) : l'objectif (sa fiche : progression, ce qui le juge, la
+  pioche impossible), puis une entrée par règle (sa fiche : son effet), puis « Retour » ;
+  E dit la description de la définition ou de la règle ; Échap ferme. O et Maj+O
+  n'étaient liés à rien dans cet écran.
+- **Fin de partie** : `gameOver` dit la raison s'il faut (« Plus aucune bille à
+  jouer. »), puis « Partie terminée. », le résultat selon l'objectif (`resultText` :
+  palier, victoire ou échec, tours tenus), puis le score final. `tierReached` dit un
+  palier franchi en cours de partie.
+- **Refus d'un verrou** : `refusalText`, « Échange interdit par la règle : terrain
+  étroit. », ou « par le statut : … ».
+- **Sons** : des points d'accroche sans fichier (`MARBLES_AUDIO` à null : `victory`,
+  `defeat`, `tier`, `enduranceEnd`), joués au centre par le palier franchi et la fin de
+  partie ; un son à null ne joue rien, et ne se précharge pas.
+
 ### Aide (H)
 
 **H** ouvre un menu vertical (`marbles/view/help-screen.js`, un menu de `lib/menu.js`), à
 tout moment : une entrée par rubrique, dans cet ordre, « But du jeu », « Score : Vitesse,
 Masse et Impact », « Le triangle et la rotation », « L'usure », « Main, lancers et
 pioche », « Les zones : sac, défausse, pot, billes perdues », « Les mots-clés » ; Entrée y
-dit un texte de quelques phrases, tiré de `doc/marbles-rules.md`, ses valeurs lues dans les
-réglages. Puis « Les touches », qui ouvre l'aide des touches de l'écran des billes, la même
+dit un texte de quelques phrases, tiré de `doc/marbles-rules.md`, ses valeurs lues dans la
+définition de la partie. Puis « Les touches », qui ouvre l'aide des touches de l'écran des billes, la même
 que F1 (générée, `lib/help.js`, l'écran décrit passé par `covered`), et « Fermer » ; Échap
 ferme aussi. H était libre dans cet écran : F1 et Maj+H sont des touches globales, qui
 ouvrent directement l'aide des touches.

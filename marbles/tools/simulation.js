@@ -14,17 +14,18 @@
 // remplacée par la première action légale, pour que la partie aille au bout :
 // c'est une faute du joueur, que le rapport signale.
 //
-// Ne change aucune règle ni aucun réglage : les surcharges (`settings`) passent par
-// les options de createMarblesGame, celles d'une partie.
+// Ne change aucune règle ni aucun réglage : chaque partie se crée d'après la
+// définition reçue (`definition`, celle du jeu par défaut), ses surcharges (`settings`)
+// appliquées sur une copie (marbles/tools/game-rules.js/withSettings).
 
-import { STARTING_BAG } from "../config/values.js";
-import { createSeed, nextRandom } from "../../lib/rng.js";
+import { createSeed } from "../../lib/rng.js";
+import { randomBag } from "../core/definitions.js";
 import { PLAYERS, publicView } from "./players.js";
-import { GAME_RULES } from "./game-rules.js";
+import { DEFAULT_GAME_DEFINITION, GAME_RULES, SETTING_NAMES, withBag, withSettings } from "./game-rules.js";
 import { TRIGGER_IDS } from "./format.js";
 
 export const MARBLE_IDS = Object.keys(GAME_RULES.types);
-export const SETTING_NAMES = ["maxHandSize", "throwsPerTurn", "potCapacity", "firstTurnDraw", "drawPerTurn", "turnCount"];
+export { SETTING_NAMES };
 
 // Au-delà, une partie ne finit pas : une faute de programmation, pas une partie.
 const MAX_ACTIONS_PER_GAME = 10_000;
@@ -55,27 +56,16 @@ function validateBagMode(mode) {
   }
 }
 
-// Un sac tiré : chaque bille uniformément parmi celles qui n'ont pas atteint leur
-// limite, par son propre générateur.
-function randomBag({ size, maxCopies }, seed) {
-  let rngState = seed;
-  const counts = {};
-  const bag = [];
-  while (bag.length < size) {
-    const open = MARBLE_IDS.filter((id) => maxCopies === null || (counts[id] ?? 0) < maxCopies);
-    const draw = nextRandom(rngState);
-    rngState = draw.state;
-    const id = open[Math.floor(draw.value * open.length)];
-    counts[id] = (counts[id] ?? 0) + 1;
-    bag.push(id);
-  }
-  return bag;
-}
-
-function bagFor(mode, seed, index) {
-  if (mode.kind === "test") return [...STARTING_BAG];
+// Les billes de départ de la partie `index` : celles de la définition (mode "test" :
+// sa liste, ou son sac aléatoire, tiré par la graine de sac de la partie), d'un
+// fichier, ou un sac aléatoire des options. Toujours une liste, que le relevé garde.
+// Un sac aléatoire est tiré par le core (marbles/core/definitions.js/randomBag), avec
+// la graine de sac du simulateur : la même partie pour les mêmes paramètres.
+function bagFor(mode, seed, index, definition) {
   if (mode.kind === "list") return [...mode.marbles];
-  return randomBag(mode, deriveSeed(seed, index, "bag"));
+  const rule = mode.kind === "random" ? mode : definition.bag;
+  if (rule.kind === "list") return [...rule.marbles];
+  return randomBag(rule, deriveSeed(seed, index, "bag"), MARBLE_IDS);
 }
 
 // Un sac décrit en texte : ids séparés par des espaces, virgules ou retours à la
@@ -201,10 +191,12 @@ export function recordEvents(record, events, actionType, drawers) {
 // (chainInterrupted), une anomalie.
 // `effectDraws` : les billes piochées par des effets ; `throws` : les lancers joués.
 // `turns` : les tours résolus ; `impacts[k]` : l'Impact du tour k + 1.
-export function playGame({ index, seed, player, playerOptions = {}, bagMode, settings = {} }) {
-  const bag = bagFor(bagMode, seed, index);
+// `result` : le résultat de la partie selon son objectif (marbles/core/definitions.js/
+// gameResult : { goal, end, score, tier | outcome | held }).
+export function playGame({ index, seed, player, playerOptions = {}, bagMode, definition = DEFAULT_GAME_DEFINITION, settings = {} }) {
+  const bag = bagFor(bagMode, seed, index, definition);
   const gameSeed = deriveSeed(seed, index, "game");
-  let state = GAME_RULES.createGame(gameSeed, { ...settings, bag });
+  let state = GAME_RULES.createGame(gameSeed, withBag(withSettings(definition, settings), bag));
   const session = PLAYERS[player].startGame({ seed: deriveSeed(seed, index, "player"), options: playerOptions });
   const record = {
     index,
@@ -242,6 +234,7 @@ export function playGame({ index, seed, player, playerOptions = {}, bagMode, set
 
   record.score = state.score;
   record.turns = record.impacts.length;
+  record.result = state.result;
   return record;
 }
 
@@ -255,6 +248,7 @@ function normalizeParams(params) {
     player: params.player ?? "greedy",
     playerOptions: params.playerOptions ?? {},
     bagMode: params.bagMode ?? { kind: "test" },
+    definition: params.definition ?? DEFAULT_GAME_DEFINITION,
     settings: params.settings ?? {},
   };
   if (!Number.isInteger(normalized.games) || normalized.games < 1) throw new Error("simulation : le nombre de parties doit être un entier >= 1.");
@@ -265,8 +259,10 @@ function normalizeParams(params) {
     if (!SETTING_NAMES.includes(name)) throw new Error(`simulation : réglage inconnu "${name}".`);
   }
   validateBagMode(normalized.bagMode);
-  // Les surcharges passent par la validation de la simulation elle-même.
-  GAME_RULES.createGame(0, { ...normalized.settings, bag: bagFor(normalized.bagMode, normalized.seed, 0) });
+  // La définition et ses surcharges passent par la validation de la simulation
+  // elle-même.
+  const definition = withSettings(normalized.definition, normalized.settings);
+  GAME_RULES.createGame(0, withBag(definition, bagFor(normalized.bagMode, normalized.seed, 0, definition)));
   return normalized;
 }
 

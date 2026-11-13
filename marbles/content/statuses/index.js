@@ -25,7 +25,15 @@
 //                "turnDraw", "effectDraw", "polish", "crack", "phaseWear" : la liste
 //                de marbles/core/statuses.js/MODIFIER_POINTS ; "add" ou "multiply") ;
 //              { type: "reaction", on, effect } : un effet (une liste de clauses)
-//                joué à chaque incrément de la valeur de partie écoutable `on`.
+//                joué à chaque incrément de la valeur de partie écoutable `on` ;
+//              { type: "lock", lock, trigger? } : un VERROU ("swap", l'échange ;
+//                "replacement", la pose sur un emplacement occupé ; "trigger", le
+//                mot-clé `trigger` ; "pot", les billes du pot : marbles/core/statuses.js/
+//                LOCKS).
+// Un modificateur peut porter `filters`, des filtres sur la bille SOURCE de la valeur
+// (ceux des cibles : { type: "size", size }), et multiplier par une fraction (0,5).
+// Une RÈGLE de partie (marbles/content/definitions/) est un statut de cette table, de
+// durée « game ».
 //
 // Ses textes découlent de son id : `marbles.status.<id>.name` (en minuscules) et
 // `marbles.status.<id>.description` (data/i18n/<langue>/marbles.json), obligatoires.
@@ -44,6 +52,13 @@ import luster from "./luster.js";
 import brittleness from "./brittleness.js";
 import respite from "./respite.js";
 import acceleratedWear from "./acceleratedWear.js";
+// Les statuts des RÈGLES de partie (marbles/content/definitions/), de durée « toute la
+// partie » ; réutilisables d'une définition à l'autre.
+import gravel from "./gravel.js";
+import oneThrowLess from "./oneThrowLess.js";
+import noSwap from "./noSwap.js";
+import inertPot from "./inertPot.js";
+import silence from "./silence.js";
 
 export default {
   extraThrow,
@@ -59,4 +74,9 @@ export default {
   brittleness,
   respite,
   acceleratedWear,
+  gravel,
+  oneThrowLess,
+  noSwap,
+  inertPot,
+  silence,
 };

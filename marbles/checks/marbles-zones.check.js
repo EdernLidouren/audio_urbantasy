@@ -32,8 +32,8 @@ function checkZoneConditions(run) {
   run.same("une seule bille sur le triangle : 1 oui, 0 et 2 non", [true, false, false], [1, 0, 2].map((count) => test("triangle", "single", { triangle: filled(count) })));
   // La main : vide, pleine selon la taille de main en vigueur.
   run.same("main vide : 0 oui, 1 non", [true, false], [0, 1].map((count) => test("hand", "empty", { hand: inHand(Array(count).fill("plain")) })));
-  run.same("main pleine : 5 sur 5 oui, 4 sur 5 non", [true, false], [5, 4].map((count) => test("hand", "full", { hand: inHand(Array(count).fill("plain")), maxHandSize: 5 })));
-  run("main pleine : la taille en vigueur, 3 sur 3", true, test("hand", "full", { hand: inHand(["plain", "plain", "plain"]), maxHandSize: 3 }));
+  run.same("main pleine : 5 sur 5 oui, 4 sur 5 non", [true, false], [5, 4].map((count) => test("hand", "full", { hand: inHand(Array(count).fill("plain")), handSize: 5 })));
+  run("main pleine : la taille en vigueur, 3 sur 3", true, test("hand", "full", { hand: inHand(["plain", "plain", "plain"]), handSize: 3 }));
   // Sac et défausse vides.
   run.same("sac vide : 0 oui, 1 non", [true, false], [[], ["plain"]].map((bag) => test("bag", "empty", { bag })));
   run.same("défausse vide : 0 oui, 1 non", [true, false], [[], ["plain"]].map((discard) => test("discard", "empty", { discard })));
@@ -103,7 +103,7 @@ function checkZoneCounts(run) {
       })
     )
   );
-  run("plafond : 6 en main, maximum 5", 5, amountOf({ base: 0, step: 1, max: 5, source: zoneCount("hand") }, { state: marblesPlayState(rules, { hand: inHand(Array(6).fill("plain")), maxHandSize: 6 }) }));
+  run("plafond : 6 en main, maximum 5", 5, amountOf({ base: 0, step: 1, max: 5, source: zoneCount("hand") }, { state: marblesPlayState(rules, { hand: inHand(Array(6).fill("plain")), handSize: 6 }) }));
 
   // En transit, la bille lancée n'est pas en main.
   const table = {

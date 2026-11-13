@@ -252,17 +252,33 @@ export const CHOICELESS_TYPES = deepFreeze({
 // Le sac de test : un exemplaire de chaque bille, dans l'ordre de la table.
 export const FIXTURE_BAG = Object.freeze(Object.keys(FIXTURE_TYPES));
 
-// Les réglages d'une partie de test, ÉCRITS ICI : changer MARBLES_SETTINGS (le
-// nombre de tours, la taille de main, la capacité du pot…) ne change aucune
-// vérification de mécanisme.
-export const FIXTURE_SETTINGS = Object.freeze({
-  firstTurnDraw: 5,
-  drawPerTurn: 1,
-  maxHandSize: 5,
-  throwsPerTurn: 5,
-  potCapacity: 3,
-  turnCount: 10,
+// La DÉFINITION DE PARTIE des vérifications (marbles/core/definitions.js), ÉCRITE ICI :
+// changer la partie par défaut du jeu (le nombre de tours, la taille de main, la
+// capacité du pot…) ne change aucune vérification de mécanisme.
+export const FIXTURE_DEFINITION = deepFreeze({
+  id: "fixture",
+  start: { firstTurnDraw: 5, drawPerTurn: 1, handSize: 5, throws: 5, potCapacity: 3 },
+  bag: { kind: "list", marbles: FIXTURE_BAG },
+  turns: 10,
+  goal: { kind: "free", tiers: { bronze: 20, silver: 40, gold: 60 } },
+  rules: [],
 });
+
+// Les champs d'une définition qui ne sont pas des valeurs de départ.
+const DEFINITION_FIELDS = ["id", "bag", "turns", "goal", "rules"];
+
+// Une définition de test dont certains champs sont remplacés, `over` À PLAT : une
+// valeur de départ par son nom (handSize, throws…), un autre champ de la définition par
+// le sien ; `bag`, une liste d'ids, ou un sac entier. `base` : la définition de départ.
+export function fixtureDefinition(over = {}, base = FIXTURE_DEFINITION) {
+  const start = { ...base.start };
+  const fields = {};
+  for (const [key, value] of Object.entries(over)) {
+    if (DEFINITION_FIELDS.includes(key)) fields[key] = key === "bag" && Array.isArray(value) ? { kind: "list", marbles: value } : value;
+    else start[key] = value;
+  }
+  return { ...base, ...fields, start };
+}
 
 // La TABLE DES STATUTS DES VÉRIFICATIONS (marbles/core/statuses.js), figée comme les
 // billes : chaque statut nommé d'après ce qu'il a de particulier, une sorte de durée,
@@ -326,6 +342,12 @@ export const FIXTURE_STATUSES = deepFreeze({
   draw_react: { stacking: "unique", duration: { kind: "game" }, behaviors: [{ type: "reaction", on: "drawnMarbles", effect: [speed(1)] }] },
   worn_react: { stacking: "unique", duration: { kind: "game" }, behaviors: [{ type: "reaction", on: "wornMarbles", effect: [speed(1)] }] },
   lost_react: { stacking: "unique", duration: { kind: "game" }, behaviors: [{ type: "reaction", on: "lostMarbles", effect: [speed(1)] }] },
+  // LES VERROUS (marbles/core/statuses.js/LOCKS) : pas d'échange ce tour ; pas de
+  // remplacement, Chiquenaude désactivée, pot inactif, toute la partie.
+  no_swap: { stacking: "unique", duration: { kind: "turn" }, behaviors: [{ type: "lock", lock: "swap" }] },
+  no_replacement: { stacking: "unique", duration: { kind: "game" }, behaviors: [{ type: "lock", lock: "replacement" }] },
+  no_flick: { stacking: "unique", duration: { kind: "game" }, behaviors: [{ type: "lock", lock: "trigger", trigger: "flick" }] },
+  no_pot: { stacking: "unique", duration: { kind: "game" }, behaviors: [{ type: "lock", lock: "pot" }] },
   // Éjecte la pointe à chaque bille lancée ; toute la partie, unique.
   throw_eject: { stacking: "unique", duration: { kind: "game" }, behaviors: [{ type: "reaction", on: "thrownMarbles", effect: [{ action: "eject", target: "apex" }] }] },
   // À chaque bille lancée : Masse +1 ; toute la partie, unique.
@@ -334,12 +356,12 @@ export const FIXTURE_STATUSES = deepFreeze({
 
 // Les règles d'une table de test (FIXTURE_TYPES par défaut, ou une table fabriquée),
 // et de la table des statuts de test (FIXTURE_STATUSES par défaut), dont chaque
-// partie neuve part du sac de test et des réglages de test ; `options` de createGame
-// les remplace au cas par cas (un sac vide, une autre capacité…).
+// partie neuve part de la définition de test ; `over` de createGame en remplace des
+// champs au cas par cas (un sac vide, une autre capacité… : fixtureDefinition).
 export function fixtureRules(types = FIXTURE_TYPES, statuses = FIXTURE_STATUSES) {
   const rules = createMarblesRules(types, statuses);
   return Object.freeze({
     ...rules,
-    createGame: (seed, options = {}) => rules.createGame(seed, { bag: FIXTURE_BAG, ...FIXTURE_SETTINGS, ...options }),
+    createGame: (seed, over = {}) => rules.createGame(seed, fixtureDefinition(over)),
   });
 }

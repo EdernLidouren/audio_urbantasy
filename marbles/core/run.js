@@ -42,7 +42,7 @@ import { recordTally } from "./tally.js";
 import { ChoiceSuspension, chooseTargets } from "./choices.js";
 import { ejectFromSlot, handRoom, moveBy, moveFromBag, moveFromDiscard, moveFromHand, moveFromSlot, redirect, retireMarble, travel } from "./path.js";
 import { LISTENABLE_KEYS, REACTION_KEYS, REACTIVE_MOMENT, TALLY_COUNTERS, maxWearOf, pocketClauses, reactionClauses } from "./content.js";
-import { NO_STATUSES, applyStatus, definitionOf, modifyActionAmount, modifyStat, statusReactionClauses, statusReactionsOf, useCharges } from "./statuses.js";
+import { NO_SOURCE, NO_STATUSES, applyStatus, definitionOf, isLocked, modifyActionAmount, modifyStat, statusReactionClauses, statusReactionsOf, useCharges } from "./statuses.js";
 
 
 // --- Hasard ---
@@ -91,7 +91,9 @@ function isOnEventSlot(event, listener) {
 //   listeners  (facultatif) les billes concernées, quand ce ne sont pas les
 //              écouteurs (marbleListeners) : une bille déjà retirée, ou en cours de
 //              lancer, toujours connue ;
-//   clauses(event, listener, types, statuses) (`statuses` : la table des statuts).
+//   clauses(event, listener, types, statuses) (`statuses` : la table des statuts) ;
+//   lock       (facultatif) le verrou qui le fait taire, { lock, trigger? }
+//              (marbles/core/statuses.js/LOCKS) : rien ne joue tant qu'il agit.
 // La phase est écrite ici ; les autres viennent de MARBLE_TRIGGERS.
 const ON_SLOT = ["triangle"];
 
@@ -117,6 +119,8 @@ for (const trigger of MARBLE_TRIGGERS) {
 
 function eventTrigger(trigger) {
   const clausesOf = (listener, types) => types[listener.marble][trigger.field] ?? null;
+  // Un déclencheur verrouillé ne joue plus (marbles/core/statuses.js/LOCKS).
+  const lock = { lock: "trigger", trigger: trigger.id };
   if (Object.hasOwn(NAMED_MARBLE, trigger.marble)) {
     // Une bille nommée inconnue (défaussée du sac à l'aveugle) rend la prévision
     // incertaine, sauf pour un déclencheur qui ne se prévoit jamais (l'Éveil, que
@@ -124,6 +128,7 @@ function eventTrigger(trigger) {
     const zone = HOLDER_ZONES[trigger.marble].zone;
     return {
       id: trigger.id,
+      lock,
       zones: trigger.forecast.line === "none" ? [] : [zone],
       listeners: (event) => [{ zone: HOLDER_ZONES[trigger.marble].zone, ...NAMED_MARBLE[trigger.marble](event) }],
       clauses: (event, listener, types) => clausesOf(listener, types),
@@ -131,6 +136,7 @@ function eventTrigger(trigger) {
   }
   return {
     id: trigger.id,
+    lock,
     zones: ON_SLOT,
     clauses: (event, listener, types) => (isOnEventSlot(event, listener) ? clausesOf(listener, types) : null),
   };
@@ -159,6 +165,8 @@ const EVENT_TRIGGERS = {
       {
         id: moment.trigger,
         zones: ["pot"],
+        // Un pot verrouillé : ses billes n'agissent plus.
+        lock: { lock: "pot" },
         listeners: (event) => [{ zone: HOLDER_ZONES.pot.zone, slot: null, index: potPlaceOf(event), marble: event.marble }],
         clauses: (event, listener, types) =>
           moment.reactive ? reactionClauses(types[listener.marble], event.counter) : pocketClauses(types[listener.marble], moment),
@@ -188,7 +196,7 @@ const EVENT_TRIGGERS = {
 // émises après le traitement de l'évènement (handleEvent) : la bille concernée joue
 // d'abord son propre effet. -> les évènements des réactions, dans l'ordre.
 function reactionsOf(run, event, before) {
-  const potListens = REACTION_KEYS.length > 0 && run.state.pot.length > 0;
+  const potListens = REACTION_KEYS.length > 0 && run.state.pot.length > 0 && !isLocked(run.state.statuses, run.statuses, "pot");
   const statusesListen = run.state.statuses.length > 0;
   if (!potListens && !statusesListen) return [];
   const after = run.state.tally;
@@ -286,11 +294,13 @@ function fireEffect(run, trigger, listener, clauses, event) {
   // passent par leurs modificateurs (marbles/core/statuses.js/modifyStat), les
   // charges se consommant à mesure ; l'effet porte les valeurs finales, ce qu'ont
   // fait les statuts se dit après lui (noteModification).
-  const speedChange = intercept(run, modifyStat, "speed", applied.speed);
-  const massChange = intercept(run, modifyStat, "mass", applied.mass);
+  // La source de ces valeurs : la bille qui joue l'effet (aucune pour un statut).
+  const source = sourceOf(run, listener.status === undefined ? marble : null);
+  const speedChange = intercept(run, modifyStat, "speed", applied.speed, source);
+  const massChange = intercept(run, modifyStat, "mass", applied.mass, source);
   const speedDelta = speedChange.value;
   const massDelta = massChange.value;
-  const { drawChange, amountChanges, operations } = interceptQuantities(run, self.draw, printedOperations);
+  const { drawChange, amountChanges, operations } = interceptQuantities(run, self.draw, printedOperations, source);
 
   // Un bonus ne vaut que si la phase de sa cible peut encore avoir lieu ce tour :
   // sinon (emplacement vide, phase déjà passée ou en cours), il est perdu, et
@@ -334,8 +344,8 @@ function fireEffect(run, trigger, listener, clauses, event) {
 // sans référence n'a rien à modifier. Une quantité ramenée à 0 : l'action ne se joue
 // pas. -> { drawChange, amountChanges, operations } : `operations`, celles qui se
 // jouent, avec leurs quantités finales.
-function interceptQuantities(run, draw, printedOperations) {
-  const drawChange = intercept(run, modifyActionAmount, "draw", draw);
+function interceptQuantities(run, draw, printedOperations, source) {
+  const drawChange = intercept(run, modifyActionAmount, "draw", draw, source);
   const amountChanges = [];
   const operations = [];
   for (const operation of printedOperations) {
@@ -343,7 +353,7 @@ function interceptQuantities(run, draw, printedOperations) {
       operations.push(operation);
       continue;
     }
-    const change = intercept(run, modifyActionAmount, operation.action, operation.amount);
+    const change = intercept(run, modifyActionAmount, operation.action, operation.amount, source);
     amountChanges.push(change);
     if (change.value > 0) operations.push({ ...operation, amount: change.value });
   }
@@ -358,8 +368,9 @@ function interceptQuantities(run, draw, printedOperations) {
 function gainStatus(run, { status, amount, duration, stacking }, by) {
   const { instances, outcome, instance } = applyStatus(run.state.statuses, run.statuses, status, { intensity: amount, count: duration.count }, by);
   run.update({ statuses: instances });
-  if (outcome === "unchanged") {
-    run.emit({ type: "statusUnchanged", status, by });
+  // Déjà là sans effet : un statut unique, ou une règle (verrouillée, `locked`).
+  if (outcome === "unchanged" || outcome === "locked") {
+    run.emit({ type: "statusUnchanged", status, by, ...(outcome === "locked" ? { locked: true } : {}) });
     return;
   }
   // La sorte de durée et le cumul (l'application, statusApplication), pour dire ce qui reste.
@@ -375,6 +386,14 @@ function gainStatus(run, { status, amount, duration, stacking }, by) {
 // noteModification dira APRÈS l'évènement qui porte la valeur finale.
 export function intercept(run, modify, ...args) {
   return consumeCharges(run, modify(run.state.statuses, run.statuses, ...args));
+}
+
+// LA SOURCE d'une valeur (marbles/core/statuses.js, en-tête) : la bille `marble`, avec
+// le test de ses filtres sur la table des billes ; null, ou une bille inconnue (piochée
+// à l'aveugle), aucune source.
+export function sourceOf(run, marble) {
+  if (marble === null || marble === undefined || !Object.hasOwn(run.types, marble)) return NO_SOURCE;
+  return { marble, matches: (filters) => passesFilters(marble, filters, run.types) };
 }
 
 // Les charges d'un changement (intercept).
@@ -521,7 +540,8 @@ function wearOnSlot(run, action, amount, slot, by) {
 // émises dans la file : pas de récursion.
 function handleEvent(run, event) {
   const trigger = EVENT_TRIGGERS[event.type];
-  const listeners = !trigger ? [] : trigger.listeners ? trigger.listeners(event) : marbleListeners(run.state);
+  const silenced = trigger?.lock !== undefined && isLocked(run.state.statuses, run.statuses, trigger.lock.lock, trigger.lock.trigger ?? null);
+  const listeners = !trigger || silenced ? [] : trigger.listeners ? trigger.listeners(event) : marbleListeners(run.state);
   for (const listener of listeners) {
     // Une bille inconnue (piochée à l'aveugle) que ce déclencheur pourrait
     // concerner : sa réaction dépend de son identité, la prévision ne peut pas la
@@ -595,7 +615,7 @@ export function transact(state, types, { eventLimit, blind = false, answers = []
   // Les réactions du pot s'y relèvent aussi, sur l'incrément des compteurs.
   function record(event) {
     const before = run.state.tally;
-    run.update({ tally: recordTally(before, event, { state: run.state, types }, TALLY_COUNTERS) });
+    run.update({ tally: recordTally(before, event, { state: run.state, types, statuses: run.statuses }, TALLY_COUNTERS) });
     run.journal.push(event);
     const reactions = reactionsOf(run, event, before);
     if (reactions.length > 0) run.reactions.set(event, reactions);

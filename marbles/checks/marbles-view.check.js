@@ -57,6 +57,12 @@ import {
   placementLines,
   remainingText,
   statusCard,
+  refusalText,
+  describeGoal,
+  describeOpening,
+  describeTurn as describeTurnLine,
+  goalCard,
+  resultText,
 } from "../view/narration.js";
 import { marbleCard } from "../view/card.js";
 import { tallyMenu } from "../view/tally-screen.js";
@@ -87,9 +93,10 @@ import {
 import { pathLength, rollAt, rollDurationMs, rollEnvelope } from "../view/rolls.js";
 import { EMPTY_SOUND_QUEUE, advanceSoundQueue, enqueueCues } from "../view/sound-queue.js";
 import { throws } from "../../lib/check.js";
-import { CHOICELESS_TYPES, FIXTURE_STATUSES, FIXTURE_TYPES, fixtureRules } from "./fixtures/marbles.js";
+import { CHOICELESS_TYPES, FIXTURE_DEFINITION, FIXTURE_STATUSES, FIXTURE_TYPES, fixtureRules } from "./fixtures/marbles.js";
 import { choice, draw, polish, speed } from "../content/effects.js";
-import { answerChoices, emptyBagMarblesGame, fabricatedRules, inHand, isCleanText, keyText, marblesPlayState, mustReduce, statusInstance } from "./helpers.js";
+import { ruleInstance } from "../core/statuses.js";
+import { answerChoices, emptyBagMarblesGame, fabricatedRules, inHand, isCleanText, keyText, marblesPlayState, mustReduce, overState, statusInstance } from "./helpers.js";
 import { choiceAnswer, choiceCursorAfterAnswer, choiceFocusLine, choiceHandOptions, choiceListEntry, choiceStartCursor, stepChoiceCursor } from "../view/choice.js";
 import { MARBLES_HELP_TOPICS, helpTopicText, marblesHelpMenu } from "../view/help-screen.js";
 import { AMOUNT_SOURCES, CLAUSE_ACTIONS, effectAt } from "../core/effects.js";
@@ -638,21 +645,22 @@ function checkHelpMenu(run) {
   menu.entries.at(-2).onActivate();
   run("aide H : « Les touches » ouvre l'aide des touches", 1, keyHelpOpened);
   run.same("aide H : une rubrique par texte, dans l'ordre", ["goal", "score", "triangle", "wear", "hand", "zones", "keywords", "statuses"], MARBLES_HELP_TOPICS);
-  // Les textes de l'aide citent les réglages du jeu, lus dans MARBLES_SETTINGS.
-  const { turnCount, maxHandSize, throwsPerTurn, firstTurnDraw, drawPerTurn, potCapacity } = MARBLES_SETTINGS;
+  // Les textes de l'aide citent les valeurs de la définition de la partie.
+  const { turns: turnCount, start } = FIXTURE_DEFINITION;
+  const { handSize: maxHandSize, throws: throwsPerTurn, firstTurnDraw, drawPerTurn, potCapacity } = start;
   run(
     "aide H : la main cite les réglages du jeu",
     `help.hand.text{turns: ${turnCount}, hand: ${maxHandSize}, throws: ${throwsPerTurn}, firstDraw: ${firstTurnDraw}, draw: ${drawPerTurn}, pot: ${potCapacity}}`,
-    helpTopicText("hand", t)
+    helpTopicText("hand", FIXTURE_DEFINITION, t)
   );
-  run("aide H : le but du jeu, ses propres textes et les mêmes réglages", helpTopicText("hand", t).replace("help.hand.", "help.goal."), helpTopicText("goal", t));
-  run("aide H : le pot cite sa capacité", true, helpTopicText("zones", t).endsWith(`pot: ${potCapacity}}`));
+  run("aide H : le but du jeu, ses propres textes et les mêmes réglages", helpTopicText("hand", FIXTURE_DEFINITION, t).replace("help.hand.", "help.goal."), helpTopicText("goal", FIXTURE_DEFINITION, t));
+  run("aide H : le pot cite sa capacité", true, helpTopicText("zones", FIXTURE_DEFINITION, t).endsWith(`pot: ${potCapacity}}`));
   setLocale("fr");
-  run("aide H : les mots-clés renvoient à E et Maj+E", true, plain(helpTopicText("keywords", realT)).includes("touche E") && plain(helpTopicText("keywords", realT)).includes("Maj+E"));
+  run("aide H : les mots-clés renvoient à E et Maj+E", true, plain(helpTopicText("keywords", FIXTURE_DEFINITION, realT)).includes("touche E") && plain(helpTopicText("keywords", FIXTURE_DEFINITION, realT)).includes("Maj+E"));
   for (const lang of ["fr", "en"]) {
     setLocale(lang);
     const short = MARBLES_HELP_TOPICS.filter((id) => {
-      const text = helpTopicText(id, realT);
+      const text = helpTopicText(id, FIXTURE_DEFINITION, realT);
       const sentences = text.split(/[.!?]\s/).length;
       return text.length === 0 || sentences > 4;
     });
@@ -1319,7 +1327,7 @@ function checkSounds(run) {
   run.same(
     "démonstration : six places, de la main à la pointe, espacées",
     ["hand@0", "hand@700", "hand@1400", "leftBase@2100", "rightBase@2800", "apex@3500"],
-    placesDemoCues("aging_flick").map((cue) => `${cue.place.slot ?? cue.place.kind}@${cue.atMs}`)
+    placesDemoCues("aging_flick", 5).map((cue) => `${cue.place.slot ?? cue.place.kind}@${cue.atMs}`)
   );
   run.same("repères : une phase sur un emplacement vide reste muette", [], eventCues([{ type: "phaseSkipped", slot: "apex" }], {}, settings, FIXTURE_TABLE));
 
@@ -1371,6 +1379,7 @@ export default function checkMarblesView(run) {
   run.section("confirmation et curseur", checkConfirmationAndCursor);
   run.section("témoins", checkWitnesses);
   run.section("statuts", checkStatusNarration);
+  run.section("objectif et règles", checkGoalNarration);
 }
 
 // LES STATUTS en mots (marbles/view/narration/statuses.js, journal.js, forecast.js),
@@ -1433,6 +1442,40 @@ function checkStatusNarration(run) {
     "fiche : une réaction, que l'intensité ne module pas",
     "statuses.card.effect{effect: effect.combined{parts: [statuses.behavior.reaction{occurrence: tally.flick.each, effect: effect.combined{parts: [effect.combined{parts: [effect.speed_up{amount: 2}]}]}}]}}",
     statusCard(instance("flick_react", { intensity: 3 }), "main", rules, t).below[0]
+  );
+  // Un modificateur filtré sur sa source, une fraction : « gains de Vitesse des calots ÷2 ».
+  const filtered = {
+    statuses: {
+      sourced: {
+        stacking: "unique",
+        duration: { kind: "game" },
+        behaviors: [
+          { type: "modifier", point: "speedGain", operation: "multiply", value: 0.5, filters: [{ type: "size", size: LARGE }] },
+          { type: "modifier", point: "massGain", operation: "multiply", value: 1.5 },
+        ],
+      },
+    },
+  };
+  run.same(
+    "fiche d'un statut : un filtre de source, une division, une fraction",
+    "statuses.card.effect{effect: effect.combined{parts: [statuses.behavior.divide{point: statuses.source.size{size: <size.large.name>, point: statuses.point.speedGain}, value: 2} | statuses.behavior.multiply{point: statuses.point.massGain, value: 1number.decimal_separator5}]}}",
+    statusCard(instance("sourced"), "main", filtered, t).below[0]
+  );
+  // Un refus de verrou nomme son statut, ou sa règle ; un autre refus, rien de plus.
+  const locked = (statuses) => ({ ...marblesPlayState(rules, {}), statuses });
+  run.same(
+    "refus : un verrou nomme le statut, ou la règle",
+    ["error.swapLocked{source: lock.source.status{status: X}}", "error.swapLocked{source: lock.source.rule{status: X}}", "error.mustDraw"].map((text) => text.replaceAll("X", t("marbles.status.no_swap.name"))),
+    [
+      refusalText("swapLocked", locked([instance("no_swap", { remaining: 1 })]), rules, t),
+      refusalText("swapLocked", locked([ruleInstance("no_swap")]), rules, t),
+      refusalText("mustDraw", locked([]), rules, t),
+    ]
+  );
+  run.same(
+    "fiche d'un statut : les verrous",
+    ["statuses.behavior.lock.swap", "statuses.behavior.lock.trigger{trigger: keyword.flick.name}", "statuses.behavior.lock.pot"].map((part) => `statuses.card.effect{effect: effect.combined{parts: [${part}]}}`),
+    ["no_swap", "no_flick", "no_pot"].map((status) => statusCard(instance(status), "main", rules, t).below[0])
   );
   run.same(
     "origine : une phase, une entrée au pot, une réaction du pot, un statut, aucune",
@@ -1709,7 +1752,7 @@ function checkSaid(run, { events, state }) {
     run("texte : pose, bille retirée avant sa phase", "outcome.removed{slot: slot.apex, marble: <aging_flick>}", describeSlotForPlacement(emptied, "apex", rules, t));
 
     // S et D : les nombres et leurs accords.
-    const counts = (bag, discard, drawPerTurn = 1) => ({ ...state, bag: Array(bag).fill("aging_flick"), discard: Array(discard).fill("aging_flick"), drawPerTurn });
+    const counts = (bag, discard, drawPerTurn = 1) => overState(state, { bag: Array(bag).fill("aging_flick"), discard: Array(discard).fill("aging_flick"), drawPerTurn });
     run("texte : sac, pluriel", "state.bag{count: 8, draw: 1}", describeBag(counts(8, 0), rules, t));
     run("texte : sac, une bille", "state.bag{count: 1, draw: 1}", describeBag(counts(1, 0), rules, t));
     run("texte : sac vide", "state.bag{count: 0, draw: 1}", describeBag(counts(0, 0), rules, t));
@@ -2021,4 +2064,55 @@ function checkWitnesses(run) {
   } finally {
     setLocale(previousLocale);
   }
+}
+
+// L'OBJECTIF ET LES RÈGLES (marbles/view/narration/goal.js) : l'ouverture, la touche O
+// pour chaque objectif, la fiche de l'objectif, le résultat de fin, le palier atteint.
+function checkGoalNarration(run) {
+  const game = (over, statuses = []) => ({ ...overState(marblesPlayState(rules, {}), over), statuses });
+  const free = game({ turn: 5, score: 25 });
+  run(
+    "O, libre : objectif, tour, palier atteint et le suivant, aucune règle",
+    "goal.free{turns: 10} goal.progress.free{turn: 5, turns: 10, score: 25, reached: goal.progress.tier{tier: tier.bronze}} goal.progress.next_tier{tier: tier.silver, score: 40} goal.rule_count{count: 0}",
+    describeGoal(free, t)
+  );
+  run("O, libre : au plus haut palier, pas de suivant", true, !describeGoal(game({ score: 99 }), t).includes("next_tier") && describeGoal(game({ score: 99 }), t).includes("tier.gold"));
+  run(
+    "O, cible",
+    "goal.target{score: 200, turns: 8} goal.progress.target{score: 120, target: 200, turn: 5, turns: 8} goal.rule_count{count: 2}",
+    describeGoal(game({ turn: 5, score: 120, goal: { kind: "target", score: 200 }, turns: 8 }, [ruleInstance("pot_game"), ruleInstance("no_pot")]), t)
+  );
+  run(
+    "O, endurance sans limite : les tours tenus",
+    "goal.endurance{minimum: 15, turns: null} goal.progress.endurance{count: 4} goal.rule_count{count: 0}",
+    describeGoal(game({ turn: 5, goal: { kind: "endurance", minimum: 15 }, turns: null }), t)
+  );
+  run("O, endurance au plus 20 tours", true, describeGoal(game({ turn: 5, goal: { kind: "endurance", minimum: 15 }, turns: 20 }), t).includes("goal.progress.endurance_max{count: 4, turns: 20}"));
+  run(
+    "ouverture : l'objectif, puis chaque règle, son nom et sa description",
+    "goal.free{turns: 10} goal.rule_line{status: status.pot_game.name, description: status.pot_game.description}",
+    describeOpening(game({}, [ruleInstance("pot_game")]), t)
+  );
+  run.same(
+    "fiche de l'objectif : la progression, ce qui le juge, la pioche impossible",
+    ["goal.progress.target{score: 0, target: 50, turn: 2, turns: 8}", "goal.detail.target_win{score: 50}", "goal.detail.target_lose{turns: 8}", "goal.detail.no_marbles"],
+    goalCard(game({ goal: { kind: "target", score: 50 }, turns: 8 }), "main", t).below
+  );
+  run.same(
+    "résultat : selon l'objectif",
+    ["result.tier{tier: tier.silver}", "result.no_tier", "result.victory", "result.defeat", "result.endurance_success{count: 20}", "result.endurance_ended{count: 4}"],
+    [
+      { goal: "free", tier: "silver" },
+      { goal: "free", tier: "none" },
+      { goal: "target", outcome: "victory" },
+      { goal: "target", outcome: "defeat" },
+      { goal: "endurance", outcome: "success", held: 20 },
+      { goal: "endurance", outcome: "ended", held: 4 },
+    ].map((result) => resultText(result, t))
+  );
+  const over = (end) => stepsText(buildSteps([{ type: "gameOver", score: 9, result: { goal: "target", end, score: 9, outcome: "defeat" } }], t));
+  run("fin de partie : le résultat puis le score", "event.game_over{score: 9, result: result.defeat}", over("lastTurn"));
+  run("fin de partie, plus aucune bille : la raison d'abord", "result.no_marbles event.game_over{score: 9, result: result.defeat}", over("noMarbles"));
+  run("palier atteint : dit", "event.tier_reached{tier: tier.bronze}", stepsText(buildSteps([{ type: "tierReached", tier: "bronze", score: 20 }], t)));
+  run("tour sans limite : sans « sur »", true, describeTurnLine(game({ goal: { kind: "endurance", minimum: 15 }, turns: null }), true, rules, t).startsWith("state.turn_unlimited{"));
 }

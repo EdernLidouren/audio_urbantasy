@@ -2,8 +2,8 @@
 // simulation pour tout ce qui est hors du core (la vue, les outils, les
 // vérifications) : on compose une fois, puis on joue.
 //
-//   const marbles = createMarblesRules(MARBLE_TYPES, MARBLE_STATUSES);   // main.js, une seule fois
-//   let game = marbles.createGame(seed);
+//   const marbles = createMarblesRules(MARBLE_TYPES, MARBLE_STATUSES, GAME_DEFINITIONS);   // main.js
+//   let game = marbles.createGame(seed, marbles.definitions[DEFAULT_DEFINITION]);
 //   const { ok, state, events } = marbles.reduce(game, { type: "draw" });
 //   marbles.forecast(state);
 //
@@ -13,34 +13,40 @@
 // table fabriquée se teste de la même façon, sans risque de retomber en silence
 // sur celle du jeu : createMarblesRules(maTable). La table des STATUTS
 // (marbles/content/statuses/index.js) est un contenu aussi, liée de même ; aucune par
-// défaut.
+// défaut. Les DÉFINITIONS DE PARTIE (marbles/content/definitions/index.js) de même,
+// validées à la composition ; une partie se crée d'après l'une d'elles, ou d'après une
+// définition venue d'ailleurs (un fichier des outils), validée à sa création.
 //
 // Les fonctions de marbles/core/marbles.js, marbles/core/content.js, marbles/core/run.js,
 // marbles/core/effects.js et marbles/core/forecast.js qui prennent `types` restent la plomberie interne du
 // core ; hors du core, on passe par ces règles. Ce qui ne lit aucune bille ni aucun
-// statut (swapRefusal, impactOf, SLOTS...) s'importe directement ; ce qui dépend des
-// caractéristiques (lancers restants, refus de lancer et de pose, actions légales)
-// passe par les règles, qui y lient les statuts.
+// statut (impactOf, SLOTS...) s'importe directement ; ce qui dépend des
+// caractéristiques ou des verrous (lancers restants, refus d'échange, de lancer et de
+// pose, actions légales) passe par les règles, qui y lient les statuts.
 
-import { createMarblesGame, legalActions, marblesReduce, nextTurnDraw, placeRefusal, throwRefusal, throwsLeft } from "./marbles.js";
+import { createMarblesGame, legalActions, lockReason, marblesReduce, nextTurnDraw, placeRefusal, swapRefusal, throwRefusal, throwsLeft } from "./marbles.js";
 import { appliedStatusesOf, keywordsOf, maxWearOf } from "./content.js";
-import { validateMarbleStatuses, validateMarbleTypes } from "./validation.js";
+import { validateGameDefinitions, validateMarbleStatuses, validateMarbleTypes } from "./validation.js";
+import { NO_DEFINITIONS } from "./definitions.js";
 import { NO_STATUSES, characteristic } from "./statuses.js";
 import { effectAt } from "./effects.js";
 import { forecast } from "./forecast.js";
 
-// Les règles de `types` et de `statuses`, validées ici : une table mal formée échoue
-// à la composition, jamais en pleine partie.
-export function createMarblesRules(types, statuses = NO_STATUSES) {
+// Les règles de `types`, de `statuses` et des définitions de partie, validées ici :
+// une table mal formée échoue à la composition, jamais en pleine partie.
+export function createMarblesRules(types, statuses = NO_STATUSES, definitions = NO_DEFINITIONS) {
   validateMarbleStatuses(statuses);
   validateMarbleTypes(types, statuses);
+  validateGameDefinitions(definitions, types, statuses);
   return Object.freeze({
     // Les tables elles-mêmes, pour qui lit les champs d'une bille (la fiche) ou d'un
     // statut.
     types,
     statuses,
-    // Une partie neuve. `options` : bag et réglages propres à cette partie.
-    createGame: (seed, options = {}) => createMarblesGame(seed, options, types),
+    // Le registre des définitions de partie, { id: définition }.
+    definitions,
+    // Une partie neuve, d'après sa définition (du registre, ou d'ailleurs).
+    createGame: (seed, definition) => createMarblesGame(seed, definition, types, statuses),
     // Le réducteur. `options` : { eventLimit, blind } (marbles/core/marbles.js/marblesReduce).
     reduce: (state, action, options = {}) => marblesReduce(state, action, types, { ...options, statuses }),
     // La prévision du tour, `action` envisagée ou non.
@@ -50,9 +56,12 @@ export function createMarblesRules(types, statuses = NO_STATUSES) {
     characteristic: (state, key) => characteristic(state, key, statuses),
     // Les lancers restants, les refus de lancer et de pose, les actions légales.
     throwsLeft: (state) => throwsLeft(state, statuses),
+    swapRefusal: (state) => swapRefusal(state, statuses),
     throwRefusal: (state) => throwRefusal(state, statuses),
     placeRefusal: (state, handIndex, slot) => placeRefusal(state, handIndex, slot, statuses),
     legalActions: (state) => legalActions(state, statuses),
+    // Le statut qui verrouille une action refusée (`code`), { status, rule }, ou null.
+    lockReason: (state, code) => lockReason(state, code, statuses),
     // La pioche du prochain début de tour, statuts compris, sans rien consommer.
     nextTurnDraw: (state) => nextTurnDraw(state, statuses),
     maxWearOf: (marble) => maxWearOf(marble, types),

@@ -22,14 +22,17 @@ import { validateMarblesContent } from "../core/validation.js";
 import { createMarblesRules } from "../core/rules.js";
 import MARBLE_TYPES from "../content/types/index.js";
 import MARBLE_STATUSES from "../content/statuses/index.js";
+import { DEFAULT_DEFINITION, GAME_DEFINITIONS } from "../content/definitions/index.js";
 import { marbleCard } from "../view/card.js";
 import { describeHandFocus, describeSlotFocus, describeSlotForPlacement, placementLines } from "../view/narration.js";
 import { throws } from "../../lib/check.js";
 import { emptyForecastTally, walkForecastGame } from "./fixtures/forecast-property.js";
 import { inHand, isCleanText, marblesPlayState, playRandomMarblesGame } from "./helpers.js";
 
-// Les règles du jeu, liées à la vraie table.
-const rules = createMarblesRules(MARBLE_TYPES, MARBLE_STATUSES);
+// Les règles du jeu, liées à la vraie table, aux vrais statuts et aux vraies
+// définitions ; une partie neuve est celle de la définition par défaut.
+const gameRules = createMarblesRules(MARBLE_TYPES, MARBLE_STATUSES, GAME_DEFINITIONS);
+const rules = Object.freeze({ ...gameRules, createGame: (seed) => gameRules.createGame(seed, GAME_DEFINITIONS[DEFAULT_DEFINITION]) });
 const ids = Object.keys(MARBLE_TYPES);
 
 export default function checkMarblesContent(run) {
@@ -41,8 +44,9 @@ export default function checkMarblesContent(run) {
 }
 
 function checkValidation(run) {
-  run("la table, celle des statuts et le sac de départ se valident", false, throws(() => validateMarblesContent(MARBLE_TYPES, MARBLE_STATUSES)));
-  run("les règles se composent sur les tables", false, throws(() => createMarblesRules(MARBLE_TYPES, MARBLE_STATUSES)));
+  run("la table, celle des statuts et les définitions se valident", false, throws(() => validateMarblesContent(MARBLE_TYPES, MARBLE_STATUSES, GAME_DEFINITIONS)));
+  run("les règles se composent sur les tables", false, throws(() => createMarblesRules(MARBLE_TYPES, MARBLE_STATUSES, GAME_DEFINITIONS)));
+  run("la définition par défaut existe", true, Object.hasOwn(GAME_DEFINITIONS, DEFAULT_DEFINITION));
   run.same("le sac de départ ne cite que des billes de la table", [], STARTING_BAG.filter((id) => !Object.hasOwn(MARBLE_TYPES, id)));
   run("une partie neuve se pioche", true, rules.reduce(rules.createGame(1), { type: "draw" }).ok);
 }
@@ -54,6 +58,12 @@ function checkTexts(run) {
     for (const locale of Object.keys(LOCALE_TABLES)) {
       setLocale(locale);
       run.same(`${locale} : chaque bille a son nom`, [], ids.filter((id) => !Object.hasOwn(LOCALE_TABLES[locale], `marble.${id}.name`)));
+      // Chaque définition de partie : son nom et sa description (touche E du menu Maj+O).
+      run.same(
+        `${locale} : chaque définition de partie a son nom et sa description`,
+        [],
+        Object.keys(GAME_DEFINITIONS).flatMap((id) => ["name", "description"].map((part) => `marbles.definition.${id}.${part}`)).filter((key) => !Object.hasOwn(LOCALE_TABLES[locale], key))
+      );
       run.same(
         `${locale} : aucun nom sans bille`,
         [],

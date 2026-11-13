@@ -7,14 +7,18 @@
 //   node marbles/tools/play.js --seed 42
 //   node marbles/tools/play.js --seed 42 --lang en
 //   node marbles/tools/play.js --seed 42 --json < commandes.txt
+//   node marbles/tools/play.js --definition free
 //
 // --seed : graine imposée (sinon tirée au hasard, et affichée pour rejouer).
+// --definition : la définition de partie, un id du registre ou un fichier JSON
+//          (marbles/tools/definition-option.js) ; celle du jeu par défaut.
 // --lang : fr (défaut) ou en.
 // --json : en sortie, une dernière ligne JSON (graine, score, état final,
 //          journal complet) pour comparer deux parties.
 //
 // Commandes, une par ligne, sur l'entrée standard (ligne vide ou # : ignorée) :
 //   etat | state                     afficher l'état, comme l'écran le dit
+//   objectif | goal | o              l'objectif, la progression et les règles (touche O)
 //   brut | raw                       afficher l'état complet (format.js), sac compris
 //   poser | place <n> <emplacement>  poser la bille n de la main (à partir de 1)
 //   echanger | swap <empl.> <empl.>  échanger deux emplacements
@@ -45,7 +49,7 @@ import { parseArgs } from "./args.js";
 // La ligne de commande, lue strictement (args.js) : une erreur, et l'outil s'arrête.
 let args;
 try {
-  args = parseArgs(process.argv.slice(2), { values: ["--lang", "--seed"], flags: ["--json"] });
+  args = parseArgs(process.argv.slice(2), { values: ["--lang", "--seed", "--definition"], flags: ["--json"] });
 } catch (error) {
   console.error(error.message);
   process.exit(1);
@@ -59,17 +63,19 @@ const seed = seedOption === undefined ? Math.floor(Math.random() * 2 ** 32) : /^
 // Avant d'importer les textes, qui se chargent par fetch (voir tools/node-fetch.js).
 installFileFetch();
 const { t, setLocale } = await import("../../data/i18n/index.js");
-const { swapRefusal, SLOTS } = await import("../core/marbles.js");
-const { buildSteps, resolutionSteps, describeBag, describeChoicePrompt, describeDiscard, describeHandFocus, describeOverview, describeSlotFocus, describeTurn, placementLines } = await import(
+const { SLOTS } = await import("../core/marbles.js");
+const { buildSteps, resolutionSteps, describeBag, describeChoicePrompt, describeDiscard, describeGoal, describeHandFocus, describeOpening, describeOverview, describeSlotFocus, describeTurn, placementLines, refusalText } = await import(
   "../view/narration.js"
 );
 const { marbleCard } = await import("../view/card.js");
+const { readDefinitionOption } = await import("./definition-option.js");
 const { choiceLine, formatEvent, formatState, tallyList } = await import("./format.js");
 setLocale(lang);
 const name = (id) => t(`marble.${id}.name`);
 
 const HELP = [
   "etat | state                     afficher l'état",
+  "objectif | goal | o              l'objectif, la progression et les règles (touche O)",
   "brut | raw                       afficher l'état complet, sac compris",
   "poser | place <n> <emplacement>  poser la bille n de la main (à partir de 1)",
   "echanger | swap <empl.> <empl.>  échanger deux emplacements",
@@ -86,7 +92,14 @@ const HELP = [
   "Emplacements : gauche (g, left), droite (d, right), pointe (p, apex).",
 ];
 
-let game = GAME_RULES.createGame(seed);
+let definition;
+try {
+  definition = await readDefinitionOption(args.option("--definition"));
+} catch (error) {
+  console.error(error.message);
+  process.exit(1);
+}
+let game = GAME_RULES.createGame(seed, definition);
 const journal = [];
 
 // Applique une action et la journalise ; rend ses évènements, ou null si elle
@@ -94,7 +107,7 @@ const journal = [];
 function apply(action) {
   const result = GAME_RULES.reduce(game, action);
   if (!result.ok) {
-    console.log(`Refusé : ${t(`marbles.error.${result.error}`)} (${result.error})`);
+    console.log(`Refusé : ${refusalText(result.error, game, GAME_RULES, t)} (${result.error})`);
     return null;
   }
   game = result.state;
@@ -160,7 +173,7 @@ function printMarble(marble, main, turnsInHand = 0) {
 
 function printState() {
   console.log(`${describeBag(game, GAME_RULES, t)} ${describeDiscard(game, t)}`);
-  console.log(describeTurn(game, swapRefusal(game) === null, GAME_RULES, t));
+  console.log(describeTurn(game, GAME_RULES.swapRefusal(game) === null, GAME_RULES, t));
   for (const slot of SLOTS) {
     const placed = game.triangle[slot];
     if (placed === null) console.log(`  ${describeSlotFocus(game, slot, GAME_RULES, t)}`);
@@ -179,7 +192,7 @@ function printState() {
 function printForecast(action) {
   const predicted = GAME_RULES.forecast(game, action);
   if (!predicted.ok) {
-    console.log(`Refusé : ${t(`marbles.error.${predicted.error}`)} (${predicted.error})`);
+    console.log(`Refusé : ${refusalText(predicted.error, game, GAME_RULES, t)} (${predicted.error})`);
     return;
   }
   if (action === null) console.log(`  ${describeOverview(game, GAME_RULES, t)}`);
@@ -213,6 +226,11 @@ function runCommand(line) {
     case "state":
       printState();
       break;
+    case "objectif":
+    case "goal":
+    case "o":
+      console.log(describeGoal(game, t));
+      break;
     case "brut":
     case "raw":
       formatState(game, name).forEach((text) => console.log(text));
@@ -238,6 +256,8 @@ function runCommand(line) {
 }
 
 console.log(`Partie de billes, graine ${seed}.`);
+// L'objectif et les règles, comme l'annonce d'ouverture de l'écran.
+console.log(describeOpening(game, t));
 act({ type: "draw" });
 
 const lines = createInterface({ input: process.stdin, terminal: false });

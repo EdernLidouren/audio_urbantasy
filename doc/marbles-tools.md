@@ -21,7 +21,8 @@ Les modules qu'ils partagent, purs (sans Node, donc vérifiables) :
 
 | Module | Rôle |
 |---|---|
-| `marbles/tools/game-rules.js` | Les règles du jeu, liées une fois aux tables des billes et des statuts : le point de composition des outils |
+| `marbles/tools/game-rules.js` | Les règles du jeu, liées une fois aux tables des billes, des statuts et des définitions : le point de composition des outils ; la définition par défaut, la recherche par id (`definitionById`), les surcharges (`withSettings`, `SETTING_NAMES`) et le sac remplacé (`withBag`) |
+| `marbles/tools/definition-option.js` | L'option `--definition` (Node) : l'id d'une définition du registre, ou un fichier JSON de même forme, validé avant de jouer |
 | `marbles/tools/args.js` | La lecture stricte de la ligne de commande, commune aux outils : une option inconnue, une option à valeur sans sa valeur, une option donnée deux fois ou un argument en trop sont une erreur claire, jamais un silence |
 | `marbles/tools/commands.js` | Les commandes texte (« poser 1 pointe ») communes à `play.js` et `case.js` |
 | `marbles/tools/format.js` | L'état et le journal en lignes lisibles : chaque type d'évènement, chaque cible vide (main pleine, pas d'emplacement de référence…) et chaque fin de choix (dont `declined`, rien choisi) |
@@ -39,10 +40,16 @@ Les modules qu'ils partagent, purs (sans Node, donc vérifiables) :
 ```
 node marbles/tools/play.js --seed 42
 node marbles/tools/play.js --seed 42 --json < commandes.txt
+node marbles/tools/play.js --definition target
 ```
 
-Le mode d'emploi est en tête du fichier : `etat`, `brut` (l'état complet, sac
-compris), `poser`, `echanger`, `prevoir`, `fin`, `journal` (lisible) ou `journal json`.
+`--definition` choisit la définition de partie : l'id d'une définition du registre
+(`marbles/content/definitions/`), ou le chemin d'un fichier JSON qui en décrit une, de la
+même forme (`marbles/core/definitions.js`, en-tête) ; sans lui, la partie par défaut.
+
+Le mode d'emploi est en tête du fichier : `etat`, `objectif` (l'objectif, la
+progression et les règles, comme la touche O ; l'objectif et les règles se disent aussi
+à l'ouverture), `brut` (l'état complet, sac compris), `poser`, `echanger`, `prevoir`, `fin`, `journal` (lisible) ou `journal json`.
 Un choix en attente se dit avec sa question et ses cibles ; on y répond par `choisir 2`
 (la bille 2 de la main), `choisir pointe`, `choisir defausse 3` (la bille 3 de la défausse,
 dans l'ordre d'arrivée), ou `terminer` (un choix facultatif : sans cible, l'action est
@@ -63,7 +70,10 @@ plus que la capacité du pot en vigueur), compteurs, valeurs de partie (`"tally"
 reste à zéro), statuts (`"statuses": ["cushion:2", { "status": "extraThrow", "pending": true }]`,
 dans l'ordre d'acquisition, ce qui n'est pas dit venant de la définition ; les bornes
 de la main, des lancers et du pot se lisent aux caractéristiques en vigueur, statuts
-compris), réglages), et `actions`, des commandes texte (`poser 1
+compris ; les règles de la définition y sont toujours, en tête), la définition
+(`"definition": "gravel"`, un id du registre ou une définition entière ; la partie par
+défaut sinon) et ses surcharges (`"settings": { "handSize": 6, "turns": 12 }`, les noms de
+`SETTING_NAMES`)), et `actions`, des commandes texte (`poser 1
 pointe`, `echanger gauche pointe`, `resoudre`, `piocher`, `prevoir`, `choisir 2`,
 `choisir pointe`, `terminer`) ou des actions brutes du réducteur ; une action suspendue
 sur un choix affiche le choix en attente et ses cibles, la suivante y répond. L'outil affiche l'état de départ, le journal ou le refus de chaque
@@ -79,13 +89,18 @@ node marbles/tools/simulate.js --games 1000 --player greedy
 node marbles/tools/simulate.js --player random --random-bag 13 --max-copies 2
 node marbles/tools/simulate.js --bag-file marbles/tools/examples/bag.txt --turns 12
 node marbles/tools/simulate.js --games 200 --export resultats.csv
+node marbles/tools/simulate.js --definition endurance
 ```
 
 Toutes les options sont en tête de `marbles/tools/simulate.js` : nombre de parties,
 graine de départ, joueur, poses envisagées par le glouton, valeur d'une bille gagnée en
-main (`--drawn-value`), sac (de test, aléatoire avec une limite d'exemplaires, ou d'un
-fichier), surcharges des réglages (taille de main, lancers, capacité du pot `--pot`,
-pioches, nombre de tours, pour cette simulation seulement) et export. Comme tous les
+main (`--drawn-value`), définition de partie (`--definition`, un id ou un fichier JSON,
+comme la partie au terminal ; la partie par défaut sinon), sac (celui de la définition,
+aléatoire avec une limite d'exemplaires, ou d'un fichier), surcharges des valeurs de la
+définition (taille de main, lancers, capacité du pot `--pot`, pioches, nombre de tours,
+pour cette simulation seulement) et export. Un sac aléatoire, des options ou de la
+définition, est tiré par le core (`marbles/core/definitions.js`/`randomBag`) avec la
+graine de sac de la partie. Comme tous les
 outils, il lit sa ligne de commande strictement (`marbles/tools/args.js`) : une option
 inconnue, une valeur manquante ou un argument en trop l'arrête sur une erreur.
 
@@ -119,7 +134,12 @@ le glouton ne voit que l'Impact du tour, et jugerait nulles les billes qui pioch
 mesurée sur le rapport glouton de référence, d'avant la Pioche : score moyen 164,825 pour 13
 billes piochées par partie. `--drawn-value 0` rend le glouton d'avant.
 
-**Le rapport** (ses sections : `marbles/tools/report.js`/`REPORT_HEADINGS`) : score final
+**Le rapport** (ses sections : `marbles/tools/report.js`/`REPORT_HEADINGS`) : la
+définition jouée (son id, son objectif, ses règles) et ses valeurs, puis l'OBJECTIF,
+selon lui (`marbles/tools/stats.js`/`goalSummary`) : la répartition des paliers en
+partie libre, la part de victoires et le tour moyen de la victoire en cible, les tours
+tenus (moyenne, médiane, extrêmes) et la part de succès en endurance, et pour tous les
+fins faute de billes (pioche impossible) ; puis score final
 (moyenne, médiane, extrêmes, centiles 10, 25, 75 et 90, par interpolation linéaire),
 Impact moyen par tour et par numéro de tour, poses (poses sur un emplacement occupé, et
 ce qu'apportent la Chiquenaude, l'Éjection et le Tic), pioche et lancers (billes piochées
@@ -142,8 +162,8 @@ observations ; colonne `interruptions` de l'export). Les réactions du pot se li
 bille, « en réaction au pot ».
 
 **L'export** : `.json`, un fichier (paramètres, résumé, une entrée par partie) ; `.csv`,
-deux fichiers, `<nom>-games.csv` (une ligne par partie) et `<nom>-marbles.csv` (une
-ligne par bille). Les chiffres par bille sont ceux du rapport, arrondis au centième une
+deux fichiers, `<nom>-games.csv` (une ligne par partie, avec sa condition de fin, son
+résultat et ses tours tenus) et `<nom>-marbles.csv` (une ligne par bille). Les chiffres par bille sont ceux du rapport, arrondis au centième une
 seule fois (`marbles/tools/stats.js`).
 
 **Durée** : environ 30 secondes pour 1 000 parties gloutonnes (le glouton prévoit chaque
@@ -165,7 +185,7 @@ touchés. Le côté « avant » joue avec le simulateur du commit : un changemen
 simulateur lui-même se voit aussi.
 
 La sortie, d'abord une ligne par simulation : « identique », ou combien de lignes
-changent et si les résultats (score final, Impact par tour :
+changent et si les résultats (score final, Impact par tour, objectif :
 `REPORT_RESULT_HEADINGS`) en font partie. Puis chaque ligne changée, « avant : » et « après : », sous son contexte : le titre
 de sa section, ou sa bille dans la section des billes. Enfin un bilan : rapports
 identiques, résultats, actions refusées et enchaînements interrompus après le changement
@@ -183,6 +203,7 @@ Domaine `marbles-tools` (`marbles/checks/marbles-tools.check.js`) : état constr
 journal lisible (chaque type de `JOURNAL_EVENTS`), vue publique des joueurs, choix du
 glouton contre une recherche exhaustive, aucune action refusée sur 50 parties par
 joueur, glouton meilleur que l'aléatoire, déterminisme du rapport, surcharges, sacs,
+chaque définition du jeu jouée avec son résultat au rapport,
 égalité des chiffres entre rapport et exports, attribution des pioches à l'effet qui
 les demande, et différence de deux rapports (titres connus du comparateur, contexte,
 résultats, durée ignorée). Les outils étant liés à la vraie table
@@ -196,9 +217,12 @@ vérifications des MÉCANISMES ne passent donc jamais par elles :
 
 - **Une table figée** : `marbles/checks/fixtures/marbles.js`, une bille par mécanisme
   (`aging_flick`, `hit_pocket`, `one_shot`…), écrites en entier, usure comprise, et
-  `CHOICELESS_TYPES`, la même sans cible au choix ni Éjecter. Ses parties prennent leurs
-  réglages dans `FIXTURE_SETTINGS`, jamais dans `MARBLES_SETTINGS` :
-  `fixtureRules()` en compose les règles. Pour vérifier un mécanisme nouveau, mieux
+  `CHOICELESS_TYPES`, la même sans cible au choix ni Éjecter. Ses parties suivent la
+  définition de test `FIXTURE_DEFINITION`, jamais celle du jeu : `fixtureRules()` en
+  compose les règles, et son `createGame(seed, over)` en remplace des champs à plat
+  (`fixtureDefinition` : `{ bag: [...], handSize: 6, turns: 3, goal, rules }`) ; un état
+  fabriqué fait de même par `overState` (`marbles/checks/helpers.js`), que
+  `marblesPlayState` applique. Pour vérifier un mécanisme nouveau, mieux
   vaut y AJOUTER une bille que changer une bille existante.
 - **Les textes par leurs clés** : les vérifications de vue passent la traduction de test
   `marbles/checks/helpers.js`/`keyText` là où la vue attend `t`. Elles lisent le gabarit et
@@ -222,10 +246,13 @@ vérifications des MÉCANISMES ne passent donc jamais par elles :
 `marbles/checks/index.js`/`MARBLES_SUITES` ; ils sont lancés par le point d'entrée unique
 des vérifications (`node tools/run-checks.js` pour tous, `node tools/run-checks.js
 <domaine>` pour un seul). Ce que vérifie chacun, aujourd'hui : `marbles` (les règles du
-réducteur), `marbles-pocket` (le pot), `marbles-path` (le chemin des billes : la Chute,
+réducteur), `marbles-definitions` (les définitions de partie : validation, copie dans
+l'état, sac de départ, objectifs et conditions de fin, règles, outils, et chaque
+définition du jeu jouée au hasard sous ses invariants), `marbles-pocket` (le pot), `marbles-path` (le chemin des billes : la Chute,
 Défausser, Rebond, Ramasser), `marbles-zones` (conditions d'état et nombre de billes par
 zone), `marbles-relative` (les cibles relatives), `marbles-statuses` (les statuts :
-définitions, cumuls, caractéristiques, modificateurs, réactions, durées, quantités, sur
+définitions, cumuls, caractéristiques, modificateurs, filtres de source et arrondi,
+verrous, réactions, durées, quantités, sur
 la table des statuts de test `FIXTURE_STATUSES`), `marbles-choice` (cibles au choix et
 Éjecter), `marbles-bus` (le bus d'évènements), `marbles-tally` (les valeurs de partie),
 `marbles-forecast` (la prévision), `marbles-view` (la narration et ses textes),

@@ -34,7 +34,7 @@ const profileOf = (marble, types) => MARBLE_SOUND_PROFILES[types[marble].size];
 
 // Les repères dont le son est le même pour toutes les billes (MARBLES_AUDIO), au
 // volume de l'interface.
-const SHARED_SOUNDS = ["polish", "crack", "flick", "awaken", "final", "windfall", "playerTurn"];
+const SHARED_SOUNDS = ["polish", "crack", "flick", "awaken", "final", "windfall", "playerTurn", "victory", "defeat", "tier", "enduranceEnd"];
 
 // Le chemin et le volume d'un repère ponctuel.
 function cueSound(cue, types) {
@@ -86,6 +86,8 @@ export function playCue(cue, types) {
     return;
   }
   const { key, volume } = cueSound(cue, types);
+  // Un point d'accroche sans fichier (MARBLES_AUDIO à null) : rien à jouer.
+  if (key === null) return;
   playAt(key, cue.place, volume, pitchOf(cue.sound), cue.sound);
 }
 
@@ -198,7 +200,7 @@ export function stopFocusBeacon() {
 
 // Tous les sons de l'écran, décodés d'avance.
 export function preloadMarblesAudio() {
-  const keys = [MARBLES_AUDIO.shuffle, ...SHARED_SOUNDS.map((sound) => MARBLES_AUDIO[sound]), ...Object.values(MARBLE_SOUND_PROFILES).flatMap((profile) => Object.values(profile))];
+  const keys = [MARBLES_AUDIO.shuffle, ...SHARED_SOUNDS.map((sound) => MARBLES_AUDIO[sound]), ...Object.values(MARBLE_SOUND_PROFILES).flatMap((profile) => Object.values(profile))].filter((key) => key !== null);
   for (const member of keys.flatMap(assetKeyMembers)) preloadOneShot(member);
   for (const member of assetKeyMembers(MARBLES_AUDIO.music)) preloadMusic(member);
 }

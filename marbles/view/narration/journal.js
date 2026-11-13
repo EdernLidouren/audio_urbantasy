@@ -5,6 +5,7 @@
 // marbles/view/narration.js.
 
 import { MARBLE_POCKET, MARBLE_TRIGGERS } from "../../config/values.js";
+import { resultText } from "./goal.js";
 import { FIRST_IN_HAND, isOptionalChoice } from "../../core/effects.js";
 import { choiceTarget, combined, describeEffect, effectMoment, formatCounter, marbleName, marbleRef, outcomeLine, slotName, statusName, valueParts } from "./effects.js";
 import { statusLabel } from "./statuses.js";
@@ -149,7 +150,14 @@ const EVENT_TEXTS = {
   // Au dernier tour, la partie finit avant que le triangle ne serve : la rotation
   // ne se dit pas.
   rotation: (event, t, context) => (context.endsBeforeNextTurn ? null : t("marbles.event.rotation", { steps: event.notches, direction: ROTATION_DIRECTION })),
-  gameOver: (event, t) => t("marbles.event.game_over", { score: event.score }),
+  // Une partie libre passe un palier : dit aussitôt après l'Impact.
+  tierReached: (event, t) => t("marbles.event.tier_reached", { tier: t(`marbles.tier.${event.tier}`) }),
+  // La fin de partie : sa raison s'il faut la dire (plus aucune bille), le résultat
+  // selon l'objectif (narration/goal.js), puis le score final.
+  gameOver: (event, t) => {
+    const ended = t("marbles.event.game_over", { score: event.score, result: resultText(event.result, t) });
+    return event.result.end === "noMarbles" ? `${t("marbles.result.no_marbles")} ${ended}` : ended;
+  },
   // LES STATUTS. Reçu : dit par l'effet qui le donne, et une modification de valeur
   // par l'effet ou l'Impact qui la porte (TRAILING) ; activé au début du tour : en
   // silence ; une réaction : par son effet. Renforcé, déjà là, une charge utilisée,
@@ -159,7 +167,7 @@ const EVENT_TEXTS = {
   statusActivated: SILENT,
   statusReaction: SILENT,
   statusStrengthened: (event, t) => t("marbles.event.status_strengthened", { status: statusLabel(event, event, t) }),
-  statusUnchanged: (event, t) => t("marbles.event.status_unchanged", { status: statusName(event.status, t) }),
+  statusUnchanged: (event, t) => t(event.locked ? "marbles.event.status_locked" : "marbles.event.status_unchanged", { status: statusName(event.status, t) }),
   statusCharge: (event, t) => t("marbles.event.status_charge", { status: statusName(event.status, t) }),
   statusExpired: (event, t) => t("marbles.event.status_expired", { status: statusName(event.status, t) }),
 };

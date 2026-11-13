@@ -32,6 +32,10 @@ const GAME_COLUMNS = [
   ["throws", (game) => game.throws],
   ["refusals", (game) => game.refusals.length],
   ["interruptions", (game) => game.interruptions],
+  // Le résultat selon l'objectif : la condition de fin, puis ce qu'il juge.
+  ["end", (game) => game.result.end],
+  ["result", (game) => game.result.tier ?? game.result.outcome],
+  ["held", (game) => game.result.held ?? ""],
   ["impacts", (game) => game.impacts.join(" ")],
   ["bag", (game) => game.bag.join(" ")],
 ];

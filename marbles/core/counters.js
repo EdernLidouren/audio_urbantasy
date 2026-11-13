@@ -46,6 +46,7 @@
 // construction.
 
 import { effectAt, isMarbleSize } from "./effects.js";
+import { isLocked } from "./statuses.js";
 import { rejectUnknownFields } from "../../lib/validate.js";
 
 export const TALLY_CATEGORIES = ["trigger", "action", "stat", "event"];
@@ -56,6 +57,13 @@ function hasField(types, marble, field) {
   return marble !== null && marble !== undefined && (types[marble][field]?.length ?? 0) > 0;
 }
 
+// Un verrou d'effet agit-il dans ce contexte (marbles/core/statuses.js/LOCKS) ? Son
+// mot-clé ne se déclenche pas : son compteur ne bouge pas. Sans état ni table des
+// statuts (un registre compté à la main), rien n'est verrouillé.
+function locked(context, lock, trigger = null) {
+  return context.state?.statuses !== undefined && context.statuses !== undefined && isLocked(context.state.statuses, context.statuses, lock, trigger);
+}
+
 // Un déclencheur (MARBLE_TRIGGERS) : la bille concernée est celle que nomme son
 // évènement, sur l'emplacement, retirée ou en cours de lancer.
 function triggerCounter(trigger) {
@@ -63,7 +71,7 @@ function triggerCounter(trigger) {
     id: trigger.id,
     category: "trigger",
     listenable: true,
-    count: (event, { types }) => (event.type === trigger.event && hasField(types, event.marble, trigger.field) ? 1 : 0),
+    count: (event, context) => (event.type === trigger.event && hasField(context.types, event.marble, trigger.field) && !locked(context, "trigger", trigger.id) ? 1 : 0),
   };
 }
 
@@ -92,7 +100,7 @@ function pocketMomentCounter({ id, event: eventType, clauses, listenable }) {
     id,
     category: "trigger",
     listenable,
-    count: (event, { types }) => (event.type === eventType && event.marble !== null && (clauses(event, types)?.length ?? 0) > 0 ? 1 : 0),
+    count: (event, context) => (event.type === eventType && event.marble !== null && (clauses(event, context.types)?.length ?? 0) > 0 && !locked(context, "pot") ? 1 : 0),
   };
 }
 

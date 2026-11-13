@@ -9,6 +9,7 @@
 
 import { MARBLE_POCKET, MARBLE_TRIGGERS } from "../config/values.js";
 import { SLOTS } from "../core/marbles.js";
+import { startValue, turnLimit } from "../core/definitions.js";
 import { formatCounter } from "../view/narration.js";
 import { GAME_RULES } from "./game-rules.js";
 
@@ -105,6 +106,13 @@ function statusList(instances) {
     .join(" ; ");
 }
 
+// Le résultat d'une partie (marbles/core/definitions.js/gameResult), en clair : son
+// objectif, sa condition de fin, puis ce que l'objectif juge.
+export function resultLine(result) {
+  const judged = { free: () => `palier ${result.tier}`, target: () => result.outcome, endurance: () => `${result.held} tours tenus, ${result.outcome}` };
+  return `objectif ${result.goal}, fin ${result.end}, ${judged[result.goal]()}`;
+}
+
 // L'état entier, une ligne par élément. Le sac se lit du haut (prochaine pioche)
 // vers le bas : c'est un outil de test, il voit ce que le joueur ne voit pas.
 // `rules` : les règles (celles du jeu par défaut), pour l'usure maximale des billes
@@ -113,7 +121,7 @@ export function formatState(state, name, rules = GAME_RULES) {
   const value = (key) => rules.characteristic(state, key);
   const yesNo = (value) => (value ? "oui" : "non");
   const lines = [
-    `Tour ${state.turn} sur ${state.turnCount}, étape ${state.stage}.`,
+    `Tour ${state.turn} sur ${turnLimit(state) ?? "∞"}, étape ${state.stage}.`,
     `Score ${state.score}. Vitesse ${formatCounter(state.speed)}, Masse ${formatCounter(state.mass)}.`,
     `Échange utilisé : ${yesNo(state.swapUsed)}. Lancers : ${state.throwsUsed} sur ${value("throws")}.`,
     ...SLOTS.map((slot) => slotLine(state, slot, name, rules)),
@@ -122,7 +130,7 @@ export function formatState(state, name, rules = GAME_RULES) {
     `Défausse, ${state.discard.length} : ${listOf(state.discard, name)}.`,
     `Pot, ${state.pot.length} sur ${value("potCapacity")}, dans l'ordre d'arrivée : ${listOf(state.pot, name)}. Perdues, ${state.lost.length} : ${listOf(state.lost, name)}.`,
     `Statuts : ${statusList(state.statuses)}.`,
-    `Pioche : ${state.firstTurnDraw} au premier tour, ${state.drawPerTurn} ensuite.`,
+    `Pioche : ${startValue(state, "firstTurnDraw")} au premier tour, ${startValue(state, "drawPerTurn")} ensuite.`,
     `Valeurs de partie (ce tour/cette partie) : ${tallyList(state.tally)}.`,
     ...(state.pendingChoice ? [choiceLine(state.pendingChoice, name)] : []),
   ];
@@ -191,7 +199,7 @@ const EMPTY_TARGETS = {
 const CHOICE_ENDS = { count: "nombre atteint", done: "terminé", exhausted: "plus de cible", declined: "rien choisi, action ignorée" };
 
 const EVENT_LINES = {
-  turnStarted: (event) => `Début du tour ${event.turn} sur ${event.turnCount}.`,
+  turnStarted: (event) => `Début du tour ${event.turn} sur ${event.turnCount ?? "∞"}.`,
   draw: (event, name) => `Pioche : ${marbleLabel(event.marble, name)}${event.cause === "effect" ? ", par un effet" : ""}.`,
   awaken: (event, name) => `Éveil : ${marbleLabel(event.marble, name)}, en main.`,
   drawSkipped: (event) => `Pioche sautée (${event.reason}).`,
@@ -233,10 +241,11 @@ const EVENT_LINES = {
   rotation: (event, name) =>
     `Rotation : ${SLOTS.map((slot) => `${slotLabel(slot)} ${event.triangle[slot] === null ? "vide" : marbleLabel(event.triangle[slot].marble, name)}`).join(", ")}.`,
   turnEnded: (event) => `Fin du tour ${event.turn}.`,
-  gameOver: (event) => `Fin de partie, score ${event.score}.`,
+  tierReached: (event) => `Palier atteint : ${event.tier}, score ${event.score}.`,
+  gameOver: (event) => `Fin de partie, score ${event.score}. Résultat : ${resultLine(event.result)}.`,
   statusGained: (event) => `Statut reçu : ${event.status}, intensité ${event.intensity}, reste ${event.remaining ?? "toute la partie"}${event.pending ? ", en attente" : ""}.`,
   statusStrengthened: (event) => `Statut renforcé : ${event.status}, intensité ${event.intensity}, reste ${event.remaining ?? "toute la partie"}${event.pending ? ", en attente" : ""}.`,
-  statusUnchanged: (event) => `Statut déjà là, sans effet : ${event.status}.`,
+  statusUnchanged: (event) => `Statut déjà là, sans effet : ${event.status}${event.locked ? " (règle, verrouillée)" : ""}.`,
   statusActivated: (event) => `Statut activé : ${event.status}.`,
   statusCharge: (event) => `Charge utilisée : ${event.status}, reste ${event.remaining}.`,
   statusExpired: (event) => `Fin du statut : ${event.status}.`,

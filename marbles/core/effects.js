@@ -234,10 +234,13 @@ export function isAll(target) {
   return target !== null && typeof target === "object" && target.type === "all";
 }
 
-// Les FILTRES d'une cible « toutes » (en-tête), déclarés ici et nulle part ailleurs,
-// sur le modèle des conditions : `fields`, `validate`, et `test(filter, marble,
-// types)`, la bille passe-t-elle le filtre. Ajouter un filtre (la matière…) : une
-// entrée ici et son texte dans la vue (marbles/view/narration/effects.js/FILTER_TEXTS).
+// Les FILTRES DE BILLE, déclarés ici et nulle part ailleurs, sur le modèle des
+// conditions : `fields`, `validate`, et `test(filter, marble, types)`, la bille
+// passe-t-elle le filtre. Deux usages, le même système : la cible « toutes » (en-tête)
+// et la SOURCE d'un modificateur de statut (marbles/core/statuses.js : seules les
+// valeurs produites par une bille qui passe ses filtres sont modifiées). Ajouter un
+// filtre (la matière, le déclencheur…) : une entrée ici et son texte dans la vue
+// (marbles/view/narration/effects.js/FILTER_TEXTS).
 export const TARGET_FILTERS = {
   // La bille est de calibre `size` (marbles/config/values.js : SMALL, MEDIUM, LARGE).
   size: {
@@ -825,10 +828,16 @@ function validateAll(clause, action, describe, fail) {
   const where = `${describe}, cible « toutes »`;
   rejectUnknownFields(all, ["type", "filters"], where, fail);
   if (action.all !== true) fail(`${where} : ${clause.action} ne vise pas toutes les billes.`);
-  if (all.filters === undefined) return;
-  if (!Array.isArray(all.filters)) fail(`${where} : filters doit être une liste.`);
+  if (all.filters !== undefined) validateFilters(all.filters, where, fail);
+}
+
+// Une liste de filtres de bille (TARGET_FILTERS) : chacun valide et d'un type au plus
+// (deux calibres à la fois ne viseraient rien). Celle d'une cible « toutes » comme
+// celle d'un modificateur de statut (marbles/core/validation.js).
+export function validateFilters(filters, where, fail) {
+  if (!Array.isArray(filters) || filters.length === 0) fail(`${where} : filters doit être une liste non vide.`);
   const seen = new Set();
-  for (const filter of all.filters) {
+  for (const filter of filters) {
     validateRule(filter, TARGET_FILTERS, "filtre", where, fail);
     if (seen.has(filter.type)) fail(`${where} : filtre "${filter.type}" en double.`);
     seen.add(filter.type);

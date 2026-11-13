@@ -9,6 +9,7 @@
 // (`node tools/run-checks.js marbles-tools`).
 
 import { MARBLES_SETTINGS, STARTING_BAG } from "../config/values.js";
+import { turnLimit } from "../core/definitions.js";
 import { SLOTS } from "../core/marbles.js";
 import { JOURNAL_EVENTS } from "../core/content.js";
 import { throws } from "../../lib/check.js";
@@ -24,7 +25,7 @@ import { contextLabel, diffReports, reportAnomalies } from "../tools/report-diff
 import { parseArgs } from "../tools/args.js";
 import { MARBLE_COLUMNS, toCsv, toJson } from "../tools/export.js";
 import MARBLE_TYPES from "../content/types/index.js";
-import { GAME_RULES } from "../tools/game-rules.js";
+import { DEFAULT_GAME_DEFINITION, GAME_RULES, definitionById, withBag, withSettings } from "../tools/game-rules.js";
 import { handIds } from "./helpers.js";
 
 // Les règles du jeu, liées aux vraies tables (marbles/tools/game-rules.js).
@@ -61,12 +62,12 @@ function checkStateBuilder(run) {
     triangle: { leftBase: "magnifier:1", rightBase: "clay", apex: { marble: "gorilla", wear: 2 } },
     hand: ["clay", "leaded:2"],
     bag: ["agate", "mica"],
-    settings: { turnCount: 6 },
+    settings: { turns: 6 },
   });
   run.same("état construit : le triangle et son usure", { marble: "magnifier", wear: 1 }, state.triangle.leftBase);
   run("état construit : usure 0 par défaut", 0, state.triangle.rightBase.wear);
   run.same("état construit : le sac dans l'ordre décrit, sans mélange", ["agate", "mica"], state.bag);
-  run("état construit : réglage surchargé", 6, state.turnCount);
+  run("état construit : réglage surchargé", 6, turnLimit(state));
   run("état construit : phase de jeu par défaut", "play", state.stage);
   run("état construit : un état que le réducteur accepte", true, rules.reduce(state, { type: "place", handIndex: 1, slot: "apex" }).ok);
   run("état construit : bille inconnue refusée", true, throws(() => buildState({ hand: ["nope"] })));
@@ -74,7 +75,7 @@ function checkStateBuilder(run) {
   run("état construit : emplacement inconnu refusé", true, throws(() => buildState({ triangle: { middle: "clay" } })));
   run("état construit : usure au maximum refusée", true, throws(() => buildState({ triangle: { apex: `clay:${rules.maxWearOf("clay")}` } })));
   run("état construit : juste sous le maximum, acceptée", false, throws(() => buildState({ triangle: { apex: `clay:${rules.maxWearOf("clay") - 1}` } })));
-  run("état construit : main trop grande refusée", true, throws(() => buildState({ hand: Array(MARBLES_SETTINGS.maxHandSize + 1).fill("clay") })));
+  run("état construit : main trop grande refusée", true, throws(() => buildState({ hand: Array(DEFAULT_GAME_DEFINITION.start.handSize + 1).fill("clay") })));
   // Les statuts : reçus comme d'un effet, puis ce que la description fixe ; les bornes
   // aux caractéristiques en vigueur.
   const withStatuses = buildState({ statuses: ["cushion:2", { status: "extraThrow", pending: true }] });
@@ -95,7 +96,7 @@ function checkStateBuilder(run) {
   run("état construit : compteur négatif refusé", true, throws(() => buildState({ hand: ["clay:-1"] })));
   run(
     "état lisible : la main dit les tours en main",
-    `Main, 2 sur ${MARBLES_SETTINGS.maxHandSize} : clay, 0 tour en main ; leaded, 2 tours en main.`,
+    `Main, 2 sur ${DEFAULT_GAME_DEFINITION.start.handSize} : clay, 0 tour en main ; leaded, 2 tours en main.`,
     formatState(state).find((line) => line.startsWith("Main"))
   );
 
@@ -137,11 +138,11 @@ function checkCommandsAndFormat(run) {
   // Chaque type d'évènement d'une vraie partie a sa ligne lisible, jamais le repli
   // JSON.
   // Trois parties suffisent : seuls leurs graines et leurs sacs servent.
-  const { games } = simulate({ games: 3, seed: "format", player: "random", bagMode: { kind: "random", size: 7, maxCopies: null }, settings: { turnCount: 20 } });
+  const { games } = simulate({ games: 3, seed: "format", player: "random", bagMode: { kind: "random", size: 7, maxCopies: null }, settings: { turns: 20 } });
   const types = new Set();
   let raw = 0;
   for (const index of [0, 1, 2]) {
-    const state = rules.createGame(games[index].seed, { bag: games[index].bag, turnCount: 20 });
+    const state = rules.createGame(games[index].seed, withBag(withSettings(DEFAULT_GAME_DEFINITION, { turns: 20 }), games[index].bag));
     let current = state;
     while (current.stage !== "over") {
       const action = current.pendingChoice
@@ -165,6 +166,7 @@ function checkCommandsAndFormat(run) {
     choice: { zones: ["hand"], count: 1, by: { trigger: "hit", slot: "apex", marble: "clay" } },
     eject: { slot: "apex", marble: "clay", by: { trigger: "hit", slot: "apex", marble: "clay" } },
     rotation: { triangle: { leftBase: null, rightBase: null, apex: null } },
+    gameOver: { score: 0, result: { goal: "free", end: "lastTurn", score: 0, tier: "none" } },
   };
   const unreadable = Object.keys(JOURNAL_EVENTS).filter((type) => formatEvent({ type, ...minimal[type] }).startsWith(`${type} : {`));
   run.same("journal lisible : chaque type du journal (JOURNAL_EVENTS) a sa ligne", [], unreadable);
@@ -301,7 +303,7 @@ function checkGreedy(run) {
   // exhaustive sur les places de la main (-1 : emplacement laissé vide). Les billes
   // se posent vraiment, dans l'ordre des phases comme le glouton : leurs
   // Chiquenaudes comptent.
-  const first = rules.reduce(rules.createGame(7), { type: "draw" }).state;
+  const first = rules.reduce(rules.createGame(7, DEFAULT_GAME_DEFINITION), { type: "draw" }).state;
   let firstBest = -Infinity;
   const hand = handIds(first);
   const choicesOf = [-1, ...hand.keys()];
@@ -379,7 +381,7 @@ function checkSimulation(run) {
   run("déterminisme : une autre graine change le rapport", false, JSON.stringify(report(5)) === JSON.stringify(report(6)));
 
   // Surcharges : prises en compte, le module de réglages intact.
-  const short = simulate({ games: 10, seed: 2, player: "greedy", settings: { turnCount: 4, drawPerTurn: 2, maxHandSize: 6, firstTurnDraw: 6 } });
+  const short = simulate({ games: 10, seed: 2, player: "greedy", settings: { turns: 4, drawPerTurn: 2, handSize: 6, firstTurnDraw: 6 } });
   run("surcharge : 4 tours", true, short.games.every((game) => game.turns === 4));
   run.same("surcharge : réglages par défaut intacts", settingsBefore, MARBLES_SETTINGS);
   run("surcharge : réglage inconnu refusé", true, throws(() => simulate({ games: 1, settings: { tours: 3 } })));
@@ -400,6 +402,22 @@ function checkSimulation(run) {
   // Une partie se rejoue à l'identique, seule, depuis son index.
   run.same("partie : rejouée seule, même relevé", results.greedy.games[17], playGame({ ...results.greedy.params, index: 17 }));
   run("centiles : interpolation", 2.5, percentile([1, 2, 3, 4], 50));
+
+  // Chaque objectif a son résultat au rapport : paliers, victoires, tours tenus, et les
+  // fins faute de billes, pour toutes les définitions du jeu.
+  for (const definition of Object.values(GAME_RULES.definitions)) {
+    const played = simulate({ games: 4, seed: 3, player: "greedy", definition });
+    const report = buildReport({ params: played.params, summary: summarize(played) });
+    const goalAt = report.indexOf(REPORT_HEADINGS.goal);
+    run(`définition ${definition.id} : jouée, son résultat au rapport`, true, played.games.every((game) => game.result.goal === definition.goal.kind) && goalAt > 0 && report.some((line) => line.startsWith("Fins faute de billes : ")));
+    run(`définition ${definition.id} : nommée au rapport`, true, report.some((line) => line.startsWith(`Définition : ${definition.id},`)));
+  }
+  const target = summarize(simulate({ games: 6, seed: 2, player: "greedy", definition: definitionById("target") })).goal;
+  run("cible : une part de victoires", true, target.kind === "target" && target.victories >= 0 && target.victories <= 100);
+  const endurance = summarize(simulate({ games: 6, seed: 2, player: "greedy", definition: definitionById("endurance") })).goal;
+  run("endurance : des tours tenus", true, endurance.kind === "endurance" && endurance.held.min >= 0 && endurance.held.max <= 20);
+  const tiers = summarize(simulate({ games: 6, seed: 2, player: "greedy" })).goal.tiers;
+  run("libre : les paliers font 100 %", 100, Math.round(Object.values(tiers).reduce((total, share) => total + share, 0)));
   run.same("ids des billes : ceux de la table, dans son ordre", Object.keys(MARBLE_TYPES), MARBLE_IDS);
 }
 
