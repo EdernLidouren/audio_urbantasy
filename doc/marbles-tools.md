@@ -223,7 +223,11 @@ vérifications des MÉCANISMES ne passent donc jamais par elles :
   (`fixtureDefinition` : `{ bag: [...], handSize: 6, turns: 3, goal, rules }`) ; un état
   fabriqué fait de même par `overState` (`marbles/checks/helpers.js`), que
   `marblesPlayState` applique. Pour vérifier un mécanisme nouveau, mieux
-  vaut y AJOUTER une bille que changer une bille existante.
+  vaut y AJOUTER une bille que changer une bille existante. Toutes ses billes sont des
+  Classiques communes ; une table FABRIQUÉE (`fabricatedRules`, `validateTable`) reçoit de
+  même, par `withSizes`, les champs obligatoires qu'elle ne déclare pas (calibre normale,
+  famille Classiques, rareté commune). Les familles et les raretés se vérifient sur des
+  billes fabriquées, une bicolore comprise (domaine `marbles-families`).
 - **Les textes par leurs clés** : les vérifications de vue passent la traduction de test
   `marbles/checks/helpers.js`/`keyText` là où la vue attend `t`. Elles lisent le gabarit et
   ses valeurs (`event.draw{marbles: [<aging_flick>]}`), jamais la rédaction : réécrire un
@@ -231,7 +235,8 @@ vérifications des MÉCANISMES ne passent donc jamais par elles :
   (domaine `marbles-view`, `checkWitnesses`), sur des billes fabriquées qui ne prennent
   aux vraies que leur nom.
 - **Le contrat des vraies billes** : domaine `marbles-content`. La table et le sac de
-  départ se valident, chaque bille a son nom et ses textes sans gabarit brut, un profil
+  départ se valident, chaque bille a son nom et ses textes sans gabarit brut (sa
+  description et ses familles comprises), chaque famille et chaque rareté son nom, un profil
   sonore complet, des parties au hasard gardent leurs invariants, et la prévision
   correspond au réel. Aucune attente chiffrée sur une bille.
 - **Des sections** : chaque domaine découpe ses vérifications par `run.section`
@@ -250,7 +255,9 @@ réducteur), `marbles-definitions` (les définitions de partie : validation, cop
 l'état, sac de départ, objectifs et conditions de fin, règles, outils, et chaque
 définition du jeu jouée au hasard sous ses invariants), `marbles-pocket` (le pot), `marbles-path` (le chemin des billes : la Chute,
 Défausser, Rebond, Ramasser), `marbles-zones` (conditions d'état et nombre de billes par
-zone), `marbles-relative` (les cibles relatives), `marbles-statuses` (les statuts :
+zone), `marbles-families` (familles et raretés : validation, filtres, conditions
+d'emplacement, nombre de billes filtré, familles différentes, leurs textes et la touche
+F), `marbles-relative` (les cibles relatives), `marbles-statuses` (les statuts :
 définitions, cumuls, caractéristiques, modificateurs, filtres de source et arrondi,
 verrous, réactions, durées, quantités, sur
 la table des statuts de test `FIXTURE_STATUSES`), `marbles-choice` (cibles au choix et

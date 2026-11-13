@@ -7,13 +7,26 @@
 
 import { formatMenuPosition } from "../../../lib/menu.js";
 import { turnLimit } from "../../core/definitions.js";
-import { cardSituation, describeEffect, describePrinted, formatCounter, marbleName, sizeName, slotName, marbleRef } from "./effects.js";
+import { cardSituation, describeEffect, describePrinted, familyNames, formatCounter, marbleName, rarityName, sizeName, slotName, marbleRef } from "./effects.js";
 
-// L'annonce principale d'une bille hors du triangle (main, sac, défausse) : son
-// nom, son calibre juste après, son usure maximale, puis « x sur y » : « gorille,
-// calot, usure 3. ». Le détail est dans sa fiche (marbles/view/card.js).
+// La ligne d'une bille hors du triangle (main, sac, défausse, pot, choix) : son nom,
+// son calibre juste après, ses familles et sa rareté, son usure maximale : « rubis,
+// normale, Trésor, rare, usure 4 ». Une bille active s'annonce sans ses familles ni
+// sa rareté (describeSlotFocus), que dit la touche F.
+export function marbleListLine(marble, rules, t) {
+  return t("marbles.list.line", {
+    name: marbleName(marble, t),
+    size: sizeName(rules.types[marble].size, t),
+    families: familyNames(marble, rules.types, t),
+    rarity: rarityName(marble, rules.types, t),
+    maxWear: rules.maxWearOf(marble),
+  });
+}
+
+// L'annonce principale d'une bille hors du triangle : sa ligne (marbleListLine), puis
+// « x sur y ». Le détail est dans sa fiche (marbles/view/card.js).
 export function describeMarbleInList(marble, index, total, rules, t) {
-  const line = t("marbles.list.line", { name: marbleName(marble, t), size: sizeName(rules.types[marble].size, t), maxWear: rules.maxWearOf(marble) });
+  const line = marbleListLine(marble, rules, t);
   const position = formatMenuPosition(index, total, t);
   return position ? `${line}. ${position}` : `${line}.`;
 }
@@ -31,7 +44,7 @@ function phaseText(game, slot, rules, t) {
   const predicted = rules.forecast(game);
   if (predicted.ok) return predicted.phases[slot] === null ? null : describeEffect(predicted.phases[slot], t);
   const { marble } = game.triangle[slot];
-  return describePrinted(rules.effectAt(marble, slot), cardSituation(marble, 0, game.tally, game), t, rules.statuses);
+  return describePrinted(rules.effectAt(marble, slot), cardSituation(marble, 0, game.tally, game, rules.types), t, rules.statuses);
 }
 
 // L'annonce principale d'un emplacement sous le curseur : la bille, son calibre

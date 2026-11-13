@@ -10,7 +10,7 @@ import { assembleCard, validateCardModel } from "../../../lib/detail-card.js";
 import { MARBLE_TRIGGERS, STATUS_CARD_MODEL } from "../../config/values.js";
 import { MODIFIER_POINTS, RULE_ORIGIN, definitionOf, ordinaryInstances } from "../../core/statuses.js";
 import { TARGET_FILTERS } from "../../core/effects.js";
-import { combined, describePrinted, effectMoment, formatCounter, sizeRef, statusName } from "./effects.js";
+import { combined, describePrinted, effectMoment, familyRef, formatCounter, rarityRef, sizeRef, statusName } from "./effects.js";
 
 validateCardModel(STATUS_CARD_MODEL);
 
@@ -60,6 +60,8 @@ export function describeStatuses(game, rules, t) {
 // TARGET_FILTERS), un seul filtre dit (un second demandera une phrase qui les combine).
 const SOURCE_FILTER_TEXTS = {
   size: (filter) => ({ key: "marbles.statuses.source.size", params: { size: sizeRef(filter.size) } }),
+  family: (filter) => ({ key: "marbles.statuses.source.family", params: { family: familyRef(filter.family) } }),
+  rarity: (filter) => ({ key: "marbles.statuses.source.rarity", params: { rarity: rarityRef(filter.rarity) } }),
 };
 for (const type of Object.keys(TARGET_FILTERS)) {
   if (!Object.hasOwn(SOURCE_FILTER_TEXTS, type)) throw new Error(`marbles : le filtre "${type}" doit avoir son texte de source (SOURCE_FILTER_TEXTS).`);

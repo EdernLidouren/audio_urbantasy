@@ -42,10 +42,23 @@
 //               `ejectedMarbles`… : marbles/core/content.js/REACTION_KEYS). Rien sur la
 //               bille elle-même ;
 //   maxWear     usure maximale, sinon MARBLES_SETTINGS.defaultMaxWear ;
+//   families    ses FAMILLES, obligatoires : une liste d'au moins une famille de
+//               marbles/config/values.js/MARBLE_FAMILIES, chacune une fois ;
+//               plusieurs pour une bille bicolore. Statiques. Lues par les filtres,
+//               les conditions de famille et les sources de montant, et dites dans
+//               son annonce (touche F) ;
+//   rarity      sa RARETÉ, obligatoire : une de MARBLE_RARITIES. Statique. Lue par
+//               les filtres et les conditions de rareté, dite dans son annonce ;
 //   size        son CALIBRE, obligatoire : SMALL, MEDIUM ou LARGE, toujours par ces
 //               constantes (marbles/config/values.js), validé au chargement. Statique.
 //               Lu par les conditions de calibre, et par le son : le profil sonore
-//               et la force des chocs de la bille viennent de lui.
+//               et la force des chocs de la bille viennent de lui ;
+//   beacon      (facultatif) sa BALISE propre, la voix de la bille à la pioche et
+//               sous le curseur : une clé du manifeste audio (assets/manifest.json),
+//               un pool dont une variante numérotée se tire au hasard, ou un
+//               fichier ; absente, la balise de son calibre
+//               (marbles/config/values.js/MARBLE_SOUND_PROFILES). Vérifiée par
+//               l'audit du contenu ; la simulation ne la lit jamais.
 //
 // Un effet est une LISTE DE CLAUSES ; une clause (marbles/core/effects.js, CLAUSE_ACTIONS
 // pour la liste des actions et ce que chacune accepte ; les formes courtes, une par
@@ -55,8 +68,8 @@
 //           Ramasser), ou Appliquer un statut (marbles/content/statuses/) ;
 //   amount  la valeur : un entier, ou un MONTANT CALCULÉ { base, step, source,
 //           max? }, base + step × la valeur de la source, plafonné à max, évalué
-//           au déclenchement (sources : turnsInHand(), activeSize(calibre),
-//           tally(valeur, portée), zoneCount(zone)) ;
+//           au déclenchement (sources : turnsInHand(), tally(valeur, portée),
+//           zoneCount(zone, filtre?), familyCount()) ;
 //   target  (facultatif) un emplacement ; une cible relative (NEXT_SLOT,
 //           PREVIOUS_SLOT) ; un CHOIX du joueur, choice({ zones, count, mode }) ;
 //           « toutes les billes actives », allActive(...filtres) ; et ce que
@@ -71,35 +84,70 @@
 //
 // Le nom d'une bille se déduit de son id : `marble.<id>.name`
 // (data/i18n/<langue>/marbles.json), vérifié par les vérifications
-// (domaine marbles-view). AJOUTER UNE BILLE : son fichier ici, sa ligne
-// ci-dessous, son nom dans chaque langue, et sa place dans
-// marbles/config/values.js/STARTING_BAG pour la mettre en jeu.
+// (domaine marbles-view) ; sa DESCRIPTION aussi, facultative, un texte d'ambiance
+// sans effet de jeu (touche V) : `marble.<id>.description`. AJOUTER UNE BILLE : son
+// fichier ici, sa ligne ci-dessous, son nom (et sa description) dans chaque langue,
+// et sa place dans marbles/config/values.js/STARTING_BAG pour la mettre en jeu.
+import copper from "./copper.js";
+import quicksilver from "./quicksilver.js";
+import ruby from "./ruby.js";
+import ingot from "./ingot.js";
+import bloodstone from "./bloodstone.js";
+import moon from "./moon.js";
+import comet from "./comet.js";
+import galaxy from "./galaxy.js";
+import eclipse from "./eclipse.js";
+import star from "./star.js";
+import bubble from "./bubble.js";
+import ghost from "./ghost.js";
+import pearl from "./pearl.js";
+import ocean from "./ocean.js";
+import snow_globe from "./snow_globe.js";
+import bee from "./bee.js";
+import dolphin from "./dolphin.js";
+import turtle from "./turtle.js";
+import spider from "./spider.js";
+import dragon from "./dragon.js";
+import sling_shot from "./sling_shot.js";
+import fireball from "./fireball.js";
+import tornado from "./tornado.js";
+import grenade from "./grenade.js";
+import red_devil from "./red_devil.js";
 import clay from "./clay.js";
-import glass from "./glass.js";
-import gorilla from "./gorilla.js";
-import agate from "./agate.js";
 import cats_eye from "./cats_eye.js";
-import porcelain from "./porcelain.js";
-import leaded from "./leaded.js";
-import mica from "./mica.js";
-import sulphide from "./sulphide.js";
-import stoneware from "./stoneware.js";
-import tiger from "./tiger.js";
-import giant from "./giant.js";
-import magnifier from "./magnifier.js";
+import agate from "./agate.js";
+import steel from "./steel.js";
+import soda from "./soda.js";
 
 export default {
+  copper,
+  quicksilver,
+  ruby,
+  ingot,
+  bloodstone,
+  moon,
+  comet,
+  galaxy,
+  eclipse,
+  star,
+  bubble,
+  ghost,
+  pearl,
+  ocean,
+  snow_globe,
+  bee,
+  dolphin,
+  turtle,
+  spider,
+  dragon,
+  sling_shot,
+  fireball,
+  tornado,
+  grenade,
+  red_devil,
   clay,
-  glass,
-  gorilla,
-  agate,
   cats_eye,
-  porcelain,
-  leaded,
-  mica,
-  sulphide,
-  stoneware,
-  tiger,
-  giant,
-  magnifier,
+  agate,
+  steel,
+  soda,
 };

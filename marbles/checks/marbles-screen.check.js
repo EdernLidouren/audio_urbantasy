@@ -63,6 +63,7 @@ function checkGoal(run) {
 export default function checkMarblesScreen(run) {
   run.section("ouverture", checkOpening);
   run.section("prendre et poser", checkPlace);
+  run.section("touches V et F", checkMarbleInfo);
   run.section("échange", checkSwap);
   run.section("séquence de résolution", checkSequence);
   run.section("menu par-dessus", checkMenuFreezes);
@@ -167,6 +168,48 @@ const turnCues = (bench) => bench.sounds.filter((sound) => sound.name === "playC
 // Entrée sur une bille de la main ouvre la sélection d'emplacement ; Entrée sur un
 // emplacement ouvre la confirmation ; Confirmer pose, et le curseur revient dans la
 // main. Échap, pendant la sélection, ramène sur la bille.
+// V (la description) et F (familles, calibre, rareté) : la bille sous le curseur, dans
+// la main comme sur le triangle ; un emplacement vide n'a aucune bille. Les billes de
+// test n'ont pas de description.
+function checkMarbleInfo(run) {
+  const bench = openScreenBench(rules, playState({ hand: inHand(["aging_flick"]), triangle: { rightBase: placed("one_shot"), leftBase: null, apex: null } }));
+  try {
+    bench.key("f");
+    run("F en main : familles, calibre et rareté", "identity.line{families: [family.classics.name], size: size.medium.name, rarity: rarity.common.name}", bench.said.at(-1));
+    bench.key("v");
+    run("V en main : sans description", "description.none", bench.said.at(-1));
+    // La main monte à la dernière base, la base gauche, vide.
+    bench.key("ArrowUp");
+    bench.key("f");
+    run("F sur un emplacement vide : aucune bille", "no_marble", bench.said.at(-1));
+    bench.key("v");
+    run("V sur un emplacement vide : aucune bille", "no_marble", bench.said.at(-1));
+    bench.key("ArrowRight");
+    bench.key("f");
+    run("F sur une bille active : ses familles aussi", "identity.line{families: [family.classics.name], size: size.large.name, rarity: rarity.common.name}", bench.said.at(-1));
+    run("l'annonce d'une bille active : inchangée, sans familles ni rareté", true, bench.said.at(-2).startsWith("slot_line.occupied{") && !bench.said.at(-2).includes("family"));
+  } finally {
+    bench.close();
+  }
+  // Dans un menu de pile (ici le pot, Maj+P) : la bille sous le curseur, dans les
+  // vrais textes (le menu les dit lui-même).
+  const pile = openScreenBench(rules, playState({ hand: inHand(["aging_flick"]), pot: ["one_shot"] }));
+  try {
+    pile.key("p", ["shift"]);
+    pile.key("Home");
+    run("menu du pot : la ligne de la bille, avec familles et rareté", true, pile.menuSaid().at(-1).includes(realT("marbles.family.classics.name")));
+    pile.key("f");
+    run("menu du pot, F : familles, calibre et rareté", realT("marbles.identity.line", { families: [realT("marbles.family.classics.name")], size: realT("marbles.size.large.name"), rarity: realT("marbles.rarity.common.name") }), pile.menuSaid().at(-1));
+    pile.key("v");
+    run("menu du pot, V : sans description", realT("marbles.description.none"), pile.menuSaid().at(-1));
+    pile.key("End");
+    pile.key("f");
+    run("menu du pot, F sur Retour : aucune bille", realT("marbles.no_marble"), pile.menuSaid().at(-1));
+  } finally {
+    pile.close();
+  }
+}
+
 function checkPlace(run) {
   const state = playState({ hand: inHand(["aging_flick", "hit_polish"]) });
   const released = openScreenBench(rules, state);
@@ -175,7 +218,7 @@ function checkPlace(run) {
     released.key("Escape");
     run(
       "Échap pendant la sélection : relâchée, de retour sur la bille dans la main",
-      "take.released zone.hand list.line{name: <aging_flick>, size: size.medium.name, maxWear: 3}. menu.position{index: 1, total: 2}",
+      "take.released zone.hand list.line{name: <aging_flick>, size: size.medium.name, families: [family.classics.name], rarity: rarity.common.name, maxWear: 3}. menu.position{index: 1, total: 2}",
       released.said.at(-1)
     );
     run("Échap pendant la sélection : la partie n'a pas bougé", state, released.game());
@@ -404,6 +447,11 @@ function checkDiscardChoice(run) {
     run("défausse : la flèche droite, la bille suivante dans l'ordre d'arrivée", true, bench.said.at(-1).startsWith("list.line{name: <flicker>"));
     bench.key("e");
     run("défausse : E dit les mots-clés de la bille", true, bench.said.at(-1).includes("keyword.flick"));
+    // Une bille de test n'a pas de description.
+    bench.key("v");
+    run("défausse : V dit la description de la bille", "description.none", bench.said.at(-1));
+    bench.key("f");
+    run("défausse : F dit ses familles, son calibre et sa rareté", "identity.line{families: [family.classics.name], size: size.medium.name, rarity: rarity.common.name}", bench.said.at(-1));
     bench.key("Enter");
     for (let pulse = 0; pulse < 5; pulse++) bench.advance(LONG_MS);
     run("défausse : la bille choisie, ramassée en main", true, bench.game().hand.some((held) => held.marble === "flicker"));

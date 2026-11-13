@@ -32,6 +32,11 @@ import { positionOf, renderAt, renderPosition, rollRendering } from "./space.js"
 // ici.
 const profileOf = (marble, types) => MARBLE_SOUND_PROFILES[types[marble].size];
 
+// La BALISE d'une bille : la sienne si elle en déclare une (son champ `beacon`), sinon
+// celle de son calibre. Une clé du manifeste : un pool tire au hasard l'une de ses
+// variantes numérotées (lib/assets.js/resolveAsset), un fichier se joue tel quel.
+export const beaconKey = (marble, types) => types[marble].beacon ?? profileOf(marble, types).beacon;
+
 // Les repères dont le son est le même pour toutes les billes (MARBLES_AUDIO), au
 // volume de l'interface.
 const SHARED_SOUNDS = ["polish", "crack", "flick", "awaken", "final", "windfall", "playerTurn", "victory", "defeat", "tier", "enduranceEnd"];
@@ -44,7 +49,7 @@ function cueSound(cue, types) {
   // calibres.
   if (SHARED_SOUNDS.includes(cue.sound)) return { key: MARBLES_AUDIO[cue.sound], volume: gain * interfaceVolumeFactor() };
   if (cue.sound === "drop") return { key: profileOf(cue.marble, types).drop, volume: gain * interfaceVolumeFactor() };
-  return { key: profileOf(cue.marble, types).beacon, volume: gain * beaconVolumeFactor() };
+  return { key: beaconKey(cue.marble, types), volume: gain * beaconVolumeFactor() };
 }
 
 // La vitesse de lecture d'un son : tirée autour de 1 pour les familles qui varient
@@ -185,7 +190,7 @@ let focusBeacon = null;
 // sac, de la défausse et du pot). `types` : la table des billes.
 export function playFocusBeacon(marble, place, types) {
   stopFocusBeacon();
-  const key = profileOf(marble, types).beacon;
+  const key = beaconKey(marble, types);
   try {
     focusBeacon = playTrackedOneShot(resolveAsset(key), placedOptions(place, beaconVolumeFactor()));
   } catch (error) {
@@ -198,9 +203,11 @@ export function stopFocusBeacon() {
   focusBeacon = null;
 }
 
-// Tous les sons de l'écran, décodés d'avance.
-export function preloadMarblesAudio() {
-  const keys = [MARBLES_AUDIO.shuffle, ...SHARED_SOUNDS.map((sound) => MARBLES_AUDIO[sound]), ...Object.values(MARBLE_SOUND_PROFILES).flatMap((profile) => Object.values(profile))].filter((key) => key !== null);
+// Tous les sons de l'écran, décodés d'avance, balises propres des billes de `types`
+// comprises.
+export function preloadMarblesAudio(types) {
+  const beacons = Object.values(types).flatMap((type) => (type.beacon === undefined ? [] : [type.beacon]));
+  const keys = [MARBLES_AUDIO.shuffle, ...SHARED_SOUNDS.map((sound) => MARBLES_AUDIO[sound]), ...Object.values(MARBLE_SOUND_PROFILES).flatMap((profile) => Object.values(profile)), ...beacons].filter((key) => key !== null);
   for (const member of keys.flatMap(assetKeyMembers)) preloadOneShot(member);
   for (const member of assetKeyMembers(MARBLES_AUDIO.music)) preloadMusic(member);
 }

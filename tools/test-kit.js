@@ -23,7 +23,7 @@
 //   tête de marbles/tools/state-builder.js) et des actions déjà jouées (commandes
 //   texte de marbles/tools/commands.js), pour arriver droit sur un choix :
 //      await k.startMarbles({ seed: 42 });
-//      await k.startMarbles({ state: { triangle: { leftBase: "tiger", apex: "clay" } },
+//      await k.startMarbles({ state: { triangle: { leftBase: "dragon", apex: "clay" } },
 //                             actions: ["resoudre"] });   // la question de la tigrée
 //      k.mark(); k.press("Escape"); await k.wait(500);
 //      k.announcements(); k.marbles().pendingChoice;      // ce qui s'est dit, l'état

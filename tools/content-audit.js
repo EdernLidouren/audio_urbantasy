@@ -73,7 +73,7 @@ import { NEW_GAME } from "../config/new-game.js";
 import { WEATHER_STATES } from "../config/weather-values.js";
 import { PERCEPTION_MUSIC_POOL, PERCEPTION_AMBIENCE_POOL } from "../config/perception.js";
 import { SHOP_CATALOGS, DISPLAY_ARTICLES } from "../config/shop-values.js";
-import { MARBLE_SIZES, MARBLE_SOUND_PROFILES, MARBLES_AUDIO } from "../marbles/config/values.js";
+import { MARBLE_RARITIES, MARBLE_SIZES, MARBLE_SOUND_PROFILES, MARBLES_AUDIO } from "../marbles/config/values.js";
 import { validateMarblesContent } from "../marbles/core/validation.js";
 import { LOCALE_TABLES } from "../data/i18n/index.js";
 import { configureAssetManifest, hasAsset } from "../lib/assets.js";
@@ -136,10 +136,16 @@ const NAME_SLOTS = [
   })),
   // marbles/view/narration.js : le calibre d'une condition, d'une source de montant ou
   // d'un filtre de cible.
-  ...["marbles.condition.sizeAt", "marbles.effect.per_active_size", "marbles.target.all_size"].map((template) => ({
+  ...["marbles.condition.sizeAt", "marbles.condition.sizeAt_relative", "marbles.effect.per_zone_size", "marbles.effect.per_zone_size_triangle", "marbles.target.all_size", "marbles.statuses.source.size"].map((template) => ({
     template,
     param: "size",
     names: () => Object.values(MARBLE_SIZES).map((id) => `marbles.size.${id}.name`),
+  })),
+  // De même, la rareté.
+  ...["marbles.condition.rarityAt", "marbles.condition.rarityAt_relative", "marbles.effect.per_zone_rarity", "marbles.target.all_rarity", "marbles.statuses.source.rarity"].map((template) => ({
+    template,
+    param: "rarity",
+    names: () => MARBLE_RARITIES.map((id) => `marbles.rarity.${id}.name`),
   })),
 ];
 
@@ -371,6 +377,8 @@ export async function auditContent() {
   // existe dans le manifeste. Le profil de chaque bille est validé au chargement
   // de marbles/view/sounds.js.
   checkStrings("billes, sons", { profiles: MARBLE_SOUND_PROFILES, audio: MARBLES_AUDIO });
+  // La balise propre d'une bille (son champ `beacon`, facultatif).
+  checkStrings("billes, balises", Object.fromEntries(Object.entries(MARBLE_TYPES).filter(([, type]) => type.beacon !== undefined).map(([id, type]) => [id, type.beacon])));
   // Les billes elles-mêmes (marbles/content/types/), les statuts et les définitions de
   // partie, comme au démarrage du jeu.
   try {

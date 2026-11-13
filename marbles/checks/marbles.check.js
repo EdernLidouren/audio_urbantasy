@@ -102,6 +102,9 @@ function checkTable(run) {
   refused("Éjection mal formée", { a: { knockout: [{ action: "nope", amount: 1 }] } });
   refused("usure nulle", { a: { maxWear: 0 } });
   refused("variante inconnue", { a: { baseVariant: { apex: [] } } });
+  refused("balise vide", { a: { beacon: "" } });
+  refused("balise qui n'est pas une clé de son", { a: { beacon: 3 } });
+  run("table acceptée : une balise propre", false, throws(() => validateTable({ a: { beacon: "assets/sounds/marbles/a_beacon" } })));
   run("table acceptée : une bille sans aucun effet", false, throws(() => validateTable({ a: {} })));
   run("table acceptée : une variante", false, throws(() => validateTable({ a: { baseVariant: { rightBase: [clause] } } })));
   run("table acceptée : valeur négative", false, throws(() => validateTable({ a: { apex: [{ action: "mass", amount: -2 }] } })));
@@ -114,7 +117,7 @@ function checkTable(run) {
   sizeRefused("calibre écrit en texte", { size: "large" });
   sizeRefused("calibre non entier", { size: 1.5 });
   for (const size of [SMALL, MEDIUM, LARGE]) {
-    run(`calibre, table acceptée : ${MARBLE_SIZES[size]}`, false, throws(() => validateMarbleTypes({ a: { size } })));
+    run(`calibre, table acceptée : ${MARBLE_SIZES[size]}`, false, throws(() => validateMarbleTypes({ a: { size, families: ["classics"], rarity: "common" } })));
   }
   run("calibre : trois, dans l'ordre", true, SMALL < MEDIUM && MEDIUM < LARGE);
 
@@ -1165,11 +1168,11 @@ function checkSizeConditions(run) {
     twin: { size: LARGE },
     plain: { size: MEDIUM },
     // Base : Vitesse +1 par minibille active.
-    counter: { size: MEDIUM, base: [{ action: "speed", amount: { base: 0, step: 1, source: { type: "activeSize", size: SMALL } } }] },
+    counter: { size: MEDIUM, base: [{ action: "speed", amount: { base: 0, step: 1, source: { type: "zoneCount", zone: "triangle", filters: [{ type: "size", size: SMALL }] } } }] },
     // Base : Vitesse +1 par minibille active, elle-même minibille.
-    selfish: { size: SMALL, base: [{ action: "speed", amount: { base: 0, step: 1, source: { type: "activeSize", size: SMALL } } }] },
+    selfish: { size: SMALL, base: [{ action: "speed", amount: { base: 0, step: 1, source: { type: "zoneCount", zone: "triangle", filters: [{ type: "size", size: SMALL }] } } }] },
     // Final : Vitesse +2 par minibille active, déjà retirée.
-    ghost: { size: SMALL, maxWear: 1, final: [{ action: "speed", amount: { base: 0, step: 2, source: { type: "activeSize", size: SMALL } } }] },
+    ghost: { size: SMALL, maxWear: 1, final: [{ action: "speed", amount: { base: 0, step: 2, source: { type: "zoneCount", zone: "triangle", filters: [{ type: "size", size: SMALL }] } } }] },
     // Pointe : Masse +1, et Masse +2 si la base gauche est un calot.
     watcher: { size: MEDIUM, apex: [{ action: "mass", amount: 1 }, { action: "mass", amount: 2, when: { type: "sizeAt", slot: "leftBase", size: LARGE } }] },
   };
@@ -1189,11 +1192,12 @@ function checkSizeConditions(run) {
   accepted("calibre d'un emplacement", { apex: speedIf({ type: "sizeAt", slot: "leftBase", size: LARGE }) });
   refused("calibre d'un emplacement inconnu", { apex: speedIf({ type: "sizeAt", slot: "top", size: LARGE }) });
   refused("calibre d'emplacement inconnu", { apex: speedIf({ type: "sizeAt", slot: "leftBase", size: "large" }) });
-  accepted("source par calibre", { base: [{ action: "speed", amount: { base: 0, step: 1, source: { type: "activeSize", size: SMALL } } }] });
-  refused("source d'un calibre inconnu", { base: [{ action: "speed", amount: { base: 0, step: 1, source: { type: "activeSize", size: 0 } } }] });
+  accepted("source par calibre", { base: [{ action: "speed", amount: { base: 0, step: 1, source: { type: "zoneCount", zone: "triangle", filters: [{ type: "size", size: SMALL }] } } }] });
+  refused("source d'un calibre inconnu", { base: [{ action: "speed", amount: { base: 0, step: 1, source: { type: "zoneCount", zone: "triangle", filters: [{ type: "size", size: 0 }] } } }] });
   refused("source inconnue", { base: [{ action: "speed", amount: { base: 0, step: 1, source: { type: "nope" } } }] });
-  refused("comptage per, remplacé par les montants calculés", { base: [{ action: "speed", amount: 1, per: { type: "activeSize", size: SMALL } }] });
-  refused("source, champ inconnu", { base: [{ action: "speed", amount: { base: 0, step: 1, source: { type: "activeSize", size: SMALL, zone: "hand" } } }] });
+  refused("comptage per, remplacé par les montants calculés", { base: [{ action: "speed", amount: 1, per: { type: "zoneCount", zone: "triangle", filters: [{ type: "size", size: SMALL }] } }] });
+  refused("source, champ inconnu", { base: [{ action: "speed", amount: { base: 0, step: 1, source: { type: "zoneCount", zone: "hand", size: SMALL } } }] });
+  refused("source, type retiré (activeSize, devenu un nombre de billes filtré)", { base: [{ action: "speed", amount: { base: 0, step: 1, source: { type: "activeSize", size: SMALL } } }] });
 
   // Comparaison relative en Tic, vue par la posée : plus petite, égale, plus grosse.
   const hitOn = (occupant) =>
@@ -1308,7 +1312,7 @@ function checkFlick(run) {
   // En cours de lancer : ni en main, ni parmi les billes actives.
   const ghost = {
     drawer: { flick: [{ action: "draw", amount: 1 }] },
-    counter: { flick: [{ action: "speed", amount: { base: 0, step: 1, source: { type: "activeSize", size: MEDIUM } } }] },
+    counter: { flick: [{ action: "speed", amount: { base: 0, step: 1, source: { type: "zoneCount", zone: "triangle", filters: [{ type: "size", size: MEDIUM }] } } }] },
     plain: {},
   };
   const drew = apply(playState({ handSize: 1, hand: inHand(["drawer"]), bag: ["plain"] }), toApex, ghost);
@@ -1767,6 +1771,8 @@ function checkSmoke(run) {
     ...FIXTURE_TYPES,
     mover: {
       size: MEDIUM,
+      families: ["classics"],
+      rarity: "common",
       base: [{ action: "bounce", target: "apex" }],
       apex: [{ action: "speed", amount: 1 }, { action: "discard", target: { type: "bag", count: 1 } }],
       hit: [{ action: "retrieve", target: { type: "choice", zones: ["discard"], pick: "marble", count: 1, mode: "required" } }],
@@ -1778,6 +1784,8 @@ function checkSmoke(run) {
     // renforcés, inchangés, activés, chargés, terminés, et leurs réactions.
     statuser: {
       size: SMALL,
+      families: ["classics"],
+      rarity: "common",
       flick: [{ action: "applyStatus", status: "gain_charge", amount: 1 }],
       base: [{ action: "speed", amount: 2 }, { action: "applyStatus", status: "flick_react", amount: 1 }],
       apex: [{ action: "speed", amount: -2 }, { action: "applyStatus", status: "loss_cushion", amount: 1 }],

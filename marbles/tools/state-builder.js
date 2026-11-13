@@ -9,9 +9,9 @@
 //     "turn": 3, "stage": "play",     "draw", "play" ou "over"
 //     "score": 12, "speed": 0, "mass": 1,
 //     "swapUsed": false, "throwsUsed": 0,  lancers déjà joués ce tour
-//     "triangle": { "leftBase": "clay", "rightBase": "giant:0", "apex": null },
-//     "hand": ["agate", "gorilla:2"],     "id:tours en main"
-//     "bag": ["mica"],                du haut (prochaine pioche) vers le bas
+//     "triangle": { "leftBase": "clay", "rightBase": "fireball:0", "apex": null },
+//     "hand": ["agate", "dragon:2"],     "id:tours en main"
+//     "bag": ["comet"],                du haut (prochaine pioche) vers le bas
 //     "discard": [],
 //     "pot": ["agate"], "lost": [],  le pot dans l'ordre d'arrivée, les billes perdues
 //     "tally": { "flick": { "turn": 1, "game": 3 } },   valeurs de partie, le reste à 0

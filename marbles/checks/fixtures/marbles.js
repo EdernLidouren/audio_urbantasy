@@ -14,12 +14,15 @@
 // d'après ce qu'elle a de particulier ; ses autres champs servent de valeurs de
 // base aux vérifications (Vitesse, Masse, usure).
 //
+// Toutes sont des Classiques communes : les vérifications de famille et de rareté
+// fabriquent leurs propres billes (bicolore comprise).
+//
 // Aucune n'a de texte : leurs noms (`marble.<id>.name`) n'existent pas. Les
 // vérifications de vue qui les jouent lisent les CLÉS et leurs paramètres
 // (marbles-view, marbles-sequence) ; les phrases complètes se vérifient sur
 // quelques témoins de la vraie table.
 
-import { activeSize, allActive, choice, crack, draw, eject, mass, pocket, polish, sizeIs, speed, tally, turnsInHand } from "../../content/effects.js";
+import { allActive, choice, crack, draw, eject, mass, pocket, polish, sizeIs, speed, tally, turnsInHand, zoneCount } from "../../content/effects.js";
 import { LARGE, MEDIUM, SMALL } from "../../config/values.js";
 import { createMarblesRules } from "../../core/rules.js";
 
@@ -45,6 +48,8 @@ export const FIXTURE_TYPES = deepFreeze({
     hit: [speed(2)],
     maxWear: 3,
     size: MEDIUM,
+    families: ["classics"],
+    rarity: "common",
   },
   // Tic : Polissage d'une bille active au choix ; sa pointe lit une valeur de
   // partie (les Trouvailles de la partie).
@@ -54,6 +59,8 @@ export const FIXTURE_TYPES = deepFreeze({
     hit: [polish(1, choice({ zones: ["triangle"], mode: "required" }))],
     maxWear: 3,
     size: MEDIUM,
+    families: ["classics"],
+    rarity: "common",
   },
   // Tic : Vitesse si l'éjectée est plus petite, puis Empocher une bille de la main
   // au choix ; Éjection : Vitesse. Un calot sans base.
@@ -63,6 +70,8 @@ export const FIXTURE_TYPES = deepFreeze({
     knockout: [speed(3)],
     maxWear: 3,
     size: LARGE,
+    families: ["classics"],
+    rarity: "common",
   },
   // Final : Polissage de la pointe, puis s'empoche elle-même depuis la défausse ; En
   // poche, à chaque résolution. Pointe conditionnée au calibre de la base gauche ;
@@ -76,6 +85,8 @@ export const FIXTURE_TYPES = deepFreeze({
     pocketed: { resolution: [mass(1)] },
     maxWear: 3,
     size: MEDIUM,
+    families: ["classics"],
+    rarity: "common",
   },
   // Variante de base (la base droite donne de la Masse) ; Tic : Pioche.
   split_base: {
@@ -85,6 +96,8 @@ export const FIXTURE_TYPES = deepFreeze({
     hit: [draw(1)],
     maxWear: 3,
     size: MEDIUM,
+    families: ["classics"],
+    rarity: "common",
   },
   // Fragile (usure 2) ; Chiquenaude de Masse ; Final : Vitesse, puis Polissage de
   // jusqu'à deux billes actives au choix ; En poche, à l'entrée.
@@ -96,6 +109,8 @@ export const FIXTURE_TYPES = deepFreeze({
     pocketed: { entry: [speed(10)] },
     maxWear: 2,
     size: SMALL,
+    families: ["classics"],
+    rarity: "common",
   },
   // Chiquenaude sur la pointe : l'Éjecte (posée en pointe sur une bille, vide
   // l'emplacement avant d'y arriver) ; pointe négative ; Éjection : Masse.
@@ -106,6 +121,8 @@ export const FIXTURE_TYPES = deepFreeze({
     knockout: [mass(1)],
     maxWear: 3,
     size: LARGE,
+    families: ["classics"],
+    rarity: "common",
   },
   // Éveil : Pioche (qui peut en éveiller une autre) ; base : Pioche ; Éjection
   // conditionnée au calibre de la posée ; En poche, à chaque mélange du sac.
@@ -117,6 +134,8 @@ export const FIXTURE_TYPES = deepFreeze({
     pocketed: { shuffles: [polish(1, "apex")] },
     maxWear: 3,
     size: SMALL,
+    families: ["classics"],
+    rarity: "common",
   },
   // Base : Empocher la bille en pointe (sa phase est alors sautée) ; Trouvaille :
   // Fêlure ; En poche, à chaque résolution, selon les minibilles actives.
@@ -124,18 +143,22 @@ export const FIXTURE_TYPES = deepFreeze({
     base: [pocket("apex")],
     apex: [mass(3)],
     windfall: [crack(1, "rightBase")],
-    pocketed: { resolution: [speed({ base: 0, step: 2, source: activeSize(SMALL) })] },
+    pocketed: { resolution: [speed({ base: 0, step: 2, source: zoneCount("triangle", sizeIs(SMALL)) })] },
     maxWear: 3,
     size: LARGE,
+    families: ["classics"],
+    rarity: "common",
   },
   // Base qui compte les minibilles actives ; Éjection : Pioche ; En poche, à chaque
   // bille éjectée du triangle. Sans pointe.
   size_count: {
-    base: [speed({ base: 0, step: 1, source: activeSize(SMALL) })],
+    base: [speed({ base: 0, step: 1, source: zoneCount("triangle", sizeIs(SMALL)) })],
     knockout: [draw(1)],
     pocketed: { ejectedMarbles: [mass(1)] },
     maxWear: 3,
     size: MEDIUM,
+    families: ["classics"],
+    rarity: "common",
   },
   // Beaucoup de déclencheurs : base qui Éjecte une bille active au choix, Éveil,
   // Trouvaille, Final, En poche à chaque Chiquenaude ; usure 4.
@@ -148,6 +171,8 @@ export const FIXTURE_TYPES = deepFreeze({
     pocketed: { flick: [speed(2)] },
     maxWear: 4,
     size: MEDIUM,
+    families: ["classics"],
+    rarity: "common",
   },
   // Usure 1 : joue puis part dès son premier tour ; Éveil : Polissage de la
   // pointe ; Final : Pioche, puis Éjecter toutes les minibilles actives.
@@ -158,6 +183,8 @@ export const FIXTURE_TYPES = deepFreeze({
     final: [draw(1), eject(allActive(sizeIs(SMALL)))],
     maxWear: 1,
     size: LARGE,
+    families: ["classics"],
+    rarity: "common",
   },
   // Chiquenaude qui lit une valeur de partie (les Chiquenaudes du tour, la sienne
   // comprise) ; en base gauche, renforce la pointe si elle donne de la Vitesse
@@ -172,6 +199,8 @@ export const FIXTURE_TYPES = deepFreeze({
     knockout: [speed(3)],
     maxWear: 3,
     size: SMALL,
+    families: ["classics"],
+    rarity: "common",
   },
 });
 
@@ -194,6 +223,8 @@ export const CHOICELESS_TYPES = deepFreeze({
     knockout: [speed(3)],
     maxWear: 3,
     size: LARGE,
+    families: ["classics"],
+    rarity: "common",
   },
   hit_polish: {
     base: [mass(1)],
@@ -201,6 +232,8 @@ export const CHOICELESS_TYPES = deepFreeze({
     hit: [polish(1, "apex")],
     maxWear: 3,
     size: MEDIUM,
+    families: ["classics"],
+    rarity: "common",
   },
   fragile: {
     base: [speed(2)],
@@ -210,6 +243,8 @@ export const CHOICELESS_TYPES = deepFreeze({
     pocketed: { entry: [speed(10)] },
     maxWear: 2,
     size: SMALL,
+    families: ["classics"],
+    rarity: "common",
   },
   flick_strike: {
     base: [mass(2)],
@@ -218,6 +253,8 @@ export const CHOICELESS_TYPES = deepFreeze({
     knockout: [mass(1)],
     maxWear: 3,
     size: LARGE,
+    families: ["classics"],
+    rarity: "common",
   },
   one_shot: {
     base: [speed(6)],
@@ -226,6 +263,8 @@ export const CHOICELESS_TYPES = deepFreeze({
     final: [draw(1)],
     maxWear: 1,
     size: LARGE,
+    families: ["classics"],
+    rarity: "common",
   },
   tally_flick: {
     flick: [speed({ base: 0, step: 2, source: tally("flick", "turn"), max: 6 })],
@@ -236,6 +275,8 @@ export const CHOICELESS_TYPES = deepFreeze({
     apex: [speed(2)],
     maxWear: 3,
     size: SMALL,
+    families: ["classics"],
+    rarity: "common",
   },
   all_rounder: {
     base: [speed(3)],
@@ -246,6 +287,8 @@ export const CHOICELESS_TYPES = deepFreeze({
     pocketed: { flick: [speed(2)] },
     maxWear: 4,
     size: MEDIUM,
+    families: ["classics"],
+    rarity: "common",
   },
 });
 

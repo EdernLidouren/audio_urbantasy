@@ -1,67 +1,182 @@
 {
+  "marble.agate.description": "Des veines de couleurs qui ne se ressemblent jamais d'une bille à l'autre. Elle s'entend avec tout le monde.",
   "marble.agate.name": {
     "base": "agate",
     "de": "d'agate",
     "gender": "f"
   },
+  "marble.bee.description": "Rayée jaune et noir, elle bourdonne presque quand elle roule. Là où il y en a une, il y en a cent.",
+  "marble.bee.name": {
+    "base": "abeille",
+    "de": "d'abeille",
+    "gender": "f"
+  },
+  "marble.bloodstone.description": "Vert sombre moucheté de rouge, comme si quelqu'un avait saigné dessus il y a des siècles. Elle ne se gagne jamais : elle se mérite.",
+  "marble.bloodstone.name": {
+    "base": "pierre de sang",
+    "de": "de pierre de sang",
+    "gender": "f"
+  },
+  "marble.bubble.description": "Si fine et si claire qu'on la croirait prête à éclater. Elle finit toujours par revenir, comme si de rien n'était.",
+  "marble.bubble.name": {
+    "base": "bulle",
+    "de": "de bulle",
+    "gender": "f"
+  },
+  "marble.cats_eye.description": "Du verre clair traversé d'une flamme colorée, comme une pupille. On dit qu'elle voit dans le noir.",
   "marble.cats_eye.name": {
     "base": "œil-de-chat",
     "de": "d'œil-de-chat",
     "gender": "m"
   },
+  "marble.clay.description": "La bille de terre cuite de toutes les cours de récré, un peu rugueuse sous le pouce. Elle n'a l'air de rien, et c'est ce qui la rend fiable.",
   "marble.clay.name": {
     "base": "argile",
     "de": "d'argile",
     "gender": "f"
   },
-  "marble.giant.name": {
-    "base": "géante",
-    "de": "de géante",
+  "marble.comet.description": "Une minibille bleu glacier qui laisse derrière elle une traînée laiteuse. Elle n'arrive jamais seule.",
+  "marble.comet.name": {
+    "base": "comète",
+    "de": "de comète",
     "gender": "f"
   },
-  "marble.glass.name": {
-    "base": "verre",
-    "de": "de verre",
+  "marble.copper.description": "Une bille cuivrée qui verdit un peu aux entournures. Les anciens jurent qu'elle porte chance à qui la frotte assez longtemps.",
+  "marble.copper.name": {
+    "base": "cuivre",
+    "de": "de cuivre",
     "gender": "m"
   },
-  "marble.gorilla.name": {
-    "base": "gorille",
-    "de": "de gorille",
+  "marble.dolphin.description": "Un gris-bleu lisse avec une vague blanche sur le flanc. Elle bondit plus qu'elle ne roule, et adore bousculer les autres.",
+  "marble.dolphin.name": {
+    "base": "dauphin",
+    "de": "de dauphin",
     "gender": "m"
   },
-  "marble.leaded.name": {
-    "base": "plombée",
-    "de": "de plombée",
+  "marble.dragon.description": "Des écailles émeraude et un œil ambré qui semble vous suivre. Les grands l'interdisent dans la cour, ce qui la rend évidemment irrésistible.",
+  "marble.dragon.name": {
+    "base": "dragon",
+    "de": "de dragon",
+    "gender": "m"
+  },
+  "marble.eclipse.description": "Noire comme l'encre, cerclée d'un mince anneau de lumière. Quand elle passe, toute la cour retient son souffle.",
+  "marble.eclipse.name": {
+    "base": "éclipse",
+    "de": "d'éclipse",
     "gender": "f"
   },
-  "marble.magnifier.name": {
-    "base": "loupe",
-    "de": "de loupe",
+  "marble.fireball.description": "Orange et rouge, avec des flammèches figées dans le verre. Elle est toujours un peu tiède, même en hiver.",
+  "marble.fireball.name": {
+    "base": "boule de feu",
+    "de": "de boule de feu",
     "gender": "f"
   },
-  "marble.mica.name": {
-    "base": "mica",
-    "de": "de mica",
-    "gender": "m"
-  },
-  "marble.porcelain.name": {
-    "base": "porcelaine",
-    "de": "de porcelaine",
+  "marble.galaxy.description": "Une spirale de poussière violette et dorée tourne lentement en son cœur. Certains enfants prétendent y avoir vu des planètes.",
+  "marble.galaxy.name": {
+    "base": "galaxie",
+    "de": "de galaxie",
     "gender": "f"
   },
-  "marble.stoneware.name": {
-    "base": "grès",
-    "de": "de grès",
+  "marble.ghost.description": "Toute blanche, plus ou moins transparente selon l'humeur. On la perd, on la cherche, et elle est déjà dans votre poche.",
+  "marble.ghost.name": {
+    "base": "fantôme",
+    "de": "de fantôme",
     "gender": "m"
   },
-  "marble.sulphide.name": {
-    "base": "sulfure",
-    "de": "de sulfure",
+  "marble.grenade.description": "Vert kaki, quadrillée de reliefs, avec une drôle de petite tige sur le dessus. Mieux vaut ne pas être à côté quand elle s'en va.",
+  "marble.grenade.name": {
+    "base": "grenade",
+    "de": "de grenade",
+    "gender": "f"
+  },
+  "marble.ingot.description": "Un petit lingot d'or poli jusqu'à devenir rond. Il pèse dans la main comme une promesse.",
+  "marble.ingot.name": {
+    "base": "lingotin",
+    "de": "de lingotin",
     "gender": "m"
   },
-  "marble.tiger.name": {
-    "base": "tigrée",
-    "de": "de tigrée",
+  "marble.moon.description": "Grise et piquetée de minuscules cratères. Les nuits de pleine lune, elle roule un peu plus loin que les autres.",
+  "marble.moon.name": {
+    "base": "lune",
+    "de": "de lune",
+    "gender": "f"
+  },
+  "marble.ocean.description": "Des bleus et des verts qui ondulent sans jamais se mélanger tout à fait. Collée à l'oreille, on jure entendre le ressac.",
+  "marble.ocean.name": {
+    "base": "océan",
+    "de": "d'océan",
+    "gender": "m"
+  },
+  "marble.pearl.description": "Nacrée, douce comme une joue, elle sent vaguement le sel. Les plongeurs disent qu'elle appelle ses sœurs perdues.",
+  "marble.pearl.name": {
+    "base": "perle",
+    "de": "de perle",
+    "gender": "f"
+  },
+  "marble.quicksilver.description": "Une goutte d'argent qui ne tient jamais en place, même au fond d'une poche. On dit qu'elle trouve toujours le chemin du coffre.",
+  "marble.quicksilver.name": {
+    "base": "vive-argent",
+    "de": "de vive-argent",
+    "gender": "m"
+  },
+  "marble.red_devil.description": "Rouge vif barré d'une bande jaune, comme un sourire en coin. Elle gagne toujours, mais personne n'aime ce que ça coûte.",
+  "marble.red_devil.name": {
+    "base": "diable rouge",
+    "de": "de diable rouge",
+    "gender": "m"
+  },
+  "marble.ruby.description": "Un rouge si profond qu'on croit y voir battre un cœur. Plus on la garde, plus elle brille.",
+  "marble.ruby.name": {
+    "base": "rubis",
+    "de": "de rubis",
+    "gender": "m"
+  },
+  "marble.sling_shot.description": "Petite, dure, et taillée pour voler. Elle ne craint rien, surtout pas les plus gros qu'elle.",
+  "marble.sling_shot.name": {
+    "base": "bille de fronde",
+    "de": "de bille de fronde",
+    "gender": "f"
+  },
+  "marble.snow_globe.description": "Des flocons minuscules tourbillonnent à l'intérieur dès qu'on la secoue. Personne n'a jamais su comment ils y sont entrés.",
+  "marble.snow_globe.name": {
+    "base": "boule à neige",
+    "de": "de boule à neige",
+    "gender": "f"
+  },
+  "marble.soda.description": "Couleur cola, on jurerait qu'elle pétille encore quand on la secoue. Elle ne tient pas en place, et ne dure jamais longtemps.",
+  "marble.soda.name": {
+    "base": "soda",
+    "de": "de soda",
+    "gender": "m"
+  },
+  "marble.spider.description": "Noire avec des filaments argentés qui ressemblent à une toile. Celles qui s'en approchent ont du mal à repartir.",
+  "marble.spider.name": {
+    "base": "araignée",
+    "de": "d'araignée",
+    "gender": "f"
+  },
+  "marble.star.description": "Parfaitement transparente, avec un seul éclat scintillant suspendu au centre. On raconte qu'elle est tombée d'un ciel d'août.",
+  "marble.star.name": {
+    "base": "étoile",
+    "de": "d'étoile",
+    "gender": "f"
+  },
+  "marble.steel.description": "Un roulement à billes échappé d'un vieux vélo, froid et lourd. Personne ne le chasse, c'est lui qui chasse.",
+  "marble.steel.name": {
+    "base": "acier",
+    "de": "d'acier",
+    "gender": "m"
+  },
+  "marble.tornado.description": "Une spirale grise et blanche qui donne le tournis à la regarder. Après son passage, il ne reste jamais grand-chose debout.",
+  "marble.tornado.name": {
+    "base": "tornade",
+    "de": "de tornade",
+    "gender": "f"
+  },
+  "marble.turtle.description": "Une carapace verte et brune striée d'hexagones. Elle a vu passer des générations de joueurs et compte bien en voir d'autres.",
+  "marble.turtle.name": {
+    "base": "tortue",
+    "de": "de tortue",
     "gender": "f"
   },
   "marbles.card.apex": "Pointe : {effect}.",
@@ -125,8 +240,12 @@
   "marbles.choice.verb.polish": "à polir",
   "marbles.choice.verb.retrieve": "à ramasser",
   "marbles.choice.verb.speed": "pour {effect}",
+  "marbles.condition.familyAt": "la {slot} est de la famille {family}",
+  "marbles.condition.familyAt_relative": "la bille de l'emplacement {relative, select, next {suivant} other {précédent}} est de la famille {family}",
   "marbles.condition.printedStat": "son effet de {slot} donne au moins {effect}",
   "marbles.condition.printedStat_relative": "l'effet de la bille de l'emplacement {relative, select, next {suivant} other {précédent}} donne au moins {effect}",
+  "marbles.condition.rarityAt": "la {slot} est {rarity:indef}",
+  "marbles.condition.rarityAt_relative": "la bille de l'emplacement {relative, select, next {suivant} other {précédent}} est {rarity:indef}",
   "marbles.condition.relativeSize": "la bille {marble, select, ejected {éjectée} other {posée}} est {is, select, smaller {plus petite} other {plus grosse}}",
   "marbles.condition.sizeAt": "la {slot} est {size:indef}",
   "marbles.condition.sizeAt_relative": "la bille de l'emplacement {relative, select, next {suivant} other {précédent}} est {size:indef}",
@@ -154,6 +273,7 @@
   "marbles.definition.silence.name": "silence",
   "marbles.definition.target.description": "Atteindre un score donné en un nombre de tours limité.",
   "marbles.definition.target.name": "défi cible",
+  "marbles.description.none": "Aucune description.",
   "marbles.discard.discarded": "{marble} {marble:gender, select, f {défaussée} other {défaussé}}",
   "marbles.discard.discarded_effect": "{marble} {marble:gender, select, f {défaussée} other {défaussé}}, Chute : {effect}",
   "marbles.discard.discarded_unknown": "une bille du sac défaussée",
@@ -189,10 +309,14 @@
   "marbles.effect.mass_down": "Masse −{amount}",
   "marbles.effect.mass_up": "Masse +{amount}",
   "marbles.effect.none": "aucun effet",
-  "marbles.effect.per_active_size": "{effect} par {size:noun} {size:gender, select, f {active} other {actif}}",
+  "marbles.effect.per_family": "{effect} par famille différente sur le triangle",
   "marbles.effect.per_tally": "{effect} par {unit} {scope}",
   "marbles.effect.per_turn_in_hand": "{effect} par tour en main",
   "marbles.effect.per_zone": "{effect} par {zone, select, triangle {bille active} hand {bille en main} bag {bille dans le sac} discard {bille à la défausse} pot {bille dans le pot} other {bille perdue}}",
+  "marbles.effect.per_zone_family": "{effect} par {family} {zone, select, triangle {active} hand {en main} bag {dans le sac} discard {à la défausse} pot {dans le pot} other {perdue}}",
+  "marbles.effect.per_zone_rarity": "{effect} par bille {rarity} {zone, select, triangle {active} hand {en main} bag {dans le sac} discard {à la défausse} pot {dans le pot} other {perdue}}",
+  "marbles.effect.per_zone_size": "{effect} par {size:noun} {zone, select, hand {en main} bag {dans le sac} discard {à la défausse} pot {dans le pot} other {parmi les billes perdues}}",
+  "marbles.effect.per_zone_size_triangle": "{effect} par {size:noun} {size:gender, select, f {active} other {actif}}",
   "marbles.effect.pocket_choice": "Empocher {target} au choix",
   "marbles.effect.pocket_hand": "Empocher la première bille de la main",
   "marbles.effect.pocket_relative": "Empocher la bille de l'emplacement {relative, select, next {suivant} other {précédent}}",
@@ -269,6 +393,12 @@
   "marbles.event.target_empty_self_eject": "{marble} n'est plus sur le triangle : rien à éjecter.",
   "marbles.event.tier_reached": "Palier {tier} atteint.",
   "marbles.event.turn_started": "Début du tour {turn}, jouez vos billes.",
+  "marbles.family.bestiary.name": "Bestiaire",
+  "marbles.family.blast.name": "Souffle",
+  "marbles.family.classics.name": "Classiques",
+  "marbles.family.mist.name": "Brume",
+  "marbles.family.stars.name": "Astres",
+  "marbles.family.treasure.name": "Trésor",
   "marbles.forecast.awakenings": "Éveils possibles.",
   "marbles.forecast.interrupted": "Enchaînement interrompu.",
   "marbles.forecast.regenerates": "Le sac sera régénéré.",
@@ -313,7 +443,7 @@
   "marbles.help.hand.text": "Vous piochez {firstDraw, plural, one {# bille} other {# billes}} au premier tour, puis {draw, plural, one {# bille} other {# billes}} à chaque tour. Votre main contient {hand, plural, one {# bille} other {# billes}} au plus. Chaque pose est un lancer, et vous avez {throws, plural, one {# lancer} other {# lancers}} par tour. Avant toute pose, vous pouvez échanger deux emplacements, une fois par tour.",
   "marbles.help.hand.title": "Main, lancers et pioche",
   "marbles.help.keys.title": "Les touches",
-  "marbles.help.keywords.text": "Les effets d'une bille se déclenchent à des moments précis : ce sont ses mots-clés. Sur une bille, la touche E dit ses mots-clés, et Maj+E les ouvre en menu. Contrôle+flèche haut et Contrôle+flèche bas parcourent sa fiche.",
+  "marbles.help.keywords.text": "Les effets d'une bille se déclenchent à des moments précis : ce sont ses mots-clés. Sur une bille, la touche E dit ses mots-clés, et Maj+E les ouvre en menu. Contrôle+flèche haut et Contrôle+flèche bas parcourent sa fiche. La touche F dit ses familles, son calibre et sa rareté ; la touche V, sa description.",
   "marbles.help.keywords.title": "Les mots-clés",
   "marbles.help.score.text": "Les effets des billes changent deux compteurs : la Vitesse, qui part de 0, et la Masse, qui part de 1. À la fin du tour, l'Impact vaut la Vitesse multipliée par la Masse. Pour ce calcul, une Vitesse négative compte pour 0, et une Masse sous 1 compte pour 1.",
   "marbles.help.score.title": "Score : Vitesse, Masse et Impact",
@@ -331,6 +461,7 @@
   "marbles.history.entry": "{text}",
   "marbles.history.title": "Historique du tour {turn}",
   "marbles.history.title_none": "Historique",
+  "marbles.identity.line": "{families, list}, {size}, {rarity}.",
   "marbles.intro": "Partie de billes. F1 pour l'aide.",
   "marbles.keyword.apex.description": "effet joué pendant la phase de pointe, quand la bille est posée en pointe.",
   "marbles.keyword.apex.name": "Pointe",
@@ -376,9 +507,10 @@
   "marbles.keyword.title_none": "Mots-clés",
   "marbles.keyword.windfall.description": "se déclenche quand le sac est reconstitué à partir de la défausse, si la bille est sur le triangle.",
   "marbles.keyword.windfall.name": "Trouvaille",
-  "marbles.list.line": "{name}, {size}, usure {maxWear}",
+  "marbles.list.line": "{name}, {size}, {families, list}, {rarity}, usure {maxWear}",
   "marbles.lock.source.rule": "la règle : {status}",
   "marbles.lock.source.status": "le statut : {status}",
+  "marbles.no_marble": "Aucune bille.",
   "marbles.number.decimal_separator": ",",
   "marbles.outcome.drop": "Chute : {effect}.",
   "marbles.outcome.empty": "{slot}, vide.",
@@ -411,6 +543,31 @@
   "marbles.pocket.lost_unknown": "pot plein : une bille piochée perdue",
   "marbles.pocket.then": "{effect}, puis {pockets}",
   "marbles.quit.confirm": "Abandonner cette partie de billes ?",
+  "marbles.rarity.common.name": {
+    "base": "commune",
+    "indef": "une bille commune",
+    "plural": "communes"
+  },
+  "marbles.rarity.epic.name": {
+    "base": "épique",
+    "indef": "une bille épique",
+    "plural": "épiques"
+  },
+  "marbles.rarity.legendary.name": {
+    "base": "légendaire",
+    "indef": "une bille légendaire",
+    "plural": "légendaires"
+  },
+  "marbles.rarity.rare.name": {
+    "base": "rare",
+    "indef": "une bille rare",
+    "plural": "rares"
+  },
+  "marbles.rarity.uncommon.name": {
+    "base": "peu commune",
+    "indef": "une bille peu commune",
+    "plural": "peu communes"
+  },
   "marbles.resolution.hint": "Entrée pour passer la résolution.",
   "marbles.resolution.opening": "Résolution du tour {turn}.",
   "marbles.result.defeat": "Échec : objectif non atteint.",
@@ -473,23 +630,23 @@
   "marbles.status.fatigue.name": "fatigue",
   "marbles.status.fervor.description": "à chaque chiquenaude : Vitesse +2. 2 tours ; unique.",
   "marbles.status.fervor.name": "ferveur",
-  "marbles.status.gravel.description": "Les calots rapportent moitié moins de Vitesse et de Masse : leurs gains de Vitesse et de Masse sont divisés par deux, arrondis vers zéro.",
+  "marbles.status.gravel.description": "les calots rapportent moitié moins de Vitesse et de Masse : leurs gains de Vitesse et de Masse sont divisés par deux, arrondis vers zéro.",
   "marbles.status.gravel.name": "gravier",
-  "marbles.status.inertPot.description": "Les billes du pot n'agissent pas : ni à leur entrée, ni à la résolution, ni en réaction.",
+  "marbles.status.inertPot.description": "les billes du pot n'agissent pas : ni à leur entrée, ni à la résolution, ni en réaction.",
   "marbles.status.inertPot.name": "pot inerte",
   "marbles.status.inspiration.description": "la prochaine Pioche d'un effet pioche une bille de plus. Une charge ; chaque nouvelle application en ajoute une.",
   "marbles.status.inspiration.name": "inspiration",
   "marbles.status.luster.description": "Polissages +1 par intensité, toute la partie. Se cumule en intensité.",
   "marbles.status.luster.name": "lustre",
-  "marbles.status.noSwap.description": "Aucun échange n'est permis.",
+  "marbles.status.noSwap.description": "aucun échange n'est permis.",
   "marbles.status.noSwap.name": "échange interdit",
-  "marbles.status.oneThrowLess.description": "Un lancer de moins à chaque tour.",
+  "marbles.status.oneThrowLess.description": "un lancer de moins à chaque tour.",
   "marbles.status.oneThrowLess.name": "un lancer de moins",
   "marbles.status.quickHand.description": "pioche du début de tour +1 par intensité. 2 tours ; se cumule en intensité.",
   "marbles.status.quickHand.name": "main vive",
   "marbles.status.respite.description": "les billes jouent leur phase sans s'user. Ce tour ; unique.",
   "marbles.status.respite.name": "répit",
-  "marbles.status.silence.description": "Le mot-clé Chiquenaude ne se déclenche plus.",
+  "marbles.status.silence.description": "le mot-clé Chiquenaude ne se déclenche plus.",
   "marbles.status.silence.name": "silence",
   "marbles.status.whiplash.description": "le prochain gain de Vitesse est doublé. Une charge ; chaque nouvelle application en ajoute une.",
   "marbles.status.whiplash.name": "coup de fouet",
@@ -538,6 +695,8 @@
   "marbles.statuses.point.turnDraw": "pioche du début de tour",
   "marbles.statuses.remaining.pending": "à partir du prochain tour",
   "marbles.statuses.remaining.pending_turns": "à partir du prochain tour, {count, plural, one {# tour} other {# tours}}",
+  "marbles.statuses.source.family": "{point} des billes {family}",
+  "marbles.statuses.source.rarity": "{point} des billes {rarity:plural}",
   "marbles.statuses.source.size": "{point} des {size:plural}",
   "marbles.statuses.summary": "{count, plural, one {# statut} other {# statuts}} : {first}.",
   "marbles.statuses.title": "Statuts",
@@ -696,6 +855,8 @@
   "marbles.tally.wornMarbles.name": "billes usées",
   "marbles.tally.wornMarbles.unit": "bille usée",
   "marbles.target.all": "toutes les billes actives",
+  "marbles.target.all_family": "toutes les billes {family} actives",
+  "marbles.target.all_rarity": "toutes les billes {rarity:plural} actives",
   "marbles.target.all_size": "{size:gender, select, f {toutes les {size:plural} actives} other {tous les {size:plural} actifs}}",
   "marbles.tier.bronze": "bronze",
   "marbles.tier.gold": "or",

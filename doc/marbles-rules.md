@@ -1,6 +1,6 @@
 # Règles du jeu des billes
 
-Ce document décrit les règles du jeu des billes telles qu'elles s'appliquent aujourd'hui. Il s'adresse au joueur et au concepteur. Les valeurs citées sont les valeurs actuelles ; les billes de l'annexe sont des billes de test, appelées à changer.
+Ce document décrit les règles du jeu des billes telles qu'elles s'appliquent aujourd'hui. Il s'adresse au joueur et au concepteur. Les valeurs citées sont les valeurs actuelles ; les billes de l'annexe sont celles du premier set, aux valeurs provisoires, appelées à changer.
 
 ## 1. Le but du jeu
 
@@ -48,7 +48,27 @@ Chaque bille a un calibre, qui ne change jamais :
 - la bille normale ;
 - le calot, le plus gros.
 
-Le calibre se compare : une minibille est plus petite qu'une bille normale, elle-même plus petite qu'un calot. Deux billes de même calibre ne sont ni plus petites ni plus grosses l'une que l'autre. Le calibre règle aussi le son de la bille.
+Le calibre se compare : une minibille est plus petite qu'une bille normale, elle-même plus petite qu'un calot. Deux billes de même calibre ne sont ni plus petites ni plus grosses l'une que l'autre. Le calibre règle aussi le son de la bille, sauf pour une bille qui a sa propre voix.
+
+### Les familles et les raretés
+
+Chaque bille appartient à au moins une famille, parfois plusieurs (une bille bicolore), et a exactement une rareté. Ni l'une ni l'autre ne change jamais.
+
+- Les familles : Trésor, Astres, Brume, Bestiaire, Souffle, Classiques. Les Classiques sont une famille comme les autres, sans aucune exception de règle.
+- Les raretés, de la plus commune à la plus rare : commune, peu commune, rare, épique, légendaire.
+
+Famille et rareté servent aux effets, comme le calibre : une cible « toutes les billes actives » filtrée (« toutes les billes Brume actives »), une condition sur un emplacement (« si la bille de l'emplacement suivant est de la famille Brume », « si la pointe est une bille rare »), un montant calculé (« Vitesse +2 par Astres active », « Vitesse +2 par famille différente sur le triangle ») et les modificateurs des statuts. Une rareté se compare exactement : « rare » ne vise ni une épique ni une légendaire.
+
+### Consulter une bille
+
+Sur la bille sous le curseur, partout où une bille peut l'être (main, triangle, menus du sac, de la défausse et du pot, choix) :
+
+- l'annonce principale d'une bille hors du triangle dit, après son nom et son calibre, ses familles et sa rareté, puis son usure maximale : « rubis, normale, Trésor, rare, usure 4. » ; plusieurs familles se lient par « et » (« Trésor et Astres »). Sur le triangle, l'annonce reste celle de l'emplacement ;
+- **F** dit ses familles, son calibre et sa rareté : « Trésor, normale, rare. » ;
+- **V** dit sa description, un texte d'ambiance sans effet de jeu, ou « Aucune description. » ;
+- sur un emplacement vide, F et V disent « Aucune bille. ».
+
+La fiche (Ctrl+flèches) reste réservée aux effets.
 
 ## 3. Le score
 
@@ -213,14 +233,14 @@ Les mots-clés se consultent en jeu, sur la bille sous le curseur, avec la touch
 - Empocher : envoie une bille au pot, où qu'elle soit : sur le triangle, en main ou dans la défausse. Si le pot est plein, la bille est perdue pour la partie.
   - Cible : la bille elle-même, où qu'elle soit (sauf en cours de lancer et dans le pot ; en partance, pendant son Final ou son Éjection, elle est redirigée vers le pot) ; un emplacement ; la première bille de la main ; ou une bille au choix, de la main ou du triangle.
 - Éjecter : chasse une bille du triangle : son effet d'éjection se déclenche, puis elle part à la défausse.
-  - Cible : la bille elle-même, seulement si elle est sur le triangle, jamais dans son Final ni dans sa propre Éjection, où elle est en partance ; un emplacement ; des billes actives au choix ; ou toutes les billes actives, éventuellement d'un seul calibre (« toutes les minibilles actives »).
+  - Cible : la bille elle-même, seulement si elle est sur le triangle, jamais dans son Final ni dans sa propre Éjection, où elle est en partance ; un emplacement ; des billes actives au choix ; ou toutes les billes actives, éventuellement d'un seul calibre, d'une seule famille ou d'une seule rareté (« toutes les minibilles actives », « toutes les billes Brume actives »).
   - « Toutes les billes actives » comprend la bille qui éjecte, si elle est sur le triangle et passe le filtre. De même, un choix parmi les billes actives peut porter sur la bille qui le pose.
 - Défausser : envoie une bille à la défausse.
-  - Cible : la bille elle-même, sur le triangle ou en main (à son Éveil), jamais en cours de lancer, en partance, à la défausse ni dans le pot ; un emplacement ; la première bille de la main ; une ou plusieurs billes de la main ou du triangle au choix ; toutes les billes actives, éventuellement d'un seul calibre ; les N prochaines billes du sac, sans les révéler avant.
+  - Cible : la bille elle-même, sur le triangle ou en main (à son Éveil), jamais en cours de lancer, en partance, à la défausse ni dans le pot ; un emplacement ; la première bille de la main ; une ou plusieurs billes de la main ou du triangle au choix ; toutes les billes actives, éventuellement d'un seul calibre, d'une seule famille ou d'une seule rareté ; les N prochaines billes du sac, sans les révéler avant.
   - La bille suit son chemin jusqu'à la défausse, où sa Chute joue. Depuis le triangle, ce n'est ni une usure ni une éjection : ni Final ni Éjection ; elle compte parmi les billes sorties du triangle, et sa phase est sautée si elle n'avait pas eu lieu.
   - Depuis le sac : les billes partent du haut, une par une. Un sac qui en a moins donne ce qu'il a, sans mélanger la défausse ; un sac vide ne donne rien.
 - Rebond : renvoie une bille du triangle dans la main. Si la main est pleine, elle part à la défausse.
-  - Cible : la bille elle-même, sur le triangle, ou en partance pendant son Final ou son Éjection (elle est alors redirigée vers la main) ; un emplacement ; des billes actives au choix ; toutes les billes actives, éventuellement d'un seul calibre.
+  - Cible : la bille elle-même, sur le triangle, ou en partance pendant son Final ou son Éjection (elle est alors redirigée vers la main) ; un emplacement ; des billes actives au choix ; toutes les billes actives, éventuellement d'un seul calibre, d'une seule famille ou d'une seule rareté.
   - La bille arrive en main à 0 tour en main, et repartira à usure 0 à sa prochaine pose. Ce n'est pas une pioche : pas d'Éveil. Pendant la phase de jeu, elle peut être rejouée ce tour, dans la limite des lancers.
   - Depuis le triangle : ni Final ni Éjection ; elle compte parmi les billes sorties du triangle, et sa phase est sautée si elle n'avait pas eu lieu. Main pleine : elle arrive à la défausse à la place, et sa Chute joue.
 - Ramasser : reprend une bille de la défausse dans la main.
@@ -286,11 +306,13 @@ Une action qui vise un emplacement peut viser, au lieu d'un emplacement fixe, l'
 
 ### Les conditions
 
-Une clause peut porter une condition, évaluée au moment où l'effet joue ; fausse, la clause ne produit rien. Quatre sortes de conditions existent :
+Une clause peut porter une condition, évaluée au moment où l'effet joue ; fausse, la clause ne produit rien. Six sortes de conditions existent :
 
 - **l'effet imprimé d'une autre bille** : la bille d'un emplacement donne au moins une certaine valeur, à cet emplacement. Seul compte ce qui est imprimé sur la bille, jamais un effet déjà modifié ;
 - **le calibre relatif**, pendant un remplacement seulement : la bille posée ou la bille chassée est plus petite, ou plus grosse, que l'autre. Quand c'est un effet Éjecter qui chasse, la bille qui éjecte tient le rôle de la bille posée, où qu'elle soit ;
 - **le calibre d'un emplacement** : la bille d'un emplacement est d'un calibre donné. L'emplacement peut être relatif : « si la bille de l'emplacement suivant est un calot » ;
+- **la famille d'un emplacement** : la bille d'un emplacement est d'une famille donnée, parmi d'autres peut-être. L'emplacement peut être relatif : « si la bille de l'emplacement suivant est de la famille Brume » ;
+- **la rareté d'un emplacement** : la bille d'un emplacement est d'une rareté donnée, exactement. L'emplacement peut être relatif : « si la pointe est une bille rare » ;
 - **l'état d'une zone de la partie** : le triangle est plein, vide, ou n'a qu'une bille ; la main est vide, ou pleine ; le sac est vide ; la défausse est vide ; le pot est plein, ou vide. « Pleine » et « plein » se comparent aux caractéristiques en vigueur : la taille de la main, la capacité du pot. Une bille en transit (en cours de lancer, en partance) n'est dans aucune zone et ne compte nulle part : pendant sa Chiquenaude, la bille lancée n'est plus en main ; pendant son Éjection, la bille chassée n'est plus sur le triangle. « Pointe : Vitesse +6 si le triangle est plein. », « Tic : Pioche 1 si la main est vide. », « En poche, à chaque résolution : Masse +2 si le pot est plein. ».
 
 ### Les montants calculés
@@ -298,9 +320,9 @@ Une clause peut porter une condition, évaluée au moment où l'effet joue ; fau
 Un montant peut dépendre du moment, par exemple « Vitesse +1 par minibille active ». Il se calcule au déclenchement, avec un plafond éventuel, à partir de :
 
 - **les tours en main** de la bille elle-même ;
-- **les billes actives d'un calibre**, la bille elle-même comprise si elle est sur le triangle (en partance ou en cours de lancer, elle ne compte pas) ;
 - **une valeur de partie**, ce tour ou cette partie (section 10) ;
-- **le nombre de billes d'une zone** : actives, en main, dans le sac, à la défausse, dans le pot, perdues. Une bille en transit ne compte nulle part. La fiche dit la valeur actuelle : « Base : Vitesse +1 par bille en main, maximum +5, actuellement +3. ».
+- **le nombre de billes d'une zone** : actives, en main, dans le sac, à la défausse, dans le pot, perdues ; toutes, ou seulement celles d'un calibre, d'une famille ou d'une rareté (« par minibille active », « par Brume à la défausse », « par bille rare en main »). Une bille active compte, la bille elle-même comprise si elle est sur le triangle ; une bille en transit ne compte nulle part. La fiche dit la valeur actuelle : « Base : Vitesse +1 par bille en main, maximum +5, actuellement +3. » ;
+- **le nombre de familles différentes** parmi les billes actives : chaque famille compte une fois, Classiques comprises ; une bille à plusieurs familles compte pour chacune ; une bille en transit ne compte pas. « Pointe : Vitesse +2 par famille différente sur le triangle, maximum +6. ».
 
 Un montant qui vaut 0 ne produit rien.
 
@@ -405,7 +427,7 @@ Un **statut** est un effet durable que reçoit la partie, donné par une bille (
   - L'Impact se modifie après son calcul habituel (Vitesse × Masse et leurs planchers), puis ne descend jamais sous 0.
   - Plusieurs statuts sur la même valeur : d'abord toutes les additions, puis toutes les multiplications, chacune dans l'ordre où les statuts ont été reçus ; le plancher à la fin.
   - Une multiplication peut être une fraction (÷2). Une valeur non entière après modification est **arrondie vers zéro**, à la fin : un gain de Vitesse 3 divisé par deux donne 1 ; un gain de 1, 0.
-  - Un modificateur peut ne viser que les valeurs **produites par une bille** d'un certain genre (aujourd'hui, un calibre) : « les gains de Vitesse des calots ÷2 ». La bille qui produit une valeur est celle dont l'effet joue (une bille du pot comprise ; pour un bonus reçu, la bille qui le reçoit et le joue à sa phase) ; pour l'usure de phase, la bille qui s'use. Une valeur produite sans bille (la réaction d'un statut) ne correspond à aucun de ces filtres. L'Impact et la pioche du début de tour n'ont jamais de bille : aucun filtre ne s'y pose.
+  - Un modificateur peut ne viser que les valeurs **produites par une bille** d'un certain genre (un calibre, une famille ou une rareté) : « les gains de Vitesse des calots ÷2 », « les gains de Vitesse des billes Brume +1 ». La bille qui produit une valeur est celle dont l'effet joue (une bille du pot comprise ; pour un bonus reçu, la bille qui le reçoit et le joue à sa phase) ; pour l'usure de phase, la bille qui s'use. Une valeur produite sans bille (la réaction d'un statut) ne correspond à aucun de ces filtres. L'Impact et la pioche du début de tour n'ont jamais de bille : aucun filtre ne s'y pose.
   - L'effet et l'Impact se disent avec leur valeur finale, partout : la séquence, R, la confirmation.
 - **Modifier une quantité** : le nombre de billes de la pioche du début de tour, le N des Pioches d'un effet, le N d'un Polissage, le N d'une Fêlure, et l'usure qu'une bille prend à sa phase (1 d'habitude).
   - Le même ordre que pour les valeurs : additions, puis multiplications, dans l'ordre où les statuts ont été reçus, plancher 0 à la fin. Une quantité ne devient jamais négative : un Polissage réduit ne devient jamais une Fêlure, ni l'inverse.
@@ -495,11 +517,11 @@ Cette liste est générée à partir de la table des statuts ; elle ne se modifi
 - **Fragilité** : Fêlures +1 par intensité. 3 tours ; se cumule en intensité.
 - **Répit** : les billes jouent leur phase sans s'user. Ce tour ; unique.
 - **Usure accélérée** : usure de phase +1 par intensité, le prochain tour. Se cumule en intensité.
-- **Gravier** : Les calots rapportent moitié moins de Vitesse et de Masse : leurs gains de Vitesse et de Masse sont divisés par deux, arrondis vers zéro.
-- **Un lancer de moins** : Un lancer de moins à chaque tour.
-- **Échange interdit** : Aucun échange n'est permis.
-- **Pot inerte** : Les billes du pot n'agissent pas : ni à leur entrée, ni à la résolution, ni en réaction.
-- **Silence** : Le mot-clé Chiquenaude ne se déclenche plus.
+- **Gravier** : les calots rapportent moitié moins de Vitesse et de Masse : leurs gains de Vitesse et de Masse sont divisés par deux, arrondis vers zéro.
+- **Un lancer de moins** : un lancer de moins à chaque tour.
+- **Échange interdit** : aucun échange n'est permis.
+- **Pot inerte** : les billes du pot n'agissent pas : ni à leur entrée, ni à la résolution, ni en réaction.
+- **Silence** : le mot-clé Chiquenaude ne se déclenche plus.
 
 <!-- statuts de test : fin -->
 
@@ -537,8 +559,8 @@ Un **verrou** est un comportement de statut (section 12, « Ce qu'un statut peut
 
 ### Les consulter
 
-- **À l'ouverture**, une seule annonce, avant celle du premier tour : l'objectif, puis chaque règle. « Objectif : 165 points en 8 tours. Règle : gravier. Les calots rapportent moitié moins de Vitesse et de Masse… »
-- **O** : l'objectif, la progression, puis le nombre de règles. « Objectif : 165 points en 8 tours. 120 sur 165, tour 5 sur 8. 1 règle. » ; en partie libre : « Objectif : libre, 10 tours. Tour 5 sur 10. Score 120, aucun palier atteint. Prochain palier : bronze à 180. » ; en endurance : « Objectif : Impact de 12 minimum chaque tour, 20 tours au plus. 4 tours tenus sur 20. »
+- **À l'ouverture**, une seule annonce, avant celle du premier tour : l'objectif, puis chaque règle. « Objectif : 122 points en 8 tours. Règle : gravier. Les calots rapportent moitié moins de Vitesse et de Masse… »
+- **O** : l'objectif, la progression, puis le nombre de règles. « Objectif : 122 points en 8 tours. 90 sur 122, tour 5 sur 8. 1 règle. » ; en partie libre : « Objectif : libre, 10 tours. Tour 5 sur 10. Score 100, aucun palier atteint. Prochain palier : bronze à 120. » ; en endurance : « Objectif : Impact de 7 minimum chaque tour, 20 tours au plus. 4 tours tenus sur 20. »
 - **Maj+O** : un menu, de gauche à droite : l'objectif, puis chaque règle, puis « Retour » ; Échap ferme. Ctrl+bas parcourt la fiche de l'objectif (sa progression, ce qui le juge, la pioche impossible) ou d'une règle (son effet) ; E dit la description de la partie ou de la règle.
 - **À la fin** : le résultat selon l'objectif, puis le score final. « Partie terminée. Palier argent atteint. Score final : 205. », « Partie terminée. Victoire : objectif atteint. Score final : 170. », « Partie terminée. Fin de l'endurance : 4 tours tenus. Score final : 80. » ; sur une pioche impossible, la raison d'abord : « Plus aucune bille à jouer. ».
 
@@ -548,143 +570,333 @@ Des définitions provisoires, pour tester les mécaniques ; leurs valeurs sont d
 
 | Définition | Objectif | Règles |
 |---|---|---|
-| partie libre (la partie habituelle) | libre, 10 tours ; paliers bronze 180, argent 200, or 245 | aucune |
-| défi cible | 165 points en 8 tours | aucune |
-| défi endurance | Impact de 12 minimum chaque tour, 20 tours au plus | aucune |
+| partie libre (la partie habituelle) | libre, 10 tours ; paliers bronze 120, argent 148, or 193 | aucune |
+| défi cible | 122 points en 8 tours | aucune |
+| défi endurance | Impact de 7 minimum chaque tour, 20 tours au plus | aucune |
 | gravier | libre, 10 tours | gravier : les gains de Vitesse et de Masse produits par un calot sont divisés par deux |
 | terrain étroit | libre, 10 tours | un lancer de moins ; échange interdit |
 | sans pot | libre, 10 tours | pot inerte : les billes du pot n'agissent pas |
 | silence | libre, 10 tours | silence : le mot-clé Chiquenaude ne se déclenche plus |
 
-## Annexe : les billes de test
+## Annexe : les billes du premier set
 
 Cette annexe est générée à partir de la table des billes ; elle ne se modifie pas à la main.
 
 <!-- annexe des billes : début -->
 
+### cuivre
+
+cuivre, normale, Trésor, commune, usure 4.
+
+*Une bille cuivrée qui verdit un peu aux entournures. Les anciens jurent qu'elle porte chance à qui la frotte assez longtemps.*
+
+- Pointe : Vitesse +3.
+- Base : Vitesse +1.
+- En poche, à chaque résolution : Vitesse +1.
+
+### vive-argent
+
+vive-argent, minibille, Trésor, peu commune, usure 3.
+
+*Une goutte d'argent qui ne tient jamais en place, même au fond d'une poche. On dit qu'elle trouve toujours le chemin du coffre.*
+
+- Pointe : Masse +1.
+- Base : Vitesse +2.
+- Final : Empocher cette bille.
+- En poche, à chaque polissage : Vitesse +2.
+
+### rubis
+
+rubis, normale, Trésor, rare, usure 4.
+
+*Un rouge si profond qu'on croit y voir battre un cœur. Plus on la garde, plus elle brille.*
+
+- Pointe : Masse +1, +1 par bille dans le pot, maximum +4.
+- Base : Polissage 1 à la bille de l'emplacement suivant.
+- En poche, à l'entrée : statut lustre, toute la partie.
+
+### lingotin
+
+lingotin, calot, Trésor, épique, usure 5.
+
+*Un petit lingot d'or poli jusqu'à devenir rond. Il pèse dans la main comme une promesse.*
+
+- Pointe : Vitesse +4 et Masse +1.
+- Base : Masse +1.
+- Tic : Empocher jusqu'à une bille de votre main au choix.
+- En poche, à chaque résolution : Masse +1 si le pot est plein.
+
+### pierre de sang
+
+pierre de sang, normale, Trésor, légendaire, usure 3.
+
+*Vert sombre moucheté de rouge, comme si quelqu'un avait saigné dessus il y a des siècles. Elle ne se gagne jamais : elle se mérite.*
+
+- Pointe : Vitesse +3.
+- Base : Masse +1.
+- Final : Empocher cette bille.
+- En poche, à l'entrée : statut poche profonde, intensité 2, toute la partie.
+- En poche, à chaque bille mise en poche : Masse +1.
+
+### lune
+
+lune, normale, Astres, commune, usure 3.
+
+*Grise et piquetée de minuscules cratères. Les nuits de pleine lune, elle roule un peu plus loin que les autres.*
+
+- Pointe : Vitesse +3.
+- Base : Vitesse +1.
+- Éveil : Vitesse +1.
+
+### comète
+
+comète, minibille, Astres, peu commune, usure 2.
+
+*Une minibille bleu glacier qui laisse derrière elle une traînée laiteuse. Elle n'arrive jamais seule.*
+
+- Pointe : Vitesse +3.
+- Base : Vitesse +1.
+- Éveil : Pioche 1.
+- En poche, à chaque mélange : Vitesse +3.
+
+### galaxie
+
+galaxie, normale, Astres, rare, usure 3.
+
+*Une spirale de poussière violette et dorée tourne lentement en son cœur. Certains enfants prétendent y avoir vu des planètes.*
+
+- Pointe : Vitesse +2 par Astres active, maximum +6.
+- Base : Vitesse +1.
+- Trouvaille : Masse +1.
+
+### éclipse
+
+éclipse, calot, Astres, épique, usure 3.
+
+*Noire comme l'encre, cerclée d'un mince anneau de lumière. Quand elle passe, toute la cour retient son souffle.*
+
+- Pointe : Masse +2.
+- Base : Vitesse +1.
+- Éveil : statut main vive, 2 tours.
+- Trouvaille : statut inspiration, 1 charge.
+
+### étoile
+
+étoile, minibille, Astres, légendaire, usure 4.
+
+*Parfaitement transparente, avec un seul éclat scintillant suspendu au centre. On raconte qu'elle est tombée d'un ciel d'août.*
+
+- Pointe : Vitesse +2 par éveil cette partie, maximum +20.
+- Base : Masse +1 par mélange cette partie, maximum +3.
+- En poche, à chaque bille piochée : Vitesse +1.
+
+### bulle
+
+bulle, minibille, Brume, commune, usure 2.
+
+*Si fine et si claire qu'on la croirait prête à éclater. Elle finit toujours par revenir, comme si de rien n'était.*
+
+- Pointe : Vitesse +3.
+- Base : Vitesse +1.
+- Chute : Vitesse +2.
+
+### fantôme
+
+fantôme, minibille, Brume, peu commune, usure 2.
+
+*Toute blanche, plus ou moins transparente selon l'humeur. On la perd, on la cherche, et elle est déjà dans votre poche.*
+
+- Pointe : Vitesse +3.
+- Base : Vitesse +1.
+- Chiquenaude : Vitesse +1 par tour en main, maximum +3.
+- Final : Rebond de cette bille.
+
+### perle
+
+perle, minibille, Brume, rare, usure 3.
+
+*Nacrée, douce comme une joue, elle sent vaguement le sel. Les plongeurs disent qu'elle appelle ses sœurs perdues.*
+
+- Pointe : Vitesse +2, +1 par Brume à la défausse, maximum +6.
+- Base : Vitesse +1.
+- Chute : statut amorti, 3 tours.
+
+### océan
+
+océan, calot, Brume, épique, usure 3.
+
+*Des bleus et des verts qui ondulent sans jamais se mélanger tout à fait. Collée à l'oreille, on jure entendre le ressac.*
+
+- Pointe : Vitesse +2 par bille défaussée ce tour, maximum +8.
+- Base : Masse +1.
+- Tic : Ramasser jusqu'à une bille de la défausse au choix.
+- En poche, à chaque bille défaussée : Vitesse +1.
+
+### boule à neige
+
+boule à neige, normale, Brume, légendaire, usure 3.
+
+*Des flocons minuscules tourbillonnent à l'intérieur dès qu'on la secoue. Personne n'a jamais su comment ils y sont entrés.*
+
+- Pointe : Vitesse +4 et Rebond de toutes les billes actives.
+- Base : Vitesse +2.
+- En poche, à chaque rebond : Masse +1.
+
+### abeille
+
+abeille, minibille, Bestiaire, commune, usure 3.
+
+*Rayée jaune et noir, elle bourdonne presque quand elle roule. Là où il y en a une, il y en a cent.*
+
+- Pointe : Vitesse +3.
+- Base : Vitesse +1 à la bille de l'emplacement suivant.
+- En poche, à chaque phase de base : Vitesse +1.
+
+### dauphin
+
+dauphin, normale, Bestiaire, peu commune, usure 3.
+
+*Un gris-bleu lisse avec une vague blanche sur le flanc. Elle bondit plus qu'elle ne roule, et adore bousculer les autres.*
+
+- Pointe : Vitesse +3.
+- Base : Vitesse +1.
+- Tic : Vitesse +3.
+- En poche, à chaque bille tiquée : Vitesse +1.
+
+### tortue
+
+tortue, calot, Bestiaire, rare, usure 6.
+
+*Une carapace verte et brune striée d'hexagones. Elle a vu passer des générations de joueurs et compte bien en voir d'autres.*
+
+- Pointe : Masse +1 par Bestiaire active, maximum +3.
+- Base : Polissage 1 à la bille de l'emplacement suivant si le triangle est plein.
+- En poche, à chaque résolution : Masse +1 si le triangle est plein.
+
+### araignée
+
+araignée, normale, Bestiaire, épique, usure 3.
+
+*Noire avec des filaments argentés qui ressemblent à une toile. Celles qui s'en approchent ont du mal à repartir.*
+
+- Pointe : Vitesse +2 par Bestiaire active, maximum +6.
+- Base : Vitesse +1.
+- Tic : Polissage 1, jusqu'à 2 billes actives au choix.
+- En poche, à chaque tic : statut coup de fouet, 1 charge.
+
+### dragon
+
+dragon, calot, Bestiaire, légendaire, usure 4.
+
+*Des écailles émeraude et un œil ambré qui semble vous suivre. Les grands l'interdisent dans la cour, ce qui la rend évidemment irrésistible.*
+
+- Pointe : Vitesse +4 et Masse +1 par Bestiaire active, maximum +3.
+- Base : Vitesse +3.
+- Chiquenaude : Vitesse +3 à la bille de l'emplacement précédent et Vitesse +3 à la bille de l'emplacement suivant.
+- En poche, à chaque tic : Masse +1.
+
+### bille de fronde
+
+bille de fronde, minibille, Souffle, commune, usure 2.
+
+*Petite, dure, et taillée pour voler. Elle ne craint rien, surtout pas les plus gros qu'elle.*
+
+- Pointe : Vitesse +3.
+- Base : Vitesse +1.
+- Tic : Vitesse +4 si la bille éjectée est plus grosse.
+- En poche, à chaque bille éjectée : Vitesse +1.
+
+### boule de feu
+
+boule de feu, normale, Souffle, peu commune, usure 2.
+
+*Orange et rouge, avec des flammèches figées dans le verre. Elle est toujours un peu tiède, même en hiver.*
+
+- Pointe : Vitesse +5.
+- Base : Vitesse +2.
+- Final : Vitesse +6.
+- En poche, à chaque final : Vitesse +2.
+
+### tornade
+
+tornade, normale, Souffle, rare, usure 3.
+
+*Une spirale grise et blanche qui donne le tournis à la regarder. Après son passage, il ne reste jamais grand-chose debout.*
+
+- Pointe : Vitesse +3, +2 par bille éjectée ce tour, maximum +11.
+- Base : Éjecter la bille de l'emplacement suivant si la bille de l'emplacement suivant est une minibille.
+- En poche, à chaque éjection par effet : Vitesse +2.
+
+### grenade
+
+grenade, normale, Souffle, épique, usure 2.
+
+*Vert kaki, quadrillée de reliefs, avec une drôle de petite tige sur le dessus. Mieux vaut ne pas être à côté quand elle s'en va.*
+
+- Pointe : Vitesse +5.
+- Base : Vitesse +2.
+- Chiquenaude : Fêlure 1, jusqu'à 2 billes actives au choix.
+- Final : Vitesse +4 et Éjecter toutes les minibilles actives.
+
+### diable rouge
+
+diable rouge, calot, Souffle, légendaire, usure 3.
+
+*Rouge vif barré d'une bande jaune, comme un sourire en coin. Elle gagne toujours, mais personne n'aime ce que ça coûte.*
+
+- Pointe : Vitesse +6, statut coup double, ce tour et statut usure accélérée, le prochain tour.
+- Base : Vitesse +3 et Fêlure 1 à la bille de l'emplacement suivant.
+- En poche, à chaque bille usée : Vitesse +2.
+
 ### argile
 
-argile, normale, usure 3.
+argile, normale, Classiques, commune, usure 3.
 
-- Pointe : Vitesse +6 si le triangle est plein.
-- Base : Vitesse +2 à la bille de l'emplacement suivant.
-- Chiquenaude : Vitesse +1 par tour en main, maximum +5.
-- Tic : statut lancer supplémentaire, le prochain tour.
+*La bille de terre cuite de toutes les cours de récré, un peu rugueuse sous le pouce. Elle n'a l'air de rien, et c'est ce qui la rend fiable.*
 
-### verre
-
-verre, normale, usure 3.
-
-- Pointe : Vitesse +1 par trouvaille cette partie, maximum +10.
-- Base : Vitesse +1 par bille en main, maximum +5.
-- Tic : Polissage 1, jusqu'à une bille active au choix.
-
-### gorille
-
-gorille, calot, usure 3.
-
-- Pointe : Vitesse +6.
-- Base : aucun effet.
-- Tic : Vitesse +4 si la bille éjectée est plus petite et Empocher une bille de votre main au choix.
-- Éjection : Éjecter la bille de l'emplacement suivant.
-
-### agate
-
-agate, normale, usure 3.
-
-- Pointe : Masse +1 et Masse +2 si la base gauche est un calot.
-- Base : Masse +1.
-- Tic : statut inspiration, 1 charge.
-- Trouvaille : statut lustre, toute la partie.
-- Final : statut poche profonde, toute la partie et Empocher cette bille.
-- En poche, à chaque résolution : Masse +2 si le pot est plein.
+- Pointe : Vitesse +4.
+- Base : Vitesse +1.
+- Aucun effet particulier.
 
 ### œil-de-chat
 
-œil-de-chat, normale, usure 3.
+œil-de-chat, normale, Classiques, peu commune, usure 3.
+
+*Du verre clair traversé d'une flamme colorée, comme une pupille. On dit qu'elle voit dans le noir.*
 
 - Pointe : Vitesse +3.
 - Base droite : Masse +1. Base gauche : Vitesse +3.
-- Tic : Pioche 1 si la main est vide.
-- Éjection : Ramasser jusqu'à une bille de la défausse au choix.
+- En poche, à chaque résolution : Masse +1 si le triangle est plein.
 
-### porcelaine
+### agate
 
-porcelaine, minibille, usure 2.
+agate, normale, Classiques, rare, usure 4.
 
-- Pointe : Vitesse +5 et Vitesse +2 à la bille de l'emplacement suivant.
+*Des veines de couleurs qui ne se ressemblent jamais d'une bille à l'autre. Elle s'entend avec tout le monde.*
+
+- Pointe : Vitesse +2 par famille différente sur le triangle, maximum +6.
+- Base : Masse +1.
+- En poche, à chaque résolution : Vitesse +1 par famille différente sur le triangle, maximum +3.
+
+### acier
+
+acier, calot, Classiques, épique, usure 5.
+
+*Un roulement à billes échappé d'un vieux vélo, froid et lourd. Personne ne le chasse, c'est lui qui chasse.*
+
+- Pointe : Masse +2.
 - Base : Vitesse +2.
-- Chiquenaude : Masse +1 à la bille de l'emplacement précédent.
-- Final : Vitesse +4 et Polissage 1, jusqu'à 2 billes actives au choix.
-- Chute : statut fragilité, 3 tours.
-- En poche, à l'entrée : Vitesse +10.
+- Tic : Vitesse +3 si la bille éjectée est plus petite.
+- En poche, à l'entrée : statut lancer supplémentaire, le prochain tour.
 
-### plombée
+### soda
 
-plombée, calot, usure 3.
+soda, normale, Classiques, légendaire, usure 1.
 
-- Pointe : Vitesse −3.
-- Base : statut usure accélérée, le prochain tour.
-- Chiquenaude : Éjecter la bille en pointe.
-- Éjection : statut coup de fouet, 1 charge.
+*Couleur cola, on jurerait qu'elle pétille encore quand on la secoue. Elle ne tient pas en place, et ne dure jamais longtemps.*
 
-### mica
-
-mica, minibille, usure 3.
-
-- Pointe : Vitesse +2 et Polissage 1 à la bille de l'emplacement suivant.
-- Base : Pioche 1.
-- Éveil : Pioche 1.
-- Éjection : Pioche 1 si la bille posée est plus grosse.
-- Final : Rebond de cette bille.
-- En poche, à chaque mélange : statut ferveur, 2 tours.
-
-### sulfure
-
-sulfure, calot, usure 3.
-
-- Pointe : Masse +3 et Rebond de la bille en base droite.
-- Base : Empocher la bille en pointe.
-- Trouvaille : Fêlure 1 à la base droite.
-- En poche, à chaque résolution : Vitesse +2 par minibille active.
-
-### grès
-
-grès, normale, usure 3.
-
-- Pointe : aucun effet.
-- Base : Vitesse +1 par minibille active.
-- Tic : Défausser jusqu'à une bille de votre main au choix.
-- Éjection : statut main vive, 2 tours.
-- En poche, à chaque bille éjectée : Masse +1.
-
-### tigrée
-
-tigrée, normale, usure 4.
-
-- Pointe : Vitesse −1.
-- Base : Éjecter une bille active au choix.
-- Éveil : statut répit, ce tour.
-- Trouvaille : Vitesse +3.
-- Final : statut amorti, 3 tours.
-- En poche, à chaque chiquenaude : Vitesse +2.
-
-### géante
-
-géante, calot, usure 1.
-
-- Pointe : Vitesse +6.
-- Base : Vitesse +6.
-- Éveil : Polissage 1 à la pointe.
-- Final : Pioche 1 et statut coup double, ce tour.
-
-### loupe
-
-loupe, minibille, usure 3.
-
-- Pointe : Vitesse +2 et Défausser la prochaine bille du sac.
-- Base droite : Vitesse +1. Base gauche : Vitesse +4 à la pointe si son effet de pointe donne au moins Vitesse +1.
-- Chiquenaude : Vitesse +2 par chiquenaude ce tour, maximum +6.
-- Éjection : statut fatigue, le prochain tour.
+- Pointe : Vitesse +3 par famille différente sur le triangle, maximum +9.
+- Base : Masse +1 par famille différente sur le triangle, maximum +3.
+- En poche, à chaque chiquenaude : Vitesse +1.
 
 <!-- annexe des billes : fin -->

@@ -8,7 +8,7 @@
 
 import { MARBLE_PHASES, MARBLE_POCKET, MARBLE_TRIGGERS } from "../config/values.js";
 import { rejectUnknownFields } from "../../lib/validate.js";
-import { isMarbleSize, validateEffect, validateFilters } from "./effects.js";
+import { isMarbleFamily, isMarbleRarity, isMarbleSize, validateEffect, validateFilters } from "./effects.js";
 import { EFFECT_FIELDS, FIXED_MOMENTS, LISTENABLE_KEYS, REACTION_KEYS, REACTIVE_MOMENT, TALLY_COUNTERS, TALLY_IDS, pocketClauses, reactionClauses } from "./content.js";
 import { CHARACTERISTICS, LOCKS, MODIFIER_OPERATIONS, MODIFIER_POINTS, NO_STATUSES, STATUS_BEHAVIORS, STATUS_DURATIONS, STATUS_STACKINGS } from "./statuses.js";
 import { BAG_KINDS, GOALS, START_KEYS } from "./definitions.js";
@@ -44,9 +44,17 @@ export function validateMarbleTypes(types, statuses = NO_STATUSES) {
   const contextOf = (moment) => ({ ...moment, tallies: TALLY_IDS, statuses });
   if (Object.keys(types).length === 0) fail("table des billes vide.");
   for (const [id, type] of Object.entries(types)) {
-    rejectUnknownFields(type, [...EFFECT_FIELDS, "baseVariant", MARBLE_POCKET.field, "maxWear", "size"], `bille "${id}"`, fail);
+    rejectUnknownFields(type, [...EFFECT_FIELDS, "baseVariant", MARBLE_POCKET.field, "maxWear", "size", "families", "rarity", "beacon"], `bille "${id}"`, fail);
     // Le calibre, obligatoire : lu par les conditions de calibre et par le son.
     if (!isMarbleSize(type.size)) fail(`bille "${id}" : calibre (size) absent ou inconnu "${type.size}".`);
+    // Ses familles, obligatoires : une liste d'au moins une famille connue, chacune
+    // une fois. Sa rareté, obligatoire : exactement une, connue.
+    if (!Array.isArray(type.families) || type.families.length === 0) fail(`bille "${id}" : families doit être une liste d'au moins une famille.`);
+    for (const family of type.families) {
+      if (!isMarbleFamily(family)) fail(`bille "${id}" : famille inconnue "${family}".`);
+    }
+    if (new Set(type.families).size !== type.families.length) fail(`bille "${id}" : une famille en double.`);
+    if (!isMarbleRarity(type.rarity)) fail(`bille "${id}" : rareté (rarity) absente ou inconnue "${type.rarity}".`);
     for (const field of EFFECT_FIELDS) {
       if (type[field] !== undefined) validateEffect(type[field], `bille "${id}", ${field}`, fail, contextOf(FIELD_CONTEXTS[field]));
     }
@@ -82,6 +90,9 @@ export function validateMarbleTypes(types, statuses = NO_STATUSES) {
     if (type.maxWear !== undefined && (!Number.isInteger(type.maxWear) || type.maxWear < 1)) {
       fail(`bille "${id}" : maxWear doit être un entier >= 1.`);
     }
+    // Sa balise propre (facultative) : une clé du manifeste audio, que la simulation
+    // ne lit jamais ; son existence se vérifie à l'audit du contenu.
+    if (type.beacon !== undefined && (typeof type.beacon !== "string" || type.beacon === "")) fail(`bille "${id}" : beacon doit être une clé de son non vide.`);
   }
 }
 

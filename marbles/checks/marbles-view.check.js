@@ -67,10 +67,13 @@ import {
 import { marbleCard } from "../view/card.js";
 import { tallyMenu } from "../view/tally-screen.js";
 import { keywordsMenu, keywordsText } from "../view/keywords.js";
+import { descriptionText } from "../view/marble-info.js";
+import { GAME_ZONES } from "../core/zones.js";
 import { confirmationEntries } from "../../view/menus/confirmation.js";
 import { INITIAL_CURSOR, placementStart, stepCursor, zoneOf } from "../view/navigation.js";
 import {
   MARBLE_EVENT_CUES,
+  beaconKey,
   discardPlace,
   eventCues,
   handPlace,
@@ -99,7 +102,7 @@ import { ruleInstance } from "../core/statuses.js";
 import { answerChoices, emptyBagMarblesGame, fabricatedRules, inHand, isCleanText, keyText, marblesPlayState, mustReduce, overState, statusInstance } from "./helpers.js";
 import { choiceAnswer, choiceCursorAfterAnswer, choiceFocusLine, choiceHandOptions, choiceListEntry, choiceStartCursor, stepChoiceCursor } from "../view/choice.js";
 import { MARBLES_HELP_TOPICS, helpTopicText, marblesHelpMenu } from "../view/help-screen.js";
-import { AMOUNT_SOURCES, CLAUSE_ACTIONS, effectAt } from "../core/effects.js";
+import { AMOUNT_SOURCES, CLAUSE_ACTIONS, TARGET_FILTERS, effectAt } from "../core/effects.js";
 
 // Les règles de la table des vérifications (marbles/checks/fixtures/marbles.js).
 const rules = fixtureRules();
@@ -272,7 +275,7 @@ function checkCards(run) {
         ],
         below: [
           "card.windfall{effect: effect.combined{parts: [effect.given{effect: effect.combined{parts: [effect.crack{amount: 1}]}, slot: slot.rightBase}]}}",
-          "card.pocketed_resolution{effect: effect.combined{parts: [effect.per_active_size{effect: effect.combined{parts: [effect.speed_up{amount: 2}]}, size: <size.small.name>}]}}",
+          "card.pocketed_resolution{effect: effect.combined{parts: [effect.per_zone_size_triangle{effect: effect.combined{parts: [effect.speed_up{amount: 2}]}, zone: triangle, size: <size.small.name>}]}}",
         ],
       },
       fields("base_pocket")
@@ -314,7 +317,7 @@ function checkCards(run) {
       fields("awaken_draw")
     );
     // Les conditions de calibre, lisibles à l'oreille.
-    run("fiche : comptage par calibre", "card.base{effect: effect.combined{parts: [effect.per_active_size{effect: effect.combined{parts: [effect.speed_up{amount: 1}]}, size: <size.small.name>}]}}", fields("size_count").above[1]);
+    run("fiche : comptage par calibre", "card.base{effect: effect.combined{parts: [effect.per_zone_size_triangle{effect: effect.combined{parts: [effect.speed_up{amount: 1}]}, zone: triangle, size: <size.small.name>}]}}", fields("size_count").above[1]);
     run("fiche : calibre d'un emplacement", "card.apex{effect: effect.combined{parts: [effect.combined{parts: [effect.mass_up{amount: 1}]} | effect.conditional{effect: effect.combined{parts: [effect.mass_up{amount: 2}]}, condition: condition.sizeAt{slot: slot.leftBase, size: <size.large.name>}}]}}", fields("final_pocket").above[0]);
     run.same("fiche : un Polissage au choix au Tic", [
       "card.hit{effect: effect.combined{parts: [effect.given_choice{effect: effect.combined{parts: [effect.polish{amount: 1}]}, target: choice.noun.triangle_marble{count: 1}, upTo: no}]}}",
@@ -578,6 +581,13 @@ function checkKeywords(run) {
     )
   );
   run("touche E : aucun mot-clé", "keyword.none", keywordsText("bare", made, t));
+
+  // Touche V : la description, un texte facultatif déduit de l'id de la bille.
+  const described = (key) => key === "marble.bare.description";
+  run("touche V : la description de la bille", "marble.bare.description", descriptionText("bare", t, described));
+  run("touche V : une bille sans description", "description.none", descriptionText("one_shot", t, described));
+  run("touche V : aucune bille (emplacement vide, main vide)", "no_marble", descriptionText(undefined, t, described));
+  run("touche V : aucune bille (null)", "no_marble", descriptionText(null, t, described));
   const menu = keywordsMenu("one_shot", rules);
   const lines = (built) => built.entries.map((entry) => t(entry.label, entry.labelParams));
   run("Maj+E : titre", "keyword.title{marble: <one_shot>}", t(menu.title, menu.titleParams));
@@ -703,7 +713,7 @@ function checkChoiceInterface(run) {
   run("choix, question : la bille et le moment, puis la main", "choice.by_hit{marble: <hit_pocket>, question: choice.question.required{target: choice.noun.hand_marble{count: 1}, verb: choice.verb.pocket{effect: undefined}}}", describeChoicePrompt(handOnly, t));
   run.same("choix, main : les billes éligibles seulement", ["aging_flick", "final_pocket"], choiceHandOptions(handOnly).map((option) => option.marble));
   run.same("choix, main : le curseur s'y ouvre", { place: "hand", handIndex: 0 }, (({ place, handIndex }) => ({ place, handIndex }))(choiceStartCursor(handOnly, cursor("apex"))));
-  run("choix, main : la position dans le menu du choix", "list.line{name: <final_pocket>, size: size.medium.name, maxWear: 3}. menu.position{index: 2, total: 2}", choiceFocusLine(hitPocket, cursor("hand", 1), rules, t));
+  run("choix, main : la position dans le menu du choix", "list.line{name: <final_pocket>, size: size.medium.name, families: [family.classics.name], rarity: rarity.common.name, maxWear: 3}. menu.position{index: 2, total: 2}", choiceFocusLine(hitPocket, cursor("hand", 1), rules, t));
   run("choix, main seule : pas de triangle", null, stepChoiceCursor(handOnly, cursor("hand"), "up"));
   run.same("choix, main : Entrée répond par la place dans la main", { type: "choose", target: { zone: "hand", index: 1 } }, choiceAnswer(handOnly, cursor("hand", 1)).action);
   run.same("choix, main : la fiche de la bille sous le curseur", "final_pocket", choiceListEntry(hitPocket, choiceHandOptions(hitPocket.pendingChoice)[1]).marble);
@@ -773,7 +783,7 @@ function checkChoiceInterface(run) {
   );
   run.same("défausse : le menu, dans l'ordre d'arrivée, la remplacée en dernier", ["plain", "booster", "plain"], choiceHandOptions(fromDiscard).map((option) => option.marble));
   run.same("défausse : le curseur s'y ouvre", { place: "hand", handIndex: 0 }, (({ place, handIndex }) => ({ place, handIndex }))(choiceStartCursor(fromDiscard, cursor("apex"))));
-  run("défausse : la position dans le menu", "list.line{name: <booster>, size: size.medium.name, maxWear: 3}. menu.position{index: 2, total: 3}", choiceFocusLine(picking, cursor("hand", 1), made, t));
+  run("défausse : la position dans le menu", "list.line{name: <booster>, size: size.medium.name, families: [family.classics.name], rarity: rarity.common.name, maxWear: 3}. menu.position{index: 2, total: 3}", choiceFocusLine(picking, cursor("hand", 1), made, t));
   run.same("défausse : Entrée répond par la place dans la défausse", { type: "choose", target: { zone: "discard", index: 1 } }, choiceAnswer(fromDiscard, cursor("hand", 1)).action);
   run.same("défausse : la fiche de la bille sous le curseur", { marble: "booster", turnsInHand: 0 }, (({ marble, turnsInHand }) => ({ marble, turnsInHand }))(choiceListEntry(picking, choiceHandOptions(picking.pendingChoice)[1])));
   run("défausse seule : pas de triangle", null, stepChoiceCursor(fromDiscard, cursor("hand"), "up"));
@@ -896,6 +906,10 @@ function checkSounds(run) {
   run("profils : les réglages du jeu sont valides", false, throws(() => validateMarbleSounds(MARBLE_SIZES, MARBLE_SOUND_PROFILES, MARBLES_SETTINGS)));
   run("profils : calibre sans profil refusé", true, throws(() => validateMarbleSounds(MARBLE_SIZES, { [SMALL]: MARBLE_SOUND_PROFILES[SMALL] }, MARBLES_SETTINGS)));
   run("profils : profil sans chute refusé", true, throws(() => validateMarbleSounds({ [SMALL]: "small" }, { [SMALL]: { beacon: "a" } }, MARBLES_SETTINGS)));
+  // La balise d'une bille : la sienne, sinon celle de son calibre.
+  const beaconTypes = { own: { size: SMALL, beacon: "assets/sounds/marbles/own_beacon" }, plain: { size: LARGE } };
+  run("balise : la balise propre de la bille", "assets/sounds/marbles/own_beacon", beaconKey("own", beaconTypes));
+  run("balise : sans balise propre, celle du calibre", MARBLE_SOUND_PROFILES[LARGE].beacon, beaconKey("plain", beaconTypes));
   run("collision : réglages du jeu valides", false, throws(() => validateCollision(MARBLES_COLLISION)));
   run("collision : écart négatif refusé", true, throws(() => validateCollision({ ...MARBLES_COLLISION, flamMs: -1 })));
   run("collision : calibre sans poids refusé", true, throws(() => validateCollision({ ...MARBLES_COLLISION, weights: { [SMALL]: 1, [LARGE]: 3 } })));
@@ -1627,7 +1641,11 @@ function checkLocales(run, { events, state }) {
       run(`${locale} : la fin de partie a son texte`, true, Object.hasOwn(LOCALE_TABLES[locale], "marbles.event.game_over"));
       const missingTriggerTexts = MARBLE_TRIGGERS.flatMap((trigger) => Object.values(trigger.texts)).filter((key) => !Object.hasOwn(LOCALE_TABLES[locale], key));
       run.same(`${locale} : chaque déclencheur a ses textes`, [], missingTriggerTexts);
-      const missingSourceTexts = Object.values(AMOUNT_SOURCES).map((source) => source.text).filter((key) => !Object.hasOwn(LOCALE_TABLES[locale], key));
+      // Un gabarit qui dépend de la source (le nombre de billes, filtré ou non) : chaque
+      // zone, sans filtre et avec chaque type de filtre.
+      const sourceSamples = Object.keys(GAME_ZONES).flatMap((zone) => [undefined, ...Object.keys(TARGET_FILTERS)].map((filter) => ({ zone, ...(filter === undefined ? {} : { filters: [{ type: filter }] }) })));
+      const sourceKeys = Object.values(AMOUNT_SOURCES).flatMap((source) => (typeof source.text === "function" ? sourceSamples.map(source.text) : [source.text]));
+      const missingSourceTexts = [...new Set(sourceKeys)].filter((key) => !Object.hasOwn(LOCALE_TABLES[locale], key));
       run.same(`${locale} : chaque source de montant a son texte`, [], missingSourceTexts);
       const tallyKeys = [
         ...TALLY_COUNTERS.flatMap((counter) => [`marbles.tally.${counter.id}.name`, `marbles.tally.${counter.id}.unit`]),
@@ -1728,8 +1746,8 @@ function checkSaid(run, { events, state }) {
 
     // Annonces principales : courtes, le détail est dans la fiche.
     const holding = { ...state, hand: inHand(["aging_flick", "split_base", "hit_pocket"]) };
-    run("texte : bille en main", "list.line{name: <aging_flick>, size: size.medium.name, maxWear: 3}. menu.position{index: 1, total: 3}", describeHandFocus(holding, 0, rules, t));
-    run("texte : usure maximale propre", "list.line{name: <one_shot>, size: size.large.name, maxWear: 1}. menu.position{index: 2, total: 5}", describeMarbleInList("one_shot", 1, 5, rules, t));
+    run("texte : bille en main", "list.line{name: <aging_flick>, size: size.medium.name, families: [family.classics.name], rarity: rarity.common.name, maxWear: 3}. menu.position{index: 1, total: 3}", describeHandFocus(holding, 0, rules, t));
+    run("texte : usure maximale propre", "list.line{name: <one_shot>, size: size.large.name, families: [family.classics.name], rarity: rarity.common.name, maxWear: 1}. menu.position{index: 2, total: 5}", describeMarbleInList("one_shot", 1, 5, rules, t));
 
     const lensed = {
       ...state,
@@ -1906,9 +1924,9 @@ function checkConfirmationAndCursor(run) {
 // billes : changer leurs valeurs ne change aucun témoin ; les renommer, si.
 const WITNESS_RULES = fabricatedRules({
   clay: { base: [speed(1)], apex: [speed(4)], hit: [speed(2)], maxWear: 3, size: MEDIUM },
-  gorilla: { apex: [speed(6)], knockout: [speed(3)], maxWear: 3, size: LARGE },
-  leaded: { apex: [speed(-3)], maxWear: 3, size: LARGE },
-  glass: { hit: [polish(1, choice({ zones: ["triangle"], mode: "optional" }))], maxWear: 3, size: MEDIUM },
+  dragon: { apex: [speed(6)], knockout: [speed(3)], maxWear: 3, size: LARGE },
+  pearl: { apex: [speed(-3)], maxWear: 3, size: LARGE },
+  dolphin: { hit: [polish(1, choice({ zones: ["triangle"], mode: "optional" }))], maxWear: 3, size: MEDIUM },
 });
 
 // Les phrases attendues des témoins, par langue.
@@ -1918,34 +1936,34 @@ const WITNESSES = {
       "Poser argile en pointe ?",
       "Vitesse +4",
       "Chiquenaude d'argile : aucun effet",
-      "Éjection de gorille : Vitesse +3",
+      "Éjection de dragon : Vitesse +3",
       "Tic d'argile : Vitesse +2",
       "Pot : aucun effet",
     ],
-    placing: "Éjection de gorille : Vitesse +3. Vitesse 3, Masse 1. Défausse : gorille. Pose : argile en pointe. Tic d'argile : Vitesse +2. Vitesse 5, Masse 1.",
+    placing: "Éjection de dragon : Vitesse +3. Vitesse 3, Masse 1. Défausse : dragon. Pose : argile en pointe. Tic d'argile : Vitesse +2. Vitesse 5, Masse 1.",
     wornOut: [
       "argile est usée et quitte le triangle.",
-      "gorille est usé et quitte le triangle.",
+      "dragon est usé et quitte le triangle.",
     ],
-    overview: "Prévision : Vitesse −2, Masse 1, Impact 0. base droite, vide. base gauche, argile : Vitesse +1. pointe, plombée : Vitesse −3.",
+    overview: "Prévision : Vitesse −2, Masse 1, Impact 0. base droite, vide. base gauche, argile : Vitesse +1. pointe, perle : Vitesse −3.",
     card: [
       "Pointe : Vitesse +4.",
       "Base : Vitesse +1.",
     ],
-    question: "Tic de verre : vous pouvez polir une bille active. T pour ne rien choisir.",
+    question: "Tic de dauphin : vous pouvez polir une bille active. T pour ne rien choisir.",
     questions: [
-      "Tic de verre : vous pouvez polir jusqu'à 2 billes actives. T pour ne rien choisir.",
-      "Tic de verre : vous devez choisir une bille active à polir.",
-      "Tic de verre : vous devez choisir 2 billes actives à polir.",
-      "Tic de verre : vous pouvez éjecter une bille active. T pour ne rien choisir.",
-      "Tic de verre : vous devez choisir une bille active à éjecter.",
-      "Tic de verre : vous pouvez donner Vitesse +2 à 2 billes actives au plus. T pour ne rien choisir.",
+      "Tic de dauphin : vous pouvez polir jusqu'à 2 billes actives. T pour ne rien choisir.",
+      "Tic de dauphin : vous devez choisir une bille active à polir.",
+      "Tic de dauphin : vous devez choisir 2 billes actives à polir.",
+      "Tic de dauphin : vous pouvez éjecter une bille active. T pour ne rien choisir.",
+      "Tic de dauphin : vous devez choisir une bille active à éjecter.",
+      "Tic de dauphin : vous pouvez donner Vitesse +2 à 2 billes actives au plus. T pour ne rien choisir.",
       "Vous pouvez encore polir une bille active. T pour terminer.",
       "Vous devez encore choisir une bille active.",
     ],
     chosen: [
       "agate choisie.",
-      "gorille choisi.",
+      "dragon choisi.",
     ],
     turn: "Tour 2 sur 10. Score 5. Vitesse 5, Masse 2. 4 lancers restants. Échange disponible.",
     bag: [
@@ -1960,34 +1978,34 @@ const WITNESSES = {
       "Place clay on the apex?",
       "Speed +4",
       "Flick of clay: no effect",
-      "Knockout of gorilla: Speed +3",
+      "Knockout of dragon: Speed +3",
       "Hit from clay: Speed +2",
       "Pot: no effect",
     ],
-    placing: "Knockout of gorilla: Speed +3. Speed 3, Mass 1. Discard: gorilla. Placement: clay on the apex. Hit from clay: Speed +2. Speed 5, Mass 1.",
+    placing: "Knockout of dragon: Speed +3. Speed 3, Mass 1. Discard: dragon. Placement: clay on the apex. Hit from clay: Speed +2. Speed 5, Mass 1.",
     wornOut: [
       "clay is worn out and leaves the triangle.",
-      "gorilla is worn out and leaves the triangle.",
+      "dragon is worn out and leaves the triangle.",
     ],
-    overview: "Forecast: Speed −2, Mass 1, Impact 0. right base, empty. left base, clay: Speed +1. apex, leaded: Speed −3.",
+    overview: "Forecast: Speed −2, Mass 1, Impact 0. right base, empty. left base, clay: Speed +1. apex, pearl: Speed −3.",
     card: [
       "Apex: Speed +4.",
       "Base: Speed +1.",
     ],
-    question: "Hit from glass: you may polish an active marble. T to choose nothing.",
+    question: "Hit from dolphin: you may polish an active marble. T to choose nothing.",
     questions: [
-      "Hit from glass: you may polish up to 2 active marbles. T to choose nothing.",
-      "Hit from glass: you must choose an active marble to polish.",
-      "Hit from glass: you must choose 2 active marbles to polish.",
-      "Hit from glass: you may eject an active marble. T to choose nothing.",
-      "Hit from glass: you must choose an active marble to eject.",
-      "Hit from glass: you may give Speed +2 to 2 active marbles at most. T to choose nothing.",
+      "Hit from dolphin: you may polish up to 2 active marbles. T to choose nothing.",
+      "Hit from dolphin: you must choose an active marble to polish.",
+      "Hit from dolphin: you must choose 2 active marbles to polish.",
+      "Hit from dolphin: you may eject an active marble. T to choose nothing.",
+      "Hit from dolphin: you must choose an active marble to eject.",
+      "Hit from dolphin: you may give Speed +2 to 2 active marbles at most. T to choose nothing.",
       "You may still polish an active marble. T to finish.",
       "You must still choose an active marble.",
     ],
     chosen: [
       "agate chosen.",
-      "gorilla chosen.",
+      "dragon chosen.",
     ],
     turn: "Turn 2 of 10. Score 5. Speed 5, Mass 2. 4 throws left. Swap available.",
     bag: [
@@ -2007,10 +2025,10 @@ const WITNESSES = {
 function checkWitnesses(run) {
   const previousLocale = getLocale();
   const game = (over) => marblesPlayState(WITNESS_RULES, { score: 0, ...over });
-  const occupied = game({ hand: inHand(["clay"]), triangle: { leftBase: null, rightBase: null, apex: { marble: "gorilla", wear: 0 } } });
-  const worn = game({ triangle: { leftBase: { marble: "clay", wear: 2 }, rightBase: null, apex: { marble: "gorilla", wear: 2 } } });
+  const occupied = game({ hand: inHand(["clay"]), triangle: { leftBase: null, rightBase: null, apex: { marble: "dragon", wear: 0 } } });
+  const worn = game({ triangle: { leftBase: { marble: "clay", wear: 2 }, rightBase: null, apex: { marble: "dragon", wear: 2 } } });
   const choosing = WITNESS_RULES.reduce(
-    game({ hand: inHand(["glass"]), triangle: { leftBase: { marble: "clay", wear: 0 }, rightBase: null, apex: { marble: "gorilla", wear: 0 } } }),
+    game({ hand: inHand(["dolphin"]), triangle: { leftBase: { marble: "clay", wear: 0 }, rightBase: null, apex: { marble: "dragon", wear: 0 } } }),
     { type: "place", handIndex: 0, slot: "leftBase" }
   ).state;
   const lines = (built) => built.map(({ key, params }) => plain(realT(key, params)));
@@ -2034,14 +2052,14 @@ function checkWitnesses(run) {
       wornOut: WITNESS_RULES.reduce(worn, { type: "resolve" })
         .events.filter((event) => event.type === "removed" && event.cause === "wear")
         .map((event) => plain(stepsText(buildSteps([event], realT)))),
-      overview: plain(describeOverview(game({ triangle: { leftBase: { marble: "clay", wear: 0 }, rightBase: null, apex: { marble: "leaded", wear: 0 } } }), WITNESS_RULES, realT)),
+      overview: plain(describeOverview(game({ triangle: { leftBase: { marble: "clay", wear: 0 }, rightBase: null, apex: { marble: "pearl", wear: 0 } } }), WITNESS_RULES, realT)),
       card: marbleCard("clay", "x", WITNESS_RULES, realT).above.map(plain),
       question: plain(describeChoicePrompt(choosing.pendingChoice, realT)),
       questions: questionVariants(choosing.pendingChoice).map((pending) => plain(describeChoicePrompt(pending, realT))),
-      chosen: ["agate", "gorilla"].map((marble) => plain(realT("marbles.choice.chosen", { marble: nameRef(`marble.${marble}.name`) }))),
+      chosen: ["agate", "dragon"].map((marble) => plain(realT("marbles.choice.chosen", { marble: nameRef(`marble.${marble}.name`) }))),
       turn: plain(describeTurn(game({ score: 5, speed: 5, mass: 2, throwsUsed: 1 }), true, rules, realT)),
       bag: [8, 1].map((count) => plain(describeBag(game({ bag: Array(count).fill("clay"), drawPerTurn: 1 }), rules, realT))),
-      pot: plain(describePot(game({ pot: ["clay"], lost: ["gorilla", "glass"] }), rules, realT)),
+      pot: plain(describePot(game({ pot: ["clay"], lost: ["dragon", "dolphin"] }), rules, realT)),
       impact: plain(stepsText(buildSteps([{ type: "impact", speed: -3, mass: 2, impact: 0, score: 14 }], realT))),
     };
   };

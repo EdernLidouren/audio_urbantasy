@@ -39,9 +39,9 @@ export function previousSlot(slot) {
 
 // LES ZONES DE LA PARTIE, déclarées ICI ET NULLE PART AILLEURS, pour les conditions
 // d'état (`zone`) et les sources de nombre de billes (`zoneCount`). Chacune :
-//   count     son nombre de billes dans un état, (state) -> entier ; une bille en
-//             transit (en cours de lancer, en partance) n'est dans aucune zone de
-//             l'état : elle ne compte nulle part ;
+//   marbles   ses billes dans un état, (state) -> [ids] ; une bille en transit (en
+//             cours de lancer, en partance) n'est dans aucune zone de l'état : elle
+//             ne compte nulle part ; son nombre de billes : zoneCount(zone, state) ;
 //   capacity  (facultatif) sa capacité EN VIGUEUR, (state, statuses) -> entier : les
 //             caractéristiques de la partie (taille de la main, capacité du pot),
 //             statuts compris (marbles/core/statuses.js/characteristic) ; une zone
@@ -50,13 +50,18 @@ export function previousSlot(slot) {
 // AJOUTER une zone ou un état : une entrée ici (et dans ZONE_STATES), ses textes
 // (`marbles.condition.zone.<zone>.<état>`, `marbles.effect.per_zone`), rien d'autre.
 export const GAME_ZONES = {
-  triangle: { count: (state) => SLOTS.filter((slot) => state.triangle[slot] !== null).length, capacity: () => SLOTS.length, states: ["full", "empty", "single"] },
-  hand: { count: (state) => state.hand.length, capacity: (state, statuses) => characteristic(state, "handSize", statuses), states: ["empty", "full"] },
-  bag: { count: (state) => state.bag.length, states: ["empty"] },
-  discard: { count: (state) => state.discard.length, states: ["empty"] },
-  pot: { count: (state) => state.pot.length, capacity: (state, statuses) => characteristic(state, "potCapacity", statuses), states: ["full", "empty"] },
-  lost: { count: (state) => state.lost.length, states: [] },
+  triangle: { marbles: (state) => SLOTS.filter((slot) => state.triangle[slot] !== null).map((slot) => state.triangle[slot].marble), capacity: () => SLOTS.length, states: ["full", "empty", "single"] },
+  hand: { marbles: (state) => state.hand.map((held) => held.marble), capacity: (state, statuses) => characteristic(state, "handSize", statuses), states: ["empty", "full"] },
+  bag: { marbles: (state) => state.bag, states: ["empty"] },
+  discard: { marbles: (state) => state.discard, states: ["empty"] },
+  pot: { marbles: (state) => state.pot, capacity: (state, statuses) => characteristic(state, "potCapacity", statuses), states: ["full", "empty"] },
+  lost: { marbles: (state) => state.lost, states: [] },
 };
+
+// Le nombre de billes de la zone `zone` dans un état.
+export function zoneCount(zone, state) {
+  return GAME_ZONES[zone].marbles(state).length;
+}
 
 // Les ÉTATS d'une zone qu'une condition peut lire : `test(count, capacity)` ;
 // `needsCapacity`, l'état n'a de sens que pour une zone qui a une capacité.

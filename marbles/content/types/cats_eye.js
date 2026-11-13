@@ -1,16 +1,15 @@
 // Bille « œil-de-chat » (cats_eye). Donnée pure : les champs sont décrits dans
 // marbles/content/types/index.js.
-import { speed, mass, draw, retrieve, choice, zoneIs } from "../effects.js";
+import { speed, mass, zoneIs } from "../effects.js";
 import { MEDIUM } from "../../config/values.js";
 
 export default {
-  base: [speed(3)],
-  baseVariant: { rightBase: [mass(1)] },
   apex: [speed(3)],
-  // Tic : Pioche 1 si la main est vide.
-  hit: [{ ...draw(1), when: zoneIs("hand", "empty") }],
-  // Éjection : Ramasser une bille de la défausse au choix. En partance, elle n'y est
-  // pas encore : elle ne peut pas se choisir elle-même.
-  knockout: [retrieve(choice({ zones: ["discard"], mode: "optional" }))],
+  // Base : Vitesse +3 en base gauche, Masse +1 en base droite.
+  baseVariant: { leftBase: [speed(3)], rightBase: [mass(1)] },
+  // En poche, à chaque résolution : Masse +1 si le triangle est plein.
+  pocketed: { resolution: [{ ...mass(1), when: zoneIs("triangle", "full") }] },
   size: MEDIUM,
+  families: ["classics"],
+  rarity: "uncommon",
 };

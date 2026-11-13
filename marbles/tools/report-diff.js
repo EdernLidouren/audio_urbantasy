@@ -80,7 +80,7 @@ function lineOperations(before, after) {
 const contextKey = ({ heading, marble }) => `${heading}\n${marble ?? ""}`;
 
 // Le contexte en mots : le titre de la section (« Score final »), ou, dans la section
-// des billes, la ligne de la bille seule (« mica, dans 1000 parties »).
+// des billes, la ligne de la bille seule (« comète, dans 1000 parties »).
 export function contextLabel({ heading, marble }) {
   return (marble ?? heading ?? "").replace(/\.$/, "");
 }

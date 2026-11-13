@@ -30,9 +30,9 @@
 // chacune, dans l'ordre des choix.
 //
 // CIBLE « TOUTES » : `target` vaut { type: "all", filters? } : toutes les billes
-// actives, au déclenchement, dans l'ordre horaire (SLOTS), qui passent TOUS les filtres
-// (TARGET_FILTERS : aujourd'hui le calibre, { type: "size", size }). Seules les
-// actions qui déclarent `all` l'acceptent (Éjecter, Défausser, Rebond).
+// actives, au déclenchement, dans l'ordre horaire (SLOTS), qui passent le filtre
+// (TARGET_FILTERS : le calibre, la famille, la rareté ; un seul aujourd'hui). Seules
+// les actions qui déclarent `all` l'acceptent (Éjecter, Défausser, Rebond).
 //
 // LA SITUATION d'un effet, ce que ses conditions et ses montants calculés lisent au
 // déclenchement : { triangle, holder, replacement, tally, state, statuses } ;
@@ -64,7 +64,7 @@
 // base + step × la valeur de `source` (AMOUNT_SOURCES), plafonné à `max` s'il est
 // donné, évalué au déclenchement (amountOf). Le seul mécanisme d'un montant qui
 // dépend du moment : « Vitesse +1 par minibille active » en est un, base 0, pas 1,
-// source activeSize.
+// source zoneCount sur le triangle, filtrée par calibre.
 // Une condition ne lit jamais un effet déjà modifié (printedStat lit l'effet
 // IMPRIMÉ) ; le calibre est statique : aucune dépendance circulaire.
 //
@@ -92,15 +92,31 @@
 // l'action (`{ speed, mass, draw }`). Le core les applique (marbles/core/run.js/fireEffect),
 // la vue les dit, la prévision les rend.
 
-import { MARBLE_SIZES } from "../config/values.js";
+import { MARBLE_FAMILIES, MARBLE_RARITIES, MARBLE_SIZES } from "../config/values.js";
 import { rejectUnknownFields } from "../../lib/validate.js";
 import { TALLY_SCOPES, tallyValue } from "./tally.js";
 import { NO_STATUSES, STATUS_DURATIONS, definitionOf, statusApplication } from "./statuses.js";
-import { CHOICE_ZONES, GAME_ZONES, HOLDER_ZONES, NO_REFERENCE_ZONES, SLOTS, ZONE_STATES, nextSlot, previousSlot } from "./zones.js";
+import { CHOICE_ZONES, GAME_ZONES, HOLDER_ZONES, NO_REFERENCE_ZONES, SLOTS, ZONE_STATES, nextSlot, previousSlot, zoneCount } from "./zones.js";
 
 // Un calibre connu (marbles/config/values.js/MARBLE_SIZES) ?
 export function isMarbleSize(size) {
   return Number.isInteger(size) && Object.hasOwn(MARBLE_SIZES, size);
+}
+
+// Une famille connue (marbles/config/values.js/MARBLE_FAMILIES) ?
+export function isMarbleFamily(family) {
+  return MARBLE_FAMILIES.includes(family);
+}
+
+// Une rareté connue (marbles/config/values.js/MARBLE_RARITIES) ?
+export function isMarbleRarity(rarity) {
+  return MARBLE_RARITIES.includes(rarity);
+}
+
+// Les familles DIFFÉRENTES de billes : chaque famille comptée une fois, une bille à
+// plusieurs familles comptant pour chacune.
+export function distinctFamilies(marbles, types) {
+  return new Set(marbles.flatMap((marble) => types[marble].families)).size;
 }
 
 // Une bille dont l'identité est cachée : au sac ou en défausse dans la copie de la
@@ -236,11 +252,15 @@ export function isAll(target) {
 
 // Les FILTRES DE BILLE, déclarés ici et nulle part ailleurs, sur le modèle des
 // conditions : `fields`, `validate`, et `test(filter, marble, types)`, la bille
-// passe-t-elle le filtre. Deux usages, le même système : la cible « toutes » (en-tête)
-// et la SOURCE d'un modificateur de statut (marbles/core/statuses.js : seules les
-// valeurs produites par une bille qui passe ses filtres sont modifiées). Ajouter un
-// filtre (la matière, le déclencheur…) : une entrée ici et son texte dans la vue
-// (marbles/view/narration/effects.js/FILTER_TEXTS).
+// passe-t-elle le filtre. Trois usages, le même système : la cible « toutes »
+// (en-tête), la SOURCE d'un modificateur de statut (marbles/core/statuses.js : seules
+// les valeurs produites par une bille qui passe ses filtres sont modifiées) et le
+// nombre de billes d'une zone (AMOUNT_SOURCES.zoneCount). Ajouter un filtre (la
+// matière, le déclencheur…) : une entrée ici, ses noms (FILTER_NAMES, pour le
+// gabarit `marbles.effect.per_zone_<filtre>` du nombre de billes) et ses textes dans
+// la vue :
+//   marbles/view/narration/effects.js/FILTER_TEXTS ;
+//   marbles/view/narration/statuses.js/SOURCE_FILTER_TEXTS.
 export const TARGET_FILTERS = {
   // La bille est de calibre `size` (marbles/config/values.js : SMALL, MEDIUM, LARGE).
   size: {
@@ -250,10 +270,31 @@ export const TARGET_FILTERS = {
     },
     test: (filter, marble, types) => types[marble].size === filter.size,
   },
+  // La bille est de la famille `family`, parmi d'autres peut-être
+  // (marbles/config/values.js/MARBLE_FAMILIES).
+  family: {
+    fields: ["type", "family"],
+    validate(filter, describe, fail) {
+      validateFamily(filter.family, describe, fail);
+    },
+    test: (filter, marble, types) => types[marble].families.includes(filter.family),
+  },
+  // La bille est de rareté `rarity`, exactement (marbles/config/values.js/
+  // MARBLE_RARITIES) : « rare » ne vise ni les épiques ni les légendaires.
+  rarity: {
+    fields: ["type", "rarity"],
+    validate(filter, describe, fail) {
+      validateRarity(filter.rarity, describe, fail);
+    },
+    test: (filter, marble, types) => types[marble].rarity === filter.rarity,
+  },
 };
 
-// Une bille passe-t-elle tous ces filtres (aucun : oui) ?
+// Une bille passe-t-elle tous ces filtres (aucun : oui) ? Une bille INCONNUE (au sac
+// ou piochée, dans la copie à l'aveugle de la prévision) n'en passe aucun : son
+// identité est cachée.
 export function passesFilters(marble, filters = [], types) {
+  if (filters.length > 0 && marble === UNKNOWN_MARBLE) return false;
   return filters.every((filter) => TARGET_FILTERS[filter.type].test(filter, marble, types));
 }
 
@@ -605,6 +646,14 @@ function validateSize(size, describe, fail) {
   if (!isMarbleSize(size)) fail(`${describe} : calibre inconnu "${size}".`);
 }
 
+function validateFamily(family, describe, fail) {
+  if (!isMarbleFamily(family)) fail(`${describe} : famille inconnue "${family}" (${MARBLE_FAMILIES.join(", ")}).`);
+}
+
+function validateRarity(rarity, describe, fail) {
+  if (!isMarbleRarity(rarity)) fail(`${describe} : rareté inconnue "${rarity}" (${MARBLE_RARITIES.join(", ")}).`);
+}
+
 function validateSlot(slot, describe, fail) {
   if (!SLOTS.includes(slot)) fail(`${describe} : emplacement inconnu "${slot}".`);
 }
@@ -681,8 +730,7 @@ export const CONDITIONS = {
       if (!GAME_ZONES[when.zone].states.includes(when.state)) fail(`${describe} : la zone "${when.zone}" n'a pas d'état "${when.state}" (${GAME_ZONES[when.zone].states.join(", ") || "aucun"}).`);
     },
     test(when, { state, statuses }) {
-      const zone = GAME_ZONES[when.zone];
-      return ZONE_STATES[when.state].test(zone.count(state), zone.capacity?.(state, statuses));
+      return ZONE_STATES[when.state].test(zoneCount(when.zone, state), GAME_ZONES[when.zone].capacity?.(state, statuses));
     },
   },
   // La bille à `slot` est-elle de calibre `size` ? Emplacement vide : non.
@@ -697,14 +745,40 @@ export const CONDITIONS = {
       return placed !== null && types[placed.marble].size === when.size;
     },
   },
+  // La bille à `slot` est-elle de la famille `family` (parmi d'autres peut-être) ?
+  // Emplacement vide : non.
+  familyAt: {
+    fields: ["type", "slot", "family"],
+    validate(when, describe, fail, context) {
+      validateConditionSlot(when.slot, describe, fail, context);
+      validateFamily(when.family, describe, fail);
+    },
+    test(when, { triangle }, types) {
+      const placed = triangle[when.slot] ?? null;
+      return placed !== null && types[placed.marble].families.includes(when.family);
+    },
+  },
+  // La bille à `slot` est-elle de rareté `rarity`, exactement ? Emplacement vide : non.
+  rarityAt: {
+    fields: ["type", "slot", "rarity"],
+    validate(when, describe, fail, context) {
+      validateConditionSlot(when.slot, describe, fail, context);
+      validateRarity(when.rarity, describe, fail);
+    },
+    test(when, { triangle }, types) {
+      const placed = triangle[when.slot] ?? null;
+      return placed !== null && types[placed.marble].rarity === when.rarity;
+    },
+  },
 };
 
 // Chaque SOURCE d'un montant calculé (en-tête), déclarée ICI ET NULLE PART AILLEURS :
 //   fields    ses champs ;
 //   validate  leur validation ;
 //   value     sa valeur dans la situation, un entier >= 0, (source, situation, types) ;
-//   text      son gabarit i18n, après le pas : il reçoit {effect} (« Vitesse +1 »),
-//             puis les paramètres de `params` et les références de nom de `names` ;
+//   text      son gabarit i18n, après le pas, ou (source) -> gabarit : il reçoit
+//             {effect} (« Vitesse +1 »), puis les paramètres de `params` et les
+//             références de nom de `names` ;
 //   params    (facultatif) ses paramètres de texte, des valeurs simples, (source) -> {} ;
 //   names     (facultatif) ses paramètres de texte qui sont des NOMS, par clé i18n,
 //             (source) -> { param: clé } : la vue en fait des références de nom
@@ -728,33 +802,37 @@ export const AMOUNT_SOURCES = {
     text: "marbles.effect.per_turn_in_hand",
     current: true,
   },
-  // Les billes ACTIVES (sur le triangle) de calibre `size`, la bille elle-même
-  // comprise si elle en est. En transit, elle n'est pas active et ne compte pas : en
-  // partance (son Final, son Éjection) comme en cours de lancer (sa Chiquenaude).
-  activeSize: {
-    fields: ["type", "size"],
-    validate(source, describe, fail) {
-      validateSize(source.size, describe, fail);
-    },
-    value(source, { triangle }, types) {
-      return SLOTS.filter((slot) => triangle[slot] !== null && types[triangle[slot].marble].size === source.size).length;
-    },
-    text: "marbles.effect.per_active_size",
-    names: (source) => ({ size: `marbles.size.${MARBLE_SIZES[source.size]}.name` }),
-    current: false,
-  },
   // Le NOMBRE DE BILLES d'une zone de la partie (GAME_ZONES) au déclenchement : « par
-  // bille en main », « par bille active ». Une bille en transit ne compte nulle part.
-  // Sa valeur se connaît hors de tout déclenchement, dans la partie en cours
-  // (`current`, `needsState` : la fiche la lit dans l'état).
+  // bille en main », « par bille active ». FILTRÉ (`filters`, facultatif, un filtre de
+  // TARGET_FILTERS) : seules les billes qui le passent, « par Brume à la défausse »,
+  // « par minibille active » ; la bille elle-même comptée si elle en est. Une bille en
+  // transit ne compte nulle part : en partance (son Final, son Éjection) comme en
+  // cours de lancer (sa Chiquenaude). Sa valeur se connaît hors de tout
+  // déclenchement, dans la partie en cours (`current`, `needsState` : la fiche la lit
+  // dans l'état).
   zoneCount: {
-    fields: ["type", "zone"],
+    fields: ["type", "zone", "filters"],
     validate(source, describe, fail) {
       validateZone(source.zone, describe, fail);
+      if (source.filters !== undefined) validateFilters(source.filters, `${describe}, filtres du nombre de billes`, fail);
     },
-    value: (source, { state }) => GAME_ZONES[source.zone].count(state),
-    text: "marbles.effect.per_zone",
+    value: (source, { state }, types) => GAME_ZONES[source.zone].marbles(state).filter((marble) => passesFilters(marble, source.filters, types)).length,
+    // Un gabarit par type de filtre, `marbles.effect.per_zone_<filtre>` ; le calibre a
+    // le sien sur le triangle (« par calot actif » : l'accord suit le calibre).
+    text: (source) => (source.filters === undefined ? "marbles.effect.per_zone" : `marbles.effect.per_zone_${source.filters[0].type}${source.filters[0].type === "size" && source.zone === "triangle" ? "_triangle" : ""}`),
     params: (source) => ({ zone: source.zone }),
+    names: (source) => (source.filters === undefined ? {} : FILTER_NAMES[source.filters[0].type](source.filters[0])),
+    current: true,
+    needsState: true,
+  },
+  // Le nombre de FAMILLES DIFFÉRENTES parmi les billes actives (distinctFamilies) :
+  // toutes les familles comptent, Classiques comprises ; une bille à plusieurs
+  // familles compte pour chacune ; une bille en transit ne compte pas.
+  familyCount: {
+    fields: ["type"],
+    validate() {},
+    value: (source, { state }, types) => distinctFamilies(GAME_ZONES.triangle.marbles(state), types),
+    text: "marbles.effect.per_family",
     current: true,
     needsState: true,
   },
@@ -777,9 +855,20 @@ export const AMOUNT_SOURCES = {
 };
 
 
+// Les NOMS d'un filtre, pour le gabarit d'un nombre de billes filtré : { param: clé
+// i18n }, dont la vue fait des références de nom (`names` des sources).
+const FILTER_NAMES = {
+  size: (filter) => ({ size: `marbles.size.${MARBLE_SIZES[filter.size]}.name` }),
+  family: (filter) => ({ family: `marbles.family.${filter.family}.name` }),
+  rarity: (filter) => ({ rarity: `marbles.rarity.${filter.rarity}.name` }),
+};
+for (const type of Object.keys(TARGET_FILTERS)) {
+  if (!Object.hasOwn(FILTER_NAMES, type)) throw new Error(`marbles : le filtre "${type}" doit avoir ses noms (FILTER_NAMES).`);
+}
+
 // Un montant (entier, ou calculé : en-tête) évalué dans une situation. La fiche s'en
 // sert aussi, pour dire la valeur actuelle d'un montant calculé dont la source est
-// `current` (elle ne lit alors que la bille, sans `types`).
+// `current` (avec la table des billes de la partie, que lisent les filtres).
 export function amountOf(amount, situation, types) {
   if (Number.isInteger(amount)) return amount;
   const value = amount.base + amount.step * AMOUNT_SOURCES[amount.source.type].value(amount.source, situation, types);
@@ -821,8 +910,7 @@ function validateChoice(clause, action, describe, fail) {
   if (!CHOICE_MODES.includes(choice.mode)) fail(`${where} : mode doit valoir ${CHOICE_MODES.map((mode) => `"${mode}"`).join(" ou ")}.`);
 }
 
-// Une cible « toutes » (en-tête) : ses champs, ses filtres, chacun valide et d'un type
-// au plus (deux calibres à la fois ne viseraient rien).
+// Une cible « toutes » (en-tête) : ses champs, son filtre (validateFilters).
 function validateAll(clause, action, describe, fail) {
   const all = clause.target;
   const where = `${describe}, cible « toutes »`;
@@ -831,17 +919,14 @@ function validateAll(clause, action, describe, fail) {
   if (all.filters !== undefined) validateFilters(all.filters, where, fail);
 }
 
-// Une liste de filtres de bille (TARGET_FILTERS) : chacun valide et d'un type au plus
-// (deux calibres à la fois ne viseraient rien). Celle d'une cible « toutes » comme
-// celle d'un modificateur de statut (marbles/core/validation.js).
+// Une liste de filtres de bille (TARGET_FILTERS) : UN SEUL filtre aujourd'hui, valide
+// (ses textes n'en disent qu'un : deux demanderont une phrase qui les combine). Celle
+// d'une cible « toutes », celle d'un modificateur de statut (marbles/core/
+// validation.js) et celle d'un nombre de billes.
 export function validateFilters(filters, where, fail) {
   if (!Array.isArray(filters) || filters.length === 0) fail(`${where} : filters doit être une liste non vide.`);
-  const seen = new Set();
-  for (const filter of filters) {
-    validateRule(filter, TARGET_FILTERS, "filtre", where, fail);
-    if (seen.has(filter.type)) fail(`${where} : filtre "${filter.type}" en double.`);
-    seen.add(filter.type);
-  }
+  if (filters.length > 1) fail(`${where} : un seul filtre à la fois aujourd'hui (${filters.length} donnés).`);
+  for (const filter of filters) validateRule(filter, TARGET_FILTERS, "filtre", where, fail);
 }
 
 // Une cible relative : seulement pour une action qui accepte un emplacement, et là

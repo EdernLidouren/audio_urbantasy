@@ -23,11 +23,6 @@ export const crack = (amount, target) => ({ action: "crack", amount, ...(target 
 // speed({ base: 0, step: 1, source: turnsInHand(), max: 5 }).
 export const turnsInHand = () => ({ type: "turnsInHand" });
 
-// Source d'un montant calculé : les billes actives de calibre `size` (SMALL, MEDIUM,
-// LARGE, marbles/config/values.js). « Vitesse +1 par minibille active » :
-// speed({ base: 0, step: 1, source: activeSize(SMALL) }).
-export const activeSize = (size) => ({ type: "activeSize", size });
-
 // Source d'un montant calculé : une VALEUR DE PARTIE, par son identifiant
 // (marbles/core/counters.js), dans une portée, "turn" (ce tour) ou "game" (cette
 // partie). « Vitesse +2 par chiquenaude ce tour » :
@@ -35,12 +30,28 @@ export const activeSize = (size) => ({ type: "activeSize", size });
 export const tally = (id, scope) => ({ type: "tally", tally: id, scope });
 
 // Le nombre de billes d'une zone de la partie, source d'un montant calculé
-// (marbles/core/effects.js/GAME_ZONES) : zoneCount("hand"), « par bille en main ».
-export const zoneCount = (zone) => ({ type: "zoneCount", zone });
+// (marbles/core/zones.js/GAME_ZONES : "triangle", "hand", "bag", "discard", "pot",
+// "lost"), filtré ou non (un filtre : sizeIs, familyIs, rarityIs) : zoneCount("hand"),
+// « par bille en main » ; zoneCount("triangle", sizeIs(SMALL)), « par minibille
+// active » ; zoneCount("discard", familyIs("mist")), « par Brume à la défausse ».
+export const zoneCount = (zone, ...filters) => ({ type: "zoneCount", zone, ...(filters.length === 0 ? {} : { filters }) });
+
+// Le nombre de familles différentes parmi les billes actives, source d'un montant
+// calculé : « Vitesse +2 par famille différente sur le triangle » :
+// speed({ base: 0, step: 2, source: familyCount(), max: 6 }).
+export const familyCount = () => ({ type: "familyCount" });
 
 // L'état d'une zone de la partie, une condition (`when`) : zoneIs("triangle",
 // "full"), « si le triangle est plein » ; états "empty", "full", "single".
 export const zoneIs = (zone, state) => ({ type: "zone", zone, state });
+
+// Le calibre, la famille ou la rareté de la bille d'un emplacement (fixe, ou relatif :
+// NEXT_SLOT, PREVIOUS_SLOT), une condition (`when`) : sizeAt(NEXT_SLOT, SMALL), « si la
+// bille de l'emplacement suivant est une minibille » ; familyAt("apex", "mist") ;
+// rarityAt("leftBase", "rare").
+export const sizeAt = (slot, size) => ({ type: "sizeAt", slot, size });
+export const familyAt = (slot, family) => ({ type: "familyAt", slot, family });
+export const rarityAt = (slot, rarity) => ({ type: "rarityAt", slot, rarity });
 
 // La première bille de la main, cible d'Empocher et de Défausser
 // (marbles/core/effects.js/FIRST_IN_HAND).
@@ -73,8 +84,13 @@ export const choice = ({ zones, count = 1, mode, pick = "marble" }) => ({ type: 
 // passent tous les filtres donnés : allActive(), allActive(sizeIs(SMALL)).
 export const allActive = (...filters) => ({ type: "all", ...(filters.length === 0 ? {} : { filters }) });
 
-// Filtre de cible : le calibre (SMALL, MEDIUM, LARGE, marbles/config/values.js).
+// Les FILTRES de bille (marbles/core/effects.js/TARGET_FILTERS), pour une cible
+// « toutes », un nombre de billes ou la source d'un modificateur de statut : le
+// calibre (SMALL, MEDIUM, LARGE), la famille (une de MARBLE_FAMILIES), la rareté (une de
+// MARBLE_RARITIES, exactement), marbles/config/values.js.
 export const sizeIs = (size) => ({ type: "size", size });
+export const familyIs = (family) => ({ type: "family", family });
+export const rarityIs = (rarity) => ({ type: "rarity", rarity });
 
 // Éjecter : chasse du triangle la bille elle-même (sans cible, sur le triangle
 // seulement), celle d'un emplacement, des billes au choix (choice) ou toutes les

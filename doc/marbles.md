@@ -373,6 +373,8 @@ export default {
   apex: [speed(2), draw(1)],
   knockout: [applyStatus("fatigue")],
   size: SMALL,
+  families: ["stars", "mist"],
+  rarity: "uncommon",
 };
 ```
 
@@ -411,7 +413,7 @@ billes.
 Les champs d'effet (`base`, `baseVariant`, `apex`, un par déclencheur, le `field` de
 chaque entrée de `MARBLE_TRIGGERS`, de `awaken` à `drop`, et `pocketed`, En poche) sont
 tous facultatifs :
-absent, aucun effet. `maxWear` vaut 3 par défaut. Un champ obligatoire, validé au
+absent, aucun effet. `maxWear` vaut 3 par défaut. Trois champs obligatoires, validés au
 chargement par la simulation (`validateMarbleTypes`) :
 
 - `size`, son **calibre** (Size) : `SMALL`, `MEDIUM` ou `LARGE`, toujours par ces
@@ -420,11 +422,37 @@ chargement par la simulation (`validateMarbleTypes`) :
   minibille, normale, calot (peewee, standard, boulder), `marbles.size.<id>.name`, l'id
   venant de `MARBLE_SIZES`. **Statique** : aucune action ne le change. Lu par les
   conditions de calibre et par le son, qui en tire le profil sonore et la force des chocs
-  (voir « Sons ») : une seule source de vérité pour la taille d'une bille.
+  (voir « Sons ») : une seule source de vérité pour la taille d'une bille ;
+- `families`, ses **familles** : une liste d'au moins une famille de `MARBLE_FAMILIES`
+  (`marbles/config/values.js` : `treasure`, `stars`, `mist`, `bestiary`, `blast`,
+  `classics`), chacune une fois ; plusieurs pour une bille bicolore. Leurs noms : Trésor,
+  Astres, Brume, Bestiaire, Souffle, Classiques (`marbles.family.<id>.name`, des textes
+  simples, avec majuscule). Les Classiques n'ont aucune exception de règle ;
+- `rarity`, sa **rareté** : une de `MARBLE_RARITIES`, liste ORDONNÉE de la plus commune à
+  la plus rare (`common`, `uncommon`, `rare`, `epic`, `legendary`), le rang étant la
+  place dans la liste. Ses noms : `marbles.rarity.<id>.name`, des formes de nom (`base`,
+  « peu commune » ; `indef`, « une bille peu commune » ; `plural` en français,
+  « peu communes »).
 
-**Ajouter une bille** : son fichier dans `marbles/content/types/` avec son calibre, sa ligne dans
-`marbles/content/types/index.js`, son nom dans chaque langue (vérifié par le domaine
-`marbles-content`), et sa place dans `STARTING_BAG` pour la mettre en jeu. En français, le nom
+Famille et rareté sont **statiques**, comme le calibre, et se lisent de la même façon :
+filtres (`familyIs`, `rarityIs`, à côté de `sizeIs`), conditions d'emplacement
+(`familyAt`, `rarityAt`, à côté de `sizeAt`) et sources de montant (le nombre de billes
+d'une zone filtré, les familles différentes) ; voir « Montants calculés » et
+« Conditions ». Une rareté se compare EXACTEMENT : rien ne lit encore son rang.
+
+Deux champs facultatifs, sans effet de jeu :
+
+- la **description**, un texte d'ambiance (touche V) : pas un champ du fichier, mais une
+  clé déduite de l'id comme le nom, `marble.<id>.description`, dans chaque langue ;
+- `beacon`, la **balise propre** de la bille : une clé du manifeste audio, un pool dont
+  une variante numérotée se tire au hasard, ou un fichier (voir « Sons »). Absente, la
+  balise de son calibre. La simulation ne la lit jamais ; l'audit du contenu vérifie
+  qu'elle existe.
+
+**Ajouter une bille** : son fichier dans `marbles/content/types/` avec son calibre, ses
+familles et sa rareté, sa ligne dans `marbles/content/types/index.js`, son nom (et sa
+description) dans chaque langue (vérifié par le domaine `marbles-content`), et sa place
+dans `STARTING_BAG` pour la mettre en jeu. En français, le nom
 porte sa forme `de` (« d'argile », « de gorille ») : `{ "base": "argile", "de": "d'argile" }`,
 pour « Tic d'argile ». Un sac est une liste d'ids : les doublons y sont permis.
 
@@ -496,20 +524,30 @@ Un `amount` peut être **calculé** au déclenchement : `{ base, step, source, m
 une action à montant positif (Pioche, Polissage, Fêlure), `base` vaut au moins 0. Évalué à
 0, la clause ne produit rien. Il n'entre jamais dans l'imprimé (`printedStat`). C'est le
 SEUL mécanisme d'un montant qui dépend du moment : un « par » (« Vitesse +1 par minibille
-active ») en est un, base 0, pas 1. L'argile et le grès :
+active ») en est un, base 0, pas 1. Le fantôme, la perle, l'étoile et l'agate :
 
 ```js
-flick: [speed({ base: 0, step: 1, source: turnsInHand(), max: 5 })],
-base: [speed({ base: 0, step: 1, source: activeSize(SMALL) })],
-apex: [speed({ base: 0, step: 1, source: tally("windfall", "game"), max: 10 })], // le verre
+flick: [speed({ base: 0, step: 1, source: turnsInHand(), max: 3 })],
+apex: [speed({ base: 2, step: 1, source: zoneCount("discard", familyIs("mist")), max: 6 })],
+apex: [speed({ base: 0, step: 2, source: tally("awaken", "game"), max: 20 })],
+apex: [speed({ base: 0, step: 2, source: familyCount(), max: 6 })],
 ```
 
 | Source (`source`) | Vaut | Fiche |
 |---|---|---|
-| `{ type: "turnsInHand" }` | le compteur de tours en main de la bille elle-même : 0 hors de la main ; pendant sa Chiquenaude, celui qu'elle avait en quittant la main | « Chiquenaude : Vitesse +1 par tour en main, maximum +5, actuellement +2. » |
-| `{ type: "activeSize", size }` | les billes actives (sur le triangle) de calibre `size`, la bille elle-même comprise si elle en est (en transit, non : en partance, dans un Final ou une Éjection, ni en cours de lancer, dans une Chiquenaude) | « Base : Vitesse +1 par minibille active. » (grès) |
-| `{ type: "zoneCount", zone }` (`zoneCount(zone)`) | le nombre de billes de la zone de la partie `zone` (`GAME_ZONES` : `triangle`, les actives ; `hand`, `bag`, `discard`, `pot`, `lost`), au déclenchement ; une bille en transit ne compte nulle part ; la fiche dit la valeur actuelle dans la partie en cours (`needsState`) | « Base : Vitesse +1 par bille en main, maximum +5, actuellement +3. » (verre) |
-| `{ type: "tally", tally, scope }` (`tally(id, portée)`) | la valeur de partie `tally` dans la portée `scope` (`"turn"`, ce tour ; `"game"`, cette partie), lue dans le registre au déclenchement (voir « Valeurs de partie ») | « Chiquenaude : Vitesse +2 par chiquenaude ce tour, maximum +6, actuellement +4. » (loupe) |
+| `{ type: "turnsInHand" }` | le compteur de tours en main de la bille elle-même : 0 hors de la main ; pendant sa Chiquenaude, celui qu'elle avait en quittant la main | « Chiquenaude : Vitesse +1 par tour en main, maximum +3, actuellement +2. » (fantôme) |
+| `{ type: "zoneCount", zone, filters? }` (`zoneCount(zone, filtre?)`) | le nombre de billes de la zone de la partie `zone` (`GAME_ZONES` : `triangle`, les actives ; `hand`, `bag`, `discard`, `pot`, `lost`), au déclenchement, celles qui passent le filtre s'il y en a un (`sizeIs`, `familyIs`, `rarityIs` : un seul), la bille elle-même comprise si elle en est ; une bille en transit ne compte nulle part (en partance, dans un Final ou une Éjection, ni en cours de lancer, dans une Chiquenaude) ; la fiche dit la valeur actuelle dans la partie en cours (`needsState`) | « Pointe : Masse +1, +1 par bille dans le pot, maximum +4. » (rubis), « Pointe : Vitesse +2 par Astres active, maximum +6, actuellement +4. » (galaxie), « Vitesse +1 par minibille active » |
+| `{ type: "familyCount" }` (`familyCount()`) | le nombre de familles DIFFÉRENTES parmi les billes actives (`distinctFamilies`) : chaque famille une fois, Classiques comprises, une bille à plusieurs familles comptant pour chacune ; une bille en transit ne compte pas | « Pointe : Vitesse +2 par famille différente sur le triangle, maximum +6. » (agate) |
+| `{ type: "tally", tally, scope }` (`tally(id, portée)`) | la valeur de partie `tally` dans la portée `scope` (`"turn"`, ce tour ; `"game"`, cette partie), lue dans le registre au déclenchement (voir « Valeurs de partie ») | « Pointe : Vitesse +2 par éveil cette partie, maximum +20, actuellement +4. » (étoile) |
+
+Le gabarit d'un nombre de billes dépend de son filtre (`text` en fonction de la source) :
+`marbles.effect.per_zone` sans filtre, `marbles.effect.per_zone_<filtre>` avec (le
+calibre a le sien sur le triangle, `per_zone_size_triangle`, pour l'accord : « par calot
+actif ») ; le nom du filtre lui vient de `FILTER_NAMES`. En français, une famille tient
+lieu du mot « bille », accordée au féminin : « par Astres active », « par Brume à la
+défausse » ; une rareté qualifie « bille » : « par bille rare en main ». À l'aveugle (la
+prévision), une bille cachée (au sac, ou piochée) ne passe aucun filtre : un nombre
+filtré des billes du sac ne se prévoit pas (`doc/marbles-backlog.md`).
 
 Chaque source est déclarée UNE fois, dans `marbles/core/effects.js`/`AMOUNT_SOURCES` :
 ses champs et leur validation, sa valeur dans la situation (`value`), son gabarit (`text`,
@@ -520,7 +558,7 @@ fiche dit alors la **valeur actuelle** (« actuellement ») là où la bille se 
 son compteur dans la main, 0 au sac, en défausse et sur le triangle (« Vitesse +2, +1 par
 tour en main, actuellement +3 » avec une base), et la valeur de partie du moment, lue
 dans le registre de la partie en cours, où que soit la bille (à zéro hors de toute
-partie) ; une source qui dépend du moment (`activeSize`) n'en dit pas. R, la
+partie) ; une source dont `current` est faux n'en dit pas. R, la
 confirmation et la séquence ne disent que la valeur finale, celle de la prévision, qui
 fait évoluer le registre sur sa copie (une Chiquenaude de loupe s'y compte elle-même).
 **Ajouter une source** : son entrée dans `AMOUNT_SOURCES` et son gabarit dans chaque
@@ -540,23 +578,26 @@ Tic ou une Éjection, le remplacement en cours.
 | Condition (`when`) | Vraie si | Exemple (fiche) |
 |---|---|---|
 | `{ type: "printedStat", slot, stat, atLeast }` | la bille de `slot` a, imprimé à cet emplacement, au moins `atLeast` de `stat` (une action à montant : Empocher et Éjecter refusés au chargement) ; emplacement vide : faux | « Vitesse +4 à la pointe si son effet de pointe donne au moins Vitesse +1 » (loupe) |
-| `{ type: "relativeSize", marble, is }` | pendant un remplacement, la bille `marble` (`ejected`, l'éjectée, ou `placed`, la posée) est `is` (`smaller` ou `larger`) que l'autre ; calibres égaux : ni l'un ni l'autre | « Tic : Vitesse +4 si la bille éjectée est plus petite. » (gorille), « Éjection : Pioche 1 si la bille posée est plus grosse. » (mica) |
-| `{ type: "sizeAt", slot, size }` | la bille de `slot` est de calibre `size` ; emplacement vide : faux | « Pointe : Masse +1 et Masse +2 si la base gauche est un calot. » (agate) |
-| `{ type: "zone", zone, state }` (`zoneIs(zone, état)`) | la zone de la partie `zone` est dans l'état `state` au déclenchement (`ZONE_STATES` : `empty`, aucune bille ; `single`, une seule ; `full`, autant que sa capacité en vigueur, taille de main ou capacité du pot) ; chaque zone déclare ses états (`GAME_ZONES`, `states`), un autre est refusé au chargement ; une bille en transit ne compte nulle part | « Pointe : Vitesse +6 si le triangle est plein. » (argile), « Tic : Pioche 1 si la main est vide. » (œil-de-chat), « En poche, à chaque résolution : Masse +2 si le pot est plein. » (agate) |
+| `{ type: "relativeSize", marble, is }` | pendant un remplacement, la bille `marble` (`ejected`, l'éjectée, ou `placed`, la posée) est `is` (`smaller` ou `larger`) que l'autre ; calibres égaux : ni l'un ni l'autre | « Tic : Vitesse +4 si la bille éjectée est plus grosse. » (bille de fronde), « Tic : Vitesse +3 si la bille éjectée est plus petite. » (acier) |
+| `{ type: "sizeAt", slot, size }` (`sizeAt(slot, calibre)`) | la bille de `slot` est de calibre `size` ; emplacement vide : faux | « Base : Éjecter la bille de l'emplacement suivant si la bille de l'emplacement suivant est une minibille. » (tornade) |
+| `{ type: "familyAt", slot, family }` (`familyAt(slot, famille)`) | la bille de `slot` est de la famille `family`, parmi d'autres peut-être ; emplacement vide : faux | « si la bille de l'emplacement suivant est de la famille Brume » |
+| `{ type: "rarityAt", slot, rarity }` (`rarityAt(slot, rareté)`) | la bille de `slot` est de rareté `rarity`, exactement ; emplacement vide : faux | « si la pointe est une bille rare » |
+| `{ type: "zone", zone, state }` (`zoneIs(zone, état)`) | la zone de la partie `zone` est dans l'état `state` au déclenchement (`ZONE_STATES` : `empty`, aucune bille ; `single`, une seule ; `full`, autant que sa capacité en vigueur, taille de main ou capacité du pot) ; chaque zone déclare ses états (`GAME_ZONES`, `states`), un autre est refusé au chargement ; une bille en transit ne compte nulle part | « Base : Polissage 1 à la bille de l'emplacement suivant si le triangle est plein. » (tortue), « En poche, à chaque résolution : Masse +1 si le pot est plein. » (lingotin) |
 
 Les ZONES DE LA PARTIE (`marbles/core/zones.js`/`GAME_ZONES`) se déclarent une fois, avec
-leur décompte, leur capacité éventuelle et leurs états ; ajouter une zone ou un état : une
+leurs billes (`marbles`, d'où se tire leur nombre, `zoneCount`), leur capacité éventuelle
+et leurs états ; ajouter une zone ou un état : une
 entrée et ses textes (`marbles.condition.zone.<zone>.<état>`, `marbles.effect.per_zone`).
 La situation d'un effet porte l'état de la partie (`state`), d'où elles se comptent. Le
-`slot` de `printedStat` et de `sizeAt` peut être une cible relative (voir « La règle des
-cibles ») ; sans référence, la condition est fausse.
+`slot` de `printedStat`, `sizeAt`, `familyAt` et `rarityAt` peut être une cible relative
+(voir « La règle des cibles ») ; sans référence, la condition est fausse.
 
 `relativeSize` n'existe que pendant un remplacement : la validation la refuse hors d'un champ
 de déclencheur marqué `replacement` dans `MARBLE_TRIGGERS` (le Tic, vu par la posée ;
 l'Éjection, vue par l'éjectée).
 
-Le calibre se compte aussi, par la source `activeSize` d'un montant calculé (voir
-« Montants calculés »).
+Le calibre, la famille et la rareté se comptent aussi, par le nombre de billes d'une
+zone filtré (voir « Montants calculés »).
 
 Dans R, la confirmation et la séquence, seules les **valeurs finales** se disent (« base
 gauche, grès : Vitesse +2. »), jamais la condition ni la source : elles ne s'entendent que
@@ -1420,6 +1461,10 @@ partage aussi le menu des statuts) : une entrée par bille, puis « Retour » ; 
 aussi. Bornes, cyclage et étoile sont ceux des menus ; fiches (Ctrl+haut, Ctrl+bas) et
 mots-clés (E, Maj+E) y marchent sur chaque bille. Une pile vide le dit, « Aucune bille. »,
 avant « Retour » : le menu ne s'ouvre jamais sur un « Retour » seul, muet sur la raison.
+L'annonce d'une bille, dans ces menus comme dans la main et les choix, dit ses
+familles et sa rareté après son calibre (`marbleListLine`) : « rubis, normale, Trésor,
+rare, usure 4. 1 sur 3 » ; V et F y marchent aussi (voir « Description et identité (V,
+F) »).
 **P** dit le pot : « 2 billes sur 3 dans le pot, 1 bille perdue. » (`describePot`, la
 capacité en vigueur, accords compris). Le menu du pot suit l'ordre d'arrivée ; les
 billes perdues n'ont pas de menu.
@@ -1579,7 +1624,9 @@ par l'audit du contenu ; la lecture, dans `marbles/view/sounds/playback.js`.
 **Profils** : le son d'une bille dépend de son **calibre** (couplage voulu, une seule
 source de vérité) : un profil sonore par calibre (`MARBLE_SOUND_PROFILES`, indexé par
 `SMALL`, `MEDIUM`, `LARGE`), qui lui donne sa **balise** (sa
-voix, à la pioche et sous le curseur), sa **chute** (à l'arrivée d'un roulement), son
+voix, à la pioche et sous le curseur ; une bille peut déclarer la SIENNE, son champ
+`beacon`, une clé du manifeste, pool ou fichier : `marbles/view/sounds/playback.js`/
+`beaconKey`, préchargée avec les autres), sa **chute** (à l'arrivée d'un roulement), son
 **roulement** (une boucle, `marble_<taille>_rolling`) et sa **collision** (`impact`,
 `marble_<taille>_collision`, quand elle en déloge une autre ou qu'on la déloge), les fichiers
 `small`, `medium` et `large` allant aux calibres minibille, normale et calot. Une voix par
@@ -1774,6 +1821,21 @@ Les noms et descriptions sont déclarés à côté des mots-clés (`MARBLE_PHASE
 `marbles/core/content.js`/`buildMarbleKeywords` : un mot-clé sans eux échoue au chargement. Pas de
 conflit de touches : E n'était lié à rien dans ces écrans (l'émote de l'écran de ville n'y
 est jamais active).
+
+### Description et identité (V, F)
+
+Sur la bille sous le curseur, partout où une bille peut l'être (triangle, main, choix,
+menus du sac, de la défausse et du pot : `marbles/view/marble-info.js`) :
+
+- **V** : sa description, un texte d'ambiance sans effet de jeu (`marble.<id>.description`,
+  facultative : sinon « Aucune description. ») ;
+- **F** : ses familles, son calibre et sa rareté, « Trésor et Astres, normale, rare. »,
+  sur le triangle aussi, où l'annonce principale de l'emplacement ne les dit pas.
+
+Sans bille (emplacement vide, main vide, « Retour » d'un menu de pile) : « Aucune
+bille. ». La fiche (Ctrl+flèches) n'en dit rien : elle reste réservée aux effets.
+Refusées pendant la séquence, comme les autres annonces de consultation. Pas de conflit de
+touches : ni V ni F n'étaient liées dans ces écrans, ni par une touche globale.
 
 ### Statuts (A, Maj+A)
 

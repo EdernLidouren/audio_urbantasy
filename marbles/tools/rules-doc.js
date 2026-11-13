@@ -1,7 +1,8 @@
 // BOÎTE À OUTILS DES BILLES — le DOCUMENT DE RÈGLES (doc/marbles-rules.md), tenu à
 // jour par le jeu lui-même :
-//   - son ANNEXE, la liste des billes de test et de leurs effets, est GÉNÉRÉE depuis
-//     la table des billes (marbles/content/types/), avec les fiches du jeu en français
+//   - son ANNEXE, la liste des billes du jeu, de leur description et de leurs effets,
+//     est GÉNÉRÉE depuis la table des billes (marbles/content/types/), avec les
+//     annonces, les descriptions (touche V) et les fiches du jeu en français
 //     (marbles/view/card.js), entre ses deux marqueurs ; elle ne s'écrit jamais à la
 //     main ;
 //   - la liste des STATUTS DE TEST (section 12) l'est aussi, depuis la table des
@@ -33,7 +34,8 @@ const { t, setLocale } = await import("../../data/i18n/index.js");
 const { marbleCard } = await import("../view/card.js");
 const { MARBLE_KEYWORDS } = await import("../core/content.js");
 const { GAME_RULES } = await import("./game-rules.js");
-const { MARBLE_SIZES } = await import("../config/values.js");
+const { marbleListLine } = await import("../view/narration/focus.js");
+const { descriptionText } = await import("../view/marble-info.js");
 
 setLocale("fr");
 
@@ -42,15 +44,15 @@ setLocale("fr");
 const plain = (text) => text.replace(/[  ]/g, " ");
 
 // L'annexe : une sous-section par bille, dans l'ordre de la table, sa ligne de liste
-// (nom, calibre, usure maximale), puis chaque champ de sa fiche.
+// (nom, calibre, familles, rareté, usure maximale, comme dans la main), sa description
+// en italique, puis chaque champ de sa fiche.
 function annex() {
   const lines = [];
   for (const marble of Object.keys(GAME_RULES.types)) {
     const name = plain(t(`marble.${marble}.name`));
-    const size = t(`marbles.size.${MARBLE_SIZES[GAME_RULES.types[marble].size]}.name`);
-    const line = plain(t("marbles.list.line", { name, size, maxWear: GAME_RULES.maxWearOf(marble) }));
+    const line = `${plain(marbleListLine(marble, GAME_RULES, t))}.`;
     const { above, below } = marbleCard(marble, line, GAME_RULES, t, { timeless: true });
-    lines.push(`### ${name}`, "", `${line}.`, "", ...[...above, ...below].map((field) => `- ${plain(field)}`), "");
+    lines.push(`### ${name}`, "", line, "", `*${plain(descriptionText(marble, t))}*`, "", ...[...above, ...below].map((field) => `- ${plain(field)}`), "");
   }
   return lines.join("\n");
 }

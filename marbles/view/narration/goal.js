@@ -14,7 +14,7 @@ function tierName(tier, t) {
   return t(`marbles.tier.${tier}`);
 }
 
-// L'OBJECTIF en une phrase : « Objectif : libre, 10 tours. », « Objectif : 165 points
+// L'OBJECTIF en une phrase : « Objectif : libre, 10 tours. », « Objectif : 122 points
 // en 8 tours. », « Objectif : Impact de 12 minimum chaque tour, 20 tours au plus. ».
 const GOAL_TEXTS = {
   free: ({ turns }, t) => t("marbles.goal.free", { turns }),
@@ -27,7 +27,7 @@ export function goalText(definition, t) {
 }
 
 // LA PROGRESSION, selon l'objectif : « Tour 5 sur 10. Score 120, palier argent
-// atteint. », « 120 sur 165, tour 5 sur 8. », « 4 tours tenus. ».
+// atteint. », « 90 sur 122, tour 5 sur 8. », « 4 tours tenus. ».
 const PROGRESS_TEXTS = {
   free: (game, t) => {
     const { tiers } = game.definition.goal;

@@ -4,8 +4,9 @@
 // (marbles/checks/fixtures/marbles.js), et ce domaine-ci ne demande aux vraies billes
 // que ce qui doit tenir quelles que soient leurs valeurs :
 //   - la table et le sac de départ se valident, les règles se composent ;
-//   - chaque bille a son nom dans chaque langue, aucun nom n'est orphelin, et tout
-//     ce qui se dit d'elle (fiche, main, triangle, confirmation d'une pose) se dit
+//   - chaque bille a son nom dans chaque langue, aucun nom ni aucune description
+//     n'est orphelin, chaque famille et chaque rareté a son nom, et tout ce qui se dit
+//     d'elle (fiche, main, triangle, confirmation d'une pose, touches V et F) se dit
 //     sans gabarit brut ;
 //   - chaque bille a un profil sonore complet, celui de son calibre ;
 //   - des parties jouées au hasard gardent leurs invariants, sans exception ni
@@ -16,7 +17,7 @@
 // core/checks/index.js/runChecks (`node tools/run-checks.js marbles-content`).
 
 import { LOCALE_TABLES, t, getLocale, setLocale } from "../../data/i18n/index.js";
-import { MARBLE_SOUND_PROFILES, STARTING_BAG } from "../config/values.js";
+import { MARBLE_FAMILIES, MARBLE_RARITIES, MARBLE_SOUND_PROFILES, STARTING_BAG } from "../config/values.js";
 import { SLOTS } from "../core/marbles.js";
 import { validateMarblesContent } from "../core/validation.js";
 import { createMarblesRules } from "../core/rules.js";
@@ -25,6 +26,7 @@ import MARBLE_STATUSES from "../content/statuses/index.js";
 import { DEFAULT_DEFINITION, GAME_DEFINITIONS } from "../content/definitions/index.js";
 import { marbleCard } from "../view/card.js";
 import { describeHandFocus, describeSlotFocus, describeSlotForPlacement, placementLines } from "../view/narration.js";
+import { descriptionText, identityText } from "../view/marble-info.js";
 import { throws } from "../../lib/check.js";
 import { emptyForecastTally, walkForecastGame } from "./fixtures/forecast-property.js";
 import { inHand, isCleanText, marblesPlayState, playRandomMarblesGame } from "./helpers.js";
@@ -58,6 +60,11 @@ function checkTexts(run) {
     for (const locale of Object.keys(LOCALE_TABLES)) {
       setLocale(locale);
       run.same(`${locale} : chaque bille a son nom`, [], ids.filter((id) => !Object.hasOwn(LOCALE_TABLES[locale], `marble.${id}.name`)));
+      run.same(
+        `${locale} : chaque famille et chaque rareté a son nom`,
+        [],
+        [...MARBLE_FAMILIES.map((family) => `marbles.family.${family}.name`), ...MARBLE_RARITIES.map((rarity) => `marbles.rarity.${rarity}.name`)].filter((key) => !Object.hasOwn(LOCALE_TABLES[locale], key))
+      );
       // Chaque définition de partie : son nom et sa description (touche E du menu Maj+O).
       run.same(
         `${locale} : chaque définition de partie a son nom et sa description`,
@@ -97,6 +104,7 @@ function checkTexts(run) {
           return [...card.above, ...card.below];
         }),
         ...ids.map((id) => describeHandFocus({ ...state, hand: inHand([id]) }, 0, rules, t)),
+        ...ids.flatMap((id) => [descriptionText(id, t), identityText(id, rules, t)]),
         ...ids.flatMap((id) =>
           SLOTS.flatMap((slot) => {
             const game = { ...state, triangle: { ...emptyTriangle, [slot]: { marble: id, wear: 0 } } };

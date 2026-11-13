@@ -18,6 +18,7 @@ import { makeCardMenuScreen } from "./card-menu.js";
 import { describeMarbleInList } from "./narration.js";
 import { playFocusBeacon } from "./sounds.js";
 import { keywordsText, openKeywordsMenu } from "./keywords.js";
+import { descriptionText, identityText } from "./marble-info.js";
 
 const PILE_BINDINGS = defineBindings("marblesPile", {
   left: { keys: ["ArrowLeft"], mods: [] },
@@ -32,6 +33,10 @@ const PILE_BINDINGS = defineBindings("marblesPile", {
   // Les mots-clés de la bille sous le curseur (marbles/view/keywords.js).
   keywords: { keys: ["e"], mods: [] },
   keywordsMenu: { keys: ["e"], mods: ["shift"] },
+  // La description de la bille sous le curseur (marbles/view/marble-info.js).
+  description: { keys: ["v"], mods: [] },
+  // Ses familles, son calibre et sa rareté.
+  identity: { keys: ["f"], mods: [] },
 });
 
 // `titleKey` : le titre du menu, une clé i18n ; `marbles` : les ids à dire, dans
@@ -54,6 +59,8 @@ export function openPileMenu(titleKey, marbles, rules, game) {
           playMenuSound("select");
           openKeywordsMenu(marbles[index], rules);
         },
+        description: (index) => announce(descriptionText(marbles[index], t), { assertive: true }),
+        identity: (index) => announce(identityText(marbles[index], rules, t), { assertive: true }),
       },
     })
   );

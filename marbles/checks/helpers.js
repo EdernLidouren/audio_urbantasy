@@ -15,10 +15,11 @@ import { readForecast } from "../core/forecast.js";
 
 export { deepFreeze };
 
-// Une table de billes FABRIQUÉE, complétée d'un calibre (obligatoire) pour chaque
-// bille qui n'en déclare pas : MEDIUM, quand la vérification ne porte pas sur lui.
+// Une table de billes FABRIQUÉE, complétée de ses champs obligatoires pour chaque
+// bille qui ne les déclare pas, quand la vérification ne porte pas sur eux : le
+// calibre MEDIUM, la famille Classiques, la rareté commune.
 export function withSizes(table) {
-  return Object.fromEntries(Object.entries(table).map(([id, type]) => [id, { size: MEDIUM, ...type }]));
+  return Object.fromEntries(Object.entries(table).map(([id, type]) => [id, { size: MEDIUM, families: ["classics"], rarity: "common", ...type }]));
 }
 
 // Répond aux choix en attente d'un résultat du réducteur des billes, toujours par

@@ -92,6 +92,7 @@ import { EMPTY_HISTORY, recordSteps } from "./history.js";
 import { openHistoryMenu } from "./history-screen.js";
 import { openTallyMenu } from "./tally-screen.js";
 import { keywordsText, openKeywordsMenu } from "./keywords.js";
+import { descriptionText, identityText } from "./marble-info.js";
 import { openMarblesHelp } from "./help-screen.js";
 
 const MARBLES_BINDINGS = defineBindings("marbles", {
@@ -124,6 +125,11 @@ const MARBLES_BINDINGS = defineBindings("marbles", {
   history: { keys: ["l"], mods: [] },
   keywords: { keys: ["e"], mods: [] },
   keywordsMenu: { keys: ["e"], mods: ["shift"] },
+  // La description de la bille sous le curseur, un texte d'ambiance
+  // (marbles/view/marble-info.js).
+  description: { keys: ["v"], mods: [] },
+  // Ses familles, son calibre et sa rareté.
+  identity: { keys: ["f"], mods: [] },
   // Terminer un choix facultatif (sur le triangle surtout : la main a son entrée
   // « Ne rien choisir », puis « Terminer »). Libre dans cet écran.
   finish: { keys: ["t"], mods: [] },
@@ -757,6 +763,8 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
     history: openMenu(() => openHistoryMenu(history.previous)),
     keywords: consult(() => keywordsText(marbleUnderCursor(), rules, t)),
     keywordsMenu: openMenu(() => openKeywordsMenu(marbleUnderCursor(), rules)),
+    description: consult(() => descriptionText(marbleUnderCursor(), t)),
+    identity: consult(() => identityText(marbleUnderCursor(), rules, t)),
     finish: finishChoice,
     help: openHelpMenu,
     placesDemo: playPlacesDemo,
@@ -771,7 +779,7 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
   // l'on en est.
   function start() {
     started = true;
-    sound.preloadMarblesAudio();
+    sound.preloadMarblesAudio(rules.types);
     // Après le préchargement : la réverbération a besoin du contexte audio.
     sound.openTableReverb();
     sound.startMarblesMusic();

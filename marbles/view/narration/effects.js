@@ -72,6 +72,29 @@ export function sizeRef(size) {
   return nameRef(`marbles.size.${MARBLE_SIZES[size]}.name`);
 }
 
+// La référence au nom d'une famille (marbles/config/values.js/MARBLE_FAMILIES) :
+// « Brume ».
+export function familyRef(family) {
+  return nameRef(`marbles.family.${family}.name`);
+}
+
+// La référence au nom d'une rareté (marbles/config/values.js/MARBLE_RARITIES), pour
+// un gabarit qui en choisit la forme (« rare », « une bille rare », « rares »).
+export function rarityRef(rarity) {
+  return nameRef(`marbles.rarity.${rarity}.name`);
+}
+
+// Les FAMILLES d'une bille, nommées, dans l'ordre de sa déclaration : une liste que
+// le gabarit lie (« Trésor et Astres »).
+export function familyNames(marble, types, t) {
+  return types[marble].families.map((family) => t(`marbles.family.${family}.name`));
+}
+
+// Le nom de la rareté d'une bille : « peu commune ».
+export function rarityName(marble, types, t) {
+  return t(`marbles.rarity.${types[marble].rarity}.name`);
+}
+
 // Un compteur qui peut être négatif (Vitesse, Masse), avec le vrai signe moins
 // (U+2212) : un lecteur d'écran le lit, là où il peut taire un trait d'union, et
 // « Vitesse 3 » dirait le contraire. Les gabarits d'effet font de même.
@@ -154,14 +177,16 @@ function statusText({ status, amount, duration, stacking }, t) {
 // minibilles actives ». Un filtre sans texte échoue au chargement.
 const FILTER_TEXTS = {
   size: (filter) => ({ key: "marbles.target.all_size", params: { size: sizeRef(filter.size) } }),
+  family: (filter) => ({ key: "marbles.target.all_family", params: { family: familyRef(filter.family) } }),
+  rarity: (filter) => ({ key: "marbles.target.all_rarity", params: { rarity: rarityRef(filter.rarity) } }),
 };
 for (const type of Object.keys(TARGET_FILTERS)) {
   if (!Object.hasOwn(FILTER_TEXTS, type)) throw new Error(`marbles : le filtre de cible "${type}" doit avoir son texte (FILTER_TEXTS).`);
 }
 
 // Ce que dit une cible « toutes » : « toutes les billes actives », ou, filtrée, le
-// texte de son filtre (un seul type de filtre existe aujourd'hui : deux filtres
-// demanderont une phrase qui les combine).
+// texte de son filtre (un seul filtre à la fois aujourd'hui : deux demanderont une
+// phrase qui les combine).
 function allTarget(target, t) {
   const [filter] = target.filters ?? [];
   if (filter === undefined) return t("marbles.target.all");
@@ -350,6 +375,14 @@ const CONDITION_TEXTS = {
       : t("marbles.condition.sizeAt", { slot: slotName(when.slot, t), size: sizeRef(when.size) }),
   // L'état d'une zone : un texte par zone et par état déclaré.
   zone: (when, t) => t(`marbles.condition.zone.${when.zone}.${when.state}`),
+  familyAt: (when, t) =>
+    isRelative(when.slot)
+      ? t("marbles.condition.familyAt_relative", { relative: relativeWord(when.slot), family: familyRef(when.family) })
+      : t("marbles.condition.familyAt", { slot: slotName(when.slot, t), family: familyRef(when.family) }),
+  rarityAt: (when, t) =>
+    isRelative(when.slot)
+      ? t("marbles.condition.rarityAt_relative", { relative: relativeWord(when.slot), rarity: rarityRef(when.rarity) })
+      : t("marbles.condition.rarityAt", { slot: slotName(when.slot, t), rarity: rarityRef(when.rarity) }),
 };
 
 // Une condition sans texte, ou un texte sans condition, échoue au chargement.
@@ -363,7 +396,7 @@ for (const type of new Set([...Object.keys(CONDITIONS), ...Object.keys(CONDITION
 function sourceText(source, step, t) {
   const { text, params, names } = AMOUNT_SOURCES[source.type];
   const references = Object.fromEntries(Object.entries(names?.(source) ?? {}).map(([param, key]) => [param, nameRef(key)]));
-  return t(text, { effect: step, ...(params?.(source) ?? {}), ...references });
+  return t(typeof text === "function" ? text(source) : text, { effect: step, ...(params?.(source) ?? {}), ...references });
 }
 
 // Un nombre d'une action signée (Vitesse, Masse : celles qui ont un texte `down`)
@@ -386,17 +419,18 @@ function computedText(action, amount, situation, t) {
   // valeur actuelle.
   const { current, needsState } = AMOUNT_SOURCES[amount.source.type];
   if (!current || situation === null || (needsState && !situation.state)) return text;
-  return t("marbles.effect.computed_current", { effect: text, current: amountNumber(action, amountOf(amount, situation)) });
+  return t("marbles.effect.computed_current", { effect: text, current: amountNumber(action, amountOf(amount, situation, situation.types)) });
 }
 
 // La situation d'une bille HORS de tout déclenchement, pour dire la valeur actuelle
 // de ses montants calculés : la bille elle-même, avec son compteur de tours en main
 // (0 hors de la main), les valeurs de partie du moment (`tally`, celles de l'état
-// de la partie ; à zéro, celles d'une partie neuve, hors de toute partie), et l'état
+// de la partie ; à zéro, celles d'une partie neuve, hors de toute partie), l'état
 // de la partie en cours (`state`, d'où se comptent les zones ; null hors de toute
-// partie : le nombre de billes d'une zone n'a alors pas de valeur actuelle).
-export function cardSituation(marble, turnsInHand = 0, tally = emptyTally(TALLY_COUNTERS), state = null) {
-  return { triangle: state?.triangle ?? null, holder: { marble, zone: null, turnsInHand }, replacement: null, tally, state };
+// partie : le nombre de billes d'une zone n'a alors pas de valeur actuelle) et la
+// table des billes (`types`, que lisent les filtres et les familles d'un compte).
+export function cardSituation(marble, turnsInHand = 0, tally = emptyTally(TALLY_COUNTERS), state = null, types = null) {
+  return { triangle: state?.triangle ?? null, holder: { marble, zone: null, turnsInHand }, replacement: null, tally, state, types };
 }
 
 // Une clause IMPRIMÉE : ce que la bille promet, son montant calculé (avec sa valeur

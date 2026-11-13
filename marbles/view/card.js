@@ -62,6 +62,6 @@ function modelFor(marble, model, rules) {
 // `timeless` : la fiche hors de toute partie, sans valeur actuelle des montants
 // calculés (l'annexe des règles, marbles/tools/rules-doc.js).
 export function marbleCard(marble, main, rules, t, { turnsInHand = 0, tally, game = null, model = MARBLE_CARD_MODEL, timeless = false } = {}) {
-  const situation = timeless ? null : cardSituation(marble, turnsInHand, tally ?? game?.tally, game);
+  const situation = timeless ? null : cardSituation(marble, turnsInHand, tally ?? game?.tally, game, rules.types);
   return assembleCard(modelFor(marble, model, rules), { main, readField: (entry) => readField(marble, entry, situation, rules, t), t });
 }

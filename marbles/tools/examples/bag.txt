@@ -1,5 +1,5 @@
 # Un sac pour le simulateur (--bag-file) : des ids de billes, séparés par des
-# espaces, des virgules ou des lignes. Ici, le sac de test avec deux calots et
-# sans mica.
-clay, glass, gorilla, gorilla, agate, cats_eye, porcelain
-leaded, sulphide, stoneware, tiger, giant, magnifier
+# espaces, des virgules ou des lignes. Ici, un sac d'Astres et de Classiques, deux
+# lunes et deux argiles.
+moon, moon, comet, galaxy, eclipse, star
+clay, clay, cats_eye, agate, steel, soda

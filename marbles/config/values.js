@@ -24,9 +24,9 @@ export const DEFAULT_GAME = {
   // Le nombre de tours (definition.turns).
   turns: 10,
   // Les PALIERS de la partie libre (definition.goal.tiers) : des repères techniques
-  // PROVISOIRES, tirés du simulateur (joueur glouton, sac de test, 1000 parties) : les
-  // 25e, 50e et 90e centiles du score final.
-  tiers: { bronze: 180, silver: 200, gold: 245 },
+  // PROVISOIRES, tirés du simulateur (joueur glouton, sac de test du premier set,
+  // 1000 parties) : les 25e, 50e et 90e centiles du score final.
+  tiers: { bronze: 120, silver: 148, gold: 193 },
 };
 
 export const MARBLES_SETTINGS = {
@@ -86,6 +86,19 @@ export const MARBLE_SIZES = Object.freeze({
   [MEDIUM]: "medium",
   [LARGE]: "large",
 });
+
+// Les FAMILLES : champ `families` obligatoire de chaque bille, une LISTE (une famille
+// au moins, plusieurs permises : une bille bicolore), statique. Dans l'ordre de la
+// roue, puis la famille neutre ; aucune n'a d'exception de règle, les Classiques
+// comprises. Le nom de chacune : `marbles.family.<id>.name`. Lues par les filtres,
+// les conditions et les sources de montant (marbles/core/effects.js) et par
+// l'annonce d'une bille.
+export const MARBLE_FAMILIES = Object.freeze(["treasure", "stars", "mist", "bestiary", "blast", "classics"]);
+
+// Les RARETÉS : champ `rarity` obligatoire de chaque bille, exactement une, statique.
+// De la plus commune à la plus rare : le rang d'une rareté est sa place dans cette
+// liste. Le nom de chacune : `marbles.rarity.<id>.name`.
+export const MARBLE_RARITIES = Object.freeze(["common", "uncommon", "rare", "epic", "legendary"]);
 
 // Les PROFILS SONORES, un par CALIBRE : le son d'une bille dépend de son calibre
 // (couplage voulu, une seule source de vérité). Chacun :
@@ -643,22 +656,40 @@ export const STATUS_CARD_MODEL = {
   ],
 };
 
-// Sac de test : un exemplaire de chaque bille, le sac de la partie par défaut
+// Sac de test : un exemplaire de chacune des 30 billes du premier set, le sac de la
+// partie par défaut
 // (DEFAULT_GAME). Une liste d'ids, pas un dérivé du registre (marbles/content/types/) :
 // un sac peut porter plusieurs exemplaires d'une bille. Validé au démarrage avec les
 // définitions (marbles/core/validation.js/validateMarblesContent).
 export const STARTING_BAG = [
+  "copper",
+  "quicksilver",
+  "ruby",
+  "ingot",
+  "bloodstone",
+  "moon",
+  "comet",
+  "galaxy",
+  "eclipse",
+  "star",
+  "bubble",
+  "ghost",
+  "pearl",
+  "ocean",
+  "snow_globe",
+  "bee",
+  "dolphin",
+  "turtle",
+  "spider",
+  "dragon",
+  "sling_shot",
+  "fireball",
+  "tornado",
+  "grenade",
+  "red_devil",
   "clay",
-  "glass",
-  "gorilla",
-  "agate",
   "cats_eye",
-  "porcelain",
-  "leaded",
-  "mica",
-  "sulphide",
-  "stoneware",
-  "tiger",
-  "giant",
-  "magnifier",
+  "agate",
+  "steel",
+  "soda",
 ];

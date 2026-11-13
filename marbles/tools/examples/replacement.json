@@ -2,10 +2,10 @@
   "state": {
     "turn": 4,
     "score": 30,
-    "triangle": { "leftBase": "magnifier:1", "rightBase": "clay", "apex": "gorilla:2" },
-    "hand": ["clay", "leaded"],
-    "bag": ["agate", "mica"],
-    "discard": ["giant"]
+    "triangle": { "leftBase": "moon:1", "rightBase": "clay", "apex": "dragon:2" },
+    "hand": ["clay", "bee"],
+    "bag": ["agate", "comet"],
+    "discard": ["fireball"]
   },
   "actions": ["prevoir", "prevoir 2 pointe", "poser 2 pointe", "resoudre"]
 }

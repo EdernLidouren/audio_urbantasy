@@ -59,14 +59,14 @@ function checkStateBuilder(run) {
   const state = buildState({
     turn: 4,
     score: 30,
-    triangle: { leftBase: "magnifier:1", rightBase: "clay", apex: { marble: "gorilla", wear: 2 } },
-    hand: ["clay", "leaded:2"],
-    bag: ["agate", "mica"],
+    triangle: { leftBase: "moon:1", rightBase: "clay", apex: { marble: "dragon", wear: 2 } },
+    hand: ["clay", "bee:2"],
+    bag: ["agate", "comet"],
     settings: { turns: 6 },
   });
-  run.same("état construit : le triangle et son usure", { marble: "magnifier", wear: 1 }, state.triangle.leftBase);
+  run.same("état construit : le triangle et son usure", { marble: "moon", wear: 1 }, state.triangle.leftBase);
   run("état construit : usure 0 par défaut", 0, state.triangle.rightBase.wear);
-  run.same("état construit : le sac dans l'ordre décrit, sans mélange", ["agate", "mica"], state.bag);
+  run.same("état construit : le sac dans l'ordre décrit, sans mélange", ["agate", "comet"], state.bag);
   run("état construit : réglage surchargé", 6, turnLimit(state));
   run("état construit : phase de jeu par défaut", "play", state.stage);
   run("état construit : un état que le réducteur accepte", true, rules.reduce(state, { type: "place", handIndex: 1, slot: "apex" }).ok);
@@ -89,14 +89,14 @@ function checkStateBuilder(run) {
   run("état construit : pot agrandi par un statut, permis", 4, buildState({ pot: ["clay", "clay", "clay", "clay"], statuses: ["deepPocket"] }).pot.length);
   run.same(
     "état construit : la main avec ses compteurs de tours en main",
-    [{ marble: "clay", turnsInHand: 0 }, { marble: "leaded", turnsInHand: 2 }],
+    [{ marble: "clay", turnsInHand: 0 }, { marble: "bee", turnsInHand: 2 }],
     state.hand
   );
-  run.same("état construit : une bille de main en objet", [{ marble: "tiger", turnsInHand: 1 }], buildState({ hand: [{ marble: "tiger", turnsInHand: 1 }] }).hand);
+  run.same("état construit : une bille de main en objet", [{ marble: "bubble", turnsInHand: 1 }], buildState({ hand: [{ marble: "bubble", turnsInHand: 1 }] }).hand);
   run("état construit : compteur négatif refusé", true, throws(() => buildState({ hand: ["clay:-1"] })));
   run(
     "état lisible : la main dit les tours en main",
-    `Main, 2 sur ${DEFAULT_GAME_DEFINITION.start.handSize} : clay, 0 tour en main ; leaded, 2 tours en main.`,
+    `Main, 2 sur ${DEFAULT_GAME_DEFINITION.start.handSize} : clay, 0 tour en main ; bee, 2 tours en main.`,
     formatState(state).find((line) => line.startsWith("Main"))
   );
 
@@ -179,12 +179,12 @@ function checkCommandsAndFormat(run) {
 }
 
 function checkPublicView(run) {
-  const state = buildState({ hand: ["clay"], bag: ["agate", "mica", "giant"] });
+  const state = buildState({ hand: ["clay"], bag: ["agate", "comet", "fireball"] });
   const view = publicView(state);
   run.same("vue publique : billes du sac inconnues", [null, null, null], view.bag);
   run("vue publique : le nombre de billes du sac reste", 3, view.bag.length);
   run("vue publique : sans hasard de la partie", null, view.rngState);
-  run.same("vue publique : une copie, l'état n'est pas touché", ["agate", "mica", "giant"], state.bag);
+  run.same("vue publique : une copie, l'état n'est pas touché", ["agate", "comet", "fireball"], state.bag);
 
   // Un joueur espion, ajouté le temps du test : ce que chaque joueur reçoit, c'est
   // une vue, jamais l'état.
@@ -234,10 +234,11 @@ function predictedAfter(state, actions) {
 // l'aléatoire une réponse légale, Terminer compris ; la vue publique voile aussi
 // l'état de départ que garde le choix.
 function checkPlayerChoices(run) {
-  // Une vraie bille dont le Tic ouvre un choix, trouvée par ce qu'elle fait.
-  const chooser = Object.keys(MARBLE_TYPES).find((id) => (MARBLE_TYPES[id].hit ?? []).some((clause) => clause.target?.type === "choice" && clause.when === undefined));
+  // Une vraie bille dont le Tic ouvre un choix sur le triangle, trouvée par ce qu'elle
+  // fait.
+  const chooser = Object.keys(MARBLE_TYPES).find((id) => (MARBLE_TYPES[id].hit ?? []).some((clause) => clause.target?.type === "choice" && clause.target.zones.includes("triangle") && clause.when === undefined));
   if (chooser === undefined) throw new Error("aucune vraie bille n'a de Tic à choix : ce test n'a rien à jouer.");
-  const state = buildState({ triangle: { leftBase: "porcelain:1", rightBase: null, apex: "clay" }, hand: [chooser], bag: ["agate", "mica"] });
+  const state = buildState({ triangle: { leftBase: "turtle:1", rightBase: null, apex: "clay" }, hand: [chooser], bag: ["agate", "comet"] });
   const pending = rules.reduce(state, { type: "place", handIndex: 0, slot: "apex" }).state;
   const view = publicView(pending);
   run("vue publique : le sac de l'état de départ du choix voilé", true, view.pendingChoice.resume.from.bag.every((marble) => marble === null));
@@ -263,8 +264,8 @@ function checkGreedy(run) {
   // (drawnValue 0) : le glouton ne compare alors que l'Impact.
   const state = buildState({
     turn: 4,
-    triangle: { leftBase: "magnifier:1", rightBase: "glass", apex: "stoneware" },
-    hand: ["clay", "gorilla", "agate"],
+    triangle: { leftBase: "moon:1", rightBase: "dolphin", apex: "galaxy" },
+    hand: ["clay", "dragon", "agate"],
   });
   const view = publicView(state);
   const swaps = [[], ...rules.legalActions(view).filter((action) => action.type === "swap").map((swap) => [swap])];
@@ -324,30 +325,44 @@ function checkGreedy(run) {
   }
   const firstPlan = bestPlan(publicView(first), impactOnly);
   run("glouton, premier tour : le meilleur remplissage, partiel compris", firstBest, firstPlan.impact);
-  // Un triangle partiel s'envisage : une main d'une bille au premier tour donne un plan d'une pose.
-  const single = { ...first, hand: first.hand.slice(0, 1) };
-  run("glouton, premier tour : une seule bille, une seule pose", 1, bestPlan(publicView(single), impactOnly).choices.length);
+  // Un triangle partiel s'envisage : une main d'une bille au premier tour donne un plan
+  // d'une pose, pour une bille qui, posée seule, rapporte un Impact (une bille sans
+  // Masse, seule, n'en rapporte aucun : ne rien poser la vaut).
+  const alone = (held) => ({ ...first, hand: [held] });
+  const scoring = first.hand.find((held) => SLOTS.some((slot) => rules.forecast(alone(held), { type: "place", handIndex: 0, slot }).impact > 0));
+  if (scoring === undefined) throw new Error("aucune bille de la main ne rapporte d'Impact seule : ce test n'a rien à jouer.");
+  run("glouton, premier tour : une seule bille, une seule pose", 1, bestPlan(publicView(alone(scoring)), impactOnly).choices.length);
 }
 
 // La valeur d'une bille gagnée en main : sans elle, une bille qui pioche ne vaut rien
 // pour le glouton ; avec elle, il la joue quand elle rapporte plus que l'Impact perdu.
 function checkDrawnValue(run) {
   run("bille gagnée : la valeur par défaut, dite dans la description du joueur", true, PLAYERS.greedy.describe({}).includes(frNumber(MARBLES_DRAWN_VALUE)));
+  run("bille gagnée : valeur négative refusée", true, throws(() => PLAYERS.greedy.startGame({ seed: 1, options: { drawnValue: -1 } })));
   // Une vraie bille dont le Tic pioche (sous condition au plus de main vide) : posée
   // seule de sa main, sur un emplacement occupé, elle pioche.
   const drawer = Object.keys(MARBLE_TYPES).find((id) =>
     (MARBLE_TYPES[id].hit ?? []).some((clause) => clause.action === "draw" && (clause.when === undefined || (clause.when.type === "zone" && clause.when.zone === "hand" && clause.when.state === "empty")))
   );
-  if (drawer === undefined) throw new Error("aucune vraie bille ne pioche à son Tic : ce test n'a rien à jouer.");
-  const view = publicView(buildState({ turn: 4, triangle: { leftBase: "clay", rightBase: "glass", apex: null }, hand: [drawer], bag: ["tiger", "giant"] }));
+  // Le set du jeu peut n'en avoir aucune (les pioches de l'itération 27 sont des
+  // Éveils, jamais prévus) : la planification d'une pioche n'a alors rien à jouer, et
+  // seule la simulation, plus bas, se vérifie.
+  if (drawer !== undefined) checkPlannedDraw(run, drawer);
+  checkEffectDraws(run);
+}
+
+// Le glouton devant une vraie bille qui pioche à son Tic, posée seule de sa main.
+function checkPlannedDraw(run, drawer) {
+  const view = publicView(buildState({ turn: 4, triangle: { leftBase: "clay", rightBase: "dolphin", apex: null }, hand: [drawer], bag: ["bubble", "fireball"] }));
   const greedy = bestPlan(view, { drawnValue: 100 });
   run("bille gagnée : très chère, le glouton pioche", true, greedy.drawn >= 1);
   run("bille gagnée : la valeur du plan", greedy.impact + 100 * greedy.drawn, greedy.value);
   run("bille gagnée : sans valeur, l'Impact seul décide", true, bestPlan(view, { drawnValue: 0 }).impact >= greedy.impact);
   run("bille gagnée : la planification ne révèle rien du sac", true, view.bag.every((marble) => marble === null));
-  run("bille gagnée : valeur négative refusée", true, throws(() => PLAYERS.greedy.startGame({ seed: 1, options: { drawnValue: -1 } })));
+}
 
-  // La simulation compte les pioches d'effets, les régénérations et les lancers.
+// La simulation compte les pioches d'effets, les régénérations et les lancers.
+function checkEffectDraws(run) {
   const summary = summarize(simulate({ games: 30, seed: 5, player: "greedy" }));
   run("simulation : des billes piochées par des effets", true, summary.draws.byEffect > 0);
   run("simulation : régénérations en cours de tour, comprises dans le total", true, summary.draws.midTurnRegenerations <= summary.draws.regenerations);
@@ -393,8 +408,8 @@ function checkSimulation(run) {
   run("sac aléatoire : la taille demandée", true, random.games.every((game) => game.bag.length === 12));
   run("sac aléatoire : la limite d'exemplaires", true, random.games.every((game) => new Set(game.bag).size === 12));
   run("sac aléatoire : des sacs différents d'une partie à l'autre", true, new Set(random.games.map((game) => [...game.bag].sort().join())).size > 1);
-  run("sac aléatoire : impossible avec la limite", true, throws(() => simulate({ games: 1, bagMode: { kind: "random", size: 14, maxCopies: 1 } })));
-  run.same("sac décrit : texte", ["clay", "clay", "mica"], parseBagText("clay, clay # deux\nmica\n"));
+  run("sac aléatoire : impossible avec la limite", true, throws(() => simulate({ games: 1, bagMode: { kind: "random", size: Object.keys(MARBLE_TYPES).length + 1, maxCopies: 1 } })));
+  run.same("sac décrit : texte", ["clay", "clay", "comet"], parseBagText("clay, clay # deux\ncomet\n"));
   run.same("sac décrit : JSON", ["agate"], parseBagText('["agate"]'));
   run("sac décrit : bille inconnue refusée", true, throws(() => parseBagText("clay nope")));
   run.same("sac de test par défaut", STARTING_BAG, results.greedy.games[0].bag);
@@ -462,30 +477,30 @@ function checkDrawAttribution(run) {
     recordEvents(record, events, "resolve", drawers);
     return Object.fromEntries(Object.entries(record.marbles).filter(([, stats]) => stats.drawn > 0).map(([id, stats]) => [id, stats.drawn]));
   };
-  // Le mélange au milieu de la Pioche de la géante : la réaction du mica se dit entre
-  // la Pioche et ses billes, sans rien piocher elle-même.
+  // Le mélange au milieu de la Pioche d'une bille (drawer) : la réaction d'une bille du
+  // pot (reactor) se dit entre la Pioche et ses billes, sans rien piocher elle-même.
   run.same(
     "attribution des pioches : une réaction glissée avant les billes n'en prend aucune",
-    { giant: 2 },
-    drawnBy([effect("giant", "phase", 2), drawn, { type: "bagRegenerated" }, effect("mica", "pocketReaction", 0), drawn])
+    { drawer: 2 },
+    drawnBy([effect("drawer", "phase", 2), drawn, { type: "bagRegenerated" }, effect("reactor", "pocketReaction", 0), drawn])
   );
-  // L'Éveil de la bille piochée pioche à son tour, puis la pioche de la géante reprend.
+  // L'Éveil de la bille piochée pioche à son tour, puis la Pioche de drawer reprend.
   run.same(
     "attribution des pioches : un Éveil qui pioche pendant une Pioche prend ses billes, la Pioche reprend",
-    { giant: 2, cats_eye: 1 },
-    drawnBy([effect("giant", "phase", 2), drawn, effect("cats_eye", "awaken", 1), drawn, drawn])
+    { drawer: 2, cats_eye: 1 },
+    drawnBy([effect("drawer", "phase", 2), drawn, effect("cats_eye", "awaken", 1), drawn, drawn])
   );
   // La Pioche d'une réaction de statut : aucune bille ne la fait, aucune ne la compte.
   run.same("attribution des pioches : la Pioche d'un statut, chez aucune bille", {}, drawnBy([effect(null, "statusReaction", 1), drawn]));
   // Une Pioche suspendue par un choix finit dans l'action suivante : la pile la garde.
   const drawers = [];
-  drawnBy([effect("giant", "phase", 2), drawn], drawers);
-  run.same("attribution des pioches : la pile passe d'une action à l'autre", { giant: 1 }, drawnBy([drawn], drawers));
+  drawnBy([effect("drawer", "phase", 2), drawn], drawers);
+  run.same("attribution des pioches : la pile passe d'une action à l'autre", { drawer: 1 }, drawnBy([drawn], drawers));
   // Une Pioche arrêtée (main pleine) ne prend rien à la suivante.
   run.same(
     "attribution des pioches : une Pioche arrêtée ne prend pas les billes d'une autre",
-    { mica: 1 },
-    drawnBy([effect("giant", "phase", 2), effect("mica", "phase", 1), drawn])
+    { reactor: 1 },
+    drawnBy([effect("drawer", "phase", 2), effect("reactor", "phase", 1), drawn])
   );
 }
 
