@@ -39,10 +39,17 @@ function fakeRegion(id) {
   };
 }
 
-function installFakeDocument() {
+// Exportée : les bancs des écrans de sacs (domaine marbles-bag-editor) jouent aussi
+// des menus.
+export function installFakeDocument() {
   if (typeof document !== "undefined") return;
   const regions = { "announce-polite": fakeRegion("announce-polite"), "announce-assertive": fakeRegion("announce-assertive") };
   globalThis.document = { getElementById: (id) => regions[id] ?? null };
+}
+
+// Ce que les menus ont annoncé jusqu'ici, dans l'ordre (les textes).
+export function menuAnnouncementTexts() {
+  return menuAnnouncements.map((entry) => entry.text);
 }
 
 // Les sons de l'écran (marbles/view/screen.js/SCREEN_SOUND_NAMES), tous relevés :

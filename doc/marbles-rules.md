@@ -586,7 +586,7 @@ Une partie se joue avec un **sac**, comme un deck dans un jeu de cartes. Quatre 
 
 - le **catalogue** : toutes les billes du jeu ;
 - la **collection** : les billes que le joueur a débloquées. Une bille débloquée s'utilise librement dans un sac, autant de fois que les règles de construction le permettent : il n'y a pas d'exemplaires possédés. Aujourd'hui, toutes les billes sont débloquées ;
-- les **sacs** : des compositions enregistrées, chaque bille avec son nombre d'exemplaires. Le jeu en fournit, les **sacs préfaits**, que le joueur ne modifie pas ; le joueur aura les siens, dans 5 emplacements (aucune interface pour les composer aujourd'hui) ;
+- les **sacs** : des compositions enregistrées, chaque bille avec son nombre d'exemplaires. Le jeu en fournit, les **sacs préfaits**, que le joueur ne modifie pas ; le joueur a les siens, dans 5 emplacements, enregistrés avec sa partie (voir « Mes sacs ») ;
 - la **partie** : elle reçoit un sac et en fait une copie, ses billes mélangées dans le sac de pioche. Rien de ce qui arrive en partie (une bille empochée, perdue, défaussée) ne change le sac ni la collection.
 
 ### Les règles de construction
@@ -608,7 +608,31 @@ Selon sa définition, une partie se joue avec :
 - un **sac imposé** : un sac préfait que la définition désigne ; le jeu le prête, ni la collection ni les règles de construction ne s'y appliquent ;
 - un **sac généré** au hasard, pour le simulateur et les tests.
 
-La partie habituelle se joue avec le sac du joueur ; lancée depuis le menu principal, elle reçoit le **sac de départ**. En mode développeur, un menu propose d'abord chaque sac préfait (son nom et son nombre de billes).
+La partie habituelle se joue avec le sac du joueur. Lancée depuis le menu principal, elle commence par le **choix du sac** : les sacs du joueur, puis les sacs préfaits, puis « Retour » (« Sac 1, 17 billes. »). Un sac invalide se dit « invalide » et ne se lance pas : Entrée dit son premier problème et leur nombre (« Sac trop petit : 9 billes sur 12 minimum. 2 problèmes au total. »). Le curseur s'ouvre sur le dernier sac utilisé, s'il existe encore et qu'il est valide ; sinon sur le premier sac valide.
+
+### Mes sacs
+
+Les sacs du joueur sont enregistrés avec sa partie : sans partie sauvegardée, il n'en a pas (« Aucune partie sauvegardée : vos sacs vivent dans une partie. »), et une nouvelle partie repart sans sacs. Un sac porte le nom de son emplacement, « sac 1 » à « sac 5 », même copié ou dupliqué.
+
+L'écran « Mes sacs », depuis le menu principal, liste les 5 emplacements (« Sac 1, 17 billes, valide. », « Emplacement 3, vide. »), puis « Sacs préfaits », puis « Retour » :
+
+- un **sac** : Modifier, Dupliquer (vers un emplacement vide ; sans emplacement vide, refusé), Supprimer (« Supprimer le sac 1 ? », Annuler d'abord) ;
+- un **emplacement vide** : Créer un sac vide, ou Partir d'un sac préfait (le sac choisi est copié) ; le sac est créé tout de suite, puis l'éditeur s'ouvre ;
+- les **sacs préfaits** : la liste, en lecture seule ; un sac se consulte (ses billes, avec leurs fiches) ou se copie dans un emplacement vide.
+
+Un sac invalide (trop petit, une bille inconnue…) s'enregistre comme un brouillon : il est dit « invalide » et ne se joue pas. Un sac enregistré qui ne respecte plus les règles, ou qui cite une bille disparue, se charge quand même, invalide, avec ses problèmes.
+
+### L'éditeur
+
+L'éditeur travaille sur une copie du sac : rien n'est enregistré avant de quitter par « Enregistrer ». Il a deux zones, le **sac** en haut (une entrée par bille : « Rubis, 2 sur 2 maximum. ») et la **collection** en bas (les billes débloquées : « Rubis, normale, Trésor, rare. Dans le sac : 2 sur 2. »), chacune rangée par famille, puis rareté, puis nom. Il suit les règles de construction par défaut.
+
+- **Haut** et **Bas** changent de zone ; **Gauche** et **Droite** parcourent la zone ; **Origine** et **Fin** vont aux bornes ; **Ctrl+Haut** et **Ctrl+Bas**, la fiche de la bille ; **V**, **F**, **E**, sa description, son identité, ses mots-clés.
+- **Entrée** ajoute un exemplaire : « Rubis ajouté, 2 sur 2. Sac : 14 billes. » ; refusé au maximum de sa rareté (« Maximum atteint pour rubis : 2. ») ou quand le sac est plein (« Sac plein : 20 billes. »).
+- **Suppr** retire un exemplaire : « Rubis retiré, 1 sur 2. Sac : 13 billes. » ; une bille qui n'a plus d'exemplaire quitte la zone du sac, et le curseur passe à sa voisine.
+- **R** dit le résumé : « 14 billes sur 12 à 20, valide. », puis la répartition par famille, par calibre et par rareté ; **Maj+R** ouvre la liste des problèmes (« Aucun problème. » pour un sac valide).
+- **G** fait défiler le filtre de famille de la collection (toutes, puis chaque famille), **Maj+G** celui de rareté : « Filtre : Astres, 5 billes. ».
+- **Échap** quitte ; si le sac a changé : « Enregistrer les modifications ? », Enregistrer, Quitter sans enregistrer, Continuer.
+- **H** ou **F1** : l'aide des touches.
 
 ### Les sacs préfaits
 

@@ -90,6 +90,15 @@ la partie (voir `doc/entity-model.md`/"Mode debug").
    lecture : console, et journal des avertissements, ouvert de lui-même en
    mode debug (voir `doc/entity-model.md`/"Mode debug").
 
+**Sacs de billes** (toujours, `core/marble-bags.js`/`repairMarbleBags`) : les
+sacs du jeu des billes (`session.marbleBags`, voir `doc/marbles.md`/"Sacs") sont
+absents d'une sauvegarde antérieure (rebouchés vides) ; présents mais abîmés, ils
+sont remis en forme sans jamais faire échouer la lecture (un sac illisible vidé,
+une entrée illisible retirée, un nombre d'exemplaires faux ramené à 1, des doublons
+fusionnés), et chaque changement est listé dans `marbleBags`
+(`{ slot, problem }`), signalé comme les entités retirées. Une bille retirée du jeu
+reste dans son sac : le sac se charge, invalide (« bille inconnue »).
+
 **Références de contenu cassées** (toujours, ces tables étant du code ou de
 la donnée du core — `core/save-migrate.js`/`repairContentReferences`) : une partie
 garde aussi, telles qu'à la première visite, les distributions de collecte
@@ -127,8 +136,9 @@ enregistré cite un tel objet l'ignore simplement (`core/trade.js`/
 ## Renommer du contenu : `config/save-renames.js`
 
 Quand tu renommes un **type d'entité**, une **clé i18n**, un **fichier de
-son** ou un **id de scène**, ajoute l'ancien et le nouveau nom dans la table
-correspondante, dans la même tâche que le renommage :
+son**, un **id de scène** ou un **id de bille** (jeu des billes), ajoute
+l'ancien et le nouveau nom dans la table correspondante, dans la même tâche que
+le renommage :
 
 ```js
 export const RENAMED_ENTITY_TYPES = { film_projector: "video_projector" };
@@ -137,7 +147,12 @@ export const RENAMED_ASSET_PATHS = {
   "assets/sounds/furniture/film_projector_1_beacon": "assets/sounds/furniture/video_projector_1_beacon",
 };
 export const RENAMED_SCENE_IDS = { clock_tower_weight_shaft_mirror_space: "clock_tower_weight_shaft_mirror_side" };
+export const RENAMED_MARBLE_IDS = { cats_eye: "tiger_eye" };   // exemple
 ```
+
+- Les ids de billes ne sont remplacés que dans les sacs du joueur
+  (`session.marbleBags`), à leur relecture (`core/save-migrate.js`/
+  `repairSavedMarbleBags`).
 
 - Les types sont remplacés dans le champ `type` des entités (mondes, deux
   faces comprises, et compagnons), et dans le `spec` des effets `"spawn"`

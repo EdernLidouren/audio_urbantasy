@@ -4,6 +4,7 @@
   "menu.described": "{text}: {description}",
   "menu.main.continue": "Continue",
   "menu.main.marbles": "Marbles game",
+  "menu.main.my_bags": "My bags",
   "menu.main.new_game": "New game",
   "menu.main.new_game_confirm_title": "A save exists. Starting a new game will overwrite it. Confirm?",
   "menu.main.options": "Options",

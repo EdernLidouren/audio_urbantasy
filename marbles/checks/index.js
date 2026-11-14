@@ -33,6 +33,7 @@ import checkMarblesSequence from "./marbles-sequence.check.js";
 import checkMarblesTools from "./marbles-tools.check.js";
 import checkMarblesContent from "./marbles-content.check.js";
 import checkMarblesScreen from "./marbles-screen.check.js";
+import checkMarblesBagEditor from "./marbles-bag-editor.check.js";
 
 export const MARBLES_SUITES = [
   { name: "marbles", check: checkMarbles },
@@ -53,4 +54,5 @@ export const MARBLES_SUITES = [
   { name: "marbles-tools", check: checkMarblesTools },
   { name: "marbles-content", check: checkMarblesContent },
   { name: "marbles-screen", check: checkMarblesScreen, nodeOnly: true },
+  { name: "marbles-bag-editor", check: checkMarblesBagEditor, nodeOnly: true },
 ];

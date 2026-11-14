@@ -31,7 +31,7 @@ import { NEW_GAME } from "./config/new-game.js";
 import { getPref, setPref } from "./config/preferences.js";
 import { configureAssetManifest } from "./lib/assets.js";
 import { checkAutoSaveTimer } from "./view/autosave-timer.js";
-import { loadGame } from "./view/save-storage.js";
+import { loadGame, saveGame } from "./view/save-storage.js";
 import { reportSaveRepairs, reportI18nWarning, reportSceneWarning } from "./view/debug-warnings.js";
 import { announceNewDiscoveries } from "./view/discoveries.js";
 import MARBLE_TYPES from "./marbles/content/types/index.js";
@@ -41,6 +41,9 @@ import { PRESET_BAGS, STARTER_BAG } from "./marbles/content/bags/index.js";
 import { catalogCollection } from "./marbles/host/collection.js";
 import { createMarblesLauncher } from "./marbles/host/entry.js";
 import { createBagMenu } from "./marbles/view/bag-menu.js";
+import { createMyBags } from "./marbles/view/my-bags.js";
+import { createBagStore } from "./marbles/host/bag-store.js";
+import { marbleBagsOf, withMarbleBags } from "./core/marble-bags.js";
 import { describeBagRefusal } from "./marbles/view/narration/bags.js";
 import { installDebugConsole } from "./view/debug-console.js";
 
@@ -281,18 +284,44 @@ function onMarblesEnd(result) {
 }
 
 // Une partie de la définition par défaut (un sac du joueur) avec `bag`. Refusée (un
-// sac invalide, qu'aucun sac préfait n'est : ils sont validés au démarrage) : ses
-// problèmes sont dits, on reste où l'on est.
+// sac invalide : le menu du choix du sac les écarte avant) : ses problèmes sont dits,
+// on reste où l'on est. -> vrai si la partie est lancée.
 function launchMarblesWith(bag, seed = createGameSeed()) {
   const launched = launchMarbles({ definition: marblesRules.definitions[DEFAULT_DEFINITION], bag, collection: marblesCollection, seed, onEnd: onMarblesEnd });
   if (!launched.ok) announce(describeBagRefusal(launched.problems, t), { assertive: true });
+  return launched.ok;
 }
 
-// « Partie de billes » du menu principal : en mode debug, le menu des sacs préfaits
-// d'abord (marbles/view/bag-menu.js) ; sinon, le sac de départ, sans menu.
+// LES SACS DU JOUEUR (marbles/host/bag-store.js), depuis le menu principal : ceux de la
+// PARTIE SAUVEGARDÉE (session.marbleBags, core/marble-bags.js), celle que « Continuer »
+// reprendrait, relue à chaque affichage du menu principal. Chaque enregistrement
+// réécrit la sauvegarde, en silence. Aucune sauvegarde : aucun sac du joueur (« Mes
+// sacs » le dit, le choix du sac n'offre que les sacs préfaits).
+const marblesBagStore = createBagStore({
+  read: () => (loadableSave === null ? null : marbleBagsOf(loadableSave.session)),
+  write: (marbleBags) => {
+    loadableSave = { ...loadableSave, session: withMarbleBags(loadableSave.session, marbleBags) };
+    saveGame(loadableSave.session, { playSound: false });
+  },
+});
+
+// L'écran « Mes sacs » (marbles/view/my-bags.js), son éditeur et ses sacs préfaits.
+const myBags = createMyBags({
+  store: marblesBagStore,
+  rules: marblesRules,
+  collection: marblesCollection,
+  openKeyHelp: (screen) => openHelp(t, { globalSections: GLOBAL_HELP_SECTIONS, covered: screen }),
+});
+
+// « Partie de billes » du menu principal : le menu du choix du sac
+// (marbles/view/bag-menu.js), les sacs du joueur puis les sacs préfaits ; le sac
+// choisi devient le dernier utilisé, s'il y a une sauvegarde où l'écrire.
 function startMarblesGame() {
-  if (isDebugEnabled()) pushScreen(makeMenuScreen(createBagMenu(marblesRules.bags, (bag) => launchMarblesWith(bag)), t));
-  else launchMarblesWith(marblesRules.bags[STARTER_BAG]);
+  const definition = marblesRules.definitions[DEFAULT_DEFINITION];
+  const onChoose = (bag) => {
+    if (launchMarblesWith(bag) && marblesBagStore.available()) marblesBagStore.setLastUsed(bag.id);
+  };
+  pushScreen(makeMenuScreen(createBagMenu({ store: marblesBagStore, rules: marblesRules, definition, unlocked: marblesCollection.unlockedMarbles(), onChoose, t }), t));
 }
 
 // La console de test (window.debugStartMarbles, view/debug-console.js) : une partie à
@@ -312,12 +341,12 @@ function debugStartMarblesGame(seed = createGameSeed(), initialState = null) {
 // Pas composeHook (lib/screens.js) ici : l'ordre compte — le
 // rafraîchissement doit avoir lieu AVANT l'annonce d'ouverture, alors que
 // composeHook exécute toujours le hook de base (l'annonce) en premier.
-const mainMenuDef = createMainMenu({ canContinue: false, continueGame, startNewGame, startTestCityGame, startMarblesGame, getSession });
+const mainMenuDef = createMainMenu({ canContinue: false, continueGame, startNewGame, startTestCityGame, startMarblesGame, openMyBags: myBags.openMyBags, getSession });
 const mainMenuScreen = makeMenuScreen(mainMenuDef, t);
 const baseMainMenuOnEnter = mainMenuScreen.onEnter;
 mainMenuScreen.onEnter = () => {
   loadableSave = loadGame();
-  const fresh = createMainMenu({ canContinue: loadableSave !== null, continueGame, startNewGame, startTestCityGame, startMarblesGame, getSession });
+  const fresh = createMainMenu({ canContinue: loadableSave !== null, continueGame, startNewGame, startTestCityGame, startMarblesGame, openMyBags: myBags.openMyBags, getSession });
   mainMenuDef.entries.splice(0, mainMenuDef.entries.length, ...fresh.entries);
   mainMenuDef.cursor = 0;
   baseMainMenuOnEnter();

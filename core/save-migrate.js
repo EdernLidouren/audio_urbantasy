@@ -17,7 +17,8 @@ import { validateDistribution } from "./distribution.js";
 import { validateCatalog } from "./catalog.js";
 import { validateDisplayDistribution, displayArticleInfo } from "./display.js";
 import { WEATHER_STATES, DEFAULT_WEATHER_STATE } from "../config/weather-values.js";
-import { RENAMED_ENTITY_TYPES, RENAMED_I18N_KEYS, RENAMED_ASSET_PATHS, RENAMED_SCENE_IDS } from "../config/save-renames.js";
+import { RENAMED_ENTITY_TYPES, RENAMED_I18N_KEYS, RENAMED_ASSET_PATHS, RENAMED_SCENE_IDS, RENAMED_MARBLE_IDS } from "../config/save-renames.js";
+import { createMarbleBags, repairMarbleBags } from "./marble-bags.js";
 import { TICK_MS } from "../lib/loop.js";
 
 // --- Renommages de contenu (config/save-renames.js, doc/save.md) ---------
@@ -48,6 +49,15 @@ const ENTITY_TYPE_RENAMES = resolveRenameChains(RENAMED_ENTITY_TYPES, "RENAMED_E
 // QU'AUX endroits où il figure (voir renameSceneIds), jamais par une passe
 // sur toutes les valeurs, qui renommerait aussi une entité homonyme.
 const SCENE_ID_RENAMES = resolveRenameChains(RENAMED_SCENE_IDS, "RENAMED_SCENE_IDS");
+// Un id de bille ne figure que dans les sacs de billes (session.marbleBags) : renommé
+// là seulement, par leur relecture (repairSavedMarbleBags).
+const MARBLE_ID_RENAMES = resolveRenameChains(RENAMED_MARBLE_IDS, "RENAMED_MARBLE_IDS");
+
+// LES SACS DE BILLES d'une sauvegarde relue (core/marble-bags.js/repairMarbleBags) :
+// leurs billes renommées, un sac abîmé remis en forme. -> { data, repairs }.
+export function repairSavedMarbleBags(data) {
+  return repairMarbleBags(data, MARBLE_ID_RENAMES);
+}
 // Clés i18n et chemins de sons ne peuvent pas se confondre (forme pointée
 // contre chemin de dossier), ni avec rien d'autre : une seule passe sur
 // toutes les valeurs.
@@ -747,6 +757,14 @@ export function migrateSave(raw) {
   // entités déjà décrites se redécouvrent à la prochaine observation.
   if (!data.observedEntityTypes || typeof data.observedEntityTypes !== "object") {
     data = { ...data, observedEntityTypes: {} };
+  }
+
+  // marbleBags (voir core/marble-bags.js) : absent d'une sauvegarde antérieure aux
+  // sacs de billes -> emplacements vides, aucun dernier sac. ABSENT seulement : un
+  // champ présent mais abîmé se répare et se signale (repairMarbleBags, appelé par
+  // core/save.js/deserializeGame), jamais en silence.
+  if (data.marbleBags === undefined) {
+    data = { ...data, marbleBags: createMarbleBags() };
   }
 
   if (data.worlds && typeof data.worlds === "object") {

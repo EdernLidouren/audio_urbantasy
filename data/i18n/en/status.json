@@ -10,6 +10,8 @@
   "debug.warnings.droppedEquippedItem": "Save: item {type} removed from equipment ({slot}), unknown type",
   "debug.warnings.empty": "No warnings",
   "debug.warnings.i18n": "Text: {message}",
+  "debug.warnings.marbleBagRepaired": "Save, marble bag {slot}: {problem}",
+  "debug.warnings.marbleBagsRepaired": "Save, marble bags: {problem}",
   "debug.warnings.scene.overlap": "Scene {sceneId}: {a}, at {ax}, and {b}, at {bx}, both impassable, overlap",
   "debug.warnings.scene.playerStartFallback": "Scene {sceneId}: arrival point {playerStart} is outside the scene, the player arrives at the start",
   "debug.warnings.scene.playerStartInBody": "Scene {sceneId}: arrival point {playerStart} is inside the body of {entityId}, at {x}",

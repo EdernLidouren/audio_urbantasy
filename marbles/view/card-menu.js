@@ -33,7 +33,7 @@ export function withPosition(label, index, total) {
 //   bindings   la table de touches du menu (defineBindings) : left, right, home, end,
 //              detailUp, detailDown, activate, reannounce, back, et ses touches à lui ;
 //   helpId     la section de l'aide des touches (le nom de sa table) ;
-//   titleKey   le titre, une clé i18n ;
+//   titleKey   le titre, une clé i18n ; `titleParams` (facultatif), ses valeurs ;
 //   count      le nombre d'éléments ;
 //   emptyKey   ce que dit l'entrée d'une liste vide, une clé i18n ;
 //   cardAt(index, total)  la fiche de l'élément, son annonce principale comprise
@@ -43,7 +43,7 @@ export function withPosition(label, index, total) {
 //   actions    (facultatif) ses touches à lui, { action: (index, line) => void } :
 //              `index` undefined hors d'un élément (« Retour », l'entrée d'une liste
 //              vide) ; `line`, la ligne courante telle qu'elle se dit.
-export function makeCardMenuScreen({ bindings, helpId, titleKey, count, emptyKey, cardAt, onCursor = () => {}, actions = {} }) {
+export function makeCardMenuScreen({ bindings, helpId, titleKey, titleParams, count, emptyKey, cardAt, onCursor = () => {}, actions = {} }) {
   // L'entrée d'une liste vide, puis « Retour », comptent comme des entrées.
   const lines = Math.max(count, 1);
   const total = lines + 1;
@@ -95,7 +95,7 @@ export function makeCardMenuScreen({ bindings, helpId, titleKey, count, emptyKey
     announce(currentLine(), { assertive: true });
   }
 
-  const announceOpening = () => announce(`${t(titleKey)}. ${currentLine()}`, { assertive: true });
+  const announceOpening = () => announce(`${t(titleKey, titleParams)}. ${currentLine()}`, { assertive: true });
 
   const keyHandlers = {
     left: () => goTo(stepMenuCursor(index, -1, total)),

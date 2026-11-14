@@ -1,8 +1,10 @@
 // Vérifications des SACS du jeu des billes (marbles/core/bags.js) : leur format, les
 // règles de construction et leur validation, la source de sac d'une partie, la copie
 // de partie, le résultat rendu à l'hôte (marbles/core/outcome.js), et l'hôte lui-même
-// (marbles/host/ : fournisseur de collection, magasin des emplacements, point
-// d'entrée), avec le menu des sacs. Sur la table figée des vérifications ; les vrais
+// (marbles/host/ : fournisseur de collection, magasins des emplacements, point
+// d'entrée), la gestion des sacs du joueur (marbles/core/bag-editing.js), la relecture
+// d'un sac sauvegardé, et le menu du choix du sac ; l'éditeur se joue au clavier dans
+// le domaine marbles-bag-editor. Sur la table figée des vérifications ; les vrais
 // sacs préfaits et les vrais textes : domaine marbles-content. Lancées par
 // core/checks/index.js/runChecks (`node tools/run-checks.js marbles-bags`).
 
@@ -16,6 +18,9 @@ import {
   bagProblems,
   bagSize,
   emptyBagSlots,
+  repairBagRecord,
+  slotBagId,
+  slotIndexOf,
   mergeBuildRules,
   validateBagFormat,
   validateBuildRules,
@@ -26,10 +31,11 @@ import { createMarblesRules } from "../core/rules.js";
 import { marblesOutcome, turnsPlayed } from "../core/outcome.js";
 import { NO_STATUSES } from "../core/statuses.js";
 import { catalogCollection, listCollection } from "../host/collection.js";
-import { createMemoryBagStore } from "../host/bag-store.js";
+import { createBagStore, createMemoryBagStore } from "../host/bag-store.js";
+import { BAG_EDIT_REFUSALS, addMarble, bagStatus, copyBagToSlot, createEmptyBag, deleteBag, duplicateBag, emptySlotIndexes, removeMarble, sameComposition, storeBag } from "../core/bag-editing.js";
 import { createMarblesLauncher } from "../host/entry.js";
 import { createBagMenu } from "../view/bag-menu.js";
-import { describeBagProblem, describeBagRefusal } from "../view/narration/bags.js";
+import { bagName, describeBagProblem, describeBagRefusal, describeLaunchRefusal, slotLineKey } from "../view/narration/bags.js";
 import { FIXTURE_DEFINITION, FIXTURE_STATUSES, FIXTURE_TYPES, deepFreeze } from "./fixtures/marbles.js";
 import { caughtMessage, createPicker, keyText, marbleCount } from "./helpers.js";
 
@@ -79,6 +85,8 @@ export default function checkMarblesBags(run) {
   run.section("emplacements et magasin", checkSlots);
   run.section("hôte", checkHost);
   run.section("vue", checkView);
+  run.section("gestion", checkEditing);
+  run.section("relecture", checkRepair);
 }
 
 // Un sac bien formé, ou une erreur claire.
@@ -286,7 +294,7 @@ function checkOutcome(run) {
   run("fin faute de billes : le tour de la pioche n'est pas joué", 4, turnsPlayed({ ...started, turn: 5, stage: "over", result: { end: "noMarbles" } }));
 }
 
-// Les emplacements du joueur et le magasin en mémoire.
+// Les emplacements du joueur et les magasins.
 function checkSlots(run) {
   run("emplacements : leur nombre, un réglage", 5, BAG_SLOTS);
   run.same("emplacements : tous vides au départ", [null, null, null, null, null], emptyBagSlots());
@@ -295,21 +303,30 @@ function checkSlots(run) {
   run("emplacement : une copie, pas le sac reçu", false, filled[1] === PRESETS.four);
   run("emplacement : hors des emplacements refusé", true, throws(() => withBagSlot(emptyBagSlots(), 5, PRESETS.four)));
   run("emplacement : un sac mal formé refusé", true, throws(() => withBagSlot(emptyBagSlots(), 0, { id: "" })));
+  run.same("id d'emplacement : slot-1 à slot-5", ["slot-1", "slot-5"], [slotBagId(0), slotBagId(4)]);
+  run.same("id d'emplacement : relu, ou null pour un sac préfait", [0, 4, null, null], [slotIndexOf("slot-1"), slotIndexOf("slot-5"), slotIndexOf("starter"), slotIndexOf(null)]);
 
   const store = createMemoryBagStore();
-  run("magasin : BAG_SLOTS emplacements vides", "5:true", `${store.list().length}:${store.list().every((slot) => slot === null)}`);
-  const mine = { id: "mine", name: "Mon sac", marbles: [{ marble: "aging_flick", count: 3 }] };
-  store.write(2, mine);
-  run.same("magasin : lu tel qu'écrit", mine, store.read(2));
-  store.read(2).marbles.push({ marble: "x", count: 1 });
-  run("magasin : une lecture est une copie", 1, store.read(2).marbles.length);
-  mine.marbles[0].count = 9;
-  run("magasin : une écriture est une copie", 3, store.read(2).marbles[0].count);
-  store.clear(2);
-  run("magasin : vidé", null, store.read(2));
-  run("magasin : hors des emplacements refusé", true, throws(() => store.read(7)));
-  run("magasin : un sac mal formé refusé", true, throws(() => store.write(0, { id: "x", marbles: [{ marble: "a", count: 0 }] })));
-  run("magasin : de départ, d'après une liste", "four", createMemoryBagStore({ count: 2, initial: [null, PRESETS.four] }).read(1).id);
+  run("magasin : des sacs du joueur", true, store.available());
+  run("magasin : BAG_SLOTS emplacements vides", "5:true", `${store.slots().length}:${store.slots().every((slot) => slot === null)}`);
+  const mine = { id: "slot-3", marbles: [{ marble: "aging_flick", count: 3 }] };
+  store.saveSlots(withBagSlot(store.slots(), 2, mine));
+  run.same("magasin : lu tel qu'enregistré", mine, store.slots()[2]);
+  store.slots()[2].marbles.push({ marble: "x", count: 1 });
+  run("magasin : une lecture est une copie", 1, store.slots()[2].marbles.length);
+  run("magasin : aucun dernier sac au départ", null, store.lastUsed());
+  store.setLastUsed("slot-3");
+  run("magasin : le dernier sac utilisé", "slot-3", store.lastUsed());
+  run("magasin : des emplacements mal formés refusés", true, throws(() => store.saveSlots([{ id: "x", marbles: [{ marble: "a", count: 0 }] }])));
+  run("magasin : de départ, d'après une liste", "four", createMemoryBagStore({ count: 2, initial: [null, PRESETS.four] }).slots()[1].id);
+  // Un magasin sur une lecture et une écriture reçues (le jeu : la sauvegarde).
+  let record = null;
+  const external = createBagStore({ read: () => record, write: (next) => (record = next) });
+  run("magasin reçu : sans données, aucun sac du joueur", false, external.available());
+  run("magasin reçu : lire sans données lève", true, throws(() => external.slots()));
+  record = { slots: emptyBagSlots(), lastUsed: null };
+  external.saveSlots(withBagSlot(external.slots(), 0, { id: "slot-1", marbles: [] }));
+  run("magasin reçu : l'écriture passe par `write`", "slot-1", record.slots[0].id);
 }
 
 // Le fournisseur de collection et le point d'entrée.
@@ -335,20 +352,112 @@ function checkHost(run) {
   run("entrée : un sac imposé, sans sac fourni", true, launch({ definition: definitionWith({ kind: "preset", bag: "mixed" }), collection: listCollection([]), seed: 6 }).ok);
 }
 
-// Ce que la vue dit des sacs, et le menu des sacs (lus par leurs clés : keyText).
+// Ce que la vue dit des sacs (lus par leurs clés : keyText), et le menu du choix du
+// sac au lancement.
 function checkView(run) {
   run("problème : son gabarit et ses paramètres", "bagProblem.bagTooSmall{size: 10, min: 12}", describeBagProblem({ code: "bagTooSmall", size: 10, min: 12 }, keyText));
   run("problème : une bille connue par sa référence", "bagProblem.tooManyCopies{marble: <aging_flick>, count: 4, max: 3}", describeBagProblem({ code: "tooManyCopies", marble: "aging_flick", count: 4, max: 3 }, keyText));
   run("problème : une bille inconnue par son id", "bagProblem.unknownMarble{marble: nope}", describeBagProblem({ code: "unknownMarble", marble: "nope" }, keyText));
   run("refus : la phrase et ses problèmes", true, describeBagRefusal([{ code: "unknownMarble", marble: "nope" }], keyText).startsWith("bagProblem.refused{problems: bagProblem.unknownMarble"));
+  run("nom : un sac du joueur, d'après son emplacement", "bagSlot.name{slot: 2}", bagName({ id: "slot-2", marbles: [] }, keyText));
+  run("nom : un nom donné l'emporte", "Mon sac", bagName({ id: "slot-2", name: "Mon sac", marbles: [] }, keyText));
+  run("emplacement vide : sa ligne", "myBags.slot_empty", slotLineKey(null, false).replace("marbles.", ""));
+  run("emplacement : valide ou invalide", "marbles.myBags.slot_valid,marbles.myBags.slot_invalid", [slotLineKey(PRESETS.four, true), slotLineKey(PRESETS.four, false)].join());
+  run("lancement : premier problème et total", "bagMenu.refused{problem: bagProblem.bagTooSmall{size: 3, min: 12}, total: 2}", describeLaunchRefusal([{ code: "bagTooSmall", size: 3, min: 12 }, { code: "unknownMarble", marble: "x" }], keyText));
 
+  // Le menu du choix du sac : les sacs du joueur (occupés), puis les préfaits, puis
+  // Retour ; le curseur sur le dernier sac utilisé s'il est valide.
+  const store = createMemoryBagStore({ initial: [{ id: "slot-1", marbles: [["aging_flick", 3]].map(([marble, count]) => ({ marble, count })) }, null, { ...PRESETS.mixed, id: "slot-3" }, null, null] });
   const chosen = [];
-  const menu = createBagMenu(PRESETS, (bag) => chosen.push(bag.id));
-  run("menu : une ligne par sac, puis Retour", 3, menu.entries.length);
+  const menuOf = () => createBagMenu({ store, rules, definition: definitionWith(), unlocked: null, onChoose: (bag) => chosen.push(bag.id), t: keyText });
+  let menu = menuOf();
+  run.same(
+    "menu : les sacs du joueur, puis les préfaits, puis Retour",
+    ["marbles.bagMenu.line_invalid", "marbles.bagMenu.line", "marbles.bagMenu.line", "marbles.bagMenu.line", "marbles.bagMenu.back"],
+    menu.entries.map((entry) => entry.label)
+  );
   run("menu : fermable (Échap)", true, menu.closable);
-  run("menu : la ligne d'un sac, son nombre de billes", 12, menu.entries[0].labelParams.count);
-  run("menu : un sac referme le menu avant de lancer", true, menu.entries[0].closesMenu);
+  run("menu : sans dernier sac, le curseur sur le premier sac valide", 1, menu.cursor);
+  store.setLastUsed("mixed");
+  run("menu : le curseur sur le dernier sac utilisé", 3, menuOf().cursor);
+  store.setLastUsed("slot-1");
+  run("menu : un dernier sac devenu invalide, le premier valide", 1, menuOf().cursor);
+  menu = menuOf();
+  run("menu : un sac valide referme le menu avant de lancer", true, menu.entries[1].closesMenu === true && menu.entries[0].closesMenu === undefined);
   menu.entries[1].onActivate();
-  run.same("menu : le sac choisi, dans l'ordre du registre", ["mixed"], chosen);
+  run.same("menu : le sac choisi", ["slot-3"], chosen);
+  const noSave = createBagMenu({ store: createBagStore({ read: () => null, write: () => {} }), rules, definition: definitionWith(), unlocked: null, onChoose: () => {}, t: keyText });
+  run("menu sans sauvegarde : les sacs préfaits seuls", 3, noSave.entries.length);
   run("menu : Retour en dernier", "marbles.bagMenu.back", menu.entries.at(-1).label);
+}
+
+// LA GESTION DES SACS DU JOUEUR (marbles/core/bag-editing.js) : chaque opération et
+// chaque refus.
+function checkEditing(run) {
+  const context = { types: FIXTURE_TYPES, rules: BAG_BUILD_RULES, unlocked: null };
+  const slots = emptyBagSlots();
+  // Créer, copier, dupliquer, supprimer.
+  const created = createEmptyBag(slots, 0);
+  run.same("créer : un sac vide, l'id de son emplacement, sans nom", { id: "slot-1", marbles: [] }, created.slots[0]);
+  run.same("créer : les emplacements reçus intacts", emptyBagSlots(), slots);
+  run.same("créer : dans un emplacement occupé, refusé", { ok: false, error: "slotOccupied", slot: 0 }, createEmptyBag(created.slots, 0));
+  run("créer : hors des emplacements, une erreur", true, throws(() => createEmptyBag(slots, 9)));
+  const copied = copyBagToSlot(created.slots, 2, PRESETS.four);
+  run.same("copier un préfait : sa composition, l'id de l'emplacement", { id: "slot-3", marbles: PRESETS.four.marbles }, copied.slots[2]);
+  run("copier : le préfait intact", "four", PRESETS.four.id);
+  run.same("copier : dans un emplacement occupé, refusé", { ok: false, error: "slotOccupied", slot: 2 }, copyBagToSlot(copied.slots, 2, PRESETS.mixed));
+  const named = withBagSlot(copied.slots, 2, { ...copied.slots[2], name: "Mon sac" });
+  const duplicated = duplicateBag(named, 2, 4);
+  run.same("dupliquer : la composition, l'id et le nom générique de la destination", { id: "slot-5", marbles: PRESETS.four.marbles }, duplicated.slots[4]);
+  run.same("dupliquer : un emplacement vide refusé", { ok: false, error: "slotEmpty", slot: 1 }, duplicateBag(named, 1, 3));
+  run.same("dupliquer : vers un emplacement occupé, refusé", { ok: false, error: "slotOccupied", slot: 0 }, duplicateBag(named, 2, 0));
+  run.same("emplacements vides : leurs indices", [1, 3], emptySlotIndexes(duplicated.slots));
+  run("supprimer : vidé", null, deleteBag(duplicated.slots, 4).slots[4]);
+  run.same("supprimer : un emplacement vide refusé", { ok: false, error: "slotEmpty", slot: 1 }, deleteBag(duplicated.slots, 1));
+  run("enregistrer : dans son emplacement", 9, storeBag(duplicated.slots, 2, { id: "slot-3", marbles: [{ marble: "aging_flick", count: 9 }] }).slots[2].marbles[0].count);
+  run("enregistrer : un sac d'un autre emplacement, une erreur", true, throws(() => storeBag(duplicated.slots, 2, { id: "slot-1", marbles: [] })));
+
+  // Ajouter : par la validation existante, avec ses refus.
+  const empty = { id: "slot-1", marbles: [] };
+  const one = addMarble(empty, "aging_flick", context);
+  run.same("ajouter : un exemplaire", { ok: true, bag: { id: "slot-1", marbles: [{ marble: "aging_flick", count: 1 }] }, count: 1 }, one);
+  run("ajouter : le sac reçu intact", 0, empty.marbles.length);
+  const three = bagOf("slot-1", [["aging_flick", 3]]);
+  run.same("ajouter : le maximum de sa rareté atteint, refusé", { ok: false, error: "maxCopies", marble: "aging_flick", max: 3 }, addMarble(three, "aging_flick", context));
+  const full = bagOf("slot-1", ["aging_flick", "hit_polish", "final_pocket", "hit_pocket", "split_base", "fragile", "flick_strike"].map((marble, index) => [marble, index === 6 ? 2 : 3]));
+  run("taille maximale : 20 billes", 20, bagSize(full));
+  run.same("ajouter : la taille maximale atteinte, refusé", { ok: false, error: "bagFull", size: 20, max: 20 }, addMarble(full, "one_shot", context));
+  run.same("ajouter : la taille avant les exemplaires", "bagFull", addMarble(full, "aging_flick", context).error);
+  run.same("ajouter : une bille inconnue, refusé", { ok: false, error: "unknownMarble", marble: "nope" }, addMarble(empty, "nope", context));
+  run.same("ajouter : une bille non débloquée, refusé", { ok: false, error: "lockedMarble", marble: "one_shot" }, addMarble(empty, "one_shot", { ...context, unlocked: ["aging_flick"] }));
+  run("ajouter : un sac déjà trop grand (relu) refuse tout ajout", "bagFull", addMarble(bagOf("slot-1", [["aging_flick", 30]]), "hit_polish", { ...context, rules: { size: BAG_BUILD_RULES.size } }).error);
+  run("ajouter : sans règle, permis", true, addMarble(three, "aging_flick", { ...context, rules: {} }).ok);
+  // Retirer.
+  run.same("retirer : un exemplaire", { ok: true, bag: bagOf("slot-1", [["aging_flick", 2]]), count: 2 }, removeMarble(three, "aging_flick"));
+  run.same("retirer : le dernier, l'entrée disparaît", { ok: true, bag: { id: "slot-1", marbles: [] }, count: 0 }, removeMarble(one.bag, "aging_flick"));
+  run.same("retirer : une bille absente, refusé", { ok: false, error: "notInBag", marble: "hit_polish" }, removeMarble(three, "hit_polish"));
+  run("retirer : une bille inconnue, permis", true, removeMarble(bagOf("slot-1", [["nope", 2]]), "nope").ok);
+  // Brouillons et état.
+  run.same("état : un brouillon trop petit, invalide, ses problèmes", { size: 3, valid: false, codes: ["bagTooSmall"] }, (({ size, valid, problems }) => ({ size, valid, codes: problems.map((p) => p.code) }))(bagStatus(three, context)));
+  run("état : un sac valide", true, bagStatus(PRESETS.four, context).valid);
+  run("même composition : l'ordre n'y fait rien", true, sameComposition(bagOf("a", [["x", 1], ["y", 2]]), bagOf("b", [["y", 2], ["x", 1]])));
+  run("même composition : un exemplaire de plus, différente", false, sameComposition(bagOf("a", [["x", 1]]), bagOf("a", [["x", 2]])));
+  run("chaque refus a sa place dans BAG_EDIT_REFUSALS", true, ["slotOccupied", "slotEmpty", "unknownMarble", "lockedMarble", "bagFull", "maxCopies", "notInBag"].every((code) => BAG_EDIT_REFUSALS.includes(code)));
+}
+
+// UN SAC RELU d'une sauvegarde (marbles/core/bags.js/repairBagRecord) : remis en forme,
+// jamais perdu, jamais d'erreur.
+function checkRepair(run) {
+  run.same("bien formé : tel quel, rien à dire", { bag: PRESETS.four, problems: [] }, repairBagRecord(structuredClone(PRESETS.four), "four"));
+  run.same("illisible : vidé, dit", 1, repairBagRecord("x", "slot-1").problems.length);
+  run("illisible : aucun sac", null, repairBagRecord(42, "slot-1").bag);
+  const repaired = repairBagRecord(
+    { id: "wrong", name: "", extra: 1, marbles: [{ marble: "aging_flick", count: 0 }, null, { marble: "aging_flick", count: 2 }, { marble: "nope", count: 1 }] },
+    "slot-2"
+  );
+  run.same("remis en forme : id, nom vide retiré, nombre ramené à 1, doublons fusionnés, inconnue gardée", { id: "slot-2", marbles: [{ marble: "aging_flick", count: 3 }, { marble: "nope", count: 1 }] }, repaired.bag);
+  run("remis en forme : chaque changement dit", 6, repaired.problems.length);
+  run("remis en forme : le résultat est bien formé", false, throws(() => validateBagFormat(repaired.bag)));
+  run.same("composition illisible : sac vide gardé", { id: "slot-1", marbles: [] }, repairBagRecord({ id: "slot-1", marbles: "x" }, "slot-1").bag);
+  run.same("renommage : la bille renommée", [{ marble: "new", count: 3 }], repairBagRecord(bagOf("slot-1", [["old", 1], ["new", 2]]), "slot-1", { old: "new" }).bag.marbles);
 }

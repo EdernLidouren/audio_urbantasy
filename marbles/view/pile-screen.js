@@ -20,7 +20,8 @@ import { playFocusBeacon } from "./sounds.js";
 import { keywordsText, openKeywordsMenu } from "./keywords.js";
 import { descriptionText, identityText } from "./marble-info.js";
 
-const PILE_BINDINGS = defineBindings("marblesPile", {
+// Exportée : la consultation d'un sac (marbles/view/my-bags.js) est ce même menu.
+export const PILE_BINDINGS = defineBindings("marblesPile", {
   left: { keys: ["ArrowLeft"], mods: [] },
   right: { keys: ["ArrowRight"], mods: [] },
   home: { keys: ["Home"], mods: [] },

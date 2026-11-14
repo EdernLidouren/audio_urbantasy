@@ -104,8 +104,8 @@ export function saveGame(session, { playSound = true } = {}) {
 function readSave(parsed) {
   const result = deserializeGame(parsed, { registry });
   if (!result.success) return result;
-  const { session, droppedEntities, droppedItems, brokenReferences } = result;
-  return { success: true, session, repairs: { droppedEntities, droppedItems, brokenReferences } };
+  const { session, droppedEntities, droppedItems, brokenReferences, marbleBags } = result;
+  return { success: true, session, repairs: { droppedEntities, droppedItems, brokenReferences, marbleBags } };
 }
 
 // Texte brut d'une sauvegarde (stockage local ou fichier) -> même résultat

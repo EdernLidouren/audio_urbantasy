@@ -96,3 +96,9 @@ export const RENAMED_ASSET_PATHS = {
 export const RENAMED_SCENE_IDS = {
   clock_tower_weight_shaft_mirror_space: "clock_tower_weight_shaft_mirror_side",
 };
+
+// Ids de billes du jeu des billes (marbles/content/types/), cités par les sacs du
+// joueur (session.marbleBags, core/marble-bags.js) : renommés là seulement. Une bille
+// RETIRÉE n'a pas d'entrée ici : elle reste dans le sac, qui devient invalide
+// (« bille inconnue ») jusqu'à ce que le joueur l'en retire.
+export const RENAMED_MARBLE_IDS = {};

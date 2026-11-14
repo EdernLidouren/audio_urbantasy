@@ -39,6 +39,7 @@ l'en-tête de `marbles/core/marbles.js`.
 | `marbles/config/values.js` | Réglages, valeurs de la partie par défaut (`DEFAULT_GAME`), phases, déclencheurs, mot-clé En poche, valeurs de partie, modèles de fiche (billes et statuts), règles de construction des sacs par défaut (`BAG_BUILD_RULES`), emplacements de sacs (`BAG_SLOTS`), sons (donnée pure) |
 | `marbles/core/zones.js` | Les zones : les emplacements et l'ordre horaire (`SLOTS`, `nextSlot`, `previousSlot`), les zones de la partie et leurs états (`GAME_ZONES`, `ZONE_STATES`), celles d'un choix (`CHOICE_ZONES`), celles de la bille qui joue un effet (`HOLDER_ZONES`, `NO_REFERENCE_ZONES`) |
 | `marbles/core/bags.js` | Les sacs : leur format (`validateBagFormat`), les sortes de règles de construction (`BUILD_RULE_KINDS`) et leur fusion (`mergeBuildRules`), les problèmes d'un sac (`bagProblems`, `BAG_PROBLEMS`), le registre des sacs préfaits (`validatePresetBags`), les emplacements du joueur (`emptyBagSlots`, `withBagSlot`) |
+| `marbles/core/bag-editing.js` | Les opérations du joueur sur ses sacs : créer, copier, dupliquer, supprimer, enregistrer, ajouter et retirer un exemplaire, avec leurs refus (`BAG_EDIT_REFUSALS`) ; l'état calculé d'un sac (`bagStatus`) |
 | `marbles/core/definitions.js` | Les définitions de partie : leur modèle, la source du sac (`BAG_SOURCES` : du joueur, imposé, généré par `randomBag`), les billes de départ (`startingList`), les règles de construction d'une définition (`buildRulesOf`), les objectifs (`GOALS`), les conditions de fin (`END_CONDITIONS`, `endReached`), le résultat selon l'objectif (`gameResult`) |
 | `marbles/core/statuses.js` | Les statuts : leur modèle, les caractéristiques en vigueur (l'accès unique), les modificateurs de valeur (filtres de source, arrondi), les verrous (`LOCKS`), les règles (`ruleInstance`), le cumul, les durées, les réactions |
 | `marbles/core/effects.js` | Le modèle d'effet : clauses, actions (`CLAUSE_ACTIONS`), cibles, conditions, sources de montant, effet imprimé, la bille inconnue de la prévision (`UNKNOWN_MARBLE`) |
@@ -55,14 +56,18 @@ l'en-tête de `marbles/core/marbles.js`.
 | `marbles/core/rules.js` | Les règles liées aux tables des billes, des statuts, des définitions et des sacs préfaits : le point d'entrée de la simulation hors du core (`startGame`, `createGame`, `bagProblems`…) |
 | `marbles/core/outcome.js` | Le résultat rendu à l'hôte en fin de partie ou à l'abandon (`marblesOutcome`) |
 | `marbles/host/collection.js` | Le fournisseur de collection (`{ unlockedMarbles }`) ; le provisoire, tout le catalogue (`catalogCollection`) |
-| `marbles/host/bag-store.js` | Le magasin des emplacements de sacs du joueur, en mémoire (`createMemoryBagStore`) |
+| `marbles/host/bag-store.js` | Le magasin des sacs du joueur, sur une lecture et une écriture reçues (`createBagStore` : le jeu, la sauvegarde) ou en mémoire (`createMemoryBagStore`) |
+| `core/marble-bags.js` | Les sacs du joueur dans la session de Templeton, donc la sauvegarde, et leur relecture |
 | `marbles/host/entry.js` | Le contrat avec Templeton : le point d'entrée unique (`createMarblesLauncher`) et sa sortie, le résultat |
 | `marbles/view/screen.js` | L'écran de jeu et sa table de touches |
 | `marbles/view/card-menu.js` | Le menu horizontal à fiches, commun aux menus des piles et à celui des statuts |
 | `marbles/view/pile-screen.js` | Le menu d'une pile de billes : sac, défausse ou pot (Maj+S, Maj+D, Maj+P) |
 | `marbles/view/status-screen.js` | Le menu des statuts de la partie (Maj+A) |
 | `marbles/view/goal-screen.js` | Le menu de l'objectif et des règles (Maj+O) |
-| `marbles/view/bag-menu.js` | Le menu des sacs préfaits, avant une partie, en mode debug |
+| `marbles/view/bag-menu.js` | Le menu du choix du sac, avant une partie |
+| `marbles/view/my-bags.js` | L'écran « Mes sacs » : emplacements, actions, sacs préfaits, consultation |
+| `marbles/view/bag-editor.js` | L'éditeur d'un sac du joueur |
+| `marbles/view/bag-sounds.js` | Les sons de la gestion des sacs (points d'accroche) |
 | `marbles/view/card.js` | La fiche d'une bille, lue dans le modèle `MARBLE_CARD_MODEL` |
 | `lib/detail-card.js` | Le mécanisme générique des fiches : assemblage et curseur secondaire |
 | `lib/real-time.js` | L'horloge temps réel à deux moteurs (images et minuterie) de l'écran |
@@ -1205,18 +1210,74 @@ RÉSULTAT (`marbles/core/outcome.js`/`marblesOutcome`, son format en en-tête) :
 fin, sans palier ni victoire. Le minijeu ne décide d'aucune récompense ni d'aucun
 déblocage ; `main.js` n'en fait rien encore (en mode debug, la console le montre).
 
-**Le lancement depuis le menu principal** : « Partie de billes » lance la définition
-par défaut (un sac du joueur) avec le sac de départ (`STARTER_BAG`) et le fournisseur
-provisoire (tout le catalogue). En mode debug, un menu vertical des sacs préfaits
-s'ouvre d'abord (`marbles/view/bag-menu.js`) : une ligne par sac, « sac du Trésor,
-15 billes », puis « Retour » ; Entrée sur un sac referme le menu et lance la partie
-(la quitter ramène au menu principal) ; Échap ou Retour reviennent au menu principal.
-La console (`window.debugStartMarbles(seed)`) lance le sac de départ, sans menu.
+**Le lancement depuis le menu principal** : « Partie de billes » ouvre le menu du
+CHOIX DU SAC (`marbles/view/bag-menu.js`) : les sacs du joueur (ses emplacements
+occupés), puis les sacs préfaits, puis « Retour » ; Échap revient au menu principal.
+Une ligne par sac, « sac 1, 17 billes » ; un sac invalide (règles de construction de
+la définition, collection) se dit « invalide », et Entrée y dit son premier problème
+et leur nombre (« Sac trop petit : 9 billes sur 12 minimum. 2 problèmes au total. »),
+sans lancer. Le curseur s'ouvre sur le dernier sac utilisé s'il existe encore et qu'il
+est valide, sinon sur le premier sac valide (le sac de départ l'est toujours). Un sac
+valide referme le menu et lance la définition par défaut par le point d'entrée, avec
+le fournisseur provisoire ; la quitter ramène au menu principal. Le sac lancé devient
+le dernier utilisé (s'il y a une sauvegarde où l'écrire). La console
+(`window.debugStartMarbles(seed)`) lance le sac de départ, sans menu.
 
-**Les emplacements du joueur** : `BAG_SLOTS` (5), chacun `null` ou un sac ; des
-fonctions pures (`emptyBagSlots`, `withBagSlot`) et un magasin
-(`{ list, read, write, clear }`, copies en entrée comme en sortie), aujourd'hui en
-mémoire seulement (`createMemoryBagStore`). Aucune interface de construction de sac.
+**Les emplacements du joueur** : `BAG_SLOTS` (5), chacun `null` ou un sac dont l'id
+est celui de l'emplacement (`slotBagId` : `slot-1`…) et le nom celui de l'emplacement
+(« sac 1 », `marbles.bagSlot.name` ; `name` attend une future saisie de texte). Des
+fonctions pures (`emptyBagSlots`, `withBagSlot`), les OPÉRATIONS du joueur
+(`marbles/core/bag-editing.js` : créer, copier un préfait, dupliquer, supprimer,
+ajouter et retirer un exemplaire, avec leurs refus, `BAG_EDIT_REFUSALS`) et un MAGASIN
+(`marbles/host/bag-store.js` : `available`, `slots`, `lastUsed`, `saveSlots`,
+`setLastUsed`, copies en entrée comme en sortie). Ajouter un exemplaire passe le sac
+candidat à la validation existante (`bagProblems`) et refuse sur le problème que
+l'ajout ferait apparaître (bille inconnue ou non débloquée, sac plein, maximum de sa
+rareté) : aucune règle n'y est recopiée. Un BROUILLON invalide s'enregistre ; sa
+validité se calcule à la lecture (`bagStatus`), jamais enregistrée, et il ne se joue
+pas.
+
+**L'écran « Mes sacs »** (`marbles/view/my-bags.js`), entrée du menu principal : les 5
+emplacements (« sac 1, 17 billes, valide », « emplacement 3, vide »), « Sacs préfaits »,
+« Retour ». Un sac : Modifier (l'éditeur), Dupliquer (vers un emplacement vide, refusé
+sans emplacement vide), Supprimer (confirmation, Annuler d'abord). Un emplacement
+vide : Créer un sac vide, Partir d'un sac préfait ; le sac créé est enregistré
+aussitôt, puis l'éditeur s'ouvre. « Sacs préfaits » : la liste en lecture seule ; un
+sac : Consulter (ses billes comme la zone Sac de l'éditeur, avec leurs fiches : le
+menu horizontal des piles), Copier dans un emplacement (sans ouvrir l'éditeur). Le
+résultat d'un geste qui referme des menus se dit avec l'annonce du menu révélé
+(`lib/menu.js`, `notice`). Sans sauvegarde : « Aucune partie sauvegardée : vos sacs
+vivent dans une partie. »
+
+**L'éditeur** (`marbles/view/bag-editor.js`, son en-tête pour le détail) travaille sur
+une COPIE DE TRAVAIL, enregistrée seulement en quittant par « Enregistrer ». Deux zones,
+la navigation de l'écran de jeu : le Sac en haut (« rubis, 2 sur 2 maximum »), la
+Collection en bas (les billes débloquées : « rubis, normale, Trésor, rare. Dans le sac :
+2 sur 2 »), dans un ordre stable (famille, rareté, nom : `sortedMarbles`). Les règles
+sont celles par défaut. Ses touches, sa propre table (`marblesBagEditor`, aide générée) :
+
+| Touche | Geste |
+|---|---|
+| Haut, Bas | changer de zone (son nom, avec un point final) |
+| Gauche, Droite, Origine, Fin | parcourir la zone (cyclage des menus) |
+| Ctrl+Haut, Ctrl+Bas | la fiche de la bille |
+| Entrée, Espace | ajouter un exemplaire (« Rubis ajouté, 2 sur 2. Sac : 14 billes. ») |
+| Suppr | retirer un exemplaire ; une entrée du Sac à 0 disparaît, le curseur passe à sa voisine |
+| R | le résumé : taille, validité, puis familles, calibres, raretés (non nulles) |
+| Maj+R | le menu des problèmes, puis « Fermer » |
+| G, Maj+G | le filtre de famille, de rareté de la Collection (« Filtre : Astres, 5 billes. ») |
+| V, F, E, Maj+E | description, identité, mots-clés, menu des mots-clés |
+| H (et F1) | l'aide des touches |
+| Retour arrière | redire l'éditeur |
+| Échap | quitter ; si la composition a changé, « Enregistrer les modifications ? » : Enregistrer, Quitter sans enregistrer, Continuer |
+
+Une bille inconnue d'un sac relu se dit (« bille inconnue : xyz, 2 exemplaires ») et se
+retire ; elle n'a pas de fiche.
+
+**Les sons** de la gestion des sacs sont des points d'accroche
+(`marbles/config/values.js`/`MARBLES_BAG_AUDIO` : ajout, retrait, refus,
+enregistrement, suppression, création ; `marbles/view/bag-sounds.js`), sans fichier
+aujourd'hui : chacun joue son son de menu de repli.
 
 #### Brancher la collection de Templeton (proposition)
 
@@ -1234,20 +1295,25 @@ liste ; la correspondance objet-bille vit dans la collection, jamais dans
 `marbles/`. Hors partie (menu principal, sans session), l'adaptateur rend le sac de
 départ seul, ou tout le catalogue en mode debug.
 
-#### Enregistrer les emplacements dans la sauvegarde (proposition)
+#### Les sacs dans la sauvegarde
 
-La session EST la sauvegarde (`doc/save.md`) : les emplacements y entrent comme un champ
-de la session, `session.marbleBags = [sac | null, ...]` (`BAG_SLOTS` entrées), créé vide
-par `core/state.js`/`createInitialState`, sans autre format que celui des sacs. Un
-magasin « session » (même interface que `createMemoryBagStore`) lit et écrit ce champ
-par des transactions du core (un module à créer : `saveMarbleBag(session, index,
-bag) -> session`, validé par `withBagSlot`), la vue posant la session rendue, comme
-pour tout geste. À la relecture (`core/save-migrate.js`) : une ancienne sauvegarde
-reçoit des emplacements vides ; un sac qui cite une bille renommée passe par
-`config/save-renames.js` (une nouvelle catégorie, les ids de billes) ; une bille
-retirée reste dans le sac, où elle devient un problème « bille inconnue » au
-lancement, jamais une erreur de lecture. Les sacs préfaits n'y sont jamais copiés :
-ce sont des données du jeu.
+La session EST la sauvegarde (`doc/save.md`) : les sacs y sont un champ,
+`session.marbleBags = { slots: [sac | null, ...], lastUsed: id | null }`
+(`core/marble-bags.js`, le seul endroit où Templeton connaît les sacs), créé vide par
+`core/state.js`/`createInitialState`. Depuis le menu principal, hors partie, le
+magasin des sacs (`main.js`) lit et écrit la PARTIE SAUVEGARDÉE, celle que
+« Continuer » reprendrait : chaque enregistrement réécrit la sauvegarde, en silence.
+Sans sauvegarde, aucun sac du joueur ; une nouvelle partie repart sans sacs. Les sacs
+préfaits n'y sont jamais copiés : ce sont des données du jeu.
+
+À la relecture (`core/save.js`/`deserializeGame`) : une sauvegarde antérieure reçoit
+des emplacements vides (`migrateSave`) ; un sac abîmé est remis en forme
+(`marbles/core/bags.js`/`repairBagRecord` : entrée illisible retirée, nombre faux
+ramené à 1, doublons fusionnés, id remplacé) et chaque changement est signalé au
+journal (`marbleBags`, `view/debug-warnings.js`) ; une bille renommée suit
+`config/save-renames.js`/`RENAMED_MARBLE_IDS` ; une bille retirée reste dans le sac,
+qui se charge marqué invalide (« bille inconnue »), jamais une erreur de lecture. Pas de
+numéro de version à part : le rebouchage des champs est celui de toute la sauvegarde.
 
 ### Le bus d'évènements
 

@@ -272,7 +272,8 @@ l'état, sac de départ, objectifs et conditions de fin, règles, outils, et cha
 définition du jeu jouée au hasard sous ses invariants), `marbles-bags` (les sacs :
 format, règles de construction et leur fusion, problèmes et leur ordre, sacs préfaits,
 sources de sac, copie de partie et sac fourni inchangé après des parties complètes,
-résultat rendu à l'hôte, emplacements et magasin, point d'entrée, menu des sacs),
+résultat rendu à l'hôte, emplacements et magasins, point d'entrée, gestion des sacs du
+joueur et ses refus, relecture d'un sac abîmé, menu du choix du sac),
 `marbles-pocket` (le pot), `marbles-path` (le chemin des billes : la Chute,
 Défausser, Rebond, Ramasser), `marbles-zones` (conditions d'état et nombre de billes par
 zone), `marbles-families` (familles et raretés : validation, filtres, conditions
@@ -285,7 +286,9 @@ la table des statuts de test `FIXTURE_STATUSES`), `marbles-choice` (cibles au ch
 `marbles-forecast` (la prévision), `marbles-view` (la narration et ses textes),
 `marbles-sequence` (la séquence de résolution), `marbles-tools` (les outils, ci-dessus),
 `marbles-content` (le contrat des vraies billes), `marbles-screen` (l'écran,
-ci-dessous). Un domaine ajouté à `MARBLES_SUITES` doit l'être aussi ici.
+ci-dessous), `marbles-bag-editor` (l'éditeur de sac et « Mes sacs », joués au clavier
+sur le banc de l'écran, `nodeOnly`). Les sacs dans la sauvegarde de Templeton : domaine
+`marble-bags` du core. Un domaine ajouté à `MARBLES_SUITES` doit l'être aussi ici.
 
 ## Vérifier l'écran au terminal
 

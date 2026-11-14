@@ -39,6 +39,7 @@ import checkCompanions from "./companions.check.js";
 import checkRoutines from "./routines.check.js";
 import checkSurfaces from "./surfaces.check.js";
 import checkSave from "./save.check.js";
+import checkMarbleBags from "./marble-bags.check.js";
 import checkInventory from "./inventory.check.js";
 import checkImprovements from "./improvements.check.js";
 import checkEmotes from "./emotes.check.js";
@@ -87,6 +88,7 @@ const SUITES = [
   { name: "routines", check: checkRoutines },
   { name: "surfaces", check: checkSurfaces },
   { name: "save", check: checkSave },
+  { name: "marble-bags", check: checkMarbleBags },
   { name: "inventory", check: checkInventory },
   { name: "improvements", check: checkImprovements },
   { name: "emotes", check: checkEmotes },

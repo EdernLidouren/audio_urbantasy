@@ -14,7 +14,7 @@
 // références vivent dans core/save-migrate.js.
 
 import { stripEphemeralsFromWorld, isTwoSided, withActiveWorld } from "./state.js";
-import { dropUnknownEntityTypes, dropUnknownItems, migrateSave, repairContentReferences } from "./save-migrate.js";
+import { dropUnknownEntityTypes, dropUnknownItems, migrateSave, repairContentReferences, repairSavedMarbleBags } from "./save-migrate.js";
 
 export const SAVE_VERSION = 1;
 
@@ -189,7 +189,8 @@ function isPlausibleSession(data) {
 // Sans registre, aucun filtrage (vérifications du core). Toujours, quel que
 // soit le registre : objets inconnus retirés (`droppedItems`), références
 // de contenu cassées neutralisées (`brokenReferences`, voir
-// repairContentReferences).
+// repairContentReferences), sacs de billes remis en forme (`marbleBags`, voir
+// core/marble-bags.js/repairMarbleBags).
 export function deserializeGame(raw, { registry } = {}) {
   if (!raw || typeof raw !== "object" || typeof raw.version !== "number") {
     return { success: false, reason: "format" };
@@ -203,11 +204,13 @@ export function deserializeGame(raw, { registry } = {}) {
     return { success: false, reason: "invalid" };
   }
 
-  // Objets et références : toujours vérifiés (registres et tables du core).
+  // Objets et références : toujours vérifiés (registres et tables du core). Les sacs
+  // de billes : remis en forme, jamais perdus en silence (core/marble-bags.js).
   const items = dropUnknownItems(data);
   const references = repairContentReferences(items.data);
-  const repairs = { droppedItems: items.dropped, brokenReferences: references.broken };
-  if (!registry) return { success: true, session: references.data, droppedEntities: [], ...repairs };
-  const filtered = dropUnknownEntityTypes(references.data, registry);
+  const bags = repairSavedMarbleBags(references.data);
+  const repairs = { droppedItems: items.dropped, brokenReferences: references.broken, marbleBags: bags.repairs };
+  if (!registry) return { success: true, session: bags.data, droppedEntities: [], ...repairs };
+  const filtered = dropUnknownEntityTypes(bags.data, registry);
   return { success: true, session: filtered.data, droppedEntities: filtered.dropped, ...repairs };
 }

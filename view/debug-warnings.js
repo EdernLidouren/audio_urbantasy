@@ -129,11 +129,22 @@ export function reportI18nWarning(message) {
   reportWarning("debug.warnings.i18n", { message: stripTrailingPeriod(message), raw: message }, `i18n: ${message}`);
 }
 
+// Sacs de billes remis en forme dans une sauvegarde relue (voir
+// core/marble-bags.js/repairMarbleBags) : `slot`, le numéro de l'emplacement, ou null
+// pour l'ensemble. Même moment de signalement que reportDroppedEntities.
+function reportMarbleBagRepairs(marbleBags = []) {
+  for (const { slot, problem } of marbleBags) {
+    const key = slot === null ? "debug.warnings.marbleBagsRepaired" : "debug.warnings.marbleBagRepaired";
+    reportWarning(key, { slot, problem }, "Sauvegarde : sac de billes remis en forme :", { slot, problem });
+  }
+}
+
 // Tout ce que la relecture d'une sauvegarde a réparé (voir
 // view/save-storage.js/loadGame, importGame), signalé quand elle devient la
 // partie en cours.
-export function reportSaveRepairs({ droppedEntities, droppedItems, brokenReferences }) {
+export function reportSaveRepairs({ droppedEntities, droppedItems, brokenReferences, marbleBags }) {
   reportDroppedEntities(droppedEntities);
   reportDroppedItems(droppedItems);
   reportBrokenReferences(brokenReferences);
+  reportMarbleBagRepairs(marbleBags);
 }

@@ -10,6 +10,8 @@
   "debug.warnings.droppedEquippedItem": "Sauvegarde : objet {type} retiré de l'équipement ({slot}), type inconnu",
   "debug.warnings.empty": "Aucun avertissement",
   "debug.warnings.i18n": "Texte : {message}",
+  "debug.warnings.marbleBagRepaired": "Sauvegarde, sac de billes {slot} : {problem}",
+  "debug.warnings.marbleBagsRepaired": "Sauvegarde, sacs de billes : {problem}",
   "debug.warnings.scene.overlap": "Scène {sceneId} : {a}, en {ax}, et {b}, en {bx}, infranchissables tous deux, se chevauchent",
   "debug.warnings.scene.playerStartFallback": "Scène {sceneId} : point d'arrivée {playerStart} hors de la scène, le joueur arrive au début",
   "debug.warnings.scene.playerStartInBody": "Scène {sceneId} : le point d'arrivée {playerStart} est dans le corps de {entityId}, en {x}",

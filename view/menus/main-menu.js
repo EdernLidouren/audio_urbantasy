@@ -50,7 +50,7 @@ function activateNewGame(startGame) {
 // getSession : état + callbacks fournis par main.js (seul propriétaire de
 // session/scene).
 // Menu racine : jamais fermable (rien en dessous vers quoi revenir).
-export function createMainMenu({ canContinue, continueGame, startNewGame, startTestCityGame, startMarblesGame, getSession }) {
+export function createMainMenu({ canContinue, continueGame, startNewGame, startTestCityGame, startMarblesGame, openMyBags, getSession }) {
   const entries = [];
 
   // "Ville test" : EN TÊTE de menu (avant même "Continuer"), raccourci de
@@ -81,6 +81,13 @@ export function createMainMenu({ canContinue, continueGame, startNewGame, startT
   entries.push({
     label: "menu.main.marbles",
     onActivate: () => startMarblesGame(),
+  });
+
+  // Les sacs du jeu des billes (marbles/view/my-bags.js) : ceux de la partie
+  // sauvegardée ; sans sauvegarde, l'entrée le dit.
+  entries.push({
+    label: "menu.main.my_bags",
+    onActivate: () => openMyBags(),
   });
 
   entries.push({

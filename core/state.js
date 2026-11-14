@@ -64,6 +64,7 @@
 // réducteur lui-même) le lit — voir le commentaire de getActiveWorld pour
 // le détail du mécanisme, c'est le cœur de ce système.
 
+import { createMarbleBags } from "./marble-bags.js";
 import { TUNING_DEFAULTS } from "../config/tuning-values.js";
 import { MAX_COMPANIONS } from "../config/companions.js";
 import { MAX_EPHEMERALS } from "../config/ephemerals.js";
@@ -310,6 +311,9 @@ export function createInitialState(
     // Types d'entité observés au moins une fois (core/observations.js) :
     // aucun au départ.
     observedEntityTypes: {},
+    // Les sacs du jeu des billes (core/marble-bags.js) : tous les emplacements
+    // vides, aucun dernier sac.
+    marbleBags: createMarbleBags(),
     companions: repositionCompanions(companions.slice(0, MAX_COMPANIONS), scene.playerStart, scene.length),
     // Flux PRNG dédié aux compagnons (voir header) : dérivé du même seed,
     // mais hashé sous une clé distincte — jamais la même suite que le

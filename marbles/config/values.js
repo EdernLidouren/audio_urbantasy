@@ -285,6 +285,24 @@ export const MARBLES_AUDIO = {
   enduranceEnd: null,
 };
 
+// Les sons de la GESTION DES SACS (écrans « Mes sacs » et éditeur,
+// marbles/view/bag-sounds.js) : des POINTS D'ACCROCHE, sans fichier aujourd'hui.
+// Chacun : `key`, une clé d'asset ou de pool (null : aucun fichier) ; `fallback`, le
+// son de menu joué tant que `key` vaut null (view/menu-sounds.js), pour que le geste
+// s'entende quand même.
+//   add      un exemplaire ajouté ;     remove   un exemplaire retiré ;
+//   refused  un ajout ou un retrait refusé ;
+//   saved    un sac enregistré ;        deleted  un sac supprimé ;
+//   created  un sac créé (vide, copié d'un sac préfait, dupliqué).
+export const MARBLES_BAG_AUDIO = {
+  add: { key: null, fallback: "select" },
+  remove: { key: null, fallback: "cancel" },
+  refused: { key: null, fallback: "refusal" },
+  saved: { key: null, fallback: "select" },
+  deleted: { key: null, fallback: "select" },
+  created: { key: null, fallback: "select" },
+};
+
 // Les PHASES, déclarées UNE fois : l'effet de base ou de pointe d'une bille, joué
 // pendant la résolution. Chacune :
 //   id      son identifiant, celui de son mot-clé et de sa valeur de partie ;

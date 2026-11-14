@@ -90,6 +90,7 @@ import "../view/menus/inventory/bag-and-equipment.js";
 import "../view/menus/shop-quantity-list.js";
 import "../marbles/view/screen.js";
 import "../marbles/view/pile-screen.js";
+import "../marbles/view/bag-editor.js";
 import MARBLE_TYPES from "../marbles/content/types/index.js";
 import MARBLE_STATUSES from "../marbles/content/statuses/index.js";
 import { GAME_DEFINITIONS } from "../marbles/content/definitions/index.js";

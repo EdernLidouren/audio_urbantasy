@@ -46,8 +46,12 @@
 // vide : le sac est valide. Leurs textes : marbles/view/narration/bags.js.
 //
 // EMPLACEMENTS du joueur : BAG_SLOTS emplacements (marbles/config/values.js), une
-// liste où chacun vaut null (vide) ou un sac. Des fonctions pures ici ; le magasin qui
-// les garde est l'affaire de l'hôte (marbles/host/bag-store.js).
+// liste où chacun vaut null (vide) ou un sac, dont l'id est celui de l'emplacement
+// (slotBagId). Des fonctions pures ici et dans marbles/core/bag-editing.js (les
+// opérations du joueur) ; le magasin qui les garde est l'affaire de l'hôte
+// (marbles/host/bag-store.js), la sauvegarde de Templeton (core/marble-bags.js).
+// RELU d'une sauvegarde, un sac peut être mal formé : repairBagRecord le remet en
+// forme en disant ce qu'il a changé, sans jamais lever.
 
 import { BAG_SLOTS, MARBLE_RARITIES } from "../config/values.js";
 import { rejectUnknownFields } from "../../lib/validate.js";
@@ -220,6 +224,61 @@ export function describeProblem({ code, ...params }) {
 }
 
 // --- Les emplacements du joueur (en-tête) ---
+
+// L'id du sac de l'emplacement `index` (à partir de 0) : `slot-1` à `slot-5`.
+export function slotBagId(index) {
+  return `slot-${index + 1}`;
+}
+
+// L'emplacement d'un id de sac du joueur (slotBagId), ou null (un sac préfait).
+export function slotIndexOf(id) {
+  const match = /^slot-(\d+)$/.exec(id ?? "");
+  return match === null ? null : Number(match[1]) - 1;
+}
+
+// UN SAC RELU d'une sauvegarde, remis en forme sans jamais lever (le joueur ne perd
+// jamais un sac en silence, et une sauvegarde abîmée ne plante pas) : `raw`, ce que la
+// sauvegarde porte ; `id`, celui de son emplacement ; `renames`, les ids de billes
+// renommés ({ ancien: nouveau }, config/save-renames.js, chaînes résolues).
+// -> { bag, problems } : `bag` bien formé (validateBagFormat), ou null si `raw` n'est
+// pas un sac du tout ; `problems`, ce qui a été changé, des phrases (vide : rien).
+// Une entrée illisible est retirée, un nombre d'exemplaires faux ramené à 1, des
+// doublons (un renommage peut en faire) fusionnés, un nom vide ou un champ inconnu
+// retirés, un id faux remplacé. Une bille INCONNUE reste : elle n'est pas une faute de
+// forme, le sac sera simplement invalide (« bille inconnue »).
+export function repairBagRecord(raw, id, renames = {}) {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return { bag: null, problems: ["sac illisible, emplacement vidé"] };
+  const problems = [];
+  const unknownFields = Object.keys(raw).filter((field) => !["id", "name", "marbles"].includes(field));
+  if (unknownFields.length > 0) problems.push(`champ(s) inconnu(s) retiré(s) : ${unknownFields.join(", ")}`);
+  if (raw.id !== id) problems.push(`id "${raw.id}" remplacé par "${id}"`);
+  const bag = { id, marbles: [] };
+  if (raw.name !== undefined) {
+    if (typeof raw.name === "string" && raw.name.trim() !== "") bag.name = raw.name;
+    else problems.push("nom vide retiré");
+  }
+  if (!Array.isArray(raw.marbles)) {
+    problems.push("composition illisible, sac vidé");
+    return { bag, problems };
+  }
+  const counts = new Map();
+  for (const entry of raw.marbles) {
+    if (entry === null || typeof entry !== "object" || typeof entry.marble !== "string" || entry.marble === "") {
+      problems.push("entrée illisible retirée");
+      continue;
+    }
+    const marble = Object.hasOwn(renames, entry.marble) ? renames[entry.marble] : entry.marble;
+    let count = entry.count;
+    if (!isCount(count, 1)) {
+      problems.push(`"${marble}" : nombre d'exemplaires ${JSON.stringify(count)} ramené à 1`);
+      count = 1;
+    }
+    if (counts.has(marble)) problems.push(`"${marble}" en double, entrées fusionnées`);
+    counts.set(marble, (counts.get(marble) ?? 0) + count);
+  }
+  bag.marbles = [...counts].map(([marble, count]) => ({ marble, count }));
+  return { bag, problems };
+}
 
 // Des emplacements tous vides.
 export function emptyBagSlots(count = BAG_SLOTS) {

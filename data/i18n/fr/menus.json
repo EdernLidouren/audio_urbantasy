@@ -4,6 +4,7 @@
   "menu.described": "{text} : {description}",
   "menu.main.continue": "Continuer",
   "menu.main.marbles": "Partie de billes",
+  "menu.main.my_bags": "Mes sacs",
   "menu.main.new_game": "Nouvelle partie",
   "menu.main.new_game_confirm_title": "Une sauvegarde existe. Démarrer une nouvelle partie l'écrasera. Confirmer ?",
   "menu.main.options": "Options",
