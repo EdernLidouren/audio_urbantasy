@@ -8,7 +8,8 @@
 // comparent se déduit de la table. Lancées par core/checks/index.js/runChecks
 // (`node tools/run-checks.js marbles-tools`).
 
-import { MARBLES_SETTINGS, STARTING_BAG } from "../config/values.js";
+import { MARBLES_SETTINGS } from "../config/values.js";
+import { bagMarbles } from "../core/bags.js";
 import { turnLimit } from "../core/definitions.js";
 import { SLOTS } from "../core/marbles.js";
 import { JOURNAL_EVENTS } from "../core/content.js";
@@ -18,15 +19,16 @@ import { choiceLine, formatEvent, formatState } from "../tools/format.js";
 import { applyActions, buildState } from "../tools/state-builder.js";
 import { PLAYERS, bestChoice, bestPlan, publicView } from "../tools/players.js";
 import { MARBLES_DRAWN_VALUE } from "../tools/drawn-value.js";
-import { MARBLE_IDS, deriveSeed, parseBagText, playGame, recordEvents, simulate } from "../tools/simulation.js";
+import { MARBLE_IDS, deriveSeed, playGame, recordEvents, simulate } from "../tools/simulation.js";
+import { parseBagText, readBagChoice } from "../tools/bag-option.js";
 import { percentile, summarize } from "../tools/stats.js";
 import { REPORT_HEADINGS, REPORT_RESULT_HEADINGS, buildReport, frNumber } from "../tools/report.js";
 import { contextLabel, diffReports, reportAnomalies } from "../tools/report-diff.js";
 import { parseArgs } from "../tools/args.js";
 import { MARBLE_COLUMNS, toCsv, toJson } from "../tools/export.js";
 import MARBLE_TYPES from "../content/types/index.js";
-import { DEFAULT_GAME_DEFINITION, GAME_RULES, definitionById, withBag, withSettings } from "../tools/game-rules.js";
-import { handIds } from "./helpers.js";
+import { DEFAULT_GAME_DEFINITION, GAME_RULES, defaultToolsBag, definitionById, gameSetup, withSettings } from "../tools/game-rules.js";
+import { caughtMessage, handIds } from "./helpers.js";
 
 // Les règles du jeu, liées aux vraies tables (marbles/tools/game-rules.js).
 const rules = GAME_RULES;
@@ -142,7 +144,8 @@ function checkCommandsAndFormat(run) {
   const types = new Set();
   let raw = 0;
   for (const index of [0, 1, 2]) {
-    const state = rules.createGame(games[index].seed, withBag(withSettings(DEFAULT_GAME_DEFINITION, { turns: 20 }), games[index].bag));
+    const setup = gameSetup(withSettings(DEFAULT_GAME_DEFINITION, { turns: 20 }), { kind: "random", size: 7, maxCopies: null });
+    const state = rules.createGame(games[index].seed, setup.definition, setup.options);
     let current = state;
     while (current.stage !== "over") {
       const action = current.pendingChoice
@@ -304,7 +307,8 @@ function checkGreedy(run) {
   // exhaustive sur les places de la main (-1 : emplacement laissé vide). Les billes
   // se posent vraiment, dans l'ordre des phases comme le glouton : leurs
   // Chiquenaudes comptent.
-  const first = rules.reduce(rules.createGame(7, DEFAULT_GAME_DEFINITION), { type: "draw" }).state;
+  const setup = gameSetup(DEFAULT_GAME_DEFINITION);
+  const first = rules.reduce(rules.createGame(7, setup.definition, setup.options), { type: "draw" }).state;
   let firstBest = -Infinity;
   const hand = handIds(first);
   const choicesOf = [-1, ...hand.keys()];
@@ -409,10 +413,45 @@ function checkSimulation(run) {
   run("sac aléatoire : la limite d'exemplaires", true, random.games.every((game) => new Set(game.bag).size === 12));
   run("sac aléatoire : des sacs différents d'une partie à l'autre", true, new Set(random.games.map((game) => [...game.bag].sort().join())).size > 1);
   run("sac aléatoire : impossible avec la limite", true, throws(() => simulate({ games: 1, bagMode: { kind: "random", size: Object.keys(MARBLE_TYPES).length + 1, maxCopies: 1 } })));
-  run.same("sac décrit : texte", ["clay", "clay", "comet"], parseBagText("clay, clay # deux\ncomet\n"));
-  run.same("sac décrit : JSON", ["agate"], parseBagText('["agate"]'));
-  run("sac décrit : bille inconnue refusée", true, throws(() => parseBagText("clay nope")));
-  run.same("sac de test par défaut", STARTING_BAG, results.greedy.games[0].bag);
+  run.same(
+    "sac décrit : liste en texte, doublons regroupés",
+    { id: "mine", marbles: [{ marble: "clay", count: 2 }, { marble: "comet", count: 1 }] },
+    parseBagText("clay, comet # deux\nclay\n", "mine")
+  );
+  run.same("sac décrit : liste JSON", { id: "mine", marbles: [{ marble: "agate", count: 1 }] }, parseBagText('["agate"]', "mine"));
+  const formatted = { id: "own", marbles: [{ marble: "agate", count: 2 }] };
+  run.same("sac décrit : au format du jeu", formatted, parseBagText(JSON.stringify(formatted), "ignored"));
+  run("sac décrit : format du jeu mal formé refusé", true, throws(() => parseBagText('{ "id": "own", "marbles": [{ "marble": "agate", "count": 0 }] }', "x")));
+  run("sac décrit : bille inconnue refusée au départ", true, throws(() => simulate({ games: 1, bagMode: { kind: "bag", bag: parseBagText("clay nope", "x"), unchecked: true } })));
+  run.same("sac par défaut : le sac de départ, pour un sac du joueur", [...bagMarbles(GAME_RULES.bags.starter)].sort(), [...results.greedy.games[0].bag].sort());
+  run("sac par défaut : le premier sac préfait valide selon les règles propres (15 billes)", "treasure", defaultToolsBag(definitionById("endurance")).id);
+  run("sac par défaut : aucun valide, une erreur", true, throws(() => defaultToolsBag({ ...DEFAULT_GAME_DEFINITION, bag: { kind: "player", buildRules: { size: { min: 1, max: 2 } } } })));
+  // Un sac fourni : validé selon les règles de construction, sauf hors règles.
+  const small = { id: "small", marbles: [{ marble: "clay", count: 3 }] };
+  run("sac fourni : invalide refusé, avec ses problèmes", true, caughtMessage(() => simulate({ games: 1, bagMode: { kind: "bag", bag: small } })).includes("bagTooSmall"));
+  run("sac fourni : hors règles, joué", 3, simulate({ games: 1, bagMode: { kind: "bag", bag: small, unchecked: true } }).games[0].bag.length);
+  run("sac fourni : un sac préfait, joué tel quel", 15, simulate({ games: 1, bagMode: { kind: "bag", bag: GAME_RULES.bags.treasure } }).games[0].bag.length);
+  // Les options de sac des outils (marbles/tools/bag-option.js), sur un faux disque.
+  const disk = { "bags/mine.txt": "clay clay comet", "bags/own.json": JSON.stringify(formatted) };
+  const readText = (path) => {
+    if (!Object.hasOwn(disk, path)) throw new Error("introuvable");
+    return disk[path];
+  };
+  const choice = (values, flags = []) => readBagChoice((name) => values[name], (name) => flags.includes(name), readText);
+  run.same("option : sans sac, celui de la définition", { kind: "definition" }, choice({}));
+  run.same("option : un sac préfait par son id", { kind: "bag", bag: GAME_RULES.bags.mist, source: "mist", unchecked: false }, choice({ "--bag": "mist" }));
+  run.same(
+    "option : un fichier en liste, nommé d'après le fichier, hors règles",
+    { kind: "bag", bag: { id: "mine", marbles: [{ marble: "clay", count: 2 }, { marble: "comet", count: 1 }] }, source: "bags/mine.txt", unchecked: true },
+    choice({ "--bag": "bags/mine.txt" }, ["--unchecked"])
+  );
+  run.same("option : un fichier au format du jeu", formatted, choice({ "--bag": "bags/own.json" }).bag);
+  run("option : fichier illisible refusé", true, throws(() => choice({ "--bag": "bags/none.txt" })));
+  run.same("option : sac généré", { kind: "random", size: 9, maxCopies: 2 }, choice({ "--random-bag": "9", "--max-copies": "2" }));
+  run("option : préfait inconnu refusé", true, throws(() => choice({ "--bag": "nope" })));
+  run("option : --bag et --random-bag s'excluent", true, throws(() => choice({ "--bag": "mist", "--random-bag": "9" })));
+  run("option : --unchecked sans --bag refusé", true, throws(() => choice({}, ["--unchecked"])));
+  run("option : --max-copies sans --random-bag refusé", true, throws(() => choice({ "--max-copies": "2" })));
 
   // Une partie se rejoue à l'identique, seule, depuis son index.
   run.same("partie : rejouée seule, même relevé", results.greedy.games[17], playGame({ ...results.greedy.params, index: 17 }));

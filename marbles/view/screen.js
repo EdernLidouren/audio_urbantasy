@@ -184,10 +184,13 @@ const REAL_IO = {
 // par main.js (marbles/core/rules.js) ; l'écran les passe à ce qui en a besoin.
 // `openKeyHelp(screen)` : ouvre l'aide des touches de cet écran (main.js, qui connaît
 // les sections globales de l'aide), pour la rubrique « Les touches » de l'aide H.
+// `onClose(state)` : appelé à la fermeture de l'écran, avec l'état de la partie à cet
+// instant, finie ou non (le contrat avec l'hôte, marbles/host/entry.js, en tire le
+// résultat).
 // `io` : le monde extérieur (voir l'en-tête), { announce, announceMenuLine, t, now,
 // setInterval, clearInterval, sounds }, chacun facultatif ; `sounds` remplace tout ou partie de
 // SCREEN_SOUNDS.
-export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () => {}, io = {} } = {}) {
+export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () => {}, onClose = () => {}, io = {} } = {}) {
   // Ces noms masquent les imports du même nom : le corps de l'écran les appelle tels
   // quels, vrais ou remplacés.
   const { announce, announceMenuLine, t, now, setInterval, clearInterval } = { ...REAL_IO, ...io };
@@ -831,6 +834,7 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
       sound.stopFocusBeacon();
       sound.closeTableReverb();
       sound.stopMarblesMusic();
+      onClose(getGame());
       setGame(null);
     },
     // Une image : un battement du temps réel, qui mesure lui-même le temps écoulé

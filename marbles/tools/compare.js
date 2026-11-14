@@ -17,7 +17,7 @@
 //   --save <dossier>   garde les rapports : <dossier>/avant/<simulation>.txt et
 //                      <dossier>/apres/<simulation>.txt
 //
-// Les six simulations de référence (RUNS) : les trois joueurs, sur le sac de test et
+// Les six simulations de référence (RUNS) : les trois joueurs, sur le sac de départ et
 // sur des sacs aléatoires de 13 billes (2 exemplaires au plus). Toutes tournent en
 // parallèle, chacune dans son processus.
 //
@@ -48,9 +48,9 @@ const ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const EXTRACTED = ["core", "config", "data", "lib", "marbles", "tools", "view"];
 const RANDOM_BAG = ["--random-bag", "13", "--max-copies", "2"];
 const RUNS = [
-  { id: "random", label: "aléatoire, sac de test", args: ["--player", "random"] },
-  { id: "greedy", label: "glouton, sac de test", args: ["--player", "greedy"] },
-  { id: "greedy-no-replacement", label: "glouton sans remplacement, sac de test", args: ["--player", "greedy-no-replacement"] },
+  { id: "random", label: "aléatoire, sac de départ", args: ["--player", "random"] },
+  { id: "greedy", label: "glouton, sac de départ", args: ["--player", "greedy"] },
+  { id: "greedy-no-replacement", label: "glouton sans remplacement, sac de départ", args: ["--player", "greedy-no-replacement"] },
   { id: "rb-random", label: "aléatoire, sacs aléatoires", args: ["--player", "random", ...RANDOM_BAG] },
   { id: "rb-greedy", label: "glouton, sacs aléatoires", args: ["--player", "greedy", ...RANDOM_BAG] },
   { id: "rb-greedy-no-replacement", label: "glouton sans remplacement, sacs aléatoires", args: ["--player", "greedy-no-replacement", ...RANDOM_BAG] },

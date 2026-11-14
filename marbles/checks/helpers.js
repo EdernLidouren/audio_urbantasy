@@ -158,20 +158,22 @@ export function createPicker(seed) {
   };
 }
 
-// Joue une partie de billes par choix ALÉATOIRES, à graine (le tirage du test,
-// jamais le hasard de la partie), actions refusées comprises, et en vérifie les
-// invariants à chaque action : aucune bille créée ni perdue, score jamais négatif
-// ni en baisse, main bornée, compteurs remis à zéro, tour dans les bornes, aucune
-// bille usée restée sur le triangle, aucun bonus resté, aucune action verrouillée
-// acceptée, un résultat selon l'objectif à la fin et seulement là. Partagée par la fumée de la
-// table des vérifications (domaine marbles) et celle de la vraie table (domaine
-// marbles-content). -> les fautes trouvées (des phrases) ; `seenTypes` (un Set)
-// reçoit les types d'évènements vus.
+// Joue une partie de billes par choix ALÉATOIRES, à graine (le tirage du test, jamais
+// le hasard de la partie), actions refusées comprises, et en vérifie les invariants à
+// chaque action : aucune bille créée ni perdue (autant que le sac reçu en a), score
+// jamais négatif ni en baisse, main bornée, compteurs remis à zéro, tour dans les
+// bornes, aucune bille usée restée sur le triangle, aucun bonus resté, aucune action
+// verrouillée acceptée, un résultat selon l'objectif à la fin et seulement là.
+// Partagée par la fumée de la table des vérifications (domaine marbles) et celle de la
+// vraie table (domaine marbles-content). -> les fautes trouvées (des phrases) ;
+// `seenTypes` (un Set) reçoit les types d'évènements vus.
 export function playRandomMarblesGame(rules, seed, options, seenTypes) {
   const pick = createPicker(seed);
   let state = rules.createGame(seed, options);
   const total = marbleCount(state);
   const faults = [];
+  // La copie de partie : autant d'exemplaires que le sac reçu en a.
+  if (total !== state.bagOrigin.size) faults.push(`copie : ${total} billes pour un sac de ${state.bagOrigin.size}`);
   let score = 0;
   let actions = 0;
   let handBefore = state.hand.length;

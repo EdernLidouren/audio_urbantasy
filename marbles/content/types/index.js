@@ -87,7 +87,7 @@
 // (domaine marbles-view) ; sa DESCRIPTION aussi, facultative, un texte d'ambiance
 // sans effet de jeu (touche V) : `marble.<id>.description`. AJOUTER UNE BILLE : son
 // fichier ici, sa ligne ci-dessous, son nom (et sa description) dans chaque langue,
-// et sa place dans marbles/config/values.js/STARTING_BAG pour la mettre en jeu.
+// et sa place dans un sac (marbles/content/bags/) pour la mettre en jeu.
 import copper from "./copper.js";
 import quicksilver from "./quicksilver.js";
 import ruby from "./ruby.js";

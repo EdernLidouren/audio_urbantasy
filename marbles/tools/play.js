@@ -8,10 +8,13 @@
 //   node marbles/tools/play.js --seed 42 --lang en
 //   node marbles/tools/play.js --seed 42 --json < commandes.txt
 //   node marbles/tools/play.js --definition free
+//   node marbles/tools/play.js --bag treasure
 //
 // --seed : graine imposée (sinon tirée au hasard, et affichée pour rejouer).
 // --definition : la définition de partie, un id du registre ou un fichier JSON
 //          (marbles/tools/definition-option.js) ; celle du jeu par défaut.
+// --bag, --unchecked, --random-bag, --max-copies : le sac (marbles/tools/bag-option.js) ;
+//          sans elles, celui de la définition (le sac de départ pour un sac du joueur).
 // --lang : fr (défaut) ou en.
 // --json : en sortie, une dernière ligne JSON (graine, score, état final,
 //          journal complet) pour comparer deux parties.
@@ -41,15 +44,17 @@
 // l'interface, comme dans le réducteur.
 
 import { createInterface } from "node:readline";
+import { readFileSync } from "node:fs";
 import { installFileFetch } from "../../tools/node-fetch.js";
 import { parseCommand } from "./commands.js";
-import { GAME_RULES } from "./game-rules.js";
+import { GAME_RULES, gameSetup } from "./game-rules.js";
 import { parseArgs } from "./args.js";
+import { BAG_FLAG_OPTIONS, BAG_VALUE_OPTIONS, readBagChoice } from "./bag-option.js";
 
 // La ligne de commande, lue strictement (args.js) : une erreur, et l'outil s'arrête.
 let args;
 try {
-  args = parseArgs(process.argv.slice(2), { values: ["--lang", "--seed", "--definition"], flags: ["--json"] });
+  args = parseArgs(process.argv.slice(2), { values: ["--lang", "--seed", "--definition", ...BAG_VALUE_OPTIONS], flags: ["--json", ...BAG_FLAG_OPTIONS] });
 } catch (error) {
   console.error(error.message);
   process.exit(1);
@@ -92,14 +97,14 @@ const HELP = [
   "Emplacements : gauche (g, left), droite (d, right), pointe (p, apex).",
 ];
 
-let definition;
+let game;
 try {
-  definition = await readDefinitionOption(args.option("--definition"));
+  const setup = gameSetup(await readDefinitionOption(args.option("--definition")), readBagChoice(args.option, args.flag, (path) => readFileSync(path, "utf-8")));
+  game = GAME_RULES.createGame(seed, setup.definition, setup.options);
 } catch (error) {
   console.error(error.message);
   process.exit(1);
 }
-let game = GAME_RULES.createGame(seed, definition);
 const journal = [];
 
 // Applique une action et la journalise ; rend ses évènements, ou null si elle

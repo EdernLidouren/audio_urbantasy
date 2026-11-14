@@ -6,7 +6,7 @@
 // donnent donc les mêmes chiffres.
 //
 // Moyennes « par partie » d'une bille : sur les parties où elle est dans le sac
-// (avec le sac de test, toutes). Centiles : interpolation linéaire entre les deux
+// (avec un même sac pour toutes, toutes). Centiles : interpolation linéaire entre les deux
 // rangs voisins (la médiane est le 50e).
 
 import { MARBLE_IDS, MARBLE_STAT_FIELDS } from "./simulation.js";

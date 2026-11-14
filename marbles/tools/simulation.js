@@ -4,8 +4,8 @@
 // les vérifications l'appellent directement.
 //
 // DÉTERMINISME : chaque partie i reçoit des graines DÉRIVÉES de la graine de départ
-// (deriveSeed) : celle de la partie (mélange du sac, régénérations), celle du
-// joueur, celle du sac aléatoire. Mêmes paramètres, mêmes parties, au caractère
+// (deriveSeed) : celle de la partie (tirage d'un sac généré, mélange du sac,
+// régénérations), celle du joueur. Mêmes paramètres, mêmes parties, au caractère
 // près. Aucune de ces graines ne dépend d'une autre partie.
 //
 // Le simulateur pioche lui-même, donne au joueur la VUE PUBLIQUE de l'état
@@ -19,9 +19,8 @@
 // appliquées sur une copie (marbles/tools/game-rules.js/withSettings).
 
 import { createSeed } from "../../lib/rng.js";
-import { randomBag } from "../core/definitions.js";
 import { PLAYERS, publicView } from "./players.js";
-import { DEFAULT_GAME_DEFINITION, GAME_RULES, SETTING_NAMES, withBag, withSettings } from "./game-rules.js";
+import { DEFAULT_GAME_DEFINITION, GAME_RULES, SETTING_NAMES, gameSetup, withSettings } from "./game-rules.js";
 import { TRIGGER_IDS } from "./format.js";
 
 export const MARBLE_IDS = Object.keys(GAME_RULES.types);
@@ -35,55 +34,10 @@ export function deriveSeed(seed, index, label) {
 }
 
 // --- Sacs ---
-// Un mode de sac : { kind: "test" } (le sac de test), { kind: "list", marbles,
-// source } (un sac décrit, dans un fichier), { kind: "random", size, maxCopies }
-// (tiré dans la table des billes, doublons permis jusqu'à maxCopies exemplaires,
-// null : sans limite).
-
-function validateBagMode(mode) {
-  if (mode.kind === "test") return;
-  if (mode.kind === "list") {
-    for (const id of mode.marbles) if (!MARBLE_IDS.includes(id)) throw new Error(`sac : bille inconnue "${id}".`);
-    return;
-  }
-  if (mode.kind !== "random") throw new Error(`sac : mode inconnu "${mode.kind}".`);
-  if (!Number.isInteger(mode.size) || mode.size < 1) throw new Error("sac aléatoire : la taille doit être un entier >= 1.");
-  if (mode.maxCopies !== null && (!Number.isInteger(mode.maxCopies) || mode.maxCopies < 1)) {
-    throw new Error("sac aléatoire : la limite d'exemplaires doit être un entier >= 1.");
-  }
-  if (mode.maxCopies !== null && mode.size > mode.maxCopies * MARBLE_IDS.length) {
-    throw new Error(`sac aléatoire : ${mode.size} billes impossibles avec ${mode.maxCopies} exemplaire(s) au plus de ${MARBLE_IDS.length} billes.`);
-  }
-}
-
-// Les billes de départ de la partie `index` : celles de la définition (mode "test" :
-// sa liste, ou son sac aléatoire, tiré par la graine de sac de la partie), d'un
-// fichier, ou un sac aléatoire des options. Toujours une liste, que le relevé garde.
-// Un sac aléatoire est tiré par le core (marbles/core/definitions.js/randomBag), avec
-// la graine de sac du simulateur : la même partie pour les mêmes paramètres.
-function bagFor(mode, seed, index, definition) {
-  if (mode.kind === "list") return [...mode.marbles];
-  const rule = mode.kind === "random" ? mode : definition.bag;
-  if (rule.kind === "list") return [...rule.marbles];
-  return randomBag(rule, deriveSeed(seed, index, "bag"), MARBLE_IDS);
-}
-
-// Un sac décrit en texte : ids séparés par des espaces, virgules ou retours à la
-// ligne, ou une liste JSON ; « # » commente la fin d'une ligne. Une bille inconnue
-// lève.
-export function parseBagText(text) {
-  const trimmed = text.trim();
-  const ids = trimmed.startsWith("[")
-    ? JSON.parse(trimmed)
-    : text
-        .split("\n")
-        .map((line) => line.replace(/#.*/, ""))
-        .join(" ")
-        .split(/[\s,]+/)
-        .filter((id) => id !== "");
-  validateBagMode({ kind: "list", marbles: ids });
-  return ids;
-}
+// Le SAC CHOISI (`bagMode`, marbles/tools/game-rules.js/gameSetup) : celui de la
+// définition, un sac fourni (préfait ou d'un fichier), ou un sac généré par partie,
+// tiré par le core avec la graine de la partie. Validé avant la première partie
+// (normalizeParams), par le départ d'une vraie partie.
 
 // --- Une partie ---
 
@@ -183,7 +137,8 @@ export function recordEvents(record, events, actionType, drawers) {
   }
 }
 
-// Une partie jouée de bout en bout. -> son relevé :
+// Une partie jouée de bout en bout. -> son relevé (`bag` : les billes de la partie,
+// dans l'ordre de pioche de départ) :
 //   { index, seed, bag, score, turns, impacts, replacements,
 //     <déclencheur>: { speed, mass } (hit, knockout…), effectDraws, regenerations,
 //     midTurnRegenerations, throws, refusals, interruptions, marbles: { id: stats } }
@@ -194,9 +149,10 @@ export function recordEvents(record, events, actionType, drawers) {
 // `result` : le résultat de la partie selon son objectif (marbles/core/definitions.js/
 // gameResult : { goal, end, score, tier | outcome | held }).
 export function playGame({ index, seed, player, playerOptions = {}, bagMode, definition = DEFAULT_GAME_DEFINITION, settings = {} }) {
-  const bag = bagFor(bagMode, seed, index, definition);
   const gameSeed = deriveSeed(seed, index, "game");
-  let state = GAME_RULES.createGame(gameSeed, withBag(withSettings(definition, settings), bag));
+  const setup = gameSetup(withSettings(definition, settings), bagMode);
+  let state = GAME_RULES.createGame(gameSeed, setup.definition, setup.options);
+  const bag = [...state.bag];
   const session = PLAYERS[player].startGame({ seed: deriveSeed(seed, index, "player"), options: playerOptions });
   const record = {
     index,
@@ -247,7 +203,7 @@ function normalizeParams(params) {
     seed: params.seed ?? 1,
     player: params.player ?? "greedy",
     playerOptions: params.playerOptions ?? {},
-    bagMode: params.bagMode ?? { kind: "test" },
+    bagMode: params.bagMode ?? { kind: "definition" },
     definition: params.definition ?? DEFAULT_GAME_DEFINITION,
     settings: params.settings ?? {},
   };
@@ -258,11 +214,10 @@ function normalizeParams(params) {
   for (const name of Object.keys(normalized.settings)) {
     if (!SETTING_NAMES.includes(name)) throw new Error(`simulation : réglage inconnu "${name}".`);
   }
-  validateBagMode(normalized.bagMode);
-  // La définition et ses surcharges passent par la validation de la simulation
-  // elle-même.
-  const definition = withSettings(normalized.definition, normalized.settings);
-  GAME_RULES.createGame(0, withBag(definition, bagFor(normalized.bagMode, normalized.seed, 0, definition)));
+  // La définition, ses surcharges et le sac passent par la validation d'une vraie
+  // partie : un sac invalide refusé avec ses problèmes.
+  const setup = gameSetup(withSettings(normalized.definition, normalized.settings), normalized.bagMode);
+  GAME_RULES.createGame(0, setup.definition, setup.options);
   return normalized;
 }
 

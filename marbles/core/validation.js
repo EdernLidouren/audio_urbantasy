@@ -1,17 +1,18 @@
 // JEU DES BILLES — LA VALIDATION des tables INJECTÉES : la table des billes, celle
-// des statuts, et les définitions de partie. Échouer au chargement,
+// des statuts, les définitions de partie et les sacs préfaits. Échouer au chargement,
 // jamais en pleine partie : les règles (marbles/core/rules.js) valident leurs tables à
 // la composition, main.js et l'audit du contenu le contenu du jeu au démarrage.
 // Ce qu'elle lit vient du catalogue (marbles/core/content.js : valeurs de partie,
 // champs d'effet, moments En poche), qui valide lui-même, à son chargement, les
 // déclarations dont il est fait (déclencheurs, phases, En poche). Pur.
 
-import { MARBLE_PHASES, MARBLE_POCKET, MARBLE_TRIGGERS } from "../config/values.js";
+import { BAG_BUILD_RULES, MARBLE_PHASES, MARBLE_POCKET, MARBLE_TRIGGERS } from "../config/values.js";
 import { rejectUnknownFields } from "../../lib/validate.js";
 import { isMarbleFamily, isMarbleRarity, isMarbleSize, validateEffect, validateFilters } from "./effects.js";
 import { EFFECT_FIELDS, FIXED_MOMENTS, LISTENABLE_KEYS, REACTION_KEYS, REACTIVE_MOMENT, TALLY_COUNTERS, TALLY_IDS, pocketClauses, reactionClauses } from "./content.js";
 import { CHARACTERISTICS, LOCKS, MODIFIER_OPERATIONS, MODIFIER_POINTS, NO_STATUSES, STATUS_BEHAVIORS, STATUS_DURATIONS, STATUS_STACKINGS } from "./statuses.js";
-import { BAG_KINDS, GOALS, START_KEYS } from "./definitions.js";
+import { BAG_SOURCES, GOALS, START_KEYS } from "./definitions.js";
+import { NO_BAGS, validateBuildRules, validatePresetBags } from "./bags.js";
 
 // La catégorie de chaque valeur de partie (marbles/core/counters.js), que lit le
 // garde-fou des boucles directes.
@@ -180,8 +181,9 @@ function validateStatusBehavior(behavior, statuses, describe, fail) {
 // marbles/core/definitions.js), du registre ou lue d'un fichier : une valeur fausse
 // échouerait sinon en pleine partie. Aucun minimum lié au triangle : le joueur est seul
 // responsable de ses poses, et la résolution se lance quel que soit l'état du
-// triangle. Un sac vide se conçoit (une partie sans billes).
-export function validateGameDefinition(definition, types, statuses = NO_STATUSES) {
+// triangle. `bags` : le registre des sacs préfaits, que cite un sac imposé (aucun par
+// défaut : un sac cité est alors inconnu).
+export function validateGameDefinition(definition, types, statuses = NO_STATUSES, bags = NO_BAGS) {
   const fail = (message) => {
     throw new Error(`marbles, définition "${definition?.id}" : ${message}`);
   };
@@ -189,7 +191,7 @@ export function validateGameDefinition(definition, types, statuses = NO_STATUSES
   rejectUnknownFields(definition, ["id", "start", "bag", "turns", "goal", "rules"], "définition", fail);
   if (typeof definition.id !== "string" || definition.id === "") fail("id doit être un texte non vide.");
   validateStart(definition.start, fail);
-  validateStartingBag(definition.bag, types, fail);
+  validateBagSource(definition.bag, types, bags, fail);
   const { goal } = definition;
   if (goal === null || typeof goal !== "object" || !Object.hasOwn(GOALS, goal.kind)) fail(`objectif (goal) inconnu "${goal?.kind}" (${Object.keys(GOALS).join(", ")}).`);
   rejectUnknownFields(goal, GOALS[goal.kind].fields, `objectif ${goal.kind}`, fail);
@@ -230,15 +232,17 @@ function validateStart(start, fail) {
   if (start.handSize < start.firstTurnDraw) fail("start.handSize doit valoir au moins start.firstTurnDraw.");
 }
 
-// Le sac de départ (BAG_KINDS) : des billes connues ; un tirage possible.
-function validateStartingBag(bag, types, fail) {
-  if (bag === null || typeof bag !== "object" || !Object.hasOwn(BAG_KINDS, bag.kind)) fail(`sac (bag) de sorte inconnue "${bag?.kind}" (${Object.keys(BAG_KINDS).join(", ")}).`);
-  rejectUnknownFields(bag, BAG_KINDS[bag.kind].fields, `sac ${bag.kind}`, fail);
-  if (bag.kind === "list") {
-    if (!Array.isArray(bag.marbles)) fail("bag.marbles doit être une liste d'ids.");
-    for (const id of bag.marbles) {
-      if (!Object.hasOwn(types, id)) fail(`bille inconnue "${id}" dans le sac.`);
-    }
+// La source du sac (BAG_SOURCES) : des règles de construction bien formées ; un sac
+// préfait connu ; un tirage possible.
+function validateBagSource(bag, types, bags, fail) {
+  if (bag === null || typeof bag !== "object" || !Object.hasOwn(BAG_SOURCES, bag.kind)) fail(`source de sac (bag) inconnue "${bag?.kind}" (${Object.keys(BAG_SOURCES).join(", ")}).`);
+  rejectUnknownFields(bag, BAG_SOURCES[bag.kind].fields, `sac ${bag.kind}`, fail);
+  if (bag.kind === "player") {
+    if (bag.buildRules !== undefined) validateBuildRules(bag.buildRules, (message) => fail(`buildRules : ${message}`), { allowNull: true });
+    return;
+  }
+  if (bag.kind === "preset") {
+    if (!Object.hasOwn(bags, bag.bag)) fail(`sac préfait inconnu "${bag.bag}" (${Object.keys(bags).join(", ") || "aucun"}).`);
     return;
   }
   if (!Number.isInteger(bag.size) || bag.size < 1) fail("bag.size doit être un entier >= 1.");
@@ -249,20 +253,31 @@ function validateStartingBag(bag, types, fail) {
 
 // Le registre des définitions : un objet { id: définition }, chaque définition
 // nommée par sa clé.
-export function validateGameDefinitions(definitions, types, statuses = NO_STATUSES) {
+export function validateGameDefinitions(definitions, types, statuses = NO_STATUSES, bags = NO_BAGS) {
   if (definitions === null || typeof definitions !== "object" || Array.isArray(definitions)) throw new Error("marbles : le registre des définitions est un objet { id: définition }.");
   for (const [id, definition] of Object.entries(definitions)) {
     if (definition?.id !== id) throw new Error(`marbles : la définition "${id}" doit porter son id ("${definition?.id}").`);
-    validateGameDefinition(definition, types, statuses);
+    validateGameDefinition(definition, types, statuses, bags);
   }
 }
 
+// Les règles de construction par défaut (marbles/config/values.js/BAG_BUILD_RULES) :
+// chaque sorte connue, bien formée.
+function validateDefaultBuildRules(rules = BAG_BUILD_RULES) {
+  validateBuildRules(rules, (message) => {
+    throw new Error(`marbles, règles de construction par défaut : ${message}`);
+  });
+}
+
 // Le contenu du jeu des billes, au démarrage (main.js, l'audit du contenu) : la
-// table des statuts, celle des billes, et les définitions de partie, qui ne citent
-// que des billes et des statuts connus. Une erreur ici échouerait sinon en pleine
-// partie.
-export function validateMarblesContent(types, statuses, definitions) {
+// table des statuts, celle des billes, les règles de construction par défaut, les sacs
+// préfaits (valides selon ces règles) et les définitions de partie, qui ne citent que
+// des billes, des statuts et des sacs connus. Une erreur ici échouerait sinon en
+// pleine partie.
+export function validateMarblesContent(types, statuses, definitions, bags = NO_BAGS) {
   validateMarbleStatuses(statuses);
   validateMarbleTypes(types, statuses);
-  validateGameDefinitions(definitions, types, statuses);
+  validateDefaultBuildRules();
+  validatePresetBags(bags, types, BAG_BUILD_RULES);
+  validateGameDefinitions(definitions, types, statuses, bags);
 }

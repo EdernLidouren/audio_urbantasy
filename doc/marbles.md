@@ -1,19 +1,22 @@
 # Jeu des billes
 
 Minijeu de stratégie solo, sans adresse ni adversaire, lancé depuis le menu principal.
-Prototype : indépendant de la partie principale (ni inventaire, ni collection, ni
-sauvegarde). Le joueur pose des billes sur un triangle à trois emplacements qui tourne
+Prototype : indépendant de la partie principale (ni inventaire ni sauvegarde ; la
+collection de Templeton ne lui parvient que par un fournisseur, voir « Sacs »). Le joueur pose des billes sur un triangle à trois emplacements qui tourne
 à chaque tour, et marque en synchronisant leurs effets.
 
 Le jeu des billes a son arbre à lui, `marbles/`, avec les mêmes règles que le jeu
 (CLAUDE.md) : `core/` (la simulation, qui ne lit jamais `content/` ni `view/`),
-`content/` (les billes), `config/` (les réglages), `view/` (l'écran), `checks/` (ses
+`content/` (les billes, les statuts, les définitions de partie, les sacs préfaits),
+`config/` (les réglages), `view/` (l'écran), `host/` (le contrat avec Templeton :
+fournisseur de collection, emplacements des sacs, point d'entrée), `checks/` (ses
 vérifications) et `tools/` (sa boîte à outils). Il ne dépend du jeu principal que
 par `lib/` (dont le PRNG seedé, `lib/rng.js`), les textes (`data/i18n/*/marbles.json`),
 les sons (`assets/`), et quelques briques de la vue (sons de menu, confirmation,
-volumes). `main.js` le compose (les règles liées aux tables des billes, des statuts et
-des définitions de partie) et l'ouvre depuis le menu principal, sur la définition par
-défaut.
+volumes). `main.js` le compose (les règles liées aux tables des billes, des statuts,
+des définitions de partie et des sacs préfaits) et l'ouvre depuis le menu principal par
+son point d'entrée unique (`marbles/host/entry.js`), sur la définition par défaut avec
+le sac de départ (voir « Sacs »).
 
 **Deux documents, deux rôles.** Les règles telles que le joueur les vit (le tour, la
 pioche, le pot, les choix, les statuts) sont dans `doc/marbles-rules.md`, et seulement
@@ -31,32 +34,39 @@ l'en-tête de `marbles/core/marbles.js`.
 | `marbles/content/types/` | Les billes, une par fichier, et leur registre `index.js` (donnée pure) |
 | `marbles/content/statuses/` | Les statuts, un par fichier, et leur registre `index.js` (donnée pure) ; les règles de partie en sont |
 | `marbles/content/definitions/` | Les définitions de partie, une par fichier, leur registre `index.js` et la définition que lance le jeu (`DEFAULT_DEFINITION`) (donnée pure) |
+| `marbles/content/bags/` | Les sacs préfaits, un par fichier, leur registre `index.js` et le sac que fournit le menu (`STARTER_BAG`) (donnée pure) |
 | `marbles/content/effects.js` | Les formes courtes des clauses : une par action (`speed(n)`, `pocket(cible?)`, `applyStatus(id, { intensity, duration })`…), les cibles (`NEXT_SLOT`, `FIRST_IN_HAND`, `nextInBag(n)`, `choice({ zones, count, mode })`, `allActive(...filtres)`…), les sources des montants calculés et les conditions ; la liste est le fichier lui-même |
-| `marbles/config/values.js` | Réglages, valeurs de la partie par défaut (`DEFAULT_GAME`), phases, déclencheurs, mot-clé En poche, valeurs de partie, modèles de fiche (billes et statuts), sac de test, sons (donnée pure) |
+| `marbles/config/values.js` | Réglages, valeurs de la partie par défaut (`DEFAULT_GAME`), phases, déclencheurs, mot-clé En poche, valeurs de partie, modèles de fiche (billes et statuts), règles de construction des sacs par défaut (`BAG_BUILD_RULES`), emplacements de sacs (`BAG_SLOTS`), sons (donnée pure) |
 | `marbles/core/zones.js` | Les zones : les emplacements et l'ordre horaire (`SLOTS`, `nextSlot`, `previousSlot`), les zones de la partie et leurs états (`GAME_ZONES`, `ZONE_STATES`), celles d'un choix (`CHOICE_ZONES`), celles de la bille qui joue un effet (`HOLDER_ZONES`, `NO_REFERENCE_ZONES`) |
-| `marbles/core/definitions.js` | Les définitions de partie : leur modèle, le sac de départ (liste ou tirage, `randomBag`), les objectifs (`GOALS`), les conditions de fin (`END_CONDITIONS`, `endReached`), le résultat (`gameResult`) |
+| `marbles/core/bags.js` | Les sacs : leur format (`validateBagFormat`), les sortes de règles de construction (`BUILD_RULE_KINDS`) et leur fusion (`mergeBuildRules`), les problèmes d'un sac (`bagProblems`, `BAG_PROBLEMS`), le registre des sacs préfaits (`validatePresetBags`), les emplacements du joueur (`emptyBagSlots`, `withBagSlot`) |
+| `marbles/core/definitions.js` | Les définitions de partie : leur modèle, la source du sac (`BAG_SOURCES` : du joueur, imposé, généré par `randomBag`), les billes de départ (`startingList`), les règles de construction d'une définition (`buildRulesOf`), les objectifs (`GOALS`), les conditions de fin (`END_CONDITIONS`, `endReached`), le résultat selon l'objectif (`gameResult`) |
 | `marbles/core/statuses.js` | Les statuts : leur modèle, les caractéristiques en vigueur (l'accès unique), les modificateurs de valeur (filtres de source, arrondi), les verrous (`LOCKS`), les règles (`ruleInstance`), le cumul, les durées, les réactions |
 | `marbles/core/effects.js` | Le modèle d'effet : clauses, actions (`CLAUSE_ACTIONS`), cibles, conditions, sources de montant, effet imprimé, la bille inconnue de la prévision (`UNKNOWN_MARBLE`) |
 | `marbles/core/counters.js` | Les compteurs des valeurs de partie : générés (mots-clés, actions, Vitesse et Masse) et déclarés (évènements réels) |
 | `marbles/core/tally.js` | Le registre des valeurs de partie : le seul à les écrire, et leur lecture publique |
 | `marbles/core/content.js` | Le catalogue : ce que la partie sait des déclarations avant de jouer (leur validation à son chargement : déclencheurs, phases, moments En poche), les valeurs de partie et les clés écoutables, les mots-clés, les statuts qu'une bille applique, l'usure maximale (`maxWearOf`), les types d'évènements du journal (décrits dans son en-tête) |
-| `marbles/core/validation.js` | La validation des tables injectées : billes (`validateMarbleTypes`), statuts (`validateMarbleStatuses`), définitions de partie (`validateGameDefinition`, `validateGameDefinitions`), contenu du jeu au démarrage (`validateMarblesContent`) |
+| `marbles/core/validation.js` | La validation des tables injectées : billes (`validateMarbleTypes`), statuts (`validateMarbleStatuses`), définitions de partie (`validateGameDefinition`, `validateGameDefinitions`), contenu du jeu au démarrage, sacs préfaits et règles de construction par défaut compris (`validateMarblesContent`) |
 | `marbles/core/bus.js` | Le bus d'évènements interne à la simulation |
 | `marbles/core/path.js` | Le chemin des billes : tout départ, déclencheur de sortie, destination et arrivée (`travel`, `arrive`, `redirect`), les déplacements des actions, l'éjection (`ejectFromSlot`), le retrait par usure (`retireMarble`), la place libre en main (`handRoom`) |
 | `marbles/core/choices.js` | Les cibles au choix : les cibles valides par zone, le choix lui-même (`chooseTargets`, qui suspend l'action par `ChoiceSuspension`), la réponse rejouée (`answerOf`), le refus d'une réponse (`chooseRefusal`), la forme publique d'une cible (`targetRef`) |
 | `marbles/core/run.js` | Le déroulé d'une action : bus et écouteurs, effets des billes, réactions (le pot, les statuts), valeurs passées par les statuts (`intercept`, `noteModification`), actions sur une bille, pioche, journal |
-| `marbles/core/marbles.js` | Le réducteur : état, mise en place, refus et codes de refus, actions (pioche du tour, échange, pose, résolution, choix) ; son en-tête porte la carte des modules du core |
+| `marbles/core/marbles.js` | Le réducteur : état, mise en place (`startMarblesGame`, la copie de partie d'après le sac reçu), refus et codes de refus, actions (pioche du tour, échange, pose, résolution, choix) ; son en-tête porte la carte des modules du core |
 | `marbles/core/forecast.js` | La prévision : le vrai moteur sur une copie à l'aveugle (`blindCopy`) |
-| `marbles/core/rules.js` | Les règles liées aux tables des billes, des statuts et des définitions : le point d'entrée de la simulation hors du core |
+| `marbles/core/rules.js` | Les règles liées aux tables des billes, des statuts, des définitions et des sacs préfaits : le point d'entrée de la simulation hors du core (`startGame`, `createGame`, `bagProblems`…) |
+| `marbles/core/outcome.js` | Le résultat rendu à l'hôte en fin de partie ou à l'abandon (`marblesOutcome`) |
+| `marbles/host/collection.js` | Le fournisseur de collection (`{ unlockedMarbles }`) ; le provisoire, tout le catalogue (`catalogCollection`) |
+| `marbles/host/bag-store.js` | Le magasin des emplacements de sacs du joueur, en mémoire (`createMemoryBagStore`) |
+| `marbles/host/entry.js` | Le contrat avec Templeton : le point d'entrée unique (`createMarblesLauncher`) et sa sortie, le résultat |
 | `marbles/view/screen.js` | L'écran de jeu et sa table de touches |
 | `marbles/view/card-menu.js` | Le menu horizontal à fiches, commun aux menus des piles et à celui des statuts |
 | `marbles/view/pile-screen.js` | Le menu d'une pile de billes : sac, défausse ou pot (Maj+S, Maj+D, Maj+P) |
 | `marbles/view/status-screen.js` | Le menu des statuts de la partie (Maj+A) |
 | `marbles/view/goal-screen.js` | Le menu de l'objectif et des règles (Maj+O) |
+| `marbles/view/bag-menu.js` | Le menu des sacs préfaits, avant une partie, en mode debug |
 | `marbles/view/card.js` | La fiche d'une bille, lue dans le modèle `MARBLE_CARD_MODEL` |
 | `lib/detail-card.js` | Le mécanisme générique des fiches : assemblage et curseur secondaire |
 | `lib/real-time.js` | L'horloge temps réel à deux moteurs (images et minuterie) de l'écran |
-| `marbles/view/narration.js` | Ce qui se dit, à partir de l'état, du journal et de la prévision (pur), point d'entrée de ses modules (`marbles/view/narration/`) : `effects.js` (vocabulaire, effets joués, prévus et imprimés), `focus.js` (lignes de curseur et d'état), `forecast.js` (confirmation d'une pose, vue d'ensemble R), `journal.js` (étapes du journal, question d'un choix), `statuses.js` (les statuts : étiquette, touche A, fiche, aide E, texte d'un refus de verrou), `goal.js` (l'objectif et les règles : ouverture, touche O, fiches du menu Maj+O, résultat) |
+| `marbles/view/narration.js` | Ce qui se dit, à partir de l'état, du journal et de la prévision (pur), point d'entrée de ses modules (`marbles/view/narration/`) : `effects.js` (vocabulaire, effets joués, prévus et imprimés), `focus.js` (lignes de curseur et d'état), `forecast.js` (confirmation d'une pose, vue d'ensemble R), `journal.js` (étapes du journal, question d'un choix), `statuses.js` (les statuts : étiquette, touche A, fiche, aide E, texte d'un refus de verrou), `goal.js` (l'objectif et les règles : ouverture, touche O, fiches du menu Maj+O, résultat), `bags.js` (les sacs : la ligne d'un sac, les problèmes, le refus d'une partie) |
 | `marbles/view/resolution.js` | La présentation de la résolution : sa séquence, la résolution qu'un choix interrompt, la garde après un saut |
 | `marbles/view/sequence.js` | La file d'étapes de la séquence de résolution et ses pauses (pur) |
 | `marbles/view/history.js` | L'historique : les messages de jeu du tour précédent (pur) |
@@ -405,7 +415,7 @@ légales) passe par elles, qui y lient les statuts. Les fonctions du core qui pr
 - **Les sons** lisent le calibre d'une bille directement dans le registre : son profil
   sonore et la force de ses chocs en viennent.
 
-Le registre et le sac de test sont validés ensemble au démarrage
+Le registre et les sacs préfaits sont validés ensemble au démarrage
 (`marbles/core/validation.js`/`validateMarblesContent`, appelé par `main.js` et par l'audit du
 contenu). L'ordre du registre compte : les sacs aléatoires du simulateur y tirent leurs
 billes.
@@ -452,9 +462,9 @@ Deux champs facultatifs, sans effet de jeu :
 **Ajouter une bille** : son fichier dans `marbles/content/types/` avec son calibre, ses
 familles et sa rareté, sa ligne dans `marbles/content/types/index.js`, son nom (et sa
 description) dans chaque langue (vérifié par le domaine `marbles-content`), et sa place
-dans `STARTING_BAG` pour la mettre en jeu. En français, le nom
+dans un sac préfait (`marbles/content/bags/`) pour la mettre en jeu. En français, le nom
 porte sa forme `de` (« d'argile », « de gorille ») : `{ "base": "argile", "de": "d'argile" }`,
-pour « Tic d'argile ». Un sac est une liste d'ids : les doublons y sont permis.
+pour « Tic d'argile », « Trop d'exemplaires d'argile ».
 
 ### Effets et clauses
 
@@ -1116,7 +1126,7 @@ outils), validée de même (`validateGameDefinition`). Une définition :
 |---|---|
 | `id` | son identifiant, celui de sa clé au registre ; textes `marbles.definition.<id>.name` et `.description` |
 | `start` | les valeurs de départ (`START_KEYS`) : `firstTurnDraw`, `drawPerTurn`, et celles des caractéristiques, `handSize`, `throws`, `potCapacity` |
-| `bag` | le sac de départ (`BAG_KINDS`) : `{ kind: "list", marbles }`, ou `{ kind: "random", size, maxCopies }`, tiré par sa propre graine dérivée de celle de la partie (`randomBag`, le même tirage que le simulateur) |
+| `bag` | la source du sac (`BAG_SOURCES`, voir « Sacs ») : `{ kind: "player", buildRules? }`, un sac du joueur fourni au départ, validé selon les règles de construction ; `{ kind: "preset", bag }`, un sac préfait imposé ; `{ kind: "random", size, maxCopies }`, un sac généré, tiré par sa propre graine dérivée de celle de la partie (`randomBag`) |
 | `turns` | le nombre de tours ; null, sans limite, pour un objectif qui le permet |
 | `goal` | l'objectif (`GOALS`) : `{ kind: "free", tiers }`, `{ kind: "target", score }`, `{ kind: "endurance", minimum }` |
 | `rules` | les règles, des ids de statuts de durée `game` (vide : aucune) |
@@ -1127,7 +1137,7 @@ fichier n'est dans aucun registre, et un état construit, une prévision ou la r
 d'un choix restent autonomes. Aucune valeur de départ n'est plus recopiée en haut de
 l'état : `characteristic` lit `state.definition.start`, `startValue` les pioches,
 `turnLimit` le nombre de tours. Les valeurs de la définition par défaut viennent de
-`marbles/config/values.js` (`DEFAULT_GAME`, `STARTING_BAG`) ; les définitions de test
+`marbles/config/values.js` (`DEFAULT_GAME`) ; les définitions de test
 les reprennent.
 
 Ajouter une définition : son fichier et sa ligne dans
@@ -1135,6 +1145,109 @@ Ajouter une définition : son fichier et sa ligne dans
 `.description` dans chaque langue. Un objectif ou une condition de fin : sa
 déclaration dans `marbles/core/definitions.js` (`GOALS`, `END_CONDITIONS`), ses textes
 (`marbles/view/narration/goal.js`), son résumé au simulateur (`marbles/tools/stats.js`).
+
+### Sacs
+
+Une partie se joue avec un SAC, comme un deck (les règles pour le joueur :
+`doc/marbles-rules.md`, section 14). Format, règles de construction, problèmes et
+emplacements : en-tête de `marbles/core/bags.js`. Quatre couches, chacune à sa place :
+
+| Couche | Où | Qui la possède |
+|---|---|---|
+| le catalogue, toutes les billes | `marbles/content/types/` | le minijeu |
+| la collection, les billes débloquées | Templeton ; le minijeu n'en reçoit que la liste, par un fournisseur (`marbles/host/collection.js`) | Templeton |
+| les sacs, des compositions | préfaits : `marbles/content/bags/` ; du joueur : ses emplacements (`marbles/host/bag-store.js`) | le minijeu (préfaits), le joueur (les siens) |
+| la partie, la copie d'un sac | l'état (`marbles/core/marbles.js`) | la partie, le temps qu'elle dure |
+
+**Un sac**, sérialisable, sans état de partie : `{ id, name?, marbles: [{ marble, count }] }`.
+Un sac préfait n'a pas de `name` : `marbles.bag.<id>.name`, en minuscules. Une forme
+fausse lève (`validateBagFormat`) ; une bille inconnue ou non débloquée, une taille ou
+des exemplaires hors règles sont des PROBLÈMES (`bagProblems`), `{ code, ... }`, dans un
+ordre fixe : les billes d'abord, puis chaque sorte de règle. Leurs textes :
+`marbles.bagProblem.<code>`, dits par `marbles/view/narration/bags.js`.
+
+**Les règles de construction** : un objet indexé par sorte (`BUILD_RULE_KINDS` : `size`,
+`copies`), celles par défaut dans les réglages (`BAG_BUILD_RULES`). Une définition en
+donne de propres, `bag.buildRules`, fusionnées sorte par sorte (`mergeBuildRules`) : une
+sorte donnée remplace celle par défaut, `null` la retire, une sorte nouvelle s'ajoute.
+Ajouter une sorte (« une seule famille », « taille exacte ») : son entrée dans
+`BUILD_RULE_KINDS` (`validate`, `check`), les codes et textes de ses problèmes.
+
+**Le départ** (`startMarblesGame`, `rules.startGame`) : la définition validée, puis le
+sac selon sa source. Un sac du joueur est requis et validé (règles de la définition,
+collection reçue) : invalide, la partie REFUSE de démarrer, `{ ok: false, problems }`.
+Un sac imposé est le sac préfait du registre, sans collection ni règles. Un sac généré
+est tiré. Fournir un sac à une définition qui impose ou génère le sien, ou n'en
+fournir aucun pour un sac du joueur, lève (une faute de programmation).
+`rules.createGame` lève avec les problèmes, pour les outils et les vérifications ;
+`unchecked` (les outils) saute les règles de construction, jamais la bille inconnue.
+
+**La copie de partie** : les exemplaires du sac, déroulés dans l'ordre de sa composition
+puis mélangés, deviennent le sac de pioche (`state.bag`). Un exemplaire n'est ensuite
+qu'un id dans une zone ; son état propre (usure, bonus, tours en main) vit dans la zone
+qui le porte (en-tête de `marbles/core/marbles.js`). Aucun identifiant d'exemplaire :
+aucune règle ne suit un exemplaire d'une zone à l'autre ; il viendra avec la première
+qui le demande. Le sac reçu n'est jamais référencé : rien de ce qui arrive en partie ne
+le change, ni la collection. Le nombre d'exemplaires, toutes zones réunies, est
+constant et vaut `state.bagOrigin.size` (`bagOrigin` : `{ id, size }`, l'id du sac reçu,
+null pour un sac généré) ; vérifié à chaque action par les parties jouées au hasard
+(`marbles/checks/helpers.js`/`playRandomMarblesGame`) et, sac gelé, par le domaine
+`marbles-bags`.
+
+**Le contrat avec Templeton** (`marbles/host/entry.js`) : un point d'entrée unique,
+`launchMarbles({ definition, bag, collection, seed, onEnd })`, composé une fois par
+`main.js` (`createMarblesLauncher({ rules, openGame })`) ; il rend `{ ok: true }` (l'écran
+ouvert) ou `{ ok: false, problems }`. Une sortie unique : `onEnd(result)`, une seule
+fois, à la fermeture de l'écran (`makeMarblesScreen`, option `onClose`), avec le
+RÉSULTAT (`marbles/core/outcome.js`/`marblesOutcome`, son format en en-tête) :
+`{ definition, bag, goal, end, outcome, tier?, held?, score, turnsPlayed, bagSize, values }`,
+`end` valant `"abandon"` et `outcome` `"abandoned"` pour une partie quittée avant sa
+fin, sans palier ni victoire. Le minijeu ne décide d'aucune récompense ni d'aucun
+déblocage ; `main.js` n'en fait rien encore (en mode debug, la console le montre).
+
+**Le lancement depuis le menu principal** : « Partie de billes » lance la définition
+par défaut (un sac du joueur) avec le sac de départ (`STARTER_BAG`) et le fournisseur
+provisoire (tout le catalogue). En mode debug, un menu vertical des sacs préfaits
+s'ouvre d'abord (`marbles/view/bag-menu.js`) : une ligne par sac, « sac du Trésor,
+15 billes », puis « Retour » ; Entrée sur un sac referme le menu et lance la partie
+(la quitter ramène au menu principal) ; Échap ou Retour reviennent au menu principal.
+La console (`window.debugStartMarbles(seed)`) lance le sac de départ, sans menu.
+
+**Les emplacements du joueur** : `BAG_SLOTS` (5), chacun `null` ou un sac ; des
+fonctions pures (`emptyBagSlots`, `withBagSlot`) et un magasin
+(`{ list, read, write, clear }`, copies en entrée comme en sortie), aujourd'hui en
+mémoire seulement (`createMemoryBagStore`). Aucune interface de construction de sac.
+
+#### Brancher la collection de Templeton (proposition)
+
+Templeton sait déjà ce qui a été découvert, par deux faits neutres de la session
+(`doc/collections.md`) : `acquiredItems` (un objet acquis au moins une fois, écrit par
+`core/bag.js`/`addItem`, seul point d'entrée dans l'inventaire) et
+`observedEntityTypes`. La collection de billes sera une collection comme les autres
+(un fichier de `collections/`, des entrées `{ item: "marble_<id>" }`, un objet par bille
+dans `config/items-values.js`) : une bille se DÉBLOQUE quand son objet est acquis, par
+n'importe quelle source (récompense, achat, ramassage). L'adaptateur, dans `main.js`
+ou un petit module de la vue, lit la session courante à chaque lancement :
+`{ unlockedMarbles: () => collectionEntries(...).filter(découverte).map(id de bille) }`,
+d'après `core/collections.js` (`discoveryFacts(session)`). Le minijeu n'en voit que la
+liste ; la correspondance objet-bille vit dans la collection, jamais dans
+`marbles/`. Hors partie (menu principal, sans session), l'adaptateur rend le sac de
+départ seul, ou tout le catalogue en mode debug.
+
+#### Enregistrer les emplacements dans la sauvegarde (proposition)
+
+La session EST la sauvegarde (`doc/save.md`) : les emplacements y entrent comme un champ
+de la session, `session.marbleBags = [sac | null, ...]` (`BAG_SLOTS` entrées), créé vide
+par `core/state.js`/`createInitialState`, sans autre format que celui des sacs. Un
+magasin « session » (même interface que `createMemoryBagStore`) lit et écrit ce champ
+par des transactions du core (un module à créer : `saveMarbleBag(session, index,
+bag) -> session`, validé par `withBagSlot`), la vue posant la session rendue, comme
+pour tout geste. À la relecture (`core/save-migrate.js`) : une ancienne sauvegarde
+reçoit des emplacements vides ; un sac qui cite une bille renommée passe par
+`config/save-renames.js` (une nouvelle catégorie, les ids de billes) ; une bille
+retirée reste dans le sac, où elle devient un problème « bille inconnue » au
+lancement, jamais une erreur de lecture. Les sacs préfaits n'y sont jamais copiés :
+ce sont des données du jeu.
 
 ### Le bus d'évènements
 

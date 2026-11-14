@@ -93,6 +93,7 @@ import "../marbles/view/pile-screen.js";
 import MARBLE_TYPES from "../marbles/content/types/index.js";
 import MARBLE_STATUSES from "../marbles/content/statuses/index.js";
 import { GAME_DEFINITIONS } from "../marbles/content/definitions/index.js";
+import { PRESET_BAGS } from "../marbles/content/bags/index.js";
 
 const KEY_PATTERN = /^[a-z][a-zA-Z0-9_]*(\.[a-zA-Z0-9_]+)+$/;
 
@@ -379,10 +380,10 @@ export async function auditContent() {
   checkStrings("billes, sons", { profiles: MARBLE_SOUND_PROFILES, audio: MARBLES_AUDIO });
   // La balise propre d'une bille (son champ `beacon`, facultatif).
   checkStrings("billes, balises", Object.fromEntries(Object.entries(MARBLE_TYPES).filter(([, type]) => type.beacon !== undefined).map(([id, type]) => [id, type.beacon])));
-  // Les billes elles-mêmes (marbles/content/types/), les statuts et les définitions de
-  // partie, comme au démarrage du jeu.
+  // Les billes elles-mêmes (marbles/content/types/), les statuts, les sacs préfaits et
+  // les définitions de partie, comme au démarrage du jeu.
   try {
-    validateMarblesContent(MARBLE_TYPES, MARBLE_STATUSES, GAME_DEFINITIONS);
+    validateMarblesContent(MARBLE_TYPES, MARBLE_STATUSES, GAME_DEFINITIONS, PRESET_BAGS);
   } catch (error) {
     report("billes", "marbles/content/types", "table invalide", error.message);
   }

@@ -13,8 +13,8 @@
 //          copie, qui doit se nommer) ;
 //   start  ses valeurs de départ : firstTurnDraw, drawPerTurn, handSize, throws,
 //          potCapacity ;
-//   bag    son sac de départ : { kind: "list", marbles } ou { kind: "random", size,
-//          maxCopies } ;
+//   bag    la source de son sac : { kind: "player", buildRules? }, { kind: "preset",
+//          bag } ou { kind: "random", size, maxCopies } ;
 //   turns  son nombre de tours ;
 //   goal   son objectif, { kind, ... } ;
 //   rules  ses règles, une liste (vide : aucune).

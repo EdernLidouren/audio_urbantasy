@@ -1,5 +1,5 @@
 // Vérifications des DÉFINITIONS DE PARTIE du jeu des billes (marbles/core/definitions.js) :
-// leur validation, leur copie dans l'état, le sac de départ (liste ou tirage), et ce
+// leur validation, leur copie dans l'état, la source du sac (fourni ou tiré), et ce
 // que les outils en font (surcharges, recherche par id). Lancées par
 // core/checks/index.js/runChecks (`node tools/run-checks.js marbles-definitions`).
 
@@ -7,11 +7,11 @@ import { throws } from "../../lib/check.js";
 import { NO_STATUSES, endTurn, ordinaryInstances, ruleInstance, ruleInstances, useCharges } from "../core/statuses.js";
 import { applyStatus as gain } from "../content/effects.js";
 import { createSeed } from "../../lib/rng.js";
-import { randomBag, startingBag, tierOf, turnLimit, turnsHeld } from "../core/definitions.js";
+import { randomBag, startingList, tierOf, turnLimit, turnsHeld } from "../core/definitions.js";
 import { validateGameDefinition, validateGameDefinitions } from "../core/validation.js";
 import { createMarblesRules } from "../core/rules.js";
-import { DEFAULT_GAME_DEFINITION, GAME_RULES, definitionById, withSettings } from "../tools/game-rules.js";
-import { FIXTURE_DEFINITION, FIXTURE_STATUSES, FIXTURE_TYPES, fixtureRules } from "./fixtures/marbles.js";
+import { DEFAULT_GAME_DEFINITION, GAME_RULES, definitionById, gameSetup, withSettings } from "../tools/game-rules.js";
+import { FIXTURE_BAG, FIXTURE_DEFINITION, FIXTURE_STATUSES, FIXTURE_TYPES, fixtureRules } from "./fixtures/marbles.js";
 import { caughtMessage, eventTypes, forecastMatches, inHand, marblesPlayState, mustReduce, overState, placed, playRandomMarblesGame, triangleOf, withSizes } from "./helpers.js";
 
 const rules = fixtureRules();
@@ -34,7 +34,8 @@ export default function checkMarblesDefinitions(run) {
 // playRandomMarblesGame), aucune action verrouillée acceptée, un résultat juste.
 function checkGameDefinitions(run) {
   for (const definition of Object.values(GAME_RULES.definitions)) {
-    const played = { ...GAME_RULES, createGame: (seed) => GAME_RULES.createGame(seed, definition) };
+    const setup = gameSetup(definition);
+    const played = { ...GAME_RULES, createGame: (seed) => GAME_RULES.createGame(seed, setup.definition, setup.options) };
     const faults = [];
     for (let seed = 1; seed <= 6; seed++) faults.push(...playRandomMarblesGame(played, seed, {}, new Set()).map((fault) => `graine ${seed} : ${fault}`));
     run.same(`${definition.id} : aucune anomalie`, [], faults.slice(0, 3));
@@ -152,9 +153,19 @@ function checkValidation(run) {
   run("main plus petite que la première pioche refusée", true, refused({ start: { ...FIXTURE_DEFINITION.start, handSize: 4 } }));
   run("tours nuls refusés", true, refused({ turns: 0 }));
   run("objectif inconnu refusé", true, refused({ goal: { kind: "nope" } }));
-  run("sac de sorte inconnue refusé", true, refused({ bag: { kind: "nope" } }));
-  run("sac : bille inconnue refusée", true, refused({ bag: { kind: "list", marbles: ["nope"] } }));
-  run("sac vide permis", false, refused({ bag: { kind: "list", marbles: [] } }));
+  run("source de sac inconnue refusée", true, refused({ bag: { kind: "nope" } }));
+  run("sac du joueur : sans règles propres permis", false, refused({ bag: { kind: "player" } }));
+  run("sac du joueur : règles propres permises", false, refused({ bag: { kind: "player", buildRules: { size: { min: 15, max: 15 } } } }));
+  run("sac du joueur : une règle retirée (null) permise", false, refused({ bag: { kind: "player", buildRules: { copies: null } } }));
+  run("sac du joueur : règle inconnue refusée", true, refused({ bag: { kind: "player", buildRules: { nope: {} } } }));
+  run("sac du joueur : règle mal formée refusée", true, refused({ bag: { kind: "player", buildRules: { size: { min: 5, max: 2 } } } }));
+  run("sac du joueur : champ inconnu refusé", true, refused({ bag: { kind: "player", marbles: [] } }));
+  run("sac imposé : sans registre de sacs, inconnu", true, refused({ bag: { kind: "preset", bag: "starter" } }));
+  run(
+    "sac imposé : un sac du registre permis",
+    true,
+    !throws(() => validateGameDefinition({ ...FIXTURE_DEFINITION, bag: { kind: "preset", bag: "mine" } }, FIXTURE_TYPES, NO_STATUSES, { mine: { id: "mine", marbles: [] } }))
+  );
   run("sac tiré : taille nulle refusée", true, refused({ bag: { kind: "random", size: 0, maxCopies: null } }));
   run("sac tiré : impossible avec la limite d'exemplaires", true, refused({ bag: { kind: "random", size: 100, maxCopies: 1 } }));
   run("sac tiré : sans limite permis", false, refused({ bag: { kind: "random", size: 30, maxCopies: null } }));
@@ -178,10 +189,11 @@ function checkState(run) {
   run("annonce du début de tour : le nombre de tours de la définition", 7, rules.reduce(rules.createGame(5, { turns: 7 }), { type: "draw" }).events[0].turnCount);
 }
 
-// Le sac de départ : une liste telle quelle (puis mélangée par la partie), ou un tirage
-// déterministe par sa propre graine.
+// Les billes de départ : celles du sac reçu, dans l'ordre de sa composition (puis
+// mélangées par la partie), ou un tirage déterministe par sa propre graine.
 function checkBag(run) {
-  run.same("liste : telle quelle avant le mélange", ["a", "b"], startingBag({ bag: { kind: "list", marbles: ["a", "b"] } }, 1, FIXTURE_TYPES));
+  const received = { id: "x", marbles: [{ marble: "a", count: 2 }, { marble: "b", count: 1 }] };
+  run.same("sac reçu : ses exemplaires dans l'ordre de sa composition, avant le mélange", ["a", "a", "b"], startingList({ bag: { kind: "player" } }, 1, FIXTURE_TYPES, received));
   const random = { bag: { kind: "random", size: 8, maxCopies: 1 } };
   const bagOf = (seed) => [...rules.createGame(seed, random).bag].sort().join();
   run("tirage : même graine, même sac", bagOf(3), bagOf(3));
@@ -194,7 +206,7 @@ function checkBag(run) {
     randomBag({ size: 5, maxCopies: null }, createSeed("x"), ["a", "b", "c"])
   );
   // Le tirage n'entame pas le hasard de la partie : le même mélange qu'une liste.
-  const listed = rules.createGame(9, { bag: FIXTURE_DEFINITION.bag.marbles });
+  const listed = rules.createGame(9, { bag: FIXTURE_BAG });
   run("tirage : le hasard de la partie reste celui de sa graine", rules.createGame(9).rngState, listed.rngState);
 }
 
@@ -207,5 +219,12 @@ function checkTools(run) {
   run("surcharge : tours", 4, changed.turns);
   run("surcharge : la définition reçue intacte", false, DEFAULT_GAME_DEFINITION.start.handSize === 7 || DEFAULT_GAME_DEFINITION.turns === 4);
   run("surcharge : nom inconnu refusé", true, throws(() => withSettings(DEFAULT_GAME_DEFINITION, { maxHandSize: 7 })));
-  run("chaque définition du jeu se joue", true, Object.values(GAME_RULES.definitions).every((definition) => GAME_RULES.reduce(GAME_RULES.createGame(1, definition), { type: "draw" }).ok));
+  run(
+    "chaque définition du jeu se joue",
+    true,
+    Object.values(GAME_RULES.definitions).every((definition) => {
+      const setup = gameSetup(definition);
+      return GAME_RULES.reduce(GAME_RULES.createGame(1, setup.definition, setup.options), { type: "draw" }).ok;
+    })
+  );
 }

@@ -1,5 +1,5 @@
-// Jeu des billes : réglages, modèle de fiche, sac de test, et tout ce que la vue
-// fait entendre. Donnée pure, zéro import. Les billes elles-mêmes sont du contenu,
+// Jeu des billes : réglages, modèle de fiche, règles de construction des sacs, et
+// tout ce que la vue fait entendre. Donnée pure, zéro import. Les billes elles-mêmes sont du contenu,
 // une par fichier : marbles/content/types/ (champs décrits dans marbles/content/types/index.js).
 
 // La PARTIE PAR DÉFAUT : les valeurs de sa définition (marbles/content/definitions/
@@ -24,9 +24,9 @@ export const DEFAULT_GAME = {
   // Le nombre de tours (definition.turns).
   turns: 10,
   // Les PALIERS de la partie libre (definition.goal.tiers) : des repères techniques
-  // PROVISOIRES, tirés du simulateur (joueur glouton, sac de test du premier set,
-  // 1000 parties) : les 25e, 50e et 90e centiles du score final.
-  tiers: { bronze: 120, silver: 148, gold: 193 },
+  // PROVISOIRES, tirés du simulateur (joueur glouton, sac de départ, 1000 parties) :
+  // les 25e, 50e et 90e centiles du score final.
+  tiers: { bronze: 87, silver: 96, gold: 113 },
 };
 
 export const MARBLES_SETTINGS = {
@@ -656,40 +656,21 @@ export const STATUS_CARD_MODEL = {
   ],
 };
 
-// Sac de test : un exemplaire de chacune des 30 billes du premier set, le sac de la
-// partie par défaut
-// (DEFAULT_GAME). Une liste d'ids, pas un dérivé du registre (marbles/content/types/) :
-// un sac peut porter plusieurs exemplaires d'une bille. Validé au démarrage avec les
-// définitions (marbles/core/validation.js/validateMarblesContent).
-export const STARTING_BAG = [
-  "copper",
-  "quicksilver",
-  "ruby",
-  "ingot",
-  "bloodstone",
-  "moon",
-  "comet",
-  "galaxy",
-  "eclipse",
-  "star",
-  "bubble",
-  "ghost",
-  "pearl",
-  "ocean",
-  "snow_globe",
-  "bee",
-  "dolphin",
-  "turtle",
-  "spider",
-  "dragon",
-  "sling_shot",
-  "fireball",
-  "tornado",
-  "grenade",
-  "red_devil",
-  "clay",
-  "cats_eye",
-  "agate",
-  "steel",
-  "soda",
-];
+// LES SACS (marbles/core/bags.js, en-tête) : une partie se joue avec un SAC, comme un
+// deck. Les RÈGLES DE CONSTRUCTION PAR DÉFAUT, celles d'un sac du joueur quand sa
+// définition de partie n'en donne pas d'autres (elle peut en remplacer, en retirer
+// ou en ajouter une, sorte par sorte : marbles/core/bags.js/mergeBuildRules). Une
+// entrée par SORTE de règle (marbles/core/bags.js/BUILD_RULE_KINDS) :
+//   size    la taille du sac, en billes : de `min` à `max`, bornes comprises ;
+//   copies  les exemplaires au plus d'une même bille, selon sa RARETÉ (une entrée
+//           par rareté de MARBLE_RARITIES).
+// Validées au démarrage (marbles/core/validation.js/validateMarblesContent).
+export const BAG_BUILD_RULES = {
+  size: { min: 12, max: 20 },
+  copies: { common: 3, uncommon: 3, rare: 2, epic: 2, legendary: 1 },
+};
+
+// Le nombre d'EMPLACEMENTS de sacs du joueur : chacun vide, ou un sac qu'il a composé
+// (marbles/core/bags.js, « Emplacements »).
+export const BAG_SLOTS = 5;
+

@@ -7,16 +7,30 @@
 //
 // Et ce que les outils font d'une définition : la trouver par son id, lui appliquer
 // des SURCHARGES de valeurs (les options --hand-size, --turns… du simulateur, le champ
-// `settings` d'un état construit). Pur, sans Node : la lecture d'une définition dans un
-// fichier est l'affaire de marbles/tools/definition-option.js.
+// `settings` d'un état construit), lui donner le SAC choisi (gameSetup). Pur, sans
+// Node : la lecture d'une définition ou d'un sac dans un fichier est l'affaire de
+// marbles/tools/definition-option.js et marbles/tools/bag-option.js.
 
 import { createMarblesRules } from "../core/rules.js";
 import { START_KEYS } from "../core/definitions.js";
 import MARBLE_TYPES from "../content/types/index.js";
 import MARBLE_STATUSES from "../content/statuses/index.js";
 import { DEFAULT_DEFINITION, GAME_DEFINITIONS } from "../content/definitions/index.js";
+import { PRESET_BAGS, STARTER_BAG } from "../content/bags/index.js";
 
-export const GAME_RULES = createMarblesRules(MARBLE_TYPES, MARBLE_STATUSES, GAME_DEFINITIONS);
+export const GAME_RULES = createMarblesRules(MARBLE_TYPES, MARBLE_STATUSES, GAME_DEFINITIONS, PRESET_BAGS);
+
+// Le SAC PAR DÉFAUT des outils pour une définition qui attend un sac du joueur, quand
+// aucun n'est choisi : le sac de départ (celui que le jeu fournit au lancement), ou,
+// s'il n'est pas valide selon les règles de construction de la définition (une taille
+// imposée), le premier sac préfait qui l'est, dans l'ordre du registre. Aucun : une
+// erreur claire.
+export function defaultToolsBag(definition) {
+  const candidates = [PRESET_BAGS[STARTER_BAG], ...Object.values(PRESET_BAGS)];
+  const bag = candidates.find((candidate) => GAME_RULES.bagProblems(candidate, definition).length === 0);
+  if (bag === undefined) throw new Error(`définition "${definition.id}" : aucun sac préfait valide selon ses règles de construction ; choisir un sac (--bag).`);
+  return bag;
+}
 
 // La définition que lance le jeu.
 export const DEFAULT_GAME_DEFINITION = GAME_DEFINITIONS[DEFAULT_DEFINITION];
@@ -52,7 +66,23 @@ export function settingOf(definition, name) {
   return name === "turns" ? definition.turns : definition.start[name];
 }
 
-// Une définition dont le sac de départ est remplacé par cette liste d'ids.
-export function withBag(definition, marbles) {
-  return { ...definition, bag: { kind: "list", marbles } };
+// LE SAC CHOISI d'un outil (marbles/tools/bag-option.js), un de :
+//   { kind: "definition" }                  celui de la définition : son sac imposé ou
+//                                           généré, ou, pour un sac du joueur, le sac
+//                                           par défaut des outils (defaultToolsBag) ;
+//   { kind: "bag", bag, source, unchecked } un sac (préfait, ou lu d'un fichier),
+//                                           fourni comme sac du joueur ; `unchecked` :
+//                                           hors règles de construction ;
+//   { kind: "random", size, maxCopies }     un sac généré, tiré par partie.
+// -> { definition, options } : la définition à jouer (sa source de sac remplacée si
+// le choix l'impose : un sac fourni en fait un sac du joueur, un tirage un sac généré)
+// et les options du départ (marbles/core/rules.js/createGame).
+export function gameSetup(definition, choice = { kind: "definition" }) {
+  if (choice.kind === "random") return { definition: { ...definition, bag: { kind: "random", size: choice.size, maxCopies: choice.maxCopies } }, options: {} };
+  if (choice.kind === "bag") {
+    const played = definition.bag.kind === "player" ? definition : { ...definition, bag: { kind: "player" } };
+    return { definition: played, options: { bag: choice.bag, unchecked: choice.unchecked === true } };
+  }
+  if (choice.kind !== "definition") throw new Error(`sac : choix inconnu "${choice.kind}".`);
+  return { definition, options: definition.bag.kind === "player" ? { bag: defaultToolsBag(definition) } : {} };
 }

@@ -19,8 +19,20 @@
 //
 // ÉTAT sérialisable, à part entière (jamais lié à la session du jeu principal,
 // aucune persistance aujourd'hui) :
-//   { rngState, definition, turn, score, speed, mass, stage, bag, hand, discard,
-//     triangle, pot, lost, swapUsed, throwsUsed, tally, statuses, pendingChoice, result }
+//   { rngState, definition, bagOrigin, turn, score, speed, mass, stage, bag, hand,
+//     discard, triangle, pot, lost, swapUsed, throwsUsed, tally, statuses,
+//     pendingChoice, result }
+// LA COPIE DE PARTIE : la partie reçoit un SAC (marbles/core/bags.js) et en déroule
+// les exemplaires, mélangés, dans `bag` (startMarblesGame). Chaque exemplaire n'est
+// ensuite qu'un id dans une zone (sac de pioche, main, triangle, défausse, pot,
+// billes perdues) : son état propre (usure, bonus, tours en main) vit dans la zone
+// qui le porte et disparaît par construction quand il en sort. Aucun identifiant
+// d'exemplaire : aucune règle ne suit un exemplaire d'une zone à l'autre (il viendra
+// avec la première qui le demande). Le sac reçu n'est jamais référencé : rien de ce
+// qui arrive en partie ne le modifie. Le NOMBRE d'exemplaires, toutes zones réunies,
+// ne change jamais (une bille perdue reste dans `lost`) : il vaut `bagOrigin.size`.
+// `bagOrigin` : { id, size }, l'id du sac reçu (null pour un sac généré) et son
+// nombre de billes, que rend le résultat pour l'hôte (marbles/core/outcome.js).
 // `definition` : la COPIE de la définition de la partie (marbles/core/definitions.js) :
 // ses valeurs de départ (pioches, et celles des CARACTÉRISTIQUES, jamais lues
 // directement par une règle : l'accès unique, marbles/core/statuses.js/characteristic,
@@ -125,7 +137,9 @@ import { SLOTS, nextSlot, previousSlot } from "./zones.js";
 import { emptyTally } from "./tally.js";
 import { TALLY_COUNTERS, maxWearOf } from "./content.js";
 import { validateGameDefinition } from "./validation.js";
-import { endReached, gameResult, startValue, startingBag, tierOf, turnLimit } from "./definitions.js";
+import { buildRulesOf, endReached, gameResult, startValue, startingList, tierOf, turnLimit } from "./definitions.js";
+import { NO_BAGS, bagProblems, describeProblem, validateBagFormat } from "./bags.js";
+import { BAG_BUILD_RULES } from "../config/values.js";
 import { drawMarbles, intercept, noteModification, shuffled, sourceOf, transact } from "./run.js";
 import { answerOf, chooseRefusal, targetRef } from "./choices.js";
 import { retireMarble, travel } from "./path.js";
@@ -166,39 +180,77 @@ export function impactOf(speed, mass) {
 
 // --- Mise en place ---
 
-// `seed` : nombre ou chaîne (lib/rng.js/createSeed). `definition` : la définition de
-// la partie (marbles/core/definitions.js), validée ici, puis copiée dans l'état : son
-// sac de départ, mélangé par le hasard de la partie ; ses règles, des statuts
-// verrouillés posés dès le départ, en silence (marbles/core/statuses.js/ruleInstance).
-export function createMarblesGame(seed, definition, types, statuses = NO_STATUSES) {
-  validateGameDefinition(definition, types, statuses);
-  const shuffle = shuffled(startingBag(definition, seed, types), createSeed(seed));
+// LE DÉPART D'UNE PARTIE, d'après sa définition et, pour un sac du joueur, le sac
+// fourni. `seed` : nombre ou chaîne (lib/rng.js/createSeed). `definition` : la
+// définition de la partie (marbles/core/definitions.js), validée ici, puis copiée dans
+// l'état ; son sac (en-tête, « la copie de partie »), mélangé par le hasard de la
+// partie ; ses règles, des statuts verrouillés posés dès le départ, en silence
+// (marbles/core/statuses.js/ruleInstance). -> { ok: true, state, problems: [] }, ou { ok: false, state: null, problems }
+// pour un sac du joueur invalide (marbles/core/bags.js/bagProblems) : la partie refuse
+// de démarrer. Une définition mal formée, un sac mal formé, un sac fourni à une
+// définition qui impose ou génère le sien, ou aucun sac pour un sac du joueur LÈVENT :
+// des fautes de programmation ou de données, pas un choix du joueur.
+// `options` :
+//   bag        le sac du joueur (source "player"), null sinon ;
+//   unlocked   les ids des billes débloquées (la collection, par son fournisseur), ou
+//              null pour ne pas la consulter ;
+//   presets    le registre des sacs préfaits, que cite un sac imposé ;
+//   unchecked  vrai : les règles de construction ne s'appliquent pas (les outils, pour
+//              essayer un sac hors règles) ; une bille inconnue reste refusée.
+export function startMarblesGame(seed, definition, types, statuses = NO_STATUSES, { bag = null, unlocked = null, presets = NO_BAGS, unchecked = false } = {}) {
+  validateGameDefinition(definition, types, statuses, presets);
+  const source = definition.bag.kind;
+  if (source !== "player" && bag !== null) {
+    throw new Error(`marbles, définition "${definition.id}" : elle ${source === "preset" ? "impose" : "génère"} son sac, aucun sac à fournir.`);
+  }
+  if (source === "player") {
+    if (bag === null) throw new Error(`marbles, définition "${definition.id}" : un sac du joueur est attendu.`);
+    validateBagFormat(bag);
+    const problems = bagProblems(bag, unchecked ? {} : buildRulesOf(definition, BAG_BUILD_RULES), { types, unlocked: unchecked ? null : unlocked });
+    if (problems.length > 0) return { ok: false, state: null, problems };
+  }
+  const received = source === "player" ? bag : source === "preset" ? presets[definition.bag.bag] : null;
+  const list = startingList(definition, seed, types, received);
+  const shuffle = shuffled(list, createSeed(seed));
   return {
-    rngState: shuffle.rngState,
-    definition: structuredClone(definition),
-    turn: 1,
-    score: 0,
-    speed: 0,
-    mass: 1,
-    stage: "draw",
-    bag: shuffle.list,
-    hand: [],
-    discard: [],
-    triangle: { leftBase: null, rightBase: null, apex: null },
-    pot: [],
-    lost: [],
-    swapUsed: false,
-    throwsUsed: 0,
-    // Les valeurs de partie, à zéro : la portée « cette partie » ne revient à zéro
-    // qu'ici.
-    tally: emptyTally(TALLY_COUNTERS),
-    // Les règles de la partie, en tête des statuts ; aucun autre.
-    statuses: definition.rules.map(ruleInstance),
-    // Aucun choix en attente.
-    pendingChoice: null,
-    // Pas encore de résultat.
-    result: null,
+    ok: true,
+    problems: [],
+    state: {
+      rngState: shuffle.rngState,
+      definition: structuredClone(definition),
+      bagOrigin: { id: received?.id ?? null, size: list.length },
+      turn: 1,
+      score: 0,
+      speed: 0,
+      mass: 1,
+      stage: "draw",
+      bag: shuffle.list,
+      hand: [],
+      discard: [],
+      triangle: { leftBase: null, rightBase: null, apex: null },
+      pot: [],
+      lost: [],
+      swapUsed: false,
+      throwsUsed: 0,
+      // Les valeurs de partie, à zéro : la portée « cette partie » ne revient à zéro
+      // qu'ici.
+      tally: emptyTally(TALLY_COUNTERS),
+      // Les règles de la partie, en tête des statuts ; aucun autre.
+      statuses: definition.rules.map(ruleInstance),
+      // Aucun choix en attente.
+      pendingChoice: null,
+      // Pas encore de résultat.
+      result: null,
+    },
   };
+}
+
+// Une partie neuve, ou une erreur qui liste les problèmes du sac : startMarblesGame
+// pour qui n'a pas de joueur à qui les dire (les outils, les vérifications).
+export function createMarblesGame(seed, definition, types, statuses = NO_STATUSES, options = {}) {
+  const start = startMarblesGame(seed, definition, types, statuses, options);
+  if (!start.ok) throw new Error(`marbles, définition "${definition.id}" : sac "${options.bag?.id}" refusé (${start.problems.map(describeProblem).join(" ; ")}).`);
+  return start.state;
 }
 
 // --- Refus ---

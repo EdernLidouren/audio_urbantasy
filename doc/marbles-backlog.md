@@ -33,3 +33,8 @@ Les points repoussés « à plus tard », une ligne par point, avec son origine 
 - Une règle d'intensité supérieure à 1 : une règle est aujourd'hui un id de statut, à l'intensité 1. (Itération 26.)
 - Les succès, qui liront les valeurs de partie. (`doc/marbles.md`, « Valeurs de partie ».)
 - Une étape de séquence qui attendrait la fin d'un son au lieu d'une durée. (`doc/marbles.md`, « Séquence de résolution ».)
+- Un identifiant par exemplaire dans la copie de partie : un exemplaire n'est qu'un id dans sa zone, son état propre vit dans la zone qui le porte ; il viendra avec la première règle qui suit un exemplaire d'une zone à l'autre (une bille modifiée durablement en partie). (Itération 28, `doc/marbles.md`, « Sacs ».)
+- L'interface de construction d'un sac (le joueur compose, nomme, range dans ses 5 emplacements), et l'enregistrement des emplacements dans la sauvegarde de Templeton (proposition : `doc/marbles.md`, « Sacs »). Aujourd'hui, un magasin en mémoire. (Itération 28, `marbles/host/bag-store.js`.)
+- L'adaptateur de la collection de billes de Templeton (proposition : `doc/marbles.md`, « Sacs ») ; aujourd'hui, toutes les billes du catalogue sont débloquées. (Itération 28, `marbles/host/collection.js`.)
+- Les récompenses et déblocages tirés du résultat d'une partie, par Templeton : `main.js` n'en fait rien encore. (Itération 28, `marbles/core/outcome.js`.)
+- D'autres sortes de règles de construction (« une seule famille », « taille exacte »…), par une entrée de `BUILD_RULE_KINDS`. (Itération 28, `marbles/core/bags.js`.)

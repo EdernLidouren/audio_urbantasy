@@ -5,7 +5,8 @@
 //
 //   node marbles/tools/simulate.js --games 1000 --player greedy
 //   node marbles/tools/simulate.js --player random --random-bag 13 --max-copies 2
-//   node marbles/tools/simulate.js --bag-file marbles/tools/examples/bag.txt --turns 12
+//   node marbles/tools/simulate.js --bag treasure
+//   node marbles/tools/simulate.js --bag marbles/tools/examples/bag.txt --turns 12
 //   node marbles/tools/simulate.js --games 200 --export resultats.csv
 //   node marbles/tools/simulate.js --definition free
 //
@@ -16,12 +17,15 @@
 //   --max-placements <n>   glouton : poses envisagées par tour après le premier (1)
 //   --drawn-value <x>      glouton : valeur d'une bille gagnée en main, en points
 //                          d'Impact, décimale permise (marbles/tools/drawn-value.js)
-//   --random-bag <n>       un sac aléatoire de n billes par partie, tirées dans la table
+//   --bag <id|fichier>     un sac préfait, ou le sac d'un fichier (format du jeu en
+//                          JSON, ou liste d'ids), fourni comme sac du joueur
+//   --unchecked            avec --bag : sans les règles de construction
+//   --random-bag <n>       un sac généré de n billes par partie, tirées dans la table
 //   --max-copies <n>       avec --random-bag : exemplaires d'une même bille au plus
 //                          (sans limite par défaut)
-//   --bag-file <chemin>    le sac d'un fichier (ids séparés par espaces, virgules ou
-//                          lignes, # commente ; ou liste JSON). Sans --random-bag ni
-//                          --bag-file : le sac de la définition.
+//                          Sans --bag ni --random-bag : le sac de la définition (le
+//                          sac de départ pour un sac du joueur). Détail :
+//                          marbles/tools/bag-option.js
 //   --definition <id|fichier>  la définition de partie : l'id d'une définition du
 //                          registre, ou un fichier JSON de même forme
 //                          (marbles/tools/definition-option.js) ; celle du jeu par défaut
@@ -33,9 +37,12 @@
 //
 // Mêmes options, même rapport, au caractère près, sauf la dernière ligne (durée).
 
-import { readFile, writeFile } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { installFileFetch } from "../../tools/node-fetch.js";
 import { parseArgs } from "./args.js";
+// Sans texte à charger : importé avant installFileFetch.
+import { BAG_FLAG_OPTIONS, BAG_VALUE_OPTIONS, readBagChoice } from "./bag-option.js";
 
 function integerOption(option, name) {
   const value = option(name);
@@ -44,16 +51,15 @@ function integerOption(option, name) {
   return Number(value);
 }
 
-// Les options, toutes à valeur ; la ligne de commande se lit strictement (args.js).
+// Les options à valeur (et --unchecked, sans valeur) ; la ligne de commande se lit
+// strictement (args.js).
 const KNOWN_OPTIONS = [
   "--games",
   "--seed",
   "--player",
   "--max-placements",
   "--drawn-value",
-  "--random-bag",
-  "--max-copies",
-  "--bag-file",
+  ...BAG_VALUE_OPTIONS,
   "--definition",
   "--hand-size",
   "--throws",
@@ -66,7 +72,7 @@ const KNOWN_OPTIONS = [
 
 installFileFetch();
 const { t } = await import("../../data/i18n/index.js");
-const { simulate, parseBagText } = await import("./simulation.js");
+const { simulate } = await import("./simulation.js");
 const { summarize } = await import("./stats.js");
 const { buildReport } = await import("./report.js");
 const { toCsv, toJson } = await import("./export.js");
@@ -74,21 +80,15 @@ const { readDefinitionOption } = await import("./definition-option.js");
 const name = (id) => t(`marble.${id}.name`);
 
 try {
-  const { option } = parseArgs(process.argv.slice(2), { values: KNOWN_OPTIONS });
+  const { option, flag } = parseArgs(process.argv.slice(2), { values: KNOWN_OPTIONS, flags: BAG_FLAG_OPTIONS });
 
   const seedOption = option("--seed") ?? "1";
   const seed = /^\d+$/.test(seedOption) ? Number(seedOption) : seedOption;
-  let bagMode = { kind: "test" };
-  if (option("--max-copies") !== undefined && option("--random-bag") === undefined) throw new Error("--max-copies ne vaut qu'avec --random-bag.");
+  const bagMode = readBagChoice(option, flag, (path) => readFileSync(path, "utf-8"));
   // L'extension de l'export, vérifiée avant de jouer : pas une simulation entière
   // perdue pour une faute de frappe.
   const exportOption = option("--export");
   if (exportOption !== undefined && !exportOption.endsWith(".json") && !exportOption.endsWith(".csv")) throw new Error("--export attend un chemin en .json ou en .csv.");
-  if (option("--random-bag") !== undefined) bagMode = { kind: "random", size: integerOption(option, "--random-bag"), maxCopies: integerOption(option, "--max-copies") ?? null };
-  else if (option("--bag-file") !== undefined) {
-    const source = option("--bag-file");
-    bagMode = { kind: "list", source, marbles: parseBagText(await readFile(source, "utf-8")) };
-  }
   const settings = {};
   for (const [flag, setting] of [["--hand-size", "handSize"], ["--throws", "throws"], ["--pot", "potCapacity"], ["--first-draw", "firstTurnDraw"], ["--draw", "drawPerTurn"], ["--turns", "turns"]]) {
     const value = integerOption(option, flag);

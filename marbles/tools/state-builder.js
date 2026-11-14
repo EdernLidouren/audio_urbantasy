@@ -36,7 +36,7 @@ import { SLOTS } from "../core/marbles.js";
 import { applyStatus } from "../core/statuses.js";
 import { rejectUnknownFields } from "../../lib/validate.js";
 import { turnLimit } from "../core/definitions.js";
-import { DEFAULT_GAME_DEFINITION, GAME_RULES, definitionById, withBag, withSettings } from "./game-rules.js";
+import { DEFAULT_GAME_DEFINITION, GAME_RULES, definitionById, gameSetup, withSettings } from "./game-rules.js";
 
 const FIELDS = ["seed", "turn", "stage", "score", "speed", "mass", "swapUsed", "throwsUsed", "triangle", "hand", "bag", "discard", "pot", "lost", "tally", "statuses", "definition", "settings"];
 const STAGES = ["draw", "play", "over"];
@@ -144,11 +144,13 @@ export function buildState(description = {}) {
 
   // La partie de départ porte les réglages validés et l'état du hasard ; le sac
   // est ensuite posé tel quel, sans mélange, dans l'ordre décrit.
-  // Une partie exige un sac d'au moins 3 billes : elle naît d'un sac minimal, et
-  // garde le hasard d'une partie sans mélange, celui de la graine.
+  // Elle naît d'un sac minimal fourni hors règles (une définition qui impose ou génère
+  // le sien en reçoit un du joueur), et garde le hasard d'une partie sans mélange,
+  // celui de la graine.
   const seed = description.seed ?? 0;
   const [first] = Object.keys(GAME_RULES.types);
-  const base = { ...GAME_RULES.createGame(seed, withBag(definition, [first, first, first])), rngState: createSeed(seed) };
+  const setup = gameSetup(definition, { kind: "bag", bag: { id: "case", marbles: [{ marble: first, count: 3 }] }, unchecked: true });
+  const base = { ...GAME_RULES.createGame(seed, setup.definition, setup.options), rngState: createSeed(seed) };
   const stage = description.stage ?? "play";
   if (!STAGES.includes(stage)) fail(`étape inconnue "${stage}".`);
   const turn = checkInteger(description.turn ?? 2, "turn", 1);
@@ -160,7 +162,7 @@ export function buildState(description = {}) {
   const value = (key) => GAME_RULES.characteristic({ ...base, statuses }, key);
   if (hand.length > value("handSize")) fail(`main de ${hand.length} billes, plus que sa taille en vigueur (${value("handSize")}).`);
 
-  return {
+  return withOrigin({
     ...base,
     turn,
     stage,
@@ -177,7 +179,14 @@ export function buildState(description = {}) {
     lost: marbleList(description.lost, "lost"),
     tally: tallyContent(description.tally, base.tally),
     statuses,
-  };
+  });
+}
+
+// L'origine du sac d'un état construit : aucun sac reçu (null), et pour taille les
+// billes décrites, toutes zones réunies (le nombre d'exemplaires d'une partie).
+function withOrigin(state) {
+  const size = state.bag.length + state.hand.length + state.discard.length + state.pot.length + state.lost.length + SLOTS.filter((slot) => state.triangle[slot] !== null).length;
+  return { ...state, bagOrigin: { id: null, size } };
 }
 
 // Les lancers déjà joués : entre 0 et la limite du tour.

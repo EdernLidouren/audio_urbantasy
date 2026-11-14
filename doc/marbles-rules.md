@@ -8,7 +8,7 @@ Le jeu des billes est un jeu de stratégie en solitaire, sans adresse ni adversa
 
 Chaque tour se termine par une résolution, qui produit un Impact ; l'Impact s'ajoute au Score. Le Score final est celui de la fin de partie.
 
-Une partie se joue selon sa **définition** (section 13) : ses valeurs de départ, son sac, son objectif et ses règles. La partie habituelle est une partie libre : marquer le plus de points possible en dix tours, le résultat se jugeant au palier atteint. La partie s'arrête aussi quand il ne reste plus aucune bille à jouer. Un sac vide ou une main vide seuls ne l'arrêtent pas : un tour sans bille à poser se résout à vide, tant qu'une bille reste en jeu.
+Une partie se joue selon sa **définition** (section 13) : ses valeurs de départ, son sac, son objectif et ses règles. Elle se joue avec un **sac**, comme un deck dans un jeu de cartes, composé selon des règles de construction (section 14). La partie habituelle est une partie libre : marquer le plus de points possible en dix tours, le résultat se jugeant au palier atteint. La partie s'arrête aussi quand il ne reste plus aucune bille à jouer. Un sac vide ou une main vide seuls ne l'arrêtent pas : un tour sans bille à poser se résout à vide, tant qu'une bille reste en jeu.
 
 ## 2. Le lexique
 
@@ -529,7 +529,7 @@ Cette liste est générée à partir de la table des statuts ; elle ne se modifi
 
 ### La définition d'une partie
 
-Une partie est décrite entièrement par sa **définition** : ses valeurs de départ (taille de la main, lancers, capacité du pot, pioche du premier tour, pioche par tour), son sac de départ (une liste fixe, ou un sac tiré au hasard dans la table des billes), son nombre de tours, ses conditions de fin, son objectif, et ses règles, éventuellement aucune. La partie habituelle est la définition par défaut ; un défi n'est qu'une définition de plus. En jeu, c'est aujourd'hui toujours la partie habituelle.
+Une partie est décrite entièrement par sa **définition** : ses valeurs de départ (taille de la main, lancers, capacité du pot, pioche du premier tour, pioche par tour), la source de son sac (section 14 : le sac du joueur, un sac imposé, ou un sac tiré au hasard pour les tests), son nombre de tours, ses conditions de fin, son objectif, et ses règles, éventuellement aucune. La partie habituelle est la définition par défaut ; un défi n'est qu'une définition de plus. En jeu, c'est aujourd'hui toujours la partie habituelle, avec le sac de départ.
 
 ### Quand la partie s'arrête : les conditions de fin
 
@@ -559,24 +559,74 @@ Un **verrou** est un comportement de statut (section 12, « Ce qu'un statut peut
 
 ### Les consulter
 
-- **À l'ouverture**, une seule annonce, avant celle du premier tour : l'objectif, puis chaque règle. « Objectif : 122 points en 8 tours. Règle : gravier. Les calots rapportent moitié moins de Vitesse et de Masse… »
-- **O** : l'objectif, la progression, puis le nombre de règles. « Objectif : 122 points en 8 tours. 90 sur 122, tour 5 sur 8. 1 règle. » ; en partie libre : « Objectif : libre, 10 tours. Tour 5 sur 10. Score 100, aucun palier atteint. Prochain palier : bronze à 120. » ; en endurance : « Objectif : Impact de 7 minimum chaque tour, 20 tours au plus. 4 tours tenus sur 20. »
+- **À l'ouverture**, une seule annonce, avant celle du premier tour : l'objectif, puis chaque règle. « Objectif : 78 points en 8 tours. Règle : gravier. Les calots rapportent moitié moins de Vitesse et de Masse… »
+- **O** : l'objectif, la progression, puis le nombre de règles. « Objectif : 78 points en 8 tours. 60 sur 78, tour 5 sur 8. 1 règle. » ; en partie libre : « Objectif : libre, 10 tours. Tour 5 sur 10. Score 50, aucun palier atteint. Prochain palier : bronze à 87. » ; en endurance : « Objectif : Impact de 6 minimum chaque tour, 20 tours au plus. 4 tours tenus sur 20. »
 - **Maj+O** : un menu, de gauche à droite : l'objectif, puis chaque règle, puis « Retour » ; Échap ferme. Ctrl+bas parcourt la fiche de l'objectif (sa progression, ce qui le juge, la pioche impossible) ou d'une règle (son effet) ; E dit la description de la partie ou de la règle.
-- **À la fin** : le résultat selon l'objectif, puis le score final. « Partie terminée. Palier argent atteint. Score final : 205. », « Partie terminée. Victoire : objectif atteint. Score final : 170. », « Partie terminée. Fin de l'endurance : 4 tours tenus. Score final : 80. » ; sur une pioche impossible, la raison d'abord : « Plus aucune bille à jouer. ».
+- **À la fin** : le résultat selon l'objectif, puis le score final. « Partie terminée. Palier argent atteint. Score final : 100. », « Partie terminée. Victoire : objectif atteint. Score final : 80. », « Partie terminée. Fin de l'endurance : 4 tours tenus. Score final : 80. » ; sur une pioche impossible, la raison d'abord : « Plus aucune bille à jouer. ».
 
 ### Les définitions de test
 
-Des définitions provisoires, pour tester les mécaniques ; leurs valeurs sont des repères techniques tirés du simulateur (joueur glouton, sac de test), pas un équilibrage.
+Des définitions provisoires, pour tester les mécaniques ; leurs valeurs sont des repères techniques tirés du simulateur (joueur glouton, sac de départ), pas un équilibrage.
 
-| Définition | Objectif | Règles |
+| Définition | Objectif | Sac | Règles |
+|---|---|---|---|
+| partie libre (la partie habituelle) | libre, 10 tours ; paliers bronze 87, argent 96, or 113 | du joueur | aucune |
+| défi cible | 78 points en 8 tours | imposé : le sac de départ | aucune |
+| défi endurance | Impact de 6 minimum chaque tour, 20 tours au plus | du joueur, exactement 15 billes | aucune |
+| gravier | libre, 10 tours | du joueur | gravier : les gains de Vitesse et de Masse produits par un calot sont divisés par deux |
+| terrain étroit | libre, 10 tours | du joueur | un lancer de moins ; échange interdit |
+| sans pot | libre, 10 tours | du joueur | pot inerte : les billes du pot n'agissent pas |
+| silence | libre, 10 tours | du joueur | silence : le mot-clé Chiquenaude ne se déclenche plus |
+
+## 14. Les sacs
+
+### Collection, sacs et partie
+
+Une partie se joue avec un **sac**, comme un deck dans un jeu de cartes. Quatre choses à distinguer :
+
+- le **catalogue** : toutes les billes du jeu ;
+- la **collection** : les billes que le joueur a débloquées. Une bille débloquée s'utilise librement dans un sac, autant de fois que les règles de construction le permettent : il n'y a pas d'exemplaires possédés. Aujourd'hui, toutes les billes sont débloquées ;
+- les **sacs** : des compositions enregistrées, chaque bille avec son nombre d'exemplaires. Le jeu en fournit, les **sacs préfaits**, que le joueur ne modifie pas ; le joueur aura les siens, dans 5 emplacements (aucune interface pour les composer aujourd'hui) ;
+- la **partie** : elle reçoit un sac et en fait une copie, ses billes mélangées dans le sac de pioche. Rien de ce qui arrive en partie (une bille empochée, perdue, défaussée) ne change le sac ni la collection.
+
+### Les règles de construction
+
+Un sac du joueur doit respecter des **règles de construction**. Par défaut :
+
+- **taille** : de 12 à 20 billes ;
+- **exemplaires** d'une même bille, au plus, selon sa rareté : commune 3, peu commune 3, rare 2, épique 2, légendaire 1.
+
+Une définition de partie peut avoir ses propres règles de construction : une règle qu'elle donne remplace celle par défaut, les autres restent (le défi endurance demande exactement 15 billes, la limite d'exemplaires restant celle par défaut).
+
+Un sac qui ne les respecte pas ne permet pas de lancer la partie : elle refuse de démarrer, et dit chaque problème. « Sac trop petit : 10 billes sur 12 minimum. », « Sac trop grand : 22 billes sur 20 maximum. », « Trop d'exemplaires de pierre de sang : 2 sur 1 maximum. », « Bille non débloquée : pierre de sang. », « Bille inconnue : … ».
+
+### Le sac d'une partie
+
+Selon sa définition, une partie se joue avec :
+
+- le **sac du joueur**, vérifié selon les règles de construction de la définition ;
+- un **sac imposé** : un sac préfait que la définition désigne ; le jeu le prête, ni la collection ni les règles de construction ne s'y appliquent ;
+- un **sac généré** au hasard, pour le simulateur et les tests.
+
+La partie habituelle se joue avec le sac du joueur ; lancée depuis le menu principal, elle reçoit le **sac de départ**. En mode développeur, un menu propose d'abord chaque sac préfait (son nom et son nombre de billes).
+
+### Les sacs préfaits
+
+| Sac | Billes | Composition |
 |---|---|---|
-| partie libre (la partie habituelle) | libre, 10 tours ; paliers bronze 120, argent 148, or 193 | aucune |
-| défi cible | 122 points en 8 tours | aucune |
-| défi endurance | Impact de 7 minimum chaque tour, 20 tours au plus | aucune |
-| gravier | libre, 10 tours | gravier : les gains de Vitesse et de Masse produits par un calot sont divisés par deux |
-| terrain étroit | libre, 10 tours | un lancer de moins ; échange interdit |
-| sans pot | libre, 10 tours | pot inerte : les billes du pot n'agissent pas |
-| silence | libre, 10 tours | silence : le mot-clé Chiquenaude ne se déclenche plus |
+| sac de départ | 20 | la commune, la peu commune et la rare de chaque famille, plus une seconde argile et un second œil-de-chat ; ni épique ni légendaire |
+| sac du Trésor | 15 | cuivre 3, vive-argent 3, rubis 2, lingotin 2, pierre de sang 1 ; lune, comète, bille de fronde, boule de feu |
+| sac des Astres | 15 | lune 3, comète 3, galaxie 2, éclipse 2, étoile 1 ; cuivre, vive-argent, bulle, fantôme |
+| sac de la Brume | 15 | bulle 3, fantôme 3, perle 2, océan 2, boule à neige 1 ; lune, comète, abeille, dauphin |
+| sac du Bestiaire | 15 | abeille 3, dauphin 3, tortue 2, araignée 2, dragon 1 ; bulle, fantôme, bille de fronde, boule de feu |
+| sac du Souffle | 15 | bille de fronde 3, boule de feu 3, tornade 2, grenade 2, diable rouge 1 ; cuivre, vive-argent, abeille, dauphin |
+| sac des Classiques | 15 | argile 3, œil-de-chat 3, agate 2, acier 2, soda 1 ; cuivre, lune, bulle, abeille |
+
+Un sac de famille réunit les cinq billes de la famille, chacune au maximum d'exemplaires que permet sa rareté, et la commune et la peu commune de ses deux voisines sur la roue des familles (Trésor, Astres, Brume, Bestiaire, Souffle, puis retour au Trésor) ; celui des Classiques, la commune de quatre familles de la roue.
+
+### La fin de la partie
+
+À la fin de la partie, ou quand le joueur la quitte, le jeu des billes rend un **résultat** : la définition, le sac, l'objectif, l'issue (palier, victoire, échec, tours tenus, ou abandon), le score final, les tours joués, et quelques valeurs de partie (billes lancées, piochées, empochées, perdues, éjectées, défaussées). Le jeu des billes ne décide d'aucune récompense : c'est au jeu qui l'accueille d'en tirer les conséquences. Un abandon n'a ni palier ni victoire.
 
 ## Annexe : les billes du premier set
 

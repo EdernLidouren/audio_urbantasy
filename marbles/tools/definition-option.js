@@ -5,7 +5,7 @@
 // partie. Sans l'option : la définition du jeu. Node seulement.
 
 import { readFile } from "node:fs/promises";
-import { DEFAULT_GAME_DEFINITION, GAME_RULES, definitionById } from "./game-rules.js";
+import { DEFAULT_GAME_DEFINITION, GAME_RULES, definitionById, gameSetup } from "./game-rules.js";
 
 export async function readDefinitionOption(value) {
   if (value === undefined) return DEFAULT_GAME_DEFINITION;
@@ -16,7 +16,9 @@ export async function readDefinitionOption(value) {
   } catch (error) {
     throw new Error(`définition illisible "${value}" : ${error.message}`);
   }
-  // Validée tout de suite : une erreur claire avant de jouer.
-  GAME_RULES.createGame(0, definition);
+  // Validée tout de suite, par le départ d'une partie avec le sac de sa définition :
+  // une erreur claire avant de jouer.
+  const setup = gameSetup(definition);
+  GAME_RULES.createGame(0, setup.definition, setup.options);
   return definition;
 }

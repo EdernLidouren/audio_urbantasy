@@ -2,8 +2,10 @@
 // simulation pour tout ce qui est hors du core (la vue, les outils, les
 // vérifications) : on compose une fois, puis on joue.
 //
-//   const marbles = createMarblesRules(MARBLE_TYPES, MARBLE_STATUSES, GAME_DEFINITIONS);   // main.js
-//   let game = marbles.createGame(seed, marbles.definitions[DEFAULT_DEFINITION]);
+//   const marbles = createMarblesRules(MARBLE_TYPES, MARBLE_STATUSES, GAME_DEFINITIONS, PRESET_BAGS);   // main.js
+//   const start = marbles.startGame(seed, marbles.definitions[DEFAULT_DEFINITION], { bag, unlocked });
+//   if (!start.ok) dire(start.problems);
+//   let game = start.state;
 //   const { ok, state, events } = marbles.reduce(game, { type: "draw" });
 //   marbles.forecast(state);
 //
@@ -15,7 +17,8 @@
 // (marbles/content/statuses/index.js) est un contenu aussi, liée de même ; aucune par
 // défaut. Les DÉFINITIONS DE PARTIE (marbles/content/definitions/index.js) de même,
 // validées à la composition ; une partie se crée d'après l'une d'elles, ou d'après une
-// définition venue d'ailleurs (un fichier des outils), validée à sa création.
+// définition venue d'ailleurs (un fichier des outils), validée à sa création. Les SACS
+// PRÉFAITS (marbles/content/bags/index.js) aussi : une définition peut en imposer un.
 //
 // Les fonctions de marbles/core/marbles.js, marbles/core/content.js, marbles/core/run.js,
 // marbles/core/effects.js et marbles/core/forecast.js qui prennent `types` restent la plomberie interne du
@@ -24,20 +27,24 @@
 // caractéristiques ou des verrous (lancers restants, refus d'échange, de lancer et de
 // pose, actions légales) passe par les règles, qui y lient les statuts.
 
-import { createMarblesGame, legalActions, lockReason, marblesReduce, nextTurnDraw, placeRefusal, swapRefusal, throwRefusal, throwsLeft } from "./marbles.js";
+import { createMarblesGame, startMarblesGame, legalActions, lockReason, marblesReduce, nextTurnDraw, placeRefusal, swapRefusal, throwRefusal, throwsLeft } from "./marbles.js";
 import { appliedStatusesOf, keywordsOf, maxWearOf } from "./content.js";
 import { validateGameDefinitions, validateMarbleStatuses, validateMarbleTypes } from "./validation.js";
-import { NO_DEFINITIONS } from "./definitions.js";
+import { NO_DEFINITIONS, buildRulesOf } from "./definitions.js";
+import { NO_BAGS, bagProblems, validatePresetBags } from "./bags.js";
+import { BAG_BUILD_RULES } from "../config/values.js";
 import { NO_STATUSES, characteristic } from "./statuses.js";
 import { effectAt } from "./effects.js";
 import { forecast } from "./forecast.js";
 
-// Les règles de `types`, de `statuses` et des définitions de partie, validées ici :
-// une table mal formée échoue à la composition, jamais en pleine partie.
-export function createMarblesRules(types, statuses = NO_STATUSES, definitions = NO_DEFINITIONS) {
+// Les règles de `types`, de `statuses`, des définitions de partie et des sacs
+// préfaits (`bags`), validées ici : une table mal formée échoue à la composition,
+// jamais en pleine partie.
+export function createMarblesRules(types, statuses = NO_STATUSES, definitions = NO_DEFINITIONS, bags = NO_BAGS) {
   validateMarbleStatuses(statuses);
   validateMarbleTypes(types, statuses);
-  validateGameDefinitions(definitions, types, statuses);
+  validatePresetBags(bags, types, BAG_BUILD_RULES);
+  validateGameDefinitions(definitions, types, statuses, bags);
   return Object.freeze({
     // Les tables elles-mêmes, pour qui lit les champs d'une bille (la fiche) ou d'un
     // statut.
@@ -45,8 +52,22 @@ export function createMarblesRules(types, statuses = NO_STATUSES, definitions = 
     statuses,
     // Le registre des définitions de partie, { id: définition }.
     definitions,
-    // Une partie neuve, d'après sa définition (du registre, ou d'ailleurs).
-    createGame: (seed, definition) => createMarblesGame(seed, definition, types, statuses),
+    // Le registre des sacs préfaits, { id: sac }.
+    bags,
+    // Le DÉPART d'une partie, d'après sa définition (du registre, ou d'ailleurs) et,
+    // pour un sac du joueur, le sac fourni : { ok, state, problems }, la partie refusée
+    // pour un sac invalide (marbles/core/marbles.js/startMarblesGame). `options` :
+    // { bag, unlocked, unchecked }.
+    startGame: (seed, definition, options = {}) => startMarblesGame(seed, definition, types, statuses, { ...options, presets: bags }),
+    // Une partie neuve, ou une erreur qui liste les problèmes du sac (les outils, les
+    // vérifications).
+    createGame: (seed, definition, options = {}) => createMarblesGame(seed, definition, types, statuses, { ...options, presets: bags }),
+    // Les règles de construction d'un sac du joueur pour cette définition (celles par
+    // défaut, complétées ou remplacées par les siennes).
+    buildRulesOf: (definition) => buildRulesOf(definition, BAG_BUILD_RULES),
+    // Les problèmes d'un sac pour cette définition, [] s'il est valide
+    // (marbles/core/bags.js/bagProblems) ; `unlocked` : les billes débloquées, ou null.
+    bagProblems: (bag, definition, unlocked = null) => bagProblems(bag, buildRulesOf(definition, BAG_BUILD_RULES), { types, unlocked }),
     // Le réducteur. `options` : { eventLimit, blind } (marbles/core/marbles.js/marblesReduce).
     reduce: (state, action, options = {}) => marblesReduce(state, action, types, { ...options, statuses }),
     // La prévision du tour, `action` envisagée ou non.

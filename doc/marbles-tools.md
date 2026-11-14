@@ -21,8 +21,9 @@ Les modules qu'ils partagent, purs (sans Node, donc vérifiables) :
 
 | Module | Rôle |
 |---|---|
-| `marbles/tools/game-rules.js` | Les règles du jeu, liées une fois aux tables des billes, des statuts et des définitions : le point de composition des outils ; la définition par défaut, la recherche par id (`definitionById`), les surcharges (`withSettings`, `SETTING_NAMES`) et le sac remplacé (`withBag`) |
+| `marbles/tools/game-rules.js` | Les règles du jeu, liées une fois aux tables des billes, des statuts, des définitions et des sacs préfaits : le point de composition des outils ; la définition par défaut, la recherche par id (`definitionById`), les surcharges (`withSettings`, `SETTING_NAMES`), le sac choisi (`gameSetup`) et le sac par défaut des outils (`defaultToolsBag` : le sac de départ, ou le premier sac préfait valide selon les règles de construction de la définition) |
 | `marbles/tools/definition-option.js` | L'option `--definition` (Node) : l'id d'une définition du registre, ou un fichier JSON de même forme, validé avant de jouer |
+| `marbles/tools/bag-option.js` | Les options de sac (`--bag`, `--unchecked`, `--random-bag`, `--max-copies`), communes au simulateur et à la partie au terminal ; la lecture d'un fichier lui est passée |
 | `marbles/tools/args.js` | La lecture stricte de la ligne de commande, commune aux outils : une option inconnue, une option à valeur sans sa valeur, une option donnée deux fois ou un argument en trop sont une erreur claire, jamais un silence |
 | `marbles/tools/commands.js` | Les commandes texte (« poser 1 pointe ») communes à `play.js` et `case.js` |
 | `marbles/tools/format.js` | L'état et le journal en lignes lisibles : chaque type d'évènement, chaque cible vide (main pleine, pas d'emplacement de référence…) et chaque fin de choix (dont `declined`, rien choisi) |
@@ -87,7 +88,8 @@ prévue ; `--json` ajoute tout cela brut. La ligne de commande se lit strictemen
 ```
 node marbles/tools/simulate.js --games 1000 --player greedy
 node marbles/tools/simulate.js --player random --random-bag 13 --max-copies 2
-node marbles/tools/simulate.js --bag-file marbles/tools/examples/bag.txt --turns 12
+node marbles/tools/simulate.js --bag treasure
+node marbles/tools/simulate.js --bag marbles/tools/examples/bag.txt --turns 12
 node marbles/tools/simulate.js --games 200 --export resultats.csv
 node marbles/tools/simulate.js --definition endurance
 ```
@@ -95,12 +97,24 @@ node marbles/tools/simulate.js --definition endurance
 Toutes les options sont en tête de `marbles/tools/simulate.js` : nombre de parties,
 graine de départ, joueur, poses envisagées par le glouton, valeur d'une bille gagnée en
 main (`--drawn-value`), définition de partie (`--definition`, un id ou un fichier JSON,
-comme la partie au terminal ; la partie par défaut sinon), sac (celui de la définition,
-aléatoire avec une limite d'exemplaires, ou d'un fichier), surcharges des valeurs de la
-définition (taille de main, lancers, capacité du pot `--pot`, pioches, nombre de tours,
-pour cette simulation seulement) et export. Un sac aléatoire, des options ou de la
-définition, est tiré par le core (`marbles/core/definitions.js`/`randomBag`) avec la
-graine de sac de la partie. Comme tous les
+comme la partie au terminal ; la partie par défaut sinon), sac, surcharges des valeurs de
+la définition (taille de main, lancers, capacité du pot `--pot`, pioches, nombre de
+tours, pour cette simulation seulement) et export.
+
+**Le sac** (`marbles/tools/bag-option.js`, mêmes options pour la partie au terminal) :
+- sans option, celui de la définition : son sac imposé ou généré, ou, pour un sac du
+  joueur, le sac de départ (le premier sac préfait valide si la définition impose
+  d'autres règles de construction : le défi endurance, 15 billes, joue le sac du Trésor) ;
+- `--bag <id>` : un sac préfait (`starter`, `treasure`…) ;
+- `--bag <fichier>` : un sac au format du jeu en JSON (`{ id, marbles: [{ marble, count }] }`),
+  ou une liste d'ids (JSON, ou texte : ids séparés par espaces, virgules ou lignes, « # »
+  commente), un id par exemplaire ;
+- `--unchecked` : avec `--bag`, sans les règles de construction (un sac trop petit pour
+  isoler un cas, trop d'exemplaires) ; une bille inconnue reste refusée ;
+- `--random-bag <n>` et `--max-copies <n>` : un sac généré par partie, tiré par le core
+  (`marbles/core/definitions.js`/`randomBag`) avec la graine de la partie.
+Un sac fourni passe par la validation d'une vraie partie : invalide, la simulation
+s'arrête avant de jouer, sur ses problèmes. Comme tous les
 outils, il lit sa ligne de commande strictement (`marbles/tools/args.js`) : une option
 inconnue, une valeur manquante ou un argument en trop l'arrête sur une erreur.
 
@@ -177,8 +191,9 @@ node marbles/tools/compare.js --games 300
 node marbles/tools/compare.js --ref main --save comparaison
 ```
 
-Les six simulations de référence (les trois joueurs, sur le sac de test et sur des sacs
-aléatoires de 13 billes à 2 exemplaires au plus), jouées sur un commit (`--ref`, le
+Les six simulations de référence (les trois joueurs, sur le sac de la définition par
+défaut, le sac de départ, et sur des sacs aléatoires de 13 billes à 2 exemplaires au
+plus), jouées sur un commit (`--ref`, le
 dernier par défaut) et sur le code en cours, à mêmes graines. Le commit est extrait dans
 un dossier temporaire (`git archive`), effacé à la fin : ni le dépôt ni l'index ne sont
 touchés. Le côté « avant » joue avec le simulateur du commit : un changement du
@@ -234,8 +249,9 @@ vérifications des MÉCANISMES ne passent donc jamais par elles :
   texte ne les casse pas. Les phrases complètes ont une dizaine de TÉMOINS par langue
   (domaine `marbles-view`, `checkWitnesses`), sur des billes fabriquées qui ne prennent
   aux vraies que leur nom.
-- **Le contrat des vraies billes** : domaine `marbles-content`. La table et le sac de
-  départ se valident, chaque bille a son nom et ses textes sans gabarit brut (sa
+- **Le contrat des vraies billes** : domaine `marbles-content`. La table et les sacs
+  préfaits se valident (chacun composé comme annoncé), les problèmes de sac se disent en
+  français et en anglais, chaque bille a son nom et ses textes sans gabarit brut (sa
   description et ses familles comprises), chaque famille et chaque rareté son nom, un profil
   sonore complet, des parties au hasard gardent leurs invariants, et la prévision
   correspond au réel. Aucune attente chiffrée sur une bille.
@@ -253,7 +269,11 @@ des vérifications (`node tools/run-checks.js` pour tous, `node tools/run-checks
 <domaine>` pour un seul). Ce que vérifie chacun, aujourd'hui : `marbles` (les règles du
 réducteur), `marbles-definitions` (les définitions de partie : validation, copie dans
 l'état, sac de départ, objectifs et conditions de fin, règles, outils, et chaque
-définition du jeu jouée au hasard sous ses invariants), `marbles-pocket` (le pot), `marbles-path` (le chemin des billes : la Chute,
+définition du jeu jouée au hasard sous ses invariants), `marbles-bags` (les sacs :
+format, règles de construction et leur fusion, problèmes et leur ordre, sacs préfaits,
+sources de sac, copie de partie et sac fourni inchangé après des parties complètes,
+résultat rendu à l'hôte, emplacements et magasin, point d'entrée, menu des sacs),
+`marbles-pocket` (le pot), `marbles-path` (le chemin des billes : la Chute,
 Défausser, Rebond, Ramasser), `marbles-zones` (conditions d'état et nombre de billes par
 zone), `marbles-families` (familles et raretés : validation, filtres, conditions
 d'emplacement, nombre de billes filtré, familles différentes, leurs textes et la touche

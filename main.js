@@ -37,6 +37,11 @@ import { announceNewDiscoveries } from "./view/discoveries.js";
 import MARBLE_TYPES from "./marbles/content/types/index.js";
 import MARBLE_STATUSES from "./marbles/content/statuses/index.js";
 import { DEFAULT_DEFINITION, GAME_DEFINITIONS } from "./marbles/content/definitions/index.js";
+import { PRESET_BAGS, STARTER_BAG } from "./marbles/content/bags/index.js";
+import { catalogCollection } from "./marbles/host/collection.js";
+import { createMarblesLauncher } from "./marbles/host/entry.js";
+import { createBagMenu } from "./marbles/view/bag-menu.js";
+import { describeBagRefusal } from "./marbles/view/narration/bags.js";
 import { installDebugConsole } from "./view/debug-console.js";
 
 // Préférences de menu (sliders/toggles + cyclage/étoile/suffixe, voir
@@ -61,8 +66,8 @@ validateEntityRegistry(registry);
 // Les billes : un registre de contenu, que le core reçoit et n'importe jamais. Les
 // règles du jeu y sont liées ici, une fois pour toutes (marbles/core/rules.js), puis
 // passées à l'écran des billes.
-validateMarblesContent(MARBLE_TYPES, MARBLE_STATUSES, GAME_DEFINITIONS);
-const marblesRules = createMarblesRules(MARBLE_TYPES, MARBLE_STATUSES, GAME_DEFINITIONS);
+validateMarblesContent(MARBLE_TYPES, MARBLE_STATUSES, GAME_DEFINITIONS, PRESET_BAGS);
+const marblesRules = createMarblesRules(MARBLE_TYPES, MARBLE_STATUSES, GAME_DEFINITIONS, PRESET_BAGS);
 const newGame = parseNewGame(NEW_GAME, registry);
 
 // Mode DEBUG (voir config/debug.js) : PAS de menu — bascule DEPUIS LA
@@ -237,15 +242,17 @@ function continueGame() {
 
 // Partie de billes en cours (voir marbles/core/marbles.js), null hors partie : comme
 // la session, c'est ici qu'elle vit, l'écran n'en détient pas de copie.
-// Indépendante de la session, jamais sauvegardée. `seed` : imposée par la
-// console de test (window.debugStartMarbles, view/debug-console.js), sinon
-// tirée au hasard ;
-// `initialState` : un état construit par la console de test, au lieu d'une
-// partie neuve (null en jeu).
+// Indépendante de la session, jamais sauvegardée.
 let marblesGame = null;
-function startMarblesGame(seed = createGameSeed(), initialState = null) {
-  // La définition par défaut : aucun choix de définition en jeu pour l'instant.
-  marblesGame = initialState ?? marblesRules.createGame(seed, marblesRules.definitions[DEFAULT_DEFINITION]);
+
+// Le FOURNISSEUR DE COLLECTION des billes (marbles/host/collection.js) : PROVISOIRE,
+// toutes les billes du catalogue sont débloquées. La collection de billes de Templeton
+// le remplacera par un adaptateur (doc/marbles.md, « Sacs »).
+const marblesCollection = catalogCollection(MARBLE_TYPES);
+
+// Ouvre l'écran des billes sur `state` ; `onClose(état final)` à sa fermeture.
+function openMarblesScreen(state, onClose) {
+  marblesGame = state;
   pushScreen(
     makeMarblesScreen(
       () => marblesGame,
@@ -253,11 +260,47 @@ function startMarblesGame(seed = createGameSeed(), initialState = null) {
         marblesGame = next;
       },
       marblesRules,
-      // La rubrique « Les touches » de l'aide H : l'aide générée de l'écran des
-      // billes, avec les touches globales, comme F1.
-      { openKeyHelp: (screen) => openHelp(t, { globalSections: GLOBAL_HELP_SECTIONS, covered: screen }) }
+      {
+        // La rubrique « Les touches » de l'aide H : l'aide générée de l'écran des
+        // billes, avec les touches globales, comme F1.
+        openKeyHelp: (screen) => openHelp(t, { globalSections: GLOBAL_HELP_SECTIONS, covered: screen }),
+        onClose,
+      }
     )
   );
+}
+
+// LE CONTRAT AVEC LE MINIJEU (marbles/host/entry.js) : son point d'entrée unique.
+const launchMarbles = createMarblesLauncher({ rules: marblesRules, openGame: openMarblesScreen });
+
+// Sa sortie unique : le RÉSULTAT d'une partie finie ou quittée
+// (marbles/core/outcome.js). Templeton n'en tire encore rien (ni récompense ni
+// déblocage) ; en mode debug, la console le montre.
+function onMarblesEnd(result) {
+  if (isDebugEnabled()) console.log("Partie de billes, résultat :", result);
+}
+
+// Une partie de la définition par défaut (un sac du joueur) avec `bag`. Refusée (un
+// sac invalide, qu'aucun sac préfait n'est : ils sont validés au démarrage) : ses
+// problèmes sont dits, on reste où l'on est.
+function launchMarblesWith(bag, seed = createGameSeed()) {
+  const launched = launchMarbles({ definition: marblesRules.definitions[DEFAULT_DEFINITION], bag, collection: marblesCollection, seed, onEnd: onMarblesEnd });
+  if (!launched.ok) announce(describeBagRefusal(launched.problems, t), { assertive: true });
+}
+
+// « Partie de billes » du menu principal : en mode debug, le menu des sacs préfaits
+// d'abord (marbles/view/bag-menu.js) ; sinon, le sac de départ, sans menu.
+function startMarblesGame() {
+  if (isDebugEnabled()) pushScreen(makeMenuScreen(createBagMenu(marblesRules.bags, (bag) => launchMarblesWith(bag)), t));
+  else launchMarblesWith(marblesRules.bags[STARTER_BAG]);
+}
+
+// La console de test (window.debugStartMarbles, view/debug-console.js) : une partie à
+// graine imposée, avec le sac de départ ; ou l'écran ouvert sur un état construit
+// (`initialState`), sans résultat à rendre.
+function debugStartMarblesGame(seed = createGameSeed(), initialState = null) {
+  if (initialState === null) launchMarblesWith(marblesRules.bags[STARTER_BAG], seed);
+  else openMarblesScreen(initialState, () => {});
 }
 
 // Écran-menu du menu principal : construit UNE FOIS puis réutilisé pour
@@ -298,7 +341,7 @@ installDebugConsole({
   getSession,
   getCityScreen: () => cityScreen,
   toggleDebug,
-  startMarblesGame,
+  startMarblesGame: debugStartMarblesGame,
   getMarblesGame: () => marblesGame,
 });
 

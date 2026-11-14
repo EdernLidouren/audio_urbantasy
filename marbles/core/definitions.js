@@ -18,9 +18,14 @@
 //          `potCapacity`, la valeur de départ des CARACTÉRISTIQUES (taille de main,
 //          lancers par tour, capacité du pot), que des statuts changent
 //          (marbles/core/statuses.js/characteristic) ;
-//   bag    son SAC DE DÉPART (BAG_KINDS) : { kind: "list", marbles }, une liste fixe
-//          d'ids (doublons permis) ; { kind: "random", size, maxCopies }, `size` billes
-//          tirées dans la table, chacune au plus `maxCopies` fois (null : sans limite) ;
+//   bag    la SOURCE de son sac (BAG_SOURCES, les sacs eux-mêmes :
+//          marbles/core/bags.js) : { kind: "player", buildRules? }, un SAC DU JOUEUR,
+//          fourni au lancement et validé selon les règles de construction (celles par
+//          défaut, complétées ou remplacées par `buildRules`, sorte par sorte) ;
+//          { kind: "preset", bag }, un SAC IMPOSÉ, l'id d'un sac préfait ;
+//          { kind: "random", size, maxCopies }, un SAC GÉNÉRÉ, `size` billes tirées
+//          dans la table, chacune au plus `maxCopies` fois (null : sans limite), pour le
+//          simulateur et les tests ;
 //   turns  son nombre de tours : la partie s'arrête après la résolution du dernier ;
 //          null, sans limite (un objectif qui le permet seulement : GOALS) ;
 //   goal   son OBJECTIF, { kind, ... } (GOALS) : comment le résultat se juge ; QUAND la
@@ -36,18 +41,24 @@
 // copie ne se modifie jamais : ce que la partie change (les statuts) vit à part.
 
 import { createSeed, nextRandom } from "../../lib/rng.js";
+import { bagMarbles, mergeBuildRules } from "./bags.js";
 
 // Les valeurs de départ (en-tête), dans l'ordre de leur validation.
 export const START_KEYS = Object.freeze(["firstTurnDraw", "drawPerTurn", "handSize", "throws", "potCapacity"]);
 
-// Les sortes de sac de départ (en-tête) : `fields`, ses champs ; `build(bag, seed,
-// ids)`, la liste des billes de départ, avant le mélange, d'après la graine de la
-// partie et les ids de la table.
-export const BAG_KINDS = Object.freeze({
-  list: { fields: ["kind", "marbles"], build: (bag) => [...bag.marbles] },
-  // Tirée par son PROPRE générateur, à graine dérivée de celle de la partie : le
-  // hasard de la partie (mélanges, régénérations) n'en dépend pas.
-  random: { fields: ["kind", "size", "maxCopies"], build: (bag, seed, ids) => randomBag(bag, createSeed(`bag/${seed}`), ids) },
+// Les SOURCES de sac (en-tête) : `fields`, ses champs.
+//   player  un sac du joueur, fourni au lancement ; `buildRules` (facultatif) : ses
+//           règles de construction propres, fusionnées sorte par sorte avec celles par
+//           défaut (marbles/core/bags.js/mergeBuildRules) ;
+//   preset  un sac imposé : `bag`, l'id d'un sac préfait du registre. Le jeu le prête :
+//           ni la collection ni les règles de construction ne s'y appliquent ;
+//   random  un sac généré, tiré par son PROPRE générateur, à graine dérivée de celle
+//           de la partie : le hasard de la partie (mélanges, régénérations) n'en dépend
+//           pas.
+export const BAG_SOURCES = Object.freeze({
+  player: { fields: ["kind", "buildRules"] },
+  preset: { fields: ["kind", "bag"] },
+  random: { fields: ["kind", "size", "maxCopies"] },
 });
 
 // LES PALIERS d'une partie libre, du plus bas au plus haut ; "none" : aucun atteint.
@@ -183,9 +194,19 @@ export function randomBag({ size, maxCopies }, rngState, ids) {
   return bag;
 }
 
-// Les billes de départ d'une définition, avant le mélange.
-export function startingBag(definition, seed, types) {
-  return BAG_KINDS[definition.bag.kind].build(definition.bag, seed, Object.keys(types));
+// Les règles de construction d'un sac du joueur pour cette définition : celles par
+// défaut (`defaults`, marbles/config/values.js/BAG_BUILD_RULES), complétées ou
+// remplacées par les siennes. Aucune pour un sac imposé ou généré.
+export function buildRulesOf(definition, defaults) {
+  return definition.bag.kind === "player" ? mergeBuildRules(defaults, definition.bag.buildRules) : {};
+}
+
+// Les billes de départ d'une partie, avant le mélange : celles du sac reçu (`bag`, un
+// sac du joueur ou le sac préfait imposé), chaque exemplaire déroulé dans l'ordre de
+// sa composition ; ou, pour un sac généré, le tirage de sa graine.
+export function startingList(definition, seed, types, bag) {
+  if (definition.bag.kind === "random") return randomBag(definition.bag, createSeed(`bag/${seed}`), Object.keys(types));
+  return bagMarbles(bag);
 }
 
 // Une valeur de départ de la partie (START_KEYS).

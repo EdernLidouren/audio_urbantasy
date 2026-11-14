@@ -1,4 +1,4 @@
-# Un sac pour le simulateur (--bag-file) : des ids de billes, séparés par des
+# Un sac pour le simulateur (--bag) : des ids de billes, séparés par des
 # espaces, des virgules ou des lignes. Ici, un sac d'Astres et de Classiques, deux
 # lunes et deux argiles.
 moon, moon, comet, galaxy, eclipse, star

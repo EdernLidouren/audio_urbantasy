@@ -7,7 +7,8 @@
 // paramètres, même rapport, au caractère près.
 
 import { PLAYERS } from "./players.js";
-import { SETTING_NAMES, settingOf } from "./game-rules.js";
+import { GAME_RULES, SETTING_NAMES, defaultToolsBag, settingOf } from "./game-rules.js";
+import { bagSize } from "../core/bags.js";
 import { PLACEMENT_TRIGGERS, TRIGGER_IDS, TRIGGER_WORDS, marbleLabel } from "./format.js";
 
 // Les titres du rapport, et le début de ses lignes d'anomalies : le comparateur
@@ -61,16 +62,20 @@ const SETTING_LABELS = {
   turns: "tours",
 };
 
-// Le sac : celui de la définition (mode "test"), d'un fichier, ou tiré par partie.
+// Le sac : celui de la définition, un sac fourni, ou tiré par partie.
 function bagLine(mode, definition) {
-  if (mode.kind === "test") {
-    const { bag } = definition;
-    if (bag.kind === "list") return `Sac : celui de la définition, ${bag.marbles.length} billes.`;
-    return bagLine(bag).replace("Sac : aléatoire", "Sac : celui de la définition, aléatoire");
-  }
-  if (mode.kind === "list") return `Sac : ${mode.source ?? "décrit"}, ${mode.marbles.length} billes.`;
-  const limit = mode.maxCopies === null ? "sans limite d'exemplaires" : `${mode.maxCopies} exemplaire(s) au plus par bille`;
-  return `Sac : aléatoire, ${mode.size} billes tirées dans la table, ${limit}, un sac par partie.`;
+  if (mode.kind === "bag") return `Sac : ${mode.source ?? mode.bag.id}, ${bagSize(mode.bag)} billes${mode.unchecked ? ", hors règles de construction" : ""}.`;
+  if (mode.kind === "random") return randomLine(mode, "Sac : généré");
+  const { bag } = definition;
+  if (bag.kind === "random") return randomLine(bag, "Sac : celui de la définition, généré");
+  if (bag.kind === "preset") return `Sac : celui de la définition, imposé, ${bag.bag}, ${bagSize(GAME_RULES.bags[bag.bag])} billes.`;
+  const fallback = defaultToolsBag(definition);
+  return `Sac : sac du joueur, par défaut le sac préfait ${fallback.id}, ${bagSize(fallback)} billes.`;
+}
+
+function randomLine({ size, maxCopies }, head) {
+  const limit = maxCopies === null ? "sans limite d'exemplaires" : `${maxCopies} exemplaire(s) au plus par bille`;
+  return `${head}, ${size} billes tirées dans la table, ${limit}, un sac par partie.`;
 }
 
 // La définition jouée : son id, son objectif et ses règles (les ids des statuts).

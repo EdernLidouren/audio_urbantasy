@@ -25,6 +25,7 @@
 import { allActive, choice, crack, draw, eject, mass, pocket, polish, sizeIs, speed, tally, turnsInHand, zoneCount } from "../../content/effects.js";
 import { LARGE, MEDIUM, SMALL } from "../../config/values.js";
 import { createMarblesRules } from "../../core/rules.js";
+import { bagFromList } from "../../core/bags.js";
 
 // Gèle en profondeur (une table de billes, un état reçu) : une écriture par mégarde
 // lèverait (modules ES, donc mode strict) au lieu de fausser les vérifications
@@ -301,7 +302,9 @@ export const FIXTURE_BAG = Object.freeze(Object.keys(FIXTURE_TYPES));
 export const FIXTURE_DEFINITION = deepFreeze({
   id: "fixture",
   start: { firstTurnDraw: 5, drawPerTurn: 1, handSize: 5, throws: 5, potCapacity: 3 },
-  bag: { kind: "list", marbles: FIXTURE_BAG },
+  // Un sac du joueur SANS règle de construction : les vérifications jouent des sacs
+  // de toute taille (fournis par createGame, fixtureRules).
+  bag: { kind: "player", buildRules: { size: null, copies: null } },
   turns: 10,
   goal: { kind: "free", tiers: { bronze: 20, silver: 40, gold: 60 } },
   rules: [],
@@ -312,15 +315,26 @@ const DEFINITION_FIELDS = ["id", "bag", "turns", "goal", "rules"];
 
 // Une définition de test dont certains champs sont remplacés, `over` À PLAT : une
 // valeur de départ par son nom (handSize, throws…), un autre champ de la définition par
-// le sien ; `bag`, une liste d'ids, ou un sac entier. `base` : la définition de départ.
+// le sien ; `bag`, une LISTE d'ids (le sac fourni : fixtureBag, la définition garde sa
+// source) ou une source de sac entière ({ kind, ... }). `base` : la définition de
+// départ.
 export function fixtureDefinition(over = {}, base = FIXTURE_DEFINITION) {
   const start = { ...base.start };
   const fields = {};
   for (const [key, value] of Object.entries(over)) {
-    if (DEFINITION_FIELDS.includes(key)) fields[key] = key === "bag" && Array.isArray(value) ? { kind: "list", marbles: value } : value;
+    if (key === "bag" && Array.isArray(value)) continue;
+    if (DEFINITION_FIELDS.includes(key)) fields[key] = value;
     else start[key] = value;
   }
   return { ...base, ...fields, start };
+}
+
+// Le sac FOURNI d'une partie de test (marbles/core/bags.js) : la liste `over.bag`, ou le
+// sac de test ; aucun pour une définition qui impose ou génère le sien. Une liste
+// devient un sac, ses doublons regroupés à leur première apparition.
+export function fixtureBag(over = {}, definition = fixtureDefinition(over)) {
+  if (definition.bag.kind !== "player") return null;
+  return bagFromList("fixture", Array.isArray(over.bag) ? over.bag : FIXTURE_BAG);
 }
 
 // La TABLE DES STATUTS DES VÉRIFICATIONS (marbles/core/statuses.js), figée comme les
@@ -405,6 +419,6 @@ export function fixtureRules(types = FIXTURE_TYPES, statuses = FIXTURE_STATUSES)
   const rules = createMarblesRules(types, statuses);
   return Object.freeze({
     ...rules,
-    createGame: (seed, over = {}) => rules.createGame(seed, fixtureDefinition(over)),
+    createGame: (seed, over = {}) => rules.createGame(seed, fixtureDefinition(over), { bag: fixtureBag(over) }),
   });
 }
