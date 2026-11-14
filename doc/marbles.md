@@ -133,7 +133,9 @@ simulation (`marbles/core/marbles.js`) :
   à tout moment de la phase de jeu, triangle plein, partiel ou vide, premier tour
   compris.
 - **La résolution** (`resolveTurn`) : les phases (`resolvePhases` : l'effet, puis
-  l'usure de phase, passée par les statuts), l'étape du pot (`potResolution`), les
+  l'usure de phase, passée par les statuts), sous une RETENUE des réactions
+  (`holdReactions`), l'étape du pot (`resolvePot` : par bille du pot, ses réactions
+  retenues puis `potResolution` ; puis les réactions retenues des statuts), les
   retraits par usure, l'Impact (`impactOf`, ses planchers, puis les statuts), le palier
   franchi (`tierReached`, partie libre), les conditions de fin d'après l'Impact, la
   rotation (`rotation`), la fin des statuts comptés en tours (sauf si la partie
@@ -283,7 +285,13 @@ poche », et section 12, « Les réactions des statuts ».
   (`handleEvent`), sans récursion. Trois évènements entrent au journal sans passer par
   la file (`run.record`) : `draw`, `removed` et `bagRegenerated` ; leurs réactions se
   règlent juste après l'Éveil, le déclencheur de sortie ou les Trouvailles, comme des
-  interruptions (`settleReactions`).
+  interruptions (`settleReactions`). Un seul point les fait partir, `releaseReactions`.
+- **La retenue des phases** : pendant les trois phases de la résolution
+  (`holdReactions`, dans `resolveTurn`), les réactions relevées ne partent pas :
+  `releaseReactions` les met de côté, celles du pot d'un côté, celles des statuts de
+  l'autre. `resolvePot` les joue ensuite, chaque bille du pot ses réactions puis son
+  effet à chaque résolution, puis les statuts. Le triangle joue ainsi en entier avant
+  le pot ; une réaction retenue qui donnerait un bonus ciblé le perd (phases passées).
 - **Sa propre arrivée ne compte pas** : la bille qui entre au pot ne réagit pas à sa
   propre mise en poche (elle a pour cela son moment « à l'entrée »), un statut ni à sa
   réception ni à son renforcement ; chacun réagit aux occurrences suivantes.

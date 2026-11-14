@@ -185,6 +185,37 @@ function checkPocket(run) {
   const impact = pot.events.find((event) => event.type === "impact");
   run("pot, résolution : compté dans l'Impact", impactOf(impact.speed, impact.mass), impact.impact);
   run("pot, résolution : la Masse de final_pocket dans l'Impact", 2, impact.mass);
+  // L'ordre de la résolution : le triangle en entier, dans l'ordre horaire, puis le pot,
+  // BILLE PAR BILLE : ses réactions retenues pendant les phases (ici, à chaque base),
+  // puis son effet à chaque résolution, avant la bille suivante. Jamais une bille du
+  // pot entre deux phases.
+  const ordering = {
+    phased: { base: [{ action: "speed", amount: 1 }], apex: [{ action: "speed", amount: 1 }] },
+    onBaseAndResolution: { pocketed: { base: [{ action: "speed", amount: 2 }], resolution: [{ action: "mass", amount: 1 }] } },
+    onResolution: { pocketed: { resolution: [{ action: "mass", amount: 1 }] } },
+    onBase: { pocketed: { base: [{ action: "speed", amount: 3 }] } },
+  };
+  const ordered = apply(
+    playState({ triangle: triangleOf(placed("phased"), placed("phased"), placed("phased")), pot: ["onBaseAndResolution", "onResolution", "onBase"] }),
+    { type: "resolve" },
+    ordering
+  );
+  run.same(
+    "pot, résolution : le triangle dans l'ordre horaire, puis chaque bille du pot, ses réactions puis sa résolution",
+    [
+      "phase:rightBase",
+      "phase:leftBase",
+      "phase:apex",
+      "pocketReaction:onBaseAndResolution",
+      "pocketReaction:onBaseAndResolution",
+      "pocketResolution:onBaseAndResolution",
+      "pocketResolution:onResolution",
+      "pocketReaction:onBase",
+      "pocketReaction:onBase",
+    ],
+    ordered.events.filter((event) => event.type === "effect").map((event) => (event.trigger === "phase" ? `phase:${event.slot}` : `${event.trigger}:${event.marble}`))
+  );
+  run("pot, résolution : les réactions retenues comptent dans l'Impact", 3 + 4 + 6, ordered.events.find((event) => event.type === "impact").speed);
   // Une bille empochée pendant la résolution, avant l'étape du pot, y passe ce tour.
   const late = apply(playState({ triangle: triangleOf(placed("base_pocket"), null, placed("final_pocket")) }), { type: "resolve" });
   run("pot, résolution : la bille empochée pendant les phases y passe", true, journal(late.events).includes("effect:pocketResolution:final_pocket"));
@@ -369,8 +400,9 @@ function checkPocketReactions(run) {
   run("boucle indirecte : la pose reprend après la chaîne coupée", true, loop.events.findIndex((event) => event.type === "placed") > loop.events.findIndex((event) => event.type === "chainInterrupted"));
   const resolved = looping.reduce(loop.state, { type: "resolve" });
   run("boucle indirecte : la partie continue", true, resolved.ok);
-  // Pendant la résolution : la boucle de la base droite (la première phase) coupée,
-  // la base gauche et la pointe jouent, les retraits et l'Impact suivent.
+  // Pendant la résolution : le Polissage de la base droite fait réagir le pot, retenu
+  // pendant les phases ; la boucle part à l'étape du pot, y est coupée, et l'étape se
+  // poursuit (la bille suivante du pot), puis les retraits et l'Impact.
   const midResolution = looping.reduce(
     playState({ bag: ["plain"], pot: ["cracker", "healer"], triangle: triangleOf(placed("baseOne"), placed("basePolisher"), placed("sturdy", 50)) }),
     { type: "resolve" }
@@ -378,10 +410,11 @@ function checkPocketReactions(run) {
   const cutAt = midResolution.events.findIndex((event) => event.type === "chainInterrupted");
   run("chaîne coupée en résolution : une seule fois", 1, midResolution.events.filter((event) => event.type === "chainInterrupted").length);
   run(
-    "chaîne coupée en résolution : la base gauche joue ensuite son effet",
+    "chaîne coupée en résolution : les trois phases jouées avant, la boucle n'y part pas",
     true,
-    midResolution.events.slice(cutAt).some((event) => event.type === "effect" && event.trigger === "phase" && event.slot === "leftBase" && event.speedDelta === 1)
+    midResolution.events.slice(0, cutAt).some((event) => event.type === "effect" && event.trigger === "phase" && event.slot === "leftBase" && event.speedDelta === 1) &&
+      midResolution.events.slice(0, cutAt).some((event) => event.type === "phase" && event.slot === "apex")
   );
-  run("chaîne coupée en résolution : la pointe joue ensuite sa phase", true, midResolution.events.slice(cutAt).some((event) => event.type === "phase" && event.slot === "apex"));
-  run("chaîne coupée en résolution : l'Impact compte la base droite", 1, midResolution.events.find((event) => event.type === "impact").speed);
+  run("chaîne coupée en résolution : l'étape du pot se poursuit ensuite", true, midResolution.events.slice(cutAt).some((event) => event.type === "potResolution" && event.marble === "healer"));
+  run("chaîne coupée en résolution : l'Impact compte la base gauche", 1, midResolution.events.find((event) => event.type === "impact").speed);
 }

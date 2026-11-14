@@ -99,6 +99,17 @@ function checkReactionOrder(run) {
   const lost = mustReduce(rules, { ...game({ hand: inHand(["twoPockets", "plain", "plain"]), pot: ["plain", "plain", "plain"] }), statuses: lostReact }, toApex);
   run.same("perte au pot plein : chaque perte, puis sa réaction, avant la suivante", ["lost", "statusReaction", "effect:statusReaction", "lost", "statusReaction", "effect:statusReaction"], order(lost.events));
 
+  // PENDANT LES PHASES, les réactions sont retenues : le triangle en entier, puis le
+  // pot (sa réaction à la pioche), puis le statut, après la dernière phase.
+  const phaseDrawing = fabricatedRules({ ...TABLE, phaseDrawer: { base: [draw(1)], apex: [draw(1)] }, potDraw: { pocketed: { drawnMarbles: [speed(5)] } } });
+  const heldDraws = mustReduce(phaseDrawing, { ...game({ bag: ["plain", "plain"], pot: ["potDraw"], triangle: triangleOf(placed("phaseDrawer"), null, placed("phaseDrawer")) }), statuses: drawReact }, { type: "resolve" });
+  run.same(
+    "phases : les réactions retenues, puis le pot, puis le statut",
+    ["effect:phase", "draw", "effect:phase", "draw", "effect:pocketReaction", "effect:pocketReaction", "effect:statusReaction", "effect:statusReaction"],
+    heldDraws.events.filter((event) => event.type === "draw" || event.type === "effect").map((event) => (event.type === "effect" ? `effect:${event.trigger}` : event.type))
+  );
+  run("phases, retenue : prévision = réel", true, forecastMatches(phaseDrawing, { ...game({ bag: ["plain", "plain"], pot: ["potDraw"], triangle: triangleOf(placed("phaseDrawer"), null, placed("phaseDrawer")) }), statuses: drawReact }, null));
+
   // Un statut qui éjecte n'est pas une bille : la condition de calibre relatif de
   // l'éjectée est fausse, rien ne plante, au réel comme en prévision.
   const ejecting = { ...game({ hand: inHand(["plain"]), triangle: triangleOf(null, null, placed("sizeKnock")) }), statuses: [instance("throw_eject", { remaining: null })] };

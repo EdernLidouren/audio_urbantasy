@@ -132,7 +132,7 @@ Si la Chiquenaude a vidé l'emplacement visé, la pose se poursuit comme sur un 
 ### La résolution
 
 1. **Les phases**, dans l'ordre horaire : base droite, base gauche, pointe. Un emplacement vide saute sa phase. La bille de l'emplacement joue son effet de phase, puis prend 1 d'usure, même si cela l'amène à son maximum. Une bille qui a quitté le triangle avant sa phase la saute.
-2. **Le pot** : chaque bille du pot, dans l'ordre d'arrivée, joue son effet En poche à chaque résolution, si elle en a un.
+2. **Le pot** : chaque bille du pot, dans l'ordre d'arrivée, joue ses réactions retenues pendant les phases (voir plus bas), puis son effet En poche à chaque résolution, si elle en a un, avant la bille suivante. Puis les statuts jouent leurs réactions retenues.
 3. **Les retraits par usure**, dans l'ordre horaire : chaque bille à son usure maximale quitte son emplacement, son Final joue pendant qu'elle est en partance, puis elle arrive à la défausse (sauf si son Final l'envoie ailleurs), avant la bille suivante.
 4. **L'Impact** se calcule et s'ajoute au Score. En partie libre, un palier franchi se dit aussitôt. Puis les **conditions de fin** d'après l'Impact se vérifient (section 13) : cible atteinte, tour d'endurance raté, dernier tour.
 5. **La rotation** : chaque bille avance d'un cran vers son emplacement suivant, la base droite vers la base gauche, la base gauche vers la pointe, la pointe vers la base droite. Les emplacements vides tournent aussi. Les bonus disparaissent.
@@ -268,8 +268,8 @@ Vitesse et Masse ne sont pas des mots-clés : un effet les augmente ou les dimin
 
 ### L'ordre exact d'une résolution
 
-1. Phase de base droite, puis de base gauche, puis de pointe : pour chacune, l'effet, puis 1 d'usure.
-2. L'étape du pot, dans l'ordre d'arrivée.
+1. Phase de base droite, puis de base gauche, puis de pointe : pour chacune, l'effet, puis 1 d'usure. Pendant les phases, les billes du pot et les statuts ne réagissent pas encore : leurs réactions sont comptées et retenues jusqu'à l'étape du pot. Le triangle joue donc toujours en entier, sans qu'une bille du pot ne s'intercale entre deux phases.
+2. L'étape du pot, dans l'ordre d'arrivée, bille par bille : ses réactions retenues, puis son effet à chaque résolution. Puis les réactions retenues des statuts.
 3. Les retraits par usure, dans l'ordre horaire : pour chaque bille, son départ, son Final, puis son arrivée.
 4. L'Impact.
 5. La rotation, puis la fin du tour.
@@ -365,8 +365,9 @@ Une bille du pot peut réagir à ce qui se passe pendant la partie : « En poche
 - Elle n'écoute jamais une quantité (comme les points d'usure rendus), ni les gains et pertes de Vitesse et de Masse, ni les réactions elles-mêmes.
 - Elle réagit une fois par occurrence : trois billes piochées, trois réactions. Un évènement qui compte pour deux occurrences écoutées donne deux réactions.
 - **L'ordre, une seule règle** : l'évènement se produit et les valeurs de partie sont comptées ; la bille concernée joue d'abord son propre effet (l'Éveil après sa pioche, le Final ou l'Éjection après son départ du triangle, les Trouvailles des billes actives après un mélange) ; puis les billes du pot réagissent, dans l'ordre d'arrivée ; puis les statuts, dans l'ordre où ils ont été reçus (section 12). Le même ordre partout : pour la pioche du début de tour comme pour une Pioche d'effet, pour un retrait à l'étape des retraits comme pour un retrait par une Fêlure. Une bille perdue au pot plein suit cet ordre comme toute arrivée. Après un mélange, les réactions jouent avant que la pioche ne reprenne.
+- **Une seule exception, les phases de la résolution** : ce qu'elles font réagir (une phase de base, un Polissage, une pioche…) attend la fin de la phase de pointe. À l'étape du pot, chaque bille joue ses réactions retenues, puis son effet à chaque résolution, avant la bille suivante ; puis les statuts jouent les leurs. Une abeille au pot ne se fait donc entendre qu'après la pointe, deux fois si les deux bases ont joué.
 - Une bille qui entre au pot ne réagit pas à sa propre mise en poche ; elle réagit aux occurrences suivantes. Une bille entrée plus tard ne réagit pas à ce qui l'a précédée.
-- Un bonus de réaction dont la phase est passée est perdu.
+- Un bonus de réaction dont la phase est passée est perdu : c'est toujours le cas d'une réaction retenue pendant les phases.
 
 ### Les garde-fous contre les boucles
 
@@ -487,7 +488,7 @@ Un statut ne compte, pour une charge comme pour ce qui se dit, que s'il change v
 
 ### Les réactions des statuts
 
-- L'ordre est la règle unique des réactions (section 9, « Les réactions en poche ») : l'évènement se produit, il est compté, la bille concernée joue son propre effet (l'Éveil après sa pioche, le Final ou l'Éjection après son départ), puis les billes du pot réagissent, dans l'ordre d'arrivée, puis les statuts, dans l'ordre où ils ont été reçus.
+- L'ordre est la règle unique des réactions (section 9, « Les réactions en poche ») : l'évènement se produit, il est compté, la bille concernée joue son propre effet (l'Éveil après sa pioche, le Final ou l'Éjection après son départ), puis les billes du pot réagissent, dans l'ordre d'arrivée, puis les statuts, dans l'ordre où ils ont été reçus. Pendant les phases de la résolution, les réactions des statuts sont retenues comme celles du pot, et jouent après l'étape du pot.
 - Un statut ne réagit jamais à sa propre réception ni à son renforcement ; il réagit aux occurrences suivantes, tant qu'il est en vigueur.
 
 ### Les consulter

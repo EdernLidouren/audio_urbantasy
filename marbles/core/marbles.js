@@ -140,7 +140,7 @@ import { validateGameDefinition } from "./validation.js";
 import { buildRulesOf, endReached, gameResult, startValue, startingList, tierOf, turnLimit } from "./definitions.js";
 import { NO_BAGS, bagProblems, describeProblem, validateBagFormat } from "./bags.js";
 import { BAG_BUILD_RULES } from "../config/values.js";
-import { drawMarbles, intercept, noteModification, shuffled, sourceOf, transact } from "./run.js";
+import { drawMarbles, holdReactions, intercept, noteModification, shuffled, sourceOf, transact } from "./run.js";
 import { answerOf, chooseRefusal, targetRef } from "./choices.js";
 import { retireMarble, travel } from "./path.js";
 import { LOCKS, NO_STATUSES, activatePending, characteristic, endTurn, isLocked, lockingInstance, modifyQuantity, ruleInstance } from "./statuses.js";
@@ -519,14 +519,23 @@ function resolvePhases(run) {
 }
 
 // L'étape du POT, une fois par tour : après les trois phases, avant les retraits par
-// usure, chaque bille du pot dans l'ordre d'arrivée, pour son effet En poche à
-// chaque résolution. Une bille entrée au pot pendant cette étape a aussi la sienne,
-// après les autres ; le pot étant borné, l'étape l'est aussi.
+// usure, chaque bille du pot dans l'ordre d'arrivée, BILLE PAR BILLE : ses réactions
+// retenues pendant les phases (`held.pot`, run.js/holdReactions), dans l'ordre où
+// elles sont survenues, puis son effet En poche à chaque résolution. Une bille entrée
+// au pot pendant les phases ou pendant cette étape a aussi les siennes, après les
+// autres ; le pot étant borné, l'étape l'est aussi. Puis les réactions retenues des
+// statuts (`held.statuses`), dans l'ordre où elles sont survenues : le triangle, puis
+// le pot, puis les statuts, l'ordre unique des réactions.
 // Un POT verrouillé (marbles/core/statuses.js/LOCKS) n'a pas d'étape : aucun
-// évènement.
-function resolvePot(run) {
-  if (isLocked(run.state.statuses, run.statuses, "pot")) return;
-  for (let index = 0; index < run.state.pot.length; index++) run.emit({ type: "potResolution", index, marble: run.state.pot[index] });
+// évènement, ses réactions retenues comprises ; celles des statuts jouent.
+function resolvePot(run, held) {
+  if (!isLocked(run.state.statuses, run.statuses, "pot")) {
+    for (let index = 0; index < run.state.pot.length; index++) {
+      for (const reaction of held.pot) if (reaction.index === index) run.emit(reaction);
+      run.emit({ type: "potResolution", index, marble: run.state.pot[index] });
+    }
+  }
+  for (const reaction of held.statuses) run.emit(reaction);
 }
 
 // Les retraits par usure, dans l'ordre horaire. Pour chaque bille usée : elle
@@ -555,8 +564,10 @@ export function runResolution(state, types, options = {}) {
 }
 
 function resolveTurn(run) {
-  resolvePhases(run);
-  resolvePot(run);
+  // Le triangle d'abord, en entier : ce que ses phases font réagir (le pot, les
+  // statuts) attend l'étape du pot.
+  const held = holdReactions(run, () => resolvePhases(run));
+  resolvePot(run, held);
   retireWornMarbles(run);
 
   const { speed, mass } = run.state;

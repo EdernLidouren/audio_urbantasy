@@ -696,16 +696,17 @@ function checkTexts(run) {
       describeOverview(shuffling, rules, t)
     );
     run.same(
-      "réaction, séquence : à sa place, juste après le mélange, avant la pioche qui reprend",
+      "réaction, séquence : au mélange pendant les phases, retenue jusqu'à l'étape du pot",
       [
         "resolution.opening{turn: 2} outcome.empty{slot: slot.rightBase}",
         "outcome.slot{slot: slot.leftBase, marble: <awaken_draw>, effect: effect.combined{parts: [effect.draw{amount: 1}]}}",
         "event.bag_regenerated{size: 2}",
-        "outcome.pot{marble: <awaken_draw>, effect: effect.combined{parts: [effect.given{effect: effect.polish{amount: 1}, slot: slot.apex}]}, speed: 0, mass: 1}",
-        "event.polished{marble: <fragile>, wear: 0, maxWear: 2}",
         "event.draw{marbles: [<aging_flick>]}",
+        "outcome.slot{slot: slot.apex, marble: <fragile>, effect: effect.combined{parts: [effect.speed_up{amount: 5}]}}",
+        "outcome.pot{marble: <awaken_draw>, effect: effect.combined{parts: [effect.given{effect: effect.polish{amount: 1}, slot: slot.apex}]}, speed: 5, mass: 1}",
+        "event.polished{marble: <fragile>, wear: 1, maxWear: 2}",
       ],
-      texts(shuffling).slice(0, 6)
+      texts(shuffling).slice(0, 7)
     );
     // Une bille du pot qui joue plusieurs fois dans la résolution : une seule ligne
     // dans R, ses valeurs regroupées ; une bille qui ne joue rien, aucune.

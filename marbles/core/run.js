@@ -194,7 +194,8 @@ const EVENT_TRIGGERS = {
 // précédée, ni à sa propre arrivée (une bille à sa mise en poche, qui a son moment
 // « à l'entrée » ; un statut à sa réception ou à son renforcement). Elles sont
 // émises après le traitement de l'évènement (handleEvent) : la bille concernée joue
-// d'abord son propre effet. -> les évènements des réactions, dans l'ordre.
+// d'abord son propre effet ; pendant les phases de la résolution, retenues jusqu'à
+// l'étape du pot (holdReactions). -> les évènements des réactions, dans l'ordre.
 function reactionsOf(run, event, before) {
   const potListens = REACTION_KEYS.length > 0 && run.state.pot.length > 0 && !isLocked(run.state.statuses, run.statuses, "pot");
   const statusesListen = run.state.statuses.length > 0;
@@ -553,20 +554,46 @@ function handleEvent(run, event) {
     const clauses = trigger.clauses(event, listener, run.types, run.statuses);
     if (clauses !== null) fireEffect(run, trigger.id, listener, clauses, event);
   }
-  const reactions = run.reactions.get(event);
-  if (reactions === undefined) return;
-  run.reactions.delete(event);
-  for (const reaction of reactions) run.emit(reaction);
+  releaseReactions(run, event, run.emit);
 }
 
 // Les réactions relevées pour `event`, réglées tout de suite, chacune jusqu'au
 // bout (des interruptions) : celles d'un évènement qui ne passe pas par la file (le
 // mélange, regenerateBag).
 function settleReactions(run, event) {
+  releaseReactions(run, event, run.settle);
+}
+
+// LE seul point où partent les réactions relevées pour `event` (reactionsOf) : jouées
+// par `play` (run.emit, dans la file ; run.settle, en interruption), ou, pendant une
+// RETENUE (holdReactions), mises de côté, celles du pot d'un côté, celles des
+// statuts de l'autre, chacune à sa place.
+function releaseReactions(run, event, play) {
   const reactions = run.reactions.get(event);
   if (reactions === undefined) return;
   run.reactions.delete(event);
-  for (const reaction of reactions) run.settle(reaction);
+  if (run.held !== null) {
+    for (const reaction of reactions) (reaction.type === "statusReaction" ? run.held.statuses : run.held.pot).push(reaction);
+    return;
+  }
+  for (const reaction of reactions) play(reaction);
+}
+
+// LA RETENUE DES RÉACTIONS : pendant `body`, les réactions du pot et des statuts sont
+// relevées et comptées comme d'habitude, mais ne jouent pas ; le déroulé les rend,
+// dans l'ordre où elles sont survenues, à qui les jouera à sa place. Sert aux trois
+// phases de la résolution : le triangle d'abord, en entier, puis le pot
+// (marbles/core/marbles.js/resolvePot), puis les statuts. -> { pot, statuses } : les
+// évènements des réactions retenues, pocketReaction et statusReaction.
+export function holdReactions(run, body) {
+  const held = { pot: [], statuses: [] };
+  run.held = held;
+  try {
+    body();
+  } finally {
+    run.held = null;
+  }
+  return held;
 }
 
 // Déroule une action sur un état de travail, avec son bus et son journal. Une
@@ -596,6 +623,8 @@ export function transact(state, types, { eventLimit, blind = false, answers = []
     phasesStarted: new Set(),
     journal: [],
     reactions: new Map(),
+    // Les réactions retenues (holdReactions), ou null hors d'une retenue.
+    held: null,
     answers,
     answerIndex: 0,
     // Les billes EN TRANSIT : sorties d'une zone, pas encore arrivées dans la
