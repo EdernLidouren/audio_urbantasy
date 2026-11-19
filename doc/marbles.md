@@ -573,7 +573,7 @@ active ») en est un, base 0, pas 1. Le fantôme, la perle, l'étoile et l'agate
 flick: [speed({ base: 0, step: 1, source: turnsInHand(), max: 3 })],
 apex: [speed({ base: 2, step: 1, source: zoneCount("discard", familyIs("mist")), max: 6 })],
 apex: [speed({ base: 0, step: 2, source: tally("awaken", "game"), max: 20 })],
-apex: [speed({ base: 0, step: 2, source: familyCount(), max: 6 })],
+apex: [speed({ base: 0, step: 3, source: familyCount(["triangle", "hand"]), max: 12 })],
 ```
 
 | Source (`source`) | Vaut | Fiche |
@@ -635,9 +635,9 @@ Tic ou une Éjection, le remplacement en cours.
 
 | Condition (`when`) | Vraie si | Exemple (fiche) |
 |---|---|---|
-| `{ type: "printedStat", slot, stat, atLeast }` | la bille de `slot` a, imprimé à cet emplacement, au moins `atLeast` de `stat` (une action à montant : Empocher et Éjecter refusés au chargement) ; emplacement vide : faux | « Vitesse +4 à la pointe si son effet de pointe donne au moins Vitesse +1 » (loupe) |
+| `{ type: "printedStat", slot, stat, atLeast }` | la bille de `slot` a, imprimé à cet emplacement, au moins `atLeast` de `stat` (une action à montant : Empocher et Éjecter refusés au chargement) ; emplacement vide : faux | « Vitesse +4 à la pointe si son effet de pointe donne au moins Vitesse +1 » |
 | `{ type: "relativeSize", marble, is }` | pendant un remplacement, la bille `marble` (`ejected`, l'éjectée, ou `placed`, la posée) est `is` (`smaller` ou `larger`) que l'autre ; calibres égaux : ni l'un ni l'autre | « Tic : Vitesse +4 si la bille éjectée est plus grosse. » (bille de fronde), « Tic : Vitesse +3 si la bille éjectée est plus petite. » (acier) |
-| `{ type: "sizeAt", slot, size }` (`sizeAt(slot, calibre)`) | la bille de `slot` est de calibre `size` ; emplacement vide : faux | « Base : Éjecter la bille de l'emplacement suivant si la bille de l'emplacement suivant est une minibille. » (tornade) |
+| `{ type: "sizeAt", slot, size }` (`sizeAt(slot, calibre)`) | la bille de `slot` est de calibre `size` ; emplacement vide : faux | « Base : Éjecter la bille de l'emplacement suivant si la bille de l'emplacement suivant est une minibille. » |
 | `{ type: "familyAt", slot, family }` (`familyAt(slot, famille)`) | la bille de `slot` est de la famille `family`, parmi d'autres peut-être ; emplacement vide : faux | « si la bille de l'emplacement suivant est de la famille Brume » |
 | `{ type: "rarityAt", slot, rarity }` (`rarityAt(slot, rareté)`) | la bille de `slot` est de rareté `rarity`, exactement ; emplacement vide : faux | « si la pointe est une bille rare » |
 | `{ type: "marbleAt", slot, marble }` (`marbleAt(slot, id)`) | la bille de `slot` est la bille `marble` (un id ; la table des billes vérifie qu'il existe, `referencedMarbles`) ; emplacement vide : faux | « Pointe : Empocher cette bille si la bille de l'emplacement précédent est une abeille, sinon Vitesse +3. » |

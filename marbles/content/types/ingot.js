@@ -1,6 +1,6 @@
 // Bille « lingotin » (ingot). Donnée pure : les champs sont décrits dans
 // marbles/content/types/index.js.
-import { speed, mass, pocket, choice, zoneIs } from "../effects.js";
+import { speed, mass, pocket, zoneIs, choice } from "../effects.js";
 import { LARGE } from "../../config/values.js";
 
 export default {

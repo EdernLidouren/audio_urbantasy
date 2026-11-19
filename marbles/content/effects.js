@@ -85,6 +85,10 @@ export const rarityAt = (slot, rarity) => ({ type: "rarityAt", slot, rarity });
 // abeille ».
 export const marbleAt = (slot, marble) => ({ type: "marbleAt", slot, marble });
 
+// TOUTES ces conditions, une condition (`when`) : allOf(count(…), count(…)), « si … et
+// … ».
+export const allOf = (...conditions) => ({ type: "all", conditions });
+
 // LA NÉGATION d'une condition qui l'accepte (sizeAt, familyAt, rarityAt, marbleAt,
 // replacementSize) : not(familyAt(NEXT_SLOT, "bestiary")), « si la bille de
 // l'emplacement suivant n'est pas de la famille Bestiaire ».

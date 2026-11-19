@@ -1,6 +1,6 @@
 # Règles du jeu des billes
 
-Ce document décrit les règles du jeu des billes telles qu'elles s'appliquent aujourd'hui. Il s'adresse au joueur et au concepteur. Les valeurs citées sont les valeurs actuelles ; les billes de l'annexe sont celles du premier set, aux valeurs provisoires, appelées à changer.
+Ce document décrit les règles du jeu des billes telles qu'elles s'appliquent aujourd'hui. Il s'adresse au joueur et au concepteur. Les valeurs citées sont les valeurs actuelles ; les billes de l'annexe sont celles du premier set, dans sa version révisée de novembre 2026, aux valeurs provisoires, appelées à changer.
 
 ## 1. Le but du jeu
 
@@ -685,17 +685,19 @@ Cette annexe est générée à partir de la table des billes ; elle ne se modifi
 
 cuivre, normale, Trésor, commune, usure 4.
 
-*Une bille cuivrée qui verdit un peu aux entournures. Les anciens jurent qu'elle porte chance à qui la frotte assez longtemps.*
+*Ne la lavez pas, elle se couvrira d'un joli vert-de-gris. Toxique, mais très classe.*
 
 - Pointe : Vitesse +3.
-- Base : Vitesse +1.
-- En poche, à chaque résolution : Vitesse +1.
+- Base : Vitesse égale à la Vitesse que donne la bille de l'autre base.
+- Éjection : Vitesse +3.
+- Polissage : Vitesse +3.
+- En poche, à chaque résolution : Vitesse +2.
 
 ### vive-argent
 
 vive-argent, minibille, Trésor, peu commune, usure 3.
 
-*Une goutte d'argent qui ne tient jamais en place, même au fond d'une poche. On dit qu'elle trouve toujours le chemin du coffre.*
+*Couleur de mercure, effet liquide : on dirait du vrai. Remarquez, à l'époque, ça se faisait encore. C'était mieux avant.*
 
 - Pointe : Masse +1.
 - Base : Vitesse +2.
@@ -706,17 +708,17 @@ vive-argent, minibille, Trésor, peu commune, usure 3.
 
 rubis, normale, Trésor, rare, usure 4.
 
-*Un rouge si profond qu'on croit y voir battre un cœur. Plus on la garde, plus elle brille.*
+*Elle vaudrait moins cher si elle était verte. Au moins vingt fois moins cher.*
 
 - Pointe : Masse +1, +1 par bille dans le pot, maximum +4.
-- Base : Polissage 1 à la bille de l'emplacement suivant.
+- Base : Polissage 1 à la bille de l'emplacement suivant ; Vitesse −2 si l'emplacement suivant est vide.
 - En poche, à l'entrée : statut lustre, toute la partie.
 
 ### lingotin
 
 lingotin, calot, Trésor, épique, usure 5.
 
-*Un petit lingot d'or poli jusqu'à devenir rond. Il pèse dans la main comme une promesse.*
+*Une bille coulée dans de l'or pur. Quelle décadence.*
 
 - Pointe : Vitesse +4 et Masse +1.
 - Base : Masse +1.
@@ -727,9 +729,9 @@ lingotin, calot, Trésor, épique, usure 5.
 
 pierre de sang, normale, Trésor, légendaire, usure 3.
 
-*Vert sombre moucheté de rouge, comme si quelqu'un avait saigné dessus il y a des siècles. Elle ne se gagne jamais : elle se mérite.*
+*C'est moins grave que ça en a l'air.*
 
-- Pointe : Vitesse +3.
+- Pointe : Vitesse +3 et Masse +1.
 - Base : Masse +1.
 - Final : Empocher cette bille.
 - En poche, à l'entrée : statut poche profonde, intensité 2, toute la partie.
@@ -739,261 +741,290 @@ pierre de sang, normale, Trésor, légendaire, usure 3.
 
 lune, normale, Astres, commune, usure 3.
 
-*Grise et piquetée de minuscules cratères. Les nuits de pleine lune, elle roule un peu plus loin que les autres.*
+*Taillée dans de la roche lunaire de première qualité. Du moins, c'est ce que disait la publicité.*
 
 - Pointe : Vitesse +3.
-- Base : Vitesse +1.
-- Éveil : Vitesse +1.
+- Base : Vitesse +3 si le triangle compte au moins 1 calot, sinon Vitesse +1.
+- Éveil : Vitesse +3.
+- Tic : Vitesse +2.
+- Éjection : Vitesse +2.
 
 ### comète
 
 comète, minibille, Astres, peu commune, usure 2.
 
-*Une minibille bleu glacier qui laisse derrière elle une traînée laiteuse. Elle n'arrive jamais seule.*
+*Quelle chevelure, quelle queue ! Oui, on parle bien d'une bille.*
 
 - Pointe : Vitesse +3.
 - Base : Vitesse +1.
 - Éveil : Pioche 1.
+- Final : Pioche 1 si vous avez au plus 3 billes en main, sinon Vitesse +2.
 - En poche, à chaque mélange : Vitesse +3.
 
 ### galaxie
 
 galaxie, normale, Astres, rare, usure 3.
 
-*Une spirale de poussière violette et dorée tourne lentement en son cœur. Certains enfants prétendent y avoir vu des planètes.*
+*Avant le big bang, l'univers aurait pu s'y loger.*
 
 - Pointe : Vitesse +2 par Astres active, maximum +6.
-- Base : Vitesse +1.
+- Base : Masse +1.
+- Chiquenaude : Vitesse +5 et Masse +1 si le triangle compte au plus 1 bille.
 - Trouvaille : Masse +1.
 
 ### éclipse
 
 éclipse, calot, Astres, épique, usure 3.
 
-*Noire comme l'encre, cerclée d'un mince anneau de lumière. Quand elle passe, toute la cour retient son souffle.*
+*Ne la regardez pas ! Même à travers un téléphone !*
 
 - Pointe : Masse +2.
-- Base : Vitesse +1.
+- Base : Vitesse +2.
 - Éveil : statut main vive, 2 tours.
 - Trouvaille : statut inspiration, 1 charge.
+- Final : Pioche 2.
 
 ### étoile
 
 étoile, minibille, Astres, légendaire, usure 4.
 
-*Parfaitement transparente, avec un seul éclat scintillant suspendu au centre. On raconte qu'elle est tombée d'un ciel d'août.*
+*C'est juste un machin qui scintille dans une bille transparente. Mais ça claque.*
 
 - Pointe : Vitesse +2 par éveil cette partie, maximum +20.
 - Base : Masse +1 par mélange cette partie, maximum +3.
-- En poche, à chaque bille piochée : Vitesse +1.
+- Éveil : Vitesse +1 par bille en main, maximum +5.
+- En poche, à chaque bille piochée : Masse +1.
 
 ### bulle
 
 bulle, minibille, Brume, commune, usure 2.
 
-*Si fine et si claire qu'on la croirait prête à éclater. Elle finit toujours par revenir, comme si de rien n'était.*
+*Rien qu'une bille translucide, un peu bleutée, un peu irisée. Ils se sont pas foulés.*
 
 - Pointe : Vitesse +3.
-- Base : Vitesse +1.
-- Chute : Vitesse +2.
+- Base : Vitesse +4 si la Masse est d'au plus 1, sinon Vitesse +1.
+- Chute : Vitesse +5, −1 par point d'usure de cette bille.
 
 ### fantôme
 
 fantôme, minibille, Brume, peu commune, usure 2.
 
-*Toute blanche, plus ou moins transparente selon l'humeur. On la perd, on la cherche, et elle est déjà dans votre poche.*
+*Qui vas-tu appeler ?*
 
 - Pointe : Vitesse +3.
 - Base : Vitesse +1.
 - Chiquenaude : Vitesse +1 par tour en main, maximum +3.
-- Final : Rebond de cette bille.
+- Trouvaille : Rebond de cette bille.
+- Éjection : Vitesse +3.
 
 ### perle
 
 perle, minibille, Brume, rare, usure 3.
 
-*Nacrée, douce comme une joue, elle sent vaguement le sel. Les plongeurs disent qu'elle appelle ses sœurs perdues.*
+*Elle est percée de part en part : elle vient d'un collier. Vous vous fichez de moi ?*
 
 - Pointe : Vitesse +2, +1 par Brume à la défausse, maximum +6.
-- Base : Vitesse +1.
+- Base : Masse +1 si vous avez au moins 3 billes en main, sinon Vitesse +1.
+- Tic : Vitesse +4 si la bille éjectée est une minibille.
 - Chute : statut amorti, 3 tours.
+- En poche, à chaque résolution : Vitesse +3.
 
 ### océan
 
 océan, calot, Brume, épique, usure 3.
 
-*Des bleus et des verts qui ondulent sans jamais se mélanger tout à fait. Collée à l'oreille, on jure entendre le ressac.*
+*Si vous la collez à votre oreille, vous entendrez peut-être le bruit des vagues. Et vous aurez sûrement l'air idiot.*
 
-- Pointe : Vitesse +2 par bille défaussée ce tour, maximum +8.
+- Pointe : Vitesse +3 par bille défaussée ce tour, maximum +12.
 - Base : Masse +1.
 - Tic : Ramasser jusqu'à une bille de la défausse au choix.
-- En poche, à chaque bille défaussée : Vitesse +1.
+- Chute : Rebond : jusqu'à une bille active au choix.
+- En poche, à chaque bille défaussée : Masse +1.
 
 ### boule à neige
 
 boule à neige, normale, Brume, légendaire, usure 3.
 
-*Des flocons minuscules tourbillonnent à l'intérieur dès qu'on la secoue. Personne n'a jamais su comment ils y sont entrés.*
+*Qui est allé foutre de la neige là-dedans ? Encore de l'argent bien employé.*
 
 - Pointe : Vitesse +4 et Rebond de toutes les billes actives.
 - Base : Vitesse +2.
-- En poche, à chaque rebond : Masse +1.
+- Éjection : Masse +2.
+- En poche, à chaque bille renvoyée par un rebond : Masse +1.
 
 ### abeille
 
 abeille, minibille, Bestiaire, commune, usure 3.
 
-*Rayée jaune et noir, elle bourdonne presque quand elle roule. Là où il y en a une, il y en a cent.*
+*Rayée de jaune et de noir, elle a vite fait de s'attirer un coup de savate par mégarde. La sale bête.*
 
-- Pointe : Vitesse +3.
-- Base : Vitesse +1 à la bille de l'emplacement suivant.
-- En poche, à chaque phase de base : Vitesse +1.
+- Pointe : Empocher cette bille si la bille de l'emplacement précédent est une abeille, sinon Vitesse +3.
+- Base : Vitesse +2 ; Fêlure 1 à la bille de l'emplacement suivant si la bille de l'emplacement suivant n'est pas de la famille Bestiaire.
+- Tic : Vitesse +3 si la bille éjectée est un calot, sinon Vitesse +2 si la bille éjectée est une bille normale, sinon Vitesse +1.
+- En poche, à chaque résolution : Vitesse +2 par abeille dans le pot ; Masse +1 si le pot compte au moins 3 abeilles.
 
 ### dauphin
 
 dauphin, normale, Bestiaire, peu commune, usure 3.
 
-*Un gris-bleu lisse avec une vague blanche sur le flanc. Elle bondit plus qu'elle ne roule, et adore bousculer les autres.*
+*Aussi jolie et aussi détestable que son modèle.*
 
 - Pointe : Vitesse +3.
-- Base : Vitesse +1.
+- Base : Vitesse +1 par bille éjectée ce tour, maximum +5.
 - Tic : Vitesse +3.
-- En poche, à chaque bille tiquée : Vitesse +1.
+- Éjection : Masse +1.
+- En poche, à chaque tic : Vitesse +3.
 
 ### tortue
 
 tortue, calot, Bestiaire, rare, usure 6.
 
-*Une carapace verte et brune striée d'hexagones. Elle a vu passer des générations de joueurs et compte bien en voir d'autres.*
+*Elle est verte, striée de brun, de noir et d'orange, et elle vous survivra. Soyez-en assuré.*
 
 - Pointe : Masse +1 par Bestiaire active, maximum +3.
 - Base : Polissage 1 à la bille de l'emplacement suivant si le triangle est plein.
+- Éjection : Empocher cette bille si la bille qui l'éjecte est un calot.
 - En poche, à chaque résolution : Masse +1 si le triangle est plein.
 
 ### araignée
 
 araignée, normale, Bestiaire, épique, usure 3.
 
-*Noire avec des filaments argentés qui ressemblent à une toile. Celles qui s'en approchent ont du mal à repartir.*
+*Une bille transparente au cœur de laquelle brille un faisceau de fils colorés. Celui qui l'a baptisée n'a jamais vu de toile de sa vie.*
 
 - Pointe : Vitesse +2 par Bestiaire active, maximum +6.
-- Base : Vitesse +1.
+- Base : Masse +1 si la Vitesse est d'au moins 10, sinon Vitesse +2.
 - Tic : Polissage 1, jusqu'à 2 billes actives au choix.
+- Éjection : Masse +1.
 - En poche, à chaque tic : statut coup de fouet, 1 charge.
 
 ### dragon
 
 dragon, calot, Bestiaire, légendaire, usure 4.
 
-*Des écailles émeraude et un œil ambré qui semble vous suivre. Les grands l'interdisent dans la cour, ce qui la rend évidemment irrésistible.*
+*Même chez les billes, il faut qu'il fasse son intéressant.*
 
 - Pointe : Vitesse +4 et Masse +1 par Bestiaire active, maximum +3.
-- Base : Vitesse +3.
-- Chiquenaude : Vitesse +3 à la bille de l'emplacement précédent et Vitesse +3 à la bille de l'emplacement suivant.
+- Base : Vitesse +1 par bille en main, maximum +3.
+- Tic : Vitesse +7, Masse +2 et Empocher la bille éjectée si la bille éjectée a au plus 1 point d'usure restant.
 - En poche, à chaque tic : Masse +1.
 
 ### bille de fronde
 
 bille de fronde, minibille, Souffle, commune, usure 2.
 
-*Petite, dure, et taillée pour voler. Elle ne craint rien, surtout pas les plus gros qu'elle.*
+*Qui sait, elle a peut-être déjà tué quelqu'un.*
 
 - Pointe : Vitesse +3.
 - Base : Vitesse +1.
 - Tic : Vitesse +4 si la bille éjectée est plus grosse.
-- En poche, à chaque bille éjectée : Vitesse +1.
+- Chute : Vitesse +2 par minibille active.
+- En poche, à chaque éjection d'une bille normale ou d'un calot : Vitesse +2.
 
 ### boule de feu
 
 boule de feu, normale, Souffle, peu commune, usure 2.
 
-*Orange et rouge, avec des flammèches figées dans le verre. Elle est toujours un peu tiède, même en hiver.*
+*Elle est juste orange et brillante, mais vous savez ce que c'est.*
 
 - Pointe : Vitesse +5.
 - Base : Vitesse +2.
+- Tic : Vitesse égale à la Vitesse du tour, maximum +8 si l'effet de la bille éjectée donne au moins Masse +1.
 - Final : Vitesse +6.
-- En poche, à chaque final : Vitesse +2.
+- En poche, à chaque final : Masse +1.
 
 ### tornade
 
 tornade, normale, Souffle, rare, usure 3.
 
-*Une spirale grise et blanche qui donne le tournis à la regarder. Après son passage, il ne reste jamais grand-chose debout.*
+*Est-ce l'ombre d'un requin ? Non, ce serait de mauvais goût.*
 
 - Pointe : Vitesse +3, +2 par bille éjectée ce tour, maximum +11.
-- Base : Éjecter la bille de l'emplacement suivant si la bille de l'emplacement suivant est une minibille.
-- En poche, à chaque éjection par effet : Vitesse +2.
+- Base : Empocher cette bille si le triangle compte au moins 2 calots, sinon Vitesse +3.
+- Tic : Rebond de la bille éjectée si la bille éjectée n'est pas un calot.
+- Éjection : Pioche 1.
+- En poche, à chaque bille éjectée par un effet : Vitesse +2.
 
 ### grenade
 
 grenade, normale, Souffle, épique, usure 2.
 
-*Vert kaki, quadrillée de reliefs, avec une drôle de petite tige sur le dessus. Mieux vaut ne pas être à côté quand elle s'en va.*
+*À jeter en hurlant son nom. Effet garanti.*
 
 - Pointe : Vitesse +5.
 - Base : Vitesse +2.
 - Chiquenaude : Fêlure 1, jusqu'à 2 billes actives au choix.
-- Final : Vitesse +4 et Éjecter toutes les minibilles actives.
+- Éjection : Rebond de cette bille.
+- Final : Vitesse +4 et Masse +1 par calot actif.
 
 ### diable rouge
 
 diable rouge, calot, Souffle, légendaire, usure 3.
 
-*Rouge vif barré d'une bande jaune, comme un sourire en coin. Elle gagne toujours, mais personne n'aime ce que ça coûte.*
+*Rouge vif barré d'une bande jaune. Il ne lui manque que des cornes. Mais ça roulerait moins bien.*
 
 - Pointe : Vitesse +6, statut coup double, ce tour et statut usure accélérée, le prochain tour.
 - Base : Vitesse +3 et Fêlure 1 à la bille de l'emplacement suivant.
-- En poche, à chaque bille usée : Vitesse +2.
+- Final : Éjecter toutes les billes actives.
+- Fêlure : Vitesse +2.
+- En poche, à chaque bille usée : Masse +1.
 
 ### argile
 
 argile, normale, Classiques, commune, usure 3.
 
-*La bille de terre cuite de toutes les cours de récré, un peu rugueuse sous le pouce. Elle n'a l'air de rien, et c'est ce qui la rend fiable.*
+*Personne n'aura l'idée de vous la voler, celle-ci.*
 
 - Pointe : Vitesse +4.
-- Base : Vitesse +1.
-- Aucun effet particulier.
+- Base : Vitesse +2.
+- Tic : Vitesse +3.
+- Éjection : Vitesse +3.
 
 ### œil-de-chat
 
 œil-de-chat, normale, Classiques, peu commune, usure 3.
 
-*Du verre clair traversé d'une flamme colorée, comme une pupille. On dit qu'elle voit dans le noir.*
+*Plus commune que ça, tu meurs.*
 
 - Pointe : Vitesse +3.
 - Base droite : Masse +1. Base gauche : Vitesse +3.
+- Éveil : Vitesse +2 par bille normale en main et sur le triangle, maximum +8.
+- Tic : Masse +1.
 - En poche, à chaque résolution : Masse +1 si le triangle est plein.
 
 ### agate
 
 agate, normale, Classiques, rare, usure 4.
 
-*Des veines de couleurs qui ne se ressemblent jamais d'une bille à l'autre. Elle s'entend avec tout le monde.*
+*Dit comme ça, ça a l'air précieux. Mais non.*
 
-- Pointe : Vitesse +2 par famille différente sur le triangle, maximum +6.
+- Pointe : Vitesse +3 par famille différente sur le triangle et en main, maximum +12.
 - Base : Masse +1.
-- En poche, à chaque résolution : Vitesse +1 par famille différente sur le triangle, maximum +3.
+- Trouvaille : Empocher la bille de l'emplacement suivant si l'emplacement suivant est occupé, sinon Empocher cette bille.
+- En poche, à chaque résolution : Vitesse +2 par famille différente sur le triangle et en main ; Masse +1 si l'on compte au moins 3 familles différentes sur le triangle et en main.
 
 ### acier
 
 acier, calot, Classiques, épique, usure 5.
 
-*Un roulement à billes échappé d'un vieux vélo, froid et lourd. Personne ne le chasse, c'est lui qui chasse.*
+*Une bille de roulement échappée d'un vieux vélo. On accepte vraiment n'importe qui, de nos jours.*
 
 - Pointe : Masse +2.
 - Base : Vitesse +2.
 - Tic : Vitesse +3 si la bille éjectée est plus petite.
+- Chute : Masse +1.
 - En poche, à l'entrée : statut lancer supplémentaire, le prochain tour.
 
 ### soda
 
-soda, normale, Classiques, légendaire, usure 1.
+soda, normale, Classiques, légendaire, usure 5.
 
-*Couleur cola, on jurerait qu'elle pétille encore quand on la secoue. Elle ne tient pas en place, et ne dure jamais longtemps.*
+*Secouez-la, secouez-la encore, et peut-être, peut-être, vous dis-je, aurez-vous l'air parfaitement stupide.*
 
-- Pointe : Vitesse +3 par famille différente sur le triangle, maximum +9.
-- Base : Masse +1 par famille différente sur le triangle, maximum +3.
-- En poche, à chaque chiquenaude : Vitesse +1.
+- Pointe : Vitesse +1 par bille dans le sac, maximum +7.
+- Base : Masse +3 si le triangle compte au moins 1 minibille et le triangle compte au moins 1 calot, sinon Masse +1.
+- Chiquenaude : statut élan, ce tour.
+- Final : Vitesse +2 par tour passé sur le triangle, maximum +10 ; Masse +2 si elle a passé au moins 4 tours sur le triangle.
+- En poche, à chaque chiquenaude : Vitesse +3.
 
 <!-- annexe des billes : fin -->

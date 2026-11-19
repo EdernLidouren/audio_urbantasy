@@ -32,6 +32,7 @@ import {
   zoneCount,
 } from "../content/effects.js";
 import { describePrinted } from "../view/narration/effects.js";
+import { placementLines } from "../view/narration.js";
 import { marbleCard } from "../view/card.js";
 import { caughtMessage, fabricatedRules, forecastMatches, inHand, keyText as t, marblesPlayState, mustReduce, placed, validateTable } from "./helpers.js";
 
@@ -43,7 +44,27 @@ export default function checkMarblesAmounts(run) {
   run.section("usure et trace de départ", checkWear);
   run.section("tours passés sur le triangle", checkTurnsOnTriangle);
   run.section("effet imprimé de la bille éjectée", checkKnockedOutPrinted);
+  run.section("billes cachées dans la prévision", checkHiddenRead);
   run.section("témoin, vraies langues", checkWitness);
+}
+
+// UNE BILLE CACHÉE LUE : à l'aveugle, une bille piochée est inconnue ; un montant qui
+// lit son identité (une famille, un filtre) ne sait pas ce qu'il aurait compté : la
+// prévision le dit (`hiddenRead`), se dit incertaine, et la confirmation l'annonce.
+function checkHiddenRead(run) {
+  const rules = fabricatedRules({
+    plain: {},
+    // Pointe : Vitesse +3 par famille différente sur le triangle et en main.
+    agate: { apex: [speed(per(3, familyCount(["triangle", "hand"])))] },
+    // Tic : Pioche 1.
+    drawer: { hit: [{ action: "draw", amount: 1 }] },
+  });
+  const state = (bag) => marblesPlayState(rules, { hand: inHand(["drawer"]), bag, triangle: { rightBase: placed("plain"), leftBase: null, apex: placed("agate") } });
+  const toRight = { type: "place", handIndex: 0, slot: "rightBase" };
+  const hidden = rules.forecast(state(["plain"]), toRight);
+  run.same("bille cachée : la famille d'une bille piochée à l'aveugle, lue", { hiddenRead: true, uncertain: true }, { hiddenRead: hidden.hiddenRead, uncertain: hidden.uncertain });
+  run("bille cachée : rien de pioché, rien de caché", false, rules.forecast(state([]), toRight).hiddenRead);
+  run("bille cachée : la confirmation le dit", true, placementLines(state(["plain"]), 0, "rightBase", rules, t).some(({ key }) => key === "marbles.forecast.hidden_read"));
 }
 
 // L'effet joué par `marble` pour le déclencheur `trigger` dans des évènements.

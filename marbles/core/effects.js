@@ -60,6 +60,9 @@
 //                l'éjectée) ; null sinon ;
 //   copying      (facultatif) vrai pendant l'évaluation d'un effet pour la source
 //                otherBase : une copie n'en copie jamais une autre ;
+//   onHiddenRead (facultatif) appelé quand une source lit l'identité d'une bille
+//                CACHÉE (UNKNOWN_MARBLE, à l'aveugle : un filtre, une famille) : la
+//                prévision se dit alors incertaine (marbles/core/run.js) ;
 //   tally        les valeurs de partie à cet instant (marbles/core/tally.js), lues
 //                par tallyValue seulement.
 //
@@ -128,9 +131,11 @@ export function isMarbleRarity(rarity) {
 }
 
 // Les familles DIFFÉRENTES de billes : chaque famille comptée une fois, une bille à
-// plusieurs familles comptant pour chacune.
+// plusieurs familles comptant pour chacune. Une bille INCONNUE (piochée à l'aveugle,
+// dans la prévision) n'en apporte aucune, comme elle ne passe aucun filtre : son
+// identité est cachée.
 export function distinctFamilies(marbles, types) {
-  return new Set(marbles.flatMap((marble) => types[marble].families)).size;
+  return new Set(marbles.filter((marble) => marble !== UNKNOWN_MARBLE).flatMap((marble) => types[marble].families)).size;
 }
 
 // Une bille dont l'identité est cachée : au sac ou en défausse dans la copie de la
@@ -918,6 +923,20 @@ export const CONDITIONS = {
       return withinBound(AMOUNT_SOURCES[when.source.type].value(when.source, situation, types), when);
     },
   },
+  // TOUTES ces conditions (`conditions`, au moins deux, chacune validée comme une
+  // condition, niée au besoin) : « si le triangle compte au moins 1 minibille et le
+  // triangle compte au moins 1 calot ».
+  all: {
+    fields: ["type", "conditions"],
+    validate(when, describe, fail, context) {
+      if (!Array.isArray(when.conditions) || when.conditions.length < 2) fail(`${describe} : conditions est une liste d'au moins deux conditions.`);
+      for (const condition of when.conditions) {
+        validateRule(condition, CONDITIONS, "condition", `${describe}, et`, fail, context);
+        validateNot(condition, `${describe}, et`, fail);
+      }
+    },
+    test: (when, situation, types) => when.conditions.every((condition) => conditionHolds(condition, situation, types)),
+  },
   // Un COMPTEUR DU TOUR (TURN_STATS), au déclenchement, avant l'effet qui le lit,
   // comparé à une borne : « si la Masse est d'au plus 1 », « si la Vitesse est d'au
   // moins 10 ».
@@ -1018,7 +1037,13 @@ export const AMOUNT_SOURCES = {
       validateZoneChoice(source, describe, fail);
       if (source.filters !== undefined) validateFilters(source.filters, `${describe}, filtres du nombre de billes`, fail);
     },
-    value: (source, { state }, types) => zoneMarbles(source, state).filter((marble) => passesFilters(marble, source.filters, types)).length,
+    value(source, situation, types) {
+      const marbles = zoneMarbles(source, situation.state);
+      // Un filtre lit l'identité : une bille cachée ne le passe pas, et la prévision
+      // ne peut pas dire si elle l'aurait passé.
+      if (source.filters !== undefined) noteHidden(marbles, situation);
+      return marbles.filter((marble) => passesFilters(marble, source.filters, types)).length;
+    },
     // Un gabarit par type de filtre, `marbles.effect.per_zone_<filtre>` ; le calibre a
     // le sien sur le triangle (« par calot actif » : l'accord suit le calibre), comme
     // une bille précise (« par abeille active ») : GENDERED_FILTERS.
@@ -1043,7 +1068,11 @@ export const AMOUNT_SOURCES = {
     validate(source, describe, fail) {
       if (source.zones !== undefined) validateZoneList(source.zones, describe, fail);
     },
-    value: (source, { state }, types) => distinctFamilies(zoneMarbles(source.zones === undefined ? { zone: "triangle" } : source, state), types),
+    value(source, situation, types) {
+      const marbles = zoneMarbles(source.zones === undefined ? { zone: "triangle" } : source, situation.state);
+      noteHidden(marbles, situation);
+      return distinctFamilies(marbles, types);
+    },
     text: (source) => (source.zones === undefined ? "marbles.effect.per_family" : "marbles.effect.per_family_zones"),
     lists: (source) => (source.zones === undefined ? {} : { zones: zonePhrases(source.zones) }),
     current: true,
@@ -1153,6 +1182,12 @@ export const AMOUNT_SOURCES = {
 
 // L'autre base, depuis une base.
 const OTHER_BASE = { leftBase: "rightBase", rightBase: "leftBase" };
+
+// Une source qui lit l'identité de billes, dont une cachée (à l'aveugle) : la situation
+// le note (`onHiddenRead`), la prévision se dira incertaine.
+function noteHidden(marbles, situation) {
+  if (situation.onHiddenRead !== undefined && marbles.includes(UNKNOWN_MARBLE)) situation.onHiddenRead();
+}
 
 // Les zones d'où une bille n'a jamais d'usure à lire : en main (son Éveil), en cours
 // de lancer, dans le pot, ou sans bille (un statut).

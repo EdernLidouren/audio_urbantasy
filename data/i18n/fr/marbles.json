@@ -1,180 +1,180 @@
 {
-  "marble.agate.description": "Des veines de couleurs qui ne se ressemblent jamais d'une bille à l'autre. Elle s'entend avec tout le monde.",
+  "marble.agate.description": "Dit comme ça, ça a l'air précieux. Mais non.",
   "marble.agate.name": {
     "base": "agate",
     "de": "d'agate",
     "gender": "f"
   },
-  "marble.bee.description": "Rayée jaune et noir, elle bourdonne presque quand elle roule. Là où il y en a une, il y en a cent.",
+  "marble.bee.description": "Rayée de jaune et de noir, elle a vite fait de s'attirer un coup de savate par mégarde. La sale bête.",
   "marble.bee.name": {
     "base": "abeille",
     "de": "d'abeille",
     "gender": "f",
     "plural": "abeilles"
   },
-  "marble.bloodstone.description": "Vert sombre moucheté de rouge, comme si quelqu'un avait saigné dessus il y a des siècles. Elle ne se gagne jamais : elle se mérite.",
+  "marble.bloodstone.description": "C'est moins grave que ça en a l'air.",
   "marble.bloodstone.name": {
     "base": "pierre de sang",
     "de": "de pierre de sang",
     "gender": "f"
   },
-  "marble.bubble.description": "Si fine et si claire qu'on la croirait prête à éclater. Elle finit toujours par revenir, comme si de rien n'était.",
+  "marble.bubble.description": "Rien qu'une bille translucide, un peu bleutée, un peu irisée. Ils se sont pas foulés.",
   "marble.bubble.name": {
     "base": "bulle",
     "de": "de bulle",
     "gender": "f"
   },
-  "marble.cats_eye.description": "Du verre clair traversé d'une flamme colorée, comme une pupille. On dit qu'elle voit dans le noir.",
+  "marble.cats_eye.description": "Plus commune que ça, tu meurs.",
   "marble.cats_eye.name": {
     "base": "œil-de-chat",
     "de": "d'œil-de-chat",
     "gender": "m"
   },
-  "marble.clay.description": "La bille de terre cuite de toutes les cours de récré, un peu rugueuse sous le pouce. Elle n'a l'air de rien, et c'est ce qui la rend fiable.",
+  "marble.clay.description": "Personne n'aura l'idée de vous la voler, celle-ci.",
   "marble.clay.name": {
     "base": "argile",
     "de": "d'argile",
     "gender": "f"
   },
-  "marble.comet.description": "Une minibille bleu glacier qui laisse derrière elle une traînée laiteuse. Elle n'arrive jamais seule.",
+  "marble.comet.description": "Quelle chevelure, quelle queue ! Oui, on parle bien d'une bille.",
   "marble.comet.name": {
     "base": "comète",
     "de": "de comète",
     "gender": "f"
   },
-  "marble.copper.description": "Une bille cuivrée qui verdit un peu aux entournures. Les anciens jurent qu'elle porte chance à qui la frotte assez longtemps.",
+  "marble.copper.description": "Ne la lavez pas, elle se couvrira d'un joli vert-de-gris. Toxique, mais très classe.",
   "marble.copper.name": {
     "base": "cuivre",
     "de": "de cuivre",
     "gender": "m"
   },
-  "marble.dolphin.description": "Un gris-bleu lisse avec une vague blanche sur le flanc. Elle bondit plus qu'elle ne roule, et adore bousculer les autres.",
+  "marble.dolphin.description": "Aussi jolie et aussi détestable que son modèle.",
   "marble.dolphin.name": {
     "base": "dauphin",
     "de": "de dauphin",
     "gender": "m"
   },
-  "marble.dragon.description": "Des écailles émeraude et un œil ambré qui semble vous suivre. Les grands l'interdisent dans la cour, ce qui la rend évidemment irrésistible.",
+  "marble.dragon.description": "Même chez les billes, il faut qu'il fasse son intéressant.",
   "marble.dragon.name": {
     "base": "dragon",
     "de": "de dragon",
     "gender": "m"
   },
-  "marble.eclipse.description": "Noire comme l'encre, cerclée d'un mince anneau de lumière. Quand elle passe, toute la cour retient son souffle.",
+  "marble.eclipse.description": "Ne la regardez pas ! Même à travers un téléphone !",
   "marble.eclipse.name": {
     "base": "éclipse",
     "de": "d'éclipse",
     "gender": "f"
   },
-  "marble.fireball.description": "Orange et rouge, avec des flammèches figées dans le verre. Elle est toujours un peu tiède, même en hiver.",
+  "marble.fireball.description": "Elle est juste orange et brillante, mais vous savez ce que c'est.",
   "marble.fireball.name": {
     "base": "boule de feu",
     "de": "de boule de feu",
     "gender": "f"
   },
-  "marble.galaxy.description": "Une spirale de poussière violette et dorée tourne lentement en son cœur. Certains enfants prétendent y avoir vu des planètes.",
+  "marble.galaxy.description": "Avant le big bang, l'univers aurait pu s'y loger.",
   "marble.galaxy.name": {
     "base": "galaxie",
     "de": "de galaxie",
     "gender": "f"
   },
-  "marble.ghost.description": "Toute blanche, plus ou moins transparente selon l'humeur. On la perd, on la cherche, et elle est déjà dans votre poche.",
+  "marble.ghost.description": "Qui vas-tu appeler ?",
   "marble.ghost.name": {
     "base": "fantôme",
     "de": "de fantôme",
     "gender": "m"
   },
-  "marble.grenade.description": "Vert kaki, quadrillée de reliefs, avec une drôle de petite tige sur le dessus. Mieux vaut ne pas être à côté quand elle s'en va.",
+  "marble.grenade.description": "À jeter en hurlant son nom. Effet garanti.",
   "marble.grenade.name": {
     "base": "grenade",
     "de": "de grenade",
     "gender": "f"
   },
-  "marble.ingot.description": "Un petit lingot d'or poli jusqu'à devenir rond. Il pèse dans la main comme une promesse.",
+  "marble.ingot.description": "Une bille coulée dans de l'or pur. Quelle décadence.",
   "marble.ingot.name": {
     "base": "lingotin",
     "de": "de lingotin",
     "gender": "m"
   },
-  "marble.moon.description": "Grise et piquetée de minuscules cratères. Les nuits de pleine lune, elle roule un peu plus loin que les autres.",
+  "marble.moon.description": "Taillée dans de la roche lunaire de première qualité. Du moins, c'est ce que disait la publicité.",
   "marble.moon.name": {
     "base": "lune",
     "de": "de lune",
     "gender": "f"
   },
-  "marble.ocean.description": "Des bleus et des verts qui ondulent sans jamais se mélanger tout à fait. Collée à l'oreille, on jure entendre le ressac.",
+  "marble.ocean.description": "Si vous la collez à votre oreille, vous entendrez peut-être le bruit des vagues. Et vous aurez sûrement l'air idiot.",
   "marble.ocean.name": {
     "base": "océan",
     "de": "d'océan",
     "gender": "m"
   },
-  "marble.pearl.description": "Nacrée, douce comme une joue, elle sent vaguement le sel. Les plongeurs disent qu'elle appelle ses sœurs perdues.",
+  "marble.pearl.description": "Elle est percée de part en part : elle vient d'un collier. Vous vous fichez de moi ?",
   "marble.pearl.name": {
     "base": "perle",
     "de": "de perle",
     "gender": "f"
   },
-  "marble.quicksilver.description": "Une goutte d'argent qui ne tient jamais en place, même au fond d'une poche. On dit qu'elle trouve toujours le chemin du coffre.",
+  "marble.quicksilver.description": "Couleur de mercure, effet liquide : on dirait du vrai. Remarquez, à l'époque, ça se faisait encore. C'était mieux avant.",
   "marble.quicksilver.name": {
     "base": "vive-argent",
     "de": "de vive-argent",
     "gender": "m"
   },
-  "marble.red_devil.description": "Rouge vif barré d'une bande jaune, comme un sourire en coin. Elle gagne toujours, mais personne n'aime ce que ça coûte.",
+  "marble.red_devil.description": "Rouge vif barré d'une bande jaune. Il ne lui manque que des cornes. Mais ça roulerait moins bien.",
   "marble.red_devil.name": {
     "base": "diable rouge",
     "de": "de diable rouge",
     "gender": "m"
   },
-  "marble.ruby.description": "Un rouge si profond qu'on croit y voir battre un cœur. Plus on la garde, plus elle brille.",
+  "marble.ruby.description": "Elle vaudrait moins cher si elle était verte. Au moins vingt fois moins cher.",
   "marble.ruby.name": {
     "base": "rubis",
     "de": "de rubis",
     "gender": "m"
   },
-  "marble.sling_shot.description": "Petite, dure, et taillée pour voler. Elle ne craint rien, surtout pas les plus gros qu'elle.",
+  "marble.sling_shot.description": "Qui sait, elle a peut-être déjà tué quelqu'un.",
   "marble.sling_shot.name": {
     "base": "bille de fronde",
     "de": "de bille de fronde",
     "gender": "f"
   },
-  "marble.snow_globe.description": "Des flocons minuscules tourbillonnent à l'intérieur dès qu'on la secoue. Personne n'a jamais su comment ils y sont entrés.",
+  "marble.snow_globe.description": "Qui est allé foutre de la neige là-dedans ? Encore de l'argent bien employé.",
   "marble.snow_globe.name": {
     "base": "boule à neige",
     "de": "de boule à neige",
     "gender": "f"
   },
-  "marble.soda.description": "Couleur cola, on jurerait qu'elle pétille encore quand on la secoue. Elle ne tient pas en place, et ne dure jamais longtemps.",
+  "marble.soda.description": "Secouez-la, secouez-la encore, et peut-être, peut-être, vous dis-je, aurez-vous l'air parfaitement stupide.",
   "marble.soda.name": {
     "base": "soda",
     "de": "de soda",
     "gender": "m"
   },
-  "marble.spider.description": "Noire avec des filaments argentés qui ressemblent à une toile. Celles qui s'en approchent ont du mal à repartir.",
+  "marble.spider.description": "Une bille transparente au cœur de laquelle brille un faisceau de fils colorés. Celui qui l'a baptisée n'a jamais vu de toile de sa vie.",
   "marble.spider.name": {
     "base": "araignée",
     "de": "d'araignée",
     "gender": "f"
   },
-  "marble.star.description": "Parfaitement transparente, avec un seul éclat scintillant suspendu au centre. On raconte qu'elle est tombée d'un ciel d'août.",
+  "marble.star.description": "C'est juste un machin qui scintille dans une bille transparente. Mais ça claque.",
   "marble.star.name": {
     "base": "étoile",
     "de": "d'étoile",
     "gender": "f"
   },
-  "marble.steel.description": "Un roulement à billes échappé d'un vieux vélo, froid et lourd. Personne ne le chasse, c'est lui qui chasse.",
+  "marble.steel.description": "Une bille de roulement échappée d'un vieux vélo. On accepte vraiment n'importe qui, de nos jours.",
   "marble.steel.name": {
     "base": "acier",
     "de": "d'acier",
     "gender": "m"
   },
-  "marble.tornado.description": "Une spirale grise et blanche qui donne le tournis à la regarder. Après son passage, il ne reste jamais grand-chose debout.",
+  "marble.tornado.description": "Est-ce l'ombre d'un requin ? Non, ce serait de mauvais goût.",
   "marble.tornado.name": {
     "base": "tornade",
     "de": "de tornade",
     "gender": "f"
   },
-  "marble.turtle.description": "Une carapace verte et brune striée d'hexagones. Elle a vu passer des générations de joueurs et compte bien en voir d'autres.",
+  "marble.turtle.description": "Elle est verte, striée de brun, de noir et d'orange, et elle vous survivra. Soyez-en assuré.",
   "marble.turtle.name": {
     "base": "tortue",
     "de": "de tortue",
@@ -301,6 +301,7 @@
   "marbles.choice.verb.polish": "à polir",
   "marbles.choice.verb.retrieve": "à ramasser",
   "marbles.choice.verb.speed": "pour {effect}",
+  "marbles.condition.all": "{conditions, list}",
   "marbles.condition.count.families": "le triangle compte {bound, select, atLeast {au moins} other {au plus}} {count, plural, one {# famille différente} other {# familles différentes}}",
   "marbles.condition.count.families_zones": "l'on compte {bound, select, atLeast {au moins} other {au plus}} {count, plural, one {# famille différente} other {# familles différentes}} {zones, list}",
   "marbles.condition.count.noun": "{count, plural, one {# bille} other {# billes}}",
@@ -431,6 +432,7 @@
   "marbles.effect.polish": "Polissage {amount}",
   "marbles.effect.retrieve_choice": "Ramasser {target} au choix",
   "marbles.effect.retrieve_last": "Ramasser la dernière bille arrivée à la défausse",
+  "marbles.effect.semicolon": "{first} ; {rest}",
   "marbles.effect.speed_down": "Vitesse −{amount}",
   "marbles.effect.speed_up": "Vitesse +{amount}",
   "marbles.eject.ejected": "{marble} {marble:gender, select, f {éjectée} other {éjecté}}",
@@ -509,6 +511,7 @@
   "marbles.family.stars.name": "Astres",
   "marbles.family.treasure.name": "Trésor",
   "marbles.forecast.awakenings": "Éveils possibles.",
+  "marbles.forecast.hidden_read": "Selon des billes encore cachées.",
   "marbles.forecast.interrupted": "Enchaînement interrompu.",
   "marbles.forecast.regenerates": "Le sac sera régénéré.",
   "marbles.forecast.regenerates_again": "Le sac sera de nouveau régénéré.",

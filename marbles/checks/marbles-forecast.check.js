@@ -447,7 +447,7 @@ function checkWearForecast(run) {
   run("Fêlure prévue : son Final", 4, predicted.slotEffects.apex[0].speed);
   run.same("Fêlure prévue : les retraits", [{ slot: "apex", marble: "fragile" }], predicted.retired);
   const real = crackerRules.reduce(cracking, { type: "resolve" });
-  run.same("Fêlure prévue : comme le réel, usure comprise", JSON.stringify((({ uncertain, awakenPossible, ...rest }) => rest)(predicted)), JSON.stringify(readForecast([], real.events, real.state)));
+  run.same("Fêlure prévue : comme le réel, usure comprise", JSON.stringify((({ uncertain, awakenPossible, hiddenRead, ...rest }) => rest)(predicted)), JSON.stringify(readForecast([], real.events, real.state)));
 
   const saving = playState({ hand: inHand([]), bag: ["aging_flick"], triangle: { leftBase: placed("final_pocket", 2), rightBase: null, apex: placed("fragile", 1) } });
   const saved = rules.forecast(saving);

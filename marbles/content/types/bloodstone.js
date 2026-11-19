@@ -4,13 +4,16 @@ import { speed, mass, pocket, applyStatus } from "../effects.js";
 import { MEDIUM } from "../../config/values.js";
 
 export default {
-  apex: [speed(3)],
+  apex: [speed(3), mass(1)],
   base: [mass(1)],
-  // Final : elle s'empoche elle-même.
+  // Final : Empocher cette bille.
   final: [pocket()],
-  // En poche : à l'entrée, statut poche profonde d'intensité 2 (le pot +2, toute la
-  // partie) ; à chaque bille mise en poche, Masse +1.
-  pocketed: { entry: [applyStatus("deepPocket", { intensity: 2 })], pocketedMarbles: [mass(1)] },
+  pocketed: {
+    // À l'entrée : statut poche profonde, intensité 2 (capacité du pot +2).
+    entry: [applyStatus("deepPocket", { intensity: 2 })],
+    // À chaque bille mise en poche : Masse +1.
+    pocketedMarbles: [mass(1)],
+  },
   size: MEDIUM,
   families: ["treasure"],
   rarity: "legendary",

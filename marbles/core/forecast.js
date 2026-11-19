@@ -91,6 +91,10 @@
 //                  (chainInterrupted) : une anomalie, que R et la confirmation disent ;
 //   choiceDependent vrai si un choix du joueur est resté indécis (plus haut) ;
 //   awakenPossible vrai si un Éveil est possible (voir plus haut) ; une des
+//                  raisons d'`uncertain` ;
+//   hiddenRead     vrai si un montant ou une condition a lu l'identité d'une bille
+//                  cachée (un filtre, une famille, sur une bille piochée à l'aveugle
+//                  ou au sac) : ce qu'elle aurait compté n'est pas sûr ; une des
 //                  raisons d'`uncertain`.
 // Un effet : { marble, status?, speed, mass, draw, operations, given, pockets?, empty?,
 // undecided?, ejected?, discards? } (`status` : la réaction d'un statut, sans bille), le
@@ -400,7 +404,8 @@ export function forecast(state, action, types, statuses) {
   // Incertaine : un Éveil possible, ou une bille inconnue qui aurait pu réagir (une
   // bille piochée à l'aveugle puis empochée : son entrée au pot, ses effets du pot).
   const uncertain = applied.uncertain || resolved.uncertain || awakening;
-  return { ...readForecast(applied.events, resolved.events, resolved.state), uncertain, awakenPossible: awakening };
+  const hiddenRead = applied.hiddenRead === true || resolved.hiddenRead === true;
+  return { ...readForecast(applied.events, resolved.events, resolved.state), uncertain, awakenPossible: awakening, hiddenRead };
 }
 
 // Une réponse au choix en attente, prévue (en-tête, « prévoir une réponse ») :
@@ -417,5 +422,6 @@ function forecastAnswer(state, action, types, statuses) {
   const resolved = isResolution ? replayAction(copy, suspended, types, options) : runResolution(applied.state, types, { blind: true, statuses });
   const awakening = awakenPossible(from, [...applied.events, ...resolved.events], types);
   const uncertain = applied.uncertain || resolved.uncertain || awakening;
-  return { ...readForecast(applied.events, resolved.events, resolved.state), uncertain, awakenPossible: awakening };
+  const hiddenRead = applied.hiddenRead === true || resolved.hiddenRead === true;
+  return { ...readForecast(applied.events, resolved.events, resolved.state), uncertain, awakenPossible: awakening, hiddenRead };
 }

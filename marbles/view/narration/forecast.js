@@ -117,11 +117,14 @@ function regenerationLines(predicted, t) {
 // Ce que la prévision ignore ou ne mène pas à terme, à la fin de ce qu'elle dit :
 // « Éveils possibles. » quand un Éveil est possible (marbles/core/forecast.js,
 // `awakenPossible` : une bille piochée, et une bille qui pouvait l'être a un Éveil) ;
-// « Enchaînement interrompu. » si la limite de sécurité arrêterait la chaîne
-// (`interrupted`, une anomalie). Rien sinon.
+// « Selon des billes encore cachées. » quand un montant ou une condition a compté
+// une bille cachée (`hiddenRead` : un filtre ou une famille, sur une bille piochée à
+// l'aveugle ou au sac) ; « Enchaînement interrompu. » si la limite de sécurité
+// arrêterait la chaîne (`interrupted`, une anomalie). Rien sinon.
 function uncertainLines(predicted) {
   return [
     ...(predicted.awakenPossible ? [{ key: "marbles.forecast.awakenings" }] : []),
+    ...(predicted.hiddenRead ? [{ key: "marbles.forecast.hidden_read" }] : []),
     ...(predicted.interrupted ? [{ key: "marbles.forecast.interrupted" }] : []),
   ];
 }

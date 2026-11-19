@@ -5,7 +5,9 @@ import { MEDIUM } from "../../config/values.js";
 
 export default {
   apex: [speed(4)],
-  base: [speed(1)],
+  base: [speed(2)],
+  hit: [speed(3)],
+  knockout: [speed(3)],
   size: MEDIUM,
   families: ["classics"],
   rarity: "common",

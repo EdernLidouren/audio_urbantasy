@@ -17,6 +17,7 @@ import {
   NEXT_SLOT,
   PREVIOUS_SLOT,
   allActive,
+  allOf,
   count,
   crack,
   eject,
@@ -52,6 +53,7 @@ export default function checkMarblesConditions(run) {
   run.section("calibre d'un remplacement", checkReplacementSize);
   run.section("nombre comparé à une borne", checkCount);
   run.section("compteurs du tour", checkStat);
+  run.section("toutes ces conditions", checkAll);
   run.section("témoin, vraies langues", checkWitness);
 }
 
@@ -260,6 +262,29 @@ function checkStat(run) {
   run("validation : compteur inconnu refusé", true, throws(() => validateTable({ x: { base: [{ ...speed(1), when: statIs("impact", { atLeast: 1 }) }] } })));
 }
 
+// TOUTES CES CONDITIONS : vraie si chacune l'est ; au moins deux, chacune validée.
+function checkAll(run) {
+  const rules = fabricatedRules({ plain: {}, small: { size: SMALL }, big: { size: LARGE } });
+  const both = allOf(count(zoneCount("triangle", sizeIs(SMALL)), { atLeast: 1 }), count(zoneCount("triangle", sizeIs(LARGE)), { atLeast: 1 }));
+  const holds = (triangle) => {
+    const state = marblesPlayState(rules, { triangle });
+    return conditionHolds(both, { triangle: state.triangle, state, tally: state.tally, holder: { turnsInHand: 0 } }, rules.types);
+  };
+  run.same(
+    "et : une minibille et un calot, oui ; deux calots, non ; une minibille seule, non",
+    [true, false, false],
+    [
+      holds({ rightBase: placed("small"), leftBase: placed("big"), apex: placed("plain") }),
+      holds({ rightBase: placed("big"), leftBase: placed("big"), apex: placed("plain") }),
+      holds({ rightBase: placed("small"), leftBase: null, apex: placed("plain") }),
+    ]
+  );
+  run("et : une négation dedans", true, conditionHolds(allOf(not(familyAt("apex", "bestiary")), slotIs("apex", "empty")), { triangle: { rightBase: null, leftBase: null, apex: null } }, rules.types));
+  run("validation : une seule condition refusée", true, throws(() => validateTable({ x: { base: [{ ...speed(1), when: allOf(slotIs("apex", "empty")) }] } })));
+  run("validation : une condition invalide dedans refusée", true, throws(() => validateTable({ x: { base: [{ ...speed(1), when: allOf(slotIs("apex", "empty"), slotIs("apex", "full")) }] } })));
+  run("validation : une négation non déclarée dedans refusée", true, throws(() => validateTable({ x: { base: [{ ...speed(1), when: allOf(slotIs("apex", "empty"), not(slotIs("apex", "empty"))) }] } })));
+}
+
 // LE TÉMOIN : ce que la fiche dit dans chaque vraie langue, accords et formes de nom
 // compris (pluriel, indéfini, genre).
 function checkWitness(run) {
@@ -274,6 +299,7 @@ function checkWitness(run) {
     speed({ base: 0, step: 2, source: zoneCount("pot", marbleIs("bee")) }),
     { ...mass(1), when: count(zoneCount("pot", marbleIs("bee")), { atLeast: 3 }) },
     { ...speed(1), when: count(tally("awaken", "game"), { atLeast: 2 }) },
+    { ...mass(3), when: allOf(count(zoneCount("triangle", sizeIs(SMALL)), { atLeast: 1 }), count(zoneCount("triangle", sizeIs(LARGE)), { atLeast: 1 })) },
   ];
   const expected = {
     fr: [
@@ -287,6 +313,7 @@ function checkWitness(run) {
       "Vitesse +2 par abeille dans le pot",
       "Masse +1 si le pot compte au moins 3 abeilles",
       "Vitesse +1 si cette partie compte au moins 2 éveils",
+      "Masse +3 si le triangle compte au moins 1 minibille et le triangle compte au moins 1 calot",
     ],
     en: [
       "Speed +3 if the triangle holds at least 1 boulder, otherwise Speed +1",
@@ -299,6 +326,19 @@ function checkWitness(run) {
       "Speed +2 per bee in the pot",
       "Mass +1 if the pot holds at least 3 bees",
       "Speed +1 if this game has at least 2 awakenings",
+      "Mass +3 if the triangle holds at least 1 peewee and the triangle holds at least 1 boulder",
+    ],
+  };
+  const GROUPED = {
+    fr: [
+      "Vitesse +5 et Masse +1 si le triangle compte au plus 1 bille",
+      "Fêlure 1 à la bille de l'emplacement suivant ; Vitesse −2 si l'emplacement suivant est vide",
+      "Vitesse +2 et Masse +1",
+    ],
+    en: [
+      "Speed +5 and Mass +1 if the triangle holds at most 1 marble",
+      "Crack 1 to the marble in the next slot; Speed −2 if the next slot is empty",
+      "Speed +2 and Mass +1",
     ],
   };
   const before = getLocale();
@@ -307,6 +347,14 @@ function checkWitness(run) {
       setLocale(locale);
       const said = clauses.map((clause) => describePrinted([clause], null, realT).replace(/[  ]/g, " "));
       run.same(`témoin ${locale} : les nouvelles conditions dites`, lines, said);
+      // Plusieurs clauses : une même condition dite une fois ; dès qu'une partie a une
+      // condition, les parties se séparent par un point-virgule.
+      const grouped = [
+        [{ ...speed(5), when: count(zoneCount("triangle"), { atMost: 1 }) }, { ...mass(1), when: count(zoneCount("triangle"), { atMost: 1 }) }],
+        [crack(1, NEXT_SLOT), { ...speed(-2), when: slotIs(NEXT_SLOT, "empty") }],
+        [speed(2), mass(1)],
+      ];
+      run.same(`témoin ${locale} : regroupement et point-virgule`, GROUPED[locale], grouped.map((clauses) => describePrinted(clauses, null, realT).replace(/[  ]/g, " ")));
     }
   } finally {
     setLocale(before);

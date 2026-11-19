@@ -13,7 +13,7 @@ import { createPicker } from "../helpers.js";
 // exceptions rencontrées (Éveils, billes inconnues mises en poche ou défaussées du
 // sac, choix réels).
 export function emptyForecastTally() {
-  return { states: 0, actions: 0, awakened: 0, unknownPockets: 0, unknownDiscards: 0, choices: 0 };
+  return { states: 0, actions: 0, awakened: 0, unknownPockets: 0, unknownDiscards: 0, hiddenReads: 0, choices: 0 };
 }
 
 // Les actions envisagées dans un état : aucune (la résolution seule), chaque pose,
@@ -59,7 +59,7 @@ function compareState(state, marbles, faults, tally) {
     }
     tally.actions += 1;
     const actual = readForecast(real.events, resolved.events, resolved.state);
-    const { uncertain, awakenPossible, ...certain } = predicted;
+    const { uncertain, awakenPossible, hiddenRead, ...certain } = predicted;
     // L'exception de l'Éveil (marbles/core/forecast.js) : un Éveil réel ne se
     // prévoit pas ; la prévision doit alors s'être dite incertaine, et seul ce qui
     // ne dépend d'aucun Éveil se compare. De même pour une bille piochée à l'aveugle
@@ -74,6 +74,14 @@ function compareState(state, marbles, faults, tally) {
     if (unknownDiscard(predicted)) {
       tally.unknownDiscards += 1;
       if (!uncertain) faults.push(`défausse inconnue sans prévision incertaine : ${JSON.stringify(action)}`);
+      continue;
+    }
+    // L'exception d'une bille cachée lue par un montant ou une condition (un filtre, une
+    // famille) : ce qu'elle aurait compté est inconnu ; la prévision doit s'être dite
+    // incertaine.
+    if (hiddenRead) {
+      tally.hiddenReads += 1;
+      if (!uncertain) faults.push(`bille cachée lue sans prévision incertaine : ${JSON.stringify(action)}`);
       continue;
     }
     if (awakened(real.events, resolved.events)) {

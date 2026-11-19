@@ -125,11 +125,11 @@ export function overState(state, over = {}) {
 // LA PROPRIÉTÉ « PRÉVISION = RÉEL » sur un cas : la prévision de `action` (null : le
 // triangle actuel) est-elle, lue de la même façon (marbles/core/forecast.js/
 // readForecast), égale à ce que l'action puis la résolution font vraiment ? Sans
-// `uncertain` ni `awakenPossible`, qui n'existent qu'à l'aveugle.
+// `uncertain`, `awakenPossible` ni `hiddenRead`, qui n'existent qu'à l'aveugle.
 export function forecastMatches(rules, state, action) {
   const real = action === null ? { state, events: [] } : mustReduce(rules, state, action);
   const resolved = mustReduce(rules, real.state, { type: "resolve" });
-  const { uncertain, awakenPossible, ...predicted } = rules.forecast(state, action);
+  const { uncertain, awakenPossible, hiddenRead, ...predicted } = rules.forecast(state, action);
   return JSON.stringify(predicted) === JSON.stringify(readForecast(real.events, resolved.events, resolved.state));
 }
 

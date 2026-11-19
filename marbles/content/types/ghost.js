@@ -8,8 +8,9 @@ export default {
   base: [speed(1)],
   // Chiquenaude : Vitesse +1 par tour en main, maximum +3.
   flick: [speed({ base: 0, step: 1, source: turnsInHand(), max: 3 })],
-  // Final : Rebond sur elle-même, en main plutôt qu'à la défausse.
-  final: [bounce()],
+  // Trouvaille : Rebond de cette bille.
+  windfall: [bounce()],
+  knockout: [speed(3)],
   maxWear: 2,
   size: SMALL,
   families: ["mist"],

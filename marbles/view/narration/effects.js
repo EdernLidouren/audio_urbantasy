@@ -451,6 +451,8 @@ const CONDITION_TEXTS = {
   slotIs: (when, t) => slotConditionText("marbles.condition.slotIs", when, { state: when.state }, t),
   replacementSize: (when, t) => t("marbles.condition.replacementSize", { marble: when.marble, size: sizeRef(when.size), not: negation(when) }),
   count: (when, t) => COUNT_TEXTS[when.source.type](when.source, boundParams(when), t),
+  // Toutes : chacune dite, liées en liste (« … et … »).
+  all: (when, t) => t("marbles.condition.all", { conditions: when.conditions.map((condition) => CONDITION_TEXTS[condition.type](condition, t)) }),
   stat: (when, t) => {
     const { bound, count } = boundParams(when);
     return t("marbles.condition.stat", { stat: when.stat, bound, value: formatCounter(count) });
@@ -552,8 +554,33 @@ function describeBranch(clause, situation, t, statuses) {
 // Un effet imprimé : une liste de clauses. `situation` (cardSituation) : où en est la
 // bille, pour la valeur actuelle de ses montants calculés ; `statuses`, la table des
 // statuts (celle des règles), que lit une clause Appliquer un statut.
+// Deux règles de lecture, pour que la portée d'une condition s'entende :
+//   - des clauses qui se suivent avec la MÊME condition, sans sinon, se disent
+//     ensemble, la condition une fois : « Vitesse +5 et Masse +1 si … » ;
+//   - dès qu'une partie porte une condition, les parties se séparent par un
+//     point-virgule plutôt que par « et » : « Polissage 1 à … ; Vitesse −2 si … ».
 export function describePrinted(clauses, situation, t, statuses = NO_STATUSES) {
-  return combined(clauses.map((clause) => describeClause(clause, situation, t, statuses)), t);
+  const parts = sameConditionRuns(clauses).map((run) => {
+    if (run.length === 1) return describeClause(run[0], situation, t, statuses);
+    const { when } = run[0];
+    const effects = combined(run.map(({ when: _when, ...clause }) => describeClause(clause, situation, t, statuses)), t);
+    return t("marbles.effect.conditional", { effect: effects, condition: CONDITION_TEXTS[when.type](when, t) });
+  });
+  const conditional = clauses.some((clause) => clause.when !== undefined);
+  if (!conditional || parts.length < 2) return combined(parts, t);
+  return parts.reduceRight((rest, part) => t("marbles.effect.semicolon", { first: part, rest }));
+}
+
+// Les clauses regroupées par suites de même condition (sans sinon) : [[clause…]…].
+function sameConditionRuns(clauses) {
+  const runs = [];
+  for (const clause of clauses) {
+    const last = runs.at(-1);
+    const grouped = clause.when !== undefined && clause.otherwise === undefined;
+    if (grouped && last !== undefined && last[0].otherwise === undefined && JSON.stringify(last[0].when) === JSON.stringify(clause.when)) last.push(clause);
+    else runs.push([clause]);
+  }
+  return runs;
 }
 
 // Ce qu'une bille produit À SON EMPLACEMENT, sur le triangle prévu ou pendant la

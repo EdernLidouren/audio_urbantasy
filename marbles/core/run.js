@@ -291,6 +291,12 @@ function fireEffect(run, trigger, listener, clauses, event) {
     tally: run.state.tally,
     state: run.state,
     statuses: run.statuses,
+    // Une source qui lit une bille cachée (à l'aveugle) : la prévision ne sait pas ce
+    // qu'elle aurait compté.
+    onHiddenRead: () => {
+      run.uncertain = true;
+      run.hiddenRead = true;
+    },
   };
   // Les cibles relatives, depuis l'emplacement d'où la bille agit (resolveClauses).
   const { self, gifts: printedGifts, operations: printedOperations } = evaluateEffect(resolveClauses(clauses, slot ?? null), situation, run.types);
@@ -636,6 +642,8 @@ export function transact(state, types, { eventLimit, blind = false, answers = []
     statuses,
     blind,
     uncertain: false,
+    // Une source a lu l'identité d'une bille cachée (fireEffect, onHiddenRead).
+    hiddenRead: false,
     choiceDependent: false,
     phasesStarted: new Set(),
     journal: [],
@@ -694,7 +702,7 @@ export function transact(state, types, { eventLimit, blind = false, answers = []
     return { ok: true, state: { ...run.state, pendingChoice }, events: run.journal.slice(seen), error: null };
   }
   const result = { ok: true, state: run.state, events: run.journal.slice(seen), error: null };
-  return blind ? { ...result, uncertain: run.uncertain, choiceDependent: run.choiceDependent } : result;
+  return blind ? { ...result, uncertain: run.uncertain, hiddenRead: run.hiddenRead, choiceDependent: run.choiceDependent } : result;
 }
 
 
