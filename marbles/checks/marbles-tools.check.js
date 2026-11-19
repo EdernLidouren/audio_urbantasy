@@ -26,6 +26,8 @@ import { REPORT_HEADINGS, REPORT_RESULT_HEADINGS, buildReport, frNumber } from "
 import { contextLabel, diffReports, reportAnomalies } from "../tools/report-diff.js";
 import { parseArgs } from "../tools/args.js";
 import { MARBLE_COLUMNS, toCsv, toJson } from "../tools/export.js";
+import { buildSetSheet } from "../tools/set-sheet-builder.js";
+import { getLocale } from "../../data/i18n/index.js";
 import MARBLE_TYPES from "../content/types/index.js";
 import { DEFAULT_GAME_DEFINITION, GAME_RULES, defaultToolsBag, definitionById, gameSetup, withSettings } from "../tools/game-rules.js";
 import { caughtMessage, handIds } from "./helpers.js";
@@ -50,6 +52,7 @@ export default function checkMarblesTools(run) {
   run.section("attribution des pioches", checkDrawAttribution);
   run.section("différence de rapports", checkReportDiff);
   run.section("ligne de commande", checkArgs);
+  run.section("fiche du set", checkSetSheet);
 }
 
 // Une clause qui pioche, quelque part dans les effets d'une bille.
@@ -545,6 +548,29 @@ function checkDrawAttribution(run) {
 
 // La différence de deux rapports (marbles/tools/report-diff.js), celle du comparateur.
 // La ligne de commande des outils, lue strictement (marbles/tools/args.js).
+// LA FICHE DU SET (marbles/tools/set-sheet-builder.js) : chaque bille de la table une
+// fois, numérotée dans son ordre, avec ses deux descriptions et sa fiche ; les sacs
+// préfaits ; aucun espace insécable ni phase « aucun effet » ; la langue rendue
+// telle qu'elle était. Aucun chiffre de bille attendu : tout se déduit de la table.
+function checkSetSheet(run) {
+  const before = getLocale();
+  const sheet = buildSetSheet({ date: "2000-01-01" });
+  const marbles = Object.keys(GAME_RULES.types);
+  const lines = sheet.split("\n");
+  run("fiche du set : la date demandée", true, lines[1] === "Généré à partir du jeu le 2000-01-01.");
+  run.same(
+    "fiche du set : une entrée numérotée par bille, dans l'ordre de la table",
+    marbles.map((_, index) => `${index + 1}.`),
+    lines.filter((line) => /^\d+\. /.test(line)).map((line) => line.split(" ")[0])
+  );
+  run("fiche du set : deux descriptions par bille", marbles.length * 2, lines.filter((line) => line.startsWith("FR : ") || line.startsWith("EN : ")).length);
+  run("fiche du set : une pointe par bille", marbles.length, lines.filter((line) => line.startsWith("Pointe : ")).length);
+  run("fiche du set : chaque sac préfait", Object.keys(GAME_RULES.bags).length, lines.filter((line) => /^Sac .* \(\d+ billes\) : /.test(line)).length);
+  run("fiche du set : ni espace insécable ni « aucun effet »", false, /[\u00a0\u202f]/.test(sheet) || sheet.includes(": aucun effet."));
+  run("fiche du set : la langue rendue", before, getLocale());
+  run("fiche du set : même table, même fiche", sheet, buildSetSheet({ date: "2000-01-01" }));
+}
+
 function checkArgs(run) {
   const spec = { values: ["--seed", "--games"], flags: ["--json"], positionals: 1 };
   const read = parseArgs(["cas.json", "--seed", "42", "--json"], spec);

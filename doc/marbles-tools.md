@@ -16,6 +16,7 @@ leur mécanisme : `doc/marbles.md`.
 | `marbles/tools/simulate.js` | Le simulateur : des milliers de parties jouées par un joueur automatique, et un rapport |
 | `marbles/tools/compare.js` | Le comparateur : les six simulations de référence sur un commit et sur le code en cours, et ce qui change entre leurs rapports |
 | `marbles/tools/rules-doc.js` | Le document de règles (`doc/marbles-rules.md`) : génère son annexe des billes depuis la table (`--write`), et vérifie qu'elle est à jour et que chaque mot-clé y figure avec sa description exacte (lancé par `tools/verify.js`) |
+| `marbles/tools/set-sheet.js` | La fiche du set : un fichier texte de toutes les billes telles que le jeu les a (noms français et anglais, famille, rareté, calibre, usure, descriptions dans les deux langues, effets tels que la fiche les dit, sacs préfaits), pour travailler le contenu hors du code ; au terminal, ou dans un fichier (`--out <fichier>`, qu'elle n'écrase qu'avec `--force`) : `node marbles/tools/set-sheet.js --out "dev/gameplay/marbles/set de billes 4.txt"` |
 
 Les modules qu'ils partagent, purs (sans Node, donc vérifiables) :
 
@@ -35,6 +36,7 @@ Les modules qu'ils partagent, purs (sans Node, donc vérifiables) :
 | `marbles/tools/report.js` | Le rapport en phrases, et ses observations |
 | `marbles/tools/report-diff.js` | La différence de deux rapports, ligne à ligne, rangée sous sa section et sa bille |
 | `marbles/tools/export.js` | L'export JSON ou CSV |
+| `marbles/tools/set-sheet-builder.js` | La construction de la fiche du set (`buildSetSheet`), dans la langue de chaque partie, la langue en vigueur rendue ensuite |
 
 ## Jouer une partie
 
@@ -220,8 +222,10 @@ glouton contre une recherche exhaustive, aucune action refusée sur 50 parties p
 joueur, glouton meilleur que l'aléatoire, déterminisme du rapport, surcharges, sacs,
 chaque définition du jeu jouée avec son résultat au rapport,
 égalité des chiffres entre rapport et exports, attribution des pioches à l'effet qui
-les demande, et différence de deux rapports (titres connus du comparateur, contexte,
-résultats, durée ignorée). Les outils étant liés à la vraie table
+les demande, différence de deux rapports (titres connus du comparateur, contexte,
+résultats, durée ignorée), et fiche du set (une entrée par bille dans l'ordre de la
+table, deux descriptions, chaque sac préfait, la langue rendue, le même texte d'une
+fois sur l'autre). Les outils étant liés à la vraie table
 (`marbles/tools/game-rules.js`), ces vérifications la jouent aussi, mais n'en attendent
 aucun chiffre : ce qu'elles comparent se déduit de la table et des réglages.
 
